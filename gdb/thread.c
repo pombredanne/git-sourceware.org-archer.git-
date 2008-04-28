@@ -60,7 +60,6 @@ static int thread_alive (struct thread_info *);
 static void info_threads_command (char *, int);
 static void thread_apply_command (char *, int);
 static void restore_current_thread (ptid_t);
-static void prune_threads (void);
 
 /* Frontend view of the thread state.  Possible extensions: stepping,
    finishing, until(ling),...  */
@@ -450,16 +449,23 @@ thread_alive (struct thread_info *tp)
   return 1;
 }
 
-static void
+void
 prune_threads (void)
 {
-  struct thread_info *tp, *next;
+  struct thread_info *tp;
+  struct thread_info **prevp = &thread_list;
 
-  for (tp = thread_list; tp; tp = next)
+  for (tp = *prevp; tp; tp = *prevp)
     {
-      next = tp->next;
+      /* If the thread has died, free it and unlink it from the list.
+	 Otherwise, advance to the next thread.  */
       if (!thread_alive (tp))
-	delete_thread (tp->ptid);
+	{
+	  (*prevp)->next = tp->next;
+	  free_thread (tp);
+	}
+      else
+	prevp = &tp->next;
     }
 }
 

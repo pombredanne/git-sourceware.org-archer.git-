@@ -43,6 +43,8 @@ static int gdbpy_should_print_stack = 1;
 #include "symtab.h"
 #include "source.h"
 #include "version.h"
+#include "inferior.h"
+#include "gdbthread.h"
 #include "target.h"
 #include "gdbthread.h"
 
@@ -54,6 +56,9 @@ static PyObject *execute_gdb_command (PyObject *, PyObject *);
 static PyObject *gdbpy_solib_address (PyObject *, PyObject *);
 static PyObject *gdbpy_decode_line (PyObject *, PyObject *);
 static PyObject *gdbpy_find_pc_function (PyObject *, PyObject *);
+static PyObject *gdbpy_get_threads (PyObject *, PyObject *);
+static PyObject *gdbpy_get_current_thread (PyObject *, PyObject *);
+static PyObject *gdbpy_switch_to_thread (PyObject *, PyObject *);
 static PyObject *gdbpy_write (PyObject *, PyObject *);
 static PyObject *gdbpy_flush (PyObject *, PyObject *);
 
@@ -90,6 +95,13 @@ static PyMethodDef GdbMethods[] =
     "Decode a string argument the way that 'break' or 'edit' does.\n\
 Return a tuple holding the file name (or None) and line number (or None).\n\
 Note: may later change to return an object." },
+
+  { "get_threads", gdbpy_get_threads, METH_NOARGS,
+    "Return a tuple holding all the valid thread IDs." },
+  { "get_current_thread", gdbpy_get_current_thread, METH_NOARGS,
+    "Return the thread ID of the current thread." },
+  { "switch_to_thread", gdbpy_switch_to_thread, METH_VARARGS,
+    "Switch to a thread, given the thread ID." },
 
   { "write", gdbpy_write, METH_VARARGS,
     "Write a string using gdb's filtered stream." },
@@ -401,6 +413,89 @@ gdbpy_decode_line (PyObject *self, PyObject *args)
 
   if (result)
     return result;
+  Py_RETURN_NONE;
+}
+
+
+
+/* Threads.  */
+
+/* Callback function for use with iterate_over_threads.  This function
+   just counts the number of threads.  */
+
+static int
+count_callback (struct thread_info *info, void *user_data)
+{
+  int *count = (int *) user_data;
+  ++*count;
+  return 0;
+}
+
+/* Structure for storing some state when iterating over threads.  */
+
+struct set_thread_info
+{
+  PyObject *tuple;
+  int index;
+};
+
+/* Callback function for use with iterate_over_threads.  This function
+   stores the thread ID into a Python tuple.  */
+
+static int
+update_tuple_callback (struct thread_info *info, void *user_data)
+{
+  struct set_thread_info *tinfo = (struct set_thread_info *) user_data;
+  PyTuple_SetItem (tinfo->tuple, tinfo->index, PyInt_FromLong (info->num));
+  ++tinfo->index;
+  return 0;
+}
+
+/* Python function which yields a tuple holding all valid thread IDs.  */
+
+static PyObject *
+gdbpy_get_threads (PyObject *unused1, PyObject *unused2)
+{
+  int thread_count = 0;
+  struct set_thread_info info;
+  PyObject *result;
+
+  prune_threads ();
+  target_find_new_threads ();
+
+  iterate_over_threads (count_callback, &thread_count);
+
+  if (!thread_count)
+    Py_RETURN_NONE;
+
+  result = PyTuple_New (thread_count);
+  info.tuple = result;
+  info.index = 0;
+  iterate_over_threads (update_tuple_callback, &info);
+  return result;
+}
+
+/* Python function that returns the current thread's ID.  */
+
+static PyObject *
+gdbpy_get_current_thread (PyObject *unused1, PyObject *unused2)
+{
+  if (PIDGET (inferior_ptid) == 0)
+    Py_RETURN_NONE;
+  return PyInt_FromLong (pid_to_thread_id (inferior_ptid));
+}
+
+/* Python function for switching to a given thread.  */
+
+static PyObject *
+gdbpy_switch_to_thread (PyObject *self, PyObject *args)
+{
+  int id;
+  if (! PyArg_ParseTuple (args, "i", &id))
+    return NULL;
+  if (! valid_thread_id (id))
+    return PyErr_Format (PyExc_RuntimeError, "invalid thread id");
+  switch_to_thread (thread_id_to_pid (id));
   Py_RETURN_NONE;
 }
 

@@ -17675,6 +17675,7 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 * Basic Python::                Basic Python Functions.
 * Exception Handling::
 * Values From Inferior::
+* Threads In Python::           Accessing inferior threads from Python.
 * Commands In Python::          Implementing new commands in Python.
 @end menu
 
@@ -17811,6 +17812,34 @@ bar = foo.dereference ()
 The result @code{bar} will be a @code{gdb.Value} object holding the
 value pointed to by @code{foo}.
 @end defmethod
+
+@node Threads In Python
+@subsubsection Threads In Python
+
+Python scripts can access information about the inferior's threads
+using some functions provided by @value{GDBN}.  Like all of
+@value{GDBN}'s Python additions, these are in the @code{gdb} module:
+
+@findex gdb.get_threads
+@defun get_threads
+This function returns a tuple holding all the thread IDs which are
+valid when the function is called.  If there are no valid threads,
+this will return @code{None}.
+@end defun
+
+@findex gdb.get_current_thread
+@defun get_current_thread
+This function returns the thread ID of the selected thread.  If there
+is no selected thread, this will return @code{None}.
+@end defun
+
+@findex gdb.switch_to_thread
+@defun switch_to_thread id
+This changes @value{GDBN}'s currently selected thread to the thread
+given by @var{id}.  @var{id} must be a valid thread ID as returned by
+@code{get_threads}.  If @var{id} is invalid, this function throws an
+exception.
+@end defun
 
 @node Commands In Python
 @subsubsection Commands In Python
