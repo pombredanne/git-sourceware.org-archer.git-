@@ -49,6 +49,7 @@ extern PyObject *gdb_module;
 extern PyTypeObject value_object_type;
 
 PyObject *gdbpy_get_value_from_history (PyObject *self, PyObject *args);
+PyObject *gdbpy_get_breakpoints (PyObject *, PyObject *);
 
 PyObject *value_to_value_object (struct value *v);
 
@@ -57,6 +58,7 @@ struct value *convert_value_from_python (PyObject *obj);
 PyObject *gdbpy_get_hook_function (const char *);
 
 void gdbpy_initialize_values (void);
+void gdbpy_initialize_breakpoints (void);
 void gdbpy_initialize_functions (void);
 
 struct cleanup *make_cleanup_py_decref (PyObject *py);

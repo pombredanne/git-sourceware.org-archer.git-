@@ -59,6 +59,9 @@ static PyMethodDef GdbMethods[] =
   { "get_parameter", get_parameter, METH_VARARGS,
     "Return a gdb parameter's value" },
 
+  { "get_breakpoints", gdbpy_get_breakpoints, METH_NOARGS,
+    "Return a tuple of all breakpoint objects" },
+
   { "write", gdbpy_write, METH_VARARGS,
     "Write a string using gdb's filtered stream." },
   { "flush", gdbpy_flush, METH_NOARGS,
@@ -401,6 +404,7 @@ Enables or disables printing of Python stack traces."),
   PyModule_AddStringConstant (gdb_module, "TARGET_CONFIG", (char*) target_name);
 
   gdbpy_initialize_values ();
+  gdbpy_initialize_breakpoints ();
   gdbpy_initialize_functions ();
 
   PyRun_SimpleString ("import gdb");
