@@ -50,6 +50,10 @@ extern PyTypeObject value_object_type;
 
 PyObject *gdbpy_get_value_from_history (PyObject *self, PyObject *args);
 PyObject *gdbpy_get_breakpoints (PyObject *, PyObject *);
+PyObject *gdbpy_get_frames (PyObject *, PyObject *);
+PyObject *gdbpy_get_current_frame (PyObject *, PyObject *);
+PyObject *gdbpy_frame_stop_reason_string (PyObject *, PyObject *);
+PyObject *gdbpy_get_selected_frame (PyObject *self, PyObject *args);
 
 PyObject *value_to_value_object (struct value *v);
 
@@ -59,6 +63,7 @@ PyObject *gdbpy_get_hook_function (const char *);
 
 void gdbpy_initialize_values (void);
 void gdbpy_initialize_breakpoints (void);
+void gdbpy_initialize_frames (void);
 void gdbpy_initialize_commands (void);
 void gdbpy_initialize_functions (void);
 

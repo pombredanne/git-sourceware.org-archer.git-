@@ -36,6 +36,7 @@ static int gdbpy_should_print_stack = 1;
 #include "cli/cli-decode.h"
 #include "charset.h"
 #include "top.h"
+#include "solib.h"
 #include "exceptions.h"
 #include "python-internal.h"
 #include "version.h"
@@ -47,6 +48,7 @@ PyObject *gdb_module;
 
 static PyObject *get_parameter (PyObject *, PyObject *);
 static PyObject *execute_gdb_command (PyObject *, PyObject *);
+static PyObject *gdbpy_solib_address (PyObject *, PyObject *);
 static PyObject *gdbpy_write (PyObject *, PyObject *);
 static PyObject *gdbpy_flush (PyObject *, PyObject *);
 
@@ -61,6 +63,18 @@ static PyMethodDef GdbMethods[] =
 
   { "get_breakpoints", gdbpy_get_breakpoints, METH_NOARGS,
     "Return a tuple of all breakpoint objects" },
+
+  { "get_frames", gdbpy_get_frames, METH_NOARGS,
+    "Return a tuple of all frame objects" },
+  { "get_current_frame", gdbpy_get_current_frame, METH_NOARGS,
+    "Return the current frame object" },
+  { "get_selected_frame", gdbpy_get_selected_frame, METH_NOARGS,
+    "Return the selected frame object" },
+  { "frame_stop_reason_string", gdbpy_frame_stop_reason_string,
+    METH_VARARGS, "Return a string explaining unwind stop reason" },
+
+  { "solib_address", gdbpy_solib_address, METH_VARARGS,
+    "Return shared library holding a given address, or None." },
 
   { "write", gdbpy_write, METH_VARARGS,
     "Write a string using gdb's filtered stream." },
@@ -262,6 +276,28 @@ execute_gdb_command (PyObject *self, PyObject *args)
   Py_RETURN_NONE;
 }
 
+static PyObject *
+gdbpy_solib_address (PyObject *self, PyObject *args)
+{
+  unsigned long long pc;
+  char *soname;
+  PyObject *str_obj;
+
+  if (!PyArg_ParseTuple (args, "K", &pc))
+    return NULL;
+
+  soname = solib_address (pc);
+  if (soname)
+    str_obj = PyString_Decode (soname, strlen (soname), host_charset (), NULL);
+  else
+    {
+      str_obj = Py_None;
+      Py_INCREF (Py_None);
+    }
+
+  return str_obj;
+}
+
 
 
 /* Printing.  */
@@ -405,6 +441,7 @@ Enables or disables printing of Python stack traces."),
 
   gdbpy_initialize_values ();
   gdbpy_initialize_breakpoints ();
+  gdbpy_initialize_frames ();
   gdbpy_initialize_commands ();
   gdbpy_initialize_functions ();
 

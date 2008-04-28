@@ -273,6 +273,7 @@ SUBDIR_PYTHON_OBS = \
 	python.o \
 	python-breakpoint.o \
 	python-cmd.o \
+	python-frame.o \
 	python-function.o \
 	python-hooks.o \
 	python-utils.o \
@@ -281,6 +282,7 @@ SUBDIR_PYTHON_SRCS = \
 	python/python.c \
 	python/python-breakpoint.c \
 	python/python-cmd.c \
+	python/python-frame.c \
 	python/python-function.c \
 	python/python-hooks.c \
 	python/python-utils.c \
@@ -1861,6 +1863,10 @@ python-breakpoint.o: $(srcdir)/python/python-breakpoint.c
 
 python-cmd.o: $(srcdir)/python/python-cmd.c
 	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-cmd.c
+	$(POSTCOMPILE)
+
+python-frame.o: $(srcdir)/python/python-frame.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-frame.c
 	$(POSTCOMPILE)
 
 python-function.o: $(srcdir)/python/python-function.c
