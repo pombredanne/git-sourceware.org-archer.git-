@@ -59,6 +59,7 @@ PyObject *gdbpy_get_hook_function (const char *);
 
 void gdbpy_initialize_values (void);
 void gdbpy_initialize_breakpoints (void);
+void gdbpy_initialize_commands (void);
 void gdbpy_initialize_functions (void);
 
 struct cleanup *make_cleanup_py_decref (PyObject *py);

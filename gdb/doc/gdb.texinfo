@@ -17675,6 +17675,7 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 * Basic Python::                Basic Python Functions.
 * Exception Handling::
 * Values From Inferior::
+* Commands In Python::          Implementing new commands in Python.
 @end menu
 
 @node Basic Python
@@ -17810,6 +17811,215 @@ bar = foo.dereference ()
 The result @code{bar} will be a @code{gdb.Value} object holding the
 value pointed to by @code{foo}.
 @end defmethod
+
+@node Commands In Python
+@subsubsection Commands In Python
+
+@cindex commands in python
+@cindex python commands
+@tindex Command
+@tindex gdb.Command
+You can implement new @value{GDBN} CLI commands in Python.  A CLI
+command is implemented using an instance of the @code{gdb.Command}
+class, most commonly using a subclass.
+
+@defmethod Command __init__ name @var{command-class} @r{[}@var{completer-class}@r{]}
+The object initializer for @code{Command} registers the new command
+with @value{GDBN}.  This initializer is normally invoked from the
+subclass' own @code{__init__} method.
+
+@var{name} is the name of the command.  Currently, this name must be a
+single word; subcommands and prefix commands are not yet supported.
+There is also no support for multi-line commands.
+
+@var{command-class} should be one of the @samp{COMMAND_} constants
+defined below.  This argument tells @value{GDBN} how to categorize the
+new command in the help system.
+
+@var{completer-class} is an optional argument.  If given, it should be
+one of the @samp{COMPLETE_} constants defined below.  This argument
+tells @value{GDBN} how to perform completion for this command.  If not
+given, @value{GDBN} will attempt to complete using the object's
+@code{complete} method (see below); if no such method is found, an
+error will occur when completion is attempted.
+
+The help text for the new command is taken from the Python
+documentation string for the command's class, if there is one.  If
+there is no documentation string, a default value is used.
+@end defmethod
+
+@defmethod Command dont_repeat
+By default, a @value{GDBN} command is repeated when the user enters a
+blank line at the command prompt.  A command can suppress this
+behavior by invoking the @code{dont_repeat} method.  This is similar
+to the user command @code{dont-repeat}, see @ref{Define, dont-repeat}.
+@end defmethod
+
+@defmethod Command invoke argument from_tty
+This method is called by @value{GDBN} when this command is invoked.
+
+@var{argument} is the argument to the command.  The argument
+ordinarily is a string, but may be @code{None}, meaning that there was
+no argument.
+
+@var{from_tty} is a boolean argument.  When true, this means that the
+command was entered by the user at the terminal; when false it means
+that the command came from elsewhere.
+
+If this method throws an exception, it is turned into a @value{GDBN}
+@code{error} call.  Otherwise, the return value is ignored.
+@end defmethod
+
+@defmethod Command complete text word
+This method is called by @value{GDBN} when the user attempts @key{TAB}
+completion on this command.
+
+The arguments @var{text} and @var{word} are both strings.  @var{text}
+holds the complete command line up to the cursor's location.
+@var{word} holds the last word of the command line; this is computed
+using a word-breaking heuristic.
+
+The @code{invoke} method can return several values:
+@itemize @bullet
+@item
+If the return value is a sequence, the contents of the sequence are
+used as the completions.  It is up to @code{invoke} to ensure that the
+contents actually do complete the word.  A zero-length sequence is
+allowed, it means that there were no completions available.  Only
+string elements of the sequence are used; other elements in the
+sequence are ignored.
+
+@item
+If the return value is one of the @samp{COMPLETE_} constants defined
+below, then the corresponding @value{GDBN}-internal completion
+function is invoked, and its result is used.
+
+@item
+All other results are treated as though there were no available
+completions.
+@end itemize
+@end defmethod
+
+
+When a new command is registered, it must be declared as a member of
+some general class of commands.  This is used to classify the command
+in the online help system.  The available classifications are
+represented by constants defined in the @code{gdb} module:
+
+@table @code
+@findex COMMAND_NONE
+@findex gdb.COMMAND_NONE
+@item COMMAND_NONE
+The command does not belong to any particular class.
+
+@findex COMMAND_RUN
+@findex gdb.COMMAND_RUN
+@item COMMAND_RUN
+The command is related to running the inferior.
+
+@findex COMMAND_VARS
+@findex gdb.COMMAND_VARS
+@item COMMAND_VARS
+The command is related to variables.
+
+@findex COMMAND_STACK
+@findex gdb.COMMAND_STACK
+@item COMMAND_STACK
+The command has to do with manipulation of the stack.
+
+@findex COMMAND_FILES
+@findex gdb.COMMAND_FILES
+@item COMMAND_FILES
+This class is used for file-related commands.
+
+@findex COMMAND_SUPPORT
+@findex gdb.COMMAND_SUPPORT
+@item COMMAND_SUPPORT
+This should be used for ``support facilities'', generally meaning
+things that are useful to the user when interacting with @value{GDBN},
+but not related to the state of the inferior.
+
+@findex COMMAND_INFO
+@findex gdb.COMMAND_INFO
+@item COMMAND_INFO
+The command is an @samp{info}-related command, that is, related to the
+state of @value{GDBN} itself.
+
+@findex COMMAND_BREAKPOINT
+@findex gdb.COMMAND_BREAKPOINT
+@item COMMAND_BREAKPOINT
+The command has to do with breakpoints.
+
+@findex COMMAND_TRACE
+@findex gdb.COMMAND_TRACE
+@item COMMAND_TRACE
+The command has to do with tracepoints.
+
+@findex COMMAND_OBSCURE
+@findex gdb.COMMAND_OBSCURE
+@item COMMAND_OBSCURE
+The command is only used in unusual circumstances, or is not of
+general interest to users.
+
+@findex COMMAND_MAINTENANCE
+@findex gdb.COMMAND_MAINTENANCE
+@item COMMAND_MAINTENANCE
+The command is only useful to @value{GDBN} maintainers.
+@end table
+
+
+A new command can use a predefined completion function, either by
+specifying it via an argument at initialization, or by return it from
+the @code{complete} method.  These predefined completion constants are
+all defined in the @code{gdb} module:
+
+@table @code
+@findex COMPLETE_NONE
+@findex gdb.COMPLETE_NONE
+@item COMPLETE_NONE
+This constant means that no completion should be done.
+
+@findex COMPLETE_FILENAME
+@findex gdb.COMPLETE_FILENAME
+@item COMPLETE_FILENAME
+This constant means that filename completion should be performed.
+
+@findex COMPLETE_LOCATION
+@findex gdb.COMPLETE_LOCATION
+@item COMPLETE_LOCATION
+This constant means that location completion should be done.
+
+@findex COMPLETE_COMMAND
+@findex gdb.COMPLETE_COMMAND
+@item COMPLETE_COMMAND
+This constant means that completion should examine @value{GDBN}
+command names.
+
+@findex COMPLETE_SYMBOL
+@findex gdb.COMPLETE_SYMBOL
+@item COMPLETE_SYMBOL
+This constant means that completion should be done using symbol names
+as the source.
+@end table
+
+The following code snippet shows how a trivial CLI command can be
+implemented in Python:
+
+@smallexample
+class HelloWorld (gdb.Command):
+  """Greet the whole world."""
+
+  def __init__ (self):
+    super (HelloWorld, self).__init__ ("hello-world", gdb.COMMAND_OBSCURE)
+
+  def invoke (self, arg, from_tty):
+    print "Hello, World!"
+
+HelloWorld ()
+@end smallexample
+
+The last line instantiates the class, and is necessary to trigger the
+registration of the command with @value{GDBN}.
 
 @node Interpreters
 @chapter Command Interpreters
