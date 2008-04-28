@@ -45,6 +45,7 @@ typedef Py_intptr_t Py_ssize_t;
 
 struct block;
 struct symbol;
+struct symtab_and_line;
 struct value;
 
 extern PyObject *gdb_module;
@@ -57,8 +58,11 @@ PyObject *gdbpy_get_breakpoints (PyObject *, PyObject *);
 PyObject *gdbpy_get_frames (PyObject *, PyObject *);
 PyObject *gdbpy_get_current_frame (PyObject *, PyObject *);
 PyObject *gdbpy_frame_stop_reason_string (PyObject *, PyObject *);
+PyObject *gdbpy_lookup_symbol (PyObject *self, PyObject *args);
 PyObject *gdbpy_get_selected_frame (PyObject *self, PyObject *args);
 
+PyObject *symtab_and_line_to_sal_object (struct symtab_and_line sal);
+PyObject *symtab_to_symtab_object (struct symtab *symtab);
 PyObject *symbol_to_symbol_object (struct symbol *sym);
 PyObject *block_to_block_object (struct block *block);
 PyObject *value_to_value_object (struct value *v);
@@ -72,6 +76,7 @@ PyObject *gdbpy_get_hook_function (const char *);
 void gdbpy_initialize_values (void);
 void gdbpy_initialize_breakpoints (void);
 void gdbpy_initialize_frames (void);
+void gdbpy_initialize_symtabs (void);
 void gdbpy_initialize_commands (void);
 void gdbpy_initialize_symbols (void);
 void gdbpy_initialize_blocks (void);

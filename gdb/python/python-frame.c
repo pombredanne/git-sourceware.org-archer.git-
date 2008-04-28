@@ -56,6 +56,8 @@ static PyObject *frapy_get_pc (PyObject *self, PyObject *args);
 static PyObject *frapy_get_address_in_block (PyObject *self, PyObject *args);
 static PyObject *frapy_get_prev (PyObject *self, PyObject *args);
 static PyObject *frapy_get_next (PyObject *self, PyObject *args);
+static PyObject *frapy_find_sal (PyObject *self, PyObject *args);
+static PyObject *frapy_read_var_value (PyObject *self, PyObject *args);
 
 #define FRAPY_REQUIRE_VALID(frame_obj, frame)			      \
     do {							      \
@@ -84,6 +86,10 @@ static PyMethodDef frame_object_methods[] = {
   { "get_prev", frapy_get_prev, METH_NOARGS,
     "Return the previous (outer) frame." },
   { "get_next", frapy_get_next, METH_NOARGS, "Return the next (inner) frame." },
+  { "find_sal", frapy_find_sal, METH_NOARGS,
+    "Return the frame's symtab and line." },
+  { "read_var_value", frapy_read_var_value, METH_VARARGS,
+    "Return the value of the variable in this frame." },
   {NULL}  /* Sentinel */
 };
 
@@ -400,6 +406,54 @@ frapy_get_next (PyObject *self, PyObject *args)
   GDB_PY_HANDLE_EXCEPTION (except);
 
   return next_obj;
+}
+
+static PyObject *
+frapy_find_sal (PyObject *self, PyObject *args)
+{
+  struct frame_info *frame;
+  struct symtab_and_line sal;
+  volatile struct gdb_exception except;
+  PyObject *sal_obj = NULL;   /* Initialize to appease gcc warning.  */
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      FRAPY_REQUIRE_VALID ((frame_object *) self, frame);
+
+      find_frame_sal (frame, &sal);
+      sal_obj = symtab_and_line_to_sal_object (sal);
+    }
+  GDB_PY_HANDLE_EXCEPTION (except);
+
+  return sal_obj;
+}
+
+static PyObject *
+frapy_read_var_value (PyObject *self, PyObject *args)
+{
+  struct frame_info *frame;
+  PyObject *sym_obj;
+  struct symbol *var;
+  struct value *val = NULL;
+  volatile struct gdb_exception except;
+
+  if (!PyArg_ParseTuple (args, "O!", &symbol_object_type, &sym_obj))
+    return NULL;
+
+  var = symbol_object_to_symbol (sym_obj);
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      FRAPY_REQUIRE_VALID ((frame_object *) self, frame);
+
+      val = read_var_value (var, frame);
+    }
+  GDB_PY_HANDLE_EXCEPTION (except);
+
+  if (val)
+    return value_to_value_object (val);
+
+  Py_RETURN_NONE;
 }
 
 PyObject *

@@ -28,6 +28,7 @@ typedef struct {
 
 static PyObject *sympy_str (PyObject *self);
 static PyObject *sympy_get_value (PyObject *self, PyObject *args);
+static PyObject *sympy_get_symtab (PyObject *self, PyObject *args);
 static PyObject *sympy_get_natural_name (PyObject *self, PyObject *args);
 static PyObject *sympy_get_linkage_name (PyObject *self, PyObject *args);
 static PyObject *sympy_get_print_name (PyObject *self, PyObject *args);
@@ -36,6 +37,8 @@ static PyObject *sympy_is_argument (PyObject *self, PyObject *args);
 
 static PyMethodDef symbol_object_methods[] = {
   { "get_value", sympy_get_value, METH_NOARGS,
+    "Return the value of the symbol." },
+  { "get_symtab", sympy_get_symtab, METH_NOARGS,
     "Return the value of the symbol." },
   { "get_natural_name", sympy_get_natural_name, METH_NOARGS,
     "Return the \"natural\" name of the symbol." },
@@ -115,6 +118,14 @@ sympy_get_value (PyObject *self, PyObject *args)
   PyErr_SetString (PyExc_NotImplementedError,
 		   "Symbol type not yet supported in Python scripts.");
   return NULL;
+}
+
+static PyObject *
+sympy_get_symtab (PyObject *self, PyObject *args)
+{
+  symbol_object *self_sym = (symbol_object *) self;
+
+  return symtab_to_symtab_object (SYMBOL_SYMTAB (self_sym->symbol));
 }
 
 static PyObject *

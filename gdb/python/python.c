@@ -39,6 +39,9 @@ static int gdbpy_should_print_stack = 1;
 #include "solib.h"
 #include "exceptions.h"
 #include "python-internal.h"
+#include "linespec.h"
+#include "symtab.h"
+#include "source.h"
 #include "version.h"
 #include "target.h"
 #include "gdbthread.h"
@@ -49,6 +52,7 @@ PyObject *gdb_module;
 static PyObject *get_parameter (PyObject *, PyObject *);
 static PyObject *execute_gdb_command (PyObject *, PyObject *);
 static PyObject *gdbpy_solib_address (PyObject *, PyObject *);
+static PyObject *gdbpy_decode_line (PyObject *, PyObject *);
 static PyObject *gdbpy_find_pc_function (PyObject *, PyObject *);
 static PyObject *gdbpy_write (PyObject *, PyObject *);
 static PyObject *gdbpy_flush (PyObject *, PyObject *);
@@ -74,11 +78,18 @@ static PyMethodDef GdbMethods[] =
   { "frame_stop_reason_string", gdbpy_frame_stop_reason_string,
     METH_VARARGS, "Return a string explaining unwind stop reason" },
 
+  { "lookup_symbol", gdbpy_lookup_symbol, METH_VARARGS,
+    "Return the symbol corresponding to the given name, or None." },
   { "solib_address", gdbpy_solib_address, METH_VARARGS,
     "Return shared library holding a given address, or None." },
 
   { "find_pc_function", gdbpy_find_pc_function, METH_VARARGS,
     "Return the function containing the given pc value, or None." },
+
+  { "decode_line", gdbpy_decode_line, METH_VARARGS,
+    "Decode a string argument the way that 'break' or 'edit' does.\n\
+Return a tuple holding the file name (or None) and line number (or None).\n\
+Note: may later change to return an object." },
 
   { "write", gdbpy_write, METH_VARARGS,
     "Write a string using gdb's filtered stream." },
@@ -319,6 +330,80 @@ gdbpy_find_pc_function (PyObject *self, PyObject *args)
   Py_RETURN_NONE;
 }
 
+/* A Python function which is a wrapper for decode_line_1.  */
+
+static PyObject *
+gdbpy_decode_line (PyObject *self, PyObject *args)
+{
+  struct symtabs_and_lines sals = { NULL, 0 }; /* Initialize to appease gcc.  */
+  struct symtab_and_line sal;
+  char *arg = NULL;
+  int free_sals = 0, i;
+  PyObject *result = NULL;
+  volatile struct gdb_exception except;
+
+  if (! PyArg_ParseTuple (args, "|s", &arg))
+    return NULL;
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      if (arg)
+	{
+	  char *copy;
+
+	  arg = strdup (arg);
+	  copy = arg;
+
+	  sals = decode_line_1 (&copy, 0, 0, 0, 0, 0);
+	  free_sals = 1;
+	}
+      else
+	{
+	  set_default_source_symtab_and_line ();
+	  sal = get_current_source_symtab_and_line ();
+	  sals.sals = &sal;
+	  sals.nelts = 1;
+	}
+    }
+  if (arg)
+    xfree (arg);
+
+  if (except.reason < 0)
+    {
+      if (free_sals)
+	xfree (sals.sals);
+      /* We know this will always throw.  */
+      GDB_PY_HANDLE_EXCEPTION (except);
+    }
+
+  if (sals.nelts)
+    {
+      result = PyTuple_New (sals.nelts);
+      for (i = 0; i < sals.nelts; ++i)
+	{
+	  PyObject *obj;
+	  char *str;
+
+	  obj = symtab_and_line_to_sal_object (sals.sals[i]);
+	  if (! obj)
+	    {
+	      Py_DECREF (result);
+	      result = NULL;
+	      break;
+	    }
+
+	  PyTuple_SetItem (result, i, obj);
+	}
+    }
+
+  if (free_sals)
+    xfree (sals.sals);
+
+  if (result)
+    return result;
+  Py_RETURN_NONE;
+}
+
 
 
 /* Printing.  */
@@ -463,6 +548,7 @@ Enables or disables printing of Python stack traces."),
   gdbpy_initialize_values ();
   gdbpy_initialize_breakpoints ();
   gdbpy_initialize_frames ();
+  gdbpy_initialize_symtabs ();
   gdbpy_initialize_commands ();
   gdbpy_initialize_symbols ();
   gdbpy_initialize_blocks ();
