@@ -43,10 +43,14 @@ typedef Py_intptr_t Py_ssize_t;
 #error "Unable to find usable Python.h"
 #endif
 
+struct block;
+struct symbol;
 struct value;
 
 extern PyObject *gdb_module;
+extern PyTypeObject block_object_type;
 extern PyTypeObject value_object_type;
+extern PyTypeObject symbol_object_type;
 
 PyObject *gdbpy_get_value_from_history (PyObject *self, PyObject *args);
 PyObject *gdbpy_get_breakpoints (PyObject *, PyObject *);
@@ -55,8 +59,12 @@ PyObject *gdbpy_get_current_frame (PyObject *, PyObject *);
 PyObject *gdbpy_frame_stop_reason_string (PyObject *, PyObject *);
 PyObject *gdbpy_get_selected_frame (PyObject *self, PyObject *args);
 
+PyObject *symbol_to_symbol_object (struct symbol *sym);
+PyObject *block_to_block_object (struct block *block);
 PyObject *value_to_value_object (struct value *v);
 
+struct block *block_object_to_block (PyObject *obj);
+struct symbol *symbol_object_to_symbol (PyObject *obj);
 struct value *convert_value_from_python (PyObject *obj);
 
 PyObject *gdbpy_get_hook_function (const char *);
@@ -65,6 +73,8 @@ void gdbpy_initialize_values (void);
 void gdbpy_initialize_breakpoints (void);
 void gdbpy_initialize_frames (void);
 void gdbpy_initialize_commands (void);
+void gdbpy_initialize_symbols (void);
+void gdbpy_initialize_blocks (void);
 void gdbpy_initialize_functions (void);
 
 struct cleanup *make_cleanup_py_decref (PyObject *py);

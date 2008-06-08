@@ -271,20 +271,24 @@ SUBDIR_TUI_CFLAGS= \
 #
 SUBDIR_PYTHON_OBS = \
 	python.o \
+	python-block.o \
 	python-breakpoint.o \
 	python-cmd.o \
 	python-frame.o \
 	python-function.o \
 	python-hooks.o \
+	python-symbol.o \
 	python-utils.o \
 	python-value.o
 SUBDIR_PYTHON_SRCS = \
 	python/python.c \
+	python/python-block.c \
 	python/python-breakpoint.c \
 	python/python-cmd.c \
 	python/python-frame.c \
 	python/python-function.c \
 	python/python-hooks.c \
+	python/python-symbol.c \
 	python/python-utils.c \
 	python/python-value.c
 SUBDIR_PYTHON_DEPS =
@@ -1857,6 +1861,10 @@ python.o: $(srcdir)/python/python.c
 	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python.c
 	$(POSTCOMPILE)
 
+python-block.o: $(srcdir)/python/python-block.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-block.c
+	$(POSTCOMPILE)
+
 python-breakpoint.o: $(srcdir)/python/python-breakpoint.c
 	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-breakpoint.c
 	$(POSTCOMPILE)
@@ -1875,6 +1883,10 @@ python-function.o: $(srcdir)/python/python-function.c
 
 python-hooks.o: $(srcdir)/python/python-hooks.c
 	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-hooks.c
+	$(POSTCOMPILE)
+
+python-symbol.o: $(srcdir)/python/python-symbol.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-symbol.c
 	$(POSTCOMPILE)
 
 python-utils.o: $(srcdir)/python/python-utils.c
