@@ -401,6 +401,7 @@ Enables or disables printing of Python stack traces."),
   PyModule_AddStringConstant (gdb_module, "TARGET_CONFIG", (char*) target_name);
 
   gdbpy_initialize_values ();
+  gdbpy_initialize_functions ();
 
   PyRun_SimpleString ("import gdb");
 

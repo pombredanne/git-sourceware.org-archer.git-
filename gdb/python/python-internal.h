@@ -57,6 +57,7 @@ struct value *convert_value_from_python (PyObject *obj);
 PyObject *gdbpy_get_hook_function (const char *);
 
 void gdbpy_initialize_values (void);
+void gdbpy_initialize_functions (void);
 
 struct cleanup *make_cleanup_py_decref (PyObject *py);
 

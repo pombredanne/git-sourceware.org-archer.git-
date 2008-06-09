@@ -465,11 +465,11 @@ extern void set_internalvar_component (struct internalvar *var,
 				       int bitpos, int bitsize,
 				       struct value *newvalue);
 
-extern struct internalvar *lookup_only_internalvar (char *name);
+extern struct internalvar *lookup_only_internalvar (const char *name);
 
-extern struct internalvar *create_internalvar (char *name);
+extern struct internalvar *create_internalvar (const char *name);
 
-extern struct internalvar *lookup_internalvar (char *name);
+extern struct internalvar *lookup_internalvar (const char *name);
 
 extern int value_equal (struct value *arg1, struct value *arg2);
 
@@ -499,7 +499,7 @@ extern int unop_user_defined_p (enum exp_opcode op, struct value *arg1);
 
 extern int destructor_name_p (const char *name, const struct type *type);
 
-#define value_free(val) xfree (val)
+extern void value_free (struct value *value);
 
 extern void free_all_values (void);
 
@@ -585,4 +585,20 @@ extern struct value *value_allocate_space_in_inferior (int);
 extern struct value *value_of_local (const char *name, int complain);
 
 extern struct value * value_subscripted_rvalue (struct value *array, struct value *idx, int lowerbound);
+
+/* User function handler.  */
+
+typedef struct value *(*internal_function_fn) (void *cookie,
+					       int argc,
+					       struct value **argv);
+
+void add_internal_function (const char *name, const char *doc,
+			    internal_function_fn handler,
+			    void *cookie, void (*destroyer) (void *));
+
+struct value *call_internal_function (struct value *function,
+				      int argc, struct value **argv);
+
+char *value_internal_function_name (struct value *);
+
 #endif /* !defined (VALUE_H) */
