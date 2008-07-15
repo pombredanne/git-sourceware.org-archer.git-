@@ -66,9 +66,11 @@ PyObject *symtab_to_symtab_object (struct symtab *symtab);
 PyObject *symbol_to_symbol_object (struct symbol *sym);
 PyObject *block_to_block_object (struct block *block);
 PyObject *value_to_value_object (struct value *v);
+PyObject *gdb_owned_value_to_value_object (struct value *v);
 
 struct block *block_object_to_block (PyObject *obj);
 struct symbol *symbol_object_to_symbol (PyObject *obj);
+struct value *value_object_to_value (PyObject *self);
 struct value *convert_value_from_python (PyObject *obj);
 
 PyObject *gdbpy_get_hook_function (const char *);

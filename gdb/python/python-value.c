@@ -574,6 +574,26 @@ valpy_richcompare (PyObject *self, PyObject *other, int op)
   Py_RETURN_FALSE;
 }
 
+/* A value owned by GDB is in the all_values chain, so it will be freed
+   automatically when not needed anymore (i.e., before the current command
+   completes).  */
+PyObject *
+gdb_owned_value_to_value_object (struct value *v)
+{
+  value_object *result = PyObject_New (value_object, &value_object_type);
+  if (result != NULL)					      
+    {
+      result->value = v;
+      result->owned_by_gdb = 1;
+      /* FIXME: should we do it? What is it? */
+      /* I don't think it is needed, since a GDB owned value has a very short
+         lifetime. The purpose of the list is explained in the comment above
+         its declaration. -- bauermann  */
+      value_prepend_to_list (&values_in_python, v);
+    }
+  return (PyObject *) result;
+}
+
 /* Returns an object for a value which is released from the all_values chain,
    so its lifetime is not bound to the execution of a command.  */
 PyObject *
@@ -590,6 +610,14 @@ value_to_value_object (struct value *val)
     }
 
   return (PyObject *) val_obj;
+}
+
+/* Returns value structure corresponding to the given value object.  */
+struct value *
+value_object_to_value (PyObject *self)
+{
+  value_object *real = (value_object *) self;
+  return real->value;
 }
 
 /* Try to convert a Python value to a gdb value.  If the value cannot

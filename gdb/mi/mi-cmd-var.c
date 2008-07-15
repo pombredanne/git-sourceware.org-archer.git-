@@ -249,6 +249,40 @@ mi_cmd_var_set_format (char *command, char **argv, int argc)
 }
 
 void
+mi_cmd_var_set_type_visualizer (char *command, char **argv, int argc)
+{
+  if (argc != 2)
+    error ("Usage: TYPE VISUALIZER_CLASS.");
+
+  varobj_set_type_visualizer (argv[0], argv[1]);
+}
+
+void
+mi_cmd_var_clear_type_visualizers (char *command, char **argv, int argc)
+{
+  if (argc != 0)
+    error ("No parameters allowed.");
+
+  varobj_clear_type_visualizers ();
+}
+
+void
+mi_cmd_var_set_visualizer (char *command, char **argv, int argc)
+{
+  struct varobj *var;
+
+  if (argc != 2)
+    error ("Usage: NAME VISUALIZER_CLASS.");
+
+  var = varobj_get_handle (argv[0]);
+
+  if (var == NULL)
+    error ("Variable object not found");
+
+  varobj_set_visualizer (var, argv[1]);
+}
+
+void
 mi_cmd_var_set_frozen (char *command, char **argv, int argc)
 {
   struct varobj *var;
@@ -694,6 +728,26 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
           ui_out_field_string (uiout, "new_type", varobj_get_type (r->varobj));
           ui_out_field_int (uiout, "new_num_children", 
 			    varobj_get_num_children (r->varobj));
+	}
+
+      if (r->children_changed)
+	{
+	  int ix;
+	  struct varobj *child;
+	  struct cleanup *cleanup =
+	    make_cleanup_ui_out_list_begin_end (uiout, "children");
+
+	  VEC (varobj_p)* children = varobj_list_children (r->varobj);
+
+	  for (ix = 0; VEC_iterate (varobj_p, children, ix, child); ++ix)
+	    {
+	      struct cleanup *cleanup_child;
+	      cleanup_child = make_cleanup_ui_out_tuple_begin_end (uiout, NULL);
+	      print_varobj (child, print_values, 1 /* print expression */);
+	      do_cleanups (cleanup_child);
+	    }
+
+	  do_cleanups (cleanup);
 	}
   
       if (mi_version (uiout) > 1)

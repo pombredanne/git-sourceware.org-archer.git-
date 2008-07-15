@@ -28,11 +28,19 @@
 
 #include "gdb_assert.h"
 #include "gdb_string.h"
+#include "gdb_regex.h"
 
 #include "varobj.h"
 #include "vec.h"
 #include "gdbthread.h"
 #include "inferior.h"
+
+#if HAVE_PYTHON
+#include "python/python.h"
+#include "python/python-internal.h"
+#else
+typedef int PyObject;
+#endif
 
 /* Non-zero if we want to see trace of varobj level stuff.  */
 
@@ -137,6 +145,12 @@ struct varobj
   /* Children of this object.  */
   VEC (varobj_p) *children;
 
+  /* Whether the children of this varobj were requested.  This field is
+     used to decide if dynamic varobj should recompute their children.
+     In the event that the frontend never asked for the children, we
+     can avoid that.  */
+  int children_requested;
+
   /* Description of the root variable. Points to root variable for children. */
   struct varobj_root *root;
 
@@ -158,6 +172,16 @@ struct varobj
      not fetched if either the variable is frozen, or any parents is
      frozen.  */
   int not_fetched;
+
+  /* A Python object used to compute the string value of varobj.  Must
+     be a callable, accepting a single parameter -- Gdb.Value instance. 
+     Must return a string.  */
+  PyObject *value_formatter;
+  /* A Python object used to compute the list of children.  Must be
+     a callable, accepting a single parameter -- Gdb.Value instance.
+     Should return a sequence of Gdb.Value instances.  May return
+     empty sequence, but may not return None, or non-sequence.  */
+  PyObject *children_lister;
 };
 
 struct cpstack
@@ -174,6 +198,14 @@ struct vlist
   struct vlist *next;
 };
 
+typedef struct type_visualizer
+{
+  char *type_regexp;
+  char *visualizer;
+} type_visualizer;
+
+DEF_VEC_O (type_visualizer);
+
 /* Private function prototypes */
 
 /* Helper functions for the above subcommands. */
@@ -188,6 +220,10 @@ static int install_variable (struct varobj *);
 static void uninstall_variable (struct varobj *);
 
 static struct varobj *create_child (struct varobj *, int, char *);
+
+static struct varobj *
+create_child_with_value (struct varobj *parent, int index, const char *name,
+			 struct value *value);
 
 /* Utility routines */
 
@@ -214,6 +250,8 @@ static char *cppop (struct cpstack **pstack);
 static int install_new_value (struct varobj *var, struct value *value, 
 			      int initial);
 
+static void install_default_visualizer (struct varobj *var);
+
 /* Language-specific routines. */
 
 static enum varobj_languages variable_language (struct varobj *var);
@@ -231,12 +269,16 @@ static struct value *value_of_child (struct varobj *parent, int index);
 static char *my_value_of_variable (struct varobj *var,
 				   enum varobj_display_formats format);
 
-static char *value_get_print_value (struct value *value,
-				    enum varobj_display_formats format);
+char *value_get_print_value (struct value *value,
+			     enum varobj_display_formats format,
+			     PyObject *value_formatter);
 
 static int varobj_value_is_changeable_p (struct varobj *var);
 
 static int is_root_p (struct varobj *var);
+
+static struct varobj *
+varobj_add_child (struct varobj *var, const char *name, struct value *value);
 
 /* C implementation */
 
@@ -405,6 +447,8 @@ static int rootcount = 0;	/* number of root varobjs in the list */
 /* Pointer to the varobj hash table (built at run time) */
 static struct vlist **varobj_table;
 
+static VEC (type_visualizer) *type_visualizers = NULL;
+
 /* Is the variable X one of our "fake" children? */
 #define CPLUS_FAKE_CHILD(x) \
 ((x) != NULL && (x)->type == NULL && (x)->value == NULL)
@@ -565,6 +609,7 @@ varobj_create (char *objname,
     }
 
   discard_cleanups (old_chain);
+  install_default_visualizer (var);
   return var;
 }
 
@@ -694,10 +739,101 @@ varobj_set_display_format (struct varobj *var,
       && var->value && !value_lazy (var->value))
     {
       xfree (var->print_value);
-      var->print_value = value_get_print_value (var->value, var->format);
+      var->print_value = value_get_print_value (var->value, var->format,
+						var->value_formatter);
     }
 
   return var->format;
+}
+
+void 
+varobj_set_visualizer (struct varobj *var, const char *visualizer)
+{
+#if HAVE_PYTHON
+  PyObject *python_main;
+  PyObject *global;
+  PyObject *vclass;
+  struct cleanup *back_to;
+
+  /* If there are any children now, wipe them.  */
+  varobj_delete (var, NULL, 1 /* children only */);
+
+  if (strcmp (visualizer, "none") == 0)
+    {
+      Py_XDECREF (var->value_formatter);
+      Py_XDECREF (var->children_lister);
+
+      var->value_formatter = 0;
+      var->children_lister = 0;
+     
+      install_new_value (var, var->value, 1);
+      return;
+    }
+  else if (strcmp (visualizer, "default") == 0)
+    {
+      install_default_visualizer  (var);
+      return;
+    }
+    
+  python_main = PyImport_ImportModule ("__main__");
+  back_to = make_cleanup_py_decref (python_main);
+
+  global = PyModule_GetDict (python_main);
+  /* TODO: allow to reset things by passing empty string.  */
+  vclass = PyDict_GetItemString (global, visualizer);
+
+  if (!vclass)
+    error ("The specified visualizer class cannot be found");
+  else
+    {
+      PyObject *tuple;
+      PyObject *dict;
+      PyObject *instance;
+
+      tuple = PyTuple_New (0);
+      make_cleanup_py_decref (tuple);
+      dict = PyDict_New ();
+      make_cleanup_py_decref (dict);
+      instance = PyObject_Call (vclass, tuple, dict);
+      make_cleanup_py_decref (instance);
+
+      if (!instance)
+	{
+	  gdbpy_print_stack ();
+	  error ("Failed to instantiate the visualizer");
+	}
+
+      Py_XDECREF (var->value_formatter);
+      Py_XDECREF (var->children_lister);
+
+      var->value_formatter = PyObject_GetAttrString (instance, "to_string");
+      var->children_lister = PyObject_GetAttrString (instance, "children");
+     
+      install_new_value (var, var->value, 1);
+    }
+  do_cleanups (back_to);
+#else
+  error ("Python support required");
+#endif
+}
+
+void 
+varobj_set_type_visualizer (const char *type_regexp, const char *visualizer)
+{
+#if HAVE_PYTHON
+  type_visualizer t;
+  t.type_regexp = xstrdup (type_regexp);
+  t.visualizer = xstrdup (visualizer);
+  VEC_safe_push (type_visualizer, type_visualizers, &t);
+#else
+  error ("Python support required");
+#endif
+}
+
+void 
+varobj_clear_type_visualizers ()
+{
+  VEC_free (type_visualizer, type_visualizers);
 }
 
 enum varobj_display_formats
@@ -748,6 +884,100 @@ varobj_get_num_children (struct varobj *var)
   return var->num_children;
 }
 
+static
+int update_dynamic_varobj_children (struct varobj *var,
+				    VEC (varobj_p) **changed,
+				    VEC (varobj_p) **new_and_unchanged)
+
+{
+#if HAVE_PYTHON
+  /* FIXME: we *might* want to provide this functionality as
+     a standalone function, so that other interested parties
+     than varobj code can benefit for this.  */
+  struct cleanup *back_to;
+  PyObject *py_value;
+  PyObject *tuple;
+  PyObject *children;
+  int n, i;
+  int children_changed = 0;
+    
+  tuple = PyTuple_New (1);
+  back_to = make_cleanup_py_decref (tuple);
+  /* Steals the reference.  */
+  PyTuple_SetItem (tuple, 0, gdb_owned_value_to_value_object (var->value));
+  children = PyObject_Call (var->children_lister, tuple, Py_None);
+  make_cleanup_py_decref (children);
+      
+  if (!children)
+    {
+      gdbpy_print_stack ();
+      error ("Null value returned for children");
+    }
+  
+  if (!PySequence_Check (children))
+    error ("Returned value is a sequence");
+  
+  n = PySequence_Size (children);
+  
+  for (i = 0; i < n; ++i)
+    {
+      PyObject *item = PySequence_GetItem (children, i);
+      PyObject *py_v;
+      struct value *v;
+      char *name;
+      
+      if (!PyArg_ParseTuple (item, "sO", &name, &py_v))
+	error ("Invalid item from the child list");
+      
+      if (!PyObject_IsInstance (py_v, (PyObject *)&value_object_type))
+	error ("child list has object of invalid type");
+      
+      v = value_object_to_value (py_v);
+
+      /* TODO: This assume the name of the i-th child never changes.  */
+
+      /* Now see what to do here.  */
+      if (VEC_length (varobj_p, var->children) < i + 1)
+	{
+	  /* There's no child yet.  */
+	  struct varobj *child = varobj_add_child (var, name, v);
+	  if (new_and_unchanged)
+	    VEC_safe_push (varobj_p, *new_and_unchanged, child);
+	  children_changed = 1;
+	}
+      else 
+	{
+	  varobj_p existing = VEC_index (varobj_p, var->children, i);
+	  if (install_new_value (existing, v, 0) && changed)
+	    {
+	      if (changed)
+		VEC_safe_push (varobj_p, *changed, existing);
+	    }
+	  else
+	    {
+	      if (new_and_unchanged)
+		VEC_safe_push (varobj_p, *new_and_unchanged, existing);
+	    }
+	}
+    }
+  if (n < VEC_length (varobj_p, var->children))
+    {
+      int i;
+      children_changed = 1;
+      for (i = n; i < VEC_length (varobj_p, var->children); ++i)
+	varobj_delete (VEC_index (varobj_p, var->children, i), NULL, 0);
+    }
+  VEC_truncate (varobj_p, var->children, n);
+ 
+  do_cleanups (back_to);
+
+  return children_changed;
+#else
+  gdb_assert (0 && "should never be called if Python is not enabled");
+#endif
+}
+
+
 /* Creates a list of the immediate children of a variable object;
    the return code is the number of such children or -1 on error */
 
@@ -757,6 +987,17 @@ varobj_list_children (struct varobj *var)
   struct varobj *child;
   char *name;
   int i;
+
+  var->children_requested = 1;
+
+  if (var->children_lister)
+    {
+      /* This, in theory, can result in the number of children changing without
+	 frontend noticing.  But well, calling -var-list-children on the same
+	 varobj twice is not something a sane frontend would do.  */
+      update_dynamic_varobj_children (var, NULL, NULL);
+      return var->children;      
+    }
 
   if (var->num_children == -1)
     var->num_children = number_of_children (var);
@@ -782,10 +1023,22 @@ varobj_list_children (struct varobj *var)
 	  name = name_of_child (var, i);
 	  existing = create_child (var, i, name);
 	  VEC_replace (varobj_p, var->children, i, existing);
+	  install_default_visualizer (existing);
 	}
     }
 
   return var->children;
+}
+
+static struct varobj *
+varobj_add_child (struct varobj *var, const char *name, struct value *value)
+{
+  varobj_p v = create_child_with_value (var, 
+					VEC_length (varobj_p, var->children), 
+					name, value);
+  VEC_safe_push (varobj_p, var->children, v);
+  install_default_visualizer (v);
+  return v;
 }
 
 /* Obtain the type of an object Variable as a string similar to the one gdb
@@ -994,6 +1247,13 @@ install_new_value (struct varobj *var, struct value *value, int initial)
      a type. */
   gdb_assert (var->type || CPLUS_FAKE_CHILD (var));
   changeable = varobj_value_is_changeable_p (var);
+
+  /* If the type has custom visualizer, we consider it to be always
+     changeable. FIXME: need to make sure this behaviour will not
+     mess up read-sensitive values.  */
+  if (var->value_formatter || var->children_lister)
+    changeable = 1;
+
   need_to_fetch = changeable;
 
   /* We are not interested in the address of references, and given
@@ -1050,7 +1310,8 @@ install_new_value (struct varobj *var, struct value *value, int initial)
      lazy -- if it is, the code above has decided that the value
      should not be fetched.  */
   if (value && !value_lazy (value))
-      print_value = value_get_print_value (value, var->format);
+    print_value = value_get_print_value (value, var->format, 
+					 var->value_formatter);
 
   /* If the type is changeable, compare the old and the new values.
      If this is the initial assignment, we don't have any old value
@@ -1115,6 +1376,27 @@ install_new_value (struct varobj *var, struct value *value, int initial)
   return changed;
 }
 
+static void
+install_default_visualizer (struct varobj *var)
+{
+  char *type = varobj_get_type (var);
+
+  if (type)
+    {
+      type_visualizer *v;
+      int i;
+      for (i = 0; VEC_iterate (type_visualizer, type_visualizers, i, v); ++i)
+	{
+	  if (re_comp (v->type_regexp) == NULL && re_exec (type) == 1)
+	    {
+	      varobj_set_visualizer (var, v->visualizer);
+	      break;
+	    }
+	}
+      xfree (type);
+    }
+}
+
 /* Update the values for a variable and its children.  This is a
    two-pronged attack.  First, re-parse the value for the root's
    expression to see if it's changed.  Then go all the way
@@ -1140,7 +1422,7 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
   struct varobj **cv;
   struct varobj **templist = NULL;
   struct value *new;
-  VEC (varobj_p) *stack = NULL;
+  VEC (varobj_update_result) *stack = NULL;
   VEC (varobj_update_result) *result = NULL;
   struct frame_info *fi;
 
@@ -1179,20 +1461,80 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
       
       if (new == NULL)
 	r.status = VAROBJ_NOT_IN_SCOPE;
+      r.value_installed = 1;
 
-      if (r.type_changed || r.changed)
-	VEC_safe_push (varobj_update_result, result, &r);
+      if (r.type_changed)
+	install_default_visualizer (*varp);
 
       if (r.status == VAROBJ_NOT_IN_SCOPE)
-	return result;
+	{
+	  VEC_safe_push (varobj_update_result, result, &r);
+	  return result;
+	}
+            
+      VEC_safe_push (varobj_update_result, stack, &r);
+    }
+  else
+    {
+      varobj_update_result r = {*varp};
+      VEC_safe_push (varobj_update_result, stack, &r);
     }
 
-  VEC_safe_push (varobj_p, stack, *varp);
-
   /* Walk through the children, reconstructing them all.  */
-  while (!VEC_empty (varobj_p, stack))
+  while (!VEC_empty (varobj_update_result, stack))
     {
-      v = VEC_pop (varobj_p, stack);
+      varobj_update_result r = *(VEC_last (varobj_update_result, stack));
+      struct varobj *v = r.varobj;
+
+      VEC_pop (varobj_update_result, stack);
+
+      /* Update this variable, unless it's a root, which is already
+	 updated.  */
+      if (!r.value_installed)
+	{	  
+	  new = value_of_child (v->parent, v->index);
+	  if (install_new_value (v, new, 0 /* type not changed */))
+	    {
+	      r.changed = 1;
+	      v->updated = 0;
+	    }
+	}
+
+      /* We probably should not get children of a varobj that has 
+	 children_lister, but for which -var-list-children was never
+	 invoked.  Presumably, such varobj is not yet expanded in the
+	 UI, so we need not bother getting it.  */
+      if (v->children_lister)
+	{
+	  VEC (varobj_p) *changed = 0, *new_and_unchanged = 0;
+	  int i;
+	  varobj_p tmp;
+
+	  if (!v->children_requested)
+	    continue;
+
+	  if (v->frozen)
+	    continue;
+
+	  if (update_dynamic_varobj_children (v, &changed, &new_and_unchanged))
+	    r.children_changed = 1;
+	  for (i = 0; VEC_iterate (varobj_p, changed, i, tmp); ++i)
+	    {
+	      varobj_update_result r = {tmp};
+	      r.changed = 1;
+	      r.value_installed = 1;
+	      VEC_safe_push (varobj_update_result, stack, &r);
+	    }
+	  for (i = 0; VEC_iterate (varobj_p, new_and_unchanged, i, tmp); ++i)
+	    {
+	      varobj_update_result r = {tmp};
+	      r.value_installed = 1;
+	      VEC_safe_push (varobj_update_result, stack, &r);
+	    }
+	  if (r.changed || r.children_changed)
+	    VEC_safe_push (varobj_update_result, result, &r);
+	  continue;
+	}
 
       /* Push any children.  Use reverse order so that the first
 	 child is popped from the work stack first, and so
@@ -1203,26 +1545,18 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
 	  varobj_p c = VEC_index (varobj_p, v->children, i);
 	  /* Child may be NULL if explicitly deleted by -var-delete.  */
 	  if (c != NULL && !c->frozen)
-	    VEC_safe_push (varobj_p, stack, c);
-	}
-
-      /* Update this variable, unless it's a root, which is already
-	 updated.  */
-      if (v->root->rootvar != v)
-	{	  
-	  new = value_of_child (v->parent, v->index);
-	  if (install_new_value (v, new, 0 /* type not changed */))
 	    {
-	      /* Note that it's changed */
-	      varobj_update_result r = {v};
-	      r.changed = 1;
-	      VEC_safe_push (varobj_update_result, result, &r);
-	      v->updated = 0;
+	      varobj_update_result r = {c};
+	      VEC_safe_push (varobj_update_result, stack, &r);
 	    }
 	}
+
+      if (r.changed || r.type_changed)
+	VEC_safe_push (varobj_update_result, result, &r);
     }
 
-  VEC_free (varobj_p, stack);
+  VEC_free (varobj_update_result, stack);
+
   return result;
 }
 
@@ -1421,16 +1755,23 @@ uninstall_variable (struct varobj *var)
 static struct varobj *
 create_child (struct varobj *parent, int index, char *name)
 {
+  return create_child_with_value (parent, index, name, 
+				  value_of_child (parent, index));
+}
+
+static struct varobj *
+create_child_with_value (struct varobj *parent, int index, const char *name,
+			 struct value *value)
+{
   struct varobj *child;
   char *childs_name;
-  struct value *value;
 
   child = new_variable ();
 
   /* name is allocated by name_of_child */
-  child->name = name;
+  /* FIXME: xstrdup should not be here.  */
+  child->name = xstrdup (name);
   child->index = index;
-  value = value_of_child (parent, index);
   child->parent = parent;
   child->root = parent->root;
   childs_name = xstrprintf ("%s.%s", parent->obj_name, name);
@@ -1479,6 +1820,9 @@ new_variable (void)
   var->print_value = NULL;
   var->frozen = 0;
   var->not_fetched = 0;
+  var->children_requested = 0;
+  var->value_formatter = 0;
+  var->children_lister = 0;
 
   return var;
 }
@@ -1510,6 +1854,11 @@ free_variable (struct varobj *var)
       free_current_contents (&var->root->exp);
       xfree (var->root);
     }
+
+#if HAVE_PYTHON
+  Py_XDECREF (var->value_formatter);
+  Py_XDECREF (var->children_lister);
+#endif
 
   xfree (var->name);
   xfree (var->obj_name);
@@ -1784,8 +2133,9 @@ my_value_of_variable (struct varobj *var, enum varobj_display_formats format)
     return NULL;
 }
 
-static char *
-value_get_print_value (struct value *value, enum varobj_display_formats format)
+char *
+value_get_print_value (struct value *value, enum varobj_display_formats format,
+		       PyObject *value_formatter)
 {
   long dummy;
   struct ui_file *stb;
@@ -1794,6 +2144,43 @@ value_get_print_value (struct value *value, enum varobj_display_formats format)
 
   if (value == NULL)
     return NULL;
+
+#if HAVE_PYTHON
+  if (value_formatter)
+    {
+      /* FIXME: we *might* want to provide this functionality as
+	 a standalone function, so that other interested parties
+	 than varobj code can benefit for this.  */
+      struct cleanup *back_to;
+      PyObject *py_value;
+      PyObject *tuple;
+      PyObject *py_s;
+      char *s;
+
+      py_value = gdb_owned_value_to_value_object (value);
+      tuple = PyTuple_New (1);
+      back_to = make_cleanup_py_decref (tuple);
+      /* Steals the reference.  */
+      PyTuple_SetItem (tuple, 0, py_value);
+      py_s = PyObject_Call (value_formatter, tuple, Py_None);
+      make_cleanup_py_decref (py_s);
+
+      if (!py_s)
+	{
+	  gdbpy_print_stack ();
+	  error ("Null value returned for string");
+	}
+      
+      if (!PyString_Check (py_s))
+	error ("Returned value is not a string");
+      
+      s = PyString_AsString (py_s);
+      gdb_assert (s);
+      
+      do_cleanups (back_to);
+      return xstrdup (s);				       
+    }
+#endif
 
   stb = mem_fileopen ();
   old_chain = make_cleanup_ui_file_delete (stb);
@@ -1890,7 +2277,7 @@ varobj_floating_p (struct varobj *var)
    value is not known.  
 
    If WAS_PTR is not NULL, set *WAS_PTR to 0 or 1
-   depending on whether pointer was deferenced
+   depending on whether pointer was dereferenced
    in this function.  */
 static void
 adjust_value_for_child_access (struct value **value,
@@ -2259,6 +2646,11 @@ c_value_of_variable (struct varobj *var, enum varobj_display_formats format)
      catch that case explicitly.  */
   struct type *type = get_type (var);
 
+  /* If we have a custom formatter, return whatever string it has
+     produced.  */
+  if (var->value_formatter && var->print_value)
+    return xstrdup (var->print_value);
+  
   /* Strip top-level references. */
   while (TYPE_CODE (type) == TYPE_CODE_REF)
     type = check_typedef (TYPE_TARGET_TYPE (type));
@@ -2303,7 +2695,8 @@ c_value_of_variable (struct varobj *var, enum varobj_display_formats format)
 	    if (format == var->format)
 	      return xstrdup (var->print_value);
 	    else
-	      return value_get_print_value (var->value, format);
+	      return value_get_print_value (var->value, format, 
+					    var->value_formatter);
 	  }
       }
     }
