@@ -47,6 +47,7 @@ static int gdbpy_should_print_stack = 1;
 #include "gdbthread.h"
 #include "target.h"
 #include "gdbthread.h"
+#include "event-top.h"
 
 
 PyObject *gdb_module;
@@ -61,6 +62,7 @@ static PyObject *gdbpy_get_current_thread (PyObject *, PyObject *);
 static PyObject *gdbpy_switch_to_thread (PyObject *, PyObject *);
 static PyObject *gdbpy_write (PyObject *, PyObject *);
 static PyObject *gdbpy_flush (PyObject *, PyObject *);
+static PyObject *gdbpy_cli (PyObject *, PyObject *);
 
 static PyMethodDef GdbMethods[] =
 {
@@ -68,6 +70,8 @@ static PyMethodDef GdbMethods[] =
     "Get a value from history" },
   { "execute", execute_gdb_command, METH_VARARGS,
     "Execute a gdb command" },
+  { "cli", gdbpy_cli, METH_NOARGS,
+    "Enter the gdb CLI" },
   { "get_parameter", get_parameter, METH_VARARGS,
     "Return a gdb parameter's value" },
 
@@ -533,6 +537,52 @@ gdbpy_print_stack (void)
     PyErr_Print ();
   else
     PyErr_Clear ();
+}
+
+
+
+/* Script interface.  */
+
+/* True if 'gdb -P' was used, false otherwise.  */
+static int running_python_script;
+
+/* True if we are currently in a call to 'gdb.cli', false otherwise.  */
+static int in_cli;
+
+/* Enter the command loop.  */
+
+static PyObject *
+gdbpy_cli (PyObject *unused1, PyObject *unused2)
+{
+  if (! running_python_script || in_cli)
+    return PyErr_Format (PyExc_RuntimeError, "cannot invoke CLI recursively");
+
+  in_cli = 1;
+  cli_command_loop ();
+  in_cli = 0;
+
+  Py_RETURN_NONE;
+}
+
+/* Set up the Python argument vector and evaluate a script.  This is
+   used to implement 'gdb -P'.  */
+
+void
+run_python_script (int argc, char **argv)
+{
+  FILE *input;
+
+  running_python_script = 1;
+  PySys_SetArgv (argc - 1, argv + 1);
+  input = fopen (argv[0], "r");
+  if (! input)
+    {
+      fprintf (stderr, "could not open %s: %s\n", argv[0], strerror (errno));
+      exit (1);
+    }
+  PyRun_SimpleFile (input, argv[0]);
+  fclose (input);
+  exit (0);
 }
 
 #else /* HAVE_PYTHON */

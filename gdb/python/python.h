@@ -26,4 +26,6 @@ extern struct value *values_in_python;
 
 void eval_python_from_control_command (struct command_line *);
 
+void run_python_script (int argc, char **argv);
+
 #endif /* GDB_PYTHON_H */
