@@ -865,6 +865,12 @@ find_pc_sect_psymtab (CORE_ADDR pc, asection *section)
      than the later used TEXTLOW/TEXTHIGH one.  */
 
   ALL_OBJFILES (objfile)
+  {
+    if (objfile->quick_addrmap)
+      {
+	if (!addrmap_find (objfile->quick_addrmap, pc))
+	  continue;
+      }
     if (require_partial_symbols (objfile)->psymtabs_addrmap != NULL)
       {
 	struct partial_symtab *pst;
@@ -898,6 +904,7 @@ find_pc_sect_psymtab (CORE_ADDR pc, asection *section)
 	    return pst;
 	  }
       }
+  }
 
   /* Existing PSYMTABS_ADDRMAP mapping is present even for PARTIAL_SYMTABs
      which still have no corresponding full SYMTABs read.  But it is not
@@ -1905,6 +1912,20 @@ find_main_psymtab (void)
 {
   struct partial_symtab *pst;
   struct objfile *objfile;
+
+  ALL_OBJFILES (objfile)
+  {
+    if ((objfile->flags & OBJF_MAIN) == 0)
+      continue;
+    require_partial_symbols (objfile);
+    ALL_OBJFILE_PSYMTABS (objfile, pst)
+    {
+      if (lookup_partial_symbol (pst, main_name (), NULL, 1, VAR_DOMAIN))
+	{
+	  return pst;
+	}
+    }
+  }
 
   ALL_PSYMTABS_REQUIRED (objfile, pst)
   {

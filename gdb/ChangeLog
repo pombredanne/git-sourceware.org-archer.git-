@@ -1,5 +1,20 @@
 2008-09-09  Tom Tromey  <tromey@redhat.com>
 
+	* symtab.c (find_pc_sect_psymtab): Use the quick addrmap.
+	(find_main_psymtab): Search OBJF_MAIN objfiles first.
+	* symfile.h: (dwarf2_create_quick_addrmap): Declare.
+	* symfile.c (symbol_file_add_with_addrs_or_offsets): Set OBJF_MAIN
+	flag.
+	* objfiles.h (struct objfile) <quick_addrmap>: New field.
+	(OBJF_MAIN): New define.
+	* elfread.c (elf_symfile_read): Call dwarf2_create_quick_addrmap.
+	* dwarf2read.c (read_comp_unit_head): Forward declare.
+	(dwarf2_has_info): Make idempotent.
+	(dwarf2_locate_sections): Only update sizes when asked.
+	(dwarf2_create_quick_addrmap): New function.
+
+2008-09-09  Tom Tromey  <tromey@redhat.com>
+
 	* symfile.c (symbol_file_add_with_addrs_or_offsets): Reorder
 	condition.
 	* objfiles.c (have_partial_symbols): Add second loop.

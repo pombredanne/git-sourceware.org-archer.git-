@@ -985,6 +985,8 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd, int from_tty,
     error (_("Not confirmed."));
 
   objfile = allocate_objfile (abfd, flags);
+  if (mainline)
+    objfile->flags |= OBJF_MAIN;
   discard_cleanups (my_cleanups);
 
   if (addrs)

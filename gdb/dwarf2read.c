@@ -102,7 +102,7 @@ typedef struct pubnames_header
 _PUBNAMES_HEADER;
 #define _ACTUAL_PUBNAMES_HEADER_SIZE 13
 
-/* .debug_pubnames header
+/* .debug_aranges header
    Because of alignment constraints, this structure has padding and cannot
    be mapped directly onto the beginning of the .debug_info section.  */
 typedef struct aranges_header
@@ -758,6 +758,9 @@ static void scan_partial_symbols (struct partial_die_info *,
 static void add_partial_symbol (struct partial_die_info *,
 				struct dwarf2_cu *);
 
+static gdb_byte *read_comp_unit_head (struct comp_unit_head *, gdb_byte *,
+				      bfd *);
+
 static int pdi_needs_namespace (enum dwarf_tag tag);
 
 static void add_partial_namespace (struct partial_die_info *pdi,
@@ -1076,13 +1079,19 @@ static struct type *get_die_type (struct die_info *die, struct dwarf2_cu *cu);
 int
 dwarf2_has_info (struct objfile *objfile)
 {
-  struct dwarf2_per_objfile *data;
+  int update_sizes = 0;
 
   /* Initialize per-objfile state.  */
-  data = obstack_alloc (&objfile->objfile_obstack, sizeof (*data));
-  memset (data, 0, sizeof (*data));
-  set_objfile_data (objfile, dwarf2_objfile_data_key, data);
-  dwarf2_per_objfile = data;
+  dwarf2_per_objfile = objfile_data (objfile, dwarf2_objfile_data_key);
+  if (!dwarf2_per_objfile)
+    {
+      struct dwarf2_per_objfile *data
+	= obstack_alloc (&objfile->objfile_obstack, sizeof (*data));
+      memset (data, 0, sizeof (*data));
+      set_objfile_data (objfile, dwarf2_objfile_data_key, data);
+      dwarf2_per_objfile = data;
+      update_sizes = 1;
+    }
 
   dwarf_info_section = 0;
   dwarf_abbrev_section = 0;
@@ -1093,8 +1102,9 @@ dwarf2_has_info (struct objfile *objfile)
   dwarf_eh_frame_section = 0;
   dwarf_ranges_section = 0;
   dwarf_loc_section = 0;
+  dwarf_aranges_section = 0;
   
-  bfd_map_over_sections (objfile->obfd, dwarf2_locate_sections, NULL);
+  bfd_map_over_sections (objfile->obfd, dwarf2_locate_sections, &update_sizes);
   return (dwarf_info_section != NULL && dwarf_abbrev_section != NULL);
 }
 
@@ -1115,51 +1125,61 @@ section_is_p (asection *sectp, const char *name)
    in.  */
 
 static void
-dwarf2_locate_sections (bfd *abfd, asection *sectp, void *ignore_ptr)
+dwarf2_locate_sections (bfd *abfd, asection *sectp, void *user_data)
 {
+  int update_sizes = * (int *) user_data;
   if (section_is_p (sectp, INFO_SECTION))
     {
-      dwarf2_per_objfile->info_size = bfd_get_section_size (sectp);
+      if (update_sizes)
+	dwarf2_per_objfile->info_size = bfd_get_section_size (sectp);
       dwarf_info_section = sectp;
     }
   else if (section_is_p (sectp, ABBREV_SECTION))
     {
-      dwarf2_per_objfile->abbrev_size = bfd_get_section_size (sectp);
+      if (update_sizes)
+	dwarf2_per_objfile->abbrev_size = bfd_get_section_size (sectp);
       dwarf_abbrev_section = sectp;
     }
   else if (section_is_p (sectp, LINE_SECTION))
     {
-      dwarf2_per_objfile->line_size = bfd_get_section_size (sectp);
+      if (update_sizes)
+	dwarf2_per_objfile->line_size = bfd_get_section_size (sectp);
       dwarf_line_section = sectp;
     }
   else if (section_is_p (sectp, PUBNAMES_SECTION))
     {
-      dwarf2_per_objfile->pubnames_size = bfd_get_section_size (sectp);
+      if (update_sizes)
+	dwarf2_per_objfile->pubnames_size = bfd_get_section_size (sectp);
       dwarf_pubnames_section = sectp;
     }
   else if (section_is_p (sectp, ARANGES_SECTION))
     {
-      dwarf2_per_objfile->aranges_size = bfd_get_section_size (sectp);
+      if (update_sizes)
+	dwarf2_per_objfile->aranges_size = bfd_get_section_size (sectp);
       dwarf_aranges_section = sectp;
     }
   else if (section_is_p (sectp, LOC_SECTION))
     {
-      dwarf2_per_objfile->loc_size = bfd_get_section_size (sectp);
+      if (update_sizes)
+	dwarf2_per_objfile->loc_size = bfd_get_section_size (sectp);
       dwarf_loc_section = sectp;
     }
   else if (section_is_p (sectp, MACINFO_SECTION))
     {
-      dwarf2_per_objfile->macinfo_size = bfd_get_section_size (sectp);
+      if (update_sizes)
+	dwarf2_per_objfile->macinfo_size = bfd_get_section_size (sectp);
       dwarf_macinfo_section = sectp;
     }
   else if (section_is_p (sectp, STR_SECTION))
     {
-      dwarf2_per_objfile->str_size = bfd_get_section_size (sectp);
+      if (update_sizes)
+	dwarf2_per_objfile->str_size = bfd_get_section_size (sectp);
       dwarf_str_section = sectp;
     }
   else if (section_is_p (sectp, FRAME_SECTION))
     {
-      dwarf2_per_objfile->frame_size = bfd_get_section_size (sectp);
+      if (update_sizes)
+	dwarf2_per_objfile->frame_size = bfd_get_section_size (sectp);
       dwarf_frame_section = sectp;
     }
   else if (section_is_p (sectp, EH_FRAME_SECTION))
@@ -1167,13 +1187,15 @@ dwarf2_locate_sections (bfd *abfd, asection *sectp, void *ignore_ptr)
       flagword aflag = bfd_get_section_flags (ignore_abfd, sectp);
       if (aflag & SEC_HAS_CONTENTS)
         {
-          dwarf2_per_objfile->eh_frame_size = bfd_get_section_size (sectp);
+	  if (update_sizes)
+	    dwarf2_per_objfile->eh_frame_size = bfd_get_section_size (sectp);
           dwarf_eh_frame_section = sectp;
         }
     }
   else if (section_is_p (sectp, RANGES_SECTION))
     {
-      dwarf2_per_objfile->ranges_size = bfd_get_section_size (sectp);
+      if (update_sizes)
+	dwarf2_per_objfile->ranges_size = bfd_get_section_size (sectp);
       dwarf_ranges_section = sectp;
     }
   
@@ -1215,6 +1237,74 @@ dwarf2_resize_section (asection *sectp, bfd_size_type new_size)
 		    _("dwarf2_resize_section: missing section_is_p check: %s"),
                     sectp->name);
 }
+
+/* Read the .debug_aranges section and construct an address map.  */
+
+void
+dwarf2_create_quick_addrmap (struct objfile *objfile)
+{
+  char *aranges_buffer, *aranges_ptr;
+  bfd *abfd = objfile->obfd;
+  CORE_ADDR baseaddr;
+
+  baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+
+  /* FIXME: this reads it onto the objfile obstack -- but this is just
+     wasted memory.  */
+  aranges_buffer = dwarf2_read_section (objfile, dwarf_aranges_section);
+  aranges_ptr = aranges_buffer;
+
+  /* FIXME: use a different obstack?  Isn't the old addrmap
+     discardable?  */
+  objfile->quick_addrmap = addrmap_create_mutable (&objfile->objfile_obstack);
+
+  while ((aranges_ptr - aranges_buffer) < dwarf2_per_objfile->aranges_size)
+    {
+      struct comp_unit_head cu_header;
+      unsigned int bytes_read, segment_size, delta;
+      LONGEST info_offset;
+      struct dwarf2_cu cu;
+
+      cu_header.initial_length_size = 0;
+      /* FIXME is this cheating?  */
+      aranges_ptr = read_comp_unit_head (&cu_header, aranges_ptr, abfd);
+
+      segment_size = read_1_byte (abfd, aranges_ptr);
+      aranges_ptr += 1;
+
+      /* Align the pointer to twice the pointer size.  I didn't see
+	 this in the spec but it appears to be required.  */
+      delta = (aranges_ptr - aranges_buffer) % (2 * cu_header.addr_size);
+      delta = (2 * cu_header.addr_size - delta) % (2 * cu_header.addr_size);
+      aranges_ptr += delta;
+
+      memset (&cu, 0, sizeof (cu));
+      cu.header.addr_size = cu_header.addr_size;
+
+      while (1)
+	{
+	  CORE_ADDR address, length;
+
+	  address = read_address (abfd, aranges_ptr, &cu, &bytes_read);
+	  aranges_ptr += bytes_read;
+
+	  length = read_address (abfd, aranges_ptr, &cu, &bytes_read);
+	  aranges_ptr += bytes_read;
+
+	  if (address == 0 && length == 0)
+	    break;
+
+	  address += baseaddr;
+
+	  addrmap_set_empty (objfile->quick_addrmap, address, address + length,
+			     objfile);
+	}
+    }
+
+  objfile->quick_addrmap = addrmap_create_fixed (objfile->quick_addrmap,
+						 &objfile->objfile_obstack);
+}
+
 
 /* Build a partial symbol table.  */
 

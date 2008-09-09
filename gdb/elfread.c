@@ -727,6 +727,9 @@ elf_symfile_read (struct objfile *objfile, int mainline)
 				str_sect->filepos,
 				bfd_section_size (abfd, str_sect));
     }
+
+  if (dwarf2_has_info (objfile))
+    dwarf2_create_quick_addrmap (objfile);
 }
 
 static void

@@ -212,6 +212,11 @@ struct objfile
 
     struct partial_symtab *psymtabs;
 
+    /* An address map that can be used to quickly determine if an
+       address comes from this objfile.  This can be NULL.  */
+
+    struct addrmap *quick_addrmap;
+
     /* Map addresses to the entries of PSYMTABS.  It would be more efficient to
        have a map per the whole process but ADDRMAP cannot selectively remove
        its items during FREE_OBJFILE.  This mapping is already present even for
@@ -427,6 +432,8 @@ struct objfile
    This is used to allow lazy reading of partial symtabs.  */
 
 #define OBJF_SYMTABS_READ (1 << 6)
+
+#define OBJF_MAIN (1 << 7)
 
 /* The object file that the main symbol table was loaded from (e.g. the
    argument to the "symbol-file" or "file" command).  */
