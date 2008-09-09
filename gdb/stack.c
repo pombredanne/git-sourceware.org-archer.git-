@@ -1201,24 +1201,24 @@ backtrace_command_1 (char *count_exp, int show_locals, int from_tty)
   else
     count = -1;
 
-/*   if (info_verbose) */
-    {
-      struct partial_symtab *ps;
+  {
+    struct partial_symtab *ps;
 
-      /* Read in symbols for all of the frames.  Need to do this in a
-         separate pass so that "Reading in symbols for xxx" messages
-         don't screw up the appearance of the backtrace.  Also if
-         people have strong opinions against reading symbols for
-         backtrace this may have to be an option.  */
-      i = count;
-      for (fi = trailing; fi != NULL && i--; fi = get_prev_frame (fi))
-	{
-	  QUIT;
-	  ps = find_pc_psymtab (get_frame_address_in_block (fi));
-	  if (info_verbose && ps)
-	    PSYMTAB_TO_SYMTAB (ps); /* Force syms to come in.  */
-	}
-    }
+    /* Read in symbols for all of the frames.  Need to do this
+       unconditionally to ensure that psymbols are read.  Also need to
+       do this in a separate pass so that "Reading in symbols for xxx"
+       messages don't screw up the appearance of the backtrace.  Also
+       if people have strong opinions against reading symbols for
+       backtrace this may have to be an option.  */
+    i = count;
+    for (fi = trailing; fi != NULL && i--; fi = get_prev_frame (fi))
+      {
+	QUIT;
+	ps = find_pc_psymtab (get_frame_address_in_block (fi));
+	if (info_verbose && ps)
+	  PSYMTAB_TO_SYMTAB (ps); /* Force syms to come in.  */
+      }
+  }
 
   for (i = 0, fi = trailing; fi && count--; i++, fi = get_prev_frame (fi))
     {

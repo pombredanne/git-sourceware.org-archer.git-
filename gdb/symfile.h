@@ -139,7 +139,10 @@ struct sym_fns
 
   void (*sym_read) (struct objfile *, int);
 
-  /* Called to read the partial symbols for an objfile.  */
+  /* Read the partial symbols for an objfile.  This may be NULL, in
+     which case gdb assumes that sym_read already read the partial
+     symbols.  */
+
   void (*sym_read_psymbols) (struct objfile *);
 
   /* Called when we are finished with an objfile.  Should do all

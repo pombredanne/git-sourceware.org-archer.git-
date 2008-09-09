@@ -1165,6 +1165,9 @@ fixup_psymbol_section (struct partial_symbol *psym, struct objfile *objfile)
   return psym;
 }
 
+/* Ensure that the partial symbols for OBJFILE have been loaded.  This
+   function always returns its argument, as a convenience.  */
+
 struct objfile *
 require_partial_symbols (struct objfile *objfile)
 {

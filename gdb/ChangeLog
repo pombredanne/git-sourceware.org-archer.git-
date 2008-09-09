@@ -1,3 +1,30 @@
+2008-09-09  Tom Tromey  <tromey@redhat.com>
+
+	* xcoffread.c (xcoff_sym_fns): Update.
+	* symtab.h (require_partial_symbols): Declare.
+	* symtab.c (lookup_partial_symtab): Use ALL_PSYMTABS_REQUIRED.
+	(find_pc_sect_psymtab): Require partial symbols.
+	(require_partial_symbols): New function.
+	(lookup_symbol_aux_psymtabs): Use ALL_PSYMTABS_REQUIRED.
+	(lookup_global_symbol_from_objfile): Require partial symbols.
+	(find_main_psymtab): Update.
+	(search_symbols): Update.
+	* symfile.h (struct sym_fns) <sym_read_psymbols>: New field.
+	* symfile.c (symbol_file_add_with_addrs_or_offsets): Require
+	partial symbols.  Don't print "no debugging symbols found".
+	(reread_symbols): Don't print "no debugging symbols found".
+	* stack.c (backtrace_command_1): Read partial symbols for all
+	frames.
+	* objfiles.h (OBJF_SYMTABS_READ): New define.
+	(ALL_PSYMTABS_REQUIRED): Likewise.
+	* objfiles.c (have_partial_symbols): Require partial symbols.
+	* mipsread.c (ecoff_sym_fns): Update.
+	* elfread.c (elf_symfile_read): Don't read dwarf symbols here...
+	(read_psyms): ... but here.  New function.
+	(elf_sym_fns): Update.
+	* dbxread.c (aout_sym_fns): Update.
+	* coffread.c (coff_sym_fns): Update.
+
 2008-08-26  Luis Machado  <luisgpm@br.ibm.com>
 
 	* ppc-linux-tdep.c (ppc_linux_vsx_regset_sections) New structure.
