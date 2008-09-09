@@ -2421,6 +2421,7 @@ reread_symbols (void)
 		}
 #endif
 	      objfile->flags |= OBJF_SYMS;
+	      objfile->flags &= ~OBJF_SYMTABS_READ;
 
 	      /* We're done reading the symbol file; finish off complaints.  */
 	      clear_complaints (&symfile_complaints, 0, 1);
