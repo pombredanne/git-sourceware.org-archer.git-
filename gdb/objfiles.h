@@ -433,6 +433,8 @@ struct objfile
 
 #define OBJF_SYMTABS_READ (1 << 6)
 
+/* This flag is set for the main objfile.  */
+
 #define OBJF_MAIN (1 << 7)
 
 /* The object file that the main symbol table was loaded from (e.g. the
