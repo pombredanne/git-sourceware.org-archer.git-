@@ -423,6 +423,11 @@ struct objfile
 
 #define OBJF_USERLOADED	(1 << 5)	/* User loaded */
 
+/* Set if we have tried to read partial symtabs for this objfile.
+   This is used to allow lazy reading of partial symtabs.  */
+
+#define OBJF_SYMTABS_READ (1 << 6)
+
 /* The object file that the main symbol table was loaded from (e.g. the
    argument to the "symbol-file" or "file" command).  */
 
@@ -561,6 +566,13 @@ extern void *objfile_data (struct objfile *objfile,
 #define	ALL_PSYMTABS(objfile, p) \
   ALL_OBJFILES (objfile)	 \
     ALL_OBJFILE_PSYMTABS (objfile, p)
+
+/* Like ALL_PSYMTABS, but ensure that partial symbols have been read
+   before examining the objfile.  */
+
+#define ALL_PSYMTABS_REQUIRED(objfile, p)			\
+  ALL_OBJFILES (objfile)					\
+    ALL_OBJFILE_PSYMTABS (require_partial_symbols (objfile), p)
 
 /* Traverse all minimal symbols in all objfiles.  */
 

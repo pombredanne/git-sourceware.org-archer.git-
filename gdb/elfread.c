@@ -727,10 +727,15 @@ elf_symfile_read (struct objfile *objfile, int mainline)
 				str_sect->filepos,
 				bfd_section_size (abfd, str_sect));
     }
+}
+
+static void
+read_psyms (struct objfile *objfile)
+{
   if (dwarf2_has_info (objfile))
     {
       /* DWARF 2 sections */
-      dwarf2_build_psymtabs (objfile, mainline);
+      dwarf2_build_psymtabs (objfile, 0);
     }
 
   /* FIXME: kettenis/20030504: This still needs to be integrated with
@@ -880,6 +885,7 @@ static struct sym_fns elf_sym_fns =
   elf_new_init,			/* sym_new_init: init anything gbl to entire symtab */
   elf_symfile_init,		/* sym_init: read initial info, setup for sym_read() */
   elf_symfile_read,		/* sym_read: read a symbol file into symtab */
+  read_psyms,
   elf_symfile_finish,		/* sym_finish: finished with file, cleanup */
   default_symfile_offsets,	/* sym_offsets:  Translate ext. to int. relocation */
   elf_symfile_segments,		/* sym_segments: Get segment information from

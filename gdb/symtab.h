@@ -1040,6 +1040,8 @@ extern void clear_pc_function_cache (void);
 
 /* from symtab.c: */
 
+struct objfile *require_partial_symbols (struct objfile *);
+
 /* lookup partial symbol table by filename */
 
 extern struct partial_symtab *lookup_partial_symtab (const char *);

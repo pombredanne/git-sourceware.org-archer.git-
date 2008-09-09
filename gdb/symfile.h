@@ -139,6 +139,9 @@ struct sym_fns
 
   void (*sym_read) (struct objfile *, int);
 
+  /* Called to read the partial symbols for an objfile.  */
+  void (*sym_read_psymbols) (struct objfile *);
+
   /* Called when we are finished with an objfile.  Should do all
      cleanup that is specific to the object file format for the
      particular objfile.  */

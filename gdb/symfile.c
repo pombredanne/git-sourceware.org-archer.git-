@@ -1020,6 +1020,8 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd, int from_tty,
 
   if ((flags & OBJF_READNOW) || readnow_symbol_files)
     {
+      require_partial_symbols (objfile);
+
       if ((from_tty || info_verbose) && print_symbol_loading)
 	{
 	  printf_unfiltered (_("expanding to full symbols..."));
@@ -1062,6 +1064,7 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd, int from_tty,
       xfree (debugfile);
     }
 
+#if 0
   if (!have_partial_symbols () && !have_full_symbols ()
       && print_symbol_loading)
     {
@@ -1073,6 +1076,7 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd, int from_tty,
         printf_filtered ("\n");
       wrap_here ("");
     }
+#endif
 
   if (from_tty || info_verbose)
     {
@@ -2408,12 +2412,14 @@ reread_symbols (void)
 	         zero is OK since dbxread.c also does what it needs to do if
 	         objfile->global_psymbols.size is 0.  */
 	      (*objfile->sf->sym_read) (objfile, 0);
+#if 0
 	      if (!have_partial_symbols () && !have_full_symbols ())
 		{
 		  wrap_here ("");
 		  printf_unfiltered (_("(no debugging symbols found)\n"));
 		  wrap_here ("");
 		}
+#endif
 	      objfile->flags |= OBJF_SYMS;
 
 	      /* We're done reading the symbol file; finish off complaints.  */

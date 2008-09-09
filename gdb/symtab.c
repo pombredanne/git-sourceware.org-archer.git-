@@ -271,7 +271,7 @@ lookup_partial_symtab (const char *name)
       make_cleanup (xfree, real_path);
     }
 
-  ALL_PSYMTABS (objfile, pst)
+  ALL_PSYMTABS_REQUIRED (objfile, pst)
   {
     if (FILENAME_CMP (name, pst->filename) == 0)
       {
@@ -865,7 +865,7 @@ find_pc_sect_psymtab (CORE_ADDR pc, asection *section)
      than the later used TEXTLOW/TEXTHIGH one.  */
 
   ALL_OBJFILES (objfile)
-    if (objfile->psymtabs_addrmap != NULL)
+    if (require_partial_symbols (objfile)->psymtabs_addrmap != NULL)
       {
 	struct partial_symtab *pst;
 
@@ -1165,6 +1165,19 @@ fixup_psymbol_section (struct partial_symbol *psym, struct objfile *objfile)
   return psym;
 }
 
+struct objfile *
+require_partial_symbols (struct objfile *objfile)
+{
+  if ((objfile->flags & OBJF_SYMTABS_READ) == 0)
+    {
+      objfile->flags |= OBJF_SYMTABS_READ;
+
+      if (objfile->sf->sym_read_psymbols)
+	(*objfile->sf->sym_read_psymbols) (objfile);
+    }
+  return objfile;
+}
+
 /* Find the definition for a specified symbol name NAME
    in domain DOMAIN, visible from lexical block BLOCK.
    Returns the struct symbol pointer, or zero if no symbol is found.
@@ -1445,6 +1458,7 @@ lookup_global_symbol_from_objfile (const struct objfile *objfile,
   }
 
   /* Now go through psymtabs.  */
+  require_partial_symbols ((struct objfile *) objfile);
   ALL_OBJFILE_PSYMTABS (objfile, ps)
   {
     if (!ps->readin
@@ -1515,7 +1529,7 @@ lookup_symbol_aux_psymtabs (int block_index, const char *name,
   struct symtab *s;
   const int psymtab_index = (block_index == GLOBAL_BLOCK ? 1 : 0);
 
-  ALL_PSYMTABS (objfile, ps)
+  ALL_PSYMTABS_REQUIRED (objfile, ps)
   {
     if (!ps->readin
 	&& lookup_partial_symbol (ps, name, linkage_name,
@@ -1889,7 +1903,7 @@ find_main_psymtab (void)
   struct partial_symtab *pst;
   struct objfile *objfile;
 
-  ALL_PSYMTABS (objfile, pst)
+  ALL_PSYMTABS_REQUIRED (objfile, pst)
   {
     if (lookup_partial_symbol (pst, main_name (), NULL, 1, VAR_DOMAIN))
       {
@@ -3081,7 +3095,7 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
      matching the regexp.  That way we don't have to reproduce all of
      the machinery below. */
 
-  ALL_PSYMTABS (objfile, ps)
+  ALL_PSYMTABS_REQUIRED (objfile, ps)
   {
     struct partial_symbol **bound, **gbound, **sbound;
     int keep_going = 1;

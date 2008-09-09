@@ -394,6 +394,7 @@ static struct sym_fns ecoff_sym_fns =
   mipscoff_new_init,		/* sym_new_init: init anything gbl to entire symtab */
   mipscoff_symfile_init,	/* sym_init: read initial info, setup for sym_read() */
   mipscoff_symfile_read,	/* sym_read: read a symbol file into symtab */
+  NULL,
   mipscoff_symfile_finish,	/* sym_finish: finished with file, cleanup */
   default_symfile_offsets,	/* sym_offsets: dummy FIXME til implem sym reloc */
   default_symfile_segments,	/* sym_segments: Get segment information from

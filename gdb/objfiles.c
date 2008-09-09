@@ -686,6 +686,7 @@ have_partial_symbols (void)
 
   ALL_OBJFILES (ofp)
   {
+    require_partial_symbols (ofp);
     if (ofp->psymtabs != NULL)
       {
 	return 1;

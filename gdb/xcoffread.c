@@ -3020,6 +3020,7 @@ static struct sym_fns xcoff_sym_fns =
   xcoff_new_init,		/* sym_new_init: init anything gbl to entire symtab */
   xcoff_symfile_init,		/* sym_init: read initial info, setup for sym_read() */
   xcoff_initial_scan,		/* sym_read: read a symbol file into symtab */
+  NULL,
   xcoff_symfile_finish,		/* sym_finish: finished with file, cleanup */
   xcoff_symfile_offsets,	/* sym_offsets: xlate offsets ext->int form */
   default_symfile_segments,	/* sym_segments: Get segment information from

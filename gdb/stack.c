@@ -1201,7 +1201,7 @@ backtrace_command_1 (char *count_exp, int show_locals, int from_tty)
   else
     count = -1;
 
-  if (info_verbose)
+/*   if (info_verbose) */
     {
       struct partial_symtab *ps;
 
@@ -1215,7 +1215,7 @@ backtrace_command_1 (char *count_exp, int show_locals, int from_tty)
 	{
 	  QUIT;
 	  ps = find_pc_psymtab (get_frame_address_in_block (fi));
-	  if (ps)
+	  if (info_verbose && ps)
 	    PSYMTAB_TO_SYMTAB (ps); /* Force syms to come in.  */
 	}
     }
