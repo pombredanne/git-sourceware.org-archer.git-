@@ -686,12 +686,25 @@ have_partial_symbols (void)
 
   ALL_OBJFILES (ofp)
   {
+    if (ofp->psymtabs != NULL)
+      {
+	return 1;
+      }
+  }
+
+  /* Try again, after reading partial symbols.  We do this in two
+     passes because objfiles are always added to the head of the list,
+     and there might be a later objfile for which we've already read
+     partial symbols.  */
+  ALL_OBJFILES (ofp)
+  {
     require_partial_symbols (ofp);
     if (ofp->psymtabs != NULL)
       {
 	return 1;
       }
   }
+
   return 0;
 }
 

@@ -1,5 +1,11 @@
 2008-09-09  Tom Tromey  <tromey@redhat.com>
 
+	* symfile.c (symbol_file_add_with_addrs_or_offsets): Reorder
+	condition.
+	* objfiles.c (have_partial_symbols): Add second loop.
+
+2008-09-09  Tom Tromey  <tromey@redhat.com>
+
 	* xcoffread.c (xcoff_sym_fns): Update.
 	* symtab.h (require_partial_symbols): Declare.
 	* symtab.c (lookup_partial_symtab): Use ALL_PSYMTABS_REQUIRED.

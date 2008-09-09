@@ -978,9 +978,9 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd, int from_tty,
   /* Give user a chance to burp if we'd be
      interactively wiping out any existing symbols.  */
 
-  if ((have_full_symbols () || have_partial_symbols ())
-      && mainline
+  if (mainline
       && from_tty
+      && (have_full_symbols () || have_partial_symbols ())
       && !query ("Load new symbol table from \"%s\"? ", name))
     error (_("Not confirmed."));
 
