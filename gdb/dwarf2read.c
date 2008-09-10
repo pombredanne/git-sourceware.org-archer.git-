@@ -937,6 +937,8 @@ static void read_common_block (struct die_info *, struct dwarf2_cu *);
 
 static void read_namespace (struct die_info *die, struct dwarf2_cu *);
 
+static void read_import_statement (struct die_info *die, struct dwarf2_cu *);
+
 static const char *namespace_name (struct die_info *die,
 				   int *is_anonymous, struct dwarf2_cu *);
 
@@ -2756,14 +2758,12 @@ process_die (struct die_info *die, struct dwarf2_cu *cu)
       break;
     case DW_TAG_imported_declaration:
     case DW_TAG_imported_module:
-      /* FIXME: carlton/2002-10-16: Eventually, we should use the
-	 information contained in these.  DW_TAG_imported_declaration
-	 dies shouldn't have children; DW_TAG_imported_module dies
-	 shouldn't in the C++ case, but conceivably could in the
-	 Fortran case.  */
       processing_has_namespace_info = 1;
-      complaint (&symfile_complaints, _("unsupported tag: '%s'"),
-		 dwarf_tag_name (die->tag));
+      if (die->child != NULL && (die->tag == DW_TAG_imported_declaration
+				 || cu->language != language_fortran))
+	complaint (&symfile_complaints, _("Tag '%s' has unexpected children"),
+		   dwarf_tag_name (die->tag));
+      read_import_statement (die, cu);
       break;
     default:
       new_symbol (die, NULL, cu);
@@ -2807,6 +2807,38 @@ dwarf2_full_name (struct die_info *die, struct dwarf2_cu *cu)
 			    name, cu);
 
   return name;
+}
+
+/* Read the import statement specified by the given die and record it.  */ 
+
+static void
+read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
+{
+  struct attribute *import_attr;
+  struct die_info *imported_die;
+  const char *imported_name;
+  int is_anonymous = 0;
+  
+  import_attr = dwarf2_attr (die, DW_AT_import, cu);
+  if (import_attr == NULL)
+    {
+      complaint (&symfile_complaints, _("Tag '%s' has no DW_AT_import"),
+		 dwarf_tag_name (die->tag));
+      return;
+    }
+
+  imported_die = follow_die_ref (die, import_attr, &cu);
+  imported_name = namespace_name (imported_die, &is_anonymous, cu);
+  if (imported_name == NULL)
+    {
+      /* C++ imports from std:: DW_TAG_base_type with no DW_AT_name - why?  */
+      return;
+    }
+
+  /* FIXME: dwarf2_name (die); for the local name after import.  */
+  
+  using_directives = cp_add_using (imported_name, strlen (imported_name), 0,
+                                   using_directives);
 }
 
 static void
@@ -3043,6 +3075,7 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
      back to building a containing block's symbol lists.  */
   local_symbols = new->locals;
   param_symbols = new->params;
+  using_directives = new->using_directives;
 
   /* If we've finished processing a top-level function, subsequent
      symbols go in the file symbol list.  */
@@ -3105,6 +3138,7 @@ read_lexical_block_scope (struct die_info *die, struct dwarf2_cu *cu)
       dwarf2_record_block_ranges (die, block, baseaddr, cu);
     }
   local_symbols = new->locals;
+  using_directives = new->using_directives;
 }
 
 /* Get low and high pc attributes from DW_AT_ranges attribute value OFFSET.

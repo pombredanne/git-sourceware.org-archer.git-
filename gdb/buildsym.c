@@ -384,6 +384,8 @@ finish_block (struct symbol *symbol, struct pending **listhead,
       opblock = pblock;
     }
 
+  block_set_using (block, using_directives, &objfile->objfile_obstack);
+
   record_pending_block (objfile, block, opblock);
 
   return block;
@@ -1202,10 +1204,12 @@ push_context (int desc, CORE_ADDR valu)
   new->params = param_symbols;
   new->old_blocks = pending_blocks;
   new->start_addr = valu;
+  new->using_directives = using_directives;
   new->name = NULL;
 
   local_symbols = NULL;
   param_symbols = NULL;
+  using_directives = NULL;
 
   return new;
 }

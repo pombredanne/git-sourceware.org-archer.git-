@@ -35,11 +35,6 @@
 
 static struct using_direct *using_list;
 
-static struct using_direct *cp_add_using (const char *name,
-					  unsigned int inner_len,
-					  unsigned int outer_len,
-					  struct using_direct *next);
-
 static struct using_direct *cp_copy_usings (struct using_direct *using,
 					    struct obstack *obstack);
 
@@ -237,7 +232,7 @@ cp_is_anonymous (const char *namespace)
    using xmalloc.  It copies the strings, so NAME can be a temporary
    string.  */
 
-static struct using_direct *
+struct using_direct *
 cp_add_using (const char *name,
 	      unsigned int inner_len,
 	      unsigned int outer_len,

@@ -1,3 +1,8 @@
+2008-09-09  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/namespace-using.cc: New test.
+	* gdb.cp/namespace-using.exp: New test.
+
 2008-09-09  Pedro Alves  <pedro@codesourcery.com>
 
 	* gdb.base/hook-stop-continue.c: New.
