@@ -1,4 +1,4 @@
-2008-11-20  Andreas Schwab  <schwab@suse.de>
+2008-09-09  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* gdb.base/foll-fork.exp (catch_fork_child_follow): Fix patterns
 	matching syscall entry point.
@@ -250,6 +250,11 @@
 
 	* gdb.ada/packed_tagged.exp: Accept "boolean" as a valid type
 	description for boolean types.
+
+2008-09-09  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/namespace-using.cc: New test.
+	* gdb.cp/namespace-using.exp: New test.
 
 2008-09-09  Pedro Alves  <pedro@codesourcery.com>
 
