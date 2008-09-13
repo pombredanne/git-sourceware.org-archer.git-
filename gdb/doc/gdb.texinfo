@@ -17656,6 +17656,14 @@ in a Python script.  This can be controlled using @code{maint set
 python print-stack}: if @code{on}, the default, then Python stack
 printing is enabled; if @code{off}, then Python stack printing is
 disabled.
+
+@kindex maint set python auto-load
+@item maint set python auto-load
+By default, @value{GDBN} will attempt to automatically load Python
+code when an object file is opened.  This can be controlled using
+@code{maint set python auto-load}: if @code{on}, the default, then
+Python auto-loading is enabled; if @code{off}, then Python
+auto-loading is disabled.
 @end table
 
 @node Python API
@@ -17674,6 +17682,7 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 @menu
 * Basic Python::                Basic Python Functions.
 * Exception Handling::
+* Auto-loading::                Automatically loading Python code.
 * Values From Inferior::
 * Threads In Python::           Accessing inferior threads from Python.
 * Commands In Python::          Implementing new commands in Python.
@@ -17754,6 +17763,26 @@ exception handler will see @code{RuntimeError} or
 message as its value, and the Python call stack backtrace at the
 Python statement closest to where the @value{GDBN} error occured as the
 traceback.
+
+@node Auto-loading
+@subsubsection Auto-loading
+
+When a new object file is read (for example, due to the @code{file}
+command, or because the inferior has loaded a shared library),
+@value{GDBN} will look for a file named @file{.gdb.py} in the
+directory holding the object file.  If this file exists and is
+readable, @value{GDBN} will evaluate it as a Python script.  Note
+that, if a separate debug file is used, @value{GDBN} will look for
+@file{.gdb.py} both in the directory associated with the application
+and the directory associated with the separate debug file.
+
+This feature is useful for supplying application-specific debugging
+commands and scripts.  It can be disabled using @code{maint set python
+auto-load}.
+
+@value{GDBN} does not track which files it has already auto-loaded.
+So, your @file{.gdb.py} should take care to ensure that it may be
+evaluated multiple times without error.
 
 @node Values From Inferior
 @subsubsection Values From Inferior

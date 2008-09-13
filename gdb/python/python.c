@@ -22,12 +22,18 @@
 #include "ui-out.h"
 #include "cli/cli-script.h"
 #include "gdbcmd.h"
+#include "objfiles.h"
+#include "observer.h"
 
 #include <ctype.h>
 
 /* True if we should print the stack when catching a Python error,
    false otherwise.  */
 static int gdbpy_should_print_stack = 1;
+
+/* This is true if we should auto-load python code when an objfile is
+   opened, false otherwise.  */
+static int gdbpy_auto_load = 1;
 
 #ifdef HAVE_PYTHON
 
@@ -585,6 +591,45 @@ run_python_script (int argc, char **argv)
   exit (0);
 }
 
+
+
+/* The file name we attempt to read.  */
+#define GDBPY_AUTO_FILENAME ".gdb.py"
+
+/* This is a new_objfile observer callback which loads python code
+   based on the path to the objfile.  */
+static void
+gdbpy_new_objfile (struct objfile *objfile)
+{
+  char *p;
+  char *filename;
+  int len;
+  FILE *input;
+
+  if (!gdbpy_auto_load || !objfile || !objfile->name)
+    return;
+
+  p = (char *) lbasename (objfile->name);
+  len = p - objfile->name;
+  filename = xmalloc (len + sizeof (GDBPY_AUTO_FILENAME));
+  memcpy (filename, objfile->name, len);
+  strcpy (filename + len, GDBPY_AUTO_FILENAME);
+
+  input = fopen (filename, "r");
+
+  if (input)
+    {
+      /* We don't want to throw an exception here -- but the user
+	 would like to know that something went wrong.  */
+      if (PyRun_SimpleFile (input, filename))
+	gdbpy_print_stack ();
+      fclose (input);
+    }
+
+  xfree (filename);
+}
+
+
 #else /* HAVE_PYTHON */
 
 /* Dummy implementation of the gdb "python" command.  */
@@ -680,6 +725,15 @@ Enables or disables printing of Python stack traces."),
 			   &set_python_list,
 			   &show_python_list);
 
+  add_setshow_boolean_cmd ("auto-load", class_maintenance,
+			   &gdbpy_auto_load, _("\
+Enable or disable auto-loading of Python code when an object is opened."), _("\
+Show whether Python code will be auto-loaded when an object is opened."), _("\
+Enables or disables auto-loading of Python code when an object is opened."),
+			   NULL, NULL,
+			   &set_python_list,
+			   &show_python_list);
+
 #ifdef HAVE_PYTHON
   Py_Initialize ();
 
@@ -700,6 +754,8 @@ Enables or disables printing of Python stack traces."),
   gdbpy_initialize_functions ();
 
   PyRun_SimpleString ("import gdb");
+
+  observer_attach_new_objfile (gdbpy_new_objfile);
 
   /* Create a couple objects which are used for Python's stdout and
      stderr.  */
