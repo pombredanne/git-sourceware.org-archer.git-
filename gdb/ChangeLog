@@ -1,3 +1,13 @@
+2008-09-12  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (finalize_obstack): New function.
+	(dwarf2_create_quick_addrmap): Don't allocate aranges buffer and
+	mutable address map on objfile obstack.
+	(zlib_decompress_section): Add obstack argument.  Allocate with
+	xmalloc if requested.
+	(dwarf2_read_section_1): New function.
+	(dwarf2_read_section): Use it.
+
 2008-09-09  Tom Tromey  <tromey@redhat.com>
 
 	* symtab.c (find_pc_sect_psymtab): Use the quick addrmap.

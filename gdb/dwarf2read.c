@@ -779,6 +779,10 @@ static void dwarf2_psymtab_to_symtab (struct partial_symtab *);
 
 static void psymtab_to_symtab_1 (struct partial_symtab *);
 
+static gdb_byte *dwarf2_read_section_1 (struct objfile *objfile,
+					struct obstack *obstack,
+					asection *sectp);
+
 gdb_byte *dwarf2_read_section (struct objfile *, asection *);
 
 static void dwarf2_read_abbrevs (bfd *abfd, struct dwarf2_cu *cu);
@@ -1238,6 +1242,14 @@ dwarf2_resize_section (asection *sectp, bfd_size_type new_size)
                     sectp->name);
 }
 
+/* A cleanup that frees an obstack.  */
+static void
+finalize_obstack (void *o)
+{
+  struct obstack *ob = o;
+  obstack_free (o, 0);
+}
+
 /* Read the .debug_aranges section and construct an address map.  */
 
 void
@@ -1246,17 +1258,19 @@ dwarf2_create_quick_addrmap (struct objfile *objfile)
   char *aranges_buffer, *aranges_ptr;
   bfd *abfd = objfile->obfd;
   CORE_ADDR baseaddr;
+  struct cleanup *old;
+  struct obstack temp_obstack;
+  struct addrmap *mutable_map;
 
   baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
 
-  /* FIXME: this reads it onto the objfile obstack -- but this is just
-     wasted memory.  */
-  aranges_buffer = dwarf2_read_section (objfile, dwarf_aranges_section);
+  aranges_buffer = dwarf2_read_section_1 (objfile, NULL, dwarf_aranges_section);
   aranges_ptr = aranges_buffer;
+  old = make_cleanup (xfree, aranges_buffer);
 
-  /* FIXME: use a different obstack?  Isn't the old addrmap
-     discardable?  */
-  objfile->quick_addrmap = addrmap_create_mutable (&objfile->objfile_obstack);
+  obstack_init (&temp_obstack);
+  make_cleanup (finalize_obstack, &temp_obstack);
+  mutable_map = addrmap_create_mutable (&temp_obstack);
 
   while ((aranges_ptr - aranges_buffer) < dwarf2_per_objfile->aranges_size)
     {
@@ -1266,7 +1280,6 @@ dwarf2_create_quick_addrmap (struct objfile *objfile)
       struct dwarf2_cu cu;
 
       cu_header.initial_length_size = 0;
-      /* FIXME is this cheating?  */
       aranges_ptr = read_comp_unit_head (&cu_header, aranges_ptr, abfd);
 
       segment_size = read_1_byte (abfd, aranges_ptr);
@@ -1296,13 +1309,13 @@ dwarf2_create_quick_addrmap (struct objfile *objfile)
 
 	  address += baseaddr;
 
-	  addrmap_set_empty (objfile->quick_addrmap, address, address + length,
-			     objfile);
+	  addrmap_set_empty (mutable_map, address, address + length, objfile);
 	}
     }
 
-  objfile->quick_addrmap = addrmap_create_fixed (objfile->quick_addrmap,
+  objfile->quick_addrmap = addrmap_create_fixed (mutable_map,
 						 &objfile->objfile_obstack);
+  do_cleanups (old);
 }
 
 
@@ -5295,10 +5308,13 @@ read_die_and_siblings (gdb_byte *info_ptr, bfd *abfd,
 }
 
 /* Decompress a section that was compressed using zlib.  Store the
-   decompressed buffer, and its size, in OUTBUF and OUTSIZE.  */
+   decompressed buffer, and its size, in OUTBUF and OUTSIZE.  The
+   result is allocated on OBSTACK; if OBSTACK is NULL, xmalloc is
+   used.  */
 
 static void
-zlib_decompress_section (struct objfile *objfile, asection *sectp,
+zlib_decompress_section (struct objfile *objfile, struct obstack *obstack,
+			 asection *sectp,
                          gdb_byte **outbuf, bfd_size_type *outsize)
 {
   bfd *abfd = objfile->obfd;
@@ -5314,6 +5330,7 @@ zlib_decompress_section (struct objfile *objfile, asection *sectp,
   z_stream strm;
   int rc;
   int header_size = 12;
+  struct cleanup *old = NULL;
 
   if (bfd_seek (abfd, sectp->filepos, SEEK_SET) != 0
       || bfd_bread (compressed_buffer, compressed_size, abfd) != compressed_size)
@@ -5343,8 +5360,13 @@ zlib_decompress_section (struct objfile *objfile, asection *sectp,
   strm.avail_in = compressed_size - header_size;
   strm.next_in = (Bytef*) compressed_buffer + header_size;
   strm.avail_out = uncompressed_size;
-  uncompressed_buffer = obstack_alloc (&objfile->objfile_obstack,
-                                       uncompressed_size);
+  if (obstack)
+    uncompressed_buffer = obstack_alloc (obstack, uncompressed_size);
+  else
+    {
+      uncompressed_buffer = xmalloc (uncompressed_size);
+      old = make_cleanup (xfree, uncompressed_buffer);
+    }
   rc = inflateInit (&strm);
   while (strm.avail_in > 0)
     {
@@ -5365,6 +5387,8 @@ zlib_decompress_section (struct objfile *objfile, asection *sectp,
     error (_("Dwarf Error: concluding DWARF uncompression in '%s': %d"),
            bfd_get_filename (abfd), rc);
 
+  if (old)
+    discard_cleanups (old);
   xfree (compressed_buffer);
   *outbuf = uncompressed_buffer;
   *outsize = uncompressed_size;
@@ -5372,17 +5396,20 @@ zlib_decompress_section (struct objfile *objfile, asection *sectp,
 }
 
 
-/* Read the contents of the section at OFFSET and of size SIZE from the
-   object file specified by OBJFILE into the objfile_obstack and return it.
-   If the section is compressed, uncompress it before returning.  */
+/* Read the contents of the section at OFFSET and of size SIZE from
+   the object file specified by OBJFILE into OBSTACK and return it.
+   If OBSTACK is NULL, xmalloc is used instead.  If the section is
+   compressed, uncompress it before returning.  */
 
-gdb_byte *
-dwarf2_read_section (struct objfile *objfile, asection *sectp)
+static gdb_byte *
+dwarf2_read_section_1 (struct objfile *objfile, struct obstack *obstack,
+		       asection *sectp)
 {
   bfd *abfd = objfile->obfd;
   gdb_byte *buf, *retbuf;
   bfd_size_type size = bfd_get_section_size (sectp);
   unsigned char header[4];
+  struct cleanup *old = NULL;
 
   if (size == 0)
     return NULL;
@@ -5395,28 +5422,47 @@ dwarf2_read_section (struct objfile *objfile, asection *sectp)
       /* Upon decompression, update the buffer and its size.  */
       if (strncmp (header, "ZLIB", sizeof (header)) == 0)
         {
-          zlib_decompress_section (objfile, sectp, &buf, &size);
+          zlib_decompress_section (objfile, obstack, sectp, &buf, &size);
           dwarf2_resize_section (sectp, size);
           return buf;
         }
     }
 
   /* If we get here, we are a normal, not-compressed section.  */
-  buf = obstack_alloc (&objfile->objfile_obstack, size);
+  if (obstack)
+    buf = obstack_alloc (obstack, size);
+  else
+    {
+      buf = xmalloc (size);
+      old = make_cleanup (xfree, buf);
+    }
   /* When debugging .o files, we may need to apply relocations; see
      http://sourceware.org/ml/gdb-patches/2002-04/msg00136.html .
      We never compress sections in .o files, so we only need to
      try this when the section is not compressed.  */
   retbuf = symfile_relocate_debug_section (abfd, sectp, buf);
   if (retbuf != NULL)
-    return retbuf;
+    {
+      if (old)
+	discard_cleanups (old);
+      return retbuf;
+    }
 
   if (bfd_seek (abfd, sectp->filepos, SEEK_SET) != 0
       || bfd_bread (buf, size, abfd) != size)
     error (_("Dwarf Error: Can't read DWARF data from '%s'"),
 	   bfd_get_filename (abfd));
 
+  if (old)
+    discard_cleanups (old);
+
   return buf;
+}
+
+gdb_byte *
+dwarf2_read_section (struct objfile *objfile, asection *sectp)
+{
+  return dwarf2_read_section_1 (objfile, &objfile->objfile_obstack, sectp);
 }
 
 /* In DWARF version 2, the description of the debugging information is
