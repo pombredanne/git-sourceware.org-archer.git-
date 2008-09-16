@@ -1367,8 +1367,10 @@ find_separate_debug_file (struct objfile *objfile)
       /* Prevent looping on a stripped .debug file.  */
       if (build_id_name != NULL && strcmp (build_id_name, objfile->name) == 0)
         {
+#if 0  /* FIXME: With lazy psymtab reading, we erroneously get this.  */
 	  warning (_("\"%s\": separate debug info file has no debug info"),
 		   build_id_name);
+#endif
 	  xfree (build_id_name);
 	}
       else if (build_id_name != NULL)

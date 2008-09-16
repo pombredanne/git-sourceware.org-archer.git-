@@ -1,3 +1,7 @@
+2008-09-16  Tom Tromey  <tromey@redhat.com>
+
+	* symfile.c (find_separate_debug_file): Comment out warning.
+
 2008-09-12  Tom Tromey  <tromey@redhat.com>
 
 	* dwarf2read.c (finalize_obstack): New function.
