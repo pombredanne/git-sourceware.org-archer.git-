@@ -942,6 +942,17 @@ new_symfile_objfile (struct objfile *objfile, int mainline, int verbo)
   clear_complaints (&symfile_complaints, 0, verbo);
 }
 
+/* A helper function which returns true if OBJFILE has any debug
+   symbols, and false otherwise.  */
+static int
+has_any_debug_symbols (struct objfile *objfile)
+{
+  return (objfile->psymtabs || objfile->quick_addrmap
+	  || (objfile->separate_debug_objfile
+	      && (objfile->separate_debug_objfile->psymtabs
+		  || objfile->separate_debug_objfile->quick_addrmap)));
+}
+
 /* Process a symbol file, as either the main file or as a dynamically
    loaded file.
 
@@ -1042,7 +1053,7 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd, int from_tty,
   /* If the file has its own symbol tables it has no separate debug info.
      `.dynsym'/`.symtab' go to MSYMBOLS, `.debug_info' goes to SYMTABS/PSYMTABS.
      `.gnu_debuglink' may no longer be present with `.note.gnu.build-id'.  */
-  if (objfile->psymtabs == NULL)
+  if (!has_any_debug_symbols (objfile))
     debugfile = find_separate_debug_file (objfile);
   if (debugfile)
     {
@@ -1066,9 +1077,7 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd, int from_tty,
       xfree (debugfile);
     }
 
-#if 0
-  if (!have_partial_symbols () && !have_full_symbols ()
-      && print_symbol_loading)
+  if (print_symbol_loading && !has_any_debug_symbols (objfile))
     {
       wrap_here ("");
       printf_filtered (_("(no debugging symbols found)"));
@@ -1078,7 +1087,6 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd, int from_tty,
         printf_filtered ("\n");
       wrap_here ("");
     }
-#endif
 
   if (from_tty || info_verbose)
     {
@@ -1367,10 +1375,8 @@ find_separate_debug_file (struct objfile *objfile)
       /* Prevent looping on a stripped .debug file.  */
       if (build_id_name != NULL && strcmp (build_id_name, objfile->name) == 0)
         {
-#if 0  /* FIXME: With lazy psymtab reading, we erroneously get this.  */
 	  warning (_("\"%s\": separate debug info file has no debug info"),
 		   build_id_name);
-#endif
 	  xfree (build_id_name);
 	}
       else if (build_id_name != NULL)
@@ -2416,14 +2422,13 @@ reread_symbols (void)
 	         zero is OK since dbxread.c also does what it needs to do if
 	         objfile->global_psymbols.size is 0.  */
 	      (*objfile->sf->sym_read) (objfile, 0);
-#if 0
-	      if (!have_partial_symbols () && !have_full_symbols ())
+	      if (!has_any_debug_symbols (objfile))
 		{
 		  wrap_here ("");
 		  printf_unfiltered (_("(no debugging symbols found)\n"));
 		  wrap_here ("");
 		}
-#endif
+
 	      objfile->flags |= OBJF_SYMS;
 	      objfile->flags &= ~OBJF_SYMTABS_READ;
 

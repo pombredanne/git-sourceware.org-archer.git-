@@ -1,5 +1,13 @@
 2008-09-16  Tom Tromey  <tromey@redhat.com>
 
+	* symfile.c (has_any_debug_symbols): New function.
+	(symbol_file_add_with_addrs_or_offsets): Use it.  Re-enable
+	messages.
+	(reread_symbols): Likewise.
+	(find_separate_debug_file): Uncomment warning.
+
+2008-09-16  Tom Tromey  <tromey@redhat.com>
+
 	* symfile.c (find_separate_debug_file): Comment out warning.
 
 2008-09-12  Tom Tromey  <tromey@redhat.com>
