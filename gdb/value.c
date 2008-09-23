@@ -744,7 +744,7 @@ show_values (char *num_exp, int from_tty)
     {
       val = access_value_history (i);
       printf_filtered (("$%d = "), i);
-      value_print (val, gdb_stdout, 0, Val_pretty_default);
+      value_print (val, gdb_stdout, 0, 0, Val_pretty_default);
       printf_filtered (("\n"));
     }
 
@@ -1091,7 +1091,7 @@ show_convenience (char *ignore, int from_tty)
 	}
       printf_filtered (("$%s = "), var->name);
       value_print (value_of_internalvar (var), gdb_stdout,
-		   0, Val_pretty_default);
+		   0, 0, Val_pretty_default);
       printf_filtered (("\n"));
     }
   if (!varseen)

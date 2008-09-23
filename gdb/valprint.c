@@ -304,10 +304,16 @@ common_val_print (struct value *val, struct ui_file *stream, int format,
 
 int
 value_print (struct value *val, struct ui_file *stream, int format,
-	     enum val_prettyprint pretty)
+	     int raw, enum val_prettyprint pretty)
 {
   if (!value_check_printable (val, stream))
     return 0;
+
+  if (!raw)
+    {
+      /* This is where we would call the printer if we had implemented
+	 that yet.  */
+    }
 
   return LA_VALUE_PRINT (val, stream, format, pretty);
 }

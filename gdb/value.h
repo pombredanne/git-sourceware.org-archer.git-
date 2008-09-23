@@ -527,7 +527,7 @@ extern void print_decimal_floating (const gdb_byte *valaddr, struct type *type,
 				    struct ui_file *stream);
 
 extern int value_print (struct value *val, struct ui_file *stream, int format,
-			enum val_prettyprint pretty);
+			int raw, enum val_prettyprint pretty);
 
 extern void value_print_array_elements (struct value *val,
 					struct ui_file *stream, int format,

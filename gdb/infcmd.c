@@ -1291,7 +1291,7 @@ print_return_value (struct type *func_type, struct type *value_type)
       ui_out_field_fmt (uiout, "gdb-result-var", "$%d",
 			record_latest_value (value));
       ui_out_text (uiout, " = ");
-      value_print (value, stb->stream, 0, Val_no_prettyprint);
+      value_print (value, stb->stream, 0, 0, Val_no_prettyprint);
       ui_out_field_stream (uiout, "return-value", stb);
       ui_out_text (uiout, "\n");
       do_cleanups (old_chain);

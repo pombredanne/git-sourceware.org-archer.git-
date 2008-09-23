@@ -62,11 +62,15 @@ struct format_data
     int count;
     char format;
     char size;
+
+    /* True if the value should be printed raw -- that is, bypassing
+       python-based formatters.  */
+    unsigned char raw;
   };
 
 /* Last specified output format.  */
 
-static char last_format = 'x';
+static char last_format = 0;
 
 /* Last specified examination size.  'b', 'h', 'w' or `q'.  */
 
@@ -180,6 +184,7 @@ decode_format (char **string_ptr, int oformat, int osize)
   val.format = '?';
   val.size = '?';
   val.count = 1;
+  val.raw = 0;
 
   if (*p >= '0' && *p <= '9')
     val.count = atoi (p);
@@ -192,6 +197,11 @@ decode_format (char **string_ptr, int oformat, int osize)
     {
       if (*p == 'b' || *p == 'h' || *p == 'w' || *p == 'g')
 	val.size = *p++;
+      else if (*p == 'r')
+	{
+	  val.raw = 1;
+	  p++;
+	}
       else if (*p >= 'a' && *p <= 'z')
 	val.format = *p++;
       else
@@ -262,7 +272,7 @@ decode_format (char **string_ptr, int oformat, int osize)
    for print / output and set for examine.  */
 
 static void
-print_formatted (struct value *val, int format, int size,
+print_formatted (struct value *val, int format, int size, int raw,
 		 struct ui_file *stream)
 {
   struct type *type = check_typedef (value_type (val));
@@ -301,7 +311,7 @@ print_formatted (struct value *val, int format, int size,
     /* If format is 0, use the 'natural' format for that type of
        value.  If the type is non-scalar, we have to use language
        rules to print it as a series of scalars.  */
-    value_print (val, stream, format, Val_pretty_default);
+    value_print (val, stream, format, 0, Val_pretty_default);
   else
     /* User specified format, so don't look to the the type to
        tell us what to do.  */
@@ -445,10 +455,10 @@ print_scalar_formatted (const void *valaddr, struct type *type,
       if (TYPE_UNSIGNED (type))
 	value_print (value_from_longest (builtin_type_true_unsigned_char,
 					 val_long),
-		     stream, 0, Val_pretty_default);
+		     stream, 0, 1, Val_pretty_default);
       else
 	value_print (value_from_longest (builtin_type_true_char, val_long),
-		     stream, 0, Val_pretty_default);
+		     stream, 0, 1, Val_pretty_default);
       break;
 
     case 'f':
@@ -809,7 +819,7 @@ do_examine (struct format_data fmt, CORE_ADDR addr)
 	  if (last_examine_value)
 	    release_value (last_examine_value);
 
-	  print_formatted (last_examine_value, format, size, gdb_stdout);
+	  print_formatted (last_examine_value, format, size, 1, gdb_stdout);
 
 	  /* Display any branch delay slots following the final insn.  */
 	  if (format == 'i' && count == 1)
@@ -895,7 +905,7 @@ print_command_1 (char *exp, int inspect, int voidprint)
       if (histindex >= 0)
 	annotate_value_history_value ();
 
-      print_formatted (val, format, fmt.size, gdb_stdout);
+      print_formatted (val, format, fmt.size, fmt.raw, gdb_stdout);
       printf_filtered ("\n");
 
       if (histindex >= 0)
@@ -960,7 +970,7 @@ output_command (char *exp, int from_tty)
 
   annotate_value_begin (value_type (val));
 
-  print_formatted (val, format, fmt.size, gdb_stdout);
+  print_formatted (val, format, fmt.size, fmt.raw, gdb_stdout);
 
   annotate_value_end ();
 
@@ -1227,7 +1237,7 @@ x_command (char *exp, int from_tty)
   struct cleanup *old_chain;
   struct value *val;
 
-  fmt.format = last_format;
+  fmt.format = last_format ? last_format : 'x';
   fmt.size = last_size;
   fmt.count = 1;
 
@@ -1522,7 +1532,8 @@ do_one_display (struct display *d)
       annotate_display_expression ();
 
       print_formatted (evaluate_expression (d->exp),
-		       d->format.format, d->format.size, gdb_stdout);
+		       d->format.format, d->format.size, d->format.raw,
+		       gdb_stdout);
       printf_filtered ("\n");
     }
 
@@ -1678,7 +1689,7 @@ print_variable_value (struct symbol *var, struct frame_info *frame,
 {
   struct value *val = read_var_value (var, frame);
 
-  value_print (val, stream, 0, Val_pretty_default);
+  value_print (val, stream, 0, 0, Val_pretty_default);
 }
 
 static void

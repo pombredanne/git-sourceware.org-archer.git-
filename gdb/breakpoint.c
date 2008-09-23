@@ -2248,7 +2248,7 @@ watchpoint_value_print (struct value *val, struct ui_file *stream)
   if (val == NULL)
     fprintf_unfiltered (stream, _("<unreadable>"));
   else
-    value_print (val, stream, 0, Val_pretty_default);
+    value_print (val, stream, 0, 0, Val_pretty_default);
 }
 
 /* This is the normal print function for a bpstat.  In the future,
