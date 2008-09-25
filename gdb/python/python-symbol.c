@@ -206,6 +206,7 @@ PyObject *gdbpy_lookup_symbol (PyObject *self, PyObject *args)
   PyArg_ParseTuple (args, "sO!i", &name, &block_object_type, &block_obj,
 		    &domain);
 
+  /* FIXME: block_object_to_block can return null */
   symbol = lookup_symbol (name, block_object_to_block (block_obj), domain,
 			  &is_a_field_of_this);
 
