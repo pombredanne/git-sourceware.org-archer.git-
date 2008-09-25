@@ -518,7 +518,10 @@ gdbpy_breakpoint_created (int num)
       hookfn = gdbpy_get_hook_function ("new_breakpoint");
       if (hookfn)
 	{
-	  PyObject_CallFunctionObjArgs (hookfn, newbp, NULL);
+	  PyObject *result;
+	  result = PyObject_CallFunctionObjArgs (hookfn, newbp, NULL);
+	  if (result)
+	    Py_DECREF (result);
 	  Py_DECREF (hookfn);
 	}
     }
