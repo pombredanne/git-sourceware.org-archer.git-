@@ -521,7 +521,9 @@ gdbpy_breakpoint_created (int num)
 	  PyObject *result;
 	  result = PyObject_CallFunctionObjArgs (hookfn, newbp, NULL);
 	  if (result)
-	    Py_DECREF (result);
+	    {
+	      Py_DECREF (result);
+	    }
 	  Py_DECREF (hookfn);
 	}
     }
