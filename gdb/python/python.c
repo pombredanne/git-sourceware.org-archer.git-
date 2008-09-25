@@ -24,6 +24,7 @@
 #include "gdbcmd.h"
 #include "objfiles.h"
 #include "observer.h"
+#include "gdb_regex.h"
 
 #include <ctype.h>
 
@@ -629,6 +630,104 @@ gdbpy_new_objfile (struct objfile *objfile)
   xfree (filename);
 }
 
+
+
+/* Return a string representing the type of a value.  */
+static char *
+get_type (struct value *val)
+{
+  struct cleanup *old_chain;
+  struct ui_file *stb;
+  char *thetype;
+  long length;
+
+  stb = mem_fileopen ();
+  old_chain = make_cleanup_ui_file_delete (stb);
+
+  type_print (value_type (val), "", stb, -1);
+
+  thetype = ui_file_xstrdup (stb, &length);
+  do_cleanups (old_chain);
+  return thetype;
+}
+
+/* Try to pretty-print VALUE.  Return an xmalloc()d string
+   representation of the value.  Return NULL on error or if no
+   pretty-printer was available.  */
+char *
+apply_pretty_printer (struct value *value)
+{
+  PyObject *dict, *key, *func;
+  Py_ssize_t iter;
+  char *type_name = NULL;
+  char *output = NULL;
+  volatile struct gdb_exception except;
+
+  /* Fetch the pretty printer dictionary.  */
+  if (! PyObject_HasAttrString (gdb_module, "pretty_printers"))
+    return NULL;
+  dict = PyObject_GetAttrString (gdb_module, "pretty_printers");
+  if (! dict)
+    return NULL;
+  if (! PyDict_Check (dict) || ! PyDict_Size (dict))
+    {
+      Py_DECREF (dict);
+      return NULL;
+    }
+
+  /* Get the name of the type.  */
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      type_name = get_type (value);
+    }
+  if (except.reason < 0)
+    {
+      Py_DECREF (dict);
+      return NULL;
+    }
+
+  /* See if the type matches a pretty-printer regexp.  */
+  iter = 0;
+  while (! output && PyDict_Next (dict, &iter, &key, &func))
+    {
+      char *rx_str;
+
+      if (! PyString_Check (key))
+	continue;
+      rx_str = PyString_AsString (key);
+      if (re_comp (rx_str) == NULL && re_exec (type_name) == 1)
+	{
+	  TRY_CATCH (except, RETURN_MASK_ALL)
+	    {
+	      PyObject *val_obj, *result;
+
+	      /* FIXME: memory management here.  Why are values so
+		 funny?  */
+	      value = value_copy (value);
+
+	      val_obj = value_to_value_object (value);
+	      /* FIXME: a method on an object, not just func?  If so,
+		 should use the same object as MI.  */
+	      result = PyObject_CallFunctionObjArgs (func, val_obj, NULL);
+	      if (result)
+		{
+		  if (PyString_Check (result))
+		    output = xstrdup (PyString_AsString (result));
+		  Py_DECREF (result);
+		}
+	      else
+		gdbpy_print_stack ();
+
+	      Py_DECREF (val_obj);
+	    }
+	}
+    }
+
+  xfree (type_name);
+  Py_DECREF (dict);
+
+  return output;
+}
 
 #else /* HAVE_PYTHON */
 
@@ -654,6 +753,12 @@ void
 eval_python_from_control_command (struct command_line *cmd)
 {
   error (_("Python scripting is not supported in this copy of GDB."));
+}
+
+char *
+apply_pretty_printer (struct value *ignore)
+{
+  return NULL;
 }
 
 #endif /* HAVE_PYTHON */
@@ -754,6 +859,7 @@ Enables or disables auto-loading of Python code when an object is opened."),
   gdbpy_initialize_functions ();
 
   PyRun_SimpleString ("import gdb");
+  PyRun_SimpleString ("gdb.pretty_printers = {}");
 
   observer_attach_new_objfile (gdbpy_new_objfile);
 

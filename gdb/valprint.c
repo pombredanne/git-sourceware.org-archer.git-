@@ -34,6 +34,7 @@
 #include "doublest.h"
 #include "exceptions.h"
 #include "dfp.h"
+#include "python/python.h"
 
 #include <errno.h>
 
@@ -311,8 +312,14 @@ value_print (struct value *val, struct ui_file *stream, int format,
 
   if (!raw)
     {
-      /* This is where we would call the printer if we had implemented
-	 that yet.  */
+      char *output = apply_pretty_printer (val);
+      if (output)
+	{
+	  int len = strlen (output);
+	  fputs_filtered (output, stream);
+	  xfree (output);
+	  return len;
+	}
     }
 
   return LA_VALUE_PRINT (val, stream, format, pretty);
