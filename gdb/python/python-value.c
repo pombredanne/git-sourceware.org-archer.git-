@@ -76,8 +76,12 @@ static PyObject *valpy_absolute (PyObject *self);
 static int valpy_nonzero (PyObject *self);
 static PyObject *valpy_richcompare (PyObject *self, PyObject *other, int op);
 static PyObject *valpy_dereference (PyObject *self, PyObject *args);
+static PyObject *valpy_cast (PyObject *self, PyObject *args);
+static PyObject *valpy_address (PyObject *self, PyObject *args);
 
 static PyMethodDef value_object_methods[] = {
+  { "address", valpy_address, METH_NOARGS, "Return the address of the value." },
+  { "cast", valpy_cast, METH_VARARGS, "Cast the value to the supplied type." },
   { "dereference", valpy_dereference, METH_NOARGS, "Dereferences the value." },
   {NULL}  /* Sentinel */
 };
@@ -200,6 +204,55 @@ valpy_dereference (PyObject *self, PyObject *args)
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
       res_val = value_ind (((value_object *) self)->value);
+    }
+  GDB_PY_HANDLE_EXCEPTION (except);
+
+  return value_to_value_object (res_val);
+}
+
+/* Return "&value".  */
+static PyObject *
+valpy_address (PyObject *self, PyObject *args)
+{
+  struct value *res_val = NULL;	  /* Initialize to appease gcc warning.  */
+  volatile struct gdb_exception except;
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      res_val = value_addr (((value_object *) self)->value);
+    }
+  GDB_PY_HANDLE_EXCEPTION (except);
+
+  return value_to_value_object (res_val);
+}
+
+/* Cast a value to a given type.  */
+static PyObject *
+valpy_cast (PyObject *self, PyObject *args)
+{
+  char *type_name;
+  struct type *type;
+  struct value *res_val = NULL;	  /* Initialize to appease gcc warning.  */
+  volatile struct gdb_exception except;
+
+  if (! PyArg_ParseTuple (args, "s", &type_name))
+    return NULL;
+
+  /* FIXME: this is all really wrong.  We need real Type
+     representation instead.  */
+  type = lookup_typename (type_name, NULL /* FIXME */, 1);
+  if (type)
+    type = lookup_pointer_type (type);
+  if (! type)
+    {
+      PyErr_Format (PyExc_RuntimeError, "no such type named %s",
+		    type_name);
+      return NULL;
+    }
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      res_val = value_cast (type, ((value_object *) self)->value);
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
