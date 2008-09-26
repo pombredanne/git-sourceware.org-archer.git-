@@ -312,7 +312,8 @@ value_print (struct value *val, struct ui_file *stream, int format,
 
   if (!raw)
     {
-      char *output = apply_pretty_printer (val);
+      struct value *replace = NULL;
+      char *output = apply_pretty_printer (val, &replace);
       if (output)
 	{
 	  int len = strlen (output);
@@ -320,6 +321,8 @@ value_print (struct value *val, struct ui_file *stream, int format,
 	  xfree (output);
 	  return len;
 	}
+      else if (replace)
+	val = replace;
     }
 
   return LA_VALUE_PRINT (val, stream, format, pretty);

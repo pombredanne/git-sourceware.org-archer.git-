@@ -656,16 +656,21 @@ get_type (struct value *val)
 }
 
 /* Try to pretty-print VALUE.  Return an xmalloc()d string
-   representation of the value.  Return NULL on error or if no
+   representation of the value.  If the result is NULL, and *OUT_VALUE
+   is set, then *OUT_VALUE is a value which should be printed in place
+   of VALUE.  *OUT_VALUE is not passed back to the pretty-printer.
+   Returns NULL and sets *OUT_VALUE to NULL on error or if no
    pretty-printer was available.  */
 char *
-apply_pretty_printer (struct value *value)
+apply_pretty_printer (struct value *value, struct value **out_value)
 {
   PyObject *dict, *key, *func;
   Py_ssize_t iter;
   char *type_name = NULL;
   char *output = NULL;
   volatile struct gdb_exception except;
+
+  *out_value = NULL;
 
   /* Fetch the pretty printer dictionary.  */
   if (! PyObject_HasAttrString (gdb_module, "pretty_printers"))
@@ -692,7 +697,7 @@ apply_pretty_printer (struct value *value)
 
   /* See if the type matches a pretty-printer regexp.  */
   iter = 0;
-  while (! output && PyDict_Next (dict, &iter, &key, &func))
+  while (! output && ! *out_value && PyDict_Next (dict, &iter, &key, &func))
     {
       char *rx_str;
 
@@ -717,6 +722,8 @@ apply_pretty_printer (struct value *value)
 		{
 		  if (PyString_Check (result))
 		    output = xstrdup (PyString_AsString (result));
+		  else
+		    *out_value = convert_value_from_python (result);
 		  Py_DECREF (result);
 		}
 	      else

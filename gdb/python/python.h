@@ -28,6 +28,6 @@ void eval_python_from_control_command (struct command_line *);
 
 void run_python_script (int argc, char **argv);
 
-char *apply_pretty_printer (struct value *);
+char *apply_pretty_printer (struct value *, struct value **);
 
 #endif /* GDB_PYTHON_H */
