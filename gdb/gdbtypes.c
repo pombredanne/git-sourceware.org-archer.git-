@@ -3056,6 +3056,62 @@ copy_type_recursive (struct objfile *objfile,
   return new_type;
 }
 
+/* Allocate a hash table which is used when freeing a struct type.  */
+
+htab_t
+create_deleted_types_hash (void)
+{
+  return htab_create (1, htab_hash_pointer, htab_eq_pointer, NULL);
+}
+
+/* Recursively delete TYPE and things it references.  TYPE must have
+   been allocated using xmalloc -- not using an objfile.
+   DELETED_TYPES is a hash table, allocated using
+   create_deleted_types_hash, which is used for checking whether a
+   type has already been deleted.  */
+
+void
+delete_type_recursive (struct type *type, htab_t deleted_types)
+{
+  int i;
+  void **slot;
+
+  if (!type)
+    return;
+
+  gdb_assert (!TYPE_OBJFILE (type));
+
+  slot = htab_find_slot (deleted_types, type, INSERT);
+  if (*slot != NULL)
+    return;
+
+  *slot = type;
+
+  xfree (TYPE_NAME (type));
+  xfree (TYPE_TAG_NAME (type));
+
+  for (i = 0; i < TYPE_NFIELDS (type); ++i)
+    {
+      delete_type_recursive (TYPE_FIELD_TYPE (type, i), deleted_types);
+      xfree (TYPE_FIELD_NAME (type, i));
+
+      if (!TYPE_FIELD_STATIC_HAS_ADDR (type, i)
+	  && TYPE_FIELD_STATIC (type, i))
+	xfree (TYPE_FIELD_STATIC_PHYSNAME (type, i));
+    }
+  xfree (TYPE_FIELDS (type));
+
+  delete_type_recursive (TYPE_TARGET_TYPE (type), deleted_types);
+  delete_type_recursive (TYPE_VPTR_BASETYPE (type), deleted_types);
+
+  /* Strangely, HAVE_CPLUS_STRUCT will return true when there isn't
+     one at all.  */
+  gdb_assert (!HAVE_CPLUS_STRUCT (type) || !TYPE_CPLUS_SPECIFIC (type));
+
+  xfree (TYPE_MAIN_TYPE (type));
+  xfree (type);
+}
+
 static struct type *
 build_flt (int bit, char *name, const struct floatformat **floatformats)
 {

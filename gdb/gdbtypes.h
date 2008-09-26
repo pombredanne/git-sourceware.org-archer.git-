@@ -1258,4 +1258,8 @@ extern struct type *copy_type_recursive (struct objfile *objfile,
 					 struct type *type,
 					 htab_t copied_types);
 
+extern htab_t create_deleted_types_hash (void);
+
+extern void delete_type_recursive (struct type *type, htab_t copied_types);
+
 #endif /* GDBTYPES_H */
