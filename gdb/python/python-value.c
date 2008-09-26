@@ -78,11 +78,13 @@ static PyObject *valpy_richcompare (PyObject *self, PyObject *other, int op);
 static PyObject *valpy_dereference (PyObject *self, PyObject *args);
 static PyObject *valpy_cast (PyObject *self, PyObject *args);
 static PyObject *valpy_address (PyObject *self, PyObject *args);
+static PyObject *valpy_type (PyObject *self, PyObject *args);
 
 static PyMethodDef value_object_methods[] = {
   { "address", valpy_address, METH_NOARGS, "Return the address of the value." },
   { "cast", valpy_cast, METH_VARARGS, "Cast the value to the supplied type." },
   { "dereference", valpy_dereference, METH_NOARGS, "Dereferences the value." },
+  { "type", valpy_type, METH_NOARGS, "Return type of the value." },
   {NULL}  /* Sentinel */
 };
 
@@ -226,27 +228,30 @@ valpy_address (PyObject *self, PyObject *args)
   return value_to_value_object (res_val);
 }
 
+/* Return type of the value.  */
+static PyObject *
+valpy_type (PyObject *self, PyObject *args)
+{
+  struct value *value = ((value_object *) self)->value;
+  return type_to_type_object (value_type (value));
+}
+
 /* Cast a value to a given type.  */
 static PyObject *
 valpy_cast (PyObject *self, PyObject *args)
 {
-  char *type_name;
+  PyObject *type_obj;
   struct type *type;
   struct value *res_val = NULL;	  /* Initialize to appease gcc warning.  */
   volatile struct gdb_exception except;
 
-  if (! PyArg_ParseTuple (args, "s", &type_name))
+  if (! PyArg_ParseTuple (args, "O", &type_obj))
     return NULL;
 
-  /* FIXME: this is all really wrong.  We need real Type
-     representation instead.  */
-  type = lookup_typename (type_name, NULL /* FIXME */, 1);
-  if (type)
-    type = lookup_pointer_type (type);
+  type = type_object_to_type (type_obj);
   if (! type)
     {
-      PyErr_Format (PyExc_RuntimeError, "no such type named %s",
-		    type_name);
+      PyErr_SetString (PyExc_RuntimeError, "argument must be a Type");
       return NULL;
     }
 

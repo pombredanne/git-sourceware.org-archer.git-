@@ -279,6 +279,7 @@ SUBDIR_PYTHON_OBS = \
 	python-hooks.o \
 	python-symbol.o \
 	python-symtab.o \
+	python-type.o \
 	python-utils.o \
 	python-value.o
 SUBDIR_PYTHON_SRCS = \
@@ -291,6 +292,7 @@ SUBDIR_PYTHON_SRCS = \
 	python/python-hooks.c \
 	python/python-symbol.c \
 	python/python-symtab.c \
+	python/python-type.c \
 	python/python-utils.c \
 	python/python-value.c
 SUBDIR_PYTHON_DEPS =
@@ -1893,6 +1895,10 @@ python-symbol.o: $(srcdir)/python/python-symbol.c
 
 python-symtab.o: $(srcdir)/python/python-symtab.c
 	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-symtab.c
+	$(POSTCOMPILE)
+
+python-type.o: $(srcdir)/python/python-type.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-type.c
 	$(POSTCOMPILE)
 
 python-utils.o: $(srcdir)/python/python-utils.c
