@@ -6403,6 +6403,12 @@ Without this format, @value{GDBN} displays pointers to and arrays of
 @code{char}, @w{@code{unsigned char}}, and @w{@code{signed char}} as
 strings.  Single-byte members of a vector are displayed as an integer
 array.
+
+@item r
+@cindex raw printing
+Print using the @samp{raw} formatting.  By default, @value{GDBN} will
+use a type-specific pretty-printer.  The @samp{r} format bypasses any
+pretty-printer which might exist for the value's type.
 @end table
 
 For example, to print the program counter in hex (@pxref{Registers}), type
@@ -17693,7 +17699,9 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 * Basic Python::                Basic Python Functions.
 * Exception Handling::
 * Auto-loading::                Automatically loading Python code.
-* Values From Inferior::
+* Values From Inferior::	Python representation of values.
+* Types From Inferior::		Python representation of types.
+* Pretty Printing::		Pretty-printing values.
 * Threads In Python::           Accessing inferior threads from Python.
 * Commands In Python::          Implementing new commands in Python.
 @end menu
@@ -17828,8 +17836,21 @@ bar = some_val['foo']
 
 Again, @code{bar} will also be a @code{gdb.Value} object.
 
-For pointer data types, @code{gdb.Value} provides a method for
-dereferencing the pointer to obtain the object it points to.
+The following methods are provided:
+
+@table @code
+@defmethod Value address
+If the @code{gdb.Value} object is addressable, this will return a new
+@code{gdb.Value} object representing the address.  Otherwise, this
+will throw an exception.
+@end defmethod
+
+@defmethod Value cast type
+Cast the @code{gdb.Value} to the type represented by @var{type}, and
+return a new @code{gdb.Value}.  @var{type} must be a @code{gdb.Type}
+object.  If the cast cannot be performed for some reason, an exception
+is thrown.
+@end defmethod
 
 @defmethod Value dereference
 This method returns a new @code{gdb.Value} object whose contents is
@@ -17851,6 +17872,66 @@ bar = foo.dereference ()
 The result @code{bar} will be a @code{gdb.Value} object holding the
 value pointed to by @code{foo}.
 @end defmethod
+
+@defmethod Value type
+Return the type of this @code{gdb.Value}.  The result is a
+@code{gdb.Type} object.
+@end defmethod
+@end table
+
+@node Types From Inferior
+@subsubsection Types From Inferior
+
+@cindex gdb.Type
+@value{GDBN} represents types from the inferior using the class
+@code{gdb.Type}.
+
+The following methods are provided:
+
+@table @code
+@defmethod Type pointer
+Return a new @code{gdb.Type} object which represents a pointer to this
+type.
+@end defmethod
+
+@defmethod Type template_argument n
+If this @code{gdb.Type} is a template type, this will return a new
+@code{gdb.Type} which represents the type of the @var{n}th template
+argument.
+
+If this @code{gdb.Type} is not a template type, this will throw an
+exception.
+@end defmethod
+@end table
+
+@node Pretty Printing
+@subsubsection Pretty Printing
+
+@value{GDBN} provides a mechanism to allow pretty-printing of values
+using Python code.
+
+The Python dictionary @code{gdb.pretty_printers} maps regular
+expressions (strings) onto functions.  When printing a value,
+@value{GDBN} first compares the name of the value's canonical type
+(the type after following all typedefs) to each regular expression.
+
+If a regular expression matches, then the corresponding function is
+called with a @code{gdb.Value} representing the value to be printed.
+
+If this function returns a string, it is printed.  If it returns any
+Python value that is convertible to a @code{gdb.Value}, then that
+value is passed to the regular @value{GDBN} type-printing code.
+
+The order in which the regular expressions are tried is not specified.
+
+Here is an example showing how a @code{std::string} might be printed:
+
+@smallexample
+def printstdstring(val):
+    return val['_M_dataplus']['_M_p']
+
+gdb.pretty_printers['^std::basic_string<char'] = printstdstring
+@end smallexample
 
 @node Threads In Python
 @subsubsection Threads In Python

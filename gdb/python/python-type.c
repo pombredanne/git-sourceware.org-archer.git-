@@ -180,6 +180,7 @@ typy_template_argument (PyObject *self, PyObject *args)
       return NULL;
     }
 
+  /* FIXME: if argument is a value, we should DTRT.  */
   type_name = cp_comp_to_string (demangled->u.s_binary.left, 10);
 
   argtype = typy_lookup_typename (type_name, block);
