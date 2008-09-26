@@ -674,7 +674,10 @@ value_to_value_object (struct value *val)
 struct value *
 value_object_to_value (PyObject *self)
 {
-  value_object *real = (value_object *) self;
+  value_object *real;
+  if (! PyObject_TypeCheck (self, &value_object_type))
+    return NULL;
+  real = (value_object *) self;
   return real->value;
 }
 

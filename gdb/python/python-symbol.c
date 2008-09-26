@@ -188,6 +188,8 @@ symbol_to_symbol_object (struct symbol *sym)
 struct symbol *
 symbol_object_to_symbol (PyObject *obj)
 {
+  if (! PyObject_TypeCheck (obj, &symbol_object_type))
+    return NULL;
   return ((symbol_object *) obj)->symbol;
 }
 
@@ -202,13 +204,20 @@ PyObject *gdbpy_lookup_symbol (PyObject *self, PyObject *args)
   const char *name;
   struct symbol *symbol;
   PyObject *block_obj, *ret_tuple, *sym_obj, *bool_obj;
+  struct block *block;
 
-  PyArg_ParseTuple (args, "sO!i", &name, &block_object_type, &block_obj,
-		    &domain);
+  if (! PyArg_ParseTuple (args, "sO!i", &name, &block_object_type, &block_obj,
+			  &domain))
+    return NULL;
 
-  /* FIXME: block_object_to_block can return null */
-  symbol = lookup_symbol (name, block_object_to_block (block_obj), domain,
-			  &is_a_field_of_this);
+  block = block_object_to_block (block_obj);
+  if (! block)
+    {
+      PyErr_SetString (PyExc_RuntimeError, "second argument must be block");
+      return NULL;
+    }
+
+  symbol = lookup_symbol (name, block, domain, &is_a_field_of_this);
 
   ret_tuple = PyTuple_New (2);
   if (!ret_tuple)

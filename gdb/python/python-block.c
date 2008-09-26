@@ -212,7 +212,8 @@ block_to_block_object (struct block *block)
 struct block *
 block_object_to_block (PyObject *obj)
 {
-  /* FIXME: type checking */
+  if (! PyObject_TypeCheck (obj, &block_object_type))
+    return NULL;
   return ((block_object *) obj)->block;
 }
 

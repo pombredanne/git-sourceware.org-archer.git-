@@ -311,7 +311,7 @@ print_formatted (struct value *val, int format, int size, int raw,
     /* If format is 0, use the 'natural' format for that type of
        value.  If the type is non-scalar, we have to use language
        rules to print it as a series of scalars.  */
-    value_print (val, stream, format, 0, Val_pretty_default);
+    value_print (val, stream, format, raw, Val_pretty_default);
   else
     /* User specified format, so don't look to the the type to
        tell us what to do.  */
@@ -873,6 +873,7 @@ print_command_1 (char *exp, int inspect, int voidprint)
       fmt.count = 1;
       fmt.format = 0;
       fmt.size = 0;
+      fmt.raw = 0;
     }
 
   if (exp && *exp)

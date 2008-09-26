@@ -446,6 +446,11 @@ frapy_read_var_value (PyObject *self, PyObject *args)
     return NULL;
 
   var = symbol_object_to_symbol (sym_obj);
+  if (! var)
+    {
+      PyErr_SetString (PyExc_RuntimeError, "second argument must be symbol");
+      return NULL;
+    }
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {

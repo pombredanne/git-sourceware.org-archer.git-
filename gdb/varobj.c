@@ -933,6 +933,8 @@ int update_dynamic_varobj_children (struct varobj *var,
 	error ("child list has object of invalid type");
       
       v = value_object_to_value (py_v);
+      if (!v)
+	error ("object does not have value type");
 
       /* TODO: This assume the name of the i-th child never changes.  */
 

@@ -95,6 +95,26 @@ typy_pointer (PyObject *self, PyObject *args)
   return type_to_type_object (type);
 }
 
+static struct type *
+typy_lookup_typename (char *type_name, struct block *block)
+{
+  struct type *type = NULL;
+  volatile struct gdb_exception except;
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      type = lookup_typename (type_name, block, 1);
+    }
+  if (except.reason < 0)
+    {
+      PyErr_Format (except.reason == RETURN_QUIT
+		    ? PyExc_KeyboardInterrupt : PyExc_RuntimeError,
+		    "%s", except.message);
+      return NULL;
+    }
+
+  return type;
+}
+
 static PyObject *
 typy_template_argument (PyObject *self, PyObject *args)
 {
@@ -104,11 +124,24 @@ typy_template_argument (PyObject *self, PyObject *args)
   const char *err;
   char *type_name;
   struct type *argtype;
+  struct block *block = NULL;
+  PyObject *block_obj = NULL;
 
-  if (! PyArg_ParseTuple (args, "i", &argno))
+  if (! PyArg_ParseTuple (args, "i|O", &argno, &block_obj))
     return NULL;
 
-  /* FIXME: thread safety.  */
+  if (block_obj)
+    {
+      block = block_object_to_block (block_obj);
+      if (! block)
+	{
+	  PyErr_SetString (PyExc_RuntimeError,
+			   "second argument must be block");
+	  return NULL;
+	}
+    }
+
+  /* Note -- this is not thread-safe.  */
   demangled = cp_demangled_name_to_comp (TYPE_NAME (type), &err);
   if (! demangled)
     {
@@ -142,8 +175,7 @@ typy_template_argument (PyObject *self, PyObject *args)
 
   type_name = cp_comp_to_string (demangled->u.s_binary.left, 10);
 
-  /* FIXME: block... */
-  argtype = lookup_typename (type_name, NULL, 1);
+  argtype = typy_lookup_typename (type_name, block);
   if (! argtype)
     {
       PyErr_Format (PyExc_RuntimeError, "no such type named %s",
@@ -197,14 +229,26 @@ typy_new (PyTypeObject *subtype, PyObject *args, PyObject *kwargs)
   char *type_name = NULL;
   struct type *type = NULL;
   type_object *result;
+  PyObject *block_obj = NULL;
+  struct block *block = NULL;
 
-  if (! PyArg_ParseTuple (args, "|s", &type_name))
+  if (! PyArg_ParseTuple (args, "|sO", &type_name, &block_obj))
     return NULL;
+
+  if (block_obj)
+    {
+      block = block_object_to_block (block_obj);
+      if (! block)
+	{
+	  PyErr_SetString (PyExc_RuntimeError,
+			   "second argument must be block");
+	  return NULL;
+	}
+    }
 
   if (type_name)
     {
-      /* FIXME: should accept a block... */
-      type = lookup_typename (type_name, NULL, 1);
+      type = typy_lookup_typename (type_name, block);
       if (! type)
 	{
 	  PyErr_Format (PyExc_RuntimeError, "no such type named %s",
