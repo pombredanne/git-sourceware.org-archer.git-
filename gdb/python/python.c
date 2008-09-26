@@ -767,8 +767,9 @@ eval_python_from_control_command (struct command_line *cmd)
 }
 
 char *
-apply_pretty_printer (struct value *ignore)
+apply_pretty_printer (struct value *ignore, struct value **out)
 {
+  *out = NULL;
   return NULL;
 }
 
