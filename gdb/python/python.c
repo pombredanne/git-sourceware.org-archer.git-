@@ -640,11 +640,15 @@ get_type (struct value *val)
   struct ui_file *stb;
   char *thetype;
   long length;
+  struct type *type;
 
   stb = mem_fileopen ();
   old_chain = make_cleanup_ui_file_delete (stb);
 
-  type_print (value_type (val), "", stb, -1);
+  type = value_type (val);
+  CHECK_TYPEDEF (type);
+
+  type_print (type, "", stb, -1);
 
   thetype = ui_file_xstrdup (stb, &length);
   do_cleanups (old_chain);
