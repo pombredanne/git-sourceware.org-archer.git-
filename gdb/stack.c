@@ -616,24 +616,24 @@ find_frame_funname (struct frame_info *frame, char **funname,
 	  /* We also don't know anything about the function besides
 	     its address and name.  */
 	  func = 0;
-	  funname = SYMBOL_PRINT_NAME (msymbol);
-	  funlang = SYMBOL_LANGUAGE (msymbol);
+	  *funname = SYMBOL_PRINT_NAME (msymbol);
+	  *funlang = SYMBOL_LANGUAGE (msymbol);
 	}
       else
 	{
-	  funname = SYMBOL_PRINT_NAME (func);
-	  funlang = SYMBOL_LANGUAGE (func);
-	  if (funlang == language_cplus)
+	  *funname = SYMBOL_PRINT_NAME (func);
+	  *funlang = SYMBOL_LANGUAGE (func);
+	  if (*funlang == language_cplus)
 	    {
 	      /* It seems appropriate to use SYMBOL_PRINT_NAME() here,
 		 to display the demangled name that we already have
 		 stored in the symbol table, but we stored a version
 		 with DMGL_PARAMS turned on, and here we don't want to
 		 display parameters.  So remove the parameters.  */
-	      char *func_only = cp_remove_params (funname);
+	      char *func_only = cp_remove_params (*funname);
 	      if (func_only)
 		{
-		  funname = func_only;
+		  *funname = func_only;
 		  make_cleanup (xfree, func_only);
 		}
 	    }
@@ -646,8 +646,8 @@ find_frame_funname (struct frame_info *frame, char **funname,
 
       if (msymbol != NULL)
 	{
-	  funname = SYMBOL_PRINT_NAME (msymbol);
-	  funlang = SYMBOL_LANGUAGE (msymbol);
+	  *funname = SYMBOL_PRINT_NAME (msymbol);
+	  *funlang = SYMBOL_LANGUAGE (msymbol);
 	}
     }
 }
