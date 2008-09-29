@@ -20,7 +20,6 @@
 #include "defs.h"
 #include "cli/cli-decode.h"
 #include "charset.h"
-#include "gdb-events.h"
 #include "python.h"
 #include "python-internal.h"
 #include "observer.h"
