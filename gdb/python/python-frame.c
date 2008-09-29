@@ -181,6 +181,10 @@ frapy_equal_p (PyObject *self, PyObject *args)
 static PyObject *
 frapy_inner_p (PyObject *self, PyObject *args)
 {
+  /* FIXME: disabled for now, because frame_id_inner is gone.  */
+  PyErr_SetString (PyExc_NotImplementedError, "method not implemented");
+  return NULL;
+#if 0
   int innerp = 0;	  /* Initialize to appease gcc warning.  */
   frame_object *self_frame = (frame_object *) self;
   frame_object *other;
@@ -208,6 +212,7 @@ frapy_inner_p (PyObject *self, PyObject *args)
     Py_RETURN_TRUE;
 
   Py_RETURN_FALSE;
+#endif
 }
 
 static PyObject *
