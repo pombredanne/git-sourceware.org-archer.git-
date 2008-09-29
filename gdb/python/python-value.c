@@ -75,6 +75,9 @@ static PyObject *valpy_positive (PyObject *self);
 static PyObject *valpy_absolute (PyObject *self);
 static int valpy_nonzero (PyObject *self);
 static PyObject *valpy_richcompare (PyObject *self, PyObject *other, int op);
+static PyObject *valpy_int (PyObject *self);
+static PyObject *valpy_long (PyObject *self);
+static PyObject *valpy_float (PyObject *self);
 static PyObject *valpy_dereference (PyObject *self, PyObject *args);
 static PyObject *valpy_cast (PyObject *self, PyObject *args);
 static PyObject *valpy_address (PyObject *self, PyObject *args);
@@ -99,7 +102,19 @@ static PyNumberMethods value_object_as_number = {
   valpy_negative,	      /* nb_negative */
   valpy_positive,	      /* nb_positive */
   valpy_absolute,	      /* nb_absolute */
-  valpy_nonzero		      /* nb_nonzero */
+  valpy_nonzero,	      /* nb_nonzero */
+  NULL,			      /* nb_invert */
+  NULL,			      /* nb_lshift */
+  NULL,			      /* nb_rshift */
+  NULL,			      /* nb_and */
+  NULL,			      /* nb_xor */
+  NULL,			      /* nb_or */
+  NULL,			      /* nb_coerce */
+  valpy_int,		      /* nb_int */
+  valpy_long,		      /* nb_long */
+  valpy_float,		      /* nb_float */
+  NULL,			      /* nb_oct */
+  NULL			      /* nb_hex */
 };
 
 static PyMappingMethods value_object_as_mapping = {
@@ -539,6 +554,8 @@ valpy_richcompare (PyObject *self, PyObject *other, int op)
   struct value *value_self, *value_other;
   volatile struct gdb_exception except;
 
+  /* FIXME: should use convert_value_from_python and should implement
+     string compares(?).  */
   if (PyObject_TypeCheck (other, &value_object_type))
     value_other = ((value_object *) other)->value;
   else if (PyInt_Check (other))
@@ -630,6 +647,81 @@ valpy_richcompare (PyObject *self, PyObject *other, int op)
     Py_RETURN_TRUE;
 
   Py_RETURN_FALSE;
+}
+
+/* Implements conversion to int.  */
+static PyObject *
+valpy_int (PyObject *self)
+{
+  struct value *value = ((value_object *) self)->value;
+  struct type *type = value_type (value);
+  LONGEST l = 0;
+  volatile struct gdb_exception except;
+
+  CHECK_TYPEDEF (type);
+  if (TYPE_CODE (type) != TYPE_CODE_INT)
+    {
+      PyErr_SetString (PyExc_RuntimeError, "cannot convert value to int");
+      return NULL;
+    }
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      l = value_as_long (value);
+    }
+  GDB_PY_HANDLE_EXCEPTION (except);
+
+  return PyInt_FromLong (l);
+}
+
+/* Implements conversion to long.  */
+static PyObject *
+valpy_long (PyObject *self)
+{
+  struct value *value = ((value_object *) self)->value;
+  struct type *type = value_type (value);
+  LONGEST l = 0;
+  volatile struct gdb_exception except;
+
+  CHECK_TYPEDEF (type);
+  if (TYPE_CODE (type) != TYPE_CODE_INT)
+    {
+      PyErr_SetString (PyExc_RuntimeError, "cannot convert value to long");
+      return NULL;
+    }
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      l = value_as_long (value);
+    }
+  GDB_PY_HANDLE_EXCEPTION (except);
+
+  return PyLong_FromLong (l);
+}
+
+/* Implements conversion to float.  */
+static PyObject *
+valpy_float (PyObject *self)
+{
+  struct value *value = ((value_object *) self)->value;
+  struct type *type = value_type (value);
+  double d = 0;
+  volatile struct gdb_exception except;
+
+  CHECK_TYPEDEF (type);
+  if (TYPE_CODE (type) != TYPE_CODE_FLT)
+    {
+      PyErr_SetString (PyExc_RuntimeError, "cannot convert value to float");
+      return NULL;
+    }
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      d = value_as_double (value);
+    }
+  GDB_PY_HANDLE_EXCEPTION (except);
+
+  return PyFloat_FromDouble (d);
 }
 
 /* A value owned by GDB is in the all_values chain, so it will be freed
