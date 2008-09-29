@@ -568,6 +568,13 @@ valpy_richcompare (PyObject *self, PyObject *other, int op)
 
       value_other = value_from_longest (builtin_type_pyint, l);
     }
+  else if (PyLong_Check (other))
+    {
+      LONGEST l = PyLong_AsLongLong (other);
+      if (PyErr_Occurred ())
+	return NULL;
+      value_other = value_from_longest (builtin_type_pyint, l);
+    }
   else if (PyFloat_Check (other))
     {
       DOUBLEST d;
@@ -731,7 +738,7 @@ PyObject *
 gdb_owned_value_to_value_object (struct value *v)
 {
   value_object *result = PyObject_New (value_object, &value_object_type);
-  if (result != NULL)					      
+  if (result != NULL)
     {
       result->value = v;
       result->owned_by_gdb = 1;
