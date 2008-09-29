@@ -17930,7 +17930,7 @@ Here is an example showing how a @code{std::string} might be printed:
 def printstdstring(val):
     return val['_M_dataplus']['_M_p']
 
-gdb.pretty_printers['^std::basic_string<char'] = printstdstring
+gdb.pretty_printers['^std::basic_string<char.*>'] = printstdstring
 @end smallexample
 
 @node Threads In Python

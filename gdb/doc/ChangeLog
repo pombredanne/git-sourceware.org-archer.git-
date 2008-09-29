@@ -1,3 +1,7 @@
+2008-09-29  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Pretty Printing): Update example.
+
 2008-09-27  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.texinfo (Macros): Remove text about stringification,
