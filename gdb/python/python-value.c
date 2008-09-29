@@ -365,6 +365,10 @@ enum valpy_opcode
   VALPY_POW
 };
 
+/* If TYPE is a reference, return the target; otherwise return TYPE.  */
+#define STRIP_REFERENCE(TYPE) \
+  ((TYPE_CODE (TYPE) == TYPE_CODE_REF) ? (TYPE_TARGET_TYPE (TYPE)) : (TYPE))
+
 /* Returns a value object which is the sum of this value with the given
    integer argument.  */
 static PyObject *
@@ -419,10 +423,47 @@ valpy_binop (enum valpy_opcode opcode, PyObject *self, PyObject *other)
       switch (opcode)
 	{
 	case VALPY_ADD:
-	  res_val = value_binop (self_value->value, other_val, BINOP_ADD);
+	  {
+	    struct type *ltype = value_type (self_value->value);
+	    struct type *rtype = value_type (other_val);
+	    CHECK_TYPEDEF (ltype);
+	    ltype = STRIP_REFERENCE (ltype);
+	    CHECK_TYPEDEF (rtype);
+	    rtype = STRIP_REFERENCE (rtype);
+
+	    if (TYPE_CODE (ltype) == TYPE_CODE_PTR)
+	      res_val = value_ptradd (self_value->value, other_val);
+	    else if (TYPE_CODE (rtype) == TYPE_CODE_PTR)
+	      res_val = value_ptradd (other_val, self_value->value);
+	    else
+	      res_val = value_binop (self_value->value, other_val, BINOP_ADD);
+	  }
 	  break;
 	case VALPY_SUB:
-	  res_val = value_binop (self_value->value, other_val, BINOP_SUB);
+	  {
+	    struct type *ltype = value_type (self_value->value);
+	    struct type *rtype = value_type (other_val);
+	    CHECK_TYPEDEF (ltype);
+	    ltype = STRIP_REFERENCE (ltype);
+	    CHECK_TYPEDEF (rtype);
+	    rtype = STRIP_REFERENCE (rtype);
+	    if (TYPE_CODE (ltype) == TYPE_CODE_PTR)
+	      {
+		if (TYPE_CODE (rtype) == TYPE_CODE_PTR)
+		  {
+		    /* A ptrdiff_t for the target would be preferable
+		       here.  */
+		    res_val
+		      = value_from_longest (builtin_type_pyint,
+					    value_ptrdiff (self_value->value,
+							   other_val));
+		  }
+		else
+		  res_val = value_ptrsub (self_value->value, other_val);
+	      }
+	    else
+	      res_val = value_binop (self_value->value, other_val, BINOP_SUB);
+	  }
 	  break;
 	case VALPY_MUL:
 	  res_val = value_binop (self_value->value, other_val, BINOP_MUL);

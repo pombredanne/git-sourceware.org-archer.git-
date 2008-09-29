@@ -1,5 +1,10 @@
 2008-09-29  Tom Tromey  <tromey@redhat.com>
 
+	* python/python-value.c (STRIP_REFERENCE): New define.
+	(valpy_binop): Handle pointer addition and subtraction.
+
+2008-09-29  Tom Tromey  <tromey@redhat.com>
+
 	* python/python-frame.c (frame_object_methods) <is_inner_than>:
 	Remove.
 	(frapy_inner_p): Remove.
