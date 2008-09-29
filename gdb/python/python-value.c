@@ -684,7 +684,7 @@ valpy_long (PyObject *self)
   volatile struct gdb_exception except;
 
   CHECK_TYPEDEF (type);
-  if (TYPE_CODE (type) != TYPE_CODE_INT)
+  if (TYPE_CODE (type) != TYPE_CODE_INT && TYPE_CODE (type) != TYPE_CODE_PTR)
     {
       PyErr_SetString (PyExc_RuntimeError, "cannot convert value to long");
       return NULL;
