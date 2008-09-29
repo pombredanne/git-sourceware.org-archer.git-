@@ -125,7 +125,7 @@ typy_lookup_typename (char *type_name, struct block *block)
 static PyObject *
 typy_template_argument (PyObject *self, PyObject *args)
 {
-  int i, argno;
+  int i, argno, n_pointers;
   struct type *type = ((type_object *) self)->type;
   struct demangle_component *demangled;
   const char *err;
@@ -180,8 +180,19 @@ typy_template_argument (PyObject *self, PyObject *args)
       return NULL;
     }
 
+  /* Count pointers and apply later, because lookup_typename does not
+     understand '*'.  FIXME: should handle references as well.  Really
+     we should have a generic cp_comp_to_type.  */
+  demangled = demangled->u.s_binary.left;
+  n_pointers = 0;
+  while (demangled->type == DEMANGLE_COMPONENT_POINTER)
+    {
+      ++n_pointers;
+      demangled = demangled->u.s_binary.left;
+    }
+
   /* FIXME: if argument is a value, we should DTRT.  */
-  type_name = cp_comp_to_string (demangled->u.s_binary.left, 10);
+  type_name = cp_comp_to_string (demangled, 10);
 
   argtype = typy_lookup_typename (type_name, block);
   if (! argtype)
@@ -192,6 +203,9 @@ typy_template_argument (PyObject *self, PyObject *args)
       return NULL;
     }
   xfree (type_name);
+
+  while (n_pointers--)
+    argtype = lookup_pointer_type (argtype);
 
   return type_to_type_object (argtype);
 }
