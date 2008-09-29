@@ -47,7 +47,6 @@ static struct frame_info *frame_object_to_frame_info (frame_object *frame_obj);
 
 static PyObject *frapy_str (PyObject *self);
 static PyObject *frapy_equal_p (PyObject *self, PyObject *args);
-static PyObject *frapy_inner_p (PyObject *self, PyObject *args);
 static PyObject *frapy_is_valid (PyObject *self, PyObject *args);
 static PyObject *frapy_get_name (PyObject *self, PyObject *args);
 static PyObject *frapy_get_type (PyObject *self, PyObject *args);
@@ -71,8 +70,6 @@ static PyObject *frapy_read_var_value (PyObject *self, PyObject *args);
 
 static PyMethodDef frame_object_methods[] = {
   { "equals", frapy_equal_p, METH_VARARGS, "Compare frames." },
-  { "is_inner_than", frapy_inner_p, METH_VARARGS,
-    "Return true if this frame is strictly inner than the other frame." },
   { "is_valid", frapy_is_valid, METH_NOARGS,
     "Return true if this frame is valid, false if not." },
   { "get_name", frapy_get_name, METH_NOARGS,
@@ -176,43 +173,6 @@ frapy_equal_p (PyObject *self, PyObject *args)
     Py_RETURN_TRUE;
 
   Py_RETURN_FALSE;
-}
-
-static PyObject *
-frapy_inner_p (PyObject *self, PyObject *args)
-{
-  /* FIXME: disabled for now, because frame_id_inner is gone.  */
-  PyErr_SetString (PyExc_NotImplementedError, "method not implemented");
-  return NULL;
-#if 0
-  int innerp = 0;	  /* Initialize to appease gcc warning.  */
-  frame_object *self_frame = (frame_object *) self;
-  frame_object *other;
-  volatile struct gdb_exception except;
-
-  if (!PyArg_ParseTuple (args, "O!", &frame_object_type, &other))
-    return NULL;
-
-  TRY_CATCH (except, RETURN_MASK_ALL)
-    {
-      /* It doesn't make sense to compare frames from different arches.  */
-      if (self_frame->gdbarch != other->gdbarch)
-	{
-	  PyErr_SetString (PyExc_ValueError,
-			   "Frames are from different architectures.");
-	  return NULL;
-	}
-
-      innerp = frame_id_inner (self_frame->gdbarch,
-			       self_frame->frame_id, other->frame_id);
-    }
-  GDB_PY_HANDLE_EXCEPTION (except);
-
-  if (innerp)
-    Py_RETURN_TRUE;
-
-  Py_RETURN_FALSE;
-#endif
 }
 
 static PyObject *

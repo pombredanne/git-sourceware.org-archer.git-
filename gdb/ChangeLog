@@ -1,5 +1,11 @@
 2008-09-29  Tom Tromey  <tromey@redhat.com>
 
+	* python/python-frame.c (frame_object_methods) <is_inner_than>:
+	Remove.
+	(frapy_inner_p): Remove.
+
+2008-09-29  Tom Tromey  <tromey@redhat.com>
+
 	* python/python-value.c (valpy_richcompare): Convert Python long.
 
 2008-09-27  Tom Tromey  <tromey@redhat.com>
