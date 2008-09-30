@@ -25,6 +25,7 @@
 #include "objfiles.h"
 #include "observer.h"
 #include "gdb_regex.h"
+#include "language.h"
 
 #include <ctype.h>
 
@@ -632,20 +633,18 @@ gdbpy_new_objfile (struct objfile *objfile)
 
 
 
-/* Return a string representing the type of a value.  */
+/* Return a string representing TYPE.  */
 static char *
-get_type (struct value *val)
+get_type (struct type *type)
 {
   struct cleanup *old_chain;
   struct ui_file *stb;
   char *thetype;
   long length;
-  struct type *type;
 
   stb = mem_fileopen ();
   old_chain = make_cleanup_ui_file_delete (stb);
 
-  type = value_type (val);
   CHECK_TYPEDEF (type);
 
   type_print (type, "", stb, -1);
@@ -655,22 +654,17 @@ get_type (struct value *val)
   return thetype;
 }
 
-/* Try to pretty-print VALUE.  Return an xmalloc()d string
-   representation of the value.  If the result is NULL, and *OUT_VALUE
-   is set, then *OUT_VALUE is a value which should be printed in place
-   of VALUE.  *OUT_VALUE is not passed back to the pretty-printer.
-   Returns NULL and sets *OUT_VALUE to NULL on error or if no
-   pretty-printer was available.  */
-char *
-apply_pretty_printer (struct value *value, struct value **out_value)
+/* Find the pretty-printing function for TYPE.  If no pretty-printer
+   exists, return NULL.  If one exists, return a borrowed reference.
+   If a printer is found, *DICTP is set to a reference to the
+   dictionary object; it must be derefed by the caller.  */
+static PyObject *
+find_pretty_printer (struct type *type, PyObject **dictp)
 {
-  PyObject *dict, *key, *func;
+  PyObject *dict, *key, *func, *found = NULL;
   Py_ssize_t iter;
   char *type_name = NULL;
-  char *output = NULL;
   volatile struct gdb_exception except;
-
-  *out_value = NULL;
 
   /* Fetch the pretty printer dictionary.  */
   if (! PyObject_HasAttrString (gdb_module, "pretty_printers"))
@@ -687,7 +681,7 @@ apply_pretty_printer (struct value *value, struct value **out_value)
   /* Get the name of the type.  */
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      type_name = get_type (value);
+      type_name = get_type (type);
     }
   if (except.reason < 0)
     {
@@ -697,7 +691,7 @@ apply_pretty_printer (struct value *value, struct value **out_value)
 
   /* See if the type matches a pretty-printer regexp.  */
   iter = 0;
-  while (! output && ! *out_value && PyDict_Next (dict, &iter, &key, &func))
+  while (! found && PyDict_Next (dict, &iter, &key, &func))
     {
       char *rx_str;
 
@@ -705,40 +699,126 @@ apply_pretty_printer (struct value *value, struct value **out_value)
 	continue;
       rx_str = PyString_AsString (key);
       if (re_comp (rx_str) == NULL && re_exec (type_name) == 1)
-	{
-	  TRY_CATCH (except, RETURN_MASK_ALL)
-	    {
-	      PyObject *val_obj, *result;
-
-	      /* FIXME: memory management here.  Why are values so
-		 funny?  */
-	      value = value_copy (value);
-
-	      val_obj = value_to_value_object (value);
-	      /* FIXME: a method on an object, not just func?  If so,
-		 should use the same object as MI.  */
-	      result = PyObject_CallFunctionObjArgs (func, val_obj, NULL);
-	      if (result)
-		{
-		  if (PyString_Check (result))
-		    output = xstrdup (PyString_AsString (result));
-		  else
-		    *out_value = convert_value_from_python (result);
-		  Py_DECREF (result);
-		}
-	      else
-		gdbpy_print_stack ();
-
-	      Py_DECREF (val_obj);
-	    }
-	}
+	found = func;
     }
 
   xfree (type_name);
+
+  if (found)
+    *dictp = dict;
+  else
+    Py_DECREF (dict);
+
+  return found;
+}
+
+/* Pretty-print a single value, VALUE, using the printer function
+   FUNC.  If the function returns a string, an xmalloc()d copy is
+   returned.  Otherwise, if the function returns a value, a *OUT_VALUE
+   is set to the value, and NULL is returned.  On error, *OUT_VALUE is
+   set to NULL and NULL is returned.  */
+static char *
+pretty_print_one_value (PyObject *func, struct value *value,
+			struct value **out_value)
+{
+  char *output = NULL;
+  volatile struct gdb_exception except;
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      PyObject *val_obj, *result;
+
+      /* FIXME: memory management here.  Why are values so
+	 funny?  */
+      value = value_copy (value);
+
+      val_obj = value_to_value_object (value);
+      /* FIXME: a method on an object, not just func?  If so,
+	 should use the same object as MI.  */
+      result = PyObject_CallFunctionObjArgs (func, val_obj, NULL);
+      if (result)
+	{
+	  if (PyString_Check (result))
+	    output = xstrdup (PyString_AsString (result));
+	  else
+	    *out_value = convert_value_from_python (result);
+	  Py_DECREF (result);
+	}
+      else
+	gdbpy_print_stack ();
+
+      Py_DECREF (val_obj);
+    }
+
+  return output;
+}
+
+/* Try to pretty-print VALUE.  Return an xmalloc()d string
+   representation of the value.  If the result is NULL, and *OUT_VALUE
+   is set, then *OUT_VALUE is a value which should be printed in place
+   of VALUE.  *OUT_VALUE is not passed back to the pretty-printer.
+   Returns NULL and sets *OUT_VALUE to NULL on error or if no
+   pretty-printer was available.  */
+char *
+apply_pretty_printer (struct value *value, struct value **out_value)
+{
+  PyObject *dict, *func;
+  char *output;
+
+  *out_value = NULL;
+
+  func = find_pretty_printer (value_type (value), &dict);
+  if (! func)
+    return NULL;
+
+  output = pretty_print_one_value (func, value, out_value);
+
   Py_DECREF (dict);
 
   return output;
 }
+
+/* Like apply_pretty_printer, but called from the 'val' (and not
+   'value') printing code.  Arguments are as for val_print.  Returns
+   an xmalloc()d pretty-printed string if a pretty-printer was found
+   and was successful.  */
+char *
+apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
+			  int embedded_offset, CORE_ADDR address,
+			  struct ui_file *stream, int format,
+			  int deref_ref, int recurse,
+			  enum val_prettyprint pretty,
+			  const struct language_defn *language)
+{
+  PyObject *dict, *func;
+  struct value *value, *replacement = NULL;
+  char *output;
+
+  func = find_pretty_printer (type, &dict);
+  if (! func)
+    return NULL;
+
+  value = value_from_contents (type, valaddr, embedded_offset, address);
+  output = pretty_print_one_value (func, value, &replacement);
+
+  Py_DECREF (dict);
+
+  if (output)
+    return output;
+
+  if (! replacement)
+    return NULL;
+
+  language->la_val_print (value_type (replacement),
+			  value_contents_all (replacement),
+			  value_embedded_offset (replacement),
+			  VALUE_ADDRESS (replacement),
+			  stream, format, deref_ref, recurse,
+			  pretty);
+
+  return xstrdup ("");
+}
+
 
 #else /* HAVE_PYTHON */
 
@@ -770,6 +850,17 @@ char *
 apply_pretty_printer (struct value *ignore, struct value **out)
 {
   *out = NULL;
+  return NULL;
+}
+
+char *
+apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
+			  int embedded_offset, CORE_ADDR address,
+			  struct ui_ifle *stream, int format,
+			  int deref_ref, int recurse,
+			  enum val_prettyprint pretty,
+			  const language_defn *language)
+{
   return NULL;
 }
 

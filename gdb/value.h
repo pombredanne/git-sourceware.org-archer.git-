@@ -284,6 +284,10 @@ extern struct value *value_from_double (struct type *type, DOUBLEST num);
 extern struct value *value_from_decfloat (struct type *type,
 					  const gdb_byte *decbytes);
 extern struct value *value_from_string (char *string);
+extern struct value *value_from_contents (struct type *type,
+					  const gdb_byte *valaddr,
+					  int embedded_offset,
+					  CORE_ADDR address);
 
 extern struct value *value_at (struct type *type, CORE_ADDR addr);
 extern struct value *value_at_lazy (struct type *type, CORE_ADDR addr);

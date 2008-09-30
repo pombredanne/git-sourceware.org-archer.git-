@@ -1,3 +1,15 @@
+2008-09-30  Tom Tromey  <tromey@redhat.com>
+
+	* valprint.c (val_print): Call apply_val_pretty_printer.
+	* python/python.h (apply_val_pretty_printer): Declare.
+	* python/python.c (get_type): Change argument type.
+	(find_pretty_printer): New function.
+	(pretty_print_one_value): Likewise.
+	(apply_pretty_printer): Use them.
+	(apply_val_pretty_printer): New function.
+	* value.h (value_from_contents): Declare.
+	* value.c (value_from_contents): New function.
+
 2008-09-29  Tom Tromey  <tromey@redhat.com>
 
 	* python/python-value.c (STRIP_REFERENCE): New define.

@@ -30,4 +30,11 @@ void run_python_script (int argc, char **argv);
 
 char *apply_pretty_printer (struct value *, struct value **);
 
+char *apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
+				int embedded_offset, CORE_ADDR address,
+				struct ui_file *stream, int format,
+				int deref_ref, int recurse,
+				enum val_prettyprint pretty,
+				const struct language_defn *language);
+
 #endif /* GDB_PYTHON_H */

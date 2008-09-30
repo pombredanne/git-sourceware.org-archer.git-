@@ -211,6 +211,7 @@ val_print (struct type *type, const gdb_byte *valaddr, int embedded_offset,
   volatile struct gdb_exception except;
   volatile enum val_prettyprint real_pretty = pretty;
   int ret = 0;
+  char *text;
 
   struct type *real_type = check_typedef (type);
   if (pretty == Val_pretty_default)
@@ -227,6 +228,18 @@ val_print (struct type *type, const gdb_byte *valaddr, int embedded_offset,
       fprintf_filtered (stream, "<incomplete type>");
       gdb_flush (stream);
       return (0);
+    }
+
+  text = apply_val_pretty_printer (type, valaddr, embedded_offset,
+				   address, stream, format,
+				   deref_ref, recurse, real_pretty,
+				   language);
+  if (text)
+    {
+      fputs_filtered (text, stream);
+      ret = strlen (text);
+      xfree (text);
+      return ret;
     }
 
   TRY_CATCH (except, RETURN_MASK_ERROR)
