@@ -1,3 +1,10 @@
+2008-10-02  Tom Tromey  <tromey@redhat.com>
+
+	* valprint.c (value_print): Use fputs_indented.
+	(val_print): Likewise.
+	* defs.h (fputs_indented): Declare.
+	* utils.c (fputs_indented): New function.
+
 2008-09-30  Tom Tromey  <tromey@redhat.com>
 
 	* valprint.c (val_print): Call apply_val_pretty_printer.

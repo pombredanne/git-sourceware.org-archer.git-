@@ -446,6 +446,8 @@ extern struct ui_file *gdb_stdtargin;
 
 extern void fputs_filtered (const char *, struct ui_file *);
 
+extern void fputs_indented (const char *, struct ui_file *);
+
 extern void fputs_unfiltered (const char *, struct ui_file *);
 
 extern int fputc_filtered (int c, struct ui_file *);

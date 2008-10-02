@@ -2050,6 +2050,37 @@ fputs_filtered (const char *linebuffer, struct ui_file *stream)
   fputs_maybe_filtered (linebuffer, stream, 1);
 }
 
+/* Print TEXT to STREAM, using filtered output.  If TEXT wraps, indent
+   subsequent lines to the current output column at the time of the call to
+   this function.  */
+void
+fputs_indented (const char *text, struct ui_file *stream)
+{
+  const char *p;
+  char *save = wrap_indent;
+  unsigned int level = chars_printed;
+  int last_was_newline = 0;
+
+  wrap_indent = "";
+
+  for (p = text; *p; ++p)
+    {
+      if (last_was_newline && *p != '\n')
+	{
+	  /* Indent properly.  Note that we can't use n_spaces here,
+	     as a caller might have used it when calling wrap_here --
+	     so a call here would clobber the saved wrap_indent.  */
+	  unsigned int i;
+	  for (i = 0; i < level; ++i)
+	    fputc_filtered (' ', stream);
+	}
+      fputc_filtered (*p, stream);
+      last_was_newline = *p == '\n';
+    }
+
+  wrap_indent = save;
+}
+
 int
 putchar_unfiltered (int c)
 {

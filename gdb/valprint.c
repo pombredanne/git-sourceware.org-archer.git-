@@ -236,7 +236,7 @@ val_print (struct type *type, const gdb_byte *valaddr, int embedded_offset,
 				   language);
   if (text)
     {
-      fputs_filtered (text, stream);
+      fputs_indented (text, stream);
       ret = strlen (text);
       xfree (text);
       return ret;
@@ -330,7 +330,7 @@ value_print (struct value *val, struct ui_file *stream, int format,
       if (output)
 	{
 	  int len = strlen (output);
-	  fputs_filtered (output, stream);
+	  fputs_indented (output, stream);
 	  xfree (output);
 	  return len;
 	}
