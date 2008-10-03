@@ -35,21 +35,21 @@ struct value *values_in_python;
 
 #include "python-internal.h"
 
-/* Python's integer type corresponds to native C's long type.  */
-struct type *builtin_type_pyint;
+/* Even though Python scalar types directly map to host types, we use
+   target types here to remain consistent with the the values system in
+   GDB (which uses target arithmetic).  */
 
-/* Python's float type corresponds to native C's double type (which is
-   assumed to use IEEE double format).  */
-#define builtin_type_pyfloat builtin_type_ieee_double
+/* Python's integer type corresponds to C's long type.  */
+#define builtin_type_pyint builtin_type (current_gdbarch)->builtin_long
 
-/* Python's long type corresponds to native C's long long type (which is
-   assumed to be int64_t).  */
-#define builtin_type_pylong builtin_type_int64
+/* Python's float type corresponds to C's double type.  */
+#define builtin_type_pyfloat builtin_type (current_gdbarch)->builtin_double
 
-/* The current language may not have a boolean type, so always use an
-   integer as boolean type.  Hopefully any language can deal with integers
-   as boolean values.  */
-#define builtin_type_pybool builtin_type_int32
+/* Python's long type corresponds to C's long long type.  */
+#define builtin_type_pylong builtin_type (current_gdbarch)->builtin_long_long
+
+#define builtin_type_pybool \
+  language_bool_type (current_language, current_gdbarch)
 
 typedef struct {
   PyObject_HEAD
@@ -897,9 +897,6 @@ gdbpy_get_value_from_history (PyObject *self, PyObject *args)
 void
 gdbpy_initialize_values (void)
 {
-  builtin_type_pyint = init_type (TYPE_CODE_INT, sizeof (long), 0, "long",
-				  (struct objfile *) NULL);
-
   value_object_type.tp_new = valpy_new;
   if (PyType_Ready (&value_object_type) < 0)
     return;
