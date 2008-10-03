@@ -955,6 +955,7 @@ output_command (char *exp, int from_tty)
   struct format_data fmt;
 
   fmt.size = 0;
+  fmt.raw = 0;
 
   if (exp && *exp == '/')
     {
@@ -1241,6 +1242,7 @@ x_command (char *exp, int from_tty)
   fmt.format = last_format ? last_format : 'x';
   fmt.size = last_size;
   fmt.count = 1;
+  fmt.raw = 0;
 
   if (exp && *exp == '/')
     {
@@ -1344,6 +1346,7 @@ display_command (char *exp, int from_tty)
 	  fmt.format = 0;
 	  fmt.size = 0;
 	  fmt.count = 0;
+	  fmt.raw = 0;
 	}
 
       innermost_block = 0;

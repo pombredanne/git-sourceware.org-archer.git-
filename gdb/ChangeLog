@@ -1,3 +1,9 @@
+2008-10-03  Tom Tromey  <tromey@redhat.com>
+
+	* printcmd.c (output_command): Initialize fmt.raw.
+	(x_command): Likewise.
+	(display_command): Likewise.
+
 2008-10-02  Tom Tromey  <tromey@redhat.com>
 
 	* valprint.c (value_print): Use fputs_indented.
