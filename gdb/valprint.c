@@ -38,6 +38,10 @@
 
 #include <errno.h>
 
+/* This is set when printing.  It indicates whether the user has
+   requested that we bypass python-based value formatting.  */
+static int raw_printing;
+
 /* Prototypes for local functions */
 
 static int partial_memory_read (CORE_ADDR memaddr, gdb_byte *myaddr,
@@ -230,16 +234,20 @@ val_print (struct type *type, const gdb_byte *valaddr, int embedded_offset,
       return (0);
     }
 
-  text = apply_val_pretty_printer (type, valaddr, embedded_offset,
-				   address, stream, format,
-				   deref_ref, recurse, real_pretty,
-				   language);
-  if (text)
+  if (!raw_printing)
     {
-      fputs_indented (text, stream);
-      ret = strlen (text);
-      xfree (text);
-      return ret;
+      char *text;
+      text = apply_val_pretty_printer (type, valaddr, embedded_offset,
+				       address, stream, format,
+				       deref_ref, recurse, real_pretty,
+				       language);
+      if (text)
+	{
+	  fputs_indented (text, stream);
+	  ret = strlen (text);
+	  xfree (text);
+	  return ret;
+	}
     }
 
   TRY_CATCH (except, RETURN_MASK_ERROR)
@@ -323,6 +331,7 @@ value_print (struct value *val, struct ui_file *stream, int format,
   if (!value_check_printable (val, stream))
     return 0;
 
+  raw_printing = raw;
   if (!raw)
     {
       struct value *replace = NULL;

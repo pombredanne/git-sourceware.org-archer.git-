@@ -1,5 +1,11 @@
 2008-10-03  Tom Tromey  <tromey@redhat.com>
 
+	* valprint.c (raw_printing): New global.
+	(value_print): Set it.
+	(val_print): Use it.
+
+2008-10-03  Tom Tromey  <tromey@redhat.com>
+
 	* printcmd.c (output_command): Initialize fmt.raw.
 	(x_command): Likewise.
 	(display_command): Likewise.
