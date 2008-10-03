@@ -198,8 +198,8 @@ proc test_value_in_inferior {} {
 
   gdb_py_test_silent_cmd "python s = gdb.get_value_from_history (0)" "get value from history" 1
 
-  gdb_test "python print 'result = ' + str(s\['a'\])" " = 3" "acess element inside struct using 8-bit string name"
-  gdb_test "python print 'result = ' + str(s\[u'a'\])" " = 3" "acess element inside struct using unicode name"
+  gdb_test "python print 'result = ' + str(s\['a'\])" " = 3" "access element inside struct using 8-bit string name"
+  gdb_test "python print 'result = ' + str(s\[u'a'\])" " = 3" "access element inside struct using unicode name"
 
   # Test dereferencing the argv pointer
 
