@@ -17894,6 +17894,26 @@ Return a new @code{gdb.Type} object which represents a pointer to this
 type.
 @end defmethod
 
+@defmethod Type reference
+Return a new @code{gdb.Type} object which represents a reference to this
+type.
+@end defmethod
+
+@defmethod Type sizeof
+Return the size of this type, in bytes.
+@end defmethod
+
+@defmethod Type target
+Return a new @code{gdb.Type} object which represents the target type
+of this type.
+
+For a pointer type, the target type is the type of the pointed-to
+object.  For an array type, the target type is the type of the
+elements of the array.  For a function type, the target type is the
+type of the return value.  For a complex type, the target type is the
+type of the elements.
+@end defmethod
+
 @defmethod Type template_argument n
 If this @code{gdb.Type} is a template type, this will return a new
 @code{gdb.Type} which represents the type of the @var{n}th template

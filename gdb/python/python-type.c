@@ -43,11 +43,19 @@ static void typy_dealloc (PyObject *);
 
 static PyObject *typy_str (PyObject *);
 static PyObject *typy_pointer (PyObject *self, PyObject *args);
+static PyObject *typy_reference (PyObject *self, PyObject *args);
+static PyObject *typy_sizeof (PyObject *self, PyObject *args);
+static PyObject *typy_target (PyObject *self, PyObject *args);
 static PyObject *typy_template_argument (PyObject *self, PyObject *args);
 
 static PyMethodDef type_object_methods[] =
 {
   { "pointer", typy_pointer, METH_NOARGS, "Return pointer to this type" },
+  { "reference", typy_reference, METH_NOARGS, "Return reference to this type" },
+  { "sizeof", typy_sizeof, METH_NOARGS,
+    "Return the size of this type, in bytes" },
+  { "target", typy_target, METH_NOARGS,
+    "Return the target type of this type" },
   { "template_argument", typy_template_argument, METH_VARARGS,
     "Return a single template argument type" },
   { NULL }
@@ -100,6 +108,53 @@ typy_pointer (PyObject *self, PyObject *args)
   GDB_PY_HANDLE_EXCEPTION (except);
 
   return type_to_type_object (type);
+}
+
+/* Return a Type object which represents a reference to SELF.  */
+static PyObject *
+typy_reference (PyObject *self, PyObject *args)
+{
+  struct type *type = ((type_object *) self)->type;
+  volatile struct gdb_exception except;
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      type = lookup_reference_type (type);
+    }
+  GDB_PY_HANDLE_EXCEPTION (except);
+
+  return type_to_type_object (type);
+}
+
+/* Return a Type object which represents the target type of SELF.  */
+static PyObject *
+typy_target (PyObject *self, PyObject *args)
+{
+  struct type *type = ((type_object *) self)->type;
+
+  if (!TYPE_TARGET_TYPE (type))
+    {
+      PyErr_SetString (PyExc_RuntimeError, "type does not have a target");
+      return NULL;
+    }
+
+  return type_to_type_object (TYPE_TARGET_TYPE (type));
+}
+
+/* Return the size of the type represented by SELF, in bytes.  */
+static PyObject *
+typy_sizeof (PyObject *self, PyObject *args)
+{
+  struct type *type = ((type_object *) self)->type;
+  volatile struct gdb_exception except;
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      CHECK_TYPEDEF (type);
+    }
+  GDB_PY_HANDLE_EXCEPTION (except);
+
+  return PyLong_FromLong (TYPE_LENGTH (type));
 }
 
 static struct type *

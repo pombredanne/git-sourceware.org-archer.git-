@@ -1,3 +1,11 @@
+2008-10-05  Tom Tromey  <tromey@redhat.com>
+
+	* python/python-type.c (typy_reference): New function.
+	(typy_target): New function.
+	(typy_target): New function.
+	(type_object_methods): Add 'reference', 'target', 'sizeof'
+	methods.
+
 2008-10-03  Tom Tromey  <tromey@redhat.com>
 
 	* valprint.c (raw_printing): New global.

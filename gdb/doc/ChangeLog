@@ -1,3 +1,7 @@
+2008-10-05  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Types From Inferior): Document new methods.
+
 2008-09-29  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.texinfo (Pretty Printing): Update example.
