@@ -46,6 +46,8 @@ proc gdb_py_test_multiple {name args} {
     return 0
 }
 
+# Run a command in GDB, and report a failure if a Python exception is thrown.
+# If report_pass is true, report a pass if no exception is thrown.
 proc gdb_py_test_silent_cmd {cmd name report_pass} {
   global gdb_prompt
 
@@ -97,7 +99,7 @@ proc test_value_numeric_ops {} {
   gdb_test "python print 'result = ' + str(+i)" " = 5" "positive integer value"
   gdb_test "python print 'result = ' + str(-f)" " = -1.25" "negated double value"
   gdb_test "python print 'result = ' + str(+f)" " = 1.25" "positive double value"
-  gdb_test "python print 'result = ' + str(abs(j-i))" " = 3" "absolute of  integer value"
+  gdb_test "python print 'result = ' + str(abs(j-i))" " = 3" "absolute of integer value"
   gdb_test "python print 'result = ' + str(abs(f-g))" " = 1.25" "absolute of double value"
 
   # Test gdb.Value mixed with Python types.
@@ -108,6 +110,18 @@ proc test_value_numeric_ops {} {
 
   gdb_test "python print 'result = ' + str(1+i)" " = 6" "add python integer with integer value"
   gdb_test "python print 'result = ' + str(1.5+f)" " = 2.75" "add python float with double value"
+
+  # Test pointer arithmethic
+
+  # First, obtain the pointers
+  gdb_test "print (void *) 2" "" ""
+  gdb_test "python a = gdb.get_value_from_history (0)" "" ""
+  gdb_test "print (void *) 5" "" ""
+  gdb_test "python b = gdb.get_value_from_history (0)" "" ""
+
+  gdb_test "python print 'result = ' + str(a+5)" " = 0x7" "add pointer value with python integer"
+  gdb_test "python print 'result = ' + str(b-2)" " = 0x3" "subtract python integer from pointer value"
+  gdb_test "python print 'result = ' + str(b-a)" " = 3" "subtract two pointer values"
 
   # Test some invalid operations.
 

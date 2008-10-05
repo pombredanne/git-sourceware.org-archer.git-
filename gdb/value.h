@@ -40,7 +40,7 @@ struct language_defn;
 
 struct value;
 
-/* Needed if another module needs to maintain its on list of values.  */
+/* Needed if another module needs to maintain its own list of values.  */
 
 void value_prepend_to_list (struct value **head, struct value *val);
 void value_remove_from_list (struct value **head, struct value *val);
