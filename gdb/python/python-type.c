@@ -359,6 +359,8 @@ typy_new (PyTypeObject *subtype, PyObject *args, PyObject *kwargs)
   PyObject *block_obj = NULL;
   struct block *block = NULL;
 
+  /* FIXME: it is strange to allow a Type with no name, but we need
+     this for type_to_type_object.  */
   if (! PyArg_ParseTuple (args, "|sO", &type_name, &block_obj))
     return NULL;
 

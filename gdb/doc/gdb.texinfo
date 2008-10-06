@@ -17889,6 +17889,16 @@ Return the type of this @code{gdb.Value}.  The result is a
 The following methods are provided:
 
 @table @code
+@defmethod Type Type [name [block]]
+Construct a new instance of @code{gdb.Type}.
+
+If @var{name} is given, it specifies the name of a type to look up in
+the inferior.
+
+If @var{block} is given, then @var{name} is looked up in that scope.
+Otherwise, it is searched for globally.
+@end defmethod
+
 @defmethod Type pointer
 Return a new @code{gdb.Type} object which represents a pointer to this
 type.
