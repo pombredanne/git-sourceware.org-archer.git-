@@ -1,22 +1,3 @@
-2008-09-09  Sami Wagiaalla  <swagiaal@redhat.com>
-
-	* dwarf2read.c (process_die): Added call to
-	read_import_statement to the appropriate dies.
-	(read_import_statement): New function.
-	(read_func_scope): Resets the using directives from saved
-	context.	
-	* cp-namespace.c: Changed cp_adding_using to extern.
-	Moved cp_adding_using prototype from here...
-	* cp-support.h: ...to here.
-	* buildsym.h: Add global variable using_directives.
-	Added using_directives variable to context struct.
-	Added extern prototype for
-	* buildsym.c (finish_block): Set using directives for
-	the block, and reset the global variable.
-	(push_context): Save and reset using_directives.
-	* block.c (block_using): Return using directives for
-	the given block instead of its owning static block.
-
 2008-08-31  Aaron W. LaFramboise  <aaronavay62@aaronwl.com>
 
 	* configure.ac (RPATH_ENVVAR): Use PATH on Windows.
