@@ -17924,13 +17924,16 @@ type of the return value.  For a complex type, the target type is the
 type of the elements.
 @end defmethod
 
-@defmethod Type template_argument n
+@defmethod Type template_argument n [block]
 If this @code{gdb.Type} is a template type, this will return a new
 @code{gdb.Type} which represents the type of the @var{n}th template
 argument.
 
 If this @code{gdb.Type} is not a template type, this will throw an
 exception.
+
+If @var{block} is given, then @var{name} is looked up in that scope.
+Otherwise, it is searched for globally.
 @end defmethod
 @end table
 

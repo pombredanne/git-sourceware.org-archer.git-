@@ -1,5 +1,10 @@
 2008-10-06  Tom Tromey  <tromey@redhat.com>
 
+	* gdb.texinfo (Types From Inferior): Document block argument to
+	template_argument.
+
+2008-10-06  Tom Tromey  <tromey@redhat.com>
+
 	* gdb.texinfo (Types From Inferior): Document Type constructor.
 
 2008-10-05  Tom Tromey  <tromey@redhat.com>
