@@ -1433,6 +1433,11 @@
 	eval.c, jv-typeprint.c, jv-valprint.c, mdebugread.c, p-typeprint.c,
 	p-valprint.c, valops.c, value.c, varobj.c: Update throughout.
 
+2008-10-07  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* symtab.c (lookup_symbol_aux_local): Added 'lanuage' argument.
+	Added a call to	la_lookup_symbol_nonlocal.
+
 2008-10-07  Thomas Schwinge  <tschwinge@gnu.org>
 	    Pedro Alves  <pedro@codesourcery.com>
 
