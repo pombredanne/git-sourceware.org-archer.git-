@@ -55,7 +55,7 @@ gdb_expect {
 # are not imported
 
 send_gdb "break marker3\n"
-gdb_continue_to_breakpoint "marker3"
+send_gdb "continue\n"
 
 send_gdb "print a\n"
 gdb_expect {
@@ -87,6 +87,33 @@ gdb_expect {
    -re "\\$\[0-9\]* = 1" { pass "print a" }
    -re ".*$gdb_prompt $" { fail "print a" }
    timeout { fail "(timeout) print a" }
+}
+
+gdb_exit
+gdb_start
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_load ${binfile}
+
+############################################
+# test printing of namespace imported into 
+# file scope.
+
+
+if ![runto_main] then {
+    perror "couldn't run to breakpoint main"
+    continue
+}
+
+gdb_breakpoint [gdb_get_line_number "marker5"]
+gdb_continue_to_breakpoint "marker1 stop"
+
+setup_kfail "gdb/380" "*-*-*"
+
+send_gdb "print cc\n"
+gdb_expect {
+   -re "\\$\[0-9\]* = 1" { pass "print cc" }
+   -re ".*$gdb_prompt $" { fail "print cc" }
+   timeout { fail "(timeout) print cc" }
 }
 
 gdb_exit
