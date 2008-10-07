@@ -1,3 +1,8 @@
+2008-10-07  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* symtab.c (lookup_symbol_aux_local): Added 'lanuage' argument.
+	Added a call to	la_lookup_symbol_nonlocal.
+
 2008-09-09  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* dwarf2read.c (process_die): Added call to

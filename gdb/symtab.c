@@ -92,6 +92,7 @@ static
 struct symbol *lookup_symbol_aux_local (const char *name,
 					const char *linkage_name,
 					const struct block *block,
+					enum language language, 
 					const domain_enum domain);
 
 static
@@ -1281,7 +1282,7 @@ lookup_symbol_aux (const char *name, const char *linkage_name,
   /* Search specified block and its superiors.  Don't search
      STATIC_BLOCK or GLOBAL_BLOCK.  */
 
-  sym = lookup_symbol_aux_local (name, linkage_name, block, domain);
+  sym = lookup_symbol_aux_local (name, linkage_name, block, language,  domain);
   if (sym != NULL)
     return sym;
 
@@ -1356,21 +1357,30 @@ lookup_symbol_aux (const char *name, const char *linkage_name,
 static struct symbol *
 lookup_symbol_aux_local (const char *name, const char *linkage_name,
 			 const struct block *block,
+			 enum language language, 
 			 const domain_enum domain)
 {
   struct symbol *sym;
   const struct block *static_block = block_static_block (block);
-
+  const struct language_defn *langdef;
+  
+  langdef = language_def (language);
+    
   /* Check if either no block is specified or it's a global block.  */
 
   if (static_block == NULL)
     return NULL;
 
-  while (block != static_block)
+  while (block != NULL)
     {
       sym = lookup_symbol_aux_block (name, linkage_name, block, domain);
+      
+      if(sym == NULL)
+        sym = langdef->la_lookup_symbol_nonlocal (name, linkage_name, block, domain);
+             
       if (sym != NULL)
 	return sym;
+      
       block = BLOCK_SUPERBLOCK (block);
     }
 
