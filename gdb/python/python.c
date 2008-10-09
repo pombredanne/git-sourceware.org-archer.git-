@@ -721,10 +721,12 @@ find_pretty_printer (struct type *type, PyObject **dictp, char *dict_name)
    FUNC.  If the function returns a string, an xmalloc()d copy is
    returned.  Otherwise, if the function returns a value, a *OUT_VALUE
    is set to the value, and NULL is returned.  On error, *OUT_VALUE is
-   set to NULL and NULL is returned.  */
+   set to NULL and NULL is returned.  If CHILDREN is true, we may also
+   try to call an object's "children" method and format the output
+   accordingly.  */
 static char *
 pretty_print_one_value (PyObject *func, struct value *value,
-			struct value **out_value)
+			struct value **out_value, int children)
 {
   char *output = NULL;
   volatile struct gdb_exception except;
@@ -745,6 +747,15 @@ pretty_print_one_value (PyObject *func, struct value *value,
       if (PyObject_HasAttr (func, gdbpy_to_string_cst))
 	result = PyObject_CallMethodObjArgs (func, gdbpy_to_string_cst,
 					     val_obj, NULL);
+      else if (children
+	       && PyObject_HasAttr (func, gdbpy_children_cst)
+	       && PyObject_HasAttrString (gdb_module, "_format_children"))
+	{
+	  PyObject *fmt = PyObject_GetAttrString (gdb_module,
+						  "_format_children");
+	  result = PyObject_CallFunctionObjArgs (fmt, func, val_obj, NULL);
+	  Py_DECREF (fmt);
+	}
       else
 	result = PyObject_CallFunctionObjArgs (func, val_obj, NULL);
       if (result)
@@ -782,7 +793,7 @@ apply_pretty_printer (struct value *value, struct value **out_value)
   if (! func)
     return NULL;
 
-  output = pretty_print_one_value (func, value, out_value);
+  output = pretty_print_one_value (func, value, out_value, 1);
 
   Py_DECREF (dict);
 
@@ -810,7 +821,7 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
     return NULL;
 
   value = value_from_contents (type, valaddr, embedded_offset, address);
-  output = pretty_print_one_value (func, value, &replacement);
+  output = pretty_print_one_value (func, value, &replacement, 1);
 
   Py_DECREF (dict);
 
@@ -838,7 +849,7 @@ char *
 apply_varobj_pretty_printer (PyObject *printer_obj, struct value *value)
 {
   struct value *out_value = NULL;
-  char *result = pretty_print_one_value (printer_obj, value, &out_value);
+  char *result = pretty_print_one_value (printer_obj, value, &out_value, 0);
 
   if (!result && out_value)
     {
@@ -1049,6 +1060,24 @@ class GdbOutputFile:\n\
 \n\
 sys.stderr = GdbOutputFile()\n\
 sys.stdout = GdbOutputFile()\n\
+");
+
+  PyRun_SimpleString ("\
+def _format_children(obj, val):\n\
+  result = []\n\
+  if hasattr(obj, 'header'):\n\
+    result.append(obj.header(val))\n\
+  max = gdb.get_parameter('print elements')\n\
+  i = 0\n\
+  for elt in obj.children(val):\n\
+    (name, val) = elt\n\
+    result.append('%s = %s' % (name, str(val)))\n\
+    i = i + 1\n\
+    if max == 0 or i == max:\n\
+      break\n\
+  return '\\n'.join(result)\n\
+\n\
+gdb._format_children = _format_children\n\
 ");
 #endif /* HAVE_PYTHON */
 }

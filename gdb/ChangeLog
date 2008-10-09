@@ -1,5 +1,14 @@
 2008-10-09  Tom Tromey  <tromey@redhat.com>
 
+	* python/python.c (_initialize_python): Define _format_children.
+	(pretty_print_one_value): Add 'children' argument.  Call
+	_format_children.
+	(apply_pretty_printer): Update.
+	(apply_val_pretty_printer): Update.
+	(apply_varobj_pretty_printer): Update.
+
+2008-10-09  Tom Tromey  <tromey@redhat.com>
+
 	* mi/mi-cmds.c (mi_cmds) <var-set-visualizer>: Remove.
 	<var-clear-type-visualizers>: Remove.
 	<var-set-type-visualizer>: Remove.
