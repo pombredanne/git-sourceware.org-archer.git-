@@ -106,4 +106,12 @@ PyObject *python_string_to_unicode (PyObject *obj);
 char *unicode_to_target_string (PyObject *unicode_str);
 char *python_string_to_target_string (PyObject *obj);
 
+/* Note that these are declared here, and not in python.h with the
+   other pretty-printer functions, because they refer to PyObject.  */
+char *apply_varobj_pretty_printer (PyObject *print_obj, struct value *value);
+PyObject *gdbpy_get_varobj_pretty_printer (struct type *type);
+
+extern PyObject *gdbpy_children_cst;
+extern PyObject *gdbpy_to_string_cst;
+
 #endif /* GDB_PYTHON_INTERNAL_H */

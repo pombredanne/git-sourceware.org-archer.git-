@@ -60,6 +60,10 @@ static int gdbpy_auto_load = 1;
 
 PyObject *gdb_module;
 
+/* Some string constants we may wish to use.  */
+PyObject *gdbpy_to_string_cst;
+PyObject *gdbpy_children_cst;
+
 static PyObject *get_parameter (PyObject *, PyObject *);
 static PyObject *execute_gdb_command (PyObject *, PyObject *);
 static PyObject *gdbpy_solib_address (PyObject *, PyObject *);
@@ -657,9 +661,10 @@ get_type (struct type *type)
 /* Find the pretty-printing function for TYPE.  If no pretty-printer
    exists, return NULL.  If one exists, return a borrowed reference.
    If a printer is found, *DICTP is set to a reference to the
-   dictionary object; it must be derefed by the caller.  */
+   dictionary object; it must be derefed by the caller.  DICT_NAME is
+   the name of the dictionary to search for types.  */
 static PyObject *
-find_pretty_printer (struct type *type, PyObject **dictp)
+find_pretty_printer (struct type *type, PyObject **dictp, char *dict_name)
 {
   PyObject *dict, *key, *func, *found = NULL;
   Py_ssize_t iter;
@@ -667,9 +672,9 @@ find_pretty_printer (struct type *type, PyObject **dictp)
   volatile struct gdb_exception except;
 
   /* Fetch the pretty printer dictionary.  */
-  if (! PyObject_HasAttrString (gdb_module, "pretty_printers"))
+  if (! PyObject_HasAttrString (gdb_module, dict_name))
     return NULL;
-  dict = PyObject_GetAttrString (gdb_module, "pretty_printers");
+  dict = PyObject_GetAttrString (gdb_module, dict_name);
   if (! dict)
     return NULL;
   if (! PyDict_Check (dict) || ! PyDict_Size (dict))
@@ -733,9 +738,15 @@ pretty_print_one_value (PyObject *func, struct value *value,
       value = value_copy (value);
 
       val_obj = value_to_value_object (value);
-      /* FIXME: a method on an object, not just func?  If so,
-	 should use the same object as MI.  */
-      result = PyObject_CallFunctionObjArgs (func, val_obj, NULL);
+
+      /* The function might be an MI-style class with a to_string
+	 method, or it might be an ordinary function.  FIXME: should
+	 also check for the 'children' method here.  */
+      if (PyObject_HasAttr (func, gdbpy_to_string_cst))
+	result = PyObject_CallMethodObjArgs (func, gdbpy_to_string_cst,
+					     val_obj, NULL);
+      else
+	result = PyObject_CallFunctionObjArgs (func, val_obj, NULL);
       if (result)
 	{
 	  if (PyString_Check (result))
@@ -767,7 +778,7 @@ apply_pretty_printer (struct value *value, struct value **out_value)
 
   *out_value = NULL;
 
-  func = find_pretty_printer (value_type (value), &dict);
+  func = find_pretty_printer (value_type (value), &dict, "cli_pretty_printers");
   if (! func)
     return NULL;
 
@@ -794,7 +805,7 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
   struct value *value, *replacement = NULL;
   char *output;
 
-  func = find_pretty_printer (type, &dict);
+  func = find_pretty_printer (type, &dict, "cli_pretty_printers");
   if (! func)
     return NULL;
 
@@ -819,6 +830,49 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
   return xstrdup ("");
 }
 
+/* Apply a pretty-printer for the varobj code.  PRINTER_OBJ is the
+   print object.  It must have a 'to_string' method (but this is
+   checked by varobj, not here) which accepts a gdb.Value and returns
+   a string.  This returns an xmalloc()d string, or NULL on error.  */
+char *
+apply_varobj_pretty_printer (PyObject *printer_obj, struct value *value)
+{
+  struct value *out_value = NULL;
+  char *result = pretty_print_one_value (printer_obj, value, &out_value);
+
+  if (!result && out_value)
+    {
+      struct ui_file *stb;
+      struct cleanup *old_chain;
+      long dummy;
+
+      stb = mem_fileopen ();
+      old_chain = make_cleanup_ui_file_delete (stb);
+
+      common_val_print (value, stb, 0, 1, 0, 0, current_language);
+      result = ui_file_xstrdup (stb, &dummy);
+
+      do_cleanups (old_chain);
+    }
+
+  return result;
+}
+
+/* Find a pretty-printer object for the varobj module.  Returns a
+   borrowed reference to the object if successful; returns NULL if
+   not.  TYPE is the type of the varobj for which a printer should be
+   returned.  */
+PyObject *
+gdbpy_get_varobj_pretty_printer (struct type *type)
+{
+  PyObject *dict = NULL;
+  PyObject *printer = find_pretty_printer (type, &dict, "mi_pretty_printers");
+  if (dict)
+    {
+      Py_DECREF (dict);
+    }
+  return printer;
+}
 
 #else /* HAVE_PYTHON */
 
@@ -963,9 +1017,13 @@ Enables or disables auto-loading of Python code when an object is opened."),
   gdbpy_initialize_types ();
 
   PyRun_SimpleString ("import gdb");
-  PyRun_SimpleString ("gdb.pretty_printers = {}");
+  PyRun_SimpleString ("gdb.cli_pretty_printers = {}");
+  PyRun_SimpleString ("gdb.mi_pretty_printers = {}");
 
   observer_attach_new_objfile (gdbpy_new_objfile);
+
+  gdbpy_to_string_cst = PyString_FromString ("to_string");
+  gdbpy_children_cst = PyString_FromString ("children");
 
   /* Create a couple objects which are used for Python's stdout and
      stderr.  */

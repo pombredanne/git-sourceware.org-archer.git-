@@ -17943,15 +17943,22 @@ Otherwise, it is searched for globally.
 @value{GDBN} provides a mechanism to allow pretty-printing of values
 using Python code.
 
-The Python dictionary @code{gdb.pretty_printers} maps regular
-expressions (strings) onto functions.  When printing a value,
-@value{GDBN} first compares the name of the value's canonical type
-(the type after following all typedefs) to each regular expression.
+The Python dictionary @code{gdb.cli_pretty_printers} maps regular
+expressions (strings) onto pretty-printers.  A pretty-printer is
+either a function or an object.
 
-If a regular expression matches, then the corresponding function is
-called with a @code{gdb.Value} representing the value to be printed.
+When printing a value, @value{GDBN} first compares the name of the
+value's canonical type (the type after following all typedefs) to each
+regular expression.  If a regular expression matches, then the
+corresponding pretty-printer is invoked with a @code{gdb.Value}
+representing the value to be printed.
 
-If this function returns a string, it is printed.  If it returns any
+If the pretty-printer is a function, the function is called directly.
+
+If the pretty-printer is an object, the object's @code{to_string}
+method is called.
+
+If the pretty-printer returns a string, it is printed.  If it returns any
 Python value that is convertible to a @code{gdb.Value}, then that
 value is passed to the regular @value{GDBN} type-printing code.
 
@@ -17963,8 +17970,18 @@ Here is an example showing how a @code{std::string} might be printed:
 def printstdstring(val):
     return val['_M_dataplus']['_M_p']
 
-gdb.pretty_printers['^std::basic_string<char.*>'] = printstdstring
+gdb.cli_pretty_printers['^std::basic_string<char.*>'] = printstdstring
 @end smallexample
+
+Here is an example of the same printer, using a class:
+
+@smallexample
+class StdStringPrinter:
+    def to_string(self, val):
+        return val['_M_dataplus']['_M_p']
+
+gdb.cli_pretty_printers['^std::basic_string<char.*>$'] = StdStringPrinter()
+@end
 
 @node Threads In Python
 @subsubsection Threads In Python

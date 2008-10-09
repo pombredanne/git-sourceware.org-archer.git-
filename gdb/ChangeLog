@@ -1,3 +1,39 @@
+2008-10-09  Tom Tromey  <tromey@redhat.com>
+
+	* mi/mi-cmds.c (mi_cmds) <var-set-visualizer>: Remove.
+	<var-clear-type-visualizers>: Remove.
+	<var-set-type-visualizer>: Remove.
+	* mi/mi-cmds.h (mi_cmd_var_set_visualizer): Remove.
+	(mi_cmd_var_clear_type_visualizers): Remove.
+	(mi_cmd_var_set_visualizer): Remove.
+	* mi/mi-cmd-var.c (mi_cmd_var_set_visualizer): Remove.
+	(mi_cmd_var_clear_type_visualizers): Remove.
+	(mi_cmd_var_set_type_visualizer): Remove.
+	* varobj.h (varobj_clear_type_visualizers,
+	varobj_set_type_visualizer, varobj_set_visualizer): Remove.
+	* varobj.c (value_get_print_value): Use
+	apply_varobj_pretty_printer.
+	(varobj_clear_type_visualizers): Remove.
+	(type_visualizer): Remove.
+	(type_visualizers): Remove.
+	(varobj_set_type_visualizer): Remove.
+	(install_default_visualizer): Rewrote.
+	(varobj_set_visualizer): Remove.
+	* python/python-internal.h (apply_varobj_pretty_printer):
+	Declare.
+	(gdbpy_children_cst, gdbpy_to_string_cst): Declare.
+	* python/python.c (gdbpy_to_static_cst, gdbpy_children_cst): New
+	globals.
+	(_initialize_python): Initialize them.
+	(pretty_print_one_value): Use to_string method if it exists.
+	(apply_varobj_pretty_printer): New function.
+	(gdbpy_get_varobj_pretty_printer): New function.
+	(find_pretty_printer): Added 'dict_name' argument.
+	(apply_val_pretty_printer): Update.
+	(gdbpy_get_varobj_pretty_printer): Update.
+	(_initialize_python): Initialize cli_pretty_printers and
+	mi_pretty_printers, not pretty_printers.
+
 2008-10-05  Tom Tromey  <tromey@redhat.com>
 
 	* python/python-type.c (typy_reference): New function.
