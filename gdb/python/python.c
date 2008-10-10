@@ -75,6 +75,7 @@ static PyObject *gdbpy_switch_to_thread (PyObject *, PyObject *);
 static PyObject *gdbpy_write (PyObject *, PyObject *);
 static PyObject *gdbpy_flush (PyObject *, PyObject *);
 static PyObject *gdbpy_cli (PyObject *, PyObject *);
+static PyObject *gdbpy_get_default_visualizer (PyObject *, PyObject *);
 
 static PyMethodDef GdbMethods[] =
 {
@@ -89,6 +90,9 @@ static PyMethodDef GdbMethods[] =
 
   { "get_breakpoints", gdbpy_get_breakpoints, METH_NOARGS,
     "Return a tuple of all breakpoint objects" },
+
+  { "get_default_visualizer", gdbpy_get_default_visualizer, METH_VARARGS,
+    "Find the default visualizer for a Value." },
 
   { "get_frames", gdbpy_get_frames, METH_NOARGS,
     "Return a tuple of all frame objects" },
@@ -883,6 +887,43 @@ gdbpy_get_varobj_pretty_printer (struct type *type)
       Py_DECREF (dict);
     }
   return printer;
+}
+
+/* A Python function which wraps gdbpy_get_varobj_pretty_printer and
+   instantiates the resulting class.  This accepts a Value argument
+   and returns a pretty printer instance, or None.  This function is
+   useful as an argument to the MI command -var-set-visualizer.  */
+static PyObject *
+gdbpy_get_default_visualizer (PyObject *self, PyObject *args)
+{
+  PyObject *val_obj;
+  PyObject *result;
+  struct value *value;
+
+  if (! PyArg_ParseTuple (args, "O", &val_obj))
+    return NULL;
+  value = value_object_to_value (val_obj);
+  if (! value)
+    {
+      PyErr_SetString (PyExc_RuntimeError, "argument must be a gdb.Value");
+      return NULL;
+    }
+
+  result = gdbpy_get_varobj_pretty_printer (value_type (value));
+  if (result)
+    {
+      /* Instantiate it.  */
+      result = PyObject_CallFunctionObjArgs (result, NULL);
+    }
+
+  if (! result)
+    {
+      PyErr_Clear ();
+      result = Py_None;
+    }
+
+  Py_INCREF (result);
+  return result;
 }
 
 #else /* HAVE_PYTHON */

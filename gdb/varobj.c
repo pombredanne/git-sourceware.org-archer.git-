@@ -1293,6 +1293,22 @@ install_new_value (struct varobj *var, struct value *value, int initial)
 }
 
 static void
+install_visualizer (struct varobj *var, PyObject *visualizer)
+{
+#if HAVE_PYTHON
+  /* If there are any children now, wipe them.  */
+  varobj_delete (var, NULL, 1 /* children only */);
+
+  Py_XDECREF (var->pretty_printer);
+  var->pretty_printer = visualizer;
+
+  install_new_value (var, var->value, 1);
+#else
+  error ("Python support required");
+#endif
+}
+
+static void
 install_default_visualizer (struct varobj *var)
 {
 #if HAVE_PYTHON
@@ -1305,21 +1321,66 @@ install_default_visualizer (struct varobj *var)
   if (!constructor)
     return;
 
-  /* If there are any children now, wipe them.  */
-  varobj_delete (var, NULL, 1 /* children only */);
-
   instance = PyObject_CallFunctionObjArgs (constructor, NULL);
-
   if (!instance)
     {
       gdbpy_print_stack ();
       error ("Failed to instantiate the visualizer");
     }
 
-  Py_XDECREF (var->pretty_printer);
-  var->pretty_printer = instance;
+  install_visualizer (var, instance);
+#else
+  error ("Python support required");
+#endif
+}
 
-  install_new_value (var, var->value, 1);
+void 
+varobj_set_visualizer (struct varobj *var, const char *visualizer)
+{
+#if HAVE_PYTHON
+  PyObject *mainmod, *globals, *constructor, *instance, *py_value;
+  struct cleanup *back_to;
+
+  mainmod = PyImport_AddModule ("__main__");
+  globals = PyModule_GetDict (mainmod);
+  Py_INCREF (globals);
+  back_to = make_cleanup_py_decref (globals);
+
+  constructor = PyRun_String (visualizer, Py_eval_input, globals, globals);
+
+  if (! constructor)
+    {
+      gdbpy_print_stack ();
+      error ("Could not evaluate visualizer expression: %s", visualizer);
+    }
+
+  make_cleanup_py_decref (constructor);
+  if (constructor == Py_None)
+    instance = NULL;
+  else
+    {
+      py_value = gdb_owned_value_to_value_object (var->value);
+      make_cleanup_py_decref (py_value);
+
+      /* In this case call the constructor with the value.  Maybe we
+	 should do this in all cases?  */
+      instance = PyObject_CallFunctionObjArgs (constructor, py_value, NULL);
+      if (!instance)
+	{
+	  gdbpy_print_stack ();
+	  error ("Failed to instantiate the visualizer");
+	}
+
+      if (instance == Py_None)
+	{
+	  Py_DECREF (instance);
+	  instance = NULL;
+	}
+    }
+
+  install_visualizer (var, instance);
+
+  do_cleanups (back_to);
 #else
   error ("Python support required");
 #endif

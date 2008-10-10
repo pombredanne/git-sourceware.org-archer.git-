@@ -1,3 +1,15 @@
+2008-10-10  Tom Tromey  <tromey@redhat.com>
+
+	* varobj.c (install_visualizer): New function.
+	(install_default_visualizer): Use it.
+	(varobj_set_visualizer): New function.
+	* varobj.h (varobj_set_visualizer): Restore.
+	* python/python.c (gdbpy_get_default_visualizer): New function.
+	(GdbMethods) <get_default_visualizer>: New entry.
+	* mi/mi-cmds.h (mi_cmd_var_set_visualizer): Restore.
+	* mi/mi-cmds.c (mi_cmds) <var-set-visualizer>: Restore.
+	* mi/mi-cmd-var.c (mi_cmd_var_set_visualizer): Restore.
+
 2008-10-09  Tom Tromey  <tromey@redhat.com>
 
 	* python/python.c (_initialize_python): Define _format_children.
