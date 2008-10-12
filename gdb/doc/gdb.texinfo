@@ -17981,7 +17981,7 @@ class StdStringPrinter:
         return val['_M_dataplus']['_M_p']
 
 gdb.cli_pretty_printers['^std::basic_string<char.*>$'] = StdStringPrinter()
-@end
+@end smallexample
 
 @node Threads In Python
 @subsubsection Threads In Python
@@ -18027,9 +18027,13 @@ The object initializer for @code{Command} registers the new command
 with @value{GDBN}.  This initializer is normally invoked from the
 subclass' own @code{__init__} method.
 
-@var{name} is the name of the command.  Currently, this name must be a
-single word; subcommands and prefix commands are not yet supported.
-There is also no support for multi-line commands.
+@var{name} is the name of the command.  If @var{name} consists of
+multiple words, then the initial words are looked for as prefix
+commands.  In this case, if one of the prefix commands does not exist,
+an exception is raised.
+
+There is no support for multi-line commands.  Currently, there is also
+no way to define new prefix commands.
 
 @var{command-class} should be one of the @samp{COMMAND_} constants
 defined below.  This argument tells @value{GDBN} how to categorize the
