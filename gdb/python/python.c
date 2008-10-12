@@ -288,14 +288,14 @@ get_parameter (PyObject *self, PyObject *args)
 	{
 	  xfree (newarg);
 	  return PyErr_Format (PyExc_RuntimeError,
-			       "could not find variable `%s'", arg);
+			       "could not find parameter `%s'", arg);
 	}
     }
   xfree (newarg);
   GDB_PY_HANDLE_EXCEPTION (except);
 
   if (! cmd->var)
-    return PyErr_Format (PyExc_RuntimeError, "`%s' is not a variable", arg);
+    return PyErr_Format (PyExc_RuntimeError, "`%s' is not a parameter", arg);
   return parameter_to_python (cmd);
 }
 

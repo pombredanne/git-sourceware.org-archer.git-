@@ -1,5 +1,10 @@
 2008-10-12  Tom Tromey  <tromey@redhat.com>
 
+	* python/python.c (get_parameter): Change 'variable' to
+	'parameter'.
+
+2008-10-12  Tom Tromey  <tromey@redhat.com>
+
 	* python/python-cmd.c (parse_command_name): New function.
 	(cmdpy_init): Use it.
 
