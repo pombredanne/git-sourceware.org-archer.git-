@@ -104,6 +104,11 @@ static PyTypeObject cmdpy_object_type =
   cmdpy_object_methods		  /* tp_methods */
 };
 
+
+/* Constants used by this module.  */
+static PyObject *invoke_cst;
+static PyObject *complete_cst;
+
 
 
 /* Python function which wraps dont_repeat.  */
@@ -136,14 +141,13 @@ static void
 cmdpy_function (struct cmd_list_element *command, char *args, int from_tty)
 {
   cmdpy_object *obj = (cmdpy_object *) get_cmd_context (command);
-  PyObject *method, *argobj, *ttyobj, *result;
+  PyObject *argobj, *ttyobj, *result;
 
   if (! obj)
     error ("Invalid invocation of Python command object");
-  if (! PyObject_HasAttrString ((PyObject *) obj, "invoke"))
+  if (! PyObject_HasAttr ((PyObject *) obj, invoke_cst))
     error ("Python command object missing 'invoke' method");
 
-  method = PyString_FromString ("invoke");
   if (! args)
     {
       argobj = Py_None;
@@ -157,9 +161,8 @@ cmdpy_function (struct cmd_list_element *command, char *args, int from_tty)
     }
   ttyobj = from_tty ? Py_True : Py_False;
   Py_INCREF (ttyobj);
-  result = PyObject_CallMethodObjArgs ((PyObject *) obj, method, argobj,
+  result = PyObject_CallMethodObjArgs ((PyObject *) obj, invoke_cst, argobj,
 				       ttyobj, NULL);
-  Py_DECREF (method);
   Py_DECREF (argobj);
   Py_DECREF (ttyobj);
   if (! result)
@@ -195,19 +198,18 @@ static char **
 cmdpy_completer (struct cmd_list_element *command, char *text, char *word)
 {
   cmdpy_object *obj = (cmdpy_object *) get_cmd_context (command);
-  PyObject *method, *textobj, *wordobj, *resultobj;
+  PyObject *textobj, *wordobj, *resultobj;
   char **result;
 
   if (! obj)
     error ("Invalid invocation of Python command object");
-  if (! PyObject_HasAttrString ((PyObject *) obj, "complete"))
+  if (! PyObject_HasAttr ((PyObject *) obj, complete_cst))
     {
       /* If there is no complete method, don't error -- instead, just
 	 say that there are no completions.  */
       return NULL;
     }
 
-  method = PyString_FromString ("complete");
   textobj = PyString_FromString (text);
   if (! textobj)
     error ("could not convert argument to Python string");
@@ -215,9 +217,8 @@ cmdpy_completer (struct cmd_list_element *command, char *text, char *word)
   if (! wordobj)
     error ("could not convert argument to Python string");
 
-  resultobj = PyObject_CallMethodObjArgs ((PyObject *) obj, method, textobj,
-					  wordobj, NULL);
-  Py_DECREF (method);
+  resultobj = PyObject_CallMethodObjArgs ((PyObject *) obj, complete_cst,
+					  textobj, wordobj, NULL);
   Py_DECREF (textobj);
   Py_DECREF (wordobj);
   if (! resultobj)
@@ -404,4 +405,7 @@ gdbpy_initialize_commands (void)
   Py_INCREF (&cmdpy_object_type);
   PyModule_AddObject (gdb_module, "Command",
 		      (PyObject *) &cmdpy_object_type);
+
+  invoke_cst = PyString_FromString ("invoke");
+  complete_cst = PyString_FromString ("complete");
 }
