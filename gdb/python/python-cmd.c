@@ -269,12 +269,92 @@ cmdpy_completer (struct cmd_list_element *command, char *text, char *word)
   return result;
 }
 
+/* Helper for cmdpy_init which locates the command list to use and
+   pulls out the command name.
+   
+   TEXT is the command name list.  The final word in the list is the
+   name of the new command.  All earlier words must be existing prefix
+   commands.
+
+   *BASE_LIST is set to the final prefix command's list of
+   *sub-commands.
+   
+   This function returns the xmalloc()d name of the new command.  On
+   error sets the Python error and returns NULL.  */
+static char *
+parse_command_name (char *text, struct cmd_list_element ***base_list)
+{
+  struct cmd_list_element *elt;
+  int len = strlen (text);
+  int i, lastchar;
+  char *prefix_text;
+  char *result;
+
+  /* Skip trailing whitespace.  */
+  for (i = len - 1; i >= 0 && (text[i] == ' ' || text[i] == '\t'); --i)
+    ;
+  if (i < 0)
+    {
+      PyErr_SetString (PyExc_RuntimeError, "no command name found");
+      return NULL;
+    }
+  lastchar = i;
+
+  /* Find first character of the final word.  */
+  for (; i > 0 && (isalnum (text[i - 1])
+		   || text[i - 1] == '-'
+		   || text[i - 1] == '_');
+       --i)
+    ;
+  result = xmalloc (lastchar - i + 2);
+  memcpy (result, &text[i], lastchar - i + 1);
+  result[lastchar - i + 1] = '\0';
+
+  /* Skip whitespace again.  */
+  for (--i; i >= 0 && (text[i] == ' ' || text[i] == '\t'); --i)
+    ;
+  if (i < 0)
+    {
+      *base_list = &cmdlist;
+      return result;
+    }
+
+  prefix_text = xmalloc (i + 2);
+  memcpy (prefix_text, text, i + 1);
+  prefix_text[i + 1] = '\0';
+
+  text = prefix_text;
+  elt = lookup_cmd_1 (&text, cmdlist, NULL, 1);
+  if (!elt || elt == (struct cmd_list_element *) -1)
+    {
+      PyErr_Format (PyExc_RuntimeError, "could not find command prefix %s",
+		    prefix_text);
+      xfree (prefix_text);
+      xfree (result);
+      return NULL;
+    }
+
+  if (elt->prefixlist)
+    {
+      xfree (prefix_text);
+      *base_list = elt->prefixlist;
+      return result;
+    }
+
+  PyErr_Format (PyExc_RuntimeError, "'%s' is not a prefix command",
+		prefix_text);
+  xfree (prefix_text);
+  xfree (result);
+  return NULL;
+}
+
 /* Object initializer; sets up gdb-side structures for command.
 
    Use: __init__(NAME, CMDCLASS, [COMPLETERCLASS]).
 
-   NAME is the name of the command.  Currently only one-word commands
-   are supported.
+   NAME is the name of the command.  It may consist of multiple words,
+   in which case the final word is the name of the new command, and
+   earlier words must be prefix commands.
 
    CMDCLASS is the kind of command.  It should be one of the COMMAND_*
    constants defined in the gdb module.
@@ -296,6 +376,8 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kwds)
   int completetype = -1;
   char *docstring = NULL;
   volatile struct gdb_exception except;
+  struct cmd_list_element **cmd_list;
+  char *cmd_name;
 
   if (obj->command)
     {
@@ -325,6 +407,10 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kwds)
       return -1;
     }
 
+  cmd_name = parse_command_name (name, &cmd_list);
+  if (! cmd_name)
+    return -1;
+
   if (PyObject_HasAttrString (self, "__doc__"))
     {
       PyObject *ds_obj = PyObject_GetAttrString (self, "__doc__");
@@ -334,28 +420,31 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kwds)
   if (! docstring)
     docstring = xstrdup ("This command is not documented.");
 
+  Py_INCREF (self);
+
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
       /* It would be nice to support multi-word commands here, but it
 	 is a bit tricky given how gdb command data structures seem to
 	 work.  */
-      struct cmd_list_element *cmd = add_cmd (xstrdup (name),
+      struct cmd_list_element *cmd = add_cmd (cmd_name,
 					      (enum command_class) cmdtype,
 					      NULL,
 					      docstring,
-					      &cmdlist);
+					      cmd_list);
       /* There appears to be no API to set this.  */
       cmd->func = cmdpy_function;
       cmd->destroyer = cmdpy_destroyer;
 
       obj->command = cmd;
-      Py_INCREF (self);
       set_cmd_context (cmd, self);
       set_cmd_completer (cmd, ((completetype == -1) ? cmdpy_completer
 			       : completers[completetype].completer));
     }
   if (except.reason < 0)
     {
+      xfree (cmd_name);
+      Py_DECREF (self);
       PyErr_Format (except.reason == RETURN_QUIT
 		    ? PyExc_KeyboardInterrupt : PyExc_RuntimeError,
 		    "%s", except.message);

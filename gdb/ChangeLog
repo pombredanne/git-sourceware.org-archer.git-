@@ -1,5 +1,10 @@
 2008-10-12  Tom Tromey  <tromey@redhat.com>
 
+	* python/python-cmd.c (parse_command_name): New function.
+	(cmdpy_init): Use it.
+
+2008-10-12  Tom Tromey  <tromey@redhat.com>
+
 	* python/python-cmd.c (invoke_cst, complete_cst): New globals.
 	(gdbpy_initialize_commands): Initialize them.
 	(cmdpy_function): Use invoke_cst.
