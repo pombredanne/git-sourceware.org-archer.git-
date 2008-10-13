@@ -667,7 +667,11 @@ static PyObject *
 find_pretty_printer (struct type *type, PyObject **dictp, char *dict_name)
 {
   PyObject *dict, *key, *func, *found = NULL;
+#if PYTHON_API_VERSION <= 1012
+  int iter;
+#else
   Py_ssize_t iter;
+#endif
   char *type_name = NULL;
   volatile struct gdb_exception except;
 
