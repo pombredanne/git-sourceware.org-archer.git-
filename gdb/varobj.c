@@ -770,15 +770,6 @@ varobj_get_frozen (struct varobj *var)
 }
 
 
-int
-varobj_get_num_children (struct varobj *var)
-{
-  if (var->num_children == -1)
-    var->num_children = number_of_children (var);
-
-  return var->num_children;
-}
-
 static int
 update_dynamic_varobj_children (struct varobj *var,
 				VEC (varobj_p) **changed,
@@ -886,6 +877,7 @@ update_dynamic_varobj_children (struct varobj *var,
 	varobj_delete (VEC_index (varobj_p, var->children, i), NULL, 0);
     }
   VEC_truncate (varobj_p, var->children, i);
+  var->num_children = VEC_length (varobj_p, var->children);
  
   do_cleanups (back_to);
 
@@ -896,6 +888,19 @@ update_dynamic_varobj_children (struct varobj *var,
 #endif
 }
 
+int
+varobj_get_num_children (struct varobj *var)
+{
+  if (var->num_children == -1)
+    {
+      int changed;
+      if (!var->pretty_printer
+	  || !update_dynamic_varobj_children (var, NULL, NULL, &changed))
+	var->num_children = number_of_children (var);
+    }
+
+  return var->num_children;
+}
 
 /* Creates a list of the immediate children of a variable object;
    the return code is the number of such children or -1 on error */

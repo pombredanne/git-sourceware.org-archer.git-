@@ -1,5 +1,12 @@
 2008-10-13  Tom Tromey  <tromey@redhat.com>
 
+	* varobj.c (update_dynamic_varobj_children): Set num_children on
+	varobj.
+	(varobj_get_num_children): Move later.  Call
+	update_dynamic_varobj_children.
+
+2008-10-13  Tom Tromey  <tromey@redhat.com>
+
 	* varobj.c (value_get_print_value): Handle replacement value
 	return.  Don't pretty-print if printer fails or returns
 	replacement.
