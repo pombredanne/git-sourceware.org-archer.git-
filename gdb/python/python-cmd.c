@@ -47,8 +47,7 @@ static struct cmdpy_completer completers[] =
 
 #define N_COMPLETERS (sizeof (completers) / sizeof (completers[0]))
 
-/* A gdb command.  For the time being only ordinary commands (not
-   set/show commands) are allowed.  */
+/* A gdb command.  */
 struct cmdpy_object
 {
   PyObject_HEAD
@@ -279,10 +278,13 @@ cmdpy_completer (struct cmd_list_element *command, char *text, char *word)
    *BASE_LIST is set to the final prefix command's list of
    *sub-commands.
    
+   START_LIST is the list in which the search starts.
+   
    This function returns the xmalloc()d name of the new command.  On
    error sets the Python error and returns NULL.  */
-static char *
-parse_command_name (char *text, struct cmd_list_element ***base_list)
+char *
+gdbpy_parse_command_name (char *text, struct cmd_list_element ***base_list,
+			  struct cmd_list_element **start_list)
 {
   struct cmd_list_element *elt;
   int len = strlen (text);
@@ -315,7 +317,7 @@ parse_command_name (char *text, struct cmd_list_element ***base_list)
     ;
   if (i < 0)
     {
-      *base_list = &cmdlist;
+      *base_list = start_list;
       return result;
     }
 
@@ -324,7 +326,7 @@ parse_command_name (char *text, struct cmd_list_element ***base_list)
   prefix_text[i + 1] = '\0';
 
   text = prefix_text;
-  elt = lookup_cmd_1 (&text, cmdlist, NULL, 1);
+  elt = lookup_cmd_1 (&text, *start_list, NULL, 1);
   if (!elt || elt == (struct cmd_list_element *) -1)
     {
       PyErr_Format (PyExc_RuntimeError, "could not find command prefix %s",
@@ -407,7 +409,7 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kwds)
       return -1;
     }
 
-  cmd_name = parse_command_name (name, &cmd_list);
+  cmd_name = gdbpy_parse_command_name (name, &cmd_list, &cmdlist);
   if (! cmd_name)
     return -1;
 
@@ -424,9 +426,6 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kwds)
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      /* It would be nice to support multi-word commands here, but it
-	 is a bit tricky given how gdb command data structures seem to
-	 work.  */
       struct cmd_list_element *cmd = add_cmd (cmd_name,
 					      (enum command_class) cmdtype,
 					      NULL,
@@ -444,6 +443,7 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kwds)
   if (except.reason < 0)
     {
       xfree (cmd_name);
+      xfree (docstring);
       Py_DECREF (self);
       PyErr_Format (except.reason == RETURN_QUIT
 		    ? PyExc_KeyboardInterrupt : PyExc_RuntimeError,

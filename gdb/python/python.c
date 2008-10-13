@@ -212,10 +212,10 @@ python_command (char *arg, int from_tty)
    NULL (and set a Python exception) on error.  Helper function for
    get_parameter.  */
 
-static PyObject *
-parameter_to_python (struct cmd_list_element *cmd)
+PyObject *
+gdbpy_parameter_value (enum var_types type, void *var)
 {
-  switch (cmd->var_type)
+  switch (type)
     {
     case var_string:
     case var_string_noescape:
@@ -223,7 +223,7 @@ parameter_to_python (struct cmd_list_element *cmd)
     case var_filename:
     case var_enum:
       {
-	char *str = * (char **) cmd->var;
+	char *str = * (char **) var;
 	if (! str)
 	  str = "";
 	return PyString_Decode (str, strlen (str), host_charset (), NULL);
@@ -231,7 +231,7 @@ parameter_to_python (struct cmd_list_element *cmd)
 
     case var_boolean:
       {
-	if (* (int *) cmd->var)
+	if (* (int *) var)
 	  Py_RETURN_TRUE;
 	else
 	  Py_RETURN_FALSE;
@@ -239,7 +239,7 @@ parameter_to_python (struct cmd_list_element *cmd)
 
     case var_auto_boolean:
       {
-	enum auto_boolean ab = * (enum auto_boolean *) cmd->var;
+	enum auto_boolean ab = * (enum auto_boolean *) var;
 	if (ab == AUTO_BOOLEAN_TRUE)
 	  Py_RETURN_TRUE;
 	else if (ab == AUTO_BOOLEAN_FALSE)
@@ -249,15 +249,15 @@ parameter_to_python (struct cmd_list_element *cmd)
       }
 
     case var_integer:
-      if ((* (int *) cmd->var) == INT_MAX)
+      if ((* (int *) var) == INT_MAX)
 	Py_RETURN_NONE;
       /* Fall through.  */
     case var_zinteger:
-      return PyLong_FromLong (* (int *) cmd->var);
+      return PyLong_FromLong (* (int *) var);
 
     case var_uinteger:
       {
-	unsigned int val = * (unsigned int *) cmd->var;
+	unsigned int val = * (unsigned int *) var;
 	if (val == UINT_MAX)
 	  Py_RETURN_NONE;
 	return PyLong_FromUnsignedLong (val);
@@ -296,7 +296,7 @@ get_parameter (PyObject *self, PyObject *args)
 
   if (! cmd->var)
     return PyErr_Format (PyExc_RuntimeError, "`%s' is not a parameter", arg);
-  return parameter_to_python (cmd);
+  return gdbpy_parameter_value (cmd->type, cmd->var);
 }
 
 /* A Python function which evaluates a string using the gdb CLI.  */
@@ -1067,6 +1067,7 @@ Enables or disables auto-loading of Python code when an object is opened."),
   gdbpy_initialize_blocks ();
   gdbpy_initialize_functions ();
   gdbpy_initialize_types ();
+  gdbpy_initialize_parameters ();
 
   PyRun_SimpleString ("import gdb");
   PyRun_SimpleString ("gdb.cli_pretty_printers = {}");

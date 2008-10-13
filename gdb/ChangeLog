@@ -1,3 +1,18 @@
+2008-10-13  Tom Tromey  <tromey@redhat.com>
+
+	* python/python.c (gdbpy_parameter_value): Rename.  No longer
+	static.  Change arguments.
+	(_initialize_python): Call gdbpy_initialize_parameters.
+	* python/python-param.c: New file.
+	* Makefile.in (SUBDIR_PYTHON_OBS): Add python-param.o.
+	(SUBDIR_PYTHON_SRCS): Add python-param.c.
+	(python-param.o): New target.
+	* python/python-internal.h (gdbpy_parse_command_name): Declare.
+	(gdbpy_initialize_parameters): Declare.
+	* python/python-cmd.c (gdbpy_parse_command_name): Rename.  Add
+	'start_list' argument.  No longer static.
+	(cmdpy_init): Update.
+
 2008-10-12  Tom Tromey  <tromey@redhat.com>
 
 	* python/python.c (get_parameter): Change 'variable' to
