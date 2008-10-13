@@ -17704,6 +17704,7 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 * Pretty Printing::		Pretty-printing values.
 * Threads In Python::           Accessing inferior threads from Python.
 * Commands In Python::          Implementing new commands in Python.
+* Parameters In Python::        Adding new @value{GDBN} parameters.
 @end menu
 
 @node Basic Python
@@ -17981,7 +17982,7 @@ class StdStringPrinter:
         return val['_M_dataplus']['_M_p']
 
 gdb.cli_pretty_printers['^std::basic_string<char.*>$'] = StdStringPrinter()
-@end
+@end smallexample
 
 @node Threads In Python
 @subsubsection Threads In Python
@@ -18027,9 +18028,13 @@ The object initializer for @code{Command} registers the new command
 with @value{GDBN}.  This initializer is normally invoked from the
 subclass' own @code{__init__} method.
 
-@var{name} is the name of the command.  Currently, this name must be a
-single word; subcommands and prefix commands are not yet supported.
-There is also no support for multi-line commands.
+@var{name} is the name of the command.  If @var{name} consists of
+multiple words, then the initial words are looked for as prefix
+commands.  In this case, if one of the prefix commands does not exist,
+an exception is raised.
+
+There is no support for multi-line commands.  Currently, there is also
+no way to define new prefix commands.
 
 @var{command-class} should be one of the @samp{COMMAND_} constants
 defined below.  This argument tells @value{GDBN} how to categorize the
@@ -18219,6 +18224,121 @@ HelloWorld ()
 
 The last line instantiates the class, and is necessary to trigger the
 registration of the command with @value{GDBN}.
+
+@node Parameters In Python
+@subsubsection Parameters In Python
+
+@cindex parameters in python
+@cindex python parameters
+@tindex gdb.Parameter
+@tindex Parameter
+You can implement new @value{GDBN} parameters using Python.  A new
+parameter is implemented as an instance of the @code{gdb.Parameter}
+class.  Parameters are exposed to the user via the @code{set} and
+@code{show} commands.
+
+@defmethod Parameter __init__ name @var{command-class} @var{parameter-class} @r{[}@var{enum-sequence}@r{]}
+The object initializer for @code{Parameter} registers the new
+parameter with @value{GDBN}.  This initializer is normally invoked
+from the subclass' own @code{__init__} method.
+
+@var{name} is the name of the new parameter.  If @var{name} consists
+of multiple words, then the initial words are looked for as prefix
+commands.  In this case, if one of the prefix commands does not exist,
+an exception is raised.
+
+@var{command-class} should be one of the @samp{COMMAND_} constants
+(@pxref{Commands In Python}).  This argument tells @value{GDBN} how to
+categorize the new parameter in the help system.
+
+@var{parameter-class} should be one of the @samp{PARAM_} constants
+defined below.  This argument tells @value{GDBN} the type of the new
+parameter; this information is used for input validation and
+completion.
+
+If @var{parameter-class} is @code{PARAM_ENUM}, then
+@var{enum-sequence} must be a sequence of strings.  These strings
+represent the possible values for the parameter.
+
+If @var{parameter-class} is not @code{PARAM_ENUM}, then the presence
+of a fourth argument will cause an exception to be thrown.
+
+The help text for the new parameter is taken from the Python
+documentation string for the parameter's class, if there is one.  If
+there is no documentation string, a default value is used.
+@end defmethod
+
+@defivar Parameter value
+The @code{value} attribute holds the underlying value of the
+parameter.  It can be read and assigned to just as any other
+attribute.  @value{GDBN} does validation when assignments are made.
+@end defivar
+
+
+When a new parameter is defined, its type must be specified.  The
+available types are represented by constants defined in the @code{gdb}
+module:
+
+@table @code
+@findex PARAM_BOOLEAN
+@findex gdb.PARAM_BOOLEAN
+@item PARAM_BOOLEAN
+The value is a plain boolean.  The Python boolean values, @code{True}
+and @code{False} are the only valid values.
+
+@findex PARAM_AUTO_BOOLEAN
+@findex gdb.PARAM_AUTO_BOOLEAN
+@item PARAM_AUTO_BOOLEAN
+The value has three possible states: true, false, and @samp{auto}.  In
+Python, true and false are represented using boolean constants, and
+@samp{auto} is represented using @code{None}.
+
+@findex PARAM_UINTEGER
+@findex gdb.PARAM_UINTEGER
+@item PARAM_UINTEGER
+The value is an unsigned integer.  The value of 0 should be
+interpreted to mean ``unlimited''.
+
+@findex PARAM_INTEGER
+@findex gdb.PARAM_INTEGER
+@item PARAM_INTEGER
+The value is a signed integer.  The value of 0 should be interpreted
+to mean ``unlimited''.
+
+@findex PARAM_STRING
+@findex gdb.PARAM_STRING
+@item PARAM_STRING
+The value is a string.  When the user modifies the string, escapes are
+translated.
+
+@findex PARAM_STRING_NOESCAPE
+@findex gdb.PARAM_STRING_NOESCAPE
+@item PARAM_STRING_NOESCAPE
+The value is a string.  When the user modifies the string, escapes are
+passed through untranslated.
+
+@findex PARAM_OPTIONAL_FILENAME
+@findex gdb.PARAM_OPTIONAL_FILENAME
+@item PARAM_OPTIONAL_FILENAME
+The value is a either a filename (a string), or @code{None}.
+
+@findex PARAM_FILENAME
+@findex gdb.PARAM_FILENAME
+@item PARAM_FILENAME
+The value is a filename (a string).
+
+@findex PARAM_ZINTEGER
+@findex gdb.PARAM_ZINTEGER
+@item PARAM_ZINTEGER
+The value is an integer.  This is like @code{PARAM_INTEGER}, except 0
+is interpreted as itself.
+
+@findex PARAM_ENUM
+@findex gdb.PARAM_ENUM
+@item PARAM_ENUM
+The value is a string, which must be one of a collection string
+constants provided when the parameter is created.
+@end table
 
 @node Interpreters
 @chapter Command Interpreters

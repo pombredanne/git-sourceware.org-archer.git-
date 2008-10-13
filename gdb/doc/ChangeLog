@@ -1,3 +1,13 @@
+2008-10-13  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Parameters In Python): New node.
+	(Python API): Update.
+
+2008-10-12  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Commands In Python): Update for multi-word
+	commands.
+
 2008-10-09  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.texinfo (Pretty Printing): Mention object-style printers.

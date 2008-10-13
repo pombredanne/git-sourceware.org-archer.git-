@@ -43,6 +43,8 @@ typedef Py_intptr_t Py_ssize_t;
 #error "Unable to find usable Python.h"
 #endif
 
+#include "command.h"
+
 struct block;
 struct symbol;
 struct symtab_and_line;
@@ -86,8 +88,15 @@ void gdbpy_initialize_symbols (void);
 void gdbpy_initialize_types (void);
 void gdbpy_initialize_blocks (void);
 void gdbpy_initialize_functions (void);
+void gdbpy_initialize_parameters (void);
 
 struct cleanup *make_cleanup_py_decref (PyObject *py);
+
+char *gdbpy_parse_command_name (char *text,
+				struct cmd_list_element ***base_list,
+				struct cmd_list_element **start_list);
+
+PyObject *gdbpy_parameter_value (enum var_types, void *);
 
 /* Use this after a TRY_EXCEPT to throw the appropriate Python
    exception.  */

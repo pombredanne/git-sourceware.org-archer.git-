@@ -277,6 +277,7 @@ SUBDIR_PYTHON_OBS = \
 	python-frame.o \
 	python-function.o \
 	python-hooks.o \
+	python-param.o \
 	python-symbol.o \
 	python-symtab.o \
 	python-type.o \
@@ -290,6 +291,7 @@ SUBDIR_PYTHON_SRCS = \
 	python/python-frame.c \
 	python/python-function.c \
 	python/python-hooks.c \
+	python/python-param.c \
 	python/python-symbol.c \
 	python/python-symtab.c \
 	python/python-type.c \
@@ -1887,6 +1889,10 @@ python-function.o: $(srcdir)/python/python-function.c
 
 python-hooks.o: $(srcdir)/python/python-hooks.c
 	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-hooks.c
+	$(POSTCOMPILE)
+
+python-param.o: $(srcdir)/python/python-param.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-param.c
 	$(POSTCOMPILE)
 
 python-symbol.o: $(srcdir)/python/python-symbol.c

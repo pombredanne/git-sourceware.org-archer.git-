@@ -47,8 +47,7 @@ static struct cmdpy_completer completers[] =
 
 #define N_COMPLETERS (sizeof (completers) / sizeof (completers[0]))
 
-/* A gdb command.  For the time being only ordinary commands (not
-   set/show commands) are allowed.  */
+/* A gdb command.  */
 struct cmdpy_object
 {
   PyObject_HEAD
@@ -104,6 +103,11 @@ static PyTypeObject cmdpy_object_type =
   cmdpy_object_methods		  /* tp_methods */
 };
 
+
+/* Constants used by this module.  */
+static PyObject *invoke_cst;
+static PyObject *complete_cst;
+
 
 
 /* Python function which wraps dont_repeat.  */
@@ -136,14 +140,13 @@ static void
 cmdpy_function (struct cmd_list_element *command, char *args, int from_tty)
 {
   cmdpy_object *obj = (cmdpy_object *) get_cmd_context (command);
-  PyObject *method, *argobj, *ttyobj, *result;
+  PyObject *argobj, *ttyobj, *result;
 
   if (! obj)
     error ("Invalid invocation of Python command object");
-  if (! PyObject_HasAttrString ((PyObject *) obj, "invoke"))
+  if (! PyObject_HasAttr ((PyObject *) obj, invoke_cst))
     error ("Python command object missing 'invoke' method");
 
-  method = PyString_FromString ("invoke");
   if (! args)
     {
       argobj = Py_None;
@@ -157,9 +160,8 @@ cmdpy_function (struct cmd_list_element *command, char *args, int from_tty)
     }
   ttyobj = from_tty ? Py_True : Py_False;
   Py_INCREF (ttyobj);
-  result = PyObject_CallMethodObjArgs ((PyObject *) obj, method, argobj,
+  result = PyObject_CallMethodObjArgs ((PyObject *) obj, invoke_cst, argobj,
 				       ttyobj, NULL);
-  Py_DECREF (method);
   Py_DECREF (argobj);
   Py_DECREF (ttyobj);
   if (! result)
@@ -195,19 +197,18 @@ static char **
 cmdpy_completer (struct cmd_list_element *command, char *text, char *word)
 {
   cmdpy_object *obj = (cmdpy_object *) get_cmd_context (command);
-  PyObject *method, *textobj, *wordobj, *resultobj;
+  PyObject *textobj, *wordobj, *resultobj;
   char **result;
 
   if (! obj)
     error ("Invalid invocation of Python command object");
-  if (! PyObject_HasAttrString ((PyObject *) obj, "complete"))
+  if (! PyObject_HasAttr ((PyObject *) obj, complete_cst))
     {
       /* If there is no complete method, don't error -- instead, just
 	 say that there are no completions.  */
       return NULL;
     }
 
-  method = PyString_FromString ("complete");
   textobj = PyString_FromString (text);
   if (! textobj)
     error ("could not convert argument to Python string");
@@ -215,9 +216,8 @@ cmdpy_completer (struct cmd_list_element *command, char *text, char *word)
   if (! wordobj)
     error ("could not convert argument to Python string");
 
-  resultobj = PyObject_CallMethodObjArgs ((PyObject *) obj, method, textobj,
-					  wordobj, NULL);
-  Py_DECREF (method);
+  resultobj = PyObject_CallMethodObjArgs ((PyObject *) obj, complete_cst,
+					  textobj, wordobj, NULL);
   Py_DECREF (textobj);
   Py_DECREF (wordobj);
   if (! resultobj)
@@ -268,12 +268,95 @@ cmdpy_completer (struct cmd_list_element *command, char *text, char *word)
   return result;
 }
 
+/* Helper for cmdpy_init which locates the command list to use and
+   pulls out the command name.
+   
+   TEXT is the command name list.  The final word in the list is the
+   name of the new command.  All earlier words must be existing prefix
+   commands.
+
+   *BASE_LIST is set to the final prefix command's list of
+   *sub-commands.
+   
+   START_LIST is the list in which the search starts.
+   
+   This function returns the xmalloc()d name of the new command.  On
+   error sets the Python error and returns NULL.  */
+char *
+gdbpy_parse_command_name (char *text, struct cmd_list_element ***base_list,
+			  struct cmd_list_element **start_list)
+{
+  struct cmd_list_element *elt;
+  int len = strlen (text);
+  int i, lastchar;
+  char *prefix_text;
+  char *result;
+
+  /* Skip trailing whitespace.  */
+  for (i = len - 1; i >= 0 && (text[i] == ' ' || text[i] == '\t'); --i)
+    ;
+  if (i < 0)
+    {
+      PyErr_SetString (PyExc_RuntimeError, "no command name found");
+      return NULL;
+    }
+  lastchar = i;
+
+  /* Find first character of the final word.  */
+  for (; i > 0 && (isalnum (text[i - 1])
+		   || text[i - 1] == '-'
+		   || text[i - 1] == '_');
+       --i)
+    ;
+  result = xmalloc (lastchar - i + 2);
+  memcpy (result, &text[i], lastchar - i + 1);
+  result[lastchar - i + 1] = '\0';
+
+  /* Skip whitespace again.  */
+  for (--i; i >= 0 && (text[i] == ' ' || text[i] == '\t'); --i)
+    ;
+  if (i < 0)
+    {
+      *base_list = start_list;
+      return result;
+    }
+
+  prefix_text = xmalloc (i + 2);
+  memcpy (prefix_text, text, i + 1);
+  prefix_text[i + 1] = '\0';
+
+  text = prefix_text;
+  elt = lookup_cmd_1 (&text, *start_list, NULL, 1);
+  if (!elt || elt == (struct cmd_list_element *) -1)
+    {
+      PyErr_Format (PyExc_RuntimeError, "could not find command prefix %s",
+		    prefix_text);
+      xfree (prefix_text);
+      xfree (result);
+      return NULL;
+    }
+
+  if (elt->prefixlist)
+    {
+      xfree (prefix_text);
+      *base_list = elt->prefixlist;
+      return result;
+    }
+
+  PyErr_Format (PyExc_RuntimeError, "'%s' is not a prefix command",
+		prefix_text);
+  xfree (prefix_text);
+  xfree (result);
+  return NULL;
+}
+
 /* Object initializer; sets up gdb-side structures for command.
 
    Use: __init__(NAME, CMDCLASS, [COMPLETERCLASS]).
 
-   NAME is the name of the command.  Currently only one-word commands
-   are supported.
+   NAME is the name of the command.  It may consist of multiple words,
+   in which case the final word is the name of the new command, and
+   earlier words must be prefix commands.
 
    CMDCLASS is the kind of command.  It should be one of the COMMAND_*
    constants defined in the gdb module.
@@ -295,6 +378,8 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kwds)
   int completetype = -1;
   char *docstring = NULL;
   volatile struct gdb_exception except;
+  struct cmd_list_element **cmd_list;
+  char *cmd_name;
 
   if (obj->command)
     {
@@ -324,6 +409,10 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kwds)
       return -1;
     }
 
+  cmd_name = gdbpy_parse_command_name (name, &cmd_list, &cmdlist);
+  if (! cmd_name)
+    return -1;
+
   if (PyObject_HasAttrString (self, "__doc__"))
     {
       PyObject *ds_obj = PyObject_GetAttrString (self, "__doc__");
@@ -333,28 +422,29 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kwds)
   if (! docstring)
     docstring = xstrdup ("This command is not documented.");
 
+  Py_INCREF (self);
+
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      /* It would be nice to support multi-word commands here, but it
-	 is a bit tricky given how gdb command data structures seem to
-	 work.  */
-      struct cmd_list_element *cmd = add_cmd (xstrdup (name),
+      struct cmd_list_element *cmd = add_cmd (cmd_name,
 					      (enum command_class) cmdtype,
 					      NULL,
 					      docstring,
-					      &cmdlist);
+					      cmd_list);
       /* There appears to be no API to set this.  */
       cmd->func = cmdpy_function;
       cmd->destroyer = cmdpy_destroyer;
 
       obj->command = cmd;
-      Py_INCREF (self);
       set_cmd_context (cmd, self);
       set_cmd_completer (cmd, ((completetype == -1) ? cmdpy_completer
 			       : completers[completetype].completer));
     }
   if (except.reason < 0)
     {
+      xfree (cmd_name);
+      xfree (docstring);
+      Py_DECREF (self);
       PyErr_Format (except.reason == RETURN_QUIT
 		    ? PyExc_KeyboardInterrupt : PyExc_RuntimeError,
 		    "%s", except.message);
@@ -404,4 +494,7 @@ gdbpy_initialize_commands (void)
   Py_INCREF (&cmdpy_object_type);
   PyModule_AddObject (gdb_module, "Command",
 		      (PyObject *) &cmdpy_object_type);
+
+  invoke_cst = PyString_FromString ("invoke");
+  complete_cst = PyString_FromString ("complete");
 }

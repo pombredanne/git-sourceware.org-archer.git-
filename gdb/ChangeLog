@@ -1,3 +1,47 @@
+2008-10-13  Tom Tromey  <tromey@redhat.com>
+
+	* python/python.c (gdbpy_parameter_value): Rename.  No longer
+	static.  Change arguments.
+	(_initialize_python): Call gdbpy_initialize_parameters.
+	* python/python-param.c: New file.
+	* Makefile.in (SUBDIR_PYTHON_OBS): Add python-param.o.
+	(SUBDIR_PYTHON_SRCS): Add python-param.c.
+	(python-param.o): New target.
+	* python/python-internal.h (gdbpy_parse_command_name): Declare.
+	(gdbpy_initialize_parameters): Declare.
+	* python/python-cmd.c (gdbpy_parse_command_name): Rename.  Add
+	'start_list' argument.  No longer static.
+	(cmdpy_init): Update.
+
+2008-10-12  Tom Tromey  <tromey@redhat.com>
+
+	* python/python.c (get_parameter): Change 'variable' to
+	'parameter'.
+
+2008-10-12  Tom Tromey  <tromey@redhat.com>
+
+	* python/python-cmd.c (parse_command_name): New function.
+	(cmdpy_init): Use it.
+
+2008-10-12  Tom Tromey  <tromey@redhat.com>
+
+	* python/python-cmd.c (invoke_cst, complete_cst): New globals.
+	(gdbpy_initialize_commands): Initialize them.
+	(cmdpy_function): Use invoke_cst.
+	(cmdpy_completer): Use complete_cst.
+
+2008-10-10  Tom Tromey  <tromey@redhat.com>
+
+	* varobj.c (install_visualizer): New function.
+	(install_default_visualizer): Use it.
+	(varobj_set_visualizer): New function.
+	* varobj.h (varobj_set_visualizer): Restore.
+	* python/python.c (gdbpy_get_default_visualizer): New function.
+	(GdbMethods) <get_default_visualizer>: New entry.
+	* mi/mi-cmds.h (mi_cmd_var_set_visualizer): Restore.
+	* mi/mi-cmds.c (mi_cmds) <var-set-visualizer>: Restore.
+	* mi/mi-cmd-var.c (mi_cmd_var_set_visualizer): Restore.
+
 2008-10-09  Tom Tromey  <tromey@redhat.com>
 
 	* python/python.c (_initialize_python): Define _format_children.

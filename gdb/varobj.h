@@ -146,4 +146,13 @@ extern int varobj_editable_p (struct varobj *var);
 
 extern int varobj_floating_p (struct varobj *var);
 
+extern void 
+varobj_set_visualizer (struct varobj *var, const char *visualizer);
+
+extern void 
+varobj_clear_type_visualizers ();
+
+extern void 
+varobj_set_visualizer (struct varobj *var, const char *visualizer);
+
 #endif /* VAROBJ_H */

@@ -75,6 +75,7 @@ static PyObject *gdbpy_switch_to_thread (PyObject *, PyObject *);
 static PyObject *gdbpy_write (PyObject *, PyObject *);
 static PyObject *gdbpy_flush (PyObject *, PyObject *);
 static PyObject *gdbpy_cli (PyObject *, PyObject *);
+static PyObject *gdbpy_get_default_visualizer (PyObject *, PyObject *);
 
 static PyMethodDef GdbMethods[] =
 {
@@ -89,6 +90,9 @@ static PyMethodDef GdbMethods[] =
 
   { "get_breakpoints", gdbpy_get_breakpoints, METH_NOARGS,
     "Return a tuple of all breakpoint objects" },
+
+  { "get_default_visualizer", gdbpy_get_default_visualizer, METH_VARARGS,
+    "Find the default visualizer for a Value." },
 
   { "get_frames", gdbpy_get_frames, METH_NOARGS,
     "Return a tuple of all frame objects" },
@@ -208,10 +212,10 @@ python_command (char *arg, int from_tty)
    NULL (and set a Python exception) on error.  Helper function for
    get_parameter.  */
 
-static PyObject *
-parameter_to_python (struct cmd_list_element *cmd)
+PyObject *
+gdbpy_parameter_value (enum var_types type, void *var)
 {
-  switch (cmd->var_type)
+  switch (type)
     {
     case var_string:
     case var_string_noescape:
@@ -219,7 +223,7 @@ parameter_to_python (struct cmd_list_element *cmd)
     case var_filename:
     case var_enum:
       {
-	char *str = * (char **) cmd->var;
+	char *str = * (char **) var;
 	if (! str)
 	  str = "";
 	return PyString_Decode (str, strlen (str), host_charset (), NULL);
@@ -227,7 +231,7 @@ parameter_to_python (struct cmd_list_element *cmd)
 
     case var_boolean:
       {
-	if (* (int *) cmd->var)
+	if (* (int *) var)
 	  Py_RETURN_TRUE;
 	else
 	  Py_RETURN_FALSE;
@@ -235,7 +239,7 @@ parameter_to_python (struct cmd_list_element *cmd)
 
     case var_auto_boolean:
       {
-	enum auto_boolean ab = * (enum auto_boolean *) cmd->var;
+	enum auto_boolean ab = * (enum auto_boolean *) var;
 	if (ab == AUTO_BOOLEAN_TRUE)
 	  Py_RETURN_TRUE;
 	else if (ab == AUTO_BOOLEAN_FALSE)
@@ -245,15 +249,15 @@ parameter_to_python (struct cmd_list_element *cmd)
       }
 
     case var_integer:
-      if ((* (int *) cmd->var) == INT_MAX)
+      if ((* (int *) var) == INT_MAX)
 	Py_RETURN_NONE;
       /* Fall through.  */
     case var_zinteger:
-      return PyLong_FromLong (* (int *) cmd->var);
+      return PyLong_FromLong (* (int *) var);
 
     case var_uinteger:
       {
-	unsigned int val = * (unsigned int *) cmd->var;
+	unsigned int val = * (unsigned int *) var;
 	if (val == UINT_MAX)
 	  Py_RETURN_NONE;
 	return PyLong_FromUnsignedLong (val);
@@ -284,15 +288,15 @@ get_parameter (PyObject *self, PyObject *args)
 	{
 	  xfree (newarg);
 	  return PyErr_Format (PyExc_RuntimeError,
-			       "could not find variable `%s'", arg);
+			       "could not find parameter `%s'", arg);
 	}
     }
   xfree (newarg);
   GDB_PY_HANDLE_EXCEPTION (except);
 
   if (! cmd->var)
-    return PyErr_Format (PyExc_RuntimeError, "`%s' is not a variable", arg);
-  return parameter_to_python (cmd);
+    return PyErr_Format (PyExc_RuntimeError, "`%s' is not a parameter", arg);
+  return gdbpy_parameter_value (cmd->type, cmd->var);
 }
 
 /* A Python function which evaluates a string using the gdb CLI.  */
@@ -889,6 +893,43 @@ gdbpy_get_varobj_pretty_printer (struct type *type)
   return printer;
 }
 
+/* A Python function which wraps gdbpy_get_varobj_pretty_printer and
+   instantiates the resulting class.  This accepts a Value argument
+   and returns a pretty printer instance, or None.  This function is
+   useful as an argument to the MI command -var-set-visualizer.  */
+static PyObject *
+gdbpy_get_default_visualizer (PyObject *self, PyObject *args)
+{
+  PyObject *val_obj;
+  PyObject *result;
+  struct value *value;
+
+  if (! PyArg_ParseTuple (args, "O", &val_obj))
+    return NULL;
+  value = value_object_to_value (val_obj);
+  if (! value)
+    {
+      PyErr_SetString (PyExc_RuntimeError, "argument must be a gdb.Value");
+      return NULL;
+    }
+
+  result = gdbpy_get_varobj_pretty_printer (value_type (value));
+  if (result)
+    {
+      /* Instantiate it.  */
+      result = PyObject_CallFunctionObjArgs (result, NULL);
+    }
+
+  if (! result)
+    {
+      PyErr_Clear ();
+      result = Py_None;
+    }
+
+  Py_INCREF (result);
+  return result;
+}
+
 #else /* HAVE_PYTHON */
 
 /* Dummy implementation of the gdb "python" command.  */
@@ -1030,6 +1071,7 @@ Enables or disables auto-loading of Python code when an object is opened."),
   gdbpy_initialize_blocks ();
   gdbpy_initialize_functions ();
   gdbpy_initialize_types ();
+  gdbpy_initialize_parameters ();
 
   PyRun_SimpleString ("import gdb");
   PyRun_SimpleString ("gdb.cli_pretty_printers = {}");
