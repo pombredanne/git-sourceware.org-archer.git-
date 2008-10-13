@@ -1,3 +1,7 @@
+2008-10-13  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* gdb/varobj.c (update_dynamic_varobj_children): Fix typo.
+
 2008-10-13  Tom Tromey  <tromey@redhat.com>
 
 	* python/python.c (gdbpy_parameter_value): Rename.  No longer

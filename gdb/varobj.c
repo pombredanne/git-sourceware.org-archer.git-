@@ -881,7 +881,7 @@ update_dynamic_varobj_children (struct varobj *var,
     {
       int i;
       children_changed = 1;
-      for (i = i; i < VEC_length (varobj_p, var->children); ++i)
+      for (i = 0; i < VEC_length (varobj_p, var->children); ++i)
 	varobj_delete (VEC_index (varobj_p, var->children, i), NULL, 0);
     }
   VEC_truncate (varobj_p, var->children, i);
