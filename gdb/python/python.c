@@ -848,29 +848,17 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
 /* Apply a pretty-printer for the varobj code.  PRINTER_OBJ is the
    print object.  It must have a 'to_string' method (but this is
    checked by varobj, not here) which accepts a gdb.Value and returns
-   a string.  This returns an xmalloc()d string, or NULL on error.  */
+   a string.  This returns an xmalloc()d string if the printer returns
+   a string.  The printer may return a replacement value instead; in
+   this case *REPLACEMENT is set to the replacement value, and this
+   function returns NULL.  On error, *REPLACEMENT is set to NULL and
+   this function also returns NULL.  */
 char *
-apply_varobj_pretty_printer (PyObject *printer_obj, struct value *value)
+apply_varobj_pretty_printer (PyObject *printer_obj, struct value *value,
+			     struct value **replacement)
 {
-  struct value *out_value = NULL;
-  char *result = pretty_print_one_value (printer_obj, value, &out_value, 0);
-
-  if (!result && out_value)
-    {
-      struct ui_file *stb;
-      struct cleanup *old_chain;
-      long dummy;
-
-      stb = mem_fileopen ();
-      old_chain = make_cleanup_ui_file_delete (stb);
-
-      common_val_print (value, stb, 0, 1, 0, 0, current_language);
-      result = ui_file_xstrdup (stb, &dummy);
-
-      do_cleanups (old_chain);
-    }
-
-  return result;
+  *replacement = NULL;
+  return pretty_print_one_value (printer_obj, value, replacement, 0);
 }
 
 /* Find a pretty-printer object for the varobj module.  Returns a

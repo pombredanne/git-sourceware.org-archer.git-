@@ -34,6 +34,7 @@
 #include "vec.h"
 #include "gdbthread.h"
 #include "inferior.h"
+#include "valprint.h"
 
 #if HAVE_PYTHON
 #include "python/python.h"
@@ -769,15 +770,6 @@ varobj_get_frozen (struct varobj *var)
 }
 
 
-int
-varobj_get_num_children (struct varobj *var)
-{
-  if (var->num_children == -1)
-    var->num_children = number_of_children (var);
-
-  return var->num_children;
-}
-
 static int
 update_dynamic_varobj_children (struct varobj *var,
 				VEC (varobj_p) **changed,
@@ -885,6 +877,7 @@ update_dynamic_varobj_children (struct varobj *var,
 	varobj_delete (VEC_index (varobj_p, var->children, i), NULL, 0);
     }
   VEC_truncate (varobj_p, var->children, i);
+  var->num_children = VEC_length (varobj_p, var->children);
  
   do_cleanups (back_to);
 
@@ -895,6 +888,19 @@ update_dynamic_varobj_children (struct varobj *var,
 #endif
 }
 
+int
+varobj_get_num_children (struct varobj *var)
+{
+  if (var->num_children == -1)
+    {
+      int changed;
+      if (!var->pretty_printer
+	  || !update_dynamic_varobj_children (var, NULL, NULL, &changed))
+	var->num_children = number_of_children (var);
+    }
+
+  return var->num_children;
+}
 
 /* Creates a list of the immediate children of a variable object;
    the return code is the number of such children or -1 on error */
@@ -2144,14 +2150,23 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
   if (value_formatter && PyObject_HasAttr (value_formatter,
 					   gdbpy_to_string_cst))
     {
-      thevalue = apply_varobj_pretty_printer (value_formatter, value);
+      struct value *replacement;
+      thevalue = apply_varobj_pretty_printer (value_formatter, value,
+					      &replacement);
       if (thevalue)
 	return thevalue;
+      if (replacement)
+	value = replacement;
     }
 #endif
 
   stb = mem_fileopen ();
   old_chain = make_cleanup_ui_file_delete (stb);
+
+  /* Don't pretty print if the pretty-printer failed or provided a
+     replacement value.  */
+  make_cleanup_restore_integer (&raw_printing);
+  raw_printing = 1;
 
   common_val_print (value, stb, format_code[(int) format], 1, 0, 0,
 		    current_language);

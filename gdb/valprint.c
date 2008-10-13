@@ -40,7 +40,7 @@
 
 /* This is set when printing.  It indicates whether the user has
    requested that we bypass python-based value formatting.  */
-static int raw_printing;
+int raw_printing;
 
 /* Prototypes for local functions */
 
