@@ -60,12 +60,7 @@ typedef struct {
 static void valpy_dealloc (PyObject *obj);
 static PyObject *valpy_new (PyTypeObject *subtype, PyObject *args,
 			    PyObject *keywords);
-#if PYTHON_API_VERSION <= 1012
-typedef int length_t;
-#else
-typedef Py_ssize_t length_t;
-#endif
-static length_t valpy_length (PyObject *self);
+static Py_ssize_t valpy_length (PyObject *self);
 static PyObject *valpy_getitem (PyObject *self, PyObject *key);
 static int valpy_setitem (PyObject *self, PyObject *key, PyObject *value);
 static PyObject *valpy_str (PyObject *self);
@@ -284,7 +279,7 @@ valpy_cast (PyObject *self, PyObject *args)
   return value_to_value_object (res_val);
 }
 
-static length_t
+static Py_ssize_t
 valpy_length (PyObject *self)
 {
   /* We don't support getting the number of elements in a struct / class.  */
