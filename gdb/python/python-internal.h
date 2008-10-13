@@ -117,7 +117,8 @@ char *python_string_to_target_string (PyObject *obj);
 
 /* Note that these are declared here, and not in python.h with the
    other pretty-printer functions, because they refer to PyObject.  */
-char *apply_varobj_pretty_printer (PyObject *print_obj, struct value *value);
+char *apply_varobj_pretty_printer (PyObject *print_obj, struct value *value,
+				   struct value **replacement);
 PyObject *gdbpy_get_varobj_pretty_printer (struct type *type);
 
 extern PyObject *gdbpy_children_cst;

@@ -1,3 +1,14 @@
+2008-10-13  Tom Tromey  <tromey@redhat.com>
+
+	* varobj.c (value_get_print_value): Handle replacement value
+	return.  Don't pretty-print if printer fails or returns
+	replacement.
+	* python/python-internal.h (apply_varobj_pretty_printer): Update.
+	* python/python.c (apply_varobj_pretty_printer): Add 'replacement'
+	argument.  Don't print replacement value.
+	* valprint.h (raw_printing): Declare.
+	* valprint.c (raw_printing): No longer static.
+
 2008-10-13  Paul Pluzhnikov  <ppluzhnikov@google.com>
 
 	* gdb/varobj.c (update_dynamic_varobj_children): Fix typo.

@@ -34,6 +34,7 @@
 #include "vec.h"
 #include "gdbthread.h"
 #include "inferior.h"
+#include "valprint.h"
 
 #if HAVE_PYTHON
 #include "python/python.h"
@@ -2144,14 +2145,23 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
   if (value_formatter && PyObject_HasAttr (value_formatter,
 					   gdbpy_to_string_cst))
     {
-      thevalue = apply_varobj_pretty_printer (value_formatter, value);
+      struct value *replacement;
+      thevalue = apply_varobj_pretty_printer (value_formatter, value,
+					      &replacement);
       if (thevalue)
 	return thevalue;
+      if (replacement)
+	value = replacement;
     }
 #endif
 
   stb = mem_fileopen ();
   old_chain = make_cleanup_ui_file_delete (stb);
+
+  /* Don't pretty print if the pretty-printer failed or provided a
+     replacement value.  */
+  make_cleanup_restore_integer (&raw_printing);
+  raw_printing = 1;
 
   common_val_print (value, stb, format_code[(int) format], 1, 0, 0,
 		    current_language);

@@ -33,6 +33,8 @@ extern int objectprint;		/* Controls looking up an object's derived type
 
 extern unsigned int print_max;	/* Max # of chars for strings/vectors */
 
+extern int raw_printing;	/* Controls Python pretty-printing.  */
+
 /* Flag to low-level print routines that this value is being printed
    in an epoch window.  We'd like to pass this as a parameter, but
    every routine would need to take it.  Perhaps we can encapsulate
