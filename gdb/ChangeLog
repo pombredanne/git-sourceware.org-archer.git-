@@ -1,3 +1,7 @@
+2008-10-13  Paul Pluzhnikov  <ppluzhnikov@google.com>
+	
+	* python/python-internal.h: Fix 64-bit compilation with python2.4
+
 2008-10-14  Tom Tromey  <tromey@redhat.com>
 
 	* mi/mi-cmd-var.c (varobj_update_one): Emit displayhint.
