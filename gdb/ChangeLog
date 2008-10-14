@@ -1,5 +1,15 @@
 2008-10-14  Tom Tromey  <tromey@redhat.com>
 
+	* mi/mi-cmd-var.c (varobj_update_one): Emit displayhint.
+	(mi_cmd_var_list_children): Likewise.
+	* varobj.h (varobj_get_display_hint): Declare.
+	* varobj.c (varobj_get_display_hint): New function.
+	* python/python-internal.h (gdbpy_display_hint_cst): Declare.
+	* python/python.c (gdbpy_display_hint_cst): New global.
+	(_initialize_python): Initialize it.
+
+2008-10-14  Tom Tromey  <tromey@redhat.com>
+
 	* varobj.h (varobj_set_child_range): Declare.
 	* varobj.c (struct varobj) <from, to>: New fields.
 	(new_variable): Initialize new fields.

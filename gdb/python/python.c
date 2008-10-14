@@ -63,6 +63,7 @@ PyObject *gdb_module;
 /* Some string constants we may wish to use.  */
 PyObject *gdbpy_to_string_cst;
 PyObject *gdbpy_children_cst;
+PyObject *gdbpy_display_hint_cst;
 
 static PyObject *get_parameter (PyObject *, PyObject *);
 static PyObject *execute_gdb_command (PyObject *, PyObject *);
@@ -1065,6 +1066,7 @@ Enables or disables auto-loading of Python code when an object is opened."),
 
   gdbpy_to_string_cst = PyString_FromString ("to_string");
   gdbpy_children_cst = PyString_FromString ("children");
+  gdbpy_display_hint_cst = PyString_FromString ("display_hint");
 
   /* Create a couple objects which are used for Python's stdout and
      stderr.  */

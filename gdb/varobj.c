@@ -743,6 +743,30 @@ varobj_get_display_format (struct varobj *var)
   return var->format;
 }
 
+char *
+varobj_get_display_hint (struct varobj *var)
+{
+  char *result = NULL;
+
+#if HAVE_PYTHON
+  if (var->pretty_printer
+      && PyObject_HasAttr (var->pretty_printer, gdbpy_display_hint_cst))
+    {
+      PyObject *hint = PyObject_CallMethodObjArgs (var->pretty_printer,
+						   gdbpy_display_hint_cst,
+						   NULL);
+      if (PyString_Check (hint))
+	result = xstrdup (PyString_AsString (hint));
+      if (hint)
+	Py_DECREF (hint);
+      else
+	PyErr_Clear ();
+    }
+#endif
+
+  return result;
+}
+
 /* If the variable object is bound to a specific thread, that
    is its evaluation can always be done in context of a frame
    inside that thread, returns GDB id of the thread -- which

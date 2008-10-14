@@ -123,5 +123,6 @@ PyObject *gdbpy_get_varobj_pretty_printer (struct type *type);
 
 extern PyObject *gdbpy_children_cst;
 extern PyObject *gdbpy_to_string_cst;
+extern PyObject *gdbpy_display_hint_cst;
 
 #endif /* GDB_PYTHON_INTERNAL_H */

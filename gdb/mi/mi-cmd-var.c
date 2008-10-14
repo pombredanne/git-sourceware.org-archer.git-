@@ -405,6 +405,7 @@ mi_cmd_var_list_children (char *command, char **argv, int argc)
   enum print_values print_values;
   int ix;
   int from, to;
+  char *display_hint;
 
   if (argc != 1 && argc != 2)
     error (_("mi_cmd_var_list_children: Usage: [PRINT_VALUES] NAME"));
@@ -427,6 +428,13 @@ mi_cmd_var_list_children (char *command, char **argv, int argc)
   varobj_get_child_range (var, children, &from, &to);
   if (from >= to)
     return;
+
+  display_hint = varobj_get_display_hint (var);
+  if (display_hint)
+    {
+      ui_out_field_string (uiout, "displayhint", display_hint);
+      xfree (display_hint);
+    }
 
   if (mi_version (uiout) == 1)
     cleanup_children = make_cleanup_ui_out_tuple_begin_end (uiout, "children");
@@ -699,6 +707,8 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
   
   for (i = 0; VEC_iterate (varobj_update_result, changes, i, r); ++i)
     {
+      char *display_hint;
+
       if (mi_version (uiout) > 1)
         cleanup = make_cleanup_ui_out_tuple_begin_end (uiout, NULL);
       ui_out_field_string (uiout, "name", varobj_get_objname (r->varobj));
@@ -731,6 +741,13 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
           ui_out_field_string (uiout, "new_type", varobj_get_type (r->varobj));
           ui_out_field_int (uiout, "new_num_children", 
 			    varobj_get_num_children (r->varobj));
+	}
+
+      display_hint = varobj_get_display_hint (var);
+      if (display_hint)
+	{
+	  ui_out_field_string (uiout, "displayhint", display_hint);
+	  xfree (display_hint);
 	}
 
       if (r->children_changed)

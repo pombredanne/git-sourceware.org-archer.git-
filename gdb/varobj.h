@@ -118,6 +118,8 @@ extern void varobj_get_child_range (struct varobj *var,
 
 extern void varobj_set_child_range (struct varobj *var, int from, int to);
 
+extern char *varobj_get_display_hint (struct varobj *var);
+
 extern int varobj_get_num_children (struct varobj *var);
 
 /* Return the list of children of VAR.  The returned vector
