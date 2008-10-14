@@ -265,6 +265,25 @@ mi_cmd_var_set_visualizer (char *command, char **argv, int argc)
 }
 
 void
+mi_cmd_var_set_child_range (char *command, char **argv, int argc)
+{
+  struct varobj *var;
+  int from, to;
+
+  if (argc != 3)
+    error (_("-var-set-child-range: NAME FROM TO"));
+
+  var = varobj_get_handle (argv[0]);
+  if (var == NULL)
+    error (_("Variable object not found"));
+
+  from = atoi (argv[1]);
+  to = atoi (argv[2]);
+
+  varobj_set_child_range (var, from, to);
+}
+
+void
 mi_cmd_var_set_frozen (char *command, char **argv, int argc)
 {
   struct varobj *var;
@@ -385,6 +404,7 @@ mi_cmd_var_list_children (char *command, char **argv, int argc)
   int numchild;
   enum print_values print_values;
   int ix;
+  int from, to;
 
   if (argc != 1 && argc != 2)
     error (_("mi_cmd_var_list_children: Usage: [PRINT_VALUES] NAME"));
@@ -404,14 +424,15 @@ mi_cmd_var_list_children (char *command, char **argv, int argc)
   else
     print_values = PRINT_NO_VALUES;
 
-  if (VEC_length (varobj_p, children) == 0)
+  varobj_get_child_range (var, children, &from, &to);
+  if (from >= to)
     return;
 
   if (mi_version (uiout) == 1)
     cleanup_children = make_cleanup_ui_out_tuple_begin_end (uiout, "children");
   else
     cleanup_children = make_cleanup_ui_out_list_begin_end (uiout, "children");
-  for (ix = 0; VEC_iterate (varobj_p, children, ix, child); ++ix)
+  for (ix = from; ix < to && VEC_iterate (varobj_p, children, ix, child); ++ix)
     {
       struct cleanup *cleanup_child;
       cleanup_child = make_cleanup_ui_out_tuple_begin_end (uiout, "child");
@@ -714,14 +735,17 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
 
       if (r->children_changed)
 	{
-	  int ix;
+	  int ix, from, to;
 	  struct varobj *child;
 	  struct cleanup *cleanup =
 	    make_cleanup_ui_out_list_begin_end (uiout, "children");
 
 	  VEC (varobj_p)* children = varobj_list_children (r->varobj);
+	  varobj_get_child_range (r->varobj, children, &from, &to);
 
-	  for (ix = 0; VEC_iterate (varobj_p, children, ix, child); ++ix)
+	  for (ix = from;
+	       ix < to && VEC_iterate (varobj_p, children, ix, child);
+	       ++ix)
 	    {
 	      struct cleanup *cleanup_child;
 	      cleanup_child = make_cleanup_ui_out_tuple_begin_end (uiout, NULL);

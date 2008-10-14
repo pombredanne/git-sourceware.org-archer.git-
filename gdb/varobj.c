@@ -174,6 +174,12 @@ struct varobj
      frozen.  */
   int not_fetched;
 
+  /* Sub-range of children which the MI consumer has requested.  If
+     FROM < 0 or TO < 0, means that all children have been
+     requested.  */
+  int from;
+  int to;
+
   /* A Python object which can either format the varobj as a string,
      or which can return the children of the varobj.  */
   PyObject *pretty_printer;
@@ -1298,6 +1304,42 @@ install_new_value (struct varobj *var, struct value *value, int initial)
   return changed;
 }
 
+/* Return the effective requested range for a varobj.  VAR is the
+   varobj.  CHILDREN is the computed list of children.  FROM and TO
+   are out parameters.  If VAR has no bounds selected, *FROM and *TO
+   will be set to the full range of CHILDREN.  Otherwise, *FROM and
+   *TO will be set to the selected sub-range of VAR, clipped to be in
+   range of CHILDREN.  */
+void
+varobj_get_child_range (struct varobj *var, VEC (varobj_p) *children,
+			int *from, int *to)
+{
+  if (var->from < 0 || var->to < 0)
+    {
+      *from = 0;
+      *to = VEC_length (varobj_p, children);
+    }
+  else
+    {
+      *from = var->from;
+      if (*from > VEC_length (varobj_p, children))
+	*from = VEC_length (varobj_p, children);
+      *to = var->to;
+      if (*to > VEC_length (varobj_p, children))
+	*to = VEC_length (varobj_p, children);
+    }
+}
+
+/* Set the selected sub-range of children of VAR to start at index
+   FROM and end at index TO.  If either FROM or TO is less than zero,
+   this is interpreted as a request for all children.  */
+void
+varobj_set_child_range (struct varobj *var, int from, int to)
+{
+  var->from = from;
+  var->to = to;
+}
+
 static void
 install_visualizer (struct varobj *var, PyObject *visualizer)
 {
@@ -1824,6 +1866,8 @@ new_variable (void)
   var->frozen = 0;
   var->not_fetched = 0;
   var->children_requested = 0;
+  var->from = -1;
+  var->to = -1;
   var->pretty_printer = 0;
 
   return var;
