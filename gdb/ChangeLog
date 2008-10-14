@@ -1,3 +1,15 @@
+2008-10-14  Tom Tromey  <tromey@redhat.com>
+
+	* varobj.h (varobj_set_child_range): Declare.
+	* varobj.c (struct varobj) <from, to>: New fields.
+	(new_variable): Initialize new fields.
+	(varobj_set_child_range): New function.
+	* mi/mi-cmds.c (mi_cmds): Add var-set-child-range.
+	* mi/mi-cmds.h (mi_cmd_var_set_child_range): Declare.
+	* mi/mi-cmd-var.c (mi_cmd_var_set_child_range): New function.
+	(varobj_update_one): Use varobj_get_child_range.
+	(mi_cmd_var_list_children): Likewise.
+
 2008-10-13  Tom Tromey  <tromey@redhat.com>
 
 	* varobj.c (update_dynamic_varobj_children): Set num_children on

@@ -158,6 +158,7 @@ struct mi_cmd mi_cmds[] =
   { "var-info-num-children", { NULL, 0 }, mi_cmd_var_info_num_children},
   { "var-info-type", { NULL, 0 }, mi_cmd_var_info_type},
   { "var-list-children", { NULL, 0 }, mi_cmd_var_list_children},
+  { "var-set-child-range", { NULL, 0 }, mi_cmd_var_set_child_range },
   { "var-set-format", { NULL, 0 }, mi_cmd_var_set_format},
   { "var-set-visualizer", { NULL, 0 }, mi_cmd_var_set_visualizer},
   { "var-set-frozen", { NULL, 0 }, mi_cmd_var_set_frozen},

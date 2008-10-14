@@ -112,6 +112,12 @@ extern void varobj_set_frozen (struct varobj *var, int frozen);
 
 extern int varobj_get_frozen (struct varobj *var);
 
+extern void varobj_get_child_range (struct varobj *var,
+				    VEC (varobj_p) *children,
+				    int *from, int *to);
+
+extern void varobj_set_child_range (struct varobj *var, int from, int to);
+
 extern int varobj_get_num_children (struct varobj *var);
 
 /* Return the list of children of VAR.  The returned vector
