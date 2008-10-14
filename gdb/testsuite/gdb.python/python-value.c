@@ -30,6 +30,7 @@ union u
 int
 main (int argc, char *argv[])
 {
+  char *cp = argv[0]; /* Prevent gcc from optimizing argv[] out.  */
   struct s s;
   union u u;
 

@@ -1,5 +1,9 @@
 2008-10-14  Paul Pluzhnikov  <ppluzhnikov@google.com>
 
+	* gdb.python/python-value.c: Prevent gcc from optimizing argv[] out.
+	
+2008-10-14  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
 	* Makefile.in: Add gdb.python to ALL_SUBDIRS
 	
 2008-09-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
