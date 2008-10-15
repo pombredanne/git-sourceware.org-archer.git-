@@ -1,3 +1,8 @@
+2008-10-15  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* python/python-types.c (typy_template_argument): Handle typedefs,
+	reference types, fix crash.
+	
 2008-10-13  Paul Pluzhnikov  <ppluzhnikov@google.com>
 	
 	* python/python-internal.h: Fix 64-bit compilation with python2.4

@@ -203,6 +203,16 @@ typy_template_argument (PyObject *self, PyObject *args)
 	}
     }
 
+  type = check_typedef (type);
+  if (TYPE_CODE (type) == TYPE_CODE_REF)
+    type = check_typedef (TYPE_TARGET_TYPE (type));
+
+  if (TYPE_NAME (type) == NULL)
+    {
+      PyErr_SetString (PyExc_RuntimeError, "null type name");
+      return NULL;
+    }
+
   /* Note -- this is not thread-safe.  */
   demangled = cp_demangled_name_to_comp (TYPE_NAME (type), &err);
   if (! demangled)
