@@ -1,3 +1,7 @@
+2008-10-16  Tom Tromey  <tromey@redhat.com>
+
+	* python/python.c (execute_gdb_command): Added from_tty argument.
+
 2008-10-15  Paul Pluzhnikov  <ppluzhnikov@google.com>
 
 	* python/python-types.c (typy_template_argument): Handle typedefs,

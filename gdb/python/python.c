@@ -307,14 +307,20 @@ execute_gdb_command (PyObject *self, PyObject *args)
 {
   struct cmd_list_element *alias, *prefix, *cmd;
   char *arg, *newarg;
+  PyObject *from_tty_obj = NULL;
+  int from_tty;
   volatile struct gdb_exception except;
 
-  if (! PyArg_ParseTuple (args, "s", &arg))
+  if (! PyArg_ParseTuple (args, "s|O!", &arg, &PyBool_Type, &from_tty_obj))
     return NULL;
+
+  from_tty = 0;
+  if (from_tty_obj)
+    from_tty = from_tty_obj == Py_True;
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      execute_command (arg, 0);
+      execute_command (arg, from_tty);
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
