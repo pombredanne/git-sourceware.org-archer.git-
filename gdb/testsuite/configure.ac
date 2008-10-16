@@ -1,7 +1,7 @@
 #                                                       -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-# Copyright 2002, 2003, 2004, 2005
+# Copyright 2002, 2003, 2004, 2005, 2008
 # Free Software Foundation, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -116,5 +116,5 @@ AC_OUTPUT([Makefile \
   gdb.cp/Makefile gdb.disasm/Makefile gdb.dwarf2/Makefile \
   gdb.fortran/Makefile gdb.server/Makefile \
   gdb.java/Makefile gdb.mi/Makefile gdb.modula2/Makefile \
-  gdb.objc/Makefile gdb.opt/Makefile gdb.pascal/Makefile \
+  gdb.objc/Makefile gdb.opt/Makefile gdb.pascal/Makefile gdb.python/Makefile \
   gdb.threads/Makefile gdb.trace/Makefile gdb.xml/Makefile])

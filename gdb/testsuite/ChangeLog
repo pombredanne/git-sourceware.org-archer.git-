@@ -1,3 +1,9 @@
+2008-10-16  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.python/Makefile.in: New file.
+	* configure: Rebuild.
+	* configure.ac: Add gdb.python/Makefile.
+
 2008-10-14  Paul Pluzhnikov  <ppluzhnikov@google.com>
 
 	* gdb.python/python-value.c: Prevent gcc from optimizing argv[] out.
