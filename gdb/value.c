@@ -1796,18 +1796,22 @@ value_from_string (char *ptr)
 
 /* Return a new value constructed from some bytes.  TYPE is the type
    of the object.  VALADDR is a pointer to the base of the enclosing
-   object.  EMBEDDED_OFFSET is the offset into VALADDR of the bytes
-   making up the new object.  ADDRESS is the inferior address of the
-   object.  */
+   object.  If VALADDR is NULL, the value is marked as lazy.
+   EMBEDDED_OFFSET is the offset into VALADDR of the bytes making up
+   the new object.  ADDRESS is the inferior address of the object.  */
 struct value *
-value_from_contents (struct type *type, const gdb_byte *valaddr,
-		     int embedded_offset, CORE_ADDR address)
+value_from_contents_and_address (struct type *type, const gdb_byte *valaddr,
+				 int embedded_offset, CORE_ADDR address)
 {
   struct value *result = allocate_value (type);
-  memcpy (value_contents_raw (result), valaddr + embedded_offset,
-	  TYPE_LENGTH (type));
-  result->location.address = address + embedded_offset;
-  result->lval = lval_memory;
+  if (valaddr == NULL)
+    set_value_lazy (result, 1);
+  else
+    memcpy (value_contents_raw (result), valaddr + embedded_offset,
+	    TYPE_LENGTH (type));
+  VALUE_ADDRESS (result) = address + embedded_offset;
+  if (address != 0)
+    VALUE_LVAL (result) = lval_memory;
   return result;
 }
 

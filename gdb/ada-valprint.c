@@ -686,7 +686,7 @@ ada_val_print_1 (struct type *type, const gdb_byte *valaddr0,
       int retn;
       struct value *mark = value_mark ();
       struct value *val;
-      val = value_from_contents_and_address (type, valaddr, address);
+      val = value_from_contents_and_address (type, valaddr, 0, address);
       val = ada_coerce_to_simple_array_ptr (val);
       if (val == NULL)
 	{
@@ -718,7 +718,7 @@ ada_val_print_1 (struct type *type, const gdb_byte *valaddr0,
 	if (ada_is_tag_type (type))
 	  {
 	    struct value *val = 
-	      value_from_contents_and_address (type, valaddr, address);
+	      value_from_contents_and_address (type, valaddr, 0, address);
 	    const char *name = ada_tag_name (val);
 	    if (name != NULL) 
 	      fprintf_filtered (stream, " (%s)", name);
@@ -741,7 +741,7 @@ ada_val_print_1 (struct type *type, const gdb_byte *valaddr0,
       else if (ada_is_vax_floating_type (type))
 	{
 	  struct value *val =
-	    value_from_contents_and_address (type, valaddr, address);
+	    value_from_contents_and_address (type, valaddr, 0, address);
 	  struct value *func = ada_vax_float_print_function (type);
 	  if (func != 0)
 	    {
@@ -776,7 +776,7 @@ ada_val_print_1 (struct type *type, const gdb_byte *valaddr0,
 	         code regardless of lengths; I'm just avoiding a cast.  */
 	      struct value *v = value_cast (target_type,
 					    value_from_contents_and_address
-					    (type, valaddr, 0));
+					    (type, valaddr, 0, 0));
 	      return ada_val_print_1 (target_type, value_contents (v), 0, 0,
 				      stream, format, 0, recurse + 1, pretty);
 	    }
@@ -954,7 +954,7 @@ ada_value_print (struct value *val0, struct ui_file *stream, int format,
   struct type *type =
     ada_to_fixed_type (value_type (val0), valaddr, address, NULL, 1);
   struct value *val =
-    value_from_contents_and_address (type, valaddr, address);
+    value_from_contents_and_address (type, valaddr, 0, address);
 
   /* If it is a pointer, indicate what it points to.  */
   if (TYPE_CODE (type) == TYPE_CODE_PTR)

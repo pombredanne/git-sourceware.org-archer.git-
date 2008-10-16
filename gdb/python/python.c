@@ -831,7 +831,8 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
   if (! func)
     return NULL;
 
-  value = value_from_contents (type, valaddr, embedded_offset, address);
+  value = value_from_contents_and_address (type, valaddr, embedded_offset,
+					   address);
   output = pretty_print_one_value (func, value, &replacement, 1);
 
   Py_DECREF (dict);

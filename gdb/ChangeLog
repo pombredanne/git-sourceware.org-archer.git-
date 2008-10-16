@@ -1,5 +1,23 @@
 2008-10-16  Tom Tromey  <tromey@redhat.com>
 
+	* python/python.c (apply_val_pretty_printer): Use
+	value_from_contents_and_address.
+	* ada-valprint.c (ada_val_print_1): Update.
+	(ada_value_print): Update.
+	* value.h (value_from_contents_and_address): Rename from
+	value_from_contents.
+	* value.c (value_from_contents_and_address): Rename from
+	value_from_contents.
+	* ada-lang.c (value_from_contents_and_address): Remove.
+	(value_tag_from_contents_and_address): Update.
+	(ada_which_variant_applies): Update.
+	(ada_template_to_fixed_record_type_1): Update.
+	(to_record_with_fixed_variant_part): Update.
+	(ada_to_fixed_value_create): Update.
+	* ada-lang.h (value_from_contents_and_address): Remove.
+
+2008-10-16  Tom Tromey  <tromey@redhat.com>
+
 	* python/python.c (execute_gdb_command): Added from_tty argument.
 
 2008-10-15  Paul Pluzhnikov  <ppluzhnikov@google.com>

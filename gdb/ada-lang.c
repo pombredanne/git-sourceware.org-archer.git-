@@ -471,26 +471,6 @@ is_suffix (const char *str, const char *suffix)
   return (len1 >= len2 && strcmp (str + len1 - len2, suffix) == 0);
 }
 
-/* Create a value of type TYPE whose contents come from VALADDR, if it
-   is non-null, and whose memory address (in the inferior) is
-   ADDRESS.  */
-
-struct value *
-value_from_contents_and_address (struct type *type,
-				 const gdb_byte *valaddr,
-                                 CORE_ADDR address)
-{
-  struct value *v = allocate_value (type);
-  if (valaddr == NULL)
-    set_value_lazy (v, 1);
-  else
-    memcpy (value_contents_raw (v), valaddr, TYPE_LENGTH (type));
-  VALUE_ADDRESS (v) = address;
-  if (address != 0)
-    VALUE_LVAL (v) = lval_memory;
-  return v;
-}
-
 /* The contents of value VAL, treated as a value of type TYPE.  The
    result is an lval in memory if VAL is.  */
 
@@ -5632,7 +5612,7 @@ value_tag_from_contents_and_address (struct type *type,
 				  : valaddr + tag_byte_offset);
       CORE_ADDR address1 = (address == 0) ? 0 : address + tag_byte_offset;
 
-      return value_from_contents_and_address (tag_type, valaddr1, address1);
+      return value_from_contents_and_address (tag_type, valaddr1, 0, address1);
     }
   return NULL;
 }
@@ -6462,7 +6442,7 @@ ada_which_variant_applies (struct type *var_type, struct type *outer_type,
   struct value *discrim;
   LONGEST discrim_val;
 
-  outer = value_from_contents_and_address (outer_type, outer_valaddr, 0);
+  outer = value_from_contents_and_address (outer_type, outer_valaddr, 0, 0);
   discrim = ada_value_struct_elt (outer, discrim_name, 1);
   if (discrim == NULL)
     return -1;
@@ -6899,7 +6879,7 @@ ada_template_to_fixed_record_type_1 (struct type *type,
       else if (is_dynamic_field (type, f))
         {
           if (dval0 == NULL)
-            dval = value_from_contents_and_address (rtype, valaddr, address);
+            dval = value_from_contents_and_address (rtype, valaddr, 0, address);
           else
             dval = dval0;
 
@@ -6948,7 +6928,7 @@ ada_template_to_fixed_record_type_1 (struct type *type,
       off = TYPE_FIELD_BITPOS (rtype, variant_field);
 
       if (dval0 == NULL)
-        dval = value_from_contents_and_address (rtype, valaddr, address);
+        dval = value_from_contents_and_address (rtype, valaddr, 0, address);
       else
         dval = dval0;
 
@@ -7089,7 +7069,7 @@ to_record_with_fixed_variant_part (struct type *type, const gdb_byte *valaddr,
     return type;
 
   if (dval0 == NULL)
-    dval = value_from_contents_and_address (type, valaddr, address);
+    dval = value_from_contents_and_address (type, valaddr, 0, address);
   else
     dval = dval0;
 
@@ -7483,7 +7463,7 @@ ada_to_fixed_value_create (struct type *type0, CORE_ADDR address,
   if (type == type0 && val0 != NULL)
     return val0;
   else
-    return value_from_contents_and_address (type, 0, address);
+    return value_from_contents_and_address (type, 0, 0, address);
 }
 
 /* A value representing VAL, but with a standard (static-sized) type
