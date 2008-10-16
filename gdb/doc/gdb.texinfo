@@ -17815,7 +17815,7 @@ for its internal bookkeeping of the inferior's values, and for
 fetching values when necessary.
 
 Inferior values that are simple scalars can be used directly in
-Python expressions that are valid for the value's data type  Here's
+Python expressions that are valid for the value's data type.  Here's
 an example for an integer or floating-point value @code{some_val}:
 
 @smallexample

@@ -104,11 +104,11 @@ proc test_value_numeric_ops {} {
 
   # Test gdb.Value mixed with Python types.
 
-  gdb_test "python print 'result = ' + str(i+1)" " = 6" "add integer value with python integer"
-  gdb_test "python print (i+1).__class__" "<type 'gdb.Value'>" "verify type of mixed integer add result"
+  gdb_test "python print 'result = ' + str(i-1)" " = 4" "subtract integer value from python integer"
+  gdb_test "python print (i-1).__class__" "<type 'gdb.Value'>" "verify type of mixed integer subtraction result"
   gdb_test "python print 'result = ' + str(f+1.5)" " = 2.75" "add double value with python float"
 
-  gdb_test "python print 'result = ' + str(1+i)" " = 6" "add python integer with integer value"
+  gdb_test "python print 'result = ' + str(1-i)" " = -4" "subtract python integer from integer value"
   gdb_test "python print 'result = ' + str(1.5+f)" " = 2.75" "add python float with double value"
 
   # Test pointer arithmethic
@@ -126,7 +126,7 @@ proc test_value_numeric_ops {} {
   # Test some invalid operations.
 
   gdb_test_multiple "python print 'result = ' + str(i+'foo')" "catch error in python type conversion" {
-      -re "unsupported operand type.*$gdb_prompt $"   {pass "catch error in python type conversion"}
+      -re "Argument to arithmetic operation not a number or boolean.*$gdb_prompt $"   {pass "catch error in python type conversion"}
       -re "result = .*$gdb_prompt $"		      {fail "catch error in python type conversion"}
       -re "$gdb_prompt $"			      {fail "catch error in python type conversion"}
   }

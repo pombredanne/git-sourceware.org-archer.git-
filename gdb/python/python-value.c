@@ -369,113 +369,80 @@ enum valpy_opcode
 #define STRIP_REFERENCE(TYPE) \
   ((TYPE_CODE (TYPE) == TYPE_CODE_REF) ? (TYPE_TARGET_TYPE (TYPE)) : (TYPE))
 
-/* Returns a value object which is the sum of this value with the given
-   integer argument.  */
+/* Returns a value object which is the result of applying the operation
+   specified by OPCODE to the given arguments.  */
 static PyObject *
 valpy_binop (enum valpy_opcode opcode, PyObject *self, PyObject *other)
 {
-  long l;
-  double d;
   struct value *res_val = NULL;	  /* Initialize to appease gcc warning.  */
-  struct value *other_val;
-  value_object *self_value;
   volatile struct gdb_exception except;
-
-  /* If the gdb.Value object is the second operand, then it will be passed
-     to us as the OTHER argument, and SELF will be an entirely different
-     kind of object, altogether.  Swap them to avoid surprises.  */
-  if (!PyObject_TypeCheck (self, &value_object_type))
-    {
-      PyObject *tmp;
-
-      tmp = self;
-      self = other;
-      other = tmp;
-    }
-
-  self_value = (value_object *) self;
-
-  if (PyObject_TypeCheck (other, &value_object_type))
-    other_val = ((value_object *) other)->value;
-  else if (PyInt_Check (other))
-    {
-      l = PyInt_AsLong (other);
-      if (PyErr_Occurred ())
-	return Py_NotImplemented;
-
-      other_val = value_from_longest (builtin_type_pyint, l);
-    }
-  else if (PyFloat_Check (other))
-    {
-      d = PyFloat_AsDouble (other);
-      if (PyErr_Occurred ())
-	return Py_NotImplemented;
-
-      other_val = value_from_double (builtin_type_pyfloat, d);
-    }
-  else
-    /* If the types cannot be added, Python documentation says to return
-       NotImplemented (http://docs.python.org/ref/numeric-types.html).  */
-    return Py_NotImplemented;
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
+      struct value *arg1, *arg2;
+
+      /* If the gdb.Value object is the second operand, then it will be passed
+	 to us as the OTHER argument, and SELF will be an entirely different
+	 kind of object, altogether.  Because of this, we can't assume self is
+	 a gdb.Value object and need to convert it from python as well.  */
+      arg1 = convert_value_from_python (self);
+      arg2 = convert_value_from_python (other);
+
       switch (opcode)
 	{
 	case VALPY_ADD:
 	  {
-	    struct type *ltype = value_type (self_value->value);
-	    struct type *rtype = value_type (other_val);
+	    struct type *ltype = value_type (arg1);
+	    struct type *rtype = value_type (arg2);
+
 	    CHECK_TYPEDEF (ltype);
 	    ltype = STRIP_REFERENCE (ltype);
 	    CHECK_TYPEDEF (rtype);
 	    rtype = STRIP_REFERENCE (rtype);
 
 	    if (TYPE_CODE (ltype) == TYPE_CODE_PTR)
-	      res_val = value_ptradd (self_value->value, other_val);
+	      res_val = value_ptradd (arg1, arg2);
 	    else if (TYPE_CODE (rtype) == TYPE_CODE_PTR)
-	      res_val = value_ptradd (other_val, self_value->value);
+	      res_val = value_ptradd (arg2, arg1);
 	    else
-	      res_val = value_binop (self_value->value, other_val, BINOP_ADD);
+	      res_val = value_binop (arg1, arg2, BINOP_ADD);
 	  }
 	  break;
 	case VALPY_SUB:
 	  {
-	    struct type *ltype = value_type (self_value->value);
-	    struct type *rtype = value_type (other_val);
+	    struct type *ltype = value_type (arg1);
+	    struct type *rtype = value_type (arg2);
+
 	    CHECK_TYPEDEF (ltype);
 	    ltype = STRIP_REFERENCE (ltype);
 	    CHECK_TYPEDEF (rtype);
 	    rtype = STRIP_REFERENCE (rtype);
+
 	    if (TYPE_CODE (ltype) == TYPE_CODE_PTR)
 	      {
 		if (TYPE_CODE (rtype) == TYPE_CODE_PTR)
-		  {
 		    /* A ptrdiff_t for the target would be preferable
 		       here.  */
-		    res_val
-		      = value_from_longest (builtin_type_pyint,
-					    value_ptrdiff (self_value->value,
-							   other_val));
-		  }
+		    res_val = value_from_longest (builtin_type_pyint,
+						  value_ptrdiff (arg1, arg2));
 		else
-		  res_val = value_ptrsub (self_value->value, other_val);
+		  res_val = value_ptrsub (arg1, arg2);
 	      }
 	    else
-	      res_val = value_binop (self_value->value, other_val, BINOP_SUB);
+	      res_val = value_binop (arg1, arg2, BINOP_SUB);
 	  }
 	  break;
 	case VALPY_MUL:
-	  res_val = value_binop (self_value->value, other_val, BINOP_MUL);
+	  res_val = value_binop (arg1, arg2, BINOP_MUL);
 	  break;
 	case VALPY_DIV:
-	  res_val = value_binop (self_value->value, other_val, BINOP_DIV);
+	  res_val = value_binop (arg1, arg2, BINOP_DIV);
 	  break;
 	case VALPY_REM:
-	  res_val = value_binop (self_value->value, other_val, BINOP_REM);
+	  res_val = value_binop (arg1, arg2, BINOP_REM);
 	  break;
 	case VALPY_POW:
-	  res_val = value_binop (self_value->value, other_val, BINOP_EXP);
+	  res_val = value_binop (arg1, arg2, BINOP_EXP);
 	  break;
 	}
     }
