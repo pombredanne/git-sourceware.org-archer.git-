@@ -1117,6 +1117,7 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
 
   for (; i < len && things_printed < print_max; i++)
     {
+      size_t elt_offset = i * eltlen;
       if (i != 0)
 	{
 	  if (prettyprint_arrays)
@@ -1136,7 +1137,7 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
       rep1 = i + 1;
       reps = 1;
       while ((rep1 < len) &&
-	     !memcmp (valaddr + i * eltlen, valaddr + rep1 * eltlen, eltlen))
+	     !memcmp (valaddr + elt_offset, valaddr + rep1 * eltlen, eltlen))
 	{
 	  ++reps;
 	  ++rep1;
@@ -1144,7 +1145,8 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
 
       if (reps > repeat_count_threshold)
 	{
-	  val_print (elttype, valaddr + i * eltlen, 0, 0, stream, format,
+	  val_print (elttype, valaddr + elt_offset, 0,
+		     address + elt_offset, stream, format,
 		     deref_ref, recurse + 1, pretty, current_language);
 	  annotate_elt_rep (reps);
 	  fprintf_filtered (stream, " <repeats %u times>", reps);
@@ -1155,7 +1157,8 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
 	}
       else
 	{
-	  val_print (elttype, valaddr + i * eltlen, 0, 0, stream, format,
+	  val_print (elttype, valaddr + elt_offset, 0,
+		     address + elt_offset, stream, format,
 		     deref_ref, recurse + 1, pretty, current_language);
 	  annotate_elt ();
 	  things_printed++;
