@@ -917,7 +917,7 @@ pascal_object_print_static_field (struct value *val,
 
   if (TYPE_CODE (type) == TYPE_CODE_STRUCT)
     {
-      CORE_ADDR *first_dont_print;
+      CORE_ADDR *first_dont_print, addr;
       int i;
 
       first_dont_print
@@ -927,7 +927,7 @@ pascal_object_print_static_field (struct value *val,
 
       while (--i >= 0)
 	{
-	  if (VALUE_ADDRESS (val) == first_dont_print[i])
+	  if (value_address (val) == first_dont_print[i])
 	    {
 	      fputs_filtered ("<same as static member of an already seen type>",
 			      stream);
@@ -935,11 +935,12 @@ pascal_object_print_static_field (struct value *val,
 	    }
 	}
 
-      obstack_grow (&dont_print_statmem_obstack, (char *) &VALUE_ADDRESS (val),
+      addr = value_address (val);
+      obstack_grow (&dont_print_statmem_obstack, (char *) &addr,
 		    sizeof (CORE_ADDR));
 
       CHECK_TYPEDEF (type);
-      pascal_object_print_value_fields (type, value_contents (val), VALUE_ADDRESS (val),
+      pascal_object_print_value_fields (type, value_contents (val), value_address (val),
 				  stream, format, recurse, pretty, NULL, 1);
       return;
     }

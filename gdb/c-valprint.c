@@ -616,7 +616,7 @@ c_value_print (struct value *val, struct ui_file *stream, int format,
 	  /* Print out object: enclosing type is same as real_type if full */
 	  return val_print (value_enclosing_type (val),
 			    value_contents_all (val), 0,
-			    VALUE_ADDRESS (val), stream, format, 1, 0,
+			    value_address (val), stream, format, 1, 0,
 			    pretty, current_language);
           /* Note: When we look up RTTI entries, we don't get any information on
              const or volatile attributes */
@@ -628,7 +628,7 @@ c_value_print (struct value *val, struct ui_file *stream, int format,
 			    TYPE_NAME (value_enclosing_type (val)));
 	  return val_print (value_enclosing_type (val),
 			    value_contents_all (val), 0,
-			    VALUE_ADDRESS (val), stream, format, 1, 0,
+			    value_address (val), stream, format, 1, 0,
 			    pretty, current_language);
 	}
       /* Otherwise, we end up at the return outside this "if" */
@@ -636,6 +636,6 @@ c_value_print (struct value *val, struct ui_file *stream, int format,
 
   return val_print (type, value_contents_all (val),
 		    value_embedded_offset (val),
-		    VALUE_ADDRESS (val) + value_offset (val),
+		    value_address (val),
 		    stream, format, 1, 0, pretty, current_language);
 }

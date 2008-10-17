@@ -1,3 +1,20 @@
+2008-10-17  Tom Tromey  <tromey@redhat.com>
+
+	* ada-lang.c, ada-valprint.c, breakpoint.c, c-valprint.c,
+	cli/cli-dump.c, cp-valprint.c, dwarf2loc.c, eval.c, findvar.c,
+	frame.c, frv-tdep.c, gnu-v2-abi.c, gnu-v3-abi.c, infcall.c,
+	jv-lang.c, jv-valprint.c, m32r-tdep.c, mi/mi-main.c, mips-tdep.c,
+	mn10300-tdep.c, p-valprint.c, printcmd.c, python/python.c,
+	tracepoint.c, v850-tdep.c, valarith.c, valops.c, valprint.c:
+	Update.
+	* value.c (set_value_address): New function.
+	(value_address): New function.
+	(deprecated_value_address_hack): Remove.
+	* value.h (set_value_address): Declare.
+	(value_address): Declare.
+	(deprecated_value_address_hack): Remove.
+	(VALUE_ADDRESS): Remove.
+
 2008-10-16  Tom Tromey  <tromey@redhat.com>
 
 	* python/python.c (apply_val_pretty_printer): Use

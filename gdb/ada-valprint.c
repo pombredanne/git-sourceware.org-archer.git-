@@ -695,7 +695,7 @@ ada_val_print_1 (struct type *type, const gdb_byte *valaddr0,
 	}
       else
 	retn = ada_val_print_1 (value_type (val), value_contents (val), 0,
-				VALUE_ADDRESS (val), stream, format,
+				value_address (val), stream, format,
 				deref_ref, recurse, pretty);
       value_free_to_mark (mark);
       return retn;
@@ -910,7 +910,7 @@ ada_val_print_1 (struct type *type, const gdb_byte *valaddr0,
                                 deref_val_int));
               val_print (value_type (deref_val),
                          value_contents (deref_val), 0,
-                         VALUE_ADDRESS (deref_val), stream, format,
+                         value_address (deref_val), stream, format,
                          deref_ref, recurse + 1, pretty, current_language);
             }
           else
@@ -950,7 +950,7 @@ ada_value_print (struct value *val0, struct ui_file *stream, int format,
 		 enum val_prettyprint pretty)
 {
   const gdb_byte *valaddr = value_contents (val0);
-  CORE_ADDR address = VALUE_ADDRESS (val0) + value_offset (val0);
+  CORE_ADDR address = value_address (val0);
   struct type *type =
     ada_to_fixed_type (value_type (val0), valaddr, address, NULL, 1);
   struct value *val =

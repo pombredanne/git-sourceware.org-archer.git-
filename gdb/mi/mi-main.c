@@ -587,7 +587,7 @@ mi_cmd_data_evaluate_expression (char *command, char **argv, int argc)
 
   /* Print the result of the expression evaluation.  */
   val_print (value_type (val), value_contents (val),
-	     value_embedded_offset (val), VALUE_ADDRESS (val),
+	     value_embedded_offset (val), value_address (val),
 	     stb->stream, 0, 0, 0, 0, current_language);
 
   ui_out_field_stream (uiout, "value", stb);

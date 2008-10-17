@@ -237,7 +237,7 @@ value_subscripted_rvalue (struct value *array, struct value *idx, int lowerbound
     VALUE_LVAL (v) = lval_internalvar_component;
   else
     VALUE_LVAL (v) = VALUE_LVAL (array);
-  VALUE_ADDRESS (v) = VALUE_ADDRESS (array);
+  set_value_address (v, value_raw_address (array));
   VALUE_REGNUM (v) = VALUE_REGNUM (array);
   VALUE_FRAME_ID (v) = VALUE_FRAME_ID (array);
   set_value_offset (v, value_offset (array) + elt_offs);
@@ -281,7 +281,7 @@ value_bitstring_subscript (struct type *type,
   VALUE_LVAL (v) = VALUE_LVAL (bitstring);
   if (VALUE_LVAL (bitstring) == lval_internalvar)
     VALUE_LVAL (v) = lval_internalvar_component;
-  VALUE_ADDRESS (v) = VALUE_ADDRESS (bitstring);
+  set_value_address (v, value_raw_address (bitstring));
   VALUE_FRAME_ID (v) = VALUE_FRAME_ID (bitstring);
 
   set_value_offset (v, offset + value_offset (bitstring));

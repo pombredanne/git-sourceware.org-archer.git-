@@ -259,8 +259,7 @@ gnuv3_rtti_type (struct value *value,
   
   /* Find the linker symbol for this vtable.  */
   vtable_symbol
-    = lookup_minimal_symbol_by_pc (VALUE_ADDRESS (vtable)
-                                   + value_offset (vtable)
+    = lookup_minimal_symbol_by_pc (value_address (vtable)
                                    + value_embedded_offset (vtable));
   if (! vtable_symbol)
     return NULL;

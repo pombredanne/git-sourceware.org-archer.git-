@@ -989,7 +989,7 @@ update_watchpoint (struct breakpoint *b, int reparse)
 		  int len, type;
 		  struct bp_location *loc, **tmp;
 
-		  addr = VALUE_ADDRESS (v) + value_offset (v);
+		  addr = value_address (v);
 		  len = TYPE_LENGTH (value_type (v));
 		  type = hw_write;
 		  if (b->type == bp_read_watchpoint)
@@ -6171,7 +6171,7 @@ can_use_hardware_watchpoint (struct value *v)
 		  || (TYPE_CODE (vtype) != TYPE_CODE_STRUCT
 		      && TYPE_CODE (vtype) != TYPE_CODE_ARRAY))
 		{
-		  CORE_ADDR vaddr = VALUE_ADDRESS (v) + value_offset (v);
+		  CORE_ADDR vaddr = value_address (v);
 		  int       len   = TYPE_LENGTH (value_type (v));
 
 		  if (!TARGET_REGION_OK_FOR_HW_WATCHPOINT (vaddr, len))

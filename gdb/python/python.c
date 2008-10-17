@@ -846,7 +846,7 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
   language->la_val_print (value_type (replacement),
 			  value_contents_all (replacement),
 			  value_embedded_offset (replacement),
-			  VALUE_ADDRESS (replacement),
+			  value_address (replacement),
 			  stream, format, deref_ref, recurse,
 			  pretty);
 
