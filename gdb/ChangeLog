@@ -1,5 +1,12 @@
 2008-10-17  Tom Tromey  <tromey@redhat.com>
 
+	* value.h (value_address): Update comment.
+	* value.c (value_address): Return 0 for internalvars.  Don't
+	assert.
+	(value_raw_address): Likewise.
+
+2008-10-17  Tom Tromey  <tromey@redhat.com>
+
 	* ada-lang.c, ada-valprint.c, breakpoint.c, c-valprint.c,
 	cli/cli-dump.c, cp-valprint.c, dwarf2loc.c, eval.c, findvar.c,
 	frame.c, frv-tdep.c, gnu-v2-abi.c, gnu-v3-abi.c, infcall.c,

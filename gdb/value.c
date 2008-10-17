@@ -487,16 +487,18 @@ deprecated_value_lval_hack (struct value *value)
 CORE_ADDR
 value_address (struct value *value)
 {
-  gdb_assert (value->lval != lval_internalvar
-	      && value->lval != lval_internalvar_component);
+  if (value->lval == lval_internalvar
+      || value->lval == lval_internalvar_component)
+    return 0;
   return value->location.address + value->offset;
 }
 
 CORE_ADDR
 value_raw_address (struct value *value)
 {
-  gdb_assert (value->lval != lval_internalvar
-	      && value->lval != lval_internalvar_component);
+  if (value->lval == lval_internalvar
+      || value->lval == lval_internalvar_component)
+    return 0;
   return value->location.address;
 }
 

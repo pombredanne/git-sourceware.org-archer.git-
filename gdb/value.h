@@ -214,7 +214,7 @@ extern enum lval_type *deprecated_value_lval_hack (struct value *);
 
 /* If lval == lval_memory, return the address in the inferior.  If
    lval == lval_register, return the byte offset into the registers
-   structure.  Otherwise, give an error.  The returned address
+   structure.  Otherwise, return 0.  The returned address
    includes the offset, if any.  */
 extern CORE_ADDR value_address (struct value *);
 
