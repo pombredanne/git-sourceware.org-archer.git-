@@ -17946,7 +17946,62 @@ Otherwise, it is searched for globally.
 @subsubsection Pretty Printing
 
 @value{GDBN} provides a mechanism to allow pretty-printing of values
-using Python code.
+using Python code.  This mechanism works for both MI and the CLI.
+
+A pretty-printer is an object that implements a specific interface.
+There is no predefined base class for pretty-printers.
+
+@c FIXME I think perhaps we should nuke header and just use to_string
+@c Investigate.
+
+@defop Operation {pretty printer} header (self, val)
+If this method exists, @value{GDBN} may call it when printing a value
+from the CLI.  In particular, it will be called if the pretty-printer
+does not define the @code{to_string} method.  The method must return a
+string.  This string will be displayed before any children of the
+value being printed.
+@end defop
+
+@defop Operation {pretty printer} children (self, val)
+This method is used by both the MI and CLI code.  When printing a
+value, @value{GDBN} will call this method to display the children of
+@var{val}, an instance of @code{gdb.Value}.
+
+This method must return an object conforming to the Python iterator
+protocol.  Each element returned by the iterator must be a tuple
+holding two elements.  The first element is the ``name'' of the child;
+the second element is the child's value.  The value can be any Python
+object which is convertible to a @value{GDBN} value.
+@end defop
+
+@defop Operation {pretty printer} display_hint (self, val)
+This method is only used by the MI printer.
+
+This method must return a string.  It will be supplied to the MI
+consumer as a @samp{displayhint} attribute of the variable being
+printed.
+
+Currently only one display hint is defined: @samp{map}.  This
+indicates to the MI consumer that the object being printed is
+``map-like'', and that the children of this value can be assumed to
+alternate between keys and values.
+@end defop
+
+@defop Operation {pretty printer} to_string (self, val)
+This method is used by both the MI and CLI code.  When printing a
+value, @value{GDBN} will call this method to display the string
+representation of @var{val}, an instance of @code{gdb.Value}.
+
+This method must return a string.
+
+@c FIXME -- this is where the oddity arises.  Don't we do something
+@c different for MI?
+When printing from the CLI, if the @code{to_string} method exists,
+then @value{GDBN} will print its result, and will not call
+@code{header} and @code{children}.
+@end defop
+
+@subsubsection Selecting CLI Pretty-Printers
 
 The Python dictionary @code{gdb.cli_pretty_printers} maps regular
 expressions (strings) onto pretty-printers.  A pretty-printer is
@@ -17960,8 +18015,8 @@ representing the value to be printed.
 
 If the pretty-printer is a function, the function is called directly.
 
-If the pretty-printer is an object, the object's @code{to_string}
-method is called.
+If the pretty-printer is an object, the object's methods are called as
+described above.
 
 If the pretty-printer returns a string, it is printed.  If it returns any
 Python value that is convertible to a @code{gdb.Value}, then that
@@ -17987,6 +18042,10 @@ class StdStringPrinter:
 
 gdb.cli_pretty_printers['^std::basic_string<char.*>$'] = StdStringPrinter()
 @end smallexample
+
+@c FIXME: describe MI pretty-printer selection
+@c ... but in the MI section, I think
+
 
 @node Threads In Python
 @subsubsection Threads In Python

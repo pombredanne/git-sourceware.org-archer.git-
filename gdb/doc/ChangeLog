@@ -1,3 +1,7 @@
+2008-10-17  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Pretty Printing): Update.
+
 2008-10-16  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.texinfo (Basic Python): Document execute's from_tty
