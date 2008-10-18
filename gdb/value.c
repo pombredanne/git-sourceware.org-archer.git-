@@ -1829,7 +1829,7 @@ value_from_contents_and_address (struct type *type, const gdb_byte *valaddr,
   else
     memcpy (value_contents_raw (result), valaddr + embedded_offset,
 	    TYPE_LENGTH (type));
-  set_value_address (result, address + embedded_offset);
+  set_value_address (result, address);
   if (address != 0)
     VALUE_LVAL (result) = lval_memory;
   return result;

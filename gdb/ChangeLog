@@ -1,5 +1,10 @@
 2008-10-17  Paul Pluzhnikov  <ppluzhnikov@google.com>
 
+	* value.c (value_from_contents_and_address): Don't
+	double-count embedded_offset.
+	
+2008-10-17  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
 	* valprint.c (val_print_array_elements): Pass correct
 	element address to val_print.
 	

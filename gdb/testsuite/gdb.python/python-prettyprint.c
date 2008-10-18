@@ -27,6 +27,17 @@ struct ss
   struct s b;
 };
 
+#ifdef __cplusplus
+struct S : public s {
+  int zs;
+};
+
+struct SS {
+  int zss;
+  S s;
+};
+#endif
+
 void init_s(struct s *s, int a)
 {
   s->a = a;
@@ -48,5 +59,23 @@ main ()
   init_ss(&ss, 1, 2);
   init_ss(ssa+0, 3, 4);
   init_ss(ssa+1, 5, 6);
+
+#ifdef __cplusplus
+  S cps;
+
+  cps.zs = 7;
+  init_s(&cps, 8);
+
+  SS cpss;
+  cpss.zss = 9;
+  init_s(&cpss.s, 10);
+
+  SS cpssa[2];
+  cpssa[0].zss = 11;
+  init_s(&cpssa[0].s, 12);
+  cpssa[1].zss = 13;
+  init_s(&cpssa[1].s, 14);
+#endif
+
   return 0;      /* break to inspect struct and union */
 }

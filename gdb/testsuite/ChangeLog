@@ -2,6 +2,12 @@
 	
 	* gdb.python/python-prettyprint.exp,
 	gdb.python/python-prettyprint.c,
+	gdb.python/python-prettyprint.py: Add C++ tests.
+	
+2008-10-17  Paul Pluzhnikov  <ppluzhnikov@google.com>
+	
+	* gdb.python/python-prettyprint.exp,
+	gdb.python/python-prettyprint.c,
 	gdb.python/python-prettyprint.py: New test for pretty
 	printing.
 	

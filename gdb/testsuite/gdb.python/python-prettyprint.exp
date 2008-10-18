@@ -23,19 +23,10 @@ if $tracelevel then {
 set testfile "python-prettyprint"
 set srcfile ${testfile}.c
 set binfile ${objdir}/${subdir}/${testfile}
-if { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
-    untested "Couldn't compile ${srcfile}"
-    return -1
-}
-
 
 # Start with a fresh gdb.
-
 gdb_exit
 gdb_start
-gdb_reinitialize_dir $srcdir/$subdir
-gdb_load ${binfile}
-
 gdb_test_multiple "python print 'hello, world!'" "verify python support" {
     -re "not supported.*$gdb_prompt $"	{
       unsupported "python support is disabled"
@@ -44,17 +35,43 @@ gdb_test_multiple "python print 'hello, world!'" "verify python support" {
     -re "$gdb_prompt $"	{}
 }
 
-if ![runto_main ] then {
-    perror "couldn't run to breakpoint"
-    return
+proc run_lang_tests {lang} {
+    global srcdir subdir srcfile binfile testfile hex
+    if { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable "debug $lang"] != "" } {
+	untested "Couldn't compile ${srcfile} in $lang mode"
+	return -1
+    }
+
+    # Start with a fresh gdb.
+    gdb_exit
+    gdb_start
+    gdb_reinitialize_dir $srcdir/$subdir
+    gdb_load ${binfile}
+
+
+    if ![runto_main ] then {
+	perror "couldn't run to breakpoint"
+	return
+    }
+
+    gdb_test "b [gdb_get_line_number {break to inspect} ${testfile}.c ]" \
+	".*Breakpoint.*"
+    gdb_test "continue" ".*Breakpoint.*"
+    
+    gdb_test "source ${srcdir}/${subdir}/${testfile}.py" ""
+    
+    gdb_test "print ss" " = a=< a=<1> b=<$hex>> b=< a=<2> b=<$hex>>"
+    gdb_test "print ssa\[1\]" " = a=< a=<5> b=<$hex>> b=< a=<6> b=<$hex>>"
+    gdb_test "print ssa" " = {a=< a=<3> b=<$hex>> b=< a=<4> b=<$hex>>, a=< a=<5> b=<$hex>> b=< a=<6> b=<$hex>>}"
+    
+    if {$lang == "c++"} {
+	gdb_test "print cps" "=  a=<8> b=<$hex>"
+	gdb_test "print cpss" " = {zss = 9, s =  a=<10> b=<$hex>}"
+	gdb_test "print cpssa\[0\]" " = {zss = 11, s =  a=<12> b=<$hex>}"
+	gdb_test "print cpssa\[1\]" " = {zss = 13, s =  a=<14> b=<$hex>}"
+	gdb_test "print cpssa" " = {{zss = 11, s =  a=<12> b=<$hex>}, {zss = 13, s =  a=<14> b=<$hex>}}"
+    }
 }
 
-gdb_test "b [gdb_get_line_number {break to inspect} ${testfile}.c ]" \
-	 ".*Breakpoint.*"
-gdb_test "continue" ".*Breakpoint.*"
-
-gdb_test "source ${srcdir}/${subdir}/${testfile}.py" ""
-
-gdb_test "print ss" " = a=< a=<1> b=<$hex>> b=< a=<2> b=<$hex>>"
-gdb_test "print ssa\[1\]" " = a=< a=<5> b=<$hex>> b=< a=<6> b=<$hex>>"
-gdb_test "print ssa" " = {a=< a=<3> b=<$hex>> b=< a=<4> b=<$hex>>, a=< a=<5> b=<$hex>> b=< a=<6> b=<$hex>>}"
+run_lang_tests "c"
+run_lang_tests "c++"
