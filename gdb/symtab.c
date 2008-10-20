@@ -42,6 +42,7 @@
 #include "ada-lang.h"
 #include "p-lang.h"
 #include "addrmap.h"
+#include "cp-support.h"
 
 #include "hashtab.h"
 
@@ -1361,22 +1362,29 @@ lookup_symbol_aux_local (const char *name, const char *linkage_name,
 			 const domain_enum domain)
 {
   struct symbol *sym;
-  const struct block *static_block = block_static_block (block);
+  const struct block *global_block = block_global_block (block);
 
   /* Check if either no block is specified or it's a global block.  */
 
-  if (static_block == NULL)
+  if (global_block == NULL)
     return NULL;
 
-  while (block != static_block)
+  while (block != global_block)
     {
       sym = lookup_symbol_aux_block (name, linkage_name, block, domain);
       if (sym != NULL)
 	return sym;
+    
+      sym = lookup_namespace_scope (name, linkage_name, block, domain,
+                                      block_scope (block), 0);
+
+      if (sym != NULL)
+        return sym;
+
       block = BLOCK_SUPERBLOCK (block);
     }
 
-  /* We've reached the static block without finding a result.  */
+  /* We've reached the global block without finding a result.  */
 
   return NULL;
 }
