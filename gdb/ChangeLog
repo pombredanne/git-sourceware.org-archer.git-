@@ -1,3 +1,15 @@
+2008-10-20  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* symtab.c (lookup_symbol_aux_local): Search continues through static
+	and stops at global block.
+	Now does a namespace at each block level via lookup_namespace_scope. 
+	* cp-support.h: Added extern lookup_namespace_scope prototype.
+	* cp-namespace.c (lookup_namespace_scope): Removed static qualifier.
+	(cp_lookup_symbol_nonlocal): Now calls lookup_symbol_file if call to 
+	lookup_namespace_scope fails.
+	(cp_lookup_symbol_namespace): Reuturn NULL if no namespace is 
+	specified.
+	
 2008-09-09  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* dwarf2read.c (process_die): Added call to

@@ -103,6 +103,13 @@ extern struct symbol *cp_lookup_symbol_nonlocal (const char *name,
 						 const struct block *block,
 						 const domain_enum domain);
 
+extern struct symbol *lookup_namespace_scope (const char *name,
+                                              const char *linkage_name,
+                                              const struct block *block,
+                                              const domain_enum domain,
+                                              const char *scope,
+                                              int scope_len);
+
 extern struct symbol *cp_lookup_symbol_namespace (const char *namespace,
 						  const char *name,
 						  const char *linkage_name,

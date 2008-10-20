@@ -38,13 +38,6 @@ static struct using_direct *using_list;
 static struct using_direct *cp_copy_usings (struct using_direct *using,
 					    struct obstack *obstack);
 
-static struct symbol *lookup_namespace_scope (const char *name,
-					      const char *linkage_name,
-					      const struct block *block,
-					      const domain_enum domain,
-					      const char *scope,
-					      int scope_len);
-
 static struct symbol *lookup_symbol_file (const char *name,
 					  const char *linkage_name,
 					  const struct block *block,
@@ -294,8 +287,14 @@ cp_lookup_symbol_nonlocal (const char *name,
 			   const struct block *block,
 			   const domain_enum domain)
 {
-  return lookup_namespace_scope (name, linkage_name, block, domain,
-				 block_scope (block), 0);
+
+  struct symbol* sym = lookup_namespace_scope(name, linkage_name, block,
+      domain, block_scope(block), 0);
+
+  if (sym != NULL)
+    return sym;
+
+  return lookup_symbol_file(name, linkage_name, block, domain, 0);
 }
 
 /* Lookup NAME at namespace scope (or, in C terms, in static and
@@ -313,7 +312,7 @@ cp_lookup_symbol_nonlocal (const char *name,
    "A::x", and if that call fails, then the first call looks for
    "x".  */
 
-static struct symbol *
+struct symbol *
 lookup_namespace_scope (const char *name,
 			const char *linkage_name,
 			const struct block *block,
@@ -393,8 +392,7 @@ cp_lookup_symbol_namespace (const char *namespace,
   
   if (namespace[0] == '\0')
     {
-      return lookup_symbol_file (name, linkage_name, block,
-				 domain, 0);
+      return NULL;
     }
   else
     {
