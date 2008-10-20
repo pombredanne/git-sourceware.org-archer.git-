@@ -16,8 +16,6 @@
 # This file is part of the GDB testsuite.  It tests python pretty
 # printers.
 
-python
-
 def pp_s(val):
   a = val["a"]
   b = val["b"]
