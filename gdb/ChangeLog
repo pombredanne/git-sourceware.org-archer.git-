@@ -1,5 +1,10 @@
 2008-10-19  Tom Tromey  <tromey@redhat.com>
 
+	* python/python.c: Remove forward declarations.
+	(GdbMethods): Move to bottom of file.
+
+2008-10-19  Tom Tromey  <tromey@redhat.com>
+
 	* python/python-type.c (type_object_methods): Remove forward
 	declarations.
 	(type_object_methods, type_object_type): Move to bottom of file.

@@ -58,79 +58,14 @@ static int gdbpy_auto_load = 1;
 #include "event-top.h"
 
 
+static PyMethodDef GdbMethods[];
+
 PyObject *gdb_module;
 
 /* Some string constants we may wish to use.  */
 PyObject *gdbpy_to_string_cst;
 PyObject *gdbpy_children_cst;
 PyObject *gdbpy_display_hint_cst;
-
-static PyObject *get_parameter (PyObject *, PyObject *);
-static PyObject *execute_gdb_command (PyObject *, PyObject *);
-static PyObject *gdbpy_solib_address (PyObject *, PyObject *);
-static PyObject *gdbpy_decode_line (PyObject *, PyObject *);
-static PyObject *gdbpy_find_pc_function (PyObject *, PyObject *);
-static PyObject *gdbpy_get_threads (PyObject *, PyObject *);
-static PyObject *gdbpy_get_current_thread (PyObject *, PyObject *);
-static PyObject *gdbpy_switch_to_thread (PyObject *, PyObject *);
-static PyObject *gdbpy_write (PyObject *, PyObject *);
-static PyObject *gdbpy_flush (PyObject *, PyObject *);
-static PyObject *gdbpy_cli (PyObject *, PyObject *);
-static PyObject *gdbpy_get_default_visualizer (PyObject *, PyObject *);
-
-static PyMethodDef GdbMethods[] =
-{
-  { "get_value_from_history", gdbpy_get_value_from_history, METH_VARARGS,
-    "Get a value from history" },
-  { "execute", execute_gdb_command, METH_VARARGS,
-    "Execute a gdb command" },
-  { "cli", gdbpy_cli, METH_NOARGS,
-    "Enter the gdb CLI" },
-  { "get_parameter", get_parameter, METH_VARARGS,
-    "Return a gdb parameter's value" },
-
-  { "get_breakpoints", gdbpy_get_breakpoints, METH_NOARGS,
-    "Return a tuple of all breakpoint objects" },
-
-  { "get_default_visualizer", gdbpy_get_default_visualizer, METH_VARARGS,
-    "Find the default visualizer for a Value." },
-
-  { "get_frames", gdbpy_get_frames, METH_NOARGS,
-    "Return a tuple of all frame objects" },
-  { "get_current_frame", gdbpy_get_current_frame, METH_NOARGS,
-    "Return the current frame object" },
-  { "get_selected_frame", gdbpy_get_selected_frame, METH_NOARGS,
-    "Return the selected frame object" },
-  { "frame_stop_reason_string", gdbpy_frame_stop_reason_string,
-    METH_VARARGS, "Return a string explaining unwind stop reason" },
-
-  { "lookup_symbol", gdbpy_lookup_symbol, METH_VARARGS,
-    "Return the symbol corresponding to the given name, or None." },
-  { "solib_address", gdbpy_solib_address, METH_VARARGS,
-    "Return shared library holding a given address, or None." },
-
-  { "find_pc_function", gdbpy_find_pc_function, METH_VARARGS,
-    "Return the function containing the given pc value, or None." },
-
-  { "decode_line", gdbpy_decode_line, METH_VARARGS,
-    "Decode a string argument the way that 'break' or 'edit' does.\n\
-Return a tuple holding the file name (or None) and line number (or None).\n\
-Note: may later change to return an object." },
-
-  { "get_threads", gdbpy_get_threads, METH_NOARGS,
-    "Return a tuple holding all the valid thread IDs." },
-  { "get_current_thread", gdbpy_get_current_thread, METH_NOARGS,
-    "Return the thread ID of the current thread." },
-  { "switch_to_thread", gdbpy_switch_to_thread, METH_VARARGS,
-    "Switch to a thread, given the thread ID." },
-
-  { "write", gdbpy_write, METH_VARARGS,
-    "Write a string using gdb's filtered stream." },
-  { "flush", gdbpy_flush, METH_NOARGS,
-    "Flush gdb's filtered stdout stream." },
-
-  {NULL, NULL, 0, NULL}
-};
 
 /* Given a command_line, return a command string suitable for passing
    to Python.  Lines in the string are separated by newlines.  The
@@ -1120,3 +1055,59 @@ gdb._format_children = _format_children\n\
 ");
 #endif /* HAVE_PYTHON */
 }
+
+
+
+static PyMethodDef GdbMethods[] =
+{
+  { "get_value_from_history", gdbpy_get_value_from_history, METH_VARARGS,
+    "Get a value from history" },
+  { "execute", execute_gdb_command, METH_VARARGS,
+    "Execute a gdb command" },
+  { "cli", gdbpy_cli, METH_NOARGS,
+    "Enter the gdb CLI" },
+  { "get_parameter", get_parameter, METH_VARARGS,
+    "Return a gdb parameter's value" },
+
+  { "get_breakpoints", gdbpy_get_breakpoints, METH_NOARGS,
+    "Return a tuple of all breakpoint objects" },
+
+  { "get_default_visualizer", gdbpy_get_default_visualizer, METH_VARARGS,
+    "Find the default visualizer for a Value." },
+
+  { "get_frames", gdbpy_get_frames, METH_NOARGS,
+    "Return a tuple of all frame objects" },
+  { "get_current_frame", gdbpy_get_current_frame, METH_NOARGS,
+    "Return the current frame object" },
+  { "get_selected_frame", gdbpy_get_selected_frame, METH_NOARGS,
+    "Return the selected frame object" },
+  { "frame_stop_reason_string", gdbpy_frame_stop_reason_string,
+    METH_VARARGS, "Return a string explaining unwind stop reason" },
+
+  { "lookup_symbol", gdbpy_lookup_symbol, METH_VARARGS,
+    "Return the symbol corresponding to the given name, or None." },
+  { "solib_address", gdbpy_solib_address, METH_VARARGS,
+    "Return shared library holding a given address, or None." },
+
+  { "find_pc_function", gdbpy_find_pc_function, METH_VARARGS,
+    "Return the function containing the given pc value, or None." },
+
+  { "decode_line", gdbpy_decode_line, METH_VARARGS,
+    "Decode a string argument the way that 'break' or 'edit' does.\n\
+Return a tuple holding the file name (or None) and line number (or None).\n\
+Note: may later change to return an object." },
+
+  { "get_threads", gdbpy_get_threads, METH_NOARGS,
+    "Return a tuple holding all the valid thread IDs." },
+  { "get_current_thread", gdbpy_get_current_thread, METH_NOARGS,
+    "Return the thread ID of the current thread." },
+  { "switch_to_thread", gdbpy_switch_to_thread, METH_VARARGS,
+    "Switch to a thread, given the thread ID." },
+
+  { "write", gdbpy_write, METH_VARARGS,
+    "Write a string using gdb's filtered stream." },
+  { "flush", gdbpy_flush, METH_NOARGS,
+    "Flush gdb's filtered stdout stream." },
+
+  {NULL, NULL, 0, NULL}
+};
