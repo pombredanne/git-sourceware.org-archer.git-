@@ -708,6 +708,14 @@ pretty_print_one_value (PyObject *func, struct value *value,
 	{
 	  if (PyString_Check (result))
 	    output = xstrdup (PyString_AsString (result));
+	  else if (PyObject_TypeCheck (result, &value_object_type))
+	    {
+	      /* If we just call convert_value_from_python for this
+		 type, we won't know who owns the result.  For this
+		 one case we need to copy the resulting value.  */
+	      struct value *v = value_object_to_value (result);
+	      *out_value = value_copy (v);
+	    }
 	  else
 	    *out_value = convert_value_from_python (result);
 	  Py_DECREF (result);

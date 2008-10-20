@@ -1,5 +1,9 @@
 2008-10-20  Tom Tromey  <tromey@redhat.com>
 
+	* python/python.c (pretty_print_one_value): Copy value if needed.
+
+2008-10-20  Tom Tromey  <tromey@redhat.com>
+
 	* python/python-value.c (value_to_value_object): Initialize
 	owned_by_gdb field.
 	(valpy_new): Likewise.
