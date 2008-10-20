@@ -38,6 +38,55 @@ struct SS {
 };
 #endif
 
+typedef struct string_repr
+{
+  struct whybother
+  {
+    const char *contents;
+  } whybother;
+} string;
+
+/* This lets us avoid malloc.  */
+int array[100];
+
+struct container
+{
+  string name;
+  int len;
+  int *elements;
+};
+
+typedef struct container zzz_type;
+
+string
+make_string (const char *s)
+{
+  string result;
+  result.whybother.contents = s;
+  return result;
+}
+
+zzz_type
+make_container (const char *s)
+{
+  zzz_type result;
+
+  result.name = make_string (s);
+  result.len = 0;
+  result.elements = 0;
+
+  return result;
+}
+
+void
+add_item (zzz_type *c, int val)
+{
+  if (c->len == 0)
+    c->elements = array;
+  c->elements[c->len] = val;
+  ++c->len;
+}
+
 void init_s(struct s *s, int a)
 {
   s->a = a;
@@ -55,6 +104,8 @@ main ()
 {
   struct ss  ss;
   struct ss  ssa[2];
+  string x = make_string ("this is x");
+  zzz_type c = make_container ("container");
 
   init_ss(&ss, 1, 2);
   init_ss(ssa+0, 3, 4);
@@ -76,6 +127,9 @@ main ()
   cpssa[1].zss = 13;
   init_s(&cpssa[1].s, 14);
 #endif
+
+  add_item (&c, 23);
+  add_item (&c, 72);
 
   return 0;      /* break to inspect struct and union */
 }

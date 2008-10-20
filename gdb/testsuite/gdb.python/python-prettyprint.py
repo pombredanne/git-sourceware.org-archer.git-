@@ -16,6 +16,34 @@
 # This file is part of the GDB testsuite.  It tests python pretty
 # printers.
 
+# Test returning a Value from a printer.
+def string_print (val):
+    return val['whybother']['contents']
+
+# Test a class-based printer.
+class ContainerPrinter:
+    class _iterator:
+        def __init__ (self, pointer, len):
+            self.start = pointer
+            self.pointer = pointer
+            self.end = pointer + len
+
+        def __iter__(self):
+            return self
+
+        def next(self):
+            if self.pointer == self.end:
+                raise StopIteration
+            result = self.pointer
+            self.pointer = self.pointer + 1
+            return ('[%d]' % int (result - self.start), result.dereference())
+
+    def header(self, val):
+        return 'container %s with %d elements' % (val['name'], val['len'])
+
+    def children(self, val):
+        return self._iterator(val['elements'], val['len'])
+
 def pp_s(val):
   a = val["a"]
   b = val["b"]
@@ -32,3 +60,12 @@ gdb.cli_pretty_printers['^S$']   = pp_s
 
 gdb.cli_pretty_printers['^struct ss$']  = pp_ss
 gdb.cli_pretty_printers['^ss$']  = pp_ss
+
+# Note that we purposely omit the typedef names here.
+# Printer lookup is based on canonical name.
+# However, we do need both tagged and untagged variants, to handle
+# both the C and C++ cases.
+gdb.cli_pretty_printers['^struct string_repr$'] = string_print
+gdb.cli_pretty_printers['^struct container$'] = ContainerPrinter()
+gdb.cli_pretty_printers['^string_repr$'] = string_print
+gdb.cli_pretty_printers['^container$'] = ContainerPrinter()

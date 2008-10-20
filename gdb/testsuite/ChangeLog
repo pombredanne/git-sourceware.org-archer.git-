@@ -1,5 +1,17 @@
 2008-10-20  Tom Tromey  <tromey@redhat.com>
 
+	* gdb.python/python-prettyprint.exp (run_lang_tests): Add tests.
+	* gdb.python/python-prettyprint.c (string_repr, container): New
+	types.
+	(array): New global.
+	(zzz_type): New typedef.
+	(make_string, make_container, add_item): New functions.
+	(main): Add variables.
+	* gdb.python/python-prettyprint.py (string_print): New function.
+	(ContainerPrinter): New class.
+
+2008-10-20  Tom Tromey  <tromey@redhat.com>
+
 	* gdb.python/python-prettyprint.exp (run_lang_tests): Use python's
 	execfile to read .py file.
 	* gdb.python/python-prettyprint.py: Remove 'python' command.
