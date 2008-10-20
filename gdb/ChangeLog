@@ -1,5 +1,9 @@
 2008-10-20  Tom Tromey  <tromey@redhat.com>
 
+	* mi/mi-main.c (mi_cmd_list_features): Add "python" feature.
+
+2008-10-20  Tom Tromey  <tromey@redhat.com>
+
 	* python/python.c (pretty_print_one_value): Copy value if needed.
 
 2008-10-20  Tom Tromey  <tromey@redhat.com>

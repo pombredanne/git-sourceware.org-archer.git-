@@ -1,3 +1,8 @@
+2008-10-20  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (GDB/MI Miscellaneous Commands): Mention 'python'
+	feature.
+
 2008-10-17  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.texinfo (Pretty Printing): Update.

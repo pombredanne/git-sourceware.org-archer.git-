@@ -23346,6 +23346,10 @@ as possible presense of the @code{frozen} field in the output
 of @code{-varobj-create}.
 @item pending-breakpoints
 Indicates presence of the @option{-f} option to the @code{-break-insert} command.
+@item python
+Indicates presence of Python scripting support, Python-based
+pretty-printing commands, and possible presence of the
+@samp{display_hint} field in the output of @code{-var-list-children}
 @item thread-info
 Indicates presence of the @code{-thread-info} command.
 
