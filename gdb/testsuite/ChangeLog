@@ -1,5 +1,9 @@
 2008-10-20  Tom Tromey  <tromey@redhat.com>
 
+	* gdb.python/Makefile.in (EXECUTABLES): Add python-prettyprint.<
+
+2008-10-20  Tom Tromey  <tromey@redhat.com>
+
 	* gdb.python/python-prettyprint.exp (run_lang_tests): Add tests.
 	* gdb.python/python-prettyprint.c (string_repr, container): New
 	types.
