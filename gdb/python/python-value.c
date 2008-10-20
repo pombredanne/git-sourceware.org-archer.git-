@@ -106,6 +106,7 @@ valpy_new (PyTypeObject *subtype, PyObject *args, PyObject *keywords)
     }
 
   value_obj->value = value;
+  value_obj->owned_by_gdb = 0;
   release_value (value);
   value_prepend_to_list (&values_in_python, value);
 
@@ -671,6 +672,7 @@ value_to_value_object (struct value *val)
   if (val_obj != NULL)
     {
       val_obj->value = val;
+      val_obj->owned_by_gdb = 0;
       release_value (val);
       value_prepend_to_list (&values_in_python, val);
     }
