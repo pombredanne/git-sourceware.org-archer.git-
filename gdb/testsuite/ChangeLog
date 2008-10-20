@@ -1,6 +1,10 @@
 2008-10-20  Tom Tromey  <tromey@redhat.com>
 
-	* gdb.python/Makefile.in (EXECUTABLES): Add python-prettyprint.<
+	* gdb.python/python-prettyprint.exp: Fixed comment.
+
+2008-10-20  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.python/Makefile.in (EXECUTABLES): Add python-prettyprint.
 
 2008-10-20  Tom Tromey  <tromey@redhat.com>
 
