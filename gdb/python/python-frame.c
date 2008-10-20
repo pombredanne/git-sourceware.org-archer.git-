@@ -42,22 +42,6 @@ typedef struct {
   int frame_id_is_next;
 } frame_object;
 
-static frame_object *frame_info_to_frame_object (struct frame_info *frame);
-static struct frame_info *frame_object_to_frame_info (frame_object *frame_obj);
-
-static PyObject *frapy_str (PyObject *self);
-static PyObject *frapy_equal_p (PyObject *self, PyObject *args);
-static PyObject *frapy_is_valid (PyObject *self, PyObject *args);
-static PyObject *frapy_get_name (PyObject *self, PyObject *args);
-static PyObject *frapy_get_type (PyObject *self, PyObject *args);
-static PyObject *frapy_get_unwind_stop_reason (PyObject *self, PyObject *args);
-static PyObject *frapy_get_pc (PyObject *self, PyObject *args);
-static PyObject *frapy_get_address_in_block (PyObject *self, PyObject *args);
-static PyObject *frapy_get_prev (PyObject *self, PyObject *args);
-static PyObject *frapy_get_next (PyObject *self, PyObject *args);
-static PyObject *frapy_find_sal (PyObject *self, PyObject *args);
-static PyObject *frapy_read_var_value (PyObject *self, PyObject *args);
-
 #define FRAPY_REQUIRE_VALID(frame_obj, frame)			      \
     do {							      \
       frame = frame_object_to_frame_info (frame_obj);		      \
@@ -68,60 +52,23 @@ static PyObject *frapy_read_var_value (PyObject *self, PyObject *args);
 	}							      \
     } while (0)
 
-static PyMethodDef frame_object_methods[] = {
-  { "equals", frapy_equal_p, METH_VARARGS, "Compare frames." },
-  { "is_valid", frapy_is_valid, METH_NOARGS,
-    "Return true if this frame is valid, false if not." },
-  { "get_name", frapy_get_name, METH_NOARGS,
-    "Return the function name of the frame." },
-  { "get_type", frapy_get_type, METH_NOARGS, "Return the type of the frame." },
-  { "get_unwind_stop_reason", frapy_get_unwind_stop_reason,
-    METH_NOARGS, "Return the function name of the frame." },
-  { "get_pc", frapy_get_pc, METH_NOARGS, "Return the frame's resume address." },
-  { "get_address_in_block", frapy_get_address_in_block, METH_NOARGS,
-    "Return an address which falls within the frame's code block." },
-  { "get_prev", frapy_get_prev, METH_NOARGS,
-    "Return the previous (outer) frame." },
-  { "get_next", frapy_get_next, METH_NOARGS, "Return the next (inner) frame." },
-  { "find_sal", frapy_find_sal, METH_NOARGS,
-    "Return the frame's symtab and line." },
-  { "read_var_value", frapy_read_var_value, METH_VARARGS,
-    "Return the value of the variable in this frame." },
-  {NULL}  /* Sentinel */
-};
+static PyTypeObject frame_object_type;
 
-static PyTypeObject frame_object_type = {
-  PyObject_HEAD_INIT (NULL)
-  0,				  /*ob_size*/
-  "gdb.Frame",			  /*tp_name*/
-  sizeof (frame_object),	  /*tp_basicsize*/
-  0,				  /*tp_itemsize*/
-  0,				  /*tp_dealloc*/
-  0,				  /*tp_print*/
-  0,				  /*tp_getattr*/
-  0,				  /*tp_setattr*/
-  0,				  /*tp_compare*/
-  0,				  /*tp_repr*/
-  0,				  /*tp_as_number*/
-  0,				  /*tp_as_sequence*/
-  0,				  /*tp_as_mapping*/
-  0,				  /*tp_hash */
-  0,				  /*tp_call*/
-  frapy_str,			  /*tp_str*/
-  0,				  /*tp_getattro*/
-  0,				  /*tp_setattro*/
-  0,				  /*tp_as_buffer*/
-  Py_TPFLAGS_DEFAULT,		  /*tp_flags*/
-  "GDB frame object",		  /* tp_doc */
-  0,				  /* tp_traverse */
-  0,				  /* tp_clear */
-  0,				  /* tp_richcompare */
-  0,				  /* tp_weaklistoffset */
-  0,				  /* tp_iter */
-  0,				  /* tp_iternext */
-  frame_object_methods		  /* tp_methods */
-};
 
+static struct frame_info *
+frame_object_to_frame_info (frame_object *frame_obj)
+{
+  struct frame_info *frame;
+
+  frame = frame_find_by_id (frame_obj->frame_id);
+  if (frame == NULL)
+    return NULL;
+
+  if (frame_obj->frame_id_is_next)
+    frame = get_prev_frame (frame);
+
+  return frame;
+}
 
 static PyObject *
 frapy_str (PyObject *self)
@@ -306,21 +253,6 @@ frame_info_to_frame_object (struct frame_info *frame)
   frame_obj->gdbarch = get_frame_arch (frame);
 
   return frame_obj;
-}
-
-static struct frame_info *
-frame_object_to_frame_info (frame_object *frame_obj)
-{
-  struct frame_info *frame;
-
-  frame = frame_find_by_id (frame_obj->frame_id);
-  if (frame == NULL)
-    return NULL;
-
-  if (frame_obj->frame_id_is_next)
-    frame = get_prev_frame (frame);
-
-  return frame;
 }
 
 static PyObject *
@@ -557,3 +489,59 @@ gdbpy_initialize_frames (void)
   Py_INCREF (&frame_object_type);
   PyModule_AddObject (gdb_module, "Frame", (PyObject *) &frame_object_type);
 }
+
+
+
+static PyMethodDef frame_object_methods[] = {
+  { "equals", frapy_equal_p, METH_VARARGS, "Compare frames." },
+  { "is_valid", frapy_is_valid, METH_NOARGS,
+    "Return true if this frame is valid, false if not." },
+  { "get_name", frapy_get_name, METH_NOARGS,
+    "Return the function name of the frame." },
+  { "get_type", frapy_get_type, METH_NOARGS, "Return the type of the frame." },
+  { "get_unwind_stop_reason", frapy_get_unwind_stop_reason,
+    METH_NOARGS, "Return the function name of the frame." },
+  { "get_pc", frapy_get_pc, METH_NOARGS, "Return the frame's resume address." },
+  { "get_address_in_block", frapy_get_address_in_block, METH_NOARGS,
+    "Return an address which falls within the frame's code block." },
+  { "get_prev", frapy_get_prev, METH_NOARGS,
+    "Return the previous (outer) frame." },
+  { "get_next", frapy_get_next, METH_NOARGS, "Return the next (inner) frame." },
+  { "find_sal", frapy_find_sal, METH_NOARGS,
+    "Return the frame's symtab and line." },
+  { "read_var_value", frapy_read_var_value, METH_VARARGS,
+    "Return the value of the variable in this frame." },
+  {NULL}  /* Sentinel */
+};
+
+static PyTypeObject frame_object_type = {
+  PyObject_HEAD_INIT (NULL)
+  0,				  /*ob_size*/
+  "gdb.Frame",			  /*tp_name*/
+  sizeof (frame_object),	  /*tp_basicsize*/
+  0,				  /*tp_itemsize*/
+  0,				  /*tp_dealloc*/
+  0,				  /*tp_print*/
+  0,				  /*tp_getattr*/
+  0,				  /*tp_setattr*/
+  0,				  /*tp_compare*/
+  0,				  /*tp_repr*/
+  0,				  /*tp_as_number*/
+  0,				  /*tp_as_sequence*/
+  0,				  /*tp_as_mapping*/
+  0,				  /*tp_hash */
+  0,				  /*tp_call*/
+  frapy_str,			  /*tp_str*/
+  0,				  /*tp_getattro*/
+  0,				  /*tp_setattro*/
+  0,				  /*tp_as_buffer*/
+  Py_TPFLAGS_DEFAULT,		  /*tp_flags*/
+  "GDB frame object",		  /* tp_doc */
+  0,				  /* tp_traverse */
+  0,				  /* tp_clear */
+  0,				  /* tp_richcompare */
+  0,				  /* tp_weaklistoffset */
+  0,				  /* tp_iter */
+  0,				  /* tp_iternext */
+  frame_object_methods		  /* tp_methods */
+};

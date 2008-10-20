@@ -1,5 +1,35 @@
 2008-10-19  Tom Tromey  <tromey@redhat.com>
 
+	* python/python-type.c (type_object_methods): Remove forward
+	declarations.
+	(type_object_methods, type_object_type): Move to bottom of file.
+	* python/python-symtab.c: Remove forward declarations.
+	(symtab_object_methods, symtab_object_type)
+	(sal_object_getseters, sal_object_methods, sal_object_type): Move
+	to bottom of file.
+	* python/python-symbol.c: Remove forward declarations.
+	(symbol_object_methods, symbol_object_type): Move to bottom of
+	file.
+	* python/python-param.c: Remove forward declarations.
+	(parmpy_object_type): Move to bottom of file.
+	* python/python-function.c (fnpy_object_type): Move to bottom of
+	file.
+	* python/python-frame.c: Remove forward declarations.
+	(frame_object_methods, frame_object_type): Move to bottom of
+	file.
+	(frame_object_to_frame_info): Move earlier.
+	* python/python-cmd.c: Remove forward declarations.
+	(cmdpy_object_methods, cmdpy_object_type): Move to bottom of
+	file.
+	* python/python-breakpoint.c: Remove forward declarations.
+	(breakpoint_object_methods, breakpoint_object_type): Move to
+	bottom of file.
+	* python/python-block.c: Remove forward declarations.
+	(block_object_methods, block_object_type)
+	(block_syms_iterator_object_type): Move to bottom of file.
+
+2008-10-19  Tom Tromey  <tromey@redhat.com>
+
 	* python/python-value.c (valpy_length): Revert return type to
 	Py_ssize_t.
 

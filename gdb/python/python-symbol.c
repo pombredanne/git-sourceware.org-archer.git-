@@ -26,65 +26,6 @@ typedef struct {
   struct symbol *symbol;
 } symbol_object;
 
-static PyObject *sympy_str (PyObject *self);
-static PyObject *sympy_get_value (PyObject *self, PyObject *args);
-static PyObject *sympy_get_symtab (PyObject *self, PyObject *args);
-static PyObject *sympy_get_natural_name (PyObject *self, PyObject *args);
-static PyObject *sympy_get_linkage_name (PyObject *self, PyObject *args);
-static PyObject *sympy_get_print_name (PyObject *self, PyObject *args);
-static PyObject *sympy_get_class (PyObject *self, PyObject *args);
-static PyObject *sympy_is_argument (PyObject *self, PyObject *args);
-
-static PyMethodDef symbol_object_methods[] = {
-  { "get_value", sympy_get_value, METH_NOARGS,
-    "Return the value of the symbol." },
-  { "get_symtab", sympy_get_symtab, METH_NOARGS,
-    "Return the value of the symbol." },
-  { "get_natural_name", sympy_get_natural_name, METH_NOARGS,
-    "Return the \"natural\" name of the symbol." },
-  { "get_linkage_name", sympy_get_linkage_name, METH_NOARGS,
-    "Return the name of the symbol as used by the linker." },
-  { "get_print_name", sympy_get_print_name, METH_NOARGS,
-    "Return the name of the symbol in a form suitable for output." },
-  { "get_class", sympy_get_class, METH_NOARGS,
-    "Return the class of the symbol." },
-  { "is_argument", sympy_is_argument, METH_NOARGS,
-    "Return True if symbol is the argument of a function." },
-  {NULL}  /* Sentinel */
-};
-
-PyTypeObject symbol_object_type = {
-  PyObject_HEAD_INIT (NULL)
-  0,				  /*ob_size*/
-  "gdb.Symbol",			  /*tp_name*/
-  sizeof (symbol_object),	  /*tp_basicsize*/
-  0,				  /*tp_itemsize*/
-  0,				  /*tp_dealloc*/
-  0,				  /*tp_print*/
-  0,				  /*tp_getattr*/
-  0,				  /*tp_setattr*/
-  0,				  /*tp_compare*/
-  0,				  /*tp_repr*/
-  0,				  /*tp_as_number*/
-  0,				  /*tp_as_sequence*/
-  0,				  /*tp_as_mapping*/
-  0,				  /*tp_hash */
-  0,				  /*tp_call*/
-  sympy_str,			  /*tp_str*/
-  0,				  /*tp_getattro*/
-  0,				  /*tp_setattro*/
-  0,				  /*tp_as_buffer*/
-  Py_TPFLAGS_DEFAULT,		  /*tp_flags*/
-  "GDB symbol object",		  /* tp_doc */
-  0,				  /* tp_traverse */
-  0,				  /* tp_clear */
-  0,				  /* tp_richcompare */
-  0,				  /* tp_weaklistoffset */
-  0,				  /* tp_iter */
-  0,				  /* tp_iternext */
-  symbol_object_methods		  /* tp_methods */
-};
-
 
 static PyObject *
 sympy_str (PyObject *self)
@@ -291,3 +232,55 @@ gdbpy_initialize_symbols (void)
   Py_INCREF (&symbol_object_type);
   PyModule_AddObject (gdb_module, "Symbol", (PyObject *) &symbol_object_type);
 }
+
+
+
+static PyMethodDef symbol_object_methods[] = {
+  { "get_value", sympy_get_value, METH_NOARGS,
+    "Return the value of the symbol." },
+  { "get_symtab", sympy_get_symtab, METH_NOARGS,
+    "Return the value of the symbol." },
+  { "get_natural_name", sympy_get_natural_name, METH_NOARGS,
+    "Return the \"natural\" name of the symbol." },
+  { "get_linkage_name", sympy_get_linkage_name, METH_NOARGS,
+    "Return the name of the symbol as used by the linker." },
+  { "get_print_name", sympy_get_print_name, METH_NOARGS,
+    "Return the name of the symbol in a form suitable for output." },
+  { "get_class", sympy_get_class, METH_NOARGS,
+    "Return the class of the symbol." },
+  { "is_argument", sympy_is_argument, METH_NOARGS,
+    "Return True if symbol is the argument of a function." },
+  {NULL}  /* Sentinel */
+};
+
+PyTypeObject symbol_object_type = {
+  PyObject_HEAD_INIT (NULL)
+  0,				  /*ob_size*/
+  "gdb.Symbol",			  /*tp_name*/
+  sizeof (symbol_object),	  /*tp_basicsize*/
+  0,				  /*tp_itemsize*/
+  0,				  /*tp_dealloc*/
+  0,				  /*tp_print*/
+  0,				  /*tp_getattr*/
+  0,				  /*tp_setattr*/
+  0,				  /*tp_compare*/
+  0,				  /*tp_repr*/
+  0,				  /*tp_as_number*/
+  0,				  /*tp_as_sequence*/
+  0,				  /*tp_as_mapping*/
+  0,				  /*tp_hash */
+  0,				  /*tp_call*/
+  sympy_str,			  /*tp_str*/
+  0,				  /*tp_getattro*/
+  0,				  /*tp_setattro*/
+  0,				  /*tp_as_buffer*/
+  Py_TPFLAGS_DEFAULT,		  /*tp_flags*/
+  "GDB symbol object",		  /* tp_doc */
+  0,				  /* tp_traverse */
+  0,				  /* tp_clear */
+  0,				  /* tp_richcompare */
+  0,				  /* tp_weaklistoffset */
+  0,				  /* tp_iter */
+  0,				  /* tp_iternext */
+  symbol_object_methods		  /* tp_methods */
+};

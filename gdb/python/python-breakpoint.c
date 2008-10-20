@@ -34,22 +34,7 @@ extern struct breakpoint *breakpoint_chain;
 
 typedef struct breakpoint_object breakpoint_object;
 
-static PyObject *bppy_is_valid (PyObject *, PyObject *);
-static PyObject *bppy_is_enabled (PyObject *, PyObject *);
-static PyObject *bppy_is_silent (PyObject *, PyObject *);
-static PyObject *bppy_set_enabled (PyObject *, PyObject *);
-static PyObject *bppy_set_silent (PyObject *, PyObject *);
-static PyObject *bppy_set_thread (PyObject *, PyObject *);
-static PyObject *bppy_set_ignore_count (PyObject *, PyObject *);
-static PyObject *bppy_clear_hit_count (PyObject *, PyObject *);
-static PyObject *bppy_get_location (PyObject *, PyObject *);
-static PyObject *bppy_get_condition (PyObject *, PyObject *);
-static PyObject *bppy_get_commands (PyObject *, PyObject *);
-static PyObject *bppy_get_number (PyObject *, PyObject *);
-static PyObject *bppy_get_thread (PyObject *, PyObject *);
-static PyObject *bppy_get_hit_count (PyObject *, PyObject *);
-static PyObject *bppy_get_ignore_count (PyObject *, PyObject *);
-
+static PyTypeObject breakpoint_object_type;
 
 /* A dynamically allocated vector of breakpoint objects.  Each
    breakpoint has a number.  A breakpoint is valid if its slot in this
@@ -95,82 +80,6 @@ struct breakpoint_object
 	return PyErr_Format (PyExc_RuntimeError, "breakpoint %d is invalid", \
 			     (Breakpoint)->number);			\
     } while (0)
-
-static PyMethodDef breakpoint_object_methods[] =
-{
-  { "is_valid", bppy_is_valid, METH_NOARGS,
-    "Return true if this breakpoint is valid, false if not." },
-  { "is_enabled", bppy_is_enabled, METH_NOARGS,
-    "Return true if this breakpoint is enabled, false if disabled." },
-  { "is_silent", bppy_is_silent, METH_NOARGS,
-    "Return true if this breakpoint is silent, false if verbose." },
-
-  { "set_enabled", bppy_set_enabled, METH_O,
-    "Enable or disable this breakpoint" },
-  { "set_silent", bppy_set_silent, METH_O,
-    "Make this breakpoint quiet or verbose" },
-  { "set_thread", bppy_set_thread, METH_O,
-    "Set the thread ID for this breakpoint.\n\
-If the argument is a thread ID, make this a thread-specific breakpoint.\n\
-If the argument is None, make this breakpoint not thread-specific.\n\
-Any other argument is an error." },
-  { "set_ignore_count", bppy_set_ignore_count, METH_O,
-    "Set the ignore count for this breakpoint" },
-  { "clear_hit_count", bppy_set_ignore_count, METH_NOARGS,
-    "Set the hit count for this breakpoint to zero" },
-
-  { "get_location", bppy_get_location, METH_NOARGS,
-    "Return the location of this breakpoint, as specified by the user"},
-  { "get_condition", bppy_get_condition, METH_NOARGS,
-    "Return the condition of this breakpoint, as specified by the user.\n\
-Returns None if no condition set."},
-  { "get_commands", bppy_get_commands, METH_NOARGS,
-    "Return the commands of this breakpoint, as specified by the user"},
-  { "get_number", bppy_get_number, METH_NOARGS,
-    "Return this breakpoint's number." },
-  { "get_thread", bppy_get_thread, METH_NOARGS,
-    "For a thread-specific breakpoint, return the thread ID.\n\
-Otherwise, return None." },
-  { "get_hit_count", bppy_get_hit_count, METH_NOARGS,
-    "Return the number of times this breakpoint has been hit." },
-  { "get_ignore_count", bppy_get_ignore_count, METH_NOARGS,
-    "Return the number of times this breakpoint should be automatically continued." },
-
-  { 0 }
-};
-
-static PyTypeObject breakpoint_object_type =
-{
-  PyObject_HEAD_INIT (NULL)
-  0,				  /*ob_size*/
-  "gdb.Breakpoint",		  /*tp_name*/
-  sizeof (breakpoint_object),	  /*tp_basicsize*/
-  0,				  /*tp_itemsize*/
-  0,				  /*tp_dealloc*/
-  0,				  /*tp_print*/
-  0,				  /*tp_getattr*/
-  0,				  /*tp_setattr*/
-  0,				  /*tp_compare*/
-  0,				  /*tp_repr*/
-  0,				  /*tp_as_number*/
-  0,				  /*tp_as_sequence*/
-  0,				  /*tp_as_mapping*/
-  0,				  /*tp_hash */
-  0,				  /*tp_call*/
-  0,				  /*tp_str*/
-  0,				  /*tp_getattro*/
-  0,				  /*tp_setattro*/
-  0,				  /*tp_as_buffer*/
-  Py_TPFLAGS_DEFAULT,		  /*tp_flags*/
-  "GDB breakpoint object",	  /* tp_doc */
-  0,				  /* tp_traverse */
-  0,				  /* tp_clear */
-  0,				  /* tp_richcompare */
-  0,				  /* tp_weaklistoffset */
-  0,				  /* tp_iter */
-  0,				  /* tp_iternext */
-  breakpoint_object_methods	  /* tp_methods */
-};
 
 /* Python function which checks the validity of a breakpoint object.  */
 static PyObject *
@@ -563,3 +472,81 @@ gdbpy_initialize_breakpoints (void)
   observer_attach_breakpoint_created (gdbpy_breakpoint_created);
   observer_attach_breakpoint_deleted (gdbpy_breakpoint_deleted);
 }
+
+
+
+static PyMethodDef breakpoint_object_methods[] =
+{
+  { "is_valid", bppy_is_valid, METH_NOARGS,
+    "Return true if this breakpoint is valid, false if not." },
+  { "is_enabled", bppy_is_enabled, METH_NOARGS,
+    "Return true if this breakpoint is enabled, false if disabled." },
+  { "is_silent", bppy_is_silent, METH_NOARGS,
+    "Return true if this breakpoint is silent, false if verbose." },
+
+  { "set_enabled", bppy_set_enabled, METH_O,
+    "Enable or disable this breakpoint" },
+  { "set_silent", bppy_set_silent, METH_O,
+    "Make this breakpoint quiet or verbose" },
+  { "set_thread", bppy_set_thread, METH_O,
+    "Set the thread ID for this breakpoint.\n\
+If the argument is a thread ID, make this a thread-specific breakpoint.\n\
+If the argument is None, make this breakpoint not thread-specific.\n\
+Any other argument is an error." },
+  { "set_ignore_count", bppy_set_ignore_count, METH_O,
+    "Set the ignore count for this breakpoint" },
+  { "clear_hit_count", bppy_set_ignore_count, METH_NOARGS,
+    "Set the hit count for this breakpoint to zero" },
+
+  { "get_location", bppy_get_location, METH_NOARGS,
+    "Return the location of this breakpoint, as specified by the user"},
+  { "get_condition", bppy_get_condition, METH_NOARGS,
+    "Return the condition of this breakpoint, as specified by the user.\n\
+Returns None if no condition set."},
+  { "get_commands", bppy_get_commands, METH_NOARGS,
+    "Return the commands of this breakpoint, as specified by the user"},
+  { "get_number", bppy_get_number, METH_NOARGS,
+    "Return this breakpoint's number." },
+  { "get_thread", bppy_get_thread, METH_NOARGS,
+    "For a thread-specific breakpoint, return the thread ID.\n\
+Otherwise, return None." },
+  { "get_hit_count", bppy_get_hit_count, METH_NOARGS,
+    "Return the number of times this breakpoint has been hit." },
+  { "get_ignore_count", bppy_get_ignore_count, METH_NOARGS,
+    "Return the number of times this breakpoint should be automatically continued." },
+
+  { 0 }
+};
+
+static PyTypeObject breakpoint_object_type =
+{
+  PyObject_HEAD_INIT (NULL)
+  0,				  /*ob_size*/
+  "gdb.Breakpoint",		  /*tp_name*/
+  sizeof (breakpoint_object),	  /*tp_basicsize*/
+  0,				  /*tp_itemsize*/
+  0,				  /*tp_dealloc*/
+  0,				  /*tp_print*/
+  0,				  /*tp_getattr*/
+  0,				  /*tp_setattr*/
+  0,				  /*tp_compare*/
+  0,				  /*tp_repr*/
+  0,				  /*tp_as_number*/
+  0,				  /*tp_as_sequence*/
+  0,				  /*tp_as_mapping*/
+  0,				  /*tp_hash */
+  0,				  /*tp_call*/
+  0,				  /*tp_str*/
+  0,				  /*tp_getattro*/
+  0,				  /*tp_setattro*/
+  0,				  /*tp_as_buffer*/
+  Py_TPFLAGS_DEFAULT,		  /*tp_flags*/
+  "GDB breakpoint object",	  /* tp_doc */
+  0,				  /* tp_traverse */
+  0,				  /* tp_clear */
+  0,				  /* tp_richcompare */
+  0,				  /* tp_weaklistoffset */
+  0,				  /* tp_iter */
+  0,				  /* tp_iternext */
+  breakpoint_object_methods	  /* tp_methods */
+};

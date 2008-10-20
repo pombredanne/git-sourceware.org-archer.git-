@@ -39,60 +39,7 @@ typedef struct pyty_type_object
   struct pyty_type_object *next;
 } type_object;
 
-static void typy_dealloc (PyObject *);
-
-static PyObject *typy_str (PyObject *);
-static PyObject *typy_pointer (PyObject *self, PyObject *args);
-static PyObject *typy_reference (PyObject *self, PyObject *args);
-static PyObject *typy_sizeof (PyObject *self, PyObject *args);
-static PyObject *typy_target (PyObject *self, PyObject *args);
-static PyObject *typy_template_argument (PyObject *self, PyObject *args);
-
-static PyMethodDef type_object_methods[] =
-{
-  { "pointer", typy_pointer, METH_NOARGS, "Return pointer to this type" },
-  { "reference", typy_reference, METH_NOARGS, "Return reference to this type" },
-  { "sizeof", typy_sizeof, METH_NOARGS,
-    "Return the size of this type, in bytes" },
-  { "target", typy_target, METH_NOARGS,
-    "Return the target type of this type" },
-  { "template_argument", typy_template_argument, METH_VARARGS,
-    "Return a single template argument type" },
-  { NULL }
-};
-
-static PyTypeObject type_object_type =
-{
-  PyObject_HEAD_INIT (NULL)
-  0,				  /*ob_size*/
-  "gdb.Type",			  /*tp_name*/
-  sizeof (type_object),		  /*tp_basicsize*/
-  0,				  /*tp_itemsize*/
-  typy_dealloc,			  /*tp_dealloc*/
-  0,				  /*tp_print*/
-  0,				  /*tp_getattr*/
-  0,				  /*tp_setattr*/
-  0,				  /*tp_compare*/
-  0,				  /*tp_repr*/
-  0,				  /*tp_as_number*/
-  0,				  /*tp_as_sequence*/
-  0,				  /*tp_as_mapping*/
-  0,				  /*tp_hash */
-  0,				  /*tp_call*/
-  typy_str,			  /*tp_str*/
-  0,				  /*tp_getattro*/
-  0,				  /*tp_setattro*/
-  0,				  /*tp_as_buffer*/
-  Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_ITER,  /*tp_flags*/
-  "GDB type object",		  /* tp_doc */
-  0,				  /* tp_traverse */
-  0,				  /* tp_clear */
-  0,				  /* tp_richcompare */
-  0,				  /* tp_weaklistoffset */
-  0,				  /* tp_iter */
-  0,				  /* tp_iternext */
-  type_object_methods		  /* tp_methods */
-};
+static PyTypeObject type_object_type;
 
 /* Return a Type object which represents a pointer to SELF.  */
 static PyObject *
@@ -474,3 +421,51 @@ gdbpy_initialize_types (void)
   Py_INCREF (&type_object_type);
   PyModule_AddObject (gdb_module, "Type", (PyObject *) &type_object_type);
 }
+
+
+
+static PyMethodDef type_object_methods[] =
+{
+  { "pointer", typy_pointer, METH_NOARGS, "Return pointer to this type" },
+  { "reference", typy_reference, METH_NOARGS, "Return reference to this type" },
+  { "sizeof", typy_sizeof, METH_NOARGS,
+    "Return the size of this type, in bytes" },
+  { "target", typy_target, METH_NOARGS,
+    "Return the target type of this type" },
+  { "template_argument", typy_template_argument, METH_VARARGS,
+    "Return a single template argument type" },
+  { NULL }
+};
+
+static PyTypeObject type_object_type =
+{
+  PyObject_HEAD_INIT (NULL)
+  0,				  /*ob_size*/
+  "gdb.Type",			  /*tp_name*/
+  sizeof (type_object),		  /*tp_basicsize*/
+  0,				  /*tp_itemsize*/
+  typy_dealloc,			  /*tp_dealloc*/
+  0,				  /*tp_print*/
+  0,				  /*tp_getattr*/
+  0,				  /*tp_setattr*/
+  0,				  /*tp_compare*/
+  0,				  /*tp_repr*/
+  0,				  /*tp_as_number*/
+  0,				  /*tp_as_sequence*/
+  0,				  /*tp_as_mapping*/
+  0,				  /*tp_hash */
+  0,				  /*tp_call*/
+  typy_str,			  /*tp_str*/
+  0,				  /*tp_getattro*/
+  0,				  /*tp_setattro*/
+  0,				  /*tp_as_buffer*/
+  Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_ITER,  /*tp_flags*/
+  "GDB type object",		  /* tp_doc */
+  0,				  /* tp_traverse */
+  0,				  /* tp_clear */
+  0,				  /* tp_richcompare */
+  0,				  /* tp_weaklistoffset */
+  0,				  /* tp_iter */
+  0,				  /* tp_iternext */
+  type_object_methods		  /* tp_methods */
+};

@@ -87,41 +87,7 @@ struct parmpy_object
 
 typedef struct parmpy_object parmpy_object;
 
-static PyObject *get_attr (PyObject *, PyObject *);
-static int set_attr (PyObject *, PyObject *, PyObject *);
-
-static PyTypeObject parmpy_object_type =
-{
-  PyObject_HEAD_INIT (NULL)
-  0,				  /*ob_size*/
-  "gdb.Parameter",		  /*tp_name*/
-  sizeof (parmpy_object),	  /*tp_basicsize*/
-  0,				  /*tp_itemsize*/
-  0,				  /*tp_dealloc*/
-  0,				  /*tp_print*/
-  0,				  /*tp_getattr*/
-  0,				  /*tp_setattr*/
-  0,				  /*tp_compare*/
-  0,				  /*tp_repr*/
-  0,				  /*tp_as_number*/
-  0,				  /*tp_as_sequence*/
-  0,				  /*tp_as_mapping*/
-  0,				  /*tp_hash */
-  0,				  /*tp_call*/
-  0,				  /*tp_str*/
-  get_attr,			  /*tp_getattro*/
-  set_attr,			  /*tp_setattro*/
-  0,				  /*tp_as_buffer*/
-  Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /*tp_flags*/
-  "GDB parameter object",	  /* tp_doc */
-  0,				  /* tp_traverse */
-  0,				  /* tp_clear */
-  0,				  /* tp_richcompare */
-  0,				  /* tp_weaklistoffset */
-  0,				  /* tp_iter */
-  0,				  /* tp_iternext */
-  0				  /* tp_methods */
-};
+static PyTypeObject parmpy_object_type;
 
 
 
@@ -550,3 +516,38 @@ gdbpy_initialize_parameters (void)
   PyModule_AddObject (gdb_module, "Parameter",
 		      (PyObject *) &parmpy_object_type);
 }
+
+
+
+static PyTypeObject parmpy_object_type =
+{
+  PyObject_HEAD_INIT (NULL)
+  0,				  /*ob_size*/
+  "gdb.Parameter",		  /*tp_name*/
+  sizeof (parmpy_object),	  /*tp_basicsize*/
+  0,				  /*tp_itemsize*/
+  0,				  /*tp_dealloc*/
+  0,				  /*tp_print*/
+  0,				  /*tp_getattr*/
+  0,				  /*tp_setattr*/
+  0,				  /*tp_compare*/
+  0,				  /*tp_repr*/
+  0,				  /*tp_as_number*/
+  0,				  /*tp_as_sequence*/
+  0,				  /*tp_as_mapping*/
+  0,				  /*tp_hash */
+  0,				  /*tp_call*/
+  0,				  /*tp_str*/
+  get_attr,			  /*tp_getattro*/
+  set_attr,			  /*tp_setattro*/
+  0,				  /*tp_as_buffer*/
+  Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /*tp_flags*/
+  "GDB parameter object",	  /* tp_doc */
+  0,				  /* tp_traverse */
+  0,				  /* tp_clear */
+  0,				  /* tp_richcompare */
+  0,				  /* tp_weaklistoffset */
+  0,				  /* tp_iter */
+  0,				  /* tp_iternext */
+  0				  /* tp_methods */
+};

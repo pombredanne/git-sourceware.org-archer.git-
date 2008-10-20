@@ -28,49 +28,7 @@ typedef struct {
   struct symtab *symtab;
 } symtab_object;
 
-static PyObject *stpy_str (PyObject *self);
-static PyObject *stpy_filename (PyObject *self, PyObject *args);
-static PyObject *stpy_to_fullname (PyObject *self, PyObject *args);
-
-static PyMethodDef symtab_object_methods[] = {
-  { "get_filename", stpy_filename, METH_NOARGS,
-    "Return the symtab's source filename." },
-  { "to_fullname", stpy_to_fullname, METH_NOARGS,
-    "Return the symtab's full source filename." },
-  {NULL}  /* Sentinel */
-};
-
-static PyTypeObject symtab_object_type = {
-  PyObject_HEAD_INIT (NULL)
-  0,				  /*ob_size*/
-  "gdb.Symtab",			  /*tp_name*/
-  sizeof (symtab_object),	  /*tp_basicsize*/
-  0,				  /*tp_itemsize*/
-  0,				  /*tp_dealloc*/
-  0,				  /*tp_print*/
-  0,				  /*tp_getattr*/
-  0,				  /*tp_setattr*/
-  0,				  /*tp_compare*/
-  0,				  /*tp_repr*/
-  0,				  /*tp_as_number*/
-  0,				  /*tp_as_sequence*/
-  0,				  /*tp_as_mapping*/
-  0,				  /*tp_hash */
-  0,				  /*tp_call*/
-  stpy_str,			  /*tp_str*/
-  0,				  /*tp_getattro*/
-  0,				  /*tp_setattro*/
-  0,				  /*tp_as_buffer*/
-  Py_TPFLAGS_DEFAULT,		  /*tp_flags*/
-  "GDB symtab object",		  /* tp_doc */
-  0,				  /* tp_traverse */
-  0,				  /* tp_clear */
-  0,				  /* tp_richcompare */
-  0,				  /* tp_weaklistoffset */
-  0,				  /* tp_iter */
-  0,				  /* tp_iternext */
-  symtab_object_methods		  /* tp_methods */
-};
+static PyTypeObject symtab_object_type;
 
 typedef struct {
   PyObject_HEAD
@@ -78,59 +36,7 @@ typedef struct {
   struct symtab_and_line *sal;
 } sal_object;
 
-static void salpy_dealloc (PyObject *self);
-static int salpy_setsymtab (PyObject *self, PyObject *value, void *closure);
-static PyObject *salpy_str (PyObject *self);
-static PyObject *salpy_getsymtab (PyObject *self, void *closure);
-static PyObject *salpy_pc (PyObject *self, PyObject *args);
-static PyObject *salpy_line (PyObject *self, PyObject *args);
-
-static PyGetSetDef sal_object_getseters[] = {
-  { "symtab", salpy_getsymtab, salpy_setsymtab, "Symtab object.", NULL },
-  {NULL}  /* Sentinel */
-};
-
-static PyMethodDef sal_object_methods[] = {
-  { "get_pc", salpy_pc, METH_NOARGS,
-    "Return the symtab_and_line's pc." },
-  { "get_line", salpy_line, METH_NOARGS,
-    "Return the symtab_and_line's line." },
-  {NULL}  /* Sentinel */
-};
-
-static PyTypeObject sal_object_type = {
-  PyObject_HEAD_INIT (NULL)
-  0,				  /*ob_size*/
-  "gdb.Symtab_and_line",	  /*tp_name*/
-  sizeof (sal_object),		  /*tp_basicsize*/
-  0,				  /*tp_itemsize*/
-  salpy_dealloc,		  /*tp_dealloc*/
-  0,				  /*tp_print*/
-  0,				  /*tp_getattr*/
-  0,				  /*tp_setattr*/
-  0,				  /*tp_compare*/
-  0,				  /*tp_repr*/
-  0,				  /*tp_as_number*/
-  0,				  /*tp_as_sequence*/
-  0,				  /*tp_as_mapping*/
-  0,				  /*tp_hash */
-  0,				  /*tp_call*/
-  salpy_str,			  /*tp_str*/
-  0,				  /*tp_getattro*/
-  0,				  /*tp_setattro*/
-  0,				  /*tp_as_buffer*/
-  Py_TPFLAGS_DEFAULT,		  /*tp_flags*/
-  "GDB symtab_and_line object",	  /* tp_doc */
-  0,				  /* tp_traverse */
-  0,				  /* tp_clear */
-  0,				  /* tp_richcompare */
-  0,				  /* tp_weaklistoffset */
-  0,				  /* tp_iter */
-  0,				  /* tp_iternext */
-  sal_object_methods,		  /* tp_methods */
-  0,				  /* tp_members */
-  sal_object_getseters		  /* tp_getset */
-};
+static PyTypeObject sal_object_type;
 
 
 static PyObject *
@@ -322,3 +228,92 @@ gdbpy_initialize_symtabs (void)
   PyModule_AddObject (gdb_module, "Symtab_and_line",
 		      (PyObject *) &sal_object_type);
 }
+
+
+
+static PyMethodDef symtab_object_methods[] = {
+  { "get_filename", stpy_filename, METH_NOARGS,
+    "Return the symtab's source filename." },
+  { "to_fullname", stpy_to_fullname, METH_NOARGS,
+    "Return the symtab's full source filename." },
+  {NULL}  /* Sentinel */
+};
+
+static PyTypeObject symtab_object_type = {
+  PyObject_HEAD_INIT (NULL)
+  0,				  /*ob_size*/
+  "gdb.Symtab",			  /*tp_name*/
+  sizeof (symtab_object),	  /*tp_basicsize*/
+  0,				  /*tp_itemsize*/
+  0,				  /*tp_dealloc*/
+  0,				  /*tp_print*/
+  0,				  /*tp_getattr*/
+  0,				  /*tp_setattr*/
+  0,				  /*tp_compare*/
+  0,				  /*tp_repr*/
+  0,				  /*tp_as_number*/
+  0,				  /*tp_as_sequence*/
+  0,				  /*tp_as_mapping*/
+  0,				  /*tp_hash */
+  0,				  /*tp_call*/
+  stpy_str,			  /*tp_str*/
+  0,				  /*tp_getattro*/
+  0,				  /*tp_setattro*/
+  0,				  /*tp_as_buffer*/
+  Py_TPFLAGS_DEFAULT,		  /*tp_flags*/
+  "GDB symtab object",		  /* tp_doc */
+  0,				  /* tp_traverse */
+  0,				  /* tp_clear */
+  0,				  /* tp_richcompare */
+  0,				  /* tp_weaklistoffset */
+  0,				  /* tp_iter */
+  0,				  /* tp_iternext */
+  symtab_object_methods		  /* tp_methods */
+};
+
+static PyGetSetDef sal_object_getseters[] = {
+  { "symtab", salpy_getsymtab, salpy_setsymtab, "Symtab object.", NULL },
+  {NULL}  /* Sentinel */
+};
+
+static PyMethodDef sal_object_methods[] = {
+  { "get_pc", salpy_pc, METH_NOARGS,
+    "Return the symtab_and_line's pc." },
+  { "get_line", salpy_line, METH_NOARGS,
+    "Return the symtab_and_line's line." },
+  {NULL}  /* Sentinel */
+};
+
+static PyTypeObject sal_object_type = {
+  PyObject_HEAD_INIT (NULL)
+  0,				  /*ob_size*/
+  "gdb.Symtab_and_line",	  /*tp_name*/
+  sizeof (sal_object),		  /*tp_basicsize*/
+  0,				  /*tp_itemsize*/
+  salpy_dealloc,		  /*tp_dealloc*/
+  0,				  /*tp_print*/
+  0,				  /*tp_getattr*/
+  0,				  /*tp_setattr*/
+  0,				  /*tp_compare*/
+  0,				  /*tp_repr*/
+  0,				  /*tp_as_number*/
+  0,				  /*tp_as_sequence*/
+  0,				  /*tp_as_mapping*/
+  0,				  /*tp_hash */
+  0,				  /*tp_call*/
+  salpy_str,			  /*tp_str*/
+  0,				  /*tp_getattro*/
+  0,				  /*tp_setattro*/
+  0,				  /*tp_as_buffer*/
+  Py_TPFLAGS_DEFAULT,		  /*tp_flags*/
+  "GDB symtab_and_line object",	  /* tp_doc */
+  0,				  /* tp_traverse */
+  0,				  /* tp_clear */
+  0,				  /* tp_richcompare */
+  0,				  /* tp_weaklistoffset */
+  0,				  /* tp_iter */
+  0,				  /* tp_iternext */
+  sal_object_methods,		  /* tp_methods */
+  0,				  /* tp_members */
+  sal_object_getseters		  /* tp_getset */
+};

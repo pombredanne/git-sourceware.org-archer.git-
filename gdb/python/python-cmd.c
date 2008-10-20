@@ -60,49 +60,7 @@ struct cmdpy_object
 
 typedef struct cmdpy_object cmdpy_object;
 
-static PyObject *cmdpy_dont_repeat (PyObject *self, PyObject *args);
-
-static PyMethodDef cmdpy_object_methods[] =
-{
-  { "dont_repeat", cmdpy_dont_repeat, METH_NOARGS,
-    "Prevent command repetition when user enters empty line." },
-
-  { 0 }
-};
-
-static PyTypeObject cmdpy_object_type =
-{
-  PyObject_HEAD_INIT (NULL)
-  0,				  /*ob_size*/
-  "gdb.Command",		  /*tp_name*/
-  sizeof (cmdpy_object),	  /*tp_basicsize*/
-  0,				  /*tp_itemsize*/
-  0,				  /*tp_dealloc*/
-  0,				  /*tp_print*/
-  0,				  /*tp_getattr*/
-  0,				  /*tp_setattr*/
-  0,				  /*tp_compare*/
-  0,				  /*tp_repr*/
-  0,				  /*tp_as_number*/
-  0,				  /*tp_as_sequence*/
-  0,				  /*tp_as_mapping*/
-  0,				  /*tp_hash */
-  0,				  /*tp_call*/
-  0,				  /*tp_str*/
-  0,				  /*tp_getattro*/
-  0,				  /*tp_setattro*/
-  0,				  /*tp_as_buffer*/
-  Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /*tp_flags*/
-  "GDB command object",		  /* tp_doc */
-  0,				  /* tp_traverse */
-  0,				  /* tp_clear */
-  0,				  /* tp_richcompare */
-  0,				  /* tp_weaklistoffset */
-  0,				  /* tp_iter */
-  0,				  /* tp_iternext */
-  cmdpy_object_methods		  /* tp_methods */
-};
-
+static PyTypeObject cmdpy_object_type;
 
 /* Constants used by this module.  */
 static PyObject *invoke_cst;
@@ -498,3 +456,46 @@ gdbpy_initialize_commands (void)
   invoke_cst = PyString_FromString ("invoke");
   complete_cst = PyString_FromString ("complete");
 }
+
+
+
+static PyMethodDef cmdpy_object_methods[] =
+{
+  { "dont_repeat", cmdpy_dont_repeat, METH_NOARGS,
+    "Prevent command repetition when user enters empty line." },
+
+  { 0 }
+};
+
+static PyTypeObject cmdpy_object_type =
+{
+  PyObject_HEAD_INIT (NULL)
+  0,				  /*ob_size*/
+  "gdb.Command",		  /*tp_name*/
+  sizeof (cmdpy_object),	  /*tp_basicsize*/
+  0,				  /*tp_itemsize*/
+  0,				  /*tp_dealloc*/
+  0,				  /*tp_print*/
+  0,				  /*tp_getattr*/
+  0,				  /*tp_setattr*/
+  0,				  /*tp_compare*/
+  0,				  /*tp_repr*/
+  0,				  /*tp_as_number*/
+  0,				  /*tp_as_sequence*/
+  0,				  /*tp_as_mapping*/
+  0,				  /*tp_hash */
+  0,				  /*tp_call*/
+  0,				  /*tp_str*/
+  0,				  /*tp_getattro*/
+  0,				  /*tp_setattro*/
+  0,				  /*tp_as_buffer*/
+  Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /*tp_flags*/
+  "GDB command object",		  /* tp_doc */
+  0,				  /* tp_traverse */
+  0,				  /* tp_clear */
+  0,				  /* tp_richcompare */
+  0,				  /* tp_weaklistoffset */
+  0,				  /* tp_iter */
+  0,				  /* tp_iternext */
+  cmdpy_object_methods		  /* tp_methods */
+};

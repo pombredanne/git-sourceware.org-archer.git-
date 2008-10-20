@@ -28,59 +28,6 @@ typedef struct {
   struct block *block;
 } block_object;
 
-static PyObject *blpy_iter (PyObject *self);
-static PyObject *blpy_itersymbols (PyObject *self, PyObject *args);
-static PyObject *blpy_get_start (PyObject *self, PyObject *args);
-static PyObject *blpy_get_end (PyObject *self, PyObject *args);
-static PyObject *blpy_get_function (PyObject *self, PyObject *args);
-static PyObject *blpy_get_superblock (PyObject *self, PyObject *args);
-
-static PyMethodDef block_object_methods[] = {
-  { "itersymbols", blpy_itersymbols, METH_NOARGS,
-    "Return an iterator to walk through the symbols in the block." },
-  { "get_start", blpy_get_start, METH_NOARGS,
-    "Return the start address of this block." },
-  { "get_end", blpy_get_end, METH_NOARGS,
-    "Return the end address of this block." },
-  { "get_function", blpy_get_function, METH_NOARGS,
-    "Return the symbol that names this block, or None." },
-  { "get_superblock", blpy_get_end, METH_NOARGS,
-    "Return the block containing this block, or None." },
-  {NULL}  /* Sentinel */
-};
-
-PyTypeObject block_object_type = {
-  PyObject_HEAD_INIT (NULL)
-  0,				  /*ob_size*/
-  "gdb.Block",			  /*tp_name*/
-  sizeof (block_object),	  /*tp_basicsize*/
-  0,				  /*tp_itemsize*/
-  0,				  /*tp_dealloc*/
-  0,				  /*tp_print*/
-  0,				  /*tp_getattr*/
-  0,				  /*tp_setattr*/
-  0,				  /*tp_compare*/
-  0,				  /*tp_repr*/
-  0,				  /*tp_as_number*/
-  0,				  /*tp_as_sequence*/
-  0,				  /*tp_as_mapping*/
-  0,				  /*tp_hash */
-  0,				  /*tp_call*/
-  0,				  /*tp_str*/
-  0,				  /*tp_getattro*/
-  0,				  /*tp_setattro*/
-  0,				  /*tp_as_buffer*/
-  Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_ITER,  /*tp_flags*/
-  "GDB block object",		  /* tp_doc */
-  0,				  /* tp_traverse */
-  0,				  /* tp_clear */
-  0,				  /* tp_richcompare */
-  0,				  /* tp_weaklistoffset */
-  blpy_iter,			  /* tp_iter */
-  0,				  /* tp_iternext */
-  block_object_methods		  /* tp_methods */
-};
-
 typedef struct {
   PyObject_HEAD
   struct dictionary *dict;
@@ -88,41 +35,7 @@ typedef struct {
   int initialized_p;
 } block_syms_iterator_object;
 
-static PyObject *blpy_block_syms_iter (PyObject *self);
-static PyObject *blpy_block_syms_iternext (PyObject *self);
-
-static PyTypeObject block_syms_iterator_object_type = {
-  PyObject_HEAD_INIT (NULL)
-  0,				  /*ob_size*/
-  "gdb.BlockIterator",		  /*tp_name*/
-  sizeof (block_syms_iterator_object),	      /*tp_basicsize*/
-  0,				  /*tp_itemsize*/
-  0,				  /*tp_dealloc*/
-  0,				  /*tp_print*/
-  0,				  /*tp_getattr*/
-  0,				  /*tp_setattr*/
-  0,				  /*tp_compare*/
-  0,				  /*tp_repr*/
-  0,				  /*tp_as_number*/
-  0,				  /*tp_as_sequence*/
-  0,				  /*tp_as_mapping*/
-  0,				  /*tp_hash */
-  0,				  /*tp_call*/
-  0,				  /*tp_str*/
-  0,				  /*tp_getattro*/
-  0,				  /*tp_setattro*/
-  0,				  /*tp_as_buffer*/
-  Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_ITER,  /*tp_flags*/
-  "GDB block syms iterator object",	      /* tp_doc */
-  0,				  /* tp_traverse */
-  0,				  /* tp_clear */
-  0,				  /* tp_richcompare */
-  0,				  /* tp_weaklistoffset */
-  blpy_block_syms_iter,		  /* tp_iter */
-  blpy_block_syms_iternext,	  /* tp_iternext */
-  0				  /* tp_methods */
-};
-
+static PyTypeObject block_syms_iterator_object_type;
 
 static PyObject *
 blpy_iter (PyObject *self)
@@ -258,3 +171,83 @@ gdbpy_initialize_blocks (void)
   PyModule_AddObject (gdb_module, "BlockIterator",
 		      (PyObject *) &block_syms_iterator_object_type);
 }
+
+
+
+static PyMethodDef block_object_methods[] = {
+  { "itersymbols", blpy_itersymbols, METH_NOARGS,
+    "Return an iterator to walk through the symbols in the block." },
+  { "get_start", blpy_get_start, METH_NOARGS,
+    "Return the start address of this block." },
+  { "get_end", blpy_get_end, METH_NOARGS,
+    "Return the end address of this block." },
+  { "get_function", blpy_get_function, METH_NOARGS,
+    "Return the symbol that names this block, or None." },
+  { "get_superblock", blpy_get_end, METH_NOARGS,
+    "Return the block containing this block, or None." },
+  {NULL}  /* Sentinel */
+};
+
+PyTypeObject block_object_type = {
+  PyObject_HEAD_INIT (NULL)
+  0,				  /*ob_size*/
+  "gdb.Block",			  /*tp_name*/
+  sizeof (block_object),	  /*tp_basicsize*/
+  0,				  /*tp_itemsize*/
+  0,				  /*tp_dealloc*/
+  0,				  /*tp_print*/
+  0,				  /*tp_getattr*/
+  0,				  /*tp_setattr*/
+  0,				  /*tp_compare*/
+  0,				  /*tp_repr*/
+  0,				  /*tp_as_number*/
+  0,				  /*tp_as_sequence*/
+  0,				  /*tp_as_mapping*/
+  0,				  /*tp_hash */
+  0,				  /*tp_call*/
+  0,				  /*tp_str*/
+  0,				  /*tp_getattro*/
+  0,				  /*tp_setattro*/
+  0,				  /*tp_as_buffer*/
+  Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_ITER,  /*tp_flags*/
+  "GDB block object",		  /* tp_doc */
+  0,				  /* tp_traverse */
+  0,				  /* tp_clear */
+  0,				  /* tp_richcompare */
+  0,				  /* tp_weaklistoffset */
+  blpy_iter,			  /* tp_iter */
+  0,				  /* tp_iternext */
+  block_object_methods		  /* tp_methods */
+};
+
+static PyTypeObject block_syms_iterator_object_type = {
+  PyObject_HEAD_INIT (NULL)
+  0,				  /*ob_size*/
+  "gdb.BlockIterator",		  /*tp_name*/
+  sizeof (block_syms_iterator_object),	      /*tp_basicsize*/
+  0,				  /*tp_itemsize*/
+  0,				  /*tp_dealloc*/
+  0,				  /*tp_print*/
+  0,				  /*tp_getattr*/
+  0,				  /*tp_setattr*/
+  0,				  /*tp_compare*/
+  0,				  /*tp_repr*/
+  0,				  /*tp_as_number*/
+  0,				  /*tp_as_sequence*/
+  0,				  /*tp_as_mapping*/
+  0,				  /*tp_hash */
+  0,				  /*tp_call*/
+  0,				  /*tp_str*/
+  0,				  /*tp_getattro*/
+  0,				  /*tp_setattro*/
+  0,				  /*tp_as_buffer*/
+  Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_ITER,  /*tp_flags*/
+  "GDB block syms iterator object",	      /* tp_doc */
+  0,				  /* tp_traverse */
+  0,				  /* tp_clear */
+  0,				  /* tp_richcompare */
+  0,				  /* tp_weaklistoffset */
+  blpy_block_syms_iter,		  /* tp_iter */
+  blpy_block_syms_iternext,	  /* tp_iternext */
+  0				  /* tp_methods */
+};
