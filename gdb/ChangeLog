@@ -1,3 +1,20 @@
+2008-10-19  Tom Tromey  <tromey@redhat.com>
+
+	* python/python-value.c (valpy_length): Revert return type to
+	Py_ssize_t.
+
+2008-10-19  Pedro Alves  <pedro@codesourcery.com>
+
+	* python/python-value.c (value_object_methods)
+	(value_object_as_number, value_object_as_mapping): Move to bottom
+	of file.
+	(valpy_dealloc, valpy_new, valpy_length, valpy_getitem)
+	(valpy_setitem, valpy_str, valpy_add, valpy_subtract)
+	(valpy_multiply, valpy_divide, valpy_remainder, valpy_power)
+	(valpy_negative, valpy_positive, valpy_absolute, valpy_nonzero)
+	(valpy_richcompare, valpy_dereference): Don't forward-declare.
+	(valpy_length) [HAVE_LIBPYTHON2_4]: Change return type to `int'.
+
 2008-10-17  Paul Pluzhnikov  <ppluzhnikov@google.com>
 
 	* value.c (value_from_contents_and_address): Don't
