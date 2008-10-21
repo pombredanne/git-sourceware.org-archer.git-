@@ -44,12 +44,7 @@ if ![runto_main] then {
     continue
 }
 
-send_gdb "print a\n"
-gdb_expect {
-   -re "\\$\[0-9\]* = 1" { pass "print a test1" }
-   -re ".*$gdb_prompt $" { fail "print a test1" }
-   timeout { fail "(timeout) print a" }
-}
+gdb_test "print a" "\\$\[0-9\].* = 1"
 
 # Test that names are not printed when they 
 # are not imported
@@ -59,8 +54,8 @@ send_gdb "continue\n"
 
 send_gdb "print a\n"
 gdb_expect {
-   -re "\\$\[0-9\]* = 1" { fail "print a" }
-   -re ".*$gdb_prompt $" { pass "print a" }
+   -re "\\$\[0-9\]* = 1" { fail "dont print a" }
+   -re ".*$gdb_prompt $" { pass "dont print a" }
    timeout { fail "(timeout) print a" }
 }
 
@@ -82,12 +77,8 @@ if ![runto_main] then {
 gdb_breakpoint [gdb_get_line_number "marker1 stop"]
 gdb_continue_to_breakpoint "marker1 stop"
 
-send_gdb "print a\n"
-gdb_expect {
-   -re "\\$\[0-9\]* = 1" { pass "print a" }
-   -re ".*$gdb_prompt $" { fail "print a" }
-   timeout { fail "(timeout) print a" }
-}
+gdb_test "print a" "\\$\[0-9\].* = 1"
+
 
 gdb_exit
 gdb_start
@@ -99,22 +90,12 @@ gdb_load ${binfile}
 # file scope.
 
 
-if ![runto_main] then {
-    perror "couldn't run to breakpoint main"
+if ![runto marker5] then {
+    perror "couldn't run to breakpoint marker5"
     continue
 }
 
-gdb_breakpoint [gdb_get_line_number "marker5"]
-gdb_continue_to_breakpoint "marker1 stop"
-
-setup_kfail "gdb/380" "*-*-*"
-
-send_gdb "print cc\n"
-gdb_expect {
-   -re "\\$\[0-9\]* = 1" { pass "print cc" }
-   -re ".*$gdb_prompt $" { fail "print cc" }
-   timeout { fail "(timeout) print cc" }
-}
+gdb_test "print cc" "\\$\[0-9\].* = 3"
 
 gdb_exit
 gdb_start
@@ -131,12 +112,7 @@ if ![runto marker2] then {
     continue
 }
 
-send_gdb "print B::a\n"
-gdb_expect {
-   -re "\\$\[0-9\]* = 1" { pass "print B::a" }
-   -re ".*$gdb_prompt $" { fail "print B::a" }
-   timeout { fail "(timeout) print B::a" }
-}
+gdb_test "print B::a" "\\$\[0-9\].* = 1"
 
 gdb_exit
 gdb_start
@@ -149,14 +125,8 @@ gdb_load ${binfile}
 
 setup_kfail "gdb/381" "*-*-*"
 if ![runto marker4] then {
-    perror "couldn't run to breakpoint marker2"
+    perror "couldn't run to breakpoint marker4"
     continue
 }
 
-send_gdb "print x\n"
-gdb_expect {
-   -re "\\$\[0-9\]* = 2" { pass "print x" }
-   -re ".*$gdb_prompt $" { fail "print x" }
-   timeout { fail "(timeout) print x" }
-}
-
+gdb_test "print x" "\\$\[0-9\].* = 2"
