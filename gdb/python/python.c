@@ -706,8 +706,8 @@ pretty_print_one_value (PyObject *func, struct value *value,
 	result = PyObject_CallFunctionObjArgs (func, val_obj, NULL);
       if (result)
 	{
-	  if (PyString_Check (result))
-	    output = xstrdup (PyString_AsString (result));
+	  if (gdbpy_is_string (result))
+	    output = python_string_to_host_string (result);
 	  else if (PyObject_TypeCheck (result, &value_object_type))
 	    {
 	      /* If we just call convert_value_from_python for this

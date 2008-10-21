@@ -116,7 +116,7 @@ set_parameter_value (parmpy_object *self, PyObject *value)
     case var_string_noescape:
     case var_optional_filename:
     case var_filename:
-      if (! PyString_Check (value)
+      if (! gdbpy_is_string (value)
 	  && (self->type == var_filename
 	      || value != Py_None))
 	{
@@ -133,7 +133,7 @@ set_parameter_value (parmpy_object *self, PyObject *value)
 	    self->value.stringval = NULL;
 	}
       else
-	self->value.stringval = xstrdup (PyString_AsString (value));
+	self->value.stringval = python_string_to_host_string (value);
       break;
 
     case var_enum:
@@ -141,16 +141,17 @@ set_parameter_value (parmpy_object *self, PyObject *value)
 	int i;
 	char *str;
 
-	if (! PyString_Check (value))
+	if (! gdbpy_is_string (value))
 	  {
 	    PyErr_SetString (PyExc_RuntimeError, "string required");
 	    return -1;
 	  }
 
-	str = PyString_AsString (value);
+	str = python_string_to_host_string (value);
 	for (i = 0; self->enumeration[i]; ++i)
 	  if (! strcmp (self->enumeration[i], str))
 	    break;
+	xfree (str);
 	if (! self->enumeration[i])
 	  {
 	    PyErr_SetString (PyExc_RuntimeError,
@@ -359,17 +360,15 @@ compute_enum_values (parmpy_object *self, PyObject *enum_values)
 
   for (i = 0; i < size; ++i)
     {
-      char *value;
       PyObject *item = PySequence_GetItem (enum_values, i);
       if (! item)
 	return 0;
-      if (! PyString_Check (item))
+      if (! gdbpy_is_string (item))
 	{
 	  PyErr_SetString (PyExc_RuntimeError, "enumeration item not a string");
 	  return 0;
 	}
-      value = PyString_AsString (item);
-      self->enumeration[i] = xstrdup (value);
+      self->enumeration[i] = python_string_to_host_string (item);
     }
 
   return 1;
@@ -463,8 +462,8 @@ parmpy_init (PyObject *self, PyObject *args, PyObject *kwds)
   if (PyObject_HasAttrString (self, "__doc__"))
     {
       PyObject *ds_obj = PyObject_GetAttrString (self, "__doc__");
-      if (ds_obj && PyString_Check (ds_obj))
-	docstring = xstrdup (PyString_AsString (ds_obj));
+      if (ds_obj && gdbpy_is_string (ds_obj))
+	docstring = python_string_to_host_string (ds_obj);
     }
   if (! docstring)
     docstring = xstrdup ("This command is not documented.");

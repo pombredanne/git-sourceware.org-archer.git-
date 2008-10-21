@@ -1,3 +1,26 @@
+2008-10-21  Tom Tromey  <tromey@redhat.com>
+
+	* python/python.c (pretty_print_one_value): Use gdbpy_is_string
+	and python_string_to_host_string.
+	* python/python-value.c (valpy_richcompare): Use gdbpy_is_string.
+	(convert_value_from_python): Likewise.
+	* python/python-param.c (set_parameter_value): Use gdbpy_is_string
+	and python_string_to_host_string.
+	(compute_enum_values): Likewise.
+	(parmpy_init): Likewise.
+	* python/python-function.c (fnpy_init): Use gdbpy_is_string and
+	python_string_to_host_string.
+	* python/python-cmd.c (cmdpy_completer): Use gdbpy_is_string and
+	python_string_to_host_string.
+	(cmdpy_init): Likewise.
+	* varobj.c (varobj_get_display_hint): Use gdbpy_is_string.
+	* python/python-internal.h (gdbpy_is_string): Declare.
+	(python_string_to_host_string): Declare.
+	* python/python-utils.c (gdbpy_is_string): New function.
+	(unicode_to_encoded_string): New function.
+	(unicode_to_target_string): Use it.
+	(python_string_to_host_string): New function.
+
 2008-10-20  Tom Tromey  <tromey@redhat.com>
 
 	* mi/mi-main.c (mi_cmd_list_features): Add "python" feature.

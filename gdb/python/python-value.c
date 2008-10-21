@@ -495,7 +495,7 @@ valpy_richcompare (PyObject *self, PyObject *other, int op)
 
       value_other = value_from_double (builtin_type_pyfloat, d);
     }
-  else if (PyString_Check (other) || PyUnicode_Check (other))
+  else if (gdbpy_is_string (other))
     {
       char *str;
 
@@ -720,7 +720,7 @@ convert_value_from_python (PyObject *obj)
       if (! PyErr_Occurred ())
 	value = value_from_double (builtin_type_pyfloat, d);
     }
-  else if (PyString_Check (obj) || PyUnicode_Check (obj))
+  else if (gdbpy_is_string (obj))
     {
       char *s;
 

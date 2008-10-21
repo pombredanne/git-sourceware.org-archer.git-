@@ -114,8 +114,9 @@ fnpy_init (PyObject *self, PyObject *args, PyObject *kwds)
   if (PyObject_HasAttrString (self, "__doc__"))
     {
       PyObject *ds_obj = PyObject_GetAttrString (self, "__doc__");
-      if (ds_obj && PyString_Check (ds_obj))
-	docstring = PyString_AsString (ds_obj);
+      if (ds_obj && gdbpy_is_string (ds_obj))
+	/* Nothing ever frees this.  */
+	docstring = python_string_to_host_string (ds_obj);
     }
   if (! docstring)
     docstring = "This command is not documented.";

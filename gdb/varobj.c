@@ -755,8 +755,8 @@ varobj_get_display_hint (struct varobj *var)
       PyObject *hint = PyObject_CallMethodObjArgs (var->pretty_printer,
 						   gdbpy_display_hint_cst,
 						   NULL);
-      if (PyString_Check (hint))
-	result = xstrdup (PyString_AsString (hint));
+      if (gdbpy_is_string (hint))
+	result = python_string_to_host_string (hint);
       if (hint)
 	Py_DECREF (hint);
       else

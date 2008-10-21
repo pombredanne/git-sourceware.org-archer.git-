@@ -196,17 +196,15 @@ cmdpy_completer (struct cmd_list_element *command, char *text, char *word)
       result = (char **) xmalloc ((len + 1) * sizeof (char *));
       for (i = out = 0; i < len; ++i)
 	{
-	  char *s;
 	  int l;
 	  PyObject *elt = PySequence_GetItem (resultobj, i);
-	  if (elt == NULL || ! PyString_Check (elt))
+	  if (elt == NULL || ! gdbpy_is_string (elt))
 	    {
 	      /* Skip problem elements.  */
 	      PyErr_Clear ();
 	      continue;
 	    }
-	  s = PyString_AsString (elt);
-	  result[out] = xstrdup (s);
+	  result[out] = python_string_to_host_string (elt);
 	  ++out;
 	}
       result[out] = NULL;
@@ -374,8 +372,8 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kwds)
   if (PyObject_HasAttrString (self, "__doc__"))
     {
       PyObject *ds_obj = PyObject_GetAttrString (self, "__doc__");
-      if (ds_obj && PyString_Check (ds_obj))
-	docstring = xstrdup (PyString_AsString (ds_obj));
+      if (ds_obj && gdbpy_is_string (ds_obj))
+	docstring = python_string_to_host_string (ds_obj);
     }
   if (! docstring)
     docstring = xstrdup ("This command is not documented.");
