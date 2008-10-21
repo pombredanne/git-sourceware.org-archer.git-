@@ -1,3 +1,7 @@
+2008-10-21  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* python/python-value (valpy_getitem): Fix heap corruption.
+	
 2008-10-21  Tom Tromey  <tromey@redhat.com>
 
 	* python/python.c (pretty_print_one_value): Use gdbpy_is_string

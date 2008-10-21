@@ -54,12 +54,18 @@ def pp_s(val):
 def pp_ss(val):
   return "a=<" + str(val["a"]) + "> b=<" + str(val["b"]) + ">"
 
+def pp_sss(val):
+    return "a=<" + str(val['a']) + "> b=<" + str(val["b"]) + ">"
+
 gdb.cli_pretty_printers['^struct s$']   = pp_s
 gdb.cli_pretty_printers['^s$']   = pp_s
 gdb.cli_pretty_printers['^S$']   = pp_s
 
 gdb.cli_pretty_printers['^struct ss$']  = pp_ss
 gdb.cli_pretty_printers['^ss$']  = pp_ss
+
+gdb.cli_pretty_printers['^const S &$']   = pp_s
+gdb.cli_pretty_printers['^SSS$']  = pp_sss
 
 # Note that we purposely omit the typedef names here.
 # Printer lookup is based on canonical name.

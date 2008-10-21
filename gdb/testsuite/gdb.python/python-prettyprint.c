@@ -36,6 +36,14 @@ struct SS {
   int zss;
   S s;
 };
+
+struct SSS
+{
+  SSS (int x, const S& r);
+  int a;
+  const S &b;
+};
+SSS::SSS (int x, const S& r) : a(x), b(r) { }
 #endif
 
 typedef struct string_repr
@@ -126,6 +134,8 @@ main ()
   init_s(&cpssa[0].s, 12);
   cpssa[1].zss = 13;
   init_s(&cpssa[1].s, 14);
+
+  SSS sss(15, cps);
 #endif
 
   add_item (&c, 23);

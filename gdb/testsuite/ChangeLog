@@ -1,3 +1,9 @@
+2008-10-21  Paul Pluzhnikov  <ppluzhnikov@google.com>
+	
+	* gdb.python/python-prettyprint.exp,
+	gdb.python/python-prettyprint.c,
+	gdb.python/python-prettyprint.py: More C++ tests.
+	
 2008-10-21  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.python/python-prettyprint.exp (run_lang_tests): Don't expect
