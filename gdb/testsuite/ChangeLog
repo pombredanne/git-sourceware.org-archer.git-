@@ -1,3 +1,8 @@
+2008-10-21  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/namespace-using.exp: use gdb_test.
+	Corrected tests.
+
 2008-10-06  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* gdb.cp/namespace-using.exp: Added a new test.
