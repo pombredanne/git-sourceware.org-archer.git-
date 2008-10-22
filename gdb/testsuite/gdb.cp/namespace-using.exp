@@ -52,12 +52,8 @@ gdb_test "print a" "\\$\[0-9\].* = 1"
 send_gdb "break marker3\n"
 send_gdb "continue\n"
 
-send_gdb "print a\n"
-gdb_expect {
-   -re "\\$\[0-9\]* = 1" { fail "dont print a" }
-   -re ".*$gdb_prompt $" { pass "dont print a" }
-   timeout { fail "(timeout) print a" }
-}
+setup_kfail "gcc/37410" "*-*-*"
+gdb_test "print a" "No symbol \"a\" in current context."
 
 gdb_exit
 gdb_start
@@ -129,4 +125,4 @@ if ![runto marker4] then {
     continue
 }
 
-gdb_test "print x" "\\$\[0-9\].* = 2"
+gdb_test "print dx" "\\$\[0-9\].* = 4"
