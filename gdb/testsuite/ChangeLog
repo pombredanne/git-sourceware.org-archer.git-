@@ -1,3 +1,8 @@
+2008-10-22  Sami Wagiaalla  <swagiaal@redhat.com> 
+
+	* gdb.cp/namespace-multiple-imports.cc: New test program.
+	* gdb.cp/namespace-multiple-imports.exp: New test.
+
 2008-10-22  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* gdb.cp/namespace-using.exp: made test for printing of namespace
