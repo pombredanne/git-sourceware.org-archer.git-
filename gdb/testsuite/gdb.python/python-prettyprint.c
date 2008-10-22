@@ -138,7 +138,7 @@ main ()
   SSS sss(15, cps);
 #endif
 
-  add_item (&c, 23);
+  add_item (&c, 23);		/* MI breakpoint here */
   add_item (&c, 72);
 
   return 0;      /* break to inspect struct and union */

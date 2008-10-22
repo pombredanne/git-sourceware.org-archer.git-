@@ -75,3 +75,6 @@ gdb.cli_pretty_printers['^struct string_repr$'] = string_print
 gdb.cli_pretty_printers['^struct container$'] = ContainerPrinter()
 gdb.cli_pretty_printers['^string_repr$'] = string_print
 gdb.cli_pretty_printers['^container$'] = ContainerPrinter()
+
+
+gdb.mi_pretty_printers['^struct container$'] = ContainerPrinter
