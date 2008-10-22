@@ -1,3 +1,13 @@
+2008-10-22  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* buildsym.c (start_symtab): Removed call to cp_initialize_namespace.
+	(end_symtab): removed call to cp_finalize_namespace.
+	* cp-namespace.c: Removed local variable using_list, and used global
+	using_directives instead.
+	(cp_initialize_namespace): Deleted.
+	(cp_finalize_namespace): Deleted.
+	Added #include b"uildsym.h".
+
 2008-10-20  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* symtab.c (lookup_symbol_aux_local): Search continues through static
