@@ -9,6 +9,11 @@ namespace C
   int cc = 3;
 }
 
+namespace D
+{
+  int dx = 4;
+}
+
 using namespace C;
 int marker5()
 {
@@ -18,7 +23,7 @@ int marker5()
 
 int marker4()
 {
-  using A::x;
+  using D::dx;
   return marker5();
 }
 
