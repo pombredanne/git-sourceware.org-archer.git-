@@ -1310,14 +1310,20 @@ proc mi_child_regexp {children add_child} {
 # have no value.
 #
 proc mi_list_varobj_children { varname children testname } {
+    mi_list_varobj_children_range $varname [llength $children] $children \
+      $testname
+}
 
+# Like mi_list_varobj_children, but assumes that a subrange has been
+# selected with -var-set-child-range.  NUMCHILDREN is the total number
+# of children.
+proc mi_list_varobj_children_range {varname numchildren children testname} {
     set options ""
     if {[llength $varname] == 2} {
         set options [lindex $varname 1]
         set varname [lindex $varname 0]
     }
 
-    set numchildren [llength $children]
     set whatever "\"\[^\"\]+\""
 
     set children_exp_j [mi_child_regexp $children 1]

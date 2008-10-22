@@ -1,5 +1,12 @@
 2008-10-22  Tom Tromey  <tromey@redhat.com>
 
+	* gdb.texinfo (Pretty Printing): Remove comments.  Add missing
+	'$'.  Document mi_pretty_printers.
+	(GDB/MI Variable Objects): Document -var-set-visualizer and
+	-var-set-child-range.
+
+2008-10-22  Tom Tromey  <tromey@redhat.com>
+
 	* gdb.texinfo (Pretty Printing): Remove 'header'.
 
 2008-10-20  Tom Tromey  <tromey@redhat.com>

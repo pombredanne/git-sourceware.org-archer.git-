@@ -18017,7 +18017,7 @@ Here is an example showing how a @code{std::string} might be printed:
 def printstdstring(val):
     return val['_M_dataplus']['_M_p']
 
-gdb.cli_pretty_printers['^std::basic_string<char.*>'] = printstdstring
+gdb.cli_pretty_printers['^std::basic_string<char.*>$'] = printstdstring
 @end smallexample
 
 Here is an example of the same printer, using a class:
@@ -18030,9 +18030,16 @@ class StdStringPrinter:
 gdb.cli_pretty_printers['^std::basic_string<char.*>$'] = StdStringPrinter()
 @end smallexample
 
-@c FIXME: describe MI pretty-printer selection
-@c ... but in the MI section, I think
+@subsubsection Selecting MI Pretty-Printers
 
+MI pretty-printers are selected using a dictionary named
+@code{gdb.mi_pretty_printers}.  A key in this dictionary should be a
+regular expression in string form.  A value in this dictionary should
+be a constructor which takes no arguments and which returns a new
+object of the form described above.
+
+@value{GDBN} will consult @code{gdb.mi_pretty_printers} whenever a new
+MI variable object is created.
 
 @node Threads In Python
 @subsubsection Threads In Python
@@ -21776,6 +21783,104 @@ Unfreezing a variable does not update it, only subsequent
 -var-set-frozen V 1
 ^done
 (gdb)
+@end smallexample
+
+@subheading The @code{-var-set-visualizer} command
+@findex -var-set-visualizer
+@anchor{-var-set-visualizer}
+
+@subsubheading Synopsis
+
+@smallexample
+ -var-set-visualizer @var{name} @var{visualizer}
+@end smallexample
+
+@subheading The @code{-var-set-child-range} command
+@findex -var-set-child-range
+@anchor{-var-set-child-range}
+
+Set a visualizer for the variable object @var{name}.
+
+@var{visualizer} is the visualizer to use.  The special value
+@samp{None} means to disable any visualizer in use.
+
+If not @samp{None}, @var{visualizer} must be a Python expression.
+This expression must evaluate to a callable object which accepts a
+single argument.  @value{GDBN} will call this object with the value of
+the varobj @var{name} as an argument.  This function must return an
+object which conforms to the pretty-printing interface (@pxref{Pretty
+Printing}).
+
+The pre-defined function @code{gdb.get_default_visualizer} may be used
+to select a visualizer according to the type of the varobj.  This is
+called when a varobj is created, and so ordinarily is not needed.
+
+@code{gdb.get_default_visualizer} looks in a global dictionary named
+@code{gdb.mi_pretty_printers}.  This works analogously to
+@code{gdb.cli_pretty_printers}.
+
+This feature is only available if Python support is enabled.
+
+@subsubheading Example
+
+Resetting the visualizer:
+
+@smallexample
+(gdb)
+-var-set-visualizer V None
+^done
+@end smallexample
+
+Reselecting the default (type-based) visualizer:
+
+@smallexample
+(gdb)
+-var-set-visualizer V gdb.get_default_visualizer
+^done
+@end smallexample
+
+Suppose @code{SomeClass} is a visualizer class.  A lambda expression
+can be used to instantiate this class for a varobj:
+
+@smallexample
+(gdb)
+-var-set-visualizer V "lambda val: SomeClass()"
+^done
+@end smallexample
+
+@subsubheading Synopsis
+
+@smallexample
+ -var-set-child-range @var{name} @var{from} @var{to}
+@end smallexample
+
+Select a sub-range of the children of the variable object @var{name};
+future calls to @code{-var-list-children} will only report the
+selected range of children.  This allows an MI consumer to avoid
+inefficiencies if the varobj has very many children.
+
+If either @var{from} or @var{to} is less than zero, then sub-range
+selection is disabled, and @code{-var-list-children} will report all
+children.
+
+Otherwise, @var{from} and @var{to} are indexes into the array of
+children.  Children starting at @var{from} and stopping jsut before
+@var{to} will be reported.
+
+@subsubheading Example
+
+@smallexample
+(gdb)
+ -var-list-children n
+ ^done,numchild=3,children=[@{name="a",numchild=0,type="int"@},
+ @{name="b",numchild=0,type="int"@},
+ @{name="c",numchild=0,type="int"@}]
+(gdb)
+ -var-set-child-range n 1 2
+(gdb)
+ -var-list-children n
+ ^done,numchild=3,children=[@{name="b",numchild=0,type="int"@},
+ @{name="c",numchild=0,type="int"@}]
 @end smallexample
 
 

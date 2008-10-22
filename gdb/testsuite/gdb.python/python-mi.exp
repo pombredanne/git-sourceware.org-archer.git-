@@ -65,3 +65,54 @@ mi_varobj_update_dynamic container {
     { {container.\[0\]} {\[0\]} 0 int }
     { {container.\[1\]} {\[1\]} 0 int }
 } "varobj update 2"
+
+mi_gdb_test "-var-set-visualizer container None" \
+  "\\^done" \
+  "clear visualizer"
+
+mi_gdb_test "-var-update container" \
+  "\\^done,changelist=\\\[\\\]" \
+  "varobj update after clearing"
+
+mi_gdb_test "-var-set-visualizer container gdb.get_default_visualizer" \
+  "\\^done" \
+  "choose default visualizer"
+
+mi_varobj_update_dynamic container {
+    { {container.\[0\]} {\[0\]} 0 int }
+    { {container.\[1\]} {\[1\]} 0 int }
+} "varobj update after choosing default"
+
+mi_gdb_test "-var-set-visualizer container \"lambda val: ContainerPrinter()\"" \
+  "\\^done" \
+  "choose visualizer using expression"
+
+mi_varobj_update_dynamic container {
+    { {container.\[0\]} {\[0\]} 0 int }
+    { {container.\[1\]} {\[1\]} 0 int }
+} "varobj update after choosing via lambda"
+
+mi_gdb_test "-var-set-child-range container 1 2" \
+  "\\^done" \
+  "select child range"
+
+mi_gdb_test "-var-update container" \
+  "\\^done,changelist=\\\[\\\]" \
+  "varobj update after selecting child range"
+
+mi_list_varobj_children_range container 2 {
+    { {container.\[1\]} {\[1\]} 0 int }
+} "list varobj children after selecting child range"
+
+mi_gdb_test "-var-set-child-range container -1 -1" \
+  "\\^done" \
+  "reset child range"
+
+mi_gdb_test "-var-update container" \
+  "\\^done,changelist=\\\[\\\]" \
+  "varobj update after resetting child range"
+
+mi_list_varobj_children container {
+    { {container.\[0\]} {\[0\]} 0 int }
+    { {container.\[1\]} {\[1\]} 0 int }
+} "list varobj children after resetting child range"

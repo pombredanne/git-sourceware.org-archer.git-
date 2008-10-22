@@ -1,5 +1,12 @@
 2008-10-22  Tom Tromey  <tromey@redhat.com>
 
+	* lib/mi-support.exp (mi_list_varobj_children_range): New proc.
+	(mi_list_varobj_children): Use it.
+	* gdb.python/python-mi.exp: Add -var-set-visualizer tests,
+	-var-set-child-range tests.
+
+2008-10-22  Tom Tromey  <tromey@redhat.com>
+
 	* gdb.python/python-prettyprint.py (ContainerPrinter.to_string):
 	Rename from 'header'.
 
