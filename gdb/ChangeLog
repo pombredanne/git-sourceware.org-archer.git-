@@ -1,3 +1,10 @@
+2008-10-22  Tom Tromey  <tromey@redhat.com>
+
+	* python/python.c (_initialize_python) <_format_children>: Call
+	to_string, not header.
+	(pretty_print_one_value): Call _format_children if either
+	'children' to 'to_string' exists.
+
 2008-10-21  Tom Tromey  <tromey@redhat.com>
 
 	* varobj.c (update_dynamic_varobj_children): Copy value when

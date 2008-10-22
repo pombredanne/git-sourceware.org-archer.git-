@@ -17951,17 +17951,6 @@ using Python code.  This mechanism works for both MI and the CLI.
 A pretty-printer is an object that implements a specific interface.
 There is no predefined base class for pretty-printers.
 
-@c FIXME I think perhaps we should nuke header and just use to_string
-@c Investigate.
-
-@defop Operation {pretty printer} header (self, val)
-If this method exists, @value{GDBN} may call it when printing a value
-from the CLI.  In particular, it will be called if the pretty-printer
-does not define the @code{to_string} method.  The method must return a
-string.  This string will be displayed before any children of the
-value being printed.
-@end defop
-
 @defop Operation {pretty printer} children (self, val)
 This method is used by both the MI and CLI code.  When printing a
 value, @value{GDBN} will call this method to display the children of
@@ -17992,13 +17981,11 @@ This method is used by both the MI and CLI code.  When printing a
 value, @value{GDBN} will call this method to display the string
 representation of @var{val}, an instance of @code{gdb.Value}.
 
-This method must return a string.
-
-@c FIXME -- this is where the oddity arises.  Don't we do something
-@c different for MI?
 When printing from the CLI, if the @code{to_string} method exists,
-then @value{GDBN} will print its result, and will not call
-@code{header} and @code{children}.
+then @value{GDBN} will prepend its result to the values returned by
+@code{children}.
+
+This method must return a string.
 @end defop
 
 @subsubsection Selecting CLI Pretty-Printers

@@ -1,5 +1,10 @@
 2008-10-22  Tom Tromey  <tromey@redhat.com>
 
+	* gdb.python/python-prettyprint.py (ContainerPrinter.to_string):
+	Rename from 'header'.
+
+2008-10-22  Tom Tromey  <tromey@redhat.com>
+
 	* gdb.python/python-prettyprint.py: Add MI pretty printer.
 	* gdb.python/python-mi.exp: New file.
 	* lib/mi-support.exp (mi_child_regexp): New proc.

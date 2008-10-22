@@ -38,7 +38,7 @@ class ContainerPrinter:
             self.pointer = self.pointer + 1
             return ('[%d]' % int (result - self.start), result.dereference())
 
-    def header(self, val):
+    def to_string(self, val):
         return 'container %s with %d elements' % (val['name'], val['len'])
 
     def children(self, val):

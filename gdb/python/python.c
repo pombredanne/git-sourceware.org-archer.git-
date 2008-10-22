@@ -687,21 +687,24 @@ pretty_print_one_value (PyObject *func, struct value *value,
 
       val_obj = value_to_value_object (value);
 
-      /* The function might be an MI-style class with a to_string
-	 method, or it might be an ordinary function.  FIXME: should
-	 also check for the 'children' method here.  */
-      if (PyObject_HasAttr (func, gdbpy_to_string_cst))
-	result = PyObject_CallMethodObjArgs (func, gdbpy_to_string_cst,
-					     val_obj, NULL);
-      else if (children
-	       && PyObject_HasAttr (func, gdbpy_children_cst)
-	       && PyObject_HasAttrString (gdb_module, "_format_children"))
+      /* The function might be an MI-style class, or it might be an
+	 ordinary function.  If CHILDREN is true, the existence of
+	 either the to_string or children methods means to call
+	 _format_children.  Otherwise, if we have to_string, call it.
+	 As a last resort, call the object as a function.  */
+      if (children
+	  && (PyObject_HasAttr (func, gdbpy_children_cst)
+	      || PyObject_HasAttr (func, gdbpy_to_string_cst))
+	  && PyObject_HasAttrString (gdb_module, "_format_children"))
 	{
 	  PyObject *fmt = PyObject_GetAttrString (gdb_module,
 						  "_format_children");
 	  result = PyObject_CallFunctionObjArgs (fmt, func, val_obj, NULL);
 	  Py_DECREF (fmt);
 	}
+      else if (PyObject_HasAttr (func, gdbpy_to_string_cst))
+	result = PyObject_CallMethodObjArgs (func, gdbpy_to_string_cst,
+					     val_obj, NULL);
       else
 	result = PyObject_CallFunctionObjArgs (func, val_obj, NULL);
       if (result)
@@ -1047,8 +1050,8 @@ sys.stdout = GdbOutputFile()\n\
   PyRun_SimpleString ("\
 def _format_children(obj, val):\n\
   result = []\n\
-  if hasattr(obj, 'header'):\n\
-    result.append(obj.header(val))\n\
+  if hasattr(obj, 'to_string'):\n\
+    result.append(obj.to_string(val))\n\
   max = gdb.get_parameter('print elements')\n\
   i = 0\n\
   for elt in obj.children(val):\n\
