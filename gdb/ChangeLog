@@ -1,3 +1,8 @@
+2008-10-21  Tom Tromey  <tromey@redhat.com>
+
+	* varobj.c (update_dynamic_varobj_children): Copy value when
+	needed.  Use convert_value_from_python.
+
 2008-10-21  Paul Pluzhnikov  <ppluzhnikov@google.com>
 
 	* python/python-value (valpy_getitem): Fix heap corruption.

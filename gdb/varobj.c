@@ -863,12 +863,16 @@ update_dynamic_varobj_children (struct varobj *var,
       if (!PyArg_ParseTuple (item, "sO", &name, &py_v))
 	error ("Invalid item from the child list");
       
-      if (!PyObject_IsInstance (py_v, (PyObject *)&value_object_type))
-	error ("child list has object of invalid type");
-      
-      v = value_object_to_value (py_v);
-      if (!v)
-	error ("object does not have value type");
+      if (PyObject_TypeCheck (py_v, &value_object_type))
+	{
+	  /* If we just call convert_value_from_python for this type,
+	     we won't know who owns the result.  For this one case we
+	     need to copy the resulting value.  */
+	  v = value_object_to_value (py_v);
+	  v = value_copy (v);
+	}
+      else
+	v = convert_value_from_python (py_v);
 
       /* TODO: This assume the name of the i-th child never changes.  */
 
