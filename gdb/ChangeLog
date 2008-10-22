@@ -1,5 +1,10 @@
 2008-10-22  Tom Tromey  <tromey@redhat.com>
 
+	* python/python.c (_initialize_python) <_format_children>: Handle
+	"print elements" properly.
+
+2008-10-22  Tom Tromey  <tromey@redhat.com>
+
 	* python/python.c (_initialize_python) <_format_children>: Call
 	to_string, not header.
 	(pretty_print_one_value): Call _format_children if either

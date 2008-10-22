@@ -1058,7 +1058,7 @@ def _format_children(obj, val):\n\
     (name, val) = elt\n\
     result.append('%s = %s' % (name, str(val)))\n\
     i = i + 1\n\
-    if max == 0 or i == max:\n\
+    if max != None and i == max:\n\
       break\n\
   return '\\n'.join(result)\n\
 \n\
