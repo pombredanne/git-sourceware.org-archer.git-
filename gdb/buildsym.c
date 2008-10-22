@@ -817,10 +817,6 @@ start_symtab (char *name, char *dirname, CORE_ADDR start_addr)
   /* We shouldn't have any address map at this point.  */
   gdb_assert (! pending_addrmap);
 
-  /* Set up support for C++ namespace support, in case we need it.  */
-
-  cp_initialize_namespace ();
-
   /* Initialize the list of sub source files with one entry for this
      file (the top-level source file).  */
 
@@ -1017,8 +1013,6 @@ end_symtab (CORE_ADDR end_addr, struct objfile *objfile, int section)
       finish_block (0, &global_symbols, 0, last_source_start_addr, end_addr,
 		    objfile);
       blockvector = make_blockvector (objfile);
-      cp_finalize_namespace (BLOCKVECTOR_BLOCK (blockvector, STATIC_BLOCK),
-			     &objfile->objfile_obstack);
     }
 
   /* Read the line table if it has to be read separately.  */
