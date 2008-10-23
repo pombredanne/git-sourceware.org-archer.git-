@@ -114,6 +114,7 @@ main ()
   struct ss  ssa[2];
   string x = make_string ("this is x");
   zzz_type c = make_container ("container");
+  const struct string_repr cstring = { { "const string" } };
 
   init_ss(&ss, 1, 2);
   init_ss(ssa+0, 3, 4);

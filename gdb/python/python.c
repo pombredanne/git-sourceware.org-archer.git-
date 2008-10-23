@@ -632,6 +632,8 @@ find_pretty_printer (struct type *type, PyObject **dictp, char *dict_name)
   /* Get the name of the type.  */
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
+      /* Strip off any qualifiers from the type.  */
+      type = make_cv_type (0, 0, type, NULL);
       type_name = get_type (type);
     }
   if (except.reason < 0)

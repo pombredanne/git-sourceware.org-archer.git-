@@ -1,3 +1,9 @@
+2008-10-23  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.python/python-prettyprint.exp (run_lang_tests): Test
+	printing 'cstring'.
+	* gdb.python/python-prettyprint.c (main): New local 'cstring'.
+
 2008-10-22  Tom Tromey  <tromey@redhat.com>
 
 	* lib/mi-support.exp (mi_list_varobj_children_range): New proc.
