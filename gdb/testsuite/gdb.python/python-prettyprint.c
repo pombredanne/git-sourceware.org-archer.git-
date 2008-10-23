@@ -137,6 +137,8 @@ main ()
   init_s(&cpssa[1].s, 14);
 
   SSS sss(15, cps);
+
+  SSS& ref (sss);
 #endif
 
   add_item (&c, 23);		/* MI breakpoint here */

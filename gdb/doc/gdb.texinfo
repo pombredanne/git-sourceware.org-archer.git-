@@ -17994,8 +17994,10 @@ The Python dictionary @code{gdb.cli_pretty_printers} maps regular
 expressions (strings) onto pretty-printers.  A pretty-printer is
 either a function or an object.
 
-When printing a value, @value{GDBN} first compares the name of the
-value's canonical type (the type after following all typedefs) to each
+When printing a value, @value{GDBN} first computes the values'
+canonical type by following typedefs, following a reference type to
+its referenced type, and removing qualifiers, such as @code{const} or
+@code{volatile}.  The name of this type is then compared to each
 regular expression.  If a regular expression matches, then the
 corresponding pretty-printer is invoked with a @code{gdb.Value}
 representing the value to be printed.

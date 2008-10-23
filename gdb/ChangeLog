@@ -1,5 +1,9 @@
 2008-10-23  Tom Tromey  <tromey@redhat.com>
 
+	* python/python.c (find_pretty_printer): Strip reference types.
+
+2008-10-23  Tom Tromey  <tromey@redhat.com>
+
 	* python/python.c (find_pretty_printer): Strip type qualifiers.
 
 2008-10-22  Tom Tromey  <tromey@redhat.com>
