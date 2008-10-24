@@ -461,7 +461,7 @@ prune_threads (void)
 	 Otherwise, advance to the next thread.  */
       if (!thread_alive (tp))
 	{
-	  (*prevp)->next = tp->next;
+	  *prevp = tp->next;
 	  free_thread (tp);
 	}
       else

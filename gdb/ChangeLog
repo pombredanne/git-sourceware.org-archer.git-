@@ -1,3 +1,7 @@
+2008-10-23  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* thread.c (prune_threads): Correctly unlink dead threads.
+	
 2008-10-23  Tom Tromey  <tromey@redhat.com>
 
 	* python/python.c (find_pretty_printer): Strip reference types.
