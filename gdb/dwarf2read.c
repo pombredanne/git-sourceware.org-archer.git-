@@ -2884,6 +2884,11 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
   struct attribute *import_attr;
   struct die_info *imported_die;
   const char *imported_name;
+  const char *imported_name_prefix;
+  char *canonical_name;
+  
+  const char *import_prefix;
+    
   int is_anonymous = 0;
   
   import_attr = dwarf2_attr (die, DW_AT_import, cu);
@@ -2904,8 +2909,26 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
 
   /* FIXME: dwarf2_name (die); for the local name after import.  */
   
-  using_directives = cp_add_using (imported_name, strlen (imported_name), 0,
-                                   using_directives);
+  /*
+   Figure out what the scope of the imported die is and prepend it
+   to the name of the imported die
+   */
+  imported_name_prefix = determine_prefix (imported_die, cu);
+  
+  
+  if(strlen (imported_name_prefix) > 0){
+    canonical_name = alloca (strlen (imported_name_prefix) + 2 + strlen (imported_name) + 1);
+    strcpy (canonical_name, imported_name_prefix);
+    strcat (canonical_name, "::");
+    strcat (canonical_name, imported_name);
+  }else{
+    canonical_name = alloca (strlen (imported_name) + 1);
+    strcpy (canonical_name, imported_name);
+  }
+  
+  using_directives = cp_add_using (canonical_name, strlen (canonical_name),
+      0,
+      using_directives);
 }
 
 static void

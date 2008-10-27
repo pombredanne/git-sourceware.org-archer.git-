@@ -813,6 +813,11 @@
 	* utils.c (do_fclose_cleanup): New function.
 	(make_cleanup_fclose): Likewise.
 
+2008-10-27  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* dwarf2read.c (read_import_statement): Properly construct
+	prefix of imported namespace.
+
 2008-10-27  Pedro Alves  <pedro@codesourcery.com>
 
 	* inflow.c (kill_command): If the target claims there is still
