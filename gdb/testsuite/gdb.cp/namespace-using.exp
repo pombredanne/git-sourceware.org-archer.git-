@@ -126,3 +126,13 @@ if ![runto marker4] then {
 }
 
 gdb_test "print dx" "\\$\[0-9\].* = 4"
+
+############################################
+# Test printing of namespace aliases
+
+if ![runto marker6] then {
+    perror "couldn't run to breakpoint marker6"
+    continue
+}
+
+gdb_test "print efx" "\\$\[0-9\].* = 5"

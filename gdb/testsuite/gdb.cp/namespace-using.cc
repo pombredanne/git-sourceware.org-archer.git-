@@ -1,3 +1,16 @@
+//--------------------------
+namespace E{
+  namespace F{
+    int efx = 5;
+  }
+}
+using namespace E::F;
+int marker6(){
+  efx;
+  return 0;
+}
+//--------------------------
+
 namespace A
 {
   int a = 1;
@@ -18,7 +31,7 @@ using namespace C;
 int marker5()
 {
   cc;
-  return 0;
+  return marker6();
 }
 
 int marker4()
