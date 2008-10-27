@@ -1056,12 +1056,23 @@ sys.stdout = GdbOutputFile()\n\
 def _format_children(obj, val):\n\
   result = []\n\
   if hasattr(obj, 'to_string'):\n\
-    result.append(obj.to_string(val))\n\
+    result.append(str(obj.to_string(val)))\n\
+  if hasattr(obj, 'display_hint'):\n\
+    is_map = 'map' == obj.display_hint(val)\n\
+  else:\n\
+    is_map = False\n\
   max = gdb.get_parameter('print elements')\n\
   i = 0\n\
+  previous = None\n\
   for elt in obj.children(val):\n\
     (name, val) = elt\n\
-    result.append('%s = %s' % (name, str(val)))\n\
+    if is_map:\n\
+      if i % 2 == 0:\n\
+        previous = val\n\
+      else:\n\
+        result.append('[%s] = %s' % (str (previous), str (val)))\n\
+    else:\n\
+      result.append('%s = %s' % (name, str(val)))\n\
     i = i + 1\n\
     if max != None and i == max:\n\
       break\n\
