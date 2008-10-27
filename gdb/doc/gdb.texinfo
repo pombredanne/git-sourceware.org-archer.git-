@@ -17970,10 +17970,14 @@ This method must return a string.  It will be supplied to the MI
 consumer as a @samp{displayhint} attribute of the variable being
 printed.
 
-Currently only one display hint is defined: @samp{map}.  This
-indicates to the MI consumer that the object being printed is
+Some display hints are predefined by @value{GDBN}:
+
+@table @samp
+@item map
+Indicate to the MI consumer that the object being printed is
 ``map-like'', and that the children of this value can be assumed to
 alternate between keys and values.
+@end table
 @end defop
 
 @defop Operation {pretty printer} to_string (self, val)
