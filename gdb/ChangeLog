@@ -1,3 +1,8 @@
+2008-10-27  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* dwarf2read.c (read_import_statement): Properly construct
+	prefix of imported namespace.
+
 2008-10-22  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* buildsym.c (start_symtab): Removed call to cp_initialize_namespace.
