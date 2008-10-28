@@ -1,3 +1,8 @@
+2008-10-28  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/namespace-using.exp: New test.
+	* gdb.cp/namespace-using.cc (marker7): Added function for new test.
+
 2008-10-27  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* gdb.cp/namespace-using.cc (marker6): Added function for new test.

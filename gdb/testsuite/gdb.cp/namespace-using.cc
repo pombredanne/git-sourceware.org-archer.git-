@@ -1,4 +1,21 @@
 //--------------------------
+namespace G{
+  namespace H  {
+    int ghx = 6;
+  }
+}
+
+namespace I{
+  
+  int marker7(){
+    using namespace G::H;
+    ghx;
+    return 0;
+  }
+}
+//--------------------------
+
+//--------------------------
 namespace E{
   namespace F{
     int efx = 5;
@@ -7,7 +24,7 @@ namespace E{
 using namespace E::F;
 int marker6(){
   efx;
-  return 0;
+  return I::marker7();
 }
 //--------------------------
 
