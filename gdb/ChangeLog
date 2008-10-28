@@ -1,3 +1,9 @@
+2008-10-28  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* dwarf2read.c (explore_children): New function.
+	(explore_abstract_origin): New function.
+	(read_func_scope): Added call to explore_abstract_origin.
+
 2008-10-27  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* dwarf2read.c (read_import_statement): Properly construct
