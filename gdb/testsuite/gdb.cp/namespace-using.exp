@@ -136,3 +136,14 @@ if ![runto marker6] then {
 }
 
 gdb_test "print efx" "\\$\[0-9\].* = 5"
+
+############################################
+# Test printing of variables imported from
+# nested namespaces
+
+if ![runto I::marker7] then {
+    perror "couldn't run to breakpoint I::marker7"
+    continue
+}
+
+gdb_test "print ghx" "\\$\[0-9\].* = 6"
