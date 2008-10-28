@@ -916,6 +916,8 @@ static char *typename_concat (struct obstack *,
 
 static void read_file_scope (struct die_info *, struct dwarf2_cu *);
 
+static void explore_children (struct die_info *, struct dwarf2_cu *);
+
 static void read_func_scope (struct die_info *, struct dwarf2_cu *);
 
 static void read_lexical_block_scope (struct die_info *, struct dwarf2_cu *);
@@ -3087,6 +3089,61 @@ add_to_cu_func_list (const char *name, CORE_ADDR lowpc, CORE_ADDR highpc,
   cu->last_fn = thisfn;
 }
 
+/*
+   If the given die has an abstract origin explore it, and its' absract
+   origins.
+ */
+static void
+explore_abstract_origin (struct die_info *die, struct dwarf2_cu *cu)
+{
+  struct attribute *abstract_origin;
+  struct die_info *abstract_origin_die;
+  
+  /* If this die has an abstract origin then explore that as well
+       it might contain useful information such as import statements. */
+    abstract_origin = dwarf2_attr (die, DW_AT_specification, cu);
+    if(abstract_origin == NULL){
+      abstract_origin = dwarf2_attr (die, DW_AT_abstract_origin, cu);
+    }
+
+    if(abstract_origin != NULL){
+      abstract_origin_die = follow_die_ref (die, abstract_origin, &cu);
+
+      if(abstract_origin_die != NULL){
+        explore_children(abstract_origin_die, cu);
+        explore_abstract_origin(abstract_origin_die, cu);
+      }
+    }  
+}
+
+/*
+ Explore the children of the given die, calling process_die on
+ each.
+ */ 
+static void
+explore_children (struct die_info *die, struct dwarf2_cu *cu)
+{
+  struct context_stack *new;
+  CORE_ADDR lowpc;
+  CORE_ADDR highpc;
+  struct die_info *child_die;
+  struct attribute *attr;
+  char *name;
+  CORE_ADDR baseaddr;
+  struct block *block;
+
+  if (die->child != NULL)
+    {
+      child_die = die->child;
+      while (child_die && child_die->tag)
+        {
+          process_die (child_die, cu);
+          child_die = sibling_die (child_die);
+        }
+    }
+
+}
+
 static void
 read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
 {
@@ -3108,7 +3165,7 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
      missing or invalid low and high pc attributes.  */
   if (name == NULL || !dwarf2_get_pc_bounds (die, &lowpc, &highpc, cu))
     return;
-
+  
   lowpc += baseaddr;
   highpc += baseaddr;
 
@@ -3145,6 +3202,11 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
 	}
     }
 
+  /* If this die has abstact origins explore them. They might
+     contain useful information such as import statements. 
+   */
+  explore_abstract_origin(die, cu);
+  
   new = pop_context ();
   /* Make a block for the local symbols within.  */
   block = finish_block (new->name, &local_symbols, new->old_blocks,

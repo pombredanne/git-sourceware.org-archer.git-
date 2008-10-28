@@ -789,6 +789,12 @@
 	format and pretty arguments.
 	(print_one_exception): Use get_user_print_options.
 
+2008-10-28  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* dwarf2read.c (explore_children): New function.
+	(explore_abstract_origin): New function.
+	(read_func_scope): Added call to explore_abstract_origin.
+
 2008-10-28  Tom Tromey  <tromey@redhat.com>
 
 	* cli/cli-script.c (do_fclose_cleanup): Remove.
