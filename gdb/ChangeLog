@@ -1,3 +1,10 @@
+2008-10-29  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* dwarf2read.c (determine_prefix): Added a rule to skip dies which
+	have a subprogram ancestor.
+	(new_symbol): use dwarf2_full_name instead of dwarf2_linkage_name for
+	variables. 
+
 2008-10-28  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* dwarf2read.c (explore_children): New function.
@@ -17,7 +24,7 @@
 	using_directives instead.
 	(cp_initialize_namespace): Deleted.
 	(cp_finalize_namespace): Deleted.
-	Added #include b"uildsym.h".
+	Added #include "buildsym.h".
 
 2008-10-20  Sami Wagiaalla  <swagiaal@redhat.com>
 
