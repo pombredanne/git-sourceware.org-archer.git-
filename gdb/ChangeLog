@@ -575,6 +575,13 @@
 	(catch_exec_command_1): Use create_catchpoint instead of
 	create_exec_event_catchpoint to create the exec catchpoint.
 
+2008-10-29  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* dwarf2read.c (determine_prefix): Added a rule to skip dies which
+	have a subprogram ancestor.
+	(new_symbol): use dwarf2_full_name instead of dwarf2_linkage_name for
+	variables. 
+
 2008-10-28  Tom Tromey  <tromey@redhat.com>
 
 	* Makefile.in (SUBDIR_CLI_OBS): Don't mention cli-utils.o.
@@ -1140,7 +1147,7 @@
 	using_directives instead.
 	(cp_initialize_namespace): Deleted.
 	(cp_finalize_namespace): Deleted.
-	Added #include b"uildsym.h".
+	Added #include "buildsym.h".
 
 2008-10-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
 

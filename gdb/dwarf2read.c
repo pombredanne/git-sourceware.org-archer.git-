@@ -7587,18 +7587,22 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
   struct objfile *objfile = cu->objfile;
   struct gdbarch *gdbarch = get_objfile_arch (objfile);
   struct symbol *sym = NULL;
-  char *name;
+  const char *name;
   struct attribute *attr = NULL;
   struct attribute *attr2 = NULL;
   CORE_ADDR baseaddr;
 
   baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
 
-  if (die->tag != DW_TAG_namespace)
-    name = dwarf2_linkage_name (die, cu);
-  else
-    name = TYPE_NAME (type);
-
+  if (die->tag == DW_TAG_variable){
+    name = dwarf2_full_name(die, cu);
+  }else{
+    if (die->tag != DW_TAG_namespace)
+      name = dwarf2_linkage_name (die, cu);
+    else
+      name = TYPE_NAME (type);
+  }
+  
   if (name)
     {
       sym = (struct symbol *) obstack_alloc (&objfile->objfile_obstack,
@@ -8169,10 +8173,16 @@ determine_prefix (struct die_info *die, struct dwarf2_cu *cu)
   else
     switch (parent->tag)
       {
+        
       case DW_TAG_namespace:
 	parent_type = read_type_die (parent, cu);
 	/* We give a name to even anonymous namespaces.  */
 	return TYPE_TAG_NAME (parent_type);
+      case DW_TAG_subprogram:
+        /* If the die is a direct or indirect child of a function then 
+           no prefix is nessesary; this variable cannot be reference 
+           from outside the function. */
+        return "";
       case DW_TAG_class_type:
       case DW_TAG_interface_type:
       case DW_TAG_structure_type:
