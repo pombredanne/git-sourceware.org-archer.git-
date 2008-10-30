@@ -1,3 +1,13 @@
+2008-10-30  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* cp-support.h: Added prototype for 
+	cp_lookup_symbol_namespace_incremental.
+	* cp-namespace.c (cp_lookup_symbol_namespace_incremental): New 
+	function.
+	* valops.c (value_maybe_namespace_elt): use 
+	cp_lookup_symbol_namespace_incremental instead of 
+	cp_lookup_symbol_namespace.
+	
 2008-10-29  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* dwarf2read.c (determine_prefix): Added a rule to skip dies which

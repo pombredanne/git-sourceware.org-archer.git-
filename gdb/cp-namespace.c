@@ -326,6 +326,42 @@ lookup_namespace_scope (const char *name,
 				     block, domain);
 }
 
+/* Searches the for the given NAME in the given NAMESPACE, using import 
+   statements implied by the given BLOCK, *and its' parents*. */
+struct symbol *
+cp_lookup_symbol_namespace_incremental (const char *namespace,
+                                        const char *name,
+                                        const char *linkage_name,
+                                        const struct block *block,
+                                        const domain_enum domain)
+{
+  struct symbol *sym;
+  const struct block *global_block = block_global_block (block);
+
+  printf("cp_lookup_symbol_namespace_incremental name %s\n", name);
+  /* Check if either no block is specified or it's a global block.  */
+
+  if (global_block == NULL)
+    return NULL;
+
+  while (block != global_block)
+    {
+      printf("  cp_lookup_symbol_namespace_incremental name %s in block %p [%p - %p]\n", name, block, (void*)block->startaddr, (void*)block->endaddr);
+      
+      sym = cp_lookup_symbol_namespace (namespace, name, linkage_name, block, domain);
+
+      if (sym != NULL)
+        return sym;
+
+      block = BLOCK_SUPERBLOCK (block);
+    }
+
+  /* We've reached the global block without finding a result.  */
+
+  return NULL;
+}
+
+
 /* Look up NAME in the C++ namespace NAMESPACE, applying the using
    directives that are active in BLOCK.  Other arguments are as in
    cp_lookup_symbol_nonlocal.  */
