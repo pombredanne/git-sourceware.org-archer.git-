@@ -545,15 +545,20 @@ run_python_script (int argc, char **argv)
 
 
 
+/* The "current" objfile.  This is set when gdb detects that a new
+   objfile has been loaded.  It is only set for the duration of a call
+   to gdbpy_new_objfile; it is NULL at other times.  */
+static struct objfile *gdbpy_current_objfile;
+
 /* The file name we attempt to read.  */
-#define GDBPY_AUTO_FILENAME ".gdb.py"
+#define GDBPY_AUTO_FILENAME "-gdb.py"
 
 /* This is a new_objfile observer callback which loads python code
    based on the path to the objfile.  */
 static void
 gdbpy_new_objfile (struct objfile *objfile)
 {
-  char *p;
+  char *realname;
   char *filename;
   int len;
   FILE *input;
@@ -561,10 +566,12 @@ gdbpy_new_objfile (struct objfile *objfile)
   if (!gdbpy_auto_load || !objfile || !objfile->name)
     return;
 
-  p = (char *) lbasename (objfile->name);
-  len = p - objfile->name;
+  gdbpy_current_objfile = objfile;
+
+  realname = gdb_realpath (objfile->name);
+  len = strlen (realname);
   filename = xmalloc (len + sizeof (GDBPY_AUTO_FILENAME));
-  memcpy (filename, objfile->name, len);
+  memcpy (filename, realname, len);
   strcpy (filename + len, GDBPY_AUTO_FILENAME);
 
   input = fopen (filename, "r");
@@ -578,7 +585,48 @@ gdbpy_new_objfile (struct objfile *objfile)
       fclose (input);
     }
 
+  xfree (realname);
   xfree (filename);
+  gdbpy_current_objfile = NULL;
+}
+
+/* Return the current Objfile, or None if there isn't one.  */
+static PyObject *
+gdbpy_get_current_objfile (PyObject *unused1, PyObject *unused2)
+{
+  PyObject *result;
+
+  if (! gdbpy_current_objfile)
+    Py_RETURN_NONE;
+
+  result = objfile_to_objfile_object (gdbpy_current_objfile);
+  if (result)
+    Py_INCREF (result);
+  return result;
+}
+
+/* Return a sequence holding all the Objfiles.  */
+static PyObject *
+gdbpy_get_objfiles (PyObject *unused1, PyObject *unused2)
+{
+  struct objfile *objf;
+  PyObject *list;
+
+  list = PyList_New (0);
+  if (!list)
+    return NULL;
+
+  ALL_OBJFILES (objf)
+  {
+    PyObject *item = objfile_to_objfile_object (objf);
+    if (!item || PyList_Append (list, item) == -1)
+      {
+	Py_DECREF (list);
+	return NULL;
+      }
+  }
+
+  return list;
 }
 
 
@@ -604,30 +652,43 @@ get_type (struct type *type)
   return thetype;
 }
 
+/* Helper function for find_pretty_printer which iterates over a
+   dictionary and tries to find a match.  */
+static PyObject *
+search_pp_dictionary (PyObject *dict, char *type_name)
+{
+  Py_ssize_t iter;
+  PyObject *key, *func, *found = NULL;
+
+  /* See if the type matches a pretty-printer regexp.  */
+  iter = 0;
+  while (! found && PyDict_Next (dict, &iter, &key, &func))
+    {
+      char *rx_str;
+
+      if (! PyString_Check (key))
+	continue;
+      rx_str = PyString_AsString (key);
+      if (re_comp (rx_str) == NULL && re_exec (type_name) == 1)
+	found = func;
+    }
+
+  return found;
+}
+
 /* Find the pretty-printing function for TYPE.  If no pretty-printer
    exists, return NULL.  If one exists, return a borrowed reference.
    If a printer is found, *DICTP is set to a reference to the
    dictionary object; it must be derefed by the caller.  DICT_NAME is
    the name of the dictionary to search for types.  */
 static PyObject *
-find_pretty_printer (struct type *type, PyObject **dictp, char *dict_name)
+find_pretty_printer (struct type *type, PyObject **dictp, int is_mi)
 {
-  PyObject *dict, *key, *func, *found = NULL;
-  Py_ssize_t iter;
+  PyObject *dict, *found;
   char *type_name = NULL;
+  char *dict_name;
+  struct objfile *obj;
   volatile struct gdb_exception except;
-
-  /* Fetch the pretty printer dictionary.  */
-  if (! PyObject_HasAttrString (gdb_module, dict_name))
-    return NULL;
-  dict = PyObject_GetAttrString (gdb_module, dict_name);
-  if (! dict)
-    return NULL;
-  if (! PyDict_Check (dict) || ! PyDict_Size (dict))
-    {
-      Py_DECREF (dict);
-      return NULL;
-    }
 
   /* Get the name of the type.  */
   TRY_CATCH (except, RETURN_MASK_ALL)
@@ -645,25 +706,45 @@ find_pretty_printer (struct type *type, PyObject **dictp, char *dict_name)
       return NULL;
     }
 
-  /* See if the type matches a pretty-printer regexp.  */
-  iter = 0;
-  while (! found && PyDict_Next (dict, &iter, &key, &func))
-    {
-      char *rx_str;
+  /* Look at the pretty-printer dictionary for each objfile.  */
+  ALL_OBJFILES (obj)
+  {
+    PyObject *objf = objfile_to_objfile_object (obj);
+    if (!objf)
+      continue;
 
-      if (! PyString_Check (key))
-	continue;
-      rx_str = PyString_AsString (key);
-      if (re_comp (rx_str) == NULL && re_exec (type_name) == 1)
-	found = func;
-    }
+    if (is_mi)
+      dict = objfpy_get_mi_printers (objf, NULL);
+    else
+      dict = objfpy_get_cli_printers (objf, NULL);
 
+    found = search_pp_dictionary (dict, type_name);
+    if (found)
+      goto done;
+
+    Py_DECREF (dict);
+  }
+
+  /* Fetch the global pretty printer dictionary.  */
+  dict_name = is_mi ? "mi_pretty_printers" : "cli_pretty_printers";
+  dict = NULL;
+  if (! PyObject_HasAttrString (gdb_module, dict_name))
+    goto done;
+  dict = PyObject_GetAttrString (gdb_module, dict_name);
+  if (! dict)
+    goto done;
+  if (! PyDict_Check (dict) || ! PyDict_Size (dict))
+    goto done;
+
+  found = search_pp_dictionary (dict, type_name);
+
+ done:
   xfree (type_name);
 
   if (found)
     *dictp = dict;
   else
-    Py_DECREF (dict);
+    Py_XDECREF (dict);
 
   return found;
 }
@@ -751,7 +832,7 @@ apply_pretty_printer (struct value *value, struct value **out_value)
 
   *out_value = NULL;
 
-  func = find_pretty_printer (value_type (value), &dict, "cli_pretty_printers");
+  func = find_pretty_printer (value_type (value), &dict, 0);
   if (! func)
     return NULL;
 
@@ -778,7 +859,7 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
   struct value *value, *replacement = NULL;
   char *output;
 
-  func = find_pretty_printer (type, &dict, "cli_pretty_printers");
+  func = find_pretty_printer (type, &dict, 0);
   if (! func)
     return NULL;
 
@@ -828,7 +909,7 @@ PyObject *
 gdbpy_get_varobj_pretty_printer (struct type *type)
 {
   PyObject *dict = NULL;
-  PyObject *printer = find_pretty_printer (type, &dict, "mi_pretty_printers");
+  PyObject *printer = find_pretty_printer (type, &dict, 1);
   if (dict)
     {
       Py_DECREF (dict);
@@ -1015,6 +1096,7 @@ Enables or disables auto-loading of Python code when an object is opened."),
   gdbpy_initialize_functions ();
   gdbpy_initialize_types ();
   gdbpy_initialize_parameters ();
+  gdbpy_initialize_objfile ();
 
   PyRun_SimpleString ("import gdb");
   PyRun_SimpleString ("gdb.cli_pretty_printers = {}");
@@ -1101,6 +1183,11 @@ static PyMethodDef GdbMethods[] =
 
   { "get_default_visualizer", gdbpy_get_default_visualizer, METH_VARARGS,
     "Find the default visualizer for a Value." },
+
+  { "get_current_objfile", gdbpy_get_current_objfile, METH_NOARGS,
+    "Return the current Objfile being loaded, or None." },
+  { "get_objfiles", gdbpy_get_objfiles, METH_NOARGS,
+    "Return a sequence of all loaded objfiles." },
 
   { "get_frames", gdbpy_get_frames, METH_NOARGS,
     "Return a tuple of all frame objects" },

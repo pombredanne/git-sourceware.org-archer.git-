@@ -1,3 +1,28 @@
+2008-10-31  Tom Tromey  <tromey@redhat.com>
+
+	* python/python.c (_initialize_python): Call
+	gdbpy_initialize_objfile.
+	(gdbpy_current_objfile): New global.
+	(gdbpy_get_current_objfile): New function.
+	(gdbpy_new_objfile): Set gdbpy_current_objfile.  Use real path to
+	objfile.  Change filename computation.
+	(GdbMethods): Add get_current_objfile, get_objfiles.
+	(gdbpy_get_objfiles): New function.
+	(find_pretty_printer): Remove dict_name argument, add is_mi.
+	Search objfile printers first.
+	(search_pp_dictionary): New function.
+	(apply_pretty_printer): Update.
+	(apply_val_pretty_printer): Likewise.
+	(gdbpy_get_varobj_pretty_printer): Likewise.
+	(GDBPY_AUTO_FILENAME): Change value.
+	* python/python-objfile.c: New file.
+	* python/python-internal.h (objfile_to_objfile_object): Declare.
+	(gdbpy_initialize_objfile): Declare.
+	(objfpy_get_mi_printers, objfpy_get_cli_printers): Declare.
+	* Makefile.in (SUBDIR_PYTHON_OBS): Add python-objfile.o.
+	(SUBDIR_PYTHON_SRCS): Add python-objfile.c.
+	(python-objfile.o): New target.
+
 2008-10-27  Tom Tromey  <tromey@redhat.com>
 
 	* python/python.c (_initialize_python) <_format_children>: Handle

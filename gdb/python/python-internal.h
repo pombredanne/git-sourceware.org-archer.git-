@@ -73,6 +73,10 @@ PyObject *block_to_block_object (struct block *block);
 PyObject *value_to_value_object (struct value *v);
 PyObject *gdb_owned_value_to_value_object (struct value *v);
 PyObject *type_to_type_object (struct type *);
+PyObject *objfile_to_objfile_object (struct objfile *);
+
+PyObject *objfpy_get_mi_printers (PyObject *, void *);
+PyObject *objfpy_get_cli_printers (PyObject *, void *);
 
 struct block *block_object_to_block (PyObject *obj);
 struct symbol *symbol_object_to_symbol (PyObject *obj);
@@ -91,6 +95,7 @@ void gdbpy_initialize_symbols (void);
 void gdbpy_initialize_types (void);
 void gdbpy_initialize_blocks (void);
 void gdbpy_initialize_functions (void);
+void gdbpy_initialize_objfile (void);
 void gdbpy_initialize_parameters (void);
 
 struct cleanup *make_cleanup_py_decref (PyObject *py);

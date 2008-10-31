@@ -1,0 +1,281 @@
+/* Python interface to objfiles.
+
+   Copyright (C) 2008 Free Software Foundation, Inc.
+
+   This file is part of GDB.
+
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation; either version 3 of the License, or
+   (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+
+#include "defs.h"
+#include "python-internal.h"
+#include "charset.h"
+#include "objfiles.h"
+
+typedef struct
+{
+  PyObject_HEAD
+
+  /* The corresponding objfile.  */
+  struct objfile *objfile;
+
+  /* The pretty-printer dictionaries.  */
+  PyObject *mi_printers;
+  PyObject *cli_printers;
+} objfile_object;
+
+static PyTypeObject objfile_object_type;
+
+static const struct objfile_data *objfpy_objfile_data_key;
+
+
+
+/* An Objfile method which returns the objfile's file name, or None.  */
+static PyObject *
+objfpy_filename (PyObject *self, PyObject *args)
+{
+  objfile_object *obj = (objfile_object *) self;
+  if (obj->objfile && obj->objfile->name)
+    return PyString_Decode (obj->objfile->name, strlen (obj->objfile->name),
+			    host_charset (), NULL);
+  Py_RETURN_NONE;
+}
+
+static void
+objfpy_dealloc (PyObject *o)
+{
+  objfile_object *self = (objfile_object *) o;
+  Py_XDECREF (self->mi_printers);
+  Py_XDECREF (self->cli_printers);
+  self->ob_type->tp_free ((PyObject *) self);
+}
+
+static PyObject *
+objfpy_new (PyTypeObject *type, PyObject *args, PyObject *keywords)
+{
+  objfile_object *self = (objfile_object *) type->tp_alloc (type, 0);
+  if (self)
+    {
+      self->objfile = NULL;
+      /* Initialize in case of early return.  */
+      self->cli_printers = NULL;
+
+      self->mi_printers = PyDict_New ();
+      if (!self->mi_printers)
+	{
+	  Py_DECREF (self);
+	  return NULL;
+	}
+      self->cli_printers = PyDict_New ();
+      if (!self->cli_printers)
+	{
+	  Py_DECREF (self);
+	  return NULL;
+	}
+    }
+  return (PyObject *) self;
+}
+
+PyObject *
+objfpy_get_mi_printers (PyObject *o, void *ignore)
+{
+  objfile_object *self = (objfile_object *) o;
+  Py_INCREF (self->mi_printers);
+  return self->mi_printers;
+}
+
+static int
+objfpy_set_mi_printers (PyObject *o, PyObject *value, void *ignore)
+{
+  objfile_object *self = (objfile_object *) o;
+  if (! value)
+    {
+      PyErr_SetString (PyExc_TypeError,
+		       "cannot delete the mi_pretty_printers attribute");
+      return -1;
+    }
+
+  if (! PyDict_Check (value))
+    {
+      PyErr_SetString (PyExc_TypeError,
+		       "the mi_pretty_printers attribute must be a dictionary");
+      return -1;
+    }
+
+  Py_XDECREF (self->mi_printers);
+  Py_INCREF (value);
+  self->mi_printers = value;
+
+  return 0;
+}
+
+PyObject *
+objfpy_get_cli_printers (PyObject *o, void *ignore)
+{
+  objfile_object *self = (objfile_object *) o;
+  Py_INCREF (self->cli_printers);
+  return self->cli_printers;
+}
+
+static int
+objfpy_set_cli_printers (PyObject *o, PyObject *value, void *ignore)
+{
+  objfile_object *self = (objfile_object *) o;
+  if (! value)
+    {
+      PyErr_SetString (PyExc_TypeError,
+		       "cannot delete the cli_pretty_printers attribute");
+      return -1;
+    }
+
+  if (! PyDict_Check (value))
+    {
+      PyErr_SetString (PyExc_TypeError,
+		       "the cli_pretty_printers attribute must be a dictionary");
+      return -1;
+    }
+
+  Py_XDECREF (self->cli_printers);
+  Py_INCREF (value);
+  self->cli_printers = value;
+
+  return 0;
+}
+
+
+
+/* Clear the OBJFILE pointer in an Objfile object and remove the
+   reference.  */
+static void
+clean_up_objfile (struct objfile *objfile, void *datum)
+{
+  objfile_object *object = datum;
+  object->objfile = NULL;
+  Py_DECREF ((PyObject *) object);
+}
+
+/* Return the Python object of type Objfile representing OBJFILE.  If
+   the object has already been created, return it.  Otherwise, create
+   it.  Return NULL and set the Python error on failure.  */
+PyObject *
+objfile_to_objfile_object (struct objfile *objfile)
+{
+  objfile_object *object;
+
+  object = objfile_data (objfile, objfpy_objfile_data_key);
+  if (!object)
+    {
+      object = PyObject_New (objfile_object, &objfile_object_type);
+      if (object)
+	{
+	  PyObject *dict;
+
+	  object->objfile = objfile;
+	  /* Initialize in case of early return.  */
+	  object->cli_printers = NULL;
+
+	  object->mi_printers = PyDict_New ();
+	  if (!object->mi_printers)
+	    {
+	      Py_DECREF (object);
+	      return NULL;
+	    }
+
+	  object->cli_printers = PyDict_New ();
+	  if (!object->cli_printers)
+	    {
+	      Py_DECREF (object);
+	      return NULL;
+	    }
+
+	  set_objfile_data (objfile, objfpy_objfile_data_key, object);
+	}
+    }
+
+  return (PyObject *) object;
+}
+
+void
+gdbpy_initialize_objfile (void)
+{
+  objfpy_objfile_data_key
+    = register_objfile_data_with_cleanup (clean_up_objfile);
+
+  objfile_object_type.tp_new = PyType_GenericNew;
+  if (PyType_Ready (&objfile_object_type) < 0)
+    return;
+
+  Py_INCREF (&objfile_object_type);
+  PyModule_AddObject (gdb_module, "Objfile", (PyObject *) &objfile_object_type);
+}
+
+
+
+static PyGetSetDef objfile_getset[] =
+{
+  { "mi_pretty_printers", objfpy_get_mi_printers, objfpy_set_mi_printers,
+    "MI pretty printers", NULL },
+  { "cli_pretty_printers", objfpy_get_cli_printers, objfpy_set_cli_printers,
+    "CLI pretty printers", NULL },
+  { NULL }
+};
+
+static PyMethodDef objfile_object_methods[] =
+{
+  { "get_filename", objfpy_filename, METH_NOARGS,
+    "Return the objfile's filename, or None." },
+  {NULL}  /* Sentinel */
+};
+
+static PyTypeObject objfile_object_type =
+{
+  PyObject_HEAD_INIT (NULL)
+  0,				  /*ob_size*/
+  "gdb.Objfile",		  /*tp_name*/
+  sizeof (objfile_object),	  /*tp_basicsize*/
+  0,				  /*tp_itemsize*/
+  objfpy_dealloc,		  /*tp_dealloc*/
+  0,				  /*tp_print*/
+  0,				  /*tp_getattr*/
+  0,				  /*tp_setattr*/
+  0,				  /*tp_compare*/
+  0,				  /*tp_repr*/
+  0,				  /*tp_as_number*/
+  0,				  /*tp_as_sequence*/
+  0,				  /*tp_as_mapping*/
+  0,				  /*tp_hash */
+  0,				  /*tp_call*/
+  0,				  /*tp_str*/
+  0,				  /*tp_getattro*/
+  0,				  /*tp_setattro*/
+  0,				  /*tp_as_buffer*/
+  Py_TPFLAGS_DEFAULT,		  /*tp_flags*/
+  "GDB objfile object",		  /* tp_doc */
+  0,				  /* tp_traverse */
+  0,				  /* tp_clear */
+  0,				  /* tp_richcompare */
+  0,				  /* tp_weaklistoffset */
+  0,				  /* tp_iter */
+  0,				  /* tp_iternext */
+  objfile_object_methods,	  /* tp_methods */
+  0,				  /* tp_members */
+  objfile_getset,		  /* tp_getset */
+  0,				  /* tp_base */
+  0,				  /* tp_dict */
+  0,				  /* tp_descr_get */
+  0,				  /* tp_descr_set */
+  0,				  /* tp_dictoffset */
+  0,				  /* tp_init */
+  0,				  /* tp_alloc */
+  objfpy_new,			  /* tp_new */
+};
