@@ -1,3 +1,7 @@
+2008-11-03  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* python/python.c (find_pretty_printer): Fix gcc-4.3.1 warnings.
+	
 2008-11-03  Tom Tromey  <tromey@redhat.com>
 
 	* python/python-value.c (valpy_getitem): Convert field name to

@@ -684,7 +684,7 @@ search_pp_dictionary (PyObject *dict, char *type_name)
 static PyObject *
 find_pretty_printer (struct type *type, PyObject **dictp, int is_mi)
 {
-  PyObject *dict, *found;
+  PyObject *dict, *found = NULL;
   char *type_name = NULL;
   char *dict_name;
   struct objfile *obj;
@@ -701,10 +701,7 @@ find_pretty_printer (struct type *type, PyObject **dictp, int is_mi)
       type_name = get_type (type);
     }
   if (except.reason < 0)
-    {
-      Py_DECREF (dict);
-      return NULL;
-    }
+    return NULL;
 
   /* Look at the pretty-printer dictionary for each objfile.  */
   ALL_OBJFILES (obj)
