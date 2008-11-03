@@ -1,3 +1,4 @@
+<<<<<<< HEAD:gdb/ChangeLog
 2008-11-24  Tom Tromey  <tromey@redhat.com>
 
 	* ada-lang.c (value_from_contents_and_address): Move...
@@ -473,6 +474,16 @@
 	* eval.c (evaluate_subexp_standard): Assert that there is at
 	least one array dimension.
 
+2008-11-03  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* cp-namespace.h (cp_add_using_directive): Now takes char
+	and char* outer arguments.
+	(cp_add_using): Ditto.
+	(cp_add_using_directive): Updated with the above changes.
+	* cp-namespace.c (cp_add_using): ditto.
+	(cp_scan_for_anonymous_namespaces): Ditto.
+	* dwarf2read.c (read_namespace): Ditto.
+
 2008-11-03  Vladimir Prus  <vladimir@codesourcery.com>
 
 	Make attach_command exception-safe
@@ -520,6 +531,17 @@
 
 	* inferior.h (write_inferior_status_register): Delete.
 	* infrun.c (write_inferior_status_register): Delete.
+=======
+2008-11-03  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* cp-namespace.h (cp_add_using_directive): Now takes char
+	and char* outer arguments.
+	(cp_add_using): Ditto.
+	(cp_add_using_directive): Updated with the above changes.
+	* cp-namespace.c (cp_add_using): ditto.
+	(cp_scan_for_anonymous_namespaces): Ditto.
+	* dwarf2read.c (read_namespace): Ditto.
+>>>>>>> add_using_directive functions now take char* outer char* inner arguments.:gdb/ChangeLog
 
 2008-10-30  Sami Wagiaalla  <swagiaal@redhat.com>
 
