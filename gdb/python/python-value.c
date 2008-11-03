@@ -196,25 +196,36 @@ static PyObject *
 valpy_getitem (PyObject *self, PyObject *key)
 {
   value_object *self_value = (value_object *) self;
-  char *field;
+  char *field = NULL;
+  struct value *idx = NULL;
   struct value *res_val = NULL;	  /* Initialize to appease gcc warning.  */
-  struct cleanup *old;
   volatile struct gdb_exception except;
 
-  field = python_string_to_target_string (key);
-  if (field == NULL)
-    return NULL;
-
-  old = make_cleanup (xfree, field);
+  if (PyUnicode_Check (key) || PyString_Check (key))
+    {  
+      field = python_string_to_host_string (key);
+      if (field == NULL)
+	return NULL;
+    }
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
       struct value *tmp = self_value->value;
-      res_val = value_struct_elt (&tmp, NULL, field, 0, NULL);
-    }
-  GDB_PY_HANDLE_EXCEPTION (except);
 
-  do_cleanups (old);
+      if (field)
+	res_val = value_struct_elt (&tmp, NULL, field, 0, NULL);
+      else
+	{
+	  /* Assume we are attempting an array access, and let the
+	     value code throw an exception if the index has an invalid
+	     type.  */
+	  struct value *idx = convert_value_from_python (key);
+	  res_val = value_subscript (tmp, idx);
+	}
+    }
+  if (field)
+    xfree (field);
+  GDB_PY_HANDLE_EXCEPTION (except);
 
   return value_to_value_object (res_val);
 }
@@ -265,7 +276,12 @@ enum valpy_opcode
   VALPY_MUL,
   VALPY_DIV,
   VALPY_REM,
-  VALPY_POW
+  VALPY_POW,
+  VALPY_LSH,
+  VALPY_RSH,
+  VALPY_BITAND,
+  VALPY_BITOR,
+  VALPY_BITXOR
 };
 
 /* If TYPE is a reference, return the target; otherwise return TYPE.  */
@@ -346,6 +362,21 @@ valpy_binop (enum valpy_opcode opcode, PyObject *self, PyObject *other)
 	  break;
 	case VALPY_POW:
 	  res_val = value_binop (arg1, arg2, BINOP_EXP);
+	  break;
+	case VALPY_LSH:
+	  res_val = value_binop (arg1, arg2, BINOP_LSH);
+	  break;
+	case VALPY_RSH:
+	  res_val = value_binop (arg1, arg2, BINOP_RSH);
+	  break;
+	case VALPY_BITAND:
+	  res_val = value_binop (arg1, arg2, BINOP_BITWISE_AND);
+	  break;
+	case VALPY_BITOR:
+	  res_val = value_binop (arg1, arg2, BINOP_BITWISE_IOR);
+	  break;
+	case VALPY_BITXOR:
+	  res_val = value_binop (arg1, arg2, BINOP_BITWISE_XOR);
 	  break;
 	}
     }
@@ -455,6 +486,57 @@ valpy_nonzero (PyObject *self)
 					  "gdb.Value type."));
       return 0;
     }
+}
+
+/* Implements ~ for value objects.  */
+static PyObject *
+valpy_invert (PyObject *self)
+{
+  struct value *val = NULL;
+  volatile struct gdb_exception except;
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      val = value_complement (((value_object *) self)->value);
+    }
+  GDB_PY_HANDLE_EXCEPTION (except);
+
+  return value_to_value_object (val);
+}
+
+/* Implements left shift for value objects.  */
+static PyObject *
+valpy_lsh (PyObject *self, PyObject *other)
+{
+  return valpy_binop (VALPY_LSH, self, other);
+}
+
+/* Implements right shift for value objects.  */
+static PyObject *
+valpy_rsh (PyObject *self, PyObject *other)
+{
+  return valpy_binop (VALPY_RSH, self, other);
+}
+
+/* Implements bitwise and for value objects.  */
+static PyObject *
+valpy_and (PyObject *self, PyObject *other)
+{
+  return valpy_binop (VALPY_BITAND, self, other);
+}
+
+/* Implements bitwise or for value objects.  */
+static PyObject *
+valpy_or (PyObject *self, PyObject *other)
+{
+  return valpy_binop (VALPY_BITOR, self, other);
+}
+
+/* Implements bitwise xor for value objects.  */
+static PyObject *
+valpy_xor (PyObject *self, PyObject *other)
+{
+  return valpy_binop (VALPY_BITXOR, self, other);
 }
 
 /* Implements comparison operations for value objects.  */
@@ -800,12 +882,12 @@ static PyNumberMethods value_object_as_number = {
   valpy_positive,	      /* nb_positive */
   valpy_absolute,	      /* nb_absolute */
   valpy_nonzero,	      /* nb_nonzero */
-  NULL,			      /* nb_invert */
-  NULL,			      /* nb_lshift */
-  NULL,			      /* nb_rshift */
-  NULL,			      /* nb_and */
-  NULL,			      /* nb_xor */
-  NULL,			      /* nb_or */
+  valpy_invert,		      /* nb_invert */
+  valpy_lsh,		      /* nb_lshift */
+  valpy_rsh,		      /* nb_rshift */
+  valpy_and,		      /* nb_and */
+  valpy_xor,		      /* nb_xor */
+  valpy_or,		      /* nb_or */
   NULL,			      /* nb_coerce */
   valpy_int,		      /* nb_int */
   valpy_long,		      /* nb_long */

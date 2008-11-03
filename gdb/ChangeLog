@@ -1,3 +1,18 @@
+2008-11-03  Tom Tromey  <tromey@redhat.com>
+
+	* python/python-value.c (valpy_getitem): Convert field name to
+	host string.  Handle array accesses.
+	(valpy_invert): New function.
+	(valpy_lsh): Likewise.
+	(valpy_rsh): Likewise.
+	(valpy_and): Likewise.
+	(valpy_or): Likewise.
+	(valpy_xor): Likewise.
+	(value_object_as_number): Update for new methods.
+	(enum valpy_opcode) <VALPY_LSH, VALPY_RSH, VALPY_BITAND,
+	VALPY_BITXOR, VALPY_BITOR>: New constants.
+	(valpy_binop): Update.
+
 2008-10-31  Tom Tromey  <tromey@redhat.com>
 
 	* python/python.c (_initialize_python): Call
