@@ -38,14 +38,19 @@ struct demangle_component;
 
 /* This struct is designed to store data from using directives.  It
    says that names from namespace INNER should be visible within
-   namespace OUTER.  OUTER should always be a strict initial substring
-   of INNER.  These form a linked list; NEXT is the next element of
-   the list.  */
+   namespace OUTER These form a linked list; NEXT is the next element of
+   the list. ALIAS is set to a non empty string if the imported namespace
+   has been aliased.Eg:
+       namespace C=A::B; 
+*/
 
 struct using_direct
 {
   char *inner;
   char *outer;
+  
+  char *alias;
+  
   struct using_direct *next;
 };
 
@@ -53,6 +58,7 @@ struct using_direct
 /* Functions from cp-support.c.  */
 
 extern char *cp_canonicalize_string (const char *string);
+
 
 extern char *cp_class_name_from_physname (const char *physname);
 
@@ -77,10 +83,12 @@ extern struct type *cp_lookup_rtti_type (const char *name,
 extern int cp_is_anonymous (const char *namespace);
 
 extern void cp_add_using_directive (const char *outer,
-                                    const char *inner);
+                                    const char *inner,
+                                    const char *alias);
 
 extern struct using_direct *cp_add_using (const char *outer,
                                           const char *inner,
+                                          const char *alias,
 					  struct using_direct *next);
 
 extern void cp_initialize_namespace (void);
