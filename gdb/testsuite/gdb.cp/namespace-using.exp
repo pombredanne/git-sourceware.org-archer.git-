@@ -147,3 +147,19 @@ if ![runto I::marker7] then {
 }
 
 gdb_test "print ghx" "\\$\[0-9\].* = 6"
+
+############################################
+# Test that variables are not printed in a namespace
+# that is sibling to the namespace containing an import
+
+if ![runto L::marker8] then {
+    perror "couldn't run to breakpoint L::marker8"
+    continue
+}
+
+gdb_test "print jx" "\\$\[0-9\].* = 44"
+
+gdb_breakpoint "K::marker9"
+gdb_continue_to_breakpoint "K::marker9"
+
+gdb_test "print jx" "No symbol \"jx\" in current context."

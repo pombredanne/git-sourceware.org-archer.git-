@@ -1,4 +1,25 @@
 //--------------------------
+namespace J {
+    int jx = 44;
+}
+
+namespace K{
+  int marker9(){
+    //x;
+    return 10;
+  }
+}
+
+namespace L{
+  using namespace J;
+  int marker8(){
+    jx;
+    return K::marker9();
+  }
+}
+//--------------------------
+
+//--------------------------
 namespace G{
   namespace H  {
     int ghx = 6;
@@ -10,7 +31,7 @@ namespace I{
   int marker7(){
     using namespace G::H;
     ghx;
-    return 0;
+    return L::marker8();
   }
 }
 //--------------------------
