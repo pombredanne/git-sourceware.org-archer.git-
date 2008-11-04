@@ -336,7 +336,6 @@ cp_lookup_symbol_namespace_incremental (const char *namespace,
   struct symbol *sym;
   const struct block *global_block = block_global_block (block);
 
-  printf("cp_lookup_symbol_namespace_incremental name %s\n", name);
   /* Check if either no block is specified or it's a global block.  */
 
   if (global_block == NULL)
@@ -344,8 +343,6 @@ cp_lookup_symbol_namespace_incremental (const char *namespace,
 
   while (block != global_block)
     {
-      printf("  cp_lookup_symbol_namespace_incremental name %s in block %p [%p - %p]\n", name, block, (void*)block->startaddr, (void*)block->endaddr);
-      
       sym = cp_lookup_symbol_namespace (namespace, name, linkage_name, block, domain);
 
       if (sym != NULL)
