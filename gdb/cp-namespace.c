@@ -108,7 +108,7 @@ cp_scan_for_anonymous_namespaces (const struct symbol *symbol)
 		 anonymous namespace.  So add symbols in it to the
 		 namespace given by the previous component if there is
 		 one, or to the global namespace if there isn't.  */
-	      cp_add_using_directive (outer, name);
+	      cp_add_using_directive (outer, name, "");
 	    }
 	  /* The "+ 2" is for the "::".  */
 	  previous_component = next_component + 2;
@@ -123,7 +123,7 @@ cp_scan_for_anonymous_namespaces (const struct symbol *symbol)
    has already been added, don't add it twice.  */
 
 void
-cp_add_using_directive (const char *outer, const char *inner)
+cp_add_using_directive (const char *outer, const char *inner, const char* alias)
 {
   struct using_direct *current;
   struct using_direct *new;
@@ -137,7 +137,7 @@ cp_add_using_directive (const char *outer, const char *inner)
 	return;
     }
 
-  using_directives = cp_add_using (outer, inner,
+  using_directives = cp_add_using (outer, inner, alias,
       using_directives);
 }
 
@@ -190,7 +190,9 @@ cp_is_anonymous (const char *namespace)
 }
 
 /* Create a new struct using direct whose inner namespace is INNER 
-   and whose outer namespace is OUTER.
+   and whose outer namespace is OUTER. ALIAS is the name of the imported
+   namespace in the current scope. If ALIAS is an empty string  then the
+   namespace is known by its original name.
    Set its next member in the linked list to NEXT; allocate all memory
    using xmalloc.  It copies the strings, so NAME can be a temporary
    string.  */
@@ -198,6 +200,7 @@ cp_is_anonymous (const char *namespace)
 struct using_direct *
 cp_add_using (const char *outer,
               const char *inner,
+              const char *alias,
 	      struct using_direct *next)
 {
   struct using_direct *retval;
@@ -205,6 +208,8 @@ cp_add_using (const char *outer,
   retval = xmalloc (sizeof (struct using_direct));
   retval->inner = savestring (inner, strlen(inner));
   retval->outer = savestring (outer, strlen(outer));
+  retval->alias = savestring (alias, strlen(alias));
+    
   retval->next = next;
 
   return retval;

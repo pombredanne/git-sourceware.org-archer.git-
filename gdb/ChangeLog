@@ -461,6 +461,15 @@
 	* infrun.c (handle_inferior_event): If stop_soon is
 	STOP_QUIETLY_NO_SIGSTOP, also expect a TARGET_SIGNAL_0.
 
+008-11-04  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* cp-support.h: Added char* alias element to using_direct data struct.
+	(cp_add_using): Added char* alias argument.
+	(cp_add_using_directive): Ditto. 
+	* cp-namespace.c: Updated with the above changes.
+	* dwarf2read.c (read_import_statement): Ditto.
+	(read_namespace): Ditto.
+
 2008-11-04  Pedro Alves  <pedro@codesourcery.com>
 
 	* inf-loop.c (inferior_event_handler): On INF_ERROR and
@@ -532,6 +541,17 @@
 	* inferior.h (write_inferior_status_register): Delete.
 	* infrun.c (write_inferior_status_register): Delete.
 =======
+=======
+2008-11-04  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* cp-support.h: Added char* alias element to using_direct data struct.
+	(cp_add_using): Added char* alias argument.
+	(cp_add_using_directive): Ditto. 
+	* cp-namespace.c: Updated with the above changes.
+	* dwarf2read.c (read_import_statement): Ditto.
+	(read_namespace): Ditto.
+	
+>>>>>>> using_direct structs now have and 'alias' element.:gdb/ChangeLog
 2008-11-03  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* cp-namespace.h (cp_add_using_directive): Now takes char
