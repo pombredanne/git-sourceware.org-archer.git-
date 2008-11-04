@@ -1375,12 +1375,6 @@ lookup_symbol_aux_local (const char *name, const char *linkage_name,
       if (sym != NULL)
 	return sym;
     
-      sym = lookup_namespace_scope (name, linkage_name, block, domain,
-                                      block_scope (block), 0);
-
-      if (sym != NULL)
-        return sym;
-
       block = BLOCK_SUPERBLOCK (block);
     }
 
