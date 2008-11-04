@@ -1,4 +1,13 @@
 2008-11-04  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* cp-namespace.c (lookup_namespace_scope): Use 
+	cp_lookup_symbol_namespace_incremental.
+	* dwarf2read.c (read_import_statement): Correctly set the import 
+	location.
+	* symtab.c (lookup_symbol_aux_local): Removed call to 
+	lookup_namespace_scope.
+
+2008-11-04  Sami Wagiaalla  <swagiaal@redhat.com>
 	
 	* cp-namespace.c (cp_lookup_symbol_namespace_incremental): Removed 
 	extraneous print statement. 

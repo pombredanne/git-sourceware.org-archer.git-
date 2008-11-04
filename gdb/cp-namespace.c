@@ -320,7 +320,7 @@ lookup_namespace_scope (const char *name,
   namespace = alloca (scope_len + 1);
   strncpy (namespace, scope, scope_len);
   namespace[scope_len] = '\0';
-  return cp_lookup_symbol_namespace (namespace, name, linkage_name,
+  return cp_lookup_symbol_namespace_incremental (namespace, name, linkage_name,
 				     block, domain);
 }
 
