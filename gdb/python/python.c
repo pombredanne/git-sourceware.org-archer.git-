@@ -1175,6 +1175,8 @@ gdb._format_children = _format_children\n\
 
 
 
+#if HAVE_PYTHON
+
 static PyMethodDef GdbMethods[] =
 {
   { "get_value_from_history", gdbpy_get_value_from_history, METH_VARARGS,
@@ -1233,3 +1235,5 @@ Note: may later change to return an object." },
 
   {NULL, NULL, 0, NULL}
 };
+
+#endif /* HAVE_PYTHON */

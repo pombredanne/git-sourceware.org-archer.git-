@@ -1,5 +1,9 @@
 2008-11-06  Tom Tromey  <tromey@redhat.com>
 
+	* python/python.c (GdbMethods): Make conditional.
+
+2008-11-06  Tom Tromey  <tromey@redhat.com>
+
 	* varobj.c (struct varobj) <constructor>: New field.
 	(varobj_set_display_format): Update.
 	(varobj_get_display_hint): Likewise.
