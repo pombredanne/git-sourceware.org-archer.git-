@@ -1,5 +1,13 @@
 2008-11-06  Tom Tromey  <tromey@redhat.com>
 
+	* python/python-type.c (pyty_type_object) <owned>: New field.
+	(clean_up_objfile_types): Set it.
+	(set_type): Initialize new field.  Always set prev and next
+	fields.
+	(typy_dealloc): Check new field.
+
+2008-11-06  Tom Tromey  <tromey@redhat.com>
+
 	* python/python.c (source_python_script): New function.
 	* python/python.h (source_python_script): Declare.
 	* cli/cli-cmds.c (find_argument): New function.

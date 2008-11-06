@@ -37,6 +37,10 @@ typedef struct pyty_type_object
      underlying struct type when the objfile is deleted.  */
   struct pyty_type_object *prev;
   struct pyty_type_object *next;
+
+  /* This is nonzero if the type is owned by this object and should be
+     freed when the object is deleted.  */
+  int owned;
 } type_object;
 
 static PyTypeObject type_object_type;
@@ -276,6 +280,7 @@ clean_up_objfile_types (struct objfile *objfile, void *datum)
 
       obj->next = NULL;
       obj->prev = NULL;
+      obj->owned = 1;
 
       obj = next;
     }
@@ -287,24 +292,19 @@ static void
 set_type (type_object *obj, struct type *type)
 {
   obj->type = type;
-  if (type)
+  obj->owned = 0;
+  obj->prev = NULL;
+  if (type && TYPE_OBJFILE (type))
     {
       struct objfile *objfile = TYPE_OBJFILE (type);
 
-      if (objfile)
-	{
-	  obj->next = objfile_data (objfile, typy_objfile_data_key);
-	  if (obj->next)
-	    obj->next->prev = obj;
-	  obj->prev = NULL;
-	  set_objfile_data (objfile, typy_objfile_data_key, obj);
-	}
-      else
-	{
-	  obj->prev = NULL;
-	  obj->next = NULL;
-	}
+      obj->next = objfile_data (objfile, typy_objfile_data_key);
+      if (obj->next)
+	obj->next->prev = obj;
+      set_objfile_data (objfile, typy_objfile_data_key, obj);
     }
+  else
+    obj->next = NULL;
 }
 
 static PyObject *
@@ -359,7 +359,7 @@ typy_dealloc (PyObject *obj)
 
   if (type->type)
     {
-      if (!TYPE_OBJFILE (type->type))
+      if (type->owned)
 	{
 	  /* We own the type, so delete it.  */
 	  htab_t deleted_types;
@@ -376,7 +376,8 @@ typy_dealloc (PyObject *obj)
 	    {
 	      /* Must reset head of list.  */
 	      struct objfile *objfile = TYPE_OBJFILE (type->type);
-	      set_objfile_data (objfile, typy_objfile_data_key, type->next);
+	      if (objfile)
+		set_objfile_data (objfile, typy_objfile_data_key, type->next);
 	    }
 	  if (type->next)
 	    type->next->prev = type->prev;
