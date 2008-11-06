@@ -41,7 +41,12 @@ struct demangle_component;
    namespace OUTER These form a linked list; NEXT is the next element of
    the list. ALIAS is set to a non empty string if the imported namespace
    has been aliased.Eg:
-       namespace C=A::B; 
+       namespace C=A::B;
+   ALIAS = "C"
+   DECLARATION is the name of the imported declaration, if this import 
+   statement represents one. Eg:
+       using A::x;
+   Where x is variable in namespace A. declaration is set to x.  
 */
 
 struct using_direct
@@ -50,6 +55,8 @@ struct using_direct
   char *outer;
   
   char *alias;
+  
+  char *declaration;
   
   struct using_direct *next;
 };
@@ -84,11 +91,13 @@ extern int cp_is_anonymous (const char *namespace);
 
 extern void cp_add_using_directive (const char *outer,
                                     const char *inner,
-                                    const char *alias);
+                                    const char *alias,
+                                    const char *declaration);
 
 extern struct using_direct *cp_add_using (const char *outer,
                                           const char *inner,
                                           const char *alias,
+                                          const char *declaration,
 					  struct using_direct *next);
 
 extern void cp_initialize_namespace (void);

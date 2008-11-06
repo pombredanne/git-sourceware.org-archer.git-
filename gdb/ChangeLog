@@ -438,6 +438,16 @@
 	* i386-dicos-tdep.c (i386_dicos_init_abi): Set decr_pc_after_break
 	to 0.
 
+2008-11-06  Sami Wagiaalla  <swagiaal@redhat.com> 
+ 
+	* cp-support.h: Added char* declaration element to using_direct data struct.
+	(cp_add_using): Added char* declaration argument.
+	(cp_add_using_directive): Ditto. 
+	* cp-namespace.c: Updated with the above changes.
+	* dwarf2read.c (read_import_statement): Ditto.
+	(read_namespace): Ditto.
+	* cp-namespace.c (cp_copy_usings): Copy aliases and declarations 
+
 2008-11-06  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* cp-namespace.c (cp_lookup_symbol_namespace): Check for aliases.

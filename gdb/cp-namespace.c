@@ -108,7 +108,7 @@ cp_scan_for_anonymous_namespaces (const struct symbol *symbol)
 		 anonymous namespace.  So add symbols in it to the
 		 namespace given by the previous component if there is
 		 one, or to the global namespace if there isn't.  */
-	      cp_add_using_directive (outer, name, "");
+	      cp_add_using_directive (outer, name, "", "");
 	    }
 	  /* The "+ 2" is for the "::".  */
 	  previous_component = next_component + 2;
@@ -123,7 +123,8 @@ cp_scan_for_anonymous_namespaces (const struct symbol *symbol)
    has already been added, don't add it twice.  */
 
 void
-cp_add_using_directive (const char *outer, const char *inner, const char* alias)
+cp_add_using_directive (const char *outer, const char *inner, const char* alias,
+    const char *declaration)
 {
   struct using_direct *current;
   struct using_direct *new;
@@ -137,7 +138,7 @@ cp_add_using_directive (const char *outer, const char *inner, const char* alias)
 	return;
     }
 
-  using_directives = cp_add_using (outer, inner, alias,
+  using_directives = cp_add_using (outer, inner, alias, declaration,
       using_directives);
 }
 
@@ -201,6 +202,7 @@ struct using_direct *
 cp_add_using (const char *outer,
               const char *inner,
               const char *alias,
+              const char *declaration,
 	      struct using_direct *next)
 {
   struct using_direct *retval;
@@ -209,7 +211,8 @@ cp_add_using (const char *outer,
   retval->inner = savestring (inner, strlen(inner));
   retval->outer = savestring (outer, strlen(outer));
   retval->alias = savestring (alias, strlen(alias));
-    
+  retval->declaration = savestring (declaration, strlen(declaration));
+      
   retval->next = next;
 
   return retval;
@@ -234,7 +237,11 @@ cp_copy_usings (struct using_direct *using,
       retval->inner = obsavestring (using->inner, strlen (using->inner),
 				    obstack);
       retval->outer = obsavestring (using->outer, strlen (using->outer),
-				    obstack);
+                                    obstack);
+      retval->alias = obsavestring (using->alias, strlen (using->alias),
+                                    obstack);
+      retval->declaration = obsavestring (using->declaration, strlen (using->declaration),
+                                    obstack);
       retval->next = cp_copy_usings (using->next, obstack);
 
       xfree (using->inner);
