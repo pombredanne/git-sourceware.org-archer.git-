@@ -2888,8 +2888,8 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
   const char *imported_name;
   const char *imported_name_prefix;
   char *canonical_name;
-  char *import_alias;
-  
+  const char *import_alias;
+  const char *imported_declaration = "";
   const char *import_prefix;
     
   int is_anonymous = 0;
@@ -2925,18 +2925,26 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
    */
   imported_name_prefix = determine_prefix (imported_die, cu);
   
-  
-  if(strlen (imported_name_prefix) > 0){
-    canonical_name = alloca (strlen (imported_name_prefix) + 2 + strlen (imported_name) + 1);
-    strcpy (canonical_name, imported_name_prefix);
-    strcat (canonical_name, "::");
-    strcat (canonical_name, imported_name);
+  if(imported_die->tag != DW_TAG_namespace){
+    imported_declaration = imported_name;
+    canonical_name = (char*)imported_name_prefix;
   }else{
-    canonical_name = alloca (strlen (imported_name) + 1);
-    strcpy (canonical_name, imported_name);
+    if(strlen (imported_name_prefix) > 0){
+      canonical_name = alloca (strlen (imported_name_prefix) + 2 + strlen (imported_name) + 1);
+      strcpy (canonical_name, imported_name_prefix);
+      strcat (canonical_name, "::");
+      strcat (canonical_name, imported_name);
+    }else{
+      canonical_name = alloca (strlen (imported_name) + 1);
+      strcpy (canonical_name, imported_name);
+    }
   }
   
-  using_directives = cp_add_using (import_prefix,canonical_name, import_alias, "", using_directives);
+  using_directives = cp_add_using (import_prefix,
+                                   canonical_name,
+                                   import_alias,
+                                   imported_declaration,
+                                   using_directives);
 }
 
 static void

@@ -433,6 +433,13 @@
 	* thread.c (print_thread_info): Eliminate now useless checks
 	for exited threads.
 
+2008-11-06  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* dwarf2read.c (read_import_statement): Create using_direc structs
+	representing imported declarations.
+	* cp-namespace.c (cp_lookup_symbol_namespace): Check for imported 
+	declarations.
+
 2008-11-06  Pedro Alves  <pedro@codesourcery.com>
 
 	* i386-dicos-tdep.c (i386_dicos_init_abi): Set decr_pc_after_break
