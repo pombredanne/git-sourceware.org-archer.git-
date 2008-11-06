@@ -1,3 +1,10 @@
+2008-11-06  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* dwarf2read.c (read_import_statement): Create using_direc structs
+	representing imported declarations.
+	* cp-namespace.c (cp_lookup_symbol_namespace): Check for imported 
+	declarations.
+
 2008-11-06  Sami Wagiaalla  <swagiaal@redhat.com> 
  
 	* cp-support.h: Added char* declaration element to using_direct data struct.

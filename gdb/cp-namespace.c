@@ -376,7 +376,7 @@ cp_lookup_symbol_namespace (const char *namespace,
 			    const domain_enum domain)
 {
   const struct using_direct *current;
-  struct symbol *sym;
+  struct symbol *sym = NULL;
 
   /* First, go through the using directives.  If any of them add new
      names to the namespace we're searching in, see if we can find a
@@ -390,6 +390,16 @@ cp_lookup_symbol_namespace (const char *namespace,
       if (strcmp (namespace, current->outer) == 0)
 	{
 	  
+	  if(strcmp ("", current->declaration) != 0){
+	    if(strcmp (name, current->declaration) == 0){
+	      sym = cp_lookup_symbol_namespace (current->inner,
+	                                        name,
+	                                        linkage_name,
+	                                        block,
+	                                        domain);
+	    }
+	   
+	  }else{
 	  /* Check for aliases */
 	  if(strcmp (name, current->alias) == 0){
 	    sym = cp_lookup_symbol_namespace (namespace,
@@ -404,7 +414,7 @@ cp_lookup_symbol_namespace (const char *namespace,
 					      block,
 					      domain);
 	  }
-	  
+	  }
 	  if (sym != NULL){
 	    return sym;
 	  }
