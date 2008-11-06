@@ -1,3 +1,10 @@
+2008-11-06  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* cp-namespace.c (cp_lookup_symbol_namespace): Check for aliases.
+	lookup unqualified names without namespace concatenation.
+	* dwarf2read.c (read_import_statement): Figure out local alias for
+	the import and pass it on cp_add_using.
+
 2008-11-04  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* cp-namespace.c (lookup_namespace_scope): Use 

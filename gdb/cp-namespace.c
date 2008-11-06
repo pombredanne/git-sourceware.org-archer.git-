@@ -379,15 +379,28 @@ cp_lookup_symbol_namespace (const char *namespace,
        current != NULL;
        current = current->next)
     {
+      
       if (strcmp (namespace, current->outer) == 0)
 	{
-	  sym = cp_lookup_symbol_namespace (current->inner,
-					    name,
-					    linkage_name,
-					    block,
-					    domain);
-	  if (sym != NULL)
+	  
+	  /* Check for aliases */
+	  if(strcmp (name, current->alias) == 0){
+	    sym = cp_lookup_symbol_namespace (namespace,
+	                                      current->inner,
+	                                      linkage_name,
+	                                      block,
+	                                      domain);
+	  }else{
+	    sym = cp_lookup_symbol_namespace (current->inner,
+		                              name,
+					      linkage_name,
+					      block,
+					      domain);
+	  }
+	  
+	  if (sym != NULL){
 	    return sym;
+	  }
 	}
     }
 
@@ -397,7 +410,10 @@ cp_lookup_symbol_namespace (const char *namespace,
   
   if (namespace[0] == '\0')
     {
-      return NULL;
+      sym = lookup_symbol_file (name, linkage_name,
+                                     block, domain, 
+                                     cp_is_anonymous (namespace));
+      return sym;
     }
   else
     {
