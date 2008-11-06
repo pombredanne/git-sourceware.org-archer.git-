@@ -1,3 +1,48 @@
+2008-11-06  Tom Tromey  <tromey@redhat.com>
+
+	* varobj.c (struct varobj) <constructor>: New field.
+	(varobj_set_display_format): Update.
+	(varobj_get_display_hint): Likewise.
+	(varobj_get_num_children): Likewise.
+	(varobj_list_children): Likewise.
+	(install_new_value): Destroy old pretty-printer.
+	(install_visualizer): Update.  Recompute children when visualizer
+	is removed.
+	(install_default_visualizer): Don't instantiate printer.  Add
+	'type' argument.
+	(new_variable): Initialize new field.
+	(free_variable): Destroy new field.
+	(instantiate_pretty_printer): New function.
+	(varobj_set_visualizer): Don't instantiate printer.
+	* python/python-internal.h (objfpy_get_mi_printers,
+	objfpy_get_cli_printers): Remove.
+	(objfpy_get_printers): Declare.
+	(gdbpy_instantiate_printer): Declare.
+	* python/python.c (find_pretty_printer): Remove is_mi and dictp
+	arguments.
+	(_initialize_python): Initialize pretty_printers, not
+	cli_pretty_printers and mi_pretty_printers.
+	<_format_children>: Update.  Conditionally call 'children'.
+	(apply_pretty_printer): Update.  Instantiate printer.
+	(apply_val_pretty_printer): Update.  Instantiate printer.
+	(pretty_print_one_value): Rename func argument to printer.  Remove
+	value argument.  Update.
+	(gdbpy_instantiate_printer): New function.
+	(apply_varobj_pretty_printer): Update.
+	(gdbpy_get_varobj_pretty_printer): Update.
+	* python/python-objfile.c (objfile_object): Remove mi_printers,
+	cli_printers; add printers.
+	(objfpy_dealloc): Update.
+	(objfpy_new): Update.
+	(objfpy_get_printers): Rename from objfpy_get_mi_printers.
+	Update.
+	(objfpy_set_printers): Rename from objfpy_set_mi_printers.
+	Update.
+	(objfpy_get_cli_printers): Remove.
+	(objfpy_set_cli_printers): Remove.
+	(objfile_to_objfile_object): Update.
+	(objfile_getset): Update.
+
 2008-11-03  Paul Pluzhnikov  <ppluzhnikov@google.com>
 
 	* python/python.c (find_pretty_printer): Fix gcc-4.3.1 warnings.

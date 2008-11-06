@@ -676,17 +676,14 @@ search_pp_dictionary (PyObject *dict, char *type_name)
   return found;
 }
 
-/* Find the pretty-printing function for TYPE.  If no pretty-printer
-   exists, return NULL.  If one exists, return a borrowed reference.
-   If a printer is found, *DICTP is set to a reference to the
-   dictionary object; it must be derefed by the caller.  DICT_NAME is
-   the name of the dictionary to search for types.  */
+/* Find the pretty-printing constructor function for TYPE.  If no
+   pretty-printer exists, return NULL.  If one exists, return a new
+   reference.  */
 static PyObject *
-find_pretty_printer (struct type *type, PyObject **dictp, int is_mi)
+find_pretty_printer (struct type *type)
 {
   PyObject *dict, *found = NULL;
   char *type_name = NULL;
-  char *dict_name;
   struct objfile *obj;
   volatile struct gdb_exception except;
 
@@ -710,11 +707,7 @@ find_pretty_printer (struct type *type, PyObject **dictp, int is_mi)
     if (!objf)
       continue;
 
-    if (is_mi)
-      dict = objfpy_get_mi_printers (objf, NULL);
-    else
-      dict = objfpy_get_cli_printers (objf, NULL);
-
+    dict = objfpy_get_printers (objf, NULL);
     found = search_pp_dictionary (dict, type_name);
     if (found)
       goto done;
@@ -723,11 +716,10 @@ find_pretty_printer (struct type *type, PyObject **dictp, int is_mi)
   }
 
   /* Fetch the global pretty printer dictionary.  */
-  dict_name = is_mi ? "mi_pretty_printers" : "cli_pretty_printers";
   dict = NULL;
-  if (! PyObject_HasAttrString (gdb_module, dict_name))
+  if (! PyObject_HasAttrString (gdb_module, "pretty_printers"))
     goto done;
-  dict = PyObject_GetAttrString (gdb_module, dict_name);
+  dict = PyObject_GetAttrString (gdb_module, "pretty_printers");
   if (! dict)
     goto done;
   if (! PyDict_Check (dict) || ! PyDict_Size (dict))
@@ -739,57 +731,44 @@ find_pretty_printer (struct type *type, PyObject **dictp, int is_mi)
   xfree (type_name);
 
   if (found)
-    *dictp = dict;
-  else
-    Py_XDECREF (dict);
+    Py_INCREF (found);
+  Py_XDECREF (dict);
 
   return found;
 }
 
-/* Pretty-print a single value, VALUE, using the printer function
-   FUNC.  If the function returns a string, an xmalloc()d copy is
-   returned.  Otherwise, if the function returns a value, a *OUT_VALUE
-   is set to the value, and NULL is returned.  On error, *OUT_VALUE is
-   set to NULL and NULL is returned.  If CHILDREN is true, we may also
-   try to call an object's "children" method and format the output
+/* Pretty-print a single value, via the printer object PRINTER.  If
+   the function returns a string, an xmalloc()d copy is returned.
+   Otherwise, if the function returns a value, a *OUT_VALUE is set to
+   the value, and NULL is returned.  On error, *OUT_VALUE is set to
+   NULL and NULL is returned.  If CHILDREN is true, we may also try to
+   call an object's "children" method and format the output
    accordingly.  */
 static char *
-pretty_print_one_value (PyObject *func, struct value *value,
-			struct value **out_value, int children)
+pretty_print_one_value (PyObject *printer, struct value **out_value,
+			int children)
 {
   char *output = NULL;
   volatile struct gdb_exception except;
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      PyObject *val_obj, *result;
+      PyObject *result;
 
-      /* FIXME: memory management here.  Why are values so
-	 funny?  */
-      value = value_copy (value);
-
-      val_obj = value_to_value_object (value);
-
-      /* The function might be an MI-style class, or it might be an
-	 ordinary function.  If CHILDREN is true, the existence of
-	 either the to_string or children methods means to call
-	 _format_children.  Otherwise, if we have to_string, call it.
-	 As a last resort, call the object as a function.  */
+      /* If CHILDREN is true, call _format_children.  Otherwise, just
+	 try to call the object's to_string method.  */
       if (children
-	  && (PyObject_HasAttr (func, gdbpy_children_cst)
-	      || PyObject_HasAttr (func, gdbpy_to_string_cst))
 	  && PyObject_HasAttrString (gdb_module, "_format_children"))
 	{
 	  PyObject *fmt = PyObject_GetAttrString (gdb_module,
 						  "_format_children");
-	  result = PyObject_CallFunctionObjArgs (fmt, func, val_obj, NULL);
+	  result = PyObject_CallFunctionObjArgs (fmt, printer, NULL);
 	  Py_DECREF (fmt);
 	}
-      else if (PyObject_HasAttr (func, gdbpy_to_string_cst))
-	result = PyObject_CallMethodObjArgs (func, gdbpy_to_string_cst,
-					     val_obj, NULL);
       else
-	result = PyObject_CallFunctionObjArgs (func, val_obj, NULL);
+	result = PyObject_CallMethodObjArgs (printer, gdbpy_to_string_cst,
+					     NULL);
+
       if (result)
 	{
 	  if (gdbpy_is_string (result))
@@ -808,11 +787,31 @@ pretty_print_one_value (PyObject *func, struct value *value,
 	}
       else
 	gdbpy_print_stack ();
-
-      Py_DECREF (val_obj);
     }
 
   return output;
+}
+
+/* Instantiate a pretty-printer given a constructor, CONS, and a
+   value, VAL.  Return NULL on error.  */
+PyObject *
+gdbpy_instantiate_printer (PyObject *cons, struct value *value)
+{
+  PyObject *val_obj = NULL, *result;
+  volatile struct gdb_exception except;
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      /* FIXME: memory management here.  Why are values so
+	 funny?  */
+      value = value_copy (value);
+      val_obj = value_to_value_object (value);
+    }
+  GDB_PY_HANDLE_EXCEPTION (except);
+
+  result = PyObject_CallFunctionObjArgs (cons, val_obj, NULL);
+  Py_DECREF (val_obj);
+  return result;
 }
 
 /* Try to pretty-print VALUE.  Return an xmalloc()d string
@@ -824,18 +823,26 @@ pretty_print_one_value (PyObject *func, struct value *value,
 char *
 apply_pretty_printer (struct value *value, struct value **out_value)
 {
-  PyObject *dict, *func;
-  char *output;
+  PyObject *func, *printer;
+  char *output = NULL;
 
   *out_value = NULL;
 
-  func = find_pretty_printer (value_type (value), &dict, 0);
+  /* Find the constructor.  */
+  func = find_pretty_printer (value_type (value));
   if (! func)
     return NULL;
 
-  output = pretty_print_one_value (func, value, out_value, 1);
-
-  Py_DECREF (dict);
+  /* Instantiate it to get a printer object.  */
+  printer = gdbpy_instantiate_printer (func, value);
+  if (printer)
+    {
+      /* If instantiation returns None, then don't try to print.  */
+      if (printer != Py_None)
+	output = pretty_print_one_value (printer, out_value, 1);
+      Py_DECREF (printer);
+    }
+  Py_DECREF (func);
 
   return output;
 }
@@ -852,20 +859,27 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
 			  enum val_prettyprint pretty,
 			  const struct language_defn *language)
 {
-  PyObject *dict, *func;
+  PyObject *func, *printer;
   struct value *value, *replacement = NULL;
-  char *output;
+  char *output = NULL;
 
-  func = find_pretty_printer (type, &dict, 0);
+  /* Find the constructor.  */
+  func = find_pretty_printer (type);
   if (! func)
     return NULL;
 
+  /* Instantiate the printer.  */
   value = value_from_contents_and_address (type, valaddr, embedded_offset,
 					   address);
-  output = pretty_print_one_value (func, value, &replacement, 1);
+  printer = gdbpy_instantiate_printer (func, value);
+  Py_DECREF (func);
 
-  Py_DECREF (dict);
+  if (!printer)
+    return NULL;
 
+  if (printer != Py_None)
+    output = pretty_print_one_value (printer, &replacement, 1);
+  Py_DECREF (printer);
   if (output)
     return output;
 
@@ -884,45 +898,39 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
 
 /* Apply a pretty-printer for the varobj code.  PRINTER_OBJ is the
    print object.  It must have a 'to_string' method (but this is
-   checked by varobj, not here) which accepts a gdb.Value and returns
-   a string.  This returns an xmalloc()d string if the printer returns
-   a string.  The printer may return a replacement value instead; in
-   this case *REPLACEMENT is set to the replacement value, and this
-   function returns NULL.  On error, *REPLACEMENT is set to NULL and
-   this function also returns NULL.  */
+   checked by varobj, not here) which accepts takes no arguments and
+   returns a string.  This function returns an xmalloc()d string if
+   the printer returns a string.  The printer may return a replacement
+   value instead; in this case *REPLACEMENT is set to the replacement
+   value, and this function returns NULL.  On error, *REPLACEMENT is
+   set to NULL and this function also returns NULL.  */
 char *
 apply_varobj_pretty_printer (PyObject *printer_obj, struct value *value,
 			     struct value **replacement)
 {
   *replacement = NULL;
-  return pretty_print_one_value (printer_obj, value, replacement, 0);
+  return pretty_print_one_value (printer_obj, replacement, 0);
 }
 
-/* Find a pretty-printer object for the varobj module.  Returns a
-   borrowed reference to the object if successful; returns NULL if
-   not.  TYPE is the type of the varobj for which a printer should be
+/* Find a pretty-printer object for the varobj module.  Returns a new
+   reference to the object if successful; returns NULL if not.  TYPE
+   is the type of the varobj for which a printer should be
    returned.  */
 PyObject *
 gdbpy_get_varobj_pretty_printer (struct type *type)
 {
-  PyObject *dict = NULL;
-  PyObject *printer = find_pretty_printer (type, &dict, 1);
-  if (dict)
-    {
-      Py_DECREF (dict);
-    }
-  return printer;
+  return find_pretty_printer (type);
 }
 
-/* A Python function which wraps gdbpy_get_varobj_pretty_printer and
-   instantiates the resulting class.  This accepts a Value argument
-   and returns a pretty printer instance, or None.  This function is
-   useful as an argument to the MI command -var-set-visualizer.  */
+/* A Python function which wraps find_pretty_printer and instantiates
+   the resulting class.  This accepts a Value argument and returns a
+   pretty printer instance, or None.  This function is useful as an
+   argument to the MI command -var-set-visualizer.  */
 static PyObject *
 gdbpy_get_default_visualizer (PyObject *self, PyObject *args)
 {
   PyObject *val_obj;
-  PyObject *result;
+  PyObject *cons, *printer = NULL;
   struct value *value;
 
   if (! PyArg_ParseTuple (args, "O", &val_obj))
@@ -930,25 +938,28 @@ gdbpy_get_default_visualizer (PyObject *self, PyObject *args)
   value = value_object_to_value (val_obj);
   if (! value)
     {
-      PyErr_SetString (PyExc_RuntimeError, "argument must be a gdb.Value");
+      PyErr_SetString (PyExc_TypeError, "argument must be a gdb.Value");
       return NULL;
     }
 
-  result = gdbpy_get_varobj_pretty_printer (value_type (value));
-  if (result)
+  cons = find_pretty_printer (value_type (value));
+  if (cons)
     {
-      /* Instantiate it.  */
-      result = PyObject_CallFunctionObjArgs (result, NULL);
+      /* While it is a bit lame to pass value here and make a new
+	 Value, it is probably better to share the instantiation
+	 code.  */
+      printer = gdbpy_instantiate_printer (cons, value);
+      Py_DECREF (cons);
     }
 
-  if (! result)
+  if (!printer)
     {
       PyErr_Clear ();
-      result = Py_None;
+      printer = Py_None;
+      Py_INCREF (printer);
     }
 
-  Py_INCREF (result);
-  return result;
+  return printer;
 }
 
 #else /* HAVE_PYTHON */
@@ -1096,8 +1107,7 @@ Enables or disables auto-loading of Python code when an object is opened."),
   gdbpy_initialize_objfile ();
 
   PyRun_SimpleString ("import gdb");
-  PyRun_SimpleString ("gdb.cli_pretty_printers = {}");
-  PyRun_SimpleString ("gdb.mi_pretty_printers = {}");
+  PyRun_SimpleString ("gdb.pretty_printers = {}");
 
   observer_attach_new_objfile (gdbpy_new_objfile);
 
@@ -1132,29 +1142,30 @@ sys.stdout = GdbOutputFile()\n\
 ");
 
   PyRun_SimpleString ("\
-def _format_children(obj, val):\n\
+def _format_children(obj):\n\
   result = []\n\
   if hasattr(obj, 'to_string'):\n\
-    result.append(str(obj.to_string(val)))\n\
+    result.append(str(obj.to_string()))\n\
   if hasattr(obj, 'display_hint'):\n\
-    is_map = 'map' == obj.display_hint(val)\n\
+    is_map = 'map' == obj.display_hint()\n\
   else:\n\
     is_map = False\n\
   max = gdb.get_parameter('print elements')\n\
   i = 0\n\
   previous = None\n\
-  for elt in obj.children(val):\n\
-    (name, val) = elt\n\
-    if is_map:\n\
-      if i % 2 == 0:\n\
-        previous = val\n\
+  if hasattr(obj, 'children'):\n\
+    for elt in obj.children():\n\
+      (name, val) = elt\n\
+      if is_map:\n\
+	if i % 2 == 0:\n\
+	  previous = val\n\
+	else:\n\
+	  result.append('[%s] = %s' % (str (previous), str (val)))\n\
       else:\n\
-        result.append('[%s] = %s' % (str (previous), str (val)))\n\
-    else:\n\
-      result.append('%s = %s' % (name, str(val)))\n\
-    i = i + 1\n\
-    if max != None and i == max:\n\
-      break\n\
+	result.append('%s = %s' % (name, str(val)))\n\
+      i = i + 1\n\
+      if max != None and i == max:\n\
+	break\n\
   return '\\n'.join(result)\n\
 \n\
 gdb._format_children = _format_children\n\

@@ -29,9 +29,8 @@ typedef struct
   /* The corresponding objfile.  */
   struct objfile *objfile;
 
-  /* The pretty-printer dictionaries.  */
-  PyObject *mi_printers;
-  PyObject *cli_printers;
+  /* The pretty-printer dictionary.  */
+  PyObject *printers;
 } objfile_object;
 
 static PyTypeObject objfile_object_type;
@@ -55,8 +54,7 @@ static void
 objfpy_dealloc (PyObject *o)
 {
   objfile_object *self = (objfile_object *) o;
-  Py_XDECREF (self->mi_printers);
-  Py_XDECREF (self->cli_printers);
+  Py_XDECREF (self->printers);
   self->ob_type->tp_free ((PyObject *) self);
 }
 
@@ -67,17 +65,9 @@ objfpy_new (PyTypeObject *type, PyObject *args, PyObject *keywords)
   if (self)
     {
       self->objfile = NULL;
-      /* Initialize in case of early return.  */
-      self->cli_printers = NULL;
 
-      self->mi_printers = PyDict_New ();
-      if (!self->mi_printers)
-	{
-	  Py_DECREF (self);
-	  return NULL;
-	}
-      self->cli_printers = PyDict_New ();
-      if (!self->cli_printers)
+      self->printers = PyDict_New ();
+      if (!self->printers)
 	{
 	  Py_DECREF (self);
 	  return NULL;
@@ -87,67 +77,34 @@ objfpy_new (PyTypeObject *type, PyObject *args, PyObject *keywords)
 }
 
 PyObject *
-objfpy_get_mi_printers (PyObject *o, void *ignore)
+objfpy_get_printers (PyObject *o, void *ignore)
 {
   objfile_object *self = (objfile_object *) o;
-  Py_INCREF (self->mi_printers);
-  return self->mi_printers;
+  Py_INCREF (self->printers);
+  return self->printers;
 }
 
 static int
-objfpy_set_mi_printers (PyObject *o, PyObject *value, void *ignore)
+objfpy_set_printers (PyObject *o, PyObject *value, void *ignore)
 {
   objfile_object *self = (objfile_object *) o;
   if (! value)
     {
       PyErr_SetString (PyExc_TypeError,
-		       "cannot delete the mi_pretty_printers attribute");
+		       "cannot delete the pretty_printers attribute");
       return -1;
     }
 
   if (! PyDict_Check (value))
     {
       PyErr_SetString (PyExc_TypeError,
-		       "the mi_pretty_printers attribute must be a dictionary");
+		       "the pretty_printers attribute must be a dictionary");
       return -1;
     }
 
-  Py_XDECREF (self->mi_printers);
+  Py_XDECREF (self->printers);
   Py_INCREF (value);
-  self->mi_printers = value;
-
-  return 0;
-}
-
-PyObject *
-objfpy_get_cli_printers (PyObject *o, void *ignore)
-{
-  objfile_object *self = (objfile_object *) o;
-  Py_INCREF (self->cli_printers);
-  return self->cli_printers;
-}
-
-static int
-objfpy_set_cli_printers (PyObject *o, PyObject *value, void *ignore)
-{
-  objfile_object *self = (objfile_object *) o;
-  if (! value)
-    {
-      PyErr_SetString (PyExc_TypeError,
-		       "cannot delete the cli_pretty_printers attribute");
-      return -1;
-    }
-
-  if (! PyDict_Check (value))
-    {
-      PyErr_SetString (PyExc_TypeError,
-		       "the cli_pretty_printers attribute must be a dictionary");
-      return -1;
-    }
-
-  Py_XDECREF (self->cli_printers);
-  Py_INCREF (value);
-  self->cli_printers = value;
+  self->printers = value;
 
   return 0;
 }
@@ -181,18 +138,9 @@ objfile_to_objfile_object (struct objfile *objfile)
 	  PyObject *dict;
 
 	  object->objfile = objfile;
-	  /* Initialize in case of early return.  */
-	  object->cli_printers = NULL;
 
-	  object->mi_printers = PyDict_New ();
-	  if (!object->mi_printers)
-	    {
-	      Py_DECREF (object);
-	      return NULL;
-	    }
-
-	  object->cli_printers = PyDict_New ();
-	  if (!object->cli_printers)
+	  object->printers = PyDict_New ();
+	  if (!object->printers)
 	    {
 	      Py_DECREF (object);
 	      return NULL;
@@ -223,10 +171,8 @@ gdbpy_initialize_objfile (void)
 
 static PyGetSetDef objfile_getset[] =
 {
-  { "mi_pretty_printers", objfpy_get_mi_printers, objfpy_set_mi_printers,
-    "MI pretty printers", NULL },
-  { "cli_pretty_printers", objfpy_get_cli_printers, objfpy_set_cli_printers,
-    "CLI pretty printers", NULL },
+  { "pretty_printers", objfpy_get_printers, objfpy_set_printers,
+    "Pretty printers", NULL },
   { NULL }
 };
 

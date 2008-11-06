@@ -75,8 +75,7 @@ PyObject *gdb_owned_value_to_value_object (struct value *v);
 PyObject *type_to_type_object (struct type *);
 PyObject *objfile_to_objfile_object (struct objfile *);
 
-PyObject *objfpy_get_mi_printers (PyObject *, void *);
-PyObject *objfpy_get_cli_printers (PyObject *, void *);
+PyObject *objfpy_get_printers (PyObject *, void *);
 
 struct block *block_object_to_block (PyObject *obj);
 struct symbol *symbol_object_to_symbol (PyObject *obj);
@@ -130,6 +129,7 @@ int gdbpy_is_string (PyObject *obj);
 char *apply_varobj_pretty_printer (PyObject *print_obj, struct value *value,
 				   struct value **replacement);
 PyObject *gdbpy_get_varobj_pretty_printer (struct type *type);
+PyObject *gdbpy_instantiate_printer (PyObject *cons, struct value *value);
 
 extern PyObject *gdbpy_children_cst;
 extern PyObject *gdbpy_to_string_cst;

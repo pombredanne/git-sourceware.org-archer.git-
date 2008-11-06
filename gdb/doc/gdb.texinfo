@@ -17951,24 +17951,31 @@ using Python code.  This mechanism works for both MI and the CLI.
 A pretty-printer is an object that implements a specific interface.
 There is no predefined base class for pretty-printers.
 
-@defop Operation {pretty printer} children (self, val)
-This method is used by both the MI and CLI code.  When printing a
-value, @value{GDBN} will call this method to display the children of
-@var{val}, an instance of @code{gdb.Value}.
+@defop Operation {pretty printer} __init__ (self, val)
+When printing a value, @value{GDBN} constructs an instance of the
+pretty-printer.  @var{val} is the value to be printed, an instance of
+@code{gdb.Value}.
+@end defop
+
+@defop Operation {pretty printer} children (self)
+When printing a value, @value{GDBN} will call this method to compute
+the children of the value passed to the object's constructor.
 
 This method must return an object conforming to the Python iterator
 protocol.  Each element returned by the iterator must be a tuple
 holding two elements.  The first element is the ``name'' of the child;
 the second element is the child's value.  The value can be any Python
 object which is convertible to a @value{GDBN} value.
+
+This method is optional.  If it does not exist, @value{GDBN} will act
+as though the value has no children.
 @end defop
 
-@defop Operation {pretty printer} display_hint (self, val)
-This method is only used by the MI printer.
-
-This method must return a string.  It will be supplied to the MI
-consumer as a @samp{displayhint} attribute of the variable being
-printed.
+@defop Operation {pretty printer} display_hint (self)
+This method must return a string.  The CLI may use this to change the
+formatting of children of a value.  The result will also be supplied
+to an MI consumer as a @samp{displayhint} attribute of the variable
+being printed.
 
 Some display hints are predefined by @value{GDBN}:
 
@@ -17980,10 +17987,9 @@ alternate between keys and values.
 @end table
 @end defop
 
-@defop Operation {pretty printer} to_string (self, val)
-This method is used by both the MI and CLI code.  When printing a
-value, @value{GDBN} will call this method to display the string
-representation of @var{val}, an instance of @code{gdb.Value}.
+@defop Operation {pretty printer} to_string (self)
+@value{GDBN} will call this method to display the string
+representation of the value passed to the object's constructor.
 
 When printing from the CLI, if the @code{to_string} method exists,
 then @value{GDBN} will prepend its result to the values returned by
@@ -17992,13 +17998,15 @@ then @value{GDBN} will prepend its result to the values returned by
 This method must return a string.
 @end defop
 
-@subsubsection Selecting CLI Pretty-Printers
+@subsubsection Selecting Pretty-Printers
 
-The Python dictionary @code{gdb.cli_pretty_printers} maps regular
-expressions (strings) onto pretty-printers.  A pretty-printer is
-either a function or an object.
+The Python dictionary @code{gdb.pretty_printers} maps regular
+expressions (strings) onto constructors.  A constructor, in this
+context, is a function which takes a single @code{gdb.Value} argument
+and returns a a pretty-printer conforming to the interface definition
+above.
 
-When printing a value, @value{GDBN} first computes the values'
+When printing a value, @value{GDBN} first computes the value's
 canonical type by following typedefs, following a reference type to
 its referenced type, and removing qualifiers, such as @code{const} or
 @code{volatile}.  The name of this type is then compared to each
@@ -18006,46 +18014,23 @@ regular expression.  If a regular expression matches, then the
 corresponding pretty-printer is invoked with a @code{gdb.Value}
 representing the value to be printed.
 
-If the pretty-printer is a function, the function is called directly.
-
-If the pretty-printer is an object, the object's methods are called as
-described above.
-
-If the pretty-printer returns a string, it is printed.  If it returns any
-Python value that is convertible to a @code{gdb.Value}, then that
-value is passed to the regular @value{GDBN} type-printing code.
-
 The order in which the regular expressions are tried is not specified.
 
-Here is an example showing how a @code{std::string} might be printed:
-
-@smallexample
-def printstdstring(val):
-    return val['_M_dataplus']['_M_p']
-
-gdb.cli_pretty_printers['^std::basic_string<char.*>$'] = printstdstring
-@end smallexample
-
-Here is an example of the same printer, using a class:
+Here is an example showing how a @code{std::string} printer might be
+written:
 
 @smallexample
 class StdStringPrinter:
-    def to_string(self, val):
-        return val['_M_dataplus']['_M_p']
+    "Print a std::string"
 
-gdb.cli_pretty_printers['^std::basic_string<char.*>$'] = StdStringPrinter()
+    def __init__(self, val):
+        self.val = val
+
+    def to_string(self):
+        return self.val['_M_dataplus']['_M_p']
+
+gdb.pretty_printers['^std::basic_string<char.*>$'] = StdStringPrinter
 @end smallexample
-
-@subsubsection Selecting MI Pretty-Printers
-
-MI pretty-printers are selected using a dictionary named
-@code{gdb.mi_pretty_printers}.  A key in this dictionary should be a
-regular expression in string form.  A value in this dictionary should
-be a constructor which takes no arguments and which returns a new
-object of the form described above.
-
-@value{GDBN} will consult @code{gdb.mi_pretty_printers} whenever a new
-MI variable object is created.
 
 @node Threads In Python
 @subsubsection Threads In Python
@@ -21821,9 +21806,8 @@ The pre-defined function @code{gdb.get_default_visualizer} may be used
 to select a visualizer according to the type of the varobj.  This is
 called when a varobj is created, and so ordinarily is not needed.
 
-@code{gdb.get_default_visualizer} looks in a global dictionary named
-@code{gdb.mi_pretty_printers}.  This works analogously to
-@code{gdb.cli_pretty_printers}.
+@code{gdb.get_default_visualizer} looks in the global dictionary named
+@code{gdb.pretty_printers}.
 
 This feature is only available if Python support is enabled.
 

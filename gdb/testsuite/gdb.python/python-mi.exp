@@ -83,14 +83,14 @@ mi_varobj_update_dynamic container {
     { {container.\[1\]} {\[1\]} 0 int }
 } "varobj update after choosing default"
 
-mi_gdb_test "-var-set-visualizer container \"lambda val: ContainerPrinter()\"" \
+mi_gdb_test "-var-set-visualizer container ContainerPrinter" \
   "\\^done" \
   "choose visualizer using expression"
 
 mi_varobj_update_dynamic container {
     { {container.\[0\]} {\[0\]} 0 int }
     { {container.\[1\]} {\[1\]} 0 int }
-} "varobj update after choosing via lambda"
+} "varobj update after choosing via expression"
 
 mi_gdb_test "-var-set-child-range container 1 2" \
   "\\^done" \

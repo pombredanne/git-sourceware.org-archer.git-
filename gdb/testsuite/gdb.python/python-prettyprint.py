@@ -17,8 +17,12 @@
 # printers.
 
 # Test returning a Value from a printer.
-def string_print (val):
-    return val['whybother']['contents']
+class string_print:
+    def __init__(self, val):
+        self.val = val
+
+    def to_string(self):
+        return self.val['whybother']['contents']
 
 # Test a class-based printer.
 class ContainerPrinter:
@@ -38,43 +42,55 @@ class ContainerPrinter:
             self.pointer = self.pointer + 1
             return ('[%d]' % int (result - self.start), result.dereference())
 
-    def to_string(self, val):
-        return 'container %s with %d elements' % (val['name'], val['len'])
+    def __init__(self, val):
+        self.val = val
 
-    def children(self, val):
-        return self._iterator(val['elements'], val['len'])
+    def to_string(self):
+        return 'container %s with %d elements' % (self.val['name'], self.val['len'])
 
-def pp_s(val):
-  a = val["a"]
-  b = val["b"]
-  if a.address() != b:
-    raise Exception("&a(%s) != b(%s)" % (str(a.address()), str(b)))
-  return " a=<" + str(val["a"]) + "> b=<" + str(val["b"]) + ">"
+    def children(self):
+        return self._iterator(self.val['elements'], self.val['len'])
 
-def pp_ss(val):
-  return "a=<" + str(val["a"]) + "> b=<" + str(val["b"]) + ">"
+class pp_s:
+    def __init__(self, val):
+        self.val = val
 
-def pp_sss(val):
-    return "a=<" + str(val['a']) + "> b=<" + str(val["b"]) + ">"
+    def to_string(self):
+        a = self.val["a"]
+        b = self.val["b"]
+        if a.address() != b:
+            raise Exception("&a(%s) != b(%s)" % (str(a.address()), str(b)))
+        return " a=<" + str(self.val["a"]) + "> b=<" + str(self.val["b"]) + ">"
 
-gdb.cli_pretty_printers['^struct s$']   = pp_s
-gdb.cli_pretty_printers['^s$']   = pp_s
-gdb.cli_pretty_printers['^S$']   = pp_s
+class pp_ss:
+    def __init__(self, val):
+        self.val = val
 
-gdb.cli_pretty_printers['^struct ss$']  = pp_ss
-gdb.cli_pretty_printers['^ss$']  = pp_ss
+    def to_string(self):
+        return "a=<" + str(self.val["a"]) + "> b=<" + str(self.val["b"]) + ">"
 
-gdb.cli_pretty_printers['^const S &$']   = pp_s
-gdb.cli_pretty_printers['^SSS$']  = pp_sss
+class pp_sss:
+    def __init__(self, val):
+        self.val = val
+
+    def to_string(self):
+        return "a=<" + str(self.val['a']) + "> b=<" + str(self.val["b"]) + ">"
+
+gdb.pretty_printers['^struct s$']   = pp_s
+gdb.pretty_printers['^s$']   = pp_s
+gdb.pretty_printers['^S$']   = pp_s
+
+gdb.pretty_printers['^struct ss$']  = pp_ss
+gdb.pretty_printers['^ss$']  = pp_ss
+
+gdb.pretty_printers['^const S &$']   = pp_s
+gdb.pretty_printers['^SSS$']  = pp_sss
 
 # Note that we purposely omit the typedef names here.
 # Printer lookup is based on canonical name.
 # However, we do need both tagged and untagged variants, to handle
 # both the C and C++ cases.
-gdb.cli_pretty_printers['^struct string_repr$'] = string_print
-gdb.cli_pretty_printers['^struct container$'] = ContainerPrinter()
-gdb.cli_pretty_printers['^string_repr$'] = string_print
-gdb.cli_pretty_printers['^container$'] = ContainerPrinter()
-
-
-gdb.mi_pretty_printers['^struct container$'] = ContainerPrinter
+gdb.pretty_printers['^struct string_repr$'] = string_print
+gdb.pretty_printers['^struct container$'] = ContainerPrinter
+gdb.pretty_printers['^string_repr$'] = string_print
+gdb.pretty_printers['^container$'] = ContainerPrinter

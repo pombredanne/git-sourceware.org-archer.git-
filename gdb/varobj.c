@@ -180,8 +180,12 @@ struct varobj
   int from;
   int to;
 
-  /* A Python object which can either format the varobj as a string,
-     or which can return the children of the varobj.  */
+  /* If NULL, no pretty printer is installed.  If not NULL, the
+     constructor to call to get a pretty-printer object.  */
+  PyObject *constructor;
+
+  /* The pretty-printer that has been constructed.  If NULL, then a
+     new printer object is needed, and one will be constructed.  */
   PyObject *pretty_printer;
 };
 
@@ -243,7 +247,7 @@ static char *cppop (struct cpstack **pstack);
 static int install_new_value (struct varobj *var, struct value *value, 
 			      int initial);
 
-static void install_default_visualizer (struct varobj *var);
+static void install_default_visualizer (struct varobj *var, struct type *type);
 
 /* Language-specific routines. */
 
@@ -599,8 +603,8 @@ varobj_create (char *objname,
 	}
     }
 
+  install_default_visualizer (var, var->type);
   discard_cleanups (old_chain);
-  install_default_visualizer (var);
   return var;
 }
 
@@ -706,6 +710,25 @@ varobj_delete (struct varobj *var, char ***dellist, int only_children)
   return delcount;
 }
 
+/* Instantiate a pretty-printer for a given value.  */
+static PyObject *
+instantiate_pretty_printer (struct varobj *var, struct value *value)
+{
+#ifdef HAVE_PYTHON
+  if (var->constructor)
+    {
+      PyObject *printer = gdbpy_instantiate_printer (var->constructor, value);
+      if (printer == Py_None)
+	{
+	  Py_DECREF (printer);
+	  printer = NULL;
+	}
+      return printer;
+    }
+#endif
+  return NULL;
+}
+
 /* Set/Get variable object display format */
 
 enum varobj_display_formats
@@ -749,10 +772,11 @@ varobj_get_display_hint (struct varobj *var)
   char *result = NULL;
 
 #if HAVE_PYTHON
-  if (var->pretty_printer
-      && PyObject_HasAttr (var->pretty_printer, gdbpy_display_hint_cst))
+  PyObject *printer = var->pretty_printer;
+
+  if (printer && PyObject_HasAttr (printer, gdbpy_display_hint_cst))
     {
-      PyObject *hint = PyObject_CallMethodObjArgs (var->pretty_printer,
+      PyObject *hint = PyObject_CallMethodObjArgs (printer,
 						   gdbpy_display_hint_cst,
 						   NULL);
       if (gdbpy_is_string (hint))
@@ -799,7 +823,6 @@ varobj_get_frozen (struct varobj *var)
   return var->frozen;
 }
 
-
 static int
 update_dynamic_varobj_children (struct varobj *var,
 				VEC (varobj_p) **changed,
@@ -812,22 +835,18 @@ update_dynamic_varobj_children (struct varobj *var,
      a standalone function, so that other interested parties
      than varobj code can benefit for this.  */
   struct cleanup *back_to;
-  PyObject *py_value;
   PyObject *children;
   PyObject *iterator;
   int i;
   int children_changed = 0;
+  PyObject *printer = var->pretty_printer;
 
   *cchanged = 0;
-  if (!PyObject_HasAttr (var->pretty_printer, gdbpy_children_cst))
+  if (!PyObject_HasAttr (printer, gdbpy_children_cst))
     return 0;
 
-  py_value = gdb_owned_value_to_value_object (var->value);
-  back_to = make_cleanup_py_decref (py_value);
-
-  children = PyObject_CallMethodObjArgs (var->pretty_printer,
-					 gdbpy_children_cst,
-					 py_value, NULL);
+  children = PyObject_CallMethodObjArgs (printer, gdbpy_children_cst,
+					 NULL);
 
   if (!children)
     {
@@ -835,7 +854,7 @@ update_dynamic_varobj_children (struct varobj *var,
       error ("Null value returned for children");
     }
 
-  make_cleanup_py_decref (children);
+  back_to = make_cleanup_py_decref (children);
 
   if (!PyIter_Check (children))
     error ("Returned value is not iterable");
@@ -979,7 +998,7 @@ varobj_list_children (struct varobj *var)
 	  name = name_of_child (var, i);
 	  existing = create_child (var, i, name);
 	  VEC_replace (varobj_p, var->children, i, existing);
-	  install_default_visualizer (existing);
+	  install_default_visualizer (existing, existing->type);
 	}
     }
 
@@ -993,7 +1012,7 @@ varobj_add_child (struct varobj *var, const char *name, struct value *value)
 					VEC_length (varobj_p, var->children), 
 					name, value);
   VEC_safe_push (varobj_p, var->children, v);
-  install_default_visualizer (v);
+  install_default_visualizer (v, v->type);
   return v;
 }
 
@@ -1207,7 +1226,7 @@ install_new_value (struct varobj *var, struct value *value, int initial)
   /* If the type has custom visualizer, we consider it to be always
      changeable. FIXME: need to make sure this behaviour will not
      mess up read-sensitive values.  */
-  if (var->pretty_printer)
+  if (var->constructor)
     changeable = 1;
 
   need_to_fetch = changeable;
@@ -1260,6 +1279,17 @@ install_new_value (struct varobj *var, struct value *value, int initial)
 	  value = NULL;
 	}
     }
+
+#if HAVE_PYTHON
+  if (var->pretty_printer)
+    {
+      Py_DECREF (var->pretty_printer);
+    }
+  if (value)
+    var->pretty_printer = instantiate_pretty_printer (var, value);
+  else
+    var->pretty_printer = NULL;
+#endif
 
   /* Below, we'll be comparing string rendering of old and new
      values.  Don't get string rendering if the value is
@@ -1374,37 +1404,36 @@ install_visualizer (struct varobj *var, PyObject *visualizer)
 #if HAVE_PYTHON
   /* If there are any children now, wipe them.  */
   varobj_delete (var, NULL, 1 /* children only */);
+  var->num_children = -1;
+
+  Py_XDECREF (var->constructor);
+  var->constructor = visualizer;
 
   Py_XDECREF (var->pretty_printer);
-  var->pretty_printer = visualizer;
+  var->pretty_printer = NULL;
 
   install_new_value (var, var->value, 1);
+
+  /* If we removed the visualizer, and the user ever requested the
+     object's children, then we must compute the list of children.
+     Note that we needn't do this when installing a visualizer,
+     because updating will recompute dynamic children.  */
+  if (!visualizer && var->children_requested)
+    varobj_list_children (var);
 #else
   error ("Python support required");
 #endif
 }
 
 static void
-install_default_visualizer (struct varobj *var)
+install_default_visualizer (struct varobj *var, struct type *type)
 {
 #if HAVE_PYTHON
-  PyObject *constructor, *instance;
+  PyObject *constructor = NULL;
 
-  if (!var->type)
-    return;
-
-  constructor = gdbpy_get_varobj_pretty_printer (var->type);
-  if (!constructor)
-    return;
-
-  instance = PyObject_CallFunctionObjArgs (constructor, NULL);
-  if (!instance)
-    {
-      gdbpy_print_stack ();
-      error ("Failed to instantiate the visualizer");
-    }
-
-  install_visualizer (var, instance);
+  if (type)
+    constructor = gdbpy_get_varobj_pretty_printer (type);
+  install_visualizer (var, constructor);
 #else
   error ("Python support required");
 #endif
@@ -1414,7 +1443,7 @@ void
 varobj_set_visualizer (struct varobj *var, const char *visualizer)
 {
 #if HAVE_PYTHON
-  PyObject *mainmod, *globals, *constructor, *instance, *py_value;
+  PyObject *mainmod, *globals, *constructor;
   struct cleanup *back_to;
 
   mainmod = PyImport_AddModule ("__main__");
@@ -1430,31 +1459,13 @@ varobj_set_visualizer (struct varobj *var, const char *visualizer)
       error ("Could not evaluate visualizer expression: %s", visualizer);
     }
 
-  make_cleanup_py_decref (constructor);
   if (constructor == Py_None)
-    instance = NULL;
-  else
     {
-      py_value = gdb_owned_value_to_value_object (var->value);
-      make_cleanup_py_decref (py_value);
-
-      /* In this case call the constructor with the value.  Maybe we
-	 should do this in all cases?  */
-      instance = PyObject_CallFunctionObjArgs (constructor, py_value, NULL);
-      if (!instance)
-	{
-	  gdbpy_print_stack ();
-	  error ("Failed to instantiate the visualizer");
-	}
-
-      if (instance == Py_None)
-	{
-	  Py_DECREF (instance);
-	  instance = NULL;
-	}
+      Py_DECREF (constructor);
+      constructor = NULL;
     }
 
-  install_visualizer (var, instance);
+  install_visualizer (var, constructor);
 
   do_cleanups (back_to);
 #else
@@ -1520,6 +1531,12 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
       new = value_of_root (varp, &type_changed);
       r.varobj = *varp;
 
+      /* Change the default visualizer, if needed, before installing
+	 the new value.  This ensures that we instantiate the correct
+	 class.  */
+      if (type_changed)
+	install_default_visualizer (*varp, value_type (new));
+
       r.type_changed = type_changed;
       if (install_new_value ((*varp), new, type_changed))
 	r.changed = 1;
@@ -1527,9 +1544,6 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
       if (new == NULL)
 	r.status = VAROBJ_NOT_IN_SCOPE;
       r.value_installed = 1;
-
-      if (r.type_changed)
-	install_default_visualizer (*varp);
 
       if (r.status == VAROBJ_NOT_IN_SCOPE)
 	{
@@ -1565,8 +1579,8 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
 	    }
 	}
 
-      /* We probably should not get children of a varobj that has 
-	 pretty_printer, but for which -var-list-children was never
+      /* We probably should not get children of a varobj that has a
+	 pretty-printer, but for which -var-list-children was never
 	 invoked.  Presumably, such varobj is not yet expanded in the
 	 UI, so we need not bother getting it.  */
       if (v->pretty_printer)
@@ -1584,7 +1598,7 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
 	  /* If update_dynamic_varobj_children returns 0, then we have
 	     a non-conforming pretty-printer, so we skip it.  */
 	  if (update_dynamic_varobj_children (v, &changed, &new_and_unchanged,
-					       &children_changed))
+					      &children_changed))
 	    {
 	      if (children_changed)
 		r.children_changed = 1;
@@ -1896,6 +1910,7 @@ new_variable (void)
   var->children_requested = 0;
   var->from = -1;
   var->to = -1;
+  var->constructor = 0;
   var->pretty_printer = 0;
 
   return var;
@@ -1930,6 +1945,7 @@ free_variable (struct varobj *var)
     }
 
 #if HAVE_PYTHON
+  Py_XDECREF (var->constructor);
   Py_XDECREF (var->pretty_printer);
 #endif
 
@@ -2703,7 +2719,7 @@ c_value_of_variable (struct varobj *var, enum varobj_display_formats format)
 
   /* If we have a custom formatter, return whatever string it has
      produced.  */
-  if (var->pretty_printer && var->print_value)
+  if (var->constructor && var->print_value)
     return xstrdup (var->print_value);
   
   /* Strip top-level references. */
