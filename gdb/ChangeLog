@@ -438,6 +438,13 @@
 	* i386-dicos-tdep.c (i386_dicos_init_abi): Set decr_pc_after_break
 	to 0.
 
+2008-11-06  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* cp-namespace.c (cp_lookup_symbol_namespace): Check for aliases.
+	lookup unqualified names without namespace concatenation.
+	* dwarf2read.c (read_import_statement): Figure out local alias for
+	the import and pass it on cp_add_using.
+
 2008-11-05  Pedro Alves  <pedro@codesourcery.com>
 
 	* remote.c (notice_new_inferiors): Add a new inferior only when
@@ -461,7 +468,21 @@
 	* infrun.c (handle_inferior_event): If stop_soon is
 	STOP_QUIETLY_NO_SIGSTOP, also expect a TARGET_SIGNAL_0.
 
-008-11-04  Sami Wagiaalla  <swagiaal@redhat.com>
+2008-11-04  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* cp-namespace.c (lookup_namespace_scope): Use 
+	cp_lookup_symbol_namespace_incremental.
+	* dwarf2read.c (read_import_statement): Correctly set the import 
+	location.
+	* symtab.c (lookup_symbol_aux_local): Removed call to 
+	lookup_namespace_scope.
+
+2008-11-04  Sami Wagiaalla  <swagiaal@redhat.com>
+	
+	* cp-namespace.c (cp_lookup_symbol_namespace_incremental): Removed 
+	extraneous print statement. 
+
+2008-11-04  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* cp-support.h: Added char* alias element to using_direct data struct.
 	(cp_add_using): Added char* alias argument.
@@ -542,6 +563,15 @@
 	* infrun.c (write_inferior_status_register): Delete.
 =======
 =======
+=======
+2008-11-06  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* cp-namespace.c (cp_lookup_symbol_namespace): Check for aliases.
+	lookup unqualified names without namespace concatenation.
+	* dwarf2read.c (read_import_statement): Figure out local alias for
+	the import and pass it on cp_add_using.
+
+>>>>>>> Fixed gdb aliased namespace lookup problem.:gdb/ChangeLog
 2008-11-04  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* cp-namespace.c (lookup_namespace_scope): Use 

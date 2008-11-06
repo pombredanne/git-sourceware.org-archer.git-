@@ -102,7 +102,6 @@ gdb_load ${binfile}
 ############################################
 # Test printing of namespace aliases
 
-setup_kfail "gdb/380" "*-*-*"
 if ![runto marker2] then {
     perror "couldn't run to breakpoint marker2"
     continue
