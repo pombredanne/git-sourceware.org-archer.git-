@@ -543,6 +543,13 @@ run_python_script (int argc, char **argv)
   exit (0);
 }
 
+void
+source_python_script (FILE *stream, char *file)
+{
+  PyRun_SimpleFile (stream, file);
+  fclose (stream);
+}
+
 
 
 /* The "current" objfile.  This is set when gdb detects that a new
@@ -1004,6 +1011,13 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
 			  const language_defn *language)
 {
   return NULL;
+}
+
+void
+source_python_script (FILE *stream)
+{
+  fclose (stream);
+  error (_("Python scripting is not supported in this copy of GDB."));
 }
 
 #endif /* HAVE_PYTHON */

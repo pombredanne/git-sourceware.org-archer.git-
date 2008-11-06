@@ -1,5 +1,10 @@
 2008-11-06  Tom Tromey  <tromey@redhat.com>
 
+	* gdb.texinfo (File Options): Document -x on .py files.
+	(Command Files): Document source -p.
+
+2008-11-06  Tom Tromey  <tromey@redhat.com>
+
 	* gdb.texinfo (Pretty Printing): Update.
 	(GDB/MI Variable Objects): Likewise.
 

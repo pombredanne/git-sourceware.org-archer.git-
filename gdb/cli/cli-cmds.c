@@ -45,6 +45,8 @@
 #include "cli/cli-setshow.h"
 #include "cli/cli-cmds.h"
 
+#include "python/python.h"
+
 #ifdef TUI
 #include "tui/tui.h"		/* For tui_active et.al.   */
 #endif
@@ -178,6 +180,7 @@ struct cmd_list_element *showchecklist;
 
 /* Command tracing state.  */
 
+static int source_python = 0;
 int source_verbose = 0;
 int trace_commands = 0;
 
@@ -437,6 +440,7 @@ source_script (char *file, int from_tty)
   struct cleanup *old_cleanups;
   char *full_pathname = NULL;
   int fd;
+  int is_python;
 
   if (file == NULL || *file == 0)
     {
@@ -465,8 +469,16 @@ source_script (char *file, int from_tty)
 	return;
     }
 
+  is_python = source_python;
+  if (strlen (file) > 3 && !strcmp (&file[strlen (file) - 3], ".py"))
+    is_python = 1;
+
   stream = fdopen (fd, FOPEN_RT);
-  script_from_file (stream, file);
+
+  if (is_python)
+    source_python_script (stream, file);
+  else
+    script_from_file (stream, file);
 
   do_cleanups (old_cleanups);
 }
@@ -480,15 +492,30 @@ source_verbose_cleanup (void *old_value)
   xfree (old_value);
 }
 
+/* A helper for source_command.  Look for an argument in *ARGS.
+   Update *ARGS by stripping leading whitespace.  If an argument is
+   found, return it (a character).  Otherwise, return 0.  */
+static int
+find_argument (char **args)
+{
+  int result = 0;
+  while (isspace ((*args)[0]))
+    ++*args;
+  if ((*args)[0] == '-' && isalpha ((*args)[1]))
+    {
+      result = (*args)[1];
+      *args += 3;
+    }
+  return result;
+}
+
 static void
 source_command (char *args, int from_tty)
 {
   struct cleanup *old_cleanups;
-  char *file = args;
-  int *old_source_verbose = xmalloc (sizeof(int));
 
-  *old_source_verbose = source_verbose;
-  old_cleanups = make_cleanup (source_verbose_cleanup, old_source_verbose);
+  old_cleanups = make_cleanup_restore_integer (&source_verbose);
+  make_cleanup_restore_integer (&source_python);
 
   /* -v causes the source command to run in verbose mode.
      We still have to be able to handle filenames with spaces in a
@@ -496,23 +523,28 @@ source_command (char *args, int from_tty)
 
   if (args)
     {
-      /* Make sure leading white space does not break the comparisons.  */
-      while (isspace(args[0]))
-	args++;
-
-      /* Is -v the first thing in the string?  */
-      if (args[0] == '-' && args[1] == 'v' && isspace (args[2]))
+      while (1)
 	{
-	  source_verbose = 1;
-
-	  /* Trim -v and whitespace from the filename.  */
-	  file = &args[3];
-	  while (isspace (file[0]))
-	    file++;
+	  int arg = find_argument (&args);
+	  if (!arg)
+	    break;
+	  switch (arg)
+	    {
+	    case 'v':
+	      source_verbose = 1;
+	      break;
+	    case 'p':
+	      source_python = 1;
+	      break;
+	    default:
+	      error (_("unrecognized option -%c"), arg);
+	    }
 	}
     }
 
-  source_script (file, from_tty);
+  source_script (args, from_tty);
+
+  do_cleanups (old_cleanups);
 }
 
 
@@ -1274,6 +1306,8 @@ Commands defined in this way may have up to ten arguments."));
 Read commands from a file named FILE.\n\
 Optional -v switch (before the filename) causes each command in\n\
 FILE to be echoed as it is executed.\n\
+Optional -p switch (before the filename) causes FILE to be evaluated\n\
+as Python code.\n\
 Note that the file \"%s\" is read automatically in this way\n\
 when GDB is started."), gdbinit);
   c = add_cmd ("source", class_support, source_command,

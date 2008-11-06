@@ -1,5 +1,17 @@
 2008-11-06  Tom Tromey  <tromey@redhat.com>
 
+	* python/python.c (source_python_script): New function.
+	* python/python.h (source_python_script): Declare.
+	* cli/cli-cmds.c (find_argument): New function.
+	(source_command): Always run cleanup.  Use find_argument.  Handle
+	-p argument.  Use make_cleanup_restore_integer.
+	(source_verbose_cleanup): Remove.
+	(source_python): New global.
+	Include python.h.
+	(init_cli_cmds): Update.
+
+2008-11-06  Tom Tromey  <tromey@redhat.com>
+
 	* python/python.c (GdbMethods): Make conditional.
 
 2008-11-06  Tom Tromey  <tromey@redhat.com>
