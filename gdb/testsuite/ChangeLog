@@ -1,3 +1,9 @@
+2008-11-07  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* gdb.python/python-template.exp,
+	gdb.python/python-template.cc: New test for const, volatile
+	qualified pointer and reference template args.
+	
 2008-11-06  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.python/python-mi.exp: Update.
