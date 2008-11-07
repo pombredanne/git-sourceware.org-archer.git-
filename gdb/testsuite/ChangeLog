@@ -1,3 +1,7 @@
+2008-11-07  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* gdb.python/python-template.exp: Make failures clearer.
+	
 2008-11-07  Daniel Jacobowitz  <dan@codesourcery.com>
 
 	PR gdb/931
