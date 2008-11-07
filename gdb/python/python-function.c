@@ -66,7 +66,7 @@ fnpy_call (void *cookie, int argc, struct value **argv)
   if (! callable)
     {
       Py_DECREF (args);
-      error _(("No method named 'invoke' in object."));
+      error (_("No method named 'invoke' in object."));
     }
 
   result = PyObject_Call (callable, args, NULL);
