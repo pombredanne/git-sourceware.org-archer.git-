@@ -1,3 +1,9 @@
+2008-11-07  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* python/python-cmd.c (cmdpy_function, cmdpy_completer,
+	gdbpy_parse_command_name, cmdpy_init): Mark strings for translation,
+	fix case and punctuation.
+
 2008-11-07  Daniel Jacobowitz  <dan@codesourcery.com>
 
 	PR gdb/931

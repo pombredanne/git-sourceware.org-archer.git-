@@ -101,9 +101,9 @@ cmdpy_function (struct cmd_list_element *command, char *args, int from_tty)
   PyObject *argobj, *ttyobj, *result;
 
   if (! obj)
-    error ("Invalid invocation of Python command object");
+    error (_("Invalid invocation of Python command object."));
   if (! PyObject_HasAttr ((PyObject *) obj, invoke_cst))
-    error ("Python command object missing 'invoke' method");
+    error (_("Python command object missing 'invoke' method."));
 
   if (! args)
     {
@@ -114,7 +114,7 @@ cmdpy_function (struct cmd_list_element *command, char *args, int from_tty)
     {
       argobj = PyString_FromString (args);
       if (! argobj)
-	error ("Couldn't convert arguments to Python string");
+	error (_("Could not convert arguments to Python string."));
     }
   ttyobj = from_tty ? Py_True : Py_False;
   Py_INCREF (ttyobj);
@@ -138,13 +138,13 @@ cmdpy_function (struct cmd_list_element *command, char *args, int from_tty)
 
 	  PyErr_Restore (ptype, pvalue, ptraceback);
 	  gdbpy_print_stack ();
-	  error ("Error occurred in Python command: %s", copy);
+	  error (_("Error occurred in Python command: %s"), copy);
 	}
       else
 	{
 	  PyErr_Restore (ptype, pvalue, ptraceback);
 	  gdbpy_print_stack ();
-	  error ("Error occurred in Python command");
+	  error (_("Error occurred in Python command."));
 	}
     }
   Py_DECREF (result);
@@ -159,7 +159,7 @@ cmdpy_completer (struct cmd_list_element *command, char *text, char *word)
   char **result;
 
   if (! obj)
-    error ("Invalid invocation of Python command object");
+    error (_("Invalid invocation of Python command object."));
   if (! PyObject_HasAttr ((PyObject *) obj, complete_cst))
     {
       /* If there is no complete method, don't error -- instead, just
@@ -169,10 +169,10 @@ cmdpy_completer (struct cmd_list_element *command, char *text, char *word)
 
   textobj = PyString_FromString (text);
   if (! textobj)
-    error ("could not convert argument to Python string");
+    error (_("Could not convert argument to Python string."));
   wordobj = PyString_FromString (word);
   if (! wordobj)
-    error ("could not convert argument to Python string");
+    error (_("Could not convert argument to Python string."));
 
   resultobj = PyObject_CallMethodObjArgs ((PyObject *) obj, complete_cst,
 					  textobj, wordobj, NULL);
@@ -253,7 +253,7 @@ gdbpy_parse_command_name (char *text, struct cmd_list_element ***base_list,
     ;
   if (i < 0)
     {
-      PyErr_SetString (PyExc_RuntimeError, "no command name found");
+      PyErr_SetString (PyExc_RuntimeError, _("no command name found"));
       return NULL;
     }
   lastchar = i;
@@ -285,7 +285,7 @@ gdbpy_parse_command_name (char *text, struct cmd_list_element ***base_list,
   elt = lookup_cmd_1 (&text, *start_list, NULL, 1);
   if (!elt || elt == (struct cmd_list_element *) -1)
     {
-      PyErr_Format (PyExc_RuntimeError, "could not find command prefix %s",
+      PyErr_Format (PyExc_RuntimeError, _("could not find command prefix %s"),
 		    prefix_text);
       xfree (prefix_text);
       xfree (result);
@@ -299,7 +299,7 @@ gdbpy_parse_command_name (char *text, struct cmd_list_element ***base_list,
       return result;
     }
 
-  PyErr_Format (PyExc_RuntimeError, "'%s' is not a prefix command",
+  PyErr_Format (PyExc_RuntimeError, _("'%s' is not a prefix command"),
 		prefix_text);
   xfree (prefix_text);
   xfree (result);
@@ -341,7 +341,8 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kwds)
     {
       /* Note: this is apparently not documented in Python.  We return
 	 0 for success, -1 for failure.  */
-      PyErr_Format (PyExc_RuntimeError, "Command object already initialized");
+      PyErr_Format (PyExc_RuntimeError,
+		    _("command object already initialized"));
       return -1;
     }
 
@@ -355,13 +356,13 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kwds)
       && cmdtype != class_trace && cmdtype != class_obscure
       && cmdtype != class_maintenance)
     {
-      PyErr_Format (PyExc_RuntimeError, "invalid command class argument");
+      PyErr_Format (PyExc_RuntimeError, _("invalid command class argument"));
       return -1;
     }
 
   if (completetype < -1 || completetype >= (int) N_COMPLETERS)
     {
-      PyErr_Format (PyExc_RuntimeError, "invalid completion type argument");
+      PyErr_Format (PyExc_RuntimeError, _("invalid completion type argument"));
       return -1;
     }
 
@@ -376,7 +377,7 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kwds)
 	docstring = python_string_to_host_string (ds_obj);
     }
   if (! docstring)
-    docstring = xstrdup ("This command is not documented.");
+    docstring = xstrdup (_("This command is not documented."));
 
   Py_INCREF (self);
 
