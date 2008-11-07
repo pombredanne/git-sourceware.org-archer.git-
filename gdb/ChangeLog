@@ -1,3 +1,18 @@
+2008-11-07  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	PR gdb/931
+	* Makefile.in (dbxread.o): Update.
+	* dbxread.c (read_dbx_symtab): Use cp_canonicalize_string.
+	* dwarf2read.c (GDB_FORM_cached_string): New.
+	(read_partial_die): Use dwarf2_canonicalize_name.
+	(dwarf2_linkage_name): Use dwarf2_name.
+	(dwarf2_canonicalize_name): New.
+	(dwarf2_name): Use dwarf2_canonicalize_name.
+	(dwarf_form_name, dump_die): Handle GDB_FORM_cached_string.
+	* stabsread.c (define_symbol, read_type): Use cp_canonicalize_string.
+	* symtab.c (lookup_symbol_in_language): Canonicalize input before
+	searching.
+
 2008-11-07  Tom Tromey  <tromey@redhat.com>
 
 	* python/python-type.c (typy_lookup_type): Rearrange to avoid

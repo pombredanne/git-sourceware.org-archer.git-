@@ -1,3 +1,11 @@
+2008-11-07  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	PR gdb/931
+	* gdb.cp/gdb1355.exp (f_li, f_lui, f_si, f_sui): Allow canonical
+	output.
+	* gdb.cp/templates.exp: Allow canonical output.  Remove KFAILs
+	for gdb/931.
+
 2008-11-07  Paul Pluzhnikov  <ppluzhnikov@google.com>
 
 	* gdb.python/python-template.exp,
