@@ -1,3 +1,8 @@
+2008-11-07  Paul Pluzhnikov  <ppluzhnikov@google.com>
+	
+	* python/python-function.c (fnpy_call): Fix syntax error
+	in last checkin.
+	
 2008-11-07  Thiago Jung Bauerman  <bauerman@br.ibm.com>
 
 	* python/python-function.c (convert_values_to_python, fnpy_call,
