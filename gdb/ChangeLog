@@ -1,3 +1,8 @@
+2008-11-07  Thiago Jung Bauerman  <bauerman@br.ibm.com>
+
+	* python/python-function.c (convert_values_to_python, fnpy_call,
+	fnpy_init): Mark strings for translation, fix case and punctuation.
+
 2008-11-07  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	* python/python-cmd.c (cmdpy_function, cmdpy_completer,

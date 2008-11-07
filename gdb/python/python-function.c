@@ -1,4 +1,4 @@
-/* gdb commands implemented in Python
+/* Convenience functions implemented in Python.
 
    Copyright (C) 2008 Free Software Foundation, Inc.
 
@@ -43,7 +43,7 @@ convert_values_to_python (int argc, struct value **argv)
       if (! elt)
 	{
 	  Py_DECREF (result);
-	  error ("could not convert value to Python object");
+	  error (_("Could not convert value to Python object."));
 	}
       PyTuple_SetItem (result, i, elt);
     }
@@ -66,7 +66,7 @@ fnpy_call (void *cookie, int argc, struct value **argv)
   if (! callable)
     {
       Py_DECREF (args);
-      error ("no method named 'invoke' in object");
+      error _(("No method named 'invoke' in object."));
     }
 
   result = PyObject_Call (callable, args, NULL);
@@ -119,7 +119,7 @@ fnpy_init (PyObject *self, PyObject *args, PyObject *kwds)
 	docstring = python_string_to_host_string (ds_obj);
     }
   if (! docstring)
-    docstring = "This command is not documented.";
+    docstring = _("This function is not documented.");
 
   add_internal_function (name, docstring, fnpy_call, self, fnpy_destroy);
   return 0;
