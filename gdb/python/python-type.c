@@ -143,17 +143,18 @@ typy_lookup_type (struct demangle_component *demangled,
       type = typy_lookup_type (demangled->u.s_binary.left, block);
       if (! type)
 	return NULL;
-    }
-  switch (demangled->type)
-    {
-    case DEMANGLE_COMPONENT_REFERENCE:
-      return lookup_reference_type (type);
-    case DEMANGLE_COMPONENT_POINTER:
-      return lookup_pointer_type (type);
-    case DEMANGLE_COMPONENT_CONST:
-      return make_cv_type (1, 0, type, NULL);
-    case DEMANGLE_COMPONENT_VOLATILE:
-      return make_cv_type (0, 1, type, NULL);
+
+      switch (demangled->type)
+	{
+	case DEMANGLE_COMPONENT_REFERENCE:
+	  return lookup_reference_type (type);
+	case DEMANGLE_COMPONENT_POINTER:
+	  return lookup_pointer_type (type);
+	case DEMANGLE_COMPONENT_CONST:
+	  return make_cv_type (1, 0, type, NULL);
+	case DEMANGLE_COMPONENT_VOLATILE:
+	  return make_cv_type (0, 1, type, NULL);
+	}
     }
 
   type_name = cp_comp_to_string (demangled, 10);
