@@ -5,6 +5,11 @@
 	
 2008-11-07  Thiago Jung Bauerman  <bauerman@br.ibm.com>
 
+	* python/python-function.c (fnpy_call): Fix silly mistake in previous
+	commit.
+
+2008-11-07  Thiago Jung Bauerman  <bauerman@br.ibm.com>
+
 	* python/python-function.c (convert_values_to_python, fnpy_call,
 	fnpy_init): Mark strings for translation, fix case and punctuation.
 
