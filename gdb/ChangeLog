@@ -1,3 +1,9 @@
+2008-11-06  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* python/python-type.c (typy_lookup_type): New fn.
+	Handle const and volatile qualified types, pointers and references.
+	* python/python-type.c (typy_template_argument): Call it.
+	
 2008-11-06  Tom Tromey  <tromey@redhat.com>
 
 	* python/python-type.c (pyty_type_object) <owned>: New field.

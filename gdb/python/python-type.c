@@ -128,6 +128,48 @@ typy_lookup_typename (char *type_name, struct block *block)
   return type;
 }
 
+static struct type *
+typy_lookup_type (struct demangle_component *demangled,
+		  struct block *block)
+{
+  struct type *type;
+  char *type_name;
+
+  if (demangled->type == DEMANGLE_COMPONENT_POINTER
+      || demangled->type == DEMANGLE_COMPONENT_REFERENCE
+      || demangled->type == DEMANGLE_COMPONENT_CONST
+      || demangled->type == DEMANGLE_COMPONENT_VOLATILE)
+    {
+      type = typy_lookup_type (demangled->u.s_binary.left, block);
+      if (! type)
+	return NULL;
+    }
+  switch (demangled->type)
+    {
+    case DEMANGLE_COMPONENT_REFERENCE:
+      return lookup_reference_type (type);
+    case DEMANGLE_COMPONENT_POINTER:
+      return lookup_pointer_type (type);
+    case DEMANGLE_COMPONENT_CONST:
+      return make_cv_type (1, 0, type, NULL);
+    case DEMANGLE_COMPONENT_VOLATILE:
+      return make_cv_type (0, 1, type, NULL);
+    }
+
+  type_name = cp_comp_to_string (demangled, 10);
+  type = typy_lookup_typename (type_name, block);
+  if (! type)
+    {
+      PyErr_Format (PyExc_RuntimeError, "no such type named %s",
+		    type_name);
+      xfree (type_name);
+      return NULL;
+    }
+  xfree (type_name);
+
+  return type;
+}
+
 static PyObject *
 typy_template_argument (PyObject *self, PyObject *args)
 {
@@ -135,7 +177,6 @@ typy_template_argument (PyObject *self, PyObject *args)
   struct type *type = ((type_object *) self)->type;
   struct demangle_component *demangled;
   const char *err;
-  char *type_name;
   struct type *argtype;
   struct block *block = NULL;
   PyObject *block_obj = NULL;
@@ -196,32 +237,9 @@ typy_template_argument (PyObject *self, PyObject *args)
       return NULL;
     }
 
-  /* Count pointers and apply later, because lookup_typename does not
-     understand '*'.  FIXME: should handle references as well.  Really
-     we should have a generic cp_comp_to_type.  */
-  demangled = demangled->u.s_binary.left;
-  n_pointers = 0;
-  while (demangled->type == DEMANGLE_COMPONENT_POINTER)
-    {
-      ++n_pointers;
-      demangled = demangled->u.s_binary.left;
-    }
-
-  /* FIXME: if argument is a value, we should DTRT.  */
-  type_name = cp_comp_to_string (demangled, 10);
-
-  argtype = typy_lookup_typename (type_name, block);
+  argtype = typy_lookup_type (demangled->u.s_binary.left, block);
   if (! argtype)
-    {
-      PyErr_Format (PyExc_RuntimeError, "no such type named %s",
-		    type_name);
-      xfree (type_name);
-      return NULL;
-    }
-  xfree (type_name);
-
-  while (n_pointers--)
-    argtype = lookup_pointer_type (argtype);
+    return NULL;
 
   return type_to_type_object (argtype);
 }
