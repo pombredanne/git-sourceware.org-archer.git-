@@ -134,17 +134,22 @@ typy_lookup_type (struct demangle_component *demangled,
 {
   struct type *type;
   char *type_name;
+  enum demangle_component_type demangled_type;
 
-  if (demangled->type == DEMANGLE_COMPONENT_POINTER
-      || demangled->type == DEMANGLE_COMPONENT_REFERENCE
-      || demangled->type == DEMANGLE_COMPONENT_CONST
-      || demangled->type == DEMANGLE_COMPONENT_VOLATILE)
+  /* Save the type: typy_lookup_type() may (indirectly) overwrite
+     memory pointed by demanged.  */
+  demangled_type = demangled->type;
+
+  if (demangled_type == DEMANGLE_COMPONENT_POINTER
+      || demangled_type == DEMANGLE_COMPONENT_REFERENCE
+      || demangled_type == DEMANGLE_COMPONENT_CONST
+      || demangled_type == DEMANGLE_COMPONENT_VOLATILE)
     {
       type = typy_lookup_type (demangled->u.s_binary.left, block);
       if (! type)
 	return NULL;
 
-      switch (demangled->type)
+      switch (demangled_type)
 	{
 	case DEMANGLE_COMPONENT_REFERENCE:
 	  return lookup_reference_type (type);
