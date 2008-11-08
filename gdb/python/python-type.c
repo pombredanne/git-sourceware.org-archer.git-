@@ -137,7 +137,7 @@ typy_lookup_type (struct demangle_component *demangled,
   enum demangle_component_type demangled_type;
 
   /* Save the type: typy_lookup_type() may (indirectly) overwrite
-     memory pointed by demanged.  */
+     memory pointed by demangled.  */
   demangled_type = demangled->type;
 
   if (demangled_type == DEMANGLE_COMPONENT_POINTER
