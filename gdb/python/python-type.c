@@ -335,13 +335,20 @@ set_type (type_object *obj, struct type *type, type_object *parent)
   else
     obj->next = NULL;
 
-  if (type && parent && parent->owned)
+  obj->originator = NULL;
+  if (type && parent)
     {
-      Py_INCREF (parent);
-      obj->originator = (PyObject *) parent;
+      if (parent->owned)
+	{
+	  Py_INCREF (parent);
+	  obj->originator = (PyObject *) parent;
+	}
+      else if (parent->originator)
+	{
+	  Py_INCREF (parent->originator);
+	  obj->originator = parent->originator;
+	}
     }
-  else
-    obj->originator = NULL;
 }
 
 static PyObject *

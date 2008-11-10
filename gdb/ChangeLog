@@ -1,5 +1,13 @@
 2008-11-10  Tom Tromey  <tromey@redhat.com>
 
+	* python/python-type.c (set_type): Use parent's originator, if it
+	exists.
+	* gdbtypes.c (delete_main_type): New function.
+	(delete_type_recursive): Use it.  Delete the pointer type,
+	reference type, and chain.
+
+2008-11-10  Tom Tromey  <tromey@redhat.com>
+
 	* cli/cli-cmds.c (source_script): Clean up full_pathname.
 
 2008-11-10  Tom Tromey  <tromey@redhat.com>
