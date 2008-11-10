@@ -1,7 +1,7 @@
 VPATH = @srcdir@
 srcdir = @srcdir@
 
-EXECUTABLES = python-value python-prettyprint
+EXECUTABLES = python-value python-prettyprint python-template
 
 all info install-info dvi install uninstall installcheck check:
 	@echo "Nothing to be done for $@..."

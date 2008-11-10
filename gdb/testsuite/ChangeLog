@@ -1,5 +1,9 @@
 2008-11-10  Tom Tromey  <tromey@redhat.com>
 
+	* gdb.python/Makefile.in (EXECUTABLES): Add python-template.
+
+2008-11-10  Tom Tromey  <tromey@redhat.com>
+
 	* gdb.base/commands.exp (redefine_backtrace_test): New proc.
 	Call it.
 
