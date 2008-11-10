@@ -1,3 +1,8 @@
+2008-11-10  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/commands.exp (redefine_backtrace_test): New proc.
+	Call it.
+
 2008-11-07  Paul Pluzhnikov  <ppluzhnikov@google.com>
 
 	* gdb.python/python-template.exp: Make failures clearer.
