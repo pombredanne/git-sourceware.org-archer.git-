@@ -72,7 +72,7 @@ PyObject *symbol_to_symbol_object (struct symbol *sym);
 PyObject *block_to_block_object (struct block *block);
 PyObject *value_to_value_object (struct value *v);
 PyObject *gdb_owned_value_to_value_object (struct value *v);
-PyObject *type_to_type_object (struct type *);
+PyObject *type_to_type_object (PyObject *, struct type *);
 PyObject *objfile_to_objfile_object (struct objfile *);
 
 PyObject *objfpy_get_printers (PyObject *, void *);

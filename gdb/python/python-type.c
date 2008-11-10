@@ -41,6 +41,11 @@ typedef struct pyty_type_object
   /* This is nonzero if the type is owned by this object and should be
      freed when the object is deleted.  */
   int owned;
+
+  /* A Type derived from an 'owned' type will refer to its originator.
+     This prevents us from freeing the underlying 'type' too
+     early.  In other cases, this is NULL.  */
+  PyObject *originator;
 } type_object;
 
 static PyTypeObject type_object_type;
@@ -58,7 +63,7 @@ typy_pointer (PyObject *self, PyObject *args)
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
-  return type_to_type_object (type);
+  return type_to_type_object (self, type);
 }
 
 /* Return a Type object which represents a reference to SELF.  */
@@ -74,7 +79,7 @@ typy_reference (PyObject *self, PyObject *args)
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
-  return type_to_type_object (type);
+  return type_to_type_object (self, type);
 }
 
 /* Return a Type object which represents the target type of SELF.  */
@@ -89,7 +94,7 @@ typy_target (PyObject *self, PyObject *args)
       return NULL;
     }
 
-  return type_to_type_object (TYPE_TARGET_TYPE (type));
+  return type_to_type_object (self, TYPE_TARGET_TYPE (type));
 }
 
 /* Return the size of the type represented by SELF, in bytes.  */
@@ -247,7 +252,7 @@ typy_template_argument (PyObject *self, PyObject *args)
   if (! argtype)
     return NULL;
 
-  return type_to_type_object (argtype);
+  return type_to_type_object (self, argtype);
 }
 
 static PyObject *
@@ -313,7 +318,7 @@ clean_up_objfile_types (struct objfile *objfile, void *datum)
 }
 
 static void
-set_type (type_object *obj, struct type *type)
+set_type (type_object *obj, struct type *type, type_object *parent)
 {
   obj->type = type;
   obj->owned = 0;
@@ -329,6 +334,14 @@ set_type (type_object *obj, struct type *type)
     }
   else
     obj->next = NULL;
+
+  if (type && parent && parent->owned)
+    {
+      Py_INCREF (parent);
+      obj->originator = (PyObject *) parent;
+    }
+  else
+    obj->originator = NULL;
 }
 
 static PyObject *
@@ -371,7 +384,7 @@ typy_new (PyTypeObject *subtype, PyObject *args, PyObject *kwargs)
   if (! result)
     return NULL;
 
-  set_type (result, type);
+  set_type (result, type, NULL);
 
   return (PyObject *) result;
 }
@@ -392,6 +405,10 @@ typy_dealloc (PyObject *obj)
 	  delete_type_recursive (type->type, deleted_types);
 	  htab_delete (deleted_types);
 	}
+      else if (type->originator)
+	{
+	  Py_DECREF (type->originator);
+	}
       else
 	{
 	  if (type->prev)
@@ -411,14 +428,18 @@ typy_dealloc (PyObject *obj)
   type->ob_type->tp_free (type);
 }
 
+/* Create a new Type referring to TYPE.  PARENT is the Type from which
+   TYPE is derived; this is needed to handle reference counting for
+   derived 'owned' types.  PARENT can be NULL if you know that this is
+   not a problem; otherwise it must be a Type object.  */
 PyObject *
-type_to_type_object (struct type *type)
+type_to_type_object (PyObject *parent, struct type *type)
 {
   type_object *type_obj;
 
   type_obj = PyObject_New (type_object, &type_object_type);
   if (type_obj)
-    set_type (type_obj, type);
+    set_type (type_obj, type, (type_object *) parent);
 
   return (PyObject *) type_obj;
 }
