@@ -1,5 +1,10 @@
 2008-11-10  Tom Tromey  <tromey@redhat.com>
 
+	* gdbtypes.c (copy_type_recursive): Clear new fields.
+	(delete_type_recursive): Move assert after deletion check.
+
+2008-11-10  Tom Tromey  <tromey@redhat.com>
+
 	PR gdb/1815:
 	* cli/cli-decode.c (delete_cmd): Forward declare.
 	(delete_cmd): Now static.  Change return type.  Remove command

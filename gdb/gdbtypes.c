@@ -3000,6 +3000,7 @@ copy_type_recursive (struct objfile *objfile,
 
       nfields = TYPE_NFIELDS (type);
       TYPE_FIELDS (new_type) = xmalloc (sizeof (struct field) * nfields);
+      memset (TYPE_FIELDS (new_type), 0, sizeof (struct field) * nfields);
       for (i = 0; i < nfields; i++)
 	{
 	  TYPE_FIELD_ARTIFICIAL (new_type, i) = 
@@ -3079,11 +3080,11 @@ delete_type_recursive (struct type *type, htab_t deleted_types)
   if (!type)
     return;
 
-  gdb_assert (!TYPE_OBJFILE (type));
-
   slot = htab_find_slot (deleted_types, type, INSERT);
   if (*slot != NULL)
     return;
+
+  gdb_assert (!TYPE_OBJFILE (type));
 
   *slot = type;
 
