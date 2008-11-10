@@ -1,5 +1,10 @@
 2008-11-10  Tom Tromey  <tromey@redhat.com>
 
+	* python/python-objfile.c (gdbpy_initialize_objfile): Don't set
+	tp_new.
+
+2008-11-10  Tom Tromey  <tromey@redhat.com>
+
 	* python/python-type.c (set_type): Use parent's originator, if it
 	exists.
 	* gdbtypes.c (delete_main_type): New function.

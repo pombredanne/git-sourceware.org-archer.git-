@@ -159,7 +159,6 @@ gdbpy_initialize_objfile (void)
   objfpy_objfile_data_key
     = register_objfile_data_with_cleanup (clean_up_objfile);
 
-  objfile_object_type.tp_new = PyType_GenericNew;
   if (PyType_Ready (&objfile_object_type) < 0)
     return;
 
