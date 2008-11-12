@@ -1,3 +1,7 @@
+2008-11-12  Tom Tromey  <tromey@redhat.com>
+
+	* valprint.c (value_print): Call apply_val_pretty_printer.
+
 2008-11-11  Tom Tromey  <tromey@redhat.com>
 
 	* varobj.c (varobj_get_display_hint): Use gdbpy_get_display_hint.

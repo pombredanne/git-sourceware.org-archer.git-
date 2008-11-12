@@ -326,6 +326,18 @@ value_print (struct value *val, struct ui_file *stream, int format,
     return 0;
 
   raw_printing = raw;
+  if (!raw)
+    {
+      int r = apply_val_pretty_printer (value_type (val),
+					value_contents_all (val),
+					value_embedded_offset (val),
+					value_address (val),
+					stream, format, 1, 0, pretty,
+					current_language);
+      if (r)
+	return r;
+    }
+
   return LA_VALUE_PRINT (val, stream, format, pretty);
 }
 
