@@ -236,18 +236,12 @@ val_print (struct type *type, const gdb_byte *valaddr, int embedded_offset,
 
   if (!raw_printing)
     {
-      char *text;
-      text = apply_val_pretty_printer (type, valaddr, embedded_offset,
-				       address, stream, format,
-				       deref_ref, recurse, real_pretty,
-				       language);
-      if (text)
-	{
-	  fputs_indented (text, stream);
-	  ret = strlen (text);
-	  xfree (text);
-	  return ret;
-	}
+      ret = apply_val_pretty_printer (type, valaddr, embedded_offset,
+				      address, stream, format,
+				      deref_ref, recurse, real_pretty,
+				      language);
+      if (ret)
+	return ret;
     }
 
   TRY_CATCH (except, RETURN_MASK_ERROR)
@@ -332,21 +326,6 @@ value_print (struct value *val, struct ui_file *stream, int format,
     return 0;
 
   raw_printing = raw;
-  if (!raw)
-    {
-      struct value *replace = NULL;
-      char *output = apply_pretty_printer (val, &replace);
-      if (output)
-	{
-	  int len = strlen (output);
-	  fputs_indented (output, stream);
-	  xfree (output);
-	  return len;
-	}
-      else if (replace)
-	val = replace;
-    }
-
   return LA_VALUE_PRINT (val, stream, format, pretty);
 }
 

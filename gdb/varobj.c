@@ -772,20 +772,8 @@ varobj_get_display_hint (struct varobj *var)
   char *result = NULL;
 
 #if HAVE_PYTHON
-  PyObject *printer = var->pretty_printer;
-
-  if (printer && PyObject_HasAttr (printer, gdbpy_display_hint_cst))
-    {
-      PyObject *hint = PyObject_CallMethodObjArgs (printer,
-						   gdbpy_display_hint_cst,
-						   NULL);
-      if (gdbpy_is_string (hint))
-	result = python_string_to_host_string (hint);
-      if (hint)
-	Py_DECREF (hint);
-      else
-	PyErr_Clear ();
-    }
+  if (var->pretty_printer)
+    result = gdbpy_get_display_hint (var->pretty_printer);
 #endif
 
   return result;

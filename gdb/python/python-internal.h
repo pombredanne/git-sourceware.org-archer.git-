@@ -130,6 +130,7 @@ char *apply_varobj_pretty_printer (PyObject *print_obj, struct value *value,
 				   struct value **replacement);
 PyObject *gdbpy_get_varobj_pretty_printer (struct type *type);
 PyObject *gdbpy_instantiate_printer (PyObject *cons, struct value *value);
+char *gdbpy_get_display_hint (PyObject *printer);
 
 extern PyObject *gdbpy_children_cst;
 extern PyObject *gdbpy_to_string_cst;

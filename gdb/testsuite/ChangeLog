@@ -1,3 +1,8 @@
+2008-11-11  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.python/python-prettyprint.exp (run_lang_tests): Ensure "set
+	print pretty" is on.  Update for recent changes.
+
 2008-11-10  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.python/Makefile.in (EXECUTABLES): Add python-template.

@@ -1,5 +1,24 @@
 2008-11-11  Tom Tromey  <tromey@redhat.com>
 
+	* varobj.c (varobj_get_display_hint): Use gdbpy_get_display_hint.
+	* python/python.c (apply_pretty_printer): Remove.
+	(gdbpy_get_display_hint): New function.
+	(print_string_repr): New function.
+	(print_children): Likewise.
+	(apply_val_pretty_printer): Rewrite.  Change return type.
+	(_initialize_python) <_format_children>: Remove.
+	(pretty_print_one_value): Remove 'children' argument.
+	(apply_varobj_pretty_printer): Update.
+	* python/python.h (apply_pretty_printer): Remove.
+	(apply_val_pretty_printer): Update.
+	* utils.c (fputs_indented): Remove.
+	* defs.h (fputs_indented): Remove.
+	* valprint.c (value_print): Don't pretty-print.
+	(val_print): Update.
+	* python/python-internal.h (gdbpy_get_display_hint): Declare.
+
+2008-11-11  Tom Tromey  <tromey@redhat.com>
+
 	* Makefile.in (HFILES_NO_SRCDIR): Add python headers.  Remove
 	obsolete headers.
 
