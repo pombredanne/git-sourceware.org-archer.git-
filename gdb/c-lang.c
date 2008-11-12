@@ -180,6 +180,87 @@ c_printstr (struct ui_file *stream, const gdb_byte *string,
   if (force_ellipses || i < length)
     fputs_filtered ("...", stream);
 }
+
+/* Obtain a C string from the inferior, storing it in a newly allocated
+   buffer in BUFFER, which should be freed by the caller.  If VALUE is an
+   array with known length, the function will copy all of its contents to
+   the buffer.  If the length is not known, read until a null byte is found.
+   LENGTH will contain the size of the string (not counting the NULL
+   character).
+
+   Assumes strings are terminated by a NULL character.  The size of a character
+   is determined by the length of the target type of the pointer or array.
+   This means that a NULL byte present in a multi-byte character will not
+   terminate the string unless the whole character is NULL.
+
+   Unless an exception is thrown, BUFFER will always be allocated, even on
+   failure.  In this case, some characters might have been read before the
+   failure happened.  Check LENGTH to recognize this situation.
+
+   Return 0 on success, errno on failure.  */
+
+int
+c_getstr (struct value *value, gdb_byte **buffer, int *length)
+{
+  int fetchlimit, errno, width;
+  struct type *type = value_type (value);
+  struct type *element_type = TYPE_TARGET_TYPE (type);
+
+  if (element_type == NULL)
+    goto error;
+
+  if (TYPE_CODE (type) == TYPE_CODE_ARRAY)
+    {
+      /* If we know the size of the array, we can use it as a limit on the
+	 number of characters to be fetched.  */
+      if ((TYPE_NFIELDS (type) == 1)
+	  && TYPE_CODE (TYPE_FIELD_TYPE (type, 0)) == TYPE_CODE_RANGE)
+	{
+	  LONGEST low_bound, high_bound;
+
+	  get_discrete_bounds (TYPE_FIELD_TYPE (type, 0),
+			       &low_bound, &high_bound);
+	  fetchlimit = high_bound - low_bound + 1;
+	}
+      else
+	fetchlimit = -1;
+    }
+  else if (TYPE_CODE (value_type (value)) == TYPE_CODE_PTR)
+    fetchlimit = -1;
+  else
+    /* We work only with arrays and pointers.  */
+    goto error;
+
+  element_type = check_typedef (element_type);
+  if ((TYPE_CODE (element_type) != TYPE_CODE_INT)
+      && (TYPE_CODE (element_type) != TYPE_CODE_CHAR))
+    /* If the elements are not integers or characters, we don't consider it
+       a string.  */
+    goto error;
+
+  width = TYPE_LENGTH (element_type);
+
+  errno = read_string (value_as_address (value), -1, width, fetchlimit, buffer,
+		       length);
+
+  /* If the last character is NULL, subtract it from length.  */
+  if (extract_unsigned_integer (*buffer + *length - width, width) == 0)
+      *length -= width;
+
+  return errno;
+
+error:
+  {
+    char *type_str;
+    struct cleanup *old_chain;
+
+    type_str = type_to_string (type);
+    if (type_str)
+      old_chain = make_cleanup (xfree, type_str);
+    error (_("Trying to read string with inappropriate type `%s'."), type_str);
+  }
+}
+
 
 /* Preprocessing and parsing C and C++ expressions.  */
 
@@ -417,6 +498,7 @@ const struct language_defn c_language_defn =
   c_language_arch_info,
   default_print_array_index,
   default_pass_by_reference,
+  c_getstr,
   LANG_MAGIC
 };
 
@@ -534,6 +616,7 @@ const struct language_defn cplus_language_defn =
   cplus_language_arch_info,
   default_print_array_index,
   cp_pass_by_reference,
+  c_getstr,
   LANG_MAGIC
 };
 
@@ -570,6 +653,7 @@ const struct language_defn asm_language_defn =
   c_language_arch_info, /* FIXME: la_language_arch_info.  */
   default_print_array_index,
   default_pass_by_reference,
+  c_getstr,
   LANG_MAGIC
 };
 
@@ -611,6 +695,7 @@ const struct language_defn minimal_language_defn =
   c_language_arch_info,
   default_print_array_index,
   default_pass_by_reference,
+  default_getstr,
   LANG_MAGIC
 };
 

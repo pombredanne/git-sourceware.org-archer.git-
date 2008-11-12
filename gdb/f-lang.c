@@ -341,6 +341,7 @@ const struct language_defn f_language_defn =
   f_language_arch_info,
   default_print_array_index,
   default_pass_by_reference,
+  default_getstr,
   LANG_MAGIC
 };
 
