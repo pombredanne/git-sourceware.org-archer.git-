@@ -1,3 +1,11 @@
+2008-11-13  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Basic Python): Document gdb.get_objfiles and
+	gdb.get_current_objfile.
+	(Objfiles in Python): New node.
+	(Auto-loading): Change to -gdb.py convention.
+	(Pretty Printing): Update example.  Document objfile search.
+
 2008-11-06  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.texinfo (File Options): Document -x on .py files.

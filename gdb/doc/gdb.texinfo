@@ -17712,6 +17712,7 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 * Threads In Python::           Accessing inferior threads from Python.
 * Commands In Python::          Implementing new commands in Python.
 * Parameters In Python::        Adding new @value{GDBN} parameters.
+* Objfiles in Python::          Object files.
 @end menu
 
 @node Basic Python
@@ -17735,6 +17736,20 @@ If no exceptions occur, this function returns @code{None}.
 @var{from_tty} specifies whether @value{GDBN} ought to consider this
 command as having originated from the user invoking it interactively.
 It must be a boolean value.  If omitted, it defaults to @code{False}.
+@end defun
+
+@findex gdb.get_current_objfile
+@defun get_current_objfile
+When auto-loading a Python script (@pxref{Auto-loading}), @var{GDBN}
+sets the ``current objfile'' to the corresponding objfile.  This
+function returns the current objfile.  If there is no current objfile,
+this function returns @code{None}.
+@end defun
+
+@findex gdb.get_objfiles
+@defun get_objfiles
+Return a sequence of all the objfiles current known to @var{GDBN}.
+@xref{Objfiles in Python}.
 @end defun
 
 @findex gdb.get_parameter
@@ -17797,21 +17812,26 @@ traceback.
 @node Auto-loading
 @subsubsection Auto-loading
 
-When a new object file is read (for example, due to the @code{file}
-command, or because the inferior has loaded a shared library),
-@value{GDBN} will look for a file named @file{.gdb.py} in the
-directory holding the object file.  If this file exists and is
-readable, @value{GDBN} will evaluate it as a Python script.  Note
-that, if a separate debug file is used, @value{GDBN} will look for
-@file{.gdb.py} both in the directory associated with the application
-and the directory associated with the separate debug file.
+When a new object file (@pxref{Objfiles in Python}) is read (for
+example, due to the @code{file} command, or because the inferior has
+loaded a shared library), @value{GDBN} will look for a file named by
+adding @samp{-gdb.py} to the object file's name.  If this file exists
+and is readable, @value{GDBN} will evaluate it as a Python script.
+Note that, if a separate debug file is used, @value{GDBN} will look
+for the @samp{-gdb.py} file both in the directory associated with the
+application and the directory associated with the separate debug file.
+
+When reading a @samp{-gdb.py} file, @var{GDBN} sets the ``current
+objfile''.  This is available via the @code{gdb.get_current_objfile}
+function.  This can be useful for registering objfile-specific
+pretty-printers.
 
 This feature is useful for supplying application-specific debugging
 commands and scripts.  It can be disabled using @code{maint set python
 auto-load}.
 
 @value{GDBN} does not track which files it has already auto-loaded.
-So, your @file{.gdb.py} should take care to ensure that it may be
+So, your @samp{-gdb.py} file should take care to ensure that it may be
 evaluated multiple times without error.
 
 @node Values From Inferior
@@ -18008,7 +18028,8 @@ This method must return a string.
 @subsubsection Selecting Pretty-Printers
 
 The Python dictionary @code{gdb.pretty_printers} maps regular
-expressions (strings) onto constructors.  A constructor, in this
+expressions (strings) onto constructors.  Each @code{gdb.Objfile} also
+contains a @code{pretty_printers} attribute.  A constructor, in this
 context, is a function which takes a single @code{gdb.Value} argument
 and returns a a pretty-printer conforming to the interface definition
 above.
@@ -18016,12 +18037,20 @@ above.
 When printing a value, @value{GDBN} first computes the value's
 canonical type by following typedefs, following a reference type to
 its referenced type, and removing qualifiers, such as @code{const} or
-@code{volatile}.  The name of this type is then compared to each
-regular expression.  If a regular expression matches, then the
-corresponding pretty-printer is invoked with a @code{gdb.Value}
-representing the value to be printed.
+@code{volatile}.
 
-The order in which the regular expressions are tried is not specified.
+Then, @var{GDBN} tests each regular expression against this type name.
+@var{GDBN} first checks the @code{pretty_printers} attribute of each
+@code{gdb.Objfile}; after these have been exhausted it tries the
+global @code{gdb.pretty_printers}.
+
+If a regular expression matches, then the corresponding pretty-printer
+is invoked with a @code{gdb.Value} representing the value to be
+printed.
+
+The order in which the objfiles are searched is not specified.
+Similarly, the order in which the regular expressions in a given
+dictionary are tried is not specified.
 
 Here is an example showing how a @code{std::string} printer might be
 written:
@@ -18036,7 +18065,8 @@ class StdStringPrinter:
     def to_string(self):
         return self.val['_M_dataplus']['_M_p']
 
-gdb.pretty_printers['^std::basic_string<char.*>$'] = StdStringPrinter
+obj = gdb.get_current_objfile()
+obj.pretty_printers['^std::basic_string<char.*>$'] = StdStringPrinter
 @end smallexample
 
 @node Threads In Python
@@ -18394,6 +18424,33 @@ is interpreted as itself.
 The value is a string, which must be one of a collection string
 constants provided when the parameter is created.
 @end table
+
+@node Objfiles in Python
+@subsubsection Objfiles in Python
+
+@cindex objfiles in python
+@cindex python objfiles
+@tindex gdb.Objfile
+@tindex Objfile
+@var{GDBN} loads symbols for an inferior from various
+symbol-containing files.  These include the primary executable file,
+any shared libraries used by the inferior, and any separate debug info
+files.  @var{GDBN} calls these symbol-containing files
+@dfn{objfiles}.
+
+Each objfile is represented by an instance of the @code{gdb.Objfile}
+class.
+
+@defmethod Objfile get_filename
+Return the file name of the objfile as a string.
+@end defmethod
+
+@defivar Objfile pretty_printers
+The @code{pretty_printers} attribute is used to look up
+pretty-printers by type.  This is a dictionary which maps regular
+expressions (strings) to pretty-printing objects.  @xref{Pretty
+Printing}, for more information.
+@end defivar
 
 @node Interpreters
 @chapter Command Interpreters
