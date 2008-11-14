@@ -903,13 +903,14 @@ print_children (PyObject *printer, struct ui_file *stream, int format,
 
       if (! item)
 	break;
-      inner_cleanup = make_cleanup_py_decref (item);
 
       if (! PyArg_ParseTuple (item, "sO", &name, &py_v))
 	{
 	  gdbpy_print_stack ();
+	  Py_DECREF (item);
 	  continue;
 	}
+      inner_cleanup = make_cleanup_py_decref (item);
 
       if (i == 0)
 	fputs_filtered (" = {", stream);
