@@ -1,3 +1,31 @@
+2008-11-15  Tom Tromey  <tromey@redhat.com>
+
+	* varobj.c (varobj_get_display_hint): Acquire GIL.
+	(update_dynamic_varobj_children): Likewise.
+	(install_new_value): Likewise.
+	(varobj_set_visualizer): Likewise.
+	(free_variable): Likewise.
+	(value_get_print_value): Likewise.
+	* python/python-cmd.c (cmdpy_destroyer): Acquire GIL.
+	(cmdpy_function): Likewise.
+	(cmdpy_completer): Likewise.
+	* python/python-breakpoint.c (gdbpy_breakpoint_created): Acquire
+	GIL.
+	(gdbpy_breakpoint_deleted): Likewise.
+	* python/python.c (_initialize_python): Initialize threads.
+	Release GIL.
+	(eval_python_from_control_command): Acquire GIL.
+	(python_command): Likewise.
+	(run_python_script): Likewise.
+	(source_python_script): Likewise.
+	(gdbpy_new_objfile): Likewise.
+	(apply_val_pretty_printer): Likewise.
+	(apply_varobj_pretty_printer): Likewise.
+	* python/python-internal.h (make_cleanup_py_restore_gil):
+	Declare.
+	* python/python-utils.c (py_gil_restore): New function.
+	(make_cleanup_py_restore_gil): Likewise.
+
 2008-11-14  Tom Tromey  <tromey@redhat.com>
 
 	* python/python.c (print_children): Don't "continue" past inner

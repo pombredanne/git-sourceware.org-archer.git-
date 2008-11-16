@@ -98,6 +98,7 @@ void gdbpy_initialize_objfile (void);
 void gdbpy_initialize_parameters (void);
 
 struct cleanup *make_cleanup_py_decref (PyObject *py);
+struct cleanup *make_cleanup_py_restore_gil (PyGILState_STATE *state);
 
 char *gdbpy_parse_command_name (char *text,
 				struct cmd_list_element ***base_list,

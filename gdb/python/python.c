@@ -103,9 +103,14 @@ void
 eval_python_from_control_command (struct command_line *cmd)
 {
   char *script;
+  struct cleanup *cleanup;
+  PyGILState_STATE state;
 
   if (cmd->body_count != 1)
     error (_("Invalid \"python\" block structure."));
+
+  state = PyGILState_Ensure ();
+  cleanup = make_cleanup_py_restore_gil (&state);
 
   script = compute_python_string (cmd->body_list[0]);
   PyRun_SimpleString (script);
@@ -115,6 +120,8 @@ eval_python_from_control_command (struct command_line *cmd)
       gdbpy_print_stack ();
       error (_("error while executing Python code"));
     }
+
+  do_cleanups (cleanup);
 }
 
 /* Implementation of the gdb "python" command.  */
@@ -122,6 +129,12 @@ eval_python_from_control_command (struct command_line *cmd)
 static void
 python_command (char *arg, int from_tty)
 {
+  struct cleanup *cleanup;
+  PyGILState_STATE state;
+
+  state = PyGILState_Ensure ();
+  cleanup = make_cleanup_py_restore_gil (&state);
+
   while (arg && *arg && isspace (*arg))
     ++arg;
   if (arg && *arg)
@@ -136,10 +149,11 @@ python_command (char *arg, int from_tty)
   else
     {
       struct command_line *l = get_command_line (python_control, "");
-      struct cleanup *cleanups = make_cleanup_free_command_lines (&l);
+      make_cleanup_free_command_lines (&l);
       execute_control_command_untraced (l);
-      do_cleanups (cleanups);
     }
+
+  do_cleanups (cleanup);
 }
 
 
@@ -529,6 +543,10 @@ void
 run_python_script (int argc, char **argv)
 {
   FILE *input;
+  PyGILState_STATE state;
+
+  /* We never free this, since we plan to exit at the end.  */
+  state = PyGILState_Ensure ();
 
   running_python_script = 1;
   PySys_SetArgv (argc - 1, argv + 1);
@@ -546,8 +564,14 @@ run_python_script (int argc, char **argv)
 void
 source_python_script (FILE *stream, char *file)
 {
+  PyGILState_STATE state;
+
+  state = PyGILState_Ensure ();
+
   PyRun_SimpleFile (stream, file);
+
   fclose (stream);
+  PyGILState_Release (state);
 }
 
 
@@ -569,9 +593,12 @@ gdbpy_new_objfile (struct objfile *objfile)
   char *filename;
   int len;
   FILE *input;
+  PyGILState_STATE state;
 
   if (!gdbpy_auto_load || !objfile || !objfile->name)
     return;
+
+  state = PyGILState_Ensure ();
 
   gdbpy_current_objfile = objfile;
 
@@ -595,6 +622,8 @@ gdbpy_new_objfile (struct objfile *objfile)
   xfree (realname);
   xfree (filename);
   gdbpy_current_objfile = NULL;
+
+  PyGILState_Release (state);
 }
 
 /* Return the current Objfile, or None if there isn't one.  */
@@ -984,11 +1013,15 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
   char *hint;
   struct cleanup *cleanups;
   int result = 0;
+  PyGILState_STATE state;
+
+  state = PyGILState_Ensure ();
+  cleanups = make_cleanup_py_restore_gil (&state);
 
   /* Find the constructor.  */
   func = find_pretty_printer (type);
   if (! func)
-    return 0;
+    goto done;
 
   /* Instantiate the printer.  */
   value = value_from_contents_and_address (type, valaddr, embedded_offset,
@@ -999,10 +1032,10 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
   if (!printer)
     {
       gdbpy_print_stack ();
-      return 0;
+      goto done;
     }
 
-  cleanups = make_cleanup_py_decref (printer);
+  make_cleanup_py_decref (printer);
   if (printer != Py_None)
     {
       print_string_repr (printer, stream, format, deref_ref,
@@ -1013,6 +1046,7 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
       result = 1;
     }
 
+ done:
   do_cleanups (cleanups);
   return result;
 }
@@ -1029,8 +1063,14 @@ char *
 apply_varobj_pretty_printer (PyObject *printer_obj, struct value *value,
 			     struct value **replacement)
 {
+  char *result;
+  PyGILState_STATE state = PyGILState_Ensure ();
+
   *replacement = NULL;
-  return pretty_print_one_value (printer_obj, replacement);
+  result = pretty_print_one_value (printer_obj, replacement);
+  PyGILState_Release (state);
+
+  return result;
 }
 
 /* Find a pretty-printer object for the varobj module.  Returns a new
@@ -1207,6 +1247,7 @@ Enables or disables auto-loading of Python code when an object is opened."),
 
 #ifdef HAVE_PYTHON
   Py_Initialize ();
+  PyEval_InitThreads ();
 
   gdb_module = Py_InitModule ("gdb", GdbMethods);
 
@@ -1261,6 +1302,10 @@ class GdbOutputFile:\n\
 sys.stderr = GdbOutputFile()\n\
 sys.stdout = GdbOutputFile()\n\
 ");
+
+  /* Release the GIL while gdb runs.  */
+  PyThreadState_Swap (NULL);
+  PyEval_ReleaseLock ();
 
 #endif /* HAVE_PYTHON */
 }

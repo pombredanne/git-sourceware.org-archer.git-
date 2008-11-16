@@ -385,6 +385,7 @@ gdbpy_breakpoint_created (int num)
 {
   breakpoint_object *newbp;
   struct breakpoint *bp;
+  PyGILState_STATE state;
 
   if (num < 0)
     return;
@@ -408,6 +409,8 @@ gdbpy_breakpoint_created (int num)
     }
 
   ++bppy_live;
+
+  state = PyGILState_Ensure ();
 
   if (bppy_pending_object)
     {
@@ -439,6 +442,8 @@ gdbpy_breakpoint_created (int num)
 
   /* Just ignore errors here.  */
   PyErr_Clear ();
+
+  PyGILState_Release (state);
 }
 
 /* Callback that is used when a breakpoint is deleted.  This will
@@ -446,6 +451,9 @@ gdbpy_breakpoint_created (int num)
 static void
 gdbpy_breakpoint_deleted (int num)
 {
+  PyGILState_STATE state;
+
+  state = PyGILState_Ensure ();
   if (BPPY_VALID_P (num))
     {
       bppy_breakpoints[num]->bp = NULL;
@@ -453,6 +461,7 @@ gdbpy_breakpoint_deleted (int num)
       bppy_breakpoints[num] = NULL;
       --bppy_live;
     }
+  PyGILState_Release (state);
 }
 
 

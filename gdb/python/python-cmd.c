@@ -76,21 +76,27 @@ cmdpy_dont_repeat (PyObject *self, PyObject *args)
   Py_RETURN_NONE;
 }
 
-
 
 
 /* Called if the gdb cmd_list_element is destroyed.  */
 static void
 cmdpy_destroyer (struct cmd_list_element *self, void *context)
 {
+  cmdpy_object *cmd;
+  PyGILState_STATE state;
+
+  state = PyGILState_Ensure ();
+
   /* Release our hold on the command object.  */
-  cmdpy_object *cmd = (cmdpy_object *) context;
+  cmd = (cmdpy_object *) context;
   cmd->command = NULL;
   Py_DECREF (cmd);
 
   /* We allocated the name and doc string.  */
   xfree (self->name);
   xfree (self->doc);
+
+  PyGILState_Release (state);
 }
 
 /* Called by gdb to invoke the command.  */
@@ -99,6 +105,11 @@ cmdpy_function (struct cmd_list_element *command, char *args, int from_tty)
 {
   cmdpy_object *obj = (cmdpy_object *) get_cmd_context (command);
   PyObject *argobj, *ttyobj, *result;
+  struct cleanup *cleanup;
+  PyGILState_STATE state;
+
+  state = PyGILState_Ensure ();
+  cleanup = make_cleanup_py_restore_gil (&state);
 
   if (! obj)
     error (_("Invalid invocation of Python command object."));
@@ -148,6 +159,7 @@ cmdpy_function (struct cmd_list_element *command, char *args, int from_tty)
 	}
     }
   Py_DECREF (result);
+  do_cleanups (cleanup);
 }
 
 /* Called by gdb for command completion.  */
@@ -155,8 +167,13 @@ static char **
 cmdpy_completer (struct cmd_list_element *command, char *text, char *word)
 {
   cmdpy_object *obj = (cmdpy_object *) get_cmd_context (command);
-  PyObject *textobj, *wordobj, *resultobj;
-  char **result;
+  PyObject *textobj, *wordobj, *resultobj = NULL;
+  char **result = NULL;
+  struct cleanup *cleanup;
+  PyGILState_STATE state;
+
+  state = PyGILState_Ensure ();
+  cleanup = make_cleanup_py_restore_gil (&state);
 
   if (! obj)
     error (_("Invalid invocation of Python command object."));
@@ -164,7 +181,7 @@ cmdpy_completer (struct cmd_list_element *command, char *text, char *word)
     {
       /* If there is no complete method, don't error -- instead, just
 	 say that there are no completions.  */
-      return NULL;
+      goto done;
     }
 
   textobj = PyString_FromString (text);
@@ -182,8 +199,9 @@ cmdpy_completer (struct cmd_list_element *command, char *text, char *word)
     {
       /* Just swallow errors here.  */
       PyErr_Clear ();
-      return NULL;
+      goto done;
     }
+  make_cleanup_py_decref (resultobj);
 
   result = NULL;
   if (PySequence_Check (resultobj))
@@ -220,7 +238,8 @@ cmdpy_completer (struct cmd_list_element *command, char *text, char *word)
 
  done:
 
-  Py_DECREF (resultobj);
+  do_cleanups (cleanup);
+
   return result;
 }
 

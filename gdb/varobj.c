@@ -772,8 +772,10 @@ varobj_get_display_hint (struct varobj *var)
   char *result = NULL;
 
 #if HAVE_PYTHON
+  PyGILState_STATE state = PyGILState_Ensure ();
   if (var->pretty_printer)
     result = gdbpy_get_display_hint (var->pretty_printer);
+  PyGILState_Release (state);
 #endif
 
   return result;
@@ -828,10 +830,17 @@ update_dynamic_varobj_children (struct varobj *var,
   int i;
   int children_changed = 0;
   PyObject *printer = var->pretty_printer;
+  PyGILState_STATE state;
+
+  state = PyGILState_Ensure ();
+  back_to = make_cleanup_py_restore_gil (&state);
 
   *cchanged = 0;
   if (!PyObject_HasAttr (printer, gdbpy_children_cst))
-    return 0;
+    {
+      do_cleanups (back_to);
+      return 0;
+    }
 
   children = PyObject_CallMethodObjArgs (printer, gdbpy_children_cst,
 					 NULL);
@@ -842,7 +851,7 @@ update_dynamic_varobj_children (struct varobj *var,
       error ("Null value returned for children");
     }
 
-  back_to = make_cleanup_py_decref (children);
+  make_cleanup_py_decref (children);
 
   if (!PyIter_Check (children))
     error ("Returned value is not iterable");
@@ -1269,14 +1278,18 @@ install_new_value (struct varobj *var, struct value *value, int initial)
     }
 
 #if HAVE_PYTHON
-  if (var->pretty_printer)
-    {
-      Py_DECREF (var->pretty_printer);
-    }
-  if (value)
-    var->pretty_printer = instantiate_pretty_printer (var, value);
-  else
-    var->pretty_printer = NULL;
+  {
+    PyGILState_STATE state = PyGILState_Ensure ();
+    if (var->pretty_printer)
+      {
+	Py_DECREF (var->pretty_printer);
+      }
+    if (value)
+      var->pretty_printer = instantiate_pretty_printer (var, value);
+    else
+      var->pretty_printer = NULL;
+    PyGILState_Release (state);
+  }
 #endif
 
   /* Below, we'll be comparing string rendering of old and new
@@ -1417,11 +1430,18 @@ static void
 install_default_visualizer (struct varobj *var, struct type *type)
 {
 #if HAVE_PYTHON
+  struct cleanup *cleanup;
+  PyGILState_STATE state;
   PyObject *constructor = NULL;
+
+  state = PyGILState_Ensure ();
+  cleanup = make_cleanup_py_restore_gil (&state);
 
   if (type)
     constructor = gdbpy_get_varobj_pretty_printer (type);
   install_visualizer (var, constructor);
+
+  do_cleanups (cleanup);
 #else
   error ("Python support required");
 #endif
@@ -1433,11 +1453,15 @@ varobj_set_visualizer (struct varobj *var, const char *visualizer)
 #if HAVE_PYTHON
   PyObject *mainmod, *globals, *constructor;
   struct cleanup *back_to;
+  PyGILState_STATE state;
+
+  state = PyGILState_Ensure ();
+  back_to = make_cleanup_py_restore_gil (&state);
 
   mainmod = PyImport_AddModule ("__main__");
   globals = PyModule_GetDict (mainmod);
   Py_INCREF (globals);
-  back_to = make_cleanup_py_decref (globals);
+  make_cleanup_py_decref (globals);
 
   constructor = PyRun_String (visualizer, Py_eval_input, globals, globals);
 
@@ -1933,8 +1957,12 @@ free_variable (struct varobj *var)
     }
 
 #if HAVE_PYTHON
-  Py_XDECREF (var->constructor);
-  Py_XDECREF (var->pretty_printer);
+  {
+    PyGILState_STATE state = PyGILState_Ensure ();
+    Py_XDECREF (var->constructor);
+    Py_XDECREF (var->pretty_printer);
+    PyGILState_Release (state);
+  }
 #endif
 
   xfree (var->name);
@@ -2223,17 +2251,24 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
     return NULL;
 
 #if HAVE_PYTHON
-  if (value_formatter && PyObject_HasAttr (value_formatter,
-					   gdbpy_to_string_cst))
-    {
-      struct value *replacement;
-      thevalue = apply_varobj_pretty_printer (value_formatter, value,
-					      &replacement);
-      if (thevalue)
-	return thevalue;
-      if (replacement)
-	value = replacement;
-    }
+  {
+    PyGILState_STATE state = PyGILState_Ensure ();
+    if (value_formatter && PyObject_HasAttr (value_formatter,
+					     gdbpy_to_string_cst))
+      {
+	struct value *replacement;
+	thevalue = apply_varobj_pretty_printer (value_formatter, value,
+						&replacement);
+	if (thevalue)
+	  {
+	    PyGILState_Release (state);
+	    return thevalue;
+	  }
+	if (replacement)
+	  value = replacement;
+      }
+    PyGILState_Release (state);
+  }
 #endif
 
   stb = mem_fileopen ();
