@@ -17937,28 +17937,25 @@ Return the type code for this type.  The type code will be one of the
 @end defmethod
 
 @defmethod Type fields
-Return a sequence of all fields of this type.  If this type has no
-fields, the sequence will be empty.
-
 For structure and union types, this method returns the fields.  Range
 types have two fields, the minimum and maximum values.  Enum types
 have one field per enum constant.  Function and method types have one
 field per parameter.  The base types of C++ classes are also
-represented as fields.
+represented as fields.  If the type has no fields, or does not fit
+into one of these categories, an empty sequence will be returned.
 
-Each field is a dictionary, with some pre-defined elements:
+Each field is an object, with some pre-defined attributes:
 @table @code
 @item bitpos
-This element is not available for @code{static} fields.  For
+This attribute is not available for @code{static} fields.  For
 non-@code{static} fields, the value is the bit position of the field.
 
 @item name
-The name of the field.  This element is not available for anonymous
-fields.
+The name of the field, or @code{None} for anonymous fields.
 
 @item artificial
 This is @code{True} if the field is artificial, usually meaning that
-it was provided by the compiler and not the user.  This value is
+it was provided by the compiler and not the user.  This attribute is
 always provided, and is @code{False} if the field is not artificial.
 
 @item bitsize

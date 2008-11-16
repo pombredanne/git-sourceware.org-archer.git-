@@ -50,6 +50,17 @@ typedef struct pyty_type_object
 
 static PyTypeObject type_object_type;
 
+/* A Field object.  */
+typedef struct pyty_field_object
+{
+  PyObject_HEAD
+
+  /* Dictionary holding our attributes.  */
+  PyObject *dict;
+} field_object;
+
+static PyTypeObject field_object_type;
+
 /* This is used to initialize various gdb.TYPE_ constants.  */
 struct pyty_code
 {
@@ -96,6 +107,31 @@ static struct pyty_code pyty_codes[] =
 
 
 
+static void
+field_dealloc (PyObject *obj)
+{
+  field_object *f = (field_object *) obj;
+  Py_XDECREF (f->dict);
+}
+
+static PyObject *
+field_new (void)
+{
+  field_object *result = PyObject_New (field_object, &field_object_type);
+  if (result)
+    {
+      result->dict = PyDict_New ();
+      if (!result->dict)
+	{
+	  Py_DECREF (result);
+	  result = NULL;
+	}
+    }
+  return (PyObject *) result;
+}
+
+
+
 /* Return the code for this type.  */
 static PyObject *
 typy_code (PyObject *self, PyObject *args)
@@ -109,10 +145,10 @@ typy_code (PyObject *self, PyObject *args)
 static PyObject *
 convert_field (PyObject *self, struct type *type, int field)
 {
-  PyObject *dict = PyDict_New ();
+  PyObject *result = field_new ();
   PyObject *arg;
 
-  if (!dict)
+  if (!result)
     return NULL;
 
   if (!TYPE_FIELD_STATIC (type, field))
@@ -121,42 +157,45 @@ convert_field (PyObject *self, struct type *type, int field)
       if (!arg)
 	goto fail;
 
-      if (PyDict_SetItemString (dict, "bitpos", arg) < 0)
+      if (PyObject_SetAttrString (result, "bitpos", arg) < 0)
 	goto failarg;
     }
 
   if (TYPE_FIELD_NAME (type, field))
+    arg = PyString_FromString (TYPE_FIELD_NAME (type, field));
+  else
     {
-      arg = PyString_FromString (TYPE_FIELD_NAME (type, field));
-      if (!arg)
-	goto fail;
-      if (PyDict_SetItemString (dict, "name", arg) < 0)
-	goto failarg;
+      arg = Py_None;
+      Py_INCREF (arg);
     }
+  if (!arg)
+    goto fail;
+  if (PyObject_SetAttrString (result, "name", arg) < 0)
+    goto failarg;
 
   arg = TYPE_FIELD_ARTIFICIAL (type, field) ? Py_True : Py_False;
   Py_INCREF (arg);
-  if (PyDict_SetItemString (dict, "artificial", arg) < 0)
+  if (PyObject_SetAttrString (result, "artificial", arg) < 0)
     goto failarg;
 
   arg = PyLong_FromLong (TYPE_FIELD_BITSIZE (type, field));
   if (!arg)
     goto fail;
-  if (PyDict_SetItemString (dict, "bitsize", arg) < 0)
+  if (PyObject_SetAttrString (result, "bitsize", arg) < 0)
     goto failarg;
 
   arg = type_to_type_object (self, TYPE_FIELD_TYPE (type, field));
   if (!arg)
     goto fail;
-  if (PyDict_SetItemString (dict, "type", arg) < 0)
+  if (PyObject_SetAttrString (result, "type", arg) < 0)
     goto failarg;
 
-  return dict;
+  return result;
 
  failarg:
   Py_DECREF (arg);
  fail:
-  Py_DECREF (dict);
+  Py_DECREF (result);
   return NULL;
 }
 
@@ -169,6 +208,9 @@ typy_fields (PyObject *self, PyObject *args)
   int i;
   struct type *type = ((type_object *) self)->type;
 
+  /* We would like to make a tuple here, make fields immutable, and
+     then memoize the result (and perhaps make Field.type() lazy).
+     However, that can lead to cycles.  */
   result = PyList_New (0);
 
   for (i = 0; i < TYPE_NFIELDS (type); ++i)
@@ -624,8 +666,9 @@ gdbpy_initialize_types (void)
   typy_objfile_data_key
     = register_objfile_data_with_cleanup (clean_up_objfile_types);
 
-  type_object_type.tp_new = typy_new;
   if (PyType_Ready (&type_object_type) < 0)
+    return;
+  if (PyType_Ready (&field_object_type) < 0)
     return;
 
   for (i = 0; pyty_codes[i].name; ++i)
@@ -691,5 +734,58 @@ static PyTypeObject type_object_type =
   0,				  /* tp_weaklistoffset */
   0,				  /* tp_iter */
   0,				  /* tp_iternext */
-  type_object_methods		  /* tp_methods */
+  type_object_methods,		  /* tp_methods */
+  0,				  /* tp_members */
+  0,				  /* tp_getset */
+  0,				  /* tp_base */
+  0,				  /* tp_dict */
+  0,				  /* tp_descr_get */
+  0,				  /* tp_descr_set */
+  0,				  /* tp_dictoffset */
+  0,				  /* tp_init */
+  0,				  /* tp_alloc */
+  typy_new,			  /* tp_new */
+};
+
+static PyTypeObject field_object_type =
+{
+  PyObject_HEAD_INIT (NULL)
+  0,				  /*ob_size*/
+  "gdb.Field",			  /*tp_name*/
+  sizeof (field_object),	  /*tp_basicsize*/
+  0,				  /*tp_itemsize*/
+  field_dealloc,		  /*tp_dealloc*/
+  0,				  /*tp_print*/
+  0,				  /*tp_getattr*/
+  0,				  /*tp_setattr*/
+  0,				  /*tp_compare*/
+  0,				  /*tp_repr*/
+  0,				  /*tp_as_number*/
+  0,				  /*tp_as_sequence*/
+  0,				  /*tp_as_mapping*/
+  0,				  /*tp_hash */
+  0,				  /*tp_call*/
+  0,				  /*tp_str*/
+  0,				  /*tp_getattro*/
+  0,				  /*tp_setattro*/
+  0,				  /*tp_as_buffer*/
+  Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_ITER,  /*tp_flags*/
+  "GDB field object",		  /* tp_doc */
+  0,				  /* tp_traverse */
+  0,				  /* tp_clear */
+  0,				  /* tp_richcompare */
+  0,				  /* tp_weaklistoffset */
+  0,				  /* tp_iter */
+  0,				  /* tp_iternext */
+  0,				  /* tp_methods */
+  0,				  /* tp_members */
+  0,				  /* tp_getset */
+  0,				  /* tp_base */
+  0,				  /* tp_dict */
+  0,				  /* tp_descr_get */
+  0,				  /* tp_descr_set */
+  offsetof (field_object, dict),  /* tp_dictoffset */
+  0,				  /* tp_init */
+  0,				  /* tp_alloc */
+  0,				  /* tp_new */
 };

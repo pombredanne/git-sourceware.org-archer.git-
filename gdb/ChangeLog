@@ -1,5 +1,15 @@
 2008-11-16  Tom Tromey  <tromey@redhat.com>
 
+	* python/python-type.c (type_object_type): Add extra fields.
+	(gdbpy_initialize_types): Don't set tp_new.  Ready new type.
+	(pyty_field_object): New type.
+	(field_object_type): New global.
+	(field_dealloc): New function.
+	(field_new): Likewise.
+	(convert_field): Create field objects.
+
+2008-11-16  Tom Tromey  <tromey@redhat.com>
+
 	* python/python-type.c (typy_code): New function.
 	(struct pyty_code): New type.
 	(ENTRY): New define.
