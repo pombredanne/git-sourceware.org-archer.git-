@@ -1,3 +1,20 @@
+2008-11-16  Tom Tromey  <tromey@redhat.com>
+
+	* python/python-type.c (typy_code): New function.
+	(struct pyty_code): New type.
+	(ENTRY): New define.
+	(pyty_codes): New array.
+	(clean_up_objfile_types): Acquire GIL.
+	(gdbpy_initialize_types): Register new constants.
+	(type_object_methods): Add "code", "fields", "tag" methods.
+	(convert_field): New functionn.
+	(typy_fields): Likewise.
+	(typy_tag): Likewise.
+	(typy_lookup_typename): Allow struct/union/enum.  Change error
+	handling.
+	(typy_lookup_type): Update.
+	(typy_new): Likewise.
+
 2008-11-15  Tom Tromey  <tromey@redhat.com>
 
 	* varobj.c (varobj_get_display_hint): Acquire GIL.

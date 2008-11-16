@@ -50,6 +50,156 @@ typedef struct pyty_type_object
 
 static PyTypeObject type_object_type;
 
+/* This is used to initialize various gdb.TYPE_ constants.  */
+struct pyty_code
+{
+  /* The code.  */
+  enum type_code code;
+  /* The name.  */
+  const char *name;
+};
+
+#define ENTRY(X) { X, #X }
+
+static struct pyty_code pyty_codes[] =
+{
+  ENTRY (TYPE_CODE_PTR),
+  ENTRY (TYPE_CODE_ARRAY),
+  ENTRY (TYPE_CODE_STRUCT),
+  ENTRY (TYPE_CODE_UNION),
+  ENTRY (TYPE_CODE_ENUM),
+  ENTRY (TYPE_CODE_FLAGS),
+  ENTRY (TYPE_CODE_FUNC),
+  ENTRY (TYPE_CODE_INT),
+  ENTRY (TYPE_CODE_FLT),
+  ENTRY (TYPE_CODE_VOID),
+  ENTRY (TYPE_CODE_SET),
+  ENTRY (TYPE_CODE_RANGE),
+  ENTRY (TYPE_CODE_STRING),
+  ENTRY (TYPE_CODE_BITSTRING),
+  ENTRY (TYPE_CODE_ERROR),
+  ENTRY (TYPE_CODE_METHOD),
+  ENTRY (TYPE_CODE_METHODPTR),
+  ENTRY (TYPE_CODE_MEMBERPTR),
+  ENTRY (TYPE_CODE_REF),
+  ENTRY (TYPE_CODE_CHAR),
+  ENTRY (TYPE_CODE_BOOL),
+  ENTRY (TYPE_CODE_COMPLEX),
+  ENTRY (TYPE_CODE_TYPEDEF),
+  ENTRY (TYPE_CODE_TEMPLATE),
+  ENTRY (TYPE_CODE_TEMPLATE_ARG),
+  ENTRY (TYPE_CODE_NAMESPACE),
+  ENTRY (TYPE_CODE_DECFLOAT),
+  ENTRY (TYPE_CODE_INTERNAL_FUNCTION),
+  { TYPE_CODE_UNDEF, NULL }
+};
+
+
+
+/* Return the code for this type.  */
+static PyObject *
+typy_code (PyObject *self, PyObject *args)
+{
+  struct type *type = ((type_object *) self)->type;
+  return PyInt_FromLong (TYPE_CODE (type));
+}
+
+/* Helper function for typy_fields which converts a single field to a
+   dictionary.  Returns NULL on error.  */
+static PyObject *
+convert_field (PyObject *self, struct type *type, int field)
+{
+  PyObject *dict = PyDict_New ();
+  PyObject *arg;
+
+  if (!dict)
+    return NULL;
+
+  if (!TYPE_FIELD_STATIC (type, field))
+    {
+      arg = PyLong_FromLong (TYPE_FIELD_BITPOS (type, field));
+      if (!arg)
+	goto fail;
+
+      if (PyDict_SetItemString (dict, "bitpos", arg) < 0)
+	goto failarg;
+    }
+
+  if (TYPE_FIELD_NAME (type, field))
+    {
+      arg = PyString_FromString (TYPE_FIELD_NAME (type, field));
+      if (!arg)
+	goto fail;
+      if (PyDict_SetItemString (dict, "name", arg) < 0)
+	goto failarg;
+    }
+
+  arg = TYPE_FIELD_ARTIFICIAL (type, field) ? Py_True : Py_False;
+  Py_INCREF (arg);
+  if (PyDict_SetItemString (dict, "artificial", arg) < 0)
+    goto failarg;
+
+  arg = PyLong_FromLong (TYPE_FIELD_BITSIZE (type, field));
+  if (!arg)
+    goto fail;
+  if (PyDict_SetItemString (dict, "bitsize", arg) < 0)
+    goto failarg;
+
+  arg = type_to_type_object (self, TYPE_FIELD_TYPE (type, field));
+  if (!arg)
+    goto fail;
+  if (PyDict_SetItemString (dict, "type", arg) < 0)
+    goto failarg;
+
+  return dict;
+
+ failarg:
+  Py_DECREF (arg);
+ fail:
+  Py_DECREF (dict);
+  return NULL;
+}
+
+/* Return a sequence of all fields.  Each field is a dictionary with
+   some pre-defined keys.  */
+static PyObject *
+typy_fields (PyObject *self, PyObject *args)
+{
+  PyObject *result;
+  int i;
+  struct type *type = ((type_object *) self)->type;
+
+  result = PyList_New (0);
+
+  for (i = 0; i < TYPE_NFIELDS (type); ++i)
+    {
+      PyObject *dict = convert_field (self, type, i);
+      if (!dict)
+	{
+	  Py_DECREF (result);
+	  return NULL;
+	}
+      if (PyList_Append (result, dict))
+	{
+	  Py_DECREF (dict);
+	  Py_DECREF (result);
+	  return NULL;
+	}
+    }
+
+  return result;
+}
+
+/* Return the type's tag, or None.  */
+static PyObject *
+typy_tag (PyObject *self, PyObject *args)
+{
+  struct type *type = ((type_object *) self)->type;
+  if (!TYPE_TAG_NAME (type))
+    Py_RETURN_NONE;
+  return PyString_FromString (TYPE_TAG_NAME (type));
+}
+
 /* Return a Type object which represents a pointer to SELF.  */
 static PyObject *
 typy_pointer (PyObject *self, PyObject *args)
@@ -120,7 +270,14 @@ typy_lookup_typename (char *type_name, struct block *block)
   volatile struct gdb_exception except;
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      type = lookup_typename (type_name, block, 1);
+      if (!strncmp (type_name, "struct ", 7))
+	type = lookup_struct (type_name + 7, block);
+      else if (!strncmp (type_name, "union ", 6))
+	type = lookup_union (type_name + 6, block);
+      else if (!strncmp (type_name, "enum ", 5))
+	type = lookup_enum (type_name + 5, block);
+      else
+	type = lookup_typename (type_name, block, 0);
     }
   if (except.reason < 0)
     {
@@ -169,13 +326,6 @@ typy_lookup_type (struct demangle_component *demangled,
 
   type_name = cp_comp_to_string (demangled, 10);
   type = typy_lookup_typename (type_name, block);
-  if (! type)
-    {
-      PyErr_Format (PyExc_RuntimeError, "no such type named %s",
-		    type_name);
-      xfree (type_name);
-      return NULL;
-    }
   xfree (type_name);
 
   return type;
@@ -297,6 +447,13 @@ clean_up_objfile_types (struct objfile *objfile, void *datum)
 {
   type_object *obj = datum;
   htab_t copied_types;
+  struct cleanup *cleanup;
+  PyGILState_STATE state;
+
+  /* This prevents another thread from freeing the objects we're
+     operating on.  */
+  state = PyGILState_Ensure ();
+  cleanup = make_cleanup_py_restore_gil (&state);
 
   copied_types = create_copied_types_hash (objfile);
 
@@ -315,6 +472,8 @@ clean_up_objfile_types (struct objfile *objfile, void *datum)
     }
 
   htab_delete (copied_types);
+
+  do_cleanups (cleanup);
 }
 
 static void
@@ -380,11 +539,7 @@ typy_new (PyTypeObject *subtype, PyObject *args, PyObject *kwargs)
     {
       type = typy_lookup_typename (type_name, block);
       if (! type)
-	{
-	  PyErr_Format (PyExc_RuntimeError, "no such type named %s",
-			type_name);
-	  return NULL;
-	}
+	return NULL;
     }
 
   result = (type_object *) subtype->tp_alloc (subtype, 1);
@@ -464,12 +619,22 @@ type_object_to_type (PyObject *obj)
 void
 gdbpy_initialize_types (void)
 {
+  int i;
+
   typy_objfile_data_key
     = register_objfile_data_with_cleanup (clean_up_objfile_types);
 
   type_object_type.tp_new = typy_new;
   if (PyType_Ready (&type_object_type) < 0)
     return;
+
+  for (i = 0; pyty_codes[i].name; ++i)
+    {
+      if (PyModule_AddIntConstant (gdb_module,
+				   pyty_codes[i].name,
+				   pyty_codes[i].code) < 0)
+	return;
+    }
 
   Py_INCREF (&type_object_type);
   PyModule_AddObject (gdb_module, "Type", (PyObject *) &type_object_type);
@@ -479,10 +644,16 @@ gdbpy_initialize_types (void)
 
 static PyMethodDef type_object_methods[] =
 {
+  { "code", typy_code, METH_NOARGS, "Return the code for this type" },
+  { "fields", typy_fields, METH_NOARGS,
+    "Return a sequence holding all the fields of this type.\n\
+Each field is a dictionary." },
   { "pointer", typy_pointer, METH_NOARGS, "Return pointer to this type" },
   { "reference", typy_reference, METH_NOARGS, "Return reference to this type" },
   { "sizeof", typy_sizeof, METH_NOARGS,
     "Return the size of this type, in bytes" },
+  { "tag", typy_tag, METH_NOARGS,
+    "Return the tag name for this type, or None." },
   { "target", typy_target, METH_NOARGS,
     "Return the target type of this type" },
   { "template_argument", typy_template_argument, METH_VARARGS,
