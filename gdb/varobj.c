@@ -247,7 +247,7 @@ static char *cppop (struct cpstack **pstack);
 static int install_new_value (struct varobj *var, struct value *value, 
 			      int initial);
 
-static void install_default_visualizer (struct varobj *var, struct type *type);
+static void install_default_visualizer (struct varobj *var);
 
 /* Language-specific routines. */
 
@@ -603,7 +603,7 @@ varobj_create (char *objname,
 	}
     }
 
-  install_default_visualizer (var, var->type);
+  install_default_visualizer (var);
   discard_cleanups (old_chain);
   return var;
 }
@@ -995,7 +995,7 @@ varobj_list_children (struct varobj *var)
 	  name = name_of_child (var, i);
 	  existing = create_child (var, i, name);
 	  VEC_replace (varobj_p, var->children, i, existing);
-	  install_default_visualizer (existing, existing->type);
+	  install_default_visualizer (existing);
 	}
     }
 
@@ -1009,7 +1009,7 @@ varobj_add_child (struct varobj *var, const char *name, struct value *value)
 					VEC_length (varobj_p, var->children), 
 					name, value);
   VEC_safe_push (varobj_p, var->children, v);
-  install_default_visualizer (v, v->type);
+  install_default_visualizer (v);
   return v;
 }
 
@@ -1427,7 +1427,7 @@ install_visualizer (struct varobj *var, PyObject *visualizer)
 }
 
 static void
-install_default_visualizer (struct varobj *var, struct type *type)
+install_default_visualizer (struct varobj *var)
 {
 #if HAVE_PYTHON
   struct cleanup *cleanup;
@@ -1437,8 +1437,8 @@ install_default_visualizer (struct varobj *var, struct type *type)
   state = PyGILState_Ensure ();
   cleanup = make_cleanup_py_restore_gil (&state);
 
-  if (type)
-    constructor = gdbpy_get_varobj_pretty_printer (type);
+  if (var->type)
+    constructor = gdbpy_get_varobj_pretty_printer (var->type);
   install_visualizer (var, constructor);
 
   do_cleanups (cleanup);
@@ -1542,12 +1542,6 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
 	 has changed.  */
       new = value_of_root (varp, &type_changed);
       r.varobj = *varp;
-
-      /* Change the default visualizer, if needed, before installing
-	 the new value.  This ensures that we instantiate the correct
-	 class.  */
-      if (type_changed)
-	install_default_visualizer (*varp, value_type (new));
 
       r.type_changed = type_changed;
       if (install_new_value ((*varp), new, type_changed))

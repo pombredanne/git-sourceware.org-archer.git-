@@ -107,6 +107,13 @@ void init_ss(struct ss *s, int a, int b)
   init_s(&s->b, b);
 }
 
+void do_nothing(void)
+{
+  int c;
+
+  c = 23;			/* Another MI breakpoint */
+}
+
 int
 main ()
 {
@@ -143,6 +150,10 @@ main ()
 
   add_item (&c, 23);		/* MI breakpoint here */
   add_item (&c, 72);
+
+#ifdef MI
+  do_nothing ();
+#endif
 
   return 0;      /* break to inspect struct and union */
 }

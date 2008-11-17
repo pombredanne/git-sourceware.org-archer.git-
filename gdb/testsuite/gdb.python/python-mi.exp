@@ -27,7 +27,7 @@ if [mi_gdb_start] {
 set testfile "python-prettyprint"
 set srcfile ${testfile}.c
 set binfile ${objdir}/${subdir}/${testfile}
-if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
+if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug additional_flags=-DMI}] != "" } {
     untested mi2-var-child.exp
     return -1
 }
@@ -48,7 +48,7 @@ mi_gdb_test "python execfile ('${srcdir}/${subdir}/${testfile}.py')" ""
 mi_continue_to_line [gdb_get_line_number {MI breakpoint here} ${testfile}.c] \
   "step to breakpoint"
 
-mi_create_varobj container c "create container varobj"
+mi_create_floating_varobj container c "create container varobj"
 
 mi_list_varobj_children container {
 } "examine container children=0"
@@ -116,3 +116,9 @@ mi_list_varobj_children container {
     { {container.\[0\]} {\[0\]} 0 int }
     { {container.\[1\]} {\[1\]} 0 int }
 } "list varobj children after resetting child range"
+
+mi_continue_to_line \
+    [gdb_get_line_number {Another MI breakpoint} ${testfile}.c] \
+    "step to second breakpoint"
+
+mi_varobj_update_with_type_change container int 0 "update after type change"
