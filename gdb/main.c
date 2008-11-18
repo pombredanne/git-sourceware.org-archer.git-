@@ -64,6 +64,9 @@ int dbx_commands = 0;
 /* System root path, used to find libraries etc.  */
 char *gdb_sysroot = 0;
 
+/* GDB datadir, used to store data files.  */
+char *gdb_datadir = 0;
+
 struct ui_file *gdb_stdout;
 struct ui_file *gdb_stderr;
 struct ui_file *gdb_stdlog;
@@ -269,6 +272,40 @@ captured_main (void *data)
 	{
 	  xfree (debug_file_directory);
 	  debug_file_directory = canon_debug;
+	}
+    }
+
+#ifdef GDB_DATADIR_RELOCATABLE
+  gdb_datadir = make_relative_prefix (argv[0], BINDIR, GDB_DATADIR);
+  if (gdb_datadir)
+    {
+      struct stat s;
+      int res = 0;
+
+      if (stat (gdb_datadir, &s) == 0)
+	if (S_ISDIR (s.st_mode))
+	  res = 1;
+
+      if (res == 0)
+	{
+	  xfree (gdb_datadir);
+	  gdb_datadir = xstrdup (GDB_DATADIR);
+	}
+    }
+  else
+    gdb_datadir = xstrdup (GDB_DATADIR);
+#else
+  gdb_datadir = xstrdup (GDB_DATADIR);
+#endif /* GDB_DATADIR_RELOCATABLE */
+
+  /* Canonicalize the GDB's datadir path.  */
+  if (*gdb_datadir)
+    {
+      char *canon_debug = lrealpath (gdb_datadir);
+      if (canon_debug)
+	{
+	  xfree (gdb_datadir);
+	  gdb_datadir = canon_debug;
 	}
     }
 

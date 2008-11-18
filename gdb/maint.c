@@ -880,4 +880,12 @@ When enabled GDB is profiled."),
 			   show_maintenance_profile_p,
 			   &maintenance_set_cmdlist,
 			   &maintenance_show_cmdlist);
+  add_setshow_filename_cmd ("gdb_datadir", class_maintenance,
+                           &gdb_datadir, _("Set GDB's datadir path."),
+                           _("Show GDB's datadir path."),
+                           _("\
+When set, GDB uses the specified path to search for data files."),
+                           NULL, NULL,
+                           &maintenance_set_cmdlist,
+                           &maintenance_show_cmdlist);
 }

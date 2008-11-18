@@ -42,6 +42,12 @@
    language is requested. */
 #undef ENABLE_NLS
 
+/* Global directory for GDB data files. */
+#undef GDB_DATADIR
+
+/* Define if GDB datadir should be relocated when GDB is moved. */
+#undef GDB_DATADIR_RELOCATABLE
+
 /* Define to be a string naming the default host character set. */
 #undef GDB_DEFAULT_HOST_CHARSET
 

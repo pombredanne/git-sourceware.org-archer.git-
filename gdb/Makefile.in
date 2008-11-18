@@ -172,6 +172,9 @@ LIBICONV = @LIBICONV@
 TARGET_SYSTEM_ROOT = @TARGET_SYSTEM_ROOT@
 TARGET_SYSTEM_ROOT_DEFINE = @TARGET_SYSTEM_ROOT_DEFINE@
 
+# Did the user give us a --with-gdb-datadir option?
+GDB_DATADIR_PATH = @GDB_DATADIR_PATH@
+
 # Helper code from gnulib.
 LIBGNU = gnulib/libgnu.a
 INCGNU = -I$(srcdir)/gnulib -Ignulib

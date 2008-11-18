@@ -1,3 +1,13 @@
+2008-11-18  Sergio Durigan Junior  <sergiodj@linux.vnet.ibm.com>
+
+	* defs.h (gdb_datadir): New variable.
+	* main.c: Add gdb_datadir variable to store the current GDB datadir.
+	(captured_main): Add the GDB datadir relocatable handler.
+	* maint.c: Create the "maintanence set gdb_datadir" command.
+	* configure, config.in: Regenerate.
+	* configure.ac: Support for relocatable GDB datadir.
+	* Makefile.in (GDB_DATADIR_PATH): New variable.
+
 2008-11-18  Tom Tromey  <tromey@redhat.com>
 
 	* python/python-cmd.c (struct cmdpy_object) <sub_list>: New field.

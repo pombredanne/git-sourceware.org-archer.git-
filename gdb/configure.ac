@@ -118,6 +118,36 @@ case ${debugdir} in
   ;;
 esac
 
+# GDB's datadir relocation
+
+gdbdatadir=${datadir}/gdb
+
+AC_ARG_WITH([gdb-datadir],
+  [AS_HELP_STRING([--with-gdb-datadir],
+                  [look for global separate data files in this path [DATADIR/gdb]])], [gdbdatadir="${withval}"])
+
+AC_DEFINE_DIR(GDB_DATADIR, gdbdatadir,
+              [Global directory for GDB data files. ])
+
+if test "x$exec_prefix" = xNONE || test "x$exec_prefix" = 'x${prefix}'; then
+  if test "x$prefix" = xNONE; then
+    test_prefix=/usr/local
+  else
+    test_prefix=$prefix
+  fi
+else
+  test_prefix=$exec_prefix
+fi
+
+case ${gdbdatadir} in
+  "${test_prefix}"|"${test_prefix}/"*|\
+  '${exec_prefix}'|'${exec_prefix}/'*)
+    AC_DEFINE(GDB_DATADIR_RELOCATABLE, 1, [Define if GDB datadir should be relocated when GDB is moved.])
+  ;;
+esac
+GDB_DATADIR_PATH=${gdbdatadir}
+AC_SUBST(GDB_DATADIR_PATH)
+
 AC_CONFIG_SUBDIRS(doc testsuite)
 
 # Check whether to support alternative target configurations
