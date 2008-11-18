@@ -1,3 +1,7 @@
+2008-11-18  Tom Tromey  <tromey@redhat.com>
+
+	* python/python.c (_initialize_python): Add gdb path to sys.path.
+
 2008-11-18  Sergio Durigan Junior  <sergiodj@linux.vnet.ibm.com>
 
 	* defs.h (gdb_datadir): New variable.
