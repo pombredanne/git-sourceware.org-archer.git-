@@ -1,5 +1,12 @@
 2008-11-18  Tom Tromey  <tromey@redhat.com>
 
+	* python/python-cmd.c (struct cmdpy_object) <sub_list>: New field.
+	(cmdpy_init): Allow prefix commands.
+	(cmdpy_destroyer): Free the prefix name.
+	(cmdpy_function): Handle prefix commands.
+
+2008-11-18  Tom Tromey  <tromey@redhat.com>
+
 	* python/python-internal.h (gdbpy_doc_cst): Declare.
 	* python/python-cmd.c (cmdpy_init): Use gdbpy_doc_cst.  Don't set
 	tp_new or tp_init.

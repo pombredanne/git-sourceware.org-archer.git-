@@ -18308,7 +18308,7 @@ You can implement new @value{GDBN} CLI commands in Python.  A CLI
 command is implemented using an instance of the @code{gdb.Command}
 class, most commonly using a subclass.
 
-@defmethod Command __init__ name @var{command-class} @r{[}@var{completer-class}@r{]}
+@defmethod Command __init__ name @var{command-class} @r{[}@var{completer-class} @var{prefix}@r{]}
 The object initializer for @code{Command} registers the new command
 with @value{GDBN}.  This initializer is normally invoked from the
 subclass' own @code{__init__} method.
@@ -18318,8 +18318,7 @@ multiple words, then the initial words are looked for as prefix
 commands.  In this case, if one of the prefix commands does not exist,
 an exception is raised.
 
-There is no support for multi-line commands.  Currently, there is also
-no way to define new prefix commands.
+There is no support for multi-line commands.
 
 @var{command-class} should be one of the @samp{COMMAND_} constants
 defined below.  This argument tells @value{GDBN} how to categorize the
@@ -18331,6 +18330,10 @@ tells @value{GDBN} how to perform completion for this command.  If not
 given, @value{GDBN} will attempt to complete using the object's
 @code{complete} method (see below); if no such method is found, an
 error will occur when completion is attempted.
+
+@var{prefix} is an optional argument.  If @code{True}, then the new
+command is a prefix command; sub-commands of this command may be
+registered.
 
 The help text for the new command is taken from the Python
 documentation string for the command's class, if there is one.  If

@@ -54,8 +54,10 @@ struct cmdpy_object
 
   /* The corresponding gdb command object, or NULL if the command is
      no longer installed.  */
-  /* It isn't clear if we will ever care about this.  */
   struct cmd_list_element *command;
+
+  /* For a prefix command, this is the list of sub-commands.  */
+  struct cmd_list_element *sub_list;
 };
 
 typedef struct cmdpy_object cmdpy_object;
@@ -92,9 +94,11 @@ cmdpy_destroyer (struct cmd_list_element *self, void *context)
   cmd->command = NULL;
   Py_DECREF (cmd);
 
-  /* We allocated the name and doc string.  */
+  /* We allocated the name, doc string, and perhaps the prefix
+     name.  */
   xfree (self->name);
   xfree (self->doc);
+  xfree (self->prefixname);
 
   PyGILState_Release (state);
 }
@@ -114,7 +118,15 @@ cmdpy_function (struct cmd_list_element *command, char *args, int from_tty)
   if (! obj)
     error (_("Invalid invocation of Python command object."));
   if (! PyObject_HasAttr ((PyObject *) obj, invoke_cst))
-    error (_("Python command object missing 'invoke' method."));
+    {
+      if (obj->command->prefixname)
+	{
+	  /* A prefix command does not need an invoke method.  */
+	  do_cleanups (cleanup);
+	  return;
+	}
+      error (_("Python command object missing 'invoke' method."));
+    }
 
   if (! args)
     {
@@ -327,7 +339,7 @@ gdbpy_parse_command_name (char *text, struct cmd_list_element ***base_list,
 
 /* Object initializer; sets up gdb-side structures for command.
 
-   Use: __init__(NAME, CMDCLASS, [COMPLETERCLASS]).
+   Use: __init__(NAME, CMDCLASS, [COMPLETERCLASS, [PREFIX]]).
 
    NAME is the name of the command.  It may consist of multiple words,
    in which case the final word is the name of the new command, and
@@ -339,6 +351,8 @@ gdbpy_parse_command_name (char *text, struct cmd_list_element ***base_list,
    COMPLETERCLASS is the kind of completer.  If not given, the
    "complete" method will be used.  Otherwise, it should be one of the
    COMPLETE_* constants defined in the gdb module.
+
+   If PREFIX is True, then this command is a prefix command.
 
    The documentation for the command is taken from the doc string for
    the python class.
@@ -354,7 +368,8 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kwds)
   char *docstring = NULL;
   volatile struct gdb_exception except;
   struct cmd_list_element **cmd_list;
-  char *cmd_name;
+  char *cmd_name, *pfx_name;
+  PyObject *is_prefix = NULL;
 
   if (obj->command)
     {
@@ -365,7 +380,8 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kwds)
       return -1;
     }
 
-  if (! PyArg_ParseTuple (args, "si|i", &name, &cmdtype, &completetype))
+  if (! PyArg_ParseTuple (args, "si|iO", &name, &cmdtype,
+			  &completetype, &is_prefix))
     return -1;
 
   if (cmdtype != no_class && cmdtype != class_run
@@ -389,6 +405,31 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kwds)
   if (! cmd_name)
     return -1;
 
+  pfx_name = NULL;
+  if (is_prefix == Py_True)
+    {
+      int i, out;
+
+      /* Make a normalized form of the command name.  */
+      pfx_name = xmalloc (strlen (name) + 2);
+
+      i = 0;
+      out = 0;
+      while (name[i])
+	{
+	  /* Skip whitespace.  */
+	  while (name[i] == ' ' || name[i] == '\t')
+	    ++i;
+	  /* Copy non-whitespace characters.  */
+	  while (name[i] && name[i] != ' ' && name[i] != '\t')
+	    pfx_name[out++] = name[i++];
+	  /* Add a single space after each word -- including the final
+	     word.  */
+	  pfx_name[out++] = ' ';
+	}
+      pfx_name[out] = '\0';
+    }
+
   if (PyObject_HasAttr (self, gdbpy_doc_cst))
     {
       PyObject *ds_obj = PyObject_GetAttr (self, gdbpy_doc_cst);
@@ -402,11 +443,23 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kwds)
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      struct cmd_list_element *cmd = add_cmd (cmd_name,
-					      (enum command_class) cmdtype,
-					      NULL,
-					      docstring,
-					      cmd_list);
+      struct cmd_list_element *cmd;
+
+      if (pfx_name)
+	{
+	  int allow_unknown;
+
+	  /* If we have our own "invoke" method, then allow unknown
+	     sub-commands.  */
+	  allow_unknown = PyObject_HasAttr (self, invoke_cst);
+	  cmd = add_prefix_cmd (cmd_name, (enum command_class) cmdtype,
+				NULL, docstring, &obj->sub_list,
+				pfx_name, allow_unknown, cmd_list);
+	}
+      else
+	cmd = add_cmd (cmd_name, (enum command_class) cmdtype, NULL,
+		       docstring, cmd_list);
+
       /* There appears to be no API to set this.  */
       cmd->func = cmdpy_function;
       cmd->destroyer = cmdpy_destroyer;
@@ -420,6 +473,7 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kwds)
     {
       xfree (cmd_name);
       xfree (docstring);
+      xfree (pfx_name);
       Py_DECREF (self);
       PyErr_Format (except.reason == RETURN_QUIT
 		    ? PyExc_KeyboardInterrupt : PyExc_RuntimeError,
