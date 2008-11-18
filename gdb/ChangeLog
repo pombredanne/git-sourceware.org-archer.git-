@@ -1,3 +1,19 @@
+2008-11-18  Tom Tromey  <tromey@redhat.com>
+
+	* python/python-internal.h (gdbpy_doc_cst): Declare.
+	* python/python-cmd.c (cmdpy_init): Use gdbpy_doc_cst.  Don't set
+	tp_new or tp_init.
+	(cmdpy_object_type): Add extra entries.  Set tp_init and tp_new.
+	* python/python.c (gdbpy_doc_cst): New global.
+	(_initialize_python): Initialize it.
+	* python/python-param.c (set_doc_cst, show_doc_cst): New globals.
+	(gdbpy_initialize_parameters): Initialize them.  Don't set
+	tp_new or tp_init.
+	(parmpy_init): Use gdbpy_doc_cst.  Get set and show help.  Don't
+	examine __doc__.
+	(get_doc_string): New function.
+	(parmpy_object_type): Add extra entries.  Set tp_init and tp_new.
+
 2008-11-17  Tom Tromey  <tromey@redhat.com>
 
 	* varobj.c (install_default_visualizer): Remove 'type' argument.

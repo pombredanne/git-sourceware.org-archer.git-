@@ -89,6 +89,10 @@ typedef struct parmpy_object parmpy_object;
 
 static PyTypeObject parmpy_object_type;
 
+/* Some handy string constants.  */
+static PyObject *set_doc_cst;
+static PyObject *show_doc_cst;
+
 
 
 /* Get an attribute.  */
@@ -374,6 +378,23 @@ compute_enum_values (parmpy_object *self, PyObject *enum_values)
   return 1;
 }
 
+/* A helper function which returns a documentation string for an
+   object.  */
+static char *
+get_doc_string (PyObject *object, PyObject *attr)
+{
+  char *result = NULL;
+  if (PyObject_HasAttr (object, attr))
+    {
+      PyObject *ds_obj = PyObject_GetAttr (object, attr);
+      if (ds_obj && gdbpy_is_string (ds_obj))
+	result = python_string_to_host_string (ds_obj);
+    }
+  if (! result)
+    result = xstrdup ("This command is not documented.");
+  return result;
+}
+
 /* Object initializer; sets up gdb-side structures for command.
 
    Use: __init__(NAME, CMDCLASS, PARMCLASS, [ENUM])
@@ -401,7 +422,7 @@ parmpy_init (PyObject *self, PyObject *args, PyObject *kwds)
 {
   parmpy_object *obj = (parmpy_object *) self;
   char *name;
-  char *docstring = NULL;
+  char *set_doc, *show_doc;
   char *cmd_name;
   int parmclass, cmdtype;
   PyObject *enum_values = NULL;
@@ -458,15 +479,10 @@ parmpy_init (PyObject *self, PyObject *args, PyObject *kwds)
   if (! cmd_name)
     return -1;
 
-  /* FIXME: need set and show docs.  */
-  if (PyObject_HasAttrString (self, "__doc__"))
-    {
-      PyObject *ds_obj = PyObject_GetAttrString (self, "__doc__");
-      if (ds_obj && gdbpy_is_string (ds_obj))
-	docstring = python_string_to_host_string (ds_obj);
-    }
-  if (! docstring)
-    docstring = xstrdup ("This command is not documented.");
+  /* FIXME: there is no way to register a destructor function for
+     set/show commands.  So, these are leaked.  */
+  set_doc = get_doc_string (self, set_doc_cst);
+  show_doc = get_doc_string (self, show_doc_cst);
 
   Py_INCREF (self);
 
@@ -474,13 +490,14 @@ parmpy_init (PyObject *self, PyObject *args, PyObject *kwds)
     {
       add_setshow_generic (parmclass, (enum command_class) cmdtype,
 			   cmd_name, obj,
-			   "FIXME: set doc", "FIXME: show doc",
-			   docstring, set_list, show_list);
+			   set_doc, show_doc,
+			   NULL, set_list, show_list);
     }
   if (except.reason < 0)
     {
       xfree (cmd_name);
-      xfree (docstring);
+      xfree (set_doc);
+      xfree (show_doc);
       Py_DECREF (self);
       PyErr_Format (except.reason == RETURN_QUIT
 		    ? PyExc_KeyboardInterrupt : PyExc_RuntimeError,
@@ -498,9 +515,14 @@ gdbpy_initialize_parameters (void)
 {
   int i;
 
-  parmpy_object_type.tp_new = PyType_GenericNew;
-  parmpy_object_type.tp_init = parmpy_init;
   if (PyType_Ready (&parmpy_object_type) < 0)
+    return;
+
+  set_doc_cst = PyString_FromString ("set_doc");
+  if (! set_doc_cst)
+    return;
+  show_doc_cst = PyString_FromString ("show_doc");
+  if (! show_doc_cst)
     return;
 
   for (i = 0; parm_constants[i].name; ++i)
@@ -548,5 +570,15 @@ static PyTypeObject parmpy_object_type =
   0,				  /* tp_weaklistoffset */
   0,				  /* tp_iter */
   0,				  /* tp_iternext */
-  0				  /* tp_methods */
+  0,				  /* tp_methods */
+  0,				  /* tp_members */
+  0,				  /* tp_getset */
+  0,				  /* tp_base */
+  0,				  /* tp_dict */
+  0,				  /* tp_descr_get */
+  0,				  /* tp_descr_set */
+  0,				  /* tp_dictoffset */
+  parmpy_init,			  /* tp_init */
+  0,				  /* tp_alloc */
+  PyType_GenericNew		  /* tp_new */
 };

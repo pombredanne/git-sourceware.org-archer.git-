@@ -136,5 +136,6 @@ char *gdbpy_get_display_hint (PyObject *printer);
 extern PyObject *gdbpy_children_cst;
 extern PyObject *gdbpy_to_string_cst;
 extern PyObject *gdbpy_display_hint_cst;
+extern PyObject *gdbpy_doc_cst;
 
 #endif /* GDB_PYTHON_INTERNAL_H */

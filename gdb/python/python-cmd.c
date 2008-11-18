@@ -389,9 +389,9 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kwds)
   if (! cmd_name)
     return -1;
 
-  if (PyObject_HasAttrString (self, "__doc__"))
+  if (PyObject_HasAttr (self, gdbpy_doc_cst))
     {
-      PyObject *ds_obj = PyObject_GetAttrString (self, "__doc__");
+      PyObject *ds_obj = PyObject_GetAttr (self, gdbpy_doc_cst);
       if (ds_obj && gdbpy_is_string (ds_obj))
 	docstring = python_string_to_host_string (ds_obj);
     }
@@ -437,8 +437,6 @@ gdbpy_initialize_commands (void)
 {
   int i;
 
-  cmdpy_object_type.tp_new = PyType_GenericNew;
-  cmdpy_object_type.tp_init = cmdpy_init;
   if (PyType_Ready (&cmdpy_object_type) < 0)
     return;
 
@@ -515,5 +513,15 @@ static PyTypeObject cmdpy_object_type =
   0,				  /* tp_weaklistoffset */
   0,				  /* tp_iter */
   0,				  /* tp_iternext */
-  cmdpy_object_methods		  /* tp_methods */
+  cmdpy_object_methods,		  /* tp_methods */
+  0,				  /* tp_members */
+  0,				  /* tp_getset */
+  0,				  /* tp_base */
+  0,				  /* tp_dict */
+  0,				  /* tp_descr_get */
+  0,				  /* tp_descr_set */
+  0,				  /* tp_dictoffset */
+  cmdpy_init,			  /* tp_init */
+  0,				  /* tp_alloc */
+  PyType_GenericNew		  /* tp_new */
 };

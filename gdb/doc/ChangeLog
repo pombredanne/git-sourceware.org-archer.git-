@@ -1,3 +1,7 @@
+2008-11-18  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Parameters In Python): Document set_doc, show_doc.
+
 2008-11-16  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.texinfo (Types From Inferior): Update.

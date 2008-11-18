@@ -18553,6 +18553,20 @@ documentation string for the parameter's class, if there is one.  If
 there is no documentation string, a default value is used.
 @end defmethod
 
+@defivar Parameter set_doc
+If this attribute exists, and is a string, then its value is used as
+the help text for this parameter's @code{set} command.  The value is
+examined when @code{Parameter.__init__} is invoked; subsequent changes
+have no effect.
+@end defivar
+
+@defivar Parameter show_doc
+If this attribute exists, and is a string, then its value is used as
+the help text for this parameter's @code{show} command.  The value is
+examined when @code{Parameter.__init__} is invoked; subsequent changes
+have no effect.
+@end defivar
+
 @defivar Parameter value
 The @code{value} attribute holds the underlying value of the
 parameter.  It can be read and assigned to just as any other
