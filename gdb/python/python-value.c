@@ -153,6 +153,39 @@ valpy_type (PyObject *self, PyObject *args)
   return type_to_type_object (NULL, value_type (value));
 }
 
+/* Return Unicode string with value contents (assumed to be encoded in the
+   target's charset).  */
+static PyObject *
+valpy_string (PyObject *self, PyObject *args)
+{
+  int length, ret;
+  gdb_byte *buffer;
+  struct value *value = ((value_object *) self)->value;
+  volatile struct gdb_exception except;
+  PyObject *unicode;
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      ret = LA_GET_STRING (value, &buffer, &length);
+    }
+  GDB_PY_HANDLE_EXCEPTION (except);
+
+  if (ret != 0)
+    {
+      /* We may have read a partial string before the error happened, but
+         we will ignore it and throw an exception anyway.  */
+      PyErr_SetString (PyExc_RuntimeError, safe_strerror (ret));
+      xfree (buffer);
+
+      return NULL;
+    }
+
+  unicode = target_string_to_unicode (buffer, length);
+  xfree (buffer);
+
+  return unicode;
+}
+
 /* Cast a value to a given type.  */
 static PyObject *
 valpy_cast (PyObject *self, PyObject *args)
@@ -867,6 +900,8 @@ static PyMethodDef value_object_methods[] = {
   { "cast", valpy_cast, METH_VARARGS, "Cast the value to the supplied type." },
   { "dereference", valpy_dereference, METH_NOARGS, "Dereferences the value." },
   { "type", valpy_type, METH_NOARGS, "Return type of the value." },
+  { "string", valpy_string, METH_NOARGS,
+    "Return Unicode string representation of the value." },
   {NULL}  /* Sentinel */
 };
 
