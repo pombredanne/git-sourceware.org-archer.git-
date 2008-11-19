@@ -1,3 +1,7 @@
+2008-11-19  Tom Tromey  <tromey@redhat.com>
+
+	* python/python-value.c (valpy_string): Initialize 'ret'.
+
 2008-11-19  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	* python/python-utils.c (target_string_to_unicode): New function.

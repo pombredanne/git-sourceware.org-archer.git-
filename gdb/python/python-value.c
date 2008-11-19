@@ -158,7 +158,7 @@ valpy_type (PyObject *self, PyObject *args)
 static PyObject *
 valpy_string (PyObject *self, PyObject *args)
 {
-  int length, ret;
+  int length, ret = 0;
   gdb_byte *buffer;
   struct value *value = ((value_object *) self)->value;
   volatile struct gdb_exception except;
