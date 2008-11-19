@@ -46,6 +46,17 @@ typedef int Py_ssize_t;
 #error "Unable to find usable Python.h"
 #endif
 
+/* If Python.h does not define WITH_THREAD, then the various
+   GIL-related functions will not be defined.  However,
+   PyGILState_STATE will be.  */
+#ifndef WITH_THREAD
+#define PyGILState_Ensure() ((PyGILState_STATE) 0)
+#define PyGILState_Release(ARG) (ARG)
+#define PyEval_InitThreads() 0
+#define PyThreadState_Swap(ARG) (ARG)
+#define PyEval_InitThreads() 0
+#endif
+
 #include "command.h"
 
 struct block;
