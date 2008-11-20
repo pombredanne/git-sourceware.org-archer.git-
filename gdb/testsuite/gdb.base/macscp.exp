@@ -410,64 +410,64 @@ gdb_test "break [gdb_get_line_number "set breakpoint here"]" \
 
 gdb_test "continue" "foo = 0;.*" "continue to macsp_expr"
 
-gdb_test "print M" \
-    "No symbol \"M\" in current context\." \
+gdb_test "print MACRO_TO_EXPAND" \
+    "No symbol \"MACRO_TO_EXPAND\" in current context\." \
     "print expression with macro before define."
 
 gdb_test "next" "foo = 1;" "next to definition"
 
-gdb_test "print M" \
+gdb_test "print MACRO_TO_EXPAND" \
     " = 0" \
     "print expression with macro in scope."
 
-gdb_test "macro define M 72" \
+gdb_test "macro define MACRO_TO_EXPAND 72" \
   "" \
   "user macro override"
 
-gdb_test "print M" \
+gdb_test "print MACRO_TO_EXPAND" \
   " = 72" \
   "choose user macro"
 
-gdb_test "macro undef M" \
+gdb_test "macro undef MACRO_TO_EXPAND" \
   "" \
   "remove user override"
 
-gdb_test "print M" \
+gdb_test "print MACRO_TO_EXPAND" \
     " = 0" \
     "print expression with macro after removing override"
 
 gdb_test "next" "foo = 2;" "next to definition"
 
-gdb_test "print M" \
-    "No symbol \"M\" in current context\." \
+gdb_test "print MACRO_TO_EXPAND" \
+    "No symbol \"MACRO_TO_EXPAND\" in current context\." \
     "print expression with macro after undef."
 
-gdb_test "macro define M 5" \
+gdb_test "macro define MACRO_TO_EXPAND 5" \
   "" \
   "basic macro define"
 
-gdb_test "print M" \
+gdb_test "print MACRO_TO_EXPAND" \
   " = 5" \
   "expansion of defined macro"
 
 gdb_test "macro list" \
-  "macro define M 5" \
+  "macro define MACRO_TO_EXPAND 5" \
   "basic macro list"
 
-gdb_test "macro define M(x) x" \
+gdb_test "macro define MACRO_TO_EXPAND(x) x" \
   "" \
   "basic redefine, macro with args"
 
-gdb_test "print M (7)" \
+gdb_test "print MACRO_TO_EXPAND (7)" \
   " = 7" \
   "expansion of macro with arguments"
 
-gdb_test "macro undef M" \
+gdb_test "macro undef MACRO_TO_EXPAND" \
   "" \
   "basic macro undef"
 
-gdb_test "print M" \
-    "No symbol \"M\" in current context\." \
+gdb_test "print MACRO_TO_EXPAND" \
+    "No symbol \"MACRO_TO_EXPAND\" in current context\." \
     "print expression with macro after user undef."
 
 # Regression test; this used to crash.
@@ -479,6 +479,76 @@ gdb_test "macro define" \
 gdb_test "macro undef" \
     "usage: macro undef.*" \
     "macro undef with no arguments"
+
+# Completion tests.
+
+# The macro FIFTY_SEVEN is in scope at this point.
+send_gdb "p FIFTY_\t"
+gdb_expect  {
+        -re "^p FIFTY_SEVEN $"\
+            { send_gdb "\n"
+              gdb_expect {
+                      -re "^.* = 57.*$gdb_prompt $"\
+                                        { pass "complete 'p FIFTY_SEVEN'"}
+                      -re ".*$gdb_prompt $" { fail "complete 'p FIFTY_SEVEN'"}
+                      timeout           {fail "(timeout) complete 'p FIFTY_SEVEN'"}
+                     }
+            }
+        -re ".*$gdb_prompt $"       { fail "complete 'p FIFTY_SEVEN'" }
+        timeout         { fail "(timeout) complete 'p FIFTY_SEVEN' 2" }
+        }
+
+# The macro TWENTY_THREE is not in scope.
+send_gdb "p TWENTY_\t"
+gdb_expect  {
+        -re "^p TWENTY_\\\x07$"\
+            { send_gdb "\n"
+              gdb_expect {
+                      -re "No symbol \"TWENTY_\" in current context\\..*$gdb_prompt $"\
+                                        { pass "complete 'p TWENTY_'"}
+                      -re ".*$gdb_prompt $" { fail "complete 'p TWENTY_'"}
+                      timeout           {fail "(timeout) complete 'p TWENTY_'"}
+                     }
+            }
+        -re ".*$gdb_prompt $"       { fail "complete 'p TWENTY_'" }
+        timeout         { fail "(timeout) complete 'p TWENTY_' 2" }
+        }
+
+# The macro FORTY_EIGHT was undefined and thus is not in scope.
+send_gdb "p FORTY_\t"
+gdb_expect  {
+        -re "^p FORTY_\\\x07$"\
+            { send_gdb "\n"
+              gdb_expect {
+                      -re "No symbol \"FORTY_\" in current context\\..*$gdb_prompt $"\
+                                        { pass "complete 'p FORTY_'"}
+                      -re ".*$gdb_prompt $" { fail "complete 'p FORTY_'"}
+                      timeout           {fail "(timeout) complete 'p FORTY_'"}
+                     }
+            }
+        -re ".*$gdb_prompt $"       { fail "complete 'p FORTY_'" }
+        timeout         { fail "(timeout) complete 'p FORTY_' 2" }
+        }
+
+gdb_test "macro define TWENTY_THREE 25" \
+  "" \
+  "defining TWENTY_THREE"
+
+# User-defined macros are always in scope.
+send_gdb "p TWENTY_\t"
+gdb_expect  {
+        -re "^p TWENTY_THREE $"\
+            { send_gdb "\n"
+              gdb_expect {
+                      -re "^.* = 25.*$gdb_prompt $"\
+                                        { pass "complete 'p TWENTY_THREE'"}
+                      -re ".*$gdb_prompt $" { fail "complete 'p TWENTY_THREE'"}
+                      timeout           {fail "(timeout) complete 'p TWENTY_THREE'"}
+                     }
+            }
+        -re ".*$gdb_prompt $"       { fail "complete 'p TWENTY_THREE'" }
+        timeout         { fail "(timeout) complete 'p TWENTY_THREE' 2" }
+        }
 
 # Splicing tests.
 
@@ -496,44 +566,44 @@ gdb_test "macro expand SPLICE(robot, invasion)" \
 
 # Varargs tests.
 
-gdb_test "macro define va_c99(...) fprintf (stderr, __VA_ARGS__)" \
+gdb_test "macro define va_c99(...) varfunc (fixedarg, __VA_ARGS__)" \
   "" \
   "define first varargs helper"
 
-gdb_test "macro define va2_c99(x, y, ...) fprintf (stderr, x, y, __VA_ARGS__)" \
+gdb_test "macro define va2_c99(x, y, ...) varfunc (fixedarg, x, y, __VA_ARGS__)" \
   "" \
   "define second varargs helper"
 
-gdb_test "macro define va_gnu(args...) fprintf (stderr, args)" \
+gdb_test "macro define va_gnu(args...) varfunc (fixedarg, args)" \
   "" \
   "define third varargs helper"
 
-gdb_test "macro define va2_gnu(args...) fprintf (stderr, ## args)" \
+gdb_test "macro define va2_gnu(args...) varfunc (fixedarg, ## args)" \
   "" \
   "define fourth varargs helper"
 
 gdb_test "macro expand va_c99(one, two, three)" \
-  "expands to: *fprintf \\(stderr, *one, two, three\\)" \
+  "expands to: *varfunc \\(fixedarg, *one, two, three\\)" \
   "c99 varargs expansion"
 
 gdb_test "macro expand va_c99()" \
-  "expands to: *fprintf \\(stderr, *\\)" \
+  "expands to: *varfunc \\(fixedarg, *\\)" \
   "c99 varargs expansion without an argument"
 
 gdb_test "macro expand va2_c99(one, two, three, four)" \
-  "expands to: *fprintf \\(stderr, *one, two, three, four\\)" \
+  "expands to: *varfunc \\(fixedarg, *one, two, three, four\\)" \
   "c99 varargs expansion, multiple formal arguments"
 
 gdb_test "macro expand va_gnu(one, two, three, four)" \
-  "expands to: *fprintf \\(stderr, *one, two, three, four\\)" \
+  "expands to: *varfunc \\(fixedarg, *one, two, three, four\\)" \
   "gnu varargs expansion"
 
 gdb_test "macro expand va_gnu()" \
-  "expands to: *fprintf \\(stderr, *\\)" \
+  "expands to: *varfunc \\(fixedarg, *\\)" \
   "gnu varargs expansion without an argument"
 
 gdb_test "macro expand va2_gnu()" \
-  "expands to: *fprintf \\(stderr\\)" \
+  "expands to: *varfunc \\(fixedarg\\)" \
   "gnu varargs expansion special splicing without an argument"
 
 # Stringification tests.

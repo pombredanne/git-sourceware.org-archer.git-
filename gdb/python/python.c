@@ -26,6 +26,7 @@
 #include "observer.h"
 #include "gdb_regex.h"
 #include "language.h"
+#include "valprint.h"
 
 #include <ctype.h>
 
@@ -862,9 +863,8 @@ gdbpy_get_display_hint (PyObject *printer)
 /* Helper for apply_val_pretty_printer which calls to_string and
    formats the result.  */
 static void
-print_string_repr (PyObject *printer, struct ui_file *stream, int format,
-		   int deref_ref, int recurse,
-		   enum val_prettyprint pretty,
+print_string_repr (PyObject *printer, struct ui_file *stream, int recurse,
+		   const struct value_print_options *options,
 		   const struct language_defn *language)
 {
   char *output;
@@ -877,8 +877,7 @@ print_string_repr (PyObject *printer, struct ui_file *stream, int format,
       xfree (output);
     }
   else if (replacement)
-    common_val_print (replacement, stream, format, deref_ref,
-		      recurse, pretty, language);
+    common_val_print (replacement, stream, recurse, options, language);
   else
     gdbpy_print_stack ();
 }
@@ -886,9 +885,8 @@ print_string_repr (PyObject *printer, struct ui_file *stream, int format,
 /* Helper for apply_val_pretty_printer that formats children of the
    printer, if any exist.  */
 static void
-print_children (PyObject *printer, struct ui_file *stream, int format,
-		int deref_ref, int recurse,
-		enum val_prettyprint pretty,
+print_children (PyObject *printer, struct ui_file *stream, int recurse,
+		const struct value_print_options *options,
 		const struct language_defn *language)
 {
   char *hint;
@@ -945,9 +943,9 @@ print_children (PyObject *printer, struct ui_file *stream, int format,
       if (i == 0)
 	fputs_filtered (" = {", stream);
       else if (! is_map || i % 2 == 0)
-	fputs_filtered (pretty ? "," : ", ", stream);
+	fputs_filtered (options->pretty ? "," : ", ", stream);
 
-      if (pretty && (! is_map || i % 2 == 0))
+      if (options->pretty && (! is_map || i % 2 == 0))
 	{
 	  fputs_filtered ("\n", stream);
 	  print_spaces_filtered (2 + 2 * recurse, stream);
@@ -975,13 +973,12 @@ print_children (PyObject *printer, struct ui_file *stream, int format,
       else
 	{
 	  struct value *value = convert_value_from_python (py_v);
-	  common_val_print (value, stream, format, deref_ref,
-			    recurse + 1, pretty, language);
+	  common_val_print (value, stream, recurse + 1, options, language);
 	}
 
       if (is_map && i % 2 == 0)
 	fputs_filtered ("] = ", stream);
-      else if (! pretty)
+      else if (! options->pretty)
 	wrap_here (n_spaces (2 + 2 * recurse));
 
       do_cleanups (inner_cleanup);
@@ -989,7 +986,7 @@ print_children (PyObject *printer, struct ui_file *stream, int format,
 
   if (i)
     {
-      if (pretty)
+      if (options->pretty)
 	{
 	  fputs_filtered ("\n", stream);
 	  print_spaces_filtered (2 * recurse, stream);
@@ -1004,9 +1001,8 @@ print_children (PyObject *printer, struct ui_file *stream, int format,
 int
 apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
 			  int embedded_offset, CORE_ADDR address,
-			  struct ui_file *stream, int format,
-			  int deref_ref, int recurse,
-			  enum val_prettyprint pretty,
+			  struct ui_file *stream, int recurse,
+			  const struct value_print_options *options,
 			  const struct language_defn *language)
 {
   PyObject *func, *printer;
@@ -1039,10 +1035,8 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
   make_cleanup_py_decref (printer);
   if (printer != Py_None)
     {
-      print_string_repr (printer, stream, format, deref_ref,
-			 recurse, pretty, language);
-      print_children (printer, stream, format, deref_ref,
-		      recurse, pretty, language);
+      print_string_repr (printer, stream, recurse, options, language);
+      print_children (printer, stream, recurse, options, language);
 
       result = 1;
     }

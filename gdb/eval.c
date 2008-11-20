@@ -40,6 +40,7 @@
 #include "regcache.h"
 #include "user-regs.h"
 #include "python/python.h"
+#include "valprint.h"
 
 #include "gdb_assert.h"
 
@@ -47,10 +48,6 @@
 
 /* This is defined in valops.c */
 extern int overload_resolution;
-
-/* JYG: lookup rtti type of STRUCTOP_PTR when this is set to continue
-   on with successful lookup for member/method of the rtti type. */
-extern int objectprint;
 
 /* Prototypes for local functions. */
 
@@ -322,7 +319,8 @@ evaluate_struct_tuple (struct value *struct_val,
 		  fieldno++;
 		  /* Skip static fields.  */
 		  while (fieldno < TYPE_NFIELDS (struct_type)
-			 && TYPE_FIELD_STATIC_KIND (struct_type, fieldno))
+			 && field_is_static (&TYPE_FIELD (struct_type,
+							  fieldno)))
 		    fieldno++;
 		  subfieldno = fieldno;
 		  if (fieldno >= TYPE_NFIELDS (struct_type))
@@ -1633,8 +1631,10 @@ evaluate_subexp_standard (struct type *expect_type,
         struct type *type = value_type (arg1);
         struct type *real_type;
         int full, top, using_enc;
-        
-        if (objectprint && TYPE_TARGET_TYPE(type) &&
+	struct value_print_options opts;
+
+	get_user_print_options (&opts);
+        if (opts.objectprint && TYPE_TARGET_TYPE(type) &&
             (TYPE_CODE (TYPE_TARGET_TYPE (type)) == TYPE_CODE_CLASS))
           {
             real_type = value_rtti_target_type (arg1, &full, &top, &using_enc);
@@ -1982,6 +1982,8 @@ evaluate_subexp_standard (struct type *expect_type,
 	if (nargs != ndimensions)
 	  error (_("Wrong number of subscripts"));
 
+	gdb_assert (nargs > 0);
+
 	/* Now that we know we have a legal array subscript expression 
 	   let us actually find out where this element exists in the array. */
 
@@ -2000,13 +2002,8 @@ evaluate_subexp_standard (struct type *expect_type,
 	/* Internal type of array is arranged right to left */
 	for (i = 0; i < nargs; i++)
 	  {
-	    retcode = f77_get_dynamic_upperbound (tmp_type, &upper);
-	    if (retcode == BOUND_FETCH_ERROR)
-	      error (_("Cannot obtain dynamic upper bound"));
-
-	    retcode = f77_get_dynamic_lowerbound (tmp_type, &lower);
-	    if (retcode == BOUND_FETCH_ERROR)
-	      error (_("Cannot obtain dynamic lower bound"));
+	    upper = f77_get_upperbound (tmp_type);
+	    lower = f77_get_lowerbound (tmp_type);
 
 	    array_size_array[nargs - i - 1] = upper - lower + 1;
 

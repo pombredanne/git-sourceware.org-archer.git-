@@ -7,11 +7,8 @@ all info install-info dvi install uninstall installcheck check:
 	@echo "Nothing to be done for $@..."
 
 clean mostlyclean:
-	-rm -f *~ *.o a.out xgdb *.x *.ci *.tmp
-	-rm -f core core.coremaker coremaker.core corefile $(EXECUTABLES)
+	-rm -f *~ *.o *.ci
+	-rm -f core $(EXECUTABLES)
 
 distclean maintainer-clean realclean: clean
-	-rm -f *~ core
 	-rm -f Makefile config.status config.log
-	-rm -f *-init.exp
-	-rm -fr *.log summary detail *.plog *.sum *.psum site.*

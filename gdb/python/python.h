@@ -32,9 +32,8 @@ void run_python_script (int argc, char **argv);
 
 int apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
 			      int embedded_offset, CORE_ADDR address,
-			      struct ui_file *stream, int format,
-			      int deref_ref, int recurse,
-			      enum val_prettyprint pretty,
+			      struct ui_file *stream, int recurse,
+			      const struct value_print_options *options,
 			      const struct language_defn *language);
 
 #endif /* GDB_PYTHON_H */

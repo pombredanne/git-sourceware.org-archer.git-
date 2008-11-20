@@ -50,7 +50,8 @@ scm_printchar (int c, struct ui_file *stream)
 
 static void
 scm_printstr (struct ui_file *stream, const gdb_byte *string,
-	      unsigned int length, int width, int force_ellipses)
+	      unsigned int length, int width, int force_ellipses,
+	      const struct value_print_options *options)
 {
   fprintf_filtered (stream, "\"%s\"", string);
 }
@@ -246,6 +247,7 @@ const struct language_defn scm_language_defn =
   type_check_off,
   case_sensitive_off,
   array_row_major,
+  macro_expansion_no,
   &exp_descriptor_scm,
   scm_parse,
   c_error,

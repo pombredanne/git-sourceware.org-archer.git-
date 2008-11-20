@@ -227,7 +227,6 @@ gdbpy_initialize_symbols (void)
   PyModule_AddIntConstant (gdb_module, "SYMBOL_FUNCTIONS_DOMAIN",
 			   FUNCTIONS_DOMAIN);
   PyModule_AddIntConstant (gdb_module, "SYMBOL_TYPES_DOMAIN", TYPES_DOMAIN);
-  PyModule_AddIntConstant (gdb_module, "SYMBOL_METHODS_DOMAIN", METHODS_DOMAIN);
 
   Py_INCREF (&symbol_object_type);
   PyModule_AddObject (gdb_module, "Symbol", (PyObject *) &symbol_object_type);

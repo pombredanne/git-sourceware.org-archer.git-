@@ -37,6 +37,7 @@
 #include "dfp.h"
 #include "objfiles.h"
 #include "cli/cli-decode.h"
+#include "valprint.h"
 
 #include "python/python.h"
 
@@ -762,9 +763,11 @@ show_values (char *num_exp, int from_tty)
 
   for (i = num; i < num + 10 && i <= value_history_count; i++)
     {
+      struct value_print_options opts;
       val = access_value_history (i);
       printf_filtered (("$%d = "), i);
-      value_print (val, gdb_stdout, 0, 0, Val_pretty_default);
+      get_user_print_options (&opts);
+      value_print (val, gdb_stdout, &opts);
       printf_filtered (("\n"));
     }
 
@@ -1102,7 +1105,9 @@ show_convenience (char *ignore, int from_tty)
 {
   struct internalvar *var;
   int varseen = 0;
+  struct value_print_options opts;
 
+  get_user_print_options (&opts);
   for (var = internalvars; var; var = var->next)
     {
       if (!varseen)
@@ -1111,7 +1116,7 @@ show_convenience (char *ignore, int from_tty)
 	}
       printf_filtered (("$%s = "), var->name);
       value_print (value_of_internalvar (var), gdb_stdout,
-		   0, 0, Val_pretty_default);
+		   &opts);
       printf_filtered (("\n"));
     }
   if (!varseen)
@@ -1400,7 +1405,7 @@ value_static_field (struct type *type, int fieldno)
 {
   struct value *retval;
 
-  if (TYPE_FIELD_STATIC_HAS_ADDR (type, fieldno))
+  if (TYPE_FIELD_LOC_KIND (type, fieldno) == FIELD_LOC_KIND_PHYSADDR)
     {
       retval = value_at (TYPE_FIELD_TYPE (type, fieldno),
 			 TYPE_FIELD_STATIC_PHYSADDR (type, fieldno));
@@ -1877,12 +1882,21 @@ coerce_ref (struct value *arg)
 struct value *
 coerce_array (struct value *arg)
 {
+  struct type *type;
+
   arg = coerce_ref (arg);
-  if (current_language->c_style_arrays
-      && TYPE_CODE (value_type (arg)) == TYPE_CODE_ARRAY)
-    arg = value_coerce_array (arg);
-  if (TYPE_CODE (value_type (arg)) == TYPE_CODE_FUNC)
-    arg = value_coerce_function (arg);
+  type = check_typedef (value_type (arg));
+
+  switch (TYPE_CODE (type))
+    {
+    case TYPE_CODE_ARRAY:
+      if (current_language->c_style_arrays)
+	arg = value_coerce_array (arg);
+      break;
+    case TYPE_CODE_FUNC:
+      arg = value_coerce_function (arg);
+      break;
+    }
   return arg;
 }
 

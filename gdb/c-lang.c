@@ -86,7 +86,8 @@ c_printchar (int c, struct ui_file *stream)
 
 void
 c_printstr (struct ui_file *stream, const gdb_byte *string,
-	    unsigned int length, int width, int force_ellipses)
+	    unsigned int length, int width, int force_ellipses,
+	    const struct value_print_options *options)
 {
   unsigned int i;
   unsigned int things_printed = 0;
@@ -108,7 +109,7 @@ c_printstr (struct ui_file *stream, const gdb_byte *string,
       return;
     }
 
-  for (i = 0; i < length && things_printed < print_max; ++i)
+  for (i = 0; i < length && things_printed < options->print_max; ++i)
     {
       /* Position of the character we are examining
          to see whether it is repeated.  */
@@ -137,11 +138,11 @@ c_printstr (struct ui_file *stream, const gdb_byte *string,
 	  ++reps;
 	}
 
-      if (reps > repeat_count_threshold)
+      if (reps > options->repeat_count_threshold)
 	{
 	  if (in_quotes)
 	    {
-	      if (inspect_it)
+	      if (options->inspect_it)
 		fputs_filtered ("\\\", ", stream);
 	      else
 		fputs_filtered ("\", ", stream);
@@ -150,14 +151,14 @@ c_printstr (struct ui_file *stream, const gdb_byte *string,
 	  LA_PRINT_CHAR (current_char, stream);
 	  fprintf_filtered (stream, _(" <repeats %u times>"), reps);
 	  i = rep1 - 1;
-	  things_printed += repeat_count_threshold;
+	  things_printed += options->repeat_count_threshold;
 	  need_comma = 1;
 	}
       else
 	{
 	  if (!in_quotes)
 	    {
-	      if (inspect_it)
+	      if (options->inspect_it)
 		fputs_filtered ("\\\"", stream);
 	      else
 		fputs_filtered ("\"", stream);
@@ -171,7 +172,7 @@ c_printstr (struct ui_file *stream, const gdb_byte *string,
   /* Terminate the quotes if necessary.  */
   if (in_quotes)
     {
-      if (inspect_it)
+      if (options->inspect_it)
 	fputs_filtered ("\\\"", stream);
       else
 	fputs_filtered ("\"", stream);
@@ -490,6 +491,7 @@ const struct language_defn c_language_defn =
   type_check_off,
   case_sensitive_on,
   array_row_major,
+  macro_expansion_c,
   &exp_descriptor_standard,
   c_preprocess_and_parse,
   c_error,
@@ -608,6 +610,7 @@ const struct language_defn cplus_language_defn =
   type_check_off,
   case_sensitive_on,
   array_row_major,
+  macro_expansion_c,
   &exp_descriptor_standard,
   c_preprocess_and_parse,
   c_error,
@@ -645,6 +648,7 @@ const struct language_defn asm_language_defn =
   type_check_off,
   case_sensitive_on,
   array_row_major,
+  macro_expansion_c,
   &exp_descriptor_standard,
   c_preprocess_and_parse,
   c_error,
@@ -687,6 +691,7 @@ const struct language_defn minimal_language_defn =
   type_check_off,
   case_sensitive_on,
   array_row_major,
+  macro_expansion_c,
   &exp_descriptor_standard,
   c_preprocess_and_parse,
   c_error,

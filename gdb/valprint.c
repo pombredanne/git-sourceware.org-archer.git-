@@ -38,10 +38,6 @@
 
 #include <errno.h>
 
-/* This is set when printing.  It indicates whether the user has
-   requested that we bypass python-based value formatting.  */
-int raw_printing;
-
 /* Prototypes for local functions */
 
 static int partial_memory_read (CORE_ADDR memaddr, gdb_byte *myaddr,
@@ -65,13 +61,56 @@ static void set_output_radix_1 (int, unsigned);
 
 void _initialize_valprint (void);
 
-/* Maximum number of chars to print for a string pointer value or vector
-   contents, or UINT_MAX for no limit.  Note that "set print elements 0"
-   stores UINT_MAX in print_max, which displays in a show command as
-   "unlimited". */
-
-unsigned int print_max;
 #define PRINT_MAX_DEFAULT 200	/* Start print_max off at this value. */
+
+struct value_print_options user_print_options =
+{
+  Val_pretty_default,		/* pretty */
+  0,				/* prettyprint_arrays */
+  0,				/* prettyprint_structs */
+  0,				/* vtblprint */
+  1,				/* unionprint */
+  1,				/* addressprint */
+  0,				/* objectprint */
+  PRINT_MAX_DEFAULT,		/* print_max */
+  10,				/* repeat_count_threshold */
+  0,				/* output_format */
+  0,				/* format */
+  0,				/* stop_print_at_null */
+  0,				/* inspect_it */
+  0,				/* print_array_indexes */
+  0,				/* deref_ref */
+  1,				/* static_field_print */
+  1,				/* pascal_static_field_print */
+  0				/* raw */
+};
+
+/* Initialize *OPTS to be a copy of the user print options.  */
+void
+get_user_print_options (struct value_print_options *opts)
+{
+  *opts = user_print_options;
+}
+
+/* Initialize *OPTS to be a copy of the user print options, but with
+   pretty-printing disabled.  */
+void
+get_raw_print_options (struct value_print_options *opts)
+{  
+  *opts = user_print_options;
+  opts->pretty = Val_no_prettyprint;
+}
+
+/* Initialize *OPTS to be a copy of the user print options, but using
+   FORMAT as the formatting option.  */
+void
+get_formatted_print_options (struct value_print_options *opts,
+			     char format)
+{
+  *opts = user_print_options;
+  opts->format = format;
+}
+
 static void
 show_print_max (struct ui_file *file, int from_tty,
 		struct cmd_list_element *c, const char *value)
@@ -103,12 +142,10 @@ show_output_radix (struct ui_file *file, int from_tty,
 Default output radix for printing of values is %s.\n"),
 		    value);
 }
-int output_format = 0;
 
 /* By default we print arrays without printing the index of each element in
    the array.  This behavior can be changed by setting PRINT_ARRAY_INDEXES.  */
 
-static int print_array_indexes = 0;
 static void
 show_print_array_indexes (struct ui_file *file, int from_tty,
 		          struct cmd_list_element *c, const char *value)
@@ -120,7 +157,6 @@ show_print_array_indexes (struct ui_file *file, int from_tty,
    element in an array.  Referenced by the low level language dependent
    print routines. */
 
-unsigned int repeat_count_threshold = 10;
 static void
 show_repeat_count_threshold (struct ui_file *file, int from_tty,
 			     struct cmd_list_element *c, const char *value)
@@ -131,7 +167,6 @@ show_repeat_count_threshold (struct ui_file *file, int from_tty,
 
 /* If nonzero, stops printing of char arrays at first null. */
 
-int stop_print_at_null;
 static void
 show_stop_print_at_null (struct ui_file *file, int from_tty,
 			 struct cmd_list_element *c, const char *value)
@@ -143,7 +178,6 @@ Printing of char arrays to stop at first null char is %s.\n"),
 
 /* Controls pretty printing of structures. */
 
-int prettyprint_structs;
 static void
 show_prettyprint_structs (struct ui_file *file, int from_tty,
 			  struct cmd_list_element *c, const char *value)
@@ -153,7 +187,6 @@ show_prettyprint_structs (struct ui_file *file, int from_tty,
 
 /* Controls pretty printing of arrays.  */
 
-int prettyprint_arrays;
 static void
 show_prettyprint_arrays (struct ui_file *file, int from_tty,
 			 struct cmd_list_element *c, const char *value)
@@ -164,7 +197,6 @@ show_prettyprint_arrays (struct ui_file *file, int from_tty,
 /* If nonzero, causes unions inside structures or other unions to be
    printed. */
 
-int unionprint;			/* Controls printing of nested unions.  */
 static void
 show_unionprint (struct ui_file *file, int from_tty,
 		 struct cmd_list_element *c, const char *value)
@@ -176,7 +208,6 @@ Printing of unions interior to structures is %s.\n"),
 
 /* If nonzero, causes machine addresses to be printed in certain contexts. */
 
-int addressprint;		/* Controls printing of machine addresses */
 static void
 show_addressprint (struct ui_file *file, int from_tty,
 		   struct cmd_list_element *c, const char *value)
@@ -187,13 +218,7 @@ show_addressprint (struct ui_file *file, int from_tty,
 
 /* Print using the given LANGUAGE the data of type TYPE located at VALADDR
    (within GDB), which came from the inferior at address ADDRESS, onto
-   stdio stream STREAM according to FORMAT (a letter, or 0 for natural
-   format using TYPE).
-
-   If DEREF_REF is nonzero, then dereference references, otherwise just print
-   them like pointers.
-
-   The PRETTY parameter controls prettyprinting.
+   stdio stream STREAM according to OPTIONS.
 
    If the data are a string pointer, returns the number of string characters
    printed.
@@ -208,18 +233,18 @@ show_addressprint (struct ui_file *file, int from_tty,
 
 int
 val_print (struct type *type, const gdb_byte *valaddr, int embedded_offset,
-	   CORE_ADDR address, struct ui_file *stream, int format,
-	   int deref_ref, int recurse, enum val_prettyprint pretty,
+	   CORE_ADDR address, struct ui_file *stream, int recurse,
+	   const struct value_print_options *options,
 	   const struct language_defn *language)
 {
   volatile struct gdb_exception except;
-  volatile enum val_prettyprint real_pretty = pretty;
   int ret = 0;
-  char *text;
-
+  struct value_print_options local_opts = *options;
   struct type *real_type = check_typedef (type);
-  if (pretty == Val_pretty_default)
-    real_pretty = prettyprint_structs ? Val_prettyprint : Val_no_prettyprint;
+
+  if (local_opts.pretty == Val_pretty_default)
+    local_opts.pretty = (local_opts.prettyprint_structs
+			 ? Val_prettyprint : Val_no_prettyprint);
 
   QUIT;
 
@@ -234,11 +259,10 @@ val_print (struct type *type, const gdb_byte *valaddr, int embedded_offset,
       return (0);
     }
 
-  if (!raw_printing)
+  if (!options->raw)
     {
       ret = apply_val_pretty_printer (type, valaddr, embedded_offset,
-				      address, stream, format,
-				      deref_ref, recurse, real_pretty,
+				      address, stream, recurse, options,
 				      language);
       if (ret)
 	return ret;
@@ -247,8 +271,7 @@ val_print (struct type *type, const gdb_byte *valaddr, int embedded_offset,
   TRY_CATCH (except, RETURN_MASK_ERROR)
     {
       ret = language->la_val_print (type, valaddr, embedded_offset, address,
-				    stream, format, deref_ref, recurse,
-				    real_pretty);
+				    stream, recurse, &local_opts);
     }
   if (except.reason < 0)
     fprintf_filtered (stream, _("<error reading variable>"));
@@ -286,12 +309,7 @@ value_check_printable (struct value *val, struct ui_file *stream)
 }
 
 /* Print using the given LANGUAGE the value VAL onto stream STREAM according
-   to FORMAT (a letter, or 0 for natural format using TYPE).
-
-   If DEREF_REF is nonzero, then dereference references, otherwise just print
-   them like pointers.
-
-   The PRETTY parameter controls prettyprinting.
+   to OPTIONS.
 
    If the data are a string pointer, returns the number of string characters
    printed.
@@ -300,8 +318,8 @@ value_check_printable (struct value *val, struct ui_file *stream)
    GDB's value mechanism.  */
 
 int
-common_val_print (struct value *val, struct ui_file *stream, int format,
-		  int deref_ref, int recurse, enum val_prettyprint pretty,
+common_val_print (struct value *val, struct ui_file *stream, int recurse,
+		  const struct value_print_options *options,
 		  const struct language_defn *language)
 {
   if (!value_check_printable (val, stream))
@@ -309,36 +327,34 @@ common_val_print (struct value *val, struct ui_file *stream, int format,
 
   return val_print (value_type (val), value_contents_all (val),
 		    value_embedded_offset (val), value_address (val),
-		    stream, format, deref_ref, recurse, pretty,
-		    language);
+		    stream, recurse, options, language);
 }
 
-/* Print the value VAL in C-ish syntax on stream STREAM.
-   FORMAT is a format-letter, or 0 for print in natural format of data type.
+/* Print the value VAL in C-ish syntax on stream STREAM according to
+   OPTIONS.
    If the object printed is a string pointer, returns
    the number of string bytes printed.  */
 
 int
-value_print (struct value *val, struct ui_file *stream, int format,
-	     int raw, enum val_prettyprint pretty)
+value_print (struct value *val, struct ui_file *stream,
+	     const struct value_print_options *options)
 {
   if (!value_check_printable (val, stream))
     return 0;
 
-  raw_printing = raw;
-  if (!raw)
+  if (!options->raw)
     {
       int r = apply_val_pretty_printer (value_type (val),
 					value_contents_all (val),
 					value_embedded_offset (val),
 					value_address (val),
-					stream, format, 1, 0, pretty,
+					stream, 0, options,
 					current_language);
       if (r)
 	return r;
     }
 
-  return LA_VALUE_PRINT (val, stream, format, pretty);
+  return LA_VALUE_PRINT (val, stream, options);
 }
 
 /* Called by various <lang>_val_print routines to print
@@ -964,15 +980,6 @@ print_char_chars (struct ui_file *stream, const gdb_byte *valaddr,
     }
 }
 
-/* Return non-zero if the debugger should print the index of each element
-   when printing array values.  */
-
-int
-print_array_indexes_p (void)
-{              
-  return print_array_indexes;
-} 
-
 /* Assuming TYPE is a simple, non-empty array type, compute its upper
    and lower bound.  Save the low bound into LOW_BOUND if not NULL.
    Save the high bound into HIGH_BOUND if not NULL.
@@ -1028,23 +1035,23 @@ get_array_bounds (struct type *type, long *low_bound, long *high_bound)
   return 1;
 }
 
-/* Print on STREAM using the given FORMAT the index for the element
+/* Print on STREAM using the given OPTIONS the index for the element
    at INDEX of an array whose index type is INDEX_TYPE.  */
     
 void  
 maybe_print_array_index (struct type *index_type, LONGEST index,
-                         struct ui_file *stream, int format,
-                         enum val_prettyprint pretty)
+                         struct ui_file *stream,
+			 const struct value_print_options *options)
 {
   struct value *index_value;
 
-  if (!print_array_indexes)
+  if (!options->print_array_indexes)
     return; 
     
   index_value = value_from_longest (index_type, index);
 
-  LA_PRINT_ARRAY_INDEX (index_value, stream, format, pretty);
-}   
+  LA_PRINT_ARRAY_INDEX (index_value, stream, options);
+}
 
 /*  Called by various <lang>_val_print routines to print elements of an
    array in the form "<elem1>, <elem2>, <elem3>, ...".
@@ -1058,8 +1065,8 @@ maybe_print_array_index (struct type *index_type, LONGEST index,
 void
 val_print_array_elements (struct type *type, const gdb_byte *valaddr,
 			  CORE_ADDR address, struct ui_file *stream,
-			  int format, int deref_ref,
-			  int recurse, enum val_prettyprint pretty,
+			  int recurse,
+			  const struct value_print_options *options,
 			  unsigned int i)
 {
   unsigned int things_printed = 0;
@@ -1106,12 +1113,12 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
 
   annotate_array_section_begin (i, elttype);
 
-  for (; i < len && things_printed < print_max; i++)
+  for (; i < len && things_printed < options->print_max; i++)
     {
       size_t elt_offset = i * eltlen;
       if (i != 0)
 	{
-	  if (prettyprint_arrays)
+	  if (options->prettyprint_arrays)
 	    {
 	      fprintf_filtered (stream, ",\n");
 	      print_spaces_filtered (2 + 2 * recurse, stream);
@@ -1123,7 +1130,7 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
 	}
       wrap_here (n_spaces (2 + 2 * recurse));
       maybe_print_array_index (index_type, i + low_bound_index,
-                               stream, format, pretty);
+                               stream, options);
 
       rep1 = i + 1;
       reps = 1;
@@ -1134,23 +1141,21 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
 	  ++rep1;
 	}
 
-      if (reps > repeat_count_threshold)
+      if (reps > options->repeat_count_threshold)
 	{
-	  val_print (elttype, valaddr + elt_offset, 0,
-		     address + elt_offset, stream, format,
-		     deref_ref, recurse + 1, pretty, current_language);
+	  val_print (elttype, valaddr + elt_offset, 0, address + elt_offset,
+		     stream, recurse + 1, options, current_language);
 	  annotate_elt_rep (reps);
 	  fprintf_filtered (stream, " <repeats %u times>", reps);
 	  annotate_elt_rep_end ();
 
 	  i = rep1 - 1;
-	  things_printed += repeat_count_threshold;
+	  things_printed += options->repeat_count_threshold;
 	}
       else
 	{
-	  val_print (elttype, valaddr + elt_offset, 0,
-		     address + elt_offset, stream, format,
-		     deref_ref, recurse + 1, pretty, current_language);
+	  val_print (elttype, valaddr + elt_offset, 0, address + elt_offset,
+		     stream, recurse + 1, options, current_language);
 	  annotate_elt ();
 	  things_printed++;
 	}
@@ -1344,7 +1349,8 @@ read_string (CORE_ADDR addr, int len, int width, unsigned int fetchlimit,
    whichever is smaller. */
 
 int
-val_print_string (CORE_ADDR addr, int len, int width, struct ui_file *stream)
+val_print_string (CORE_ADDR addr, int len, int width, struct ui_file *stream,
+		  const struct value_print_options *options)
 {
   int force_ellipsis = 0;	/* Force ellipsis to be printed if nonzero. */
   int errcode;			/* Errno returned from bad reads. */
@@ -1362,7 +1368,7 @@ val_print_string (CORE_ADDR addr, int len, int width, struct ui_file *stream)
      because finding the null byte (or available memory) is what actually
      limits the fetch. */
 
-  fetchlimit = (len == -1 ? print_max : min (len, print_max));
+  fetchlimit = (len == -1 ? options->print_max : min (len, options->print_max));
 
   errcode = read_string (addr, len, width, fetchlimit, &buffer, &bytes_read);
   old_chain = make_cleanup (xfree, buffer);
@@ -1400,11 +1406,11 @@ val_print_string (CORE_ADDR addr, int len, int width, struct ui_file *stream)
      and then the error message.  */
   if (errcode == 0 || bytes_read > 0)
     {
-      if (addressprint)
+      if (options->addressprint)
 	{
 	  fputs_filtered (" ", stream);
 	}
-      LA_PRINT_STRING (stream, buffer, bytes_read / width, width, force_ellipsis);
+      LA_PRINT_STRING (stream, buffer, bytes_read / width, width, force_ellipsis, options);
     }
 
   if (errcode != 0)
@@ -1479,13 +1485,13 @@ set_output_radix_1 (int from_tty, unsigned radix)
   switch (radix)
     {
     case 16:
-      output_format = 'x';	/* hex */
+      user_print_options.output_format = 'x';	/* hex */
       break;
     case 10:
-      output_format = 0;	/* decimal */
+      user_print_options.output_format = 0;	/* decimal */
       break;
     case 8:
-      output_format = 'o';	/* octal */
+      user_print_options.output_format = 'o';	/* octal */
       break;
     default:
       /* FIXME: cagney/2002-03-17: This needs to revert the bad radix
@@ -1579,7 +1585,8 @@ _initialize_valprint (void)
   add_alias_cmd ("p", "print", no_class, 1, &showlist);
   add_alias_cmd ("pr", "print", no_class, 1, &showlist);
 
-  add_setshow_uinteger_cmd ("elements", no_class, &print_max, _("\
+  add_setshow_uinteger_cmd ("elements", no_class,
+			    &user_print_options.print_max, _("\
 Set limit on string chars or array elements to print."), _("\
 Show limit on string chars or array elements to print."), _("\
 \"set print elements 0\" causes there to be no limit."),
@@ -1587,7 +1594,8 @@ Show limit on string chars or array elements to print."), _("\
 			    show_print_max,
 			    &setprintlist, &showprintlist);
 
-  add_setshow_boolean_cmd ("null-stop", no_class, &stop_print_at_null, _("\
+  add_setshow_boolean_cmd ("null-stop", no_class,
+			   &user_print_options.stop_print_at_null, _("\
 Set printing of char arrays to stop at first null char."), _("\
 Show printing of char arrays to stop at first null char."), NULL,
 			   NULL,
@@ -1595,7 +1603,7 @@ Show printing of char arrays to stop at first null char."), NULL,
 			   &setprintlist, &showprintlist);
 
   add_setshow_uinteger_cmd ("repeats", no_class,
-			    &repeat_count_threshold, _("\
+			    &user_print_options.repeat_count_threshold, _("\
 Set threshold for repeated print elements."), _("\
 Show threshold for repeated print elements."), _("\
 \"set print repeats 0\" causes all elements to be individually printed."),
@@ -1603,28 +1611,32 @@ Show threshold for repeated print elements."), _("\
 			    show_repeat_count_threshold,
 			    &setprintlist, &showprintlist);
 
-  add_setshow_boolean_cmd ("pretty", class_support, &prettyprint_structs, _("\
+  add_setshow_boolean_cmd ("pretty", class_support,
+			   &user_print_options.prettyprint_structs, _("\
 Set prettyprinting of structures."), _("\
 Show prettyprinting of structures."), NULL,
 			   NULL,
 			   show_prettyprint_structs,
 			   &setprintlist, &showprintlist);
 
-  add_setshow_boolean_cmd ("union", class_support, &unionprint, _("\
+  add_setshow_boolean_cmd ("union", class_support,
+			   &user_print_options.unionprint, _("\
 Set printing of unions interior to structures."), _("\
 Show printing of unions interior to structures."), NULL,
 			   NULL,
 			   show_unionprint,
 			   &setprintlist, &showprintlist);
 
-  add_setshow_boolean_cmd ("array", class_support, &prettyprint_arrays, _("\
+  add_setshow_boolean_cmd ("array", class_support,
+			   &user_print_options.prettyprint_arrays, _("\
 Set prettyprinting of arrays."), _("\
 Show prettyprinting of arrays."), NULL,
 			   NULL,
 			   show_prettyprint_arrays,
 			   &setprintlist, &showprintlist);
 
-  add_setshow_boolean_cmd ("address", class_support, &addressprint, _("\
+  add_setshow_boolean_cmd ("address", class_support,
+			   &user_print_options.addressprint, _("\
 Set printing of addresses."), _("\
 Show printing of addresses."), NULL,
 			   NULL,
@@ -1663,15 +1675,8 @@ Use 'show input-radix' or 'show output-radix' to independently show each."),
 	   &showlist);
 
   add_setshow_boolean_cmd ("array-indexes", class_support,
-                           &print_array_indexes, _("\
+                           &user_print_options.print_array_indexes, _("\
 Set printing of array indexes."), _("\
 Show printing of array indexes"), NULL, NULL, show_print_array_indexes,
                            &setprintlist, &showprintlist);
-
-  /* Give people the defaults which they are used to.  */
-  prettyprint_structs = 0;
-  prettyprint_arrays = 0;
-  unionprint = 1;
-  addressprint = 1;
-  print_max = PRINT_MAX_DEFAULT;
 }

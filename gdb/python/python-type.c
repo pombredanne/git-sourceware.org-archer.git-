@@ -151,7 +151,7 @@ convert_field (PyObject *self, struct type *type, int field)
   if (!result)
     return NULL;
 
-  if (!TYPE_FIELD_STATIC (type, field))
+  if (!field_is_static (&TYPE_FIELD (type, field)))
     {
       arg = PyLong_FromLong (TYPE_FIELD_BITPOS (type, field));
       if (!arg)

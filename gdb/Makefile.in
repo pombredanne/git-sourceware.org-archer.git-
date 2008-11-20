@@ -188,15 +188,14 @@ GNULIB_H = gnulib/string.h @GNULIB_STDINT_H@
 #
 SUBDIR_CLI_OBS = \
 	cli-dump.o \
-	cli-decode.o cli-script.o cli-cmds.o cli-setshow.o cli-utils.o \
+	cli-decode.o cli-script.o cli-cmds.o cli-setshow.o \
 	cli-logging.o \
 	cli-interp.o
 SUBDIR_CLI_SRCS = \
 	cli/cli-dump.c \
 	cli/cli-decode.c cli/cli-script.c cli/cli-cmds.c cli/cli-setshow.c \
 	cli/cli-logging.c \
-	cli/cli-interp.c \
-	cli/cli-utils.c
+	cli/cli-interp.c
 SUBDIR_CLI_DEPS =
 SUBDIR_CLI_LDFLAGS=
 SUBDIR_CLI_CFLAGS=
@@ -436,13 +435,13 @@ INTERNAL_LDFLAGS = $(CFLAGS) $(GLOBAL_CFLAGS) $(MH_LDFLAGS) $(LDFLAGS) $(CONFIG_
 # If you have the Cygnus libraries installed,
 # you can use 'CLIBS=$(INSTALLED_LIBS)' 'CDEPS='
 INSTALLED_LIBS=-lbfd -lreadline -lopcodes -liberty -ldecnumber \
-	$(XM_CLIBS) $(TM_CLIBS) $(NAT_CLIBS) $(GDBTKLIBS) @LIBS@ \
+	$(XM_CLIBS) $(NAT_CLIBS) $(GDBTKLIBS) @LIBS@ \
 	-lintl -liberty $(LIBGNU)
 CLIBS = $(SIM) $(READLINE) $(OPCODES) $(BFD) $(INTL) $(LIBIBERTY) $(LIBDECNUMBER) \
-	$(XM_CLIBS) $(TM_CLIBS) $(NAT_CLIBS) $(GDBTKLIBS) @LIBS@ \
+	$(XM_CLIBS) $(NAT_CLIBS) $(GDBTKLIBS) @LIBS@ \
 	$(LIBICONV) $(LIBEXPAT) \
 	$(LIBIBERTY) $(WIN32LIBS) $(LIBGNU)
-CDEPS = $(XM_CDEPS) $(TM_CDEPS) $(NAT_CDEPS) $(SIM) $(BFD) $(READLINE_DEPS) \
+CDEPS = $(XM_CDEPS) $(NAT_CDEPS) $(SIM) $(BFD) $(READLINE_DEPS) \
 	$(OPCODES) $(INTL_DEPS) $(LIBIBERTY) $(CONFIG_DEPS) $(LIBGNU)
 
 ADD_FILES = $(XM_ADD_FILES) $(TM_ADD_FILES) $(NAT_ADD_FILES)
@@ -636,7 +635,7 @@ TARGET_FLAGS_TO_PASS = \
 # Links made at configuration time should not be specified here, since
 # SFILES is used in building the distribution archive.
 
-SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c  \
+SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c ada-tasks.c \
 	addrmap.c \
 	auxv.c ax-general.c ax-gdb.c \
 	bcache.c \
@@ -666,7 +665,7 @@ SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c  \
 	objfiles.c osabi.c observer.c \
 	p-exp.y p-lang.c p-typeprint.c p-valprint.c parse.c printcmd.c \
 	prologue-value.c \
-	regcache.c reggroups.c remote.c remote-fileio.c \
+	regcache.c reggroups.c remote.c remote-fileio.c reverse.c \
 	scm-exp.c scm-lang.c scm-valprint.c \
 	sentinel-frame.c \
 	serial.c ser-base.c ser-unix.c \
@@ -707,7 +706,7 @@ exec.h m32r-tdep.h osabi.h gdbcore.h solib-som.h \
 i386bsd-nat.h xml-support.h xml-tdesc.h alphabsd-tdep.h gdb_obstack.h \
 ia64-tdep.h ada-lang.h varobj.h frv-tdep.h nto-tdep.h serial.h \
 c-lang.h frame.h event-loop.h block.h cli/cli-setshow.h	\
-cli/cli-decode.h cli/cli-cmds.h cli/cli-utils.h cli/cli-dump.h \
+cli/cli-decode.h cli/cli-cmds.h cli/cli-dump.h \
 cli/cli-script.h macrotab.h symtab.h version.h gnulib/wchar.in.h \
 gnulib/string.in.h gnulib/str-two-way.h gnulib/extra/link-warning.h \
 gnulib/stdint.in.h remote.h gdb.h sparc-nat.h gdbserver/win32-low.h \
@@ -806,11 +805,13 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 	findcmd.o \
 	std-regs.o \
 	signals.o \
-	exec.o bcache.o objfiles.o observer.o minsyms.o maint.o demangle.o \
+	exec.o reverse.o \
+	bcache.o objfiles.o observer.o minsyms.o maint.o demangle.o \
 	dbxread.o coffread.o coff-pe-read.o \
 	dwarf2read.o mipsread.o stabsread.o corefile.o \
 	dwarf2expr.o dwarf2loc.o dwarf2-frame.o \
 	ada-lang.o c-lang.o f-lang.o objc-lang.o \
+	ada-tasks.o \
 	ui-out.o cli-out.o \
 	varobj.o vec.o wrapper.o \
 	jv-lang.o jv-valprint.o jv-typeprint.o \
@@ -1374,13 +1375,6 @@ ALLDEPFILES = \
 # Some files need explicit build rules (due to -Werror problems) or due
 # to sub-directory fun 'n' games.
 
-# "gnu-nat.c" gets "suggest parentheses around assignment used as
-# truth value" errors.  It turns out that there is a system header
-# that does `if (a = b)'.
-gnu-nat.o: $(srcdir)/gnu-nat.c
-	$(COMPILE.pre) $(INTERNAL_WARN_CFLAGS) $(COMPILE.post) $(srcdir)/gnu-nat.c
-	$(POSTCOMPILE)
-
 hpux-thread.o: $(srcdir)/hpux-thread.c
 	$(COMPILE) -I$(srcdir)/osf-share -I$(srcdir)/osf-share/HP800 \
 		-I/usr/include/dce $(srcdir)/hpux-thread.c
@@ -1406,12 +1400,6 @@ monitor.o: $(srcdir)/monitor.c
 printcmd.o: $(srcdir)/printcmd.c
 	$(COMPILE.pre) $(INTERNAL_CFLAGS_BASE) $(GDB_WARN_CFLAGS_NO_FORMAT) \
 		$(GDB_WERROR_CFLAGS) $(COMPILE.post) $(srcdir)/printcmd.c
-	$(POSTCOMPILE)
-
-# FIXME: Procfs.o gets -Wformat errors because things like pid_t don't
-# match output format strings.
-procfs.o: $(srcdir)/procfs.c
-	$(COMPILE.pre) $(INTERNAL_WARN_CFLAGS) $(COMPILE.post) $(srcdir)/procfs.c
 	$(POSTCOMPILE)
 
 # Message files.  Based on code in gcc/Makefile.in.
@@ -1507,6 +1495,8 @@ po/$(PACKAGE).pot: force
 	     -e '/include.*malloc.h/d' \
 	     -e 's/\([^x]\)malloc/\1xmalloc/g' \
 	     -e 's/\([^x]\)realloc/\1xrealloc/g' \
+	     -e 's/\([ \t;,(]\)free\([ \t]*[&(),]\)/\1xfree\2/g' \
+	     -e 's/\([ \t;,(]\)free$$/\1xfree/g' \
 	     -e '/^#line.*y.tab.c/d' \
 	  < $@.tmp > $@.new
 	-rm $@.tmp
@@ -1521,6 +1511,8 @@ po/$(PACKAGE).pot: force
 	        -e '/include.*malloc.h/d' \
 	        -e 's/\([^x]\)malloc/\1xmalloc/g' \
 	        -e 's/\([^x]\)realloc/\1xrealloc/g' \
+	        -e 's/\([ \t;,(]\)free\([ \t]*[&(),]\)/\1xfree\2/g' \
+	        -e 's/\([ \t;,(]\)free$$/\1xfree/g' \
 		-e 's/yy_flex_xrealloc/yyxrealloc/g' \
 	      < $@ > $@.new && \
 	    rm -f $@ && \
@@ -1585,10 +1577,6 @@ cli-script.o: $(srcdir)/cli/cli-script.c
 
 cli-setshow.o: $(srcdir)/cli/cli-setshow.c
 	$(COMPILE) $(srcdir)/cli/cli-setshow.c
-	$(POSTCOMPILE)
-
-cli-utils.o: $(srcdir)/cli/cli-utils.c
-	$(COMPILE) $(srcdir)/cli/cli-utils.c
 	$(POSTCOMPILE)
 
 

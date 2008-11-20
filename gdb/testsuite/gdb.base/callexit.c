@@ -1,5 +1,6 @@
-/* GDB CLI utility library.
-   Copyright (c) 2001, 2007, 2008 Free Software Foundation, Inc.
+/* This testcase is part of GDB, the GNU debugger.
+
+   Copyright 2008 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -14,6 +15,19 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#include "defs.h"
-#include "cli/cli-utils.h"
+/* Support program for testing gdb's ability to handle an
+   inferior function call that terminates the program.  */
 
+#include <stdlib.h>
+
+void
+callexit ()
+{
+  exit (0);
+}
+
+int
+main ()
+{
+  return 0;
+}
