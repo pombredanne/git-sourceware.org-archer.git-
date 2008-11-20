@@ -674,7 +674,8 @@ gdbpy_initialize_types (void)
   for (i = 0; pyty_codes[i].name; ++i)
     {
       if (PyModule_AddIntConstant (gdb_module,
-				   pyty_codes[i].name,
+				   /* Cast needed for Python 2.4.  */
+				   (char *) pyty_codes[i].name,
 				   pyty_codes[i].code) < 0)
 	return;
     }
