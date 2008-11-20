@@ -202,7 +202,7 @@ c_printstr (struct ui_file *stream, const gdb_byte *string,
 int
 c_getstr (struct value *value, gdb_byte **buffer, int *length)
 {
-  int fetchlimit, errno, width;
+  int fetchlimit, err, width;
   struct type *type = value_type (value);
   struct type *element_type = TYPE_TARGET_TYPE (type);
 
@@ -240,14 +240,26 @@ c_getstr (struct value *value, gdb_byte **buffer, int *length)
 
   width = TYPE_LENGTH (element_type);
 
-  errno = read_string (value_as_address (value), -1, width, fetchlimit, buffer,
-		       length);
+  /* If the string lives in GDB's memory intead of the inferior's, then we
+     just need to copy it to BUFFER.  Also, since such strings are arrays
+     with known size, FETCHLIMIT will hold the size of the string.  */
+  if (((VALUE_LVAL (value) == not_lval)
+      || (VALUE_LVAL (value) == lval_internalvar)) && (fetchlimit != -1))
+    {
+      *length = fetchlimit;
+      *buffer = xmalloc (*length * width);
+      memcpy (*buffer, value_contents (value), *length * width);
+      err = 0;
+    }
+  else
+    err = read_string (value_as_address (value), -1, width, fetchlimit,
+			 buffer, length);
 
   /* If the last character is NULL, subtract it from length.  */
   if (extract_unsigned_integer (*buffer + *length - width, width) == 0)
       *length -= width;
 
-  return errno;
+  return err;
 
 error:
   {
@@ -256,8 +268,13 @@ error:
 
     type_str = type_to_string (type);
     if (type_str)
-      old_chain = make_cleanup (xfree, type_str);
-    error (_("Trying to read string with inappropriate type `%s'."), type_str);
+      {
+	old_chain = make_cleanup (xfree, type_str);
+	error (_("Trying to read string with inappropriate type `%s'."),
+	       type_str);
+      }
+    else
+      error (_("Trying to read string with inappropriate type."));
   }
 }
 

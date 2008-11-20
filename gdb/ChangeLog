@@ -3,6 +3,11 @@
 	* python/python-type.c (gdbpy_initialize_types): Add cast for
 	Python 2.4.
 
+2008-11-20  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* c-lang.c (c_getstr): Add special case for GDB-hosted strings, and
+	some minor cleanups.
+
 2008-11-19  Tom Tromey  <tromey@redhat.com>
 
 	* python/python-internal.h (PyGILState_Ensure): New define.
