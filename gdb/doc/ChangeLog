@@ -1,3 +1,7 @@
+2008-11-21  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Values From Inferior): Document Value.string.
+
 2008-11-18  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.texinfo (Commands In Python): Document prefix commands.

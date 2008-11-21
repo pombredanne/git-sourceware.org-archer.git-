@@ -164,6 +164,13 @@ valpy_string (PyObject *self, PyObject *args)
   struct value *value = ((value_object *) self)->value;
   volatile struct gdb_exception except;
   PyObject *unicode;
+  const char *encoding = NULL;
+
+  if (!PyArg_ParseTuple (args, "|s", &encoding))
+    return NULL;
+
+  if (!encoding)
+    encoding = target_charset ();
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
@@ -181,7 +188,7 @@ valpy_string (PyObject *self, PyObject *args)
       return NULL;
     }
 
-  unicode = target_string_to_unicode (buffer, length);
+  unicode = PyUnicode_Decode (buffer, length, encoding, NULL);
   xfree (buffer);
 
   return unicode;
@@ -905,7 +912,7 @@ static PyMethodDef value_object_methods[] = {
   { "cast", valpy_cast, METH_VARARGS, "Cast the value to the supplied type." },
   { "dereference", valpy_dereference, METH_NOARGS, "Dereferences the value." },
   { "type", valpy_type, METH_NOARGS, "Return type of the value." },
-  { "string", valpy_string, METH_NOARGS,
+  { "string", valpy_string, METH_VARARGS,
     "Return Unicode string representation of the value." },
   {NULL}  /* Sentinel */
 };

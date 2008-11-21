@@ -1,3 +1,9 @@
+2008-11-21  Tom Tromey  <tromey@redhat.com>
+
+	* python/python-value.c (value_object_methods) <string>: Accept
+	varargs.
+	(valpy_string): Accept optional encoding argument.
+
 2008-11-20  Tom Tromey  <tromey@redhat.com>
 
 	* gdbtypes.c (delete_main_type): Use TYPE_FIELD_LOC_KIND.
