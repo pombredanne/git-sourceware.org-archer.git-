@@ -164,9 +164,9 @@ an integer nor a pointer of the same type."));
 struct value *
 value_subscript (struct value *array, struct value *idx)
 {
-  struct value *bound;
   int c_style = current_language->c_style_arrays;
   struct type *tarray;
+  LONGEST index = value_as_long (idx);
 
   array = coerce_ref (array);
   tarray = check_typedef (value_type (array));
@@ -179,13 +179,26 @@ value_subscript (struct value *array, struct value *idx)
       get_discrete_bounds (range_type, &lowerbound, &upperbound);
 
       if (VALUE_LVAL (array) != lval_memory)
-	return value_subscripted_rvalue (array, idx, lowerbound);
+	{
+	  if (index >= lowerbound && index <= upperbound)
+	    {
+	      CORE_ADDR element_size = TYPE_LENGTH (TYPE_TARGET_TYPE (tarray));
+	      CORE_ADDR offset = (index - lowerbound) * element_size;
+
+	      return value_subscripted_rvalue (array, offset);
+	    }
+	  error (_("array or string index out of range"));
+	}
 
       if (c_style == 0)
 	{
-	  LONGEST index = value_as_long (idx);
 	  if (index >= lowerbound && index <= upperbound)
-	    return value_subscripted_rvalue (array, idx, lowerbound);
+	    {
+	      CORE_ADDR element_size = TYPE_LENGTH (TYPE_TARGET_TYPE (tarray));
+	      CORE_ADDR offset = (index - lowerbound) * element_size;
+
+	      return value_subscripted_rvalue (array, offset);
+	    }
 	  /* Emit warning unless we have an array of unknown size.
 	     An array of unknown size has lowerbound 0 and upperbound -1.  */
 	  if (upperbound > -1)
@@ -194,53 +207,62 @@ value_subscript (struct value *array, struct value *idx)
 	  c_style = 1;
 	}
 
-      if (lowerbound != 0)
-	{
-	  bound = value_from_longest (value_type (idx), (LONGEST) lowerbound);
-	  idx = value_binop (idx, bound, BINOP_SUB);
-	}
-
+      index -= lowerbound;
       array = value_coerce_array (array);
     }
 
   if (c_style)
-    return value_ind (value_ptradd (array, idx));
+    {
+      struct value *idx;
+
+      idx = value_from_longest (builtin_type_int32, index);
+      return value_ind (value_ptradd (array, idx));
+    }
   else
     error (_("not an array or string"));
 }
 
-/* Return the value of EXPR[IDX], expr an aggregate rvalue
-   (eg, a vector register).  This routine used to promote floats
-   to doubles, but no longer does.  */
+/* Return the value of *((void *) ARRAY + ELEMENT), ARRAY an aggregate rvalue
+   (eg, a vector register).  This routine used to promote floats to doubles,
+   but no longer does.  OFFSET is zero-based with 0 for the lowermost existing
+   element, it must be expressed in bytes (therefore multiplied by
+   check_typedef (TYPE_TARGET_TYPE (array_type)).  */
 
 struct value *
-value_subscripted_rvalue (struct value *array, struct value *idx, int lowerbound)
+value_subscripted_rvalue (struct value *array, CORE_ADDR offset)
 {
   struct type *array_type = check_typedef (value_type (array));
   struct type *elt_type = check_typedef (TYPE_TARGET_TYPE (array_type));
-  unsigned int elt_size = TYPE_LENGTH (elt_type);
-  LONGEST index = value_as_long (idx);
-  unsigned int elt_offs = elt_size * longest_to_int (index - lowerbound);
   struct value *v;
 
-  if (index < lowerbound || elt_offs >= TYPE_LENGTH (array_type))
-    error (_("no such vector element"));
+  /* Do not check TYPE_LENGTH (array_type) as we may have been given the
+     innermost dimension of a multi-dimensional Fortran array where its length
+     is shorter than the possibly accessed element offset.  */
 
   v = allocate_value (elt_type);
   if (VALUE_LVAL (array) == lval_memory && value_lazy (array))
     set_value_lazy (v, 1);
   else
-    memcpy (value_contents_writeable (v),
-	    value_contents (array) + elt_offs, elt_size);
+    {
+      unsigned int elt_size = TYPE_LENGTH (elt_type);
+      memcpy (value_contents_writeable (v),
+	      value_contents (array) + offset, elt_size);
+    }
 
   if (VALUE_LVAL (array) == lval_internalvar)
     VALUE_LVAL (v) = lval_internalvar_component;
   else
     VALUE_LVAL (v) = VALUE_LVAL (array);
+
   VALUE_ADDRESS (v) = VALUE_ADDRESS (array);
+  /* We need to already adjust the address according to the former type as
+     V will have a different type (ELT_TYPE) which may no longer contain the
+     adjustment code like TYPE_FORTRAN_ARRAY_DATA_LOCATION.  */
+  object_address_get_data (array_type, &VALUE_ADDRESS (v));
+
   VALUE_REGNUM (v) = VALUE_REGNUM (array);
   VALUE_FRAME_ID (v) = VALUE_FRAME_ID (array);
-  set_value_offset (v, value_offset (array) + elt_offs);
+  set_value_offset (v, value_offset (array) + offset);
   return v;
 }
 

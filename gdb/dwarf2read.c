@@ -1023,7 +1023,14 @@ static void store_in_ref_table (struct die_info *,
 
 static unsigned int dwarf2_get_ref_die_offset (struct attribute *);
 
-static int dwarf2_get_attr_constant_value (struct attribute *, int);
+enum dwarf2_get_attr_constant_value
+  {
+    dwarf2_attr_unknown,
+    dwarf2_attr_const,
+    dwarf2_attr_block
+  };
+static enum dwarf2_get_attr_constant_value dwarf2_get_attr_constant_value
+  (struct attribute *attr, int *val_return);
 
 static struct die_info *follow_die_ref (struct die_info *,
 					struct attribute *,
@@ -1078,6 +1085,9 @@ static void age_cached_comp_units (void);
 
 static void free_one_cached_comp_unit (void *);
 
+static void fetch_die_type_attrs (struct die_info *die, struct type *type,
+				  struct dwarf2_cu *cu);
+
 static struct type *set_die_type (struct die_info *, struct type *,
 				  struct dwarf2_cu *);
 
@@ -1096,6 +1106,9 @@ static void dwarf2_mark (struct dwarf2_cu *);
 static void dwarf2_clear_marks (struct dwarf2_per_cu_data *);
 
 static struct type *get_die_type (struct die_info *die, struct dwarf2_cu *cu);
+
+static struct dwarf2_locexpr_baton *dwarf2_attr_to_locexpr_baton
+  (struct attribute *attr, struct dwarf2_cu *cu);
 
 /* Try to locate the sections we need for DWARF 2 debugging
    information and return true if we have enough to do something.  */
@@ -4466,6 +4479,26 @@ process_enumeration_scope (struct die_info *die, struct dwarf2_cu *cu)
   new_symbol (die, this_type, cu);
 }
 
+/* Create a new array dimension referencing its target type TYPE.
+
+   Multidimensional arrays are internally represented as a stack of
+   singledimensional arrays being referenced by their TYPE_TARGET_TYPE.  */
+
+static struct type *
+create_single_array_dimension (struct type *type, struct type *range_type,
+			       struct die_info *die, struct dwarf2_cu *cu)
+{
+  type = create_array_type (NULL, type, range_type);
+
+  /* These generic type attributes need to be fetched by
+     evaluate_subexp_standard <multi_f77_subscript>'s call of
+     value_subscripted_rvalue only for the innermost array type.  */
+
+  fetch_die_type_attrs (die, type, cu);
+
+  return type;
+}
+
 /* Extract all information from a DW_TAG_array_type DIE and put it in
    the DIE's type field.  For now, this only handles one dimensional
    arrays.  */
@@ -4479,7 +4512,7 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
   struct type *element_type, *range_type, *index_type;
   struct type **range_types = NULL;
   struct attribute *attr;
-  int ndim = 0;
+  int ndim = 0, i;
   struct cleanup *back_to;
   char *name;
 
@@ -4526,16 +4559,11 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
   type = element_type;
 
   if (read_array_order (die, cu) == DW_ORD_col_major)
-    {
-      int i = 0;
-      while (i < ndim)
-	type = create_array_type (NULL, type, range_types[i++]);
-    }
-  else
-    {
-      while (ndim-- > 0)
-	type = create_array_type (NULL, type, range_types[ndim]);
-    }
+    for (i = 0; i < ndim; i++)
+      type = create_single_array_dimension (type, range_types[i], die, cu);
+  else /* (read_array_order (die, cu) == DW_ORD_row_major) */
+    for (i = ndim - 1; i >= 0; i--)
+      type = create_single_array_dimension (type, range_types[i], die, cu);
 
   /* Understand Dwarf2 support for vector types (like they occur on
      the PowerPC w/ AltiVec).  Gcc just adds another attribute to the
@@ -4891,29 +4919,93 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
   struct objfile *objfile = cu->objfile;
   struct type *type, *range_type, *index_type, *char_type;
   struct attribute *attr;
-  unsigned int length;
-
-  attr = dwarf2_attr (die, DW_AT_string_length, cu);
-  if (attr)
-    {
-      length = DW_UNSND (attr);
-    }
-  else
-    {
-      /* check for the DW_AT_byte_size attribute */
-      attr = dwarf2_attr (die, DW_AT_byte_size, cu);
-      if (attr)
-        {
-          length = DW_UNSND (attr);
-        }
-      else
-        {
-          length = 1;
-        }
-    }
+  int length;
 
   index_type = builtin_type_int32;
-  range_type = create_range_type (NULL, index_type, 1, length);
+  range_type = create_range_type_nfields (NULL, index_type, 2);
+  TYPE_UNSIGNED (range_type) = 1;
+
+  /* C/C++ should probably have the low bound 0 but C/C++ does not use
+     DW_TAG_string_type.  */
+  TYPE_LOW_BOUND (range_type) = 1;
+
+  attr = dwarf2_attr (die, DW_AT_string_length, cu);
+  switch (dwarf2_get_attr_constant_value (attr, &length))
+    {
+    case dwarf2_attr_const:
+      /* We currently do not support a constant address where the location
+	 should be read from - DWARF2_ATTR_BLOCK is expected instead.  See
+	 DWARF for the DW_AT_STRING_LENGTH vs. DW_AT_BYTE_SIZE difference.  */
+      /* PASSTHRU */
+    case dwarf2_attr_unknown:
+      attr = dwarf2_attr (die, DW_AT_byte_size, cu);
+      switch (dwarf2_get_attr_constant_value (attr, &length))
+	{
+	case dwarf2_attr_unknown:
+	  length = 1;
+	  /* PASSTHRU */
+	case dwarf2_attr_const:
+	  TYPE_HIGH_BOUND (range_type) = length;
+	  break;
+	case dwarf2_attr_block:
+	  TYPE_RANGE_BOUND_SET_DWARF_BLOCK (range_type, 1);
+	  TYPE_FIELD_DWARF_BLOCK (range_type, 1) =
+					dwarf2_attr_to_locexpr_baton (attr, cu);
+	  TYPE_DYNAMIC (range_type) = 1;
+	  break;
+	}
+      break;
+    case dwarf2_attr_block:
+      /* Security check for a size overflow.  */
+      if (DW_BLOCK (attr)->size + 2 < DW_BLOCK (attr)->size)
+	{
+	  TYPE_HIGH_BOUND (range_type) = 1;
+	  break;
+	}
+      /* Extend the DWARF block by a new DW_OP_deref/DW_OP_deref_size
+	 instruction as DW_AT_string_length specifies the length location, not
+	 its value.  */
+      {
+	struct dwarf2_locexpr_baton *length_baton;
+	struct attribute *size_attr;
+
+	length_baton = obstack_alloc (&cu->comp_unit_obstack,
+				      sizeof (*length_baton));
+	length_baton->per_cu = cu->per_cu;
+	length_baton->data = obstack_alloc (&cu->comp_unit_obstack,
+					    DW_BLOCK (attr)->size + 2);
+	memcpy (length_baton->data, DW_BLOCK (attr)->data,
+		DW_BLOCK (attr)->size);
+
+	/* DW_AT_BYTE_SIZE existing together with DW_AT_STRING_LENGTH specifies
+	   the size of an integer to fetch.  */
+
+	size_attr = dwarf2_attr (die, DW_AT_byte_size, cu);
+	if (size_attr)
+	  {
+	    length_baton->size = DW_BLOCK (attr)->size + 2;
+	    length_baton->data[DW_BLOCK (attr)->size] = DW_OP_deref_size;
+	    length_baton->data[DW_BLOCK (attr)->size + 1]
+							 = DW_UNSND (size_attr);
+	    if (length_baton->data[DW_BLOCK (attr)->size + 1]
+	        != DW_UNSND (size_attr))
+	      complaint (&symfile_complaints,
+	                 _("DW_AT_string_length's DW_AT_byte_size integer "
+			   "exceeds the byte size storage"));
+	  }
+	else
+	  {
+	    length_baton->size = DW_BLOCK (attr)->size + 1;
+	    length_baton->data[DW_BLOCK (attr)->size] = DW_OP_deref;
+	  }
+
+	TYPE_RANGE_BOUND_SET_DWARF_BLOCK (range_type, 1);
+	TYPE_FIELD_DWARF_BLOCK (range_type, 1) = length_baton;
+	TYPE_DYNAMIC (range_type) = 1;
+      }
+      break;
+    }
+
   type = create_string_type (NULL, range_type);
 
   return set_die_type (die, type, cu);
@@ -5007,7 +5099,6 @@ static struct type *
 read_typedef (struct die_info *die, struct dwarf2_cu *cu)
 {
   struct objfile *objfile = cu->objfile;
-  struct attribute *attr;
   const char *name = NULL;
   struct type *this_type;
 
@@ -5112,9 +5203,9 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
   struct gdbarch *gdbarch = get_objfile_arch (cu->objfile);
   struct type *base_type;
   struct type *range_type;
-  struct attribute *attr;
-  int low = 0;
-  int high = -1;
+  struct attribute *attr, *byte_stride_attr;
+  int low, high, byte_stride_int;
+  enum dwarf2_get_attr_constant_value high_type, byte_stride_type;
   char *name;
   
   base_type = die_type (die, cu);
@@ -5127,42 +5218,89 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
 		     0, NULL, cu->objfile);
     }
 
-  if (cu->language == language_fortran)
-    { 
-      /* FORTRAN implies a lower bound of 1, if not given.  */
-      low = 1;
-    }
+  /* DW_AT_bit_stride is currently unsupported as we count in bytes.  */
+  byte_stride_attr = dwarf2_attr (die, DW_AT_byte_stride, cu);
+  byte_stride_type = dwarf2_get_attr_constant_value (byte_stride_attr,
+						     &byte_stride_int);
 
-  /* FIXME: For variable sized arrays either of these could be
-     a variable rather than a constant value.  We'll allow it,
-     but we don't know how to handle it.  */
+  range_type = create_range_type_nfields
+    (NULL, base_type, byte_stride_type == dwarf2_attr_unknown ? 2 : 3);
+
   attr = dwarf2_attr (die, DW_AT_lower_bound, cu);
-  if (attr)
-    low = dwarf2_get_attr_constant_value (attr, 0);
+  switch (dwarf2_get_attr_constant_value (attr, &low))
+    {
+    case dwarf2_attr_unknown:
+      if (cu->language == language_fortran)
+	{
+	  /* FORTRAN implies a lower bound of 1, if not given.  */
+	  low = 1;
+	}
+      else
+        {
+	  /* According to DWARF we should assume the value 0 only for
+	     LANGUAGE_C and LANGUAGE_CPLUS.  */
+	  low = 0;
+	}
+      /* PASSTHRU */
+    case dwarf2_attr_const:
+      TYPE_LOW_BOUND (range_type) = low;
+      if (low >= 0)
+	TYPE_UNSIGNED (range_type) = 1;
+      break;
+    case dwarf2_attr_block:
+      TYPE_RANGE_BOUND_SET_DWARF_BLOCK (range_type, 0);
+      TYPE_FIELD_DWARF_BLOCK (range_type, 0) = dwarf2_attr_to_locexpr_baton
+								     (attr, cu);
+      TYPE_DYNAMIC (range_type) = 1;
+      /* For setting a default if DW_AT_UPPER_BOUND would be missing.  */
+      low = 0;
+      break;
+    }
 
   attr = dwarf2_attr (die, DW_AT_upper_bound, cu);
-  if (attr)
-    {       
-      if (attr->form == DW_FORM_block1)
-        {
-          /* GCC encodes arrays with unspecified or dynamic length
-             with a DW_FORM_block1 attribute.
-             FIXME: GDB does not yet know how to handle dynamic
-             arrays properly, treat them as arrays with unspecified
-             length for now.
-
-             FIXME: jimb/2003-09-22: GDB does not really know
-             how to handle arrays of unspecified length
-             either; we just represent them as zero-length
-             arrays.  Choose an appropriate upper bound given
-             the lower bound we've computed above.  */
-          high = low - 1;
-        }
-      else
-        high = dwarf2_get_attr_constant_value (attr, 1);
+  high_type = dwarf2_get_attr_constant_value (attr, &high);
+  if (high_type == dwarf2_attr_unknown)
+    {
+      attr = dwarf2_attr (die, DW_AT_count, cu);
+      high_type = dwarf2_get_attr_constant_value (attr, &high);
+      /* It does not hurt but it is needlessly ineffective in check_typedef.  */
+      if (high_type != dwarf2_attr_unknown)
+	TYPE_RANGE_HIGH_BOUND_IS_COUNT (range_type) = 1;
+      /* Pass it now as the regular DW_AT_upper_bound.  */
+    }
+  switch (high_type)
+    {
+    case dwarf2_attr_unknown:
+      TYPE_RANGE_UPPER_BOUND_IS_UNDEFINED (range_type) = 1;
+      high = low - 1;
+      /* PASSTHRU */
+    case dwarf2_attr_const:
+      TYPE_HIGH_BOUND (range_type) = high;
+      break;
+    case dwarf2_attr_block:
+      TYPE_RANGE_BOUND_SET_DWARF_BLOCK (range_type, 1);
+      TYPE_FIELD_DWARF_BLOCK (range_type, 1) = dwarf2_attr_to_locexpr_baton
+								     (attr, cu);
+      TYPE_DYNAMIC (range_type) = 1;
+      break;
     }
 
-  range_type = create_range_type (NULL, base_type, low, high);
+  switch (byte_stride_type)
+    {
+    case dwarf2_attr_unknown:
+      break;
+    case dwarf2_attr_const:
+      if (byte_stride_int == 0)
+	warning (_("Found DW_AT_byte_stride with unsupported value 0"));
+      SET_TYPE_BYTE_STRIDE (range_type, byte_stride_int);
+      break;
+    case dwarf2_attr_block:
+      TYPE_RANGE_BOUND_SET_DWARF_BLOCK (range_type, 2);
+      TYPE_FIELD_DWARF_BLOCK (range_type, 2) = dwarf2_attr_to_locexpr_baton
+							 (byte_stride_attr, cu);
+      TYPE_DYNAMIC (range_type) = 1;
+      break;
+    }
 
   name = dwarf2_name (die, cu);
   if (name)
@@ -7450,10 +7588,12 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
      (i.e. when the value of a register or memory location is
      referenced, or a thread-local block, etc.).  Then again, it might
      not be worthwhile.  I'm assuming that it isn't unless performance
-     or memory numbers show me otherwise.  */
+     or memory numbers show me otherwise.
+     
+     SYMBOL_CLASS may get overriden by dwarf2_symbol_mark_computed.  */
 
-  dwarf2_symbol_mark_computed (attr, sym, cu);
   SYMBOL_CLASS (sym) = LOC_COMPUTED;
+  dwarf2_symbol_mark_computed (attr, sym, cu);
 }
 
 /* Given a pointer to a DWARF information entry, figure out if we need
@@ -7486,6 +7626,8 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
 					     sizeof (struct symbol));
       OBJSTAT (objfile, n_syms++);
       memset (sym, 0, sizeof (struct symbol));
+      /* Some methods are called without checking SYMBOL_OPS validity.  */
+      SYMBOL_OPS (sym) = &dwarf2_missing_funcs;
 
       /* Cache this symbol's name and the name's demangled form (if any).  */
       SYMBOL_LANGUAGE (sym) = cu->language;
@@ -9291,26 +9433,35 @@ dwarf2_get_ref_die_offset (struct attribute *attr)
   return result;
 }
 
-/* Return the constant value held by the given attribute.  Return -1
-   if the value held by the attribute is not constant.  */
+/* (*val_return) is filled only if returning dwarf2_attr_const.  */
 
-static int
-dwarf2_get_attr_constant_value (struct attribute *attr, int default_value)
+static enum dwarf2_get_attr_constant_value
+dwarf2_get_attr_constant_value (struct attribute *attr, int *val_return)
 {
+  if (attr == NULL)
+    return dwarf2_attr_unknown;
   if (attr->form == DW_FORM_sdata)
-    return DW_SND (attr);
-  else if (attr->form == DW_FORM_udata
-           || attr->form == DW_FORM_data1
-           || attr->form == DW_FORM_data2
-           || attr->form == DW_FORM_data4
-           || attr->form == DW_FORM_data8)
-    return DW_UNSND (attr);
-  else
     {
-      complaint (&symfile_complaints, _("Attribute value is not a constant (%s)"),
-                 dwarf_form_name (attr->form));
-      return default_value;
+      *val_return = DW_SND (attr);
+      return dwarf2_attr_const;
     }
+  if (attr->form == DW_FORM_udata
+      || attr->form == DW_FORM_data1
+      || attr->form == DW_FORM_data2
+      || attr->form == DW_FORM_data4
+      || attr->form == DW_FORM_data8)
+    {
+      *val_return = DW_UNSND (attr);
+      return dwarf2_attr_const;
+    }
+  if (attr->form == DW_FORM_block
+      || attr->form == DW_FORM_block1
+      || attr->form == DW_FORM_block2
+      || attr->form == DW_FORM_block4)
+    return dwarf2_attr_block;
+  complaint (&symfile_complaints, _("Attribute value is not a constant (%s)"),
+             dwarf_form_name (attr->form));
+  return dwarf2_attr_unknown;
 }
 
 /* THIS_CU has a reference to PER_CU.  If necessary, load the new compilation
@@ -10088,6 +10239,34 @@ attr_form_is_constant (struct attribute *attr)
     }
 }
 
+/* Convert DW_BLOCK into struct dwarf2_locexpr_baton.  ATTR must be a DW_BLOCK
+   attribute type.  */
+
+static struct dwarf2_locexpr_baton *
+dwarf2_attr_to_locexpr_baton (struct attribute *attr, struct dwarf2_cu *cu)
+{
+  struct dwarf2_locexpr_baton *baton;
+
+  gdb_assert (attr_form_is_block (attr));
+
+  baton = obstack_alloc (&cu->objfile->objfile_obstack, sizeof (*baton));
+  baton->per_cu = cu->per_cu;
+  gdb_assert (baton->per_cu);
+
+  /* Note that we're just copying the block's data pointer
+     here, not the actual data.  We're still pointing into the
+     info_buffer for SYM's objfile; right now we never release
+     that buffer, but when we do clean up properly this may
+     need to change.  */
+  baton->size = DW_BLOCK (attr)->size;
+  baton->data = DW_BLOCK (attr)->data;
+  gdb_assert (baton->size == 0 || baton->data != NULL);
+
+  return baton;
+}
+
+/* SYM may get its SYMBOL_CLASS overriden on invalid ATTR content.  */
+
 static void
 dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
 			     struct dwarf2_cu *cu)
@@ -10117,35 +10296,24 @@ dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
       SYMBOL_OPS (sym) = &dwarf2_loclist_funcs;
       SYMBOL_LOCATION_BATON (sym) = baton;
     }
+  else if (attr_form_is_block (attr))
+    {
+      SYMBOL_OPS (sym) = &dwarf2_locexpr_funcs;
+      SYMBOL_LOCATION_BATON (sym) = dwarf2_attr_to_locexpr_baton (attr, cu);
+    }
   else
     {
-      struct dwarf2_locexpr_baton *baton;
+      dwarf2_invalid_attrib_class_complaint ("location description",
+					     SYMBOL_NATURAL_NAME (sym));
 
-      baton = obstack_alloc (&cu->objfile->objfile_obstack,
-			     sizeof (struct dwarf2_locexpr_baton));
-      baton->per_cu = cu->per_cu;
-      gdb_assert (baton->per_cu);
+      /* Some methods are called without checking SYMBOL_OPS validity.  */
+      SYMBOL_OPS (sym) = &dwarf2_missing_funcs;
+      SYMBOL_LOCATION_BATON (sym) = NULL;
 
-      if (attr_form_is_block (attr))
-	{
-	  /* Note that we're just copying the block's data pointer
-	     here, not the actual data.  We're still pointing into the
-	     info_buffer for SYM's objfile; right now we never release
-	     that buffer, but when we do clean up properly this may
-	     need to change.  */
-	  baton->size = DW_BLOCK (attr)->size;
-	  baton->data = DW_BLOCK (attr)->data;
-	}
-      else
-	{
-	  dwarf2_invalid_attrib_class_complaint ("location description",
-						 SYMBOL_NATURAL_NAME (sym));
-	  baton->size = 0;
-	  baton->data = NULL;
-	}
-      
-      SYMBOL_OPS (sym) = &dwarf2_locexpr_funcs;
-      SYMBOL_LOCATION_BATON (sym) = baton;
+      /* For functions a missing DW_AT_frame_base does not optimize out the
+	 whole function definition, only its frame base resolving.  */
+      if (attr->name == DW_AT_location)
+	SYMBOL_CLASS (sym) = LOC_OPTIMIZED_OUT;
     }
 }
 
@@ -10420,6 +10588,27 @@ offset_and_type_eq (const void *item_lhs, const void *item_rhs)
   return ofs_lhs->offset == ofs_rhs->offset;
 }
 
+/* Fill in generic attributes applicable for type DIEs.  */
+
+static void
+fetch_die_type_attrs (struct die_info *die, struct type *type,
+		      struct dwarf2_cu *cu)
+{
+  struct attribute *attr;
+
+  attr = dwarf2_attr (die, DW_AT_data_location, cu);
+  if (attr_form_is_block (attr))
+    TYPE_DATA_LOCATION (type) = dwarf2_attr_to_locexpr_baton (attr, cu);
+
+  attr = dwarf2_attr (die, DW_AT_allocated, cu);
+  if (attr_form_is_block (attr))
+    TYPE_ALLOCATED (type) = dwarf2_attr_to_locexpr_baton (attr, cu);
+
+  attr = dwarf2_attr (die, DW_AT_associated, cu);
+  if (attr_form_is_block (attr))
+    TYPE_ASSOCIATED (type) = dwarf2_attr_to_locexpr_baton (attr, cu);
+}
+
 /* Set the type associated with DIE to TYPE.  Save it in CU's hash
    table if necessary.  For convenience, return TYPE.  */
 
@@ -10427,6 +10616,8 @@ static struct type *
 set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
 {
   struct dwarf2_offset_and_type **slot, ofs;
+
+  fetch_die_type_attrs (die, type, cu);
 
   if (cu->type_hash == NULL)
     {

@@ -40,6 +40,7 @@
 #include "regcache.h"
 #include "user-regs.h"
 #include "valprint.h"
+#include "dwarf2loc.h"
 
 #include "gdb_assert.h"
 
@@ -671,6 +672,7 @@ evaluate_subexp_standard (struct type *expect_type,
   long mem_offset;
   struct type **arg_types;
   int save_pos1;
+  struct cleanup *old_chain;
 
   pc = (*pos)++;
   op = exp->elts[pc].opcode;
@@ -1529,7 +1531,10 @@ evaluate_subexp_standard (struct type *expect_type,
 
       /* First determine the type code we are dealing with.  */
       arg1 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
+      old_chain = make_cleanup (null_cleanup, 0);
+      object_address_set (VALUE_ADDRESS (arg1));
       type = check_typedef (value_type (arg1));
+      do_cleanups (old_chain);
       code = TYPE_CODE (type);
 
       if (code == TYPE_CODE_PTR)
@@ -1963,12 +1968,18 @@ evaluate_subexp_standard (struct type *expect_type,
       {
 	int subscript_array[MAX_FORTRAN_DIMS];
 	int array_size_array[MAX_FORTRAN_DIMS];
+	int byte_stride_array[MAX_FORTRAN_DIMS];
 	int ndimensions = 1, i;
 	struct type *tmp_type;
 	int offset_item;	/* The array offset where the item lives */
+	CORE_ADDR offset_byte;	/* byte_stride based offset  */
+	unsigned element_size;
 
 	if (nargs > MAX_FORTRAN_DIMS)
 	  error (_("Too many subscripts for F77 (%d Max)"), MAX_FORTRAN_DIMS);
+
+	old_chain = make_cleanup (null_cleanup, 0);
+	object_address_set (VALUE_ADDRESS (arg1));
 
 	tmp_type = check_typedef (value_type (arg1));
 	ndimensions = calc_f77_array_dims (type);
@@ -1999,6 +2010,9 @@ evaluate_subexp_standard (struct type *expect_type,
 	    upper = f77_get_upperbound (tmp_type);
 	    lower = f77_get_lowerbound (tmp_type);
 
+	    byte_stride_array[nargs - i - 1] =
+					TYPE_ARRAY_BYTE_STRIDE_VALUE (tmp_type);
+
 	    array_size_array[nargs - i - 1] = upper - lower + 1;
 
 	    /* Zero-normalize subscripts so that offsetting will work. */
@@ -2017,17 +2031,25 @@ evaluate_subexp_standard (struct type *expect_type,
 	      tmp_type = check_typedef (TYPE_TARGET_TYPE (tmp_type));
 	  }
 
+	/* Kept for the f77_get_upperbound / f77_get_lowerbound calls above.  */
+	do_cleanups (old_chain);
+
 	/* Now let us calculate the offset for this item */
 
-	offset_item = subscript_array[ndimensions - 1];
+	offset_item = 0;
+	offset_byte = 0;
 
-	for (i = ndimensions - 1; i > 0; --i)
-	  offset_item =
-	    array_size_array[i - 1] * offset_item + subscript_array[i - 1];
+	for (i = ndimensions - 1; i >= 0; --i)
+	  {
+	    offset_item *= array_size_array[i];
+	    if (byte_stride_array[i] == 0)
+	      offset_item += subscript_array[i];
+	    else
+	      offset_byte += subscript_array[i] * byte_stride_array[i];
+	  }
 
-	/* Construct a value node with the value of the offset */
-
-	arg2 = value_from_longest (builtin_type_int32, offset_item);
+	element_size = TYPE_LENGTH (TYPE_TARGET_TYPE (tmp_type));
+	offset_byte += offset_item * element_size;
 
 	/* Let us now play a dirty trick: we will take arg1 
 	   which is a value node pointing to the topmost level
@@ -2037,7 +2059,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	   returns the correct type value */
 
 	deprecated_set_value_type (arg1, tmp_type);
-	return value_subscripted_rvalue (arg1, arg2, 0);
+	return value_subscripted_rvalue (arg1, offset_byte);
       }
 
     case BINOP_LOGICAL_AND:
@@ -2686,9 +2708,12 @@ evaluate_subexp_for_sizeof (struct expression *exp, int *pos)
 
     case OP_VAR_VALUE:
       (*pos) += 4;
-      type = check_typedef (SYMBOL_TYPE (exp->elts[pc + 2].symbol));
-      return
-	value_from_longest (size_type, (LONGEST) TYPE_LENGTH (type));
+      /* We do not need to call read_var_value but the object evaluation may
+	 need to have executed object_address_set which needs valid
+	 SYMBOL_VALUE_ADDRESS of the symbol.  Still VALUE returned by
+	 read_var_value we left as lazy.  */
+      type = value_type (read_var_value (exp->elts[pc + 2].symbol, NULL));
+      return value_from_longest (size_type, (LONGEST) TYPE_LENGTH (type));
 
     default:
       val = evaluate_subexp (NULL_TYPE, exp, pos, EVAL_AVOID_SIDE_EFFECTS);

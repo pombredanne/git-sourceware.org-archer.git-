@@ -43,6 +43,7 @@
 #include "disasm.h"
 #include "dfp.h"
 #include "valprint.h"
+#include "exceptions.h"
 
 #ifdef TUI
 #include "tui/tui.h"		/* For tui_active et.al.   */
@@ -875,6 +876,11 @@ print_command_1 (char *exp, int inspect, int voidprint)
     }
   else
     val = access_value_history (0);
+
+  /* Do not try to OBJECT_ADDRESS_SET here anything.  We are interested in the
+     source variable base addresses as found by READ_VAR_VALUE.  The value here
+     can be already a calculated expression address inappropriate for
+     DW_OP_push_object_address.  */
 
   if (voidprint || (val && value_type (val) &&
 		    TYPE_CODE (value_type (val)) != TYPE_CODE_VOID))
@@ -1731,17 +1737,30 @@ disable_display_command (char *args, int from_tty)
 
 
 /* Print the value in stack frame FRAME of a variable specified by a
-   struct symbol.  */
+   struct symbol.  Printed value gets terminated by a newline.  */
 
 void
-print_variable_value (struct symbol *var, struct frame_info *frame,
-		      struct ui_file *stream)
+print_variable_value_nl (struct symbol *var, struct frame_info *frame,
+			 struct ui_file *stream)
 {
-  struct value *val = read_var_value (var, frame);
-  struct value_print_options opts;
+  struct value *val = NULL;	/* A false GCC warning.  */
+  struct gdb_exception e;
 
-  get_user_print_options (&opts);
-  value_print (val, stream, &opts);
+  TRY_CATCH (e, RETURN_MASK_ERROR)
+    {
+      val = read_var_value (var, frame);
+    }
+  if (e.reason < 0)
+    exception_print (stream, e);
+  else
+    {
+      struct value_print_options opts;
+
+      get_user_print_options (&opts);
+      value_print (val, stream, &opts);
+
+      fputc_filtered ('\n', stream);
+    }
 }
 
 static void
