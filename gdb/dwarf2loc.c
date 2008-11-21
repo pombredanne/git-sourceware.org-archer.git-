@@ -107,6 +107,9 @@ struct dwarf_expr_baton
 {
   struct frame_info *frame;
   struct objfile *objfile;
+  /* From DW_TAG_variable's DW_AT_location (not DW_TAG_type's
+     DW_AT_data_location) for DW_OP_push_object_address.  */
+  CORE_ADDR object_address;
 };
 
 /* Helper functions for dwarf2_evaluate_loc_desc.  */
@@ -163,22 +166,32 @@ dwarf_expr_frame_base (void *baton, gdb_byte **start, size_t * length)
       *start = find_location_expression (symbaton, length,
 					 get_frame_address_in_block (frame));
     }
-  else
+  else if (SYMBOL_OPS (framefunc) == &dwarf2_locexpr_funcs)
     {
       struct dwarf2_locexpr_baton *symbaton;
+
       symbaton = SYMBOL_LOCATION_BATON (framefunc);
-      if (symbaton != NULL)
-	{
-	  *length = symbaton->size;
-	  *start = symbaton->data;
-	}
-      else
-	*start = NULL;
+      gdb_assert (symbaton != NULL);
+      *start = symbaton->data;
+      *length = symbaton->size;
     }
+  else if (SYMBOL_OPS (framefunc) == &dwarf2_missing_funcs)
+    {
+      struct dwarf2_locexpr_baton *symbaton;
+
+      symbaton = SYMBOL_LOCATION_BATON (framefunc);
+      gdb_assert (symbaton == NULL);
+      *start = NULL;
+      *length = 0;	/* unused */
+    }
+  else
+    internal_error (__FILE__, __LINE__,
+		    _("Unsupported SYMBOL_OPS %p for \"%s\""),
+		    SYMBOL_OPS (framefunc), SYMBOL_PRINT_NAME (framefunc));
 
   if (*start == NULL)
     error (_("Could not find the frame base for \"%s\"."),
-	   SYMBOL_NATURAL_NAME (framefunc));
+	   SYMBOL_PRINT_NAME (framefunc));
 }
 
 /* Using the objfile specified in BATON, find the address for the
@@ -191,6 +204,119 @@ dwarf_expr_tls_address (void *baton, CORE_ADDR offset)
   return target_translate_tls_address (debaton->objfile, offset);
 }
 
+static CORE_ADDR
+dwarf_expr_object_address (void *baton)
+{
+  struct dwarf_expr_baton *debaton = baton;
+
+  /* The message is suppressed in DWARF_BLOCK_EXEC.  */
+  if (debaton->object_address == 0)
+    error (_("Cannot resolve DW_OP_push_object_address for a missing object"));
+
+  return debaton->object_address;
+}
+
+/* Address of the variable we are currently referring to.  It is set from
+   DW_TAG_variable's DW_AT_location (not DW_TAG_type's DW_AT_data_location) for
+   DW_OP_push_object_address.  */
+
+static CORE_ADDR object_address;
+
+/* Callers use object_address_set while their callers use the result set so we
+   cannot run the cleanup at the local block of our direct caller.  Still we
+   should reset OBJECT_ADDRESS at least for the next GDB command.  */
+
+static void
+object_address_cleanup (void *prev_save_voidp)
+{
+  CORE_ADDR *prev_save = prev_save_voidp;
+
+  object_address = *prev_save;
+  xfree (prev_save);
+}
+
+/* Set the base address - DW_AT_location - of a variable.  It is being later
+   used to derive other object addresses by DW_OP_push_object_address.
+
+   It would be useful to sanity check ADDRESS - such as for some objects with
+   unset VALUE_ADDRESS - but some valid addresses may be zero (such as first
+   objects in relocatable .o files).  */
+
+void
+object_address_set (CORE_ADDR address)
+{
+  CORE_ADDR *prev_save;
+
+  prev_save = xmalloc (sizeof *prev_save);
+  *prev_save = object_address;
+  make_cleanup (object_address_cleanup, prev_save);
+
+  object_address = address;
+}
+
+/* Evaluate DWARF expression at DATA ... DATA + SIZE with its result readable
+   by dwarf_expr_fetch (RETVAL, 0).  FRAME parameter can be NULL to call
+   get_selected_frame to find it.  Returned dwarf_expr_context freeing is
+   pushed on the cleanup chain.  */
+
+static struct dwarf_expr_context *
+dwarf_expr_prep_ctx (struct frame_info *frame, gdb_byte *data,
+		     unsigned short size, struct dwarf2_per_cu_data *per_cu)
+{
+  struct dwarf_expr_context *ctx;
+  struct dwarf_expr_baton baton;
+
+  if (!frame)
+    frame = get_selected_frame (NULL);
+
+  baton.frame = frame;
+  baton.objfile = dwarf2_per_cu_objfile (per_cu);
+  baton.object_address = object_address;
+
+  ctx = new_dwarf_expr_context ();
+  ctx->gdbarch = get_objfile_arch (baton.objfile);
+  ctx->addr_size = dwarf2_per_cu_addr_size (per_cu);
+  ctx->baton = &baton;
+  ctx->read_reg = dwarf_expr_read_reg;
+  ctx->read_mem = dwarf_expr_read_mem;
+  ctx->get_frame_base = dwarf_expr_frame_base;
+  ctx->get_tls_address = dwarf_expr_tls_address;
+  ctx->get_object_address = dwarf_expr_object_address;
+
+  make_cleanup ((make_cleanup_ftype *) free_dwarf_expr_context, ctx);
+
+  dwarf_expr_eval (ctx, data, size);
+
+  /* It was used only during dwarf_expr_eval.  */
+  ctx->baton = NULL;
+
+  return ctx;
+}
+
+/* Evaluate DWARF expression at DLBATON expecting it produces exactly one
+   CORE_ADDR result on the DWARF stack stack.  */
+
+CORE_ADDR
+dwarf_locexpr_baton_eval (struct dwarf2_locexpr_baton *dlbaton)
+{
+  struct dwarf_expr_context *ctx;
+  CORE_ADDR retval;
+  struct cleanup *back_to = make_cleanup (null_cleanup, 0);
+
+  ctx = dwarf_expr_prep_ctx (NULL, dlbaton->data, dlbaton->size,
+			     dlbaton->per_cu);
+  if (ctx->num_pieces > 0)
+    error (_("DW_OP_*piece is unsupported for DW_FORM_block"));
+  else if (ctx->in_reg)
+    error (_("Register result is unsupported for DW_FORM_block"));
+
+  retval = dwarf_expr_fetch (ctx, 0);
+
+  do_cleanups (back_to);
+
+  return retval;
+}
+
 /* Evaluate a location description, starting at DATA and with length
    SIZE, to find the current location of variable VAR in the context
    of FRAME.  */
@@ -201,8 +327,8 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
 {
   struct gdbarch *arch = get_frame_arch (frame);
   struct value *retval;
-  struct dwarf_expr_baton baton;
   struct dwarf_expr_context *ctx;
+  struct cleanup *back_to = make_cleanup (null_cleanup, 0);
 
   if (size == 0)
     {
@@ -212,19 +338,8 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
       return retval;
     }
 
-  baton.frame = frame;
-  baton.objfile = dwarf2_per_cu_objfile (per_cu);
+  ctx = dwarf_expr_prep_ctx (frame, data, size, per_cu);
 
-  ctx = new_dwarf_expr_context ();
-  ctx->gdbarch = get_objfile_arch (baton.objfile);
-  ctx->addr_size = dwarf2_per_cu_addr_size (per_cu);
-  ctx->baton = &baton;
-  ctx->read_reg = dwarf_expr_read_reg;
-  ctx->read_mem = dwarf_expr_read_mem;
-  ctx->get_frame_base = dwarf_expr_frame_base;
-  ctx->get_tls_address = dwarf_expr_tls_address;
-
-  dwarf_expr_eval (ctx, data, size);
   if (ctx->num_pieces > 0)
     {
       int i;
@@ -262,6 +377,10 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
     {
       CORE_ADDR address = dwarf_expr_fetch (ctx, 0);
 
+      /* object_address_set called here is required in ALLOCATE_VALUE's
+	 CHECK_TYPEDEF for the object's possible DW_OP_push_object_address.  */
+      object_address_set (address);
+
       retval = allocate_value (SYMBOL_TYPE (var));
       VALUE_LVAL (retval) = lval_memory;
       set_value_lazy (retval, 1);
@@ -270,7 +389,7 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
 
   set_value_initialized (retval, ctx->initialized);
 
-  free_dwarf_expr_context (ctx);
+  do_cleanups (back_to);
 
   return retval;
 }
@@ -588,7 +707,7 @@ static int
 loclist_describe_location (struct symbol *symbol, struct ui_file *stream)
 {
   /* FIXME: Could print the entire list of locations.  */
-  fprintf_filtered (stream, "a variable with multiple locations");
+  fprintf_filtered (stream, _("a variable with multiple locations"));
   return 1;
 }
 
@@ -604,16 +723,56 @@ loclist_tracepoint_var_ref (struct symbol * symbol, struct agent_expr * ax,
 
   data = find_location_expression (dlbaton, &size, ax->scope);
   if (data == NULL)
-    error (_("Variable \"%s\" is not available."), SYMBOL_NATURAL_NAME (symbol));
+    error (_("Variable \"%s\" is not available."), SYMBOL_PRINT_NAME (symbol));
 
   dwarf2_tracepoint_var_ref (symbol, ax, value, data, size);
 }
 
-/* The set of location functions used with the DWARF-2 expression
-   evaluator and location lists.  */
+/* The set of location functions used with the DWARF-2 location lists.  */
 const struct symbol_ops dwarf2_loclist_funcs = {
   loclist_read_variable,
   loclist_read_needs_frame,
   loclist_describe_location,
   loclist_tracepoint_var_ref
+};
+
+static struct value *
+missing_read_variable (struct symbol *symbol, struct frame_info *frame)
+{
+  struct dwarf2_loclist_baton *dlbaton = SYMBOL_LOCATION_BATON (symbol);
+
+  gdb_assert (dlbaton == NULL);
+  error (_("Unable to resolve variable \"%s\""), SYMBOL_PRINT_NAME (symbol));
+}
+
+static int
+missing_read_needs_frame (struct symbol *symbol)
+{
+  return 0;
+}
+
+static int
+missing_describe_location (struct symbol *symbol, struct ui_file *stream)
+{
+  fprintf_filtered (stream, _("a variable we are unable to resolve"));
+  return 1;
+}
+
+static void
+missing_tracepoint_var_ref (struct symbol *symbol, struct agent_expr *ax,
+			    struct axs_value *value)
+{
+  struct dwarf2_loclist_baton *dlbaton = SYMBOL_LOCATION_BATON (symbol);
+
+  gdb_assert (dlbaton == NULL);
+  error (_("Unable to resolve variable \"%s\""), SYMBOL_PRINT_NAME (symbol));
+}
+
+/* The set of location functions used with the DWARF-2 evaluator when we are
+   unable to resolve the symbols.  */
+const struct symbol_ops dwarf2_missing_funcs = {
+  missing_read_variable,
+  missing_read_needs_frame,
+  missing_describe_location,
+  missing_tracepoint_var_ref
 };

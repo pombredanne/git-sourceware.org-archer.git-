@@ -1378,8 +1378,7 @@ print_block_frame_locals (struct block *b, struct frame_info *frame,
 	    fputs_filtered ("\t", stream);
 	  fputs_filtered (SYMBOL_PRINT_NAME (sym), stream);
 	  fputs_filtered (" = ", stream);
-	  print_variable_value (sym, frame, stream);
-	  fprintf_filtered (stream, "\n");
+	  print_variable_value_nl (sym, frame, stream);
 	  break;
 
 	default:
@@ -1591,8 +1590,7 @@ print_frame_arg_vars (struct frame_info *frame, struct ui_file *stream)
 
 	  sym2 = lookup_symbol (SYMBOL_LINKAGE_NAME (sym),
 				b, VAR_DOMAIN, NULL);
-	  print_variable_value (sym2, frame, stream);
-	  fprintf_filtered (stream, "\n");
+	  print_variable_value_nl (sym2, frame, stream);
 	}
     }
 

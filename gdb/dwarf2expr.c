@@ -738,6 +738,13 @@ execute_stack_op (struct dwarf_expr_context *ctx,
 	  ctx->initialized = 0;
 	  goto no_push;
 
+	case DW_OP_push_object_address:
+	  if (ctx->get_object_address == NULL)
+	    error (_("DWARF-2 expression error: DW_OP_push_object_address must "
+	           "have a value to push."));
+	  result = (ctx->get_object_address) (ctx->baton);
+	  break;
+
 	default:
 	  error (_("Unhandled dwarf expression opcode 0x%x"), op);
 	}

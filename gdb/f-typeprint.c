@@ -31,7 +31,7 @@
 #include "gdbcore.h"
 #include "target.h"
 #include "f-lang.h"
-
+#include "dwarf2loc.h"
 #include "gdb_string.h"
 #include <errno.h>
 
@@ -39,7 +39,7 @@
 static void f_type_print_args (struct type *, struct ui_file *);
 #endif
 
-static void f_type_print_varspec_suffix (struct type *, struct ui_file *,
+static void f_type_print_varspec_suffix (struct type *, struct ui_file *, int,
 					 int, int, int);
 
 void f_type_print_varspec_prefix (struct type *, struct ui_file *,
@@ -47,6 +47,34 @@ void f_type_print_varspec_prefix (struct type *, struct ui_file *,
 
 void f_type_print_base (struct type *, struct ui_file *, int, int);
 
+
+const char *
+f_object_address_data_valid_print_to_stream (struct type *type,
+					     struct ui_file *stream)
+{
+  const char *msg;
+
+  msg = object_address_data_not_valid (type);
+  if (msg != NULL)
+    {
+      /* Assuming the content printed to STREAM should not be localized.  */
+      fprintf_filtered (stream, "<%s>", msg);
+    }
+
+  return msg;
+}
+
+void
+f_object_address_data_valid_or_error (struct type *type)
+{
+  const char *msg;
+
+  msg = object_address_data_not_valid (type);
+  if (msg != NULL)
+    {
+      error (_("Cannot access it because the %s."), _(msg));
+    }
+}
 
 /* LEVEL is the depth to indent lines by.  */
 
@@ -56,6 +84,9 @@ f_print_type (struct type *type, char *varstring, struct ui_file *stream,
 {
   enum type_code code;
   int demangled_args;
+
+  if (f_object_address_data_valid_print_to_stream (type, stream) != NULL)
+    return;
 
   f_type_print_base (type, stream, show, level);
   code = TYPE_CODE (type);
@@ -80,7 +111,7 @@ f_print_type (struct type *type, char *varstring, struct ui_file *stream,
          so don't print an additional pair of ()'s */
 
       demangled_args = varstring[strlen (varstring) - 1] == ')'; 
-      f_type_print_varspec_suffix (type, stream, show, 0, demangled_args);
+      f_type_print_varspec_suffix (type, stream, show, 0, demangled_args, 0);
    }
 }
 
@@ -150,11 +181,13 @@ f_type_print_varspec_prefix (struct type *type, struct ui_file *stream,
 
 static void
 f_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
-			     int show, int passed_a_ptr, int demangled_args)
+			     int show, int passed_a_ptr, int demangled_args,
+			     int arrayprint_recurse_level)
 {
   int upper_bound, lower_bound;
-  static int arrayprint_recurse_level = 0;
   int retcode;
+  /* No static variables (such as ARRAYPRINT_RECURSE_LEVEL) permitted as ERROR
+     may occur during the evaluation of DWARF_BLOCK values.  */
 
   if (type == 0)
     return;
@@ -163,6 +196,9 @@ f_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
     return;
 
   QUIT;
+
+  if (TYPE_CODE (type) != TYPE_CODE_TYPEDEF)
+    CHECK_TYPEDEF (type);
 
   switch (TYPE_CODE (type))
     {
@@ -173,7 +209,8 @@ f_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
 	fprintf_filtered (stream, "(");
 
       if (TYPE_CODE (TYPE_TARGET_TYPE (type)) == TYPE_CODE_ARRAY)
-	f_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream, 0, 0, 0);
+	f_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream, 0, 0, 0,
+				     arrayprint_recurse_level);
 
       lower_bound = f77_get_lowerbound (type);
       if (lower_bound != 1)	/* Not the default.  */
@@ -191,7 +228,8 @@ f_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
 	}
 
       if (TYPE_CODE (TYPE_TARGET_TYPE (type)) != TYPE_CODE_ARRAY)
-	f_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream, 0, 0, 0);
+	f_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream, 0, 0, 0,
+				     arrayprint_recurse_level);
       if (arrayprint_recurse_level == 1)
 	fprintf_filtered (stream, ")");
       else
@@ -201,13 +239,14 @@ f_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
 
     case TYPE_CODE_PTR:
     case TYPE_CODE_REF:
-      f_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream, 0, 1, 0);
+      f_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream, 0, 1, 0,
+				   arrayprint_recurse_level);
       fprintf_filtered (stream, ")");
       break;
 
     case TYPE_CODE_FUNC:
       f_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream, 0,
-				   passed_a_ptr, 0);
+				   passed_a_ptr, 0, arrayprint_recurse_level);
       if (passed_a_ptr)
 	fprintf_filtered (stream, ")");
 
@@ -362,7 +401,7 @@ f_type_print_base (struct type *type, struct ui_file *stream, int show,
 	  fprintfi_filtered (level, stream, "%s",
 			     TYPE_FIELD_NAME (type, index));
 	  f_type_print_varspec_suffix (TYPE_FIELD_TYPE (type, index),
-				       stream, 0, 0, 0);
+				       stream, 0, 0, 0, 0);
 	  fputs_filtered ("\n", stream);
 	} 
       fprintfi_filtered (level, stream, "End Type ");

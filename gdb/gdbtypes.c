@@ -38,6 +38,8 @@
 #include "cp-abi.h"
 #include "gdb_assert.h"
 #include "hashtab.h"
+#include "dwarf2expr.h"
+#include "dwarf2loc.h"
 
 /* These variables point to the objects
    representing the predefined C data types.  */
@@ -478,11 +480,13 @@ make_qualified_type (struct type *type, int new_flags,
   struct type *ntype;
 
   ntype = type;
-  do {
-    if (TYPE_INSTANCE_FLAGS (ntype) == new_flags)
-      return ntype;
-    ntype = TYPE_CHAIN (ntype);
-  } while (ntype != type);
+  do
+    {
+      if (TYPE_INSTANCE_FLAGS (ntype) == new_flags)
+	return ntype;
+      ntype = TYPE_CHAIN (ntype);
+    }
+  while (ntype != type);
 
   /* Create a new type instance.  */
   if (storage == NULL)
@@ -690,16 +694,21 @@ allocate_stub_method (struct type *type)
    RESULT_TYPE, or creating a new type, inheriting the objfile from
    INDEX_TYPE.
 
-   Indices will be of type INDEX_TYPE, and will range from LOW_BOUND
-   to HIGH_BOUND, inclusive.
+   Indices will be of type INDEX_TYPE.  NFIELDS should be 2 for standard
+   arrays, 3 for custom TYPE_BYTE_STRIDE.  Use CREATE_RANGE_TYPE for common
+   constant TYPE_LOW_BOUND/TYPE_HIGH_BOUND ranges instead.
+
+   You must to decide TYPE_UNSIGNED yourself as being done in CREATE_RANGE_TYPE.
 
    FIXME: Maybe we should check the TYPE_CODE of RESULT_TYPE to make
    sure it is TYPE_CODE_UNDEF before we bash it into a range type?  */
 
 struct type *
-create_range_type (struct type *result_type, struct type *index_type,
-		   int low_bound, int high_bound)
+create_range_type_nfields (struct type *result_type, struct type *index_type,
+                           int nfields)
 {
+  int fieldno;
+
   if (result_type == NULL)
     {
       result_type = alloc_type (TYPE_OBJFILE (index_type));
@@ -710,17 +719,33 @@ create_range_type (struct type *result_type, struct type *index_type,
     TYPE_TARGET_STUB (result_type) = 1;
   else
     TYPE_LENGTH (result_type) = TYPE_LENGTH (check_typedef (index_type));
-  TYPE_NFIELDS (result_type) = 2;
+  TYPE_NFIELDS (result_type) = nfields;
   TYPE_FIELDS (result_type) = (struct field *)
-    TYPE_ALLOC (result_type, 2 * sizeof (struct field));
-  memset (TYPE_FIELDS (result_type), 0, 2 * sizeof (struct field));
-  TYPE_FIELD_BITPOS (result_type, 0) = low_bound;
-  TYPE_FIELD_BITPOS (result_type, 1) = high_bound;
+    TYPE_ALLOC (result_type,
+		TYPE_NFIELDS (result_type) * sizeof (struct field));
+  memset (TYPE_FIELDS (result_type), 0,
+	  TYPE_NFIELDS (result_type) * sizeof (struct field));
+
+  return (result_type);
+}
+
+/* Simplified CREATE_RANGE_TYPE_NFIELDS for constant ranges from LOW_BOUND to
+   HIGH_BOUND, inclusive.  TYPE_BYTE_STRIDE is always set to zero (default
+   native target type length).  */
+
+struct type *
+create_range_type (struct type *result_type, struct type *index_type,
+		   int low_bound, int high_bound)
+{
+  result_type = create_range_type_nfields (result_type, index_type, 2);
+
+  TYPE_LOW_BOUND (result_type) = low_bound;
+  TYPE_HIGH_BOUND (result_type) = high_bound;
 
   if (low_bound >= 0)
     TYPE_UNSIGNED (result_type) = 1;
 
-  return (result_type);
+  return result_type;
 }
 
 /* Set *LOWP and *HIGHP to the lower and upper bounds of discrete type
@@ -734,6 +759,9 @@ get_discrete_bounds (struct type *type, LONGEST *lowp, LONGEST *highp)
   switch (TYPE_CODE (type))
     {
     case TYPE_CODE_RANGE:
+      if (TYPE_RANGE_UPPER_BOUND_IS_UNDEFINED (type) 
+	  || TYPE_RANGE_LOWER_BOUND_IS_UNDEFINED (type))
+	return -1;
       *lowp = TYPE_LOW_BOUND (type);
       *highp = TYPE_HIGH_BOUND (type);
       return 1;
@@ -816,17 +844,6 @@ create_array_type (struct type *result_type,
     }
   TYPE_CODE (result_type) = TYPE_CODE_ARRAY;
   TYPE_TARGET_TYPE (result_type) = element_type;
-  if (get_discrete_bounds (range_type, &low_bound, &high_bound) < 0)
-    low_bound = high_bound = 0;
-  CHECK_TYPEDEF (element_type);
-  /* Be careful when setting the array length.  Ada arrays can be
-     empty arrays with the high_bound being smaller than the low_bound.
-     In such cases, the array length should be zero.  */
-  if (high_bound < low_bound)
-    TYPE_LENGTH (result_type) = 0;
-  else
-    TYPE_LENGTH (result_type) =
-      TYPE_LENGTH (element_type) * (high_bound - low_bound + 1);
   TYPE_NFIELDS (result_type) = 1;
   TYPE_FIELDS (result_type) =
     (struct field *) TYPE_ALLOC (result_type, sizeof (struct field));
@@ -834,9 +851,48 @@ create_array_type (struct type *result_type,
   TYPE_FIELD_TYPE (result_type, 0) = range_type;
   TYPE_VPTR_FIELDNO (result_type) = -1;
 
-  /* TYPE_FLAG_TARGET_STUB will take care of zero length arrays */
+  /* DWARF blocks may depend on runtime information like
+     DW_OP_PUSH_OBJECT_ADDRESS not being available during the
+     CREATE_ARRAY_TYPE time.  */
+  if (TYPE_RANGE_BOUND_IS_DWARF_BLOCK (range_type, 0)
+      || TYPE_RANGE_BOUND_IS_DWARF_BLOCK (range_type, 1)
+      || TYPE_RANGE_UPPER_BOUND_IS_UNDEFINED (range_type) 
+      || TYPE_RANGE_LOWER_BOUND_IS_UNDEFINED (range_type) 
+      || get_discrete_bounds (range_type, &low_bound, &high_bound) < 0)
+    {
+      low_bound = 0;
+      high_bound = -1;
+    }
+
+  /* Be careful when setting the array length.  Ada arrays can be
+     empty arrays with the high_bound being smaller than the low_bound.
+     In such cases, the array length should be zero.  TYPE_TARGET_STUB needs to
+     be checked as it may have dependencies on DWARF blocks depending on
+     runtime information not available during the CREATE_ARRAY_TYPE time.  */
+  if (high_bound < low_bound || TYPE_TARGET_STUB (element_type))
+    TYPE_LENGTH (result_type) = 0;
+  else
+    {
+      CHECK_TYPEDEF (element_type);
+      TYPE_LENGTH (result_type) =
+	TYPE_LENGTH (element_type) * (high_bound - low_bound + 1);
+    }
+
+  if (TYPE_DYNAMIC (range_type))
+    TYPE_DYNAMIC (result_type) = 1;
+
+  /* Multidimensional dynamic arrays need to have all the outer dimensions
+     dynamic to update the outer TYPE_TARGET_TYPE pointer with the new type
+     with statically evaluated dimensions.  */
+  if (TYPE_DYNAMIC (element_type))
+    TYPE_DYNAMIC (result_type) = 1;
+
   if (TYPE_LENGTH (result_type) == 0)
-    TYPE_TARGET_STUB (result_type) = 1;
+    {
+      /* The real size will be computed for specific instances by
+	 CHECK_TYPEDEF.  */
+      TYPE_TARGET_STUB (result_type) = 1;
+    }
 
   return (result_type);
 }
@@ -1380,6 +1436,65 @@ stub_noname_complaint (void)
   complaint (&symfile_complaints, _("stub type has NULL name"));
 }
 
+/* Calculate the memory length of array TYPE.
+
+   TARGET_TYPE should be set to `check_typedef (TYPE_TARGET_TYPE (type))' as
+   a performance hint.  Feel free to pass NULL.  Set FULL_SPAN to return the
+   size incl. the possible padding of the last element - it may differ from the
+   cleared FULL_SPAN return value (the expected SIZEOF) for non-zero
+   TYPE_BYTE_STRIDE values.  */
+
+static CORE_ADDR
+type_length_get (struct type *type, struct type *target_type, int full_span)
+{
+  struct type *range_type;
+  int count;
+  CORE_ADDR byte_stride = 0;	/* `= 0' for a false GCC warning.  */
+  CORE_ADDR element_size;
+
+  if (TYPE_CODE (type) != TYPE_CODE_ARRAY
+      && TYPE_CODE (type) != TYPE_CODE_STRING)
+    return TYPE_LENGTH (type);
+
+  /* Avoid executing TYPE_HIGH_BOUND for invalid (unallocated/unassociated)
+     Fortran arrays.  The allocated data will never be used so they can be
+     zero-length.  */
+  if (object_address_data_not_valid (type))
+    return 0;
+
+  range_type = TYPE_INDEX_TYPE (type);
+  if (TYPE_RANGE_LOWER_BOUND_IS_UNDEFINED (range_type)
+      || TYPE_RANGE_UPPER_BOUND_IS_UNDEFINED (range_type))
+    return 0;
+  count = TYPE_HIGH_BOUND (range_type) - TYPE_LOW_BOUND (range_type) + 1;
+  /* It may happen for wrong DWARF annotations returning garbage data.  */
+  if (count < 0)
+    warning (_("Range for type %s has invalid bounds %d..%d"),
+	     TYPE_NAME (type), TYPE_LOW_BOUND (range_type),
+	     TYPE_HIGH_BOUND (range_type));
+  /* The code below does not handle count == 0 right.  */
+  if (count <= 0)
+    return 0;
+  if (full_span || count > 1)
+    {
+      /* We do not use TYPE_ARRAY_BYTE_STRIDE_VALUE (type) here as we want to
+         force FULL_SPAN to 1.  */
+      byte_stride = TYPE_BYTE_STRIDE (range_type);
+      if (byte_stride == 0)
+        {
+	  if (target_type == NULL)
+	    target_type = check_typedef (TYPE_TARGET_TYPE (type));
+	  byte_stride = type_length_get (target_type, NULL, 1);
+	}
+    }
+  if (full_span)
+    return count * byte_stride;
+  if (target_type == NULL)
+    target_type = check_typedef (TYPE_TARGET_TYPE (type));
+  element_size = type_length_get (target_type, NULL, 1);
+  return (count - 1) * byte_stride + element_size;
+}
+
 /* Added by Bryan Boreham, Kewill, Sun Sep 17 18:07:17 1989.
 
    If this is a stubbed struct (i.e. declared as struct foo *), see if
@@ -1396,7 +1511,8 @@ stub_noname_complaint (void)
 /* Find the real type of TYPE.  This function returns the real type,
    after removing all layers of typedefs and completing opaque or stub
    types.  Completion changes the TYPE argument, but stripping of
-   typedefs does not.  */
+   typedefs does not.  Still original passed TYPE will have TYPE_LENGTH
+   updated.  FIXME: Remove this dependency (only ada_to_fixed_type?).  */
 
 struct type *
 check_typedef (struct type *type)
@@ -1506,34 +1622,87 @@ check_typedef (struct type *type)
         }
     }
 
-  if (TYPE_TARGET_STUB (type))
+  if (TYPE_DYNAMIC (type) || (TYPE_CODE (type) == TYPE_CODE_RANGE
+			      && TYPE_RANGE_HIGH_BOUND_IS_COUNT (type)))
     {
-      struct type *range_type;
+      struct type *ntype;
+
+      /* make_cv_type does not copy the contents of TYPE_MAIN_TYPE while we are
+	 changing fields in it below.  Do a full TYPE_MAIN_TYPE copy.
+	 Sure FIXME as it is at least a memory leak.  */
+
+      ntype = alloc_type (TYPE_OBJFILE (type));
+      *TYPE_MAIN_TYPE (ntype) = *TYPE_MAIN_TYPE (type);
+      TYPE_LENGTH (ntype) = TYPE_LENGTH (type);
+      TYPE_INSTANCE_FLAGS (ntype) = TYPE_INSTANCE_FLAGS (type);
+      if (TYPE_NFIELDS (type))
+	{
+	  size_t size = sizeof (*TYPE_FIELDS (type)) * TYPE_NFIELDS (type);
+
+	  if (TYPE_OBJFILE (type))
+	    TYPE_FIELDS (ntype) = obstack_alloc
+	      (&TYPE_OBJFILE (type)->objfile_obstack, size);
+	  else
+	    TYPE_FIELDS (ntype) = xzalloc (size);
+	  memcpy (TYPE_FIELDS (ntype), TYPE_FIELDS (type), size);
+	}
+      type = ntype;
+
+      if (TYPE_CODE (type) == TYPE_CODE_ARRAY
+	  || TYPE_CODE (type) == TYPE_CODE_STRING)
+	{
+	  struct type *range_type;
+
+	  gdb_assert (TYPE_NFIELDS (type) == 1);
+	  range_type = TYPE_INDEX_TYPE (type);
+	  gdb_assert (TYPE_CODE (range_type) == TYPE_CODE_RANGE);
+	  TYPE_INDEX_TYPE (type) = check_typedef (range_type);
+	}
+      else if (TYPE_CODE (type) == TYPE_CODE_RANGE)
+	{
+	  int fieldno;
+
+	  /* Evaluate the DWARF ranges and set them statically.  */
+	  for (fieldno = 0; fieldno < TYPE_NFIELDS (type); fieldno++)
+	    if (TYPE_RANGE_BOUND_IS_DWARF_BLOCK (type, fieldno))
+	      {
+		struct dwarf2_locexpr_baton *dlbaton;
+		CORE_ADDR val;
+
+		dlbaton = TYPE_FIELD_DWARF_BLOCK (type, fieldno);
+		val = dwarf_locexpr_baton_eval (dlbaton);
+		TYPE_RANGE_BOUND_UNSET_DWARF_BLOCK (type, fieldno);
+		TYPE_FIELD_BITPOS (type, fieldno) = val;
+	      }
+
+	  /* Convert TYPE_RANGE_HIGH_BOUND_IS_COUNT-modified TYPE_HIGH_BOUND
+	     meanint the count (not the high bound) into a regular bound.  */
+	  if (TYPE_RANGE_HIGH_BOUND_IS_COUNT (type))
+	    {
+	      TYPE_RANGE_HIGH_BOUND_IS_COUNT (type) = 0;
+	      TYPE_HIGH_BOUND (type) = TYPE_LOW_BOUND (type)
+				       + TYPE_HIGH_BOUND (type) - 1;
+	    }
+	}
+    }
+
+  if (!currently_reading_symtab
+      && (TYPE_TARGET_STUB (type) || TYPE_DYNAMIC (type)))
+    {
       struct type *target_type = check_typedef (TYPE_TARGET_TYPE (type));
 
+      if (TYPE_DYNAMIC (type))
+	TYPE_TARGET_TYPE (type) = target_type;
       if (TYPE_STUB (target_type) || TYPE_TARGET_STUB (target_type))
 	{
 	  /* Empty.  */
 	}
       else if (TYPE_CODE (type) == TYPE_CODE_ARRAY
-	       && TYPE_NFIELDS (type) == 1
-	       && (TYPE_CODE (range_type = TYPE_FIELD_TYPE (type, 0))
-		   == TYPE_CODE_RANGE))
+	       || TYPE_CODE (type) == TYPE_CODE_STRING)
 	{
 	  /* Now recompute the length of the array type, based on its
-	     number of elements and the target type's length.
-	     Watch out for Ada null Ada arrays where the high bound
-	     is smaller than the low bound.  */
-	  const int low_bound = TYPE_FIELD_BITPOS (range_type, 0);
-	  const int high_bound = TYPE_FIELD_BITPOS (range_type, 1);
-	  int nb_elements;
-	
-	  if (high_bound < low_bound)
-	    nb_elements = 0;
-	  else
-	    nb_elements = high_bound - low_bound + 1;
-	
-	  TYPE_LENGTH (type) = nb_elements * TYPE_LENGTH (target_type);
+	     number of elements and the target type's length.  */
+	  TYPE_LENGTH (type) = type_length_get (type, target_type, 0);
 	  TYPE_TARGET_STUB (type) = 0;
 	}
       else if (TYPE_CODE (type) == TYPE_CODE_RANGE)
@@ -1541,9 +1710,12 @@ check_typedef (struct type *type)
 	  TYPE_LENGTH (type) = TYPE_LENGTH (target_type);
 	  TYPE_TARGET_STUB (type) = 0;
 	}
+      TYPE_DYNAMIC (type) = 0;
     }
+
   /* Cache TYPE_LENGTH for future use.  */
   TYPE_LENGTH (orig_type) = TYPE_LENGTH (type);
+
   return type;
 }
 

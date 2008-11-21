@@ -286,6 +286,10 @@ extern struct value *value_from_decfloat (struct type *type,
 					  const gdb_byte *decbytes);
 extern struct value *value_from_string (char *string);
 
+extern const char *object_address_data_not_valid (struct type *type);
+extern int object_address_get_data (struct type *type,
+				    CORE_ADDR *address_return);
+
 extern struct value *value_at (struct type *type, CORE_ADDR addr);
 extern struct value *value_at_lazy (struct type *type, CORE_ADDR addr);
 
@@ -551,9 +555,9 @@ extern int val_print_string (CORE_ADDR addr, int len, int width,
 			     struct ui_file *stream,
 			     const struct value_print_options *options);
 
-extern void print_variable_value (struct symbol *var,
-				  struct frame_info *frame,
-				  struct ui_file *stream);
+extern void print_variable_value_nl (struct symbol *var,
+				     struct frame_info *frame,
+				     struct ui_file *stream);
 
 extern int check_field (struct type *, const char *);
 
@@ -584,5 +588,7 @@ extern struct value *value_allocate_space_in_inferior (int);
 
 extern struct value *value_of_local (const char *name, int complain);
 
-extern struct value * value_subscripted_rvalue (struct value *array, struct value *idx, int lowerbound);
+extern struct value *value_subscripted_rvalue (struct value *array,
+					       CORE_ADDR offset);
+
 #endif /* !defined (VALUE_H) */

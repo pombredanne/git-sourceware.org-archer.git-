@@ -209,6 +209,11 @@ enum type_instance_flag_value
 
 #define TYPE_TARGET_STUB(t)	(TYPE_MAIN_TYPE (t)->flag_target_stub)
 
+/* Type needs to be evaluated on each CHECK_TYPEDEF and its results must not be
+   sticky.  Used for TYPE_RANGE_BOUND_IS_DWARF_BLOCK.  */
+
+#define TYPE_DYNAMIC(t)		(TYPE_MAIN_TYPE (t)->flag_dynamic)
+
 /* Static type.  If this is set, the corresponding type had 
  * a static modifier.
  * Note: This may be unnecessary, since static data members
@@ -352,6 +357,8 @@ struct main_type
   unsigned int flag_stub_supported : 1;
   unsigned int flag_nottext : 1;
   unsigned int flag_fixed_instance : 1;
+  unsigned int flag_dynamic : 1;
+  unsigned int flag_range_high_bound_is_count : 1;
 
   /* Number of fields described for this type.  This field appears at
      this location because it packs nicely here.  */
@@ -413,6 +420,15 @@ struct main_type
      Unused otherwise.  */
 
   struct type *target_type;
+
+  /* For DW_AT_data_location.  FIXME: Support also its constant form.  */
+  struct dwarf2_locexpr_baton *data_location;
+
+  /* For DW_AT_allocated.  FIXME: Support also its constant form.  */
+  struct dwarf2_locexpr_baton *allocated;
+
+  /* For DW_AT_associated.  FIXME: Support also its constant form.  */
+  struct dwarf2_locexpr_baton *associated;
 
   /* For structure and union types, a description of each field.
      For set and pascal array types, there is one "field",
@@ -795,9 +811,9 @@ extern void allocate_cplus_struct_type (struct type *);
 #define TYPE_POINTER_TYPE(thistype) (thistype)->pointer_type
 #define TYPE_REFERENCE_TYPE(thistype) (thistype)->reference_type
 #define TYPE_CHAIN(thistype) (thistype)->chain
-/* Note that if thistype is a TYPEDEF type, you have to call check_typedef.
-   But check_typedef does set the TYPE_LENGTH of the TYPEDEF type,
-   so you only have to call check_typedef once.  Since allocate_value
+/* Note that if thistype is a TYPEDEF, ARRAY or STRING type, you have to call
+   check_typedef.  But check_typedef does set the TYPE_LENGTH of the TYPEDEF
+   type, so you only have to call check_typedef once.  Since allocate_value
    calls check_typedef, TYPE_LENGTH (VALUE_TYPE (X)) is safe.  */
 #define TYPE_LENGTH(thistype) (thistype)->length
 #define TYPE_OBJFILE(thistype) TYPE_MAIN_TYPE(thistype)->objfile
@@ -807,23 +823,53 @@ extern void allocate_cplus_struct_type (struct type *);
 #define TYPE_NFIELDS(thistype) TYPE_MAIN_TYPE(thistype)->nfields
 #define TYPE_FIELDS(thistype) TYPE_MAIN_TYPE(thistype)->fields
 #define TYPE_TEMPLATE_ARGS(thistype) TYPE_CPLUS_SPECIFIC(thistype)->template_args
+#define TYPE_DATA_LOCATION(thistype) TYPE_MAIN_TYPE (thistype)->data_location
+#define TYPE_ALLOCATED(thistype) TYPE_MAIN_TYPE (thistype)->allocated
+#define TYPE_ASSOCIATED(thistype) TYPE_MAIN_TYPE (thistype)->associated
 
 #define TYPE_INDEX_TYPE(type) TYPE_FIELD_TYPE (type, 0)
+/* `TYPE_NFIELDS (range_type) >= 3' check is required before accessing it:  */
+#define SET_TYPE_BYTE_STRIDE(range_type, n) \
+  (TYPE_FIELD_BITPOS (range_type, 2) = (n))
 #define TYPE_LOW_BOUND(range_type) TYPE_FIELD_BITPOS (range_type, 0)
 #define TYPE_HIGH_BOUND(range_type) TYPE_FIELD_BITPOS (range_type, 1)
+#define TYPE_BYTE_STRIDE(range_type) \
+  (TYPE_NFIELDS (range_type) < 3 ? 0 : TYPE_FIELD_BITPOS (range_type, 2))
 
-/* Moto-specific stuff for FORTRAN arrays */
+/* Whether we should use TYPE_FIELD_DWARF_BLOCK (and not TYPE_FIELD_BITPOS).  */
+#define TYPE_RANGE_BOUND_IS_DWARF_BLOCK(range_type, fieldno) \
+  (TYPE_FIELD_LOC_KIND (range_type, fieldno) == FIELD_LOC_KIND_DWARF_BLOCK)
+#define TYPE_RANGE_BOUND_SET_DWARF_BLOCK(range_type, fieldno) \
+  (TYPE_FIELD_LOC_KIND (range_type, fieldno) = FIELD_LOC_KIND_DWARF_BLOCK)
+#define TYPE_RANGE_BOUND_UNSET_DWARF_BLOCK(range_type, fieldno) \
+  (TYPE_FIELD_LOC_KIND (range_type, fieldno) = FIELD_LOC_KIND_BITPOS)
+#define TYPE_ARRAY_BOUND_IS_DWARF_BLOCK(array_type, fieldno) \
+  TYPE_RANGE_BOUND_IS_DWARF_BLOCK (TYPE_INDEX_TYPE (array_type), fieldno)
 
-#define TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED(arraytype) \
-   (TYPE_FIELD_ARTIFICIAL((TYPE_FIELD_TYPE((arraytype),0)),1))
+/* Is HIGH_BOUND a low-bound relative count (1) or the high bound itself (0)?  */
+#define TYPE_RANGE_HIGH_BOUND_IS_COUNT(range_type) \
+  (TYPE_MAIN_TYPE (range_type)->flag_range_high_bound_is_count)
+
+/* Unbound arrays, such as GCC array[]; at end of struct.  */
+#define TYPE_RANGE_LOWER_BOUND_IS_UNDEFINED(rangetype) \
+   TYPE_FIELD_ARTIFICIAL((rangetype),0)
+#define TYPE_RANGE_UPPER_BOUND_IS_UNDEFINED(rangetype) \
+   TYPE_FIELD_ARTIFICIAL((rangetype),1)
 #define TYPE_ARRAY_LOWER_BOUND_IS_UNDEFINED(arraytype) \
-   (TYPE_FIELD_ARTIFICIAL((TYPE_FIELD_TYPE((arraytype),0)),0))
-
-#define TYPE_ARRAY_UPPER_BOUND_VALUE(arraytype) \
-   (TYPE_FIELD_BITPOS((TYPE_FIELD_TYPE((arraytype),0)),1))
+   TYPE_RANGE_LOWER_BOUND_IS_UNDEFINED (TYPE_INDEX_TYPE (arraytype))
+#define TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED(arraytype) \
+   TYPE_RANGE_UPPER_BOUND_IS_UNDEFINED (TYPE_INDEX_TYPE (arraytype))
 
 #define TYPE_ARRAY_LOWER_BOUND_VALUE(arraytype) \
-   (TYPE_FIELD_BITPOS((TYPE_FIELD_TYPE((arraytype),0)),0))
+  TYPE_LOW_BOUND (TYPE_INDEX_TYPE (arraytype))
+#define TYPE_ARRAY_UPPER_BOUND_VALUE(arraytype) \
+  TYPE_HIGH_BOUND (TYPE_INDEX_TYPE (arraytype))
+/* TYPE_BYTE_STRIDE (TYPE_INDEX_TYPE (arraytype)) with a fallback to the
+   element size if no specific stride value is known.  */
+#define TYPE_ARRAY_BYTE_STRIDE_VALUE(arraytype)		\
+  (TYPE_NFIELDS (TYPE_INDEX_TYPE (arraytype)) < 2	\
+   ? TYPE_LENGTH (TYPE_TARGET_TYPE (arraytype))		\
+   : TYPE_BYTE_STRIDE (TYPE_INDEX_TYPE (arraytype)))
 
 /* C++ */
 
@@ -1162,11 +1208,25 @@ extern struct type *make_function_type (struct type *, struct type **);
 
 extern struct type *lookup_function_type (struct type *);
 
+extern struct type *create_range_type_nfields (struct type *result_type,
+					       struct type *index_type,
+					       int nfields);
+
 extern struct type *create_range_type (struct type *, struct type *, int,
 				       int);
 
 extern struct type *create_array_type (struct type *, struct type *,
 				       struct type *);
+
+extern CORE_ADDR type_range_any_field_internal (struct type *range_type,
+						int fieldno);
+
+extern int type_range_high_bound_internal (struct type *range_type);
+
+extern int type_range_count_bound_internal (struct type *range_type);
+
+extern CORE_ADDR type_range_byte_stride_internal (struct type *range_type,
+						  struct type *element_type);
 
 extern struct type *create_string_type (struct type *, struct type *);
 
