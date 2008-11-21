@@ -1,5 +1,9 @@
 2008-11-21  Tom Tromey  <tromey@redhat.com>
 
+	* python/python.c (get_parameter): Use var_type, not type.
+
+2008-11-21  Tom Tromey  <tromey@redhat.com>
+
 	* python/python-param.c (parmpy_init): Get __doc__ as well.
 
 2008-11-21  Tom Tromey  <tromey@redhat.com>

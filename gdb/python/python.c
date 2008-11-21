@@ -248,7 +248,7 @@ get_parameter (PyObject *self, PyObject *args)
 
   if (! cmd->var)
     return PyErr_Format (PyExc_RuntimeError, "`%s' is not a parameter", arg);
-  return gdbpy_parameter_value (cmd->type, cmd->var);
+  return gdbpy_parameter_value (cmd->var_type, cmd->var);
 }
 
 /* A Python function which evaluates a string using the gdb CLI.  */
