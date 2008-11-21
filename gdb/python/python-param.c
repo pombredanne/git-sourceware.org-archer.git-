@@ -422,7 +422,7 @@ parmpy_init (PyObject *self, PyObject *args, PyObject *kwds)
 {
   parmpy_object *obj = (parmpy_object *) self;
   char *name;
-  char *set_doc, *show_doc;
+  char *set_doc, *show_doc, *doc;
   char *cmd_name;
   int parmclass, cmdtype;
   PyObject *enum_values = NULL;
@@ -483,6 +483,7 @@ parmpy_init (PyObject *self, PyObject *args, PyObject *kwds)
      set/show commands.  So, these are leaked.  */
   set_doc = get_doc_string (self, set_doc_cst);
   show_doc = get_doc_string (self, show_doc_cst);
+  doc = get_doc_string (self, gdbpy_doc_cst);
 
   Py_INCREF (self);
 
@@ -491,13 +492,14 @@ parmpy_init (PyObject *self, PyObject *args, PyObject *kwds)
       add_setshow_generic (parmclass, (enum command_class) cmdtype,
 			   cmd_name, obj,
 			   set_doc, show_doc,
-			   NULL, set_list, show_list);
+			   doc, set_list, show_list);
     }
   if (except.reason < 0)
     {
       xfree (cmd_name);
       xfree (set_doc);
       xfree (show_doc);
+      xfree (doc);
       Py_DECREF (self);
       PyErr_Format (except.reason == RETURN_QUIT
 		    ? PyExc_KeyboardInterrupt : PyExc_RuntimeError,

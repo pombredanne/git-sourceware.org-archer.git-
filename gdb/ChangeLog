@@ -1,5 +1,9 @@
 2008-11-21  Tom Tromey  <tromey@redhat.com>
 
+	* python/python-param.c (parmpy_init): Get __doc__ as well.
+
+2008-11-21  Tom Tromey  <tromey@redhat.com>
+
 	* python/python-value.c (value_object_methods) <string>: Accept
 	varargs.
 	(valpy_string): Accept optional encoding argument.
