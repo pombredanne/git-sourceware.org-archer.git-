@@ -1913,6 +1913,35 @@ python-value.o: $(srcdir)/python/python-value.c
 	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-value.c
 	$(POSTCOMPILE)
 
+# All Python install directories.  These must be sorted, shallowest
+# first.  These are maintained by hand because that is simpler than
+# writing portable sh to make the __init__.py files, and the result is
+# faster.
+PY_DIRS = gdb gdb/libstdcxx gdb/libstdcxx/v6
+
+# All python library files, with the "python/lib" stripped off.
+# Note that we should only install files in the "gdb" module.
+PY_FILES = gdb/libstdcxx/v6/printers.py
+
+# Install the Python library.  Python library files go under
+# $(GDB_DATADIR_PATH)/python.  We create a dummy __init__.py for
+# each directory, to make importing work properly.  If there is a real
+# __init__.py in PY_FILES, it will overwrite the dummy file.
+install-python:
+	dirs='$(PY_DIRS)'; for dir in $$dirs; do \
+	  $(SHELL) $(srcdir)/../mkinstalldirs $(DESTDIR)$(GDB_DATADIR_PATH)/python/$$dir; \
+	  if ! test -f $(DESTDIR)$(GDB_DATADIR_PATH)/python/$$dir/__init__.py; then \
+	    echo > $(DESTDIR)$(GDB_DATADIR_PATH)/python/$$dir/__init__.py; \
+	  fi; \
+	done; \
+	files='$(PY_FILES)'; for file in $$files; do \
+	  $(INSTALL_DATA) $(srcdir)/python/lib/$$file $(DESTDIR)$(GDB_DATADIR_PATH)/python/$$file; \
+	done
+
+# Brute force.
+uninstall-python:
+	rm -rf $(DESTDIR)/$(GDB_DATADIR_PATH)/python
+
 #
 # Dependency tracking.  Most of this is conditional on GNU Make being
 # found by configure; if GNU Make is not found, we fall back to a

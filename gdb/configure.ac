@@ -681,6 +681,8 @@ if test "${have_libpython}" = yes; then
   CONFIG_OBS="$CONFIG_OBS \$(SUBDIR_PYTHON_OBS)"
   CONFIG_DEPS="$CONFIG_DEPS \$(SUBDIR_PYTHON_DEPS)"
   CONFIG_SRCS="$CONFIG_SRCS \$(SUBDIR_PYTHON_SRCS)"
+  CONFIG_INSTALL="$CONFIG_INSTALL install-python"
+  CONFIG_UNINSTALL="$CONFIG_UNINSTALL uninstall-python"
   ENABLE_CFLAGS="$ENABLE_CFLAGS \$(SUBDIR_PYTHON_CFLAGS)"
 
   # Flags needed to compile Python code (taken from python-config --cflags).

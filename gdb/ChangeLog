@@ -1,5 +1,18 @@
 2008-11-21  Tom Tromey  <tromey@redhat.com>
 
+	* python/lib/gdb/libstdcxx/v6/printers.py: New file.
+	* python/python.c (_initialize_python): Conditionally define
+	gdb.datadir.  Correctly update sys.path.  Set gdb.__path__.
+	* configure: Rebuild.
+	* configure.ac: Update CONFIG_INSTALL and CONFIG_UNINSTALL for
+	Python.
+	* Makefile.in (PY_FILES): New variable.
+	(install-python): New target.
+	(uninstall-python): Likewise.
+	(PY_DIRS): New variable.
+
+2008-11-21  Tom Tromey  <tromey@redhat.com>
+
 	* python/python.c (get_parameter): Use var_type, not type.
 
 2008-11-21  Tom Tromey  <tromey@redhat.com>

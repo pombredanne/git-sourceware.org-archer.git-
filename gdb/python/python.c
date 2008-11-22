@@ -1250,7 +1250,8 @@ Enables or disables auto-loading of Python code when an object is opened."),
   PyModule_AddStringConstant (gdb_module, "VERSION", (char*) version);
   PyModule_AddStringConstant (gdb_module, "HOST_CONFIG", (char*) host_name);
   PyModule_AddStringConstant (gdb_module, "TARGET_CONFIG", (char*) target_name);
-  PyModule_AddStringConstant (gdb_module, "datadir", gdb_datadir);
+  if (gdb_datadir)
+    PyModule_AddStringConstant (gdb_module, "datadir", gdb_datadir);
 
   gdbpy_initialize_values ();
   gdbpy_initialize_breakpoints ();
@@ -1298,7 +1299,9 @@ class GdbOutputFile:\n\
 \n\
 sys.stderr = GdbOutputFile()\n\
 sys.stdout = GdbOutputFile()\n\
-sys.path.insert(0, gdb.datadir)\n\
+if hasattr (gdb, 'datadir'):\n\
+  sys.path.insert(0, gdb.datadir + '/python')\n\
+  gdb.__path__ = [gdb.datadir + '/python/gdb']\n\
 ");
 
   /* Release the GIL while gdb runs.  */
