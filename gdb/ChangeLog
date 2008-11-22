@@ -1,3 +1,7 @@
+2008-11-22  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* python/python-function.c (fnpy_call, fnpy_destroy): Acquire GIL.
+
 2008-11-21  Tom Tromey  <tromey@redhat.com>
 
 	* python/lib/gdb/libstdcxx/v6/printers.py: New file.

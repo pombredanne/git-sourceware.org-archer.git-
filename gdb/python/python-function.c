@@ -59,6 +59,11 @@ fnpy_call (void *cookie, int argc, struct value **argv)
   struct value *value = NULL;
   PyObject *result, *callable, *args;
   volatile struct gdb_exception except;
+  struct cleanup *cleanup;
+  PyGILState_STATE state;
+
+  state = PyGILState_Ensure ();
+  cleanup = make_cleanup_py_restore_gil (&state);
 
   args = convert_values_to_python (argc, argv);
 
@@ -74,7 +79,10 @@ fnpy_call (void *cookie, int argc, struct value **argv)
   Py_DECREF (args);
 
   if (!result)
-    return NULL;
+    {
+      gdbpy_print_stack ();
+      error(_("Error while executing Python code."));
+    }
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
@@ -88,6 +96,7 @@ fnpy_call (void *cookie, int argc, struct value **argv)
     }
 
   Py_DECREF (result);
+  do_cleanups (cleanup);
   
   return value;
 }
@@ -97,7 +106,12 @@ fnpy_call (void *cookie, int argc, struct value **argv)
 static void
 fnpy_destroy (void *cookie)
 {
+  PyGILState_STATE state;
+
+  state = PyGILState_Ensure ();
   Py_DECREF ((PyObject *) cookie);
+  PyGILState_Release (state);
+
 }
 
 /* Initializer for a Function object.  It takes one argument, the name
