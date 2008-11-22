@@ -109,6 +109,35 @@ sympy_is_argument (PyObject *self, PyObject *args)
   return PyBool_FromLong (SYMBOL_IS_ARGUMENT (self_sym->symbol));
 }
 
+static PyObject *
+sympy_is_constant (PyObject *self, PyObject *args)
+{
+  symbol_object *self_sym = (symbol_object *) self;
+  enum address_class class = SYMBOL_CLASS (self_sym->symbol);
+
+  return PyBool_FromLong (class == LOC_CONST || class == LOC_CONST_BYTES);
+}
+
+static PyObject *
+sympy_is_function (PyObject *self, PyObject *args)
+{
+  symbol_object *self_sym = (symbol_object *) self;
+  enum address_class class = SYMBOL_CLASS (self_sym->symbol);
+
+  return PyBool_FromLong (class == LOC_BLOCK);
+}
+
+static PyObject *
+sympy_is_variable (PyObject *self, PyObject *args)
+{
+  symbol_object *self_sym = (symbol_object *) self;
+  enum address_class class = SYMBOL_CLASS (self_sym->symbol);
+
+  return PyBool_FromLong (!SYMBOL_IS_ARGUMENT (self_sym->symbol)
+      && (class == LOC_LOCAL || class == LOC_REGISTER || class == LOC_STATIC
+	  || class == LOC_COMPUTED || class == LOC_OPTIMIZED_OUT));
+}
+
 PyObject *
 symbol_to_symbol_object (struct symbol *sym)
 {
@@ -251,6 +280,12 @@ static PyMethodDef symbol_object_methods[] = {
     "Return the class of the symbol." },
   { "is_argument", sympy_is_argument, METH_NOARGS,
     "Return True if symbol is the argument of a function." },
+  { "is_constant", sympy_is_constant, METH_NOARGS,
+    "Return True if symbol is a function or method." },
+  { "is_function", sympy_is_function, METH_NOARGS,
+    "Return True if symbol is a function or method." },
+  { "is_variable", sympy_is_variable, METH_NOARGS,
+    "Return True if symbol is a variable." },
   {NULL}  /* Sentinel */
 };
 
