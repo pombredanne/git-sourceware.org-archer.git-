@@ -104,6 +104,7 @@ compute_python_string (struct command_line *l)
 void
 eval_python_from_control_command (struct command_line *cmd)
 {
+  int ret;
   char *script;
   struct cleanup *cleanup;
   PyGILState_STATE state;
@@ -115,12 +116,12 @@ eval_python_from_control_command (struct command_line *cmd)
   cleanup = make_cleanup_py_restore_gil (&state);
 
   script = compute_python_string (cmd->body_list[0]);
-  PyRun_SimpleString (script);
+  ret = PyRun_SimpleString (script);
   xfree (script);
-  if (PyErr_Occurred ())
+  if (ret)
     {
       gdbpy_print_stack ();
-      error (_("error while executing Python code"));
+      error (_("Error while executing Python code."));
     }
 
   do_cleanups (cleanup);
@@ -141,11 +142,10 @@ python_command (char *arg, int from_tty)
     ++arg;
   if (arg && *arg)
     {
-      PyRun_SimpleString (arg);
-      if (PyErr_Occurred ())
+      if (PyRun_SimpleString (arg))
 	{
 	  gdbpy_print_stack ();
-	  error (_("error while executing Python code"));
+	  error (_("Error while executing Python code."));
 	}
     }
   else
