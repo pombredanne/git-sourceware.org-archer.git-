@@ -1354,6 +1354,9 @@ static PyMethodDef GdbMethods[] =
   { "find_pc_function", gdbpy_find_pc_function, METH_VARARGS,
     "Return the function containing the given pc value, or None." },
 
+  { "get_block_for_pc", gdbpy_get_block_for_pc, METH_VARARGS,
+    "Return the block containing the given pc value, or None." },
+
   { "decode_line", gdbpy_decode_line, METH_VARARGS,
     "Decode a string argument the way that 'break' or 'edit' does.\n\
 Return a tuple holding the file name (or None) and line number (or None).\n\

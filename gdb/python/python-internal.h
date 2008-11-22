@@ -76,6 +76,7 @@ PyObject *gdbpy_get_current_frame (PyObject *, PyObject *);
 PyObject *gdbpy_frame_stop_reason_string (PyObject *, PyObject *);
 PyObject *gdbpy_lookup_symbol (PyObject *self, PyObject *args);
 PyObject *gdbpy_get_selected_frame (PyObject *self, PyObject *args);
+PyObject *gdbpy_get_block_for_pc (PyObject *self, PyObject *args);
 
 PyObject *symtab_and_line_to_sal_object (struct symtab_and_line sal);
 PyObject *symtab_to_symtab_object (struct symtab *symtab);

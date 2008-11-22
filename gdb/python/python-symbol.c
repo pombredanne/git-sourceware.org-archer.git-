@@ -218,6 +218,8 @@ gdbpy_initialize_symbols (void)
   PyModule_AddIntConstant (gdb_module, "SYMBOL_LOC_OPTIMIZED_OUT",
 			   LOC_OPTIMIZED_OUT);
   PyModule_AddIntConstant (gdb_module, "SYMBOL_LOC_COMPUTED", LOC_COMPUTED);
+  PyModule_AddIntConstant (gdb_module, "SYMBOL_LOC_REGPARM_ADDR",
+			   LOC_REGPARM_ADDR);
   PyModule_AddIntConstant (gdb_module, "SYMBOL_UNDEF_DOMAIN", UNDEF_DOMAIN);
   PyModule_AddIntConstant (gdb_module, "SYMBOL_VAR_DOMAIN", VAR_DOMAIN);
   PyModule_AddIntConstant (gdb_module, "SYMBOL_STRUCT_DOMAIN", STRUCT_DOMAIN);

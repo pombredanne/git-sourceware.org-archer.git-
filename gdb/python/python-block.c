@@ -153,6 +153,26 @@ blpy_block_syms_iternext (PyObject *self)
   return (sym == NULL)? NULL : symbol_to_symbol_object (sym);
 }
 
+/* Return the innermost lexical block containing the specified pc value,
+   or 0 if there is none.  */
+
+PyObject *
+gdbpy_get_block_for_pc (PyObject *self, PyObject *args)
+{
+  unsigned PY_LONG_LONG pc;
+  struct block *block;
+  PyObject *sym_obj;
+
+  if (!PyArg_ParseTuple (args, "K", &pc))
+    return NULL;
+
+  block = block_for_pc (pc);
+  if (block)
+    return block_to_block_object (block);
+
+  Py_RETURN_NONE;
+}
+
 void
 gdbpy_initialize_blocks (void)
 {
@@ -183,7 +203,7 @@ static PyMethodDef block_object_methods[] = {
     "Return the end address of this block." },
   { "get_function", blpy_get_function, METH_NOARGS,
     "Return the symbol that names this block, or None." },
-  { "get_superblock", blpy_get_end, METH_NOARGS,
+  { "get_superblock", blpy_get_superblock, METH_NOARGS,
     "Return the block containing this block, or None." },
   {NULL}  /* Sentinel */
 };

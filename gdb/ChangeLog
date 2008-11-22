@@ -1,5 +1,14 @@
 2008-11-22  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
+	* python/python-block.c (gdbpy_get_block_for_pc): New function.
+	(block_object_methods): Fix function called for get_superblock method.
+	* python/python-internal.h (gdbpy_get_block_for_pc): New prototype.
+	* python/python-symbol.c (gdbpy_initialize_symbols): Add
+	SYMBOL_LOC_REGPARM_ADDR constant.
+	* python/python.c (GdbMethods): Add get_block_for_pc function.
+
+2008-11-22  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
 	* python/python.c (eval_python_from_control_command): Fix error
 	checking of function PyRun_SimpleString.  Fix error string.
 	(python_command): Likewise.
