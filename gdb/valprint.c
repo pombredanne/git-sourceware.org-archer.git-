@@ -1233,13 +1233,13 @@ int
 read_string (CORE_ADDR addr, int len, int width, unsigned int fetchlimit,
 	     gdb_byte **buffer, int *bytes_read)
 {
-  int found_nul;		/* Non-zero if we found the nul char */
-  int errcode;			/* Errno returned from bad reads. */
-  unsigned int nfetch;		/* Chars to fetch / chars fetched. */
-  unsigned int chunksize;	/* Size of each fetch, in chars. */
-  gdb_byte *bufptr;		/* Pointer to next available byte in buffer. */
-  gdb_byte *limit;		/* First location past end of fetch buffer. */
-  struct cleanup *old_chain = NULL;	/* Top of the old cleanup chain. */
+  int found_nul;		/* Non-zero if we found the nul char.  */
+  int errcode;			/* Errno returned from bad reads.  */
+  unsigned int nfetch;		/* Chars to fetch / chars fetched.  */
+  unsigned int chunksize;	/* Size of each fetch, in chars.  */
+  gdb_byte *bufptr;		/* Pointer to next available byte in buffer.  */
+  gdb_byte *limit;		/* First location past end of fetch buffer.  */
+  struct cleanup *old_chain = NULL;	/* Top of the old cleanup chain.  */
 
   /* Decide how large of chunks to try to read in one operation.  This
      is also pretty simple.  If LEN >= zero, then we want fetchlimit chars,
@@ -1253,7 +1253,7 @@ read_string (CORE_ADDR addr, int len, int width, unsigned int fetchlimit,
   chunksize = (len == -1 ? min (8, fetchlimit) : fetchlimit);
 
   /* Loop until we either have all the characters to print, or we encounter
-     some error, such as bumping into the end of the address space. */
+     some error, such as bumping into the end of the address space.  */
 
   found_nul = 0;
   old_chain = make_cleanup (null_cleanup, 0);
@@ -1293,7 +1293,7 @@ read_string (CORE_ADDR addr, int len, int width, unsigned int fetchlimit,
 	  bufptr = *buffer + bufsize * width;
 	  bufsize += nfetch;
 
-	  /* Read as much as we can. */
+	  /* Read as much as we can.  */
 	  nfetch = partial_memory_read (addr, bufptr, nfetch * width, &errcode)
 		    / width;
 
@@ -1301,7 +1301,7 @@ read_string (CORE_ADDR addr, int len, int width, unsigned int fetchlimit,
 	     to print.  If found, we don't need to fetch any more.  Note
 	     that bufptr is explicitly left pointing at the next character
 	     after the null byte, or at the next character after the end of
-	     the buffer. */
+	     the buffer.  */
 
 	  limit = bufptr + nfetch * width;
 	  while (bufptr < limit)
@@ -1326,7 +1326,7 @@ read_string (CORE_ADDR addr, int len, int width, unsigned int fetchlimit,
 	     && !found_nul);	/* haven't found nul yet */
     }
   else
-    {				/* length of string is really 0! */
+    {				/* Length of string is really 0!  */
       *buffer = bufptr = NULL;
       errcode = 0;
     }
@@ -1342,23 +1342,24 @@ read_string (CORE_ADDR addr, int len, int width, unsigned int fetchlimit,
   return errcode;
 }
 
-/*  Print a string from the inferior, starting at ADDR and printing up to LEN
+/* Print a string from the inferior, starting at ADDR and printing up to LEN
    characters, of WIDTH bytes a piece, to STREAM.  If LEN is -1, printing
    stops at the first null byte, otherwise printing proceeds (including null
    bytes) until either print_max or LEN characters have been printed,
-   whichever is smaller. */
+   whichever is smaller.  */
 
 int
 val_print_string (CORE_ADDR addr, int len, int width, struct ui_file *stream,
 		  const struct value_print_options *options)
 {
-  int force_ellipsis = 0;	/* Force ellipsis to be printed if nonzero. */
-  int errcode;			/* Errno returned from bad reads. */
+  int force_ellipsis = 0;	/* Force ellipsis to be printed if nonzero.  */
+  int errcode;			/* Errno returned from bad reads.  */
   int found_nul;		/* Non-zero if we found the nul char */
-  unsigned int fetchlimit;	/* Maximum number of chars to print. */
+  unsigned int fetchlimit;	/* Maximum number of chars to print.  */
   int bytes_read;
-  gdb_byte *buffer = NULL;	/* Dynamically growable fetch buffer. */
-  struct cleanup *old_chain = NULL;	/* Top of the old cleanup chain. */
+  gdb_byte *buffer = NULL;	/* Dynamically growable fetch buffer.  */
+  CORE_ADDR addr_next;		/* Address right after the last read byte.  */
+  struct cleanup *old_chain = NULL;	/* Top of the old cleanup chain.  */
 
   /* First we need to figure out the limit on the number of characters we are
      going to attempt to fetch and print.  This is actually pretty simple.  If
@@ -1366,15 +1367,17 @@ val_print_string (CORE_ADDR addr, int len, int width, struct ui_file *stream,
      LEN is -1, then the limit is print_max.  This is true regardless of
      whether print_max is zero, UINT_MAX (unlimited), or something in between,
      because finding the null byte (or available memory) is what actually
-     limits the fetch. */
+     limits the fetch.  */
 
   fetchlimit = (len == -1 ? options->print_max : min (len, options->print_max));
 
   errcode = read_string (addr, len, width, fetchlimit, &buffer, &bytes_read);
   old_chain = make_cleanup (xfree, buffer);
 
+  addr_next = addr + bytes_read;
+
   /* We now have either successfully filled the buffer to fetchlimit, or
-     terminated early due to an error or finding a null char when LEN is -1. */
+     terminated early due to an error or finding a null char when LEN is -1.  */
 
   /* Determine found_nul by looking at the last character read.  */
   found_nul = extract_unsigned_integer (buffer + bytes_read - width, width) == 0;
@@ -1389,7 +1392,7 @@ val_print_string (CORE_ADDR addr, int len, int width, struct ui_file *stream,
 
       peekbuf = (gdb_byte *) alloca (width);
 
-      if (target_read_memory (addr, peekbuf, width) == 0
+      if (target_read_memory (addr_next, peekbuf, width) == 0
 	  && extract_unsigned_integer (peekbuf, width) != 0)
 	force_ellipsis = 1;
     }
@@ -1397,7 +1400,7 @@ val_print_string (CORE_ADDR addr, int len, int width, struct ui_file *stream,
     {
       /* Getting an error when we have a requested length, or fetching less
          than the number of characters actually requested, always make us
-         print ellipsis. */
+         print ellipsis.  */
       force_ellipsis = 1;
     }
 
@@ -1418,13 +1421,13 @@ val_print_string (CORE_ADDR addr, int len, int width, struct ui_file *stream,
       if (errcode == EIO)
 	{
 	  fprintf_filtered (stream, " <Address ");
-	  fputs_filtered (paddress (addr), stream);
+	  fputs_filtered (paddress (addr_next), stream);
 	  fprintf_filtered (stream, " out of bounds>");
 	}
       else
 	{
 	  fprintf_filtered (stream, " <Error reading address ");
-	  fputs_filtered (paddress (addr), stream);
+	  fputs_filtered (paddress (addr_next), stream);
 	  fprintf_filtered (stream, ": %s>", safe_strerror (errcode));
 	}
     }

@@ -1,5 +1,12 @@
 2008-11-22  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
+	* valprint.c (read_string): Put 2 spaces after period in comments.
+	(val_print_string): Fix peeking of next byte to see if it is null,
+	for ellipsis printing.  Put 2 spaces after period in comments.
+	* c-lang.c (c_getstr): Make function static.
+
+2008-11-22  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
 	* python/python-symbol.c (sympy_is_constant, sympy_is_function,
 	sympy_is_variable): New functions.
 	(symbol_object_methods): Add is_constant, is_function, is_variable

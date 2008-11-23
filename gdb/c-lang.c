@@ -200,7 +200,7 @@ c_printstr (struct ui_file *stream, const gdb_byte *string,
 
    Return 0 on success, errno on failure.  */
 
-int
+static int
 c_getstr (struct value *value, gdb_byte **buffer, int *length)
 {
   int fetchlimit, err, width;
