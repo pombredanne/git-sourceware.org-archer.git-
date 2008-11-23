@@ -1302,6 +1302,10 @@ sys.stdout = GdbOutputFile()\n\
 if hasattr (gdb, 'datadir'):\n\
   sys.path.insert(0, gdb.datadir + '/python')\n\
   gdb.__path__ = [gdb.datadir + '/python/gdb']\n\
+  from os.path import exists\n\
+  ipy = gdb.datadir + '/python/gdb/__init__.py'\n\
+  if exists (ipy):\n\
+    execfile (ipy)\n\
 ");
 
   /* Release the GIL while gdb runs.  */

@@ -1,3 +1,7 @@
+2008-11-23  Tom Tromey  <tromey@redhat.com>
+
+	* python/python.c (_initialize_python): Read gdb's __init__.py.
+
 2008-11-22  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	* valprint.c (read_string): Put 2 spaces after period in comments.
