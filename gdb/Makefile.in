@@ -1917,11 +1917,13 @@ python-value.o: $(srcdir)/python/python-value.c
 # first.  These are maintained by hand because that is simpler than
 # writing portable sh to make the __init__.py files, and the result is
 # faster.
-PY_DIRS = gdb gdb/libstdcxx gdb/libstdcxx/v6
+PY_DIRS = gdb gdb/command gdb/libstdcxx gdb/libstdcxx/v6
 
 # All python library files, with the "python/lib" stripped off.
 # Note that we should only install files in the "gdb" module.
-PY_FILES = gdb/libstdcxx/v6/printers.py
+PY_FILES = gdb/backtrace.py gdb/command/alias.py \
+    gdb/command/backtrace.py gdb/command/require.py gdb/FrameIterator.py \
+    gdb/__init__.py gdb/libstdcxx/v6/printers.py
 
 # Install the Python library.  Python library files go under
 # $(GDB_DATADIR_PATH)/python.  We create a dummy __init__.py for
