@@ -1,5 +1,11 @@
 2008-11-23  Tom Tromey  <tromey@redhat.com>
 
+	* Makefile.in (PY_FILES): Add caller_is.py.
+	* python/lib/gdb/function/caller_is.py: New file.
+	* python/lib/gdb/command/require.py: Add "require function".
+
+2008-11-23  Tom Tromey  <tromey@redhat.com>
+
 	* Makefile.in (PY_DIRS): Update.
 	(PY_FILES): List new files.
 	* python/lib/gdb/FrameIterator.py: New file.

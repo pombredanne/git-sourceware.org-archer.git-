@@ -54,4 +54,4 @@ class RequireSubcommand (gdb.Command):
 
 RequireCommand()
 RequireSubcommand("command")
-# Don't install a "require function" command until we have one.
+RequireSubcommand("function")
