@@ -869,7 +869,7 @@ generated_files = config.h observer.h observer.inc ada-lex.c \
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 
-all: gdb$(EXEEXT) $(CONFIG_ALL)
+all: gdb$(EXEEXT) $(CONFIG_ALL) .gdbinit
 	@$(MAKE) $(FLAGS_TO_PASS) DO=all "DODIRS=`echo $(SUBDIRS) | sed 's/testsuite//'`" subdir_do
 .PHONY: all-tui
 all-tui: $(TUI)$(EXEEXT)
@@ -1219,6 +1219,12 @@ stamp-h: config.in config.status
 	  CONFIG_COMMANDS="default depdir" \
 	  CONFIG_FILES= \
 	  CONFIG_LINKS= \
+	  $(SHELL) config.status
+
+.gdbinit: gdbinit.in config.status
+	CONFIG_FILES=".gdbinit:gdbinit.in" \
+	  CONFIG_COMMANDS= \
+	  CONFIG_HEADERS= \
 	  $(SHELL) config.status
 
 config.status: configure configure.tgt configure.host
@@ -1913,31 +1919,21 @@ python-value.o: $(srcdir)/python/python-value.c
 	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-value.c
 	$(POSTCOMPILE)
 
-# All Python install directories.  These must be sorted, shallowest
-# first.  These are maintained by hand because that is simpler than
-# writing portable sh to make the __init__.py files, and the result is
-# faster.
-PY_DIRS = gdb gdb/command gdb/function gdb/libstdcxx gdb/libstdcxx/v6
-
 # All python library files, with the "python/lib" stripped off.
 # Note that we should only install files in the "gdb" module.
-PY_FILES = gdb/backtrace.py gdb/command/alias.py \
+PY_FILES = gdb/FrameIterator.py gdb/command/alias.py \
     gdb/command/backtrace.py gdb/command/require.py \
+    gdb/command/__init__.py gdb/libstdcxx/v6/printers.py \
+    gdb/libstdcxx/v6/__init__.py gdb/libstdcxx/__init__.py \
     gdb/function/caller_is.py gdb/function/in_scope.py \
-    gdb/FrameIterator.py gdb/__init__.py gdb/libstdcxx/v6/printers.py
+    gdb/function/__init__.py gdb/backtrace.py gdb/__init__.py
 
 # Install the Python library.  Python library files go under
-# $(GDB_DATADIR_PATH)/python.  We create a dummy __init__.py for
-# each directory, to make importing work properly.  If there is a real
-# __init__.py in PY_FILES, it will overwrite the dummy file.
+# $(GDB_DATADIR_PATH)/python.
 install-python:
-	dirs='$(PY_DIRS)'; for dir in $$dirs; do \
-	  $(SHELL) $(srcdir)/../mkinstalldirs $(DESTDIR)$(GDB_DATADIR_PATH)/python/$$dir; \
-	  if ! test -f $(DESTDIR)$(GDB_DATADIR_PATH)/python/$$dir/__init__.py; then \
-	    echo > $(DESTDIR)$(GDB_DATADIR_PATH)/python/$$dir/__init__.py; \
-	  fi; \
-	done; \
 	files='$(PY_FILES)'; for file in $$files; do \
+	  dir=`echo "$$file" | sed 's,/[^/]*$$,,'`; \
+	  $(SHELL) $(srcdir)/../mkinstalldirs $(DESTDIR)$(GDB_DATADIR_PATH)/python/$$dir; \
 	  $(INSTALL_DATA) $(srcdir)/python/lib/$$file $(DESTDIR)$(GDB_DATADIR_PATH)/python/$$file; \
 	done
 

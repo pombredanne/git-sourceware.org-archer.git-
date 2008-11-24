@@ -1300,10 +1300,11 @@ class GdbOutputFile:\n\
 sys.stderr = GdbOutputFile()\n\
 sys.stdout = GdbOutputFile()\n\
 if hasattr (gdb, 'datadir'):\n\
-  sys.path.insert(0, gdb.datadir + '/python')\n\
-  gdb.__path__ = [gdb.datadir + '/python/gdb']\n\
+  gdb.pythonlibdir = gdb.datadir + '/python'\n\
+  sys.path.insert(0, gdb.pythonlibdir)\n\
+  gdb.__path__ = [gdb.pythonlibdir + '/gdb']\n\
   from os.path import exists\n\
-  ipy = gdb.datadir + '/python/gdb/__init__.py'\n\
+  ipy = gdb.pythonlibdir + '/gdb/__init__.py'\n\
   if exists (ipy):\n\
     execfile (ipy)\n\
 ");

@@ -41,7 +41,7 @@ class RequireSubcommand (gdb.Command):
             exec ('import gdb.' + self.name + '.' + cmd, globals ())
 
     def complete (self, text, word):
-        dir = gdb.datadir + '/python/gdb/' + self.name
+        dir = gdb.pythonlibdir + '/gdb/' + self.name
         result = []
         for file in os.listdir(dir):
             if not file.startswith (word) or not file.endswith ('.py'):

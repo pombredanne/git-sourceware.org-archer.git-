@@ -1,3 +1,19 @@
+2008-11-24  Tom Tromey  <tromey@redhat.com>
+
+	* python/lib/gdb/libstdcxx/v6/__init__.py: New file.
+	* python/lib/gdb/libstdcxx/__init__.py: New file.
+	* python/lib/gdb/function/__init__.py: New file.
+	* python/lib/gdb/command/__init__.py: New file.
+	* gdbinit.in: Set up python library.
+	* python/lib/gdb/command/require.py (RequireSubcommand.complete):
+	Use gdb.pythonlibdir.
+	* python/python.c (_initialize_python): Set gdb.pythonlibdir.
+	* Makefile.in (.gdbinit): New target.
+	(all): Depend on .gdbinit.
+	(PY_DIRS): Remove.
+	(PY_FILES): Update.
+	(install-python): Don't make dummy __init__.py files.
+
 2008-11-24  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	* Makefile.in (PY_FILES): Add in_scope.py.
