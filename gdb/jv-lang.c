@@ -1131,7 +1131,7 @@ const struct language_defn java_language_defn =
   java_language_arch_info,
   default_print_array_index,
   default_pass_by_reference,
-  default_getstr,
+  default_get_string,
   LANG_MAGIC
 };
 

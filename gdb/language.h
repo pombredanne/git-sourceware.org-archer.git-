@@ -285,8 +285,10 @@ struct language_defn
     /* Obtain a string from the inferior, storing it in a newly allocated
        buffer in BUFFER, which should be freed by the caller.  LENGTH will
        hold the size in bytes of the string (only actual characters, excluding
-       an eventual terminating null character).  */
-    int (*la_getstr) (struct value *value, gdb_byte **buffer, int *length);
+       an eventual terminating null character).  CHARSET will hold the encoding
+       used in the string.  */
+    int (*la_get_string) (struct value *value, gdb_byte **buffer, int *length,
+			  const char **charset);
 
     /* Add fields above this point, so the magic number is always last. */
     /* Magic number for compat checking */
@@ -386,8 +388,8 @@ extern enum language set_language (enum language);
 				 force_ellipses,options))
 #define LA_EMIT_CHAR(ch, stream, quoter) \
   (current_language->la_emitchar(ch, stream, quoter))
-#define LA_GET_STRING(value, buffer, length) \
-  (current_language->la_getstr(value, buffer, length))
+#define LA_GET_STRING(value, buffer, length, encoding) \
+  (current_language->la_get_string(value, buffer, length, encoding))
 
 #define LA_PRINT_ARRAY_INDEX(index_value, stream, optins) \
   (current_language->la_print_array_index(index_value, stream, options))
@@ -497,6 +499,7 @@ int default_pass_by_reference (struct type *type);
 void default_print_typedef (struct type *type, struct symbol *new_symbol,
 			    struct ui_file *stream);
 
-int default_getstr (struct value *value, gdb_byte **buffer, int *length);
+int default_get_string (struct value *value, gdb_byte **buffer, int *length,
+			const char **charset);
 
 #endif /* defined (LANGUAGE_H) */

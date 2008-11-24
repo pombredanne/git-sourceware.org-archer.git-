@@ -198,12 +198,16 @@ c_printstr (struct ui_file *stream, const gdb_byte *string,
    failure.  In this case, some characters might have been read before the
    failure happened.  Check LENGTH to recognize this situation.
 
+   CHARSET is always set to the target charset.
+
    Return 0 on success, errno on failure.  */
 
 static int
-c_getstr (struct value *value, gdb_byte **buffer, int *length)
+c_get_string (struct value *value, gdb_byte **buffer, int *length,
+	      const char **charset)
 {
-  int fetchlimit, err, width;
+  int err, width;
+  unsigned int fetchlimit;
   struct type *type = value_type (value);
   struct type *element_type = TYPE_TARGET_TYPE (type);
 
@@ -224,10 +228,10 @@ c_getstr (struct value *value, gdb_byte **buffer, int *length)
 	  fetchlimit = high_bound - low_bound + 1;
 	}
       else
-	fetchlimit = -1;
+	fetchlimit = UINT_MAX;
     }
   else if (TYPE_CODE (value_type (value)) == TYPE_CODE_PTR)
-    fetchlimit = -1;
+    fetchlimit = UINT_MAX;
   else
     /* We work only with arrays and pointers.  */
     goto error;
@@ -245,7 +249,7 @@ c_getstr (struct value *value, gdb_byte **buffer, int *length)
      just need to copy it to BUFFER.  Also, since such strings are arrays
      with known size, FETCHLIMIT will hold the size of the array.  */
   if (((VALUE_LVAL (value) == not_lval)
-      || (VALUE_LVAL (value) == lval_internalvar)) && (fetchlimit != -1))
+      || (VALUE_LVAL (value) == lval_internalvar)) && (fetchlimit != UINT_MAX))
     {
       int i;
       const gdb_byte *contents = value_contents (value);
@@ -269,17 +273,18 @@ c_getstr (struct value *value, gdb_byte **buffer, int *length)
   if (extract_unsigned_integer (*buffer + *length - width, width) == 0)
       *length -= width;
 
+  *charset = target_charset ();
+
   return err;
 
 error:
   {
     char *type_str;
-    struct cleanup *old_chain;
 
     type_str = type_to_string (type);
     if (type_str)
       {
-	old_chain = make_cleanup (xfree, type_str);
+	make_cleanup (xfree, type_str);
 	error (_("Trying to read string with inappropriate type `%s'."),
 	       type_str);
       }
@@ -526,7 +531,7 @@ const struct language_defn c_language_defn =
   c_language_arch_info,
   default_print_array_index,
   default_pass_by_reference,
-  c_getstr,
+  c_get_string,
   LANG_MAGIC
 };
 
@@ -645,7 +650,7 @@ const struct language_defn cplus_language_defn =
   cplus_language_arch_info,
   default_print_array_index,
   cp_pass_by_reference,
-  c_getstr,
+  c_get_string,
   LANG_MAGIC
 };
 
@@ -683,7 +688,7 @@ const struct language_defn asm_language_defn =
   c_language_arch_info, /* FIXME: la_language_arch_info.  */
   default_print_array_index,
   default_pass_by_reference,
-  c_getstr,
+  c_get_string,
   LANG_MAGIC
 };
 
@@ -726,7 +731,7 @@ const struct language_defn minimal_language_defn =
   c_language_arch_info,
   default_print_array_index,
   default_pass_by_reference,
-  default_getstr,
+  default_get_string,
   LANG_MAGIC
 };
 

@@ -1214,11 +1214,11 @@ partial_memory_read (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int *errnoptr
    free, and BYTES_READ will be set to the number of bytes read.  Returns 0 on
    success, or errno on failure.
 
-   If LEN is -1, stops at the first null character (not necessarily the first
-   null byte) up to a maximum of FETCHLIMIT characters, otherwise reading
-   proceeds (including null characters) until LEN characters have been read.
-   Set FETCHLIMIT to UINT_MAX to read as many characters as possible from the
-   string.
+   If LEN > 0, reads exactly LEN characters (including eventual NULs in
+   the middle or end of the string).  If LEN is -1, stops at the first
+   null character (not necessarily the first null byte) up to a maximum
+   of FETCHLIMIT characters.  Set FETCHLIMIT to UINT_MAX to read as many
+   characters as possible from the string.
 
    Unless an exception is thrown, BUFFER will always be allocated, even on
    failure.  In this case, some characters might have been read before the
@@ -1328,7 +1328,8 @@ read_string (CORE_ADDR addr, int len, int width, unsigned int fetchlimit,
     }
   else
     {				/* Length of string is really 0!  */
-      *buffer = bufptr = NULL;
+      /* We always allocate *buffer.  */
+      *buffer = bufptr = xmalloc (1);
       errcode = 0;
     }
 
