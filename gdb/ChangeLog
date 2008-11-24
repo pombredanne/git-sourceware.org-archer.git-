@@ -1,5 +1,11 @@
 2008-11-23  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
+	* valarith.c (value_subscripted_rvalue,
+	value_bitstring_subscript): Fix internal error when given a value
+	for an internal variable.
+
+2008-11-23  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
 	* c-lang.c (c_getstr): Fix description of function behaviour.
 	Read GDB-hosted string only up to terminating null character.
 	Fix NULL vs null confusion in comments.
