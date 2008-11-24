@@ -1,3 +1,10 @@
+2008-11-24  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* python/python-value.c (valpy_richcompare): Call
+	convert_value_from_python instead of doing conversions itself.
+	(convert_value_from_python): Clear Python exception and throw
+	GDB exception if python_string_to_target_string fails.
+
 2008-11-23  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	* valarith.c (value_subscripted_rvalue,

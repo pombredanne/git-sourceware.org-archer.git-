@@ -589,49 +589,10 @@ static PyObject *
 valpy_richcompare (PyObject *self, PyObject *other, int op)
 {
   int result = 0;
-  struct value *value_self, *value_other;
+  struct value *value_other;
   volatile struct gdb_exception except;
 
-  /* FIXME: should use convert_value_from_python and should implement
-     string compares(?).  */
-  if (PyObject_TypeCheck (other, &value_object_type))
-    value_other = ((value_object *) other)->value;
-  else if (PyInt_Check (other))
-    {
-      LONGEST l;
-
-      l = PyInt_AsLong (other);
-      if (PyErr_Occurred ())
-	return NULL;
-
-      value_other = value_from_longest (builtin_type_pyint, l);
-    }
-  else if (PyLong_Check (other))
-    {
-      LONGEST l = PyLong_AsLongLong (other);
-      if (PyErr_Occurred ())
-	return NULL;
-      value_other = value_from_longest (builtin_type_pyint, l);
-    }
-  else if (PyFloat_Check (other))
-    {
-      DOUBLEST d;
-
-      d = PyFloat_AsDouble (other);
-      if (PyErr_Occurred ())
-	return NULL;
-
-      value_other = value_from_double (builtin_type_pyfloat, d);
-    }
-  else if (gdbpy_is_string (other))
-    {
-      char *str;
-
-      str = python_string_to_target_string (other);
-      value_other = value_from_string (str);
-      xfree (str);
-    }
-  else if (other == Py_None)
+  if (other == Py_None)
     /* Comparing with None is special.  From what I can tell, in Python
        None is smaller than anything else.  */
     switch (op) {
@@ -649,15 +610,11 @@ valpy_richcompare (PyObject *self, PyObject *other, int op)
 			 "Invalid operation on gdb.Value.");
 	return NULL;
     }
-  else
-    {
-      PyErr_SetString (PyExc_NotImplementedError,
-		       "Operation not supported on gdb.Value of this type.");
-      return NULL;
-    }
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
+      value_other = convert_value_from_python (other);
+
       switch (op) {
         case Py_LT:
 	  result = value_less (((value_object *) self)->value, value_other);
@@ -854,7 +811,10 @@ convert_value_from_python (PyObject *obj)
 
       s = python_string_to_target_string (obj);
       if (s == NULL)
-	return NULL;
+	{
+	  PyErr_Clear ();
+	  error (_("Error converting Python value."));
+	}
 
       old = make_cleanup (xfree, s);
       value = value_from_string (s);
