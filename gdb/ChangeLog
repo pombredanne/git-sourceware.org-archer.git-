@@ -1,3 +1,18 @@
+2008-11-24  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	More changes from review.
+	* c-lang.c (c_printstr): Renamed to c_print_string.  Updated all
+	references.  Added charset argument.  Changed fetchlimit to unsigned
+	int, and use UINT_MAX instead of -1.
+	* language.c (default_getstr): Renamed to default_get_string.  Updated
+	all references.  Added charset argument.
+	* language.h (language_defn): Renamed la_getstr element to
+	la_get_string.
+	* python/python-value.c (valpy_string): Use language-provided charset
+	if the user doesn't specify one.
+	* valprint.c (read_string): Clarify description of LEN and FETCHLIMIT
+	arguments.  Allocate buffer even when LEN is zero.
+
 2008-11-24  Tom Tromey  <tromey@redhat.com>
 
 	* Makefile.in (PY_FILES): Add new file.

@@ -165,16 +165,15 @@ valpy_string (PyObject *self, PyObject *args)
   volatile struct gdb_exception except;
   PyObject *unicode;
   const char *encoding = NULL;
+  const char *user_encoding = NULL;
+  const char *la_encoding = NULL;
 
-  if (!PyArg_ParseTuple (args, "|s", &encoding))
+  if (!PyArg_ParseTuple (args, "|s", &user_encoding))
     return NULL;
-
-  if (!encoding)
-    encoding = target_charset ();
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      ret = LA_GET_STRING (value, &buffer, &length);
+      ret = LA_GET_STRING (value, &buffer, &length, &la_encoding);
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
@@ -188,6 +187,7 @@ valpy_string (PyObject *self, PyObject *args)
       return NULL;
     }
 
+  encoding = user_encoding? user_encoding : la_encoding;
   unicode = PyUnicode_Decode (buffer, length, encoding, NULL);
   xfree (buffer);
 
