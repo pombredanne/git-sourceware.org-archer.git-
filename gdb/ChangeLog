@@ -1,3 +1,14 @@
+2008-11-23  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* c-lang.c (c_getstr): Fix description of function behaviour.
+	Read GDB-hosted string only up to terminating null character.
+	Fix NULL vs null confusion in comments.
+	* language.h (la_getstr): Fix NULL vs null confusion in comment.
+	* valprint.c (read_string): Fix description of function behaviour.
+	Fix NULL vs null confusion in comments.
+	(val_print_string): Update addr variable instead of using addr_next.
+	Fix NULL vs null confusion in comments.
+
 2008-11-23  Tom Tromey  <tromey@redhat.com>
 
 	* Makefile.in (PY_FILES): Add caller_is.py.

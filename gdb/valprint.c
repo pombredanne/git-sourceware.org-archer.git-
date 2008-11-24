@@ -1215,9 +1215,10 @@ partial_memory_read (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int *errnoptr
    success, or errno on failure.
 
    If LEN is -1, stops at the first null character (not necessarily the first
-   null byte), otherwise reading proceeds (including null characters) until
-   FETCHLIMIT characters have been read.  Set FETCHLIMIT to UINT_MAX to read
-   as many characters as possible from the string.
+   null byte) up to a maximum of FETCHLIMIT characters, otherwise reading
+   proceeds (including null characters) until LEN characters have been read.
+   Set FETCHLIMIT to UINT_MAX to read as many characters as possible from the
+   string.
 
    Unless an exception is thrown, BUFFER will always be allocated, even on
    failure.  In this case, some characters might have been read before the
@@ -1226,8 +1227,8 @@ partial_memory_read (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int *errnoptr
    Note: There was a FIXME asking to make this code use target_read_string,
    but this function is more general (can read past null characters, up to
    given LEN). Besides, it is used much more often than target_read_string
-   so it is more tested.  Perhaps target_read_string should be rewritten to
-   use this function?  */
+   so it is more tested.  Perhaps callers of target_read_string should use
+   this function instead?  */
 
 int
 read_string (CORE_ADDR addr, int len, int width, unsigned int fetchlimit,
@@ -1244,7 +1245,7 @@ read_string (CORE_ADDR addr, int len, int width, unsigned int fetchlimit,
   /* Decide how large of chunks to try to read in one operation.  This
      is also pretty simple.  If LEN >= zero, then we want fetchlimit chars,
      so we might as well read them all in one operation.  If LEN is -1, we
-     are looking for a null terminator to end the fetching, so we might as
+     are looking for a NUL terminator to end the fetching, so we might as
      well read in blocks that are large enough to be efficient, but not so
      large as to be slow if fetchlimit happens to be large.  So we choose the
      minimum of 8 and fetchlimit.  We used to use 200 instead of 8 but
@@ -1252,7 +1253,7 @@ read_string (CORE_ADDR addr, int len, int width, unsigned int fetchlimit,
 
   chunksize = (len == -1 ? min (8, fetchlimit) : fetchlimit);
 
-  /* Loop until we either have all the characters to print, or we encounter
+  /* Loop until we either have all the characters, or we encounter
      some error, such as bumping into the end of the address space.  */
 
   found_nul = 0;
@@ -1297,11 +1298,11 @@ read_string (CORE_ADDR addr, int len, int width, unsigned int fetchlimit,
 	  nfetch = partial_memory_read (addr, bufptr, nfetch * width, &errcode)
 		    / width;
 
-	  /* Scan this chunk for the null byte that terminates the string
+	  /* Scan this chunk for the null character that terminates the string
 	     to print.  If found, we don't need to fetch any more.  Note
 	     that bufptr is explicitly left pointing at the next character
-	     after the null byte, or at the next character after the end of
-	     the buffer.  */
+	     after the null character, or at the next character after the end
+	     of the buffer.  */
 
 	  limit = bufptr + nfetch * width;
 	  while (bufptr < limit)
@@ -1314,7 +1315,7 @@ read_string (CORE_ADDR addr, int len, int width, unsigned int fetchlimit,
 	      if (c == 0)
 		{
 		  /* We don't care about any error which happened after
-		     the NULL terminator.  */
+		     the NUL terminator.  */
 		  errcode = 0;
 		  found_nul = 1;
 		  break;
@@ -1323,7 +1324,7 @@ read_string (CORE_ADDR addr, int len, int width, unsigned int fetchlimit,
 	}
       while (errcode == 0	/* no error */
 	     && bufptr - *buffer < fetchlimit * width	/* no overrun */
-	     && !found_nul);	/* haven't found nul yet */
+	     && !found_nul);	/* haven't found NUL yet */
     }
   else
     {				/* Length of string is really 0!  */
@@ -1358,7 +1359,6 @@ val_print_string (CORE_ADDR addr, int len, int width, struct ui_file *stream,
   unsigned int fetchlimit;	/* Maximum number of chars to print.  */
   int bytes_read;
   gdb_byte *buffer = NULL;	/* Dynamically growable fetch buffer.  */
-  CORE_ADDR addr_next;		/* Address right after the last read byte.  */
   struct cleanup *old_chain = NULL;	/* Top of the old cleanup chain.  */
 
   /* First we need to figure out the limit on the number of characters we are
@@ -1374,7 +1374,7 @@ val_print_string (CORE_ADDR addr, int len, int width, struct ui_file *stream,
   errcode = read_string (addr, len, width, fetchlimit, &buffer, &bytes_read);
   old_chain = make_cleanup (xfree, buffer);
 
-  addr_next = addr + bytes_read;
+  addr += bytes_read;
 
   /* We now have either successfully filled the buffer to fetchlimit, or
      terminated early due to an error or finding a null char when LEN is -1.  */
@@ -1386,13 +1386,13 @@ val_print_string (CORE_ADDR addr, int len, int width, struct ui_file *stream,
     {
       gdb_byte *peekbuf;
 
-      /* We didn't find a null terminator we were looking for.  Attempt
+      /* We didn't find a NUL terminator we were looking for.  Attempt
          to peek at the next character.  If not successful, or it is not
          a null byte, then force ellipsis to be printed.  */
 
       peekbuf = (gdb_byte *) alloca (width);
 
-      if (target_read_memory (addr_next, peekbuf, width) == 0
+      if (target_read_memory (addr, peekbuf, width) == 0
 	  && extract_unsigned_integer (peekbuf, width) != 0)
 	force_ellipsis = 1;
     }
@@ -1421,13 +1421,13 @@ val_print_string (CORE_ADDR addr, int len, int width, struct ui_file *stream,
       if (errcode == EIO)
 	{
 	  fprintf_filtered (stream, " <Address ");
-	  fputs_filtered (paddress (addr_next), stream);
+	  fputs_filtered (paddress (addr), stream);
 	  fprintf_filtered (stream, " out of bounds>");
 	}
       else
 	{
 	  fprintf_filtered (stream, " <Error reading address ");
-	  fputs_filtered (paddress (addr_next), stream);
+	  fputs_filtered (paddress (addr), stream);
 	  fprintf_filtered (stream, ": %s>", safe_strerror (errcode));
 	}
     }

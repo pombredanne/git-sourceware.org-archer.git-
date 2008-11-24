@@ -182,17 +182,17 @@ c_printstr (struct ui_file *stream, const gdb_byte *string,
     fputs_filtered ("...", stream);
 }
 
-/* Obtain a C string from the inferior, storing it in a newly allocated
-   buffer in BUFFER, which should be freed by the caller.  If VALUE is an
-   array with known length, the function will copy all of its contents to
-   the buffer.  If the length is not known, read until a null byte is found.
-   LENGTH will contain the size of the string (not counting the NULL
+/* Obtain a C string from the inferior storing it in a newly allocated
+   buffer in BUFFER, which should be freed by the caller.  The string is
+   read until a null character is found. If VALUE is an array with known
+   length, the function will not read past the end of the array.  LENGTH
+   will contain the size of the string in bytes (not counting the null
    character).
 
-   Assumes strings are terminated by a NULL character.  The size of a character
+   Assumes strings are terminated by a null character.  The size of a character
    is determined by the length of the target type of the pointer or array.
-   This means that a NULL byte present in a multi-byte character will not
-   terminate the string unless the whole character is NULL.
+   This means that a null byte present in a multi-byte character will not
+   terminate the string unless the whole character is null.
 
    Unless an exception is thrown, BUFFER will always be allocated, even on
    failure.  In this case, some characters might have been read before the
@@ -243,20 +243,29 @@ c_getstr (struct value *value, gdb_byte **buffer, int *length)
 
   /* If the string lives in GDB's memory intead of the inferior's, then we
      just need to copy it to BUFFER.  Also, since such strings are arrays
-     with known size, FETCHLIMIT will hold the size of the string.  */
+     with known size, FETCHLIMIT will hold the size of the array.  */
   if (((VALUE_LVAL (value) == not_lval)
       || (VALUE_LVAL (value) == lval_internalvar)) && (fetchlimit != -1))
     {
-      *length = fetchlimit;
-      *buffer = xmalloc (*length * width);
-      memcpy (*buffer, value_contents (value), *length * width);
+      int i;
+      const gdb_byte *contents = value_contents (value);
+
+      /* Look for a null character.  */
+      for (i = 0; i < fetchlimit; i++)
+	if (extract_unsigned_integer (contents + i*width, width) == 0)
+	  break;
+
+      /* i is now either the number of non-null characters, or fetchlimit.  */
+      *length = i*width;
+      *buffer = xmalloc (*length);
+      memcpy (*buffer, contents, *length);
       err = 0;
     }
   else
     err = read_string (value_as_address (value), -1, width, fetchlimit,
-			 buffer, length);
+		       buffer, length);
 
-  /* If the last character is NULL, subtract it from length.  */
+  /* If the last character is null, subtract it from length.  */
   if (extract_unsigned_integer (*buffer + *length - width, width) == 0)
       *length -= width;
 

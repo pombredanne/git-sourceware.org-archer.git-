@@ -285,7 +285,7 @@ struct language_defn
     /* Obtain a string from the inferior, storing it in a newly allocated
        buffer in BUFFER, which should be freed by the caller.  LENGTH will
        hold the size in bytes of the string (only actual characters, excluding
-       an eventual NULL terminating character).  */
+       an eventual terminating null character).  */
     int (*la_getstr) (struct value *value, gdb_byte **buffer, int *length);
 
     /* Add fields above this point, so the magic number is always last. */
