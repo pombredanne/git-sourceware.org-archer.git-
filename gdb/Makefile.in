@@ -1923,8 +1923,8 @@ PY_DIRS = gdb gdb/command gdb/function gdb/libstdcxx gdb/libstdcxx/v6
 # Note that we should only install files in the "gdb" module.
 PY_FILES = gdb/backtrace.py gdb/command/alias.py \
     gdb/command/backtrace.py gdb/command/require.py \
-    gdb/function/caller_is.py gdb/FrameIterator.py \
-    gdb/__init__.py gdb/libstdcxx/v6/printers.py
+    gdb/function/caller_is.py gdb/function/in_scope.py \
+    gdb/FrameIterator.py gdb/__init__.py gdb/libstdcxx/v6/printers.py
 
 # Install the Python library.  Python library files go under
 # $(GDB_DATADIR_PATH)/python.  We create a dummy __init__.py for
