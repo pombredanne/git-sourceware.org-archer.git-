@@ -440,11 +440,14 @@
 	* cp-namespace.c (cp_lookup_symbol_namespace): Check for imported 
 	declarations.
 
+<<<<<<< HEAD:gdb/ChangeLog
 2008-11-06  Pedro Alves  <pedro@codesourcery.com>
 
 	* i386-dicos-tdep.c (i386_dicos_init_abi): Set decr_pc_after_break
 	to 0.
 
+=======
+>>>>>>> 4c736314fe5bf41d4c63daee24c7e226fa00dfc5:gdb/ChangeLog
 2008-11-06  Sami Wagiaalla  <swagiaal@redhat.com> 
  
 	* cp-support.h: Added char* declaration element to using_direct data struct.
@@ -462,6 +465,7 @@
 	* dwarf2read.c (read_import_statement): Figure out local alias for
 	the import and pass it on cp_add_using.
 
+<<<<<<< HEAD:gdb/ChangeLog
 2008-11-05  Pedro Alves  <pedro@codesourcery.com>
 
 	* remote.c (notice_new_inferiors): Add a new inferior only when
@@ -589,6 +593,8 @@
 	the import and pass it on cp_add_using.
 
 >>>>>>> Fixed gdb aliased namespace lookup problem.:gdb/ChangeLog
+=======
+>>>>>>> 4c736314fe5bf41d4c63daee24c7e226fa00dfc5:gdb/ChangeLog
 2008-11-04  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* cp-namespace.c (lookup_namespace_scope): Use 
@@ -612,7 +618,10 @@
 	* dwarf2read.c (read_import_statement): Ditto.
 	(read_namespace): Ditto.
 	
+<<<<<<< HEAD:gdb/ChangeLog
 >>>>>>> using_direct structs now have and 'alias' element.:gdb/ChangeLog
+=======
+>>>>>>> 4c736314fe5bf41d4c63daee24c7e226fa00dfc5:gdb/ChangeLog
 2008-11-03  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* cp-namespace.h (cp_add_using_directive): Now takes char
@@ -622,7 +631,10 @@
 	* cp-namespace.c (cp_add_using): ditto.
 	(cp_scan_for_anonymous_namespaces): Ditto.
 	* dwarf2read.c (read_namespace): Ditto.
+<<<<<<< HEAD:gdb/ChangeLog
 >>>>>>> add_using_directive functions now take char* outer char* inner arguments.:gdb/ChangeLog
+=======
+>>>>>>> 4c736314fe5bf41d4c63daee24c7e226fa00dfc5:gdb/ChangeLog
 
 2008-10-30  Sami Wagiaalla  <swagiaal@redhat.com>
 
@@ -634,6 +646,7 @@
 	cp_lookup_symbol_namespace_incremental instead of 
 	cp_lookup_symbol_namespace.
 	
+<<<<<<< HEAD:gdb/ChangeLog
 2008-10-30  Tom Tromey  <tromey@redhat.com>
 
 	* value.c (coerce_array): Use check_typedef.
@@ -688,6 +701,8 @@
 	(catch_exec_command_1): Use create_catchpoint instead of
 	create_exec_event_catchpoint to create the exec catchpoint.
 
+=======
+>>>>>>> 4c736314fe5bf41d4c63daee24c7e226fa00dfc5:gdb/ChangeLog
 2008-10-29  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* dwarf2read.c (determine_prefix): Added a rule to skip dies which
@@ -695,6 +710,7 @@
 	(new_symbol): use dwarf2_full_name instead of dwarf2_linkage_name for
 	variables. 
 
+<<<<<<< HEAD:gdb/ChangeLog
 2008-10-28  Tom Tromey  <tromey@redhat.com>
 
 	* Makefile.in (SUBDIR_CLI_OBS): Don't mention cli-utils.o.
@@ -909,12 +925,15 @@
 	format and pretty arguments.
 	(print_one_exception): Use get_user_print_options.
 
+=======
+>>>>>>> 4c736314fe5bf41d4c63daee24c7e226fa00dfc5:gdb/ChangeLog
 2008-10-28  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* dwarf2read.c (explore_children): New function.
 	(explore_abstract_origin): New function.
 	(read_func_scope): Added call to explore_abstract_origin.
 
+<<<<<<< HEAD:gdb/ChangeLog
 2008-10-28  Tom Tromey  <tromey@redhat.com>
 
 	* cli/cli-script.c (do_fclose_cleanup): Remove.
@@ -939,11 +958,14 @@
 	* utils.c (do_fclose_cleanup): New function.
 	(make_cleanup_fclose): Likewise.
 
+=======
+>>>>>>> 4c736314fe5bf41d4c63daee24c7e226fa00dfc5:gdb/ChangeLog
 2008-10-27  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* dwarf2read.c (read_import_statement): Properly construct
 	prefix of imported namespace.
 
+<<<<<<< HEAD:gdb/ChangeLog
 2008-10-27  Pedro Alves  <pedro@codesourcery.com>
 
 	* inflow.c (kill_command): If the target claims there is still
@@ -1252,6 +1274,8 @@
 	* c-exp.y (string_exp): New production.
 	(exp): Use it.
 
+=======
+>>>>>>> 4c736314fe5bf41d4c63daee24c7e226fa00dfc5:gdb/ChangeLog
 2008-10-22  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* buildsym.c (start_symtab): Removed call to cp_initialize_namespace.
@@ -1262,11 +1286,14 @@
 	(cp_finalize_namespace): Deleted.
 	Added #include "buildsym.h".
 
+<<<<<<< HEAD:gdb/ChangeLog
 2008-10-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* mips-tdep.c (mips_n32n64_fp_arg_chunk_p): Update TYPE_FIELD_STATIC
 	removed before.
 
+=======
+>>>>>>> 4c736314fe5bf41d4c63daee24c7e226fa00dfc5:gdb/ChangeLog
 2008-10-20  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* symtab.c (lookup_symbol_aux_local): Search continues through static
@@ -1279,6 +1306,7 @@
 	(cp_lookup_symbol_namespace): Reuturn NULL if no namespace is 
 	specified.
 	
+<<<<<<< HEAD:gdb/ChangeLog
 2008-10-20  Joel Brobecker  <brobecker@adacore.com>
 
 	* NEWS: Add entry mentioning thread-support on Tru64
@@ -2895,6 +2923,8 @@
 	(ada_evaluate_subexp) [UNOP_IN_RANGE]: Use operand range type
 	instead of builtin_type_int.
 
+=======
+>>>>>>> 4c736314fe5bf41d4c63daee24c7e226fa00dfc5:gdb/ChangeLog
 2008-09-09  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* dwarf2read.c (process_die): Added call to
