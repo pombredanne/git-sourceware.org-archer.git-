@@ -151,7 +151,7 @@ static PyObject *
 valpy_type (PyObject *self, PyObject *args)
 {
   struct value *value = ((value_object *) self)->value;
-  return type_to_type_object (NULL, value_type (value));
+  return type_to_type_object (value_type (value));
 }
 
 /* Return Unicode string with value contents (assumed to be encoded in the

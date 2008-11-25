@@ -1,3 +1,21 @@
+2008-11-25  Tom Tromey  <tromey@redhat.com>
+
+	* python/python-value.c (valpy_type): Update.
+	* python/python-internal.h (type_to_type_object): Update.
+	* python/python-type.c (pyty_type_object) <owned, originator>:
+	Remove.
+	(clean_up_objfile_types): Update.
+	(typy_dealloc): Update.
+	(set_type): Update.  Remove "parent" argument.
+	(type_to_type_object): Likewise.
+	(convert_field): Update.  Remove "self" argument.
+	(typy_fields): Update.
+	(typy_pointer): Update.
+	(typy_reference): Update.
+	(typy_target): Update.
+	(typy_template_argument): Update.
+	(typy_new): Update.
+
 2008-11-24  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	More changes from review.

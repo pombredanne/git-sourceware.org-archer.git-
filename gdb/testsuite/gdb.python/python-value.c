@@ -27,12 +27,15 @@ union u
   float b;
 };
 
+typedef struct s *PTR;
+
 int
 main (int argc, char *argv[])
 {
   char *cp = argv[0]; /* Prevent gcc from optimizing argv[] out.  */
   struct s s;
   union u u;
+  PTR x = &s;
 
   s.a = 3;
   s.b = 5;

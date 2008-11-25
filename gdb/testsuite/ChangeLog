@@ -1,3 +1,9 @@
+2008-11-25  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.python/python-value.c (PTR): New typedef.
+	* gdb.python/python-value.exp (test_value_after_death): New proc.
+	Call it.
+
 2008-11-17  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.python/python-prettyprint.c (do_nothing): New function.
