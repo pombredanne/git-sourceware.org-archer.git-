@@ -1,3 +1,77 @@
+2008-11-24  Tom Tromey  <tromey@redhat.com>
+
+	* ada-lang.c (value_from_contents_and_address): Move...
+	* value.c: ... here.
+	* ada-lang.h (value_from_contents_and_address): Move
+	declaration...
+	* value.h: ... here.
+
+2008-11-24  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* valprint.c (val_print_array_elements): Pass correct
+	element address to val_print.
+	
+2008-11-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix access of an already freed memory.
+	* parse.c (parse_field_expression): Call xstrdup on `*name'.
+	* completer.c (expression_completer): Free fieldname.
+
+2008-11-24  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	PR gdb/2474
+	* remote.c (remote_read_description_p): New function.
+	(remote_start_remote): Try to fetch the target description
+	before adding shared libraries.  Try again later if the
+	target is running but stopped.
+	(remote_open_1): Mark extended targets as exited by default.
+	(remote_read_description): Check target_has_execution.
+
+2008-11-24  Jerome Guitton  <guitton@adacore.com>
+
+	* alpha-mdebug-tdep.c (alpha_mdebug_frame_unwind_cache): Use
+        the frame address in block instead of the return address to
+        locate the mdebug PDR of the frame.
+
+2008-11-21  Joel Brobecker  <brobecker@adacore.com>
+
+	Remove the unused BPSTAT_WHAT_CHECK_SHLIBS_RESUME_FROM_HOOK.
+
+	* breakpoint.h (enum bpstat_what_main_action): Remove
+	BPSTAT_WHAT_CHECK_SHLIBS_RESUME_FROM_HOOK.
+	* breakpoint.c (bpstat_what): Delete catch_shlib_event from enum class.
+	Remove the BPSTAT_WHAT_CHECK_SHLIBS_RESUME_FROM_HOOK column from
+	variable table.
+	* infrun.c (wait_for_inferior): Remove handling of
+	BPSTAT_WHAT_CHECK_SHLIBS_RESUME_FROM_HOOK.
+
+2008-11-21  Tom Tromey  <tromey@redhat.com>
+
+	* configure: Rebuild.
+	* configure.ac: Merge calls to AC_CHECK_FUNCS, AC_CHECK_HEADERS,
+	AC_CHECK_DECLS, and AC_CHECK_MEMBERS.
+
+2008-11-21  Tom Tromey  <tromey@redhat.com>
+
+	* python/python-internal.h (PyGILState_Ensure): New define.
+	(PyGILState_Release): Likewise.
+	(PyEval_InitThreads): Likewise.
+	(PyThreadState_Swap): Likewise.
+	(PyEval_InitThreads): Likewise.
+	* python/python.c (_initialize_python): Initialize threads.
+	Release GIL.
+	(eval_python_from_control_command): Acquire GIL.
+	(python_command): Likewise.
+	* python/python-internal.h (make_cleanup_py_restore_gil):
+	Declare.
+	* python/python-utils.c (py_gil_restore): New function.
+	(make_cleanup_py_restore_gil): Likewise.
+
+2008-11-20  Doug Evans  <dje@google.com>
+
+	* frame.c (frame_debug_got_null_frame): Remove file arg.
+	All callers updated.
+
 2008-11-20  Pedro Alves  <pedro@codesourcery.com>
 
 	* infrun.c (resume): If following a fork, also reset regcache,
