@@ -1,5 +1,10 @@
 2008-12-01  Tom Tromey  <tromey@redhat.com>
 
+	* python/python.c (GdbMethods) <parse_and_eval>: New.
+	(gdbpy_parse_and_eval): New function.
+
+2008-12-01  Tom Tromey  <tromey@redhat.com>
+
 	* python/python-value.c (is_intlike): New function.
 	(valpy_int): Use it.
 	(valpy_long): Likewise.

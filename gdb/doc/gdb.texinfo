@@ -18099,6 +18099,13 @@ If the named parameter does not exist, this function throws a
 a Python value of the appropriate type, and returned.
 @end defun
 
+@findex gdb.parse_and_eval
+@defun parse_and_eval expression
+Parse @var{expression} as an expression in the current language,
+evaluate it, and return the result as a @code{gdb.Value}.
+@var{expression} must be a string.
+@end defun
+
 @findex gdb.write
 @defun write string
 Print a string to @value{GDBN}'s paginated standard output stream.

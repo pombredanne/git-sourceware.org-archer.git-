@@ -1,5 +1,9 @@
 2008-12-01  Tom Tromey  <tromey@redhat.com>
 
+	* gdb.texinfo (Basic Python): Document parse_and_eval.
+
+2008-12-01  Tom Tromey  <tromey@redhat.com>
+
 	* gdb.texinfo (Convenience Vars): Document convenience functions.
 	(Functions In Python): New node.
 	(Python API): Update.

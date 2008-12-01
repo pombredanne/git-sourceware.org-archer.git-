@@ -394,6 +394,26 @@ gdbpy_decode_line (PyObject *self, PyObject *args)
   Py_RETURN_NONE;
 }
 
+/* Parse a string and evaluate it as an expression.  */
+static PyObject *
+gdbpy_parse_and_eval (PyObject *self, PyObject *args)
+{
+  char *expr_str;
+  struct value *result = NULL;
+  volatile struct gdb_exception except;
+
+  if (!PyArg_ParseTuple (args, "s", &expr_str))
+    return NULL;
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      result = parse_and_eval (expr_str);
+    }
+  GDB_PY_HANDLE_EXCEPTION (except);
+
+  return value_to_value_object (result);
+}
+
 
 
 /* Threads.  */
@@ -1373,6 +1393,9 @@ Note: may later change to return an object." },
     "Return the thread ID of the current thread." },
   { "switch_to_thread", gdbpy_switch_to_thread, METH_VARARGS,
     "Switch to a thread, given the thread ID." },
+
+  { "parse_and_eval", gdbpy_parse_and_eval, METH_VARARGS,
+    "Parse a string as an expression, evaluate it, and return the result." },
 
   { "write", gdbpy_write, METH_VARARGS,
     "Write a string using gdb's filtered stream." },
