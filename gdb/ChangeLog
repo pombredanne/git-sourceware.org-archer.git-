@@ -1,3 +1,69 @@
+2008-12-01  Tom Tromey  <tromey@redhat.com>
+
+	* value.c (allocate_value): Update reference counts.
+	(value_free): Likewise.
+	(deprecated_set_value_type): Likewise.
+	(value_copy): Likewise.
+	(preserve_one_value): Likewise.
+	(value_change_enclosing_type): Likewise.
+	(value_primitive_field): Likewise.
+	(allocate_repeat_value): Remove FIXME comments.
+	(_initialize_values): Update.
+	* valops.c (value_cast): Remove FIXME.
+	(value_slice): Likewise.
+	* stabsread.c (dbx_alloc_type): Update.
+	* python/python-type.c (clean_up_objfile_types): Increment
+	reference count.
+	(set_type): Likewise.
+	(typy_dealloc): Decrement reference count.
+	* mdebugread.c (new_type): Update.
+	* jv-lang.c (type_from_class): Update.
+	* gdbtypes.h (alloc_type): Update.
+	(type_incref, type_decref): Declare.
+	(create_deleted_types_hash, delete_type_recursive): Remove.
+	* gdbtypes.c (struct type_refc_entry): New struct.
+	(type_refc_table): New global.
+	(alloc_type): Add 'parent' argument.  Init refc.
+	(alloc_type_instance): Init refc.
+	(make_pointer_type): Update.
+	(make_reference_type): Update.
+	(make_function_type): Update.
+	(make_qualified_type): Update.
+	(lookup_memberptr_type): Update.
+	(lookup_methodptr_type): Update.
+	(create_range_type): Update.
+	(create_array_type): Update.
+	(create_set_type): Update.
+	(check_typedef): Update.
+	(init_type): Update.  Increment reference count.
+	(copy_type_recursive_1): New function.
+	(copy_type_recursive): Use it.
+	(copy_type): Update.
+	(create_deleted_types_hash): Now static.
+	(delete_type_recursive): Likewise.
+	(type_refc_hash): New function.
+	(type_refc_equal): Likewise.
+	(type_init_refc): Likewise.
+	(type_incref): Likewise.
+	(type_refc_remove): Likewise.
+	(type_decref): Likewise.
+	(_initialize_gdbtypes): Initialize type_refc_table.
+	* dwarf2read.c (dwarf2_add_member_fn): Update.
+	(quirk_gcc_member_function_pointer): Update.
+	(read_structure_type): Update.
+	(read_enumeration_type): Update.
+	* coffread.c (coff_alloc_type): Update.
+	* ada-lang.c (ada_type_of_array): Update.
+	(packed_array_type): Update.
+	(empty_record): Update.
+	(ada_template_to_fixed_record_type_1): Update.
+	(template_to_static_fixed_type): Update.
+	(to_record_with_fixed_variant_part): Update.
+	(to_fixed_array_type): Update.
+	(to_fixed_array_type): Update.
+	(to_fixed_range_type): Update.
+	(to_fixed_range_type): Update.
+
 2008-11-25  Tom Tromey  <tromey@redhat.com>
 
 	* python/python-value.c (valpy_type): Update.

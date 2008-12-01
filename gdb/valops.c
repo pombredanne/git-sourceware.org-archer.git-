@@ -370,8 +370,6 @@ value_cast (struct type *type, struct value *arg2)
 	  new_length = val_length / element_length;
 	  if (val_length % element_length != 0)
 	    warning (_("array element type size does not divide object size in cast"));
-	  /* FIXME-type-allocation: need a way to free this type when
-	     we are done with it.  */
 	  range_type = create_range_type ((struct type *) NULL,
 					  TYPE_TARGET_TYPE (range_type),
 					  low_bound,
@@ -2917,8 +2915,6 @@ value_slice (struct value *array, int lowbound, int length)
       || lowbound + length - 1 > upperbound)
     error (_("slice out of range"));
 
-  /* FIXME-type-allocation: need a way to free this type when we are
-     done with it.  */
   slice_range_type = create_range_type ((struct type *) NULL,
 					TYPE_TARGET_TYPE (range_type),
 					lowbound, 

@@ -251,7 +251,9 @@ allocate_value (struct type *type)
   val->next = all_values;
   all_values = val;
   val->type = type;
+  type_incref (type);
   val->enclosing_type = type;
+  type_incref (type);
   VALUE_LVAL (val) = not_lval;
   val->location.address = 0;
   VALUE_FRAME_ID (val) = null_frame_id;
@@ -273,6 +275,8 @@ allocate_value (struct type *type)
 void
 value_free (struct value *value)
 {
+  type_decref (value->type);
+  type_decref (value->enclosing_type);
   xfree (value);
 }
 
@@ -283,13 +287,9 @@ struct value *
 allocate_repeat_value (struct type *type, int count)
 {
   int low_bound = current_language->string_lower_bound;		/* ??? */
-  /* FIXME-type-allocation: need a way to free this type when we are
-     done with it.  */
   struct type *range_type
   = create_range_type ((struct type *) NULL, builtin_type_int32,
 		       low_bound, count + low_bound - 1);
-  /* FIXME-type-allocation: need a way to free this type when we are
-     done with it.  */
   return allocate_value (create_array_type ((struct type *) NULL,
 					    type, range_type));
 }
@@ -335,6 +335,8 @@ value_type (struct value *value)
 void
 deprecated_set_value_type (struct value *value, struct type *type)
 {
+  type_incref (type);
+  type_decref (value->type);
   value->type = type;
 }
 
@@ -634,6 +636,10 @@ value_copy (struct value *arg)
 {
   struct type *encl_type = value_enclosing_type (arg);
   struct value *val = allocate_value (encl_type);
+  struct type *old = val->type;
+
+  type_incref (arg->type);
+  type_decref (val->type);
   val->type = arg->type;
   VALUE_LVAL (val) = VALUE_LVAL (arg);
   val->location = arg->location;
@@ -1059,12 +1065,22 @@ preserve_one_value (struct value *value, struct objfile *objfile,
 		    htab_t copied_types)
 {
   if (TYPE_OBJFILE (value->type) == objfile)
-    value->type = copy_type_recursive (objfile, value->type, copied_types);
+    {
+      /* No need to decref the old type here, since we know it has no
+	 reference count.  */
+      value->type = copy_type_recursive (objfile, value->type, copied_types);
+      type_incref (value->type);
+    }
 
   if (TYPE_OBJFILE (value->enclosing_type) == objfile)
-    value->enclosing_type = copy_type_recursive (objfile,
-						 value->enclosing_type,
-						 copied_types);
+    {
+      /* No need to decref the old type here, since we know it has no
+	 reference count.  */
+      value->enclosing_type = copy_type_recursive (objfile,
+						   value->enclosing_type,
+						   copied_types);
+      type_incref (value->enclosing_type);
+    }
 }
 
 /* Update the internal variables and value history when OBJFILE is
@@ -1452,6 +1468,8 @@ value_static_field (struct type *type, int fieldno)
 struct value *
 value_change_enclosing_type (struct value *val, struct type *new_encl_type)
 {
+  type_incref (new_encl_type);
+  type_decref (val->enclosing_type);
   if (TYPE_LENGTH (new_encl_type) <= TYPE_LENGTH (value_enclosing_type (val))) 
     {
       val->enclosing_type = new_encl_type;
@@ -1522,6 +1540,8 @@ value_primitive_field (struct value *arg1, int offset,
          entire object's contents for later references to virtual
          bases, etc.  */
       v = allocate_value (value_enclosing_type (arg1));
+      type_incref (type);
+      type_decref (v->type);
       v->type = type;
 
       /* Lazy register values with offsets are not supported.  */
@@ -1968,7 +1988,7 @@ VARIABLE is already initialized."));
 Placeholder command for showing help on convenience functions."),
 		  &functionlist, "function ", 0, &cmdlist);
 
-  internal_fn_type = alloc_type (NULL);
+  internal_fn_type = alloc_type (NULL, NULL);
   TYPE_CODE (internal_fn_type) = TYPE_CODE_INTERNAL_FUNCTION;
   TYPE_LENGTH (internal_fn_type) = sizeof (struct internal_function *);
   TYPE_NAME (internal_fn_type) = "<internal function>";

@@ -495,10 +495,11 @@ clean_up_objfile_types (struct objfile *objfile, void *datum)
       type_object *next = obj->next;
 
       htab_empty (copied_types);
-      /* Note that we leak this memory.  There is no good way to
-	 handle freeing this, given things like Value.cast and other
-	 unconstrained operations on values.  */
+
+      /* No need to decref the old type here, since we know it has no
+	 reference count.  */
       obj->type = copy_type_recursive (objfile, obj->type, copied_types);
+      type_incref (obj->type);
 
       obj->next = NULL;
       obj->prev = NULL;
@@ -515,6 +516,7 @@ static void
 set_type (type_object *obj, struct type *type)
 {
   obj->type = type;
+  type_incref (type);
   obj->prev = NULL;
   if (type && TYPE_OBJFILE (type))
     {
@@ -574,6 +576,9 @@ static void
 typy_dealloc (PyObject *obj)
 {
   type_object *type = (type_object *) obj;
+
+  if (type->type)
+    type_decref (type->type);
 
   if (type->prev)
     type->prev->next = type->next;

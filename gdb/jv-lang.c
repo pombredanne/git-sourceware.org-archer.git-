@@ -301,7 +301,7 @@ type_from_class (struct value *clas)
   if (type != NULL)
     return type;
 
-  type = alloc_type (objfile);
+  type = alloc_type (objfile, NULL);
   TYPE_CODE (type) = TYPE_CODE_STRUCT;
   INIT_CPLUS_SPECIFIC (type);
 

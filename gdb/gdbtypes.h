@@ -1101,7 +1101,7 @@ extern struct type *builtin_type_error;
 	      0, size)  \
     : xzalloc (size))
 
-extern struct type *alloc_type (struct objfile *);
+extern struct type *alloc_type (struct objfile *, struct type *);
 
 extern struct type *init_type (enum type_code, int, int, char *,
 			       struct objfile *);
@@ -1268,8 +1268,8 @@ extern struct type *copy_type_recursive (struct objfile *objfile,
 
 extern struct type *copy_type (const struct type *type);
 
-extern htab_t create_deleted_types_hash (void);
+extern void type_incref (struct type *type);
 
-extern void delete_type_recursive (struct type *type, htab_t copied_types);
+extern void type_decref (struct type *type);
 
 #endif /* GDBTYPES_H */
