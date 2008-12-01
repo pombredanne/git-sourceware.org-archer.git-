@@ -7398,6 +7398,20 @@ On HP-UX systems, if you refer to a function or variable name that
 begins with a dollar sign, @value{GDBN} searches for a user or system
 name first, before it searches for a convenience variable.
 
+@cindex convenience functions
+@value{GDBN} also supplies some @dfn{convenience functions}.  These
+have a syntax similar to convenience variables.  A convenience
+function can be used in an expression just like an ordinary function;
+however, a convenience function is implemented internally to
+@value{GDBN}.
+
+@table @code
+@item help function
+@kindex help function
+@cindex show all convenience functions
+Print a list of all convenience functions.
+@end table
+
 @node Registers
 @section Registers
 
@@ -18032,6 +18046,7 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 * Threads In Python::           Accessing inferior threads from Python.
 * Commands In Python::          Implementing new commands in Python.
 * Parameters In Python::        Adding new @value{GDBN} parameters.
+* Functions In Python::         Writing new convenience functions.
 * Objfiles in Python::          Object files.
 @end menu
 
@@ -18981,6 +18996,43 @@ is interpreted as itself.
 The value is a string, which must be one of a collection string
 constants provided when the parameter is created.
 @end table
+
+@node Functions In Python
+@subsubsection Writing new convenience functions
+
+@cindex writing convenience functions
+@cindex convenience functions in python
+@cindex python convenience functions
+@tindex gdb.Function
+@tindex Function
+You can implement new convenience functions (@pxref{Convenience Vars})
+in Python.  A convenience function is an instance of a subclass of the
+class @code{gdb.Function}.
+
+@defmethod Function __init__ name
+The initializer for @code{Function} registers the new function with
+@value{GDBN}.  The @var{name} argument is the name of the function.
+This must be a string.  The function is made visible to the user as a
+convenience variable, of ``internal function'' type, whose name is the
+same as @var{name}.
+
+The documentation for the new function is taken from the documentation
+string for the new class.
+@end defmethod
+
+@defmethod Function invoke @var{*args}
+When a convenience function is evaluated, its arguments are converted
+to instances of @code{gdb.Value}, and then the function's
+@code{invoke} method is called.  Note that @value{GDBN} does not
+predetermine the arity of convenience functions.  Instead, all
+available arguments are passed to @code{invoke}, following the
+standard Python calling convention.  In particular, a convenience
+function can have default values for parameters without ill effect.
+
+The return value of this method is used as its value in the enclosing
+expression.  If an ordinary Python value is returned, it is converted
+to a @code{gdb.Value} following the usual rules.
+@end defmethod
 
 @node Objfiles in Python
 @subsubsection Objfiles in Python
