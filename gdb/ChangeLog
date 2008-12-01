@@ -1,5 +1,11 @@
 2008-12-01  Tom Tromey  <tromey@redhat.com>
 
+	* python/python-value.c (is_intlike): New function.
+	(valpy_int): Use it.
+	(valpy_long): Likewise.
+
+2008-12-01  Tom Tromey  <tromey@redhat.com>
+
 	* value.c (allocate_value): Update reference counts.
 	(value_free): Likewise.
 	(deprecated_set_value_type): Likewise.

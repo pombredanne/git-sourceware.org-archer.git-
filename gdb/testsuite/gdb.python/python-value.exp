@@ -111,6 +111,11 @@ proc test_value_numeric_ops {} {
   gdb_test "python print 'result = ' + str(1-i)" " = -4" "subtract python integer from integer value"
   gdb_test "python print 'result = ' + str(1.5+f)" " = 2.75" "add python float with double value"
 
+  # Conversion test.
+  gdb_test "print evalue" " = TWO"
+  gdb_test "python evalue = gdb.get_value_from_history (0)" ""
+  gdb_test "python print int (evalue)" "2"
+
   # Test pointer arithmethic
 
   # First, obtain the pointers

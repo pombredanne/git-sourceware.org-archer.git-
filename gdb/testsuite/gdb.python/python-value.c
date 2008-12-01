@@ -27,7 +27,15 @@ union u
   float b;
 };
 
+enum e
+  {
+    ONE = 1,
+    TWO = 2
+  };
+
 typedef struct s *PTR;
+
+enum e evalue = TWO;
 
 int
 main (int argc, char *argv[])

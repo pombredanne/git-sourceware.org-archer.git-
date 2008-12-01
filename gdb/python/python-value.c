@@ -651,6 +651,18 @@ valpy_richcompare (PyObject *self, PyObject *other, int op)
   Py_RETURN_FALSE;
 }
 
+/* Helper function to determine if a type is "int-like".  */
+static int
+is_intlike (struct type *type, int ptr_ok)
+{
+  CHECK_TYPEDEF (type);
+  return (TYPE_CODE (type) == TYPE_CODE_INT
+	  || TYPE_CODE (type) == TYPE_CODE_ENUM
+	  || TYPE_CODE (type) == TYPE_CODE_BOOL
+	  || TYPE_CODE (type) == TYPE_CODE_CHAR
+	  || (ptr_ok && TYPE_CODE (type) == TYPE_CODE_PTR));
+}
+
 /* Implements conversion to int.  */
 static PyObject *
 valpy_int (PyObject *self)
@@ -661,7 +673,7 @@ valpy_int (PyObject *self)
   volatile struct gdb_exception except;
 
   CHECK_TYPEDEF (type);
-  if (TYPE_CODE (type) != TYPE_CODE_INT)
+  if (!is_intlike (type, 0))
     {
       PyErr_SetString (PyExc_RuntimeError, "cannot convert value to int");
       return NULL;
@@ -685,8 +697,7 @@ valpy_long (PyObject *self)
   LONGEST l = 0;
   volatile struct gdb_exception except;
 
-  CHECK_TYPEDEF (type);
-  if (TYPE_CODE (type) != TYPE_CODE_INT && TYPE_CODE (type) != TYPE_CODE_PTR)
+  if (!is_intlike (type, 1))
     {
       PyErr_SetString (PyExc_RuntimeError, "cannot convert value to long");
       return NULL;

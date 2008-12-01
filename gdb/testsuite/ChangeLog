@@ -1,3 +1,10 @@
+2008-12-01  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.python/python-value.exp (test_value_numeric_ops): Add
+	test for conversion of enum constant.
+	* gdb.python/python-value.c (enum e): New type.
+	(evalue): New global.
+
 2008-11-25  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.python/python-value.c (PTR): New typedef.
