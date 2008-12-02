@@ -1,5 +1,11 @@
 2008-12-02  Tom Tromey  <tromey@redhat.com>
 
+	* Makefile.in (PY_FILES): Add new files.
+	* python/lib/gdb/command/ignore_errors.py: New file.
+	* python/lib/gdb/command/save_breakpoints.py: New file.
+
+2008-12-02  Tom Tromey  <tromey@redhat.com>
+
 	* python/python-param.c (set_attr): Don't let user delete the
 	value.
 
