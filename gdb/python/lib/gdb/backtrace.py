@@ -28,12 +28,14 @@ def push_frame_filter (constructor):
 The filter will be passed an iterator as an argument.  The iterator
 will return gdb.Frame-like objects.  The filter should in turn act as
 an iterator returning such objects."""
+    global frame_filter
     if frame_filter == None:
         frame_filter = constructor
     else:
         frame_filter = lambda iterator: constructor (frame_filter (iterator))
 
 def create_frame_filter (iter):
+    global frame_filter
     if frame_filter is None:
         return iter
     return frame_filter (iter)

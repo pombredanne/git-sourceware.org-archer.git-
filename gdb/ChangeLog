@@ -1,5 +1,13 @@
 2008-12-02  Tom Tromey  <tromey@redhat.com>
 
+	* python/lib/gdb/command/backtrace.py (FrameWrapper.__getattr__):
+	Rename from __getattribute__.
+	* python/lib/gdb/backtrace.py (push_frame_filter): Add missing
+	'global'.
+	(create_frame_filter): Likewise.
+
+2008-12-02  Tom Tromey  <tromey@redhat.com>
+
 	* Makefile.in (PY_FILES): Add new files.
 	* python/lib/gdb/command/ignore_errors.py: New file.
 	* python/lib/gdb/command/save_breakpoints.py: New file.

@@ -111,7 +111,7 @@ class FrameWrapper:
             if full:
                 self.print_frame_locals (stream, func)
 
-    def __getattribute__ (self, name):
+    def __getattr__ (self, name):
         return getattr (self.frame, name)
 
 class ReverseBacktraceParameter (gdb.Parameter):
