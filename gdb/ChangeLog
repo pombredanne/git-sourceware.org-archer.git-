@@ -1,5 +1,9 @@
 2008-12-02  Tom Tromey  <tromey@redhat.com>
 
+	* python/python-value.c (valpy_string): Add "errors" argument.
+
+2008-12-02  Tom Tromey  <tromey@redhat.com>
+
 	* python/lib/gdb/command/backtrace.py (FrameWrapper.__getattr__):
 	Rename from __getattribute__.
 	* python/lib/gdb/backtrace.py (push_frame_filter): Add missing
