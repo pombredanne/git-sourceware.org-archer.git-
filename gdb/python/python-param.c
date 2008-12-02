@@ -244,7 +244,15 @@ set_attr (PyObject *obj, PyObject *attr_name, PyObject *val)
 {
   if (PyString_Check (attr_name)
       && ! strcmp (PyString_AsString (attr_name), "value"))
-    return set_parameter_value ((parmpy_object *) obj, val);
+    {
+      if (!val)
+	{
+	  PyErr_SetString (PyExc_RuntimeError,
+			   "cannot delete a parameter's value");
+	  return -1;
+	}
+      return set_parameter_value ((parmpy_object *) obj, val);
+    }
 
   return PyObject_GenericSetAttr (obj, attr_name, val);
 }

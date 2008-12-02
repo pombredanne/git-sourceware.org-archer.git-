@@ -1,3 +1,8 @@
+2008-12-02  Tom Tromey  <tromey@redhat.com>
+
+	* python/python-param.c (set_attr): Don't let user delete the
+	value.
+
 2008-12-01  Tom Tromey  <tromey@redhat.com>
 
 	* python/python.c (GdbMethods) <parse_and_eval>: New.
