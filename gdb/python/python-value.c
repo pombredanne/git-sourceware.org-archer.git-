@@ -846,7 +846,7 @@ convert_value_from_python (PyObject *obj)
 
 /* Returns value object in the ARGth position in GDB's history.  */
 PyObject *
-gdbpy_get_value_from_history (PyObject *self, PyObject *args)
+gdbpy_history (PyObject *self, PyObject *args)
 {
   int i;
   struct value *res_val = NULL;	  /* Initialize to appease gcc warning.  */

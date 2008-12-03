@@ -1,3 +1,9 @@
+2008-12-03  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.python/python-template.exp: Use `gdb.history' instead of
+	`gdb.value_from_history'.
+	* gdb.python/python-value.exp: Likewise.
+
 2008-12-01  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.python/python-value.exp (test_value_numeric_ops): Add

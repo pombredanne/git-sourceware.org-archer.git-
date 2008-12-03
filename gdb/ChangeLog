@@ -1,3 +1,12 @@
+2008-12-03  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* python/python-internal.h (gdbpy_get_value_from_history): Rename
+	prototype to gdbpy_history.
+	* python/python-value.c (gdbpy_get_value_from_history): Rename
+	function to gdbpy_history.
+	* python/python.c (GdbMethods): Rename function from
+	`get_value_from_history' to `history'.
+
 2008-12-02  Tom Tromey  <tromey@redhat.com>
 
 	* python/lib/gdb/command/alias.py (AliasCommand.invoke): Call

@@ -69,7 +69,7 @@ extern PyTypeObject block_object_type;
 extern PyTypeObject value_object_type;
 extern PyTypeObject symbol_object_type;
 
-PyObject *gdbpy_get_value_from_history (PyObject *self, PyObject *args);
+PyObject *gdbpy_history (PyObject *self, PyObject *args);
 PyObject *gdbpy_get_breakpoints (PyObject *, PyObject *);
 PyObject *gdbpy_get_frames (PyObject *, PyObject *);
 PyObject *gdbpy_get_current_frame (PyObject *, PyObject *);
