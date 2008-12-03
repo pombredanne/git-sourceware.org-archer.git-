@@ -37,6 +37,7 @@ The breakpoints can be restored using the 'source' command."""
                                                        gdb.COMPLETE_FILENAME)
 
     def invoke (self, arg, from_tty):
+        self.dont_repeat ()
         bps = gdb.get_breakpoints ()
         if bps is None:
             raise RuntimeError, 'No breakpoints to save'

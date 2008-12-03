@@ -1,5 +1,12 @@
 2008-12-02  Tom Tromey  <tromey@redhat.com>
 
+	* python/lib/gdb/command/alias.py (AliasCommand.invoke): Call
+	dont_repeat.  Fix logic when no '='.
+	* python/lib/gdb/command/save_breakpoints.py
+	(SaveBreakpointsCommand.invoke): Call dont_repeat.
+
+2008-12-02  Tom Tromey  <tromey@redhat.com>
+
 	* python/python-value.c (valpy_string): Add "errors" argument.
 
 2008-12-02  Tom Tromey  <tromey@redhat.com>

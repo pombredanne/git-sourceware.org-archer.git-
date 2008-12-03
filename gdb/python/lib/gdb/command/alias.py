@@ -45,15 +45,18 @@ before the '=' are the name of the new command."""
                                              gdb.COMPLETE_COMMAND)
 
     def invoke (self, arg, from_tty):
+        self.dont_repeat ()
         # Without some form of quoting we can't alias a multi-word
         # command to another command.
         args = arg.split()
         try:
-            i = args.index ('=')
+            start = args.index ('=')
+            end = start + 1
         except ValueError:
-            i = 0
-        target = " ".join(args[(i+1):])
-        AliasImplementation (" ".join (args[0:i]), target,
+            start = 1
+            end = 1
+        target = " ".join(args[end:])
+        AliasImplementation (" ".join (args[0:start]), target,
                              "This command is an alias for '%s'." % target)
 
 AliasCommand()
