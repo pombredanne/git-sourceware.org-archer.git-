@@ -1,3 +1,21 @@
+2008-12-09  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* python/lib/gdb/function/in_scope.py: Adjust to use gdb.Block
+	attributes rather than functions.
+	* python/python-block.c (blpy_get_start, blpy_get_end,
+	blpy_get_function, blpy_get_superblock): Change to conform to
+	Python getter signature.
+	(block_object_methods): Remove in favor of ...
+	(block_object_getset): ... this.
+	(gdbpy_get_block_for_pc): Rename to ...
+	(gdbpy_block_for_pc): ... this.
+	(blpy_itersymbols): Remove.
+	* python/python-internal.h (gdbpy_get_block_for_pc): Rename
+	prototype to ...
+	(gdbpy_block_for_pc): ... this.
+	* python/python.c (GdbMethods): Rename function from
+	`get_block_for_pc' to `block_for_pc'.
+
 2008-12-09  Tom Tromey  <tromey@redhat.com>
 
 	* python/python-type.c (gdbpy_initialize_types): Add Field to gdb

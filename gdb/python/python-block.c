@@ -58,13 +58,7 @@ blpy_iter (PyObject *self)
 }
 
 static PyObject *
-blpy_itersymbols (PyObject *self, PyObject *args)
-{
-  return blpy_iter (self);
-}
-
-static PyObject *
-blpy_get_start (PyObject *self, PyObject *args)
+blpy_get_start (PyObject *self, void *closure)
 {
   block_object *self_block = (block_object *) self;
 
@@ -72,7 +66,7 @@ blpy_get_start (PyObject *self, PyObject *args)
 }
 
 static PyObject *
-blpy_get_end (PyObject *self, PyObject *args)
+blpy_get_end (PyObject *self, void *closure)
 {
   block_object *self_block = (block_object *) self;
 
@@ -80,7 +74,7 @@ blpy_get_end (PyObject *self, PyObject *args)
 }
 
 static PyObject *
-blpy_get_function (PyObject *self, PyObject *args)
+blpy_get_function (PyObject *self, void *closure)
 {
   block_object *self_block = (block_object *) self;
   struct symbol *sym;
@@ -93,7 +87,7 @@ blpy_get_function (PyObject *self, PyObject *args)
 }
 
 static PyObject *
-blpy_get_superblock (PyObject *self, PyObject *args)
+blpy_get_superblock (PyObject *self, void *closure)
 {
   block_object *self_block = (block_object *) self;
   struct block *block;
@@ -157,7 +151,7 @@ blpy_block_syms_iternext (PyObject *self)
    or 0 if there is none.  */
 
 PyObject *
-gdbpy_get_block_for_pc (PyObject *self, PyObject *args)
+gdbpy_block_for_pc (PyObject *self, PyObject *args)
 {
   unsigned PY_LONG_LONG pc;
   struct block *block;
@@ -194,18 +188,14 @@ gdbpy_initialize_blocks (void)
 
 
 
-static PyMethodDef block_object_methods[] = {
-  { "itersymbols", blpy_itersymbols, METH_NOARGS,
-    "Return an iterator to walk through the symbols in the block." },
-  { "get_start", blpy_get_start, METH_NOARGS,
-    "Return the start address of this block." },
-  { "get_end", blpy_get_end, METH_NOARGS,
-    "Return the end address of this block." },
-  { "get_function", blpy_get_function, METH_NOARGS,
-    "Return the symbol that names this block, or None." },
-  { "get_superblock", blpy_get_superblock, METH_NOARGS,
-    "Return the block containing this block, or None." },
-  {NULL}  /* Sentinel */
+static PyGetSetDef block_object_getset[] = {
+  { "start", blpy_get_start, NULL, "Start address of the block.", NULL },
+  { "end", blpy_get_end, NULL, "End address of the block.", NULL },
+  { "function", blpy_get_function, NULL,
+    "Symbol that names the block, or None.", NULL },
+  { "superblock", blpy_get_superblock, NULL,
+    "Block containing the block, or None.", NULL },
+  { NULL }  /* Sentinel */
 };
 
 PyTypeObject block_object_type = {
@@ -237,7 +227,9 @@ PyTypeObject block_object_type = {
   0,				  /* tp_weaklistoffset */
   blpy_iter,			  /* tp_iter */
   0,				  /* tp_iternext */
-  block_object_methods		  /* tp_methods */
+  0,				  /* tp_methods */
+  0,				  /* tp_members */
+  block_object_getset		  /* tp_getset */
 };
 
 static PyTypeObject block_syms_iterator_object_type = {
