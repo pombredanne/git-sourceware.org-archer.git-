@@ -1,5 +1,10 @@
 2008-12-02  Tom Tromey  <tromey@redhat.com>
 
+	* gdb.texinfo (Pretty Printing): Update to_string documentation.
+	Mention package recommendation.
+
+2008-12-02  Tom Tromey  <tromey@redhat.com>
+
 	* gdb.texinfo (Values From Inferior): Document new string
 	argument.
 

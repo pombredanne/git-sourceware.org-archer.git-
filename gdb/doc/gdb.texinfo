@@ -18589,7 +18589,11 @@ When printing from the CLI, if the @code{to_string} method exists,
 then @value{GDBN} will prepend its result to the values returned by
 @code{children}.
 
-This method must return a string.
+If this method returns a string, it is printed verbatim.  Otherwise,
+the result is converted to a @code{gdb.Value}, following the usual
+algorithm.  Then @value{GDBN} prints this value; this may possibly
+result in a call to another pretty-printer.  If the result is not
+convertible to @code{gdb.Value}, an exception is raised.
 @end defop
 
 @subsubsection Selecting Pretty-Printers
@@ -18631,9 +18635,28 @@ class StdStringPrinter:
 
     def to_string(self):
         return self.val['_M_dataplus']['_M_p']
+@end smallexample
 
-obj = gdb.get_current_objfile()
-obj.pretty_printers['^std::basic_string<char.*>$'] = StdStringPrinter
+We recommend that you put your core pretty-printers into a versioned
+python package, and then restrict your auto-loaded code to idempotent
+behavior -- for example, just @code{import}s of your printer modules,
+followed by a call to a register pretty-printers with the current
+objfile.  This approach will scale more nicely to multiple inferiors,
+potentially using different library versions.
+
+For example, in addition to the above, this code might appear in
+@code{gdb.libstdcxx.v6}:
+
+@smallexample
+def register_printers (objfile):
+    objfile.pretty_printers['^std::basic_string<char.*>$'] = StdStringPrinter
+@end smallexample
+
+And then the corresponding contents of the auto-load file would be:
+
+@smallexample
+import gdb.libstdcxx.v6
+gdb.libstdcxx.v6.register_printers (gdb.get_current_objfile ())
 @end smallexample
 
 @node Threads In Python
