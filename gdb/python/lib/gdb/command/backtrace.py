@@ -78,21 +78,21 @@ class FrameWrapper:
     # FIXME: this should probably just be a method on gdb.Frame.
     # But then we need stream wrappers.
     def describe (self, stream, full):
-        if self.frame.get_type () == gdb.DUMMY_FRAME:
+        if self.frame.type () == gdb.DUMMY_FRAME:
             stream.write (" <function called from gdb>\n")
-        elif self.frame.get_type () == gdb.SIGTRAMP_FRAME:
+        elif self.frame.type () == gdb.SIGTRAMP_FRAME:
             stream.write (" <signal handler called>\n")
         else:
             sal = self.frame.find_sal ()
-            pc = self.frame.get_pc ()
-            name = self.frame.get_name ()
+            pc = self.frame.pc ()
+            name = self.frame.name ()
             if not name:
                 name = "??"
             if pc != sal.get_pc () or not sal.symtab:
                 stream.write (" 0x%08x in" % pc)
             stream.write (" " + name + " (")
 
-            func = gdb.find_pc_function (self.frame.get_address_in_block ())
+            func = gdb.find_pc_function (self.frame.address_in_block ())
             self.print_frame_args (stream, func)
 
             stream.write (")")
@@ -101,7 +101,7 @@ class FrameWrapper:
                 stream.write (" at " + sal.symtab.get_filename ())
                 stream.write (":" + str (sal.get_line ()))
 
-            if not self.frame.get_name () or (not sal.symtab or not sal.symtab.get_filename ()):
+            if not self.frame.name () or (not sal.symtab or not sal.symtab.get_filename ()):
                 lib = gdb.solib_address (pc)
                 if lib:
                     stream.write (" from " + lib)
@@ -175,7 +175,7 @@ Use of the 'raw' qualifier avoids any filtering by loadable modules.
         # FIXME: provide option to start at selected frame
         # However, should still number as if starting from current
         iter = itertools.imap (FrameWrapper,
-                               FrameIterator (gdb.get_current_frame ()))
+                               FrameIterator (gdb.current_frame ()))
         if filter:
             iter = gdb.backtrace.create_frame_filter (iter)
 

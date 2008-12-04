@@ -30,11 +30,11 @@ to traverse to find the calling function.  The default is 1."""
         super (CallerIs, self).__init__ ("caller_is")
 
     def invoke (self, name, nframes = 1):
-        frame = gdb.get_current_frame ()
+        frame = gdb.current_frame ()
         while nframes > 0:
-            frame = frame.get_prev ()
+            frame = frame.older ()
             nframes = nframes - 1
-        return frame.get_name () == name.string ()
+        return frame.name () == name.string ()
 
 class CallerMatches (gdb.Function):
     """Return True if the calling function's name matches a string.
@@ -48,11 +48,11 @@ to traverse to find the calling function.  The default is 1."""
         super (CallerMatches, self).__init__ ("caller_matches")
 
     def invoke (self, name, nframes = 1):
-        frame = gdb.get_current_frame ()
+        frame = gdb.current_frame ()
         while nframes > 0:
-            frame = frame.get_prev ()
+            frame = frame.older ()
             nframes = nframes - 1
-        return re.match (name.string (), frame.get_name ()) is not None
+        return re.match (name.string (), frame.name ()) is not None
 
 CallerIs()
 CallerMatches()

@@ -123,7 +123,7 @@ frapy_equal_p (PyObject *self, PyObject *args)
 }
 
 static PyObject *
-frapy_get_name (PyObject *self, PyObject *args)
+frapy_name (PyObject *self, PyObject *args)
 {
   struct frame_info *frame;
   char *name;
@@ -151,7 +151,7 @@ frapy_get_name (PyObject *self, PyObject *args)
 }
 
 static PyObject *
-frapy_get_type (PyObject *self, PyObject *args)
+frapy_type (PyObject *self, PyObject *args)
 {
   struct frame_info *frame;
   enum frame_type type = NORMAL_FRAME;/* Initialize to appease gcc warning.  */
@@ -169,7 +169,7 @@ frapy_get_type (PyObject *self, PyObject *args)
 }
 
 static PyObject *
-frapy_get_unwind_stop_reason (PyObject *self, PyObject *args)
+frapy_unwind_stop_reason (PyObject *self, PyObject *args)
 {
   struct frame_info *frame = NULL;    /* Initialize to appease gcc warning.  */
   volatile struct gdb_exception except;
@@ -187,7 +187,7 @@ frapy_get_unwind_stop_reason (PyObject *self, PyObject *args)
 }
 
 static PyObject *
-frapy_get_pc (PyObject *self, PyObject *args)
+frapy_pc (PyObject *self, PyObject *args)
 {
   CORE_ADDR pc = 0;	      /* Initialize to appease gcc warning.  */
   struct frame_info *frame;
@@ -205,7 +205,7 @@ frapy_get_pc (PyObject *self, PyObject *args)
 }
 
 static PyObject *
-frapy_get_address_in_block (PyObject *self, PyObject *args)
+frapy_address_in_block (PyObject *self, PyObject *args)
 {
   CORE_ADDR pc = 0;	      /* Initialize to appease gcc warning.  */
   struct frame_info *frame;
@@ -256,7 +256,7 @@ frame_info_to_frame_object (struct frame_info *frame)
 }
 
 static PyObject *
-frapy_get_prev (PyObject *self, PyObject *args)
+frapy_older (PyObject *self, PyObject *args)
 {
   struct frame_info *frame, *prev;
   volatile struct gdb_exception except;
@@ -281,7 +281,7 @@ frapy_get_prev (PyObject *self, PyObject *args)
 }
 
 static PyObject *
-frapy_get_next (PyObject *self, PyObject *args)
+frapy_newer (PyObject *self, PyObject *args)
 {
   struct frame_info *frame, *next;
   volatile struct gdb_exception except;
@@ -359,7 +359,7 @@ frapy_read_var_value (PyObject *self, PyObject *args)
 }
 
 PyObject *
-gdbpy_get_frames (PyObject *self, PyObject *args)
+gdbpy_frames (PyObject *self, PyObject *args)
 {
   int result = 0;
   struct frame_info *frame;
@@ -403,7 +403,7 @@ gdbpy_get_frames (PyObject *self, PyObject *args)
 }
 
 PyObject *
-gdbpy_get_current_frame (PyObject *self, PyObject *args)
+gdbpy_current_frame (PyObject *self, PyObject *args)
 {
   struct frame_info *frame;
   frame_object *frame_obj = NULL;   /* Initialize to appease gcc warning.  */
@@ -422,7 +422,7 @@ gdbpy_get_current_frame (PyObject *self, PyObject *args)
 }
 
 PyObject *
-gdbpy_get_selected_frame (PyObject *self, PyObject *args)
+gdbpy_selected_frame (PyObject *self, PyObject *args)
 {
   struct frame_info *frame;
   frame_object *frame_obj = NULL;   /* Initialize to appease gcc warning.  */
@@ -496,17 +496,18 @@ static PyMethodDef frame_object_methods[] = {
   { "equals", frapy_equal_p, METH_VARARGS, "Compare frames." },
   { "is_valid", frapy_is_valid, METH_NOARGS,
     "Return true if this frame is valid, false if not." },
-  { "get_name", frapy_get_name, METH_NOARGS,
+  { "name", frapy_name, METH_NOARGS,
     "Return the function name of the frame." },
-  { "get_type", frapy_get_type, METH_NOARGS, "Return the type of the frame." },
-  { "get_unwind_stop_reason", frapy_get_unwind_stop_reason,
-    METH_NOARGS, "Return the function name of the frame." },
-  { "get_pc", frapy_get_pc, METH_NOARGS, "Return the frame's resume address." },
-  { "get_address_in_block", frapy_get_address_in_block, METH_NOARGS,
+  { "type", frapy_type, METH_NOARGS, "Return the type of the frame." },
+  { "unwind_stop_reason", frapy_unwind_stop_reason, METH_NOARGS,
+    "Return the function name of the frame." },
+  { "pc", frapy_pc, METH_NOARGS, "Return the frame's resume address." },
+  { "address_in_block", frapy_address_in_block, METH_NOARGS,
     "Return an address which falls within the frame's code block." },
-  { "get_prev", frapy_get_prev, METH_NOARGS,
-    "Return the previous (outer) frame." },
-  { "get_next", frapy_get_next, METH_NOARGS, "Return the next (inner) frame." },
+  { "older", frapy_older, METH_NOARGS,
+    "Return the frame immediately older (outer) to this frame." },
+  { "newer", frapy_newer, METH_NOARGS,
+    "Return the frame immetidaely newer (inner) to this frame." },
   { "find_sal", frapy_find_sal, METH_NOARGS,
     "Return the frame's symtab and line." },
   { "read_var_value", frapy_read_var_value, METH_VARARGS,

@@ -27,7 +27,7 @@ Receives as argument a list of names separated by whitespace."""
     def invoke (self, var):
 	vars = set (var.string().split())
 	found = set ()
-	block = gdb.block_for_pc (gdb.get_selected_frame ().get_pc ())
+	block = gdb.block_for_pc (gdb.selected_frame ().pc ())
 	while block:
 	    for sym in block:
 		if (sym.is_argument () or sym.is_constant ()

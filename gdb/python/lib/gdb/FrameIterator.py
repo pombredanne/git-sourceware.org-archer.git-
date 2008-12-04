@@ -29,5 +29,5 @@ class FrameIterator:
         result = self.frame
         if result == None:
             raise StopIteration
-        self.frame = result.get_prev()
+        self.frame = result.older ()
         return result
