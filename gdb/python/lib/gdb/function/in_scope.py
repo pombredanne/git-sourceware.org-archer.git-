@@ -32,7 +32,7 @@ Receives as argument a list of names separated by whitespace."""
 	    for sym in block:
 		if (sym.is_argument () or sym.is_constant ()
 		      or sym.is_function () or sym.is_variable ()):
-		    sym_name = sym.get_print_name ()
+		    sym_name = sym.name
 		    if sym_name in vars:
 			found.add (sym_name)
 

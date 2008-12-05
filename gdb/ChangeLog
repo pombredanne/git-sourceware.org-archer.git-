@@ -1,5 +1,25 @@
 2008-12-09  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
+	* python/python-symbol.c (sympy_get_value, sympy_get_symtab,
+	sympy_get_linkage_name, sympy_get_print_name, sympy_is_argument,
+	sympy_is_constant, sympy_is_function, sympy_is_variable): Change
+	to conform to Python getter signature.
+	(sympy_get_natural_name): Rename to ...
+	(sympy_get_name): ... this. Change to conform to Python getter
+	signature.
+	(sympy_get_class): Rename to ...
+	(sympy_get_addr_class): ... this. Change to conform to Python
+	getter signature.
+	(symbol_object_methods): Remove in favor of ...
+	(symbol_object_getset): ... this.
+	(symbol_object_type): Set tp_getset field. Unset tp_methods field.
+	* python/lib/gdb/command/backtrace.py: Adjust to use gdb.Symbol
+	attributes rather than functions.
+	* python/lib/gdb/function/in_scope.py: Adjust to use gdb.Symbol
+	attributes rather than functions.
+
+2008-12-09  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
 	* python/python-frame.c (frapy_get_name): Rename to ...
 	(frapy_name): ... this.
 	(frapy_get_type): Rename to ...

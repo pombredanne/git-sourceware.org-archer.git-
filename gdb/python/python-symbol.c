@@ -46,7 +46,7 @@ sympy_str (PyObject *self)
 }
 
 static PyObject *
-sympy_get_value (PyObject *self, PyObject *args)
+sympy_get_value (PyObject *self, void *closure)
 {
   symbol_object *self_sym = (symbol_object *) self;
 
@@ -62,7 +62,7 @@ sympy_get_value (PyObject *self, PyObject *args)
 }
 
 static PyObject *
-sympy_get_symtab (PyObject *self, PyObject *args)
+sympy_get_symtab (PyObject *self, void *closure)
 {
   symbol_object *self_sym = (symbol_object *) self;
 
@@ -70,7 +70,7 @@ sympy_get_symtab (PyObject *self, PyObject *args)
 }
 
 static PyObject *
-sympy_get_natural_name (PyObject *self, PyObject *args)
+sympy_get_name (PyObject *self, void *closure)
 {
   symbol_object *self_sym = (symbol_object *) self;
 
@@ -78,7 +78,7 @@ sympy_get_natural_name (PyObject *self, PyObject *args)
 }
 
 static PyObject *
-sympy_get_linkage_name (PyObject *self, PyObject *args)
+sympy_get_linkage_name (PyObject *self, void *closure)
 {
   symbol_object *self_sym = (symbol_object *) self;
 
@@ -86,7 +86,7 @@ sympy_get_linkage_name (PyObject *self, PyObject *args)
 }
 
 static PyObject *
-sympy_get_print_name (PyObject *self, PyObject *args)
+sympy_get_print_name (PyObject *self, void *closure)
 {
   symbol_object *self_sym = (symbol_object *) self;
 
@@ -94,7 +94,7 @@ sympy_get_print_name (PyObject *self, PyObject *args)
 }
 
 static PyObject *
-sympy_get_class (PyObject *self, PyObject *args)
+sympy_get_addr_class (PyObject *self, void *closure)
 {
   symbol_object *self_sym = (symbol_object *) self;
 
@@ -102,7 +102,7 @@ sympy_get_class (PyObject *self, PyObject *args)
 }
 
 static PyObject *
-sympy_is_argument (PyObject *self, PyObject *args)
+sympy_is_argument (PyObject *self, void *closure)
 {
   symbol_object *self_sym = (symbol_object *) self;
 
@@ -110,7 +110,7 @@ sympy_is_argument (PyObject *self, PyObject *args)
 }
 
 static PyObject *
-sympy_is_constant (PyObject *self, PyObject *args)
+sympy_is_constant (PyObject *self, void *closure)
 {
   symbol_object *self_sym = (symbol_object *) self;
   enum address_class class = SYMBOL_CLASS (self_sym->symbol);
@@ -119,7 +119,7 @@ sympy_is_constant (PyObject *self, PyObject *args)
 }
 
 static PyObject *
-sympy_is_function (PyObject *self, PyObject *args)
+sympy_is_function (PyObject *self, void *closure)
 {
   symbol_object *self_sym = (symbol_object *) self;
   enum address_class class = SYMBOL_CLASS (self_sym->symbol);
@@ -128,7 +128,7 @@ sympy_is_function (PyObject *self, PyObject *args)
 }
 
 static PyObject *
-sympy_is_variable (PyObject *self, PyObject *args)
+sympy_is_variable (PyObject *self, void *closure)
 {
   symbol_object *self_sym = (symbol_object *) self;
   enum address_class class = SYMBOL_CLASS (self_sym->symbol);
@@ -265,28 +265,28 @@ gdbpy_initialize_symbols (void)
 
 
 
-static PyMethodDef symbol_object_methods[] = {
-  { "get_value", sympy_get_value, METH_NOARGS,
-    "Return the value of the symbol." },
-  { "get_symtab", sympy_get_symtab, METH_NOARGS,
-    "Return the symbol table in which this symbol appears." },
-  { "get_natural_name", sympy_get_natural_name, METH_NOARGS,
-    "Return the \"natural\" name of the symbol." },
-  { "get_linkage_name", sympy_get_linkage_name, METH_NOARGS,
-    "Return the name of the symbol as used by the linker." },
-  { "get_print_name", sympy_get_print_name, METH_NOARGS,
-    "Return the name of the symbol in a form suitable for output." },
-  { "get_class", sympy_get_class, METH_NOARGS,
-    "Return the class of the symbol." },
-  { "is_argument", sympy_is_argument, METH_NOARGS,
-    "Return True if symbol is the argument of a function." },
-  { "is_constant", sympy_is_constant, METH_NOARGS,
-    "Return True if symbol is a function or method." },
-  { "is_function", sympy_is_function, METH_NOARGS,
-    "Return True if symbol is a function or method." },
-  { "is_variable", sympy_is_variable, METH_NOARGS,
-    "Return True if symbol is a variable." },
-  {NULL}  /* Sentinel */
+static PyGetSetDef symbol_object_getset[] = {
+  { "value", sympy_get_value, NULL, "Value of the symbol.", NULL },
+  { "symtab", sympy_get_symtab, NULL,
+    "Symbol table in which the symbol appears.", NULL },
+  { "name", sympy_get_name, NULL,
+    "Name of the symbol, as it appears in the source code.", NULL },
+  { "linkage_name", sympy_get_linkage_name, NULL,
+    "Name of the symbol, as used by the linker (i.e., may be mangled).", NULL },
+  { "print_name", sympy_get_print_name, NULL,
+    "Name of the symbol in a form suitable for output.\n\
+This is either name or linkage_name, depending on whether the user asked GDB\n\
+to display demangled or mangled names.", NULL },
+  { "addr_class", sympy_get_addr_class, NULL, "Address class of the symbol." },
+  { "is_argument", sympy_is_argument, NULL,
+    "True if the symbol is an argument of a function." },
+  { "is_constant", sympy_is_constant, NULL,
+    "True if the symbol is a constant." },
+  { "is_function", sympy_is_function, NULL,
+    "True if the symbol is a function or method." },
+  { "is_variable", sympy_is_variable, NULL,
+    "True if the symbol is a variable." },
+  { NULL }  /* Sentinel */
 };
 
 PyTypeObject symbol_object_type = {
@@ -318,5 +318,7 @@ PyTypeObject symbol_object_type = {
   0,				  /* tp_weaklistoffset */
   0,				  /* tp_iter */
   0,				  /* tp_iternext */
-  symbol_object_methods		  /* tp_methods */
+  0,				  /* tp_methods */
+  0,				  /* tp_members */
+  symbol_object_getset		  /* tp_getset */
 };

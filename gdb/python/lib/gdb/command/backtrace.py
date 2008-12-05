@@ -26,12 +26,12 @@ class FrameWrapper:
         self.frame = frame;
 
     def write_symbol (self, stream, sym, block):
-        if len (sym.get_linkage_name ()):
-            nsym, is_field_of_this = gdb.lookup_symbol (sym.get_linkage_name (), block, gdb.SYMBOL_VAR_DOMAIN)
-            if nsym.get_class () != gdb.SYMBOL_LOC_REGISTER:
+        if len (sym.linkage_name):
+            nsym, is_field_of_this = gdb.lookup_symbol (sym.linkage_name, block, gdb.SYMBOL_VAR_DOMAIN)
+            if nsym.addr_class != gdb.SYMBOL_LOC_REGISTER:
                 sym = nsym
 
-        stream.write (sym.get_print_name () + "=")
+        stream.write (sym.print_name + "=")
         try:
             val = self.frame.read_var_value (sym)
             if val != None:
@@ -49,10 +49,10 @@ class FrameWrapper:
             return
 
         first = True
-        block = func.get_value ()
+        block = func.value
 
         for sym in block:
-            if sym.is_argument ():
+            if sym.is_argument:
                 continue;
 
             self.write_symbol (stream, sym, block)
@@ -63,10 +63,10 @@ class FrameWrapper:
             return
 
         first = True
-        block = func.get_value ()
+        block = func.value
 
         for sym in block:
-            if not sym.is_argument ():
+            if not sym.is_argument:
                 continue;
 
             if not first:
