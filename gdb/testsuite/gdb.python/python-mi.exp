@@ -74,7 +74,7 @@ mi_gdb_test "-var-update container" \
   "\\^done,changelist=\\\[\\\]" \
   "varobj update after clearing"
 
-mi_gdb_test "-var-set-visualizer container gdb.get_default_visualizer" \
+mi_gdb_test "-var-set-visualizer container gdb.default_visualizer" \
   "\\^done" \
   "choose default visualizer"
 

@@ -18073,22 +18073,22 @@ command as having originated from the user invoking it interactively.
 It must be a boolean value.  If omitted, it defaults to @code{False}.
 @end defun
 
-@findex gdb.get_current_objfile
-@defun get_current_objfile
+@findex gdb.current_objfile
+@defun current_objfile
 When auto-loading a Python script (@pxref{Auto-loading}), @var{GDBN}
 sets the ``current objfile'' to the corresponding objfile.  This
 function returns the current objfile.  If there is no current objfile,
 this function returns @code{None}.
 @end defun
 
-@findex gdb.get_objfiles
-@defun get_objfiles
+@findex gdb.objfiles
+@defun objfiles
 Return a sequence of all the objfiles current known to @var{GDBN}.
 @xref{Objfiles in Python}.
 @end defun
 
-@findex gdb.get_parameter
-@defun get_parameter parameter
+@findex gdb.parameter
+@defun parameter
 Return the value of a @value{GDBN} parameter.  @var{parameter} is a
 string naming the parameter to look up; @var{parameter} may contain
 spaces if the parameter has a multi-part name.  For example,
@@ -18177,7 +18177,7 @@ for the @samp{-gdb.py} file both in the directory associated with the
 application and the directory associated with the separate debug file.
 
 When reading a @samp{-gdb.py} file, @var{GDBN} sets the ``current
-objfile''.  This is available via the @code{gdb.get_current_objfile}
+objfile''.  This is available via the @code{gdb.current_objfile}
 function.  This can be useful for registering objfile-specific
 pretty-printers.
 
@@ -18669,7 +18669,7 @@ And then the corresponding contents of the auto-load file would be:
 
 @smallexample
 import gdb.libstdcxx.v6
-gdb.libstdcxx.v6.register_printers (gdb.get_current_objfile ())
+gdb.libstdcxx.v6.register_printers (gdb.current_objfile ())
 @end smallexample
 
 @node Threads In Python
@@ -19098,9 +19098,9 @@ files.  @var{GDBN} calls these symbol-containing files
 Each objfile is represented by an instance of the @code{gdb.Objfile}
 class.
 
-@defmethod Objfile get_filename
-Return the file name of the objfile as a string.
-@end defmethod
+@defivar Objfile filename
+The file name of the objfile as a string.
+@end defivar
 
 @defivar Objfile pretty_printers
 The @code{pretty_printers} attribute is used to look up

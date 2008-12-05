@@ -41,7 +41,7 @@ static const struct objfile_data *objfpy_objfile_data_key;
 
 /* An Objfile method which returns the objfile's file name, or None.  */
 static PyObject *
-objfpy_filename (PyObject *self, PyObject *args)
+objfpy_get_filename (PyObject *self, void *closure)
 {
   objfile_object *obj = (objfile_object *) self;
   if (obj->objfile && obj->objfile->name)
@@ -170,16 +170,11 @@ gdbpy_initialize_objfile (void)
 
 static PyGetSetDef objfile_getset[] =
 {
+  { "filename", objfpy_get_filename, NULL,
+    "The objfile's filename, or None.", NULL },
   { "pretty_printers", objfpy_get_printers, objfpy_set_printers,
-    "Pretty printers", NULL },
+    "Pretty printers.", NULL },
   { NULL }
-};
-
-static PyMethodDef objfile_object_methods[] =
-{
-  { "get_filename", objfpy_filename, METH_NOARGS,
-    "Return the objfile's filename, or None." },
-  {NULL}  /* Sentinel */
 };
 
 static PyTypeObject objfile_object_type =
@@ -212,7 +207,7 @@ static PyTypeObject objfile_object_type =
   0,				  /* tp_weaklistoffset */
   0,				  /* tp_iter */
   0,				  /* tp_iternext */
-  objfile_object_methods,	  /* tp_methods */
+  0,				  /* tp_methods */
   0,				  /* tp_members */
   objfile_getset,		  /* tp_getset */
   0,				  /* tp_base */

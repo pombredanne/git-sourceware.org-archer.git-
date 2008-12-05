@@ -150,7 +150,7 @@ class StdStackOrQueuePrinter:
 
     def __init__ (self, typename, val):
         self.typename = typename
-        self.visualizer = gdb.get_default_visualizer(val['c'])
+        self.visualizer = gdb.default_visualizer(val['c'])
 
     def children (self):
         return self.visualizer.children()
@@ -388,7 +388,7 @@ class StdStringPrinter:
         # Look up the target encoding as late as possible.
         encoding = self.encoding
         if encoding is None:
-            encoding = gdb.get_parameter('target-charset')
+            encoding = gdb.parameter('target-charset')
         elif isinstance(encoding, WideEncoding):
             encoding = encoding.value
         return self.val['_M_dataplus']['_M_p'].string(encoding)
@@ -519,4 +519,4 @@ def register_libstdcxx_printers(obj):
     # Extensions.
     obj.pretty_printers['^__gnu_cxx::slist<.*>$'] = StdSlistPrinter
 
-register_libstdcxx_printers (gdb.get_current_objfile())
+register_libstdcxx_printers (gdb.current_objfile())

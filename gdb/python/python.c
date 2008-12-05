@@ -223,7 +223,7 @@ gdbpy_parameter_value (enum var_types type, void *var)
    value.  */
 
 static PyObject *
-get_parameter (PyObject *self, PyObject *args)
+gdbpy_parameter (PyObject *self, PyObject *args)
 {
   struct cmd_list_element *alias, *prefix, *cmd;
   char *arg, *newarg;
@@ -665,7 +665,7 @@ gdbpy_get_current_objfile (PyObject *unused1, PyObject *unused2)
 
 /* Return a sequence holding all the Objfiles.  */
 static PyObject *
-gdbpy_get_objfiles (PyObject *unused1, PyObject *unused2)
+gdbpy_objfiles (PyObject *unused1, PyObject *unused2)
 {
   struct objfile *objf;
   PyObject *list;
@@ -1103,7 +1103,7 @@ gdbpy_get_varobj_pretty_printer (struct type *type)
    pretty printer instance, or None.  This function is useful as an
    argument to the MI command -var-set-visualizer.  */
 static PyObject *
-gdbpy_get_default_visualizer (PyObject *self, PyObject *args)
+gdbpy_default_visualizer (PyObject *self, PyObject *args)
 {
   PyObject *val_obj;
   PyObject *cons, *printer = NULL;
@@ -1348,18 +1348,18 @@ static PyMethodDef GdbMethods[] =
     "Execute a gdb command" },
   { "cli", gdbpy_cli, METH_NOARGS,
     "Enter the gdb CLI" },
-  { "get_parameter", get_parameter, METH_VARARGS,
+  { "parameter", gdbpy_parameter, METH_VARARGS,
     "Return a gdb parameter's value" },
 
   { "get_breakpoints", gdbpy_get_breakpoints, METH_NOARGS,
     "Return a tuple of all breakpoint objects" },
 
-  { "get_default_visualizer", gdbpy_get_default_visualizer, METH_VARARGS,
+  { "default_visualizer", gdbpy_default_visualizer, METH_VARARGS,
     "Find the default visualizer for a Value." },
 
-  { "get_current_objfile", gdbpy_get_current_objfile, METH_NOARGS,
+  { "current_objfile", gdbpy_get_current_objfile, METH_NOARGS,
     "Return the current Objfile being loaded, or None." },
-  { "get_objfiles", gdbpy_get_objfiles, METH_NOARGS,
+  { "objfiles", gdbpy_objfiles, METH_NOARGS,
     "Return a sequence of all loaded objfiles." },
 
   { "frames", gdbpy_frames, METH_NOARGS,

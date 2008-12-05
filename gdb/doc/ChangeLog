@@ -1,3 +1,7 @@
+2008-12-05  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.texinfo: Fix references to renamed gdb module functions.
+
 2008-12-03  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.texinfo (Basic Python): Document gdb.history.

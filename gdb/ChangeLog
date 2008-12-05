@@ -1,5 +1,28 @@
 2008-12-09  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
+	* python/python-objfile.c (objfpy_filename): Rename to ...
+	(objfpy_get_filename): ... this. Change to conform to Python getter
+	signature.
+	(objfile_getset): Add entry for `filename'.
+	(symtab_object_methods): Remove.
+	(objfile_object_type): Unset tp_methods field.
+	* python/python.c (get_parameter): Rename to ...
+	(gdbpy_parameter): ... this.
+	(gdbpy_get_objfiles): Rename to ...
+	(gdbpy_objfiles): ... this.
+	(gdbpy_get_default_visualizers): Rename to ...
+	(gdbpy_default_visualizers): ... this.
+	(GdbMethods): Rename `get_parameter' to `parameter',
+	`get_default_visualizer' to `default_visualizer',
+	`get_current_objfile' to `current_objfile' and `get_objfiles' to
+	`objfiles'.
+	* python/lib/gdb/command/backtrace.py: Adjust to use gdb.Symtab and
+	gdb.Symtab_and_line attributes rather than functions.
+	* python/lib/gdb/libstdcxx/v6/printers.py: Adjust to use new gdb
+	module function names.
+
+2008-12-09  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
 	* python/python-symtab.c (stpy_filename): Rename to ...
 	(stpy_get_filename): ... this. Change to conform to Python getter
 	signature.

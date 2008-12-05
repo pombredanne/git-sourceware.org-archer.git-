@@ -1,3 +1,8 @@
+2008-12-09  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.python/python-mi.exp: Use `gdb.default_visualizer' instead of
+	`gdb.get_default_visualizer'.
+
 2008-12-08  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.base/help.exp: Update.
