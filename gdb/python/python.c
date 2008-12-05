@@ -452,7 +452,7 @@ update_tuple_callback (struct thread_info *info, void *user_data)
 /* Python function which yields a tuple holding all valid thread IDs.  */
 
 static PyObject *
-gdbpy_get_threads (PyObject *unused1, PyObject *unused2)
+gdbpy_threads (PyObject *unused1, PyObject *unused2)
 {
   int thread_count = 0;
   struct set_thread_info info;
@@ -476,7 +476,7 @@ gdbpy_get_threads (PyObject *unused1, PyObject *unused2)
 /* Python function that returns the current thread's ID.  */
 
 static PyObject *
-gdbpy_get_current_thread (PyObject *unused1, PyObject *unused2)
+gdbpy_current_thread (PyObject *unused1, PyObject *unused2)
 {
   if (PIDGET (inferior_ptid) == 0)
     Py_RETURN_NONE;
@@ -1387,9 +1387,9 @@ static PyMethodDef GdbMethods[] =
 Return a tuple holding the file name (or None) and line number (or None).\n\
 Note: may later change to return an object." },
 
-  { "get_threads", gdbpy_get_threads, METH_NOARGS,
+  { "threads", gdbpy_threads, METH_NOARGS,
     "Return a tuple holding all the valid thread IDs." },
-  { "get_current_thread", gdbpy_get_current_thread, METH_NOARGS,
+  { "current_thread", gdbpy_current_thread, METH_NOARGS,
     "Return the thread ID of the current thread." },
   { "switch_to_thread", gdbpy_switch_to_thread, METH_VARARGS,
     "Switch to a thread, given the thread ID." },

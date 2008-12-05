@@ -18679,15 +18679,15 @@ Python scripts can access information about the inferior's threads
 using some functions provided by @value{GDBN}.  Like all of
 @value{GDBN}'s Python additions, these are in the @code{gdb} module:
 
-@findex gdb.get_threads
-@defun get_threads
+@findex gdb.threads
+@defun threads
 This function returns a tuple holding all the thread IDs which are
 valid when the function is called.  If there are no valid threads,
 this will return @code{None}.
 @end defun
 
-@findex gdb.get_current_thread
-@defun get_current_thread
+@findex gdb.current_thread
+@defun current_thread
 This function returns the thread ID of the selected thread.  If there
 is no selected thread, this will return @code{None}.
 @end defun
@@ -18696,7 +18696,7 @@ is no selected thread, this will return @code{None}.
 @defun switch_to_thread id
 This changes @value{GDBN}'s currently selected thread to the thread
 given by @var{id}.  @var{id} must be a valid thread ID as returned by
-@code{get_threads}.  If @var{id} is invalid, this function throws an
+@code{threads}.  If @var{id} is invalid, this function throws an
 exception.
 @end defun
 

@@ -1,5 +1,14 @@
 2008-12-09  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
+	* python/python.c (gdbpy_get_threads): Rename to ...
+	(gdbpy_threads): ... this.
+	(gdbpy_get_current_thread): Rename to ...
+	(gdbpy_current_thread): ... this.
+	(GdbMethods): Rename `get_threads' to `threads' and
+	`get_current_thread' to `current_thread'.
+
+2008-12-09  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
 	* python/python-objfile.c (objfpy_filename): Rename to ...
 	(objfpy_get_filename): ... this. Change to conform to Python getter
 	signature.
