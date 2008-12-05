@@ -269,7 +269,7 @@ static PyMethodDef symbol_object_methods[] = {
   { "get_value", sympy_get_value, METH_NOARGS,
     "Return the value of the symbol." },
   { "get_symtab", sympy_get_symtab, METH_NOARGS,
-    "Return the value of the symbol." },
+    "Return the symbol table in which this symbol appears." },
   { "get_natural_name", sympy_get_natural_name, METH_NOARGS,
     "Return the \"natural\" name of the symbol." },
   { "get_linkage_name", sympy_get_linkage_name, METH_NOARGS,

@@ -1,3 +1,8 @@
+2008-12-05  Tom Tromey  <tromey@redhat.com>
+
+	* python/python-symbol.c (symbol_object_methods) <get_symtab>: Fix
+	documentation.
+
 2008-12-03  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	* python/python-internal.h (gdbpy_get_value_from_history): Rename
