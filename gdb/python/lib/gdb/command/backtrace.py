@@ -88,7 +88,7 @@ class FrameWrapper:
             name = self.frame.name ()
             if not name:
                 name = "??"
-            if pc != sal.get_pc () or not sal.symtab:
+            if pc != sal.pc or not sal.symtab:
                 stream.write (" 0x%08x in" % pc)
             stream.write (" " + name + " (")
 
@@ -97,11 +97,11 @@ class FrameWrapper:
 
             stream.write (")")
 
-            if sal.symtab and sal.symtab.get_filename ():
-                stream.write (" at " + sal.symtab.get_filename ())
-                stream.write (":" + str (sal.get_line ()))
+            if sal.symtab and sal.symtab.filename:
+                stream.write (" at " + sal.symtab.filename)
+                stream.write (":" + str (sal.line))
 
-            if not self.frame.name () or (not sal.symtab or not sal.symtab.get_filename ()):
+            if not self.frame.name () or (not sal.symtab or not sal.symtab.filename):
                 lib = gdb.solib_address (pc)
                 if lib:
                     stream.write (" from " + lib)

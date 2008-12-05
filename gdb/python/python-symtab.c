@@ -57,9 +57,8 @@ stpy_str (PyObject *self)
   return result;
 }
 
-/* FIXME: maybe this should be an attribute instead of a method?  */
 static PyObject *
-stpy_filename (PyObject *self, PyObject *args)
+stpy_get_filename (PyObject *self, void *closure)
 {
   symtab_object *self_symtab = (symtab_object *) self;
   PyObject *str_obj;
@@ -79,7 +78,7 @@ stpy_filename (PyObject *self, PyObject *args)
 }
 
 static PyObject *
-stpy_to_fullname (PyObject *self, PyObject *args)
+stpy_fullname (PyObject *self, PyObject *args)
 {
   char *fullname;
 
@@ -113,33 +112,25 @@ salpy_str (PyObject *self)
 }
 
 static PyObject *
-salpy_pc (PyObject *self, PyObject *args)
+salpy_get_pc (PyObject *self, void *closure)
 {
   return PyLong_FromUnsignedLongLong (((sal_object *) self)->sal->pc);
 }
 
 static PyObject *
-salpy_line (PyObject *self, PyObject *args)
+salpy_get_line (PyObject *self, void *closure)
 {
   return PyLong_FromUnsignedLongLong (((sal_object *) self)->sal->line);
 }
 
 static PyObject *
-salpy_getsymtab (PyObject *self, void *closure)
+salpy_get_symtab (PyObject *self, void *closure)
 {
   sal_object *self_sal = (sal_object *) self;
 
   Py_INCREF (self_sal->symtab);
 
   return (PyObject *) self_sal->symtab;
-}
-
-static int
-salpy_setsymtab (PyObject *self, PyObject *value, void *closure)
-{
-  PyErr_SetString (PyExc_TypeError, "The symtab attribute can't be modified.");
-
-  return -1;
 }
 
 static void 
@@ -231,10 +222,14 @@ gdbpy_initialize_symtabs (void)
 
 
 
+static PyGetSetDef symtab_object_getset[] = {
+  { "filename", stpy_get_filename, NULL,
+    "The symbol table's source filename.", NULL },
+  {NULL}  /* Sentinel */
+};
+
 static PyMethodDef symtab_object_methods[] = {
-  { "get_filename", stpy_filename, METH_NOARGS,
-    "Return the symtab's source filename." },
-  { "to_fullname", stpy_to_fullname, METH_NOARGS,
+  { "fullname", stpy_fullname, METH_NOARGS,
     "Return the symtab's full source filename." },
   {NULL}  /* Sentinel */
 };
@@ -268,19 +263,16 @@ static PyTypeObject symtab_object_type = {
   0,				  /* tp_weaklistoffset */
   0,				  /* tp_iter */
   0,				  /* tp_iternext */
-  symtab_object_methods		  /* tp_methods */
+  symtab_object_methods,	  /* tp_methods */
+  0,				  /* tp_members */
+  symtab_object_getset		  /* tp_getset */
 };
 
-static PyGetSetDef sal_object_getseters[] = {
-  { "symtab", salpy_getsymtab, salpy_setsymtab, "Symtab object.", NULL },
-  {NULL}  /* Sentinel */
-};
-
-static PyMethodDef sal_object_methods[] = {
-  { "get_pc", salpy_pc, METH_NOARGS,
-    "Return the symtab_and_line's pc." },
-  { "get_line", salpy_line, METH_NOARGS,
-    "Return the symtab_and_line's line." },
+static PyGetSetDef sal_object_getset[] = {
+  { "symtab", salpy_get_symtab, NULL, "Symtab object.", NULL },
+  { "pc", salpy_get_pc, NULL, "Return the symtab_and_line's pc.", NULL },
+  { "line", salpy_get_line, NULL,
+    "Return the symtab_and_line's line.", NULL },
   {NULL}  /* Sentinel */
 };
 
@@ -313,7 +305,7 @@ static PyTypeObject sal_object_type = {
   0,				  /* tp_weaklistoffset */
   0,				  /* tp_iter */
   0,				  /* tp_iternext */
-  sal_object_methods,		  /* tp_methods */
+  0,				  /* tp_methods */
   0,				  /* tp_members */
-  sal_object_getseters		  /* tp_getset */
+  sal_object_getset		  /* tp_getset */
 };

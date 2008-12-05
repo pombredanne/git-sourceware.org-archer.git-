@@ -1,5 +1,30 @@
 2008-12-09  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
+	* python/python-symtab.c (stpy_filename): Rename to ...
+	(stpy_get_filename): ... this. Change to conform to Python getter
+	signature.
+	(stpy_to_fullname): Rename to ...
+	(stpy_fullname): ... this.
+	(salpy_pc): Rename to ...
+	(salpy_get_pc): ... this. Change to conform to Python
+	getter signature.
+	(salpy_line): Rename to ...
+	(salpy_get_line): ... this. Change to conform to Python
+	getter signature.
+	(salpy_getsymtab): Rename to ...
+	(salpy_get_symtab): ... this.
+	(salpy_setsymtab): Remove.
+	(symtab_object_getset): New.
+	(symtab_object_methods): Remove `get_filename' entry.
+	(symtab_object_type): Set tp_getset field.
+	(sal_object_methods): Remove in favor of ...
+	(sal_object_getset): ... this.
+	(sal_object_type): Set tp_getset field. Unset tp_methods field.
+	* python/lib/gdb/command/backtrace.py: Adjust to use gdb.Symtab and
+	gdb.Symtab_and_line attributes rather than functions.
+
+2008-12-09  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
 	* python/python-symbol.c (sympy_get_value, sympy_get_symtab,
 	sympy_get_linkage_name, sympy_get_print_name, sympy_is_argument,
 	sympy_is_constant, sympy_is_function, sympy_is_variable): Change
