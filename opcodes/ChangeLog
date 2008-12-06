@@ -1,3 +1,35 @@
+2008-12-04  Ben Elliston  <bje@au.ibm.com>
+
+	* ppc-dis.c (powerpc_init_dialect): Do not set PPC_OPCODE_BOOKE
+	for -Mbooke.
+	(print_ppc_disassembler_options): Update usage.
+	* ppc-opc.c (DE, DES, DEO, DE_MASK): Remove.
+	(BOOKE64): Remove.
+	(PPCCHLK64): Likewise.
+	(powerpc_opcodes): Remove all BOOKE64 instructions.
+
+2008-11-28  Joshua Kinard  <kumba@gentoo.org>
+
+	* mips-dis.c (mips_arch_choices): Add r14000, r16000.
+
+2008-11-27  M R Swami Reddy <MR.Swami.Reddy@nsc.com>
+
+	* cr16-dis.c (match_opcode): Truncate mcode to 32 bit and
+	adjusted the mask for 32-bit branch instruction.
+
+2008-11-27  Alan Modra  <amodra@bigpond.net.au>
+
+	* ppc-opc.c (extract_sprg): Correct operand range check.
+
+2008-11-26  Andreas Schwab  <schwab@suse.de>
+
+	* m68k-dis.c (NEXTBYTE, NEXTWORD, NEXTLONG, NEXTULONG, NEXTSINGLE)
+	(NEXTDOUBLE, NEXTEXTEND, NEXTPACKED): Fix error handling.
+	(save_printer, save_print_address): Remove.
+	(fetch_data): Don't use them.
+	(match_insn_m68k): Always restore printing functions.
+	(print_insn_m68k): Don't save/restore printing functions.
+
 2008-11-25  Nick Clifton  <nickc@redhat.com>
 
 	* m68k-dis.c: Rewrite to remove use of setjmp/longjmp.
@@ -21,7 +53,7 @@
 	* mips-opc.c (synciobdma, syncs, syncw, syncws): Move these
 	before sync.
 	(sync): New instruction with 5-bit sync type.
-	* mips-dis.c (print_insn_args: Add case '1' to print 5-bit values.
+	* mips-dis.c (print_insn_args): Add case '1' to print 5-bit values.
 
 2008-11-06  Nick Clifton  <nickc@redhat.com>
 
@@ -317,7 +349,7 @@
 
 	PR gas/6517
 	* i386-opc.tbl: Break cvtsi2ss/cvtsi2sd/vcvtsi2sd/vcvtsi2ss
-	into 32bit and 64bit.  Remove Reg64|Qword and add 
+	into 32bit and 64bit.  Remove Reg64|Qword and add
 	IgnoreSize|No_qSuf on 32bit version.
 	* i386-tbl.h: Regenerated.
 

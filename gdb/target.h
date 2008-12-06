@@ -214,8 +214,11 @@ enum target_object
      See "target-descriptions.c".  ANNEX should never be empty.  */
   TARGET_OBJECT_AVAILABLE_FEATURES,
   /* Currently loaded libraries, in XML format.  */
-  TARGET_OBJECT_LIBRARIES
-  /* Possible future objects: TARGET_OBJECT_FILE, TARGET_OBJECT_PROC, ... */
+  TARGET_OBJECT_LIBRARIES,
+  /* Get OS specific data.  The ANNEX specifies the type (running
+     processes, etc.).  */
+  TARGET_OBJECT_OSDATA
+  /* Possible future objects: TARGET_OBJECT_FILE, ... */
 };
 
 /* Request that OPS transfer up to LEN 8-bit bytes of the target's
@@ -1282,6 +1285,14 @@ extern int target_resize_to_sections (struct target_ops *target,
 				      int num_added);
 
 extern void remove_target_sections (bfd *abfd);
+
+/* Read OS data object of type TYPE from the target, and return it in
+   XML format.  The result is NUL-terminated and returned as a string,
+   allocated using xmalloc.  If an error occurs or the transfer is
+   unsupported, NULL is returned.  Empty objects are returned as
+   allocated but empty strings.  */
+
+extern char *target_get_osdata (const char *type);
 
 
 /* Stuff that should be shared among the various remote targets.  */

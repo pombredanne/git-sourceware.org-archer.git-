@@ -1303,7 +1303,6 @@ proceed (CORE_ADDR addr, enum target_signal siggnal, int step)
   struct thread_info *tp;
   CORE_ADDR pc = regcache_read_pc (regcache);
   int oneproc = 0;
-  enum target_signal stop_signal;
 
   if (step > 0)
     step_start_function = find_pc_function (pc);
@@ -2511,8 +2510,6 @@ targets should add new threads to the thread list themselves in non-stop mode.")
 	}
     }
 
-  stepping_past_singlestep_breakpoint = 0;
-
   if (!ptid_equal (deferred_step_ptid, null_ptid))
     {
       /* In non-stop mode, there's never a deferred_step_ptid set.  */
@@ -2522,8 +2519,6 @@ targets should add new threads to the thread list themselves in non-stop mode.")
 	 the fact that we were supposed to switch back.  */
       if (ecs->event_thread->stop_signal == TARGET_SIGNAL_TRAP)
 	{
-	  struct thread_info *tp;
-
 	  if (debug_infrun)
 	    fprintf_unfiltered (gdb_stdlog,
 				"infrun: handling deferred step\n");

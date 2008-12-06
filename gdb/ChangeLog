@@ -1,3 +1,152 @@
+2008-12-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix compilation on 32-bit host configurations.
+	* ia64-tdep.c (ia64_breakpoint_from_pc): Suffix a constant by `LL'.
+
+2008-12-05  Tristan Gingold  <gingold@adacore.com>
+
+	* i386-darwin-nat.c (i386_darwin_sstep_at_sigreturn): New function.
+	(amd64_darwin_sstep_at_sigreturn): New function.
+	(darwin_set_sstep): The sigreturn is a special case: the trace flag
+	must be set in the mcontext structure.
+
+2008-12-05  Pedro Alves  <pedro@codesourcery.com>
+
+	* infcmd.c (step_once): Remove dead code.
+
+2008-12-04  Doug Evans  <dje@google.com>
+
+	* infcall.c (call_function_by_hand): Clean up use of local dummy_addr.
+
+2008-12-02  Doug Evans  <dje@google.com>
+
+	* infrun.c (handle_inferior_event): Remove redundant resetting of
+	stepping_past_singlestep_breakpoint.
+
+2008-12-02  Pedro Alves  <pedro@codesourcery.com>
+
+	* target.h (target_get_osdata): Describe.
+	* osdata.h (make_cleanup_osdata_free): Declare.
+	* osdata.c (osdata_item_clear): Define even if HAVE_LIBEXPAT is
+	not defined.
+	(osdata_free_cleanup): New.
+	(make_cleanup_osdata_free): New.
+	(get_osdata): Fix leak.
+	(info_osdata_command): Use make_cleanup_osdata_free.
+	(info_processes_command): Delete.
+	(_initialize_osdata): Drop undocumented "info processes" alias.
+	* mi/mi-main.c (mi_cmd_list_thread_groups): Fix leak.
+
+2008-12-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix resolving external references to TLS variables.
+	* findvar.c: Include `objfiles.h'.
+	(read_var_value <LOC_UNRESOLVED>): New variable `obj_section'.  Handle
+	SEC_THREAD_LOCAL variables.
+	* printcmd.c (address_info <LOC_UNRESOLVED>): Handle SEC_THREAD_LOCAL
+	variables.
+
+2008-12-02  Doug Evans  <dje@google.com>
+
+	* infrun.c (handle_inferior_event): Delete unused local tp.
+
+2008-12-02  Pedro Alves  <pedro@codesourcery.com>
+	    Vladimir Prus  <vladimir@codesourcery.com>
+
+	Implement -list-thread-groups --available
+
+        * Makefile.in (XMLFILES): Add osdata.dtd.
+        (SFILES): Add osdata.c.
+        (COMMON_OBS): Add osdata.o.
+        * linux-nat.c: Include pwd.h, sys/types.h, gdb_dirent.h and xml-support.h.
+        (linux_nat_xfer_osdata): New function.
+        (linux_xfer_partial): Handle TARGET_OBJECT_OSDATA.
+        * osdata.c: New file.
+        * osdata.h: New file.
+        * remote.c (PACKET_qXfer_osdata): New packet enum.
+        (remote_protocol_features): Add "qXfer:osdata:read".
+        (remote_read_qxfer): Handle TARGET_OBJECT_OSDATA.
+        (extended_remote_can_run): New.
+        (init_extended_remote_ops): Set to_can_run to
+        extended_remote_can_run.
+        (_initialize_remote): Add packet config command for
+        "qXfer:osdata:read".
+        * xml-support.c (obstack_xml_printf): New function.
+        * xml-support.h (obstack_xml_printf): Declare.
+        * target.c (target_get_osdata): New function.
+        * target.h (enum target_object): Add TARGET_OBJECT_OSDATA.
+        (target_os_data): Declare.
+        * features/osdata.dtd: New file.
+        * mi/mi-main.c (mi_list_thread_groups): Handle the --available
+        option.
+
+2008-12-01  Doug Evans  <dje@google.com>
+
+	* infrun.c (proceed): Delete unused local stop_signal.
+
+2008-11-27  Tristan Gingold  <gingold@adacore.com>
+
+	* NEWS: Add entry for new native configuration: Darwin.
+	* configure.host: Add Darwin host.
+	* configure.tgt: Add Darwin target.
+	* defs.h (enum gdb_osabi): Add GDB_OSABI_DARWIN.
+	* osabi.c (gdb_osabi_names): Add name for Darwin abi.
+	* i386-darwin-nat.c: New file.
+	* i386-darwin-tdep.c: New file.
+	* machoread.c: New file.
+	* darwin-nat-info.c: New file.
+	* darwin-nat.c: New file.
+	* darwin-nat.h: New file.
+	* darwin.defs: New file.
+	* config/i386/darwin.mh: New file.
+
+2008-11-26  Tristan Gingold  <gingold@adacore.com>
+
+	* MAINTAINERS: Add myself for write after approval privileges.
+
+2008-11-26  Jerome Guitton  <guitton@adacore.com>
+
+	* value.h (allocate_value_lazy): New function declaration.
+	(value_free): Remove macro, make it a function.
+	* value.c (value): Move actual content outside of the memory space
+	of the struct; add a pointer to this actual content.
+	(allocate_value_lazy, allocate_value_contents): New function.
+	(allocate_value): Reimplement using these two new functions.
+	(value_contents_raw, value_contents_all_raw): If no memory
+	has been allocated yet for the actual content, allocate it.
+	(value_contents_all): Resync with struct value's changes.
+	(value_free): New function.
+	(value_copy, value_primitive_field): Use new function
+	allocate_value_lazy to allocate lazy values.
+	(value_change_enclosing_type): Resync with struct value's changes.
+	As the value is not reallocated, remove the special handling for
+	the value chain (now obsolete).
+	* valops.c (value_at_lazy): Use new function allocate_value_lazy.
+	(value_fetch_lazy): Allocate value content. Use allocate_value_lazy
+	to allocate lazy values.
+	(value_slice): Use allocate_value_lazy to allocate lazy values.
+
+2008-11-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix automatic restoration of breakpoints memory for ia64.
+	* ia64-tdep.c: New #if check on BREAKPOINT_MAX vs. BUNDLE_LEN.  
+	(ia64_memory_insert_breakpoint): New comment part for SHADOW_CONTENTS
+	content.  Remove variable instr.  New variable cleanup.  Disable
+	automatic breakpoints restoration.  PLACED_SIZE and SHADOW_LEN are now
+	set larger, to BUNDLE_LEN - 2.  Variable `bundle' type update.  Return
+	error if even just final target_write_memory has failed.
+	(ia64_memory_remove_breakpoint): Rename variables bundle to bundle_mem
+	and instr to instr_saved.  New variables bundle_saved and
+	instr_breakpoint.  Comment new reasons why we need to disable automatic
+	restoration of breakpoints.  Assert PLACED_SIZE and SHADOW_LEN.  New
+	check of the original memory content.  Return error if even just final
+	target_write_memory has failed.
+	(ia64_breakpoint_from_pc): Implement the emulation of permanent
+	breakpoints compatible with current bp_loc_is_permanent.
+	(template_encoding_table): Make it `const'.
+	* breakpoint.c (bp_loc_is_permanent): Support unsupported software
+	breakpoints.  New variables `cleanup' and `retval'.
+
 2008-11-24  Tom Tromey  <tromey@redhat.com>
 
 	* ada-lang.c (value_from_contents_and_address): Move...
