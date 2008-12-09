@@ -1,3 +1,8 @@
+2008-12-09  Tom Tromey  <tromey@redhat.com>
+
+	* python/python.c (apply_val_pretty_printer): Add missing
+	"struct".  Fix typo in "ui_file".
+
 2008-12-08  Tom Tromey  <tromey@redhat.com>
 
 	* value.c (value_free): Handle value==0.
