@@ -275,9 +275,12 @@ allocate_value (struct type *type)
 void
 value_free (struct value *value)
 {
-  type_decref (value->type);
-  type_decref (value->enclosing_type);
-  xfree (value);
+  if (value)
+    {
+      type_decref (value->type);
+      type_decref (value->enclosing_type);
+      xfree (value);
+    }
 }
 
 /* Allocate a  value  that has the correct length

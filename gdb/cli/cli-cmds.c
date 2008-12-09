@@ -1310,10 +1310,10 @@ Commands defined in this way may have up to ten arguments."));
 Read commands from a file named FILE.\n\
 Optional -v switch (before the filename) causes each command in\n\
 FILE to be echoed as it is executed.\n\
-Optional -p switch (before the filename) causes FILE to be evaluated\n\
-as Python code.\n\
 Note that the file \"%s\" is read automatically in this way\n\
-when GDB is started."), gdbinit);
+when GDB is started.\n\
+Optional -p switch (before the filename) causes FILE to be evaluated\n\
+as Python code."), gdbinit);
   c = add_cmd ("source", class_support, source_command,
 	       source_help_text, &cmdlist);
   set_cmd_completer (c, filename_completer);

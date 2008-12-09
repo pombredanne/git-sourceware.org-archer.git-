@@ -1,3 +1,7 @@
+2008-12-08  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/help.exp: Update.
+
 2008-12-03  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	* gdb.python/python-template.exp: Use `gdb.history' instead of

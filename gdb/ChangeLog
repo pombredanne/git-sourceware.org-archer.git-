@@ -1,3 +1,11 @@
+2008-12-08  Tom Tromey  <tromey@redhat.com>
+
+	* value.c (value_free): Handle value==0.
+
+	* gdbtypes.c (create_array_type): Use range_type as parent.
+
+	* cli/cli-cmds.c (init_cli_cmds): Disambiguate help text.
+
 2008-12-05  Tom Tromey  <tromey@redhat.com>
 
 	* python/python-symbol.c (symbol_object_methods) <get_symtab>: Fix
