@@ -642,6 +642,9 @@ gdbpy_initialize_types (void)
 
   Py_INCREF (&type_object_type);
   PyModule_AddObject (gdb_module, "Type", (PyObject *) &type_object_type);
+
+  Py_INCREF (&field_object_type);
+  PyModule_AddObject (gdb_module, "Field", (PyObject *) &field_object_type);
 }
 
 

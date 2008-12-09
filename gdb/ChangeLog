@@ -1,5 +1,10 @@
 2008-12-09  Tom Tromey  <tromey@redhat.com>
 
+	* python/python-type.c (gdbpy_initialize_types): Add Field to gdb
+	module.
+
+2008-12-09  Tom Tromey  <tromey@redhat.com>
+
 	* python/python.c (apply_val_pretty_printer): Add missing
 	"struct".  Fix typo in "ui_file".
 
