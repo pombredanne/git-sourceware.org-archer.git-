@@ -863,4 +863,7 @@ extern void breakpoint_retire_moribund (void);
 /* Tell a breakpoint to be quiet.  */
 extern void make_breakpoint_silent (struct breakpoint *);
 
+/* Set break condition of breakpoint B to EXP.  */
+extern void set_breakpoint_condition (struct breakpoint *b, char *exp, int from_tty);
+
 #endif /* !defined (BREAKPOINT_H) */

@@ -38,22 +38,22 @@ The breakpoints can be restored using the 'source' command."""
 
     def invoke (self, arg, from_tty):
         self.dont_repeat ()
-        bps = gdb.get_breakpoints ()
+        bps = gdb.breakpoints ()
         if bps is None:
             raise RuntimeError, 'No breakpoints to save'
         with open (arg.strip (), 'w') as f:
             for bp in bps:
-                print >> f, "break", bp.get_location (),
-                if bp.get_thread () is not None:
-                    print >> f, " thread", bp.get_thread (),
-                if bp.get_condition () is not None:
-                    print >> f, " if", bp.get_condition (),
+                print >> f, "break", bp.location,
+                if bp.thread is not None:
+                    print >> f, " thread", bp.thread,
+                if bp.condition is not None:
+                    print >> f, " if", bp.condition,
                 print >> f
-                if not bp.is_enabled ():
-                    print >> f, "disable $bpnum"
+                if not bp.enabled:
+                    print >> f, "disable %d" % bp.number
                 # Note: we don't save the ignore count; there doesn't
                 # seem to be much point.
-                commands = bp.get_commands ()
+                commands = bp.commands
                 if commands is not None:
                     print >> f, "commands"
                     # Note that COMMANDS has a trailing newline.

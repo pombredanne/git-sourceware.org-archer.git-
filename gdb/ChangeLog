@@ -1,3 +1,52 @@
+2008-12-15  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	Change gdb.Breakpoint to use attributes instead of methods.
+	* breakpoint.c (set_breakpoint_condition): New function, with code
+	factored out of condition_command.
+	(condition_command): Call set_breakpoint_condition.
+	* breakpoint.h (set_breakpoint_command): New prototype.
+	* python/python-breakpoint.c (BPPY_SET_REQUIRE_VALID): New macro.
+	(bppy_is_enabled): Rename to ...
+	(bppy_get_enabled): ... this.  Change to conform to Python attribute
+	getter signature.
+	(bppy_is_silent): Rename to ...
+	(bppy_get_silent): ... this.  Change to conform to Python attribute
+	getter signature.
+	(bppy_set_enabled): Convert to Python attribute getter.
+	(bppy_set_silent): Likewise.
+	(bppy_set_thread): Likewise.
+	(bppy_set_ignore_count): Likewise.
+	(bppy_clear_hit_count): Rename to ...
+	(bppy_set_hit_count): ... this.  Convert to Python attribute getter.
+	(bppy_get_location): Change to conform to Python attribute getter
+	signature.
+	(bppy_get_condition): Likewise.
+	(bppy_set_condition): New function.
+	(bppy_get_commands): Change to conform to Python attribute getter
+	signature.
+	(bppy_get_number): Change to conform to Python attribute getter
+	signature.
+	(bppy_get_thread): Change to conform to Python attribute getter
+	signature.
+	(bppy_get_hit_count): Change to conform to Python attribute getter
+	signature.
+	(bppy_get_ignore_count): Change to conform to Python attribute getter
+	signature.
+	(gdbpy_get_breakpoints): Rename to ...
+	(gdbpy_breakpoints): ... this.
+	(breakpoint_object_getset): New array.
+	(breakpoint_object_methods): Remove most methods in favour of
+	attributes.
+	(breakpoint_object_type): Register breakpoint_object_getset.
+	* python/python-internal.h (gdbpy_get_breakpoints): Rename prototype
+	to ...
+	(gdbpy_breakpoints): ... this.
+	(GDB_PY_SET_HANDLE_EXCEPTION): New macro.
+	* python/python.c (GdbMethods): Rename `get_breakpoints' entry to
+	`breakpoints'.
+	* python/lib/gdb/command/save_breakpoints.py: Adjust to
+	new gdb.Breakpoint attributes.
+
 2008-12-13  Jim Blandy  <jimb@red-bean.com>
 
 	Check return values of functions declared with warn_unused_result

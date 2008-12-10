@@ -1496,7 +1496,7 @@ static PyMethodDef GdbMethods[] =
   { "parameter", gdbpy_parameter, METH_VARARGS,
     "Return a gdb parameter's value" },
 
-  { "get_breakpoints", gdbpy_get_breakpoints, METH_NOARGS,
+  { "breakpoints", gdbpy_breakpoints, METH_NOARGS,
     "Return a tuple of all breakpoint objects" },
 
   { "default_visualizer", gdbpy_default_visualizer, METH_VARARGS,

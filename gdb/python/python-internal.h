@@ -70,7 +70,7 @@ extern PyTypeObject value_object_type;
 extern PyTypeObject symbol_object_type;
 
 PyObject *gdbpy_history (PyObject *self, PyObject *args);
-PyObject *gdbpy_get_breakpoints (PyObject *, PyObject *);
+PyObject *gdbpy_breakpoints (PyObject *, PyObject *);
 PyObject *gdbpy_frames (PyObject *, PyObject *);
 PyObject *gdbpy_current_frame (PyObject *, PyObject *);
 PyObject *gdbpy_frame_stop_reason_string (PyObject *, PyObject *);
@@ -126,6 +126,19 @@ PyObject *gdbpy_parameter_value (enum var_types, void *);
 	return PyErr_Format (Exception.reason == RETURN_QUIT		\
 			     ? PyExc_KeyboardInterrupt : PyExc_RuntimeError, \
 			     "%s", Exception.message);			\
+    } while (0)
+
+/* Use this after a TRY_EXCEPT to throw the appropriate Python
+   exception.  This macro is for use inside setter functions.  */
+#define GDB_PY_SET_HANDLE_EXCEPTION(Exception)				\
+    do {								\
+      if (Exception.reason < 0)						\
+        {								\
+	  PyErr_Format (Exception.reason == RETURN_QUIT			\
+			? PyExc_KeyboardInterrupt : PyExc_RuntimeError, \
+			"%s", Exception.message);			\
+	  return -1;							\
+	}								\
     } while (0)
 
 
