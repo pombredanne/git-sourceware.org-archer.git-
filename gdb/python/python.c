@@ -27,6 +27,7 @@
 #include "gdb_regex.h"
 #include "language.h"
 #include "valprint.h"
+#include "event-loop.h"
 
 #include <ctype.h>
 
@@ -412,6 +413,113 @@ gdbpy_parse_and_eval (PyObject *self, PyObject *args)
   GDB_PY_HANDLE_EXCEPTION (except);
 
   return value_to_value_object (result);
+}
+
+
+
+/* Posting and handling events.  */
+
+/* A single event.  */
+struct gdbpy_event
+{
+  /* The Python event.  This is just a callable object.  */
+  PyObject *event;
+  /* The next event.  */
+  struct gdbpy_event *next;
+};
+
+/* All pending events.  */
+static struct gdbpy_event *gdbpy_event_list;
+/* The final link of the event list.  */
+static struct gdbpy_event **gdbpy_event_list_end;
+
+/* We use a file handler, and not an async handler, so that we can
+   wake up the main thread even when it is blocked in poll().  */
+static int gdbpy_event_fds[2];
+
+/* The file handler callback.  This reads from the internal pipe, and
+   then processes the Python event queue.  This will always be run in
+   the main gdb thread.  */
+static void
+gdbpy_run_events (int err, gdb_client_data ignore)
+{
+  PyGILState_STATE state;
+  char buffer[100];
+  int r;
+
+  state = PyGILState_Ensure ();
+
+  /* Just read whatever is available on the fd.  It is relatively
+     harmless if there are any bytes left over.  */
+  r = read (gdbpy_event_fds[0], buffer, sizeof (buffer));
+
+  while (gdbpy_event_list)
+    {
+      /* Dispatching the event might push a new element onto the event
+	 loop, so we update here "atomically enough".  */
+      struct gdbpy_event *item = gdbpy_event_list;
+      gdbpy_event_list = gdbpy_event_list->next;
+      if (gdbpy_event_list == NULL)
+	gdbpy_event_list_end = &gdbpy_event_list;
+
+      /* Ignore errors.  */
+      PyObject_CallObject (item->event, NULL);
+
+      Py_DECREF (item->event);
+      xfree (item);
+    }
+
+  PyGILState_Release (state);
+}
+
+/* Submit an event to the gdb thread.  */
+static PyObject *
+gdbpy_post_event (PyObject *self, PyObject *args)
+{
+  struct gdbpy_event *event;
+  PyObject *func;
+  int wakeup;
+
+  if (!PyArg_ParseTuple (args, "O", &func))
+    return NULL;
+
+  if (!PyCallable_Check (func))
+    {
+      PyErr_SetString (PyExc_RuntimeError, "Posted event is not callable");
+      return NULL;
+    }
+
+  Py_INCREF (func);
+
+  /* From here until the end of the function, we have the GIL, so we
+     can operate on our global data structures without worrying.  */
+  wakeup = gdbpy_event_list == NULL;
+
+  event = XNEW (struct gdbpy_event);
+  event->event = func;
+  event->next = NULL;
+  *gdbpy_event_list_end = event;
+  gdbpy_event_list_end = &event->next;
+
+  /* Wake up gdb when needed.  */
+  if (wakeup)
+    {
+      char c = 'q';		/* Anything. */
+      write (gdbpy_event_fds[1], &c, 1);
+    }
+
+  Py_RETURN_NONE;
+}
+
+/* Initialize the Python event handler.  */
+static void
+gdbpy_initialize_events (void)
+{
+  if (!pipe (gdbpy_event_fds))
+    {
+      gdbpy_event_list_end = &gdbpy_event_list;
+      add_file_handler (gdbpy_event_fds[0], gdbpy_run_events, NULL);
+    }
 }
 
 
@@ -1285,6 +1393,8 @@ Enables or disables auto-loading of Python code when an object is opened."),
   gdbpy_initialize_parameters ();
   gdbpy_initialize_objfile ();
 
+  gdbpy_initialize_events ();
+
   PyRun_SimpleString ("import gdb");
   PyRun_SimpleString ("gdb.pretty_printers = {}");
 
@@ -1396,6 +1506,9 @@ Note: may later change to return an object." },
 
   { "parse_and_eval", gdbpy_parse_and_eval, METH_VARARGS,
     "Parse a string as an expression, evaluate it, and return the result." },
+
+  { "post_event", gdbpy_post_event, METH_VARARGS,
+    "Post an event into gdb's event loop." },
 
   { "write", gdbpy_write, METH_VARARGS,
     "Write a string using gdb's filtered stream." },

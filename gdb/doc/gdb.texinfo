@@ -18119,6 +18119,21 @@ evaluate it, and return the result as a @code{gdb.Value}.
 @var{expression} must be a string.
 @end defun
 
+@findex gdb.post_event
+@defun post_event event
+Put @var{event}, a callable object taking no arguments, into
+@value{GDBN}'s internal event queue.  This callable will be invoked at
+some later point, during @value{GDBN}'s event processing.  Events
+posted using @code{post_event} will be run in the order in which they
+were posted; however, there is no way to know when they will be
+processed relative to other events inside @value{GDBN}.
+
+@value{GDBN} is not thread-safe.  If your Python program uses multiple
+threads, you must be careful to only call @value{GDBN}-specific
+functions in the main @value{GDBN} thread.  @code{post_event} ensures
+this.
+@end defun
+
 @findex gdb.write
 @defun write string
 Print a string to @value{GDBN}'s paginated standard output stream.

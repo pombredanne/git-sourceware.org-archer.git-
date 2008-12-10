@@ -1,3 +1,15 @@
+2008-12-10  Tom Tromey  <tromey@redhat.com>
+
+	* python/python.c: Include event-loop.h.
+	(struct gdbpy_event): New type.
+	(gdbpy_event_list, gdbpy_event_list_end): New globals.
+	(gdbpy_event_fd): Likewise.
+	(gdbpy_run_events): New function.
+	(gdbpy_post_event): Likewise.
+	(gdbpy_initialize_events): Likewise.
+	(_initialize_python): Call it.
+	(GdbMethods) <post_event>: New method.
+
 2008-12-09  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	* python/python.c (gdbpy_get_threads): Rename to ...
