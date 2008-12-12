@@ -18603,9 +18603,17 @@ Some display hints are predefined by @value{GDBN}:
 
 @table @samp
 @item map
-Indicate to the MI consumer that the object being printed is
-``map-like'', and that the children of this value can be assumed to
-alternate between keys and values.
+Indicate that the object being printed is ``map-like'', and that the
+children of this value can be assumed to alternate between keys and
+values.
+
+@item string
+Indicate that the object being printed is ``string-like''.  If the
+printer's @code{to_string} method returns a Python string of some
+kind, then @value{GDBN} will call its internal language-specific
+string-printing function to format the string.  For the CLI this means
+adding quotation marks, possibly escaping some characters, respecting
+@code{set print elements}, and the like.
 @end table
 @end defop
 

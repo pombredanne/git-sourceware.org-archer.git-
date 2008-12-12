@@ -1,3 +1,13 @@
+2008-12-12  Tom Tromey  <tromey@redhat.com>
+
+	* python/lib/gdb/libstdcxx/v6/printers.py
+	(StdStringPrinter.display_hint): New method.
+	* python/python.c (apply_val_pretty_printer): Compute printer's
+	hint.
+	(print_string_repr): Add "hint" argument.  Recognize "string"
+	hint.
+	(print_children): Add "hint" argument.
+
 2008-12-10  Tom Tromey  <tromey@redhat.com>
 
 	* python/python.c: Include event-loop.h.

@@ -991,7 +991,8 @@ gdbpy_get_display_hint (PyObject *printer)
 /* Helper for apply_val_pretty_printer which calls to_string and
    formats the result.  */
 static void
-print_string_repr (PyObject *printer, struct ui_file *stream, int recurse,
+print_string_repr (PyObject *printer, const char *hint,
+		   struct ui_file *stream, int recurse,
 		   const struct value_print_options *options,
 		   const struct language_defn *language)
 {
@@ -1001,7 +1002,11 @@ print_string_repr (PyObject *printer, struct ui_file *stream, int recurse,
   output = pretty_print_one_value (printer, &replacement);
   if (output)
     {
-      fputs_filtered (output, stream);
+      if (hint && !strcmp (hint, "string"))
+	LA_PRINT_STRING (stream, (gdb_byte *) output, strlen (output),
+			 1, 0, options);
+      else
+	fputs_filtered (output, stream);
       xfree (output);
     }
   else if (replacement)
@@ -1013,12 +1018,12 @@ print_string_repr (PyObject *printer, struct ui_file *stream, int recurse,
 /* Helper for apply_val_pretty_printer that formats children of the
    printer, if any exist.  */
 static void
-print_children (PyObject *printer, struct ui_file *stream, int recurse,
+print_children (PyObject *printer, const char *hint,
+		struct ui_file *stream, int recurse,
 		const struct value_print_options *options,
 		const struct language_defn *language)
 {
-  char *hint;
-  int is_map = 0, i;
+  int is_map, i;
   PyObject *children, *iter;
   struct cleanup *cleanups;
 
@@ -1026,12 +1031,7 @@ print_children (PyObject *printer, struct ui_file *stream, int recurse,
     return;
 
   /* If we are printing a map, we want some special formatting.  */
-  hint = gdbpy_get_display_hint (printer);
-  if (hint)
-    {
-      is_map = ! strcmp (hint, "map");
-      xfree (hint);
-    }
+  is_map = hint && ! strcmp (hint, "map");
 
   children = PyObject_CallMethodObjArgs (printer, gdbpy_children_cst,
 					 NULL);
@@ -1135,7 +1135,7 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
 {
   PyObject *func, *printer;
   struct value *value;
-  char *hint;
+  char *hint = NULL;
   struct cleanup *cleanups;
   int result = 0;
   PyGILState_STATE state;
@@ -1160,11 +1160,15 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
       goto done;
     }
 
+  /* If we are printing a map, we want some special formatting.  */
+  hint = gdbpy_get_display_hint (printer);
+  make_cleanup (free_current_contents, &hint);
+
   make_cleanup_py_decref (printer);
   if (printer != Py_None)
     {
-      print_string_repr (printer, stream, recurse, options, language);
-      print_children (printer, stream, recurse, options, language);
+      print_string_repr (printer, hint, stream, recurse, options, language);
+      print_children (printer, hint, stream, recurse, options, language);
 
       result = 1;
     }

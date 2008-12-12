@@ -393,6 +393,9 @@ class StdStringPrinter:
             encoding = encoding.value
         return self.val['_M_dataplus']['_M_p'].string(encoding)
 
+    def display_hint (self):
+        return 'string'
+
 class Tr1HashtableIterator:
     def __init__ (self, hash):
         self.count = 0

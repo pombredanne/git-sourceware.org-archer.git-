@@ -1,3 +1,7 @@
+2008-12-12  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Pretty Printing): Document 'string' hint.
+
 2008-12-10  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.texinfo (Basic Python): Document post_event.
