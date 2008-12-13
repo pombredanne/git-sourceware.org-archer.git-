@@ -1,6 +1,15 @@
 2008-12-12  Tom Tromey  <tromey@redhat.com>
 
 	* python/lib/gdb/libstdcxx/v6/printers.py
+	(StdVectorPrinter.display_hint): Return 'array'.
+	(StdDequePrinter.display_hint): New method.
+	(StdStackOrQueuePrinter.display_hint): Likewise.
+	* python/python.c (print_children): Handle "array" hint.  Respect
+	"print elements".
+
+2008-12-12  Tom Tromey  <tromey@redhat.com>
+
+	* python/lib/gdb/libstdcxx/v6/printers.py
 	(StdStringPrinter.display_hint): New method.
 	* python/python.c (apply_val_pretty_printer): Compute printer's
 	hint.

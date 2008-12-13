@@ -143,7 +143,7 @@ class StdVectorPrinter:
                 % (int (finish - start), int (end - start)))
 
     def display_hint(self):
-        return 'whatever'
+        return 'array'
 
 class StdStackOrQueuePrinter:
     "Print a std::stack or std::queue"
@@ -158,6 +158,11 @@ class StdStackOrQueuePrinter:
     def to_string (self):
         return '%s wrapping: %s' % (self.typename,
                                     self.visualizer.to_string())
+
+    def display_hint (self):
+        if hasattr (self.visualizer, 'display_hint'):
+            return self.visualizer.display_hint ()
+        return None
 
 class RbtreeIterator:
     def __init__(self, rbtree):
@@ -360,6 +365,9 @@ class StdDequePrinter:
         end = self.val['_M_impl']['_M_finish']
         return self._iter(start['_M_node'], start['_M_cur'], start['_M_last'],
                           end['_M_cur'], self.buffer_size)
+
+    def display_hint (self):
+        return 'array'
 
 class WideEncoding (gdb.Parameter):
     """The target wide character set is the encoding used for wchar_t."""

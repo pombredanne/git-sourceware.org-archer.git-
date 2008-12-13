@@ -18602,6 +18602,11 @@ being printed.
 Some display hints are predefined by @value{GDBN}:
 
 @table @samp
+@item array
+Indicate that the object being printed is ``array-like''.  The CLI
+uses this to respect parameters such as @code{set print elements} and
+@code{set print array}.
+
 @item map
 Indicate that the object being printed is ``map-like'', and that the
 children of this value can be assumed to alternate between keys and

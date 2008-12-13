@@ -1023,15 +1023,18 @@ print_children (PyObject *printer, const char *hint,
 		const struct value_print_options *options,
 		const struct language_defn *language)
 {
-  int is_map, i;
+  int is_map, is_array, done_flag;
+  unsigned int i;
   PyObject *children, *iter;
   struct cleanup *cleanups;
 
   if (! PyObject_HasAttr (printer, gdbpy_children_cst))
     return;
 
-  /* If we are printing a map, we want some special formatting.  */
+  /* If we are printing a map or an array, we want some special
+     formatting.  */
   is_map = hint && ! strcmp (hint, "map");
+  is_array = hint && ! strcmp (hint, "array");
 
   children = PyObject_CallMethodObjArgs (printer, gdbpy_children_cst,
 					 NULL);
@@ -1051,14 +1054,20 @@ print_children (PyObject *printer, const char *hint,
     }
   make_cleanup_py_decref (iter);
 
-  for (i = 0; ; ++i)
+  done_flag = 0;
+  for (i = 0; i < options->print_max; ++i)
     {
       PyObject *py_v, *item = PyIter_Next (iter);
       char *name;
       struct cleanup *inner_cleanup;
 
       if (! item)
-	break;
+	{
+	  /* Set a flag so we can know whether we printed all the
+	     available elements.  */
+	  done_flag = 1;
+	  break;
+	}
 
       if (! PyArg_ParseTuple (item, "sO", &name, &py_v))
 	{
@@ -1068,6 +1077,11 @@ print_children (PyObject *printer, const char *hint,
 	}
       inner_cleanup = make_cleanup_py_decref (item);
 
+      /* Print initial "{".  For other elements, there are three
+	 cases:
+	 1. Maps.  Print a "," after each value element.
+	 2. Arrays.  Always print a ",".
+	 3. Other.  Always print a ",".  */
       if (i == 0)
 	fputs_filtered (" = {", stream);
       else if (! is_map || i % 2 == 0)
@@ -1081,6 +1095,13 @@ print_children (PyObject *printer, const char *hint,
 
       if (is_map && i % 2 == 0)
 	fputs_filtered ("[", stream);
+      else if (is_array)
+	{
+	  /* We print the index, not whatever the child method
+	     returned as the name.  */
+	  if (options->print_array_indexes)
+	    fprintf_filtered (stream, "[%d] = ", i);
+	}
       else if (! is_map)
 	{
 	  fputs_filtered (name, stream);
@@ -1114,6 +1135,15 @@ print_children (PyObject *printer, const char *hint,
 
   if (i)
     {
+      if (!done_flag)
+	{
+	  if (options->pretty)
+	    {
+	      fputs_filtered ("\n", stream);
+	      print_spaces_filtered (2 + 2 * recurse, stream);
+	    }
+	  fputs_filtered ("...", stream);
+	}
       if (options->pretty)
 	{
 	  fputs_filtered ("\n", stream);
