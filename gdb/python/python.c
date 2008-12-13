@@ -505,7 +505,8 @@ gdbpy_post_event (PyObject *self, PyObject *args)
   if (wakeup)
     {
       char c = 'q';		/* Anything. */
-      write (gdbpy_event_fds[1], &c, 1);
+      if (write (gdbpy_event_fds[1], &c, 1) != 1)
+        return PyErr_SetFromErrno (PyExc_IOError);
     }
 
   Py_RETURN_NONE;

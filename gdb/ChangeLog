@@ -1,3 +1,9 @@
+2008-12-13  Jim Blandy  <jimb@red-bean.com>
+
+	Check return values of functions declared with warn_unused_result
+	attribute in GLIBC 2.8.
+	* python/python.c (gdbpy_post_event): Check return value from write.
+
 2008-12-12  Tom Tromey  <tromey@redhat.com>
 
 	* python/lib/gdb/libstdcxx/v6/printers.py
