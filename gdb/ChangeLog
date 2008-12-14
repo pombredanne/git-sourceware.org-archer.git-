@@ -1,3 +1,50 @@
+2008-12-09  Tom Tromey  <tromey@redhat.com>
+
+	PR gdb/1815:
+	* cli/cli-decode.c (delete_cmd): Forward declare.
+	(delete_cmd): Now static.  Change return type.  Remove command
+	from alias chain.  Rewrite.
+	(add_cmd): Initialize new fields.  Update cmd_pointer on all
+	aliases.
+	(add_alias_cmd): Put command on alias chain.
+	* command.h (delete_cmd): Don't declare.
+	* cli/cli-decode.h (delete_cmd): Don't declare.
+	(struct cmd_list_element) <aliases, alias_chain>: New fields.
+
+2008-12-09  Tom Tromey  <tromey@redhat.com>
+
+	* config.in, configure: Rebuild.
+	* configure.ac: Check for locale.h, setlocale.  Call
+	AM_LC_MESSAGES.
+	* acinclude.m4: Include lcmessage.m4.
+
+2008-12-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* remote.c (remote_parse_stop_reply): Use REG only after its NULL check.
+
+2008-12-08  Joel Brobecker  <brobecker@adacore.com>
+
+	* python/python-value.c (values_in_python): Add specific initialization
+	to NULL to work-around a MacOS linker bug.
+
+2008-12-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix loc_type of `bp_location's created by update_watchpoint.
+	* breakpoint.c (allocate_bp_location): Remove the bp_type parameter.
+	Replace bp_type by bpt->type.  Update prototype.  All callers updated.
+	(add_location_to_breakpoint):  Remove the bp_type parameter.
+	Replace bp_type by b->type.  All callers updated.
+	(set_breakpoint_location_function): Replace bptype by b->type.
+
+2008-12-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* breakpoint.c (update_global_location_list): Fix the comment.
+
+2008-12-05  Pedro Alves  <pedro@codesourcery.com>
+
+	* infcmd.c (step_1, step_once): Look up the stepping range based
+	on the current frame's PC, not on stop_pc.
+
 2008-12-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	Fix compilation on 32-bit host configurations.
