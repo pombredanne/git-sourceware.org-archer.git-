@@ -3086,11 +3086,11 @@ delete_type_recursive (struct type *type, htab_t deleted_types)
   if (!type)
     return;
 
-  gdb_assert (!TYPE_OBJFILE (type));
-
   slot = htab_find_slot (deleted_types, type, INSERT);
   if (*slot != NULL)
     return;
+
+  gdb_assert (!TYPE_OBJFILE (type));
 
   *slot = type;
 
