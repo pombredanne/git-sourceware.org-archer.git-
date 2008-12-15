@@ -1,3 +1,8 @@
+2008-12-16  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.texinfo (GDB/MI Variable Objects): Fix references to renamed
+	`gdb.default_visualizer' Python function.
+
 2008-12-15  Paul Pluzhnikov  <ppluzhnikov@google.com>
 
 	* gdb.texinfo: Fix GDBN references.

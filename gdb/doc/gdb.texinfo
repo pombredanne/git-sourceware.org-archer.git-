@@ -22654,11 +22654,11 @@ the varobj @var{name} as an argument.  This function must return an
 object which conforms to the pretty-printing interface (@pxref{Pretty
 Printing}).
 
-The pre-defined function @code{gdb.get_default_visualizer} may be used
+The pre-defined function @code{gdb.default_visualizer} may be used
 to select a visualizer according to the type of the varobj.  This is
 called when a varobj is created, and so ordinarily is not needed.
 
-@code{gdb.get_default_visualizer} looks in the global dictionary named
+@code{gdb.default_visualizer} looks in the global dictionary named
 @code{gdb.pretty_printers}.
 
 This feature is only available if Python support is enabled.
@@ -22677,7 +22677,7 @@ Reselecting the default (type-based) visualizer:
 
 @smallexample
 (gdb)
--var-set-visualizer V gdb.get_default_visualizer
+-var-set-visualizer V gdb.default_visualizer
 ^done
 @end smallexample
 
