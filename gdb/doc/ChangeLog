@@ -1,5 +1,10 @@
 2008-12-15  Tom Tromey  <tromey@redhat.com>
 
+	* gdb.texinfo (Auto-loading): Document debug-file-directory
+	search.
+
+2008-12-15  Tom Tromey  <tromey@redhat.com>
+
 	* gdb.texinfo (Basic Python): Document gdb.breakpoints.
 	(Breakpoints in Python): New node.
 

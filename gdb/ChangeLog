@@ -1,5 +1,10 @@
 2008-12-15  Tom Tromey  <tromey@redhat.com>
 
+	* python/python.c (gdbpy_new_objfile): Look in
+	debug_file_directory as well.
+
+2008-12-15  Tom Tromey  <tromey@redhat.com>
+
 	* python/python.c (print_children): Wrap after ",".
 
 2008-12-15  Tom Tromey  <tromey@redhat.com>

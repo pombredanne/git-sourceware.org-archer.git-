@@ -18192,10 +18192,17 @@ traceback.
 When a new object file (@pxref{Objfiles in Python}) is read (for
 example, due to the @code{file} command, or because the inferior has
 loaded a shared library), @value{GDBN} will look for a file named by
-adding @samp{-gdb.py} to the object file's name.  If this file exists
-and is readable, @value{GDBN} will evaluate it as a Python script.
-Note that, if a separate debug file is used, @value{GDBN} will look
-for the @samp{-gdb.py} file both in the directory associated with the
+adding @samp{-gdb.py} to the object file's real name (the name formed
+after following all symlinks and resolving @code{.} and @code{..}
+components).  If this file exists and is readable, @value{GDBN} will
+evaluate it as a Python script.
+
+If this file does not exist, and if the parameter
+@code{debug-file-directory} is set, then @value{GDBN} will append the
+object file's real name to the value of this parameter, and try again.
+
+Also, if a separate debug file is used, @value{GDBN} will look for the
+@samp{-gdb.py} file both in the directory associated with the
 application and the directory associated with the separate debug file.
 
 When reading a @samp{-gdb.py} file, @var{GDBN} sets the ``current

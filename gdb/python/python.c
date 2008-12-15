@@ -741,6 +741,23 @@ gdbpy_new_objfile (struct objfile *objfile)
 
   input = fopen (filename, "r");
 
+  if (!input && debug_file_directory)
+    {
+      /* Also try the same file in the separate debug info directory.  */
+      char *debugfile;
+
+      debugfile = xmalloc (strlen (filename)
+			   + strlen (debug_file_directory) + 1);
+      strcpy (debugfile, debug_file_directory);
+      /* FILENAME is absolute, so we don't need a "/" here.  */
+      strcat (debugfile, filename);
+
+      xfree (filename);
+      filename = debugfile;
+
+      input = fopen (filename, "r");
+    }
+
   if (input)
     {
       /* We don't want to throw an exception here -- but the user
