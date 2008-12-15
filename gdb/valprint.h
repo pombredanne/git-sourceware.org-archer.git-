@@ -87,6 +87,9 @@ struct value_print_options
 
   /* Controls Python pretty-printing.  */
   int raw;
+
+  /* If nonzero, print the value in "summary" form.  */
+  int summary;
 };
 
 /* The global print options set by the user.  In general this should

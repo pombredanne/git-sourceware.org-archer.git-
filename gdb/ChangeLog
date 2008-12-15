@@ -1,5 +1,12 @@
 2008-12-15  Tom Tromey  <tromey@redhat.com>
 
+	* python/python.c (print_children): Handle the "summary" field.
+	* stack.c (print_frame_args): Set "summary" flag.
+	* valprint.c (user_print_options): Add new field.
+	* valprint.h (struct value_print_options) <summary>: New field.
+
+2008-12-15  Tom Tromey  <tromey@redhat.com>
+
 	* python/python.c (gdbpy_new_objfile): Look in
 	debug_file_directory as well.
 

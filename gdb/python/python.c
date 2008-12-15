@@ -1109,6 +1109,18 @@ print_children (PyObject *printer, const char *hint,
       else if (! is_map || i % 2 == 0)
 	fputs_filtered (pretty ? "," : ", ", stream);
 
+      /* In summary mode, we just want to print "= {...}" if there is
+	 a value.  */
+      if (options->summary)
+	{
+	  /* This increment tricks the post-loop logic to print what
+	     we want.  */
+	  ++i;
+	  /* Likewise.  */
+	  pretty = 0;
+	  break;
+	}
+
       if (! is_map || i % 2 == 0)
 	{
 	  if (pretty)

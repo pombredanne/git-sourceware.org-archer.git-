@@ -82,7 +82,8 @@ struct value_print_options user_print_options =
   0,				/* deref_ref */
   1,				/* static_field_print */
   1,				/* pascal_static_field_print */
-  0				/* raw */
+  0,				/* raw */
+  0				/* summary */
 };
 
 /* Initialize *OPTS to be a copy of the user print options.  */

@@ -380,6 +380,7 @@ print_frame_args (struct symbol *func, struct frame_info *frame,
 
 		  get_raw_print_options (&opts);
 		  opts.deref_ref = 0;
+		  opts.summary = 1;
 		  common_val_print (val, stb->stream, 2,
 				    &opts, language);
 		  ui_out_field_stream (uiout, "value", stb);
