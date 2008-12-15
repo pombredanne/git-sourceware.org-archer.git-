@@ -18048,6 +18048,7 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 * Parameters In Python::        Adding new @value{GDBN} parameters.
 * Functions In Python::         Writing new convenience functions.
 * Objfiles in Python::          Object files.
+* Breakpoints in Python::       Manipulating breakpoints using Python.
 @end menu
 
 @node Basic Python
@@ -18079,6 +18080,12 @@ When auto-loading a Python script (@pxref{Auto-loading}), @var{GDBN}
 sets the ``current objfile'' to the corresponding objfile.  This
 function returns the current objfile.  If there is no current objfile,
 this function returns @code{None}.
+@end defun
+
+@findex gdb.breakpoints
+@defun breakpoints
+Return a sequence holding all of @value{GDBN}'s breakpoints.
+@xref{Breakpoints in Python}, for more information.
 @end defun
 
 @findex gdb.objfiles
@@ -19135,6 +19142,82 @@ The @code{pretty_printers} attribute is used to look up
 pretty-printers by type.  This is a dictionary which maps regular
 expressions (strings) to pretty-printing objects.  @xref{Pretty
 Printing}, for more information.
+@end defivar
+
+@node Breakpoints in Python
+@subsubsection Manipulating breakpoints using Python
+
+@cindex breakpoints in python
+@cindex python breakpoints
+@tindex gdb.Breakpoint
+@tindex Breakpoint
+Python code can manipulate breakpoints via the @code{gdb.Breakpoint}
+class.
+
+@defmethod Breakpoint __init__ location
+Create a new breakpoint.  @var{location} is a string naming the
+location of the breakpoint.  The contents can be any location
+recognized by the @code{break} command.
+@end defmethod
+
+@defmethod Breakpoint is_valid
+Return @code{True} if this @code{Breakpoint} object is valid,
+@code{False} otherwise.  A @code{Breakpoint} object can become invalid
+if the user deletes the breakpoint.  In this case, the object still
+exists, but the underlying breakpoint does not.
+@end defmethod
+
+@defivar Breakpoint enabled
+This attribute is @code{True} if the breakpoint is enabled, and
+@code{False} otherwise.  This attribute is writable.
+@end defivar
+
+@defivar Breakpoint silent
+This attribute is @code{True} if the breakpoint is silent, and
+@code{False} otherwise.  This attribute is writable.
+
+Note that a breakpoint can also be silent if it has commands and the
+first command is @code{silent}.  This is not reported by the
+@code{silent} attribute.
+@end defivar
+
+@defivar Breakpoint thread
+If the breakpoint is thread-specific, this attribute holds the thread
+id.  If the breakpoint is not thread-specific, this attribute is
+@code{None}.  This attribute is writable.
+@end defivar
+
+@defivar Breakpoint ignore_count
+This attribute holds the ignore count for the breakpoint, an integer.
+This attribute is writable.
+@end defivar
+
+@defivar Breakpoint number
+This attribute holds the breakpoint's number -- the identifier used by
+the user to manipulate the breakpoint.  This attribute is not writable.
+@end defivar
+
+@defivar Breakpoint hit_count
+This attribute holds the hit count for the breakpoint, an integer.
+This attribute is writable, but currently it can only be set to zero.
+@end defivar
+
+@defivar Breakpoint location
+This attribute holds the location of the breakpoint, as specified by
+the user.  It is a string.  This attribute is not writable.
+@end defivar
+
+@defivar Breakpoint condition
+This attribute holds the condition of the breakpoint, as specified by
+the user.  It is a string.  If there is no condition, this attribute's
+value is @code{None}.  This attribute is writable.
+@end defivar
+
+@defivar Breakpoint commands
+This attribute holds the commands attached to the breakpoint.  If
+there are commands, this returns a string holding all the commands,
+separated by newlines.  If there are no commands, this attribute is
+@code{None}.  This attribute is not writable.
 @end defivar
 
 @node Interpreters
