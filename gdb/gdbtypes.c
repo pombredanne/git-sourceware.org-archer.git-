@@ -844,7 +844,7 @@ create_array_type (struct type *result_type,
 
   if (result_type == NULL)
     {
-      result_type = alloc_type (TYPE_OBJFILE (range_type), element_type);
+      result_type = alloc_type (TYPE_OBJFILE (range_type), range_type);
     }
   else
     {

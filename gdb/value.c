@@ -516,8 +516,8 @@ value_free (struct value *val)
       xfree (val->contents);
       type_decref (val->type);
       type_decref (val->enclosing_type);
+      xfree (val);
     }
-  xfree (val);
 }
 
 /* Free all values allocated since MARK was obtained by value_mark
