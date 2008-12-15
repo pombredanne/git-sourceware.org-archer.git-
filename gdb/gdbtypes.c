@@ -3071,14 +3071,13 @@ create_deleted_types_hash (void)
   return htab_create (1, htab_hash_pointer, htab_eq_pointer, NULL);
 }
 
-/* Recursively delete TYPE and things it references.  TYPE must have
-   been allocated using xmalloc -- not using an objfile.
-   DELETED_TYPES is a hash table, allocated using
-   create_deleted_types_hash, which is used for checking whether a
-   type has already been deleted.  */
+/* A helper for delete_type_recursive which deletes a main_type and
+   the things to which it refers.  TYPE is a type whose main_type we
+   wish to destroy.  DELETED_TYPES is a hash holding already-seen
+   pointers; see delete_type_recursive.  */
 
-void
-delete_type_recursive (struct type *type, htab_t deleted_types)
+static void
+delete_main_type (struct type *type, htab_t deleted_types)
 {
   int i;
   void **slot;
@@ -3086,16 +3085,18 @@ delete_type_recursive (struct type *type, htab_t deleted_types)
   if (!type)
     return;
 
-  slot = htab_find_slot (deleted_types, type, INSERT);
+  /* Multiple types might share a single main_type.  So, we must
+     check to make sure this is not happening.  */
+  slot = htab_find_slot (deleted_types, TYPE_MAIN_TYPE (type), INSERT);
   if (*slot != NULL)
     return;
-
-  gdb_assert (!TYPE_OBJFILE (type));
-
-  *slot = type;
+  *slot = TYPE_MAIN_TYPE (type);
 
   xfree (TYPE_NAME (type));
   xfree (TYPE_TAG_NAME (type));
+
+  delete_type_recursive (TYPE_TARGET_TYPE (type), deleted_types);
+  delete_type_recursive (TYPE_VPTR_BASETYPE (type), deleted_types);
 
   for (i = 0; i < TYPE_NFIELDS (type); ++i)
     {
@@ -3107,14 +3108,42 @@ delete_type_recursive (struct type *type, htab_t deleted_types)
     }
   xfree (TYPE_FIELDS (type));
 
-  delete_type_recursive (TYPE_TARGET_TYPE (type), deleted_types);
-  delete_type_recursive (TYPE_VPTR_BASETYPE (type), deleted_types);
-
   /* Strangely, HAVE_CPLUS_STRUCT will return true when there isn't
      one at all.  */
   gdb_assert (!HAVE_CPLUS_STRUCT (type) || !TYPE_CPLUS_SPECIFIC (type));
 
   xfree (TYPE_MAIN_TYPE (type));
+}
+
+/* Recursively delete TYPE and things it references.  TYPE must have
+   been allocated using xmalloc -- not using an objfile.
+   DELETED_TYPES is a hash table, allocated using
+   create_deleted_types_hash, which is used for checking whether a
+   type has already been deleted.  */
+
+void
+delete_type_recursive (struct type *type, htab_t deleted_types)
+{
+  void **slot;
+
+  if (!type)
+    return;
+
+  slot = htab_find_slot (deleted_types, type, INSERT);
+  if (*slot != NULL)
+    return;
+  gdb_assert (!TYPE_OBJFILE (type));
+  *slot = type;
+
+  delete_main_type (type, deleted_types);
+  delete_type_recursive (TYPE_POINTER_TYPE (type), deleted_types);
+  delete_type_recursive (TYPE_REFERENCE_TYPE (type), deleted_types);
+
+  /* It is somewhat inefficient to free the chain recursively.
+     However, the list is typically short, and this avoid duplicating
+     the deletion checking code.  */
+  delete_type_recursive (TYPE_CHAIN (type), deleted_types);
+
   xfree (type);
 }
 
