@@ -2240,7 +2240,7 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
   long dummy;
   struct ui_file *stb;
   struct cleanup *old_chain;
-  char *thevalue;
+  char *thevalue = NULL;
   struct value_print_options opts;
 
   if (value == NULL)
@@ -2252,10 +2252,21 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
     if (value_formatter && PyObject_HasAttr (value_formatter,
 					     gdbpy_to_string_cst))
       {
+	char *hint;
 	struct value *replacement;
+	int string_print = 0;
+
+	hint = gdbpy_get_display_hint (value_formatter);
+	if (hint)
+	  {
+	    if (!strcmp (hint, "string"))
+	      string_print = 1;
+	    xfree (hint);
+	  }
+
 	thevalue = apply_varobj_pretty_printer (value_formatter, value,
 						&replacement);
-	if (thevalue)
+	if (thevalue && !string_print)
 	  {
 	    PyGILState_Release (state);
 	    return thevalue;
@@ -2273,7 +2284,14 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
   get_formatted_print_options (&opts, format_code[(int) format]);
   opts.deref_ref = 0;
   opts.raw = 1;
-  common_val_print (value, stb, 0, &opts, current_language);
+  if (thevalue)
+    {
+      make_cleanup (xfree, thevalue);
+      LA_PRINT_STRING (stb, (gdb_byte *) thevalue, strlen (thevalue),
+		       1, 0, &opts);
+    }
+  else
+    common_val_print (value, stb, 0, &opts, current_language);
   thevalue = ui_file_xstrdup (stb, &dummy);
 
   do_cleanups (old_chain);

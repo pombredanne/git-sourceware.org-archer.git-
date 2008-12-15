@@ -1,5 +1,10 @@
 2008-12-15  Tom Tromey  <tromey@redhat.com>
 
+	* varobj.c (value_get_print_value): Use LA_PRINT_STRING for
+	"string" printers.
+
+2008-12-15  Tom Tromey  <tromey@redhat.com>
+
 	* python/python.c (print_children): Handle the "summary" field.
 	* stack.c (print_frame_args): Set "summary" flag.
 	* valprint.c (user_print_options): Add new field.
