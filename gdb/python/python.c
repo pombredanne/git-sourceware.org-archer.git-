@@ -1024,7 +1024,7 @@ print_children (PyObject *printer, const char *hint,
 		const struct value_print_options *options,
 		const struct language_defn *language)
 {
-  int is_map, is_array, done_flag;
+  int is_map, is_array, done_flag, pretty;
   unsigned int i;
   PyObject *children, *iter;
   struct cleanup *cleanups;
@@ -1054,6 +1054,10 @@ print_children (PyObject *printer, const char *hint,
       goto done;
     }
   make_cleanup_py_decref (iter);
+
+  /* Use the prettyprint_arrays option if we are printing an array,
+     and the pretty option otherwise.  */
+  pretty = is_array ? options->prettyprint_arrays : options->pretty;
 
   done_flag = 0;
   for (i = 0; i < options->print_max; ++i)
@@ -1086,9 +1090,9 @@ print_children (PyObject *printer, const char *hint,
       if (i == 0)
 	fputs_filtered (" = {", stream);
       else if (! is_map || i % 2 == 0)
-	fputs_filtered (options->pretty ? "," : ", ", stream);
+	fputs_filtered (pretty ? "," : ", ", stream);
 
-      if (options->pretty && (! is_map || i % 2 == 0))
+      if (pretty && (! is_map || i % 2 == 0))
 	{
 	  fputs_filtered ("\n", stream);
 	  print_spaces_filtered (2 + 2 * recurse, stream);
@@ -1128,7 +1132,7 @@ print_children (PyObject *printer, const char *hint,
 
       if (is_map && i % 2 == 0)
 	fputs_filtered ("] = ", stream);
-      else if (! options->pretty)
+      else if (! pretty)
 	wrap_here (n_spaces (2 + 2 * recurse));
 
       do_cleanups (inner_cleanup);
@@ -1138,14 +1142,14 @@ print_children (PyObject *printer, const char *hint,
     {
       if (!done_flag)
 	{
-	  if (options->pretty)
+	  if (pretty)
 	    {
 	      fputs_filtered ("\n", stream);
 	      print_spaces_filtered (2 + 2 * recurse, stream);
 	    }
 	  fputs_filtered ("...", stream);
 	}
-      if (options->pretty)
+      if (pretty)
 	{
 	  fputs_filtered ("\n", stream);
 	  print_spaces_filtered (2 * recurse, stream);

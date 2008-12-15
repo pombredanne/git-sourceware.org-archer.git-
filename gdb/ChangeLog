@@ -1,3 +1,7 @@
+2008-12-15  Tom Tromey  <tromey@redhat.com>
+
+	* python/python.c (print_children): Respect "set print arrays".
+
 2008-12-15  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	Change gdb.Breakpoint to use attributes instead of methods.
