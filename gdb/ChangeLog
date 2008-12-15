@@ -1,5 +1,9 @@
 2008-12-15  Tom Tromey  <tromey@redhat.com>
 
+	* python/python.c (print_children): Wrap after ",".
+
+2008-12-15  Tom Tromey  <tromey@redhat.com>
+
 	* python/python.c (print_children): Respect "set print arrays".
 
 2008-12-15  Thiago Jung Bauermann  <bauerman@br.ibm.com>

@@ -1092,10 +1092,15 @@ print_children (PyObject *printer, const char *hint,
       else if (! is_map || i % 2 == 0)
 	fputs_filtered (pretty ? "," : ", ", stream);
 
-      if (pretty && (! is_map || i % 2 == 0))
+      if (! is_map || i % 2 == 0)
 	{
-	  fputs_filtered ("\n", stream);
-	  print_spaces_filtered (2 + 2 * recurse, stream);
+	  if (pretty)
+	    {
+	      fputs_filtered ("\n", stream);
+	      print_spaces_filtered (2 + 2 * recurse, stream);
+	    }
+	  else
+	    wrap_here (n_spaces (2 + 2 *recurse));
 	}
 
       if (is_map && i % 2 == 0)
@@ -1132,8 +1137,6 @@ print_children (PyObject *printer, const char *hint,
 
       if (is_map && i % 2 == 0)
 	fputs_filtered ("] = ", stream);
-      else if (! pretty)
-	wrap_here (n_spaces (2 + 2 * recurse));
 
       do_cleanups (inner_cleanup);
     }
