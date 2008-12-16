@@ -18095,9 +18095,9 @@ Return a sequence of all the objfiles current known to @value{GDBN}.
 @end defun
 
 @findex gdb.parameter
-@defun parameter
-Return the value of a @value{GDBN} parameter.  @var{parameter} is a
-string naming the parameter to look up; @var{parameter} may contain
+@defun parameter name
+Return the value of the named @value{GDBN} parameter.  @var{name} is a
+string naming the parameter to look up; @var{name} may contain
 spaces if the parameter has a multi-part name.  For example,
 @samp{print object} is a valid parameter name.
 

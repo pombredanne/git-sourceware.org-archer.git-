@@ -1,5 +1,9 @@
 2008-12-15  Paul Pluzhnikov  <ppluzhnikov@google.com>
 
+	* gdb.texinfo (Basic Python): Clarify gdb.parameter argument.
+	
+2008-12-15  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
 	* gdb.texinfo: Fix GDBN references.
 	
 2008-12-15  Tom Tromey  <tromey@redhat.com>
