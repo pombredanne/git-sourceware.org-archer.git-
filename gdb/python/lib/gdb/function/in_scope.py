@@ -18,26 +18,30 @@
 import gdb
 
 class InScope (gdb.Function):
-    """Check if all the given variables or macros are in scope.
-Receives as argument a list of names separated by whitespace."""
+    """Return True if all the given variables or macros are in scope.
+Takes one argument for each variable name to be checked."""
 
     def __init__ (self):
 	super (InScope, self).__init__ ("in_scope")
 
-    def invoke (self, var):
-	vars = set (var.string().split())
+    def invoke (self, *vars):
+        if len (vars) == 0:
+	    raise TypeError, "in_scope takes at least one argument"
+
+        # gdb.Value isn't hashable so it can't be put in a map.
+	# Convert to string first.
+	wanted = set (map (lambda x: x.string (), vars))
 	found = set ()
 	block = gdb.block_for_pc (gdb.selected_frame ().pc ())
 	while block:
 	    for sym in block:
-		if (sym.is_argument () or sym.is_constant ()
-		      or sym.is_function () or sym.is_variable ()):
-		    sym_name = sym.name
-		    if sym_name in vars:
-			found.add (sym_name)
+		if (sym.is_argument or sym.is_constant
+		      or sym.is_function or sym.is_variable):
+		    if sym.name in wanted:
+			found.add (sym.name)
 
 	    block = block.superblock
 
-	return vars == found
+	return wanted == found
 
 InScope ()

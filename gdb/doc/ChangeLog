@@ -1,3 +1,14 @@
+2008-12-16  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.texinfo (Commands in Python): Mention need of importing the gdb
+	Python module.
+	(Functions In Python): Add example.
+
+2008-12-16  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.texinfo (GDB/MI Variable Objects): Fix references to renamed
+	`gdb.default_visualizer' Python function.
+
 2008-12-15  Paul Pluzhnikov  <ppluzhnikov@google.com>
 
 	* gdb.texinfo (Basic Python): Clarify gdb.parameter argument.

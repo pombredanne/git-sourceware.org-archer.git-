@@ -228,6 +228,7 @@ gdbpy_parameter (PyObject *self, PyObject *args)
 {
   struct cmd_list_element *alias, *prefix, *cmd;
   char *arg, *newarg;
+  int found = -1;
   volatile struct gdb_exception except;
 
   if (! PyArg_ParseTuple (args, "s", &arg))
@@ -237,15 +238,13 @@ gdbpy_parameter (PyObject *self, PyObject *args)
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      if (! lookup_cmd_composition (newarg, &alias, &prefix, &cmd))
-	{
-	  xfree (newarg);
-	  return PyErr_Format (PyExc_RuntimeError,
-			       "could not find parameter `%s'", arg);
-	}
+      found = lookup_cmd_composition (newarg, &alias, &prefix, &cmd);
     }
   xfree (newarg);
   GDB_PY_HANDLE_EXCEPTION (except);
+  if (!found)
+    return PyErr_Format (PyExc_RuntimeError,
+			 "could not find parameter `%s'", arg);
 
   if (! cmd->var)
     return PyErr_Format (PyExc_RuntimeError, "`%s' is not a parameter", arg);

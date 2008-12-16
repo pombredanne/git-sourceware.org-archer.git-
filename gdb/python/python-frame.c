@@ -42,14 +42,13 @@ typedef struct {
   int frame_id_is_next;
 } frame_object;
 
-#define FRAPY_REQUIRE_VALID(frame_obj, frame)			      \
-    do {							      \
-      frame = frame_object_to_frame_info (frame_obj);		      \
-      if (frame == NULL)					      \
-        {							      \
-	  PyErr_SetString (PyExc_RuntimeError, "Frame is invalid.");  \
-	  return NULL;						      \
-	}							      \
+/* Require a valid frame.  This must be called inside a TRY_CATCH, or
+   another context in which a gdb exception is allowed.  */
+#define FRAPY_REQUIRE_VALID(frame_obj, frame)		\
+    do {						\
+      frame = frame_object_to_frame_info (frame_obj);	\
+      if (frame == NULL)				\
+	error ("Frame is invalid.");			\
     } while (0)
 
 static PyTypeObject frame_object_type;
@@ -382,7 +381,8 @@ gdbpy_frames (PyObject *self, PyObject *args)
 	  if (frame_obj == NULL)
 	    {
 	      Py_DECREF (list);
-	      return NULL;
+	      list = NULL;
+	      break;
 	    }
 
 	  PyList_Append (list, (PyObject *) frame_obj);
@@ -396,8 +396,13 @@ gdbpy_frames (PyObject *self, PyObject *args)
 			   "%s", except.message);
     }
 
-  tuple = PyList_AsTuple (list);
-  Py_DECREF (list);
+  if (list)
+    {
+      tuple = PyList_AsTuple (list);
+      Py_DECREF (list);
+    }
+  else
+    tuple = NULL;
 
   return tuple;
 }
@@ -413,8 +418,6 @@ gdbpy_current_frame (PyObject *self, PyObject *args)
     {
       frame = get_current_frame ();
       frame_obj = frame_info_to_frame_object (frame);
-      if (frame_obj == NULL)
-	return NULL;
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
@@ -432,8 +435,6 @@ gdbpy_selected_frame (PyObject *self, PyObject *args)
     {
       frame = get_selected_frame ("No frame is currently selected.");
       frame_obj = frame_info_to_frame_object (frame);
-      if (frame_obj == NULL)
-	return NULL;
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
