@@ -1,3 +1,8 @@
+2008-12-16  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* python/lib/gdb/function/in_scope.py: Fix use of gdb.Symbol
+	attributes.  Change to receive variable number of arguments.
+
 2008-12-15  Paul Pluzhnikov  <ppluzhnikov@google.com>
 
 	* python/python-internal.h (PyEval_ReleaseLock): New define.
