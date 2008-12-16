@@ -18076,7 +18076,7 @@ It must be a boolean value.  If omitted, it defaults to @code{False}.
 
 @findex gdb.current_objfile
 @defun current_objfile
-When auto-loading a Python script (@pxref{Auto-loading}), @var{GDBN}
+When auto-loading a Python script (@pxref{Auto-loading}), @value{GDBN}
 sets the ``current objfile'' to the corresponding objfile.  This
 function returns the current objfile.  If there is no current objfile,
 this function returns @code{None}.
@@ -18090,7 +18090,7 @@ Return a sequence holding all of @value{GDBN}'s breakpoints.
 
 @findex gdb.objfiles
 @defun objfiles
-Return a sequence of all the objfiles current known to @var{GDBN}.
+Return a sequence of all the objfiles current known to @value{GDBN}.
 @xref{Objfiles in Python}.
 @end defun
 
@@ -18205,7 +18205,7 @@ Also, if a separate debug file is used, @value{GDBN} will look for the
 @samp{-gdb.py} file both in the directory associated with the
 application and the directory associated with the separate debug file.
 
-When reading a @samp{-gdb.py} file, @var{GDBN} sets the ``current
+When reading a @samp{-gdb.py} file, @value{GDBN} sets the ``current
 objfile''.  This is available via the @code{gdb.current_objfile}
 function.  This can be useful for registering objfile-specific
 pretty-printers.
@@ -18574,7 +18574,7 @@ A decimal floating point type.
 @findex TYPE_CODE_INTERNAL_FUNCTION
 @findex gdb.TYPE_CODE_INTERNAL_FUNCTION
 @item TYPE_CODE_INTERNAL_FUNCTION
-A function internal to @var{GDBN}.  This is the type used to represent
+A function internal to @value{GDBN}.  This is the type used to represent
 convenience functions.
 @end table
 
@@ -18665,8 +18665,8 @@ canonical type by following typedefs, following a reference type to
 its referenced type, and removing qualifiers, such as @code{const} or
 @code{volatile}.
 
-Then, @var{GDBN} tests each regular expression against this type name.
-@var{GDBN} first checks the @code{pretty_printers} attribute of each
+Then, @value{GDBN} tests each regular expression against this type name.
+@value{GDBN} first checks the @code{pretty_printers} attribute of each
 @code{gdb.Objfile}; after these have been exhausted it tries the
 global @code{gdb.pretty_printers}.
 
@@ -19131,10 +19131,10 @@ to a @code{gdb.Value} following the usual rules.
 @cindex python objfiles
 @tindex gdb.Objfile
 @tindex Objfile
-@var{GDBN} loads symbols for an inferior from various
+@value{GDBN} loads symbols for an inferior from various
 symbol-containing files.  These include the primary executable file,
 any shared libraries used by the inferior, and any separate debug info
-files.  @var{GDBN} calls these symbol-containing files
+files.  @value{GDBN} calls these symbol-containing files
 @dfn{objfiles}.
 
 Each objfile is represented by an instance of the @code{gdb.Objfile}
