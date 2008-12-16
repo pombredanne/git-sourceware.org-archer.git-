@@ -2766,6 +2766,7 @@ process_full_comp_unit (struct dwarf2_per_cu_data *per_cu)
 static void
 process_die (struct die_info *die, struct dwarf2_cu *cu)
 {
+
   switch (die->tag)
     {
     case DW_TAG_padding:
@@ -3110,6 +3111,94 @@ unsigned_int_compar (const void *ap, const void *bp)
   return (a > b) - (b > a);
 }
 
+static void explore_abstract_origin(struct die_info *die, struct dwarf2_cu *cu, unsigned* die_children_p){
+  struct attribute *attr;
+  unsigned die_children = *die_children_p;
+  struct die_info *child_die;
+  
+  attr = dwarf2_attr (die, DW_AT_abstract_origin, cu);
+  
+  /* GCC currently uses DW_AT_specification to indicate die inheritence
+     in the case of import statements. The following is to accommodate that */
+  if(!attr){
+    attr = dwarf2_attr (die, DW_AT_specification, cu);
+  }
+  
+  if (attr)
+    {
+      /* For the list of CHILD_DIEs.  */
+      unsigned *offsets;
+      unsigned *offsets_end, *offsetp;
+      struct die_info *origin_die, *origin_child_die;
+      struct cleanup *cleanups;
+
+      origin_die = follow_die_ref (die, attr, &cu);
+      if (die->tag != origin_die->tag)
+        complaint (&symfile_complaints,
+                   _("DIE 0x%x and its abstract origin 0x%x have different "
+                     "tags"),
+                   die->offset, origin_die->offset);
+
+      offsets = xmalloc (sizeof (*offsets) * die_children);
+      cleanups = make_cleanup (xfree, offsets);
+
+      offsets_end = offsets;
+      child_die = die->child;
+      while (child_die && child_die->tag)
+        {
+          attr = dwarf2_attr (child_die, DW_AT_abstract_origin, cu);
+          if (!attr)
+            complaint (&symfile_complaints,
+                       _("Child DIE 0x%x of DIE 0x%x has missing "
+                         "DW_AT_abstract_origin"),
+                       child_die->offset, die->offset);
+          else
+            {
+              struct die_info *child_origin_die;
+
+              child_origin_die = follow_die_ref (child_die, attr, &cu);
+              if (child_die->tag != child_origin_die->tag)
+                complaint (&symfile_complaints,
+                           _("Child DIE 0x%x and its abstract origin 0x%x have "
+                             "different tags"),
+                           child_die->offset, child_origin_die->offset);
+              *offsets_end++ = child_origin_die->offset;
+            }
+          child_die = sibling_die (child_die);
+        }
+      qsort (offsets, offsets_end - offsets, sizeof (*offsets),
+             unsigned_int_compar);
+      /* Disabled as excessively expensive - check if we may ever complain.  */
+      if (0)
+        {
+          for (offsetp = offsets + 1; offsetp < offsets_end; offsetp++)
+            if (offsetp[-1] == *offsetp)
+              complaint (&symfile_complaints,
+                         _("Child DIEs of DIE 0x%x duplicitly abstract-origin "
+                           "referenced DIE 0x%x"),
+                         die->offset, *offsetp);
+        }
+
+      offsetp = offsets;
+      origin_child_die = origin_die->child;
+      while (origin_child_die && origin_child_die->tag)
+        {
+          /* Is origin_child_die referenced by any of the DIE children?  */
+          while (offsetp < offsets_end && *offsetp < origin_child_die->offset)
+            offsetp++;
+          if (offsetp >= offsets_end || *offsetp > origin_child_die->offset)
+            {
+              /* Found that origin_child_die is really not referenced.  */
+              process_die (origin_child_die, cu);
+            }
+          origin_child_die = sibling_die (origin_child_die);
+        }
+
+      do_cleanups (cleanups);
+    }
+  
+}
+
 static void
 read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
 {
@@ -3130,9 +3219,13 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
 
   /* Ignore functions with missing or empty names and functions with
      missing or invalid low and high pc attributes.  */
-  if (name == NULL || !dwarf2_get_pc_bounds (die, &lowpc, &highpc, cu))
+  if (name == NULL || !dwarf2_get_pc_bounds (die, &lowpc, &highpc, cu)){
+    /* explore abstract origins if present. They might contain useful information
+     such as import statements. */
+    explore_abstract_origin(die, cu, &die_children);
     return;
-
+  }
+  
   lowpc += baseaddr;
   highpc += baseaddr;
 
@@ -3168,79 +3261,7 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
       die_children++;
     }
 
-  attr = dwarf2_attr (die, DW_AT_abstract_origin, cu);
-  if (attr)
-    {
-      /* For the list of CHILD_DIEs.  */
-      unsigned *offsets;
-      unsigned *offsets_end, *offsetp;
-      struct die_info *origin_die, *origin_child_die;
-      struct cleanup *cleanups;
-
-      origin_die = follow_die_ref (die, attr, &cu);
-      if (die->tag != origin_die->tag)
-	complaint (&symfile_complaints,
-		   _("DIE 0x%x and its abstract origin 0x%x have different "
-		     "tags"),
-		   die->offset, origin_die->offset);
-
-      offsets = xmalloc (sizeof (*offsets) * die_children);
-      cleanups = make_cleanup (xfree, offsets);
-
-      offsets_end = offsets;
-      child_die = die->child;
-      while (child_die && child_die->tag)
-	{
-	  attr = dwarf2_attr (child_die, DW_AT_abstract_origin, cu);
-	  if (!attr)
-	    complaint (&symfile_complaints,
-		       _("Child DIE 0x%x of DIE 0x%x has missing "
-			 "DW_AT_abstract_origin"),
-		       child_die->offset, die->offset);
-	  else
-	    {
-	      struct die_info *child_origin_die;
-
-	      child_origin_die = follow_die_ref (child_die, attr, &cu);
-	      if (child_die->tag != child_origin_die->tag)
-		complaint (&symfile_complaints,
-			   _("Child DIE 0x%x and its abstract origin 0x%x have "
-			     "different tags"),
-			   child_die->offset, child_origin_die->offset);
-	      *offsets_end++ = child_origin_die->offset;
-	    }
-	  child_die = sibling_die (child_die);
-	}
-      qsort (offsets, offsets_end - offsets, sizeof (*offsets),
-	     unsigned_int_compar);
-      /* Disabled as excessively expensive - check if we may ever complain.  */
-      if (0)
-	{
-	  for (offsetp = offsets + 1; offsetp < offsets_end; offsetp++)
-	    if (offsetp[-1] == *offsetp)
-	      complaint (&symfile_complaints,
-			 _("Child DIEs of DIE 0x%x duplicitly abstract-origin "
-			   "referenced DIE 0x%x"),
-			 die->offset, *offsetp);
-	}
-
-      offsetp = offsets;
-      origin_child_die = origin_die->child;
-      while (origin_child_die && origin_child_die->tag)
-      	{
-	  /* Is origin_child_die referenced by any of the DIE children?  */
-	  while (offsetp < offsets_end && *offsetp < origin_child_die->offset)
-	    offsetp++;
-	  if (offsetp >= offsets_end || *offsetp > origin_child_die->offset)
-	    {
-	      /* Found that origin_child_die is really not referenced.  */
-	      process_die (origin_child_die, cu);
-	    }
-	  origin_child_die = sibling_die (origin_child_die);
-	}
-
-      do_cleanups (cleanups);
-    }
+  explore_abstract_origin(die, cu, &die_children);
 
   new = pop_context ();
   /* Make a block for the local symbols within.  */
