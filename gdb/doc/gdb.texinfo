@@ -18956,7 +18956,10 @@ HelloWorld ()
 @end smallexample
 
 The last line instantiates the class, and is necessary to trigger the
-registration of the command with @value{GDBN}.
+registration of the command with @value{GDBN}.  Depending on how the
+Python code is read into @value{GDBN}, you may need to import the
+@code{gdb} module explicitly.
+
 
 @node Parameters In Python
 @subsubsection Parameters In Python
@@ -19123,6 +19126,28 @@ The return value of this method is used as its value in the enclosing
 expression.  If an ordinary Python value is returned, it is converted
 to a @code{gdb.Value} following the usual rules.
 @end defmethod
+
+The following code snippet shows how a trivial convenience function can
+be implemented in Python:
+
+@smallexample
+class Greet (gdb.Function):
+  """Return string to greet someone.
+Takes a name as argument."""
+
+  def __init__ (self):
+    super (Greet, self).__init__ ("greet")
+
+  def invoke (self, name):
+    return "Hello, %s!" % name.string ()
+
+Greet ()
+@end smallexample
+
+The last line instantiates the class, and is necessary to trigger the
+registration of the function with @value{GDBN}.  Depending on how the
+Python code is read into @value{GDBN}, you may need to import the
+@code{gdb} module explicitly.
 
 @node Objfiles in Python
 @subsubsection Objfiles in Python
