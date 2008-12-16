@@ -55,6 +55,7 @@ typedef int Py_ssize_t;
 #define PyEval_InitThreads() 0
 #define PyThreadState_Swap(ARG) (ARG)
 #define PyEval_InitThreads() 0
+#define PyEval_ReleaseLock() 0
 #endif
 
 #include "command.h"
