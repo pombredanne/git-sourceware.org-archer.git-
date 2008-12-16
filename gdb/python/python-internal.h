@@ -73,7 +73,7 @@ extern PyTypeObject symbol_object_type;
 PyObject *gdbpy_history (PyObject *self, PyObject *args);
 PyObject *gdbpy_breakpoints (PyObject *, PyObject *);
 PyObject *gdbpy_frames (PyObject *, PyObject *);
-PyObject *gdbpy_current_frame (PyObject *, PyObject *);
+PyObject *gdbpy_newest_frame (PyObject *, PyObject *);
 PyObject *gdbpy_frame_stop_reason_string (PyObject *, PyObject *);
 PyObject *gdbpy_lookup_symbol (PyObject *self, PyObject *args);
 PyObject *gdbpy_selected_frame (PyObject *self, PyObject *args);

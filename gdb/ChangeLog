@@ -1,3 +1,15 @@
+2008-12-29  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* python/python-frame.c (gdbpy_current_frame): Rename to ...
+	(gdbpy_newest_frame): ... this.
+	* python/python-internal.h (gdbpy_current_frame): Rename prototype
+	to ...
+	(gdbpy_newest_frame): ... this.
+	* python/python.c (GdbMethods): Rename `current_frame' function to
+	`newest_frame'.
+	* python/lib/gdb/command/backtrace.py: Change to use gdb.newest_frame.
+	* python/lib/gdb/function/caller_is.py: Likewise.
+
 2008-12-22  Tom Tromey  <tromey@redhat.com>
 
 	* python/python-internal.h (gdb_owned_value_to_value_object):

@@ -173,9 +173,9 @@ Use of the 'raw' qualifier avoids any filtering by loadable modules.
                 count = int (word)
 
         # FIXME: provide option to start at selected frame
-        # However, should still number as if starting from current
+        # However, should still number as if starting from newest
         iter = itertools.imap (FrameWrapper,
-                               FrameIterator (gdb.current_frame ()))
+                               FrameIterator (gdb.newest_frame ()))
         if filter:
             iter = gdb.backtrace.create_frame_filter (iter)
 

@@ -1544,8 +1544,8 @@ static PyMethodDef GdbMethods[] =
 
   { "frames", gdbpy_frames, METH_NOARGS,
     "Return a tuple of all frame objects" },
-  { "current_frame", gdbpy_current_frame, METH_NOARGS,
-    "Return the current frame object" },
+  { "newest_frame", gdbpy_newest_frame, METH_NOARGS,
+    "Return the newest frame object" },
   { "selected_frame", gdbpy_selected_frame, METH_NOARGS,
     "Return the selected frame object" },
   { "frame_stop_reason_string", gdbpy_frame_stop_reason_string,

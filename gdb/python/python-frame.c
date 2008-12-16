@@ -408,7 +408,7 @@ gdbpy_frames (PyObject *self, PyObject *args)
 }
 
 PyObject *
-gdbpy_current_frame (PyObject *self, PyObject *args)
+gdbpy_newest_frame (PyObject *self, PyObject *args)
 {
   struct frame_info *frame;
   frame_object *frame_obj = NULL;   /* Initialize to appease gcc warning.  */
