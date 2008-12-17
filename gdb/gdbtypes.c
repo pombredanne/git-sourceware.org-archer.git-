@@ -148,6 +148,7 @@ static void print_bit_vector (B_TYPE *, int);
 static void print_arg_types (struct field *, int, int);
 static void dump_fn_fieldlists (struct type *, int);
 static void print_cplus_stuff (struct type *, int);
+static struct type *copy_type_temporarily (const struct type *type);
 static void type_init_refc (struct type *new_type, struct type *parent_type);
 
 /* A reference count structure for the type reference count map.  Each
@@ -165,7 +166,6 @@ struct type_refc_entry
 
 /* The hash table holding all reference counts.  */
 static htab_t type_refc_table;
-
 
 /* Alloc a new type structure and fill it with some defaults.  If
    OBJFILE is non-NULL, then allocate the space for the type structure
@@ -1669,31 +1669,12 @@ check_typedef (struct type *type)
   if (TYPE_DYNAMIC (type) || (TYPE_CODE (type) == TYPE_CODE_RANGE
 			      && TYPE_RANGE_HIGH_BOUND_IS_COUNT (type)))
     {
-      struct type *ntype;
+      type = copy_type_temporarily (type);
 
-      /* make_cv_type does not copy the contents of TYPE_MAIN_TYPE while we are
-	 changing fields in it below.  Do a full TYPE_MAIN_TYPE copy.
-	 Sure FIXME as it is at least a memory leak.  */
-
-      ntype = alloc_type (TYPE_OBJFILE (type));
-      *TYPE_MAIN_TYPE (ntype) = *TYPE_MAIN_TYPE (type);
-      TYPE_LENGTH (ntype) = TYPE_LENGTH (type);
-      TYPE_INSTANCE_FLAGS (ntype) = TYPE_INSTANCE_FLAGS (type);
-      if (TYPE_NFIELDS (type))
-	{
-	  size_t size = sizeof (*TYPE_FIELDS (type)) * TYPE_NFIELDS (type);
-
-	  if (TYPE_OBJFILE (type))
-	    TYPE_FIELDS (ntype) = obstack_alloc
-	      (&TYPE_OBJFILE (type)->objfile_obstack, size);
-	  else
-	    TYPE_FIELDS (ntype) = xzalloc (size);
-	  memcpy (TYPE_FIELDS (ntype), TYPE_FIELDS (type), size);
-	}
-      type = ntype;
-
-      if (TYPE_CODE (type) == TYPE_CODE_ARRAY
-	  || TYPE_CODE (type) == TYPE_CODE_STRING)
+      switch (TYPE_CODE (type))
+      {
+      case TYPE_CODE_ARRAY:
+      case TYPE_CODE_STRING:
 	{
 	  struct type *range_type;
 
@@ -1702,9 +1683,17 @@ check_typedef (struct type *type)
 	  gdb_assert (TYPE_CODE (range_type) == TYPE_CODE_RANGE);
 	  TYPE_INDEX_TYPE (type) = check_typedef (range_type);
 	}
-      else if (TYPE_CODE (type) == TYPE_CODE_RANGE)
+	break;
+
+      case TYPE_CODE_RANGE:
 	{
 	  int fieldno;
+	  size_t fields_size;
+
+	  /* copy_type_temporarily will free TYPE_FIELDS (type).  */
+	  fields_size = sizeof (*TYPE_FIELDS (type)) * TYPE_NFIELDS (type);
+	  TYPE_FIELDS (type) = xmemdup (TYPE_FIELDS (type), fields_size,
+					fields_size);
 
 	  /* Evaluate the DWARF ranges and set them statically.  */
 	  for (fieldno = 0; fieldno < TYPE_NFIELDS (type); fieldno++)
@@ -1728,6 +1717,8 @@ check_typedef (struct type *type)
 				       + TYPE_HIGH_BOUND (type) - 1;
 	    }
 	}
+	break;
+      }
     }
 
   if (!currently_reading_symtab
@@ -3296,6 +3287,51 @@ copy_type (const struct type *type)
   gdb_assert (TYPE_OBJFILE (type) != NULL);
 
   new_type = alloc_type (TYPE_OBJFILE (type), NULL);
+  TYPE_INSTANCE_FLAGS (new_type) = TYPE_INSTANCE_FLAGS (type);
+  TYPE_LENGTH (new_type) = TYPE_LENGTH (type);
+  memcpy (TYPE_MAIN_TYPE (new_type), TYPE_MAIN_TYPE (type),
+	  sizeof (struct main_type));
+
+  return new_type;
+}
+
+struct copy_type_temporarily_cleanup
+  {
+    const struct type *old;
+    struct type *new;
+  };
+
+static void
+copy_type_temporarily_cleanup (void *pointer)
+{
+  struct copy_type_temporarily_cleanup *data = pointer;
+  struct type *new = data->new;
+  const struct type *old = data->old;
+
+  xfree (data);
+
+  if (TYPE_FIELDS (new) != TYPE_FIELDS (old))
+    xfree (TYPE_FIELDS (new));
+  xfree (TYPE_MAIN_TYPE (new));
+  xfree (new);
+}
+
+/* Make a temporary copy of the given TYPE, except that the pointer & reference
+   types are not preserved.  The copy is deleted on next do_cleanups().  */
+
+static struct type *
+copy_type_temporarily (const struct type *type)
+{
+  struct type *new_type;
+  struct copy_type_temporarily_cleanup *data;
+
+  new_type = alloc_type (NULL);
+
+  data = xmalloc (sizeof (*data));
+  data->old = type;
+  data->new = new_type;
+  make_cleanup (copy_type_temporarily_cleanup, data);
+
   TYPE_INSTANCE_FLAGS (new_type) = TYPE_INSTANCE_FLAGS (type);
   TYPE_LENGTH (new_type) = TYPE_LENGTH (type);
   memcpy (TYPE_MAIN_TYPE (new_type), TYPE_MAIN_TYPE (type),
