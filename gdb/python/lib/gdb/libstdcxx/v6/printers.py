@@ -586,7 +586,7 @@ def register_libstdcxx_printers(obj):
     # Extensions.
     obj.pretty_printers['^__gnu_cxx::slist<.*>$'] = StdSlistPrinter
 
-    if (True):
+    if True:
         # These shouldn't be necessary, if GDB "print *i" worked.
         # But it often doesn't, so here they are.
         obj.pretty_printers['^std::_List_iterator<.*>$'] = lambda val: StdListIteratorPrinter(val)
