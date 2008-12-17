@@ -232,9 +232,9 @@ class StdMapPrinter:
         return '%s with %d elements' % (self.typename, len (self.iter))
 
     def children (self):
-        keytype = self.val.type().template_argument(0)
+        keytype = self.val.type().template_argument(0).const()
         valuetype = self.val.type().template_argument(1)
-        nodetype = gdb.Type('std::_Rb_tree_node< std::pair< const %s, %s > >' % (keytype, valuetype))
+        nodetype = gdb.Type('std::_Rb_tree_node< std::pair< %s, %s > >' % (keytype, valuetype))
         nodetype = nodetype.pointer()
         return self._iter (self.iter, nodetype)
 

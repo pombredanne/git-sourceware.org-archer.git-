@@ -1,3 +1,8 @@
+2008-12-17  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Types From Inferior): Document const, volatile,
+	and unqualified methods.
+
 2008-12-16  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	* gdb.texinfo (Commands in Python): Mention need of importing the gdb

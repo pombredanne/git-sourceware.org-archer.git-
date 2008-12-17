@@ -1,3 +1,12 @@
+2008-12-17  Tom Tromey  <tromey@redhat.com>
+
+	* python/lib/gdb/libstdcxx/v6/printers.py
+	(StdMapPrinter.children): Use type's const method.
+	* python/python-type.c (typy_const): New function.
+	(typy_volatile): Likewise.
+	(typy_unqualified): Likewise.
+	(type_object_methods): Add const, volatile, unqualified.
+
 2008-12-16  Tom Tromey  <tromey@redhat.com>
 
 	* python/python-frame.c (FRAPY_REQUIRE_VALID): Use error, not

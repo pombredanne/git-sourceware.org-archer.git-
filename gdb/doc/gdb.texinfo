@@ -18377,9 +18377,25 @@ The type of the field.
 @end table
 @end defmethod
 
-@defmethod Type pointer
-Return a new @code{gdb.Type} object which represents a pointer to this
-type.
+@defmethod Type const
+Return a new @code{gdb.Type} object which represents a @code{const}
+qualified variant of this type.
+@end defmethod
+
+@defmethod Type const
+Return a new @code{gdb.Type} object which represents a
+@code{const}-qualified variant of this type.
+@end defmethod
+
+@defmethod Type volatile
+Return a new @code{gdb.Type} object which represents a
+@code{volatile}-qualified variant of this type.
+@end defmethod
+
+@defmethod Type unqualified
+Return a new @code{gdb.Type} object which represents an unqualified
+variant of this type.  That is, the result is neither @code{const} nor
+@code{volatile}.
 @end defmethod
 
 @defmethod Type reference

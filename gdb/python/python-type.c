@@ -280,6 +280,54 @@ typy_target (PyObject *self, PyObject *args)
   return type_to_type_object (TYPE_TARGET_TYPE (type));
 }
 
+/* Return a const-qualified type variant.  */
+static PyObject *
+typy_const (PyObject *self, PyObject *args)
+{
+  struct type *type = ((type_object *) self)->type;
+  volatile struct gdb_exception except;
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      type = make_cv_type (1, 0, type, NULL);
+    }
+  GDB_PY_HANDLE_EXCEPTION (except);
+
+  return type_to_type_object (type);
+}
+
+/* Return a volatile-qualified type variant.  */
+static PyObject *
+typy_volatile (PyObject *self, PyObject *args)
+{
+  struct type *type = ((type_object *) self)->type;
+  volatile struct gdb_exception except;
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      type = make_cv_type (0, 1, type, NULL);
+    }
+  GDB_PY_HANDLE_EXCEPTION (except);
+
+  return type_to_type_object (type);
+}
+
+/* Return an unqualified type variant.  */
+static PyObject *
+typy_unqualified (PyObject *self, PyObject *args)
+{
+  struct type *type = ((type_object *) self)->type;
+  volatile struct gdb_exception except;
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      type = make_cv_type (0, 0, type, NULL);
+    }
+  GDB_PY_HANDLE_EXCEPTION (except);
+
+  return type_to_type_object (type);
+}
+
 /* Return the size of the type represented by SELF, in bytes.  */
 static PyObject *
 typy_sizeof (PyObject *self, PyObject *args)
@@ -652,6 +700,7 @@ gdbpy_initialize_types (void)
 static PyMethodDef type_object_methods[] =
 {
   { "code", typy_code, METH_NOARGS, "Return the code for this type" },
+  { "const", typy_const, METH_NOARGS, "Return a const variant of this type" },
   { "fields", typy_fields, METH_NOARGS,
     "Return a sequence holding all the fields of this type.\n\
 Each field is a dictionary." },
@@ -665,6 +714,10 @@ Each field is a dictionary." },
     "Return the target type of this type" },
   { "template_argument", typy_template_argument, METH_VARARGS,
     "Return a single template argument type" },
+  { "unqualified", typy_unqualified, METH_NOARGS,
+    "Return a variant of this type without const or volatile attributes" },
+  { "volatile", typy_volatile, METH_NOARGS,
+    "Return a volatile variant of this type" },
   { NULL }
 };
 
