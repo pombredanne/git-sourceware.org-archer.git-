@@ -73,6 +73,17 @@ class StdListPrinter:
             return 'empty std::list'
         return 'std::list'
 
+class StdListIteratorPrinter:
+    "Print std::list::iterator"
+
+    def __init__(self, val):
+        self.val = val
+
+    def to_string(self):
+        itype = self.val.type().template_argument(0)
+        nodetype = gdb.Type('std::_List_node<%s>' % itype).pointer()
+        return self.val['_M_node'].cast(nodetype).dereference()['_M_data']
+
 class StdSlistPrinter:
     "Print a __gnu_cxx::slist"
 
@@ -106,6 +117,17 @@ class StdSlistPrinter:
         if self.val['_M_head']['_M_next'] == 0:
             return 'empty __gnu_cxx::slist'
         return '__gnu_cxx::slist'
+
+class StdSlistIteratorPrinter:
+    "Print __gnu_cxx::slist::iterator"
+
+    def __init__(self, val):
+        self.val = val
+
+    def to_string(self):
+        itype = self.val.type().template_argument(0)
+        nodetype = gdb.Type('__gnu_cxx::_Slist_node<%s>' % itype).pointer()
+        return self.val['_M_node'].cast(nodetype).dereference()['_M_data']
 
 class StdVectorPrinter:
     "Print a std::vector"
@@ -144,6 +166,15 @@ class StdVectorPrinter:
 
     def display_hint(self):
         return 'array'
+
+class StdVectorIteratorPrinter:
+    "Print std::vector::iterator"
+
+    def __init__(self, val):
+        self.val = val
+
+    def to_string(self):
+        return self.val['_M_current'].dereference()
 
 class StdStackOrQueuePrinter:
     "Print a std::stack or std::queue"
@@ -197,6 +228,22 @@ class RbtreeIterator:
                     node = parent
             self.node = node
         return result
+
+# This is a pretty printer for std::_Rb_tree_iterator (which is
+# std::map::iterator), and has nothing to do with the RbtreeIterator
+# class above.
+class StdRbtreeIteratorPrinter:
+    "Print std::map::iterator"
+
+    def __init__ (self, val):
+        self.val = val
+
+    def to_string (self):
+        valuetype = self.val.type().template_argument(0)
+        nodetype = gdb.Type('std::_Rb_tree_node < %s >' % valuetype)
+        nodetype = nodetype.pointer()
+        return self.val.cast(nodetype).dereference()['_M_value_field']
+
 
 class StdMapPrinter:
     "Print a std::map or std::multimap"
@@ -369,6 +416,15 @@ class StdDequePrinter:
     def display_hint (self):
         return 'array'
 
+class StdDequeIteratorPrinter:
+    "Print std::deque::iterator"
+
+    def __init__(self, val):
+        self.val = val
+
+    def to_string(self):
+        return self.val['_M_cur'].dereference()
+
 class WideEncoding (gdb.Parameter):
     """The target wide character set is the encoding used for wchar_t."""
 
@@ -529,5 +585,17 @@ def register_libstdcxx_printers(obj):
 
     # Extensions.
     obj.pretty_printers['^__gnu_cxx::slist<.*>$'] = StdSlistPrinter
+
+    if (True):
+        # These shouldn't be necessary, if GDB "print *i" worked.
+        # But it often doesn't, so here they are.
+        obj.pretty_printers['^std::_List_iterator<.*>$'] = lambda val: StdListIteratorPrinter(val)
+        obj.pretty_printers['^std::_List_const_iterator<.*>$'] = lambda val: StdListIteratorPrinter(val)
+        obj.pretty_printers['^std::_Rb_tree_iterator<.*>$'] = lambda val: StdRbtreeIteratorPrinter(val)
+        obj.pretty_printers['^std::_Rb_tree_const_iterator<.*>$'] = lambda val: StdRbtreeIteratorPrinter(val)
+        obj.pretty_printers['^std::_Deque_iterator<.*>$'] = lambda val: StdDequeIteratorPrinter(val)
+        obj.pretty_printers['^std::_Deque_const_iterator<.*>$'] = lambda val: StdDequeIteratorPrinter(val)
+        obj.pretty_printers['^__gnu_cxx::__normal_iterator<.*>$'] = lambda val: StdVectorIteratorPrinter(val)
+        obj.pretty_printers['^__gnu_cxx::_Slist_iterator<.*>$'] = lambda val: StdSlistIteratorPrinter(val)
 
 register_libstdcxx_printers (gdb.current_objfile())

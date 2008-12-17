@@ -1,3 +1,7 @@
+2008-12-17  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* python/lib/gdb/libstdcxx/v6/printers.py: Iterator pretty-printers.
+	
 2008-12-17  Tom Tromey  <tromey@redhat.com>
 
 	* python/lib/gdb/libstdcxx/v6/printers.py
