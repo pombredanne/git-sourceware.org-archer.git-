@@ -1,3 +1,8 @@
+2008-12-18  Sami Wagiaalla  <swagiaal@redhat.com>
+ 
+ 	* dwarf2read.c (new_symbol): Added fall back call on liknage
+	name for when full name cannot be constructed correctly
+	
 2008-12-16  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* dwarf2read.c (explore_abstract_origin): New function.

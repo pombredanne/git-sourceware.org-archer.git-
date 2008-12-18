@@ -7642,14 +7642,27 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
   struct gdbarch *gdbarch = get_objfile_arch (objfile);
   struct symbol *sym = NULL;
   const char *name;
+  const char *linkage_name;
   struct attribute *attr = NULL;
   struct attribute *attr2 = NULL;
   CORE_ADDR baseaddr;
 
   baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
 
-  if (die->tag == DW_TAG_variable){
-    name = dwarf2_full_name(die, cu);
+  name = dwarf2_full_name(die, cu);
+  linkage_name = dwarf2_linkage_name (die, cu);
+  
+  if (die->tag == DW_TAG_variable && 
+      name != NULL &&
+      linkage_name != NULL &&
+      strlen(name) > strlen(linkage_name)){
+        /* Due to gcc bugs some time the full name cannot be constructred
+           correctly. If the linkage name is available and is longer than
+           the constructed full name, assume the linkage name is better 
+           qualified and fall back on it */
+        
+        name = dwarf2_full_name(die, cu);
+
   }else{
     if (die->tag != DW_TAG_namespace)
       name = dwarf2_linkage_name (die, cu);
