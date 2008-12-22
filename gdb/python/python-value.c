@@ -738,26 +738,6 @@ valpy_float (PyObject *self)
   return PyFloat_FromDouble (d);
 }
 
-/* A value owned by GDB is in the all_values chain, so it will be freed
-   automatically when not needed anymore (i.e., before the current command
-   completes).  */
-PyObject *
-gdb_owned_value_to_value_object (struct value *v)
-{
-  value_object *result = PyObject_New (value_object, &value_object_type);
-  if (result != NULL)
-    {
-      result->value = v;
-      result->owned_by_gdb = 1;
-      /* FIXME: should we do it? What is it? */
-      /* I don't think it is needed, since a GDB owned value has a very short
-         lifetime. The purpose of the list is explained in the comment above
-         its declaration. -- bauermann  */
-      value_prepend_to_list (&values_in_python, v);
-    }
-  return (PyObject *) result;
-}
-
 /* Returns an object for a value which is released from the all_values chain,
    so its lifetime is not bound to the execution of a command.  */
 PyObject *
@@ -867,7 +847,6 @@ gdbpy_history (PyObject *self, PyObject *args)
 void
 gdbpy_initialize_values (void)
 {
-  value_object_type.tp_new = valpy_new;
   if (PyType_Ready (&value_object_type) < 0)
     return;
 
@@ -950,7 +929,17 @@ PyTypeObject value_object_type = {
   0,				  /* tp_weaklistoffset */
   0,				  /* tp_iter */
   0,				  /* tp_iternext */
-  value_object_methods		  /* tp_methods */
+  value_object_methods,		  /* tp_methods */
+  0,				  /* tp_members */
+  0,				  /* tp_getset */
+  0,				  /* tp_base */
+  0,				  /* tp_dict */
+  0,				  /* tp_descr_get */
+  0,				  /* tp_descr_set */
+  0,				  /* tp_dictoffset */
+  0,				  /* tp_init */
+  0,				  /* tp_alloc */
+  valpy_new			  /* tp_new */
 };
 
 #endif /* HAVE_PYTHON */
