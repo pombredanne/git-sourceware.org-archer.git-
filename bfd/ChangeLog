@@ -1,3 +1,51 @@
+2008-12-20  Hans-Peter Nilsson  <hp@axis.com>
+
+	* elf32-cris.c 	(cris_elf_howto_table): Add entry for R_CRIS_32_IE.
+	(cris_reloc_map): Similarly.
+	(cris_elf_relocate_section, cris_elf_gc_sweep_hook)
+	(cris_elf_check_relocs): Handle R_CRIS_32_IE.
+	* reloc.c (bfd_reloc_code_type): Add entry for R_CRIS_32_IE.
+	* bfd-in2.h, libbfd.h: Regenerate.
+
+2008-12-18  Ralf Wildenhues  <Ralf.Wildenhues@gmx.de>
+
+	* configure: Regenerate.
+
+2008-12-17  Hans-Peter Nilsson  <hp@axis.com>
+
+	* elf32-cris.c (elf_cris_copy_indirect_symbol): Return without
+	action for symbols other than bfd_link_hash_indirect.
+	(cris_elf_relocate_section) <R_CRIS_8, R_CRIS_16, R_CRIS_32>: Add missing
+	gate h != NULL for h->def_regular test.
+
+2008-12-15  Hans-Peter Nilsson  <hp@axis.com>
+
+	* elf32-cris.c (elf_cris_copy_indirect_symbol): New function.
+	(elf_backend_copy_indirect_symbol): Define to above.
+
+	* elf32-cris.c (struct elf_cris_pcrel_relocs_copied): New member
+	r_type.  Fix formatting.
+	(cris_elf_relocate_section) <R_CRIS_8_PCREL, R_CRIS_16_PCREL>
+	<R_CRIS_32_PCREL>: Also break early if the symbol doesn't get
+	emitted as a dynamic one.
+	(cris_elf_check_relocs) <R_CRIS_7, R_CRIS_16, R_CRIS_32>: Fork
+	from PCREL relocs code and simplify; don't fall through.
+	<R_CRIS_8_PCREL, R_CRIS_16_PCREL, R_CRIS_32_PCREL>: Simplify for
+	pcrel only.  For non-local or overridable symbols in a DSO, always
+	keep count of relocs, not just when -Bsymbolic.  Don't emit
+	message nor mark as TEXTREL here.
+	(elf_cris_discard_excess_dso_dynamics): Emit warning and mark as
+	TEXTREL here, if there are nondiscarded pcrel relocs.
+
+	* elf32-cris.c (elf_cris_got_elt_size) <symtab_hdr>: Initialize
+	using ibfd, not abfd.
+
+2008-12-11  Alan Modra  <amodra@bigpond.net.au>
+
+	PR 7041
+	* elf64-ppc.c (func_desc_adjust): Correct logic making fake function
+	descriptors.  Similarly correct making function descriptors dynamic.
+
 2008-12-10  Alan Modra  <amodra@bigpond.net.au>
 
 	* elf32-spu.h (struct spu_elf_params): Add num_regions.

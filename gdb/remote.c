@@ -1527,8 +1527,13 @@ read_ptid (char *buf, char **obuf)
   pp = unpack_varlen_hex (p, &tid);
 
   /* Since the stub is not sending a process id, then default to
-     what's in inferior_ptid.  */
-  pid = ptid_get_pid (inferior_ptid);
+     what's in inferior_ptid, unless it's null at this point.  If so,
+     then since there's no way to know the pid of the reported
+     threads, use the magic number.  */
+  if (ptid_equal (inferior_ptid, null_ptid))
+    pid = ptid_get_pid (magic_null_ptid);
+  else
+    pid = ptid_get_pid (inferior_ptid);
 
   if (obuf)
     *obuf = pp;
@@ -2576,13 +2581,6 @@ remote_start_remote (struct ui_out *uiout, void *opaque)
 	 controlling.  We default to adding them in the running state.
 	 The '?' query below will then tell us about which threads are
 	 stopped.  */
-
-      /* If we're not using the multi-process extensions, there's no
-	 way to know the pid of the reported threads; use the magic
-	 number.  */
-      if (!remote_multi_process_p (rs))
-	inferior_ptid = magic_null_ptid;
-
       remote_threads_info ();
     }
   else if (rs->non_stop_aware)
@@ -3318,7 +3316,6 @@ remote_detach_1 (char *args, int from_tty, int extended)
     }
 
   discard_pending_stop_replies (pid);
-  detach_inferior (pid);
   target_mourn_inferior ();
 }
 
@@ -4512,31 +4509,28 @@ process_stop_reply (struct stop_reply *stop_reply,
   if (ptid_equal (ptid, null_ptid))
     ptid = inferior_ptid;
 
-  if (status->kind == TARGET_WAITKIND_EXITED
-      || status->kind == TARGET_WAITKIND_SIGNALLED)
+  if (status->kind != TARGET_WAITKIND_EXITED
+      && status->kind != TARGET_WAITKIND_SIGNALLED)
     {
-      int pid = ptid_get_pid (ptid);
-      delete_inferior (pid);
+      notice_new_inferiors (ptid);
+
+      /* Expedited registers.  */
+      if (stop_reply->regcache)
+	{
+	  cached_reg_t *reg;
+	  int ix;
+
+	  for (ix = 0;
+	       VEC_iterate(cached_reg_t, stop_reply->regcache, ix, reg);
+	       ix++)
+	    regcache_raw_supply (get_thread_regcache (ptid),
+				 reg->num, reg->data);
+	  VEC_free (cached_reg_t, stop_reply->regcache);
+	}
+
+      remote_stopped_by_watchpoint_p = stop_reply->stopped_by_watchpoint_p;
+      remote_watch_data_address = stop_reply->watch_data_address;
     }
-  else
-    notice_new_inferiors (ptid);
-
-  /* Expedited registers.  */
-  if (stop_reply->regcache)
-    {
-      cached_reg_t *reg;
-      int ix;
-
-      for (ix = 0;
-	   VEC_iterate(cached_reg_t, stop_reply->regcache, ix, reg);
-	   ix++)
-	regcache_raw_supply (get_thread_regcache (ptid),
-			     reg->num, reg->data);
-      VEC_free (cached_reg_t, stop_reply->regcache);
-    }
-
-  remote_stopped_by_watchpoint_p = stop_reply->stopped_by_watchpoint_p;
-  remote_watch_data_address = stop_reply->watch_data_address;
 
   stop_reply_xfree (stop_reply);
   return ptid;
@@ -6511,7 +6505,6 @@ extended_remote_kill (void)
   if (res != 0)
     error (_("Can't kill process"));
 
-  delete_inferior (pid);
   target_mourn_inferior ();
 }
 
@@ -6558,6 +6551,9 @@ extended_remote_mourn_1 (struct target_ops *target)
   /* Unlike "target remote", we do not want to unpush the target; then
      the next time the user says "run", we won't be connected.  */
 
+  /* Call common code to mark the inferior as not running.	*/
+  generic_mourn_inferior ();
+
   if (have_inferiors ())
     {
       extern void nullify_last_target_wait_ptid ();
@@ -6569,10 +6565,6 @@ extended_remote_mourn_1 (struct target_ops *target)
     }
   else
     {
-      struct remote_state *rs = get_remote_state ();
-
-      /* Call common code to mark the inferior as not running.	*/
-      generic_mourn_inferior ();
       if (!remote_multi_process_p (rs))
 	{
 	  /* Check whether the target is running now - some remote stubs

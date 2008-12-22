@@ -15,11 +15,10 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-extern __thread int a_thread_local;
-__thread int file2_thread_local;
+int watchee;
 
-void
-function_referencing_a_thread_local (void)
+int
+main (void)
 {
-  a_thread_local = a_thread_local;
+  return 0;
 }

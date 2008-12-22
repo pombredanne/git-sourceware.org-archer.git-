@@ -1,3 +1,47 @@
+2008-12-22  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/punctuator.exp: New file.
+
+2008-12-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/completion.exp (Completing non-existing component): New test.
+
+2008-12-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix for PR gdb/8648.
+	* gdb.arch/ppc-fp.exp, gdb.arch/vsx-regs.exp, gdb.base/watchpoint-hw.c,
+	gdb.gdbtk/browser.test, gdb.gdbtk/console.test, gdb.gdbtk/srcwin.test,
+	gdb.gdbtk/srcwin2.test, gdb.gdbtk/srcwin3.test, gdb.gdbtk/windows.test,
+	gdb.threads/tls2.c: Remove reference to bug-gdb@prep.ai.mit.edu .
+
+2008-12-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/watchpoint-hw.exp, gdb.base/watchpoint-hw.c: New.
+
+2008-12-16  Christophe Lyon  <christophe.lyon@st.com>
+
+	* gdb.base/expand-psymtabs.c: Insert code in foo so that the
+	compiler actually generate code at the expected line number.
+
+2008-12-15  Jie Zhang  <jie.zhang@analog.com>
+
+	* gdb.base/consecutive.exp: Don't use global in gdb_expect.
+
+2008-12-12  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/commands.exp (redefine_hook_test): New proc.
+	Call it.
+
+2008-12-11  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/macscp.exp: New regression test.
+
+2008-12-11  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/macscp.exp: Print "address.addr".
+	* gdb.base/macscp1.c (struct outer): New struct.
+	(address): New global.
+
 2008-12-09  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.base/commands.exp (redefine_backtrace_test): New proc.

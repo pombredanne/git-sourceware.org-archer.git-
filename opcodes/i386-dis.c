@@ -240,7 +240,9 @@ fetch_data (struct disassemble_info *info, bfd_byte *addr)
 #define XX { NULL, 0 }
 
 #define Eb { OP_E, b_mode }
+#define EbS { OP_E, b_swap_mode }
 #define Ev { OP_E, v_mode }
+#define EvS { OP_E, v_swap_mode }
 #define Ed { OP_E, d_mode }
 #define Edq { OP_E, dq_mode }
 #define Edqw { OP_E, dqw_mode }
@@ -355,12 +357,15 @@ fetch_data (struct disassemble_info *info, bfd_byte *addr)
 #define XM { OP_XMM, 0 }
 #define XMM { OP_XMM, xmm_mode }
 #define EM { OP_EM, v_mode }
+#define EMS { OP_EM, v_swap_mode }
 #define EMd { OP_EM, d_mode }
 #define EMx { OP_EM, x_mode }
 #define EXw { OP_EX, w_mode }
 #define EXd { OP_EX, d_mode }
 #define EXq { OP_EX, q_mode }
+#define EXqS { OP_EX, q_swap_mode }
 #define EXx { OP_EX, x_mode }
+#define EXxS { OP_EX, x_swap_mode }
 #define EXxmm { OP_EX, xmm_mode }
 #define EXxmmq { OP_EX, xmmq_mode }
 #define EXymmq { OP_EX, ymmq_mode }
@@ -412,20 +417,28 @@ fetch_data (struct disassemble_info *info, bfd_byte *addr)
 
 /* byte operand */
 #define b_mode			1
+/* byte operand with operand swapped */
+#define b_swap_mode		(b_mode + 1)
 /* operand size depends on prefixes */
-#define v_mode			(b_mode + 1)
+#define v_mode			(b_swap_mode + 1)
+/* operand size depends on prefixes with operand swapped */
+#define v_swap_mode		(v_mode + 1)
 /* word operand */
-#define w_mode			(v_mode + 1)
+#define w_mode			(v_swap_mode + 1)
 /* double word operand  */
 #define d_mode			(w_mode + 1)
 /* quad word operand */
 #define q_mode			(d_mode + 1)
+/* quad word operand with operand swapped */
+#define q_swap_mode		(q_mode + 1)
 /* ten-byte operand */
-#define t_mode			(q_mode + 1)
+#define t_mode			(q_swap_mode + 1)
 /* 16-byte XMM or 32-byte YMM operand */
 #define x_mode			(t_mode + 1)
+/* 16-byte XMM or 32-byte YMM operand with operand swapped */
+#define x_swap_mode		(x_mode + 1)
 /* 16-byte XMM operand */
-#define xmm_mode		(x_mode + 1)
+#define xmm_mode		(x_swap_mode + 1)
 /* 16-byte XMM or quad word operand */
 #define xmmq_mode		(xmm_mode + 1)
 /* 32-byte YMM or quad word operand */
@@ -1458,8 +1471,8 @@ static const struct dis386 dis386[] = {
   /* 88 */
   { "movB",		{ Eb, Gb } },
   { "movS",		{ Ev, Gv } },
-  { "movB",		{ Gb, Eb } },
-  { "movS",		{ Gv, Ev } },
+  { "movB",		{ Gb, EbS } },
+  { "movS",		{ Gv, EvS } },
   { "movD",		{ Sv, Sw } },
   { MOD_TABLE (MOD_8D) },
   { "movD",		{ Sw, Sv } },
@@ -1640,7 +1653,7 @@ static const struct dis386 dis386_twobyte[] = {
   { "(bad)",		{ XX } },
   /* 28 */
   { "movapX",		{ XM, EXx } },
-  { "movapX",		{ EXx, XM } },
+  { "movapX",		{ EXxS, XM } },
   { PREFIX_TABLE (PREFIX_0F2A) },
   { PREFIX_TABLE (PREFIX_0F2B) },
   { PREFIX_TABLE (PREFIX_0F2C) },
@@ -1931,6 +1944,7 @@ static const unsigned char twobyte_has_modrm[256] = {
 
 static char obuf[100];
 static char *obufp;
+static char *mnemonicendp;
 static char scratchbuf[100];
 static unsigned char *start_codep;
 static unsigned char *insn_codep;
@@ -1960,6 +1974,12 @@ vex;
 static unsigned char need_vex;
 static unsigned char need_vex_reg;
 static unsigned char vex_w_done;
+
+struct op
+  {
+    const char *name;
+    unsigned int len;
+  };
 
 /* If we are accessing mod/rm/reg without need_modrm set, then the
    values are stale.  Hitting this abort likely indicates that you
@@ -2406,9 +2426,9 @@ static const struct dis386 prefix_table[][4] = {
 
   /* PREFIX_0F11 */
   {
-    { "movups",	{ EXx, XM } },
+    { "movups",	{ EXxS, XM } },
     { "movss",	{ EXd, XM } },
-    { "movupd",	{ EXx, XM } },
+    { "movupd",	{ EXxS, XM } },
     { "movsd",	{ EXq, XM } },
   },
 
@@ -2678,9 +2698,9 @@ static const struct dis386 prefix_table[][4] = {
 
   /* PREFIX_0F7F */
   {
-    { "movq",	{ EM, MX } },
-    { "movdqu",	{ EXx, XM } },
-    { "movdqa",	{ EXx, XM } },
+    { "movq",	{ EMS, MX } },
+    { "movdqu",	{ EXxS, XM } },
+    { "movdqa",	{ EXxS, XM } },
     { "(bad)",	{ XX } },
   },
 
@@ -2736,7 +2756,7 @@ static const struct dis386 prefix_table[][4] = {
   {
     { "(bad)",	{ XX } },
     { "movq2dq",{ XM, MS } },
-    { "movq",	{ EXq, XM } },
+    { "movq",	{ EXqS, XM } },
     { "movdq2q",{ MX, XS } },
   },
 
@@ -3286,9 +3306,9 @@ static const struct dis386 prefix_table[][4] = {
 
   /* PREFIX_VEX_11 */
   {
-    { "vmovups", { EXx, XM } },
+    { "vmovups", { EXxS, XM } },
     { VEX_LEN_TABLE (VEX_LEN_11_P_1) },
-    { "vmovupd", { EXx, XM } },
+    { "vmovupd", { EXxS, XM } },
     { VEX_LEN_TABLE (VEX_LEN_11_P_3) },
   },
 
@@ -3711,8 +3731,8 @@ static const struct dis386 prefix_table[][4] = {
   /* PREFIX_VEX_7F */
   {
     { "(bad)",	{ XX } },
-    { "vmovdqu", { EXx, XM } },
-    { "vmovdqa", { EXx, XM } },
+    { "vmovdqu", { EXxS, XM } },
+    { "vmovdqa", { EXxS, XM } },
     { "(bad)",	{ XX } },
   },
 
@@ -6982,7 +7002,7 @@ static const struct dis386 vex_table[][256] = {
     { "(bad)",		{ XX } },
     /* 28 */
     { "vmovapX",	{ XM, EXx } },
-    { "vmovapX",	{ EXx, XM } },
+    { "vmovapX",	{ EXxS, XM } },
     { PREFIX_TABLE (PREFIX_VEX_2A) },
     { MOD_TABLE (MOD_VEX_2B) },
     { PREFIX_TABLE (PREFIX_VEX_2C) },
@@ -8321,7 +8341,7 @@ static const struct dis386 vex_len_table[][2] = {
 
   /* VEX_LEN_D6_P_2 */
   {
-    { "vmovq",		{ EXq, XM } },
+    { "vmovq",		{ EXqS, XM } },
     { "(bad)",		{ XX } },
   },
 
@@ -10359,7 +10379,7 @@ print_insn (bfd_vma pc, disassemble_info *info)
   if (prefix_obuf[0] != 0)
     (*info->fprintf_func) (info->stream, "%s", prefix_obuf);
 
-  obufp = obuf + strlen (obuf);
+  obufp = mnemonicendp;
   for (i = strlen (obuf) + strlen (prefix_obuf); i < 6; i++)
     oappend (" ");
   oappend (" ");
@@ -10715,6 +10735,14 @@ static char *fgrps[][8] = {
     "fNstsw","(bad)","(bad)","(bad)","(bad)","(bad)","(bad)","(bad)",
   },
 };
+
+static void
+swap_operand (void)
+{
+  mnemonicendp[0] = '.';
+  mnemonicendp[1] = 's';
+  mnemonicendp += 2;
+}
 
 static void
 OP_Skip_MODRM (int bytemode ATTRIBUTE_UNUSED,
@@ -11184,14 +11212,14 @@ case_Q:
       alt = 0;
     }
   *obufp = 0;
+  mnemonicendp = obufp;
   return 0;
 }
 
 static void
 oappend (const char *s)
 {
-  strcpy (obufp, s);
-  obufp += strlen (s);
+  obufp = stpcpy (obufp, s);
 }
 
 static void
@@ -11344,6 +11372,7 @@ intel_operand_size (int bytemode, int sizeflag)
   switch (bytemode)
     {
     case b_mode:
+    case b_swap_mode:
     case dqb_mode:
       oappend ("BYTE PTR ");
       break;
@@ -11360,6 +11389,7 @@ intel_operand_size (int bytemode, int sizeflag)
 	}
       /* FALLTHRU */
     case v_mode:
+    case v_swap_mode:
     case dq_mode:
       USED_REX (REX_W);
       if (rex & REX_W)
@@ -11389,6 +11419,7 @@ intel_operand_size (int bytemode, int sizeflag)
       oappend ("DWORD PTR ");
       break;
     case q_mode:
+    case q_swap_mode:
       oappend ("QWORD PTR ");
       break;
     case m_mode:
@@ -11408,6 +11439,7 @@ intel_operand_size (int bytemode, int sizeflag)
       oappend ("TBYTE PTR ");
       break;
     case x_mode:
+    case x_swap_mode:
       if (need_vex)
 	{
 	  switch (vex.length)
@@ -11478,9 +11510,14 @@ OP_E_register (int bytemode, int sizeflag)
   if ((rex & REX_B))
     reg += 8;
 
+  if ((sizeflag & SUFFIX_ALWAYS)
+      && (bytemode == b_swap_mode || bytemode == v_swap_mode))
+    swap_operand ();
+
   switch (bytemode)
     {
     case b_mode:
+    case b_swap_mode:
       USED_REX (0);
       if (rex)
 	names = names8rex;
@@ -11509,6 +11546,7 @@ OP_E_register (int bytemode, int sizeflag)
       bytemode = v_mode;
       /* FALLTHRU */
     case v_mode:
+    case v_swap_mode:
     case dq_mode:
     case dqb_mode:
     case dqd_mode:
@@ -11516,7 +11554,9 @@ OP_E_register (int bytemode, int sizeflag)
       USED_REX (REX_W);
       if (rex & REX_W)
 	names = names64;
-      else if ((sizeflag & DFLAG) || bytemode != v_mode)
+      else if ((sizeflag & DFLAG) 
+	       || (bytemode != v_mode
+		   && bytemode != v_swap_mode))
 	names = names32;
       else
 	names = names16;
@@ -12528,7 +12568,8 @@ OP_EM (int bytemode, int sizeflag)
 {
   if (modrm.mod != 3)
     {
-      if (intel_syntax && bytemode == v_mode)
+      if (intel_syntax
+	  && (bytemode == v_mode || bytemode == v_swap_mode))
 	{
 	  bytemode = (prefixes & PREFIX_DATA) ? x_mode : q_mode;
 	  used_prefixes |= (prefixes & PREFIX_DATA);
@@ -12536,6 +12577,9 @@ OP_EM (int bytemode, int sizeflag)
       OP_E (bytemode, sizeflag);
       return;
     }
+
+  if ((sizeflag & SUFFIX_ALWAYS) && bytemode == v_swap_mode)
+    swap_operand ();
 
   /* Skip mod/rm byte.  */
   MODRM_CHECK;
@@ -12606,6 +12650,10 @@ OP_EX (int bytemode, int sizeflag)
     add = 8;
   else
     add = 0;
+
+  if ((sizeflag & SUFFIX_ALWAYS)
+      && (bytemode == x_swap_mode || bytemode == q_swap_mode))
+    swap_operand ();
 
   /* Skip mod/rm byte.  */
   MODRM_CHECK;
@@ -12769,7 +12817,7 @@ OP_3DNowSuffix (int bytemode ATTRIBUTE_UNUSED, int sizeflag ATTRIBUTE_UNUSED)
   /* AMD 3DNow! instructions are specified by an opcode suffix in the
      place where an 8-bit immediate would normally go.  ie. the last
      byte of the instruction.  */
-  obufp = obuf + strlen (obuf);
+  obufp = mnemonicendp;
   mnemonic = Suffix3DNow[*codep++ & 0xff];
   if (mnemonic)
     oappend (mnemonic);
@@ -12783,17 +12831,19 @@ OP_3DNowSuffix (int bytemode ATTRIBUTE_UNUSED, int sizeflag ATTRIBUTE_UNUSED)
       op_out[1][0] = '\0';
       BadOp ();
     }
+  mnemonicendp = obufp;
 }
 
-static const char *simd_cmp_op[] = {
-  "eq",
-  "lt",
-  "le",
-  "unord",
-  "neq",
-  "nlt",
-  "nle",
-  "ord"
+static struct op simd_cmp_op[] =
+{
+  { STRING_COMMA_LEN ("eq") },
+  { STRING_COMMA_LEN ("lt") },
+  { STRING_COMMA_LEN ("le") },
+  { STRING_COMMA_LEN ("unord") },
+  { STRING_COMMA_LEN ("neq") },
+  { STRING_COMMA_LEN ("nlt") },
+  { STRING_COMMA_LEN ("nle") },
+  { STRING_COMMA_LEN ("ord") }
 };
 
 static void
@@ -12806,11 +12856,12 @@ CMP_Fixup (int bytemode ATTRIBUTE_UNUSED, int sizeflag ATTRIBUTE_UNUSED)
   if (cmp_type < ARRAY_SIZE (simd_cmp_op))
     {
       char suffix [3];
-      char *p = obuf + strlen (obuf) - 2;
+      char *p = mnemonicendp - 2;
       suffix[0] = p[0];
       suffix[1] = p[1];
       suffix[2] = '\0';
-      sprintf (p, "%s%s", simd_cmp_op[cmp_type], suffix);
+      sprintf (p, "%s%s", simd_cmp_op[cmp_type].name, suffix);
+      mnemonicendp += simd_cmp_op[cmp_type].len;
     }
   else
     {
@@ -12914,8 +12965,8 @@ CMPXCHG8B_Fixup (int bytemode, int sizeflag)
   if (rex & REX_W)
     {
       /* Change cmpxchg8b to cmpxchg16b.  */
-      char *p = obuf + strlen (obuf) - 2;
-      strcpy (p, "16b");
+      char *p = mnemonicendp - 2;
+      mnemonicendp = stpcpy (p, "16b");
       bytemode = o_mode;
     }
   OP_M (bytemode, sizeflag);
@@ -12947,19 +12998,19 @@ static void
 CRC32_Fixup (int bytemode, int sizeflag)
 {
   /* Add proper suffix to "crc32".  */
-  char *p = obuf + strlen (obuf);
+  char *p = mnemonicendp;
 
   switch (bytemode)
     {
     case b_mode:
       if (intel_syntax)
-	break;
+	goto skip;
 
       *p++ = 'b';
       break;
     case v_mode:
       if (intel_syntax)
-	break;
+	goto skip;
 
       USED_REX (REX_W);
       if (rex & REX_W)
@@ -12974,8 +13025,10 @@ CRC32_Fixup (int bytemode, int sizeflag)
       oappend (INTERNAL_DISASSEMBLER_ERROR);
       break;
     }
+  mnemonicendp = p;
   *p = '\0';
 
+skip:
   if (modrm.mod == 3)
     {
       int add;
@@ -13303,7 +13356,7 @@ OP_DREX_FCMP (int bytemode ATTRIBUTE_UNUSED,
   else
     {
       sprintf (scratchbuf, "com%s%s", cmp_test[byte], obuf+3);
-      strcpy (obuf, scratchbuf);
+      mnemonicendp = stpcpy (obuf, scratchbuf);
       codep++;
     }
 }
@@ -13345,7 +13398,7 @@ OP_DREX_ICMP (int bytemode ATTRIBUTE_UNUSED,
   else
     {
       sprintf (scratchbuf, "pcom%s%s", cmp_test[byte], obuf+4);
-      strcpy (obuf, scratchbuf);
+      mnemonicendp = stpcpy (obuf, scratchbuf);
       codep++;
     }
 }
@@ -13665,49 +13718,50 @@ VZERO_Fixup (int bytemode ATTRIBUTE_UNUSED, int sizeflag ATTRIBUTE_UNUSED)
   switch (vex.length)
     {
     case 128:
-      strcpy (obuf, "vzeroupper");
+      mnemonicendp = stpcpy (obuf, "vzeroupper");
       break;
     case 256:
-      strcpy (obuf, "vzeroall");
+      mnemonicendp = stpcpy (obuf, "vzeroall");
       break;
     default:
       abort ();
     }
 }
 
-static const char *vex_cmp_op[] = {
-  "eq",
-  "lt",
-  "le",
-  "unord",
-  "neq",
-  "nlt",
-  "nle",
-  "ord",
-  "eq_uq",
-  "nge",
-  "ngt",
-  "false",
-  "neq_oq",
-  "ge",
-  "gt",
-  "true",
-  "eq_os",
-  "lt_oq",
-  "le_oq",
-  "unord_s",
-  "neq_us",
-  "nlt_uq",
-  "nle_uq",
-  "ord_s",
-  "eq_us",
-  "nge_uq",
-  "ngt_uq",
-  "false_os",
-  "neq_os",
-  "ge_oq",
-  "gt_oq",
-  "true_us"
+static struct op vex_cmp_op[] =
+{
+  { STRING_COMMA_LEN ("eq") },
+  { STRING_COMMA_LEN ("lt") },
+  { STRING_COMMA_LEN ("le") },
+  { STRING_COMMA_LEN ("unord") },
+  { STRING_COMMA_LEN ("neq") },
+  { STRING_COMMA_LEN ("nlt") },
+  { STRING_COMMA_LEN ("nle") },
+  { STRING_COMMA_LEN ("ord") },
+  { STRING_COMMA_LEN ("eq_uq") },
+  { STRING_COMMA_LEN ("nge") },
+  { STRING_COMMA_LEN ("ngt") },
+  { STRING_COMMA_LEN ("false") },
+  { STRING_COMMA_LEN ("neq_oq") },
+  { STRING_COMMA_LEN ("ge") },
+  { STRING_COMMA_LEN ("gt") },
+  { STRING_COMMA_LEN ("true") },
+  { STRING_COMMA_LEN ("eq_os") },
+  { STRING_COMMA_LEN ("lt_oq") },
+  { STRING_COMMA_LEN ("le_oq") },
+  { STRING_COMMA_LEN ("unord_s") },
+  { STRING_COMMA_LEN ("neq_us") },
+  { STRING_COMMA_LEN ("nlt_uq") },
+  { STRING_COMMA_LEN ("nle_uq") },
+  { STRING_COMMA_LEN ("ord_s") },
+  { STRING_COMMA_LEN ("eq_us") },
+  { STRING_COMMA_LEN ("nge_uq") },
+  { STRING_COMMA_LEN ("ngt_uq") },
+  { STRING_COMMA_LEN ("false_os") },
+  { STRING_COMMA_LEN ("neq_os") },
+  { STRING_COMMA_LEN ("ge_oq") },
+  { STRING_COMMA_LEN ("gt_oq") },
+  { STRING_COMMA_LEN ("true_us") },
 };
 
 static void
@@ -13720,11 +13774,12 @@ VCMP_Fixup (int bytemode ATTRIBUTE_UNUSED, int sizeflag ATTRIBUTE_UNUSED)
   if (cmp_type < ARRAY_SIZE (vex_cmp_op))
     {
       char suffix [3];
-      char *p = obuf + strlen (obuf) - 2;
+      char *p = mnemonicendp - 2;
       suffix[0] = p[0];
       suffix[1] = p[1];
       suffix[2] = '\0';
-      sprintf (p, "%s%s", vex_cmp_op[cmp_type], suffix);
+      sprintf (p, "%s%s", vex_cmp_op[cmp_type].name, suffix);
+      mnemonicendp += vex_cmp_op[cmp_type].len;
     }
   else
     {
@@ -13736,11 +13791,12 @@ VCMP_Fixup (int bytemode ATTRIBUTE_UNUSED, int sizeflag ATTRIBUTE_UNUSED)
     }
 }
 
-static const char *pclmul_op[] = {
-  "lql",
-  "hql",
-  "lqh",
-  "hqh"
+static const struct op pclmul_op[] =
+{
+  { STRING_COMMA_LEN ("lql") },
+  { STRING_COMMA_LEN ("hql") },
+  { STRING_COMMA_LEN ("lqh") },
+  { STRING_COMMA_LEN ("hqh") }
 };
 
 static void
@@ -13765,12 +13821,13 @@ PCLMUL_Fixup (int bytemode ATTRIBUTE_UNUSED,
   if (pclmul_type < ARRAY_SIZE (pclmul_op))
     {
       char suffix [4];
-      char *p = obuf + strlen (obuf) - 3;
+      char *p = mnemonicendp - 3;
       suffix[0] = p[0];
       suffix[1] = p[1];
       suffix[2] = p[2];
       suffix[3] = '\0';
-      sprintf (p, "%s%s", pclmul_op[pclmul_type], suffix);
+      sprintf (p, "%s%s", pclmul_op[pclmul_type].name, suffix);
+      mnemonicendp += pclmul_op[pclmul_type].len;
     }
   else
     {
@@ -13782,11 +13839,12 @@ PCLMUL_Fixup (int bytemode ATTRIBUTE_UNUSED,
     }
 }
 
-static const char *vpermil2_op[] = {
-  "td",
-  "td",
-  "mo",
-  "mz"
+static const struct op vpermil2_op[] =
+{
+  { STRING_COMMA_LEN ("td") },
+  { STRING_COMMA_LEN ("td") },
+  { STRING_COMMA_LEN ("mo") },
+  { STRING_COMMA_LEN ("mz") }
 };
 
 static void
@@ -13800,12 +13858,13 @@ VPERMIL2_Fixup (int bytemode ATTRIBUTE_UNUSED,
   if (vpermil2_type < ARRAY_SIZE (vpermil2_op))
     {
       char suffix [4];
-      char *p = obuf + strlen (obuf) - 3;
+      char *p = mnemonicendp - 3;
       suffix[0] = p[0];
       suffix[1] = p[1];
       suffix[2] = p[2];
       suffix[3] = '\0';
-      sprintf (p, "%s%s", vpermil2_op[vpermil2_type], suffix);
+      sprintf (p, "%s%s", vpermil2_op[vpermil2_type].name, suffix);
+      mnemonicendp += vpermil2_op[vpermil2_type].len;
     }
   else
     {
@@ -13821,13 +13880,13 @@ static void
 MOVBE_Fixup (int bytemode, int sizeflag)
 {
   /* Add proper suffix to "movbe".  */
-  char *p = obuf + strlen (obuf);
+  char *p = mnemonicendp;
 
   switch (bytemode)
     {
     case v_mode:
       if (intel_syntax)
-	break;
+	goto skip;
 
       USED_REX (REX_W);
       if (sizeflag & SUFFIX_ALWAYS)
@@ -13845,7 +13904,9 @@ MOVBE_Fixup (int bytemode, int sizeflag)
       oappend (INTERNAL_DISASSEMBLER_ERROR);
       break;
     }
+  mnemonicendp = p;
   *p = '\0';
 
+skip:
   OP_M (bytemode, sizeflag);
 }

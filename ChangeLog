@@ -1,3 +1,41 @@
+2008-12-18  Ralf Wildenhues  <Ralf.Wildenhues@gmx.de>
+
+	Backport link test fix from upstream Libtool:
+
+	* libltdl.m4 (_LT_SYS_DYNAMIC_LINKER, _LT_LINKER_SHLIBS):
+	Add cache variables to tests that require the linker to work.
+	For shlibpath_overrides_runpath, this also changes the semantics
+	to let the result from the C compiler take precedence.
+	compiler take precedence.
+
+2008-12-02  Ben Elliston  <bje@au.ibm.com>
+
+	* config.sub, config.guess: Update from upstream sources.
+
+2008-12-17  Jeff Johnston  <jjohnstn@redhat.com>
+
+	* COPYING.NEWLIB: Updated.
+	* COPYING.LIBGLOSS: Ditto.
+
+2008-12-16  Paolo Bonzini  <bonzini@gnu.org>
+
+	Sync with GCC:
+
+	2008-12-12  Sebastian Pop  <sebastian.pop@amd.com>
+
+	* configure.ac (ppllibs): Add by default the lib flags.
+	* configure: Regenerate.
+
+	2008-12-04  Jack Howarth  <howarth@bromo.med.uc.edu>
+
+        * configure.ac: Add double brackets on darwin[912].
+        * configure: Regenerate.
+
+	2008-12-02  Jack Howarth  <howarth@bromo.med.uc.edu>
+
+        * configure.ac: Expand to darwin10 and later.
+        * configure: Regenerate.
+
 2008-12-02  Andreas Schwab  <schwab@suse.de>
 
 	* Makefile.def: configure-target-boehm-gc depends on
