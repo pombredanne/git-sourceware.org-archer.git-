@@ -4922,7 +4922,9 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
   int length;
 
   index_type = builtin_type_int32;
-  range_type = create_range_type_nfields (NULL, index_type, 2);
+  /* RANGE_TYPE is allocated from OBJFILE, not OBJFILE_INTERNAL.  */
+  range_type = alloc_type (objfile, index_type);
+  range_type = create_range_type_nfields (range_type, index_type, 2);
   TYPE_UNSIGNED (range_type) = 1;
 
   /* C/C++ should probably have the low bound 0 but C/C++ does not use
@@ -5265,7 +5267,10 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
       high_type = dwarf2_get_attr_constant_value (attr, &high);
       /* It does not hurt but it is needlessly ineffective in check_typedef.  */
       if (high_type != dwarf2_attr_unknown)
-	TYPE_RANGE_HIGH_BOUND_IS_COUNT (range_type) = 1;
+      	{
+	  TYPE_RANGE_HIGH_BOUND_IS_COUNT (range_type) = 1;
+	  TYPE_DYNAMIC (range_type) = 1;
+	}
       /* Pass it now as the regular DW_AT_upper_bound.  */
     }
   switch (high_type)

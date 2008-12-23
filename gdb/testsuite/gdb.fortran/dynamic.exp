@@ -139,3 +139,16 @@ gdb_test "p vart(2,7)" "\\$\[0-9\]* = 8"
 gdb_test "p vart(3,8)" "\\$\[0-9\]* = 9"
 # maps to foo::vary(1,3)
 gdb_test "p vart(2,9)" "\\$\[0-9\]* = 10"
+
+set test "quit #1"
+gdb_test_multiple "quit" $test {
+    -re "The program is running.  Quit anyway \\(and kill it\\)\\? \\(y or n\\) " {
+	pass $test
+    }
+}
+set test "quit #2"
+gdb_test_multiple "y" $test {
+    eof {
+	pass $test
+    }
+}

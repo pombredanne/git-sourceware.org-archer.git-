@@ -209,7 +209,6 @@ struct value *
 allocate_value_lazy (struct type *type)
 {
   struct value *val;
-  struct type *atype = check_typedef (type);
 
   val = (struct value *) xzalloc (sizeof (struct value));
   val->contents = NULL;
@@ -241,7 +240,11 @@ void
 allocate_value_contents (struct value *val)
 {
   if (!val->contents)
-    val->contents = (gdb_byte *) xzalloc (TYPE_LENGTH (val->enclosing_type));
+    {
+      unsigned length = TYPE_LENGTH (check_typedef (val->enclosing_type));
+
+      val->contents = xzalloc (length);
+    }
 }
 
 /* Allocate a  value  and its contents for type TYPE.  */
@@ -761,6 +764,25 @@ show_values (char *num_exp, int from_tty)
       num_exp[1] = '\0';
     }
 }
+
+/* Sanity check for memory leaks and proper types reference counting.  */
+
+static void
+value_history_cleanup (void *unused)
+{
+  while (value_history_chain)
+    {
+      struct value_history_chunk *chunk = value_history_chain;
+      int i;
+
+      for (i = 0; i < ARRAY_SIZE (chunk->values); i++)
+      	value_free (chunk->values[i]);
+
+      value_history_chain = chunk->next;
+      xfree (chunk);
+    }
+  value_history_count = 0;
+}
 
 /* Internal variables.  These are variables within the debugger
    that hold values assigned by debugger commands.
@@ -961,7 +983,7 @@ preserve_one_value (struct value *value, struct objfile *objfile,
     {
       /* No need to decref the old type here, since we know it has no
 	 reference count.  */
-      value->type = copy_type_recursive (objfile, value->type, copied_types);
+      value->type = copy_type_recursive (value->type, copied_types);
       type_incref (value->type);
     }
 
@@ -969,8 +991,7 @@ preserve_one_value (struct value *value, struct objfile *objfile,
     {
       /* No need to decref the old type here, since we know it has no
 	 reference count.  */
-      value->enclosing_type = copy_type_recursive (objfile,
-						   value->enclosing_type,
+      value->enclosing_type = copy_type_recursive (value->enclosing_type,
 						   copied_types);
       type_incref (value->enclosing_type);
     }
@@ -1852,4 +1873,6 @@ init-if-undefined VARIABLE = EXPRESSION\n\
 Set an internal VARIABLE to the result of the EXPRESSION if it does not\n\
 exist or does not contain a value.  The EXPRESSION is not evaluated if the\n\
 VARIABLE is already initialized."));
+
+  make_final_cleanup (value_history_cleanup, NULL);
 }

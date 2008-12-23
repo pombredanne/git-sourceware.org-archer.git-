@@ -57,3 +57,16 @@ gdb_breakpoint [gdb_get_line_number "var-finish"]
 gdb_continue_to_breakpoint "var-finish"
 gdb_test "p e" "\\$\[0-9\]* = 'e   '" "p e re-set"
 gdb_test "p f" "\\$\[0-9\]* = \\(\\( 'f   ', 'f   ', 'f   ', 'f   ', 'f   ', 'f   ', 'f   '\\) \\( 'f2  ', 'f   ', 'f   ', 'f   ', 'f   ', 'f   ', 'f   '\\) \\( 'f   ', 'f   ', 'f   ', 'f   ', 'f   ', 'f   ', 'f   '\\) \\)" "p *f re-set"
+
+set test "quit #1"
+gdb_test_multiple "quit" $test {
+    -re "The program is running.  Quit anyway \\(and kill it\\)\\? \\(y or n\\) " {
+	pass $test
+    }
+}
+set test "quit #2"
+gdb_test_multiple "y" $test {
+    eof {
+	pass $test
+    }
+}
