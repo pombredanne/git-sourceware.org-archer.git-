@@ -1688,6 +1688,8 @@ check_typedef (struct type *type)
     {
       struct type *target_type = check_typedef (TYPE_TARGET_TYPE (type));
 
+      if (TYPE_DYNAMIC (type))
+	TYPE_TARGET_TYPE (type) = target_type;
       if (TYPE_STUB (target_type) || TYPE_TARGET_STUB (target_type))
 	{
 	  /* Empty.  */
@@ -1705,6 +1707,7 @@ check_typedef (struct type *type)
 	  TYPE_LENGTH (type) = TYPE_LENGTH (target_type);
 	  TYPE_TARGET_STUB (type) = 0;
 	}
+      TYPE_DYNAMIC (type) = 0;
     }
 
   /* Cache TYPE_LENGTH for future use.  */
