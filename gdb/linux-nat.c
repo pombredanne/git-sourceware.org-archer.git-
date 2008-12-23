@@ -857,6 +857,12 @@ linux_child_follow_fork (struct target_ops *ops, int follow_child)
 	  if (!fp)
 	    fp = add_fork (parent_pid);
 	  fork_save_infrun_state (fp, 0);
+
+	  /* Also add an entry for the child fork.  */
+	  fp = find_fork_pid (child_pid);
+	  if (!fp)
+	    fp = add_fork (child_pid);
+	  fork_save_infrun_state (fp, 0);
 	}
       else
 	target_detach (NULL, 0);
@@ -2868,7 +2874,6 @@ retry:
     {
       /* Causes SIGINT to be passed on to the attached process.  */
       set_sigint_trap ();
-      set_sigio_trap ();
     }
 
   while (status == 0)
@@ -2937,10 +2942,7 @@ retry:
     }
 
   if (!target_can_async_p ())
-    {
-      clear_sigio_trap ();
-      clear_sigint_trap ();
-    }
+    clear_sigint_trap ();
 
   gdb_assert (lp);
 

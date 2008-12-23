@@ -1,3 +1,174 @@
+2008-12-22  Tom Tromey  <tromey@redhat.com>
+
+	* c-exp.y (ident_tokens): New global.
+	(struct token) <cxx_only>: New field.
+	(tokentab3): Update.
+	(tokentab2): Update.
+	(yylex): Use ident_tokens.
+
+2008-12-22  Adam Denton  <adenton@yahoo.com>
+
+	PR gdb/8307:
+	* environ.c (free_environ): Free e->vector.
+
+2008-12-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix memory double-free.
+	* completer.c (line_completion_function): Clear LIST after called xfree.
+
+2008-12-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* breakpoint.c (update_watchpoint): Adjust and extend the description
+	of this function.  Fix one error message accordingly.
+
+2008-12-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix hw watchpoints created before the inferior was started.
+	* breakpoint.c (update_watchpoint): Convert the bp_watchpoint and
+	bp_hardware_watchpoint types according to the current runtime state.
+
+2008-12-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* linux-nat.c (linux_child_follow_fork): If following the child,
+	and not detaching the parent, also add the child fork to the fork
+	list.
+	* linux-fork.c (linux_fork_context): Remove dead error call.
+	Assert that the incoming newfp argument is not null.  Do not add a
+	new fork for inferior_ptid.  Assert that there is one already.
+
+2008-12-16  Tristan Gingold  <gingold@adacore.com>
+
+	* inflow.c: Remove old_sigio, handle_sigio, old_fcntl_flags,
+	set_sigio_trap, clear_sigio_trap definitions.
+	* inferior.h: Remove set_sigio_trap and clear_sigio_trap declarations.
+	* inf-ptrace.c (inf_ptrace_wait): Remove call to set_sigio_trap
+	and clear_sigio_trap.
+	* inf-ttrace.c (inf_ttrace_wait): Ditto.
+	* linux-nat.c (linux_nat_wait): Ditto.
+	* spu-linux-nat.c (spu_child_wait): Ditto.
+	* rs6000-nat.c (rs6000_wait): Ditto.
+	* target.c: Remove target_activity_function and target_activity_fd.
+	* target.h: Remove target_activity_function and target_activity_fd
+	declarations.
+
+2008-12-15  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* dbxread.c (read_ofile_symtab): Sign-extend 32-bit N_LSYM and
+	N_PSYM STABS values for 64-bit GDB.
+
+2008-12-15  Tristan Gingold  <gingold@adacore.com>
+
+	* dwarf2expr.c (execute_stack_op): Handle DW_OP_swap.
+
+2008-12-15  Jerome Guitton  <guitton@adacore.com>
+
+	* ada-lang.c (ada_value_slice_ptr): Rename to...
+	(ada_value_slice_from_ptr): ... this. Return a lazy value instead
+	of a reference.	Update comment.
+	(ada_value_struct_elt): Ditto if arg is a pointer or a reference.
+	Update comment as well.
+	(ada_evaluate_subexp): Update use of ada_value_slice_ptr.
+
+2008-12-12  Kevin Buettner  <kevinb@redhat.com>
+
+	* gnu-v3-abi.c (vtable_ptrdiff_type): New function.
+	(gnuv3_decode_method_ptr, gnuv3_print_method_ptr)
+	(gnuv3_method_ptr_to_value): Use a better approximation for
+	`ptrdiff_t' instead of `long'.
+
+2008-12-12  Kevin Buettner  <kevinb@redhat.com>
+
+	* m32c-tdep.c (m32c_gdbarch_init): Call set_gdbarch_vbit_in_delta().
+	(m32c_push_dummy_call): Dereference pointer type.
+
+2008-12-12  Tom Tromey  <tromey@redhat.com>
+
+	PR cli/2563:
+	* cli/cli-decode.c (delete_cmd): Add hook-related out parameters.
+	(add_cmd): Update.  Install hooks into new command.
+	(add_alias_cmd): Update.
+
+2008-12-11  Tom Tromey  <tromey@redhat.com>
+
+	* macroexp.c (get_pp_number): Require digit after leading ".".
+	Correctly handle suffixes.
+
+2008-12-11  Tom Tromey  <tromey@redhat.com>
+
+	* macrocmd.c (macro_define_command): Skip whitespace after
+	macro name.
+	(print_one_macro): Print space after macro name.
+
+2008-12-12  Pedro Alves  <pedro@codesourcery.com>
+
+	* infrun.c (handle_inferior_event): Correctly tag non-executing
+	threads in multi-process.
+	(normal_stop): Correctly tag stopped threads in multi-process.
+
+2008-12-12  Pedro Alves  <pedro@codesourcery.com>
+
+	* remote.c (extended_remote_mourn_1): Always call
+	generic_mourn_inferior.
+
+2008-12-12  Pedro Alves  <pedro@codesourcery.com>
+
+	* remote.c (remote_detach_1): Don't delete the inferior here.
+	(process_stop_reply): Ditto.
+	(extended_remote_kill): Ditto.
+
+2008-12-12  Pedro Alves  <pedro@codesourcery.com>
+
+	* remote.c (read_ptid): If we don't know about any inferior yet,
+	use the pid of magic_null_ptid.
+	(remote_start_remote): In the non-stop mode case, don't set
+	inferior_ptid to magic_null_ptid here.
+
+2008-12-11  Daniel Jacobowitz  <dan@codesourcery.com>
+	    Pedro Alves  <pedro@codesourcery.com>
+
+	* infcmd.c (step_1): Use step_once in the synchronous case too.
+	(step_1_continuation): Wrap line.
+	(step_once): Adjust comment.  Only install the continuation in
+	async mode.
+
+2008-12-11  Pedro Alves  <pedro@codesourcery.com>
+
+	* infrun.c (handle_inferior_event): On a TARGET_WAITKIND_EXITED or
+	TARGET_WAITKIND_SIGNALLED, switch inferior_ptid to the event ptid.
+	* linux_thread_db.c (thread_db_wait): On a TARGET_WAITKIND_EXITED
+	or TARGET_WAITKIND_SIGNALLED, return the ptid the beneath target
+	returned.
+	* inf-ptrace.c (inf_ptrace_wait): Return inferior_ptid instead of
+	minus_one_ptid if the inferior disappeared.
+	* rs6000-nat.c (rs6000_wait): Likewise.
+	* spu-linux-nat.c (spu_child_wait): Likewise.
+
+2008-12-11  Tom Tromey  <tromey@redhat.com>
+
+	PR macros/2564:
+	* c-exp.y (macro_original_text, expansion_obstack,
+	expression_macro_scope): New globals.
+	(scan_macro_expansion): New function.
+	(scanning_macro_expansion): Likewise.
+	(finished_macro_expansion): Likewise.
+	(scan_macro_cleanup): Likewise.
+	(c_parse): Find macro scope.  Initialize obstack.
+	* c-lang.h (scan_macro_expansion, scanning_macro_expansion,
+	finished_macro_expansion, expression_macro_lookup_func,
+	expression_macro_lookup_baton): Remove.
+	* c-lang.c (scan_macro_expansion, scanning_macro_expansion,
+	finished_macro_expansion, expression_macro_lookup_func,
+	expression_macro_lookup_baton): Remove.
+	(macro_original_text, macro_expanded_text,
+	c_preprocess_and_parse): Remove.
+	(c_language_defn, cplus_language_defn, asm_language_defn,
+	minimal_language_defn): Use c_parse.
+
+2008-12-10  Pedro Alves  <pedro@codesourcery.com>
+
+	* infcmd.c (until_next_command, finish_backward): Use get_frame_pc
+	instead of read_pc.
+
 2008-12-09  Tom Tromey  <tromey@redhat.com>
 
 	PR gdb/1815:
