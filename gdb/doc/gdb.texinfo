@@ -18049,6 +18049,7 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 * Functions In Python::         Writing new convenience functions.
 * Objfiles in Python::          Object files.
 * Breakpoints in Python::       Manipulating breakpoints using Python.
+* Frames In Python::            Acessing inferior stack frames from Python.
 @end menu
 
 @node Basic Python
@@ -18153,6 +18154,29 @@ call this function.
 Flush @value{GDBN}'s paginated standard output stream.  Flushing
 @code{sys.stdout} or @code{sys.stderr} will automatically call this
 function.
+@end defun
+
+@findex gdb.frames
+@defun frames
+Return a tuple of all frame objects.
+@end defun
+
+@findex gdb.newest_frame
+@defun newest_frame
+Return the newest frame object.
+@end defun
+
+@findex gdb.selected_frame
+@defun selected_frame
+Return the selected frame object.
+@end defun
+
+@findex gdb.frame_stop_reason_string
+@defun frame_stop_reason_string @var{reason}
+Return a string explaining the reason why @value{GDBN} stopped unwinding
+frames, as expressed by the given @var{reason} code (an integer, see the
+@code{unwind_stop_reason} method in
+@xref{Frames In Python,,Acessing inferior stack frames from Python}.)
 @end defun
 
 @node Exception Handling
@@ -19267,6 +19291,71 @@ there are commands, this returns a string holding all the commands,
 separated by newlines.  If there are no commands, this attribute is
 @code{None}.  This attribute is not writable.
 @end defivar
+
+@node Frames in Python
+@subsubsection Acessing inferior stack frames from Python.
+
+@cindex frames in python
+@tindex gdb.Frame
+@tindex Frame
+When the debugged program stops, @value{GDBN} is able to analyse its call
+stack (see @xref{Frames,,Stack frames}).  The @code{gdb.Frame} class
+represents a frame in the stack.  You can get a tuple containing all the
+frames in the stack with the @code{gdb.frames} function, the newest
+frame with the @code{gdb.newest_frame} function, and the selected frame
+with the @code{gdb.selected_frame} function
+(see @xref{Selection,,Selecting a Frame}.)  See
+@xref{Basic Python,,Basic Python}.
+
+A @code{gdb.Frame} object has the following methods:
+
+@table @code
+@defmethod Frame equals @code{frame}
+Compare frames.
+@end defmethod
+
+@defmethod Frame is_valid
+Returns true if the @code{gdb.Frame} object is valid, false if not.
+A frame object can become invalid if the frame it refers to doesn't
+exist anymore in the inferior.  All @code{gdb.Frame} methods will throw
+an exception if it is invalid at the time the method call is made.
+@end defmethod
+
+@defmethod Frame name
+Returns the function name of the frame, or @code{None} if it can't be
+obtained.
+@end defmethod
+
+@defmethod Frame type
+Returns the type of the frame. The value can be one of
+@code{gdb.NORMAL_FRAME}, @code{gdb.DUMMY_FRAME}, @code{gdb.SIGTRAMP_FRAME}
+or @code{gdb.SENTINEL_FRAME}.
+@end defmethod
+
+@defmethod Frame pc
+Returns the frame's resume address.
+@end defmethod
+
+@defmethod Frame address_in_block
+Returns an address which falls within the frame's code block.
+@end defmethod
+
+@defmethod Frame older
+Return the frame immediately older (outer) to this frame.
+@end defmethod
+
+@defmethod Frame newer
+Return the frame immetidaely newer (inner) to this frame.
+@end defmethod
+
+@defmethod Frame find_sal
+Return the frame's symtab and line object (see @xref{Symtab_and_line,, Symtab and line}).
+@end defmethod
+
+@defmethod Frame read_var_value @var{symbol}
+Return the value of the variable corresponding to the given symbol in this frame.
+@end defmethod
+@end table
 
 @node Interpreters
 @chapter Command Interpreters

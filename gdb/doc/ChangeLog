@@ -1,3 +1,9 @@
+2008-12-24  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.texinfo (Basic Python): Document Frame-related functions.
+	(Frames in Python): New node.
+	(Python API): Update.
+
 2008-12-17  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.texinfo (Types From Inferior): Document const, volatile,
