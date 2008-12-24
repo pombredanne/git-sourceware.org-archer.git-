@@ -3101,15 +3101,15 @@ create_copied_types_hash (struct objfile *objfile)
     {
       /* NULL OBJFILE is for TYPE_DYNAMIC types already contained in
 	 OBJFILE_MALLOC memory, such as those from VALUE_HISTORY_CHAIN.  Table
-	 element entries get xmalloc-ated - so use xfree.  */
+	 element entries get allocated by xmalloc - so use xfree.  */
       return htab_create (1, type_pair_hash, type_pair_eq, xfree);
     }
   else
     {
       /* Use OBJFILE's obstack, because OBJFILE is about to be deleted.  Table
-	 element entries also do not have to be freed.  */
+	 element entries get allocated by xmalloc - so use xfree.  */
       return htab_create_alloc_ex (1, type_pair_hash, type_pair_eq,
-				   NULL, &objfile->objfile_obstack,
+				   xfree, &objfile->objfile_obstack,
 				   hashtab_obstack_allocate,
 				   dummy_obstack_deallocate);
     }
@@ -3149,11 +3149,10 @@ copy_type_recursive_1 (struct objfile *objfile,
     *representative = new_type;
 
   /* We must add the new type to the hash table immediately, in case
-     we encounter this type again during a recursive call below.  */
-  if (objfile == OBJFILE_MALLOC)
-    stored = xmalloc (sizeof (*stored));
-  else
-    stored = obstack_alloc (&objfile->objfile_obstack, sizeof (*stored));
+     we encounter this type again during a recursive call below.  Memory could
+     be allocated from OBJFILE in the case we will be removing OBJFILE, this
+     optimization is missed and xfree is called for it from COPIED_TYPES.  */
+  stored = xmalloc (sizeof (*stored));
   stored->old = type;
   stored->new = new_type;
   *slot = stored;
