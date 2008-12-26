@@ -4924,8 +4924,8 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
   index_type = builtin_type_int32;
   /* RANGE_TYPE is allocated from OBJFILE, not OBJFILE_INTERNAL.  */
   range_type = alloc_type (objfile, index_type);
-  range_type = create_range_type_nfields (range_type, index_type, 2);
-  TYPE_UNSIGNED (range_type) = 1;
+  /* LOW_BOUND and HIGH_BOUND are set for real below.  */
+  range_type = create_range_type (range_type, index_type, 0, -1);
 
   /* C/C++ should probably have the low bound 0 but C/C++ does not use
      DW_TAG_string_type.  */
@@ -5205,9 +5205,9 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
   struct gdbarch *gdbarch = get_objfile_arch (cu->objfile);
   struct type *base_type;
   struct type *range_type;
-  struct attribute *attr, *byte_stride_attr;
+  struct attribute *attr;
   int low, high, byte_stride_int;
-  enum dwarf2_get_attr_constant_value high_type, byte_stride_type;
+  enum dwarf2_get_attr_constant_value high_type;
   char *name;
   
   base_type = die_type (die, cu);
@@ -5220,13 +5220,8 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
 		     0, NULL, cu->objfile);
     }
 
-  /* DW_AT_bit_stride is currently unsupported as we count in bytes.  */
-  byte_stride_attr = dwarf2_attr (die, DW_AT_byte_stride, cu);
-  byte_stride_type = dwarf2_get_attr_constant_value (byte_stride_attr,
-						     &byte_stride_int);
-
-  range_type = create_range_type_nfields
-    (NULL, base_type, byte_stride_type == dwarf2_attr_unknown ? 2 : 3);
+  /* LOW_BOUND and HIGH_BOUND are set for real below.  */
+  range_type = create_range_type (NULL, base_type, 0, -1);
 
   attr = dwarf2_attr (die, DW_AT_lower_bound, cu);
   switch (dwarf2_get_attr_constant_value (attr, &low))
@@ -5290,19 +5285,22 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
       break;
     }
 
-  switch (byte_stride_type)
+  /* DW_AT_bit_stride is currently unsupported as we count in bytes.  */
+  attr = dwarf2_attr (die, DW_AT_byte_stride, cu);
+  switch (dwarf2_get_attr_constant_value (attr, &byte_stride_int))
     {
     case dwarf2_attr_unknown:
       break;
     case dwarf2_attr_const:
       if (byte_stride_int == 0)
-	warning (_("Found DW_AT_byte_stride with unsupported value 0"));
-      SET_TYPE_BYTE_STRIDE (range_type, byte_stride_int);
+	complaint (&symfile_complaints,
+		   _("Found DW_AT_byte_stride with unsupported value 0"));
+      TYPE_BYTE_STRIDE (range_type) = byte_stride_int;
       break;
     case dwarf2_attr_block:
       TYPE_RANGE_BOUND_SET_DWARF_BLOCK (range_type, 2);
       TYPE_FIELD_DWARF_BLOCK (range_type, 2) = dwarf2_attr_to_locexpr_baton
-							 (byte_stride_attr, cu);
+								     (attr, cu);
       TYPE_DYNAMIC (range_type) = 1;
       break;
     }

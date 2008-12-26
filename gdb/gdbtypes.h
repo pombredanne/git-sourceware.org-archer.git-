@@ -828,13 +828,9 @@ extern void allocate_cplus_struct_type (struct type *);
 #define TYPE_ASSOCIATED(thistype) TYPE_MAIN_TYPE (thistype)->associated
 
 #define TYPE_INDEX_TYPE(type) TYPE_FIELD_TYPE (type, 0)
-/* `TYPE_NFIELDS (range_type) >= 3' check is required before accessing it:  */
-#define SET_TYPE_BYTE_STRIDE(range_type, n) \
-  (TYPE_FIELD_BITPOS (range_type, 2) = (n))
 #define TYPE_LOW_BOUND(range_type) TYPE_FIELD_BITPOS (range_type, 0)
 #define TYPE_HIGH_BOUND(range_type) TYPE_FIELD_BITPOS (range_type, 1)
-#define TYPE_BYTE_STRIDE(range_type) \
-  (TYPE_NFIELDS (range_type) < 3 ? 0 : TYPE_FIELD_BITPOS (range_type, 2))
+#define TYPE_BYTE_STRIDE(range_type) TYPE_FIELD_BITPOS (range_type, 2)
 
 /* Whether we should use TYPE_FIELD_DWARF_BLOCK (and not TYPE_FIELD_BITPOS).  */
 #define TYPE_RANGE_BOUND_IS_DWARF_BLOCK(range_type, fieldno) \
@@ -865,7 +861,7 @@ extern void allocate_cplus_struct_type (struct type *);
 /* TYPE_BYTE_STRIDE (TYPE_INDEX_TYPE (arraytype)) with a fallback to the
    element size if no specific stride value is known.  */
 #define TYPE_ARRAY_BYTE_STRIDE_VALUE(arraytype)		\
-  (TYPE_NFIELDS (TYPE_INDEX_TYPE (arraytype)) < 2	\
+  (TYPE_BYTE_STRIDE (TYPE_INDEX_TYPE (arraytype)) == 0	\
    ? TYPE_LENGTH (TYPE_TARGET_TYPE (arraytype))		\
    : TYPE_BYTE_STRIDE (TYPE_INDEX_TYPE (arraytype)))
 
@@ -1215,10 +1211,6 @@ extern struct type *lookup_pointer_type (struct type *);
 extern struct type *make_function_type (struct type *, struct type **);
 
 extern struct type *lookup_function_type (struct type *);
-
-extern struct type *create_range_type_nfields (struct type *result_type,
-					       struct type *index_type,
-					       int nfields);
 
 extern struct type *create_range_type (struct type *, struct type *, int,
 				       int);

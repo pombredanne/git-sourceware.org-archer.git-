@@ -729,21 +729,16 @@ allocate_stub_method (struct type *type)
    RESULT_TYPE, or creating a new type, inheriting the objfile from
    INDEX_TYPE.
 
-   Indices will be of type INDEX_TYPE.  NFIELDS should be 2 for standard
-   arrays, 3 for custom TYPE_BYTE_STRIDE.  Use CREATE_RANGE_TYPE for common
-   constant TYPE_LOW_BOUND/TYPE_HIGH_BOUND ranges instead.
-
-   You must to decide TYPE_UNSIGNED yourself as being done in CREATE_RANGE_TYPE.
+   Indices will be of type INDEX_TYPE, and will range from LOW_BOUND
+   to HIGH_BOUND, inclusive.
 
    FIXME: Maybe we should check the TYPE_CODE of RESULT_TYPE to make
    sure it is TYPE_CODE_UNDEF before we bash it into a range type?  */
 
 struct type *
-create_range_type_nfields (struct type *result_type, struct type *index_type,
-                           int nfields)
+create_range_type (struct type *result_type, struct type *index_type,
+		   int low_bound, int high_bound)
 {
-  int fieldno;
-
   if (result_type == NULL)
     {
       result_type = alloc_type (TYPE_OBJFILE (index_type), index_type);
@@ -754,33 +749,18 @@ create_range_type_nfields (struct type *result_type, struct type *index_type,
     TYPE_TARGET_STUB (result_type) = 1;
   else
     TYPE_LENGTH (result_type) = TYPE_LENGTH (check_typedef (index_type));
-  TYPE_NFIELDS (result_type) = nfields;
+  TYPE_NFIELDS (result_type) = 3;
   TYPE_FIELDS (result_type) = (struct field *)
-    TYPE_ALLOC (result_type,
-		TYPE_NFIELDS (result_type) * sizeof (struct field));
-  memset (TYPE_FIELDS (result_type), 0,
-	  TYPE_NFIELDS (result_type) * sizeof (struct field));
-
-  return (result_type);
-}
-
-/* Simplified CREATE_RANGE_TYPE_NFIELDS for constant ranges from LOW_BOUND to
-   HIGH_BOUND, inclusive.  TYPE_BYTE_STRIDE is always set to zero (default
-   native target type length).  */
-
-struct type *
-create_range_type (struct type *result_type, struct type *index_type,
-		   int low_bound, int high_bound)
-{
-  result_type = create_range_type_nfields (result_type, index_type, 2);
-
-  TYPE_LOW_BOUND (result_type) = low_bound;
-  TYPE_HIGH_BOUND (result_type) = high_bound;
+    TYPE_ALLOC (result_type, 3 * sizeof (struct field));
+  memset (TYPE_FIELDS (result_type), 0, 3 * sizeof (struct field));
+  TYPE_FIELD_BITPOS (result_type, 0) = low_bound;
+  TYPE_FIELD_BITPOS (result_type, 1) = high_bound;
+  TYPE_BYTE_STRIDE (result_type) = 0;
 
   if (low_bound >= 0)
     TYPE_UNSIGNED (result_type) = 1;
 
-  return result_type;
+  return (result_type);
 }
 
 /* Set *LOWP and *HIGHP to the lower and upper bounds of discrete type

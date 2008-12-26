@@ -2492,8 +2492,9 @@ static LONGEST
 ada_array_bound_from_type (struct type * arr_type, int n, int which,
                            struct type ** typep)
 {
-  struct type *type;
-  struct type *index_type_desc;
+  struct type *type, *index_type_desc, *index_type;
+
+  gdb_assert (which == 0 || which == 1);
 
   if (ada_is_packed_array_type (arr_type))
     arr_type = decode_packed_array_type (arr_type);
@@ -2511,10 +2512,11 @@ ada_array_bound_from_type (struct type * arr_type, int n, int which,
     type = arr_type;
 
   index_type_desc = ada_find_parallel_type (type, "___XA");
-  if (index_type_desc == NULL)
+  if (index_type_desc != NULL)
+    index_type = to_fixed_range_type (TYPE_FIELD_NAME (index_type_desc, n - 1),
+				      NULL, TYPE_OBJFILE (arr_type));
+  else
     {
-      struct type *index_type;
-
       while (n > 1)
         {
           type = TYPE_TARGET_TYPE (type);
@@ -2522,33 +2524,22 @@ ada_array_bound_from_type (struct type * arr_type, int n, int which,
         }
 
       index_type = TYPE_INDEX_TYPE (type);
-      if (typep != NULL)
-        *typep = index_type;
-
-      /* The index type is either a range type or an enumerated type.
-         For the range type, we have some macros that allow us to
-         extract the value of the low and high bounds.  But they
-         do now work for enumerated types.  The expressions used
-         below work for both range and enum types.  */
-      return
-        (LONGEST) (which == 0
-                   ? TYPE_FIELD_BITPOS (index_type, 0)
-                   : TYPE_FIELD_BITPOS (index_type,
-                                        TYPE_NFIELDS (index_type) - 1));
     }
-  else
+
+  if (typep != NULL)
+    *typep = index_type;
+
+  switch (TYPE_CODE (index_type))
     {
-      struct type *index_type =
-        to_fixed_range_type (TYPE_FIELD_NAME (index_type_desc, n - 1),
-                             NULL, TYPE_OBJFILE (arr_type));
-
-      if (typep != NULL)
-        *typep = index_type;
-
-      return
-        (LONGEST) (which == 0
-                   ? TYPE_LOW_BOUND (index_type)
-                   : TYPE_HIGH_BOUND (index_type));
+    case TYPE_CODE_RANGE:
+      return which == 0 ? TYPE_LOW_BOUND (index_type)
+			: TYPE_HIGH_BOUND (index_type);
+    case TYPE_CODE_ENUM:
+      return which == 0 ? TYPE_FIELD_BITPOS (index_type, 0)
+			: TYPE_FIELD_BITPOS (index_type,
+					     TYPE_NFIELDS (index_type) - 1);
+    default:
+      internal_error (__FILE__, __LINE__, _("invalid type code of index type"));
     }
 }
 
