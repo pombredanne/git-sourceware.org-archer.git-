@@ -750,17 +750,19 @@ create_range_type (struct type *result_type, struct type *index_type,
   else
     TYPE_LENGTH (result_type) = TYPE_LENGTH (check_typedef (index_type));
   TYPE_NFIELDS (result_type) = 3;
-  TYPE_FIELDS (result_type) = (struct field *)
-    TYPE_ALLOC (result_type, 3 * sizeof (struct field));
-  memset (TYPE_FIELDS (result_type), 0, 3 * sizeof (struct field));
-  TYPE_FIELD_BITPOS (result_type, 0) = low_bound;
-  TYPE_FIELD_BITPOS (result_type, 1) = high_bound;
+  TYPE_FIELDS (result_type) = TYPE_ALLOC (result_type,
+					  TYPE_NFIELDS (result_type)
+					  * sizeof (struct field));
+  memset (TYPE_FIELDS (result_type), 0,
+	  TYPE_NFIELDS (result_type) * sizeof (struct field));
+  TYPE_LOW_BOUND (result_type) = low_bound;
+  TYPE_HIGH_BOUND (result_type) = high_bound;
   TYPE_BYTE_STRIDE (result_type) = 0;
 
   if (low_bound >= 0)
     TYPE_UNSIGNED (result_type) = 1;
 
-  return (result_type);
+  return result_type;
 }
 
 /* Set *LOWP and *HIGHP to the lower and upper bounds of discrete type
@@ -870,7 +872,7 @@ create_array_type (struct type *result_type,
     (struct field *) TYPE_ALLOC (result_type, sizeof (struct field));
   memset (TYPE_FIELDS (result_type), 0, sizeof (struct field));
   /* FIXME: type alloc.  */
-  TYPE_FIELD_TYPE (result_type, 0) = range_type;
+  TYPE_INDEX_TYPE (result_type) = range_type;
   TYPE_VPTR_FIELDNO (result_type) = -1;
 
   /* DWARF blocks may depend on runtime information like

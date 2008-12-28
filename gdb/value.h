@@ -561,10 +561,6 @@ extern int val_print_string (CORE_ADDR addr, int len, int width,
 			     struct ui_file *stream,
 			     const struct value_print_options *options);
 
-extern void print_variable_value_nl (struct symbol *var,
-				     struct frame_info *frame,
-				     struct ui_file *stream);
-
 extern void print_variable_and_value (const char *name,
 				      struct symbol *var,
 				      struct frame_info *frame,

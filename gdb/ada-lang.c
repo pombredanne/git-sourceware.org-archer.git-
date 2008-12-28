@@ -1777,11 +1777,11 @@ packed_array_type (struct type *type, long *elt_bits)
   new_elt_type = packed_array_type (ada_check_typedef (TYPE_TARGET_TYPE (type)),
                                     elt_bits);
   new_type = alloc_type (TYPE_OBJFILE (type), new_elt_type);
-  create_array_type (new_type, new_elt_type, TYPE_FIELD_TYPE (type, 0));
+  create_array_type (new_type, new_elt_type, TYPE_INDEX_TYPE (type));
   TYPE_FIELD_BITSIZE (new_type, 0) = *elt_bits;
   TYPE_NAME (new_type) = ada_type_name (type);
 
-  if (get_discrete_bounds (TYPE_FIELD_TYPE (type, 0),
+  if (get_discrete_bounds (TYPE_INDEX_TYPE (type),
                            &low_bound, &high_bound) < 0)
     low_bound = high_bound = 0;
   if (high_bound < low_bound)
@@ -2468,7 +2468,7 @@ ada_index_type (struct type *type, int n)
 
       for (i = 1; i < n; i += 1)
         type = TYPE_TARGET_TYPE (type);
-      result_type = TYPE_TARGET_TYPE (TYPE_FIELD_TYPE (type, 0));
+      result_type = TYPE_TARGET_TYPE (TYPE_INDEX_TYPE (type));
       /* FIXME: The stabs type r(0,0);bound;bound in an array type
          has a target type of TYPE_CODE_UNDEF.  We compensate here, but
          perhaps stabsread.c would make more sense.  */
@@ -2493,6 +2493,7 @@ ada_array_bound_from_type (struct type * arr_type, int n, int which,
                            struct type ** typep)
 {
   struct type *type, *index_type_desc, *index_type;
+  LONGEST retval;
 
   gdb_assert (which == 0 || which == 1);
 
@@ -2526,21 +2527,25 @@ ada_array_bound_from_type (struct type * arr_type, int n, int which,
       index_type = TYPE_INDEX_TYPE (type);
     }
 
-  if (typep != NULL)
-    *typep = index_type;
-
   switch (TYPE_CODE (index_type))
     {
     case TYPE_CODE_RANGE:
-      return which == 0 ? TYPE_LOW_BOUND (index_type)
-			: TYPE_HIGH_BOUND (index_type);
+      retval = which == 0 ? TYPE_LOW_BOUND (index_type)
+			  : TYPE_HIGH_BOUND (index_type);
+      break;
     case TYPE_CODE_ENUM:
-      return which == 0 ? TYPE_FIELD_BITPOS (index_type, 0)
-			: TYPE_FIELD_BITPOS (index_type,
-					     TYPE_NFIELDS (index_type) - 1);
+      retval = which == 0 ? TYPE_FIELD_BITPOS (index_type, 0)
+			  : TYPE_FIELD_BITPOS (index_type,
+					       TYPE_NFIELDS (index_type) - 1);
+      break;
     default:
       internal_error (__FILE__, __LINE__, _("invalid type code of index type"));
     }
+
+  if (typep != NULL)
+    *typep = index_type;
+
+  return retval;
 }
 
 /* Given that arr is an array value, returns the lower bound of the
