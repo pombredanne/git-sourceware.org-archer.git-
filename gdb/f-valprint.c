@@ -578,8 +578,7 @@ info_common_command (char *comname, int from_tty)
 
       while (entry != NULL)
 	{
-	  printf_filtered ("%s = ", SYMBOL_PRINT_NAME (entry->symbol));
-	  print_variable_value_nl (entry->symbol, fi, gdb_stdout);
+	  print_variable_and_value (NULL, entry->symbol, fi, gdb_stdout, 0);
 	  entry = entry->next;
 	}
     }

@@ -1,3 +1,88 @@
+2008-12-23  Jon Beniston <jon@beniston.com>
+
+	* Makefile.am: Add LM32 object files and dependencies.
+	* Makefile.in: Regenerate.
+	* archures.c: Add LM32 architechiture info.
+	* targets.c: Likewise.
+	* reloc.c: Likewise.
+	* bfd-in2.h: Regenerate.
+	* config.bfd: Add LM32 targets.
+	* configure.in: Likewise.
+	* configure: Regenerate.
+	* cpu-lm32.c: New file.
+	* elf32-lm32.c: New file.
+
+2008-12-23  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/7036
+	* elfxx-ia64.c (elfNN_ia64_relax_section): Assume linker will
+	always insert 32byte between the .plt and .text sections after
+	the the first relaxation pass.
+
+2008-12-23  Nick Clifton  <nickc@redhat.com>
+
+	PR 7093
+	* elf32-arm.c (bfd_elf32_arm_init_maps): Only process ARM ELF
+	object files.
+
+2008-12-23  Tristan Gingold  <gingold@adacore.com>
+
+	* mach-o.c (bfd_mach_o_make_bfd_section): Use the standard ELF name
+	.eh_frame for __TEXT.__eh_frame so that it is recognized by gdb.
+	Use shorter sections name for well known sections.
+	(bfd_mach_o_scan_read_dylinker): Only put dylinker name in the
+	section content.
+	(bfd_mach_o_scan_read_segment): Use shorter sections name for
+	well known segments.
+	(bfd_mach_o_scan_read_command): Ignore some new commands.
+	(bfd_mach_o_openr_next_archived_file): Use more descriptive names
+	for members filename.
+	(bfd_mach_o_fat_extract): New function to easily extract members
+	of a fat binary.
+	* mach-o.h (bfd_mach_o_load_command_type): Add new constants.
+	(bfd_mach_o_dylinker_command): Fix comment and reindent.
+	(bfd_mach_o_fat_extract): New prototype.
+
+2008-12-23  Johan Olmutz Nielsen  <jnielsen@ddci.com>
+
+	* coffcode.h (coff_write_object_contents): Always initialise
+	section.s_page.
+
+2008-12-23  Andreas Schwab  <schwab@suse.de>
+
+	* elf32-m68k.c (elf_m68k_discard_copies): Use SYMBOL_CALLS_LOCAL.
+	(elf_m68k_relocate_section): Use SYMBOL_CALLS_LOCAL and
+	SYMBOL_REFERENCES_LOCAL.
+	(elf_m68k_relocate_section): Likewise.
+
+2008-12-23  Nick Clifton  <nickc@redhat.com>
+
+	* elf-bfd.h (struct bfd_elf_section_data): Remove indirect_relocs
+	field.
+	(_bfd_elf_make_ifunc_reloc_section): Remove prototype.
+	* elf.c (swap_out_syms): Remove STT_IFUNC support.
+	(elf_find_function): Likewise.
+	* elf32-arm.c (arm_elf_find_function): Likewise.
+	(elf32_arm_adjust_dynamic_symbol): Likewise.
+	(elf32_arm_swap_symbol_in): Likewise.
+	(elf32_arm_is_function_type): Likewise.
+	* elf32-i386.c (is_indirect_symbol): Delete.
+	(elf_i386_check_relocs): Remove STT_IFUNC support.
+	(allocate_dynrelocs): Likewise.
+	(elf_i386_relocate_section): Likewise.
+	* elf64-x86-64.c (is_indirect_symbol): Delete.
+	(elf64_x86_64_check_relocs): Remove STT_IFUNC support.
+	(allocate_dynrelocs): Likewise.
+	(elf64_x86_64_relocate_section): Likewise.
+	* elfcode.h (elf_slurp_symbol_table): Likewise.
+	* elflink.c (_bfd_elf_adjust_symbol): Likewise.
+	(get_ifunc_reloc_section_name): Delete.
+	(_bfd_elf_make_ifunc_reloc_section): Delete.
+	* syms.c (BSF_INDIRECT_FUNCTION): Delete.
+	(bfd_print_symbol_vandf): Remove STT_IFUNC support.
+	(bfd_decode_symclass): Likewise.
+	* bfd-in2.h: Regenerate.
+
 2008-12-20  Hans-Peter Nilsson  <hp@axis.com>
 
 	* elf32-cris.c 	(cris_elf_howto_table): Add entry for R_CRIS_32_IE.
@@ -98,7 +183,7 @@
 	* cpu-avr.c (compatible): Makes avr-6 compatible only with itself.
 
 2008-12-04  Andreas Krebbel  <Andreas.Krebbel@de.ibm.com>
-	
+
 	* elf64-s390.c (elf_s390_check_relocs): Initialize
 	htab->elf.dynobj if necessary.
 
@@ -295,7 +380,7 @@
 	relocs.  For overflow, emit additional messages for the new 16-bit
 	relocs as well as R_CRIS_16_GOTPLT and R_CRIS_16_GOT.
 	(elf_cris_finish_dynamic_symbol): Use elf_cris_finish_dynamic_symbol
-	instead of plain casts.  Check new hash entry member 
+	instead of plain casts.  Check new hash entry member
 	reg_got_refcount when checking whether to emit a GOT entry.
 	(elf_cris_finish_dynamic_sections): Update head comment to warn
 	about emitting relocs here.  Use a temporary variable when testing
@@ -348,7 +433,7 @@
 	Leave addend zero on LD DTPMOD dynamic reloc.
 
 2008-11-19  Bob Wilson  <bob.wilson@acm.org>
-	
+
 	* xtensa-modules.c (sysregs): Add MMID, VECBASE, EPC5, EPC6, EPC7,
 	EXCSAVE5, EXCSAVE6, EXCSAVE7, EPS5, EPS6, EPS7, CPENABLE,
 	SCOMPARE1, and THREADPTR registers.
@@ -411,7 +496,7 @@
 	(Slot_inst16b_get_field_fns, Slot_inst16b_set_field_fns): Likewise.
 	(xtensa_modules): Update number of fields, operands, iclasses and
 	opcodes.
-	
+
 2008-11-19  Nix  <nix@esperi.org.uk>
 
 	* elf.c (swap_out_syms) [USE_STT_COMMON]: Fix syntax error.
@@ -429,7 +514,7 @@
 	* elf32-arm.c (elf32_arm_merge_eabi_attributes): Merge
 	half-precision attributes.
 	(elf32_arm_copy_one_eabi_other_attribute): New.
-	(elf32_arm_copy_other_attribute_list): New. 
+	(elf32_arm_copy_other_attribute_list): New.
 
 2008-11-18  Nick Clifton  <nickc@redhat.com>
 
@@ -464,7 +549,7 @@
 
 2008-11-14  Tristan Gingold  <gingold@adacore.com>
 
-	* configure.com: Handle bfd_default_target_size, BFD_HOST_LONG_LONG, 
+	* configure.com: Handle bfd_default_target_size, BFD_HOST_LONG_LONG,
 	BFD_HOST_64BIT_LONG_LONG, BFD_HOSTPTR_T, bfd_file_ptr.
 	Generate bfdver.h.
 	* vms-hdr.c (_bfd_vms_write_hdr): Use strdup/free instead of alloca.

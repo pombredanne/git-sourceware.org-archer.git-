@@ -565,6 +565,12 @@ extern void print_variable_value_nl (struct symbol *var,
 				     struct frame_info *frame,
 				     struct ui_file *stream);
 
+extern void print_variable_and_value (const char *name,
+				      struct symbol *var,
+				      struct frame_info *frame,
+				      struct ui_file *stream,
+				      int indent);
+
 extern int check_field (struct type *, const char *);
 
 extern void typedef_print (struct type *type, struct symbol *news,

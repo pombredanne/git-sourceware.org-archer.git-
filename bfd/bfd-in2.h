@@ -2035,6 +2035,8 @@ enum bfd_architecture
 #define bfd_mach_z80            3 /* With ixl, ixh, iyl, and iyh.  */
 #define bfd_mach_z80full        7 /* All undocumented instructions.  */
 #define bfd_mach_r800           11 /* R800: successor with multiplication.  */
+  bfd_arch_lm32,      /* Lattice Mico32 */
+#define bfd_mach_lm32      1
   bfd_arch_last
   };
 
@@ -4412,6 +4414,17 @@ BFD_RELOC_XTENSA_ASM_EXPAND.  */
 
 /* 4 bit value.  */
   BFD_RELOC_Z8K_IMM4L,
+
+/* Lattice Mico32 relocations.  */
+  BFD_RELOC_LM32_CALL,
+  BFD_RELOC_LM32_BRANCH,
+  BFD_RELOC_LM32_16_GOT,
+  BFD_RELOC_LM32_GOTOFF_HI16,
+  BFD_RELOC_LM32_GOTOFF_LO16,
+  BFD_RELOC_LM32_COPY,
+  BFD_RELOC_LM32_GLOB_DAT,
+  BFD_RELOC_LM32_JMP_SLOT,
+  BFD_RELOC_LM32_RELATIVE,
   BFD_RELOC_UNUSED };
 typedef enum bfd_reloc_code_real bfd_reloc_code_real_type;
 reloc_howto_type *bfd_reloc_type_lookup
@@ -4472,13 +4485,6 @@ typedef struct bfd_symbol
      perhaps others someday.  */
 #define BSF_FUNCTION           (1 << 3)
 
-  /* The symbol is an indirect code object.  Unrelated to BSF_INDIRECT.
-     Relocations against a symbol with this flag have to evaluated at
-     run-time, where the function pointed to by this symbol is invoked
-     in order to determine the value to be used in the relocation.
-     BSF_FUNCTION must also be set for symbols with this flag.  */
-#define BSF_INDIRECT_FUNCTION  (1 << 4)
- 
   /* Used by the linker.  */
 #define BSF_KEEP               (1 << 5)
 #define BSF_KEEP_G             (1 << 6)

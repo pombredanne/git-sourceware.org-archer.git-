@@ -1737,30 +1737,28 @@ disable_display_command (char *args, int from_tty)
 
 
 /* Print the value in stack frame FRAME of a variable specified by a
-   struct symbol.  Printed value gets terminated by a newline.  */
+   struct symbol.  NAME is the name to print; if NULL then VAR's print
+   name will be used.  STREAM is the ui_file on which to print the
+   value.  INDENT specifies the number of indent levels to print
+   before printing the variable name.  */
 
 void
-print_variable_value_nl (struct symbol *var, struct frame_info *frame,
-			 struct ui_file *stream)
+print_variable_and_value (const char *name, struct symbol *var,
+			  struct frame_info *frame,
+			  struct ui_file *stream, int indent)
 {
-  struct value *val = NULL;	/* A false GCC warning.  */
-  struct gdb_exception e;
+  struct value *val;
+  struct value_print_options opts;
 
-  TRY_CATCH (e, RETURN_MASK_ERROR)
-    {
-      val = read_var_value (var, frame);
-    }
-  if (e.reason < 0)
-    exception_print (stream, e);
-  else
-    {
-      struct value_print_options opts;
+  if (!name)
+    name = SYMBOL_PRINT_NAME (var);
 
-      get_user_print_options (&opts);
-      value_print (val, stream, &opts);
+  fprintf_filtered (stream, "%s%s = ", n_spaces (2 * indent), name);
 
-      fputc_filtered ('\n', stream);
-    }
+  val = read_var_value (var, frame);
+  get_user_print_options (&opts);
+  common_val_print (val, stream, indent, &opts, current_language);
+  fprintf_filtered (stream, "\n");
 }
 
 static void
