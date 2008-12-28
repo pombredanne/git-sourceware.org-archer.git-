@@ -1,3 +1,48 @@
+2008-12-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* Makefile.am (CFILES, ALL_MACHINES): Add LM32 source and object files.
+	* Makefile.in: Regenerate.
+
+2008-12-23  Jon Beniston <jon@beniston.com>
+
+	* Makefile.am: Add LM32 object files and dependencies.
+	* Makefile.in: Regenerate.
+	* configure.in: Add LM32 target.
+	* configure: Regenerate.
+	* disassemble.c: Add LM32 disassembler.
+	* cgen-asm.in: Update copyright year.
+	* cgen-dis.in: Update copyright year.
+	* cgen-ibld.in: Update copyright year.
+	* lm32-asm.c: New file.
+	* lm32-desc.c: New file.
+	* lm32-desc.h: New file.
+	* lm32-dis.c: New file.
+	* lm32-ibld.c: New file.
+	* lm32-opc.c: New file.
+	* lm32-opc.h: New file.
+	* lm32-opinst.c: New file.
+
+2008-12-23  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* i386-dis.c (EXdS): New.
+	(EXdVexS): Likewise.
+	(EXqVexS): Likewise.
+	(d_swap_mode): Likewise.
+	(q_mode): Updated.
+	(prefix_table): Use EXdS on movss and EXqS on movsd.
+	(vex_len_table): Use EXdVexS on vmovss and EXqVexS on vmovsd.
+	(intel_operand_size): Handle d_swap_mode.
+	(OP_EX): Likewise.
+
+	* i386-opc.h (S): Update comments.
+
+	* i386-opc.tbl: Add S to movss, movsd, vmovss and vmovsd.
+	* i386-tbl.h: Regenerated.
+
+2008-12-23  Nick Clifton  <nickc@redhat.com>
+
+	* po/ga.po: Updated Irish translation.
+
 2008-12-20  H.J. Lu  <hongjiu.lu@intel.com>
 
 	* i386-dis.c (EbS): New.
