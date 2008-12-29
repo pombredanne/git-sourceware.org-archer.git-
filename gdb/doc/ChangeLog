@@ -1,3 +1,8 @@
+2008-12-29  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.texinfo (Basic Python): Document gdb.read_memory and
+	gdb.write_memory.
+
 2008-12-24  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	* gdb.texinfo (Basic Python): Document Frame-related functions.

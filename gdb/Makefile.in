@@ -279,6 +279,7 @@ SUBDIR_PYTHON_OBS = \
 	python-frame.o \
 	python-function.o \
 	python-hooks.o \
+	python-membuf.o \
 	python-objfile.o \
 	python-param.o \
 	python-symbol.o \
@@ -294,6 +295,7 @@ SUBDIR_PYTHON_SRCS = \
 	python/python-frame.c \
 	python/python-function.c \
 	python/python-hooks.c \
+	python/python-membuf.c \
 	python/python-objfile.c \
 	python/python-param.c \
 	python/python-symbol.c \
@@ -1889,6 +1891,10 @@ python-function.o: $(srcdir)/python/python-function.c
 
 python-hooks.o: $(srcdir)/python/python-hooks.c
 	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-hooks.c
+	$(POSTCOMPILE)
+
+python-membuf.o: $(srcdir)/python/python-membuf.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-membuf.c
 	$(POSTCOMPILE)
 
 python-objfile.o: $(srcdir)/python/python-objfile.c

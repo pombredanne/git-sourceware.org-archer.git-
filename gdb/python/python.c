@@ -1462,8 +1462,8 @@ Enables or disables auto-loading of Python code when an object is opened."),
   gdbpy_initialize_types ();
   gdbpy_initialize_parameters ();
   gdbpy_initialize_objfile ();
-
   gdbpy_initialize_events ();
+  gdbpy_initialize_membuf ();
 
   PyRun_SimpleString ("import gdb");
   PyRun_SimpleString ("gdb.pretty_printers = {}");
@@ -1579,6 +1579,13 @@ Note: may later change to return an object." },
 
   { "post_event", gdbpy_post_event, METH_VARARGS,
     "Post an event into gdb's event loop." },
+
+  { "read_memory", gdbpy_read_memory, METH_VARARGS,
+    "read_memory (address, length) -> buffer\n\
+Return a buffer object for reading from the inferior's memory." },
+  { "write_memory", gdbpy_write_memory, METH_VARARGS,
+    "write_memory (address, buffer [, length])\n\
+Write the given buffer object to the inferior's memory." },
 
   { "write", gdbpy_write, METH_VARARGS,
     "Write a string using gdb's filtered stream." },

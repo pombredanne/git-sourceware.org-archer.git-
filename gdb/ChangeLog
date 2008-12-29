@@ -1,5 +1,17 @@
 2008-12-29  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
+	* Makefile.in (SUBDIR_PYTHON_OBS): Add python-membuf.o.
+	(SUBDIR_PYTHON_SRCS): Add python-membuf.c.
+	(python-membuf.o): New target.
+	* python/python-internal.h (gdbpy_read_memory,
+	gdbpy_write_memory, gdbpy_initialize_membuf): New prototypes.
+	* python/python-membuf.c: New file.
+	* python/python.c (_initialize_python): Call
+	gdbpy_initialize_membuf.
+	(GdbMethods): Add entries for `read_memory' and `write_memory'.
+
+2008-12-29  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
 	* python/python-frame.c (gdbpy_current_frame): Rename to ...
 	(gdbpy_newest_frame): ... this.
 	* python/python-internal.h (gdbpy_current_frame): Rename prototype

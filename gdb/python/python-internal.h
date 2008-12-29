@@ -78,6 +78,8 @@ PyObject *gdbpy_frame_stop_reason_string (PyObject *, PyObject *);
 PyObject *gdbpy_lookup_symbol (PyObject *self, PyObject *args);
 PyObject *gdbpy_selected_frame (PyObject *self, PyObject *args);
 PyObject *gdbpy_block_for_pc (PyObject *self, PyObject *args);
+PyObject *gdbpy_read_memory (PyObject *self, PyObject *args);
+PyObject *gdbpy_write_memory (PyObject *self, PyObject *args);
 
 PyObject *symtab_and_line_to_sal_object (struct symtab_and_line sal);
 PyObject *symtab_to_symtab_object (struct symtab *symtab);
@@ -108,6 +110,7 @@ void gdbpy_initialize_blocks (void);
 void gdbpy_initialize_functions (void);
 void gdbpy_initialize_objfile (void);
 void gdbpy_initialize_parameters (void);
+void gdbpy_initialize_membuf (void);
 
 struct cleanup *make_cleanup_py_decref (PyObject *py);
 struct cleanup *make_cleanup_py_restore_gil (PyGILState_STATE *state);
