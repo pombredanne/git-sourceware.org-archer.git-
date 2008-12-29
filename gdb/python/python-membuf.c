@@ -91,8 +91,6 @@ gdbpy_write_memory (PyObject *self, PyObject *args)
   const char *buffer;
   long length = -1;
   CORE_ADDR addr;
-  membuf_object *membuf_obj;
-  struct cleanup *cleanups;
   volatile struct gdb_exception except;
 
   /* Assume CORE_ADDR corresponds to unsigned long.  */

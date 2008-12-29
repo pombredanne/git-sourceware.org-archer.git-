@@ -1,5 +1,10 @@
 2008-12-29  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
+	* gdb/python/python-membuf.c (gdbpy_write_memory): Remove unused
+	variables.
+
+2008-12-29  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
 	* Makefile.in (SUBDIR_PYTHON_OBS): Add python-membuf.o.
 	(SUBDIR_PYTHON_SRCS): Add python-membuf.c.
 	(python-membuf.o): New target.
