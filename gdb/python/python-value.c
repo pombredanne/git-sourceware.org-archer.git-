@@ -245,7 +245,7 @@ valpy_getitem (PyObject *self, PyObject *key)
   struct value *res_val = NULL;	  /* Initialize to appease gcc warning.  */
   volatile struct gdb_exception except;
 
-  if (PyUnicode_Check (key) || PyString_Check (key))
+  if (gdbpy_is_string (key))
     {  
       field = python_string_to_host_string (key);
       if (field == NULL)
