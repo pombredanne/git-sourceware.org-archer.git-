@@ -1,6 +1,6 @@
 /* libthread_db assisted debugging support, generic parts.
 
-   Copyright (C) 1999, 2000, 2001, 2003, 2004, 2005, 2006, 2007, 2008
+   Copyright (C) 1999, 2000, 2001, 2003, 2004, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -784,10 +784,15 @@ thread_db_detach (struct target_ops *ops, char *args, int from_tty)
 {
   disable_thread_event_reporting ();
 
-  target_beneath->to_detach (target_beneath, args, from_tty);
+  /* Forget about the child's process ID.  We shouldn't need it
+     anymore.  */
+  proc_handle.pid = 0;
 
-  /* Should this be done by detach_command?  */
-  target_mourn_inferior ();
+  /* Detach thread_db target ops.  */
+  unpush_target (&thread_db_ops);
+  using_thread_db = 0;
+
+  target_beneath->to_detach (target_beneath, args, from_tty);
 }
 
 /* Check if PID is currently stopped at the location of a thread event
