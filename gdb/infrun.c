@@ -3,7 +3,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008 Free Software Foundation, Inc.
+   2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -4639,20 +4639,22 @@ Are you sure you want to change it? ", target_signal_to_name ((enum target_signa
       argv++;
     }
 
-  target_notice_signals (inferior_ptid);
+  for (signum = 0; signum < nsigs; signum++)
+    if (sigs[signum])
+      {
+	target_notice_signals (inferior_ptid);
 
-  if (from_tty)
-    {
-      /* Show the results.  */
-      sig_print_header ();
-      for (signum = 0; signum < nsigs; signum++)
-	{
-	  if (sigs[signum])
-	    {
-	      sig_print_info (signum);
-	    }
-	}
-    }
+	if (from_tty)
+	  {
+	    /* Show the results.  */
+	    sig_print_header ();
+	    for (; signum < nsigs; signum++)
+	      if (sigs[signum])
+		sig_print_info (signum);
+	  }
+
+	break;
+      }
 
   do_cleanups (old_chain);
 }

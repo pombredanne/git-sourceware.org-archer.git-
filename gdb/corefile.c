@@ -1,7 +1,8 @@
 /* Core dump and executable file functions above target vector, for GDB.
 
    Copyright (C) 1986, 1987, 1989, 1991, 1992, 1993, 1994, 1996, 1997, 1998,
-   1999, 2000, 2001, 2003, 2006, 2007, 2008 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2003, 2006, 2007, 2008, 2009
+   Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -205,30 +206,22 @@ Use the \"file\" or \"exec-file\" command."));
 }
 
 
-/* Report a memory error with error().  */
+/* Report a memory error by throwing a MEMORY_ERROR error.  */
 
 void
 memory_error (int status, CORE_ADDR memaddr)
 {
-  struct ui_file *tmp_stream = mem_fileopen ();
-  make_cleanup_ui_file_delete (tmp_stream);
-
   if (status == EIO)
-    {
-      /* Actually, address between memaddr and memaddr + len
-         was out of bounds. */
-      fprintf_unfiltered (tmp_stream, "Cannot access memory at address ");
-      fputs_filtered (paddress (memaddr), tmp_stream);
-    }
+    /* Actually, address between memaddr and memaddr + len was out of
+       bounds.  */
+    throw_error (MEMORY_ERROR,
+		 _("Cannot access memory at address %s"),
+		 paddress (memaddr));
   else
-    {
-      fprintf_filtered (tmp_stream, "Error accessing memory address ");
-      fputs_filtered (paddress (memaddr), tmp_stream);
-      fprintf_filtered (tmp_stream, ": %s.",
-		       safe_strerror (status));
-    }
-
-  error_stream (tmp_stream);
+    throw_error (MEMORY_ERROR,
+		 _("Error accessing memory address %s: %s."),
+		 paddress (memaddr),
+		 safe_strerror (status));
 }
 
 /* Same as target_read_memory, but report an error if can't read.  */

@@ -1,3 +1,81 @@
+2009-01-03  Hans-Peter Nilsson  <hp@axis.com>
+
+	* cris/sim-if.c (TARGET_AT_NULL, TARGET_AT_PHDR, TARGET_AT_PHENT)
+	(TARGET_AT_PHNUM, TARGET_AT_PAGESZ, TARGET_AT_BASE)
+	(TARGET_AT_FLAGS, TARGET_AT_ENTRY, TARGET_AT_UID, TARGET_AT_EUID)
+	(TARGET_AT_GID, TARGET_AT_EGID, TARGET_AT_HWCAP)
+	(TARGET_AT_CLKTCK): Remove redundant macros.
+	(AUX_ENT): Adjust to use standard ELF AT_* macros.
+	(AUX_ENTF): Ditto.  Remove always-0 middle argument.  Update all
+	callers.
+	(sim_open): Also pass AT_SECURE.
+
+	* cris/sim-main.h (struct _sim_cpu): New member
+	set_target_thread_data.
+	* cris/crisv32f.c (CRIS_TLS_REGISTER): Define.
+	* cris/crisv10f.c: Ditto.
+	* cris/cris-tmpl.c (MY (set_target_thread_data)): New function.
+	(MY (f_specific_init)): Set new _sim_cpu member to new function.
+	* cris/traps.c (TARGET_SYS_set_thread_area): Define.
+	(cris_break_13_handler) <case TARGET_SYS_set_thread_area>: New
+	case.
+
+	* cris/traps.c (TARGET_SYS_exit_group): Define.
+	(cris_break_13_handler): Handle it like the exit for the last
+	thread.
+
+	* cris/traps.c (TARGET_UTSNAME): Update to 2009-01-01.
+	(TARGET_EPOCH): Update to match TARGET_UTSNAME.  Correct comment.
+	(cris_break_13_handler) <case TARGET_SYS_uname>: Update to
+	2.6.27.  Set machine field to the BFD printable name of the
+	machine.
+
+	* cris/traps.c (TARGET_MAP_DENYWRITE): Define.
+	(cris_break_13_handler) <case TARGET_SYS_mmap2>: Handle
+	TARGET_MAP_DENYWRITE.
+
+	* cris/traps.c (TARGET_SYS_access, TARGET_R_OK, TARGET_W_OK)
+	(TARGET_X_OK, TARGET_F_OK): Define.
+	(cris_break_13_handler) <case TARGET_SYS_access>: New case.
+
+	* cris/semcrisv32f-switch.c: Regenerate.
+
+2008-12-30  Hans-Peter Nilsson  <hp@axis.com>
+
+	* cris/sim-if.c (sim_open): If sim_analyze_program fails, emit
+	just a short CRIS-specific notice.  Tweak the wording for a
+	failing architecture test.
+
+	* cris/traps.c (TARGET_SYS_writev): New macro.
+	(is_mapped_only, cris_dump_map): New functions.
+	(cris_break_13_handler) <case TARGET_SYS_mmap2>: Handle more flags
+	and prot combinations and a non-zero page-offset.  If
+	TARGET_MAP_FIXED, unmap pages before mapping them.
+	<case TARGET_SYS_mprotect>: When checking, allow any length
+	argument.  Don't actually do anything.
+	<case TARGET_SYS_writev>: New case.
+
+	* cris/Makefile.in (SIM_OBJS): Remove sim-hload.o.
+	* cris/sim-if.c: Include elf-bfd.h.
+	(struct progbounds): New members end_loadmem, start_nonloadmem.
+	(xprintf, eprintf): New functions, copied from common/sim-load.c.
+	(cris_load_elf_file, sim_load, cris_get_progbounds): New functions.
+	(get_progbounds_iterator): Renamed from get_progbounds.  Make
+	static.  Update head comment.  Set new struct progbounds members.
+	(exec_load_addr, interp_load_addr, interp_start_addr): New static
+	variables.
+	(aux_ent_phdr, aux_ent_phent, aux_ent_phnum, aux_ent_base)
+	(aux_ent_entry, cris_write_interp, cris_handle_interpreter): New
+	functions.
+	(sim_open): New constant array auxv_entries.  Rewrite AUX_ENT
+	handling to use auxv_entries.  Improve error message and checking
+	for invalid programs.  Use new variable abfd for the program
+	instead of for each access reaching into sd to get it.
+	(sim_create_inferior): If non-zero, use interp_start_addr instead
+	of the program start address.
+	(cris_disassemble_insn): Remove incorrect and unclear, supposedly
+	stale comment.  Always specify little-endian.
+
 2008-07-29  Nick Clifton  <nickc@redhat.com>
 
 	* common/genmloop.sh: Add new parameter: -shell to specify the

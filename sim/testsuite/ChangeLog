@@ -1,3 +1,30 @@
+2009-01-03  Hans-Peter Nilsson  <hp@axis.com>
+
+	* sim/cris/c/settls1.c: New test.
+	* sim/cris/c/exitg1.c, sim/cris/c/exitg2.c: New tests.
+	* sim/cris/c/uname1.c: New test.
+	* sim/cris/c/mmap1.c (MMAP_FLAGS): Default-define to
+	MAP_PRIVATE and use this macro in the mmap call.
+	* sim/cris/c/mmap4.c: New test.
+	* sim/cris/c/access1.c: New test.
+	* sim/cris/asm/pid1.ms: New test.
+
+2008-12-30  Hans-Peter Nilsson  <hp@axis.com>
+
+	* sim/cris/asm/badarch1.ms: Tweak error message match.
+
+	* sim/cris/asm/badarch1.ms, sim/cris/c/badldso1.c,
+	sim/cris/c/badldso2.c, sim/cris/c/badldso3.c,
+	sim/cris/c/helloaout.c, sim/cris/c/hellodyn.c,
+	sim/cris/c/hellodyn2.c, sim/cris/c/writev1.c,
+	sim/cris/c/writev2.c: New tests.
+	* sim/cris/c/c.exp: If compiler links libc.so when attempting to
+	link dynamically, create symlink named "lib" to the directory
+	where it is found.  Handle new test-case option "dynamic".
+
+	* sim/cris/asm/opterr1.ms, sim/cris/asm/opterr2.ms: Adjust for
+	differences in getopt_long error message quoting.
+
 2008-02-12  M Ranga Swami Reddy <MR.Swami.Reddy@nsc.com>
 
 	* sim/cr16/: New directory. Tests for CR16 simulator.

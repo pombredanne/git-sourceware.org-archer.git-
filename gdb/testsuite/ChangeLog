@@ -1,3 +1,26 @@
+2009-01-01  Pedro Alves  <pedro@codesourcery.com>
+
+	PR breakpoints/9681:
+	* gdb.base/watchpoint.exp: Add regression test.
+
+2008-12-31  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.threads/attach-into-signal.exp: Don't use
+	gdb_suppress_entire_file.
+	* gdb.threads/attach-stopped.exp: Ditto.
+	* gdb.threads/attachstop-mt.exp: Ditto.
+
+2008-12-31  Pedro Alves  <pedro@codesourcery.com>
+
+	PR gdb/8812:
+	* gdb.base/signal.exp: Change kfail to fail, and update PR number.
+
+2008-12-29  Pedro Alves  <pedro@codesourcery.com>
+
+	PR gdb/7536:
+	* gdb.base/radix.exp: Add tests to ensure invalid input radices
+	and unsupported output radices are really rejected.
+
 2008-12-23  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* gdb.cp/punctuator.exp: Backslash the '$' signs.
