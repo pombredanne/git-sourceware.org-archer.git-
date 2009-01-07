@@ -1,6 +1,6 @@
 /* Python interface to the inferior memory.
 
-   Copyright (C) 2008 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -172,7 +172,9 @@ static PyBufferProcs buffer_procs = {
   get_read_buffer,
   get_write_buffer,
   get_seg_count,
-  get_char_buffer
+  /* The cast here works around a difference between Python 2.4 and
+     Python 2.5.  */
+  (getcharbufferproc) get_char_buffer
 };
 
 static PyTypeObject membuf_object_type = {
