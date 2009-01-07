@@ -1,3 +1,13 @@
+2009-01-07  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Python API): Normalize capitalization.
+	(Basic Python): Likewise.
+	(Auto-loading): Likewise.
+	(Functions In Python): Likewise.
+	(Objfiles In Python): Likewise.
+	(Breakpoints In Python): Likewise.
+	(Frames In Python): Likewise.  Fix typo.  Comment out bad xref.
+
 2008-12-29  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	* gdb.texinfo (Basic Python): Document gdb.read_memory and

@@ -1,6 +1,6 @@
 \input texinfo      @c -*-texinfo-*-
 @c Copyright (C) 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1998,
-@c 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
+@c 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
 @c Free Software Foundation, Inc.
 @c
 @c %**start of header
@@ -18047,8 +18047,8 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 * Commands In Python::          Implementing new commands in Python.
 * Parameters In Python::        Adding new @value{GDBN} parameters.
 * Functions In Python::         Writing new convenience functions.
-* Objfiles in Python::          Object files.
-* Breakpoints in Python::       Manipulating breakpoints using Python.
+* Objfiles In Python::          Object files.
+* Breakpoints In Python::       Manipulating breakpoints using Python.
 * Frames In Python::            Acessing inferior stack frames from Python.
 @end menu
 
@@ -18086,13 +18086,13 @@ this function returns @code{None}.
 @findex gdb.breakpoints
 @defun breakpoints
 Return a sequence holding all of @value{GDBN}'s breakpoints.
-@xref{Breakpoints in Python}, for more information.
+@xref{Breakpoints In Python}, for more information.
 @end defun
 
 @findex gdb.objfiles
 @defun objfiles
 Return a sequence of all the objfiles current known to @value{GDBN}.
-@xref{Objfiles in Python}.
+@xref{Objfiles In Python}.
 @end defun
 
 @findex gdb.parameter
@@ -18228,7 +18228,7 @@ traceback.
 @node Auto-loading
 @subsubsection Auto-loading
 
-When a new object file (@pxref{Objfiles in Python}) is read (for
+When a new object file (@pxref{Objfiles In Python}) is read (for
 example, due to the @code{file} command, or because the inferior has
 loaded a shared library), @value{GDBN} will look for a file named by
 adding @samp{-gdb.py} to the object file's real name (the name formed
@@ -19204,8 +19204,8 @@ registration of the function with @value{GDBN}.  Depending on how the
 Python code is read into @value{GDBN}, you may need to import the
 @code{gdb} module explicitly.
 
-@node Objfiles in Python
-@subsubsection Objfiles in Python
+@node Objfiles In Python
+@subsubsection Objfiles In Python
 
 @cindex objfiles in python
 @cindex python objfiles
@@ -19231,7 +19231,7 @@ expressions (strings) to pretty-printing objects.  @xref{Pretty
 Printing}, for more information.
 @end defivar
 
-@node Breakpoints in Python
+@node Breakpoints In Python
 @subsubsection Manipulating breakpoints using Python
 
 @cindex breakpoints in python
@@ -19307,14 +19307,14 @@ separated by newlines.  If there are no commands, this attribute is
 @code{None}.  This attribute is not writable.
 @end defivar
 
-@node Frames in Python
+@node Frames In Python
 @subsubsection Acessing inferior stack frames from Python.
 
 @cindex frames in python
 @tindex gdb.Frame
 @tindex Frame
 When the debugged program stops, @value{GDBN} is able to analyse its call
-stack (see @xref{Frames,,Stack frames}).  The @code{gdb.Frame} class
+stack (@pxref{Frames,,Stack frames}).  The @code{gdb.Frame} class
 represents a frame in the stack.  You can get a tuple containing all the
 frames in the stack with the @code{gdb.frames} function, the newest
 frame with the @code{gdb.newest_frame} function, and the selected frame
@@ -19360,11 +19360,11 @@ Return the frame immediately older (outer) to this frame.
 @end defmethod
 
 @defmethod Frame newer
-Return the frame immetidaely newer (inner) to this frame.
+Return the frame immediately newer (inner) to this frame.
 @end defmethod
 
 @defmethod Frame find_sal
-Return the frame's symtab and line object (see @xref{Symtab_and_line,, Symtab and line}).
+Return the frame's symtab and line object. @c (see @xref{Symtab_and_line,, Symtab and line}).
 @end defmethod
 
 @defmethod Frame read_var_value @var{symbol}
