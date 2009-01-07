@@ -572,13 +572,20 @@ value_one (struct type *type, enum lval_type lv)
 const char *
 object_address_data_not_valid (struct type *type)
 {
+  /* Attributes are present only at the target type of a typedef.  Make the
+     call conditional as it would otherwise loop through type_length_get.  */
+  if (TYPE_CODE (type) == TYPE_CODE_TYPEDEF)
+    CHECK_TYPEDEF (type);
+
   /* DW_AT_associated has a preference over DW_AT_allocated.  */
-  if (TYPE_ASSOCIATED (type) != NULL
-      && 0 == dwarf_locexpr_baton_eval (TYPE_ASSOCIATED (type)))
+  if (TYPE_NOT_ASSOCIATED (type)
+      || (TYPE_ASSOCIATED (type) != NULL
+	  && 0 == dwarf_locexpr_baton_eval (TYPE_ASSOCIATED (type))))
     return N_("object is not associated");
 
-  if (TYPE_ALLOCATED (type) != NULL
-      && 0 == dwarf_locexpr_baton_eval (TYPE_ALLOCATED (type)))
+  if (TYPE_NOT_ALLOCATED (type)
+      || (TYPE_ALLOCATED (type) != NULL
+	  && 0 == dwarf_locexpr_baton_eval (TYPE_ALLOCATED (type))))
     return N_("object is not allocated");
 
   return NULL;
@@ -597,6 +604,11 @@ object_address_get_data (struct type *type, CORE_ADDR *address_return)
   gdb_assert (address_return != NULL);
 
   object_address_set (*address_return);
+
+  /* TYPE_DATA_LOCATION_DWARF_BLOCK / TYPE_DATA_LOCATION_ADDR are present only
+     at the target type of a typedef.  */
+  CHECK_TYPEDEF (type);
+
   if (object_address_data_not_valid (type) != NULL)
     {
       /* Do not try to evaluate DW_AT_data_location as it may even crash
@@ -604,8 +616,11 @@ object_address_get_data (struct type *type, CORE_ADDR *address_return)
       return 0;
     }
 
-  if (TYPE_DATA_LOCATION (type) != NULL)
-    *address_return = dwarf_locexpr_baton_eval (TYPE_DATA_LOCATION (type));
+  if (TYPE_DATA_LOCATION_IS_ADDR (type))
+    *address_return = TYPE_DATA_LOCATION_ADDR (type);
+  else if (TYPE_DATA_LOCATION_DWARF_BLOCK (type) != NULL)
+    *address_return
+      = dwarf_locexpr_baton_eval (TYPE_DATA_LOCATION_DWARF_BLOCK (type));
 
   return 1;
 }

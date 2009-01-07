@@ -2650,13 +2650,13 @@ evaluate_subexp_with_coercion (struct expression *exp,
     {
     case OP_VAR_VALUE:
       var = exp->elts[pc + 2].symbol;
+      /* locate_var_value will call object_address_set for check_typedef.  */
+      val = locate_var_value (var,
+			      block_innermost_frame (exp->elts[pc + 1].block));
       if (TYPE_CODE (check_typedef (SYMBOL_TYPE (var))) == TYPE_CODE_ARRAY
 	  && CAST_IS_CONVERSION)
 	{
 	  (*pos) += 4;
-	  val =
-	    locate_var_value
-	    (var, block_innermost_frame (exp->elts[pc + 1].block));
 	  return value_cast (lookup_pointer_type (TYPE_TARGET_TYPE (check_typedef (SYMBOL_TYPE (var)))),
 			     val);
 	}

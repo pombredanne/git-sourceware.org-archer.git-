@@ -4494,8 +4494,11 @@ create_single_array_dimension (struct type *type, struct type *range_type,
   /* These generic type attributes need to be fetched by
      evaluate_subexp_standard <multi_f77_subscript>'s call of
      value_subscripted_rvalue only for the innermost array type.  */
-
   fetch_die_type_attrs (die, type, cu);
+
+  /* These generic type attributes are checked for allocated/associated
+     validity while accessing FIELD_LOC_KIND_DWARF_BLOCK.  */
+  fetch_die_type_attrs (die, range_type, cu);
 
   return type;
 }
@@ -10602,15 +10605,19 @@ fetch_die_type_attrs (struct die_info *die, struct type *type,
 
   attr = dwarf2_attr (die, DW_AT_data_location, cu);
   if (attr_form_is_block (attr))
-    TYPE_DATA_LOCATION (type) = dwarf2_attr_to_locexpr_baton (attr, cu);
+    TYPE_DATA_LOCATION_DWARF_BLOCK (type) = dwarf2_attr_to_locexpr_baton (attr,
+									  cu);
+  gdb_assert (!TYPE_DATA_LOCATION_IS_ADDR (type));
 
   attr = dwarf2_attr (die, DW_AT_allocated, cu);
   if (attr_form_is_block (attr))
     TYPE_ALLOCATED (type) = dwarf2_attr_to_locexpr_baton (attr, cu);
+  gdb_assert (!TYPE_NOT_ALLOCATED (type));
 
   attr = dwarf2_attr (die, DW_AT_associated, cu);
   if (attr_form_is_block (attr))
     TYPE_ASSOCIATED (type) = dwarf2_attr_to_locexpr_baton (attr, cu);
+  gdb_assert (!TYPE_NOT_ASSOCIATED (type));
 }
 
 /* Set the type associated with DIE to TYPE.  Save it in CU's hash

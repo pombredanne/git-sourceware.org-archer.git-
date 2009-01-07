@@ -1,4 +1,4 @@
-	.file	"vla-typedef.c"
+	.file	"x86_64-vla-typedef.c"
 	.section	.debug_abbrev,"",@progbits
 .Ldebug_abbrev0:
 	.section	.debug_info,"",@progbits
@@ -11,7 +11,7 @@
 	.type	foo, @function
 foo:
 .LFB2:
-	.file 1 "vla-typedef.c"
+	.file 1 "x86_64-vla-typedef.c"
 	.loc 1 22 0
 	pushq	%rbp
 .LCFI0:
@@ -442,13 +442,13 @@ break_here:
 .LASF5:
 	.string	"size"
 .LASF3:
-	.string	"vla-typedef.c"
+	.string	"x86_64-vla-typedef.c"
 .LASF6:
 	.string	"array_t"
 .LASF1:
 	.string	"char"
 .LASF4:
-	.string	"/home/jkratoch/redhat/archer-jankratochvil-vla/gdb/testsuite/gdb.base"
+	.string	"gdb.arch"
 .LASF2:
 	.string	"GNU C 4.3.2 20081105 (Red Hat 4.3.2-7)"
 	.ident	"GCC: (GNU) 4.3.2 20081105 (Red Hat 4.3.2-7)"

@@ -271,6 +271,36 @@ enum type_instance_flag_value
 
 #define TYPE_NOTTEXT(t)		(TYPE_MAIN_TYPE (t)->flag_nottext)
 
+/* Is HIGH_BOUND a low-bound relative count (1) or the high bound itself (0)?  */
+
+#define TYPE_RANGE_HIGH_BOUND_IS_COUNT(range_type) \
+  (TYPE_MAIN_TYPE (range_type)->flag_range_high_bound_is_count)
+
+/* Not allocated.  TYPE_ALLOCATED(t) must be NULL in such case.  If this flag
+   is unset and TYPE_ALLOCATED(t) is NULL then the type is allocated.  If this
+   flag is unset and TYPE_ALLOCATED(t) is not NULL then its DWARF block
+   determines the actual allocation state.  */
+
+#define TYPE_NOT_ALLOCATED(t)	(TYPE_MAIN_TYPE (t)->flag_not_allocated)
+
+/* Not associated.  TYPE_ASSOCIATED(t) must be NULL in such case.  If this flag
+   is unset and TYPE_ASSOCIATED(t) is NULL then the type is associated.  If
+   this flag is unset and TYPE_ASSOCIATED(t) is not NULL then its DWARF block
+   determines the actual association state.  */
+
+#define TYPE_NOT_ASSOCIATED(t)	(TYPE_MAIN_TYPE (t)->flag_not_associated)
+
+/* Address of the actual data as for DW_AT_data_location.  Its dwarf block must
+   not be evaluated unless both TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are
+   false.  If TYPE_DATA_LOCATION_IS_ADDR set then TYPE_DATA_LOCATION_ADDR value
+   is the actual data address value.  If unset and
+   TYPE_DATA_LOCATION_DWARF_BLOCK is NULL then the value is the normal
+   VALUE_ADDRESS copy.  If unset and TYPE_DATA_LOCATION_DWARF_BLOCK is not NULL
+   then its DWARF block determines the actual data address.  */
+
+#define TYPE_DATA_LOCATION_IS_ADDR(t) \
+  (TYPE_MAIN_TYPE (t)->flag_data_location_is_addr)
+
 /* Constant type.  If this is set, the corresponding type has a
  * const modifier.
  */
@@ -359,6 +389,9 @@ struct main_type
   unsigned int flag_fixed_instance : 1;
   unsigned int flag_dynamic : 1;
   unsigned int flag_range_high_bound_is_count : 1;
+  unsigned int flag_not_allocated : 1;
+  unsigned int flag_not_associated : 1;
+  unsigned int flag_data_location_is_addr : 1;
 
   /* Number of fields described for this type.  This field appears at
      this location because it packs nicely here.  */
@@ -421,13 +454,18 @@ struct main_type
 
   struct type *target_type;
 
-  /* For DW_AT_data_location.  FIXME: Support also its constant form.  */
-  struct dwarf2_locexpr_baton *data_location;
+  /* For DW_AT_data_location.  */
+  union
+    {
+      struct dwarf2_locexpr_baton *dwarf_block;
+      CORE_ADDR addr;
+    }
+  data_location;
 
-  /* For DW_AT_allocated.  FIXME: Support also its constant form.  */
+  /* For DW_AT_allocated.  */
   struct dwarf2_locexpr_baton *allocated;
 
-  /* For DW_AT_associated.  FIXME: Support also its constant form.  */
+  /* For DW_AT_associated.  */
   struct dwarf2_locexpr_baton *associated;
 
   /* For structure and union types, a description of each field.
@@ -823,7 +861,8 @@ extern void allocate_cplus_struct_type (struct type *);
 #define TYPE_NFIELDS(thistype) TYPE_MAIN_TYPE(thistype)->nfields
 #define TYPE_FIELDS(thistype) TYPE_MAIN_TYPE(thistype)->fields
 #define TYPE_TEMPLATE_ARGS(thistype) TYPE_CPLUS_SPECIFIC(thistype)->template_args
-#define TYPE_DATA_LOCATION(thistype) TYPE_MAIN_TYPE (thistype)->data_location
+#define TYPE_DATA_LOCATION_DWARF_BLOCK(thistype) TYPE_MAIN_TYPE (thistype)->data_location.dwarf_block
+#define TYPE_DATA_LOCATION_ADDR(thistype) TYPE_MAIN_TYPE (thistype)->data_location.addr
 #define TYPE_ALLOCATED(thistype) TYPE_MAIN_TYPE (thistype)->allocated
 #define TYPE_ASSOCIATED(thistype) TYPE_MAIN_TYPE (thistype)->associated
 
@@ -839,10 +878,6 @@ extern void allocate_cplus_struct_type (struct type *);
   (TYPE_FIELD_LOC_KIND (range_type, fieldno) = FIELD_LOC_KIND_DWARF_BLOCK)
 #define TYPE_ARRAY_BOUND_IS_DWARF_BLOCK(array_type, fieldno) \
   TYPE_RANGE_BOUND_IS_DWARF_BLOCK (TYPE_INDEX_TYPE (array_type), fieldno)
-
-/* Is HIGH_BOUND a low-bound relative count (1) or the high bound itself (0)?  */
-#define TYPE_RANGE_HIGH_BOUND_IS_COUNT(range_type) \
-  (TYPE_MAIN_TYPE (range_type)->flag_range_high_bound_is_count)
 
 /* Unbound arrays, such as GCC array[]; at end of struct.  */
 #define TYPE_RANGE_LOWER_BOUND_IS_UNDEFINED(rangetype) \

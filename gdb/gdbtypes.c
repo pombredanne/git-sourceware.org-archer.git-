@@ -3152,6 +3152,38 @@ copy_type_recursive_1 (struct objfile *objfile,
   TYPE_INSTANCE_FLAGS (new_type) = TYPE_INSTANCE_FLAGS (type);
   TYPE_LENGTH (new_type) = TYPE_LENGTH (type);
 
+  if (TYPE_ALLOCATED (new_type))
+    {
+      gdb_assert (!TYPE_NOT_ALLOCATED (new_type));
+
+      if (!dwarf_locexpr_baton_eval (TYPE_ALLOCATED (new_type)))
+        TYPE_NOT_ALLOCATED (new_type) = 1;
+      TYPE_ALLOCATED (new_type) = NULL;
+    }
+
+  if (TYPE_ASSOCIATED (new_type))
+    {
+      gdb_assert (!TYPE_NOT_ASSOCIATED (new_type));
+
+      if (!dwarf_locexpr_baton_eval (TYPE_ASSOCIATED (new_type)))
+        TYPE_NOT_ASSOCIATED (new_type) = 1;
+      TYPE_ASSOCIATED (new_type) = NULL;
+    }
+
+  if (!TYPE_DATA_LOCATION_IS_ADDR (new_type)
+      && TYPE_DATA_LOCATION_DWARF_BLOCK (new_type))
+    {
+      if (TYPE_NOT_ALLOCATED (new_type)
+          || TYPE_NOT_ASSOCIATED (new_type))
+	TYPE_DATA_LOCATION_DWARF_BLOCK (new_type) = NULL;
+      else
+	{
+	  TYPE_DATA_LOCATION_IS_ADDR (new_type) = 1;
+	  TYPE_DATA_LOCATION_ADDR (new_type) = dwarf_locexpr_baton_eval
+				    (TYPE_DATA_LOCATION_DWARF_BLOCK (new_type));
+	}
+    }
+
   /* Copy the fields.  */
   if (TYPE_NFIELDS (type))
     {
@@ -3190,7 +3222,11 @@ copy_type_recursive_1 (struct objfile *objfile,
 	    case FIELD_LOC_KIND_DWARF_BLOCK:
 	      /* `struct dwarf2_locexpr_baton' is too bound to its objfile so
 		 it is expected to be made constant by CHECK_TYPEDEF.  */
-	      SET_FIELD_BITPOS (TYPE_FIELD (new_type, i),
+	      if (TYPE_NOT_ALLOCATED (new_type)
+		  || TYPE_NOT_ASSOCIATED (new_type))
+		SET_FIELD_DWARF_BLOCK (TYPE_FIELD (new_type, i), NULL);
+	      else
+		SET_FIELD_BITPOS (TYPE_FIELD (new_type, i),
 		   dwarf_locexpr_baton_eval (TYPE_FIELD_DWARF_BLOCK (type, i)));
 	      break;
 	    default:
