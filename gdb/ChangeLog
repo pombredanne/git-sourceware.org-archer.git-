@@ -1,3 +1,36 @@
+2009-01-06  Jim Blandy  <jimb@red-bean.com>
+
+	Check return values of functions declared with warn_unused_result
+	attribute in GLIBC 2.8.
+	* cli/cli-cmds.c (pwd_command): Check return value from getcwd.
+	* inflow.c (check_syscall): New function.
+	(new_tty): Use check_syscall to check return values from open and dup.
+	* linux-nat.c (linux_nat_info_proc_cmd): Check return value from fgets.
+	* main.c (captured_main): Call cwd after setting up gdb_stderr;
+	check for errors from getcwd.
+	* mi/mi-cmd-env.c (mi_cmd_env_pwd): Check return value from getcwd.
+	* ui-file.c (stdio_file_write): Ignore return value from fwrite.
+	(stdio_file_fputs): Same.
+	* utils.c (internal_vproblem): abort if last-ditch error message
+	write fails.
+
+	* top.c (gdb_init): Don't set the current directory here; that's
+	already been done in captured_main.
+
+2009-01-06  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* ser-tcp.c: Adjust includes.
+	(tcp_set_cmdlist, tcp_show_cmdlist): Declare.
+	(tcp_auto_retry, tcp_retry_limit): Declare.
+	(TIMEOUT): Remove, in favor of tcp_retry_limit.
+	(POLL_INTERVAL): Increase to 5, in favor of backoff logic.
+	(wait_for_connect): New function.
+	(net_open): Use it.  Add auto-retry logic.
+	(set_tcp_cmd, show_tcp_cmd): New functions.
+	(_initialize_ser_tcp): Initialize new "set/show tcp auto-retry"
+	and "set/show tcp connect-timeout" commands.
+	* NEWS: Document new commands.
+
 2009-01-05  Tom Tromey  <tromey@redhat.com>
 
 	* python/python-internal.h (Py_ssize_t): Define as int.
