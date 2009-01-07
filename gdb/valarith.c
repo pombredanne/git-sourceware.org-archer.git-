@@ -254,10 +254,12 @@ value_subscripted_rvalue (struct value *array, CORE_ADDR offset)
   else
     VALUE_LVAL (v) = VALUE_LVAL (array);
 
-  VALUE_ADDRESS (v) = VALUE_ADDRESS (array);
   /* We need to already adjust the address according to the former type as
      V will have a different type (ELT_TYPE) which may no longer contain the
-     adjustment code like TYPE_FORTRAN_ARRAY_DATA_LOCATION.  */
+     adjustment code like TYPE_FORTRAN_ARRAY_DATA_LOCATION.  The address needs
+     to be resolved for both VALUE_LAZY and non-VALUE_LAZY Vs.  */
+
+  VALUE_ADDRESS (v) = VALUE_ADDRESS (array);
   object_address_get_data (array_type, &VALUE_ADDRESS (v));
 
   VALUE_REGNUM (v) = VALUE_REGNUM (array);
