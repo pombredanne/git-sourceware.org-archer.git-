@@ -168,13 +168,20 @@ get_char_buffer (PyObject *self, Py_ssize_t segment, char **ptrptr)
   return get_char_buffer (self, segment, ptrptr);
 }
 
+/* Python doesn't provide a decent way to get compatibility here.  */
+#if HAVE_LIBPYTHON2_4
+#define CHARBUFFERPROC_NAME getcharbufferproc
+#else
+#define CHARBUFFERPROC_NAME charbufferproc
+#endif
+
 static PyBufferProcs buffer_procs = {
   get_read_buffer,
   get_write_buffer,
   get_seg_count,
   /* The cast here works around a difference between Python 2.4 and
      Python 2.5.  */
-  (getcharbufferproc) get_char_buffer
+  (CHARBUFFERPROC_NAME) get_char_buffer
 };
 
 static PyTypeObject membuf_object_type = {

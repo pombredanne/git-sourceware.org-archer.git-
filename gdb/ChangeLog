@@ -1,3 +1,8 @@
+2009-01-08  Tom Tromey  <tromey@redhat.com>
+
+	* python/python-membuf.c (CHARBUFFERPROC_NAME): New define.
+	(buffer_procs): Use it.
+
 2009-01-07  Tom Tromey  <tromey@redhat.com>
 
 	* python/python-membuf.c (buffer_procs): Add compatibility cast.
