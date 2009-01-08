@@ -1,6 +1,6 @@
 /* Python interface to values.
 
-   Copyright (C) 2008 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -30,7 +30,9 @@
    can copy the values' types if needed.  This is declared
    unconditionally to reduce the number of uses of HAVE_PYTHON in the
    generic code.  */
-struct value *values_in_python;
+/* This variable is unnecessarily initialized to NULL in order to 
+   work around a linker bug on MacOS.  */
+struct value *values_in_python = NULL;
 
 #ifdef HAVE_PYTHON
 

@@ -1,5 +1,5 @@
 /* SPU native-dependent code for GDB, the GNU debugger.
-   Copyright (C) 2006, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    Contributed by Ulrich Weigand <uweigand@de.ibm.com>.
 
@@ -414,7 +414,6 @@ spu_child_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
     {
       set_sigint_trap ();	/* Causes SIGINT to be passed on to the
 				   attached process.  */
-      set_sigio_trap ();
 
       pid = waitpid (PIDGET (ptid), &status, 0);
       if (pid == -1 && errno == ECHILD)
@@ -431,7 +430,6 @@ spu_child_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
 	  save_errno = EINTR;
 	}
 
-      clear_sigio_trap ();
       clear_sigint_trap ();
     }
   while (pid == -1 && save_errno == EINTR);
@@ -444,7 +442,7 @@ spu_child_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
       /* Claim it exited with unknown signal.  */
       ourstatus->kind = TARGET_WAITKIND_SIGNALLED;
       ourstatus->value.sig = TARGET_SIGNAL_UNKNOWN;
-      return minus_one_ptid;
+      return inferior_ptid;
     }
 
   store_waitstatus (ourstatus, status);

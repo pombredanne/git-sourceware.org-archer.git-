@@ -2,7 +2,7 @@
    Where it is, why it stopped, and how to step it.
 
    Copyright (C) 1986, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1998, 1999, 2000, 2001, 2003, 2004, 2005, 2006, 2007, 2008
+   1998, 1999, 2000, 2001, 2003, 2004, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -96,10 +96,6 @@ extern struct cleanup * save_inferior_ptid (void);
 extern void set_sigint_trap (void);
 
 extern void clear_sigint_trap (void);
-
-extern void set_sigio_trap (void);
-
-extern void clear_sigio_trap (void);
 
 /* Set/get file name for default use for standard in/out in the inferior.  */
 

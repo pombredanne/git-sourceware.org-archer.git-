@@ -1,6 +1,6 @@
 /* General utility routines for the remote server for GDB.
    Copyright (C) 1986, 1989, 1993, 1995, 1996, 1997, 1999, 2000, 2002, 2003,
-   2007, 2008 Free Software Foundation, Inc.
+   2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -29,6 +29,63 @@
 #endif
 
 /* Generally useful subroutines used throughout the program.  */
+
+static void malloc_failure (size_t size) ATTR_NORETURN;
+
+static void
+malloc_failure (size_t size)
+{
+  fprintf (stderr, "gdbserver: ran out of memory while trying to allocate %lu bytes\n",
+	   (unsigned long) size);
+  exit (1);
+}
+
+/* Allocate memory without fail.
+   If malloc fails, this will print a message to stderr and exit.  */
+
+void *
+xmalloc (size_t size)
+{
+  void *newmem;
+
+  if (size == 0)
+    size = 1;
+  newmem = malloc (size);
+  if (!newmem)
+    malloc_failure (size);
+
+  return newmem;
+}
+
+/* Allocate memory without fail and set it to zero.
+   If malloc fails, this will print a message to stderr and exit.  */
+
+void *
+xcalloc (size_t nelem, size_t elsize)
+{
+  void *newmem;
+
+  if (nelem == 0 || elsize == 0)
+    nelem = elsize = 1;
+
+  newmem = calloc (nelem, elsize);
+  if (!newmem)
+    malloc_failure (nelem * elsize);
+
+  return newmem;
+}
+
+/* Copy a string into a memory buffer.
+   If malloc fails, this will print a message to stderr and exit.  */
+
+char *
+xstrdup (const char *s)
+{
+  char *ret = strdup (s);
+  if (ret == NULL)
+    malloc_failure (strlen (s) + 1);
+  return ret;
+}
 
 /* Print the system error message for errno, and also mention STRING
    as the file name for which the error was encountered.

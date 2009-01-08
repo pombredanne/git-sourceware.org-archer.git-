@@ -1777,11 +1777,11 @@ packed_array_type (struct type *type, long *elt_bits)
   new_elt_type = packed_array_type (ada_check_typedef (TYPE_TARGET_TYPE (type)),
                                     elt_bits);
   new_type = alloc_type (TYPE_OBJFILE (type), new_elt_type);
-  create_array_type (new_type, new_elt_type, TYPE_FIELD_TYPE (type, 0));
+  create_array_type (new_type, new_elt_type, TYPE_INDEX_TYPE (type));
   TYPE_FIELD_BITSIZE (new_type, 0) = *elt_bits;
   TYPE_NAME (new_type) = ada_type_name (type);
 
-  if (get_discrete_bounds (TYPE_FIELD_TYPE (type, 0),
+  if (get_discrete_bounds (TYPE_INDEX_TYPE (type),
                            &low_bound, &high_bound) < 0)
     low_bound = high_bound = 0;
   if (high_bound < low_bound)
@@ -2346,12 +2346,12 @@ ada_value_ptr_subscript (struct value *arr, struct type *type, int arity,
 }
 
 /* Given that ARRAY_PTR is a pointer or reference to an array of type TYPE (the
-   actual type of ARRAY_PTR is ignored), returns a reference to
-   the Ada slice of HIGH-LOW+1 elements starting at index LOW.  The lower
-   bound of this array is LOW, as per Ada rules. */
+   actual type of ARRAY_PTR is ignored), returns the Ada slice of HIGH-LOW+1
+   elements starting at index LOW.  The lower bound of this array is LOW, as
+   per Ada rules. */
 static struct value *
-ada_value_slice_ptr (struct value *array_ptr, struct type *type,
-                     int low, int high)
+ada_value_slice_from_ptr (struct value *array_ptr, struct type *type,
+                          int low, int high)
 {
   CORE_ADDR base = value_as_address (array_ptr)
     + ((low - TYPE_LOW_BOUND (TYPE_INDEX_TYPE (type)))
@@ -2361,7 +2361,7 @@ ada_value_slice_ptr (struct value *array_ptr, struct type *type,
                        low, high);
   struct type *slice_type =
     create_array_type (NULL, TYPE_TARGET_TYPE (type), index_type);
-  return value_from_pointer (lookup_reference_type (slice_type), base);
+  return value_at_lazy (slice_type, base);
 }
 
 
@@ -2468,7 +2468,7 @@ ada_index_type (struct type *type, int n)
 
       for (i = 1; i < n; i += 1)
         type = TYPE_TARGET_TYPE (type);
-      result_type = TYPE_TARGET_TYPE (TYPE_FIELD_TYPE (type, 0));
+      result_type = TYPE_TARGET_TYPE (TYPE_INDEX_TYPE (type));
       /* FIXME: The stabs type r(0,0);bound;bound in an array type
          has a target type of TYPE_CODE_UNDEF.  We compensate here, but
          perhaps stabsread.c would make more sense.  */
@@ -2492,8 +2492,10 @@ static LONGEST
 ada_array_bound_from_type (struct type * arr_type, int n, int which,
                            struct type ** typep)
 {
-  struct type *type;
-  struct type *index_type_desc;
+  struct type *type, *index_type_desc, *index_type;
+  LONGEST retval;
+
+  gdb_assert (which == 0 || which == 1);
 
   if (ada_is_packed_array_type (arr_type))
     arr_type = decode_packed_array_type (arr_type);
@@ -2511,10 +2513,11 @@ ada_array_bound_from_type (struct type * arr_type, int n, int which,
     type = arr_type;
 
   index_type_desc = ada_find_parallel_type (type, "___XA");
-  if (index_type_desc == NULL)
+  if (index_type_desc != NULL)
+    index_type = to_fixed_range_type (TYPE_FIELD_NAME (index_type_desc, n - 1),
+				      NULL, TYPE_OBJFILE (arr_type));
+  else
     {
-      struct type *index_type;
-
       while (n > 1)
         {
           type = TYPE_TARGET_TYPE (type);
@@ -2522,34 +2525,27 @@ ada_array_bound_from_type (struct type * arr_type, int n, int which,
         }
 
       index_type = TYPE_INDEX_TYPE (type);
-      if (typep != NULL)
-        *typep = index_type;
-
-      /* The index type is either a range type or an enumerated type.
-         For the range type, we have some macros that allow us to
-         extract the value of the low and high bounds.  But they
-         do now work for enumerated types.  The expressions used
-         below work for both range and enum types.  */
-      return
-        (LONGEST) (which == 0
-                   ? TYPE_FIELD_BITPOS (index_type, 0)
-                   : TYPE_FIELD_BITPOS (index_type,
-                                        TYPE_NFIELDS (index_type) - 1));
     }
-  else
+
+  switch (TYPE_CODE (index_type))
     {
-      struct type *index_type =
-        to_fixed_range_type (TYPE_FIELD_NAME (index_type_desc, n - 1),
-                             NULL, TYPE_OBJFILE (arr_type));
-
-      if (typep != NULL)
-        *typep = index_type;
-
-      return
-        (LONGEST) (which == 0
-                   ? TYPE_LOW_BOUND (index_type)
-                   : TYPE_HIGH_BOUND (index_type));
+    case TYPE_CODE_RANGE:
+      retval = which == 0 ? TYPE_LOW_BOUND (index_type)
+			  : TYPE_HIGH_BOUND (index_type);
+      break;
+    case TYPE_CODE_ENUM:
+      retval = which == 0 ? TYPE_FIELD_BITPOS (index_type, 0)
+			  : TYPE_FIELD_BITPOS (index_type,
+					       TYPE_NFIELDS (index_type) - 1);
+      break;
+    default:
+      internal_error (__FILE__, __LINE__, _("invalid type code of index type"));
     }
+
+  if (typep != NULL)
+    *typep = index_type;
+
+  return retval;
 }
 
 /* Given that arr is an array value, returns the lower bound of the
@@ -5594,7 +5590,7 @@ value_tag_from_contents_and_address (struct type *type,
 				  : valaddr + tag_byte_offset);
       CORE_ADDR address1 = (address == 0) ? 0 : address + tag_byte_offset;
 
-      return value_from_contents_and_address (tag_type, valaddr1, 0, address1);
+      return value_from_contents_and_address (tag_type, valaddr1, address1);
     }
   return NULL;
 }
@@ -6178,9 +6174,7 @@ ada_index_struct_field_1 (int *index_p, struct value *arg, int offset,
 /* Given ARG, a value of type (pointer or reference to a)*
    structure/union, extract the component named NAME from the ultimate
    target structure/union and return it as a value with its
-   appropriate type.  If ARG is a pointer or reference and the field
-   is not packed, returns a reference to the field, otherwise the
-   value of the field (an lvalue if ARG is an lvalue).     
+   appropriate type.
 
    The routine searches for NAME among all members of the structure itself
    and (recursively) among all members of any wrapper members
@@ -6257,8 +6251,7 @@ ada_value_struct_elt (struct value *arg, char *name, int no_err)
                                                   field_type);
             }
           else
-            v = value_from_pointer (lookup_reference_type (field_type),
-                                    address + byte_offset);
+            v = value_at_lazy (field_type, address + byte_offset);
         }
     }
 
@@ -6448,7 +6441,7 @@ ada_which_variant_applies (struct type *var_type, struct type *outer_type,
   struct value *discrim;
   LONGEST discrim_val;
 
-  outer = value_from_contents_and_address (outer_type, outer_valaddr, 0, 0);
+  outer = value_from_contents_and_address (outer_type, outer_valaddr, 0);
   discrim = ada_value_struct_elt (outer, discrim_name, 1);
   if (discrim == NULL)
     return -1;
@@ -6886,7 +6879,7 @@ ada_template_to_fixed_record_type_1 (struct type *type,
       else if (is_dynamic_field (type, f))
         {
           if (dval0 == NULL)
-            dval = value_from_contents_and_address (rtype, valaddr, 0, address);
+            dval = value_from_contents_and_address (rtype, valaddr, address);
           else
             dval = dval0;
 
@@ -6935,7 +6928,7 @@ ada_template_to_fixed_record_type_1 (struct type *type,
       off = TYPE_FIELD_BITPOS (rtype, variant_field);
 
       if (dval0 == NULL)
-        dval = value_from_contents_and_address (rtype, valaddr, 0, address);
+        dval = value_from_contents_and_address (rtype, valaddr, address);
       else
         dval = dval0;
 
@@ -7077,7 +7070,7 @@ to_record_with_fixed_variant_part (struct type *type, const gdb_byte *valaddr,
     return type;
 
   if (dval0 == NULL)
-    dval = value_from_contents_and_address (type, valaddr, 0, address);
+    dval = value_from_contents_and_address (type, valaddr, address);
   else
     dval = dval0;
 
@@ -7514,7 +7507,7 @@ ada_to_fixed_value_create (struct type *type0, CORE_ADDR address,
   if (type == type0 && val0 != NULL)
     return val0;
   else
-    return value_from_contents_and_address (type, 0, 0, address);
+    return value_from_contents_and_address (type, 0, address);
 }
 
 /* A value representing VAL, but with a standard (static-sized) type
@@ -8809,9 +8802,9 @@ ada_evaluate_subexp (struct type *expect_type, struct expression *exp,
                 struct type *arr_type0 =
                   to_fixed_array_type (TYPE_TARGET_TYPE (value_type (array)),
                                        NULL, 1);
-                return ada_value_slice_ptr (array, arr_type0,
-                                            longest_to_int (low_bound),
-					    longest_to_int (high_bound));
+                return ada_value_slice_from_ptr (array, arr_type0,
+                                                 longest_to_int (low_bound),
+                                                 longest_to_int (high_bound));
               }
           }
         else if (noside == EVAL_AVOID_SIDE_EFFECTS)

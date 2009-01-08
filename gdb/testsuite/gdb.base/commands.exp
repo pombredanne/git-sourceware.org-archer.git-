@@ -1,5 +1,6 @@
 #   Copyright 1988, 1990, 1991, 1992, 1994, 1995, 1997, 1998, 1999, 2000,
-#   2001, 2002, 2003, 2005, 2006, 2007, 2008 Free Software Foundation, Inc.
+#   2001, 2002, 2003, 2005, 2006, 2007, 2008, 2009
+#   Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -692,13 +693,47 @@ proc if_commands_test {} {
     }
 }
 
+proc redefine_hook_test {} {
+    global gdb_prompt
+
+    gdb_test "define one\nend" \
+      "" \
+      "define one"
+
+    gdb_test "define hook-one\necho hibob\\n\nend" \
+      "" \
+      "define hook-one"
+
+    gdb_test_multiple "define one" "redefine one" {
+	-re "Redefine command .one.. .y or n. $" {
+	    send_gdb "y\n"
+	    exp_continue
+	}
+
+	-re "End with"  {
+	    pass "define one in redefine_hook_test"
+	}
+        default {
+	    fail "(timeout or eof) define one in redefine_hook_test"
+	}
+    }
+
+    gdb_test "end" \
+	    "" \
+	    "enter commands for one redefinition in redefine_hook_test"
+
+    gdb_test "one" \
+	    "hibob" \
+	    "execute one command in redefine_hook_test"
+}
+
 proc redefine_backtrace_test {} {
     global gdb_prompt
 
-    send_gdb "define backtrace\n"
-    gdb_expect {
+    gdb_test_multiple "define backtrace" "define backtrace" {
 	-re "Really redefine built-in.*$" {
 	    send_gdb "y\n"
+	    exp_continue
 	}
 
 	-re "End with"  {
@@ -738,5 +773,6 @@ temporary_breakpoint_commands
 stray_arg0_test
 recursive_source_test
 if_commands_test
+redefine_hook_test
 # This one should come last, as it redefines "backtrace".
 redefine_backtrace_test

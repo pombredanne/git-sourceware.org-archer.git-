@@ -1,7 +1,7 @@
 /* Low-level child interface to ptrace.
 
    Copyright (C) 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1998,
-   1999, 2000, 2001, 2002, 2004, 2005, 2006, 2007, 2008
+   1999, 2000, 2001, 2002, 2004, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -309,7 +309,9 @@ inf_ptrace_detach (struct target_ops *ops, char *args, int from_tty)
 
   inferior_ptid = null_ptid;
   detach_inferior (pid);
-  unpush_target (ops);
+
+  if (!have_inferiors ())
+    unpush_target (ops);
 }
 
 /* Kill the inferior.  */
@@ -389,7 +391,6 @@ inf_ptrace_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
   do
     {
       set_sigint_trap ();
-      set_sigio_trap ();
 
       do
 	{
@@ -398,7 +399,6 @@ inf_ptrace_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
 	}
       while (pid == -1 && errno == EINTR);
 
-      clear_sigio_trap ();
       clear_sigint_trap ();
 
       if (pid == -1)
@@ -410,7 +410,7 @@ inf_ptrace_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
 	  /* Claim it exited with unknown signal.  */
 	  ourstatus->kind = TARGET_WAITKIND_SIGNALLED;
 	  ourstatus->value.sig = TARGET_SIGNAL_UNKNOWN;
-	  return minus_one_ptid;
+	  return inferior_ptid;
 	}
 
       /* Ignore terminated detached child processes.  */

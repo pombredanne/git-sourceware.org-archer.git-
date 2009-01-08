@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008 Free Software Foundation, Inc.
+   2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -605,7 +605,7 @@ value_at_lazy (struct type *type, CORE_ADDR addr)
   if (TYPE_CODE (check_typedef (type)) == TYPE_CODE_VOID)
     error (_("Attempt to dereference a generic pointer."));
 
-  val = allocate_value (type);
+  val = allocate_value_lazy (type);
 
   VALUE_LVAL (val) = lval_memory;
   set_value_address (val, addr);
@@ -631,6 +631,8 @@ value_at_lazy (struct type *type, CORE_ADDR addr)
 int
 value_fetch_lazy (struct value *val)
 {
+  gdb_assert (value_lazy (val));
+  allocate_value_contents (val);
   if (VALUE_LVAL (val) == lval_memory)
     {
       CORE_ADDR addr = value_address (val);
@@ -1530,7 +1532,7 @@ search_struct_field (char *name, struct value *arg1, int offset,
       if (BASETYPE_VIA_VIRTUAL (type, i))
 	{
 	  int boffset;
-	  struct value *v2 = allocate_value (basetype);
+	  struct value *v2;
 
 	  boffset = baseclass_offset (type, i,
 				      value_contents (arg1) + offset,
@@ -1547,6 +1549,7 @@ search_struct_field (char *name, struct value *arg1, int offset,
 	    {
 	      CORE_ADDR base_addr;
 
+	      v2  = allocate_value (basetype);
 	      base_addr = 
 		value_address (arg1) + boffset;
 	      if (target_read_memory (base_addr, 
@@ -1558,16 +1561,19 @@ search_struct_field (char *name, struct value *arg1, int offset,
 	    }
 	  else
 	    {
+	      if (VALUE_LVAL (arg1) == lval_memory && value_lazy (arg1))
+		v2  = allocate_value_lazy (basetype);
+	      else
+		{
+		  v2  = allocate_value (basetype);
+		  memcpy (value_contents_raw (v2),
+			  value_contents_raw (arg1) + boffset,
+			  TYPE_LENGTH (basetype));
+		}
 	      VALUE_LVAL (v2) = VALUE_LVAL (arg1);
 	      set_value_address (v2, value_raw_address (arg1));
 	      VALUE_FRAME_ID (v2) = VALUE_FRAME_ID (arg1);
 	      set_value_offset (v2, value_offset (arg1) + boffset);
-	      if (VALUE_LVAL (arg1) == lval_memory && value_lazy (arg1))
-		set_value_lazy (v2, 1);
-	      else
-		memcpy (value_contents_raw (v2),
-			value_contents_raw (arg1) + boffset,
-			TYPE_LENGTH (basetype));
 	    }
 
 	  if (found_baseclass)
@@ -1838,7 +1844,7 @@ value_struct_elt (struct value **argp, struct value **args,
 }
 
 /* Search through the methods of an object (and its bases) to find a
-   specified method. Return the pointer to the fn_field list of
+   specified method.  Return the pointer to the fn_field list of
    overloaded instances.
 
    Helper function for value_find_oload_list.
@@ -2959,13 +2965,15 @@ value_slice (struct value *array, int lowbound, int length)
 				      slice_range_type);
       TYPE_CODE (slice_type) = TYPE_CODE (array_type);
 
-      slice = allocate_value (slice_type);
       if (VALUE_LVAL (array) == lval_memory && value_lazy (array))
-	set_value_lazy (slice, 1);
+	slice = allocate_value_lazy (slice_type);
       else
-	memcpy (value_contents_writeable (slice),
-		value_contents (array) + offset,
-		TYPE_LENGTH (slice_type));
+	{
+	  slice = allocate_value (slice_type);
+	  memcpy (value_contents_writeable (slice),
+		  value_contents (array) + offset,
+		  TYPE_LENGTH (slice_type));
+	}
 
       if (VALUE_LVAL (array) == lval_internalvar)
 	VALUE_LVAL (slice) = lval_internalvar_component;

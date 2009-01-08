@@ -42,11 +42,6 @@
 
 	* gdb.python/Makefile.in (EXECUTABLES): Add python-template.
 
-2008-11-10  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.base/commands.exp (redefine_backtrace_test): New proc.
-	Call it.
-
 2008-11-07  Paul Pluzhnikov  <ppluzhnikov@google.com>
 
 	* gdb.python/python-template.exp: Make failures clearer.
@@ -79,6 +74,117 @@
 
 	* gdb.base/display.exp: print/r is now valid.
 	
+2009-01-01  Pedro Alves  <pedro@codesourcery.com>
+
+	PR breakpoints/9681:
+	* gdb.base/watchpoint.exp: Add regression test.
+
+2008-12-31  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.threads/attach-into-signal.exp: Don't use
+	gdb_suppress_entire_file.
+	* gdb.threads/attach-stopped.exp: Ditto.
+	* gdb.threads/attachstop-mt.exp: Ditto.
+
+2008-12-31  Pedro Alves  <pedro@codesourcery.com>
+
+	PR gdb/8812:
+	* gdb.base/signal.exp: Change kfail to fail, and update PR number.
+
+2008-12-29  Pedro Alves  <pedro@codesourcery.com>
+
+	PR gdb/7536:
+	* gdb.base/radix.exp: Add tests to ensure invalid input radices
+	and unsupported output radices are really rejected.
+
+2008-12-23  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.cp/punctuator.exp: Backslash the '$' signs.
+
+2008-12-22  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/punctuator.exp: New file.
+
+2008-12-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/completion.exp (Completing non-existing component): New test.
+
+2008-12-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix for PR gdb/8648.
+	* gdb.arch/ppc-fp.exp, gdb.arch/vsx-regs.exp, gdb.base/watchpoint-hw.c,
+	gdb.gdbtk/browser.test, gdb.gdbtk/console.test, gdb.gdbtk/srcwin.test,
+	gdb.gdbtk/srcwin2.test, gdb.gdbtk/srcwin3.test, gdb.gdbtk/windows.test,
+	gdb.threads/tls2.c: Remove reference to bug-gdb@prep.ai.mit.edu .
+
+2008-12-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/watchpoint-hw.exp, gdb.base/watchpoint-hw.c: New.
+
+2008-12-16  Christophe Lyon  <christophe.lyon@st.com>
+
+	* gdb.base/expand-psymtabs.c: Insert code in foo so that the
+	compiler actually generate code at the expected line number.
+
+2008-12-15  Jie Zhang  <jie.zhang@analog.com>
+
+	* gdb.base/consecutive.exp: Don't use global in gdb_expect.
+
+2008-12-12  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/commands.exp (redefine_hook_test): New proc.
+	Call it.
+
+2008-12-11  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/macscp.exp: New regression test.
+
+2008-12-11  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/macscp.exp: Print "address.addr".
+	* gdb.base/macscp1.c (struct outer): New struct.
+	(address): New global.
+
+2008-12-09  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/commands.exp (redefine_backtrace_test): New proc.
+	Call it.
+
+2008-12-04  Doug Evans  <dje@google.com>
+
+	* gdb.server/ext-run.exp: Relax regexp for init program.
+
+2008-12-03  Tristan Gingold  <gingold@adacore.com>
+
+	* gdb.base/macscp.exp: Generate an object file during compilation
+	to work around Darwin dsymutil limitations.
+
+2008-12-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Test resolving external references to TLS variables.
+	* gdb.threads/tls.exp: New tests to examine A_THREAD_LOCAL and
+	FILE2_THREAD_LOCAL.
+	(testfile2, srcfile2): New variables.
+	* gdb.threads/tls.c (file2_thread_local)
+	(function_referencing_file2_thread_local): New.
+	* gdb.threads/tls2.c: New file.
+
+2008-11-28  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/int_deref.exp: Convert the addresses into long_integer
+	rather than integer, as integer might not be big enough when
+	on 64bit targets.
+
+2008-11-27  Jerome Guitton  <guitton@adacore.com>
+
+	* gdb.cp/formatted-ref.exp: Add equality test.
+	* gdb.ada/formatted_ref.exp: Ditto.
+
+2008-11-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/breakpoint-shadow.exp, gdb.base/breakpoint-shadow.c: New.
+	* gdb.base/start.exp: New comment about an alternative - `runto_main'.
+
 2008-11-20  Andreas Schwab  <schwab@suse.de>
 
 	* gdb.base/foll-fork.exp (catch_fork_child_follow): Fix patterns

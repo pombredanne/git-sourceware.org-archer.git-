@@ -1,5 +1,5 @@
 /* Declarations for Intel 80386 opcode table
-   Copyright 2007, 2008
+   Copyright 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of the GNU opcodes library.
@@ -166,8 +166,11 @@ typedef union i386_cpu_flags
 #define D			0
 /* set if operands can be words or dwords encoded the canonical way */
 #define W			(D + 1)
+/* Skip the current insn and use the next insn in i386-opc.tbl to swap
+   operand in encoding.  */
+#define S			(W + 1)
 /* insn has a modrm byte. */
-#define Modrm			(W + 1)
+#define Modrm			(S + 1)
 /* register is in low 3 bits of opcode */
 #define ShortForm		(Modrm + 1)
 /* special case for jump insns.  */
@@ -245,8 +248,9 @@ typedef union i386_cpu_flags
 #define Vex			(Drexc + 1)
 /* insn has 256bit VEX prefix. */
 #define Vex256			(Vex + 1)
-/* insn has VEX NDS. Register-only source is encoded in Vex
-   prefix. */
+/* insn has VEX NDS. Register-only source is encoded in Vex prefix.
+   We use VexNDS on insns with VEX DDS since the register-only source
+   is the second source register.  */
 #define VexNDS			(Vex256 + 1)
 /* insn has VEX NDD. Register destination is encoded in Vex
    prefix. */
@@ -284,6 +288,7 @@ typedef struct i386_opcode_modifier
 {
   unsigned int d:1;
   unsigned int w:1;
+  unsigned int s:1;
   unsigned int modrm:1;
   unsigned int shortform:1;
   unsigned int jump:1;

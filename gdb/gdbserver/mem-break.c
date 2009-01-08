@@ -1,5 +1,6 @@
 /* Memory breakpoint operations for the remote server for GDB.
-   Copyright (C) 2002, 2003, 2005, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2002, 2003, 2005, 2007, 2008, 2009
+   Free Software Foundation, Inc.
 
    Contributed by MontaVista Software.
 
@@ -55,7 +56,7 @@ set_breakpoint_at (CORE_ADDR where, int (*handler) (CORE_ADDR))
   if (breakpoint_data == NULL)
     error ("Target does not support breakpoints.");
 
-  bp = malloc (sizeof (struct breakpoint));
+  bp = xmalloc (sizeof (struct breakpoint));
   memset (bp, 0, sizeof (struct breakpoint));
 
   (*the_target->read_memory) (where, bp->old_data,

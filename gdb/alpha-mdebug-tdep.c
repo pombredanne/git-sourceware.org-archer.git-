@@ -1,6 +1,6 @@
 /* Target-dependent mdebug code for the ALPHA architecture.
    Copyright (C) 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
-   2003, 2007, 2008 Free Software Foundation, Inc.
+   2003, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -193,7 +193,7 @@ alpha_mdebug_frame_unwind_cache (struct frame_info *this_frame,
 
   info = FRAME_OBSTACK_ZALLOC (struct alpha_mdebug_unwind_cache);
   *this_prologue_cache = info;
-  pc = get_frame_pc (this_frame);
+  pc = get_frame_address_in_block (this_frame);
 
   /* ??? We don't seem to be able to cache the lookup of the PDR
      from alpha_mdebug_frame_p.  It'd be nice if we could change

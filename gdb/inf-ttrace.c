@@ -1,6 +1,7 @@
 /* Low-level child interface to ttrace.
 
-   Copyright (C) 2004, 2005, 2006, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009
+   Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -930,7 +931,6 @@ inf_ttrace_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
   do
     {
       set_sigint_trap ();
-      set_sigio_trap ();
 
       if (ttrace_wait (pid, lwpid, TTRACE_WAITOK, &tts, sizeof tts) == -1)
 	perror_with_name (("ttrace_wait"));
@@ -949,7 +949,6 @@ inf_ttrace_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
 	  tts.tts_event = TTEVT_NONE;
 	}
 
-      clear_sigio_trap ();
       clear_sigint_trap ();
     }
   while (tts.tts_event == TTEVT_NONE);

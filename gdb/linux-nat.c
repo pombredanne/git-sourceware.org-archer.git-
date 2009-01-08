@@ -1,6 +1,6 @@
 /* GNU/Linux native-dependent code common to multiple platforms.
 
-   Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
+   Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -49,6 +49,10 @@
 #include "inf-loop.h"
 #include "event-loop.h"
 #include "event-top.h"
+#include <pwd.h>
+#include <sys/types.h>
+#include "gdb_dirent.h"
+#include "xml-support.h"
 
 #ifdef HAVE_PERSONALITY
 # include <sys/personality.h>
@@ -822,6 +826,11 @@ linux_child_follow_fork (struct target_ops *ops, int follow_child)
 			    child_pid);
 	}
 
+      /* Add the new inferior first, so that the target_detach below
+	 doesn't unpush the target.  */
+
+      add_inferior (child_pid);
+
       /* If we're vforking, we may want to hold on to the parent until
 	 the child exits or execs.  At exec time we can remove the old
 	 breakpoints from the parent and detach it; at exit time we
@@ -853,17 +862,18 @@ linux_child_follow_fork (struct target_ops *ops, int follow_child)
 	  if (!fp)
 	    fp = add_fork (parent_pid);
 	  fork_save_infrun_state (fp, 0);
+
+	  /* Also add an entry for the child fork.  */
+	  fp = find_fork_pid (child_pid);
+	  if (!fp)
+	    fp = add_fork (child_pid);
+	  fork_save_infrun_state (fp, 0);
 	}
       else
 	target_detach (NULL, 0);
 
       inferior_ptid = ptid_build (child_pid, child_pid, 0);
-      add_inferior (child_pid);
 
-      /* Reinstall ourselves, since we might have been removed in
-	 target_detach (which does other necessary cleanup).  */
-
-      push_target (ops);
       linux_nat_switch_fork (inferior_ptid);
       check_for_thread_db ();
 
@@ -1611,12 +1621,24 @@ linux_nat_detach (struct target_ops *ops, char *args, int from_tty)
   /* Destroy LWP info; it's no longer valid.  */
   init_lwp_list ();
 
-  pid = GET_PID (inferior_ptid);
-  inferior_ptid = pid_to_ptid (pid);
-  linux_ops->to_detach (ops, args, from_tty);
+  pid = ptid_get_pid (inferior_ptid);
 
   if (target_can_async_p ())
     drain_queued_events (pid);
+
+  if (forks_exist_p ())
+    {
+      /* Multi-fork case.  The current inferior_ptid is being detached
+	 from, but there are other viable forks to debug.  Detach from
+	 the current fork, and context-switch to the first
+	 available.  */
+      linux_fork_detach (args, from_tty);
+
+      if (non_stop && target_can_async_p ())
+ 	target_async (inferior_event_handler, 0);
+    }
+  else
+    linux_ops->to_detach (ops, args, from_tty);
 }
 
 /* Resume LP.  */
@@ -2864,7 +2886,6 @@ retry:
     {
       /* Causes SIGINT to be passed on to the attached process.  */
       set_sigint_trap ();
-      set_sigio_trap ();
     }
 
   while (status == 0)
@@ -2933,10 +2954,7 @@ retry:
     }
 
   if (!target_can_async_p ())
-    {
-      clear_sigio_trap ();
-      clear_sigint_trap ();
-    }
+    clear_sigint_trap ();
 
   gdb_assert (lp);
 
@@ -3666,8 +3684,10 @@ linux_nat_info_proc_cmd (char *args, int from_tty)
       if ((procfile = fopen (fname1, "r")) != NULL)
 	{
 	  struct cleanup *cleanup = make_cleanup_fclose (procfile);
-	  fgets (buffer, sizeof (buffer), procfile);
-	  printf_filtered ("cmdline = '%s'\n", buffer);
+          if (fgets (buffer, sizeof (buffer), procfile))
+            printf_filtered ("cmdline = '%s'\n", buffer);
+          else
+            warning (_("unable to read '%s'"), fname1);
 	  do_cleanups (cleanup);
 	}
       else
@@ -3995,6 +4015,113 @@ linux_proc_pending_signals (int pid, sigset_t *pending, sigset_t *blocked, sigse
 }
 
 static LONGEST
+linux_nat_xfer_osdata (struct target_ops *ops, enum target_object object,
+                    const char *annex, gdb_byte *readbuf,
+                    const gdb_byte *writebuf, ULONGEST offset, LONGEST len)
+{
+  /* We make the process list snapshot when the object starts to be
+     read.  */
+  static const char *buf;
+  static LONGEST len_avail = -1;
+  static struct obstack obstack;
+
+  DIR *dirp;
+
+  gdb_assert (object == TARGET_OBJECT_OSDATA);
+
+  if (strcmp (annex, "processes") != 0)
+    return 0;
+
+  gdb_assert (readbuf && !writebuf);
+
+  if (offset == 0)
+    {
+      if (len_avail != -1 && len_avail != 0)
+       obstack_free (&obstack, NULL);
+      len_avail = 0;
+      buf = NULL;
+      obstack_init (&obstack);
+      obstack_grow_str (&obstack, "<osdata type=\"processes\">\n");
+
+      dirp = opendir ("/proc");
+      if (dirp)
+       {
+         struct dirent *dp;
+         while ((dp = readdir (dirp)) != NULL)
+           {
+             struct stat statbuf;
+             char procentry[sizeof ("/proc/4294967295")];
+
+             if (!isdigit (dp->d_name[0])
+                 || strlen (dp->d_name) > sizeof ("4294967295") - 1)
+               continue;
+
+             sprintf (procentry, "/proc/%s", dp->d_name);
+             if (stat (procentry, &statbuf) == 0
+                 && S_ISDIR (statbuf.st_mode))
+               {
+                 char *pathname;
+                 FILE *f;
+                 char cmd[MAXPATHLEN + 1];
+                 struct passwd *entry;
+
+                 pathname = xstrprintf ("/proc/%s/cmdline", dp->d_name);
+                 entry = getpwuid (statbuf.st_uid);
+
+                 if ((f = fopen (pathname, "r")) != NULL)
+                   {
+                     size_t len = fread (cmd, 1, sizeof (cmd) - 1, f);
+                     if (len > 0)
+                       {
+                         int i;
+                         for (i = 0; i < len; i++)
+                           if (cmd[i] == '\0')
+                             cmd[i] = ' ';
+                         cmd[len] = '\0';
+
+                         obstack_xml_printf (
+			   &obstack,
+			   "<item>"
+			   "<column name=\"pid\">%s</column>"
+			   "<column name=\"user\">%s</column>"
+			   "<column name=\"command\">%s</column>"
+			   "</item>",
+			   dp->d_name,
+			   entry ? entry->pw_name : "?",
+			   cmd);
+                       }
+                     fclose (f);
+                   }
+
+                 xfree (pathname);
+               }
+           }
+
+         closedir (dirp);
+       }
+
+      obstack_grow_str0 (&obstack, "</osdata>\n");
+      buf = obstack_finish (&obstack);
+      len_avail = strlen (buf);
+    }
+
+  if (offset >= len_avail)
+    {
+      /* Done.  Get rid of the obstack.  */
+      obstack_free (&obstack, NULL);
+      buf = NULL;
+      len_avail = 0;
+      return 0;
+    }
+
+  if (len > len_avail - offset)
+    len = len_avail - offset;
+  memcpy (readbuf, buf + offset, len);
+
+  return len;
+}
+
+static LONGEST
 linux_xfer_partial (struct target_ops *ops, enum target_object object,
                     const char *annex, gdb_byte *readbuf,
 		    const gdb_byte *writebuf, ULONGEST offset, LONGEST len)
@@ -4004,6 +4131,10 @@ linux_xfer_partial (struct target_ops *ops, enum target_object object,
   if (object == TARGET_OBJECT_AUXV)
     return procfs_xfer_auxv (ops, object, annex, readbuf, writebuf,
 			     offset, len);
+
+  if (object == TARGET_OBJECT_OSDATA)
+    return linux_nat_xfer_osdata (ops, object, annex, readbuf, writebuf,
+                               offset, len);
 
   xfer = linux_proc_xfer_partial (ops, object, annex, readbuf, writebuf,
 				  offset, len);

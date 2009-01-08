@@ -1,6 +1,7 @@
 /* MI Command Set - environment commands.
 
-   Copyright (C) 2002, 2003, 2004, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2002, 2003, 2004, 2007, 2008, 2009
+   Free Software Foundation, Inc.
 
    Contributed by Red Hat Inc.
 
@@ -78,7 +79,10 @@ mi_cmd_env_pwd (char *command, char **argv, int argc)
      
   /* Otherwise the mi level is 2 or higher.  */
 
-  getcwd (gdb_dirbuf, sizeof (gdb_dirbuf));
+  if (! getcwd (gdb_dirbuf, sizeof (gdb_dirbuf)))
+    error (_("mi_cmd_env_pwd: error finding name of working directory: %s"),
+           safe_strerror (errno));
+    
   ui_out_field_string (uiout, "cwd", gdb_dirbuf);
 }
 

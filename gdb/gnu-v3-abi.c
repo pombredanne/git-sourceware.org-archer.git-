@@ -1,7 +1,7 @@
 /* Abstraction of GNU v3 abi.
    Contributed by Jim Blandy <jimb@redhat.com>
 
-   Copyright (C) 2001, 2002, 2003, 2005, 2006, 2007, 2008
+   Copyright (C) 2001, 2002, 2003, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -186,6 +186,16 @@ build_gdb_vtable_type (struct gdbarch *arch)
   return t;
 }
 
+
+/* Return the ptrdiff_t type used in the vtable type.  */
+static struct type *
+vtable_ptrdiff_type (struct gdbarch *gdbarch)
+{
+  struct type *vtable_type = gdbarch_data (gdbarch, vtable_type_gdbarch_data);
+
+  /* The "offset_to_top" field has the appropriate (ptrdiff_t) type.  */
+  return TYPE_FIELD_TYPE (vtable_type, vtable_field_offset_to_top);
+}
 
 /* Return the offset from the start of the imaginary `struct
    gdb_gnu_v3_abi_vtable' object to the vtable's "address point"
@@ -530,7 +540,7 @@ gnuv3_decode_method_ptr (struct gdbarch *gdbarch,
 			 LONGEST *adjustment_p)
 {
   struct type *funcptr_type = builtin_type (gdbarch)->builtin_func_ptr;
-  struct type *offset_type = builtin_type (gdbarch)->builtin_long;
+  struct type *offset_type = vtable_ptrdiff_type (gdbarch);
   CORE_ADDR ptr_value;
   LONGEST voffset, adjustment;
   int vbit;
@@ -594,7 +604,7 @@ gnuv3_print_method_ptr (const gdb_byte *contents,
       /* It's a virtual table offset, maybe in this class.  Search
 	 for a field with the correct vtable offset.  First convert it
 	 to an index, as used in TYPE_FN_FIELD_VOFFSET.  */
-      voffset = ptr_value / TYPE_LENGTH (builtin_type (gdbarch)->builtin_long);
+      voffset = ptr_value / TYPE_LENGTH (vtable_ptrdiff_type (gdbarch));
 
       physname = gnuv3_find_method_in (domain, voffset, adjustment);
 
@@ -721,7 +731,7 @@ gnuv3_method_ptr_to_value (struct value **this_p, struct value *method_ptr)
   if (vbit)
     {
       LONGEST voffset;
-      voffset = ptr_value / TYPE_LENGTH (builtin_type (gdbarch)->builtin_long);
+      voffset = ptr_value / TYPE_LENGTH (vtable_ptrdiff_type (gdbarch));
       return gnuv3_get_virtual_fn (gdbarch, value_ind (*this_p),
 				   method_type, voffset);
     }

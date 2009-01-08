@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008 Free Software Foundation, Inc.
+   2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -310,7 +310,6 @@ struct value *
 call_function_by_hand (struct value *function, int nargs, struct value **args)
 {
   CORE_ADDR sp;
-  CORE_ADDR dummy_addr;
   struct type *values_type, *target_values_type;
   unsigned char struct_return = 0, lang_struct_return = 0;
   CORE_ADDR struct_addr = 0;
@@ -471,35 +470,26 @@ call_function_by_hand (struct value *function, int nargs, struct value **args)
   switch (gdbarch_call_dummy_location (gdbarch))
     {
     case ON_STACK:
-      /* "dummy_addr" is here just to keep old targets happy.  New
-	 targets return that same information via "sp" and "bp_addr".  */
-      if (gdbarch_inner_than (gdbarch, 1, 2))
-	{
-	  sp = push_dummy_code (gdbarch, sp, funaddr,
+      sp = push_dummy_code (gdbarch, sp, funaddr,
 				args, nargs, target_values_type,
 				&real_pc, &bp_addr, get_current_regcache ());
-	  dummy_addr = sp;
-	}
-      else
-	{
-	  dummy_addr = sp;
-	  sp = push_dummy_code (gdbarch, sp, funaddr,
-				args, nargs, target_values_type,
-				&real_pc, &bp_addr, get_current_regcache ());
-	}
       break;
     case AT_ENTRY_POINT:
-      real_pc = funaddr;
-      dummy_addr = entry_point_address ();
-      /* Make certain that the address points at real code, and not a
-         function descriptor.  */
-      dummy_addr = gdbarch_convert_from_func_ptr_addr (gdbarch,
-						       dummy_addr,
-						       &current_target);
-      /* A call dummy always consists of just a single breakpoint, so
-         it's address is the same as the address of the dummy.  */
-      bp_addr = dummy_addr;
-      break;
+      {
+	CORE_ADDR dummy_addr;
+
+	real_pc = funaddr;
+	dummy_addr = entry_point_address ();
+	/* Make certain that the address points at real code, and not a
+	   function descriptor.  */
+	dummy_addr = gdbarch_convert_from_func_ptr_addr (gdbarch,
+							 dummy_addr,
+							 &current_target);
+	/* A call dummy always consists of just a single breakpoint, so
+	   its address is the same as the address of the dummy.  */
+	bp_addr = dummy_addr;
+	break;
+      }
     case AT_SYMBOL:
       /* Some executables define a symbol __CALL_DUMMY_ADDRESS whose
 	 address is the location where the breakpoint should be
@@ -507,6 +497,7 @@ call_function_by_hand (struct value *function, int nargs, struct value **args)
 	 this can be deleted - ON_STACK is a better option.  */
       {
 	struct minimal_symbol *sym;
+	CORE_ADDR dummy_addr;
 
 	sym = lookup_minimal_symbol ("__CALL_DUMMY_ADDRESS", NULL, NULL);
 	real_pc = funaddr;

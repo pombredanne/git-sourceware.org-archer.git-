@@ -1,8 +1,8 @@
 /* Evaluate expressions for GDB.
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2005, 2006, 2007, 2008
-   Free Software Foundation, Inc.
+   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2005, 2006, 2007, 2008,
+   2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -827,7 +827,7 @@ evaluate_subexp_standard (struct type *expect_type,
       if (expect_type != NULL_TYPE && noside != EVAL_SKIP
 	  && TYPE_CODE (type) == TYPE_CODE_ARRAY)
 	{
-	  struct type *range_type = TYPE_FIELD_TYPE (type, 0);
+	  struct type *range_type = TYPE_INDEX_TYPE (type);
 	  struct type *element_type = TYPE_TARGET_TYPE (type);
 	  struct value *array = allocate_value (expect_type);
 	  int element_size = TYPE_LENGTH (check_typedef (element_type));

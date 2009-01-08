@@ -1,7 +1,7 @@
 /* Parse expressions for GDB.
 
    Copyright (C) 1986, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997,
-   1998, 1999, 2000, 2001, 2004, 2005, 2007, 2008
+   1998, 1999, 2000, 2001, 2004, 2005, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    Modified from expread.y by the Department of Computer Science at the
@@ -1090,7 +1090,8 @@ parse_expression (char *string)
 /* Parse STRING as an expression.  If parsing ends in the middle of a
    field reference, return the type of the left-hand-side of the
    reference; furthermore, if the parsing ends in the field name,
-   return the field name in *NAME.  In all other cases, return NULL.  */
+   return the field name in *NAME.  In all other cases, return NULL.
+   Returned non-NULL *NAME must be freed by the caller.  */
 
 struct type *
 parse_field_expression (char *string, char **name)
@@ -1120,6 +1121,9 @@ parse_field_expression (char *string, char **name)
       xfree (exp);
       return NULL;
     }
+  /* (*NAME) is a part of the EXP memory block freed below.  */
+  *name = xstrdup (*name);
+
   val = evaluate_subexpression_type (exp, subexp);
   xfree (exp);
 

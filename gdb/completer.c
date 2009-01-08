@@ -1,5 +1,5 @@
 /* Line completion stuff for GDB, the GNU debugger.
-   Copyright (C) 2000, 2001, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2000, 2001, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -414,9 +414,11 @@ expression_completer (struct cmd_list_element *ignore, char *text, char *word)
 
 	  add_struct_fields (type, &out, result, fieldname, flen);
 	  result[out] = NULL;
+	  xfree (fieldname);
 	  return result;
 	}
     }
+  xfree (fieldname);
 
   /* Commands which complete on locations want to see the entire
      argument.  */
@@ -750,8 +752,10 @@ line_completion_function (const char *text, int matches,
       if (list)
 	{
 	  /* Free the storage used by LIST, but not by the strings inside.
-	     This is because rl_complete_internal () frees the strings.  */
+	     This is because rl_complete_internal () frees the strings.
+	     As complete_line may abort by calling `error' clear LIST now.  */
 	  xfree (list);
+	  list = NULL;
 	}
       index = 0;
       list = complete_line (text, line_buffer, point);

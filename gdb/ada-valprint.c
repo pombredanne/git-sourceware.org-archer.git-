@@ -1,7 +1,7 @@
 /* Support for printing Ada values for GDB, the GNU debugger.
 
    Copyright (C) 1986, 1988, 1989, 1991, 1992, 1993, 1994, 1997, 2001, 2002,
-   2003, 2004, 2005, 2006, 2007, 2008 Free Software Foundation, Inc.
+   2003, 2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -162,7 +162,7 @@ val_print_packed_array_elements (struct type *type, const gdb_byte *valaddr,
 
   {
     LONGEST high;
-    if (get_discrete_bounds (TYPE_FIELD_TYPE (type, 0), &low, &high) < 0)
+    if (get_discrete_bounds (index_type, &low, &high) < 0)
       len = 1;
     else
       len = high - low + 1;
@@ -679,7 +679,7 @@ ada_val_print_1 (struct type *type, const gdb_byte *valaddr0,
       int retn;
       struct value *mark = value_mark ();
       struct value *val;
-      val = value_from_contents_and_address (type, valaddr, 0, address);
+      val = value_from_contents_and_address (type, valaddr, address);
       val = ada_coerce_to_simple_array_ptr (val);
       if (val == NULL)
 	{
@@ -710,7 +710,7 @@ ada_val_print_1 (struct type *type, const gdb_byte *valaddr0,
 	if (ada_is_tag_type (type))
 	  {
 	    struct value *val = 
-	      value_from_contents_and_address (type, valaddr, 0, address);
+	      value_from_contents_and_address (type, valaddr, address);
 	    const char *name = ada_tag_name (val);
 	    if (name != NULL) 
 	      fprintf_filtered (stream, " (%s)", name);
@@ -733,7 +733,7 @@ ada_val_print_1 (struct type *type, const gdb_byte *valaddr0,
       else if (ada_is_vax_floating_type (type))
 	{
 	  struct value *val =
-	    value_from_contents_and_address (type, valaddr, 0, address);
+	    value_from_contents_and_address (type, valaddr, address);
 	  struct value *func = ada_vax_float_print_function (type);
 	  if (func != 0)
 	    {
@@ -768,7 +768,7 @@ ada_val_print_1 (struct type *type, const gdb_byte *valaddr0,
 	         code regardless of lengths; I'm just avoiding a cast.  */
 	      struct value *v = value_cast (target_type,
 					    value_from_contents_and_address
-					    (type, valaddr, 0, 0));
+					    (type, valaddr, 0));
 	      return ada_val_print_1 (target_type, value_contents (v), 0, 0,
 				      stream, recurse + 1, options);
 	    }
@@ -948,7 +948,7 @@ ada_value_print (struct value *val0, struct ui_file *stream,
   struct type *type =
     ada_to_fixed_type (value_type (val0), valaddr, address, NULL, 1);
   struct value *val =
-    value_from_contents_and_address (type, valaddr, 0, address);
+    value_from_contents_and_address (type, valaddr, address);
   struct value_print_options opts;
 
   /* If it is a pointer, indicate what it points to.  */

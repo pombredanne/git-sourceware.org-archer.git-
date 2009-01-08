@@ -1,6 +1,6 @@
 /* GDB CLI commands.
 
-   Copyright (C) 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008
+   Copyright (C) 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -323,7 +323,9 @@ pwd_command (char *args, int from_tty)
 {
   if (args)
     error (_("The \"pwd\" command does not take an argument: %s"), args);
-  getcwd (gdb_dirbuf, sizeof (gdb_dirbuf));
+  if (! getcwd (gdb_dirbuf, sizeof (gdb_dirbuf)))
+    error (_("Error finding name of working directory: %s"),
+           safe_strerror (errno));
 
   if (strcmp (gdb_dirbuf, current_directory) != 0)
     printf_unfiltered (_("Working directory %s\n (canonically %s).\n"),

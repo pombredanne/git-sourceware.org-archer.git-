@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008 Free Software Foundation, Inc.
+   2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1255,16 +1255,25 @@ address_info (char *exp, int from_tty)
 	else
 	  {
 	    section = SYMBOL_OBJ_SECTION (msym);
-	    printf_filtered (_("static storage at address "));
 	    load_addr = SYMBOL_VALUE_ADDRESS (msym);
-	    fputs_filtered (paddress (load_addr), gdb_stdout);
-	    if (section_is_overlay (section))
+
+	    if (section
+		&& (section->the_bfd_section->flags & SEC_THREAD_LOCAL) != 0)
+	      printf_filtered (_("a thread-local variable at offset %s "
+				 "in the thread-local storage for `%s'"),
+			       paddr_nz (load_addr), section->objfile->name);
+	    else
 	      {
-		load_addr = overlay_unmapped_address (load_addr, section);
-		printf_filtered (_(",\n -- loaded at "));
+		printf_filtered (_("static storage at address "));
 		fputs_filtered (paddress (load_addr), gdb_stdout);
-		printf_filtered (_(" in overlay section %s"),
-				 section->the_bfd_section->name);
+		if (section_is_overlay (section))
+		  {
+		    load_addr = overlay_unmapped_address (load_addr, section);
+		    printf_filtered (_(",\n -- loaded at "));
+		    fputs_filtered (paddress (load_addr), gdb_stdout);
+		    printf_filtered (_(" in overlay section %s"),
+				     section->the_bfd_section->name);
+		  }
 	      }
 	  }
       }
@@ -1739,17 +1748,28 @@ disable_display_command (char *args, int from_tty)
 
 
 /* Print the value in stack frame FRAME of a variable specified by a
-   struct symbol.  */
+   struct symbol.  NAME is the name to print; if NULL then VAR's print
+   name will be used.  STREAM is the ui_file on which to print the
+   value.  INDENT specifies the number of indent levels to print
+   before printing the variable name.  */
 
 void
-print_variable_value (struct symbol *var, struct frame_info *frame,
-		      struct ui_file *stream)
+print_variable_and_value (const char *name, struct symbol *var,
+			  struct frame_info *frame,
+			  struct ui_file *stream, int indent)
 {
-  struct value *val = read_var_value (var, frame);
+  struct value *val;
   struct value_print_options opts;
 
+  if (!name)
+    name = SYMBOL_PRINT_NAME (var);
+
+  fprintf_filtered (stream, "%s%s = ", n_spaces (2 * indent), name);
+
+  val = read_var_value (var, frame);
   get_user_print_options (&opts);
-  value_print (val, stream, &opts);
+  common_val_print (val, stream, indent, &opts, current_language);
+  fprintf_filtered (stream, "\n");
 }
 
 static void

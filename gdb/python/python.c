@@ -1,6 +1,6 @@
 /* General python/gdb code
 
-   Copyright (C) 2008 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1215,8 +1215,9 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
     goto done;
 
   /* Instantiate the printer.  */
-  value = value_from_contents_and_address (type, valaddr, embedded_offset,
-					   address);
+  if (valaddr)
+    valaddr += embedded_offset;
+  value = value_from_contents_and_address (type, valaddr, address);
   printer = gdbpy_instantiate_printer (func, value);
   Py_DECREF (func);
 

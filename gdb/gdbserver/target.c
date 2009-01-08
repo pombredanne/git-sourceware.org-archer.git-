@@ -1,5 +1,6 @@
 /* Target operations for the remote server for GDB.
-   Copyright (C) 2002, 2004, 2005, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2002, 2004, 2005, 2007, 2008, 2009
+   Free Software Foundation, Inc.
 
    Contributed by MontaVista Software.
 
@@ -77,7 +78,7 @@ write_inferior_memory (CORE_ADDR memaddr, const unsigned char *myaddr,
   if (buffer != NULL)
     free (buffer);
 
-  buffer = malloc (len);
+  buffer = xmalloc (len);
   memcpy (buffer, myaddr, len);
   check_mem_write (memaddr, buffer, len);
   res = (*the_target->write_memory) (memaddr, buffer, len);
@@ -106,6 +107,6 @@ mywait (char *statusp, int connected_wait)
 void
 set_target_ops (struct target_ops *target)
 {
-  the_target = (struct target_ops *) malloc (sizeof (*the_target));
+  the_target = (struct target_ops *) xmalloc (sizeof (*the_target));
   memcpy (the_target, target, sizeof (*the_target));
 }

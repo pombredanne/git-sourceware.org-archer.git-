@@ -1,7 +1,7 @@
 /* Find a variable's value in memory, for GDB, the GNU debugger.
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2001, 2003, 2004, 2005, 2007, 2008
+   1996, 1997, 1998, 1999, 2000, 2001, 2003, 2004, 2005, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -34,6 +34,7 @@
 #include "regcache.h"
 #include "user-regs.h"
 #include "block.h"
+#include "objfiles.h"
 
 /* Basic byte-swapping routines.  GDB has needed these for a long time...
    All extract a target-format integer at ADDR which is LEN bytes long.  */
@@ -536,6 +537,7 @@ read_var_value (struct symbol *var, struct frame_info *frame)
     case LOC_UNRESOLVED:
       {
 	struct minimal_symbol *msym;
+	struct obj_section *obj_section;
 
 	msym = lookup_minimal_symbol (SYMBOL_LINKAGE_NAME (var), NULL, NULL);
 	if (msym == NULL)
@@ -545,6 +547,11 @@ read_var_value (struct symbol *var, struct frame_info *frame)
 					   SYMBOL_OBJ_SECTION (msym));
 	else
 	  addr = SYMBOL_VALUE_ADDRESS (msym);
+
+	obj_section = SYMBOL_OBJ_SECTION (msym);
+	if (obj_section
+	    && (obj_section->the_bfd_section->flags & SEC_THREAD_LOCAL) != 0)
+	  addr = target_translate_tls_address (obj_section->objfile, addr);
       }
       break;
 

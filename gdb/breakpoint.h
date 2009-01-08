@@ -1,6 +1,6 @@
 /* Data structures associated with breakpoints in GDB.
    Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001,
-   2002, 2003, 2004, 2007, 2008 Free Software Foundation, Inc.
+   2002, 2003, 2004, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -518,10 +518,6 @@ enum bpstat_what_main_action
     /* Check the dynamic linker's data structures for new libraries, then
        keep checking.  */
     BPSTAT_WHAT_CHECK_SHLIBS,
-
-    /* Check the dynamic linker's data structures for new libraries, then
-       resume out of the dynamic linker's callback, stop and print.  */
-    BPSTAT_WHAT_CHECK_SHLIBS_RESUME_FROM_HOOK,
 
     /* This is just used to keep track of how many enums there are.  */
     BPSTAT_WHAT_LAST

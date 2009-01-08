@@ -1,6 +1,6 @@
 /* Low level interface to ptrace, for the remote server for GDB.
    Copyright (C) 1995, 1996, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005,
-   2006, 2007, 2008 Free Software Foundation, Inc.
+   2006, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -33,6 +33,10 @@
 #include <errno.h>
 #include <sys/syscall.h>
 #include <sched.h>
+#include <ctype.h>
+#include <pwd.h>
+#include <sys/types.h>
+#include <dirent.h>
 
 #ifndef PTRACE_GETSIGINFO
 # define PTRACE_GETSIGINFO 0x4202
@@ -117,6 +121,7 @@ static void stop_all_processes (void);
 static int linux_wait_for_event (struct thread_info *child);
 static int check_removed_breakpoint (struct process_info *event_child);
 static void *add_process (unsigned long pid);
+static int my_waitpid (int pid, int *status, int flags);
 
 struct pending_signals
 {
@@ -157,9 +162,7 @@ handle_extended_wait (struct process_info *event_child, int wstat)
 	  /* The new child has a pending SIGSTOP.  We can't affect it until it
 	     hits the SIGSTOP, but we're already attached.  */
 
-	  do {
-	    ret = waitpid (new_pid, &status, __WALL);
-	  } while (ret == -1 && errno == EINTR);
+	  ret = my_waitpid (new_pid, &status, __WALL);
 
 	  if (ret == -1)
 	    perror_with_name ("waiting for new child");
@@ -177,7 +180,7 @@ handle_extended_wait (struct process_info *event_child, int wstat)
 
       /* Normally we will get the pending SIGSTOP.  But in some cases
 	 we might get another signal delivered to the group first.
-         If we do, be sure not to lose it.  */
+	 If we do get another signal, be sure not to lose it.  */
       if (WSTOPSIG (status) == SIGSTOP)
 	{
 	  if (stopping_threads)
@@ -246,7 +249,7 @@ add_process (unsigned long pid)
 {
   struct process_info *process;
 
-  process = (struct process_info *) malloc (sizeof (*process));
+  process = (struct process_info *) xmalloc (sizeof (*process));
   memset (process, 0, sizeof (*process));
 
   process->head.id = pid;
@@ -323,6 +326,8 @@ linux_attach_lwp (unsigned long pid)
 	       strerror (errno), errno);
     }
 
+  /* FIXME: This intermittently fails.
+     We need to wait for SIGSTOP first.  */
   ptrace (PTRACE_SETOPTIONS, pid, 0, PTRACE_O_TRACECLONE);
 
   new_process = (struct process_info *) add_process (pid);
@@ -330,15 +335,36 @@ linux_attach_lwp (unsigned long pid)
   new_thread_notify (thread_id_to_gdb_id (new_process->lwpid));
 
   /* The next time we wait for this LWP we'll see a SIGSTOP as PTRACE_ATTACH
-     brings it to a halt.  We should ignore that SIGSTOP and resume the process
-     (unless this is the first process, in which case the flag will be cleared
-     in linux_attach).
+     brings it to a halt.
+
+     There are several cases to consider here:
+
+     1) gdbserver has already attached to the process and is being notified
+        of a new thread that is being created.
+        In this case we should ignore that SIGSTOP and resume the process.
+        This is handled below by setting stop_expected = 1.
+
+     2) This is the first thread (the process thread), and we're attaching
+        to it via attach_inferior.
+        In this case we want the process thread to stop.
+        This is handled by having linux_attach clear stop_expected after
+        we return.
+        ??? If the process already has several threads we leave the other
+        threads running.
+
+     3) GDB is connecting to gdbserver and is requesting an enumeration of all
+        existing threads.
+        In this case we want the thread to stop.
+        FIXME: This case is currently not properly handled.
+        We should wait for the SIGSTOP but don't.  Things work apparently
+        because enough time passes between when we ptrace (ATTACH) and when
+        gdb makes the next ptrace call on the thread.
 
      On the other hand, if we are currently trying to stop all threads, we
      should treat the new thread as if we had sent it a SIGSTOP.  This works
-     because we are guaranteed that add_process added us to the end of the
-     list, and so the new thread has not yet reached wait_for_sigstop (but
-     will).  */
+     because we are guaranteed that the add_process call above added us to the
+     end of the list, and so the new thread has not yet reached
+     wait_for_sigstop (but will).  */
   if (! stopping_threads)
     new_process->stop_expected = 1;
 }
@@ -639,11 +665,13 @@ retry:
   if (debug_threads
       && WIFSTOPPED (*wstatp))
     {
+      struct thread_info *saved_inferior = current_inferior;
       current_inferior = (struct thread_info *)
 	find_inferior_id (&all_threads, (*childp)->lwpid);
       /* For testing only; i386_stop_pc prints out a diagnostic.  */
       if (the_low_target.get_pc != NULL)
 	get_stop_pc ();
+      current_inferior = saved_inferior;
     }
 }
 
@@ -1115,7 +1143,7 @@ linux_resume_one_process (struct inferior_list_entry *entry,
 	  || process->bp_reinsert != 0))
     {
       struct pending_signals *p_sig;
-      p_sig = malloc (sizeof (*p_sig));
+      p_sig = xmalloc (sizeof (*p_sig));
       p_sig->prev = process->pending_signals;
       p_sig->signal = signal;
       if (info == NULL)
@@ -1286,7 +1314,7 @@ linux_queue_one_thread (struct inferior_list_entry *entry)
   if (process->resume->sig != 0)
     {
       struct pending_signals *p_sig;
-      p_sig = malloc (sizeof (*p_sig));
+      p_sig = xmalloc (sizeof (*p_sig));
       p_sig->prev = process->pending_signals;
       p_sig->signal = process->resume->sig;
       memset (&p_sig->info, 0, sizeof (siginfo_t));
@@ -1522,7 +1550,7 @@ regsets_fetch_inferior_registers ()
 	  continue;
 	}
 
-      buf = malloc (regset->size);
+      buf = xmalloc (regset->size);
 #ifndef __sparc__
       res = ptrace (regset->get_request, inferior_pid, 0, buf);
 #else
@@ -1575,7 +1603,7 @@ regsets_store_inferior_registers ()
 	  continue;
 	}
 
-      buf = malloc (regset->size);
+      buf = xmalloc (regset->size);
 
       /* First fill the buffer with the current register set contents,
 	 in case there are any items in the kernel's regset that are
@@ -1827,7 +1855,7 @@ linux_test_for_tracefork (void)
 {
   int child_pid, ret, status;
   long second_pid;
-  char *stack = malloc (STACK_SIZE * 4);
+  char *stack = xmalloc (STACK_SIZE * 4);
 
   linux_supports_tracefork_flag = 0;
 
@@ -2049,6 +2077,109 @@ linux_read_offsets (CORE_ADDR *text_p, CORE_ADDR *data_p)
 }
 #endif
 
+static int
+linux_qxfer_osdata (const char *annex,
+                   unsigned char *readbuf, unsigned const char *writebuf,
+                   CORE_ADDR offset, int len)
+{
+  /* We make the process list snapshot when the object starts to be
+     read.  */
+  static const char *buf;
+  static long len_avail = -1;
+  static struct buffer buffer;
+
+  DIR *dirp;
+
+  if (strcmp (annex, "processes") != 0)
+    return 0;
+
+  if (!readbuf || writebuf)
+    return 0;
+
+  if (offset == 0)
+    {
+      if (len_avail != -1 && len_avail != 0)
+       buffer_free (&buffer);
+      len_avail = 0;
+      buf = NULL;
+      buffer_init (&buffer);
+      buffer_grow_str (&buffer, "<osdata type=\"processes\">");
+
+      dirp = opendir ("/proc");
+      if (dirp)
+       {
+         struct dirent *dp;
+         while ((dp = readdir (dirp)) != NULL)
+           {
+             struct stat statbuf;
+             char procentry[sizeof ("/proc/4294967295")];
+
+             if (!isdigit (dp->d_name[0])
+                 || strlen (dp->d_name) > sizeof ("4294967295") - 1)
+               continue;
+
+             sprintf (procentry, "/proc/%s", dp->d_name);
+             if (stat (procentry, &statbuf) == 0
+                 && S_ISDIR (statbuf.st_mode))
+               {
+                 char pathname[128];
+                 FILE *f;
+                 char cmd[MAXPATHLEN + 1];
+                 struct passwd *entry;
+
+                 sprintf (pathname, "/proc/%s/cmdline", dp->d_name);
+                 entry = getpwuid (statbuf.st_uid);
+
+                 if ((f = fopen (pathname, "r")) != NULL)
+                   {
+                     size_t len = fread (cmd, 1, sizeof (cmd) - 1, f);
+                     if (len > 0)
+                       {
+                         int i;
+                         for (i = 0; i < len; i++)
+                           if (cmd[i] == '\0')
+                             cmd[i] = ' ';
+                         cmd[len] = '\0';
+
+                         buffer_xml_printf (
+			   &buffer,
+			   "<item>"
+			   "<column name=\"pid\">%s</column>"
+			   "<column name=\"user\">%s</column>"
+			   "<column name=\"command\">%s</column>"
+			   "</item>",
+			   dp->d_name,
+			   entry ? entry->pw_name : "?",
+			   cmd);
+                       }
+                     fclose (f);
+                   }
+               }
+           }
+
+         closedir (dirp);
+       }
+      buffer_grow_str0 (&buffer, "</osdata>\n");
+      buf = buffer_finish (&buffer);
+      len_avail = strlen (buf);
+    }
+
+  if (offset >= len_avail)
+    {
+      /* Done.  Get rid of the data.  */
+      buffer_free (&buffer);
+      buf = NULL;
+      len_avail = 0;
+      return 0;
+    }
+
+  if (len > len_avail - offset)
+    len = len_avail - offset;
+  memcpy (readbuf, buf + offset, len);
+
+  return len;
+}
+
 static struct target_ops linux_target_ops = {
   linux_create_inferior,
   linux_attach,
@@ -2081,6 +2212,7 @@ static struct target_ops linux_target_ops = {
 #endif
   NULL,
   hostio_last_error_from_errno,
+  linux_qxfer_osdata,
 };
 
 static void
@@ -2103,6 +2235,6 @@ initialize_low (void)
 #ifdef HAVE_LINUX_REGSETS
   for (num_regsets = 0; target_regsets[num_regsets].size >= 0; num_regsets++)
     ;
-  disabled_regsets = malloc (num_regsets);
+  disabled_regsets = xmalloc (num_regsets);
 #endif
 }

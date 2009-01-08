@@ -1,7 +1,7 @@
 /* Handle lists of commands, their decoding and documentation, for GDB.
 
    Copyright (c) 1986, 1989, 1990, 1991, 1998, 2000, 2001, 2002, 2004, 2007,
-   2008 Free Software Foundation, Inc.
+   2008, 2009 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -38,7 +38,11 @@
 static void undef_cmd_error (char *, char *);
 
 static struct cmd_list_element *delete_cmd (char *name,
-					    struct cmd_list_element **list);
+					    struct cmd_list_element **list,
+					    struct cmd_list_element **prehook,
+					    struct cmd_list_element **prehookee,
+					    struct cmd_list_element **posthook,
+					    struct cmd_list_element **posthookee);
 
 static struct cmd_list_element *find_cmd (char *command,
 					  int len,
@@ -162,9 +166,18 @@ add_cmd (char *name, enum command_class class, void (*fun) (char *, int),
 
   /* Turn each alias of the old command into an alias of the new
      command.  */
-  c->aliases = delete_cmd (name, list);
+  c->aliases = delete_cmd (name, list, &c->hook_pre, &c->hookee_pre,
+			   &c->hook_post, &c->hookee_post);
   for (iter = c->aliases; iter; iter = iter->alias_chain)
     iter->cmd_pointer = c;
+  if (c->hook_pre)
+    c->hook_pre->hookee_pre = c;
+  if (c->hookee_pre)
+    c->hookee_pre->hook_pre = c;
+  if (c->hook_post)
+    c->hook_post->hookee_post = c;
+  if (c->hookee_post)
+    c->hookee_post->hook_post = c;
 
   if (*list == NULL || strcmp ((*list)->name, name) >= 0)
     {
@@ -190,8 +203,6 @@ add_cmd (char *name, enum command_class class, void (*fun) (char *, int),
   c->flags = 0;
   c->replacement = NULL;
   c->pre_show_hook = NULL;
-  c->hook_pre  = NULL;
-  c->hook_post = NULL;
   c->hook_in = 0;
   c->prefixlist = NULL;
   c->prefixname = NULL;
@@ -204,8 +215,6 @@ add_cmd (char *name, enum command_class class, void (*fun) (char *, int),
   c->var_type = var_boolean;
   c->enums = NULL;
   c->user_commands = NULL;
-  c->hookee_pre = NULL;
-  c->hookee_post = NULL;
   c->cmd_pointer = NULL;
   c->alias_chain = NULL;
 
@@ -249,7 +258,13 @@ add_alias_cmd (char *name, char *oldname, enum command_class class,
 
   if (old == 0)
     {
-      delete_cmd (name, list);
+      struct cmd_list_element *prehook, *prehookee, *posthook, *posthookee;
+      struct cmd_list_element *aliases = delete_cmd (name, list,
+						     &prehook, &prehookee,
+						     &posthook, &posthookee);
+      /* If this happens, it means a programmer error somewhere.  */
+      gdb_assert (!aliases && !prehook && prehookee
+		  && !posthook && ! posthookee);
       return 0;
     }
 
@@ -626,27 +641,42 @@ add_setshow_zinteger_cmd (char *name, enum command_class class,
 			NULL, NULL);
 }
 
-/* Remove the command named NAME from the command list.  */
+/* Remove the command named NAME from the command list.  Return the
+   list commands which were aliased to the deleted command.  If the
+   command had no aliases, return NULL.  The various *HOOKs are set to
+   the pre- and post-hook commands for the deleted command.  If the
+   command does not have a hook, the corresponding out parameter is
+   set to NULL.  */
 
 static struct cmd_list_element *
-delete_cmd (char *name, struct cmd_list_element **list)
+delete_cmd (char *name, struct cmd_list_element **list,
+	    struct cmd_list_element **prehook,
+	    struct cmd_list_element **prehookee,
+	    struct cmd_list_element **posthook,
+	    struct cmd_list_element **posthookee)
 {
   struct cmd_list_element *iter;
   struct cmd_list_element **previous_chain_ptr;
   struct cmd_list_element *aliases = NULL;
 
+  *prehook = NULL;
+  *prehookee = NULL;
+  *posthook = NULL;
+  *posthookee = NULL;
   previous_chain_ptr = list;
 
   for (iter = *previous_chain_ptr; iter; iter = *previous_chain_ptr)
     {
       if (strcmp (iter->name, name) == 0)
 	{
-	  if (iter->destroyer)
-	    iter->destroyer (iter, iter->context);
 	  if (iter->hookee_pre)
 	    iter->hookee_pre->hook_pre = 0;
+	  *prehook = iter->hook_pre;
+	  *prehookee = iter->hookee_pre;
 	  if (iter->hookee_post)
 	    iter->hookee_post->hook_post = 0;
+	  *posthook = iter->hook_post;
+	  *posthookee = iter->hookee_post;
 
 	  /* Update the link.  */
 	  *previous_chain_ptr = iter->next;

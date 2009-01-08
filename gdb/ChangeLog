@@ -12403,76 +12403,68 @@
 
 	* linux-nat.c (linux_child_follow_fork): Call also CHECK_FOR_THREAD_DB.
 
-2008-01-02  Joel Brobecker  <brobecker@adacore.com>
+2009-01-06  Jim Blandy  <jimb@red-bean.com>
 
-	* ada-lang.c (ada_evaluate_subexp): Modify the value returned
-	when noside is EVAL_AVOID_SIDE_EFFECTS to be an lval_memory.
-	This is needed to make sure that any other treatment applied
-	to the resulting value does not fail for spurious reason,
-	such as trying to take the address of this value.
+	Check return values of functions declared with warn_unused_result
+	attribute in GLIBC 2.8.
+	* cli/cli-cmds.c (pwd_command): Check return value from getcwd.
+	* inflow.c (check_syscall): New function.
+	(new_tty): Use check_syscall to check return values from open and dup.
+	* linux-nat.c (linux_nat_info_proc_cmd): Check return value from fgets.
+	* main.c (captured_main): Call cwd after setting up gdb_stderr;
+	check for errors from getcwd.
+	* mi/mi-cmd-env.c (mi_cmd_env_pwd): Check return value from getcwd.
+	* ui-file.c (stdio_file_write): Ignore return value from fwrite.
+	(stdio_file_fputs): Same.
+	* utils.c (internal_vproblem): abort if last-ditch error message
+	write fails.
 
-2008-01-02  Joel Brobecker  <brobecker@adacore.com>
+	* top.c (gdb_init): Don't set the current directory here; that's
+	already been done in captured_main.
 
-	* ada-lang.c (ada_value_equal): Dereference reference types when
-	comparing arrays.
+2009-01-06  Sandra Loosemore  <sandra@codesourcery.com>
 
-2008-01-01  Daniel Jacobowitz  <dan@codesourcery.com>
+	* ser-tcp.c: Adjust includes.
+	(tcp_set_cmdlist, tcp_show_cmdlist): Declare.
+	(tcp_auto_retry, tcp_retry_limit): Declare.
+	(TIMEOUT): Remove, in favor of tcp_retry_limit.
+	(POLL_INTERVAL): Increase to 5, in favor of backoff logic.
+	(wait_for_connect): New function.
+	(net_open): Use it.  Add auto-retry logic.
+	(set_tcp_cmd, show_tcp_cmd): New functions.
+	(_initialize_ser_tcp): Initialize new "set/show tcp auto-retry"
+	and "set/show tcp connect-timeout" commands.
+	* NEWS: Document new commands.
+
+2009-01-05  Tom Tromey  <tromey@redhat.com>
+
+	* python/python-internal.h (Py_ssize_t): Define as int.
+
+2009-01-05  Jim Blandy  <jimb@red-bean.com>
+
+	* MAINTAINERS: Fix my e-mail address as steering committee member.
+
+2009-01-03  Joel Brobecker  <brobecker@adacore.com>
 
 	Updated copyright notices for most files.
 
-2008-01-01  Christopher Faylor  <me+gdb@cgf.cx>
-
-	* win32-nat.c (psapi_module_handle): Remove static.
-	(get_module_name): Rename from psapi_get_dll_name.  Revamp slightly to
-	return first module found if base_address is zero.  Don't initialize
-	psapi function pointers here.  Convert to cygwin paths when
-	appropriate.
-	(win32_pid_to_exec_file): Use Cygwin's /proc interface to determine
-	executable name.  Use get_module_name when that fails or when
-	!__CYGWIN__.
-	(_initialize_psapi): New function.  Initialize psapi stuff before it is
-	needed or issue a warning if it is not found.  Move psapi_module_handle
-	here.
-
-2008-01-01  Joel Brobecker  <brobecker@adacore.com>
-
-	* ada-lang.c (ada_remove_trailing_digits): New function.
-	(ada_remove_po_subprogram_suffix): New function.
-	(ada_decode): Improve. Move the description of the algorithm
-	directly inside the code, instead of in the function global
-	description.
-
-2008-01-01  Joel Brobecker  <brobecker@adacore.com>
-
-	* ada-valprint.c (ada_val_print_1) [TYPE_CODE_REF]: Ignore deref_ref
-	and always print the dereferenced value.
-
-2008-01-01  Joel Brobecker  <brobecker@adacore.com>
-
-	* ada-lang.c (ada_evaluate_subexp, case BINOP_SUB): Add handling
-	of the case where the first argument is a reference.
-	(ada_evaluate_subexp, case BINOP_ADD): Likewise.
-
-2008-01-01  Joel Brobecker  <brobecker@adacore.com>
-
-	Implement support for Ada interface types.
-
-	* ada-lang.c (ada_is_dispatch_table_ptr_type): New function.
-	(ada_is_ignored_field): Ignore fields that are a dispatch table
-	of a tagged type.
-
-2008-01-01  Joel Brobecker  <brobecker@adacore.com>
+2009-01-03  Joel Brobecker  <brobecker@adacore.com>
 
 	* top.c (print_gdb_version): Update copyright year.
 
-2008-01-01  Joel Brobecker  <brobecker@adacore.com>
+2009-01-03  Joel Brobecker  <brobecker@adacore.com>
 
-	* ChangeLog-2007: New ChangeLog rotation.
-	* ChangeLog: Reset for 2008.
-	* config/djgpp/fnchange.lst: Add entries for ChangeLog-2006 and
-	ChangeLog-2007.
+	* config/djgpp/fnchange.lst: Add entry for ChangeLog-2008.
 
-For older changes see ChangeLog-2007.
+2009-01-01  Pedro Alves  <pedro@codesourcery.com>
+
+	PR breakpoints/9681:
+	* exceptions.h (enum errors): New error type, MEMORY_ERROR.
+	* corefile.c (memory_error): Rewrite to throw a MEMORY_ERROR.
+	* breakpoint.c (fetch_watchpoint_value): Ignore MEMORY_ERRORs, but
+	retrow all other exceptions.
+
+For older changes see ChangeLog-2008.
 
 Local Variables:
 mode: change-log

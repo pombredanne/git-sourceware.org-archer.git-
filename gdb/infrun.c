@@ -3,7 +3,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008 Free Software Foundation, Inc.
+   2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1303,7 +1303,6 @@ proceed (CORE_ADDR addr, enum target_signal siggnal, int step)
   struct thread_info *tp;
   CORE_ADDR pc = regcache_read_pc (regcache);
   int oneproc = 0;
-  enum target_signal stop_signal;
 
   if (step > 0)
     step_start_function = find_pc_function (pc);
@@ -2142,13 +2141,17 @@ handle_inferior_event (struct execution_control_state *ecs)
     {
       breakpoint_retire_moribund ();
 
-      /* Mark the non-executing threads accordingly.  */
-      if (!non_stop
- 	  || ecs->ws.kind == TARGET_WAITKIND_EXITED
- 	  || ecs->ws.kind == TARGET_WAITKIND_SIGNALLED)
- 	set_executing (pid_to_ptid (-1), 0);
-      else
- 	set_executing (ecs->ptid, 0);
+      /* Mark the non-executing threads accordingly.  In all-stop, all
+	 threads of all processes are stopped when we get any event
+	 reported.  In non-stop mode, only the event thread stops.  If
+	 we're handling a process exit in non-stop mode, there's
+	 nothing to do, as threads of the dead process are gone, and
+	 threads of any other process were left running.  */
+      if (!non_stop)
+	set_executing (minus_one_ptid, 0);
+      else if (ecs->ws.kind != TARGET_WAITKIND_SIGNALLED
+	       && ecs->ws.kind != TARGET_WAITKIND_EXITED)
+	set_executing (inferior_ptid, 0);
     }
 
   switch (infwait_state)
@@ -2272,6 +2275,7 @@ handle_inferior_event (struct execution_control_state *ecs)
     case TARGET_WAITKIND_EXITED:
       if (debug_infrun)
         fprintf_unfiltered (gdb_stdlog, "infrun: TARGET_WAITKIND_EXITED\n");
+      inferior_ptid = ecs->ptid;
       target_terminal_ours ();	/* Must do this before mourn anyway */
       print_stop_reason (EXITED, ecs->ws.value.integer);
 
@@ -2290,6 +2294,7 @@ handle_inferior_event (struct execution_control_state *ecs)
     case TARGET_WAITKIND_SIGNALLED:
       if (debug_infrun)
         fprintf_unfiltered (gdb_stdlog, "infrun: TARGET_WAITKIND_SIGNALLED\n");
+      inferior_ptid = ecs->ptid;
       stop_print_frame = 0;
       target_terminal_ours ();	/* Must do this before mourn anyway */
 
@@ -2511,8 +2516,6 @@ targets should add new threads to the thread list themselves in non-stop mode.")
 	}
     }
 
-  stepping_past_singlestep_breakpoint = 0;
-
   if (!ptid_equal (deferred_step_ptid, null_ptid))
     {
       /* In non-stop mode, there's never a deferred_step_ptid set.  */
@@ -2522,8 +2525,6 @@ targets should add new threads to the thread list themselves in non-stop mode.")
 	 the fact that we were supposed to switch back.  */
       if (ecs->event_thread->stop_signal == TARGET_SIGNAL_TRAP)
 	{
-	  struct thread_info *tp;
-
 	  if (debug_infrun)
 	    fprintf_unfiltered (gdb_stdlog,
 				"infrun: handling deferred step\n");
@@ -3161,7 +3162,6 @@ infrun: BPSTAT_WHAT_SET_LONGJMP_RESUME (!gdbarch_get_longjmp_target)\n");
 	break;
 
       case BPSTAT_WHAT_CHECK_SHLIBS:
-      case BPSTAT_WHAT_CHECK_SHLIBS_RESUME_FROM_HOOK:
 	{
           if (debug_infrun)
 	    fprintf_unfiltered (gdb_stdlog, "infrun: BPSTAT_WHAT_CHECK_SHLIBS\n");
@@ -4376,17 +4376,25 @@ done:
       else
 	observer_notify_normal_stop (NULL);
     }
-  if (target_has_execution
-      && last.kind != TARGET_WAITKIND_SIGNALLED
-      && last.kind != TARGET_WAITKIND_EXITED)
-    {
-      /* Delete the breakpoint we stopped at, if it wants to be deleted.
-	 Delete any breakpoint that is to be deleted at the next stop.  */
-      breakpoint_auto_delete (inferior_thread ()->stop_bpstat);
 
+  if (target_has_execution)
+    {
+      if (last.kind != TARGET_WAITKIND_SIGNALLED
+	  && last.kind != TARGET_WAITKIND_EXITED)
+	/* Delete the breakpoint we stopped at, if it wants to be deleted.
+	   Delete any breakpoint that is to be deleted at the next stop.  */
+	breakpoint_auto_delete (inferior_thread ()->stop_bpstat);
+
+      /* Mark the stopped threads accordingly.  In all-stop, all
+	 threads of all processes are stopped when we get any event
+	 reported.  In non-stop mode, only the event thread stops.  If
+	 we're handling a process exit in non-stop mode, there's
+	 nothing to do, as threads of the dead process are gone, and
+	 threads of any other process were left running.  */
       if (!non_stop)
-	set_running (pid_to_ptid (-1), 0);
-      else
+	set_running (minus_one_ptid, 0);
+      else if (last.kind != TARGET_WAITKIND_SIGNALLED
+	       && last.kind != TARGET_WAITKIND_EXITED)
 	set_running (inferior_ptid, 0);
     }
 
@@ -4631,20 +4639,22 @@ Are you sure you want to change it? ", target_signal_to_name ((enum target_signa
       argv++;
     }
 
-  target_notice_signals (inferior_ptid);
+  for (signum = 0; signum < nsigs; signum++)
+    if (sigs[signum])
+      {
+	target_notice_signals (inferior_ptid);
 
-  if (from_tty)
-    {
-      /* Show the results.  */
-      sig_print_header ();
-      for (signum = 0; signum < nsigs; signum++)
-	{
-	  if (sigs[signum])
-	    {
-	      sig_print_info (signum);
-	    }
-	}
-    }
+	if (from_tty)
+	  {
+	    /* Show the results.  */
+	    sig_print_header ();
+	    for (; signum < nsigs; signum++)
+	      if (sigs[signum])
+		sig_print_info (signum);
+	  }
+
+	break;
+      }
 
   do_cleanups (old_chain);
 }

@@ -1,7 +1,7 @@
 /* Internal type definitions for GDB.
 
    Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001,
-   2002, 2003, 2004, 2006, 2007, 2008 Free Software Foundation, Inc.
+   2002, 2003, 2004, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support, using pieces from other GDB modules.
 
@@ -818,15 +818,15 @@ extern void allocate_cplus_struct_type (struct type *);
 /* Moto-specific stuff for FORTRAN arrays */
 
 #define TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED(arraytype) \
-   (TYPE_FIELD_ARTIFICIAL((TYPE_FIELD_TYPE((arraytype),0)),1))
+   (TYPE_FIELD_ARTIFICIAL(TYPE_INDEX_TYPE((arraytype)),1))
 #define TYPE_ARRAY_LOWER_BOUND_IS_UNDEFINED(arraytype) \
-   (TYPE_FIELD_ARTIFICIAL((TYPE_FIELD_TYPE((arraytype),0)),0))
+   (TYPE_FIELD_ARTIFICIAL(TYPE_INDEX_TYPE((arraytype)),0))
 
 #define TYPE_ARRAY_UPPER_BOUND_VALUE(arraytype) \
-   (TYPE_FIELD_BITPOS((TYPE_FIELD_TYPE((arraytype),0)),1))
+   (TYPE_HIGH_BOUND(TYPE_INDEX_TYPE((arraytype))))
 
 #define TYPE_ARRAY_LOWER_BOUND_VALUE(arraytype) \
-   (TYPE_FIELD_BITPOS((TYPE_FIELD_TYPE((arraytype),0)),0))
+   (TYPE_LOW_BOUND(TYPE_INDEX_TYPE((arraytype))))
 
 /* C++ */
 

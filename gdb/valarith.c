@@ -1,7 +1,7 @@
 /* Perform arithmetic and other operations on values, for GDB.
 
    Copyright (C) 1986, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008
+   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -1566,7 +1566,7 @@ value_bit_index (struct type *type, const gdb_byte *valaddr, int index)
   LONGEST low_bound, high_bound;
   LONGEST word;
   unsigned rel_index;
-  struct type *range = TYPE_FIELD_TYPE (type, 0);
+  struct type *range = TYPE_INDEX_TYPE (type);
   if (get_discrete_bounds (range, &low_bound, &high_bound) < 0)
     return -2;
   if (index < low_bound || index > high_bound)

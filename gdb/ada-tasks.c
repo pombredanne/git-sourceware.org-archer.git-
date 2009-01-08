@@ -1,5 +1,5 @@
-/* Copyright (C) 1992, 1993, 1994, 1997, 1998, 1999, 2000, 2003, 2004,
-   2005, 2007, 2008 Free Software Foundation, Inc.
+/* Copyright (C) 1992, 1993, 1994, 1997, 1998, 1999, 2000, 2003, 2004, 2005,
+   2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -501,7 +501,7 @@ read_atcb (CORE_ADDR task_id, struct ada_task_info *task_info)
     get_tcb_types_info (&atcb_type, &atcb_common_type, &atcb_ll_type,
                         &atcb_call_type, &fieldno);
 
-  tcb_value = value_from_contents_and_address (atcb_type, NULL, 0, task_id);
+  tcb_value = value_from_contents_and_address (atcb_type, NULL, task_id);
   common_value = value_field (tcb_value, fieldno.common);
 
   /* Fill in the task_id.  */
@@ -598,7 +598,7 @@ read_atcb (CORE_ADDR task_id, struct ada_task_info *task_info)
       if (call != 0)
         {
           call_val =
-            value_from_contents_and_address (atcb_call_type, NULL, 0, call);
+            value_from_contents_and_address (atcb_call_type, NULL, call);
           task_info->caller_task =
             value_as_address (value_field (call_val, fieldno.call_self));
         }
