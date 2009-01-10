@@ -166,6 +166,7 @@ struct type_refc_entry
 /* The hash table holding all reference counts.  */
 static htab_t type_refc_table;
 
+
 /* Alloc a new type structure and fill it with some defaults.  If
    OBJFILE is non-NULL, then allocate the space for the type structure
    in that objfile's objfile_obstack.  Otherwise allocate the new type
