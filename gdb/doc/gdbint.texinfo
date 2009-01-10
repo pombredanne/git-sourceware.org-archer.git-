@@ -4525,11 +4525,6 @@ undefined) in @file{nm-@var{system}.h}.
 An x86-based machine can define this to use the generic x86 watchpoint
 support; see @ref{Algorithms, I386_USE_GENERIC_WATCHPOINTS}.
 
-@item ONE_PROCESS_WRITETEXT
-@findex ONE_PROCESS_WRITETEXT
-Define this to be able to, when a breakpoint insertion fails, warn the
-user that another process may be running with the same executable.
-
 @item PROC_NAME_FMT
 @findex PROC_NAME_FMT
 Defines the format for the name of a @file{/proc} device.  Should be
@@ -5842,6 +5837,7 @@ mode: change-log
 left-margin: 8
 fill-column: 74
 version-control: never
+coding: utf-8
 End:
 @end smallexample
 
@@ -5852,8 +5848,12 @@ in @file{gdb/config/djgpp/fnchange.lst}.
 @item
 Update the copyright year in the startup message
 
-Update the copyright year in file @file{top.c}, function
-@code{print_gdb_version}.
+Update the copyright year in:
+@itemize @bullet
+@item file @file{top.c}, function @code{print_gdb_version}
+@item file @file{gdbserver/server.c}, function @code{gdbserver_version}
+@item file @file{gdbserver/gdbreplay.c}, function @code{gdbreplay_version}
+@end itemize
 
 @item
 Add the new year in the copyright notices of all source and documentation

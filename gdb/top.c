@@ -132,9 +132,6 @@ void (*window_hook) (FILE *, char *);
 int epoch_interface;
 int xgdb_verbose;
 
-/* gdb prints this when reading a command interactively */
-static char *gdb_prompt_string;	/* the global prompt string */
-
 /* Buffer used for reading command lines, and the size
    allocated for it so far.  */
 
@@ -285,11 +282,6 @@ void (*deprecated_set_hook) (struct cmd_list_element * c);
 /* Called when the current thread changes.  Argument is thread id.  */
 
 void (*deprecated_context_hook) (int id);
-
-/* Takes control from error ().  Typically used to prevent longjmps out of the
-   middle of the GUI.  Usually used in conjunction with a catch routine.  */
-
-void (*deprecated_error_hook) (void);
 
 /* Handler for SIGHUP.  */
 

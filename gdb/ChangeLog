@@ -1,3 +1,174 @@
+2009-01-09  Andreas Schwab  <schwab@suse.de>
+
+	* Makefile.in (init.c): Set LANG/LC_ALL to C, not c.
+
+2009-01-09  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdbtypes.c (append_composite_type_field): Correct the location of
+	appended fields.
+
+2009-01-09  Pedro Alves  <pedro@codesourcery.com>
+
+	* defs.h (deprecated_error_hook): Delete declaration.
+	* interps.c (clear_interpreter_hooks): Adjust.
+	* remote-sim.c (gdb_os_error): Don't try to call
+	deprecated_error_hook.  No need to call exit anymore.
+	* top.c (deprecated_error_hook): Delete.
+
+2009-01-09  Joel Brobecker  <brobecker@adacore.com>
+
+	* arch-utils.c (gdbarch_update_p): Use host_address_to_string
+	to print the address of the gdbarch pointer.
+
+2009-01-09  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdbarch.sh: Fix all the compilation errors on amd64-windows
+	due to casting a pointer to a long when printing a function
+	address. Instead, use host_address_to_string to convert our
+	address to a string.
+	* gdbarch.c: Regenerate.
+
+2009-01-09  Joel Brobecker  <brobecker@adacore.com>
+
+	* event-top.c (async_disconnect, async_stop_sig): use "raise"
+	instead of "kill" to raise a signal.
+
+2009-01-09  Joel Brobecker  <brobecker@adacore.com>
+
+	* win32-nat.c (get_module_name): Change the type of parameter
+	"base_address" to LPVOID.  Remove unnecessary cast.
+	(struct lm_info): Change type of load_addr to LPVOID.
+	(win32_make_so): Change the type of parameter "load_addr"
+	to LPVOID.  Remove some unnecessary casts.
+	(handle_unload_dll): Change the type of "lpBaseOfDll" to LPVOID.
+	(win32_xfer_shared_libraries): Add missing cast.
+
+2009-01-09  Joel Brobecker  <brobecker@adacore.com>
+
+	* win32-nat.c (has_detach_ability, set_process_privilege):
+	Cast the result of GetProcAddress to (void *) to avoid
+	a compilation warning.
+
+2009-01-09  Joel Brobecker  <brobecker@adacore.com>
+
+	* win32-nat.c (CONTEXT_EXTENDED_REGISTERS): Define to 0 if not
+	already defined.
+
+2009-01-09  Joel Brobecker  <brobecker@adacore.com>
+
+	* win32-nat.c (get_image_name, win32_xfer_memory): Fix type
+	definition of local variable "done".
+	(info_w32_command, handle_exception): Remove unnecessary cast.
+
+2009-01-09  Joel Brobecker  <brobecker@adacore.com>
+
+	* win32-nat.c (kernel32_DebugSetProcessKillOnExit): Renames
+	DebugSetProcessKillOnExit.  Update all uses in this file.
+	(kernel32_DebugActiveProcessStop): Renames DebugActiveProcessStop.
+	Update all uses in this file.
+
+2009-01-09  Joel Brobecker  <brobecker@adacore.com>
+
+	* win32-nat.c (do_initial_win32_stuff): Add new ops parameter,
+	and use it when pushing the target.
+	(win32_attach, win32_create_inferior): Update call to
+	do_initial_win32_stuff.
+	(win32_detach, win32_mourn_inferior): Use our ops parameter
+	instead of the global win32_ops to unpush the target.
+
+2009-01-09  Joel Brobecker  <brobecker@adacore.com>
+
+	* ser-mingw.c (ser_windows_open): Use proper type when casting
+	in call to _open_osfhandle.
+
+2009-01-09  Kai Tietz  <kai.tietz@onevision.com>
+
+	* coff-pe-read.c (read_pe_exported_syms): Fix typo.
+
+2009-01-09  Joel Brobecker  <brobecker@adacore.com>
+
+	* CONTRIBUTE: Minor reformatting.
+
+2009-01-08  Kai Tietz  <kai.tietz@onevision.com>
+
+	* MAINTAINERS: Add myself to Write After Approval.
+	* coff-pe-read.c (read_pe_exported_syms): Enable read of PE+
+	export directory.
+
+2009-01-08  Nathan Froyd  <froydnj@codesourcery.com>
+
+	* remote-sim.c (gdb_os_error): Mark as a noreturn function.
+	Call exit to make it obvious to GCC.
+
+2009-01-08  Tom Tromey  <tromey@redhat.com>
+
+	PR breakpoints/9350:
+	* varobj.c (varobj_invalidate): Unconditionally free
+	all_rootvarobj.
+	* symfile.c (syms_from_objfile): Free local_addr when returning
+	normally.
+	* exec.c (exec_file_attach): Do cleanups before returning.
+	(exec_file_command): Likewise.
+	* corefile.c (reopen_exec_file): Do cleanups before returning.
+	* breakpoint.c (insert_breakpoint_locations): Do cleanups before
+	returning. 
+	(do_vec_free): New function.
+	(update_global_location_list): Make a cleanup for old_locations.
+	Do cleanups before returning.  Remove unused variable 'e'.
+	(find_condition_and_thread): Free result of parsing the
+	expression.
+	(print_it_typical): Do cleanups before returning.
+	(breakpoint_re_set_one): Always free sals.sals.
+
+2009-01-08  Joel Brobecker  <brobecker@adacore.com>
+	    Emi Suzuki  <emi-suzuki@tjsys.co.jp>
+ 
+	* breakpoint.c (do_enable_breakpoint): Use update_watchpoint for
+	watchpoints.
+
+2009-01-07  Doug Evans  <dje@google.com>
+
+	* top.c (gdb_prompt_string): Delete, unused.
+
+2009-01-07  Pedro Alves  <pedro@codesourcery.com>
+
+	Delete ONE_PROCESS_WRITETEXT leftovers.
+
+	* breakpoint.c (insert_bp_location): Delete process_warning
+	argument.  Adjust.
+	(insert_breakpoint_locations): Adjust.
+	(reattach_breakpoints): Adjust.
+	* infrun.c (normal_stop): Drop "It might be running in another
+	process" notice.
+
+2009-01-07  Stan Shebs  <stan@codesourcery.com>
+
+	* config/pa/linux.mh (XDEPFILES): Remove.
+
+2009-01-07  Doug Evans  <dje@google.com>
+
+	* cli/cli-cmds.c (set_debug): Fix cut-n-paste error.
+
+2009-01-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* f-typeprint.c (f_type_print_base <TYPE_CODE_STRUCT>): Fix output
+	spacing, a regression from 2008-04-22.
+
+2009-01-07  Joel Brobecker  <brobecker@adacore.com>
+
+	* utils.c (gdb_print_host_address): Adjust implementation to
+	reuse host_address_to_string. Move comment explaining the conversion
+	from host address to string from here...
+	(host_address_to_string): ... to there.
+
+2009-01-07  Emi Suzuki  <emi-suzuki@tjsys.co.jp>
+
+	* MAINTAINERS: Add myself for write after approval privileges.
+
+2009-01-06  Tom Tromey  <tromey@redhat.com>
+
+	* value.c (set_internalvar): Use value_free, not xfree.
+
 2009-01-06  Jim Blandy  <jimb@red-bean.com>
 
 	Check return values of functions declared with warn_unused_result
