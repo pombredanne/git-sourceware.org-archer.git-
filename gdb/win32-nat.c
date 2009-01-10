@@ -85,6 +85,12 @@ enum
 #endif
 #include <psapi.h>
 
+#ifndef CONTEXT_EXTENDED_REGISTERS
+/* This macro is only defined on ia32.  It only makes sense on this target,
+   so define it as zero if not already defined.  */
+#define CONTEXT_EXTENDED_REGISTERS 0
+#endif
+
 #define CONTEXT_DEBUGGER_DR CONTEXT_DEBUGGER | CONTEXT_DEBUG_REGISTERS \
 	| CONTEXT_EXTENDED_REGISTERS
 
@@ -475,7 +481,7 @@ static DWORD WINAPI (*psapi_GetModuleFileNameExA) (HANDLE, HMODULE, LPSTR,
    is zero return the first loaded module (which is always the name of the
    executable).  */
 static int
-get_module_name (DWORD base_address, char *dll_name_ret)
+get_module_name (LPVOID base_address, char *dll_name_ret)
 {
   DWORD len;
   MODULEINFO mi;
@@ -518,7 +524,7 @@ get_module_name (DWORD base_address, char *dll_name_ret)
 				       &mi, sizeof (mi)))
 	error (_("Can't get module info"));
 
-      if (!base_address || (DWORD) (mi.lpBaseOfDll) == base_address)
+      if (!base_address || mi.lpBaseOfDll == base_address)
 	{
 	  /* Try to find the name of the given module */
 	  len = psapi_GetModuleFileNameExA (current_process_handle,
@@ -554,7 +560,7 @@ struct safe_symbol_file_add_args
 /* Maintain a linked list of "so" information. */
 struct lm_info
 {
-  DWORD load_addr;
+  LPVOID load_addr;
 };
 
 static struct so_list solib_start, *solib_end;
@@ -613,7 +619,7 @@ safe_symbol_file_add (char *name, int from_tty,
 }
 
 static struct so_list *
-win32_make_so (const char *name, DWORD load_addr)
+win32_make_so (const char *name, LPVOID load_addr)
 {
   struct so_list *so;
   char buf[MAX_PATH + 1];
@@ -696,7 +702,7 @@ get_image_name (HANDLE h, void *address, int unicode)
   char *address_ptr;
   int len = 0;
   char b[2];
-  DWORD done;
+  SIZE_T done;
 
   /* Attempt to read the name of the dll that was detected.
      This is documented to work only when actively debugging
@@ -740,7 +746,7 @@ handle_load_dll (void *dummy)
 
   dll_buf[0] = dll_buf[sizeof (dll_buf) - 1] = '\0';
 
-  if (!get_module_name ((DWORD) event->lpBaseOfDll, dll_buf))
+  if (!get_module_name (event->lpBaseOfDll, dll_buf))
     dll_buf[0] = dll_buf[sizeof (dll_buf) - 1] = '\0';
 
   dll_name = dll_buf;
@@ -751,11 +757,11 @@ handle_load_dll (void *dummy)
   if (!dll_name)
     return 1;
 
-  solib_end->next = win32_make_so (dll_name, (DWORD) event->lpBaseOfDll);
+  solib_end->next = win32_make_so (dll_name, event->lpBaseOfDll);
   solib_end = solib_end->next;
 
   DEBUG_EVENTS (("gdb: Loading dll \"%s\" at 0x%lx.\n", solib_end->so_name,
-		 (DWORD) solib_end->lm_info->load_addr));
+		 solib_end->lm_info->load_addr));
 
   return 1;
 }
@@ -771,7 +777,7 @@ win32_free_so (struct so_list *so)
 static int
 handle_unload_dll (void *dummy)
 {
-  DWORD lpBaseOfDll = (DWORD) current_event.u.UnloadDll.lpBaseOfDll;
+  LPVOID lpBaseOfDll = current_event.u.UnloadDll.lpBaseOfDll;
   struct so_list *so;
 
   for (so = &solib_start; so->next != NULL; so = so->next)
@@ -1001,7 +1007,7 @@ info_w32_command (char *args, int from_tty)
 
 #define DEBUG_EXCEPTION_SIMPLE(x)       if (debug_exceptions) \
   printf_unfiltered ("gdb: Target exception %s at 0x%08lx\n", x, \
-  (DWORD) current_event.u.Exception.ExceptionRecord.ExceptionAddress)
+          current_event.u.Exception.ExceptionRecord.ExceptionAddress)
 
 static int
 handle_exception (struct target_waitstatus *ourstatus)
@@ -1115,7 +1121,7 @@ handle_exception (struct target_waitstatus *ourstatus)
 	return -1;
       printf_unfiltered ("gdb: unknown target exception 0x%08lx at 0x%08lx\n",
 		    current_event.u.Exception.ExceptionRecord.ExceptionCode,
-	(DWORD) current_event.u.Exception.ExceptionRecord.ExceptionAddress);
+	        current_event.u.Exception.ExceptionRecord.ExceptionAddress);
       ourstatus->value.sig = TARGET_SIGNAL_UNKNOWN;
       break;
     }
@@ -1521,7 +1527,7 @@ win32_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
 }
 
 static void
-do_initial_win32_stuff (DWORD pid, int attaching)
+do_initial_win32_stuff (struct target_ops *ops, DWORD pid, int attaching)
 {
   extern int stop_after_trap;
   int i;
@@ -1541,7 +1547,7 @@ do_initial_win32_stuff (DWORD pid, int attaching)
 #endif
   current_event.dwProcessId = pid;
   memset (&current_event, 0, sizeof (current_event));
-  push_target (&win32_ops);
+  push_target (ops);
   disable_breakpoints_in_shlibs ();
   win32_clear_solib ();
   clear_proceed_status ();
@@ -1581,8 +1587,8 @@ do_initial_win32_stuff (DWORD pid, int attaching)
    If loading these functions succeeds use them to actually detach from
    the inferior process, otherwise behave as usual, pretending that
    detach has worked. */
-static BOOL WINAPI (*DebugSetProcessKillOnExit)(BOOL);
-static BOOL WINAPI (*DebugActiveProcessStop)(DWORD);
+static BOOL WINAPI (*kernel32_DebugSetProcessKillOnExit)(BOOL);
+static BOOL WINAPI (*kernel32_DebugActiveProcessStop)(DWORD);
 
 static int
 has_detach_ability (void)
@@ -1593,13 +1599,14 @@ has_detach_ability (void)
     kernel32 = LoadLibrary ("kernel32.dll");
   if (kernel32)
     {
-      if (!DebugSetProcessKillOnExit)
-	DebugSetProcessKillOnExit = GetProcAddress (kernel32,
-						 "DebugSetProcessKillOnExit");
-      if (!DebugActiveProcessStop)
-	DebugActiveProcessStop = GetProcAddress (kernel32,
-						 "DebugActiveProcessStop");
-      if (DebugSetProcessKillOnExit && DebugActiveProcessStop)
+      if (!kernel32_DebugSetProcessKillOnExit)
+	kernel32_DebugSetProcessKillOnExit =
+	  (void *) GetProcAddress (kernel32, "DebugSetProcessKillOnExit");
+      if (!kernel32_DebugActiveProcessStop)
+	kernel32_DebugActiveProcessStop =
+	  (void *) GetProcAddress (kernel32, "DebugActiveProcessStop");
+      if (kernel32_DebugSetProcessKillOnExit
+	  && kernel32_DebugActiveProcessStop)
 	return 1;
     }
   return 0;
@@ -1634,13 +1641,14 @@ set_process_privilege (const char *privilege, BOOL enable)
       if (!(advapi32 = LoadLibrary ("advapi32.dll")))
 	goto out;
       if (!OpenProcessToken)
-	OpenProcessToken = GetProcAddress (advapi32, "OpenProcessToken");
+	OpenProcessToken =
+          (void *) GetProcAddress (advapi32, "OpenProcessToken");
       if (!LookupPrivilegeValue)
-	LookupPrivilegeValue = GetProcAddress (advapi32,
-					       "LookupPrivilegeValueA");
+	LookupPrivilegeValue =
+          (void *) GetProcAddress (advapi32, "LookupPrivilegeValueA");
       if (!AdjustTokenPrivileges)
-	AdjustTokenPrivileges = GetProcAddress (advapi32,
-						"AdjustTokenPrivileges");
+	AdjustTokenPrivileges =
+          (void *) GetProcAddress (advapi32, "AdjustTokenPrivileges");
       if (!OpenProcessToken || !LookupPrivilegeValue || !AdjustTokenPrivileges)
 	{
 	  advapi32 = NULL;
@@ -1719,7 +1727,7 @@ win32_attach (struct target_ops *ops, char *args, int from_tty)
     error (_("Can't attach to process."));
 
   if (has_detach_ability ())
-    DebugSetProcessKillOnExit (FALSE);
+    kernel32_DebugSetProcessKillOnExit (FALSE);
 
   if (from_tty)
     {
@@ -1735,7 +1743,7 @@ win32_attach (struct target_ops *ops, char *args, int from_tty)
       gdb_flush (gdb_stdout);
     }
 
-  do_initial_win32_stuff (pid, 1);
+  do_initial_win32_stuff (ops, pid, 1);
   target_terminal_ours ();
 }
 
@@ -1749,13 +1757,13 @@ win32_detach (struct target_ops *ops, char *args, int from_tty)
       ptid_t ptid = {-1};
       win32_resume (ptid, 0, TARGET_SIGNAL_0);
 
-      if (!DebugActiveProcessStop (current_event.dwProcessId))
+      if (!kernel32_DebugActiveProcessStop (current_event.dwProcessId))
 	{
 	  error (_("Can't detach process %lu (error %lu)"),
 		 current_event.dwProcessId, GetLastError ());
 	  detached = 0;
 	}
-      DebugSetProcessKillOnExit (FALSE);
+      kernel32_DebugSetProcessKillOnExit (FALSE);
     }
   if (detached && from_tty)
     {
@@ -1770,7 +1778,7 @@ win32_detach (struct target_ops *ops, char *args, int from_tty)
   inferior_ptid = null_ptid;
   detach_inferior (current_event.dwProcessId);
 
-  unpush_target (&win32_ops);
+  unpush_target (ops);
 }
 
 static char *
@@ -1945,7 +1953,7 @@ win32_create_inferior (struct target_ops *ops, char *exec_file,
   else
     saw_create = 0;
 
-  do_initial_win32_stuff (pi.dwProcessId, 0);
+  do_initial_win32_stuff (ops, pi.dwProcessId, 0);
 
   /* win32_continue (DBG_CONTINUE, -1); */
 }
@@ -1960,7 +1968,7 @@ win32_mourn_inferior (struct target_ops *ops)
       CHECK (CloseHandle (current_process_handle));
       open_process_used = 0;
     }
-  unpush_target (&win32_ops);
+  unpush_target (ops);
   generic_mourn_inferior ();
 }
 
@@ -1980,7 +1988,7 @@ win32_xfer_memory (CORE_ADDR memaddr, gdb_byte *our, int len,
 		   int write, struct mem_attrib *mem,
 		   struct target_ops *target)
 {
-  DWORD done = 0;
+  SIZE_T done = 0;
   if (write)
     {
       DEBUG_MEM (("gdb: write target memory, %d bytes at 0x%08lx\n",
@@ -2074,7 +2082,8 @@ win32_xfer_shared_libraries (struct target_ops *ops,
   obstack_init (&obstack);
   obstack_grow_str (&obstack, "<library-list>\n");
   for (so = solib_start.next; so; so = so->next)
-    win32_xfer_shared_library (so->so_name, so->lm_info->load_addr, &obstack);
+    win32_xfer_shared_library (so->so_name, (CORE_ADDR) so->lm_info->load_addr,
+                               &obstack);
   obstack_grow_str0 (&obstack, "</library-list>\n");
 
   buf = obstack_finish (&obstack);
