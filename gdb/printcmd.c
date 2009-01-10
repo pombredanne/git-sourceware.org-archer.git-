@@ -43,7 +43,6 @@
 #include "disasm.h"
 #include "dfp.h"
 #include "valprint.h"
-#include "exceptions.h"
 
 #ifdef TUI
 #include "tui/tui.h"		/* For tui_active et.al.   */
