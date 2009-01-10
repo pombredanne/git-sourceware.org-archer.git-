@@ -1078,6 +1078,16 @@ extern struct type *builtin_type_error;
    (TYPE_UNSIGNED(t) ? UMIN_OF_SIZE(TYPE_LENGTH(t)) \
     : MIN_OF_SIZE(TYPE_LENGTH(t)))
 
+/* Virtual OBJFILE used for builtin types.  */
+#define OBJFILE_INTERNAL ((struct objfile *) 1L)
+
+/* Virtual OBJFILE used for types allocated by malloc.  FIXME: Currently
+   backward compatible with the old NULL value; fix then also init_type.  */
+#define OBJFILE_MALLOC ((struct objfile *) 0L)
+
+#define OBJFILE_IS_VIRTUAL(objfile) ((objfile) == OBJFILE_INTERNAL	\
+				     || (objfile) == OBJFILE_MALLOC)
+
 /* Allocate space for storing data associated with a particular type.
    We ensure that the space is allocated using the same mechanism that
    was used to allocate the space for the type structure itself.  I.E.
@@ -1087,16 +1097,16 @@ extern struct type *builtin_type_error;
    builtin types), then the data space will be allocated with xmalloc,
    the same as for the type structure. */
 
-#define TYPE_ALLOC(t,size)  \
-   (TYPE_OBJFILE (t) != NULL  \
-    ? obstack_alloc (&TYPE_OBJFILE (t) -> objfile_obstack, size) \
-    : xmalloc (size))
+#define TYPE_ALLOC(t,size)						\
+   (OBJFILE_IS_VIRTUAL (TYPE_OBJFILE (t))				\
+    ? xmalloc (size)							\
+    : obstack_alloc (&TYPE_OBJFILE (t) -> objfile_obstack, size))
 
-#define TYPE_ZALLOC(t,size)  \
-   (TYPE_OBJFILE (t) != NULL  \
-    ? memset (obstack_alloc (&TYPE_OBJFILE (t)->objfile_obstack, size),  \
-	      0, size)  \
-    : xzalloc (size))
+#define TYPE_ZALLOC(t,size)						\
+   (OBJFILE_IS_VIRTUAL (TYPE_OBJFILE (t))				\
+    ? xzalloc (size)							\
+    : memset (obstack_alloc (&TYPE_OBJFILE (t)->objfile_obstack, size),	\
+	      0, size))
 
 extern struct type *alloc_type (struct objfile *, struct type *);
 
@@ -1259,8 +1269,7 @@ extern void maintenance_print_type (char *, int);
 
 extern htab_t create_copied_types_hash (struct objfile *objfile);
 
-extern struct type *copy_type_recursive (struct objfile *objfile,
-					 struct type *type,
+extern struct type *copy_type_recursive (struct type *type,
 					 htab_t copied_types);
 
 extern struct type *copy_type (const struct type *type);
@@ -1268,5 +1277,7 @@ extern struct type *copy_type (const struct type *type);
 extern void type_incref (struct type *type);
 
 extern void type_decref (struct type *type);
+
+extern void free_all_types (void);
 
 #endif /* GDBTYPES_H */

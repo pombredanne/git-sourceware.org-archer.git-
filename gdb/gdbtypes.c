@@ -177,20 +177,22 @@ alloc_type (struct objfile *objfile, struct type *parent)
 
   /* Alloc the structure and start off with all fields zeroed.  */
 
-  if (objfile == NULL)
+  switch ((long) objfile)
     {
+    case (long) OBJFILE_INTERNAL:
+    case (long) OBJFILE_MALLOC:
       type = xmalloc (sizeof (struct type));
       memset (type, 0, sizeof (struct type));
       TYPE_MAIN_TYPE (type) = xmalloc (sizeof (struct main_type));
-    }
-  else
-    {
+      break;
+    default:
       type = obstack_alloc (&objfile->objfile_obstack,
 			    sizeof (struct type));
       memset (type, 0, sizeof (struct type));
       TYPE_MAIN_TYPE (type) = obstack_alloc (&objfile->objfile_obstack,
 					     sizeof (struct main_type));
       OBJSTAT (objfile, n_types++);
+      break;
     }
   memset (TYPE_MAIN_TYPE (type), 0, sizeof (struct main_type));
 
@@ -218,16 +220,18 @@ alloc_type_instance (struct type *oldtype)
 
   /* Allocate the structure.  */
 
-  if (TYPE_OBJFILE (oldtype) == NULL)
+  switch ((long) TYPE_OBJFILE (oldtype))
     {
+    case (long) OBJFILE_INTERNAL:
+    case (long) OBJFILE_MALLOC:
       type = xmalloc (sizeof (struct type));
       memset (type, 0, sizeof (struct type));
-    }
-  else
-    {
+      break;
+    default:
       type = obstack_alloc (&TYPE_OBJFILE (oldtype)->objfile_obstack,
 			    sizeof (struct type));
       memset (type, 0, sizeof (struct type));
+      break;
     }
   TYPE_MAIN_TYPE (type) = TYPE_MAIN_TYPE (oldtype);
 
@@ -1841,15 +1845,24 @@ init_type (enum type_code code, int length, int flags,
   if (flags & TYPE_FLAG_FIXED_INSTANCE)
     TYPE_FIXED_INSTANCE (type) = 1;
 
-  if ((name != NULL) && (objfile != NULL))
-    {
-      TYPE_NAME (type) = obsavestring (name, strlen (name), 
-				       &objfile->objfile_obstack);
-    }
-  else if (name)
-    {
-      TYPE_NAME (type) = xstrdup (name);
-    }
+  if (name)
+    switch ((long) objfile)
+      {
+      case (long) OBJFILE_INTERNAL:
+	TYPE_NAME (type) = name;
+	break;
+      case (long) OBJFILE_MALLOC:
+	TYPE_NAME (type) = xstrdup (name);
+	break;
+#if 0 /* OBJFILE_MALLOC duplication now.  */
+      case (long) NULL:
+	internal_error (__FILE__, __LINE__,
+			_("OBJFILE pointer NULL should be OBJFILE_* instead"));
+#endif
+      default:
+	TYPE_NAME (type) = obsavestring (name, strlen (name), 
+					 &objfile->objfile_obstack);
+      }
 
   /* C++ fancies.  */
 
@@ -2960,23 +2973,34 @@ type_pair_eq (const void *item_lhs, const void *item_rhs)
 }
 
 /* Allocate the hash table used by copy_type_recursive to walk
-   types without duplicates.  We use OBJFILE's obstack, because
-   OBJFILE is about to be deleted.  */
+   types without duplicates.   */
 
 htab_t
 create_copied_types_hash (struct objfile *objfile)
 {
-  return htab_create_alloc_ex (1, type_pair_hash, type_pair_eq,
-			       NULL, &objfile->objfile_obstack,
-			       hashtab_obstack_allocate,
-			       dummy_obstack_deallocate);
+  if (objfile == NULL)
+    {
+      /* NULL OBJFILE is for TYPE_DYNAMIC types already contained in
+	 OBJFILE_MALLOC memory, such as those from VALUE_HISTORY_CHAIN.  Table
+	 element entries get allocated by xmalloc - so use xfree.  */
+      return htab_create (1, type_pair_hash, type_pair_eq, xfree);
+    }
+  else
+    {
+      /* Use OBJFILE's obstack, because OBJFILE is about to be deleted.  Table
+	 element entries get allocated by xmalloc - so use xfree.  */
+      return htab_create_alloc_ex (1, type_pair_hash, type_pair_eq,
+				   xfree, &objfile->objfile_obstack,
+				   hashtab_obstack_allocate,
+				   dummy_obstack_deallocate);
+    }
 }
 
 /* A helper for copy_type_recursive.  This does all the work.
    REPRESENTATIVE is a pointer to a type.  This is used to register
    newly-created types in the type_refc_table.  Initially it pointer
    to a NULL pointer, but it is filled in the first time a type is
-   copied.  */
+   copied.  OBJFILE is used only for an assertion checking.  */
 
 static struct type *
 copy_type_recursive_1 (struct objfile *objfile, 
@@ -2988,7 +3012,7 @@ copy_type_recursive_1 (struct objfile *objfile,
   void **slot;
   struct type *new_type;
 
-  if (TYPE_OBJFILE (type) == NULL)
+  if (TYPE_OBJFILE (type) == OBJFILE_INTERNAL || objfile == OBJFILE_MALLOC)
     return type;
 
   /* This type shouldn't be pointing to any types in other objfiles;
@@ -3000,13 +3024,15 @@ copy_type_recursive_1 (struct objfile *objfile,
   if (*slot != NULL)
     return ((struct type_pair *) *slot)->new;
 
-  new_type = alloc_type (NULL, *representative);
+  new_type = alloc_type (OBJFILE_MALLOC, *representative);
   if (!*representative)
     *representative = new_type;
 
   /* We must add the new type to the hash table immediately, in case
-     we encounter this type again during a recursive call below.  */
-  stored = obstack_alloc (&objfile->objfile_obstack, sizeof (struct type_pair));
+     we encounter this type again during a recursive call below.  Memory could
+     be allocated from OBJFILE in the case we will be removing OBJFILE, this
+     optimization is missed and xfree is called for it from COPIED_TYPES.  */
+  stored = xmalloc (sizeof (*stored));
   stored->old = type;
   stored->new = new_type;
   *slot = stored;
@@ -3097,19 +3123,18 @@ copy_type_recursive_1 (struct objfile *objfile,
   return new_type;
 }
 
-/* Recursively copy (deep copy) TYPE, if it is associated with
-   OBJFILE.  Return a new type allocated using malloc, a saved type if
-   we have already visited TYPE (using COPIED_TYPES), or TYPE if it is
-   not associated with OBJFILE.  */
+/* Recursively copy (deep copy) TYPE.  Return a new type allocated using
+   malloc, a saved type if we have already visited TYPE (using COPIED_TYPES),
+   or TYPE if it is not associated with OBJFILE.  */
 
 struct type *
-copy_type_recursive (struct objfile *objfile, 
-		     struct type *type,
+copy_type_recursive (struct type *type,
 		     htab_t copied_types)
 {
   struct type *representative = NULL;
 
-  return copy_type_recursive_1 (objfile, type, copied_types, &representative);
+  return copy_type_recursive_1 (TYPE_OBJFILE (type), type, copied_types,
+				&representative);
 }
 
 /* Make a copy of the given TYPE, except that the pointer & reference
@@ -3134,46 +3159,28 @@ copy_type (const struct type *type)
   return new_type;
 }
 
-/* Allocate a hash table which is used when freeing a struct type.  */
+static void delete_type (struct type *type);
 
-static htab_t
-create_deleted_types_hash (void)
-{
-  return htab_create (1, htab_hash_pointer, htab_eq_pointer, NULL);
-}
-
-static void delete_type_recursive (struct type *type, htab_t deleted_types);
-
-/* A helper for delete_type_recursive which deletes a main_type and
-   the things to which it refers.  TYPE is a type whose main_type we
-   wish to destroy.  DELETED_TYPES is a hash holding already-seen
-   pointers; see delete_type_recursive.  */
+/* A helper for delete_type which deletes a main_type and the things to which
+   it refers.  TYPE is a type whose main_type we wish to destroy.  */
 
 static void
-delete_main_type (struct type *type, htab_t deleted_types)
+delete_main_type (struct main_type *main_type)
 {
   int i;
   void **slot;
+  struct
+    {
+      struct main_type *main_type;
+    } type_local = { main_type }, *type = &type_local;
 
-  if (!type)
-    return;
-
-  /* Multiple types might share a single main_type.  So, we must
-     check to make sure this is not happening.  */
-  slot = htab_find_slot (deleted_types, TYPE_MAIN_TYPE (type), INSERT);
-  if (*slot != NULL)
-    return;
-  *slot = TYPE_MAIN_TYPE (type);
+  gdb_assert (TYPE_OBJFILE (type) == OBJFILE_MALLOC);
 
   xfree (TYPE_NAME (type));
   xfree (TYPE_TAG_NAME (type));
 
-  delete_type_recursive (TYPE_TARGET_TYPE (type), deleted_types);
-  delete_type_recursive (TYPE_VPTR_BASETYPE (type), deleted_types);
-
   for (i = 0; i < TYPE_NFIELDS (type); ++i)
     {
-      delete_type_recursive (TYPE_FIELD_TYPE (type, i), deleted_types);
       xfree (TYPE_FIELD_NAME (type, i));
 
       if (TYPE_FIELD_LOC_KIND (type, i) == FIELD_LOC_KIND_PHYSNAME)
@@ -3188,34 +3195,65 @@ delete_main_type (struct type *type, htab_t deleted_types)
   xfree (TYPE_MAIN_TYPE (type));
 }
 
-/* Recursively delete TYPE and things it references.  TYPE must have
-   been allocated using xmalloc -- not using an objfile.
-   DELETED_TYPES is a hash table, allocated using
-   create_deleted_types_hash, which is used for checking whether a
-   type has already been deleted.  */
+/* Store `struct main_type *' entries which got `struct type *' deleted.  */
+
+static htab_t deleted_main_types_hash;
+
+/* To be called before any call of delete_type.  */
 
 static void
-delete_type_recursive (struct type *type, htab_t deleted_types)
+delete_type_begin (void)
+{
+  gdb_assert (deleted_main_types_hash == NULL);
+
+  deleted_main_types_hash = htab_create_alloc (10, htab_hash_pointer,
+			    htab_eq_pointer, NULL, xcalloc, xfree);
+}
+
+/* Helper for delete_type_finish.  */
+
+static int
+delete_type_finish_traverse (void **slot, void *unused)
+{
+  struct main_type *main_type = *slot;
+
+  delete_main_type (main_type);
+
+  return 1;
+}
+
+/* To be called after all the calls of delete_type.  Each MAIN_TYPE must have
+   either none or all of its TYPE entries deleted.  */
+
+static void
+delete_type_finish (void)
+{
+  htab_traverse (deleted_main_types_hash, delete_type_finish_traverse, NULL);
+
+  htab_delete (deleted_main_types_hash);
+  deleted_main_types_hash = NULL;
+}
+
+/* Delete TYPE and remember MAIN_TYPE it references.  TYPE must have been
+   allocated using xmalloc -- not using an objfile.  You must wrap calls of
+   this function by delete_type_begin and delete_type_finish.  */
+
+static void
+delete_type (struct type *type)
 {
   void **slot;
 
   if (!type)
     return;
 
-  slot = htab_find_slot (deleted_types, type, INSERT);
-  if (*slot != NULL)
+  if (TYPE_OBJFILE (type) == OBJFILE_INTERNAL)
     return;
-  gdb_assert (!TYPE_OBJFILE (type));
-  *slot = type;
+  gdb_assert (TYPE_OBJFILE (type) == OBJFILE_MALLOC);
 
-  delete_main_type (type, deleted_types);
-  delete_type_recursive (TYPE_POINTER_TYPE (type), deleted_types);
-  delete_type_recursive (TYPE_REFERENCE_TYPE (type), deleted_types);
-
-  /* It is somewhat inefficient to free the chain recursively.
-     However, the list is typically short, and this avoid duplicating
-     the deletion checking code.  */
-  delete_type_recursive (TYPE_CHAIN (type), deleted_types);
+  slot = htab_find_slot (deleted_main_types_hash, TYPE_MAIN_TYPE (type),
+			 INSERT);
+  gdb_assert (!*slot);
+  *slot = TYPE_MAIN_TYPE (type);
 
   xfree (type);
 }
@@ -3296,15 +3334,19 @@ type_incref (struct type *type)
 }
 
 /* A traverse callback for type_refc_table which removes any entry
-   whose reference count pointer is REFC.  */
+   whose reference count pointer is REFC.  REFC may be NULL to delete all the
+   unused entries - use such cleanup only in the GDB idle state as GDB code
+   does not necessarily reference county TYPEs during its processing.  */
 
 static int
 type_refc_remove (void **slot, void *refc)
 {
   struct type_refc_entry *entry = *slot;
 
-  if (entry->refc == refc)
+  if (entry->refc == refc || (refc == NULL && *entry->refc == 0))
     {
+      delete_type (entry->type);
+
       xfree (entry);
       htab_clear_slot (type_refc_table, slot);
     }
@@ -3329,21 +3371,28 @@ type_decref (struct type *type)
   --*(found->refc);
   if (*(found->refc) == 0)
     {
-      htab_t deleted;
       void *refc = found->refc;
-      struct type *representative = found->type;
 
-      /* Clear all table entries referring to this count.  */
+      /* Clear all table entries referring to this count.  CHECK: Should not be
+         the deletion delayed till free_all_types?  */
+      delete_type_begin ();
       htab_traverse (type_refc_table, type_refc_remove, refc);
+      delete_type_finish ();
 
       /* Delete the reference count itself.  */
       xfree (refc);
-      
-      /* Delete the entire type hierarchy.  */
-      deleted = create_deleted_types_hash ();
-      delete_type_recursive (representative, deleted);
-      htab_delete (deleted);
     }
+}
+
+/* Free all the types that have been allocated (except for those released).
+   Called after each command, successful or not.  */
+
+void
+free_all_types (void)
+{
+  delete_type_begin ();
+  htab_traverse (type_refc_table, type_refc_remove, NULL);
+  delete_type_finish ();
 }
 
 static struct type *
@@ -3383,7 +3432,7 @@ build_complex (int bit, char *name, struct type *target_type)
       return builtin_type_error;
     }
   t = init_type (TYPE_CODE_COMPLEX, 2 * bit / TARGET_CHAR_BIT,
-		 0, name, (struct objfile *) NULL);
+		 0, name, OBJFILE_INTERNAL);
   TYPE_TARGET_TYPE (t) = target_type;
   return t;
 }
@@ -3397,56 +3446,56 @@ gdbtypes_post_init (struct gdbarch *gdbarch)
   builtin_type->builtin_void =
     init_type (TYPE_CODE_VOID, 1,
 	       0,
-	       "void", (struct objfile *) NULL);
+	       "void", OBJFILE_INTERNAL);
   builtin_type->builtin_char =
     init_type (TYPE_CODE_INT, TARGET_CHAR_BIT / TARGET_CHAR_BIT,
 	       (TYPE_FLAG_NOSIGN
                 | (gdbarch_char_signed (gdbarch) ? 0 : TYPE_FLAG_UNSIGNED)),
-	       "char", (struct objfile *) NULL);
+	       "char", OBJFILE_INTERNAL);
   builtin_type->builtin_signed_char =
     init_type (TYPE_CODE_INT, TARGET_CHAR_BIT / TARGET_CHAR_BIT,
 	       0,
-	       "signed char", (struct objfile *) NULL);
+	       "signed char", OBJFILE_INTERNAL);
   builtin_type->builtin_unsigned_char =
     init_type (TYPE_CODE_INT, TARGET_CHAR_BIT / TARGET_CHAR_BIT,
 	       TYPE_FLAG_UNSIGNED,
-	       "unsigned char", (struct objfile *) NULL);
+	       "unsigned char", OBJFILE_INTERNAL);
   builtin_type->builtin_short =
     init_type (TYPE_CODE_INT, 
 	       gdbarch_short_bit (gdbarch) / TARGET_CHAR_BIT,
-	       0, "short", (struct objfile *) NULL);
+	       0, "short", OBJFILE_INTERNAL);
   builtin_type->builtin_unsigned_short =
     init_type (TYPE_CODE_INT, 
 	       gdbarch_short_bit (gdbarch) / TARGET_CHAR_BIT,
 	       TYPE_FLAG_UNSIGNED, "unsigned short", 
-	       (struct objfile *) NULL);
+	       OBJFILE_INTERNAL);
   builtin_type->builtin_int =
     init_type (TYPE_CODE_INT, 
 	       gdbarch_int_bit (gdbarch) / TARGET_CHAR_BIT,
-	       0, "int", (struct objfile *) NULL);
+	       0, "int", OBJFILE_INTERNAL);
   builtin_type->builtin_unsigned_int =
     init_type (TYPE_CODE_INT, 
 	       gdbarch_int_bit (gdbarch) / TARGET_CHAR_BIT,
 	       TYPE_FLAG_UNSIGNED, "unsigned int", 
-	       (struct objfile *) NULL);
+	       OBJFILE_INTERNAL);
   builtin_type->builtin_long =
     init_type (TYPE_CODE_INT, 
 	       gdbarch_long_bit (gdbarch) / TARGET_CHAR_BIT,
-	       0, "long", (struct objfile *) NULL);
+	       0, "long", OBJFILE_INTERNAL);
   builtin_type->builtin_unsigned_long =
     init_type (TYPE_CODE_INT, 
 	       gdbarch_long_bit (gdbarch) / TARGET_CHAR_BIT,
 	       TYPE_FLAG_UNSIGNED, "unsigned long", 
-	       (struct objfile *) NULL);
+	       OBJFILE_INTERNAL);
   builtin_type->builtin_long_long =
     init_type (TYPE_CODE_INT,
 	       gdbarch_long_long_bit (gdbarch) / TARGET_CHAR_BIT,
-	       0, "long long", (struct objfile *) NULL);
+	       0, "long long", OBJFILE_INTERNAL);
   builtin_type->builtin_unsigned_long_long =
     init_type (TYPE_CODE_INT,
 	       gdbarch_long_long_bit (gdbarch) / TARGET_CHAR_BIT,
 	       TYPE_FLAG_UNSIGNED, "unsigned long long", 
-	       (struct objfile *) NULL);
+	       OBJFILE_INTERNAL);
   builtin_type->builtin_float
     = build_flt (gdbarch_float_bit (gdbarch), "float",
 		 gdbarch_float_format (gdbarch));
@@ -3465,26 +3514,26 @@ gdbtypes_post_init (struct gdbarch *gdbarch)
   builtin_type->builtin_string =
     init_type (TYPE_CODE_STRING, TARGET_CHAR_BIT / TARGET_CHAR_BIT,
 	       0,
-	       "string", (struct objfile *) NULL);
+	       "string", OBJFILE_INTERNAL);
   builtin_type->builtin_bool =
     init_type (TYPE_CODE_BOOL, TARGET_CHAR_BIT / TARGET_CHAR_BIT,
 	       0,
-	       "bool", (struct objfile *) NULL);
+	       "bool", OBJFILE_INTERNAL);
 
   /* The following three are about decimal floating point types, which
      are 32-bits, 64-bits and 128-bits respectively.  */
   builtin_type->builtin_decfloat
     = init_type (TYPE_CODE_DECFLOAT, 32 / 8,
 	        0,
-	       "_Decimal32", (struct objfile *) NULL);
+	       "_Decimal32", OBJFILE_INTERNAL);
   builtin_type->builtin_decdouble
     = init_type (TYPE_CODE_DECFLOAT, 64 / 8,
 	       0,
-	       "_Decimal64", (struct objfile *) NULL);
+	       "_Decimal64", OBJFILE_INTERNAL);
   builtin_type->builtin_declong
     = init_type (TYPE_CODE_DECFLOAT, 128 / 8,
 	       0,
-	       "_Decimal128", (struct objfile *) NULL);
+	       "_Decimal128", OBJFILE_INTERNAL);
 
   /* Pointer/Address types.  */
 
@@ -3523,27 +3572,28 @@ gdbtypes_post_init (struct gdbarch *gdbarch)
     init_type (TYPE_CODE_INT, 
 	       gdbarch_addr_bit (gdbarch) / 8,
 	       TYPE_FLAG_UNSIGNED,
-	       "__CORE_ADDR", (struct objfile *) NULL);
+	       "__CORE_ADDR", OBJFILE_INTERNAL);
 
 
   /* The following set of types is used for symbols with no
      debug information.  */
   builtin_type->nodebug_text_symbol =
     init_type (TYPE_CODE_FUNC, 1, 0, 
-	       "<text variable, no debug info>", NULL);
+	       "<text variable, no debug info>", OBJFILE_INTERNAL);
   TYPE_TARGET_TYPE (builtin_type->nodebug_text_symbol) =
     builtin_type->builtin_int;
   builtin_type->nodebug_data_symbol =
     init_type (TYPE_CODE_INT, 
 	       gdbarch_int_bit (gdbarch) / HOST_CHAR_BIT, 0,
-	       "<data variable, no debug info>", NULL);
+	       "<data variable, no debug info>", OBJFILE_INTERNAL);
   builtin_type->nodebug_unknown_symbol =
     init_type (TYPE_CODE_INT, 1, 0,
-	       "<variable (not text or data), no debug info>", NULL);
+	       "<variable (not text or data), no debug info>",
+	       OBJFILE_INTERNAL);
   builtin_type->nodebug_tls_symbol =
     init_type (TYPE_CODE_INT, 
 	       gdbarch_int_bit (gdbarch) / HOST_CHAR_BIT, 0,
-	       "<thread local variable, no debug info>", NULL);
+	       "<thread local variable, no debug info>", OBJFILE_INTERNAL);
 
   return builtin_type;
 }
@@ -3565,47 +3615,47 @@ _initialize_gdbtypes (void)
   builtin_type_int0 =
     init_type (TYPE_CODE_INT, 0 / 8,
 	       0,
-	       "int0_t", (struct objfile *) NULL);
+	       "int0_t", OBJFILE_INTERNAL);
   builtin_type_int8 =
     init_type (TYPE_CODE_INT, 8 / 8,
 	       TYPE_FLAG_NOTTEXT,
-	       "int8_t", (struct objfile *) NULL);
+	       "int8_t", OBJFILE_INTERNAL);
   builtin_type_uint8 =
     init_type (TYPE_CODE_INT, 8 / 8,
 	       TYPE_FLAG_UNSIGNED | TYPE_FLAG_NOTTEXT,
-	       "uint8_t", (struct objfile *) NULL);
+	       "uint8_t", OBJFILE_INTERNAL);
   builtin_type_int16 =
     init_type (TYPE_CODE_INT, 16 / 8,
 	       0,
-	       "int16_t", (struct objfile *) NULL);
+	       "int16_t", OBJFILE_INTERNAL);
   builtin_type_uint16 =
     init_type (TYPE_CODE_INT, 16 / 8,
 	       TYPE_FLAG_UNSIGNED,
-	       "uint16_t", (struct objfile *) NULL);
+	       "uint16_t", OBJFILE_INTERNAL);
   builtin_type_int32 =
     init_type (TYPE_CODE_INT, 32 / 8,
 	       0,
-	       "int32_t", (struct objfile *) NULL);
+	       "int32_t", OBJFILE_INTERNAL);
   builtin_type_uint32 =
     init_type (TYPE_CODE_INT, 32 / 8,
 	       TYPE_FLAG_UNSIGNED,
-	       "uint32_t", (struct objfile *) NULL);
+	       "uint32_t", OBJFILE_INTERNAL);
   builtin_type_int64 =
     init_type (TYPE_CODE_INT, 64 / 8,
 	       0,
-	       "int64_t", (struct objfile *) NULL);
+	       "int64_t", OBJFILE_INTERNAL);
   builtin_type_uint64 =
     init_type (TYPE_CODE_INT, 64 / 8,
 	       TYPE_FLAG_UNSIGNED,
-	       "uint64_t", (struct objfile *) NULL);
+	       "uint64_t", OBJFILE_INTERNAL);
   builtin_type_int128 =
     init_type (TYPE_CODE_INT, 128 / 8,
 	       0,
-	       "int128_t", (struct objfile *) NULL);
+	       "int128_t", OBJFILE_INTERNAL);
   builtin_type_uint128 =
     init_type (TYPE_CODE_INT, 128 / 8,
 	       TYPE_FLAG_UNSIGNED,
-	       "uint128_t", (struct objfile *) NULL);
+	       "uint128_t", OBJFILE_INTERNAL);
 
   builtin_type_ieee_single =
     build_flt (-1, "builtin_type_ieee_single", floatformats_ieee_single);
@@ -3625,15 +3675,15 @@ _initialize_gdbtypes (void)
   builtin_type_void =
     init_type (TYPE_CODE_VOID, 1,
 	       0,
-	       "void", (struct objfile *) NULL);
+	       "void", OBJFILE_INTERNAL);
   builtin_type_true_char =
     init_type (TYPE_CODE_CHAR, TARGET_CHAR_BIT / TARGET_CHAR_BIT,
 	       0,
-	       "true character", (struct objfile *) NULL);
+	       "true character", OBJFILE_INTERNAL);
   builtin_type_true_unsigned_char =
     init_type (TYPE_CODE_CHAR, TARGET_CHAR_BIT / TARGET_CHAR_BIT,
 	       TYPE_FLAG_UNSIGNED,
-	       "true character", (struct objfile *) NULL);
+	       "true character", OBJFILE_INTERNAL);
 
   add_setshow_zinteger_cmd ("overload", no_class, &overload_debug, _("\
 Set debugging of C++ overloading."), _("\

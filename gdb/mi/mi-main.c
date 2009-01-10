@@ -1317,6 +1317,7 @@ mi_cmd_execute (struct mi_parse *parse)
   struct cleanup *cleanup;
   int i;
   free_all_values ();
+  free_all_types ();
 
   current_token = xstrdup (parse->token);
   cleanup = make_cleanup (free_current_contents, &current_token);
