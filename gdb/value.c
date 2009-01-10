@@ -209,6 +209,7 @@ struct value *
 allocate_value_lazy (struct type *type)
 {
   struct value *val;
+  struct type *atype = check_typedef (type);
 
   val = (struct value *) xzalloc (sizeof (struct value));
   val->contents = NULL;
@@ -240,11 +241,7 @@ void
 allocate_value_contents (struct value *val)
 {
   if (!val->contents)
-    {
-      unsigned length = TYPE_LENGTH (check_typedef (val->enclosing_type));
-
-      val->contents = xzalloc (length);
-    }
+    val->contents = (gdb_byte *) xzalloc (TYPE_LENGTH (val->enclosing_type));
 }
 
 /* Allocate a  value  and its contents for type TYPE.  */
