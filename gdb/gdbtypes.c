@@ -516,13 +516,11 @@ make_qualified_type (struct type *type, int new_flags,
   struct type *ntype;
 
   ntype = type;
-  do
-    {
-      if (TYPE_INSTANCE_FLAGS (ntype) == new_flags)
-	return ntype;
-      ntype = TYPE_CHAIN (ntype);
-    }
-  while (ntype != type);
+  do {
+    if (TYPE_INSTANCE_FLAGS (ntype) == new_flags)
+      return ntype;
+    ntype = TYPE_CHAIN (ntype);
+  } while (ntype != type);
 
   /* Create a new type instance.  */
   if (storage == NULL)
