@@ -397,7 +397,7 @@ captured_main (void *data)
       {"args", no_argument, &set_args, 1},
      {"l", required_argument, 0, 'l'},
       {"return-child-result", no_argument, &return_child_result, 1},
-#ifdef HAVE_PYTHON
+#if HAVE_PYTHON
       {"python", no_argument, 0, 'P'},
       {"P", no_argument, 0, 'P'},
 #endif
@@ -901,7 +901,7 @@ Can't attach to process and specify a core file at the same time."));
 #endif
     }
 
-#ifdef HAVE_PYTHON
+#if HAVE_PYTHON
   if (python_script)
     {
       extern int pagination_enabled;
@@ -946,7 +946,7 @@ print_gdb_help (struct ui_file *stream)
 This is the GNU debugger.  Usage:\n\n\
     gdb [options] [executable-file [core-file or process-id]]\n\
     gdb [options] --args executable-file [inferior-arguments ...]\n"), stream);
-#ifdef HAVE_PYTHON
+#if HAVE_PYTHON
   fputs_unfiltered (_("\
     gdb [options] [--python|-P] script-file [script-arguments ...]\n"), stream);
 #endif
@@ -989,7 +989,7 @@ Options:\n\n\
   --nx               Do not read "), stream);
   fputs_unfiltered (gdbinit, stream);
   fputs_unfiltered (_(" file.\n"), stream);
-#ifdef HAVE_PYTHON
+#if HAVE_PYTHON
   fputs_unfiltered (_("\
   --python, -P       Following argument is Python script file; remaining\n\
                      arguments are passed to script.\n"), stream);

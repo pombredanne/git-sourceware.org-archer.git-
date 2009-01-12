@@ -715,7 +715,7 @@ varobj_delete (struct varobj *var, char ***dellist, int only_children)
 static PyObject *
 instantiate_pretty_printer (struct varobj *var, struct value *value)
 {
-#ifdef HAVE_PYTHON
+#if HAVE_PYTHON
   if (var->constructor)
     {
       PyObject *printer = gdbpy_instantiate_printer (var->constructor, value);
