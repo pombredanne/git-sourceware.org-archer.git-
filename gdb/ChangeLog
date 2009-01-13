@@ -1,3 +1,9 @@
+2009-01-13  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* python/lib/gdb/command/save_breakpoints.py
+	(SaveBreakpointsCommand.invoke): Add filename check and error
+	message.	
+
 2009-01-12  Tom Tromey  <tromey@redhat.com>
 
 	* varobj.c (instantiate_pretty_printer): Use #if, not #ifdef.

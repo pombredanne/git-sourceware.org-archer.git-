@@ -1,6 +1,6 @@
 # Save breakpoints.
 
-# Copyright (C) 2008 Free Software Foundation, Inc.
+# Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -41,6 +41,8 @@ The breakpoints can be restored using the 'source' command."""
         bps = gdb.breakpoints ()
         if bps is None:
             raise RuntimeError, 'No breakpoints to save'
+        if arg is None:
+            raise RuntimeError, 'No filename specified'
         with open (arg.strip (), 'w') as f:
             for bp in bps:
                 print >> f, "break", bp.location,
