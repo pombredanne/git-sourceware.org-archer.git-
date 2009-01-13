@@ -18264,7 +18264,7 @@ Return the selected frame object.
 Return a string explaining the reason why @value{GDBN} stopped unwinding
 frames, as expressed by the given @var{reason} code (an integer, see the
 @code{unwind_stop_reason} method in
-@xref{Frames In Python,,Acessing inferior stack frames from Python}.)
+@xref{Frames In Python,,Accessing inferior stack frames from Python}.)
 @end defun
 
 @findex gdb.read_memory
@@ -18496,7 +18496,7 @@ always provided, and is @code{False} if the field is not artificial.
 
 @item bitsize
 If the field is packed, or is a bitfield, then this will have a
-nonzero value, which is the size of the field in bits.  Otherwise,
+non-zero value, which is the size of the field in bits.  Otherwise,
 this will be zero; in this case the field's size is given by its type.
 
 @item type
@@ -18983,7 +18983,7 @@ completions.
 
 When a new command is registered, it must be declared as a member of
 some general class of commands.  This is used to classify the command
-in the online help system.  The available classifications are
+in the on-line help system.  The available classifications are
 represented by constants defined in the @code{gdb} module:
 
 @table @code
@@ -19396,7 +19396,7 @@ separated by newlines.  If there are no commands, this attribute is
 @end defivar
 
 @node Frames In Python
-@subsubsection Acessing inferior stack frames from Python.
+@subsubsection Accessing inferior stack frames from Python.
 
 @cindex frames in python
 @tindex gdb.Frame
