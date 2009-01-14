@@ -1,3 +1,8 @@
+2009-01-14  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.texinfo (Python Commands): Remove documentation
+	prompts from scripted example.
+
 2009-01-13  Phil Muldoon  <pmuldoon@redhat.com>
 
 	* gdb.texinfo (Basic Python):  Fix typos.
