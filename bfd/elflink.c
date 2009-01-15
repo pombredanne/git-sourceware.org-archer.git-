@@ -11397,10 +11397,21 @@ elf_gc_sweep (bfd *abfd, struct bfd_link_info *info)
 
       for (o = sub->sections; o != NULL; o = o->next)
 	{
-	  /* Keep debug and special sections.  */
-	  if ((o->flags & (SEC_DEBUGGING | SEC_LINKER_CREATED)) != 0
-	      || (o->flags & (SEC_ALLOC | SEC_LOAD | SEC_RELOC)) == 0)
-	    o->gc_mark = 1;
+	  /* When any section in a section group is kept, we keep all
+	     sections in the section group.  If the first member of
+	     the section group is excluded, we will also exclude the
+	     group section.  */
+	  if (o->flags & SEC_GROUP)
+	    {
+	      asection *first = elf_next_in_group (o);
+	      o->gc_mark = first->gc_mark;
+	    }
+	  else if ((o->flags & (SEC_DEBUGGING | SEC_LINKER_CREATED)) != 0
+		   || (o->flags & (SEC_ALLOC | SEC_LOAD | SEC_RELOC)) == 0)
+	    {
+	      /* Keep debug and special sections.  */
+	      o->gc_mark = 1;
+	    }
 
 	  if (o->gc_mark)
 	    continue;
@@ -12279,6 +12290,28 @@ _bfd_elf_section_already_linked (bfd *abfd, asection *sec,
 	      sec->kept_section = first;
 	      break;
 	    }
+	}
+
+  /* Do not complain on unresolved relocations in `.gnu.linkonce.r.F'
+     referencing its discarded `.gnu.linkonce.t.F' counterpart - g++-3.4
+     specific as g++-4.x is using COMDAT groups (without the `.gnu.linkonce'
+     prefix) instead.  `.gnu.linkonce.r.*' were the `.rodata' part of its
+     matching `.gnu.linkonce.t.*'.  If `.gnu.linkonce.r.F' is not discarded
+     but its `.gnu.linkonce.t.F' is discarded means we chose one-only
+     `.gnu.linkonce.t.F' section from a different bfd not requiring any
+     `.gnu.linkonce.r.F'.  Thus `.gnu.linkonce.r.F' should be discarded.
+     The reverse order cannot happen as there is never a bfd with only the
+     `.gnu.linkonce.r.F' section.  The order of sections in a bfd does not
+     matter as here were are looking only for cross-bfd sections.  */
+
+  if ((flags & SEC_GROUP) == 0 && CONST_STRNEQ (name, ".gnu.linkonce.r."))
+    for (l = already_linked_list->entry; l != NULL; l = l->next)
+      if ((l->sec->flags & SEC_GROUP) == 0
+	  && CONST_STRNEQ (l->sec->name, ".gnu.linkonce.t."))
+	{
+	  if (abfd != l->sec->owner)
+	    sec->output_section = bfd_abs_section_ptr;
+	  break;
 	}
 
   /* This is the first section with this name.  Record it.  */

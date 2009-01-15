@@ -249,19 +249,7 @@ value_subscripted_rvalue (struct value *array, CORE_ADDR offset)
 	      value_contents (array) + offset, elt_size);
     }
 
-  if (VALUE_LVAL (array) == lval_internalvar)
-    VALUE_LVAL (v) = lval_internalvar_component;
-  else
-    VALUE_LVAL (v) = VALUE_LVAL (array);
-
-  /* We need to already adjust the address according to the former type as
-     V will have a different type (ELT_TYPE) which may no longer contain the
-     adjustment code like TYPE_FORTRAN_ARRAY_DATA_LOCATION.  The address needs
-     to be resolved for both VALUE_LAZY and non-VALUE_LAZY Vs.  */
-
-  VALUE_ADDRESS (v) = VALUE_ADDRESS (array);
-  object_address_get_data (array_type, &VALUE_ADDRESS (v));
-
+  set_value_component_location (v, array);
   VALUE_REGNUM (v) = VALUE_REGNUM (array);
   VALUE_FRAME_ID (v) = VALUE_FRAME_ID (array);
   set_value_offset (v, value_offset (array) + offset);
@@ -301,11 +289,7 @@ value_bitstring_subscript (struct type *type,
 
   set_value_bitpos (v, bit_index);
   set_value_bitsize (v, 1);
-
-  VALUE_LVAL (v) = VALUE_LVAL (bitstring);
-  if (VALUE_LVAL (bitstring) == lval_internalvar)
-    VALUE_LVAL (v) = lval_internalvar_component;
-  VALUE_ADDRESS (v) = VALUE_ADDRESS (bitstring);
+  set_value_component_location (v, bitstring);
   VALUE_FRAME_ID (v) = VALUE_FRAME_ID (bitstring);
 
   set_value_offset (v, offset + value_offset (bitstring));

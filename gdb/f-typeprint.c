@@ -186,8 +186,8 @@ f_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
 {
   int upper_bound, lower_bound;
   int retcode;
-  /* No static variables (such as ARRAYPRINT_RECURSE_LEVEL) permitted as ERROR
-     may occur during the evaluation of DWARF_BLOCK values.  */
+  /* No static variables are permitted as an error call may occur during
+     execution of this function.  */
 
   if (type == 0)
     return;

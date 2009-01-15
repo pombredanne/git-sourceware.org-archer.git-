@@ -325,7 +325,6 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
 			  gdb_byte *data, unsigned short size,
 			  struct dwarf2_per_cu_data *per_cu)
 {
-  struct gdbarch *arch = get_frame_arch (frame);
   struct value *retval;
   struct dwarf_expr_context *ctx;
   struct cleanup *back_to = make_cleanup (null_cleanup, 0);
@@ -353,9 +352,9 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
 	  struct dwarf_expr_piece *p = &ctx->pieces[i];
 	  if (p->in_reg)
 	    {
+	      struct gdbarch *arch = get_frame_arch (frame);
 	      bfd_byte regval[MAX_REGISTER_SIZE];
-	      int gdb_regnum = gdbarch_dwarf2_reg_to_regnum
-				 (arch, p->value);
+	      int gdb_regnum = gdbarch_dwarf2_reg_to_regnum (arch, p->value);
 	      get_frame_register (frame, gdb_regnum, regval);
 	      memcpy (contents + offset, regval, p->size);
 	    }
@@ -368,9 +367,9 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
     }
   else if (ctx->in_reg)
     {
+      struct gdbarch *arch = get_frame_arch (frame);
       CORE_ADDR dwarf_regnum = dwarf_expr_fetch (ctx, 0);
-      int gdb_regnum = gdbarch_dwarf2_reg_to_regnum
-			 (arch, dwarf_regnum);
+      int gdb_regnum = gdbarch_dwarf2_reg_to_regnum (arch, dwarf_regnum);
       retval = value_from_register (SYMBOL_TYPE (var), gdb_regnum, frame);
     }
   else
