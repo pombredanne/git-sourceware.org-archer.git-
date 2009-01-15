@@ -711,6 +711,7 @@ qualified_name:	typebase COLONCOLON name
 	;
 
 variable:	qualified_name
+	|	COLONCOLON qualified_name
 	|	COLONCOLON name
 			{
 			  char *name = copy_name ($2);

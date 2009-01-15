@@ -1,3 +1,7 @@
+2009-01-15  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* c-exp.y: Added a rule for qualified global references.
+
 2008-12-18  Sami Wagiaalla  <swagiaal@redhat.com>
  
  	* dwarf2read.c (new_symbol): Added fall back call on liknage
