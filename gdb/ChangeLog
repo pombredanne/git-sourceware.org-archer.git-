@@ -1,3 +1,191 @@
+2009-01-14  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* NEWS: Document "define" for prefixed commands.
+	* cli/cli-cmds.c (show_user): Update calls to show_user_1.  Call
+	show_user_1 for prefix commands.
+	* cli/cli-decode.c (help_cmd_list): Recurse for "help user-defined".
+	* cli/cli-script.c (validate_comname): Rewrite to handle prefix
+	commands.  Return the containing command list.
+	(define_command, document_command): Update to handle prefix commands.
+	(show_user_1): Add prefix and name arguments.  Handle prefix
+	commands.
+	* cli/cli-script.h (show_user_1): Update prototype.
+
+2009-01-14  Kai Tietz  <kai.tietz@onevision.com>
+
+	* mingw-ser.c (console_select_thread): Add return to make
+	compiler happy.
+	(pipe_select_thread): Likewise.
+	(file_select_thread): Likewise.
+
+2009-01-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* mi/mi-main.c (mi_cmd_execute): Clean up parenthesis mess from
+	previous change.
+
+2009-01-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* remote.c (extended_remote_mourn_1): Invalidate our notion of
+	current general thread.
+
+2009-01-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* mi/mi-main.c (mi_cmd_execute): Also allow -list-thread-groups
+	without a live selected thread.
+
+2009-01-14  Joel Brobecker  <brobecker@adacore.com>
+
+	Update the copyright notice of some of the files I missed
+	in the previous copyright update.
+
+2009-01-14  Joel Brobecker  <brobecker@adacore.com>
+
+	* windows-nat.c (handle_unload_dll): Use %p to print the DLL
+	base address instead of casting it to DWORD.
+
+2009-01-13  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* dwarf2loc.c (dwarf2_evaluate_loc_desc): Do not call get_frame_arch
+	for NULL frame pointers.
+
+2009-01-13  Mark Kettenis  <kettenis@gnu.org>
+
+	* utils.c (host_address_to_string): Reimplement in a way that
+	avoids the cast of the address to long.
+
+2009-01-13  Joel Brobecker  <brobecker@adacore.com>
+
+	* mdebugread.c (parse_symbol): Save the symbol private data
+	using SYMBOL_VALUE_BYTES instead of SYMBOL_VALUE.
+	(psymtab_to_symtab_1): Likewise.
+	(parse_procedure): Declare variable "e" only in the scope
+	where it is used. Extract the symbol private data using
+	SYMBOL_VALUE_BYTES.
+
+2009-01-13  Jim Blandy  <jimb@codesourcery.com>
+
+	Abstract out common code for copying value locations.
+
+	* value.h (set_value_component_location): New declaration.
+	* value.c (set_value_component_location): New function.
+	(value_primitive_field): Use it.
+	* valarith.c (value_subscript, value_subscripted_rvalue): Same.
+	* valops.c (search_struct_field, value_slice): Same.
+	* ada-lang.c (coerce_unspec_val_to_type)
+	(ada_value_primitive_packed_val): Same.
+
+2009-01-13  Joel Brobecker  <brobecker@adacore.com>
+
+	* MAINTAINERS (GLOBAL MAINTAINERS): Add Tom Tromey.
+
+2009-01-12  Christopher Faylor  <me+cygwin@cgf.cx>
+
+	* amd64-windows-nat.c Rename gdb-specific win32_* to windows_*
+	throughout.
+	* i386-cygwin-tdep.c: Ditto.
+	* i386-windows-nat.c: Ditto.
+	* windows-nat.h: Ditto.
+	* windows-tdep.c: Ditto.
+	* windows-tdep.h: Ditto.
+	* windows-nat.c: Ditto.
+	(cygwin_load_start): Redefine as CORE_ADDR.
+	(cygwin_load_end): Ditto.
+	(windows_make_so): Coerce result of address arithmetic to to uintptr_t
+	before coercing to CORE_ADDR to avoid a compiler warning.
+	(handle_exception): Define addr as CORE_ADDR and coerce
+	ExceptionAddress to uintptr_t before assigining to avoid a compiler
+	warning.
+	* config/djgpp/fnchange.lst: Add mappings for recently renamed windows
+	files.
+
+2009-01-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix linking with --enable-targets=all:
+	* Makefile.in (ALL_TARGET_OBS): Add windows-tdep.o.
+	(HFILES_NO_SRCDIR): Add windows-tdep.h.
+	(ALLDEPFILES): Add windows-tdep.c.
+
+2009-01-11  Christ Faylor  <me.gdb@cgf.cx>
+
+	* win32-nat.h: Delete.
+	* windows-nat.h: Rename from win32-nat.h.
+	* win32-nat.c: Delete.
+	* windows-nat.c: Rename from win32-nat.c.
+	* win32-termcap.c: Delete.
+	* windows-termcap.c: Rename from win32-termcap.c.
+	* amd64-windows-nat.c: Handle rename from win32-nat.h -> windows-nat.h.
+	* configure.ac: Handle rename from win32-termcap.c ->
+	windows-termcap.c.
+	* configure: Regenerate.
+	* gdb_curses.h: Change comment to reflect rename from win32-termcap.c
+	-> windows-termcap.c.
+	* i386-cygwin-tdep.c: Handle rename from win32-tdep.h ->
+	windows-tdep.h.
+	* i386-windows-nat.c: Refect rename from win32-nat.h -> windows-nat.h.
+	* windows-nat.c: Ditto.  Also reflect rename from from win32-tdep.h ->
+	windows-tdep.h.
+	(win32_make_so): Handle cygwin compiler warning due to change of
+	load_addr from DWORD to LPVOID.
+	(handle_load_dll): Use %p in format string to properly print address
+	and avoid a compiler warning.
+	(DEBUG_EXCEPTION_SIMPLE): Ditto.
+	(handle_exception): Ditto.
+	* windows-tdep.c: Handle rename from win32-tdep.h -> windows-tdep.h.
+	* config/i386/cygwin.mh: Handle rename from win32-nat.o ->
+	windows-nat.o.
+	* config/i386/mingw.mh: Ditto.
+	* config/i386/mingw64.mh: Ditto.
+
+2009-01-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* f-typeprint.c (f_type_print_varspec_suffix): Convert the autovariable
+	arrayprint_recurse_level to a parameter.  Update all the callers.  New
+	comment at autovariables.
+
+2009-01-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdbtypes.c (make_qualified_type, replace_type): Reformat to the GNU
+	coding style.
+
+2009-01-11  Joel Brobecker  <brobecker@adacore.com>
+
+	* target.c (target_xfer_partial): Use host_address_to_string to
+	print the address of readbuf and writebuf. Cast the address of
+	elements inside the myaddr buffer into intptr_t.
+	(deprecated_debug_xfer_memory): Use paddress to print memaddr.
+	Cast the address of elements inside the myaddr buffer into
+	intptr_t.
+
+2009-01-11  Joel Brobecker  <brobecker@adacore.com>
+
+	* amd64-windows-nat.c, amd64-windows-tdep.c: New files.
+	* config/i386/mingw64.mh, config/i386/nm-cygwin64.h: New files.
+	* configure.host, configure.tgt: Add handling for x86_64/windows.
+	* config/djgpp/fnchange.lst: Add entries for amd64-windows-nat.c
+	and amd64-windows-tdep.c.
+
+2009-01-11  Joel Brobecker  <brobecker@adacore.com>
+
+	* win32-tdep.h, win32-tdep.c: New files.
+	* i386-cygwin-tdep.h: Delete.
+	* i386-cygwin-tdep.c: Include win32-tdep.h instead of
+	i386-cygwin-tdep.h.
+	(win32_xfer_shared_library): Delete.  Moved to win32-tdep.c.
+	* win32-nat.c: Likewise.
+	* configure.tgt: Add win32-tdep.o to the list of target object
+	files for i386-cygwin and i386-mingw targets.
+
+2009-01-11  Joel Brobecker  <brobecker@adacore.com>
+
+	* win32-nat.h: New file.
+	* win32-nat.c (mappings): Initialize to NULL.
+	(win32_set_context_register_offsets): New function.
+	* i386-windows-nat.c: New file.
+	(mappings): Moved here from win32-nat.c.
+	(_initialize_i386_windows_nat): New function.
+	* config/i386/mingw.mh (NATDEPFILES): Add i386-windows-nat.o.
+	* config/i386/cygwin.mh (NATDEPFILES): Likewise.
+
 2009-01-09  Andreas Schwab  <schwab@suse.de>
 
 	* Makefile.in (init.c): Set LANG/LC_ALL to C, not c.

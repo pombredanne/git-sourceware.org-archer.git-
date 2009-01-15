@@ -1,6 +1,4 @@
-/* Target-dependent code for Cygwin running on i386's, for GDB.
-
-   Copyright (C) 2007, 2008, 2009 Free Software Foundation, Inc.
+/* Copyright 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -17,13 +15,10 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#ifndef I386_CYGWIN_TDEP_H
-#define I386_CYGWIN_TDEP_H
+#ifndef WINDOWS_NAT_H
+#define WINDOWS_NAT_H
 
-struct obstack;
+extern void windows_set_context_register_offsets (const int *offsets);
 
-extern void win32_xfer_shared_library (const char* so_name,
-				       CORE_ADDR load_addr,
-				       struct obstack *obstack);
+#endif
 
-#endif /* I386_CYGWIN_TDEP_H */
