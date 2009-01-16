@@ -642,6 +642,8 @@ set_value_component_location (struct value *component, struct value *whole)
   else
     VALUE_LVAL (component) = VALUE_LVAL (whole);
   component->location = whole->location;
+
+  object_address_get_data (value_type (whole), &VALUE_ADDRESS (component));
 }
 
 
