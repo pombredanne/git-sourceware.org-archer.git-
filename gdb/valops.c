@@ -694,10 +694,8 @@ value_fetch_lazy (struct value *val)
   allocate_value_contents (val);
   if (VALUE_LVAL (val) == lval_memory)
     {
-      CORE_ADDR addr;
-      int length;
+      CORE_ADDR addr = VALUE_ADDRESS (val);
 
-      addr = VALUE_ADDRESS (val);
       if (object_address_get_data (value_type (val), &addr))
 	{
 	  struct type *type = value_enclosing_type (val);
