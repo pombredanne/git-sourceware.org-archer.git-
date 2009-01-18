@@ -78,12 +78,13 @@ f77_get_upperbound (struct type *type)
 
   if (TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED (type))
     {
-      /* We have an assumed size array on our hands.  Assume that
-	 upper_bound == lower_bound so that we show at least 1 element.
-	 If the user wants to see more elements, let him manually ask for 'em
-	 and we'll subscript the array and show him.  */
+      /* We have an assumed size array on our hands.  As type_length_get
+	 already assumes a length zero of arrays with underfined bounds VALADDR
+	 passed to the Fortran functions does not contained the real inferior
+	 memory content.  User should request printing of specific array
+	 elements instead.  */
 
-      return f77_get_lowerbound (type);
+      return f77_get_lowerbound (type) - 1;
     }
 
   return TYPE_ARRAY_UPPER_BOUND_VALUE (type);
