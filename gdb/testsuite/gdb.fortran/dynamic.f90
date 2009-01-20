@@ -23,20 +23,20 @@ subroutine baz
   real, pointer :: varv (:, :, :)
   real, target :: varu (1, 2, 3)
   logical :: l
-  allocate (varx (1:6, 5:15, 17:28))		! varx-init
+  allocate (varx (1:6, 5:15, 17:28))            ! varx-init
   l = allocated (varx)
-  varx(:, :, :) = 6				! varx-allocated
+  varx(:, :, :) = 6                             ! varx-allocated
   varx(1, 5, 17) = 7
   varx(2, 6, 18) = 8
   varx(6, 15, 28) = 9
-  varv => varx					! varx-filled
+  varv => varx                                  ! varx-filled
   l = associated (varv)
-  varv(3, 7, 19) = 10				! varv-associated
-  varv => null ()				! varv-filled
+  varv(3, 7, 19) = 10                           ! varv-associated
+  varv => null ()                               ! varv-filled
   l = associated (varv)
-  deallocate (varx)				! varv-deassociated
+  deallocate (varx)                             ! varv-deassociated
   l = allocated (varx)
-  varu(:, :, :) = 10				! varx-deallocated
+  varu(:, :, :) = 10                            ! varx-deallocated
   allocate (varv (1:6, 5:15, 17:28))
   l = associated (varv)
   varv(:, :, :) = 6
@@ -53,19 +53,20 @@ end subroutine baz
 subroutine foo (vary, varw)
   real :: vary (:, :)
   real :: varw (:, :, :)
-  vary(:, :) = 4				! vary-passed
+  vary(:, :) = 4                                ! vary-passed
   vary(1, 1) = 8
   vary(2, 2) = 9
   vary(1, 3) = 10
-  varw(:, :, :) = 5				! vary-filled
+  varw(:, :, :) = 5                             ! vary-filled
   varw(1, 1, 1) = 6
-  varw(2, 2, 2) = 7				! varw-almostfilled
+  varw(2, 2, 2) = 7                             ! varw-almostfilled
 end subroutine foo
 subroutine bar (varz, vart)
   real :: varz (*)
   real :: vart (2:11, 7:*)
   varz(1:3) = 4
-  varz(2) = 5					! varz-almostfilled
+  varz(2) = 5                                   ! varz-almostfilled
+  vart(2,7) = vart(2,7)
 end subroutine bar
 program test
   interface

@@ -25,10 +25,10 @@ subroutine foo (e, f)
   character (len=*) :: f (1:7, 8:10)
   c = 'c'
   d = 'd'
-  e = 'e'					! var-init
+  e = 'e'                                       ! var-init
   f = 'f'
   f(1,9) = 'f2'
-  c = 'c'					! var-finish
+  c = 'c'                                       ! var-finish
 end subroutine foo
   character (len=4) :: g, h (1:7, 8:10)
   g = 'g'
