@@ -1,3 +1,7 @@
+2009-01-23  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/namespace.exp: Removed kfail. Bug has been fixed.
+
 2008-11-06  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* gdb.cp/namespace-using.exp: Removed kfail; test has been fix.

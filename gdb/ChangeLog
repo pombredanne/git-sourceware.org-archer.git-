@@ -1,5 +1,10 @@
 2009-01-23  Sami Wagiaalla  <swagiaal@redhat.com>
 
+	* symtab.c (lookup_symbol_in_language): Added handling for global 
+	names.
+
+2009-01-23  Sami Wagiaalla  <swagiaal@redhat.com>
+
 	* c-exp.y: Created name_prefix, and used it during lexing.  
 
 2009-01-15  Sami Wagiaalla  <swagiaal@redhat.com>

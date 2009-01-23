@@ -1201,6 +1201,11 @@ lookup_symbol_in_language (const char *name, const struct block *block,
   int needtofreename = 0;
   struct symbol *returnval;
 
+  if(strncmp(name, "::", 2) == 0){/* this must be a global name */
+    name = name+2;
+    block = NULL;
+  }
+  
   modified_name = name;
 
   /* If we are using C++ or Java, demangle the name before doing a lookup, so
