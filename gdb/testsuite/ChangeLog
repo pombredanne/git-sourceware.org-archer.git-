@@ -1,5 +1,10 @@
 2009-01-23  Sami Wagiaalla  <swagiaal@redhat.com>
 
+	* gdb.cp/namespace.exp: Used cp_test_ptype_class for matching classes.
+	* lib/cp-support.exp: Added support for class names containing '::'. 
+
+2009-01-23  Sami Wagiaalla  <swagiaal@redhat.com>
+
 	* gdb.cp/namespace.exp: Removed kfail. Bug has been fixed.
 
 2008-11-06  Sami Wagiaalla  <swagiaal@redhat.com>
