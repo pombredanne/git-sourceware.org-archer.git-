@@ -717,7 +717,7 @@ variable:	qualified_name
 			  char *name = copy_name ($2);
 			  struct symbol *sym;
 			  struct minimal_symbol *msymbol;
-
+			  
 			  sym =
 			    lookup_symbol (name, (const struct block *) NULL,
 					   VAR_DOMAIN, (int *) NULL);
@@ -1412,6 +1412,13 @@ static int last_was_structop;
 static int
 yylex ()
 {
+  /* name_prefix stores the full qualification of a variable that is
+     specified in the expression. It is used to eleminate confusion 
+     during lookup.*/
+  static char* name_prefix = NULL;
+  static int name_prefix_len = 0;
+  static int terminate_prefix = 0;
+  
   int c;
   int namelen;
   unsigned int i;
@@ -1425,9 +1432,18 @@ yylex ()
   int saw_structop = last_was_structop;
 
   last_was_structop = 0;
-
+  
  retry:
-
+  
+  if(terminate_prefix ||
+     lexptr != name_prefix + name_prefix_len // Some token was skiped so clear name_prefix
+   ){
+    name_prefix = NULL;
+    name_prefix_len = 0;
+  }
+    
+  terminate_prefix = 1;
+  	  	  
   /* Check if this is a macro invocation that we need to expand.  */
   if (! scanning_macro_expansion ())
     {
@@ -1455,10 +1471,19 @@ yylex ()
   for (i = 0; i < sizeof tokentab2 / sizeof tokentab2[0]; i++)
     if (strncmp (tokstart, tokentab2[i].operator, 2) == 0)
       {
+	
+	if(tokentab2[i].token == COLONCOLON){
+	  name_prefix_len += 2;
+	  terminate_prefix = 0;
+	  if(name_prefix == NULL){
+   	    name_prefix = lexptr;
+          }
+	}
 	lexptr += 2;
 	yylval.opcode = tokentab2[i].opcode;
 	if (in_parse_field && tokentab2[i].token == ARROW)
 	  last_was_structop = 1;
+	
 	return tokentab2[i].token;
       }
 
@@ -1487,6 +1512,8 @@ yylex ()
         return 0;
 
     case ' ':
+      name_prefix_len++;
+      terminate_prefix = 0;
     case '\t':
     case '\n':
       lexptr++;
@@ -1721,11 +1748,13 @@ yylex ()
     error ("Invalid character '%c' in expression.", c);
 
   /* It's a name.  See how long it is.  */
+  
   namelen = 0;
   for (c = tokstart[namelen];
        (c == '_' || c == '$' || (c >= '0' && c <= '9')
 	|| (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '<');)
     {
+    
       /* Template parameter lists are part of the name.
 	 FIXME: This mishandles `print $a<4&&$a>3'.  */
 
@@ -1835,10 +1864,24 @@ yylex ()
     int is_a_field_of_this = 0;
     int hextype;
 
+    if(name_prefix != NULL){
+      tmp = savestring (name_prefix, name_prefix_len+namelen);
+    }
+
     sym = lookup_symbol (tmp, expression_context_block,
 			 VAR_DOMAIN,
 			 parse_language->la_language == language_cplus
 			 ? &is_a_field_of_this : (int *) NULL);
+			 
+    /* keep this name as prefix for the next name */
+    if(sym){
+      if(name_prefix == NULL){
+        name_prefix = tokstart;
+      }
+      name_prefix_len += namelen;
+      terminate_prefix = 0;
+    }
+
     /* Call lookup_symtab, not lookup_partial_symtab, in case there are
        no psymtabs (coff, xcoff, or some future change to blow away the
        psymtabs once once symbols are read).  */
@@ -1897,6 +1940,7 @@ yylex ()
     yylval.ssym.is_a_field_of_this = is_a_field_of_this;
     if (in_parse_field && *lexptr == '\0')
       saw_name_at_eof = 1;
+        
     return NAME;
   }
 }

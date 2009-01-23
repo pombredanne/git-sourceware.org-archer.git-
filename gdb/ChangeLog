@@ -1,3 +1,7 @@
+2009-01-23  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* c-exp.y: Created name_prefix, and used it during lexing.  
+
 2009-01-15  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* c-exp.y: Added a rule for qualified global references.
