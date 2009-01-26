@@ -1,3 +1,8 @@
+2009-01-27  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.python/python-frame.c: New file.
+	* gdb.python/python-frame.exp: New file.
+
 2008-12-09  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	* gdb.python/python-mi.exp: Use `gdb.default_visualizer' instead of
