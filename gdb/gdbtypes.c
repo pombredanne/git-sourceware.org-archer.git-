@@ -3131,6 +3131,13 @@ copy_type_recursive_1 (struct objfile *objfile,
   *TYPE_MAIN_TYPE (new_type) = *TYPE_MAIN_TYPE (type);
   TYPE_OBJFILE (new_type) = NULL;
 
+  /* Pre-clear the fields processed by delete_main_type.  If DWARF block
+     evaluations below call error we would leave an unfreeable TYPE.  */
+  TYPE_TARGET_TYPE (new_type) = NULL;
+  TYPE_VPTR_BASETYPE (new_type) = NULL;
+  TYPE_NFIELDS (new_type) = 0;
+  TYPE_FIELDS (new_type) = NULL;
+
   if (TYPE_NAME (type))
     TYPE_NAME (new_type) = xstrdup (TYPE_NAME (type));
   if (TYPE_TAG_NAME (type))
@@ -3177,6 +3184,7 @@ copy_type_recursive_1 (struct objfile *objfile,
       int i, nfields;
 
       nfields = TYPE_NFIELDS (type);
+      TYPE_NFIELDS (new_type) = nfields;
       TYPE_FIELDS (new_type) = XCALLOC (nfields, struct field);
       for (i = 0; i < nfields; i++)
 	{
