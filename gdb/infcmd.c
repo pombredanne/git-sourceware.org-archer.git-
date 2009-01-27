@@ -456,6 +456,8 @@ static void
 run_command_1 (char *args, int from_tty, int tbreak_at_main)
 {
   char *exec_file;
+  struct cleanup *old_chain;
+  ptid_t ptid;
 
   dont_repeat ();
 
@@ -544,14 +546,29 @@ run_command_1 (char *args, int from_tty, int tbreak_at_main)
   target_create_inferior (exec_file, get_inferior_args (),
 			  environ_vector (inferior_environ), from_tty);
 
+  /* We're starting off a new process.  When we get out of here, in
+     non-stop mode, finish the state of all threads of that process,
+     but leave other threads alone, as they may be stopped in internal
+     events --- the frontend shouldn't see them as stopped.  In
+     all-stop, always finish the state of all threads, as we may be
+     resuming more than just the new process.  */
+  if (non_stop)
+    ptid = pid_to_ptid (ptid_get_pid (inferior_ptid));
+  else
+    ptid = minus_one_ptid;
+  old_chain = make_cleanup (finish_thread_state_cleanup, &ptid);
+
   /* Pass zero for FROM_TTY, because at this point the "run" command
      has done its thing; now we are setting up the running program.  */
   post_create_inferior (&current_target, 0);
 
   /* Start the target running.  */
   proceed ((CORE_ADDR) -1, TARGET_SIGNAL_0, 0);
-}
 
+  /* Since there was no error, there's no need to finish the thread
+     states here.  */
+  discard_cleanups (old_chain);
+}
 
 static void
 run_command (char *args, int from_tty)
@@ -1128,11 +1145,7 @@ signal_command (char *signum_exp, int from_tty)
     }
 
   clear_proceed_status ();
-  /* "signal 0" should not get stuck if we are stopped at a breakpoint.
-     FIXME: Neither should "signal foo" but when I tried passing
-     (CORE_ADDR)-1 unconditionally I got a testsuite failure which I haven't
-     tried to track down yet.  */
-  proceed (oursig == TARGET_SIGNAL_0 ? (CORE_ADDR) -1 : stop_pc, oursig, 0);
+  proceed ((CORE_ADDR) -1, oursig, 0);
 }
 
 /* Proceed until we reach a different source line with pc greater than
@@ -1570,8 +1583,7 @@ program_info (char *args, int from_tty)
   stat = bpstat_num (&bs, &num);
 
   target_files_info ();
-  printf_filtered (_("Program stopped at %s.\n"),
-		   hex_string ((unsigned long) stop_pc));
+  printf_filtered (_("Program stopped at %s.\n"), paddress (stop_pc));
   if (tp->stop_step)
     printf_filtered (_("It stopped after being stepped.\n"));
   else if (stat != 0)

@@ -181,20 +181,16 @@ alloc_type (struct objfile *objfile, struct type *parent)
     {
     case (long) OBJFILE_INTERNAL:
     case (long) OBJFILE_MALLOC:
-      type = xmalloc (sizeof (struct type));
-      memset (type, 0, sizeof (struct type));
-      TYPE_MAIN_TYPE (type) = xmalloc (sizeof (struct main_type));
+      type = XZALLOC (struct type);
+      TYPE_MAIN_TYPE (type) = XZALLOC (struct main_type);
       break;
     default:
-      type = obstack_alloc (&objfile->objfile_obstack,
-			    sizeof (struct type));
-      memset (type, 0, sizeof (struct type));
-      TYPE_MAIN_TYPE (type) = obstack_alloc (&objfile->objfile_obstack,
-					     sizeof (struct main_type));
+      type = OBSTACK_ZALLOC (&objfile->objfile_obstack, struct type);
+      TYPE_MAIN_TYPE (type) = OBSTACK_ZALLOC (&objfile->objfile_obstack,
+					      struct main_type);
       OBJSTAT (objfile, n_types++);
       break;
     }
-  memset (TYPE_MAIN_TYPE (type), 0, sizeof (struct main_type));
 
   /* Initialize the fields that might not be zero.  */
 
@@ -224,13 +220,11 @@ alloc_type_instance (struct type *oldtype)
     {
     case (long) OBJFILE_INTERNAL:
     case (long) OBJFILE_MALLOC:
-      type = xmalloc (sizeof (struct type));
-      memset (type, 0, sizeof (struct type));
+      type = XZALLOC (struct type);
       break;
     default:
-      type = obstack_alloc (&TYPE_OBJFILE (oldtype)->objfile_obstack,
-			    sizeof (struct type));
-      memset (type, 0, sizeof (struct type));
+      type = OBSTACK_ZALLOC (&TYPE_OBJFILE (oldtype)->objfile_obstack,
+			     struct type);
       break;
     }
   TYPE_MAIN_TYPE (type) = TYPE_MAIN_TYPE (oldtype);
@@ -741,9 +735,7 @@ create_range_type (struct type *result_type, struct type *index_type,
 		   int low_bound, int high_bound)
 {
   if (result_type == NULL)
-    {
-      result_type = alloc_type (TYPE_OBJFILE (index_type), index_type);
-    }
+    result_type = alloc_type (TYPE_OBJFILE (index_type), index_type);
   TYPE_CODE (result_type) = TYPE_CODE_RANGE;
   TYPE_TARGET_TYPE (result_type) = index_type;
   if (TYPE_STUB (index_type))
@@ -751,11 +743,9 @@ create_range_type (struct type *result_type, struct type *index_type,
   else
     TYPE_LENGTH (result_type) = TYPE_LENGTH (check_typedef (index_type));
   TYPE_NFIELDS (result_type) = 2;
-  TYPE_FIELDS (result_type) = TYPE_ALLOC (result_type,
-					  TYPE_NFIELDS (result_type)
-					  * sizeof (struct field));
-  memset (TYPE_FIELDS (result_type), 0,
-	  TYPE_NFIELDS (result_type) * sizeof (struct field));
+  TYPE_FIELDS (result_type) = TYPE_ZALLOC (result_type,
+					   TYPE_NFIELDS (result_type)
+					   * sizeof (struct field));
   TYPE_LOW_BOUND (result_type) = low_bound;
   TYPE_HIGH_BOUND (result_type) = high_bound;
 
@@ -877,8 +867,7 @@ create_array_type (struct type *result_type,
       TYPE_LENGTH (element_type) * (high_bound - low_bound + 1);
   TYPE_NFIELDS (result_type) = 1;
   TYPE_FIELDS (result_type) =
-    (struct field *) TYPE_ALLOC (result_type, sizeof (struct field));
-  memset (TYPE_FIELDS (result_type), 0, sizeof (struct field));
+    (struct field *) TYPE_ZALLOC (result_type, sizeof (struct field));
   /* FIXME: type alloc.  */
   TYPE_INDEX_TYPE (result_type) = range_type;
   TYPE_VPTR_FIELDNO (result_type) = -1;
@@ -931,9 +920,7 @@ create_set_type (struct type *result_type, struct type *domain_type)
     }
   TYPE_CODE (result_type) = TYPE_CODE_SET;
   TYPE_NFIELDS (result_type) = 1;
-  TYPE_FIELDS (result_type) = (struct field *)
-    TYPE_ALLOC (result_type, 1 * sizeof (struct field));
-  memset (TYPE_FIELDS (result_type), 0, sizeof (struct field));
+  TYPE_FIELDS (result_type) = TYPE_ZALLOC (result_type, sizeof (struct field));
 
   if (!TYPE_STUB (domain_type))
     {
@@ -979,9 +966,7 @@ init_flags_type (char *name, int length)
   type = init_type (TYPE_CODE_FLAGS, length, 
 		    TYPE_FLAG_UNSIGNED, name, NULL);
   TYPE_NFIELDS (type) = nfields;
-  TYPE_FIELDS (type) = TYPE_ALLOC (type, 
-				   nfields * sizeof (struct field));
-  memset (TYPE_FIELDS (type), 0, nfields * sizeof (struct field));
+  TYPE_FIELDS (type) = TYPE_ZALLOC (type, nfields * sizeof (struct field));
 
   return type;
 }
@@ -3059,8 +3044,7 @@ copy_type_recursive_1 (struct objfile *objfile,
       int i, nfields;
 
       nfields = TYPE_NFIELDS (type);
-      TYPE_FIELDS (new_type) = xmalloc (sizeof (struct field) * nfields);
-      memset (TYPE_FIELDS (new_type), 0, sizeof (struct field) * nfields);
+      TYPE_FIELDS (new_type) = XCALLOC (nfields, struct field);
       for (i = 0; i < nfields; i++)
 	{
 	  TYPE_FIELD_ARTIFICIAL (new_type, i) = 

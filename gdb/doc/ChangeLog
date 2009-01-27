@@ -1,3 +1,19 @@
+2009-01-26  Pedro Alves  <pedro@codesourcery.com>
+
+	PR gdb/7580:
+	* gdb.texinfo (Maintenance Commands): Document "maint set|show
+	internal-error|internal-warning quit|corefile ask|yes|no".
+
+2009-01-26  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo (Using the `gdbserver' Program): Document
+	--remote-debug.
+
+2009-01-23  Doug Evans  <dje@google.com>
+
+	* gdb.texinfo: Add nexti to list of commands that support
+	background execution.
+
 2009-01-14  Daniel Jacobowitz  <dan@codesourcery.com>
 
 	* gdb.texinfo (Define, Hooks): Document prefix command support.

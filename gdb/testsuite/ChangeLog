@@ -1,3 +1,56 @@
+2009-01-27  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* gdb.base/find.exp: Set newline variable
+	using quotes instead of braces to fix cygwin failures.
+
+2009-01-23  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.base/radix.exp: Add tests to ensure that that set
+	input-radix 0 and set output-radix 0 are really rejected.
+
+2009-01-23  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.base/hook-stop-frame.c, gdb.base/hook-stop-frame.exp: Update
+	copyright years.
+
+2009-01-23  Pedro Alves  <pedro@codesourcery.com>
+
+	PR gdb/9664:
+	* gdb.base/hook-stop-frame.c, gdb.base/hook-stop-frame.exp: New.
+
+2009-01-22  Pedro Alves  <pedro@codesourcery.com>
+
+	PR c++/9631:
+	* gdb.cp/pr9631.cc, gdb.cp/pr9631.exp: New.
+
+2009-01-22  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* gdb.server/file-transfer.exp: Use EXEEXT variable for
+	binfile definition to fix Windows OS failure.
+
+2009-01-20  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	PR gdb/9346
+	* gdb.base/interrupt.c (sigint_handler): New.
+	(main): Install a SIGINT handler if SIGNALS is defined.  Exit
+	on error.
+	* gdb.base/interrupt.exp: Define SIGNALS unless gdb,nosignals.
+	Test "signal SIGINT".
+
+2009-01-19  Doug Evans  <dje@google.com>
+
+	* gdb.base/break.exp: Update expected gdb output.
+	* gdb.base/sepdebug.exp: Ditto.
+	* gdb.mi/mi-syn-frame.exp: Ditto.
+	* gdb.mi/mi2-syn-frame.exp: Ditto.
+	* gdb.base/call-signal-resume.exp: New file.
+	* gdb.base/call-signals.c: New file.
+	* gdb.base/unwindonsignal.exp: New file.
+	* gdb.base/unwindonsignal.c: New file.
+	* gdb.threads/interrupted-hand-call.exp: New file.
+	* gdb.threads/interrupted-hand-call.c: New file.
+	* gdb.threads/thread-unwindonsignal.exp: New file.
+
 2009-01-14  Daniel Jacobowitz  <dan@codesourcery.com>
 
 	* gdb.base/define.exp: Test defining and hooking prefix commands.
