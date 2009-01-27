@@ -1528,7 +1528,16 @@ cris_elf_relocate_section (output_bfd, info, input_bfd, input_section,
 					 rel->r_offset);
 	      if (outrel.r_offset == (bfd_vma) -1)
 		skip = TRUE;
-	      else if (outrel.r_offset == (bfd_vma) -2)
+	      else if (outrel.r_offset == (bfd_vma) -2
+		       /* For now, undefined weak symbols with non-default
+			  visibility (yielding 0), like exception info for
+			  discarded sections, will get a R_CRIS_NONE
+			  relocation rather than no relocation, because we
+			  notice too late that the symbol doesn't need a
+			  relocation.  */
+		       || (h != NULL
+			   && h->root.type == bfd_link_hash_undefweak
+			   && ELF_ST_VISIBILITY (h->other) != STV_DEFAULT))
 		skip = TRUE, relocate = TRUE;
 	      outrel.r_offset += (input_section->output_section->vma
 				  + input_section->output_offset);
@@ -1678,9 +1687,14 @@ cris_elf_relocate_section (output_bfd, info, input_bfd, input_section,
 	    }
 
 	  /* The thread-based offset to the local symbol is the
-	     relocation.  */
+	     relocation.
+	     For the executable, TLS data begins at the thread pointer plus
+	     the negative size of the TLS data.  For a DSO, that's part of
+	     the module TLS offset.  */
 	  relocation -= elf_hash_table (info)->tls_sec == NULL
-	    ? 0 : elf_hash_table (info)->tls_sec->vma;
+	    ? 0 : (elf_hash_table (info)->tls_sec->vma
+		   + (info->shared
+		      ? 0 : elf_hash_table (info)->tls_sec->size));
 	  break;
 
 	case R_CRIS_32_GD:
@@ -3055,7 +3069,11 @@ elf_cris_copy_indirect_symbol (struct bfd_link_info *info,
   /* Only indirect symbols are replaced; we're not interested in
      updating any of EIND's fields for other symbols.  */
   if (eind->root.root.type != bfd_link_hash_indirect)
-    return;
+    {
+      /* Still, we need to copy flags for e.g. weak definitions.  */
+      _bfd_elf_link_hash_copy_indirect (info, dir, ind);
+      return;
+    }
 
   BFD_ASSERT (edir->pcrel_relocs_copied == NULL);
   BFD_ASSERT (edir->gotplt_offset == 0 || eind->gotplt_offset == 0);

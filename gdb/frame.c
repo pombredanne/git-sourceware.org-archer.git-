@@ -536,6 +536,14 @@ frame_pop (struct frame_info *this_frame)
   struct regcache *scratch;
   struct cleanup *cleanups;
 
+  if (get_frame_type (this_frame) == DUMMY_FRAME)
+    {
+      /* Popping a dummy frame involves restoring more than just registers.
+	 dummy_frame_pop does all the work.  */
+      dummy_frame_pop (get_frame_id (this_frame));
+      return;
+    }
+
   /* Ensure that we have a frame to pop to.  */
   prev_frame = get_prev_frame_1 (this_frame);
 
@@ -548,11 +556,6 @@ frame_pop (struct frame_info *this_frame)
      at the same time writing new values into that same cache.  */
   scratch = frame_save_as_regcache (prev_frame);
   cleanups = make_cleanup_regcache_xfree (scratch);
-
-  /* If we are popping a dummy frame, clean up the associated
-     data as well.  */
-  if (get_frame_type (this_frame) == DUMMY_FRAME)
-    dummy_frame_pop (get_frame_id (this_frame));
 
   /* FIXME: cagney/2003-03-16: It should be possible to tell the
      target's register cache that it is about to be hit with a burst
@@ -1103,13 +1106,19 @@ create_new_frame (CORE_ADDR addr, CORE_ADDR pc)
 
   fi->next = create_sentinel_frame (get_current_regcache ());
 
+  /* Set/update this frame's cached PC value, found in the next frame.
+     Do this before looking for this frame's unwinder.  A sniffer is
+     very likely to read this, and the corresponding unwinder is
+     entitled to rely that the PC doesn't magically change.  */
+  fi->next->prev_pc.value = pc;
+  fi->next->prev_pc.p = 1;
+
   /* Select/initialize both the unwind function and the frame's type
      based on the PC.  */
   fi->unwind = frame_unwind_find_by_frame (fi, &fi->prologue_cache);
 
   fi->this_id.p = 1;
-  deprecated_update_frame_base_hack (fi, addr);
-  deprecated_update_frame_pc_hack (fi, pc);
+  fi->this_id.value = frame_id_build (addr, pc);
 
   if (frame_debug)
     {
@@ -1727,38 +1736,6 @@ get_frame_type (struct frame_info *frame)
   return frame->unwind->type;
 }
 
-void
-deprecated_update_frame_pc_hack (struct frame_info *frame, CORE_ADDR pc)
-{
-  if (frame_debug)
-    fprintf_unfiltered (gdb_stdlog,
-			"{ deprecated_update_frame_pc_hack (frame=%d,pc=0x%s) }\n",
-			frame->level, paddr_nz (pc));
-  /* NOTE: cagney/2003-03-11: Some architectures (e.g., Arm) are
-     maintaining a locally allocated frame object.  Since such frames
-     are not in the frame chain, it isn't possible to assume that the
-     frame has a next.  Sigh.  */
-  if (frame->next != NULL)
-    {
-      /* While we're at it, update this frame's cached PC value, found
-	 in the next frame.  Oh for the day when "struct frame_info"
-	 is opaque and this hack on hack can just go away.  */
-      frame->next->prev_pc.value = pc;
-      frame->next->prev_pc.p = 1;
-    }
-}
-
-void
-deprecated_update_frame_base_hack (struct frame_info *frame, CORE_ADDR base)
-{
-  if (frame_debug)
-    fprintf_unfiltered (gdb_stdlog,
-			"{ deprecated_update_frame_base_hack (frame=%d,base=0x%s) }\n",
-			frame->level, paddr_nz (base));
-  /* See comment in "frame.h".  */
-  frame->this_id.value.stack_addr = base;
-}
-
 /* Memory access methods.  */
 
 void
@@ -1795,6 +1772,11 @@ safe_frame_unwind_memory (struct frame_info *this_frame,
 struct gdbarch *
 get_frame_arch (struct frame_info *this_frame)
 {
+  /* In the future, this function will return a per-frame
+     architecture instead of current_gdbarch.  Calling the
+     routine with a NULL value of this_frame is a bug!  */
+  gdb_assert (this_frame);
+
   return current_gdbarch;
 }
 

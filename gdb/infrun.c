@@ -45,7 +45,6 @@
 #include "language.h"
 #include "solib.h"
 #include "main.h"
-
 #include "gdb_assert.h"
 #include "mi/mi-common.h"
 #include "event-top.h"
@@ -1783,6 +1782,8 @@ wait_for_inferior (int treat_exec_as_sigtrap)
 
   while (1)
     {
+      struct cleanup *old_chain;
+
       if (deprecated_target_wait_hook)
 	ecs->ptid = deprecated_target_wait_hook (waiton_ptid, &ecs->ws);
       else
@@ -1795,8 +1796,16 @@ wait_for_inferior (int treat_exec_as_sigtrap)
           ecs->ws.value.sig = TARGET_SIGNAL_TRAP;
         }
 
+      /* If an error happens while handling the event, propagate GDB's
+	 knowledge of the executing state to the frontend/user running
+	 state.  */
+      old_chain = make_cleanup (finish_thread_state_cleanup, &minus_one_ptid);
+
       /* Now figure out what to do with the result of the result.  */
       handle_inferior_event (ecs);
+
+      /* No error, don't finish the state yet.  */
+      discard_cleanups (old_chain);
 
       if (!ecs->wait_some_more)
 	break;
@@ -1820,6 +1829,7 @@ fetch_inferior_event (void *client_data)
   struct execution_control_state ecss;
   struct execution_control_state *ecs = &ecss;
   struct cleanup *old_chain = make_cleanup (null_cleanup, NULL);
+  struct cleanup *ts_old_chain;
   int was_sync = sync_execution;
 
   memset (ecs, 0, sizeof (*ecs));
@@ -1863,6 +1873,14 @@ fetch_inferior_event (void *client_data)
        thread.  */
     context_switch (ecs->ptid);
 
+  /* If an error happens while handling the event, propagate GDB's
+     knowledge of the executing state to the frontend/user running
+     state.  */
+  if (!non_stop)
+    ts_old_chain = make_cleanup (finish_thread_state_cleanup, &minus_one_ptid);
+  else
+    ts_old_chain = make_cleanup (finish_thread_state_cleanup, &ecs->ptid);
+
   /* Now figure out what to do with the result of the result.  */
   handle_inferior_event (ecs);
 
@@ -1885,6 +1903,9 @@ fetch_inferior_event (void *client_data)
       else
 	inferior_event_handler (INF_EXEC_COMPLETE, NULL);
     }
+
+  /* No error, don't finish the thread states yet.  */
+  discard_cleanups (ts_old_chain);
 
   /* Revert thread and frame.  */
   do_cleanups (old_chain);
@@ -4161,8 +4182,22 @@ normal_stop (void)
 {
   struct target_waitstatus last;
   ptid_t last_ptid;
+  struct cleanup *old_chain = make_cleanup (null_cleanup, NULL);
 
   get_last_target_status (&last_ptid, &last);
+
+  /* If an exception is thrown from this point on, make sure to
+     propagate GDB's knowledge of the executing state to the
+     frontend/user running state.  A QUIT is an easy exception to see
+     here, so do this before any filtered output.  */
+  if (target_has_execution)
+    {
+      if (!non_stop)
+	old_chain = make_cleanup (finish_thread_state_cleanup, &minus_one_ptid);
+      else if (last.kind != TARGET_WAITKIND_SIGNALLED
+	       && last.kind != TARGET_WAITKIND_EXITED)
+	old_chain = make_cleanup (finish_thread_state_cleanup, &inferior_ptid);
+    }
 
   /* In non-stop mode, we don't want GDB to switch threads behind the
      user's back, to avoid races where the user is typing a command to
@@ -4188,17 +4223,6 @@ normal_stop (void)
       annotate_thread_changed ();
       previous_inferior_ptid = inferior_ptid;
     }
-
-  /* NOTE drow/2004-01-17: Is this still necessary?  */
-  /* Make sure that the current_frame's pc is correct.  This
-     is a correction for setting up the frame info before doing
-     gdbarch_decr_pc_after_break */
-  if (target_has_execution)
-    /* FIXME: cagney/2002-12-06: Has the PC changed?  Thanks to
-       gdbarch_decr_pc_after_break, the program counter can change.  Ask the
-       frame code to check for this and sort out any resultant mess.
-       gdbarch_decr_pc_after_break needs to just go away.  */
-    deprecated_update_frame_pc_hack (get_current_frame (), read_pc ());
 
   if (!breakpoints_always_inserted_mode () && target_has_execution)
     {
@@ -4233,6 +4257,15 @@ Further execution is probably impossible.\n"));
      during a user hook-stop function.  */
   if (target_has_stack && !stop_stack_dummy)
     set_current_sal_from_frame (get_current_frame (), 1);
+
+  /* Let the user/frontend see the threads as stopped.  */
+  do_cleanups (old_chain);
+
+  /* Look up the hook_stop and run it (CLI internally handles problem
+     of stop_command's pre-hook not existing).  */
+  if (stop_command)
+    catch_errors (hook_stop_stub, stop_command,
+		  "Error while running hook_stop:\n", RETURN_MASK_ALL);
 
   if (!target_has_stack)
     goto done;
@@ -4351,14 +4384,20 @@ Further execution is probably impossible.\n"));
 
   if (stop_stack_dummy)
     {
-      /* Pop the empty frame that contains the stack dummy.  POP_FRAME
-         ends with a setting of the current frame, so we can use that
-         next. */
-      frame_pop (get_current_frame ());
-      /* Set stop_pc to what it was before we called the function.
-         Can't rely on restore_inferior_status because that only gets
-         called if we don't stop in the called function.  */
-      stop_pc = read_pc ();
+      /* Pop the empty frame that contains the stack dummy.
+	 This also restores inferior state prior to the call
+	 (struct inferior_thread_state).  */
+      struct frame_info *frame = get_current_frame ();
+      gdb_assert (get_frame_type (frame) == DUMMY_FRAME);
+      frame_pop (frame);
+      /* frame_pop() calls reinit_frame_cache as the last thing it does
+	 which means there's currently no selected frame.  We don't need
+	 to re-establish a selected frame if the dummy call returns normally,
+	 that will be done by restore_inferior_status.  However, we do have
+	 to handle the case where the dummy call is returning after being
+	 stopped (e.g. the dummy call previously hit a breakpoint).  We
+	 can't know which case we have so just always re-establish a
+	 selected frame here.  */
       select_frame (get_current_frame ());
     }
 
@@ -4383,26 +4422,7 @@ done:
 	/* Delete the breakpoint we stopped at, if it wants to be deleted.
 	   Delete any breakpoint that is to be deleted at the next stop.  */
 	breakpoint_auto_delete (inferior_thread ()->stop_bpstat);
-
-      /* Mark the stopped threads accordingly.  In all-stop, all
-	 threads of all processes are stopped when we get any event
-	 reported.  In non-stop mode, only the event thread stops.  If
-	 we're handling a process exit in non-stop mode, there's
-	 nothing to do, as threads of the dead process are gone, and
-	 threads of any other process were left running.  */
-      if (!non_stop)
-	set_running (minus_one_ptid, 0);
-      else if (last.kind != TARGET_WAITKIND_SIGNALLED
-	       && last.kind != TARGET_WAITKIND_EXITED)
-	set_running (inferior_ptid, 0);
     }
-
-  /* Look up the hook_stop and run it (CLI internally handles problem
-     of stop_command's pre-hook not existing).  */
-  if (stop_command)
-    catch_errors (hook_stop_stub, stop_command,
-		  "Error while running hook_stop:\n", RETURN_MASK_ALL);
-
 }
 
 static int
@@ -4464,7 +4484,7 @@ Signal        Stop\tPrint\tPass to program\tDescription\n"));
 static void
 sig_print_info (enum target_signal oursig)
 {
-  char *name = target_signal_to_name (oursig);
+  const char *name = target_signal_to_name (oursig);
   int name_padding = 13 - strlen (name);
 
   if (name_padding <= 0)
@@ -4765,10 +4785,85 @@ signals_info (char *signum_exp, int from_tty)
   printf_filtered (_("\nUse the \"handle\" command to change these tables.\n"));
 }
 
-struct inferior_status
+/* Inferior thread state.
+   These are details related to the inferior itself, and don't include
+   things like what frame the user had selected or what gdb was doing
+   with the target at the time.
+   For inferior function calls these are things we want to restore
+   regardless of whether the function call successfully completes
+   or the dummy frame has to be manually popped.  */
+
+struct inferior_thread_state
 {
   enum target_signal stop_signal;
   CORE_ADDR stop_pc;
+  struct regcache *registers;
+};
+
+struct inferior_thread_state *
+save_inferior_thread_state (void)
+{
+  struct inferior_thread_state *inf_state = XMALLOC (struct inferior_thread_state);
+  struct thread_info *tp = inferior_thread ();
+
+  inf_state->stop_signal = tp->stop_signal;
+  inf_state->stop_pc = stop_pc;
+
+  inf_state->registers = regcache_dup (get_current_regcache ());
+
+  return inf_state;
+}
+
+/* Restore inferior session state to INF_STATE.  */
+
+void
+restore_inferior_thread_state (struct inferior_thread_state *inf_state)
+{
+  struct thread_info *tp = inferior_thread ();
+
+  tp->stop_signal = inf_state->stop_signal;
+  stop_pc = inf_state->stop_pc;
+
+  /* The inferior can be gone if the user types "print exit(0)"
+     (and perhaps other times).  */
+  if (target_has_execution)
+    /* NB: The register write goes through to the target.  */
+    regcache_cpy (get_current_regcache (), inf_state->registers);
+  regcache_xfree (inf_state->registers);
+  xfree (inf_state);
+}
+
+static void
+do_restore_inferior_thread_state_cleanup (void *state)
+{
+  restore_inferior_thread_state (state);
+}
+
+struct cleanup *
+make_cleanup_restore_inferior_thread_state (struct inferior_thread_state *inf_state)
+{
+  return make_cleanup (do_restore_inferior_thread_state_cleanup, inf_state);
+}
+
+void
+discard_inferior_thread_state (struct inferior_thread_state *inf_state)
+{
+  regcache_xfree (inf_state->registers);
+  xfree (inf_state);
+}
+
+struct regcache *
+get_inferior_thread_state_regcache (struct inferior_thread_state *inf_state)
+{
+  return inf_state->registers;
+}
+
+/* Session related state for inferior function calls.
+   These are the additional bits of state that need to be restored
+   when an inferior function call successfully completes.  */
+
+struct inferior_status
+{
   bpstat stop_bpstat;
   int stop_step;
   int stop_stack_dummy;
@@ -4782,32 +4877,23 @@ struct inferior_status
   int stop_after_trap;
   int stop_soon;
 
-  /* These are here because if call_function_by_hand has written some
-     registers and then decides to call error(), we better not have changed
-     any registers.  */
-  struct regcache *registers;
-
-  /* A frame unique identifier.  */
+  /* ID if the selected frame when the inferior function call was made.  */
   struct frame_id selected_frame_id;
 
   int breakpoint_proceeded;
-  int restore_stack_info;
   int proceed_to_finish;
 };
 
 /* Save all of the information associated with the inferior<==>gdb
-   connection.  INF_STATUS is a pointer to a "struct inferior_status"
-   (defined in inferior.h).  */
+   connection.  */
 
 struct inferior_status *
-save_inferior_status (int restore_stack_info)
+save_inferior_status (void)
 {
   struct inferior_status *inf_status = XMALLOC (struct inferior_status);
   struct thread_info *tp = inferior_thread ();
   struct inferior *inf = current_inferior ();
 
-  inf_status->stop_signal = tp->stop_signal;
-  inf_status->stop_pc = stop_pc;
   inf_status->stop_step = tp->stop_step;
   inf_status->stop_stack_dummy = stop_stack_dummy;
   inf_status->stopped_by_random_signal = stopped_by_random_signal;
@@ -4825,12 +4911,10 @@ save_inferior_status (int restore_stack_info)
   inf_status->stop_bpstat = tp->stop_bpstat;
   tp->stop_bpstat = bpstat_copy (tp->stop_bpstat);
   inf_status->breakpoint_proceeded = breakpoint_proceeded;
-  inf_status->restore_stack_info = restore_stack_info;
   inf_status->proceed_to_finish = tp->proceed_to_finish;
 
-  inf_status->registers = regcache_dup (get_current_regcache ());
-
   inf_status->selected_frame_id = get_frame_id (get_selected_frame (NULL));
+
   return inf_status;
 }
 
@@ -4855,14 +4939,14 @@ restore_selected_frame (void *args)
   return (1);
 }
 
+/* Restore inferior session state to INF_STATUS.  */
+
 void
 restore_inferior_status (struct inferior_status *inf_status)
 {
   struct thread_info *tp = inferior_thread ();
   struct inferior *inf = current_inferior ();
 
-  tp->stop_signal = inf_status->stop_signal;
-  stop_pc = inf_status->stop_pc;
   tp->stop_step = inf_status->stop_step;
   stop_stack_dummy = inf_status->stop_stack_dummy;
   stopped_by_random_signal = inf_status->stopped_by_random_signal;
@@ -4875,24 +4959,11 @@ restore_inferior_status (struct inferior_status *inf_status)
   inf->stop_soon = inf_status->stop_soon;
   bpstat_clear (&tp->stop_bpstat);
   tp->stop_bpstat = inf_status->stop_bpstat;
+  inf_status->stop_bpstat = NULL;
   breakpoint_proceeded = inf_status->breakpoint_proceeded;
   tp->proceed_to_finish = inf_status->proceed_to_finish;
 
-  /* The inferior can be gone if the user types "print exit(0)"
-     (and perhaps other times).  */
-  if (target_has_execution)
-    /* NB: The register write goes through to the target.  */
-    regcache_cpy (get_current_regcache (), inf_status->registers);
-  regcache_xfree (inf_status->registers);
-
-  /* FIXME: If we are being called after stopping in a function which
-     is called from gdb, we should not be trying to restore the
-     selected frame; it just prints a spurious error message (The
-     message is useful, however, in detecting bugs in gdb (like if gdb
-     clobbers the stack)).  In fact, should we be restoring the
-     inferior status at all in that case?  .  */
-
-  if (target_has_stack && inf_status->restore_stack_info)
+  if (target_has_stack)
     {
       /* The point of catch_errors is that if the stack is clobbered,
          walking the stack might encounter a garbage pointer and
@@ -4904,7 +4975,6 @@ restore_inferior_status (struct inferior_status *inf_status)
 	/* Error in restoring the selected frame.  Select the innermost
 	   frame.  */
 	select_frame (get_current_frame ());
-
     }
 
   xfree (inf_status);
@@ -4927,10 +4997,9 @@ discard_inferior_status (struct inferior_status *inf_status)
 {
   /* See save_inferior_status for info on stop_bpstat. */
   bpstat_clear (&inf_status->stop_bpstat);
-  regcache_xfree (inf_status->registers);
   xfree (inf_status);
 }
-
+
 int
 inferior_has_forked (ptid_t pid, ptid_t *child_pid)
 {

@@ -632,6 +632,55 @@ set_stop_requested (ptid_t ptid, int stop)
     observer_notify_thread_stop_requested (ptid);
 }
 
+void
+finish_thread_state (ptid_t ptid)
+{
+  struct thread_info *tp;
+  int all;
+  int any_started = 0;
+
+  all = ptid_equal (ptid, minus_one_ptid);
+
+  if (all || ptid_is_pid (ptid))
+    {
+      for (tp = thread_list; tp; tp = tp->next)
+	{
+ 	  if (tp->state_ == THREAD_EXITED)
+  	    continue;
+	  if (all || ptid_get_pid (ptid) == ptid_get_pid (tp->ptid))
+	    {
+	      if (tp->executing_ && tp->state_ == THREAD_STOPPED)
+		any_started = 1;
+	      tp->state_ = tp->executing_ ? THREAD_RUNNING : THREAD_STOPPED;
+	    }
+	}
+    }
+  else
+    {
+      tp = find_thread_pid (ptid);
+      gdb_assert (tp);
+      if (tp->state_ != THREAD_EXITED)
+	{
+	  if (tp->executing_ && tp->state_ == THREAD_STOPPED)
+	    any_started = 1;
+	  tp->state_ = tp->executing_ ? THREAD_RUNNING : THREAD_STOPPED;
+	}
+    }
+
+  if (any_started)
+    observer_notify_target_resumed (ptid);
+}
+
+void
+finish_thread_state_cleanup (void *arg)
+{
+  ptid_t *ptid_p = arg;
+
+  gdb_assert (arg);
+
+  finish_thread_state (*ptid_p);
+}
+
 /* Prints the list of threads and their details on UIOUT.
    This is a version of 'info_thread_command' suitable for
    use from MI.  
@@ -1045,7 +1094,6 @@ thread_command (char *tidstr, int from_tty)
       return;
     }
 
-  annotate_thread_changed ();
   gdb_thread_select (uiout, tidstr, NULL);
 }
 
@@ -1077,6 +1125,8 @@ do_captured_thread_select (struct ui_out *uiout, void *tidstr)
     error (_("Thread ID %d has terminated."), num);
 
   switch_to_thread (tp->ptid);
+
+  annotate_thread_changed ();
 
   ui_out_text (uiout, "[Switching to thread ");
   ui_out_field_int (uiout, "new-thread-id", pid_to_thread_id (inferior_ptid));
