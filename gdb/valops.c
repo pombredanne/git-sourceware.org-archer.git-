@@ -1091,7 +1091,8 @@ address_of_variable (struct symbol *var, struct block *b)
 
   val = value_of_variable (var, b);
 
-  if ((VALUE_LVAL (val) == lval_memory && value_lazy (val))
+  if ((VALUE_LVAL (val) == lval_memory && value_lazy (val)
+       && object_address_get_data (type, &VALUE_ADDRESS (val)))
       || TYPE_CODE (type) == TYPE_CODE_FUNC)
     {
       CORE_ADDR addr = VALUE_ADDRESS (val);
