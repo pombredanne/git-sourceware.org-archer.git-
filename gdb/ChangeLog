@@ -1,3 +1,13 @@
+2009-01-26  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb/python/python-frame.c (frapy_name): Return a Unicode string
+	instead of an 8-bit string.
+	(frapy_frame_stop_reason_string): Likewise.
+	(frapy_address_in_block): Rename to frapy_addr_in_block.
+	(frame_object_methods): Rename `address_in_block' entry to `addr_in_block'.
+	* gdb/python/lib/gdb/command/backtrace.py (describe): Update to call
+	`addr_in_block'.
+
 2009-01-02  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	* gdb/python/python-value.c (valpy_getitem): Use gdbpy_is_string.

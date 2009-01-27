@@ -139,7 +139,7 @@ frapy_name (PyObject *self, PyObject *args)
   GDB_PY_HANDLE_EXCEPTION (except);
 
   if (name)
-    result = PyString_Decode (name, strlen (name), host_charset (), NULL);
+    result = target_string_to_unicode (name, strlen (name));
   else
     {
       result = Py_None;
@@ -204,7 +204,7 @@ frapy_pc (PyObject *self, PyObject *args)
 }
 
 static PyObject *
-frapy_address_in_block (PyObject *self, PyObject *args)
+frapy_addr_in_block (PyObject *self, PyObject *args)
 {
   CORE_ADDR pc = 0;	      /* Initialize to appease gcc warning.  */
   struct frame_info *frame;
@@ -457,7 +457,7 @@ gdbpy_frame_stop_reason_string (PyObject *self, PyObject *args)
     }
 
   str = frame_stop_reason_string (reason);
-  return PyString_Decode (str, strlen (str), host_charset (), NULL);
+  return PyUnicode_Decode (str, strlen (str), host_charset (), NULL);
 }
 
 void
@@ -503,7 +503,7 @@ static PyMethodDef frame_object_methods[] = {
   { "unwind_stop_reason", frapy_unwind_stop_reason, METH_NOARGS,
     "Return the function name of the frame." },
   { "pc", frapy_pc, METH_NOARGS, "Return the frame's resume address." },
-  { "address_in_block", frapy_address_in_block, METH_NOARGS,
+  { "addr_in_block", frapy_addr_in_block, METH_NOARGS,
     "Return an address which falls within the frame's code block." },
   { "older", frapy_older, METH_NOARGS,
     "Return the frame immediately older (outer) to this frame." },
