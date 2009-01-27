@@ -1,3 +1,13 @@
+2009-01-26  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* python/python-breakpoint.c (bppy_set_enabled): Use
+	PyObject_IsTrue and account for comparison failure.
+	(bppy_set_silent): Likewise.
+	* python/python-cmd.c (cmdpy_init): Likewise.
+	* python/python-param.c (set_parameter_value): Likewise.
+	* python/python-value.c (convert_value_from_python): Likewise.
+	* python/python.c (execute_gdb_command): Likewise.
+	
 2009-01-14  Tom Tromey  <tromey@redhat.com>
 
 	* darwin-nat-info.c (info_mach_region_command): Use

@@ -779,12 +779,17 @@ convert_value_from_python (PyObject *obj)
   struct value *value = NULL; /* -Wall */
   PyObject *target_str, *unicode_str;
   struct cleanup *old;
+  int cmp;
 
   if (! obj)
     error (_("Internal error while converting Python value."));
 
-  if (PyBool_Check (obj))
-    value = value_from_longest (builtin_type_pybool, obj == Py_True);
+  if (PyBool_Check (obj)) 
+    {
+      cmp = PyObject_IsTrue (obj);
+      if (cmp >= 0)
+	value = value_from_longest (builtin_type_pybool, cmp);
+    }
   else if (PyInt_Check (obj))
     value = value_from_longest (builtin_type_pyint, PyInt_AsLong (obj));
   else if (PyLong_Check (obj))

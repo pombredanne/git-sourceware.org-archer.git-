@@ -1,6 +1,6 @@
 /* Python interface to breakpoints
 
-   Copyright (C) 2008 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -129,6 +129,7 @@ static int
 bppy_set_enabled (PyObject *self, PyObject *newvalue, void *closure)
 {
   breakpoint_object *self_bp = (breakpoint_object *) self;
+  int cmp;
 
   BPPY_SET_REQUIRE_VALID (self_bp);
 
@@ -144,11 +145,13 @@ bppy_set_enabled (PyObject *self, PyObject *newvalue, void *closure)
       return -1;
     }
 
-  if (newvalue == Py_True)
+  cmp = PyObject_IsTrue (newvalue);
+  if (cmp < 0)
+    return -1;
+  else if (cmp == 1)
     enable_breakpoint (self_bp->bp);
-  else
+  else 
     disable_breakpoint (self_bp->bp);
-
   return 0;
 }
 
@@ -157,6 +160,7 @@ static int
 bppy_set_silent (PyObject *self, PyObject *newvalue, void *closure)
 {
   breakpoint_object *self_bp = (breakpoint_object *) self;
+  int cmp;
 
   BPPY_SET_REQUIRE_VALID (self_bp);
 
@@ -172,7 +176,11 @@ bppy_set_silent (PyObject *self, PyObject *newvalue, void *closure)
       return -1;
     }
 
-  self_bp->bp->silent = (newvalue == Py_True);
+  cmp = PyObject_IsTrue (newvalue);
+  if (cmp < 0)
+    return -1;
+  else
+    self_bp->bp->silent = cmp;
 
   return 0;
 }

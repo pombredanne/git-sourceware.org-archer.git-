@@ -1,6 +1,6 @@
 /* gdb commands implemented in Python
 
-   Copyright (C) 2008 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -370,6 +370,7 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kwds)
   struct cmd_list_element **cmd_list;
   char *cmd_name, *pfx_name;
   PyObject *is_prefix = NULL;
+  int cmp;
 
   if (obj->command)
     {
@@ -406,30 +407,35 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kwds)
     return -1;
 
   pfx_name = NULL;
-  if (is_prefix == Py_True)
+  if (is_prefix != NULL) 
     {
-      int i, out;
-
-      /* Make a normalized form of the command name.  */
-      pfx_name = xmalloc (strlen (name) + 2);
-
-      i = 0;
-      out = 0;
-      while (name[i])
+      cmp = PyObject_IsTrue (is_prefix);
+      if (cmp == 1)
 	{
-	  /* Skip whitespace.  */
-	  while (name[i] == ' ' || name[i] == '\t')
-	    ++i;
-	  /* Copy non-whitespace characters.  */
-	  while (name[i] && name[i] != ' ' && name[i] != '\t')
-	    pfx_name[out++] = name[i++];
-	  /* Add a single space after each word -- including the final
-	     word.  */
-	  pfx_name[out++] = ' ';
+	  int i, out;
+	  
+	  /* Make a normalized form of the command name.  */
+	  pfx_name = xmalloc (strlen (name) + 2);
+	  
+	  i = 0;
+	  out = 0;
+	  while (name[i])
+	    {
+	      /* Skip whitespace.  */
+	      while (name[i] == ' ' || name[i] == '\t')
+		++i;
+	      /* Copy non-whitespace characters.  */
+	      while (name[i] && name[i] != ' ' && name[i] != '\t')
+		pfx_name[out++] = name[i++];
+	      /* Add a single space after each word -- including the final
+		 word.  */
+	      pfx_name[out++] = ' ';
+	    }
+	  pfx_name[out] = '\0';
 	}
-      pfx_name[out] = '\0';
+      else if (cmp < 0)
+	  return -1;
     }
-
   if (PyObject_HasAttr (self, gdbpy_doc_cst))
     {
       PyObject *ds_obj = PyObject_GetAttr (self, gdbpy_doc_cst);

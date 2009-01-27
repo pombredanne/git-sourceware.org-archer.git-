@@ -1,6 +1,6 @@
 /* gdb parameters implemented in Python
 
-   Copyright (C) 2008 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -114,6 +114,8 @@ get_attr (PyObject *obj, PyObject *attr_name)
 static int
 set_parameter_value (parmpy_object *self, PyObject *value)
 {
+  int cmp;
+
   switch (self->type)
     {
     case var_string:
@@ -172,7 +174,10 @@ set_parameter_value (parmpy_object *self, PyObject *value)
 	  PyErr_SetString (PyExc_RuntimeError, "boolean required");
 	  return -1;
 	}
-      self->value.intval = value == Py_True;
+      cmp = PyObject_IsTrue (value);
+      if (cmp < 0) 
+	  return -1;
+      self->value.intval = cmp;
       break;
 
     case var_auto_boolean:
@@ -183,13 +188,20 @@ set_parameter_value (parmpy_object *self, PyObject *value)
 	  return -1;
 	}
 
-      if (value == Py_True)
-	self->value.autoboolval = AUTO_BOOLEAN_TRUE;
-      else if (value == Py_False)
-	self->value.autoboolval = AUTO_BOOLEAN_FALSE;
-      else
+      if (value == Py_None)
 	self->value.autoboolval = AUTO_BOOLEAN_AUTO;
-      break;
+      else
+	{
+	  cmp = PyObject_IsTrue (value);
+	  if (cmp < 0 )
+	    return -1;	  
+	  if (cmp == 1)
+	    self->value.autoboolval = AUTO_BOOLEAN_TRUE;
+	  else 
+	    self->value.autoboolval = AUTO_BOOLEAN_FALSE;
+
+	  break;
+	}
 
     case var_integer:
     case var_zinteger:

@@ -260,6 +260,7 @@ execute_gdb_command (PyObject *self, PyObject *args)
   char *arg, *newarg;
   PyObject *from_tty_obj = NULL;
   int from_tty;
+  int cmp;
   volatile struct gdb_exception except;
 
   if (! PyArg_ParseTuple (args, "s|O!", &arg, &PyBool_Type, &from_tty_obj))
@@ -267,7 +268,12 @@ execute_gdb_command (PyObject *self, PyObject *args)
 
   from_tty = 0;
   if (from_tty_obj)
-    from_tty = from_tty_obj == Py_True;
+    {
+      cmp = PyObject_IsTrue (from_tty_obj);
+      if (cmp < 0)
+	  return NULL;
+      from_tty = cmp;
+    }
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
