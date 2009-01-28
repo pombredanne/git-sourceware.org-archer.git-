@@ -79,3 +79,5 @@ gdb_test "python print 'result =', f0.pc ()" " = \[0-9\]+" "test Frame.pc"
 gdb_test "python print 'result =', f0.addr_in_block ()" " = \[0-9\]+" "test Frame.addr_in_block"
 gdb_test "python print 'result =', f0.older ().equals (f1)" " = True" "test Frame.older"
 gdb_test "python print 'result =', f1.newer ().equals (f0)" " = True" "test Frame.newer"
+
+gdb_test "python print 'result =', f0.block ()" "<gdb.Block object at 0x\[\[:xdigit:\]\]+>" "test Frame.block"

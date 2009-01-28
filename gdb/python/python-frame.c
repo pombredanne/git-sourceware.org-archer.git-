@@ -19,6 +19,7 @@
 
 #include "defs.h"
 #include "charset.h"
+#include "block.h"
 #include "frame.h"
 #include "exceptions.h"
 #include "symtab.h"
@@ -201,6 +202,27 @@ frapy_pc (PyObject *self, PyObject *args)
   GDB_PY_HANDLE_EXCEPTION (except);
 
   return PyLong_FromUnsignedLongLong (pc);
+}
+
+static PyObject *
+frapy_block (PyObject *self, PyObject *args)
+{
+  struct frame_info *frame;
+  struct block *block = NULL;
+  volatile struct gdb_exception except;
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      FRAPY_REQUIRE_VALID ((frame_object *) self, frame);
+
+      block = block_for_pc (get_frame_address_in_block (frame));
+    }
+  GDB_PY_HANDLE_EXCEPTION (except);
+
+  if (block)
+    return block_to_block_object (block);
+
+  Py_RETURN_NONE;
 }
 
 static PyObject *
@@ -503,6 +525,7 @@ static PyMethodDef frame_object_methods[] = {
   { "unwind_stop_reason", frapy_unwind_stop_reason, METH_NOARGS,
     "Return the function name of the frame." },
   { "pc", frapy_pc, METH_NOARGS, "Return the frame's resume address." },
+  { "block", frapy_block, METH_NOARGS, "Return the frame's code block." },
   { "addr_in_block", frapy_addr_in_block, METH_NOARGS,
     "Return an address which falls within the frame's code block." },
   { "older", frapy_older, METH_NOARGS,

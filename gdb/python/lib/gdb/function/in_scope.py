@@ -32,7 +32,7 @@ Takes one argument for each variable name to be checked."""
 	# Convert to string first.
 	wanted = set (map (lambda x: x.string (), vars))
 	found = set ()
-	block = gdb.block_for_pc (gdb.selected_frame ().pc ())
+	block = gdb.selected_frame ().block ()
 	while block:
 	    for sym in block:
 		if (sym.is_argument or sym.is_constant
