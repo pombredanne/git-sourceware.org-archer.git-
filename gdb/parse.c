@@ -1,7 +1,7 @@
 /* Parse expressions for GDB.
 
    Copyright (C) 1986, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997,
-   1998, 1999, 2000, 2001, 2004, 2005, 2007, 2008
+   1998, 1999, 2000, 2001, 2004, 2005, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    Modified from expread.y by the Department of Computer Science at the
@@ -400,23 +400,17 @@ write_exp_bitstring (struct stoken str)
 }
 
 /* Add the appropriate elements for a minimal symbol to the end of
-   the expression.  The rationale behind passing in text_symbol_type and
-   data_symbol_type was so that Modula-2 could pass in WORD for
-   data_symbol_type.  Perhaps it still is useful to have those types vary
-   based on the language, but they no longer have names like "int", so
-   the initial rationale is gone.  */
+   the expression.  */
 
 void
-write_exp_msymbol (struct minimal_symbol *msymbol, 
-		   struct type *text_symbol_type, 
-		   struct type *data_symbol_type)
+write_exp_msymbol (struct minimal_symbol *msymbol)
 {
   struct objfile *objfile = msymbol_objfile (msymbol);
   struct gdbarch *gdbarch = get_objfile_arch (objfile);
 
   CORE_ADDR addr = SYMBOL_VALUE_ADDRESS (msymbol);
-  asection *bfd_section = SYMBOL_BFD_SECTION (msymbol);
-  enum minimal_symbol_type type = msymbol->type;
+  struct obj_section *section = SYMBOL_OBJ_SECTION (msymbol);
+  enum minimal_symbol_type type = MSYMBOL_TYPE (msymbol);
   CORE_ADDR pc;
 
   /* The minimal symbol might point to a function descriptor;
@@ -427,20 +421,20 @@ write_exp_msymbol (struct minimal_symbol *msymbol,
       /* In this case, assume we have a code symbol instead of
 	 a data symbol.  */
       type = mst_text;
-      bfd_section = NULL;
+      section = NULL;
       addr = pc;
     }
 
   if (overlay_debugging)
-    addr = symbol_overlayed_address (addr, bfd_section);
+    addr = symbol_overlayed_address (addr, section);
 
   write_exp_elt_opcode (OP_LONG);
   /* Let's make the type big enough to hold a 64-bit address.  */
-  write_exp_elt_type (builtin_type_CORE_ADDR);
+  write_exp_elt_type (builtin_type (gdbarch)->builtin_core_addr);
   write_exp_elt_longcst ((LONGEST) addr);
   write_exp_elt_opcode (OP_LONG);
 
-  if (bfd_section && bfd_section->flags & SEC_THREAD_LOCAL)
+  if (section && section->the_bfd_section->flags & SEC_THREAD_LOCAL)
     {
       write_exp_elt_opcode (UNOP_MEMVAL_TLS);
       write_exp_elt_objfile (objfile);
@@ -576,9 +570,7 @@ write_dollar_variable (struct stoken str)
   msym = lookup_minimal_symbol (copy_name (str), NULL, NULL);
   if (msym)
     {
-      write_exp_msymbol (msym,
-			 lookup_function_type (builtin_type_int),
-			 builtin_type_int);
+      write_exp_msymbol (msym);
       return;
     }
 
@@ -775,7 +767,7 @@ operator_length_standard (struct expression *expr, int endpos,
       break;
 
     case OP_COMPLEX:
-      oplen = 1;
+      oplen = 3;
       args = 2;
       break;
 
@@ -1035,6 +1027,7 @@ parse_exp_in_context (char **stringptr, struct block *block, int comma,
   expout = (struct expression *)
     xmalloc (sizeof (struct expression) + EXP_ELEM_TO_BYTES (expout_size));
   expout->language_defn = current_language;
+  expout->gdbarch = current_gdbarch;
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
@@ -1097,7 +1090,8 @@ parse_expression (char *string)
 /* Parse STRING as an expression.  If parsing ends in the middle of a
    field reference, return the type of the left-hand-side of the
    reference; furthermore, if the parsing ends in the field name,
-   return the field name in *NAME.  In all other cases, return NULL.  */
+   return the field name in *NAME.  In all other cases, return NULL.
+   Returned non-NULL *NAME must be freed by the caller.  */
 
 struct type *
 parse_field_expression (char *string, char **name)
@@ -1127,6 +1121,9 @@ parse_field_expression (char *string, char **name)
       xfree (exp);
       return NULL;
     }
+  /* (*NAME) is a part of the EXP memory block freed below.  */
+  *name = xstrdup (*name);
+
   val = evaluate_subexpression_type (exp, subexp);
   xfree (exp);
 
@@ -1269,14 +1266,13 @@ follow_types (struct type *follow_type)
 	   done with it.  */
 	range_type =
 	  create_range_type ((struct type *) NULL,
-			     builtin_type_int, 0,
+			     builtin_type_int32, 0,
 			     array_size >= 0 ? array_size - 1 : 0);
 	follow_type =
 	  create_array_type ((struct type *) NULL,
 			     follow_type, range_type);
 	if (array_size < 0)
-	  TYPE_ARRAY_UPPER_BOUND_TYPE (follow_type)
-	    = BOUND_CANNOT_BE_DETERMINED;
+	  TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED (follow_type) = 1;
 	break;
       case tp_function:
 	/* FIXME-type-allocation: need a way to free this type when we are

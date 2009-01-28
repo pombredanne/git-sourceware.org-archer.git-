@@ -1,5 +1,5 @@
 /* Native debugging support for Intel x86 running DJGPP.
-   Copyright (C) 1997, 1999, 2000, 2001, 2005, 2006, 2007, 2008
+   Copyright (C) 1997, 1999, 2000, 2001, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
    Written by Robert Hoehne.
 
@@ -184,8 +184,9 @@ static int go32_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len,
 static void go32_files_info (struct target_ops *target);
 static void go32_stop (ptid_t);
 static void go32_kill_inferior (void);
-static void go32_create_inferior (char *exec_file, char *args, char **env, int from_tty);
-static void go32_mourn_inferior (void);
+static void go32_create_inferior (struct target_ops *ops, char *exec_file,
+				  char *args, char **env, int from_tty);
+static void go32_mourn_inferior (struct target_ops *ops);
 static int go32_can_run (void);
 
 static struct target_ops go32_ops;
@@ -306,7 +307,7 @@ go32_close (int quitting)
 }
 
 static void
-go32_attach (char *args, int from_tty)
+go32_attach (struct target_ops *ops, char *args, int from_tty)
 {
   error (_("\
 You cannot attach to a running program on this platform.\n\
@@ -314,7 +315,7 @@ Use the `run' command to run DJGPP programs."));
 }
 
 static void
-go32_detach (char *args, int from_tty)
+go32_detach (struct target_ops *ops, char *args, int from_tty)
 {
 }
 
@@ -662,6 +663,8 @@ go32_create_inferior (char *exec_file, char *args, char **env, int from_tty)
 #endif
 
   inferior_ptid = pid_to_ptid (SOME_PID);
+  add_inferior_silent (SOME_PID);
+
   push_target (&go32_ops);
 
   add_thread_silent (inferior_ptid);
@@ -672,7 +675,7 @@ go32_create_inferior (char *exec_file, char *args, char **env, int from_tty)
 }
 
 static void
-go32_mourn_inferior (void)
+go32_mourn_inferior (struct target_ops *ops)
 {
   /* We need to make sure all the breakpoint enable bits in the DR7
      register are reset when the inferior exits.  Otherwise, if they

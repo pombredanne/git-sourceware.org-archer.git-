@@ -262,6 +262,7 @@ struct mips_opcode
 
    Each of these characters corresponds to a mask field defined above.
 
+   "1" 5 bit sync type (OP_*_SHAMT)
    "<" 5 bit shift amount (OP_*_SHAMT)
    ">" shift amount between 32 and 63, stored after subtracting 32 (OP_*_SHAMT)
    "a" 26 bit target address (OP_*_TARGET)
@@ -401,7 +402,7 @@ struct mips_opcode
    "+"  Start of extension sequence.
 
    Characters used so far, for quick reference when adding more:
-   "234567890"
+   "1234567890"
    "%[]<>(),+:'@!$*&"
    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
    "abcdefghijklopqrstuvwxz"
@@ -631,6 +632,8 @@ static const unsigned int mips_isa_table[] =
 #define CPU_RM9000	9000
 #define CPU_R10000	10000
 #define CPU_R12000	12000
+#define CPU_R14000	14000
+#define CPU_R16000	16000
 #define CPU_MIPS16	16
 #define CPU_MIPS32	32
 #define CPU_MIPS32R2	33
@@ -660,7 +663,8 @@ static const unsigned int mips_isa_table[] =
      || (cpu == CPU_R4010 && ((insn)->membership & INSN_4010) != 0)	\
      || (cpu == CPU_VR4100 && ((insn)->membership & INSN_4100) != 0)	\
      || (cpu == CPU_R3900 && ((insn)->membership & INSN_3900) != 0)	\
-     || ((cpu == CPU_R10000 || cpu == CPU_R12000)			\
+     || ((cpu == CPU_R10000 || cpu == CPU_R12000 || cpu == CPU_R14000	\
+	  || cpu == CPU_R16000)						\
 	 && ((insn)->membership & INSN_10000) != 0)			\
      || (cpu == CPU_SB1 && ((insn)->membership & INSN_SB1) != 0)	\
      || (cpu == CPU_R4111 && ((insn)->membership & INSN_4111) != 0)	\

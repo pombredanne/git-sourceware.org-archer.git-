@@ -1,6 +1,7 @@
 /* Remote File-I/O communications
 
-   Copyright (C) 2003, 2005, 2006, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2003, 2005, 2006, 2007, 2008, 2009
+   Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1398,7 +1399,7 @@ remote_fileio_reset (void)
     }
   if (remote_fio_data.fd_map)
     {
-      free (remote_fio_data.fd_map);
+      xfree (remote_fio_data.fd_map);
       remote_fio_data.fd_map = NULL;
       remote_fio_data.fd_map_size = 0;
     }

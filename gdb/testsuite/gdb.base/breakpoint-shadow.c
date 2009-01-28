@@ -1,5 +1,6 @@
-/* Header file for GDB CLI utility library.
-   Copyright (c) 2001, 2007, 2008 Free Software Foundation, Inc.
+/* This testcase is part of GDB, the GNU debugger.
+
+   Copyright 2008, 2009 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -14,7 +15,13 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#if !defined (CLI_UTILS_H)
-# define CLI_UTILS_H 1
+int
+main (void)
+{
+  volatile int i;
+  
+  i = 1;	/* break-first */
+  i = 2;	/* break-second */
 
-#endif /* !defined (CLI_UTILS_H) */
+  return 0;
+}

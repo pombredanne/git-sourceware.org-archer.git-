@@ -1,7 +1,7 @@
 /* Tracing functionality for remote targets in custom GDB protocol
 
    Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006,
-   2007, 2008 Free Software Foundation, Inc.
+   2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -38,6 +38,7 @@
 #include "dictionary.h"
 #include "observer.h"
 #include "user-regs.h"
+#include "valprint.h"
 
 #include "ax.h"
 #include "ax-gdb.h"
@@ -67,7 +68,6 @@
 extern void (*deprecated_readline_begin_hook) (char *, ...);
 extern char *(*deprecated_readline_hook) (char *);
 extern void (*deprecated_readline_end_hook) (void);
-extern int addressprint;	/* Print machine addresses? */
 
 /* GDB commands implemented in other modules:
  */  
@@ -220,7 +220,7 @@ set_tracepoint_count (int num)
 {
   tracepoint_count = num;
   set_internalvar (lookup_internalvar ("tpnum"),
-		   value_from_longest (builtin_type_int, (LONGEST) num));
+		   value_from_longest (builtin_type_int32, (LONGEST) num));
 }
 
 /* Set traceframe number to NUM.  */
@@ -229,7 +229,7 @@ set_traceframe_num (int num)
 {
   traceframe_number = num;
   set_internalvar (lookup_internalvar ("trace_frame"),
-		   value_from_longest (builtin_type_int, (LONGEST) num));
+		   value_from_longest (builtin_type_int32, (LONGEST) num));
 }
 
 /* Set tracepoint number to NUM.  */
@@ -238,8 +238,7 @@ set_tracepoint_num (int num)
 {
   tracepoint_number = num;
   set_internalvar (lookup_internalvar ("tracepoint"),
-		   value_from_longest (builtin_type_int, 
-				       (LONGEST) num));
+		   value_from_longest (builtin_type_int32, (LONGEST) num));
 }
 
 /* Set externally visible debug variables for querying/printing
@@ -252,11 +251,7 @@ set_traceframe_context (CORE_ADDR trace_pc)
   static struct type *func_range, *file_range;
   struct value *func_val;
   struct value *file_val;
-  static struct type *charstar;
   int len;
-
-  if (charstar == (struct type *) NULL)
-    charstar = lookup_pointer_type (builtin_type_char);
 
   if (trace_pc == -1)		/* Cease debugging any trace buffers.  */
     {
@@ -264,11 +259,11 @@ set_traceframe_context (CORE_ADDR trace_pc)
       traceframe_sal.pc = traceframe_sal.line = 0;
       traceframe_sal.symtab = NULL;
       set_internalvar (lookup_internalvar ("trace_func"),
-		       value_from_pointer (charstar, (LONGEST) 0));
+		       allocate_value (builtin_type_void));
       set_internalvar (lookup_internalvar ("trace_file"),
-		       value_from_pointer (charstar, (LONGEST) 0));
+		       allocate_value (builtin_type_void));
       set_internalvar (lookup_internalvar ("trace_line"),
-		       value_from_longest (builtin_type_int, 
+		       value_from_longest (builtin_type_int32,
 					   (LONGEST) - 1));
       return;
     }
@@ -280,7 +275,7 @@ set_traceframe_context (CORE_ADDR trace_pc)
   /* Save linenumber as "$trace_line", a debugger variable visible to
      users.  */
   set_internalvar (lookup_internalvar ("trace_line"),
-		   value_from_longest (builtin_type_int,
+		   value_from_longest (builtin_type_int32,
 				       (LONGEST) traceframe_sal.line));
 
   /* Save func name as "$trace_func", a debugger variable visible to
@@ -288,14 +283,14 @@ set_traceframe_context (CORE_ADDR trace_pc)
   if (traceframe_fun == NULL ||
       SYMBOL_LINKAGE_NAME (traceframe_fun) == NULL)
     set_internalvar (lookup_internalvar ("trace_func"),
-		     value_from_pointer (charstar, (LONGEST) 0));
+		     allocate_value (builtin_type_void));
   else
     {
       len = strlen (SYMBOL_LINKAGE_NAME (traceframe_fun));
       func_range = create_range_type (func_range,
-				      builtin_type_int, 0, len - 1);
+				      builtin_type_int32, 0, len - 1);
       func_string = create_array_type (func_string,
-				       builtin_type_char, func_range);
+				       builtin_type_true_char, func_range);
       func_val = allocate_value (func_string);
       deprecated_set_value_type (func_val, func_string);
       memcpy (value_contents_raw (func_val),
@@ -310,14 +305,14 @@ set_traceframe_context (CORE_ADDR trace_pc)
   if (traceframe_sal.symtab == NULL ||
       traceframe_sal.symtab->filename == NULL)
     set_internalvar (lookup_internalvar ("trace_file"),
-		     value_from_pointer (charstar, (LONGEST) 0));
+		     allocate_value (builtin_type_void));
   else
     {
       len = strlen (traceframe_sal.symtab->filename);
       file_range = create_range_type (file_range,
-				      builtin_type_int, 0, len - 1);
+				      builtin_type_int32, 0, len - 1);
       file_string = create_array_type (file_string,
-				       builtin_type_char, file_range);
+				       builtin_type_true_char, file_range);
       file_val = allocate_value (file_string);
       deprecated_set_value_type (file_val, file_string);
       memcpy (value_contents_raw (file_val),
@@ -439,9 +434,11 @@ trace_command (char *arg, int from_tty)
 static void
 trace_mention (struct tracepoint *tp)
 {
+  struct value_print_options opts;
   printf_filtered ("Tracepoint %d", tp->number);
 
-  if (addressprint || (tp->source_file == NULL))
+  get_user_print_options (&opts);
+  if (opts.addressprint || (tp->source_file == NULL))
     {
       printf_filtered (" at ");
       printf_filtered ("%s", paddress (tp->address));
@@ -472,12 +469,12 @@ tracepoints_info (char *tpnum_exp, int from_tty)
   ALL_TRACEPOINTS (t)
     if (tpnum == -1 || tpnum == t->number)
     {
-      extern int addressprint;	/* Print machine addresses?  */
-
+      struct value_print_options opts;
+      get_user_print_options (&opts);
       if (!found_a_tracepoint++)
 	{
 	  printf_filtered ("Num Enb ");
-	  if (addressprint)
+	  if (opts.addressprint)
 	    {
 	      if (gdbarch_addr_bit (current_gdbarch) <= 32)
 		printf_filtered ("Address    ");
@@ -487,7 +484,7 @@ tracepoints_info (char *tpnum_exp, int from_tty)
 	  printf_filtered ("PassC StepC What\n");
 	}
       strcpy (wrap_indent, "                           ");
-      if (addressprint)
+      if (opts.addressprint)
 	{
 	  if (gdbarch_addr_bit (current_gdbarch) <= 32)
 	    strcat (wrap_indent, "           ");
@@ -497,7 +494,7 @@ tracepoints_info (char *tpnum_exp, int from_tty)
 
       printf_filtered ("%-3d %-3s ", t->number,
 		       t->enabled_p ? "y" : "n");
-      if (addressprint)
+      if (opts.addressprint)
 	{
 	  char *tmp;
 
@@ -1457,7 +1454,7 @@ stringify_collection_list (struct collection_list *list, char *string)
 
   if (ndx == 0)
     {
-      free (str_list);
+      xfree (str_list);
       return NULL;
     }
   else
@@ -2297,6 +2294,7 @@ tracepoint_save_command (char *args, int from_tty)
   char *i1 = "    ", *i2 = "      ";
   char *indent, *actionline, *pathname;
   char tmp[40];
+  struct cleanup *cleanup;
 
   if (args == 0 || *args == 0)
     error (_("Argument required (file name in which to save tracepoints)"));
@@ -2308,10 +2306,11 @@ tracepoint_save_command (char *args, int from_tty)
     }
 
   pathname = tilde_expand (args);
+  cleanup = make_cleanup (xfree, pathname);
   if (!(fp = fopen (pathname, "w")))
     error (_("Unable to open file '%s' for saving tracepoints (%s)"),
 	   args, safe_strerror (errno));
-  xfree (pathname);
+  make_cleanup_fclose (fp);
   
   ALL_TRACEPOINTS (tp)
   {
@@ -2353,7 +2352,7 @@ tracepoint_save_command (char *args, int from_tty)
 	  }
       }
   }
-  fclose (fp);
+  do_cleanups (cleanup);
   if (from_tty)
     printf_filtered ("Tracepoints saved to file '%s'.\n", args);
   return;

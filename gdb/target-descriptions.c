@@ -1,6 +1,6 @@
 /* Target description support for GDB.
 
-   Copyright (C) 2006, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    Contributed by CodeSourcery.
 
@@ -183,7 +183,7 @@ target_find_description (void)
   /* The current architecture should not have any target description
      specified.  It should have been cleared, e.g. when we
      disconnected from the previous target.  */
-  gdb_assert (gdbarch_target_desc (current_gdbarch) == NULL);
+  gdb_assert (gdbarch_target_desc (target_gdbarch) == NULL);
 
   /* First try to fetch an XML description from the user-specified
      file.  */
@@ -216,7 +216,7 @@ target_find_description (void)
 	{
 	  struct tdesc_arch_data *data;
 
-	  data = gdbarch_data (current_gdbarch, tdesc_data);
+	  data = gdbarch_data (target_gdbarch, tdesc_data);
 	  if (tdesc_has_registers (current_target_desc)
 	      && data->registers == NULL)
 	    warning (_("Target-supplied registers are not supported "
@@ -552,32 +552,32 @@ tdesc_register_type (struct gdbarch *gdbarch, int regno)
   if (strcmp (reg->type, "float") == 0)
     {
       if (reg->bitsize == gdbarch_float_bit (gdbarch))
-	return builtin_type_float;
+	return builtin_type (gdbarch)->builtin_float;
       else if (reg->bitsize == gdbarch_double_bit (gdbarch))
-	return builtin_type_double;
+	return builtin_type (gdbarch)->builtin_double;
       else if (reg->bitsize == gdbarch_long_double_bit (gdbarch))
-	return builtin_type_long_double;
+	return builtin_type (gdbarch)->builtin_long_double;
     }
   else if (strcmp (reg->type, "int") == 0)
     {
       if (reg->bitsize == gdbarch_long_bit (gdbarch))
-	return builtin_type_long;
+	return builtin_type (gdbarch)->builtin_long;
       else if (reg->bitsize == TARGET_CHAR_BIT)
-	return builtin_type_char;
+	return builtin_type (gdbarch)->builtin_char;
       else if (reg->bitsize == gdbarch_short_bit (gdbarch))
-	return builtin_type_short;
+	return builtin_type (gdbarch)->builtin_short;
       else if (reg->bitsize == gdbarch_int_bit (gdbarch))
-	return builtin_type_int;
+	return builtin_type (gdbarch)->builtin_int;
       else if (reg->bitsize == gdbarch_long_long_bit (gdbarch))
-	return builtin_type_long_long;
+	return builtin_type (gdbarch)->builtin_long_long;
       else if (reg->bitsize == gdbarch_ptr_bit (gdbarch))
 	/* A bit desperate by this point... */
-	return builtin_type_void_data_ptr;
+	return builtin_type (gdbarch)->builtin_data_ptr;
     }
   else if (strcmp (reg->type, "code_ptr") == 0)
-    return builtin_type_void_func_ptr;
+    return builtin_type (gdbarch)->builtin_func_ptr;
   else if (strcmp (reg->type, "data_ptr") == 0)
-    return builtin_type_void_data_ptr;
+    return builtin_type (gdbarch)->builtin_data_ptr;
   else
     internal_error (__FILE__, __LINE__,
 		    "Register \"%s\" has an unknown type \"%s\"",
@@ -585,7 +585,7 @@ tdesc_register_type (struct gdbarch *gdbarch, int regno)
 
   warning (_("Register \"%s\" has an unsupported size (%d bits)"),
 	   reg->name, reg->bitsize);
-  return builtin_type_long;
+  return builtin_type (gdbarch)->builtin_long;
 }
 
 static int

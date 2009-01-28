@@ -1,7 +1,7 @@
 /* Target-dependent code for GDB, the GNU debugger.
 
    Copyright (C) 1986, 1987, 1989, 1991, 1992, 1993, 1994, 1995, 1996, 1997,
-   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
+   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -42,9 +42,15 @@
 #include "features/rs6000/powerpc-32l.c"
 #include "features/rs6000/powerpc-altivec32l.c"
 #include "features/rs6000/powerpc-vsx32l.c"
+#include "features/rs6000/powerpc-isa205-32l.c"
+#include "features/rs6000/powerpc-isa205-altivec32l.c"
+#include "features/rs6000/powerpc-isa205-vsx32l.c"
 #include "features/rs6000/powerpc-64l.c"
 #include "features/rs6000/powerpc-altivec64l.c"
 #include "features/rs6000/powerpc-vsx64l.c"
+#include "features/rs6000/powerpc-isa205-64l.c"
+#include "features/rs6000/powerpc-isa205-altivec64l.c"
+#include "features/rs6000/powerpc-isa205-vsx64l.c"
 #include "features/rs6000/powerpc-e500l.c"
 
 
@@ -1170,8 +1176,14 @@ _initialize_ppc_linux_tdep (void)
   initialize_tdesc_powerpc_32l ();
   initialize_tdesc_powerpc_altivec32l ();
   initialize_tdesc_powerpc_vsx32l ();
+  initialize_tdesc_powerpc_isa205_32l ();
+  initialize_tdesc_powerpc_isa205_altivec32l ();
+  initialize_tdesc_powerpc_isa205_vsx32l ();
   initialize_tdesc_powerpc_64l ();
   initialize_tdesc_powerpc_altivec64l ();
   initialize_tdesc_powerpc_vsx64l ();
+  initialize_tdesc_powerpc_isa205_64l ();
+  initialize_tdesc_powerpc_isa205_altivec64l ();
+  initialize_tdesc_powerpc_isa205_vsx64l ();
   initialize_tdesc_powerpc_e500l ();
 }

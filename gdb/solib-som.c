@@ -1,6 +1,6 @@
 /* Handle SOM shared libraries.
 
-   Copyright (C) 2004, 2005, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2004, 2005, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -391,7 +391,7 @@ som_solib_desire_dynamic_linker_symbols (void)
 							  objfile);
     if (dld_msymbol != NULL)
       {
-	if (SYMBOL_TYPE (dld_msymbol) == mst_solib_trampoline)
+	if (MSYMBOL_TYPE (dld_msymbol) == mst_solib_trampoline)
 	  {
 	    u = find_unwind_entry (SYMBOL_VALUE (dld_msymbol));
 	    if ((u != NULL) && (u->stub_unwind.stub_type == EXPORT))
@@ -430,7 +430,7 @@ som_solib_desire_dynamic_linker_symbols (void)
 							  objfile);
     if (dld_msymbol != NULL)
       {
-	if (SYMBOL_TYPE (dld_msymbol) == mst_solib_trampoline)
+	if (MSYMBOL_TYPE (dld_msymbol) == mst_solib_trampoline)
 	  {
 	    u = find_unwind_entry (SYMBOL_VALUE (dld_msymbol));
 	    if ((u != NULL) && (u->stub_unwind.stub_type == EXPORT))

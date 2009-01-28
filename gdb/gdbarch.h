@@ -54,6 +54,7 @@ struct displaced_step_closure;
 struct core_regset_section;
 
 extern struct gdbarch *current_gdbarch;
+extern struct gdbarch *target_gdbarch;
 
 
 /* The following are pre-initialized by GDBARCH. */
@@ -490,14 +491,14 @@ extern void set_gdbarch_convert_from_func_ptr_addr (struct gdbarch *gdbarch, gdb
    sort of generic thing to handle alignment or segmentation (it's
    possible it should be in TARGET_READ_PC instead). */
 
-typedef CORE_ADDR (gdbarch_addr_bits_remove_ftype) (CORE_ADDR addr);
+typedef CORE_ADDR (gdbarch_addr_bits_remove_ftype) (struct gdbarch *gdbarch, CORE_ADDR addr);
 extern CORE_ADDR gdbarch_addr_bits_remove (struct gdbarch *gdbarch, CORE_ADDR addr);
 extern void set_gdbarch_addr_bits_remove (struct gdbarch *gdbarch, gdbarch_addr_bits_remove_ftype *addr_bits_remove);
 
 /* It is not at all clear why gdbarch_smash_text_address is not folded into
    gdbarch_addr_bits_remove. */
 
-typedef CORE_ADDR (gdbarch_smash_text_address_ftype) (CORE_ADDR addr);
+typedef CORE_ADDR (gdbarch_smash_text_address_ftype) (struct gdbarch *gdbarch, CORE_ADDR addr);
 extern CORE_ADDR gdbarch_smash_text_address (struct gdbarch *gdbarch, CORE_ADDR addr);
 extern void set_gdbarch_smash_text_address (struct gdbarch *gdbarch, gdbarch_smash_text_address_ftype *smash_text_address);
 
@@ -589,9 +590,6 @@ extern void set_gdbarch_elf_make_msymbol_special (struct gdbarch *gdbarch, gdbar
 typedef void (gdbarch_coff_make_msymbol_special_ftype) (int val, struct minimal_symbol *msym);
 extern void gdbarch_coff_make_msymbol_special (struct gdbarch *gdbarch, int val, struct minimal_symbol *msym);
 extern void set_gdbarch_coff_make_msymbol_special (struct gdbarch *gdbarch, gdbarch_coff_make_msymbol_special_ftype *coff_make_msymbol_special);
-
-extern const char * gdbarch_name_of_malloc (struct gdbarch *gdbarch);
-extern void set_gdbarch_name_of_malloc (struct gdbarch *gdbarch, const char * name_of_malloc);
 
 extern int gdbarch_cannot_step_breakpoint (struct gdbarch *gdbarch);
 extern void set_gdbarch_cannot_step_breakpoint (struct gdbarch *gdbarch, int cannot_step_breakpoint);
@@ -812,6 +810,15 @@ extern int gdbarch_record_special_symbol_p (struct gdbarch *gdbarch);
 typedef void (gdbarch_record_special_symbol_ftype) (struct gdbarch *gdbarch, struct objfile *objfile, asymbol *sym);
 extern void gdbarch_record_special_symbol (struct gdbarch *gdbarch, struct objfile *objfile, asymbol *sym);
 extern void set_gdbarch_record_special_symbol (struct gdbarch *gdbarch, gdbarch_record_special_symbol_ftype *record_special_symbol);
+
+/* True if the list of shared libraries is one and only for all
+   processes, as opposed to a list of shared libraries per inferior.
+   When this property is true, GDB assumes that since shared libraries
+   are shared across processes, so is all code.  Hence, GDB further
+   assumes an inserted breakpoint location is visible to all processes. */
+
+extern int gdbarch_has_global_solist (struct gdbarch *gdbarch);
+extern void set_gdbarch_has_global_solist (struct gdbarch *gdbarch, int has_global_solist);
 
 extern struct gdbarch_tdep *gdbarch_tdep (struct gdbarch *gdbarch);
 

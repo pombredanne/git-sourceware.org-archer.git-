@@ -1,6 +1,6 @@
 /* Native-dependent code for Motorola 68000 BSD's.
 
-   Copyright (C) 2004, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2004, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -59,12 +59,13 @@ m68kbsd_supply_gregset (struct regcache *regcache, const void *gregs)
 static void
 m68kbsd_supply_fpregset (struct regcache *regcache, const void *fpregs)
 {
+  struct gdbarch *gdbarch = get_regcache_arch (regcache);
   const char *regs = fpregs;
   int regnum;
 
   for (regnum = M68K_FP0_REGNUM; regnum <= M68K_FPI_REGNUM; regnum++)
     regcache_raw_supply (regcache, regnum,
-			 regs + m68kbsd_fpreg_offset (regnum));
+			 regs + m68kbsd_fpreg_offset (gdbarch, regnum));
 }
 
 /* Collect the general-purpose registers from REGCACHE and store them
@@ -91,13 +92,15 @@ static void
 m68kbsd_collect_fpregset (struct regcache *regcache,
 			  void *fpregs, int regnum)
 {
+  struct gdbarch *gdbarch = get_regcache_arch (regcache);
   char *regs = fpregs;
   int i;
 
   for (i = M68K_FP0_REGNUM; i <= M68K_FPI_REGNUM; i++)
     {
       if (regnum == -1 || regnum == i)
-	regcache_raw_collect (regcache, i, regs + m68kbsd_fpreg_offset (i));
+	regcache_raw_collect (regcache, i,
+			      regs + m68kbsd_fpreg_offset (gdbarch, i));
     }
 }
 

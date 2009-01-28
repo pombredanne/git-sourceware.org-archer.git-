@@ -2,22 +2,23 @@
 
 THIS FILE IS MACHINE GENERATED WITH CGEN.
 
-Copyright 1996-2005 Free Software Foundation, Inc.
+Copyright 1996-2007 Free Software Foundation, Inc.
 
 This file is part of the GNU simulators.
 
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 3 of the License, or
-(at your option) any later version.
+   This file is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation; either version 3, or (at your option)
+   any later version.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+   It is distributed in the hope that it will be useful, but WITHOUT
+   ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+   or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+   License for more details.
 
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   You should have received a copy of the GNU General Public License along
+   with this program; if not, write to the Free Software Foundation, Inc.,
+   51 Franklin Street - Fifth Floor, Boston, MA 02110-1301, USA.
 
 */
 
@@ -481,7 +482,7 @@ SEM_FN_NAME (frvbf,smass) (SIM_CPU *current_cpu, SEM_ARG sem_arg)
   SEM_PC vpc = SEM_NEXT_VPC (sem_arg, pc, 4);
 
   {
-    DI opval = (ANDIF (ANDIF (GTDI (MULDI (EXTSIDI (GET_H_GR (FLD (f_GRi))), EXTSIDI (GET_H_GR (FLD (f_GRj)))), 0), GTDI (GET_H_IACC0 (((UINT) 0)), 0)), LTDI (SUBDI (9223372036854775807, MULDI (EXTSIDI (GET_H_GR (FLD (f_GRi))), EXTSIDI (GET_H_GR (FLD (f_GRj))))), GET_H_IACC0 (((UINT) 0))))) ? (MAKEDI (2147483647, 0xffffffff)) : (ANDIF (ANDIF (LTDI (MULDI (EXTSIDI (GET_H_GR (FLD (f_GRi))), EXTSIDI (GET_H_GR (FLD (f_GRj)))), 0), LTDI (GET_H_IACC0 (((UINT) 0)), 0)), GTDI (SUBDI (9223372036854775808, MULDI (EXTSIDI (GET_H_GR (FLD (f_GRi))), EXTSIDI (GET_H_GR (FLD (f_GRj))))), GET_H_IACC0 (((UINT) 0))))) ? (MAKEDI (0x80000000, 0)) : (ADDDI (GET_H_IACC0 (((UINT) 0)), MULDI (EXTSIDI (GET_H_GR (FLD (f_GRi))), EXTSIDI (GET_H_GR (FLD (f_GRj))))));
+    DI opval = (ANDIF (ANDIF (GTDI (MULDI (EXTSIDI (GET_H_GR (FLD (f_GRi))), EXTSIDI (GET_H_GR (FLD (f_GRj)))), 0), GTDI (GET_H_IACC0 (((UINT) 0)), 0)), LTDI (SUBDI (MAKEDI (2147483647, 0xffffffff), MULDI (EXTSIDI (GET_H_GR (FLD (f_GRi))), EXTSIDI (GET_H_GR (FLD (f_GRj))))), GET_H_IACC0 (((UINT) 0))))) ? (MAKEDI (2147483647, 0xffffffff)) : (ANDIF (ANDIF (LTDI (MULDI (EXTSIDI (GET_H_GR (FLD (f_GRi))), EXTSIDI (GET_H_GR (FLD (f_GRj)))), 0), LTDI (GET_H_IACC0 (((UINT) 0)), 0)), GTDI (SUBDI (MAKEDI (0x80000000, 0), MULDI (EXTSIDI (GET_H_GR (FLD (f_GRi))), EXTSIDI (GET_H_GR (FLD (f_GRj))))), GET_H_IACC0 (((UINT) 0))))) ? (MAKEDI (0x80000000, 0)) : (ADDDI (GET_H_IACC0 (((UINT) 0)), MULDI (EXTSIDI (GET_H_GR (FLD (f_GRi))), EXTSIDI (GET_H_GR (FLD (f_GRj))))));
     sim_queue_fn_di_write (current_cpu, frvbf_h_iacc0_set, ((UINT) 0), opval);
     TRACE_RESULT (current_cpu, abuf, "iacc0", 'D', opval);
   }
@@ -502,7 +503,7 @@ SEM_FN_NAME (frvbf,smsss) (SIM_CPU *current_cpu, SEM_ARG sem_arg)
   SEM_PC vpc = SEM_NEXT_VPC (sem_arg, pc, 4);
 
   {
-    DI opval = (ANDIF (ANDIF (LTDI (MULDI (EXTSIDI (GET_H_GR (FLD (f_GRi))), EXTSIDI (GET_H_GR (FLD (f_GRj)))), 0), GTDI (GET_H_IACC0 (((UINT) 0)), 0)), LTDI (ADDDI (9223372036854775807, MULDI (EXTSIDI (GET_H_GR (FLD (f_GRi))), EXTSIDI (GET_H_GR (FLD (f_GRj))))), GET_H_IACC0 (((UINT) 0))))) ? (MAKEDI (2147483647, 0xffffffff)) : (ANDIF (ANDIF (GTDI (MULDI (EXTSIDI (GET_H_GR (FLD (f_GRi))), EXTSIDI (GET_H_GR (FLD (f_GRj)))), 0), LTDI (GET_H_IACC0 (((UINT) 0)), 0)), GTDI (ADDDI (9223372036854775808, MULDI (EXTSIDI (GET_H_GR (FLD (f_GRi))), EXTSIDI (GET_H_GR (FLD (f_GRj))))), GET_H_IACC0 (((UINT) 0))))) ? (MAKEDI (0x80000000, 0)) : (SUBDI (GET_H_IACC0 (((UINT) 0)), MULDI (EXTSIDI (GET_H_GR (FLD (f_GRi))), EXTSIDI (GET_H_GR (FLD (f_GRj))))));
+    DI opval = (ANDIF (ANDIF (LTDI (MULDI (EXTSIDI (GET_H_GR (FLD (f_GRi))), EXTSIDI (GET_H_GR (FLD (f_GRj)))), 0), GTDI (GET_H_IACC0 (((UINT) 0)), 0)), LTDI (ADDDI (MAKEDI (2147483647, 0xffffffff), MULDI (EXTSIDI (GET_H_GR (FLD (f_GRi))), EXTSIDI (GET_H_GR (FLD (f_GRj))))), GET_H_IACC0 (((UINT) 0))))) ? (MAKEDI (2147483647, 0xffffffff)) : (ANDIF (ANDIF (GTDI (MULDI (EXTSIDI (GET_H_GR (FLD (f_GRi))), EXTSIDI (GET_H_GR (FLD (f_GRj)))), 0), LTDI (GET_H_IACC0 (((UINT) 0)), 0)), GTDI (ADDDI (MAKEDI (0x80000000, 0), MULDI (EXTSIDI (GET_H_GR (FLD (f_GRi))), EXTSIDI (GET_H_GR (FLD (f_GRj))))), GET_H_IACC0 (((UINT) 0))))) ? (MAKEDI (0x80000000, 0)) : (SUBDI (GET_H_IACC0 (((UINT) 0)), MULDI (EXTSIDI (GET_H_GR (FLD (f_GRi))), EXTSIDI (GET_H_GR (FLD (f_GRj))))));
     sim_queue_fn_di_write (current_cpu, frvbf_h_iacc0_set, ((UINT) 0), opval);
     TRACE_RESULT (current_cpu, abuf, "iacc0", 'D', opval);
   }
@@ -20351,7 +20352,7 @@ SEM_FN_NAME (frvbf,mabshs) (SIM_CPU *current_cpu, SEM_ARG sem_arg)
   }
   tmp_arghi = GET_H_FR_HI (((FLD (f_FRj)) + (0)));
   tmp_arglo = GET_H_FR_LO (((FLD (f_FRj)) + (0)));
-if (GTDI (ABSHI (tmp_arghi), 32767)) {
+if (GTDI (ABSDI (EXTHIDI (tmp_arghi)), 32767)) {
 {
   {
     UHI opval = 32767;
@@ -20362,7 +20363,7 @@ if (GTDI (ABSHI (tmp_arghi), 32767)) {
 frvbf_media_overflow (current_cpu, 8);
 }
 } else {
-if (LTDI (ABSHI (tmp_arghi), -32768)) {
+if (LTDI (ABSDI (EXTHIDI (tmp_arghi)), -32768)) {
 {
   {
     UHI opval = -32768;
@@ -20374,14 +20375,14 @@ frvbf_media_overflow (current_cpu, 8);
 }
 } else {
   {
-    UHI opval = ABSHI (tmp_arghi);
+    UHI opval = ABSDI (EXTHIDI (tmp_arghi));
     sim_queue_fn_hi_write (current_cpu, frvbf_h_fr_hi_set, ((FLD (f_FRk)) + (0)), opval);
     written |= (1 << 8);
     TRACE_RESULT (current_cpu, abuf, "fr_hi", 'x', opval);
   }
 }
 }
-if (GTDI (ABSHI (tmp_arglo), 32767)) {
+if (GTDI (ABSDI (EXTHIDI (tmp_arglo)), 32767)) {
 {
   {
     UHI opval = 32767;
@@ -20392,7 +20393,7 @@ if (GTDI (ABSHI (tmp_arglo), 32767)) {
 frvbf_media_overflow (current_cpu, 4);
 }
 } else {
-if (LTDI (ABSHI (tmp_arglo), -32768)) {
+if (LTDI (ABSDI (EXTHIDI (tmp_arglo)), -32768)) {
 {
   {
     UHI opval = -32768;
@@ -20404,7 +20405,7 @@ frvbf_media_overflow (current_cpu, 4);
 }
 } else {
   {
-    UHI opval = ABSHI (tmp_arglo);
+    UHI opval = ABSDI (EXTHIDI (tmp_arglo));
     sim_queue_fn_hi_write (current_cpu, frvbf_h_fr_lo_set, ((FLD (f_FRk)) + (0)), opval);
     written |= (1 << 9);
     TRACE_RESULT (current_cpu, abuf, "fr_lo", 'x', opval);
@@ -20442,7 +20443,7 @@ SEM_FN_NAME (frvbf,maddhss) (SIM_CPU *current_cpu, SEM_ARG sem_arg)
 }
 {
   DI tmp_tmp;
-  tmp_tmp = ADDHI (tmp_argihi, tmp_argjhi);
+  tmp_tmp = ADDDI (EXTHIDI (tmp_argihi), EXTHIDI (tmp_argjhi));
 if (GTDI (tmp_tmp, 32767)) {
 {
   {
@@ -20476,7 +20477,7 @@ frvbf_media_overflow (current_cpu, 8);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = ADDHI (tmp_argilo, tmp_argjlo);
+  tmp_tmp = ADDDI (EXTHIDI (tmp_argilo), EXTHIDI (tmp_argjlo));
 if (GTDI (tmp_tmp, 32767)) {
 {
   {
@@ -20539,7 +20540,7 @@ SEM_FN_NAME (frvbf,maddhus) (SIM_CPU *current_cpu, SEM_ARG sem_arg)
 }
 {
   DI tmp_tmp;
-  tmp_tmp = ADDHI (tmp_argihi, tmp_argjhi);
+  tmp_tmp = ADDDI (ZEXTHIDI (tmp_argihi), ZEXTHIDI (tmp_argjhi));
 if (GTDI (tmp_tmp, 65535)) {
 {
   {
@@ -20573,7 +20574,7 @@ frvbf_media_overflow (current_cpu, 8);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = ADDHI (tmp_argilo, tmp_argjlo);
+  tmp_tmp = ADDDI (ZEXTHIDI (tmp_argilo), ZEXTHIDI (tmp_argjlo));
 if (GTDI (tmp_tmp, 65535)) {
 {
   {
@@ -20636,7 +20637,7 @@ SEM_FN_NAME (frvbf,msubhss) (SIM_CPU *current_cpu, SEM_ARG sem_arg)
 }
 {
   DI tmp_tmp;
-  tmp_tmp = SUBHI (tmp_argihi, tmp_argjhi);
+  tmp_tmp = SUBDI (EXTHIDI (tmp_argihi), EXTHIDI (tmp_argjhi));
 if (GTDI (tmp_tmp, 32767)) {
 {
   {
@@ -20670,7 +20671,7 @@ frvbf_media_overflow (current_cpu, 8);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = SUBHI (tmp_argilo, tmp_argjlo);
+  tmp_tmp = SUBDI (EXTHIDI (tmp_argilo), EXTHIDI (tmp_argjlo));
 if (GTDI (tmp_tmp, 32767)) {
 {
   {
@@ -20733,7 +20734,7 @@ SEM_FN_NAME (frvbf,msubhus) (SIM_CPU *current_cpu, SEM_ARG sem_arg)
 }
 {
   DI tmp_tmp;
-  tmp_tmp = SUBHI (tmp_argihi, tmp_argjhi);
+  tmp_tmp = SUBDI (ZEXTHIDI (tmp_argihi), ZEXTHIDI (tmp_argjhi));
 if (GTDI (tmp_tmp, 65535)) {
 {
   {
@@ -20767,7 +20768,7 @@ frvbf_media_overflow (current_cpu, 8);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = SUBHI (tmp_argilo, tmp_argjlo);
+  tmp_tmp = SUBDI (ZEXTHIDI (tmp_argilo), ZEXTHIDI (tmp_argjlo));
 if (GTDI (tmp_tmp, 65535)) {
 {
   {
@@ -20831,7 +20832,7 @@ if (EQQI (CPU (h_cccr[FLD (f_CCi)]), ORSI (FLD (f_cond), 2))) {
 }
 {
   DI tmp_tmp;
-  tmp_tmp = ADDHI (tmp_argihi, tmp_argjhi);
+  tmp_tmp = ADDDI (EXTHIDI (tmp_argihi), EXTHIDI (tmp_argjhi));
 if (GTDI (tmp_tmp, 32767)) {
 {
   {
@@ -20865,7 +20866,7 @@ frvbf_media_overflow (current_cpu, 8);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = ADDHI (tmp_argilo, tmp_argjlo);
+  tmp_tmp = ADDDI (EXTHIDI (tmp_argilo), EXTHIDI (tmp_argjlo));
 if (GTDI (tmp_tmp, 32767)) {
 {
   {
@@ -20930,7 +20931,7 @@ if (EQQI (CPU (h_cccr[FLD (f_CCi)]), ORSI (FLD (f_cond), 2))) {
 }
 {
   DI tmp_tmp;
-  tmp_tmp = ADDHI (tmp_argihi, tmp_argjhi);
+  tmp_tmp = ADDDI (ZEXTHIDI (tmp_argihi), ZEXTHIDI (tmp_argjhi));
 if (GTDI (tmp_tmp, 65535)) {
 {
   {
@@ -20964,7 +20965,7 @@ frvbf_media_overflow (current_cpu, 8);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = ADDHI (tmp_argilo, tmp_argjlo);
+  tmp_tmp = ADDDI (ZEXTHIDI (tmp_argilo), ZEXTHIDI (tmp_argjlo));
 if (GTDI (tmp_tmp, 65535)) {
 {
   {
@@ -21029,7 +21030,7 @@ if (EQQI (CPU (h_cccr[FLD (f_CCi)]), ORSI (FLD (f_cond), 2))) {
 }
 {
   DI tmp_tmp;
-  tmp_tmp = SUBHI (tmp_argihi, tmp_argjhi);
+  tmp_tmp = SUBDI (EXTHIDI (tmp_argihi), EXTHIDI (tmp_argjhi));
 if (GTDI (tmp_tmp, 32767)) {
 {
   {
@@ -21063,7 +21064,7 @@ frvbf_media_overflow (current_cpu, 8);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = SUBHI (tmp_argilo, tmp_argjlo);
+  tmp_tmp = SUBDI (EXTHIDI (tmp_argilo), EXTHIDI (tmp_argjlo));
 if (GTDI (tmp_tmp, 32767)) {
 {
   {
@@ -21128,7 +21129,7 @@ if (EQQI (CPU (h_cccr[FLD (f_CCi)]), ORSI (FLD (f_cond), 2))) {
 }
 {
   DI tmp_tmp;
-  tmp_tmp = SUBHI (tmp_argihi, tmp_argjhi);
+  tmp_tmp = SUBDI (ZEXTHIDI (tmp_argihi), ZEXTHIDI (tmp_argjhi));
 if (GTDI (tmp_tmp, 65535)) {
 {
   {
@@ -21162,7 +21163,7 @@ frvbf_media_overflow (current_cpu, 8);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = SUBHI (tmp_argilo, tmp_argjlo);
+  tmp_tmp = SUBDI (ZEXTHIDI (tmp_argilo), ZEXTHIDI (tmp_argjlo));
 if (GTDI (tmp_tmp, 65535)) {
 {
   {
@@ -21235,7 +21236,7 @@ frvbf_media_register_not_aligned (current_cpu);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = ADDHI (tmp_argihi, tmp_argjhi);
+  tmp_tmp = ADDDI (EXTHIDI (tmp_argihi), EXTHIDI (tmp_argjhi));
 if (GTDI (tmp_tmp, 32767)) {
 {
   {
@@ -21269,7 +21270,7 @@ frvbf_media_overflow (current_cpu, 8);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = ADDHI (tmp_argilo, tmp_argjlo);
+  tmp_tmp = ADDDI (EXTHIDI (tmp_argilo), EXTHIDI (tmp_argjlo));
 if (GTDI (tmp_tmp, 32767)) {
 {
   {
@@ -21309,7 +21310,7 @@ frvbf_media_overflow (current_cpu, 4);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = ADDHI (tmp_argihi, tmp_argjhi);
+  tmp_tmp = ADDDI (EXTHIDI (tmp_argihi), EXTHIDI (tmp_argjhi));
 if (GTDI (tmp_tmp, 32767)) {
 {
   {
@@ -21343,7 +21344,7 @@ frvbf_media_overflow (current_cpu, 2);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = ADDHI (tmp_argilo, tmp_argjlo);
+  tmp_tmp = ADDDI (EXTHIDI (tmp_argilo), EXTHIDI (tmp_argjlo));
 if (GTDI (tmp_tmp, 32767)) {
 {
   {
@@ -21416,7 +21417,7 @@ frvbf_media_register_not_aligned (current_cpu);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = ADDHI (tmp_argihi, tmp_argjhi);
+  tmp_tmp = ADDDI (ZEXTHIDI (tmp_argihi), ZEXTHIDI (tmp_argjhi));
 if (GTDI (tmp_tmp, 65535)) {
 {
   {
@@ -21450,7 +21451,7 @@ frvbf_media_overflow (current_cpu, 8);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = ADDHI (tmp_argilo, tmp_argjlo);
+  tmp_tmp = ADDDI (ZEXTHIDI (tmp_argilo), ZEXTHIDI (tmp_argjlo));
 if (GTDI (tmp_tmp, 65535)) {
 {
   {
@@ -21490,7 +21491,7 @@ frvbf_media_overflow (current_cpu, 4);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = ADDHI (tmp_argihi, tmp_argjhi);
+  tmp_tmp = ADDDI (ZEXTHIDI (tmp_argihi), ZEXTHIDI (tmp_argjhi));
 if (GTDI (tmp_tmp, 65535)) {
 {
   {
@@ -21524,7 +21525,7 @@ frvbf_media_overflow (current_cpu, 2);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = ADDHI (tmp_argilo, tmp_argjlo);
+  tmp_tmp = ADDDI (ZEXTHIDI (tmp_argilo), ZEXTHIDI (tmp_argjlo));
 if (GTDI (tmp_tmp, 65535)) {
 {
   {
@@ -21597,7 +21598,7 @@ frvbf_media_register_not_aligned (current_cpu);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = SUBHI (tmp_argihi, tmp_argjhi);
+  tmp_tmp = SUBDI (EXTHIDI (tmp_argihi), EXTHIDI (tmp_argjhi));
 if (GTDI (tmp_tmp, 32767)) {
 {
   {
@@ -21631,7 +21632,7 @@ frvbf_media_overflow (current_cpu, 8);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = SUBHI (tmp_argilo, tmp_argjlo);
+  tmp_tmp = SUBDI (EXTHIDI (tmp_argilo), EXTHIDI (tmp_argjlo));
 if (GTDI (tmp_tmp, 32767)) {
 {
   {
@@ -21671,7 +21672,7 @@ frvbf_media_overflow (current_cpu, 4);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = SUBHI (tmp_argihi, tmp_argjhi);
+  tmp_tmp = SUBDI (EXTHIDI (tmp_argihi), EXTHIDI (tmp_argjhi));
 if (GTDI (tmp_tmp, 32767)) {
 {
   {
@@ -21705,7 +21706,7 @@ frvbf_media_overflow (current_cpu, 2);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = SUBHI (tmp_argilo, tmp_argjlo);
+  tmp_tmp = SUBDI (EXTHIDI (tmp_argilo), EXTHIDI (tmp_argjlo));
 if (GTDI (tmp_tmp, 32767)) {
 {
   {
@@ -21778,7 +21779,7 @@ frvbf_media_register_not_aligned (current_cpu);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = SUBHI (tmp_argihi, tmp_argjhi);
+  tmp_tmp = SUBDI (ZEXTHIDI (tmp_argihi), ZEXTHIDI (tmp_argjhi));
 if (GTDI (tmp_tmp, 65535)) {
 {
   {
@@ -21812,7 +21813,7 @@ frvbf_media_overflow (current_cpu, 8);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = SUBHI (tmp_argilo, tmp_argjlo);
+  tmp_tmp = SUBDI (ZEXTHIDI (tmp_argilo), ZEXTHIDI (tmp_argjlo));
 if (GTDI (tmp_tmp, 65535)) {
 {
   {
@@ -21852,7 +21853,7 @@ frvbf_media_overflow (current_cpu, 4);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = SUBHI (tmp_argihi, tmp_argjhi);
+  tmp_tmp = SUBDI (ZEXTHIDI (tmp_argihi), ZEXTHIDI (tmp_argjhi));
 if (GTDI (tmp_tmp, 65535)) {
 {
   {
@@ -21886,7 +21887,7 @@ frvbf_media_overflow (current_cpu, 2);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = SUBHI (tmp_argilo, tmp_argjlo);
+  tmp_tmp = SUBDI (ZEXTHIDI (tmp_argilo), ZEXTHIDI (tmp_argjlo));
 if (GTDI (tmp_tmp, 65535)) {
 {
   {
@@ -21960,7 +21961,7 @@ if (EQQI (CPU (h_cccr[FLD (f_CCi)]), ORSI (FLD (f_cond), 2))) {
 }
 {
   DI tmp_tmp;
-  tmp_tmp = ADDHI (tmp_argihi, tmp_argjhi);
+  tmp_tmp = ADDDI (EXTHIDI (tmp_argihi), EXTHIDI (tmp_argjhi));
 if (GTDI (tmp_tmp, 32767)) {
 {
   {
@@ -21994,7 +21995,7 @@ frvbf_media_overflow (current_cpu, 8);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = ADDHI (tmp_argilo, tmp_argjlo);
+  tmp_tmp = ADDDI (EXTHIDI (tmp_argilo), EXTHIDI (tmp_argjlo));
 if (GTDI (tmp_tmp, 32767)) {
 {
   {
@@ -22034,7 +22035,7 @@ frvbf_media_overflow (current_cpu, 4);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = ADDHI (tmp_argihi, tmp_argjhi);
+  tmp_tmp = ADDDI (EXTHIDI (tmp_argihi), EXTHIDI (tmp_argjhi));
 if (GTDI (tmp_tmp, 32767)) {
 {
   {
@@ -22068,7 +22069,7 @@ frvbf_media_overflow (current_cpu, 2);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = ADDHI (tmp_argilo, tmp_argjlo);
+  tmp_tmp = ADDDI (EXTHIDI (tmp_argilo), EXTHIDI (tmp_argjlo));
 if (GTDI (tmp_tmp, 32767)) {
 {
   {
@@ -22143,7 +22144,7 @@ if (EQQI (CPU (h_cccr[FLD (f_CCi)]), ORSI (FLD (f_cond), 2))) {
 }
 {
   DI tmp_tmp;
-  tmp_tmp = ADDHI (tmp_argihi, tmp_argjhi);
+  tmp_tmp = ADDDI (ZEXTHIDI (tmp_argihi), ZEXTHIDI (tmp_argjhi));
 if (GTDI (tmp_tmp, 65535)) {
 {
   {
@@ -22177,7 +22178,7 @@ frvbf_media_overflow (current_cpu, 8);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = ADDHI (tmp_argilo, tmp_argjlo);
+  tmp_tmp = ADDDI (ZEXTHIDI (tmp_argilo), ZEXTHIDI (tmp_argjlo));
 if (GTDI (tmp_tmp, 65535)) {
 {
   {
@@ -22217,7 +22218,7 @@ frvbf_media_overflow (current_cpu, 4);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = ADDHI (tmp_argihi, tmp_argjhi);
+  tmp_tmp = ADDDI (ZEXTHIDI (tmp_argihi), ZEXTHIDI (tmp_argjhi));
 if (GTDI (tmp_tmp, 65535)) {
 {
   {
@@ -22251,7 +22252,7 @@ frvbf_media_overflow (current_cpu, 2);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = ADDHI (tmp_argilo, tmp_argjlo);
+  tmp_tmp = ADDDI (ZEXTHIDI (tmp_argilo), ZEXTHIDI (tmp_argjlo));
 if (GTDI (tmp_tmp, 65535)) {
 {
   {
@@ -22326,7 +22327,7 @@ if (EQQI (CPU (h_cccr[FLD (f_CCi)]), ORSI (FLD (f_cond), 2))) {
 }
 {
   DI tmp_tmp;
-  tmp_tmp = SUBHI (tmp_argihi, tmp_argjhi);
+  tmp_tmp = SUBDI (EXTHIDI (tmp_argihi), EXTHIDI (tmp_argjhi));
 if (GTDI (tmp_tmp, 32767)) {
 {
   {
@@ -22360,7 +22361,7 @@ frvbf_media_overflow (current_cpu, 8);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = SUBHI (tmp_argilo, tmp_argjlo);
+  tmp_tmp = SUBDI (EXTHIDI (tmp_argilo), EXTHIDI (tmp_argjlo));
 if (GTDI (tmp_tmp, 32767)) {
 {
   {
@@ -22400,7 +22401,7 @@ frvbf_media_overflow (current_cpu, 4);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = SUBHI (tmp_argihi, tmp_argjhi);
+  tmp_tmp = SUBDI (EXTHIDI (tmp_argihi), EXTHIDI (tmp_argjhi));
 if (GTDI (tmp_tmp, 32767)) {
 {
   {
@@ -22434,7 +22435,7 @@ frvbf_media_overflow (current_cpu, 2);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = SUBHI (tmp_argilo, tmp_argjlo);
+  tmp_tmp = SUBDI (EXTHIDI (tmp_argilo), EXTHIDI (tmp_argjlo));
 if (GTDI (tmp_tmp, 32767)) {
 {
   {
@@ -22509,7 +22510,7 @@ if (EQQI (CPU (h_cccr[FLD (f_CCi)]), ORSI (FLD (f_cond), 2))) {
 }
 {
   DI tmp_tmp;
-  tmp_tmp = SUBHI (tmp_argihi, tmp_argjhi);
+  tmp_tmp = SUBDI (ZEXTHIDI (tmp_argihi), ZEXTHIDI (tmp_argjhi));
 if (GTDI (tmp_tmp, 65535)) {
 {
   {
@@ -22543,7 +22544,7 @@ frvbf_media_overflow (current_cpu, 8);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = SUBHI (tmp_argilo, tmp_argjlo);
+  tmp_tmp = SUBDI (ZEXTHIDI (tmp_argilo), ZEXTHIDI (tmp_argjlo));
 if (GTDI (tmp_tmp, 65535)) {
 {
   {
@@ -22583,7 +22584,7 @@ frvbf_media_overflow (current_cpu, 4);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = SUBHI (tmp_argihi, tmp_argjhi);
+  tmp_tmp = SUBDI (ZEXTHIDI (tmp_argihi), ZEXTHIDI (tmp_argjhi));
 if (GTDI (tmp_tmp, 65535)) {
 {
   {
@@ -22617,7 +22618,7 @@ frvbf_media_overflow (current_cpu, 2);
 }
 {
   DI tmp_tmp;
-  tmp_tmp = SUBHI (tmp_argilo, tmp_argjlo);
+  tmp_tmp = SUBDI (ZEXTHIDI (tmp_argilo), ZEXTHIDI (tmp_argjlo));
 if (GTDI (tmp_tmp, 65535)) {
 {
   {
@@ -22941,10 +22942,10 @@ frvbf_media_acc_not_aligned (current_cpu);
 {
   DI tmp_tmp;
   tmp_tmp = ADDDI (GET_H_ACC40S (FLD (f_ACC40Si)), GET_H_ACC40S (((FLD (f_ACC40Si)) + (1))));
-if (GTDI (tmp_tmp, 549755813887)) {
+if (GTDI (tmp_tmp, MAKEDI (127, 0xffffffff))) {
 {
   {
-    DI opval = 549755813887;
+    DI opval = MAKEDI (127, 0xffffffff);
     sim_queue_fn_di_write (current_cpu, frvbf_h_acc40S_set, FLD (f_ACC40Sk), opval);
     written |= (1 << 4);
     TRACE_RESULT (current_cpu, abuf, "acc40S", 'D', opval);
@@ -22952,10 +22953,10 @@ if (GTDI (tmp_tmp, 549755813887)) {
 frvbf_media_overflow (current_cpu, 8);
 }
 } else {
-if (LTDI (tmp_tmp, INVDI (549755813887))) {
+if (LTDI (tmp_tmp, INVDI (MAKEDI (127, 0xffffffff)))) {
 {
   {
-    DI opval = INVDI (549755813887);
+    DI opval = INVDI (MAKEDI (127, 0xffffffff));
     sim_queue_fn_di_write (current_cpu, frvbf_h_acc40S_set, FLD (f_ACC40Sk), opval);
     written |= (1 << 4);
     TRACE_RESULT (current_cpu, abuf, "acc40S", 'D', opval);
@@ -23000,10 +23001,10 @@ frvbf_media_acc_not_aligned (current_cpu);
 {
   DI tmp_tmp;
   tmp_tmp = SUBDI (GET_H_ACC40S (FLD (f_ACC40Si)), GET_H_ACC40S (((FLD (f_ACC40Si)) + (1))));
-if (GTDI (tmp_tmp, 549755813887)) {
+if (GTDI (tmp_tmp, MAKEDI (127, 0xffffffff))) {
 {
   {
-    DI opval = 549755813887;
+    DI opval = MAKEDI (127, 0xffffffff);
     sim_queue_fn_di_write (current_cpu, frvbf_h_acc40S_set, FLD (f_ACC40Sk), opval);
     written |= (1 << 4);
     TRACE_RESULT (current_cpu, abuf, "acc40S", 'D', opval);
@@ -23011,10 +23012,10 @@ if (GTDI (tmp_tmp, 549755813887)) {
 frvbf_media_overflow (current_cpu, 8);
 }
 } else {
-if (LTDI (tmp_tmp, INVDI (549755813887))) {
+if (LTDI (tmp_tmp, INVDI (MAKEDI (127, 0xffffffff)))) {
 {
   {
-    DI opval = INVDI (549755813887);
+    DI opval = INVDI (MAKEDI (127, 0xffffffff));
     sim_queue_fn_di_write (current_cpu, frvbf_h_acc40S_set, FLD (f_ACC40Sk), opval);
     written |= (1 << 4);
     TRACE_RESULT (current_cpu, abuf, "acc40S", 'D', opval);
@@ -23063,10 +23064,10 @@ frvbf_media_acc_not_aligned (current_cpu);
 {
   DI tmp_tmp;
   tmp_tmp = ADDDI (GET_H_ACC40S (FLD (f_ACC40Si)), GET_H_ACC40S (((FLD (f_ACC40Si)) + (1))));
-if (GTDI (tmp_tmp, 549755813887)) {
+if (GTDI (tmp_tmp, MAKEDI (127, 0xffffffff))) {
 {
   {
-    DI opval = 549755813887;
+    DI opval = MAKEDI (127, 0xffffffff);
     sim_queue_fn_di_write (current_cpu, frvbf_h_acc40S_set, FLD (f_ACC40Sk), opval);
     written |= (1 << 6);
     TRACE_RESULT (current_cpu, abuf, "acc40S", 'D', opval);
@@ -23074,10 +23075,10 @@ if (GTDI (tmp_tmp, 549755813887)) {
 frvbf_media_overflow (current_cpu, 8);
 }
 } else {
-if (LTDI (tmp_tmp, INVDI (549755813887))) {
+if (LTDI (tmp_tmp, INVDI (MAKEDI (127, 0xffffffff)))) {
 {
   {
-    DI opval = INVDI (549755813887);
+    DI opval = INVDI (MAKEDI (127, 0xffffffff));
     sim_queue_fn_di_write (current_cpu, frvbf_h_acc40S_set, FLD (f_ACC40Sk), opval);
     written |= (1 << 6);
     TRACE_RESULT (current_cpu, abuf, "acc40S", 'D', opval);
@@ -23097,10 +23098,10 @@ frvbf_media_overflow (current_cpu, 8);
 {
   DI tmp_tmp;
   tmp_tmp = ADDDI (GET_H_ACC40S (((FLD (f_ACC40Si)) + (2))), GET_H_ACC40S (((FLD (f_ACC40Si)) + (3))));
-if (GTDI (tmp_tmp, 549755813887)) {
+if (GTDI (tmp_tmp, MAKEDI (127, 0xffffffff))) {
 {
   {
-    DI opval = 549755813887;
+    DI opval = MAKEDI (127, 0xffffffff);
     sim_queue_fn_di_write (current_cpu, frvbf_h_acc40S_set, ((FLD (f_ACC40Sk)) + (1)), opval);
     written |= (1 << 7);
     TRACE_RESULT (current_cpu, abuf, "acc40S", 'D', opval);
@@ -23108,10 +23109,10 @@ if (GTDI (tmp_tmp, 549755813887)) {
 frvbf_media_overflow (current_cpu, 4);
 }
 } else {
-if (LTDI (tmp_tmp, INVDI (549755813887))) {
+if (LTDI (tmp_tmp, INVDI (MAKEDI (127, 0xffffffff)))) {
 {
   {
-    DI opval = INVDI (549755813887);
+    DI opval = INVDI (MAKEDI (127, 0xffffffff));
     sim_queue_fn_di_write (current_cpu, frvbf_h_acc40S_set, ((FLD (f_ACC40Sk)) + (1)), opval);
     written |= (1 << 7);
     TRACE_RESULT (current_cpu, abuf, "acc40S", 'D', opval);
@@ -23162,10 +23163,10 @@ frvbf_media_acc_not_aligned (current_cpu);
 {
   DI tmp_tmp;
   tmp_tmp = SUBDI (GET_H_ACC40S (FLD (f_ACC40Si)), GET_H_ACC40S (((FLD (f_ACC40Si)) + (1))));
-if (GTDI (tmp_tmp, 549755813887)) {
+if (GTDI (tmp_tmp, MAKEDI (127, 0xffffffff))) {
 {
   {
-    DI opval = 549755813887;
+    DI opval = MAKEDI (127, 0xffffffff);
     sim_queue_fn_di_write (current_cpu, frvbf_h_acc40S_set, FLD (f_ACC40Sk), opval);
     written |= (1 << 6);
     TRACE_RESULT (current_cpu, abuf, "acc40S", 'D', opval);
@@ -23173,10 +23174,10 @@ if (GTDI (tmp_tmp, 549755813887)) {
 frvbf_media_overflow (current_cpu, 8);
 }
 } else {
-if (LTDI (tmp_tmp, INVDI (549755813887))) {
+if (LTDI (tmp_tmp, INVDI (MAKEDI (127, 0xffffffff)))) {
 {
   {
-    DI opval = INVDI (549755813887);
+    DI opval = INVDI (MAKEDI (127, 0xffffffff));
     sim_queue_fn_di_write (current_cpu, frvbf_h_acc40S_set, FLD (f_ACC40Sk), opval);
     written |= (1 << 6);
     TRACE_RESULT (current_cpu, abuf, "acc40S", 'D', opval);
@@ -23196,10 +23197,10 @@ frvbf_media_overflow (current_cpu, 8);
 {
   DI tmp_tmp;
   tmp_tmp = SUBDI (GET_H_ACC40S (((FLD (f_ACC40Si)) + (2))), GET_H_ACC40S (((FLD (f_ACC40Si)) + (3))));
-if (GTDI (tmp_tmp, 549755813887)) {
+if (GTDI (tmp_tmp, MAKEDI (127, 0xffffffff))) {
 {
   {
-    DI opval = 549755813887;
+    DI opval = MAKEDI (127, 0xffffffff);
     sim_queue_fn_di_write (current_cpu, frvbf_h_acc40S_set, ((FLD (f_ACC40Sk)) + (1)), opval);
     written |= (1 << 7);
     TRACE_RESULT (current_cpu, abuf, "acc40S", 'D', opval);
@@ -23207,10 +23208,10 @@ if (GTDI (tmp_tmp, 549755813887)) {
 frvbf_media_overflow (current_cpu, 4);
 }
 } else {
-if (LTDI (tmp_tmp, INVDI (549755813887))) {
+if (LTDI (tmp_tmp, INVDI (MAKEDI (127, 0xffffffff)))) {
 {
   {
-    DI opval = INVDI (549755813887);
+    DI opval = INVDI (MAKEDI (127, 0xffffffff));
     sim_queue_fn_di_write (current_cpu, frvbf_h_acc40S_set, ((FLD (f_ACC40Sk)) + (1)), opval);
     written |= (1 << 7);
     TRACE_RESULT (current_cpu, abuf, "acc40S", 'D', opval);
@@ -23261,10 +23262,10 @@ frvbf_media_acc_not_aligned (current_cpu);
 {
   DI tmp_tmp;
   tmp_tmp = ADDDI (GET_H_ACC40S (FLD (f_ACC40Si)), GET_H_ACC40S (((FLD (f_ACC40Si)) + (1))));
-if (GTDI (tmp_tmp, 549755813887)) {
+if (GTDI (tmp_tmp, MAKEDI (127, 0xffffffff))) {
 {
   {
-    DI opval = 549755813887;
+    DI opval = MAKEDI (127, 0xffffffff);
     sim_queue_fn_di_write (current_cpu, frvbf_h_acc40S_set, FLD (f_ACC40Sk), opval);
     written |= (1 << 4);
     TRACE_RESULT (current_cpu, abuf, "acc40S", 'D', opval);
@@ -23272,10 +23273,10 @@ if (GTDI (tmp_tmp, 549755813887)) {
 frvbf_media_overflow (current_cpu, 8);
 }
 } else {
-if (LTDI (tmp_tmp, INVDI (549755813887))) {
+if (LTDI (tmp_tmp, INVDI (MAKEDI (127, 0xffffffff)))) {
 {
   {
-    DI opval = INVDI (549755813887);
+    DI opval = INVDI (MAKEDI (127, 0xffffffff));
     sim_queue_fn_di_write (current_cpu, frvbf_h_acc40S_set, FLD (f_ACC40Sk), opval);
     written |= (1 << 4);
     TRACE_RESULT (current_cpu, abuf, "acc40S", 'D', opval);
@@ -23295,10 +23296,10 @@ frvbf_media_overflow (current_cpu, 8);
 {
   DI tmp_tmp;
   tmp_tmp = SUBDI (GET_H_ACC40S (FLD (f_ACC40Si)), GET_H_ACC40S (((FLD (f_ACC40Si)) + (1))));
-if (GTDI (tmp_tmp, 549755813887)) {
+if (GTDI (tmp_tmp, MAKEDI (127, 0xffffffff))) {
 {
   {
-    DI opval = 549755813887;
+    DI opval = MAKEDI (127, 0xffffffff);
     sim_queue_fn_di_write (current_cpu, frvbf_h_acc40S_set, ((FLD (f_ACC40Sk)) + (1)), opval);
     written |= (1 << 5);
     TRACE_RESULT (current_cpu, abuf, "acc40S", 'D', opval);
@@ -23306,10 +23307,10 @@ if (GTDI (tmp_tmp, 549755813887)) {
 frvbf_media_overflow (current_cpu, 4);
 }
 } else {
-if (LTDI (tmp_tmp, INVDI (549755813887))) {
+if (LTDI (tmp_tmp, INVDI (MAKEDI (127, 0xffffffff)))) {
 {
   {
-    DI opval = INVDI (549755813887);
+    DI opval = INVDI (MAKEDI (127, 0xffffffff));
     sim_queue_fn_di_write (current_cpu, frvbf_h_acc40S_set, ((FLD (f_ACC40Sk)) + (1)), opval);
     written |= (1 << 5);
     TRACE_RESULT (current_cpu, abuf, "acc40S", 'D', opval);
@@ -23360,10 +23361,10 @@ frvbf_media_acc_not_aligned (current_cpu);
 {
   DI tmp_tmp;
   tmp_tmp = ADDDI (GET_H_ACC40S (FLD (f_ACC40Si)), GET_H_ACC40S (((FLD (f_ACC40Si)) + (1))));
-if (GTDI (tmp_tmp, 549755813887)) {
+if (GTDI (tmp_tmp, MAKEDI (127, 0xffffffff))) {
 {
   {
-    DI opval = 549755813887;
+    DI opval = MAKEDI (127, 0xffffffff);
     sim_queue_fn_di_write (current_cpu, frvbf_h_acc40S_set, FLD (f_ACC40Sk), opval);
     written |= (1 << 6);
     TRACE_RESULT (current_cpu, abuf, "acc40S", 'D', opval);
@@ -23371,10 +23372,10 @@ if (GTDI (tmp_tmp, 549755813887)) {
 frvbf_media_overflow (current_cpu, 8);
 }
 } else {
-if (LTDI (tmp_tmp, INVDI (549755813887))) {
+if (LTDI (tmp_tmp, INVDI (MAKEDI (127, 0xffffffff)))) {
 {
   {
-    DI opval = INVDI (549755813887);
+    DI opval = INVDI (MAKEDI (127, 0xffffffff));
     sim_queue_fn_di_write (current_cpu, frvbf_h_acc40S_set, FLD (f_ACC40Sk), opval);
     written |= (1 << 6);
     TRACE_RESULT (current_cpu, abuf, "acc40S", 'D', opval);
@@ -23394,10 +23395,10 @@ frvbf_media_overflow (current_cpu, 8);
 {
   DI tmp_tmp;
   tmp_tmp = SUBDI (GET_H_ACC40S (FLD (f_ACC40Si)), GET_H_ACC40S (((FLD (f_ACC40Si)) + (1))));
-if (GTDI (tmp_tmp, 549755813887)) {
+if (GTDI (tmp_tmp, MAKEDI (127, 0xffffffff))) {
 {
   {
-    DI opval = 549755813887;
+    DI opval = MAKEDI (127, 0xffffffff);
     sim_queue_fn_di_write (current_cpu, frvbf_h_acc40S_set, ((FLD (f_ACC40Sk)) + (1)), opval);
     written |= (1 << 7);
     TRACE_RESULT (current_cpu, abuf, "acc40S", 'D', opval);
@@ -23405,10 +23406,10 @@ if (GTDI (tmp_tmp, 549755813887)) {
 frvbf_media_overflow (current_cpu, 4);
 }
 } else {
-if (LTDI (tmp_tmp, INVDI (549755813887))) {
+if (LTDI (tmp_tmp, INVDI (MAKEDI (127, 0xffffffff)))) {
 {
   {
-    DI opval = INVDI (549755813887);
+    DI opval = INVDI (MAKEDI (127, 0xffffffff));
     sim_queue_fn_di_write (current_cpu, frvbf_h_acc40S_set, ((FLD (f_ACC40Sk)) + (1)), opval);
     written |= (1 << 7);
     TRACE_RESULT (current_cpu, abuf, "acc40S", 'D', opval);
@@ -23428,10 +23429,10 @@ frvbf_media_overflow (current_cpu, 4);
 {
   DI tmp_tmp;
   tmp_tmp = ADDDI (GET_H_ACC40S (((FLD (f_ACC40Si)) + (2))), GET_H_ACC40S (((FLD (f_ACC40Si)) + (3))));
-if (GTDI (tmp_tmp, 549755813887)) {
+if (GTDI (tmp_tmp, MAKEDI (127, 0xffffffff))) {
 {
   {
-    DI opval = 549755813887;
+    DI opval = MAKEDI (127, 0xffffffff);
     sim_queue_fn_di_write (current_cpu, frvbf_h_acc40S_set, ((FLD (f_ACC40Sk)) + (2)), opval);
     written |= (1 << 8);
     TRACE_RESULT (current_cpu, abuf, "acc40S", 'D', opval);
@@ -23439,10 +23440,10 @@ if (GTDI (tmp_tmp, 549755813887)) {
 frvbf_media_overflow (current_cpu, 2);
 }
 } else {
-if (LTDI (tmp_tmp, INVDI (549755813887))) {
+if (LTDI (tmp_tmp, INVDI (MAKEDI (127, 0xffffffff)))) {
 {
   {
-    DI opval = INVDI (549755813887);
+    DI opval = INVDI (MAKEDI (127, 0xffffffff));
     sim_queue_fn_di_write (current_cpu, frvbf_h_acc40S_set, ((FLD (f_ACC40Sk)) + (2)), opval);
     written |= (1 << 8);
     TRACE_RESULT (current_cpu, abuf, "acc40S", 'D', opval);
@@ -23462,10 +23463,10 @@ frvbf_media_overflow (current_cpu, 2);
 {
   DI tmp_tmp;
   tmp_tmp = SUBDI (GET_H_ACC40S (((FLD (f_ACC40Si)) + (2))), GET_H_ACC40S (((FLD (f_ACC40Si)) + (3))));
-if (GTDI (tmp_tmp, 549755813887)) {
+if (GTDI (tmp_tmp, MAKEDI (127, 0xffffffff))) {
 {
   {
-    DI opval = 549755813887;
+    DI opval = MAKEDI (127, 0xffffffff);
     sim_queue_fn_di_write (current_cpu, frvbf_h_acc40S_set, ((FLD (f_ACC40Sk)) + (3)), opval);
     written |= (1 << 9);
     TRACE_RESULT (current_cpu, abuf, "acc40S", 'D', opval);
@@ -23473,10 +23474,10 @@ if (GTDI (tmp_tmp, 549755813887)) {
 frvbf_media_overflow (current_cpu, 1);
 }
 } else {
-if (LTDI (tmp_tmp, INVDI (549755813887))) {
+if (LTDI (tmp_tmp, INVDI (MAKEDI (127, 0xffffffff)))) {
 {
   {
-    DI opval = INVDI (549755813887);
+    DI opval = INVDI (MAKEDI (127, 0xffffffff));
     sim_queue_fn_di_write (current_cpu, frvbf_h_acc40S_set, ((FLD (f_ACC40Sk)) + (3)), opval);
     written |= (1 << 9);
     TRACE_RESULT (current_cpu, abuf, "acc40S", 'D', opval);

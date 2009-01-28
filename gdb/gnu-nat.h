@@ -1,5 +1,5 @@
 /* Common things used by the various *gnu-nat.c files
-   Copyright (C) 1995, 1996, 1997, 1999, 2000, 2007, 2008
+   Copyright (C) 1995, 1996, 1997, 1999, 2000, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    Written by Miles Bader <miles@gnu.ai.mit.edu>
@@ -25,7 +25,7 @@
 
 struct inf;
 
-extern struct inf *current_inferior;
+extern struct inf *gnu_current_inf;
 
 /* Converts a GDB pid to a struct proc.  */
 struct proc *inf_tid_to_thread (struct inf *inf, int tid);

@@ -1,7 +1,7 @@
 /* Do various things to symbol tables (other than lookup), for GDB.
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2002, 2003, 2004, 2007, 2008
+   1996, 1997, 1998, 1999, 2000, 2002, 2003, 2004, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -274,7 +274,9 @@ dump_msymbols (struct objfile *objfile, struct ui_file *outfile)
   index = 0;
   ALL_OBJFILE_MSYMBOLS (objfile, msymbol)
     {
-      switch (msymbol->type)
+      struct obj_section *section = SYMBOL_OBJ_SECTION (msymbol);
+
+      switch (MSYMBOL_TYPE (msymbol))
 	{
 	case mst_unknown:
 	  ms_type = 'u';
@@ -310,10 +312,10 @@ dump_msymbols (struct objfile *objfile, struct ui_file *outfile)
       fprintf_filtered (outfile, "[%2d] %c ", index, ms_type);
       fputs_filtered (paddress (SYMBOL_VALUE_ADDRESS (msymbol)), outfile);
       fprintf_filtered (outfile, " %s", SYMBOL_LINKAGE_NAME (msymbol));
-      if (SYMBOL_BFD_SECTION (msymbol))
+      if (section)
 	fprintf_filtered (outfile, " section %s",
 			  bfd_section_name (objfile->obfd,
-					    SYMBOL_BFD_SECTION (msymbol)));
+					    section->the_bfd_section));
       if (SYMBOL_DEMANGLED_NAME (msymbol) != NULL)
 	{
 	  fprintf_filtered (outfile, "  %s", SYMBOL_DEMANGLED_NAME (msymbol));
@@ -524,10 +526,7 @@ maintenance_print_symbols (char *args, int from_tty)
       error (_("\
 Arguments missing: an output file name and an optional symbol file name"));
     }
-  else if ((argv = buildargv (args)) == NULL)
-    {
-      nomem (0);
-    }
+  argv = gdb_buildargv (args);
   cleanups = make_cleanup_freeargv (argv);
 
   if (argv[0] != NULL)
@@ -567,16 +566,17 @@ print_symbol (void *args)
   struct symbol *symbol = ((struct print_symbol_args *) args)->symbol;
   int depth = ((struct print_symbol_args *) args)->depth;
   struct ui_file *outfile = ((struct print_symbol_args *) args)->outfile;
+  struct obj_section *section = SYMBOL_OBJ_SECTION (symbol);
 
   print_spaces (depth, outfile);
   if (SYMBOL_DOMAIN (symbol) == LABEL_DOMAIN)
     {
       fprintf_filtered (outfile, "label %s at ", SYMBOL_PRINT_NAME (symbol));
       fputs_filtered (paddress (SYMBOL_VALUE_ADDRESS (symbol)), outfile);
-      if (SYMBOL_BFD_SECTION (symbol))
+      if (section)
 	fprintf_filtered (outfile, " section %s\n",
-		       bfd_section_name (SYMBOL_BFD_SECTION (symbol)->owner,
-					 SYMBOL_BFD_SECTION (symbol)));
+			  bfd_section_name (section->the_bfd_section->owner,
+					    section->the_bfd_section));
       else
 	fprintf_filtered (outfile, "\n");
       return 1;
@@ -638,11 +638,10 @@ print_symbol (void *args)
 	case LOC_STATIC:
 	  fprintf_filtered (outfile, "static at ");
 	  fputs_filtered (paddress (SYMBOL_VALUE_ADDRESS (symbol)), outfile);
-	  if (SYMBOL_BFD_SECTION (symbol))
+	  if (section)
 	    fprintf_filtered (outfile, " section %s",
-			      bfd_section_name
-			      (SYMBOL_BFD_SECTION (symbol)->owner,
-			       SYMBOL_BFD_SECTION (symbol)));
+			      bfd_section_name (section->the_bfd_section->owner,
+						section->the_bfd_section));
 	  break;
 
 	case LOC_REGISTER:
@@ -677,11 +676,10 @@ print_symbol (void *args)
 	case LOC_LABEL:
 	  fprintf_filtered (outfile, "label at ");
 	  fputs_filtered (paddress (SYMBOL_VALUE_ADDRESS (symbol)), outfile);
-	  if (SYMBOL_BFD_SECTION (symbol))
+	  if (section)
 	    fprintf_filtered (outfile, " section %s",
-			      bfd_section_name
-			      (SYMBOL_BFD_SECTION (symbol)->owner,
-			       SYMBOL_BFD_SECTION (symbol)));
+			      bfd_section_name (section->the_bfd_section->owner,
+						section->the_bfd_section));
 	  break;
 
 	case LOC_BLOCK:
@@ -693,11 +691,10 @@ print_symbol (void *args)
 	  fprintf_filtered (outfile, "..");
 	  fputs_filtered (paddress (BLOCK_END (SYMBOL_BLOCK_VALUE (symbol))),
 			  outfile);
-	  if (SYMBOL_BFD_SECTION (symbol))
+	  if (section)
 	    fprintf_filtered (outfile, " section %s",
-			      bfd_section_name
-			      (SYMBOL_BFD_SECTION (symbol)->owner,
-			       SYMBOL_BFD_SECTION (symbol)));
+			      bfd_section_name (section->the_bfd_section->owner,
+						section->the_bfd_section));
 	  break;
 
 	case LOC_COMPUTED:
@@ -739,10 +736,7 @@ maintenance_print_psymbols (char *args, int from_tty)
     {
       error (_("print-psymbols takes an output file name and optional symbol file name"));
     }
-  else if ((argv = buildargv (args)) == NULL)
-    {
-      nomem (0);
-    }
+  argv = gdb_buildargv (args);
   cleanups = make_cleanup_freeargv (argv);
 
   if (argv[0] != NULL)
@@ -878,10 +872,7 @@ maintenance_print_msymbols (char *args, int from_tty)
     {
       error (_("print-msymbols takes an output file name and optional symbol file name"));
     }
-  else if ((argv = buildargv (args)) == NULL)
-    {
-      nomem (0);
-    }
+  argv = gdb_buildargv (args);
   cleanups = make_cleanup_freeargv (argv);
 
   if (argv[0] != NULL)
@@ -947,32 +938,36 @@ maintenance_info_symtabs (char *regexp, int from_tty)
       int printed_objfile_start = 0;
 
       ALL_OBJFILE_SYMTABS (objfile, symtab)
-        if (! regexp
-            || re_exec (symtab->filename))
-          {
-            if (! printed_objfile_start)
-              {
-                printf_filtered ("{ objfile %s ", objfile->name);
-                wrap_here ("  ");
-                printf_filtered ("((struct objfile *) %p)\n", objfile);
-                printed_objfile_start = 1;
-              }
+	{
+	  QUIT;
 
-            printf_filtered ("  { symtab %s ", symtab->filename);
-            wrap_here ("    ");
-            printf_filtered ("((struct symtab *) %p)\n", symtab);
-            printf_filtered ("    dirname %s\n",
-                             symtab->dirname ? symtab->dirname : "(null)");
-            printf_filtered ("    fullname %s\n",
-                             symtab->fullname ? symtab->fullname : "(null)");
-            printf_filtered ("    blockvector ((struct blockvector *) %p)%s\n",
-                             symtab->blockvector,
-                             symtab->primary ? " (primary)" : "");
-            printf_filtered ("    linetable ((struct linetable *) %p)\n",
-                             symtab->linetable);
-            printf_filtered ("    debugformat %s\n", symtab->debugformat);
-            printf_filtered ("  }\n");
-          }
+	  if (! regexp
+	      || re_exec (symtab->filename))
+	    {
+	      if (! printed_objfile_start)
+		{
+		  printf_filtered ("{ objfile %s ", objfile->name);
+		  wrap_here ("  ");
+		  printf_filtered ("((struct objfile *) %p)\n", objfile);
+		  printed_objfile_start = 1;
+		}
+
+	      printf_filtered ("	{ symtab %s ", symtab->filename);
+	      wrap_here ("    ");
+	      printf_filtered ("((struct symtab *) %p)\n", symtab);
+	      printf_filtered ("	  dirname %s\n",
+			       symtab->dirname ? symtab->dirname : "(null)");
+	      printf_filtered ("	  fullname %s\n",
+			       symtab->fullname ? symtab->fullname : "(null)");
+	      printf_filtered ("	  blockvector ((struct blockvector *) %p)%s\n",
+			       symtab->blockvector,
+			       symtab->primary ? " (primary)" : "");
+	      printf_filtered ("	  linetable ((struct linetable *) %p)\n",
+			       symtab->linetable);
+	      printf_filtered ("	  debugformat %s\n", symtab->debugformat);
+	      printf_filtered ("	}\n");
+	    }
+	}
 
       if (printed_objfile_start)
         printf_filtered ("}\n");
@@ -998,70 +993,74 @@ maintenance_info_psymtabs (char *regexp, int from_tty)
       int printed_objfile_start = 0;
 
       ALL_OBJFILE_PSYMTABS (objfile, psymtab)
-        if (! regexp
-            || re_exec (psymtab->filename))
-          {
-            if (! printed_objfile_start)
-              {
-                printf_filtered ("{ objfile %s ", objfile->name);
-                wrap_here ("  ");
-                printf_filtered ("((struct objfile *) %p)\n", objfile);
-                printed_objfile_start = 1;
-              }
+	{
+	  QUIT;
 
-            printf_filtered ("  { psymtab %s ", psymtab->filename);
-            wrap_here ("    ");
-            printf_filtered ("((struct partial_symtab *) %p)\n", psymtab);
-            printf_filtered ("    readin %s\n",
-                             psymtab->readin ? "yes" : "no");
-            printf_filtered ("    fullname %s\n",
-                             psymtab->fullname ? psymtab->fullname : "(null)");
-            printf_filtered ("    text addresses ");
-	    fputs_filtered (paddress (psymtab->textlow), gdb_stdout);
-            printf_filtered (" -- ");
-	    fputs_filtered (paddress (psymtab->texthigh), gdb_stdout);
-            printf_filtered ("\n");
-            printf_filtered ("    globals ");
-            if (psymtab->n_global_syms)
-              {
-                printf_filtered ("(* (struct partial_symbol **) %p @ %d)\n",
-                                 (psymtab->objfile->global_psymbols.list
-                                  + psymtab->globals_offset),
-                                 psymtab->n_global_syms);
-              }
-            else
-              printf_filtered ("(none)\n");
-            printf_filtered ("    statics ");
-            if (psymtab->n_static_syms)
-              {
-                printf_filtered ("(* (struct partial_symbol **) %p @ %d)\n",
-                                 (psymtab->objfile->static_psymbols.list
-                                  + psymtab->statics_offset),
-                                 psymtab->n_static_syms);
-              }
-            else
-              printf_filtered ("(none)\n");
-            printf_filtered ("    dependencies ");
-            if (psymtab->number_of_dependencies)
-              {
-                int i;
+	  if (! regexp
+	      || re_exec (psymtab->filename))
+	    {
+	      if (! printed_objfile_start)
+		{
+		  printf_filtered ("{ objfile %s ", objfile->name);
+		  wrap_here ("  ");
+		  printf_filtered ("((struct objfile *) %p)\n", objfile);
+		  printed_objfile_start = 1;
+		}
 
-                printf_filtered ("{\n");
-                for (i = 0; i < psymtab->number_of_dependencies; i++)
-                  {
-                    struct partial_symtab *dep = psymtab->dependencies[i];
+	      printf_filtered ("  { psymtab %s ", psymtab->filename);
+	      wrap_here ("    ");
+	      printf_filtered ("((struct partial_symtab *) %p)\n", psymtab);
+	      printf_filtered ("    readin %s\n",
+			       psymtab->readin ? "yes" : "no");
+	      printf_filtered ("    fullname %s\n",
+			       psymtab->fullname ? psymtab->fullname : "(null)");
+	      printf_filtered ("    text addresses ");
+	      fputs_filtered (paddress (psymtab->textlow), gdb_stdout);
+	      printf_filtered (" -- ");
+	      fputs_filtered (paddress (psymtab->texthigh), gdb_stdout);
+	      printf_filtered ("\n");
+	      printf_filtered ("    globals ");
+	      if (psymtab->n_global_syms)
+		{
+		  printf_filtered ("(* (struct partial_symbol **) %p @ %d)\n",
+				   (psymtab->objfile->global_psymbols.list
+				    + psymtab->globals_offset),
+				   psymtab->n_global_syms);
+		}
+	      else
+		printf_filtered ("(none)\n");
+	      printf_filtered ("    statics ");
+	      if (psymtab->n_static_syms)
+		{
+		  printf_filtered ("(* (struct partial_symbol **) %p @ %d)\n",
+				   (psymtab->objfile->static_psymbols.list
+				    + psymtab->statics_offset),
+				   psymtab->n_static_syms);
+		}
+	      else
+		printf_filtered ("(none)\n");
+	      printf_filtered ("    dependencies ");
+	      if (psymtab->number_of_dependencies)
+		{
+		  int i;
 
-                    /* Note the string concatenation there --- no comma.  */
-                    printf_filtered ("      psymtab %s "
-                                     "((struct partial_symtab *) %p)\n",
-                                     dep->filename, dep);
-                  }
-                printf_filtered ("    }\n");
-              }
-            else
-              printf_filtered ("(none)\n");
-            printf_filtered ("  }\n");
-          }
+		  printf_filtered ("{\n");
+		  for (i = 0; i < psymtab->number_of_dependencies; i++)
+		    {
+		      struct partial_symtab *dep = psymtab->dependencies[i];
+
+		      /* Note the string concatenation there --- no comma.  */
+		      printf_filtered ("      psymtab %s "
+				       "((struct partial_symtab *) %p)\n",
+				       dep->filename, dep);
+		    }
+		  printf_filtered ("    }\n");
+		}
+	      else
+		printf_filtered ("(none)\n");
+	      printf_filtered ("  }\n");
+	    }
+	}
 
       if (printed_objfile_start)
         printf_filtered ("}\n");

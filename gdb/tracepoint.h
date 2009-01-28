@@ -1,5 +1,5 @@
 /* Data structures associated with tracepoints in GDB.
-   Copyright (C) 1997, 1998, 1999, 2000, 2007, 2008
+   Copyright (C) 1997, 1998, 1999, 2000, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -94,7 +94,7 @@ struct tracepoint
 
     /* BFD section, in case of overlays: no, I don't know if
        tracepoints are really gonna work with overlays.  */
-    asection *section;
+    struct obj_section *section;
   };
 
 enum actionline_type

@@ -317,16 +317,14 @@ AC_ARG_WITH(libunwind,
   no)   enable_libunwind=no ;;
   *)    AC_MSG_ERROR(bad value ${withval} for GDB with-libunwind option) ;;
 esac],[
-  AC_CHECK_HEADERS(libunwind.h)
-  AC_CHECK_HEADERS(libunwind-ia64.h)
+  AC_CHECK_HEADERS(libunwind.h libunwind-ia64.h)
   if test x"$ac_cv_header_libunwind_h" = xyes -a x"$ac_cv_header_libunwind_ia64_h" = xyes; then
     enable_libunwind=yes;
   fi
 ])
    
 if test x"$enable_libunwind" = xyes; then
-  AC_CHECK_HEADERS(libunwind.h)
-  AC_CHECK_HEADERS(libunwind-ia64.h)
+  AC_CHECK_HEADERS(libunwind.h libunwind-ia64.h)
   AC_DEFINE(HAVE_LIBUNWIND, 1, [Define if libunwind library is being used.])
   CONFIG_OBS="$CONFIG_OBS libunwind-frame.o"
   CONFIG_DEPS="$CONFIG_DEPS libunwind-frame.o"
@@ -429,19 +427,69 @@ AC_SEARCH_LIBS(socketpair, socket)
 # Link in zlib if we can.  This allows us to read compressed debug sections.
 AC_SEARCH_LIBS(zlibVersion, z, [AC_CHECK_HEADERS(zlib.h)])
 
-# For the TUI, we need enhanced curses functionality.
-#
-# FIXME: kettenis/20040905: We prefer ncurses over the vendor-supplied
-# curses library because the latter might not provide all the
-# functionality we need.  However, this leads to problems on systems
-# where the linker searches /usr/local/lib, but the compiler doesn't
-# search /usr/local/include, if ncurses is installed in /usr/local.  A
-# default installation of ncurses on alpha*-dec-osf* will lead to such
-# a situation.
-AC_SEARCH_LIBS(waddstr, [ncurses cursesX curses])
-
 # On HP/UX we may need libxpdl for dlgetmodinfo (used by solib-pa64.c).
 AC_SEARCH_LIBS(dlgetmodinfo, [dl xpdl])
+
+# On alpha-osf, it appears that libtermcap and libcurses are not compatible.
+# There is a very specific comment in /usr/include/curses.h explaining that
+# termcap routines built into libcurses must not be used.
+# 
+# The symptoms we observed so far is GDB unexpectedly changing
+# the terminal settings when tgetent is called - this is particularly
+# visible as the output is missing carriage returns, and so rapidly
+# becomes very hard to read.
+#
+# The readline configure script has already decided that libtermcap
+# was enough for its purposes, and so decided to build readline using
+# libtermcap.  Since the TUI mode requires curses, building GDB with
+# TUI enabled results in both libraries to be used at the same time,
+# which is not allowed.  This basically means that GDB with TUI is
+# broken on alpha-osf.
+
+case $host_os in
+  alpha*-*-osf* )
+    if "$enable_tui" = "yes"; then
+      AC_MSG_ERROR([Building GDB with TUI mode is not supported on this host])
+    fi
+    if "$enable_tui" = "auto"; then
+      enable_tui=no
+    fi
+    ;;
+esac
+
+# Check whether we should enable the TUI, but only do so if we really
+# can.
+if test x"$enable_tui" != xno; then
+  if test -d $srcdir/tui; then
+    # For the TUI, we need enhanced curses functionality.
+    #
+    # FIXME: kettenis/20040905: We prefer ncurses over the vendor-supplied
+    # curses library because the latter might not provide all the
+    # functionality we need.  However, this leads to problems on systems
+    # where the linker searches /usr/local/lib, but the compiler doesn't
+    # search /usr/local/include, if ncurses is installed in /usr/local.  A
+    # default installation of ncurses on alpha*-dec-osf* will lead to such
+    # a situation.
+    AC_SEARCH_LIBS(waddstr, [ncurses cursesX curses])
+
+    if test "$ac_cv_search_waddstr" != no; then
+      CONFIG_OBS="$CONFIG_OBS \$(SUBDIR_TUI_OBS)"
+      CONFIG_DEPS="$CONFIG_DEPS \$(SUBDIR_TUI_DEPS)"
+      CONFIG_SRCS="$CONFIG_SRCS \$(SUBDIR_TUI_SRCS)"
+      ENABLE_CFLAGS="$ENABLE_CFLAGS \$(SUBDIR_TUI_CFLAGS)"
+      CONFIG_ALL="${CONFIG_ALL} all-tui"
+      CONFIG_CLEAN="${CONFIG_CLEAN} clean-tui"
+      CONFIG_INSTALL="${CONFIG_INSTALL} install-tui"
+      CONFIG_UNINSTALL="${CONFIG_UNINSTALL} uninstall-tui"
+    else
+      if test x"$enable_tui" = xyes; then
+	AC_MSG_ERROR([no enhanced curses library found; disable TUI])
+      else
+	AC_MSG_WARN([no enhanced curses library found; disabling TUI])
+      fi
+    fi
+  fi
+fi
 
 # Since GDB uses Readline, we need termcap functionality.  In many
 # cases this will be provided by the curses library, but some systems
@@ -458,7 +506,7 @@ case $host_os in
     ;;
   *mingw32*)	 
     ac_cv_search_tgetent="none required"
-    CONFIG_OBS="$CONFIG_OBS win32-termcap.o"
+    CONFIG_OBS="$CONFIG_OBS windows-termcap.o"
     ;;
 esac
 
@@ -624,10 +672,10 @@ if test "${have_libpython}" = yes; then
     AC_MSG_RESULT(${PYTHON_CFLAGS})
   fi
 else
-  # Even if Python support is not compiled in, we need to have this file
+  # Even if Python support is not compiled in, we need to have these files
   # included in order to recognize the GDB command "python".
-  CONFIG_OBS="$CONFIG_OBS python.o"
-  CONFIG_SRCS="$CONFIG_SRCS python/python.c"
+  CONFIG_OBS="$CONFIG_OBS python.o python-value.o"
+  CONFIG_SRCS="$CONFIG_SRCS python/python.c python/python-value.c"
 fi
 AC_SUBST(PYTHON_CFLAGS)
 
@@ -638,7 +686,17 @@ AC_SUBST(PYTHON_CFLAGS)
 AC_HEADER_DIRENT
 AC_HEADER_STAT
 AC_HEADER_STDC
-AC_CHECK_HEADERS(nlist.h)
+# elf_hp.h is for HP/UX 64-bit shared library support.
+# FIXME: kettenis/20030102: In most cases we include these (ctype.h, time.h)
+# unconditionally, so what's the point in checking these?
+AC_CHECK_HEADERS([nlist.h machine/reg.h poll.h sys/poll.h proc_service.h \
+                  thread_db.h gnu/libc-version.h signal.h stddef.h \
+		  stdlib.h string.h memory.h strings.h sys/fault.h \
+		  sys/file.h sys/filio.h sys/ioctl.h sys/param.h \
+		  sys/resource.h sys/procfs.h sys/ptrace.h ptrace.h \
+		  sys/reg.h sys/debugreg.h sys/select.h sys/syscall.h \
+		  sys/types.h sys/wait.h wait.h termios.h termio.h \
+		  sgtty.h unistd.h elf_hp.h ctype.h time.h locale.h])
 AC_CHECK_HEADERS(link.h, [], [],
 [#if HAVE_SYS_TYPES_H
 # include <sys/types.h>
@@ -647,38 +705,16 @@ AC_CHECK_HEADERS(link.h, [], [],
 # include <nlist.h>
 #endif
 ])
-AC_CHECK_HEADERS(machine/reg.h)
-AC_CHECK_HEADERS(poll.h sys/poll.h)
-AC_CHECK_HEADERS(proc_service.h thread_db.h gnu/libc-version.h)
-AC_CHECK_HEADERS(signal.h)
-AC_CHECK_HEADERS(stddef.h)
-AC_CHECK_HEADERS(stdlib.h)
-AC_CHECK_HEADERS(string.h memory.h strings.h)
-AC_CHECK_HEADERS(sys/fault.h)
-AC_CHECK_HEADERS(sys/file.h)
-AC_CHECK_HEADERS(sys/filio.h)
-AC_CHECK_HEADERS(sys/ioctl.h)
-AC_CHECK_HEADERS(sys/param.h)
-AC_CHECK_HEADERS(sys/resource.h)
 AC_CHECK_HEADERS(sys/proc.h, [], [],
 [#if HAVE_SYS_PARAM_H
 # include <sys/param.h>
 #endif
 ])
-AC_CHECK_HEADERS(sys/procfs.h)
-AC_CHECK_HEADERS(sys/ptrace.h ptrace.h)
-AC_CHECK_HEADERS(sys/reg.h sys/debugreg.h)
-AC_CHECK_HEADERS(sys/select.h)
-AC_CHECK_HEADERS(sys/syscall.h)
-AC_CHECK_HEADERS(sys/types.h)
 AC_CHECK_HEADERS(sys/user.h, [], [],
 [#if HAVE_SYS_PARAM_H
 # include <sys/param.h>
 #endif
 ])
-AC_CHECK_HEADERS(sys/wait.h wait.h)
-AC_CHECK_HEADERS(termios.h termio.h sgtty.h)
-AC_CHECK_HEADERS(unistd.h)
 
 # On Solaris 2.[789], we need to define _MSE_INT_H to avoid a clash
 # between <widec.h> and <wchar.h> that would cause AC_CHECK_HEADERS to
@@ -691,35 +727,26 @@ case $host_os in
    Solaris 2.[789] when using GCC. ])
     fi ;;
 esac
-AC_CHECK_HEADERS(curses.h cursesX.h ncurses.h ncurses/ncurses.h)
-AC_CHECK_HEADERS(ncurses/term.h)
+AC_CHECK_HEADERS(curses.h cursesX.h ncurses.h ncurses/ncurses.h ncurses/term.h)
 AC_CHECK_HEADERS(term.h, [], [],
 [#if HAVE_CURSES_H
 # include <curses.h>
 #endif
 ])
 
-# Check for HP/UX 64-bit shared library support
-AC_CHECK_HEADERS(elf_hp.h)
-
-# FIXME: kettenis/20030102: In most cases we include these
-# unconditionally, so what's the point in checking these?
-AC_CHECK_HEADERS(ctype.h time.h)
-
 # ------------------------- #
 # Checks for declarations.  #
 # ------------------------- #
 
-AC_CHECK_DECLS([free, malloc, realloc])
-AC_CHECK_DECLS([strerror, strstr])
-AC_CHECK_DECLS([getopt, snprintf, vsnprintf])
+AC_CHECK_DECLS([free, malloc, realloc, strerror, strstr, getopt,
+                snprintf, vsnprintf])
+AM_LC_MESSAGES
 
 # ----------------------- #
 # Checks for structures.  #
 # ----------------------- #
 
-AC_CHECK_MEMBERS([struct stat.st_blocks])
-AC_CHECK_MEMBERS([struct stat.st_blksize])
+AC_CHECK_MEMBERS([struct stat.st_blocks, struct stat.st_blksize])
 
 # ------------------ #
 # Checks for types.  #
@@ -746,18 +773,10 @@ AC_C_BIGENDIAN
 AC_FUNC_ALLOCA
 AC_FUNC_MMAP
 AC_FUNC_VFORK
-AC_CHECK_FUNCS(canonicalize_file_name realpath)
-AC_CHECK_FUNCS(getrusage)
-AC_CHECK_FUNCS(getuid getgid)
-AC_CHECK_FUNCS(poll)
-AC_CHECK_FUNCS(pread64)
-AC_CHECK_FUNCS(sbrk)
-AC_CHECK_FUNCS(setpgid setpgrp setsid)
-AC_CHECK_FUNCS(sigaction sigprocmask sigsetmask)
-AC_CHECK_FUNCS(socketpair)
-AC_CHECK_FUNCS(syscall)
-AC_CHECK_FUNCS(ttrace)
-AC_CHECK_FUNCS(wborder)
+AC_CHECK_FUNCS([canonicalize_file_name realpath getrusage getuid \
+                getgid poll pread64 sbrk setpgid setpgrp setsid \
+		sigaction sigprocmask sigsetmask socketpair syscall \
+		ttrace wborder setlocale])
 
 # Check the return and argument types of ptrace.  No canned test for
 # this, so roll our own.
@@ -1747,29 +1766,6 @@ AC_SUBST(GDBTK_CFLAGS)
 AC_SUBST(GDBTK_SRC_DIR)
 
 AC_PATH_X
-
-# Check whether we should enable the TUI, but only do so if we really
-# can.
-if test x"$enable_tui" != xno; then
-  if test -d $srcdir/tui; then
-    if test "$ac_cv_search_waddstr" != no; then
-      CONFIG_OBS="$CONFIG_OBS \$(SUBDIR_TUI_OBS)"
-      CONFIG_DEPS="$CONFIG_DEPS \$(SUBDIR_TUI_DEPS)"
-      CONFIG_SRCS="$CONFIG_SRCS \$(SUBDIR_TUI_SRCS)"
-      ENABLE_CFLAGS="$ENABLE_CFLAGS \$(SUBDIR_TUI_CFLAGS)"
-      CONFIG_ALL="${CONFIG_ALL} all-tui"
-      CONFIG_CLEAN="${CONFIG_CLEAN} clean-tui"
-      CONFIG_INSTALL="${CONFIG_INSTALL} install-tui"
-      CONFIG_UNINSTALL="${CONFIG_UNINSTALL} uninstall-tui"
-    else
-      if test x"$enable_tui" = xyes; then
-	AC_MSG_ERROR([no enhanced curses library found; disable TUI])
-      else
-	AC_MSG_WARN([no enhanced curses library found; disabling TUI])
-      fi
-    fi
-  fi
-fi
 
 # Unlike the sim directory, whether a simulator is linked is controlled by 
 # presence of a gdb_sim definition in the target configure.tgt entry.  

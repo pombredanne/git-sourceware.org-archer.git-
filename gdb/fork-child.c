@@ -1,7 +1,7 @@
 /* Fork a Unix child process, and set up to debug it, for GDB.
 
    Copyright (C) 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1998, 1999, 2000,
-   2001, 2004, 2005, 2006, 2007, 2008 Free Software Foundation, Inc.
+   2001, 2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support.
 
@@ -118,7 +118,7 @@ escape_bang_in_quoted_argument (const char *shell_file)
 /* This function is NOT reentrant.  Some of the variables have been
    made static to ensure that they survive the vfork call.  */
 
-void
+int
 fork_inferior (char *exec_file_arg, char *allargs, char **env,
 	       void (*traceme_fun) (void), void (*init_trace_fun) (int),
 	       void (*pre_trace_fun) (void), char *shell_file_arg)
@@ -394,17 +394,27 @@ fork_inferior (char *exec_file_arg, char *allargs, char **env,
 
   init_thread_list ();
 
+  add_inferior (pid);
+
   /* Needed for wait_for_inferior stuff below.  */
   inferior_ptid = pid_to_ptid (pid);
+
+  /* We have something that executes now.  We'll be running through
+     the shell at this point, but the pid shouldn't change.  Targets
+     supporting MT should fill this task's ptid with more data as soon
+     as they can.  */
+  add_thread_silent (inferior_ptid);
 
   /* Now that we have a child process, make it our target, and
      initialize anything target-vector-specific that needs
      initializing.  */
-  (*init_trace_fun) (pid);
+  if (init_trace_fun)
+    (*init_trace_fun) (pid);
 
   /* We are now in the child process of interest, having exec'd the
      correct program, and are poised at the first instruction of the
      new program.  */
+  return pid;
 }
 
 /* Accept NTRAPS traps from the inferior.  */
@@ -422,21 +432,73 @@ startup_inferior (int ntraps)
   if (exec_wrapper)
     pending_execs++;
 
-  clear_proceed_status ();
-
-  init_wait_for_inferior ();
-
   while (1)
     {
-      /* Make wait_for_inferior be quiet. */
-      stop_soon = STOP_QUIETLY;
-      wait_for_inferior (1);
-      if (stop_signal != TARGET_SIGNAL_TRAP)
+      int resume_signal = TARGET_SIGNAL_0;
+      ptid_t resume_ptid;
+      ptid_t event_ptid;
+
+      struct target_waitstatus ws;
+      memset (&ws, 0, sizeof (ws));
+      event_ptid = target_wait (pid_to_ptid (-1), &ws);
+
+      if (ws.kind == TARGET_WAITKIND_IGNORE)
+	/* The inferior didn't really stop, keep waiting.  */
+	continue;
+
+      switch (ws.kind)
 	{
-	  /* Let shell child handle its own signals in its own way.
-	     FIXME: what if child has exited?  Must exit loop
-	     somehow.  */
-	  resume (0, stop_signal);
+	  case TARGET_WAITKIND_SPURIOUS:
+	  case TARGET_WAITKIND_LOADED:
+	  case TARGET_WAITKIND_FORKED:
+	  case TARGET_WAITKIND_VFORKED:
+	  case TARGET_WAITKIND_SYSCALL_ENTRY:
+	  case TARGET_WAITKIND_SYSCALL_RETURN:
+	    /* Ignore gracefully during startup of the inferior.  */
+	    switch_to_thread (event_ptid);
+	    break;
+
+	  case TARGET_WAITKIND_SIGNALLED:
+	    target_terminal_ours ();
+	    target_mourn_inferior ();
+	    error (_("During startup program terminated with signal %s, %s."),
+		   target_signal_to_name (ws.value.sig),
+		   target_signal_to_string (ws.value.sig));
+	    return;
+
+	  case TARGET_WAITKIND_EXITED:
+	    target_terminal_ours ();
+	    target_mourn_inferior ();
+	    if (ws.value.integer)
+	      error (_("During startup program exited with code %d."),
+		     ws.value.integer);
+	    else
+	      error (_("During startup program exited normally."));
+	    return;
+
+	  case TARGET_WAITKIND_EXECD:
+	    /* Handle EXEC signals as if they were SIGTRAP signals.  */
+	    xfree (ws.value.execd_pathname);
+	    resume_signal = TARGET_SIGNAL_TRAP;
+	    switch_to_thread (event_ptid);
+	    break;
+
+	  case TARGET_WAITKIND_STOPPED:
+	    resume_signal = ws.value.sig;
+	    switch_to_thread (event_ptid);
+	    break;
+	}
+
+      /* In all-stop mode, resume all threads.  */
+      if (!non_stop)
+	resume_ptid = pid_to_ptid (-1);
+      else
+	resume_ptid = event_ptid;
+
+      if (resume_signal != TARGET_SIGNAL_TRAP)
+	{
+	  /* Let shell child handle its own signals in its own way.  */
+	  target_resume (resume_ptid, 0, resume_signal);
 	}
       else
 	{
@@ -461,10 +523,15 @@ startup_inferior (int ntraps)
 	  if (--pending_execs == 0)
 	    break;
 
-	  resume (0, TARGET_SIGNAL_0);	/* Just make it go on.  */
+	  /* Just make it go on.  */
+	  target_resume (resume_ptid, 0, TARGET_SIGNAL_0);
 	}
     }
-  stop_soon = NO_STOP_QUIETLY;
+
+  /* Mark all threads non-executing.  */
+  set_executing (pid_to_ptid (-1), 0);
+
+  stop_pc = read_pc ();
 }
 
 /* Implement the "unset exec-wrapper" command.  */

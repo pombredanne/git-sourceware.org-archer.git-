@@ -1,5 +1,5 @@
 /* Header file for GDB CLI command implementation library.
-   Copyright (c) 2000, 2002, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (c) 2000, 2002, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -33,7 +33,8 @@ extern void while_command (char *arg, int from_tty);
 
 extern void if_command (char *arg, int from_tty);
 
-extern void show_user_1 (struct cmd_list_element *c, struct ui_file *stream);
+extern void show_user_1 (struct cmd_list_element *c, char *prefix,
+			 char *name, struct ui_file *stream);
 
 /* Exported to gdb/breakpoint.c */
 

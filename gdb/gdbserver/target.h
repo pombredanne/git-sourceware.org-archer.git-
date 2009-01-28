@@ -1,5 +1,5 @@
 /* Target operations for the remote server for GDB.
-   Copyright (C) 2002, 2003, 2004, 2005, 2007, 2008
+   Copyright (C) 2002, 2003, 2004, 2005, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    Contributed by MontaVista Software.
@@ -188,6 +188,11 @@ struct target_ops
   /* Fill BUF with an hostio error packet representing the last hostio
      error.  */
   void (*hostio_last_error) (char *buf);
+
+  /* Read/Write OS data using qXfer packets.  */
+  int (*qxfer_osdata) (const char *annex, unsigned char *readbuf,
+		       unsigned const char *writebuf, CORE_ADDR offset, 
+		       int len);
 };
 
 extern struct target_ops *the_target;

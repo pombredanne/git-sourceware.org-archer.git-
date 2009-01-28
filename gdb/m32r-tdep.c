@@ -1,7 +1,7 @@
 /* Target-dependent code for Renesas M32R, for GDB.
 
    Copyright (C) 1996, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007,
-   2008 Free Software Foundation, Inc.
+   2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -231,9 +231,9 @@ static struct type *
 m32r_register_type (struct gdbarch *gdbarch, int reg_nr)
 {
   if (reg_nr == M32R_PC_REGNUM)
-    return builtin_type_void_func_ptr;
+    return builtin_type (gdbarch)->builtin_func_ptr;
   else if (reg_nr == M32R_SP_REGNUM || reg_nr == M32R_FP_REGNUM)
-    return builtin_type_void_data_ptr;
+    return builtin_type (gdbarch)->builtin_data_ptr;
   else
     return builtin_type_int32;
 }

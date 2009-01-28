@@ -1,6 +1,7 @@
 /* Support for printing Modula 2 types for GDB, the GNU debugger.
    Copyright (C) 1986, 1988, 1989, 1991, 1992, 1995, 2000, 2001, 2002, 2003,
-                 2004, 2005, 2006, 2007, 2008 Free Software Foundation, Inc.
+                 2004, 2005, 2006, 2007, 2008, 2009
+                 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -154,6 +155,26 @@ m2_print_type (struct type *type, char *varstring, struct ui_file *stream,
     }
 }
 
+/* Print a typedef using M2 syntax.  TYPE is the underlying type.
+   NEW_SYMBOL is the symbol naming the type.  STREAM is the stream on
+   which to print.  */
+
+void
+m2_print_typedef (struct type *type, struct symbol *new_symbol,
+		  struct ui_file *stream)
+{
+  CHECK_TYPEDEF (type);
+  fprintf_filtered (stream, "TYPE ");
+  if (!TYPE_NAME (SYMBOL_TYPE (new_symbol))
+      || strcmp (TYPE_NAME ((SYMBOL_TYPE (new_symbol))),
+		 SYMBOL_LINKAGE_NAME (new_symbol)) != 0)
+    fprintf_filtered (stream, "%s = ", SYMBOL_PRINT_NAME (new_symbol));
+  else
+    fprintf_filtered (stream, "<builtin> = ");
+  type_print (type, "", stream, 0);
+  fprintf_filtered (stream, ";\n");
+}
+
 /* m2_type_name - if a, type, has a name then print it.  */
 
 void
@@ -202,7 +223,7 @@ static void m2_array (struct type *type, struct ui_file *stream,
 {
   fprintf_filtered (stream, "ARRAY [");
   if (TYPE_LENGTH (TYPE_TARGET_TYPE (type)) > 0
-      && TYPE_ARRAY_UPPER_BOUND_TYPE (type) != BOUND_CANNOT_BE_DETERMINED)
+      && !TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED (type))
     {
       if (TYPE_INDEX_TYPE (type) != 0)
 	{
@@ -287,7 +308,7 @@ m2_print_bounds (struct type *type,
   struct type *target = TYPE_TARGET_TYPE (type);
 
   if (target == NULL)
-    target = builtin_type_int;
+    target = builtin_type_int32;
 
   if (TYPE_NFIELDS(type) == 0)
     return;
@@ -394,7 +415,7 @@ m2_is_long_set_of_type (struct type *type, struct type **of_type)
       range = TYPE_INDEX_TYPE (TYPE_FIELD_TYPE (type, i));
       target = TYPE_TARGET_TYPE (range);
       if (target == NULL)
-	target = builtin_type_int;
+	target = builtin_type_int32;
 
       l1 = TYPE_LOW_BOUND (TYPE_INDEX_TYPE (TYPE_FIELD_TYPE (type, i)));
       h1 = TYPE_HIGH_BOUND (TYPE_INDEX_TYPE (TYPE_FIELD_TYPE (type, len-1)));

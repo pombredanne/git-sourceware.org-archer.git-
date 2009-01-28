@@ -1,7 +1,7 @@
 /* Cache and manage the values of registers for GDB, the GNU debugger.
 
    Copyright (C) 1986, 1987, 1989, 1991, 1994, 1995, 1996, 1998, 2000, 2001,
-   2002, 2004, 2007, 2008 Free Software Foundation, Inc.
+   2002, 2004, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1104,11 +1104,13 @@ regcache_print (char *args, enum regcache_dump_what what_to_dump)
     regcache_dump (get_current_regcache (), gdb_stdout, what_to_dump);
   else
     {
+      struct cleanup *cleanups;
       struct ui_file *file = gdb_fopen (args, "w");
       if (file == NULL)
 	perror_with_name (_("maintenance print architecture"));
+      cleanups = make_cleanup_ui_file_delete (file);
       regcache_dump (get_current_regcache (), file, what_to_dump);
-      ui_file_delete (file);
+      do_cleanups (cleanups);
     }
 }
 

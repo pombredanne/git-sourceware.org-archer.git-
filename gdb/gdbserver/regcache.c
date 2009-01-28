@@ -1,5 +1,5 @@
 /* Register support routines for the remote server for GDB.
-   Copyright (C) 2001, 2002, 2004, 2005, 2007, 2008
+   Copyright (C) 2001, 2002, 2004, 2005, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -91,14 +91,15 @@ new_register_cache (void)
 {
   struct inferior_regcache_data *regcache;
 
-  regcache = malloc (sizeof (*regcache));
+  if (register_bytes == 0)
+    return NULL; /* The architecture hasn't been initialized yet.  */
+
+  regcache = xmalloc (sizeof (*regcache));
 
   /* Make sure to zero-initialize the register cache when it is created,
      in case there are registers the target never fetches.  This way they'll
      read as zero instead of garbage.  */
-  regcache->registers = calloc (1, register_bytes);
-  if (regcache->registers == NULL)
-    fatal ("Could not allocate register cache.");
+  regcache->registers = xcalloc (1, register_bytes);
 
   regcache->registers_valid = 0;
 
@@ -111,8 +112,11 @@ free_register_cache (void *regcache_p)
   struct inferior_regcache_data *regcache
     = (struct inferior_regcache_data *) regcache_p;
 
-  free (regcache->registers);
-  free (regcache);
+  if (regcache)
+    {
+      free (regcache->registers);
+      free (regcache);
+    }
 }
 
 static void

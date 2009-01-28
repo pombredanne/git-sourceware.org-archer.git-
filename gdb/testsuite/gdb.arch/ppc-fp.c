@@ -1,8 +1,4 @@
-/* Win32 termcap emulation.
-
-   Copyright (C) 2005, 2006, 2007, 2008 Free Software Foundation, Inc.
-
-   Contributed by CodeSourcery, LLC.
+/* Copyright 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -19,47 +15,22 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#include <stdlib.h>
-
-/* Each of the files below is a minimal implementation of the standard
-   termcap function with the same name, suitable for use in a Windows
-   console window.  */
-
 int
-tgetent (char *buffer, char *termtype)
+main (int argc, char *argv[])
 {
-  return -1;
-}
+  double result;
 
-int
-tgetnum (char *name)
-{
-  return -1;
-}
+  asm ("fdiv %0, %1, %1\n"	/* Invalid operation.  */
+       : "=f" (result)
+       : "f" (0.0));
 
-int
-tgetflag (char *name)
-{
-  return -1;
-}
+  asm ("mtfsf 0xff, %0\n"  /* Reset FPSCR.  */
+       :
+       : "f" (0.0));
 
-char *
-tgetstr (char *name, char **area)
-{
-  return NULL;
-}
-
-int
-tputs (char *string, int nlines, int (*outfun) ())
-{
-  while (*string)
-    outfun (*string++);
+  asm ("fdiv %0, %1, %2\n"	/* Division by zero.  */
+       : "=f" (result)
+       : "f" (1.25), "f" (0.0));
 
   return 0;
-}
-
-char *
-tgoto (const char *cap, int col, int row)
-{
-  return NULL;
 }

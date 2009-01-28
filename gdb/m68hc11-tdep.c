@@ -1,6 +1,6 @@
 /* Target-dependent code for Motorola 68HC11 & 68HC12
 
-   Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008
+   Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    Contributed by Stephane Carrez, stcarrez@nerim.fr
@@ -59,18 +59,16 @@
    MSYMBOL_IS_RTI       Tests the "RTC" bit in a minimal symbol.  */
 
 #define MSYMBOL_SET_RTC(msym)                                           \
-        MSYMBOL_INFO (msym) = (char *) (((long) MSYMBOL_INFO (msym))	\
-					| 0x80000000)
+        MSYMBOL_TARGET_FLAG_1 (msym) = 1
 
 #define MSYMBOL_SET_RTI(msym)                                           \
-        MSYMBOL_INFO (msym) = (char *) (((long) MSYMBOL_INFO (msym))	\
-					| 0x40000000)
+        MSYMBOL_TARGET_FLAG_2 (msym) = 1
 
 #define MSYMBOL_IS_RTC(msym)				\
-	(((long) MSYMBOL_INFO (msym) & 0x80000000) != 0)
+	MSYMBOL_TARGET_FLAG_1 (msym)
 
 #define MSYMBOL_IS_RTI(msym)				\
-	(((long) MSYMBOL_INFO (msym) & 0x40000000) != 0)
+	MSYMBOL_TARGET_FLAG_2 (msym)
 
 enum insn_return_kind {
   RETURN_RTS,
@@ -1349,7 +1347,7 @@ m68hc11_elf_make_msymbol_special (asymbol *sym, struct minimal_symbol *msym)
 static int
 gdb_print_insn_m68hc11 (bfd_vma memaddr, disassemble_info *info)
 {
-  if (gdbarch_bfd_arch_info (current_gdbarch)->arch == bfd_arch_m68hc11)
+  if (info->arch == bfd_arch_m68hc11)
     return print_insn_m68hc11 (memaddr, info);
   else
     return print_insn_m68hc12 (memaddr, info);

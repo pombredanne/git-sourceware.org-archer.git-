@@ -1,8 +1,8 @@
 /* Print and select stack frames for GDB, the GNU debugger.
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008
-   Free Software Foundation, Inc.
+   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008,
+   2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -202,9 +202,9 @@ print_this_frame_argument_p (struct symbol *sym)
    of arguments according to the stack frame (or -1 if the number of
    arguments is unknown).  */
 
-/* Note that currently the "number of argumentss according to the
+/* Note that currently the "number of arguments according to the
    stack frame" is only known on VAX where i refers to the "number of
-   ints of argumentss according to the stack frame".  */
+   ints of arguments according to the stack frame".  */
 
 static void
 print_frame_args (struct symbol *func, struct frame_info *frame,
@@ -368,6 +368,7 @@ print_frame_args (struct symbol *func, struct frame_info *frame,
 	      if (val)
 	        {
                   const struct language_defn *language;
+		  struct value_print_options opts;
 
                   /* Use the appropriate language to display our symbol,
                      unless the user forced the language to a specific
@@ -377,8 +378,10 @@ print_frame_args (struct symbol *func, struct frame_info *frame,
                   else
                     language = current_language;
 
-		  common_val_print (val, stb->stream, 0, 0, 2,
-				    Val_no_prettyprint, language);
+		  get_raw_print_options (&opts);
+		  opts.deref_ref = 0;
+		  common_val_print (val, stb->stream, 2,
+				    &opts, language);
 		  ui_out_field_stream (uiout, "value", stb);
 	        }
 	      else
@@ -547,6 +550,8 @@ print_frame_info (struct frame_info *frame, int print_level,
 						      sal.line + 1, 0);
 	  else
 	    {
+	      struct value_print_options opts;
+	      get_user_print_options (&opts);
 	      /* We used to do this earlier, but that is clearly
 		 wrong. This function is used by many different
 		 parts of gdb, including normal_stop in infrun.c,
@@ -555,7 +560,7 @@ print_frame_info (struct frame_info *frame, int print_level,
 		 line. Only the command line really wants this
 		 behavior. Other UIs probably would like the
 		 ability to decide for themselves if it is desired.  */
-	      if (addressprint && mid_statement)
+	      if (opts.addressprint && mid_statement)
 		{
 		  ui_out_field_core_addr (uiout, "addr", get_frame_pc (frame));
 		  ui_out_text (uiout, "\t");
@@ -584,6 +589,7 @@ print_frame (struct frame_info *frame, int print_level,
   enum language funlang = language_unknown;
   struct ui_stream *stb;
   struct cleanup *old_chain, *list_chain;
+  struct value_print_options opts;
 
   stb = ui_out_stream_new (uiout);
   old_chain = make_cleanup_ui_out_stream_delete (stb);
@@ -665,7 +671,8 @@ print_frame (struct frame_info *frame, int print_level,
       ui_out_field_fmt_int (uiout, 2, ui_left, "level",
 			    frame_relative_level (frame));
     }
-  if (addressprint)
+  get_user_print_options (&opts);
+  if (opts.addressprint)
     if (get_frame_pc (frame) != sal.pc || !sal.symtab
 	|| print_what == LOC_AND_ADDRESS)
       {
@@ -825,7 +832,7 @@ parse_frame_specification_1 (const char *frame_exp, const char *message,
   {
     int i;
     for (i = 0; i < numargs; i++)
-      addrs[i] = value_as_address (args[0]);
+      addrs[i] = value_as_address (args[i]);
   }
 
   /* Assume that the single arg[0] is an address, use that to identify
@@ -1282,7 +1289,7 @@ backtrace_command (char *arg, int from_tty)
       char **argv;
       int i;
 
-      argv = buildargv (arg);
+      argv = gdb_buildargv (arg);
       old_chain = make_cleanup_freeargv (argv);
       argc = 0;
       for (i = 0; argv[i]; i++)
@@ -1367,12 +1374,7 @@ print_block_frame_locals (struct block *b, struct frame_info *frame,
 	  if (SYMBOL_IS_ARGUMENT (sym))
 	    break;
 	  values_printed = 1;
-	  for (j = 0; j < num_tabs; j++)
-	    fputs_filtered ("\t", stream);
-	  fputs_filtered (SYMBOL_PRINT_NAME (sym), stream);
-	  fputs_filtered (" = ", stream);
-	  print_variable_value (sym, frame, stream);
-	  fprintf_filtered (stream, "\n");
+	  print_variable_and_value (NULL, sym, frame, stream, 4 * num_tabs);
 	  break;
 
 	default:
@@ -1405,10 +1407,12 @@ print_block_frame_labels (struct block *b, int *have_default,
       if (SYMBOL_CLASS (sym) == LOC_LABEL)
 	{
 	  struct symtab_and_line sal;
+	  struct value_print_options opts;
 	  sal = find_pc_line (SYMBOL_VALUE_ADDRESS (sym), 0);
 	  values_printed = 1;
 	  fputs_filtered (SYMBOL_PRINT_NAME (sym), stream);
-	  if (addressprint)
+	  get_user_print_options (&opts);
+	  if (opts.addressprint)
 	    {
 	      fprintf_filtered (stream, " ");
 	      fputs_filtered (paddress (SYMBOL_VALUE_ADDRESS (sym)), stream);
@@ -1566,8 +1570,6 @@ print_frame_arg_vars (struct frame_info *frame, struct ui_file *stream)
       if (SYMBOL_IS_ARGUMENT (sym))
 	{
 	  values_printed = 1;
-	  fputs_filtered (SYMBOL_PRINT_NAME (sym), stream);
-	  fputs_filtered (" = ", stream);
 
 	  /* We have to look up the symbol because arguments can have
 	     two entries (one a parameter, one a local) and the one we
@@ -1582,8 +1584,8 @@ print_frame_arg_vars (struct frame_info *frame, struct ui_file *stream)
 
 	  sym2 = lookup_symbol (SYMBOL_LINKAGE_NAME (sym),
 				b, VAR_DOMAIN, NULL);
-	  print_variable_value (sym2, frame, stream);
-	  fprintf_filtered (stream, "\n");
+	  print_variable_and_value (SYMBOL_PRINT_NAME (sym), sym2,
+				    frame, stream, 0);
 	}
     }
 
@@ -1780,11 +1782,13 @@ down_command (char *count_exp, int from_tty)
 void
 return_command (char *retval_exp, int from_tty)
 {
+  struct frame_info *thisframe;
   struct symbol *thisfun;
   struct value *return_value = NULL;
   const char *query_prefix = "";
 
-  thisfun = get_frame_function (get_selected_frame ("No selected frame."));
+  thisframe = get_selected_frame ("No selected frame.");
+  thisfun = get_frame_function (thisframe);
 
   /* Compute the return value.  If the computation triggers an error,
      let it bail.  If the return type can't be handled, set
@@ -1803,7 +1807,7 @@ return_command (char *retval_exp, int from_tty)
       if (thisfun != NULL)
 	return_type = TYPE_TARGET_TYPE (SYMBOL_TYPE (thisfun));
       if (return_type == NULL)
-	return_type = builtin_type_int;
+	return_type = builtin_type (get_frame_arch (thisframe))->builtin_int;
       CHECK_TYPEDEF (return_type);
       return_value = value_cast (return_type, return_value);
 
@@ -1844,29 +1848,8 @@ If you continue, the return value that you specified will be ignored.\n";
 	error (_("Not confirmed"));
     }
 
-  /* NOTE: cagney/2003-01-18: Is this silly?  Rather than pop each
-     frame in turn, should this code just go straight to the relevant
-     frame and pop that?  */
-
-  /* First discard all frames inner-to the selected frame (making the
-     selected frame current).  */
-  {
-    struct frame_id selected_id = get_frame_id (get_selected_frame (NULL));
-    while (!frame_id_eq (selected_id, get_frame_id (get_current_frame ())))
-      {
-	struct frame_info *frame = get_current_frame ();
-	if (frame_id_inner (get_frame_arch (frame), selected_id,
-			    get_frame_id (frame)))
-	  /* Caught in the safety net, oops!  We've gone way past the
-             selected frame.  */
-	  error (_("Problem while popping stack frames (corrupt stack?)"));
-	frame_pop (get_current_frame ());
-      }
-  }
-
-  /* Second discard the selected frame (which is now also the current
-     frame).  */
-  frame_pop (get_current_frame ());
+  /* Discard the selected frame and all frames inner-to it.  */
+  frame_pop (get_selected_frame (NULL));
 
   /* Store RETURN_VALUE in the just-returned register set.  */
   if (return_value != NULL)

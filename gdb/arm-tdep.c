@@ -1,7 +1,7 @@
 /* Common target dependent code for GDB on ARM systems.
 
    Copyright (C) 1988, 1989, 1991, 1992, 1993, 1995, 1996, 1998, 1999, 2000,
-   2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
+   2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -63,11 +63,10 @@ static int arm_debug;
    MSYMBOL_IS_SPECIAL   Tests the "special" bit in a minimal symbol.  */
 
 #define MSYMBOL_SET_SPECIAL(msym)					\
-	MSYMBOL_INFO (msym) = (char *) (((long) MSYMBOL_INFO (msym))	\
-					| 0x80000000)
+	MSYMBOL_TARGET_FLAG_1 (msym) = 1
 
 #define MSYMBOL_IS_SPECIAL(msym)				\
-	(((long) MSYMBOL_INFO (msym) & 0x80000000) != 0)
+	MSYMBOL_TARGET_FLAG_1 (msym)
 
 /* Macros for swapping shorts and ints. In the unlikely case that anybody else needs these,
    move to a general header. (A better solution might be to define memory read routines that
@@ -363,7 +362,7 @@ arm_pc_is_thumb (CORE_ADDR memaddr)
 
 /* Remove useless bits from addresses in a running program.  */
 static CORE_ADDR
-arm_addr_bits_remove (CORE_ADDR val)
+arm_addr_bits_remove (struct gdbarch *gdbarch, CORE_ADDR val)
 {
   if (arm_apcs_32)
     return UNMAKE_THUMB_ADDR (val);
@@ -374,7 +373,7 @@ arm_addr_bits_remove (CORE_ADDR val)
 /* When reading symbols, we need to zap the low bit of the address,
    which may be set to 1 for Thumb functions.  */
 static CORE_ADDR
-arm_smash_text_address (CORE_ADDR val)
+arm_smash_text_address (struct gdbarch *gdbarch, CORE_ADDR val)
 {
   return val & ~1;
 }
@@ -536,43 +535,40 @@ arm_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR pc)
 {
   unsigned long inst;
   CORE_ADDR skip_pc;
-  CORE_ADDR func_addr, func_end = 0;
-  char *func_name;
+  CORE_ADDR func_addr, limit_pc;
   struct symtab_and_line sal;
 
   /* If we're in a dummy frame, don't even try to skip the prologue.  */
   if (deprecated_pc_in_call_dummy (pc))
     return pc;
 
-  /* See what the symbol table says.  */
-
-  if (find_pc_partial_function (pc, &func_name, &func_addr, &func_end))
+  /* See if we can determine the end of the prologue via the symbol table.
+     If so, then return either PC, or the PC after the prologue, whichever
+     is greater.  */
+  if (find_pc_partial_function (pc, NULL, &func_addr, NULL))
     {
-      struct symbol *sym;
-
-      /* Found a function.  */
-      sym = lookup_symbol (func_name, NULL, VAR_DOMAIN, NULL);
-      if (sym && SYMBOL_LANGUAGE (sym) != language_asm)
-        {
-	  /* Don't use this trick for assembly source files.  */
-	  sal = find_pc_line (func_addr, 0);
-	  if ((sal.line != 0) && (sal.end < func_end))
-	    return sal.end;
-        }
+      CORE_ADDR post_prologue_pc = skip_prologue_using_sal (func_addr);
+      if (post_prologue_pc != 0)
+	return max (pc, post_prologue_pc);
     }
 
-  /* Can't find the prologue end in the symbol table, try it the hard way
-     by disassembling the instructions.  */
+  /* Can't determine prologue from the symbol table, need to examine
+     instructions.  */
 
+  /* Find an upper limit on the function prologue using the debug
+     information.  If the debug information could not be used to provide
+     that bound, then use an arbitrary large number as the upper bound.  */
   /* Like arm_scan_prologue, stop no later than pc + 64. */
-  if (func_end == 0 || func_end > pc + 64)
-    func_end = pc + 64;
+  limit_pc = skip_prologue_using_sal (pc);
+  if (limit_pc == 0)
+    limit_pc = pc + 64;          /* Magic.  */
+
 
   /* Check if this is Thumb code.  */
   if (arm_pc_is_thumb (pc))
-    return thumb_analyze_prologue (gdbarch, pc, func_end, NULL);
+    return thumb_analyze_prologue (gdbarch, pc, limit_pc, NULL);
 
-  for (skip_pc = pc; skip_pc < func_end; skip_pc += 4)
+  for (skip_pc = pc; skip_pc < limit_pc; skip_pc += 4)
     {
       inst = read_memory_unsigned_integer (skip_pc, 4);
 
@@ -1096,6 +1092,7 @@ arm_prologue_prev_register (struct frame_info *this_frame,
 			    void **this_cache,
 			    int prev_regnum)
 {
+  struct gdbarch *gdbarch = get_frame_arch (this_frame);
   struct arm_prologue_cache *cache;
 
   if (*this_cache == NULL)
@@ -1113,7 +1110,7 @@ arm_prologue_prev_register (struct frame_info *this_frame,
 
       lr = frame_unwind_register_unsigned (this_frame, ARM_LR_REGNUM);
       return frame_unwind_got_constant (this_frame, prev_regnum,
-					arm_addr_bits_remove (lr));
+					arm_addr_bits_remove (gdbarch, lr));
     }
 
   /* SP is generally not saved to the stack, but this frame is
@@ -1251,7 +1248,7 @@ arm_unwind_pc (struct gdbarch *gdbarch, struct frame_info *this_frame)
 {
   CORE_ADDR pc;
   pc = frame_unwind_register_unsigned (this_frame, ARM_PC_REGNUM);
-  return arm_addr_bits_remove (pc);
+  return arm_addr_bits_remove (gdbarch, pc);
 }
 
 static CORE_ADDR
@@ -1264,6 +1261,7 @@ static struct value *
 arm_dwarf2_prev_register (struct frame_info *this_frame, void **this_cache,
 			  int regnum)
 {
+  struct gdbarch * gdbarch = get_frame_arch (this_frame);
   CORE_ADDR lr, cpsr;
 
   switch (regnum)
@@ -1275,7 +1273,7 @@ arm_dwarf2_prev_register (struct frame_info *this_frame, void **this_cache,
 	 part of the PC.  */
       lr = frame_unwind_register_unsigned (this_frame, ARM_LR_REGNUM);
       return frame_unwind_got_constant (this_frame, regnum,
-					arm_addr_bits_remove (lr));
+					arm_addr_bits_remove (gdbarch, lr));
 
     case ARM_PS_REGNUM:
       /* Reconstruct the T bit; see arm_prologue_prev_register for details.  */
@@ -1603,9 +1601,9 @@ arm_register_type (struct gdbarch *gdbarch, int regnum)
   if (regnum >= ARM_F0_REGNUM && regnum < ARM_F0_REGNUM + NUM_FREGS)
     return builtin_type_arm_ext;
   else if (regnum == ARM_SP_REGNUM)
-    return builtin_type_void_data_ptr;
+    return builtin_type (gdbarch)->builtin_data_ptr;
   else if (regnum == ARM_PC_REGNUM)
-    return builtin_type_void_func_ptr;
+    return builtin_type (gdbarch)->builtin_func_ptr;
   else if (regnum >= ARRAY_SIZE (arm_register_names))
     /* These registers are only supported on targets which supply
        an XML description.  */
@@ -2704,7 +2702,7 @@ arm_update_current_architecture (void)
   struct gdbarch_info info;
 
   /* If the current architecture is not ARM, we have nothing to do.  */
-  if (gdbarch_bfd_arch_info (current_gdbarch)->arch != bfd_arch_arm)
+  if (gdbarch_bfd_arch_info (target_gdbarch)->arch != bfd_arch_arm)
     return;
 
   /* Update the architecture.  */
@@ -2738,10 +2736,10 @@ static void
 show_fp_model (struct ui_file *file, int from_tty,
 	       struct cmd_list_element *c, const char *value)
 {
-  struct gdbarch_tdep *tdep = gdbarch_tdep (current_gdbarch);
+  struct gdbarch_tdep *tdep = gdbarch_tdep (target_gdbarch);
 
   if (arm_fp_model == ARM_FLOAT_AUTO
-      && gdbarch_bfd_arch_info (current_gdbarch)->arch == bfd_arch_arm)
+      && gdbarch_bfd_arch_info (target_gdbarch)->arch == bfd_arch_arm)
     fprintf_filtered (file, _("\
 The current ARM floating point model is \"auto\" (currently \"%s\").\n"),
 		      fp_model_strings[tdep->fp_model]);
@@ -2775,10 +2773,10 @@ static void
 arm_show_abi (struct ui_file *file, int from_tty,
 	     struct cmd_list_element *c, const char *value)
 {
-  struct gdbarch_tdep *tdep = gdbarch_tdep (current_gdbarch);
+  struct gdbarch_tdep *tdep = gdbarch_tdep (target_gdbarch);
 
   if (arm_abi_global == ARM_ABI_AUTO
-      && gdbarch_bfd_arch_info (current_gdbarch)->arch == bfd_arch_arm)
+      && gdbarch_bfd_arch_info (target_gdbarch)->arch == bfd_arch_arm)
     fprintf_filtered (file, _("\
 The current ARM ABI is \"auto\" (currently \"%s\").\n"),
 		      arm_abi_strings[tdep->arm_abi]);
@@ -2791,7 +2789,7 @@ static void
 arm_show_fallback_mode (struct ui_file *file, int from_tty,
 			struct cmd_list_element *c, const char *value)
 {
-  struct gdbarch_tdep *tdep = gdbarch_tdep (current_gdbarch);
+  struct gdbarch_tdep *tdep = gdbarch_tdep (target_gdbarch);
 
   fprintf_filtered (file, _("\
 The current execution mode assumed (when symbols are unavailable) is \"%s\".\n"),
@@ -2802,7 +2800,7 @@ static void
 arm_show_force_mode (struct ui_file *file, int from_tty,
 		     struct cmd_list_element *c, const char *value)
 {
-  struct gdbarch_tdep *tdep = gdbarch_tdep (current_gdbarch);
+  struct gdbarch_tdep *tdep = gdbarch_tdep (target_gdbarch);
 
   fprintf_filtered (file, _("\
 The current execution mode assumed (even when symbols are available) is \"%s\".\n"),

@@ -1,8 +1,8 @@
 /* Top level stuff for GDB, the GNU debugger.
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008
-   Free Software Foundation, Inc.
+   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008,
+   2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -188,9 +188,6 @@ captured_main (void *data)
   line[0] = '\0';		/* Terminate saved (now empty) cmd line */
   instream = stdin;
 
-  getcwd (gdb_dirbuf, sizeof (gdb_dirbuf));
-  current_directory = gdb_dirbuf;
-
   gdb_stdout = stdio_fileopen (stdout);
   gdb_stderr = stdio_fileopen (stderr);
   gdb_stdlog = gdb_stderr;	/* for moment */
@@ -198,6 +195,15 @@ captured_main (void *data)
   gdb_stdin = stdio_fileopen (stdin);
   gdb_stdtargerr = gdb_stderr;	/* for moment */
   gdb_stdtargin = gdb_stdin;	/* for moment */
+
+  if (! getcwd (gdb_dirbuf, sizeof (gdb_dirbuf)))
+    /* Don't use *_filtered or warning() (which relies on
+       current_target) until after initialize_all_files(). */
+    fprintf_unfiltered (gdb_stderr,
+                        _("%s: warning: error finding working directory: %s\n"),
+                        argv[0], safe_strerror (errno));
+    
+  current_directory = gdb_dirbuf;
 
   /* Set the sysroot path.  */
 #ifdef TARGET_SYSTEM_ROOT_RELOCATABLE

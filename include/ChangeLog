@@ -1,3 +1,93 @@
+2008-12-01  Cary Coutant  <ccoutant@google.com>
+
+	* plugin-api.h (LDPS_BAD_HANDLE): New constant.
+	(ld_plugin_get_input_file): New typedef.
+	(ld_plugin_release_input_file): New typedef.
+	(LDPT_GET_INPUT_FILE, LDPT_RELEASE_INPUT_FILE): New constants.
+	(struct ld_plugin_tv): Add two new fields.
+
+2008-12-23  Jon Beniston <jon@beniston.com>
+
+	* dis-asm.h: Add LM32 disassembler function prototype.
+
+2008-12-10  Jason Merrill  <jason@redhat.com>
+
+	* demangle.h (enum demangle_component_type): Add
+	DEMANGLE_COMPONENT_FIXED_TYPE.
+
+2008-12-01  Cary Coutant  <ccoutant@google.com>
+
+	* plugin-api.h (ld_plugin_message): Change format parameter to const.
+
+2008-12-01  Cary Coutant  <ccoutant@google.com>
+
+	* plugin-api.h: Fix syntax error when compiling with C++.
+
+2008-11-26  Alan Modra  <amodra@bigpond.net.au>
+
+	PR 7047
+	* bfdlink.h (struct bfd_elf_version_expr): Delete "symbol".
+	Add "literal".
+
+2008-11-21  Sterling Augustine  <sterling@tensilica.com>
+
+	* xtensa-isa-internal.h (XTENSA_STATE_IS_SHARED_OR): New flag.
+	* xtensa-isa.h (xtensa_state_is_shared_or): New prototype.
+
+2008-11-19  Bob Wilson  <bob.wilson@acm.org>
+	
+	* xtensa-config.h (XCHAL_HAVE_MUL16, XCHAL_HAVE_MUL32, XCHAL_HAVE_DIV32)
+	(XCHAL_HAVE_MINMAX, XCHAL_HAVE_SEXT, XCHAL_HAVE_THREADPTR)
+	(XCHAL_HAVE_RELEASE_SYNC, XCHAL_HAVE_S32C1I): Change to 1.
+	(XCHAL_NUM_AREGS): Change to 32.
+	(XCHAL_ICACHE_SIZE, XCHAL_DCACHE_SIZE): Change to 16K.
+	(XCHAL_ICACHE_LINESIZE, XCHAL_DCACHE_LINESIZE): Change to 32.
+	(XCHAL_ICACHE_LINEWIDTH, XCHAL_DCACHE_LINEWIDTH): Change to 5.
+	(XCHAL_DCACHE_IS_WRITEBACK): Change to 1.
+	(XCHAL_DEBUGLEVEL): Change to 6.
+	
+2008-11-14  Tristan Gingold  <gingold@adacore.com>
+
+	* fopen-vms.h (FOPEN_RB): Use a single string to match the
+	standard prototype.
+	(FOPEN_WB): Ditto.
+	(FOPEN_AB): Ditto.
+	(FOPEN_RUB): Ditto.
+	(FOPEN_WUB): Ditto.
+	(FOPEN_AUB): Ditto.
+
+2008-10-21  Alan Modra  <amodra@bigpond.net.au>
+
+	* obstack.h (obstack_finish <!__GNUC__>): Cast result to void *.
+
+2008-10-06  Jason Merrill  <jason@redhat.com>
+
+	* demangle.h (enum demangle_component_type): Add
+	DEMANGLE_COMPONENT_PACK_EXPANSION.
+
+2008-09-24  Richard Henderson  <rth@redhat.com>
+
+	* elf/dwarf2.h (DW_OP_GNU_encoded_addr): New.
+
+2008-09-22 Rafael Espindola  <espindola@google.com>
+
+	* plugin-api.h (ld_plugin_status): Remove comma from the last item.
+	Use C style comment.
+	(ld_plugin_api_version, ld_plugin_output_file_type,
+	ld_plugin_symbol_kind, ld_plugin_symbol_visibility,
+	ld_plugin_symbol_resolution, ld_plugin_level, ld_plugin_tag): Remove
+	comma from the last item.
+
+2008-09-18  Cary Coutant  <ccoutant@google.com>
+
+	Add plugin functionality for link-time optimization (LTO).
+	* plugin-api.h: New file.
+
+2008-09-09  Jason Merrill  <jason@redhat.com>
+
+	* demangle.h (enum demangle_component_type): Add
+	DEMANGLE_COMPONENT_DECLTYPE.
+
 2008-08-25  Alan Modra  <amodra@bigpond.net.au>
 
 	* binary-io.h: New file, imported from gnulib, but don't

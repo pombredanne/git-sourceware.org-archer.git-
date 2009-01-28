@@ -1,6 +1,6 @@
 /* Dynamic architecture support for GDB, the GNU debugger.
 
-   Copyright (C) 1998, 1999, 2000, 2002, 2003, 2004, 2007, 2008
+   Copyright (C) 1998, 1999, 2000, 2002, 2003, 2004, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -60,7 +60,7 @@ extern int core_addr_greaterthan (CORE_ADDR lhs, CORE_ADDR rhs);
 
 /* Identity functions on a CORE_ADDR.  Just return the "addr".  */
 
-extern CORE_ADDR core_addr_identity (CORE_ADDR addr);
+extern CORE_ADDR core_addr_identity (struct gdbarch *gdbarch, CORE_ADDR addr);
 extern gdbarch_convert_from_func_ptr_addr_ftype convert_from_func_ptr_addr_identity;
 
 /* No-op conversion of reg to regnum. */

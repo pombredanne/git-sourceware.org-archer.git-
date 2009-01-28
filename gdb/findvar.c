@@ -1,7 +1,7 @@
 /* Find a variable's value in memory, for GDB, the GNU debugger.
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2001, 2003, 2004, 2005, 2007, 2008
+   1996, 1997, 1998, 1999, 2000, 2001, 2003, 2004, 2005, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -34,6 +34,7 @@
 #include "regcache.h"
 #include "user-regs.h"
 #include "block.h"
+#include "objfiles.h"
 
 /* Basic byte-swapping routines.  GDB has needed these for a long time...
    All extract a target-format integer at ADDR which is LEN bytes long.  */
@@ -381,8 +382,7 @@ symbol_read_needs_frame (struct symbol *sym)
 /* Given a struct symbol for a variable,
    and a stack frame id, read the value of the variable
    and return a (pointer to a) struct value containing the value. 
-   If the variable cannot be found, return a zero pointer.
-   If FRAME is NULL, use the selected frame.  */
+   If the variable cannot be found, return a zero pointer.  */
 
 struct value *
 read_var_value (struct symbol *var, struct frame_info *frame)
@@ -404,10 +404,8 @@ read_var_value (struct symbol *var, struct frame_info *frame)
 
   len = TYPE_LENGTH (type);
 
-  /* FIXME drow/2003-09-06: this call to the selected frame should be
-     pushed upwards to the callers.  */
-  if (frame == NULL)
-    frame = deprecated_safe_get_selected_frame ();
+  if (symbol_read_needs_frame (var))
+    gdb_assert (frame);
 
   switch (SYMBOL_CLASS (var))
     {
@@ -424,7 +422,7 @@ read_var_value (struct symbol *var, struct frame_info *frame)
 	{
 	  CORE_ADDR addr
 	    = symbol_overlayed_address (SYMBOL_VALUE_ADDRESS (var),
-					SYMBOL_BFD_SECTION (var));
+					SYMBOL_OBJ_SECTION (var));
 	  store_typed_address (value_contents_raw (v), type, addr);
 	}
       else
@@ -443,14 +441,12 @@ read_var_value (struct symbol *var, struct frame_info *frame)
     case LOC_STATIC:
       if (overlay_debugging)
 	addr = symbol_overlayed_address (SYMBOL_VALUE_ADDRESS (var),
-					 SYMBOL_BFD_SECTION (var));
+					 SYMBOL_OBJ_SECTION (var));
       else
 	addr = SYMBOL_VALUE_ADDRESS (var);
       break;
 
     case LOC_ARG:
-      if (frame == NULL)
-	return 0;
       addr = get_frame_args_address (frame);
       if (!addr)
 	return 0;
@@ -461,8 +457,6 @@ read_var_value (struct symbol *var, struct frame_info *frame)
       {
 	struct value *ref;
 	CORE_ADDR argref;
-	if (frame == NULL)
-	  return 0;
 	argref = get_frame_args_address (frame);
 	if (!argref)
 	  return 0;
@@ -473,8 +467,6 @@ read_var_value (struct symbol *var, struct frame_info *frame)
       }
 
     case LOC_LOCAL:
-      if (frame == NULL)
-	return 0;
       addr = get_frame_locals_address (frame);
       addr += SYMBOL_VALUE (var);
       break;
@@ -486,7 +478,7 @@ read_var_value (struct symbol *var, struct frame_info *frame)
     case LOC_BLOCK:
       if (overlay_debugging)
 	VALUE_ADDRESS (v) = symbol_overlayed_address
-	  (BLOCK_START (SYMBOL_BLOCK_VALUE (var)), SYMBOL_BFD_SECTION (var));
+	  (BLOCK_START (SYMBOL_BLOCK_VALUE (var)), SYMBOL_OBJ_SECTION (var));
       else
 	VALUE_ADDRESS (v) = BLOCK_START (SYMBOL_BLOCK_VALUE (var));
       return v;
@@ -496,9 +488,6 @@ read_var_value (struct symbol *var, struct frame_info *frame)
       {
 	int regno = SYMBOL_VALUE (var);
 	struct value *regval;
-
-	if (frame == NULL)
-	  return 0;
 
 	if (SYMBOL_CLASS (var) == LOC_REGPARM_ADDR)
 	  {
@@ -529,22 +518,26 @@ read_var_value (struct symbol *var, struct frame_info *frame)
 	 Unfortunately DWARF 2 stores the frame-base (instead of the
 	 function) location in a function's symbol.  Oops!  For the
 	 moment enable this when/where applicable.  */
-      if (frame == 0 && SYMBOL_OPS (var)->read_needs_frame (var))
-	return 0;
       return SYMBOL_OPS (var)->read_variable (var, frame);
 
     case LOC_UNRESOLVED:
       {
 	struct minimal_symbol *msym;
+	struct obj_section *obj_section;
 
 	msym = lookup_minimal_symbol (SYMBOL_LINKAGE_NAME (var), NULL, NULL);
 	if (msym == NULL)
 	  return 0;
 	if (overlay_debugging)
 	  addr = symbol_overlayed_address (SYMBOL_VALUE_ADDRESS (msym),
-					   SYMBOL_BFD_SECTION (msym));
+					   SYMBOL_OBJ_SECTION (msym));
 	else
 	  addr = SYMBOL_VALUE_ADDRESS (msym);
+
+	obj_section = SYMBOL_OBJ_SECTION (msym);
+	if (obj_section
+	    && (obj_section->the_bfd_section->flags & SEC_THREAD_LOCAL) != 0)
+	  addr = target_translate_tls_address (obj_section->objfile, addr);
       }
       break;
 
@@ -649,59 +642,4 @@ address_from_register (struct type *type, int regnum, struct frame_info *frame)
   value_free (value);
 
   return result;
-}
-
-
-/* Given a struct symbol for a variable or function,
-   and a stack frame id, 
-   return a (pointer to a) struct value containing the properly typed
-   address.  */
-
-struct value *
-locate_var_value (struct symbol *var, struct frame_info *frame)
-{
-  struct gdbarch *gdbarch;
-  CORE_ADDR addr = 0;
-  struct type *type = SYMBOL_TYPE (var);
-  struct value *lazy_value;
-
-  /* Evaluate it first; if the result is a memory address, we're fine.
-     Lazy evaluation pays off here. */
-
-  lazy_value = read_var_value (var, frame);
-  if (lazy_value == 0)
-    error (_("Address of \"%s\" is unknown."), SYMBOL_PRINT_NAME (var));
-
-  if ((VALUE_LVAL (lazy_value) == lval_memory && value_lazy (lazy_value))
-      || TYPE_CODE (type) == TYPE_CODE_FUNC)
-    {
-      struct value *val;
-
-      addr = VALUE_ADDRESS (lazy_value);
-      val = value_from_pointer (lookup_pointer_type (type), addr);
-      return val;
-    }
-
-  /* Not a memory address; check what the problem was.  */
-  switch (VALUE_LVAL (lazy_value))
-    {
-    case lval_register:
-      gdb_assert (frame);
-      gdbarch = get_frame_arch (frame);
-      gdb_assert (gdbarch_register_name
-		   (gdbarch, VALUE_REGNUM (lazy_value)) != NULL
-		  && *gdbarch_register_name
-		    (gdbarch, VALUE_REGNUM (lazy_value)) != '\0');
-      error (_("Address requested for identifier "
-	       "\"%s\" which is in register $%s"),
-            SYMBOL_PRINT_NAME (var), 
-	    gdbarch_register_name (gdbarch, VALUE_REGNUM (lazy_value)));
-      break;
-
-    default:
-      error (_("Can't take address of \"%s\" which isn't an lvalue."),
-	     SYMBOL_PRINT_NAME (var));
-      break;
-    }
-  return 0;			/* For lint -- never reached */
 }

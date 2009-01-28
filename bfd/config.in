@@ -78,6 +78,9 @@
 /* Define to 1 if you have the `fdopen' function. */
 #undef HAVE_FDOPEN
 
+/* Define to 1 if you have the `fileno' function. */
+#undef HAVE_FILENO
+
 /* Define to 1 if you have the `fopen64' function. */
 #undef HAVE_FOPEN64
 
@@ -297,10 +300,16 @@
 /* Version number of package */
 #undef VERSION
 
+/* Number of bits in a file offset, on hosts where this is settable. */
+#undef _FILE_OFFSET_BITS
+
 /* Enable GNU extensions on systems that have them.  */
 #ifndef _GNU_SOURCE
 # undef _GNU_SOURCE
 #endif
+
+/* Define for large files, on AIX-style hosts. */
+#undef _LARGE_FILES
 
 /* Define to 1 if on MINIX. */
 #undef _MINIX

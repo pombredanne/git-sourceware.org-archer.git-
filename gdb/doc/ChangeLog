@@ -1,3 +1,254 @@
+2009-01-26  Pedro Alves  <pedro@codesourcery.com>
+
+	PR gdb/7580:
+	* gdb.texinfo (Maintenance Commands): Document "maint set|show
+	internal-error|internal-warning quit|corefile ask|yes|no".
+
+2009-01-26  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo (Using the `gdbserver' Program): Document
+	--remote-debug.
+
+2009-01-23  Doug Evans  <dje@google.com>
+
+	* gdb.texinfo: Add nexti to list of commands that support
+	background execution.
+
+2009-01-14  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.texinfo (Define, Hooks): Document prefix command support.
+
+2009-01-14  Joseph Myers  <joseph@codesourcery.com>
+            Carlos O'Donell  <carlos@codesourcery.com>
+
+	Fixes for makeinfo --html.
+
+	* annotate.texinfo: Use @copying and @insertcopying.  Use
+	@ifnottex in place of @ifinfo.
+	* gdb.texinfo: Use @copying and @insertcopying.  Use @ifnottex in
+	place of @ifinfo.  Use @ifnotinfo for one index entry.
+	* gdbint.texinfo: Use @copying and @insertcopying.  Use @ifnottex
+	in place of @ifinfo.
+	* stabs.texinfo: Use @copying and @insertcopying.  Use @ifnottex
+	in place of @ifinfo.  Include contents at start unconditionally.
+
+2009-01-13  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo (General Query Packets): Remove @var{} around the
+	"spu" literal string.
+
+2009-01-07  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo (Error in Breakpoints): Delete mention of "The same
+	program may be running in another process" errors.
+	* gdbint.texinfo (Native Conditionals): Delete
+	ONE_PROCESS_WRITETEXT description.
+
+2009-01-07  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdbint.texinfo (Start of New Year Procedure): Add the "coding"
+	emacs local variable to be placed at the end of the ChangeLog.
+	Add server.c and gdbreplay.c to the list of files where the
+	copyright year needs to be updated.
+
+2009-01-06  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* gdb.texinfo (Remote Configuration): Document new
+	"set/show tcp auto-retry" and "set/show tcp connect-timeout"
+	commands.
+
+2008-12-28  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdbint.texinfo (gdbarch_cannot_fetch_register): Don't mention
+	FETCH_INFERIOR_REGISTERS.
+	(Native Conditionals): Remove obsolete CHILD_PREPARE_TO_STORE,
+	FETCH_INFERIOR_REGISTERS descriptions.  Remove
+	gdbarch_get_longjmp_target descrition, since already described in
+	Target Conditionals.  Move gdbarch_fp0_regnum description to ...
+	(Target Conditionals): ... here.
+
+2008-12-16  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.texinfo (Omissions from Ada): Add missing GDB prompt in
+	examples.
+	(Additions to Ada): Likewise.  Add the missing opening and closing
+	parenthesis of the GDB prompt in one of the examples.
+
+2008-12-14  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.texinfo (Omissions from Ada): Remove incorrect documentation
+	about the result of 'Address not being of type System.Address.
+	This problem has been fixed a while ago.
+
+2008-12-02  Vladimir Prus  <vladimir@codesourcery.com>
+
+	MI non-stop and multiprocess docs.
+
+        * gdb.texinfo (GDB/MI): New section 'GDB/MI General Design'
+        (GDB/MI Output Records): New section 'GDB/MI Frame Information'
+        Adjust documentation for *stopped, document =thread-created,
+        =thread-exited, =thread-group-created and =thread-group-exited.
+        (GDB/MI Thread Commands): Document the 'state' field in
+        -thread-info output.
+        (GDB/MI Program Execution): Mention --all and --thread-group
+        options.
+        (GDB/MI Variable Objects): Describe floating and fixed variable
+        objects.
+        (GDB/MI Miscellaneous Commands): Document -list-thread-groups.
+
+2008-12-02  Vladimir Prus  <vladimir@codesourcery.com>
+
+        * gdb.texinfo (Operating System Information): New appendix.
+        (Operating System Auxiliary Information): Document 'info os processes'
+        (Remote Configuration): Document 'osdata'
+        (General Query Packets): Document qXfer:osdata:read.
+
+2008-11-27  Tristan Gingold  <gingold@adacore.com>
+
+	* gdb.texinfo (Darwin): Document Darwin specific features.
+
+2008-11-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdbint.texinfo (Target Conditionals): Extend the
+	gdbarch_breakpoint_from_pc description.
+
+2008-11-22  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* gdb.texinfo (M68K Features): Fix typo.
+
+2008-11-18  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* gdb.texinfo (Symbols): Mention printing containing
+	image name in "info symbol".
+	(Maint translate-address): Likewise.
+	
+2008-11-18  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.texinfo (Set Catchpoints): Remove the documentation of
+	commands "catch load" and "catch unload".
+
+2008-11-17  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* gdb.texinfo (GDB/MI Async Records): Document
+        =thread-selected.
+	
+2008-11-17  Vladimir Prus  <vladimir@codesourcery.com>
+
+        * observer.texi (new_inferior, inferior_exit): New observers.
+
+2008-10-27  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdbint.texinfo (Adding a New Target): Don't mention TDEPFILES,
+	.mt files, TM_CLIBS or TM_CDEPS.
+	(x86 Watchpoints): Don't mention TDEPFILES.
+
+2008-10-24  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* gdb.texinfo (Remote Protocol): Add new nodes to menu.
+	(Overview): Mention notifications and non-stop mode behavior.
+	(Packets): Update documentation of ?, vAttach, vCont, and vRun
+	with non-stop mode behavior.  Add vStopped description.
+	(Stop Reply Packets):  Update list of packets that return
+	stop replies.  Mention non-stop behavior.
+	(General Query Packets): Document QNonStop packet and associated
+	qSupported query response.
+	(Interrupts): Clarify multi-threaded behavior.  Mention non-stop
+	behavior.
+	(Notification Packets): New section.
+	(Remote Non-Stop): New section.
+	(File-I/O Overview): Mention non-stop behavior.
+
+2008-10-24  Hui Zhu  <teawater@gmail.com>
+	    Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo (displaced-stepping): Describe the auto mode
+	setting, and say it's the default.  This is now a mainstream
+	setting instead of a maintenance setting.
+
+2008-10-23  Pedro Alves  <pedro@codesourcery.com>
+
+	* observer.texi (thread_stop_requested): New.
+
+2008-10-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.texinfo (Ada Tasks, Ada Tasks and Core Files): New nodes.
+	(Patching): Replace incorrect usage of @samp by @kbd.
+
+2008-10-17  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.texinfo: Add documentation for reverse execution.
+
+2008-10-16  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+	    Eli Zaretskii  <eliz@gnu.org>
+
+	* gdb.texinfo. (Values From Inferior): New subsubsection.
+
+2008-10-06  Doug Evans  <dje@google.com>
+
+	* gdb.texinfo (set debug dwarf2-die): Document it.
+
+2008-10-01  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.texinfo (catch) [exception]: Document how to insert
+	a breakpoint on user-defined exceptions when the exception
+	name is identical to one of the language-defined ones.
+
+2008-09-27  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Macros): Remove text about stringification,
+	varargs, and splicing.
+
+2008-09-27  Tom Tromey  <tromey@redhat.com>
+
+	* gdbint.texinfo (Language Support): Remove text about omitting
+	support for a language.
+
+2008-09-23  Doug Evans  <dje@google.com>
+
+	* gdb.texinfo (info dcache): Update.
+
+2008-09-22  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* gdb.texinfo (Packets): Add info on thread-id syntax and
+	multiprocess extensions.
+	<D>: Document multiprocess form of packet.
+	<H>: Use thread-id syntax.
+	<T>: Likewise.
+	<vCont>: Likewise.  Note this is required for multiprocess.
+	<vKill>: New packet.
+	(Stop Reply Packets) <T>: Use thread-id syntax.
+	<W>: Document multiprocess form of reply.
+	<X>: Likewise.
+	(General Query Packets) <qC>: Use thread-id syntax.
+	<qfThreadInfo>: Likewise.
+	<qGetTLSAddr>: Likewise.
+	<qP>: Likewise.
+	<qSupported>: Add "multiprocess" feature.
+	<qThreadExtraInfo>: Use thread-id syntax.
+
+2008-09-22  Stan Shebs  <stan@codesourcery.com>
+
+	* gdb.texinfo (Inferiors): New section.
+
+2008-09-12  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdbint.texinfo (Native Debugging): Mention NAT_GENERATED_FILES.
+
+2008-09-11  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdbint.texinfo (Target Conditionals): Remove documentation
+	for gdbarch_name_of_malloc.
+
+2008-09-03  Angela Marie Thomas <angela@releasedominatrix.com>
+
+	* gdb.texinfo (Interrupts): Mention TCP interface for
+	sending BREAK.
+
+2008-08-26  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.texinfo (Commands to Specify Files): Document "remote:"
+	argument prefix to "set sysroot".
+
 2008-08-21  Paul N. Hilfinger  <hilfinger@adacore.com>
 
 	* gdb.texinfo (Omissions from Ada): Describe new treatment of True

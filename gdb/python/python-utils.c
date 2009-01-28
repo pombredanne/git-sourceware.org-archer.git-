@@ -1,6 +1,6 @@
 /* General utility routines for GDB/Python.
 
-   Copyright (C) 2008 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -44,6 +44,23 @@ struct cleanup *
 make_cleanup_py_decref (PyObject *py)
 {
   return make_cleanup (py_decref, (void *) py);
+}
+
+/* A cleanup function to restore the thread state.  */
+
+static void
+py_gil_restore (void *p)
+{
+  PyGILState_STATE *state = p;
+  PyGILState_Release (*state);
+}
+
+/* Return a new cleanup which will restore the Python GIL state.  */
+
+struct cleanup *
+make_cleanup_py_restore_gil (PyGILState_STATE *state)
+{
+  return make_cleanup (py_gil_restore, state);
 }
 
 /* Converts a Python 8-bit string to a unicode string object.  Assumes the

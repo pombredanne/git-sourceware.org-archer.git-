@@ -1,7 +1,7 @@
 /* Header file for command-reading library command.c.
 
    Copyright (C) 1986, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1999, 2000,
-   2002, 2004, 2007, 2008 Free Software Foundation, Inc.
+   2002, 2004, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -87,6 +87,9 @@ typedef enum var_types
     /* ZeroableInteger.  *VAR is an int.  Like Unsigned Integer except
        that zero really means zero.  */
     var_zinteger,
+    /* ZeroableUnsignedInteger.  *VAR is an unsigned int.  Zero really
+       means zero.  */
+    var_zuinteger,
     /* Enumerated type.  Can only have one of the specified values.  *VAR is a
        char pointer to the name of the element that we find.  */
     var_enum
@@ -192,8 +195,6 @@ extern struct cmd_list_element *add_info_alias (char *, char *, int);
 extern char **complete_on_cmdlist (struct cmd_list_element *, char *, char *);
 
 extern char **complete_on_enum (const char *enumlist[], char *, char *);
-
-extern void delete_cmd (char *, struct cmd_list_element **);
 
 extern void help_cmd (char *, struct ui_file *);
 
@@ -333,6 +334,17 @@ extern void add_setshow_zinteger_cmd (char *name,
 				      show_value_ftype *show_func,
 				      struct cmd_list_element **set_list,
 				      struct cmd_list_element **show_list);
+
+extern void add_setshow_zuinteger_cmd (char *name,
+				       enum command_class class,
+				       unsigned int *var,
+				       const char *set_doc,
+				       const char *show_doc,
+				       const char *help_doc,
+				       cmd_sfunc_ftype *set_func,
+				       show_value_ftype *show_func,
+				       struct cmd_list_element **set_list,
+				       struct cmd_list_element **show_list);
 
 /* Do a "show" command for each thing on a command list.  */
 

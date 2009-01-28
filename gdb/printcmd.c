@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008 Free Software Foundation, Inc.
+   2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -42,12 +42,13 @@
 #include "block.h"
 #include "disasm.h"
 #include "dfp.h"
+#include "valprint.h"
 
 #ifdef TUI
 #include "tui/tui.h"		/* For tui_active et.al.   */
 #endif
 
-#if defined(__MINGW32__)
+#if defined(__MINGW32__) && !defined(PRINTF_HAS_LONG_LONG)
 # define USE_PRINTF_I64 1
 # define PRINTF_HAS_LONG_LONG
 #else
@@ -55,7 +56,6 @@
 #endif
 
 extern int asm_demangle;	/* Whether to demangle syms in asm printouts */
-extern int addressprint;	/* Whether to print hex addresses in HLL " */
 
 struct format_data
   {
@@ -119,13 +119,6 @@ Printing of source filename and line number with <symbol> is %s.\n"),
    -1 when not doing one.  */
 
 int current_display_number;
-
-/* Flag to low-level print routines that this value is being printed
-   in an epoch window.  We'd like to pass this as a parameter, but
-   every routine would need to take it.  Perhaps we can encapsulate
-   this in the I/O stream once we have GNU stdio. */
-
-int inspect_it = 0;
 
 struct display
   {
@@ -254,15 +247,15 @@ decode_format (char **string_ptr, int oformat, int osize)
   return val;
 }
 
-/* Print value VAL on stream according to FORMAT, a letter or 0.
+/* Print value VAL on stream according to OPTIONS.
    Do not end with a newline.
-   0 means print VAL according to its own type.
    SIZE is the letter for the size of datum being printed.
    This is used to pad hex numbers so they line up.  SIZE is 0
    for print / output and set for examine.  */
 
 static void
-print_formatted (struct value *val, int format, int size,
+print_formatted (struct value *val, int size,
+		 const struct value_print_options *options,
 		 struct ui_file *stream)
 {
   struct type *type = check_typedef (value_type (val));
@@ -273,12 +266,13 @@ print_formatted (struct value *val, int format, int size,
 
   if (size)
     {
-      switch (format)
+      switch (options->format)
 	{
 	case 's':
 	  /* FIXME: Need to handle wchar_t's here... */
 	  next_address = VALUE_ADDRESS (val)
-	    + val_print_string (VALUE_ADDRESS (val), -1, 1, stream);
+	    + val_print_string (VALUE_ADDRESS (val), -1, 1, stream,
+				options);
 	  return;
 
 	case 'i':
@@ -291,34 +285,50 @@ print_formatted (struct value *val, int format, int size,
 	}
     }
 
-  if (format == 0 || format == 's'
+  if (options->format == 0 || options->format == 's'
       || TYPE_CODE (type) == TYPE_CODE_REF
       || TYPE_CODE (type) == TYPE_CODE_ARRAY
       || TYPE_CODE (type) == TYPE_CODE_STRING
       || TYPE_CODE (type) == TYPE_CODE_STRUCT
       || TYPE_CODE (type) == TYPE_CODE_UNION
       || TYPE_CODE (type) == TYPE_CODE_NAMESPACE)
-    /* If format is 0, use the 'natural' format for that type of
-       value.  If the type is non-scalar, we have to use language
-       rules to print it as a series of scalars.  */
-    value_print (val, stream, format, Val_pretty_default);
+    value_print (val, stream, options);
   else
     /* User specified format, so don't look to the the type to
        tell us what to do.  */
     print_scalar_formatted (value_contents (val), type,
-			    format, size, stream);
+			    options, size, stream);
+}
+
+/* Return builtin floating point type of same length as TYPE.
+   If no such type is found, return TYPE itself.  */
+static struct type *
+float_type_from_length (struct gdbarch *gdbarch, struct type *type)
+{
+  const struct builtin_type *builtin = builtin_type (gdbarch);
+  unsigned int len = TYPE_LENGTH (type);
+
+  if (len == TYPE_LENGTH (builtin->builtin_float))
+    type = builtin->builtin_float;
+  else if (len == TYPE_LENGTH (builtin->builtin_double))
+    type = builtin->builtin_double;
+  else if (len == TYPE_LENGTH (builtin->builtin_long_double))
+    type = builtin->builtin_long_double;
+
+  return type;
 }
 
 /* Print a scalar of data of type TYPE, pointed to in GDB by VALADDR,
-   according to letters FORMAT and SIZE on STREAM.
-   FORMAT may not be zero.  Formats s and i are not supported at this level.
+   according to OPTIONS and SIZE on STREAM.
+   Formats s and i are not supported at this level.
 
    This is how the elements of an array or structure are printed
    with a format.  */
 
 void
 print_scalar_formatted (const void *valaddr, struct type *type,
-			int format, int size, struct ui_file *stream)
+			const struct value_print_options *options,
+			int size, struct ui_file *stream)
 {
   LONGEST val_long = 0;
   unsigned int len = TYPE_LENGTH (type);
@@ -327,9 +337,12 @@ print_scalar_formatted (const void *valaddr, struct type *type,
   /* If we get here with a string format, try again without it.  Go
      all the way back to the language printers, which may call us
      again.  */
-  if (format == 's')
+  if (options->format == 's')
     {
-      val_print (type, valaddr, 0, 0, stream, 0, 0, 0, Val_pretty_default,
+      struct value_print_options opts = *options;
+      opts.format = 0;
+      opts.deref_ref = 0;
+      val_print (type, valaddr, 0, 0, stream, 0, &opts,
 		 current_language);
       return;
     }
@@ -338,7 +351,7 @@ print_scalar_formatted (const void *valaddr, struct type *type,
       (TYPE_CODE (type) == TYPE_CODE_INT
        || TYPE_CODE (type) == TYPE_CODE_ENUM))
     {
-      switch (format)
+      switch (options->format)
 	{
 	case 'o':
 	  print_octal_chars (stream, valaddr, len, byte_order);
@@ -361,7 +374,7 @@ print_scalar_formatted (const void *valaddr, struct type *type,
 	};
     }
 
-  if (format != 'f')
+  if (options->format != 'f')
     val_long = unpack_long (type, valaddr);
 
   /* If the value is a pointer, and pointers and addresses are not the
@@ -373,13 +386,13 @@ print_scalar_formatted (const void *valaddr, struct type *type,
   /* If we are printing it as unsigned, truncate it in case it is actually
      a negative signed value (e.g. "print/u (short)-1" should print 65535
      (if shorts are 16 bits) instead of 4294967295).  */
-  if (format != 'd')
+  if (options->format != 'd')
     {
       if (len < sizeof (LONGEST))
 	val_long &= ((LONGEST) 1 << HOST_CHAR_BIT * len) - 1;
     }
 
-  switch (format)
+  switch (options->format)
     {
     case 'x':
       if (!size)
@@ -424,26 +437,21 @@ print_scalar_formatted (const void *valaddr, struct type *type,
       break;
 
     case 'c':
-      if (TYPE_UNSIGNED (type))
-	{
-	  struct type *utype;
-
-	  utype = builtin_type (current_gdbarch)->builtin_true_unsigned_char;
-	  value_print (value_from_longest (utype, val_long),
-		       stream, 0, Val_pretty_default);
-	}
-      else
-	value_print (value_from_longest (builtin_type_true_char, val_long),
-		     stream, 0, Val_pretty_default);
+      {
+	struct value_print_options opts = *options;
+	opts.format = 0;
+	if (TYPE_UNSIGNED (type))
+	  value_print (value_from_longest (builtin_type_true_unsigned_char,
+					   val_long),
+		       stream, &opts);
+	else
+	  value_print (value_from_longest (builtin_type_true_char, val_long),
+		       stream, &opts);
+      }
       break;
 
     case 'f':
-      if (len == TYPE_LENGTH (builtin_type_float))
-        type = builtin_type_float;
-      else if (len == TYPE_LENGTH (builtin_type_double))
-        type = builtin_type_double;
-      else if (len == TYPE_LENGTH (builtin_type_long_double))
-        type = builtin_type_long_double;
+      type = float_type_from_length (current_gdbarch, type);
       print_floating (valaddr, type, stream);
       break;
 
@@ -499,7 +507,7 @@ print_scalar_formatted (const void *valaddr, struct type *type,
       break;
 
     default:
-      error (_("Undefined output format \"%c\"."), format);
+      error (_("Undefined output format \"%c\"."), options->format);
     }
 }
 
@@ -507,14 +515,15 @@ print_scalar_formatted (const void *valaddr, struct type *type,
    The `info lines' command uses this.  */
 
 void
-set_next_address (CORE_ADDR addr)
+set_next_address (struct gdbarch *gdbarch, CORE_ADDR addr)
 {
+  struct type *ptr_type = builtin_type (gdbarch)->builtin_data_ptr;
+
   next_address = addr;
 
   /* Make address available to the user as $_.  */
   set_internalvar (lookup_internalvar ("_"),
-		   value_from_pointer (lookup_pointer_type (builtin_type_void),
-				       addr));
+		   value_from_pointer (ptr_type, addr));
 }
 
 /* Optionally print address ADDR symbolically as <SYMBOL+OFFSET> on STREAM,
@@ -590,7 +599,7 @@ build_address_symbolic (CORE_ADDR addr,  /* IN */
   struct minimal_symbol *msymbol;
   struct symbol *symbol;
   CORE_ADDR name_location = 0;
-  asection *section = 0;
+  struct obj_section *section = NULL;
   char *name_temp = "";
   
   /* Let's say it is unmapped.  */
@@ -697,11 +706,13 @@ void
 print_address_demangle (CORE_ADDR addr, struct ui_file *stream,
 			int do_demangle)
 {
+  struct value_print_options opts;
+  get_user_print_options (&opts);
   if (addr == 0)
     {
       fprintf_filtered (stream, "0");
     }
-  else if (addressprint)
+  else if (opts.addressprint)
     {
       fputs_filtered (paddress (addr), stream);
       print_address_symbolic (addr, stream, do_demangle, " ");
@@ -735,6 +746,7 @@ do_examine (struct format_data fmt, CORE_ADDR addr)
   struct type *val_type = NULL;
   int i;
   int maxelts;
+  struct value_print_options opts;
 
   format = fmt.format;
   size = fmt.size;
@@ -764,6 +776,8 @@ do_examine (struct format_data fmt, CORE_ADDR addr)
     maxelts = 2;
   if (format == 's' || format == 'i')
     maxelts = 1;
+
+  get_formatted_print_options (&opts, format);
 
   /* Print as many objects as specified in COUNT, at most maxelts per line,
      with the address of the next one at the start of each line.  */
@@ -799,7 +813,7 @@ do_examine (struct format_data fmt, CORE_ADDR addr)
 	  if (last_examine_value)
 	    release_value (last_examine_value);
 
-	  print_formatted (last_examine_value, format, size, gdb_stdout);
+	  print_formatted (last_examine_value, size, &opts, gdb_stdout);
 
 	  /* Display any branch delay slots following the final insn.  */
 	  if (format == 'i' && count == 1)
@@ -837,10 +851,6 @@ print_command_1 (char *exp, int inspect, int voidprint)
   struct format_data fmt;
   int cleanup = 0;
 
-  /* Pass inspect flag to the rest of the print routines in a global
-     (sigh).  */
-  inspect_it = inspect;
-
   if (exp && *exp == '/')
     {
       exp++;
@@ -869,6 +879,7 @@ print_command_1 (char *exp, int inspect, int voidprint)
   if (voidprint || (val && value_type (val) &&
 		    TYPE_CODE (value_type (val)) != TYPE_CODE_VOID))
     {
+      struct value_print_options opts;
       int histindex = record_latest_value (val);
 
       if (histindex >= 0)
@@ -885,7 +896,10 @@ print_command_1 (char *exp, int inspect, int voidprint)
       if (histindex >= 0)
 	annotate_value_history_value ();
 
-      print_formatted (val, format, fmt.size, gdb_stdout);
+      get_formatted_print_options (&opts, format);
+      opts.inspect_it = inspect;
+
+      print_formatted (val, fmt.size, &opts, gdb_stdout);
       printf_filtered ("\n");
 
       if (histindex >= 0)
@@ -899,7 +913,6 @@ print_command_1 (char *exp, int inspect, int voidprint)
 
   if (cleanup)
     do_cleanups (old_chain);
-  inspect_it = 0;		/* Reset print routines to normal.  */
 }
 
 static void
@@ -932,6 +945,7 @@ output_command (char *exp, int from_tty)
   char format = 0;
   struct value *val;
   struct format_data fmt;
+  struct value_print_options opts;
 
   fmt.size = 0;
 
@@ -950,7 +964,8 @@ output_command (char *exp, int from_tty)
 
   annotate_value_begin (value_type (val));
 
-  print_formatted (val, format, fmt.size, gdb_stdout);
+  get_formatted_print_options (&opts, format);
+  print_formatted (val, fmt.size, &opts, gdb_stdout);
 
   annotate_value_end ();
 
@@ -976,7 +991,6 @@ sym_info (char *arg, int from_tty)
   struct minimal_symbol *msymbol;
   struct objfile *objfile;
   struct obj_section *osect;
-  asection *sect;
   CORE_ADDR addr, sect_addr;
   int matches = 0;
   unsigned int offset;
@@ -992,28 +1006,71 @@ sym_info (char *arg, int from_tty)
     if (objfile->separate_debug_objfile_backlink)
       continue;
 
-    sect = osect->the_bfd_section;
-    sect_addr = overlay_mapped_address (addr, sect);
+    sect_addr = overlay_mapped_address (addr, osect);
 
     if (obj_section_addr (osect) <= sect_addr
 	&& sect_addr < obj_section_endaddr (osect)
-	&& (msymbol = lookup_minimal_symbol_by_pc_section (sect_addr, sect)))
+	&& (msymbol = lookup_minimal_symbol_by_pc_section (sect_addr, osect)))
       {
+	const char *obj_name, *mapped, *sec_name, *msym_name;
+	char *loc_string;
+	struct cleanup *old_chain;
+
 	matches = 1;
 	offset = sect_addr - SYMBOL_VALUE_ADDRESS (msymbol);
+	mapped = section_is_mapped (osect) ? _("mapped") : _("unmapped");
+	sec_name = osect->the_bfd_section->name;
+	msym_name = SYMBOL_PRINT_NAME (msymbol);
+
+	/* Don't print the offset if it is zero.
+	   We assume there's no need to handle i18n of "sym + offset".  */
 	if (offset)
-	  printf_filtered ("%s + %u in ",
-			   SYMBOL_PRINT_NAME (msymbol), offset);
+	  xasprintf (&loc_string, "%s + %u", msym_name, offset);
 	else
-	  printf_filtered ("%s in ",
-			   SYMBOL_PRINT_NAME (msymbol));
-	if (pc_in_unmapped_range (addr, sect))
-	  printf_filtered (_("load address range of "));
-	if (section_is_overlay (sect))
-	  printf_filtered (_("%s overlay "),
-			   section_is_mapped (sect) ? "mapped" : "unmapped");
-	printf_filtered (_("section %s"), sect->name);
-	printf_filtered ("\n");
+	  xasprintf (&loc_string, "%s", msym_name);
+
+	/* Use a cleanup to free loc_string in case the user quits
+	   a pagination request inside printf_filtered.  */
+	old_chain = make_cleanup (xfree, loc_string);
+
+	gdb_assert (osect->objfile && osect->objfile->name);
+	obj_name = osect->objfile->name;
+
+	if (MULTI_OBJFILE_P ())
+	  if (pc_in_unmapped_range (addr, osect))
+	    if (section_is_overlay (osect))
+	      printf_filtered (_("%s in load address range of "
+				 "%s overlay section %s of %s\n"),
+			       loc_string, mapped, sec_name, obj_name);
+	    else
+	      printf_filtered (_("%s in load address range of "
+				 "section %s of %s\n"),
+			       loc_string, sec_name, obj_name);
+	  else
+	    if (section_is_overlay (osect))
+	      printf_filtered (_("%s in %s overlay section %s of %s\n"),
+			       loc_string, mapped, sec_name, obj_name);
+	    else
+	      printf_filtered (_("%s in section %s of %s\n"),
+			       loc_string, sec_name, obj_name);
+	else
+	  if (pc_in_unmapped_range (addr, osect))
+	    if (section_is_overlay (osect))
+	      printf_filtered (_("%s in load address range of %s overlay "
+				 "section %s\n"),
+			       loc_string, mapped, sec_name);
+	    else
+	      printf_filtered (_("%s in load address range of section %s\n"),
+			       loc_string, sec_name);
+	  else
+	    if (section_is_overlay (osect))
+	      printf_filtered (_("%s in %s overlay section %s\n"),
+			       loc_string, mapped, sec_name);
+	    else
+	      printf_filtered (_("%s in section %s\n"),
+			       loc_string, sec_name);
+
+	do_cleanups (old_chain);
       }
   }
   if (matches == 0)
@@ -1026,7 +1083,7 @@ address_info (char *exp, int from_tty)
   struct symbol *sym;
   struct minimal_symbol *msymbol;
   long val;
-  asection *section;
+  struct obj_section *section;
   CORE_ADDR load_addr;
   int is_a_field_of_this;	/* C++: lookup_symbol sets this to nonzero
 				   if exp is a field of `this'. */
@@ -1063,13 +1120,14 @@ address_info (char *exp, int from_tty)
 	  printf_filtered ("\" is at ");
 	  fputs_filtered (paddress (load_addr), gdb_stdout);
 	  printf_filtered (" in a file compiled without debugging");
-	  section = SYMBOL_BFD_SECTION (msymbol);
+	  section = SYMBOL_OBJ_SECTION (msymbol);
 	  if (section_is_overlay (section))
 	    {
 	      load_addr = overlay_unmapped_address (load_addr, section);
 	      printf_filtered (",\n -- loaded at ");
 	      fputs_filtered (paddress (load_addr), gdb_stdout);
-	      printf_filtered (" in overlay section %s", section->name);
+	      printf_filtered (" in overlay section %s",
+			       section->the_bfd_section->name);
 	    }
 	  printf_filtered (".\n");
 	}
@@ -1083,7 +1141,7 @@ address_info (char *exp, int from_tty)
 			   current_language->la_language, DMGL_ANSI);
   printf_filtered ("\" is ");
   val = SYMBOL_VALUE (sym);
-  section = SYMBOL_BFD_SECTION (sym);
+  section = SYMBOL_OBJ_SECTION (sym);
 
   switch (SYMBOL_CLASS (sym))
     {
@@ -1101,7 +1159,8 @@ address_info (char *exp, int from_tty)
 	  load_addr = overlay_unmapped_address (load_addr, section);
 	  printf_filtered (",\n -- loaded at ");
 	  fputs_filtered (paddress (load_addr), gdb_stdout);
-	  printf_filtered (" in overlay section %s", section->name);
+	  printf_filtered (" in overlay section %s",
+			   section->the_bfd_section->name);
 	}
       break;
 
@@ -1132,7 +1191,8 @@ address_info (char *exp, int from_tty)
 	  load_addr = overlay_unmapped_address (load_addr, section);
 	  printf_filtered (_(",\n -- loaded at "));
 	  fputs_filtered (paddress (load_addr), gdb_stdout);
-	  printf_filtered (_(" in overlay section %s"), section->name);
+	  printf_filtered (_(" in overlay section %s"),
+			   section->the_bfd_section->name);
 	}
       break;
 
@@ -1166,7 +1226,8 @@ address_info (char *exp, int from_tty)
 	  load_addr = overlay_unmapped_address (load_addr, section);
 	  printf_filtered (_(",\n -- loaded at "));
 	  fputs_filtered (paddress (load_addr), gdb_stdout);
-	  printf_filtered (_(" in overlay section %s"), section->name);
+	  printf_filtered (_(" in overlay section %s"),
+			   section->the_bfd_section->name);
 	}
       break;
 
@@ -1179,16 +1240,26 @@ address_info (char *exp, int from_tty)
 	  printf_filtered ("unresolved");
 	else
 	  {
-	    section = SYMBOL_BFD_SECTION (msym);
-	    printf_filtered (_("static storage at address "));
+	    section = SYMBOL_OBJ_SECTION (msym);
 	    load_addr = SYMBOL_VALUE_ADDRESS (msym);
-	    fputs_filtered (paddress (load_addr), gdb_stdout);
-	    if (section_is_overlay (section))
+
+	    if (section
+		&& (section->the_bfd_section->flags & SEC_THREAD_LOCAL) != 0)
+	      printf_filtered (_("a thread-local variable at offset %s "
+				 "in the thread-local storage for `%s'"),
+			       paddr_nz (load_addr), section->objfile->name);
+	    else
 	      {
-		load_addr = overlay_unmapped_address (load_addr, section);
-		printf_filtered (_(",\n -- loaded at "));
+		printf_filtered (_("static storage at address "));
 		fputs_filtered (paddress (load_addr), gdb_stdout);
-		printf_filtered (_(" in overlay section %s"), section->name);
+		if (section_is_overlay (section))
+		  {
+		    load_addr = overlay_unmapped_address (load_addr, section);
+		    printf_filtered (_(",\n -- loaded at "));
+		    fputs_filtered (paddress (load_addr), gdb_stdout);
+		    printf_filtered (_(" in overlay section %s"),
+				     section->the_bfd_section->name);
+		  }
 	      }
 	  }
       }
@@ -1494,6 +1565,8 @@ do_one_display (struct display *d)
     }
   else
     {
+      struct value_print_options opts;
+
       annotate_display_format ();
 
       if (d->format.format)
@@ -1508,8 +1581,9 @@ do_one_display (struct display *d)
 
       annotate_display_expression ();
 
+      get_formatted_print_options (&opts, d->format.format);
       print_formatted (evaluate_expression (d->exp),
-		       d->format.format, d->format.size, gdb_stdout);
+		       d->format.size, &opts, gdb_stdout);
       printf_filtered ("\n");
     }
 
@@ -1657,15 +1731,28 @@ disable_display_command (char *args, int from_tty)
 
 
 /* Print the value in stack frame FRAME of a variable specified by a
-   struct symbol.  */
+   struct symbol.  NAME is the name to print; if NULL then VAR's print
+   name will be used.  STREAM is the ui_file on which to print the
+   value.  INDENT specifies the number of indent levels to print
+   before printing the variable name.  */
 
 void
-print_variable_value (struct symbol *var, struct frame_info *frame,
-		      struct ui_file *stream)
+print_variable_and_value (const char *name, struct symbol *var,
+			  struct frame_info *frame,
+			  struct ui_file *stream, int indent)
 {
-  struct value *val = read_var_value (var, frame);
+  struct value *val;
+  struct value_print_options opts;
 
-  value_print (val, stream, 0, Val_pretty_default);
+  if (!name)
+    name = SYMBOL_PRINT_NAME (var);
+
+  fprintf_filtered (stream, "%s%s = ", n_spaces (2 * indent), name);
+
+  val = read_var_value (var, frame);
+  get_user_print_options (&opts);
+  common_val_print (val, stream, indent, &opts, current_language);
+  fprintf_filtered (stream, "\n");
 }
 
 static void
@@ -1999,17 +2086,6 @@ printf_command (char *arg, int from_tty)
 	s1 = s;
 	val_args[nargs] = parse_to_comma_and_eval (&s1);
 
-	/* If format string wants a float, unchecked-convert the value to
-	   floating point of the same size */
-
-	if (argclass[nargs] == double_arg)
-	  {
-	    struct type *type = value_type (val_args[nargs]);
-	    if (TYPE_LENGTH (type) == sizeof (float))
-	      deprecated_set_value_type (val_args[nargs], builtin_type_float);
-	    if (TYPE_LENGTH (type) == sizeof (double))
-	      deprecated_set_value_type (val_args[nargs], builtin_type_double);
-	  }
 	nargs++;
 	s = s1;
 	if (*s == ',')
@@ -2053,15 +2129,35 @@ printf_command (char *arg, int from_tty)
 	    break;
 	  case double_arg:
 	    {
-	      double val = value_as_double (val_args[i]);
-	      printf_filtered (current_substring, val);
+	      struct type *type = value_type (val_args[i]);
+	      DOUBLEST val;
+	      int inv;
+
+	      /* If format string wants a float, unchecked-convert the value
+		 to floating point of the same size.  */
+	      type = float_type_from_length (current_gdbarch, type);
+	      val = unpack_double (type, value_contents (val_args[i]), &inv);
+	      if (inv)
+		error (_("Invalid floating value found in program."));
+
+	      printf_filtered (current_substring, (double) val);
 	      break;
 	    }
 	  case long_double_arg:
 #ifdef HAVE_LONG_DOUBLE
 	    {
-	      long double val = value_as_double (val_args[i]);
-	      printf_filtered (current_substring, val);
+	      struct type *type = value_type (val_args[i]);
+	      DOUBLEST val;
+	      int inv;
+
+	      /* If format string wants a float, unchecked-convert the value
+		 to floating point of the same size.  */
+	      type = float_type_from_length (current_gdbarch, type);
+	      val = unpack_double (type, value_contents (val_args[i]), &inv);
+	      if (inv)
+		error (_("Invalid floating value found in program."));
+
+	      printf_filtered (current_substring, (long double) val);
 	      break;
 	    }
 #else

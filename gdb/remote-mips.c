@@ -1,7 +1,7 @@
 /* Remote debugging interface for MIPS remote debugging protocol.
 
    Copyright (C) 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
-   2003, 2004, 2006, 2007, 2008 Free Software Foundation, Inc.
+   2003, 2004, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support.  Written by Ian Lance Taylor
    <ian@cygnus.com>.
@@ -84,7 +84,7 @@ static void lsi_open (char *name, int from_tty);
 
 static void mips_close (int quitting);
 
-static void mips_detach (char *args, int from_tty);
+static void mips_detach (struct target_ops *ops, char *args, int from_tty);
 
 static void mips_resume (ptid_t ptid, int step,
                          enum target_signal siggnal);
@@ -1490,8 +1490,7 @@ device is attached to the target board (e.g., /dev/ttya).\n"
 
   /* Parse the serial port name, the optional TFTP name, and the
      optional local TFTP name.  */
-  if ((argv = buildargv (name)) == NULL)
-    nomem (0);
+  argv = gdb_buildargv (name);
   make_cleanup_freeargv (argv);
 
   serial_port_name = xstrdup (argv[0]);
@@ -1593,10 +1592,10 @@ static void
 mips_open (char *name, int from_tty)
 {
   const char *monitor_prompt = NULL;
-  if (gdbarch_bfd_arch_info (current_gdbarch) != NULL
-      && gdbarch_bfd_arch_info (current_gdbarch)->arch == bfd_arch_mips)
+  if (gdbarch_bfd_arch_info (target_gdbarch) != NULL
+      && gdbarch_bfd_arch_info (target_gdbarch)->arch == bfd_arch_mips)
     {
-    switch (gdbarch_bfd_arch_info (current_gdbarch)->mach)
+    switch (gdbarch_bfd_arch_info (target_gdbarch)->mach)
       {
       case bfd_mach_mips4100:
       case bfd_mach_mips4300:
@@ -1653,7 +1652,7 @@ mips_close (int quitting)
 /* Detach from the remote board.  */
 
 static void
-mips_detach (char *args, int from_tty)
+mips_detach (struct target_ops *ops, char *args, int from_tty)
 {
   if (args)
     error ("Argument given to \"detach\" when remotely debugging.");
@@ -2417,7 +2416,7 @@ mips_common_breakpoint (int set, CORE_ADDR addr, int len, enum break_type type)
   int rpid, rerrflg, rresponse, rlen;
   int nfields;
 
-  addr = gdbarch_addr_bits_remove (current_gdbarch, addr);
+  addr = gdbarch_addr_bits_remove (target_gdbarch, addr);
 
   if (mips_monitor == MON_LSI)
     {
@@ -2620,7 +2619,7 @@ send_srec (char *srec, int len, CORE_ADDR addr)
 	case 0x6:		/* ACK */
 	  return;
 	case 0x15:		/* NACK */
-	  fprintf_unfiltered (gdb_stderr, "Download got a NACK at byte %s!  Retrying.\n", paddr_u (addr));
+	  fprintf_unfiltered (gdb_stderr, "Download got a NACK at byte 0x%s!  Retrying.\n", paddr_nz (addr));
 	  continue;
 	default:
 	  error ("Download got unexpected ack char: 0x%x, retrying.\n", ch);

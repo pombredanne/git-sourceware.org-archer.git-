@@ -1,7 +1,7 @@
 /* Target-dependent code for the Matsushita MN10300 for GDB, the GNU debugger.
 
    Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005,
-   2007, 2008 Free Software Foundation, Inc.
+   2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -265,7 +265,7 @@ am33_2_register_name (struct gdbarch *gdbarch, int reg)
 static struct type *
 mn10300_register_type (struct gdbarch *gdbarch, int reg)
 {
-  return builtin_type_int;
+  return builtin_type (gdbarch)->builtin_int;
 }
 
 static CORE_ADDR

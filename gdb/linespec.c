@@ -1,8 +1,8 @@
 /* Parser for linespec for the GNU debugger, GDB.
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008
-   Free Software Foundation, Inc.
+   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008,
+   2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1849,8 +1849,8 @@ minsym_found (int funfirstline, struct minimal_symbol *msymbol)
   values.sals = (struct symtab_and_line *)
     xmalloc (sizeof (struct symtab_and_line));
   values.sals[0] = find_pc_sect_line (SYMBOL_VALUE_ADDRESS (msymbol),
-				      (struct bfd_section *) 0, 0);
-  values.sals[0].section = SYMBOL_BFD_SECTION (msymbol);
+				      (struct obj_section *) 0, 0);
+  values.sals[0].section = SYMBOL_OBJ_SECTION (msymbol);
 
   /* The minimal symbol might point to a function descriptor;
      resolve it to the actual code address instead.  */

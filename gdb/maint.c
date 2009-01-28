@@ -1,7 +1,7 @@
 /* Support for GDB maintenance commands.
 
    Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1999, 2000, 2001, 2002,
-   2003, 2004, 2007, 2008 Free Software Foundation, Inc.
+   2003, 2004, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    Written by Fred Fish at Cygnus Support.
 
@@ -35,6 +35,7 @@
 #include "symfile.h"
 #include "objfiles.h"
 #include "value.h"
+#include "gdb_assert.h"
 
 #include "cli/cli-decode.h"
 
@@ -414,11 +415,13 @@ maintenance_print_architecture (char *args, int from_tty)
     gdbarch_dump (current_gdbarch, gdb_stdout);
   else
     {
+      struct cleanup *cleanups;
       struct ui_file *file = gdb_fopen (args, "w");
       if (file == NULL)
 	perror_with_name (_("maintenance print architecture"));
+      cleanups = make_cleanup_ui_file_delete (file);
       gdbarch_dump (current_gdbarch, file);    
-      ui_file_delete (file);
+      do_cleanups (cleanups);
     }
 }
 
@@ -443,7 +446,7 @@ static void
 maintenance_translate_address (char *arg, int from_tty)
 {
   CORE_ADDR address;
-  asection *sect;
+  struct obj_section *sect;
   char *p;
   struct minimal_symbol *sym;
   struct objfile *objfile;
@@ -464,14 +467,13 @@ maintenance_translate_address (char *arg, int from_tty)
       while (isspace (*p))
 	p++;			/* Skip whitespace */
 
-      ALL_OBJFILES (objfile)
+      ALL_OBJSECTIONS (objfile, sect)
       {
-	sect = bfd_get_section_by_name (objfile->obfd, arg);
-	if (sect != NULL)
+	if (strcmp (sect->the_bfd_section->name, arg) == 0)
 	  break;
       }
 
-      if (!sect)
+      if (!objfile)
 	error (_("Unknown section %s."), arg);
     }
 
@@ -483,11 +485,35 @@ maintenance_translate_address (char *arg, int from_tty)
     sym = lookup_minimal_symbol_by_pc (address);
 
   if (sym)
-    printf_filtered ("%s+%s\n",
-		     SYMBOL_PRINT_NAME (sym),
-		     paddr_u (address - SYMBOL_VALUE_ADDRESS (sym)));
+    {
+      const char *symbol_name = SYMBOL_PRINT_NAME (sym);
+      const char *symbol_offset = pulongest (address - SYMBOL_VALUE_ADDRESS (sym));
+
+      sect = SYMBOL_OBJ_SECTION(sym);
+      if (sect != NULL)
+	{
+	  const char *section_name;
+	  const char *obj_name;
+
+	  gdb_assert (sect->the_bfd_section && sect->the_bfd_section->name);
+	  section_name = sect->the_bfd_section->name;
+
+	  gdb_assert (sect->objfile && sect->objfile->name);
+	  obj_name = sect->objfile->name;
+
+	  if (MULTI_OBJFILE_P ())
+	    printf_filtered (_("%s + %s in section %s of %s\n"),
+			     symbol_name, symbol_offset, section_name, obj_name);
+	  else
+	    printf_filtered (_("%s + %s in section %s\n"),
+			     symbol_name, symbol_offset, section_name);
+	}
+      else
+	printf_filtered (_("%s + %s\n"), symbol_name, symbol_offset);
+    }
   else if (sect)
-    printf_filtered (_("no symbol at %s:0x%s\n"), sect->name, paddr (address));
+    printf_filtered (_("no symbol at %s:0x%s\n"),
+		     sect->the_bfd_section->name, paddr (address));
   else
     printf_filtered (_("no symbol at 0x%s\n"), paddr (address));
 
@@ -850,14 +876,14 @@ Takes an optional file parameter."),
 
   add_cmd ("deprecate", class_maintenance, maintenance_deprecate, _("\
 Deprecate a command.  Note that this is just in here so the \n\
-testsuite can check the comamnd deprecator. You probably shouldn't use this,\n\
+testsuite can check the command deprecator. You probably shouldn't use this,\n\
 rather you should use the C function deprecate_cmd().  If you decide you \n\
 want to use it: maintenance deprecate 'commandname' \"replacement\". The \n\
 replacement is optional."), &maintenancelist);
 
   add_cmd ("undeprecate", class_maintenance, maintenance_undeprecate, _("\
 Undeprecate a command.  Note that this is just in here so the \n\
-testsuite can check the comamnd deprecator. You probably shouldn't use this,\n\
+testsuite can check the command deprecator. You probably shouldn't use this,\n\
 If you decide you want to use it: maintenance undeprecate 'commandname'"),
 	   &maintenancelist);
 

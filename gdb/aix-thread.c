@@ -1,6 +1,7 @@
 /* Low level interface for debugging AIX 4.3+ pthreads.
 
-   Copyright (C) 1999, 2000, 2002, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2000, 2002, 2007, 2008, 2009
+   Free Software Foundation, Inc.
    Written by Nick Duffek <nsd@redhat.com>.
 
    This file is part of GDB.
@@ -938,19 +939,19 @@ new_objfile (struct objfile *objfile)
 /* Attach to process specified by ARGS.  */
 
 static void
-aix_thread_attach (char *args, int from_tty)
+aix_thread_attach (struct target_ops *ops, char *args, int from_tty)
 {
-  base_target.to_attach (args, from_tty);
+  base_target.to_attach (&base_target, args, from_tty);
   pd_activate (1);
 }
 
 /* Detach from the process attached to by aix_thread_attach().  */
 
 static void
-aix_thread_detach (char *args, int from_tty)
+aix_thread_detach (struct target_ops *ops, char *args, int from_tty)
 {
   pd_disable ();
-  base_target.to_detach (args, from_tty);
+  base_target.to_detach (&base_target, args, from_tty);
 }
 
 /* Tell the inferior process to continue running thread PID if != -1
@@ -1667,10 +1668,10 @@ aix_thread_kill (void)
 /* Clean up after the inferior exits.  */
 
 static void
-aix_thread_mourn_inferior (void)
+aix_thread_mourn_inferior (struct target_ops *ops)
 {
   pd_deactivate ();
-  base_target.to_mourn_inferior ();
+  base_target.to_mourn_inferior (&base_target);
 }
 
 /* Return whether thread PID is still valid.  */

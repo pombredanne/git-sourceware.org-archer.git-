@@ -1,6 +1,6 @@
 /* BSD user-level threads support.
 
-   Copyright (C) 2005, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2005, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -145,6 +145,13 @@ bsd_uthread_lookup_offset (const char *name, struct objfile *objfile)
   return read_memory_unsigned_integer (addr, 4);
 }
 
+static CORE_ADDR
+bsd_uthread_read_memory_address (CORE_ADDR addr)
+{
+  struct type *ptr_type = builtin_type (target_gdbarch)->builtin_data_ptr;
+  return read_memory_typed_address (addr, ptr_type);
+}
+
 /* If OBJFILE contains the symbols corresponding to one of the
    supported user-level threads libraries, activate the thread stratum
    implemented by this module.  */
@@ -263,9 +270,10 @@ bsd_uthread_solib_unloaded (struct so_list *so)
 }
 
 static void
-bsd_uthread_mourn_inferior (void)
+bsd_uthread_mourn_inferior (struct target_ops *ops)
 {
-  find_target_beneath (bsd_uthread_ops_hack)->to_mourn_inferior ();
+  struct target_ops *beneath = find_target_beneath (bsd_uthread_ops_hack);
+  beneath->to_mourn_inferior (beneath);
   bsd_uthread_deactivate ();
 }
 
@@ -285,8 +293,7 @@ bsd_uthread_fetch_registers (struct regcache *regcache, int regnum)
      thread structure.  This can go once we fix the underlying target.  */
   regnum = -1;
 
-  active_addr = read_memory_typed_address (bsd_uthread_thread_run_addr,
-					   builtin_type_void_data_ptr);
+  active_addr = bsd_uthread_read_memory_address (bsd_uthread_thread_run_addr);
   if (addr != 0 && addr != active_addr)
     {
       bsd_uthread_check_magic (addr);
@@ -303,8 +310,7 @@ bsd_uthread_store_registers (struct regcache *regcache, int regnum)
   CORE_ADDR addr = ptid_get_tid (inferior_ptid);
   CORE_ADDR active_addr;
 
-  active_addr = read_memory_typed_address (bsd_uthread_thread_run_addr,
-					   builtin_type_void_data_ptr);
+  active_addr = bsd_uthread_read_memory_address (bsd_uthread_thread_run_addr);
   if (addr != 0 && addr != active_addr)
     {
       bsd_uthread_check_magic (addr);
@@ -349,8 +355,7 @@ bsd_uthread_wait (ptid_t ptid, struct target_waitstatus *status)
 
   /* Fetch the corresponding thread ID, and augment the returned
      process ID with it.  */
-  addr = read_memory_typed_address (bsd_uthread_thread_run_addr,
-				    builtin_type_void_data_ptr);
+  addr = bsd_uthread_read_memory_address (bsd_uthread_thread_run_addr);
   if (addr != 0)
     {
       gdb_byte buf[4];
@@ -367,14 +372,16 @@ bsd_uthread_wait (ptid_t ptid, struct target_waitstatus *status)
 	}
     }
 
-  /* HACK: Twiddle INFERIOR_PTID such that the initial thread of a
-     process isn't recognized as a new thread.  */
-  if (ptid_get_tid (ptid) != 0 && !in_thread_list (ptid)
-      && ptid_get_tid (inferior_ptid) == 0)
-    {
-      add_thread_silent (ptid);
-      inferior_ptid = ptid;
-    }
+  /* If INFERIOR_PTID doesn't have a tid member yet, and we now have a
+     ptid with tid set, then ptid is still the initial thread of
+     the process.  Notify GDB core about it.  */
+  if (ptid_get_tid (inferior_ptid) == 0
+      && ptid_get_tid (ptid) != 0 && !in_thread_list (ptid))
+    thread_change_ptid (inferior_ptid, ptid);
+
+  /* Don't let the core see a ptid without a corresponding thread.  */
+  if (!in_thread_list (ptid) || is_exited (ptid))
+    add_thread (ptid);
 
   return ptid;
 }
@@ -413,17 +420,23 @@ bsd_uthread_find_new_threads (void)
   int offset = bsd_uthread_thread_next_offset;
   CORE_ADDR addr;
 
-  addr = read_memory_typed_address (bsd_uthread_thread_list_addr,
-				    builtin_type_void_data_ptr);
+  addr = bsd_uthread_read_memory_address (bsd_uthread_thread_list_addr);
   while (addr != 0)
     {
       ptid_t ptid = ptid_build (pid, 0, addr);
 
-      if (!in_thread_list (ptid))
-	add_thread (ptid);
+      if (!in_thread_list (ptid) || is_exited (ptid))
+	{
+	  /* If INFERIOR_PTID doesn't have a tid member yet, then ptid
+	     is still the initial thread of the process.  Notify GDB
+	     core about it.  */
+	  if (ptid_get_tid (inferior_ptid) == 0)
+	    thread_change_ptid (inferior_ptid, ptid);
+	  else
+	    add_thread (ptid);
+	}
 
-      addr = read_memory_typed_address (addr + offset,
-					builtin_type_void_data_ptr);
+      addr = bsd_uthread_read_memory_address (addr + offset);
     }
 }
 

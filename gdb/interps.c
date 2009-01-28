@@ -1,6 +1,7 @@
 /* Manages interpreters for GDB, the GNU debugger.
 
-   Copyright (C) 2000, 2002, 2003, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2000, 2002, 2003, 2007, 2008, 2009
+   Free Software Foundation, Inc.
 
    Written by Jim Ingham <jingham@apple.com> of Apple Computer, Inc.
 
@@ -345,7 +346,6 @@ clear_interpreter_hooks (void)
   deprecated_context_hook = 0;
   deprecated_target_wait_hook = 0;
   deprecated_call_command_hook = 0;
-  deprecated_error_hook = 0;
   deprecated_error_begin_hook = 0;
   deprecated_command_loop_hook = 0;
 }
@@ -371,20 +371,15 @@ interpreter_exec_cmd (char *args, int from_tty)
   unsigned int i;
   int old_quiet, use_quiet;
 
-  prules = buildargv (args);
-  if (prules == NULL)
-    {
-      error (_("unable to parse arguments"));
-    }
+  if (args == NULL)
+    error_no_arg (_("interpreter-exec command"));
+
+  prules = gdb_buildargv (args);
+  make_cleanup_freeargv (prules);
 
   nrules = 0;
-  if (prules != NULL)
-    {
-      for (trule = prules; *trule != NULL; trule++)
-	{
-	  nrules++;
-	}
-    }
+  for (trule = prules; *trule != NULL; trule++)
+    nrules++;
 
   if (nrules < 2)
     error (_("usage: interpreter-exec <interpreter> [ <command> ... ]"));

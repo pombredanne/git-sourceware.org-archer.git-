@@ -1,6 +1,6 @@
 /* Java language support routines for GDB, the GNU debugger.
 
-   Copyright (C) 1997, 1998, 1999, 2000, 2003, 2004, 2005, 2007, 2008
+   Copyright (C) 1997, 1998, 1999, 2000, 2003, 2004, 2005, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -775,7 +775,7 @@ java_array_type (struct type *type, int dims)
 
   while (dims-- > 0)
     {
-      range_type = create_range_type (NULL, builtin_type_int, 0, 0);
+      range_type = create_range_type (NULL, builtin_type_int32, 0, 0);
       /* FIXME  This is bogus!  Java arrays are not gdb arrays! */
       type = create_array_type (NULL, type, range_type);
     }
@@ -938,7 +938,7 @@ evaluate_subexp_java (struct type *expect_type, struct expression *exp,
 standard:
   return evaluate_subexp_standard (expect_type, exp, pos, noside);
 nosideret:
-  return value_from_longest (builtin_type_long, (LONGEST) 1);
+  return value_from_longest (builtin_type_int8, (LONGEST) 1);
 }
 
 static char *java_demangle (const char *mangled, int options)
@@ -1040,6 +1040,51 @@ const struct op_print java_op_print_tab[] =
   {NULL, 0, 0, 0}
 };
 
+enum java_primitive_types
+{
+  java_primitive_type_int,
+  java_primitive_type_short,
+  java_primitive_type_long,
+  java_primitive_type_byte,
+  java_primitive_type_boolean,
+  java_primitive_type_char,
+  java_primitive_type_float,
+  java_primitive_type_double,
+  java_primitive_type_void,
+  nr_java_primitive_types
+};
+
+void
+java_language_arch_info (struct gdbarch *gdbarch,
+			 struct language_arch_info *lai)
+{
+  lai->string_char_type = java_char_type;
+  lai->primitive_type_vector
+    = GDBARCH_OBSTACK_CALLOC (gdbarch, nr_java_primitive_types + 1,
+                              struct type *);
+  lai->primitive_type_vector [java_primitive_type_int]
+    = java_int_type;
+  lai->primitive_type_vector [java_primitive_type_short]
+    = java_short_type;
+  lai->primitive_type_vector [java_primitive_type_long]
+    = java_long_type;
+  lai->primitive_type_vector [java_primitive_type_byte]
+    = java_byte_type;
+  lai->primitive_type_vector [java_primitive_type_boolean]
+    = java_boolean_type;
+  lai->primitive_type_vector [java_primitive_type_char]
+    = java_char_type;
+  lai->primitive_type_vector [java_primitive_type_float]
+    = java_float_type;
+  lai->primitive_type_vector [java_primitive_type_double]
+    = java_double_type;
+  lai->primitive_type_vector [java_primitive_type_void]
+    = java_void_type;
+
+  lai->bool_type_symbol = "boolean";
+  lai->bool_type_default = java_boolean_type;
+}
+
 const struct exp_descriptor exp_descriptor_java = 
 {
   print_subexp_standard,
@@ -1057,6 +1102,7 @@ const struct language_defn java_language_defn =
   type_check_off,
   case_sensitive_on,
   array_row_major,
+  macro_expansion_no,
   &exp_descriptor_java,
   java_parse,
   java_error,
@@ -1065,6 +1111,7 @@ const struct language_defn java_language_defn =
   c_printstr,			/* Function to print string constant */
   java_emit_char,		/* Function to print a single character */
   java_print_type,		/* Print a type using appropriate syntax */
+  default_print_typedef,	/* Print a typedef using appropriate syntax */
   java_val_print,		/* Print a value using appropriate syntax */
   java_value_print,		/* Print a top-level value */
   NULL,				/* Language specific skip_trampoline */
@@ -1078,7 +1125,7 @@ const struct language_defn java_language_defn =
   0,				/* String lower bound */
   default_word_break_characters,
   default_make_symbol_completion_list,
-  c_language_arch_info,
+  java_language_arch_info,
   default_print_array_index,
   default_pass_by_reference,
   LANG_MAGIC

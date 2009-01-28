@@ -1,7 +1,7 @@
 /* Parser definitions for GDB.
 
    Copyright (C) 1986, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997,
-   1998, 1999, 2000, 2002, 2007, 2008 Free Software Foundation, Inc.
+   1998, 1999, 2000, 2002, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    Modified from expread.y by the Department of Computer Science at the
    State University of New York at Buffalo.
@@ -31,6 +31,9 @@ struct block;
 extern struct expression *expout;
 extern int expout_size;
 extern int expout_ptr;
+
+#define parse_gdbarch (expout->gdbarch)
+#define parse_language (expout->language_defn)
 
 /* If this is nonzero, this block is used as the lexical context
    for symbol names.  */
@@ -133,8 +136,7 @@ extern void write_exp_elt_block (struct block *);
 
 extern void write_exp_elt_objfile (struct objfile *objfile);
 
-extern void write_exp_msymbol (struct minimal_symbol *,
-			       struct type *, struct type *);
+extern void write_exp_msymbol (struct minimal_symbol *);
 
 extern void write_dollar_variable (struct stoken str);
 

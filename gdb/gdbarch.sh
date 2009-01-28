@@ -3,7 +3,7 @@
 # Architecture commands for GDB, the GNU debugger.
 #
 # Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-# 2008 Free Software Foundation, Inc.
+# 2008, 2009 Free Software Foundation, Inc.
 #
 # This file is part of GDB.
 #
@@ -318,8 +318,8 @@ do
 	# An optional expression that convers MEMBER to a value
 	# suitable for formatting using %s.
 
-	# If PRINT is empty, paddr_nz (for CORE_ADDR) or paddr_d
-	# (anything else) is used.
+	# If PRINT is empty, core_addr_to_string_nz (for CORE_ADDR)
+	# or plongest (anything else) is used.
 
     garbage_at_eol ) : ;;
 
@@ -343,7 +343,7 @@ i:int:byte_order_for_code:::BFD_ENDIAN_BIG
 #
 i:enum gdb_osabi:osabi:::GDB_OSABI_UNKNOWN
 #
-i:const struct target_desc *:target_desc:::::::paddr_d ((long) gdbarch->target_desc)
+i:const struct target_desc *:target_desc:::::::host_address_to_string (gdbarch->target_desc)
 
 # The bit byte-order has to do just with numbering of bits in debugging symbols
 # and such.  Conceptually, it's quite separate from byte/word byte order.
@@ -529,10 +529,10 @@ m:CORE_ADDR:convert_from_func_ptr_addr:CORE_ADDR addr, struct target_ops *targ:a
 # being a few stray bits in the PC which would mislead us, not as some
 # sort of generic thing to handle alignment or segmentation (it's
 # possible it should be in TARGET_READ_PC instead).
-f:CORE_ADDR:addr_bits_remove:CORE_ADDR addr:addr::core_addr_identity::0
+m:CORE_ADDR:addr_bits_remove:CORE_ADDR addr:addr::core_addr_identity::0
 # It is not at all clear why gdbarch_smash_text_address is not folded into
 # gdbarch_addr_bits_remove.
-f:CORE_ADDR:smash_text_address:CORE_ADDR addr:addr::core_addr_identity::0
+m:CORE_ADDR:smash_text_address:CORE_ADDR addr:addr::core_addr_identity::0
 
 # FIXME/cagney/2001-01-18: This should be split in two.  A target method that
 # indicates if the target needs software single step.  An ISA method to
@@ -586,7 +586,6 @@ m:int:in_function_epilogue_p:CORE_ADDR addr:addr:0:generic_in_function_epilogue_
 m:char *:construct_inferior_arguments:int argc, char **argv:argc, argv::construct_inferior_arguments::0
 f:void:elf_make_msymbol_special:asymbol *sym, struct minimal_symbol *msym:sym, msym::default_elf_make_msymbol_special::0
 f:void:coff_make_msymbol_special:int val, struct minimal_symbol *msym:val, msym::default_coff_make_msymbol_special::0
-v:const char *:name_of_malloc:::"malloc":"malloc"::0:gdbarch->name_of_malloc
 v:int:cannot_step_breakpoint:::0:0::0
 v:int:have_nonsteppable_watchpoint:::0:0::0
 F:int:address_class_type_flags:int byte_size, int dwarf2_addr_class:byte_size, dwarf2_addr_class
@@ -708,6 +707,13 @@ m:int:target_signal_to_host:enum target_signal ts:ts::default_target_signal_to_h
 
 # Record architecture-specific information from the symbol table.
 M:void:record_special_symbol:struct objfile *objfile, asymbol *sym:objfile, sym
+
+# True if the list of shared libraries is one and only for all
+# processes, as opposed to a list of shared libraries per inferior.
+# When this property is true, GDB assumes that since shared libraries
+# are shared across processes, so is all code.  Hence, GDB further
+# assumes an inserted breakpoint location is visible to all processes.
+v:int:has_global_solist:::0:0::0
 EOF
 }
 
@@ -822,6 +828,7 @@ struct displaced_step_closure;
 struct core_regset_section;
 
 extern struct gdbarch *current_gdbarch;
+extern struct gdbarch *target_gdbarch;
 EOF
 
 # function typedef's
@@ -1281,6 +1288,7 @@ cat <<EOF
 };
 
 struct gdbarch *current_gdbarch = &startup_gdbarch;
+struct gdbarch *target_gdbarch = &startup_gdbarch;
 EOF
 
 # Create a new gdbarch struct
@@ -1466,18 +1474,18 @@ do
     if class_is_function_p
     then
 	printf "  fprintf_unfiltered (file,\n"
-	printf "                      \"gdbarch_dump: ${function} = <0x%%lx>\\\\n\",\n"
-	printf "                      (long) gdbarch->${function});\n"
+	printf "                      \"gdbarch_dump: ${function} = <%%s>\\\\n\",\n"
+	printf "                      host_address_to_string (gdbarch->${function}));\n"
     else
 	# It is a variable
 	case "${print}:${returntype}" in
 	    :CORE_ADDR )
-		fmt="0x%s"
-		print="paddr_nz (gdbarch->${function})"
+		fmt="%s"
+		print="core_addr_to_string_nz (gdbarch->${function})"
 		;;
 	    :* )
 	        fmt="%s"
-		print="paddr_d (gdbarch->${function})"
+		print="plongest (gdbarch->${function})"
 		;;
 	    * )
 	        fmt="%s"
@@ -1818,9 +1826,9 @@ gdbarch_register (enum bfd_architecture bfd_architecture,
     }
   /* log it */
   if (gdbarch_debug)
-    fprintf_unfiltered (gdb_stdlog, "register_gdbarch_init (%s, 0x%08lx)\n",
+    fprintf_unfiltered (gdb_stdlog, "register_gdbarch_init (%s, %s)\n",
 			bfd_arch_info->printable_name,
-			(long) init);
+			host_address_to_string (init));
   /* Append it */
   (*curr) = XMALLOC (struct gdbarch_registration);
   (*curr)->bfd_architecture = bfd_architecture;
@@ -1899,11 +1907,11 @@ find_arch_by_info (struct gdbarch_info info)
 			  "find_arch_by_info: info.osabi %d (%s)\n",
 			  info.osabi, gdbarch_osabi_name (info.osabi));
       fprintf_unfiltered (gdb_stdlog,
-			  "find_arch_by_info: info.abfd 0x%lx\n",
-			  (long) info.abfd);
+			  "find_arch_by_info: info.abfd %s\n",
+			  host_address_to_string (info.abfd));
       fprintf_unfiltered (gdb_stdlog,
-			  "find_arch_by_info: info.tdep_info 0x%lx\n",
-			  (long) info.tdep_info);
+			  "find_arch_by_info: info.tdep_info %s\n",
+			  host_address_to_string (info.tdep_info));
     }
 
   /* Find the tdep code that knows about this architecture.  */
@@ -1942,8 +1950,8 @@ find_arch_by_info (struct gdbarch_info info)
       struct gdbarch_list *this;
       if (gdbarch_debug)
 	fprintf_unfiltered (gdb_stdlog, "find_arch_by_info: "
-			    "Previous architecture 0x%08lx (%s) selected\n",
-			    (long) new_gdbarch,
+			    "Previous architecture %s (%s) selected\n",
+			    host_address_to_string (new_gdbarch),
 			    new_gdbarch->bfd_arch_info->printable_name);
       /* Find the existing arch in the list.  */
       for (list = &rego->arches;
@@ -1964,8 +1972,8 @@ find_arch_by_info (struct gdbarch_info info)
   /* It's a new architecture.  */
   if (gdbarch_debug)
     fprintf_unfiltered (gdb_stdlog, "find_arch_by_info: "
-			"New architecture 0x%08lx (%s) selected\n",
-			(long) new_gdbarch,
+			"New architecture %s (%s) selected\n",
+			host_address_to_string (new_gdbarch),
 			new_gdbarch->bfd_arch_info->printable_name);
   
   /* Insert the new architecture into the front of the architecture
@@ -2022,6 +2030,7 @@ deprecated_current_gdbarch_select_hack (struct gdbarch *new_gdbarch)
   gdb_assert (current_gdbarch != NULL);
   gdb_assert (new_gdbarch->initialized_p);
   current_gdbarch = new_gdbarch;
+  target_gdbarch = new_gdbarch;
   observer_notify_architecture_changed (new_gdbarch);
   registers_changed ();
 }

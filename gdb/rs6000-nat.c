@@ -1,7 +1,7 @@
 /* IBM RS/6000 native-dependent code for GDB, the GNU debugger.
 
    Copyright (C) 1986, 1987, 1989, 1991, 1992, 1993, 1994, 1995, 1996, 1997,
-   1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008
+   1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -525,7 +525,6 @@ rs6000_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
   do
     {
       set_sigint_trap ();
-      set_sigio_trap ();
 
       do
 	{
@@ -534,7 +533,6 @@ rs6000_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
 	}
       while (pid == -1 && errno == EINTR);
 
-      clear_sigio_trap ();
       clear_sigint_trap ();
 
       if (pid == -1)
@@ -546,7 +544,7 @@ rs6000_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
 	  /* Claim it exited with unknown signal.  */
 	  ourstatus->kind = TARGET_WAITKIND_SIGNALLED;
 	  ourstatus->value.sig = TARGET_SIGNAL_UNKNOWN;
-	  return minus_one_ptid;
+	  return inferior_ptid;
 	}
 
       /* Ignore terminated detached child processes.  */
@@ -966,17 +964,18 @@ vmap_exec (void)
 /* Set the current architecture from the host running GDB.  Called when
    starting a child process. */
 
-static void (*super_create_inferior) (char *exec_file, char *allargs,
-				      char **env, int from_tty);
+static void (*super_create_inferior) (struct target_ops *,char *exec_file, 
+				      char *allargs, char **env, int from_tty);
 static void
-rs6000_create_inferior (char *exec_file, char *allargs, char **env, int from_tty)
+rs6000_create_inferior (struct target_ops * ops, char *exec_file,
+			char *allargs, char **env, int from_tty)
 {
   enum bfd_architecture arch;
   unsigned long mach;
   bfd abfd;
   struct gdbarch_info info;
 
-  super_create_inferior (exec_file, allargs, env, from_tty);
+  super_create_inferior (ops, exec_file, allargs, env, from_tty);
 
   if (__power_rs ())
     {

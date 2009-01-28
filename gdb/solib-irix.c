@@ -1,6 +1,6 @@
 /* Shared library support for IRIX.
    Copyright (C) 1993, 1994, 1995, 1996, 1998, 1999, 2000, 2001, 2002, 2004,
-   2007, 2008 Free Software Foundation, Inc.
+   2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file was created using portions of irix5-nat.c originally
    contributed to GDB by Ian Lance Taylor.
@@ -31,6 +31,7 @@
 #include "gdbcore.h"
 #include "target.h"
 #include "inferior.h"
+#include "gdbthread.h"
 
 #include "solist.h"
 #include "solib.h"
@@ -421,6 +422,9 @@ enable_break (void)
 static void
 irix_solib_create_inferior_hook (void)
 {
+  struct inferior *inf;
+  struct thread_info *tp;
+
   if (!enable_break ())
     {
       warning (_("shared library handler failed to enable breakpoint"));
@@ -432,15 +436,20 @@ irix_solib_create_inferior_hook (void)
      can go groveling around in the dynamic linker structures to find
      out what we need to know about them. */
 
+  inf = current_inferior ();
+  tp = inferior_thread ();
+
   clear_proceed_status ();
-  stop_soon = STOP_QUIETLY;
-  stop_signal = TARGET_SIGNAL_0;
+
+  inf->stop_soon = STOP_QUIETLY;
+  tp->stop_signal = TARGET_SIGNAL_0;
+
   do
     {
-      target_resume (pid_to_ptid (-1), 0, stop_signal);
+      target_resume (pid_to_ptid (-1), 0, tp->stop_signal);
       wait_for_inferior (0);
     }
-  while (stop_signal != TARGET_SIGNAL_TRAP);
+  while (tp->stop_signal != TARGET_SIGNAL_TRAP);
 
   /* We are now either at the "mapping complete" breakpoint (or somewhere
      else, a condition we aren't prepared to deal with anyway), so adjust
@@ -459,7 +468,7 @@ irix_solib_create_inferior_hook (void)
      Delaying the resetting of stop_soon until after symbol loading
      suppresses the warning.  */
   solib_add ((char *) 0, 0, (struct target_ops *) 0, auto_solib_add);
-  stop_soon = NO_STOP_QUIETLY;
+  inf->stop_soon = NO_STOP_QUIETLY;
 }
 
 /* LOCAL FUNCTION
@@ -505,9 +514,9 @@ irix_current_sos (void)
 
   read_memory (debug_base,
 	       addr_buf,
-	       gdbarch_addr_bit (current_gdbarch) / TARGET_CHAR_BIT);
+	       gdbarch_addr_bit (target_gdbarch) / TARGET_CHAR_BIT);
   lma = extract_mips_address (addr_buf,
-			      gdbarch_addr_bit (current_gdbarch)
+			      gdbarch_addr_bit (target_gdbarch)
 				/ TARGET_CHAR_BIT);
 
   while (lma)
@@ -611,9 +620,9 @@ irix_open_symbol_file_object (void *from_ttyp)
   /* First link map member should be the executable.  */
   read_memory (debug_base,
 	       addr_buf,
-	       gdbarch_addr_bit (current_gdbarch) / TARGET_CHAR_BIT);
+	       gdbarch_addr_bit (target_gdbarch) / TARGET_CHAR_BIT);
   lma = extract_mips_address (addr_buf,
-			      gdbarch_addr_bit (current_gdbarch)
+			      gdbarch_addr_bit (target_gdbarch)
 				/ TARGET_CHAR_BIT);
   if (lma == 0)
     return 0;			/* failed somehow...  */

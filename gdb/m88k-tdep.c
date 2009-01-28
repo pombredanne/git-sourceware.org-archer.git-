@@ -1,6 +1,6 @@
 /* Target-dependent code for the Motorola 88000 series.
 
-   Copyright (C) 2004, 2005, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2004, 2005, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -75,18 +75,18 @@ m88k_register_type (struct gdbarch *gdbarch, int regnum)
   /* SXIP, SNIP, SFIP and R1 contain code addresses.  */
   if ((regnum >= M88K_SXIP_REGNUM && regnum <= M88K_SFIP_REGNUM)
       || regnum == M88K_R1_REGNUM)
-    return builtin_type_void_func_ptr;
+    return builtin_type (gdbarch)->builtin_func_ptr;
 
   /* R30 and R31 typically contains data addresses.  */
   if (regnum == M88K_R30_REGNUM || regnum == M88K_R31_REGNUM)
-    return builtin_type_void_data_ptr;
+    return builtin_type (gdbarch)->builtin_data_ptr;
 
   return builtin_type_int32;
 }
 
 
 static CORE_ADDR
-m88k_addr_bits_remove (CORE_ADDR addr)
+m88k_addr_bits_remove (struct gdbarch *gdbarch, CORE_ADDR addr)
 {
   /* All instructures are 4-byte aligned.  The lower 2 bits of SXIP,
      SNIP and SFIP are used for special purposes: bit 0 is the
@@ -116,7 +116,7 @@ m88k_unwind_pc (struct gdbarch *gdbarch, struct frame_info *next_frame)
   CORE_ADDR pc;
 
   pc = frame_unwind_register_unsigned (next_frame, M88K_SXIP_REGNUM);
-  return m88k_addr_bits_remove (pc);
+  return m88k_addr_bits_remove (gdbarch, pc);
 }
 
 static void

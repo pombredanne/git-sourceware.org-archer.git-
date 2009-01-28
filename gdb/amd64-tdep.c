@@ -1,6 +1,6 @@
 /* Target-dependent code for AMD64.
 
-   Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
+   Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    Contributed by Jiri Smid, SuSE Labs.
@@ -90,11 +90,11 @@ amd64_register_type (struct gdbarch *gdbarch, int regnum)
   if (regnum >= AMD64_RAX_REGNUM && regnum <= AMD64_RDI_REGNUM)
     return builtin_type_int64;
   if (regnum == AMD64_RBP_REGNUM || regnum == AMD64_RSP_REGNUM)
-    return builtin_type_void_data_ptr;
+    return builtin_type (gdbarch)->builtin_data_ptr;
   if (regnum >= AMD64_R8_REGNUM && regnum <= AMD64_R15_REGNUM)
     return builtin_type_int64;
   if (regnum == AMD64_RIP_REGNUM)
-    return builtin_type_void_func_ptr;
+    return builtin_type (gdbarch)->builtin_func_ptr;
   if (regnum == AMD64_EFLAGS_REGNUM)
     return i386_eflags_type;
   if (regnum >= AMD64_CS_REGNUM && regnum <= AMD64_GS_REGNUM)
@@ -316,7 +316,7 @@ amd64_classify_aggregate (struct type *type, enum amd64_reg_class class[2])
 	  enum amd64_reg_class subclass[2];
 
 	  /* Ignore static fields.  */
-	  if (TYPE_FIELD_STATIC (type, i))
+	  if (field_is_static (&TYPE_FIELD (type, i)))
 	    continue;
 
 	  gdb_assert (pos == 0 || pos == 1);
@@ -1277,7 +1277,7 @@ amd64_get_longjmp_target (struct frame_info *frame, CORE_ADDR *pc)
   CORE_ADDR jb_addr;
   struct gdbarch *gdbarch = get_frame_arch (frame);
   int jb_pc_offset = gdbarch_tdep (gdbarch)->jb_pc_offset;
-  int len = TYPE_LENGTH (builtin_type_void_func_ptr);
+  int len = TYPE_LENGTH (builtin_type (gdbarch)->builtin_func_ptr);
 
   /* If JB_PC_OFFSET is -1, we have no way to find out where the
      longjmp will land.	 */
@@ -1285,11 +1285,12 @@ amd64_get_longjmp_target (struct frame_info *frame, CORE_ADDR *pc)
     return 0;
 
   get_frame_register (frame, AMD64_RDI_REGNUM, buf);
-  jb_addr = extract_typed_address (buf, builtin_type_void_data_ptr);
+  jb_addr= extract_typed_address
+	    (buf, builtin_type (gdbarch)->builtin_data_ptr);
   if (target_read_memory (jb_addr + jb_pc_offset, buf, len))
     return 0;
 
-  *pc = extract_typed_address (buf, builtin_type_void_func_ptr);
+  *pc = extract_typed_address (buf, builtin_type (gdbarch)->builtin_func_ptr);
 
   return 1;
 }

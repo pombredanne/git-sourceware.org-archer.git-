@@ -1,7 +1,7 @@
 /* Handle OSF/1, Digital UNIX, and Tru64 shared libraries
    for GDB, the GNU Debugger.
-   Copyright (C) 1993, 1994, 1995, 1996, 1998, 1999, 2000, 2001, 2007, 2008
-   Free Software Foundation, Inc.
+   Copyright (C) 1993, 1994, 1995, 1996, 1998, 1999, 2000, 2001, 2007, 2008,
+   2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -53,7 +53,9 @@
 #include "objfiles.h"
 #include "target.h"
 #include "inferior.h"
+#include "gdbthread.h"
 #include "solist.h"
+#include "solib.h"
 
 #ifdef USE_LDR_ROUTINES
 # include <loader.h>
@@ -306,9 +308,14 @@ osf_clear_solib (void)
 static void
 osf_solib_create_inferior_hook (void)
 {
+  struct inferior *inf;
+  struct thread_info *tp;
+
+  inf = current_inferior ();
+
   /* If we are attaching to the inferior, the shared libraries
      have already been mapped, so nothing more to do.  */
-  if (attach_flag)
+  if (inf->attach_flag)
     return;
 
   /* Nothing to do for statically bound executables.  */
@@ -330,15 +337,16 @@ osf_solib_create_inferior_hook (void)
   if (!target_can_run (&current_target))
     return;
 
+  tp = inferior_thread ();
   clear_proceed_status ();
-  stop_soon = STOP_QUIETLY;
-  stop_signal = TARGET_SIGNAL_0;
+  inf->stop_soon = STOP_QUIETLY;
+  tp->stop_signal = TARGET_SIGNAL_0;
   do
     {
-      target_resume (minus_one_ptid, 0, stop_signal);
+      target_resume (minus_one_ptid, 0, tp->stop_signal);
       wait_for_inferior (0);
     }
-  while (stop_signal != TARGET_SIGNAL_TRAP);
+  while (tp->stop_signal != TARGET_SIGNAL_TRAP);
 
   /*  solib_add will call reinit_frame_cache.
      But we are stopped in the runtime loader and we do not have symbols
@@ -347,7 +355,7 @@ osf_solib_create_inferior_hook (void)
      Delaying the resetting of stop_soon until after symbol loading
      suppresses the warning.  */
   solib_add ((char *) 0, 0, (struct target_ops *) 0, auto_solib_add);
-  stop_soon = NO_STOP_QUIETLY;
+  inf->stop_soon = NO_STOP_QUIETLY;
 }
 
 /* target_so_ops callback.  Do additional symbol handling, lookup, etc. after

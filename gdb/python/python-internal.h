@@ -1,6 +1,6 @@
 /* Gdb/Python header for private use by Python module.
 
-   Copyright (C) 2008 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -33,8 +33,11 @@
 
 #if HAVE_LIBPYTHON2_4
 #include "python2.4/Python.h"
-/* Py_ssize_t is not defined until 2.5.  */
-typedef Py_intptr_t Py_ssize_t;
+/* Py_ssize_t is not defined until 2.5.
+   Logical type for Py_ssize_t is Py_intptr_t, but that fails in 64-bit
+   compilation due to several apparent mistakes in python2.4 API, so we
+   use 'int' instead.  */
+typedef int Py_ssize_t;
 #elif HAVE_LIBPYTHON2_5
 #include "python2.5/Python.h"
 #elif HAVE_LIBPYTHON2_6
@@ -43,13 +46,33 @@ typedef Py_intptr_t Py_ssize_t;
 #error "Unable to find usable Python.h"
 #endif
 
-struct block;
-struct symbol;
-struct symtab_and_line;
+/* If Python.h does not define WITH_THREAD, then the various
+   GIL-related functions will not be defined.  However,
+   PyGILState_STATE will be.  */
+#ifndef WITH_THREAD
+#define PyGILState_Ensure() ((PyGILState_STATE) 0)
+#define PyGILState_Release(ARG) (ARG)
+#define PyEval_InitThreads() 0
+#define PyThreadState_Swap(ARG) (ARG)
+#define PyEval_InitThreads() 0
+#define PyEval_ReleaseLock() 0
+#endif
+
+struct value;
 
 extern PyObject *gdb_module;
+extern PyTypeObject value_object_type;
+
+PyObject *gdbpy_get_value_from_history (PyObject *self, PyObject *args);
+
+PyObject *value_to_value_object (struct value *v);
+
+struct value *convert_value_from_python (PyObject *obj);
+
+void gdbpy_initialize_values (void);
 
 struct cleanup *make_cleanup_py_decref (PyObject *py);
+struct cleanup *make_cleanup_py_restore_gil (PyGILState_STATE *state);
 
 /* Use this after a TRY_EXCEPT to throw the appropriate Python
    exception.  */

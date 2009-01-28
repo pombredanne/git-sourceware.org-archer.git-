@@ -1,6 +1,6 @@
 /* Support for printing Ada types for GDB, the GNU debugger.
    Copyright (C) 1986, 1988, 1989, 1991, 1997, 1998, 1999, 2000, 2001, 2002,
-   2003, 2004, 2007, 2008 Free Software Foundation, Inc.
+   2003, 2004, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -149,7 +149,7 @@ print_range (struct type *type, struct ui_file *stream)
     case TYPE_CODE_ENUM:
       break;
     default:
-      target_type = builtin_type_int;
+      target_type = builtin_type_int32;
       break;
     }
 
@@ -170,8 +170,9 @@ print_range (struct type *type, struct ui_file *stream)
       /* We extract the range type bounds respectively from the first element
          and the last element of the type->fields array */
       const LONGEST lower_bound = (LONGEST) TYPE_LOW_BOUND (type);
-      const LONGEST upper_bound =
-	(LONGEST) TYPE_FIELD_BITPOS (type, TYPE_NFIELDS (type) - 1);
+      const LONGEST upper_bound = (TYPE_CODE (type) == TYPE_CODE_RANGE
+	? (LONGEST) TYPE_HIGH_BOUND (type)
+	: (LONGEST) TYPE_FIELD_BITPOS (type, TYPE_NFIELDS (type) - 1));
 
       ada_print_scalar (target_type, lower_bound, stream);
       fprintf_filtered (stream, " .. ");
@@ -197,11 +198,11 @@ print_range_bound (struct type *type, char *bounds, int *n,
          the upper bound of the 0 .. -1 range types to be printed as
          a very large unsigned number instead of -1.
          To workaround this stabs deficiency, we replace the TYPE by
-         builtin_type_long when we detect that the bound is negative,
+         builtin_type_int32 when we detect that the bound is negative,
          and the type is a TYPE_CODE_INT.  The bound is negative when
          'm' is the last character of the number scanned in BOUNDS.  */
       if (bounds[*n - 1] == 'm' && TYPE_CODE (type) == TYPE_CODE_INT)
-	type = builtin_type_long;
+	type = builtin_type_int32;
       ada_print_scalar (type, B, stream);
       if (bounds[*n] == '_')
 	*n += 2;
@@ -258,7 +259,7 @@ print_range_type_named (char *name, struct ui_file *stream)
   char *subtype_info;
 
   if (raw_type == NULL)
-    base_type = builtin_type_int;
+    base_type = builtin_type_int32;
   else if (TYPE_CODE (raw_type) == TYPE_CODE_RANGE)
     base_type = TYPE_TARGET_TYPE (raw_type);
   else

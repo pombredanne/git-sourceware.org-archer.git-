@@ -1,7 +1,7 @@
 /* Definitions for dealing with stack frames, for GDB, the GNU debugger.
 
    Copyright (C) 1986, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1996, 1997,
-   1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008
+   1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -111,7 +111,7 @@ struct frame_id
      frames that do not change the stack but are still distinct and have 
      some form of distinct identifier (e.g. the ia64 which uses a 2nd 
      stack for registers).  This field is treated as unordered - i.e. will
-     not be used in frame ordering comparisons such as frame_id_inner().
+     not be used in frame ordering comparisons.
 
      This field is valid only if special_addr_p is true.  Otherwise, this
      frame is considered to have a wildcard special address, i.e. one that
@@ -124,22 +124,7 @@ struct frame_id
   unsigned int special_addr_p : 1;
 };
 
-/* Methods for constructing and comparing Frame IDs.
-
-   NOTE: Given stackless functions A and B, where A calls B (and hence
-   B is inner-to A).  The relationships: !eq(A,B); !eq(B,A);
-   !inner(A,B); !inner(B,A); all hold.
-
-   This is because, while B is inner-to A, B is not strictly inner-to A.  
-   Being stackless, they have an identical .stack_addr value, and differ 
-   only by their unordered .code_addr and/or .special_addr values.
-
-   Because frame_id_inner is only used as a safety net (e.g.,
-   detect a corrupt stack) the lack of strictness is not a problem.
-   Code needing to determine an exact relationship between two frames
-   must instead use frame_id_eq and frame_id_unwind.  For instance,
-   in the above, to determine that A stepped-into B, the equation
-   "A.id != B.id && A.id == id_unwind (B)" can be used.  */
+/* Methods for constructing and comparing Frame IDs.  */
 
 /* For convenience.  All fields are zero.  */
 extern const struct frame_id null_frame_id;
@@ -175,12 +160,6 @@ extern int frame_id_p (struct frame_id l);
 /* Returns non-zero when L and R identify the same frame, or, if
    either L or R have a zero .func, then the same frame base.  */
 extern int frame_id_eq (struct frame_id l, struct frame_id r);
-
-/* Returns non-zero when L is strictly inner-than R (they have
-   different frame .bases).  Neither L, nor R can be `null'.  See note
-   above about frameless functions.  */
-extern int frame_id_inner (struct gdbarch *gdbarch, struct frame_id l,
-			   struct frame_id r);
 
 /* Write the internal representation of a frame ID on the specified
    stream.  */
@@ -680,23 +659,5 @@ extern struct frame_info *deprecated_safe_get_selected_frame (void);
 /* Create a frame using the specified BASE and PC.  */
 
 extern struct frame_info *create_new_frame (CORE_ADDR base, CORE_ADDR pc);
-
-/* FIXME: cagney/2002-12-06: Has the PC in the current frame changed?
-   "infrun.c", Thanks to gdbarch_decr_pc_after_break, can change the PC after
-   the initial frame create.  This puts things back in sync.
-
-   This replaced: frame->pc = ....; */
-extern void deprecated_update_frame_pc_hack (struct frame_info *frame,
-					     CORE_ADDR pc);
-
-/* FIXME: cagney/2002-12-18: Has the frame's base changed?  Or to be
-   more exact, was that initial guess at the frame's base as returned
-   by the deleted read_fp() wrong?  If it was, fix it.  This shouldn't
-   be necessary since the code should be getting the frame's base
-   correct from the outset.
-
-   This replaced: frame->frame = ....; */
-extern void deprecated_update_frame_base_hack (struct frame_info *frame,
-					       CORE_ADDR base);
 
 #endif /* !defined (FRAME_H)  */

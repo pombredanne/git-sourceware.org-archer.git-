@@ -3,6 +3,11 @@
 
 *** Changes since GDB 6.8
 
+* GDB now supports automatic retrieval of shared library files from
+remote targets.  To use this feature, specify a system root that begins
+with the `remote:' prefix, either via the `set sysroot' command or via
+the `--with-sysroot' configure-time option.
+
 * Commands `set debug-file-directory', `set solib-search-path' and `set args'
 now complete on file names.
 
@@ -17,6 +22,10 @@ For instance, consider:
 If the user types TAB at the end of this command line, the available
 completions will be "f1" and "f2".
 
+* GDB now supports the token-splicing (##) and stringification (#)
+operators when expanding macros.  It also supports variable-arity
+macros.
+
 * New remote packets
 
 qSearch:memory:
@@ -26,6 +35,9 @@ QStartNoAckMode
   Turn off `+'/`-' protocol acknowledgments to permit more efficient
   operation over reliable transport links.  Use of this packet is
   controlled by the `set remote noack-packet' command.
+
+qXfer:osdata:read
+  Obtains additional operating system information
 
 * Removed remote protocol undocumented extension
 
@@ -47,6 +59,8 @@ and Renesas calling convention.  It also adds the new CLI commands
 with the --compress-debug-sections=zlib flag.
 
 * 64-bit core files are now supported on AIX.
+
+* Thread switching is now supported on Tru64.
 
 * Watchpoints can now be set on unreadable memory locations, e.g. addresses
 which will be allocated using malloc later in program execution.
@@ -74,10 +88,30 @@ are treated as the standard definitions, regardless of context.
   - gdbserver uses the new noack protocol mode for TCP connections to
   reduce communications latency, if also supported and enabled in GDB.
 
+  - Support for the sparc64-linux-gnu target is now included in
+  gdbserver.
+
 * Python scripting
 
   GDB now has support for scripting using Python.  Whether this is
   available is determined at configure time.
+
+* Ada tasking support
+
+  Ada tasks can now be inspected in GDB. The following commands have
+  been introduced:
+
+    info tasks
+      Print the list of Ada tasks.
+    info task N
+      Print detailed information about task number N.
+    task
+      Print the task number of the current task.
+    task N
+      Switch the context of debugging to task number N.
+
+* Support for user-defined prefixed commands.  The "define" command can
+add new commands to existing prefixes, e.g. "target".
 
 * New commands
 
@@ -138,15 +172,38 @@ set target-async
   with GDB while the target is running.  "show target-async" displays the
   current state of asynchronous execution of the target.
 
+set tcp auto-retry (on|off)
+show tcp auto-retry
+set tcp connect-timeout
+show tcp connect-timeout
+  These commands allow GDB to retry failed TCP connections to a remote stub
+  with a specified timeout period; this is useful if the stub is launched
+  in parallel with GDB but may not be ready to accept connections immediately.
+
 macro define
 macro list
 macro undef
   These allow macros to be defined, undefined, and listed
   interactively.
 
+info os processes
+  Show operating system information about processes.
+
+* New native configurations
+
+x86/x86_64 Darwin		i[34567]86-*-darwin*
+
+x86_64 MinGW			x86_64-*-mingw*
+
 * New targets
 
 x86 DICOS			i[34567]86-*-dicos*
+
+* Removed commands
+
+catch load
+catch unload
+  These commands were actually not implemented on any target.
 
 *** Changes in GDB 6.8
 

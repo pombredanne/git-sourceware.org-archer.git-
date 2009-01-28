@@ -1,7 +1,7 @@
 /* Abstraction of GNU v3 abi.
    Contributed by Jim Blandy <jimb@redhat.com>
 
-   Copyright (C) 2001, 2002, 2003, 2005, 2006, 2007, 2008
+   Copyright (C) 2001, 2002, 2003, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -44,6 +44,21 @@ gnuv3_is_operator_name (const char *name)
   return strncmp (name, "operator", 8) == 0;
 }
 
+
+/* Determine architecture of class DOMAIN.  This architecture is used
+   to query C++ ABI details (types, method pointer layout, etc.).
+
+   Note that we assume DOMAIN must have been allocated with an OBJFILE;
+   GDB does not provide any built-in class types.  Thus we use the
+   architecture of that OBJFILE to define the C++ ABI.  */
+
+static struct gdbarch *
+get_class_arch (struct type *domain)
+{
+  gdb_assert (TYPE_CODE (domain) == TYPE_CODE_CLASS);
+  gdb_assert (TYPE_OBJFILE (domain) != NULL);
+  return get_objfile_arch (TYPE_OBJFILE (domain));
+}
 
 /* To help us find the components of a vtable, we build ourselves a
    GDB type object representing the vtable structure.  Following the
@@ -107,9 +122,9 @@ build_gdb_vtable_type (struct gdbarch *arch)
   int offset;
 
   struct type *void_ptr_type
-    = lookup_pointer_type (builtin_type_void);
+    = builtin_type (arch)->builtin_data_ptr;
   struct type *ptr_to_void_fn_type
-    = lookup_pointer_type (lookup_function_type (builtin_type_void));
+    = builtin_type (arch)->builtin_func_ptr;
 
   /* ARCH can't give us the true ptrdiff_t type, so we guess.  */
   struct type *ptrdiff_type
@@ -132,7 +147,7 @@ build_gdb_vtable_type (struct gdbarch *arch)
   FIELD_NAME (*field) = "vcall_and_vbase_offsets";
   FIELD_TYPE (*field)
     = create_array_type (0, ptrdiff_type,
-                         create_range_type (0, builtin_type_int, 0, -1));
+                         create_range_type (0, builtin_type_int32, 0, -1));
   FIELD_BITPOS (*field) = offset * TARGET_CHAR_BIT;
   offset += TYPE_LENGTH (FIELD_TYPE (*field));
   field++;
@@ -155,7 +170,7 @@ build_gdb_vtable_type (struct gdbarch *arch)
   FIELD_NAME (*field) = "virtual_functions";
   FIELD_TYPE (*field)
     = create_array_type (0, ptr_to_void_fn_type,
-                         create_range_type (0, builtin_type_int, 0, -1));
+                         create_range_type (0, builtin_type_int32, 0, -1));
   FIELD_BITPOS (*field) = offset * TARGET_CHAR_BIT;
   offset += TYPE_LENGTH (FIELD_TYPE (*field));
   field++;
@@ -172,14 +187,23 @@ build_gdb_vtable_type (struct gdbarch *arch)
 }
 
 
+/* Return the ptrdiff_t type used in the vtable type.  */
+static struct type *
+vtable_ptrdiff_type (struct gdbarch *gdbarch)
+{
+  struct type *vtable_type = gdbarch_data (gdbarch, vtable_type_gdbarch_data);
+
+  /* The "offset_to_top" field has the appropriate (ptrdiff_t) type.  */
+  return TYPE_FIELD_TYPE (vtable_type, vtable_field_offset_to_top);
+}
+
 /* Return the offset from the start of the imaginary `struct
    gdb_gnu_v3_abi_vtable' object to the vtable's "address point"
    (i.e., where objects' virtual table pointers point).  */
 static int
-vtable_address_point_offset (void)
+vtable_address_point_offset (struct gdbarch *gdbarch)
 {
-  struct type *vtable_type = gdbarch_data (current_gdbarch,
-					   vtable_type_gdbarch_data);
+  struct type *vtable_type = gdbarch_data (gdbarch, vtable_type_gdbarch_data);
 
   return (TYPE_FIELD_BITPOS (vtable_type, vtable_field_virtual_functions)
           / TARGET_CHAR_BIT);
@@ -190,8 +214,8 @@ static struct type *
 gnuv3_rtti_type (struct value *value,
                  int *full_p, int *top_p, int *using_enc_p)
 {
-  struct type *vtable_type = gdbarch_data (current_gdbarch,
-					   vtable_type_gdbarch_data);
+  struct gdbarch *gdbarch;
+  struct type *vtable_type;
   struct type *values_type = check_typedef (value_type (value));
   CORE_ADDR vtable_address;
   struct value *vtable;
@@ -207,6 +231,16 @@ gnuv3_rtti_type (struct value *value,
   /* We only have RTTI for class objects.  */
   if (TYPE_CODE (values_type) != TYPE_CODE_CLASS)
     return NULL;
+
+  /* This routine may be called for Java types that do not have
+     a proper objfile.  Just return NULL for those.  */
+  if (!TYPE_OBJFILE (values_type)
+      || !TYPE_OBJFILE (values_type)->obfd)
+    return NULL;
+
+  /* Determine architecture.  */
+  gdbarch = get_class_arch (values_type);
+  vtable_type = gdbarch_data (gdbarch, vtable_type_gdbarch_data);
 
   /* If we can't find the virtual table pointer for values_type, we
      can't find the RTTI.  */
@@ -229,8 +263,9 @@ gnuv3_rtti_type (struct value *value,
     }
   vtable_address
     = value_as_address (value_field (value, values_type_vptr_fieldno));
-  vtable = value_at_lazy (vtable_type,
-                          vtable_address - vtable_address_point_offset ());
+  vtable
+    = value_at_lazy (vtable_type,
+		     vtable_address - vtable_address_point_offset (gdbarch));
   
   /* Find the linker symbol for this vtable.  */
   vtable_symbol
@@ -282,10 +317,9 @@ gnuv3_rtti_type (struct value *value,
    vtable type for this architecture.  */
 
 static struct value *
-gnuv3_get_vtable (struct value *container)
+gnuv3_get_vtable (struct gdbarch *gdbarch, struct value *container)
 {
-  struct type *vtable_type = gdbarch_data (current_gdbarch,
-					   vtable_type_gdbarch_data);
+  struct type *vtable_type = gdbarch_data (gdbarch, vtable_type_gdbarch_data);
   struct type *vtable_pointer_type;
   struct value *vtable_pointer;
   CORE_ADDR vtable_pointer_address, vtable_address;
@@ -311,29 +345,29 @@ gnuv3_get_vtable (struct value *container)
   /* Correct it to point at the start of the virtual table, rather
      than the address point.  */
   return value_at_lazy (vtable_type,
-			vtable_address - vtable_address_point_offset ());
+			vtable_address - vtable_address_point_offset (gdbarch));
 }
 
 /* Return a function pointer for CONTAINER's VTABLE_INDEX'th virtual
    function, of type FNTYPE.  */
 
 static struct value *
-gnuv3_get_virtual_fn (struct value *container, struct type *fntype,
-		      int vtable_index)
+gnuv3_get_virtual_fn (struct gdbarch *gdbarch, struct value *container,
+		      struct type *fntype, int vtable_index)
 {
-  struct value *vtable = gnuv3_get_vtable (container);
+  struct value *vtable = gnuv3_get_vtable (gdbarch, container);
   struct value *vfn;
 
   /* Fetch the appropriate function pointer from the vtable.  */
   vfn = value_subscript (value_field (vtable, vtable_field_virtual_functions),
-                         value_from_longest (builtin_type_int, vtable_index));
+                         value_from_longest (builtin_type_int32, vtable_index));
 
   /* If this architecture uses function descriptors directly in the vtable,
      then the address of the vtable entry is actually a "function pointer"
      (i.e. points to the descriptor).  We don't need to scale the index
      by the size of a function descriptor; GCC does that before outputing
      debug information.  */
-  if (gdbarch_vtable_function_descriptors (current_gdbarch))
+  if (gdbarch_vtable_function_descriptors (gdbarch))
     vfn = value_addr (vfn);
 
   /* Cast the function pointer to the appropriate type.  */
@@ -351,10 +385,14 @@ gnuv3_virtual_fn_field (struct value **value_p,
 			struct type *vfn_base, int offset)
 {
   struct type *values_type = check_typedef (value_type (*value_p));
+  struct gdbarch *gdbarch;
 
   /* Some simple sanity checks.  */
   if (TYPE_CODE (values_type) != TYPE_CODE_CLASS)
     error (_("Only classes can have virtual functions."));
+
+  /* Determine architecture.  */
+  gdbarch = get_class_arch (values_type);
 
   /* Cast our value to the base class which defines this virtual
      function.  This takes care of any necessary `this'
@@ -362,7 +400,7 @@ gnuv3_virtual_fn_field (struct value **value_p,
   if (vfn_base != values_type)
     *value_p = value_cast (vfn_base, *value_p);
 
-  return gnuv3_get_virtual_fn (*value_p, TYPE_FN_FIELD_TYPE (f, j),
+  return gnuv3_get_virtual_fn (gdbarch, *value_p, TYPE_FN_FIELD_TYPE (f, j),
 			       TYPE_FN_FIELD_VOFFSET (f, j));
 }
 
@@ -377,14 +415,20 @@ static int
 gnuv3_baseclass_offset (struct type *type, int index, const bfd_byte *valaddr,
 			CORE_ADDR address)
 {
-  struct type *vtable_type = gdbarch_data (current_gdbarch,
-					   vtable_type_gdbarch_data);
+  struct gdbarch *gdbarch;
+  struct type *vtable_type;
+  struct type *ptr_type;
   struct value *vtable;
   struct type *vbasetype;
   struct value *offset_val, *vbase_array;
   CORE_ADDR vtable_address;
   long int cur_base_offset, base_offset;
   int vbasetype_vptr_fieldno;
+
+  /* Determine architecture.  */
+  gdbarch = get_class_arch (type);
+  vtable_type = gdbarch_data (gdbarch, vtable_type_gdbarch_data);
+  ptr_type = builtin_type (gdbarch)->builtin_data_ptr;
 
   /* If it isn't a virtual base, this is easy.  The offset is in the
      type definition.  */
@@ -397,14 +441,13 @@ gnuv3_baseclass_offset (struct type *type, int index, const bfd_byte *valaddr,
      complete inheritance graph based on the debug info.  Neither is
      worthwhile.  */
   cur_base_offset = TYPE_BASECLASS_BITPOS (type, index) / 8;
-  if (cur_base_offset >= - vtable_address_point_offset ())
+  if (cur_base_offset >= - vtable_address_point_offset (gdbarch))
     error (_("Expected a negative vbase offset (old compiler?)"));
 
-  cur_base_offset = cur_base_offset + vtable_address_point_offset ();
-  if ((- cur_base_offset) % TYPE_LENGTH (builtin_type_void_data_ptr) != 0)
+  cur_base_offset = cur_base_offset + vtable_address_point_offset (gdbarch);
+  if ((- cur_base_offset) % TYPE_LENGTH (ptr_type) != 0)
     error (_("Misaligned vbase offset."));
-  cur_base_offset = cur_base_offset
-    / ((int) TYPE_LENGTH (builtin_type_void_data_ptr));
+  cur_base_offset = cur_base_offset / ((int) TYPE_LENGTH (ptr_type));
 
   /* We're now looking for the cur_base_offset'th entry (negative index)
      in the vcall_and_vbase_offsets array.  We used to cast the object to
@@ -417,7 +460,7 @@ gnuv3_baseclass_offset (struct type *type, int index, const bfd_byte *valaddr,
      start of whichever baseclass it resides in, as a sanity measure - iff
      we have debugging information for that baseclass.  */
 
-  vbasetype = TYPE_VPTR_BASETYPE (type);
+  vbasetype = check_typedef (TYPE_VPTR_BASETYPE (type));
   vbasetype_vptr_fieldno = get_vptr_fieldno (vbasetype, NULL);
 
   if (vbasetype_vptr_fieldno >= 0
@@ -425,11 +468,11 @@ gnuv3_baseclass_offset (struct type *type, int index, const bfd_byte *valaddr,
     error (_("Illegal vptr offset in class %s"),
 	   TYPE_NAME (vbasetype) ? TYPE_NAME (vbasetype) : "<unknown>");
 
-  vtable_address = value_as_address (value_at_lazy (builtin_type_void_data_ptr,
-						    address));
-  vtable = value_at_lazy (vtable_type,
-                          vtable_address - vtable_address_point_offset ());
-  offset_val = value_from_longest(builtin_type_int, cur_base_offset);
+  vtable_address = value_as_address (value_at_lazy (ptr_type, address));
+  vtable
+    = value_at_lazy (vtable_type,
+		     vtable_address - vtable_address_point_offset (gdbarch));
+  offset_val = value_from_longest (builtin_type_int32, cur_base_offset);
   vbase_array = value_field (vtable, vtable_field_vcall_and_vbase_offsets);
   base_offset = value_as_long (value_subscript (vbase_array, offset_val));
   return base_offset;
@@ -489,6 +532,47 @@ gnuv3_find_method_in (struct type *domain, CORE_ADDR voffset,
   return NULL;
 }
 
+/* Decode GNU v3 method pointer.  */
+
+static int
+gnuv3_decode_method_ptr (struct gdbarch *gdbarch,
+			 const gdb_byte *contents,
+			 CORE_ADDR *value_p,
+			 LONGEST *adjustment_p)
+{
+  struct type *funcptr_type = builtin_type (gdbarch)->builtin_func_ptr;
+  struct type *offset_type = vtable_ptrdiff_type (gdbarch);
+  CORE_ADDR ptr_value;
+  LONGEST voffset, adjustment;
+  int vbit;
+
+  /* Extract the pointer to member.  The first element is either a pointer
+     or a vtable offset.  For pointers, we need to use extract_typed_address
+     to allow the back-end to convert the pointer to a GDB address -- but
+     vtable offsets we must handle as integers.  At this point, we do not
+     yet know which case we have, so we extract the value under both
+     interpretations and choose the right one later on.  */
+  ptr_value = extract_typed_address (contents, funcptr_type);
+  voffset = extract_signed_integer (contents, TYPE_LENGTH (funcptr_type));
+  contents += TYPE_LENGTH (funcptr_type);
+  adjustment = extract_signed_integer (contents, TYPE_LENGTH (offset_type));
+
+  if (!gdbarch_vbit_in_delta (gdbarch))
+    {
+      vbit = voffset & 1;
+      voffset = voffset ^ vbit;
+    }
+  else
+    {
+      vbit = adjustment & 1;
+      adjustment = adjustment >> 1;
+    }
+
+  *value_p = vbit? voffset : ptr_value;
+  *adjustment_p = adjustment;
+  return vbit;
+}
+
 /* GNU v3 implementation of cplus_print_method_ptr.  */
 
 static void
@@ -496,29 +580,14 @@ gnuv3_print_method_ptr (const gdb_byte *contents,
 			struct type *type,
 			struct ui_file *stream)
 {
+  struct type *domain = TYPE_DOMAIN_TYPE (type);
+  struct gdbarch *gdbarch = get_class_arch (domain);
   CORE_ADDR ptr_value;
   LONGEST adjustment;
-  struct type *domain;
   int vbit;
 
-  domain = TYPE_DOMAIN_TYPE (type);
-
   /* Extract the pointer to member.  */
-  ptr_value = extract_typed_address (contents, builtin_type_void_func_ptr);
-  contents += TYPE_LENGTH (builtin_type_void_func_ptr);
-  adjustment = extract_signed_integer (contents,
-				       TYPE_LENGTH (builtin_type_long));
-
-  if (!gdbarch_vbit_in_delta (current_gdbarch))
-    {
-      vbit = ptr_value & 1;
-      ptr_value = ptr_value ^ vbit;
-    }
-  else
-    {
-      vbit = adjustment & 1;
-      adjustment = adjustment >> 1;
-    }
+  vbit = gnuv3_decode_method_ptr (gdbarch, contents, &ptr_value, &adjustment);
 
   /* Check for NULL.  */
   if (ptr_value == 0 && vbit == 0)
@@ -536,7 +605,7 @@ gnuv3_print_method_ptr (const gdb_byte *contents,
       /* It's a virtual table offset, maybe in this class.  Search
 	 for a field with the correct vtable offset.  First convert it
 	 to an index, as used in TYPE_FN_FIELD_VOFFSET.  */
-      voffset = ptr_value / TYPE_LENGTH (builtin_type_long);
+      voffset = ptr_value / TYPE_LENGTH (vtable_ptrdiff_type (gdbarch));
 
       physname = gnuv3_find_method_in (domain, voffset, adjustment);
 
@@ -575,17 +644,22 @@ gnuv3_print_method_ptr (const gdb_byte *contents,
 /* GNU v3 implementation of cplus_method_ptr_size.  */
 
 static int
-gnuv3_method_ptr_size (void)
+gnuv3_method_ptr_size (struct type *type)
 {
-  return 2 * TYPE_LENGTH (builtin_type_void_data_ptr);
+  struct type *domain_type = check_typedef (TYPE_DOMAIN_TYPE (type));
+  struct gdbarch *gdbarch = get_class_arch (domain_type);
+  return 2 * TYPE_LENGTH (builtin_type (gdbarch)->builtin_data_ptr);
 }
 
 /* GNU v3 implementation of cplus_make_method_ptr.  */
 
 static void
-gnuv3_make_method_ptr (gdb_byte *contents, CORE_ADDR value, int is_virtual)
+gnuv3_make_method_ptr (struct type *type, gdb_byte *contents,
+		       CORE_ADDR value, int is_virtual)
 {
-  int size = TYPE_LENGTH (builtin_type_void_data_ptr);
+  struct type *domain_type = check_typedef (TYPE_DOMAIN_TYPE (type));
+  struct gdbarch *gdbarch = get_class_arch (domain_type);
+  int size = TYPE_LENGTH (builtin_type (gdbarch)->builtin_data_ptr);
 
   /* FIXME drow/2006-12-24: The adjustment of "this" is currently
      always zero, since the method pointer is of the correct type.
@@ -596,7 +670,7 @@ gnuv3_make_method_ptr (gdb_byte *contents, CORE_ADDR value, int is_virtual)
      support for adjusting pointers to members when casting them -
      not currently supported by GDB.  */
 
-  if (!gdbarch_vbit_in_delta (current_gdbarch))
+  if (!gdbarch_vbit_in_delta (gdbarch))
     {
       store_unsigned_integer (contents, size, value | is_virtual);
       store_unsigned_integer (contents + size, size, 0);
@@ -613,33 +687,22 @@ gnuv3_make_method_ptr (gdb_byte *contents, CORE_ADDR value, int is_virtual)
 static struct value *
 gnuv3_method_ptr_to_value (struct value **this_p, struct value *method_ptr)
 {
+  struct gdbarch *gdbarch;
   const gdb_byte *contents = value_contents (method_ptr);
   CORE_ADDR ptr_value;
-  struct type *final_type, *method_type;
+  struct type *domain_type, *final_type, *method_type;
   LONGEST adjustment;
   struct value *adjval;
   int vbit;
 
-  final_type = TYPE_DOMAIN_TYPE (check_typedef (value_type (method_ptr)));
-  final_type = lookup_pointer_type (final_type);
+  domain_type = TYPE_DOMAIN_TYPE (check_typedef (value_type (method_ptr)));
+  final_type = lookup_pointer_type (domain_type);
 
   method_type = TYPE_TARGET_TYPE (check_typedef (value_type (method_ptr)));
 
-  ptr_value = extract_typed_address (contents, builtin_type_void_func_ptr);
-  contents += TYPE_LENGTH (builtin_type_void_func_ptr);
-  adjustment = extract_signed_integer (contents,
-				       TYPE_LENGTH (builtin_type_long));
-
-  if (!gdbarch_vbit_in_delta (current_gdbarch))
-    {
-      vbit = ptr_value & 1;
-      ptr_value = ptr_value ^ vbit;
-    }
-  else
-    {
-      vbit = adjustment & 1;
-      adjustment = adjustment >> 1;
-    }
+  /* Extract the pointer to member.  */
+  gdbarch = get_class_arch (domain_type);
+  vbit = gnuv3_decode_method_ptr (gdbarch, contents, &ptr_value, &adjustment);
 
   /* First convert THIS to match the containing type of the pointer to
      member.  This cast may adjust the value of THIS.  */
@@ -660,15 +723,18 @@ gnuv3_method_ptr_to_value (struct value **this_p, struct value *method_ptr)
 
      You can provoke this case by casting a Base::* to a Derived::*, for
      instance.  */
-  *this_p = value_cast (builtin_type_void_data_ptr, *this_p);
-  adjval = value_from_longest (builtin_type_long, adjustment);
-  *this_p = value_add (*this_p, adjval);
+  *this_p = value_cast (builtin_type (gdbarch)->builtin_data_ptr, *this_p);
+  adjval = value_from_longest (builtin_type (gdbarch)->builtin_long,
+			       adjustment);
+  *this_p = value_ptradd (*this_p, adjval);
   *this_p = value_cast (final_type, *this_p);
 
   if (vbit)
     {
-      LONGEST voffset = ptr_value / TYPE_LENGTH (builtin_type_long);
-      return gnuv3_get_virtual_fn (value_ind (*this_p), method_type, voffset);
+      LONGEST voffset;
+      voffset = ptr_value / TYPE_LENGTH (vtable_ptrdiff_type (gdbarch));
+      return gnuv3_get_virtual_fn (gdbarch, value_ind (*this_p),
+				   method_type, voffset);
     }
   else
     return value_from_pointer (lookup_pointer_type (method_type), ptr_value);

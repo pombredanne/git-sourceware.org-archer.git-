@@ -1,6 +1,6 @@
 /* Helper routines for parsing XML using Expat.
 
-   Copyright (C) 2006, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -995,6 +995,45 @@ xml_escape_text (const char *text)
   result[i + special] = '\0';
 
   return result;
+}
+
+void
+obstack_xml_printf (struct obstack *obstack, const char *format, ...)
+{
+  va_list ap;
+  const char *f;
+  const char *prev;
+  int percent = 0;
+
+  va_start (ap, format);
+
+  prev = format;
+  for (f = format; *f; f++)
+    {
+      if (percent)
+       {
+         switch (*f)
+           {
+           case 's':
+             {
+               char *p;
+               char *a = va_arg (ap, char *);
+               obstack_grow (obstack, prev, f - prev - 1);
+               p = xml_escape_text (a);
+               obstack_grow_str (obstack, p);
+               xfree (p);
+               prev = f + 1;
+             }
+             break;
+           }
+         percent = 0;
+       }
+      else if (*f == '%')
+       percent = 1;
+    }
+
+  obstack_grow_str (obstack, prev);
+  va_end (ap);
 }
 
 void _initialize_xml_support (void);

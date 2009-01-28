@@ -1,7 +1,7 @@
 /* Definitions for symbol file management in GDB.
 
    Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001,
-   2002, 2003, 2004, 2007, 2008 Free Software Foundation, Inc.
+   2002, 2003, 2004, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -388,22 +388,13 @@ struct objfile
 
 /* Defines for the objfile flag word. */
 
-/* When using mapped/remapped predigested gdb symbol information, we need
-   a flag that indicates that we have previously done an initial symbol
-   table read from this particular objfile.  We can't just look for the
-   absence of any of the three symbol tables (msymbols, psymtab, symtab)
-   because if the file has no symbols for example, none of these will
-   exist. */
-
-#define OBJF_SYMS	(1 << 1)	/* Have tried to read symbols */
-
 /* When an object file has its functions reordered (currently Irix-5.2
    shared libraries exhibit this behaviour), we will need an expensive
    algorithm to locate a partial symtab or symtab via an address.
    To avoid this penalty for normal object files, we use this flag,
    whose setting is determined upon symbol table read in.  */
 
-#define OBJF_REORDERED	(1 << 2)	/* Functions are reordered */
+#define OBJF_REORDERED	(1 << 0)	/* Functions are reordered */
 
 /* Distinguish between an objfile for a shared library and a "vanilla"
    objfile. (If not set, the objfile may still actually be a solib.
@@ -413,11 +404,11 @@ struct objfile
    implementation of the solib interface is responsible for setting
    this flag when noticing solibs used by an inferior.)  */
 
-#define OBJF_SHARED     (1 << 3)	/* From a shared library */
+#define OBJF_SHARED     (1 << 1)	/* From a shared library */
 
 /* User requested that this objfile be read in it's entirety. */
 
-#define OBJF_READNOW	(1 << 4)	/* Immediate full read */
+#define OBJF_READNOW	(1 << 2)	/* Immediate full read */
 
 /* This objfile was created because the user explicitly caused it
    (e.g., used the add-symbol-file command).  This bit offers a way
@@ -426,7 +417,13 @@ struct objfile
    ones that the user explicitly loaded via the add-symbol-file
    command. */
 
-#define OBJF_USERLOADED	(1 << 5)	/* User loaded */
+#define OBJF_USERLOADED	(1 << 3)	/* User loaded */
+
+/* The bfd of this objfile is used outside of the objfile (e.g. by solib).
+   Do not try to free it.  */
+
+#define OBJF_KEEPBFD	(1 << 4)	/* Do not delete bfd */
+
 
 /* Set if we have tried to read partial symtabs for this objfile.
    This is used to allow lazy reading of partial symtabs.  */
@@ -511,9 +508,6 @@ extern void objfile_purge_solibs (void);
 extern int have_minimal_symbols (void);
 
 extern struct obj_section *find_pc_section (CORE_ADDR pc);
-
-extern struct obj_section *find_pc_sect_section (CORE_ADDR pc,
-						 asection * section);
 
 extern int in_plt_section (CORE_ADDR, char *);
 
@@ -615,5 +609,9 @@ extern void *objfile_data (struct objfile *objfile,
    want to die here. Let the users of SECT_OFF_BSS deal with an
    uninitialized section index. */
 #define SECT_OFF_BSS(objfile) (objfile)->sect_index_bss
+
+/* Answer whether there is more than one object file loaded.  */
+
+#define MULTI_OBJFILE_P() (object_files && object_files->next)
 
 #endif /* !defined (OBJFILES_H) */

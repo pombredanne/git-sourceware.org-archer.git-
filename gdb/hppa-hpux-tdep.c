@@ -1,6 +1,6 @@
 /* Target-dependent code for HP-UX on PA-RISC.
 
-   Copyright (C) 2002, 2003, 2004, 2005, 2007, 2008
+   Copyright (C) 2002, 2003, 2004, 2005, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -179,7 +179,7 @@ hppa64_hpux_in_solib_call_trampoline (CORE_ADDR pc, char *name)
   if (! minsym)
     return 0;
 
-  sec = SYMBOL_BFD_SECTION (minsym);
+  sec = SYMBOL_OBJ_SECTION (minsym)->the_bfd_section;
 
   if (bfd_get_section_vma (sec->owner, sec) <= pc
       && pc < (bfd_get_section_vma (sec->owner, sec)
@@ -1404,7 +1404,7 @@ hppa_hpux_write_pc (struct regcache *regcache, CORE_ADDR pc)
   if (flags & HPPA_HPUX_SS_INSYSCALL)
     regcache_cooked_write_unsigned (regcache, HPPA_R31_REGNUM, pc | 0x3);
 
-  return hppa_write_pc (regcache, pc);
+  hppa_write_pc (regcache, pc);
 }
 
 static CORE_ADDR

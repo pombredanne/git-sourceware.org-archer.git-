@@ -1,6 +1,6 @@
 /* Generate a core file for the inferior process.
 
-   Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
+   Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -215,6 +215,8 @@ derive_stack_segment (bfd_vma *bottom, bfd_vma *top)
 static int
 derive_heap_segment (bfd *abfd, bfd_vma *bottom, bfd_vma *top)
 {
+  struct objfile *sbrk_objf;
+  struct gdbarch *gdbarch;
   bfd_vma top_of_data_memory = 0;
   bfd_vma top_of_heap = 0;
   bfd_size_type sec_size;
@@ -256,20 +258,21 @@ derive_heap_segment (bfd *abfd, bfd_vma *bottom, bfd_vma *top)
   /* Now get the top-of-heap by calling sbrk in the inferior.  */
   if (lookup_minimal_symbol ("sbrk", NULL, NULL) != NULL)
     {
-      sbrk = find_function_in_inferior ("sbrk");
+      sbrk = find_function_in_inferior ("sbrk", &sbrk_objf);
       if (sbrk == NULL)
 	return 0;
     }
   else if (lookup_minimal_symbol ("_sbrk", NULL, NULL) != NULL)
     {
-      sbrk = find_function_in_inferior ("_sbrk");
+      sbrk = find_function_in_inferior ("_sbrk", &sbrk_objf);
       if (sbrk == NULL)
 	return 0;
     }
   else
     return 0;
 
-  zero = value_from_longest (builtin_type_int, 0);
+  gdbarch = get_objfile_arch (sbrk_objf);
+  zero = value_from_longest (builtin_type (gdbarch)->builtin_int, 0);
   gdb_assert (zero);
   sbrk = call_function_by_hand (sbrk, 1, &zero);
   if (sbrk == NULL)
@@ -325,7 +328,7 @@ gcore_create_callback (CORE_ADDR vaddr, unsigned long size,
       if (info_verbose)
         {
           fprintf_filtered (gdb_stdout, "Ignore segment, %s bytes at 0x%s\n",
-                           paddr_d (size), paddr_nz (vaddr));
+                            plongest (size), paddr_nz (vaddr));
         }
 
       return 0;
@@ -383,7 +386,7 @@ gcore_create_callback (CORE_ADDR vaddr, unsigned long size,
   if (info_verbose)
     {
       fprintf_filtered (gdb_stdout, "Save segment, %s bytes at 0x%s\n",
-			paddr_d (size), paddr_nz (vaddr));
+			plongest (size), paddr_nz (vaddr));
     }
 
   bfd_set_section_size (obfd, osec, size);
@@ -476,7 +479,7 @@ gcore_copy_callback (bfd *obfd, asection *osec, void *ignored)
 			      memhunk, size) != 0)
 	{
 	  warning (_("Memory read failed for corefile section, %s bytes at 0x%s."),
-		   paddr_d (size), paddr (bfd_section_vma (obfd, osec)));
+		   plongest (size), paddr (bfd_section_vma (obfd, osec)));
 	  break;
 	}
       if (!bfd_set_section_contents (obfd, osec, memhunk, offset, size))

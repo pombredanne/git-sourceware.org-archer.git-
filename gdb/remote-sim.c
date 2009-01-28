@@ -1,7 +1,7 @@
 /* Generic remote debugging interface for simulators.
 
    Copyright (C) 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
-   2004, 2005, 2006, 2007, 2008 Free Software Foundation, Inc.
+   2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support.
    Steve Chamberlain (sac@cygnus.com).
@@ -70,7 +70,7 @@ static void gdb_os_vprintf_filtered (host_callback *, const char *, va_list);
 
 static void gdb_os_evprintf_filtered (host_callback *, const char *, va_list);
 
-static void gdb_os_error (host_callback *, const char *, ...);
+static void gdb_os_error (host_callback *, const char *, ...) ATTR_NORETURN;
 
 static void gdbsim_fetch_register (struct regcache *regcache, int regno);
 
@@ -84,7 +84,7 @@ static void gdbsim_open (char *args, int from_tty);
 
 static void gdbsim_close (int quitting);
 
-static void gdbsim_detach (char *args, int from_tty);
+static void gdbsim_detach (struct target_ops *ops, char *args, int from_tty);
 
 static void gdbsim_resume (ptid_t ptid, int step, enum target_signal siggnal);
 
@@ -94,7 +94,7 @@ static void gdbsim_prepare_to_store (struct regcache *regcache);
 
 static void gdbsim_files_info (struct target_ops *target);
 
-static void gdbsim_mourn_inferior (void);
+static void gdbsim_mourn_inferior (struct target_ops *target);
 
 static void gdbsim_stop (ptid_t ptid);
 
@@ -262,17 +262,12 @@ gdb_os_evprintf_filtered (host_callback * p, const char *format, va_list ap)
 /* GDB version of error callback.  */
 
 static void
-gdb_os_error (host_callback * p, const char *format,...)
+gdb_os_error (host_callback * p, const char *format, ...)
 {
-  if (deprecated_error_hook)
-    (*deprecated_error_hook) ();
-  else
-    {
-      va_list args;
-      va_start (args, format);
-      verror (format, args);
-      va_end (args);
-    }
+  va_list args;
+  va_start (args, format);
+  verror (format, args);
+  va_end (args);
 }
 
 int
@@ -406,12 +401,13 @@ gdbsim_kill (void)
 static void
 gdbsim_load (char *args, int fromtty)
 {
-  char **argv = buildargv (args);
+  char **argv;
   char *prog;
 
-  if (argv == NULL)
-    nomem (0);
+  if (args == NULL)
+      error_no_arg (_("program to load"));
 
+  argv = gdb_buildargv (args);
   make_cleanup_freeargv (argv);
 
   prog = tilde_expand (argv[0]);
@@ -444,7 +440,8 @@ gdbsim_load (char *args, int fromtty)
    user types "run" after having attached.  */
 
 static void
-gdbsim_create_inferior (char *exec_file, char *args, char **env, int from_tty)
+gdbsim_create_inferior (struct target_ops *target, char *exec_file, char *args,
+			char **env, int from_tty)
 {
   int len;
   char *arg_buf, **argv;
@@ -472,7 +469,7 @@ gdbsim_create_inferior (char *exec_file, char *args, char **env, int from_tty)
       strcat (arg_buf, exec_file);
       strcat (arg_buf, " ");
       strcat (arg_buf, args);
-      argv = buildargv (arg_buf);
+      argv = gdb_buildargv (arg_buf);
       make_cleanup_freeargv (argv);
     }
   else
@@ -480,6 +477,7 @@ gdbsim_create_inferior (char *exec_file, char *args, char **env, int from_tty)
   sim_create_inferior (gdbsim_desc, exec_bfd, argv, env);
 
   inferior_ptid = remote_sim_ptid;
+  add_inferior_silent (ptid_get_pid (inferior_ptid));
   add_thread_silent (inferior_ptid);
 
   target_mark_running (&gdbsim_ops);
@@ -545,9 +543,7 @@ gdbsim_open (char *args, int from_tty)
       strcat (arg_buf, " ");	/* 1 */
       strcat (arg_buf, args);
     }
-  argv = buildargv (arg_buf);
-  if (argv == NULL)
-    error (_("Insufficient memory available to allocate simulator arg list."));
+  argv = gdb_buildargv (arg_buf);
   make_cleanup_freeargv (argv);
 
   init_callbacks ();
@@ -591,6 +587,7 @@ gdbsim_close (int quitting)
   end_callbacks ();
   generic_mourn_inferior ();
   delete_thread_silent (remote_sim_ptid);
+  delete_inferior_silent (ptid_get_pid (remote_sim_ptid));
 }
 
 /* Takes a program previously attached to and detaches it.
@@ -603,7 +600,7 @@ gdbsim_close (int quitting)
    Use this when you want to detach and do something else with your gdb.  */
 
 static void
-gdbsim_detach (char *args, int from_tty)
+gdbsim_detach (struct target_ops *ops, char *args, int from_tty)
 {
   if (remote_debug)
     printf_filtered ("gdbsim_detach: args \"%s\"\n", args);
@@ -821,13 +818,13 @@ gdbsim_files_info (struct target_ops *target)
 /* Clear the simulator's notion of what the break points are.  */
 
 static void
-gdbsim_mourn_inferior (void)
+gdbsim_mourn_inferior (struct target_ops *target)
 {
   if (remote_debug)
     printf_filtered ("gdbsim_mourn_inferior:\n");
 
   remove_breakpoints ();
-  target_mark_exited (&gdbsim_ops);
+  target_mark_exited (target);
   generic_mourn_inferior ();
   delete_thread_silent (remote_sim_ptid);
 }

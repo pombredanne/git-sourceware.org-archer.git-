@@ -1,6 +1,6 @@
 /* MI Command Set.
 
-   Copyright (C) 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008
+   Copyright (C) 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    Contributed by Cygnus Solutions (a Red Hat company).
@@ -44,7 +44,11 @@
 #include "gdb.h"
 #include "frame.h"
 #include "mi-main.h"
+#include "mi-common.h"
 #include "language.h"
+#include "valprint.h"
+#include "inferior.h"
+#include "osdata.h"
 
 #include <ctype.h>
 #include <sys/time.h>
@@ -160,6 +164,23 @@ mi_cmd_exec_return (char *command, char **argv, int argc)
   print_stack_frame (get_selected_frame (NULL), 1, LOC_AND_ADDRESS);
 }
 
+static int
+proceed_thread_callback (struct thread_info *thread, void *arg)
+{
+  int pid = *(int *)arg;
+
+  if (!is_stopped (thread->ptid))
+    return 0;
+
+  if (PIDGET (thread->ptid) != pid)
+    return 0;
+
+  switch_to_thread (thread->ptid);
+  clear_proceed_status ();
+  proceed ((CORE_ADDR) -1, TARGET_SIGNAL_DEFAULT, 0);
+  return 0;
+}
+
 void
 mi_cmd_exec_continue (char *command, char **argv, int argc)
 {
@@ -167,8 +188,37 @@ mi_cmd_exec_continue (char *command, char **argv, int argc)
     continue_1 (0);
   else if (argc == 1 && strcmp (argv[0], "--all") == 0)
     continue_1 (1);
+  else if (argc == 2 && strcmp (argv[0], "--thread-group") == 0)
+    {
+      struct cleanup *old_chain;
+      int pid;
+      if (argv[1] == NULL || argv[1] == '\0')
+	error ("Thread group id not specified");
+      pid = atoi (argv[1] + 1);
+      if (!in_inferior_list (pid))
+	error ("Invalid thread group id '%s'", argv[1]);
+
+      old_chain = make_cleanup_restore_current_thread ();
+      iterate_over_threads (proceed_thread_callback, &pid);
+      do_cleanups (old_chain);            
+    }
   else
-    error ("Usage: -exec-continue [--all]");
+    error ("Usage: -exec-continue [--all|--thread-group id]");
+}
+
+static int
+interrupt_thread_callback (struct thread_info *thread, void *arg)
+{
+  int pid = *(int *)arg;
+
+  if (!is_running (thread->ptid))
+    return 0;
+
+  if (PIDGET (thread->ptid) != pid)
+    return 0;
+
+  target_stop (thread->ptid);
+  return 0;
 }
 
 /* Interrupt the execution of the target.  Note how we must play around
@@ -190,11 +240,61 @@ mi_cmd_exec_interrupt (char *command, char **argv, int argc)
     {
       if (!any_running ())
 	error ("Inferior not running.");
-
+      
       interrupt_target_1 (1);
     }
+  else if (argc == 2 && strcmp (argv[0], "--thread-group") == 0)
+    {
+      struct cleanup *old_chain;
+      int pid;
+      if (argv[1] == NULL || argv[1] == '\0')
+	error ("Thread group id not specified");
+      pid = atoi (argv[1] + 1);
+      if (!in_inferior_list (pid))
+	error ("Invalid thread group id '%s'", argv[1]);
+
+      old_chain = make_cleanup_restore_current_thread ();
+      iterate_over_threads (interrupt_thread_callback, &pid);
+      do_cleanups (old_chain);
+    }
   else
-    error ("Usage: -exec-interrupt [--all]");
+    error ("Usage: -exec-interrupt [--all|--thread-group id]");
+}
+
+static int
+find_thread_of_process (struct thread_info *ti, void *p)
+{
+  int pid = *(int *)p;
+  if (PIDGET (ti->ptid) == pid && !is_exited (ti->ptid))
+    return 1;
+
+  return 0;
+}
+
+void
+mi_cmd_target_detach (char *command, char **argv, int argc)
+{
+  if (argc != 0 && argc != 1)
+    error ("Usage: -target-detach [thread-group]");
+
+  if (argc == 1)
+    {
+      struct thread_info *tp;
+      char *end = argv[0];
+      int pid = strtol (argv[0], &end, 10);
+      if (*end != '\0')
+	error (_("Cannot parse thread group id '%s'"), argv[0]);
+
+      /* Pick any thread in the desired process.  Current
+	 target_detach deteches from the parent of inferior_ptid.  */
+      tp = iterate_over_threads (find_thread_of_process, &pid);
+      if (!tp)
+	error (_("Thread group is empty"));
+
+      switch_to_thread (tp->ptid);
+    }
+
+  detach_command (NULL, 0);
 }
 
 void
@@ -244,7 +344,92 @@ mi_cmd_thread_info (char *command, char **argv, int argc)
   if (argc == 1)
     thread = atoi (argv[0]);
 
-  print_thread_info (uiout, thread);
+  print_thread_info (uiout, thread, -1);
+}
+
+static int
+print_one_inferior (struct inferior *inferior, void *arg)
+{
+  struct cleanup *back_to = make_cleanup_ui_out_tuple_begin_end (uiout, NULL);
+
+  ui_out_field_fmt (uiout, "id", "%d", inferior->pid);
+  ui_out_field_string (uiout, "type", "process");
+  ui_out_field_int (uiout, "pid", inferior->pid);
+  
+  do_cleanups (back_to);
+  return 0;
+}
+
+void
+mi_cmd_list_thread_groups (char *command, char **argv, int argc)
+{
+  struct cleanup *back_to;
+  int available = 0;
+  char *id = NULL;
+
+  if (argc > 0 && strcmp (argv[0], "--available") == 0)
+    {
+      ++argv;
+      --argc;
+      available = 1;
+    }
+
+  if (argc > 0)
+    id = argv[0];
+
+  back_to = make_cleanup (null_cleanup, NULL);
+
+  if (available && id)
+    {
+      error (_("Can only report top-level available thread groups"));
+    }
+  else if (available)
+    {
+      struct osdata *data;
+      struct osdata_item *item;
+      int ix_items;
+
+      data = get_osdata ("processes");
+      make_cleanup_osdata_free (data);
+
+      make_cleanup_ui_out_list_begin_end (uiout, "groups");
+
+      for (ix_items = 0;
+	   VEC_iterate (osdata_item_s, data->items,
+			ix_items, item);
+	   ix_items++)
+	{
+	  struct cleanup *back_to =
+	    make_cleanup_ui_out_tuple_begin_end (uiout, NULL);
+
+	  const char *pid = get_osdata_column (item, "pid");
+	  const char *cmd = get_osdata_column (item, "command");
+	  const char *user = get_osdata_column (item, "user");
+
+	  ui_out_field_fmt (uiout, "id", "%s", pid);
+	  ui_out_field_string (uiout, "type", "process");
+	  if (cmd)
+	    ui_out_field_string (uiout, "description", cmd);
+	  if (user)
+	    ui_out_field_string (uiout, "user", user);
+
+	  do_cleanups (back_to);
+	}
+    }
+  else if (id)
+    {
+      int pid = atoi (id);
+      if (!in_inferior_list (pid))
+	error ("Invalid thread group id '%s'", id);
+      print_thread_info (uiout, -1, pid);    
+    }
+  else
+    {
+      make_cleanup_ui_out_list_begin_end (uiout, "groups");
+      iterate_over_inferiors (print_one_inferior, NULL);
+    }
+  
+  do_cleanups (back_to);
 }
 
 void
@@ -499,9 +684,11 @@ get_register (int regnum, int format)
     }
   else
     {
+      struct value_print_options opts;
+      get_formatted_print_options (&opts, format);
+      opts.deref_ref = 1;
       val_print (register_type (current_gdbarch, regnum), buffer, 0, 0,
-		 stb->stream, format, 1, 0, Val_pretty_default,
-		 current_language);
+		 stb->stream, 0, &opts, current_language);
       ui_out_field_stream (uiout, "value", stb);
       ui_out_stream_delete (stb);
     }
@@ -570,6 +757,7 @@ mi_cmd_data_evaluate_expression (char *command, char **argv, int argc)
   struct cleanup *old_chain = NULL;
   struct value *val;
   struct ui_stream *stb = NULL;
+  struct value_print_options opts;
 
   stb = ui_out_stream_new (uiout);
 
@@ -586,9 +774,11 @@ mi_cmd_data_evaluate_expression (char *command, char **argv, int argc)
   val = evaluate_expression (expr);
 
   /* Print the result of the expression evaluation.  */
+  get_user_print_options (&opts);
+  opts.deref_ref = 0;
   val_print (value_type (val), value_contents (val),
 	     value_embedded_offset (val), VALUE_ADDRESS (val),
-	     stb->stream, 0, 0, 0, 0, current_language);
+	     stb->stream, 0, &opts, current_language);
 
   ui_out_field_stream (uiout, "value", stb);
   ui_out_stream_delete (stb);
@@ -743,10 +933,13 @@ mi_cmd_data_read_memory (char *command, char **argv, int argc)
 	int col_byte;
 	struct cleanup *cleanup_tuple;
 	struct cleanup *cleanup_list_data;
+	struct value_print_options opts;
+
 	cleanup_tuple = make_cleanup_ui_out_tuple_begin_end (uiout, NULL);
 	ui_out_field_core_addr (uiout, "addr", addr + row_byte);
 	/* ui_out_field_core_addr_symbolic (uiout, "saddr", addr + row_byte); */
 	cleanup_list_data = make_cleanup_ui_out_list_begin_end (uiout, "data");
+	get_formatted_print_options (&opts, word_format);
 	for (col = 0, col_byte = row_byte;
 	     col < nr_cols;
 	     col++, col_byte += word_size)
@@ -758,7 +951,7 @@ mi_cmd_data_read_memory (char *command, char **argv, int argc)
 	    else
 	      {
 		ui_file_rewind (stream->stream);
-		print_scalar_formatted (mbuf + col_byte, word_type, word_format,
+		print_scalar_formatted (mbuf + col_byte, word_type, &opts,
 					word_asize, stream->stream);
 		ui_out_field_stream (uiout, NULL, stream);
 	      }
@@ -1049,6 +1242,7 @@ mi_execute_command (char *cmd, int from_tty)
   if (command != NULL)
     {
       struct gdb_exception result;
+      ptid_t previous_ptid = inferior_ptid;
 
       if (do_timings)
 	{
@@ -1073,6 +1267,41 @@ mi_execute_command (char *cmd, int from_tty)
 	  mi_out_rewind (uiout);
 	}
 
+      if (/* The notifications are only output when the top-level
+	     interpreter (specified on the command line) is MI.  */      
+	  ui_out_is_mi_like_p (interp_ui_out (top_level_interpreter ()))
+	  /* Don't try report anything if there are no threads -- 
+	     the program is dead.  */
+	  && thread_count () != 0
+	  /* -thread-select explicitly changes thread. If frontend uses that
+	     internally, we don't want to emit =thread-selected, since
+	     =thread-selected is supposed to indicate user's intentions.  */
+	  && strcmp (command->command, "thread-select") != 0)
+	{
+	  struct mi_interp *mi = top_level_interpreter_data ();
+	  struct thread_info *ti = inferior_thread ();
+	  int report_change;
+
+	  if (command->thread == -1)
+	    {
+	      report_change = !ptid_equal (previous_ptid, null_ptid)
+		&& !ptid_equal (inferior_ptid, previous_ptid);
+	    }
+	  else
+	    {
+	      report_change = (ti->num != command->thread);
+	    }
+
+	  if (report_change)
+	    {     
+	      target_terminal_ours ();
+	      fprintf_unfiltered (mi->event_channel, 
+				  "thread-selected,id=\"%d\"",
+				  ti->num);
+	      gdb_flush (mi->event_channel);
+	    }
+	}
+
       mi_parse_free (command);
     }
 
@@ -1094,19 +1323,19 @@ mi_cmd_execute (struct mi_parse *parse)
 
   if (parse->frame != -1 && parse->thread == -1)
     error (_("Cannot specify --frame without --thread"));
-  
+
   if (parse->thread != -1)
     {
       struct thread_info *tp = find_thread_id (parse->thread);
       if (!tp)
 	error (_("Invalid thread id: %d"), parse->thread);
-      
-      if (non_stop)
-	context_switch_to (tp->ptid);
-      else
-	switch_to_thread (tp->ptid);
+
+      if (is_exited (tp->ptid))
+	error (_("Thread id: %d has terminated"), parse->thread);
+
+      switch_to_thread (tp->ptid);
     }
-  
+
   if (parse->frame != -1)
     {
       struct frame_info *fid;
@@ -1118,15 +1347,16 @@ mi_cmd_execute (struct mi_parse *parse)
       else
 	error (_("Invalid frame id: %d"), frame);
     }
-  
+
   if (parse->cmd->argv_func != NULL)
     {
       if (target_can_async_p ()
 	  && target_has_execution
-	  && (is_exited (inferior_ptid))
+	  && is_exited (inferior_ptid)
 	  && (strcmp (parse->command, "thread-info") != 0
 	      && strcmp (parse->command, "thread-list-ids") != 0
-	      && strcmp (parse->command, "thread-select") != 0))
+	      && strcmp (parse->command, "thread-select") != 0
+	      && strcmp (parse->command, "list-thread-groups") != 0))
 	{
 	  struct ui_file *stb;
 	  stb = mem_fileopen ();

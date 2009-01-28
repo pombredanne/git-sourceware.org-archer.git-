@@ -1,5 +1,5 @@
 /* SPU target-dependent code for GDB, the GNU debugger.
-   Copyright (C) 2006, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    Contributed by Ulrich Weigand <uweigand@de.ibm.com>.
    Based on a port by Sid Manning <sid@us.ibm.com>.
@@ -74,9 +74,11 @@ spu_builtin_type_vec128 (struct gdbarch *gdbarch)
       append_composite_type_field (t, "v16_int8",
 				   init_vector_type (builtin_type_int8, 16));
       append_composite_type_field (t, "v2_double",
-				   init_vector_type (builtin_type_double, 2));
+				   init_vector_type (builtin_type (gdbarch)
+						     ->builtin_double, 2));
       append_composite_type_field (t, "v4_float",
-				   init_vector_type (builtin_type_float, 4));
+				   init_vector_type (builtin_type (gdbarch)
+						     ->builtin_float, 4));
 
       TYPE_VECTOR (t) = 1;
       TYPE_NAME (t) = "spu_builtin_type_vec128";
@@ -137,10 +139,10 @@ spu_register_type (struct gdbarch *gdbarch, int reg_nr)
       return builtin_type_uint32;
 
     case SPU_PC_REGNUM:
-      return builtin_type_void_func_ptr;
+      return builtin_type (gdbarch)->builtin_func_ptr;
 
     case SPU_SP_REGNUM:
-      return builtin_type_void_data_ptr;
+      return builtin_type (gdbarch)->builtin_data_ptr;
 
     case SPU_FPSCR_REGNUM:
       return builtin_type_uint128;
@@ -910,6 +912,10 @@ spu_frame_unwind_cache (struct frame_info *this_frame,
 	}
     }
 
+  /* If we didn't find a frame, we cannot determine SP / return address.  */
+  if (info->frame_base == 0)
+    return info;
+
   /* The previous SP is equal to the CFA.  */
   trad_frame_set_value (info->saved_regs, SPU_SP_REGNUM, info->frame_base);
 
@@ -1028,6 +1034,22 @@ spu_frame_align (struct gdbarch *gdbarch, CORE_ADDR sp)
   return sp & ~15;
 }
 
+static CORE_ADDR
+spu_push_dummy_code (struct gdbarch *gdbarch, CORE_ADDR sp, CORE_ADDR funaddr,
+		     struct value **args, int nargs, struct type *value_type,
+		     CORE_ADDR *real_pc, CORE_ADDR *bp_addr,
+		     struct regcache *regcache)
+{
+  /* Allocate space sufficient for a breakpoint, keeping the stack aligned.  */
+  sp = (sp - 4) & ~15;
+  /* Store the address of that breakpoint */
+  *bp_addr = sp;
+  /* The call starts at the callee's entry point.  */
+  *real_pc = funaddr;
+
+  return sp;
+}
+
 static int
 spu_scalar_value_p (struct type *type)
 {
@@ -1103,6 +1125,7 @@ spu_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 		     int nargs, struct value **args, CORE_ADDR sp,
 		     int struct_return, CORE_ADDR struct_addr)
 {
+  CORE_ADDR sp_delta;
   int i;
   int regnum = SPU_ARG1_REGNUM;
   int stack_arg = -1;
@@ -1182,8 +1205,14 @@ spu_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
   regcache_cooked_read (regcache, SPU_RAW_SP_REGNUM, buf);
   target_write_memory (sp, buf, 16);
 
-  /* Finally, update the SP register.  */
-  regcache_cooked_write_unsigned (regcache, SPU_SP_REGNUM, sp);
+  /* Finally, update all slots of the SP register.  */
+  sp_delta = sp - extract_unsigned_integer (buf, 4);
+  for (i = 0; i < 4; i++)
+    {
+      CORE_ADDR sp_slot = extract_unsigned_integer (buf + 4*i, 4);
+      store_unsigned_integer (buf + 4*i, 4, sp_slot + sp_delta);
+    }
+  regcache_cooked_write (regcache, SPU_RAW_SP_REGNUM, buf);
 
   return sp;
 }
@@ -1444,7 +1473,7 @@ spu_overlay_update (struct obj_section *osect)
       struct objfile *objfile;
 
       ALL_OBJSECTIONS (objfile, osect)
-	if (section_is_overlay (osect->the_bfd_section))
+	if (section_is_overlay (osect))
 	  spu_overlay_update_osect (osect);
     }
 }
@@ -2097,6 +2126,7 @@ spu_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   set_gdbarch_call_dummy_location (gdbarch, ON_STACK);
   set_gdbarch_frame_align (gdbarch, spu_frame_align);
   set_gdbarch_frame_red_zone_size (gdbarch, 2000);
+  set_gdbarch_push_dummy_code (gdbarch, spu_push_dummy_code);
   set_gdbarch_push_dummy_call (gdbarch, spu_push_dummy_call);
   set_gdbarch_dummy_id (gdbarch, spu_dummy_id);
   set_gdbarch_return_value (gdbarch, spu_return_value);

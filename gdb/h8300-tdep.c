@@ -1,7 +1,8 @@
 /* Target-machine dependent code for Renesas H8/300, for GDB.
 
    Copyright (C) 1988, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1998, 1999,
-   2000, 2001, 2002, 2003, 2005, 2007, 2008 Free Software Foundation, Inc.
+   2000, 2001, 2002, 2003, 2005, 2007, 2008, 2009
+   Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1112,10 +1113,10 @@ h8300_register_type (struct gdbarch *gdbarch, int regno)
       switch (regno)
 	{
 	case E_PC_REGNUM:
-	  return builtin_type_void_func_ptr;
+	  return builtin_type (gdbarch)->builtin_func_ptr;
 	case E_SP_REGNUM:
 	case E_FP_REGNUM:
-	  return builtin_type_void_data_ptr;
+	  return builtin_type (gdbarch)->builtin_data_ptr;
 	default:
 	  if (regno == E_PSEUDO_CCR_REGNUM (gdbarch))
 	    return builtin_type_uint8;

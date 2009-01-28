@@ -1,6 +1,7 @@
 /* Auxiliary vector support for GDB, the GNU debugger.
 
-   Copyright (C) 2004, 2005, 2006, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009
+   Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -82,7 +83,8 @@ int
 default_auxv_parse (struct target_ops *ops, gdb_byte **readptr,
 		   gdb_byte *endptr, CORE_ADDR *typep, CORE_ADDR *valp)
 {
-  const int sizeof_auxv_field = TYPE_LENGTH (builtin_type_void_data_ptr);
+  const int sizeof_auxv_field = gdbarch_ptr_bit (target_gdbarch)
+				/ TARGET_CHAR_BIT;
   gdb_byte *ptr = *readptr;
 
   if (endptr == ptr)
@@ -171,7 +173,6 @@ fprint_target_auxv (struct ui_file *file, struct target_ops *ops)
 
   while (target_auxv_parse (ops, &ptr, data + len, &type, &val) > 0)
     {
-      extern int addressprint;
       const char *name = "???";
       const char *description = "";
       enum { dec, hex, str } flavor = hex;
@@ -203,9 +204,11 @@ fprint_target_auxv (struct ui_file *file, struct target_ops *ops)
 	  TAG (AT_ICACHEBSIZE, _("Instruction cache block size"), dec);
 	  TAG (AT_UCACHEBSIZE, _("Unified cache block size"), dec);
 	  TAG (AT_IGNOREPPC, _("Entry should be ignored"), dec);
+	  TAG (AT_BASE_PLATFORM, _("String identifying base platform"), str);
+	  TAG (AT_EXECFN, _("File name of executable"), str);
+	  TAG (AT_SECURE, _("Boolean, was exec setuid-like?"), dec);
 	  TAG (AT_SYSINFO, _("Special system info/entry points"), hex);
 	  TAG (AT_SYSINFO_EHDR, _("System-supplied DSO's ELF header"), hex);
-	  TAG (AT_SECURE, _("Boolean, was exec setuid-like?"), dec);
 	  TAG (AT_SUN_UID, _("Effective user ID"), dec);
 	  TAG (AT_SUN_RUID, _("Real user ID"), dec);
 	  TAG (AT_SUN_GID, _("Effective group ID"), dec);
@@ -229,20 +232,24 @@ fprint_target_auxv (struct ui_file *file, struct target_ops *ops)
 	}
 
       fprintf_filtered (file, "%-4s %-20s %-30s ",
-			paddr_d (type), name, description);
+			plongest (type), name, description);
       switch (flavor)
 	{
 	case dec:
-	  fprintf_filtered (file, "%s\n", paddr_d (val));
+	  fprintf_filtered (file, "%s\n", plongest (val));
 	  break;
 	case hex:
 	  fprintf_filtered (file, "0x%s\n", paddr_nz (val));
 	  break;
 	case str:
-	  if (addressprint)
-	    fprintf_filtered (file, "0x%s", paddr_nz (val));
-	  val_print_string (val, -1, 1, file);
-	  fprintf_filtered (file, "\n");
+	  {
+	    struct value_print_options opts;
+	    get_user_print_options (&opts);
+	    if (opts.addressprint)
+	      fprintf_filtered (file, "0x%s", paddr_nz (val));
+	    val_print_string (val, -1, 1, file, &opts);
+	    fprintf_filtered (file, "\n");
+	  }
 	  break;
 	}
       ++ents;

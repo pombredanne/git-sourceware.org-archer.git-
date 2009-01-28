@@ -1,7 +1,7 @@
 /* Scheme/Guile language support routines for GDB, the GNU debugger.
 
    Copyright (C) 1995, 1996, 1998, 2000, 2001, 2002, 2003, 2004, 2005, 2007,
-   2008 Free Software Foundation, Inc.
+   2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -32,6 +32,7 @@
 #include "gdb_string.h"
 #include "gdbcore.h"
 #include "infcall.h"
+#include "objfiles.h"
 
 extern void _initialize_scheme_language (void);
 static struct value *evaluate_subexp_scm (struct type *, struct expression *,
@@ -49,7 +50,8 @@ scm_printchar (int c, struct ui_file *stream)
 
 static void
 scm_printstr (struct ui_file *stream, const gdb_byte *string,
-	      unsigned int length, int width, int force_ellipses)
+	      unsigned int length, int width, int force_ellipses,
+	      const struct value_print_options *options)
 {
   fprintf_filtered (stream, "\"%s\"", string);
 }
@@ -147,13 +149,19 @@ in_eval_c (void)
 static struct value *
 scm_lookup_name (char *str)
 {
+  struct objfile *objf;
+  struct gdbarch *gdbarch;
   struct value *args[3];
   int len = strlen (str);
   struct value *func;
   struct value *val;
   struct symbol *sym;
+
+  func = find_function_in_inferior ("scm_lookup_cstr", &objf);
+  gdbarch = get_objfile_arch (objf);
+
   args[0] = value_allocate_space_in_inferior (len);
-  args[1] = value_from_longest (builtin_type_int, len);
+  args[1] = value_from_longest (builtin_type (gdbarch)->builtin_int, len);
   write_memory (value_as_long (args[0]), (gdb_byte *) str, len);
 
   if (in_eval_c ()
@@ -165,7 +173,6 @@ scm_lookup_name (char *str)
     /* FIXME in this case, we should try lookup_symbol first */
     args[2] = value_from_longest (builtin_type_scm, SCM_EOL);
 
-  func = find_function_in_inferior ("scm_lookup_cstr");
   val = call_function_by_hand (func, 3, args);
   if (!value_logical_not (val))
     return value_ind (val);
@@ -187,7 +194,7 @@ scm_evaluate_string (char *str, int len)
   write_memory (iaddr, (gdb_byte *) str, len);
   /* FIXME - should find and pass env */
   write_memory (iaddr + len, (gdb_byte *) "", 1);
-  func = find_function_in_inferior ("scm_evstr");
+  func = find_function_in_inferior ("scm_evstr", NULL);
   return call_function_by_hand (func, 1, &addr);
 }
 
@@ -220,7 +227,7 @@ evaluate_exp (struct type *expect_type, struct expression *exp,
     }
   return evaluate_subexp_standard (expect_type, exp, pos, noside);
 nosideret:
-  return value_from_longest (builtin_type_long, (LONGEST) 1);
+  return value_from_longest (builtin_type_int8, (LONGEST) 1);
 }
 
 const struct exp_descriptor exp_descriptor_scm = 
@@ -240,6 +247,7 @@ const struct language_defn scm_language_defn =
   type_check_off,
   case_sensitive_off,
   array_row_major,
+  macro_expansion_no,
   &exp_descriptor_scm,
   scm_parse,
   c_error,
@@ -248,6 +256,7 @@ const struct language_defn scm_language_defn =
   scm_printstr,			/* Function to print string constant */
   NULL,				/* Function to print a single character */
   c_print_type,			/* Print a type using appropriate syntax */
+  default_print_typedef,	/* Print a typedef using appropriate syntax */
   scm_val_print,		/* Print a value using appropriate syntax */
   scm_value_print,		/* Print a top-level value */
   NULL,				/* Language specific skip_trampoline */

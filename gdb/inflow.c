@@ -1,7 +1,7 @@
 /* Low level interface to ptrace, for GDB when running under Unix.
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
-   Free Software Foundation, Inc.
+   1996, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008,
+   2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -277,15 +277,16 @@ terminal_inferior (void)
 
       if (job_control)
 	{
+	  struct inferior *inf = current_inferior ();
 #ifdef HAVE_TERMIOS
 	  result = tcsetpgrp (0, inferior_process_group);
-	  if (!attach_flag)
+	  if (!inf->attach_flag)
 	    OOPSY ("tcsetpgrp");
 #endif
 
 #ifdef HAVE_SGTTY
 	  result = ioctl (0, TIOCSPGRP, &inferior_process_group);
-	  if (!attach_flag)
+	  if (!inf->attach_flag)
 	    OOPSY ("TIOCSPGRP");
 #endif
 	}
@@ -334,6 +335,8 @@ terminal_ours_1 (int output_only)
 
   if (!terminal_is_ours)
     {
+      struct inferior *inf = current_inferior ();
+
 #ifdef SIGTTOU
       /* Ignore this signal since it will happen when we try to set the
          pgrp.  */
@@ -353,7 +356,7 @@ terminal_ours_1 (int output_only)
       inferior_ttystate = serial_get_tty_state (stdin_serial);
 
 #ifdef PROCESS_GROUP_TYPE
-      if (!attach_flag)
+      if (!inf->attach_flag)
 	/* If setpgrp failed in terminal_inferior, this would give us
 	   our process group instead of the inferior's.  See
 	   terminal_inferior for details.  */
@@ -520,6 +523,20 @@ new_tty_prefork (const char *ttyname)
   inferior_thisrun_terminal = ttyname;
 }
 
+
+/* If RESULT, assumed to be the return value from a system call, is
+   negative, print the error message indicated by errno and exit.
+   MSG should identify the operation that failed.  */
+static void
+check_syscall (const char *msg, int result)
+{
+  if (result < 0)
+    {
+      print_sys_errmsg (msg, errno);
+      _exit (1);
+    }
+}
+
 void
 new_tty (void)
 {
@@ -546,27 +563,23 @@ new_tty (void)
 
   /* Now open the specified new terminal.  */
   tty = open (inferior_thisrun_terminal, O_RDWR | O_NOCTTY);
-  if (tty == -1)
-    {
-      print_sys_errmsg (inferior_thisrun_terminal, errno);
-      _exit (1);
-    }
+  check_syscall (inferior_thisrun_terminal, tty);
 
   /* Avoid use of dup2; doesn't exist on all systems.  */
   if (tty != 0)
     {
       close (0);
-      dup (tty);
+      check_syscall ("dup'ing tty into fd 0", dup (tty));
     }
   if (tty != 1)
     {
       close (1);
-      dup (tty);
+      check_syscall ("dup'ing tty into fd 1", dup (tty));
     }
   if (tty != 2)
     {
       close (2);
-      dup (tty);
+      check_syscall ("dup'ing tty into fd 2", dup (tty));
     }
 
 #ifdef TIOCSCTTY
@@ -598,14 +611,19 @@ kill_command (char *arg, int from_tty)
     error (_("Not confirmed."));
   target_kill ();
 
-  init_thread_list ();		/* Destroy thread info */
-
-  /* Killing off the inferior can leave us with a core file.  If so,
-     print the state we are left in.  */
-  if (target_has_stack)
+  /* If the current target interface claims there's still execution,
+     then don't mess with threads of other processes.  */
+  if (!target_has_execution)
     {
-      printf_filtered (_("In %s,\n"), target_longname);
-      print_stack_frame (get_selected_frame (NULL), 1, SRC_AND_LOC);
+      init_thread_list ();		/* Destroy thread info */
+
+      /* Killing off the inferior can leave us with a core file.  If
+	 so, print the state we are left in.  */
+      if (target_has_stack)
+	{
+	  printf_filtered (_("In %s,\n"), target_longname);
+	  print_stack_frame (get_selected_frame (NULL), 1, SRC_AND_LOC);
+	}
     }
   bfd_cache_close_all ();
 }
@@ -626,7 +644,8 @@ static void (*osig) ();
 void
 set_sigint_trap (void)
 {
-  if (attach_flag || inferior_thisrun_terminal)
+  struct inferior *inf = current_inferior ();
+  if (inf->attach_flag || inferior_thisrun_terminal)
     {
       osig = (void (*)()) signal (SIGINT, pass_signal);
     }
@@ -635,73 +654,12 @@ set_sigint_trap (void)
 void
 clear_sigint_trap (void)
 {
-  if (attach_flag || inferior_thisrun_terminal)
+  struct inferior *inf = current_inferior ();
+  if (inf->attach_flag || inferior_thisrun_terminal)
     {
       signal (SIGINT, osig);
     }
 }
-
-#if defined (SIGIO) && defined (FASYNC) && defined (FD_SET) && defined (F_SETOWN)
-static void (*old_sigio) ();
-
-static void
-handle_sigio (int signo)
-{
-  int numfds;
-  fd_set readfds;
-
-  signal (SIGIO, handle_sigio);
-
-  FD_ZERO (&readfds);
-  FD_SET (target_activity_fd, &readfds);
-  numfds = gdb_select (target_activity_fd + 1, &readfds, NULL, NULL, NULL);
-  if (numfds >= 0 && FD_ISSET (target_activity_fd, &readfds))
-    {
-#ifndef _WIN32
-      if ((*target_activity_function) ())
-	kill (PIDGET (inferior_ptid), SIGINT);
-#endif
-    }
-}
-
-static int old_fcntl_flags;
-
-void
-set_sigio_trap (void)
-{
-  if (target_activity_function)
-    {
-      old_sigio = (void (*)()) signal (SIGIO, handle_sigio);
-      fcntl (target_activity_fd, F_SETOWN, getpid ());
-      old_fcntl_flags = fcntl (target_activity_fd, F_GETFL, 0);
-      fcntl (target_activity_fd, F_SETFL, old_fcntl_flags | FASYNC);
-    }
-}
-
-void
-clear_sigio_trap (void)
-{
-  if (target_activity_function)
-    {
-      signal (SIGIO, old_sigio);
-      fcntl (target_activity_fd, F_SETFL, old_fcntl_flags);
-    }
-}
-#else /* No SIGIO.  */
-void
-set_sigio_trap (void)
-{
-  if (target_activity_function)
-    internal_error (__FILE__, __LINE__, _("failed internal consistency check"));
-}
-
-void
-clear_sigio_trap (void)
-{
-  if (target_activity_function)
-    internal_error (__FILE__, __LINE__, _("failed internal consistency check"));
-}
-#endif /* No SIGIO.  */
 
 
 /* Create a new session if the inferior will run in a different tty.

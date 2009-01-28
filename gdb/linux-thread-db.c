@@ -1,6 +1,6 @@
 /* libthread_db assisted debugging support, generic parts.
 
-   Copyright (C) 1999, 2000, 2001, 2003, 2004, 2005, 2006, 2007, 2008
+   Copyright (C) 1999, 2000, 2001, 2003, 2004, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -780,14 +780,19 @@ detach_thread (ptid_t ptid)
 }
 
 static void
-thread_db_detach (char *args, int from_tty)
+thread_db_detach (struct target_ops *ops, char *args, int from_tty)
 {
   disable_thread_event_reporting ();
 
-  target_beneath->to_detach (args, from_tty);
+  /* Forget about the child's process ID.  We shouldn't need it
+     anymore.  */
+  proc_handle.pid = 0;
 
-  /* Should this be done by detach_command?  */
-  target_mourn_inferior ();
+  /* Detach thread_db target ops.  */
+  unpush_target (&thread_db_ops);
+  using_thread_db = 0;
+
+  target_beneath->to_detach (target_beneath, args, from_tty);
 }
 
 /* Check if PID is currently stopped at the location of a thread event
@@ -888,8 +893,8 @@ thread_db_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
     return ptid;
 
   if (ourstatus->kind == TARGET_WAITKIND_EXITED
-    || ourstatus->kind == TARGET_WAITKIND_SIGNALLED)
-    return pid_to_ptid (-1);
+      || ourstatus->kind == TARGET_WAITKIND_SIGNALLED)
+    return ptid;
 
   if (ourstatus->kind == TARGET_WAITKIND_EXECD)
     {
@@ -927,20 +932,20 @@ thread_db_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
 }
 
 static void
-thread_db_mourn_inferior (void)
+thread_db_mourn_inferior (struct target_ops *ops)
 {
   /* Forget about the child's process ID.  We shouldn't need it
      anymore.  */
   proc_handle.pid = 0;
 
-  target_beneath->to_mourn_inferior ();
+  target_beneath->to_mourn_inferior (target_beneath);
 
   /* Delete the old thread event breakpoints.  Do this after mourning
      the inferior, so that we don't try to uninsert them.  */
   remove_thread_event_breakpoints ();
 
   /* Detach thread_db target ops.  */
-  unpush_target (&thread_db_ops);
+  unpush_target (ops);
   using_thread_db = 0;
 }
 
@@ -1143,6 +1148,35 @@ thread_db_get_thread_local_address (ptid_t ptid,
 	         _("TLS not supported on this target"));
 }
 
+/* Callback routine used to find a thread based on the TID part of
+   its PTID.  */
+
+static int
+thread_db_find_thread_from_tid (struct thread_info *thread, void *data)
+{
+  long *tid = (long *) data;
+
+  if (thread->private->tid == *tid)
+    return 1;
+
+  return 0;
+}
+
+/* Implement the to_get_ada_task_ptid target method for this target.  */
+
+static ptid_t
+thread_db_get_ada_task_ptid (long lwp, long thread)
+{
+  struct thread_info *thread_info;
+
+  thread_db_find_new_threads ();
+  thread_info = iterate_over_threads (thread_db_find_thread_from_tid, &thread);
+
+  gdb_assert (thread_info != NULL);
+
+  return (thread_info->ptid);
+}
+
 static void
 init_thread_db_ops (void)
 {
@@ -1163,6 +1197,7 @@ init_thread_db_ops (void)
   thread_db_ops.to_is_async_p = thread_db_is_async_p;
   thread_db_ops.to_async = thread_db_async;
   thread_db_ops.to_async_mask = thread_db_async_mask;
+  thread_db_ops.to_get_ada_task_ptid = thread_db_get_ada_task_ptid;
   thread_db_ops.to_magic = OPS_MAGIC;
 }
 

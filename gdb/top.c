@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008 Free Software Foundation, Inc.
+   2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -131,9 +131,6 @@ void (*window_hook) (FILE *, char *);
 
 int epoch_interface;
 int xgdb_verbose;
-
-/* gdb prints this when reading a command interactively */
-static char *gdb_prompt_string;	/* the global prompt string */
 
 /* Buffer used for reading command lines, and the size
    allocated for it so far.  */
@@ -285,11 +282,6 @@ void (*deprecated_set_hook) (struct cmd_list_element * c);
 /* Called when the current thread changes.  Argument is thread id.  */
 
 void (*deprecated_context_hook) (int id);
-
-/* Takes control from error ().  Typically used to prevent longjmps out of the
-   middle of the GUI.  Usually used in conjunction with a catch routine.  */
-
-void (*deprecated_error_hook) (void);
 
 /* Handler for SIGHUP.  */
 
@@ -534,8 +526,10 @@ command_loop (void)
 	}
 
       execute_command (command, instream == stdin);
-      /* Do any commands attached to breakpoint we stopped at.  */
-      bpstat_do_actions (&stop_bpstat);
+
+      /* Do any commands attached to breakpoint we are stopped at.  */
+      bpstat_do_actions ();
+
       do_cleanups (old_chain);
 
       if (display_time)
@@ -1120,7 +1114,7 @@ print_gdb_version (struct ui_file *stream)
 
   /* Second line is a copyright notice. */
 
-  fprintf_filtered (stream, "Copyright (C) 2008 Free Software Foundation, Inc.\n");
+  fprintf_filtered (stream, "Copyright (C) 2009 Free Software Foundation, Inc.\n");
 
   /* Following the copyright is a brief statement that the program is
      free software, that users are free to copy and change it on
@@ -1183,13 +1177,14 @@ quit_confirm (void)
   if (! ptid_equal (inferior_ptid, null_ptid) && target_has_execution)
     {
       char *s;
+      struct inferior *inf = current_inferior ();
 
       /* This is something of a hack.  But there's no reliable way to
          see if a GUI is running.  The `use_windows' variable doesn't
          cut it.  */
       if (deprecated_init_ui_hook)
 	s = "A debugging session is active.\nDo you still want to close the debugger?";
-      else if (attach_flag)
+      else if (inf->attach_flag)
 	s = "The program is running.  Quit anyway (and detach it)? ";
       else
 	s = "The program is running.  Quit anyway (and kill it)? ";
@@ -1201,26 +1196,57 @@ quit_confirm (void)
   return 1;
 }
 
-/* Helper routine for quit_force that requires error handling.  */
-
 struct qt_args
 {
   char *args;
   int from_tty;
 };
 
+/* Callback for iterate_over_threads.  Finds any thread of inferior
+   given by ARG (really an int*).  */
+
+static int
+any_thread_of (struct thread_info *thread, void *arg)
+{
+  int pid = * (int *)arg;
+
+  if (PIDGET (thread->ptid) == pid)
+    return 1;
+
+  return 0;
+}
+
+/* Callback for iterate_over_inferiors.  Kills or detaches the given
+   inferior, depending on how we originally gained control of it.  */
+
+static int
+kill_or_detach (struct inferior *inf, void *args)
+{
+  struct qt_args *qt = args;
+  struct thread_info *thread;
+
+  thread = iterate_over_threads (any_thread_of, &inf->pid);
+  if (thread)
+    {
+      switch_to_thread (thread->ptid);
+      if (inf->attach_flag)
+	target_detach (qt->args, qt->from_tty);
+      else
+	target_kill ();
+    }
+
+  return 0;
+}
+
+/* Helper routine for quit_force that requires error handling.  */
+
 static int
 quit_target (void *arg)
 {
   struct qt_args *qt = (struct qt_args *)arg;
 
-  if (! ptid_equal (inferior_ptid, null_ptid) && target_has_execution)
-    {
-      if (attach_flag)
-        target_detach (qt->args, qt->from_tty);
-      else
-        target_kill ();
-    }
+  /* Kill or detach all inferiors.  */
+  iterate_over_inferiors (kill_or_detach, qt);
 
   /* Give all pushed targets a chance to do minimal cleanup, and pop
      them all out.  */
@@ -1608,9 +1634,6 @@ gdb_init (char *argv0)
     pre_init_ui_hook ();
 
   /* Run the init function of each source file */
-
-  getcwd (gdb_dirbuf, sizeof (gdb_dirbuf));
-  current_directory = gdb_dirbuf;
 
 #ifdef __MSDOS__
   /* Make sure we return to the original directory upon exit, come

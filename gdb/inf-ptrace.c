@@ -1,7 +1,7 @@
 /* Low-level child interface to ptrace.
 
    Copyright (C) 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1998,
-   1999, 2000, 2001, 2002, 2004, 2005, 2006, 2007, 2008
+   1999, 2000, 2001, 2002, 2004, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -33,9 +33,8 @@
 #include <signal.h>
 
 #include "inf-child.h"
+#include "gdbthread.h"
 
-/* HACK: Save the ptrace ops returned by inf_ptrace_target.  */
-static struct target_ops *ptrace_ops_hack;
 
 
 #ifdef PT_GET_PROCESS_STATE
@@ -45,6 +44,7 @@ inf_ptrace_follow_fork (struct target_ops *ops, int follow_child)
 {
   pid_t pid, fpid;
   ptrace_state_t pe;
+  struct thread_info *last_tp = NULL;
 
   /* FIXME: kettenis/20050720: This stuff should really be passed as
      an argument by our caller.  */
@@ -56,6 +56,7 @@ inf_ptrace_follow_fork (struct target_ops *ops, int follow_child)
     gdb_assert (status.kind == TARGET_WAITKIND_FORKED);
 
     pid = ptid_get_pid (ptid);
+    last_tp = find_thread_pid (ptid);
   }
 
   if (ptrace (PT_GET_PROCESS_STATE, pid,
@@ -67,14 +68,44 @@ inf_ptrace_follow_fork (struct target_ops *ops, int follow_child)
 
   if (follow_child)
     {
-      inferior_ptid = pid_to_ptid (fpid);
-      detach_breakpoints (pid);
+      /* Copy user stepping state to the new inferior thread.  */
+      struct breakpoint *step_resume_breakpoint = last_tp->step_resume_breakpoint;
+      CORE_ADDR step_range_start = last_tp->step_range_start;
+      CORE_ADDR step_range_end = last_tp->step_range_end;
+      struct frame_id step_frame_id = last_tp->step_frame_id;
+      int attach_flag = find_inferior_pid (pid)->attach_flag;
+      struct inferior *inf;
+      struct thread_info *tp;
 
-      /* Reset breakpoints in the child as appropriate.  */
-      follow_inferior_reset_breakpoints ();
+      /* Otherwise, deleting the parent would get rid of this
+	 breakpoint.  */
+      last_tp->step_resume_breakpoint = NULL;
+
+      /* Before detaching from the parent, remove all breakpoints from
+	 it.  */
+      remove_breakpoints ();
 
       if (ptrace (PT_DETACH, pid, (PTRACE_TYPE_ARG3)1, 0) == -1)
 	perror_with_name (("ptrace"));
+
+      /* Switch inferior_ptid out of the parent's way.  */
+      inferior_ptid = pid_to_ptid (fpid);
+
+      /* Delete the parent.  */
+      detach_inferior (pid);
+
+      /* Add the child.  */
+      inf = add_inferior (fpid);
+      inf->attach_flag = attach_flag;
+      tp = add_thread_silent (inferior_ptid);
+
+      tp->step_resume_breakpoint = step_resume_breakpoint;
+      tp->step_range_start = step_range_start;
+      tp->step_range_end = step_range_end;
+      tp->step_frame_id = step_frame_id;
+
+      /* Reset breakpoints in the child as appropriate.  */
+      follow_inferior_reset_breakpoints ();
     }
   else
     {
@@ -83,6 +114,7 @@ inf_ptrace_follow_fork (struct target_ops *ops, int follow_child)
 
       if (ptrace (PT_DETACH, fpid, (PTRACE_TYPE_ARG3)1, 0) == -1)
 	perror_with_name (("ptrace"));
+      detach_inferior (pid);
     }
 
   return 0;
@@ -100,12 +132,22 @@ inf_ptrace_me (void)
   ptrace (PT_TRACE_ME, 0, (PTRACE_TYPE_ARG3)0, 0);
 }
 
-/* Start tracing PID.  */
+/* Start a new inferior Unix child process.  EXEC_FILE is the file to
+   run, ALLARGS is a string containing the arguments to the program.
+   ENV is the environment vector to pass.  If FROM_TTY is non-zero, be
+   chatty about it.  */
 
 static void
-inf_ptrace_him (int pid)
+inf_ptrace_create_inferior (struct target_ops *ops,
+			    char *exec_file, char *allargs, char **env,
+			    int from_tty)
 {
-  push_target (ptrace_ops_hack);
+  int pid;
+
+  pid = fork_inferior (exec_file, allargs, env, inf_ptrace_me, NULL,
+		       NULL, NULL);
+
+  push_target (ops);
 
   /* On some targets, there must be some explicit synchronization
      between the parent and child processes after the debugger
@@ -122,19 +164,6 @@ inf_ptrace_him (int pid)
   /* On some targets, there must be some explicit actions taken after
      the inferior has been started up.  */
   target_post_startup_inferior (pid_to_ptid (pid));
-}
-
-/* Start a new inferior Unix child process.  EXEC_FILE is the file to
-   run, ALLARGS is a string containing the arguments to the program.
-   ENV is the environment vector to pass.  If FROM_TTY is non-zero, be
-   chatty about it.  */
-
-static void
-inf_ptrace_create_inferior (char *exec_file, char *allargs, char **env,
-			    int from_tty)
-{
-  fork_inferior (exec_file, allargs, env, inf_ptrace_me, inf_ptrace_him,
-		 NULL, NULL);
 }
 
 #ifdef PT_GET_PROCESS_STATE
@@ -157,7 +186,7 @@ inf_ptrace_post_startup_inferior (ptid_t pid)
 /* Clean up a rotting corpse of an inferior after it died.  */
 
 static void
-inf_ptrace_mourn_inferior (void)
+inf_ptrace_mourn_inferior (struct target_ops *ops)
 {
   int status;
 
@@ -167,7 +196,7 @@ inf_ptrace_mourn_inferior (void)
      only report its exit status to its original parent.  */
   waitpid (ptid_get_pid (inferior_ptid), &status, 0);
 
-  unpush_target (ptrace_ops_hack);
+  unpush_target (ops);
   generic_mourn_inferior ();
 }
 
@@ -175,11 +204,12 @@ inf_ptrace_mourn_inferior (void)
    be chatty about it.  */
 
 static void
-inf_ptrace_attach (char *args, int from_tty)
+inf_ptrace_attach (struct target_ops *ops, char *args, int from_tty)
 {
   char *exec_file;
   pid_t pid;
   char *dummy;
+  struct inferior *inf;
 
   if (!args)
     error_no_arg (_("process-id to attach"));
@@ -212,13 +242,20 @@ inf_ptrace_attach (char *args, int from_tty)
   ptrace (PT_ATTACH, pid, (PTRACE_TYPE_ARG3)0, 0);
   if (errno != 0)
     perror_with_name (("ptrace"));
-  attach_flag = 1;
 #else
   error (_("This system does not support attaching to a process"));
 #endif
 
   inferior_ptid = pid_to_ptid (pid);
-  push_target (ptrace_ops_hack);
+
+  inf = add_inferior (pid);
+  inf->attach_flag = 1;
+
+  /* Always add a main thread.  If some target extends the ptrace
+     target, it should decorate the ptid later with more info.  */
+  add_thread_silent (inferior_ptid);
+
+  push_target(ops);
 }
 
 #ifdef PT_GET_PROCESS_STATE
@@ -242,7 +279,7 @@ inf_ptrace_post_attach (int pid)
    specified by ARGS.  If FROM_TTY is non-zero, be chatty about it.  */
 
 static void
-inf_ptrace_detach (char *args, int from_tty)
+inf_ptrace_detach (struct target_ops *ops, char *args, int from_tty)
 {
   pid_t pid = ptid_get_pid (inferior_ptid);
   int sig = 0;
@@ -268,13 +305,15 @@ inf_ptrace_detach (char *args, int from_tty)
   ptrace (PT_DETACH, pid, (PTRACE_TYPE_ARG3)1, sig);
   if (errno != 0)
     perror_with_name (("ptrace"));
-  attach_flag = 0;
 #else
   error (_("This system does not support detaching from a process"));
 #endif
 
   inferior_ptid = null_ptid;
-  unpush_target (ptrace_ops_hack);
+  detach_inferior (pid);
+
+  if (!have_inferiors ())
+    unpush_target (ops);
 }
 
 /* Kill the inferior.  */
@@ -354,7 +393,6 @@ inf_ptrace_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
   do
     {
       set_sigint_trap ();
-      set_sigio_trap ();
 
       do
 	{
@@ -363,7 +401,6 @@ inf_ptrace_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
 	}
       while (pid == -1 && errno == EINTR);
 
-      clear_sigio_trap ();
       clear_sigint_trap ();
 
       if (pid == -1)
@@ -375,7 +412,7 @@ inf_ptrace_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
 	  /* Claim it exited with unknown signal.  */
 	  ourstatus->kind = TARGET_WAITKIND_SIGNALLED;
 	  ourstatus->value.sig = TARGET_SIGNAL_UNKNOWN;
-	  return minus_one_ptid;
+	  return inferior_ptid;
 	}
 
       /* Ignore terminated detached child processes.  */
@@ -571,8 +608,10 @@ inf_ptrace_thread_alive (ptid_t ptid)
 static void
 inf_ptrace_files_info (struct target_ops *ignore)
 {
+  struct inferior *inf = current_inferior ();
+
   printf_filtered (_("\tUsing the running image of %s %s.\n"),
-		   attach_flag ? "attached" : "child",
+		   inf->attach_flag ? "attached" : "child",
 		   target_pid_to_str (inferior_ptid));
 }
 
@@ -602,7 +641,6 @@ inf_ptrace_target (void)
   t->to_stop = inf_ptrace_stop;
   t->to_xfer_partial = inf_ptrace_xfer_partial;
 
-  ptrace_ops_hack = t;
   return t;
 }
 

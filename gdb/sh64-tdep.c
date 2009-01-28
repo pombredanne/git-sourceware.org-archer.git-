@@ -1,7 +1,7 @@
 /* Target-dependent code for Renesas Super-H, for GDB.
 
    Copyright (C) 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
-   2003, 2004, 2005, 2007, 2008 Free Software Foundation, Inc.
+   2003, 2004, 2005, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -40,6 +40,7 @@
 #include "arch-utils.h"
 #include "regcache.h"
 #include "osabi.h"
+#include "valprint.h"
 
 #include "elf-bfd.h"
 
@@ -211,7 +212,7 @@ sh64_register_name (struct gdbarch *gdbarch, int reg_nr)
    MSYMBOL_IS_SPECIAL   tests the "special" bit in a minimal symbol  */
 
 #define MSYMBOL_IS_SPECIAL(msym) \
-  (((long) MSYMBOL_INFO (msym) & 0x80000000) != 0)
+  MSYMBOL_TARGET_FLAG_1 (msym)
 
 static void
 sh64_elf_make_msymbol_special (asymbol *sym, struct minimal_symbol *msym)
@@ -221,7 +222,7 @@ sh64_elf_make_msymbol_special (asymbol *sym, struct minimal_symbol *msym)
 
   if (((elf_symbol_type *)(sym))->internal_elf_sym.st_other == STO_SH5_ISA32)
     {
-      MSYMBOL_INFO (msym) = (char *) (((long) MSYMBOL_INFO (msym)) | 0x80000000);
+      MSYMBOL_TARGET_FLAG_1 (msym) = 1;
       SYMBOL_VALUE_ADDRESS (msym) |= 1;
     }
 }
@@ -674,14 +675,6 @@ static int
 sh64_use_struct_convention (struct type *type)
 {
   return (TYPE_LENGTH (type) > 8);
-}
-
-/* Disassemble an instruction.  */
-static int
-gdb_print_insn_sh64 (bfd_vma memaddr, disassemble_info *info)
-{
-  info->endian = gdbarch_byte_order (current_gdbarch);
-  return print_insn_sh (memaddr, info);
 }
 
 /* For vectors of 4 floating point registers.  */
@@ -1503,12 +1496,12 @@ REGISTER_BYTE returns the register byte for the base register.
 */
 
 static struct type *
-sh64_build_float_register_type (int high)
+sh64_build_float_register_type (struct gdbarch *gdbarch, int high)
 {
   struct type *temp;
 
-  temp = create_range_type (NULL, builtin_type_int, 0, high);
-  return create_array_type (NULL, builtin_type_float, temp);
+  temp = create_range_type (NULL, builtin_type_int32, 0, high);
+  return create_array_type (NULL, builtin_type (gdbarch)->builtin_float, temp);
 }
 
 /* Return the GDB type object for the "standard" data type
@@ -1520,27 +1513,27 @@ sh64_register_type (struct gdbarch *gdbarch, int reg_nr)
        && reg_nr <= FP_LAST_REGNUM)
       || (reg_nr >= FP0_C_REGNUM
 	  && reg_nr <= FP_LAST_C_REGNUM))
-    return builtin_type_float;
+    return builtin_type (gdbarch)->builtin_float;
   else if ((reg_nr >= DR0_REGNUM 
 	    && reg_nr <= DR_LAST_REGNUM)
 	   || (reg_nr >= DR0_C_REGNUM 
 	       && reg_nr <= DR_LAST_C_REGNUM))
-    return builtin_type_double;
+    return builtin_type (gdbarch)->builtin_double;
   else if  (reg_nr >= FPP0_REGNUM 
 	    && reg_nr <= FPP_LAST_REGNUM)
-    return sh64_build_float_register_type (1);
+    return sh64_build_float_register_type (gdbarch, 1);
   else if ((reg_nr >= FV0_REGNUM
 	    && reg_nr <= FV_LAST_REGNUM)
 	   ||(reg_nr >= FV0_C_REGNUM 
 	      && reg_nr <= FV_LAST_C_REGNUM))
-    return sh64_build_float_register_type (3);
+    return sh64_build_float_register_type (gdbarch, 3);
   else if (reg_nr == FPSCR_REGNUM)
-    return builtin_type_int;
+    return builtin_type (gdbarch)->builtin_int;
   else if (reg_nr >= R0_C_REGNUM
 	   && reg_nr < FP0_C_REGNUM)
-    return builtin_type_int;
+    return builtin_type (gdbarch)->builtin_int;
   else
-    return builtin_type_long_long;
+    return builtin_type (gdbarch)->builtin_long_long;
 }
 
 static void
@@ -1997,7 +1990,7 @@ sh64_do_fp_register (struct gdbarch *gdbarch, struct ui_file *file,
 	   regnum, gdbarch_register_name (gdbarch, regnum));
 
   /* Get the register as a number */ 
-  flt = unpack_double (builtin_type_float, raw_buffer, &inv);
+  flt = unpack_double (builtin_type (gdbarch)->builtin_float, raw_buffer, &inv);
 
   /* Print the name and some spaces.  */
   fputs_filtered (gdbarch_register_name (gdbarch, regnum), file);
@@ -2100,6 +2093,7 @@ sh64_do_register (struct gdbarch *gdbarch, struct ui_file *file,
 		  struct frame_info *frame, int regnum)
 {
   unsigned char raw_buffer[MAX_REGISTER_SIZE];
+  struct value_print_options opts;
 
   fputs_filtered (gdbarch_register_name (gdbarch, regnum), file);
   print_spaces_filtered (15 - strlen (gdbarch_register_name
@@ -2108,12 +2102,16 @@ sh64_do_register (struct gdbarch *gdbarch, struct ui_file *file,
   /* Get the data in raw format.  */
   if (!frame_register_read (frame, regnum, raw_buffer))
     fprintf_filtered (file, "*value not available*\n");
-      
+
+  get_formatted_print_options (&opts, 'x');
+  opts.deref_ref = 1;
   val_print (register_type (gdbarch, regnum), raw_buffer, 0, 0,
-	     file, 'x', 1, 0, Val_pretty_default, current_language);
+	     file, 0, &opts, current_language);
   fprintf_filtered (file, "\t");
+  get_formatted_print_options (&opts, 0);
+  opts.deref_ref = 1;
   val_print (register_type (gdbarch, regnum), raw_buffer, 0, 0,
-	     file, 0, 1, 0, Val_pretty_default, current_language);
+	     file, 0, &opts, current_language);
   fprintf_filtered (file, "\n");
 }
 
@@ -2471,7 +2469,7 @@ sh64_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
 
   set_gdbarch_breakpoint_from_pc (gdbarch, sh64_breakpoint_from_pc);
 
-  set_gdbarch_print_insn (gdbarch, gdb_print_insn_sh64);
+  set_gdbarch_print_insn (gdbarch, print_insn_sh);
   set_gdbarch_register_sim_regno (gdbarch, legacy_register_sim_regno);
 
   set_gdbarch_return_value (gdbarch, sh64_return_value);

@@ -1,6 +1,6 @@
 /* Dump-to-file commands, for GDB, the GNU debugger.
 
-   Copyright (c) 2002, 2005, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (c) 2002, 2005, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    Contributed by Red Hat.
 
@@ -66,19 +66,6 @@ scan_expression_with_cleanup (char **cmd, const char *def)
     }
 }
 
-
-static void
-do_fclose_cleanup (void *arg)
-{
-  FILE *file = arg;
-  fclose (arg);
-}
-
-static struct cleanup *
-make_cleanup_fclose (FILE *file)
-{
-  return make_cleanup (do_fclose_cleanup, file);
-}
 
 char *
 scan_filename_with_cleanup (char **cmd, const char *defname)

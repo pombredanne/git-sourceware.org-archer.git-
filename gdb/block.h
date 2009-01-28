@@ -1,6 +1,6 @@
 /* Code dealing with blocks for GDB.
 
-   Copyright (C) 2003, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2003, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -138,13 +138,14 @@ extern int contained_in (const struct block *, const struct block *);
 
 extern struct blockvector *blockvector_for_pc (CORE_ADDR, struct block **);
 
-extern struct blockvector *blockvector_for_pc_sect (CORE_ADDR, asection *,
+extern struct blockvector *blockvector_for_pc_sect (CORE_ADDR, 
+						    struct obj_section *,
 						    struct block **,
                                                     struct symtab *);
 
 extern struct block *block_for_pc (CORE_ADDR);
 
-extern struct block *block_for_pc_sect (CORE_ADDR, asection *);
+extern struct block *block_for_pc_sect (CORE_ADDR, struct obj_section *);
 
 extern const char *block_scope (const struct block *block);
 

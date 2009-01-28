@@ -1,6 +1,6 @@
 /* int.c --- M32C interrupt handling.
 
-Copyright (C) 2005, 2007, 2008 Free Software Foundation, Inc.
+Copyright (C) 2005, 2007, 2008, 2009 Free Software Foundation, Inc.
 Contributed by Red Hat, Inc.
 
 This file is part of the GNU simulators.
@@ -72,4 +72,5 @@ trigger_peripheral_interrupt (int vector, int icaddr)
   int addr = get_reg (intb) + vector * 4;
   trigger_interrupt (addr, 1);
   put_reg (flags, (get_reg (flags) & 0x8fff) | ((old_ic & 7) << 12));
+  mem_put_qi (icaddr, old_ic & ~ 0x08);
 }

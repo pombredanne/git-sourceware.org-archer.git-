@@ -1,7 +1,7 @@
 /* C language support definitions for GDB, the GNU debugger.
 
    Copyright (C) 1992, 1994, 1995, 1996, 1997, 1998, 2000, 2002, 2005, 2006,
-   2007, 2008 Free Software Foundation, Inc.
+   2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -37,12 +37,14 @@ extern void c_error (char *);	/* Defined in c-exp.y */
 extern void c_print_type (struct type *, char *, struct ui_file *, int,
 			  int);
 
-extern int c_val_print (struct type *, const gdb_byte *, int, CORE_ADDR,
-			struct ui_file *, int, int, int,
-			enum val_prettyprint);
+extern void c_print_typedef (struct type *, struct symbol *, struct ui_file *);
 
-extern int c_value_print (struct value *, struct ui_file *, int,
-			  enum val_prettyprint);
+extern int c_val_print (struct type *, const gdb_byte *, int, CORE_ADDR,
+			struct ui_file *, int,
+			const struct value_print_options *);
+
+extern int c_value_print (struct value *, struct ui_file *,
+			  const struct value_print_options *);
 
 /* These are in c-lang.c: */
 
@@ -50,14 +52,8 @@ extern void c_printchar (int, struct ui_file *);
 
 extern void c_printstr (struct ui_file * stream, const gdb_byte *string,
 			unsigned int length, int width,
-			int force_ellipses);
-
-extern void scan_macro_expansion (char *expansion);
-extern int scanning_macro_expansion (void);
-extern void finished_macro_expansion (void);
-
-extern macro_lookup_ftype *expression_macro_lookup_func;
-extern void *expression_macro_lookup_baton;
+			int force_ellipses,
+			const struct value_print_options *options);
 
 extern void c_language_arch_info (struct gdbarch *gdbarch,
 				  struct language_arch_info *lai);
@@ -68,17 +64,13 @@ extern void c_type_print_base (struct type *, struct ui_file *, int, int);
 
 /* These are in cp-valprint.c */
 
-extern int vtblprint;		/* Controls printing of vtbl's */
-
-extern int static_field_print;
-
 extern void cp_print_class_member (const gdb_byte *, struct type *,
 				   struct ui_file *, char *);
 
 extern void cp_print_value_fields (struct type *, struct type *,
 				   const gdb_byte *, int, CORE_ADDR,
 				   struct ui_file *, int,
-				   int, enum val_prettyprint,
+				   const struct value_print_options *,
 				   struct type **, int);
 
 extern int cp_is_vtbl_ptr_type (struct type *);

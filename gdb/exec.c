@@ -1,7 +1,7 @@
 /* Work with executable files, for GDB. 
 
    Copyright (C) 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997,
-   1998, 1999, 2000, 2001, 2002, 2003, 2007, 2008
+   1998, 1999, 2000, 2001, 2002, 2003, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -194,6 +194,7 @@ exec_file_attach (char *filename, int from_tty)
     }
   else
     {
+      struct cleanup *cleanups;
       char *scratch_pathname;
       int scratch_chan;
 
@@ -217,15 +218,18 @@ exec_file_attach (char *filename, int from_tty)
 			    scratch_chan);
 
       if (!exec_bfd)
-	error (_("\"%s\": could not open as an executable file: %s"),
-	       scratch_pathname, bfd_errmsg (bfd_get_error ()));
+	{
+	  close (scratch_chan);
+	  error (_("\"%s\": could not open as an executable file: %s"),
+		 scratch_pathname, bfd_errmsg (bfd_get_error ()));
+	}
 
       /* At this point, scratch_pathname and exec_bfd->name both point to the
          same malloc'd string.  However exec_close() will attempt to free it
          via the exec_bfd->name pointer, so we need to make another copy and
          leave exec_bfd as the new owner of the original copy. */
       scratch_pathname = xstrdup (scratch_pathname);
-      make_cleanup (xfree, scratch_pathname);
+      cleanups = make_cleanup (xfree, scratch_pathname);
 
       if (!bfd_check_format (exec_bfd, bfd_object))
 	{
@@ -273,6 +277,8 @@ exec_file_attach (char *filename, int from_tty)
       /* Tell display code (if any) about the changed file name.  */
       if (deprecated_exec_file_display_hook)
 	(*deprecated_exec_file_display_hook) (filename);
+
+      do_cleanups (cleanups);
     }
   bfd_cache_close_all ();
   observer_notify_executable_changed ();
@@ -299,14 +305,13 @@ exec_file_command (char *args, int from_tty)
 
   if (args)
     {
+      struct cleanup *cleanups;
+
       /* Scan through the args and pick up the first non option arg
          as the filename.  */
 
-      argv = buildargv (args);
-      if (argv == NULL)
-        nomem (0);
-
-      make_cleanup_freeargv (argv);
+      argv = gdb_buildargv (args);
+      cleanups = make_cleanup_freeargv (argv);
 
       for (; (*argv != NULL) && (**argv == '-'); argv++)
         {;
@@ -317,6 +322,8 @@ exec_file_command (char *args, int from_tty)
       filename = tilde_expand (*argv);
       make_cleanup (xfree, filename);
       exec_file_attach (filename, from_tty);
+
+      do_cleanups (cleanups);
     }
   else
     exec_file_attach (NULL, from_tty);
@@ -466,7 +473,7 @@ xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int write,
   int res;
   struct section_table *p;
   CORE_ADDR nextsectaddr, memend;
-  asection *section = NULL;
+  struct obj_section *section = NULL;
 
   if (len <= 0)
     internal_error (__FILE__, __LINE__, _("failed internal consistency check"));
@@ -483,8 +490,9 @@ xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int write,
 
   for (p = target->to_sections; p < target->to_sections_end; p++)
     {
-      if (overlay_debugging && section && 
-	  strcmp (section->name, p->the_bfd_section->name) != 0)
+      if (overlay_debugging && section
+	  && strcmp (section->the_bfd_section->name,
+		     p->the_bfd_section->name) != 0)
 	continue;		/* not the section we need */
       if (memaddr >= p->addr)
         {

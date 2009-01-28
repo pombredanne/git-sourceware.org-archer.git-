@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008 Free Software Foundation, Inc.
+   2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -32,6 +32,7 @@ struct symbol;
 struct type;
 struct ui_file;
 struct language_defn;
+struct value_print_options;
 
 /* The structure which defines the type of a value.  It should never
    be possible for a program lval value to survive over a call to the
@@ -40,9 +41,15 @@ struct language_defn;
 
 struct value;
 
+/* Needed if another module needs to maintain its own list of values.  */
+
+void value_prepend_to_list (struct value **head, struct value *val);
+void value_remove_from_list (struct value **head, struct value *val);
+
 /* Values are stored in a chain, so that they can be deleted easily
-   over calls to the inferior.  Values assigned to internal variables
-   or put into the value history are taken off this list.  */
+   over calls to the inferior.  Values assigned to internal variables,
+   put into the value history or exposed to Python are taken off this
+   list.  */
 
 struct value *value_next (struct value *);
 
@@ -198,6 +205,11 @@ extern void set_value_optimized_out (struct value *value, int val);
 extern int value_initialized (struct value *);
 extern void set_value_initialized (struct value *, int);
 
+/* Set COMPONENT's location as appropriate for a component of WHOLE
+   --- regardless of what kind of lvalue WHOLE is.  */
+extern void set_value_component_location (struct value *component,
+                                          struct value *whole);
+
 /* While the following fields are per- VALUE .CONTENT .PIECE (i.e., a
    single value might have multiple LVALs), this hacked interface is
    limited to just the first PIECE.  Expect further change.  */
@@ -230,17 +242,11 @@ extern short *deprecated_value_regnum_hack (struct value *);
 extern struct value *coerce_ref (struct value *value);
 
 /* If ARG is an array, convert it to a pointer.
-   If ARG is an enum, convert it to an integer.
    If ARG is a function, convert it to a function pointer.
 
    References are dereferenced.  */
 
 extern struct value *coerce_array (struct value *value);
-extern struct value *coerce_number (struct value *value);
-
-/* If ARG is an enum, convert it to an integer.  */
-
-extern struct value *coerce_enum (struct value *value);
 
 /* Internal variables (variables for convenience of use of debugger)
    are recorded as a chain of these structures.  */
@@ -288,6 +294,10 @@ extern struct value *value_from_string (char *string);
 extern struct value *value_at (struct type *type, CORE_ADDR addr);
 extern struct value *value_at_lazy (struct type *type, CORE_ADDR addr);
 
+extern struct value *value_from_contents_and_address (struct type *,
+						      const gdb_byte *,
+						      CORE_ADDR);
+
 extern struct value *default_value_from_register (struct type *type,
 						  int regnum,
 						  struct frame_info *frame);
@@ -300,6 +310,8 @@ extern CORE_ADDR address_from_register (struct type *type, int regnum,
 
 extern struct value *value_of_variable (struct symbol *var, struct block *b);
 
+extern struct value *address_of_variable (struct symbol *var, struct block *b);
+
 extern struct value *value_of_register (int regnum, struct frame_info *frame);
 
 struct value *value_of_register_lazy (struct frame_info *frame, int regnum);
@@ -309,10 +321,9 @@ extern int symbol_read_needs_frame (struct symbol *);
 extern struct value *read_var_value (struct symbol *var,
 				     struct frame_info *frame);
 
-extern struct value *locate_var_value (struct symbol *var,
-				       struct frame_info *frame);
-
 extern struct value *allocate_value (struct type *type);
+extern struct value *allocate_value_lazy (struct type *type);
+extern void allocate_value_contents (struct value *value);
 
 extern struct value *allocate_repeat_value (struct type *type, int count);
 
@@ -331,9 +342,11 @@ extern struct value *value_concat (struct value *arg1, struct value *arg2);
 extern struct value *value_binop (struct value *arg1, struct value *arg2,
 				  enum exp_opcode op);
 
-extern struct value *value_add (struct value *arg1, struct value *arg2);
+extern struct value *value_ptradd (struct value *arg1, struct value *arg2);
 
-extern struct value *value_sub (struct value *arg1, struct value *arg2);
+extern struct value *value_ptrsub (struct value *arg1, struct value *arg2);
+
+extern LONGEST value_ptrdiff (struct value *arg1, struct value *arg2);
 
 extern int value_must_coerce_to_target (struct value *arg1);
 
@@ -405,10 +418,14 @@ extern struct value *value_repeat (struct value *arg1, int count);
 
 extern struct value *value_subscript (struct value *array, struct value *idx);
 
+extern struct value *value_bitstring_subscript (struct type *type,
+						struct value *bitstring,
+						struct value *idx);
+
 extern struct value *register_value_being_returned (struct type *valtype,
 						    struct regcache *retbuf);
 
-extern struct value *value_in (struct value *element, struct value *set);
+extern int value_in (struct value *element, struct value *set);
 
 extern int value_bit_index (struct type *type, const gdb_byte *addr,
 			    int index);
@@ -439,6 +456,14 @@ extern CORE_ADDR parse_and_eval_address (char *exp);
 extern CORE_ADDR parse_and_eval_address_1 (char **expptr);
 
 extern LONGEST parse_and_eval_long (char *exp);
+
+extern void unop_promote (const struct language_defn *language,
+			  struct gdbarch *gdbarch,
+			  struct value **arg1);
+
+extern void binop_promote (const struct language_defn *language,
+			   struct gdbarch *gdbarch,
+			   struct value **arg1, struct value **arg2);
 
 extern struct value *access_value_history (int num);
 
@@ -485,7 +510,7 @@ extern int unop_user_defined_p (enum exp_opcode op, struct value *arg1);
 
 extern int destructor_name_p (const char *name, const struct type *type);
 
-#define value_free(val) xfree (val)
+extern void value_free (struct value *val);
 
 extern void free_all_values (void);
 
@@ -512,8 +537,8 @@ extern void print_floating (const gdb_byte *valaddr, struct type *type,
 extern void print_decimal_floating (const gdb_byte *valaddr, struct type *type,
 				    struct ui_file *stream);
 
-extern int value_print (struct value *val, struct ui_file *stream, int format,
-			enum val_prettyprint pretty);
+extern int value_print (struct value *val, struct ui_file *stream,
+			const struct value_print_options *options);
 
 extern void value_print_array_elements (struct value *val,
 					struct ui_file *stream, int format,
@@ -523,23 +548,24 @@ extern struct value *value_release_to_mark (struct value *mark);
 
 extern int val_print (struct type *type, const gdb_byte *valaddr,
 		      int embedded_offset, CORE_ADDR address,
-		      struct ui_file *stream, int format,
-		      int deref_ref, int recurse,
-		      enum val_prettyprint pretty,
+		      struct ui_file *stream, int recurse,
+		      const struct value_print_options *options,
 		      const struct language_defn *language);
 
 extern int common_val_print (struct value *val,
-			     struct ui_file *stream, int format,
-			     int deref_ref, int recurse,
-			     enum val_prettyprint pretty,
+			     struct ui_file *stream, int recurse,
+			     const struct value_print_options *options,
 			     const struct language_defn *language);
 
 extern int val_print_string (CORE_ADDR addr, int len, int width,
-			     struct ui_file *stream);
+			     struct ui_file *stream,
+			     const struct value_print_options *options);
 
-extern void print_variable_value (struct symbol *var,
-				  struct frame_info *frame,
-				  struct ui_file *stream);
+extern void print_variable_and_value (const char *name,
+				      struct symbol *var,
+				      struct frame_info *frame,
+				      struct ui_file *stream,
+				      int indent);
 
 extern int check_field (struct type *, const char *);
 
@@ -563,7 +589,8 @@ extern struct value *value_slice (struct value *, int, int);
 extern struct value *value_literal_complex (struct value *, struct value *,
 					    struct type *);
 
-extern struct value *find_function_in_inferior (const char *);
+extern struct value *find_function_in_inferior (const char *,
+						struct objfile **);
 
 extern struct value *value_allocate_space_in_inferior (int);
 

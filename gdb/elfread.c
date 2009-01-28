@@ -1,7 +1,7 @@
 /* Read ELF (Executable and Linking Format) object files for GDB.
 
    Copyright (C) 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000,
-   2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
+   2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    Written by Fred Fish at Cygnus Support.
@@ -172,7 +172,7 @@ record_minimal_symbol (char *name, CORE_ADDR address,
     address = gdbarch_smash_text_address (gdbarch, address);
 
   return prim_record_minimal_symbol_and_info
-    (name, address, ms_type, NULL, bfd_section->index, bfd_section, objfile);
+    (name, address, ms_type, bfd_section->index, bfd_section, objfile);
 }
 
 /*

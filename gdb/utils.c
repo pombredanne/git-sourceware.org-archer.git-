@@ -1,8 +1,8 @@
 /* General utility routines for GDB, the GNU debugger.
 
    Copyright (C) 1986, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
-   Free Software Foundation, Inc.
+   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008,
+   2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -25,6 +25,7 @@
 #include "gdb_string.h"
 #include "event-top.h"
 #include "exceptions.h"
+#include "gdbthread.h"
 
 #ifdef TUI
 #include "tui/tui.h"		/* For tui_get_command_dimension.   */
@@ -104,13 +105,6 @@ static int debug_timestamp = 0;
 
 static struct cleanup *cleanup_chain;	/* cleaned up after a failed command */
 static struct cleanup *final_cleanup_chain;	/* cleaned up when gdb exits */
-
-/* Pointer to what is left to do for an execution command after the
-   target stops. Used only in asynchronous mode, by targets that
-   support async execution.  The finish and until commands use it. So
-   does the target extended-remote command. */
-struct continuation *cmd_continuation;
-struct continuation *intermediate_continuation;
 
 /* Nonzero if we have job control. */
 
@@ -250,7 +244,6 @@ do_close_cleanup (void *arg)
 {
   int *fd = arg;
   close (*fd);
-  xfree (fd);
 }
 
 struct cleanup *
@@ -258,7 +251,24 @@ make_cleanup_close (int fd)
 {
   int *saved_fd = xmalloc (sizeof (fd));
   *saved_fd = fd;
-  return make_cleanup (do_close_cleanup, saved_fd);
+  return make_cleanup_dtor (do_close_cleanup, saved_fd, xfree);
+}
+
+/* Helper function which does the work for make_cleanup_fclose.  */
+
+static void
+do_fclose_cleanup (void *arg)
+{
+  FILE *file = arg;
+  fclose (arg);
+}
+
+/* Return a new cleanup that closes FILE.  */
+
+struct cleanup *
+make_cleanup_fclose (FILE *file)
+{
+  return make_cleanup (do_fclose_cleanup, file);
 }
 
 static void
@@ -477,14 +487,14 @@ struct continuation
   struct cleanup base;
 };
 
-/* Add a continuation to the continuation list, the global list
-   cmd_continuation. The new continuation will be added at the
-   front.  */
+/* Add a continuation to the continuation list of THREAD.  The new
+   continuation will be added at the front.  */
 void
-add_continuation (void (*continuation_hook) (void *), void *args,
+add_continuation (struct thread_info *thread,
+		  void (*continuation_hook) (void *), void *args,
 		  void (*continuation_free_args) (void *))
 {
-  struct cleanup *as_cleanup = &cmd_continuation->base;
+  struct cleanup *as_cleanup = &thread->continuations->base;
   make_cleanup_ftype *continuation_hook_fn = continuation_hook;
 
   make_my_cleanup2 (&as_cleanup,
@@ -492,53 +502,175 @@ add_continuation (void (*continuation_hook) (void *), void *args,
 		    args,
 		    continuation_free_args);
 
-  cmd_continuation = (struct continuation *) as_cleanup;
+  thread->continuations = (struct continuation *) as_cleanup;
 }
 
-/* Walk down the cmd_continuation list, and execute all the
-   continuations. There is a problem though. In some cases new
-   continuations may be added while we are in the middle of this
-   loop. If this happens they will be added in the front, and done
-   before we have a chance of exhausting those that were already
-   there. We need to then save the beginning of the list in a pointer
-   and do the continuations from there on, instead of using the
-   global beginning of list as our iteration pointer.  */
+/* Add a continuation to the continuation list of INFERIOR.  The new
+   continuation will be added at the front.  */
+
 void
-do_all_continuations (void)
+add_inferior_continuation (void (*continuation_hook) (void *), void *args,
+			   void (*continuation_free_args) (void *))
 {
-  struct cleanup *continuation_ptr;
+  struct inferior *inf = current_inferior ();
+  struct cleanup *as_cleanup = &inf->continuations->base;
+  make_cleanup_ftype *continuation_hook_fn = continuation_hook;
+
+  make_my_cleanup2 (&as_cleanup,
+		    continuation_hook_fn,
+		    args,
+		    continuation_free_args);
+
+  inf->continuations = (struct continuation *) as_cleanup;
+}
+
+/* Do all continuations of the current inferior.  */
+
+void
+do_all_inferior_continuations (void)
+{
+  struct cleanup *old_chain;
+  struct cleanup *as_cleanup;
+  struct inferior *inf = current_inferior ();
+
+  if (inf->continuations == NULL)
+    return;
 
   /* Copy the list header into another pointer, and set the global
      list header to null, so that the global list can change as a side
      effect of invoking the continuations and the processing of the
      preexisting continuations will not be affected.  */
 
-  continuation_ptr = &cmd_continuation->base;
-  cmd_continuation = NULL;
+  as_cleanup = &inf->continuations->base;
+  inf->continuations = NULL;
 
   /* Work now on the list we have set aside.  */
-  do_my_cleanups (&continuation_ptr, NULL);
+  do_my_cleanups (&as_cleanup, NULL);
 }
 
-/* Walk down the cmd_continuation list, and get rid of all the
-   continuations. */
+/* Get rid of all the inferior-wide continuations of INF.  */
+
+void
+discard_all_inferior_continuations (struct inferior *inf)
+{
+  struct cleanup *continuation_ptr = &inf->continuations->base;
+  discard_my_cleanups (&continuation_ptr, NULL);
+  inf->continuations = NULL;
+}
+
+static void
+restore_thread_cleanup (void *arg)
+{
+  ptid_t *ptid_p = arg;
+  switch_to_thread (*ptid_p);
+}
+
+/* Walk down the continuation list of PTID, and execute all the
+   continuations.  There is a problem though.  In some cases new
+   continuations may be added while we are in the middle of this loop.
+   If this happens they will be added in the front, and done before we
+   have a chance of exhausting those that were already there.  We need
+   to then save the beginning of the list in a pointer and do the
+   continuations from there on, instead of using the global beginning
+   of list as our iteration pointer.  */
+static void
+do_all_continuations_ptid (ptid_t ptid,
+			   struct continuation **continuations_p)
+{
+  struct cleanup *old_chain;
+  ptid_t current_thread;
+  struct cleanup *as_cleanup;
+
+  if (*continuations_p == NULL)
+    return;
+
+  current_thread = inferior_ptid;
+
+  /* Restore selected thread on exit.  Don't try to restore the frame
+     as well, because:
+
+    - When running continuations, the selected frame is always #0.
+
+    - The continuations may trigger symbol file loads, which may
+      change the frame layout (frame ids change), which would trigger
+      a warning if we used make_cleanup_restore_current_thread.  */
+
+  old_chain = make_cleanup (restore_thread_cleanup, &current_thread);
+
+  /* Let the continuation see this thread as selected.  */
+  switch_to_thread (ptid);
+
+  /* Copy the list header into another pointer, and set the global
+     list header to null, so that the global list can change as a side
+     effect of invoking the continuations and the processing of the
+     preexisting continuations will not be affected.  */
+
+  as_cleanup = &(*continuations_p)->base;
+  *continuations_p = NULL;
+
+  /* Work now on the list we have set aside.  */
+  do_my_cleanups (&as_cleanup, NULL);
+
+  do_cleanups (old_chain);
+}
+
+/* Callback for iterate over threads.  */
+static int
+do_all_continuations_thread_callback (struct thread_info *thread, void *data)
+{
+  do_all_continuations_ptid (thread->ptid, &thread->continuations);
+  return 0;
+}
+
+/* Do all continuations of thread THREAD.  */
+void
+do_all_continuations_thread (struct thread_info *thread)
+{
+  do_all_continuations_thread_callback (thread, NULL);
+}
+
+/* Do all continuations of all threads.  */
+void
+do_all_continuations (void)
+{
+  iterate_over_threads (do_all_continuations_thread_callback, NULL);
+}
+
+/* Callback for iterate over threads.  */
+static int
+discard_all_continuations_thread_callback (struct thread_info *thread,
+					   void *data)
+{
+  struct cleanup *continuation_ptr = &thread->continuations->base;
+  discard_my_cleanups (&continuation_ptr, NULL);
+  thread->continuations = NULL;
+  return 0;
+}
+
+/* Get rid of all the continuations of THREAD.  */
+void
+discard_all_continuations_thread (struct thread_info *thread)
+{
+  discard_all_continuations_thread_callback (thread, NULL);
+}
+
+/* Get rid of all the continuations of all threads.  */
 void
 discard_all_continuations (void)
 {
-  struct cleanup *continuation_ptr = &cmd_continuation->base;
-  discard_my_cleanups (&continuation_ptr, NULL);
-  cmd_continuation = NULL;
+  iterate_over_threads (discard_all_continuations_thread_callback, NULL);
 }
 
-/* Add a continuation to the continuation list, the global list
-   intermediate_continuation.  The new continuation will be added at
-   the front.  */
+
+/* Add a continuation to the intermediate continuation list of THREAD.
+   The new continuation will be added at the front.  */
 void
-add_intermediate_continuation (void (*continuation_hook)
+add_intermediate_continuation (struct thread_info *thread,
+			       void (*continuation_hook)
 			       (void *), void *args,
 			       void (*continuation_free_args) (void *))
 {
-  struct cleanup *as_cleanup = &intermediate_continuation->base;
+  struct cleanup *as_cleanup = &thread->intermediate_continuations->base;
   make_cleanup_ftype *continuation_hook_fn = continuation_hook;
 
   make_my_cleanup2 (&as_cleanup,
@@ -546,7 +678,7 @@ add_intermediate_continuation (void (*continuation_hook)
 		    args,
 		    continuation_free_args);
 
-  intermediate_continuation = (struct continuation *) as_cleanup;
+  thread->intermediate_continuations = (struct continuation *) as_cleanup;
 }
 
 /* Walk down the cmd_continuation list, and execute all the
@@ -557,31 +689,52 @@ add_intermediate_continuation (void (*continuation_hook)
    there. We need to then save the beginning of the list in a pointer
    and do the continuations from there on, instead of using the
    global beginning of list as our iteration pointer.*/
+static int
+do_all_intermediate_continuations_thread_callback (struct thread_info *thread,
+						   void *data)
+{
+  do_all_continuations_ptid (thread->ptid,
+			     &thread->intermediate_continuations);
+  return 0;
+}
+
+/* Do all intermediate continuations of thread THREAD.  */
+void
+do_all_intermediate_continuations_thread (struct thread_info *thread)
+{
+  do_all_intermediate_continuations_thread_callback (thread, NULL);
+}
+
+/* Do all intermediate continuations of all threads.  */
 void
 do_all_intermediate_continuations (void)
 {
-  struct cleanup *continuation_ptr;
-
-  /* Copy the list header into another pointer, and set the global
-     list header to null, so that the global list can change as a side
-     effect of invoking the continuations and the processing of the
-     preexisting continuations will not be affected.  */
-
-  continuation_ptr = &intermediate_continuation->base;
-  intermediate_continuation = NULL;
-
-  /* Work now on the list we have set aside.  */
-  do_my_cleanups (&continuation_ptr, NULL);
+  iterate_over_threads (do_all_intermediate_continuations_thread_callback, NULL);
 }
 
-/* Walk down the cmd_continuation list, and get rid of all the
-   continuations. */
+/* Callback for iterate over threads.  */
+static int
+discard_all_intermediate_continuations_thread_callback (struct thread_info *thread,
+							void *data)
+{
+  struct cleanup *continuation_ptr = &thread->intermediate_continuations->base;
+  discard_my_cleanups (&continuation_ptr, NULL);
+  thread->intermediate_continuations = NULL;
+  return 0;
+}
+
+/* Get rid of all the intermediate continuations of THREAD.  */
+void
+discard_all_intermediate_continuations_thread (struct thread_info *thread)
+{
+  discard_all_intermediate_continuations_thread_callback (thread, NULL);
+}
+
+/* Get rid of all the intermediate continuations of all threads.  */
 void
 discard_all_intermediate_continuations (void)
 {
-  struct cleanup *continuation_ptr = &intermediate_continuation->base;
-  discard_my_cleanups (&continuation_ptr, NULL);
-  continuation_ptr = NULL;
+  iterate_over_threads (discard_all_intermediate_continuations_thread_callback, NULL);
 }
 
 
@@ -672,6 +825,21 @@ error_stream (struct ui_file *stream)
   error (("%s"), message);
 }
 
+/* Allow the user to configure the debugger behavior with respect to
+   what to do when an internal problem is detected.  */
+
+const char internal_problem_ask[] = "ask";
+const char internal_problem_yes[] = "yes";
+const char internal_problem_no[] = "no";
+static const char *internal_problem_modes[] =
+{
+  internal_problem_ask,
+  internal_problem_yes,
+  internal_problem_no,
+  NULL
+};
+static const char *internal_problem_mode = internal_problem_ask;
+
 /* Print a message reporting an internal error/warning. Ask the user
    if they want to continue, dump core, or just exit.  Return
    something to indicate a quit.  */
@@ -679,10 +847,8 @@ error_stream (struct ui_file *stream)
 struct internal_problem
 {
   const char *name;
-  /* FIXME: cagney/2002-08-15: There should be ``maint set/show''
-     commands available for controlling these variables.  */
-  enum auto_boolean should_quit;
-  enum auto_boolean should_dump_core;
+  const char *should_quit;
+  const char *should_dump_core;
 };
 
 /* Report a problem, internal to GDB, to the user.  Once the problem
@@ -709,10 +875,16 @@ internal_vproblem (struct internal_problem *problem,
       case 1:
 	dejavu = 2;
 	fputs_unfiltered (msg, gdb_stderr);
-	abort ();	/* NOTE: GDB has only three calls to abort().  */
+	abort ();	/* NOTE: GDB has only four calls to abort().  */
       default:
 	dejavu = 3;
-	write (STDERR_FILENO, msg, sizeof (msg));
+        /* Newer GLIBC versions put the warn_unused_result attribute
+           on write, but this is one of those rare cases where
+           ignoring the return value is correct.  Casting to (void)
+           does not fix this problem.  This is the solution suggested
+           at http://gcc.gnu.org/bugzilla/show_bug.cgi?id=25509.  */
+	if (write (STDERR_FILENO, msg, sizeof (msg)) != sizeof (msg))
+          abort (); /* NOTE: GDB has only four calls to abort().  */
 	exit (1);
       }
   }
@@ -737,47 +909,38 @@ further debugging may prove unreliable.", file, line, problem->name, msg);
     make_cleanup (xfree, reason);
   }
 
-  switch (problem->should_quit)
+  if (problem->should_quit == internal_problem_ask)
     {
-    case AUTO_BOOLEAN_AUTO:
       /* Default (yes/batch case) is to quit GDB.  When in batch mode
-         this lessens the likelhood of GDB going into an infinate
-         loop.  */
+	 this lessens the likelihood of GDB going into an infinite
+	 loop.  */
       quit_p = query (_("%s\nQuit this debugging session? "), reason);
-      break;
-    case AUTO_BOOLEAN_TRUE:
-      quit_p = 1;
-      break;
-    case AUTO_BOOLEAN_FALSE:
-      quit_p = 0;
-      break;
-    default:
-      internal_error (__FILE__, __LINE__, _("bad switch"));
     }
+  else if (problem->should_quit == internal_problem_yes)
+    quit_p = 1;
+  else if (problem->should_quit == internal_problem_no)
+    quit_p = 0;
+  else
+    internal_error (__FILE__, __LINE__, _("bad switch"));
 
-  switch (problem->should_dump_core)
+  if (problem->should_dump_core == internal_problem_ask)
     {
-    case AUTO_BOOLEAN_AUTO:
       /* Default (yes/batch case) is to dump core.  This leaves a GDB
          `dropping' so that it is easier to see that something went
          wrong in GDB.  */
       dump_core_p = query (_("%s\nCreate a core file of GDB? "), reason);
-      break;
-      break;
-    case AUTO_BOOLEAN_TRUE:
-      dump_core_p = 1;
-      break;
-    case AUTO_BOOLEAN_FALSE:
-      dump_core_p = 0;
-      break;
-    default:
-      internal_error (__FILE__, __LINE__, _("bad switch"));
     }
+  else if (problem->should_dump_core == internal_problem_yes)
+    dump_core_p = 1;
+  else if (problem->should_dump_core == internal_problem_no)
+    dump_core_p = 0;
+  else
+    internal_error (__FILE__, __LINE__, _("bad switch"));
 
   if (quit_p)
     {
       if (dump_core_p)
-	abort ();		/* NOTE: GDB has only three calls to abort().  */
+	abort ();		/* NOTE: GDB has only four calls to abort().  */
       else
 	exit (1);
     }
@@ -787,7 +950,7 @@ further debugging may prove unreliable.", file, line, problem->name, msg);
 	{
 #ifdef HAVE_WORKING_FORK
 	  if (fork () == 0)
-	    abort ();		/* NOTE: GDB has only three calls to abort().  */
+	    abort ();		/* NOTE: GDB has only four calls to abort().  */
 #endif
 	}
     }
@@ -796,7 +959,7 @@ further debugging may prove unreliable.", file, line, problem->name, msg);
 }
 
 static struct internal_problem internal_error_problem = {
-  "internal-error", AUTO_BOOLEAN_AUTO, AUTO_BOOLEAN_AUTO
+  "internal-error", internal_problem_ask, internal_problem_ask
 };
 
 NORETURN void
@@ -816,7 +979,7 @@ internal_error (const char *file, int line, const char *string, ...)
 }
 
 static struct internal_problem internal_warning_problem = {
-  "internal-warning", AUTO_BOOLEAN_AUTO, AUTO_BOOLEAN_AUTO
+  "internal-warning", internal_problem_ask, internal_problem_ask
 };
 
 void
@@ -832,6 +995,99 @@ internal_warning (const char *file, int line, const char *string, ...)
   va_start (ap, string);
   internal_vwarning (file, line, string, ap);
   va_end (ap);
+}
+
+/* Dummy functions to keep add_prefix_cmd happy.  */
+
+static void
+set_internal_problem_cmd (char *args, int from_tty)
+{
+}
+
+static void
+show_internal_problem_cmd (char *args, int from_tty)
+{
+}
+
+/* When GDB reports an internal problem (error or warning) it gives
+   the user the opportunity to quit GDB and/or create a core file of
+   the current debug session.  This function registers a few commands
+   that make it possible to specify that GDB should always or never
+   quit or create a core file, without asking.  The commands look
+   like:
+
+   maint set PROBLEM-NAME quit ask|yes|no
+   maint show PROBLEM-NAME quit
+   maint set PROBLEM-NAME corefile ask|yes|no
+   maint show PROBLEM-NAME corefile
+
+   Where PROBLEM-NAME is currently "internal-error" or
+   "internal-warning".  */
+
+static void
+add_internal_problem_command (struct internal_problem *problem)
+{
+  struct cmd_list_element **set_cmd_list;
+  struct cmd_list_element **show_cmd_list;
+  char *set_doc;
+  char *show_doc;
+
+  set_cmd_list = xmalloc (sizeof (*set_cmd_list));
+  show_cmd_list = xmalloc (sizeof (*set_cmd_list));
+  *set_cmd_list = NULL;
+  *show_cmd_list = NULL;
+
+  set_doc = xstrprintf (_("Configure what GDB does when %s is detected."),
+			problem->name);
+
+  show_doc = xstrprintf (_("Show what GDB does when %s is detected."),
+			 problem->name);
+
+  add_prefix_cmd ((char*) problem->name,
+		  class_maintenance, set_internal_problem_cmd, set_doc,
+		  set_cmd_list,
+		  concat ("maintenance set ", problem->name, " ", NULL),
+		  0/*allow-unknown*/, &maintenance_set_cmdlist);
+
+  add_prefix_cmd ((char*) problem->name,
+		  class_maintenance, show_internal_problem_cmd, show_doc,
+		  show_cmd_list,
+		  concat ("maintenance show ", problem->name, " ", NULL),
+		  0/*allow-unknown*/, &maintenance_show_cmdlist);
+
+  set_doc = xstrprintf (_("\
+Set whether GDB should quit when an %s is detected"),
+			problem->name);
+  show_doc = xstrprintf (_("\
+Show whether GDB will quit when an %s is detected"),
+			 problem->name);
+  add_setshow_enum_cmd ("quit", class_maintenance,
+			internal_problem_modes,
+			&problem->should_quit,
+			set_doc,
+			show_doc,
+			NULL, /* help_doc */
+			NULL, /* setfunc */
+			NULL, /* showfunc */
+			set_cmd_list,
+			show_cmd_list);
+
+  set_doc = xstrprintf (_("\
+Set whether GDB should create a core file of GDB when %s is detected"),
+			problem->name);
+  show_doc = xstrprintf (_("\
+Show whether GDB will create a core file of GDB when %s is detected"),
+			 problem->name);
+  add_setshow_enum_cmd ("corefile", class_maintenance,
+			internal_problem_modes,
+			&problem->should_dump_core,
+			set_doc,
+			show_doc,
+			NULL, /* help_doc */
+			NULL, /* setfunc */
+			NULL, /* showfunc */
+			set_cmd_list,
+			show_cmd_list);
 }
 
 /* Print the system error message for errno, and also mention STRING
@@ -1102,12 +1358,7 @@ print_spaces (int n, struct ui_file *file)
 void
 gdb_print_host_address (const void *addr, struct ui_file *stream)
 {
-
-  /* We could use the %p conversion specifier to fprintf if we had any
-     way of knowing whether this host supports it.  But the following
-     should work on the Alpha and on 32 bit machines.  */
-
-  fprintf_filtered (stream, "0x%lx", (unsigned long) addr);
+  fprintf_filtered (stream, "%s", host_address_to_string (addr));
 }
 
 
@@ -2133,13 +2384,22 @@ vfprintf_unfiltered (struct ui_file *stream, const char *format, va_list args)
     {
       struct timeval tm;
       char *timestamp;
+      int len, need_nl;
 
       gettimeofday (&tm, NULL);
-      timestamp = xstrprintf ("%ld:%ld ", (long) tm.tv_sec, (long) tm.tv_usec);
+
+      len = strlen (linebuffer);
+      need_nl = (len > 0 && linebuffer[len - 1] != '\n');
+
+      timestamp = xstrprintf ("%ld:%ld %s%s",
+			      (long) tm.tv_sec, (long) tm.tv_usec,
+			      linebuffer,
+			      need_nl ? "\n": "");
       make_cleanup (xfree, timestamp);
       fputs_unfiltered (timestamp, stream);
     }
-  fputs_unfiltered (linebuffer, stream);
+  else
+    fputs_unfiltered (linebuffer, stream);
   do_cleanups (old_cleanups);
 }
 
@@ -2676,18 +2936,18 @@ octal2str (ULONGEST addr, int width)
 }
 
 char *
-paddr_u (CORE_ADDR addr)
+pulongest (ULONGEST u)
 {
-  return decimal2str ("", addr, 0);
+  return decimal2str ("", u, 0);
 }
 
 char *
-paddr_d (LONGEST addr)
+plongest (LONGEST l)
 {
-  if (addr < 0)
-    return decimal2str ("-", -addr, 0);
+  if (l < 0)
+    return decimal2str ("-", -l, 0);
   else
-    return decimal2str ("", addr, 0);
+    return decimal2str ("", l, 0);
 }
 
 /* Eliminate warning from compiler on 32-bit systems.  */
@@ -2907,7 +3167,8 @@ const char *
 host_address_to_string (const void *addr)
 {
   char *str = get_cell ();
-  sprintf (str, "0x%lx", (unsigned long) addr);
+
+  xsnprintf (str, CELLSIZE, "0x%s", phex_nz ((uintptr_t) addr, sizeof (addr)));
   return str;
 }
 
@@ -3264,4 +3525,25 @@ ldirname (const char *filename)
 
   dirname[base - filename] = '\0';
   return dirname;
+}
+
+/* Call libiberty's buildargv, and return the result.
+   If buildargv fails due to out-of-memory, call nomem.
+   Therefore, the returned value is guaranteed to be non-NULL,
+   unless the parameter itself is NULL.  */
+
+char **
+gdb_buildargv (const char *s)
+{
+  char **argv = buildargv (s);
+  if (s != NULL && argv == NULL)
+    nomem (0);
+  return argv;
+}
+
+void
+_initialize_utils (void)
+{
+  add_internal_problem_command (&internal_error_problem);
+  add_internal_problem_command (&internal_warning_problem);
 }

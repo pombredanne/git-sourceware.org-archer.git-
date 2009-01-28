@@ -1,6 +1,6 @@
 /* Target-dependent code for Morpho mt processor, for GDB.
 
-   Copyright (C) 2005, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2005, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -37,6 +37,7 @@
 #include "infcall.h"
 #include "gdb_assert.h"
 #include "language.h"
+#include "valprint.h"
 
 enum mt_arch_constants
 {
@@ -226,9 +227,9 @@ mt_copro_register_type (struct gdbarch *arch, int regnum)
     case MT_MAC_REGNUM:
       return builtin_type_uint32;
     case MT_CONTEXT_REGNUM:
-      return builtin_type_long_long;
+      return builtin_type (arch)->builtin_long_long;
     case MT_FLAG_REGNUM:
-      return builtin_type_unsigned_char;
+      return builtin_type (arch)->builtin_unsigned_char;
     default:
       if (regnum >= MT_CPR0_REGNUM && regnum <= MT_CPR15_REGNUM)
 	return builtin_type_int16;
@@ -251,20 +252,14 @@ mt_copro_register_type (struct gdbarch *arch, int regnum)
 static struct type *
 mt_register_type (struct gdbarch *arch, int regnum)
 {
-  static struct type *void_func_ptr = NULL;
-  static struct type *void_ptr = NULL;
-  static struct type *copro_type;
+  static struct type *copro_type = NULL;
 
   if (regnum >= 0 && regnum < MT_NUM_REGS + MT_NUM_PSEUDO_REGS)
     {
-      if (void_func_ptr == NULL)
+      if (copro_type == NULL)
 	{
 	  struct type *temp;
-
-	  void_ptr = lookup_pointer_type (builtin_type_void);
-	  void_func_ptr =
-	    lookup_pointer_type (lookup_function_type (builtin_type_void));
-	  temp = create_range_type (NULL, builtin_type_unsigned_int, 0, 1);
+	  temp = create_range_type (NULL, builtin_type_int32, 0, 1);
 	  copro_type = create_array_type (NULL, builtin_type_int16, temp);
 	}
       switch (regnum)
@@ -272,10 +267,10 @@ mt_register_type (struct gdbarch *arch, int regnum)
 	case MT_PC_REGNUM:
 	case MT_RA_REGNUM:
 	case MT_IRA_REGNUM:
-	  return void_func_ptr;
+	  return builtin_type (arch)->builtin_func_ptr;
 	case MT_SP_REGNUM:
 	case MT_FP_REGNUM:
-	  return void_ptr;
+	  return builtin_type (arch)->builtin_data_ptr;
 	case MT_COPRO_REGNUM:
 	case MT_COPRO_PSEUDOREG_REGNUM:
 	  return copro_type;
@@ -681,6 +676,7 @@ mt_registers_info (struct gdbarch *gdbarch,
 	{
 	  /* Special output handling for the 'coprocessor' register.  */
 	  gdb_byte *buf;
+	  struct value_print_options opts;
 
 	  buf = alloca (register_size (gdbarch, MT_COPRO_REGNUM));
 	  frame_register_read (frame, MT_COPRO_REGNUM, buf);
@@ -691,8 +687,10 @@ mt_registers_info (struct gdbarch *gdbarch,
 	  print_spaces_filtered (15 - strlen (gdbarch_register_name
 					        (gdbarch, regnum)),
 				 file);
+	  get_raw_print_options (&opts);
+	  opts.deref_ref = 1;
 	  val_print (register_type (gdbarch, regnum), buf,
-		     0, 0, file, 0, 1, 0, Val_no_prettyprint,
+		     0, 0, file, 0, &opts,
 		     current_language);
 	  fputs_filtered ("\n", file);
 	}

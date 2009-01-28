@@ -1,8 +1,8 @@
 /* Low level packing and unpacking of values for GDB, the GNU Debugger.
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2002, 2003, 2004, 2005, 2006, 2007, 2008
-   Free Software Foundation, Inc.
+   1996, 1997, 1998, 1999, 2000, 2002, 2003, 2004, 2005, 2006, 2007, 2008,
+   2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -36,6 +36,9 @@
 #include "block.h"
 #include "dfp.h"
 #include "objfiles.h"
+#include "valprint.h"
+
+#include "python/python.h"
 
 /* Prototypes for exported functions. */
 
@@ -130,8 +133,8 @@ struct value
 
   /* Values are stored in a chain, so that they can be deleted easily
      over calls to the inferior.  Values assigned to internal
-     variables or put into the value history are taken off this
-     list.  */
+     variables, put into the value history or exposed to Python are
+     taken off this list.  */
   struct value *next;
 
   /* Register number if the value is from a register.  */
@@ -160,21 +163,9 @@ struct value
   /* If value is a variable, is it initialized or not.  */
   int initialized;
 
-  /* Actual contents of the value.  For use of this value; setting it
-     uses the stuff above.  Not valid if lazy is nonzero.  Target
-     byte-order.  We force it to be aligned properly for any possible
-     value.  Note that a value therefore extends beyond what is
-     declared here.  */
-  union
-  {
-    gdb_byte contents[1];
-    DOUBLEST force_doublest_align;
-    LONGEST force_longest_align;
-    CORE_ADDR force_core_addr_align;
-    void *force_pointer_align;
-  } aligner;
-  /* Do not add any new members here -- contents above will trash
-     them.  */
+  /* Actual contents of the value.  Target byte-order.  NULL or not
+     valid if lazy is nonzero.  */
+  gdb_byte *contents;
 };
 
 /* Prototypes for local functions. */
@@ -210,15 +201,18 @@ static int value_history_count;	/* Abs number of last entry stored */
 
 static struct value *all_values;
 
-/* Allocate a  value  that has the correct length for type TYPE.  */
+/* Allocate a lazy value for type TYPE.  Its actual content is
+   "lazily" allocated too: the content field of the return value is
+   NULL; it will be allocated when it is fetched from the target.  */
 
 struct value *
-allocate_value (struct type *type)
+allocate_value_lazy (struct type *type)
 {
   struct value *val;
   struct type *atype = check_typedef (type);
 
-  val = (struct value *) xzalloc (sizeof (struct value) + TYPE_LENGTH (atype));
+  val = (struct value *) xzalloc (sizeof (struct value));
+  val->contents = NULL;
   val->next = all_values;
   all_values = val;
   val->type = type;
@@ -230,12 +224,32 @@ allocate_value (struct type *type)
   val->bitpos = 0;
   val->bitsize = 0;
   VALUE_REGNUM (val) = -1;
-  val->lazy = 0;
+  val->lazy = 1;
   val->optimized_out = 0;
   val->embedded_offset = 0;
   val->pointed_to_offset = 0;
   val->modifiable = 1;
   val->initialized = 1;  /* Default to initialized.  */
+  return val;
+}
+
+/* Allocate the contents of VAL if it has not been allocated yet.  */
+
+void
+allocate_value_contents (struct value *val)
+{
+  if (!val->contents)
+    val->contents = (gdb_byte *) xzalloc (TYPE_LENGTH (val->enclosing_type));
+}
+
+/* Allocate a  value  and its contents for type TYPE.  */
+
+struct value *
+allocate_value (struct type *type)
+{
+  struct value *val = allocate_value_lazy (type);
+  allocate_value_contents (val);
+  val->lazy = 0;
   return val;
 }
 
@@ -249,12 +263,37 @@ allocate_repeat_value (struct type *type, int count)
   /* FIXME-type-allocation: need a way to free this type when we are
      done with it.  */
   struct type *range_type
-  = create_range_type ((struct type *) NULL, builtin_type_int,
+  = create_range_type ((struct type *) NULL, builtin_type_int32,
 		       low_bound, count + low_bound - 1);
   /* FIXME-type-allocation: need a way to free this type when we are
      done with it.  */
   return allocate_value (create_array_type ((struct type *) NULL,
 					    type, range_type));
+}
+
+/* Needed if another module needs to maintain its on list of values.  */
+void
+value_prepend_to_list (struct value **head, struct value *val)
+{
+  val->next = *head;
+  *head = val;
+}
+
+/* Needed if another module needs to maintain its on list of values.  */
+void
+value_remove_from_list (struct value **head, struct value *val)
+{
+  struct value *prev;
+
+  if (*head == val)
+    *head = (*head)->next;
+  else
+    for (prev = *head; prev->next; prev = prev->next)
+      if (prev->next == val)
+      {
+	prev->next = val->next;
+	break;
+      }
 }
 
 /* Accessor methods.  */
@@ -312,13 +351,15 @@ set_value_bitsize (struct value *value, int bit)
 gdb_byte *
 value_contents_raw (struct value *value)
 {
-  return value->aligner.contents + value->embedded_offset;
+  allocate_value_contents (value);
+  return value->contents + value->embedded_offset;
 }
 
 gdb_byte *
 value_contents_all_raw (struct value *value)
 {
-  return value->aligner.contents;
+  allocate_value_contents (value);
+  return value->contents;
 }
 
 struct type *
@@ -332,7 +373,7 @@ value_contents_all (struct value *value)
 {
   if (value->lazy)
     value_fetch_lazy (value);
-  return value->aligner.contents;
+  return value->contents;
 }
 
 int
@@ -467,6 +508,14 @@ value_mark (void)
   return all_values;
 }
 
+void
+value_free (struct value *val)
+{
+  if (val)
+    xfree (val->contents);
+  xfree (val);
+}
+
 /* Free all values allocated since MARK was obtained by value_mark
    (except for those released).  */
 void
@@ -551,7 +600,12 @@ struct value *
 value_copy (struct value *arg)
 {
   struct type *encl_type = value_enclosing_type (arg);
-  struct value *val = allocate_value (encl_type);
+  struct value *val;
+
+  if (value_lazy (arg))
+    val = allocate_value_lazy (encl_type);
+  else
+    val = allocate_value (encl_type);
   val->type = arg->type;
   VALUE_LVAL (val) = VALUE_LVAL (arg);
   val->location = arg->location;
@@ -573,6 +627,17 @@ value_copy (struct value *arg)
     }
   return val;
 }
+
+void
+set_value_component_location (struct value *component, struct value *whole)
+{
+  if (VALUE_LVAL (whole) == lval_internalvar)
+    VALUE_LVAL (component) = lval_internalvar_component;
+  else
+    VALUE_LVAL (component) = VALUE_LVAL (whole);
+  component->location = whole->location;
+}
+
 
 /* Access to the value history.  */
 
@@ -681,9 +746,11 @@ show_values (char *num_exp, int from_tty)
 
   for (i = num; i < num + 10 && i <= value_history_count; i++)
     {
+      struct value_print_options opts;
       val = access_value_history (i);
       printf_filtered (("$%d = "), i);
-      value_print (val, gdb_stdout, 0, Val_pretty_default);
+      get_user_print_options (&opts);
+      value_print (val, gdb_stdout, &opts);
       printf_filtered (("\n"));
     }
 
@@ -875,7 +942,7 @@ set_internalvar (struct internalvar *var, struct value *val)
      something in the value chain (i.e., before release_value is
      called), because after the error free_all_values will get called before
      long.  */
-  xfree (var->value);
+  value_free (var->value);
   var->value = newval;
   var->endian = gdbarch_byte_order (current_gdbarch);
   release_value (newval);
@@ -916,6 +983,7 @@ preserve_values (struct objfile *objfile)
   htab_t copied_types;
   struct value_history_chunk *cur;
   struct internalvar *var;
+  struct value *val;
   int i;
 
   /* Create the hash table.  We allocate on the objfile's obstack, since
@@ -930,6 +998,9 @@ preserve_values (struct objfile *objfile)
   for (var = internalvars; var; var = var->next)
     preserve_one_value (var->value, objfile, copied_types);
 
+  for (val = values_in_python; val; val = val->next)
+    preserve_one_value (val, objfile, copied_types);
+
   htab_delete (copied_types);
 }
 
@@ -938,7 +1009,9 @@ show_convenience (char *ignore, int from_tty)
 {
   struct internalvar *var;
   int varseen = 0;
+  struct value_print_options opts;
 
+  get_user_print_options (&opts);
   for (var = internalvars; var; var = var->next)
     {
       if (!varseen)
@@ -947,7 +1020,7 @@ show_convenience (char *ignore, int from_tty)
 	}
       printf_filtered (("$%s = "), var->name);
       value_print (value_of_internalvar (var), gdb_stdout,
-		   0, Val_pretty_default);
+		   &opts);
       printf_filtered (("\n"));
     }
   if (!varseen)
@@ -1236,7 +1309,7 @@ value_static_field (struct type *type, int fieldno)
 {
   struct value *retval;
 
-  if (TYPE_FIELD_STATIC_HAS_ADDR (type, fieldno))
+  if (TYPE_FIELD_LOC_KIND (type, fieldno) == FIELD_LOC_KIND_PHYSADDR)
     {
       retval = value_at (TYPE_FIELD_TYPE (type, fieldno),
 			 TYPE_FIELD_STATIC_PHYSADDR (type, fieldno));
@@ -1283,39 +1356,12 @@ value_static_field (struct type *type, int fieldno)
 struct value *
 value_change_enclosing_type (struct value *val, struct type *new_encl_type)
 {
-  if (TYPE_LENGTH (new_encl_type) <= TYPE_LENGTH (value_enclosing_type (val))) 
-    {
-      val->enclosing_type = new_encl_type;
-      return val;
-    }
-  else
-    {
-      struct value *new_val;
-      struct value *prev;
-      
-      new_val = (struct value *) xrealloc (val, sizeof (struct value) + TYPE_LENGTH (new_encl_type));
+  if (TYPE_LENGTH (new_encl_type) > TYPE_LENGTH (value_enclosing_type (val))) 
+    val->contents =
+      (gdb_byte *) xrealloc (val->contents, TYPE_LENGTH (new_encl_type));
 
-      new_val->enclosing_type = new_encl_type;
- 
-      /* We have to make sure this ends up in the same place in the value
-	 chain as the original copy, so it's clean-up behavior is the same. 
-	 If the value has been released, this is a waste of time, but there
-	 is no way to tell that in advance, so... */
-      
-      if (val != all_values) 
-	{
-	  for (prev = all_values; prev != NULL; prev = prev->next)
-	    {
-	      if (prev->next == val) 
-		{
-		  prev->next = new_val;
-		  break;
-		}
-	    }
-	}
-      
-      return new_val;
-    }
+  val->enclosing_type = new_encl_type;
+  return val;
 }
 
 /* Given a value ARG1 (offset by OFFSET bytes)
@@ -1352,18 +1398,20 @@ value_primitive_field (struct value *arg1, int offset,
       /* This field is actually a base subobject, so preserve the
          entire object's contents for later references to virtual
          bases, etc.  */
-      v = allocate_value (value_enclosing_type (arg1));
-      v->type = type;
 
       /* Lazy register values with offsets are not supported.  */
       if (VALUE_LVAL (arg1) == lval_register && value_lazy (arg1))
 	value_fetch_lazy (arg1);
 
       if (value_lazy (arg1))
-	set_value_lazy (v, 1);
+	v = allocate_value_lazy (value_enclosing_type (arg1));
       else
-	memcpy (value_contents_all_raw (v), value_contents_all_raw (arg1),
-		TYPE_LENGTH (value_enclosing_type (arg1)));
+	{
+	  v = allocate_value (value_enclosing_type (arg1));
+	  memcpy (value_contents_all_raw (v), value_contents_all_raw (arg1),
+		  TYPE_LENGTH (value_enclosing_type (arg1)));
+	}
+      v->type = type;
       v->offset = value_offset (arg1);
       v->embedded_offset = (offset + value_embedded_offset (arg1)
 			    + TYPE_FIELD_BITPOS (arg_type, fieldno) / 8);
@@ -1372,25 +1420,24 @@ value_primitive_field (struct value *arg1, int offset,
     {
       /* Plain old data member */
       offset += TYPE_FIELD_BITPOS (arg_type, fieldno) / 8;
-      v = allocate_value (type);
 
       /* Lazy register values with offsets are not supported.  */
       if (VALUE_LVAL (arg1) == lval_register && value_lazy (arg1))
 	value_fetch_lazy (arg1);
 
       if (value_lazy (arg1))
-	set_value_lazy (v, 1);
+	v = allocate_value_lazy (type);
       else
-	memcpy (value_contents_raw (v),
-		value_contents_raw (arg1) + offset,
-		TYPE_LENGTH (type));
+	{
+	  v = allocate_value (type);
+	  memcpy (value_contents_raw (v),
+		  value_contents_raw (arg1) + offset,
+		  TYPE_LENGTH (type));
+	}
       v->offset = (value_offset (arg1) + offset
 		   + value_embedded_offset (arg1));
     }
-  VALUE_LVAL (v) = VALUE_LVAL (arg1);
-  if (VALUE_LVAL (arg1) == lval_internalvar)
-    VALUE_LVAL (v) = lval_internalvar_component;
-  v->location = arg1->location;
+  set_value_component_location (v, arg1);
   VALUE_REGNUM (v) = VALUE_REGNUM (arg1);
   VALUE_FRAME_ID (v) = VALUE_FRAME_ID (arg1);
   return v;
@@ -1638,7 +1685,7 @@ value_from_string (char *ptr)
   struct type *stringtype;
 
   rangetype = create_range_type ((struct type *) NULL,
-				 builtin_type_int,
+				 builtin_type_int32,
 				 lowbound, len + lowbound - 1);
   string_char_type = language_string_char_type (current_language,
 						current_gdbarch);
@@ -1648,6 +1695,26 @@ value_from_string (char *ptr)
   val = allocate_value (stringtype);
   memcpy (value_contents_raw (val), ptr, len);
   return val;
+}
+
+/* Create a value of type TYPE whose contents come from VALADDR, if it
+   is non-null, and whose memory address (in the inferior) is
+   ADDRESS.  */
+
+struct value *
+value_from_contents_and_address (struct type *type,
+				 const gdb_byte *valaddr,
+				 CORE_ADDR address)
+{
+  struct value *v = allocate_value (type);
+  if (valaddr == NULL)
+    set_value_lazy (v, 1);
+  else
+    memcpy (value_contents_raw (v), valaddr, TYPE_LENGTH (type));
+  VALUE_ADDRESS (v) = address;
+  if (address != 0)
+    VALUE_LVAL (v) = lval_memory;
+  return v;
 }
 
 struct value *
@@ -1692,28 +1759,21 @@ coerce_ref (struct value *arg)
 struct value *
 coerce_array (struct value *arg)
 {
+  struct type *type;
+
   arg = coerce_ref (arg);
-  if (current_language->c_style_arrays
-      && TYPE_CODE (value_type (arg)) == TYPE_CODE_ARRAY)
-    arg = value_coerce_array (arg);
-  if (TYPE_CODE (value_type (arg)) == TYPE_CODE_FUNC)
-    arg = value_coerce_function (arg);
-  return arg;
-}
+  type = check_typedef (value_type (arg));
 
-struct value *
-coerce_number (struct value *arg)
-{
-  arg = coerce_array (arg);
-  arg = coerce_enum (arg);
-  return arg;
-}
-
-struct value *
-coerce_enum (struct value *arg)
-{
-  if (TYPE_CODE (check_typedef (value_type (arg))) == TYPE_CODE_ENUM)
-    arg = value_cast (builtin_type_unsigned_int, arg);
+  switch (TYPE_CODE (type))
+    {
+    case TYPE_CODE_ARRAY:
+      if (current_language->c_style_arrays)
+	arg = value_coerce_array (arg);
+      break;
+    case TYPE_CODE_FUNC:
+      arg = value_coerce_function (arg);
+      break;
+    }
   return arg;
 }
 

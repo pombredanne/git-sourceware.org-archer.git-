@@ -1,6 +1,7 @@
 /* MI Command Set for GDB, the GNU debugger.
 
-   Copyright (C) 2000, 2001, 2003, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2000, 2001, 2003, 2007, 2008, 2009
+   Free Software Foundation, Inc.
 
    Contributed by Cygnus Solutions (a Red Hat company).
 
@@ -90,6 +91,7 @@ struct mi_cmd mi_cmds[] =
   { "interpreter-exec", { NULL, 0 }, mi_cmd_interpreter_exec},
   { "list-features", { NULL, 0 }, mi_cmd_list_features},
   { "list-target-features", { NULL, 0 }, mi_cmd_list_target_features},
+  { "list-thread-groups", { NULL, 0 }, mi_cmd_list_thread_groups },  
   { "overlay-auto", { NULL, 0 }, NULL },
   { "overlay-list-mapping-state", { NULL, 0 }, NULL },
   { "overlay-list-overlays", { NULL, 0 }, NULL },
@@ -120,7 +122,7 @@ struct mi_cmd mi_cmds[] =
   { "symbol-type", { NULL, 0 }, NULL },
   { "target-attach", { "attach", 1 }, NULL },
   { "target-compare-sections", { NULL, 0 }, NULL },
-  { "target-detach", { "detach", 0 }, 0 },
+  { "target-detach", { NULL, 0 }, mi_cmd_target_detach },
   { "target-disconnect", { "disconnect", 0 }, 0 },
   { "target-download", { "load", 1 }, NULL},
   { "target-exec-status", { NULL, 0 }, NULL },

@@ -1,6 +1,6 @@
 /* Python/gdb header for generic use in gdb
 
-   Copyright (C) 2008 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -21,6 +21,8 @@
 #define GDB_PYTHON_H
 
 #include "value.h"
+
+extern struct value *values_in_python;
 
 void eval_python_from_control_command (struct command_line *);
 

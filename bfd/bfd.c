@@ -1001,6 +1001,9 @@ bfd_get_sign_extend_vma (bfd *abfd)
       || strcmp (name, "pei-arm-wince-little") == 0)
     return 1;
 
+  if (CONST_STRNEQ (name, "mach-o"))
+    return 0;
+
   bfd_set_error (bfd_error_wrong_format);
   return -1;
 }
@@ -1472,9 +1475,8 @@ is32bit (bfd *abfd)
       return bed->s->elfclass == ELFCLASS32;
     }
 
-  /* For non-ELF, make a guess based on the target name.  */
-  return (strstr (bfd_get_target (abfd), "64") == NULL
-	  && strcmp (bfd_get_target (abfd), "mmo") != 0);
+  /* For non-ELF targets, use architecture information.  */
+  return bfd_arch_bits_per_address (abfd) <= 32;
 }
 #endif
 

@@ -1,7 +1,7 @@
 /* Source-language-related definitions for GDB.
 
    Copyright (C) 1991, 1992, 1993, 1994, 1995, 1998, 1999, 2000, 2003, 2004,
-   2007, 2008 Free Software Foundation, Inc.
+   2007, 2008, 2009 Free Software Foundation, Inc.
 
    Contributed by the Department of Computer Science at the State University
    of New York at Buffalo.
@@ -30,14 +30,7 @@ struct objfile;
 struct frame_info;
 struct expression;
 struct ui_file;
-
-/* This used to be included to configure GDB for one or more specific
-   languages.  Now it is left out to configure for all of them.  FIXME.  */
-/* #include "lang_def.h" */
-#define	_LANG_c
-#define	_LANG_m2
-#define  _LANG_fortran
-#define  _LANG_pascal
+struct value_print_options;
 
 #define MAX_FORTRAN_DIMS  7	/* Maximum number of F77 array dims */
 
@@ -113,6 +106,17 @@ extern enum case_sensitivity
     case_sensitive_on, case_sensitive_off
   }
 case_sensitivity;
+
+
+/* macro_expansion ==
+   macro_expansion_no:  No macro expansion is available
+   macro_expansion_c:   C-like macro expansion is available  */
+
+enum macro_expansion
+  {
+    macro_expansion_no, macro_expansion_c
+  };
+
 
 /* Per architecture (OS/ABI) language information.  */
 
@@ -125,6 +129,11 @@ struct language_arch_info
   struct type **primitive_type_vector;
   /* Type of elements of strings. */
   struct type *string_char_type;
+
+  /* Symbol name of type to use as boolean type, if defined.  */
+  const char *bool_type_symbol;
+  /* Otherwise, this is the default boolean builtin type.  */
+  struct type *bool_type_default;
 };
 
 /* Structure tying together assorted information about a language.  */
@@ -153,6 +162,9 @@ struct language_defn
     /* Multi-dimensional array ordering */
     enum array_ordering la_array_ordering;
 
+    /* Style of macro expansion, if any, supported by this language.  */
+    enum macro_expansion la_macro_expansion;
+
     /* Definitions related to expression printing, prefixifying, and
        dumping */
 
@@ -178,7 +190,8 @@ struct language_defn
 
     void (*la_printstr) (struct ui_file * stream, const gdb_byte *string,
 			 unsigned int length, int width,
-			 int force_ellipses);
+			 int force_ellipses,
+			 const struct value_print_options *);
 
     void (*la_emitchar) (int ch, struct ui_file * stream, int quoter);
 
@@ -187,16 +200,23 @@ struct language_defn
     void (*la_print_type) (struct type *, char *, struct ui_file *, int,
 			   int);
 
+    /* Print a typedef using syntax appropriate for this language.
+       TYPE is the underlying type.  NEW_SYMBOL is the symbol naming
+       the type.  STREAM is the output stream on which to print.  */
+
+    void (*la_print_typedef) (struct type *type, struct symbol *new_symbol,
+			      struct ui_file *stream);
+
     /* Print a value using syntax appropriate for this language. */
 
     int (*la_val_print) (struct type *, const gdb_byte *, int, CORE_ADDR,
-			 struct ui_file *, int, int, int,
-			 enum val_prettyprint);
+			 struct ui_file *, int,
+			 const struct value_print_options *);
 
     /* Print a top-level value using syntax appropriate for this language. */
 
     int (*la_value_print) (struct value *, struct ui_file *,
-			   int, enum val_prettyprint);
+			   const struct value_print_options *);
 
     /* PC is possibly an unknown languages trampoline.
        If that PC falls in a trampoline belonging to this language,
@@ -256,8 +276,7 @@ struct language_defn
     /* Print the index of an element of an array.  */
     void (*la_print_array_index) (struct value *index_value,
                                   struct ui_file *stream,
-                                  int format,
-                                  enum val_prettyprint pretty);
+                                  const struct value_print_options *options);
 
     /* Return non-zero if TYPE should be passed (and returned) by
        reference at the language level.  */
@@ -306,6 +325,9 @@ extern enum language_mode
   }
 language_mode;
 
+struct type *language_bool_type (const struct language_defn *l,
+				 struct gdbarch *gdbarch);
+
 struct type *language_string_char_type (const struct language_defn *l,
 					struct gdbarch *gdbarch);
 
@@ -342,21 +364,25 @@ extern enum language set_language (enum language);
 #define LA_PRINT_TYPE(type,varstring,stream,show,level) \
   (current_language->la_print_type(type,varstring,stream,show,level))
 
-#define LA_VAL_PRINT(type,valaddr,offset,addr,stream,fmt,deref,recurse,pretty) \
-  (current_language->la_val_print(type,valaddr,offset,addr,stream,fmt,deref, \
-				  recurse,pretty))
-#define LA_VALUE_PRINT(val,stream,fmt,pretty) \
-  (current_language->la_value_print(val,stream,fmt,pretty))
+#define LA_PRINT_TYPEDEF(type,new_symbol,stream) \
+  (current_language->la_print_typedef(type,new_symbol,stream))
+
+#define LA_VAL_PRINT(type,valaddr,offset,addr,stream,recurse,options) \
+  (current_language->la_val_print(type,valaddr,offset,addr,stream, \
+				  recurse,options))
+#define LA_VALUE_PRINT(val,stream,options) \
+  (current_language->la_value_print(val,stream,options))
 
 #define LA_PRINT_CHAR(ch, stream) \
   (current_language->la_printchar(ch, stream))
-#define LA_PRINT_STRING(stream, string, length, width, force_ellipses) \
-  (current_language->la_printstr(stream, string, length, width, force_ellipses))
+#define LA_PRINT_STRING(stream, string, length, width, force_ellipses,options) \
+  (current_language->la_printstr(stream, string, length, width, \
+				 force_ellipses,options))
 #define LA_EMIT_CHAR(ch, stream, quoter) \
   (current_language->la_emitchar(ch, stream, quoter))
 
-#define LA_PRINT_ARRAY_INDEX(index_value, stream, format, pretty) \
-  (current_language->la_print_array_index(index_value, stream, format, pretty))
+#define LA_PRINT_ARRAY_INDEX(index_value, stream, optins) \
+  (current_language->la_print_array_index(index_value, stream, options))
 
 /* Test a character to decide whether it can be printed in literal form
    or needs to be printed in another representation.  For example,
@@ -416,11 +442,6 @@ extern void range_error (const char *, ...) ATTR_FORMAT (printf, 1, 2);
 
 extern int value_true (struct value *);
 
-extern struct type *lang_bool_type (void);
-
-/* The type used for Boolean values in the current language. */
-#define LA_BOOL_TYPE lang_bool_type ()
-
 /* Misc:  The string representing a particular enum language.  */
 
 extern enum language language_enum (char *str);
@@ -453,8 +474,7 @@ extern char *default_word_break_characters (void);
 /* Print the index of an array element using the C99 syntax.  */
 extern void default_print_array_index (struct value *index_value,
                                        struct ui_file *stream,
-                                       int format,
-                                       enum val_prettyprint pretty);
+				       const struct value_print_options *options);
 
 /* Return non-zero if TYPE should be passed (and returned) by
    reference at the language level.  */
@@ -464,5 +484,9 @@ int language_pass_by_reference (struct type *type);
    level.  The target ABI may pass or return some structs by reference
    independent of this.  */
 int default_pass_by_reference (struct type *type);
+
+/* The default implementation of la_print_typedef.  */
+void default_print_typedef (struct type *type, struct symbol *new_symbol,
+			    struct ui_file *stream);
 
 #endif /* defined (LANGUAGE_H) */

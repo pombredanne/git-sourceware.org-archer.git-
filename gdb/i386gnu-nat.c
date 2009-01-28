@@ -1,6 +1,6 @@
 /* Low level interface to i386 running the GNU Hurd.
 
-   Copyright (C) 1992, 1995, 1996, 1998, 2000, 2001, 2004, 2007, 2008
+   Copyright (C) 1992, 1995, 1996, 1998, 2000, 2001, 2004, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -116,12 +116,13 @@ gnu_fetch_registers (struct regcache *regcache, int regno)
   struct proc *thread;
 
   /* Make sure we know about new threads.  */
-  inf_update_procs (current_inferior);
+  inf_update_procs (gnu_current_inf);
 
-  thread = inf_tid_to_thread (current_inferior, PIDGET (inferior_ptid));
+  thread = inf_tid_to_thread (gnu_current_inf,
+			      ptid_get_tid (inferior_ptid));
   if (!thread)
-    error (_("Can't fetch registers from thread %d: No such thread"),
-	   PIDGET (inferior_ptid));
+    error (_("Can't fetch registers from thread %s: No such thread"),
+	   target_pid_to_str (inferior_ptid));
 
   if (regno < I386_NUM_GREGS || regno == -1)
     {
@@ -207,12 +208,13 @@ gnu_store_registers (struct regcache *regcache, int regno)
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
 
   /* Make sure we know about new threads.  */
-  inf_update_procs (current_inferior);
+  inf_update_procs (gnu_current_inf);
 
-  thread = inf_tid_to_thread (current_inferior, PIDGET (inferior_ptid));
+  thread = inf_tid_to_thread (gnu_current_inf,
+			      ptid_get_tid (inferior_ptid));
   if (!thread)
-    error (_("Couldn't store registers into thread %d: No such thread"),
-	   PIDGET (inferior_ptid));
+    error (_("Couldn't store registers into thread %s: No such thread"),
+	   target_pid_to_str (inferior_ptid));
 
   if (regno < I386_NUM_GREGS || regno == -1)
     {

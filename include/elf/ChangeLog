@@ -1,3 +1,69 @@
+2009-01-15  Andrew Stubbs  <ams@codesourcery.com>
+	    Julian Brown   <julian@codesourcery.com>
+
+	* arm.h (TAG_CPU_ARCH_V6_M, TAG_CPU_ARCH_V6S_M): New defines.
+	(MAX_TAG_CPU_ARCH, TAG_CPU_ARCH_V4T_PLUS_V6_M): New defines.
+	(Tag_NEON_arch): Rename to Tag_Advanced_SIMD_arch to match ARM ABI
+	version 2.07.
+	(Tag_undefined39, Tag_nodefaults): New enum values.
+	(Tag_also_compatible_with, Tag_T2EE_use): Likewise.
+	(Tag_conformance, Tag_Virtualization_use): Likewise.
+	(Tag_undefined69, Tag_MPextension_use): Likewise.
+
+2009-01-15  Douglas B Rupp  <rupp@gnat.com>
+
+	* ia64.h (SHT_IA_64_VMS_DISPLAY_NAME_INFO, EF_IA_64_ARCHVER_1):
+	New macros. Minor reformatting.
+
+2008-12-23  Jon Beniston <jon@beniston.com>
+
+	* lm32.h: New file.
+
+2008-12-23  Nick Clifton  <nickc@redhat.com>
+
+	* commmon.h (STT_IFUNC): Delete.
+
+2008-12-20  Hans-Peter Nilsson  <hp@axis.com>
+
+	* cris.h (R_CRIS_32_IE): New relocation.
+
+2008-12-03  Nick Clifton  <nickc@redhat.com>
+
+	* common.h (STT_IFUNC): Define.
+
+2008-11-27  M R Swami Reddy <MR.Swami.Reddy@nsc.com>
+
+	* cr16.h (R_CR16_GOT_REGREL20, R_CR16_GOTC_REGREL20 and
+	R_CR16_GLOB_DAT): New relocations.
+
+2008-11-25  Hans-Peter Nilsson  <hp@axis.com>
+
+	* cris.h (R_CRIS_32_TPREL): Correct comment.
+	(R_CRIS_DTPMOD): Open up for use elsewhere than the fourth GOT entry.
+
+2008-11-18  Catherine Moore  <clm@codesourcery.com>
+
+	* arm.h (Tag_ABI_FP_16bit_format): Define.
+
+2008-11-14  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* internal.h (struct elf_segment_map): Add header_size field.
+ 
+2008-10-13  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* common.h (AT_BASE_PLATFORM, AT_EXECFN): Define.
+
+2008-10-10  Nathan Froyd  <froydnj@codesourcery.com>
+
+	* ppc.h: Add Tag_GNU_Power_ABI_Struct_Return.
+
+2008-10-04  Hans-Peter Nilsson  <hp@axis.com>
+
+	* cris.h (R_CRIS_32_GOT_GD, R_CRIS_16_GOT_GD, R_CRIS_32_GD)
+	(R_CRIS_DTP, R_CRIS_32_DTPREL, R_CRIS_16_DTPREL, R_CRIS_DTPMOD)
+	(R_CRIS_32_GOT_TPREL, R_CRIS_16_GOT_TPREL, R_CRIS_32_TPREL)
+	(R_CRIS_16_TPREL): New relocations.
+
 2008-08-20  Bob Wilson  <bob.wilson@acm.org>
 
 	* xtensa.h (R_XTENSA_TLSDESC_FN, R_XTENSA_TLSDESC_ARG)

@@ -1,5 +1,5 @@
 # Copyright (C) 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-# 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
+# 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
 # Free Software Foundation, Inc.
 
 # This file is part of GDB.
@@ -185,15 +185,14 @@ GNULIB_H = gnulib/string.h @GNULIB_STDINT_H@
 #
 SUBDIR_CLI_OBS = \
 	cli-dump.o \
-	cli-decode.o cli-script.o cli-cmds.o cli-setshow.o cli-utils.o \
+	cli-decode.o cli-script.o cli-cmds.o cli-setshow.o \
 	cli-logging.o \
 	cli-interp.o
 SUBDIR_CLI_SRCS = \
 	cli/cli-dump.c \
 	cli/cli-decode.c cli/cli-script.c cli/cli-cmds.c cli/cli-setshow.c \
 	cli/cli-logging.c \
-	cli/cli-interp.c \
-	cli/cli-utils.c
+	cli/cli-interp.c
 SUBDIR_CLI_DEPS =
 SUBDIR_CLI_LDFLAGS=
 SUBDIR_CLI_CFLAGS=
@@ -271,10 +270,12 @@ SUBDIR_TUI_CFLAGS= \
 #
 SUBDIR_PYTHON_OBS = \
 	python.o \
-	python-utils.o
+	python-utils.o \
+	python-value.o
 SUBDIR_PYTHON_SRCS = \
 	python/python.c \
-	python/python-utils.c
+	python/python-utils.c \
+	python/python-value.c
 SUBDIR_PYTHON_DEPS =
 SUBDIR_PYTHON_LDFLAGS=
 SUBDIR_PYTHON_CFLAGS=
@@ -409,13 +410,13 @@ INTERNAL_LDFLAGS = $(CFLAGS) $(GLOBAL_CFLAGS) $(MH_LDFLAGS) $(LDFLAGS) $(CONFIG_
 # If you have the Cygnus libraries installed,
 # you can use 'CLIBS=$(INSTALLED_LIBS)' 'CDEPS='
 INSTALLED_LIBS=-lbfd -lreadline -lopcodes -liberty -ldecnumber \
-	$(XM_CLIBS) $(TM_CLIBS) $(NAT_CLIBS) $(GDBTKLIBS) @LIBS@ \
+	$(XM_CLIBS) $(NAT_CLIBS) $(GDBTKLIBS) @LIBS@ \
 	-lintl -liberty $(LIBGNU)
 CLIBS = $(SIM) $(READLINE) $(OPCODES) $(BFD) $(INTL) $(LIBIBERTY) $(LIBDECNUMBER) \
-	$(XM_CLIBS) $(TM_CLIBS) $(NAT_CLIBS) $(GDBTKLIBS) @LIBS@ \
+	$(XM_CLIBS) $(NAT_CLIBS) $(GDBTKLIBS) @LIBS@ \
 	$(LIBICONV) $(LIBEXPAT) \
 	$(LIBIBERTY) $(WIN32LIBS) $(LIBGNU)
-CDEPS = $(XM_CDEPS) $(TM_CDEPS) $(NAT_CDEPS) $(SIM) $(BFD) $(READLINE_DEPS) \
+CDEPS = $(XM_CDEPS) $(NAT_CDEPS) $(SIM) $(BFD) $(READLINE_DEPS) \
 	$(OPCODES) $(INTL_DEPS) $(LIBIBERTY) $(CONFIG_DEPS) $(LIBGNU)
 
 ADD_FILES = $(XM_ADD_FILES) $(TM_ADD_FILES) $(NAT_ADD_FILES)
@@ -433,7 +434,7 @@ RUNTESTFLAGS=
 
 # XML files to build in to GDB.
 XMLFILES = $(srcdir)/features/gdb-target.dtd $(srcdir)/features/xinclude.dtd \
-	$(srcdir)/features/library-list.dtd
+	$(srcdir)/features/library-list.dtd $(srcdir)/features/osdata.dtd
 
 # This is ser-unix.o for any system which supports a v7/BSD/SYSV/POSIX
 # interface to the serial port.  Hopefully if get ported to OS/2, VMS,
@@ -514,7 +515,8 @@ ALL_TARGET_OBS = \
 	xcoffread.o \
 	prologue-value.o \
 	symfile-mem.o \
-	corelow.o
+	corelow.o \
+	windows-tdep.o
 
 # Host-dependent makefile fragment comes in here.
 @host_makefile_frag@
@@ -609,7 +611,7 @@ TARGET_FLAGS_TO_PASS = \
 # Links made at configuration time should not be specified here, since
 # SFILES is used in building the distribution archive.
 
-SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c  \
+SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c ada-tasks.c \
 	addrmap.c \
 	auxv.c ax-general.c ax-gdb.c \
 	bcache.c \
@@ -636,10 +638,10 @@ SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c  \
 	macrotab.c macroexp.c macrocmd.c macroscope.c main.c maint.c \
 	mdebugread.c memattr.c mem-break.c minsyms.c mipsread.c memory-map.c \
 	objc-exp.y objc-lang.c \
-	objfiles.c osabi.c observer.c \
+	objfiles.c osabi.c observer.c osdata.c \
 	p-exp.y p-lang.c p-typeprint.c p-valprint.c parse.c printcmd.c \
 	prologue-value.c \
-	regcache.c reggroups.c remote.c remote-fileio.c \
+	regcache.c reggroups.c remote.c remote-fileio.c reverse.c \
 	scm-exp.c scm-lang.c scm-valprint.c \
 	sentinel-frame.c \
 	serial.c ser-base.c ser-unix.c \
@@ -655,7 +657,8 @@ SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c  \
 	user-regs.c \
 	valarith.c valops.c valprint.c value.c varobj.c vec.c \
 	wrapper.c \
-	xml-tdesc.c xml-support.c
+	xml-tdesc.c xml-support.c \
+	inferior.c
 
 LINTFILES = $(SFILES) $(YYFILES) $(CONFIG_SRCS) init.c
 
@@ -675,11 +678,11 @@ osf-share/cma_stack_int.h osf-share/cma_init.h \
 osf-share/cma_deb_core.h osf-share/AT386/cma_thread_io.h \
 osf-share/cma_sched.h proc-utils.h arm-tdep.h ax-gdb.h ppcnbsd-tdep.h \
 cli-out.h gdb_expat.h breakpoint.h infcall.h obsd-tdep.h gnu-v2-abi.h \
-exec.h m32r-tdep.h osabi.h gdb-events.h gdbcore.h solib-som.h \
+exec.h m32r-tdep.h osabi.h gdbcore.h solib-som.h \
 i386bsd-nat.h xml-support.h xml-tdesc.h alphabsd-tdep.h gdb_obstack.h \
 ia64-tdep.h ada-lang.h varobj.h frv-tdep.h nto-tdep.h serial.h \
 c-lang.h frame.h event-loop.h block.h cli/cli-setshow.h	\
-cli/cli-decode.h cli/cli-cmds.h cli/cli-utils.h cli/cli-dump.h \
+cli/cli-decode.h cli/cli-cmds.h cli/cli-dump.h \
 cli/cli-script.h macrotab.h symtab.h version.h gnulib/wchar.in.h \
 gnulib/string.in.h gnulib/str-two-way.h gnulib/extra/link-warning.h \
 gnulib/stdint.in.h remote.h gdb.h sparc-nat.h gdbserver/win32-low.h \
@@ -692,7 +695,7 @@ gdbarch.h bsd-uthread.h gdb_thread_db.h gdb_stat.h memory-map.h	\
 mdebugread.h m88k-tdep.h stabsread.h hppa-linux-offsets.h linux-fork.h \
 ser-unix.h scm-lang.h inf-ptrace.h terminal.h ui-out.h frame-base.h \
 f-lang.h dwarf2loc.h value.h sparc-tdep.h defs.h target-descriptions.h \
-objfiles.h vec.h disasm.h mips-tdep.h gstdint.h ser-base.h \
+objfiles.h vec.h disasm.h mips-tdep.h ser-base.h \
 gdb_curses.h bfd-target.h memattr.h inferior.h ax.h dummy-frame.h \
 inflow.h fbsd-nat.h libunwind-frame.h completer.h inf-ttrace.h \
 solib-target.h shnbsd-tdep.h gdb_vfork.h alpha-tdep.h dwarf2expr.h \
@@ -725,7 +728,7 @@ config/sparc/nm-sol2.h config/nm-linux.h config/mips/nm-irix5.h	\
 config/rs6000/nm-rs6000.h top.h bsd-kvm.h gdb-stabs.h reggroups.h \
 annotate.h sim-regno.h dictionary.h dfp.h main.h frame-unwind.h	\
 remote-fileio.h i386-linux-tdep.h vax-tdep.h objc-lang.h \
-sentinel-frame.h bcache.h symfile.h
+sentinel-frame.h bcache.h symfile.h windows-tdep.h
 
 # Header files that already have srcdir in them, or which are in objdir.
 
@@ -777,11 +780,13 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 	findcmd.o \
 	std-regs.o \
 	signals.o \
-	exec.o bcache.o objfiles.o observer.o minsyms.o maint.o demangle.o \
+	exec.o reverse.o \
+	bcache.o objfiles.o observer.o minsyms.o maint.o demangle.o \
 	dbxread.o coffread.o coff-pe-read.o \
 	dwarf2read.o mipsread.o stabsread.o corefile.o \
 	dwarf2expr.o dwarf2loc.o dwarf2-frame.o \
 	ada-lang.o c-lang.o f-lang.o objc-lang.o \
+	ada-tasks.o \
 	ui-out.o cli-out.o \
 	varobj.o vec.o wrapper.o \
 	jv-lang.o jv-valprint.o jv-typeprint.o \
@@ -803,7 +808,8 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 	tramp-frame.o \
 	solib.o solib-null.o \
 	prologue-value.o memory-map.o xml-support.o \
-	target-descriptions.o target-memory.o xml-tdesc.o xml-builtin.o
+	target-descriptions.o target-memory.o xml-tdesc.o xml-builtin.o \
+	inferior.o osdata.o
 
 TSOBS = inflow.o
 
@@ -831,7 +837,8 @@ DISTSTUFF = $(YYFILES)
 
 
 # All generated files which can be included by another file.
-generated_files = config.h observer.h observer.inc ada-lex.c $(GNULIB_H)
+generated_files = config.h observer.h observer.inc ada-lex.c \
+	$(GNULIB_H) $(NAT_GENERATED_FILES)
 
 .c.o:
 	$(COMPILE) $<
@@ -1005,8 +1012,8 @@ init.c: $(INIT_FILES)
 	@rm -f init.c-tmp init.l-tmp
 	@touch init.c-tmp
 	@echo gdbtypes > init.l-tmp
-	@-LANG=c ; export LANG ; \
-	LC_ALL=c ; export LC_ALL ; \
+	@-LANG=C ; export LANG ; \
+	LC_ALL=C ; export LC_ALL ; \
 	echo $(INIT_FILES) | \
 	tr ' ' '\012' | \
 	sed \
@@ -1334,7 +1341,7 @@ ALLDEPFILES = \
 	spu-linux-nat.c spu-tdep.c \
 	v850-tdep.c \
 	vax-nat.c vax-tdep.c vaxbsd-nat.c vaxnbsd-tdep.c \
-	win32-nat.c \
+	windows-nat.c windows-tdep.c \
 	xcoffread.c xcoffsolib.c \
 	xstormy16-tdep.c \
 	xtensa-tdep.c xtensa-config.c \
@@ -1368,12 +1375,6 @@ monitor.o: $(srcdir)/monitor.c
 printcmd.o: $(srcdir)/printcmd.c
 	$(COMPILE.pre) $(INTERNAL_CFLAGS_BASE) $(GDB_WARN_CFLAGS_NO_FORMAT) \
 		$(GDB_WERROR_CFLAGS) $(COMPILE.post) $(srcdir)/printcmd.c
-	$(POSTCOMPILE)
-
-# FIXME: Procfs.o gets -Wformat errors because things like pid_t don't
-# match output format strings.
-procfs.o: $(srcdir)/procfs.c
-	$(COMPILE.pre) $(INTERNAL_WARN_CFLAGS) $(COMPILE.post) $(srcdir)/procfs.c
 	$(POSTCOMPILE)
 
 # Message files.  Based on code in gcc/Makefile.in.
@@ -1469,6 +1470,8 @@ po/$(PACKAGE).pot: force
 	     -e '/include.*malloc.h/d' \
 	     -e 's/\([^x]\)malloc/\1xmalloc/g' \
 	     -e 's/\([^x]\)realloc/\1xrealloc/g' \
+	     -e 's/\([ \t;,(]\)free\([ \t]*[&(),]\)/\1xfree\2/g' \
+	     -e 's/\([ \t;,(]\)free$$/\1xfree/g' \
 	     -e '/^#line.*y.tab.c/d' \
 	  < $@.tmp > $@.new
 	-rm $@.tmp
@@ -1483,6 +1486,8 @@ po/$(PACKAGE).pot: force
 	        -e '/include.*malloc.h/d' \
 	        -e 's/\([^x]\)malloc/\1xmalloc/g' \
 	        -e 's/\([^x]\)realloc/\1xrealloc/g' \
+	        -e 's/\([ \t;,(]\)free\([ \t]*[&(),]\)/\1xfree\2/g' \
+	        -e 's/\([ \t;,(]\)free$$/\1xfree/g' \
 		-e 's/yy_flex_xrealloc/yyxrealloc/g' \
 	      < $@ > $@.new && \
 	    rm -f $@ && \
@@ -1547,10 +1552,6 @@ cli-script.o: $(srcdir)/cli/cli-script.c
 
 cli-setshow.o: $(srcdir)/cli/cli-setshow.c
 	$(COMPILE) $(srcdir)/cli/cli-setshow.c
-	$(POSTCOMPILE)
-
-cli-utils.o: $(srcdir)/cli/cli-utils.c
-	$(COMPILE) $(srcdir)/cli/cli-utils.c
 	$(POSTCOMPILE)
 
 
@@ -1837,6 +1838,10 @@ python.o: $(srcdir)/python/python.c
 
 python-utils.o: $(srcdir)/python/python-utils.c
 	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-utils.c
+	$(POSTCOMPILE)
+
+python-value.o: $(srcdir)/python/python-value.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-value.c
 	$(POSTCOMPILE)
 
 #

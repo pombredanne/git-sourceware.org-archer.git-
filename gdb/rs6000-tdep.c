@@ -1,7 +1,7 @@
 /* Target-dependent code for GDB, the GNU debugger.
 
    Copyright (C) 1986, 1987, 1989, 1991, 1992, 1993, 1994, 1995, 1996, 1997,
-   1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
+   1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -1274,6 +1274,187 @@ bl_to_blrl_insn_p (CORE_ADDR pc, int insn)
 #define BL_INSTRUCTION 0x48000001
 #define BL_DISPLACEMENT_MASK 0x03fffffc
 
+static unsigned long
+rs6000_fetch_instruction (const CORE_ADDR pc)
+{
+  gdb_byte buf[4];
+  unsigned long op;
+
+  /* Fetch the instruction and convert it to an integer.  */
+  if (target_read_memory (pc, buf, 4))
+    return 0;
+  op = extract_unsigned_integer (buf, 4);
+
+  return op;
+}
+
+/* GCC generates several well-known sequences of instructions at the begining
+   of each function prologue when compiling with -fstack-check.  If one of
+   such sequences starts at START_PC, then return the address of the
+   instruction immediately past this sequence.  Otherwise, return START_PC.  */
+   
+static CORE_ADDR
+rs6000_skip_stack_check (const CORE_ADDR start_pc)
+{
+  CORE_ADDR pc = start_pc;
+  unsigned long op = rs6000_fetch_instruction (pc);
+
+  /* First possible sequence: A small number of probes.
+         stw 0, -<some immediate>(1)
+         [repeat this instruction any (small) number of times]
+  */
+  
+  if ((op & 0xffff0000) == 0x90010000)
+    {
+      while ((op & 0xffff0000) == 0x90010000)
+        {
+          pc = pc + 4;
+          op = rs6000_fetch_instruction (pc);
+        }
+      return pc;
+    }
+
+  /* Second sequence: A probing loop.
+         addi 12,1,-<some immediate>
+         lis 0,-<some immediate>
+         [possibly ori 0,0,<some immediate>]
+         add 0,12,0
+         cmpw 0,12,0
+         beq 0,<disp>
+         addi 12,12,-<some immediate>
+         stw 0,0(12)
+         b <disp>
+         [possibly one last probe: stw 0,<some immediate>(12)]
+  */
+
+  while (1)
+    {
+      /* addi 12,1,-<some immediate> */
+      if ((op & 0xffff0000) != 0x39810000)
+        break;
+
+      /* lis 0,-<some immediate> */
+      pc = pc + 4;
+      op = rs6000_fetch_instruction (pc);
+      if ((op & 0xffff0000) != 0x3c000000)
+        break;
+
+      pc = pc + 4;
+      op = rs6000_fetch_instruction (pc);
+      /* [possibly ori 0,0,<some immediate>] */
+      if ((op & 0xffff0000) == 0x60000000)
+        {
+          pc = pc + 4;
+          op = rs6000_fetch_instruction (pc);
+        }
+      /* add 0,12,0 */
+      if (op != 0x7c0c0214)
+        break;
+
+      /* cmpw 0,12,0 */
+      pc = pc + 4;
+      op = rs6000_fetch_instruction (pc);
+      if (op != 0x7c0c0000)
+        break;
+
+      /* beq 0,<disp> */
+      pc = pc + 4;
+      op = rs6000_fetch_instruction (pc);
+      if ((op & 0xff9f0001) != 0x41820000)
+        break;
+
+      /* addi 12,12,-<some immediate> */
+      pc = pc + 4;
+      op = rs6000_fetch_instruction (pc);
+      if ((op & 0xffff0000) != 0x398c0000)
+        break;
+
+      /* stw 0,0(12) */
+      pc = pc + 4;
+      op = rs6000_fetch_instruction (pc);
+      if (op != 0x900c0000)
+        break;
+
+      /* b <disp> */
+      pc = pc + 4;
+      op = rs6000_fetch_instruction (pc);
+      if ((op & 0xfc000001) != 0x48000000)
+        break;
+
+      /* [possibly one last probe: stw 0,<some immediate>(12)] */
+      pc = pc + 4;
+      op = rs6000_fetch_instruction (pc);
+      if ((op & 0xffff0000) == 0x900c0000)
+        {
+          pc = pc + 4;
+          op = rs6000_fetch_instruction (pc);
+        }
+
+      /* We found a valid stack-check sequence, return the new PC.  */
+      return pc;
+    }
+
+  /* Third sequence: No probe; instead, a comparizon between the stack size
+     limit (saved in a run-time global variable) and the current stack
+     pointer:
+
+        addi 0,1,-<some immediate>
+        lis 12,__gnat_stack_limit@ha
+        lwz 12,__gnat_stack_limit@l(12)
+        twllt 0,12
+
+     or, with a small variant in the case of a bigger stack frame:
+        addis 0,1,<some immediate>
+        addic 0,0,-<some immediate>
+        lis 12,__gnat_stack_limit@ha
+        lwz 12,__gnat_stack_limit@l(12)
+        twllt 0,12
+  */
+  while (1)
+    {
+      /* addi 0,1,-<some immediate> */
+      if ((op & 0xffff0000) != 0x38010000)
+        {
+          /* small stack frame variant not recognized; try the
+             big stack frame variant: */
+
+          /* addis 0,1,<some immediate> */
+          if ((op & 0xffff0000) != 0x3c010000)
+            break;
+
+          /* addic 0,0,-<some immediate> */
+          pc = pc + 4;
+          op = rs6000_fetch_instruction (pc);
+          if ((op & 0xffff0000) != 0x30000000)
+            break;
+        }
+
+      /* lis 12,<some immediate> */
+      pc = pc + 4;
+      op = rs6000_fetch_instruction (pc);
+      if ((op & 0xffff0000) != 0x3d800000)
+        break;
+      
+      /* lwz 12,<some immediate>(12) */
+      pc = pc + 4;
+      op = rs6000_fetch_instruction (pc);
+      if ((op & 0xffff0000) != 0x818c0000)
+        break;
+
+      /* twllt 0,12 */
+      pc = pc + 4;
+      op = rs6000_fetch_instruction (pc);
+      if ((op & 0xfffffffe) != 0x7c406008)
+        break;
+
+      /* We found a valid stack-check sequence, return the new PC.  */
+      return pc;
+    }
+
+  /* No stack check code in our prologue, return the start_pc.  */
+  return start_pc;
+}
+
 /* return pc value after skipping a function prologue and also return
    information about a function frame.
 
@@ -1332,6 +1513,10 @@ skip_prologue (struct gdbarch *gdbarch, CORE_ADDR pc, CORE_ADDR lim_pc,
   fdata->frameless = 1;
   fdata->nosavedpc = 1;
   fdata->lr_register = -1;
+
+  pc = rs6000_skip_stack_check (pc);
+  if (pc >= lim_pc)
+    pc = lim_pc;
 
   for (;; pc += 4)
     {
@@ -2079,7 +2264,8 @@ rs6000_builtin_type_vec64 (struct gdbarch *gdbarch)
       t = init_composite_type ("__ppc_builtin_type_vec64", TYPE_CODE_UNION);
       append_composite_type_field (t, "uint64", builtin_type_int64);
       append_composite_type_field (t, "v2_float",
-				   init_vector_type (builtin_type_float, 2));
+				   init_vector_type (builtin_type (gdbarch)
+						     ->builtin_float, 2));
       append_composite_type_field (t, "v2_int32",
 				   init_vector_type (builtin_type_int32, 2));
       append_composite_type_field (t, "v4_int16",
@@ -2277,7 +2463,8 @@ rs6000_convert_register_p (struct gdbarch *gdbarch, int regnum,
 	  && regnum >= tdep->ppc_fp0_regnum
 	  && regnum < tdep->ppc_fp0_regnum + ppc_num_fprs
 	  && TYPE_CODE (type) == TYPE_CODE_FLT
-	  && TYPE_LENGTH (type) != TYPE_LENGTH (builtin_type_double));
+	  && TYPE_LENGTH (type)
+	     != TYPE_LENGTH (builtin_type (gdbarch)->builtin_double));
 }
 
 static void
@@ -2286,12 +2473,14 @@ rs6000_register_to_value (struct frame_info *frame,
                           struct type *type,
                           gdb_byte *to)
 {
+  struct gdbarch *gdbarch = get_frame_arch (frame);
   gdb_byte from[MAX_REGISTER_SIZE];
   
   gdb_assert (TYPE_CODE (type) == TYPE_CODE_FLT);
 
   get_frame_register (frame, regnum, from);
-  convert_typed_floating (from, builtin_type_double, to, type);
+  convert_typed_floating (from, builtin_type (gdbarch)->builtin_double,
+			  to, type);
 }
 
 static void
@@ -2300,11 +2489,13 @@ rs6000_value_to_register (struct frame_info *frame,
                           struct type *type,
                           const gdb_byte *from)
 {
+  struct gdbarch *gdbarch = get_frame_arch (frame);
   gdb_byte to[MAX_REGISTER_SIZE];
 
   gdb_assert (TYPE_CODE (type) == TYPE_CODE_FLT);
 
-  convert_typed_floating (from, type, to, builtin_type_double);
+  convert_typed_floating (from, type,
+			  to, builtin_type (gdbarch)->builtin_double);
   put_frame_register (frame, regnum, to);
 }
 
@@ -3669,6 +3860,17 @@ rs6000_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   /* Frame handling.  */
   dwarf2_frame_set_init_reg (gdbarch, ppc_dwarf2_frame_init_reg);
 
+  /* Setup displaced stepping.  */
+  set_gdbarch_displaced_step_copy_insn (gdbarch,
+					simple_displaced_step_copy_insn);
+  set_gdbarch_displaced_step_fixup (gdbarch, ppc_displaced_step_fixup);
+  set_gdbarch_displaced_step_free_closure (gdbarch,
+					   simple_displaced_step_free_closure);
+  set_gdbarch_displaced_step_location (gdbarch,
+				       displaced_step_at_entry_point);
+
+  set_gdbarch_max_insn_length (gdbarch, PPC_INSN_SIZE);
+
   /* Hook in ABI-specific overrides, if they have been registered.  */
   info.target_desc = tdesc;
   info.tdep_info = (void *) tdesc_data;
@@ -3731,17 +3933,6 @@ rs6000_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
 
   gdb_assert (gdbarch_num_regs (gdbarch)
 	      + gdbarch_num_pseudo_regs (gdbarch) == cur_reg);
-
-  /* Setup displaced stepping.  */
-  set_gdbarch_displaced_step_copy_insn (gdbarch,
-					simple_displaced_step_copy_insn);
-  set_gdbarch_displaced_step_fixup (gdbarch, ppc_displaced_step_fixup);
-  set_gdbarch_displaced_step_free_closure (gdbarch,
-					   simple_displaced_step_free_closure);
-  set_gdbarch_displaced_step_location (gdbarch,
-				       displaced_step_at_entry_point);
-
-  set_gdbarch_max_insn_length (gdbarch, PPC_INSN_SIZE);
 
   return gdbarch;
 }

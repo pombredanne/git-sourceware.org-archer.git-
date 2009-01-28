@@ -1,6 +1,6 @@
 /* Target-dependent code for GDB, the GNU debugger.
 
-   Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
+   Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    Contributed by D.J. Barrow (djbarrow@de.ibm.com,barrow_dj@yahoo.com)
@@ -96,19 +96,19 @@ static struct type *
 s390_register_type (struct gdbarch *gdbarch, int regnum)
 {
   if (regnum == S390_PSWM_REGNUM || regnum == S390_PSWA_REGNUM)
-    return builtin_type_long;
+    return builtin_type (gdbarch)->builtin_long;
   if (regnum >= S390_R0_REGNUM && regnum <= S390_R15_REGNUM)
-    return builtin_type_long;
+    return builtin_type (gdbarch)->builtin_long;
   if (regnum >= S390_A0_REGNUM && regnum <= S390_A15_REGNUM)
-    return builtin_type_int;
+    return builtin_type (gdbarch)->builtin_int;
   if (regnum == S390_FPC_REGNUM)
-    return builtin_type_int;
+    return builtin_type (gdbarch)->builtin_int;
   if (regnum >= S390_F0_REGNUM && regnum <= S390_F15_REGNUM)
-    return builtin_type_double;
+    return builtin_type (gdbarch)->builtin_double;
   if (regnum == S390_PC_REGNUM)
-    return builtin_type_void_func_ptr;
+    return builtin_type (gdbarch)->builtin_func_ptr;
   if (regnum == S390_CC_REGNUM)
-    return builtin_type_int;
+    return builtin_type (gdbarch)->builtin_int;
 
   internal_error (__FILE__, __LINE__, _("invalid regnum"));
 }
@@ -2269,7 +2269,7 @@ s390_breakpoint_from_pc (struct gdbarch *gdbarch, CORE_ADDR *pcptr, int *lenptr)
 /* Address handling.  */
 
 static CORE_ADDR
-s390_addr_bits_remove (CORE_ADDR addr)
+s390_addr_bits_remove (struct gdbarch *gdbarch, CORE_ADDR addr)
 {
   return addr & 0x7fffffff;
 }

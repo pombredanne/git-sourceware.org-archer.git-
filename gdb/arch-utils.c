@@ -1,7 +1,7 @@
 /* Dynamic architecture support for GDB, the GNU debugger.
 
    Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008 Free Software Foundation, Inc.
+   2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -146,7 +146,7 @@ core_addr_greaterthan (CORE_ADDR lhs, CORE_ADDR rhs)
 /* Misc helper functions for targets. */
 
 CORE_ADDR
-core_addr_identity (CORE_ADDR addr)
+core_addr_identity (struct gdbarch *gdbarch, CORE_ADDR addr)
 {
   return addr;
 }
@@ -491,12 +491,12 @@ gdbarch_update_p (struct gdbarch_info info)
 
   /* If it is the same old architecture, accept the request (but don't
      swap anything).  */
-  if (new_gdbarch == current_gdbarch)
+  if (new_gdbarch == target_gdbarch)
     {
       if (gdbarch_debug)
 	fprintf_unfiltered (gdb_stdlog, "gdbarch_update_p: "
-			    "Architecture 0x%08lx (%s) unchanged\n",
-			    (long) new_gdbarch,
+			    "Architecture %s (%s) unchanged\n",
+			    host_address_to_string (new_gdbarch),
 			    gdbarch_bfd_arch_info (new_gdbarch)->printable_name);
       return 1;
     }
@@ -504,8 +504,8 @@ gdbarch_update_p (struct gdbarch_info info)
   /* It's a new architecture, swap it in.  */
   if (gdbarch_debug)
     fprintf_unfiltered (gdb_stdlog, "gdbarch_update_p: "
-			"New architecture 0x%08lx (%s) selected\n",
-			(long) new_gdbarch,
+			"New architecture %s (%s) selected\n",
+			host_address_to_string (new_gdbarch),
 			gdbarch_bfd_arch_info (new_gdbarch)->printable_name);
   deprecated_current_gdbarch_select_hack (new_gdbarch);
 

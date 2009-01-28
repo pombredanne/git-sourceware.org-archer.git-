@@ -1,7 +1,7 @@
 /* Target-dependent code for the HP PA-RISC architecture.
 
    Copyright (C) 1986, 1987, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008
+   1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    Contributed by the Center for Software Science at the
@@ -230,6 +230,7 @@ internalize_unwinds (struct objfile *objfile, struct unwind_table_entry *table,
 
   if (size > 0)
     {
+      struct gdbarch *gdbarch = get_objfile_arch (objfile);
       unsigned long tmp;
       unsigned i;
       char *buf = alloca (size);
@@ -241,7 +242,7 @@ internalize_unwinds (struct objfile *objfile, struct unwind_table_entry *table,
 	 Note that when loading a shared library (text_offset != 0) the
 	 unwinds are already relative to the text_offset that will be
 	 passed in.  */
-      if (gdbarch_tdep (current_gdbarch)->is_elf && text_offset == 0)
+      if (gdbarch_tdep (gdbarch)->is_elf && text_offset == 0)
 	{
           low_text_segment_address = -1;
 
@@ -251,9 +252,9 @@ internalize_unwinds (struct objfile *objfile, struct unwind_table_entry *table,
 
 	  text_offset = low_text_segment_address;
 	}
-      else if (gdbarch_tdep (current_gdbarch)->solib_get_text_base)
+      else if (gdbarch_tdep (gdbarch)->solib_get_text_base)
         {
-	  text_offset = gdbarch_tdep (current_gdbarch)->solib_get_text_base (objfile);
+	  text_offset = gdbarch_tdep (gdbarch)->solib_get_text_base (objfile);
 	}
 
       bfd_get_section_contents (objfile->obfd, section, buf, 0, size);
@@ -657,18 +658,19 @@ hppa64_register_name (struct gdbarch *gdbarch, int i)
     return names[i];
 }
 
+/* Map dwarf DBX register numbers to GDB register numbers.  */
 static int
 hppa64_dwarf_reg_to_regnum (struct gdbarch *gdbarch, int reg)
 {
-  /* r0-r31 and sar map one-to-one.  */
+  /* The general registers and the sar are the same in both sets.  */
   if (reg <= 32)
     return reg;
 
   /* fr4-fr31 are mapped from 72 in steps of 2.  */
-  if (reg >= 72 || reg < 72 + 28 * 2)
+  if (reg >= 72 && reg < 72 + 28 * 2 && !(reg & 1))
     return HPPA64_FP4_REGNUM + (reg - 72) / 2;
 
-  error ("Invalid DWARF register num %d.", reg);
+  warning (_("Unmapped DWARF DBX Register #%d encountered."), reg);
   return -1;
 }
 
@@ -1244,8 +1246,9 @@ hppa32_convert_from_func_ptr_addr (struct gdbarch *gdbarch, CORE_ADDR addr,
 {
   if (addr & 2)
     {
+      struct type *func_ptr_type = builtin_type (gdbarch)->builtin_func_ptr;
       CORE_ADDR plabel = addr & ~3;
-      return read_memory_typed_address (plabel, builtin_type_void_func_ptr);
+      return read_memory_typed_address (plabel, func_ptr_type);
     }
 
   return addr;
@@ -1310,7 +1313,7 @@ hppa_alignof (struct type *type)
     case TYPE_CODE_FLT:
       return TYPE_LENGTH (type);
     case TYPE_CODE_ARRAY:
-      return hppa_alignof (TYPE_FIELD_TYPE (type, 0));
+      return hppa_alignof (TYPE_INDEX_TYPE (type));
     case TYPE_CODE_STRUCT:
     case TYPE_CODE_UNION:
       max_align = 1;
@@ -2663,7 +2666,7 @@ hppa64_cannot_fetch_register (struct gdbarch *gdbarch, int regnum)
 }
 
 static CORE_ADDR
-hppa_smash_text_address (CORE_ADDR addr)
+hppa_smash_text_address (struct gdbarch *gdbarch, CORE_ADDR addr)
 {
   /* The low two bits of the PC on the PA contain the privilege level.
      Some genius implementing a (non-GCC) compiler apparently decided
@@ -2897,6 +2900,9 @@ hppa_in_solib_call_trampoline (CORE_ADDR pc, char *name)
 CORE_ADDR
 hppa_skip_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
 {
+  struct gdbarch *gdbarch = get_frame_arch (frame);
+  struct type *func_ptr_type = builtin_type (gdbarch)->builtin_func_ptr;
+
   unsigned int insn[HPPA_MAX_INSN_PATTERN_LEN];
   int dp_rel;
 
@@ -2907,7 +2913,7 @@ hppa_skip_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
 
       /* PLABELs have bit 30 set; if it's a PLABEL, then dereference it.  */
       if (pc & 0x2)
-	pc = read_memory_typed_address (pc & ~0x3, builtin_type_void_func_ptr);
+	pc = read_memory_typed_address (pc & ~0x3, func_ptr_type);
 
       return pc;
     }
@@ -2928,7 +2934,7 @@ hppa_skip_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
 
   if (in_plt_section (pc, NULL))
     {
-      pc = read_memory_typed_address (pc, builtin_type_void_func_ptr);
+      pc = read_memory_typed_address (pc, func_ptr_type);
 
       /* If the PLT slot has not yet been resolved, the target will be
          the PLT stub.  */
@@ -2942,7 +2948,7 @@ hppa_skip_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
 	    }
 
 	  /* This should point to the fixup routine.  */
-	  pc = read_memory_typed_address (pc + 8, builtin_type_void_func_ptr);
+	  pc = read_memory_typed_address (pc + 8, func_ptr_type);
 	}
     }
 

@@ -1,6 +1,6 @@
 /* Decimal floating point support for GDB.
 
-   Copyright 2007, 2008 Free Software Foundation, Inc.
+   Copyright 2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -235,16 +235,12 @@ void
 decimal_from_floating (struct value *from, gdb_byte *to, int len)
 {
   char *buffer;
-  int ret;
 
-  ret = asprintf (&buffer, "%.30" DOUBLEST_PRINT_FORMAT,
-		  value_as_double (from));
-  if (ret < 0)
-    error (_("Error in memory allocation for conversion to decimal float."));
+  buffer = xstrprintf ("%.30" DOUBLEST_PRINT_FORMAT, value_as_double (from));
 
   decimal_from_string (to, len, buffer);
 
-  free (buffer);
+  xfree (buffer);
 }
 
 /* Converts a decimal float of LEN bytes to a double value.  */

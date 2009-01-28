@@ -1,7 +1,7 @@
 /* *INDENT-OFF* */ /* ATTR_FORMAT confuses indent, avoid running it for now */
 /* Basic, host-specific, and target-specific definitions for GDB.
    Copyright (C) 1986, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008
+   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -29,6 +29,20 @@
 #include <errno.h>		/* System call error return status.  */
 #include <limits.h>
 #include <stdint.h>
+
+/* The libdecnumber library, on which GDB depends, includes a header file
+   called gstdint.h instead of relying directly on stdint.h.  GDB, on the
+   other hand, includes stdint.h directly, relying on the fact that gnulib
+   generates a copy if the system doesn't provide one or if it is missing
+   some features.  Unfortunately, gstdint.h and stdint.h cannot be included
+   at the same time, which may happen when we include a file from
+   libdecnumber.
+
+   The following macro definition effectively prevents the inclusion of
+   gstdint.h, as all the definitions it provides are guarded against
+   the GCC_GENERATED_STDINT_H macro.  We already have gnulib/stdint.h
+   included, so it's ok to blank out gstdint.h.  */
+#define GCC_GENERATED_STDINT_H 1
 
 #ifdef HAVE_STDDEF_H
 #include <stddef.h>
@@ -298,6 +312,7 @@ struct cleanup
 struct symtab;
 struct breakpoint;
 struct frame_info;
+struct gdbarch;
 
 /* From utils.c */
 
@@ -347,6 +362,8 @@ extern struct cleanup *(make_cleanup_free_section_addr_info
 
 extern struct cleanup *make_cleanup_close (int fd);
 
+extern struct cleanup *make_cleanup_fclose (FILE *file);
+
 extern struct cleanup *make_cleanup_bfd_close (bfd *abfd);
 
 extern struct cleanup *make_cleanup_restore_integer (int *variable);
@@ -389,6 +406,8 @@ extern unsigned long gnu_debuglink_crc32 (unsigned long crc,
 ULONGEST strtoulst (const char *num, const char **trailer, int base);
 
 char *ldirname (const char *filename);
+
+char **gdb_buildargv (const char *);
 
 /* From demangle.c */
 
@@ -489,16 +508,18 @@ extern void gdb_print_host_address (const void *addr, struct ui_file *stream);
 extern const char *host_address_to_string (const void *addr);
 
 /* Convert a CORE_ADDR into a HEX string.  paddr() is like %08lx.
-   paddr_nz() is like %lx.  paddr_u() is like %lu. paddr_width() is
-   for ``%*''. */
+   paddr_nz() is like %lx.  */
 extern int strlen_paddr (void);
 extern char *paddr (CORE_ADDR addr);
 extern char *paddr_nz (CORE_ADDR addr);
-extern char *paddr_u (CORE_ADDR addr);
-extern char *paddr_d (LONGEST addr);
 
 /* Like 0x%lx.  */
 extern const char *paddress (CORE_ADDR addr);
+
+/* %d for LONGEST */
+extern char *plongest (LONGEST l);
+/* %u for ULONGEST */
+extern char *pulongest (ULONGEST l);
 
 extern char *phex (ULONGEST l, int sizeof_l);
 extern char *phex_nz (ULONGEST l, int sizeof_l);
@@ -570,7 +591,7 @@ extern int info_verbose;
 
 /* From printcmd.c */
 
-extern void set_next_address (CORE_ADDR);
+extern void set_next_address (struct gdbarch *, CORE_ADDR);
 
 extern void print_address_symbolic (CORE_ADDR, struct ui_file *, int,
 				    char *);
@@ -679,22 +700,36 @@ extern void free_command_lines (struct command_line **);
    when opening an extended-remote connection. */
 
 struct continuation;
-
-/* In infrun.c. */
-extern struct continuation *cmd_continuation;
-/* Used only by the step_1 function. */
-extern struct continuation *intermediate_continuation;
+struct thread_info;
+struct inferior;
 
 /* From utils.c */
-extern void add_continuation (void (*)(void *), void *,
+
+/* Thread specific continuations.  */
+
+extern void add_continuation (struct thread_info *,
+			      void (*)(void *), void *,
 			      void (*)(void *));
 extern void do_all_continuations (void);
+extern void do_all_continuations_thread (struct thread_info *);
 extern void discard_all_continuations (void);
+extern void discard_all_continuations_thread (struct thread_info *);
 
-extern void add_intermediate_continuation (void (*)(void *), void *,
+extern void add_intermediate_continuation (struct thread_info *,
+					   void (*)(void *), void *,
 					   void (*)(void *));
 extern void do_all_intermediate_continuations (void);
+extern void do_all_intermediate_continuations_thread (struct thread_info *);
 extern void discard_all_intermediate_continuations (void);
+extern void discard_all_intermediate_continuations_thread (struct thread_info *);
+
+/* Inferior specific (any thread) continuations.  */
+
+extern void add_inferior_continuation (void (*) (void *),
+				       void *,
+				       void (*) (void *));
+extern void do_all_inferior_continuations (void);
+extern void discard_all_inferior_continuations (struct inferior *inf);
 
 /* String containing the current directory (what getwd would return).  */
 
@@ -731,6 +766,7 @@ enum val_prettyprint
       ptid_get_lwp	- Fetch the lwp component of a ptid.
       ptid_get_tid	- Fetch the tid component of a ptid.
       ptid_equal	- Test to see if two ptids are equal.
+      ptid_is_pid	- Test to see if this ptid represents a process id.
 
    Please do NOT access the struct ptid members directly (except, of
    course, in the implementation of the above ptid manipulation
@@ -921,6 +957,7 @@ enum gdb_osabi
   GDB_OSABI_CYGWIN,
   GDB_OSABI_AIX,
   GDB_OSABI_DICOS,
+  GDB_OSABI_DARWIN,
 
   GDB_OSABI_INVALID		/* keep this last */
 };
@@ -1071,8 +1108,6 @@ extern void (*deprecated_call_command_hook) (struct cmd_list_element * c,
 					     char *cmd, int from_tty);
 
 extern void (*deprecated_set_hook) (struct cmd_list_element * c);
-
-extern void (*deprecated_error_hook) (void);
 
 extern void (*deprecated_error_begin_hook) (void);
 

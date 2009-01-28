@@ -1,5 +1,5 @@
 /* C preprocessor macro expansion commands for GDB.
-   Copyright (C) 2002, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2002, 2007, 2008, 2009 Free Software Foundation, Inc.
    Contributed by Red Hat, Inc.
 
    This file is part of GDB.
@@ -197,18 +197,37 @@ skip_ws (char **expp)
     ++*expp;
 }
 
+/* Try to find the bounds of an identifier.  If an identifier is
+   found, returns a newly allocated string; otherwise returns NULL.
+   EXPP is a pointer to an input string; it is updated to point to the
+   text following the identifier.  If IS_PARAMETER is true, this
+   function will also allow "..." forms as used in varargs macro
+   parameters.  */
+
 static char *
-extract_identifier (char **expp)
+extract_identifier (char **expp, int is_parameter)
 {
   char *result;
   char *p = *expp;
   unsigned int len;
-  if (! *p || ! macro_is_identifier_nondigit (*p))
-    return NULL;
-  for (++p;
-       *p && (macro_is_identifier_nondigit (*p) || macro_is_digit (*p));
-       ++p)
-    ;
+
+  if (is_parameter && !strncmp (p, "...", 3))
+    {
+      /* Ok.  */
+    }
+  else
+    {
+      if (! *p || ! macro_is_identifier_nondigit (*p))
+	return NULL;
+      for (++p;
+	   *p && (macro_is_identifier_nondigit (*p) || macro_is_digit (*p));
+	   ++p)
+	;
+    }
+
+  if (is_parameter && !strncmp (p, "...", 3))      
+    p += 3;
+
   len = p - *expp;
   result = (char *) xmalloc (len + 1);
   memcpy (result, *expp, len);
@@ -246,7 +265,7 @@ macro_define_command (char *exp, int from_tty)
   memset (&new_macro, 0, sizeof (struct macro_definition));
 
   skip_ws (&exp);
-  name = extract_identifier (&exp);
+  name = extract_identifier (&exp, 0);
   if (! name)
     error (_("Invalid macro name."));
   if (*exp == '(')
@@ -274,7 +293,7 @@ macro_define_command (char *exp, int from_tty)
 	      /* Must update new_macro as well... */
 	      new_macro.argv = (const char * const *) argv;
 	    }
-	  argv[new_macro.argc] = extract_identifier (&exp);
+	  argv[new_macro.argc] = extract_identifier (&exp, 1);
 	  if (! argv[new_macro.argc])
 	    error (_("Macro is missing an argument."));
 	  ++new_macro.argc;
@@ -296,13 +315,17 @@ macro_define_command (char *exp, int from_tty)
 	}
       /* Skip the closing paren.  */
       ++exp;
+      skip_ws (&exp);
 
       macro_define_function (macro_main (macro_user_macros), -1, name,
 			     new_macro.argc, (const char **) new_macro.argv,
 			     exp);
     }
   else
-    macro_define_object (macro_main (macro_user_macros), -1, name, exp);
+    {
+      skip_ws (&exp);
+      macro_define_object (macro_main (macro_user_macros), -1, name, exp);
+    }
 
   do_cleanups (cleanup_chain);
 }
@@ -317,7 +340,7 @@ macro_undef_command (char *exp, int from_tty)
     error (_("usage: macro undef NAME"));
 
   skip_ws (&exp);
-  name = extract_identifier (&exp);
+  name = extract_identifier (&exp, 0);
   if (! name)
     error (_("Invalid macro name."));
   macro_undef (macro_main (macro_user_macros), -1, name);
@@ -326,7 +349,8 @@ macro_undef_command (char *exp, int from_tty)
 
 
 static void
-print_one_macro (const char *name, const struct macro_definition *macro)
+print_one_macro (const char *name, const struct macro_definition *macro,
+		 void *ignore)
 {
   fprintf_filtered (gdb_stdout, "macro define %s", name);
   if (macro->kind == macro_function_like)
@@ -338,16 +362,14 @@ print_one_macro (const char *name, const struct macro_definition *macro)
 			  macro->argv[i]);
       fprintf_filtered (gdb_stdout, ")");
     }
-  /* Note that we don't need a leading space here -- "macro define"
-     provided it.  */
-  fprintf_filtered (gdb_stdout, "%s\n", macro->replacement);
+  fprintf_filtered (gdb_stdout, " %s\n", macro->replacement);
 }
 
 
 static void
 macro_list_command (char *exp, int from_tty)
 {
-  macro_for_each (macro_user_macros, print_one_macro);
+  macro_for_each (macro_user_macros, print_one_macro, NULL);
 }
 
 

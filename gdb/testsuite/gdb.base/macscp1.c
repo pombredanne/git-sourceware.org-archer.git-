@@ -5,6 +5,25 @@
 #define STRINGIFY(a) INNER_STRINGIFY(a)
 #define INNER_STRINGIFY(a) #a
 
+#define FIFTY_SEVEN 57
+
+#define FORTY_EIGHT 48
+#undef  FORTY_EIGHT
+
+struct outer
+{
+  struct fields
+  {
+    struct fault
+    {
+      int addr;
+    } fault;
+  } fields;
+};
+struct outer address;
+
+#define addr fields.fault.addr
+
 /* A macro named UNTIL_<func> is #defined until just before the
    definition of the function <func>.
 
@@ -69,11 +88,13 @@ macscp_expr (void)
   int foo = -1;
 
   foo = 0;  /* set breakpoint here */
-#define M foo
+#define MACRO_TO_EXPAND foo
   foo = 1;
-#undef M
+#undef MACRO_TO_EXPAND
   foo = 2;
 }
+
+#define TWENTY_THREE 23
 
 int
 main (int argc, char **argv)

@@ -1,6 +1,6 @@
 /* Machine independent support for SVR4 /proc (process file system) for GDB.
 
-   Copyright (C) 1999, 2000, 2001, 2002, 2003, 2006, 2007, 2008
+   Copyright (C) 1999, 2000, 2001, 2002, 2003, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    Written by Michael Snyder at Cygnus Solutions.
@@ -112,8 +112,8 @@
  */
 
 static void procfs_open (char *, int);
-static void procfs_attach (char *, int);
-static void procfs_detach (char *, int);
+static void procfs_attach (struct target_ops *, char *, int);
+static void procfs_detach (struct target_ops *, char *, int);
 static void procfs_resume (ptid_t, int, enum target_signal);
 static int procfs_can_run (void);
 static void procfs_stop (ptid_t);
@@ -123,16 +123,17 @@ static void procfs_store_registers (struct regcache *, int);
 static void procfs_notice_signals (ptid_t);
 static void procfs_prepare_to_store (struct regcache *);
 static void procfs_kill_inferior (void);
-static void procfs_mourn_inferior (void);
-static void procfs_create_inferior (char *, char *, char **, int);
+static void procfs_mourn_inferior (struct target_ops *ops);
+static void procfs_create_inferior (struct target_ops *, char *, 
+				    char *, char **, int);
 static ptid_t procfs_wait (ptid_t, struct target_waitstatus *);
-static int procfs_xfer_memory (CORE_ADDR, char *, int, int,
+static int procfs_xfer_memory (CORE_ADDR, gdb_byte *, int, int,
 			       struct mem_attrib *attrib,
 			       struct target_ops *);
 static LONGEST procfs_xfer_partial (struct target_ops *ops,
 				    enum target_object object,
 				    const char *annex,
-				    void *readbuf, const void *writebuf,
+				    gdb_byte *readbuf, const gdb_byte *writebuf,
 				    ULONGEST offset, LONGEST len);
 
 static int procfs_thread_alive (ptid_t);
@@ -160,7 +161,6 @@ static int
 procfs_auxv_parse (struct target_ops *ops, gdb_byte **readptr,
                   gdb_byte *endptr, CORE_ADDR *typep, CORE_ADDR *valp)
 {
-  const int pointer_size = TYPE_LENGTH (builtin_type_void_data_ptr);
   gdb_byte *ptr = *readptr;
 
   if (endptr == ptr)
@@ -716,7 +716,7 @@ open_procinfo_files (procinfo *pi, int which)
 static procinfo *
 create_procinfo (int pid, int tid)
 {
-  procinfo *pi, *parent;
+  procinfo *pi, *parent = NULL;
 
   if ((pi = find_procinfo (pid, tid)))
     return pi;			/* Already exists, nothing to do. */
@@ -867,7 +867,7 @@ dead_procinfo (procinfo *pi, char *msg, int kill_p)
     kill (pi->pid, SIGKILL);
 
   destroy_procinfo (pi);
-  error ((msg));
+  error ("%s", msg);
 }
 
 /*
@@ -2899,11 +2899,12 @@ proc_parent_pid (procinfo *pi)
 static void *
 procfs_address_to_host_pointer (CORE_ADDR addr)
 {
+  struct type *ptr_type = builtin_type (target_gdbarch)->builtin_data_ptr;
   void *ptr;
 
-  gdb_assert (sizeof (ptr) == TYPE_LENGTH (builtin_type_void_data_ptr));
-  gdbarch_address_to_pointer (current_gdbarch, builtin_type_void_data_ptr,
-			      &ptr, addr);
+  gdb_assert (sizeof (ptr) == TYPE_LENGTH (ptr_type));
+  gdbarch_address_to_pointer (target_gdbarch, ptr_type,
+			      (gdb_byte *) &ptr, addr);
   return ptr;
 }
 
@@ -3065,14 +3066,14 @@ procfs_find_LDT_entry (ptid_t ptid)
   /* Find procinfo for the lwp. */
   if ((pi = find_procinfo (PIDGET (ptid), TIDGET (ptid))) == NULL)
     {
-      warning (_("procfs_find_LDT_entry: could not find procinfo for %d:%d."),
+      warning (_("procfs_find_LDT_entry: could not find procinfo for %d:%ld."),
 	       PIDGET (ptid), TIDGET (ptid));
       return NULL;
     }
   /* get its general registers. */
   if ((gregs = proc_get_gregs (pi)) == NULL)
     {
-      warning (_("procfs_find_LDT_entry: could not read gregs for %d:%d."),
+      warning (_("procfs_find_LDT_entry: could not read gregs for %d:%ld."),
 	       PIDGET (ptid), TIDGET (ptid));
       return NULL;
     }
@@ -3602,7 +3603,7 @@ procfs_debug_inferior (procinfo *pi)
 }
 
 static void
-procfs_attach (char *args, int from_tty)
+procfs_attach (struct target_ops *ops, char *args, int from_tty)
 {
   char *exec_file;
   int   pid;
@@ -3632,16 +3633,16 @@ procfs_attach (char *args, int from_tty)
 }
 
 static void
-procfs_detach (char *args, int from_tty)
+procfs_detach (struct target_ops *ops, char *args, int from_tty)
 {
   int sig = 0;
+  int pid = PIDGET (inferior_ptid);
 
   if (args)
     sig = atoi (args);
 
   if (from_tty)
     {
-      int pid = PIDGET (inferior_ptid);
       char *exec_file;
 
       exec_file = get_exec_file (0);
@@ -3656,6 +3657,7 @@ procfs_detach (char *args, int from_tty)
   do_detach (sig);
 
   inferior_ptid = null_ptid;
+  detach_inferior (pid);
   unpush_target (&procfs_ops);
 }
 
@@ -3663,7 +3665,9 @@ static ptid_t
 do_attach (ptid_t ptid)
 {
   procinfo *pi;
+  struct inferior *inf;
   int fail;
+  int lwpid;
 
   if ((pi = create_procinfo (PIDGET (ptid), 0)) == NULL)
     perror (_("procfs: out of memory in 'attach'"));
@@ -3711,9 +3715,19 @@ do_attach (ptid_t ptid)
   if ((fail = procfs_debug_inferior (pi)) != 0)
     dead_procinfo (pi, "do_attach: failed in procfs_debug_inferior", NOKILL);
 
+  inf = add_inferior (pi->pid);
   /* Let GDB know that the inferior was attached.  */
-  attach_flag = 1;
-  return MERGEPID (pi->pid, proc_get_current_thread (pi));
+  inf->attach_flag = 1;
+
+  /* Create a procinfo for the current lwp.  */
+  lwpid = proc_get_current_thread (pi);
+  create_procinfo (pi->pid, lwpid);
+
+  /* Add it to gdb's thread list.  */
+  ptid = MERGEPID (pi->pid, lwpid);
+  add_thread (ptid);
+
+  return ptid;
 }
 
 static void
@@ -3757,7 +3771,6 @@ do_detach (int signo)
 	  proc_warn (pi, "do_detach, set_rlc", __LINE__);
       }
 
-  attach_flag = 0;
   destroy_procinfo (pi);
 }
 
@@ -3784,14 +3797,7 @@ procfs_fetch_registers (struct regcache *regcache, int regnum)
   int tid = TIDGET (inferior_ptid);
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
 
-  /* First look up procinfo for the main process.  */
-  pi = find_procinfo_or_die (pid, 0);
-
-  /* If the event thread is not the same as GDB's requested thread
-     (ie. inferior_ptid), then look up procinfo for the requested
-     thread.  */
-  if (tid != 0 && tid != proc_get_current_thread (pi))
-    pi = find_procinfo_or_die (pid, tid);
+  pi = find_procinfo_or_die (pid, tid);
 
   if (pi == NULL)
     error (_("procfs: fetch_registers failed to find procinfo for %s"),
@@ -3850,14 +3856,7 @@ procfs_store_registers (struct regcache *regcache, int regnum)
   int tid = TIDGET (inferior_ptid);
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
 
-  /* First find procinfo for main process.  */
-  pi = find_procinfo_or_die (pid, 0);
-
-  /* If the event thread is not the same as GDB's requested thread
-     (ie. inferior_ptid), then look up procinfo for the requested
-     thread.  */
-  if (tid != 0 && tid != proc_get_current_thread (pi))
-    pi = find_procinfo_or_die (pid, tid);
+  pi = find_procinfo_or_die (pid, tid);
 
   if (pi == NULL)
     error (_("procfs: store_registers: failed to find procinfo for %s"),
@@ -4077,6 +4076,8 @@ wait_again:
 		  }
 		else if (syscall_is_exit (pi, what))
 		  {
+		    struct inferior *inf;
+
 		    /* Handle SYS_exit call only */
 		    /* Stopped at entry to SYS_exit.
 		       Make it runnable, resume it, then use
@@ -4090,7 +4091,9 @@ wait_again:
 		       TARGET_WAITKIND_SPURIOUS.  */
 		    if (!proc_run_process (pi, 0, 0))
 		      proc_error (pi, "target_wait, run_process", __LINE__);
-		    if (attach_flag)
+
+		    inf = find_inferior_pid (pi->pid);
+		    if (inf->attach_flag)
 		      {
 			/* Don't call wait: simulate waiting for exit,
 			   return a "success" exit code.  Bogus: what if
@@ -4350,20 +4353,6 @@ wait_again:
 		  add_thread (retval);
 		  if (find_procinfo (PIDGET (retval), TIDGET (retval)) == NULL)
 		    create_procinfo (PIDGET (retval), TIDGET (retval));
-
-		  /* In addition, it's possible that this is the first
-		   * new thread we've seen, in which case we may not
-		   * have created entries for inferior_ptid yet.
-		   */
-		  if (TIDGET (inferior_ptid) != 0)
-		    {
-		      if (!in_thread_list (inferior_ptid))
-			add_thread (inferior_ptid);
-		      if (find_procinfo (PIDGET (inferior_ptid),
-					 TIDGET (inferior_ptid)) == NULL)
-			create_procinfo (PIDGET (inferior_ptid),
-					 TIDGET (inferior_ptid));
-		    }
 		}
 	    }
 	  else	/* flags do not indicate STOPPED */
@@ -4388,18 +4377,18 @@ wait_again:
 
 static LONGEST
 procfs_xfer_partial (struct target_ops *ops, enum target_object object,
-		     const char *annex, void *readbuf,
-		     const void *writebuf, ULONGEST offset, LONGEST len)
+		     const char *annex, gdb_byte *readbuf,
+		     const gdb_byte *writebuf, ULONGEST offset, LONGEST len)
 {
   switch (object)
     {
     case TARGET_OBJECT_MEMORY:
       if (readbuf)
-	return (*ops->deprecated_xfer_memory) (offset, readbuf, len,
-					       0/*read*/, NULL, ops);
+	return (*ops->deprecated_xfer_memory) (offset, readbuf,
+					       len, 0/*read*/, NULL, ops);
       if (writebuf)
-	return (*ops->deprecated_xfer_memory) (offset, writebuf, len,
-					       1/*write*/, NULL, ops);
+	return (*ops->deprecated_xfer_memory) (offset, (gdb_byte *) writebuf,
+					       len, 1/*write*/, NULL, ops);
       return -1;
 
 #ifdef NEW_PROC_API
@@ -4428,7 +4417,7 @@ procfs_xfer_partial (struct target_ops *ops, enum target_object object,
    negative values, but this capability isn't implemented here.) */
 
 static int
-procfs_xfer_memory (CORE_ADDR memaddr, char *myaddr, int len, int dowrite,
+procfs_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int dowrite,
 		    struct mem_attrib *attrib, struct target_ops *target)
 {
   procinfo *pi;
@@ -4703,8 +4692,9 @@ procfs_notice_signals (ptid_t ptid)
 static void
 procfs_files_info (struct target_ops *ignore)
 {
+  struct inferior *inf = current_inferior ();
   printf_filtered (_("\tUsing the running image of %s %s via /proc.\n"),
-		   attach_flag? "attached": "child",
+		   inf->attach_flag? "attached": "child",
 		   target_pid_to_str (inferior_ptid));
 }
 
@@ -4853,7 +4843,7 @@ procfs_kill_inferior (void)
  */
 
 static void
-procfs_mourn_inferior (void)
+procfs_mourn_inferior (struct target_ops *ops)
 {
   procinfo *pi;
 
@@ -4891,6 +4881,7 @@ procfs_init_inferior (int pid)
   procinfo *pi;
   gdb_sigset_t signals;
   int fail;
+  int lwpid;
 
   /* This routine called on the parent side (GDB side)
      after GDB forks the inferior.  */
@@ -4951,9 +4942,17 @@ procfs_init_inferior (int pid)
   if (!proc_set_run_on_last_close (pi))
     proc_error (pi, "init_inferior, set_RLC", __LINE__);
 
-  /* The 'process ID' we return to GDB is composed of
-     the actual process ID plus the lwp ID. */
-  inferior_ptid = MERGEPID (pi->pid, proc_get_current_thread (pi));
+  /* We now have have access to the lwpid of the main thread/lwp.  */
+  lwpid = proc_get_current_thread (pi);
+
+  /* Create a procinfo for the main lwp.  */
+  create_procinfo (pid, lwpid);
+
+  /* We already have a main thread registered in the thread table at
+     this point, but it didn't have any lwp info yet.  Notify the core
+     about it.  This changes inferior_ptid as well.  */
+  thread_change_ptid (pid_to_ptid (pid),
+		      MERGEPID (pid, lwpid));
 
   /* Typically two, one trap to exec the shell, one to exec the
      program being debugged.  Defined by "inferior.h".  */
@@ -5113,8 +5112,8 @@ procfs_set_exec_trap (void)
  */
 
 static void
-procfs_create_inferior (char *exec_file, char *allargs, char **env,
-			int from_tty)
+procfs_create_inferior (struct target_ops *ops, char *exec_file,
+			char *allargs, char **env, int from_tty)
 {
   char *shell_file = getenv ("SHELL");
   char *tryname;
@@ -5212,7 +5211,7 @@ procfs_notice_thread (procinfo *pi, procinfo *thread, void *ptr)
 {
   ptid_t gdb_threadid = MERGEPID (pi->pid, thread->tid);
 
-  if (!in_thread_list (gdb_threadid))
+  if (!in_thread_list (gdb_threadid) || is_exited (gdb_threadid))
     add_thread (gdb_threadid);
 
   return 0;
@@ -5361,7 +5360,8 @@ procfs_can_use_hw_breakpoint (int type, int cnt, int othertype)
      procfs_address_to_host_pointer will reveal that an internal error
      will be generated when the host and target pointer sizes are
      different.  */
-  if (sizeof (void *) != TYPE_LENGTH (builtin_type_void_data_ptr))
+  struct type *ptr_type = builtin_type (target_gdbarch)->builtin_data_ptr;
+  if (sizeof (void *) != TYPE_LENGTH (ptr_type))
     return 0;
 
   /* Other tests here???  */
@@ -5782,23 +5782,28 @@ mappingflags (long flags)
 static int
 info_mappings_callback (struct prmap *map, int (*ignore) (), void *unused)
 {
-  char *data_fmt_string;
+  unsigned int pr_off;
+
+#ifdef PCAGENT	/* Horrible hack: only defined on Solaris 2.6+ */
+  pr_off = (unsigned int) map->pr_offset;
+#else
+  pr_off = map->pr_off;
+#endif
 
   if (gdbarch_addr_bit (current_gdbarch) == 32)
-    data_fmt_string   = "\t%#10lx %#10lx %#10x %#10x %7s\n";
+    printf_filtered ("\t%#10lx %#10lx %#10lx %#10x %7s\n",
+		     (unsigned long) map->pr_vaddr,
+		     (unsigned long) map->pr_vaddr + map->pr_size - 1,
+		     (unsigned long) map->pr_size,
+		     pr_off,
+		     mappingflags (map->pr_mflags));
   else
-    data_fmt_string   = "  %#18lx %#18lx %#10x %#10x %7s\n";
-
-  printf_filtered (data_fmt_string,
-		   (unsigned long) map->pr_vaddr,
-		   (unsigned long) map->pr_vaddr + map->pr_size - 1,
-		   map->pr_size,
-#ifdef PCAGENT	/* Horrible hack: only defined on Solaris 2.6+ */
-		   (unsigned int) map->pr_offset,
-#else
-		   map->pr_off,
-#endif
-		   mappingflags (map->pr_mflags));
+    printf_filtered ("  %#18lx %#18lx %#10lx %#10x %7s\n",
+		     (unsigned long) map->pr_vaddr,
+		     (unsigned long) map->pr_vaddr + map->pr_size - 1,
+		     (unsigned long) map->pr_size,
+		     pr_off,
+		     mappingflags (map->pr_mflags));
 
   return 0;
 }
@@ -5812,23 +5817,24 @@ info_mappings_callback (struct prmap *map, int (*ignore) (), void *unused)
 static void
 info_proc_mappings (procinfo *pi, int summary)
 {
-  char *header_fmt_string;
-
-  if (gdbarch_ptr_bit (current_gdbarch) == 32)
-    header_fmt_string = "\t%10s %10s %10s %10s %7s\n";
-  else
-    header_fmt_string = "  %18s %18s %10s %10s %7s\n";
-
   if (summary)
     return;	/* No output for summary mode. */
 
   printf_filtered (_("Mapped address spaces:\n\n"));
-  printf_filtered (header_fmt_string,
-		   "Start Addr",
-		   "  End Addr",
-		   "      Size",
-		   "    Offset",
-		   "Flags");
+  if (gdbarch_ptr_bit (current_gdbarch) == 32)
+    printf_filtered ("\t%10s %10s %10s %10s %7s\n",
+		     "Start Addr",
+		     "  End Addr",
+		     "      Size",
+		     "    Offset",
+		     "Flags");
+  else
+    printf_filtered ("  %18s %18s %10s %10s %7s\n",
+		     "Start Addr",
+		     "  End Addr",
+		     "      Size",
+		     "    Offset",
+		     "Flags");
 
   iterate_over_mappings (pi, NULL, NULL, info_mappings_callback);
   printf_filtered ("\n");
@@ -5855,10 +5861,8 @@ info_proc_cmd (char *args, int from_tty)
   old_chain = make_cleanup (null_cleanup, 0);
   if (args)
     {
-      if ((argv = buildargv (args)) == NULL)
-	nomem (0);
-      else
-	make_cleanup_freeargv (argv);
+      argv = gdb_buildargv (args);
+      make_cleanup_freeargv (argv);
     }
   while (argv != NULL && *argv != NULL)
     {
@@ -6054,13 +6058,36 @@ procfs_first_available (void)
   return pid_to_ptid (procinfo_list ? procinfo_list->pid : -1);
 }
 
+static int
+find_signalled_thread (struct thread_info *info, void *data)
+{
+  if (info->stop_signal != TARGET_SIGNAL_0
+      && ptid_get_pid (info->ptid) == ptid_get_pid (inferior_ptid))
+    return 1;
+
+  return 0;
+}
+
+static enum target_signal
+find_stop_signal (void)
+{
+  struct thread_info *info =
+    iterate_over_threads (find_signalled_thread, NULL);
+
+  if (info)
+    return info->stop_signal;
+  else
+    return TARGET_SIGNAL_0;
+}
+
 /* ===================  GCORE .NOTE "MODULE" =================== */
 #if defined (UNIXWARE) || defined (PIOCOPENLWP) || defined (PCAGENT)
 /* gcore only implemented on solaris and unixware (so far) */
 
 static char *
 procfs_do_thread_registers (bfd *obfd, ptid_t ptid,
-			    char *note_data, int *note_size)
+			    char *note_data, int *note_size,
+			    enum target_signal stop_signal)
 {
   struct regcache *regcache = get_thread_regcache (ptid);
   gdb_gregset_t gregs;
@@ -6098,6 +6125,7 @@ struct procfs_corefile_thread_data {
   bfd *obfd;
   char *note_data;
   int *note_size;
+  enum target_signal stop_signal;
 };
 
 static int
@@ -6105,13 +6133,14 @@ procfs_corefile_thread_callback (procinfo *pi, procinfo *thread, void *data)
 {
   struct procfs_corefile_thread_data *args = data;
 
-  if (pi != NULL && thread->tid != 0)
+  if (pi != NULL)
     {
       ptid_t saved_ptid = inferior_ptid;
       inferior_ptid = MERGEPID (pi->pid, thread->tid);
       args->note_data = procfs_do_thread_registers (args->obfd, inferior_ptid,
 						    args->note_data,
-						    args->note_size);
+						    args->note_size,
+						    args->stop_signal);
       inferior_ptid = saved_ptid;
     }
   return 0;
@@ -6129,7 +6158,7 @@ procfs_make_note_section (bfd *obfd, int *note_size)
   char *note_data = NULL;
   char *inf_args;
   struct procfs_corefile_thread_data thread_args;
-  char *auxv;
+  gdb_byte *auxv;
   int auxv_len;
 
   if (get_exec_file (0))
@@ -6165,19 +6194,12 @@ procfs_make_note_section (bfd *obfd, int *note_size)
   thread_args.obfd = obfd;
   thread_args.note_data = note_data;
   thread_args.note_size = note_size;
+  thread_args.stop_signal = find_stop_signal ();
   proc_iterate_over_threads (pi, procfs_corefile_thread_callback, &thread_args);
 
-  if (thread_args.note_data == note_data)
-    {
-      /* iterate_over_threads didn't come up with any threads;
-	 just use inferior_ptid. */
-      note_data = procfs_do_thread_registers (obfd, inferior_ptid,
-					      note_data, note_size);
-    }
-  else
-    {
-      note_data = thread_args.note_data;
-    }
+  /* There should be always at least one thread.  */
+  gdb_assert (thread_args.note_data != note_data);
+  note_data = thread_args.note_data;
 
   auxv_len = target_read_alloc (&current_target, TARGET_OBJECT_AUXV,
 				NULL, &auxv);

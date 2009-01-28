@@ -446,6 +446,9 @@
 #ifndef elf_backend_got_header_size
 #define elf_backend_got_header_size	0
 #endif
+#ifndef elf_backend_got_elt_size
+#define elf_backend_got_elt_size _bfd_elf_default_got_elt_size
+#endif
 #ifndef elf_backend_obj_attrs_vendor
 #define elf_backend_obj_attrs_vendor		NULL
 #endif
@@ -457,6 +460,9 @@
 #endif
 #ifndef elf_backend_obj_attrs_section_type
 #define elf_backend_obj_attrs_section_type		SHT_GNU_ATTRIBUTES
+#endif
+#ifndef elf_backend_obj_attrs_order
+#define elf_backend_obj_attrs_order		NULL
 #endif
 #ifndef elf_backend_post_process_headers
 #define elf_backend_post_process_headers	NULL
@@ -712,10 +718,12 @@ static struct elf_backend_data elfNN_bed =
   &elf_backend_size_info,
   elf_backend_special_sections,
   elf_backend_got_header_size,
+  elf_backend_got_elt_size,
   elf_backend_obj_attrs_vendor,
   elf_backend_obj_attrs_section,
   elf_backend_obj_attrs_arg_type,
   elf_backend_obj_attrs_section_type,
+  elf_backend_obj_attrs_order,
   elf_backend_collect,
   elf_backend_type_change_ok,
   elf_backend_may_use_rel_p,

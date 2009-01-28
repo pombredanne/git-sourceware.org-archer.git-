@@ -1,6 +1,7 @@
 # Reply server mig-output massager
 #
-#   Copyright (C) 1995, 1996, 1999, 2007, 2008 Free Software Foundation, Inc.
+#   Copyright (C) 1995, 1996, 1999, 2007, 2008, 2009
+#   Free Software Foundation, Inc.
 #
 #   Written by Miles Bader <miles@gnu.ai.mit.edu>
 #
@@ -101,7 +102,7 @@ parse_phase == 5 && /^#if[ \t]TypeCheck/ {
   # structure that we want to check for.
   print "\tif (In0P->Head.msgh_size == sizeof (Reply)";
   print "\t    && ! (In0P->Head.msgh_bits & MACH_MSGH_BITS_COMPLEX)";
-  print "\t    && *(int *)&In0P->" arg_type_code_name[0] " == *(int *)&" arg_check_name[0];
+  print "\t    && ! BAD_TYPECHECK(&In0P->" arg_type_code_name[0] ", &" arg_check_name[0] ")";
   print "\t    && In0P->" arg_name[0] " != 0)";
   print "\t  /* Error return, only the error code argument is passed.  */";
   print "\t  {";

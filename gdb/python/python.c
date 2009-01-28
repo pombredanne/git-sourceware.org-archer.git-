@@ -1,6 +1,6 @@
 /* General python/gdb code
 
-   Copyright (C) 2008 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -52,6 +52,8 @@ static PyObject *gdbpy_flush (PyObject *, PyObject *);
 
 static PyMethodDef GdbMethods[] =
 {
+  { "get_value_from_history", gdbpy_get_value_from_history, METH_VARARGS,
+    "Get a value from history" },
   { "execute", execute_gdb_command, METH_VARARGS,
     "Execute a gdb command" },
   { "get_parameter", get_parameter, METH_VARARGS,
@@ -101,9 +103,14 @@ void
 eval_python_from_control_command (struct command_line *cmd)
 {
   char *script;
+  struct cleanup *cleanup;
+  PyGILState_STATE state;
 
   if (cmd->body_count != 1)
     error (_("Invalid \"python\" block structure."));
+
+  state = PyGILState_Ensure ();
+  cleanup = make_cleanup_py_restore_gil (&state);
 
   script = compute_python_string (cmd->body_list[0]);
   PyRun_SimpleString (script);
@@ -113,6 +120,8 @@ eval_python_from_control_command (struct command_line *cmd)
       gdbpy_print_stack ();
       error (_("error while executing Python code"));
     }
+
+  do_cleanups (cleanup);
 }
 
 /* Implementation of the gdb "python" command.  */
@@ -120,6 +129,12 @@ eval_python_from_control_command (struct command_line *cmd)
 static void
 python_command (char *arg, int from_tty)
 {
+  struct cleanup *cleanup;
+  PyGILState_STATE state;
+
+  state = PyGILState_Ensure ();
+  cleanup = make_cleanup_py_restore_gil (&state);
+
   while (arg && *arg && isspace (*arg))
     ++arg;
   if (arg && *arg)
@@ -134,10 +149,11 @@ python_command (char *arg, int from_tty)
   else
     {
       struct command_line *l = get_command_line (python_control, "");
-      struct cleanup *cleanups = make_cleanup_free_command_lines (&l);
+      make_cleanup_free_command_lines (&l);
       execute_control_command_untraced (l);
-      do_cleanups (cleanups);
     }
+
+  do_cleanups (cleanup);
 }
 
 
@@ -241,12 +257,9 @@ execute_gdb_command (PyObject *self, PyObject *args)
   struct cmd_list_element *alias, *prefix, *cmd;
   char *arg, *newarg;
   volatile struct gdb_exception except;
-  struct cleanup *old_chain;
 
   if (! PyArg_ParseTuple (args, "s", &arg))
     return NULL;
-
-  old_chain = make_cleanup (null_cleanup, 0);
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
@@ -254,14 +267,8 @@ execute_gdb_command (PyObject *self, PyObject *args)
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
-  /* Do any commands attached to breakpoint we stopped at. Only if we
-     are always running synchronously. Or if we have just executed a
-     command that doesn't start the target. */
-  if (!target_can_async_p () || !is_running (inferior_ptid))
-    {
-      bpstat_do_actions (&stop_bpstat);
-      do_cleanups (old_chain);
-    }
+  /* Do any commands attached to breakpoint we stopped at.  */
+  bpstat_do_actions ();
 
   Py_RETURN_NONE;
 }
@@ -399,6 +406,7 @@ Enables or disables printing of Python stack traces."),
 
 #ifdef HAVE_PYTHON
   Py_Initialize ();
+  PyEval_InitThreads ();
 
   gdb_module = Py_InitModule ("gdb", GdbMethods);
 
@@ -406,6 +414,8 @@ Enables or disables printing of Python stack traces."),
   PyModule_AddStringConstant (gdb_module, "VERSION", (char*) version);
   PyModule_AddStringConstant (gdb_module, "HOST_CONFIG", (char*) host_name);
   PyModule_AddStringConstant (gdb_module, "TARGET_CONFIG", (char*) target_name);
+
+  gdbpy_initialize_values ();
 
   PyRun_SimpleString ("import gdb");
 
@@ -434,5 +444,10 @@ class GdbOutputFile:\n\
 sys.stderr = GdbOutputFile()\n\
 sys.stdout = GdbOutputFile()\n\
 ");
+
+  /* Release the GIL while gdb runs.  */
+  PyThreadState_Swap (NULL);
+  PyEval_ReleaseLock ();
+
 #endif /* HAVE_PYTHON */
 }

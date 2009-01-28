@@ -1,6 +1,6 @@
 /* nto-tdep.h - QNX Neutrino target header.
 
-   Copyright (C) 2003, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2003, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    Contributed by QNX Software Systems Ltd.
 
@@ -61,7 +61,7 @@ struct nto_target_ops
    and stuff it into the last argument.  If regno is -1, calculate the
    size of the entire regset.  Returns length of data, -1 if unknown
    regset, 0 if unknown register.  */
-  int (*register_area) (int, int, unsigned *);
+  int (*register_area) (struct gdbarch *, int, int, unsigned *);
 
 /* Build the Neutrino register set info into the data buffer.  
    Return -1 if unknown regset, 0 otherwise.  */

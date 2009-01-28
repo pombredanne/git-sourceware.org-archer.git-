@@ -1,5 +1,5 @@
 /* Handling of inferior events for the event loop for GDB, the GNU debugger.
-   Copyright (C) 1999, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2007, 2008, 2009 Free Software Foundation, Inc.
    Written by Elena Zannoni <ezannoni@cygnus.com> of Cygnus Solutions.
 
    This file is part of GDB.
@@ -50,8 +50,7 @@ inferior_event_handler (enum inferior_event_type event_type,
     {
     case INF_ERROR:
       printf_unfiltered (_("error detected from target.\n"));
-      target_async (NULL, 0);
-      pop_target ();
+      pop_all_targets_above (file_stratum, 0);
       discard_all_intermediate_continuations ();
       discard_all_continuations ();
       async_enable_stdin ();
@@ -65,8 +64,7 @@ inferior_event_handler (enum inferior_event_type event_type,
       if (!catch_errors (fetch_inferior_event_wrapper, 
 			 client_data, "", RETURN_MASK_ALL))
 	{
-	  target_async (NULL, 0);
-	  pop_target ();
+	  pop_all_targets_above (file_stratum, 0);
 	  discard_all_intermediate_continuations ();
 	  discard_all_continuations ();
 	  async_enable_stdin ();
@@ -91,6 +89,11 @@ inferior_event_handler (enum inferior_event_type event_type,
       was_sync = sync_execution;
       async_enable_stdin ();
 
+      /* Do all continuations associated with the whole inferior (not
+	 a particular thread).  */
+      if (!ptid_equal (inferior_ptid, null_ptid))
+	do_all_inferior_continuations ();
+
       /* If we were doing a multi-step (eg: step n, next n), but it
 	 got interrupted by a breakpoint, still do the pending
 	 continuations.  The continuation itself is responsible for
@@ -98,13 +101,23 @@ inferior_event_handler (enum inferior_event_type event_type,
 	 touch the inferior memory, e.g. to remove breakpoints, so run
 	 them before running breakpoint commands, which may resume the
 	 target.  */
-      do_all_intermediate_continuations ();
+      if (non_stop
+	  && target_has_execution
+	  && !ptid_equal (inferior_ptid, null_ptid))
+	do_all_intermediate_continuations_thread (inferior_thread ());
+      else
+	do_all_intermediate_continuations ();
 
       /* Always finish the previous command before running any
 	 breakpoint commands.  Any stop cancels the previous command.
 	 E.g. a "finish" or "step-n" command interrupted by an
 	 unrelated breakpoint is canceled.  */
-      do_all_continuations ();
+      if (non_stop
+	  && target_has_execution
+	  && !ptid_equal (inferior_ptid, null_ptid))
+	do_all_continuations_thread (inferior_thread ());
+      else
+	do_all_continuations ();
 
       if (current_language != expected_language
 	  && language_mode == language_mode_auto)
@@ -115,7 +128,7 @@ inferior_event_handler (enum inferior_event_type event_type,
 	 be informed.  */
       TRY_CATCH (e, RETURN_MASK_ALL)
 	{
-	  bpstat_do_actions (&stop_bpstat);
+	  bpstat_do_actions ();
 	}
 
       if (!was_sync && !is_running (inferior_ptid) && exec_done_display_p)
@@ -125,7 +138,11 @@ inferior_event_handler (enum inferior_event_type event_type,
     case INF_EXEC_CONTINUE:
       /* Is there anything left to do for the command issued to
          complete? */
-      do_all_intermediate_continuations ();
+
+      if (non_stop)
+	do_all_intermediate_continuations_thread (inferior_thread ());
+      else
+	do_all_intermediate_continuations ();
       break;
 
     case INF_QUIT_REQ: 

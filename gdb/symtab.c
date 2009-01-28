@@ -1,7 +1,7 @@
 /* Symbol table lookup for the GNU debugger, GDB.
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008
+   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -58,6 +58,8 @@
 #include "observer.h"
 #include "gdb_assert.h"
 #include "solist.h"
+#include "macrotab.h"
+#include "macroscope.h"
 
 /* Prototypes for local functions */
 
@@ -705,8 +707,11 @@ init_sal (struct symtab_and_line *sal)
    file and another in a separated debug file.  */
 
 int
-matching_bfd_sections (asection *first, asection *second)
+matching_obj_sections (struct obj_section *obj_first,
+		       struct obj_section *obj_second)
 {
+  asection *first = obj_first? obj_first->the_bfd_section : NULL;
+  asection *second = obj_second? obj_second->the_bfd_section : NULL;
   struct objfile *obj;
 
   /* If they're the same section, then they match.  */
@@ -766,7 +771,7 @@ matching_bfd_sections (asection *first, asection *second)
    We may find a different psymtab than PST.  See FIND_PC_SECT_PSYMTAB.  */
 
 struct partial_symtab *
-find_pc_sect_psymtab_closer (CORE_ADDR pc, asection *section,
+find_pc_sect_psymtab_closer (CORE_ADDR pc, struct obj_section *section,
 			     struct partial_symtab *pst,
 			     struct minimal_symbol *msymbol)
 {
@@ -844,7 +849,7 @@ find_pc_sect_psymtab_closer (CORE_ADDR pc, asection *section,
    exactly matches PC, or, if we cannot find an exact match, the
    psymtab that contains a symbol whose address is closest to PC.  */
 struct partial_symtab *
-find_pc_sect_psymtab (CORE_ADDR pc, asection *section)
+find_pc_sect_psymtab (CORE_ADDR pc, struct obj_section *section)
 {
   struct objfile *objfile;
   struct minimal_symbol *msymbol;
@@ -854,11 +859,11 @@ find_pc_sect_psymtab (CORE_ADDR pc, asection *section)
      not include the data ranges.  */
   msymbol = lookup_minimal_symbol_by_pc_section (pc, section);
   if (msymbol
-      && (msymbol->type == mst_data
-	  || msymbol->type == mst_bss
-	  || msymbol->type == mst_abs
-	  || msymbol->type == mst_file_data
-	  || msymbol->type == mst_file_bss))
+      && (MSYMBOL_TYPE (msymbol) == mst_data
+	  || MSYMBOL_TYPE (msymbol) == mst_bss
+	  || MSYMBOL_TYPE (msymbol) == mst_abs
+	  || MSYMBOL_TYPE (msymbol) == mst_file_data
+	  || MSYMBOL_TYPE (msymbol) == mst_file_bss))
     return NULL;
 
   /* Try just the PSYMTABS_ADDRMAP mapping first as it has better granularity
@@ -948,7 +953,7 @@ find_pc_psymtab (CORE_ADDR pc)
 
 struct partial_symbol *
 find_pc_sect_psymbol (struct partial_symtab *psymtab, CORE_ADDR pc,
-		      asection *section)
+		      struct obj_section *section)
 {
   struct partial_symbol *best = NULL, *p, **pp;
   CORE_ADDR best_pc;
@@ -980,7 +985,7 @@ find_pc_sect_psymbol (struct partial_symtab *psymtab, CORE_ADDR pc,
 	  if (section)		/* match on a specific section */
 	    {
 	      fixup_psymbol_section (p, psymtab->objfile);
-	      if (!matching_bfd_sections (SYMBOL_BFD_SECTION (p), section))
+	      if (!matching_obj_sections (SYMBOL_OBJ_SECTION (p), section))
 		continue;
 	    }
 	  best_pc = SYMBOL_VALUE_ADDRESS (p);
@@ -1004,7 +1009,7 @@ find_pc_sect_psymbol (struct partial_symtab *psymtab, CORE_ADDR pc,
 	  if (section)		/* match on a specific section */
 	    {
 	      fixup_psymbol_section (p, psymtab->objfile);
-	      if (!matching_bfd_sections (SYMBOL_BFD_SECTION (p), section))
+	      if (!matching_obj_sections (SYMBOL_OBJ_SECTION (p), section))
 		continue;
 	    }
 	  best_pc = SYMBOL_VALUE_ADDRESS (p);
@@ -1041,7 +1046,7 @@ fixup_section (struct general_symbol_info *ginfo,
   msym = lookup_minimal_symbol_by_pc_name (addr, ginfo->name, objfile);
   if (msym)
     {
-      ginfo->bfd_section = SYMBOL_BFD_SECTION (msym);
+      ginfo->obj_section = SYMBOL_OBJ_SECTION (msym);
       ginfo->section = SYMBOL_SECTION (msym);
     }
   else
@@ -1091,7 +1096,7 @@ fixup_section (struct general_symbol_info *ginfo,
 	  if (obj_section_addr (s) - offset <= addr
 	      && addr < obj_section_endaddr (s) - offset)
 	    {
-	      ginfo->bfd_section = s->the_bfd_section;
+	      ginfo->obj_section = s;
 	      ginfo->section = idx;
 	      return;
 	    }
@@ -1107,7 +1112,7 @@ fixup_symbol_section (struct symbol *sym, struct objfile *objfile)
   if (!sym)
     return NULL;
 
-  if (SYMBOL_BFD_SECTION (sym))
+  if (SYMBOL_OBJ_SECTION (sym))
     return sym;
 
   /* We either have an OBJFILE, or we can get at it from the sym's
@@ -1149,7 +1154,7 @@ fixup_psymbol_section (struct partial_symbol *psym, struct objfile *objfile)
   if (!psym)
     return NULL;
 
-  if (SYMBOL_BFD_SECTION (psym))
+  if (SYMBOL_OBJ_SECTION (psym))
     return psym;
 
   gdb_assert (objfile);
@@ -2008,7 +2013,7 @@ lookup_block_symbol (const struct block *block, const char *name,
    psymtabs and read in another symtab if necessary. */
 
 struct symtab *
-find_pc_sect_symtab (CORE_ADDR pc, asection *section)
+find_pc_sect_symtab (CORE_ADDR pc, struct obj_section *section)
 {
   struct block *b;
   struct blockvector *bv;
@@ -2026,11 +2031,11 @@ find_pc_sect_symtab (CORE_ADDR pc, asection *section)
      on the partial_symtab's texthigh and textlow.  */
   msymbol = lookup_minimal_symbol_by_pc_section (pc, section);
   if (msymbol
-      && (msymbol->type == mst_data
-	  || msymbol->type == mst_bss
-	  || msymbol->type == mst_abs
-	  || msymbol->type == mst_file_data
-	  || msymbol->type == mst_file_bss))
+      && (MSYMBOL_TYPE (msymbol) == mst_data
+	  || MSYMBOL_TYPE (msymbol) == mst_bss
+	  || MSYMBOL_TYPE (msymbol) == mst_abs
+	  || MSYMBOL_TYPE (msymbol) == mst_file_data
+	  || MSYMBOL_TYPE (msymbol) == mst_file_bss))
     return NULL;
 
   /* Search all symtabs for the one whose file contains our address, and which
@@ -2078,7 +2083,7 @@ find_pc_sect_symtab (CORE_ADDR pc, asection *section)
 	    ALL_BLOCK_SYMBOLS (b, iter, sym)
 	      {
 		fixup_symbol_section (sym, objfile);
-		if (matching_bfd_sections (SYMBOL_BFD_SECTION (sym), section))
+		if (matching_obj_sections (SYMBOL_OBJ_SECTION (sym), section))
 		  break;
 	      }
 	    if (sym == NULL)
@@ -2136,7 +2141,7 @@ find_pc_symtab (CORE_ADDR pc)
 /* If it's worth the effort, we could be using a binary search.  */
 
 struct symtab_and_line
-find_pc_sect_line (CORE_ADDR pc, struct bfd_section *section, int notcurrent)
+find_pc_sect_line (CORE_ADDR pc, struct obj_section *section, int notcurrent)
 {
   struct symtab *s;
   struct linetable *l;
@@ -2373,7 +2378,7 @@ find_pc_sect_line (CORE_ADDR pc, struct bfd_section *section, int notcurrent)
 struct symtab_and_line
 find_pc_line (CORE_ADDR pc, int notcurrent)
 {
-  asection *section;
+  struct obj_section *section;
 
   section = find_pc_overlay (pc);
   if (pc_in_unmapped_range (pc, section))
@@ -2605,7 +2610,7 @@ find_pc_line_pc_range (CORE_ADDR pc, CORE_ADDR *startptr, CORE_ADDR *endptr)
    address after the function prologue.  */
 CORE_ADDR
 find_function_start_pc (struct gdbarch *gdbarch,
-			CORE_ADDR pc, asection *section)
+			CORE_ADDR pc, struct obj_section *section)
 {
   /* If the function is in an unmapped overlay, use its unmapped LMA address,
      so that gdbarch_skip_prologue has something unique to work on.  */
@@ -2641,9 +2646,9 @@ find_function_start_sal (struct symbol *sym, int funfirstline)
   if (funfirstline)
     {
       /* Skip "first line" of function (which is actually its prologue).  */
-      pc = find_function_start_pc (gdbarch, pc, SYMBOL_BFD_SECTION (sym));
+      pc = find_function_start_pc (gdbarch, pc, SYMBOL_OBJ_SECTION (sym));
     }
-  sal = find_pc_sect_line (pc, SYMBOL_BFD_SECTION (sym), 0);
+  sal = find_pc_sect_line (pc, SYMBOL_OBJ_SECTION (sym), 0);
 
   /* Check if gdbarch_skip_prologue left us in mid-line, and the next
      line is still part of the same function.  */
@@ -2654,7 +2659,7 @@ find_function_start_sal (struct symbol *sym, int funfirstline)
       /* First pc of next line */
       pc = sal.end;
       /* Recalculate the line number (might not be N+1).  */
-      sal = find_pc_sect_line (pc, SYMBOL_BFD_SECTION (sym), 0);
+      sal = find_pc_sect_line (pc, SYMBOL_OBJ_SECTION (sym), 0);
     }
 
   /* On targets with executable formats that don't have a concept of
@@ -2668,7 +2673,7 @@ find_function_start_sal (struct symbol *sym, int funfirstline)
     {
       pc = gdbarch_skip_main_prologue (current_gdbarch, pc);
       /* Recalculate the line number (might not be N+1).  */
-      sal = find_pc_sect_line (pc, SYMBOL_BFD_SECTION (sym), 0);
+      sal = find_pc_sect_line (pc, SYMBOL_OBJ_SECTION (sym), 0);
     }
 
   sal.pc = pc;
@@ -3022,7 +3027,6 @@ sort_search_symbols (struct symbol_search *prevtail, int nfound)
    Only symbols of KIND are searched:
    FUNCTIONS_DOMAIN - search all functions
    TYPES_DOMAIN     - search all type names
-   METHODS_DOMAIN   - search all methods NOT IMPLEMENTED
    VARIABLES_DOMAIN - search all symbols, excluding functions, type names,
    and constants (enums)
 
@@ -3163,8 +3167,7 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
 		    && ((kind == VARIABLES_DOMAIN && SYMBOL_CLASS (*psym) != LOC_TYPEDEF
 			 && SYMBOL_CLASS (*psym) != LOC_BLOCK)
 			|| (kind == FUNCTIONS_DOMAIN && SYMBOL_CLASS (*psym) == LOC_BLOCK)
-			|| (kind == TYPES_DOMAIN && SYMBOL_CLASS (*psym) == LOC_TYPEDEF)
-			|| (kind == METHODS_DOMAIN && SYMBOL_CLASS (*psym) == LOC_BLOCK))))
+			|| (kind == TYPES_DOMAIN && SYMBOL_CLASS (*psym) == LOC_TYPEDEF))))
 	      {
 		PSYMTAB_TO_SYMTAB (ps);
 		keep_going = 0;
@@ -3239,8 +3242,7 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
 			   && SYMBOL_CLASS (sym) != LOC_BLOCK
 			   && SYMBOL_CLASS (sym) != LOC_CONST)
 			  || (kind == FUNCTIONS_DOMAIN && SYMBOL_CLASS (sym) == LOC_BLOCK)
-			  || (kind == TYPES_DOMAIN && SYMBOL_CLASS (sym) == LOC_TYPEDEF)
-			  || (kind == METHODS_DOMAIN && SYMBOL_CLASS (sym) == LOC_BLOCK))))
+			  || (kind == TYPES_DOMAIN && SYMBOL_CLASS (sym) == LOC_TYPEDEF))))
 		{
 		  /* match */
 		  psr = (struct symbol_search *) xmalloc (sizeof (struct symbol_search));
@@ -3675,6 +3677,29 @@ language_search_unquoted_string (char *text, char *p)
   return p;
 }
 
+/* Type of the user_data argument passed to add_macro_name.  The
+   contents are simply whatever is needed by
+   completion_list_add_name.  */
+struct add_macro_name_data
+{
+  char *sym_text;
+  int sym_text_len;
+  char *text;
+  char *word;
+};
+
+/* A callback used with macro_for_each and macro_for_each_in_scope.
+   This adds a macro's name to the current completion list.  */
+static void
+add_macro_name (const char *name, const struct macro_definition *ignore,
+		void *user_data)
+{
+  struct add_macro_name_data *datum = (struct add_macro_name_data *) user_data;
+  completion_list_add_name ((char *) name,
+			    datum->sym_text, datum->sym_text_len,
+			    datum->text, datum->word);
+}
+
 char **
 default_make_symbol_completion_list (char *text, char *word)
 {
@@ -3860,6 +3885,35 @@ default_make_symbol_completion_list (char *text, char *word)
 	COMPLETION_LIST_ADD_SYMBOL (sym, sym_text, sym_text_len, text, word);
       }
   }
+
+  if (current_language->la_macro_expansion == macro_expansion_c)
+    {
+      struct macro_scope *scope;
+      struct add_macro_name_data datum;
+
+      datum.sym_text = sym_text;
+      datum.sym_text_len = sym_text_len;
+      datum.text = text;
+      datum.word = word;
+
+      /* Add any macros visible in the default scope.  Note that this
+	 may yield the occasional wrong result, because an expression
+	 might be evaluated in a scope other than the default.  For
+	 example, if the user types "break file:line if <TAB>", the
+	 resulting expression will be evaluated at "file:line" -- but
+	 at there does not seem to be a way to detect this at
+	 completion time.  */
+      scope = default_macro_scope ();
+      if (scope)
+	{
+	  macro_for_each_in_scope (scope->file, scope->line,
+				   add_macro_name, &datum);
+	  xfree (scope);
+	}
+
+      /* User-defined macros are always visible.  */
+      macro_for_each (macro_user_macros, add_macro_name, &datum);
+    }
 
   return (return_val);
 }
@@ -4233,6 +4287,7 @@ skip_prologue_using_sal (CORE_ADDR func_addr)
   struct symtab_and_line prologue_sal;
   CORE_ADDR start_pc;
   CORE_ADDR end_pc;
+  struct block *bl;
 
   /* Get an initial range for the function.  */
   find_pc_partial_function (func_addr, NULL, &start_pc, &end_pc);
@@ -4241,11 +4296,35 @@ skip_prologue_using_sal (CORE_ADDR func_addr)
   prologue_sal = find_pc_line (start_pc, 0);
   if (prologue_sal.line != 0)
     {
+      /* For langauges other than assembly, treat two consecutive line
+	 entries at the same address as a zero-instruction prologue.
+	 The GNU assembler emits separate line notes for each instruction
+	 in a multi-instruction macro, but compilers generally will not
+	 do this.  */
+      if (prologue_sal.symtab->language != language_asm)
+	{
+	  struct linetable *linetable = LINETABLE (prologue_sal.symtab);
+	  int exact;
+	  int idx = 0;
+
+	  /* Skip any earlier lines, and any end-of-sequence marker
+	     from a previous function.  */
+	  while (linetable->item[idx].pc != prologue_sal.pc
+		 || linetable->item[idx].line == 0)
+	    idx++;
+
+	  if (idx+1 < linetable->nitems
+	      && linetable->item[idx+1].line != 0
+	      && linetable->item[idx+1].pc == start_pc)
+	    return start_pc;
+	}
+
       /* If there is only one sal that covers the entire function,
 	 then it is probably a single line function, like
 	 "foo(){}". */
       if (prologue_sal.end >= end_pc)
 	return 0;
+
       while (prologue_sal.end < end_pc)
 	{
 	  struct symtab_and_line sal;
@@ -4267,7 +4346,14 @@ skip_prologue_using_sal (CORE_ADDR func_addr)
 	  prologue_sal = sal;
 	}
     }
-  return prologue_sal.end;
+
+  if (prologue_sal.end < end_pc)
+    /* Return the end of this line, or zero if we could not find a
+       line.  */
+    return prologue_sal.end;
+  else
+    /* Don't return END_PC, which is past the end of the function.  */
+    return prologue_sal.pc;
 }
 
 struct symtabs_and_lines

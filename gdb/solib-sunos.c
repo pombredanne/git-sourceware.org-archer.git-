@@ -1,7 +1,7 @@
 /* Handle SunOS shared libraries for GDB, the GNU Debugger.
 
    Copyright (C) 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1998, 1999, 2000,
-   2001, 2004, 2007, 2008 Free Software Foundation, Inc.
+   2001, 2004, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -36,6 +36,7 @@
 #include "objfiles.h"
 #include "gdbcore.h"
 #include "inferior.h"
+#include "gdbthread.h"
 #include "solist.h"
 #include "bcache.h"
 #include "regcache.h"
@@ -737,6 +738,9 @@ sunos_special_symbol_handling (void)
 static void
 sunos_solib_create_inferior_hook (void)
 {
+  struct thread_info *tp;
+  struct inferior *inf;
+
   if ((debug_base = locate_base ()) == 0)
     {
       /* Can't find the symbol or the executable is statically linked. */
@@ -758,16 +762,20 @@ sunos_solib_create_inferior_hook (void)
      can go groveling around in the dynamic linker structures to find
      out what we need to know about them. */
 
+  inf = current_inferior ();
+  tp = inferior_thread ();
+
   clear_proceed_status ();
-  stop_soon = STOP_QUIETLY;
-  stop_signal = TARGET_SIGNAL_0;
+
+  inf->stop_soon = STOP_QUIETLY;
+  tp->stop_signal = TARGET_SIGNAL_0;
   do
     {
-      target_resume (pid_to_ptid (-1), 0, stop_signal);
+      target_resume (pid_to_ptid (-1), 0, tp->stop_signal);
       wait_for_inferior (0);
     }
-  while (stop_signal != TARGET_SIGNAL_TRAP);
-  stop_soon = NO_STOP_QUIETLY;
+  while (tp->stop_signal != TARGET_SIGNAL_TRAP);
+  inf->stop_soon = NO_STOP_QUIETLY;
 
   /* We are now either at the "mapping complete" breakpoint (or somewhere
      else, a condition we aren't prepared to deal with anyway), so adjust
@@ -780,9 +788,9 @@ sunos_solib_create_inferior_hook (void)
      the GDB software break point list.  Thus we have to adjust the
      PC here.  */
 
-  if (gdbarch_decr_pc_after_break (current_gdbarch))
+  if (gdbarch_decr_pc_after_break (target_gdbarch))
     {
-      stop_pc -= gdbarch_decr_pc_after_break (current_gdbarch);
+      stop_pc -= gdbarch_decr_pc_after_break (target_gdbarch);
       write_pc (stop_pc);
     }
 

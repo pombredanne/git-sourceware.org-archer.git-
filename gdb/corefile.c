@@ -1,7 +1,8 @@
 /* Core dump and executable file functions above target vector, for GDB.
 
    Copyright (C) 1986, 1987, 1989, 1991, 1992, 1993, 1994, 1996, 1997, 1998,
-   1999, 2000, 2001, 2003, 2006, 2007, 2008 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2003, 2006, 2007, 2008, 2009
+   Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -74,7 +75,7 @@ core_file_command (char *filename, int from_tty)
     error (_("GDB can't read core files on this machine."));
 
   if (!filename)
-    (t->to_detach) (filename, from_tty);
+    (t->to_detach) (t, filename, from_tty);
   else
     (t->to_open) (filename, from_tty);
 }
@@ -152,6 +153,7 @@ reopen_exec_file (void)
   int res;
   struct stat st;
   long mtime;
+  struct cleanup *cleanups;
 
   /* Don't do anything if there isn't an exec file. */
   if (exec_bfd == NULL)
@@ -159,7 +161,7 @@ reopen_exec_file (void)
 
   /* If the timestamp of the exec file has changed, reopen it. */
   filename = xstrdup (bfd_get_filename (exec_bfd));
-  make_cleanup (xfree, filename);
+  cleanups = make_cleanup (xfree, filename);
   res = stat (filename, &st);
 
   if (exec_bfd_mtime && exec_bfd_mtime != st.st_mtime)
@@ -169,6 +171,8 @@ reopen_exec_file (void)
        this stops GDB from holding the executable open after it
        exits.  */
     bfd_cache_close_all ();
+
+  do_cleanups (cleanups);
 #endif
 }
 
@@ -205,30 +209,22 @@ Use the \"file\" or \"exec-file\" command."));
 }
 
 
-/* Report a memory error with error().  */
+/* Report a memory error by throwing a MEMORY_ERROR error.  */
 
 void
 memory_error (int status, CORE_ADDR memaddr)
 {
-  struct ui_file *tmp_stream = mem_fileopen ();
-  make_cleanup_ui_file_delete (tmp_stream);
-
   if (status == EIO)
-    {
-      /* Actually, address between memaddr and memaddr + len
-         was out of bounds. */
-      fprintf_unfiltered (tmp_stream, "Cannot access memory at address ");
-      fputs_filtered (paddress (memaddr), tmp_stream);
-    }
+    /* Actually, address between memaddr and memaddr + len was out of
+       bounds.  */
+    throw_error (MEMORY_ERROR,
+		 _("Cannot access memory at address %s"),
+		 paddress (memaddr));
   else
-    {
-      fprintf_filtered (tmp_stream, "Error accessing memory address ");
-      fputs_filtered (paddress (memaddr), tmp_stream);
-      fprintf_filtered (tmp_stream, ": %s.",
-		       safe_strerror (status));
-    }
-
-  error_stream (tmp_stream);
+    throw_error (MEMORY_ERROR,
+		 _("Error accessing memory address %s: %s."),
+		 paddress (memaddr),
+		 safe_strerror (status));
 }
 
 /* Same as target_read_memory, but report an error if can't read.  */
@@ -350,10 +346,7 @@ void
 write_memory (CORE_ADDR memaddr, const bfd_byte *myaddr, int len)
 {
   int status;
-  gdb_byte *bytes = alloca (len);
-  
-  memcpy (bytes, myaddr, len);
-  status = target_write_memory (memaddr, bytes, len);
+  status = target_write_memory (memaddr, myaddr, len);
   if (status != 0)
     memory_error (status, memaddr);
 }

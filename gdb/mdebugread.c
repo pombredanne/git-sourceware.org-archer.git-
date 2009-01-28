@@ -1,7 +1,7 @@
 /* Read a symbol table in ECOFF format (Third-Eye).
 
    Copyright (C) 1986, 1987, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008
+   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    Original version contributed by Alessandro Forin (af@cs.cmu.edu) at
@@ -1054,11 +1054,10 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
 		if (tsym.st != stMember)
 		  break;
 
-		FIELD_BITPOS (*f) = tsym.value;
+		SET_FIELD_BITPOS (*f, tsym.value);
 		FIELD_TYPE (*f) = t;
 		FIELD_NAME (*f) = debug_info->ss + cur_fdr->issBase + tsym.iss;
 		FIELD_BITSIZE (*f) = 0;
-		FIELD_STATIC_KIND (*f) = 0;
 
 		enum_sym = ((struct symbol *)
 			    obstack_alloc (&current_objfile->objfile_obstack,
@@ -1162,7 +1161,7 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
 	       obstack_alloc (&current_objfile->objfile_obstack,
 			      sizeof (struct mdebug_extra_func_info)));
 	  memset (e, 0, sizeof (struct mdebug_extra_func_info));
-	  SYMBOL_VALUE (s) = (long) e;
+	  SYMBOL_VALUE_BYTES (s) = (gdb_byte *) e;
 	  e->numargs = top_stack->numargs;
 	  e->pdr.framereg = -1;
 	  add_symbol (s, top_stack->cur_st, top_stack->cur_block);
@@ -1241,11 +1240,10 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
     case stMember:		/* member of struct or union */
       f = &TYPE_FIELDS (top_stack->cur_type)[top_stack->cur_field++];
       FIELD_NAME (*f) = name;
-      FIELD_BITPOS (*f) = sh->value;
+      SET_FIELD_BITPOS (*f, sh->value);
       bitsize = 0;
       FIELD_TYPE (*f) = parse_type (cur_fd, ax, sh->index, &bitsize, bigend, name);
       FIELD_BITSIZE (*f) = bitsize;
-      FIELD_STATIC_KIND (*f) = 0;
       break;
 
     case stIndirect:		/* forward declaration on Irix5 */
@@ -1646,11 +1644,11 @@ parse_type (int fd, union aux_ext *ax, unsigned int aux_index, int *bs,
 			  TYPE_ALLOC (tp, 2 * sizeof (struct field)));
       TYPE_FIELD_NAME (tp, 0) = obsavestring ("Low", strlen ("Low"),
 					    &current_objfile->objfile_obstack);
-      TYPE_FIELD_BITPOS (tp, 0) = AUX_GET_DNLOW (bigend, ax);
+      TYPE_LOW_BOUND (tp) = AUX_GET_DNLOW (bigend, ax);
       ax++;
       TYPE_FIELD_NAME (tp, 1) = obsavestring ("High", strlen ("High"),
 					    &current_objfile->objfile_obstack);
-      TYPE_FIELD_BITPOS (tp, 1) = AUX_GET_DNHIGH (bigend, ax);
+      TYPE_HIGH_BOUND (tp) = AUX_GET_DNHIGH (bigend, ax);
       ax++;
     }
 
@@ -1777,12 +1775,9 @@ upgrade_type (int fd, struct type **tpp, int tq, union aux_ext *ax, int bigend,
          ignore the erroneous bitsize from the auxiliary entry safely.
          dbx seems to ignore it too.  */
 
-      /* TYPE_FLAG_TARGET_STUB now takes care of the zero TYPE_LENGTH
-         problem.  */
+      /* TYPE_TARGET_STUB now takes care of the zero TYPE_LENGTH problem.  */
       if (TYPE_LENGTH (*tpp) == 0)
-	{
-	  TYPE_TARGET_STUB (t) = 1;
-	}
+	TYPE_TARGET_STUB (t) = 1;
 
       *tpp = t;
       return 4 + off;
@@ -1822,7 +1817,6 @@ parse_procedure (PDR *pr, struct symtab *search_symtab,
   struct gdbarch *gdbarch = get_objfile_arch (pst->objfile);
   struct symbol *s, *i;
   struct block *b;
-  struct mdebug_extra_func_info *e;
   char *sh_name;
 
   /* Simple rule to find files linked "-x" */
@@ -1922,9 +1916,10 @@ parse_procedure (PDR *pr, struct symtab *search_symtab,
 
   if (i)
     {
-      e = (struct mdebug_extra_func_info *) SYMBOL_VALUE (i);
+      struct mdebug_extra_func_info *e;
+      
+      e = (struct mdebug_extra_func_info *) SYMBOL_VALUE_BYTES (i);
       e->pdr = *pr;
-      e->pdr.isym = (long) s;
 
       /* GDB expects the absolute function start address for the
          procedure descriptor in e->pdr.adr.
@@ -2211,7 +2206,7 @@ record_minimal_symbol (const char *name, const CORE_ADDR address,
         bfd_section = NULL;
     }
 
-  prim_record_minimal_symbol_and_info (name, address, ms_type, NULL,
+  prim_record_minimal_symbol_and_info (name, address, ms_type,
                                        section, bfd_section, objfile);
 }
 
@@ -3340,7 +3335,7 @@ parse_partial_symbols (struct objfile *objfile)
 
 		case stStaticProc:
 		  prim_record_minimal_symbol_and_info (name, sh.value,
-						       mst_file_text, NULL,
+						       mst_file_text,
 						       SECT_OFF_TEXT (objfile), NULL,
 						       objfile);
 
@@ -3426,13 +3421,13 @@ parse_partial_symbols (struct objfile *objfile)
 		case stStatic:	/* Variable */
 		  if (SC_IS_DATA (sh.sc))
 		    prim_record_minimal_symbol_and_info (name, sh.value,
-							 mst_file_data, NULL,
+							 mst_file_data,
 							 SECT_OFF_DATA (objfile),
 							 NULL,
 							 objfile);
 		  else
 		    prim_record_minimal_symbol_and_info (name, sh.value,
-							 mst_file_bss, NULL,
+							 mst_file_bss,
 							 SECT_OFF_BSS (objfile),
 							 NULL,
 							 objfile);
@@ -3943,7 +3938,7 @@ psymtab_to_symtab_1 (struct partial_symtab *pst, char *filename)
 		  SYMBOL_DOMAIN (s) = LABEL_DOMAIN;
 		  SYMBOL_CLASS (s) = LOC_CONST;
 		  SYMBOL_TYPE (s) = mdebug_type_void;
-		  SYMBOL_VALUE (s) = (long) e;
+		  SYMBOL_VALUE_BYTES (s) = (gdb_byte *) e;
 		  e->pdr.framereg = -1;
 		  add_symbol_to_list (s, &local_symbols);
 		}

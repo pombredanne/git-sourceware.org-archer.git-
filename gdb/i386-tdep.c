@@ -1,7 +1,7 @@
 /* Intel 386 target-dependent stuff.
 
    Copyright (C) 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997,
-   1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
+   1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -1275,7 +1275,7 @@ i386_unwind_pc (struct gdbarch *gdbarch, struct frame_info *next_frame)
   gdb_byte buf[8];
 
   frame_unwind_register (next_frame, gdbarch_pc_regnum (gdbarch), buf);
-  return extract_typed_address (buf, builtin_type_void_func_ptr);
+  return extract_typed_address (buf, builtin_type (gdbarch)->builtin_func_ptr);
 }
 
 
@@ -1712,8 +1712,8 @@ i386_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
      (i386_frame_this_id, i386_sigtramp_frame_this_id,
      i386_dummy_id).  It's there, since all frame unwinders for
      a given target have to agree (within a certain margin) on the
-     definition of the stack address of a frame.  Otherwise
-     frame_id_inner() won't work correctly.  Since DWARF2/GCC uses the
+     definition of the stack address of a frame.  Otherwise frame id
+     comparison might not work correctly.  Since DWARF2/GCC uses the
      stack address *before* the function call as a frame's CFA.  On
      the i386, when %ebp is used as a frame pointer, the offset
      between the contents %ebp and the CFA as defined by GCC.  */
@@ -2071,9 +2071,11 @@ i386_sse_type (struct gdbarch *gdbarch)
 
       t = init_composite_type ("__gdb_builtin_type_vec128i", TYPE_CODE_UNION);
       append_composite_type_field (t, "v4_float",
-				   init_vector_type (builtin_type_float, 4));
+				   init_vector_type (builtin_type (gdbarch)
+						     ->builtin_float, 4));
       append_composite_type_field (t, "v2_double",
-				   init_vector_type (builtin_type_double, 2));
+				   init_vector_type (builtin_type (gdbarch)
+						     ->builtin_double, 2));
       append_composite_type_field (t, "v16_int8",
 				   init_vector_type (builtin_type_int8, 16));
       append_composite_type_field (t, "v8_int16",
@@ -2100,13 +2102,13 @@ static struct type *
 i386_register_type (struct gdbarch *gdbarch, int regnum)
 {
   if (regnum == I386_EIP_REGNUM)
-    return builtin_type_void_func_ptr;
+    return builtin_type (gdbarch)->builtin_func_ptr;
 
   if (regnum == I386_EFLAGS_REGNUM)
     return i386_eflags_type;
 
   if (regnum == I386_EBP_REGNUM || regnum == I386_ESP_REGNUM)
-    return builtin_type_void_data_ptr;
+    return builtin_type (gdbarch)->builtin_data_ptr;
 
   if (i386_fp_regnum_p (gdbarch, regnum))
     return builtin_type_i387_ext;
@@ -2120,7 +2122,7 @@ i386_register_type (struct gdbarch *gdbarch, int regnum)
   if (regnum == I387_MXCSR_REGNUM (gdbarch_tdep (gdbarch)))
     return i386_mxcsr_type;
 
-  return builtin_type_int;
+  return builtin_type (gdbarch)->builtin_int;
 }
 
 /* Map a cooked register onto a raw register or memory.  For the i386,
@@ -2624,6 +2626,18 @@ i386_fetch_pointer_argument (struct frame_info *frame, int argi,
   return read_memory_unsigned_integer (sp + (4 * (argi + 1)), 4);
 }
 
+static void
+i386_skip_permanent_breakpoint (struct regcache *regcache)
+{
+  CORE_ADDR current_pc = regcache_read_pc (regcache);
+
+ /* On i386, breakpoint is exactly 1 byte long, so we just
+    adjust the PC in the regcache.  */
+  current_pc += 1;
+  regcache_write_pc (regcache, current_pc);
+}
+
+
 
 static struct gdbarch *
 i386_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
@@ -2811,6 +2825,9 @@ i386_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
      pseudo-register.  */
   if (tdep->mm0_regnum == 0)
     tdep->mm0_regnum = gdbarch_num_regs (gdbarch);
+
+  set_gdbarch_skip_permanent_breakpoint (gdbarch,
+					 i386_skip_permanent_breakpoint);
 
   return gdbarch;
 }

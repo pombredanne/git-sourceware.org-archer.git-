@@ -1,7 +1,7 @@
 /* Remote debugging interface for boot monitors, for GDB.
 
    Copyright (C) 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2006, 2007, 2008 Free Software Foundation, Inc.
+   2000, 2001, 2002, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support.  Written by Rob Savoye for Cygnus.
    Resurrected from the ashes by Stu Grossman.
@@ -817,6 +817,7 @@ monitor_open (char *args, struct monitor_ops *mon_ops, int from_tty)
 
   /* Make run command think we are busy...  */
   inferior_ptid = monitor_ptid;
+  add_inferior_silent (ptid_get_pid (inferior_ptid));
   add_thread_silent (inferior_ptid);
 
   /* Give monitor_wait something to read */
@@ -845,13 +846,14 @@ monitor_close (int quitting)
   monitor_desc = NULL;
 
   delete_thread_silent (monitor_ptid);
+  delete_inferior_silent (ptid_get_pid (monitor_ptid));
 }
 
 /* Terminate the open connection to the remote debugger.  Use this
    when you want to detach and do something else with your gdb.  */
 
 static void
-monitor_detach (char *args, int from_tty)
+monitor_detach (struct target_ops *ops, char *args, int from_tty)
 {
   pop_target ();		/* calls monitor_close to do the real work */
   if (from_tty)
@@ -1993,8 +1995,8 @@ monitor_kill (void)
 /* All we actually do is set the PC to the start address of exec_bfd.  */
 
 static void
-monitor_create_inferior (char *exec_file, char *args, char **env,
-			 int from_tty)
+monitor_create_inferior (struct target_ops *ops, char *exec_file,
+			 char *args, char **env, int from_tty)
 {
   if (args && (*args != '\000'))
     error (_("Args are not supported by the monitor."));
@@ -2010,7 +2012,7 @@ monitor_create_inferior (char *exec_file, char *args, char **env,
    instructions.  */
 
 static void
-monitor_mourn_inferior (void)
+monitor_mourn_inferior (struct target_ops *ops)
 {
   unpush_target (targ_ops);
   generic_mourn_inferior ();	/* Do all the proper things now */
@@ -2024,7 +2026,6 @@ monitor_insert_breakpoint (struct bp_target_info *bp_tgt)
 {
   CORE_ADDR addr = bp_tgt->placed_address;
   int i;
-  const unsigned char *bp;
   int bplen;
 
   monitor_debug ("MON inst bkpt %s\n", paddr (addr));
@@ -2035,7 +2036,7 @@ monitor_insert_breakpoint (struct bp_target_info *bp_tgt)
     addr = gdbarch_addr_bits_remove (current_gdbarch, addr);
 
   /* Determine appropriate breakpoint size for this address.  */
-  bp = gdbarch_breakpoint_from_pc (current_gdbarch, &addr, &bplen);
+  gdbarch_breakpoint_from_pc (current_gdbarch, &addr, &bplen);
   bp_tgt->placed_address = addr;
   bp_tgt->placed_size = bplen;
 

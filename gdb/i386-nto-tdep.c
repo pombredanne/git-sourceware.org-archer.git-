@@ -1,6 +1,6 @@
 /* Target-dependent code for QNX Neutrino x86.
 
-   Copyright (C) 2003, 2004, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2003, 2004, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    Contributed by QNX Software Systems Ltd.
 
@@ -131,7 +131,8 @@ i386nto_regset_id (int regno)
 }
 
 static int
-i386nto_register_area (int regno, int regset, unsigned *off)
+i386nto_register_area (struct gdbarch *gdbarch,
+		       int regno, int regset, unsigned *off)
 {
   int len;
 
@@ -166,8 +167,7 @@ i386nto_register_area (int regno, int regset, unsigned *off)
       if (regno == -1)
 	return regset_size;
 
-      *off = (regno - gdbarch_fp0_regnum (current_gdbarch))
-	     * regsize + off_adjust;
+      *off = (regno - gdbarch_fp0_regnum (gdbarch)) * regsize + off_adjust;
       return 10;
       /* Why 10 instead of regsize?  GDB only stores 10 bytes per FP
          register so if we're sending a register back to the target,

@@ -1,6 +1,6 @@
 /* DWARF 2 Expression Evaluator.
 
-   Copyright (C) 2001, 2002, 2003, 2005, 2007, 2008
+   Copyright (C) 2001, 2002, 2003, 2005, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    Contributed by Daniel Berlin <dan@dberlin.org>.
@@ -33,6 +33,9 @@ struct dwarf_expr_context
   /* The number of values currently pushed on the stack, and the
      number of elements allocated to the stack.  */
   int stack_len, stack_allocated;
+
+  /* Target architecture to use for address operations.  */
+  struct gdbarch *gdbarch;
 
   /* Target address size in bytes.  */
   int addr_size;
@@ -138,7 +141,7 @@ CORE_ADDR dwarf_expr_fetch (struct dwarf_expr_context *ctx, int n);
 
 gdb_byte *read_uleb128 (gdb_byte *buf, gdb_byte *buf_end, ULONGEST * r);
 gdb_byte *read_sleb128 (gdb_byte *buf, gdb_byte *buf_end, LONGEST * r);
-CORE_ADDR dwarf2_read_address (gdb_byte *buf, gdb_byte *buf_end,
-			       int addr_size);
+CORE_ADDR dwarf2_read_address (struct gdbarch *gdbarch, gdb_byte *buf,
+			       gdb_byte *buf_end, int addr_size);
 
 #endif /* dwarf2expr.h */
