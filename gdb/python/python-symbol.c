@@ -18,6 +18,9 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "block.h"
+#include "exceptions.h"
+#include "frame.h"
 #include "symtab.h"
 #include "python-internal.h"
 
@@ -170,21 +173,29 @@ symbol_object_to_symbol (PyObject *obj)
    is_a_field_of_this.  */
 PyObject *gdbpy_lookup_symbol (PyObject *self, PyObject *args)
 {
-  int domain, is_a_field_of_this = 0;
+  int domain = VAR_DOMAIN, is_a_field_of_this = 0;
   const char *name;
   struct symbol *symbol;
-  PyObject *block_obj, *ret_tuple, *sym_obj, *bool_obj;
-  struct block *block;
+  PyObject *block_obj = NULL, *ret_tuple, *sym_obj, *bool_obj;
+  struct block *block = NULL;
 
-  if (! PyArg_ParseTuple (args, "sO!i", &name, &block_object_type, &block_obj,
+  if (! PyArg_ParseTuple (args, "s|O!i", &name, &block_object_type, &block_obj,
 			  &domain))
     return NULL;
 
-  block = block_object_to_block (block_obj);
-  if (! block)
+  if (block_obj)
+    block = block_object_to_block (block_obj);
+  else
     {
-      PyErr_SetString (PyExc_RuntimeError, "second argument must be block");
-      return NULL;
+      struct frame_info *selected_frame;
+      volatile struct gdb_exception except;
+
+      TRY_CATCH (except, RETURN_MASK_ALL)
+	{
+	  selected_frame  = get_selected_frame (_("No frame selected."));
+	  block = block_for_pc (get_frame_address_in_block (selected_frame));
+	}
+      GDB_PY_HANDLE_EXCEPTION (except);
     }
 
   symbol = lookup_symbol (name, block, domain, &is_a_field_of_this);

@@ -1,3 +1,10 @@
+2009-01-29  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* python/python-symbol.c (gdbpy_lookup_symbol): Turn block and domain
+	into optional parameters.
+	* python/lib/gdb/command/backtrace.py (write_symbol): Don't explicitly
+	define domain in call to `gdb.lookup_symbol'.
+
 2009-01-28  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	* python/lib/gdb/function/in_scope.py (invoke): Change to use `block' method

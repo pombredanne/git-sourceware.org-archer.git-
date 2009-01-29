@@ -27,7 +27,7 @@ class FrameWrapper:
 
     def write_symbol (self, stream, sym, block):
         if len (sym.linkage_name):
-            nsym, is_field_of_this = gdb.lookup_symbol (sym.linkage_name, block, gdb.SYMBOL_VAR_DOMAIN)
+            nsym, is_field_of_this = gdb.lookup_symbol (sym.linkage_name, block)
             if nsym.addr_class != gdb.SYMBOL_LOC_REGISTER:
                 sym = nsym
 
