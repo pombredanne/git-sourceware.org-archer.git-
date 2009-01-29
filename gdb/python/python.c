@@ -1038,6 +1038,81 @@ print_string_repr (PyObject *printer, const char *hint,
     gdbpy_print_stack ();
 }
 
+static void
+py_restore_tstate (void *p)
+{
+  PyFrameObject *frame = p;
+  PyThreadState *tstate = PyThreadState_GET ();
+  tstate->frame = frame;
+}
+
+/* Create a dummy PyFrameObject, needed to work around
+   a Python-2.4 bug with generators.  */
+static PyObject *
+push_dummy_python_frame ()
+{
+  PyObject *empty_string, *null_tuple, *globals;
+  PyCodeObject *code;
+  PyFrameObject *frame;
+  PyThreadState *tstate;
+
+  empty_string = PyString_FromString ("");
+  if (!empty_string)
+    return NULL;
+
+  null_tuple = PyTuple_New (0);
+  if (!null_tuple)
+    {
+      Py_DECREF (empty_string);
+      return NULL;
+    }
+
+  code = PyCode_New (0,			/* argcount */
+		     0,			/* nlocals */
+		     0,			/* stacksize */
+		     0,			/* flags */
+		     empty_string,	/* code */
+		     null_tuple,	/* consts */
+		     null_tuple,	/* names */
+		     null_tuple,	/* varnames */
+#if PYTHON_API_VERSION >= 1010
+		     null_tuple,	/* freevars */
+		     null_tuple,	/* cellvars */
+#endif
+		     empty_string,	/* filename */
+		     empty_string,	/* name */
+		     1,			/* firstlineno */
+		     empty_string	/* lnotab */
+		    );
+
+  Py_DECREF (empty_string);
+  Py_DECREF (null_tuple);
+
+  if (!code)
+    return NULL;
+
+  globals = PyDict_New ();
+  if (!globals)
+    {
+      Py_DECREF (code);
+      return NULL;
+    }
+
+  tstate = PyThreadState_GET ();
+
+  frame = PyFrame_New (tstate, code, globals, NULL);
+
+  Py_DECREF (globals);
+  Py_DECREF (code);
+
+  if (!frame)
+    return NULL;
+
+  tstate->frame = frame;
+  make_cleanup (py_restore_tstate, frame->f_back);
+  return (PyObject *) frame;
+}
+
 /* Helper for apply_val_pretty_printer that formats children of the
    printer, if any exist.  */
 static void
@@ -1048,7 +1123,7 @@ print_children (PyObject *printer, const char *hint,
 {
   int is_map, is_array, done_flag, pretty;
   unsigned int i;
-  PyObject *children, *iter;
+  PyObject *children, *iter, *frame;
   struct cleanup *cleanups;
 
   if (! PyObject_HasAttr (printer, gdbpy_children_cst))
@@ -1080,6 +1155,17 @@ print_children (PyObject *printer, const char *hint,
   /* Use the prettyprint_arrays option if we are printing an array,
      and the pretty option otherwise.  */
   pretty = is_array ? options->prettyprint_arrays : options->pretty;
+
+  /* Manufacture a dummy Python frame to work around Python 2.4 bug,
+     where it insists on having a non-NULL tstate->frame when
+     a generator is called.  */
+  frame = push_dummy_python_frame ();
+  if (!frame)
+    {
+      gdbpy_print_stack ();
+      goto done;
+    }
+  make_cleanup_py_decref (frame);
 
   done_flag = 0;
   for (i = 0; i < options->print_max; ++i)

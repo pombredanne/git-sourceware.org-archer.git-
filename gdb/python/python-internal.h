@@ -33,6 +33,7 @@
 
 #if HAVE_LIBPYTHON2_4
 #include "python2.4/Python.h"
+#include "python2.4/frameobject.h"
 /* Py_ssize_t is not defined until 2.5.
    Logical type for Py_ssize_t is Py_intptr_t, but that fails in 64-bit
    compilation due to several apparent mistakes in python2.4 API, so we
@@ -40,8 +41,10 @@
 typedef int Py_ssize_t;
 #elif HAVE_LIBPYTHON2_5
 #include "python2.5/Python.h"
+#include "python2.5/frameobject.h"
 #elif HAVE_LIBPYTHON2_6
 #include "python2.6/Python.h"
+#include "python2.6/frameobject.h"
 #else
 #error "Unable to find usable Python.h"
 #endif
