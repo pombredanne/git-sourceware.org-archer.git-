@@ -2709,7 +2709,7 @@ evaluate_subexp_for_sizeof (struct expression *exp, int *pos)
 	 SYMBOL_VALUE_ADDRESS of the symbol.  Still VALUE returned by
 	 read_var_value we left as lazy.  */
       type = value_type (read_var_value (exp->elts[pc + 2].symbol,
-			 get_current_frame ()));
+					deprecated_safe_get_selected_frame ()));
       return value_from_longest (size_type, (LONGEST) TYPE_LENGTH (type));
 
     default:
