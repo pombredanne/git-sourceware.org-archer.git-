@@ -408,11 +408,13 @@ cp_lookup_symbol_namespace (const char *namespace,
 	                                      block,
 	                                      domain);
 	  }else{
-	    sym = cp_lookup_symbol_namespace (current->inner,
-		                              name,
-					      linkage_name,
-					      block,
-					      domain);
+	    if(strcmp ("", current->alias) == 0){
+	      sym = cp_lookup_symbol_namespace (current->inner,
+		                                name,
+		                                linkage_name,
+		                                block,
+		                                domain);
+	    }
 	  }
 	  }
 	  if (sym != NULL){

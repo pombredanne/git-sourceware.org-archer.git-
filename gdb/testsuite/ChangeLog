@@ -1,3 +1,9 @@
+2009-01-29  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/namespace-using.cc: rename variable a to _a.
+	* gdb.cp/namespace-using.exp: Added tests for printing of non-imported
+	names.
+
 2009-01-23  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* gdb.cp/namespace.exp: Used cp_test_ptype_class for matching classes.

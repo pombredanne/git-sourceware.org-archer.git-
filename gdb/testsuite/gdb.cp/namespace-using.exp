@@ -44,7 +44,7 @@ if ![runto_main] then {
     continue
 }
 
-gdb_test "print a" "\\$\[0-9\].* = 1"
+gdb_test "print _a" "\\$\[0-9\].* = 1"
 
 # Test that names are not printed when they 
 # are not imported
@@ -52,8 +52,7 @@ gdb_test "print a" "\\$\[0-9\].* = 1"
 send_gdb "break marker3\n"
 send_gdb "continue\n"
 
-setup_kfail "gcc/37410" "*-*-*"
-gdb_test "print a" "No symbol \"a\" in current context."
+gdb_test "print _a" "No symbol \"_a\" in current context."
 
 gdb_exit
 gdb_start
@@ -73,7 +72,7 @@ if ![runto_main] then {
 gdb_breakpoint [gdb_get_line_number "marker1 stop"]
 gdb_continue_to_breakpoint "marker1 stop"
 
-gdb_test "print a" "\\$\[0-9\].* = 1"
+gdb_test "print _a" "\\$\[0-9\].* = 1"
 
 
 gdb_exit
@@ -107,7 +106,10 @@ if ![runto marker2] then {
     continue
 }
 
-gdb_test "print B::a" "\\$\[0-9\].* = 1"
+gdb_test "print B::_a" "\\$\[0-9\].* = 1"
+
+gdb_test "print _a" "No symbol \"_a\" in current context."
+gdb_test "print x" "No symbol \"x\" in current context."
 
 gdb_exit
 gdb_start

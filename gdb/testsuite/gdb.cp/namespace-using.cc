@@ -51,8 +51,9 @@ int marker6(){
 
 namespace A
 {
-  int a = 1;
+  int _a = 1;
   int x = 2;
+    
 }
 
 namespace C
@@ -86,7 +87,7 @@ int marker3()
 int marker2()
 {
   namespace B = A;
-  B::a;
+  B::_a;
   return marker3();
 }
 
@@ -100,7 +101,7 @@ int marker1()
           int c = 2;
             {
               int d = 3;
-              total = a + b + c + d + marker2(); // marker1 stop
+              total = _a + b + c + d + marker2(); // marker1 stop
             }
         }
     }
@@ -110,6 +111,6 @@ int marker1()
 int main()
 {
   using namespace A;
-  a;
+  _a;
   return marker1();
 }

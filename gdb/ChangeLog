@@ -1,3 +1,8 @@
+2009-01-29  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* cp-namespace.c (cp_lookup_symbol_namespace): Added check for empty aliases
+	when searching regular imports.
+
 2009-01-23  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* symtab.c (lookup_symbol_in_language): Added handling for global 
