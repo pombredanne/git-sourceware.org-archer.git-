@@ -18503,11 +18503,6 @@ The type of the field.
 @end defmethod
 
 @defmethod Type const
-Return a new @code{gdb.Type} object which represents a @code{const}
-qualified variant of this type.
-@end defmethod
-
-@defmethod Type const
 Return a new @code{gdb.Type} object which represents a
 @code{const}-qualified variant of this type.
 @end defmethod

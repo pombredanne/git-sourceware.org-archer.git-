@@ -1,3 +1,8 @@
+2009-01-29  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.texinfo (Types From Inferior): Remove
+	duplicate const qualified text.
+
 2009-01-14  Phil Muldoon  <pmuldoon@redhat.com>
 
 	* gdb.texinfo (Python Commands): Remove documentation
