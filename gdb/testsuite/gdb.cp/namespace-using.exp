@@ -163,3 +163,21 @@ gdb_breakpoint "K::marker9"
 gdb_continue_to_breakpoint "K::marker9"
 
 gdb_test "print jx" "No symbol \"jx\" in current context."
+
+############################################
+# Test that variables are only printed after the line
+# containing the import
+
+if ![runto_main] then {
+    perror "couldn't run to breakpoint main"
+    continue
+}
+
+gdb_breakpoint [gdb_get_line_number "marker10 stop"]
+gdb_continue_to_breakpoint "marker10 stop"
+
+gdb_test "print x" "\\$\[0-9\].* = 911"
+
+send_gdb "next\n"
+
+gdb_test "print x" "\\$\[0-9\].* = 912"

@@ -1,3 +1,10 @@
+2009-02-02  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* dwarf2read.c (dwarf2_read_decl_line): New function.
+	(read_import_statement): Read and record import line.
+	* cp-namespace.c (cp_lookup_symbol_namespace): Check line number of
+	import against current line number.
+
 2009-01-29  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* cp-namespace.c (cp_lookup_symbol_namespace): Added check for empty aliases

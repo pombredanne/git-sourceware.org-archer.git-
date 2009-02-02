@@ -58,6 +58,8 @@ struct using_direct
   
   char *declaration;
   
+  int line_number;
+  
   struct using_direct *next;
 };
 
@@ -92,12 +94,14 @@ extern int cp_is_anonymous (const char *namespace);
 extern void cp_add_using_directive (const char *outer,
                                     const char *inner,
                                     const char *alias,
-                                    const char *declaration);
+                                    const char *declaration,
+                                    const int line_number);
 
 extern struct using_direct *cp_add_using (const char *outer,
                                           const char *inner,
                                           const char *alias,
                                           const char *declaration,
+                                          const int line_number,
 					  struct using_direct *next);
 
 extern void cp_initialize_namespace (void);

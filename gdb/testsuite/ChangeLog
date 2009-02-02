@@ -1,3 +1,8 @@
+2009-02-02  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/namespace-using.exp: New Test.
+	* gdb.cp/namespace-using.cc (marker10): New test function.
+
 2009-01-29  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* gdb.cp/namespace-using.cc: rename variable a to _a.

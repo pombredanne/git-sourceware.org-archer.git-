@@ -108,7 +108,7 @@ cp_scan_for_anonymous_namespaces (const struct symbol *symbol)
 		 anonymous namespace.  So add symbols in it to the
 		 namespace given by the previous component if there is
 		 one, or to the global namespace if there isn't.  */
-	      cp_add_using_directive (outer, name, "", "");
+	      cp_add_using_directive (outer, name, "", "", 0);
 	    }
 	  /* The "+ 2" is for the "::".  */
 	  previous_component = next_component + 2;
@@ -124,7 +124,7 @@ cp_scan_for_anonymous_namespaces (const struct symbol *symbol)
 
 void
 cp_add_using_directive (const char *outer, const char *inner, const char* alias,
-    const char *declaration)
+    const char *declaration, const int line_number)
 {
   struct using_direct *current;
   struct using_direct *new;
@@ -139,7 +139,7 @@ cp_add_using_directive (const char *outer, const char *inner, const char* alias,
     }
 
   using_directives = cp_add_using (outer, inner, alias, declaration,
-      using_directives);
+      line_number,using_directives);
 }
 
 /* Record the namespace that the function defined by SYMBOL was
@@ -203,6 +203,7 @@ cp_add_using (const char *outer,
               const char *inner,
               const char *alias,
               const char *declaration,
+              const int line_number,
 	      struct using_direct *next)
 {
   struct using_direct *retval;
@@ -212,7 +213,8 @@ cp_add_using (const char *outer,
   retval->outer = savestring (outer, strlen(outer));
   retval->alias = savestring (alias, strlen(alias));
   retval->declaration = savestring (declaration, strlen(declaration));
-      
+  retval->line_number = line_number;
+        
   retval->next = next;
 
   return retval;
@@ -387,7 +389,9 @@ cp_lookup_symbol_namespace (const char *namespace,
        current = current->next)
     {
       
-      if (strcmp (namespace, current->outer) == 0)
+      int current_line = find_pc_line (get_frame_pc (get_current_frame ()), 0).line;
+      
+      if (strcmp (namespace, current->outer) == 0 && current->line_number < current_line)
 	{
 	  
 	  if(strcmp ("", current->declaration) != 0){

@@ -2877,6 +2877,18 @@ dwarf2_full_name (struct die_info *die, struct dwarf2_cu *cu)
   return name;
 }
 
+/* read the given die's decl_line number. Return -1 if in case of an error */
+static const int dwarf2_read_decl_line (struct die_info *die, struct dwarf2_cu *cu){
+  struct attribute *line_attr;
+
+  line_attr = dwarf2_attr (die, DW_AT_decl_line, cu);
+  if (line_attr){
+    return  DW_UNSND (line_attr);
+  }
+
+  return -1;
+}
+
 /* Read the import statement specified by the given die and record it.  */ 
 
 static void
@@ -2890,7 +2902,9 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
   const char *import_alias;
   const char *imported_declaration = "";
   const char *import_prefix;
-    
+  
+  int line_number = -1;
+  
   int is_anonymous = 0;
   
   import_attr = dwarf2_attr (die, DW_AT_import, cu);
@@ -2914,6 +2928,9 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
   if(import_alias == NULL){
     import_alias = "";
   }
+  
+  /* Determine the line number at which the import was made */
+  line_number = dwarf2_read_decl_line(die, cu);
   
   /* Figure out where the statement is being imported to */
   import_prefix = determine_prefix (die, cu);
@@ -2943,6 +2960,7 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
                                    canonical_name,
                                    import_alias,
                                    imported_declaration,
+                                   line_number,
                                    using_directives);
 }
 
@@ -4887,7 +4905,7 @@ read_namespace (struct die_info *die, struct dwarf2_cu *cu)
       if (is_anonymous)
 	{
 	  const char *previous_prefix = determine_prefix (die, cu);
-	  cp_add_using_directive (previous_prefix, TYPE_NAME (type), "", "");
+	  cp_add_using_directive (previous_prefix, TYPE_NAME (type), "", "", dwarf2_read_decl_line(die, cu));
 	}
     }
 

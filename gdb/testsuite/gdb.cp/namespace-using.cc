@@ -1,4 +1,19 @@
 //--------------------------
+namespace M{
+  int x = 911;
+}
+
+namespace N{
+  int x = 912;
+}
+
+int marker10(){
+  using namespace M;
+  int y = x+1;       // marker10 stop
+  using namespace N;
+  return y;
+}
+//--------------------------
 namespace J {
     int jx = 44;
 }
@@ -6,7 +21,7 @@ namespace J {
 namespace K{
   int marker9(){
     //x;
-    return 10;
+    return marker10();
   }
 }
 
