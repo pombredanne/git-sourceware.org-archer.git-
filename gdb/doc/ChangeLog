@@ -1,3 +1,8 @@
+2009-02-03  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.texinfo (Functions in Python): Rephrasing as suggested by
+	Eli Zaretskii.
+
 2009-01-29  Phil Muldoon  <pmuldoon@redhat.com>
 
 	* gdb.texinfo (Types From Inferior): Remove

@@ -19240,10 +19240,10 @@ class @code{gdb.Function}.
 
 @defmethod Function __init__ name
 The initializer for @code{Function} registers the new function with
-@value{GDBN}.  The @var{name} argument is the name of the function.
-This must be a string.  The function is made visible to the user as a
-convenience variable, of ``internal function'' type, whose name is the
-same as @var{name}.
+@value{GDBN}.  The argument @var{name} is the name of the function,
+a string.  The function will be visible to the user as a convenience
+variable of type @code{internal function}, whose name is the same as
+the given @var{name}.
 
 The documentation for the new function is taken from the documentation
 string for the new class.
