@@ -218,7 +218,7 @@ c_get_string (struct value *value, gdb_byte **buffer, int *length,
     {
       /* If we know the size of the array, we can use it as a limit on the
 	 number of characters to be fetched.  */
-      if ((TYPE_NFIELDS (type) == 1)
+      if (TYPE_NFIELDS (type) == 1
 	  && TYPE_CODE (TYPE_FIELD_TYPE (type, 0)) == TYPE_CODE_RANGE)
 	{
 	  LONGEST low_bound, high_bound;
@@ -237,8 +237,8 @@ c_get_string (struct value *value, gdb_byte **buffer, int *length,
     goto error;
 
   element_type = check_typedef (element_type);
-  if ((TYPE_CODE (element_type) != TYPE_CODE_INT)
-      && (TYPE_CODE (element_type) != TYPE_CODE_CHAR))
+  if (TYPE_CODE (element_type) != TYPE_CODE_INT
+      && TYPE_CODE (element_type) != TYPE_CODE_CHAR)
     /* If the elements are not integers or characters, we don't consider it
        a string.  */
     goto error;
@@ -248,8 +248,9 @@ c_get_string (struct value *value, gdb_byte **buffer, int *length,
   /* If the string lives in GDB's memory intead of the inferior's, then we
      just need to copy it to BUFFER.  Also, since such strings are arrays
      with known size, FETCHLIMIT will hold the size of the array.  */
-  if (((VALUE_LVAL (value) == not_lval)
-      || (VALUE_LVAL (value) == lval_internalvar)) && (fetchlimit != UINT_MAX))
+  if ((VALUE_LVAL (value) == not_lval
+       || VALUE_LVAL (value) == lval_internalvar)
+      && fetchlimit != UINT_MAX)
     {
       int i;
       const gdb_byte *contents = value_contents (value);

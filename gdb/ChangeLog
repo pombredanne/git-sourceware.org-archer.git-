@@ -1,3 +1,8 @@
+2009-02-03  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb/c-lang.c (c_get_string): Remove superfluous parenthesis from
+	expressions.
+
 2009-01-29  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	* python/lib/gdb/function/caller_is.py: Use `selected_frame' instead
