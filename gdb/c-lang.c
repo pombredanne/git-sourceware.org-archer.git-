@@ -196,7 +196,7 @@ c_printstr (struct ui_file *stream, const gdb_byte *string,
 
    CHARSET is always set to the target charset.  */
 
-static void
+void
 c_get_string (struct value *value, gdb_byte **buffer, int *length,
 	      const char **charset)
 {
@@ -629,7 +629,7 @@ const struct language_defn minimal_language_defn =
   c_language_arch_info,
   default_print_array_index,
   default_pass_by_reference,
-  default_get_string,
+  c_get_string,
   LANG_MAGIC
 };
 

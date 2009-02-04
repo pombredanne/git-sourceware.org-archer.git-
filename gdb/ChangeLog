@@ -1,5 +1,12 @@
 2009-02-04  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
+	* ada-lang.c (ada_language_defn): Use c_get_string.
+	* c-lang.c (c_get_string): Remove static attribute.
+	(minimal_language_defn): Use c_get_string.
+	* language.h (c_get_string): Add prototype.
+
+2009-02-04  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
 	* c-lang.c (c_get_string): Change to return void.
 	* language.c (default_get_string): Likewise.
 	* language.h (language_defn): Change la_get_string member to return

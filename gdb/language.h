@@ -502,4 +502,7 @@ void default_print_typedef (struct type *type, struct symbol *new_symbol,
 void default_get_string (struct value *value, gdb_byte **buffer, int *length,
 			 const char **charset);
 
+void c_get_string (struct value *value, gdb_byte **buffer, int *length,
+		   const char **charset);
+
 #endif /* defined (LANGUAGE_H) */
