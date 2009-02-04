@@ -176,19 +176,9 @@ valpy_string (PyObject *self, PyObject *args)
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      ret = LA_GET_STRING (value, &buffer, &length, &la_encoding);
+      LA_GET_STRING (value, &buffer, &length, &la_encoding);
     }
   GDB_PY_HANDLE_EXCEPTION (except);
-
-  if (ret != 0)
-    {
-      /* We may have read a partial string before the error happened, but
-         we will ignore it and throw an exception anyway.  */
-      PyErr_SetString (PyExc_RuntimeError, safe_strerror (ret));
-      xfree (buffer);
-
-      return NULL;
-    }
 
   encoding = (user_encoding && *user_encoding) ? user_encoding : la_encoding;
   unicode = PyUnicode_Decode (buffer, length, encoding, errors);

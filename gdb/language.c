@@ -1043,7 +1043,7 @@ default_print_array_index (struct value *index_value, struct ui_file *stream,
   fprintf_filtered (stream, "] = ");
 }
 
-int
+void
 default_get_string (struct value *value, gdb_byte **buffer, int *length,
 		    const char **charset)
 {

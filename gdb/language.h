@@ -287,7 +287,7 @@ struct language_defn
        hold the size in bytes of the string (only actual characters, excluding
        an eventual terminating null character).  CHARSET will hold the encoding
        used in the string.  */
-    int (*la_get_string) (struct value *value, gdb_byte **buffer, int *length,
+    void (*la_get_string) (struct value *value, gdb_byte **buffer, int *length,
 			  const char **charset);
 
     /* Add fields above this point, so the magic number is always last. */
@@ -499,7 +499,7 @@ int default_pass_by_reference (struct type *type);
 void default_print_typedef (struct type *type, struct symbol *new_symbol,
 			    struct ui_file *stream);
 
-int default_get_string (struct value *value, gdb_byte **buffer, int *length,
-			const char **charset);
+void default_get_string (struct value *value, gdb_byte **buffer, int *length,
+			 const char **charset);
 
 #endif /* defined (LANGUAGE_H) */

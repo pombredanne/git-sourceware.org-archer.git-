@@ -1,3 +1,13 @@
+2009-02-04  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* c-lang.c (c_get_string): Change to return void.
+	* language.c (default_get_string): Likewise.
+	* language.h (language_defn): Change la_get_string member to return
+	void.
+	(default_get_string): Change prototype to return void.
+	* python/python-value.c (valpy_string): Adapt to new return type of
+	la_get_string.
+
 2009-02-03  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	* gdb/c-lang.c (c_get_string): Remove superfluous parenthesis from

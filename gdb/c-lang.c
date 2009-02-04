@@ -194,15 +194,9 @@ c_printstr (struct ui_file *stream, const gdb_byte *string,
    This means that a null byte present in a multi-byte character will not
    terminate the string unless the whole character is null.
 
-   Unless an exception is thrown, BUFFER will always be allocated, even on
-   failure.  In this case, some characters might have been read before the
-   failure happened.  Check LENGTH to recognize this situation.
+   CHARSET is always set to the target charset.  */
 
-   CHARSET is always set to the target charset.
-
-   Return 0 on success, errno on failure.  */
-
-static int
+static void
 c_get_string (struct value *value, gdb_byte **buffer, int *length,
 	      const char **charset)
 {
@@ -267,8 +261,16 @@ c_get_string (struct value *value, gdb_byte **buffer, int *length,
       err = 0;
     }
   else
-    err = read_string (value_as_address (value), -1, width, fetchlimit,
-		       buffer, length);
+    {
+      err = read_string (value_as_address (value), -1, width, fetchlimit,
+			 buffer, length);
+      if (err)
+	{
+	  xfree (buffer);
+	  error (_("Error reading string from inferior: %s"),
+		 safe_strerror (err));
+	}
+    }
 
   /* If the last character is null, subtract it from length.  */
   if (extract_unsigned_integer (*buffer + *length - width, width) == 0)
@@ -276,7 +278,7 @@ c_get_string (struct value *value, gdb_byte **buffer, int *length,
 
   *charset = target_charset ();
 
-  return err;
+  return;
 
 error:
   {
