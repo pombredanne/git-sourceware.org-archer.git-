@@ -18428,12 +18428,14 @@ array of characters or ints.  The string is assumed to be terminated
 by a zero of the appropriate width.
 
 If the optional @var{encoding} argument is given, it must be a string
-naming the encoding of the string in the @code{gdb.Value}.  The Python
-codec machinery will be used to convert the string.  If @var{encoding}
-is not given, or if @var{encoding} is the empty string, then either
-the @code{target-charset} (@pxref{Character Sets}) will be used, or a
-language-specific encoding will be used, if the current language is
-able to supply one.
+naming the encoding of the string in the @code{gdb.Value}, such as
+@code{"ascii"}, @code{"iso-8859-6"} or @code{"utf-8"}.  It accepts
+the same encodings as the corresponding argument to Python's
+@code{string.decode} method, and the Python codec machinery will be used
+to convert the string.  If @var{encoding} is not given, or if
+@var{encoding} is the empty string, then either the @code{target-charset}
+(@pxref{Character Sets}) will be used, or a language-specific encoding
+will be used, if the current language is able to supply one.
 
 The optional @var{errors} argument is the same as the corresponding
 argument to Python's @code{string.decode} method.
