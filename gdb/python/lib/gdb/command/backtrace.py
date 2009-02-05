@@ -160,8 +160,6 @@ Use of the 'raw' qualifier avoids any filtering by loadable modules.
         filter = True
         full = False
 
-        if arg == None:
-            arg = ''
         for word in arg.split (" "):
             if word == '':
                 continue

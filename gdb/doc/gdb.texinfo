@@ -18917,8 +18917,9 @@ command is a prefix command; sub-commands of this command may be
 registered.
 
 The help text for the new command is taken from the Python
-documentation string for the command's class, if there is one.  If
-there is no documentation string, a default value is used.
+documentation string for the command's class, if there is one.  If no
+documentation string is provided, the default value ``This command is
+not documented.'' is used.
 @end defmethod
 
 @defmethod Command dont_repeat
@@ -18931,9 +18932,8 @@ to the user command @code{dont-repeat}, see @ref{Define, dont-repeat}.
 @defmethod Command invoke argument from_tty
 This method is called by @value{GDBN} when this command is invoked.
 
-@var{argument} is the argument to the command.  The argument
-ordinarily is a string, but may be @code{None}, meaning that there was
-no argument.
+@var{argument} is a string.  It is the argument to the command, after
+leading and trailing whitespace has been stripped.
 
 @var{from_tty} is a boolean argument.  When true, this means that the
 command was entered by the user at the terminal; when false it means
@@ -18944,19 +18944,21 @@ If this method throws an exception, it is turned into a @value{GDBN}
 @end defmethod
 
 @defmethod Command complete text word
-This method is called by @value{GDBN} when the user attempts @key{TAB}
-completion on this command.
+This method is called by @value{GDBN} when the user attempts
+completion on this command.  All forms of completion are handled by
+this method, that is, the @key{TAB} and @key{M-?} key bindings, and
+the @code{complete} command.
 
 The arguments @var{text} and @var{word} are both strings.  @var{text}
 holds the complete command line up to the cursor's location.
 @var{word} holds the last word of the command line; this is computed
 using a word-breaking heuristic.
 
-The @code{invoke} method can return several values:
+The @code{complete} method can return several values:
 @itemize @bullet
 @item
 If the return value is a sequence, the contents of the sequence are
-used as the completions.  It is up to @code{invoke} to ensure that the
+used as the completions.  It is up to @code{complete} to ensure that the
 contents actually do complete the word.  A zero-length sequence is
 allowed, it means that there were no completions available.  Only
 string elements of the sequence are used; other elements in the
@@ -18975,76 +18977,108 @@ completions.
 
 
 When a new command is registered, it must be declared as a member of
-some general class of commands.  This is used to classify the command
-in the on-line help system.  The available classifications are
-represented by constants defined in the @code{gdb} module:
+some general class of commands.  This is used to classify top-level
+commands in the on-line help system; note that prefix commands are not
+listed under their own category but rather that of their top-level
+command.  The available classifications are represented by constants
+defined in the @code{gdb} module:
 
 @table @code
 @findex COMMAND_NONE
 @findex gdb.COMMAND_NONE
 @item COMMAND_NONE
-The command does not belong to any particular class.
+The command does not belong to any particular class.  A command in
+this category will not be displayed in any of the help categories.
 
 @findex COMMAND_RUN
 @findex gdb.COMMAND_RUN
 @item COMMAND_RUN
-The command is related to running the inferior.
+The command is related to running the inferior.  For example,
+@code{start}, @code{step}, and @code{continue} are in this category.
+Type @code{help running} at the @value{GDBN} prompt to see a list of
+commands in this category.
 
 @findex COMMAND_VARS
 @findex gdb.COMMAND_VARS
 @item COMMAND_VARS
-The command is related to variables.
+The command is related to data or variables.  For example,
+@code{call}, @code{find}, and @code{print} are in this category.  Type
+@code{help data} at the @value{GDBN} prompt to see a list of commands
+in this category.
 
 @findex COMMAND_STACK
 @findex gdb.COMMAND_STACK
 @item COMMAND_STACK
-The command has to do with manipulation of the stack.
+The command has to do with manipulation of the stack.  For example,
+@code{backtrace}, @code{frame}, and @code{return} are in this
+category.  Type @code{help stack} at the @value{GDBN} prompt to see a
+list of commands in this category.
 
 @findex COMMAND_FILES
 @findex gdb.COMMAND_FILES
 @item COMMAND_FILES
-This class is used for file-related commands.
+This class is used for file-related commands.  For example,
+@code{file}, @code{list} and @code{section} are in this category.
+Type @code{help files} at the @value{GDBN} prompt to see a list of
+commands in this category.
 
 @findex COMMAND_SUPPORT
 @findex gdb.COMMAND_SUPPORT
 @item COMMAND_SUPPORT
 This should be used for ``support facilities'', generally meaning
 things that are useful to the user when interacting with @value{GDBN},
-but not related to the state of the inferior.
+but not related to the state of the inferior.  For example,
+@code{help}, @code{make}, and @code{shell} are in this category.  Type
+@code{help support} at the @value{GDBN} prompt to see a list of
+commands in this category.
 
 @findex COMMAND_INFO
 @findex gdb.COMMAND_INFO
 @item COMMAND_INFO
 The command is an @samp{info}-related command, that is, related to the
-state of @value{GDBN} itself.
+state of @value{GDBN} itself.  For example, @code{info}, @code{macro},
+and @code{show} are in this category.  Type @code{help status} at the
+@value{GDBN} prompt to see a list of commands in this category.
 
 @findex COMMAND_BREAKPOINT
 @findex gdb.COMMAND_BREAKPOINT
 @item COMMAND_BREAKPOINT
-The command has to do with breakpoints.
+The command has to do with breakpoints.  For example, @code{break},
+@code{clear}, and @code{delete} are in this category.  Type @code{help
+breakpoints} at the @value{GDBN} prompt to see a list of commands in
+this category.
 
 @findex COMMAND_TRACE
 @findex gdb.COMMAND_TRACE
 @item COMMAND_TRACE
-The command has to do with tracepoints.
+The command has to do with tracepoints.  For example, @code{trace},
+@code{actions}, and @code{tfind} are in this category.  Type
+@code{help tracepoints} at the @value{GDBN} prompt to see a list of
+commands in this category.
 
 @findex COMMAND_OBSCURE
 @findex gdb.COMMAND_OBSCURE
 @item COMMAND_OBSCURE
 The command is only used in unusual circumstances, or is not of
-general interest to users.
+general interest to users.  For example, @code{checkpoint},
+@code{fork}, and @code{stop} are in this category.  Type @code{help
+obscure} at the @value{GDBN} prompt to see a list of commands in this
+category.
 
 @findex COMMAND_MAINTENANCE
 @findex gdb.COMMAND_MAINTENANCE
 @item COMMAND_MAINTENANCE
-The command is only useful to @value{GDBN} maintainers.
+The command is only useful to @value{GDBN} maintainers.  The
+@code{maintenance} and @code{flushregs} commands are in this category.
+Type @code{help internals} at the @value{GDBN} prompt to see a list of
+commands in this category.
 @end table
 
 
 A new command can use a predefined completion function, either by
-specifying it via an argument at initialization, or by return it from
-the @code{complete} method.  These predefined completion constants are
-all defined in the @code{gdb} module:
+specifying it via an argument at initialization, or by returning it
+from the @code{complete} method.  These predefined completion
+constants are all defined in the @code{gdb} module:
 
 @table @code
 @findex COMPLETE_NONE
@@ -19061,6 +19095,7 @@ This constant means that filename completion should be performed.
 @findex gdb.COMPLETE_LOCATION
 @item COMPLETE_LOCATION
 This constant means that location completion should be done.
+@xref{Specify Location}.
 
 @findex COMPLETE_COMMAND
 @findex gdb.COMPLETE_COMMAND

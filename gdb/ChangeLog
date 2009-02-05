@@ -1,3 +1,17 @@
+2009-02-05  Tom Tromey  <tromey@redhat.com>
+
+	* python/lib/gdb/command/save_breakpoints.py
+	(SaveBreakpointsCommand.invoke): Don't check for 'None'.
+	* python/lib/gdb/command/backtrace.py (FilteringBacktrace.invoke):
+	Don't check for 'None'.
+	* python/lib/gdb/command/alias.py (AliasImplementation.invoke):
+	Don't check for 'None'.
+	* NEWS: Mention commands feature.
+	* python/python-cmd.c (struct cmdpy_object) <sub_list>: Rewrite
+	comment.
+	(cmdpy_function): Always pass a string argument to 'invoke'.
+	(gdbpy_initialize_commands): Update comment.
+
 2009-02-05  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	* c-lang.c (c_get_string): Call check_typedef before examining the

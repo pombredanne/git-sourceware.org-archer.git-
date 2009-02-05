@@ -27,10 +27,7 @@ class AliasImplementation (gdb.Command):
         self.real = real
 
     def invoke(self, arg, from_tty):
-        if arg == None:
-            gdb.execute (self.real, from_tty)
-        else:
-            gdb.execute (self.real + ' ' + arg, from_tty)
+        gdb.execute (self.real + ' ' + arg, from_tty)
 
 class AliasCommand (gdb.Command):
     """Alias one command to another.

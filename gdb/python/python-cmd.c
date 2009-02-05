@@ -56,7 +56,10 @@ struct cmdpy_object
      no longer installed.  */
   struct cmd_list_element *command;
 
-  /* For a prefix command, this is the list of sub-commands.  */
+  /* A prefix command requires storage for a list of its sub-commands.
+     A pointer to this is passed to add_prefix_command, and to add_cmd
+     for sub-commands of that prefix.  If this Command is not a prefix
+     command, then this field is unused.  */
   struct cmd_list_element *sub_list;
 };
 
@@ -129,16 +132,11 @@ cmdpy_function (struct cmd_list_element *command, char *args, int from_tty)
     }
 
   if (! args)
-    {
-      argobj = Py_None;
-      Py_INCREF (argobj);
-    }
-  else
-    {
-      argobj = PyString_FromString (args);
-      if (! argobj)
-	error (_("Could not convert arguments to Python string."));
-    }
+    args = "";
+  argobj = PyString_FromString (args);
+  if (! argobj)
+    error (_("Could not convert arguments to Python string."));
+
   ttyobj = from_tty ? Py_True : Py_False;
   Py_INCREF (ttyobj);
   result = PyObject_CallMethodObjArgs ((PyObject *) obj, invoke_cst, argobj,
@@ -500,8 +498,8 @@ gdbpy_initialize_commands (void)
   if (PyType_Ready (&cmdpy_object_type) < 0)
     return;
 
-  /* Note: alias and user seem to be special; pseudo appears to be
-     unused, and there is no reason to expose tui or xdb, I think.  */
+  /* Note: alias and user are special; pseudo appears to be unused,
+     and there is no reason to expose tui or xdb, I think.  */
   if (PyModule_AddIntConstant (gdb_module, "COMMAND_NONE", no_class) < 0
       || PyModule_AddIntConstant (gdb_module, "COMMAND_RUN", class_run) < 0
       || PyModule_AddIntConstant (gdb_module, "COMMAND_VARS", class_vars) < 0

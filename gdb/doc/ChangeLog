@@ -1,3 +1,9 @@
+2009-02-05  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Commands In Python): Update for change to 'invoke'
+	argument.  Fix a couple typos.  Update documentation for COMMAND_
+	constants.
+
 2009-02-03  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	* gdb.texinfo (Functions in Python): Rephrasing as suggested by

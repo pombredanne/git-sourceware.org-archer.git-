@@ -41,8 +41,6 @@ The breakpoints can be restored using the 'source' command."""
         bps = gdb.breakpoints ()
         if bps is None:
             raise RuntimeError, 'No breakpoints to save'
-        if arg is None:
-            raise RuntimeError, 'No filename specified'
         with open (arg.strip (), 'w') as f:
             for bp in bps:
                 print >> f, "break", bp.location,
