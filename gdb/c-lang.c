@@ -202,7 +202,7 @@ c_get_string (struct value *value, gdb_byte **buffer, int *length,
 {
   int err, width;
   unsigned int fetchlimit;
-  struct type *type = value_type (value);
+  struct type *type = check_typedef (value_type (value));
   struct type *element_type = TYPE_TARGET_TYPE (type);
 
   if (element_type == NULL)
@@ -224,7 +224,7 @@ c_get_string (struct value *value, gdb_byte **buffer, int *length,
       else
 	fetchlimit = UINT_MAX;
     }
-  else if (TYPE_CODE (value_type (value)) == TYPE_CODE_PTR)
+  else if (TYPE_CODE (type) == TYPE_CODE_PTR)
     fetchlimit = UINT_MAX;
   else
     /* We work only with arrays and pointers.  */
@@ -251,11 +251,11 @@ c_get_string (struct value *value, gdb_byte **buffer, int *length,
 
       /* Look for a null character.  */
       for (i = 0; i < fetchlimit; i++)
-	if (extract_unsigned_integer (contents + i*width, width) == 0)
+	if (extract_unsigned_integer (contents + i * width, width) == 0)
 	  break;
 
-      /* i is now either the number of non-null characters, or fetchlimit.  */
-      *length = i*width;
+      /* I is now either the number of non-null characters, or FETCHLIMIT.  */
+      *length = i * width;
       *buffer = xmalloc (*length);
       memcpy (*buffer, contents, *length);
       err = 0;
@@ -272,15 +272,16 @@ c_get_string (struct value *value, gdb_byte **buffer, int *length,
 	}
     }
 
-  /* If the last character is null, subtract it from length.  */
-  if (extract_unsigned_integer (*buffer + *length - width, width) == 0)
-      *length -= width;
+  /* If the last character is null, subtract it from LENGTH.  */
+  if (*length > 0
+      && extract_unsigned_integer (*buffer + *length - width, width) == 0)
+    *length -= width;
 
   *charset = target_charset ();
 
   return;
 
-error:
+ error:
   {
     char *type_str;
 

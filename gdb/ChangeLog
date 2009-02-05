@@ -1,3 +1,11 @@
+2009-02-05  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* c-lang.c (c_get_string): Call check_typedef before examining the
+	type of the value.  Use the type variable instead of calling
+	value_type again.  Fix formatting issues.  Verify if *length > 0
+	before checking whether the last character is null.
+	* value.h (type_to_string): Remove extra space.
+
 2009-02-04  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	* ada-lang.c (ada_language_defn): Use c_get_string.
