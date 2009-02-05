@@ -1,3 +1,12 @@
+2009-02-05  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* python/python-cmd.c (cmdpy_function): Convert command arguments to a
+	Unicode string.
+	(cmdpy_completer): Convert text and word arguments to a Unicode
+	string.
+	* python/lib/gdb/command/pahole.py (invoke): Raise a TypeError
+	exception instead of a (deprecated) string.
+
 2009-02-05  Tom Tromey  <tromey@redhat.com>
 
 	* python/lib/gdb/command/save_breakpoints.py

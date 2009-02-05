@@ -133,7 +133,7 @@ cmdpy_function (struct cmd_list_element *command, char *args, int from_tty)
 
   if (! args)
     args = "";
-  argobj = PyString_FromString (args);
+  argobj = PyUnicode_Decode (args, strlen (args), host_charset (), NULL);
   if (! argobj)
     error (_("Could not convert arguments to Python string."));
 
@@ -194,10 +194,10 @@ cmdpy_completer (struct cmd_list_element *command, char *text, char *word)
       goto done;
     }
 
-  textobj = PyString_FromString (text);
+  textobj = PyUnicode_Decode (text, strlen (text), host_charset (), NULL);
   if (! textobj)
     error (_("Could not convert argument to Python string."));
-  wordobj = PyString_FromString (word);
+  wordobj = PyUnicode_Decode (word, strlen (word), host_charset (), NULL);
   if (! wordobj)
     error (_("Could not convert argument to Python string."));
 

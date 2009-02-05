@@ -74,7 +74,7 @@ It prints the type and displays comments showing where holes are."""
         type = gdb.Type (arg)
         type = self.strip (type)
         if type.code () != gdb.TYPE_CODE_STRUCT:
-            raise '%s is not a struct type' % arg
+            raise TypeError, '%s is not a struct type' % arg
         print ' ' * 14,
         self.pahole (type, 0, '')
 
