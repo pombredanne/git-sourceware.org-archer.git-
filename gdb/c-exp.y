@@ -119,6 +119,8 @@ static int yylex (void);
 
 void yyerror (char *);
 
+/* Cleanup for 'nonempty_typelist' */
+static struct cleanup *typelist_cleanup;
 %}
 
 /* Although the yacc "value" of an expression is not used,
@@ -398,6 +400,38 @@ arglist	:	exp
 arglist	:	arglist ',' exp   %prec ABOVE_COMMA
 			{ arglist_len++; }
 	;
+
+exp     :       exp '(' nonempty_typelist ')'
+			{ int i;
+			  /* What to do about freeing memory if
+			     there is an error during parsing? */
+			  write_exp_elt_opcode (TYPE_INSTANCE);
+			  write_exp_elt_longcst ((LONGEST) $<ivec>3[0]);
+			  for (i = 0; i < $<ivec>3[0]; ++i)
+			    write_exp_elt_type ($<tvec>3[i + 1]);
+			  write_exp_elt_longcst((LONGEST) $<ivec>3[0]);
+			  write_exp_elt_opcode (TYPE_INSTANCE);
+			  do_cleanups (typelist_cleanup);
+			}
+	;
+
+/*
+exp     :       BLOCKNAME '(' nonempty_typelist ')'
+			{ int i;
+			  write_exp_elt_opcode (TYPE_INSTANCE_LOOKUP);
+			  write_exp_elt_sym ($1.sym);
+			  write_exp_elt_opcode (TYPE_INSTANCE_LOOKUP);
+
+			  write_exp_elt_opcode (TYPE_INSTANCE);
+			  write_exp_elt_longcst ((LONGEST) $<ivec>3[0]);
+			  for (i = 0; i < $<ivec>3[0]; ++i)
+			    write_exp_elt_type ($<tvec>3[i + 1]);
+			  write_exp_elt_longcst((LONGEST) $<ivec>3[0]);
+			  write_exp_elt_opcode (TYPE_INSTANCE);
+			  do_cleanups (typelist_cleanup);
+			}
+	;
+*/
 
 rcurly	:	'}'
 			{ $$ = end_arglist () - 1; }
@@ -857,7 +891,7 @@ array_mod:	'[' ']'
 func_mod:	'(' ')'
 			{ $$ = 0; }
 	|	'(' nonempty_typelist ')'
-			{ free ($2); $$ = 0; }
+			{ do_cleanups (typelist_cleanup); $$ = 0; }
 	;
 
 /* We used to try to recognize pointer to member types here, but
@@ -1058,12 +1092,15 @@ typename:	TYPENAME
 nonempty_typelist
 	:	type
 		{ $$ = (struct type **) malloc (sizeof (struct type *) * 2);
+		  typelist_cleanup = make_cleanup (free, $$);
 		  $<ivec>$[0] = 1;	/* Number of types in vector */
 		  $$[1] = $1;
 		}
 	|	nonempty_typelist ',' type
 		{ int len = sizeof (struct type *) * (++($<ivec>1[0]) + 1);
 		  $$ = (struct type **) realloc ((char *) $1, len);
+		  discard_cleanups (typelist_cleanup);
+		  typelist_cleanup = make_cleanup (free, $$);
 		  $$[$<ivec>$[0]] = $3;
 		}
 	;

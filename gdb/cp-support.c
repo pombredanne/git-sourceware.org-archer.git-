@@ -175,7 +175,8 @@ mangled_name_to_comp (const char *mangled_name, int options,
   return ret;
 }
 
-/* Return the name of the class containing method PHYSNAME.  */
+/* Return the name of the class or namespace containing
+   function, method, or variable PHYSNAME.  */
 
 char *
 cp_class_name_from_physname (const char *physname)

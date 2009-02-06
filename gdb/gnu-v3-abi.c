@@ -482,15 +482,13 @@ gnuv3_baseclass_offset (struct type *type, int index, const bfd_byte *valaddr,
    which has virtual table index VOFFSET.  The method has an associated
    "this" adjustment of ADJUSTMENT bytes.  */
 
-const char *
+static const char *
 gnuv3_find_method_in (struct type *domain, CORE_ADDR voffset,
 		      LONGEST adjustment)
 {
   int i;
-  const char *physname;
 
   /* Search this class first.  */
-  physname = NULL;
   if (adjustment == 0)
     {
       int len;
@@ -615,13 +613,15 @@ gnuv3_print_method_ptr (const gdb_byte *contents,
 	{
 	  char *demangled_name = cplus_demangle (physname,
 						 DMGL_ANSI | DMGL_PARAMS);
-	  if (demangled_name != NULL)
+	  fprintf_filtered (stream, "&virtual ");
+	  if (demangled_name == NULL)
+	    fputs_filtered (physname, stream);
+	  else
 	    {
-	      fprintf_filtered (stream, "&virtual ");
 	      fputs_filtered (demangled_name, stream);
 	      xfree (demangled_name);
-	      return;
 	    }
+	  return;
 	}
     }
 

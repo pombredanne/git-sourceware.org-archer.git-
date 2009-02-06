@@ -171,9 +171,6 @@ extern CORE_ADDR symbol_overlayed_address (CORE_ADDR, struct obj_section *);
 #define SYMBOL_SECTION(symbol)		(symbol)->ginfo.section
 #define SYMBOL_OBJ_SECTION(symbol)	(symbol)->ginfo.obj_section
 
-#define SYMBOL_CPLUS_DEMANGLED_NAME(symbol)	\
-  (symbol)->ginfo.language_specific.cplus_specific.demangled_name
-
 /* Initializes the language dependent portion of a symbol
    depending upon the language for the symbol. */
 #define SYMBOL_INIT_LANGUAGE_SPECIFIC(symbol,language) \

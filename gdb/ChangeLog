@@ -1,71 +1,150 @@
- aclocal.m4: Regenerate.
-	* configure: Regenerate.
+2009-02-02  Keith Seitz  <keiths@redhat.com>
 
-2009-02-02  Tom Tromey  <tromey@redhat.com>
+	2009-01-26:
+	* cp-name-parser.y: operator() requires two parameters,
+	according to libiberty.
 
-	PR exp/9059:
-	* valops.c (find_overload_match): Follow typedefs before taking
-	address of object argument.
+	* minsyms.c (lookup_minimal_symbol): Canonicalize input
+	before searching.
 
-2009-02-01  Doug Evans  <dje@google.com>
+	From Daniel Jacobowitz <dan@codesourcery.com>:
+		PR gdb/931
+	* dbxread.c (read_dbx_symtab): Use cp_canonicalize_string.
+	* dwarf2read.c (GDB_FORM_cached_string): New.
+	(read_partial_die): Use dwarf2_canonicalize_name.
+	(dwarf2_linkage_name): Use dwarf2_name.
+	(dwarf2_canonicalize_name): New.
+	(dwarf2_name): Use dwarf2_canonicalize_name.
+	(dwarf_form_name, dump_die): Handle GDB_FORM_cached_string.
+	* stabsread.c (define_symbol, read_type): Use cp_canonicalize_string.
+	* symtab.c (lookup_symbol_in_language): Canonicalize input before
+	searching.
 
-	* target.h (target_waitstatus_to_string): Declare.
-	* target.c (target_waitstatus_to_string): New function.  Copied from
-	debug_to_wait.  Add missing entries for TARGET_WAITKIND_SYSCALL_ENTRY,
-	TARGET_WAITKIND_SYSCALL_RETURN, TARGET_WAITKIND_IGNORE,
-	TARGET_WAITKIND_NO_HISTORY.
-	(debug_to_wait): Call it.
-	* infrun.c (wait_for_inferior): If debug_infrun, print result of
-	target_wait.
-	(fetch_inferior_event): Ditto.
 
-2009-01-30  Tom Tromey  <tromey@redhat.com>
+	2009-01-09:
+	* linespec.c (decode_line_1): If the string "(void)" appears
+	in the input, strip it out.
+	If "const" appears in the input, make sure that it does not
+	get stripped.
 
-	* Makefile.in (HFILES_NO_SRCDIR): Remove i386-cygwin-tdep.h.
+	2008-12-09:
+	* c-exp.y: Remove spurious printfs introduced yesterday.
+	Add cleanup for freeing allocated memory in nonempty_typelist.
+	Do cleanups when nonempty_typelist is pushed onto the expression
+	chain (TYPE_INSTANCE and TYPE_INSTANCE_LOOKUP).
 
-2009-01-30  Vladimir Prus  <vladimir@codesourcery.com>
+	2008-12-08:
+	* c-exp.y: Add new rule for resolving method overloads.
+	Add new rule for resolving function overloads -- not working yet.
+	* eval.c (compare_parameters): New function.
+	(make_params): New function.
+	(evaluate_subexp_standard): Pass expect_type to value_aggregate_elt.
+	Handle case TYPE_INSTANCE.
+	Add prototype for TYPE_INSTANCE_LOOKUP (not working yet).
+	(evaluate_subexp_for_address): Pass expect_type to
+	value_aggregate_elt.
+	* expression.h (enum exp_opcode): Add TYPE_INSTANCE and
+	TYPE_INSTANCE_LOOKUP.
+	(compare_parameters): Add declaration.
+	* parse.c (operator_length_standard): Add TYPE_INSTANCE and
+	TYPE_INSTANCE_LOOKUP.
+	* valops.c (value_aggregate_elt): Add new expect_type parameter.
+	Pass expect_type to value_struct_elt_for_reference.
+	(value_struct_elt_for_reference): Use compare_parameters (deep
+	comparison) when comparing a method's overloaded parameters.
+	* value.h (value_aggregate_elt): Add new expect_type parameter.
 
-	PR 8145.
-	* thread.c (do_captured_list_thread_ids): Report the current
-	thread id.
+2009-01-29  Keith Seitz  <keiths@redhat.com>
 
-2009-01-30  Vladimir Prus  <vladimir@codesourcery.com>
-
-	* breakpoint.c (create_breakpoint, create_breakpoints)
-	(break_command_really, set_breakpoint): New parameter enabled.
-	(create_breakpoint, break_command_really): Make breakpoint
-	disabled if so requested.
-	* breakpoint.h (set_breakpoint): New parameter enabled.
-	* mi/mi-cmd-break.c (mi_cmd_break_insert): Handle the -d option.
-
-2009-01-28  Doug Evans  <dje@google.com>
-
-	* amd64-tdep.h (amd64_displaced_step_copy_insn): Declare.
-	(amd64_displaced_step_fixup): Declare.
-	* amd64-tdep.c: #include opcode/i386.h, dis-asm.h.
-	(amd64_arch_regmap): Move out of amd64_analyze_stack_align
-	and make static global.
-	(amd64_arch_regmap_len): New static global.
-	(amd64_arch_reg_to_regnum): New function.
-	(struct amd64_insn): New struct.
-	(struct displaced_step_closure): New struct.
-	(onebyte_has_modrm,twobyte_has_modrm): New static globals.
-	(rex_prefix_p,skip_prefixes)
-	(amd64_insn_length_fprintf,amd64_insn_length_init_dis)
-	(amd64_insn_length,amd64_get_unused_input_int_reg)
-	(amd64_get_insn_details,fixup_riprel,fixup_displaced_copy)
-	(amd64_displaced_step_copy_insn)
-	(amd64_absolute_jmp_p,amd64_absolute_call_p,amd64_ret_p)
-	(amd64_call_p,amd64_breakpoint_p,amd64_syscall_p)
-	(amd64_displaced_step_fixup): New functions.
-	* amd64-linux-tdep.c: #include arch-utils.h.
-	(amd64_linux_init_abi): Install displaced stepping support.
-
-2009-01-28  Pedro Alves  <pedro@codesourcery.com>
-
-	* corefile.c (generic_search): Delete disabled code.
-	* gdbcore.h (generic_search): Delete declaration.
-
+	Based overwhelmingly on work from
+	Daniel Jacobowitz  <dan@codsourcery.org>:
+	* c-typeprint.c (c_type_print_args): Remove static declaration..
+	(cp_type_print_method_args): Print qualifiers for non-static
+	methods from "this" pointer.
+	(c_type_print_args): Add "show_artificial" parameter.
+	Only print artificial fields when requested. Adjusted all callers.
+	* cp-support.c (cp_class_name_from_physname): Expand comment.
+	* dwarf2read.c: Include c-lang.h and typeprint.h.
+	(struct dwarf2_cu): Remove members ranges_offset, and
+	has_ranges_offset. Turned into local stack data.
+	(struct partial_die_info): Remove members language, dirname,
+	has_stmt_list, and line_offset. Turned into local stack data.
+	Add member linkage_name.
+	(dwarf2_build_include_psymtabs): Replace partial_die_info
+	parameter with die_info.
+	Get the line header directly from the die here.
+	(dwarf2_find_base_address): New function.
+	(dwarf2_build_psymtabs_hard): Call read_full_die instead of
+	read_partial_die. Read and set the CU language.
+	Read the CU name. Read and set compilation directory.
+	Replace has_ranges_offset and related with call to
+	dwarf2_get_pc_bounds. Call dwarf2_find_base_address.
+	Don't save lowpc/highpc into CU, just the psymtab.
+	Read in ranges offset here.
+	Remove check for has_stmt_list; always call
+	dwarf2_build_include_psymtabs.
+	(load_comp_unit): Call read_full_die instead of read_partial_die.
+	Read and set the language here directly from the DIE's attributes.
+	(partial_die_full_name): Rewrite to account for DW_AT_specification
+	and other shortcomings.
+	(add_partial_symbol): If we have a linkage_name for the partial DIE,
+	use it instead of the psym's demangled name.
+	(pdi_needs_namespace): Add DW_TAG_subprogram, DW_TAG_variable,
+	and DW_TAG_member.
+	(guess_structure_name): For subprograms, make sure we have
+	a linkage name before saving an acutal class name.
+	(process_full_comp_unit): Remove code finding base address and
+	call dwarf2_find_base_address.
+	(dwarf2_full_name): Move some of the tag checks into
+	pdi_needs_namespace. Print type information using a memory uifile.
+	For C++ CUs with subprogram tags, add argument information.
+	(read_func_scope): Call dwarf2_name instead of dwarf2_linkage_name.
+	(read_lexical_block_scope): Add NULL pst argument to call to
+	dwarf2_get_pc_bounds.
+	(dwarf2_get_pc_bounds): Add partial_symtab parameter. Pass this pst
+	to dwarf2_ranges_read.
+	(dwarf2_get_subprogram_pc_bounds): Add NULL pst argument to call to
+	dwarf2_get_pc_bounds.
+	(get_scope_pc_bounds): Likewise.
+	(dwarf2_add_field): When getting a physical name, prefer the
+	linkage name over the full name.
+	(dwarf2_add_member_fn): Likewise.
+	(determine_class_name): Use the linkage name.
+	(read_partial_die): Remove base_address and related code.
+	Do not set the compilation directory here. Set the name from
+	DW_AT_name. Set the linkage_name from DW_AT_MIPS_linkage_name.
+	Remove newly localized handling of DW_AT_language, DW_AT_ranges,
+	DW_AT_stmt_list, and base address handling.
+	(fixup_partial_die): Check if either the name or linkage_name
+	is non-NULL. If the specification DIE has a linkage name, copy
+	it into the partial DIE.
+	(new_symbol): Use dwarf2_name instead of dwarf2_linkage_name.
+	Cache the linkage name, too, if set.
+	(determine_prefix): For subprograms, there is no appropriate prefix.
+	See comments.
+	(dwarf2_linkage_name): Return the linkage name or NULL.
+	* eval.c (eval_subexp_standard): Handle non-pointer-to-member
+	to pointer-to-member conversions.
+	* gnu-v3-abi.c (gnuv3_find_method_in): Make static.
+	Remove unused variable "physname".
+	(gnuv3_print_method_ptr): For virtual methods, print out
+	the physname if there is no demangled name.
+	* symfile.c (allocate_psymtab): Make parameter "filename" const.
+	(start_psymtab_common): Ditto.
+	* symfile.h (start_psymtab_common): Ditto.
+	(allocate_psymtab): Ditto.
+	* symtab.h (SYMBOL_CPLUS_DEMANGLED_NAME): Remove.
+	* typerint.h (c_type_print_args): Add declaration.
+	* ui-file.c: Include gdb_obstack.h.
+	(do_ui_file_obsavestring): New function.
+	(ui_file_obsavestring): New function.
+	* ui-file.h (ui_file_obsavestring): Add declaration.
+	* valops.c (find_overload_match): Coerce the passed object from
+	a pointer to the actual object. Add logic to deal with data
+	members pointing to methods.
+	Use SYMBOL_NATURAL_NAME instead of SYMBOL_CPLUS_DEMANGLED_NAME.
+	Do not extract function names from member method pointers.
+	
 2009-01-26  Pedro Alves  <pedro@codesourcery.com>
 
 	* linux-nat.c (linux_child_follow_fork): Copy attach_flag from the

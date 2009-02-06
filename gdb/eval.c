@@ -40,6 +40,8 @@
 #include "regcache.h"
 #include "user-regs.h"
 #include "valprint.h"
+#include "gdb_obstack.h"
+#include "objfiles.h"
 
 #include "gdb_assert.h"
 
@@ -651,6 +653,64 @@ ptrmath_type_p (struct type *type)
     }
 }
 
+/* Compares the two method/function types T1 and T2 for "equality" 
+   with respect to the the methods' parameters. If the types of the
+   two parameter lists are the same, returns 1; 0 otherwise. This
+   comparison ignores any artificial this pointer. */
+int
+compare_parameters (struct type *t1, struct type *t2)
+{
+  int i, has_this;
+  /* Hacky: we don't know a priori whether or not t1 is a static
+     method, so we skip any artificial "this" pointer and hope
+     for the best. t2, which comes as user input, never contains a
+     "this" pointer (a user would never enter it into expressions. */
+  if (TYPE_NFIELDS (t1) > 0)
+    has_this = TYPE_FIELD_ARTIFICIAL (t1, 0) ? 1 : 0;
+  else
+    has_this = 0;
+
+  /* Special case: a method taking void. t1 will contain either
+     no fields or just "this". t2 will contain TYPE_CODE_VOID. */
+  if ((TYPE_NFIELDS (t1) - has_this) == 0 && TYPE_NFIELDS (t2) == 1
+      && TYPE_CODE (TYPE_FIELD_TYPE (t2, 0)) == TYPE_CODE_VOID)
+    return 1;
+
+  if ((TYPE_NFIELDS (t1) - has_this) == TYPE_NFIELDS (t2))
+    {
+      for (i = has_this; i < TYPE_NFIELDS (t1); ++i)
+	{
+	  if (rank_one_type (TYPE_FIELD_TYPE (t1, i),
+			     TYPE_FIELD_TYPE (t2, i - has_this))
+	      != 0)
+	    return 0;
+	}
+
+      return 1;
+    }
+
+  return 0;
+}
+
+/* Constructs a fake method with the given parameter types. */
+
+static struct type *
+make_params (int num_types, struct type **param_types)
+{
+  struct type *type = alloc_type (NULL);
+  TYPE_LENGTH (type) = 1;
+  TYPE_CODE (type) = TYPE_CODE_METHOD;
+  TYPE_NFIELDS (type) = num_types;
+  TYPE_FIELDS (type) = (struct field *)
+    TYPE_ALLOC (type, sizeof (struct field) * num_types);
+  memset (TYPE_FIELDS (type), 0, sizeof (struct field) * num_types);
+
+  while (num_types-- > 0)
+    TYPE_FIELD_TYPE (type, num_types) = param_types[num_types];
+
+  return type;
+}
+
 struct value *
 evaluate_subexp_standard (struct type *expect_type,
 			  struct expression *exp, int *pos,
@@ -684,7 +744,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	goto nosideret;
       arg1 = value_aggregate_elt (exp->elts[pc + 1].type,
 				  &exp->elts[pc + 3].string,
-				  0, noside);
+				  expect_type, 0, noside);
       if (arg1 == NULL)
 	error (_("There is no field named %s"), &exp->elts[pc + 3].string);
       return arg1;
@@ -1284,7 +1344,6 @@ evaluate_subexp_standard (struct type *expect_type,
       argvec = (struct value **) alloca (sizeof (struct value *) * (nargs + 3));
       if (op == STRUCTOP_MEMBER || op == STRUCTOP_MPTR)
 	{
-	  nargs++;
 	  /* First, evaluate the structure into arg2 */
 	  pc2 = (*pos)++;
 
@@ -1308,21 +1367,40 @@ evaluate_subexp_standard (struct type *expect_type,
 
 	  arg1 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
 
-	  if (TYPE_CODE (check_typedef (value_type (arg1)))
-	      != TYPE_CODE_METHODPTR)
-	    error (_("Non-pointer-to-member value used in pointer-to-member "
-		     "construct"));
-
-	  if (noside == EVAL_AVOID_SIDE_EFFECTS)
+	  type = check_typedef (value_type (arg1));
+	  switch (TYPE_CODE (type))
 	    {
-	      struct type *method_type = check_typedef (value_type (arg1));
-	      arg1 = value_zero (method_type, not_lval);
-	    }
-	  else
-	    arg1 = cplus_method_ptr_to_value (&arg2, arg1);
+	    case TYPE_CODE_METHODPTR:
+	      if (noside == EVAL_AVOID_SIDE_EFFECTS)
+		arg1 = value_zero (TYPE_TARGET_TYPE (type), not_lval);
+	      else
+		arg1 = cplus_method_ptr_to_value (&arg2, arg1);
 
-	  /* Now, say which argument to start evaluating from */
-	  tem = 2;
+	      /* Now, say which argument to start evaluating from */
+	      nargs++;
+	      tem = 2;
+	      argvec[1] = arg2;
+	      break;
+
+	    case TYPE_CODE_MEMBERPTR:
+	      /* Now, convert these values to an address.  */
+	      arg2 = value_cast (lookup_pointer_type (TYPE_DOMAIN_TYPE (type)),
+				 arg2);
+
+	      mem_offset = value_as_long (arg1);
+
+	      arg1 = value_from_pointer (lookup_pointer_type (TYPE_TARGET_TYPE (type)),
+					 value_as_long (arg2) + mem_offset);
+	      arg1 = value_ind (arg1);
+	      tem = 1;
+	      break;
+
+	    default:
+	      error (_("Non-pointer-to-member value used in pointer-to-member "
+		       "construct"));
+	    }
+
+	  argvec[0] = arg1;
 	}
       else if (op == STRUCTOP_STRUCT || op == STRUCTOP_PTR)
 	{
@@ -1448,8 +1526,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	}
       else if (op == STRUCTOP_MEMBER || op == STRUCTOP_MPTR)
 	{
-	  argvec[1] = arg2;
-	  argvec[0] = arg1;
+	  /* Pointer to member.  argvec is already set up.  */
 	}
       else if (op == OP_VAR_VALUE)
 	{
@@ -1695,6 +1772,37 @@ evaluate_subexp_standard (struct type *expect_type,
 	default:
 	  error (_("non-pointer-to-member value used in pointer-to-member construct"));
 	}
+
+    case TYPE_INSTANCE:
+      nargs = longest_to_int (exp->elts[pc + 1].longconst);
+      arg_types = (struct type **) alloca (nargs * sizeof (struct type *));
+      for (ix = 0; ix < nargs; ++ix)
+	arg_types[ix] = exp->elts[pc + 1 + ix + 1].type;
+
+      expect_type = make_params (nargs, arg_types);
+      *(pos) += 3 + nargs;
+      return evaluate_subexp_standard (expect_type, exp, pos, noside);
+
+    case TYPE_INSTANCE_LOOKUP:
+      {
+	int i;
+	struct symbol *sym;
+	struct type **arg_types;
+	(*pos) += 3;
+	printf ("TYPE_INSTANCE_LOOKUP\n");
+	arg_types = (struct type **) alloca (TYPE_NFIELDS (expect_type)
+					     * sizeof (struct type *));
+	for (i = 0; i < TYPE_NFIELDS (expect_type); ++i)
+	  arg_types[i] = TYPE_FIELD_TYPE (expect_type, i);
+	(void) find_overload_match (arg_types, TYPE_NFIELDS (expect_type),
+				    NULL /* no need for name */,
+				    0 /* not method */,
+				    0 /* strict match */,
+				    NULL, exp->elts[pc + 1].symbol, NULL,
+				    &sym, NULL);
+	i = 0;
+      }
+      break;
 
     case BINOP_CONCAT:
       arg1 = evaluate_subexp_with_coercion (exp, pos, noside);
@@ -2568,7 +2676,7 @@ evaluate_subexp_for_address (struct expression *exp, int *pos,
       (*pos) += 5 + BYTES_TO_EXP_ELEM (tem + 1);
       x = value_aggregate_elt (exp->elts[pc + 1].type,
 			       &exp->elts[pc + 3].string,
-			       1, noside);
+			       NULL, 1, noside);
       if (x == NULL)
 	error (_("There is no field named %s"), &exp->elts[pc + 3].string);
       return x;

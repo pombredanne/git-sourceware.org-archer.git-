@@ -138,11 +138,18 @@ class Diamond : public Padding, public Left, public Right
 {
 public:
   virtual int vget_base ();
+  int (*func_ptr) (int);
 };
 
 int Diamond::vget_base ()
 {
   return this->Left::x + 2000;
+}
+
+int
+func (int x)
+{
+  return 19 + x;
 }
 
 int main ()
@@ -162,6 +169,7 @@ int main ()
   int (Diamond::*right_vpmf) ();
   int (Base::*base_vpmf) ();
   int Diamond::*diamond_pmi;
+  int (* Diamond::*diamond_pfunc_ptr) (int);
 
   PMI null_pmi;
   PMF null_pmf;
@@ -179,6 +187,7 @@ int main ()
 
   diamond.Left::x = 77;
   diamond.Right::x = 88;
+  diamond.func_ptr = func;
 
   /* Some valid pointer to members from a base class.  */
   left_pmf = (int (Diamond::*) ()) (int (Left::*) ()) (&Base::get_x);
@@ -193,10 +202,18 @@ int main ()
   /* A pointer to data member from a base class.  */
   diamond_pmi = (int Diamond::*) (int Left::*) &Base::x;
 
+  /* A pointer to data member, where the member is itself a pointer to
+     a function.  */
+  diamond_pfunc_ptr = (int (* Diamond::*) (int)) &Diamond::func_ptr;
+
   null_pmi = NULL;
   null_pmf = NULL;
 
   pmi = NULL; /* Breakpoint 1 here.  */
+
+  // Invalid (uses diamond_pfunc_ptr as a function):
+  // diamond.*diamond_pfunc_ptr (20);
+  (diamond.*diamond_pfunc_ptr) (20);
 
   k = (a.*pmf)(3);
 
