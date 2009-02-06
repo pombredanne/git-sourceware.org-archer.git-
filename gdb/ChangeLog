@@ -1,3 +1,8 @@
+2009-02-06  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* python/python-cmd.c (gdbpy_initialize_commands): Rename COMMAND_
+	constants to match the actual help category to which they correspond.
+
 2009-02-05  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	* python/python-cmd.c (cmdpy_function): Convert command arguments to a

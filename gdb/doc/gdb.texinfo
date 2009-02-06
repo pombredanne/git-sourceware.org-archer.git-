@@ -18992,16 +18992,16 @@ defined in the @code{gdb} module:
 The command does not belong to any particular class.  A command in
 this category will not be displayed in any of the help categories.
 
-@findex COMMAND_RUN
-@findex gdb.COMMAND_RUN
+@findex COMMAND_RUNNING
+@findex gdb.COMMAND_RUNNING
 @item COMMAND_RUN
 The command is related to running the inferior.  For example,
 @code{start}, @code{step}, and @code{continue} are in this category.
 Type @code{help running} at the @value{GDBN} prompt to see a list of
 commands in this category.
 
-@findex COMMAND_VARS
-@findex gdb.COMMAND_VARS
+@findex COMMAND_DATA
+@findex gdb.COMMAND_DATA
 @item COMMAND_VARS
 The command is related to data or variables.  For example,
 @code{call}, @code{find}, and @code{print} are in this category.  Type
@@ -19034,24 +19034,24 @@ but not related to the state of the inferior.  For example,
 @code{help support} at the @value{GDBN} prompt to see a list of
 commands in this category.
 
-@findex COMMAND_INFO
-@findex gdb.COMMAND_INFO
+@findex COMMAND_STATUS
+@findex gdb.COMMAND_STATUS
 @item COMMAND_INFO
 The command is an @samp{info}-related command, that is, related to the
 state of @value{GDBN} itself.  For example, @code{info}, @code{macro},
 and @code{show} are in this category.  Type @code{help status} at the
 @value{GDBN} prompt to see a list of commands in this category.
 
-@findex COMMAND_BREAKPOINT
-@findex gdb.COMMAND_BREAKPOINT
+@findex COMMAND_BREAKPOINTS
+@findex gdb.COMMAND_BREAKPOINTS
 @item COMMAND_BREAKPOINT
 The command has to do with breakpoints.  For example, @code{break},
 @code{clear}, and @code{delete} are in this category.  Type @code{help
 breakpoints} at the @value{GDBN} prompt to see a list of commands in
 this category.
 
-@findex COMMAND_TRACE
-@findex gdb.COMMAND_TRACE
+@findex COMMAND_TRACEPOINTS
+@findex gdb.COMMAND_TRACEPOINTS
 @item COMMAND_TRACE
 The command has to do with tracepoints.  For example, @code{trace},
 @code{actions}, and @code{tfind} are in this category.  Type

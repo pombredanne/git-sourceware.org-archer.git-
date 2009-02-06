@@ -501,16 +501,17 @@ gdbpy_initialize_commands (void)
   /* Note: alias and user are special; pseudo appears to be unused,
      and there is no reason to expose tui or xdb, I think.  */
   if (PyModule_AddIntConstant (gdb_module, "COMMAND_NONE", no_class) < 0
-      || PyModule_AddIntConstant (gdb_module, "COMMAND_RUN", class_run) < 0
-      || PyModule_AddIntConstant (gdb_module, "COMMAND_VARS", class_vars) < 0
+      || PyModule_AddIntConstant (gdb_module, "COMMAND_RUNNING", class_run) < 0
+      || PyModule_AddIntConstant (gdb_module, "COMMAND_DATA", class_vars) < 0
       || PyModule_AddIntConstant (gdb_module, "COMMAND_STACK", class_stack) < 0
       || PyModule_AddIntConstant (gdb_module, "COMMAND_FILES", class_files) < 0
       || PyModule_AddIntConstant (gdb_module, "COMMAND_SUPPORT",
 				  class_support) < 0
-      || PyModule_AddIntConstant (gdb_module, "COMMAND_INFO", class_info) < 0
-      || PyModule_AddIntConstant (gdb_module, "COMMAND_BREAKPOINT",
+      || PyModule_AddIntConstant (gdb_module, "COMMAND_STATUS", class_info) < 0
+      || PyModule_AddIntConstant (gdb_module, "COMMAND_BREAKPOINTS",
 				  class_breakpoint) < 0
-      || PyModule_AddIntConstant (gdb_module, "COMMAND_TRACE", class_trace) < 0
+      || PyModule_AddIntConstant (gdb_module, "COMMAND_TRACEPOINTS",
+				  class_trace) < 0
       || PyModule_AddIntConstant (gdb_module, "COMMAND_OBSCURE",
 				  class_obscure) < 0
       || PyModule_AddIntConstant (gdb_module, "COMMAND_MAINTENANCE",
