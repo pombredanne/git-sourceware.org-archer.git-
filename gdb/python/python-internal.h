@@ -1,6 +1,6 @@
 /* Gdb/Python header for private use by Python module.
 
-   Copyright (C) 2008 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -33,8 +33,11 @@
 
 #if HAVE_LIBPYTHON2_4
 #include "python2.4/Python.h"
-/* Py_ssize_t is not defined until 2.5.  */
-typedef Py_intptr_t Py_ssize_t;
+/* Py_ssize_t is not defined until 2.5.
+   Logical type for Py_ssize_t is Py_intptr_t, but that fails in 64-bit
+   compilation due to several apparent mistakes in python2.4 API, so we
+   use 'int' instead.  */
+typedef int Py_ssize_t;
 #elif HAVE_LIBPYTHON2_5
 #include "python2.5/Python.h"
 #elif HAVE_LIBPYTHON2_6
@@ -52,6 +55,7 @@ typedef Py_intptr_t Py_ssize_t;
 #define PyEval_InitThreads() 0
 #define PyThreadState_Swap(ARG) (ARG)
 #define PyEval_InitThreads() 0
+#define PyEval_ReleaseLock() 0
 #endif
 
 struct value;

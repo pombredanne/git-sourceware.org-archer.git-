@@ -1,7 +1,8 @@
 /* Multi-process/thread control for GDB, the GNU debugger.
 
    Copyright (C) 1986, 1987, 1988, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003, 2004, 2007, 2008 Free Software Foundation, Inc.
+   2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009
+   Free Software Foundation, Inc.
 
    Contributed by Lynx Real-Time Systems, Inc.  Los Gatos, CA.
 
@@ -409,6 +410,7 @@ do_captured_list_thread_ids (struct ui_out *uiout, void *arg)
   struct thread_info *tp;
   int num = 0;
   struct cleanup *cleanup_chain;
+  int current_thread = -1;
 
   prune_threads ();
   target_find_new_threads ();
@@ -419,11 +421,18 @@ do_captured_list_thread_ids (struct ui_out *uiout, void *arg)
     {
       if (tp->state_ == THREAD_EXITED)
 	continue;
+
+      if (ptid_equal (tp->ptid, inferior_ptid))
+	current_thread = tp->num;
+
       num++;
       ui_out_field_int (uiout, "thread-id", tp->num);
     }
 
   do_cleanups (cleanup_chain);
+
+  if (current_thread != -1)
+    ui_out_field_int (uiout, "current-thread-id", current_thread);
   ui_out_field_int (uiout, "number-of-threads", num);
   return GDB_RC_OK;
 }
@@ -629,6 +638,55 @@ set_stop_requested (ptid_t ptid, int stop)
      react to this request.  */
   if (stop)
     observer_notify_thread_stop_requested (ptid);
+}
+
+void
+finish_thread_state (ptid_t ptid)
+{
+  struct thread_info *tp;
+  int all;
+  int any_started = 0;
+
+  all = ptid_equal (ptid, minus_one_ptid);
+
+  if (all || ptid_is_pid (ptid))
+    {
+      for (tp = thread_list; tp; tp = tp->next)
+	{
+ 	  if (tp->state_ == THREAD_EXITED)
+  	    continue;
+	  if (all || ptid_get_pid (ptid) == ptid_get_pid (tp->ptid))
+	    {
+	      if (tp->executing_ && tp->state_ == THREAD_STOPPED)
+		any_started = 1;
+	      tp->state_ = tp->executing_ ? THREAD_RUNNING : THREAD_STOPPED;
+	    }
+	}
+    }
+  else
+    {
+      tp = find_thread_pid (ptid);
+      gdb_assert (tp);
+      if (tp->state_ != THREAD_EXITED)
+	{
+	  if (tp->executing_ && tp->state_ == THREAD_STOPPED)
+	    any_started = 1;
+	  tp->state_ = tp->executing_ ? THREAD_RUNNING : THREAD_STOPPED;
+	}
+    }
+
+  if (any_started)
+    observer_notify_target_resumed (ptid);
+}
+
+void
+finish_thread_state_cleanup (void *arg)
+{
+  ptid_t *ptid_p = arg;
+
+  gdb_assert (arg);
+
+  finish_thread_state (*ptid_p);
 }
 
 /* Prints the list of threads and their details on UIOUT.
@@ -1044,7 +1102,6 @@ thread_command (char *tidstr, int from_tty)
       return;
     }
 
-  annotate_thread_changed ();
   gdb_thread_select (uiout, tidstr, NULL);
 }
 
@@ -1076,6 +1133,8 @@ do_captured_thread_select (struct ui_out *uiout, void *tidstr)
     error (_("Thread ID %d has terminated."), num);
 
   switch_to_thread (tp->ptid);
+
+  annotate_thread_changed ();
 
   ui_out_text (uiout, "[Switching to thread ");
   ui_out_field_int (uiout, "new-thread-id", pid_to_thread_id (inferior_ptid));

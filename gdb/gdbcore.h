@@ -1,7 +1,7 @@
 /* Machine independent variables that describe the core file under GDB.
 
    Copyright (C) 1986, 1987, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1997, 1998, 1999, 2000, 2001, 2004, 2007, 2008
+   1997, 1998, 1999, 2000, 2001, 2004, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -82,11 +82,6 @@ extern void write_memory_unsigned_integer (CORE_ADDR addr, int len,
 /* Store VALUE at ADDR in the inferior as a LEN-byte unsigned integer.  */
 extern void write_memory_signed_integer (CORE_ADDR addr, int len,
                                          LONGEST value);
-
-extern void generic_search (int len, char *data, char *mask,
-			    CORE_ADDR startaddr, int increment,
-			    CORE_ADDR lorange, CORE_ADDR hirange,
-			    CORE_ADDR * addr_found, char *data_found);
 
 /* Hook for `exec_file_command' command to call.  */
 

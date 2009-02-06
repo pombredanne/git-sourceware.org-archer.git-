@@ -1,68 +1,219 @@
-2009-02-02  Sami Wagiaalla  <swagiaal@redhat.com>
+2009-02-02  Tom Tromey  <tromey@redhat.com>
 
-	* gdb.cp/namespace-using.exp: New Test.
-	* gdb.cp/namespace-using.cc (marker10): New test function.
+	* gdb.cp/cpcompletion.exp: Name the test "pr9594".
+	* gdb.cp/pr2489.cc: Rename...
+	* gdb.cp/pr9594.cc: ... to this.
 
-2009-01-29  Sami Wagiaalla  <swagiaal@redhat.com>
+2009-02-02  Tom Tromey  <tromey@redhat.com>
 
-	* gdb.cp/namespace-using.cc: rename variable a to _a.
-	* gdb.cp/namespace-using.exp: Added tests for printing of non-imported
-	names.
+	* gdb.cp/Makefile.in (EXECUTABLES): Add pr2489.
+	* gdb.cp/pr2489.cc: New file.
+	* gdb.cp/cpcompletion.exp: New file.
 
-2009-01-23  Sami Wagiaalla  <swagiaal@redhat.com>
+2009-02-02  Tom Tromey  <tromey@redhat.com>
 
-	* gdb.cp/namespace.exp: Used cp_test_ptype_class for matching classes.
-	* lib/cp-support.exp: Added support for class names containing '::'. 
+	PR exp/9059:
+	* gdb.cp/call-c.exp: Add regression test.
+	* gdb.cp/call-c.cc (FooHandle): New typedef.
+	(main): New variable 'handle'.
 
-2009-01-23  Sami Wagiaalla  <swagiaal@redhat.com>
+2009-01-30  Vladimir Prus  <vladimir@codesourcery.com>
 
-	* gdb.cp/namespace.exp: Removed kfail. Bug has been fixed.
+	* lib/mi-support.exp (et_mi_thread_list)
+	(check_mi_and_console_threads): Adjust for current thread in
+	-thread-list-ids output.
 
-2008-11-06  Sami Wagiaalla  <swagiaal@redhat.com>
+2009-01-30  Vladimir Prus  <vladimir@codesourcery.com>
 
-	* gdb.cp/namespace-using.exp: Removed kfail; test has been fix.
-	
-2008-11-06  Sami Wagiaalla  <swagiaal@redhat.com>
+    	* gdb.mi/mi-break.exp (test_disabled_creation): New.
+    	Call it.
 
-	* gdb.cp/namespace-using.exp: Removed kfail; test has been fix.
+2009-01-28  Doug Evans  <dje@google.com>
 
-2008-11-04  Sami Wagiaalla  <swagiaal@redhat.com>
+	* gdb.arch/amd64-disp-step.S: New file.
+	* gdb.arch/amd64-disp-step.exp: New file.
+	* gdb.arch/i386-disp-step.S: New file.
+	* gdb.arch/i386-disp-step.exp: New file.
 
-	* gdb.cp/namespace-using.exp: New test.
-	* gdb.cp/namespace-using.cc (marker8): new function for new test.
-	(marker9): Ditto.
-	
-2008-10-28  Sami Wagiaalla  <swagiaal@redhat.com>
+2009-01-27  Pierre Muller  <muller@ics.u-strasbg.fr>
 
-	* gdb.cp/namespace-using.exp: New test.
-	* gdb.cp/namespace-using.cc (marker7): Added function for new test.
+	* gdb.base/find.exp: Set newline variable
+	using quotes instead of braces to fix cygwin failures.
 
-2008-10-27  Sami Wagiaalla  <swagiaal@redhat.com>
+2009-01-23  Pedro Alves  <pedro@codesourcery.com>
 
-	* gdb.cp/namespace-using.cc (marker6): Added function for new test.
-	* gdb.cp/namespace-using.exp: Added new test.
+	* gdb.base/radix.exp: Add tests to ensure that that set
+	input-radix 0 and set output-radix 0 are really rejected.
 
-2008-10-22  Sami Wagiaalla  <swagiaal@redhat.com> 
+2009-01-23  Pedro Alves  <pedro@codesourcery.com>
 
-	* gdb.cp/namespace-multiple-imports.cc: New test program.
-	* gdb.cp/namespace-multiple-imports.exp: New test.
+	* gdb.base/hook-stop-frame.c, gdb.base/hook-stop-frame.exp: Update
+	copyright years.
 
-2008-10-22  Sami Wagiaalla  <swagiaal@redhat.com>
+2009-01-23  Pedro Alves  <pedro@codesourcery.com>
 
-	* gdb.cp/namespace-using.exp: made test for printing of namespace
-	aliases more independent.
+	PR gdb/9664:
+	* gdb.base/hook-stop-frame.c, gdb.base/hook-stop-frame.exp: New.
 
-2008-10-21  Sami Wagiaalla  <swagiaal@redhat.com>
+2009-01-22  Pedro Alves  <pedro@codesourcery.com>
 
-	* gdb.cp/namespace-using.exp: use gdb_test.
-	Corrected tests.
+	PR c++/9631:
+	* gdb.cp/pr9631.cc, gdb.cp/pr9631.exp: New.
 
-2008-10-06  Sami Wagiaalla  <swagiaal@redhat.com>
+2009-01-22  Pierre Muller  <muller@ics.u-strasbg.fr>
 
-	* gdb.cp/namespace-using.exp: Added a new test.
-	* gdb.cp/namespace-using.cc (marker5): New function.
-	
-2008-09-09  Sami Wagiaalla  <swagiaal@redhat.com>
+	* gdb.server/file-transfer.exp: Use EXEEXT variable for
+	binfile definition to fix Windows OS failure.
+
+2009-01-20  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	PR gdb/9346
+	* gdb.base/interrupt.c (sigint_handler): New.
+	(main): Install a SIGINT handler if SIGNALS is defined.  Exit
+	on error.
+	* gdb.base/interrupt.exp: Define SIGNALS unless gdb,nosignals.
+	Test "signal SIGINT".
+
+2009-01-19  Doug Evans  <dje@google.com>
+
+	* gdb.base/break.exp: Update expected gdb output.
+	* gdb.base/sepdebug.exp: Ditto.
+	* gdb.mi/mi-syn-frame.exp: Ditto.
+	* gdb.mi/mi2-syn-frame.exp: Ditto.
+	* gdb.base/call-signal-resume.exp: New file.
+	* gdb.base/call-signals.c: New file.
+	* gdb.base/unwindonsignal.exp: New file.
+	* gdb.base/unwindonsignal.c: New file.
+	* gdb.threads/interrupted-hand-call.exp: New file.
+	* gdb.threads/interrupted-hand-call.c: New file.
+	* gdb.threads/thread-unwindonsignal.exp: New file.
+
+2009-01-14  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.base/define.exp: Test defining and hooking prefix commands.
+	* gdb.python/python.exp: Update test for "show user" output.
+
+2009-01-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.fortran/derived-type.exp: New variables int4 and real4.  Match
+	now the output exactly, using less wildcards.  Expect also the output
+	of gfortran-4.3.  Update for the f-valprint.c modification from
+	2008-04-22.
+	* gdb.fortran/subarray.exp: Expect also the output of gfortran-4.3.
+	Remove gdb_test test names where matching the command.
+
+2009-01-01  Pedro Alves  <pedro@codesourcery.com>
+
+	PR breakpoints/9681:
+	* gdb.base/watchpoint.exp: Add regression test.
+
+2008-12-31  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.threads/attach-into-signal.exp: Don't use
+	gdb_suppress_entire_file.
+	* gdb.threads/attach-stopped.exp: Ditto.
+	* gdb.threads/attachstop-mt.exp: Ditto.
+
+2008-12-31  Pedro Alves  <pedro@codesourcery.com>
+
+	PR gdb/8812:
+	* gdb.base/signal.exp: Change kfail to fail, and update PR number.
+
+2008-12-29  Pedro Alves  <pedro@codesourcery.com>
+
+	PR gdb/7536:
+	* gdb.base/radix.exp: Add tests to ensure invalid input radices
+	and unsupported output radices are really rejected.
+
+2008-12-23  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.cp/punctuator.exp: Backslash the '$' signs.
+
+2008-12-22  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/punctuator.exp: New file.
+
+2008-12-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/completion.exp (Completing non-existing component): New test.
+
+2008-12-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix for PR gdb/8648.
+	* gdb.arch/ppc-fp.exp, gdb.arch/vsx-regs.exp, gdb.base/watchpoint-hw.c,
+	gdb.gdbtk/browser.test, gdb.gdbtk/console.test, gdb.gdbtk/srcwin.test,
+	gdb.gdbtk/srcwin2.test, gdb.gdbtk/srcwin3.test, gdb.gdbtk/windows.test,
+	gdb.threads/tls2.c: Remove reference to bug-gdb@prep.ai.mit.edu .
+
+2008-12-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/watchpoint-hw.exp, gdb.base/watchpoint-hw.c: New.
+
+2008-12-16  Christophe Lyon  <christophe.lyon@st.com>
+
+	* gdb.base/expand-psymtabs.c: Insert code in foo so that the
+	compiler actually generate code at the expected line number.
+
+2008-12-15  Jie Zhang  <jie.zhang@analog.com>
+
+	* gdb.base/consecutive.exp: Don't use global in gdb_expect.
+
+2008-12-12  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/commands.exp (redefine_hook_test): New proc.
+	Call it.
+
+2008-12-11  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/macscp.exp: New regression test.
+
+2008-12-11  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/macscp.exp: Print "address.addr".
+	* gdb.base/macscp1.c (struct outer): New struct.
+	(address): New global.
+
+2008-12-09  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/commands.exp (redefine_backtrace_test): New proc.
+	Call it.
+
+2008-12-04  Doug Evans  <dje@google.com>
+
+	* gdb.server/ext-run.exp: Relax regexp for init program.
+
+2008-12-03  Tristan Gingold  <gingold@adacore.com>
+
+	* gdb.base/macscp.exp: Generate an object file during compilation
+	to work around Darwin dsymutil limitations.
+
+2008-12-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Test resolving external references to TLS variables.
+	* gdb.threads/tls.exp: New tests to examine A_THREAD_LOCAL and
+	FILE2_THREAD_LOCAL.
+	(testfile2, srcfile2): New variables.
+	* gdb.threads/tls.c (file2_thread_local)
+	(function_referencing_file2_thread_local): New.
+	* gdb.threads/tls2.c: New file.
+
+2008-11-28  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/int_deref.exp: Convert the addresses into long_integer
+	rather than integer, as integer might not be big enough when
+	on 64bit targets.
+
+2008-11-27  Jerome Guitton  <guitton@adacore.com>
+
+	* gdb.cp/formatted-ref.exp: Add equality test.
+	* gdb.ada/formatted_ref.exp: Ditto.
+
+2008-11-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/breakpoint-shadow.exp, gdb.base/breakpoint-shadow.c: New.
+	* gdb.base/start.exp: New comment about an alternative - `runto_main'.
+
+2008-11-20  Andreas Schwab  <schwab@suse.de>
 
 	* gdb.base/foll-fork.exp (catch_fork_child_follow): Fix patterns
 	matching syscall entry point.

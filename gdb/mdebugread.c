@@ -1,7 +1,7 @@
 /* Read a symbol table in ECOFF format (Third-Eye).
 
    Copyright (C) 1986, 1987, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008
+   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    Original version contributed by Alessandro Forin (af@cs.cmu.edu) at
@@ -1161,7 +1161,7 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
 	       obstack_alloc (&current_objfile->objfile_obstack,
 			      sizeof (struct mdebug_extra_func_info)));
 	  memset (e, 0, sizeof (struct mdebug_extra_func_info));
-	  SYMBOL_VALUE (s) = (long) e;
+	  SYMBOL_VALUE_BYTES (s) = (gdb_byte *) e;
 	  e->numargs = top_stack->numargs;
 	  e->pdr.framereg = -1;
 	  add_symbol (s, top_stack->cur_st, top_stack->cur_block);
@@ -1644,11 +1644,11 @@ parse_type (int fd, union aux_ext *ax, unsigned int aux_index, int *bs,
 			  TYPE_ALLOC (tp, 2 * sizeof (struct field)));
       TYPE_FIELD_NAME (tp, 0) = obsavestring ("Low", strlen ("Low"),
 					    &current_objfile->objfile_obstack);
-      TYPE_FIELD_BITPOS (tp, 0) = AUX_GET_DNLOW (bigend, ax);
+      TYPE_LOW_BOUND (tp) = AUX_GET_DNLOW (bigend, ax);
       ax++;
       TYPE_FIELD_NAME (tp, 1) = obsavestring ("High", strlen ("High"),
 					    &current_objfile->objfile_obstack);
-      TYPE_FIELD_BITPOS (tp, 1) = AUX_GET_DNHIGH (bigend, ax);
+      TYPE_HIGH_BOUND (tp) = AUX_GET_DNHIGH (bigend, ax);
       ax++;
     }
 
@@ -1817,7 +1817,6 @@ parse_procedure (PDR *pr, struct symtab *search_symtab,
   struct gdbarch *gdbarch = get_objfile_arch (pst->objfile);
   struct symbol *s, *i;
   struct block *b;
-  struct mdebug_extra_func_info *e;
   char *sh_name;
 
   /* Simple rule to find files linked "-x" */
@@ -1917,9 +1916,10 @@ parse_procedure (PDR *pr, struct symtab *search_symtab,
 
   if (i)
     {
-      e = (struct mdebug_extra_func_info *) SYMBOL_VALUE (i);
+      struct mdebug_extra_func_info *e;
+      
+      e = (struct mdebug_extra_func_info *) SYMBOL_VALUE_BYTES (i);
       e->pdr = *pr;
-      e->pdr.isym = (long) s;
 
       /* GDB expects the absolute function start address for the
          procedure descriptor in e->pdr.adr.
@@ -3938,7 +3938,7 @@ psymtab_to_symtab_1 (struct partial_symtab *pst, char *filename)
 		  SYMBOL_DOMAIN (s) = LABEL_DOMAIN;
 		  SYMBOL_CLASS (s) = LOC_CONST;
 		  SYMBOL_TYPE (s) = mdebug_type_void;
-		  SYMBOL_VALUE (s) = (long) e;
+		  SYMBOL_VALUE_BYTES (s) = (gdb_byte *) e;
 		  e->pdr.framereg = -1;
 		  add_symbol_to_list (s, &local_symbols);
 		}

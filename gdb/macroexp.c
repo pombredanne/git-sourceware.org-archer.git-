@@ -1,5 +1,5 @@
 /* C preprocessor macro expansion for GDB.
-   Copyright (C) 2002, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2002, 2007, 2008, 2009 Free Software Foundation, Inc.
    Contributed by Red Hat, Inc.
 
    This file is part of GDB.
@@ -278,20 +278,22 @@ get_pp_number (struct macro_buffer *tok, char *p, char *end)
 {
   if (p < end
       && (macro_is_digit (*p)
-          || *p == '.'))
+          || (*p == '.'
+	      && p + 2 <= end
+	      && macro_is_digit (p[1]))))
     {
       char *tok_start = p;
 
       while (p < end)
         {
-          if (macro_is_digit (*p)
-              || macro_is_identifier_nondigit (*p)
-              || *p == '.')
-            p++;
-          else if (p + 2 <= end
-                   && strchr ("eEpP.", *p)
-                   && (p[1] == '+' || p[1] == '-'))
+	  if (p + 2 <= end
+	      && strchr ("eEpP", *p)
+	      && (p[1] == '+' || p[1] == '-'))
             p += 2;
+          else if (macro_is_digit (*p)
+		   || macro_is_identifier_nondigit (*p)
+		   || *p == '.')
+            p++;
           else
             break;
         }

@@ -1,7 +1,7 @@
 /* Low-level child interface to ptrace.
 
    Copyright (C) 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1998,
-   1999, 2000, 2001, 2002, 2004, 2005, 2006, 2007, 2008
+   1999, 2000, 2001, 2002, 2004, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -73,7 +73,8 @@ inf_ptrace_follow_fork (struct target_ops *ops, int follow_child)
       CORE_ADDR step_range_start = last_tp->step_range_start;
       CORE_ADDR step_range_end = last_tp->step_range_end;
       struct frame_id step_frame_id = last_tp->step_frame_id;
-
+      int attach_flag = find_inferior_pid (pid)->attach_flag;
+      struct inferior *inf;
       struct thread_info *tp;
 
       /* Otherwise, deleting the parent would get rid of this
@@ -82,7 +83,7 @@ inf_ptrace_follow_fork (struct target_ops *ops, int follow_child)
 
       /* Before detaching from the parent, remove all breakpoints from
 	 it.  */
-      detach_breakpoints (pid);
+      remove_breakpoints ();
 
       if (ptrace (PT_DETACH, pid, (PTRACE_TYPE_ARG3)1, 0) == -1)
 	perror_with_name (("ptrace"));
@@ -94,7 +95,8 @@ inf_ptrace_follow_fork (struct target_ops *ops, int follow_child)
       detach_inferior (pid);
 
       /* Add the child.  */
-      add_inferior (fpid);
+      inf = add_inferior (fpid);
+      inf->attach_flag = attach_flag;
       tp = add_thread_silent (inferior_ptid);
 
       tp->step_resume_breakpoint = step_resume_breakpoint;
@@ -309,7 +311,9 @@ inf_ptrace_detach (struct target_ops *ops, char *args, int from_tty)
 
   inferior_ptid = null_ptid;
   detach_inferior (pid);
-  unpush_target (ops);
+
+  if (!have_inferiors ())
+    unpush_target (ops);
 }
 
 /* Kill the inferior.  */
@@ -389,7 +393,6 @@ inf_ptrace_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
   do
     {
       set_sigint_trap ();
-      set_sigio_trap ();
 
       do
 	{
@@ -398,7 +401,6 @@ inf_ptrace_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
 	}
       while (pid == -1 && errno == EINTR);
 
-      clear_sigio_trap ();
       clear_sigint_trap ();
 
       if (pid == -1)
@@ -410,7 +412,7 @@ inf_ptrace_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
 	  /* Claim it exited with unknown signal.  */
 	  ourstatus->kind = TARGET_WAITKIND_SIGNALLED;
 	  ourstatus->value.sig = TARGET_SIGNAL_UNKNOWN;
-	  return minus_one_ptid;
+	  return inferior_ptid;
 	}
 
       /* Ignore terminated detached child processes.  */

@@ -1,3 +1,86 @@
+2009-01-26  Pedro Alves  <pedro@codesourcery.com>
+
+	* server.c (gdbserver_usage): Mention --remote-debug.
+	(main): Accept '--remote-debug' switch.
+
+2009-01-18  Doug Evans  <dje@google.com>
+
+	* regcache.c (new_register_cache): No need to check result of xcalloc.
+	* server.c (handle_search_memory): Back out calls to xmalloc,
+	result is checked and error is returned to user upon failure.
+	(handle_query): Ditto.  Add more checks for result of malloc.
+	(handle_v_cont): Check result of malloc, report error back to
+	user upon failure.
+	(handle_v_run): Ditto.  Call freeargv.
+	* server.h (freeargv): Declare.
+	* utils.c (freeargv): New fn.
+
+2009-01-15  Doug Evans  <dje@google.com>
+
+	* gdbreplay.c (perror_with_name): Make arg const char *.
+	* server.h (target_signal_to_name): Make return type const char *.
+	* thread-db.c (thread_db_err_str): Make return type const char *.
+	* utils.c (perror_with_name): Make arg const char *.
+
+2009-01-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* win32-low.c (get_child_debug_event): Issue a final DBG_CONTINUE
+	when handling a EXIT_PROCESS_DEBUG_EVENT.
+
+2009-01-06  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdbreplay.c (gdbreplay_version): Update copyright year.
+	* server.c (gdbserver_version): Likewise.
+
+2009-01-05  Doug Evans  <dje@google.com>
+
+	* linux-low.c (linux_attach_lwp): Add some comments/fixmes.
+	(handle_extended_wait): Improve comment.
+
+2008-12-13  Doug Evans  <dje@google.com>
+
+	* utils.c (xmalloc,xcalloc,xstrdup): New fns.
+	* server.h (ATTR_MALLOC): New macro.
+	(xmalloc,xcalloc,xstrdup): Declare.
+	* hostio.c: Replace malloc,calloc,strdup with xmalloc,xcalloc,xstrdup.
+	* inferiors.c: Ditto.
+	* linux-low.c: Ditto.
+	* mem-break.c: Ditto.
+	* regcache.c: Ditto.
+	* remote-utils.c: Ditto.
+	* server.c: Ditto.
+	* target.c: Ditto.
+	* win32-low.c: Ditto.
+
+2008-12-12  Doug Evans  <dje@google.com>
+
+	* linux-low.c (linux_wait_for_process): Don't clobber current_inferior
+	in debugging printf.
+
+	* linux-low.c (handle_extended_wait): Simplify, use my_waitpid.
+
+2008-12-09  Doug Evans  <dje@google.com>
+
+	* linux-low.h (struct process_info): Delete member tid, unused.
+	* thread-db.c (find_one_thread): Update.
+	(maybe_attach_thread): Update.
+
+2008-12-02  Pedro Alves  <pedro@codesourcery.com>
+
+        * target.h (struct target_ops): Add qxfer_osdata member.
+        * linux-low.c: Include ctype.h and pwd.h and sys/types.h
+        and dirent.h.
+        (linux_qxfer_osdata): New functions.
+        (linux_target_ops): Register linux_qxfer_osdata as qxfer_osdata
+        callback.
+        * server.c (handle_query): Handle "qXfer:osdata:read:".
+        * remote-utils.c (buffer_grow, buffer_free, buffer_init, buffer_finish)
+        (buffer_xml_printf): New functions.
+        * server.h (struct buffer): New.
+        (buffer_grow_str, buffer_grow_str0): New macros.
+        (buffer_grow, buffer_free, buffer_init, buffer_finish)
+        (buffer_xml_printf): Declare.
+
 2008-11-24  Doug Evans  <dje@google.com>
 
 	* Makefile.in (VERSION,DIST,LINT,LINTFLAGS): Delete, unused.

@@ -1,6 +1,6 @@
 /* m32c.opc --- semantics for m32c opcodes.		        -*- mode: c -*-
 
-Copyright (C) 2005, 2007, 2008 Free Software Foundation, Inc.
+Copyright (C) 2005, 2007, 2008, 2009 Free Software Foundation, Inc.
 Contributed by Red Hat, Inc.
 
 This file is part of the GNU simulators.
@@ -642,13 +642,13 @@ next_opcode:
 
   prefix (0, 0, 0);
   sc = decode_src23 (sss, ss, 1);
-  BIT_OPC (sc, bit, !b & carry);
+  BIT_OPC (sc, bit, (!b) & carry);
 
   /** 0000 0001 1101 sss0 ss11 0bit	BNOR src */
 
   prefix (0, 0, 0);
   sc = decode_src23 (sss, ss, 1);
-  BIT_OPC (sc, bit, !b | carry);
+  BIT_OPC (sc, bit, (!b) | carry);
 
   /** 1101 ddd0 dd01 1bit		BNOT dest */
 

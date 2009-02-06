@@ -1,6 +1,6 @@
 /* MI Command Set.
 
-   Copyright (C) 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008
+   Copyright (C) 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    Contributed by Cygnus Solutions (a Red Hat company).
@@ -48,6 +48,7 @@
 #include "language.h"
 #include "valprint.h"
 #include "inferior.h"
+#include "osdata.h"
 
 #include <ctype.h>
 #include <sys/time.h>
@@ -376,9 +377,46 @@ mi_cmd_list_thread_groups (char *command, char **argv, int argc)
   if (argc > 0)
     id = argv[0];
 
-  back_to = make_cleanup (&null_cleanup, NULL);
+  back_to = make_cleanup (null_cleanup, NULL);
 
-  if (id)
+  if (available && id)
+    {
+      error (_("Can only report top-level available thread groups"));
+    }
+  else if (available)
+    {
+      struct osdata *data;
+      struct osdata_item *item;
+      int ix_items;
+
+      data = get_osdata ("processes");
+      make_cleanup_osdata_free (data);
+
+      make_cleanup_ui_out_list_begin_end (uiout, "groups");
+
+      for (ix_items = 0;
+	   VEC_iterate (osdata_item_s, data->items,
+			ix_items, item);
+	   ix_items++)
+	{
+	  struct cleanup *back_to =
+	    make_cleanup_ui_out_tuple_begin_end (uiout, NULL);
+
+	  const char *pid = get_osdata_column (item, "pid");
+	  const char *cmd = get_osdata_column (item, "command");
+	  const char *user = get_osdata_column (item, "user");
+
+	  ui_out_field_fmt (uiout, "id", "%s", pid);
+	  ui_out_field_string (uiout, "type", "process");
+	  if (cmd)
+	    ui_out_field_string (uiout, "description", cmd);
+	  if (user)
+	    ui_out_field_string (uiout, "user", user);
+
+	  do_cleanups (back_to);
+	}
+    }
+  else if (id)
     {
       int pid = atoi (id);
       if (!in_inferior_list (pid))
@@ -1314,10 +1352,11 @@ mi_cmd_execute (struct mi_parse *parse)
     {
       if (target_can_async_p ()
 	  && target_has_execution
-	  && (is_exited (inferior_ptid))
+	  && is_exited (inferior_ptid)
 	  && (strcmp (parse->command, "thread-info") != 0
 	      && strcmp (parse->command, "thread-list-ids") != 0
-	      && strcmp (parse->command, "thread-select") != 0))
+	      && strcmp (parse->command, "thread-select") != 0
+	      && strcmp (parse->command, "list-thread-groups") != 0))
 	{
 	  struct ui_file *stb;
 	  stb = mem_fileopen ();

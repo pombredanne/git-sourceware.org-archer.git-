@@ -1,8 +1,8 @@
 /* Print and select stack frames for GDB, the GNU debugger.
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008
-   Free Software Foundation, Inc.
+   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008,
+   2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -832,7 +832,7 @@ parse_frame_specification_1 (const char *frame_exp, const char *message,
   {
     int i;
     for (i = 0; i < numargs; i++)
-      addrs[i] = value_as_address (args[0]);
+      addrs[i] = value_as_address (args[i]);
   }
 
   /* Assume that the single arg[0] is an address, use that to identify
@@ -1374,12 +1374,7 @@ print_block_frame_locals (struct block *b, struct frame_info *frame,
 	  if (SYMBOL_IS_ARGUMENT (sym))
 	    break;
 	  values_printed = 1;
-	  for (j = 0; j < num_tabs; j++)
-	    fputs_filtered ("\t", stream);
-	  fputs_filtered (SYMBOL_PRINT_NAME (sym), stream);
-	  fputs_filtered (" = ", stream);
-	  print_variable_value (sym, frame, stream);
-	  fprintf_filtered (stream, "\n");
+	  print_variable_and_value (NULL, sym, frame, stream, 4 * num_tabs);
 	  break;
 
 	default:
@@ -1575,8 +1570,6 @@ print_frame_arg_vars (struct frame_info *frame, struct ui_file *stream)
       if (SYMBOL_IS_ARGUMENT (sym))
 	{
 	  values_printed = 1;
-	  fputs_filtered (SYMBOL_PRINT_NAME (sym), stream);
-	  fputs_filtered (" = ", stream);
 
 	  /* We have to look up the symbol because arguments can have
 	     two entries (one a parameter, one a local) and the one we
@@ -1591,8 +1584,8 @@ print_frame_arg_vars (struct frame_info *frame, struct ui_file *stream)
 
 	  sym2 = lookup_symbol (SYMBOL_LINKAGE_NAME (sym),
 				b, VAR_DOMAIN, NULL);
-	  print_variable_value (sym2, frame, stream);
-	  fprintf_filtered (stream, "\n");
+	  print_variable_and_value (SYMBOL_PRINT_NAME (sym), sym2,
+				    frame, stream, 0);
 	}
     }
 

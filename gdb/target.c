@@ -1,7 +1,7 @@
 /* Select target systems and architectures at runtime for GDB.
 
    Copyright (C) 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
+   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    Contributed by Cygnus Support.
@@ -1200,11 +1200,12 @@ target_xfer_partial (struct target_ops *ops,
       const unsigned char *myaddr = NULL;
 
       fprintf_unfiltered (gdb_stdlog,
-			  "%s:target_xfer_partial (%d, %s, 0x%lx,  0x%lx,  %s, %s) = %s",
+			  "%s:target_xfer_partial (%d, %s, %s, %s, %s, %s) = %s",
 			  ops->to_shortname,
 			  (int) object,
 			  (annex ? annex : "(null)"),
-			  (long) readbuf, (long) writebuf,
+			  host_address_to_string (readbuf),
+			  host_address_to_string (writebuf),
 			  core_addr_to_string_nz (offset),
 			  plongest (len), plongest (retval));
 
@@ -1219,7 +1220,7 @@ target_xfer_partial (struct target_ops *ops,
 	  fputs_unfiltered (", bytes =", gdb_stdlog);
 	  for (i = 0; i < retval; i++)
 	    {
-	      if ((((long) &(myaddr[i])) & 0xf) == 0)
+	      if ((((intptr_t) &(myaddr[i])) & 0xf) == 0)
 		{
 		  if (targetdebug < 2 && i > 0)
 		    {
@@ -2224,6 +2225,26 @@ target_supports_non_stop ()
 }
 
 
+char *
+target_get_osdata (const char *type)
+{
+  char *document;
+  struct target_ops *t;
+
+  if (target_can_run (&current_target))
+    t = &current_target;
+  else
+    t = find_default_run_target ("get OS data");
+
+  if (!t)
+    return NULL;
+
+  document = target_read_stralloc (t,
+                                  TARGET_OBJECT_OSDATA,
+                                  type);
+  return document;
+}
+
 static int
 default_region_ok_for_hw_watchpoint (CORE_ADDR addr, int len)
 {
@@ -2455,10 +2476,6 @@ store_waitstatus (struct target_waitstatus *ourstatus, int hoststatus)
     }
 }
 
-/* Returns zero to leave the inferior alone, one to interrupt it.  */
-int (*target_activity_function) (void);
-int target_activity_fd;
-
 /* Convert a normal process ID to a string.  Returns the string in a
    static buffer.  */
 
@@ -2586,50 +2603,63 @@ debug_to_resume (ptid_t ptid, int step, enum target_signal siggnal)
 		      target_signal_to_name (siggnal));
 }
 
+/* Return a pretty printed form of target_waitstatus.
+   Space for the result is malloc'd, caller must free.  */
+
+char *
+target_waitstatus_to_string (const struct target_waitstatus *ws)
+{
+  const char *kind_str = "status->kind = ";
+
+  switch (ws->kind)
+    {
+    case TARGET_WAITKIND_EXITED:
+      return xstrprintf ("%sexited, status = %d",
+			 kind_str, ws->value.integer);
+    case TARGET_WAITKIND_STOPPED:
+      return xstrprintf ("%sstopped, signal = %s",
+			 kind_str, target_signal_to_name (ws->value.sig));
+    case TARGET_WAITKIND_SIGNALLED:
+      return xstrprintf ("%ssignalled, signal = %s",
+			 kind_str, target_signal_to_name (ws->value.sig));
+    case TARGET_WAITKIND_LOADED:
+      return xstrprintf ("%sloaded", kind_str);
+    case TARGET_WAITKIND_FORKED:
+      return xstrprintf ("%sforked", kind_str);
+    case TARGET_WAITKIND_VFORKED:
+      return xstrprintf ("%svforked", kind_str);
+    case TARGET_WAITKIND_EXECD:
+      return xstrprintf ("%sexecd", kind_str);
+    case TARGET_WAITKIND_SYSCALL_ENTRY:
+      return xstrprintf ("%ssyscall-entry", kind_str);
+    case TARGET_WAITKIND_SYSCALL_RETURN:
+      return xstrprintf ("%ssyscall-return", kind_str);
+    case TARGET_WAITKIND_SPURIOUS:
+      return xstrprintf ("%sspurious", kind_str);
+    case TARGET_WAITKIND_IGNORE:
+      return xstrprintf ("%signore", kind_str);
+    case TARGET_WAITKIND_NO_HISTORY:
+      return xstrprintf ("%sno-history", kind_str);
+    default:
+      return xstrprintf ("%sunknown???", kind_str);
+    }
+}
+
 static ptid_t
 debug_to_wait (ptid_t ptid, struct target_waitstatus *status)
 {
   ptid_t retval;
+  char *status_string;
 
   retval = debug_target.to_wait (ptid, status);
 
   fprintf_unfiltered (gdb_stdlog,
 		      "target_wait (%d, status) = %d,   ", PIDGET (ptid),
 		      PIDGET (retval));
-  fprintf_unfiltered (gdb_stdlog, "status->kind = ");
-  switch (status->kind)
-    {
-    case TARGET_WAITKIND_EXITED:
-      fprintf_unfiltered (gdb_stdlog, "exited, status = %d\n",
-			  status->value.integer);
-      break;
-    case TARGET_WAITKIND_STOPPED:
-      fprintf_unfiltered (gdb_stdlog, "stopped, signal = %s\n",
-			  target_signal_to_name (status->value.sig));
-      break;
-    case TARGET_WAITKIND_SIGNALLED:
-      fprintf_unfiltered (gdb_stdlog, "signalled, signal = %s\n",
-			  target_signal_to_name (status->value.sig));
-      break;
-    case TARGET_WAITKIND_LOADED:
-      fprintf_unfiltered (gdb_stdlog, "loaded\n");
-      break;
-    case TARGET_WAITKIND_FORKED:
-      fprintf_unfiltered (gdb_stdlog, "forked\n");
-      break;
-    case TARGET_WAITKIND_VFORKED:
-      fprintf_unfiltered (gdb_stdlog, "vforked\n");
-      break;
-    case TARGET_WAITKIND_EXECD:
-      fprintf_unfiltered (gdb_stdlog, "execd\n");
-      break;
-    case TARGET_WAITKIND_SPURIOUS:
-      fprintf_unfiltered (gdb_stdlog, "spurious\n");
-      break;
-    default:
-      fprintf_unfiltered (gdb_stdlog, "unknown???\n");
-      break;
-    }
+
+  status_string = target_waitstatus_to_string (status);
+  fprintf_unfiltered (gdb_stdlog, "%s\n", status_string);
+  xfree (status_string);
 
   return retval;
 }
@@ -2701,9 +2731,9 @@ deprecated_debug_xfer_memory (CORE_ADDR memaddr, bfd_byte *myaddr, int len,
 						attrib, target);
 
   fprintf_unfiltered (gdb_stdlog,
-		      "target_xfer_memory (0x%x, xxx, %d, %s, xxx) = %d",
-		      (unsigned int) memaddr,	/* possable truncate long long */
-		      len, write ? "write" : "read", retval);
+		      "target_xfer_memory (%s, xxx, %d, %s, xxx) = %d",
+		      paddress (memaddr), len, write ? "write" : "read",
+                      retval);
 
   if (retval > 0)
     {
@@ -2712,7 +2742,7 @@ deprecated_debug_xfer_memory (CORE_ADDR memaddr, bfd_byte *myaddr, int len,
       fputs_unfiltered (", bytes =", gdb_stdlog);
       for (i = 0; i < retval; i++)
 	{
-	  if ((((long) &(myaddr[i])) & 0xf) == 0)
+	  if ((((intptr_t) &(myaddr[i])) & 0xf) == 0)
 	    {
 	      if (targetdebug < 2 && i > 0)
 		{

@@ -1,6 +1,6 @@
 /* Main code for remote server for GDB.
    Copyright (C) 1989, 1993, 1994, 1995, 1997, 1998, 1999, 2000, 2002, 2003,
-   2004, 2005, 2006, 2007, 2008 Free Software Foundation, Inc.
+   2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -649,6 +649,11 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
       if (len > PBUFSIZ - 2)
 	len = PBUFSIZ - 2;
       data = malloc (len + 1);
+      if (data == NULL)
+	{
+	  write_enn (own_buf);
+	  return;
+	}
       n = (*the_target->read_auxv) (ofs, data, len + 1);
       if (n < 0)
 	write_enn (own_buf);
@@ -727,6 +732,11 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 	total_len += 128 + 6 * strlen (((struct dll_info *) dll_ptr)->name);
 
       document = malloc (total_len);
+      if (document == NULL)
+	{
+	  write_enn (own_buf);
+	  return;
+	}
       strcpy (document, "<library-list>\n");
       p = document + strlen (document);
 
@@ -768,6 +778,38 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
       return;
     }
 
+  if (the_target->qxfer_osdata != NULL
+      && strncmp ("qXfer:osdata:read:", own_buf, 18) == 0)
+    {
+      char *annex;
+      int n;
+      unsigned int len;
+      CORE_ADDR ofs;
+      unsigned char *workbuf;
+
+      strcpy (own_buf, "E00");
+      if (decode_xfer_read (own_buf + 18, &annex, &ofs, &len) < 0)
+       return;
+      if (len > PBUFSIZ - 2)
+       len = PBUFSIZ - 2;
+      workbuf = malloc (len + 1);
+      if (!workbuf)
+        return;
+
+      n = (*the_target->qxfer_osdata) (annex, workbuf, NULL, ofs, len + 1);
+      if (n < 0)
+       write_enn (own_buf);
+      else if (n > len)
+       *new_packet_len_p = write_qxfer_response
+                             (own_buf, workbuf, len, 1);
+      else
+       *new_packet_len_p = write_qxfer_response
+                             (own_buf, workbuf, n, 0);
+
+      free (workbuf);
+      return;
+    }
+
   /* Protocol features query.  */
   if (strncmp ("qSupported", own_buf, 10) == 0
       && (own_buf[10] == ':' || own_buf[10] == '\0'))
@@ -792,6 +834,10 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 
       if (transport_is_reliable)
 	strcat (own_buf, ";QStartNoAckMode+");
+
+      if (the_target->qxfer_osdata != NULL)
+        strcat (own_buf, ";qXfer:osdata:read+");
+
       return;
     }
 
@@ -861,6 +907,12 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
     {
       char *mon = malloc (PBUFSIZ);
       int len = strlen (own_buf + 6);
+
+      if (mon == NULL)
+	{
+	  write_enn (own_buf);
+	  return;
+	}
 
       if ((len % 2) != 0 || unhexify (mon, own_buf + 6, len / 2) != len / 2)
 	{
@@ -940,6 +992,8 @@ handle_v_cont (char *own_buf, char *status, int *signal)
      behavior; if no default action is in the list, we'll need the extra
      slot.  */
   resume_info = malloc ((n + 1) * sizeof (resume_info[0]));
+  if (resume_info == NULL)
+    goto err;
 
   default_action.thread = -1;
   default_action.leave_stopped = 1;
@@ -1061,7 +1115,7 @@ handle_v_attach (char *own_buf, char *status, int *signal)
 static int
 handle_v_run (char *own_buf, char *status, int *signal)
 {
-  char *p, **pp, *next_p, **new_argv;
+  char *p, *next_p, **new_argv;
   int i, new_argc;
 
   new_argc = 0;
@@ -1072,6 +1126,12 @@ handle_v_run (char *own_buf, char *status, int *signal)
     }
 
   new_argv = calloc (new_argc + 2, sizeof (char *));
+  if (new_argv == NULL)
+    {
+      write_enn (own_buf);
+      return 0;
+    }
+
   i = 0;
   for (p = own_buf + strlen ("vRun;"); *p; p = next_p)
     {
@@ -1083,7 +1143,8 @@ handle_v_run (char *own_buf, char *status, int *signal)
 	new_argv[i] = NULL;
       else
 	{
-	  new_argv[i] = malloc (1 + (next_p - p) / 2);
+	  /* FIXME: Fail request if out of memory instead of dying.  */
+	  new_argv[i] = xmalloc (1 + (next_p - p) / 2);
 	  unhexify (new_argv[i], p, (next_p - p) / 2);
 	  new_argv[i][(next_p - p) / 2] = '\0';
 	}
@@ -1101,20 +1162,22 @@ handle_v_run (char *own_buf, char *status, int *signal)
 
       if (program_argv == NULL)
 	{
+	  /* FIXME: new_argv memory leak */
 	  write_enn (own_buf);
 	  return 0;
 	}
 
       new_argv[0] = strdup (program_argv[0]);
+      if (new_argv[0] == NULL)
+	{
+	  /* FIXME: new_argv memory leak */
+	  write_enn (own_buf);
+	  return 0;
+	}	  
     }
 
-  /* Free the old argv.  */
-  if (program_argv)
-    {
-      for (pp = program_argv; *pp != NULL; pp++)
-	free (*pp);
-      free (program_argv);
-    }
+  /* Free the old argv and install the new one.  */
+  freeargv (program_argv);
   program_argv = new_argv;
 
   *signal = start_inferior (program_argv, status);
@@ -1219,7 +1282,7 @@ static void
 gdbserver_version (void)
 {
   printf ("GNU gdbserver %s%s\n"
-	  "Copyright (C) 2007 Free Software Foundation, Inc.\n"
+	  "Copyright (C) 2009 Free Software Foundation, Inc.\n"
 	  "gdbserver is free software, covered by the GNU General Public License.\n"
 	  "This gdbserver was configured as \"%s\"\n",
 	  PKGVERSION, version, host_name);
@@ -1236,9 +1299,10 @@ gdbserver_usage (FILE *stream)
 	   "HOST:PORT to listen for a TCP connection.\n"
 	   "\n"
 	   "Options:\n"
-	   "  --debug\t\tEnable debugging output.\n"
-	   "  --version\t\tDisplay version information and exit.\n"
-	   "  --wrapper WRAPPER --\tRun WRAPPER to start new programs.\n");
+	   "  --debug               Enable general debugging output.\n"
+	   "  --remote-debug        Enable remote protocol debugging output.\n"
+	   "  --version             Display version information and exit.\n"
+	   "  --wrapper WRAPPER --  Run WRAPPER to start new programs.\n");
   if (REPORT_BUGS_TO[0] && stream == stdout)
     fprintf (stream, "Report bugs to \"%s\".\n", REPORT_BUGS_TO);
 }
@@ -1315,6 +1379,8 @@ main (int argc, char *argv[])
 	}
       else if (strcmp (*next_arg, "--debug") == 0)
 	debug_threads = 1;
+      else if (strcmp (*next_arg, "--remote-debug") == 0)
+	remote_debug = 1;
       else if (strcmp (*next_arg, "--disable-packet") == 0)
 	{
 	  gdbserver_show_disableable (stdout);
@@ -1407,17 +1473,17 @@ main (int argc, char *argv[])
   initialize_async_io ();
   initialize_low ();
 
-  own_buf = malloc (PBUFSIZ + 1);
-  mem_buf = malloc (PBUFSIZ);
+  own_buf = xmalloc (PBUFSIZ + 1);
+  mem_buf = xmalloc (PBUFSIZ);
 
   if (pid == 0 && *next_arg != NULL)
     {
       int i, n;
 
       n = argc - (next_arg - argv);
-      program_argv = malloc (sizeof (char *) * (n + 1));
+      program_argv = xmalloc (sizeof (char *) * (n + 1));
       for (i = 0; i < n; i++)
-	program_argv[i] = strdup (next_arg[i]);
+	program_argv[i] = xstrdup (next_arg[i]);
       program_argv[i] = NULL;
 
       /* Wait till we are at first instruction in program.  */

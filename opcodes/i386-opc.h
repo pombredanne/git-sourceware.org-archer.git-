@@ -1,5 +1,5 @@
 /* Declarations for Intel 80386 opcode table
-   Copyright 2007, 2008
+   Copyright 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of the GNU opcodes library.
@@ -42,14 +42,12 @@
 #define Cpu586		(Cpu486 + 1)
 /* i686 or better required */
 #define Cpu686		(Cpu586 + 1)
-/* Pentium4 or better required */
-#define CpuP4		(Cpu686 + 1)
-/* AMD K6 or better required*/
-#define CpuK6		(CpuP4 + 1)
-/* AMD K8 or better required */
-#define CpuK8		(CpuK6 + 1)
+/* CLFLUSH Instuction support required */
+#define CpuClflush	(Cpu686 + 1)
+/* SYSCALL Instuctions support required */
+#define CpuSYSCALL	(CpuClflush + 1)
 /* MMX support required */
-#define CpuMMX		(CpuK8 + 1)
+#define CpuMMX		(CpuSYSCALL + 1)
 /* SSE support required */
 #define CpuSSE		(CpuMMX + 1)
 /* SSE2 support required */
@@ -94,8 +92,10 @@
 #define CpuMovbe	(CpuFMA + 1)
 /* EPT Instructions required */
 #define CpuEPT		(CpuMovbe + 1)
+/* RDTSCP Instuction support required */
+#define CpuRdtscp	(CpuEPT + 1)
 /* 64bit support available, used by -march= in assembler.  */
-#define CpuLM		(CpuEPT + 1)
+#define CpuLM		(CpuRdtscp + 1)
 /* 64bit support required  */
 #define Cpu64		(CpuLM + 1)
 /* Not supported in the 64bit mode  */
@@ -124,9 +124,8 @@ typedef union i386_cpu_flags
       unsigned int cpui486:1;
       unsigned int cpui586:1;
       unsigned int cpui686:1;
-      unsigned int cpup4:1;
-      unsigned int cpuk6:1;
-      unsigned int cpuk8:1;
+      unsigned int cpuclflush:1;
+      unsigned int cpusyscall:1;
       unsigned int cpummx:1;
       unsigned int cpusse:1;
       unsigned int cpusse2:1;
@@ -150,6 +149,7 @@ typedef union i386_cpu_flags
       unsigned int cpufma:1;
       unsigned int cpumovbe:1;
       unsigned int cpuept:1;
+      unsigned int cpurdtscp:1;
       unsigned int cpulm:1;
       unsigned int cpu64:1;
       unsigned int cpuno64:1;
@@ -166,8 +166,11 @@ typedef union i386_cpu_flags
 #define D			0
 /* set if operands can be words or dwords encoded the canonical way */
 #define W			(D + 1)
+/* Skip the current insn and use the next insn in i386-opc.tbl to swap
+   operand in encoding.  */
+#define S			(W + 1)
 /* insn has a modrm byte. */
-#define Modrm			(W + 1)
+#define Modrm			(S + 1)
 /* register is in low 3 bits of opcode */
 #define ShortForm		(Modrm + 1)
 /* special case for jump insns.  */
@@ -245,8 +248,9 @@ typedef union i386_cpu_flags
 #define Vex			(Drexc + 1)
 /* insn has 256bit VEX prefix. */
 #define Vex256			(Vex + 1)
-/* insn has VEX NDS. Register-only source is encoded in Vex
-   prefix. */
+/* insn has VEX NDS. Register-only source is encoded in Vex prefix.
+   We use VexNDS on insns with VEX DDS since the register-only source
+   is the second source register.  */
 #define VexNDS			(Vex256 + 1)
 /* insn has VEX NDD. Register destination is encoded in Vex
    prefix. */
@@ -284,6 +288,7 @@ typedef struct i386_opcode_modifier
 {
   unsigned int d:1;
   unsigned int w:1;
+  unsigned int s:1;
   unsigned int modrm:1;
   unsigned int shortform:1;
   unsigned int jump:1;

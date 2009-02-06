@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008 Free Software Foundation, Inc.
+   2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -456,6 +456,8 @@ static void
 run_command_1 (char *args, int from_tty, int tbreak_at_main)
 {
   char *exec_file;
+  struct cleanup *old_chain;
+  ptid_t ptid;
 
   dont_repeat ();
 
@@ -544,14 +546,29 @@ run_command_1 (char *args, int from_tty, int tbreak_at_main)
   target_create_inferior (exec_file, get_inferior_args (),
 			  environ_vector (inferior_environ), from_tty);
 
+  /* We're starting off a new process.  When we get out of here, in
+     non-stop mode, finish the state of all threads of that process,
+     but leave other threads alone, as they may be stopped in internal
+     events --- the frontend shouldn't see them as stopped.  In
+     all-stop, always finish the state of all threads, as we may be
+     resuming more than just the new process.  */
+  if (non_stop)
+    ptid = pid_to_ptid (ptid_get_pid (inferior_ptid));
+  else
+    ptid = minus_one_ptid;
+  old_chain = make_cleanup (finish_thread_state_cleanup, &ptid);
+
   /* Pass zero for FROM_TTY, because at this point the "run" command
      has done its thing; now we are setting up the running program.  */
   post_create_inferior (&current_target, 0);
 
   /* Start the target running.  */
   proceed ((CORE_ADDR) -1, TARGET_SIGNAL_0, 0);
-}
 
+  /* Since there was no error, there's no need to finish the thread
+     states here.  */
+  discard_cleanups (old_chain);
+}
 
 static void
 run_command (char *args, int from_tty)
@@ -799,67 +816,41 @@ step_1 (int skip_subroutines, int single_inst, char *count_string)
       make_cleanup (delete_longjmp_breakpoint_cleanup, &thread);
     }
 
-  /* In synchronous case, all is well, just use the regular for loop. */
+  /* In synchronous case, all is well; each step_once call will step once.  */
   if (!target_can_async_p ())
     {
       for (; count > 0; count--)
 	{
-	  struct thread_info *tp = inferior_thread ();
-	  clear_proceed_status ();
+	  struct thread_info *tp;
+	  step_once (skip_subroutines, single_inst, count, thread);
 
-	  frame = get_current_frame ();
-	  tp->step_frame_id = get_frame_id (frame);
-
-	  if (!single_inst)
-	    {
-	      find_pc_line_pc_range (stop_pc,
-				     &tp->step_range_start, &tp->step_range_end);
-	      if (tp->step_range_end == 0)
-		{
-		  char *name;
-		  if (find_pc_partial_function (stop_pc, &name,
-						&tp->step_range_start,
-						&tp->step_range_end) == 0)
-		    error (_("Cannot find bounds of current function"));
-
-		  target_terminal_ours ();
-		  printf_filtered (_("\
-Single stepping until exit from function %s, \n\
-which has no line number information.\n"), name);
-		}
-	    }
+	  if (target_has_execution
+	      && !ptid_equal (inferior_ptid, null_ptid))
+	    tp = inferior_thread ();
 	  else
+	    tp = NULL;
+
+	  if (!tp || !tp->stop_step || !tp->step_multi)
 	    {
-	      /* Say we are stepping, but stop after one insn whatever it does.  */
-	      tp->step_range_start = tp->step_range_end = 1;
-	      if (!skip_subroutines)
-		/* It is stepi.
-		   Don't step over function calls, not even to functions lacking
-		   line numbers.  */
-		tp->step_over_calls = STEP_OVER_NONE;
+	      /* If we stopped for some reason that is not stepping
+		 there are no further steps to make.  */
+	      if (tp)
+		tp->step_multi = 0;
+	      break;
 	    }
-
-	  if (skip_subroutines)
-	    tp->step_over_calls = STEP_OVER_ALL;
-
-	  tp->step_multi = (count > 1);
-	  proceed ((CORE_ADDR) -1, TARGET_SIGNAL_DEFAULT, 1);
-
-	  if (!target_has_execution
-	      || !inferior_thread ()->stop_step)
-	    break;
 	}
 
       do_cleanups (cleanups);
-      return;
     }
-  /* In case of asynchronous target things get complicated, do only
-     one step for now, before returning control to the event loop. Let
-     the continuation figure out how many other steps we need to do,
-     and handle them one at the time, through step_once(). */
   else
     {
+      /* In the case of an asynchronous target things get complicated;
+	 do only one step for now, before returning control to the
+	 event loop.  Let the continuation figure out how many other
+	 steps we need to do, and handle them one at the time, through
+	 step_once.  */
       step_once (skip_subroutines, single_inst, count, thread);
+
       /* We are running, and the continuation is installed.  It will
 	 disable the longjmp breakpoint as appropriate.  */
       discard_cleanups (cleanups);
@@ -893,7 +884,8 @@ step_1_continuation (void *args)
 	{
 	  /* There are more steps to make, and we did stop due to
 	     ending a stepping range.  Do another step.  */
-	  step_once (a->skip_subroutines, a->single_inst, a->count - 1, a->thread);
+	  step_once (a->skip_subroutines, a->single_inst,
+		     a->count - 1, a->thread);
 	  return;
 	}
       tp->step_multi = 0;
@@ -905,18 +897,16 @@ step_1_continuation (void *args)
     delete_longjmp_breakpoint (a->thread);
 }
 
-/* Do just one step operation. If count >1 we will have to set up a
-   continuation to be done after the target stops (after this one
-   step). This is useful to implement the 'step n' kind of commands, in
-   case of asynchronous targets. We had to split step_1 into two parts,
-   one to be done before proceed() and one afterwards. This function is
-   called in case of step n with n>1, after the first step operation has
-   been completed.*/
-static void 
+/* Do just one step operation.  This is useful to implement the 'step
+   n' kind of commands.  In case of asynchronous targets, we will have
+   to set up a continuation to be done after the target stops (after
+   this one step).  For synch targets, the caller handles further
+   stepping.  */
+
+static void
 step_once (int skip_subroutines, int single_inst, int count, int thread)
 {
   struct frame_info *frame;
-  struct step_1_continuation_args *args;
 
   if (count > 0)
     {
@@ -928,13 +918,14 @@ step_once (int skip_subroutines, int single_inst, int count, int thread)
       clear_proceed_status ();
 
       frame = get_current_frame ();
-      if (!frame)		/* Avoid coredump here.  Why tho? */
-	error (_("No current frame"));
       tp->step_frame_id = get_frame_id (frame);
 
       if (!single_inst)
 	{
-	  find_pc_line_pc_range (stop_pc,
+	  CORE_ADDR pc;
+
+	  pc = get_frame_pc (frame);
+	  find_pc_line_pc_range (pc,
 				 &tp->step_range_start, &tp->step_range_end);
 
 	  /* If we have no line info, switch to stepi mode.  */
@@ -945,7 +936,7 @@ step_once (int skip_subroutines, int single_inst, int count, int thread)
 	  else if (tp->step_range_end == 0)
 	    {
 	      char *name;
-	      if (find_pc_partial_function (stop_pc, &name,
+	      if (find_pc_partial_function (pc, &name,
 					    &tp->step_range_start,
 					    &tp->step_range_end) == 0)
 		error (_("Cannot find bounds of current function"));
@@ -973,12 +964,21 @@ which has no line number information.\n"), name);
       tp->step_multi = (count > 1);
       proceed ((CORE_ADDR) -1, TARGET_SIGNAL_DEFAULT, 1);
 
-      args = xmalloc (sizeof (*args));
-      args->skip_subroutines = skip_subroutines;
-      args->single_inst = single_inst;
-      args->count = count;
-      args->thread = thread;
-      add_intermediate_continuation (tp, step_1_continuation, args, xfree);
+      /* For async targets, register a continuation to do any
+	 additional steps.  For sync targets, the caller will handle
+	 further stepping.  */
+      if (target_can_async_p ())
+	{
+	  struct step_1_continuation_args *args;
+
+	  args = xmalloc (sizeof (*args));
+	  args->skip_subroutines = skip_subroutines;
+	  args->single_inst = single_inst;
+	  args->count = count;
+	  args->thread = thread;
+
+	  add_intermediate_continuation (tp, step_1_continuation, args, xfree);
+	}
     }
 }
 
@@ -1145,11 +1145,7 @@ signal_command (char *signum_exp, int from_tty)
     }
 
   clear_proceed_status ();
-  /* "signal 0" should not get stuck if we are stopped at a breakpoint.
-     FIXME: Neither should "signal foo" but when I tried passing
-     (CORE_ADDR)-1 unconditionally I got a testsuite failure which I haven't
-     tried to track down yet.  */
-  proceed (oursig == TARGET_SIGNAL_0 ? (CORE_ADDR) -1 : stop_pc, oursig, 0);
+  proceed ((CORE_ADDR) -1, oursig, 0);
 }
 
 /* Proceed until we reach a different source line with pc greater than
@@ -1177,7 +1173,7 @@ until_next_command (int from_tty)
      than the current line (if in symbolic section) or pc (if
      not). */
 
-  pc = read_pc ();
+  pc = get_frame_pc (frame);
   func = find_pc_function (pc);
 
   if (!func)
@@ -1401,11 +1397,13 @@ finish_backward (struct symbol *function)
   struct thread_info *tp = inferior_thread ();
   struct breakpoint *breakpoint;
   struct cleanup *old_chain;
+  CORE_ADDR pc;
   CORE_ADDR func_addr;
   int back_up;
 
-  if (find_pc_partial_function (get_frame_pc (get_current_frame ()),
-				NULL, &func_addr, NULL) == 0)
+  pc = get_frame_pc (get_current_frame ());
+
+  if (find_pc_partial_function (pc, NULL, &func_addr, NULL) == 0)
     internal_error (__FILE__, __LINE__,
 		    _("Finish: couldn't find function."));
 
@@ -1422,7 +1420,7 @@ finish_backward (struct symbol *function)
      no way that a function up the stack can have a return address
      that's equal to its entry point.  */
 
-  if (sal.pc != read_pc ())
+  if (sal.pc != pc)
     {
       /* Set breakpoint and continue.  */
       breakpoint =
@@ -1585,8 +1583,7 @@ program_info (char *args, int from_tty)
   stat = bpstat_num (&bs, &num);
 
   target_files_info ();
-  printf_filtered (_("Program stopped at %s.\n"),
-		   hex_string ((unsigned long) stop_pc));
+  printf_filtered (_("Program stopped at %s.\n"), paddress (stop_pc));
   if (tp->stop_step)
     printf_filtered (_("It stopped after being stepped.\n"));
   else if (stat != 0)

@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008 Free Software Foundation, Inc.
+   2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -205,6 +205,11 @@ extern void set_value_optimized_out (struct value *value, int val);
 extern int value_initialized (struct value *);
 extern void set_value_initialized (struct value *, int);
 
+/* Set COMPONENT's location as appropriate for a component of WHOLE
+   --- regardless of what kind of lvalue WHOLE is.  */
+extern void set_value_component_location (struct value *component,
+                                          struct value *whole);
+
 /* While the following fields are per- VALUE .CONTENT .PIECE (i.e., a
    single value might have multiple LVALs), this hacked interface is
    limited to just the first PIECE.  Expect further change.  */
@@ -305,6 +310,8 @@ extern CORE_ADDR address_from_register (struct type *type, int regnum,
 
 extern struct value *value_of_variable (struct symbol *var, struct block *b);
 
+extern struct value *address_of_variable (struct symbol *var, struct block *b);
+
 extern struct value *value_of_register (int regnum, struct frame_info *frame);
 
 struct value *value_of_register_lazy (struct frame_info *frame, int regnum);
@@ -314,10 +321,9 @@ extern int symbol_read_needs_frame (struct symbol *);
 extern struct value *read_var_value (struct symbol *var,
 				     struct frame_info *frame);
 
-extern struct value *locate_var_value (struct symbol *var,
-				       struct frame_info *frame);
-
 extern struct value *allocate_value (struct type *type);
+extern struct value *allocate_value_lazy (struct type *type);
+extern void allocate_value_contents (struct value *value);
 
 extern struct value *allocate_repeat_value (struct type *type, int count);
 
@@ -504,7 +510,7 @@ extern int unop_user_defined_p (enum exp_opcode op, struct value *arg1);
 
 extern int destructor_name_p (const char *name, const struct type *type);
 
-#define value_free(val) xfree (val)
+extern void value_free (struct value *val);
 
 extern void free_all_values (void);
 
@@ -555,9 +561,11 @@ extern int val_print_string (CORE_ADDR addr, int len, int width,
 			     struct ui_file *stream,
 			     const struct value_print_options *options);
 
-extern void print_variable_value (struct symbol *var,
-				  struct frame_info *frame,
-				  struct ui_file *stream);
+extern void print_variable_and_value (const char *name,
+				      struct symbol *var,
+				      struct frame_info *frame,
+				      struct ui_file *stream,
+				      int indent);
 
 extern int check_field (struct type *, const char *);
 

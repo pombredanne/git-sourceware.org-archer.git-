@@ -1,6 +1,6 @@
 /* Machine independent support for SVR4 /proc (process file system) for GDB.
 
-   Copyright (C) 1999, 2000, 2001, 2002, 2003, 2006, 2007, 2008
+   Copyright (C) 1999, 2000, 2001, 2002, 2003, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    Written by Michael Snyder at Cygnus Solutions.
@@ -5791,17 +5791,17 @@ info_mappings_callback (struct prmap *map, int (*ignore) (), void *unused)
 #endif
 
   if (gdbarch_addr_bit (current_gdbarch) == 32)
-    printf_filtered ("\t%#10lx %#10lx %#10x %#10x %7s\n",
+    printf_filtered ("\t%#10lx %#10lx %#10lx %#10x %7s\n",
 		     (unsigned long) map->pr_vaddr,
 		     (unsigned long) map->pr_vaddr + map->pr_size - 1,
-		     map->pr_size,
+		     (unsigned long) map->pr_size,
 		     pr_off,
 		     mappingflags (map->pr_mflags));
   else
-    printf_filtered ("  %#18lx %#18lx %#10x %#10x %7s\n",
+    printf_filtered ("  %#18lx %#18lx %#10lx %#10x %7s\n",
 		     (unsigned long) map->pr_vaddr,
 		     (unsigned long) map->pr_vaddr + map->pr_size - 1,
-		     map->pr_size,
+		     (unsigned long) map->pr_size,
 		     pr_off,
 		     mappingflags (map->pr_mflags));
 

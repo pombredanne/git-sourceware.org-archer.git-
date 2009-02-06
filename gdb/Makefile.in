@@ -1,5 +1,5 @@
 # Copyright (C) 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-# 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
+# 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
 # Free Software Foundation, Inc.
 
 # This file is part of GDB.
@@ -434,7 +434,7 @@ RUNTESTFLAGS=
 
 # XML files to build in to GDB.
 XMLFILES = $(srcdir)/features/gdb-target.dtd $(srcdir)/features/xinclude.dtd \
-	$(srcdir)/features/library-list.dtd
+	$(srcdir)/features/library-list.dtd $(srcdir)/features/osdata.dtd
 
 # This is ser-unix.o for any system which supports a v7/BSD/SYSV/POSIX
 # interface to the serial port.  Hopefully if get ported to OS/2, VMS,
@@ -515,7 +515,8 @@ ALL_TARGET_OBS = \
 	xcoffread.o \
 	prologue-value.o \
 	symfile-mem.o \
-	corelow.o
+	corelow.o \
+	windows-tdep.o
 
 # Host-dependent makefile fragment comes in here.
 @host_makefile_frag@
@@ -637,7 +638,7 @@ SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c ada-tasks.c \
 	macrotab.c macroexp.c macrocmd.c macroscope.c main.c maint.c \
 	mdebugread.c memattr.c mem-break.c minsyms.c mipsread.c memory-map.c \
 	objc-exp.y objc-lang.c \
-	objfiles.c osabi.c observer.c \
+	objfiles.c osabi.c observer.c osdata.c \
 	p-exp.y p-lang.c p-typeprint.c p-valprint.c parse.c printcmd.c \
 	prologue-value.c \
 	regcache.c reggroups.c remote.c remote-fileio.c reverse.c \
@@ -716,7 +717,7 @@ coff-pe-read.h parser-defs.h gdb_ptrace.h mips-linux-tdep.h \
 m68k-tdep.h spu-tdep.h jv-lang.h environ.h solib-irix.h amd64-tdep.h \
 doublest.h regset.h hppa-tdep.h ppc-linux-tdep.h rs6000-tdep.h \
 gdb_locale.h gdb_dirent.h arch-utils.h trad-frame.h gnu-nat.h \
-language.h i386-cygwin-tdep.h nbsd-tdep.h wrapper.h solib-svr4.h \
+language.h nbsd-tdep.h wrapper.h solib-svr4.h \
 macroexp.h ui-file.h regcache.h gdb_string.h tracepoint.h i386-tdep.h \
 inf-child.h p-lang.h event-top.h gdbtypes.h scm-tags.h user-regs.h \
 regformats/regdef.h config/alpha/nm-osf3.h config/i386/nm-cygwin.h \
@@ -727,7 +728,7 @@ config/sparc/nm-sol2.h config/nm-linux.h config/mips/nm-irix5.h	\
 config/rs6000/nm-rs6000.h top.h bsd-kvm.h gdb-stabs.h reggroups.h \
 annotate.h sim-regno.h dictionary.h dfp.h main.h frame-unwind.h	\
 remote-fileio.h i386-linux-tdep.h vax-tdep.h objc-lang.h \
-sentinel-frame.h bcache.h symfile.h
+sentinel-frame.h bcache.h symfile.h windows-tdep.h
 
 # Header files that already have srcdir in them, or which are in objdir.
 
@@ -808,7 +809,7 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 	solib.o solib-null.o \
 	prologue-value.o memory-map.o xml-support.o \
 	target-descriptions.o target-memory.o xml-tdesc.o xml-builtin.o \
-	inferior.o
+	inferior.o osdata.o
 
 TSOBS = inflow.o
 
@@ -1011,8 +1012,8 @@ init.c: $(INIT_FILES)
 	@rm -f init.c-tmp init.l-tmp
 	@touch init.c-tmp
 	@echo gdbtypes > init.l-tmp
-	@-LANG=c ; export LANG ; \
-	LC_ALL=c ; export LC_ALL ; \
+	@-LANG=C ; export LANG ; \
+	LC_ALL=C ; export LC_ALL ; \
 	echo $(INIT_FILES) | \
 	tr ' ' '\012' | \
 	sed \
@@ -1340,7 +1341,7 @@ ALLDEPFILES = \
 	spu-linux-nat.c spu-tdep.c \
 	v850-tdep.c \
 	vax-nat.c vax-tdep.c vaxbsd-nat.c vaxnbsd-tdep.c \
-	win32-nat.c \
+	windows-nat.c windows-tdep.c \
 	xcoffread.c xcoffsolib.c \
 	xstormy16-tdep.c \
 	xtensa-tdep.c xtensa-config.c \

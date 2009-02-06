@@ -2069,7 +2069,11 @@ allocate_dynrelocs (struct elf_link_hash_entry *h, void *inf)
   /* Finally, allocate space.  */
   for (p = eh->dyn_relocs; p != NULL; p = p->next)
     {
-      asection *sreloc = elf_section_data (p->sec)->sreloc;
+      asection *sreloc;
+
+      sreloc = elf_section_data (p->sec)->sreloc;
+
+      BFD_ASSERT (sreloc != NULL);
       sreloc->size += p->count * sizeof (Elf32_External_Rel);
     }
 
@@ -2248,7 +2252,7 @@ elf_i386_size_dynamic_sections (bfd *output_bfd ATTRIBUTE_UNUSED,
 
   /* Allocate global sym .plt and .got entries, and space for global
      sym dynamic relocs.  */
-  elf_link_hash_traverse (&htab->elf, allocate_dynrelocs, (PTR) info);
+  elf_link_hash_traverse (&htab->elf, allocate_dynrelocs, info);
 
   /* For every jump slot reserved in the sgotplt, reloc_count is
      incremented.  However, when we reserve space for TLS descriptors,
@@ -2361,8 +2365,7 @@ elf_i386_size_dynamic_sections (bfd *output_bfd ATTRIBUTE_UNUSED,
 	  /* If any dynamic relocs apply to a read-only section,
 	     then we need a DT_TEXTREL entry.  */
 	  if ((info->flags & DF_TEXTREL) == 0)
-	    elf_link_hash_traverse (&htab->elf, readonly_dynrelocs,
-				    (PTR) info);
+	    elf_link_hash_traverse (&htab->elf, readonly_dynrelocs, info);
 
 	  if ((info->flags & DF_TEXTREL) != 0)
 	    {
@@ -2920,11 +2923,12 @@ elf_i386_relocate_section (bfd *output_bfd,
 		}
 
 	      sreloc = elf_section_data (input_section)->sreloc;
-	      if (sreloc == NULL)
-		abort ();
+
+	      BFD_ASSERT (sreloc != NULL && sreloc->contents != NULL);
 
 	      loc = sreloc->contents;
 	      loc += sreloc->reloc_count++ * sizeof (Elf32_External_Rel);
+
 	      bfd_elf32_swap_reloc_out (output_bfd, &outrel, loc);
 
 	      /* If this reloc is against an external symbol, we do

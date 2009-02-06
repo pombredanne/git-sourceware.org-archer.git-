@@ -1,6 +1,7 @@
 /* Manages interpreters for GDB, the GNU debugger.
 
-   Copyright (C) 2000, 2002, 2003, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2000, 2002, 2003, 2007, 2008, 2009
+   Free Software Foundation, Inc.
 
    Written by Jim Ingham <jingham@apple.com> of Apple Computer, Inc.
 
@@ -345,7 +346,6 @@ clear_interpreter_hooks (void)
   deprecated_context_hook = 0;
   deprecated_target_wait_hook = 0;
   deprecated_call_command_hook = 0;
-  deprecated_error_hook = 0;
   deprecated_error_begin_hook = 0;
   deprecated_command_loop_hook = 0;
 }

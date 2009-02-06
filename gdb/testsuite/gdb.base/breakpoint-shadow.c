@@ -1,8 +1,6 @@
-/* Target-dependent code for Cygwin running on i386's, for GDB.
+/* This testcase is part of GDB, the GNU debugger.
 
-   Copyright (C) 2007, 2008 Free Software Foundation, Inc.
-
-   This file is part of GDB.
+   Copyright 2008, 2009 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,13 +15,13 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#ifndef I386_CYGWIN_TDEP_H
-#define I386_CYGWIN_TDEP_H
+int
+main (void)
+{
+  volatile int i;
+  
+  i = 1;	/* break-first */
+  i = 2;	/* break-second */
 
-struct obstack;
-
-extern void win32_xfer_shared_library (const char* so_name,
-				       CORE_ADDR load_addr,
-				       struct obstack *obstack);
-
-#endif /* I386_CYGWIN_TDEP_H */
+  return 0;
+}

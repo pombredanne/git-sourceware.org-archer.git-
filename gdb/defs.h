@@ -1,7 +1,7 @@
 /* *INDENT-OFF* */ /* ATTR_FORMAT confuses indent, avoid running it for now */
 /* Basic, host-specific, and target-specific definitions for GDB.
    Copyright (C) 1986, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008
+   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -957,6 +957,7 @@ enum gdb_osabi
   GDB_OSABI_CYGWIN,
   GDB_OSABI_AIX,
   GDB_OSABI_DICOS,
+  GDB_OSABI_DARWIN,
 
   GDB_OSABI_INVALID		/* keep this last */
 };
@@ -1107,8 +1108,6 @@ extern void (*deprecated_call_command_hook) (struct cmd_list_element * c,
 					     char *cmd, int from_tty);
 
 extern void (*deprecated_set_hook) (struct cmd_list_element * c);
-
-extern void (*deprecated_error_hook) (void);
 
 extern void (*deprecated_error_begin_hook) (void);
 

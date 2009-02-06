@@ -1,7 +1,7 @@
 /* Support routines for manipulating internal types for GDB.
 
    Copyright (C) 1992, 1993, 1994, 1995, 1996, 1998, 1999, 2000, 2001, 2002,
-   2003, 2004, 2005, 2006, 2007, 2008 Free Software Foundation, Inc.
+   2003, 2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support, using pieces from other GDB modules.
 
@@ -162,20 +162,16 @@ alloc_type (struct objfile *objfile)
 
   if (objfile == NULL)
     {
-      type = xmalloc (sizeof (struct type));
-      memset (type, 0, sizeof (struct type));
-      TYPE_MAIN_TYPE (type) = xmalloc (sizeof (struct main_type));
+      type = XZALLOC (struct type);
+      TYPE_MAIN_TYPE (type) = XZALLOC (struct main_type);
     }
   else
     {
-      type = obstack_alloc (&objfile->objfile_obstack,
-			    sizeof (struct type));
-      memset (type, 0, sizeof (struct type));
-      TYPE_MAIN_TYPE (type) = obstack_alloc (&objfile->objfile_obstack,
-					     sizeof (struct main_type));
+      type = OBSTACK_ZALLOC (&objfile->objfile_obstack, struct type);
+      TYPE_MAIN_TYPE (type) = OBSTACK_ZALLOC (&objfile->objfile_obstack,
+					      struct main_type);
       OBJSTAT (objfile, n_types++);
     }
-  memset (TYPE_MAIN_TYPE (type), 0, sizeof (struct main_type));
 
   /* Initialize the fields that might not be zero.  */
 
@@ -199,16 +195,11 @@ alloc_type_instance (struct type *oldtype)
   /* Allocate the structure.  */
 
   if (TYPE_OBJFILE (oldtype) == NULL)
-    {
-      type = xmalloc (sizeof (struct type));
-      memset (type, 0, sizeof (struct type));
-    }
+    type = XZALLOC (struct type);
   else
-    {
-      type = obstack_alloc (&TYPE_OBJFILE (oldtype)->objfile_obstack,
-			    sizeof (struct type));
-      memset (type, 0, sizeof (struct type));
-    }
+    type = OBSTACK_ZALLOC (&TYPE_OBJFILE (oldtype)->objfile_obstack,
+			   struct type);
+
   TYPE_MAIN_TYPE (type) = TYPE_MAIN_TYPE (oldtype);
 
   TYPE_CHAIN (type) = type;	/* Chain back to itself for now.  */
@@ -478,11 +469,13 @@ make_qualified_type (struct type *type, int new_flags,
   struct type *ntype;
 
   ntype = type;
-  do {
-    if (TYPE_INSTANCE_FLAGS (ntype) == new_flags)
-      return ntype;
-    ntype = TYPE_CHAIN (ntype);
-  } while (ntype != type);
+  do
+    {
+      if (TYPE_INSTANCE_FLAGS (ntype) == new_flags)
+	return ntype;
+      ntype = TYPE_CHAIN (ntype);
+    }
+  while (ntype != type);
 
   /* Create a new type instance.  */
   if (storage == NULL)
@@ -620,18 +613,20 @@ replace_type (struct type *ntype, struct type *type)
   /* The type length is not a part of the main type.  Update it for
      each type on the variant chain.  */
   chain = ntype;
-  do {
-    /* Assert that this element of the chain has no address-class bits
-       set in its flags.  Such type variants might have type lengths
-       which are supposed to be different from the non-address-class
-       variants.  This assertion shouldn't ever be triggered because
-       symbol readers which do construct address-class variants don't
-       call replace_type().  */
-    gdb_assert (TYPE_ADDRESS_CLASS_ALL (chain) == 0);
+  do
+    {
+      /* Assert that this element of the chain has no address-class bits
+	 set in its flags.  Such type variants might have type lengths
+	 which are supposed to be different from the non-address-class
+	 variants.  This assertion shouldn't ever be triggered because
+	 symbol readers which do construct address-class variants don't
+	 call replace_type().  */
+      gdb_assert (TYPE_ADDRESS_CLASS_ALL (chain) == 0);
 
-    TYPE_LENGTH (chain) = TYPE_LENGTH (type);
-    chain = TYPE_CHAIN (chain);
-  } while (ntype != chain);
+      TYPE_LENGTH (chain) = TYPE_LENGTH (type);
+      chain = TYPE_CHAIN (chain);
+    }
+  while (ntype != chain);
 
   /* Assert that the two types have equivalent instance qualifiers.
      This should be true for at least all of our debug readers.  */
@@ -701,9 +696,7 @@ create_range_type (struct type *result_type, struct type *index_type,
 		   int low_bound, int high_bound)
 {
   if (result_type == NULL)
-    {
-      result_type = alloc_type (TYPE_OBJFILE (index_type));
-    }
+    result_type = alloc_type (TYPE_OBJFILE (index_type));
   TYPE_CODE (result_type) = TYPE_CODE_RANGE;
   TYPE_TARGET_TYPE (result_type) = index_type;
   if (TYPE_STUB (index_type))
@@ -711,16 +704,16 @@ create_range_type (struct type *result_type, struct type *index_type,
   else
     TYPE_LENGTH (result_type) = TYPE_LENGTH (check_typedef (index_type));
   TYPE_NFIELDS (result_type) = 2;
-  TYPE_FIELDS (result_type) = (struct field *)
-    TYPE_ALLOC (result_type, 2 * sizeof (struct field));
-  memset (TYPE_FIELDS (result_type), 0, 2 * sizeof (struct field));
-  TYPE_FIELD_BITPOS (result_type, 0) = low_bound;
-  TYPE_FIELD_BITPOS (result_type, 1) = high_bound;
+  TYPE_FIELDS (result_type) = TYPE_ZALLOC (result_type,
+					   TYPE_NFIELDS (result_type)
+					   * sizeof (struct field));
+  TYPE_LOW_BOUND (result_type) = low_bound;
+  TYPE_HIGH_BOUND (result_type) = high_bound;
 
   if (low_bound >= 0)
     TYPE_UNSIGNED (result_type) = 1;
 
-  return (result_type);
+  return result_type;
 }
 
 /* Set *LOWP and *HIGHP to the lower and upper bounds of discrete type
@@ -829,9 +822,8 @@ create_array_type (struct type *result_type,
       TYPE_LENGTH (element_type) * (high_bound - low_bound + 1);
   TYPE_NFIELDS (result_type) = 1;
   TYPE_FIELDS (result_type) =
-    (struct field *) TYPE_ALLOC (result_type, sizeof (struct field));
-  memset (TYPE_FIELDS (result_type), 0, sizeof (struct field));
-  TYPE_FIELD_TYPE (result_type, 0) = range_type;
+    (struct field *) TYPE_ZALLOC (result_type, sizeof (struct field));
+  TYPE_INDEX_TYPE (result_type) = range_type;
   TYPE_VPTR_FIELDNO (result_type) = -1;
 
   /* TYPE_FLAG_TARGET_STUB will take care of zero length arrays */
@@ -877,9 +869,7 @@ create_set_type (struct type *result_type, struct type *domain_type)
     }
   TYPE_CODE (result_type) = TYPE_CODE_SET;
   TYPE_NFIELDS (result_type) = 1;
-  TYPE_FIELDS (result_type) = (struct field *)
-    TYPE_ALLOC (result_type, 1 * sizeof (struct field));
-  memset (TYPE_FIELDS (result_type), 0, sizeof (struct field));
+  TYPE_FIELDS (result_type) = TYPE_ZALLOC (result_type, sizeof (struct field));
 
   if (!TYPE_STUB (domain_type))
     {
@@ -925,9 +915,7 @@ init_flags_type (char *name, int length)
   type = init_type (TYPE_CODE_FLAGS, length, 
 		    TYPE_FLAG_UNSIGNED, name, NULL);
   TYPE_NFIELDS (type) = nfields;
-  TYPE_FIELDS (type) = TYPE_ALLOC (type, 
-				   nfields * sizeof (struct field));
-  memset (TYPE_FIELDS (type), 0, nfields * sizeof (struct field));
+  TYPE_FIELDS (type) = TYPE_ZALLOC (type, nfields * sizeof (struct field));
 
   return type;
 }
@@ -1517,15 +1505,15 @@ check_typedef (struct type *type)
 	}
       else if (TYPE_CODE (type) == TYPE_CODE_ARRAY
 	       && TYPE_NFIELDS (type) == 1
-	       && (TYPE_CODE (range_type = TYPE_FIELD_TYPE (type, 0))
+	       && (TYPE_CODE (range_type = TYPE_INDEX_TYPE (type))
 		   == TYPE_CODE_RANGE))
 	{
 	  /* Now recompute the length of the array type, based on its
 	     number of elements and the target type's length.
 	     Watch out for Ada null Ada arrays where the high bound
 	     is smaller than the low bound.  */
-	  const int low_bound = TYPE_FIELD_BITPOS (range_type, 0);
-	  const int high_bound = TYPE_FIELD_BITPOS (range_type, 1);
+	  const int low_bound = TYPE_LOW_BOUND (range_type);
+	  const int high_bound = TYPE_HIGH_BOUND (range_type);
 	  int nb_elements;
 	
 	  if (high_bound < low_bound)
@@ -1854,10 +1842,9 @@ append_composite_type_field (struct type *t, char *name,
     {
       TYPE_LENGTH (t) = TYPE_LENGTH (t) + TYPE_LENGTH (field);
       if (TYPE_NFIELDS (t) > 1)
-	{
-	  FIELD_BITPOS (f[0]) = (FIELD_BITPOS (f[-1])
-				 + TYPE_LENGTH (field) * TARGET_CHAR_BIT);
-	}
+	FIELD_BITPOS (f[0]) = (FIELD_BITPOS (f[-1])
+			       + (TYPE_LENGTH (FIELD_TYPE (f[-1]))
+				  * TARGET_CHAR_BIT));
     }
 }
 
@@ -2976,8 +2963,7 @@ copy_type_recursive (struct objfile *objfile,
       int i, nfields;
 
       nfields = TYPE_NFIELDS (type);
-      TYPE_FIELDS (new_type) = xmalloc (sizeof (struct field) * nfields);
-      memset (TYPE_FIELDS (new_type), 0, sizeof (struct field) * nfields);
+      TYPE_FIELDS (new_type) = XCALLOC (nfields, struct field);
       for (i = 0; i < nfields; i++)
 	{
 	  TYPE_FIELD_ARTIFICIAL (new_type, i) = 

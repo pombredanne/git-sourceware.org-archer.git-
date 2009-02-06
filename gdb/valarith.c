@@ -1,7 +1,7 @@
 /* Perform arithmetic and other operations on values, for GDB.
 
    Copyright (C) 1986, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008
+   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -233,11 +233,7 @@ value_subscripted_rvalue (struct value *array, struct value *idx, int lowerbound
     memcpy (value_contents_writeable (v),
 	    value_contents (array) + elt_offs, elt_size);
 
-  if (VALUE_LVAL (array) == lval_internalvar)
-    VALUE_LVAL (v) = lval_internalvar_component;
-  else
-    VALUE_LVAL (v) = VALUE_LVAL (array);
-  VALUE_ADDRESS (v) = VALUE_ADDRESS (array);
+  set_value_component_location (v, array);
   VALUE_REGNUM (v) = VALUE_REGNUM (array);
   VALUE_FRAME_ID (v) = VALUE_FRAME_ID (array);
   set_value_offset (v, value_offset (array) + elt_offs);
@@ -277,11 +273,7 @@ value_bitstring_subscript (struct type *type,
 
   set_value_bitpos (v, bit_index);
   set_value_bitsize (v, 1);
-
-  VALUE_LVAL (v) = VALUE_LVAL (bitstring);
-  if (VALUE_LVAL (bitstring) == lval_internalvar)
-    VALUE_LVAL (v) = lval_internalvar_component;
-  VALUE_ADDRESS (v) = VALUE_ADDRESS (bitstring);
+  set_value_component_location (v, bitstring);
   VALUE_FRAME_ID (v) = VALUE_FRAME_ID (bitstring);
 
   set_value_offset (v, offset + value_offset (bitstring));
@@ -1557,7 +1549,7 @@ value_bit_index (struct type *type, const gdb_byte *valaddr, int index)
   LONGEST low_bound, high_bound;
   LONGEST word;
   unsigned rel_index;
-  struct type *range = TYPE_FIELD_TYPE (type, 0);
+  struct type *range = TYPE_INDEX_TYPE (type);
   if (get_discrete_bounds (range, &low_bound, &high_bound) < 0)
     return -2;
   if (index < low_bound || index > high_bound)

@@ -1,6 +1,6 @@
 /* Support for printing Ada types for GDB, the GNU debugger.
    Copyright (C) 1986, 1988, 1989, 1991, 1997, 1998, 1999, 2000, 2001, 2002,
-   2003, 2004, 2007, 2008 Free Software Foundation, Inc.
+   2003, 2004, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -170,8 +170,9 @@ print_range (struct type *type, struct ui_file *stream)
       /* We extract the range type bounds respectively from the first element
          and the last element of the type->fields array */
       const LONGEST lower_bound = (LONGEST) TYPE_LOW_BOUND (type);
-      const LONGEST upper_bound =
-	(LONGEST) TYPE_FIELD_BITPOS (type, TYPE_NFIELDS (type) - 1);
+      const LONGEST upper_bound = (TYPE_CODE (type) == TYPE_CODE_RANGE
+	? (LONGEST) TYPE_HIGH_BOUND (type)
+	: (LONGEST) TYPE_FIELD_BITPOS (type, TYPE_NFIELDS (type) - 1));
 
       ada_print_scalar (target_type, lower_bound, stream);
       fprintf_filtered (stream, " .. ");

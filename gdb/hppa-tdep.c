@@ -1,7 +1,7 @@
 /* Target-dependent code for the HP PA-RISC architecture.
 
    Copyright (C) 1986, 1987, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008
+   1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    Contributed by the Center for Software Science at the
@@ -1313,7 +1313,7 @@ hppa_alignof (struct type *type)
     case TYPE_CODE_FLT:
       return TYPE_LENGTH (type);
     case TYPE_CODE_ARRAY:
-      return hppa_alignof (TYPE_FIELD_TYPE (type, 0));
+      return hppa_alignof (TYPE_INDEX_TYPE (type));
     case TYPE_CODE_STRUCT:
     case TYPE_CODE_UNION:
       max_align = 1;

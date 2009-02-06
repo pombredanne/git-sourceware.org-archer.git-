@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008 Free Software Foundation, Inc.
+   2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -131,9 +131,6 @@ void (*window_hook) (FILE *, char *);
 
 int epoch_interface;
 int xgdb_verbose;
-
-/* gdb prints this when reading a command interactively */
-static char *gdb_prompt_string;	/* the global prompt string */
 
 /* Buffer used for reading command lines, and the size
    allocated for it so far.  */
@@ -285,11 +282,6 @@ void (*deprecated_set_hook) (struct cmd_list_element * c);
 /* Called when the current thread changes.  Argument is thread id.  */
 
 void (*deprecated_context_hook) (int id);
-
-/* Takes control from error ().  Typically used to prevent longjmps out of the
-   middle of the GUI.  Usually used in conjunction with a catch routine.  */
-
-void (*deprecated_error_hook) (void);
 
 /* Handler for SIGHUP.  */
 
@@ -1122,7 +1114,7 @@ print_gdb_version (struct ui_file *stream)
 
   /* Second line is a copyright notice. */
 
-  fprintf_filtered (stream, "Copyright (C) 2008 Free Software Foundation, Inc.\n");
+  fprintf_filtered (stream, "Copyright (C) 2009 Free Software Foundation, Inc.\n");
 
   /* Following the copyright is a brief statement that the program is
      free software, that users are free to copy and change it on
@@ -1642,9 +1634,6 @@ gdb_init (char *argv0)
     pre_init_ui_hook ();
 
   /* Run the init function of each source file */
-
-  getcwd (gdb_dirbuf, sizeof (gdb_dirbuf));
-  current_directory = gdb_dirbuf;
 
 #ifdef __MSDOS__
   /* Make sure we return to the original directory upon exit, come

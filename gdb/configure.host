@@ -62,6 +62,8 @@ esac
 
 case "${host}" in
 
+*-*-darwin*)		gdb_host=darwin ;;
+
 alpha*-*-osf[3456789]*)	gdb_host=alpha-osf3 ;;
 alpha*-*-linux*)	gdb_host=alpha-linux ;;
 alpha*-*-freebsd* | alpha*-*-kfreebsd*-gnu)
@@ -169,7 +171,9 @@ x86_64-*-freebsd* | x86_64-*-kfreebsd*-gnu)
 x86_64-*-netbsd* | x86_64-*-knetbsd*-gnu)
 			gdb_host=nbsd64 ;;
 x86_64-*-openbsd*)	gdb_host=obsd64 ;;
-
+x86_64-*-mingw*)        gdb_host=mingw64
+			gdb_host_obs=mingw-hdep.o
+			;;
 m32r*-*-linux*)          gdb_host=linux ;;
 
 xtensa*-*-linux*)	gdb_host=linux ;;

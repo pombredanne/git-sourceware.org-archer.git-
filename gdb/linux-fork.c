@@ -1,6 +1,6 @@
 /* GNU/Linux native-dependent code for debugging multiple forks.
 
-   Copyright (C) 2005, 2006, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -387,6 +387,40 @@ linux_fork_mourn_inferior (void)
     delete_fork (inferior_ptid);
 }
 
+/* The current inferior_ptid is being detached, but there are other
+   viable forks to debug.  Detach and delete it and context-switch to
+   the first available.  */
+
+extern void
+linux_fork_detach (char *args, int from_tty)
+{
+  /* OK, inferior_ptid is the one we are detaching from.  We need to
+     delete it from the fork_list, and switch to the next available
+     fork.  */
+
+  if (ptrace (PTRACE_DETACH, PIDGET (inferior_ptid), 0, 0))
+    error (_("Unable to detach %s"), target_pid_to_str (inferior_ptid));
+
+  delete_fork (inferior_ptid);
+  /* Delete process from GDB's inferior list.  */
+  delete_inferior (ptid_get_pid (inferior_ptid));
+
+  /* There should still be a fork - if there's only one left,
+     delete_fork won't remove it, because we haven't updated
+     inferior_ptid yet.  */
+  gdb_assert (fork_list);
+
+  fork_load_infrun_state (fork_list);
+
+  if (from_tty)
+    printf_filtered (_("[Switching to %s]\n"),
+		     target_pid_to_str (inferior_ptid));
+
+  /* If there's only one fork, switch back to non-fork mode.  */
+  if (fork_list->next == NULL)
+    delete_fork (inferior_ptid);
+}
+
 /* Fork list <-> user interface.  */
 
 static void
@@ -600,15 +634,14 @@ static void
 linux_fork_context (struct fork_info *newfp, int from_tty)
 {
   /* Now we attempt to switch processes.  */
-  struct fork_info *oldfp = find_fork_ptid (inferior_ptid);
+  struct fork_info *oldfp;
   ptid_t ptid;
   int id, i;
 
-  if (!newfp)
-    error (_("No such fork/process"));
+  gdb_assert (newfp != NULL);
 
-  if (!oldfp)
-    oldfp = add_fork (ptid_get_pid (inferior_ptid));
+  oldfp = find_fork_ptid (inferior_ptid);
+  gdb_assert (oldfp != NULL);
 
   fork_save_infrun_state (oldfp, 1);
   remove_breakpoints ();

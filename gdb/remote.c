@@ -1,7 +1,7 @@
 /* Remote target communications for serial-line targets in custom GDB protocol
 
    Copyright (C) 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997,
-   1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
+   1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -992,6 +992,7 @@ enum {
   PACKET_qXfer_memory_map,
   PACKET_qXfer_spu_read,
   PACKET_qXfer_spu_write,
+  PACKET_qXfer_osdata,
   PACKET_qGetTLSAddr,
   PACKET_qSupported,
   PACKET_QPassSignals,
@@ -1526,8 +1527,13 @@ read_ptid (char *buf, char **obuf)
   pp = unpack_varlen_hex (p, &tid);
 
   /* Since the stub is not sending a process id, then default to
-     what's in inferior_ptid.  */
-  pid = ptid_get_pid (inferior_ptid);
+     what's in inferior_ptid, unless it's null at this point.  If so,
+     then since there's no way to know the pid of the reported
+     threads, use the magic number.  */
+  if (ptid_equal (inferior_ptid, null_ptid))
+    pid = ptid_get_pid (magic_null_ptid);
+  else
+    pid = ptid_get_pid (inferior_ptid);
 
   if (obuf)
     *obuf = pp;
@@ -2575,13 +2581,6 @@ remote_start_remote (struct ui_out *uiout, void *opaque)
 	 controlling.  We default to adding them in the running state.
 	 The '?' query below will then tell us about which threads are
 	 stopped.  */
-
-      /* If we're not using the multi-process extensions, there's no
-	 way to know the pid of the reported threads; use the magic
-	 number.  */
-      if (!remote_multi_process_p (rs))
-	inferior_ptid = magic_null_ptid;
-
       remote_threads_info ();
     }
   else if (rs->non_stop_aware)
@@ -2958,6 +2957,8 @@ static struct protocol_feature remote_protocol_features[] = {
     PACKET_qXfer_spu_read },
   { "qXfer:spu:write", PACKET_DISABLE, remote_supported_packet,
     PACKET_qXfer_spu_write },
+  { "qXfer:osdata:read", PACKET_DISABLE, remote_supported_packet,
+    PACKET_qXfer_osdata },
   { "QPassSignals", PACKET_DISABLE, remote_supported_packet,
     PACKET_QPassSignals },
   { "QStartNoAckMode", PACKET_DISABLE, remote_supported_packet,
@@ -3315,7 +3316,6 @@ remote_detach_1 (char *args, int from_tty, int extended)
     }
 
   discard_pending_stop_replies (pid);
-  detach_inferior (pid);
   target_mourn_inferior ();
 }
 
@@ -4302,8 +4302,6 @@ Packet: '%s'\n"),
 		struct packet_reg *reg = packet_reg_from_pnum (rsa, pnum);
 		cached_reg_t cached_reg;
 
-		cached_reg.num = reg->regnum;
-
 		p = p1;
 
 		if (*p != ':')
@@ -4316,6 +4314,8 @@ Packet: '%s'\n"),
 		  error (_("Remote sent bad register number %s: %s\n\
 Packet: '%s'\n"),
 			 phex_nz (pnum, 0), p, buf);
+
+		cached_reg.num = reg->regnum;
 
 		fieldsize = hex2bin (p, cached_reg.data,
 				     register_size (target_gdbarch,
@@ -4509,31 +4509,28 @@ process_stop_reply (struct stop_reply *stop_reply,
   if (ptid_equal (ptid, null_ptid))
     ptid = inferior_ptid;
 
-  if (status->kind == TARGET_WAITKIND_EXITED
-      || status->kind == TARGET_WAITKIND_SIGNALLED)
+  if (status->kind != TARGET_WAITKIND_EXITED
+      && status->kind != TARGET_WAITKIND_SIGNALLED)
     {
-      int pid = ptid_get_pid (ptid);
-      delete_inferior (pid);
+      notice_new_inferiors (ptid);
+
+      /* Expedited registers.  */
+      if (stop_reply->regcache)
+	{
+	  cached_reg_t *reg;
+	  int ix;
+
+	  for (ix = 0;
+	       VEC_iterate(cached_reg_t, stop_reply->regcache, ix, reg);
+	       ix++)
+	    regcache_raw_supply (get_thread_regcache (ptid),
+				 reg->num, reg->data);
+	  VEC_free (cached_reg_t, stop_reply->regcache);
+	}
+
+      remote_stopped_by_watchpoint_p = stop_reply->stopped_by_watchpoint_p;
+      remote_watch_data_address = stop_reply->watch_data_address;
     }
-  else
-    notice_new_inferiors (ptid);
-
-  /* Expedited registers.  */
-  if (stop_reply->regcache)
-    {
-      cached_reg_t *reg;
-      int ix;
-
-      for (ix = 0;
-	   VEC_iterate(cached_reg_t, stop_reply->regcache, ix, reg);
-	   ix++)
-	regcache_raw_supply (get_thread_regcache (ptid),
-			     reg->num, reg->data);
-      VEC_free (cached_reg_t, stop_reply->regcache);
-    }
-
-  remote_stopped_by_watchpoint_p = stop_reply->stopped_by_watchpoint_p;
-  remote_watch_data_address = stop_reply->watch_data_address;
 
   stop_reply_xfree (stop_reply);
   return ptid;
@@ -6508,7 +6505,6 @@ extended_remote_kill (void)
   if (res != 0)
     error (_("Can't kill process"));
 
-  delete_inferior (pid);
   target_mourn_inferior ();
 }
 
@@ -6552,8 +6548,36 @@ extended_remote_mourn_1 (struct target_ops *target)
   /* We're no longer interested in these events.  */
   discard_pending_stop_replies (ptid_get_pid (inferior_ptid));
 
+  /* If the current general thread belonged to the process we just
+     detached from or has exited, the remote side current general
+     thread becomes undefined.  Considering a case like this:
+
+     - We just got here due to a detach.
+     - The process that we're detaching from happens to immediately
+       report a global breakpoint being hit in non-stop mode, in the
+       same thread we had selected before.
+     - GDB attaches to this process again.
+     - This event happens to be the next event we handle.
+
+     GDB would consider that the current general thread didn't need to
+     be set on the stub side (with Hg), since for all it knew,
+     GENERAL_THREAD hadn't changed.
+
+     Notice that although in all-stop mode, the remote server always
+     sets the current thread to the thread reporting the stop event,
+     that doesn't happen in non-stop mode; in non-stop, the stub *must
+     not* change the current thread when reporting a breakpoint hit,
+     due to the decoupling of event reporting and event handling.
+
+     To keep things simple, we always invalidate our notion of the
+     current thread.  */
+  record_currthread (minus_one_ptid);
+
   /* Unlike "target remote", we do not want to unpush the target; then
      the next time the user says "run", we won't be connected.  */
+
+  /* Call common code to mark the inferior as not running.	*/
+  generic_mourn_inferior ();
 
   if (have_inferiors ())
     {
@@ -6566,10 +6590,6 @@ extended_remote_mourn_1 (struct target_ops *target)
     }
   else
     {
-      struct remote_state *rs = get_remote_state ();
-
-      /* Call common code to mark the inferior as not running.	*/
-      generic_mourn_inferior ();
       if (!remote_multi_process_p (rs))
 	{
 	  /* Check whether the target is running now - some remote stubs
@@ -7354,6 +7374,13 @@ remote_xfer_partial (struct target_ops *ops, enum target_object object,
       gdb_assert (annex == NULL);
       return remote_read_qxfer (ops, "memory-map", annex, readbuf, offset, len,
 				&remote_protocol_packets[PACKET_qXfer_memory_map]);
+
+    case TARGET_OBJECT_OSDATA:
+      /* Should only get here if we're connected.  */
+      gdb_assert (remote_desc);
+      return remote_read_qxfer
+       (ops, "osdata", annex, readbuf, offset, len,
+        &remote_protocol_packets[PACKET_qXfer_osdata]);
 
     default:
       return -1;
@@ -8647,6 +8674,15 @@ remote_supports_multi_process (void)
   return remote_multi_process_p (rs);
 }
 
+static int
+extended_remote_can_run (void)
+{
+  if (remote_desc != NULL)
+    return 1;
+
+  return 0;
+}
+
 static void
 init_remote_ops (void)
 {
@@ -8732,6 +8768,7 @@ Specify the serial device it is connected to (e.g. /dev/ttya).";
   extended_remote_ops.to_detach = extended_remote_detach;
   extended_remote_ops.to_attach = extended_remote_attach;
   extended_remote_ops.to_kill = extended_remote_kill;
+  extended_remote_ops.to_can_run = extended_remote_can_run;
 }
 
 static int
@@ -9040,6 +9077,9 @@ Show the maximum size of the address (in bits) in a memory packet."), NULL,
 
   add_packet_config_cmd (&remote_protocol_packets[PACKET_qXfer_spu_write],
                          "qXfer:spu:write", "write-spu-object", 0);
+
+  add_packet_config_cmd (&remote_protocol_packets[PACKET_qXfer_osdata],
+                        "qXfer:osdata:read", "osdata", 0);
 
   add_packet_config_cmd (&remote_protocol_packets[PACKET_qGetTLSAddr],
 			 "qGetTLSAddr", "get-thread-local-storage-address",

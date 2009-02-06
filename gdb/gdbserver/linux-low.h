@@ -1,5 +1,6 @@
 /* Internal interfaces for the GNU/Linux specific target code for gdbserver.
-   Copyright (C) 2002, 2004, 2005, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2002, 2004, 2005, 2007, 2008, 2009
+   Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -130,7 +131,6 @@ struct process_info
   struct thread_resume *resume;
 
   int thread_known;
-  unsigned long tid;
 #ifdef HAVE_THREAD_DB_H
   /* The thread handle, used for e.g. TLS access.  Only valid if
      THREAD_KNOWN is set.  */

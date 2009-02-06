@@ -1,5 +1,6 @@
 /* MI Command Set - breakpoint and watchpoint commands.
-   Copyright (C) 2000, 2001, 2002, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2000, 2001, 2002, 2007, 2008, 2009
+   Free Software Foundation, Inc.
    Contributed by Cygnus Solutions (a Red Hat company).
 
    This file is part of GDB.
@@ -70,12 +71,14 @@ mi_cmd_break_insert (char *command, char **argv, int argc)
   int ignore_count = 0;
   char *condition = NULL;
   int pending = 0;
+  int enabled = 1;
+
   struct gdb_exception e;
   struct gdb_events *old_hooks;
   enum opt
     {
       HARDWARE_OPT, TEMP_OPT /*, REGEXP_OPT */ , CONDITION_OPT,
-      IGNORE_COUNT_OPT, THREAD_OPT, PENDING_OPT
+      IGNORE_COUNT_OPT, THREAD_OPT, PENDING_OPT, DISABLE_OPT
     };
   static struct mi_opt opts[] =
   {
@@ -85,6 +88,7 @@ mi_cmd_break_insert (char *command, char **argv, int argc)
     {"i", IGNORE_COUNT_OPT, 1},
     {"p", THREAD_OPT, 1},
     {"f", PENDING_OPT, 0},
+    {"d", DISABLE_OPT, 0},
     { 0, 0, 0 }
   };
 
@@ -122,6 +126,8 @@ mi_cmd_break_insert (char *command, char **argv, int argc)
 	case PENDING_OPT:
 	  pending = 1;
 	  break;
+	case DISABLE_OPT:
+	  enabled = 0;
 	}
     }
 
@@ -150,13 +156,13 @@ mi_cmd_break_insert (char *command, char **argv, int argc)
 	  set_breakpoint (address, condition,
 			  0 /*hardwareflag */ , temp_p,
 			  thread, ignore_count,
-			  pending);
+			  pending, enabled);
 	  break;
 	case HW_BP:
 	  set_breakpoint (address, condition,
 			  1 /*hardwareflag */ , temp_p,
 			  thread, ignore_count,
-			  pending);
+			  pending, enabled);
 	  break;
 #if 0
 	case REGEXP_BP:

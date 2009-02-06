@@ -159,7 +159,7 @@ future, if there are, a reference to the list will be included here.
 The current global maintainers are (in alphabetical order):
 
 Pedro Alves                     pedro@codesourcery.com
-Jim Blandy			jimb@mozilla.com
+Jim Blandy			jimb@red-bean.com
 Joel Brobecker			brobecker@adacore.com
 Kevin Buettner			kevinb@redhat.com
 Andrew Cagney			cagney@gnu.org
@@ -167,6 +167,7 @@ Daniel Jacobowitz		dan@debian.org
 Mark Kettenis           	kettenis@gnu.org
 Stan Shebs			stan@codesourcery.com
 Michael Snyder			msnyder@vmware.com
+Tom Tromey			tromey@redhat.com
 Ulrich Weigand			Ulrich.Weigand@de.ibm.com
 Elena Zannoni			ezannoni@redhat.com
 Eli Zaretskii			eliz@gnu.org
@@ -493,6 +494,7 @@ Orjan Friberg					orjanf@axis.com
 Nathan Froyd					froydnj@codesourcery.com
 Gary Funck					gary@intrepid.com
 Paul Gilliam					pgilliam@us.ibm.com
+Tristan Gingold					gingold@adacore.com
 Raoul Gough					RaoulGough@yahoo.co.uk
 Anthony Green			 		green@redhat.com
 Matthew Green					mrg@eterna.com.au
@@ -579,10 +581,12 @@ Jackie Smith Cashion				jsmith@redhat.com
 Michael Snyder					msnyder@vmware.com
 Petr Sorfa					petrs@caldera.com
 Andrew Stubbs					ams@codesourcery.com
+Emi Suzuki					emi-suzuki@tjsys.co.jp
 Ian Lance Taylor				ian@airs.com
 Gary Thomas					gthomas@redhat.com
 Jason Thorpe					thorpej@netbsd.org
 Caroline Tice					ctice@apple.com
+Kai Tietz					kai.tietz@onevision.com
 Tom Tromey					tromey@redhat.com
 David Ung					davidu@mips.com
 D Venkatasubramanian				dvenkat@noida.hcltech.com

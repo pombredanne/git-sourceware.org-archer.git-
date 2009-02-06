@@ -1,6 +1,7 @@
 /* Target-dependent definitions for AMD64.
 
-   Copyright (C) 2001, 2003, 2004, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2001, 2003, 2004, 2007, 2008, 2009
+   Free Software Foundation, Inc.
    Contributed by Jiri Smid, SuSE Labs.
 
    This file is part of GDB.
@@ -65,6 +66,14 @@ enum amd64_regnum
 
 /* Number of general purpose registers.  */
 #define AMD64_NUM_GREGS		24
+
+extern struct displaced_step_closure *amd64_displaced_step_copy_insn
+  (struct gdbarch *gdbarch, CORE_ADDR from, CORE_ADDR to,
+   struct regcache *regs);
+extern void amd64_displaced_step_fixup (struct gdbarch *gdbarch,
+					struct displaced_step_closure *closure,
+					CORE_ADDR from, CORE_ADDR to,
+					struct regcache *regs);
 
 extern void amd64_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch);
 

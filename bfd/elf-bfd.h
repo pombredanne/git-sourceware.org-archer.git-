@@ -1,6 +1,7 @@
 /* BFD back-end data structures for ELF files.
    Copyright 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001,
-   2002, 2003, 2004, 2005, 2006, 2007, 2008 Free Software Foundation, Inc.
+   2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
+   Free Software Foundation, Inc.
    Written by Cygnus Support.
 
    This file is part of BFD, the Binary File Descriptor library.
@@ -594,7 +595,7 @@ struct bfd_elf_special_section
      PREFIX and finish with the last SUFFIX_LENGTH chars of PREFIX.  */
   int suffix_length;
   int type;
-  int attr;
+  bfd_vma attr;
 };
 
 enum action_discarded
@@ -1166,6 +1167,12 @@ struct elf_backend_data
   /* The section type to use for an attributes section.  */
   unsigned int obj_attrs_section_type;
 
+  /* This function determines the order in which any attributes are written.
+     It must be defined for input in the range 4..NUM_KNOWN_OBJ_ATTRIBUTES-1
+     (this range is used in order to make unity easy).  The returned value is
+     the actual tag number to place in the input position.  */
+  int (*obj_attrs_order) (int);
+
   /* This is TRUE if the linker should act like collect and gather
      global constructors and destructors by name.  This is TRUE for
      MIPS ELF because the Irix 5 tools can not handle the .init
@@ -1327,55 +1334,23 @@ struct bfd_elf_section_data
 #define get_elf_backend_data(abfd) \
    xvec_get_elf_backend_data ((abfd)->xvec)
 
-/* This struct is used to pass information to routines called via
-   elf_link_hash_traverse which must return failure.  */
-
-struct elf_info_failed
-{
-  bfd_boolean failed;
-  struct bfd_link_info *info;
-  struct bfd_elf_version_tree *verdefs;
-};
-
-/* This structure is used to pass information to
-   _bfd_elf_link_assign_sym_version.  */
-
-struct elf_assign_sym_version_info
-{
-  /* Output BFD.  */
-  bfd *output_bfd;
-  /* General link information.  */
-  struct bfd_link_info *info;
-  /* Version tree.  */
-  struct bfd_elf_version_tree *verdefs;
-  /* Whether we had a failure.  */
-  bfd_boolean failed;
-};
-
-/* This structure is used to pass information to
-   _bfd_elf_link_find_version_dependencies.  */
-
-struct elf_find_verdep_info
-{
-  /* Output BFD.  */
-  bfd *output_bfd;
-  /* General link information.  */
-  struct bfd_link_info *info;
-  /* The number of dependencies.  */
-  unsigned int vers;
-  /* Whether we had a failure.  */
-  bfd_boolean failed;
-};
-
 /* The maximum number of known object attributes for any target.  */
-#define NUM_KNOWN_OBJ_ATTRIBUTES 32
+#define NUM_KNOWN_OBJ_ATTRIBUTES 71
 
-/* The value of an object attribute.  type & 1 indicates whether there
-   is an integer value; type & 2 indicates whether there is a string
-   value.  */
+/* The value of an object attribute.  The type indicates whether the attribute
+   holds and integer, a string, or both.  It can also indicate that there can
+   be no default (i.e. all values must be written to file, even zero).  */
 
 typedef struct obj_attribute
 {
+#define ATTR_TYPE_FLAG_INT_VAL    (1 << 0)
+#define ATTR_TYPE_FLAG_STR_VAL    (1 << 1)
+#define ATTR_TYPE_FLAG_NO_DEFAULT (1 << 2)
+
+#define ATTR_TYPE_HAS_INT_VAL(TYPE)	((TYPE) & ATTR_TYPE_FLAG_INT_VAL)
+#define ATTR_TYPE_HAS_STR_VAL(TYPE)	((TYPE) & ATTR_TYPE_FLAG_STR_VAL)
+#define ATTR_TYPE_HAS_NO_DEFAULT(TYPE)	((TYPE) & ATTR_TYPE_FLAG_NO_DEFAULT)
+
   int type;
   unsigned int i;
   char *s;
@@ -1651,8 +1626,6 @@ extern unsigned int _bfd_elf_section_from_bfd_section
   (bfd *, asection *);
 extern char *bfd_elf_string_from_elf_section
   (bfd *, unsigned, unsigned);
-extern char *bfd_elf_get_str_section
-  (bfd *, unsigned);
 extern Elf_Internal_Sym *bfd_elf_get_elf_syms
   (bfd *, Elf_Internal_Shdr *, size_t, size_t, Elf_Internal_Sym *, void *,
    Elf_External_Sym_Shndx *);
@@ -1696,8 +1669,6 @@ extern bfd_boolean bfd_elf_make_generic_object
   (bfd *);
 extern bfd_boolean bfd_elf_mkcorefile
   (bfd *);
-extern Elf_Internal_Shdr *bfd_elf_find_section
-  (bfd *, char *);
 extern bfd_boolean _bfd_elf_make_section_from_shdr
   (bfd *, Elf_Internal_Shdr *, const char *, int);
 extern bfd_boolean _bfd_elf_make_section_from_phdr
@@ -1872,20 +1843,6 @@ extern bfd_boolean _bfd_elf_merge_symbol
 
 extern bfd_boolean _bfd_elf_hash_symbol (struct elf_link_hash_entry *);
 
-extern bfd_boolean _bfd_elf_add_default_symbol
-  (bfd *, struct bfd_link_info *, struct elf_link_hash_entry *,
-   const char *, Elf_Internal_Sym *, asection **, bfd_vma *,
-   bfd_boolean *, bfd_boolean);
-
-extern bfd_boolean _bfd_elf_export_symbol
-  (struct elf_link_hash_entry *, void *);
-
-extern bfd_boolean _bfd_elf_link_find_version_dependencies
-  (struct elf_link_hash_entry *, void *);
-
-extern bfd_boolean _bfd_elf_link_assign_sym_version
-  (struct elf_link_hash_entry *, void *);
-
 extern long _bfd_elf_link_lookup_local_dynindx
   (struct bfd_link_info *, bfd *, long);
 extern bfd_boolean _bfd_elf_compute_section_file_positions
@@ -1921,24 +1878,12 @@ extern char *_bfd_elfcore_strndup
 extern Elf_Internal_Rela *_bfd_elf_link_read_relocs
   (bfd *, asection *, void *, Elf_Internal_Rela *, bfd_boolean);
 
-extern bfd_boolean _bfd_elf_link_size_reloc_section
-  (bfd *, Elf_Internal_Shdr *, asection *);
-
 extern bfd_boolean _bfd_elf_link_output_relocs
   (bfd *, asection *, Elf_Internal_Shdr *, Elf_Internal_Rela *,
    struct elf_link_hash_entry **);
 
-extern bfd_boolean _bfd_elf_fix_symbol_flags
-  (struct elf_link_hash_entry *, struct elf_info_failed *);
-
-extern bfd_boolean _bfd_elf_adjust_dynamic_symbol
-  (struct elf_link_hash_entry *, void *);
-
 extern bfd_boolean _bfd_elf_adjust_dynamic_copy
   (struct elf_link_hash_entry *, asection *);
-
-extern bfd_boolean _bfd_elf_link_sec_merge_syms
-  (struct elf_link_hash_entry *, void *);
 
 extern bfd_boolean _bfd_elf_dynamic_symbol_p
   (struct elf_link_hash_entry *, struct bfd_link_info *, bfd_boolean);
@@ -2061,10 +2006,6 @@ extern bfd_boolean bfd_elf_link_record_dynamic_symbol
 extern int bfd_elf_link_record_local_dynamic_symbol
   (struct bfd_link_info *, bfd *, long);
 
-extern void bfd_elf_link_mark_dynamic_symbol
-  (struct bfd_link_info *, struct elf_link_hash_entry *,
-   Elf_Internal_Sym *);
-
 extern bfd_boolean _bfd_elf_close_and_cleanup
   (bfd *);
 
@@ -2183,10 +2124,11 @@ extern void bfd_elf_add_obj_attr_int (bfd *, int, int, unsigned int);
 extern void bfd_elf_add_obj_attr_string (bfd *, int, int, const char *);
 #define bfd_elf_add_proc_attr_string(BFD, TAG, VALUE) \
   bfd_elf_add_obj_attr_string ((BFD), OBJ_ATTR_PROC, (TAG), (VALUE))
-extern void bfd_elf_add_obj_attr_compat (bfd *, int, unsigned int,
-					 const char *);
-#define bfd_elf_add_proc_attr_compat(BFD, INTVAL, STRVAL) \
-  bfd_elf_add_obj_attr_compat ((BFD), OBJ_ATTR_PROC, (INTVAL), (STRVAL))
+extern void bfd_elf_add_obj_attr_int_string (bfd *, int, int, unsigned int,
+					     const char *);
+#define bfd_elf_add_proc_attr_int_string(BFD, TAG, INTVAL, STRVAL) \
+  bfd_elf_add_obj_attr_int_string ((BFD), OBJ_ATTR_PROC, (TAG), \
+				   (INTVAL), (STRVAL))
 
 extern char *_bfd_elf_attr_strdup (bfd *, const char *);
 extern void _bfd_elf_copy_obj_attributes (bfd *, bfd *);
@@ -2196,11 +2138,6 @@ extern bfd_boolean _bfd_elf_merge_object_attributes (bfd *, bfd *);
 
 /* Large common section.  */
 extern asection _bfd_elf_large_com_section;
-
-/* SH ELF specific routine.  */
-
-extern bfd_boolean _sh_elf_set_mach_from_flags
-  (bfd *);
 
 /* This is the condition under which finish_dynamic_symbol will be called.
    If our finish_dynamic_symbol isn't called, we'll need to do something

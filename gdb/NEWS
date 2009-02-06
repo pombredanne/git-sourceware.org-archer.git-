@@ -36,6 +36,9 @@ QStartNoAckMode
   operation over reliable transport links.  Use of this packet is
   controlled by the `set remote noack-packet' command.
 
+qXfer:osdata:read
+  Obtains additional operating system information
+
 * Removed remote protocol undocumented extension
 
   An undocumented extension to the remote protocol's `S' stop reply
@@ -107,6 +110,9 @@ are treated as the standard definitions, regardless of context.
     task N
       Switch the context of debugging to task number N.
 
+* Support for user-defined prefixed commands.  The "define" command can
+add new commands to existing prefixes, e.g. "target".
+
 * New commands
 
 find [/size-char] [/max-count] start-address, end-address|+search-space-size,
@@ -166,11 +172,28 @@ set target-async
   with GDB while the target is running.  "show target-async" displays the
   current state of asynchronous execution of the target.
 
+set tcp auto-retry (on|off)
+show tcp auto-retry
+set tcp connect-timeout
+show tcp connect-timeout
+  These commands allow GDB to retry failed TCP connections to a remote stub
+  with a specified timeout period; this is useful if the stub is launched
+  in parallel with GDB but may not be ready to accept connections immediately.
+
 macro define
 macro list
 macro undef
   These allow macros to be defined, undefined, and listed
   interactively.
+
+info os processes
+  Show operating system information about processes.
+
+* New native configurations
+
+x86/x86_64 Darwin		i[34567]86-*-darwin*
+
+x86_64 MinGW			x86_64-*-mingw*
 
 * New targets
 

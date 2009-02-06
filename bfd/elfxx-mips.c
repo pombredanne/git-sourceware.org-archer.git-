@@ -7575,7 +7575,7 @@ _bfd_mips_elf_check_relocs (bfd *abfd, struct bfd_link_info *info,
 	case R_MIPS_CALL_LO16:
 	  if (h != NULL)
 	    {
-	      /* VxWorks call relocations point the function's .got.plt
+	      /* VxWorks call relocations point at the function's .got.plt
 		 entry, which will be allocated by adjust_dynamic_symbol.
 		 Otherwise, this symbol requires a global GOT entry.  */
 	      if ((!htab->is_vxworks || h->forced_local)
@@ -10400,6 +10400,8 @@ mips_set_isa_flags (bfd *abfd)
     case bfd_mach_mips8000:
     case bfd_mach_mips10000:
     case bfd_mach_mips12000:
+    case bfd_mach_mips14000:
+    case bfd_mach_mips16000:
       val = E_MIPS_ARCH_4;
       break;
 
@@ -12124,6 +12126,8 @@ static const struct mips_mach_extension mips_mach_extensions[] = {
 
   /* R10000 extensions.  */
   { bfd_mach_mips12000, bfd_mach_mips10000 },
+  { bfd_mach_mips14000, bfd_mach_mips10000 },
+  { bfd_mach_mips16000, bfd_mach_mips10000 },
 
   /* R5000 extensions.  Note: the vr5500 ISA is an extension of the core
      vr5400 ISA, but doesn't include the multimedia stuff.  It seems

@@ -1,7 +1,7 @@
 /* Support for printing Fortran values for GDB, the GNU debugger.
 
    Copyright (C) 1993, 1994, 1995, 1996, 1998, 1999, 2000, 2003, 2005, 2006,
-   2007, 2008 Free Software Foundation, Inc.
+   2007, 2008, 2009 Free Software Foundation, Inc.
 
    Contributed by Motorola.  Adapted from the C definitions by Farooq Butt
    (fmbutt@engage.sps.mot.com), additionally worked over by Stan Shebs.
@@ -566,9 +566,7 @@ info_common_command (char *comname, int from_tty)
 
       while (entry != NULL)
 	{
-	  printf_filtered ("%s = ", SYMBOL_PRINT_NAME (entry->symbol));
-	  print_variable_value (entry->symbol, fi, gdb_stdout);
-	  printf_filtered ("\n");
+	  print_variable_and_value (NULL, entry->symbol, fi, gdb_stdout, 0);
 	  entry = entry->next;
 	}
     }

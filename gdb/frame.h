@@ -1,7 +1,7 @@
 /* Definitions for dealing with stack frames, for GDB, the GNU debugger.
 
    Copyright (C) 1986, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1996, 1997,
-   1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008
+   1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -659,23 +659,5 @@ extern struct frame_info *deprecated_safe_get_selected_frame (void);
 /* Create a frame using the specified BASE and PC.  */
 
 extern struct frame_info *create_new_frame (CORE_ADDR base, CORE_ADDR pc);
-
-/* FIXME: cagney/2002-12-06: Has the PC in the current frame changed?
-   "infrun.c", Thanks to gdbarch_decr_pc_after_break, can change the PC after
-   the initial frame create.  This puts things back in sync.
-
-   This replaced: frame->pc = ....; */
-extern void deprecated_update_frame_pc_hack (struct frame_info *frame,
-					     CORE_ADDR pc);
-
-/* FIXME: cagney/2002-12-18: Has the frame's base changed?  Or to be
-   more exact, was that initial guess at the frame's base as returned
-   by the deleted read_fp() wrong?  If it was, fix it.  This shouldn't
-   be necessary since the code should be getting the frame's base
-   correct from the outset.
-
-   This replaced: frame->frame = ....; */
-extern void deprecated_update_frame_base_hack (struct frame_info *frame,
-					       CORE_ADDR base);
 
 #endif /* !defined (FRAME_H)  */

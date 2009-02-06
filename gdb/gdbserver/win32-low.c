@@ -1,5 +1,5 @@
 /* Low level interface to Windows debugging, for gdbserver.
-   Copyright (C) 2006, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    Contributed by Leo Zayas.  Based on "win32-nat.c" from GDB.
 
@@ -176,7 +176,7 @@ child_add_thread (DWORD tid, HANDLE h)
   if ((th = thread_rec (tid, FALSE)))
     return th;
 
-  th = calloc (1, sizeof (*th));
+  th = xcalloc (1, sizeof (*th));
   th->tid = tid;
   th->h = h;
 
@@ -1453,6 +1453,7 @@ get_child_debug_event (struct target_waitstatus *ourstatus)
 		(unsigned) current_event.dwThreadId));
       ourstatus->kind = TARGET_WAITKIND_EXITED;
       ourstatus->value.integer = current_event.u.ExitProcess.dwExitCode;
+      child_continue (DBG_CONTINUE, -1);
       CloseHandle (current_process_handle);
       current_process_handle = NULL;
       break;

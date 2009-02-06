@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008 Free Software Foundation, Inc.
+   2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -608,11 +608,10 @@ value_at_lazy (struct type *type, CORE_ADDR addr)
   if (TYPE_CODE (check_typedef (type)) == TYPE_CODE_VOID)
     error (_("Attempt to dereference a generic pointer."));
 
-  val = allocate_value (type);
+  val = allocate_value_lazy (type);
 
   VALUE_LVAL (val) = lval_memory;
   VALUE_ADDRESS (val) = addr;
-  set_value_lazy (val, 1);
 
   return val;
 }
@@ -634,6 +633,8 @@ value_at_lazy (struct type *type, CORE_ADDR addr)
 int
 value_fetch_lazy (struct value *val)
 {
+  gdb_assert (value_lazy (val));
+  allocate_value_contents (val);
   if (VALUE_LVAL (val) == lval_memory)
     {
       CORE_ADDR addr = VALUE_ADDRESS (val) + value_offset (val);
@@ -987,11 +988,13 @@ struct value *
 value_of_variable (struct symbol *var, struct block *b)
 {
   struct value *val;
-  struct frame_info *frame = NULL;
+  struct frame_info *frame;
 
-  if (!b)
-    frame = NULL;		/* Use selected frame.  */
-  else if (symbol_read_needs_frame (var))
+  if (!symbol_read_needs_frame (var))
+    frame = NULL;
+  else if (!b)
+    frame = get_selected_frame (_("No frame selected."));
+  else
     {
       frame = block_innermost_frame (b);
       if (!frame)
@@ -1008,6 +1011,54 @@ value_of_variable (struct symbol *var, struct block *b)
   val = read_var_value (var, frame);
   if (!val)
     error (_("Address of symbol \"%s\" is unknown."), SYMBOL_PRINT_NAME (var));
+
+  return val;
+}
+
+struct value *
+address_of_variable (struct symbol *var, struct block *b)
+{
+  struct type *type = SYMBOL_TYPE (var);
+  struct value *val;
+
+  /* Evaluate it first; if the result is a memory address, we're fine.
+     Lazy evaluation pays off here. */
+
+  val = value_of_variable (var, b);
+
+  if ((VALUE_LVAL (val) == lval_memory && value_lazy (val))
+      || TYPE_CODE (type) == TYPE_CODE_FUNC)
+    {
+      CORE_ADDR addr = VALUE_ADDRESS (val);
+      return value_from_pointer (lookup_pointer_type (type), addr);
+    }
+
+  /* Not a memory address; check what the problem was.  */
+  switch (VALUE_LVAL (val))
+    {
+    case lval_register:
+      {
+	struct frame_info *frame;
+	const char *regname;
+
+	frame = frame_find_by_id (VALUE_FRAME_ID (val));
+	gdb_assert (frame);
+
+	regname = gdbarch_register_name (get_frame_arch (frame),
+					 VALUE_REGNUM (val));
+	gdb_assert (regname && *regname);
+
+	error (_("Address requested for identifier "
+		 "\"%s\" which is in register $%s"),
+	       SYMBOL_PRINT_NAME (var), regname);
+	break;
+      }
+
+    default:
+      error (_("Can't take address of \"%s\" which isn't an lvalue."),
+	     SYMBOL_PRINT_NAME (var));
+      break;
+    }
 
   return val;
 }
@@ -1535,7 +1586,7 @@ search_struct_field (char *name, struct value *arg1, int offset,
       if (BASETYPE_VIA_VIRTUAL (type, i))
 	{
 	  int boffset;
-	  struct value *v2 = allocate_value (basetype);
+	  struct value *v2;
 
 	  boffset = baseclass_offset (type, i,
 				      value_contents (arg1) + offset,
@@ -1553,6 +1604,7 @@ search_struct_field (char *name, struct value *arg1, int offset,
 	    {
 	      CORE_ADDR base_addr;
 
+	      v2  = allocate_value (basetype);
 	      base_addr = 
 		VALUE_ADDRESS (arg1) + value_offset (arg1) + boffset;
 	      if (target_read_memory (base_addr, 
@@ -1564,16 +1616,18 @@ search_struct_field (char *name, struct value *arg1, int offset,
 	    }
 	  else
 	    {
-	      VALUE_LVAL (v2) = VALUE_LVAL (arg1);
-	      VALUE_ADDRESS (v2) = VALUE_ADDRESS (arg1);
+	      if (VALUE_LVAL (arg1) == lval_memory && value_lazy (arg1))
+		v2  = allocate_value_lazy (basetype);
+	      else
+		{
+		  v2  = allocate_value (basetype);
+		  memcpy (value_contents_raw (v2),
+			  value_contents_raw (arg1) + boffset,
+			  TYPE_LENGTH (basetype));
+		}
+	      set_value_component_location (v2, arg1);
 	      VALUE_FRAME_ID (v2) = VALUE_FRAME_ID (arg1);
 	      set_value_offset (v2, value_offset (arg1) + boffset);
-	      if (VALUE_LVAL (arg1) == lval_memory && value_lazy (arg1))
-		set_value_lazy (v2, 1);
-	      else
-		memcpy (value_contents_raw (v2),
-			value_contents_raw (arg1) + boffset,
-			TYPE_LENGTH (basetype));
 	    }
 
 	  if (found_baseclass)
@@ -1846,7 +1900,7 @@ value_struct_elt (struct value **argp, struct value **args,
 }
 
 /* Search through the methods of an object (and its bases) to find a
-   specified method. Return the pointer to the fn_field list of
+   specified method.  Return the pointer to the fn_field list of
    overloaded instances.
 
    Helper function for value_find_oload_list.
@@ -2119,9 +2173,11 @@ find_overload_match (struct type **arg_types, int nargs,
 
   if (objp)
     {
-      if (TYPE_CODE (value_type (temp)) != TYPE_CODE_PTR
-	  && (TYPE_CODE (value_type (*objp)) == TYPE_CODE_PTR
-	      || TYPE_CODE (value_type (*objp)) == TYPE_CODE_REF))
+      struct type *temp_type = check_typedef (value_type (temp));
+      struct type *obj_type = check_typedef (value_type (*objp));
+      if (TYPE_CODE (temp_type) != TYPE_CODE_PTR
+	  && (TYPE_CODE (obj_type) == TYPE_CODE_PTR
+	      || TYPE_CODE (obj_type) == TYPE_CODE_REF))
 	{
 	  temp = value_addr (temp);
 	}
@@ -2969,20 +3025,17 @@ value_slice (struct value *array, int lowbound, int length)
 				      slice_range_type);
       TYPE_CODE (slice_type) = TYPE_CODE (array_type);
 
-      slice = allocate_value (slice_type);
       if (VALUE_LVAL (array) == lval_memory && value_lazy (array))
-	set_value_lazy (slice, 1);
+	slice = allocate_value_lazy (slice_type);
       else
-	memcpy (value_contents_writeable (slice),
-		value_contents (array) + offset,
-		TYPE_LENGTH (slice_type));
+	{
+	  slice = allocate_value (slice_type);
+	  memcpy (value_contents_writeable (slice),
+		  value_contents (array) + offset,
+		  TYPE_LENGTH (slice_type));
+	}
 
-      if (VALUE_LVAL (array) == lval_internalvar)
-	VALUE_LVAL (slice) = lval_internalvar_component;
-      else
-	VALUE_LVAL (slice) = VALUE_LVAL (array);
-
-      VALUE_ADDRESS (slice) = VALUE_ADDRESS (array);
+      set_value_component_location (slice, array);
       VALUE_FRAME_ID (slice) = VALUE_FRAME_ID (array);
       set_value_offset (slice, value_offset (array) + offset);
     }

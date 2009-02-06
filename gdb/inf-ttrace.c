@@ -1,6 +1,7 @@
 /* Low-level child interface to ttrace.
 
-   Copyright (C) 2004, 2005, 2006, 2007, 2008 Free Software Foundation, Inc.
+   Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009
+   Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -457,6 +458,8 @@ inf_ttrace_follow_fork (struct target_ops *ops, int follow_child)
 
   if (follow_child)
     {
+      struct inferior *inf;
+
       /* Copy user stepping state to the new inferior thread.  */
       step_resume_breakpoint = last_tp->step_resume_breakpoint;
       step_range_start = last_tp->step_range_start;
@@ -468,7 +471,8 @@ inf_ttrace_follow_fork (struct target_ops *ops, int follow_child)
       last_tp->step_resume_breakpoint = NULL;
 
       inferior_ptid = ptid_build (fpid, flwpid, 0);
-      add_inferior (fpid);
+      inf = add_inferior (fpid);
+      inf->attach_flag = find_inferior_pid (pid)->attach_flag;
       detach_breakpoints (pid);
 
       target_terminal_ours ();
@@ -930,7 +934,6 @@ inf_ttrace_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
   do
     {
       set_sigint_trap ();
-      set_sigio_trap ();
 
       if (ttrace_wait (pid, lwpid, TTRACE_WAITOK, &tts, sizeof tts) == -1)
 	perror_with_name (("ttrace_wait"));
@@ -949,7 +952,6 @@ inf_ttrace_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
 	  tts.tts_event = TTEVT_NONE;
 	}
 
-      clear_sigio_trap ();
       clear_sigint_trap ();
     }
   while (tts.tts_event == TTEVT_NONE);
