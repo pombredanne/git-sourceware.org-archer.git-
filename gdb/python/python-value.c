@@ -18,6 +18,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "gdb_assert.h"
 #include "charset.h"
 #include "value.h"
 #include "exceptions.h"
@@ -79,7 +80,6 @@ valpy_new (PyTypeObject *subtype, PyObject *args, PyObject *keywords)
 {
   struct value *value = NULL;   /* Initialize to appease gcc warning.  */
   value_object *value_obj;
-  volatile struct gdb_exception except;
 
   if (PyTuple_Size (args) != 1)
     {
@@ -96,16 +96,11 @@ valpy_new (PyTypeObject *subtype, PyObject *args, PyObject *keywords)
       return NULL;
     }
 
-  TRY_CATCH (except, RETURN_MASK_ALL)
-    {
-      value = convert_value_from_python (PyTuple_GetItem (args, 0));
-    }
-  if (except.reason < 0)
+  value = convert_value_from_python (PyTuple_GetItem (args, 0));
+  if (value == NULL)
     {
       subtype->tp_free (value_obj);
-      return PyErr_Format (except.reason == RETURN_QUIT
-			     ? PyExc_KeyboardInterrupt : PyExc_TypeError,
-			     "%s", except.message);
+      return NULL;
     }
 
   value_obj->value = value;
@@ -254,6 +249,9 @@ valpy_getitem (PyObject *self, PyObject *key)
 	     value code throw an exception if the index has an invalid
 	     type.  */
 	  struct value *idx = convert_value_from_python (key);
+	  if (idx == NULL)
+	    return NULL;
+
 	  res_val = value_subscript (tmp, idx);
 	}
     }
@@ -343,7 +341,12 @@ valpy_binop (enum valpy_opcode opcode, PyObject *self, PyObject *other)
 	 kind of object, altogether.  Because of this, we can't assume self is
 	 a gdb.Value object and need to convert it from python as well.  */
       arg1 = convert_value_from_python (self);
+      if (arg1 == NULL)
+	return NULL;
+
       arg2 = convert_value_from_python (other);
+      if (arg2 == NULL)
+	return NULL;
 
       switch (opcode)
 	{
@@ -607,6 +610,8 @@ valpy_richcompare (PyObject *self, PyObject *other, int op)
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
       value_other = convert_value_from_python (other);
+      if (value_other == NULL)
+	return NULL;
 
       switch (op) {
         case Py_LT:
@@ -761,7 +766,7 @@ value_object_to_value (PyObject *self)
 }
 
 /* Try to convert a Python value to a gdb value.  If the value cannot
-   be converted, throw a gdb exception.  */
+   be converted, set a Python exception and return NULL.  */
 
 struct value *
 convert_value_from_python (PyObject *obj)
@@ -769,54 +774,65 @@ convert_value_from_python (PyObject *obj)
   struct value *value = NULL; /* -Wall */
   PyObject *target_str, *unicode_str;
   struct cleanup *old;
+  volatile struct gdb_exception except;
   int cmp;
 
-  if (! obj)
-    error (_("Internal error while converting Python value."));
+  gdb_assert (obj != NULL);
 
-  if (PyBool_Check (obj)) 
+  TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      cmp = PyObject_IsTrue (obj);
-      if (cmp >= 0)
-	value = value_from_longest (builtin_type_pybool, cmp);
-    }
-  else if (PyInt_Check (obj))
-    value = value_from_longest (builtin_type_pyint, PyInt_AsLong (obj));
-  else if (PyLong_Check (obj))
-    {
-      LONGEST l = PyLong_AsLongLong (obj);
-      if (! PyErr_Occurred ())
-	value = value_from_longest (builtin_type_pylong, l);
-    }
-  else if (PyFloat_Check (obj))
-    {
-      double d = PyFloat_AsDouble (obj);
-      if (! PyErr_Occurred ())
-	value = value_from_double (builtin_type_pyfloat, d);
-    }
-  else if (gdbpy_is_string (obj))
-    {
-      char *s;
-
-      s = python_string_to_target_string (obj);
-      if (s == NULL)
+      if (PyBool_Check (obj)) 
 	{
-	  PyErr_Clear ();
-	  error (_("Error converting Python value."));
+	  cmp = PyObject_IsTrue (obj);
+	  if (cmp >= 0)
+	    value = value_from_longest (builtin_type_pybool, cmp);
 	}
+      else if (PyInt_Check (obj))
+	{
+	  long l = PyInt_AsLong (obj);
 
-      old = make_cleanup (xfree, s);
-      value = value_from_string (s);
-      do_cleanups (old);
+	  if (! PyErr_Occurred ())
+	    value = value_from_longest (builtin_type_pyint, l);
+	}
+      else if (PyLong_Check (obj))
+	{
+	  LONGEST l = PyLong_AsLongLong (obj);
+
+	  if (! PyErr_Occurred ())
+	    value = value_from_longest (builtin_type_pylong, l);
+	}
+      else if (PyFloat_Check (obj))
+	{
+	  double d = PyFloat_AsDouble (obj);
+
+	  if (! PyErr_Occurred ())
+	    value = value_from_double (builtin_type_pyfloat, d);
+	}
+      else if (gdbpy_is_string (obj))
+	{
+	  char *s;
+
+	  s = python_string_to_target_string (obj);
+	  if (s != NULL)
+	    {
+	      old = make_cleanup (xfree, s);
+	      value = value_from_string (s);
+	      do_cleanups (old);
+	    }
+	}
+      else if (PyObject_TypeCheck (obj, &value_object_type))
+	value = ((value_object *) obj)->value;
+      else
+	PyErr_Format (PyExc_TypeError, _("Could not convert Python object: %s"),
+		      PyString_AsString (PyObject_Str (obj)));
     }
-  else if (PyObject_TypeCheck (obj, &value_object_type))
-    value = ((value_object *) obj)->value;
-  else
-    error (_("Could not convert Python object: %s"),
-	   PyString_AsString (PyObject_Str (obj)));
-
-  if (PyErr_Occurred ())
-    error (_("Error converting Python value."));
+  if (except.reason < 0)
+    {
+      PyErr_Format (except.reason == RETURN_QUIT
+		    ? PyExc_KeyboardInterrupt : PyExc_RuntimeError,
+		    "%s", except.message);
+      return NULL;
+    }
 
   return value;
 }

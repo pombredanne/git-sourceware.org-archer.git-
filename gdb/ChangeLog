@@ -1,3 +1,14 @@
+2009-02-08  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* python/python-value.c (convert_value_from_python): Change to throw
+	a Python exception instead of a GDB exception on error.
+	(valpy_new, valpy_getitem, valpy_binop, valpy_richcompare): Adapt to
+	new behaviour of convert_value_from_python.
+	* python/python-function.c (fnpy_call): Likewise.
+	* python/python.c (pretty_print_one_value, print_children): Likewise.
+	(apply_varobj_pretty_printer): Call gdbpy_print_stack if
+	pretty_print_one_value fails.
+
 2009-02-06  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	* python/python-cmd.c (gdbpy_initialize_commands): Rename COMMAND_

@@ -958,8 +958,6 @@ pretty_print_one_value (PyObject *printer, struct value **out_value)
 	    *out_value = convert_value_from_python (result);
 	  Py_DECREF (result);
 	}
-      else
-	gdbpy_print_stack ();
     }
 
   return output;
@@ -1252,7 +1250,14 @@ print_children (PyObject *printer, const char *hint,
       else
 	{
 	  struct value *value = convert_value_from_python (py_v);
-	  common_val_print (value, stream, recurse + 1, options, language);
+
+	  if (value == NULL)
+	    {
+	      gdbpy_print_stack ();
+	      error (_("Error while executing Python code."));
+	    }
+	  else
+	    common_val_print (value, stream, recurse + 1, options, language);
 	}
 
       if (is_map && i % 2 == 0)
@@ -1339,7 +1344,7 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
 
 /* Apply a pretty-printer for the varobj code.  PRINTER_OBJ is the
    print object.  It must have a 'to_string' method (but this is
-   checked by varobj, not here) which accepts takes no arguments and
+   checked by varobj, not here) which takes no arguments and
    returns a string.  This function returns an xmalloc()d string if
    the printer returns a string.  The printer may return a replacement
    value instead; in this case *REPLACEMENT is set to the replacement
@@ -1354,6 +1359,8 @@ apply_varobj_pretty_printer (PyObject *printer_obj, struct value *value,
 
   *replacement = NULL;
   result = pretty_print_one_value (printer_obj, replacement);
+  if (result == NULL);
+    gdbpy_print_stack ();
   PyGILState_Release (state);
 
   return result;

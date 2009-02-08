@@ -58,7 +58,6 @@ fnpy_call (void *cookie, int argc, struct value **argv)
   int i;
   struct value *value = NULL;
   PyObject *result, *callable, *args;
-  volatile struct gdb_exception except;
   struct cleanup *cleanup;
   PyGILState_STATE state;
 
@@ -81,18 +80,15 @@ fnpy_call (void *cookie, int argc, struct value **argv)
   if (!result)
     {
       gdbpy_print_stack ();
-      error(_("Error while executing Python code."));
+      error (_("Error while executing Python code."));
     }
 
-  TRY_CATCH (except, RETURN_MASK_ALL)
-    {
-      value = convert_value_from_python (result);
-    }
-  if (except.reason < 0)
+  value = convert_value_from_python (result);
+  if (value == NULL)
     {
       Py_DECREF (result);
       gdbpy_print_stack ();
-      throw_exception (except);
+      error (_("Error while executing Python code."));
     }
 
   Py_DECREF (result);
