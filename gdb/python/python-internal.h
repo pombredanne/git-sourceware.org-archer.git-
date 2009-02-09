@@ -63,13 +63,14 @@ struct value;
 extern PyObject *gdb_module;
 extern PyTypeObject value_object_type;
 
-PyObject *gdbpy_get_value_from_history (PyObject *self, PyObject *args);
+PyObject *gdbpy_history (PyObject *self, PyObject *args);
 
 PyObject *value_to_value_object (struct value *v);
 
 struct value *convert_value_from_python (PyObject *obj);
 
 void gdbpy_initialize_values (void);
+void gdbpy_initialize_commands (void);
 
 struct cleanup *make_cleanup_py_decref (PyObject *py);
 struct cleanup *make_cleanup_py_restore_gil (PyGILState_STATE *state);
@@ -90,5 +91,10 @@ void gdbpy_print_stack (void);
 PyObject *python_string_to_unicode (PyObject *obj);
 char *unicode_to_target_string (PyObject *unicode_str);
 char *python_string_to_target_string (PyObject *obj);
+char *python_string_to_host_string (PyObject *obj);
+PyObject *target_string_to_unicode (const gdb_byte *str, int length);
+int gdbpy_is_string (PyObject *obj);
+
+extern PyObject *gdbpy_doc_cst;
 
 #endif /* GDB_PYTHON_INTERNAL_H */

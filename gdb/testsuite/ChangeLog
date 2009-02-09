@@ -1,3 +1,75 @@
+2009-02-06  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.base/siginfo-obj.c, gdb.base/siginfo-obj.exp: New.
+
+2009-02-06  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.python/python-cmd.exp: New file.
+
+2009-02-06  Tristan Gingold  <gingold@adacore.com>
+
+	* gdb.arch/i386-sse.c (main): Replace call to puts by an nop asm.
+
+2009-02-05  Tristan Gingold  <gingold@adacore.com>
+
+	* gdb.base/sigbpt.exp: Detect which signal is received when a NULL
+	pointer is dereferenced and use this signal name in regexp.
+	* gdb.base/signull.exp: Ditto.
+	* gdb.base/sigbpt.c (main): Catch SIGBUS too.
+	* gdb.base/signull.c (main): Ditto.
+
+2009-02-04  Tom Tromey  <tromey@redhat.com>
+	    Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.python/python-value.exp: Use `gdb.history' instead of
+	`gdb.value_from_history'.
+	(test_value_numeric_ops): Add test for conversion of enum constant.
+	* gdb.python/python-value.c (enum e): New type.
+	(evalue): New global.
+	(main): Use argv.
+
+2009-02-04  Jerome Guitton  <guitton@adacore.com>
+
+	* gdb.ada/uninitialized_vars: New test program.
+	* gdb.ada/uninitialized_vars.exp: New testcase.
+
+2009-02-02  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/cpcompletion.exp: Name the test "pr9594".
+	* gdb.cp/pr2489.cc: Rename...
+	* gdb.cp/pr9594.cc: ... to this.
+
+2009-02-02  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/Makefile.in (EXECUTABLES): Add pr2489.
+	* gdb.cp/pr2489.cc: New file.
+	* gdb.cp/cpcompletion.exp: New file.
+
+2009-02-02  Tom Tromey  <tromey@redhat.com>
+
+	PR exp/9059:
+	* gdb.cp/call-c.exp: Add regression test.
+	* gdb.cp/call-c.cc (FooHandle): New typedef.
+	(main): New variable 'handle'.
+
+2009-01-30  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* lib/mi-support.exp (et_mi_thread_list)
+	(check_mi_and_console_threads): Adjust for current thread in
+	-thread-list-ids output.
+
+2009-01-30  Vladimir Prus  <vladimir@codesourcery.com>
+
+    	* gdb.mi/mi-break.exp (test_disabled_creation): New.
+    	Call it.
+
+2009-01-28  Doug Evans  <dje@google.com>
+
+	* gdb.arch/amd64-disp-step.S: New file.
+	* gdb.arch/amd64-disp-step.exp: New file.
+	* gdb.arch/i386-disp-step.S: New file.
+	* gdb.arch/i386-disp-step.exp: New file.
+
 2009-01-27  Pierre Muller  <muller@ics.u-strasbg.fr>
 
 	* gdb.base/find.exp: Set newline variable
