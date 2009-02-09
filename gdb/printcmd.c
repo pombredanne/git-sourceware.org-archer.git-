@@ -124,6 +124,8 @@ struct display
   {
     /* Chain link to next auto-display item.  */
     struct display *next;
+    /* The expression as the user typed it.  */
+    char *exp_string;
     /* Expression to be evaluated and displayed.  */
     struct expression *exp;
     /* Item number of this auto-display item.  */
@@ -1403,6 +1405,7 @@ display_command (char *exp, int from_tty)
 
       new = (struct display *) xmalloc (sizeof (struct display));
 
+      new->exp_string = xstrdup (exp);
       new->exp = expr;
       new->block = innermost_block;
       new->next = display_chain;
@@ -1421,6 +1424,7 @@ display_command (char *exp, int from_tty)
 static void
 free_display (struct display *d)
 {
+  xfree (d->exp_string);
   xfree (d->exp);
   xfree (d);
 }
@@ -1435,9 +1439,8 @@ clear_displays (void)
 
   while ((d = display_chain) != NULL)
     {
-      xfree (d->exp);
       display_chain = d->next;
-      xfree (d);
+      free_display (d);
     }
 }
 
@@ -1551,7 +1554,7 @@ do_one_display (struct display *d)
 
       annotate_display_expression ();
 
-      print_expression (d->exp, gdb_stdout);
+      puts_filtered (d->exp_string);
       annotate_display_expression_end ();
 
       if (d->format.count != 1 || d->format.format == 'i')
@@ -1579,7 +1582,7 @@ do_one_display (struct display *d)
 
       annotate_display_expression ();
 
-      print_expression (d->exp, gdb_stdout);
+      puts_filtered (d->exp_string);
       annotate_display_expression_end ();
 
       printf_filtered (" = ");
@@ -1659,7 +1662,7 @@ Num Enb Expression\n"));
 			 d->format.format);
       else if (d->format.format)
 	printf_filtered ("/%c ", d->format.format);
-      print_expression (d->exp, gdb_stdout);
+      puts_filtered (d->exp_string);
       if (d->block && !contained_in (get_selected_block (0), d->block))
 	printf_filtered (_(" (cannot be evaluated in the current context)"));
       printf_filtered ("\n");

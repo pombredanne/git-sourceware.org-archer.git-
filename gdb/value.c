@@ -63,6 +63,15 @@ struct value
 
     /* Pointer to internal variable.  */
     struct internalvar *internalvar;
+
+    /* If lval == lval_computed, this is a set of function pointers
+       to use to access and describe the value, and a closure pointer
+       for them to use.  */
+    struct
+    {
+      struct lval_funcs *funcs; /* Functions to call.  */
+      void *closure;            /* Closure for those functions to use.  */
+    } computed;
   } location;
 
   /* Describes offset of a value within lval of a structure in bytes.
@@ -294,6 +303,20 @@ value_remove_from_list (struct value **head, struct value *val)
       }
 }
 
+struct value *
+allocate_computed_value (struct type *type,
+                         struct lval_funcs *funcs,
+                         void *closure)
+{
+  struct value *v = allocate_value (type);
+  VALUE_LVAL (v) = lval_computed;
+  v->location.computed.funcs = funcs;
+  v->location.computed.closure = closure;
+  set_value_lazy (v, 1);
+
+  return v;
+}
+
 /* Accessor methods.  */
 
 struct value *
@@ -458,6 +481,22 @@ set_value_pointed_to_offset (struct value *value, int val)
   value->pointed_to_offset = val;
 }
 
+struct lval_funcs *
+value_computed_funcs (struct value *v)
+{
+  gdb_assert (VALUE_LVAL (v) == lval_computed);
+
+  return v->location.computed.funcs;
+}
+
+void *
+value_computed_closure (struct value *v)
+{
+  gdb_assert (VALUE_LVAL (v) == lval_computed);
+
+  return v->location.computed.closure;
+}
+
 enum lval_type *
 deprecated_value_lval_hack (struct value *value)
 {
@@ -513,11 +552,20 @@ value_free (struct value *val)
 {
   if (val)
     {
-      xfree (val->contents);
       type_decref (val->type);
       type_decref (val->enclosing_type);
-      xfree (val);
+
+      if (VALUE_LVAL (val) == lval_computed)
+	{
+	  struct lval_funcs *funcs = val->location.computed.funcs;
+
+	  if (funcs->free_closure)
+	    funcs->free_closure (val);
+	}
+
+      xfree (val->contents);
     }
+  xfree (val);
 }
 
 /* Free all values allocated since MARK was obtained by value_mark
@@ -631,6 +679,13 @@ value_copy (struct value *arg)
 	      TYPE_LENGTH (value_enclosing_type (arg)));
 
     }
+  if (VALUE_LVAL (val) == lval_computed)
+    {
+      struct lval_funcs *funcs = val->location.computed.funcs;
+
+      if (funcs->copy_closure)
+        val->location.computed.closure = funcs->copy_closure (val);
+    }
   return val;
 }
 
@@ -641,7 +696,16 @@ set_value_component_location (struct value *component, struct value *whole)
     VALUE_LVAL (component) = lval_internalvar_component;
   else
     VALUE_LVAL (component) = VALUE_LVAL (whole);
+
   component->location = whole->location;
+
+  if (VALUE_LVAL (whole) == lval_computed)
+    {
+      struct lval_funcs *funcs = whole->location.computed.funcs;
+
+      if (funcs->copy_closure)
+        component->location.computed.closure = funcs->copy_closure (whole);
+    }
 
   object_address_get_data (value_type (whole), &VALUE_ADDRESS (component));
 }
@@ -864,12 +928,31 @@ create_internalvar (char *name)
   var->name = concat (name, (char *)NULL);
   var->value = allocate_value (builtin_type_void);
   var->endian = gdbarch_byte_order (current_gdbarch);
+  var->make_value = NULL;
   release_value (var->value);
   var->next = internalvars;
   internalvars = var;
   return var;
 }
 
+/* Create an internal variable with name NAME and register FUN as the
+   function that value_of_internalvar uses to create a value whenever
+   this variable is referenced.  NAME should not normally include a
+   dollar sign.  */
+
+struct internalvar *
+create_internalvar_type_lazy (char *name, internalvar_make_value fun)
+{
+  struct internalvar *var;
+  var = (struct internalvar *) xmalloc (sizeof (struct internalvar));
+  var->name = concat (name, (char *)NULL);
+  var->value = NULL;
+  var->make_value = fun;
+  var->endian = gdbarch_byte_order (current_gdbarch);
+  var->next = internalvars;
+  internalvars = var;
+  return var;
+}
 
 /* Look up an internal variable with name NAME.  NAME should not
    normally include a dollar sign.
@@ -896,11 +979,32 @@ value_of_internalvar (struct internalvar *var)
   int i, j;
   gdb_byte temp;
 
-  val = value_copy (var->value);
-  if (value_lazy (val))
-    value_fetch_lazy (val);
-  VALUE_LVAL (val) = lval_internalvar;
-  VALUE_INTERNALVAR (val) = var;
+  if (var->make_value != NULL)
+    val = (*var->make_value) (var);
+  else
+    {
+      val = value_copy (var->value);
+      if (value_lazy (val))
+	value_fetch_lazy (val);
+
+      /* If the variable's value is a computed lvalue, we want
+	 references to it to produce another computed lvalue, where
+	 referencces and assignments actually operate through the
+	 computed value's functions.
+
+	 This means that internal variables with computed values
+	 behave a little differently from other internal variables:
+	 assignments to them don't just replace the previous value
+	 altogether.  At the moment, this seems like the behavior we
+	 want.  */
+      if (var->value->lval == lval_computed)
+	VALUE_LVAL (val) = lval_computed;
+      else
+	{
+	  VALUE_LVAL (val) = lval_internalvar;
+	  VALUE_INTERNALVAR (val) = var;
+	}
+    }
 
   /* Values are always stored in the target's byte order.  When connected to a
      target this will most likely always be correct, so there's normally no
@@ -1032,7 +1136,8 @@ preserve_values (struct objfile *objfile)
 	preserve_one_value (cur->values[i], objfile, copied_types);
 
   for (var = internalvars; var; var = var->next)
-    preserve_one_value (var->value, objfile, copied_types);
+    if (var->value)
+      preserve_one_value (var->value, objfile, copied_types);
 
   for (val = values_in_python; val; val = val->next)
     preserve_one_value (val, objfile, copied_types);
@@ -1752,8 +1857,7 @@ value_from_contents_and_address (struct type *type,
   else
     memcpy (value_contents_raw (v), valaddr, TYPE_LENGTH (type));
   VALUE_ADDRESS (v) = address;
-  if (address != 0)
-    VALUE_LVAL (v) = lval_memory;
+  VALUE_LVAL (v) = lval_memory;
   return v;
 }
 

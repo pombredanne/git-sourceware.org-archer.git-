@@ -1,7 +1,7 @@
 /* Ada language support routines for GDB, the GNU debugger.  Copyright (C)
 
-   1992, 1993, 1994, 1997, 1998, 1999, 2000, 2003, 2004, 2005, 2007
-   Free Software Foundation, Inc.
+   1992, 1993, 1994, 1997, 1998, 1999, 2000, 2003, 2004, 2005, 2007, 2008,
+   2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -6877,7 +6877,15 @@ ada_template_to_fixed_record_type_1 (struct type *type,
       else if (is_dynamic_field (type, f))
         {
           if (dval0 == NULL)
-            dval = value_from_contents_and_address (rtype, valaddr, address);
+	    {
+	      /* rtype's length is computed based on the run-time
+		 value of discriminants.  If the discriminants are not
+		 initialized, the type size may be completely bogus and
+		 GDB may fail to allocate a value for it. So check the
+		 size first before creating the value.  */
+	      check_size (rtype);
+	      dval = value_from_contents_and_address (rtype, valaddr, address);
+	    }
           else
             dval = dval0;
 
@@ -11056,6 +11064,7 @@ const struct language_defn ada_language_defn = {
   ada_language_arch_info,
   ada_print_array_index,
   default_pass_by_reference,
+  c_get_string,
   LANG_MAGIC
 };
 

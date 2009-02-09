@@ -1,3 +1,149 @@
+2009-02-08  John David Anglin  <dave.anglin@nrc-cnrc.gc.ca>
+
+	* elf64-hppa.c: Remove PARAMS macro.  Replace PTR with void *.  Convert
+	functions to C90.
+	* elf64-hppa.h: Likewise.
+
+2009-02-06  Joseph Myers  <joseph@codesourcery.com>
+
+	* elfxx-mips.c (_bfd_mips_elf_section_processing): Remove special
+	.sbss handling.
+
+2009-02-04  Alan Modra  <amodra@bigpond.net.au>
+
+	* elf32-spu.c (spu_elf_build_stubs): Define __icache_neg_log2_linesize.
+	Define __icache_ptr_handler*, not __icache_ptr___icache_bi_handler*.
+
+2009-02-03  Sandip Matte  <sandip@rmicorp.com>
+
+	* aoutx.h (NAME (aout, machine_type)): Handle bfd_mach_mips_xlr.
+	* archures.c (bfd_mach_mips_xlr): Define.
+	* bfd-in2.h: Regenerate.
+	* cpu-mips.c (I_xlr): Define.
+	(arch_info_struct): Add XLR entry.
+	* elfxx-mips.c (_bfd_elf_mips_mach): Handle E_MIPS_MACH_XLR.
+	(mips_set_isa_flags): Handle bfd_mach_mips_xlr
+	(mips_mach_extensions): Add XLR entry.
+
+2009-02-03  Eric B. Weddington  <eric.weddington@atmel.com>
+
+	* elf32-avr.c (avr_final_link_relocate): Allow avr25 to wraparound.
+
+2009-02-03  Carlos O'Donell  <carlos@codesourcery.com>
+
+	* configure.in: AC_SUBST pdfdir.
+	* Makefile.am: Add install-pdf, install-pdf-am 
+	and install-pdf-recursive targets. Define pdfdir.
+	* doc/Makefile.am: Define pdf__strip_dir. Add
+	install-pdf and install-pdf-am targets.
+	* po/Make-in: Add install-pdf target. 
+	* configure: Regenerate.
+	* Makefile.in: Regenerate
+	* doc/Makefile.in: Regenerate.
+
+2009-02-03  Maxim Kuvyrkov  <maxim@codesourcery.com>
+
+	* bfd-in2.h: Regenerate.
+	* elf32-m68k.c: Handle 2-slot GOT entries.  Rename variables and
+	fields from n_entries to n_slots where appropriate, update comments.
+	(HOWTO): Add TLS relocations.
+	(reloc_map): Map BFD_RELOC_68K_TLS_* to R_68K_TLS_*.
+	(enum elf_m68k_got_offset_size): New enum.
+	(struct elf_m68k_got_entry.type): Move field to ...
+	(struct elf_m68k_got_entry_key): ... here.  Update all uses.
+	(elf_m68k_reloc_got_type, elf_m68k_reloc_got_offset_size): New static
+	functions.
+	(elf_m68k_reloc_got_n_entries, elf_m68k_reloc_tls_p): New static
+	functions.
+	(struct elf_m68k_got): merge rel_8o_n_entries and rel_8o_16o_n_entries
+	fields into n_entries array.  Update comments.
+	(elf_m68k_init_got): Simplify, update all uses.
+	(elf_m68k_init_got_entry_key): Handle R_68K_TLS_LDM32 reloc, update.
+	(ELF_M68K_REL_8O_MAX_N_ENTRIES_IN_GOT): Adjust to handle 2-slot
+	GOT entries; update name, update all uses.
+	(ELF_M68K_REL_8O_16O_MAX_N_ENTRIES_IN_GOT): Ditto.
+	(elf_m68k_get_got_entry): Update.
+	(elf_m68k_update_got_entry_type): Rewrite to handle TLS GOT entries,
+	simplify.
+	(elf_m68k_remove_got_entry_type): Simplify.
+	(elf_m68k_add_entry_to_got, elf_m68k_can_merge_gots_1): Update.
+	(elf_m68k_can_merge_gots): Update.
+	(elf_m68k_merge_gots_1, elf_m68k_merge_gots): Update.
+	(struct elf_m68k_finalize_got_offsets_arg): Rewrite to handle 2-slot
+	GOT entries, simplify.
+	(elf_m68k_finalize_got_offsets_1, elf_m68k_finalize_got_offsets): Same.
+	(struct elf_m68k_partition_multi_got_arg): Add slots_relas_diff
+	field, remove obsoleted local_n_entries field.
+	(elf_m68k_partition_multi_got_2): New static function.
+	(elf_m68k_partition_multi_got_1, elf_m68k_partition_multi_got): Use it;
+	update.
+	(elf_m68k_remove_got_entry_type): Update.
+	(elf_m68k_install_rela, dtpoff_base, tpoff): New static functions.
+	(elf_m68k_check_relocs): Handle TLS relocations.  Remove unnecessary 
+	update of sgot->size and srelgot->size.
+	(elf_m68k_gc_sweep_hook): Update.
+	(elf_m68k_install_rela, dtpoff_base, tpoff): New static functions.
+	(elf_m68k_relocate_section, elf_m68k_finish_dynamic_symbol): Handle
+	TLS relocations.
+	* reloc.c (BFD_RELOC_68K_TLS_*): Declare TLS relocations.
+	* libbfd.h (bfd_reloc_code_real_names): Add BFD_RELOC_68K_TLS_*.
+
+2009-02-02  DJ Delorie  <dj@redhat.com>
+
+	* elf32-mep.c (config_names): Regenerate configuration.
+
+2009-02-02  Alan Modra  <amodra@bigpond.net.au>
+
+	* elf-bfd.h (bfd_elf_get_str_section): Don't declare.
+	(bfd_elf_find_section, _sh_elf_set_mach_from_flags): Likewise.
+	* elf.c (bfd_elf_get_str_section): Make static.
+	(bfd_elf_find_section): Delete.
+	* libbfd.h: Regenerate.
+
+2009-02-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* elf-eh-frame.c (REQUIRE_CLEARED_RELOCS) Remove.
+	(_bfd_elf_parse_eh_frame): Do not check relocations for removed FDEs.
+
+2009-01-31  Alan Modra  <amodra@bigpond.net.au>
+
+	* elflink.c (on_needed_list): New function.
+	(elf_link_add_object_symbols): Link in --as-needed libs if they
+	satisfy undefined symbols in other libs.
+
+2009-01-30  Julian Brown  <julian@codesourcery.com>
+
+	* elf32-arm.c (bfd_elf32_arm_vfp11_erratum_scan): Skip BFDs with
+	EXEC_P or DYNAMIC flags, and skip sections which are being linked
+	with --just-symbols (-R).
+
+2009-01-29  Adam Nemet  <anemet@caviumnetworks.com>
+
+	* dwarf2.c (read_rangelist): Use read_address to read low_pc and
+	high_pc in order to properly sign-extend VMAs.
+
+2009-01-29  Daniel Jacobowitz  <dan@codesourcery.com>
+            Mark Shinwell  <shinwell@codesourcery.com>
+            Catherine Moore  <clm@codesourcery.com>
+
+	* elf-attrs.c, elflink.c, elfxx-mips.c: Correct typos in comments.
+
+2009-01-28  Catherine Moore <clm@codesourcery.com>
+
+	* elf32-arm.c (elf32_arm_check_relocs): Set SEC_ALLOC and
+	SEC_LOAD for dynamic relocation sections.
+
+2009-01-27  Hans-Peter Nilsson  <hp@axis.com>
+
+	* elf32-cris.c (cris_elf_relocate_section): Use elf_hash_table
+	(info)->tls_size, not elf_hash_table (info)->tls_sec->size for
+	the size of local TLS data.
+
+2009-01-27  Andreas Schwab  <schwab@suse.de>
+
+	* mach-o.c (bfd_mach_o_archive_p): Restrict the number of
+	architectures in the archive.
+
 2009-01-27  Hans-Peter Nilsson  <hp@axis.com>
 
 	* elf32-cris.c (cris_elf_relocate_section) <case R_CRIS_16_DTPREL>

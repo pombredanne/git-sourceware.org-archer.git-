@@ -792,6 +792,8 @@ value_fetch_lazy (struct value *val)
 	 watchpoints from trying to watch the saved frame pointer.  */
       value_free_to_mark (mark);
     }
+  else if (VALUE_LVAL (val) == lval_computed)
+    value_computed_funcs (val)->read (val);
   else
     internal_error (__FILE__, __LINE__, "Unexpected lazy value type.");
 
@@ -960,7 +962,15 @@ value_assign (struct value *toval, struct value *fromval)
 	observer_notify_target_changed (&current_target);
 	break;
       }
-      
+
+    case lval_computed:
+      {
+	struct lval_funcs *funcs = value_computed_funcs (toval);
+
+	funcs->write (toval, fromval);
+      }
+      break;
+
     default:
       error (_("Left operand of assignment is not an lvalue."));
     }
@@ -2244,9 +2254,11 @@ find_overload_match (struct type **arg_types, int nargs,
 
   if (objp)
     {
-      if (TYPE_CODE (value_type (temp)) != TYPE_CODE_PTR
-	  && (TYPE_CODE (value_type (*objp)) == TYPE_CODE_PTR
-	      || TYPE_CODE (value_type (*objp)) == TYPE_CODE_REF))
+      struct type *temp_type = check_typedef (value_type (temp));
+      struct type *obj_type = check_typedef (value_type (*objp));
+      if (TYPE_CODE (temp_type) != TYPE_CODE_PTR
+	  && (TYPE_CODE (obj_type) == TYPE_CODE_PTR
+	      || TYPE_CODE (obj_type) == TYPE_CODE_REF))
 	{
 	  temp = value_addr (temp);
 	}

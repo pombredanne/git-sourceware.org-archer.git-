@@ -117,9 +117,6 @@ static void remote_send (char **buf, long *sizeof_buf_p);
 
 static int readchar (int timeout);
 
-static ptid_t remote_wait (ptid_t ptid,
-			   struct target_waitstatus *status);
-
 static void remote_kill (void);
 
 static int tohex (int nib);
@@ -1001,6 +998,8 @@ enum {
   PACKET_vRun,
   PACKET_QStartNoAckMode,
   PACKET_vKill,
+  PACKET_qXfer_siginfo_read,
+  PACKET_qXfer_siginfo_write,
   PACKET_MAX
 };
 
@@ -2965,6 +2964,10 @@ static struct protocol_feature remote_protocol_features[] = {
     PACKET_QStartNoAckMode },
   { "multiprocess", PACKET_DISABLE, remote_multi_process_feature, -1 },
   { "QNonStop", PACKET_DISABLE, remote_non_stop_feature, -1 },
+  { "qXfer:siginfo:read", PACKET_DISABLE, remote_supported_packet,
+    PACKET_qXfer_siginfo_read },
+  { "qXfer:siginfo:write", PACKET_DISABLE, remote_supported_packet,
+    PACKET_qXfer_siginfo_write },
 };
 
 static void
@@ -4733,7 +4736,8 @@ remote_wait_as (ptid_t ptid, struct target_waitstatus *status)
    STATUS just as `wait' would.  */
 
 static ptid_t
-remote_wait (ptid_t ptid, struct target_waitstatus *status)
+remote_wait (struct target_ops *ops,
+	     ptid_t ptid, struct target_waitstatus *status)
 {
   ptid_t event_ptid;
 
@@ -7325,6 +7329,19 @@ remote_xfer_partial (struct target_ops *ops, enum target_object object,
 				     [PACKET_qXfer_spu_write]);
     }
 
+  /* Handle extra signal info using qxfer packets.  */
+  if (object == TARGET_OBJECT_SIGNAL_INFO)
+    {
+      if (readbuf)
+	return remote_read_qxfer (ops, "siginfo", annex, readbuf, offset, len,
+				  &remote_protocol_packets
+				  [PACKET_qXfer_siginfo_read]);
+      else
+	return remote_write_qxfer (ops, "siginfo", annex, writebuf, offset, len,
+				   &remote_protocol_packets
+				   [PACKET_qXfer_siginfo_write]);
+    }
+
   /* Only handle flash writes.  */
   if (writebuf != NULL)
     {
@@ -7769,7 +7786,7 @@ Fetch and print the remote list of thread identifiers, one pkt only"));
    buffer.  */
 
 static char *
-remote_pid_to_str (ptid_t ptid)
+remote_pid_to_str (struct target_ops *ops, ptid_t ptid)
 {
   static char buf[64];
   struct remote_state *rs = get_remote_state ();
@@ -7800,7 +7817,8 @@ remote_pid_to_str (ptid_t ptid)
    stored at OFFSET within the thread local storage for thread PTID.  */
 
 static CORE_ADDR
-remote_get_thread_local_address (ptid_t ptid, CORE_ADDR lm, CORE_ADDR offset)
+remote_get_thread_local_address (struct target_ops *ops,
+				 ptid_t ptid, CORE_ADDR lm, CORE_ADDR offset)
 {
   if (remote_protocol_packets[PACKET_qGetTLSAddr].support != PACKET_DISABLE)
     {
@@ -8674,15 +8692,6 @@ remote_supports_multi_process (void)
   return remote_multi_process_p (rs);
 }
 
-static int
-extended_remote_can_run (void)
-{
-  if (remote_desc != NULL)
-    return 1;
-
-  return 0;
-}
-
 static void
 init_remote_ops (void)
 {
@@ -8768,7 +8777,6 @@ Specify the serial device it is connected to (e.g. /dev/ttya).";
   extended_remote_ops.to_detach = extended_remote_detach;
   extended_remote_ops.to_attach = extended_remote_attach;
   extended_remote_ops.to_kill = extended_remote_kill;
-  extended_remote_ops.to_can_run = extended_remote_can_run;
 }
 
 static int
@@ -9080,6 +9088,12 @@ Show the maximum size of the address (in bits) in a memory packet."), NULL,
 
   add_packet_config_cmd (&remote_protocol_packets[PACKET_qXfer_osdata],
                         "qXfer:osdata:read", "osdata", 0);
+
+  add_packet_config_cmd (&remote_protocol_packets[PACKET_qXfer_siginfo_read],
+                         "qXfer:siginfo:read", "read-siginfo-object", 0);
+
+  add_packet_config_cmd (&remote_protocol_packets[PACKET_qXfer_siginfo_write],
+                         "qXfer:siginfo:write", "write-siginfo-object", 0);
 
   add_packet_config_cmd (&remote_protocol_packets[PACKET_qGetTLSAddr],
 			 "qGetTLSAddr", "get-thread-local-storage-address",
