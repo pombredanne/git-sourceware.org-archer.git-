@@ -821,7 +821,7 @@ convert_value_from_python (PyObject *obj)
 	    }
 	}
       else if (PyObject_TypeCheck (obj, &value_object_type))
-	value = ((value_object *) obj)->value;
+	value = value_copy (((value_object *) obj)->value);
       else
 	PyErr_Format (PyExc_TypeError, _("Could not convert Python object: %s"),
 		      PyString_AsString (PyObject_Str (obj)));

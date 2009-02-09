@@ -1,3 +1,9 @@
+2009-02-08  Jim Blandy  <jimb@red-bean.com>
+
+	* python/python-value.c (convert_value_from_python):
+	Properly hand off GDB values returned by convenience
+	functions.
+
 2009-02-08  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	* python/python-value.c (convert_value_from_python): Change to throw

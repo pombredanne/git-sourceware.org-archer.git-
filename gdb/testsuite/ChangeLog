@@ -1,3 +1,8 @@
+2009-02-08  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.python/python-function.exp: Add test for function returning
+	a GDB value.
+
 2009-02-01  Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	* gdb.python/python-cmd.exp: New file.
