@@ -40,6 +40,8 @@ static void cp_type_print_method_args (struct type *mtype, char *prefix,
 				       char *varstring, int staticp,
 				       struct ui_file *stream);
 
+static void c_type_print_args (struct type *, struct ui_file *);
+
 static void cp_type_print_derivation_info (struct ui_file *, struct type *);
 
 static void c_type_print_varspec_prefix (struct type *, struct ui_file *, int,
@@ -197,23 +199,6 @@ cp_type_print_method_args (struct type *mtype, char *prefix, char *varstring,
     fprintf_filtered (stream, "void");
 
   fprintf_filtered (stream, ")");
-
-  /* For non-static methods, read qualifiers from the type of
-     THIS.  */
-  if (!staticp)
-    {
-      struct type *domain;
-
-      gdb_assert (nargs > 0);
-      gdb_assert (TYPE_CODE (args[0].type) == TYPE_CODE_PTR);
-      domain = TYPE_TARGET_TYPE (args[0].type);
-
-      if (TYPE_CONST (domain))
-	fprintf_filtered (stream, " const");
-
-      if (TYPE_VOLATILE (domain))
-	fprintf_filtered (stream, " volatile");
-    }
 }
 
 
@@ -369,12 +354,10 @@ c_type_print_modifier (struct type *type, struct ui_file *stream,
 
 /* Print out the arguments of TYPE, which should have TYPE_CODE_METHOD
    or TYPE_CODE_FUNC, to STREAM.  Artificial arguments, such as "this"
-   in non-static methods, are displayed if SHOW_ARTIFICIAL is
-   non-zero.  */
+   in non-static methods, are displayed.  */
 
-void
-c_type_print_args (struct type *type, struct ui_file *stream,
-		   int show_artificial)
+static void
+c_type_print_args (struct type *type, struct ui_file *stream)
 {
   int i, len;
   struct field *args;
@@ -386,9 +369,6 @@ c_type_print_args (struct type *type, struct ui_file *stream,
 
   for (i = 0; i < TYPE_NFIELDS (type); i++)
     {
-      if (TYPE_FIELD_ARTIFICIAL (type, i) && !show_artificial)
-	continue;
-
       if (printed_any)
 	{
 	  fprintf_filtered (stream, ", ");
@@ -612,7 +592,7 @@ c_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
       if (passed_a_ptr)
 	fprintf_filtered (stream, ")");
       if (!demangled_args)
-	c_type_print_args (type, stream, 1);
+	c_type_print_args (type, stream);
       c_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream, show,
 				   passed_a_ptr, 0);
       break;

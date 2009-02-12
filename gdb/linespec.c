@@ -842,32 +842,12 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
     }
   else if (paren_pointer != NULL)
     {
-      /* We need to deal with method and function overloads
-	 with no parameters. Gdb and gcc (and who knows about other
-	 compilers) are very inconsistent with the keyword "void".
-	 Canonicalizing C++ types is insufficient in this case, since
-	 we still need to enforce the presence (or lack thereof) of
-	 "void". For simplicity, omit the keyword "void" if present. */
-      if (strncmp (paren_pointer - 5, "(void)", 6) == 0)
-	{
-	  char *a, *b;
-	  a = paren_pointer - 4;
-	  b = paren_pointer;
-	  while ((*(a++) = *(b++)) != '\0') ;
-	  *a = '\0';
-	  p = paren_pointer - 3;
-	}
-      else
-	p = paren_pointer + 1;
+      p = paren_pointer + 1;
     }
   else
     {
       p = skip_quoted (*argptr);
     }
-
-  /* Make sure we keep important kewords like "const" */
-  if (strncmp (p, " const", 6) == 0)
-    p += 6;
 
   copy = (char *) alloca (p - *argptr + 1);
   memcpy (copy, *argptr, p - *argptr);

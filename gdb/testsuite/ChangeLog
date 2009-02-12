@@ -1,45 +1,39 @@
-2009-02-02  Keith Seitz  <keiths@redhat.com>
+2009-02-02  Tom Tromey  <tromey@redhat.com>
 
-	From Daniel Jacobowitz  <dan@codesourcery.com>:
-	PR gdb/931
-	* gdb.cp/gdb1355.exp (f_li, f_lui, f_si, f_sui): Allow canonical
-	output.
-	* gdb.cp/templates.exp: Allow canonical output.  Remove KFAILs
-	for gdb/931.
+	* gdb.cp/cpcompletion.exp: Name the test "pr9594".
+	* gdb.cp/pr2489.cc: Rename...
+	* gdb.cp/pr9594.cc: ... to this.
 
-2009-01-29  Keith Seitz  <keiths@redhat.com>
+2009-02-02  Tom Tromey  <tromey@redhat.com>
 
-	Based overwhelmingly on work from
-	Daniel Jacobowitz  <dan@codsourcery.org>:
-	* gdb.cp/cplusfuncs.cc (dm_type_short): New function.
-	(dm_type_long): New function.
-	(dm_type_unsigned_short): New function.
-	(dm_type_unsigned_long): New function.
-	(dm_type_typedef): New function.
-	(myint): New typedef.
-	* gdb.cp/cplusfuncs.exp: Add globals for new functions.
-	(probe_demangler): Add new char* conversion operator test.
-	Add regexp for dm_type_long_star fro GCC v3 and GDB's type printer.
-	Add tests for the new functions. Add test to detect whether
-	using v2/v3 demanglers or GDB's type printer.
-	(test_lookup_operator_functions): The conversion operator's proper
-	name is dm_operator_char_star_quoted, not dm_type_char_star_quoted.
-	(test_paddr_operator_functions): Ditto.
-	(test_paddr_overloaded_functions): Replace string literals
-	"unsigned short" et al with variable substitutions.
-	(test_paddr_hairy_functions): Add results for GDB's type printer.
-	* gdb.cp/member-ptr.cc (class Diamond): Add public member "func_ptr".
-	(Diamond::func): New function.
-	(Diamond::main): Initialize "func_ptr". Initialize a pointer to
-	data member which points to a function.
-	* gdb.cp/member-ptr.exp: Add tests for dealing with member
-	pointers to function pointers et al.
-	* gdb.cp/overload.exp: "short" and "long", and their unsigned
-	versions, may be followed by "int".
-	* gdb.cp/olvdbreak.exp: Rewrite super-duper-mega-long string
-	into something more managable with the "append" command.
-	"info break" might show main with "(void)". It might also
-	show "long" and "short" (and unsigned versions) with "int".
+	* gdb.cp/Makefile.in (EXECUTABLES): Add pr2489.
+	* gdb.cp/pr2489.cc: New file.
+	* gdb.cp/cpcompletion.exp: New file.
+
+2009-02-02  Tom Tromey  <tromey@redhat.com>
+
+	PR exp/9059:
+	* gdb.cp/call-c.exp: Add regression test.
+	* gdb.cp/call-c.cc (FooHandle): New typedef.
+	(main): New variable 'handle'.
+
+2009-01-30  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* lib/mi-support.exp (et_mi_thread_list)
+	(check_mi_and_console_threads): Adjust for current thread in
+	-thread-list-ids output.
+
+2009-01-30  Vladimir Prus  <vladimir@codesourcery.com>
+
+    	* gdb.mi/mi-break.exp (test_disabled_creation): New.
+    	Call it.
+
+2009-01-28  Doug Evans  <dje@google.com>
+
+	* gdb.arch/amd64-disp-step.S: New file.
+	* gdb.arch/amd64-disp-step.exp: New file.
+	* gdb.arch/i386-disp-step.S: New file.
+	* gdb.arch/i386-disp-step.exp: New file.
 
 2009-01-27  Pierre Muller  <muller@ics.u-strasbg.fr>
 

@@ -378,7 +378,6 @@ extern struct value *value_struct_elt (struct value **argp,
 
 extern struct value *value_aggregate_elt (struct type *curtype,
 					  char *name,
-					  struct type *expect_type,
 					  int want_address,
 					  enum noside noside);
 

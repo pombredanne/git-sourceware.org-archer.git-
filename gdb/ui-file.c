@@ -22,7 +22,6 @@
 
 #include "defs.h"
 #include "ui-file.h"
-#include "gdb_obstack.h"
 #include "gdb_string.h"
 
 #include <errno.h>
@@ -264,7 +263,7 @@ set_ui_file_data (struct ui_file *file, void *data,
 }
 
 /* ui_file utility function for converting a ``struct ui_file'' into
-   a memory buffer. */
+   a memory buffer''. */
 
 struct accumulated_ui_file
 {
@@ -297,23 +296,6 @@ ui_file_xstrdup (struct ui_file *file,
     acc.buffer = xstrdup ("");
   *length = acc.length;
   return acc.buffer;
-}
-
-static void
-do_ui_file_obsavestring (void *context, const char *buffer, long length)
-{
-  struct obstack *obstack = (struct obstack *) context;
-  obstack_grow (obstack, buffer, length);
-}
-
-char *
-ui_file_obsavestring (struct ui_file *file, struct obstack *obstack,
-		      long *length)
-{
-  ui_file_put (file, do_ui_file_obsavestring, obstack);
-  *length = obstack_object_size (obstack);
-  obstack_1grow (obstack, '\0');
-  return obstack_finish (obstack);
 }
 
 /* A pure memory based ``struct ui_file'' that can be used an output

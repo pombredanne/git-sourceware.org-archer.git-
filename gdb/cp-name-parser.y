@@ -1,6 +1,7 @@
 /* YACC parser for C++ names, for GDB.
 
-   Copyright (C) 2003, 2004, 2005, 2007, 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 2003, 2004, 2005, 2007, 2008, 2009
+   Free Software Foundation, Inc.
 
    Parts of the lexer are based on c-exp.y from GDB.
 
@@ -499,7 +500,7 @@ operator	:	OPERATOR NEW
 		|	OPERATOR ARROW
 			{ $$ = make_operator ("->", 2); }
 		|	OPERATOR '(' ')'
-			{ $$ = make_operator ("()", 2); }
+			{ $$ = make_operator ("()", 0); }
 		|	OPERATOR '[' ']'
 			{ $$ = make_operator ("[]", 2); }
 		;

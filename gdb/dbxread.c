@@ -1,6 +1,6 @@
 /* Read dbx symbol tables and convert to internal format, for GDB.
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2008, 2009.
+   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2008.
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -1198,8 +1198,6 @@ read_dbx_symtab (struct objfile *objfile)
   bfd *abfd;
   int textlow_not_set;
   int data_sect_index;
-  char *sym_name;
-  int sym_len;
 
   /* Current partial symtab */
   struct partial_symtab *pst;
@@ -1683,28 +1681,6 @@ pos %d"),
 	  if (!p)
 	    continue;			/* Not a debugging symbol.   */
 
-	  sym_len = 0;
-	  if (psymtab_language == language_cplus)
-	    {
-	      char *new_name, *name = alloca (p - namestring + 1);
-	      memcpy (name, namestring, p - namestring);
-	      name[p - namestring] = '\0';
-	      new_name = cp_canonicalize_string (name);
-	      if (new_name != NULL)
-		{
-		  sym_len = strlen (new_name);
-		  sym_name = obsavestring (new_name, sym_len,
-					   &objfile->objfile_obstack);
-		  xfree (new_name);
-		}
-	    }
-
-	  if (sym_len == 0)
-	    {
-	      sym_name = namestring;
-	      sym_len = p - namestring;
-	    }
-
 	  /* Main processing section for debugging symbols which
 	     the initial read through the symbol tables needs to worry
 	     about.  If we reach this point, the symbol which we are
@@ -1722,7 +1698,7 @@ pos %d"),
 		namestring = gdbarch_static_transform_name (gdbarch,
 							    namestring);
 
-	      add_psymbol_to_list (sym_name, sym_len,
+	      add_psymbol_to_list (namestring, p - namestring,
 				   VAR_DOMAIN, LOC_STATIC,
 				   &objfile->static_psymbols,
 				   0, nlist.n_value,
@@ -1734,7 +1710,7 @@ pos %d"),
 					 data_sect_index);
 	      /* The addresses in these entries are reported to be
 		 wrong.  See the code that reads 'G's for symtabs. */
-	      add_psymbol_to_list (sym_name, sym_len,
+	      add_psymbol_to_list (namestring, p - namestring,
 				   VAR_DOMAIN, LOC_STATIC,
 				   &objfile->global_psymbols,
 				   0, nlist.n_value,
@@ -1752,7 +1728,7 @@ pos %d"),
 		  || (p == namestring + 1
 		      && namestring[0] != ' '))
 		{
-		  add_psymbol_to_list (sym_name, sym_len,
+		  add_psymbol_to_list (namestring, p - namestring,
 				       STRUCT_DOMAIN, LOC_TYPEDEF,
 				       &objfile->static_psymbols,
 				       nlist.n_value, 0,
@@ -1760,7 +1736,7 @@ pos %d"),
 		  if (p[2] == 't')
 		    {
 		      /* Also a typedef with the same name.  */
-		      add_psymbol_to_list (sym_name, sym_len,
+		      add_psymbol_to_list (namestring, p - namestring,
 					   VAR_DOMAIN, LOC_TYPEDEF,
 					   &objfile->static_psymbols,
 					   nlist.n_value, 0,
@@ -1773,7 +1749,7 @@ pos %d"),
 	    case 't':
 	      if (p != namestring)	/* a name is there, not just :T... */
 		{
-		  add_psymbol_to_list (sym_name, sym_len,
+		  add_psymbol_to_list (namestring, p - namestring,
 				       VAR_DOMAIN, LOC_TYPEDEF,
 				       &objfile->static_psymbols,
 				       nlist.n_value, 0,
@@ -1853,7 +1829,7 @@ pos %d"),
 
 	    case 'c':
 	      /* Constant, e.g. from "const" in Pascal.  */
-	      add_psymbol_to_list (sym_name, sym_len,
+	      add_psymbol_to_list (namestring, p - namestring,
 				   VAR_DOMAIN, LOC_CONST,
 				   &objfile->static_psymbols, nlist.n_value,
 				   0, psymtab_language, objfile);
@@ -1917,7 +1893,7 @@ pos %d"),
 		  pst->textlow = nlist.n_value;
 		  textlow_not_set = 0;
 		}
-	      add_psymbol_to_list (sym_name, sym_len,
+	      add_psymbol_to_list (namestring, p - namestring,
 				   VAR_DOMAIN, LOC_BLOCK,
 				   &objfile->static_psymbols,
 				   0, nlist.n_value,
@@ -1985,7 +1961,7 @@ pos %d"),
 		  pst->textlow = nlist.n_value;
 		  textlow_not_set = 0;
 		}
-	      add_psymbol_to_list (sym_name, sym_len,
+	      add_psymbol_to_list (namestring, p - namestring,
 				   VAR_DOMAIN, LOC_BLOCK,
 				   &objfile->global_psymbols,
 				   0, nlist.n_value,
