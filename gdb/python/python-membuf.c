@@ -165,7 +165,13 @@ get_seg_count (PyObject *self, Py_ssize_t *lenp)
 Py_ssize_t
 get_char_buffer (PyObject *self, Py_ssize_t segment, char **ptrptr)
 {
-  return get_char_buffer (self, segment, ptrptr);
+  void *ptr;
+  Py_ssize_t ret;
+
+  ret = get_read_buffer (self, segment, &ptr);
+  *ptrptr = (char *) ptr;
+
+  return ret;
 }
 
 /* Python doesn't provide a decent way to get compatibility here.  */
