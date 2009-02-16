@@ -1167,6 +1167,20 @@ extern int target_search_memory (CORE_ADDR start_addr,
                                  ULONGEST pattern_len,
                                  CORE_ADDR *found_addrp);
 
+/* Utility functions which can be used by search_memory implementations.  */
+
+void allocate_pattern_buffer (char **pattern_bufp, char **pattern_buf_end,
+			      ULONGEST *pattern_buf_size);
+
+void increase_pattern_buffer (char **pattern_bufp, char **pattern_buf_end,
+			      ULONGEST *pattern_buf_size, int val_bytes);
+
+int search_memory (CORE_ADDR *start_addr, ULONGEST *search_space_len,
+		   const char *pattern_buf, ULONGEST pattern_len,
+		   CORE_ADDR *found_addr);
+
+void put_bits (bfd_uint64_t data, char *buf, int bits, bfd_boolean big_p);
+
 /* Command logging facility.  */
 
 #define target_log_command(p)						\

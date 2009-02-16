@@ -26,7 +26,7 @@
 
 /* Copied from bfd_put_bits.  */
 
-static void
+void
 put_bits (bfd_uint64_t data, char *buf, int bits, bfd_boolean big_p)
 {
   int i;
@@ -44,6 +44,41 @@ put_bits (bfd_uint64_t data, char *buf, int bits, bfd_boolean big_p)
     }
 }
 
+/* Allocates a buffer in *PATTERN_BUF, with a hard-coded initial size which
+   will be returned in *PATTERN_BUF_SIZE. *PATTERN_BUF_END points to the same
+   place as *PATTERN_BUF, indicating that the buffer is initially empty.  */
+
+void
+allocate_pattern_buffer (char **pattern_buf, char **pattern_buf_end,
+			 ULONGEST *pattern_buf_size)
+{
+#define INITIAL_PATTERN_BUF_SIZE 100
+  *pattern_buf_size = INITIAL_PATTERN_BUF_SIZE;
+  *pattern_buf = xmalloc (*pattern_buf_size);
+  *pattern_buf_end = *pattern_buf;
+}
+
+/* Grows *PATTERN_BUF by a factor of two if it's not large enough to hold
+   VAL_BYTES more bytes  or a 64-bit value, whichever is larger.
+   *PATTERN_BUF_END is updated as necessary.  */
+
+void
+increase_pattern_buffer (char **pattern_buf, char **pattern_buf_end,
+			 ULONGEST *pattern_buf_size, int val_bytes)
+{
+    /* Keep it simple and assume size == 'g' when watching for when we
+       need to grow the pattern buf.  */
+    if ((*pattern_buf_end - *pattern_buf + max (val_bytes, sizeof (int64_t)))
+	> *pattern_buf_size)
+      {
+	size_t current_offset = *pattern_buf_end - *pattern_buf;
+
+	*pattern_buf_size *= 2;
+	*pattern_buf = xrealloc (*pattern_buf, *pattern_buf_size);
+	*pattern_buf_end = *pattern_buf + current_offset;
+      }
+}
+
 /* Subroutine of find_command to simplify it.
    Parse the arguments of the "find" command.  */
 
@@ -59,8 +94,7 @@ parse_find_args (char *args, ULONGEST *max_countp,
   char *pattern_buf;
   /* Current size of search pattern buffer.
      We realloc space as needed.  */
-#define INITIAL_PATTERN_BUF_SIZE 100
-  ULONGEST pattern_buf_size = INITIAL_PATTERN_BUF_SIZE;
+  ULONGEST pattern_buf_size;
   /* Pointer to one past the last in-use part of pattern_buf.  */
   char *pattern_buf_end;
   ULONGEST pattern_len;
@@ -74,8 +108,7 @@ parse_find_args (char *args, ULONGEST *max_countp,
   if (args == NULL)
     error (_("Missing search parameters."));
 
-  pattern_buf = xmalloc (pattern_buf_size);
-  pattern_buf_end = pattern_buf;
+  allocate_pattern_buffer (&pattern_buf, &pattern_buf_end, &pattern_buf_size);
   old_cleanups = make_cleanup (free_current_contents, &pattern_buf);
 
   /* Get search granularity and/or max count if specified.
@@ -172,16 +205,8 @@ parse_find_args (char *args, ULONGEST *max_countp,
       v = parse_to_comma_and_eval (&s);
       val_bytes = TYPE_LENGTH (value_type (v));
 
-      /* Keep it simple and assume size == 'g' when watching for when we
-	 need to grow the pattern buf.  */
-      if ((pattern_buf_end - pattern_buf + max (val_bytes, sizeof (int64_t)))
-	  > pattern_buf_size)
-	{
-	  size_t current_offset = pattern_buf_end - pattern_buf;
-	  pattern_buf_size *= 2;
-	  pattern_buf = xrealloc (pattern_buf, pattern_buf_size);
-	  pattern_buf_end = pattern_buf + current_offset;
-	}
+      increase_pattern_buffer (&pattern_buf, &pattern_buf_end,
+			       &pattern_buf_size, val_bytes);
 
       if (size != '\0')
 	{
@@ -236,6 +261,45 @@ parse_find_args (char *args, ULONGEST *max_countp,
   discard_cleanups (old_cleanups);
 }
 
+/* Drives target_search_memory to sweep through the specified search space,
+   possibly in several iterations (with one call to this function for each
+   iteration).  *START_ADDR is the address where the search starts, and is
+   updated to the next starting address to continue the search.
+   *SEARCH_SPACE_LEN is the amount of bytes which will be searched, and is
+   updated for the next iteration. PATTERN_BUF holds the pattern to be searched
+   for, PATTERN_LEN is the size of the pattern in bytes.  If a match is found,
+   it's address is put in *FOUND_ADDR.
+
+   Returns 1 if found, 0 if not found, and -1 if there was an error requiring
+   halting of the search (e.g. memory read error).  */
+
+int
+search_memory (CORE_ADDR *start_addr, ULONGEST *search_space_len,
+	       const char *pattern_buf, ULONGEST pattern_len,
+	       CORE_ADDR *found_addr)
+{
+  /* Offset from start of this iteration to the next iteration.  */
+  ULONGEST next_iter_incr;
+  int found;
+    
+  found = target_search_memory (*start_addr, *search_space_len,
+				pattern_buf, pattern_len, found_addr);
+  if (found <= 0)
+    return found;
+
+  /* Begin next iteration at one byte past this match.  */
+  next_iter_incr = (*found_addr - *start_addr) + 1;
+
+  /* For robustness, we don't let search_space_len go -ve here.  */
+  if (*search_space_len >= next_iter_incr)
+    *search_space_len -= next_iter_incr;
+  else
+    *search_space_len = 0;
+  *start_addr += next_iter_incr;
+
+  return found;
+}
+
 static void
 find_command (char *args, int from_tty)
 {
@@ -264,12 +328,11 @@ find_command (char *args, int from_tty)
   while (search_space_len >= pattern_len
 	 && found_count < max_count)
     {
-      /* Offset from start of this iteration to the next iteration.  */
-      ULONGEST next_iter_incr;
       CORE_ADDR found_addr;
-      int found = target_search_memory (start_addr, search_space_len,
-					pattern_buf, pattern_len, &found_addr);
+      int found;
 
+      found = search_memory (&start_addr, &search_space_len, pattern_buf,
+			     pattern_len, &found_addr);
       if (found <= 0)
 	break;
 
@@ -277,16 +340,6 @@ find_command (char *args, int from_tty)
       printf_filtered ("\n");
       ++found_count;
       last_found_addr = found_addr;
-
-      /* Begin next iteration at one byte past this match.  */
-      next_iter_incr = (found_addr - start_addr) + 1;
-
-      /* For robustness, we don't let search_space_len go -ve here.  */
-      if (search_space_len >= next_iter_incr)
-	search_space_len -= next_iter_incr;
-      else
-	search_space_len = 0;
-      start_addr += next_iter_incr;
     }
 
   /* Record and print the results.  */

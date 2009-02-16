@@ -18280,6 +18280,23 @@ protocol, i.e., a string, an array or the object returned from
 @var{length} determines the number of bytes from @var{buffer} to be written.
 @end defun
 
+@findex gdb.search_memory
+@defun search_memory @var{address} @var{length} @var{pattern} @r{[}@var{size}@r{]} @r{[}@var{max_count}@r{]}
+Search a region of the inferior memory starting at @var{address} with the given
+@var{length}.  @var{pattern} can be a string, a byte array, a buffer object,
+a number, a @code{gdb.Value} object (@pxref{Values From Inferior}) or a list
+or tuple with elements in any combination of those types.  If @var{size} is
+given and is non-zero, it specifies the size in bytes of a Python scalar or
+@code{gdb.Value} in the search pattern.  If @var{size} is zero or not specified,
+ it is taken from the value's type in the current language.
+This is useful when one wants to specify the search
+pattern as a mixture of types.
+Note that this means, for example, that in the case of C-like languages
+a search for an untyped 0x42 will search for @samp{(int) 0x42}
+which is typically four bytes.  @var{max_count} is the highest number of matches
+to search for.
+@end defun
+
 @node Exception Handling
 @subsubsection Exception Handling
 @cindex python exceptions
