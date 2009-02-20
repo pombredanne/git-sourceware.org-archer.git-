@@ -463,7 +463,7 @@ class StdStringPrinter:
 class Tr1HashtableIterator:
     def __init__ (self, hash):
         self.count = 0
-        self.n_buckets = hash['_M_bucket_count']
+        self.n_buckets = hash['_M_element_count']
         if self.n_buckets == 0:
             self.node = False
         else:
@@ -480,11 +480,13 @@ class Tr1HashtableIterator:
         while self.node == 0:
             self.bucket = self.bucket + 1
             self.node = self.bucket[0]
+
+       # If we advanced off the end of the bucket array, then
+       # we're done.
+        if self.count == self.n_buckets:
+            self.node = False
+        else:
             self.count = self.count + 1
-            # If we advanced off the end of the bucket array, then
-            # we're done.
-            if self.count == self.n_buckets:
-                self.node = False
 
     def next (self):
         if not self.node:
