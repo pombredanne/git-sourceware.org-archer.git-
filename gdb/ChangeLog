@@ -1,3 +1,138 @@
+2009-02-20  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* Extend use of i386_use_watchpoints to all i386 native files
+	using hardware watchpoints.
+	go32-nat.c (init_go32_ops): Call i386_use_watchpoints.
+	i386fbsd-nat.c (_initialize_i386fbsd_nat): Ditto.
+	windows-nat.c (init_windows_ops): Ditto.
+	config/i386/nm-cygwin.h: Define I386_WATCHPOINTS_IN_TARGET_VECTOR.
+	config/i386/nm-cygwin64.h: Ditto.
+	config/i386/nm-fbsd.h: Ditto.
+	config/i386/nm-go32.h: Ditto.
+
+
+2009-02-19  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-typeprint.c (ada_typedef_print): Remove.  Unused.
+
+2009-02-18  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* mi/mi-interp.c (mi_solib_loaded, mi_solib_unloaded): New.
+	(mi_interpreter_init): Register the above.
+	* solib.c (clear_solib): Notify solib unload.
+	* breakpoint.c (disable_breakpoints_in_unloaded_shlib): Do not
+	disable breakpoints on a.out targets.
+
+2009-02-17  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* observer.c (observer_test_first_notification_function)
+	(observer_test_second_notification_function)
+	(observer_test_third_notification_function): Adjust prototype.
+
+2009-02-17  Pedro Alves  <pedro@codesourcery.com>
+
+	* Makefile.in (ALL_64_TARGET_OBS): Add amd64-dicos-tdep.o.
+	(ALL_TARGET_OBS): Add dicos-tdep.o.
+	(ALLDEPFILES): Add amd64-dicos-tdep.c and dicos-tdep.c.
+	* configure.tgt (i[34567]86-*-dicos*): Add dicos-tdep.o to
+	gdb_target_obs.
+	(x86_64-*-dicos*): Add dicos-tdep.o and amd64-dicos-tdep.o to
+	gdb_target_obs.
+	* dicos-tdep.h, dicos-tdep.c: New.
+	* amd64-dicos-tdep.c: New.
+	* i386-dicos-tdep.c: Don't include solib.h, solib-target.h or
+	inferior.h.  Include dicos-tdep.h.
+	(i386_dicos_init_abi): Call dicos_init_abi.
+	(i386_dicos_bfd_has_symbol_p): Delete.
+	(i386_dicos_osabi_sniffer): Use dicos_load_module_p.
+
+	* NEWS: Mention x86-64 DICOS target support.
+
+2009-02-16  Doug Evans  <dje@google.com>
+
+	* amd64-tdep.c (amd64_skip_prefixes): Renamed from skip_prefixes.
+	All callers updated.
+	(amd64_get_insn_details): Handle more 3-byte opcode insns.
+	(amd64_breakpoint_p): Delete.
+	(amd64_displaced_step_fixup): When fixing up after stepping an int3,
+	don't back up pc to the start of the int3.
+	* i386-tdep.c: #include opcode/i386.h.
+	(i386_skip_prefixes): New function.
+	(i386_absolute_jmp_p): Constify argument.
+	(i386_absolute_call_p,i386_ret_p,i386_call_p,i386_syscall_p): Ditto.
+	(i386_breakpoint_p): Delete.
+	(i386_displaced_step_fixup): Handle unnecessary or redundant prefixes.
+	When fixing up after stepping an int3, don't back up pc to the start
+	of the int3.
+
+2009-02-16  Pedro Alves  <pedro@codesourcery.com>
+
+	* corelow.c (core_close): Don't hardcode the core's pid.
+	(core_open): Find core threads before calling
+	post_create_inferior.
+	(add_to_thread_list, get_core_register_section): Take into account
+	systems where the regset section names encode the pid of the
+	inferior.
+
+	* gdbarch.sh (core_reg_section_encodes_pid): New gdbarch setting.
+	* gdbarch.h, gdbarch.c: Regenerate.
+
+	* amd64-sol2-tdep.c (amd64_sol2_init_abi): Set it.
+	* i386-sol2-tdep.c (i386_sol2_init_abi): Set it.
+	* sparc-sol2-tdep.c (sparc32_sol2_init_abi): Set it.
+	* sparc64-sol2-tdep.c (sparc64_sol2_init_abi): Set it.
+
+2009-02-14  Vladimir Prus  <vladimir@codesourcery.com>
+
+	Include frame information for *stopped due to CLI commands.
+
+        * ada-tasks.c (ada_normal_stop_observer): Adjust prototype.
+        * infcmd.c (finish_command_continuation): Pass '1' for
+        'print_frame' parameter to the observer.
+        * infrun.c (normal_stop): Don't print mi-specific information
+        here. Pass 'stop_print_frame' to the 'print_frame' parameter
+        of the observer.
+        * mi/mi-interp.c (mi_on_normal_stop): Adjust prototype.
+        If we need to print frame, and current uiout is not the MI one,
+        print frame again.
+
+2009-02-13  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* xtensa-tdep.c (call0_analyze_prologue): Delete BSZ macro.
+	Replace BSZ macro uses by XTENSA_ISA_BSZ macro.
+
+2009-02-12  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR fortran/9806
+	* dwarf2read.c (process_die <DW_TAG_module>, read_module)
+	(scan_partial_symbols <DW_TAG_module>, add_partial_module): New.
+
+2009-02-11  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* dwarf2read.c (read_base_type): Set code to TYPE_CODE_CHAR
+	for DW_ATE_signed_char and DW_ATE_unsigned_char
+	for pascal language.
+
+2009-02-11  Jim Meyering  <meyering@redhat.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Avoid NULL dereference.
+	* stack.c (return_command): Guard use of SYMBOL_TYPE (thisfun).
+	New variable func_type.
+
+2009-02-11  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdbarch.c: Regenerate.
+
+2009-02-10  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* p-lang.c (is_pascal_string_type): Fix comment.
+	Determine exact size of char elements for GPC
+	strings.
+	(pascal_printstr): Handle char width of 2 or 4.
+	* p-valprint.c (pascal_val_print): Handle char
+	of width 2 or 4.
+	
 2009-02-07  Daniel Jacobowitz  <dan@codesourcery.com>
 
 	* dwarf2read.c (dwarf2_build_psymtabs_hard): Move lowpc and highpc
@@ -831,7 +966,7 @@
 	* windows-nat.c: Ditto.
 	(cygwin_load_start): Redefine as CORE_ADDR.
 	(cygwin_load_end): Ditto.
-	(windows_make_so): Coerce result of address arithmetic to to uintptr_t
+	(windows_make_so): Coerce result of address arithmetic to uintptr_t
 	before coercing to CORE_ADDR to avoid a compiler warning.
 	(handle_exception): Define addr as CORE_ADDR and coerce
 	ExceptionAddress to uintptr_t before assigining to avoid a compiler

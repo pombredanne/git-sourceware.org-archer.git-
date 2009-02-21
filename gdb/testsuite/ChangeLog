@@ -1,3 +1,79 @@
+2009-02-18  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/macscp.exp (objfile): Move it to ${objdir}/${subdir}/.
+	(list_and_check_macro): Use more specific test name.
+	(next to definition): Make the test names unique.
+
+2009-02-18  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* gdb.pascal/floats.exp: Accept approximate results everywhere.
+	
+2009-02-17  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* gdb.mi/mi-nonstop.exp (notifs): Adjust for library
+	notifications.
+	* gdb.mi/mi-nsintrall.exp (notifs): Likewise.
+	* gdb.mi/mi-nsmoribund.exp (notifs): Likewise.
+	* lib/mi-support.exp (library_loaded_re): New.
+	(mi_run_cmd, mi_send_resuming_command_raw): Adjust.
+
+2009-02-17  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* gdb.gdb/observer.exp: Use test_notification observer, not
+	normal_stop, everywhere.
+	(test_normal_stop_notifications): Rename to...
+	(test_notifications): ...this.
+	(test_observer_normal_stop): Rename to...
+	(test_observer): ...this.
+
+2009-02-16  Doug Evans  <dje@google.com>
+
+	* gdb.arch/amd64-disp-step.S (test_int3): New test.
+	* gdb.arch/amd64-disp-step.exp (test_int3): New test.
+	* gdb.arch/i386-disp-step.S (test_prefixed_abs_jump): New test.
+	(test_prefixed_syscall,test_int3): New tests.
+	* gdb.arch/i386-disp-step.exp (test_prefixed_abs_jump): New test.
+	(test_prefixed_syscall,test_int3): New tests.
+
+2009-02-14  Vladimir Prus  <vladimir@codesourcery.com>
+
+        * lib/mi-support.exp (mi_expect_stop): Adjust the order of fields.
+        (mi_expect_interrupt): Likewise.
+        * gdb.mi/mi-cli.exp: Check that "step" results in proper *stopped
+        response.
+
+2009-02-14  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* lib/gdb.exp (get_hexadecimal_valueof): New procedure.
+	* gdb.base/pc-fp.exp (get_valueofx): Remove.
+	Replace calls to get_valueofx by get_hexadecimal_valueof.
+
+2009-02-14  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* lib/gdb.exp (get_valueof): Accept anything as a return value.
+	(get_integer_valueof): New procedure.
+	(get_sizeof): Use new get_integer_value_of.
+	* gdb.base/sizeof.exp: Replace all uses of get_valueof
+	by get_integer_valueof.
+
+2009-02-13  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/remote.exp (get_sizeof): Remove.
+	* gdb.base/long_long.exp (get_valueof, get_sizeof): Remove.
+	* gdb.base/dfp-test.exp (get_valueof, get_sizeof): Remove.
+	* gdb.base/sizeof.exp (get_valueof, get_sizeof): Remove.
+	* lib/gdb.exp (get_valueof): Move from long_long.exp.
+	(get_sizeof): Likewise.
+
+2009-02-12  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR fortran/9806
+	* gdb.fortran/module.exp, gdb.fortran/module.f90: New.
+
+2009-02-06  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* gdb.cp/pr9594.cc: Prevent GCC from optimizing 'a' out.
+
 2009-02-06  Pedro Alves  <pedro@codesourcery.com>
 
 	* gdb.base/siginfo-obj.c, gdb.base/siginfo-obj.exp: New.
