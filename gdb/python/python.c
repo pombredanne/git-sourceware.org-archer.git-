@@ -471,14 +471,13 @@ get_search_pattern (PyObject *obj, int size, char **pattern_bufp,
 }
 
 /* Implementation of
-   gdb.search_memory (start_address, length, pattern|list
-		      [, size] [, max_count]).
+   gdb.search_memory (address, length, pattern [, size] [, max_count]).
    The third argument may be either a pattern, or a list or tupple of patterns
    to be searched.  Size is the size in bytes of each search query value, either
    1, 2, 4 or 8.  Returns a list of the addresses where matches were found.  */
 
 PyObject *
-gdbpy_search_memory (PyObject *self, PyObject *args)
+gdbpy_search_memory (PyObject *self, PyObject *args, PyObject *kw)
 {
   int size = 0;
   long length;
@@ -486,13 +485,16 @@ gdbpy_search_memory (PyObject *self, PyObject *args)
   long max_count = 0;
   CORE_ADDR start_addr;
   char *pattern_buf;
+  static char *keywords[] = { "address", "length", "pattern", "size",
+			      "max_count", NULL };
   ULONGEST pattern_len, search_space_len;
   PyObject *pattern, *list = NULL, *start_addr_obj;
   volatile struct gdb_exception except;
 
   /* Assume CORE_ADDR corresponds to unsigned long.  */
-  if (! PyArg_ParseTuple (args, "OlO|il", &start_addr_obj, &length, &pattern,
-			  &size, &max_count))
+  if (! PyArg_ParseTupleAndKeywords (args, kw, "OlO|il", keywords,
+				     &start_addr_obj, &length, &pattern,
+				     &size, &max_count))
     return NULL;
 
   if (!max_count)
@@ -1893,8 +1895,8 @@ Return a buffer object for reading from the inferior's memory." },
   { "write_memory", gdbpy_write_memory, METH_VARARGS,
     "write_memory (address, buffer [, length])\n\
 Write the given buffer object to the inferior's memory." },
-  { "search_memory", gdbpy_search_memory, METH_VARARGS,
-    "search_memory (start_address, length, pattern|list [, size] [, max_count]) -> list\n\
+  { "search_memory", (PyCFunction) gdbpy_search_memory, METH_VARARGS | METH_KEYWORDS,
+    "search_memory (address, length, pattern [, size] [, max_count]) -> list\n\
 Return a list with the addresses where matches were found." },
 
   { "write", gdbpy_write, METH_VARARGS,

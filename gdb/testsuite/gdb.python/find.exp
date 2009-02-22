@@ -107,10 +107,22 @@ gdb_test "py print gdb.search_memory (start_addr, 10+3, 'aaaa')" \
 gdb_test "py print gdb.search_memory (start_addr, 10+3+1, \['a', 'a', 'a', 'a'\])" \
   "${one_pattern_found}" "pattern found at end of range"
 
-# Test max-count with size-char.
+# Test max-count with size, with different parameter position
 
 gdb_test "py print gdb.search_memory (start_addr, length, \[0x61, 0x61\], 1, 1)" \
-  "\[\\r\\n\].${dec_number}L]" "size = 1, max_count = 1"
+  "${one_pattern_found}" "size = 1, max_count = 1"
+
+gdb_test "py print gdb.search_memory (start_addr, length, \[0x61, 0x61\], 1, 2)" \
+  "${two_patterns_found}" "size = 1, max_count = 2, normal ordering"
+
+gdb_test "py print gdb.search_memory (start_addr, length, \[0x61, 0x61\], size = 1, max_count = 2)" \
+  "${two_patterns_found}" "size = 1, max_count = 2, normal ordering, with keywords"
+
+gdb_test "py print gdb.search_memory (start_addr, length, \[0x61, 0x61\], max_count = 2, size = 1)" \
+  "${two_patterns_found}" "size = 1, max_count = 2, inverted ordering"
+
+gdb_test "py print gdb.search_memory (start_addr, length, \['a', 'a'\], max_count = 2)" \
+  "${two_patterns_found}" "max_count = 2, with keyword"
 
 # Test 16-bit pattern.
 
