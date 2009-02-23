@@ -155,10 +155,11 @@ valpy_type (PyObject *self, PyObject *args)
   return type_to_type_object (value_type (value));
 }
 
-/* Return Unicode string with value contents (assumed to be encoded in the
-   target's charset).  */
+/* Implementation of gdb.Value.string ([encoding] [, errors]) -> string
+   Return Unicode string with value contents.  If ENCODING is not given,
+   the string is assumed to be encoded in the target's charset.  */
 static PyObject *
-valpy_string (PyObject *self, PyObject *args)
+valpy_string (PyObject *self, PyObject *args, PyObject *kw)
 {
   int length, ret = 0;
   gdb_byte *buffer;
@@ -169,8 +170,10 @@ valpy_string (PyObject *self, PyObject *args)
   const char *errors = NULL;
   const char *user_encoding = NULL;
   const char *la_encoding = NULL;
+  static char *keywords[] = { "encoding", "errors" };
 
-  if (!PyArg_ParseTuple (args, "|ss", &user_encoding, &errors))
+  if (!PyArg_ParseTupleAndKeywords (args, kw, "|ss", keywords,
+				    &user_encoding, &errors))
     return NULL;
 
   TRY_CATCH (except, RETURN_MASK_ALL)
@@ -915,8 +918,9 @@ static PyMethodDef value_object_methods[] = {
   { "cast", valpy_cast, METH_VARARGS, "Cast the value to the supplied type." },
   { "dereference", valpy_dereference, METH_NOARGS, "Dereferences the value." },
   { "type", valpy_type, METH_NOARGS, "Return type of the value." },
-  { "string", valpy_string, METH_VARARGS,
-    "Return Unicode string representation of the value." },
+  { "string", (PyCFunction) valpy_string, METH_VARARGS | METH_KEYWORDS,
+    "string ([encoding] [, errors]) -> string\n\
+Return Unicode string representation of the value." },
   {NULL}  /* Sentinel */
 };
 

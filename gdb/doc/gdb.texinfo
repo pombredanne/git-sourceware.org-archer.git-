@@ -18431,7 +18431,7 @@ The result @code{bar} will be a @code{gdb.Value} object holding the
 value pointed to by @code{foo}.
 @end defmethod
 
-@defmethod Value string @r{[}encoding @r{[}errors@r{]}@r{]}
+@defmethod Value string @r{[}encoding@r{]} @r{[}errors@r{]}
 If this @code{gdb.Value} represents a string, then this method
 converts the contents to a Python string.  Otherwise, this method will
 throw an exception.
