@@ -770,7 +770,7 @@ matching_obj_sections (struct obj_section *obj_first,
 /* Find which partial symtab contains PC and SECTION starting at psymtab PST.
    We may find a different psymtab than PST.  See FIND_PC_SECT_PSYMTAB.  */
 
-struct partial_symtab *
+static struct partial_symtab *
 find_pc_sect_psymtab_closer (CORE_ADDR pc, struct obj_section *section,
 			     struct partial_symtab *pst,
 			     struct minimal_symbol *msymbol)
@@ -2361,7 +2361,7 @@ find_pc_line (CORE_ADDR pc, int notcurrent)
 struct symtab *
 find_line_symtab (struct symtab *symtab, int line, int *index, int *exact_match)
 {
-  int exact;
+  int exact = 0;  /* Initialized here to avoid a compiler warning.  */
 
   /* BEST_INDEX and BEST_LINETABLE identify the smallest linenumber > LINE
      so far seen.  */

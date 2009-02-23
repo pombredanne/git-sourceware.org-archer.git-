@@ -1,6 +1,6 @@
-/* Target-dependent code for Solaris.
+/* Target-dependent code for HP PA-RISC BSD's.
 
-   Copyright (C) 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -17,13 +17,9 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#ifndef SOL2_TDEP_H
-#define SOL2_TDEP_H 1
+#ifndef HPPABSD_TDEP_H
+#define HPPABSD_TDEP_H
 
-struct gdbarch;
+extern void hppabsd_init_abi (struct gdbarch_info, struct gdbarch *);
 
-CORE_ADDR sol2_skip_solib_resolver (struct gdbarch *, CORE_ADDR);
-
-char *sol2_core_pid_to_str (struct gdbarch *gdbarch, ptid_t ptid);
-
-#endif /* sol2-tdep.h */
+#endif /* hppabsd-tdep.h */
