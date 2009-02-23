@@ -1,6 +1,5 @@
-/* Target-dependent code for Solaris.
-
-   Copyright (C) 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+/* Read AIX xcoff symbol tables and convert to internal format, for GDB.
+   Copyright (C) 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -17,13 +16,9 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#ifndef SOL2_TDEP_H
-#define SOL2_TDEP_H 1
+#ifndef XCOFF_READ_H
+#define XCOFF_READ_H
 
-struct gdbarch;
+extern CORE_ADDR xcoff_get_toc_offset (struct objfile *);
 
-CORE_ADDR sol2_skip_solib_resolver (struct gdbarch *, CORE_ADDR);
-
-char *sol2_core_pid_to_str (struct gdbarch *gdbarch, ptid_t ptid);
-
-#endif /* sol2-tdep.h */
+#endif /* xcoffread.h */
