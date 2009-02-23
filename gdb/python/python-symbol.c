@@ -166,21 +166,23 @@ symbol_object_to_symbol (PyObject *obj)
   return ((symbol_object *) obj)->symbol;
 }
 
-/* This function has less arguments than its C counterpart, to simplify the
-   Python interface: name, block and domain. The other two arguments are always
-   assumed to be set, and a tuple with 2 elements is always returned. The first
-   is the symbol object or None, the second is a boolean with the value of
-   is_a_field_of_this.  */
-PyObject *gdbpy_lookup_symbol (PyObject *self, PyObject *args)
+/* Implementation of
+   gdb.lookup_symbol (name [, block] [, domain]) -> (symbol, is_field_of_this)
+   A tuple with 2 elements is always returned.  The first is the symbol
+   object or None, the second is a boolean with the value of
+   is_a_field_of_this (see comment in lookup_symbol_in_language).  */
+
+PyObject *gdbpy_lookup_symbol (PyObject *self, PyObject *args, PyObject *kw)
 {
   int domain = VAR_DOMAIN, is_a_field_of_this = 0;
   const char *name;
+  static char *keywords[] = { "name", "block", "domain", NULL };
   struct symbol *symbol;
   PyObject *block_obj = NULL, *ret_tuple, *sym_obj, *bool_obj;
   struct block *block = NULL;
 
-  if (! PyArg_ParseTuple (args, "s|O!i", &name, &block_object_type, &block_obj,
-			  &domain))
+  if (! PyArg_ParseTupleAndKeywords (args, kw, "s|O!i", keywords, &name,
+				     &block_object_type, &block_obj, &domain))
     return NULL;
 
   if (block_obj)

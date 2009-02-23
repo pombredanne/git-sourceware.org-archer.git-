@@ -1860,8 +1860,12 @@ static PyMethodDef GdbMethods[] =
   { "frame_stop_reason_string", gdbpy_frame_stop_reason_string,
     METH_VARARGS, "Return a string explaining unwind stop reason" },
 
-  { "lookup_symbol", gdbpy_lookup_symbol, METH_VARARGS,
-    "Return the symbol corresponding to the given name, or None." },
+  { "lookup_symbol", (PyCFunction) gdbpy_lookup_symbol,
+    METH_VARARGS | METH_KEYWORDS,
+    "lookup_symbol (name [, block] [, domain]) -> (symbol, is_field_of_this)\n\
+Return a tuple with the symbol corresponding to the given name (or None) and\n\
+a boolean indicating if name is a field of the current implied argument\n\
+`this' (when the current language is object-oriented)." },
   { "solib_address", gdbpy_solib_address, METH_VARARGS,
     "Return shared library holding a given address, or None." },
 
