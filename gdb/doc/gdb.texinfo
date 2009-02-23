@@ -18114,6 +18114,14 @@ auto-loading is disabled.
 @cindex python api
 @cindex programming in python
 
+You can get quick online help for @value{GDBN}'s Python API by issuing
+the command @w{@kbd{python help (gdb)}}.
+
+Functions and methods which have two or more optional arguments allow
+them to be specified using keyword syntax.  This allows passing some
+optional arguments while skipping others.  Example:
+@w{@code{gdb.some_function ('foo', bar = 1, baz = 2)}}.
+
 @cindex python stdout
 @cindex python pagination
 At startup, @value{GDBN} overrides Python's @code{sys.stdout} and
