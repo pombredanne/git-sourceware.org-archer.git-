@@ -90,8 +90,9 @@ set two_patterns_found "${newline}.${dec_number}L, ${dec_number}L]"
 # Test string pattern.
 
 gdb_test "set *(int32_t*) &int8_search_buf\[10\] = 0x61616161" "" ""
-gdb_test "py start_addr = gdb.parse_and_eval ('&int8_search_buf\[0\]')" "" ""
-gdb_test "py length = gdb.parse_and_eval ('sizeof (int8_search_buf)')" "" ""
+gdb_test "py search_buf = gdb.selected_frame ().read_var_value ('int8_search_buf')" "" ""
+gdb_test "py start_addr = search_buf.address ()" "" ""
+gdb_test "py length = search_buf.type ().sizeof ()" "" ""
 
 gdb_test "py print gdb.search_memory (start_addr, length, 'aaa')" \
   "${two_patterns_found}" "find string pattern"
@@ -127,8 +128,9 @@ gdb_test "py print gdb.search_memory (start_addr, length, \['a', 'a'\], max_coun
 # Test 16-bit pattern.
 
 gdb_test "set int16_search_buf\[10\] = 0x1234" "" ""
-gdb_test "py start_addr = gdb.parse_and_eval ('&int16_search_buf\[0\]')" "" ""
-gdb_test "py length = gdb.parse_and_eval ('sizeof (int16_search_buf)')" "" ""
+gdb_test "py search_buf = gdb.selected_frame ().read_var_value ('int16_search_buf')" "" ""
+gdb_test "py start_addr = search_buf.address ()" "" ""
+gdb_test "py length = search_buf.type ().sizeof ()" "" ""
 gdb_test "py pattern = gdb.parse_and_eval ('(int16_t) 0x1234')" "" ""
 
 gdb_test "py print gdb.search_memory (start_addr, length, 0x1234, 2)" \
@@ -140,8 +142,9 @@ gdb_test "py print gdb.search_memory (start_addr, length, pattern)" \
 # Test 32-bit pattern.
 
 gdb_test "set int32_search_buf\[10\] = 0x12345678" "" ""
-gdb_test "py start_addr = gdb.parse_and_eval ('&int32_search_buf\[0\]')" "" ""
-gdb_test "py length = gdb.parse_and_eval ('sizeof (int32_search_buf)')" "" ""
+gdb_test "py search_buf = gdb.selected_frame ().read_var_value ('int32_search_buf')" "" ""
+gdb_test "py start_addr = search_buf.address ()" "" ""
+gdb_test "py length = search_buf.type ().sizeof ()" "" ""
 gdb_test "py pattern = gdb.parse_and_eval ('(int32_t) 0x12345678')" "" ""
 
 gdb_test "py print gdb.search_memory (start_addr, length, 0x12345678, 4)" \
@@ -152,8 +155,9 @@ gdb_test "py print gdb.search_memory (start_addr, length, pattern)" \
 # Test 64-bit pattern.
 
 gdb_test "set int64_search_buf\[10\] = 0xfedcba9876543210LL" "" ""
-gdb_test "py start_addr = gdb.parse_and_eval ('&int64_search_buf\[0\]')" "" ""
-gdb_test "py length = gdb.parse_and_eval ('sizeof (int64_search_buf)')" "" ""
+gdb_test "py search_buf = gdb.selected_frame ().read_var_value ('int64_search_buf')" "" ""
+gdb_test "py start_addr = search_buf.address ()" "" ""
+gdb_test "py length = search_buf.type ().sizeof ()" "" ""
 gdb_test "py pattern = gdb.parse_and_eval ('(int64_t) 0xfedcba9876543210LL')" "" ""
 
 gdb_test "py print gdb.search_memory (start_addr, length, 0xfedcba9876543210, 8)" \
@@ -166,7 +170,8 @@ gdb_test "py print gdb.search_memory (start_addr, length, pattern)" \
 gdb_test "set *(int8_t*) &search_buf\[10\] = 0x62" "" ""
 gdb_test "set *(int16_t*) &search_buf\[11\] = 0x6363" "" ""
 gdb_test "set *(int32_t*) &search_buf\[13\] = 0x64646464" "" ""
-gdb_test "py start_addr = gdb.parse_and_eval ('&search_buf\[0\]')" "" ""
+gdb_test "py search_buf = gdb.selected_frame ().read_var_value ('search_buf')" "" ""
+gdb_test "py start_addr = search_buf\[0\].address ()" "" ""
 gdb_test "py pattern1 = gdb.parse_and_eval ('(int8_t) 0x62')" "" ""
 gdb_test "py pattern2 = gdb.parse_and_eval ('(int16_t) 0x6363')" "" ""
 gdb_test "py pattern3 = gdb.parse_and_eval ('(int32_t) 0x64646464')" "" ""
@@ -182,8 +187,8 @@ set CHUNK_SIZE 16000 ;
 
 gdb_test "set *(int32_t*) &search_buf\[0*${CHUNK_SIZE}+100\] = 0x12345678" "" ""
 gdb_test "set *(int32_t*) &search_buf\[1*${CHUNK_SIZE}+100\] = 0x12345678" "" ""
-gdb_test "py start_addr = gdb.parse_and_eval ('search_buf')" "" ""
-gdb_test "py length = gdb.parse_and_eval ('search_buf_size')" "" ""
+gdb_test "py start_addr = gdb.selected_frame ().read_var_value ('search_buf')" "" ""
+gdb_test "py length = gdb.selected_frame ().read_var_value ('search_buf_size')" "" ""
 
 gdb_test "py print gdb.search_memory (start_addr, length, 0x12345678, 4)" \
   "${two_patterns_found}" "search spanning large range"

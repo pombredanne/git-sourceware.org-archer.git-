@@ -355,13 +355,33 @@ frapy_read_var_value (PyObject *self, PyObject *args)
   struct value *val = NULL;
   volatile struct gdb_exception except;
 
-  if (!PyArg_ParseTuple (args, "O!", &symbol_object_type, &sym_obj))
+  if (!PyArg_ParseTuple (args, "O", &sym_obj))
     return NULL;
 
-  var = symbol_object_to_symbol (sym_obj);
-  if (! var)
+  if (PyObject_TypeCheck (sym_obj, &symbol_object_type))
+    var = symbol_object_to_symbol (sym_obj);
+  else if (gdbpy_is_string (sym_obj))
     {
-      PyErr_SetString (PyExc_RuntimeError, "second argument must be symbol");
+      char *var_name;
+      struct block *block;
+      volatile struct gdb_exception except;
+
+      TRY_CATCH (except, RETURN_MASK_ALL)
+	{
+	  struct block *block;
+
+	  FRAPY_REQUIRE_VALID ((frame_object *) self, frame);
+
+	  block = block_for_pc (get_frame_address_in_block (frame));
+	  var = lookup_symbol (python_string_to_target_string (sym_obj), block,
+			       VAR_DOMAIN, NULL);
+	}
+      GDB_PY_HANDLE_EXCEPTION (except);
+    }
+  else
+    {
+      PyErr_SetString (PyExc_TypeError,
+		       _("argument must be a symbol or string"));
       return NULL;
     }
 
