@@ -32,6 +32,7 @@
 #include "gdb_wait.h"
 #include <signal.h>
 
+#include "inf-ptrace.h"
 #include "inf-child.h"
 #include "gdbthread.h"
 
@@ -351,7 +352,8 @@ inf_ptrace_stop (ptid_t ptid)
    that signal.  */
 
 static void
-inf_ptrace_resume (ptid_t ptid, int step, enum target_signal signal)
+inf_ptrace_resume (struct target_ops *ops,
+		   ptid_t ptid, int step, enum target_signal signal)
 {
   pid_t pid = ptid_get_pid (ptid);
   int request = PT_CONTINUE;
@@ -385,7 +387,8 @@ inf_ptrace_resume (ptid_t ptid, int step, enum target_signal signal)
    the status in *OURSTATUS.  */
 
 static ptid_t
-inf_ptrace_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
+inf_ptrace_wait (struct target_ops *ops,
+		 ptid_t ptid, struct target_waitstatus *ourstatus)
 {
   pid_t pid;
   int status, save_errno;
@@ -597,7 +600,7 @@ inf_ptrace_xfer_partial (struct target_ops *ops, enum target_object object,
 /* Return non-zero if the thread specified by PTID is alive.  */
 
 static int
-inf_ptrace_thread_alive (ptid_t ptid)
+inf_ptrace_thread_alive (struct target_ops *ops, ptid_t ptid)
 {
   /* ??? Is kill the right way to do this?  */
   return (kill (ptid_get_pid (ptid), 0) != -1);
@@ -613,6 +616,12 @@ inf_ptrace_files_info (struct target_ops *ignore)
   printf_filtered (_("\tUsing the running image of %s %s.\n"),
 		   inf->attach_flag ? "attached" : "child",
 		   target_pid_to_str (inferior_ptid));
+}
+
+static char *
+inf_ptrace_pid_to_str (struct target_ops *ops, ptid_t ptid)
+{
+  return normal_pid_to_str (ptid);
 }
 
 /* Create a prototype ptrace target.  The client can override it with
@@ -637,7 +646,7 @@ inf_ptrace_target (void)
 #endif
   t->to_mourn_inferior = inf_ptrace_mourn_inferior;
   t->to_thread_alive = inf_ptrace_thread_alive;
-  t->to_pid_to_str = normal_pid_to_str;
+  t->to_pid_to_str = inf_ptrace_pid_to_str;
   t->to_stop = inf_ptrace_stop;
   t->to_xfer_partial = inf_ptrace_xfer_partial;
 
@@ -698,7 +707,8 @@ inf_ptrace_fetch_register (struct regcache *regcache, int regnum)
    for all registers.  */
 
 static void
-inf_ptrace_fetch_registers (struct regcache *regcache, int regnum)
+inf_ptrace_fetch_registers (struct target_ops *ops,
+			    struct regcache *regcache, int regnum)
 {
   if (regnum == -1)
     for (regnum = 0;
@@ -754,8 +764,9 @@ inf_ptrace_store_register (const struct regcache *regcache, int regnum)
 /* Store register REGNUM back into the inferior.  If REGNUM is -1, do
    this for all registers.  */
 
-void
-inf_ptrace_store_registers (struct regcache *regcache, int regnum)
+static void
+inf_ptrace_store_registers (struct target_ops *ops,
+			    struct regcache *regcache, int regnum)
 {
   if (regnum == -1)
     for (regnum = 0;

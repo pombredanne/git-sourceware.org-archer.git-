@@ -763,7 +763,7 @@ static void dwarf2_build_psymtabs_hard (struct objfile *, int);
 
 static void scan_partial_symbols (struct partial_die_info *,
 				  CORE_ADDR *, CORE_ADDR *,
-				  struct dwarf2_cu *);
+				  int, struct dwarf2_cu *);
 
 static void add_partial_symbol (struct partial_die_info *,
 				struct dwarf2_cu *);
@@ -775,14 +775,18 @@ static int pdi_needs_namespace (enum dwarf_tag tag);
 
 static void add_partial_namespace (struct partial_die_info *pdi,
 				   CORE_ADDR *lowpc, CORE_ADDR *highpc,
-				   struct dwarf2_cu *cu);
+				   int need_pc, struct dwarf2_cu *cu);
+
+static void add_partial_module (struct partial_die_info *pdi, CORE_ADDR *lowpc,
+				CORE_ADDR *highpc, int need_pc,
+				struct dwarf2_cu *cu);
 
 static void add_partial_enumeration (struct partial_die_info *enum_pdi,
 				     struct dwarf2_cu *cu);
 
 static void add_partial_subprogram (struct partial_die_info *pdi,
 				    CORE_ADDR *lowpc, CORE_ADDR *highpc,
-				    struct dwarf2_cu *cu);
+				    int need_pc, struct dwarf2_cu *cu);
 
 static gdb_byte *locate_pdi_sibling (struct partial_die_info *orig_pdi,
                                      gdb_byte *info_ptr,
@@ -962,6 +966,8 @@ static const char *determine_class_name (struct die_info *die,
 static void read_common_block (struct die_info *, struct dwarf2_cu *);
 
 static void read_namespace (struct die_info *die, struct dwarf2_cu *);
+
+static void read_module (struct die_info *die, struct dwarf2_cu *cu);
 
 static const char *namespace_name (struct die_info *die,
 				   int *is_anonymous, struct dwarf2_cu *);
@@ -1589,7 +1595,7 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile, int mainline)
   struct partial_die_info comp_unit_die;
   struct partial_symtab *pst;
   struct cleanup *back_to;
-  CORE_ADDR lowpc, highpc, baseaddr;
+  CORE_ADDR baseaddr;
 
   info_ptr = dwarf2_per_objfile->info_buffer;
 
@@ -1710,6 +1716,13 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile, int mainline)
 				  &comp_unit_die.highpc, &cu, pst))
 	    comp_unit_die.has_pc_info = 1;
 	}
+      else if (comp_unit_die.has_pc_info
+	       && comp_unit_die.lowpc < comp_unit_die.highpc)
+	/* Store the contiguous range if it is not empty; it can be empty for
+	   CUs with no code.  */
+	addrmap_set_empty (objfile->psymtabs_addrmap,
+			   comp_unit_die.lowpc + baseaddr,
+			   comp_unit_die.highpc + baseaddr - 1, pst);
 
       /* Check if comp unit has_children.
          If so, read the rest of the partial symbols from this comp unit.
@@ -1717,13 +1730,15 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile, int mainline)
       if (comp_unit_die.has_children)
 	{
 	  struct partial_die_info *first_die;
+	  CORE_ADDR lowpc, highpc;
 
 	  lowpc = ((CORE_ADDR) -1);
 	  highpc = ((CORE_ADDR) 0);
 
 	  first_die = load_partial_dies (abfd, info_ptr, 1, &cu);
 
-	  scan_partial_symbols (first_die, &lowpc, &highpc, &cu);
+	  scan_partial_symbols (first_die, &lowpc, &highpc,
+				! comp_unit_die.has_pc_info, &cu);
 
 	  /* If we didn't find a lowpc, set it to highpc to avoid
 	     complaints from `maint check'.  */
@@ -1740,12 +1755,6 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile, int mainline)
 	}
       pst->textlow = comp_unit_die.lowpc + baseaddr;
       pst->texthigh = comp_unit_die.highpc + baseaddr;
-
-      /* Store the contiguous range; `DW_AT_ranges' range is stored above.  The
-         range can be also empty for CUs with no code.  */
-      if (!cu.has_ranges_offset && pst->textlow < pst->texthigh)
-	addrmap_set_empty (objfile->psymtabs_addrmap, pst->textlow,
-			   pst->texthigh - 1, pst);
 
       pst->n_global_syms = objfile->global_psymbols.next -
 	(objfile->global_psymbols.list + pst->globals_offset);
@@ -1891,13 +1900,16 @@ create_all_comp_units (struct objfile *objfile)
   dwarf2_per_objfile->n_comp_units = n_comp_units;
 }
 
-/* Process all loaded DIEs for compilation unit CU, starting at FIRST_DIE.
-   Also set *LOWPC and *HIGHPC to the lowest and highest PC values found
-   in CU.  */
+/* Process all loaded DIEs for compilation unit CU, starting at
+   FIRST_DIE.  The caller should pass NEED_PC == 1 if the compilation
+   unit DIE did not have PC info (DW_AT_low_pc and DW_AT_high_pc, or
+   DW_AT_ranges).  If NEED_PC is set, then this function will set
+   *LOWPC and *HIGHPC to the lowest and highest PC values found in CU
+   and record the covered ranges in the addrmap.  */
 
 static void
 scan_partial_symbols (struct partial_die_info *first_die, CORE_ADDR *lowpc,
-		      CORE_ADDR *highpc, struct dwarf2_cu *cu)
+		      CORE_ADDR *highpc, int need_pc, struct dwarf2_cu *cu)
 {
   struct objfile *objfile = cu->objfile;
   bfd *abfd = objfile->obfd;
@@ -1923,7 +1935,7 @@ scan_partial_symbols (struct partial_die_info *first_die, CORE_ADDR *lowpc,
 	  switch (pdi->tag)
 	    {
 	    case DW_TAG_subprogram:
-	      add_partial_subprogram (pdi, lowpc, highpc, cu);
+	      add_partial_subprogram (pdi, lowpc, highpc, need_pc, cu);
 	      break;
 	    case DW_TAG_variable:
 	    case DW_TAG_typedef:
@@ -1952,7 +1964,10 @@ scan_partial_symbols (struct partial_die_info *first_die, CORE_ADDR *lowpc,
 	      add_partial_symbol (pdi, cu);
 	      break;
 	    case DW_TAG_namespace:
-	      add_partial_namespace (pdi, lowpc, highpc, cu);
+	      add_partial_namespace (pdi, lowpc, highpc, need_pc, cu);
+	      break;
+	    case DW_TAG_module:
+	      add_partial_module (pdi, lowpc, highpc, need_pc, cu);
 	      break;
 	    default:
 	      break;
@@ -2259,7 +2274,7 @@ pdi_needs_namespace (enum dwarf_tag tag)
 static void
 add_partial_namespace (struct partial_die_info *pdi,
 		       CORE_ADDR *lowpc, CORE_ADDR *highpc,
-		       struct dwarf2_cu *cu)
+		       int need_pc, struct dwarf2_cu *cu)
 {
   struct objfile *objfile = cu->objfile;
 
@@ -2270,7 +2285,21 @@ add_partial_namespace (struct partial_die_info *pdi,
   /* Now scan partial symbols in that namespace.  */
 
   if (pdi->has_children)
-    scan_partial_symbols (pdi->die_child, lowpc, highpc, cu);
+    scan_partial_symbols (pdi->die_child, lowpc, highpc, need_pc, cu);
+}
+
+/* Read a partial die corresponding to a Fortran module.  */
+
+static void
+add_partial_module (struct partial_die_info *pdi, CORE_ADDR *lowpc,
+		    CORE_ADDR *highpc, int need_pc, struct dwarf2_cu *cu)
+{
+  /* Now scan partial symbols in that module.
+
+     FIXME: Support the separate Fortran module namespaces.  */
+
+  if (pdi->has_children)
+    scan_partial_symbols (pdi->die_child, lowpc, highpc, need_pc, cu);
 }
 
 /* Read a partial die corresponding to a subprogram and create a partial
@@ -2286,7 +2315,7 @@ add_partial_namespace (struct partial_die_info *pdi,
 static void
 add_partial_subprogram (struct partial_die_info *pdi,
 			CORE_ADDR *lowpc, CORE_ADDR *highpc,
-			struct dwarf2_cu *cu)
+			int need_pc, struct dwarf2_cu *cu)
 {
   if (pdi->tag == DW_TAG_subprogram)
     {
@@ -2296,6 +2325,17 @@ add_partial_subprogram (struct partial_die_info *pdi,
             *lowpc = pdi->lowpc;
           if (pdi->highpc > *highpc)
             *highpc = pdi->highpc;
+	  if (need_pc)
+	    {
+	      CORE_ADDR baseaddr;
+	      struct objfile *objfile = cu->objfile;
+
+	      baseaddr = ANOFFSET (objfile->section_offsets,
+				   SECT_OFF_TEXT (objfile));
+	      addrmap_set_empty (objfile->psymtabs_addrmap,
+				 pdi->lowpc, pdi->highpc - 1,
+				 cu->per_cu->psymtab);
+	    }
           if (!pdi->is_declaration)
             add_partial_symbol (pdi, cu);
         }
@@ -2312,7 +2352,7 @@ add_partial_subprogram (struct partial_die_info *pdi,
 	  fixup_partial_die (pdi, cu);
 	  if (pdi->tag == DW_TAG_subprogram
 	      || pdi->tag == DW_TAG_lexical_block)
-	    add_partial_subprogram (pdi, lowpc, highpc, cu);
+	    add_partial_subprogram (pdi, lowpc, highpc, need_pc, cu);
 	  pdi = pdi->die_sibling;
 	}
     }
@@ -2924,6 +2964,9 @@ process_die (struct die_info *die, struct dwarf2_cu *cu)
     case DW_TAG_namespace:
       processing_has_namespace_info = 1;
       read_namespace (die, cu);
+      break;
+    case DW_TAG_module:
+      read_module (die, cu);
       break;
     case DW_TAG_imported_declaration:
     case DW_TAG_imported_module:
@@ -4834,6 +4877,22 @@ read_namespace (struct die_info *die, struct dwarf2_cu *cu)
     }
 }
 
+/* Read a Fortran module.  */
+
+static void
+read_module (struct die_info *die, struct dwarf2_cu *cu)
+{
+  struct die_info *child_die = die->child;
+
+  /* FIXME: Support the separate Fortran module namespaces.  */
+
+  while (child_die && child_die->tag)
+    {
+      process_die (child_die, cu);
+      child_die = sibling_die (child_die);
+    }
+}
+
 /* Return the name of the namespace represented by DIE.  Set
    *IS_ANONYMOUS to tell whether or not the namespace is an anonymous
    namespace.  */
@@ -5184,11 +5243,13 @@ read_base_type (struct die_info *die, struct dwarf2_cu *cu)
 	type_flags |= TYPE_FLAG_UNSIGNED;
 	break;
       case DW_ATE_signed_char:
-	if (cu->language == language_ada || cu->language == language_m2)
+	if (cu->language == language_ada || cu->language == language_m2 
+	    || cu->language == language_pascal)
 	  code = TYPE_CODE_CHAR;
 	break;
       case DW_ATE_unsigned_char:
-	if (cu->language == language_ada || cu->language == language_m2)
+	if (cu->language == language_ada || cu->language == language_m2
+	    || cu->language == language_pascal)
 	  code = TYPE_CODE_CHAR;
 	type_flags |= TYPE_FLAG_UNSIGNED;
 	break;

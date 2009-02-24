@@ -80,9 +80,6 @@
 /* This module's target vector.  */
 static struct target_ops thread_db_ops;
 
-/* The target vector that we call for things this module can't handle.  */
-static struct target_ops *target_beneath;
-
 /* Non-zero if we're using this module's target vector.  */
 static int using_thread_db;
 
@@ -142,7 +139,7 @@ static CORE_ADDR td_create_bp_addr;
 static CORE_ADDR td_death_bp_addr;
 
 /* Prototypes for local functions.  */
-static void thread_db_find_new_threads (void);
+static void thread_db_find_new_threads_1 (void);
 static void attach_thread (ptid_t ptid, const td_thrhandle_t *th_p,
 			   const td_thrinfo_t *ti_p);
 static void detach_thread (ptid_t ptid);
@@ -284,7 +281,7 @@ thread_get_info_callback (const td_thrhandle_t *thp, void *infop)
     {
       /* New thread.  Attach to it now (why wait?).  */
       if (!have_threads ())
-	thread_db_find_new_threads ();
+	thread_db_find_new_threads_1 ();
       else
 	attach_thread (thread_ptid, thp, &ti);
       thread_info = find_thread_pid (thread_ptid);
@@ -361,7 +358,7 @@ thread_db_attach_lwp (ptid_t ptid)
      initialized, we may not know its thread ID yet.  Make sure we do
      before we add another thread to the list.  */
   if (!have_threads ())
-    thread_db_find_new_threads ();
+    thread_db_find_new_threads_1 ();
 
   err = td_ta_map_lwp2thr_p (thread_agent, GET_LWP (ptid), &th);
   if (err != TD_OK)
@@ -377,12 +374,6 @@ thread_db_attach_lwp (ptid_t ptid)
 
   attach_thread (ptid, &th, &ti);
   return 1;
-}
-
-void
-thread_db_init (struct target_ops *target)
-{
-  target_beneath = target;
 }
 
 static void *
@@ -664,7 +655,7 @@ check_for_thread_db (void)
       using_thread_db = 1;
 
       enable_thread_event_reporting ();
-      thread_db_find_new_threads ();
+      thread_db_find_new_threads_1 ();
       break;
 
     default:
@@ -782,6 +773,8 @@ detach_thread (ptid_t ptid)
 static void
 thread_db_detach (struct target_ops *ops, char *args, int from_tty)
 {
+  struct target_ops *target_beneath = find_target_beneath (ops);
+
   disable_thread_event_reporting ();
 
   /* Forget about the child's process ID.  We shouldn't need it
@@ -823,7 +816,7 @@ check_event (ptid_t ptid)
      initialized, we may not know its thread ID yet.  Make sure we do
      before we add another thread to the list.  */
   if (!have_threads ())
-    thread_db_find_new_threads ();
+    thread_db_find_new_threads_1 ();
 
   /* If we are at a create breakpoint, we do not know what new lwp
      was created and cannot specifically locate the event message for it.
@@ -885,9 +878,12 @@ check_event (ptid_t ptid)
 }
 
 static ptid_t
-thread_db_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
+thread_db_wait (struct target_ops *ops,
+		ptid_t ptid, struct target_waitstatus *ourstatus)
 {
-  ptid = target_beneath->to_wait (ptid, ourstatus);
+  struct target_ops *beneath = find_target_beneath (ops);
+
+  ptid = beneath->to_wait (beneath, ptid, ourstatus);
 
   if (ourstatus->kind == TARGET_WAITKIND_IGNORE)
     return ptid;
@@ -908,7 +904,7 @@ thread_db_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
   /* If we do not know about the main thread yet, this would be a good time to
      find it.  */
   if (ourstatus->kind == TARGET_WAITKIND_STOPPED && !have_threads ())
-    thread_db_find_new_threads ();
+    thread_db_find_new_threads_1 ();
 
   if (ourstatus->kind == TARGET_WAITKIND_STOPPED
       && ourstatus->value.sig == TARGET_SIGNAL_TRAP)
@@ -934,6 +930,8 @@ thread_db_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
 static void
 thread_db_mourn_inferior (struct target_ops *ops)
 {
+  struct target_ops *target_beneath = find_target_beneath (ops);
+
   /* Forget about the child's process ID.  We shouldn't need it
      anymore.  */
   proc_handle.pid = 0;
@@ -947,31 +945,6 @@ thread_db_mourn_inferior (struct target_ops *ops)
   /* Detach thread_db target ops.  */
   unpush_target (ops);
   using_thread_db = 0;
-}
-
-static int
-thread_db_can_async_p (void)
-{
-  return target_beneath->to_can_async_p ();
-}
-
-static int
-thread_db_is_async_p (void)
-{
-  return target_beneath->to_is_async_p ();
-}
-
-static void
-thread_db_async (void (*callback) (enum inferior_event_type event_type,
-				   void *context), void *context)
-{
-  return target_beneath->to_async (callback, context);
-}
-
-static int
-thread_db_async_mask (int mask)
-{
-  return target_beneath->to_async_mask (mask);
 }
 
 static int
@@ -1019,7 +992,7 @@ find_new_threads_callback (const td_thrhandle_t *th_p, void *data)
    PTID.  */
 
 static void
-thread_db_find_new_threads (void)
+thread_db_find_new_threads_1 (void)
 {
   td_err_e err;
   struct lwp_info *lp;
@@ -1044,10 +1017,17 @@ thread_db_find_new_threads (void)
     error (_("Cannot find new threads: %s"), thread_db_err_str (err));
 }
 
+static void
+thread_db_find_new_threads (struct target_ops *ops)
+{
+  thread_db_find_new_threads_1 ();
+}
+
 static char *
-thread_db_pid_to_str (ptid_t ptid)
+thread_db_pid_to_str (struct target_ops *ops, ptid_t ptid)
 {
   struct thread_info *thread_info = find_thread_pid (ptid);
+  struct target_ops *beneath;
 
   if (thread_info != NULL && thread_info->private != NULL)
     {
@@ -1062,8 +1042,9 @@ thread_db_pid_to_str (ptid_t ptid)
       return buf;
     }
 
-  if (target_beneath->to_pid_to_str (ptid))
-    return target_beneath->to_pid_to_str (ptid);
+  beneath = find_target_beneath (ops);
+  if (beneath->to_pid_to_str (beneath, ptid))
+    return beneath->to_pid_to_str (beneath, ptid);
 
   return normal_pid_to_str (ptid);
 }
@@ -1087,15 +1068,17 @@ thread_db_extra_thread_info (struct thread_info *info)
    is stored at OFFSET within the thread local storage for thread PTID.  */
 
 static CORE_ADDR
-thread_db_get_thread_local_address (ptid_t ptid,
+thread_db_get_thread_local_address (struct target_ops *ops,
+				    ptid_t ptid,
 				    CORE_ADDR lm,
 				    CORE_ADDR offset)
 {
   struct thread_info *thread_info;
+  struct target_ops *beneath;
 
   /* If we have not discovered any threads yet, check now.  */
   if (!have_threads ())
-    thread_db_find_new_threads ();
+    thread_db_find_new_threads_1 ();
 
   /* Find the matching thread.  */
   thread_info = find_thread_pid (ptid);
@@ -1141,8 +1124,9 @@ thread_db_get_thread_local_address (ptid_t ptid,
 	      : (CORE_ADDR) (uintptr_t) address);
     }
 
-  if (target_beneath->to_get_thread_local_address)
-    return target_beneath->to_get_thread_local_address (ptid, lm, offset);
+  beneath = find_target_beneath (ops);
+  if (beneath->to_get_thread_local_address)
+    return beneath->to_get_thread_local_address (beneath, ptid, lm, offset);
   else
     throw_error (TLS_GENERIC_ERROR,
 	         _("TLS not supported on this target"));
@@ -1169,7 +1153,7 @@ thread_db_get_ada_task_ptid (long lwp, long thread)
 {
   struct thread_info *thread_info;
 
-  thread_db_find_new_threads ();
+  thread_db_find_new_threads_1 ();
   thread_info = iterate_over_threads (thread_db_find_thread_from_tid, &thread);
 
   gdb_assert (thread_info != NULL);
@@ -1193,13 +1177,12 @@ init_thread_db_ops (void)
   thread_db_ops.to_get_thread_local_address
     = thread_db_get_thread_local_address;
   thread_db_ops.to_extra_thread_info = thread_db_extra_thread_info;
-  thread_db_ops.to_can_async_p = thread_db_can_async_p;
-  thread_db_ops.to_is_async_p = thread_db_is_async_p;
-  thread_db_ops.to_async = thread_db_async;
-  thread_db_ops.to_async_mask = thread_db_async_mask;
   thread_db_ops.to_get_ada_task_ptid = thread_db_get_ada_task_ptid;
   thread_db_ops.to_magic = OPS_MAGIC;
 }
+
+/* Provide a prototype to silence -Wmissing-prototypes.  */
+extern initialize_file_ftype _initialize_thread_db;
 
 void
 _initialize_thread_db (void)

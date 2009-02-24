@@ -270,10 +270,12 @@ SUBDIR_TUI_CFLAGS= \
 #
 SUBDIR_PYTHON_OBS = \
 	python.o \
+	python-cmd.o \
 	python-utils.o \
 	python-value.o
 SUBDIR_PYTHON_SRCS = \
 	python/python.c \
+	python/python-cmd.c \
 	python/python-utils.c \
 	python/python-value.c
 SUBDIR_PYTHON_DEPS =
@@ -459,8 +461,8 @@ TARGET_OBS = @TARGET_OBS@
 ALL_64_TARGET_OBS = \
 	alphabsd-tdep.o alphafbsd-tdep.o alpha-linux-tdep.o alpha-mdebug-tdep.o \
 	alphanbsd-tdep.o alphaobsd-tdep.o alpha-osf1-tdep.o alpha-tdep.o \
-	amd64fbsd-tdep.o amd64-linux-tdep.o amd64nbsd-tdep.o amd64obsd-tdep.o \
-	amd64-sol2-tdep.o amd64-tdep.o \
+	amd64fbsd-tdep.o amd64-dicos-tdep.o amd64-linux-tdep.o amd64nbsd-tdep.o \
+	amd64obsd-tdep.o amd64-sol2-tdep.o amd64-tdep.o \
 	ia64-linux-tdep.o ia64-tdep.o \
 	mips64obsd-tdep.o \
 	sparc64fbsd-tdep.o sparc64-linux-tdep.o sparc64nbsd-tdep.o \
@@ -472,6 +474,7 @@ ALL_TARGET_OBS = \
 	arm-tdep.o arm-wince-tdep.o \
 	avr-tdep.o \
 	cris-tdep.o \
+	dicos-tdep.o \
 	frv-linux-tdep.o frv-tdep.o \
 	h8300-tdep.o \
 	hppabsd-tdep.o hppanbsd-tdep.o hppaobsd-tdep.o \
@@ -481,6 +484,7 @@ ALL_TARGET_OBS = \
 	i386-sol2-tdep.o i386-tdep.o i387-tdep.o \
 	i386-dicos-tdep.o \
 	iq2000-tdep.o \
+	linux-tdep.o \
 	m32c-tdep.o \
 	m32r-linux-tdep.o m32r-tdep.o \
 	m68hc11-tdep.o \
@@ -717,7 +721,7 @@ coff-pe-read.h parser-defs.h gdb_ptrace.h mips-linux-tdep.h \
 m68k-tdep.h spu-tdep.h jv-lang.h environ.h solib-irix.h amd64-tdep.h \
 doublest.h regset.h hppa-tdep.h ppc-linux-tdep.h rs6000-tdep.h \
 gdb_locale.h gdb_dirent.h arch-utils.h trad-frame.h gnu-nat.h \
-language.h i386-cygwin-tdep.h nbsd-tdep.h wrapper.h solib-svr4.h \
+language.h nbsd-tdep.h wrapper.h solib-svr4.h \
 macroexp.h ui-file.h regcache.h gdb_string.h tracepoint.h i386-tdep.h \
 inf-child.h p-lang.h event-top.h gdbtypes.h scm-tags.h user-regs.h \
 regformats/regdef.h config/alpha/nm-osf3.h config/i386/nm-cygwin.h \
@@ -728,7 +732,7 @@ config/sparc/nm-sol2.h config/nm-linux.h config/mips/nm-irix5.h	\
 config/rs6000/nm-rs6000.h top.h bsd-kvm.h gdb-stabs.h reggroups.h \
 annotate.h sim-regno.h dictionary.h dfp.h main.h frame-unwind.h	\
 remote-fileio.h i386-linux-tdep.h vax-tdep.h objc-lang.h \
-sentinel-frame.h bcache.h symfile.h windows-tdep.h
+sentinel-frame.h bcache.h symfile.h windows-tdep.h linux-tdep.h
 
 # Header files that already have srcdir in them, or which are in objdir.
 
@@ -1268,6 +1272,7 @@ ALLDEPFILES = \
 	amd64bsd-nat.c amd64fbsd-nat.c amd64fbsd-tdep.c \
 	amd64nbsd-nat.c amd64nbsd-tdep.c \
 	amd64obsd-nat.c amd64obsd-tdep.c \
+	amd64-dicos-tdep.c \
 	amd64-linux-nat.c amd64-linux-tdep.c \
 	amd64-sol2-tdep.c \
 	arm-linux-nat.c arm-linux-tdep.c arm-tdep.c \
@@ -1275,7 +1280,8 @@ ALLDEPFILES = \
 	avr-tdep.c \
 	bsd-uthread.c bsd-kvm.c \
 	core-regset.c corelow.c \
-	dcache.c exec.c \
+	dcache.c dicos-tdep.c \
+	exec.c \
 	fbsd-nat.c \
 	fork-child.c \
 	glibc-tdep.c \
@@ -1299,6 +1305,7 @@ ALLDEPFILES = \
 	irix5-nat.c \
 	libunwind-frame.c \
 	linux-fork.c \
+	linux-tdep.c \
 	m68hc11-tdep.c \
 	m32r-tdep.c \
 	m32r-linux-nat.c m32r-linux-tdep.c \
@@ -1834,6 +1841,10 @@ PYTHON_CFLAGS=@PYTHON_CFLAGS@
 
 python.o: $(srcdir)/python/python.c
 	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python.c
+	$(POSTCOMPILE)
+
+python-cmd.o: $(srcdir)/python/python-cmd.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-cmd.c
 	$(POSTCOMPILE)
 
 python-utils.o: $(srcdir)/python/python-utils.c

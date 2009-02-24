@@ -42,30 +42,11 @@ static int gdbpy_should_print_stack = 1;
 #include "target.h"
 #include "gdbthread.h"
 
+static PyMethodDef GdbMethods[];
 
 PyObject *gdb_module;
 
-static PyObject *get_parameter (PyObject *, PyObject *);
-static PyObject *execute_gdb_command (PyObject *, PyObject *);
-static PyObject *gdbpy_write (PyObject *, PyObject *);
-static PyObject *gdbpy_flush (PyObject *, PyObject *);
-
-static PyMethodDef GdbMethods[] =
-{
-  { "get_value_from_history", gdbpy_get_value_from_history, METH_VARARGS,
-    "Get a value from history" },
-  { "execute", execute_gdb_command, METH_VARARGS,
-    "Execute a gdb command" },
-  { "get_parameter", get_parameter, METH_VARARGS,
-    "Return a gdb parameter's value" },
-
-  { "write", gdbpy_write, METH_VARARGS,
-    "Write a string using gdb's filtered stream." },
-  { "flush", gdbpy_flush, METH_NOARGS,
-    "Flush gdb's filtered stdout stream." },
-
-  {NULL, NULL, 0, NULL}
-};
+PyObject *gdbpy_doc_cst;
 
 /* Given a command_line, return a command string suitable for passing
    to Python.  Lines in the string are separated by newlines.  The
@@ -102,6 +83,7 @@ compute_python_string (struct command_line *l)
 void
 eval_python_from_control_command (struct command_line *cmd)
 {
+  int ret;
   char *script;
   struct cleanup *cleanup;
   PyGILState_STATE state;
@@ -113,12 +95,12 @@ eval_python_from_control_command (struct command_line *cmd)
   cleanup = make_cleanup_py_restore_gil (&state);
 
   script = compute_python_string (cmd->body_list[0]);
-  PyRun_SimpleString (script);
+  ret = PyRun_SimpleString (script);
   xfree (script);
-  if (PyErr_Occurred ())
+  if (ret)
     {
       gdbpy_print_stack ();
-      error (_("error while executing Python code"));
+      error (_("Error while executing Python code."));
     }
 
   do_cleanups (cleanup);
@@ -139,11 +121,10 @@ python_command (char *arg, int from_tty)
     ++arg;
   if (arg && *arg)
     {
-      PyRun_SimpleString (arg);
-      if (PyErr_Occurred ())
+      if (PyRun_SimpleString (arg))
 	{
 	  gdbpy_print_stack ();
-	  error (_("error while executing Python code"));
+	  error (_("Error while executing Python code."));
 	}
     }
   else
@@ -256,14 +237,26 @@ execute_gdb_command (PyObject *self, PyObject *args)
 {
   struct cmd_list_element *alias, *prefix, *cmd;
   char *arg, *newarg;
+  PyObject *from_tty_obj = NULL;
+  int from_tty;
+  int cmp;
   volatile struct gdb_exception except;
 
-  if (! PyArg_ParseTuple (args, "s", &arg))
+  if (! PyArg_ParseTuple (args, "s|O!", &arg, &PyBool_Type, &from_tty_obj))
     return NULL;
+
+  from_tty = 0;
+  if (from_tty_obj)
+    {
+      cmp = PyObject_IsTrue (from_tty_obj);
+      if (cmp < 0)
+	  return NULL;
+      from_tty = cmp;
+    }
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      execute_command (arg, 0);
+      execute_command (arg, from_tty);
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
@@ -362,6 +355,9 @@ show_python (char *args, int from_tty)
 
 /* Initialize the Python code.  */
 
+/* Provide a prototype to silence -Wmissing-prototypes.  */
+extern initialize_file_ftype _initialize_python;
+
 void
 _initialize_python (void)
 {
@@ -416,8 +412,11 @@ Enables or disables printing of Python stack traces."),
   PyModule_AddStringConstant (gdb_module, "TARGET_CONFIG", (char*) target_name);
 
   gdbpy_initialize_values ();
+  gdbpy_initialize_commands ();
 
   PyRun_SimpleString ("import gdb");
+
+  gdbpy_doc_cst = PyString_FromString ("__doc__");
 
   /* Create a couple objects which are used for Python's stdout and
      stderr.  */
@@ -451,3 +450,26 @@ sys.stdout = GdbOutputFile()\n\
 
 #endif /* HAVE_PYTHON */
 }
+
+
+
+#if HAVE_PYTHON
+
+static PyMethodDef GdbMethods[] =
+{
+  { "history", gdbpy_history, METH_VARARGS,
+    "Get a value from history" },
+  { "execute", execute_gdb_command, METH_VARARGS,
+    "Execute a gdb command" },
+  { "get_parameter", get_parameter, METH_VARARGS,
+    "Return a gdb parameter's value" },
+
+  { "write", gdbpy_write, METH_VARARGS,
+    "Write a string using gdb's filtered stream." },
+  { "flush", gdbpy_flush, METH_NOARGS,
+    "Flush gdb's filtered stdout stream." },
+
+  {NULL, NULL, 0, NULL}
+};
+
+#endif /* HAVE_PYTHON */

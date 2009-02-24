@@ -151,6 +151,10 @@ struct target_waitstatus
     value;
   };
 
+/* Return a pretty printed form of target_waitstatus.
+   Space for the result is malloc'd, caller must free.  */
+extern char *target_waitstatus_to_string (const struct target_waitstatus *);
+
 /* Possible types of events that the inferior handler will have to
    deal with.  */
 enum inferior_event_type
@@ -217,7 +221,10 @@ enum target_object
   TARGET_OBJECT_LIBRARIES,
   /* Get OS specific data.  The ANNEX specifies the type (running
      processes, etc.).  */
-  TARGET_OBJECT_OSDATA
+  TARGET_OBJECT_OSDATA,
+  /* Extra signal info.  Usually the contents of `siginfo_t' on unix
+     platforms.  */
+  TARGET_OBJECT_SIGNAL_INFO,
   /* Possible future objects: TARGET_OBJECT_FILE, ... */
 };
 
@@ -325,10 +332,11 @@ struct target_ops
     void (*to_post_attach) (int);
     void (*to_detach) (struct target_ops *ops, char *, int);
     void (*to_disconnect) (struct target_ops *, char *, int);
-    void (*to_resume) (ptid_t, int, enum target_signal);
-    ptid_t (*to_wait) (ptid_t, struct target_waitstatus *);
-    void (*to_fetch_registers) (struct regcache *, int);
-    void (*to_store_registers) (struct regcache *, int);
+    void (*to_resume) (struct target_ops *, ptid_t, int, enum target_signal);
+    ptid_t (*to_wait) (struct target_ops *,
+		      ptid_t, struct target_waitstatus *);
+    void (*to_fetch_registers) (struct target_ops *, struct regcache *, int);
+    void (*to_store_registers) (struct target_ops *, struct regcache *, int);
     void (*to_prepare_to_store) (struct regcache *);
 
     /* Transfer LEN bytes of memory between GDB address MYADDR and
@@ -396,9 +404,9 @@ struct target_ops
     void (*to_mourn_inferior) (struct target_ops *);
     int (*to_can_run) (void);
     void (*to_notice_signals) (ptid_t ptid);
-    int (*to_thread_alive) (ptid_t ptid);
-    void (*to_find_new_threads) (void);
-    char *(*to_pid_to_str) (ptid_t);
+    int (*to_thread_alive) (struct target_ops *, ptid_t ptid);
+    void (*to_find_new_threads) (struct target_ops *);
+    char *(*to_pid_to_str) (struct target_ops *, ptid_t);
     char *(*to_extra_thread_info) (struct thread_info *);
     void (*to_stop) (ptid_t);
     void (*to_rcmd) (char *command, struct ui_file *output);
@@ -434,7 +442,8 @@ struct target_ops
        or executable file given by OBJFILE.  If that block of
        thread-local storage hasn't been allocated yet, this function
        may return an error.  */
-    CORE_ADDR (*to_get_thread_local_address) (ptid_t ptid,
+    CORE_ADDR (*to_get_thread_local_address) (struct target_ops *ops,
+					      ptid_t ptid,
 					      CORE_ADDR load_module_addr,
 					      CORE_ADDR offset);
 
@@ -529,7 +538,7 @@ struct target_ops
 			     CORE_ADDR *found_addrp);
 
     /* Can target execute in reverse?  */
-    int (*to_can_execute_reverse) ();
+    int (*to_can_execute_reverse) (void);
 
     /* Does this target support debugging multiple processes
        simultaneously?  */
@@ -621,20 +630,17 @@ extern void target_resume (ptid_t ptid, int step, enum target_signal signal);
    to the prompt with a debugging target but without the frame cache,
    stop_pc, etc., set up.  */
 
-#define	target_wait(ptid, status)		\
-     (*current_target.to_wait) (ptid, status)
+extern ptid_t target_wait (ptid_t ptid, struct target_waitstatus *status);
 
 /* Fetch at least register REGNO, or all regs if regno == -1.  No result.  */
 
-#define	target_fetch_registers(regcache, regno)	\
-     (*current_target.to_fetch_registers) (regcache, regno)
+extern void target_fetch_registers (struct regcache *regcache, int regno);
 
 /* Store at least register REGNO, or all regs if REGNO == -1.
    It can store as many registers as it wants to, so target_prepare_to_store
    must have been previously called.  Calls error() if there are problems.  */
 
-#define	target_store_registers(regcache, regs)	\
-     (*current_target.to_store_registers) (regcache, regs)
+extern void target_store_registers (struct regcache *regcache, int regs);
 
 /* Get ready to modify the registers array.  On machines which store
    individual registers, this doesn't need to do anything.  On machines
@@ -910,13 +916,11 @@ void target_mourn_inferior (void);
 
 /* Check to see if a thread is still alive.  */
 
-#define target_thread_alive(ptid) \
-     (*current_target.to_thread_alive) (ptid)
+extern int target_thread_alive (ptid_t ptid);
 
 /* Query for new threads and add them to the thread list.  */
 
-#define target_find_new_threads() \
-     (*current_target.to_find_new_threads) ()
+extern void target_find_new_threads (void);
 
 /* Make target stop in a continuable fashion.  (For instance, under
    Unix, this should act like SIGSTOP).  This function is normally
@@ -1009,14 +1013,9 @@ int target_supports_non_stop (void);
    `process xyz', but on some systems it may contain
    `process xyz thread abc'.  */
 
-#undef target_pid_to_str
-#define target_pid_to_str(PID) current_target.to_pid_to_str (PID)
+extern char *target_pid_to_str (ptid_t ptid);
 
-#ifndef target_tid_to_str
-#define target_tid_to_str(PID) \
-     target_pid_to_str (PID)
 extern char *normal_pid_to_str (ptid_t ptid);
-#endif
 
 /* Return a short string describing extra information about PID,
    e.g. "sleeping", "runnable", "running on LWP 3".  Null return value
@@ -1056,13 +1055,6 @@ extern char *normal_pid_to_str (ptid_t ptid);
 
 #define target_make_corefile_notes(BFD, SIZE_P) \
      (current_target.to_make_corefile_notes) (BFD, SIZE_P)
-
-/* Thread-local values.  */
-#define target_get_thread_local_address \
-    (current_target.to_get_thread_local_address)
-#define target_get_thread_local_address_p() \
-    (target_get_thread_local_address != NULL)
-
 
 /* Hardware watchpoint interfaces.  */
 
@@ -1129,14 +1121,9 @@ extern char *normal_pid_to_str (ptid_t ptid);
      (*current_target.to_remove_hw_breakpoint) (bp_tgt)
 #endif
 
-extern int target_stopped_data_address_p (struct target_ops *);
-
 #ifndef target_stopped_data_address
 #define target_stopped_data_address(target, x) \
     (*target.to_stopped_data_address) (target, x)
-#else
-/* Horrible hack to get around existing macros :-(.  */
-#define target_stopped_data_address_p(CURRENT_TARGET) (1)
 #endif
 
 #define target_watchpoint_addr_within_range(target, addr, start, length) \
@@ -1257,7 +1244,7 @@ extern int default_memory_insert_breakpoint (struct gdbarch *, struct bp_target_
 
 extern void initialize_targets (void);
 
-extern void noprocess (void);
+extern NORETURN void noprocess (void) ATTR_NORETURN;
 
 extern void target_require_runnable (void);
 

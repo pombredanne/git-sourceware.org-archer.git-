@@ -91,10 +91,6 @@ static void remote_files_info (struct target_ops *ignore);
 
 static void remote_prepare_to_store (struct regcache *regcache);
 
-static void remote_fetch_registers (struct regcache *regcache, int regno);
-
-static void remote_resume (ptid_t ptid, int step,
-                           enum target_signal siggnal);
 static void remote_open (char *name, int from_tty);
 
 static void extended_remote_open (char *name, int from_tty);
@@ -102,8 +98,6 @@ static void extended_remote_open (char *name, int from_tty);
 static void remote_open_1 (char *, int, struct target_ops *, int extended_p);
 
 static void remote_close (int quitting);
-
-static void remote_store_registers (struct regcache *regcache, int regno);
 
 static void remote_mourn (struct target_ops *ops);
 
@@ -116,9 +110,6 @@ static void remote_mourn_1 (struct target_ops *);
 static void remote_send (char **buf, long *sizeof_buf_p);
 
 static int readchar (int timeout);
-
-static ptid_t remote_wait (ptid_t ptid,
-			   struct target_waitstatus *status);
 
 static void remote_kill (void);
 
@@ -143,8 +134,6 @@ static void interrupt_query (void);
 
 static void set_general_thread (struct ptid ptid);
 static void set_continue_thread (struct ptid ptid);
-
-static int remote_thread_alive (ptid_t);
 
 static void get_offsets (void);
 
@@ -1001,6 +990,8 @@ enum {
   PACKET_vRun,
   PACKET_QStartNoAckMode,
   PACKET_vKill,
+  PACKET_qXfer_siginfo_read,
+  PACKET_qXfer_siginfo_write,
   PACKET_MAX
 };
 
@@ -1328,7 +1319,7 @@ set_general_process (void)
     system.  */
 
 static int
-remote_thread_alive (ptid_t ptid)
+remote_thread_alive (struct target_ops *ops, ptid_t ptid)
 {
   struct remote_state *rs = get_remote_state ();
   int tid = ptid_get_tid (ptid);
@@ -2134,7 +2125,7 @@ remote_find_new_threads (void)
  */
 
 static void
-remote_threads_info (void)
+remote_threads_info (struct target_ops *ops)
 {
   struct remote_state *rs = get_remote_state ();
   char *bufp;
@@ -2581,7 +2572,7 @@ remote_start_remote (struct ui_out *uiout, void *opaque)
 	 controlling.  We default to adding them in the running state.
 	 The '?' query below will then tell us about which threads are
 	 stopped.  */
-      remote_threads_info ();
+      remote_threads_info (args->target);
     }
   else if (rs->non_stop_aware)
     {
@@ -2965,6 +2956,10 @@ static struct protocol_feature remote_protocol_features[] = {
     PACKET_QStartNoAckMode },
   { "multiprocess", PACKET_DISABLE, remote_multi_process_feature, -1 },
   { "QNonStop", PACKET_DISABLE, remote_non_stop_feature, -1 },
+  { "qXfer:siginfo:read", PACKET_DISABLE, remote_supported_packet,
+    PACKET_qXfer_siginfo_read },
+  { "qXfer:siginfo:write", PACKET_DISABLE, remote_supported_packet,
+    PACKET_qXfer_siginfo_write },
 };
 
 static void
@@ -3410,7 +3405,7 @@ extended_remote_attach_1 (struct target_ops *target, char *args, int from_tty)
 
   if (non_stop)
     /* Get list of threads.  */
-    remote_threads_info ();
+    remote_threads_info (target);
   else
     /* Add the main thread to the thread list.  */
     add_thread_silent (inferior_ptid);
@@ -3693,7 +3688,8 @@ static enum target_signal last_sent_signal = TARGET_SIGNAL_0;
 static int last_sent_step;
 
 static void
-remote_resume (ptid_t ptid, int step, enum target_signal siggnal)
+remote_resume (struct target_ops *ops,
+	       ptid_t ptid, int step, enum target_signal siggnal)
 {
   struct remote_state *rs = get_remote_state ();
   char *buf;
@@ -4733,7 +4729,8 @@ remote_wait_as (ptid_t ptid, struct target_waitstatus *status)
    STATUS just as `wait' would.  */
 
 static ptid_t
-remote_wait (ptid_t ptid, struct target_waitstatus *status)
+remote_wait (struct target_ops *ops,
+	     ptid_t ptid, struct target_waitstatus *status)
 {
   ptid_t event_ptid;
 
@@ -4956,7 +4953,8 @@ fetch_registers_using_g (struct regcache *regcache)
 }
 
 static void
-remote_fetch_registers (struct regcache *regcache, int regnum)
+remote_fetch_registers (struct target_ops *ops,
+			struct regcache *regcache, int regnum)
 {
   struct remote_state *rs = get_remote_state ();
   struct remote_arch_state *rsa = get_remote_arch_state ();
@@ -5105,7 +5103,8 @@ store_registers_using_G (const struct regcache *regcache)
    of the register cache buffer.  FIXME: ignores errors.  */
 
 static void
-remote_store_registers (struct regcache *regcache, int regnum)
+remote_store_registers (struct target_ops *ops,
+			struct regcache *regcache, int regnum)
 {
   struct remote_state *rs = get_remote_state ();
   struct remote_arch_state *rsa = get_remote_arch_state ();
@@ -5705,7 +5704,7 @@ remote_xfer_memory (CORE_ADDR mem_addr, gdb_byte *buffer, int mem_len,
    FORMAT and the remaining arguments, then gets the reply.  Returns
    whether the packet was a success, a failure, or unknown.  */
 
-enum packet_result
+static enum packet_result
 remote_send_printf (const char *format, ...)
 {
   struct remote_state *rs = get_remote_state ();
@@ -7325,6 +7324,19 @@ remote_xfer_partial (struct target_ops *ops, enum target_object object,
 				     [PACKET_qXfer_spu_write]);
     }
 
+  /* Handle extra signal info using qxfer packets.  */
+  if (object == TARGET_OBJECT_SIGNAL_INFO)
+    {
+      if (readbuf)
+	return remote_read_qxfer (ops, "siginfo", annex, readbuf, offset, len,
+				  &remote_protocol_packets
+				  [PACKET_qXfer_siginfo_read]);
+      else
+	return remote_write_qxfer (ops, "siginfo", annex, writebuf, offset, len,
+				   &remote_protocol_packets
+				   [PACKET_qXfer_siginfo_write]);
+    }
+
   /* Only handle flash writes.  */
   if (writebuf != NULL)
     {
@@ -7769,7 +7781,7 @@ Fetch and print the remote list of thread identifiers, one pkt only"));
    buffer.  */
 
 static char *
-remote_pid_to_str (ptid_t ptid)
+remote_pid_to_str (struct target_ops *ops, ptid_t ptid)
 {
   static char buf[64];
   struct remote_state *rs = get_remote_state ();
@@ -7800,7 +7812,8 @@ remote_pid_to_str (ptid_t ptid)
    stored at OFFSET within the thread local storage for thread PTID.  */
 
 static CORE_ADDR
-remote_get_thread_local_address (ptid_t ptid, CORE_ADDR lm, CORE_ADDR offset)
+remote_get_thread_local_address (struct target_ops *ops,
+				 ptid_t ptid, CORE_ADDR lm, CORE_ADDR offset)
 {
   if (remote_protocol_packets[PACKET_qGetTLSAddr].support != PACKET_DISABLE)
     {
@@ -8674,15 +8687,6 @@ remote_supports_multi_process (void)
   return remote_multi_process_p (rs);
 }
 
-static int
-extended_remote_can_run (void)
-{
-  if (remote_desc != NULL)
-    return 1;
-
-  return 0;
-}
-
 static void
 init_remote_ops (void)
 {
@@ -8768,7 +8772,6 @@ Specify the serial device it is connected to (e.g. /dev/ttya).";
   extended_remote_ops.to_detach = extended_remote_detach;
   extended_remote_ops.to_attach = extended_remote_attach;
   extended_remote_ops.to_kill = extended_remote_kill;
-  extended_remote_ops.to_can_run = extended_remote_can_run;
 }
 
 static int
@@ -9080,6 +9083,12 @@ Show the maximum size of the address (in bits) in a memory packet."), NULL,
 
   add_packet_config_cmd (&remote_protocol_packets[PACKET_qXfer_osdata],
                         "qXfer:osdata:read", "osdata", 0);
+
+  add_packet_config_cmd (&remote_protocol_packets[PACKET_qXfer_siginfo_read],
+                         "qXfer:siginfo:read", "read-siginfo-object", 0);
+
+  add_packet_config_cmd (&remote_protocol_packets[PACKET_qXfer_siginfo_write],
+                         "qXfer:siginfo:write", "write-siginfo-object", 0);
 
   add_packet_config_cmd (&remote_protocol_packets[PACKET_qGetTLSAddr],
 			 "qGetTLSAddr", "get-thread-local-storage-address",

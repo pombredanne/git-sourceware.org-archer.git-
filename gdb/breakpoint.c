@@ -835,8 +835,8 @@ fetch_watchpoint_value (struct expression *exp, struct value **valp,
      in b->loc->cond.
    - Update the list of values that must be watched in B->loc.
 
-   If the watchpoint is disabled, do nothing.  If this is
-   local watchpoint that is out of scope, delete it.  */
+   If the watchpoint disposition is disp_del_at_next_stop, then do nothing.
+   If this is local watchpoint that is out of scope, delete it.  */
 static void
 update_watchpoint (struct breakpoint *b, int reparse)
 {
@@ -3491,8 +3491,7 @@ print_one_breakpoint_location (struct breakpoint *b,
 	if (opts.addressprint)
 	  ui_out_field_skip (uiout, "addr");
 	annotate_field (5);
-	print_expression (b->exp, stb->stream);
-	ui_out_field_stream (uiout, "what", stb);
+	ui_out_field_string (uiout, "what", b->exp_string);
 	break;
 
       case bp_breakpoint:
@@ -4458,6 +4457,14 @@ disable_breakpoints_in_unloaded_shlib (struct so_list *solib)
   struct bp_location *loc;
   int disabled_shlib_breaks = 0;
 
+  /* SunOS a.out shared libraries are always mapped, so do not
+     disable breakpoints; they will only be reported as unloaded
+     through clear_solib when GDB discards its shared library
+     list.  See clear_solib for more information.  */
+  if (exec_bfd != NULL
+      && bfd_get_flavour (exec_bfd) == bfd_target_aout_flavour)
+    return;
+
   ALL_BP_LOCATIONS (loc)
   {
     struct breakpoint *b = loc->owner;
@@ -4890,14 +4897,10 @@ static void
 mention (struct breakpoint *b)
 {
   int say_where = 0;
-  struct cleanup *old_chain, *ui_out_chain;
-  struct ui_stream *stb;
+  struct cleanup *ui_out_chain;
   struct value_print_options opts;
 
   get_user_print_options (&opts);
-
-  stb = ui_out_stream_new (uiout);
-  old_chain = make_cleanup_ui_out_stream_delete (stb);
 
   /* FIXME: This is misplaced; mention() is called by things (like
      hitting a watchpoint) other than breakpoint creation.  It should
@@ -4918,8 +4921,7 @@ mention (struct breakpoint *b)
 	ui_out_chain = make_cleanup_ui_out_tuple_begin_end (uiout, "wpt");
 	ui_out_field_int (uiout, "number", b->number);
 	ui_out_text (uiout, ": ");
-	print_expression (b->exp, stb->stream);
-	ui_out_field_stream (uiout, "exp", stb);
+	ui_out_field_string (uiout, "exp", b->exp_string);
 	do_cleanups (ui_out_chain);
 	break;
       case bp_hardware_watchpoint:
@@ -4927,8 +4929,7 @@ mention (struct breakpoint *b)
 	ui_out_chain = make_cleanup_ui_out_tuple_begin_end (uiout, "wpt");
 	ui_out_field_int (uiout, "number", b->number);
 	ui_out_text (uiout, ": ");
-	print_expression (b->exp, stb->stream);
-	ui_out_field_stream (uiout, "exp", stb);
+	ui_out_field_string (uiout, "exp", b->exp_string);
 	do_cleanups (ui_out_chain);
 	break;
       case bp_read_watchpoint:
@@ -4936,8 +4937,7 @@ mention (struct breakpoint *b)
 	ui_out_chain = make_cleanup_ui_out_tuple_begin_end (uiout, "hw-rwpt");
 	ui_out_field_int (uiout, "number", b->number);
 	ui_out_text (uiout, ": ");
-	print_expression (b->exp, stb->stream);
-	ui_out_field_stream (uiout, "exp", stb);
+	ui_out_field_string (uiout, "exp", b->exp_string);
 	do_cleanups (ui_out_chain);
 	break;
       case bp_access_watchpoint:
@@ -4945,8 +4945,7 @@ mention (struct breakpoint *b)
 	ui_out_chain = make_cleanup_ui_out_tuple_begin_end (uiout, "hw-awpt");
 	ui_out_field_int (uiout, "number", b->number);
 	ui_out_text (uiout, ": ");
-	print_expression (b->exp, stb->stream);
-	ui_out_field_stream (uiout, "exp", stb);
+	ui_out_field_string (uiout, "exp", b->exp_string);
 	do_cleanups (ui_out_chain);
 	break;
       case bp_breakpoint:
@@ -5015,7 +5014,6 @@ mention (struct breakpoint *b)
 
 	}
     }
-  do_cleanups (old_chain);
   if (ui_out_is_mi_like_p (uiout))
     return;
   printf_filtered ("\n");
@@ -5090,7 +5088,7 @@ create_breakpoint (struct symtabs_and_lines sals, char *addr_string,
 		   char *cond_string,
 		   enum bptype type, enum bpdisp disposition,
 		   int thread, int ignore_count, 
-		   struct breakpoint_ops *ops, int from_tty)
+		   struct breakpoint_ops *ops, int from_tty, int enabled)
 {
   struct breakpoint *b = NULL;
   int i;
@@ -5124,7 +5122,7 @@ create_breakpoint (struct symtabs_and_lines sals, char *addr_string,
   
 	  b->cond_string = cond_string;
 	  b->ignore_count = ignore_count;
-	  b->enable_state = bp_enabled;
+	  b->enable_state = enabled ? bp_enabled : bp_disabled;
 	  b->disposition = disposition;
 
 	  loc = b->loc;
@@ -5159,7 +5157,8 @@ create_breakpoint (struct symtabs_and_lines sals, char *addr_string,
 
 /* Remove element at INDEX_TO_REMOVE from SAL, shifting other
    elements to fill the void space.  */
-static void remove_sal (struct symtabs_and_lines *sal, int index_to_remove)
+static void
+remove_sal (struct symtabs_and_lines *sal, int index_to_remove)
 {
   int i = index_to_remove+1;
   int last_index = sal->nelts-1;
@@ -5184,7 +5183,7 @@ static void remove_sal (struct symtabs_and_lines *sal, int index_to_remove)
    line in all existing instantiations of 'foo'.
 
 */
-struct symtabs_and_lines
+static struct symtabs_and_lines
 expand_line_sal_maybe (struct symtab_and_line sal)
 {
   struct symtabs_and_lines expanded;
@@ -5299,7 +5298,8 @@ create_breakpoints (struct symtabs_and_lines sals, char **addr_string,
 		    char *cond_string,
 		    enum bptype type, enum bpdisp disposition,
 		    int thread, int ignore_count, 
-		    struct breakpoint_ops *ops, int from_tty)
+		    struct breakpoint_ops *ops, int from_tty,
+		    int enabled)
 {
   int i;
   for (i = 0; i < sals.nelts; ++i)
@@ -5309,7 +5309,7 @@ create_breakpoints (struct symtabs_and_lines sals, char **addr_string,
 
       create_breakpoint (expanded, addr_string[i],
 			 cond_string, type, disposition,
-			 thread, ignore_count, ops, from_tty);
+			 thread, ignore_count, ops, from_tty, enabled);
     }
 
   update_global_location_list (1);
@@ -5481,7 +5481,8 @@ break_command_really (char *arg, char *cond_string, int thread,
 		      int ignore_count,
 		      enum auto_boolean pending_break_support,
 		      struct breakpoint_ops *ops,
-		      int from_tty)
+		      int from_tty,
+		      int enabled)
 {
   struct gdb_exception e;
   struct symtabs_and_lines sals;
@@ -5614,7 +5615,7 @@ break_command_really (char *arg, char *cond_string, int thread,
 			  hardwareflag ? bp_hardware_breakpoint 
 			  : bp_breakpoint,
 			  tempflag ? disp_del : disp_donttouch,
-			  thread, ignore_count, ops, from_tty);
+			  thread, ignore_count, ops, from_tty, enabled);
     }
   else
     {
@@ -5635,6 +5636,7 @@ break_command_really (char *arg, char *cond_string, int thread,
       b->disposition = tempflag ? disp_del : disp_donttouch;
       b->condition_not_parsed = 1;
       b->ops = ops;
+      b->enable_state = enabled ? bp_enabled : bp_disabled;
 
       update_global_location_list (1);
       mention (b);
@@ -5669,7 +5671,8 @@ break_command_1 (char *arg, int flag, int from_tty)
 			0 /* Ignore count */,
 			pending_break_support, 
 			NULL /* breakpoint_ops */,
-			from_tty);
+			from_tty,
+			1 /* enabled */);
 }
 
 
@@ -5677,7 +5680,7 @@ void
 set_breakpoint (char *address, char *condition,
 		int hardwareflag, int tempflag,
 		int thread, int ignore_count,
-		int pending)
+		int pending, int enabled)
 {
   break_command_really (address, condition, thread,
 			0 /* condition and thread are valid.  */,
@@ -5685,7 +5688,7 @@ set_breakpoint (char *address, char *condition,
 			ignore_count,
 			pending 
 			? AUTO_BOOLEAN_TRUE : AUTO_BOOLEAN_FALSE,
-			NULL, 0);
+			NULL, 0, enabled);
 }
 
 /* Adjust SAL to the first instruction past the function prologue.
@@ -5950,6 +5953,12 @@ watch_command_1 (char *arg, int accessflag, int from_tty)
   exp_start = arg;
   exp = parse_exp_1 (&arg, 0, 0);
   exp_end = arg;
+  /* Remove trailing whitespace from the expression before saving it.
+     This makes the eventual display of the expression string a bit
+     prettier.  */
+  while (exp_end > exp_start && (exp_end[-1] == ' ' || exp_end[-1] == '\t'))
+    --exp_end;
+
   exp_valid_block = innermost_block;
   mark = value_mark ();
   fetch_watchpoint_value (exp, &val, NULL, NULL);
@@ -6536,7 +6545,8 @@ handle_gnu_v3_exceptions (int tempflag, char *cond_string,
 			tempflag, 0,
 			0,
 			AUTO_BOOLEAN_TRUE /* pending */,
-			&gnu_v3_exception_catchpoint_ops, from_tty);
+			&gnu_v3_exception_catchpoint_ops, from_tty,
+			1 /* enabled */);
 
   return 1;
 }

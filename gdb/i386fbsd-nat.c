@@ -35,7 +35,8 @@
    single-step it.  If SIGNAL is nonzero, give it that signal.  */
 
 static void
-i386fbsd_resume (ptid_t ptid, int step, enum target_signal signal)
+i386fbsd_resume (struct target_ops *ops,
+		 ptid_t ptid, int step, enum target_signal signal)
 {
   pid_t pid = ptid_get_pid (ptid);
   int request = PT_STEP;
@@ -125,6 +126,7 @@ _initialize_i386fbsd_nat (void)
 
   /* Add some extra features to the common *BSD/i386 target.  */
   t = i386bsd_target ();
+  i386_use_watchpoints (t);
   t->to_resume = i386fbsd_resume;
   t->to_pid_to_exec_file = fbsd_pid_to_exec_file;
   t->to_find_memory_regions = fbsd_find_memory_regions;

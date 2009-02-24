@@ -20,9 +20,7 @@
 #include "defs.h"
 #include "osabi.h"
 #include "gdb_string.h"
-#include "solib.h"
-#include "solib-target.h"
-#include "inferior.h"
+#include "dicos-tdep.h"
 
 static CORE_ADDR
 i386_dicos_push_dummy_code (struct gdbarch *gdbarch,
@@ -47,69 +45,9 @@ i386_dicos_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
 {
   struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
 
-  set_solib_ops (gdbarch, &solib_target_so_ops);
+  dicos_init_abi (gdbarch);
 
-  /* Every process, although has its own address space, sees the same
-     list of shared libraries.  */
-  set_gdbarch_has_global_solist (gdbarch, 1);
-
-  /* There's no (standard definition of) entry point or a guaranteed
-     text location we could find with a symbol where to place the call
-     dummy, so we put it on the stack.  */
-  set_gdbarch_call_dummy_location (gdbarch, ON_STACK);
   set_gdbarch_push_dummy_code (gdbarch, i386_dicos_push_dummy_code);
-
-  /* DICOS rewinds itself.  Need to override the i386 default which is
-     to decrement the PC.  */
-  set_gdbarch_decr_pc_after_break (gdbarch, 0);
-}
-
-/* Look in the elf symbol table of ABFD for a symbol named WANTED.
-   Return true if found.  */
-static int
-i386_dicos_bfd_has_symbol_p (bfd *abfd, const char *wanted)
-{
-  long storage_needed;
-  int ret = 0;
-  asymbol **symbol_table = NULL;
-
-  storage_needed = bfd_get_symtab_upper_bound (abfd);
-  if (storage_needed < 0)
-    {
-      warning (_("Can't read elf symbols from %s: %s"), bfd_get_filename (abfd),
-	       bfd_errmsg (bfd_get_error ()));
-      return 0;
-    }
-
-  if (storage_needed > 0)
-    {
-      long i, symcount;
-
-      symbol_table = xmalloc (storage_needed);
-      symcount = bfd_canonicalize_symtab (abfd, symbol_table);
-
-      if (symcount < 0)
-	warning (_("Can't read elf symbols from %s: %s"),
-		 bfd_get_filename (abfd),
-		 bfd_errmsg (bfd_get_error ()));
-      else
-	{
-	  for (i = 0; i < symcount; i++)
-	    {
-	      asymbol *sym = symbol_table[i];
-	      if (sym->name != NULL
-		  && wanted[0] == sym->name[0]
-		  && strcmp (wanted + 1, sym->name + 1) == 0)
-		{
-		  ret = 1;
-		  break;
-		}
-	    }
-	}
-    }
-
-  xfree (symbol_table);
-  return ret;
 }
 
 static enum gdb_osabi
@@ -117,19 +55,10 @@ i386_dicos_osabi_sniffer (bfd *abfd)
 {
   char *target_name = bfd_get_target (abfd);
 
-  /* DICOS debug info files don't have a .note.ABI-tag marker or
-     something similar.  We do know there's always a "header" section
-     of 36 bytes, and there's always a "Dicos_loadModuleInfo" symbol
-     defined.  Look for the section first, as that should be
-     cheaper.  */
-  if (strcmp (target_name, "elf32-i386") == 0)
-    {
-      asection *section = bfd_get_section_by_name (abfd, "header");
-      if (section
-	  && bfd_section_size (abfd, section) == 36
-	  && i386_dicos_bfd_has_symbol_p (abfd, "Dicos_loadModuleInfo"))
-	return GDB_OSABI_DICOS;
-    }
+  /* On x86-DICOS, the Load Module's "header" section is 36 bytes.  */
+  if (strcmp (target_name, "elf32-i386") == 0
+      && dicos_load_module_p (abfd, 36))
+    return GDB_OSABI_DICOS;
 
   return GDB_OSABI_UNKNOWN;
 }

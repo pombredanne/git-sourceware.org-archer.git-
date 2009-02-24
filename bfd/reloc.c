@@ -1734,6 +1734,36 @@ ENUMX
   BFD_RELOC_68K_JMP_SLOT
 ENUMX
   BFD_RELOC_68K_RELATIVE
+ENUMX
+  BFD_RELOC_68K_TLS_GD32
+ENUMX
+  BFD_RELOC_68K_TLS_GD16
+ENUMX
+  BFD_RELOC_68K_TLS_GD8
+ENUMX
+  BFD_RELOC_68K_TLS_LDM32
+ENUMX
+  BFD_RELOC_68K_TLS_LDM16
+ENUMX
+  BFD_RELOC_68K_TLS_LDM8
+ENUMX
+  BFD_RELOC_68K_TLS_LDO32
+ENUMX
+  BFD_RELOC_68K_TLS_LDO16
+ENUMX
+  BFD_RELOC_68K_TLS_LDO8
+ENUMX
+  BFD_RELOC_68K_TLS_IE32
+ENUMX
+  BFD_RELOC_68K_TLS_IE16
+ENUMX
+  BFD_RELOC_68K_TLS_IE8
+ENUMX
+  BFD_RELOC_68K_TLS_LE32
+ENUMX
+  BFD_RELOC_68K_TLS_LE16
+ENUMX
+  BFD_RELOC_68K_TLS_LE8
 ENUMDOC
   Relocations used by 68K ELF.
 
@@ -2078,6 +2108,30 @@ ENUMDOC
   Like BFD_RELOC_23_PCREL_S2, except that the source and target must
   share a common GP, and the target address is adjusted for
   STO_ALPHA_STD_GPLOAD.
+
+ENUM
+  BFD_RELOC_ALPHA_NOP
+ENUMDOC
+  The NOP relocation outputs a NOP if the longword displacement
+     between two procedure entry points is < 2^21.
+
+ENUM
+  BFD_RELOC_ALPHA_BSR
+ENUMDOC
+  The BSR relocation outputs a BSR if the longword displacement
+     between two procedure entry points is < 2^21.
+
+ENUM
+  BFD_RELOC_ALPHA_LDA
+ENUMDOC
+  The LDA relocation outputs a LDA if the longword displacement
+     between two procedure entry points is < 2^16.
+
+ENUM
+  BFD_RELOC_ALPHA_BOH
+ENUMDOC
+  The BOH relocation outputs a BSR if the longword displacement
+     between two procedure entry points is < 2^21, or else a hint.
 
 ENUM
   BFD_RELOC_ALPHA_TLSGD

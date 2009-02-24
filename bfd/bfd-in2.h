@@ -1801,6 +1801,7 @@ enum bfd_architecture
 #define bfd_mach_mips_loongson_2f      3002
 #define bfd_mach_mips_sb1              12310201 /* octal 'SB', 01 */
 #define bfd_mach_mips_octeon           6501
+#define bfd_mach_mips_xlr              887682   /* decimal 'XLR'  */
 #define bfd_mach_mipsisa32             32
 #define bfd_mach_mipsisa32r2           33
 #define bfd_mach_mipsisa64             64
@@ -2363,6 +2364,21 @@ The 24-bit relocation is used in some Intel 960 configurations.  */
   BFD_RELOC_68K_GLOB_DAT,
   BFD_RELOC_68K_JMP_SLOT,
   BFD_RELOC_68K_RELATIVE,
+  BFD_RELOC_68K_TLS_GD32,
+  BFD_RELOC_68K_TLS_GD16,
+  BFD_RELOC_68K_TLS_GD8,
+  BFD_RELOC_68K_TLS_LDM32,
+  BFD_RELOC_68K_TLS_LDM16,
+  BFD_RELOC_68K_TLS_LDM8,
+  BFD_RELOC_68K_TLS_LDO32,
+  BFD_RELOC_68K_TLS_LDO16,
+  BFD_RELOC_68K_TLS_LDO8,
+  BFD_RELOC_68K_TLS_IE32,
+  BFD_RELOC_68K_TLS_IE16,
+  BFD_RELOC_68K_TLS_IE8,
+  BFD_RELOC_68K_TLS_LE32,
+  BFD_RELOC_68K_TLS_LE16,
+  BFD_RELOC_68K_TLS_LE8,
 
 /* Linkage-table relative.  */
   BFD_RELOC_32_BASEREL,
@@ -2569,6 +2585,22 @@ GP register.  */
 share a common GP, and the target address is adjusted for
 STO_ALPHA_STD_GPLOAD.  */
   BFD_RELOC_ALPHA_BRSGP,
+
+/* The NOP relocation outputs a NOP if the longword displacement
+between two procedure entry points is < 2^21.  */
+  BFD_RELOC_ALPHA_NOP,
+
+/* The BSR relocation outputs a BSR if the longword displacement
+between two procedure entry points is < 2^21.  */
+  BFD_RELOC_ALPHA_BSR,
+
+/* The LDA relocation outputs a LDA if the longword displacement
+between two procedure entry points is < 2^16.  */
+  BFD_RELOC_ALPHA_LDA,
+
+/* The BOH relocation outputs a BSR if the longword displacement
+between two procedure entry points is < 2^21, or else a hint.  */
+  BFD_RELOC_ALPHA_BOH,
 
 /* Alpha thread-local storage relocations.  */
   BFD_RELOC_ALPHA_TLSGD,

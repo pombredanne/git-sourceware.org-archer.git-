@@ -45,6 +45,7 @@
 #include "observer.h"
 #include "readline/readline.h"
 #include "remote.h"
+#include "solib.h"
 
 /* Architecture-specific operations.  */
 
@@ -908,6 +909,7 @@ clear_solib (void)
     {
       struct so_list *so = so_list_head;
       so_list_head = so->next;
+      observer_notify_solib_unloaded (so);
       if (so->abfd)
 	remove_target_sections (so->abfd);
       free_so (so);

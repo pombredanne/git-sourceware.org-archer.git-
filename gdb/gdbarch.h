@@ -638,6 +638,15 @@ typedef const struct regset * (gdbarch_regset_from_core_section_ftype) (struct g
 extern const struct regset * gdbarch_regset_from_core_section (struct gdbarch *gdbarch, const char *sect_name, size_t sect_size);
 extern void set_gdbarch_regset_from_core_section (struct gdbarch *gdbarch, gdbarch_regset_from_core_section_ftype *regset_from_core_section);
 
+/* When creating core dumps, some systems encode the PID in addition
+   to the LWP id in core file register section names.  In those cases, the
+   "XXX" in ".reg/XXX" is encoded as [LWPID << 16 | PID].  This setting
+   is set to true for such architectures; false if "XXX" represents an LWP
+   or thread id with no special encoding. */
+
+extern int gdbarch_core_reg_section_encodes_pid (struct gdbarch *gdbarch);
+extern void set_gdbarch_core_reg_section_encodes_pid (struct gdbarch *gdbarch, int core_reg_section_encodes_pid);
+
 /* Supported register notes in a core file. */
 
 extern struct core_regset_section * gdbarch_core_regset_sections (struct gdbarch *gdbarch);
@@ -651,6 +660,15 @@ extern int gdbarch_core_xfer_shared_libraries_p (struct gdbarch *gdbarch);
 typedef LONGEST (gdbarch_core_xfer_shared_libraries_ftype) (struct gdbarch *gdbarch, gdb_byte *readbuf, ULONGEST offset, LONGEST len);
 extern LONGEST gdbarch_core_xfer_shared_libraries (struct gdbarch *gdbarch, gdb_byte *readbuf, ULONGEST offset, LONGEST len);
 extern void set_gdbarch_core_xfer_shared_libraries (struct gdbarch *gdbarch, gdbarch_core_xfer_shared_libraries_ftype *core_xfer_shared_libraries);
+
+/* How the core_stratum layer converts a PTID from a core file to a
+   string. */
+
+extern int gdbarch_core_pid_to_str_p (struct gdbarch *gdbarch);
+
+typedef char * (gdbarch_core_pid_to_str_ftype) (struct gdbarch *gdbarch, ptid_t ptid);
+extern char * gdbarch_core_pid_to_str (struct gdbarch *gdbarch, ptid_t ptid);
+extern void set_gdbarch_core_pid_to_str (struct gdbarch *gdbarch, gdbarch_core_pid_to_str_ftype *core_pid_to_str);
 
 /* If the elements of C++ vtables are in-place function descriptors rather
    than normal function pointers (which may point to code or a descriptor),
@@ -802,6 +820,16 @@ extern void set_gdbarch_target_signal_from_host (struct gdbarch *gdbarch, gdbarc
 typedef int (gdbarch_target_signal_to_host_ftype) (struct gdbarch *gdbarch, enum target_signal ts);
 extern int gdbarch_target_signal_to_host (struct gdbarch *gdbarch, enum target_signal ts);
 extern void set_gdbarch_target_signal_to_host (struct gdbarch *gdbarch, gdbarch_target_signal_to_host_ftype *target_signal_to_host);
+
+/* Extra signal info inspection.
+  
+   Return a type suitable to inspect extra signal information. */
+
+extern int gdbarch_get_siginfo_type_p (struct gdbarch *gdbarch);
+
+typedef struct type * (gdbarch_get_siginfo_type_ftype) (struct gdbarch *gdbarch);
+extern struct type * gdbarch_get_siginfo_type (struct gdbarch *gdbarch);
+extern void set_gdbarch_get_siginfo_type (struct gdbarch *gdbarch, gdbarch_get_siginfo_type_ftype *get_siginfo_type);
 
 /* Record architecture-specific information from the symbol table. */
 

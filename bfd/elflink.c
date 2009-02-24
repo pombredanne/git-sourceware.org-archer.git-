@@ -1262,7 +1262,7 @@ _bfd_elf_merge_symbol (bfd *abfd,
   if (olddef && newdyn)
     oldweak = FALSE;
 
-  /* Allow changes between different types of funciton symbol.  */
+  /* Allow changes between different types of function symbol.  */
   if (newfunc && oldfunc)
     *type_change_ok = TRUE;
 
@@ -3199,6 +3199,16 @@ elf_add_dt_needed_tag (bfd *abfd,
   return 0;
 }
 
+static bfd_boolean
+on_needed_list (const char *soname, struct bfd_link_needed_list *needed)
+{
+  for (; needed != NULL; needed = needed->next)
+    if (strcmp (soname, needed->name) == 0)
+      return TRUE;
+
+  return FALSE;
+}
+
 /* Sort symbol by value and section.  */
 static int
 elf_sort_symbol (const void *arg1, const void *arg2)
@@ -4434,8 +4444,11 @@ elf_link_add_object_symbols (bfd *abfd, struct bfd_link_info *info)
 
 	  if (!add_needed
 	      && definition
-	      && dynsym
-	      && h->ref_regular)
+	      && ((dynsym
+		   && h->ref_regular)
+		  || (h->ref_dynamic
+		      && (elf_dyn_lib_class (abfd) & DYN_AS_NEEDED) != 0
+		      && !on_needed_list (elf_dt_name (abfd), htab->needed))))
 	    {
 	      int ret;
 	      const char *soname = elf_dt_name (abfd);
@@ -10215,8 +10228,13 @@ bfd_elf_final_link (bfd *abfd, struct bfd_link_info *info)
 	      bfd_size_type entsize1;
 
 	      entsize1 = esdi->rel_hdr.sh_entsize;
-	      BFD_ASSERT (entsize1 == bed->s->sizeof_rel
-			  || entsize1 == bed->s->sizeof_rela);
+	      /* PR 9827: If the header size has not been set yet then
+		 assume that it will match the output section's reloc type.  */
+	      if (entsize1 == 0)
+		entsize1 = o->use_rela_p ? bed->s->sizeof_rela : bed->s->sizeof_rel;
+	      else
+		BFD_ASSERT (entsize1 == bed->s->sizeof_rel
+			    || entsize1 == bed->s->sizeof_rela);
 	      same_size = !o->use_rela_p == (entsize1 == bed->s->sizeof_rel);
 
 	      if (!same_size)

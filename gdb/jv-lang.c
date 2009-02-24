@@ -1054,7 +1054,7 @@ enum java_primitive_types
   nr_java_primitive_types
 };
 
-void
+static void
 java_language_arch_info (struct gdbarch *gdbarch,
 			 struct language_arch_info *lai)
 {
@@ -1128,6 +1128,7 @@ const struct language_defn java_language_defn =
   java_language_arch_info,
   default_print_array_index,
   default_pass_by_reference,
+  default_get_string,
   LANG_MAGIC
 };
 

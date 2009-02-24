@@ -404,7 +404,8 @@ spu_child_post_attach (int pid)
 /* Wait for child PTID to do something.  Return id of the child,
    minus_one_ptid in case of error; store status into *OURSTATUS.  */
 static ptid_t
-spu_child_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
+spu_child_wait (struct target_ops *ops,
+		ptid_t ptid, struct target_waitstatus *ourstatus)
 {
   int save_errno;
   int status;
@@ -451,7 +452,8 @@ spu_child_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
 
 /* Override the fetch_inferior_register routine.  */
 static void
-spu_fetch_inferior_registers (struct regcache *regcache, int regno)
+spu_fetch_inferior_registers (struct target_ops *ops,
+			      struct regcache *regcache, int regno)
 {
   int fd;
   ULONGEST addr;
@@ -492,7 +494,8 @@ spu_fetch_inferior_registers (struct regcache *regcache, int regno)
 
 /* Override the store_inferior_register routine.  */
 static void
-spu_store_inferior_registers (struct regcache *regcache, int regno)
+spu_store_inferior_registers (struct target_ops *ops,
+			      struct regcache *regcache, int regno)
 {
   int fd;
   ULONGEST addr;
