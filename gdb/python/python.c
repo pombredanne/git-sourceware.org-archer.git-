@@ -1055,74 +1055,47 @@ gdbpy_objfiles (PyObject *unused1, PyObject *unused2)
 
 
 
-/* Return a string representing TYPE.  */
-static char *
-get_type (struct type *type)
-{
-  struct cleanup *old_chain;
-  struct ui_file *stb;
-  char *thetype;
-  long length;
-
-  stb = mem_fileopen ();
-  old_chain = make_cleanup_ui_file_delete (stb);
-
-  CHECK_TYPEDEF (type);
-
-  type_print (type, "", stb, -1);
-
-  thetype = ui_file_xstrdup (stb, &length);
-  do_cleanups (old_chain);
-  return thetype;
-}
-
 /* Helper function for find_pretty_printer which iterates over a
-   dictionary and tries to find a match.  */
+   list, calls each function and inspects output.  */
 static PyObject *
-search_pp_dictionary (PyObject *dict, char *type_name)
+search_pp_list (PyObject *list, PyObject *value)
 {
-  Py_ssize_t iter;
-  PyObject *key, *func, *found = NULL;
-
-  /* See if the type matches a pretty-printer regexp.  */
-  iter = 0;
-  while (! found && PyDict_Next (dict, &iter, &key, &func))
+  Py_ssize_t pp_list_size, list_index;
+  PyObject *function, *printer = NULL;
+  
+  pp_list_size = PyList_Size (list);
+  for (list_index = 0; list_index < pp_list_size; list_index++)
     {
-      char *rx_str;
+      function = PyList_GetItem (list, list_index);
+      if (! function)
+	return NULL;
 
-      if (! PyString_Check (key))
-	continue;
-      rx_str = PyString_AsString (key);
-      if (re_comp (rx_str) == NULL && re_exec (type_name) == 1)
-	found = func;
+      /* gdbpy_instantiate_printer can return three possible return
+	 values:  NULL on error;  Py_None if the pretty-printer
+	 in the list cannot print the value; or a printer instance if
+	 the printer can print the value.  */
+      printer = gdbpy_instantiate_printer (function, value);
+      if (! printer)
+	return NULL;
+      else if (printer != Py_None)
+	return printer;
+
+      Py_DECREF (printer);
     }
 
-  return found;
+  Py_RETURN_NONE;
 }
 
 /* Find the pretty-printing constructor function for TYPE.  If no
    pretty-printer exists, return NULL.  If one exists, return a new
    reference.  */
 static PyObject *
-find_pretty_printer (struct type *type)
+find_pretty_printer (PyObject *value)
 {
-  PyObject *dict, *found = NULL;
-  char *type_name = NULL;
+  PyObject *pp_list = NULL;
+  PyObject *function = NULL;
   struct objfile *obj;
   volatile struct gdb_exception except;
-
-  /* Get the name of the type.  */
-  TRY_CATCH (except, RETURN_MASK_ALL)
-    {
-      /* If we have a reference, use the referenced type.  */
-      if (TYPE_CODE (type) == TYPE_CODE_REF)
-	type = TYPE_TARGET_TYPE (type);
-      /* Strip off any qualifiers from the type.  */
-      type = make_cv_type (0, 0, type, NULL);
-      type_name = get_type (type);
-    }
-  if (except.reason < 0)
-    return NULL;
 
   /* Look at the pretty-printer dictionary for each objfile.  */
   ALL_OBJFILES (obj)
@@ -1131,34 +1104,43 @@ find_pretty_printer (struct type *type)
     if (!objf)
       continue;
 
-    dict = objfpy_get_printers (objf, NULL);
-    found = search_pp_dictionary (dict, type_name);
-    if (found)
-      goto done;
+    pp_list = objfpy_get_printers (objf, NULL);
+    function = search_pp_list (pp_list, value);
 
-    Py_DECREF (dict);
+    /* If there is an error in any objfile list, abort the search and
+       exit.  */
+    if (! function)
+      {
+	Py_XDECREF (pp_list);
+	return NULL;
+      }
+
+    if (function != Py_None)
+      goto done;
+    
+    /* In this loop, if function is not an instantiation of a
+    pretty-printer, and it is not null, then it is a return of
+    Py_RETURN_NONE, which must be decremented.  */
+    Py_DECREF (function);
+    Py_XDECREF (pp_list);
   }
 
+  pp_list = NULL;
   /* Fetch the global pretty printer dictionary.  */
-  dict = NULL;
   if (! PyObject_HasAttrString (gdb_module, "pretty_printers"))
     goto done;
-  dict = PyObject_GetAttrString (gdb_module, "pretty_printers");
-  if (! dict)
+  pp_list = PyObject_GetAttrString (gdb_module, "pretty_printers");
+  if (! pp_list)
     goto done;
-  if (! PyDict_Check (dict) || ! PyDict_Size (dict))
+  if (! PyList_Check (pp_list))
     goto done;
 
-  found = search_pp_dictionary (dict, type_name);
+  function = search_pp_list (pp_list, value);
 
  done:
-  xfree (type_name);
-
-  if (found)
-    Py_INCREF (found);
-  Py_XDECREF (dict);
-
-  return found;
+  Py_XDECREF (pp_list);
+  
+  return function;
 }
 
 /* Pretty-print a single value, via the printer object PRINTER.  If
@@ -1199,24 +1181,13 @@ pretty_print_one_value (PyObject *printer, struct value **out_value)
 }
 
 /* Instantiate a pretty-printer given a constructor, CONS, and a
-   value, VAL.  Return NULL on error.  */
+   value, VAL.  Return NULL on error.  Ownership of the object
+   instance is transferred to the reciever */
 PyObject *
-gdbpy_instantiate_printer (PyObject *cons, struct value *value)
+gdbpy_instantiate_printer (PyObject *cons, PyObject *value)
 {
-  PyObject *val_obj = NULL, *result;
-  volatile struct gdb_exception except;
-
-  TRY_CATCH (except, RETURN_MASK_ALL)
-    {
-      /* FIXME: memory management here.  Why are values so
-	 funny?  */
-      value = value_copy (value);
-      val_obj = value_to_value_object (value);
-    }
-  GDB_PY_HANDLE_EXCEPTION (except);
-
-  result = PyObject_CallFunctionObjArgs (cons, val_obj, NULL);
-  Py_DECREF (val_obj);
+  PyObject *result;
+  result = PyObject_CallFunctionObjArgs (cons, value, NULL);
   return result;
 }
 
@@ -1409,9 +1380,12 @@ print_children (PyObject *printer, const char *hint,
 
       if (! item)
 	{
+	  if (PyErr_Occurred ())
+	    gdbpy_print_stack ();
 	  /* Set a flag so we can know whether we printed all the
 	     available elements.  */
-	  done_flag = 1;
+	  else	  
+	    done_flag = 1;
 	  break;
 	}
 
@@ -1531,7 +1505,8 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
 			  const struct value_print_options *options,
 			  const struct language_defn *language)
 {
-  PyObject *func, *printer;
+  PyObject *printer = NULL;
+  PyObject *val_obj = NULL;
   struct value *value;
   char *hint = NULL;
   struct cleanup *cleanups;
@@ -1541,38 +1516,34 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
   state = PyGILState_Ensure ();
   cleanups = make_cleanup_py_restore_gil (&state);
 
-  /* Find the constructor.  */
-  func = find_pretty_printer (type);
-  if (! func)
-    goto done;
-
   /* Instantiate the printer.  */
   if (valaddr)
     valaddr += embedded_offset;
   value = value_from_contents_and_address (type, valaddr, address);
-  printer = gdbpy_instantiate_printer (func, value);
-  Py_DECREF (func);
 
-  if (!printer)
-    {
-      gdbpy_print_stack ();
-      goto done;
-    }
+  val_obj = value_to_value_object (value);
+  if (! val_obj)
+    goto done;
+  
+  /* Find the constructor.  */
+  printer = find_pretty_printer (val_obj);
+  make_cleanup_py_decref (printer);
+  if (! printer || printer == Py_None)
+    goto done;
 
   /* If we are printing a map, we want some special formatting.  */
   hint = gdbpy_get_display_hint (printer);
   make_cleanup (free_current_contents, &hint);
 
-  make_cleanup_py_decref (printer);
-  if (printer != Py_None)
-    {
-      print_string_repr (printer, hint, stream, recurse, options, language);
-      print_children (printer, hint, stream, recurse, options, language);
+  /* Print the section */
+  print_string_repr (printer, hint, stream, recurse, options, language);
+  print_children (printer, hint, stream, recurse, options, language);
+  result = 1;
 
-      result = 1;
-    }
 
  done:
+  if (PyErr_Occurred ())
+    gdbpy_print_stack ();
   do_cleanups (cleanups);
   return result;
 }
@@ -1586,7 +1557,7 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
    value, and this function returns NULL.  On error, *REPLACEMENT is
    set to NULL and this function also returns NULL.  */
 char *
-apply_varobj_pretty_printer (PyObject *printer_obj, struct value *value,
+apply_varobj_pretty_printer (PyObject *printer_obj,
 			     struct value **replacement)
 {
   char *result;
@@ -1602,13 +1573,29 @@ apply_varobj_pretty_printer (PyObject *printer_obj, struct value *value,
 }
 
 /* Find a pretty-printer object for the varobj module.  Returns a new
-   reference to the object if successful; returns NULL if not.  TYPE
-   is the type of the varobj for which a printer should be
-   returned.  */
+   reference to the object if successful; returns NULL if not.  VALUE
+   is the value for which a printer tests to determine if it 
+   can pretty-print the value.  */
 PyObject *
-gdbpy_get_varobj_pretty_printer (struct type *type)
+gdbpy_get_varobj_pretty_printer (struct value *value)
 {
-  return find_pretty_printer (type);
+  PyObject *val_obj;
+  PyObject *pretty_printer = NULL;
+  volatile struct gdb_exception except;
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      value = value_copy (value);
+    }
+  GDB_PY_HANDLE_EXCEPTION (except);
+  
+  val_obj = value_to_value_object (value);
+  if (! val_obj)
+    return NULL;
+
+  pretty_printer = find_pretty_printer (val_obj);
+  Py_DECREF (val_obj);
+  return pretty_printer;
 }
 
 /* A Python function which wraps find_pretty_printer and instantiates
@@ -1631,24 +1618,8 @@ gdbpy_default_visualizer (PyObject *self, PyObject *args)
       return NULL;
     }
 
-  cons = find_pretty_printer (value_type (value));
-  if (cons)
-    {
-      /* While it is a bit lame to pass value here and make a new
-	 Value, it is probably better to share the instantiation
-	 code.  */
-      printer = gdbpy_instantiate_printer (cons, value);
-      Py_DECREF (cons);
-    }
-
-  if (!printer)
-    {
-      PyErr_Clear ();
-      printer = Py_None;
-      Py_INCREF (printer);
-    }
-
-  return printer;
+  cons = find_pretty_printer (val_obj);
+  return cons;
 }
 
 #else /* HAVE_PYTHON */
@@ -1801,7 +1772,7 @@ Enables or disables auto-loading of Python code when an object is opened."),
   gdbpy_initialize_membuf ();
 
   PyRun_SimpleString ("import gdb");
-  PyRun_SimpleString ("gdb.pretty_printers = {}");
+  PyRun_SimpleString ("gdb.pretty_printers = []");
 
   observer_attach_new_objfile (gdbpy_new_objfile);
 

@@ -1,6 +1,6 @@
 /* Python interface to types.
 
-   Copyright (C) 2008 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -231,6 +231,15 @@ typy_tag (PyObject *self, PyObject *args)
   if (!TYPE_TAG_NAME (type))
     Py_RETURN_NONE;
   return PyString_FromString (TYPE_TAG_NAME (type));
+}
+
+/* Return the type, stripped of typedefs. */
+static PyObject *
+typy_strip_typedefs (PyObject *self, PyObject *args)
+{
+  struct type *type = ((type_object *) self)->type;
+
+  return type_to_type_object (check_typedef (type));
 }
 
 /* Return a Type object which represents a pointer to SELF.  */
@@ -710,6 +719,8 @@ Each field is a dictionary." },
     "Return the size of this type, in bytes" },
   { "tag", typy_tag, METH_NOARGS,
     "Return the tag name for this type, or None." },
+  { "strip_typedefs", typy_strip_typedefs, METH_NOARGS,
+    "Return a type stripped of typedefs"},
   { "target", typy_target, METH_NOARGS,
     "Return the target type of this type" },
   { "template_argument", typy_template_argument, METH_VARARGS,

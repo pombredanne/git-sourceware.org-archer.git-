@@ -1,6 +1,6 @@
 /* Python interface to objfiles.
 
-   Copyright (C) 2008 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -29,7 +29,7 @@ typedef struct
   /* The corresponding objfile.  */
   struct objfile *objfile;
 
-  /* The pretty-printer dictionary.  */
+  /* The pretty-printer list of functions.  */
   PyObject *printers;
 } objfile_object;
 
@@ -66,7 +66,7 @@ objfpy_new (PyTypeObject *type, PyObject *args, PyObject *keywords)
     {
       self->objfile = NULL;
 
-      self->printers = PyDict_New ();
+      self->printers = PyList_New (0);
       if (!self->printers)
 	{
 	  Py_DECREF (self);
@@ -95,10 +95,10 @@ objfpy_set_printers (PyObject *o, PyObject *value, void *ignore)
       return -1;
     }
 
-  if (! PyDict_Check (value))
+  if (! PyList_Check (value))
     {
       PyErr_SetString (PyExc_TypeError,
-		       "the pretty_printers attribute must be a dictionary");
+		       "the pretty_printers attribute must be a list");
       return -1;
     }
 
@@ -139,7 +139,7 @@ objfile_to_objfile_object (struct objfile *objfile)
 
 	  object->objfile = objfile;
 
-	  object->printers = PyDict_New ();
+	  object->printers = PyList_New (0);
 	  if (!object->printers)
 	    {
 	      Py_DECREF (object);

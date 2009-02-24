@@ -18548,6 +18548,11 @@ target's @code{char} type will be an 8-bit byte.  However, on some
 unusual platforms, this type may have a different size.
 @end defmethod
 
+@defmethod Type strip_typedefs
+Return a new @code{gdb.Type} that represents the real type,
+after removing all layers of typedefs.
+@end defmethod
+
 @defmethod Type tag
 Return the tag name for this type.  The tag name is the name after
 @code{struct}, @code{union}, or @code{enum} in C; not all languages
@@ -18808,30 +18813,27 @@ convertible to @code{gdb.Value}, an exception is raised.
 
 @subsubsection Selecting Pretty-Printers
 
-The Python dictionary @code{gdb.pretty_printers} maps regular
-expressions (strings) onto constructors.  Each @code{gdb.Objfile} also
-contains a @code{pretty_printers} attribute.  A constructor, in this
-context, is a function which takes a single @code{gdb.Value} argument
-and returns a a pretty-printer conforming to the interface definition
-above.
+The Python list @code{gdb.pretty_printers} contains an array of
+functions that have been registered via addition as a pretty-printer.
+Each function will be called with a @code{gdb.Value} to be
+pretty-printed.  Each @code{gdb.Objfile} also contains a
+@code{pretty_printers} attribute.  A function on one of these lists
+takes a single @code{gdb.Value} argument and returns a pretty-printer
+object conforming to the interface definition above.  If this function
+cannot create a pretty-printer for the value, it should return
+@code{None}.
 
-When printing a value, @value{GDBN} first computes the value's
-canonical type by following typedefs, following a reference type to
-its referenced type, and removing qualifiers, such as @code{const} or
-@code{volatile}.
-
-Then, @value{GDBN} tests each regular expression against this type name.
 @value{GDBN} first checks the @code{pretty_printers} attribute of each
-@code{gdb.Objfile}; after these have been exhausted it tries the
-global @code{gdb.pretty_printers}.
-
-If a regular expression matches, then the corresponding pretty-printer
-is invoked with a @code{gdb.Value} representing the value to be
-printed.
+@code{gdb.Objfile} and iteratively calls each function in the list for
+that @code{gdb.Objfile} until it receives a pretty-printer object.
+After these @code{gdb.Objfile} have been exhausted, it tries the
+global @code{gdb.pretty-printers} list, again calling each function
+until an object is returned.
 
 The order in which the objfiles are searched is not specified.
-Similarly, the order in which the regular expressions in a given
-dictionary are tried is not specified.
+Functions are always invoked from the head of the
+@code{gdb.pretty-printers} list, and iterated over sequentially until
+the end of the list, or a printer object is returned.
 
 Here is an example showing how a @code{std::string} printer might be
 written:
@@ -18840,12 +18842,33 @@ written:
 class StdStringPrinter:
     "Print a std::string"
 
-    def __init__(self, val):
+    def __init__ (self, val):
         self.val = val
 
-    def to_string(self):
+    def to_string (self):
         return self.val['_M_dataplus']['_M_p']
 @end smallexample
+
+And here is an example showing how a lookup function for
+the printer example above might be written. 
+
+@smallexample
+def str_lookup_function (val):
+
+    lookup_tag = val.type ().tag ()
+    regex = re.compile ("^std::basic_string<char,.*>$")
+    if lookup_tag == None:
+        return None
+    if regex.match (lookup_tag):
+        return StdStringPrinter (val)
+    
+    return None
+@end smallexample
+
+The example lookup function extracts the value's type, and attempts to
+match it to a type that it can pretty-print.  If it is a type the
+printer can pretty-print, it will return a printer object.  If not, it
+returns: @code{None}.
 
 We recommend that you put your core pretty-printers into a versioned
 python package, and then restrict your auto-loaded code to idempotent
@@ -18859,7 +18882,7 @@ For example, in addition to the above, this code might appear in
 
 @smallexample
 def register_printers (objfile):
-    objfile.pretty_printers['^std::basic_string<char.*>$'] = StdStringPrinter
+    objfile.pretty_printers.add (str_lookup_function)
 @end smallexample
 
 And then the corresponding contents of the auto-load file would be:

@@ -181,10 +181,6 @@ struct varobj
   int from;
   int to;
 
-  /* If NULL, no pretty printer is installed.  If not NULL, the
-     constructor to call to get a pretty-printer object.  */
-  PyObject *constructor;
-
   /* The pretty-printer that has been constructed.  If NULL, then a
      new printer object is needed, and one will be constructed.  */
   PyObject *pretty_printer;
@@ -711,21 +707,29 @@ varobj_delete (struct varobj *var, char ***dellist, int only_children)
   return delcount;
 }
 
-/* Instantiate a pretty-printer for a given value.  */
+/* Convenience function for varobj_set_visualizer.  Instantiate a
+   pretty-printer for a given value.  */
 static PyObject *
-instantiate_pretty_printer (struct varobj *var, struct value *value)
+instantiate_pretty_printer (PyObject *constructor, struct value *value)
 {
 #if HAVE_PYTHON
-  if (var->constructor)
+  PyObject *val_obj = NULL; 
+  PyObject *printer;
+  volatile struct gdb_exception except;
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      PyObject *printer = gdbpy_instantiate_printer (var->constructor, value);
-      if (printer == Py_None)
-	{
-	  Py_DECREF (printer);
-	  printer = NULL;
-	}
-      return printer;
+      value = value_copy (value);
     }
+  GDB_PY_HANDLE_EXCEPTION (except);
+  val_obj = value_to_value_object (value);
+
+  if (! val_obj)
+    return NULL;
+
+  printer = gdbpy_instantiate_printer (constructor, val_obj);
+  Py_DECREF (val_obj);
+  return printer;
 #endif
   return NULL;
 }
@@ -1224,7 +1228,7 @@ install_new_value (struct varobj *var, struct value *value, int initial)
   /* If the type has custom visualizer, we consider it to be always
      changeable. FIXME: need to make sure this behaviour will not
      mess up read-sensitive values.  */
-  if (var->constructor)
+  if (var->pretty_printer)
     changeable = 1;
 
   need_to_fetch = changeable;
@@ -1278,20 +1282,6 @@ install_new_value (struct varobj *var, struct value *value, int initial)
 	}
     }
 
-#if HAVE_PYTHON
-  {
-    PyGILState_STATE state = PyGILState_Ensure ();
-    if (var->pretty_printer)
-      {
-	Py_DECREF (var->pretty_printer);
-      }
-    if (value)
-      var->pretty_printer = instantiate_pretty_printer (var, value);
-    else
-      var->pretty_printer = NULL;
-    PyGILState_Release (state);
-  }
-#endif
 
   /* Below, we'll be comparing string rendering of old and new
      values.  Don't get string rendering if the value is
@@ -1408,11 +1398,8 @@ install_visualizer (struct varobj *var, PyObject *visualizer)
   varobj_delete (var, NULL, 1 /* children only */);
   var->num_children = -1;
 
-  Py_XDECREF (var->constructor);
-  var->constructor = visualizer;
-
   Py_XDECREF (var->pretty_printer);
-  var->pretty_printer = NULL;
+  var->pretty_printer = visualizer;
 
   install_new_value (var, var->value, 1);
 
@@ -1433,15 +1420,28 @@ install_default_visualizer (struct varobj *var)
 #if HAVE_PYTHON
   struct cleanup *cleanup;
   PyGILState_STATE state;
-  PyObject *constructor = NULL;
+  PyObject *pretty_printer = NULL;
 
   state = PyGILState_Ensure ();
   cleanup = make_cleanup_py_restore_gil (&state);
 
-  if (var->type)
-    constructor = gdbpy_get_varobj_pretty_printer (var->type);
-  install_visualizer (var, constructor);
-
+  if (var->value)
+    {
+      pretty_printer = gdbpy_get_varobj_pretty_printer (var->value);
+      if (! pretty_printer)
+	{
+	  gdbpy_print_stack ();
+	  error (_("Cannot instantiate printer for default visualizer"));
+	}
+    }
+      
+  if (pretty_printer == Py_None)
+    {
+      Py_DECREF (pretty_printer);
+      pretty_printer = NULL;
+    }
+  
+  install_visualizer (var, pretty_printer);
   do_cleanups (cleanup);
 #else
   error ("Python support required");
@@ -1452,9 +1452,10 @@ void
 varobj_set_visualizer (struct varobj *var, const char *visualizer)
 {
 #if HAVE_PYTHON
-  PyObject *mainmod, *globals, *constructor;
-  struct cleanup *back_to;
+  PyObject *mainmod, *globals, *pretty_printer, *constructor;
+  struct cleanup *back_to, *value;
   PyGILState_STATE state;
+
 
   state = PyGILState_Ensure ();
   back_to = make_cleanup_py_restore_gil (&state);
@@ -1465,20 +1466,31 @@ varobj_set_visualizer (struct varobj *var, const char *visualizer)
   make_cleanup_py_decref (globals);
 
   constructor = PyRun_String (visualizer, Py_eval_input, globals, globals);
+  
+  /* Do not instantiate NoneType. */
+  if (constructor == Py_None)
+    {
+      pretty_printer = Py_None;
+      Py_INCREF (pretty_printer);
+    }
+  else
+    pretty_printer = instantiate_pretty_printer (constructor, var->value);
 
-  if (! constructor)
+  Py_XDECREF (constructor);
+
+  if (! pretty_printer)
     {
       gdbpy_print_stack ();
       error ("Could not evaluate visualizer expression: %s", visualizer);
     }
 
-  if (constructor == Py_None)
+  if (pretty_printer == Py_None)
     {
-      Py_DECREF (constructor);
-      constructor = NULL;
+      Py_DECREF (pretty_printer);
+      pretty_printer = NULL;
     }
 
-  install_visualizer (var, constructor);
+  install_visualizer (var, pretty_printer);
 
   do_cleanups (back_to);
 #else
@@ -1917,7 +1929,6 @@ new_variable (void)
   var->children_requested = 0;
   var->from = -1;
   var->to = -1;
-  var->constructor = 0;
   var->pretty_printer = 0;
 
   return var;
@@ -1954,7 +1965,6 @@ free_variable (struct varobj *var)
 #if HAVE_PYTHON
   {
     PyGILState_STATE state = PyGILState_Ensure ();
-    Py_XDECREF (var->constructor);
     Py_XDECREF (var->pretty_printer);
     PyGILState_Release (state);
   }
@@ -2264,7 +2274,7 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
 	    xfree (hint);
 	  }
 
-	thevalue = apply_varobj_pretty_printer (value_formatter, value,
+	thevalue = apply_varobj_pretty_printer (value_formatter,
 						&replacement);
 	if (thevalue && !string_print)
 	  {
@@ -2753,7 +2763,7 @@ c_value_of_variable (struct varobj *var, enum varobj_display_formats format)
 
   /* If we have a custom formatter, return whatever string it has
      produced.  */
-  if (var->constructor && var->print_value)
+  if (var->pretty_printer && var->print_value)
     return xstrdup (var->print_value);
   
   /* Strip top-level references. */

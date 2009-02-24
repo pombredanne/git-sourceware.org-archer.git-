@@ -1,4 +1,4 @@
-# Copyright (C) 2008 Free Software Foundation, Inc.
+# Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,6 +15,8 @@
 
 # This file is part of the GDB testsuite.  It tests python pretty
 # printers.
+
+import re
 
 # Test returning a Value from a printer.
 class string_print:
@@ -76,21 +78,57 @@ class pp_sss:
     def to_string(self):
         return "a=<" + str(self.val['a']) + "> b=<" + str(self.val["b"]) + ">"
 
-gdb.pretty_printers['^struct s$']   = pp_s
-gdb.pretty_printers['^s$']   = pp_s
-gdb.pretty_printers['^S$']   = pp_s
+def lookup_function (val):
+    "Look-up and return a pretty-printer that can print val."
 
-gdb.pretty_printers['^struct ss$']  = pp_ss
-gdb.pretty_printers['^ss$']  = pp_ss
+    # Get the type.
+    type = val.type ();
 
-gdb.pretty_printers['^const S &$']   = pp_s
-gdb.pretty_printers['^SSS$']  = pp_sss
+    # If it points to a reference, get the reference.
+    if type.code () == gdb.TYPE_CODE_REF:
+        type = type.target ()
 
-# Note that we purposely omit the typedef names here.
-# Printer lookup is based on canonical name.
-# However, we do need both tagged and untagged variants, to handle
-# both the C and C++ cases.
-gdb.pretty_printers['^struct string_repr$'] = string_print
-gdb.pretty_printers['^struct container$'] = ContainerPrinter
-gdb.pretty_printers['^string_repr$'] = string_print
-gdb.pretty_printers['^container$'] = ContainerPrinter
+    # Get the unqualified type, stripped of typedefs.
+    type = type.unqualified ().strip_typedefs ()
+
+    # Get the type name.    
+    typename = type.tag ()
+
+    if typename == None:
+        return None
+
+    # Iterate over local dictionary of types to determine
+    # if a printer is registered for that type.  Return an
+    # instantiation of the printer if found.
+    for function in pretty_printers_dict:
+        if function.match (typename):
+            return pretty_printers_dict[function] (val)
+        
+    # Cannot find a pretty printer.  Return None.
+
+    return None
+
+
+def register_pretty_printers ():
+    pretty_printers_dict[re.compile ('^struct s$')]   = pp_s
+    pretty_printers_dict[re.compile ('^s$')]   = pp_s
+    pretty_printers_dict[re.compile ('^S$')]   = pp_s
+
+    pretty_printers_dict[re.compile ('^struct ss$')]  = pp_ss
+    pretty_printers_dict[re.compile ('^ss$')]  = pp_ss
+    pretty_printers_dict[re.compile ('^const S &$')]   = pp_s
+    pretty_printers_dict[re.compile ('^SSS$')]  = pp_sss
+    
+    # Note that we purposely omit the typedef names here.
+    # Printer lookup is based on canonical name.
+    # However, we do need both tagged and untagged variants, to handle
+    # both the C and C++ cases.
+    pretty_printers_dict[re.compile ('^struct string_repr$')] = string_print
+    pretty_printers_dict[re.compile ('^struct container$')] = ContainerPrinter
+    pretty_printers_dict[re.compile ('^string_repr$')] = string_print
+    pretty_printers_dict[re.compile ('^container$')] = ContainerPrinter
+    
+pretty_printers_dict = {}
+
+register_pretty_printers ()
+gdb.pretty_printers.append (lookup_function)
