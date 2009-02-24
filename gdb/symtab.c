@@ -1829,7 +1829,11 @@ basic_lookup_transparent_type (const char *name)
       }
   }
 
-  ALL_PSYMTABS (objfile, ps)
+  /* FIXME: .debug_pubnames should be read in.
+     
+     One may also try to the first pass without the require_partial_symbols
+     call but that would behave nondeterministically.  */
+  ALL_PSYMTABS_REQUIRED (objfile, ps)
   {
     if (!ps->readin && lookup_partial_symbol (ps, name, NULL,
 					      1, STRUCT_DOMAIN))
@@ -1877,7 +1881,12 @@ basic_lookup_transparent_type (const char *name)
       }
   }
 
-  ALL_PSYMTABS (objfile, ps)
+  /* FIXME: Something like .debug_pubnames containing also static symbols
+     should be read in.  Compiler needs to be taught to generate it first.
+     
+     One may also try to the first pass without the require_partial_symbols
+     call but that would behave nondeterministically.  */
+  ALL_PSYMTABS_REQUIRED (objfile, ps)
   {
     if (!ps->readin && lookup_partial_symbol (ps, name, NULL, 0, STRUCT_DOMAIN))
       {
