@@ -1064,7 +1064,9 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd, int from_tty,
       xfree (debugfile);
     }
 
-  if (print_symbol_loading && !has_any_debug_symbols (objfile))
+  /* has_any_debug_symbols is not fully compatible with the former calls which
+     would just be needlessly expensive here.  */
+  if (print_symbol_loading && !has_any_debug_symbols (objfile) && mainline)
     {
       wrap_here ("");
       printf_unfiltered (_("(no debugging symbols found)"));
