@@ -38,6 +38,7 @@
 
 #include "complaints.h"
 #include "dwarf2-frame.h"
+#include "addrmap.h"
 
 struct comp_unit;
 
@@ -1498,6 +1499,14 @@ dwarf2_frame_find_fde (CORE_ADDR *pc)
     {
       struct dwarf2_fde *fde;
       CORE_ADDR offset;
+
+      if (objfile->quick_addrmap)
+	{
+	  if (!addrmap_find (objfile->quick_addrmap, *pc))
+	    continue;
+	}
+      /* FIXME: Read-in only .debug_frame/.eh_frame without .debug_info?  */
+      require_partial_symbols (objfile);
 
       fde = objfile_data (objfile, dwarf2_frame_objfile_data);
       if (fde == NULL)
