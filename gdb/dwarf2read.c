@@ -1296,6 +1296,9 @@ dwarf2_create_quick_addrmap (struct objfile *objfile)
   struct obstack temp_obstack;
   struct addrmap *mutable_map;
 
+  if (!dwarf_aranges_section)
+    return;
+
   baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
 
   aranges_buffer = dwarf2_read_section_1 (objfile, NULL, dwarf_aranges_section);
