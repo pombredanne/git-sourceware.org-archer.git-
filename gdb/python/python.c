@@ -488,7 +488,6 @@ gdbpy_search_memory (PyObject *self, PyObject *args)
   char *pattern_buf;
   ULONGEST pattern_len, search_space_len;
   PyObject *pattern, *list = NULL, *start_addr_obj;
-  struct cleanup *cleanups = NULL;
   volatile struct gdb_exception except;
 
   /* Assume CORE_ADDR corresponds to unsigned long.  */
@@ -534,7 +533,9 @@ gdbpy_search_memory (PyObject *self, PyObject *args)
 	{
 	  if (get_search_pattern (pattern, size, &pattern_buf, &pattern_len))
 	    {
-	      cleanups = make_cleanup (xfree, pattern_buf);
+	      /* Any cleanups get automatically executed on an exception.  */
+	      struct cleanup *cleanups = make_cleanup (xfree, pattern_buf);
+
 	      list = PyList_New (0);
 
 	      while (search_space_len >= pattern_len && found_count < max_count)
@@ -550,13 +551,12 @@ gdbpy_search_memory (PyObject *self, PyObject *args)
 		  PyList_Append (list, PyLong_FromUnsignedLong (found_addr));
 		  ++found_count;
 		}
+
+	      do_cleanups (cleanups);
 	    }
 	}
     }
   GDB_PY_HANDLE_EXCEPTION (except);
-
-  if (cleanups)
-    do_cleanups (cleanups);
 
   return list;
 }
