@@ -337,7 +337,16 @@ class StdBitsetPrinter:
     def children (self):
         words = self.val['_M_w']
         wtype = words.type()
-        tsize = wtype.target().sizeof()
+
+        # The _M_w member can be either an unsigned long, or an
+        # array.  This depends on the template specialization used.
+        # If it is a single long, convert to a single element list.
+        if wtype.code () == gdb.TYPE_CODE_ARRAY:
+            tsize = wtype.target ().sizeof ()
+        else:
+            words = [words]
+            tsize = wtype.sizeof () 
+
         nwords = wtype.sizeof() / tsize
         result = []
         byte = 0
