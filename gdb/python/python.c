@@ -387,7 +387,7 @@ add_pattern_element (PyObject *obj, int size, char **pattern_buf,
          object implementing the buffer protocol.  The SIZE parameter is
 	 ignored in this case.  */
 
-      int val_bytes;
+      Py_ssize_t val_bytes;
       const void *buffer;
 
       if (PyObject_AsReadBuffer (obj, &buffer, &val_bytes) == -1)

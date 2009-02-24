@@ -165,7 +165,7 @@ get_seg_count (PyObject *self, Py_ssize_t *lenp)
 Py_ssize_t
 get_char_buffer (PyObject *self, Py_ssize_t segment, char **ptrptr)
 {
-  void *ptr;
+  void *ptr = NULL;
   Py_ssize_t ret;
 
   ret = get_read_buffer (self, segment, &ptr);
