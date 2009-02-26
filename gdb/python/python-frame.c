@@ -1,6 +1,6 @@
 /* Python interface to stack frames
 
-   Copyright (C) 2008 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -54,6 +54,9 @@ typedef struct {
 
 static PyTypeObject frame_object_type;
 
+/* Returns the frame_info object corresponding to the given Python Frame
+   object.  If the frame doesn't exist anymore (the frame id doesn't
+   correspond to any frame in the inferior), returns NULL.  */
 
 static struct frame_info *
 frame_object_to_frame_info (frame_object *frame_obj)
@@ -69,6 +72,9 @@ frame_object_to_frame_info (frame_object *frame_obj)
 
   return frame;
 }
+
+/* Called by the Python interpreter to obtain string representation
+   of the object.  */
 
 static PyObject *
 frapy_str (PyObject *self)
@@ -87,6 +93,10 @@ frapy_str (PyObject *self)
   return result;
 }
 
+/* Implementation of gdb.Frame.is_valid (self) -> Boolean.
+   Returns True if the frame corresponding to the frame_id of this
+   object still exists in the inferior.  */
+
 static PyObject *
 frapy_is_valid (PyObject *self, PyObject *args)
 {
@@ -98,6 +108,8 @@ frapy_is_valid (PyObject *self, PyObject *args)
 
   Py_RETURN_TRUE;
 }
+
+/* Implementation of gdb.Frame.equals (self, other) -> Boolean. */
 
 static PyObject *
 frapy_equal_p (PyObject *self, PyObject *args)
@@ -121,6 +133,9 @@ frapy_equal_p (PyObject *self, PyObject *args)
 
   Py_RETURN_FALSE;
 }
+
+/* Implementation of gdb.Frame.name (self) -> String.
+   Returns the name of the function corresponding to this frame.  */
 
 static PyObject *
 frapy_name (PyObject *self, PyObject *args)
@@ -150,6 +165,9 @@ frapy_name (PyObject *self, PyObject *args)
   return result;
 }
 
+/* Implementation of gdb.Frame.type (self) -> Integer.
+   Returns the frame type, namely one of the gdb.*_FRAME constants.  */
+
 static PyObject *
 frapy_type (PyObject *self, PyObject *args)
 {
@@ -167,6 +185,9 @@ frapy_type (PyObject *self, PyObject *args)
 
   return PyInt_FromLong (type);
 }
+
+/* Implementation of gdb.Frame.unwind_stop_reason (self) -> Integer.
+   Returns one of the gdb.FRAME_UNWIND_* constants.  */
 
 static PyObject *
 frapy_unwind_stop_reason (PyObject *self, PyObject *args)
@@ -186,6 +207,9 @@ frapy_unwind_stop_reason (PyObject *self, PyObject *args)
   return PyInt_FromLong (stop_reason);
 }
 
+/* Implementation of gdb.Frame.pc (self) -> Long.
+   Returns the frame's resume address.  */
+
 static PyObject *
 frapy_pc (PyObject *self, PyObject *args)
 {
@@ -203,6 +227,9 @@ frapy_pc (PyObject *self, PyObject *args)
 
   return PyLong_FromUnsignedLongLong (pc);
 }
+
+/* Implementation of gdb.Frame.block (self) -> gdb.Block.
+   Returns the frame's code block.  */
 
 static PyObject *
 frapy_block (PyObject *self, PyObject *args)
@@ -225,6 +252,10 @@ frapy_block (PyObject *self, PyObject *args)
   Py_RETURN_NONE;
 }
 
+
+/* Implementation of gdb.Frame.addr_in_block (self) -> Long.
+   Returns an address which falls within the frame's code block.  */
+
 static PyObject *
 frapy_addr_in_block (PyObject *self, PyObject *args)
 {
@@ -242,6 +273,9 @@ frapy_addr_in_block (PyObject *self, PyObject *args)
 
   return PyLong_FromUnsignedLongLong (pc);
 }
+
+/* Convert a frame_info struct to a Python Frame object.
+   Sets a Python exception and returns NULL on error.  */
 
 static frame_object *
 frame_info_to_frame_object (struct frame_info *frame)
@@ -276,6 +310,10 @@ frame_info_to_frame_object (struct frame_info *frame)
   return frame_obj;
 }
 
+/* Implementation of gdb.Frame.older (self) -> gdb.Frame.
+   Returns the frame immediately older (outer) to this frame, or None if
+   there isn't one.  */
+
 static PyObject *
 frapy_older (PyObject *self, PyObject *args)
 {
@@ -300,6 +338,10 @@ frapy_older (PyObject *self, PyObject *args)
 
   return prev_obj;
 }
+
+/* Implementation of gdb.Frame.newer (self) -> gdb.Frame.
+   Returns the frame immediately newer (inner) to this frame, or None if
+   there isn't one.  */
 
 static PyObject *
 frapy_newer (PyObject *self, PyObject *args)
@@ -326,6 +368,9 @@ frapy_newer (PyObject *self, PyObject *args)
   return next_obj;
 }
 
+/* Implementation of gdb.Frame.find_sal (self) -> gdb.Symtab_and_line.
+   Returns the frame's symtab and line.  */
+
 static PyObject *
 frapy_find_sal (PyObject *self, PyObject *args)
 {
@@ -345,6 +390,11 @@ frapy_find_sal (PyObject *self, PyObject *args)
 
   return sal_obj;
 }
+
+/* Implementation of gdb.Frame.read_var_value (self, variable) -> gdb.Value.
+   Returns the value of the given variable in this frame.  The argument can be
+   either a gdb.Symbol or a string.  Returns None if GDB can't find the
+   specified variable.  */
 
 static PyObject *
 frapy_read_var_value (PyObject *self, PyObject *args)
@@ -399,6 +449,9 @@ frapy_read_var_value (PyObject *self, PyObject *args)
   Py_RETURN_NONE;
 }
 
+/* Implementation of gdb.frames () -> (gdb.Frame, ...).
+   Returns a tuple of all frame objects.  */
+
 PyObject *
 gdbpy_frames (PyObject *self, PyObject *args)
 {
@@ -449,6 +502,9 @@ gdbpy_frames (PyObject *self, PyObject *args)
   return tuple;
 }
 
+/* Implementation of gdb.newest_frame () -> gdb.Frame.
+   Returns the newest frame object.  */
+
 PyObject *
 gdbpy_newest_frame (PyObject *self, PyObject *args)
 {
@@ -466,6 +522,9 @@ gdbpy_newest_frame (PyObject *self, PyObject *args)
   return (PyObject *) frame_obj;
 }
 
+/* Implementation of gdb.selected_frame () -> gdb.Frame.
+   Returns the selected frame object.  */
+
 PyObject *
 gdbpy_selected_frame (PyObject *self, PyObject *args)
 {
@@ -482,6 +541,9 @@ gdbpy_selected_frame (PyObject *self, PyObject *args)
 
   return (PyObject *) frame_obj;
 }
+
+/* Implementation of gdb.stop_reason_string (Integer) -> String.
+   Return a string explaining the unwind stop reason.  */
 
 PyObject *
 gdbpy_frame_stop_reason_string (PyObject *self, PyObject *args)
@@ -501,6 +563,8 @@ gdbpy_frame_stop_reason_string (PyObject *self, PyObject *args)
   str = frame_stop_reason_string (reason);
   return PyUnicode_Decode (str, strlen (str), host_charset (), NULL);
 }
+
+/* Sets up the Frame API in the gdb module.  */
 
 void
 gdbpy_initialize_frames (void)
@@ -543,7 +607,7 @@ static PyMethodDef frame_object_methods[] = {
     "Return the function name of the frame." },
   { "type", frapy_type, METH_NOARGS, "Return the type of the frame." },
   { "unwind_stop_reason", frapy_unwind_stop_reason, METH_NOARGS,
-    "Return the function name of the frame." },
+    "Return the reason why it's not possible to find frames older than this." },
   { "pc", frapy_pc, METH_NOARGS, "Return the frame's resume address." },
   { "block", frapy_block, METH_NOARGS, "Return the frame's code block." },
   { "addr_in_block", frapy_addr_in_block, METH_NOARGS,
@@ -561,26 +625,26 @@ static PyMethodDef frame_object_methods[] = {
 
 static PyTypeObject frame_object_type = {
   PyObject_HEAD_INIT (NULL)
-  0,				  /*ob_size*/
-  "gdb.Frame",			  /*tp_name*/
-  sizeof (frame_object),	  /*tp_basicsize*/
-  0,				  /*tp_itemsize*/
-  0,				  /*tp_dealloc*/
-  0,				  /*tp_print*/
-  0,				  /*tp_getattr*/
-  0,				  /*tp_setattr*/
-  0,				  /*tp_compare*/
-  0,				  /*tp_repr*/
-  0,				  /*tp_as_number*/
-  0,				  /*tp_as_sequence*/
-  0,				  /*tp_as_mapping*/
-  0,				  /*tp_hash */
-  0,				  /*tp_call*/
-  frapy_str,			  /*tp_str*/
-  0,				  /*tp_getattro*/
-  0,				  /*tp_setattro*/
-  0,				  /*tp_as_buffer*/
-  Py_TPFLAGS_DEFAULT,		  /*tp_flags*/
+  0,				  /* ob_size */
+  "gdb.Frame",			  /* tp_name */
+  sizeof (frame_object),	  /* tp_basicsize */
+  0,				  /* tp_itemsize */
+  0,				  /* tp_dealloc */
+  0,				  /* tp_print */
+  0,				  /* tp_getattr */
+  0,				  /* tp_setattr */
+  0,				  /* tp_compare */
+  0,				  /* tp_repr */
+  0,				  /* tp_as_number */
+  0,				  /* tp_as_sequence */
+  0,				  /* tp_as_mapping */
+  0,				  /* tp_hash  */
+  0,				  /* tp_call */
+  frapy_str,			  /* tp_str */
+  0,				  /* tp_getattro */
+  0,				  /* tp_setattro */
+  0,				  /* tp_as_buffer */
+  Py_TPFLAGS_DEFAULT,		  /* tp_flags */
   "GDB frame object",		  /* tp_doc */
   0,				  /* tp_traverse */
   0,				  /* tp_clear */

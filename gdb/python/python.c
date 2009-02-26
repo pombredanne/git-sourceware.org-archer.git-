@@ -287,6 +287,9 @@ execute_gdb_command (PyObject *self, PyObject *args)
   Py_RETURN_NONE;
 }
 
+/* Implementation of gdb.solib_address (Long) -> String.
+   Returns the name of the shared library holding a given address, or None.  */
+
 static PyObject *
 gdbpy_solib_address (PyObject *self, PyObject *args)
 {
@@ -1852,13 +1855,13 @@ static PyMethodDef GdbMethods[] =
     "Return a sequence of all loaded objfiles." },
 
   { "frames", gdbpy_frames, METH_NOARGS,
-    "Return a tuple of all frame objects" },
+    "Return a tuple of all frame objects." },
   { "newest_frame", gdbpy_newest_frame, METH_NOARGS,
-    "Return the newest frame object" },
+    "Return the newest frame object." },
   { "selected_frame", gdbpy_selected_frame, METH_NOARGS,
-    "Return the selected frame object" },
+    "Return the selected frame object." },
   { "frame_stop_reason_string", gdbpy_frame_stop_reason_string,
-    METH_VARARGS, "Return a string explaining unwind stop reason" },
+    METH_VARARGS, "Return a string explaining unwind stop reason." },
 
   { "lookup_symbol", (PyCFunction) gdbpy_lookup_symbol,
     METH_VARARGS | METH_KEYWORDS,
