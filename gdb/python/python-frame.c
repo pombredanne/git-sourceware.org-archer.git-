@@ -612,26 +612,42 @@ gdbpy_initialize_frames (void)
 
 
 static PyMethodDef frame_object_methods[] = {
-  { "equals", frapy_equal_p, METH_VARARGS, "Compare frames." },
+  { "equals", frapy_equal_p, METH_VARARGS,
+    "equals (frame) -> Boolean.\n\
+Compare this frame to the given frame." },
   { "is_valid", frapy_is_valid, METH_NOARGS,
-    "Return true if this frame is valid, false if not." },
+    "is_valid () -> Boolean.\n\
+Return true if this frame is valid, false if not." },
   { "name", frapy_name, METH_NOARGS,
-    "Return the function name of the frame." },
-  { "type", frapy_type, METH_NOARGS, "Return the type of the frame." },
+    "name () -> String.\n\
+Return the function name of the frame, or None if it can't be determined." },
+  { "type", frapy_type, METH_NOARGS,
+    "type () -> Integer.\n\
+Return the type of the frame." },
   { "unwind_stop_reason", frapy_unwind_stop_reason, METH_NOARGS,
-    "Return the reason why it's not possible to find frames older than this." },
-  { "pc", frapy_pc, METH_NOARGS, "Return the frame's resume address." },
-  { "block", frapy_block, METH_NOARGS, "Return the frame's code block." },
+    "unwind_stop_reason () -> Integer.\n\
+Return the reason why it's not possible to find frames older than this." },
+  { "pc", frapy_pc, METH_NOARGS,
+    "pc () -> Long.\n\
+Return the frame's resume address." },
+  { "block", frapy_block, METH_NOARGS,
+    "block () -> gdb.Block.\n\
+Return the frame's code block." },
   { "addr_in_block", frapy_addr_in_block, METH_NOARGS,
-    "Return an address which falls within the frame's code block." },
+    "addr_in_block () -> Long.\n\
+Return an address which falls within the frame's code block." },
   { "older", frapy_older, METH_NOARGS,
-    "Return the frame immediately older (outer) to this frame." },
+    "older () -> gdb.Frame.\n\
+Return the frame immediately older (outer) to this frame." },
   { "newer", frapy_newer, METH_NOARGS,
-    "Return the frame immetidaely newer (inner) to this frame." },
+    "newer () -> gdb.Frame.\n\
+Return the frame immetidaely newer (inner) to this frame." },
   { "find_sal", frapy_find_sal, METH_NOARGS,
-    "Return the frame's symtab and line." },
+    "find_sal () -> gdb.Symtab_and_line.\n\
+Return the frame's symtab and line." },
   { "read_var_value", frapy_read_var_value, METH_VARARGS,
-    "Return the value of the variable in this frame." },
+    "read_var_value (variable) -> gdb.Value.\n\
+Return the value of the variable in this frame." },
   {NULL}  /* Sentinel */
 };
 

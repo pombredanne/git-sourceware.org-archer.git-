@@ -1855,13 +1855,17 @@ static PyMethodDef GdbMethods[] =
     "Return a sequence of all loaded objfiles." },
 
   { "frames", gdbpy_frames, METH_NOARGS,
-    "Return a tuple of all frame objects." },
+    "frames () -> (gdb.Frame, ...).\n\
+Return a tuple of all frame objects." },
   { "newest_frame", gdbpy_newest_frame, METH_NOARGS,
-    "Return the newest frame object." },
+    "newest_frame () -> gdb.Frame.\n\
+Return the newest frame object." },
   { "selected_frame", gdbpy_selected_frame, METH_NOARGS,
-    "Return the selected frame object." },
-  { "frame_stop_reason_string", gdbpy_frame_stop_reason_string,
-    METH_VARARGS, "Return a string explaining unwind stop reason." },
+    "selected_frame () -> gdb.Frame.\n\
+Return the selected frame object." },
+  { "frame_stop_reason_string", gdbpy_frame_stop_reason_string, METH_VARARGS,
+    "stop_reason_string (Integer) -> String.\n\
+Return a string explaining unwind stop reason." },
 
   { "lookup_symbol", (PyCFunction) gdbpy_lookup_symbol,
     METH_VARARGS | METH_KEYWORDS,
@@ -1870,7 +1874,8 @@ Return a tuple with the symbol corresponding to the given name (or None) and\n\
 a boolean indicating if name is a field of the current implied argument\n\
 `this' (when the current language is object-oriented)." },
   { "solib_address", gdbpy_solib_address, METH_VARARGS,
-    "Return shared library holding a given address, or None." },
+    "solib_address (Long) -> String.\n\
+Return the name of the shared library holding a given address, or None." },
 
   { "find_pc_function", gdbpy_find_pc_function, METH_VARARGS,
     "Return the function containing the given pc value, or None." },
