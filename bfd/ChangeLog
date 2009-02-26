@@ -1,3 +1,75 @@
+2009-02-26  Christophe Lyon  <christophe.lyon@st.com>
+
+	* elf32-arm.c (stub_reloc_type): Removed.
+	(insn_sequence): Renamed reloc_type field to r_type.
+	(elf32_arm_stub_long_branch_v4t_arm_thumb_pic): New stub.
+	(elf32_arm_stub_long_branch_v4t_thumb_arm_pic): Likewise.
+	(elf32_arm_stub_long_branch_thumb_only_pic): Likewise.
+	(elf32_arm_stub_type): Add new enum entries for the new stubs.
+	(arm_stub_is_thumb): Catch new stubs.
+	(arm_type_of_stub): Handle new stubs.
+	(arm_size_one_stub): Use ARRAY_SIZE. Handle new stubs.
+	(bfd_elf32_arm_process_before_allocation): Remove useless
+	condition.
+
+2009-02-25  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elf.c (elf_find_function): Use is_function_type to check
+	function symbol.
+
+2009-02-24  Sterling Augustine  <sterling@jaw.hq.tensilica.com>
+
+	* xtensa-modules.c: Revert to previous version 1.11 due
+	to inadvertant commit.
+
+2009-02-24  Sterling Augustine  <sterling@tensilica.com>
+
+	* elf32-xtensa.c (text_action_add): Separate test for action
+	type.  Break if saved action is ta_widen_insn at same offset.
+
+2009-02-24  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* elf32-arm.c (elf32_arm_stub_long_branch_any_any_pic): Rename
+	to elf32_arm_stub_long_branch_any_arm_pic.
+	(elf32_arm_stub_long_branch_any_thumb_pic): New.
+	(enum elf32_arm_stub_type, arm_type_of_stub)
+	(arm_size_one_stub): Handle any to ARM PIC and any to Thumb PIC
+	separately.
+
+2009-02-24  Joseph Myers  <joseph@codesourcery.com>
+
+	* elf32-arm.c (PREV_SEC): Update comment.
+	(group_sections): Rename argument to stubs_always_after_branch.
+	Reverse the list and place stubs at the end of input sections.
+	Undefine NEXT_SEC.
+	(elf32_arm_size_stubs): Update to use stubs_always_after_branch.
+
+2009-02-23  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* elf32-arm.c (arm_build_one_stub): Initialize stub_reloc_offset.
+	Fix formatting.
+	(arm_size_one_stub): Remove unnecessary break.
+	(arm_map_one_stub): Fix formatting.  Return after BFD_FAIL.
+
+2009-02-23  Christophe Lyon  <christophe.lyon@st.com>
+
+	* elf32-arm.c (stub_insn_type): New type.
+	(stub_reloc_type): Likewise.
+	(insn_sequence): Likewise.
+	(elf32_arm_stub_long_branch_any_any): Encode using insn_sequence.
+	(elf32_arm_stub_long_branch_v4t_arm_thumb): Likewise.
+	(elf32_arm_stub_long_branch_thumb_only): Likewise.
+	(elf32_arm_stub_long_branch_v4t_thumb_arm): Likewise.
+	(elf32_arm_stub_short_branch_v4t_thumb_arm): Likewise.
+	(elf32_arm_stub_long_branch_any_any_pic): Likewise.
+	(elf32_arm_stub_hash_entry): Add new helper fields.
+	(stub_hash_newfunc): Initialize these new fields.
+	(arm_build_one_stub): Encode Arm and Thumb instructions separately
+	to take endianness into account.
+	(arm_size_one_stub): Compute size of stubs using insn_sequence.
+	(arm_map_one_stub): Code is now more generic, thanks to
+	insn_sequence.
+
 2009-02-23  Christophe Lyon  <christophe.lyon@st.com>
 
 	* elf32-arm.c (elf32_arm_stub_long_branch_thumb_only): Fix stub
@@ -11,6 +83,8 @@
 	(arm_map_one_stub): Likewise.
 
 2009-02-23  Tristan Gingold  <gingold@adacore.com>
+	    Eric Botcazou  <ebotcazou@adacore.com>
+	    Douglas B Rupp  <rupp@gnat.com>
 
 	* vms.h: Update copyright year, fix comments, reorder declarations.
 	(_bfd_save_vms_section): Remove the prototype.

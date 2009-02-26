@@ -979,7 +979,7 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd, int from_tty,
   if (mainline
       && from_tty
       && (have_full_symbols () || have_partial_symbols ())
-      && !query ("Load new symbol table from \"%s\"? ", name))
+      && !query (_("Load new symbol table from \"%s\"? "), name))
     error (_("Not confirmed."));
 
   objfile = allocate_objfile (abfd, flags);
