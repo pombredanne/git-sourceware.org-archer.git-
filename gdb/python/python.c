@@ -1527,6 +1527,7 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
   
   /* Find the constructor.  */
   printer = find_pretty_printer (val_obj);
+  Py_DECREF (val_obj);
   make_cleanup_py_decref (printer);
   if (! printer || printer == Py_None)
     goto done;
