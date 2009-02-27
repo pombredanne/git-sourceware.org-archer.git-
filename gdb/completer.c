@@ -105,14 +105,14 @@ readline_line_completion_function (const char *text, int matches)
 /* This can be used for functions which don't want to complete on symbols
    but don't want to complete on anything else either.  */
 char **
-noop_completer (char *text, char *prefix)
+noop_completer (struct cmd_list_element *ignore, char *text, char *prefix)
 {
   return NULL;
 }
 
 /* Complete on filenames.  */
 char **
-filename_completer (char *text, char *word)
+filename_completer (struct cmd_list_element *ignore, char *text, char *word)
 {
   int subsequent_name;
   char **return_val;
@@ -195,7 +195,7 @@ filename_completer (char *text, char *word)
 
    This is intended to be used in commands that set breakpoints etc.  */
 char **
-location_completer (char *text, char *word)
+location_completer (struct cmd_list_element *ignore, char *text, char *word)
 {
   int n_syms = 0, n_files = 0;
   char ** fn_list = NULL;
@@ -371,6 +371,7 @@ add_struct_fields (struct type *type, int *nextp, char **output,
 		   char *fieldname, int namelen)
 {
   int i;
+  int computed_type_name = 0;
   char *type_name = NULL;
 
   CHECK_TYPEDEF (type);
@@ -392,10 +393,13 @@ add_struct_fields (struct type *type, int *nextp, char **output,
       char *name = TYPE_FN_FIELDLIST_NAME (type, i);
       if (name && ! strncmp (name, fieldname, namelen))
 	{
-	  if (!type_name)
-	    type_name = type_name_no_tag (type);
+	  if (!computed_type_name)
+	    {
+	      type_name = type_name_no_tag (type);
+	      computed_type_name = 1;
+	    }
 	  /* Omit constructors from the completion list.  */
-	  if (strcmp (type_name, name))
+	  if (type_name && strcmp (type_name, name))
 	    {
 	      output[*nextp] = xstrdup (name);
 	      ++*nextp;
@@ -408,7 +412,7 @@ add_struct_fields (struct type *type, int *nextp, char **output,
    names, but some language parsers also have support for completing
    field names.  */
 char **
-expression_completer (char *text, char *word)
+expression_completer (struct cmd_list_element *ignore, char *text, char *word)
 {
   struct type *type;
   char *fieldname, *p;
@@ -452,7 +456,7 @@ expression_completer (char *text, char *word)
     ;
 
   /* Not ideal but it is what we used to do before... */
-  return location_completer (p, word);
+  return location_completer (ignore, p, word);
 }
 
 /* Here are some useful test cases for completion.  FIXME: These should
@@ -647,7 +651,7 @@ complete_line_internal (const char *text, char *line_buffer, int point,
 			   p--)
 			;
 		    }
-		  list = (*c->completer) (p, word);
+		  list = (*c->completer) (c, p, word);
 		}
 	    }
 	  else
@@ -715,7 +719,7 @@ complete_line_internal (const char *text, char *line_buffer, int point,
 		       p--)
 		    ;
 		}
-	      list = (*c->completer) (p, word);
+	      list = (*c->completer) (c, p, word);
 	    }
 	}
     }
@@ -733,7 +737,7 @@ complete_line (const char *text, char *line_buffer, int point)
 
 /* Complete on command names.  Used by "help".  */
 char **
-command_completer (char *text, char *word)
+command_completer (struct cmd_list_element *ignore, char *text, char *word)
 {
   return complete_line_internal (word, text, strlen (text), 1);
 }

@@ -1,7 +1,7 @@
 /* Ada language support routines for GDB, the GNU debugger.  Copyright (C)
 
-   1992, 1993, 1994, 1997, 1998, 1999, 2000, 2003, 2004, 2005, 2007
-   Free Software Foundation, Inc.
+   1992, 1993, 1994, 1997, 1998, 1999, 2000, 2003, 2004, 2005, 2007, 2008,
+   2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1201,7 +1201,7 @@ ada_decode_symbol (const struct general_symbol_info *gsymbol)
   return *resultp;
 }
 
-char *
+static char *
 ada_la_decode (const char *encoded, int options)
 {
   return xstrdup (ada_decode (encoded));
@@ -1214,7 +1214,7 @@ ada_la_decode (const char *encoded, int options)
    suffix of SYM_NAME minus the same suffixes.  Also returns 0 if
    either argument is NULL.  */
 
-int
+static int
 ada_match_name (const char *sym_name, const char *name, int wild)
 {
   if (sym_name == NULL || name == NULL)
@@ -1235,7 +1235,7 @@ ada_match_name (const char *sym_name, const char *name, int wild)
 /* True (non-zero) iff, in Ada mode, the symbol SYM should be
    suppressed in info listings.  */
 
-int
+static int
 ada_suppress_symbol_printing (struct symbol *sym)
 {
   if (SYMBOL_DOMAIN (sym) == STRUCT_DOMAIN)
@@ -1570,7 +1570,7 @@ ada_is_direct_array_type (struct type *type)
 /* Non-zero iff TYPE represents any kind of array in Ada, or a pointer
  * to one. */
 
-int
+static int
 ada_is_array_type (struct type *type)
 {
   while (type != NULL 
@@ -2315,7 +2315,7 @@ ada_value_subscript (struct value *arr, int arity, struct value **ind)
    value of the element of *ARR at the ARITY indices given in
    IND.  Does not read the entire array into memory.  */
 
-struct value *
+static struct value *
 ada_value_ptr_subscript (struct value *arr, struct type *type, int arity,
                          struct value **ind)
 {
@@ -2574,7 +2574,7 @@ ada_array_bound (struct value *arr, int n, int which)
    Does not work for arrays indexed by enumeration types with representation
    clauses at the moment.  */
 
-struct value *
+static struct value *
 ada_array_length (struct value *arr, int n)
 {
   struct type *arr_type = ada_check_typedef (value_type (arr));
@@ -6877,7 +6877,15 @@ ada_template_to_fixed_record_type_1 (struct type *type,
       else if (is_dynamic_field (type, f))
         {
           if (dval0 == NULL)
-            dval = value_from_contents_and_address (rtype, valaddr, address);
+	    {
+	      /* rtype's length is computed based on the run-time
+		 value of discriminants.  If the discriminants are not
+		 initialized, the type size may be completely bogus and
+		 GDB may fail to allocate a value for it. So check the
+		 size first before creating the value.  */
+	      check_size (rtype);
+	      dval = value_from_contents_and_address (rtype, valaddr, address);
+	    }
           else
             dval = dval0;
 
@@ -7524,7 +7532,7 @@ ada_to_fixed_value (struct value *val)
    without consulting any runtime values.  For Ada dynamic-sized
    types, therefore, the type of the result is likely to be inaccurate.  */
 
-struct value *
+static struct value *
 ada_to_static_fixed_value (struct value *val)
 {
   struct type *type =
@@ -11055,8 +11063,12 @@ const struct language_defn ada_language_defn = {
   ada_language_arch_info,
   ada_print_array_index,
   default_pass_by_reference,
+  c_get_string,
   LANG_MAGIC
 };
+
+/* Provide a prototype to silence -Wmissing-prototypes.  */
+extern initialize_file_ftype _initialize_ada_language;
 
 void
 _initialize_ada_language (void)

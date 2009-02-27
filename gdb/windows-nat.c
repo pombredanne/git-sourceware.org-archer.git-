@@ -113,7 +113,7 @@ static int debug_registers_used;
 #define DEBUG_EXCEPT(x)	if (debug_exceptions)	printf_unfiltered x
 
 static void windows_stop (ptid_t);
-static int windows_thread_alive (ptid_t);
+static int windows_thread_alive (struct target_ops *, ptid_t);
 static void windows_kill_inferior (void);
 
 static enum target_signal last_sig = TARGET_SIGNAL_0;
@@ -401,7 +401,8 @@ do_windows_fetch_inferior_registers (struct regcache *regcache, int r)
 }
 
 static void
-windows_fetch_inferior_registers (struct regcache *regcache, int r)
+windows_fetch_inferior_registers (struct target_ops *ops,
+				  struct regcache *regcache, int r)
 {
   current_thread = thread_rec (ptid_get_tid (inferior_ptid), TRUE);
   /* Check if current_thread exists.  Windows sometimes uses a non-existent
@@ -427,7 +428,8 @@ do_windows_store_inferior_registers (const struct regcache *regcache, int r)
 
 /* Store a new register value into the current thread context */
 static void
-windows_store_inferior_registers (struct regcache *regcache, int r)
+windows_store_inferior_registers (struct target_ops *ops,
+				  struct regcache *regcache, int r)
 {
   current_thread = thread_rec (ptid_get_tid (inferior_ptid), TRUE);
   /* Check if current_thread exists.  Windows sometimes uses a non-existent
@@ -1165,7 +1167,8 @@ fake_create_process (void)
 }
 
 static void
-windows_resume (ptid_t ptid, int step, enum target_signal sig)
+windows_resume (struct target_ops *ops,
+		ptid_t ptid, int step, enum target_signal sig)
 {
   thread_info *th;
   DWORD continue_status = DBG_CONTINUE;
@@ -1224,8 +1227,9 @@ windows_resume (ptid_t ptid, int step, enum target_signal sig)
       if (step)
 	{
 	  /* Single step by setting t bit */
-	  windows_fetch_inferior_registers (get_current_regcache (),
-					  gdbarch_ps_regnum (current_gdbarch));
+	  windows_fetch_inferior_registers (ops,
+					    get_current_regcache (),
+					    gdbarch_ps_regnum (current_gdbarch));
 	  th->context.EFlags |= FLAG_TRACE_BIT;
 	}
 
@@ -1258,7 +1262,8 @@ windows_resume (ptid_t ptid, int step, enum target_signal sig)
    handling by WFI (or whatever).
  */
 static int
-get_windows_debug_event (int pid, struct target_waitstatus *ourstatus)
+get_windows_debug_event (struct target_ops *ops,
+			 int pid, struct target_waitstatus *ourstatus)
 {
   BOOL debug_event;
   DWORD continue_status, event_code;
@@ -1427,7 +1432,7 @@ get_windows_debug_event (int pid, struct target_waitstatus *ourstatus)
   if (!retval || saw_create != 1)
     {
       if (continue_status == -1)
-	windows_resume (minus_one_ptid, 0, 1);
+	windows_resume (ops, minus_one_ptid, 0, 1);
       else
 	CHECK (windows_continue (continue_status, -1));
     }
@@ -1444,7 +1449,8 @@ out:
 
 /* Wait for interesting events to occur in the target process.  */
 static ptid_t
-windows_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
+windows_wait (struct target_ops *ops,
+	      ptid_t ptid, struct target_waitstatus *ourstatus)
 {
   int pid = -1;
 
@@ -1474,7 +1480,7 @@ windows_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
          to find a better solution to that problem.  But in the meantime,
          the current approach already greatly mitigate this issue.  */
       SetConsoleCtrlHandler (NULL, TRUE);
-      retval = get_windows_debug_event (pid, ourstatus);
+      retval = get_windows_debug_event (ops, pid, ourstatus);
       SetConsoleCtrlHandler (NULL, FALSE);
 
       if (retval)
@@ -1721,7 +1727,7 @@ windows_detach (struct target_ops *ops, char *args, int from_tty)
   if (has_detach_ability ())
     {
       ptid_t ptid = {-1};
-      windows_resume (ptid, 0, TARGET_SIGNAL_0);
+      windows_resume (ops, ptid, 0, TARGET_SIGNAL_0);
 
       if (!kernel32_DebugActiveProcessStop (current_event.dwProcessId))
 	{
@@ -2017,7 +2023,7 @@ windows_close (int x)
 
 /* Convert pid to printable format. */
 static char *
-windows_pid_to_str (ptid_t ptid)
+windows_pid_to_str (struct target_ops *ops, ptid_t ptid)
 {
   static char buf[80];
 
@@ -2134,6 +2140,8 @@ init_windows_ops (void)
   windows_ops.to_has_registers = 1;
   windows_ops.to_has_execution = 1;
   windows_ops.to_pid_to_exec_file = windows_pid_to_exec_file;
+  i386_use_watchpoints (&windows_ops);
+
   windows_ops.to_magic = OPS_MAGIC;
 }
 
@@ -2266,7 +2274,7 @@ cygwin_get_dr6 (void)
    by "polling" it.  If WaitForSingleObject returns WAIT_OBJECT_0
    it means that the thread has died.  Otherwise it is assumed to be alive. */
 static int
-windows_thread_alive (ptid_t ptid)
+windows_thread_alive (struct target_ops *ops, ptid_t ptid)
 {
   int tid;
 

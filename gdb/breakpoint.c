@@ -1135,8 +1135,8 @@ Note: automatically using hardware breakpoints for read-only addresses.\n"));
 		  bpt->overlay_target_info.placed_address = addr;
 		  val = target_insert_breakpoint (&bpt->overlay_target_info);
 		  if (val != 0)
-		    fprintf_unfiltered (tmp_error_stream, 
-					"Overlay breakpoint %d failed: in ROM?", 
+		    fprintf_unfiltered (tmp_error_stream,
+					"Overlay breakpoint %d failed: in ROM?\n",
 					bpt->owner->number);
 		}
 	    }
@@ -3491,8 +3491,7 @@ print_one_breakpoint_location (struct breakpoint *b,
 	if (opts.addressprint)
 	  ui_out_field_skip (uiout, "addr");
 	annotate_field (5);
-	print_expression (b->exp, stb->stream);
-	ui_out_field_stream (uiout, "what", stb);
+	ui_out_field_string (uiout, "what", b->exp_string);
 	break;
 
       case bp_breakpoint:
@@ -4425,7 +4424,6 @@ void
 disable_breakpoints_in_shlibs (void)
 {
   struct bp_location *loc;
-  int disabled_shlib_breaks = 0;
 
   ALL_BP_LOCATIONS (loc)
   {
@@ -4457,6 +4455,14 @@ disable_breakpoints_in_unloaded_shlib (struct so_list *solib)
 {
   struct bp_location *loc;
   int disabled_shlib_breaks = 0;
+
+  /* SunOS a.out shared libraries are always mapped, so do not
+     disable breakpoints; they will only be reported as unloaded
+     through clear_solib when GDB discards its shared library
+     list.  See clear_solib for more information.  */
+  if (exec_bfd != NULL
+      && bfd_get_flavour (exec_bfd) == bfd_target_aout_flavour)
+    return;
 
   ALL_BP_LOCATIONS (loc)
   {
@@ -4890,14 +4896,10 @@ static void
 mention (struct breakpoint *b)
 {
   int say_where = 0;
-  struct cleanup *old_chain, *ui_out_chain;
-  struct ui_stream *stb;
+  struct cleanup *ui_out_chain;
   struct value_print_options opts;
 
   get_user_print_options (&opts);
-
-  stb = ui_out_stream_new (uiout);
-  old_chain = make_cleanup_ui_out_stream_delete (stb);
 
   /* FIXME: This is misplaced; mention() is called by things (like
      hitting a watchpoint) other than breakpoint creation.  It should
@@ -4918,8 +4920,7 @@ mention (struct breakpoint *b)
 	ui_out_chain = make_cleanup_ui_out_tuple_begin_end (uiout, "wpt");
 	ui_out_field_int (uiout, "number", b->number);
 	ui_out_text (uiout, ": ");
-	print_expression (b->exp, stb->stream);
-	ui_out_field_stream (uiout, "exp", stb);
+	ui_out_field_string (uiout, "exp", b->exp_string);
 	do_cleanups (ui_out_chain);
 	break;
       case bp_hardware_watchpoint:
@@ -4927,8 +4928,7 @@ mention (struct breakpoint *b)
 	ui_out_chain = make_cleanup_ui_out_tuple_begin_end (uiout, "wpt");
 	ui_out_field_int (uiout, "number", b->number);
 	ui_out_text (uiout, ": ");
-	print_expression (b->exp, stb->stream);
-	ui_out_field_stream (uiout, "exp", stb);
+	ui_out_field_string (uiout, "exp", b->exp_string);
 	do_cleanups (ui_out_chain);
 	break;
       case bp_read_watchpoint:
@@ -4936,8 +4936,7 @@ mention (struct breakpoint *b)
 	ui_out_chain = make_cleanup_ui_out_tuple_begin_end (uiout, "hw-rwpt");
 	ui_out_field_int (uiout, "number", b->number);
 	ui_out_text (uiout, ": ");
-	print_expression (b->exp, stb->stream);
-	ui_out_field_stream (uiout, "exp", stb);
+	ui_out_field_string (uiout, "exp", b->exp_string);
 	do_cleanups (ui_out_chain);
 	break;
       case bp_access_watchpoint:
@@ -4945,8 +4944,7 @@ mention (struct breakpoint *b)
 	ui_out_chain = make_cleanup_ui_out_tuple_begin_end (uiout, "hw-awpt");
 	ui_out_field_int (uiout, "number", b->number);
 	ui_out_text (uiout, ": ");
-	print_expression (b->exp, stb->stream);
-	ui_out_field_stream (uiout, "exp", stb);
+	ui_out_field_string (uiout, "exp", b->exp_string);
 	do_cleanups (ui_out_chain);
 	break;
       case bp_breakpoint:
@@ -5015,7 +5013,6 @@ mention (struct breakpoint *b)
 
 	}
     }
-  do_cleanups (old_chain);
   if (ui_out_is_mi_like_p (uiout))
     return;
   printf_filtered ("\n");
@@ -5159,7 +5156,8 @@ create_breakpoint (struct symtabs_and_lines sals, char *addr_string,
 
 /* Remove element at INDEX_TO_REMOVE from SAL, shifting other
    elements to fill the void space.  */
-static void remove_sal (struct symtabs_and_lines *sal, int index_to_remove)
+static void
+remove_sal (struct symtabs_and_lines *sal, int index_to_remove)
 {
   int i = index_to_remove+1;
   int last_index = sal->nelts-1;
@@ -5184,7 +5182,7 @@ static void remove_sal (struct symtabs_and_lines *sal, int index_to_remove)
    line in all existing instantiations of 'foo'.
 
 */
-struct symtabs_and_lines
+static struct symtabs_and_lines
 expand_line_sal_maybe (struct symtab_and_line sal)
 {
   struct symtabs_and_lines expanded;
@@ -5954,6 +5952,12 @@ watch_command_1 (char *arg, int accessflag, int from_tty)
   exp_start = arg;
   exp = parse_exp_1 (&arg, 0, 0);
   exp_end = arg;
+  /* Remove trailing whitespace from the expression before saving it.
+     This makes the eventual display of the expression string a bit
+     prettier.  */
+  while (exp_end > exp_start && (exp_end[-1] == ' ' || exp_end[-1] == '\t'))
+    --exp_end;
+
   exp_valid_block = innermost_block;
   mark = value_mark ();
   fetch_watchpoint_value (exp, &val, NULL, NULL);

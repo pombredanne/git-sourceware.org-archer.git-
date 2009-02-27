@@ -194,7 +194,8 @@ blocked.  */
 #endif
 
 #ifndef PTRACE_GETSIGINFO
-#define PTRACE_GETSIGINFO    0x4202
+# define PTRACE_GETSIGINFO    0x4202
+# define PTRACE_SETSIGINFO    0x4203
 #endif
 
 /* The single-threaded native GNU/Linux target_ops.  We save a pointer for
@@ -204,6 +205,13 @@ static struct target_ops linux_ops_saved;
 
 /* The method to call, if any, when a new thread is attached.  */
 static void (*linux_nat_new_thread) (ptid_t);
+
+/* The method to call, if any, when the siginfo object needs to be
+   converted between the layout returned by ptrace, and the layout in
+   the architecture of the inferior.  */
+static int (*linux_nat_siginfo_fixup) (struct siginfo *,
+				       gdb_byte *,
+				       int);
 
 /* The saved to_xfer_partial method, inherited from inf-ptrace.c.
    Called by our to_xfer_partial.  */
@@ -982,7 +990,7 @@ static struct sigaction sigchld_default_action;
 
 /* Prototypes for local functions.  */
 static int stop_wait_callback (struct lwp_info *lp, void *data);
-static int linux_nat_thread_alive (ptid_t ptid);
+static int linux_thread_alive (ptid_t ptid);
 static char *linux_child_pid_to_exec_file (int pid);
 static int cancel_breakpoint (struct lwp_info *lp);
 
@@ -1656,7 +1664,8 @@ resume_callback (struct lwp_info *lp, void *data)
 {
   if (lp->stopped && lp->status == 0)
     {
-      linux_ops->to_resume (pid_to_ptid (GET_LWP (lp->ptid)),
+      linux_ops->to_resume (linux_ops,
+			    pid_to_ptid (GET_LWP (lp->ptid)),
 			    0, TARGET_SIGNAL_0);
       if (debug_linux_nat)
 	fprintf_unfiltered (gdb_stdlog,
@@ -1691,7 +1700,8 @@ resume_set_callback (struct lwp_info *lp, void *data)
 }
 
 static void
-linux_nat_resume (ptid_t ptid, int step, enum target_signal signo)
+linux_nat_resume (struct target_ops *ops,
+		  ptid_t ptid, int step, enum target_signal signo)
 {
   struct lwp_info *lp;
   int resume_all;
@@ -1802,7 +1812,7 @@ linux_nat_resume (ptid_t ptid, int step, enum target_signal signo)
   if (resume_all)
     iterate_over_lwps (resume_callback, NULL);
 
-  linux_ops->to_resume (ptid, step, signo);
+  linux_ops->to_resume (linux_ops, ptid, step, signo);
   memset (&lp->siginfo, 0, sizeof (lp->siginfo));
 
   if (debug_linux_nat)
@@ -2647,7 +2657,7 @@ linux_nat_filter_event (int lwpid, int status, int options)
      thread model, LWPs other than the main thread do not issue
      signals when they exit so we must check whenever the thread has
      stopped.  A similar check is made in stop_wait_callback().  */
-  if (num_lwps > 1 && !linux_nat_thread_alive (lp->ptid))
+  if (num_lwps > 1 && !linux_thread_alive (lp->ptid))
     {
       if (debug_linux_nat)
 	fprintf_unfiltered (gdb_stdlog,
@@ -2678,7 +2688,7 @@ linux_nat_filter_event (int lwpid, int status, int options)
 
       registers_changed ();
 
-      linux_ops->to_resume (pid_to_ptid (GET_LWP (lp->ptid)),
+      linux_ops->to_resume (linux_ops, pid_to_ptid (GET_LWP (lp->ptid)),
 			    lp->step, TARGET_SIGNAL_0);
       if (debug_linux_nat)
 	fprintf_unfiltered (gdb_stdlog,
@@ -2708,7 +2718,7 @@ linux_nat_filter_event (int lwpid, int status, int options)
       lp->ignore_sigint = 0;
 
       registers_changed ();
-      linux_ops->to_resume (pid_to_ptid (GET_LWP (lp->ptid)),
+      linux_ops->to_resume (linux_ops, pid_to_ptid (GET_LWP (lp->ptid)),
 			    lp->step, TARGET_SIGNAL_0);
       if (debug_linux_nat)
 	fprintf_unfiltered (gdb_stdlog,
@@ -2776,7 +2786,8 @@ local_event_queue_to_pipe (void)
 }
 
 static ptid_t
-linux_nat_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
+linux_nat_wait (struct target_ops *ops,
+		ptid_t ptid, struct target_waitstatus *ourstatus)
 {
   struct lwp_info *lp = NULL;
   int options = 0;
@@ -2876,7 +2887,7 @@ retry:
       /* Resume the thread.  It should halt immediately returning the
          pending SIGSTOP.  */
       registers_changed ();
-      linux_ops->to_resume (pid_to_ptid (GET_LWP (lp->ptid)),
+      linux_ops->to_resume (linux_ops, pid_to_ptid (GET_LWP (lp->ptid)),
 			    lp->step, TARGET_SIGNAL_0);
       if (debug_linux_nat)
 	fprintf_unfiltered (gdb_stdlog,
@@ -2997,7 +3008,7 @@ retry:
 	     newly attached threads may cause an unwanted delay in
 	     getting them running.  */
 	  registers_changed ();
-	  linux_ops->to_resume (pid_to_ptid (GET_LWP (lp->ptid)),
+	  linux_ops->to_resume (linux_ops, pid_to_ptid (GET_LWP (lp->ptid)),
 				lp->step, signo);
 	  if (debug_linux_nat)
 	    fprintf_unfiltered (gdb_stdlog,
@@ -3222,14 +3233,97 @@ linux_nat_mourn_inferior (struct target_ops *ops)
     linux_fork_mourn_inferior ();
 }
 
+/* Convert a native/host siginfo object, into/from the siginfo in the
+   layout of the inferiors' architecture.  */
+
+static void
+siginfo_fixup (struct siginfo *siginfo, gdb_byte *inf_siginfo, int direction)
+{
+  int done = 0;
+
+  if (linux_nat_siginfo_fixup != NULL)
+    done = linux_nat_siginfo_fixup (siginfo, inf_siginfo, direction);
+
+  /* If there was no callback, or the callback didn't do anything,
+     then just do a straight memcpy.  */
+  if (!done)
+    {
+      if (direction == 1)
+	memcpy (siginfo, inf_siginfo, sizeof (struct siginfo));
+      else
+	memcpy (inf_siginfo, siginfo, sizeof (struct siginfo));
+    }
+}
+
+static LONGEST
+linux_xfer_siginfo (struct target_ops *ops, enum target_object object,
+                    const char *annex, gdb_byte *readbuf,
+		    const gdb_byte *writebuf, ULONGEST offset, LONGEST len)
+{
+  struct lwp_info *lp;
+  LONGEST n;
+  int pid;
+  struct siginfo siginfo;
+  gdb_byte inf_siginfo[sizeof (struct siginfo)];
+
+  gdb_assert (object == TARGET_OBJECT_SIGNAL_INFO);
+  gdb_assert (readbuf || writebuf);
+
+  pid = GET_LWP (inferior_ptid);
+  if (pid == 0)
+    pid = GET_PID (inferior_ptid);
+
+  if (offset > sizeof (siginfo))
+    return -1;
+
+  errno = 0;
+  ptrace (PTRACE_GETSIGINFO, pid, (PTRACE_TYPE_ARG3) 0, &siginfo);
+  if (errno != 0)
+    return -1;
+
+  /* When GDB is built as a 64-bit application, ptrace writes into
+     SIGINFO an object with 64-bit layout.  Since debugging a 32-bit
+     inferior with a 64-bit GDB should look the same as debugging it
+     with a 32-bit GDB, we need to convert it.  GDB core always sees
+     the converted layout, so any read/write will have to be done
+     post-conversion.  */
+  siginfo_fixup (&siginfo, inf_siginfo, 0);
+
+  if (offset + len > sizeof (siginfo))
+    len = sizeof (siginfo) - offset;
+
+  if (readbuf != NULL)
+    memcpy (readbuf, inf_siginfo + offset, len);
+  else
+    {
+      memcpy (inf_siginfo + offset, writebuf, len);
+
+      /* Convert back to ptrace layout before flushing it out.  */
+      siginfo_fixup (&siginfo, inf_siginfo, 1);
+
+      errno = 0;
+      ptrace (PTRACE_SETSIGINFO, pid, (PTRACE_TYPE_ARG3) 0, &siginfo);
+      if (errno != 0)
+	return -1;
+    }
+
+  return len;
+}
+
 static LONGEST
 linux_nat_xfer_partial (struct target_ops *ops, enum target_object object,
 			const char *annex, gdb_byte *readbuf,
 			const gdb_byte *writebuf,
 			ULONGEST offset, LONGEST len)
 {
-  struct cleanup *old_chain = save_inferior_ptid ();
+  struct cleanup *old_chain;
   LONGEST xfer;
+
+  if (object == TARGET_OBJECT_SIGNAL_INFO)
+    return linux_xfer_siginfo (ops, object, annex, readbuf, writebuf,
+			       offset, len);
+
+  old_chain = save_inferior_ptid ();
 
   if (is_lwp (inferior_ptid))
     inferior_ptid = pid_to_ptid (GET_LWP (inferior_ptid));
@@ -3242,7 +3336,7 @@ linux_nat_xfer_partial (struct target_ops *ops, enum target_object object,
 }
 
 static int
-linux_nat_thread_alive (ptid_t ptid)
+linux_thread_alive (ptid_t ptid)
 {
   int err;
 
@@ -3265,8 +3359,14 @@ linux_nat_thread_alive (ptid_t ptid)
   return 1;
 }
 
+static int
+linux_nat_thread_alive (struct target_ops *ops, ptid_t ptid)
+{
+  return linux_thread_alive (ptid);
+}
+
 static char *
-linux_nat_pid_to_str (ptid_t ptid)
+linux_nat_pid_to_str (struct target_ops *ops, ptid_t ptid)
 {
   static char buf[64];
 
@@ -4466,7 +4566,7 @@ linux_nat_terminal_inferior (void)
 
 /* target_terminal_ours implementation.  */
 
-void
+static void
 linux_nat_terminal_ours (void)
 {
   if (!target_is_async_p ())
@@ -4659,10 +4759,6 @@ linux_nat_add_target (struct target_ops *t)
      also want to be used for single-threaded processes.  */
 
   add_target (t);
-
-  /* TODO: Eliminate this and have libthread_db use
-     find_target_beneath.  */
-  thread_db_init (t);
 }
 
 /* Register a method to call whenever a new thread is attached.  */
@@ -4673,6 +4769,19 @@ linux_nat_set_new_thread (struct target_ops *t, void (*new_thread) (ptid_t))
      of the GNU/Linux native target, so we do not need to map this to
      T.  */
   linux_nat_new_thread = new_thread;
+}
+
+/* Register a method that converts a siginfo object between the layout
+   that ptrace returns, and the layout in the architecture of the
+   inferior.  */
+void
+linux_nat_set_siginfo_fixup (struct target_ops *t,
+			     int (*siginfo_fixup) (struct siginfo *,
+						   gdb_byte *,
+						   int))
+{
+  /* Save the pointer.  */
+  linux_nat_siginfo_fixup = siginfo_fixup;
 }
 
 /* Return the saved siginfo associated with PTID.  */
@@ -4697,6 +4806,9 @@ linux_nat_setup_async (void)
   fcntl (linux_nat_event_pipe[0], F_SETFL, O_NONBLOCK);
   fcntl (linux_nat_event_pipe[1], F_SETFL, O_NONBLOCK);
 }
+
+/* Provide a prototype to silence -Wmissing-prototypes.  */
+extern initialize_file_ftype _initialize_linux_nat;
 
 void
 _initialize_linux_nat (void)

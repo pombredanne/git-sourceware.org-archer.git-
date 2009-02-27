@@ -1,6 +1,6 @@
 /* ppc-opc.c -- PowerPC opcode list
    Copyright 1994, 1995, 1996, 1997, 1998, 2000, 2001, 2002, 2003, 2004,
-   2005, 2006, 2007, 2008 Free Software Foundation, Inc.
+   2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
    Written by Ian Lance Taylor, Cygnus Support
 
    This file is part of the GNU opcodes library.
@@ -3636,7 +3636,8 @@ const struct powerpc_opcode powerpc_opcodes[] = {
 {"mtsrin",	X(31,242),	XRA_MASK,    PPC32,	PPCNONE,	{RS, RB}},
 {"mtsri",	X(31,242),	XRA_MASK,    POWER32,	PPCNONE,	{RS, RB}},
 
-{"dcbtst",	X(31,246),	X_MASK,      PPC,	PPCNONE,	{CT, RA, RB}},
+{"dcbtst",	X(31,246),	X_MASK,      PPC,	POWER4,		{CT, RA, RB}},
+{"dcbtst",	X(31,246),	X_MASK,      POWER4,	PPCNONE,	{RA, RB, CT}},
 
 {"stbux",	X(31,247),	X_MASK,      COM,	PPCNONE,	{RS, RAS, RB}},
 
@@ -3667,7 +3668,8 @@ const struct powerpc_opcode powerpc_opcodes[] = {
 {"lscbx",	XRC(31,277,0),	X_MASK,      M601,	PPCNONE,	{RT, RA, RB}},
 {"lscbx.",	XRC(31,277,1),	X_MASK,      M601,	PPCNONE,	{RT, RA, RB}},
 
-{"dcbt",	X(31,278),	X_MASK,      PPC,	PPCNONE,	{CT, RA, RB}},
+{"dcbt",	X(31,278),	X_MASK,      PPC,	POWER4,		{CT, RA, RB}},
+{"dcbt",	X(31,278),	X_MASK,      POWER4,	PPCNONE,	{RA, RB, CT}},
 
 {"lhzx",	X(31,279),	X_MASK,      COM,	PPCNONE,	{RT, RA0, RB}},
 
@@ -4284,7 +4286,7 @@ const struct powerpc_opcode powerpc_opcodes[] = {
 
 {"lfdx",	X(31,599),	X_MASK,      COM,	PPCNONE,	{FRT, RA0, RB}},
 
-{"lfdepx",	X(31,607),	X_MASK,      E500MC,	PPCNONE,	{RT, RA, RB}},
+{"lfdepx",	X(31,607),	X_MASK,      E500MC,	PPCNONE,	{FRT, RA, RB}},
 {"mffgpr",	XRC(31,607,0),	XRA_MASK,    POWER6,	PPCNONE,	{FRT, RB}},
 
 {"lddx",	X(31,611),	X_MASK,      E500MC,	PPCNONE,	{RT, RA, RB}},
@@ -4371,7 +4373,7 @@ const struct powerpc_opcode powerpc_opcodes[] = {
 {"sreq",	XRC(31,729,0),	X_MASK,      M601,	PPCNONE,	{RA, RS, RB}},
 {"sreq.",	XRC(31,729,1),	X_MASK,      M601,	PPCNONE,	{RA, RS, RB}},
 
-{"stfdepx",	X(31,735),	X_MASK,      E500MC,	PPCNONE,	{RS, RA, RB}},
+{"stfdepx",	X(31,735),	X_MASK,      E500MC,	PPCNONE,	{FRS, RA, RB}},
 {"mftgpr",	XRC(31,735,0),	XRA_MASK,    POWER6,	PPCNONE,	{RT, FRB}},
 
 {"stddx",	X(31,739),	X_MASK,      E500MC,	PPCNONE,	{RS, RA, RB}},

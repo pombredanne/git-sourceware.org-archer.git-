@@ -1801,6 +1801,7 @@ enum bfd_architecture
 #define bfd_mach_mips_loongson_2f      3002
 #define bfd_mach_mips_sb1              12310201 /* octal 'SB', 01 */
 #define bfd_mach_mips_octeon           6501
+#define bfd_mach_mips_xlr              887682   /* decimal 'XLR'  */
 #define bfd_mach_mipsisa32             32
 #define bfd_mach_mipsisa32r2           33
 #define bfd_mach_mipsisa64             64
@@ -2584,6 +2585,22 @@ GP register.  */
 share a common GP, and the target address is adjusted for
 STO_ALPHA_STD_GPLOAD.  */
   BFD_RELOC_ALPHA_BRSGP,
+
+/* The NOP relocation outputs a NOP if the longword displacement
+between two procedure entry points is < 2^21.  */
+  BFD_RELOC_ALPHA_NOP,
+
+/* The BSR relocation outputs a BSR if the longword displacement
+between two procedure entry points is < 2^21.  */
+  BFD_RELOC_ALPHA_BSR,
+
+/* The LDA relocation outputs a LDA if the longword displacement
+between two procedure entry points is < 2^16.  */
+  BFD_RELOC_ALPHA_LDA,
+
+/* The BOH relocation outputs a BSR if the longword displacement
+between two procedure entry points is < 2^21, or else a hint.  */
+  BFD_RELOC_ALPHA_BOH,
 
 /* Alpha thread-local storage relocations.  */
   BFD_RELOC_ALPHA_TLSGD,

@@ -37,6 +37,7 @@
 #include "rs6000-tdep.h"
 #include "exec.h"
 #include "observer.h"
+#include "xcoffread.h"
 
 #include <sys/ptrace.h>
 #include <sys/reg.h>
@@ -333,7 +334,8 @@ store_register (const struct regcache *regcache, int regno)
    REGNO otherwise. */
 
 static void
-rs6000_fetch_inferior_registers (struct regcache *regcache, int regno)
+rs6000_fetch_inferior_registers (struct target_ops *ops,
+				 struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
   if (regno != -1)
@@ -375,7 +377,8 @@ rs6000_fetch_inferior_registers (struct regcache *regcache, int regno)
    Otherwise, REGNO specifies which register (so we can save time).  */
 
 static void
-rs6000_store_inferior_registers (struct regcache *regcache, int regno)
+rs6000_store_inferior_registers (struct target_ops *ops,
+				 struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
   if (regno != -1)
@@ -517,7 +520,8 @@ rs6000_xfer_partial (struct target_ops *ops, enum target_object object,
    the status in *OURSTATUS.  */
 
 static ptid_t
-rs6000_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
+rs6000_wait (struct target_ops *ops,
+	     ptid_t ptid, struct target_waitstatus *ourstatus)
 {
   pid_t pid;
   int status, save_errno;
@@ -1190,16 +1194,15 @@ static CORE_ADDR
 find_toc_address (CORE_ADDR pc)
 {
   struct vmap *vp;
-  extern CORE_ADDR get_toc_offset (struct objfile *);	/* xcoffread.c */
 
   for (vp = vmap; vp; vp = vp->nxt)
     {
       if (pc >= vp->tstart && pc < vp->tend)
 	{
 	  /* vp->objfile is only NULL for the exec file.  */
-	  return vp->dstart + get_toc_offset (vp->objfile == NULL
-					      ? symfile_objfile
-					      : vp->objfile);
+	  return vp->dstart + xcoff_get_toc_offset (vp->objfile == NULL
+						    ? symfile_objfile
+						    : vp->objfile);
 	}
     }
   error (_("Unable to find TOC entry for pc %s."), hex_string (pc));

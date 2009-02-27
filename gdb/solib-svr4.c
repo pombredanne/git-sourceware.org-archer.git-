@@ -149,7 +149,7 @@ LM_ADDR_FROM_LINK_MAP (struct so_list *so)
 }
 
 static int
-HAS_LM_DYNAMIC_FROM_LINK_MAP ()
+HAS_LM_DYNAMIC_FROM_LINK_MAP (void)
 {
   struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
 
@@ -845,7 +845,7 @@ open_symbol_file_object (void *from_ttyp)
   struct cleanup *cleanups = make_cleanup (xfree, l_name_buf);
 
   if (symfile_objfile)
-    if (!query ("Attempt to reload symbols from process? "))
+    if (!query (_("Attempt to reload symbols from process? ")))
       return 0;
 
   /* Always locate the debug struct, in case it has moved.  */

@@ -26,6 +26,10 @@ completions will be "f1" and "f2".
 operators when expanding macros.  It also supports variable-arity
 macros.
 
+* GDB now supports inspecting extra signal information, exported by
+  the new $_siginfo convenience variable.  The feature is currently
+  implemented on linux ARM, i386 and amd64.
+
 * New remote packets
 
 qSearch:memory:
@@ -38,6 +42,10 @@ QStartNoAckMode
 
 qXfer:osdata:read
   Obtains additional operating system information
+
+qXfer:siginfo:read
+qXfer:siginfo:write
+  Read or write additional signal information.
 
 * Removed remote protocol undocumented extension
 
@@ -95,6 +103,8 @@ are treated as the standard definitions, regardless of context.
 
   GDB now has support for scripting using Python.  Whether this is
   available is determined at configure time.
+
+  New GDB commands can now be written in Python.
 
 * Ada tasking support
 
@@ -198,6 +208,7 @@ x86_64 MinGW			x86_64-*-mingw*
 * New targets
 
 x86 DICOS			i[34567]86-*-dicos*
+x86_64 DICOS		        x86_64-*-dicos*
 
 * Removed commands
 

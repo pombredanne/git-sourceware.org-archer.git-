@@ -97,20 +97,6 @@ static struct target_ops debug_target;
 
 static void debug_to_open (char *, int);
 
-static void debug_to_close (int);
-
-static void debug_to_attach (struct target_ops *ops, char *, int);
-
-static void debug_to_detach (struct target_ops *ops, char *, int);
-
-static void debug_to_resume (ptid_t, int, enum target_signal);
-
-static ptid_t debug_to_wait (ptid_t, struct target_waitstatus *);
-
-static void debug_to_fetch_registers (struct regcache *, int);
-
-static void debug_to_store_registers (struct regcache *, int);
-
 static void debug_to_prepare_to_store (struct regcache *);
 
 static void debug_to_files_info (struct target_ops *);
@@ -156,13 +142,9 @@ static void debug_to_load (char *, int);
 
 static int debug_to_lookup_symbol (char *, CORE_ADDR *);
 
-static void debug_to_mourn_inferior (struct target_ops *);
-
 static int debug_to_can_run (void);
 
 static void debug_to_notice_signals (ptid_t);
-
-static int debug_to_thread_alive (ptid_t);
 
 static void debug_to_stop (ptid_t);
 
@@ -281,8 +263,9 @@ target_load (char *arg, int from_tty)
   (*current_target.to_load) (arg, from_tty);
 }
 
-void target_create_inferior (char *exec_file, char *args,
-			     char **env, int from_tty)
+void
+target_create_inferior (char *exec_file, char *args,
+			char **env, int from_tty)
 {
   struct target_ops *t;
   for (t = current_target.beneath; t != NULL; t = t->beneath)
@@ -290,6 +273,10 @@ void target_create_inferior (char *exec_file, char *args,
       if (t->to_create_inferior != NULL)	
 	{
 	  t->to_create_inferior (t, exec_file, args, env, from_tty);
+	  if (targetdebug)
+	    fprintf_unfiltered (gdb_stdlog,
+				"target_create_inferior (%s, %s, xxx, %d)\n",
+				exec_file, args, from_tty);
 	  return;
 	}
     }
@@ -354,7 +341,7 @@ kill_or_be_killed (int from_tty)
     {
       printf_unfiltered (_("You are already running a program:\n"));
       target_files_info ();
-      if (query ("Kill it? "))
+      if (query (_("Kill it? ")))
 	{
 	  target_kill ();
 	  if (target_has_execution)
@@ -375,7 +362,7 @@ kill_or_be_killed (int from_tty)
    the PTID lwp and tid elements.  The pid used is the pid of the
    inferior_ptid.  */
 
-ptid_t
+static ptid_t
 default_get_ada_task_ptid (long lwp, long tid)
 {
   return ptid_build (ptid_get_pid (inferior_ptid), lwp, tid);
@@ -417,10 +404,10 @@ update_current_target (void)
       INHERIT (to_attach_no_wait, t);
       /* Do not inherit to_detach.  */
       /* Do not inherit to_disconnect.  */
-      INHERIT (to_resume, t);
-      INHERIT (to_wait, t);
-      INHERIT (to_fetch_registers, t);
-      INHERIT (to_store_registers, t);
+      /* Do not inherit to_resume.  */
+      /* Do not inherit to_wait.  */
+      /* Do not inherit to_fetch_registers.  */
+      /* Do not inherit to_store_registers.  */
       INHERIT (to_prepare_to_store, t);
       INHERIT (deprecated_xfer_memory, t);
       INHERIT (to_files_info, t);
@@ -457,12 +444,12 @@ update_current_target (void)
       INHERIT (to_insert_exec_catchpoint, t);
       INHERIT (to_remove_exec_catchpoint, t);
       INHERIT (to_has_exited, t);
-      /* Do no inherit to_mourn_inferiour.  */
+      /* Do not inherit to_mourn_inferiour.  */
       INHERIT (to_can_run, t);
       INHERIT (to_notice_signals, t);
-      INHERIT (to_thread_alive, t);
-      INHERIT (to_find_new_threads, t);
-      INHERIT (to_pid_to_str, t);
+      /* Do not inherit to_thread_alive.  */
+      /* Do not inherit to_find_new_threads.  */
+      /* Do not inherit to_pid_to_str.  */
       INHERIT (to_extra_thread_info, t);
       INHERIT (to_stop, t);
       /* Do not inherit to_xfer_partial.  */
@@ -484,7 +471,7 @@ update_current_target (void)
       INHERIT (to_async_mask, t);
       INHERIT (to_find_memory_regions, t);
       INHERIT (to_make_corefile_notes, t);
-      INHERIT (to_get_thread_local_address, t);
+      /* Do not inherit to_get_thread_local_address.  */
       INHERIT (to_can_execute_reverse, t);
       /* Do not inherit to_read_description.  */
       INHERIT (to_get_ada_task_ptid, t);
@@ -514,18 +501,6 @@ update_current_target (void)
   de_fault (to_post_attach,
 	    (void (*) (int))
 	    target_ignore);
-  de_fault (to_resume,
-	    (void (*) (ptid_t, int, enum target_signal))
-	    noprocess);
-  de_fault (to_wait,
-	    (ptid_t (*) (ptid_t, struct target_waitstatus *))
-	    noprocess);
-  de_fault (to_fetch_registers,
-	    (void (*) (struct regcache *, int))
-	    target_ignore);
-  de_fault (to_store_registers,
-	    (void (*) (struct regcache *, int))
-	    noprocess);
   de_fault (to_prepare_to_store,
 	    (void (*) (struct regcache *))
 	    noprocess);
@@ -621,12 +596,6 @@ update_current_target (void)
 	    return_zero);
   de_fault (to_notice_signals,
 	    (void (*) (ptid_t))
-	    target_ignore);
-  de_fault (to_thread_alive,
-	    (int (*) (ptid_t))
-	    return_zero);
-  de_fault (to_find_new_threads,
-	    (void (*) (void))
 	    target_ignore);
   de_fault (to_extra_thread_info,
 	    (char *(*) (struct thread_info *))
@@ -856,8 +825,17 @@ CORE_ADDR
 target_translate_tls_address (struct objfile *objfile, CORE_ADDR offset)
 {
   volatile CORE_ADDR addr = 0;
+  struct target_ops *target;
 
-  if (target_get_thread_local_address_p ()
+  for (target = current_target.beneath;
+       target != NULL;
+       target = target->beneath)
+    {
+      if (target->to_get_thread_local_address != NULL)
+	break;
+    }
+
+  if (target != NULL
       && gdbarch_fetch_tls_load_module_address_p (target_gdbarch))
     {
       ptid_t ptid = inferior_ptid;
@@ -875,7 +853,7 @@ target_translate_tls_address (struct objfile *objfile, CORE_ADDR offset)
 	    throw_error (TLS_LOAD_MODULE_NOT_FOUND_ERROR,
 			 _("TLS load module not found"));
 
-	  addr = target_get_thread_local_address (ptid, lm_addr, offset);
+	  addr = target->to_get_thread_local_address (target, ptid, lm_addr, offset);
 	}
       /* If an error occurred, print TLS related messages here.  Otherwise,
          throw the error to some higher catcher.  */
@@ -1353,21 +1331,6 @@ target_flash_done (void)
   tcomplain ();
 }
 
-#ifndef target_stopped_data_address_p
-int
-target_stopped_data_address_p (struct target_ops *target)
-{
-  if (target->to_stopped_data_address
-      == (int (*) (struct target_ops *, CORE_ADDR *)) return_zero)
-    return 0;
-  if (target->to_stopped_data_address == debug_to_stopped_data_address
-      && (debug_target.to_stopped_data_address
-	  == (int (*) (struct target_ops *, CORE_ADDR *)) return_zero))
-    return 0;
-  return 1;
-}
-#endif
-
 static void
 show_trust_readonly (struct ui_file *file, int from_tty,
 		     struct cmd_list_element *c, const char *value)
@@ -1826,6 +1789,9 @@ target_detach (char *args, int from_tty)
       if (t->to_detach != NULL)
 	{
 	  t->to_detach (t, args, from_tty);
+	  if (targetdebug)
+	    fprintf_unfiltered (gdb_stdlog, "target_detach (%s, %d)\n",
+				args, from_tty);
 	  return;
 	}
     }
@@ -1856,13 +1822,75 @@ target_disconnect (char *args, int from_tty)
   tcomplain ();
 }
 
+ptid_t
+target_wait (ptid_t ptid, struct target_waitstatus *status)
+{
+  struct target_ops *t;
+
+  for (t = current_target.beneath; t != NULL; t = t->beneath)
+    {
+      if (t->to_wait != NULL)
+	{
+	  ptid_t retval = (*t->to_wait) (t, ptid, status);
+
+	  if (targetdebug)
+	    {
+	      char *status_string;
+
+	      status_string = target_waitstatus_to_string (status);
+	      fprintf_unfiltered (gdb_stdlog,
+				  "target_wait (%d, status) = %d,   %s\n",
+				  PIDGET (ptid), PIDGET (retval),
+				  status_string);
+	      xfree (status_string);
+	    }
+
+	  return retval;
+	}
+    }
+
+  noprocess ();
+}
+
+char *
+target_pid_to_str (ptid_t ptid)
+{
+  struct target_ops *t;
+
+  for (t = current_target.beneath; t != NULL; t = t->beneath)
+    {
+      if (t->to_pid_to_str != NULL)
+	return (*t->to_pid_to_str) (t, ptid);
+    }
+
+  return normal_pid_to_str (ptid);
+}
+
 void
 target_resume (ptid_t ptid, int step, enum target_signal signal)
 {
+  struct target_ops *t;
+
   dcache_invalidate (target_dcache);
-  (*current_target.to_resume) (ptid, step, signal);
-  set_executing (ptid, 1);
-  set_running (ptid, 1);
+
+  for (t = current_target.beneath; t != NULL; t = t->beneath)
+    {
+      if (t->to_resume != NULL)
+	{
+	  t->to_resume (t, ptid, step, signal);
+	  if (targetdebug)
+	    fprintf_unfiltered (gdb_stdlog, "target_resume (%d, %s, %s)\n",
+				PIDGET (ptid),
+				step ? "step" : "continue",
+				target_signal_to_name (signal));
+
+	  set_executing (ptid, 1);
+	  set_running (ptid, 1);
+	  return;
+	}
+    }
+
+  noprocess ();
 }
 /* Look through the list of possible targets for a target that can
    follow forks.  */
@@ -1898,6 +1926,8 @@ target_mourn_inferior (void)
       if (t->to_mourn_inferior != NULL)	
 	{
 	  t->to_mourn_inferior (t);
+	  if (targetdebug)
+	    fprintf_unfiltered (gdb_stdlog, "target_mourn_inferior ()\n");
 	  return;
 	}
     }
@@ -2172,7 +2202,7 @@ find_default_create_inferior (struct target_ops *ops,
   return;
 }
 
-int
+static int
 find_default_can_async_p (void)
 {
   struct target_ops *t;
@@ -2187,7 +2217,7 @@ find_default_can_async_p (void)
   return 0;
 }
 
-int
+static int
 find_default_is_async_p (void)
 {
   struct target_ops *t;
@@ -2202,7 +2232,7 @@ find_default_is_async_p (void)
   return 0;
 }
 
-int
+static int
 find_default_supports_non_stop (void)
 {
   struct target_ops *t;
@@ -2214,7 +2244,7 @@ find_default_supports_non_stop (void)
 }
 
 int
-target_supports_non_stop ()
+target_supports_non_stop (void)
 {
   struct target_ops *t;
   for (t = &current_target; t != NULL; t = t->beneath)
@@ -2231,18 +2261,18 @@ target_get_osdata (const char *type)
   char *document;
   struct target_ops *t;
 
-  if (target_can_run (&current_target))
-    t = &current_target;
+  /* If we're already connected to something that can get us OS
+     related data, use it.  Otherwise, try using the native
+     target.  */
+  if (current_target.to_stratum >= process_stratum)
+    t = current_target.beneath;
   else
     t = find_default_run_target ("get OS data");
 
   if (!t)
     return NULL;
 
-  document = target_read_stralloc (t,
-                                  TARGET_OBJECT_OSDATA,
-                                  type);
-  return document;
+  return target_read_stralloc (t, TARGET_OBJECT_OSDATA, type);
 }
 
 static int
@@ -2488,6 +2518,12 @@ normal_pid_to_str (ptid_t ptid)
   return buf;
 }
 
+static char *
+dummy_pid_to_str (struct target_ops *ops, ptid_t ptid)
+{
+  return normal_pid_to_str (ptid);
+}
+
 /* Error-catcher for target_find_memory_regions */
 static int dummy_find_memory_regions (int (*ignore1) (), void *ignore2)
 {
@@ -2518,7 +2554,7 @@ init_dummy_target (void)
   dummy_target.to_can_async_p = find_default_can_async_p;
   dummy_target.to_is_async_p = find_default_is_async_p;
   dummy_target.to_supports_non_stop = find_default_supports_non_stop;
-  dummy_target.to_pid_to_str = normal_pid_to_str;
+  dummy_target.to_pid_to_str = dummy_pid_to_str;
   dummy_target.to_stratum = dummy_stratum;
   dummy_target.to_find_memory_regions = dummy_find_memory_regions;
   dummy_target.to_make_corefile_notes = dummy_make_corefile_notes;
@@ -2534,13 +2570,6 @@ debug_to_open (char *args, int from_tty)
   fprintf_unfiltered (gdb_stdlog, "target_open (%s, %d)\n", args, from_tty);
 }
 
-static void
-debug_to_close (int quitting)
-{
-  target_close (&debug_target, quitting);
-  fprintf_unfiltered (gdb_stdlog, "target_close (%d)\n", quitting);
-}
-
 void
 target_close (struct target_ops *targ, int quitting)
 {
@@ -2548,6 +2577,9 @@ target_close (struct target_ops *targ, int quitting)
     targ->to_xclose (targ, quitting);
   else if (targ->to_close != NULL)
     targ->to_close (quitting);
+
+  if (targetdebug)
+    fprintf_unfiltered (gdb_stdlog, "target_close (%d)\n", quitting);
 }
 
 void
@@ -2559,6 +2591,9 @@ target_attach (char *args, int from_tty)
       if (t->to_attach != NULL)	
 	{
 	  t->to_attach (t, args, from_tty);
+	  if (targetdebug)
+	    fprintf_unfiltered (gdb_stdlog, "target_attach (%s, %d)\n",
+				args, from_tty);
 	  return;
 	}
     }
@@ -2567,15 +2602,44 @@ target_attach (char *args, int from_tty)
 		  "could not find a target to attach");
 }
 
-
-static void
-debug_to_attach (struct target_ops *ops, char *args, int from_tty)
+int
+target_thread_alive (ptid_t ptid)
 {
-  debug_target.to_attach (&debug_target, args, from_tty);
+  struct target_ops *t;
+  for (t = current_target.beneath; t != NULL; t = t->beneath)
+    {
+      if (t->to_thread_alive != NULL)
+	{
+	  int retval;
 
-  fprintf_unfiltered (gdb_stdlog, "target_attach (%s, %d)\n", args, from_tty);
+	  retval = t->to_thread_alive (t, ptid);
+	  if (targetdebug)
+	    fprintf_unfiltered (gdb_stdlog, "target_thread_alive (%d) = %d\n",
+				PIDGET (ptid), retval);
+
+	  return retval;
+	}
+    }
+
+  return 0;
 }
 
+void
+target_find_new_threads (void)
+{
+  struct target_ops *t;
+  for (t = current_target.beneath; t != NULL; t = t->beneath)
+    {
+      if (t->to_find_new_threads != NULL)
+	{
+	  t->to_find_new_threads (t);
+	  if (targetdebug)
+	    fprintf_unfiltered (gdb_stdlog, "target_find_new_threads ()\n");
+
+	  return;
+	}
+    }
+}
 
 static void
 debug_to_post_attach (int pid)
@@ -2583,24 +2647,6 @@ debug_to_post_attach (int pid)
   debug_target.to_post_attach (pid);
 
   fprintf_unfiltered (gdb_stdlog, "target_post_attach (%d)\n", pid);
-}
-
-static void
-debug_to_detach (struct target_ops *ops, char *args, int from_tty)
-{
-  debug_target.to_detach (&debug_target, args, from_tty);
-
-  fprintf_unfiltered (gdb_stdlog, "target_detach (%s, %d)\n", args, from_tty);
-}
-
-static void
-debug_to_resume (ptid_t ptid, int step, enum target_signal siggnal)
-{
-  debug_target.to_resume (ptid, step, siggnal);
-
-  fprintf_unfiltered (gdb_stdlog, "target_resume (%d, %s, %s)\n", PIDGET (ptid),
-		      step ? "step" : "continue",
-		      target_signal_to_name (siggnal));
 }
 
 /* Return a pretty printed form of target_waitstatus.
@@ -2645,25 +2691,6 @@ target_waitstatus_to_string (const struct target_waitstatus *ws)
     }
 }
 
-static ptid_t
-debug_to_wait (ptid_t ptid, struct target_waitstatus *status)
-{
-  ptid_t retval;
-  char *status_string;
-
-  retval = debug_target.to_wait (ptid, status);
-
-  fprintf_unfiltered (gdb_stdlog,
-		      "target_wait (%d, status) = %d,   ", PIDGET (ptid),
-		      PIDGET (retval));
-
-  status_string = target_waitstatus_to_string (status);
-  fprintf_unfiltered (gdb_stdlog, "%s\n", status_string);
-  xfree (status_string);
-
-  return retval;
-}
-
 static void
 debug_print_register (const char * func,
 		      struct regcache *regcache, int regno)
@@ -2697,19 +2724,41 @@ debug_print_register (const char * func,
   fprintf_unfiltered (gdb_stdlog, "\n");
 }
 
-static void
-debug_to_fetch_registers (struct regcache *regcache, int regno)
+void
+target_fetch_registers (struct regcache *regcache, int regno)
 {
-  debug_target.to_fetch_registers (regcache, regno);
-  debug_print_register ("target_fetch_registers", regcache, regno);
+  struct target_ops *t;
+  for (t = current_target.beneath; t != NULL; t = t->beneath)
+    {
+      if (t->to_fetch_registers != NULL)
+	{
+	  t->to_fetch_registers (t, regcache, regno);
+	  if (targetdebug)
+	    debug_print_register ("target_fetch_registers", regcache, regno);
+	  return;
+	}
+    }
 }
 
-static void
-debug_to_store_registers (struct regcache *regcache, int regno)
+void
+target_store_registers (struct regcache *regcache, int regno)
 {
-  debug_target.to_store_registers (regcache, regno);
-  debug_print_register ("target_store_registers", regcache, regno);
-  fprintf_unfiltered (gdb_stdlog, "\n");
+
+  struct target_ops *t;
+  for (t = current_target.beneath; t != NULL; t = t->beneath)
+    {
+      if (t->to_store_registers != NULL)
+	{
+	  t->to_store_registers (t, regcache, regno);
+	  if (targetdebug)
+	    {
+	      debug_print_register ("target_store_registers", regcache, regno);
+	    }
+	  return;
+	}
+    }
+
+  noprocess ();
 }
 
 static void
@@ -3004,17 +3053,6 @@ debug_to_lookup_symbol (char *name, CORE_ADDR *addrp)
 }
 
 static void
-debug_to_create_inferior (struct target_ops *ops,
-			  char *exec_file, char *args, char **env,
-			  int from_tty)
-{
-  debug_target.to_create_inferior (ops, exec_file, args, env, from_tty);
-
-  fprintf_unfiltered (gdb_stdlog, "target_create_inferior (%s, %s, xxx, %d)\n",
-		      exec_file, args, from_tty);
-}
-
-static void
 debug_to_post_startup_inferior (ptid_t ptid)
 {
   debug_target.to_post_startup_inferior (ptid);
@@ -3111,14 +3149,6 @@ debug_to_has_exited (int pid, int wait_status, int *exit_status)
   return has_exited;
 }
 
-static void
-debug_to_mourn_inferior (struct target_ops *ops)
-{
-  debug_target.to_mourn_inferior (&debug_target);
-
-  fprintf_unfiltered (gdb_stdlog, "target_mourn_inferior ()\n");
-}
-
 static int
 debug_to_can_run (void)
 {
@@ -3138,27 +3168,6 @@ debug_to_notice_signals (ptid_t ptid)
 
   fprintf_unfiltered (gdb_stdlog, "target_notice_signals (%d)\n",
                       PIDGET (ptid));
-}
-
-static int
-debug_to_thread_alive (ptid_t ptid)
-{
-  int retval;
-
-  retval = debug_target.to_thread_alive (ptid);
-
-  fprintf_unfiltered (gdb_stdlog, "target_thread_alive (%d) = %d\n",
-		      PIDGET (ptid), retval);
-
-  return retval;
-}
-
-static void
-debug_to_find_new_threads (void)
-{
-  debug_target.to_find_new_threads ();
-
-  fputs_unfiltered ("target_find_new_threads ()\n", gdb_stdlog);
 }
 
 static void
@@ -3197,14 +3206,7 @@ setup_target_debug (void)
   memcpy (&debug_target, &current_target, sizeof debug_target);
 
   current_target.to_open = debug_to_open;
-  current_target.to_close = debug_to_close;
-  current_target.to_attach = debug_to_attach;
   current_target.to_post_attach = debug_to_post_attach;
-  current_target.to_detach = debug_to_detach;
-  current_target.to_resume = debug_to_resume;
-  current_target.to_wait = debug_to_wait;
-  current_target.to_fetch_registers = debug_to_fetch_registers;
-  current_target.to_store_registers = debug_to_store_registers;
   current_target.to_prepare_to_store = debug_to_prepare_to_store;
   current_target.deprecated_xfer_memory = deprecated_debug_xfer_memory;
   current_target.to_files_info = debug_to_files_info;
@@ -3228,7 +3230,6 @@ setup_target_debug (void)
   current_target.to_kill = debug_to_kill;
   current_target.to_load = debug_to_load;
   current_target.to_lookup_symbol = debug_to_lookup_symbol;
-  current_target.to_create_inferior = debug_to_create_inferior;
   current_target.to_post_startup_inferior = debug_to_post_startup_inferior;
   current_target.to_acknowledge_created_inferior = debug_to_acknowledge_created_inferior;
   current_target.to_insert_fork_catchpoint = debug_to_insert_fork_catchpoint;
@@ -3238,11 +3239,8 @@ setup_target_debug (void)
   current_target.to_insert_exec_catchpoint = debug_to_insert_exec_catchpoint;
   current_target.to_remove_exec_catchpoint = debug_to_remove_exec_catchpoint;
   current_target.to_has_exited = debug_to_has_exited;
-  current_target.to_mourn_inferior = debug_to_mourn_inferior;
   current_target.to_can_run = debug_to_can_run;
   current_target.to_notice_signals = debug_to_notice_signals;
-  current_target.to_thread_alive = debug_to_thread_alive;
-  current_target.to_find_new_threads = debug_to_find_new_threads;
   current_target.to_stop = debug_to_stop;
   current_target.to_rcmd = debug_to_rcmd;
   current_target.to_pid_to_exec_file = debug_to_pid_to_exec_file;

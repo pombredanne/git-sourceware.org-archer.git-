@@ -169,13 +169,14 @@ static void go32_open (char *name, int from_tty);
 static void go32_close (int quitting);
 static void go32_attach (char *args, int from_tty);
 static void go32_detach (char *args, int from_tty);
-static void go32_resume (ptid_t ptid, int step,
-                         enum target_signal siggnal);
-static ptid_t go32_wait (ptid_t ptid,
-                               struct target_waitstatus *status);
-static void go32_fetch_registers (struct regcache *, int regno);
+static void go32_resume (struct target_ops *ops,
+			 ptid_t ptid, int step,
+			 enum target_signal siggnal);
+static void go32_fetch_registers (struct target_ops *ops,
+				  struct regcache *, int regno);
 static void store_register (const struct regcache *, int regno);
-static void go32_store_registers (struct regcache *, int regno);
+static void go32_store_registers (struct target_ops *ops,
+				  struct regcache *, int regno);
 static void go32_prepare_to_store (struct regcache *);
 static int go32_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len,
 			     int write,
@@ -323,7 +324,8 @@ static int resume_is_step;
 static int resume_signal = -1;
 
 static void
-go32_resume (ptid_t ptid, int step, enum target_signal siggnal)
+go32_resume (struct target_ops *ops,
+	     ptid_t ptid, int step, enum target_signal siggnal)
 {
   int i;
 
@@ -347,7 +349,8 @@ go32_resume (ptid_t ptid, int step, enum target_signal siggnal)
 static char child_cwd[FILENAME_MAX];
 
 static ptid_t
-go32_wait (ptid_t ptid, struct target_waitstatus *status)
+go32_wait (struct target_ops *ops,
+	   ptid_t ptid, struct target_waitstatus *status)
 {
   int i;
   unsigned char saved_opcode;
@@ -479,7 +482,8 @@ fetch_register (struct regcache *regcache, int regno)
 }
 
 static void
-go32_fetch_registers (struct regcache *regcache, int regno)
+go32_fetch_registers (struct target_ops *ops,
+		      struct regcache *regcache, int regno)
 {
   if (regno >= 0)
     fetch_register (regcache, regno);
@@ -508,7 +512,8 @@ store_register (const struct regcache *regcache, int regno)
 }
 
 static void
-go32_store_registers (struct regcache *regcache, int regno)
+go32_store_registers (struct target_ops *ops,
+		      struct regcache *regcache, int regno)
 {
   unsigned r;
 
@@ -860,13 +865,13 @@ go32_terminal_ours (void)
 }
 
 static int
-go32_thread_alive (ptid_t ptid)
+go32_thread_alive (struct target_ops *ops, ptid_t ptid)
 {
   return 1;
 }
 
 static char *
-go32_pid_to_str (ptid_t ptid)
+go32_pid_to_str (struct target_ops *ops, ptid_t ptid)
 {
   static char buf[64];
   xsnprintf (buf, sizeof buf, "Thread <main>");
@@ -911,6 +916,9 @@ init_go32_ops (void)
   go32_ops.to_has_stack = 1;
   go32_ops.to_has_registers = 1;
   go32_ops.to_has_execution = 1;
+
+  i386_use_watchpoints (&go32_ops);
+
   go32_ops.to_magic = OPS_MAGIC;
 
   /* Initialize child's cwd as empty to be initialized when starting

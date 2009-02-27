@@ -223,8 +223,10 @@ struct gdbarch
   gdbarch_register_reggroup_p_ftype *register_reggroup_p;
   gdbarch_fetch_pointer_argument_ftype *fetch_pointer_argument;
   gdbarch_regset_from_core_section_ftype *regset_from_core_section;
+  int core_reg_section_encodes_pid;
   struct core_regset_section * core_regset_sections;
   gdbarch_core_xfer_shared_libraries_ftype *core_xfer_shared_libraries;
+  gdbarch_core_pid_to_str_ftype *core_pid_to_str;
   int vtable_function_descriptors;
   int vbit_in_delta;
   gdbarch_skip_permanent_breakpoint_ftype *skip_permanent_breakpoint;
@@ -239,6 +241,7 @@ struct gdbarch
   int sofun_address_maybe_missing;
   gdbarch_target_signal_from_host_ftype *target_signal_from_host;
   gdbarch_target_signal_to_host_ftype *target_signal_to_host;
+  gdbarch_get_siginfo_type_ftype *get_siginfo_type;
   gdbarch_record_special_symbol_ftype *record_special_symbol;
   int has_global_solist;
 };
@@ -355,8 +358,10 @@ struct gdbarch startup_gdbarch =
   default_register_reggroup_p,  /* register_reggroup_p */
   0,  /* fetch_pointer_argument */
   0,  /* regset_from_core_section */
+  0,  /* core_reg_section_encodes_pid */
   0,  /* core_regset_sections */
   0,  /* core_xfer_shared_libraries */
+  0,  /* core_pid_to_str */
   0,  /* vtable_function_descriptors */
   0,  /* vbit_in_delta */
   0,  /* skip_permanent_breakpoint */
@@ -371,6 +376,7 @@ struct gdbarch startup_gdbarch =
   0,  /* sofun_address_maybe_missing */
   default_target_signal_from_host,  /* target_signal_from_host */
   default_target_signal_to_host,  /* target_signal_to_host */
+  0,  /* get_siginfo_type */
   0,  /* record_special_symbol */
   0,  /* has_global_solist */
   /* startup_gdbarch() */
@@ -607,7 +613,9 @@ verify_gdbarch (struct gdbarch *gdbarch)
   /* Skip verify of register_reggroup_p, invalid_p == 0 */
   /* Skip verify of fetch_pointer_argument, has predicate */
   /* Skip verify of regset_from_core_section, has predicate */
+  /* Skip verify of core_reg_section_encodes_pid, invalid_p == 0 */
   /* Skip verify of core_xfer_shared_libraries, has predicate */
+  /* Skip verify of core_pid_to_str, has predicate */
   /* Skip verify of vtable_function_descriptors, invalid_p == 0 */
   /* Skip verify of vbit_in_delta, invalid_p == 0 */
   /* Skip verify of skip_permanent_breakpoint, has predicate */
@@ -624,6 +632,7 @@ verify_gdbarch (struct gdbarch *gdbarch)
   /* Skip verify of sofun_address_maybe_missing, invalid_p == 0 */
   /* Skip verify of target_signal_from_host, invalid_p == 0 */
   /* Skip verify of target_signal_to_host, invalid_p == 0 */
+  /* Skip verify of get_siginfo_type, has predicate */
   /* Skip verify of record_special_symbol, has predicate */
   /* Skip verify of has_global_solist, invalid_p == 0 */
   buf = ui_file_xstrdup (log, &dummy);
@@ -727,11 +736,20 @@ gdbarch_dump (struct gdbarch *gdbarch, struct ui_file *file)
                       "gdbarch_dump: convert_register_p = <%s>\n",
                       host_address_to_string (gdbarch->convert_register_p));
   fprintf_unfiltered (file,
+                      "gdbarch_dump: gdbarch_core_pid_to_str_p() = %d\n",
+                      gdbarch_core_pid_to_str_p (gdbarch));
+  fprintf_unfiltered (file,
+                      "gdbarch_dump: core_pid_to_str = <%s>\n",
+                      host_address_to_string (gdbarch->core_pid_to_str));
+  fprintf_unfiltered (file,
                       "gdbarch_dump: gdbarch_core_read_description_p() = %d\n",
                       gdbarch_core_read_description_p (gdbarch));
   fprintf_unfiltered (file,
                       "gdbarch_dump: core_read_description = <%s>\n",
                       host_address_to_string (gdbarch->core_read_description));
+  fprintf_unfiltered (file,
+                      "gdbarch_dump: core_reg_section_encodes_pid = %s\n",
+                      plongest (gdbarch->core_reg_section_encodes_pid));
   fprintf_unfiltered (file,
                       "gdbarch_dump: core_regset_sections = %s\n",
                       host_address_to_string (gdbarch->core_regset_sections));
@@ -834,6 +852,12 @@ gdbarch_dump (struct gdbarch *gdbarch, struct ui_file *file)
   fprintf_unfiltered (file,
                       "gdbarch_dump: get_longjmp_target = <%s>\n",
                       host_address_to_string (gdbarch->get_longjmp_target));
+  fprintf_unfiltered (file,
+                      "gdbarch_dump: gdbarch_get_siginfo_type_p() = %d\n",
+                      gdbarch_get_siginfo_type_p (gdbarch));
+  fprintf_unfiltered (file,
+                      "gdbarch_dump: get_siginfo_type = <%s>\n",
+                      host_address_to_string (gdbarch->get_siginfo_type));
   fprintf_unfiltered (file,
                       "gdbarch_dump: has_global_solist = %s\n",
                       plongest (gdbarch->has_global_solist));
@@ -2890,6 +2914,23 @@ set_gdbarch_regset_from_core_section (struct gdbarch *gdbarch,
   gdbarch->regset_from_core_section = regset_from_core_section;
 }
 
+int
+gdbarch_core_reg_section_encodes_pid (struct gdbarch *gdbarch)
+{
+  gdb_assert (gdbarch != NULL);
+  /* Skip verify of core_reg_section_encodes_pid, invalid_p == 0 */
+  if (gdbarch_debug >= 2)
+    fprintf_unfiltered (gdb_stdlog, "gdbarch_core_reg_section_encodes_pid called\n");
+  return gdbarch->core_reg_section_encodes_pid;
+}
+
+void
+set_gdbarch_core_reg_section_encodes_pid (struct gdbarch *gdbarch,
+                                          int core_reg_section_encodes_pid)
+{
+  gdbarch->core_reg_section_encodes_pid = core_reg_section_encodes_pid;
+}
+
 struct core_regset_section *
 gdbarch_core_regset_sections (struct gdbarch *gdbarch)
 {
@@ -2928,6 +2969,30 @@ set_gdbarch_core_xfer_shared_libraries (struct gdbarch *gdbarch,
                                         gdbarch_core_xfer_shared_libraries_ftype core_xfer_shared_libraries)
 {
   gdbarch->core_xfer_shared_libraries = core_xfer_shared_libraries;
+}
+
+int
+gdbarch_core_pid_to_str_p (struct gdbarch *gdbarch)
+{
+  gdb_assert (gdbarch != NULL);
+  return gdbarch->core_pid_to_str != NULL;
+}
+
+char *
+gdbarch_core_pid_to_str (struct gdbarch *gdbarch, ptid_t ptid)
+{
+  gdb_assert (gdbarch != NULL);
+  gdb_assert (gdbarch->core_pid_to_str != NULL);
+  if (gdbarch_debug >= 2)
+    fprintf_unfiltered (gdb_stdlog, "gdbarch_core_pid_to_str called\n");
+  return gdbarch->core_pid_to_str (gdbarch, ptid);
+}
+
+void
+set_gdbarch_core_pid_to_str (struct gdbarch *gdbarch,
+                             gdbarch_core_pid_to_str_ftype core_pid_to_str)
+{
+  gdbarch->core_pid_to_str = core_pid_to_str;
 }
 
 int
@@ -3217,6 +3282,30 @@ set_gdbarch_target_signal_to_host (struct gdbarch *gdbarch,
                                    gdbarch_target_signal_to_host_ftype target_signal_to_host)
 {
   gdbarch->target_signal_to_host = target_signal_to_host;
+}
+
+int
+gdbarch_get_siginfo_type_p (struct gdbarch *gdbarch)
+{
+  gdb_assert (gdbarch != NULL);
+  return gdbarch->get_siginfo_type != NULL;
+}
+
+struct type *
+gdbarch_get_siginfo_type (struct gdbarch *gdbarch)
+{
+  gdb_assert (gdbarch != NULL);
+  gdb_assert (gdbarch->get_siginfo_type != NULL);
+  if (gdbarch_debug >= 2)
+    fprintf_unfiltered (gdb_stdlog, "gdbarch_get_siginfo_type called\n");
+  return gdbarch->get_siginfo_type (gdbarch);
+}
+
+void
+set_gdbarch_get_siginfo_type (struct gdbarch *gdbarch,
+                              gdbarch_get_siginfo_type_ftype get_siginfo_type)
+{
+  gdbarch->get_siginfo_type = get_siginfo_type;
 }
 
 int

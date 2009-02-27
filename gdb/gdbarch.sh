@@ -600,12 +600,23 @@ F:CORE_ADDR:fetch_pointer_argument:struct frame_info *frame, int argi, struct ty
 # name SECT_NAME and size SECT_SIZE.
 M:const struct regset *:regset_from_core_section:const char *sect_name, size_t sect_size:sect_name, sect_size
 
+# When creating core dumps, some systems encode the PID in addition
+# to the LWP id in core file register section names.  In those cases, the
+# "XXX" in ".reg/XXX" is encoded as [LWPID << 16 | PID].  This setting
+# is set to true for such architectures; false if "XXX" represents an LWP
+# or thread id with no special encoding.
+v:int:core_reg_section_encodes_pid:::0:0::0
+
 # Supported register notes in a core file.
 v:struct core_regset_section *:core_regset_sections:const char *name, int len::::::host_address_to_string (gdbarch->core_regset_sections)
 
 # Read offset OFFSET of TARGET_OBJECT_LIBRARIES formatted shared libraries list from
 # core file into buffer READBUF with length LEN.
 M:LONGEST:core_xfer_shared_libraries:gdb_byte *readbuf, ULONGEST offset, LONGEST len:readbuf, offset, len
+
+# How the core_stratum layer converts a PTID from a core file to a
+# string.
+M:char *:core_pid_to_str:ptid_t ptid:ptid
 
 # If the elements of C++ vtables are in-place function descriptors rather
 # than normal function pointers (which may point to code or a descriptor),
@@ -704,6 +715,11 @@ m:enum target_signal:target_signal_from_host:int signo:signo::default_target_sig
 # Signal translation: translate GDB's signal number into inferior's host
 # signal number.
 m:int:target_signal_to_host:enum target_signal ts:ts::default_target_signal_to_host::0
+
+# Extra signal info inspection.
+#
+# Return a type suitable to inspect extra signal information.
+M:struct type *:get_siginfo_type:void:
 
 # Record architecture-specific information from the symbol table.
 M:void:record_special_symbol:struct objfile *objfile, asymbol *sym:objfile, sym

@@ -1,3 +1,84 @@
+2009-02-23  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* i386-gen.c (operand_type_init): Remove OPERAND_TYPE_VEX_IMM4.
+	(operand_types): Remove Vex_Imm4.
+
+	* i386-opc.h (Vex_Imm4): Removed.
+	(OTMax): Updated.
+	(i386_operand_type): Remove vex_imm4.
+
+	* i386-opc.tbl: Remove Vex_Imm4 comments.
+	* i386-init.h: Regenerated.
+	* i386-tbl.h: Likewise.
+
+2009-02-23  Richard Earnshaw  <rearnsha@arm.com>
+
+	* arm-dis.c (neon_opcodes): Correct bit-mask and patterns for
+	vq{r}shr{u}n.s64 insnstructions.
+
+2009-02-19  Peter Bergner  <bergner@vnet.ibm.com>
+
+	* ppc-opc.c (powerpc_opcodes) <"lfdepx", "stfdepx">: Fix the first
+	operand to be a float point register (FRT/FRS).
+
+2009-02-18  Adam Nemet  <anemet@caviumnetworks.com>
+
+	* mips-opc.c (mips_builtin_opcodes): Move the Octeon-specific
+	dmfc2 and dmtc2 before the architecture-level variants.
+
+2009-02-18  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* fr30-opc.c: Regenerate.
+	* frv-opc.c: Regenerate.
+	* ip2k-opc.c: Regenerate.
+	* iq2000-opc.c: Regenerate.
+	* lm32-opc.c: Regenerate.
+	* m32c-opc.c: Regenerate.
+	* m32r-opc.c: Regenerate.
+	* mep-opc.c: Regenerate.
+	* mt-opc.c: Regenerate.
+	* xc16x-opc.c: Regenerate.
+	* xstormy16-opc.c: Regenerate.
+	* tic54x-dis.c (print_instruction): Avoid compiler warning on
+	sprintf call.
+
+2009-02-12  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* m68k-opc.c (m68k_opcodes): Add stldsr instruction.
+
+2009-02-05  Peter Bergner  <bergner@vnet.ibm.com>
+
+	* ppc-opc.c: Update copyright year.
+	(powerpc_opcodes) <"dcbt", "dcbtst">: Deprecate the Embedded operand
+	ordering for POWER4 and later and use the correct Server ordering.
+
+2009-02-04  H.J. Lu  <hongjiu.lu@intel.com>
+
+	AVX Programming Reference (January, 2009)
+	* i386-dis.c (PREFIX_VEX_3A44): New.
+	(VEX_LEN_3A44_P_2): Likewise.
+	(PREFIX_VEX_3A48): Updated.
+	(VEX_LEN_3A4C_P_2): Likewise.
+	(prefix_table): Add PREFIX_VEX_3A44.
+	(vex_table): Likewise.
+	(vex_len_table): Add VEX_LEN_3A44_P_2.
+
+	* i386-opc.tbl: Add PCLMUL + AVX instructions.
+	* i386-tbl.h: Regenerated.
+
+2009-02-03  Sandip Matte  <sandip@rmicorp.com>
+
+	* mips-dis.c (mips_cp0_names_xlr, mips_cp0sel_names_xlr): Define.
+	(mips_arch_choices): Add XLR entry.
+	* mips-opc.c (XLR): Define.
+	(mips_builtin_opcodes): Add XLR instructions.
+
+2009-02-03  Carlos O'Donell  <carlos@codesourcery.com>
+
+	* Makefile.am: Add install-pdf target.
+	* po/Make-in: Add install-pdf target.
+	* Makefile.in: Regenerate.
+
 2009-02-02  DJ Delorie  <dj@redhat.com>
 
 	* mep-asm.c: Regenerate.

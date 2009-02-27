@@ -912,7 +912,8 @@ monitor_supply_register (struct regcache *regcache, int regno, char *valstr)
 /* Tell the remote machine to resume.  */
 
 static void
-monitor_resume (ptid_t ptid, int step, enum target_signal sig)
+monitor_resume (struct target_ops *ops,
+		ptid_t ptid, int step, enum target_signal sig)
 {
   /* Some monitors require a different command when starting a program */
   monitor_debug ("MON resume\n");
@@ -1007,8 +1008,8 @@ monitor_interrupt_query (void)
 {
   target_terminal_ours ();
 
-  if (query ("Interrupted while waiting for the program.\n\
-Give up (and stop debugging it)? "))
+  if (query (_("Interrupted while waiting for the program.\n\
+Give up (and stop debugging it)? ")))
     {
       target_mourn_inferior ();
       deprecated_throw_reason (RETURN_QUIT);
@@ -1063,7 +1064,8 @@ monitor_wait_filter (char *buf,
    status just as `wait' would.  */
 
 static ptid_t
-monitor_wait (ptid_t ptid, struct target_waitstatus *status)
+monitor_wait (struct target_ops *ops,
+	      ptid_t ptid, struct target_waitstatus *status)
 {
   int old_timeout = timeout;
   char buf[TARGET_BUF_SIZE];
@@ -1285,7 +1287,8 @@ monitor_dump_regs (struct regcache *regcache)
 }
 
 static void
-monitor_fetch_registers (struct regcache *regcache, int regno)
+monitor_fetch_registers (struct target_ops *ops,
+			 struct regcache *regcache, int regno)
 {
   monitor_debug ("MON fetchregs\n");
   if (current_monitor->getreg.cmd)
@@ -1367,7 +1370,8 @@ monitor_store_register (struct regcache *regcache, int regno)
 /* Store the remote registers.  */
 
 static void
-monitor_store_registers (struct regcache *regcache, int regno)
+monitor_store_registers (struct target_ops *ops,
+			 struct regcache *regcache, int regno)
 {
   if (regno >= 0)
     {
@@ -2231,7 +2235,7 @@ monitor_get_dev_name (void)
 /* Check to see if a thread is still alive.  */
 
 static int
-monitor_thread_alive (ptid_t ptid)
+monitor_thread_alive (struct target_ops *ops, ptid_t ptid)
 {
   if (ptid_equal (ptid, monitor_ptid))
     /* The monitor's task is always alive.  */
@@ -2244,7 +2248,7 @@ monitor_thread_alive (ptid_t ptid)
    buffer.  */
 
 static char *
-monitor_pid_to_str (ptid_t ptid)
+monitor_pid_to_str (struct target_ops *ops, ptid_t ptid)
 {
   static char buf[64];
 

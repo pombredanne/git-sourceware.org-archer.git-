@@ -72,10 +72,6 @@ static void gdb_os_evprintf_filtered (host_callback *, const char *, va_list);
 
 static void gdb_os_error (host_callback *, const char *, ...) ATTR_NORETURN;
 
-static void gdbsim_fetch_register (struct regcache *regcache, int regno);
-
-static void gdbsim_store_register (struct regcache *regcache, int regno);
-
 static void gdbsim_kill (void);
 
 static void gdbsim_load (char *prog, int fromtty);
@@ -85,10 +81,6 @@ static void gdbsim_open (char *args, int from_tty);
 static void gdbsim_close (int quitting);
 
 static void gdbsim_detach (struct target_ops *ops, char *args, int from_tty);
-
-static void gdbsim_resume (ptid_t ptid, int step, enum target_signal siggnal);
-
-static ptid_t gdbsim_wait (ptid_t ptid, struct target_waitstatus *status);
 
 static void gdbsim_prepare_to_store (struct regcache *regcache);
 
@@ -279,13 +271,14 @@ one2one_register_sim_regno (struct gdbarch *gdbarch, int regnum)
 }
 
 static void
-gdbsim_fetch_register (struct regcache *regcache, int regno)
+gdbsim_fetch_register (struct target_ops *ops,
+		       struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
   if (regno == -1)
     {
       for (regno = 0; regno < gdbarch_num_regs (gdbarch); regno++)
-	gdbsim_fetch_register (regcache, regno);
+	gdbsim_fetch_register (ops, regcache, regno);
       return;
     }
 
@@ -347,13 +340,14 @@ gdbsim_fetch_register (struct regcache *regcache, int regno)
 
 
 static void
-gdbsim_store_register (struct regcache *regcache, int regno)
+gdbsim_store_register (struct target_ops *ops,
+		       struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
   if (regno == -1)
     {
       for (regno = 0; regno < gdbarch_num_regs (gdbarch); regno++)
-	gdbsim_store_register (regcache, regno);
+	gdbsim_store_register (ops, regcache, regno);
       return;
     }
   else if (gdbarch_register_sim_regno (gdbarch, regno) >= 0)
@@ -618,7 +612,8 @@ static enum target_signal resume_siggnal;
 static int resume_step;
 
 static void
-gdbsim_resume (ptid_t ptid, int step, enum target_signal siggnal)
+gdbsim_resume (struct target_ops *ops,
+	       ptid_t ptid, int step, enum target_signal siggnal)
 {
   if (!ptid_equal (inferior_ptid, remote_sim_ptid))
     error (_("The program is not being run."));
@@ -680,7 +675,8 @@ gdbsim_cntrl_c (int signo)
 }
 
 static ptid_t
-gdbsim_wait (ptid_t ptid, struct target_waitstatus *status)
+gdbsim_wait (struct target_ops *ops,
+	     ptid_t ptid, struct target_waitstatus *status)
 {
   static RETSIGTYPE (*prev_sigint) ();
   int sigrc = 0;
@@ -861,7 +857,7 @@ simulator_command (char *args, int from_tty)
 /* Check to see if a thread is still alive.  */
 
 static int
-gdbsim_thread_alive (ptid_t ptid)
+gdbsim_thread_alive (struct target_ops *ops, ptid_t ptid)
 {
   if (ptid_equal (ptid, remote_sim_ptid))
     /* The simulators' task is always alive.  */
@@ -874,7 +870,7 @@ gdbsim_thread_alive (ptid_t ptid)
    buffer.  */
 
 static char *
-gdbsim_pid_to_str (ptid_t ptid)
+gdbsim_pid_to_str (struct target_ops *ops, ptid_t ptid)
 {
   static char buf[64];
 

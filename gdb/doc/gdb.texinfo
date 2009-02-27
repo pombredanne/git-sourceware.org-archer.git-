@@ -4472,6 +4472,55 @@ a result of the fatal signal once it saw the signal.  To prevent this,
 you can continue with @samp{signal 0}.  @xref{Signaling, ,Giving your
 Program a Signal}.
 
+@cindex extra signal information
+@anchor{extra signal information}
+
+On some targets, @value{GDBN} can inspect extra signal information
+associated with the intercepted signal, before it is actually
+delivered to the program being debugged.  This information is exported
+by the convenience variable @code{$_siginfo}, and consists of data
+that is passed by the kernel to the signal handler at the time of the
+receipt of a signal.  The data type of the information itself is
+target dependent.  You can see the data type using the @code{ptype
+$_siginfo} command.  On Unix systems, it typically corresponds to the
+standard @code{siginfo_t} type, as defined in the @file{signal.h}
+system header.
+
+Here's an example, on a @sc{gnu}/Linux system, printing the stray
+referenced address that raised a segmentation fault.
+
+@smallexample
+@group
+(@value{GDBP}) continue
+Program received signal SIGSEGV, Segmentation fault.
+0x0000000000400766 in main ()
+69        *(int *)p = 0;
+(@value{GDBP}) ptype $_siginfo
+type = struct @{
+    int si_signo;
+    int si_errno;
+    int si_code;
+    union @{
+        int _pad[28];
+        struct @{...@} _kill;
+        struct @{...@} _timer;
+        struct @{...@} _rt;
+        struct @{...@} _sigchld;
+        struct @{...@} _sigfault;
+        struct @{...@} _sigpoll;
+    @} _sifields;
+@}
+(@value{GDBP}) ptype $_siginfo._sifields._sigfault
+type = struct @{
+    void *si_addr;
+@}
+(@value{GDBP}) p $_siginfo._sifields._sigfault.si_addr
+$1 = (void *) 0x7ffff7ff7000
+@end group
+@end smallexample
+
+Depending on target support, @code{$_siginfo} may also be writable.
+
 @node Thread Stops
 @section Stopping and Starting Multi-thread Programs
 
@@ -7348,6 +7397,11 @@ to match the format in which the data was printed.
 @vindex $_exitcode@r{, convenience variable}
 The variable @code{$_exitcode} is automatically set to the exit code when
 the program being debugged terminates.
+
+@item $_siginfo
+@vindex $_siginfo@r{, convenience variable}
+The variable @code{$_siginfo} is bound to extra signal information
+inspection (@pxref{extra signal information}).
 @end table
 
 On HP-UX systems, if you refer to a function or variable name that
@@ -14307,6 +14361,14 @@ are:
 @tab @code{qXfer:spu:write}
 @tab @code{info spu}
 
+@item @code{read-siginfo-object}
+@tab @code{qXfer:siginfo:read}
+@tab @code{print $_siginfo}
+
+@item @code{write-siginfo-object}
+@tab @code{qXfer:siginfo:write}
+@tab @code{set $_siginfo}
+
 @item @code{get-thread-local-@*storage-address}
 @tab @code{qGetTLSAddr}
 @tab Displaying @code{__thread} variables
@@ -18064,6 +18126,7 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 * Basic Python::                Basic Python Functions.
 * Exception Handling::
 * Values From Inferior::
+* Commands In Python::          Implementing new commands in Python.
 @end menu
 
 @node Basic Python
@@ -18078,11 +18141,15 @@ methods and classes added by @value{GDBN} are placed in this module.
 use in all scripts evaluated by the @code{python} command.
 
 @findex gdb.execute
-@defun execute command
+@defun execute command [from_tty]
 Evaluate @var{command}, a string, as a @value{GDBN} CLI command.
 If a GDB exception happens while @var{command} runs, it is
 translated as described in @ref{Exception Handling,,Exception Handling}.
 If no exceptions occur, this function returns @code{None}.
+
+@var{from_tty} specifies whether @value{GDBN} ought to consider this
+command as having originated from the user invoking it interactively.
+It must be a boolean value.  If omitted, it defaults to @code{False}.
 @end defun
 
 @findex gdb.get_parameter
@@ -18095,6 +18162,21 @@ spaces if the parameter has a multi-part name.  For example,
 If the named parameter does not exist, this function throws a
 @code{RuntimeError}.  Otherwise, the parameter's value is converted to
 a Python value of the appropriate type, and returned.
+@end defun
+
+@findex gdb.history
+@defun history number
+Return a value from @value{GDBN}'s value history (@pxref{Value
+History}).  @var{number} indicates which history element to return.
+If @var{number} is negative, then @value{GDBN} will take its absolute value
+and count backward from the last element (i.e., the most recent element) to
+find the value to return.  If @var{number} is zero, then @value{GDBN} will
+return the most recent element.  If the element specified by @var{number}
+doesn't exist in the value history, a @code{RuntimeError} exception will be
+raised.
+
+If no exception is raised, the return value is always an instance of
+@code{gdb.Value} (@pxref{Values From Inferior}).
 @end defun
 
 @findex gdb.write
@@ -18199,6 +18281,287 @@ bar = foo.dereference ()
 The result @code{bar} will be a @code{gdb.Value} object holding the
 value pointed to by @code{foo}.
 @end defmethod
+
+@defmethod Value string @r{[}encoding @r{[}errors@r{]}@r{]}
+If this @code{gdb.Value} represents a string, then this method
+converts the contents to a Python string.  Otherwise, this method will
+throw an exception.
+
+Strings are recognized in a language-specific way; whether a given
+@code{gdb.Value} represents a string is determined by the current
+language.
+
+For C-like languages, a value is a string if it is a pointer to or an
+array of characters or ints.  The string is assumed to be terminated
+by a zero of the appropriate width.
+
+If the optional @var{encoding} argument is given, it must be a string
+naming the encoding of the string in the @code{gdb.Value}, such as
+@code{"ascii"}, @code{"iso-8859-6"} or @code{"utf-8"}.  It accepts
+the same encodings as the corresponding argument to Python's
+@code{string.decode} method, and the Python codec machinery will be used
+to convert the string.  If @var{encoding} is not given, or if
+@var{encoding} is the empty string, then either the @code{target-charset}
+(@pxref{Character Sets}) will be used, or a language-specific encoding
+will be used, if the current language is able to supply one.
+
+The optional @var{errors} argument is the same as the corresponding
+argument to Python's @code{string.decode} method.
+@end defmethod
+
+@node Commands In Python
+@subsubsection Commands In Python
+
+@cindex commands in python
+@cindex python commands
+@tindex Command
+@tindex gdb.Command
+You can implement new @value{GDBN} CLI commands in Python.  A CLI
+command is implemented using an instance of the @code{gdb.Command}
+class, most commonly using a subclass.
+
+@defmethod Command __init__ name @var{command-class} @r{[}@var{completer-class} @var{prefix}@r{]}
+The object initializer for @code{Command} registers the new command
+with @value{GDBN}.  This initializer is normally invoked from the
+subclass' own @code{__init__} method.
+
+@var{name} is the name of the command.  If @var{name} consists of
+multiple words, then the initial words are looked for as prefix
+commands.  In this case, if one of the prefix commands does not exist,
+an exception is raised.
+
+There is no support for multi-line commands.
+
+@var{command-class} should be one of the @samp{COMMAND_} constants
+defined below.  This argument tells @value{GDBN} how to categorize the
+new command in the help system.
+
+@var{completer-class} is an optional argument.  If given, it should be
+one of the @samp{COMPLETE_} constants defined below.  This argument
+tells @value{GDBN} how to perform completion for this command.  If not
+given, @value{GDBN} will attempt to complete using the object's
+@code{complete} method (see below); if no such method is found, an
+error will occur when completion is attempted.
+
+@var{prefix} is an optional argument.  If @code{True}, then the new
+command is a prefix command; sub-commands of this command may be
+registered.
+
+The help text for the new command is taken from the Python
+documentation string for the command's class, if there is one.  If no
+documentation string is provided, the default value ``This command is
+not documented.'' is used.
+@end defmethod
+
+@cindex don't repeat Python command
+@defmethod Command dont_repeat
+By default, a @value{GDBN} command is repeated when the user enters a
+blank line at the command prompt.  A command can suppress this
+behavior by invoking the @code{dont_repeat} method.  This is similar
+to the user command @code{dont-repeat}, see @ref{Define, dont-repeat}.
+@end defmethod
+
+@defmethod Command invoke argument from_tty
+This method is called by @value{GDBN} when this command is invoked.
+
+@var{argument} is a string.  It is the argument to the command, after
+leading and trailing whitespace has been stripped.
+
+@var{from_tty} is a boolean argument.  When true, this means that the
+command was entered by the user at the terminal; when false it means
+that the command came from elsewhere.
+
+If this method throws an exception, it is turned into a @value{GDBN}
+@code{error} call.  Otherwise, the return value is ignored.
+@end defmethod
+
+@cindex completion of Python commands
+@defmethod Command complete text word
+This method is called by @value{GDBN} when the user attempts
+completion on this command.  All forms of completion are handled by
+this method, that is, the @key{TAB} and @key{M-?} key bindings
+(@pxref{Completion}), and the @code{complete} command (@pxref{Help,
+complete}).
+
+The arguments @var{text} and @var{word} are both strings.  @var{text}
+holds the complete command line up to the cursor's location.
+@var{word} holds the last word of the command line; this is computed
+using a word-breaking heuristic.
+
+The @code{complete} method can return several values:
+@itemize @bullet
+@item
+If the return value is a sequence, the contents of the sequence are
+used as the completions.  It is up to @code{complete} to ensure that the
+contents actually do complete the word.  A zero-length sequence is
+allowed, it means that there were no completions available.  Only
+string elements of the sequence are used; other elements in the
+sequence are ignored.
+
+@item
+If the return value is one of the @samp{COMPLETE_} constants defined
+below, then the corresponding @value{GDBN}-internal completion
+function is invoked, and its result is used.
+
+@item
+All other results are treated as though there were no available
+completions.
+@end itemize
+@end defmethod
+
+When a new command is registered, it must be declared as a member of
+some general class of commands.  This is used to classify top-level
+commands in the on-line help system; note that prefix commands are not
+listed under their own category but rather that of their top-level
+command.  The available classifications are represented by constants
+defined in the @code{gdb} module:
+
+@table @code
+@findex COMMAND_NONE
+@findex gdb.COMMAND_NONE
+@item COMMAND_NONE
+The command does not belong to any particular class.  A command in
+this category will not be displayed in any of the help categories.
+
+@findex COMMAND_RUNNING
+@findex gdb.COMMAND_RUNNING
+@item COMMAND_RUNNING
+The command is related to running the inferior.  For example,
+@code{start}, @code{step}, and @code{continue} are in this category.
+Type @kbd{help running} at the @value{GDBN} prompt to see a list of
+commands in this category.
+
+@findex COMMAND_DATA
+@findex gdb.COMMAND_DATA
+@item COMMAND_DATA
+The command is related to data or variables.  For example,
+@code{call}, @code{find}, and @code{print} are in this category.  Type
+@kbd{help data} at the @value{GDBN} prompt to see a list of commands
+in this category.
+
+@findex COMMAND_STACK
+@findex gdb.COMMAND_STACK
+@item COMMAND_STACK
+The command has to do with manipulation of the stack.  For example,
+@code{backtrace}, @code{frame}, and @code{return} are in this
+category.  Type @kbd{help stack} at the @value{GDBN} prompt to see a
+list of commands in this category.
+
+@findex COMMAND_FILES
+@findex gdb.COMMAND_FILES
+@item COMMAND_FILES
+This class is used for file-related commands.  For example,
+@code{file}, @code{list} and @code{section} are in this category.
+Type @kbd{help files} at the @value{GDBN} prompt to see a list of
+commands in this category.
+
+@findex COMMAND_SUPPORT
+@findex gdb.COMMAND_SUPPORT
+@item COMMAND_SUPPORT
+This should be used for ``support facilities'', generally meaning
+things that are useful to the user when interacting with @value{GDBN},
+but not related to the state of the inferior.  For example,
+@code{help}, @code{make}, and @code{shell} are in this category.  Type
+@kbd{help support} at the @value{GDBN} prompt to see a list of
+commands in this category.
+
+@findex COMMAND_STATUS
+@findex gdb.COMMAND_STATUS
+@item COMMAND_STATUS
+The command is an @samp{info}-related command, that is, related to the
+state of @value{GDBN} itself.  For example, @code{info}, @code{macro},
+and @code{show} are in this category.  Type @kbd{help status} at the
+@value{GDBN} prompt to see a list of commands in this category.
+
+@findex COMMAND_BREAKPOINTS
+@findex gdb.COMMAND_BREAKPOINTS
+@item COMMAND_BREAKPOINTS
+The command has to do with breakpoints.  For example, @code{break},
+@code{clear}, and @code{delete} are in this category.  Type @kbd{help
+breakpoints} at the @value{GDBN} prompt to see a list of commands in
+this category.
+
+@findex COMMAND_TRACEPOINTS
+@findex gdb.COMMAND_TRACEPOINTS
+@item COMMAND_TRACEPOINTS
+The command has to do with tracepoints.  For example, @code{trace},
+@code{actions}, and @code{tfind} are in this category.  Type
+@kbd{help tracepoints} at the @value{GDBN} prompt to see a list of
+commands in this category.
+
+@findex COMMAND_OBSCURE
+@findex gdb.COMMAND_OBSCURE
+@item COMMAND_OBSCURE
+The command is only used in unusual circumstances, or is not of
+general interest to users.  For example, @code{checkpoint},
+@code{fork}, and @code{stop} are in this category.  Type @kbd{help
+obscure} at the @value{GDBN} prompt to see a list of commands in this
+category.
+
+@findex COMMAND_MAINTENANCE
+@findex gdb.COMMAND_MAINTENANCE
+@item COMMAND_MAINTENANCE
+The command is only useful to @value{GDBN} maintainers.  The
+@code{maintenance} and @code{flushregs} commands are in this category.
+Type @kbd{help internals} at the @value{GDBN} prompt to see a list of
+commands in this category.
+@end table
+
+A new command can use a predefined completion function, either by
+specifying it via an argument at initialization, or by returning it
+from the @code{complete} method.  These predefined completion
+constants are all defined in the @code{gdb} module:
+
+@table @code
+@findex COMPLETE_NONE
+@findex gdb.COMPLETE_NONE
+@item COMPLETE_NONE
+This constant means that no completion should be done.
+
+@findex COMPLETE_FILENAME
+@findex gdb.COMPLETE_FILENAME
+@item COMPLETE_FILENAME
+This constant means that filename completion should be performed.
+
+@findex COMPLETE_LOCATION
+@findex gdb.COMPLETE_LOCATION
+@item COMPLETE_LOCATION
+This constant means that location completion should be done.
+@xref{Specify Location}.
+
+@findex COMPLETE_COMMAND
+@findex gdb.COMPLETE_COMMAND
+@item COMPLETE_COMMAND
+This constant means that completion should examine @value{GDBN}
+command names.
+
+@findex COMPLETE_SYMBOL
+@findex gdb.COMPLETE_SYMBOL
+@item COMPLETE_SYMBOL
+This constant means that completion should be done using symbol names
+as the source.
+@end table
+
+The following code snippet shows how a trivial CLI command can be
+implemented in Python:
+
+@smallexample
+class HelloWorld (gdb.Command):
+  """Greet the whole world."""
+
+  def __init__ (self):
+    super (HelloWorld, self).__init__ ("hello-world", gdb.COMMAND_OBSCURE)
+
+  def invoke (self, arg, from_tty):
+    print "Hello, World!"
+
+HelloWorld ()
+@end smallexample
+
+The last line instantiates the class, and is necessary to trigger the
+registration of the command with @value{GDBN}.  Depending on how the
+Python code is read into @value{GDBN}, you may need to import the
+@code{gdb} module explicitly.
 
 @node Interpreters
 @chapter Command Interpreters
@@ -19548,6 +19911,22 @@ invoking, directly or indirectly (via user-defined command), the CLI
 We suggest that in response to this notification, front ends
 highlight the selected thread and cause subsequent commands to apply to
 that thread.
+
+@item =library-loaded,...
+Reports that a new library file was loaded by the program.  This
+notification has 4 fields---@var{id}, @var{target-name},
+@var{host-name}, and @var{symbols-loaded}.  The @var{id} field is an
+opaque identifier of the library.  For remote debugging case,
+@var{target-name} and @var{host-name} fields give the name of the
+library file on the target, and on the host respectively.  For native
+debugging, both those fields have the same value.  The
+@var{symbols-loaded} field reports if the debug symbols for this
+library are loaded.
+
+@item =library-unloaded,...
+Reports that a library was unloaded by the program.  This notification
+has 3 fields---@var{id}, @var{target-name} and @var{host-name} with
+the same meaning as for the @code{=library-loaded} notification
 
 @end table
 
@@ -26579,6 +26958,16 @@ These are the currently defined stub features and their properties:
 @tab @samp{-}
 @tab Yes
 
+@item @samp{qXfer:siginfo:read}
+@tab No
+@tab @samp{-}
+@tab Yes
+
+@item @samp{qXfer:siginfo:write}
+@tab No
+@tab @samp{-}
+@tab Yes
+
 @item @samp{QNonStop}
 @tab No
 @tab @samp{-}
@@ -26638,6 +27027,14 @@ The remote stub understands the @samp{qXfer:spu:read} packet
 @item qXfer:spu:write
 The remote stub understands the @samp{qXfer:spu:write} packet
 (@pxref{qXfer spu write}).
+
+@item qXfer:siginfo:read
+The remote stub understands the @samp{qXfer:siginfo:read} packet
+(@pxref{qXfer siginfo read}).
+
+@item qXfer:siginfo:write
+The remote stub understands the @samp{qXfer:siginfo:write} packet
+(@pxref{qXfer siginfo write}).
 
 @item QNonStop
 The remote stub understands the @samp{QNonStop} packet
@@ -26797,6 +27194,16 @@ annex part of the generic @samp{qXfer} packet must be empty
 This packet is not probed by default; the remote stub must request it,
 by supplying an appropriate @samp{qSupported} response (@pxref{qSupported}).
 
+@item qXfer:siginfo:read::@var{offset},@var{length}
+@anchor{qXfer siginfo read}
+Read contents of the extra signal information on the target
+system.  The annex part of the generic @samp{qXfer} packet must be
+empty (@pxref{qXfer read}).
+
+This packet is not probed by default; the remote stub must request it,
+by supplying an appropriate @samp{qSupported} response
+(@pxref{qSupported}).
+
 @item qXfer:spu:read:@var{annex}:@var{offset},@var{length}
 @anchor{qXfer spu read}
 Read contents of an @code{spufs} file on the target system.  The
@@ -26849,6 +27256,7 @@ the stub, or that the object does not support reading.
 
 @item qXfer:@var{object}:write:@var{annex}:@var{offset}:@var{data}@dots{}
 @cindex write data into object, remote request
+@anchor{qXfer write}
 Write uninterpreted bytes into the target's special data area
 identified by the keyword @var{object}, starting at @var{offset} bytes
 into the data.  @var{data}@dots{} is the binary-encoded data
@@ -26861,6 +27269,16 @@ Here are the specific requests of this form defined so far.  All
 formats, listed below.
 
 @table @samp
+@item qXfer:siginfo:write::@var{offset}:@var{data}@dots{}
+@anchor{qXfer siginfo write}
+Write @var{data} to the extra signal information on the target system.
+The annex part of the generic @samp{qXfer} packet must be
+empty (@pxref{qXfer write}).
+
+This packet is not probed by default; the remote stub must request it,
+by supplying an appropriate @samp{qSupported} response
+(@pxref{qSupported}).
+
 @item qXfer:spu:write:@var{annex}:@var{offset}:@var{data}@dots{}
 @anchor{qXfer spu write}
 Write @var{data} to an @code{spufs} file on the target system.  The

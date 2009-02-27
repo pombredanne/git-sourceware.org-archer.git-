@@ -480,7 +480,7 @@ struct place_section_arg
 /* Find a unique offset to use for loadable section SECT if
    the user did not provide an offset.  */
 
-void
+static void
 place_section (bfd *abfd, asection *sect, void *obj)
 {
   struct place_section_arg *arg = obj;
@@ -968,7 +968,7 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd, int from_tty,
   if ((have_full_symbols () || have_partial_symbols ())
       && mainline
       && from_tty
-      && !query ("Load new symbol table from \"%s\"? ", name))
+      && !query (_("Load new symbol table from \"%s\"? "), name))
     error (_("Not confirmed."));
 
   objfile = allocate_objfile (abfd, flags);
