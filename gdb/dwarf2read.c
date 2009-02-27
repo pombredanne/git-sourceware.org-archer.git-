@@ -3230,7 +3230,7 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
   char *name;
   CORE_ADDR baseaddr;
   struct block *block;
-  unsigned die_children;
+  unsigned die_children = 0;
 
   baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
 
@@ -3272,7 +3272,6 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
   cu->list_in_scope = &local_symbols;
 
   child_die = die->child;
-  die_children = 0;
   while (child_die && child_die->tag)
     {
       process_die (child_die, cu);
