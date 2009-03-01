@@ -401,7 +401,7 @@ frapy_read_var_value (PyObject *self, PyObject *args)
 {
   struct frame_info *frame;
   PyObject *sym_obj;
-  struct symbol *var;
+  struct symbol *var = NULL;	/* gcc-4.3.2 false warning.  */
   struct value *val = NULL;
   volatile struct gdb_exception except;
 
