@@ -18305,6 +18305,11 @@ which is typically four bytes.  @var{max_count} is the highest number of matches
 to search for.
 @end defun
 
+@findex gdb.solib_address
+@defun solib_address @var{address}
+Return the name of the shared library holding the given address, or None.
+@end defun
+
 @node Exception Handling
 @subsubsection Exception Handling
 @cindex python exceptions
@@ -19513,8 +19518,18 @@ Returns the type of the frame. The value can be one of
 or @code{gdb.SENTINEL_FRAME}.
 @end defmethod
 
+@defmethod Frame unwind_stop_reason
+Return an integer representing the reason why it's not possible to find
+frames older than this.  Use @code{gdb.frame_stop_reason_string} to convert
+the value returned by this function to a string.
+@end defmethod
+
 @defmethod Frame pc
 Returns the frame's resume address.
+@end defmethod
+
+@defmethod Frame block
+Returns the frame's code block. @c (see @xref{Block,,Code Blocks and Scopes}).
 @end defmethod
 
 @defmethod Frame address_in_block
@@ -19533,8 +19548,9 @@ Return the frame immediately newer (inner) to this frame.
 Return the frame's symtab and line object. @c (see @xref{Symtab_and_line,, Symtab and line}).
 @end defmethod
 
-@defmethod Frame read_var_value @var{symbol}
-Return the value of the variable corresponding to the given symbol in this frame.
+@defmethod Frame read_var_value @var{variable}
+Return the value of the given variable in this frame.  @code{variable} can be
+either a string or a @code{gdb.Symbol} object. @c (@pxref{Symbols In Python}).
 @end defmethod
 @end table
 

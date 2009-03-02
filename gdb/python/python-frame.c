@@ -585,7 +585,7 @@ gdbpy_initialize_frames (void)
   if (PyType_Ready (&frame_object_type) < 0)
     return;
 
-  /* FIXME: These would probably be best exposed as class attributes of Frame,
+  /* Note: These would probably be best exposed as class attributes of Frame,
      but I don't know how to do it except by messing with the type's dictionary.
      That seems too messy.  */
   PyModule_AddIntConstant (gdb_module, "NORMAL_FRAME", NORMAL_FRAME);
