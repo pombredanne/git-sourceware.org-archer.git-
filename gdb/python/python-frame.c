@@ -413,20 +413,32 @@ frapy_read_var_value (PyObject *self, PyObject *args)
   else if (gdbpy_is_string (sym_obj))
     {
       char *var_name;
-      struct block *block;
+      struct block *block = NULL;
+      struct cleanup *cleanup;
       volatile struct gdb_exception except;
+
+      var_name = python_string_to_target_string (sym_obj);
+      cleanup = make_cleanup (xfree, var_name);
 
       TRY_CATCH (except, RETURN_MASK_ALL)
 	{
-	  struct block *block;
-
 	  FRAPY_REQUIRE_VALID ((frame_object *) self, frame);
 
 	  block = block_for_pc (get_frame_address_in_block (frame));
-	  var = lookup_symbol (python_string_to_target_string (sym_obj), block,
-			       VAR_DOMAIN, NULL);
+	  var = lookup_symbol (var_name, block, VAR_DOMAIN, NULL);
 	}
       GDB_PY_HANDLE_EXCEPTION (except);
+
+      if (!var)
+	{
+	  PyErr_Format (PyExc_ValueError,
+			_("variable '%s' not found"), var_name);
+	  do_cleanups (cleanup);
+
+	  return NULL;
+	}
+
+      do_cleanups (cleanup);
     }
   else
     {
