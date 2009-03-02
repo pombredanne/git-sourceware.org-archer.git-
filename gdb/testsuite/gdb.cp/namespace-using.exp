@@ -44,15 +44,18 @@ if ![runto_main] then {
     continue
 }
 
-gdb_test "print _a" "\\$\[0-9\].* = 1"
+gdb_test "print _a" "= 1"
 
 # Test that names are not printed when they 
 # are not imported
 
-send_gdb "break marker3\n"
-send_gdb "continue\n"
+gdb_breakpoint marker3
+gdb_continue_to_breakpoint "marker3"
 
-gdb_test "print _a" "No symbol \"_a\" in current context."
+#send_gdb "break marker3\n"
+#send_gdb "continue\n"
+
+gdb_test "print _a" "No symbol \"_a\" in current context." "Print _a without import"
 
 gdb_exit
 gdb_start
@@ -72,7 +75,7 @@ if ![runto_main] then {
 gdb_breakpoint [gdb_get_line_number "marker1 stop"]
 gdb_continue_to_breakpoint "marker1 stop"
 
-gdb_test "print _a" "\\$\[0-9\].* = 1"
+gdb_test "print _a" "= 1" "print _a in a nested scope"
 
 
 gdb_exit
@@ -90,7 +93,7 @@ if ![runto marker5] then {
     continue
 }
 
-gdb_test "print cc" "\\$\[0-9\].* = 3"
+gdb_test "print cc" "= 3"
 
 gdb_exit
 gdb_start
@@ -106,10 +109,10 @@ if ![runto marker2] then {
     continue
 }
 
-gdb_test "print B::_a" "\\$\[0-9\].* = 1"
+gdb_test "print B::_a" "= 1"
 
-gdb_test "print _a" "No symbol \"_a\" in current context."
-gdb_test "print x" "No symbol \"x\" in current context."
+gdb_test "print _a" "No symbol \"_a\" in current context." "print _a in namespace alias scope"
+gdb_test "print x" "No symbol \"x\" in current context." "print x in namespace alias scope"
 
 gdb_exit
 gdb_start
@@ -125,7 +128,7 @@ if ![runto marker4] then {
     continue
 }
 
-gdb_test "print dx" "\\$\[0-9\].* = 4"
+gdb_test "print dx" "= 4"
 
 ############################################
 # Test printing of namespace aliases
@@ -135,7 +138,7 @@ if ![runto marker6] then {
     continue
 }
 
-gdb_test "print efx" "\\$\[0-9\].* = 5"
+gdb_test "print efx" "= 5"
 
 ############################################
 # Test printing of variables imported from
@@ -146,7 +149,7 @@ if ![runto I::marker7] then {
     continue
 }
 
-gdb_test "print ghx" "\\$\[0-9\].* = 6"
+gdb_test "print ghx" "= 6"
 
 ############################################
 # Test that variables are not printed in a namespace
@@ -157,7 +160,7 @@ if ![runto L::marker8] then {
     continue
 }
 
-gdb_test "print jx" "\\$\[0-9\].* = 44"
+gdb_test "print jx" "= 44"
 
 gdb_breakpoint "K::marker9"
 gdb_continue_to_breakpoint "K::marker9"
@@ -176,8 +179,8 @@ if ![runto_main] then {
 gdb_breakpoint [gdb_get_line_number "marker10 stop"]
 gdb_continue_to_breakpoint "marker10 stop"
 
-gdb_test "print x" "\\$\[0-9\].* = 911"
+gdb_test "print x" "= 911" "print x (from M::x)"
 
-send_gdb "next\n"
+gdb_test "next" ""
 
-gdb_test "print x" "\\$\[0-9\].* = 912"
+gdb_test "print x" "= 912" "print x (from M::x)"
