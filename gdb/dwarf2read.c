@@ -3284,6 +3284,12 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
   if (name == NULL || !dwarf2_get_pc_bounds (die, &lowpc, &highpc, cu)){
     /* explore abstract origins if present. They might contain useful information
      such as import statements. */
+    child_die = die->child;
+    while (child_die && child_die->tag)
+      {
+	child_die = sibling_die (child_die);
+	die_children++;
+      }
     explore_abstract_origin(die, cu, &die_children);
     return;
   }
