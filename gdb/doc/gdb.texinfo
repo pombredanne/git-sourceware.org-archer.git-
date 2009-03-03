@@ -18250,29 +18250,6 @@ Flush @value{GDBN}'s paginated standard output stream.  Flushing
 function.
 @end defun
 
-@findex gdb.frames
-@defun frames
-Return a tuple of all frame objects.
-@end defun
-
-@findex gdb.newest_frame
-@defun newest_frame
-Return the newest frame object.
-@end defun
-
-@findex gdb.selected_frame
-@defun selected_frame
-Return the selected frame object.
-@end defun
-
-@findex gdb.frame_stop_reason_string
-@defun frame_stop_reason_string @var{reason}
-Return a string explaining the reason why @value{GDBN} stopped unwinding
-frames, as expressed by the given @var{reason} code (an integer, see the
-@code{unwind_stop_reason} method in
-@xref{Frames In Python,,Accessing inferior stack frames from Python}.)
-@end defun
-
 @findex gdb.read_memory
 @defun read_memory @var{address} @var{length}
 Read @var{length} bytes of memory from the inferior, starting at @var{address}.
@@ -19492,12 +19469,34 @@ separated by newlines.  If there are no commands, this attribute is
 @tindex Frame
 When the debugged program stops, @value{GDBN} is able to analyse its call
 stack (@pxref{Frames,,Stack frames}).  The @code{gdb.Frame} class
-represents a frame in the stack.  You can get a tuple containing all the
-frames in the stack with the @code{gdb.frames} function, the newest
-frame with the @code{gdb.newest_frame} function, and the selected frame
-with the @code{gdb.selected_frame} function
-(see @xref{Selection,,Selecting a Frame}.)  See
-@xref{Basic Python,,Basic Python}.
+represents a frame in the stack.  A @code{gdb.Frame} object is only valid
+while its corresponding frame exists in the inferior's stack.  If you try
+to use an invalid frame object, a @code{RuntimeError} exception will be
+thrown.
+
+The following frame-related functions are available in the @code{gdb} module:
+
+@findex gdb.frames
+@defun frames
+Return a tuple containing all frame objects.
+@end defun
+
+@findex gdb.newest_frame
+@defun newest_frame
+Return the newest frame object.
+@end defun
+
+@findex gdb.selected_frame
+@defun selected_frame
+Return the selected frame object.  (@pxref{Selection,,Selecting a Frame}).
+@end defun
+
+@findex gdb.frame_stop_reason_string
+@defun frame_stop_reason_string @var{reason}
+Return a string explaining the reason why @value{GDBN} stopped unwinding
+frames, as expressed by the given @var{reason} code (an integer, see the
+@code{unwind_stop_reason} method further down in this section).
+@end defun
 
 A @code{gdb.Frame} object has the following methods:
 
@@ -19535,7 +19534,7 @@ Returns the frame's resume address.
 @end defmethod
 
 @defmethod Frame block
-Returns the frame's code block. @c (see @xref{Block,,Code Blocks and Scopes}).
+Returns the frame's code block. @c (@pxref{Block,,Code Blocks and Scopes}).
 @end defmethod
 
 @defmethod Frame address_in_block
@@ -19551,7 +19550,7 @@ Return the frame immediately newer (inner) to this frame.
 @end defmethod
 
 @defmethod Frame find_sal
-Return the frame's symtab and line object. @c (see @xref{Symtab_and_line,, Symtab and line}).
+Return the frame's symtab and line object. @c (@pxref{Symtab_and_line,, Symtab and line}).
 @end defmethod
 
 @defmethod Frame read_var @var{variable}

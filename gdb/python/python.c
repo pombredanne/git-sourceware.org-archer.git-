@@ -1876,7 +1876,7 @@ static PyMethodDef GdbMethods[] =
 
   { "frames", gdbpy_frames, METH_NOARGS,
     "frames () -> (gdb.Frame, ...).\n\
-Return a tuple of all frame objects." },
+Return a tuple containing all frame objects." },
   { "newest_frame", gdbpy_newest_frame, METH_NOARGS,
     "newest_frame () -> gdb.Frame.\n\
 Return the newest frame object." },
