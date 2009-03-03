@@ -18356,6 +18356,12 @@ If this file does not exist, and if the parameter
 @code{debug-file-directory} is set, then @value{GDBN} will append the
 object file's real name to the value of this parameter, and try again.
 
+Finally, if this file does not exist, then @value{GDBN} will look in
+subdirectory of @code{gdb_datadir} (whose value is available from
+@code{maint show gdb_datadir}).  Specifically, @value{GDBN} will take
+the value of @code{gdb_datadir}, append @samp{python/auto-load}, and
+then append the object file's real name.
+
 Also, if a separate debug file is used, @value{GDBN} will look for the
 @samp{-gdb.py} file both in the directory associated with the
 application and the directory associated with the separate debug file.

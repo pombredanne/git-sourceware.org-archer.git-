@@ -966,10 +966,11 @@ static void
 gdbpy_new_objfile (struct objfile *objfile)
 {
   char *realname;
-  char *filename;
+  char *filename, *debugfile;
   int len;
   FILE *input;
   PyGILState_STATE state;
+  struct cleanup *cleanups;
 
   if (!gdbpy_auto_load || !objfile || !objfile->name)
     return;
@@ -985,35 +986,49 @@ gdbpy_new_objfile (struct objfile *objfile)
   strcpy (filename + len, GDBPY_AUTO_FILENAME);
 
   input = fopen (filename, "r");
+  debugfile = filename;
+
+  cleanups = make_cleanup (xfree, filename);
+  make_cleanup (xfree, realname);
 
   if (!input && debug_file_directory)
     {
       /* Also try the same file in the separate debug info directory.  */
-      char *debugfile;
-
       debugfile = xmalloc (strlen (filename)
 			   + strlen (debug_file_directory) + 1);
       strcpy (debugfile, debug_file_directory);
       /* FILENAME is absolute, so we don't need a "/" here.  */
       strcat (debugfile, filename);
 
-      xfree (filename);
-      filename = debugfile;
+      make_cleanup (xfree, debugfile);
+      input = fopen (debugfile, "r");
+    }
 
-      input = fopen (filename, "r");
+  if (!input)
+    {
+      /* Also try the same file in a subdirectory of gdb's data
+	 directory.  */
+      debugfile = xmalloc (strlen (gdb_datadir) + strlen (filename)
+			   + strlen ("/auto-load") + 1);
+      strcpy (debugfile, gdb_datadir);
+      strcat (debugfile, "/auto-load");
+      /* FILENAME is absolute, so we don't need a "/" here.  */
+      strcat (debugfile, filename);
+
+      make_cleanup (xfree, debugfile);
+      input = fopen (debugfile, "r");
     }
 
   if (input)
     {
       /* We don't want to throw an exception here -- but the user
 	 would like to know that something went wrong.  */
-      if (PyRun_SimpleFile (input, filename))
+      if (PyRun_SimpleFile (input, debugfile))
 	gdbpy_print_stack ();
       fclose (input);
     }
 
-  xfree (realname);
-  xfree (filename);
+  do_cleanups (cleanups);
   gdbpy_current_objfile = NULL;
 
   PyGILState_Release (state);
