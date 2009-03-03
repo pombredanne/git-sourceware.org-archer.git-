@@ -33,7 +33,7 @@ class FrameWrapper:
 
         stream.write (sym.print_name + "=")
         try:
-            val = self.frame.read_var_value (sym)
+            val = self.frame.read_var (sym)
             if val != None:
                 val = str (val)
         # FIXME: would be nice to have a more precise exception here.
