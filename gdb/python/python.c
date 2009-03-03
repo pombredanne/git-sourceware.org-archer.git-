@@ -1004,7 +1004,7 @@ gdbpy_new_objfile (struct objfile *objfile)
       input = fopen (debugfile, "r");
     }
 
-  if (!input)
+  if (!input && gdb_datadir)
     {
       /* Also try the same file in a subdirectory of gdb's data
 	 directory.  */
