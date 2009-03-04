@@ -1949,9 +1949,17 @@ install-python:
 	  $(INSTALL_DATA) $(srcdir)/python/lib/$$file $(DESTDIR)$(pythondir)/$$file; \
 	done
 
-# Brute force.
+# Other packages may have their files installed in $(pythondir).
 uninstall-python:
-	rm -rf $(DESTDIR)/$(pythondir)
+	files='$(PY_FILES)'; for file in $$files; do \
+	  slashdir=`echo "/$$file" | sed 's,/[^/]*$$,,'`; \
+	  rm -f $(DESTDIR)$(pythondir)/$$file; \
+	  while test "x$$file" != "x$$slashdir"; do \
+	    rmdir 2>/dev/null "$(DESTDIR)$(pythondir)$$slashdir"; \
+	    file="$$slashdir"; \
+	    slashdir=`echo "$$file" | sed 's,/[^/]*$$,,'`; \
+	  done \
+	done
 
 #
 # Dependency tracking.  Most of this is conditional on GNU Make being
