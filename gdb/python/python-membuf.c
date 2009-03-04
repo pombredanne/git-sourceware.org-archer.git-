@@ -130,7 +130,7 @@ mbpy_str (PyObject *self)
 			      pulongest (membuf_obj->length));
 }
 
-Py_ssize_t
+static Py_ssize_t
 get_read_buffer (PyObject *self, Py_ssize_t segment, void **ptrptr)
 {
   membuf_object *membuf_obj = (membuf_object *) self;
@@ -147,13 +147,13 @@ get_read_buffer (PyObject *self, Py_ssize_t segment, void **ptrptr)
   return membuf_obj->length;
 }
 
-Py_ssize_t
+static Py_ssize_t
 get_write_buffer (PyObject *self, Py_ssize_t segment, void **ptrptr)
 {
   return get_read_buffer (self, segment, ptrptr);
 }
 
-Py_ssize_t
+static Py_ssize_t
 get_seg_count (PyObject *self, Py_ssize_t *lenp)
 {
   if (lenp)
@@ -162,7 +162,7 @@ get_seg_count (PyObject *self, Py_ssize_t *lenp)
   return 1;
 }
 
-Py_ssize_t
+static Py_ssize_t
 get_char_buffer (PyObject *self, Py_ssize_t segment, char **ptrptr)
 {
   void *ptr = NULL;
@@ -212,13 +212,29 @@ static PyTypeObject membuf_object_type = {
   0,				  /*tp_setattro*/
   &buffer_procs,		  /*tp_as_buffer*/
   Py_TPFLAGS_DEFAULT,		  /*tp_flags*/
-  "GDB memory buffer object" 	  /*tp_doc*/
+  "GDB memory buffer object", 	  /*tp_doc*/
+  0,				  /* tp_traverse */
+  0,				  /* tp_clear */
+  0,				  /* tp_richcompare */
+  0,				  /* tp_weaklistoffset */
+  0,				  /* tp_iter */
+  0,				  /* tp_iternext */
+  0,				  /* tp_methods */
+  0,				  /* tp_members */
+  0,				  /* tp_getset */
+  0,				  /* tp_base */
+  0,				  /* tp_dict */
+  0,				  /* tp_descr_get */
+  0,				  /* tp_descr_set */
+  0,				  /* tp_dictoffset */
+  0,				  /* tp_init */
+  0,				  /* tp_alloc */
+  PyType_GenericNew		  /* tp_new */
 };
 
 void
 gdbpy_initialize_membuf (void)
 {
-  membuf_object_type.tp_new = PyType_GenericNew;
   if (PyType_Ready (&membuf_object_type) < 0)
     return;
 
