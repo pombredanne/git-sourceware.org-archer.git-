@@ -349,11 +349,11 @@ valpy_binop (enum valpy_opcode opcode, PyObject *self, PyObject *other)
 	 a gdb.Value object and need to convert it from python as well.  */
       arg1 = convert_value_from_python (self);
       if (arg1 == NULL)
-	return NULL;
+	break;
 
       arg2 = convert_value_from_python (other);
       if (arg2 == NULL)
-	return NULL;
+	break;
 
       switch (opcode)
 	{
@@ -430,7 +430,7 @@ valpy_binop (enum valpy_opcode opcode, PyObject *self, PyObject *other)
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
-  return value_to_value_object (res_val);
+  return res_val ? value_to_value_object (res_val) : NULL;
 }
 
 static PyObject *

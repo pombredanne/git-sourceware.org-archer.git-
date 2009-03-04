@@ -391,13 +391,13 @@ frapy_find_sal (PyObject *self, PyObject *args)
   return sal_obj;
 }
 
-/* Implementation of gdb.Frame.read_var_value (self, variable) -> gdb.Value.
+/* Implementation of gdb.Frame.read_var (self, variable) -> gdb.Value.
    Returns the value of the given variable in this frame.  The argument can be
    either a gdb.Symbol or a string.  Returns None if GDB can't find the
    specified variable.  */
 
 static PyObject *
-frapy_read_var_value (PyObject *self, PyObject *args)
+frapy_read_var (PyObject *self, PyObject *args)
 {
   struct frame_info *frame;
   PyObject *sym_obj;
@@ -418,6 +418,8 @@ frapy_read_var_value (PyObject *self, PyObject *args)
       volatile struct gdb_exception except;
 
       var_name = python_string_to_target_string (sym_obj);
+      if (!var_name)
+      	return NULL;
       cleanup = make_cleanup (xfree, var_name);
 
       TRY_CATCH (except, RETURN_MASK_ALL)
@@ -645,8 +647,8 @@ Return the frame immetidaely newer (inner) to this frame." },
   { "find_sal", frapy_find_sal, METH_NOARGS,
     "find_sal () -> gdb.Symtab_and_line.\n\
 Return the frame's symtab and line." },
-  { "read_var_value", frapy_read_var_value, METH_VARARGS,
-    "read_var_value (variable) -> gdb.Value.\n\
+  { "read_var", frapy_read_var, METH_VARARGS,
+    "read_var (variable) -> gdb.Value.\n\
 Return the value of the variable in this frame." },
   {NULL}  /* Sentinel */
 };

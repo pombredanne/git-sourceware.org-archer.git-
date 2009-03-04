@@ -1444,7 +1444,7 @@ install_default_visualizer (struct varobj *var)
   install_visualizer (var, pretty_printer);
   do_cleanups (cleanup);
 #else
-  error ("Python support required");
+  /* No error is right as this function is inserted just as a hook.  */
 #endif
 }
 

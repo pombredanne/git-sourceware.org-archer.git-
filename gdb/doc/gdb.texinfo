@@ -19554,7 +19554,7 @@ Return the frame immediately newer (inner) to this frame.
 Return the frame's symtab and line object. @c (see @xref{Symtab_and_line,, Symtab and line}).
 @end defmethod
 
-@defmethod Frame read_var_value @var{variable}
+@defmethod Frame read_var @var{variable}
 Return the value of the given variable in this frame.  @code{variable} can be
 either a string or a @code{gdb.Symbol} object. @c (@pxref{Symbols In Python}).
 @end defmethod
