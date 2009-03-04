@@ -125,9 +125,9 @@ mbpy_str (PyObject *self)
 {
   membuf_object *membuf_obj = (membuf_object *) self;
 
-  return PyString_FromFormat ("memory buffer for address %p, %u bytes long",
-			      (void *) membuf_obj->addr,
-			      (unsigned int) membuf_obj->length);
+  return PyString_FromFormat ("memory buffer for address %s, %s bytes long",
+			      paddress (membuf_obj->addr),
+			      pulongest (membuf_obj->length));
 }
 
 Py_ssize_t
