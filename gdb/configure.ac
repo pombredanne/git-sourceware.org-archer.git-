@@ -1,6 +1,6 @@
 dnl Autoconf configure script for GDB, the GNU debugger.
 dnl Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
-dnl 2005, 2006, 2007, 2008
+dnl 2005, 2006, 2007, 2008, 2009
 dnl Free Software Foundation, Inc.
 dnl
 dnl This file is part of GDB.
@@ -147,6 +147,21 @@ case ${gdbdatadir} in
 esac
 GDB_DATADIR_PATH=${gdbdatadir}
 AC_SUBST(GDB_DATADIR_PATH)
+
+AC_ARG_WITH([pythondir],
+  [AS_HELP_STRING([--with-pythondir],
+                  [install Python data files in this path [DATADIR/gdb/python]])], [pythondir="${withval}"], [pythondir=no])
+
+# If the user passed in a path, define it.  Otherwise, compute it at
+# runtime based on the possibly-relocatable datadir.
+if test "$pythondir" = "no"; then
+  pythondir='$(GDB_DATADIR_PATH)/python'
+else
+  AC_DEFINE_UNQUOTED(PYTHONDIR, "$pythondir",
+      [Define to install path for Python sources])
+fi
+AC_SUBST(pythondir)
+
 
 AC_CONFIG_SUBDIRS(doc testsuite)
 

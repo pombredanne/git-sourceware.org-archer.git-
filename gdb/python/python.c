@@ -1775,8 +1775,12 @@ Enables or disables auto-loading of Python code when an object is opened."),
   PyModule_AddStringConstant (gdb_module, "VERSION", (char*) version);
   PyModule_AddStringConstant (gdb_module, "HOST_CONFIG", (char*) host_name);
   PyModule_AddStringConstant (gdb_module, "TARGET_CONFIG", (char*) target_name);
+#ifdef PYTHONDIR
+  PyModule_AddStringConstant (gdb_module, "pythondir", PYTHONDIR);
+#else
   if (gdb_datadir)
     PyModule_AddStringConstant (gdb_module, "datadir", gdb_datadir);
+#endif
 
   gdbpy_initialize_values ();
   gdbpy_initialize_breakpoints ();
@@ -1827,11 +1831,12 @@ class GdbOutputFile:\n\
 sys.stderr = GdbOutputFile()\n\
 sys.stdout = GdbOutputFile()\n\
 if hasattr (gdb, 'datadir'):\n\
-  gdb.pythonlibdir = gdb.datadir + '/python'\n\
-  sys.path.insert(0, gdb.pythonlibdir)\n\
-  gdb.__path__ = [gdb.pythonlibdir + '/gdb']\n\
+  gdb.pythondir = gdb.datadir + '/python'\n\
+if hasattr (gdb, 'pythondir'):\n\
+  sys.path.insert(0, gdb.pythondir)\n\
+  gdb.__path__ = [gdb.pythondir + '/gdb']\n\
   from os.path import exists\n\
-  ipy = gdb.pythonlibdir + '/gdb/__init__.py'\n\
+  ipy = gdb.pythondir + '/gdb/__init__.py'\n\
   if exists (ipy):\n\
     execfile (ipy)\n\
 ");

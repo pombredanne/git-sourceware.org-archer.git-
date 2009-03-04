@@ -624,6 +624,9 @@
    'ptrdiff_t'. */
 #undef PTRDIFF_T_SUFFIX
 
+/* Define to install path for Python sources */
+#undef PYTHONDIR
+
 /* Bug reporting address */
 #undef REPORT_BUGS_TO
 

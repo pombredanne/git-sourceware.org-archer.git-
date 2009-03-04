@@ -175,6 +175,10 @@ TARGET_SYSTEM_ROOT_DEFINE = @TARGET_SYSTEM_ROOT_DEFINE@
 # Did the user give us a --with-gdb-datadir option?
 GDB_DATADIR_PATH = @GDB_DATADIR_PATH@
 
+# The argument to --with-pythondir.  If not given, this is
+# GDB_DATADIR_PATH/python.
+pythondir = @pythondir@
+
 # Helper code from gnulib.
 LIBGNU = gnulib/libgnu.a
 INCGNU = -I$(srcdir)/gnulib -Ignulib
@@ -1937,17 +1941,17 @@ PY_FILES = gdb/FrameIterator.py gdb/command/alias.py \
     gdb/__init__.py
 
 # Install the Python library.  Python library files go under
-# $(GDB_DATADIR_PATH)/python.
+# $(pythondir).
 install-python:
 	files='$(PY_FILES)'; for file in $$files; do \
 	  dir=`echo "$$file" | sed 's,/[^/]*$$,,'`; \
-	  $(SHELL) $(srcdir)/../mkinstalldirs $(DESTDIR)$(GDB_DATADIR_PATH)/python/$$dir; \
-	  $(INSTALL_DATA) $(srcdir)/python/lib/$$file $(DESTDIR)$(GDB_DATADIR_PATH)/python/$$file; \
+	  $(SHELL) $(srcdir)/../mkinstalldirs $(DESTDIR)$(pythondir)/$$dir; \
+	  $(INSTALL_DATA) $(srcdir)/python/lib/$$file $(DESTDIR)$(pythondir)/$$file; \
 	done
 
 # Brute force.
 uninstall-python:
-	rm -rf $(DESTDIR)/$(GDB_DATADIR_PATH)/python
+	rm -rf $(DESTDIR)/$(pythondir)
 
 #
 # Dependency tracking.  Most of this is conditional on GNU Make being
