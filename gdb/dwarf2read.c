@@ -2922,7 +2922,7 @@ dwarf2_full_name (struct die_info *die, struct dwarf2_cu *cu)
 }
 
 /* read the given die's decl_line number. Return -1 if in case of an error */
-static const int dwarf2_read_decl_line (struct die_info *die, struct dwarf2_cu *cu){
+static int dwarf2_read_decl_line (struct die_info *die, struct dwarf2_cu *cu){
   struct attribute *line_attr;
 
   line_attr = dwarf2_attr (die, DW_AT_decl_line, cu);
