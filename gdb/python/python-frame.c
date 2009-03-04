@@ -418,6 +418,8 @@ frapy_read_var (PyObject *self, PyObject *args)
       volatile struct gdb_exception except;
 
       var_name = python_string_to_target_string (sym_obj);
+      if (!var_name)
+      	return NULL;
       cleanup = make_cleanup (xfree, var_name);
 
       TRY_CATCH (except, RETURN_MASK_ALL)
