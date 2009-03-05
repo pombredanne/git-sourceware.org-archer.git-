@@ -259,6 +259,9 @@ struct internalvar
   char *name;
   struct value *value;
   int endian;
+  /* True if this internalvar is the canonical name for a convenience
+     function.  */
+  int canonical;
 };
 
 
@@ -612,7 +615,7 @@ typedef struct value *(*internal_function_fn) (void *cookie,
 
 void add_internal_function (const char *name, const char *doc,
 			    internal_function_fn handler,
-			    void *cookie, void (*destroyer) (void *));
+			    void *cookie);
 
 struct value *call_internal_function (struct value *function,
 				      int argc, struct value **argv);

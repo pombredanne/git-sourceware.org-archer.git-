@@ -58,10 +58,6 @@ struct internal_function
 
   /* User data for the handler.  */
   void *cookie;
-
-  /* Function called to destroy the cookie when the function object is
-     destroyed.  */
-  void (*destroyer) (void *cookie);
 };
 
 static struct cmd_list_element *functionlist;
@@ -879,6 +875,7 @@ create_internalvar (const char *name)
   var->name = concat (name, (char *)NULL);
   var->value = allocate_value (builtin_type_void);
   var->endian = gdbarch_byte_order (current_gdbarch);
+  var->canonical = 0;
   release_value (var->value);
   var->next = internalvars;
   internalvars = var;
@@ -969,6 +966,9 @@ set_internalvar (struct internalvar *var, struct value *val)
 {
   struct value *newval;
 
+  if (var->canonical)
+    error (_("Cannot overwrite convenience function %s"), var->name);
+
   newval = value_copy (val);
   newval->modifiable = 1;
 
@@ -1000,22 +1000,15 @@ internalvar_name (struct internalvar *var)
 static struct value *
 value_create_internal_function (const char *name,
 				internal_function_fn handler,
-				void *cookie,
-				void (*destroyer) (void *))
+				void *cookie)
 {
   struct value *result = allocate_value (internal_fn_type);
   gdb_byte *addr = value_contents_writeable (result);
   struct internal_function **fnp = (struct internal_function **) addr;
-  /* The internal_function object is leaked here -- to make it truly
-     deletable, we would have to reference count it and add special
-     code to value_free and value_copy.  The setup here is a bit odd
-     in general.  It would be better to have a special case in
-     help_command.  */
   struct internal_function *ifn = XNEW (struct internal_function);
   ifn->name = xstrdup (name);
   ifn->handler = handler;
   ifn->cookie = cookie;
-  ifn->destroyer = destroyer;
   *fnp = ifn;
   return result;
 }
@@ -1057,19 +1050,17 @@ function_destroyer (struct cmd_list_element *self, void *ignore)
 /* Add a new internal function.  NAME is the name of the function; DOC
    is a documentation string describing the function.  HANDLER is
    called when the function is invoked.  COOKIE is an arbitrary
-   pointer which is passed to HANDLER and is intended for "user data".
-   DESTROYER is invoked when the function is destroyed.  */
+   pointer which is passed to HANDLER and is intended for "user
+   data".  */
 void
 add_internal_function (const char *name, const char *doc,
-		       internal_function_fn handler,
-		       void *cookie, void (*destroyer) (void *))
+		       internal_function_fn handler, void *cookie)
 {
   struct cmd_list_element *cmd;
   struct internalvar *var = lookup_internalvar (name);
-  struct value *fnval = value_create_internal_function (name, handler, cookie,
-							destroyer);
-  release_value (fnval);
+  struct value *fnval = value_create_internal_function (name, handler, cookie);
   set_internalvar (var, fnval);
+  var->canonical = 1;
 
   cmd = add_cmd (xstrdup (name), no_class, function_command, (char *) doc,
 		 &functionlist);

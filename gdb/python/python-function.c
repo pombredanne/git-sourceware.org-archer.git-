@@ -1,6 +1,6 @@
 /* Convenience functions implemented in Python.
 
-   Copyright (C) 2008 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -97,19 +97,6 @@ fnpy_call (void *cookie, int argc, struct value **argv)
   return value;
 }
 
-/* Called when destroying a struct internal_function.  */
-
-static void
-fnpy_destroy (void *cookie)
-{
-  PyGILState_STATE state;
-
-  state = PyGILState_Ensure ();
-  Py_DECREF ((PyObject *) cookie);
-  PyGILState_Release (state);
-
-}
-
 /* Initializer for a Function object.  It takes one argument, the name
    of the function.  */
 
@@ -131,7 +118,7 @@ fnpy_init (PyObject *self, PyObject *args, PyObject *kwds)
   if (! docstring)
     docstring = _("This function is not documented.");
 
-  add_internal_function (name, docstring, fnpy_call, self, fnpy_destroy);
+  add_internal_function (name, docstring, fnpy_call, self);
   return 0;
 }
 
