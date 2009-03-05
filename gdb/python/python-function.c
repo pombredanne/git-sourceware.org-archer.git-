@@ -93,7 +93,7 @@ fnpy_call (void *cookie, int argc, struct value **argv)
 
   Py_DECREF (result);
   do_cleanups (cleanup);
-  
+
   return value;
 }
 
@@ -127,10 +127,9 @@ fnpy_init (PyObject *self, PyObject *args, PyObject *kwds)
 void
 gdbpy_initialize_functions (void)
 {
-  fnpy_object_type.tp_new = PyType_GenericNew;
-  fnpy_object_type.tp_init = fnpy_init;
   if (PyType_Ready (&fnpy_object_type) < 0)
     return;
+
   Py_INCREF (&fnpy_object_type);
   PyModule_AddObject (gdb_module, "Function", (PyObject *) &fnpy_object_type);
 }
@@ -167,5 +166,15 @@ static PyTypeObject fnpy_object_type =
   0,				  /* tp_weaklistoffset */
   0,				  /* tp_iter */
   0,				  /* tp_iternext */
-  0				  /* tp_methods */
+  0,				  /* tp_methods */
+  0,				  /* tp_members */
+  0,				  /* tp_getset */
+  0,				  /* tp_base */
+  0,				  /* tp_dict */
+  0,				  /* tp_descr_get */
+  0,				  /* tp_descr_set */
+  0,				  /* tp_dictoffset */
+  fnpy_init,			  /* tp_init */
+  0,				  /* tp_alloc */
+  PyType_GenericNew		  /* tp_new */
 };
