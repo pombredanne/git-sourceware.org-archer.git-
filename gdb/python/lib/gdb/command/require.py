@@ -1,6 +1,6 @@
 # Demand-loading commands.
 
-# Copyright (C) 2008 Free Software Foundation, Inc.
+# Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -41,7 +41,7 @@ class RequireSubcommand (gdb.Command):
             exec ('import gdb.' + self.name + '.' + cmd, globals ())
 
     def complete (self, text, word):
-        dir = gdb.pythonlibdir + '/gdb/' + self.name
+        dir = gdb.pythondir + '/gdb/' + self.name
         result = []
         for file in os.listdir(dir):
             if not file.startswith (word) or not file.endswith ('.py'):
