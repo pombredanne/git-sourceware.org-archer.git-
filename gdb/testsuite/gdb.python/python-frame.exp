@@ -81,9 +81,20 @@ gdb_test "python print 'result =', f0.pc ()" " = \[0-9\]+" "test Frame.pc"
 gdb_test "python print 'result =', f0.addr_in_block ()" " = \[0-9\]+" "test Frame.addr_in_block"
 gdb_test "python print 'result =', f0.older ().equals (f1)" " = True" "test Frame.older"
 gdb_test "python print 'result =', f1.newer ().equals (f0)" " = True" "test Frame.newer"
-gdb_test "python print 'result =', f0.read_var ('b')" \
-  "ValueError: variable 'b' not found.*Error while executing Python code." \
-  "test Frame.read_var - error"
+
+set test "test Frame.read_var - error"
+gdb_test_multiple "python print 'result =', f0.read_var ('b')" $test {
+    -re "ValueError: variable 'b' not found.*Error while executing Python code.\r\n$gdb_prompt $" {
+	pass $test
+    }
+    -re "result = \\\{i = \\\{0, \[0-9\]+\\\}, d = 0\\.\[0-9\]+\\\}\r\n$gdb_prompt $" {
+	# libm.so debuginfo contains file static symbol `b' from `atnat.h'.
+	# local `b' would be find first if it would exist so it is more a PASS.
+	setup_xfail *-*-*
+	fail $test
+    }
+}
+
 gdb_test "python print 'result =', f0.read_var ('a')" " = 1" "test Frame.read_var - success"
 
 gdb_test "python print 'result =', gdb.newest_frame ().equals (f0)" " = True" "test gdb.newest_frame"
