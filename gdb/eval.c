@@ -2635,7 +2635,7 @@ evaluate_subexp_with_coercion (struct expression *exp,
 {
   enum exp_opcode op;
   int pc;
-  struct value *val;
+  struct value *val = NULL;
   struct symbol *var;
   struct type *type;
 
@@ -2646,13 +2646,17 @@ evaluate_subexp_with_coercion (struct expression *exp,
     {
     case OP_VAR_VALUE:
       var = exp->elts[pc + 2].symbol;
-      /* address_of_variable will call object_address_set for check_typedef.  */
-      val = address_of_variable (var, exp->elts[pc + 1].block);
+      /* address_of_variable will call object_address_set for check_typedef.
+	 Call it only if required as it can error-out on VAR in register.  */
+      if (TYPE_DYNAMIC (SYMBOL_TYPE (var)))
+	val = address_of_variable (var, exp->elts[pc + 1].block);
       type = check_typedef (SYMBOL_TYPE (var));
       if (TYPE_CODE (type) == TYPE_CODE_ARRAY
 	  && CAST_IS_CONVERSION)
 	{
 	  (*pos) += 4;
+	  if (!val)
+	    val = address_of_variable (var, exp->elts[pc + 1].block);
 	  return value_cast (lookup_pointer_type (TYPE_TARGET_TYPE (type)),
 			     val);
 	}

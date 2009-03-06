@@ -8196,6 +8196,9 @@ read_type_die (struct die_info *die, struct dwarf2_cu *cu)
       break;
     }
 
+  if (this_type)
+    finalize_type (this_type);
+
   return this_type;
 }
 

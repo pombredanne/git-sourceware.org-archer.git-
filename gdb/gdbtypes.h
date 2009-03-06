@@ -1267,6 +1267,8 @@ extern int type_range_count_bound_internal (struct type *range_type);
 extern CORE_ADDR type_range_byte_stride_internal (struct type *range_type,
 						  struct type *element_type);
 
+extern void finalize_type (struct type *type);
+
 extern struct type *create_string_type (struct type *, struct type *);
 
 extern struct type *create_set_type (struct type *, struct type *);

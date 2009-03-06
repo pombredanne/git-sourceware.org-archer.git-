@@ -894,15 +894,6 @@ create_array_type (struct type *result_type,
 	TYPE_LENGTH (element_type) * (high_bound - low_bound + 1);
     }
 
-  if (TYPE_DYNAMIC (range_type))
-    TYPE_DYNAMIC (result_type) = 1;
-
-  /* Multidimensional dynamic arrays need to have all the outer dimensions
-     dynamic to update the outer TYPE_TARGET_TYPE pointer with the new type
-     with statically evaluated dimensions.  */
-  if (TYPE_DYNAMIC (element_type))
-    TYPE_DYNAMIC (result_type) = 1;
-
   if (TYPE_LENGTH (result_type) == 0)
     {
       /* The real size will be computed for specific instances by
@@ -1510,6 +1501,25 @@ type_length_get (struct type *type, struct type *target_type, int full_span)
     target_type = check_typedef (TYPE_TARGET_TYPE (type));
   element_size = type_length_get (target_type, NULL, 1);
   return (count - 1) * byte_stride + element_size;
+}
+
+/* Prepare TYPE after being read in by the backend.  Currently this function
+   only propagates the TYPE_DYNAMIC flag.  */
+
+void
+finalize_type (struct type *type)
+{
+  int i;
+
+  for (i = 0; i < TYPE_NFIELDS (type); ++i)
+    if (TYPE_FIELD_TYPE (type, i) && TYPE_DYNAMIC (TYPE_FIELD_TYPE (type, i)))
+      break;
+
+  /* FIXME: cplus_stuff is ignored here.  */
+  if (i < TYPE_NFIELDS (type)
+      || (TYPE_VPTR_BASETYPE (type) && TYPE_DYNAMIC (TYPE_VPTR_BASETYPE (type)))
+      || (TYPE_TARGET_TYPE (type) && TYPE_DYNAMIC (TYPE_TARGET_TYPE (type))))
+    TYPE_DYNAMIC (type) = 1;
 }
 
 /* Added by Bryan Boreham, Kewill, Sun Sep 17 18:07:17 1989.
