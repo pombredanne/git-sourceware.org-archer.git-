@@ -27,8 +27,9 @@ class StdPointerPrinter:
         self.val = val
 
     def to_string (self):
-        return '%s (count %d) %s' % (self.typename, self.val['_M_refcount'],
-                                     self.val['_M_ptr'])
+        return '%s (count %d) %s' % (self.typename,
+        self.val['_M_refcount']['_M_pi']['_M_use_count'],
+        self.val['_M_ptr'])
 
 class UniquePointerPrinter:
     "Print a unique_ptr"
@@ -612,19 +613,19 @@ def build_libstdcxx_dictionary ():
     pretty_printers_dict[re.compile('^std::queue<.*>$')] = lambda val: StdStackOrQueuePrinter("std::queue", val)
     pretty_printers_dict[re.compile('^std::set<.*>$')] = lambda val: StdSetPrinter("std::set", val)
     pretty_printers_dict[re.compile('^std::stack<.*>$')] = lambda val: StdStackOrQueuePrinter("std::stack", val)
+    pretty_printers_dict[re.compile('^std::unique_ptr<.*>$')] = UniquePointerPrinter
     pretty_printers_dict[re.compile('^std::vector<.*>$')] = StdVectorPrinter
     # vector<bool>
 
-    # C++0x stuff.
-    # array - the default seems reasonable
-    # smart_ptr?  seems to only be in boost right now
-    pretty_printers_dict[re.compile('^std::tr1::shared_ptr<.*>$')] = lambda val: StdPointerPrinter ('std::shared_ptr', val)
-    pretty_printers_dict[re.compile('^std::tr1::weak_ptr<.*>$')] = lambda val: StdPointerPrinter ('std::weak_ptr', val)
-    pretty_printers_dict[re.compile('^std::tr1::unique_ptr<.*>$')] = UniquePointerPrinter
-    pretty_printers_dict[re.compile('^std::tr1::unordered_map<.*>$')] = lambda val: Tr1UnorderedMapPrinter ('std::tr1::unordered_map', val)
-    pretty_printers_dict[re.compile('^std::tr1::unordered_set<.*>$')] = lambda val: Tr1UnorderedSetPrinter ('std::tr1::unordered_set', val)
-    pretty_printers_dict[re.compile('^std::tr1::unordered_multimap<.*>$')] = lambda val: Tr1UnorderedMapPrinter ('std::tr1::unordered_multimap', val)
-    pretty_printers_dict[re.compile('^std::tr1::unordered_multiset<.*>$')] = lambda val: Tr1UnorderedSetPrinter ('std::tr1::unordered_multiset', val)
+    # These are the C++0x printers. They also exist in the standard namespace.
+    # For array - the default GDB pretty-printer seems reasonable.
+    pretty_printers_dict[re.compile('^std::(tr1::)?shared_ptr<.*>$')] = lambda val: StdPointerPrinter ('std::shared_ptr', val)
+    pretty_printers_dict[re.compile('^std::(tr1::)?weak_ptr<.*>$')] = lambda val: StdPointerPrinter ('std::weak_ptr', val)
+    pretty_printers_dict[re.compile('^std::(tr1::)?unordered_map<.*>$')] = lambda val: Tr1UnorderedMapPrinter ('std::tr1::unordered_map', val)
+    pretty_printers_dict[re.compile('^std::(tr1::)?unordered_set<.*>$')] = lambda val: Tr1UnorderedSetPrinter ('std::tr1::unordered_set', val)
+    pretty_printers_dict[re.compile('^std::(tr1::)?unordered_multimap<.*>$')] = lambda val: Tr1UnorderedMapPrinter ('std::tr1::unordered_multimap', val)
+    pretty_printers_dict[re.compile('^std::(tr1::)?unordered_multiset<.*>$')] = lambda val: Tr1UnorderedSetPrinter ('std::tr1::unordered_multiset', val)
+
 
     # Extensions.
     pretty_printers_dict[re.compile('^__gnu_cxx::slist<.*>$')] = StdSlistPrinter
