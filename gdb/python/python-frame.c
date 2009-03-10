@@ -83,7 +83,7 @@ frapy_str (PyObject *self)
   long len;
   PyObject *result;
   struct ui_file *strfile;
-  
+
   strfile = mem_fileopen ();
   fprint_frame_id (strfile, ((frame_object *) self)->frame_id);
   s = ui_file_xstrdup (strfile, &len);
@@ -583,7 +583,6 @@ gdbpy_frame_stop_reason_string (PyObject *self, PyObject *args)
 void
 gdbpy_initialize_frames (void)
 {
-  frame_object_type.tp_new = PyType_GenericNew;
   if (PyType_Ready (&frame_object_type) < 0)
     return;
 
@@ -682,5 +681,15 @@ static PyTypeObject frame_object_type = {
   0,				  /* tp_weaklistoffset */
   0,				  /* tp_iter */
   0,				  /* tp_iternext */
-  frame_object_methods		  /* tp_methods */
+  frame_object_methods,		  /* tp_methods */
+  0,				  /* tp_members */
+  0,				  /* tp_getset */
+  0,				  /* tp_base */
+  0,				  /* tp_dict */
+  0,				  /* tp_descr_get */
+  0,				  /* tp_descr_set */
+  0,				  /* tp_dictoffset */
+  0,				  /* tp_init */
+  0,				  /* tp_alloc */
+  PyType_GenericNew		  /* tp_new */
 };
