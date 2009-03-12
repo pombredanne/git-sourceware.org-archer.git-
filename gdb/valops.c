@@ -2051,7 +2051,7 @@ value_find_oload_method_list (struct value **argp, char *method,
 */
 
 int
-find_overload_match (struct type **arg_types, int nargs, 
+find_overload_match (struct value **argvec, int nargs,
 		     char *name, int method, int lax, 
 		     struct value **objp, struct symbol *fsym,
 		     struct value **valp, struct symbol **symp, 
@@ -2078,6 +2078,13 @@ find_overload_match (struct type **arg_types, int nargs,
   const char *obj_type_name = NULL;
   char *func_name = NULL;
   enum oload_classification match_quality;
+
+  struct type **arg_types;
+
+  /* Prepare list of argument types for overload resolution */
+  arg_types = (struct type **) alloca (nargs * (sizeof (struct type *)));
+  for (ix = 1; ix <= nargs; ix++)
+    arg_types[ix - 1] = value_type (argvec[ix]);
 
   /* Get the list of overloaded methods or functions.  */
   if (method)

@@ -444,7 +444,7 @@ extern struct fn_field *value_find_oload_method_list (struct value **, char *,
 						      int, int *,
 						      struct type **, int *);
 
-extern int find_overload_match (struct type **arg_types, int nargs,
+extern int find_overload_match (struct value **argvec , int nargs,
 				char *name, int method, int lax,
 				struct value **objp, struct symbol *fsym,
 				struct value **valp, struct symbol **symp,

@@ -1,3 +1,10 @@
+2009-03-12  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* valops.c (find_overload_match): Creates its own list of argument
+	types. 
+	* eval.c (evaluate_subexp_standard): Moved redundant code to
+	find_overload_match.
+
 2009-02-25  Doug Evans  <dje@google.com>
 
 	* breakpoint.c (insert_bp_location): Add \n to overlay breakpoint
