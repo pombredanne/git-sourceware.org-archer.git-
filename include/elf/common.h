@@ -334,6 +334,9 @@
 
 #define EM_CYGNUS_MEP		0xF00D  /* Toshiba MeP */
 
+/* Old Sunplus S+core7 backend magic number. Written in the absence of an ABI.  */
+#define EM_SCORE_OLD            95
+
 /* See the above comment before you add a new EM_* value here.  */
 
 /* Values for e_version.  */
@@ -533,8 +536,8 @@
 #define STB_WEAK	2		/* Like globals, lower precedence */
 #define STB_LOOS	10		/* OS-specific semantics */
 #define STB_HIOS	12		/* OS-specific semantics */
-#define STB_LOPROC	13		/* Application-specific semantics */
-#define STB_HIPROC	15		/* Application-specific semantics */
+#define STB_LOPROC	13		/* Processor-specific semantics */
+#define STB_HIPROC	15		/* Processor-specific semantics */
 
 #define STT_NOTYPE	0		/* Symbol type is unspecified */
 #define STT_OBJECT	1		/* Symbol is a data object */
@@ -547,8 +550,8 @@
 #define STT_SRELC	9		/* Signed Complex relocation expression */
 #define STT_LOOS	10		/* OS-specific semantics */
 #define STT_HIOS	12		/* OS-specific semantics */
-#define STT_LOPROC	13		/* Application-specific semantics */
-#define STT_HIPROC	15		/* Application-specific semantics */
+#define STT_LOPROC	13		/* Processor-specific semantics */
+#define STT_HIPROC	15		/* Processor-specific semantics */
 
 /* The following constants control how a symbol may be accessed once it has
    become part of an executable or shared library.  */

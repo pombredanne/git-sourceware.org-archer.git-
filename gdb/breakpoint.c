@@ -1135,8 +1135,8 @@ Note: automatically using hardware breakpoints for read-only addresses.\n"));
 		  bpt->overlay_target_info.placed_address = addr;
 		  val = target_insert_breakpoint (&bpt->overlay_target_info);
 		  if (val != 0)
-		    fprintf_unfiltered (tmp_error_stream, 
-					"Overlay breakpoint %d failed: in ROM?", 
+		    fprintf_unfiltered (tmp_error_stream,
+					"Overlay breakpoint %d failed: in ROM?\n",
 					bpt->owner->number);
 		}
 	    }
@@ -1160,7 +1160,7 @@ Note: automatically using hardware breakpoints for read-only addresses.\n"));
       if (val)
 	{
 	  /* Can't set the breakpoint.  */
-	  if (solib_address (bpt->address))
+	  if (solib_name_from_address (bpt->address))
 	    {
 	      /* See also: disable_breakpoints_in_shlibs. */
 	      val = 0;
@@ -1629,7 +1629,7 @@ remove_breakpoint (struct bp_location *b, insertion_state_t is)
       /* In some cases, we might not be able to remove a breakpoint
 	 in a shared library that has already been removed, but we
 	 have not yet processed the shlib unload event.  */
-      if (val && solib_address (b->address))
+      if (val && solib_name_from_address (b->address))
 	val = 0;
 
       if (val)
@@ -2882,6 +2882,13 @@ bpstat_check_breakpoint_conditions (bpstat bs, ptid_t ptid)
       
       if (bl->cond && bl->owner->disposition != disp_del_at_next_stop)
 	{
+	  /* We use value_mark and value_free_to_mark because it could
+	     be a long time before we return to the command level and
+	     call free_all_values.  We can't call free_all_values
+	     because we might be in the middle of evaluating a
+	     function call.  */
+	  struct value *mark = value_mark ();
+
 	  /* Need to select the frame, with all that implies
 	     so that the conditions will have the right context.  */
 	  select_frame (get_current_frame ());
@@ -2890,7 +2897,7 @@ bpstat_check_breakpoint_conditions (bpstat bs, ptid_t ptid)
 			    "Error in testing breakpoint condition:\n",
 			    RETURN_MASK_ALL);
 	  /* FIXME-someday, should give breakpoint # */
-	  free_all_values ();
+	  value_free_to_mark (mark);
 	}
       if (bl->cond && value_is_zero)
 	{
@@ -3948,8 +3955,8 @@ check_duplicates_for (CORE_ADDR address, struct obj_section *section)
     }
 
   /* If we found a permanent breakpoint at this address, go over the
-     list again and declare all the other breakpoints there to be the
-     duplicates.  */
+     list again and declare all the other breakpoints there (except
+     other permanent breakpoints) to be the duplicates.  */
   if (perm_bp)
     {
       perm_bp->duplicate = 0;
@@ -3963,7 +3970,8 @@ check_duplicates_for (CORE_ADDR address, struct obj_section *section)
       ALL_BP_LOCATIONS (b)
 	if (b != perm_bp)
 	  {
-	    if (b->owner->enable_state != bp_disabled
+	    if (b->owner->enable_state != bp_permanent
+		&& b->owner->enable_state != bp_disabled
 		&& b->owner->enable_state != bp_call_disabled
 		&& b->enabled && !b->shlib_disabled		
 		&& b->address == address	/* address / overlay match */
@@ -4424,7 +4432,6 @@ void
 disable_breakpoints_in_shlibs (void)
 {
   struct bp_location *loc;
-  int disabled_shlib_breaks = 0;
 
   ALL_BP_LOCATIONS (loc)
   {
@@ -4439,7 +4446,7 @@ disable_breakpoints_in_shlibs (void)
 #ifdef PC_SOLIB
 	&& PC_SOLIB (loc->address)
 #else
-	&& solib_address (loc->address)
+	&& solib_name_from_address (loc->address)
 #endif
 	)
       {
@@ -4475,7 +4482,7 @@ disable_breakpoints_in_unloaded_shlib (struct so_list *solib)
 #ifdef PC_SOLIB
 	char *so_name = PC_SOLIB (loc->address);
 #else
-	char *so_name = solib_address (loc->address);
+	char *so_name = solib_name_from_address (loc->address);
 #endif
 	if (so_name && !strcmp (so_name, solib->so_name))
           {

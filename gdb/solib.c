@@ -834,15 +834,31 @@ info_sharedlibrary_command (char *ignore, int from_tty)
     }
 }
 
+/* Return 1 if ADDRESS lies within SOLIB.  */
+
+int
+solib_contains_address_p (const struct so_list *const solib,
+			  CORE_ADDR address)
+{
+  struct section_table *p;
+
+  for (p = solib->sections; p < solib->sections_end; p++)
+    if (p->addr <= address && address < p->endaddr)
+      return 1;
+
+  return 0;
+}
+
 /*
 
    GLOBAL FUNCTION
 
-   solib_address -- check to see if an address is in a shared lib
+   solib_name_from_address -- if an address is in a shared lib, return
+   its name.
 
    SYNOPSIS
 
-   char * solib_address (CORE_ADDR address)
+   char * solib_name_from_address (CORE_ADDR address)
 
    DESCRIPTION
 
@@ -856,20 +872,13 @@ info_sharedlibrary_command (char *ignore, int from_tty)
  */
 
 char *
-solib_address (CORE_ADDR address)
+solib_name_from_address (CORE_ADDR address)
 {
   struct so_list *so = 0;	/* link map state variable */
 
   for (so = so_list_head; so; so = so->next)
-    {
-      struct section_table *p;
-
-      for (p = so->sections; p < so->sections_end; p++)
-	{
-	  if (p->addr <= address && address < p->endaddr)
-	    return (so->so_name);
-	}
-    }
+    if (solib_contains_address_p (so, address))
+      return (so->so_name);
 
   return (0);
 }
@@ -999,8 +1008,13 @@ sharedlibrary_command (char *args, int from_tty)
 void
 no_shared_libraries (char *ignored, int from_tty)
 {
-  objfile_purge_solibs ();
+  /* The order of the two routines below is important: clear_solib notifies
+     the solib_unloaded observers, and some of these observers might need
+     access to their associated objfiles.  Therefore, we can not purge the
+     solibs' objfiles before clear_solib has been called.  */
+
   clear_solib ();
+  objfile_purge_solibs ();
 }
 
 static void
@@ -1009,6 +1023,28 @@ reload_shared_libraries (char *ignored, int from_tty,
 {
   no_shared_libraries (NULL, from_tty);
   solib_add (NULL, from_tty, NULL, auto_solib_add);
+  /* Creating inferior hooks here has two purposes. First, if we reload 
+     shared libraries then the address of solib breakpoint we've computed
+     previously might be no longer valid.  For example, if we forgot to set
+     solib-absolute-prefix and are setting it right now, then the previous
+     breakpoint address is plain wrong.  Second, installing solib hooks
+     also implicitly figures were ld.so is and loads symbols for it.
+     Absent this call, if we've just connected to a target and set 
+     solib-absolute-prefix or solib-search-path, we'll lose all information
+     about ld.so.  */
+  if (target_has_execution)
+    {
+#ifdef SOLIB_CREATE_INFERIOR_HOOK
+      SOLIB_CREATE_INFERIOR_HOOK (PIDGET (inferior_ptid));
+#else
+      solib_create_inferior_hook ();
+#endif
+    }
+  /* We have unloaded and then reloaded debug info for all shared libraries.
+     However, frames may still reference them, for example a frame's 
+     unwinder might still point of DWARF FDE structures that are now freed.
+     Reinit frame cache to avoid crashing.  */
+  reinit_frame_cache ();
 }
 
 static void

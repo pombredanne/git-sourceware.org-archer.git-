@@ -1343,6 +1343,9 @@ typedef struct bfd_section
   /* Nonzero if this section has TLS related relocations.  */
   unsigned int has_tls_reloc:1;
 
+  /* Nonzero if this section has a call to __tls_get_addr.  */
+  unsigned int has_tls_get_addr_call:1;
+
   /* Nonzero if this section has a gp reloc.  */
   unsigned int has_gp_reloc:1;
 
@@ -1603,11 +1606,11 @@ extern asection bfd_ind_section;
   /* segment_mark, sec_info_type, use_rela_p, has_tls_reloc,       */  \
      0,            0,             0,          0,                       \
                                                                        \
-  /* has_gp_reloc, need_finalize_relax, reloc_done,                */  \
-     0,            0,                   0,                             \
+  /* has_tls_get_addr_call, has_gp_reloc, need_finalize_relax,     */  \
+     0,                     0,            0,                           \
                                                                        \
-  /* vma, lma, size, rawsize                                       */  \
-     0,   0,   0,    0,                                                \
+  /* reloc_done, vma, lma, size, rawsize                           */  \
+     0,          0,   0,   0,    0,                                    \
                                                                        \
   /* output_offset, output_section,              alignment_power,  */  \
      0,             (struct bfd_section *) &SEC, 0,                    \
@@ -2002,6 +2005,8 @@ enum bfd_architecture
 #define bfd_mach_s390_31       31
 #define bfd_mach_s390_64       64
   bfd_arch_score,     /* Sunplus score */ 
+#define bfd_mach_score3         3
+#define bfd_mach_score7         7
   bfd_arch_openrisc,  /* OpenRISC */
   bfd_arch_mmix,      /* Donald Knuth's educational processor.  */
   bfd_arch_xstormy16,
@@ -2926,6 +2931,8 @@ relaxation.  */
 
 /* PowerPC and PowerPC64 thread-local storage relocations.  */
   BFD_RELOC_PPC_TLS,
+  BFD_RELOC_PPC_TLSGD,
+  BFD_RELOC_PPC_TLSLD,
   BFD_RELOC_PPC_DTPMOD,
   BFD_RELOC_PPC_TPREL16,
   BFD_RELOC_PPC_TPREL16_LO,
@@ -3889,10 +3896,8 @@ instructions  */
   BFD_RELOC_390_GOTPLT20,
   BFD_RELOC_390_TLS_GOTIE20,
 
-/* Score relocations  */
-  BFD_RELOC_SCORE_DUMMY1,
-
-/* Low 16 bit for load/store  */
+/* Score relocations
+Low 16 bit for load/store  */
   BFD_RELOC_SCORE_GPREL15,
 
 /* This is a 24-bit reloc with the right 1 bit assumed to be 0  */
@@ -3902,11 +3907,20 @@ instructions  */
 /* This is a 19-bit reloc with the right 1 bit assumed to be 0  */
   BFD_RELOC_SCORE_BRANCH,
 
+/* This is a 32-bit reloc for 48-bit instructions.  */
+  BFD_RELOC_SCORE_IMM30,
+
+/* This is a 32-bit reloc for 48-bit instructions.  */
+  BFD_RELOC_SCORE_IMM32,
+
 /* This is a 11-bit reloc with the right 1 bit assumed to be 0  */
   BFD_RELOC_SCORE16_JMP,
 
 /* This is a 8-bit reloc with the right 1 bit assumed to be 0  */
   BFD_RELOC_SCORE16_BRANCH,
+
+/* This is a 9-bit reloc with the right 1 bit assumed to be 0  */
+  BFD_RELOC_SCORE_BCMP,
 
 /* Undocumented Score relocs  */
   BFD_RELOC_SCORE_GOT15,
@@ -4754,6 +4768,11 @@ struct bfd
   /* This BFD has been created by the linker and doesn't correspond
      to any input file.  */
 #define BFD_LINKER_CREATED 0x2000
+
+  /* This may be set before writing out a BFD to request that it
+     be written using values for UIDs, GIDs, timestamps, etc. that
+     will be consistent from run to run.  */
+#define BFD_DETERMINISTIC_OUTPUT 0x4000
 
   /* Currently my_archive is tested before adding origin to
      anything. I believe that this can become always an add of

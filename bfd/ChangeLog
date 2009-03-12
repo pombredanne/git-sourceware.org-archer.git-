@@ -1,3 +1,259 @@
+2009-03-12  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/9938
+	* elf32-i386.c (elf_i386_check_tls_transition): Use strncmp
+	to check ___tls_get_addr.
+
+	* elf64-x86-64.c (elf64_x86_64_check_tls_transition): Use
+	strncmp to check __tls_get_addr.
+
+2009-03-12  Andrew Stubbs  <ams@codesourcery.com>
+
+	* dwarf2.c (read_section): Always check the offset, even when the
+	section has been read before.
+
+2009-03-11  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elf32-i386.c (elf_i386_check_tls_transition): Fix a typo in
+	comments.
+
+2009-03-11  Chris Demetriou  <cgd@google.com>
+
+	* bfd.c (BFD_DETERMINISTIC_OUTPUT): New flag.
+	* bfd-in2.h: Regenerate.
+	* archive.c (bfd_ar_hdr_from_filesystem): If BFD_DETERMINISTIC_OUTPUT
+	flag is set, use 0 for uid, gid, and timestamp, and use 0644 for file
+	mode.
+	(bsd_write_armap): Likewise.
+	(_bfd_archive_bsd_update_armap_timestamp): If BFD_DETERMINISTIC_OUTPUT
+	flag is set, do nothing.
+	(coff_write_armap): If BFD_DETERMINISTIC_OUTPUT flag is set, use 0
+	for timestamp.
+
+2009-03-11  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* elf32-spu.c (find_function_stack_adjust): Handle sf instruction
+	used to update stack pointer.
+
+2009-03-07  John David Anglin  <dave.anglin@nrc-cnrc.gc.ca>
+
+	PR binutils/9921
+	* som.c (som_bfd_derive_misc_symbol_info): Set symbol type ST_ABSOLUTE
+	for unknown symbols in absolute section.
+
+2009-03-06  Nick Clifton  <nickc@redhat.com>
+
+	* po/es.po: Updated Spanish translation.
+
+2009-03-05  Christophe Lyon  <christophe.lyon@st.com>
+
+	* elf32-arm.c (group_sections): Take next section size into
+	account before accepting to group it.
+
+2009-03-05  Christophe Lyon  <christophe.lyon@st.com>
+
+	* elf32-arm.c (arm_type_of_stub): Handle long branches targetting
+	PLT entries.
+	(elf32_arm_final_link_relocate): Likewise.
+
+2009-03-05  Moritz Kroll  <Moritz.Kroll@gmx.de>
+
+	PR 9923
+	* peXXigen.c (_bfd_XXi_final_link_postscript): Check h->root.type.
+
+2009-03-04  Alan Modra  <amodra@bigpond.net.au>
+
+	* reloc.c (BFD_RELOC_PPC_TLSGD, BFD_RELOC_PPC_TLSLD): New.
+	* section.c (struct bfd_section): Add has_tls_get_addr_call.
+	(BFD_FAKE_SECTION): Init new flag.
+	* ecoff.c (bfd_debug_section): Likewise.
+	* bfd-in2.h: Regenerate.
+	* libbfd.h: Regenerate.
+	* elf32-ppc.c (ppc_elf_howto_raw): Add R_PPC_TLSGD and R_PPC_TLSLD.
+	(ppc_elf_reloc_type_lookup): Handle new relocs.
+	(ppc_elf_check_relocs): Set has_tls_get_addr_call on finding such
+	without marker relocs.
+	(ppc_elf_tls_optimize): Allow out-of-order __tls_get_addr relocs
+	if section has no old-style calls.
+	(ppc_elf_relocate_section): Set tls_mask for non-tls relocs too.
+	Don't try to optimize new-style __tls_get_addr call when handling
+	arg setup relocs.  Instead do so for R_PPC_TLSGD and R_PPC_TLSLD
+	relocs.
+	* elf64-ppc.c (ppc64_elf_howto_raw): Add R_PPC64_TLSGD, R_PPC64_TLSLD.
+	(ppc64_elf_reloc_type_lookup): Handle new relocs.
+	(ppc64_elf_check_relocs): Set has_tls_get_addr_call on finding such
+	without marker relocs.
+	(ppc64_elf_tls_optimize): Allow out-of-order __tls_get_addr relocs
+	if section has no old-style calls.  Set toc_ref for new relocs as
+	appropriate.
+	(ppc64_elf_relocate_section): Set tls_mask for non-tls relocs too.
+	Don't try to optimize new-style __tls_get_addr call when handling
+	arg setup relocs.  Instead do so for R_PPC_TLSGD and R_PPC_TLSLD
+	relocs.
+
+2009-03-04  Alan Modra  <amodra@bigpond.net.au>
+
+	PR 6768
+	* configure.in: Test for ld --as-needed support.  Link shared
+	libbfd against libm.
+	* configure: Regenerate.
+
+2009-03-03  Alan Modra  <amodra@bigpond.net.au>
+
+	* Makefile.am: Run "make dep-am".
+	* Makefile.in: Regenerate.
+
+2009-03-02  Qinwei  <qinwei@sunnorth.com.cn>
+
+	* elf32-score7.c: New file.
+	* elf32-score.h: New file.
+	* elf32-score.c: Add code to support score 7.  Set score7 as the
+	default.
+	* cpu-score.c: Add score7 architecure.
+	(compatibile): New function.
+	* Makefile.am: Add rules for building elf32-score7 object.
+	* Makefile.in: Regenerate.
+	* configure.in: Add elf32-score7 object to score vectors.
+	* configure: Regenerate.
+	* reloc.c: Add score7 relocs.
+	* archures.c: Add score3 and score7 machine numbers.
+	* bfd-in2.h: Regenerate.
+	* libbfd.h: Regenerate.
+
+2009-03-01  Ralf Wildenhues  <Ralf.Wildenhues@gmx.de>
+
+	* configure: Regenerate.
+
+2009-03-01  John David Anglin  <dave.anglin@nrc-cnrc.gc.ca>
+
+	* elf32-hppa.c (hppa32_elf_local_refcounts): New function.
+	(elf32_hppa_check_relocs): Use it.
+
+	* elf_hppa_add_symbol_hook (elf_hppa_add_symbol_hook): Move to
+	elf64-hppa.c.
+	(elf_hppa_unmark_useless_dynamic_symbols): Likewise.
+	(elf_hppa_remark_useless_dynamic_symbols): Likewise.
+	(elf_hppa_is_dynamic_loader_symbol): Likewise.
+	(elf_hppa_record_segment_addrs): Likewise.
+	(elf_hppa_final_link): Likewise.
+	(elf_hppa_relocate_insn): Likewise.
+	(elf_hppa_final_link_relocate): Likewise.
+	(elf64_hppa_relocate_section): Likewise.
+	* elf64-hppa.c: Insert above.
+
+2009-02-28  John David Anglin  <dave.anglin@nrc-cnrc.gc.ca>
+
+	* elf-hppa.h (elf_hppa_final_link): Use elf_hppa_final_link.
+	(elf_hppa_final_link_relocate ): Rewrite eliminating dynamic hash table.
+	(elf_hppa_relocate_section): Likewise.
+	* elf64-hppa.c (struct elf64_hppa_link_hash_entry): Change to derive
+	from struct elf_link_hash_entry.  Add count field.
+	(struct elf64_hppa_dyn_hash_table): Delete.
+	(struct elf64_hppa_link_hash_table): Delete dyn_hash_table field.
+	(elf64_hppa_hash_table): Rename to hppa_link_hash_table.
+	(hppa_elf_hash_entry, eh_name): Define.
+	(elf64_hppa_new_dyn_hash_entry): Delete.
+	(elf64_hppa_dyn_hash_lookup): Delete.
+	(elf64_hppa_dyn_hash_traverse): Delete.
+	(get_dyn_name): Delete.
+	(elf64_hppa_finalize_opd): Use struct elf_link_hash_entry * instead
+	of struct elf64_hppa_dyn_hash_entry *.
+	(elf64_hppa_finalize_dlt, llocate_global_data_dlt,
+	allocate_global_data_plt, allocate_global_data_stub,
+	allocate_global_data_opd, count_dyn_reloc, allocate_dynrel_entries):
+	Likewise.
+	(hppa64_link_hash_newfunc): New.
+	(elf64_hppa_hash_table_create): Rework.
+	(count_dyn_reloc): Likewise.
+	(hppa64_elf_local_refcounts): New.
+	(elf64_hppa_check_relocs): Rework using standard technique for recording
+	local DLT, PLT and OPD reference counts.
+	(elf64_hppa_dynamic_symbol_p): Revise using "eh" for struct
+	elf_link_hash_entry *.
+	(elf64_hppa_mark_exported_functions, allocate_global_data_dlt,
+	allocate_global_data_plt, allocate_global_data_stub,
+	allocate_global_data_opd, allocate_dynrel_entries,
+	elf64_hppa_adjust_dynamic_symbol,
+	elf64_hppa_mark_milli_and_exported_functions): Likewise.
+	(elf64_hppa_create_dynamic_sections, elf64_hppa_size_dynamic_sections):
+	Use hppa_link_hash_table.  Rework.
+	(elf64_hppa_link_output_symbol_hook): Rework.
+	(elf64_hppa_finish_dynamic_symbol, elf64_hppa_finalize_opd,
+	elf64_hppa_finalize_dlt, elf64_hppa_finalize_dynreloc,
+	elf64_hppa_finish_dynamic_sections): Likewise.
+
+2009-02-26  Christophe Lyon  <christophe.lyon@st.com>
+
+	* elf32-arm.c (stub_reloc_type): Removed.
+	(insn_sequence): Renamed reloc_type field to r_type.
+	(elf32_arm_stub_long_branch_v4t_arm_thumb_pic): New stub.
+	(elf32_arm_stub_long_branch_v4t_thumb_arm_pic): Likewise.
+	(elf32_arm_stub_long_branch_thumb_only_pic): Likewise.
+	(elf32_arm_stub_type): Add new enum entries for the new stubs.
+	(arm_stub_is_thumb): Catch new stubs.
+	(arm_type_of_stub): Handle new stubs.
+	(arm_size_one_stub): Use ARRAY_SIZE. Handle new stubs.
+	(bfd_elf32_arm_process_before_allocation): Remove useless
+	condition.
+
+2009-02-25  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elf.c (elf_find_function): Use is_function_type to check
+	function symbol.
+
+2009-02-24  Sterling Augustine  <sterling@jaw.hq.tensilica.com>
+
+	* xtensa-modules.c: Revert to previous version 1.11 due
+	to inadvertant commit.
+
+2009-02-24  Sterling Augustine  <sterling@tensilica.com>
+
+	* elf32-xtensa.c (text_action_add): Separate test for action
+	type.  Break if saved action is ta_widen_insn at same offset.
+
+2009-02-24  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* elf32-arm.c (elf32_arm_stub_long_branch_any_any_pic): Rename
+	to elf32_arm_stub_long_branch_any_arm_pic.
+	(elf32_arm_stub_long_branch_any_thumb_pic): New.
+	(enum elf32_arm_stub_type, arm_type_of_stub)
+	(arm_size_one_stub): Handle any to ARM PIC and any to Thumb PIC
+	separately.
+
+2009-02-24  Joseph Myers  <joseph@codesourcery.com>
+
+	* elf32-arm.c (PREV_SEC): Update comment.
+	(group_sections): Rename argument to stubs_always_after_branch.
+	Reverse the list and place stubs at the end of input sections.
+	Undefine NEXT_SEC.
+	(elf32_arm_size_stubs): Update to use stubs_always_after_branch.
+
+2009-02-23  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* elf32-arm.c (arm_build_one_stub): Initialize stub_reloc_offset.
+	Fix formatting.
+	(arm_size_one_stub): Remove unnecessary break.
+	(arm_map_one_stub): Fix formatting.  Return after BFD_FAIL.
+
+2009-02-23  Christophe Lyon  <christophe.lyon@st.com>
+
+	* elf32-arm.c (stub_insn_type): New type.
+	(stub_reloc_type): Likewise.
+	(insn_sequence): Likewise.
+	(elf32_arm_stub_long_branch_any_any): Encode using insn_sequence.
+	(elf32_arm_stub_long_branch_v4t_arm_thumb): Likewise.
+	(elf32_arm_stub_long_branch_thumb_only): Likewise.
+	(elf32_arm_stub_long_branch_v4t_thumb_arm): Likewise.
+	(elf32_arm_stub_short_branch_v4t_thumb_arm): Likewise.
+	(elf32_arm_stub_long_branch_any_any_pic): Likewise.
+	(elf32_arm_stub_hash_entry): Add new helper fields.
+	(stub_hash_newfunc): Initialize these new fields.
+	(arm_build_one_stub): Encode Arm and Thumb instructions separately
+	to take endianness into account.
+	(arm_size_one_stub): Compute size of stubs using insn_sequence.
+	(arm_map_one_stub): Code is now more generic, thanks to
+	insn_sequence.
+
 2009-02-23  Christophe Lyon  <christophe.lyon@st.com>
 
 	* elf32-arm.c (elf32_arm_stub_long_branch_thumb_only): Fix stub
@@ -11,6 +267,8 @@
 	(arm_map_one_stub): Likewise.
 
 2009-02-23  Tristan Gingold  <gingold@adacore.com>
+	    Eric Botcazou  <ebotcazou@adacore.com>
+	    Douglas B Rupp  <rupp@gnat.com>
 
 	* vms.h: Update copyright year, fix comments, reorder declarations.
 	(_bfd_save_vms_section): Remove the prototype.
