@@ -1184,11 +1184,11 @@ quit_confirm (void)
          see if a GUI is running.  The `use_windows' variable doesn't
          cut it.  */
       if (deprecated_init_ui_hook)
-	s = "A debugging session is active.\nDo you still want to close the debugger?";
+	s = _("A debugging session is active.\nDo you still want to close the debugger?");
       else if (inf->attach_flag)
-	s = "The program is running.  Quit anyway (and detach it)? ";
+	s = _("The program is running.  Quit anyway (and detach it)? ");
       else
-	s = "The program is running.  Quit anyway (and kill it)? ";
+	s = _("The program is running.  Quit anyway (and kill it)? ");
 
       if (!query ("%s", s))
 	return 0;
@@ -1247,7 +1247,8 @@ quit_target (void *arg)
   struct qt_args *qt = (struct qt_args *)arg;
 
   /* Kill or detach all inferiors.  */
-  iterate_over_inferiors (kill_or_detach, qt);
+  if (target_has_execution)
+    iterate_over_inferiors (kill_or_detach, qt);
 
   /* Give all pushed targets a chance to do minimal cleanup, and pop
      them all out.  */

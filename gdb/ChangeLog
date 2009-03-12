@@ -1,3 +1,269 @@
+2009-03-12  Jerome Guitton  <guitton@adacore.com>
+
+	* xcoffread.c (process_linenos): Check if the line in the
+	include table refers to the main source file and, if so,
+	add them to the main subfile.
+
+2009-03-12  Joel Brobecker  <brobecker@adacore.com>
+
+	Fix a build failure on AIX introduced after a change in the profile
+	of some of the "methods" in the target_ops structure.
+	* aix-thread.c: Add missing target_ops parameter throughout.
+
+	Implement Ada task switching on AIX.
+	* aix-thread.c (aix_thread_get_ada_task_ptid): New function.
+	(init_aix_thread_ops): Set aix_thread_ops.to_get_ada_task_ptid.
+
+2009-03-11  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* breakpoint.c (bpstat_check_breakpoint_conditions): Use
+	value_mark and value_free_to_mark.
+	* objfiles.c (free_objfile): Call objfile_free_data before
+	freeing the BFD.
+
+2009-03-10  Hui Zhu  <teawater@gmail.com>
+
+	* disasm.c (gdb_disassembly): Remove unused argument
+	"line_num".
+	* disasm.h (gdb_disassembly): Ditto.
+	* cli/cli-cmds.c (print_disassembly): Ditto.
+	* mi/mi-cmd-disas.c (mi_cmd_disassemble): Ditto.
+
+2009-03-09  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* solib.c (solib_contains_address_p): New function.
+	(solib_name_from_address): Use it.
+	* printcmd.c (display_uses_solib_p): Use it.
+	* solib.h (solib_contains_address_p): Declare it.	
+	
+2009-03-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* varobj.c (free_variable): Call value_free.
+
+2009-03-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR gdb/9873:
+	* dwarf2read.c (dwarf_decode_macros): New variable `at_commandline'.
+	Move the variable `macinfo_type' out of the loop.  Create a new
+	processing pass before the current one to pre-create `current_file'.
+	New complaint on misplaced zero/non-zero definitions/includes.
+	Skip first DW_MACINFO_start_file with `at_commandline' set.
+
+2008-03-09  Vladimir Prus  <vladimir@codesourcery.com>
+
+       * solib.c (reload_shared_libraries): Give
+       inferior a chance to reset solib breakpoint.
+       Reinit frame cache.
+
+2009-03-08  Christopher Faylor  <me+cygwin@cgf.cx>
+
+	* windows-nat.c (dr): Redefine to use largest possible integer which
+	holds a pointer.
+	(cygwin_set_dr): Avoid coercion.
+
+2009-03-08  Oswald Buddenhagen  <oswald.buddenhagen@trolltech.de>
+
+	* windows-nat.c (windows_create_inferior): Implement --tty handling on
+	non-cygwin.
+
+2009-03-06  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	Rename solib_address to solib_name_from_address.
+	* breakpoint.c (insert_bp_location, disable_breakpoints_in_shlibs)
+	(disable_breakpoints_in_unloaded_shlib): Update.
+	* printcmd.c (display_uses_solib_p): Likewise.
+	* stack.c (print_frame): Likewise.
+	* solib.c: Rename.
+	* solib.h: Rename.
+	
+2009-03-05  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* printcmd.c (do_one_display): Reparse exp_string.
+	(display_uses_solib_p): New function.
+	(clear_dangling_display_expressions): New function.
+	(_initialize_printcmd): Add observer.
+	* solib.c (no_shared_libraries): Swap order of calls to
+	clear_solib and objfile_purge_solibs.
+	
+2009-03-05  Joel Brobecker  <brobecker@adacore.com>
+
+	Implement the target-specific part of Ada tasking support
+	on Tru64.
+
+	* dec-thread.c (dec_thread_get_ada_task_ptid): New function.
+	(init_dec_thread_ops): Set the to_get_ada_task_ptid method.
+
+2009-03-05  Joel Brobecker  <brobecker@adacore.com>
+
+	Get rid of the global "base_target" and use "find_target_beneath"
+	to find the underlying target.
+	* dec-thread.c (base_target): Delete.
+	(enable_dec_thread): Remove assignement to base_target.
+	(dec_thread_detach, dec_thread_wait, dec_thread_wait)
+	(dec_thread_fetch_registers, dec_thread_store_registers)
+	(dec_thread_mourn_inferior, dec_thread_pid_to_str):
+	Update the function profile if necessary.
+	Use find_target_beneath to call the same method but from
+	the underlying target, removing the need for "base_target".
+
+	* dec-thread.c (dec_thread_get_regsets, dec_thread_set_regsets):
+	Fix a copy/paste error in a few debug traces...
+
+	* solib-osf.c (init_so): Use a simpler method for computing
+	the size of lm_info structure. This also gets rid of warning
+	emitted by the compiler.
+
+2009-03-05  Pedro Alves  <pedro@codesourcery.com>
+
+	* breakpoint.c (check_duplicates_for): Skip permanent breakpoints
+	duplicates of permanent breakpoints.
+
+2009-03-04  Pedro Alves  <pedro@codesourcery.com>
+
+	* inferior.h (notice_new_inferior): Declare.
+	* infcmd.c (notice_new_inferior): New.
+	* remote.c (remote_add_inferior, remote_add_thread): New.
+	(notice_new_inferiors): Rename to...
+	(remote_notice_new_inferior): ... this.  Add RUNNING argument.
+	Use remote_add_thread instead of add_thread, passing it the
+	RUNNING argument.  Add an inferior with remote_add_inferior.  If
+	we just learned about an inferior, call notice_new_inferior.
+	(record_currthread): Adjust.
+	(remote_threads_info): Adjust to use remote_notice_new_inferior.
+	(remote_start_remote, extended_remote_attach_1): Use
+	remote_add_inferior.
+	(process_stop_reply): Adjust.  Call remote_notice_new_inferior
+	after handling expedited registers and watchpoint state.
+	(extended_remote_create_inferior_1): Use remote_add_inferior.
+
+2009-03-04  Aleksandar Ristovski  <aristovski@qnx.com>
+
+	* infcmd.c (registers_info): Remove register number case.
+
+2009-03-03  Pedro Alves  <pedro@codesourcery.com>
+
+	* top.c (quit_target): Check for target_has_execution before
+	killing or detaching from inferiors.
+
+2009-03-02  Joel Brobecker  <brobecker@adacore.com>
+
+	Remove some unused routines.
+
+	* ada-lang.c (is_suppressed_name, ada_suppress_symbol_printing):
+	Delete.
+	* ada-lang.c (ada_task_list_iterator_ftype)
+	(iterate_over_live_ada_tasks): Delete.
+	* ada-tasks.c (ada_get_environment_task, iterate_over_live_ada_tasks):
+	Delete.
+
+2009-03-01  Doug Evans  <dje@google.com>
+
+	* symtab.c: Remove trailing whitespace throughout the file.
+	(expand_line_sal): Fix some typos and whitespace.
+
+	* Makefile.in (clean): rm -f $(DEPDIR)/*.
+
+	* Makefile.in (GDB_CFLAGS): Add -I$(srcdir)/common.
+	(init.c): signals/ -> common/.
+	(signals.o): Update.
+	* target.h (target_signal_to_string,target_signal_to_string)
+	(target_signal_from_name,target_signal_to_host_p)
+	(target_signal_from_host,target_signal_to_host): Move to ...
+	* common/gdb_signals.h: ... here.  New file.
+	* common/signals.c: Moved here from signals/signals.c.
+	#include gdb_signals.h, remove #include of target.h in gdb case.
+	(target_signal_from_command,default_target_signal_to_host)
+	(default_target_signal_from_host): Move inside #ifndef GDBSERVER.
+
+	Include thread ID in target_wait debugging output.
+	* infrun.c (print_target_wait_results): New function.
+	(wait_for_inferior,fetch_inferior_event): Call it.
+
+2009-02-27  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb_proc_service.h (struct ps_prochandle): Replace pid_t field
+	with a ptid_t field.
+	* linux-thread-db.c (thread_get_info_callback): Build the ptid
+	using the pid stored in proc_handle.ptid.
+	(thread_from_lwp, thread_db_attach_lwp, enable_thread_event)
+	(check_for_thread_db, thread_db_detach, check_event)
+	(thread_db_mourn_inferior, find_new_threads_callback)
+	(thread_db_find_new_threads_1): Adjust.
+	* proc-service.c (ps_xfer_memory, ps_lgetregs, ps_lsetregs)
+	(ps_lgetfpregs, ps_lsetfpregs, ps_getpid): Adjust.
+
+2009-02-27  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* valprint.c (read_string): Rework clean-up logic. Use
+	free_current_contents to clean-up buffer.
+
+2009-02-27  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* MAINTAINERS: Update e-mail address.
+
+2009-02-26  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* python/python-utils.c (python_string_to_unicode): Always return
+	a new reference.
+	(python_string_to_target_string): Decrement transient python
+	instance.
+	(python_string_to_host_string): Likewise.
+
+2007-02-26  Pedro Alves  <pedro@codesourcery.com>
+
+	* mips-linux-nat.c (mips64_linux_fetch_registers): Pass `ops' to
+	call to super_fetch_registers.
+	(mips64_linux_store_registers): Pass `ops' to call to
+	super_store_registers.
+
+2009-02-25  Doug Evans  <dje@google.com>
+
+	* breakpoint.c (insert_bp_location): Add \n to overlay breakpoint
+	error message.
+
+	* breakpoint.c (disable_breakpoints_in_shlibs): Delete local
+	disabled_shlib_breaks, unused.
+
+	* printcmd.c (build_address_symbolic): Fix comment.
+
+2009-02-25  Hui Zhu  <teawater@gmail.com>
+
+	* cli/cli-script.c (define_command): Add _() to query.
+	* gnu-nat.c (inf_validate_task_sc): Ditto.
+	* infcmd.c (kill_if_already_running): Ditto.
+	(jump_command): Ditto.
+	(attach_command): Ditto.
+	* inflow.c (kill_command): Ditto.
+	* infrun.c (handle_command): Ditto.
+	* maint.c (maintenance_dump_me): Ditto.
+	* memattr.c (mem_delete_command): Ditto.
+	* monitor.c (monitor_interrupt_query): Ditto.
+	* nto-procfs.c (interrupt_query): Ditto.
+	* printcmd.c (undisplay_command): Ditto.
+	* remote-mips.c (mips_kill): Ditto.
+	* remote.c (interrupt_query): Ditto.
+	* solib-irix.c (irix_open_symbol_file_object): Ditto.
+	* solib-osf.c (osf_open_symbol_file_object): Ditto.
+	* solib-pa64.c (pa64_open_symbol_file_object): Ditto.
+	* solib-som.c (som_open_symbol_file_object): Ditto.
+	* solib-svr4.c (open_symbol_file_object): Ditto.
+	* symfile.c (symbol_file_add_with_addrs_or_offsets): Ditto.
+	* target.c (kill_or_be_killed): Ditto.
+	* tracepoint.c (delete_trace_command): Ditto.
+	* top.c (quit_confirm): Add _() to s that will be used
+	in query.
+
+2009-02-24  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	Fix windows-nat.c compilation failure.
+
+	* windows-nat.c (windows_thread_alive): Fix forward declaration.
+	(get_windows_debug_event): Add ops parameter to call to windows_resume.
+
+2009-02-23  Pedro Alves  <pedro@codesourcery.com>
+
+	* remote-sim.c (gdbsim_resume): Add target_ops* argument.
+
 2009-02-23  Jay Krell  <jay.krell@cornell.edu>  (tiny change)
 
 	* symtab.c (find_line_symtab): Initialize exact to avoid
@@ -74,7 +340,7 @@
 	(target_fetch_registers, target_store_registers)
 	(target_thread_alive, target_find_new_threads): Redeclare as
 	function.
-	
+
 	* target.c (update_current_target): Do not inherit or de_fault
 	to_resume, to_fetch_registers, to_store_registers,
 	to_thread_alive, to_find_new_threads.
@@ -86,9 +352,9 @@
 	(target_store_registers): New.
 	(debug_to_thread_alive, debug_to_find_new_threads): Delete.
 	(setup_target_debug): Adjust.
-	
+
 	* gdbcore.h (core_ops): Delete declaration.
-	
+
 	* inf-ptrace.c, linux-nat.c, remote.c, amd64-linux-nat.c,
 	inf-child.c, linux-thread-db.c, bsd-uthread.c, inf-ttrace.c,
 	i386-sol2-tdep.c, darwin-nat.c, gnu-nat.c, go32-nat.c,
@@ -125,11 +391,11 @@
 	Silence a few -Wmissing-prototypes warnings.
 
 	PR build/9877:
-        * alpha-linux-tdep.c (alpha_linux_regset_from_core_section): Make
+	* alpha-linux-tdep.c (alpha_linux_regset_from_core_section): Make
 	it static.
-        * alpha-osf1-tdep.c (_initialize_alpha_osf1_tdep): Declare.
-        * amd64fbsd-tdep.c (amd64fbsd_init_abi): Make it static.
-        * amd64nbsd-tdep.c (_initialize_amd64nbsd_ndep): Rename to ...
+	* alpha-osf1-tdep.c (_initialize_alpha_osf1_tdep): Declare.
+	* amd64fbsd-tdep.c (amd64fbsd_init_abi): Make it static.
+	* amd64nbsd-tdep.c (_initialize_amd64nbsd_ndep): Rename to ...
 	(_initialize_amd64nbsd_tdep): ... this.
 	* arm-linux-tdep.c (arm_linux_software_single_step): Make it static.
 	(_initialize_arm_linux_tdep): Declare.
@@ -300,8 +566,8 @@
 	* solib-svr4.c (HAS_LM_DYNAMIC_FROM_LINK_MAP): Add a prototype.
 	* target.h (struct target_ops): Add a prototype to the
 	to_can_execute_reverse callback.
-	* macroscope.c (_initialize_macroscope): Declare before definition. 
-	* cp-namespace.c (_initialize_cp_namespace): Declare before definition. 
+	* macroscope.c (_initialize_macroscope): Declare before definition.
+	* cp-namespace.c (_initialize_cp_namespace): Declare before definition.
 	* python/python.c (_initialize_python): Declare before definition.
 	* tui/tui-command.c: Include "tui/tui-command.h".
 	* tui/tui-data.c (init_content_element, init_win_info): Make them
@@ -415,15 +681,15 @@
 
 	Include frame information for *stopped due to CLI commands.
 
-        * ada-tasks.c (ada_normal_stop_observer): Adjust prototype.
-        * infcmd.c (finish_command_continuation): Pass '1' for
-        'print_frame' parameter to the observer.
-        * infrun.c (normal_stop): Don't print mi-specific information
-        here. Pass 'stop_print_frame' to the 'print_frame' parameter
-        of the observer.
-        * mi/mi-interp.c (mi_on_normal_stop): Adjust prototype.
-        If we need to print frame, and current uiout is not the MI one,
-        print frame again.
+	* ada-tasks.c (ada_normal_stop_observer): Adjust prototype.
+	* infcmd.c (finish_command_continuation): Pass '1' for
+	'print_frame' parameter to the observer.
+	* infrun.c (normal_stop): Don't print mi-specific information
+	here. Pass 'stop_print_frame' to the 'print_frame' parameter
+	of the observer.
+	* mi/mi-interp.c (mi_on_normal_stop): Adjust prototype.
+	If we need to print frame, and current uiout is not the MI one,
+	print frame again.
 
 2009-02-13  Pierre Muller  <muller@ics.u-strasbg.fr>
 
@@ -461,7 +727,7 @@
 	(pascal_printstr): Handle char width of 2 or 4.
 	* p-valprint.c (pascal_val_print): Handle char
 	of width 2 or 4.
-	
+
 2009-02-07  Daniel Jacobowitz  <dan@codesourcery.com>
 
 	* dwarf2read.c (dwarf2_build_psymtabs_hard): Move lowpc and highpc
@@ -550,7 +816,7 @@
 	* Makefile.in (ALL_TARGET_OBS): Add linux-tdep.o.
 	(HFILES_NO_SRCDIR): Add linux-tdep.h.
 	(ALLDEPFILES): Add linux-tdep.c.
-	
+
 	* configure.tgt (arm*-*-linux* | arm*-*-uclinux*)
 	(i[34567]86-*-linux*, x86_64-*-linux*): Add linux-tdep.o to
 	gdb_target_obs.
@@ -1504,7 +1770,7 @@
 	(exec_file_command): Likewise.
 	* corefile.c (reopen_exec_file): Do cleanups before returning.
 	* breakpoint.c (insert_breakpoint_locations): Do cleanups before
-	returning. 
+	returning.
 	(do_vec_free): New function.
 	(update_global_location_list): Make a cleanup for old_locations.
 	Do cleanups before returning.  Remove unused variable 'e'.
@@ -1515,7 +1781,7 @@
 
 2009-01-08  Joel Brobecker  <brobecker@adacore.com>
 	    Emi Suzuki  <emi-suzuki@tjsys.co.jp>
- 
+
 	* breakpoint.c (do_enable_breakpoint): Use update_watchpoint for
 	watchpoints.
 
