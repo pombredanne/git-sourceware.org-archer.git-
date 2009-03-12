@@ -2857,6 +2857,7 @@ arm_type_of_stub (struct bfd_link_info *info,
   int thumb2;
   int thumb_only;
   enum elf32_arm_stub_type stub_type = arm_stub_none;
+  int use_plt = 0;
 
   /* We don't know the actual type of destination in case it is of
      type STT_SECTION: give up.  */
@@ -2878,20 +2879,38 @@ arm_type_of_stub (struct bfd_link_info *info,
 
   r_type = ELF32_R_TYPE (rel->r_info);
 
-  /* If the call will go through a PLT entry then we do not need
-     glue.  */
+  /* Keep a simpler condition, for the sake of clarity.  */
   if (globals->splt != NULL && hash != NULL && hash->root.plt.offset != (bfd_vma) -1)
-    return stub_type;
+    {
+      use_plt = 1;
+      /* Note when dealing with PLT entries: the main PLT stub is in
+	 ARM mode, so if the branch is in Thumb mode, another
+	 Thumb->ARM stub will be inserted later just before the ARM
+	 PLT stub. We don't take this extra distance into account
+	 here, because if a long branch stub is needed, we'll add a
+	 Thumb->Arm one and branch directly to the ARM PLT entry
+	 because it avoids spreading offset corrections in several
+	 places.  */
+    }
 
   if (r_type == R_ARM_THM_CALL)
     {
+      /* Handle cases where:
+	 - this call goes too far (different Thumb/Thumb2 max
+           distance)
+	 - it's a Thumb->Arm call and blx is not available. A stub is
+           needed in this case, but only if this call is not through a
+           PLT entry. Indeed, PLT stubs handle mode switching already.
+      */
       if ((!thumb2
 	    && (branch_offset > THM_MAX_FWD_BRANCH_OFFSET
 		|| (branch_offset < THM_MAX_BWD_BRANCH_OFFSET)))
 	  || (thumb2
 	      && (branch_offset > THM2_MAX_FWD_BRANCH_OFFSET
 		  || (branch_offset < THM2_MAX_BWD_BRANCH_OFFSET)))
-	  || ((st_type != STT_ARM_TFUNC) && !globals->use_blx))
+	  || ((st_type != STT_ARM_TFUNC)
+	      && ((r_type == R_ARM_THM_CALL) && !globals->use_blx)
+	      && !use_plt))
 	{
 	  if (st_type == STT_ARM_TFUNC)
 	    {
@@ -3535,11 +3554,20 @@ group_sections (struct elf32_arm_link_hash_table *htab,
 	  bfd_size_type total;
 
 	  curr = head;
-	  total = head->size;
-	  while ((next = NEXT_SEC (curr)) != NULL
-		 && ((total += next->output_offset - curr->output_offset)
-		     < stub_group_size))
+	  total = 0;
+	  while ((next = NEXT_SEC (curr)) != NULL)
+	    {
+	      if ( (total + next->output_offset - curr->output_offset
+		    + next->size)
+		   < stub_group_size )
+		{
+		  total += next->output_offset - curr->output_offset;
+		}
+	      else
+		break;
+
 	    curr = next;
+	    }
 
 	  /* OK, the size from the start to the start of CURR is less
 	     than stub_group_size and thus can be handled by one stub
@@ -3560,11 +3588,18 @@ group_sections (struct elf32_arm_link_hash_table *htab,
 	     bytes after the stub section can be handled by it too.  */
 	  if (!stubs_always_after_branch)
 	    {
-	      total = 0;
-	      while (next != NULL
-		     && ((total += next->output_offset - head->output_offset)
-			 < stub_group_size))
+	      total = head->size;
+	      while (next != NULL)
 		{
+		  if ( (total + next->output_offset - head->output_offset
+			+ next->size)
+		       < stub_group_size )
+		    {
+		      total += next->output_offset - head->output_offset;
+		    }
+		  else
+		    break;
+
 		  head = next;
 		  next = NEXT_SEC (head);
 		  htab->stub_group[head->id].link_sec = curr;
@@ -6049,9 +6084,11 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
       /* Handle relocations which should use the PLT entry.  ABS32/REL32
 	 will use the symbol's value, which may point to a PLT entry, but we
 	 don't need to handle that here.  If we created a PLT entry, all
-	 branches in this object should go to it.  */
+	 branches in this object should go to it, except if the PLT is too
+	 far away, in which case a long branch stub should be inserted.  */
       if ((r_type != R_ARM_ABS32 && r_type != R_ARM_REL32
-           && r_type != R_ARM_ABS32_NOI && r_type != R_ARM_REL32_NOI)
+           && r_type != R_ARM_ABS32_NOI && r_type != R_ARM_REL32_NOI
+	   && r_type != R_ARM_CALL)
 	  && h != NULL
 	  && splt != NULL
 	  && h->plt.offset != (bfd_vma) -1)
@@ -6208,11 +6245,6 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
 	  bfd_signed_vma branch_offset;
 	  struct elf32_arm_stub_hash_entry *stub_entry = NULL;
 
-	  from = (input_section->output_section->vma
-		  + input_section->output_offset
-		  + rel->r_offset);
-	  branch_offset = (bfd_signed_vma)(value - from);
-
 	  if (r_type == R_ARM_XPC25)
 	    {
 	      /* Check for Arm calling Arm function.  */
@@ -6244,6 +6276,21 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
 	     destination is too far or we are changing mode.  */
 	  if (r_type == R_ARM_CALL)
 	    {
+	      /* If the call goes through a PLT entry, make sure to
+		 check distance to the right destination address.  */
+	      if (h != NULL && splt != NULL && h->plt.offset != (bfd_vma) -1)
+		{
+		  value = (splt->output_section->vma
+			   + splt->output_offset
+			   + h->plt.offset);
+		  *unresolved_reloc_p = FALSE;
+		}
+
+	      from = (input_section->output_section->vma
+		      + input_section->output_offset
+		      + rel->r_offset);
+	      branch_offset = (bfd_signed_vma)(value - from);
+
 	      if (branch_offset > ARM_MAX_FWD_BRANCH_OFFSET
 		  || branch_offset < ARM_MAX_BWD_BRANCH_OFFSET
 		  || sym_flags == STT_ARM_TFUNC)

@@ -1948,21 +1948,6 @@ registers_info (char *addr_exp, int fpregs)
 	  }
       }
 
-      /* A register number?  (how portable is this one?).  */
-      {
-	char *endptr;
-	int regnum = strtol (start, &endptr, 0);
-	if (endptr == end
-	    && regnum >= 0
-	    && regnum < gdbarch_num_regs (gdbarch)
-			+ gdbarch_num_pseudo_regs (gdbarch))
-	  {
-	    gdbarch_print_registers_info (gdbarch, gdb_stdout,
-					  frame, regnum, fpregs);
-	    continue;
-	  }
-      }
-
       /* A register group?  */
       {
 	struct reggroup *group;
@@ -2326,6 +2311,72 @@ attach_command (char *args, int from_tty)
 
   attach_command_post_wait (args, from_tty, async_exec);
   discard_cleanups (back_to);
+}
+
+/* We had just found out that the target was already attached to an
+   inferior.  PTID points at a thread of this new inferior, that is
+   the most likely to be stopped right now, but not necessarily so.
+   The new inferior is assumed to be already added to the inferior
+   list at this point.  If LEAVE_RUNNING, then leave the threads of
+   this inferior running, except those we've explicitly seen reported
+   as stopped.  */
+
+void
+notice_new_inferior (ptid_t ptid, int leave_running, int from_tty)
+{
+  struct cleanup* old_chain;
+  int async_exec;
+
+  old_chain = make_cleanup (null_cleanup, NULL);
+
+  /* If in non-stop, leave threads as running as they were.  If
+     they're stopped for some reason other than us telling it to, the
+     target reports a signal != TARGET_SIGNAL_0.  We don't try to
+     resume threads with such a stop signal.  */
+  async_exec = non_stop;
+
+  if (!ptid_equal (inferior_ptid, null_ptid))
+    make_cleanup_restore_current_thread ();
+
+  switch_to_thread (ptid);
+
+  /* When we "notice" a new inferior we need to do all the things we
+     would normally do if we had just attached to it.  */
+
+  if (is_executing (inferior_ptid))
+    {
+      struct inferior *inferior = current_inferior ();
+
+      /* We're going to install breakpoints, and poke at memory,
+	 ensure that the inferior is stopped for a moment while we do
+	 that.  */
+      target_stop (inferior_ptid);
+
+      inferior->stop_soon = STOP_QUIETLY_REMOTE;
+
+      /* Wait for stop before proceeding.  */
+      if (target_can_async_p ())
+	{
+	  struct attach_command_continuation_args *a;
+
+	  a = xmalloc (sizeof (*a));
+	  a->args = xstrdup ("");
+	  a->from_tty = from_tty;
+	  a->async_exec = async_exec;
+	  add_inferior_continuation (attach_command_continuation, a,
+				     attach_command_continuation_free_args);
+
+	  do_cleanups (old_chain);
+	  return;
+	}
+      else
+	wait_for_inferior (0);
+    }
+
+  async_exec = leave_running;
+  attach_command_post_wait ("" /* args */, from_tty, async_exec);
+
+  do_cleanups (old_chain);
 }
 
 /*
