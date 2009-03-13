@@ -141,4 +141,6 @@ extern int varobj_editable_p (struct varobj *var);
 
 extern int varobj_floating_p (struct varobj *var);
 
+extern void preserve_variables (struct objfile *objfile, htab_t copied_types);
+
 #endif /* VAROBJ_H */
