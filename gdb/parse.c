@@ -811,6 +811,13 @@ operator_length_standard (struct expression *expr, int endpos,
       args = 1;
       break;
 
+    case OP_ADL_FUNC:
+      oplen = longest_to_int (expr->elts[endpos - 2].longconst);
+      oplen = 4 + BYTES_TO_EXP_ELEM (oplen + 1);
+      oplen++; // block
+      oplen++; // symbol
+      break;
+
     case OP_LABELED:
     case STRUCTOP_STRUCT:
     case STRUCTOP_PTR:

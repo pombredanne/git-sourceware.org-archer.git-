@@ -334,6 +334,10 @@ enum exp_opcode
        Then comes another OP_DECFLOAT.  */
     OP_DECFLOAT,
 
+    /* OP_ADL_FUNC specifies that the argument is to be looked up in an
+       Argument Dependent manner (keonig lookup) */
+    OP_ADL_FUNC,
+
      /* First extension operator.  Individual language modules define
         extra operators they need as constants with values 
         OP_LANGUAGE_SPECIFIC0 + k, for k >= 0, using a separate 
