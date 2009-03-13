@@ -541,6 +541,7 @@ varobj_create (char *objname,
 	}
       else 
 	var->type = value_type (value);
+      type_incref (var->type);
 
       install_new_value (var, value, 1 /* Initial assignment */);
 
@@ -1425,6 +1426,38 @@ uninstall_variable (struct varobj *var)
 
 }
 
+/* Update GDB variable objects when OBJFILE is discarded; we must copy the
+   types out of the objfile.  Usually varobj_invalidate (by clear_symtab_users)
+   gets called which does not require this functionality.  But according to the
+   free_objfile comment this is not always the case.  */
+
+void
+preserve_variables (struct objfile *objfile, htab_t copied_types)
+{
+  unsigned int index;
+
+  for (index = 0; index < VAROBJ_TABLE_SIZE; index++)
+    {
+      struct vlist *vlist;
+
+      for (vlist = varobj_table[index]; vlist; vlist = vlist->next)
+	{
+	  struct varobj *var = vlist->var;
+
+	  if (var->value)
+	    preserve_one_value (var->value, objfile, copied_types);
+
+	  if (var->type && TYPE_OBJFILE (var->type) == objfile)
+	    {
+	      /* No need to decref the old type here, since we know it has no
+		 reference count.  */
+	      var->type = copy_type_recursive (var->type, copied_types);
+	      type_incref (var->type);
+	    }
+	}
+    }
+}
+
 /* Create and install a child of the parent of the given name */
 static struct varobj *
 create_child (struct varobj *parent, int index, char *name)
@@ -1455,6 +1488,8 @@ create_child (struct varobj *parent, int index, char *name)
     /* Otherwise, we must compute the type. */
     child->type = (*child->root->lang->type_of_child) (child->parent, 
 						       child->index);
+  if (child->type)
+    type_incref (child->type);
   install_new_value (child, value, 1);
 
   return child;
@@ -1513,6 +1548,8 @@ static void
 free_variable (struct varobj *var)
 {
   value_free (var->value);
+  if (var->type)
+    type_decref (var->type);
 
   /* Free the expression if this is a root variable. */
   if (is_root_p (var))
@@ -2784,6 +2821,8 @@ varobj_invalidate (void)
           else
               (*varp)->root->is_valid = 0;
         }
+	/* FIXME: If VALID_BLOCK does not belong to OBJFILE being removed we
+	   should keep this varobj valid.  */
         else /* locals must be invalidated.  */
           (*varp)->root->is_valid = 0;
 
