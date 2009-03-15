@@ -422,6 +422,7 @@ _bfd_xcoff_swap_aux_in (abfd, ext1, type, class, indx, numaux, in1)
 
       /* RS/6000 "csect" auxents */
     case C_EXT:
+    case C_AIX_WEAKEXT:
     case C_HIDEXT:
       if (indx + 1 == numaux)
 	{
@@ -531,6 +532,7 @@ _bfd_xcoff_swap_aux_out (abfd, inp, type, class, indx, numaux, extp)
 
       /* RS/6000 "csect" auxents */
     case C_EXT:
+    case C_AIX_WEAKEXT:
     case C_HIDEXT:
       if (indx + 1 == numaux)
 	{
@@ -2947,11 +2949,13 @@ xcoff_reloc_type_br (input_bfd, input_section, output_bfd, rel, sym, howto,
      bfd_byte *contents;
 {
   struct xcoff_link_hash_entry *h;
+  bfd_vma section_offset;
 
   if (0 > rel->r_symndx)
     return FALSE;
 
   h = obj_xcoff_sym_hashes (input_bfd)[rel->r_symndx];
+  section_offset = rel->r_vaddr - input_section->vma;
 
   /* If we see an R_BR or R_RBR reloc which is jumping to global
      linkage code, and it is followed by an appropriate cror nop
@@ -2961,13 +2965,14 @@ xcoff_reloc_type_br (input_bfd, input_section, output_bfd, rel, sym, howto,
      going to global linkage code, we can replace the load with a
      cror.  */
   if (NULL != h
-      && bfd_link_hash_defined == h->root.type
-      && rel->r_vaddr - input_section->vma + 8 <= input_section->size)
+      && (bfd_link_hash_defined == h->root.type
+	  || bfd_link_hash_defweak == h->root.type)
+      && section_offset + 8 <= input_section->size)
     {
       bfd_byte *pnext;
       unsigned long next;
 
-      pnext = contents + (rel->r_vaddr - input_section->vma) + 4;
+      pnext = contents + section_offset + 4;
       next = bfd_get_32 (input_bfd, pnext);
 
       /* The _ptrgl function is magic.  It is used by the AIX
@@ -2977,12 +2982,12 @@ xcoff_reloc_type_br (input_bfd, input_section, output_bfd, rel, sym, howto,
 	  if (next == 0x4def7b82			/* cror 15,15,15 */
 	      || next == 0x4ffffb82			/* cror 31,31,31 */
 	      || next == 0x60000000)			/* ori r0,r0,0 */
-	    bfd_put_32 (input_bfd, 0x80410014, pnext);	/* lwz r1,20(r1) */
+	    bfd_put_32 (input_bfd, 0x80410014, pnext);	/* lwz r2,20(r1) */
 
 	}
       else
 	{
-	  if (next == 0x80410014)			/* lwz r1,20(r1) */
+	  if (next == 0x80410014)			/* lwz r2,20(r1) */
 	    bfd_put_32 (input_bfd, 0x60000000, pnext);	/* ori r0,r0,0 */
 	}
     }
@@ -2998,16 +3003,42 @@ xcoff_reloc_type_br (input_bfd, input_section, output_bfd, rel, sym, howto,
       howto->complain_on_overflow = complain_overflow_dont;
     }
 
-  howto->pc_relative = TRUE;
+  /* The original PC-relative relocation is biased by -r_vaddr, so adding
+     the value below will give the absolute target address.  */
+  *relocation = val + addend + rel->r_vaddr;
+
   howto->src_mask &= ~3;
   howto->dst_mask = howto->src_mask;
 
-  /* A PC relative reloc includes the section address.  */
-  addend += input_section->vma;
+  if (h != NULL
+      && (h->root.type == bfd_link_hash_defined
+	  || h->root.type == bfd_link_hash_defweak)
+      && bfd_is_abs_section (h->root.u.def.section)
+      && section_offset + 4 <= input_section->size)
+    {
+      bfd_byte *ptr;
+      bfd_vma insn;
 
-  *relocation = val + addend;
-  *relocation -= (input_section->output_section->vma
-		  + input_section->output_offset);
+      /* Turn the relative branch into an absolute one by setting the
+	 AA bit.  */
+      ptr = contents + section_offset;
+      insn = bfd_get_32 (input_bfd, ptr);
+      insn |= 2;
+      bfd_put_32 (input_bfd, insn, ptr);
+
+      /* Make the howto absolute too.  */
+      howto->pc_relative = FALSE;
+      howto->complain_on_overflow = complain_overflow_bitfield;
+    }
+  else
+    {
+      /* Use a PC-relative howto and subtract the instruction's address
+	 from the target address we calculated above.  */
+      howto->pc_relative = TRUE;
+      *relocation -= (input_section->output_section->vma
+		      + input_section->output_offset
+		      + section_offset);
+    }
   return TRUE;
 }
 
@@ -3323,9 +3354,7 @@ xcoff_complain_overflow_unsigned_func (input_bfd, val, relocation, howto)
 
    R_RBR:
    A relative branch which may be modified to become an
-   absolute branch.  FIXME: We don't implement this,
-   although we should for symbols of storage mapping class
-   XMC_XO.
+   absolute branch.
 
    R_RL:
    The PowerPC AIX ABI describes this as a load which may be
@@ -3422,6 +3451,17 @@ xcoff_ppc_relocate_section (output_bfd, info, input_bfd,
 	    }
 	  else
 	    {
+	      if (info->unresolved_syms_in_objects != RM_IGNORE
+		  && (h->flags & XCOFF_WAS_UNDEFINED) != 0)
+		{
+		  if (! ((*info->callbacks->undefined_symbol)
+			 (info, h->root.root.string,
+			  input_bfd, input_section,
+			  rel->r_vaddr - input_section->vma,
+			  (info->unresolved_syms_in_objects
+			   == RM_GENERATE_ERROR))))
+		    return FALSE;
+		}
 	      if (h->root.type == bfd_link_hash_defined
 		  || h->root.type == bfd_link_hash_defweak)
 		{
@@ -3437,17 +3477,11 @@ xcoff_ppc_relocate_section (output_bfd, info, input_bfd,
 			 + sec->output_offset);
 
 		}
-	      else if ((0 == (h->flags & (XCOFF_DEF_DYNAMIC | XCOFF_IMPORT)))
-		       && ! info->relocatable)
+	      else
 		{
-		  if (! ((*info->callbacks->undefined_symbol)
-			 (info, h->root.root.string, input_bfd, input_section,
-			  rel->r_vaddr - input_section->vma, TRUE)))
-		    return FALSE;
-
-		  /* Don't try to process the reloc.  It can't help, and
-		     it may generate another error.  */
-		  continue;
+		  BFD_ASSERT (info->relocatable
+			      || (h->flags & XCOFF_DEF_DYNAMIC) != 0
+			      || (h->flags & XCOFF_IMPORT) != 0);
 		}
 	    }
 	}

@@ -1,3 +1,124 @@
+2009-03-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* stack.c (return_command <retval_exp>): New variables retval_expr
+	and old_chain.  Inline parse_and_eval to initialize retval_expr.  Check
+	RETVAL_EXPR for UNOP_CAST and set RETURN_TYPE to the RETURN_VALUE type
+	if RETURN_TYPE is NULL.
+
+2009-03-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* remote.c (PACKET_qAttached): New.
+	(remote_query_attached): New.
+	(remote_add_inferior): Add new `attached' argument.  Handle it.
+	(remote_notice_new_inferior, remote_start_remote): Adjust to pass
+	-1 to remote_add_inferior in new parameter.
+	(extended_remote_attach_1): Adjust to pass 1 to
+	remote_add_inferior in the new parameter.
+	(extended_remote_create_inferior_1): Adjust to pass 0 to
+	remote_add_inferior in the new parameter.
+	(_initialize_remote): Add "set/show remote query-attached-packet"
+	commands.
+
+2009-03-13  Tom Tromey  <tromey@redhat.com>
+
+	* symtab.c (lookup_symbol_in_language): Use a cleanup.
+
+2009-03-13  Doug Evans  <dje@google.com>
+
+	* exceptions.h: Clean up some comments on catch_exceptions usage.
+	* exceptions.c: Ditto.  Plus mark catch_errors as superseded by
+	catch_exceptions.
+
+2009-02-17  Joel Brobecker  <brobecker@adacore.com>
+
+	The following patch helps getting rid of a warning inside solib-som.c.
+
+	* source.c (source_full_path_of): Constify parameter filename.
+	* defs.h (source_full_path_of): Update declaration accordingly.
+
+2009-03-12  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (ada_evaluate_subexp): Merge case BINOP_REM and
+	BINOP_MOD cases with the handling of case BINOP_DIV and BINOP_MUL.
+	Remove useless op value checks when EVAL_AVOID_SIDE_EFFECTS.
+
+2009-03-12  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (ada_evaluate_subexp) <BINOP_DIV>: make sure to
+	promote the operands when noside is EVAL_AVOID_SIDE_EFFECTS.
+
+2009-03-12  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-tasks.c (ada_task_is_alive): Move up and make static.
+	* ada-lang.h (ada_task_is_alive): Remove declaration.
+
+2009-03-12  Jerome Guitton  <guitton@adacore.com>
+
+	* ada-lang.c (ada_delta): Change the type of numerators and
+	denominators to DOUBLEST, as they may not fit into a long.
+	(scaling_factor): Ditto.
+
+2009-03-12  Jerome Guitton  <guitton@adacore.com>
+
+	* language.c (lang_bool_type): Set lai->bool_type_symbol to NULL.
+
+2009-03-12  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (ada_evaluate_subexp) [OP_VAR_VALUE]: For tagged
+	types, if we are unable to determine the actual symbol type
+	from its tag, then use the static approximation instead.
+
+2009-03-12  Joel Brobecker  <brobecker@adacore.com>
+
+	Fix crash printing packed record with packed array.
+
+	* ada-lang.c (ada_modulus_from_name): New function.
+	(ada_modulus): In the case where the type length is bigger than
+	the size of the type used to hold the bounds, try determining
+	the modulus from the type name.
+	(ada_value_primitive_packed_val): Fix bug in the computation of
+	ntarg causing an out-of-buffer invalid access.
+
+2009-03-12  Joel Brobecker  <brobecker@adacore.com>
+
+	Fix segfault when printing short_integer'last.
+
+	* ada-lang.c (ada_find_any_type): Search in the primitive types
+	if a symbol could not be found.
+
+2009-03-12  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-tasks.c (task_states,long_task_states): Add new states
+	Activating and Acceptor_Delay_Sleep.  Update the description
+	of state Acceptor_Sleep.
+
+2009-03-12  Jonas Maebe <jonas.maebe@elis.ugent.be>  (obvious change)
+
+	Fix a build failure on Darwin following some changes in
+	the profile of some target_ops methods.
+
+	* darwin-nat.c (darwin_kill_inferior): Add target_ops parameter
+	where missing.
+	(darwin_stop_inferior, darwin_detach): Likewise.
+
+2009-03-12  Vladimir Prus  <vladimir@codesourcery.com>
+
+	Include token in ^running notification for CLI commands.
+
+        * mi/mi-main.c (mi_execute_command): Set current_token here.
+        (mi_cmd_execute): Do not set current_token here.
+
+2009-03-12  Vladimir Prus  <vladimir@codesourcery.com>
+
+	Fix MI timings.
+
+        * mi/mi-main.c (mi_print_timing_maybe): New.
+        (captured_mi_execute_command): Simplify. Output timings to
+        CLI commands, too.
+        (mi_execute_async_cli_command): Do not print timings.
+        * mi/mi-main.h (mi_print_timing_maybe): Declare.
+        * mi/mi-interp.c (mi_on_normal_stop): Call mi_print_timing_maybe.
+
 2009-03-12  Jerome Guitton  <guitton@adacore.com>
 
 	* xcoffread.c (process_linenos): Check if the line in the

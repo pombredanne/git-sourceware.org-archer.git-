@@ -1137,9 +1137,14 @@ mi_cmd_list_target_features (char *command, char **argv, int argc)
 static void
 captured_mi_execute_command (struct ui_out *uiout, void *data)
 {
+  struct cleanup *cleanup;
   struct mi_parse *context = (struct mi_parse *) data;
 
-  struct mi_timestamp cmd_finished;
+  if (do_timings)
+    current_command_ts = context->cmd_start;
+
+  current_token = xstrdup (context->token);
+  cleanup = make_cleanup (free_current_contents, &current_token);
 
   running_result_record_printed = 0;
   switch (context->op)
@@ -1151,13 +1156,8 @@ captured_mi_execute_command (struct ui_out *uiout, void *data)
 	fprintf_unfiltered (raw_stdout, " token=`%s' command=`%s' args=`%s'\n",
 			    context->token, context->command, context->args);
 
-      if (do_timings)
-	current_command_ts = context->cmd_start;
 
       mi_cmd_execute (context);
-
-      if (do_timings)
-	timestamp (&cmd_finished);
 
       /* Print the result if there were no errors.
 
@@ -1174,10 +1174,7 @@ captured_mi_execute_command (struct ui_out *uiout, void *data)
 			    ? "^connected" : "^done", raw_stdout);
 	  mi_out_put (uiout, raw_stdout);
 	  mi_out_rewind (uiout);
-	  /* Have to check cmd_start, since the command could be
-	     -enable-timings.  */
-	  if (do_timings && context->cmd_start)
-	    print_diff (context->cmd_start, &cmd_finished);
+	  mi_print_timing_maybe ();
 	  fputs_unfiltered ("\n", raw_stdout);
 	}
       else
@@ -1212,7 +1209,8 @@ captured_mi_execute_command (struct ui_out *uiout, void *data)
 		fputs_unfiltered ("^done", raw_stdout);
 		mi_out_put (uiout, raw_stdout);
 		mi_out_rewind (uiout);
-		fputs_unfiltered ("\n", raw_stdout);
+		mi_print_timing_maybe ();
+		fputs_unfiltered ("\n", raw_stdout);		
 	      }
 	    else
 	      mi_out_rewind (uiout);
@@ -1221,6 +1219,8 @@ captured_mi_execute_command (struct ui_out *uiout, void *data)
       }
 
     }
+
+  do_cleanups (cleanup);
 
   return;
 }
@@ -1316,11 +1316,10 @@ mi_cmd_execute (struct mi_parse *parse)
 {
   struct cleanup *cleanup;
   int i;
+
   free_all_values ();
   free_all_types ();
-
-  current_token = xstrdup (parse->token);
-  cleanup = make_cleanup (free_current_contents, &current_token);
+  cleanup = make_cleanup (null_cleanup, NULL);
 
   if (parse->frame != -1 && parse->thread == -1)
     error (_("Cannot specify --frame without --thread"));
@@ -1448,8 +1447,6 @@ mi_execute_async_cli_command (char *cli_command, char **argv, int argc)
       /* Do this before doing any printing.  It would appear that some
          print code leaves garbage around in the buffer.  */
       do_cleanups (old_cleanups);
-      if (do_timings)
-      	print_diff_now (current_command_ts);
     }
 }
 
@@ -1567,6 +1564,15 @@ print_diff_now (struct mi_timestamp *start)
     timestamp (&now);
     print_diff (start, &now);
   }
+
+void
+mi_print_timing_maybe (void)
+{
+  /* If the command is -enable-timing then do_timings may be
+     true whilst current_command_ts is not initialized.  */
+  if (do_timings && current_command_ts)
+    print_diff_now (current_command_ts);
+}
 
 static long 
 timeval_diff (struct timeval start, struct timeval end)

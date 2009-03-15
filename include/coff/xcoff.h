@@ -214,6 +214,8 @@ struct internal_ldsym
 #define L_ENTRY (0x20)
 /* Exported symbol.  */
 #define L_EXPORT (0x10)
+/* Weak symbol.  */
+#define L_WEAK (0x08)
 
 /* The ldrel structure.  This is used to represent a reloc in the
    .loader section.  */
@@ -291,11 +293,12 @@ struct xcoff_link_hash_entry
 #define XCOFF_LDREL            0x00000008
 /* Symbol is the entry point.  */
 #define XCOFF_ENTRY            0x00000010
-/* Symbol is called; this is, it appears in a R_BR reloc.  */
+/* Symbol is for a function and is the target of a relocation.
+   The relocation may or may not be a branch-type relocation.  */
 #define XCOFF_CALLED           0x00000020
 /* Symbol needs the TOC entry filled in.  */
 #define XCOFF_SET_TOC          0x00000040
-/* Symbol is explicitly imported.  */
+/* Symbol is implicitly or explicitly imported.  */
 #define XCOFF_IMPORT           0x00000080
 /* Symbol is explicitly exported.  */
 #define XCOFF_EXPORT           0x00000100
@@ -315,6 +318,10 @@ struct xcoff_link_hash_entry
 #define XCOFF_SYSCALL32        0x00008000
 /* Symbol is an imported 64 bit syscall.  */
 #define XCOFF_SYSCALL64        0x00010000 
+/* Symbol was not explicitly defined by the time it was marked.  */
+#define XCOFF_WAS_UNDEFINED    0x00020000
+/* We have assigned an output XCOFF entry to this symbol.  */
+#define XCOFF_ALLOCATED	       0x00040000
 
 /* The XCOFF linker hash table.  */
 
@@ -368,6 +375,9 @@ struct xcoff_link_hash_table
   /* Whether the .text section must be read-only.  */
   bfd_boolean textro;
 
+  /* Whether -brtl was specified.  */
+  bfd_boolean rtld;
+
   /* Whether garbage collection was done.  */
   bfd_boolean gc;
 
@@ -384,6 +394,9 @@ struct xcoff_link_hash_table
   asection *special_sections[XCOFF_NUMBER_OF_SPECIAL_SECTIONS];
 };
 
+/* These flags indicate which of -bexpall and -bexpfull are in effect.  */
+#define XCOFF_EXPALL 1
+#define XCOFF_EXPFULL 2
 
 /* This structure is used to pass information through
    xcoff_link_hash_traverse.  */
@@ -399,8 +412,8 @@ struct xcoff_loader_info
   /* Link information structure.  */
   struct bfd_link_info *info;
 
-  /* Whether all defined symbols should be exported.  */
-  bfd_boolean export_defineds;
+  /* A mask of XCOFF_EXPALL and XCOFF_EXPFULL flags.  */
+  unsigned int auto_export_flags;
 
   /* Number of ldsym structures.  */
   size_t ldsym_count;
@@ -635,5 +648,9 @@ struct xcoff_ar_hdr_big
   ((struct xcoff_ar_hdr *) arch_eltdata (bfd)->arch_header)
 #define arch_xhdr_big(bfd) \
   ((struct xcoff_ar_hdr_big *) arch_eltdata (bfd)->arch_header)
+
+/* True if symbols of class CLASS are external.  */
+#define EXTERN_SYM_P(CLASS) \
+  ((CLASS) == C_EXT || (CLASS) == C_AIX_WEAKEXT)
 
 #endif /* _INTERNAL_XCOFF_H */

@@ -1,8 +1,6 @@
-/* MI Internal Functions for GDB, the GNU debugger.
+/* This testcase is part of GDB, the GNU debugger.
 
-   Copyright (C) 2003, 2007, 2008, 2009 Free Software Foundation, Inc.
-
-   This file is part of GDB.
+   Copyright 2009 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,20 +15,35 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#ifndef MI_MAIN_H
-#define MI_MAIN_H
+#include <stdio.h>
 
-extern void mi_load_progress (const char *section_name,
-			      unsigned long sent_so_far,
-			      unsigned long total_section,
-			      unsigned long total_sent,
-			      unsigned long grand_total);
+static TYPE
+init (void)
+{
+  return 0;
+}
 
-extern char *current_token;
+static TYPE
+func (void)
+{
+  return 31;
+}
 
-extern int running_result_record_printed;
+static void
+marker (void)
+{
+}
 
-void mi_print_timing_maybe ();
+int
+main (void)
+{
+  /* Preinitialize registers to 0 to avoid false PASS by leftover garbage.  */
+  init ();
 
-#endif
+  printf ("result=" FORMAT "\n", CAST func ());
 
+  /* Cannot `next' with no debug info.  */
+  marker ();
+
+  return 0;
+}
