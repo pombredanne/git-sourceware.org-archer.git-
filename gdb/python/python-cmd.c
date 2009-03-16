@@ -337,7 +337,7 @@ gdbpy_parse_command_name (char *text, struct cmd_list_element ***base_list,
 
 /* Object initializer; sets up gdb-side structures for command.
 
-   Use: __init__(NAME, COMMAND_CLASS, [COMPLETER_CLASS, [PREFIX]]).
+   Use: __init__(NAME, COMMAND_CLASS [, COMPLETER_CLASS] [, PREFIX]]).
 
    NAME is the name of the command.  It may consist of multiple words,
    in which case the final word is the name of the new command, and
