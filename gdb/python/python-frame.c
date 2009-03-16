@@ -642,10 +642,10 @@ Return the frame's code block." },
 Returns the symbol for the function corresponding to this frame." },
   { "older", frapy_older, METH_NOARGS,
     "older () -> gdb.Frame.\n\
-Return the frame immediately older (outer) to this frame." },
+Return the frame that called this frame." },
   { "newer", frapy_newer, METH_NOARGS,
     "newer () -> gdb.Frame.\n\
-Return the frame immetidaely newer (inner) to this frame." },
+Return the frame called by this frame." },
   { "find_sal", frapy_find_sal, METH_NOARGS,
     "find_sal () -> gdb.Symtab_and_line.\n\
 Return the frame's symtab and line." },

@@ -19478,32 +19478,28 @@ separated by newlines.  If there are no commands, this attribute is
 @cindex frames in python
 @tindex gdb.Frame
 @tindex Frame
-When the debugged program stops, @value{GDBN} is able to analyse its call
+When the debugged program stops, @value{GDBN} is able to analyze its call
 stack (@pxref{Frames,,Stack frames}).  The @code{gdb.Frame} class
 represents a frame in the stack.  A @code{gdb.Frame} object is only valid
 while its corresponding frame exists in the inferior's stack.  If you try
-to use an invalid frame object, a @code{RuntimeError} exception will be
-thrown.
+to use an invalid frame object, @value{GDBN} will throw a @code{RuntimeError}
+exception.
 
 The following frame-related functions are available in the @code{gdb} module:
 
-@findex gdb.frames
 @defun frames
 Return a tuple containing all frame objects.
 @end defun
 
-@findex gdb.newest_frame
 @defun newest_frame
 Return the newest frame object.
 @end defun
 
-@findex gdb.selected_frame
 @defun selected_frame
 Return the selected frame object.  (@pxref{Selection,,Selecting a Frame}).
 @end defun
 
-@findex gdb.frame_stop_reason_string
-@defun frame_stop_reason_string @var{reason}
+@defun frame_stop_reason_string reason
 Return a string explaining the reason why @value{GDBN} stopped unwinding
 frames, as expressed by the given @var{reason} code (an integer, see the
 @code{unwind_stop_reason} method further down in this section).
@@ -19512,7 +19508,7 @@ frames, as expressed by the given @var{reason} code (an integer, see the
 A @code{gdb.Frame} object has the following methods:
 
 @table @code
-@defmethod Frame equals @code{frame}
+@defmethod Frame equals frame
 Compare frames.
 @end defmethod
 
@@ -19520,7 +19516,7 @@ Compare frames.
 Returns true if the @code{gdb.Frame} object is valid, false if not.
 A frame object can become invalid if the frame it refers to doesn't
 exist anymore in the inferior.  All @code{gdb.Frame} methods will throw
-an exception if it is invalid at the time the method call is made.
+an exception if it is invalid at the time the method is called.
 @end defmethod
 
 @defmethod Frame name
@@ -19529,15 +19525,16 @@ obtained.
 @end defmethod
 
 @defmethod Frame type
-Returns the type of the frame. The value can be one of
+Returns the type of the frame.  The value can be one of
 @code{gdb.NORMAL_FRAME}, @code{gdb.DUMMY_FRAME}, @code{gdb.SIGTRAMP_FRAME}
 or @code{gdb.SENTINEL_FRAME}.
 @end defmethod
 
 @defmethod Frame unwind_stop_reason
 Return an integer representing the reason why it's not possible to find
-frames older than this.  Use @code{gdb.frame_stop_reason_string} to convert
-the value returned by this function to a string.
+more frames toward the outermost frame.  Use
+@code{gdb.frame_stop_reason_string} to convert the value returned by this
+function to a string.
 @end defmethod
 
 @defmethod Frame pc
@@ -19553,19 +19550,19 @@ Returns the symbol for the function corresponding to this frame. @c (@pxref{Symb
 @end defmethod
 
 @defmethod Frame older
-Return the frame immediately older (outer) to this frame.
+Return the frame that called this frame.
 @end defmethod
 
 @defmethod Frame newer
-Return the frame immediately newer (inner) to this frame.
+Return the frame called by this frame.
 @end defmethod
 
 @defmethod Frame find_sal
 Return the frame's symtab and line object. @c (@pxref{Symtab_and_line,, Symtab and line}).
 @end defmethod
 
-@defmethod Frame read_var @var{variable}
-Return the value of the given variable in this frame.  @code{variable} can be
+@defmethod Frame read_var variable
+Return the value of the given variable in this frame.  @var{variable} can be
 either a string or a @code{gdb.Symbol} object. @c (@pxref{Symbols In Python}).
 @end defmethod
 @end table
