@@ -92,7 +92,7 @@ class FrameWrapper:
                 stream.write (" 0x%08x in" % pc)
             stream.write (" " + name + " (")
 
-            func = gdb.find_pc_function (self.frame.addr_in_block ())
+            func = self.frame.function ()
             self.print_frame_args (stream, func)
 
             stream.write (")")

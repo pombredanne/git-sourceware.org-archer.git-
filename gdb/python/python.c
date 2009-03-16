@@ -312,23 +312,6 @@ gdbpy_solib_address (PyObject *self, PyObject *args)
   return str_obj;
 }
 
-static PyObject *
-gdbpy_find_pc_function (PyObject *self, PyObject *args)
-{
-  unsigned long long pc;
-  struct symbol *sym;
-  PyObject *sym_obj;
-
-  if (!PyArg_ParseTuple (args, "K", &pc))
-    return NULL;
-
-  sym = find_pc_function (pc);
-  if (sym)
-    return symbol_to_symbol_object (sym);
-
-  Py_RETURN_NONE;
-}
-
 /* Adds GDB value V to the pattern buffer in *PATTERN_BUF.  If SIZE is not zero,
    it specifies the number of bytes from V to copy to *PATTERN_BUF.  The
    function increases the size of *PATTERN_BUF as necessary, adjusting
@@ -1896,9 +1879,6 @@ a boolean indicating if name is a field of the current implied argument\n\
   { "solib_address", gdbpy_solib_address, METH_VARARGS,
     "solib_address (Long) -> String.\n\
 Return the name of the shared library holding a given address, or None." },
-
-  { "find_pc_function", gdbpy_find_pc_function, METH_VARARGS,
-    "Return the function containing the given pc value, or None." },
 
   { "block_for_pc", gdbpy_block_for_pc, METH_VARARGS,
     "Return the block containing the given pc value, or None." },

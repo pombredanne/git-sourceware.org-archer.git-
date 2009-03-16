@@ -253,13 +253,13 @@ frapy_block (PyObject *self, PyObject *args)
 }
 
 
-/* Implementation of gdb.Frame.addr_in_block (self) -> Long.
-   Returns an address which falls within the frame's code block.  */
+/* Implementation of gdb.Frame.function (self) -> gdb.Symbol.
+   Returns the symbol for the function corresponding to this frame.  */
 
 static PyObject *
-frapy_addr_in_block (PyObject *self, PyObject *args)
+frapy_function (PyObject *self, PyObject *args)
 {
-  CORE_ADDR pc = 0;	      /* Initialize to appease gcc warning.  */
+  struct symbol *sym = NULL;
   struct frame_info *frame;
   volatile struct gdb_exception except;
 
@@ -267,11 +267,14 @@ frapy_addr_in_block (PyObject *self, PyObject *args)
     {
       FRAPY_REQUIRE_VALID ((frame_object *) self, frame);
 
-      pc = get_frame_address_in_block (frame);
+      sym = find_pc_function (get_frame_address_in_block (frame));
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
-  return PyLong_FromUnsignedLongLong (pc);
+  if (sym)
+    return symbol_to_symbol_object (sym);
+
+  Py_RETURN_NONE;
 }
 
 /* Convert a frame_info struct to a Python Frame object.
@@ -634,9 +637,9 @@ Return the frame's resume address." },
   { "block", frapy_block, METH_NOARGS,
     "block () -> gdb.Block.\n\
 Return the frame's code block." },
-  { "addr_in_block", frapy_addr_in_block, METH_NOARGS,
-    "addr_in_block () -> Long.\n\
-Return an address which falls within the frame's code block." },
+  { "function", frapy_function, METH_NOARGS,
+    "function () -> gdb.Symbol.\n\
+Returns the symbol for the function corresponding to this frame." },
   { "older", frapy_older, METH_NOARGS,
     "older () -> gdb.Frame.\n\
 Return the frame immediately older (outer) to this frame." },

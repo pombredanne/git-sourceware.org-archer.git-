@@ -78,7 +78,7 @@ gdb_test "python print 'result =', f0.type () == gdb.NORMAL_FRAME" " = True" "te
 gdb_test "python print 'result =', f0.unwind_stop_reason () == gdb.FRAME_UNWIND_NO_REASON" " = True" "test Frame.type"
 gdb_test "python print 'result =', gdb.frame_stop_reason_string (gdb.FRAME_UNWIND_INNER_ID)" " = previous frame inner to this frame \\(corrupt stack\\?\\)" "test gdb.frame_stop_reason_string"
 gdb_test "python print 'result =', f0.pc ()" " = \[0-9\]+" "test Frame.pc"
-gdb_test "python print 'result =', f0.addr_in_block ()" " = \[0-9\]+" "test Frame.addr_in_block"
+gdb_test "python print 'result =', f0.function ()" " = symbol for f2" "test Frame.function"
 gdb_test "python print 'result =', f0.older ().equals (f1)" " = True" "test Frame.older"
 gdb_test "python print 'result =', f1.newer ().equals (f0)" " = True" "test Frame.newer"
 gdb_test "python print 'result =', f0.read_var ('variable_which_surely_doesnt_exist')" \

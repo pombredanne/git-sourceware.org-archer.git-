@@ -19548,8 +19548,8 @@ Returns the frame's resume address.
 Returns the frame's code block. @c (@pxref{Block,,Code Blocks and Scopes}).
 @end defmethod
 
-@defmethod Frame address_in_block
-Returns an address which falls within the frame's code block.
+@defmethod Frame function
+Returns the symbol for the function corresponding to this frame. @c (@pxref{Symbols In Python}).
 @end defmethod
 
 @defmethod Frame older
