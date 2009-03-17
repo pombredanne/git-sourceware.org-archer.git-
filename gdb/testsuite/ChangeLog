@@ -1,3 +1,8 @@
+2009-03-17  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/namespace-koenig.exp: New test.
+	* gdb.cp/namespace-koenig.cc: New test file.
+
 2009-02-18  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* gdb.base/macscp.exp (objfile): Move it to ${objdir}/${subdir}/.

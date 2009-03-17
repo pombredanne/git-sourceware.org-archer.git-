@@ -1,0 +1,67 @@
+# Copyright 2008 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+if $tracelevel then {
+    strace $tracelevel
+}
+
+set prms_id 0
+set bug_id 0
+
+set testfile namespace-koenig
+set srcfile ${testfile}.cc
+set binfile ${objdir}/${subdir}/${testfile}
+if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug c++}] != "" } {
+    untested "Couldn't compile test program"
+    return -1
+}
+
+# Get things started.
+
+gdb_exit
+gdb_start
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_load ${binfile}
+
+############################################
+
+if ![runto_main] then {
+    perror "couldn't run to breakpoint main"
+    continue
+}
+
+# Test that koenig lookup finds correct function
+gdb_test "p first(c)" "= 11"
+
+# Change the number of parameters and position of
+# the qualifying parameter
+gdb_test "p second(0,0,c,0,0)" "= 33"
+
+# Test that koenig lookup finds correct function
+# even if it is overloaded
+gdb_test "p first(0,c)" "= 22"
+
+# Test that koenig lookup finds correct function
+# when the argument is an expression 
+gdb_test "p first(b.c)" "= 11"
+
+
+
+
+
+
+
+
+
