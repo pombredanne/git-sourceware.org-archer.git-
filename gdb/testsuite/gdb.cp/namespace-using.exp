@@ -179,8 +179,5 @@ if ![runto_main] then {
 gdb_breakpoint [gdb_get_line_number "marker10 stop"]
 gdb_continue_to_breakpoint "marker10 stop"
 
+# Assert that M::x is printed and not N::x
 gdb_test "print x" "= 911" "print x (from M::x)"
-
-gdb_test "next" ""
-
-gdb_test "print x" "= 912" "print x (from M::x)"

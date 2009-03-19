@@ -248,6 +248,8 @@ cp_copy_usings (struct using_direct *using,
 
       xfree (using->inner);
       xfree (using->outer);
+      xfree (using->alias);
+      xfree (using->declaration);
       xfree (using);
 
       return retval;
@@ -394,7 +396,12 @@ cp_lookup_symbol_namespace (const char *namespace,
       if (strcmp (namespace, current->outer) == 0 && current->line_number < current_line)
 	{
 	  
-	  if(strcmp ("", current->declaration) != 0){
+	  /* If there is an import of a single declaration, compare the imported
+	     declaration with the sought out name. If there is a match pass
+	     current->inner as NAMESPACE to direct the search towards the
+	     imported namespace.  */
+	  if (strcmp ("", current->declaration) != 0)
+	    {
 	    if(strcmp (name, current->declaration) == 0){
 	      sym = cp_lookup_symbol_namespace (current->inner,
 	                                        name,
@@ -403,24 +410,27 @@ cp_lookup_symbol_namespace (const char *namespace,
 	                                        domain);
 	    }
 	   
-	  }else{
-	  /* Check for aliases */
-	  if(strcmp (name, current->alias) == 0){
+	    }
+	  else if(strcmp (name, current->alias) == 0)
+	    /* If the import is creating an alias and the alias matches the
+	       sought name. Pass current->inner as the NAME to direct the
+	       search towards the aliased namespace */
+	    {
 	    sym = cp_lookup_symbol_namespace (namespace,
 	                                      current->inner,
 	                                      linkage_name,
 	                                      block,
 	                                      domain);
-	  }else{
-	    if(strcmp ("", current->alias) == 0){
+	  }else if(strcmp ("", current->alias) == 0){
+	    /* If this import statement creates no alias, pass current->inner as
+	       NAMESPACE to direct the search towards the imported namespace. */
 	      sym = cp_lookup_symbol_namespace (current->inner,
 		                                name,
 		                                linkage_name,
 		                                block,
 		                                domain);
 	    }
-	  }
-	  }
+
 	  if (sym != NULL){
 	    return sym;
 	  }
