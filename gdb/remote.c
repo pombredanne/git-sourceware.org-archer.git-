@@ -111,7 +111,7 @@ static void remote_send (char **buf, long *sizeof_buf_p);
 
 static int readchar (int timeout);
 
-static void remote_kill (void);
+static void remote_kill (struct target_ops *ops);
 
 static int tohex (int nib);
 
@@ -2398,8 +2398,6 @@ remote_close (int quitting)
     delete_async_event_handler (&remote_async_inferior_event_token);
   if (remote_async_get_pending_events_token)
     delete_async_event_handler (&remote_async_get_pending_events_token);
-
-  generic_mourn_inferior ();
 }
 
 /* Query the remote side for the text, data and bss offsets.  */
@@ -2802,6 +2800,8 @@ remote_start_remote (struct ui_out *uiout, void *opaque)
       /* In non-stop mode, any cached wait status will be stored in
 	 the stop reply queue.  */
       gdb_assert (wait_status == NULL);
+
+      init_wait_for_inferior ();
     }
 
   /* If we connected to a live target, do some additional setup.  */
@@ -6528,7 +6528,7 @@ getpkt_or_notif_sane (char **buf, long *sizeof_buf, int forever)
 
 
 static void
-remote_kill (void)
+remote_kill (struct target_ops *ops)
 {
   /* Use catch_errors so the user can quit from gdb even when we
      aren't on speaking terms with the remote system.  */
@@ -6560,7 +6560,7 @@ remote_vkill (int pid, struct remote_state *rs)
 }
 
 static void
-extended_remote_kill (void)
+extended_remote_kill (struct target_ops *ops)
 {
   int res;
   int pid = ptid_get_pid (inferior_ptid);
@@ -6602,7 +6602,8 @@ remote_mourn_1 (struct target_ops *target)
 {
   unpush_target (target);
 
-  /* remote_close takes care of cleaning up.  */
+  /* remote_close takes care of doing most of the clean up.  */
+  generic_mourn_inferior ();
 }
 
 static int

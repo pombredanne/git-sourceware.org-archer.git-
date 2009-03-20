@@ -15,34 +15,20 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#include <stdio.h>
-
-static TYPE
-init (void)
-{
-  return 0;
-}
-
-static TYPE
-func (void)
-{
-  return 31;
-}
+extern TYPE func (void);
 
 static void
 marker (void)
 {
 }
 
+TYPE t;
+
 int
 main (void)
 {
-  /* Preinitialize registers to 0 to avoid false PASS by leftover garbage.  */
-  init ();
+  t = func ();
 
-  printf ("result=" FORMAT "\n", CAST func ());
-
-  /* Cannot `next' with no debug info.  */
   marker ();
 
   return 0;

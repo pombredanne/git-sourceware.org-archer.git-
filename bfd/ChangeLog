@@ -1,3 +1,83 @@
+2009-03-19  Kai Tietz  <kai.tietz@onevision.com>
+
+	* bfd-in2.h: Regenerated.
+	* coffcode.h (sec_to_styp_flags): For pe-coff add SEC_READONLY
+	for debugging sections and map memory read/write dependent on
+	SEC_COFF_NOREAD.
+	(styp_to_sec_flags): Set SEC_COFF_NOREAD for sections
+	without memory read flags set.
+	* section.c: Add SEC_COFF_NOREAD to section flags.
+
+2009-03-19  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* elf32-hppa.c (final_link_relocate): Cast bfd_vma values to long
+	for format string.
+
+2009-03-19  Alan Modra  <amodra@bigpond.net.au>
+
+	* elf32-spu.c (spu_elf_find_overlays): Separate error return from
+	"no overlays" return.  If there are overlays, create overlay
+	manager entry symbols here, so that..
+	(spu_elf_build_stubs): ..we don't need to set them up here.
+	Simplify entry symbol tests.
+	* elf32-spu.h (spu_elf_find_overlays): Update prototype.
+
+2009-03-18  Mark Kettenis  <kettenis@gnu.org>
+
+	* elf.c (elfcore_grok_openbsd_procinfo)
+	(elfcore_grok_openbsd_note): New functions.
+	(elf_parse_notes): Handle notes from OpenBSD ELF core files.
+
+2009-03-18  Alan Modra  <amodra@bigpond.net.au>
+
+	* vms-hdr.c: Don't include alloca.h.
+	* elf32-m68hc1x.c: Include alloca-conf.h.
+	* xsym.c: Likewise.
+	* elf64-hppa.c: Likewise.  Remove existing #if's handling alloca.
+	* som.c: Likewise.
+	* Makefile.am: Run "make dep-am".
+	* Makefile.in: Regenerate.
+
+2009-03-17  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* elf32-arm.c (elf32_arm_check_relocs): Correct symbian_p test.
+
+2009-03-17  Alan Modra  <amodra@bigpond.net.au>
+
+	* elf32-spu.h (struct spu_elf_params): ovly_flavour now only 1 bit.
+	Add compact_stub.
+	(emum _ovly_flavour): Delete ovly_compact, ovly_none.
+	* elf32-spu.c (struct spu_link_hash_table): Replace ovly_load and
+	ovly_return fields with ovly_entry[2].  Adjust all users.
+	(spu_elf_find_overlays): Set ovly_entry[1] from __icache_call_handler
+	when soft-icache.
+	(spu_elf_build_stubs): Likewise.
+	(ovl_stub_size): Change arg to spu_elf_params pointer.  Adjust for
+	ovly_flavour changes.  Update all callers.
+	(ovl_stub_size_log2): New function.
+	(build_stub): Handle compact icache stubs.  Use different manager
+	entry point for stubs in non-icache area.
+	(spu_elf_size_stubs): Don't allocate space for indirect branch
+	descriptors.
+	(spu_elf_build_stubs): And don't built them.
+
+2009-03-16  Andrew Stubbs  <ams@codesourcery.com>
+
+	* dwarf2.c (read_section): Always use rawsize, if available.
+
+2009-03-16  Alan Modra  <amodra@bigpond.net.au>
+
+	* simple.c (bfd_simple_get_relocated_section_contents): Use larger
+	of rawsize and size for buffer.
+
+2009-03-15  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* elf32-spu.c (spu_elf_check_vma): Do not reset auto_overlay
+	parameter just because fixed sections fit into local store.
+	(spu_elf_auto_overlay): Do not declare as "noreturn".  Skip
+	generating overlays if fixed sections plus reserved stack
+	and heap space fit into local store.
+
 2009-03-15  Alan Modra  <amodra@bigpond.net.au>
 
 	* elf32-spu.c (build_stub): Correct icache set_id.
@@ -148,7 +228,7 @@
 	and simplify its handling.
 	(xcoff_mark): Treat last_symndx as an inclusive value.  Only mark
 	symbols with the right csect.  Don't mark rsec when processing
-	relocations against undefined or absolute sections.  
+	relocations against undefined or absolute sections.
 	(bfd_xcoff_size_dynamic_sections): Don't check the SEC_MARK flag
 	of bfd_und_section_ptr.
 	(xcoff_link_input_bfd): Likewise.
@@ -174,7 +254,7 @@
 	is a function, mark its descriptor and allocate room for global
 	linkage code.  Otherwise mark the symbol as implicitly imported.
 	Move the code for creating function descriptors from...
-	(xcoff_build_ldsyms): ...here.  Use XCOFF_WAS_UNDEFINED to 
+	(xcoff_build_ldsyms): ...here.  Use XCOFF_WAS_UNDEFINED to
 	check for symbols that were implicitly defined.
 	(xcoff_mark): Don't count any dynamic relocations against
 	function symbols.
@@ -897,11 +977,11 @@
 2009-02-03  Carlos O'Donell  <carlos@codesourcery.com>
 
 	* configure.in: AC_SUBST pdfdir.
-	* Makefile.am: Add install-pdf, install-pdf-am 
+	* Makefile.am: Add install-pdf, install-pdf-am
 	and install-pdf-recursive targets. Define pdfdir.
 	* doc/Makefile.am: Define pdf__strip_dir. Add
 	install-pdf and install-pdf-am targets.
-	* po/Make-in: Add install-pdf target. 
+	* po/Make-in: Add install-pdf target.
 	* configure: Regenerate.
 	* Makefile.in: Regenerate
 	* doc/Makefile.in: Regenerate.
@@ -944,7 +1024,7 @@
 	update.
 	(elf_m68k_remove_got_entry_type): Update.
 	(elf_m68k_install_rela, dtpoff_base, tpoff): New static functions.
-	(elf_m68k_check_relocs): Handle TLS relocations.  Remove unnecessary 
+	(elf_m68k_check_relocs): Handle TLS relocations.  Remove unnecessary
 	update of sgot->size and srelgot->size.
 	(elf_m68k_gc_sweep_hook): Update.
 	(elf_m68k_install_rela, dtpoff_base, tpoff): New static functions.
@@ -988,8 +1068,8 @@
 	high_pc in order to properly sign-extend VMAs.
 
 2009-01-29  Daniel Jacobowitz  <dan@codesourcery.com>
-            Mark Shinwell  <shinwell@codesourcery.com>
-            Catherine Moore  <clm@codesourcery.com>
+	    Mark Shinwell  <shinwell@codesourcery.com>
+	    Catherine Moore  <clm@codesourcery.com>
 
 	* elf-attrs.c, elflink.c, elfxx-mips.c: Correct typos in comments.
 
