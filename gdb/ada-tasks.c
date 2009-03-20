@@ -49,7 +49,9 @@ enum task_states
   Timer_Server_Sleep,
   AST_Server_Sleep,
   Asynchronous_Hold,
-  Interrupt_Server_Blocked_On_Event_Flag
+  Interrupt_Server_Blocked_On_Event_Flag,
+  Activating,
+  Acceptor_Delay_Sleep
 };
 
 /* A short description corresponding to each possible task state.  */
@@ -58,7 +60,7 @@ static const char *task_states[] = {
   N_("Runnable"),
   N_("Terminated"),
   N_("Child Activation Wait"),
-  N_("Accept Statement"),
+  N_("Accept or Select Term"),
   N_("Waiting on entry call"),
   N_("Async Select Wait"),
   N_("Delay Sleep"),
@@ -69,7 +71,9 @@ static const char *task_states[] = {
   "",
   "",
   N_("Asynchronous Hold"),
-  ""
+  "",
+  N_("Activating"),
+  N_("Selective Wait")
 };
 
 /* A longer description corresponding to each possible task state.  */
@@ -78,7 +82,7 @@ static const char *long_task_states[] = {
   N_("Runnable"),
   N_("Terminated"),
   N_("Waiting for child activation"),
-  N_("Blocked in accept statement"),
+  N_("Blocked in accept or select with terminate"),
   N_("Waiting on entry call"),
   N_("Asynchronous Selective Wait"),
   N_("Delay Sleep"),
@@ -89,7 +93,9 @@ static const char *long_task_states[] = {
   "",
   "",
   N_("Asynchronous Hold"),
-  ""
+  "",
+  N_("Activating"),
+  N_("Blocked in selective wait statement")
 };
 
 /* The index of certain important fields in the Ada Task Control Block
@@ -194,6 +200,15 @@ valid_task_id (int task_num)
 {
   return (task_num > 0
           && task_num <= VEC_length (ada_task_info_s, task_list));
+}
+
+/* Return non-zero iff the task STATE corresponds to a non-terminated
+   task state.  */
+
+static int
+ada_task_is_alive (struct ada_task_info *task_info)
+{
+  return (task_info->state != Terminated);
 }
 
 /* Extract the contents of the value as a string whose length is LENGTH,
@@ -654,15 +669,6 @@ ada_build_task_list (int warn_if_null)
     }
 
   return 1;
-}
-
-/* Return non-zero iff the task STATE corresponds to a non-terminated
-   task state.  */
-
-int
-ada_task_is_alive (struct ada_task_info *task_info)
-{
-  return (task_info->state != Terminated);
 }
 
 /* Print a one-line description of the task whose number is TASKNO.

@@ -165,7 +165,8 @@ struct xcoff_tdata
 
   /* Used by the XCOFF backend linker.  */
   asection **csects;
-  unsigned long *debug_indices;
+  long *debug_indices;
+  unsigned int *lineno_counts;
   unsigned int import_file_id;
 };
 
@@ -215,8 +216,7 @@ struct xcoff_section_tdata
   /* The lineno_count field for the enclosing section, because we are
      going to clobber it there.  */
   unsigned int lineno_count;
-  /* The first and one past the last symbol indices for symbols used
-     by this csect.  */
+  /* The first and last symbol indices for symbols used by this csect.  */
   unsigned long first_symndx;
   unsigned long last_symndx;
 };

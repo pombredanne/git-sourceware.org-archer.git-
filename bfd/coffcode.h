@@ -637,7 +637,7 @@ sec_to_styp_flags (const char *sec_name, flagword sec_flags)
   /* FIXME: There is no gas syntax to specify the debug section flag.  */
   if (CONST_STRNEQ (sec_name, DOT_DEBUG)
       || CONST_STRNEQ (sec_name, GNU_LINKONCE_WI))
-    sec_flags = SEC_DEBUGGING;
+    sec_flags = SEC_DEBUGGING | SEC_READONLY;
 
   /* skip LOAD */
   /* READONLY later */
@@ -666,19 +666,14 @@ sec_to_styp_flags (const char *sec_name, flagword sec_flags)
   /* skip LINK_DUPLICATES */
   /* skip LINKER_CREATED */
 
-  if (sec_flags & (SEC_ALLOC | SEC_LOAD))
-    {
-      /* For now, the read/write bits are mapped onto SEC_READONLY, even
-	 though the semantics don't quite match.  The bits from the input
-	 are retained in pei_section_data(abfd, section)->pe_flags.  */
-      styp_flags |= IMAGE_SCN_MEM_READ;       /* Always readable.  */
-      if ((sec_flags & SEC_READONLY) == 0)
-	styp_flags |= IMAGE_SCN_MEM_WRITE;    /* Invert READONLY for write.  */
-      if (sec_flags & SEC_CODE)
-	styp_flags |= IMAGE_SCN_MEM_EXECUTE;  /* CODE->EXECUTE.  */
-      if (sec_flags & SEC_COFF_SHARED)
-	styp_flags |= IMAGE_SCN_MEM_SHARED;   /* Shared remains meaningful.  */
-    }
+  if ((sec_flags & SEC_COFF_NOREAD) == 0)
+    styp_flags |= IMAGE_SCN_MEM_READ;     /* Invert NOREAD for read.  */
+  if ((sec_flags & SEC_READONLY) == 0)
+    styp_flags |= IMAGE_SCN_MEM_WRITE;    /* Invert READONLY for write.  */
+  if (sec_flags & SEC_CODE)
+    styp_flags |= IMAGE_SCN_MEM_EXECUTE;  /* CODE->EXECUTE.  */
+  if (sec_flags & SEC_COFF_SHARED)
+    styp_flags |= IMAGE_SCN_MEM_SHARED;   /* Shared remains meaningful.  */
 
   return styp_flags;
 }
@@ -1117,6 +1112,10 @@ styp_to_sec_flags (bfd *abfd,
   /* Assume read only unless IMAGE_SCN_MEM_WRITE is specified.  */
   sec_flags = SEC_READONLY;
 
+  /* If section disallows read, then set the NOREAD flag. */
+  if ((styp_flags & IMAGE_SCN_MEM_READ) == 0)
+    sec_flags |= SEC_COFF_NOREAD;
+
   /* Process each flag bit in styp_flags in turn.  */
   while (styp_flags)
     {
@@ -1149,7 +1148,7 @@ styp_to_sec_flags (bfd *abfd,
 	  break;
 #endif
 	case IMAGE_SCN_MEM_READ:
-	  /* Ignored, assume it always to be true.  */
+	  sec_flags &= ~SEC_COFF_NOREAD;
 	  break;
 	case IMAGE_SCN_TYPE_NO_PAD:
 	  /* Skip.  */
@@ -2416,7 +2415,7 @@ symname_in_debug_hook (bfd * abfd ATTRIBUTE_UNUSED, struct internal_syment *sym)
 #define FORCE_SYMNAMES_IN_STRINGS
 #endif
 
-/* Handle the csect auxent of a C_EXT or C_HIDEXT symbol.  */
+/* Handle the csect auxent of a C_EXT, C_AIX_WEAKEXT or C_HIDEXT symbol.  */
 
 static bfd_boolean
 coff_pointerize_aux_hook (bfd *abfd ATTRIBUTE_UNUSED,
@@ -2427,7 +2426,7 @@ coff_pointerize_aux_hook (bfd *abfd ATTRIBUTE_UNUSED,
 {
   int class = symbol->u.syment.n_sclass;
 
-  if ((class == C_EXT || class == C_HIDEXT)
+  if (CSECT_SYM_P (class)
       && indaux + 1 == symbol->u.syment.n_numaux)
     {
       if (SMTYP_SMTYP (aux->u.auxent.x_csect.x_smtyp) == XTY_LD)
@@ -2485,8 +2484,7 @@ coff_print_aux (bfd *abfd ATTRIBUTE_UNUSED,
 		unsigned int indaux ATTRIBUTE_UNUSED)
 {
 #ifdef RS6000COFF_C
-  if ((symbol->u.syment.n_sclass == C_EXT
-       || symbol->u.syment.n_sclass == C_HIDEXT)
+  if (CSECT_SYM_P (symbol->u.syment.n_sclass)
       && indaux + 1 == symbol->u.syment.n_numaux)
     {
       /* This is a csect entry.  */

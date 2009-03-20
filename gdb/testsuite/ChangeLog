@@ -1,9 +1,77 @@
+2009-03-19  Jerome Guitton  <guitton@adacore.com>
+
+	* gdb.ada/fixed_points/fixed_points.adb: Add a test on overprecise
+	deltas.
+	* gdb.ada/fixed_points.exp: Ditto.
+
+2009-03-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* return-nodebug.c: Don't include stdio.h.
+	(init): Delete.
+	(func): Delete definition and provide extern declaration.
+	(t): New.
+	(main): Don't call printf.  Call func and store its result in t.
+	* return-nodebug1.c: New.
+	* return-nodebug.exp: Don't expect stdio output.  Instead, print
+	the global variable t.  Drop printf formatters and cast types from
+	foreach loop.  Don't use prepare_for_testing.  Compile
+	return-nodebug.c and return-nodebug1.c in separate steps.  Don't
+	define FORMAT or CAST.
+
+2009-03-17  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* gdb.base/solib-display.exp: Disable test for remote targers.
+
+2009-03-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/return-nodebug.exp, gdb.base/return-nodebug.c: New.
+
+2009-03-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix a racy FAIL.
+	* gdb.base/multi-forks.exp (continue_to_exit_bp_loc): New function with
+	code from `follow parent, print pids'.
+	(`follow child, print pids', `follow parent, print pids'): Call it.
+	Replace `gdb_test "break..."' by gdb_breakpoint.
+
+2009-03-13  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* gdb.mi/mi-cli.exp: Adjust for output difference in
+	sync and async modes.
+
+2009-03-12  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/ptype_arith_binop.exp: Remove some commented-out code
+	that was checked in by mistake. Remove loading of ada.exp, since
+	this is not necessary in this case.
+
+2009-03-12  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/ptype_arith_binop.exp: New testcase.
+
+2009-03-12  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/mod_from_name: New testcase.
+
+2009-03-12  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/tick_last_segv: New testcase.
+
+2009-03-12  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* gdb.mi/mi-cli.exp: Remove debug print.
+
+2009-03-12  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* gdb.mi/mi-cli.exp: Verify that CLI commands that run inferior
+	include the token in ^running and frame info in *stopped.
+
 2009-03-05  Paul Pluzhnikov  <ppluzhnikov@google.com>
 
 	* solib-display.exp: New file.
 	* solib-display-main.c: New file.
 	* solib-display-lib.c: New file.
-	
+
 2009-03-05  Pedro Alves  <pedro@codesourcery.com>
 
 	* gdb.arch/i386-permbkpt.S, gdb.arch/i386-permbkpt.exp: New.

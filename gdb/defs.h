@@ -366,6 +366,9 @@ extern struct cleanup *make_cleanup_fclose (FILE *file);
 
 extern struct cleanup *make_cleanup_bfd_close (bfd *abfd);
 
+struct obstack;
+extern struct cleanup *make_cleanup_obstack_free (struct obstack *obstack);
+
 extern struct cleanup *make_cleanup_restore_integer (int *variable);
 
 extern struct cleanup *make_final_cleanup (make_cleanup_ftype *, void *);
@@ -613,7 +616,7 @@ extern void print_address (CORE_ADDR, struct ui_file *);
 
 extern int openp (const char *, int, const char *, int, int, char **);
 
-extern int source_full_path_of (char *, char **);
+extern int source_full_path_of (const char *, char **);
 
 extern void mod_path (char *, char **);
 

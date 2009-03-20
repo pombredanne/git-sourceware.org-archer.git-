@@ -2015,6 +2015,7 @@ ada_value_primitive_packed_val (struct value *obj, const gdb_byte *valaddr,
           /* ... And are placed at the beginning (most-significant) bytes
              of the target.  */
           targ = (bit_size + HOST_CHAR_BIT - 1) / HOST_CHAR_BIT - 1;
+          ntarg = targ + 1;
           break;
         default:
           accumSize = 0;
@@ -6535,11 +6536,16 @@ struct type *
 ada_find_any_type (const char *name)
 {
   struct symbol *sym = ada_find_any_symbol (name);
+  struct type *type = NULL;
 
   if (sym != NULL)
-    return SYMBOL_TYPE (sym);
+    type = SYMBOL_TYPE (sym);
 
-  return NULL;
+  if (type == NULL)
+    type = language_lookup_primitive_type_by_name
+      (language_def (language_ada), current_gdbarch, name);
+
+  return type;
 }
 
 /* Given NAME and an associated BLOCK, search all symbols for
@@ -8447,13 +8453,17 @@ ada_evaluate_subexp (struct type *expect_type, struct expression *exp,
 
     case BINOP_MUL:
     case BINOP_DIV:
+    case BINOP_REM:
+    case BINOP_MOD:
       arg1 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
       arg2 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
       if (noside == EVAL_SKIP)
         goto nosideret;
-      else if (noside == EVAL_AVOID_SIDE_EFFECTS
-               && (op == BINOP_DIV || op == BINOP_REM || op == BINOP_MOD))
-        return value_zero (value_type (arg1), not_lval);
+      else if (noside == EVAL_AVOID_SIDE_EFFECTS)
+        {
+          binop_promote (exp->language_defn, exp->gdbarch, &arg1, &arg2);
+          return value_zero (value_type (arg1), not_lval);
+        }
       else
         {
           type = builtin_type (exp->gdbarch)->builtin_double;
@@ -8464,21 +8474,6 @@ ada_evaluate_subexp (struct type *expect_type, struct expression *exp,
           binop_promote (exp->language_defn, exp->gdbarch, &arg1, &arg2);
           return ada_value_binop (arg1, arg2, op);
         }
-
-    case BINOP_REM:
-    case BINOP_MOD:
-      arg1 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
-      arg2 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
-      if (noside == EVAL_SKIP)
-        goto nosideret;
-      else if (noside == EVAL_AVOID_SIDE_EFFECTS
-               && (op == BINOP_DIV || op == BINOP_REM || op == BINOP_MOD))
-        return value_zero (value_type (arg1), not_lval);
-      else
-	{
-	  binop_promote (exp->language_defn, exp->gdbarch, &arg1, &arg2);
-	  return ada_value_binop (arg1, arg2, op);
-	}
 
     case BINOP_EQUAL:
     case BINOP_NOTEQUAL:
@@ -8571,8 +8566,19 @@ ada_evaluate_subexp (struct type *expect_type, struct expression *exp,
                a fixed type would result in the loss of that type name,
                thus preventing us from printing the name of the ancestor
                type in the type description.  */
+            struct type *actual_type;
+
             arg1 = evaluate_subexp (NULL_TYPE, exp, pos, EVAL_NORMAL);
-            return value_zero (type_from_tag (ada_value_tag (arg1)), not_lval);
+            actual_type = type_from_tag (ada_value_tag (arg1));
+            if (actual_type == NULL)
+              /* If, for some reason, we were unable to determine
+                 the actual type from the tag, then use the static
+                 approximation that we just computed as a fallback.
+                 This can happen if the debugging information is
+                 incomplete, for instance.  */
+              actual_type = type;
+
+            return value_zero (actual_type, not_lval);
           }
 
           *pos += 4;
@@ -9280,12 +9286,16 @@ DOUBLEST
 ada_delta (struct type *type)
 {
   const char *encoding = fixed_type_info (type);
-  long num, den;
+  DOUBLEST num, den;
 
-  if (sscanf (encoding, "_%ld_%ld", &num, &den) < 2)
+  /* Strictly speaking, num and den are encoded as integer.  However,
+     they may not fit into a long, and they will have to be converted
+     to DOUBLEST anyway.  So scan them as DOUBLEST.  */
+  if (sscanf (encoding, "_%" DOUBLEST_SCAN_FORMAT "_%" DOUBLEST_SCAN_FORMAT,
+	      &num, &den) < 2)
     return -1.0;
   else
-    return (DOUBLEST) num / (DOUBLEST) den;
+    return num / den;
 }
 
 /* Assuming that ada_is_fixed_point_type (TYPE), return the scaling
@@ -9295,17 +9305,23 @@ static DOUBLEST
 scaling_factor (struct type *type)
 {
   const char *encoding = fixed_type_info (type);
-  unsigned long num0, den0, num1, den1;
+  DOUBLEST num0, den0, num1, den1;
   int n;
 
-  n = sscanf (encoding, "_%lu_%lu_%lu_%lu", &num0, &den0, &num1, &den1);
+  /* Strictly speaking, num's and den's are encoded as integer.  However,
+     they may not fit into a long, and they will have to be converted
+     to DOUBLEST anyway.  So scan them as DOUBLEST.  */
+  n = sscanf (encoding,
+	      "_%" DOUBLEST_SCAN_FORMAT "_%" DOUBLEST_SCAN_FORMAT
+	      "_%" DOUBLEST_SCAN_FORMAT "_%" DOUBLEST_SCAN_FORMAT,
+	      &num0, &den0, &num1, &den1);
 
   if (n < 2)
     return 1.0;
   else if (n == 4)
-    return (DOUBLEST) num1 / (DOUBLEST) den1;
+    return num1 / den1;
   else
-    return (DOUBLEST) num0 / (DOUBLEST) den0;
+    return num0 / den0;
 }
 
 
@@ -9593,11 +9609,55 @@ ada_is_modular_type (struct type *type)
           && TYPE_UNSIGNED (subranged_type));
 }
 
+/* Try to determine the lower and upper bounds of the given modular type
+   using the type name only.  Return non-zero and set L and U as the lower
+   and upper bounds (respectively) if successful.  */
+
+int
+ada_modulus_from_name (struct type *type, ULONGEST *modulus)
+{
+  char *name = ada_type_name (type);
+  char *suffix;
+  int k;
+  LONGEST U;
+
+  if (name == NULL)
+    return 0;
+
+  /* Discrete type bounds are encoded using an __XD suffix.  In our case,
+     we are looking for static bounds, which means an __XDLU suffix.
+     Moreover, we know that the lower bound of modular types is always
+     zero, so the actual suffix should start with "__XDLU_0__", and
+     then be followed by the upper bound value.  */
+  suffix = strstr (name, "__XDLU_0__");
+  if (suffix == NULL)
+    return 0;
+  k = 10;
+  if (!ada_scan_number (suffix, k, &U, NULL))
+    return 0;
+
+  *modulus = (ULONGEST) U + 1;
+  return 1;
+}
+
 /* Assuming ada_is_modular_type (TYPE), the modulus of TYPE.  */
 
 ULONGEST
-ada_modulus (struct type * type)
+ada_modulus (struct type *type)
 {
+  ULONGEST modulus;
+
+  /* Normally, the modulus of a modular type is equal to the value of
+     its upper bound + 1.  However, the upper bound is currently stored
+     as an int, which is not always big enough to hold the actual bound
+     value.  To workaround this, try to take advantage of the encoding
+     that GNAT uses with with discrete types.  To avoid some unnecessary
+     parsing, we do this only when the size of TYPE is greater than
+     the size of the field holding the bound.  */
+  if (TYPE_LENGTH (type) > sizeof (TYPE_HIGH_BOUND (type))
+      && ada_modulus_from_name (type, &modulus))
+    return modulus;
+
   return (ULONGEST) (unsigned int) TYPE_HIGH_BOUND (type) + 1;
 }
 
@@ -10953,7 +11013,7 @@ ada_language_arch_info (struct gdbarch *gdbarch,
   TYPE_NAME (lai->primitive_type_vector [ada_primitive_type_system_address])
     = "system__address";
 
-  lai->bool_type_symbol = "boolean";
+  lai->bool_type_symbol = NULL;
   lai->bool_type_default = builtin->builtin_bool;
 }
 

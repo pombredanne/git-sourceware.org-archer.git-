@@ -155,6 +155,7 @@ LD = @LD@
 LDFLAGS = @LDFLAGS@
 LIBINTL = @LIBINTL@
 LIBINTL_DEP = @LIBINTL_DEP@
+LIBM = @LIBM@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
@@ -1279,9 +1280,10 @@ cgen-bitset.lo: cgen-bitset.c $(INCDIR)/libiberty.h \
 cgen-dis.lo: cgen-dis.c sysdep.h config.h $(INCDIR)/ansidecl.h \
   $(INCDIR)/libiberty.h $(BFD_H) $(INCDIR)/symcat.h $(INCDIR)/opcode/cgen.h \
   $(INCDIR)/opcode/cgen-bitset.h
-cgen-opc.lo: cgen-opc.c sysdep.h config.h $(INCDIR)/ansidecl.h \
-  $(INCDIR)/libiberty.h $(INCDIR)/safe-ctype.h $(BFD_H) \
-  $(INCDIR)/symcat.h $(INCDIR)/opcode/cgen.h $(INCDIR)/opcode/cgen-bitset.h
+cgen-opc.lo: cgen-opc.c $(INCDIR)/alloca-conf.h config.h \
+  sysdep.h $(INCDIR)/ansidecl.h $(INCDIR)/libiberty.h \
+  $(INCDIR)/safe-ctype.h $(BFD_H) $(INCDIR)/symcat.h \
+  $(INCDIR)/opcode/cgen.h $(INCDIR)/opcode/cgen-bitset.h
 cr16-dis.lo: cr16-dis.c $(INCDIR)/dis-asm.h $(BFD_H) \
   $(INCDIR)/ansidecl.h $(INCDIR)/symcat.h sysdep.h config.h \
   $(INCDIR)/opcode/cr16.h $(INCDIR)/libiberty.h
@@ -1629,7 +1631,8 @@ pj-dis.lo: pj-dis.c sysdep.h config.h $(INCDIR)/ansidecl.h \
 pj-opc.lo: pj-opc.c sysdep.h config.h $(INCDIR)/ansidecl.h \
   $(INCDIR)/opcode/pj.h
 ppc-dis.lo: ppc-dis.c sysdep.h config.h $(INCDIR)/ansidecl.h \
-  $(INCDIR)/dis-asm.h $(BFD_H) $(INCDIR)/symcat.h $(INCDIR)/opcode/ppc.h
+  $(INCDIR)/dis-asm.h $(BFD_H) $(INCDIR)/symcat.h opintl.h \
+  $(INCDIR)/opcode/ppc.h
 ppc-opc.lo: ppc-opc.c sysdep.h config.h $(INCDIR)/ansidecl.h \
   $(INCDIR)/opcode/ppc.h opintl.h
 s390-mkopc.lo: s390-mkopc.c

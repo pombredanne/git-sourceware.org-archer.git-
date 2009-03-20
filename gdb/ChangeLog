@@ -1,3 +1,303 @@
+2009-03-19  Tom Tromey  <tromey@redhat.com>
+
+	* utils.c (do_obstack_free): New function.
+	(make_cleanup_obstack_free): Likewise.
+	* defs.h (make_cleanup_obstack_free): Declare.
+
+2009-03-18  Doug Evans  <dje@google.com>
+
+	* linux-nat.c (linux_nat_find_memory_regions): Result of PIDGET is an
+	int, not a long long.
+	(linux_nat_info_proc_cmd): Store pid in long instead of long long.
+
+	* expprint.c (dump_raw_expression): Print note if non-NULL.
+
+	* printcmd.c (display_uses_solib_p): Redo loop, scan element list
+	backwards.
+
+2009-03-18  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* Makefile.in: Update license to GPLv3.
+	* ada-exp.y: Update license to GPLv3.
+	* ada-lex.l: Update license to GPLv3.
+	* c-exp.y: Update license to GPLv3.
+	* cp-name-parser.y: Update license to GPLv3.
+	* darwin-nat-info.c: Update license to GPLv3.
+	* f-exp.y: Update license to GPLv3.
+	* gdb_thread_db.h: Update license to GPLv3.
+	* hppanbsd-nat.c: Update license to GPLv3.
+	* hppanbsd-tdep.c: Update license to GPLv3.
+	* hppaobsd-tdep.c: Update license to GPLv3.
+	* jv-exp.y: Update license to GPLv3.
+	* m2-exp.y: Update license to GPLv3.
+	* objc-exp.y: Update license to GPLv3.
+	* p-exp.y: Update license to GPLv3.
+	* reply_mig_hack.awk: Update license to GPLv3.
+	* reverse.c: Update license to GPLv3.
+	* xtensa-xtregs.c: Update license to GPLv3.
+
+2009-03-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* remote.c (remote_close): Don't call generic_mourn_inferior.
+	(remote_mourn_1): Call generic_mourn_inferior after closing the
+	target.
+
+2009-03-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* remote.c (remote_start_remote): Add missing call to
+	init_wait_for_inferior in non-stop mode.
+
+2009-03-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* breakpoint.c (bpstat_should_step): Only consider software
+	watchpoints that have a location.
+
+2009-03-17  Joel Brobecker  <brobecker@adacore.com>
+
+	Add a target_ops parameter to the to_kill method in struct target_ops.
+
+	* target.h (struct target_ops): Add a "target_ops *" parameter to
+	method to_kill.
+	(target_kill): Remove macro. Add declaration.
+	* target.c (debug_to_kill): Delete, no longer necessary.
+	(target_kill): New function.
+	(update_current_target):  Stop inheriting the to_kill method.
+	Do not de_fault it to no_process either.
+	(setup_target_debug): Do not set current_target.to_kill.
+	* gnu-nat.c, go32-nat.c, hpux-thread.c, inf-ptrace.c, inf-ttrace.c,
+	linux-nat.c, monitor.c, nto-procfs.c, procfs.c, remote-m32r-sdi.c,
+	remote-mips.c, remote-sim.c, remote.c, windows-nat.c: Update
+	accordingly.
+
+2009-03-17  Doug Evans  <dje@google.com>
+
+	* amd64-linux-nat.c (si_timerid,si_overrun): Provide definition for
+	glibc 2.3.2 and earlier.
+
+2009-03-17  Joel Brobecker  <brobecker@adacore.com>
+
+	* frame.c (get_prev_frame_1): Do not perform the inner_frame
+	sanity check if this_frame is not NORMAL.
+	(frame_id_inner): Update the description of this function.
+
+2009-03-17  Hui Zhu  <teawater@gmail.com>
+
+	* stack.c: Change the introduce of "disassemble-next-line".
+
+2009-03-17  Pedro Alves  <pedro@codesourcery.com>
+
+	* mi/mi-main.h (mi_print_timing_maybe): Add strict prototype,
+	declare as extern.
+
+2009-03-17  Hui Zhu  <teawater@gmail.com>
+
+	* stack.c: Include valprint.h.
+	(disassemble_next_line): New enum.
+	(show_disassemble_next_line): New function.  Show the current
+	value of disassemble-next-line.
+	(gdb_disassembly_stub_args): New struct for argument passing
+	between function do_gdb_disassembly and function
+	gdb_disassembly_stub.
+	(gdb_disassembly_stub): New function.  Helper for
+	gdb_disassembly.
+	(do_gdb_disassembly): New function.  Use TRY_CATCH to catch
+	the exception from the gdb_disassembly because it will be
+	broken by filter sometime.
+	(print_frame_info): If disassemble-next-line is set to auto
+	or on and doesn't have the line debug messages for $pc,
+	output the next instruction.
+	If disassemble-next-line is set to on and there is line debug
+	messages, output assembly codes for next line.
+	(_initialize_stack): Make the "set disassemble-next-line"
+	command an auto-boolean command.  Change its class to
+	class_stack.  Place it in the top level set list.  Extend help
+	to describe the auto mode.
+
+2009-03-17  Pedro Alves  <pedro@codesourcery.com>
+
+	* infrun.c (normal_stop): Don't overwrite old_chain.
+
+2009-03-16  Joel Brobecker  <brobecker@adacore.com>
+
+	* remote-mips.c (mips_load): Replace call to regcache_set_valid_p,
+	which is undefined, by call to regcache_invalidate, which should
+	do what the original author wanted to do.
+
+2009-03-16  Joel Brobecker  <brobecker@adacore.com>
+
+	* remote-mips.c (mips_mourn_inferior): Add missing ops parameter.
+	(mips_create_inferior): Likewise.
+
+2009-03-16  Joel Brobecker  <brobecker@adacore.com>
+
+	* go32-nat.c (go32_create_inferior): Add missing ops parameter.
+
+2009-03-16  Joel Brobecker  <brobecker@adacore.com>
+
+	* darwin-nat.c (darwin_resume): Fix a compiler warning when
+	building on x86_64-darwin.
+
+2009-03-16  Tristan Gingold  <gingold@adacore.com>
+
+	* configure.tgt: Add handling for x86_64-darwin.
+
+2009-03-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* auxv.c (fprint_target_auxv): New TAG for AT_RANDOM.
+
+2009-03-15  Joel Brobecker  <brobecker@adacore.com>
+
+	* aix-thread.c (aix_thread_thread_alive, aix_thread_pid_to_str):
+	Use the ops parameter to get to the target beneath, rather than
+	using the current_target global.  Using the current_target global
+	was an unintended accident.
+
+2009-03-15  Joel Brobecker  <brobecker@adacore.com>
+
+	Fix an error happening while loading symbols from a core file
+	(on AIX).
+
+	* rs6000-nat.c (xcoff_relocate_symtab): Use target_has_execution
+	to detect whether we're debugging a core file or not.
+
+2009-03-15  Joel Brobecker  <brobecker@adacore.com>
+
+	Modernize the aix-thread later by getting rid of the base_target
+	global.  This brings back to life the AIX port which was otherwise
+	crashing all the time.
+
+	* aix-thread.c (base_target): Delete.
+	(pd_enable): Do not set base_target.
+	(aix_thread_attach): Use find_target_beneath instead of base_target.
+	(aix_thread_detach, aix_thread_resume, aix_thread_wait)
+	(aix_thread_fetch_registers, aix_thread_store_registers),
+	(aix_thread_xfer_partial, aix_thread_mourn_inferior)
+	(aix_thread_thread_alive, aix_thread_pid_to_str): Likewise.
+	(aix_thread_kill): Delete. Does not seem necessary.
+	(init_aix_thread_ops): Do not set aix_thread_ops.to_kill.
+
+2009-03-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* stack.c (return_command <retval_exp>): New variables retval_expr
+	and old_chain.  Inline parse_and_eval to initialize retval_expr.  Check
+	RETVAL_EXPR for UNOP_CAST and set RETURN_TYPE to the RETURN_VALUE type
+	if RETURN_TYPE is NULL.
+
+>>>>>>> 1.10280
+2009-03-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* remote.c (PACKET_qAttached): New.
+	(remote_query_attached): New.
+	(remote_add_inferior): Add new `attached' argument.  Handle it.
+	(remote_notice_new_inferior, remote_start_remote): Adjust to pass
+	-1 to remote_add_inferior in new parameter.
+	(extended_remote_attach_1): Adjust to pass 1 to
+	remote_add_inferior in the new parameter.
+	(extended_remote_create_inferior_1): Adjust to pass 0 to
+	remote_add_inferior in the new parameter.
+	(_initialize_remote): Add "set/show remote query-attached-packet"
+	commands.
+
+2009-03-13  Tom Tromey  <tromey@redhat.com>
+
+	* symtab.c (lookup_symbol_in_language): Use a cleanup.
+
+2009-03-13  Doug Evans  <dje@google.com>
+
+	* exceptions.h: Clean up some comments on catch_exceptions usage.
+	* exceptions.c: Ditto.  Plus mark catch_errors as superseded by
+	catch_exceptions.
+
+2009-02-17  Joel Brobecker  <brobecker@adacore.com>
+
+	The following patch helps getting rid of a warning inside solib-som.c.
+
+	* source.c (source_full_path_of): Constify parameter filename.
+	* defs.h (source_full_path_of): Update declaration accordingly.
+
+2009-03-12  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (ada_evaluate_subexp): Merge case BINOP_REM and
+	BINOP_MOD cases with the handling of case BINOP_DIV and BINOP_MUL.
+	Remove useless op value checks when EVAL_AVOID_SIDE_EFFECTS.
+
+2009-03-12  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (ada_evaluate_subexp) <BINOP_DIV>: make sure to
+	promote the operands when noside is EVAL_AVOID_SIDE_EFFECTS.
+
+2009-03-12  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-tasks.c (ada_task_is_alive): Move up and make static.
+	* ada-lang.h (ada_task_is_alive): Remove declaration.
+
+2009-03-12  Jerome Guitton  <guitton@adacore.com>
+
+	* ada-lang.c (ada_delta): Change the type of numerators and
+	denominators to DOUBLEST, as they may not fit into a long.
+	(scaling_factor): Ditto.
+
+2009-03-12  Jerome Guitton  <guitton@adacore.com>
+
+	* language.c (lang_bool_type): Set lai->bool_type_symbol to NULL.
+
+2009-03-12  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (ada_evaluate_subexp) [OP_VAR_VALUE]: For tagged
+	types, if we are unable to determine the actual symbol type
+	from its tag, then use the static approximation instead.
+
+2009-03-12  Joel Brobecker  <brobecker@adacore.com>
+
+	Fix crash printing packed record with packed array.
+
+	* ada-lang.c (ada_modulus_from_name): New function.
+	(ada_modulus): In the case where the type length is bigger than
+	the size of the type used to hold the bounds, try determining
+	the modulus from the type name.
+	(ada_value_primitive_packed_val): Fix bug in the computation of
+	ntarg causing an out-of-buffer invalid access.
+
+2009-03-12  Joel Brobecker  <brobecker@adacore.com>
+
+	Fix segfault when printing short_integer'last.
+
+	* ada-lang.c (ada_find_any_type): Search in the primitive types
+	if a symbol could not be found.
+
+2009-03-12  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-tasks.c (task_states,long_task_states): Add new states
+	Activating and Acceptor_Delay_Sleep.  Update the description
+	of state Acceptor_Sleep.
+
+2009-03-12  Jonas Maebe <jonas.maebe@elis.ugent.be>  (obvious change)
+
+	Fix a build failure on Darwin following some changes in
+	the profile of some target_ops methods.
+
+	* darwin-nat.c (darwin_kill_inferior): Add target_ops parameter
+	where missing.
+	(darwin_stop_inferior, darwin_detach): Likewise.
+
+2009-03-12  Vladimir Prus  <vladimir@codesourcery.com>
+
+	Include token in ^running notification for CLI commands.
+
+        * mi/mi-main.c (mi_execute_command): Set current_token here.
+        (mi_cmd_execute): Do not set current_token here.
+
+2009-03-12  Vladimir Prus  <vladimir@codesourcery.com>
+
+	Fix MI timings.
+
+        * mi/mi-main.c (mi_print_timing_maybe): New.
+        (captured_mi_execute_command): Simplify. Output timings to
+        CLI commands, too.
+        (mi_execute_async_cli_command): Do not print timings.
+        * mi/mi-main.h (mi_print_timing_maybe): Declare.
+        * mi/mi-interp.c (mi_on_normal_stop): Call mi_print_timing_maybe.
+
 2009-03-12  Jerome Guitton  <guitton@adacore.com>
 
 	* xcoffread.c (process_linenos): Check if the line in the
@@ -1576,7 +1876,7 @@
 	(HFILES_NO_SRCDIR): Add windows-tdep.h.
 	(ALLDEPFILES): Add windows-tdep.c.
 
-2009-01-11  Christ Faylor  <me.gdb@cgf.cx>
+2009-01-11  Chris Faylor  <me.gdb@cgf.cx>
 
 	* win32-nat.h: Delete.
 	* windows-nat.h: Rename from win32-nat.h.

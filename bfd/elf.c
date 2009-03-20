@@ -2774,6 +2774,7 @@ assign_section_numbers (bfd *abfd, struct bfd_link_info *link_info)
   unsigned int section_number, secn;
   Elf_Internal_Shdr **i_shdrp;
   struct bfd_elf_section_data *d;
+  bfd_boolean need_symtab;
 
   section_number = 1;
 
@@ -2829,7 +2830,11 @@ assign_section_numbers (bfd *abfd, struct bfd_link_info *link_info)
   _bfd_elf_strtab_addref (elf_shstrtab (abfd), t->shstrtab_hdr.sh_name);
   elf_elfheader (abfd)->e_shstrndx = t->shstrtab_section;
 
-  if (bfd_get_symcount (abfd) > 0)
+  need_symtab = (bfd_get_symcount (abfd) > 0
+		|| (link_info == NULL
+		    && ((abfd->flags & (EXEC_P | DYNAMIC | HAS_RELOC))
+			== HAS_RELOC)));
+  if (need_symtab)
     {
       t->symtab_section = section_number++;
       _bfd_elf_strtab_addref (elf_shstrtab (abfd), t->symtab_hdr.sh_name);
@@ -2868,7 +2873,7 @@ assign_section_numbers (bfd *abfd, struct bfd_link_info *link_info)
   elf_elfsections (abfd) = i_shdrp;
 
   i_shdrp[t->shstrtab_section] = &t->shstrtab_hdr;
-  if (bfd_get_symcount (abfd) > 0)
+  if (need_symtab)
     {
       i_shdrp[t->symtab_section] = &t->symtab_hdr;
       if (elf_numsections (abfd) > (SHN_LORESERVE & 0xFFFF))
@@ -3261,6 +3266,7 @@ _bfd_elf_compute_section_file_positions (bfd *abfd,
   bfd_boolean failed;
   struct bfd_strtab_hash *strtab = NULL;
   Elf_Internal_Shdr *shstrtab_hdr;
+  bfd_boolean need_symtab;
 
   if (abfd->output_has_begun)
     return TRUE;
@@ -3285,7 +3291,11 @@ _bfd_elf_compute_section_file_positions (bfd *abfd,
     return FALSE;
 
   /* The backend linker builds symbol table information itself.  */
-  if (link_info == NULL && bfd_get_symcount (abfd) > 0)
+  need_symtab = (link_info == NULL
+		 && (bfd_get_symcount (abfd) > 0
+		     || ((abfd->flags & (EXEC_P | DYNAMIC | HAS_RELOC))
+			 == HAS_RELOC)));
+  if (need_symtab)
     {
       /* Non-zero if doing a relocatable link.  */
       int relocatable_p = ! (abfd->flags & (EXEC_P | DYNAMIC));
@@ -3316,7 +3326,7 @@ _bfd_elf_compute_section_file_positions (bfd *abfd,
   if (!assign_file_positions_except_relocs (abfd, link_info))
     return FALSE;
 
-  if (link_info == NULL && bfd_get_symcount (abfd) > 0)
+  if (need_symtab)
     {
       file_ptr off;
       Elf_Internal_Shdr *hdr;
@@ -8101,6 +8111,70 @@ elfcore_grok_netbsd_note (bfd *abfd, Elf_Internal_Note *note)
 }
 
 static bfd_boolean
+elfcore_grok_openbsd_procinfo (bfd *abfd, Elf_Internal_Note *note)
+{
+  /* Signal number at offset 0x08. */
+  elf_tdata (abfd)->core_signal
+    = bfd_h_get_32 (abfd, (bfd_byte *) note->descdata + 0x08);
+
+  /* Process ID at offset 0x20. */
+  elf_tdata (abfd)->core_pid
+    = bfd_h_get_32 (abfd, (bfd_byte *) note->descdata + 0x20);
+
+  /* Command name at 0x48 (max 32 bytes, including nul). */
+  elf_tdata (abfd)->core_command
+    = _bfd_elfcore_strndup (abfd, note->descdata + 0x48, 31);
+
+  return TRUE;
+}
+
+static bfd_boolean
+elfcore_grok_openbsd_note (bfd *abfd, Elf_Internal_Note *note)
+{
+  if (note->type == NT_OPENBSD_PROCINFO)
+    return elfcore_grok_openbsd_procinfo (abfd, note);
+
+  if (note->type == NT_OPENBSD_REGS)
+    return elfcore_make_note_pseudosection (abfd, ".reg", note);
+
+  if (note->type == NT_OPENBSD_FPREGS)
+    return elfcore_make_note_pseudosection (abfd, ".reg2", note);
+
+  if (note->type == NT_OPENBSD_XFPREGS)
+    return elfcore_make_note_pseudosection (abfd, ".reg-xfp", note);
+
+  if (note->type == NT_OPENBSD_AUXV)
+    {
+      asection *sect = bfd_make_section_anyway_with_flags (abfd, ".auxv",
+							   SEC_HAS_CONTENTS);
+
+      if (sect == NULL)
+	return FALSE;
+      sect->size = note->descsz;
+      sect->filepos = note->descpos;
+      sect->alignment_power = 1 + bfd_get_arch_size (abfd) / 32;
+
+      return TRUE;
+    }
+
+  if (note->type == NT_OPENBSD_WCOOKIE)
+    {
+      asection *sect = bfd_make_section_anyway_with_flags (abfd, ".wcookie",
+							   SEC_HAS_CONTENTS);
+
+      if (sect == NULL)
+	return FALSE;
+      sect->size = note->descsz;
+      sect->filepos = note->descpos;
+      sect->alignment_power = 1 + bfd_get_arch_size (abfd) / 32;
+
+      return TRUE;
+    }
+
+  return TRUE;
+}
+
+static bfd_boolean
 elfcore_grok_nto_status (bfd *abfd, Elf_Internal_Note *note, long *tid)
 {
   void *ddata = note->descdata;
@@ -8585,6 +8659,11 @@ elf_parse_notes (bfd *abfd, char *buf, size_t size, file_ptr offset)
 	  if (CONST_STRNEQ (in.namedata, "NetBSD-CORE"))
 	    {
 	      if (! elfcore_grok_netbsd_note (abfd, &in))
+		return FALSE;
+	    }
+	  else if (CONST_STRNEQ (in.namedata, "OpenBSD"))
+	    {
+	      if (! elfcore_grok_openbsd_note (abfd, &in))
 		return FALSE;
 	    }
 	  else if (CONST_STRNEQ (in.namedata, "QNX"))

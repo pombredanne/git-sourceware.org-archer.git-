@@ -1,3 +1,24 @@
+2009-03-17  Hui Zhu  <teawater@gmail.com>
+
+	* gdb.texinfo: Change the introduce of "disassemble-next-line".
+
+2009-03-17  Hui Zhu  <teawater@gmail.com>
+
+	* gdb.texinfo: Add documentation for disassemble-next-line.
+
+2009-03-16  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.texinfo (Commands In Python): Remove tindex entries.
+
+2009-03-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.texinfo (Returning): New description for missing debug info.
+
+2009-03-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo (Remote Configuration): Document query-attached.
+	(General Query Packets): Document qAttached.
+
 2009-03-05  Pedro Alves  <pedro@codesourcery.com>
 
 	* gdb.texinfo (Background Execution): Better describe the set
@@ -21,8 +42,8 @@
 
 2009-02-14  Vladimir Prus  <vladimir@codesourcery.com>
 
-        * observer.texi: Add parameter 'print_frame' to normal_stop
-        observer.
+	* observer.texi: Add parameter 'print_frame' to normal_stop
+	observer.
 
 2009-02-07  Eli Zaretskii  <eliz@gnu.org>
 
