@@ -18390,6 +18390,15 @@ bar = some_val['foo']
 
 Again, @code{bar} will also be a @code{gdb.Value} object.
 
+The following attribute is provided:
+
+@table @code
+@defmethod Value is_optimized_out
+This read-only boolean attribute is true if the compiler optimized out
+this value, thus it is not available for fetching from the inferior.
+@end defmethod
+@end table
+
 The following methods are provided:
 
 @table @code
