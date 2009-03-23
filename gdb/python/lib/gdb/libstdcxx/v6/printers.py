@@ -27,6 +27,8 @@ class StdPointerPrinter:
         self.val = val
 
     def to_string (self):
+        if self.val['_M_refcount']['_M_pi'] == 0:
+            return '%s (empty) %s' % (self.typename, self.val['_M_ptr'])
         return '%s (count %d) %s' % (self.typename,
         self.val['_M_refcount']['_M_pi']['_M_use_count'],
         self.val['_M_ptr'])
@@ -617,14 +619,21 @@ def build_libstdcxx_dictionary ():
     pretty_printers_dict[re.compile('^std::vector<.*>$')] = StdVectorPrinter
     # vector<bool>
 
-    # These are the C++0x printers. They also exist in the standard namespace.
+    # These are the TR1 and C++0x printers.
     # For array - the default GDB pretty-printer seems reasonable.
-    pretty_printers_dict[re.compile('^std::(tr1::)?shared_ptr<.*>$')] = lambda val: StdPointerPrinter ('std::shared_ptr', val)
-    pretty_printers_dict[re.compile('^std::(tr1::)?weak_ptr<.*>$')] = lambda val: StdPointerPrinter ('std::weak_ptr', val)
-    pretty_printers_dict[re.compile('^std::(tr1::)?unordered_map<.*>$')] = lambda val: Tr1UnorderedMapPrinter ('std::tr1::unordered_map', val)
-    pretty_printers_dict[re.compile('^std::(tr1::)?unordered_set<.*>$')] = lambda val: Tr1UnorderedSetPrinter ('std::tr1::unordered_set', val)
-    pretty_printers_dict[re.compile('^std::(tr1::)?unordered_multimap<.*>$')] = lambda val: Tr1UnorderedMapPrinter ('std::tr1::unordered_multimap', val)
-    pretty_printers_dict[re.compile('^std::(tr1::)?unordered_multiset<.*>$')] = lambda val: Tr1UnorderedSetPrinter ('std::tr1::unordered_multiset', val)
+    pretty_printers_dict[re.compile('^std::shared_ptr<.*>$')] = lambda val: StdPointerPrinter ('std::shared_ptr', val)
+    pretty_printers_dict[re.compile('^std::weak_ptr<.*>$')] = lambda val: StdPointerPrinter ('std::weak_ptr', val)
+    pretty_printers_dict[re.compile('^std::unordered_map<.*>$')] = lambda val: Tr1UnorderedMapPrinter ('std::unordered_map', val)
+    pretty_printers_dict[re.compile('^std::unordered_set<.*>$')] = lambda val: Tr1UnorderedSetPrinter ('std::unordered_set', val)
+    pretty_printers_dict[re.compile('^std::unordered_multimap<.*>$')] = lambda val: Tr1UnorderedMapPrinter ('std::unordered_multimap', val)
+    pretty_printers_dict[re.compile('^std::unordered_multiset<.*>$')] = lambda val: Tr1UnorderedSetPrinter ('std::unordered_multiset', val)
+
+    pretty_printers_dict[re.compile('^std::tr1::shared_ptr<.*>$')] = lambda val: StdPointerPrinter ('std::tr1::shared_ptr', val)
+    pretty_printers_dict[re.compile('^std::tr1::weak_ptr<.*>$')] = lambda val: StdPointerPrinter ('std::tr1::weak_ptr', val)
+    pretty_printers_dict[re.compile('^std::tr1::unordered_map<.*>$')] = lambda val: Tr1UnorderedMapPrinter ('std::tr1::unordered_map', val)
+    pretty_printers_dict[re.compile('^std::tr1::unordered_set<.*>$')] = lambda val: Tr1UnorderedSetPrinter ('std::tr1::unordered_set', val)
+    pretty_printers_dict[re.compile('^std::tr1::unordered_multimap<.*>$')] = lambda val: Tr1UnorderedMapPrinter ('std::tr1::unordered_multimap', val)
+    pretty_printers_dict[re.compile('^std::tr1::unordered_multiset<.*>$')] = lambda val: Tr1UnorderedSetPrinter ('std::tr1::unordered_multiset', val)
 
 
     # Extensions.
