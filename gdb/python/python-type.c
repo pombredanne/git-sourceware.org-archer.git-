@@ -175,7 +175,14 @@ convert_field (struct type *type, int field)
   if (PyObject_SetAttrString (result, "bitsize", arg) < 0)
     goto failarg;
 
-  arg = type_to_type_object (TYPE_FIELD_TYPE (type, field));
+  /* A field can have a NULL type in some situations.  */
+  if (TYPE_FIELD_TYPE (type, field) == NULL)
+    {
+      arg = Py_None;
+      Py_INCREF (arg);
+    }
+  else
+    arg = type_to_type_object (TYPE_FIELD_TYPE (type, field));
   if (!arg)
     goto fail;
   if (PyObject_SetAttrString (result, "type", arg) < 0)

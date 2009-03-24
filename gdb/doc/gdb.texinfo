@@ -18522,7 +18522,8 @@ non-zero value, which is the size of the field in bits.  Otherwise,
 this will be zero; in this case the field's size is given by its type.
 
 @item type
-The type of the field.
+The type of the field.  This is usually an instance of @code{Type},
+but it can be @code{None} in some situations.
 @end table
 @end defmethod
 
