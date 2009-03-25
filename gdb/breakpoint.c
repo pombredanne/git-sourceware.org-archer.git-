@@ -191,6 +191,11 @@ static int is_hardware_watchpoint (struct breakpoint *bpt);
 
 static void insert_breakpoint_locations (void);
 
+/* Flag indicating that a command has proceeded the inferior past the
+   current breakpoint.  */
+
+static int breakpoint_proceeded;
+
 static const char *
 bpdisp_text (enum bpdisp disp)
 {
@@ -2081,6 +2086,26 @@ bpstat_clear_actions (bpstat bs)
 	  bs->old_val = NULL;
 	}
     }
+}
+
+/* Called when a command is about to proceed the inferior.  */
+
+static void
+breakpoint_about_to_proceed (void)
+{
+  if (!ptid_equal (inferior_ptid, null_ptid))
+    {
+      struct thread_info *tp = inferior_thread ();
+
+      /* Allow inferior function calls in breakpoint commands to not
+	 interrupt the command list.  When the call finishes
+	 successfully, the inferior will be standing at the same
+	 breakpoint as if nothing happened.  */
+      if (tp->in_infcall)
+	return;
+    }
+
+  breakpoint_proceeded = 1;
 }
 
 /* Stub for cleaning up our state if we error-out of a breakpoint command */
@@ -4477,28 +4502,22 @@ disable_breakpoints_in_unloaded_shlib (struct so_list *solib)
     struct breakpoint *b = loc->owner;
     if ((loc->loc_type == bp_loc_hardware_breakpoint
 	 || loc->loc_type == bp_loc_software_breakpoint)
-	&& !loc->shlib_disabled)
+	&& !loc->shlib_disabled
+	&& (b->type == bp_breakpoint || b->type == bp_hardware_breakpoint)
+	&& solib_contains_address_p (solib, loc->address))
       {
-#ifdef PC_SOLIB
-	char *so_name = PC_SOLIB (loc->address);
-#else
-	char *so_name = solib_name_from_address (loc->address);
-#endif
-	if (so_name && !strcmp (so_name, solib->so_name))
-          {
-	    loc->shlib_disabled = 1;
-	    /* At this point, we cannot rely on remove_breakpoint
-	       succeeding so we must mark the breakpoint as not inserted
-	       to prevent future errors occurring in remove_breakpoints.  */
-	    loc->inserted = 0;
-	    if (!disabled_shlib_breaks)
-	      {
-		target_terminal_ours_for_output ();
-		warning (_("Temporarily disabling breakpoints for unloaded shared library \"%s\""),
-			  so_name);
-	      }
-	    disabled_shlib_breaks = 1;
+	loc->shlib_disabled = 1;
+	/* At this point, we cannot rely on remove_breakpoint
+	   succeeding so we must mark the breakpoint as not inserted
+	   to prevent future errors occurring in remove_breakpoints.  */
+	loc->inserted = 0;
+	if (!disabled_shlib_breaks)
+	  {
+	    target_terminal_ours_for_output ();
+	    warning (_("Temporarily disabling breakpoints for unloaded shared library \"%s\""),
+		     solib->so_name);
 	  }
+	disabled_shlib_breaks = 1;
       }
   }
 }
@@ -8498,4 +8517,6 @@ inferior in all-stop mode, gdb behaves as if always-inserted mode is off."),
 			   &breakpoint_show_cmdlist);
   
   automatic_hardware_breakpoints = 1;
+
+  observer_attach_about_to_proceed (breakpoint_about_to_proceed);
 }

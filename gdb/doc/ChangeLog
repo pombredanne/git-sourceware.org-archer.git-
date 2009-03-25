@@ -1,3 +1,53 @@
+2009-03-22  Pedro Alves  <pedro@codesourcery.com>
+
+	* observer.texi (about_to_proceed): New.
+
+2009-03-21  Jeremy Bennett  <jeremy.bennett@embecosm.com>
+
+	* gdbint.texinfo (everywhere): Use braces {} in @deftypeXX type
+	field throughout to handle types with spaces in them.  Fix typos
+	found by aspell.
+	(Summary, Requirements, Contributors): New first chapter,
+	"Summary" added, old Requirements section moved there, and new
+	section, "Contributors" added.
+	(Initializing a New Architecture, Register Representation)
+	(Frame Interpretation, Inferior Call Setup, Adding a New Target)
+	(Porting gdb): These sections extended and updated.
+	(Compiler Characteristics): This section (empty) deleted.
+	(Defining Other Architecture Features): This section renamed and
+	duplicate material removed from (formerly "Target Conditionals").
+	Use braces {} in @deftypeXX type field throughout to handle types
+	with spaces in them. Typos found by aspell fixed.
+
+	* stack_frame.svg: New file, source of image for gdbint.texinfo.
+	* stack_frame.pdf: Version of image for PDF output.
+	* stack_frame.png: Version of image for HTML output and for Emacs.
+	* stack_frame.txt: Version of image for Info output.
+	* stack_frame.eps: Version of image for TeX DVI output.
+
+2009-03-21  Eli Zaretskii  <eliz@gnu.org>
+
+	* gdb.texinfo (Character Sets): Fix last change.
+
+2009-03-21  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.texinfo (Values From Inferior): Fix optional arguments
+	markup.
+	(Commands In Python): Adjust argument names of gdb.Command.__init__
+	to what the function accepts as keywords.
+
+2008-03-20  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Convenience Vars): Document convenience functions.
+	(Functions In Python): New node.
+	(Python API): Update.
+
+2009-03-20  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Character Sets): Remove obsolete text.  Document
+	set target-wide-charset.
+	(Requirements): Mention iconv.
+
 2009-03-17  Hui Zhu  <teawater@gmail.com>
 
 	* gdb.texinfo: Change the introduce of "disassemble-next-line".

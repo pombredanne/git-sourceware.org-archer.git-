@@ -1,6 +1,6 @@
 dnl Autoconf configure script for GDB, the GNU debugger.
 dnl Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
-dnl 2005, 2006, 2007, 2008
+dnl 2005, 2006, 2007, 2008, 2009
 dnl Free Software Foundation, Inc.
 dnl
 dnl This file is part of GDB.
@@ -331,6 +331,14 @@ if test x"$enable_libunwind" = xyes; then
   CONFIG_SRCS="$CONFIG_SRCS libunwind-frame.c"
 fi
 
+opt_curses=no
+AC_ARG_WITH(curses, AC_HELP_STRING([--with-curses], [use the curses library instead of the termcap library]), opt_curses=$withval)
+
+prefer_curses=no
+if test "$opt_curses" = "yes"; then
+  prefer_curses=yes
+fi
+
 # Profiling support.
 AC_ARG_ENABLE(profiling,
 [  --enable-profiling      enable profiling of GDB],
@@ -430,6 +438,8 @@ AC_SEARCH_LIBS(zlibVersion, z, [AC_CHECK_HEADERS(zlib.h)])
 # On HP/UX we may need libxpdl for dlgetmodinfo (used by solib-pa64.c).
 AC_SEARCH_LIBS(dlgetmodinfo, [dl xpdl])
 
+AM_ICONV
+
 # On alpha-osf, it appears that libtermcap and libcurses are not compatible.
 # There is a very specific comment in /usr/include/curses.h explaining that
 # termcap routines built into libcurses must not be used.
@@ -457,22 +467,32 @@ case $host_os in
     ;;
 esac
 
+# For the TUI, we need enhanced curses functionality.
+if test x"$enable_tui" != xno; then
+  prefer_curses=yes
+fi
+
+curses_found=no
+if test x"$prefer_curses" = xyes; then
+  # FIXME: kettenis/20040905: We prefer ncurses over the vendor-supplied
+  # curses library because the latter might not provide all the
+  # functionality we need.  However, this leads to problems on systems
+  # where the linker searches /usr/local/lib, but the compiler doesn't
+  # search /usr/local/include, if ncurses is installed in /usr/local.  A
+  # default installation of ncurses on alpha*-dec-osf* will lead to such
+  # a situation.
+  AC_SEARCH_LIBS(waddstr, [ncurses cursesX curses])
+
+  if test "$ac_cv_search_waddstr" != no; then
+    curses_found=yes
+  fi
+fi
+
 # Check whether we should enable the TUI, but only do so if we really
 # can.
 if test x"$enable_tui" != xno; then
   if test -d $srcdir/tui; then
-    # For the TUI, we need enhanced curses functionality.
-    #
-    # FIXME: kettenis/20040905: We prefer ncurses over the vendor-supplied
-    # curses library because the latter might not provide all the
-    # functionality we need.  However, this leads to problems on systems
-    # where the linker searches /usr/local/lib, but the compiler doesn't
-    # search /usr/local/include, if ncurses is installed in /usr/local.  A
-    # default installation of ncurses on alpha*-dec-osf* will lead to such
-    # a situation.
-    AC_SEARCH_LIBS(waddstr, [ncurses cursesX curses])
-
-    if test "$ac_cv_search_waddstr" != no; then
+    if test "$curses_found" != no; then
       CONFIG_OBS="$CONFIG_OBS \$(SUBDIR_TUI_OBS)"
       CONFIG_DEPS="$CONFIG_DEPS \$(SUBDIR_TUI_DEPS)"
       CONFIG_SRCS="$CONFIG_SRCS \$(SUBDIR_TUI_SRCS)"
@@ -776,7 +796,8 @@ AC_FUNC_VFORK
 AC_CHECK_FUNCS([canonicalize_file_name realpath getrusage getuid \
                 getgid poll pread64 sbrk setpgid setpgrp setsid \
 		sigaction sigprocmask sigsetmask socketpair syscall \
-		ttrace wborder setlocale])
+		ttrace wborder setlocale iconvlist])
+AM_LANGINFO_CODESET
 
 # Check the return and argument types of ptrace.  No canned test for
 # this, so roll our own.
@@ -1930,16 +1951,9 @@ dnl Check for exe extension set on certain hosts (e.g. Win32)
 AC_EXEEXT
 
 dnl  Detect the character set used by this host.
-
-dnl  At the moment, we just assume it's ISO-8859-1 (which is a
-dnl  superset of ASCII containing the characters needed for French,
-dnl  German, Spanish, Italian, and possibly others), but if were
-dnl  *were* to support any host character sets other than ISO-8859-1,
-dnl  here's where we'd detect it.
-AC_DEFINE(GDB_DEFAULT_HOST_CHARSET, "ISO-8859-1",
+dnl  At the moment, we just assume it's UTF-8.
+AC_DEFINE(GDB_DEFAULT_HOST_CHARSET, "UTF-8",
           [Define to be a string naming the default host character set.])
-
-AM_ICONV
 
 AC_OUTPUT(Makefile .gdbinit:gdbinit.in gnulib/Makefile,
 [

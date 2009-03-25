@@ -7436,6 +7436,20 @@ On HP-UX systems, if you refer to a function or variable name that
 begins with a dollar sign, @value{GDBN} searches for a user or system
 name first, before it searches for a convenience variable.
 
+@cindex convenience functions
+@value{GDBN} also supplies some @dfn{convenience functions}.  These
+have a syntax similar to convenience variables.  A convenience
+function can be used in an expression just like an ordinary function;
+however, a convenience function is implemented internally to
+@value{GDBN}.
+
+@table @code
+@item help function
+@kindex help function
+@cindex show all convenience functions
+Print a list of all convenience functions.
+@end table
+
 @node Registers
 @section Registers
 
@@ -7959,13 +7973,10 @@ support:
 @table @code
 @item set target-charset @var{charset}
 @kindex set target-charset
-Set the current target character set to @var{charset}.  We list the
-character set names @value{GDBN} recognizes below, but if you type
-@code{set target-charset} followed by @key{TAB}@key{TAB}, @value{GDBN} will
-list the target character sets it supports.
-@end table
+Set the current target character set to @var{charset}.  To display the
+list of supported target character sets, type
+@kbd{@w{set target-charset @key{TAB}@key{TAB}}}.
 
-@table @code
 @item set host-charset @var{charset}
 @kindex set host-charset
 Set the current host character set to @var{charset}.
@@ -7975,63 +7986,39 @@ system it is running on; you can override that default using the
 @code{set host-charset} command.
 
 @value{GDBN} can only use certain character sets as its host character
-set.  We list the character set names @value{GDBN} recognizes below, and
-indicate which can be host character sets, but if you type
-@code{set target-charset} followed by @key{TAB}@key{TAB}, @value{GDBN} will
-list the host character sets it supports.
+set.  If you type @kbd{@w{set target-charset @key{TAB}@key{TAB}}},
+@value{GDBN} will list the host character sets it supports.
 
 @item set charset @var{charset}
 @kindex set charset
 Set the current host and target character sets to @var{charset}.  As
-above, if you type @code{set charset} followed by @key{TAB}@key{TAB},
-@value{GDBN} will list the name of the character sets that can be used
+above, if you type @kbd{@w{set charset @key{TAB}@key{TAB}}},
+@value{GDBN} will list the names of the character sets that can be used
 for both host and target.
-
 
 @item show charset
 @kindex show charset
-Show the names of the current host and target charsets.
+Show the names of the current host and target character sets.
 
-@itemx show host-charset
+@item show host-charset
 @kindex show host-charset
-Show the name of the current host charset.
+Show the name of the current host character set.
 
-@itemx show target-charset
+@item show target-charset
 @kindex show target-charset
-Show the name of the current target charset.
+Show the name of the current target character set.
 
+@item set target-wide-charset @var{charset}
+@kindex set target-wide-charset
+Set the current target's wide character set to @var{charset}.  This is
+the character set used by the target's @code{wchar_t} type.  To
+display the list of supported wide character sets, type
+@kbd{@w{set target-wide-charset @key{TAB}@key{TAB}}}.
+
+@item show target-wide-charset
+@kindex show target-wide-charset
+Show the name of the current target's wide character set.
 @end table
-
-@value{GDBN} currently includes support for the following character
-sets:
-
-@table @code
-
-@item ASCII
-@cindex ASCII character set
-Seven-bit U.S. @sc{ascii}.  @value{GDBN} can use this as its host
-character set.
-
-@item ISO-8859-1
-@cindex ISO 8859-1 character set
-@cindex ISO Latin 1 character set
-The ISO Latin 1 character set.  This extends @sc{ascii} with accented
-characters needed for French, German, and Spanish.  @value{GDBN} can use
-this as its host character set.
-
-@item EBCDIC-US
-@itemx IBM1047
-@cindex EBCDIC character set
-@cindex IBM1047 character set
-Variants of the @sc{ebcdic} character set, used on some of IBM's
-mainframe operating systems.  (@sc{gnu}/Linux on the S/390 uses U.S. @sc{ascii}.)
-@value{GDBN} cannot use these as its host character set.
-
-@end table
-
-Note that these are all single-byte character sets.  More work inside
-@value{GDBN} is needed to support multi-byte or variable-width character
-encodings, like the UTF-8 and UCS-2 encodings of Unicode.
 
 Here is an example of @value{GDBN}'s character set support in action.
 Assume that the following source code has been placed in the file
@@ -18206,6 +18193,7 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 * Exception Handling::
 * Values From Inferior::
 * Commands In Python::          Implementing new commands in Python.
+* Functions In Python::         Writing new convenience functions.
 @end menu
 
 @node Basic Python
@@ -18361,7 +18349,7 @@ The result @code{bar} will be a @code{gdb.Value} object holding the
 value pointed to by @code{foo}.
 @end defmethod
 
-@defmethod Value string @r{[}encoding @r{[}errors@r{]}@r{]}
+@defmethod Value string @r{[}encoding@r{]} @r{[}errors@r{]}
 If this @code{gdb.Value} represents a string, then this method
 converts the contents to a Python string.  Otherwise, this method will
 throw an exception.
@@ -18397,7 +18385,7 @@ You can implement new @value{GDBN} CLI commands in Python.  A CLI
 command is implemented using an instance of the @code{gdb.Command}
 class, most commonly using a subclass.
 
-@defmethod Command __init__ name @var{command-class} @r{[}@var{completer-class} @var{prefix}@r{]}
+@defmethod Command __init__ name @var{command_class} @r{[}@var{completer_class}@r{]} @r{[}@var{prefix}@r{]}
 The object initializer for @code{Command} registers the new command
 with @value{GDBN}.  This initializer is normally invoked from the
 subclass' own @code{__init__} method.
@@ -18409,11 +18397,11 @@ an exception is raised.
 
 There is no support for multi-line commands.
 
-@var{command-class} should be one of the @samp{COMMAND_} constants
+@var{command_class} should be one of the @samp{COMMAND_} constants
 defined below.  This argument tells @value{GDBN} how to categorize the
 new command in the help system.
 
-@var{completer-class} is an optional argument.  If given, it should be
+@var{completer_class} is an optional argument.  If given, it should be
 one of the @samp{COMPLETE_} constants defined below.  This argument
 tells @value{GDBN} how to perform completion for this command.  If not
 given, @value{GDBN} will attempt to complete using the object's
@@ -18637,6 +18625,65 @@ HelloWorld ()
 
 The last line instantiates the class, and is necessary to trigger the
 registration of the command with @value{GDBN}.  Depending on how the
+Python code is read into @value{GDBN}, you may need to import the
+@code{gdb} module explicitly.
+
+@node Functions In Python
+@subsubsection Writing new convenience functions
+
+@cindex writing convenience functions
+@cindex convenience functions in python
+@cindex python convenience functions
+@tindex gdb.Function
+@tindex Function
+You can implement new convenience functions (@pxref{Convenience Vars})
+in Python.  A convenience function is an instance of a subclass of the
+class @code{gdb.Function}.
+
+@defmethod Function __init__ name
+The initializer for @code{Function} registers the new function with
+@value{GDBN}.  The argument @var{name} is the name of the function,
+a string.  The function will be visible to the user as a convenience
+variable of type @code{internal function}, whose name is the same as
+the given @var{name}.
+
+The documentation for the new function is taken from the documentation
+string for the new class.
+@end defmethod
+
+@defmethod Function invoke @var{*args}
+When a convenience function is evaluated, its arguments are converted
+to instances of @code{gdb.Value}, and then the function's
+@code{invoke} method is called.  Note that @value{GDBN} does not
+predetermine the arity of convenience functions.  Instead, all
+available arguments are passed to @code{invoke}, following the
+standard Python calling convention.  In particular, a convenience
+function can have default values for parameters without ill effect.
+
+The return value of this method is used as its value in the enclosing
+expression.  If an ordinary Python value is returned, it is converted
+to a @code{gdb.Value} following the usual rules.
+@end defmethod
+
+The following code snippet shows how a trivial convenience function can
+be implemented in Python:
+
+@smallexample
+class Greet (gdb.Function):
+  """Return string to greet someone.
+Takes a name as argument."""
+
+  def __init__ (self):
+    super (Greet, self).__init__ ("greet")
+
+  def invoke (self, name):
+    return "Hello, %s!" % name.string ()
+
+Greet ()
+@end smallexample
+
+The last line instantiates the class, and is necessary to trigger the
+registration of the function with @value{GDBN}.  Depending on how the
 Python code is read into @value{GDBN}, you may need to import the
 @code{gdb} module explicitly.
 
@@ -24826,6 +24873,24 @@ The @samp{zlib} library is likely included with your operating system
 distribution; if it is not, you can get the latest version from
 @url{http://zlib.net}.
 
+@item iconv
+@value{GDBN}'s features related to character sets (@pxref{Character
+Sets}) require a functioning @code{iconv} implementation.  If you are
+on a GNU system, then this is provided by the GNU C Library.  Some
+other systems also provide a working @code{iconv}.
+
+On systems with @code{iconv}, you can install GNU Libiconv.  If you
+have previously installed Libiconv, you can use the
+@option{--with-libiconv-prefix} option to configure.
+
+@value{GDBN}'s top-level @file{configure} and @file{Makefile} will
+arrange to build Libiconv if a directory named @file{libiconv} appears
+in the top-most source directory.  If Libiconv is built this way, and
+if the operating system does not provide a suitable @code{iconv}
+implementation, then the just-built library will automatically be used
+by @value{GDBN}.  One easy way to set this up is to download GNU
+Libiconv, unpack it, and then rename the directory holding the
+Libiconv source code to @samp{libiconv}.
 @end table
 
 @node Running Configure
