@@ -217,6 +217,33 @@ show_addressprint (struct ui_file *file, int from_tty,
 }
 
 
+/* A helper function for val_print.  When printing in "summary" mode,
+   we want to print scalar arguments, but not aggregate arguments.
+   This function distinguishes between the two.  */
+
+static int
+scalar_type_p (struct type *type)
+{
+  CHECK_TYPEDEF (type);
+  while (TYPE_CODE (type) == TYPE_CODE_REF)
+    {
+      type = TYPE_TARGET_TYPE (type);
+      CHECK_TYPEDEF (type);
+    }
+  switch (TYPE_CODE (type))
+    {
+    case TYPE_CODE_ARRAY:
+    case TYPE_CODE_STRUCT:
+    case TYPE_CODE_UNION:
+    case TYPE_CODE_SET:
+    case TYPE_CODE_STRING:
+    case TYPE_CODE_BITSTRING:
+      return 0;
+    default:
+      return 1;
+    }
+}
+
 /* Print using the given LANGUAGE the data of type TYPE located at VALADDR
    (within GDB), which came from the inferior at address ADDRESS, onto
    stdio stream STREAM according to OPTIONS.
@@ -267,6 +294,14 @@ val_print (struct type *type, const gdb_byte *valaddr, int embedded_offset,
 				      language);
       if (ret)
 	return ret;
+    }
+
+  /* Handle summary mode.  If the value is a scalar, print it;
+     otherwise, print an ellipsis.  */
+  if (options->summary && !scalar_type_p (type))
+    {
+      fprintf_filtered (stream, "...");
+      return 0;
     }
 
   TRY_CATCH (except, RETURN_MASK_ERROR)
