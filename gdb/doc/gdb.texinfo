@@ -18393,6 +18393,7 @@ Again, @code{bar} will also be a @code{gdb.Value} object.
 The following attribute is provided:
 
 @table @code
+@cindex optimized out value in Python
 @defmethod Value is_optimized_out
 This read-only boolean attribute is true if the compiler optimized out
 this value, thus it is not available for fetching from the inferior.
