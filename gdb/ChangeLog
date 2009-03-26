@@ -1,4 +1,11 @@
-2009-03-12  Sami Wagiaalla  <swagiaal@redhat.com>
+2009-03-26  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* symtab.c (lookup_symbol_aux): Moved check for member variables
+	from here...
+	(lookup_symbol_aux_local): ...to here.
+	Check check namespace scope at every block level.
+
+2009-03-19  Tom Tromey  <tromey@redhat.com>
 
 	* valops.c (find_overload_match): Creates its own list of argument
 	types. 
