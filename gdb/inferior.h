@@ -287,11 +287,6 @@ extern void notice_new_inferior (ptid_t, int, int);
 
 extern CORE_ADDR stop_pc;
 
-/* Flag indicating that a command has proceeded the inferior past the
-   current breakpoint.  */
-
-extern int breakpoint_proceeded;
-
 /* Nonzero if stopped due to completion of a stack dummy routine.  */
 
 extern int stop_stack_dummy;
@@ -367,13 +362,6 @@ extern int debug_displaced;
 /* Dump LEN bytes at BUF in hex to FILE, followed by a newline.  */
 void displaced_step_dump_bytes (struct ui_file *file,
                                 const gdb_byte *buf, size_t len);
-
-
-/* When set, normal_stop will not call the normal_stop observer.  */
-extern int suppress_stop_observer;
-
-/* When set, no calls to target_resumed observer will be made.  */
-extern int suppress_resume_observer;
 
 
 /* Possible values for gdbarch_call_dummy_location.  */

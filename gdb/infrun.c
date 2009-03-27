@@ -1230,7 +1230,8 @@ clear_proceed_status (void)
     }
 
   stop_after_trap = 0;
-  breakpoint_proceeded = 1;	/* We're about to proceed... */
+
+  observer_notify_about_to_proceed ();
 
   if (stop_registers)
     {
@@ -4433,11 +4434,26 @@ Further execution is probably impossible.\n"));
 
 done:
   annotate_stopped ();
-  if (!suppress_stop_observer
-      && !(target_has_execution
-	   && last.kind != TARGET_WAITKIND_SIGNALLED
-	   && last.kind != TARGET_WAITKIND_EXITED
-	   && inferior_thread ()->step_multi))
+
+  /* Suppress the stop observer if we're in the middle of:
+
+     - a step n (n > 1), as there still more steps to be done.
+
+     - a "finish" command, as the observer will be called in
+       finish_command_continuation, so it can include the inferior
+       function's return value.
+
+     - calling an inferior function, as we pretend we inferior didn't
+       run at all.  The return value of the call is handled by the
+       expression evaluator, through call_function_by_hand.  */
+
+  if (!target_has_execution
+      || last.kind == TARGET_WAITKIND_SIGNALLED
+      || last.kind == TARGET_WAITKIND_EXITED
+      || (!inferior_thread ()->step_multi
+	  && !(inferior_thread ()->stop_bpstat
+	       && inferior_thread ()->proceed_to_finish)
+	  && !inferior_thread ()->in_infcall))
     {
       if (!ptid_equal (inferior_ptid, null_ptid))
 	observer_notify_normal_stop (inferior_thread ()->stop_bpstat,
@@ -4992,8 +5008,8 @@ struct inferior_status
   /* ID if the selected frame when the inferior function call was made.  */
   struct frame_id selected_frame_id;
 
-  int breakpoint_proceeded;
   int proceed_to_finish;
+  int in_infcall;
 };
 
 /* Save all of the information associated with the inferior<==>gdb
@@ -5022,8 +5038,8 @@ save_inferior_status (void)
      called.  */
   inf_status->stop_bpstat = tp->stop_bpstat;
   tp->stop_bpstat = bpstat_copy (tp->stop_bpstat);
-  inf_status->breakpoint_proceeded = breakpoint_proceeded;
   inf_status->proceed_to_finish = tp->proceed_to_finish;
+  inf_status->in_infcall = tp->in_infcall;
 
   inf_status->selected_frame_id = get_frame_id (get_selected_frame (NULL));
 
@@ -5072,8 +5088,8 @@ restore_inferior_status (struct inferior_status *inf_status)
   bpstat_clear (&tp->stop_bpstat);
   tp->stop_bpstat = inf_status->stop_bpstat;
   inf_status->stop_bpstat = NULL;
-  breakpoint_proceeded = inf_status->breakpoint_proceeded;
   tp->proceed_to_finish = inf_status->proceed_to_finish;
+  tp->in_infcall = inf_status->in_infcall;
 
   if (target_has_stack)
     {

@@ -1,3 +1,53 @@
+2009-03-24  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* cpu-i386.c (bfd_x86_64_arch_intel_syntax): Make it static.
+	(bfd_i386_arch_intel_syntax): Likewise.
+	(i8086_arch): Likewise.
+	(bfd_x86_64_arch): Likewise.
+
+2009-03-24  Hans-Peter Nilsson  <hp@axis.com>
+
+	* elf32-cris.c (cris_elf_relocate_section): <case
+	R_CRIS_16_DTPREL, R_CRIS_32_DTPREL>: Allow use of non-local
+	symbols for non-allocated sections.  Don't check whether to
+	generate R_CRIS_DTPMOD for non-allocated sections.
+	(cris_elf_gc_sweep_hook) <case R_CRIS_32_DTPREL>: Don't
+	handle relocation GC:ing if applied to non-allocated section.
+	(cris_elf_check_relocs): Similar.
+
+	* elf32-cris.c (cris_elf_relocate_section) <case R_CRIS_32_GD>
+	<R_CRIS_16_GOT_GD, R_CRIS_32_GOT_GD>: Don't include the TLS size
+	when emitting a known TP offset in the GOT.
+
+2009-03-23  Alan Modra  <amodra@bigpond.net.au>
+
+	* elf64-ppc.c (synthetic_opd): Delete.
+	(compare_symbols): Look for .opd name rather than section match.
+	(ppc64_elf_get_synthetic_symtab): Likewise.
+
+2009-03-21  Alan Modra  <amodra@bigpond.net.au>
+
+	* elf32-ppc.c (is_pic_glink_stub): Delete.
+	(is_nonpic_glink_stub): New function.
+	(ppc_elf_get_synthetic_symtab): Check for last non-pic stub rather
+	than first pic one.
+	(struct ppc_elf_link_hash_table <glink_pltresolve>): Comment fix.
+
+2009-03-20  Martin Schwidefsky  <schwidefsky@de.ibm.com>
+	    Andreas Krebbel  <Andreas.Krebbel@de.ibm.com>
+
+	* elf32-s390.c (elf_s390_check_relocs): Use the SYMBOL_*
+        macros for visibilty and locality checks.
+	(elf_s390_adjust_dynamic_symbol): Likewise.
+	(allocate_dynrelocs): Likewise.
+	(elf_s390_relocate_section): Likewise.
+	(elf_s390_finish_dynamic_symbol): Likewise.
+	* elf64-s390.c (elf_s390_check_relocs): Likewise.
+	(elf_s390_adjust_dynamic_symbol): Likewise.
+	(allocate_dynrelocs): Likewise.
+	(elf_s390_relocate_section): Likewise.
+	(elf_s390_finish_dynamic_symbol): Likewise.
+
 2009-03-19  Kai Tietz  <kai.tietz@onevision.com>
 
 	* bfd-in2.h: Regenerated.

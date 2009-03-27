@@ -287,6 +287,13 @@ value_check_printable (struct value *val, struct ui_file *stream)
       return 0;
     }
 
+  if (TYPE_CODE (value_type (val)) == TYPE_CODE_INTERNAL_FUNCTION)
+    {
+      fprintf_filtered (stream, _("<internal function %s>"),
+			value_internal_function_name (val));
+      return 0;
+    }
+
   return 1;
 }
 
@@ -919,7 +926,8 @@ print_hex_chars (struct ui_file *stream, const gdb_byte *valaddr,
    Omit any leading zero chars.  */
 
 void
-print_char_chars (struct ui_file *stream, const gdb_byte *valaddr,
+print_char_chars (struct ui_file *stream, struct type *type,
+		  const gdb_byte *valaddr,
 		  unsigned len, enum bfd_endian byte_order)
 {
   const gdb_byte *p;
@@ -932,7 +940,7 @@ print_char_chars (struct ui_file *stream, const gdb_byte *valaddr,
 
       while (p < valaddr + len)
 	{
-	  LA_EMIT_CHAR (*p, stream, '\'');
+	  LA_EMIT_CHAR (*p, type, stream, '\'');
 	  ++p;
 	}
     }
@@ -944,7 +952,7 @@ print_char_chars (struct ui_file *stream, const gdb_byte *valaddr,
 
       while (p >= valaddr)
 	{
-	  LA_EMIT_CHAR (*p, stream, '\'');
+	  LA_EMIT_CHAR (*p, type, stream, '\'');
 	  --p;
 	}
     }
@@ -1315,7 +1323,8 @@ read_string (CORE_ADDR addr, int len, int width, unsigned int fetchlimit,
    whichever is smaller.  */
 
 int
-val_print_string (CORE_ADDR addr, int len, int width, struct ui_file *stream,
+val_print_string (struct type *elttype, CORE_ADDR addr, int len,
+		  struct ui_file *stream,
 		  const struct value_print_options *options)
 {
   int force_ellipsis = 0;	/* Force ellipsis to be printed if nonzero.  */
@@ -1325,6 +1334,7 @@ val_print_string (CORE_ADDR addr, int len, int width, struct ui_file *stream,
   int bytes_read;
   gdb_byte *buffer = NULL;	/* Dynamically growable fetch buffer.  */
   struct cleanup *old_chain = NULL;	/* Top of the old cleanup chain.  */
+  int width = TYPE_LENGTH (elttype);
 
   /* First we need to figure out the limit on the number of characters we are
      going to attempt to fetch and print.  This is actually pretty simple.  If
@@ -1378,7 +1388,7 @@ val_print_string (CORE_ADDR addr, int len, int width, struct ui_file *stream,
 	{
 	  fputs_filtered (" ", stream);
 	}
-      LA_PRINT_STRING (stream, buffer, bytes_read / width, width, force_ellipsis, options);
+      LA_PRINT_STRING (stream, elttype, buffer, bytes_read / width, force_ellipsis, options);
     }
 
   if (errcode != 0)

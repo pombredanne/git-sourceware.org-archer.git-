@@ -411,25 +411,28 @@ field_name_match (const char *field_name, const char *target)
 }
 
 
-/* Assuming TYPE is a TYPE_CODE_STRUCT, find the field whose name matches
-   FIELD_NAME, and return its index.  This function also handles fields
-   whose name have ___ suffixes because the compiler sometimes alters
-   their name by adding such a suffix to represent fields with certain
-   constraints.  If the field could not be found, return a negative
-   number if MAYBE_MISSING is set.  Otherwise raise an error.  */
+/* Assuming TYPE is a TYPE_CODE_STRUCT or a TYPE_CODE_TYPDEF to
+   a TYPE_CODE_STRUCT, find the field whose name matches FIELD_NAME,
+   and return its index.  This function also handles fields whose name
+   have ___ suffixes because the compiler sometimes alters their name
+   by adding such a suffix to represent fields with certain constraints.
+   If the field could not be found, return a negative number if
+   MAYBE_MISSING is set.  Otherwise raise an error.  */
 
 int
 ada_get_field_index (const struct type *type, const char *field_name,
                      int maybe_missing)
 {
   int fieldno;
-  for (fieldno = 0; fieldno < TYPE_NFIELDS (type); fieldno++)
-    if (field_name_match (TYPE_FIELD_NAME (type, fieldno), field_name))
+  struct type *struct_type = check_typedef ((struct type *) type);
+
+  for (fieldno = 0; fieldno < TYPE_NFIELDS (struct_type); fieldno++)
+    if (field_name_match (TYPE_FIELD_NAME (struct_type, fieldno), field_name))
       return fieldno;
 
   if (!maybe_missing)
     error (_("Unable to find field %s in struct %s.  Aborting"),
-           field_name, TYPE_NAME (type));
+           field_name, TYPE_NAME (struct_type));
 
   return -1;
 }
@@ -1783,6 +1786,7 @@ decode_packed_array_type (struct type *type)
       return NULL;
     }
   shadow_type = SYMBOL_TYPE (sym);
+  CHECK_TYPEDEF (shadow_type);
 
   if (TYPE_CODE (shadow_type) != TYPE_CODE_ARRAY)
     {
@@ -2650,7 +2654,7 @@ resolve_subexp (struct expression **expp, int *pos, int deprocedure_p,
 
     case UNOP_QUAL:
       *pos += 3;
-      resolve_subexp (expp, pos, 1, exp->elts[pc + 1].type);
+      resolve_subexp (expp, pos, 1, check_typedef (exp->elts[pc + 1].type));
       break;
 
     case OP_ATR_MODULUS:
@@ -8783,7 +8787,7 @@ ada_evaluate_subexp (struct type *expect_type, struct expression *exp,
     case UNOP_IN_RANGE:
       (*pos) += 2;
       arg1 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
-      type = exp->elts[pc + 1].type;
+      type = check_typedef (exp->elts[pc + 1].type);
 
       if (noside == EVAL_SKIP)
         goto nosideret;
@@ -8869,7 +8873,7 @@ ada_evaluate_subexp (struct type *expect_type, struct expression *exp,
           {
             evaluate_subexp (NULL_TYPE, exp, pos, EVAL_SKIP);
             arg1 = NULL;
-            type_arg = exp->elts[pc + 2].type;
+            type_arg = check_typedef (exp->elts[pc + 2].type);
           }
         else
           {
@@ -9007,7 +9011,7 @@ ada_evaluate_subexp (struct type *expect_type, struct expression *exp,
 
     case OP_ATR_MODULUS:
       {
-        struct type *type_arg = exp->elts[pc + 2].type;
+        struct type *type_arg = check_typedef (exp->elts[pc + 2].type);
         evaluate_subexp (NULL_TYPE, exp, pos, EVAL_SKIP);
 
         if (noside == EVAL_SKIP)
@@ -11022,9 +11026,9 @@ ada_language_arch_info (struct gdbarch *gdbarch,
 /* Not really used, but needed in the ada_language_defn.  */
 
 static void
-emit_char (int c, struct ui_file *stream, int quoter)
+emit_char (int c, struct type *type, struct ui_file *stream, int quoter)
 {
-  ada_emit_char (c, stream, quoter, 1);
+  ada_emit_char (c, type, stream, quoter, 1);
 }
 
 static int

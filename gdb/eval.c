@@ -40,9 +40,12 @@
 #include "regcache.h"
 #include "user-regs.h"
 #include "valprint.h"
+#include "python/python.h"
 #include "dwarf2loc.h"
 
 #include "gdb_assert.h"
+
+#include <ctype.h>
 
 /* This is defined in valops.c */
 extern int overload_resolution;
@@ -1514,6 +1517,9 @@ evaluate_subexp_standard (struct type *expect_type,
 	  else
 	    error (_("Expression of type other than \"Function returning ...\" used as function"));
 	}
+      if (TYPE_CODE (value_type (argvec[0])) == TYPE_CODE_INTERNAL_FUNCTION)
+	return call_internal_function (argvec[0], nargs, argvec + 1);
+
       return call_function_by_hand (argvec[0], nargs, argvec + 1);
       /* pai: FIXME save value from call_function_by_hand, then adjust pc by adjust_fn_pc if +ve  */
 
@@ -2497,7 +2503,17 @@ evaluate_subexp_standard (struct type *expect_type,
       if (noside == EVAL_SKIP)
         goto nosideret;
       else if (noside == EVAL_AVOID_SIDE_EFFECTS)
-        return allocate_value (exp->elts[pc + 1].type);
+	{
+	  struct type *type = exp->elts[pc + 1].type;
+	  /* If this is a typedef, then find its immediate target.  We
+	     use check_typedef to resolve stubs, but we ignore its
+	     result because we do not want to dig past all
+	     typedefs.  */
+	  check_typedef (type);
+	  if (TYPE_CODE (type) == TYPE_CODE_TYPEDEF)
+	    type = TYPE_TARGET_TYPE (type);
+	  return allocate_value (type);
+	}
       else
         error (_("Attempt to use a type name as an expression"));
 
