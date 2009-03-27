@@ -2740,6 +2740,13 @@ remote_start_remote (struct ui_out *uiout, void *opaque)
     }
   else
     {
+      /* Clear WFI global state.  Do this before finding about new
+	 threads and inferiors, and setting the current inferior.
+	 Otherwise we would clear the proceed status of the current
+	 inferior when we want its stop_soon state to be preserved
+	 (see notice_new_inferior).  */
+      init_wait_for_inferior ();
+
       /* In non-stop, we will either get an "OK", meaning that there
 	 are no stopped threads at this time; or, a regular stop
 	 reply.  In the latter case, there may be more than one thread
@@ -2800,8 +2807,6 @@ remote_start_remote (struct ui_out *uiout, void *opaque)
       /* In non-stop mode, any cached wait status will be stored in
 	 the stop reply queue.  */
       gdb_assert (wait_status == NULL);
-
-      init_wait_for_inferior ();
     }
 
   /* If we connected to a live target, do some additional setup.  */
@@ -6606,19 +6611,6 @@ remote_mourn_1 (struct target_ops *target)
   generic_mourn_inferior ();
 }
 
-static int
-select_new_thread_callback (struct thread_info *th, void* data)
-{
-  if (!is_exited (th->ptid))
-    {
-      switch_to_thread (th->ptid);
-      printf_filtered (_("[Switching to %s]\n"),
-		       target_pid_to_str (inferior_ptid));
-      return 1;
-    }
-  return 0;
-}
-
 static void
 extended_remote_mourn_1 (struct target_ops *target)
 {
@@ -6662,16 +6654,7 @@ extended_remote_mourn_1 (struct target_ops *target)
   /* Call common code to mark the inferior as not running.	*/
   generic_mourn_inferior ();
 
-  if (have_inferiors ())
-    {
-      extern void nullify_last_target_wait_ptid ();
-      /* Multi-process case.  The current process has exited, but
-	 there are other processes to debug.  Switch to the first
-	 available.  */
-      iterate_over_threads (select_new_thread_callback, NULL);
-      nullify_last_target_wait_ptid ();
-    }
-  else
+  if (!have_inferiors ())
     {
       if (!remote_multi_process_p (rs))
 	{

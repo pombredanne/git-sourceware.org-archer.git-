@@ -1,3 +1,45 @@
+2009-03-26  Doug Evans  <dje@google.com>
+
+	* gdb.mi/mi-nonstop-exit.exp: New file.
+	* gdb.mi/non-stop-exit.c: New file.
+
+2009-03-26  Tom Tromey  <tromey@redhat.com>
+
+	Update for change to prologue skipping:
+	* gdb.mi/mi2-simplerun.exp: Update.
+	* gdb.mi/mi2-break.exp: Update.
+	* gdb.mi/mi-simplerun.exp: Update.
+	* gdb.mi/mi-break.exp: Update.
+	* gdb.base/ending-run.exp: Update.
+
+2009-03-26  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.python/python-value.exp (test_value_in_inferior): Test
+	gdb.Value.is_optimized_out attribute.
+
+2009-03-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-noloc-main.c: New file.
+	* gdb.dwarf2/dw2-noloc.S: New symbols matrix.
+	(.text): Remove.
+	(.data): New.
+	(DW_AT_stmt_list, .debug_line, DW_AT_frame_base): Remove.
+	(DW_AT_low_pc, DW_AT_high_pc): Reference `dw2-noloc-main.c'.
+	(DW_TAG_subprogram func_cu1, noloc): Remove.
+	(main): New.
+	* gdb.dwarf2/dw2-noloc.exp: Use prepare_for_testing, compile also
+	`dw2-noloc-main.c'.  Test the new DIEs from `dw2-noloc.S'.
+	(file_symbols): New procedure.
+
+2009-03-25  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/charset.exp (valid_target_charset): New proc.
+	Use it to skip tests on invalid charsets.
+
+2009-03-25  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* gdb.base/completion.exp: Add a test for directory completion.
+
 2009-03-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	Fix a racy FAIL.

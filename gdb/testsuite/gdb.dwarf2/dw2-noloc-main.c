@@ -1,8 +1,6 @@
-/* Native definitions for Intel x86 running DJGPP.
-   Copyright 1997, 1998, 1999, 2001, 2002, 2007, 2008, 2009
-   Free Software Foundation, Inc.
+/* This testcase is part of GDB, the GNU debugger.
 
-   This file is part of GDB.
+   Copyright 2009 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,19 +15,14 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#define I386_USE_GENERIC_WATCHPOINTS
+asm (".globl cu_text_start");
+asm ("cu_text_start:");
 
-#include "i386/nm-i386.h"
+int
+main (void)
+{
+  return 0;
+}
 
-/* Support for hardware-assisted breakpoints and watchpoints.  */
-
-#define I386_DR_LOW_SET_CONTROL(VAL)	go32_set_dr7 (VAL)
-extern void go32_set_dr7 (unsigned);
-
-#define I386_DR_LOW_SET_ADDR(N,ADDR)	go32_set_dr (N,ADDR)
-extern void go32_set_dr (int, CORE_ADDR);
-
-#define I386_DR_LOW_RESET_ADDR(N)
-
-#define I386_DR_LOW_GET_STATUS()	go32_get_dr6 ()
-extern unsigned go32_get_dr6 (void);
+asm (".globl cu_text_end");
+asm ("cu_text_end:");
