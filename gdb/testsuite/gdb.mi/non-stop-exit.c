@@ -1,6 +1,5 @@
-/* Native definitions for Intel x86 running DJGPP.
-   Copyright 1997, 1998, 1999, 2001, 2002, 2007, 2008, 2009
-   Free Software Foundation, Inc.
+/* Test program exit in non-stop mode.
+   Copyright 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -17,19 +16,39 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#define I386_USE_GENERIC_WATCHPOINTS
+#include <pthread.h>
+#include <stdio.h>
 
-#include "i386/nm-i386.h"
+#define NTHREADS 4
+void* thread_function (void*);
 
-/* Support for hardware-assisted breakpoints and watchpoints.  */
+void *
+thread_function (void *arg)
+{
+  int x = * (int *) arg;
 
-#define I386_DR_LOW_SET_CONTROL(VAL)	go32_set_dr7 (VAL)
-extern void go32_set_dr7 (unsigned);
+  printf ("Thread <%d> executing\n", x);
 
-#define I386_DR_LOW_SET_ADDR(N,ADDR)	go32_set_dr (N,ADDR)
-extern void go32_set_dr (int, CORE_ADDR);
+  return NULL;
+}
 
-#define I386_DR_LOW_RESET_ADDR(N)
+int
+main ()
+{
+  pthread_t thread_id[NTHREADS];
+  int args[NTHREADS];
+  int i;
 
-#define I386_DR_LOW_GET_STATUS()	go32_get_dr6 ()
-extern unsigned go32_get_dr6 (void);
+  for (i = 0; i < NTHREADS; ++i)
+    {
+      args[i] = i;
+      pthread_create (&thread_id[i], NULL, thread_function, &args[i]);
+    }
+
+  for (i = 0; i < NTHREADS; ++i)
+    {
+      pthread_join (thread_id[i], NULL); 
+    }
+
+  return 0;
+}

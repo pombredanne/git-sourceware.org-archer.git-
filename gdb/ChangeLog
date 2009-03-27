@@ -1,3 +1,181 @@
+2009-03-26  Doug Evans  <dje@google.com>
+
+	* thread.c (do_restore_current_thread_cleanup): Redo test for
+	whether to restore old->inferior_ptid.
+
+2009-03-26  Tom Tromey  <tromey@redhat.com>
+
+	* breakpoint.c (resolve_sal_pc): Preserve original line number
+	when skipping prologue.
+
+2009-03-26  Doug Evans  <dje@google.com>
+
+	* thread.c (inferior_thread) Remove "extern" in definition.
+
+2009-03-26  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	Add gdb.Value.is_optimized_out attribute.
+	* python/python-value.c (valpy_get_is_optimized_out): New
+	function.
+	(value_object_getset): New variable.
+	(value_object_type): Initialize tp_getset element.
+
+2009-03-26  Joel Brobecker  <brobecker@adacore.com>
+
+	Recognize missing DW_AT_location as <value optimized out>.
+	* dwarf2read.c
+	(new_symbol <DW_TAG_variable> <!DW_AT_location> <!DW_AT_external>):
+	Call add_symbol_to_list.
+
+2009-03-25  Tom Tromey  <tromey@redhat.com>
+
+	* gdbtypes.h (CHECK_TYPEDEF): Don't yield a value.
+	* stack.c (print_this_frame_argument_p): Use check_typedef.
+
+2009-03-25  Tom Tromey  <tromey@redhat.com>
+
+	* configure: Rebuild.
+	* acinclude.m4 (AM_ICONV): Set am_cv_use_build_libiconv.
+	Rearrange flags setting.  Add comments.
+
+2009-03-25  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* config/i386/nm-i386.h: Remove code within
+	I386_WATCHPOINTS_IN_TARGET_VECTOR conditional.
+	* config/i386/nm-cygwin.h: Remove I386_WATCHPOINTS_IN_TARGET_VECTOR
+	macro.
+	* config/i386/nm-cygwin64.h: Ditto.
+	* config/i386/nm-fbsd.h: Ditto.
+	* config/i386/nm-go32.h: Ditto.
+	* config/i386/nm-linux.h: Ditto.
+	* config/i386/nm-linux64.h: Ditto.
+
+2009-03-25  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	ARI fix: "xasprintf" rule.
+	* printcmd.c (sym_info): Replace xasprintf by xstrprintf.
+
+2009-03-25  Pedro Alves  <pedro@codesourcery.com>
+
+	* remote.c (remote_start_remote): In non-stop mode, call
+	init_wait_for_inferior before adding threads and inferiors.
+
+2009-03-25  Joel Brobecker  <brobecker@adacore.com>
+
+	* breakpoint.c (breakpoint_thread_match): Split a large condition
+	into several smaller conditions.  No behavior change.
+
+2009-03-25  Pedro Alves  <pedro@codesourcery.com>
+
+	* infrun.c (infrun_thread_thread_exit): New.
+	(_initialize_infrun): Attach it to the thread_exit observer.
+	* thread.c (delete_thread_1): Always call the observer, passing it
+	the silent flag.
+	* mi/mi-interp.c (mi_thread_exit): Add "silent" parameter.  If
+	SILENT, return immediately.
+
+2009-03-25  Pedro Alves  <pedro@codesourcery.com>
+
+	* infrun.c (normal_stop): Use has_stack_frames instead of
+	target_has_stack.
+	* mi/mi-main.c (mi_execute_command): Avoid calling inferior_thread
+	when there is no thread selected.
+	(mi_cmd_execute): Don't special case commands that can run without
+	a valid selected thread.
+	* top.c (execute_command): Don't special case commands that can
+	run without a valid selected thread.  Use has_stack_frames.
+	* infcmd.c (ensure_valid_thread): New.
+	(continue_1, step_1, jump_command, signal_command): Use it.
+	(detach_command): Error out if there's no selected thread/inferior.
+	* thread.c (print_thread_info): Allow having no thread selected.
+	(switch_to_thread): Don't read the PC if there is no current thread.
+	(do_restore_current_thread_cleanup): Don't record the current
+	frame if there is no current thread.
+	(make_cleanup_restore_current_thread): Don't read frame info if
+	there is no selected thread.
+	(_initialize_thread): Don't mark commands as
+	"no_selected_thread_ok".
+	* frame.c (get_current_frame): Error out if there is no valid
+	selected thread.
+	(has_stack_frames): Return false if there is no valid
+	selected thread.
+	* cli/cli-cmds.c (init_cli_cmds): Don't mark commands as
+	"no_selected_thread_ok".
+	* cli/cli-decode.c (set_cmd_no_selected_thread_ok)
+	(get_cmd_no_selected_thread_ok): Delete.
+	* cli/cli-decode.h (CMD_NO_SELECTED_THREAD_OK): Delete.
+	(set_cmd_no_selected_thread_ok, get_cmd_no_selected_thread_ok):
+	Delete declaration.
+	* stack.c (get_selected_block): Use has_stack_frames.
+
+2009-03-25  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	Fix size of FPSCR in Power 7 processors.
+	* ppc-linux-nat.c (PPC_FEATURE_ARCH_2_05): Remove #define.
+	(PPC_FEATURE_HAS_DFP): New #define.
+	(ppc_linux_read_description): Check for DFP feature instead of
+	ISA 2.05 to decide on size of the FPSCR.
+
+2009-03-25  Kevin Buettner  <kevinb@redhat.com>
+
+	* mn10300-tdep.c (trad-frame.h): Don't include.
+	(prologue-value.h): Include.
+	(mn10300_frame_unwind_cache, set_reg_offsets): Delete.
+	(struct mn10300_prologue): Define.
+	(push_reg, translate_rreg, check_for_saved): New functions.
+	(mn10300_analyze_prologue): Rewrite, using prologue-value
+	machinery.  Handle more instructions than before.  Permit
+	instructions to occur in any order.
+	(mn10300_skip_prologue): Find the extents of the function
+	in question; mn10300_analyze_prologue no longer does this.
+	(mn10300_analyze_frame_prologue): New function.
+	(mn10300_frame_base): New function.
+	(mn10300_frame_this_id): Rewrite, no longer using trad-frame
+	implementation.
+	(mn10300_frame_prev_register): Likewise.
+	(mn10300_frame_base_address, mn10300_frame_base struct): Delete.
+	(mn10300_unwind_pc, mn10300_unwind_sp): Rename `next_frame' to
+	`this_frame'.
+	(mn10300_frame_unwind_init): Don't call frame_base_set_default().
+
+2009-03-25  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	Fix completer problem for filename completion on the first try.
+
+	* gdb/completer.h (gdb_completion_word_break_characters): New function.
+	* gdb/completer.c: Include gdb_assert.h.
+	(complete_line_internal_reason): New enum.
+	(complete_line_internal): Change last argument type to
+	complete_line_internal_reason.
+	Modify function to handle the different complete_line_internal_reason
+	argument values.
+	(complete_line): Adapt to change in complete_line_internal.
+	(command_completer): Ditto.
+	(gdb_completion_word_break_characters): Implement new function.
+	* top.c (init_main): Set  rl_completion_word_break_hook to
+	gdb_completion_word_break_characters.
+	
+
+2009-03-25  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	ARI fix: "strlen d_name" rule.
+	* linux-nat.c (linux_nat_xfer_osdata): Use NAMELEN macro.
+
+
+2009-03-24  Tom Tromey  <tromey@redhat.com>
+	    Pedro Alves  <pedro@codesourcery.com>
+
+	* configure, config.in: Rebuild.
+	* configure.ac: Check for libiconvlist.
+	* charset.c: Check HAVE_LIBICONVLIST.
+	* acinclude.m4 (AM_ICONV): Don't subst LIBICONV, LIBICONV_INCLUDE,
+	LIBICONV_LIBDIR.  Update CPPFLAGS and LIBS.
+	* Makefile.in (LIBICONV, LIBICONV_INCLUDE, LIBICONV_LIBDIR):
+	Remove.
+	(INTERNAL_CFLAGS_BASE): Update.
+	(INTERNAL_LDFLAGS): Update.
+	(CLIBS): Update.
+
 2009-03-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* configure.ac: Initialize the variable $PREFER_CURSES.

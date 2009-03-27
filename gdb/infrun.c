@@ -1691,6 +1691,15 @@ infrun_thread_stop_requested (ptid_t ptid)
   iterate_over_threads (infrun_thread_stop_requested_callback, &ptid);
 }
 
+void nullify_last_target_wait_ptid (void);
+
+static void
+infrun_thread_thread_exit (struct thread_info *tp, int silent)
+{
+  if (ptid_equal (target_last_wait_ptid, tp->ptid))
+    nullify_last_target_wait_ptid ();
+}
+
 /* Callback for iterate_over_threads.  */
 
 static int
@@ -4302,7 +4311,7 @@ Further execution is probably impossible.\n"));
   /* Set the current source location.  This will also happen if we
      display the frame below, but the current SAL will be incorrect
      during a user hook-stop function.  */
-  if (target_has_stack && !stop_stack_dummy)
+  if (has_stack_frames () && !stop_stack_dummy)
     set_current_sal_from_frame (get_current_frame (), 1);
 
   /* Let the user/frontend see the threads as stopped.  */
@@ -4314,7 +4323,7 @@ Further execution is probably impossible.\n"));
     catch_errors (hook_stop_stub, stop_command,
 		  "Error while running hook_stop:\n", RETURN_MASK_ALL);
 
-  if (!target_has_stack)
+  if (!has_stack_frames ())
     goto done;
 
   if (last.kind == TARGET_WAITKIND_SIGNALLED
@@ -5575,6 +5584,7 @@ Options are 'forward' or 'reverse'."),
 
   observer_attach_thread_ptid_changed (infrun_thread_ptid_changed);
   observer_attach_thread_stop_requested (infrun_thread_stop_requested);
+  observer_attach_thread_exit (infrun_thread_thread_exit);
 
   /* Explicitly create without lookup, since that tries to create a
      value with a void typed value, and when we get here, gdbarch

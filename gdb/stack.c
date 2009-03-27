@@ -181,9 +181,9 @@ print_this_frame_argument_p (struct symbol *sym)
   /* The user asked to print only the scalar arguments, so do not
      print the non-scalar ones.  */
 
-  type = CHECK_TYPEDEF (SYMBOL_TYPE (sym));
+  type = check_typedef (SYMBOL_TYPE (sym));
   while (TYPE_CODE (type) == TYPE_CODE_REF)
-    type = CHECK_TYPEDEF (TYPE_TARGET_TYPE (type));
+    type = check_typedef (TYPE_TARGET_TYPE (type));
   switch (TYPE_CODE (type))
     {
       case TYPE_CODE_ARRAY:
@@ -1694,13 +1694,7 @@ select_and_print_frame (struct frame_info *frame)
 struct block *
 get_selected_block (CORE_ADDR *addr_in_block)
 {
-  if (!target_has_stack)
-    return 0;
-
-  if (is_exited (inferior_ptid))
-    return 0;
-
-  if (is_executing (inferior_ptid))
+  if (!has_stack_frames ())
     return 0;
 
   return get_frame_block (get_selected_frame (NULL), addr_in_block);
