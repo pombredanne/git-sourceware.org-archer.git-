@@ -49,7 +49,7 @@ class StdListPrinter:
         def __init__(self, nodetype, head):
             self.nodetype = nodetype
             self.base = head['_M_next']
-            self.head = head.address()
+            self.head = head.address
             self.count = 0
 
         def __iter__(self):
@@ -73,7 +73,7 @@ class StdListPrinter:
         return self._iterator(nodetype, self.val['_M_impl']['_M_node'])
 
     def to_string(self):
-        if self.val['_M_impl']['_M_node'].address() == self.val['_M_impl']['_M_node']['_M_next']:
+        if self.val['_M_impl']['_M_node'].address == self.val['_M_impl']['_M_node']['_M_next']:
             return 'empty std::list'
         return 'std::list'
 

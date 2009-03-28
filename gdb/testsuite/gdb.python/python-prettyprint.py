@@ -60,8 +60,8 @@ class pp_s:
     def to_string(self):
         a = self.val["a"]
         b = self.val["b"]
-        if a.address() != b:
-            raise Exception("&a(%s) != b(%s)" % (str(a.address()), str(b)))
+        if a.address != b:
+            raise Exception("&a(%s) != b(%s)" % (str(a.address), str(b)))
         return " a=<" + str(self.val["a"]) + "> b=<" + str(self.val["b"]) + ">"
 
 class pp_ss:
