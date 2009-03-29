@@ -18394,8 +18394,8 @@ The following attributes are provided:
 
 @table @code
 @defmethod Value address
-If the @code{gdb.Value} object is addressable, this read-only attribute
-holds a @code{gdb.Value} object representing the address.  Otherwise,
+If this object is addressable, this read-only attribute holds a
+@code{gdb.Value} object representing the address.  Otherwise,
 this attribute holds @code{None}.
 @end defmethod
 
