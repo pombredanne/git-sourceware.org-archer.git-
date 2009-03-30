@@ -40,14 +40,15 @@ static PyTypeObject membuf_object_type;
 PyObject *
 gdbpy_read_memory (PyObject *self, PyObject *args)
 {
+  int error = 0;
   CORE_ADDR addr, length;
   void *buffer;
   membuf_object *membuf_obj;
+  PyObject *addr_obj, *length_obj;
   struct cleanup *cleanups;
   volatile struct gdb_exception except;
 
-  /* Assume CORE_ADDR corresponds to unsigned long.  */
-  if (! PyArg_ParseTuple (args, "kk", &addr, &length))
+  if (! PyArg_ParseTuple (args, "OO", &addr_obj, &length_obj))
     return NULL;
 
   buffer = xmalloc (length);
@@ -55,9 +56,22 @@ gdbpy_read_memory (PyObject *self, PyObject *args)
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
+      if (!get_addr_from_python (addr_obj, &addr)
+	  || !get_addr_from_python (length_obj, &length))
+	{
+	  error = 1;
+	  break;
+	}
+
       read_memory (addr, buffer, length);
     }
   GDB_PY_HANDLE_EXCEPTION (except);
+
+  if (error)
+    {
+      do_cleanups (cleanups);
+      return NULL;
+    }
 
   discard_cleanups (cleanups);
 
@@ -71,11 +85,11 @@ gdbpy_read_memory (PyObject *self, PyObject *args)
     }
 
   membuf_obj->buffer = buffer;
-
   membuf_obj->addr = addr;
   membuf_obj->length = length;
 
-  return PyBuffer_FromReadWriteObject ((PyObject *) membuf_obj, 0, Py_END_OF_BUFFER);
+  return PyBuffer_FromReadWriteObject ((PyObject *) membuf_obj, 0,
+				       Py_END_OF_BUFFER);
 }
 
 /* Implementation of gdb.write_memory (address, buffer [, length]).
@@ -87,24 +101,38 @@ gdbpy_read_memory (PyObject *self, PyObject *args)
 PyObject *
 gdbpy_write_memory (PyObject *self, PyObject *args)
 {
-  int buf_len;
+  int buf_len, error = 0;
   const char *buffer;
-  long length = -1;
-  CORE_ADDR addr;
+  CORE_ADDR addr, length;
+  PyObject *addr_obj, *length_obj = NULL;
   volatile struct gdb_exception except;
 
-  /* Assume CORE_ADDR corresponds to unsigned long.  */
-  if (! PyArg_ParseTuple (args, "ks#|l", &addr, &buffer, &buf_len, &length))
+  if (! PyArg_ParseTuple (args, "Os#|O", &addr_obj, &buffer, &buf_len,
+			  &length_obj))
     return NULL;
-
-  if (length == -1)
-    length = buf_len;
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
+      if (!get_addr_from_python (addr_obj, &addr))
+	{
+	  error = 1;
+	  break;
+	}
+      
+      if (!length_obj)
+	length = buf_len;
+      else if (!get_addr_from_python (length_obj, &length))
+	{
+	  error = 1;
+	  break;
+	}
+
       write_memory (addr, buffer, length);
     }
   GDB_PY_HANDLE_EXCEPTION (except);
+
+  if (error)
+    return NULL;
 
   Py_RETURN_NONE;
 }

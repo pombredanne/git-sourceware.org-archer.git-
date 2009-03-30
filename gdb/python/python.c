@@ -466,48 +466,23 @@ PyObject *
 gdbpy_search_memory (PyObject *self, PyObject *args, PyObject *kw)
 {
   int size = 0;
-  long length;
   unsigned int found_count = 0;
   long max_count = 0;
-  CORE_ADDR start_addr;
+  CORE_ADDR start_addr, length;
   char *pattern_buf;
   static char *keywords[] = { "address", "length", "pattern", "size",
 			      "max_count", NULL };
   ULONGEST pattern_len, search_space_len;
-  PyObject *pattern, *list = NULL, *start_addr_obj;
+  PyObject *pattern, *list = NULL, *start_addr_obj, *length_obj;
   volatile struct gdb_exception except;
 
-  /* Assume CORE_ADDR corresponds to unsigned long.  */
-  if (! PyArg_ParseTupleAndKeywords (args, kw, "OlO|il", keywords,
-				     &start_addr_obj, &length, &pattern,
+  if (! PyArg_ParseTupleAndKeywords (args, kw, "OOO|il", keywords,
+				     &start_addr_obj, &length_obj, &pattern,
 				     &size, &max_count))
     return NULL;
 
   if (!max_count)
     max_count = LONG_MAX;
-
-  if (!length)
-    {
-      PyErr_SetString (PyExc_ValueError, "empty search range");
-      return NULL;
-    }
-  else if (length < 0)
-    {
-      PyErr_SetString (PyExc_ValueError, "invalid search range");
-      return NULL;
-    }
-  else
-    {
-      /* Watch for overflows.  */
-      if (length > CORE_ADDR_MAX
-	  || (start_addr + length - 1) < start_addr)
-	{
-	  PyErr_SetString (PyExc_ValueError, "search range too large");
-	  return NULL;
-	}
-
-      search_space_len = length;
-    }
 
   if (size != 0 && size != 1 && size != 2 && size != 4 && size != 8)
     {
@@ -517,8 +492,24 @@ gdbpy_search_memory (PyObject *self, PyObject *args, PyObject *kw)
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      if (get_addr_from_python (start_addr_obj, &start_addr))
+      if (get_addr_from_python (start_addr_obj, &start_addr)
+	  && get_addr_from_python (length_obj, &length))
 	{
+	  if (!length)
+	    {
+	      PyErr_SetString (PyExc_ValueError, "empty search range");
+	      break;
+	    }
+	  /* Watch for overflows.  */
+	  else if (length > CORE_ADDR_MAX
+		   || (start_addr + length - 1) < start_addr)
+	    {
+	      PyErr_SetString (PyExc_ValueError, "search range too large");
+	      break;
+	    }
+
+	  search_space_len = length;
+
 	  if (get_search_pattern (pattern, size, &pattern_buf, &pattern_len))
 	    {
 	      /* Any cleanups get automatically executed on an exception.  */
