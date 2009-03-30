@@ -1,3 +1,49 @@
+2009-03-29  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	Remove unused value_object attribute `owned_by_gdb'.
+	* python/python-value.c (value_object): Remove owned_by_gdb
+	attribute.
+	(valpy_dealloc): Remove reference to self->owned_by_gdb.
+	(valpy_new): Likewise.
+	(value_to_value_object): Likewise.
+
+2009-03-29  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	Change gdb.Value.address from a method to an attribute.
+	* python/python-value.c (value_object): Add `address' element.
+	(valpy_dealloc): Decrement reference to self->address if set.
+	(valpy_new): Initialize val_obj->address.
+	(valpy_address): Rename to ...
+	(valpy_get_address): ... this.  Change signature from method to
+	attribute.  Update self->address if not set.
+	(value_to_value_object): Initialize val_obj->address.
+	(value_object_getset): Add `address' element.
+	(value_object_methods): Remove `address' element.
+
+2009-03-29  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* observer.sh: Set LANG/LC_ALL to C, not c.
+
+2009-03-28  Kevin Buettner  <kevinb@redhat.com>
+
+	* mn10300-tdep.c (mn10300_gdbarch_init): For mn10300, by default,
+	`char' is unsigned.
+
+2009-03-28  Pedro Alves  <pedro@codesourcery.com>
+
+	* remote.c (remote_stop_ns): If multi-process extensions are off,
+	and GDB is requesting the whole process to stop, sent "vCont;t",
+	not "vCont;t:-1"
+
+2009-03-28  Pedro Alves  <pedro@codesourcery.com>
+
+	* inf-loop.c (inferior_event_handler): Avoid calling is_running on
+	null inferior_ptid.
+
+2009-03-27  Eli Zaretskii  <eliz@gnu.org>
+
+	* config/djgpp/fnchange.lst: Update to fix ARI-reported problems.
+
 2009-03-26  Doug Evans  <dje@google.com>
 
 	* thread.c (do_restore_current_thread_cleanup): Redo test for
@@ -154,7 +200,7 @@
 	(gdb_completion_word_break_characters): Implement new function.
 	* top.c (init_main): Set  rl_completion_word_break_hook to
 	gdb_completion_word_break_characters.
-	
+
 
 2009-03-25  Pierre Muller  <muller@ics.u-strasbg.fr>
 
@@ -255,7 +301,7 @@
 
 	* breakpoint.c (disable_breakpoints_in_unloaded_shlib): Use
 	solib_contains_address_p instead of searching.
-	
+
 2009-03-23  Tom Tromey  <tromey@redhat.com>
 
 	* charset.c (ICONV_CONST) <PHONY_ICONV>: Define.
@@ -270,7 +316,7 @@
 	(LookupPrivilegeValueA): Ditto.
 	(OpenProcessToken): Ditto.
 	(AdjustTokenPrivileges): Rename and define placeholder for address of
-        dynamically loaded function.
+	dynamically loaded function.
 	(LookupPrivilegeValueA): Ditto.
 	(OpenProcessToken): Ditto.
 	(set_process_privilege): Remove check for loaded functions.
@@ -649,8 +695,8 @@
 	(INTERNAL_CFLAGS_BASE): Add LIBICONV_INCLUDE.
 	(INTERNAL_LDFLAGS): Add LIBICONV_LIBDIR.
 	* gdb_obstack.h (obstack_grow_wstr): New define.
-        * gdb_wchar.h: New file.
-        * defs.h: Include it.
+	* gdb_wchar.h: New file.
+	* defs.h: Include it.
 
 2009-03-20  Tom Tromey  <tromey@redhat.com>
 	    Jan Kratochvil  <jan.kratochvil@redhat.com>
@@ -949,19 +995,19 @@
 
 	Include token in ^running notification for CLI commands.
 
-        * mi/mi-main.c (mi_execute_command): Set current_token here.
-        (mi_cmd_execute): Do not set current_token here.
+	* mi/mi-main.c (mi_execute_command): Set current_token here.
+	(mi_cmd_execute): Do not set current_token here.
 
 2009-03-12  Vladimir Prus  <vladimir@codesourcery.com>
 
 	Fix MI timings.
 
-        * mi/mi-main.c (mi_print_timing_maybe): New.
-        (captured_mi_execute_command): Simplify. Output timings to
-        CLI commands, too.
-        (mi_execute_async_cli_command): Do not print timings.
-        * mi/mi-main.h (mi_print_timing_maybe): Declare.
-        * mi/mi-interp.c (mi_on_normal_stop): Call mi_print_timing_maybe.
+	* mi/mi-main.c (mi_print_timing_maybe): New.
+	(captured_mi_execute_command): Simplify. Output timings to
+	CLI commands, too.
+	(mi_execute_async_cli_command): Do not print timings.
+	* mi/mi-main.h (mi_print_timing_maybe): Declare.
+	* mi/mi-interp.c (mi_on_normal_stop): Call mi_print_timing_maybe.
 
 2009-03-12  Jerome Guitton  <guitton@adacore.com>
 
@@ -999,8 +1045,8 @@
 	* solib.c (solib_contains_address_p): New function.
 	(solib_name_from_address): Use it.
 	* printcmd.c (display_uses_solib_p): Use it.
-	* solib.h (solib_contains_address_p): Declare it.	
-	
+	* solib.h (solib_contains_address_p): Declare it.
+
 2009-03-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* varobj.c (free_variable): Call value_free.
@@ -1040,7 +1086,7 @@
 	* stack.c (print_frame): Likewise.
 	* solib.c: Rename.
 	* solib.h: Rename.
-	
+
 2009-03-05  Paul Pluzhnikov  <ppluzhnikov@google.com>
 
 	* printcmd.c (do_one_display): Reparse exp_string.
@@ -1049,7 +1095,7 @@
 	(_initialize_printcmd): Add observer.
 	* solib.c (no_shared_libraries): Swap order of calls to
 	clear_solib and objfile_purge_solibs.
-	
+
 2009-03-05  Joel Brobecker  <brobecker@adacore.com>
 
 	Implement the target-specific part of Ada tasking support
