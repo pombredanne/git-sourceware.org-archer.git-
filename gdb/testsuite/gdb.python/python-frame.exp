@@ -70,8 +70,8 @@ gdb_test "python print frames" "\\(<gdb.Frame object at 0x\[\[:xdigit:\]\]+>, <g
 gdb_py_test_silent_cmd "python f0 = frames\[0\]" "get first frame" 0
 gdb_py_test_silent_cmd "python f1 = frames\[1\]" "get second frame" 0
 
-gdb_test "python print 'result =', f0.equals (f1)" " = False" "test equals (false)"
-gdb_test "python print 'result =', f0.equals (f0)" " = True" "test equals (true)"
+gdb_test "python print 'result =', f0 == f1" " = False" "test equality comparison (false)"
+gdb_test "python print 'result =', f0 == f0" " = True" "test equality comparison (true)"
 gdb_test "python print 'result =', f0.is_valid ()" " = True" "test Frame.is_valid"
 gdb_test "python print 'result =', f0.name ()" " = f2" "test Frame.name"
 gdb_test "python print 'result =', f0.type () == gdb.NORMAL_FRAME" " = True" "test Frame.type"
@@ -79,14 +79,14 @@ gdb_test "python print 'result =', f0.unwind_stop_reason () == gdb.FRAME_UNWIND_
 gdb_test "python print 'result =', gdb.frame_stop_reason_string (gdb.FRAME_UNWIND_INNER_ID)" " = previous frame inner to this frame \\(corrupt stack\\?\\)" "test gdb.frame_stop_reason_string"
 gdb_test "python print 'result =', f0.pc ()" " = \[0-9\]+" "test Frame.pc"
 gdb_test "python print 'result =', f0.function ()" " = symbol for f2" "test Frame.function"
-gdb_test "python print 'result =', f0.older ().equals (f1)" " = True" "test Frame.older"
-gdb_test "python print 'result =', f1.newer ().equals (f0)" " = True" "test Frame.newer"
+gdb_test "python print 'result =', f0.older () == f1" " = True" "test Frame.older"
+gdb_test "python print 'result =', f1.newer () == f0" " = True" "test Frame.newer"
 gdb_test "python print 'result =', f0.read_var ('variable_which_surely_doesnt_exist')" \
   "ValueError: variable 'variable_which_surely_doesnt_exist' not found.*Error while executing Python code." \
   "test Frame.read_var - error"
 gdb_test "python print 'result =', f0.read_var ('a')" " = 1" "test Frame.read_var - success"
 
-gdb_test "python print 'result =', gdb.newest_frame ().equals (f0)" " = True" "test gdb.newest_frame"
-gdb_test "python print 'result =', gdb.selected_frame ().equals (f1)" " = True" "test gdb.selected_frame"
+gdb_test "python print 'result =', gdb.newest_frame () == f0" " = True" "test gdb.newest_frame"
+gdb_test "python print 'result =', gdb.selected_frame () == f1" " = True" "test gdb.selected_frame"
 
 gdb_test "python print 'result =', f0.block ()" "<gdb.Block object at 0x\[\[:xdigit:\]\]+>" "test Frame.block"

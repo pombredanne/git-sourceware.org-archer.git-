@@ -19485,6 +19485,14 @@ while its corresponding frame exists in the inferior's stack.  If you try
 to use an invalid frame object, @value{GDBN} will throw a @code{RuntimeError}
 exception.
 
+Two @code{gdb.Frame} objects can be compared for equality with the @code{==}
+operator, like:
+
+@smallexample
+(@value{GDBP}) python print gdb.newest_frame() == gdb.selected_frame ()
+True
+@end smallexample
+
 The following frame-related functions are available in the @code{gdb} module:
 
 @defun frames
@@ -19508,10 +19516,6 @@ frames, as expressed by the given @var{reason} code (an integer, see the
 A @code{gdb.Frame} object has the following methods:
 
 @table @code
-@defmethod Frame equals frame
-Compare frames.
-@end defmethod
-
 @defmethod Frame is_valid
 Returns true if the @code{gdb.Frame} object is valid, false if not.
 A frame object can become invalid if the frame it refers to doesn't

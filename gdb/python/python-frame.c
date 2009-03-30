@@ -109,31 +109,6 @@ frapy_is_valid (PyObject *self, PyObject *args)
   Py_RETURN_TRUE;
 }
 
-/* Implementation of gdb.Frame.equals (self, other) -> Boolean. */
-
-static PyObject *
-frapy_equal_p (PyObject *self, PyObject *args)
-{
-  int equalp = 0;	  /* Initialize to appease gcc warning.  */
-  frame_object *self_frame = (frame_object *) self;
-  frame_object *other;
-  volatile struct gdb_exception except;
-
-  if (!PyArg_ParseTuple (args, "O!", &frame_object_type, &other))
-    return NULL;
-
-  TRY_CATCH (except, RETURN_MASK_ALL)
-    {
-      equalp = frame_id_eq (self_frame->frame_id, other->frame_id);
-    }
-  GDB_PY_HANDLE_EXCEPTION (except);
-
-  if (equalp)
-    Py_RETURN_TRUE;
-
-  Py_RETURN_FALSE;
-}
-
 /* Implementation of gdb.Frame.name (self) -> String.
    Returns the name of the function corresponding to this frame.  */
 
@@ -581,6 +556,31 @@ gdbpy_frame_stop_reason_string (PyObject *self, PyObject *args)
   return PyUnicode_Decode (str, strlen (str), host_charset (), NULL);
 }
 
+/* Implements the equality comparison for Frame objects.
+   All other comparison operators will throw a TypeError Python exception,
+   as they aren't valid for frames.  */
+
+static PyObject *
+frapy_richcompare (PyObject *self, PyObject *other, int op)
+{
+  if (!PyObject_TypeCheck (other, &frame_object_type))
+    {
+      PyErr_SetString (PyExc_TypeError, "Frame object expected in comparison.");
+      return NULL;
+    }
+  else if (op != Py_EQ)
+    {
+      PyErr_SetString (PyExc_TypeError, "Invalid comparison for gdb.Frame.");
+      return NULL;
+    }
+
+  if (frame_id_eq (((frame_object *) self)->frame_id,
+		   ((frame_object *) other)->frame_id))
+    Py_RETURN_TRUE;
+
+  Py_RETURN_FALSE;
+}
+
 /* Sets up the Frame API in the gdb module.  */
 
 void
@@ -616,9 +616,6 @@ gdbpy_initialize_frames (void)
 
 
 static PyMethodDef frame_object_methods[] = {
-  { "equals", frapy_equal_p, METH_VARARGS,
-    "equals (frame) -> Boolean.\n\
-Compare this frame to the given frame." },
   { "is_valid", frapy_is_valid, METH_NOARGS,
     "is_valid () -> Boolean.\n\
 Return true if this frame is valid, false if not." },
@@ -680,7 +677,7 @@ static PyTypeObject frame_object_type = {
   "GDB frame object",		  /* tp_doc */
   0,				  /* tp_traverse */
   0,				  /* tp_clear */
-  0,				  /* tp_richcompare */
+  frapy_richcompare,		  /* tp_richcompare */
   0,				  /* tp_weaklistoffset */
   0,				  /* tp_iter */
   0,				  /* tp_iternext */
