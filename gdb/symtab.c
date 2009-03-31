@@ -95,9 +95,7 @@ static
 struct symbol *lookup_symbol_aux_local (const char *name,
 					const char *linkage_name,
 					const struct block *block,
-					const domain_enum domain,
-					enum language lang,
-					int *is_a_field_of_this);
+					const domain_enum domain);
 
 static
 struct symbol *lookup_symbol_aux_symtabs (int block_index,
@@ -1291,14 +1289,52 @@ lookup_symbol_aux (const char *name, const char *linkage_name,
   /* Search specified block and its superiors.  Don't search
      STATIC_BLOCK or GLOBAL_BLOCK.  */
 
-  sym = lookup_symbol_aux_local (name, linkage_name, block, domain, language, is_a_field_of_this);
-  if (sym != NULL || (is_a_field_of_this && *is_a_field_of_this))
+  sym = lookup_symbol_aux_local (name, linkage_name, block, domain);
+  if (sym != NULL)
     return sym;
 
   /* If requested to do so by the caller and if appropriate for LANGUAGE,
      check to see if NAME is a field of `this'. */
 
   langdef = language_def (language);
+
+  if (langdef->la_name_of_this != NULL && is_a_field_of_this != NULL
+      && block != NULL)
+    {
+      struct symbol *sym = NULL;
+      const struct block *function_block = block;
+
+      /* 'this' is only defined in the function's block, so find the
+	 enclosing function block.  */
+      for (; function_block && !BLOCK_FUNCTION (function_block);
+      function_block = BLOCK_SUPERBLOCK (function_block));
+
+      if (function_block && !dict_empty (BLOCK_DICT (function_block)))
+	sym = lookup_block_symbol (function_block, langdef->la_name_of_this,
+				   NULL, VAR_DOMAIN);
+      if (sym)
+	{
+	  struct type *t = sym->type;
+	  
+	  /* I'm not really sure that type of this can ever
+	     be typedefed; just be safe.  */
+	  CHECK_TYPEDEF (t);
+	  if (TYPE_CODE (t) == TYPE_CODE_PTR
+	      || TYPE_CODE (t) == TYPE_CODE_REF)
+	    t = TYPE_TARGET_TYPE (t);
+	  
+	  if (TYPE_CODE (t) != TYPE_CODE_STRUCT
+	      && TYPE_CODE (t) != TYPE_CODE_UNION)
+	    error (_("Internal error: `%s' is not an aggregate"), 
+		   langdef->la_name_of_this);
+	  
+	  if (check_field (t, name))
+	    {
+	      *is_a_field_of_this = 1;
+	      return NULL;
+	    }
+	}
+    }
 
   /* Now do whatever is appropriate for LANGUAGE to look
      up static and global variables.  */
@@ -1330,66 +1366,23 @@ lookup_symbol_aux (const char *name, const char *linkage_name,
 static struct symbol *
 lookup_symbol_aux_local (const char *name, const char *linkage_name,
 			 const struct block *block,
-			 const domain_enum domain,
-			 enum language language,
-			 int *is_a_field_of_this)
+			 const domain_enum domain)
 {
   struct symbol *sym;
   const struct block *global_block = block_global_block (block);
   const struct block *block_iterator = block;
-  const struct language_defn *langdef;
-
-  langdef = language_def (language);
 
   /* Check if either no block is specified or it's a global block.  */
+
   if (global_block == NULL)
     return NULL;
 
   while (block_iterator != global_block)
     {
-      /* First check the local lexical level */
       sym = lookup_symbol_aux_block (name, linkage_name, block_iterator, domain);
       if (sym != NULL)
 	return sym;
     
-      if (language == language_cplus)
-        {
-          /* Check class scope, if we have reach the function block */
-          if(BLOCK_FUNCTION (block_iterator)){
-
-          if (block_iterator && !dict_empty (BLOCK_DICT (block_iterator)))
-            sym = lookup_block_symbol (block_iterator, langdef->la_name_of_this,
-                                       NULL, VAR_DOMAIN);
-          if (sym)
-            {
-              struct type *t = sym->type;
-
-              /* I'm not really sure that type of this can ever
-                 be typedefed; just be safe.  */
-              CHECK_TYPEDEF (t);
-              if (TYPE_CODE (t) == TYPE_CODE_PTR
-                  || TYPE_CODE (t) == TYPE_CODE_REF)
-                t = TYPE_TARGET_TYPE (t);
-
-              if (TYPE_CODE (t) != TYPE_CODE_STRUCT
-                  && TYPE_CODE (t) != TYPE_CODE_UNION)
-                error (_("Internal error: `%s' is not an aggregate"),
-                       langdef->la_name_of_this);
-
-              if (check_field (t, name))
-                {
-                  *is_a_field_of_this = 1;
-                  return NULL;
-                }
-            }
-          }
-
-          /* Check the namespace scope */
-          sym = langdef->la_lookup_symbol_nonlocal (name, linkage_name, block, domain);
-          if (sym != NULL)
-            return sym;
-        }
-
       block_iterator = BLOCK_SUPERBLOCK (block_iterator);
     }
 
