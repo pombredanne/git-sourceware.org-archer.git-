@@ -45,14 +45,11 @@ gdbpy_read_memory (PyObject *self, PyObject *args)
   void *buffer;
   membuf_object *membuf_obj;
   PyObject *addr_obj, *length_obj;
-  struct cleanup *cleanups;
+  struct cleanup *cleanups = NULL;
   volatile struct gdb_exception except;
 
   if (! PyArg_ParseTuple (args, "OO", &addr_obj, &length_obj))
     return NULL;
-
-  buffer = xmalloc (length);
-  cleanups = make_cleanup (xfree, buffer);
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
@@ -63,15 +60,15 @@ gdbpy_read_memory (PyObject *self, PyObject *args)
 	  break;
 	}
 
+      buffer = xmalloc (length);
+      cleanups = make_cleanup (xfree, buffer);
+
       read_memory (addr, buffer, length);
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
   if (error)
-    {
-      do_cleanups (cleanups);
-      return NULL;
-    }
+    return NULL;
 
   discard_cleanups (cleanups);
 
