@@ -116,9 +116,13 @@ objfpy_set_printers (PyObject *o, PyObject *value, void *ignore)
 static void
 clean_up_objfile (struct objfile *objfile, void *datum)
 {
+  PyGILState_STATE state;
   objfile_object *object = datum;
+
+  state = PyGILState_Ensure ();
   object->objfile = NULL;
   Py_DECREF ((PyObject *) object);
+  PyGILState_Release (state);
 }
 
 /* Return the Python object of type Objfile representing OBJFILE.  If
