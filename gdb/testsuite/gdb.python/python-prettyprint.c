@@ -1,6 +1,6 @@
 /* This testcase is part of GDB, the GNU debugger.
 
-   Copyright 2008 Free Software Foundation, Inc.
+   Copyright 2008, 2009 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -44,6 +44,35 @@ struct SSS
   const S &b;
 };
 SSS::SSS (int x, const S& r) : a(x), b(r) { }
+
+class VirtualTest 
+{ 
+ private: 
+  int value; 
+
+ public: 
+  VirtualTest () 
+    { 
+      value = 1;
+    } 
+};
+
+class Vbase1 : public virtual VirtualTest { };
+class Vbase2 : public virtual VirtualTest { };
+class Vbase3 : public virtual VirtualTest { };
+
+class Derived : public Vbase1, public Vbase2, public Vbase3
+{ 
+ private: 
+  int value; 
+  
+ public:
+  Derived () 
+    { 
+      value = 2; 
+    }
+};
+
 #endif
 
 typedef struct string_repr
@@ -146,6 +175,9 @@ main ()
   SSS sss(15, cps);
 
   SSS& ref (sss);
+
+  Derived derived;
+  
 #endif
 
   add_item (&c, 23);		/* MI breakpoint here */

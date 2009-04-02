@@ -78,6 +78,20 @@ class pp_sss:
     def to_string(self):
         return "a=<" + str(self.val['a']) + "> b=<" + str(self.val["b"]) + ">"
 
+class pp_multiple_virtual:
+    def __init__ (self, val):
+        self.val = val
+
+    def to_string (self):
+        return "pp value variable is: " + str (self.val['value'])
+
+class pp_vbase1:
+    def __init__ (self, val):
+        self.val = val
+
+    def to_string (self):
+        return "pp class name: " + self.val.type ().tag ()
+
 def lookup_function (val):
     "Look-up and return a pretty-printer that can print val."
 
@@ -118,6 +132,9 @@ def register_pretty_printers ():
     pretty_printers_dict[re.compile ('^ss$')]  = pp_ss
     pretty_printers_dict[re.compile ('^const S &$')]   = pp_s
     pretty_printers_dict[re.compile ('^SSS$')]  = pp_sss
+    
+    pretty_printers_dict[re.compile ('^VirtualTest$')] =  pp_multiple_virtual
+    pretty_printers_dict[re.compile ('^Vbase1$')] =  pp_vbase1
     
     # Note that we purposely omit the typedef names here.
     # Printer lookup is based on canonical name.
