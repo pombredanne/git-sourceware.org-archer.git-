@@ -208,7 +208,7 @@ alloc_type1 (struct objfile *objfile)
     {
       type = OBSTACK_ZALLOC (&objfile->objfile_obstack, struct type);
       TYPE_MAIN_TYPE (type) = OBSTACK_ZALLOC (&objfile->objfile_obstack,
-					     struct main_type);
+					      struct main_type);
       OBJSTAT (objfile, n_types++);
     }
 
@@ -895,7 +895,6 @@ create_array_type (struct type *result_type,
   TYPE_NFIELDS (result_type) = 1;
   TYPE_FIELDS (result_type) =
     (struct field *) TYPE_ZALLOC (result_type, sizeof (struct field));
-  /* FIXME: type alloc.  */
   TYPE_INDEX_TYPE (result_type) = range_type;
   TYPE_VPTR_FIELDNO (result_type) = -1;
 
@@ -1882,7 +1881,6 @@ init_type (enum type_code code, int length, int flags,
     {
       INIT_CPLUS_SPECIFIC (type);
     }
-
   return (type);
 }
 
@@ -3040,12 +3038,8 @@ copy_type_recursive_1 (struct objfile *objfile,
 
   pair.old = type;
   slot = htab_find_slot (copied_types, &pair, INSERT);
-  /* Do not reuse any of the types as they could have distinct REFC despite
-     being later connected.  It gets sanity checked by check_types_refc.  */
-#if 0
   if (*slot != NULL)
     return ((struct type_pair *) *slot)->new;
-#endif
 
   new_type = alloc_type (NULL);
 
