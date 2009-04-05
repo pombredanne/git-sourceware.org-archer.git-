@@ -2049,9 +2049,7 @@ static const insn_sequence elf32_arm_stub_long_branch_v4t_arm_thumb[] =
     DATA_WORD(0, R_ARM_ABS32, 0),    /* dcd   R_ARM_ABS32(X) */
   };
 
-/* Thumb -> Thumb long branch stub. Used on architectures which
-   support only this mode, or on V4T where it is expensive to switch
-   to ARM.  */
+/* Thumb -> Thumb long branch stub. Used on M-profile architectures.  */
 static const insn_sequence elf32_arm_stub_long_branch_thumb_only[] =
   {
     THUMB16_INSN(0xb401),             /* push {r0} */
@@ -2060,6 +2058,17 @@ static const insn_sequence elf32_arm_stub_long_branch_thumb_only[] =
     THUMB16_INSN(0xbc01),             /* pop  {r0} */
     THUMB16_INSN(0x4760),             /* bx   ip */
     THUMB16_INSN(0xbf00),             /* nop */
+    DATA_WORD(0, R_ARM_ABS32, 0),     /* dcd  R_ARM_ABS32(X) */
+  };
+
+/* V4T Thumb -> Thumb long branch stub. Using the stack is not
+   allowed.  */
+static const insn_sequence elf32_arm_stub_long_branch_v4t_thumb_thumb[] =
+  {
+    THUMB16_INSN(0x4778),             /* bx   pc */
+    THUMB16_INSN(0x46c0),             /* nop */
+    ARM_INSN(0xe59fc000),             /* ldr  ip, [pc, #0] */
+    ARM_INSN(0xe12fff1c),             /* bx   ip */
     DATA_WORD(0, R_ARM_ABS32, 0),     /* dcd  R_ARM_ABS32(X) */
   };
 
@@ -2122,9 +2131,8 @@ static const insn_sequence elf32_arm_stub_long_branch_v4t_thumb_arm_pic[] =
     DATA_WORD(0, R_ARM_REL32, -4),     /* dcd  R_ARM_REL32(X) */
   };
 
-/* Thumb -> Thumb long branch stub, PIC. Used on architectures which
-   support only this mode, or on V4T where it is expensive to switch
-   to ARM.  */
+/* Thumb -> Thumb long branch stub, PIC. Used on M-profile
+   architectures.  */
 static const insn_sequence elf32_arm_stub_long_branch_thumb_only_pic[] =
   {
     THUMB16_INSN(0xb401),             /* push {r0} */
@@ -2134,6 +2142,18 @@ static const insn_sequence elf32_arm_stub_long_branch_thumb_only_pic[] =
     THUMB16_INSN(0xbc01),             /* pop  {r0} */
     THUMB16_INSN(0x4760),             /* bx   ip */
     DATA_WORD(0, R_ARM_REL32, 4),     /* dcd  R_ARM_REL32(X) */
+  };
+
+/* V4T Thumb -> Thumb long branch stub, PIC. Using the stack is not
+   allowed.  */
+static const insn_sequence elf32_arm_stub_long_branch_v4t_thumb_thumb_pic[] =
+  {
+    THUMB16_INSN(0x4778),             /* bx   pc */
+    THUMB16_INSN(0x46c0),             /* nop */
+    ARM_INSN(0xe59fc004),             /* ldr  ip, [pc, #4] */
+    ARM_INSN(0xe08fc00c),             /* add   ip, pc, ip */
+    ARM_INSN(0xe12fff1c),             /* bx   ip */
+    DATA_WORD(0, R_ARM_REL32, 0),     /* dcd  R_ARM_REL32(X) */
   };
 
 /* Section name for stubs is the associated section name plus this
@@ -2146,6 +2166,7 @@ enum elf32_arm_stub_type
   arm_stub_long_branch_any_any,
   arm_stub_long_branch_v4t_arm_thumb,
   arm_stub_long_branch_thumb_only,
+  arm_stub_long_branch_v4t_thumb_thumb,
   arm_stub_long_branch_v4t_thumb_arm,
   arm_stub_short_branch_v4t_thumb_arm,
   arm_stub_long_branch_any_arm_pic,
@@ -2153,6 +2174,7 @@ enum elf32_arm_stub_type
   arm_stub_long_branch_v4t_arm_thumb_pic,
   arm_stub_long_branch_v4t_thumb_arm_pic,
   arm_stub_long_branch_thumb_only_pic,
+  arm_stub_long_branch_v4t_thumb_thumb_pic,
 };
 
 struct elf32_arm_stub_hash_entry
@@ -2923,14 +2945,14 @@ arm_type_of_stub (struct bfd_link_info *info,
 		       /* V5T and above.  */
 		       ? arm_stub_long_branch_any_thumb_pic
 		       /* On V4T, use Thumb code only.  */
-		       : arm_stub_long_branch_thumb_only_pic)
+		       : arm_stub_long_branch_v4t_thumb_thumb_pic)
 
 		    /* non-PIC stubs.  */
 		    : ((globals->use_blx)
 		       /* V5T and above.  */
 		       ? arm_stub_long_branch_any_any
 		       /* V4T.  */
-		       : arm_stub_long_branch_thumb_only);
+		       : arm_stub_long_branch_v4t_thumb_thumb);
 		}
 	      else
 		{
@@ -3336,6 +3358,10 @@ arm_size_one_stub (struct bfd_hash_entry *gen_entry,
       template =  elf32_arm_stub_long_branch_thumb_only;
       template_size = ARRAY_SIZE (elf32_arm_stub_long_branch_thumb_only);
       break;
+    case arm_stub_long_branch_v4t_thumb_thumb:
+      template =  elf32_arm_stub_long_branch_v4t_thumb_thumb;
+      template_size = ARRAY_SIZE (elf32_arm_stub_long_branch_v4t_thumb_thumb);
+      break;
     case arm_stub_long_branch_v4t_thumb_arm:
       template =  elf32_arm_stub_long_branch_v4t_thumb_arm;
       template_size = ARRAY_SIZE (elf32_arm_stub_long_branch_v4t_thumb_arm);
@@ -3363,6 +3389,10 @@ arm_size_one_stub (struct bfd_hash_entry *gen_entry,
     case arm_stub_long_branch_thumb_only_pic:
       template = elf32_arm_stub_long_branch_thumb_only_pic;
       template_size = ARRAY_SIZE (elf32_arm_stub_long_branch_thumb_only_pic);
+      break;
+    case arm_stub_long_branch_v4t_thumb_thumb_pic:
+      template = elf32_arm_stub_long_branch_v4t_thumb_thumb_pic;
+      template_size = ARRAY_SIZE (elf32_arm_stub_long_branch_v4t_thumb_thumb_pic);
       break;
     default:
       BFD_FAIL ();
@@ -3525,7 +3555,6 @@ group_sections (struct elf32_arm_link_hash_table *htab,
     {
       asection *tail = *list;
       asection *head;
-      asection *tp;
 
       if (tail == bfd_abs_section_ptr)
 	continue;
@@ -3535,38 +3564,35 @@ group_sections (struct elf32_arm_link_hash_table *htab,
 	 section may be required for an interrupt vector in bare metal
 	 code.  */
 #define NEXT_SEC PREV_SEC
-      head = tail;
-      tp = NULL;
-      for (;;)
-	{
-	  asection *h = PREV_SEC (head);
-	  NEXT_SEC (head) = tp;
-	  if (h == NULL)
-	    break;
-	  tp = head;
-	  head = h;
-	}
+      head = NULL;
+      while (tail != NULL)
+        {
+          /* Pop from tail.  */
+          asection *item = tail;
+          tail = PREV_SEC (item);
+
+          /* Push on head.  */
+          NEXT_SEC (item) = head;
+          head = item;
+        }
 
       while (head != NULL)
 	{
 	  asection *curr;
 	  asection *next;
-	  bfd_size_type total;
+	  bfd_vma stub_group_start = head->output_offset;
+	  bfd_vma end_of_next;
 
 	  curr = head;
-	  total = 0;
-	  while ((next = NEXT_SEC (curr)) != NULL)
+	  while (NEXT_SEC (curr) != NULL)
 	    {
-	      if ( (total + next->output_offset - curr->output_offset
-		    + next->size)
-		   < stub_group_size )
-		{
-		  total += next->output_offset - curr->output_offset;
-		}
-	      else
+	      next = NEXT_SEC (curr);
+	      end_of_next = next->output_offset + next->size;
+	      if (end_of_next - stub_group_start >= stub_group_size)
+		/* End of NEXT is too far from start, so stop.  */
 		break;
-
-	    curr = next;
+	      /* Add NEXT to the group.  */
+	      curr = next;
 	    }
 
 	  /* OK, the size from the start to the start of CURR is less
@@ -3588,18 +3614,15 @@ group_sections (struct elf32_arm_link_hash_table *htab,
 	     bytes after the stub section can be handled by it too.  */
 	  if (!stubs_always_after_branch)
 	    {
-	      total = head->size;
+	      stub_group_start = curr->output_offset + curr->size;
+
 	      while (next != NULL)
 		{
-		  if ( (total + next->output_offset - head->output_offset
-			+ next->size)
-		       < stub_group_size )
-		    {
-		      total += next->output_offset - head->output_offset;
-		    }
-		  else
+		  end_of_next = next->output_offset + next->size;
+		  if (end_of_next - stub_group_start >= stub_group_size)
+		    /* End of NEXT is too far from stubs, so stop.  */
 		    break;
-
+		  /* Add NEXT to the stub group.  */
 		  head = next;
 		  next = NEXT_SEC (head);
 		  htab->stub_group[head->id].link_sec = curr;

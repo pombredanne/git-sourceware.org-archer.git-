@@ -160,7 +160,7 @@ static int stale_task_list_p = 1;
 /* Return the task number of the task whose ptid is PTID, or zero
    if the task could not be found.  */
 
-static int
+int
 ada_get_task_number (ptid_t ptid)
 {
   int i;
@@ -711,9 +711,6 @@ short_task_info (int taskno)
   else if (task_info->state == Entry_Caller_Sleep && task_info->called_task)
     printf_filtered (_(" Waiting on RV with %-3d"),
                      get_task_number_from_id (task_info->called_task));
-  else if (task_info->state == Runnable && active_task_p)
-    /* Replace "Runnable" by "Running" since this is the active task.  */
-    printf_filtered (" %-22s", _("Running"));
   else
     printf_filtered (" %-22s", _(task_states[task_info->state]));
 
