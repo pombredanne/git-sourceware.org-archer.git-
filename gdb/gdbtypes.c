@@ -146,7 +146,19 @@ static void print_bit_vector (B_TYPE *, int);
 static void print_arg_types (struct field *, int, int);
 static void dump_fn_fieldlists (struct type *, int);
 static void print_cplus_stuff (struct type *, int);
-static void type_init_refc (struct type *new_type, struct type *parent_type);
+static void type_init_refc (struct type *type);
+
+struct type_refc_group
+{
+  int use_count;
+
+  /* Number of type_refc_entry items in this GROUP.  It is only valid
+     if GROUP == thistype_refc_entry.  It is the length of list
+     group->group_next.  */
+  int entries_count;
+
+  struct type_refc_entry *entry_list;
+};
 
 /* A reference count structure for the type reference count map.  Each
    type in a hierarchy of types is mapped to the same reference
@@ -161,23 +173,14 @@ struct type_refc_entry
      own slot.  */
   struct type *type;
 
-  /* A pointer to the shared reference count.  */
-  int *refc;
-
-  /* Set to TYPE_REFC_MARKER when the following fields are valid for the
-     current check_types_refc pass.  */
+  /* Set to TYPE_REFC_MARKER during each check_types_refc pass.  */
   unsigned marked : 1;
 
   /* Pointer to leading type_refc_entry of interconnected types group.  */
-  struct type_refc_entry *group;
+  struct type_refc_group *group;
 
   /* Next type_refc_entry in this GROUP or NULL.  */
   struct type_refc_entry *group_next;
-
-  /* Number of type_refc_entry items in this GROUP.  It is only valid
-     if GROUP == thistype_refc_entry.  It is the length of list
-     group->group_next.  */
-  unsigned group_count;
 };
 
 /* The hash table holding all reference counts.  */
@@ -190,7 +193,7 @@ static unsigned type_refc_marker;
    (GDB-internal) types.  */
 
 static struct type *
-alloc_type1 (struct objfile *objfile, struct type *parent)
+alloc_type1 (struct objfile *objfile)
 {
   struct type *type;
 
@@ -226,12 +229,11 @@ alloc_type1 (struct objfile *objfile, struct type *parent)
    later).  */
 
 struct type *
-alloc_type (struct objfile *objfile, struct type *parent)
+alloc_type (struct objfile *objfile)
 {
-  struct type *type = alloc_type1 (objfile, parent);
+  struct type *type = alloc_type1 (objfile);
 
-  if (objfile == NULL)
-    type_init_refc (type, parent);
+  type_init_refc (type);
 
   return type;
 }
@@ -257,10 +259,9 @@ alloc_type_instance (struct type *oldtype)
 
   TYPE_CHAIN (type) = type;	/* Chain back to itself for now.  */
 
-  if (TYPE_OBJFILE (oldtype) == NULL)
-    type_init_refc (type, oldtype);
+  type_init_refc (type);
 
-  return (type);
+  return type;
 }
 
 /* Clear all remnants of the previous type at TYPE, in preparation for
@@ -304,7 +305,7 @@ make_pointer_type (struct type *type, struct type **typeptr)
 
   if (typeptr == 0 || *typeptr == 0)	/* We'll need to allocate one.  */
     {
-      ntype = alloc_type (TYPE_OBJFILE (type), type);
+      ntype = alloc_type (TYPE_OBJFILE (type));
       if (typeptr)
 	*typeptr = ntype;
     }
@@ -387,7 +388,7 @@ make_reference_type (struct type *type, struct type **typeptr)
 
   if (typeptr == 0 || *typeptr == 0)	/* We'll need to allocate one.  */
     {
-      ntype = alloc_type (TYPE_OBJFILE (type), type);
+      ntype = alloc_type (TYPE_OBJFILE (type));
       if (typeptr)
 	*typeptr = ntype;
     }
@@ -450,7 +451,7 @@ make_function_type (struct type *type, struct type **typeptr)
 
   if (typeptr == 0 || *typeptr == 0)	/* We'll need to allocate one.  */
     {
-      ntype = alloc_type (TYPE_OBJFILE (type), type);
+      ntype = alloc_type (TYPE_OBJFILE (type));
       if (typeptr)
 	*typeptr = ntype;
     }
@@ -708,7 +709,7 @@ lookup_memberptr_type (struct type *type, struct type *domain)
 {
   struct type *mtype;
 
-  mtype = alloc_type (TYPE_OBJFILE (type), NULL);
+  mtype = alloc_type (TYPE_OBJFILE (type));
   smash_to_memberptr_type (mtype, domain, type);
   return (mtype);
 }
@@ -720,7 +721,7 @@ lookup_methodptr_type (struct type *to_type)
 {
   struct type *mtype;
 
-  mtype = alloc_type (TYPE_OBJFILE (to_type), NULL);
+  mtype = alloc_type (TYPE_OBJFILE (to_type));
   TYPE_TARGET_TYPE (mtype) = to_type;
   TYPE_DOMAIN_TYPE (mtype) = TYPE_DOMAIN_TYPE (to_type);
   TYPE_LENGTH (mtype) = cplus_method_ptr_size (to_type);
@@ -761,7 +762,7 @@ create_range_type (struct type *result_type, struct type *index_type,
 		   int low_bound, int high_bound)
 {
   if (result_type == NULL)
-    result_type = alloc_type (TYPE_OBJFILE (index_type), index_type);
+    result_type = alloc_type (TYPE_OBJFILE (index_type));
   TYPE_CODE (result_type) = TYPE_CODE_RANGE;
   TYPE_TARGET_TYPE (result_type) = index_type;
   if (TYPE_STUB (index_type))
@@ -870,7 +871,7 @@ create_array_type (struct type *result_type,
 
   if (result_type == NULL)
     {
-      result_type = alloc_type (TYPE_OBJFILE (range_type), range_type);
+      result_type = alloc_type (TYPE_OBJFILE (range_type));
     }
   else
     {
@@ -937,7 +938,7 @@ create_set_type (struct type *result_type, struct type *domain_type)
 {
   if (result_type == NULL)
     {
-      result_type = alloc_type (TYPE_OBJFILE (domain_type), domain_type);
+      result_type = alloc_type (TYPE_OBJFILE (domain_type));
     }
   else
     {
@@ -1497,7 +1498,7 @@ check_typedef (struct type *type)
 	  if (sym)
 	    TYPE_TARGET_TYPE (type) = SYMBOL_TYPE (sym);
 	  else					/* TYPE_CODE_UNDEF */
-	    TYPE_TARGET_TYPE (type) = alloc_type (NULL, NULL);
+	    TYPE_TARGET_TYPE (type) = alloc_type (NULL);
 	}
       type = TYPE_TARGET_TYPE (type);
     }
@@ -1831,7 +1832,7 @@ init_type (enum type_code code, int length, int flags,
   struct type *type;
 
   /* alloc_type1 will make TYPE permanent.  */
-  type = alloc_type1 (objfile, NULL);
+  type = alloc_type1 (objfile);
   TYPE_CODE (type) = code;
   TYPE_LENGTH (type) = length;
 
@@ -3018,17 +3019,13 @@ create_copied_types_hash (struct objfile *objfile)
     }
 }
 
-/* A helper for copy_type_recursive.  This does all the work.
-   REPRESENTATIVE is a pointer to a type.  This is used to register
-   newly-created types in the type_refc_table.  Initially it pointer
-   to a NULL pointer, but it is filled in the first time a type is
-   copied.  OBJFILE is used only for an assertion checking.  */
+/* A helper for copy_type_recursive.  This does all the work.  OBJFILE is used
+   only for an assertion checking.  */
 
 static struct type *
 copy_type_recursive_1 (struct objfile *objfile, 
 		       struct type *type,
-		       htab_t copied_types,
-		       struct type **representative)
+		       htab_t copied_types)
 {
   struct type_pair *stored, pair;
   void **slot;
@@ -3050,9 +3047,7 @@ copy_type_recursive_1 (struct objfile *objfile,
     return ((struct type_pair *) *slot)->new;
 #endif
 
-  new_type = alloc_type (NULL, *representative);
-  if (!*representative)
-    *representative = new_type;
+  new_type = alloc_type (NULL);
 
   /* We must add the new type to the hash table immediately, in case
      we encounter this type again during a recursive call below.  Memory could
@@ -3099,7 +3094,7 @@ copy_type_recursive_1 (struct objfile *objfile,
 	  if (TYPE_FIELD_TYPE (type, i))
 	    TYPE_FIELD_TYPE (new_type, i)
 	      = copy_type_recursive_1 (objfile, TYPE_FIELD_TYPE (type, i),
-				       copied_types, representative);
+				       copied_types);
 	  if (TYPE_FIELD_NAME (type, i))
 	    TYPE_FIELD_NAME (new_type, i) = 
 	      xstrdup (TYPE_FIELD_NAME (type, i));
@@ -3131,14 +3126,12 @@ copy_type_recursive_1 (struct objfile *objfile,
     TYPE_TARGET_TYPE (new_type) = 
       copy_type_recursive_1 (objfile, 
 			     TYPE_TARGET_TYPE (type),
-			     copied_types,
-			     representative);
+			     copied_types);
   if (TYPE_VPTR_BASETYPE (type))
     TYPE_VPTR_BASETYPE (new_type) = 
       copy_type_recursive_1 (objfile,
 			     TYPE_VPTR_BASETYPE (type),
-			     copied_types,
-			     representative);
+			     copied_types);
   /* Maybe copy the type_specific bits.
 
      NOTE drow/2005-12-09: We do not copy the C++-specific bits like
@@ -3164,10 +3157,7 @@ struct type *
 copy_type_recursive (struct type *type,
 		     htab_t copied_types)
 {
-  struct type *representative = NULL;
-
-  return copy_type_recursive_1 (TYPE_OBJFILE (type), type, copied_types,
-				&representative);
+  return copy_type_recursive_1 (TYPE_OBJFILE (type), type, copied_types);
 }
 
 /* Make a copy of the given TYPE, except that the pointer & reference
@@ -3183,7 +3173,7 @@ copy_type (const struct type *type)
 
   gdb_assert (TYPE_OBJFILE (type) != NULL);
 
-  new_type = alloc_type (TYPE_OBJFILE (type), NULL);
+  new_type = alloc_type (TYPE_OBJFILE (type));
   TYPE_INSTANCE_FLAGS (new_type) = TYPE_INSTANCE_FLAGS (type);
   TYPE_LENGTH (new_type) = TYPE_LENGTH (type);
   memcpy (TYPE_MAIN_TYPE (new_type), TYPE_MAIN_TYPE (type),
@@ -3239,40 +3229,30 @@ main_type_crawl (struct type *type, main_type_crawl_iter iter, void *data)
   main_type_crawl (TYPE_VPTR_BASETYPE (type), iter, data);
 }
 
-/* Elements are `int *refc'.  It is used to find all the connected TYPEs nests
-   have disjunct REFCs.  */
-static htab_t type_target_refc_table;
-
-/* Number of currently valid (with actual MARKED field) unique GROUP fields of
-   the type_refc_table items.  */
-static unsigned entry_groups;
-
 /* Unify all the entries associated by GROUP in FROM with TO.  The new group
    will keep the GROUP pointer TO.  */
 
 static void
-entry_group_relabel (struct type_refc_entry *to, struct type_refc_entry *from)
+entry_group_relabel (struct type_refc_group *to, struct type_refc_group *from)
 {
   struct type_refc_entry *iter, *iter_next;
 
-  gdb_assert (to->group == to);
-  gdb_assert (from->group == from);
-  gdb_assert (to->group != from->group);
+  gdb_assert (to != from);
 
-  to->group_count += from->group_count;
-  gdb_assert (entry_groups > 0);
-  entry_groups--;
+  to->entries_count += from->entries_count;
 
-  for (iter = from; iter; iter = iter_next)
+  for (iter = from->entry_list; iter; iter = iter_next)
     {
       iter_next = iter->group_next;
 
       /* Relink ITER to the group list of TO.  */
-      iter->group_next = to->group_next;
-      to->group_next = iter;
+      iter->group_next = to->entry_list;
+      to->entry_list = iter;
 
       iter->group = to;
     }
+
+  xfree (from);
 }
 
 /* Number of valid (with actual MARKED field) entries of type_refc_table.  */
@@ -3296,13 +3276,8 @@ check_types_refc_grouping_iter (struct type *type, void *data)
   /* Was this ENTRY already met during the current check_types_refc pass?  */
   if (entry->marked != type_refc_marker)
     {
-      entry->group = entry;
-      entry->group_count = 1;
-      entry->group_next = NULL;
       entry->marked = type_refc_marker;
-      entry_groups++;
       check_types_refc_grouping_markers++;
-
       crawl_into = 1;
     }
 
@@ -3310,7 +3285,7 @@ check_types_refc_grouping_iter (struct type *type, void *data)
     {
       /* Keep the time complexity linear by relabeling always the smaller
 	 group.  */
-      if (entry->group->group_count < entry_prev->group->group_count)
+      if (entry->group->entries_count < entry_prev->group->entries_count)
 	entry_group_relabel (entry->group, entry_prev->group);
       else
 	entry_group_relabel (entry_prev->group, entry->group);
@@ -3327,10 +3302,6 @@ check_types_refc_grouping (void **slot, void *unused)
 {
   struct type_refc_entry *entry = *slot;
 
-  slot = htab_find_slot (type_target_refc_table, entry->refc, INSERT);
-  /* The same value may be already present there.  */
-  *slot = entry->refc;
-
   main_type_crawl (entry->type, check_types_refc_grouping_iter, entry);
 
   return 1;
@@ -3344,14 +3315,12 @@ check_types_fail_iter (void **slot, void *unused)
   struct type_refc_entry *entry = *slot;
   struct type *type = entry->type;
 
-  fprintf_unfiltered (gdb_stderr, "type %p main_type %p \"%s\" refc %p %d "
-				  "group %p",
+  fprintf_unfiltered (gdb_stderr, "type %p main_type %p \"%s\" group %p "
+				  "use_count %d entries_count %d\n",
 		      type, TYPE_MAIN_TYPE (type),
 		      TYPE_NAME (type) ? TYPE_NAME (type) : "<null>",
-		      entry->refc, *entry->refc, entry->group);
-  if (entry->group == entry)
-    fprintf_unfiltered (gdb_stderr, " group_count %d", entry->group_count);
-  fputc_unfiltered ('\n', gdb_stderr);
+		      entry->group, entry->group->use_count,
+		      entry->group->entries_count);
 
   return 1;
 }
@@ -3378,26 +3347,6 @@ check_types_fail (const char *file, int line, const char *function)
   ((void) ((expr) ? 0 :							 \
 	   (check_types_fail (__FILE__, __LINE__, ASSERT_FUNCTION), 0)))
 
-/* Last met type_refc_entry by check_types_refc_groups.  */
-static struct type_refc_entry *check_types_refc_groups_last;
-
-/* Iterator to check REFC connectivity matches the found unique GROUPs.  */
-
-static int
-check_types_refc_groups (void **slot, void *unused)
-{
-  struct type_refc_entry *entry = *slot;
-
-  if (check_types_refc_groups_last)
-    check_types_assert ((entry->group == check_types_refc_groups_last->group
-			 && entry->refc == check_types_refc_groups_last->refc)
-			|| (entry->group != check_types_refc_groups_last->group
-			 && entry->refc != check_types_refc_groups_last->refc));
-  check_types_refc_groups_last = entry;
-
-  return 1;
-}
-
 /* Sanity check TYPE_REFC_TABLE uses disjunct REFC pointers for unconnected
    interconnected TYPEs nests.  Also sanity check each interconnected TYPEs
    nest uses the same REFC.  */
@@ -3405,61 +3354,10 @@ check_types_refc_groups (void **slot, void *unused)
 static void
 check_types_refc (void)
 {
-  type_refc_marker ^= 1;
-
-  type_target_refc_table = htab_create_alloc (10, htab_hash_pointer,
-					     htab_eq_pointer, NULL, xcalloc,
-					     xfree);
-
   check_types_refc_grouping_markers = 0;
-  entry_groups = 0;
   htab_traverse (type_refc_table, check_types_refc_grouping, NULL);
   check_types_assert (check_types_refc_grouping_markers
 		      == htab_elements (type_refc_table));
-  check_types_assert (entry_groups == htab_elements (type_target_refc_table));
-
-  check_types_refc_groups_last = NULL;
-  htab_traverse (type_refc_table, check_types_refc_groups, NULL);
-
-  htab_delete (type_target_refc_table);
-}
-
-/* Store `int *' entries which got all their `type_refc_entry *' deleted.  */
-static htab_t deleted_refc_hash;
-
-/* To be called before any call of delete_type.  */
-
-static void
-delete_type_begin (void)
-{
-  gdb_assert (deleted_refc_hash == NULL);
-
-  deleted_refc_hash = htab_create_alloc (10, htab_hash_pointer, htab_eq_pointer,
-					 NULL, xcalloc, xfree);
-}
-
-/* Helper for delete_type_finish.  */
-
-static int
-delete_type_finish_refc (void **slot, void *unused)
-{
-  int *refc = *slot;
-
-  xfree (refc);
-
-  return 1;
-}
-
-/* To be called after all the calls of delete_type.  Each MAIN_TYPE must have
-   either none or all of its TYPE entries deleted.  */
-
-static void
-delete_type_finish (void)
-{
-  htab_traverse (deleted_refc_hash, delete_type_finish_refc, NULL);
-
-  htab_delete (deleted_refc_hash);
-  deleted_refc_hash = NULL;
 }
 
 /* A helper for delete_type which deletes a main_type and the things to which
@@ -3492,8 +3390,7 @@ delete_main_type (struct type *type)
 }
 
 /* Delete TYPE and remember MAIN_TYPE it references.  TYPE must have been
-   allocated using xmalloc -- not using an objfile.  You must wrap calls of
-   this function by delete_type_begin and delete_type_finish.  */
+   allocated using xmalloc -- not using an objfile.  */
 
 static void
 delete_type_chain (struct type *type)
@@ -3542,39 +3439,27 @@ type_refc_equal (const void *a, const void *b)
    to one.  */
 
 static void
-type_init_refc (struct type *new_type, struct type *parent_type)
+type_init_refc (struct type *type)
 {
-  int *refc;
   void **slot;
-  struct type_refc_entry *new_entry;
+  struct type_refc_group *group;
+  struct type_refc_entry *entry;
 
-  if (TYPE_OBJFILE (new_type))
+  if (TYPE_OBJFILE (type))
     return;
 
-  if (parent_type)
-    {
-      struct type_refc_entry entry, *found;
-      entry.type = parent_type;
-      found = htab_find (type_refc_table, &entry);
-      /* A permanent type?  */
-      if (!found)
-	return;
-      refc = found->refc;
-    }
-  else
-    {
-      refc = xmalloc (sizeof (int));
-      *refc = 0;
-    }
+  group = XNEW (struct type_refc_group);
+  group->use_count = 0;
+  group->entries_count = 1;
 
-  new_entry = XNEW (struct type_refc_entry);
-  new_entry->type = new_type;
-  new_entry->refc = refc;
-  new_entry->marked = type_refc_marker;
+  entry = XNEW (struct type_refc_entry);
+  entry->type = type;
+  entry->group = group;
+  entry->group_next = NULL;
 
-  slot = htab_find_slot (type_refc_table, new_entry, INSERT);
+  slot = htab_find_slot (type_refc_table, entry, INSERT);
   gdb_assert (!*slot);
-  *slot = new_entry;
+  *slot = entry;
 }
 
 /* Increment the reference count for TYPE.  */
@@ -3592,7 +3477,7 @@ type_incref (struct type *type)
   /* A permanent type?  */
   if (!found)
     return;
-  ++*(found->refc);
+  found->group->use_count++;
 }
 
 /* A traverse callback for type_refc_table which removes any entry
@@ -3603,17 +3488,21 @@ type_refc_remove (void **slot, void *unused)
 {
   struct type_refc_entry *entry = *slot;
 
-  if (*entry->refc == 0)
+  if (entry->group->use_count == 0)
     {
-      int *refc = entry->refc;
+      struct type_refc_group *group = entry->group;
 
       delete_type_chain (entry->type);
+
+      /* ENTRY_LIST with its GROUP_NEXT is left inconsistent as after the
+	 iteration by this function finishes the whole group will be deleted
+	 anyway.  */
+      gdb_assert (group->entries_count > 0);
+      if (!--group->entries_count)
+	xfree (group);
+
       xfree (entry);
       htab_clear_slot (type_refc_table, slot);
-
-      slot = htab_find_slot (deleted_refc_hash, refc, INSERT);
-      gdb_assert (!*slot || *slot == refc);
-      *slot = refc;
     }
 
   return 1;
@@ -3637,8 +3526,8 @@ type_decref (struct type *type)
   /* A permanent type?  */
   if (!found)
     return;
-  gdb_assert (found->refc > 0);
-  --*(found->refc);
+  gdb_assert (found->group->use_count > 0);
+  found->group->use_count--;
 }
 
 /* Free all the types that have been allocated and that are not used according
@@ -3651,9 +3540,7 @@ free_all_types (void)
 {
   check_types_refc ();
 
-  delete_type_begin ();
   htab_traverse (type_refc_table, type_refc_remove, NULL);
-  delete_type_finish ();
 }
 
 static struct type *

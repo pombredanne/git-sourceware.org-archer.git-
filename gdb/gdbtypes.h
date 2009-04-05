@@ -1101,7 +1101,7 @@ extern struct type *builtin_type_error;
 	      0, size)  \
     : xzalloc (size))
 
-extern struct type *alloc_type (struct objfile *, struct type *);
+extern struct type *alloc_type (struct objfile *);
 
 extern struct type *init_type (enum type_code, int, int, char *,
 			       struct objfile *);
