@@ -1729,9 +1729,9 @@ packed_array_type (struct type *type, long *elt_bits)
   if (TYPE_CODE (type) != TYPE_CODE_ARRAY)
     return type;
 
+  new_type = alloc_type (TYPE_OBJFILE (type));
   new_elt_type = packed_array_type (ada_check_typedef (TYPE_TARGET_TYPE (type)),
                                     elt_bits);
-  new_type = alloc_type (TYPE_OBJFILE (type));
   create_array_type (new_type, new_elt_type, TYPE_INDEX_TYPE (type));
   TYPE_FIELD_BITSIZE (new_type, 0) = *elt_bits;
   TYPE_NAME (new_type) = ada_type_name (type);
