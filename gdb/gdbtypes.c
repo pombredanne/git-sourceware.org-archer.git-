@@ -192,8 +192,8 @@ static unsigned type_group_age;
 /* The core code for alloc_type.  Call this function for allocating permanent
    (GDB-internal) types.  */
 
-static struct type *
-alloc_type1 (struct objfile *objfile)
+struct type *
+alloc_type (struct objfile *objfile)
 {
   struct type *type;
 
@@ -228,12 +228,34 @@ alloc_type1 (struct objfile *objfile)
    structure by xmalloc () (for permanent types or types than can be freed
    later).  */
 
-struct type *
-alloc_type (struct objfile *objfile)
+static struct type *
+alloc_type_discardable (struct objfile *objfile)
 {
-  struct type *type = alloc_type1 (objfile);
+  struct type *type = alloc_type (objfile);
 
   type_init_group (type);
+
+  return type;
+}
+
+/* Like alloc_type but make the new type permanent if the original type was
+   also permanent.  */
+
+static struct type *
+alloc_type_as_parent (struct type *parent_type)
+{
+  struct type *type = alloc_type (TYPE_OBJFILE (parent_type));
+
+  if (!TYPE_OBJFILE (parent_type))
+    {
+      struct type_group_link link, *found;
+
+      link.type = type;
+      found = htab_find (type_group_link_table, &link);
+      /* Not a permanent type?  */
+      if (found)
+	type_init_group (type);
+    }
 
   return type;
 }
@@ -303,7 +325,7 @@ make_pointer_type (struct type *type, struct type **typeptr)
 
   if (typeptr == 0 || *typeptr == 0)	/* We'll need to allocate one.  */
     {
-      ntype = alloc_type (TYPE_OBJFILE (type));
+      ntype = alloc_type_as_parent (type);
       if (typeptr)
 	*typeptr = ntype;
     }
@@ -1827,8 +1849,7 @@ init_type (enum type_code code, int length, int flags,
 {
   struct type *type;
 
-  /* alloc_type1 will make TYPE permanent.  */
-  type = alloc_type1 (objfile);
+  type = alloc_type (objfile);
   TYPE_CODE (type) = code;
   TYPE_LENGTH (type) = length;
 
@@ -3038,7 +3059,7 @@ copy_type_recursive_1 (struct objfile *objfile,
   if (*slot != NULL)
     return ((struct type_pair *) *slot)->new;
 
-  new_type = alloc_type (NULL);
+  new_type = alloc_type_discardable (NULL);
 
   /* We must add the new type to the hash table immediately, in case
      we encounter this type again during a recursive call below.  Memory could
