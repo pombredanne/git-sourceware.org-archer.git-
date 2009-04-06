@@ -259,8 +259,6 @@ alloc_type_instance (struct type *oldtype)
 
   TYPE_CHAIN (type) = type;	/* Chain back to itself for now.  */
 
-  type_init_group (type);
-
   return type;
 }
 
@@ -3189,7 +3187,7 @@ typedef int (*main_type_crawl_iter) (struct type *type, void *data);
 static void
 main_type_crawl (struct type *type, main_type_crawl_iter iter, void *data)
 {
-  struct type_group_link entry, *found;
+  struct type_group_link link, *found;
   struct type *type_iter;
   int i;
 
@@ -3197,9 +3195,9 @@ main_type_crawl (struct type *type, main_type_crawl_iter iter, void *data)
     return;
 
   gdb_assert (TYPE_OBJFILE (type) == NULL);
-  /* Strangely, HAVE_CPLUS_STRUCT will return true when there isn't
-     one at all.  */
-  gdb_assert (!HAVE_CPLUS_STRUCT (type) || !TYPE_CPLUS_SPECIFIC (type));
+  gdb_assert ((TYPE_CODE (type) != TYPE_CODE_STRUCT
+	       && TYPE_CODE (type) != TYPE_CODE_UNION)
+	      || !HAVE_CPLUS_STRUCT (type) || !TYPE_CPLUS_SPECIFIC (type));
 
   if (!(*iter) (type, data))
     return;
@@ -3227,7 +3225,7 @@ main_type_crawl (struct type *type, main_type_crawl_iter iter, void *data)
    will keep the GROUP pointer TO.  */
 
 static void
-entry_group_relabel (struct type_group *to, struct type_group *from)
+link_group_relabel (struct type_group *to, struct type_group *from)
 {
   struct type_group_link *iter, *iter_next;
 
@@ -3259,44 +3257,46 @@ static int
 type_group_link_check_grouping_iter (struct type *type, void *data)
 {
   /* The starting point TYPE referenced in type_group_link_table.  */
-  struct type_group_link *entry_prev = data;
-  struct type_group_link entry_local, *entry;
+  struct type_group_link *link_prev = data;
+  struct type_group_link link_local, *link;
   int crawl_into = 0;
 
-  entry_local.type = type;
-  entry = htab_find (type_group_link_table, &entry_local);
-  gdb_assert (entry);
+  link_local.type = type;
+  link = htab_find (type_group_link_table, &link_local);
+  /* A permanent type?  */
+  if (!link)
+    return 0;
 
-  /* Was this ENTRY already met during the current type_group_link_check pass?  */
-  if (entry->age != type_group_age)
+  /* Was this LINK already met during the current type_group_link_check pass?  */
+  if (link->age != type_group_age)
     {
-      entry->age = type_group_age;
+      link->age = type_group_age;
       type_group_link_check_grouping_markers++;
       crawl_into = 1;
     }
 
-  if (entry != entry_prev && entry->group != entry_prev->group)
+  if (link != link_prev && link->group != link_prev->group)
     {
       /* Keep the time complexity linear by relabeling always the smaller
 	 group.  */
-      if (entry->group->link_count < entry_prev->group->link_count)
-	entry_group_relabel (entry->group, entry_prev->group);
+      if (link->group->link_count < link_prev->group->link_count)
+	link_group_relabel (link->group, link_prev->group);
       else
-	entry_group_relabel (entry_prev->group, entry->group);
+	link_group_relabel (link_prev->group, link->group);
     }
 
   return crawl_into;
 }
 
 /* Iterator to unify GROUP of all the TYPEs connected with the one starting at
-   ENTRY.  */
+   LINK.  */
 
 static int
 type_group_link_check_grouping (void **slot, void *unused)
 {
-  struct type_group_link *entry = *slot;
+  struct type_group_link *link = *slot;
 
-  main_type_crawl (entry->type, type_group_link_check_grouping_iter, entry);
+  main_type_crawl (link->type, type_group_link_check_grouping_iter, link);
 
   return 1;
 }
@@ -3306,15 +3306,15 @@ type_group_link_check_grouping (void **slot, void *unused)
 static int
 check_types_fail_iter (void **slot, void *unused)
 {
-  struct type_group_link *entry = *slot;
-  struct type *type = entry->type;
+  struct type_group_link *link = *slot;
+  struct type *type = link->type;
 
   fprintf_unfiltered (gdb_stderr, "type %p main_type %p \"%s\" group %p "
 				  "use_count %d link_count %d\n",
 		      type, TYPE_MAIN_TYPE (type),
 		      TYPE_NAME (type) ? TYPE_NAME (type) : "<null>",
-		      entry->group, entry->group->use_count,
-		      entry->group->link_count);
+		      link->group, link->group->use_count,
+		      link->group->link_count);
 
   return 1;
 }
@@ -3348,6 +3348,8 @@ check_types_fail (const char *file, int line, const char *function)
 static void
 type_group_link_check (void)
 {
+  type_group_age ^= 1;
+
   type_group_link_check_grouping_markers = 0;
   htab_traverse (type_group_link_table, type_group_link_check_grouping, NULL);
   check_types_assert (type_group_link_check_grouping_markers
@@ -3376,9 +3378,9 @@ delete_main_type (struct type *type)
     }
   xfree (TYPE_FIELDS (type));
 
-  /* Strangely, HAVE_CPLUS_STRUCT will return true when there isn't
-     one at all.  */
-  gdb_assert (!HAVE_CPLUS_STRUCT (type) || !TYPE_CPLUS_SPECIFIC (type));
+  gdb_assert ((TYPE_CODE (type) != TYPE_CODE_STRUCT
+	       && TYPE_CODE (type) != TYPE_CODE_UNION)
+	      || !HAVE_CPLUS_STRUCT (type) || !TYPE_CPLUS_SPECIFIC (type));
 
   xfree (TYPE_MAIN_TYPE (type));
 }
@@ -3411,8 +3413,8 @@ delete_type_chain (struct type *type)
 static hashval_t
 type_group_link_hash (const void *p)
 {
-  const struct type_group_link *entry = p;
-  return htab_hash_pointer (TYPE_MAIN_TYPE (entry->type));
+  const struct type_group_link *link = p;
+  return htab_hash_pointer (TYPE_MAIN_TYPE (link->type));
 }
 
 /* Equality function for type_group_link_table.  */
@@ -3437,23 +3439,26 @@ type_init_group (struct type *type)
 {
   void **slot;
   struct type_group *group;
-  struct type_group_link *entry;
+  struct type_group_link *link;
 
   if (TYPE_OBJFILE (type))
     return;
 
   group = XNEW (struct type_group);
+  link = XNEW (struct type_group_link);
+
   group->use_count = 0;
   group->link_count = 1;
+  group->link_list = link;
 
-  entry = XNEW (struct type_group_link);
-  entry->type = type;
-  entry->group = group;
-  entry->group_next = NULL;
+  link->type = type;
+  link->age = type_group_age;
+  link->group = group;
+  link->group_next = NULL;
 
-  slot = htab_find_slot (type_group_link_table, entry, INSERT);
+  slot = htab_find_slot (type_group_link_table, link, INSERT);
   gdb_assert (!*slot);
-  *slot = entry;
+  *slot = link;
 }
 
 /* Increment the reference count for TYPE.  */
@@ -3461,32 +3466,32 @@ type_init_group (struct type *type)
 void
 type_incref (struct type *type)
 {
-  struct type_group_link entry, *found;
+  struct type_group_link link, *found;
 
   if (TYPE_OBJFILE (type))
     return;
 
-  entry.type = type;
-  found = htab_find (type_group_link_table, &entry);
+  link.type = type;
+  found = htab_find (type_group_link_table, &link);
   /* A permanent type?  */
   if (!found)
     return;
   found->group->use_count++;
 }
 
-/* A traverse callback for type_group_link_table which removes any entry
-   whose reference count is zero (unused entry).  */
+/* A traverse callback for type_group_link_table which removes any link
+   whose reference count is zero (unused link).  */
 
 static int
 type_group_link_remove (void **slot, void *unused)
 {
-  struct type_group_link *entry = *slot;
+  struct type_group_link *link = *slot;
 
-  if (entry->group->use_count == 0)
+  if (link->group->use_count == 0)
     {
-      struct type_group *group = entry->group;
+      struct type_group *group = link->group;
 
-      delete_type_chain (entry->type);
+      delete_type_chain (link->type);
 
       /* link_list with its GROUP_NEXT is left inconsistent as after the
 	 iteration by this function finishes the whole group will be deleted
@@ -3495,7 +3500,7 @@ type_group_link_remove (void **slot, void *unused)
       if (!--group->link_count)
 	xfree (group);
 
-      xfree (entry);
+      xfree (link);
       htab_clear_slot (type_group_link_table, slot);
     }
 
@@ -3510,13 +3515,13 @@ type_group_link_remove (void **slot, void *unused)
 void
 type_decref (struct type *type)
 {
-  struct type_group_link entry, *found;
+  struct type_group_link link, *found;
 
   if (TYPE_OBJFILE (type))
     return;
 
-  entry.type = type;
-  found = htab_find (type_group_link_table, &entry);
+  link.type = type;
+  found = htab_find (type_group_link_table, &link);
   /* A permanent type?  */
   if (!found)
     return;
