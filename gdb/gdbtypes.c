@@ -146,48 +146,48 @@ static void print_bit_vector (B_TYPE *, int);
 static void print_arg_types (struct field *, int, int);
 static void dump_fn_fieldlists (struct type *, int);
 static void print_cplus_stuff (struct type *, int);
-static void type_init_refc (struct type *type);
+static void type_init_group (struct type *type);
 
-struct type_refc_group
+struct type_group
 {
   int use_count;
 
-  /* Number of type_refc_entry items in this GROUP.  It is only valid
-     if GROUP == thistype_refc_entry.  It is the length of list
+  /* Number of type_group_link items in this GROUP.  It is only valid
+     if GROUP == thistype_group_link.  It is the length of list
      group->group_next.  */
-  int entries_count;
+  int link_count;
 
-  struct type_refc_entry *entry_list;
+  struct type_group_link *link_list;
 };
 
 /* A reference count structure for the type reference count map.  Each
    type in a hierarchy of types is mapped to the same reference
-   count.  type_refc_entry exists only once for (freeable) main_type.  Iterate
-   by TYPE_CHAIN (type_refc_entry->type) for the other TYPEs.  MAIN_TYPEs with
+   count.  type_group_link exists only once for (freeable) main_type.  Iterate
+   by TYPE_CHAIN (type_group_link->type) for the other TYPEs.  MAIN_TYPEs with
    non-NULL TYPE_OBJFILE or permanent (GDB-internal) MAIN_TYPEs have no
-   associated type_refc_entry.  */
+   associated type_group_link.  */
 
-struct type_refc_entry
+struct type_group_link
 {
   /* One type in the hierarchy.  Each type in the hierarchy gets its
      own slot.  */
   struct type *type;
 
-  /* Set to TYPE_REFC_MARKER during each check_types_refc pass.  */
-  unsigned marked : 1;
+  /* Set to type_group_age during each check_types_refc pass.  */
+  unsigned age : 1;
 
-  /* Pointer to leading type_refc_entry of interconnected types group.  */
-  struct type_refc_group *group;
+  /* Pointer to leading type_group_link of interconnected types group.  */
+  struct type_group *group;
 
-  /* Next type_refc_entry in this GROUP or NULL.  */
-  struct type_refc_entry *group_next;
+  /* Next type_group_link in this GROUP or NULL.  */
+  struct type_group_link *group_next;
 };
 
 /* The hash table holding all reference counts.  */
-static htab_t type_refc_table;
+static htab_t type_group_link_table;
 
-/* Current pass to invalidate obsolete info by type_refc_entry->marked.  */
-static unsigned type_refc_marker;
+/* Current pass to invalidate obsolete info by type_group_link->age.  */
+static unsigned type_group_age;
 
 /* The core code for alloc_type.  Call this function for allocating permanent
    (GDB-internal) types.  */
@@ -233,7 +233,7 @@ alloc_type (struct objfile *objfile)
 {
   struct type *type = alloc_type1 (objfile);
 
-  type_init_refc (type);
+  type_init_group (type);
 
   return type;
 }
@@ -259,7 +259,7 @@ alloc_type_instance (struct type *oldtype)
 
   TYPE_CHAIN (type) = type;	/* Chain back to itself for now.  */
 
-  type_init_refc (type);
+  type_init_group (type);
 
   return type;
 }
@@ -3189,7 +3189,7 @@ typedef int (*main_type_crawl_iter) (struct type *type, void *data);
 static void
 main_type_crawl (struct type *type, main_type_crawl_iter iter, void *data)
 {
-  struct type_refc_entry entry, *found;
+  struct type_group_link entry, *found;
   struct type *type_iter;
   int i;
 
@@ -3227,21 +3227,21 @@ main_type_crawl (struct type *type, main_type_crawl_iter iter, void *data)
    will keep the GROUP pointer TO.  */
 
 static void
-entry_group_relabel (struct type_refc_group *to, struct type_refc_group *from)
+entry_group_relabel (struct type_group *to, struct type_group *from)
 {
-  struct type_refc_entry *iter, *iter_next;
+  struct type_group_link *iter, *iter_next;
 
   gdb_assert (to != from);
 
-  to->entries_count += from->entries_count;
+  to->link_count += from->link_count;
 
-  for (iter = from->entry_list; iter; iter = iter_next)
+  for (iter = from->link_list; iter; iter = iter_next)
     {
       iter_next = iter->group_next;
 
       /* Relink ITER to the group list of TO.  */
-      iter->group_next = to->entry_list;
-      to->entry_list = iter;
+      iter->group_next = to->link_list;
+      to->link_list = iter;
 
       iter->group = to;
     }
@@ -3249,28 +3249,28 @@ entry_group_relabel (struct type_refc_group *to, struct type_refc_group *from)
   xfree (from);
 }
 
-/* Number of valid (with actual MARKED field) entries of type_refc_table.  */
+/* Number of valid (with actual age field) entries of type_group_link_table.  */
 static unsigned check_types_refc_grouping_markers;
 
-/* Unify GROUP of each TYPE found crawling the type_refc_table tree with the
-   starting TYPE referenced in type_refc_table.  */
+/* Unify GROUP of each TYPE found crawling the type_group_link_table tree with the
+   starting TYPE referenced in type_group_link_table.  */
 
 static int
 check_types_refc_grouping_iter (struct type *type, void *data)
 {
-  /* The starting point TYPE referenced in type_refc_table.  */
-  struct type_refc_entry *entry_prev = data;
-  struct type_refc_entry entry_local, *entry;
+  /* The starting point TYPE referenced in type_group_link_table.  */
+  struct type_group_link *entry_prev = data;
+  struct type_group_link entry_local, *entry;
   int crawl_into = 0;
 
   entry_local.type = type;
-  entry = htab_find (type_refc_table, &entry_local);
+  entry = htab_find (type_group_link_table, &entry_local);
   gdb_assert (entry);
 
   /* Was this ENTRY already met during the current check_types_refc pass?  */
-  if (entry->marked != type_refc_marker)
+  if (entry->age != type_group_age)
     {
-      entry->marked = type_refc_marker;
+      entry->age = type_group_age;
       check_types_refc_grouping_markers++;
       crawl_into = 1;
     }
@@ -3279,7 +3279,7 @@ check_types_refc_grouping_iter (struct type *type, void *data)
     {
       /* Keep the time complexity linear by relabeling always the smaller
 	 group.  */
-      if (entry->group->entries_count < entry_prev->group->entries_count)
+      if (entry->group->link_count < entry_prev->group->link_count)
 	entry_group_relabel (entry->group, entry_prev->group);
       else
 	entry_group_relabel (entry_prev->group, entry->group);
@@ -3294,7 +3294,7 @@ check_types_refc_grouping_iter (struct type *type, void *data)
 static int
 check_types_refc_grouping (void **slot, void *unused)
 {
-  struct type_refc_entry *entry = *slot;
+  struct type_group_link *entry = *slot;
 
   main_type_crawl (entry->type, check_types_refc_grouping_iter, entry);
 
@@ -3306,21 +3306,21 @@ check_types_refc_grouping (void **slot, void *unused)
 static int
 check_types_fail_iter (void **slot, void *unused)
 {
-  struct type_refc_entry *entry = *slot;
+  struct type_group_link *entry = *slot;
   struct type *type = entry->type;
 
   fprintf_unfiltered (gdb_stderr, "type %p main_type %p \"%s\" group %p "
-				  "use_count %d entries_count %d\n",
+				  "use_count %d link_count %d\n",
 		      type, TYPE_MAIN_TYPE (type),
 		      TYPE_NAME (type) ? TYPE_NAME (type) : "<null>",
 		      entry->group, entry->group->use_count,
-		      entry->group->entries_count);
+		      entry->group->link_count);
 
   return 1;
 }
 
 /* Called by check_types_assert to abort GDB execution printing the state of
-   type_refc_table to make te GDB debugging possible.  */
+   type_group_link_table to make te GDB debugging possible.  */
 
 static void
 check_types_fail (const char *file, int line, const char *function)
@@ -3328,20 +3328,20 @@ check_types_fail (const char *file, int line, const char *function)
   target_terminal_ours ();
   gdb_flush (gdb_stdout);
 
-  htab_traverse (type_refc_table, check_types_fail_iter, NULL);
+  htab_traverse (type_group_link_table, check_types_fail_iter, NULL);
 
   internal_error (file, line, _("%s: Types refc consistensy failed"), function);
 }
 
 /* Use instead of gdb_assert for conditions being caused by wrong
-   type_refc_table state (and not due to a bug in these sanity checking
+   type_group_link_table state (and not due to a bug in these sanity checking
    functions themselves).  */
 
 #define check_types_assert(expr)					 \
   ((void) ((expr) ? 0 :							 \
 	   (check_types_fail (__FILE__, __LINE__, ASSERT_FUNCTION), 0)))
 
-/* Sanity check TYPE_REFC_TABLE uses disjunct REFC pointers for unconnected
+/* Sanity check type_group_link_table uses disjunct REFC pointers for unconnected
    interconnected TYPEs nests.  Also sanity check each interconnected TYPEs
    nest uses the same REFC.  */
 
@@ -3349,9 +3349,9 @@ static void
 check_types_refc (void)
 {
   check_types_refc_grouping_markers = 0;
-  htab_traverse (type_refc_table, check_types_refc_grouping, NULL);
+  htab_traverse (type_group_link_table, check_types_refc_grouping, NULL);
   check_types_assert (check_types_refc_grouping_markers
-		      == htab_elements (type_refc_table));
+		      == htab_elements (type_group_link_table));
 }
 
 /* A helper for delete_type which deletes a main_type and the things to which
@@ -3406,22 +3406,22 @@ delete_type_chain (struct type *type)
   while (type_iter != type);
 }
 
-/* Hash function for type_refc_table.  */
+/* Hash function for type_group_link_table.  */
 
 static hashval_t
 type_refc_hash (const void *p)
 {
-  const struct type_refc_entry *entry = p;
+  const struct type_group_link *entry = p;
   return htab_hash_pointer (TYPE_MAIN_TYPE (entry->type));
 }
 
-/* Equality function for type_refc_table.  */
+/* Equality function for type_group_link_table.  */
 
 static int
 type_refc_equal (const void *a, const void *b)
 {
-  const struct type_refc_entry *left = a;
-  const struct type_refc_entry *right = b;
+  const struct type_group_link *left = a;
+  const struct type_group_link *right = b;
   return TYPE_MAIN_TYPE (left->type) == TYPE_MAIN_TYPE (right->type);
 }
 
@@ -3433,25 +3433,25 @@ type_refc_equal (const void *a, const void *b)
    to one.  */
 
 static void
-type_init_refc (struct type *type)
+type_init_group (struct type *type)
 {
   void **slot;
-  struct type_refc_group *group;
-  struct type_refc_entry *entry;
+  struct type_group *group;
+  struct type_group_link *entry;
 
   if (TYPE_OBJFILE (type))
     return;
 
-  group = XNEW (struct type_refc_group);
+  group = XNEW (struct type_group);
   group->use_count = 0;
-  group->entries_count = 1;
+  group->link_count = 1;
 
-  entry = XNEW (struct type_refc_entry);
+  entry = XNEW (struct type_group_link);
   entry->type = type;
   entry->group = group;
   entry->group_next = NULL;
 
-  slot = htab_find_slot (type_refc_table, entry, INSERT);
+  slot = htab_find_slot (type_group_link_table, entry, INSERT);
   gdb_assert (!*slot);
   *slot = entry;
 }
@@ -3461,42 +3461,42 @@ type_init_refc (struct type *type)
 void
 type_incref (struct type *type)
 {
-  struct type_refc_entry entry, *found;
+  struct type_group_link entry, *found;
 
   if (TYPE_OBJFILE (type))
     return;
 
   entry.type = type;
-  found = htab_find (type_refc_table, &entry);
+  found = htab_find (type_group_link_table, &entry);
   /* A permanent type?  */
   if (!found)
     return;
   found->group->use_count++;
 }
 
-/* A traverse callback for type_refc_table which removes any entry
+/* A traverse callback for type_group_link_table which removes any entry
    whose reference count is zero (unused entry).  */
 
 static int
 type_refc_remove (void **slot, void *unused)
 {
-  struct type_refc_entry *entry = *slot;
+  struct type_group_link *entry = *slot;
 
   if (entry->group->use_count == 0)
     {
-      struct type_refc_group *group = entry->group;
+      struct type_group *group = entry->group;
 
       delete_type_chain (entry->type);
 
-      /* ENTRY_LIST with its GROUP_NEXT is left inconsistent as after the
+      /* link_list with its GROUP_NEXT is left inconsistent as after the
 	 iteration by this function finishes the whole group will be deleted
 	 anyway.  */
-      gdb_assert (group->entries_count > 0);
-      if (!--group->entries_count)
+      gdb_assert (group->link_count > 0);
+      if (!--group->link_count)
 	xfree (group);
 
       xfree (entry);
-      htab_clear_slot (type_refc_table, slot);
+      htab_clear_slot (type_group_link_table, slot);
     }
 
   return 1;
@@ -3510,13 +3510,13 @@ type_refc_remove (void **slot, void *unused)
 void
 type_decref (struct type *type)
 {
-  struct type_refc_entry entry, *found;
+  struct type_group_link entry, *found;
 
   if (TYPE_OBJFILE (type))
     return;
 
   entry.type = type;
-  found = htab_find (type_refc_table, &entry);
+  found = htab_find (type_group_link_table, &entry);
   /* A permanent type?  */
   if (!found)
     return;
@@ -3525,7 +3525,7 @@ type_decref (struct type *type)
 }
 
 /* Free all the types that have been allocated and that are not used according
-   to type_refc_entry->refc.  Called after each command, successful or not.
+   to type_group_link->refc.  Called after each command, successful or not.
    Use this cleanup only in the GDB idle state as GDB code does not necessarily
    use type_incref / type_decref during temporary use of types.  */
 
@@ -3534,7 +3534,7 @@ free_all_types (void)
 {
   check_types_refc ();
 
-  htab_traverse (type_refc_table, type_refc_remove, NULL);
+  htab_traverse (type_group_link_table, type_refc_remove, NULL);
 }
 
 static struct type *
@@ -3745,7 +3745,7 @@ _initialize_gdbtypes (void)
 {
   gdbtypes_data = gdbarch_data_register_post_init (gdbtypes_post_init);
 
-  type_refc_table = htab_create_alloc (20, type_refc_hash, type_refc_equal,
+  type_group_link_table = htab_create_alloc (20, type_refc_hash, type_refc_equal,
 				       NULL, xcalloc, xfree);
 
   /* FIXME: The following types are architecture-neutral.  However,
