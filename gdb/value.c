@@ -2085,9 +2085,8 @@ VARIABLE is already initialized."));
 Placeholder command for showing help on convenience functions."),
 		  &functionlist, "function ", 0, &cmdlist);
 
-  internal_fn_type = init_type (TYPE_CODE_INTERNAL_FUNCTION,
-				sizeof (struct internal_function *), 0,
-				"<internal function>", NULL);
-
-  make_final_cleanup (value_history_cleanup, NULL);
+  internal_fn_type = alloc_type (NULL);
+  TYPE_CODE (internal_fn_type) = TYPE_CODE_INTERNAL_FUNCTION;
+  TYPE_LENGTH (internal_fn_type) = sizeof (struct internal_function *);
+  TYPE_NAME (internal_fn_type) = "<internal function>";
 }
