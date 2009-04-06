@@ -442,21 +442,20 @@ lookup_reference_type (struct type *type)
    function type we return.  We allocate new memory if needed.  */
 
 struct type *
-make_function_type (struct type *type, struct type **typeptr)
+make_function_type (struct type *type, struct type **typeptr,
+		    struct objfile *objfile)
 {
   struct type *ntype;	/* New type */
-  struct objfile *objfile;
 
   if (typeptr == 0 || *typeptr == 0)	/* We'll need to allocate one.  */
     {
-      ntype = alloc_type (TYPE_OBJFILE (type));
+      ntype = alloc_type (objfile);
       if (typeptr)
 	*typeptr = ntype;
     }
   else			/* We have storage, but need to reset it.  */
     {
       ntype = *typeptr;
-      objfile = TYPE_OBJFILE (ntype);
       smash_type (ntype);
       TYPE_OBJFILE (ntype) = objfile;
 
@@ -479,7 +478,7 @@ make_function_type (struct type *type, struct type **typeptr)
 struct type *
 lookup_function_type (struct type *type)
 {
-  return make_function_type (type, (struct type **) 0);
+  return make_function_type (type, (struct type **) 0, TYPE_OBJFILE (type));
 }
 
 /* Identify address space identifier by name --
