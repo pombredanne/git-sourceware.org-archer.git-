@@ -173,7 +173,7 @@ struct type_group_link
      own slot.  */
   struct type *type;
 
-  /* Set to type_group_age during each check_types_refc pass.  */
+  /* Set to type_group_age during each type_group_link_check pass.  */
   unsigned age : 1;
 
   /* Pointer to leading type_group_link of interconnected types group.  */
@@ -3250,13 +3250,13 @@ entry_group_relabel (struct type_group *to, struct type_group *from)
 }
 
 /* Number of valid (with actual age field) entries of type_group_link_table.  */
-static unsigned check_types_refc_grouping_markers;
+static unsigned type_group_link_check_grouping_markers;
 
 /* Unify GROUP of each TYPE found crawling the type_group_link_table tree with the
    starting TYPE referenced in type_group_link_table.  */
 
 static int
-check_types_refc_grouping_iter (struct type *type, void *data)
+type_group_link_check_grouping_iter (struct type *type, void *data)
 {
   /* The starting point TYPE referenced in type_group_link_table.  */
   struct type_group_link *entry_prev = data;
@@ -3267,11 +3267,11 @@ check_types_refc_grouping_iter (struct type *type, void *data)
   entry = htab_find (type_group_link_table, &entry_local);
   gdb_assert (entry);
 
-  /* Was this ENTRY already met during the current check_types_refc pass?  */
+  /* Was this ENTRY already met during the current type_group_link_check pass?  */
   if (entry->age != type_group_age)
     {
       entry->age = type_group_age;
-      check_types_refc_grouping_markers++;
+      type_group_link_check_grouping_markers++;
       crawl_into = 1;
     }
 
@@ -3292,11 +3292,11 @@ check_types_refc_grouping_iter (struct type *type, void *data)
    ENTRY.  */
 
 static int
-check_types_refc_grouping (void **slot, void *unused)
+type_group_link_check_grouping (void **slot, void *unused)
 {
   struct type_group_link *entry = *slot;
 
-  main_type_crawl (entry->type, check_types_refc_grouping_iter, entry);
+  main_type_crawl (entry->type, type_group_link_check_grouping_iter, entry);
 
   return 1;
 }
@@ -3330,7 +3330,7 @@ check_types_fail (const char *file, int line, const char *function)
 
   htab_traverse (type_group_link_table, check_types_fail_iter, NULL);
 
-  internal_error (file, line, _("%s: Types refc consistensy failed"), function);
+  internal_error (file, line, _("%s: Type groups consistensy fail"), function);
 }
 
 /* Use instead of gdb_assert for conditions being caused by wrong
@@ -3346,11 +3346,11 @@ check_types_fail (const char *file, int line, const char *function)
    nest uses the same REFC.  */
 
 static void
-check_types_refc (void)
+type_group_link_check (void)
 {
-  check_types_refc_grouping_markers = 0;
-  htab_traverse (type_group_link_table, check_types_refc_grouping, NULL);
-  check_types_assert (check_types_refc_grouping_markers
+  type_group_link_check_grouping_markers = 0;
+  htab_traverse (type_group_link_table, type_group_link_check_grouping, NULL);
+  check_types_assert (type_group_link_check_grouping_markers
 		      == htab_elements (type_group_link_table));
 }
 
@@ -3409,7 +3409,7 @@ delete_type_chain (struct type *type)
 /* Hash function for type_group_link_table.  */
 
 static hashval_t
-type_refc_hash (const void *p)
+type_group_link_hash (const void *p)
 {
   const struct type_group_link *entry = p;
   return htab_hash_pointer (TYPE_MAIN_TYPE (entry->type));
@@ -3418,7 +3418,7 @@ type_refc_hash (const void *p)
 /* Equality function for type_group_link_table.  */
 
 static int
-type_refc_equal (const void *a, const void *b)
+type_group_link_equal (const void *a, const void *b)
 {
   const struct type_group_link *left = a;
   const struct type_group_link *right = b;
@@ -3478,7 +3478,7 @@ type_incref (struct type *type)
    whose reference count is zero (unused entry).  */
 
 static int
-type_refc_remove (void **slot, void *unused)
+type_group_link_remove (void **slot, void *unused)
 {
   struct type_group_link *entry = *slot;
 
@@ -3532,9 +3532,9 @@ type_decref (struct type *type)
 void
 free_all_types (void)
 {
-  check_types_refc ();
+  type_group_link_check ();
 
-  htab_traverse (type_group_link_table, type_refc_remove, NULL);
+  htab_traverse (type_group_link_table, type_group_link_remove, NULL);
 }
 
 static struct type *
@@ -3745,8 +3745,9 @@ _initialize_gdbtypes (void)
 {
   gdbtypes_data = gdbarch_data_register_post_init (gdbtypes_post_init);
 
-  type_group_link_table = htab_create_alloc (20, type_refc_hash, type_refc_equal,
-				       NULL, xcalloc, xfree);
+  type_group_link_table = htab_create_alloc (20, type_group_link_hash,
+					     type_group_link_equal, NULL,
+					     xcalloc, xfree);
 
   /* FIXME: The following types are architecture-neutral.  However,
      they contain pointer_type and reference_type fields potentially
