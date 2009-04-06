@@ -38,7 +38,6 @@
 #include "objfiles.h"
 #include "valprint.h"
 #include "cli/cli-decode.h"
-#include "varobj.h"
 
 #include "python/python.h"
 
@@ -1183,7 +1182,7 @@ add_internal_function (const char *name, const char *doc,
 /* Update VALUE before discarding OBJFILE.  COPIED_TYPES is used to
    prevent cycles / duplicates.  */
 
-void
+static void
 preserve_one_value (struct value *value, struct objfile *objfile,
 		    htab_t copied_types)
 {
@@ -1235,8 +1234,6 @@ preserve_values (struct objfile *objfile)
 
   for (val = values_in_python; val; val = val->next)
     preserve_one_value (val, objfile, copied_types);
-
-  preserve_variables (objfile, copied_types);
 
   htab_delete (copied_types);
 }
