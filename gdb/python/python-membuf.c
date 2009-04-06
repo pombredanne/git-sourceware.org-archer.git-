@@ -42,7 +42,7 @@ gdbpy_read_memory (PyObject *self, PyObject *args)
 {
   int error = 0;
   CORE_ADDR addr, length;
-  void *buffer;
+  void *buffer = NULL;
   membuf_object *membuf_obj;
   PyObject *addr_obj, *length_obj;
   struct cleanup *cleanups = NULL;
