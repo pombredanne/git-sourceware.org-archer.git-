@@ -90,23 +90,23 @@ class pp_vbase1:
         self.val = val
 
     def to_string (self):
-        return "pp class name: " + self.val.type ().tag ()
+        return "pp class name: " + self.val.type.tag
 
 def lookup_function (val):
     "Look-up and return a pretty-printer that can print val."
 
     # Get the type.
-    type = val.type ();
+    type = val.type
 
     # If it points to a reference, get the reference.
-    if type.code () == gdb.TYPE_CODE_REF:
+    if type.code == gdb.TYPE_CODE_REF:
         type = type.target ()
 
     # Get the unqualified type, stripped of typedefs.
     type = type.unqualified ().strip_typedefs ()
 
     # Get the type name.    
-    typename = type.tag ()
+    typename = type.tag
 
     if typename == None:
         return None

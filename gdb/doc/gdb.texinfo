@@ -18135,7 +18135,7 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 * Exception Handling::
 * Auto-loading::                Automatically loading Python code.
 * Values From Inferior::	Python representation of values.
-* Types From Inferior::		Python representation of types.
+* Types In Python::		Python representation of types.
 * Pretty Printing::		Pretty-printing values.
 * Threads In Python::           Accessing inferior threads from Python.
 * Commands In Python::          Implementing new commands in Python.
@@ -18393,17 +18393,22 @@ Again, @code{bar} will also be a @code{gdb.Value} object.
 The following attributes are provided:
 
 @table @code
-@defmethod Value address
+@defivar Value address
 If this object is addressable, this read-only attribute holds a
 @code{gdb.Value} object representing the address.  Otherwise,
 this attribute holds @code{None}.
-@end defmethod
+@end defivar
 
 @cindex optimized out value in Python
-@defmethod Value is_optimized_out
+@defivar Value is_optimized_out
 This read-only boolean attribute is true if the compiler optimized out
 this value, thus it is not available for fetching from the inferior.
-@end defmethod
+@end defivar
+
+@defivar Value type
+The type of this @code{gdb.Value}.  The result is a @code{gdb.Type}
+object.
+@end defivar
 @end table
 
 The following methods are provided:
@@ -18463,43 +18468,62 @@ will be used, if the current language is able to supply one.
 The optional @var{errors} argument is the same as the corresponding
 argument to Python's @code{string.decode} method.
 @end defmethod
-
-@defmethod Value type
-Return the type of this @code{gdb.Value}.  The result is a
-@code{gdb.Type} object.
-@end defmethod
 @end table
 
-@node Types From Inferior
-@subsubsection Types From Inferior
+@node Types In Python
+@subsubsection Types In Python
+@cindex types in Python
+@cindex Python, working with types
 
-@cindex gdb.Type
+@tindex gdb.Type
 @value{GDBN} represents types from the inferior using the class
 @code{gdb.Type}.
+
+The following type-related functions are available in the @code{gdb}
+module:
+
+@findex gdb.lookup_type
+@defun lookup_type name [block]
+This function looks up a type by name.  @var{name} is the name of the
+type to look up.  It must be a string.
+
+If @var{block} is given, then @var{name} is looked up in that scope.
+Otherwise, it is searched for globally.
+
+Ordinarily, this function will return an instance of @code{gdb.Type}.
+If the named type cannot be found, it will throw an exception.
+@end defun
+
+An instance of @code{Type} has the following attributes:
+
+@table @code
+@defivar Type code
+The type code for this type.  The type code will be one of the
+@code{TYPE_CODE_} constants defined below.
+@end defivar
+
+@defivar Type sizeof
+The size of this type, in target @code{char} units.  Usually, a
+target's @code{char} type will be an 8-bit byte.  However, on some
+unusual platforms, this type may have a different size.
+@end defivar
+
+@defivar Type tag
+The tag name for this type.  The tag name is the name after
+@code{struct}, @code{union}, or @code{enum} in C; not all languages
+have this concept.  If this type has no tag name, then @code{None} is
+returned.
+@end defivar
+@end table
 
 The following methods are provided:
 
 @table @code
-@defmethod Type Type [name [block]]
-Construct a new instance of @code{gdb.Type}.
-
-If @var{name} is given, it specifies the name of a type to look up in
-the inferior.
-
-If @var{block} is given, then @var{name} is looked up in that scope.
-Otherwise, it is searched for globally.
-@end defmethod
-
-@defmethod Type code
-Return the type code for this type.  The type code will be one of the
-@code{TYPE_CODE_} constants defined below.
-@end defmethod
-
 @defmethod Type fields
 For structure and union types, this method returns the fields.  Range
 types have two fields, the minimum and maximum values.  Enum types
 have one field per enum constant.  Function and method types have one
-field per parameter.  The base types of C++ classes are also
+field per parameter.  The base types of C@t{++} classes are also
 represented as fields.  If the type has no fields, or does not fit
 into one of these categories, an empty sequence will be returned.
 
@@ -18549,22 +18573,9 @@ Return a new @code{gdb.Type} object which represents a reference to this
 type.
 @end defmethod
 
-@defmethod Type sizeof
-Return the size of this type, in target @code{char} units.  Usually, a
-target's @code{char} type will be an 8-bit byte.  However, on some
-unusual platforms, this type may have a different size.
-@end defmethod
-
 @defmethod Type strip_typedefs
 Return a new @code{gdb.Type} that represents the real type,
 after removing all layers of typedefs.
-@end defmethod
-
-@defmethod Type tag
-Return the tag name for this type.  The tag name is the name after
-@code{struct}, @code{union}, or @code{enum} in C; not all languages
-have this concept.  If this type has no tag name, then @code{None} is
-returned.
 @end defmethod
 
 @defmethod Type target
@@ -18626,8 +18637,7 @@ The type is an enum.
 @findex TYPE_CODE_FLAGS
 @findex gdb.TYPE_CODE_FLAGS
 @item TYPE_CODE_FLAGS
-A bit flags type.
-@c FIXME: what is this?
+A bit flags type, used for things such as status registers.
 
 @findex TYPE_CODE_FUNC
 @findex gdb.TYPE_CODE_FUNC
@@ -18678,7 +18688,7 @@ An unknown or erroneous type.
 @findex TYPE_CODE_METHOD
 @findex gdb.TYPE_CODE_METHOD
 @item TYPE_CODE_METHOD
-A C++ method type.
+A method type, as found in C++ or Java.
 
 @findex TYPE_CODE_METHODPTR
 @findex gdb.TYPE_CODE_METHODPTR
@@ -18714,19 +18724,6 @@ A complex float type.
 @findex gdb.TYPE_CODE_TYPEDEF
 @item TYPE_CODE_TYPEDEF
 A typedef to some other type.
-
-@findex TYPE_CODE_TEMPLATE
-@findex gdb.TYPE_CODE_TEMPLATE
-@item TYPE_CODE_TEMPLATE
-A C++ template type.  Note that this is not used for a template
-instantiation; those appear as ordinary struct types.
-@c FIXME I hope that is true
-
-@findex TYPE_CODE_TEMPLATE_ARG
-@findex gdb.TYPE_CODE_TEMPLATE_ARG
-@item TYPE_CODE_TEMPLATE_ARG
-A C++ template argument.
-@c FIXME: is this ever used?
 
 @findex TYPE_CODE_NAMESPACE
 @findex gdb.TYPE_CODE_NAMESPACE

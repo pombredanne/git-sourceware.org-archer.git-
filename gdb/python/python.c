@@ -1861,6 +1861,11 @@ Return the selected frame object." },
     "stop_reason_string (Integer) -> String.\n\
 Return a string explaining unwind stop reason." },
 
+  { "lookup_type", (PyCFunction) gdbpy_lookup_type,
+    METH_VARARGS | METH_KEYWORDS,
+    "lookup_type (name [, block]) -> type\n\
+Return a Type corresponding to the given name." },
+
   { "lookup_symbol", (PyCFunction) gdbpy_lookup_symbol,
     METH_VARARGS | METH_KEYWORDS,
     "lookup_symbol (name [, block] [, domain]) -> (symbol, is_field_of_this)\n\

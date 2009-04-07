@@ -238,7 +238,7 @@ proc test_value_in_inferior {} {
 
 proc test_value_after_death {} {
   # Construct a type while the inferior is still running.
-  gdb_py_test_silent_cmd "python ptrtype = gdb.Type('PTR')" \
+  gdb_py_test_silent_cmd "python ptrtype = gdb.lookup_type('PTR')" \
     "create PTR type" 1
 
   # Kill the inferior and remove the symbols.
@@ -259,7 +259,7 @@ proc test_value_after_death {} {
     "delete PTR type" 1
 
   # Now see if the value's type is still valid.
-  gdb_test "python print castval.type()" "struct s .." \
+  gdb_test "python print castval.type" "struct s .." \
     "print value's type"
 }
 

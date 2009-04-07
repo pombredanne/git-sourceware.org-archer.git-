@@ -68,8 +68,8 @@ class StdListPrinter:
         self.val = val
 
     def children(self):
-        itype = self.val.type().template_argument(0)
-        nodetype = gdb.Type('std::_List_node<%s>' % itype).pointer()
+        itype = self.val.type.template_argument(0)
+        nodetype = gdb.lookup_type('std::_List_node<%s>' % itype).pointer()
         return self._iterator(nodetype, self.val['_M_impl']['_M_node'])
 
     def to_string(self):
@@ -84,8 +84,8 @@ class StdListIteratorPrinter:
         self.val = val
 
     def to_string(self):
-        itype = self.val.type().template_argument(0)
-        nodetype = gdb.Type('std::_List_node<%s>' % itype).pointer()
+        itype = self.val.type.template_argument(0)
+        nodetype = gdb.lookup_type('std::_List_node<%s>' % itype).pointer()
         return self.val['_M_node'].cast(nodetype).dereference()['_M_data']
 
 class StdSlistPrinter:
@@ -113,8 +113,8 @@ class StdSlistPrinter:
         self.val = val
 
     def children(self):
-        itype = self.val.type().template_argument(0)
-        nodetype = gdb.Type('__gnu_cxx::_Slist_node<%s>' % itype).pointer()
+        itype = self.val.type.template_argument(0)
+        nodetype = gdb.lookup_type('__gnu_cxx::_Slist_node<%s>' % itype).pointer()
         return self._iterator(nodetype, self.val)
 
     def to_string(self):
@@ -129,8 +129,8 @@ class StdSlistIteratorPrinter:
         self.val = val
 
     def to_string(self):
-        itype = self.val.type().template_argument(0)
-        nodetype = gdb.Type('__gnu_cxx::_Slist_node<%s>' % itype).pointer()
+        itype = self.val.type.template_argument(0)
+        nodetype = gdb.lookup_type('__gnu_cxx::_Slist_node<%s>' % itype).pointer()
         return self.val['_M_node'].cast(nodetype).dereference()['_M_data']
 
 class StdVectorPrinter:
@@ -243,8 +243,8 @@ class StdRbtreeIteratorPrinter:
         self.val = val
 
     def to_string (self):
-        valuetype = self.val.type().template_argument(0)
-        nodetype = gdb.Type('std::_Rb_tree_node < %s >' % valuetype)
+        valuetype = self.val.type.template_argument(0)
+        nodetype = gdb.lookup_type('std::_Rb_tree_node < %s >' % valuetype)
         nodetype = nodetype.pointer()
         return self.val.cast(nodetype).dereference()['_M_value_field']
 
@@ -283,9 +283,9 @@ class StdMapPrinter:
         return '%s with %d elements' % (self.typename, len (self.iter))
 
     def children (self):
-        keytype = self.val.type().template_argument(0).const()
-        valuetype = self.val.type().template_argument(1)
-        nodetype = gdb.Type('std::_Rb_tree_node< std::pair< %s, %s > >' % (keytype, valuetype))
+        keytype = self.val.type.template_argument(0).const()
+        valuetype = self.val.type.template_argument(1)
+        nodetype = gdb.lookup_type('std::_Rb_tree_node< std::pair< %s, %s > >' % (keytype, valuetype))
         nodetype = nodetype.pointer()
         return self._iter (self.iter, nodetype)
 
@@ -323,8 +323,8 @@ class StdSetPrinter:
         return '%s with %d elements' % (self.typename, len (self.iter))
 
     def children (self):
-        keytype = self.val.type().template_argument(0)
-        nodetype = gdb.Type('std::_Rb_tree_node< %s >' % keytype).pointer()
+        keytype = self.val.type.template_argument(0)
+        nodetype = gdb.lookup_type('std::_Rb_tree_node< %s >' % keytype).pointer()
         return self._iter (self.iter, nodetype)
 
 class StdBitsetPrinter:
@@ -340,18 +340,18 @@ class StdBitsetPrinter:
 
     def children (self):
         words = self.val['_M_w']
-        wtype = words.type()
+        wtype = words.type
 
         # The _M_w member can be either an unsigned long, or an
         # array.  This depends on the template specialization used.
         # If it is a single long, convert to a single element list.
-        if wtype.code () == gdb.TYPE_CODE_ARRAY:
-            tsize = wtype.target ().sizeof ()
+        if wtype.code == gdb.TYPE_CODE_ARRAY:
+            tsize = wtype.target ().sizeof
         else:
             words = [words]
-            tsize = wtype.sizeof () 
+            tsize = wtype.sizeof 
 
-        nwords = wtype.sizeof() / tsize
+        nwords = wtype.sizeof / tsize
         result = []
         byte = 0
         while byte < nwords:
@@ -401,8 +401,8 @@ class StdDequePrinter:
 
     def __init__(self, val):
         self.val = val
-        self.elttype = val.type().template_argument(0)
-        size = self.elttype.sizeof ()
+        self.elttype = val.type.template_argument(0)
+        size = self.elttype.sizeof
         if size < 512:
             self.buffer_size = int (512 / size)
         else:
@@ -573,17 +573,17 @@ def lookup_function (val):
     "Look-up and return a pretty-printer that can print val."
 
     # Get the type.
-    type = val.type ();
+    type = val.type;
 
     # If it points to a reference, get the reference.
-    if type.code () == gdb.TYPE_CODE_REF:
+    if type.code == gdb.TYPE_CODE_REF:
         type = type.target ()
 
     # Get the unqualified type, stripped of typedefs.
     type = type.unqualified ().strip_typedefs ()
 
     # Get the type name.    
-    typename = type.tag ()
+    typename = type.tag
     if typename == None:
         return None
 

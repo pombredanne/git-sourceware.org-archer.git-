@@ -1,6 +1,6 @@
 # pahole command for gdb
 
-# Copyright (C) 2008 Free Software Foundation, Inc.
+# Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,16 +26,10 @@ It prints the type and displays comments showing where holes are."""
         super (Pahole, self).__init__ ("pahole", gdb.COMMAND_NONE,
                                        gdb.COMPLETE_SYMBOL)
 
-    @staticmethod
-    def strip (type):
-        while type.code () == gdb.TYPE_CODE_TYPEDEF:
-            type = type.target ()
-        return type
-
     def pahole (self, type, level, name):
         if name is None:
             name = ''
-        tag = type.tag ()
+        tag = type.tag
         if tag is None:
             tag = ''
         print '%sstruct %s {' % (' ' * (2 * level), tag)
@@ -45,7 +39,7 @@ It prints the type and displays comments showing where holes are."""
             if not hasattr (field, ('bitpos')):
                 continue
 
-            ftype = self.strip (field.type)
+            ftype = field.type.strip_typedefs()
 
             if bitpos != field.bitpos:
                 hole = field.bitpos - bitpos
@@ -55,13 +49,13 @@ It prints the type and displays comments showing where holes are."""
                 fieldsize = field.bitsize
             else:
                 # TARGET_CHAR_BIT here...
-                fieldsize = 8 * ftype.sizeof ()
+                fieldsize = 8 * ftype.sizeof
 
             # TARGET_CHAR_BIT
             print ' /* %3d %3d */' % (int (bitpos / 8), int (fieldsize / 8)),
             bitpos = bitpos + fieldsize
 
-            if ftype.code () == gdb.TYPE_CODE_STRUCT:
+            if ftype.code == gdb.TYPE_CODE_STRUCT:
                 self.pahole (ftype, level + 1, field.name)
             else:
                 print ' ' * (2 + 2 * level),
@@ -71,9 +65,9 @@ It prints the type and displays comments showing where holes are."""
         print '} %s' % name
 
     def invoke (self, arg, from_tty):
-        type = gdb.Type (arg)
-        type = self.strip (type)
-        if type.code () != gdb.TYPE_CODE_STRUCT:
+        type = gdb.lookup_type (arg)
+        type = type.strip_typedefs ()
+        if type.code != gdb.TYPE_CODE_STRUCT:
             raise TypeError, '%s is not a struct type' % arg
         print ' ' * 14,
         self.pahole (type, 0, '')

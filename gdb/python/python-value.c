@@ -63,6 +63,7 @@ typedef struct {
   PyObject_HEAD
   struct value *value;
   PyObject *address;
+  PyObject *type;
 } value_object;
 
 /* Called by the Python interpreter when deallocating a value object.  */
@@ -79,6 +80,11 @@ valpy_dealloc (PyObject *obj)
     /* Use braces to appease gcc warning.  *sigh*  */
     {
       Py_DECREF (self->address);
+    }
+
+  if (self->type)
+    {
+      Py_DECREF (self->type);
     }
 
   self->ob_type->tp_free (self);
@@ -115,6 +121,7 @@ valpy_new (PyTypeObject *subtype, PyObject *args, PyObject *keywords)
 
   value_obj->value = value;
   value_obj->address = NULL;
+  value_obj->type = NULL;
   release_value (value);
   value_prepend_to_list (&values_in_python, value);
 
@@ -167,10 +174,20 @@ valpy_get_address (PyObject *self, void *closure)
 
 /* Return type of the value.  */
 static PyObject *
-valpy_type (PyObject *self, PyObject *args)
+valpy_get_type (PyObject *self, void *closure)
 {
-  struct value *value = ((value_object *) self)->value;
-  return type_to_type_object (value_type (value));
+  value_object *obj = (value_object *) self;
+  if (!obj->type)
+    {
+      obj->type = type_to_type_object (value_type (obj->value));
+      if (!obj->type)
+	{
+	  obj->type = Py_None;
+	  Py_INCREF (obj->type);
+	}
+    }
+  Py_INCREF (obj->type);
+  return obj->type;
 }
 
 /* Implementation of gdb.Value.string ([encoding] [, errors]) -> string
@@ -784,6 +801,7 @@ value_to_value_object (struct value *val)
     {
       val_obj->value = val;
       val_obj->address = NULL;
+      val_obj->type = NULL;
       release_value (val);
       value_prepend_to_list (&values_in_python, val);
     }
@@ -949,13 +967,13 @@ static PyGetSetDef value_object_getset[] = {
   { "is_optimized_out", valpy_get_is_optimized_out, NULL,
     "Boolean telling whether the value is optimized out (i.e., not available).",
     NULL },
+  { "type", valpy_get_type, NULL, "Type of the value.", NULL },
   {NULL}  /* Sentinel */
 };
 
 static PyMethodDef value_object_methods[] = {
   { "cast", valpy_cast, METH_VARARGS, "Cast the value to the supplied type." },
   { "dereference", valpy_dereference, METH_NOARGS, "Dereferences the value." },
-  { "type", valpy_type, METH_NOARGS, "Return type of the value." },
   { "string", (PyCFunction) valpy_string, METH_VARARGS | METH_KEYWORDS,
     "string ([encoding] [, errors]) -> string\n\
 Return Unicode string representation of the value." },

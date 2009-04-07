@@ -83,6 +83,7 @@ PyObject *gdbpy_selected_frame (PyObject *self, PyObject *args);
 PyObject *gdbpy_block_for_pc (PyObject *self, PyObject *args);
 PyObject *gdbpy_read_memory (PyObject *self, PyObject *args);
 PyObject *gdbpy_write_memory (PyObject *self, PyObject *args);
+PyObject *gdbpy_lookup_type (PyObject *self, PyObject *args, PyObject *kw);
 
 PyObject *symtab_and_line_to_sal_object (struct symtab_and_line sal);
 PyObject *symtab_to_symtab_object (struct symtab *symtab);
