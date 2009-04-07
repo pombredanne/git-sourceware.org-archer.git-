@@ -52,10 +52,10 @@ gdb_test "whatis array" "type = array_t" "first: whatis array"
 
 gdb_test "ptype array" "type = char \\\[26\\\]" "first: ptype array"
 
-gdb_test "p array\[1\]" "\\$\[0-9\] = 1 '\\\\001'"
-gdb_test "p array\[2\]" "\\$\[0-9\] = 2 '\\\\002'"
-gdb_test "p array\[3\]" "\\$\[0-9\] = 3 '\\\\003'"
-gdb_test "p array\[4\]" "\\$\[0-9\] = 4 '\\\\004'"
+gdb_test "p array\[1\]" "\\$\[0-9\] = 1 '\\\\1'"
+gdb_test "p array\[2\]" "\\$\[0-9\] = 2 '\\\\2'"
+gdb_test "p array\[3\]" "\\$\[0-9\] = 3 '\\\\3'"
+gdb_test "p array\[4\]" "\\$\[0-9\] = 4 '\\\\4'"
 
 gdb_continue_to_breakpoint "break_here"
 
