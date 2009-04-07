@@ -2049,9 +2049,7 @@ static const insn_sequence elf32_arm_stub_long_branch_v4t_arm_thumb[] =
     DATA_WORD(0, R_ARM_ABS32, 0),    /* dcd   R_ARM_ABS32(X) */
   };
 
-/* Thumb -> Thumb long branch stub. Used on architectures which
-   support only this mode, or on V4T where it is expensive to switch
-   to ARM.  */
+/* Thumb -> Thumb long branch stub. Used on M-profile architectures.  */
 static const insn_sequence elf32_arm_stub_long_branch_thumb_only[] =
   {
     THUMB16_INSN(0xb401),             /* push {r0} */
@@ -2060,6 +2058,17 @@ static const insn_sequence elf32_arm_stub_long_branch_thumb_only[] =
     THUMB16_INSN(0xbc01),             /* pop  {r0} */
     THUMB16_INSN(0x4760),             /* bx   ip */
     THUMB16_INSN(0xbf00),             /* nop */
+    DATA_WORD(0, R_ARM_ABS32, 0),     /* dcd  R_ARM_ABS32(X) */
+  };
+
+/* V4T Thumb -> Thumb long branch stub. Using the stack is not
+   allowed.  */
+static const insn_sequence elf32_arm_stub_long_branch_v4t_thumb_thumb[] =
+  {
+    THUMB16_INSN(0x4778),             /* bx   pc */
+    THUMB16_INSN(0x46c0),             /* nop */
+    ARM_INSN(0xe59fc000),             /* ldr  ip, [pc, #0] */
+    ARM_INSN(0xe12fff1c),             /* bx   ip */
     DATA_WORD(0, R_ARM_ABS32, 0),     /* dcd  R_ARM_ABS32(X) */
   };
 
@@ -2122,9 +2131,8 @@ static const insn_sequence elf32_arm_stub_long_branch_v4t_thumb_arm_pic[] =
     DATA_WORD(0, R_ARM_REL32, -4),     /* dcd  R_ARM_REL32(X) */
   };
 
-/* Thumb -> Thumb long branch stub, PIC. Used on architectures which
-   support only this mode, or on V4T where it is expensive to switch
-   to ARM.  */
+/* Thumb -> Thumb long branch stub, PIC. Used on M-profile
+   architectures.  */
 static const insn_sequence elf32_arm_stub_long_branch_thumb_only_pic[] =
   {
     THUMB16_INSN(0xb401),             /* push {r0} */
@@ -2134,6 +2142,18 @@ static const insn_sequence elf32_arm_stub_long_branch_thumb_only_pic[] =
     THUMB16_INSN(0xbc01),             /* pop  {r0} */
     THUMB16_INSN(0x4760),             /* bx   ip */
     DATA_WORD(0, R_ARM_REL32, 4),     /* dcd  R_ARM_REL32(X) */
+  };
+
+/* V4T Thumb -> Thumb long branch stub, PIC. Using the stack is not
+   allowed.  */
+static const insn_sequence elf32_arm_stub_long_branch_v4t_thumb_thumb_pic[] =
+  {
+    THUMB16_INSN(0x4778),             /* bx   pc */
+    THUMB16_INSN(0x46c0),             /* nop */
+    ARM_INSN(0xe59fc004),             /* ldr  ip, [pc, #4] */
+    ARM_INSN(0xe08fc00c),             /* add   ip, pc, ip */
+    ARM_INSN(0xe12fff1c),             /* bx   ip */
+    DATA_WORD(0, R_ARM_REL32, 0),     /* dcd  R_ARM_REL32(X) */
   };
 
 /* Section name for stubs is the associated section name plus this
@@ -2146,6 +2166,7 @@ enum elf32_arm_stub_type
   arm_stub_long_branch_any_any,
   arm_stub_long_branch_v4t_arm_thumb,
   arm_stub_long_branch_thumb_only,
+  arm_stub_long_branch_v4t_thumb_thumb,
   arm_stub_long_branch_v4t_thumb_arm,
   arm_stub_short_branch_v4t_thumb_arm,
   arm_stub_long_branch_any_arm_pic,
@@ -2153,6 +2174,7 @@ enum elf32_arm_stub_type
   arm_stub_long_branch_v4t_arm_thumb_pic,
   arm_stub_long_branch_v4t_thumb_arm_pic,
   arm_stub_long_branch_thumb_only_pic,
+  arm_stub_long_branch_v4t_thumb_thumb_pic,
 };
 
 struct elf32_arm_stub_hash_entry
@@ -2923,14 +2945,14 @@ arm_type_of_stub (struct bfd_link_info *info,
 		       /* V5T and above.  */
 		       ? arm_stub_long_branch_any_thumb_pic
 		       /* On V4T, use Thumb code only.  */
-		       : arm_stub_long_branch_thumb_only_pic)
+		       : arm_stub_long_branch_v4t_thumb_thumb_pic)
 
 		    /* non-PIC stubs.  */
 		    : ((globals->use_blx)
 		       /* V5T and above.  */
 		       ? arm_stub_long_branch_any_any
 		       /* V4T.  */
-		       : arm_stub_long_branch_thumb_only);
+		       : arm_stub_long_branch_v4t_thumb_thumb);
 		}
 	      else
 		{
@@ -3336,6 +3358,10 @@ arm_size_one_stub (struct bfd_hash_entry *gen_entry,
       template =  elf32_arm_stub_long_branch_thumb_only;
       template_size = ARRAY_SIZE (elf32_arm_stub_long_branch_thumb_only);
       break;
+    case arm_stub_long_branch_v4t_thumb_thumb:
+      template =  elf32_arm_stub_long_branch_v4t_thumb_thumb;
+      template_size = ARRAY_SIZE (elf32_arm_stub_long_branch_v4t_thumb_thumb);
+      break;
     case arm_stub_long_branch_v4t_thumb_arm:
       template =  elf32_arm_stub_long_branch_v4t_thumb_arm;
       template_size = ARRAY_SIZE (elf32_arm_stub_long_branch_v4t_thumb_arm);
@@ -3363,6 +3389,10 @@ arm_size_one_stub (struct bfd_hash_entry *gen_entry,
     case arm_stub_long_branch_thumb_only_pic:
       template = elf32_arm_stub_long_branch_thumb_only_pic;
       template_size = ARRAY_SIZE (elf32_arm_stub_long_branch_thumb_only_pic);
+      break;
+    case arm_stub_long_branch_v4t_thumb_thumb_pic:
+      template = elf32_arm_stub_long_branch_v4t_thumb_thumb_pic;
+      template_size = ARRAY_SIZE (elf32_arm_stub_long_branch_v4t_thumb_thumb_pic);
       break;
     default:
       BFD_FAIL ();
@@ -3525,7 +3555,6 @@ group_sections (struct elf32_arm_link_hash_table *htab,
     {
       asection *tail = *list;
       asection *head;
-      asection *tp;
 
       if (tail == bfd_abs_section_ptr)
 	continue;
@@ -3535,38 +3564,35 @@ group_sections (struct elf32_arm_link_hash_table *htab,
 	 section may be required for an interrupt vector in bare metal
 	 code.  */
 #define NEXT_SEC PREV_SEC
-      head = tail;
-      tp = NULL;
-      for (;;)
-	{
-	  asection *h = PREV_SEC (head);
-	  NEXT_SEC (head) = tp;
-	  if (h == NULL)
-	    break;
-	  tp = head;
-	  head = h;
-	}
+      head = NULL;
+      while (tail != NULL)
+        {
+          /* Pop from tail.  */
+          asection *item = tail;
+          tail = PREV_SEC (item);
+
+          /* Push on head.  */
+          NEXT_SEC (item) = head;
+          head = item;
+        }
 
       while (head != NULL)
 	{
 	  asection *curr;
 	  asection *next;
-	  bfd_size_type total;
+	  bfd_vma stub_group_start = head->output_offset;
+	  bfd_vma end_of_next;
 
 	  curr = head;
-	  total = 0;
-	  while ((next = NEXT_SEC (curr)) != NULL)
+	  while (NEXT_SEC (curr) != NULL)
 	    {
-	      if ( (total + next->output_offset - curr->output_offset
-		    + next->size)
-		   < stub_group_size )
-		{
-		  total += next->output_offset - curr->output_offset;
-		}
-	      else
+	      next = NEXT_SEC (curr);
+	      end_of_next = next->output_offset + next->size;
+	      if (end_of_next - stub_group_start >= stub_group_size)
+		/* End of NEXT is too far from start, so stop.  */
 		break;
-
-	    curr = next;
+	      /* Add NEXT to the group.  */
+	      curr = next;
 	    }
 
 	  /* OK, the size from the start to the start of CURR is less
@@ -3588,18 +3614,15 @@ group_sections (struct elf32_arm_link_hash_table *htab,
 	     bytes after the stub section can be handled by it too.  */
 	  if (!stubs_always_after_branch)
 	    {
-	      total = head->size;
+	      stub_group_start = curr->output_offset + curr->size;
+
 	      while (next != NULL)
 		{
-		  if ( (total + next->output_offset - head->output_offset
-			+ next->size)
-		       < stub_group_size )
-		    {
-		      total += next->output_offset - head->output_offset;
-		    }
-		  else
+		  end_of_next = next->output_offset + next->size;
+		  if (end_of_next - stub_group_start >= stub_group_size)
+		    /* End of NEXT is too far from stubs, so stop.  */
 		    break;
-
+		  /* Add NEXT to the stub group.  */
 		  head = next;
 		  next = NEXT_SEC (head);
 		  htab->stub_group[head->id].link_sec = curr;
@@ -8516,7 +8539,7 @@ tag_cpu_arch_combine (bfd *ibfd, int oldtag, int *secondary_compat_out,
 
   if (oldtag >= MAX_TAG_CPU_ARCH || newtag >= MAX_TAG_CPU_ARCH)
     {
-      _bfd_error_handler (_("ERROR: %B: Unknown CPU architecture"), ibfd);
+      _bfd_error_handler (_("error: %B: Unknown CPU architecture"), ibfd);
       return -1;
     }
 
@@ -8554,7 +8577,7 @@ tag_cpu_arch_combine (bfd *ibfd, int oldtag, int *secondary_compat_out,
 
   if (result == -1)
     {
-      _bfd_error_handler (_("ERROR: %B: Conflicting CPU architectures %d/%d"),
+      _bfd_error_handler (_("error: %B: Conflicting CPU architectures %d/%d"),
 			  ibfd, oldtag, newtag);
       return -1;
     }
@@ -8605,7 +8628,7 @@ elf32_arm_merge_eabi_attributes (bfd *ibfd, bfd *obfd)
       else if (in_attr[Tag_ABI_FP_number_model].i != 0)
 	{
 	  _bfd_error_handler
-	    (_("ERROR: %B uses VFP register arguments, %B does not"),
+	    (_("error: %B uses VFP register arguments, %B does not"),
 	     ibfd, obfd);
 	  result = FALSE;
 	}
@@ -8721,7 +8744,7 @@ elf32_arm_merge_eabi_attributes (bfd *ibfd, bfd *obfd)
 		 binaries in the toolchain have had the attributes set
 		 properly.
 	      _bfd_error_handler
-		(_("ERROR: %B: 8-byte data alignment conflicts with %B"),
+		(_("error: %B: 8-byte data alignment conflicts with %B"),
 		 obfd, ibfd);
 	      result = FALSE; */
 	    }
@@ -8755,7 +8778,7 @@ elf32_arm_merge_eabi_attributes (bfd *ibfd, bfd *obfd)
 	      else
 		{
 		  _bfd_error_handler
-		    (_("ERROR: %B: Conflicting architecture profiles %c/%c"),
+		    (_("error: %B: Conflicting architecture profiles %c/%c"),
 		     ibfd,
 		     in_attr[i].i ? in_attr[i].i : '0',
 		     out_attr[i].i ? out_attr[i].i : '0');
@@ -8788,7 +8811,7 @@ elf32_arm_merge_eabi_attributes (bfd *ibfd, bfd *obfd)
 	      && in_attr[i].i != AEABI_R9_unused)
 	    {
 	      _bfd_error_handler
-		(_("ERROR: %B: Conflicting use of R9"), ibfd);
+		(_("error: %B: Conflicting use of R9"), ibfd);
 	      result = FALSE;
 	    }
 	  if (out_attr[i].i == AEABI_R9_unused)
@@ -8800,7 +8823,7 @@ elf32_arm_merge_eabi_attributes (bfd *ibfd, bfd *obfd)
 	      && out_attr[Tag_ABI_PCS_R9_use].i != AEABI_R9_unused)
 	    {
 	      _bfd_error_handler
-		(_("ERROR: %B: SB relative addressing conflicts with use of R9"),
+		(_("error: %B: SB relative addressing conflicts with use of R9"),
 		 ibfd);
 	      result = FALSE;
 	    }
@@ -8856,7 +8879,7 @@ elf32_arm_merge_eabi_attributes (bfd *ibfd, bfd *obfd)
 	  if (in_attr[i].i != out_attr[i].i)
 	    {
 	      _bfd_error_handler
-		(_("ERROR: %B uses iWMMXt register arguments, %B does not"),
+		(_("error: %B uses iWMMXt register arguments, %B does not"),
 		 ibfd, obfd);
 	      result = FALSE;
 	    }
@@ -8878,7 +8901,7 @@ elf32_arm_merge_eabi_attributes (bfd *ibfd, bfd *obfd)
 	      if (in_attr[i].i != out_attr[i].i)
 		{
 		  _bfd_error_handler
-		    (_("ERROR: fp16 format mismatch between %B and %B"),
+		    (_("error: fp16 format mismatch between %B and %B"),
 		     ibfd, obfd);
 		  result = FALSE;
 		}
@@ -9082,7 +9105,7 @@ elf32_arm_merge_private_bfd_data (bfd * ibfd, bfd * obfd)
       && !(ibfd->flags & DYNAMIC)
       && (in_flags & EF_ARM_BE8))
     {
-      _bfd_error_handler (_("ERROR: %B is already in final BE8 format"),
+      _bfd_error_handler (_("error: %B is already in final BE8 format"),
 			  ibfd);
       return FALSE;
     }
@@ -9158,7 +9181,7 @@ elf32_arm_merge_private_bfd_data (bfd * ibfd, bfd * obfd)
 				      EF_ARM_EABI_VERSION (out_flags)))
     {
       _bfd_error_handler
-	(_("ERROR: Source object %B has EABI version %d, but target %B has EABI version %d"),
+	(_("error: Source object %B has EABI version %d, but target %B has EABI version %d"),
 	 ibfd, obfd,
 	 (in_flags & EF_ARM_EABIMASK) >> 24,
 	 (out_flags & EF_ARM_EABIMASK) >> 24);
@@ -9174,7 +9197,7 @@ elf32_arm_merge_private_bfd_data (bfd * ibfd, bfd * obfd)
       if ((in_flags & EF_ARM_APCS_26) != (out_flags & EF_ARM_APCS_26))
 	{
 	  _bfd_error_handler
-	    (_("ERROR: %B is compiled for APCS-%d, whereas target %B uses APCS-%d"),
+	    (_("error: %B is compiled for APCS-%d, whereas target %B uses APCS-%d"),
 	     ibfd, obfd,
 	     in_flags & EF_ARM_APCS_26 ? 26 : 32,
 	     out_flags & EF_ARM_APCS_26 ? 26 : 32);
@@ -9185,11 +9208,11 @@ elf32_arm_merge_private_bfd_data (bfd * ibfd, bfd * obfd)
 	{
 	  if (in_flags & EF_ARM_APCS_FLOAT)
 	    _bfd_error_handler
-	      (_("ERROR: %B passes floats in float registers, whereas %B passes them in integer registers"),
+	      (_("error: %B passes floats in float registers, whereas %B passes them in integer registers"),
 	       ibfd, obfd);
 	  else
 	    _bfd_error_handler
-	      (_("ERROR: %B passes floats in integer registers, whereas %B passes them in float registers"),
+	      (_("error: %B passes floats in integer registers, whereas %B passes them in float registers"),
 	       ibfd, obfd);
 
 	  flags_compatible = FALSE;
@@ -9199,11 +9222,11 @@ elf32_arm_merge_private_bfd_data (bfd * ibfd, bfd * obfd)
 	{
 	  if (in_flags & EF_ARM_VFP_FLOAT)
 	    _bfd_error_handler
-	      (_("ERROR: %B uses VFP instructions, whereas %B does not"),
+	      (_("error: %B uses VFP instructions, whereas %B does not"),
 	       ibfd, obfd);
 	  else
 	    _bfd_error_handler
-	      (_("ERROR: %B uses FPA instructions, whereas %B does not"),
+	      (_("error: %B uses FPA instructions, whereas %B does not"),
 	       ibfd, obfd);
 
 	  flags_compatible = FALSE;
@@ -9213,11 +9236,11 @@ elf32_arm_merge_private_bfd_data (bfd * ibfd, bfd * obfd)
 	{
 	  if (in_flags & EF_ARM_MAVERICK_FLOAT)
 	    _bfd_error_handler
-	      (_("ERROR: %B uses Maverick instructions, whereas %B does not"),
+	      (_("error: %B uses Maverick instructions, whereas %B does not"),
 	       ibfd, obfd);
 	  else
 	    _bfd_error_handler
-	      (_("ERROR: %B does not use Maverick instructions, whereas %B does"),
+	      (_("error: %B does not use Maverick instructions, whereas %B does"),
 	       ibfd, obfd);
 
 	  flags_compatible = FALSE;
@@ -9236,11 +9259,11 @@ elf32_arm_merge_private_bfd_data (bfd * ibfd, bfd * obfd)
 	    {
 	      if (in_flags & EF_ARM_SOFT_FLOAT)
 		_bfd_error_handler
-		  (_("ERROR: %B uses software FP, whereas %B uses hardware FP"),
+		  (_("error: %B uses software FP, whereas %B uses hardware FP"),
 		   ibfd, obfd);
 	      else
 		_bfd_error_handler
-		  (_("ERROR: %B uses hardware FP, whereas %B uses software FP"),
+		  (_("error: %B uses hardware FP, whereas %B uses software FP"),
 		   ibfd, obfd);
 
 	      flags_compatible = FALSE;

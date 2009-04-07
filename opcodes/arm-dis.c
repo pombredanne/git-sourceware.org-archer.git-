@@ -4041,7 +4041,9 @@ print_insn (bfd_vma pc, struct disassemble_info *info, bfd_boolean little)
 	     for a preceeding one.  */
 	  for (; n >= 0; n--)
 	    {
-	      if (get_sym_code_type (info, n, &type))
+	      if ((info->section == NULL
+		   || info->section == info->symtab[n]->section)
+		  && get_sym_code_type (info, n, &type))
 		{
 		  last_sym = n;
 		  found = TRUE;
@@ -4111,7 +4113,11 @@ print_insn (bfd_vma pc, struct disassemble_info *info, bfd_boolean little)
   if (force_thumb)
     is_thumb = TRUE;
 
-  info->display_endian = little ? BFD_ENDIAN_LITTLE : BFD_ENDIAN_BIG;
+  if (is_data)
+    info->display_endian = little ? BFD_ENDIAN_LITTLE : BFD_ENDIAN_BIG;
+  else
+    info->display_endian = little_code ? BFD_ENDIAN_LITTLE : BFD_ENDIAN_BIG;
+
   info->bytes_per_line = 4;
 
   if (is_data)

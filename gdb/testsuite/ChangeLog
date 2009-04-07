@@ -1,3 +1,99 @@
+2009-04-03  Ulrich Weigand  <Ulrich.Weigand@de.ibm.com>
+
+	* gdb.base/attach.exp: Re-enable for spu*-*-* targets.
+	* gdb.server/ext-attach.exp: Likewise.
+
+2009-04-03  Vladimir Prus  <vladimir@codesourcery.com>
+
+	Eliminate some sleep usage.
+
+        * gdb.mi/basics.c (do_nothing): New.
+        (main): Use do_nothing instead of printf, so that
+        not to introduce race condition between output of
+        inferiour and output of gdb. Do not use sleep as it
+        is not generally available on embedded targets.
+
+2009-04-02  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.server/ext-attach.exp: Expect an optional process id after
+	"Detached from remote process".
+
+2009-04-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-unresolved-main.c, gdb.dwarf2/dw2-unresolved.S,
+	gdb.dwarf2/dw2-unresolved.exp: New.
+
+2009-04-02  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.mi/mi-nonstop-exit.exp: Don't check isnative.  Use
+	mi_run_to_main.
+
+2009-04-02  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.mi/mi-nonstop.exp: Don't check isnative.  Use
+	mi_run_to_main.  Skip thread exit test on remote targets.
+	* gdb.mi/mi-nsintrall.exp: Don't check isnative.  Use
+	mi_run_to_main.
+	* gdb.mi/mi-nsmoribund.exp: Don't check isnative.  Use
+	mi_run_to_main.
+	* lib/mi-support.exp (mi_gdb_target_cmd): Remove trailing anchor
+	when expecting ^connected.  Detect when the target doesn't support
+	non-stop mode.
+	(mi_run_cmd): Detect if non-stop mode was requested by isn't
+	supported.  Return -1 on error, 0 on success.
+	(mi_runto_helper): Don't expect a stop if mi_run_cmd failed.
+	(mi_runto): Return mi_runto_helper's result explicitly.
+
+2009-04-01  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.threads/pending-step.c, gdb.threads/pending-step.exp: New.
+
+2009-04-01  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/funcargs.exp: Set print frame-arguments to "all".
+	* gdb.base/call-ar-st.exp: Set print frame-arguments to "all".
+	* gdb.ada/ref_param.exp: Set print frame-arguments to "all".
+	* gdb.ada/lang_switch.exp: Set print frame-arguments to "all".
+
+2009-03-31  Daniel Jacobowitz  <dan@codesourcery.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR gdb/931
+	* gdb.cp/gdb1355.exp (f_li, f_lui, f_si, f_sui): Allow canonical
+	output.
+	* gdb.cp/templates.exp: Allow canonical output.  Remove KFAILs
+	for gdb/931.
+	* dw2-strp.S (DW_AT_language): Change to C++.
+	(DW_TAG_variable (name ""), Abbrev code 7, .Lemptyname): New.
+
+2009-03-31  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/tasks: New testcase.
+
+2009-03-30  Stan Shebs  <stan@codesourcery.com>
+
+	* gdb.trace/actions.exp: Update to match new info trace format.
+	* gdb.trace/deltrace.exp: Ditto.
+	* gdb.trace/infotrace.exp: Ditto.
+	* gdb.trace/passcount.exp: Ditto.
+	* gdb.trace/save-trace.exp: Ditto.
+	* gdb.trace/while-stepping.exp: Ditto.
+	* gdb.trace/tracecmd.exp: Ditto, plus don't allow pending option.
+
+2009-03-30  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.python/python-frame.c: New file.
+	* gdb.python/python-frame.exp: New file.
+
+2009-03-29  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.python/python-value.exp: Add tests for the address
+	attribute.
+
+2009-03-29  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* gdb.arch/powerpc-prologue.exp: Update for disassemble-next-line.
+
 2009-03-26  Doug Evans  <dje@google.com>
 
 	* gdb.mi/mi-nonstop-exit.exp: New file.
@@ -168,7 +264,7 @@
 2009-02-18  Pierre Muller  <muller@ics.u-strasbg.fr>
 
 	* gdb.pascal/floats.exp: Accept approximate results everywhere.
-	
+
 2009-02-17  Vladimir Prus  <vladimir@codesourcery.com>
 
 	* gdb.mi/mi-nonstop.exp (notifs): Adjust for library
@@ -198,10 +294,10 @@
 
 2009-02-14  Vladimir Prus  <vladimir@codesourcery.com>
 
-        * lib/mi-support.exp (mi_expect_stop): Adjust the order of fields.
-        (mi_expect_interrupt): Likewise.
-        * gdb.mi/mi-cli.exp: Check that "step" results in proper *stopped
-        response.
+	* lib/mi-support.exp (mi_expect_stop): Adjust the order of fields.
+	(mi_expect_interrupt): Likewise.
+	* gdb.mi/mi-cli.exp: Check that "step" results in proper *stopped
+	response.
 
 2009-02-14  Pierre Muller  <muller@ics.u-strasbg.fr>
 

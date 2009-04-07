@@ -1228,15 +1228,23 @@ remote_notice_new_inferior (ptid_t currthread, int running)
   if (!in_thread_list (currthread))
     {
       struct inferior *inf = NULL;
+      int pid = ptid_get_pid (currthread);
 
-      if (ptid_equal (pid_to_ptid (ptid_get_pid (currthread)), inferior_ptid))
+      if (ptid_is_pid (inferior_ptid)
+	  && pid == ptid_get_pid (inferior_ptid))
 	{
 	  /* inferior_ptid has no thread member yet.  This can happen
 	     with the vAttach -> remote_wait,"TAAthread:" path if the
 	     stub doesn't support qC.  This is the first stop reported
 	     after an attach, so this is the main thread.  Update the
 	     ptid in the thread list.  */
-  	  thread_change_ptid (inferior_ptid, currthread);
+	  if (in_thread_list (pid_to_ptid (pid)))
+	    thread_change_ptid (inferior_ptid, currthread);
+	  else
+	    {
+	      remote_add_thread (currthread, running);
+	      inferior_ptid = currthread;
+	    }
  	  return;
 	}
 
@@ -3484,19 +3492,34 @@ extended_remote_attach_1 (struct target_ops *target, char *args, int from_tty)
     error (_("Attaching to %s failed"),
 	   target_pid_to_str (pid_to_ptid (pid)));
 
-  inferior_ptid = pid_to_ptid (pid);
-
-  /* Now, if we have thread information, update inferior_ptid.  */
-  inferior_ptid = remote_current_thread (inferior_ptid);
-
   remote_add_inferior (pid, 1);
 
+  inferior_ptid = pid_to_ptid (pid);
+
   if (non_stop)
-    /* Get list of threads.  */
-    remote_threads_info (target);
+    {
+      struct thread_info *thread;
+
+      /* Get list of threads.  */
+      remote_threads_info (target);
+
+      thread = first_thread_of_process (pid);
+      if (thread)
+	inferior_ptid = thread->ptid;
+      else
+	inferior_ptid = pid_to_ptid (pid);
+
+      /* Invalidate our notion of the remote current thread.  */
+      record_currthread (minus_one_ptid);
+    }
   else
-    /* Add the main thread to the thread list.  */
-    add_thread_silent (inferior_ptid);
+    {
+      /* Now, if we have thread information, update inferior_ptid.  */
+      inferior_ptid = remote_current_thread (inferior_ptid);
+
+      /* Add the main thread to the thread list.  */
+      add_thread_silent (inferior_ptid);
+    }
 
   /* Next, if the target can specify a description, read it.  We do
      this before anything involving memory or registers.  */
@@ -3649,6 +3672,50 @@ remote_vcont_probe (struct remote_state *rs)
   packet_ok (buf, &remote_protocol_packets[PACKET_vCont]);
 }
 
+/* Helper function for building "vCont" resumptions.  Write a
+   resumption to P.  ENDP points to one-passed-the-end of the buffer
+   we're allowed to write to.  Returns BUF+CHARACTERS_WRITTEN.  The
+   thread to be resumed is PTID; STEP and SIGGNAL indicate whether the
+   resumed thread should be single-stepped and/or signalled.  If PTID
+   equals minus_one_ptid, then all threads are resumed; if PTID
+   represents a process, then all threads of the process are resumed;
+   the thread to be stepped and/or signalled is given in the global
+   INFERIOR_PTID.  */
+
+static char *
+append_resumption (char *p, char *endp,
+		   ptid_t ptid, int step, enum target_signal siggnal)
+{
+  struct remote_state *rs = get_remote_state ();
+
+  if (step && siggnal != TARGET_SIGNAL_0)
+    p += xsnprintf (p, endp - p, ";S%02x", siggnal);
+  else if (step)
+    p += xsnprintf (p, endp - p, ";s");
+  else if (siggnal != TARGET_SIGNAL_0)
+    p += xsnprintf (p, endp - p, ";C%02x", siggnal);
+  else
+    p += xsnprintf (p, endp - p, ";c");
+
+  if (remote_multi_process_p (rs) && ptid_is_pid (ptid))
+    {
+      ptid_t nptid;
+
+      /* All (-1) threads of process.  */
+      nptid = ptid_build (ptid_get_pid (ptid), 0, -1);
+
+      p += xsnprintf (p, endp - p, ":");
+      p = write_ptid (p, endp, nptid);
+    }
+  else if (!ptid_equal (ptid, minus_one_ptid))
+    {
+      p += xsnprintf (p, endp - p, ":");
+      p = write_ptid (p, endp, ptid);
+    }
+
+  return p;
+}
+
 /* Resume the remote inferior by using a "vCont" packet.  The thread
    to be resumed is PTID; STEP and SIGGNAL indicate whether the
    resumed thread should be single-stepped and/or signalled.  If PTID
@@ -3679,78 +3746,35 @@ remote_vcont_resume (ptid_t ptid, int step, enum target_signal siggnal)
      about overflowing BUF.  Should there be a generic
      "multi-part-packet" packet?  */
 
+  p += xsnprintf (p, endp - p, "vCont");
+
   if (ptid_equal (ptid, magic_null_ptid))
     {
       /* MAGIC_NULL_PTID means that we don't have any active threads,
 	 so we don't have any TID numbers the inferior will
 	 understand.  Make sure to only send forms that do not specify
 	 a TID.  */
-      if (step && siggnal != TARGET_SIGNAL_0)
-	xsnprintf (p, endp - p, "vCont;S%02x", siggnal);
-      else if (step)
-	xsnprintf (p, endp - p, "vCont;s");
-      else if (siggnal != TARGET_SIGNAL_0)
-	xsnprintf (p, endp - p, "vCont;C%02x", siggnal);
-      else
-	xsnprintf (p, endp - p, "vCont;c");
+      p = append_resumption (p, endp, minus_one_ptid, step, siggnal);
     }
-  else if (ptid_equal (ptid, minus_one_ptid))
+  else if (ptid_equal (ptid, minus_one_ptid) || ptid_is_pid (ptid))
     {
-      /* Resume all threads, with preference for INFERIOR_PTID.  */
-      if (step && siggnal != TARGET_SIGNAL_0)
+      /* Resume all threads (of all processes, or of a single
+	 process), with preference for INFERIOR_PTID.  This assumes
+	 inferior_ptid belongs to the set of all threads we are about
+	 to resume.  */
+      if (step || siggnal != TARGET_SIGNAL_0)
 	{
-	  /* Step inferior_ptid with signal.  */
-	  p += xsnprintf (p, endp - p, "vCont;S%02x:", siggnal);
-	  p = write_ptid (p, endp, inferior_ptid);
-	  /* And continue others.  */
-	  p += xsnprintf (p, endp - p, ";c");
+	  /* Step inferior_ptid, with or without signal.  */
+	  p = append_resumption (p, endp, inferior_ptid, step, siggnal);
 	}
-      else if (step)
-	{
-	  /* Step inferior_ptid.  */
-	  p += xsnprintf (p, endp - p, "vCont;s:");
-	  p = write_ptid (p, endp, inferior_ptid);
-	  /* And continue others.  */
-	  p += xsnprintf (p, endp - p, ";c");
-	}
-      else if (siggnal != TARGET_SIGNAL_0)
-	{
-	  /* Continue inferior_ptid with signal.  */
-	  p += xsnprintf (p, endp - p, "vCont;C%02x:", siggnal);
-	  p = write_ptid (p, endp, inferior_ptid);
-	  /* And continue others.  */
-	  p += xsnprintf (p, endp - p, ";c");
-	}
-      else
-	xsnprintf (p, endp - p, "vCont;c");
+
+      /* And continue others without a signal.  */
+      p = append_resumption (p, endp, ptid, /*step=*/ 0, TARGET_SIGNAL_0);
     }
   else
     {
       /* Scheduler locking; resume only PTID.  */
-      if (step && siggnal != TARGET_SIGNAL_0)
-	{
-	  /* Step ptid with signal.  */
-	  p += xsnprintf (p, endp - p, "vCont;S%02x:", siggnal);
-	  p = write_ptid (p, endp, ptid);
-	}
-      else if (step)
-	{
-	  /* Step ptid.  */
-	  p += xsnprintf (p, endp - p, "vCont;s:");
-	  p = write_ptid (p, endp, ptid);
-	}
-      else if (siggnal != TARGET_SIGNAL_0)
-	{
-	  /* Continue ptid with signal.  */
-	  p += xsnprintf (p, endp - p, "vCont;C%02x:", siggnal);
-	  p = write_ptid (p, endp, ptid);
-	}
-      else
-	{
-	  /* Continue ptid.  */
-	  p += xsnprintf (p, endp - p, "vCont;c:");
-	  p = write_ptid (p, endp, ptid);
-	}
+      p = append_resumption (p, endp, ptid, step, siggnal);
     }
 
   gdb_assert (strlen (rs->buf) < get_remote_packet_size ());
@@ -3945,13 +3969,13 @@ remote_stop_ns (ptid_t ptid)
   if (!rs->support_vCont_t)
     error (_("Remote server does not support stopping threads"));
 
-  if (ptid_equal (ptid, minus_one_ptid))
+  if (ptid_equal (ptid, minus_one_ptid)
+      || (!remote_multi_process_p (rs) && ptid_is_pid (ptid)))
     p += xsnprintf (p, endp - p, "vCont;t");
   else
     {
       ptid_t nptid;
 
-      /* Step inferior_ptid.  */
       p += xsnprintf (p, endp - p, "vCont;t:");
 
       if (ptid_is_pid (ptid))
