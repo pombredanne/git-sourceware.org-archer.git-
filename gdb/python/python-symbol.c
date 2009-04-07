@@ -1,6 +1,6 @@
 /* Python interface to symbols.
 
-   Copyright (C) 2008 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -235,7 +235,6 @@ PyObject *gdbpy_lookup_symbol (PyObject *self, PyObject *args, PyObject *kw)
 void
 gdbpy_initialize_symbols (void)
 {
-  symbol_object_type.tp_new = PyType_GenericNew;
   if (PyType_Ready (&symbol_object_type) < 0)
     return;
 
