@@ -18510,9 +18510,9 @@ unusual platforms, this type may have a different size.
 
 @defivar Type tag
 The tag name for this type.  The tag name is the name after
-@code{struct}, @code{union}, or @code{enum} in C; not all languages
-have this concept.  If this type has no tag name, then @code{None} is
-returned.
+@code{struct}, @code{union}, or @code{enum} in C and C@t{++}; not all
+languages have this concept.  If this type has no tag name, then
+@code{None} is returned.
 @end defivar
 @end table
 
@@ -18530,8 +18530,9 @@ into one of these categories, an empty sequence will be returned.
 Each field is an object, with some pre-defined attributes:
 @table @code
 @item bitpos
-This attribute is not available for @code{static} fields.  For
-non-@code{static} fields, the value is the bit position of the field.
+This attribute is not available for @code{static} fields (as in
+C@t{++} or Java).  For non-@code{static} fields, the value is the bit
+position of the field.
 
 @item name
 The name of the field, or @code{None} for anonymous fields.
@@ -18583,20 +18584,23 @@ Return a new @code{gdb.Type} object which represents the target type
 of this type.
 
 For a pointer type, the target type is the type of the pointed-to
-object.  For an array type, the target type is the type of the
-elements of the array.  For a function type, the target type is the
-type of the return value.  For a complex type, the target type is the
-type of the elements.  For a typedef, the target type is the aliased
-type.
+object.  For an array type (meaning C-like arrays), the target type is
+the type of the elements of the array.  For a function or method type,
+the target type is the type of the return value.  For a complex type,
+the target type is the type of the elements.  For a typedef, the
+target type is the aliased type.
+
+If the type does not have a target, this method will throw an
+exception.
 @end defmethod
 
 @defmethod Type template_argument n [block]
-If this @code{gdb.Type} is a template type, this will return a new
-@code{gdb.Type} which represents the type of the @var{n}th template
-argument.
+If this @code{gdb.Type} is an instantiation of a template, this will
+return a new @code{gdb.Type} which represents the type of the
+@var{n}th template argument.
 
 If this @code{gdb.Type} is not a template type, this will throw an
-exception.
+exception.  Ordinarily, only C@t{++} code will have template types.
 
 If @var{block} is given, then @var{name} is looked up in that scope.
 Otherwise, it is searched for globally.
@@ -18859,7 +18863,7 @@ the printer example above might be written.
 @smallexample
 def str_lookup_function (val):
 
-    lookup_tag = val.type ().tag ()
+    lookup_tag = val.type.tag
     regex = re.compile ("^std::basic_string<char,.*>$")
     if lookup_tag == None:
         return None
