@@ -893,7 +893,6 @@ create_array_type (struct type *result_type,
     {
       result_type = alloc_type (TYPE_OBJFILE (range_type));
     }
-
   TYPE_CODE (result_type) = TYPE_CODE_ARRAY;
   TYPE_TARGET_TYPE (result_type) = element_type;
   if (get_discrete_bounds (range_type, &low_bound, &high_bound) < 0)
