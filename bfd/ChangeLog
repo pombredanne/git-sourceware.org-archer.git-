@@ -1,3 +1,25 @@
+2009-04-08  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elflink.c (elf_link_add_object_symbols): Warn alternate ELF
+	machine code.
+
+2009-04-07  DJ Delorie  <dj@redhat.com>
+
+	* archures.c: Add bfd_mach_mep_c5.
+	* bfd-in2.h: Likewise.
+	* cpu-mep.c: Add bfd_c5_arch.
+	* elf32-mep.c: Support it.
+
+2009-04-07  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elflink.c (_bfd_elf_section_already_linked): Add `\n' for
+	info->callbacks->einfo.
+	* linker.c (_bfd_generic_section_already_linked): Likewise.
+
+2009-04-06  DJ Delorie  <dj@redhat.com>
+
+	* elf32-h8300.c (elf32_h8_relax_section): Relax MOVA opcodes.
+
 2009-04-06  H.J. Lu  <hongjiu.lu@intel.com>
 
 	* coff-x86_64.c (bfd_pe_print_pdata): Defined to

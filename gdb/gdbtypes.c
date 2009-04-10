@@ -739,7 +739,7 @@ lookup_memberptr_type (struct type *type, struct type *domain)
 
   mtype = alloc_type (TYPE_OBJFILE (type));
   smash_to_memberptr_type (mtype, domain, type);
-  return (mtype);
+  return mtype;
 }
 
 /* Return a pointer-to-method type, for a method of type TO_TYPE.  */
@@ -772,7 +772,7 @@ allocate_stub_method (struct type *type)
 		     TYPE_OBJFILE (type));
   TYPE_TARGET_TYPE (mtype) = type;
   /*  _DOMAIN_TYPE (mtype) = unknown yet */
-  return (mtype);
+  return mtype;
 }
 
 /* Create a range type using either a blank type supplied in
@@ -930,7 +930,7 @@ create_array_type (struct type *result_type,
   if (TYPE_LENGTH (result_type) == 0)
     TYPE_TARGET_STUB (result_type) = 1;
 
-  return (result_type);
+  return result_type;
 }
 
 /* Create a string type using either a blank type supplied in
@@ -957,7 +957,7 @@ create_string_type (struct type *result_type,
 				   string_char_type,
 				   range_type);
   TYPE_CODE (result_type) = TYPE_CODE_STRING;
-  return (result_type);
+  return result_type;
 }
 
 struct type *
@@ -989,7 +989,7 @@ create_set_type (struct type *result_type, struct type *domain_type)
     }
   TYPE_FIELD_TYPE (result_type, 0) = domain_type;
 
-  return (result_type);
+  return result_type;
 }
 
 void
@@ -1154,11 +1154,11 @@ lookup_typename (char *name, struct block *block, int noerr)
 						    name);
       if (tmp)
 	{
-	  return (tmp);
+	  return tmp;
 	}
       else if (!tmp && noerr)
 	{
-	  return (NULL);
+	  return NULL;
 	}
       else
 	{
@@ -1232,14 +1232,14 @@ lookup_union (char *name, struct block *block)
   t = SYMBOL_TYPE (sym);
 
   if (TYPE_CODE (t) == TYPE_CODE_UNION)
-    return (t);
+    return t;
 
   /* C++ unions may come out with TYPE_CODE_CLASS, but we look at
    * a further "declared_type" field to discover it is really a union.
    */
   if (HAVE_CPLUS_STRUCT (t))
     if (TYPE_DECLARED_TYPE (t) == DECLARED_TYPE_UNION)
-      return (t);
+      return t;
 
   /* If we get here, it's not a union.  */
   error (_("This context has class, struct or enum %s, not a union."), 
@@ -1908,7 +1908,7 @@ init_type (enum type_code code, int length, int flags,
     {
       INIT_CPLUS_SPECIFIC (type);
     }
-  return (type);
+  return type;
 }
 
 /* Helper function.  Create an empty composite type.  */
