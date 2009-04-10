@@ -3158,17 +3158,17 @@ copy_type (const struct type *type)
 /* Callback type for main_type_crawl.  */
 typedef int (*main_type_crawl_iter) (struct type *type, void *data);
 
-/* Iterate all MAIN_TYPEs reachable through any TYPE pointers from TYPE.  ITER
-   will be called only for one TYPE of each MAIN_TYPE, use TYPE_CHAIN traversal
-   to find all the TYPEs instances.  ITER is being called for each MAIN_TYPE
-   found.  ITER returns non-zero if main_type_crawl should depth-first enter
-   the TYPE.  ITER must provide some detection for reentering the same
-   MAIN_TYPEs as this function will endlessly loop otherwise.  */
+/* Iterate all main_type structures reachable through any `struct type *' from
+   TYPE.  ITER will be called only for one type of each main_type, use
+   TYPE_CHAIN traversal to find all the type instances.  ITER is being called
+   for each main_type found.  ITER returns non-zero if main_type_crawl should
+   depth-first enter the specific type.  ITER must provide some detection for
+   reentering the same main_type as this function would otherwise endlessly
+   loop.  */
 
 static void
 main_type_crawl (struct type *type, main_type_crawl_iter iter, void *data)
 {
-  struct type_group_link link, *found;
   struct type *type_iter;
   int i;
 
@@ -3176,6 +3176,8 @@ main_type_crawl (struct type *type, main_type_crawl_iter iter, void *data)
     return;
 
   gdb_assert (TYPE_OBJFILE (type) == NULL);
+
+  /* `struct cplus_struct_type' handling is unsupported by this function.  */
   gdb_assert ((TYPE_CODE (type) != TYPE_CODE_STRUCT
 	       && TYPE_CODE (type) != TYPE_CODE_UNION)
 	      || !HAVE_CPLUS_STRUCT (type) || !TYPE_CPLUS_SPECIFIC (type));
@@ -3183,6 +3185,7 @@ main_type_crawl (struct type *type, main_type_crawl_iter iter, void *data)
   if (!(*iter) (type, data))
     return;
 
+  /* Iterate all the type instances of this main_type.  */
   type_iter = type;
   do
     {
@@ -3202,8 +3205,8 @@ main_type_crawl (struct type *type, main_type_crawl_iter iter, void *data)
   main_type_crawl (TYPE_VPTR_BASETYPE (type), iter, data);
 }
 
-/* Unify all the entries associated by GROUP in FROM with TO.  The new group
-   will keep the GROUP pointer TO.  */
+/* Unify all the entries associated by type_group FROM with type_group TO.  The
+   new group will belong to type_group TO.  */
 
 static void
 link_group_relabel (struct type_group *to, struct type_group *from)
@@ -3228,17 +3231,20 @@ link_group_relabel (struct type_group *to, struct type_group *from)
   xfree (from);
 }
 
-/* Number of valid (with actual age field) entries of type_group_link_table.  */
+/* Number of visited type_group_link_table entries during this
+   type_group_link_check pass.  */
 static unsigned type_group_link_check_grouping_markers;
 
-/* Unify GROUP of each TYPE found crawling the type_group_link_table tree with the
-   starting TYPE referenced in type_group_link_table.  */
+/* Unify type_group of all the type structures found while crawling the
+   type_group_link_table tree from the starting point type.  DATA contains
+   type_group_link reference of the starting point type.  Only during the first
+   callback TYPE will always match type_group_link referenced by DATA.  */
 
 static int
 type_group_link_check_grouping_iter (struct type *type, void *data)
 {
-  /* The starting point TYPE referenced in type_group_link_table.  */
-  struct type_group_link *link_prev = data;
+  /* The starting point referenced in type_group_link_table.  */
+  struct type_group_link *link_start = data;
   struct type_group_link link_local, *link;
   int crawl_into = 0;
 
@@ -3256,21 +3262,21 @@ type_group_link_check_grouping_iter (struct type *type, void *data)
       crawl_into = 1;
     }
 
-  if (link != link_prev && link->group != link_prev->group)
+  if (link != link_start && link->group != link_start->group)
     {
       /* Keep the time complexity linear by relabeling always the smaller
 	 group.  */
-      if (link->group->link_count < link_prev->group->link_count)
-	link_group_relabel (link->group, link_prev->group);
+      if (link->group->link_count < link_start->group->link_count)
+	link_group_relabel (link->group, link_start->group);
       else
-	link_group_relabel (link_prev->group, link->group);
+	link_group_relabel (link_start->group, link->group);
     }
 
   return crawl_into;
 }
 
-/* Iterator to unify GROUP of all the TYPEs connected with the one starting at
-   LINK.  */
+/* Iterator to unify type_group of all the type structures connected with the
+   one referenced by LINK (therefore *SLOT).  */
 
 static int
 type_group_link_check_grouping (void **slot, void *unused)
@@ -3282,7 +3288,7 @@ type_group_link_check_grouping (void **slot, void *unused)
   return 1;
 }
 
-/* Helper function for check_types_fail.  */
+/* Helper iterator for check_types_fail.  */
 
 static int
 check_types_fail_iter (void **slot, void *unused)
@@ -3301,7 +3307,7 @@ check_types_fail_iter (void **slot, void *unused)
 }
 
 /* Called by check_types_assert to abort GDB execution printing the state of
-   type_group_link_table to make te GDB debugging possible.  */
+   type_group_link_table to make debugging GDB possible.  */
 
 static void
 check_types_fail (const char *file, int line, const char *function)
@@ -3311,12 +3317,12 @@ check_types_fail (const char *file, int line, const char *function)
 
   htab_traverse (type_group_link_table, check_types_fail_iter, NULL);
 
-  internal_error (file, line, _("%s: Type groups consistensy fail"), function);
+  internal_error (file, line, _("%s: Type groups consistency fail"), function);
 }
 
-/* Use instead of gdb_assert for conditions being caused by wrong
-   type_group_link_table state (and not due to a bug in these sanity checking
-   functions themselves).  */
+/* gdb_assert replacement for conditions being caused by wrong
+   type_group_link_table state.  This function is not intended for catching
+   bugs in these sanity checking functions themselves.  */
 
 #define check_types_assert(expr)					 \
   ((void) ((expr) ? 0 :							 \
@@ -3326,9 +3332,17 @@ check_types_fail (const char *file, int line, const char *function)
    interconnected TYPEs nests.  Also sanity check each interconnected TYPEs
    nest uses the same REFC.  */
 
+/* Unify type_group of all the type structures found while crawling the
+   type_group_link_table tree from every of its type_group_link entries.  This
+   functionality protects free_all_types from freeing a type structure still
+   being referenced by some other type.  */
+
 static void
 type_group_link_check (void)
 {
+  /* Mark a new pass.  As GDB checks all the entries were visited after each
+     pass there cannot be any stale entries already containing the changed
+     value.  */
   type_group_age ^= 1;
 
   type_group_link_check_grouping_markers = 0;
@@ -3359,6 +3373,7 @@ delete_main_type (struct type *type)
     }
   xfree (TYPE_FIELDS (type));
 
+  /* `struct cplus_struct_type' handling is unsupported by this function.  */
   gdb_assert ((TYPE_CODE (type) != TYPE_CODE_STRUCT
 	       && TYPE_CODE (type) != TYPE_CODE_UNION)
 	      || !HAVE_CPLUS_STRUCT (type) || !TYPE_CPLUS_SPECIFIC (type));
@@ -3366,13 +3381,13 @@ delete_main_type (struct type *type)
   xfree (TYPE_MAIN_TYPE (type));
 }
 
-/* Delete TYPE and remember MAIN_TYPE it references.  TYPE must have been
-   allocated using xmalloc -- not using an objfile.  */
+/* Delete all the instances on TYPE_CHAIN of TYPE, including their referenced
+   main_type.  TYPE must be a reclaimable type - neither permanent nor objfile
+   associated.  */
 
 static void
 delete_type_chain (struct type *type)
 {
-  void **slot;
   struct type *type_iter, *type_iter_to_free;
 
   gdb_assert (TYPE_OBJFILE (type) == NULL);
@@ -3395,6 +3410,7 @@ static hashval_t
 type_group_link_hash (const void *p)
 {
   const struct type_group_link *link = p;
+
   return htab_hash_pointer (TYPE_MAIN_TYPE (link->type));
 }
 
@@ -3405,15 +3421,13 @@ type_group_link_equal (const void *a, const void *b)
 {
   const struct type_group_link *left = a;
   const struct type_group_link *right = b;
+
   return TYPE_MAIN_TYPE (left->type) == TYPE_MAIN_TYPE (right->type);
 }
 
-/* Insert the new type NEW_TYPE into the table.  Does nothing if
-   NEW_TYPE has an objfile.  If PARENT_TYPE is not NULL, then NEW_TYPE
-   will be inserted into the same hierarchy as PARENT_TYPE.  In this
-   case, PARENT_TYPE must already exist in the reference count map.
-   If PARENT_TYPE is NULL, a new reference count is allocated and set
-   to one.  */
+/* Define currently permanent TYPE as being reclaimable during free_all_types.
+   TYPE is required to be now permanent.  TYPE will be left with zero reference
+   count, early type_incref call is probably appropriate.  */
 
 static void
 type_init_group (struct type *type)
@@ -3441,7 +3455,8 @@ type_init_group (struct type *type)
   *slot = link;
 }
 
-/* Increment the reference count for TYPE.  */
+/* Increment the reference count for TYPE.  For permanent or objfile associated
+   types nothing happens.  */
 
 void
 type_incref (struct type *type)
@@ -3456,11 +3471,12 @@ type_incref (struct type *type)
   /* A permanent type?  */
   if (!found)
     return;
+
   found->group->use_count++;
 }
 
-/* A traverse callback for type_group_link_table which removes any link
-   whose reference count is zero (unused link).  */
+/* A traverse callback for type_group_link_table which removes any
+   type_group_link whose reference count is now zero (unused link).  */
 
 static int
 type_group_link_remove (void **slot, void *unused)
@@ -3473,9 +3489,10 @@ type_group_link_remove (void **slot, void *unused)
 
       delete_type_chain (link->type);
 
-      /* link_list with its GROUP_NEXT is left inconsistent as after the
-	 iteration by this function finishes the whole group will be deleted
-	 anyway.  */
+      /* The list `type_group->link_list' is left inconsistent during the
+	 traversal.  After free_all_types finishes the whole group will be
+	 deleted anyway.  */
+
       gdb_assert (group->link_count > 0);
       if (!--group->link_count)
 	xfree (group);
@@ -3487,10 +3504,12 @@ type_group_link_remove (void **slot, void *unused)
   return 1;
 }
 
-/* Decrement the reference count for TYPE.  Even if TYPE has no more
-   references still do not delete it as callers may hold pointers to types
-   dynamically generated by check_typedef where type_incref is never called.
-   Always rely on the free_all_types garbage collector.  */
+/* Decrement the reference count for TYPE.  For permanent or objfile associated
+   types nothing happens.  
+
+   Even if TYPE has no more references still do not delete it as callers may
+   hold pointers to types dynamically generated by check_typedef.  Always rely
+   just on the free_all_types garbage collector.  */
 
 void
 type_decref (struct type *type)
@@ -3505,14 +3524,17 @@ type_decref (struct type *type)
   /* A permanent type?  */
   if (!found)
     return;
+
   gdb_assert (found->group->use_count > 0);
   found->group->use_count--;
 }
 
-/* Free all the types that have been allocated and that are not used according
-   to type_group_link->refc.  Called after each command, successful or not.
-   Use this cleanup only in the GDB idle state as GDB code does not necessarily
-   use type_incref / type_decref during temporary use of types.  */
+/* Free all the reclaimable types that have been allocated and that have
+   currently zero reference counter.
+
+   This function is called after each command, successful or not.  Use this
+   cleanup only in the GDB idle state as GDB code does not necessarily use
+   type_incref / type_decref during temporary use of types.  */
 
 void
 free_all_types (void)
