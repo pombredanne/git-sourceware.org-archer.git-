@@ -1270,7 +1270,8 @@ extern void maintenance_print_type (char *, int);
 
 extern htab_t create_copied_types_hash (struct objfile *objfile);
 
-extern struct type *copy_type_recursive (struct type *type,
+extern struct type *copy_type_recursive (struct objfile *objfile,
+					 struct type *type,
 					 htab_t copied_types);
 
 extern struct type *copy_type (const struct type *type);

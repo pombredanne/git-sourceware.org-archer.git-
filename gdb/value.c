@@ -1190,7 +1190,7 @@ preserve_one_value (struct value *value, struct objfile *objfile,
     {
       /* No need to decref the old type here, since we know it has no
 	 reference count.  */
-      value->type = copy_type_recursive (value->type, copied_types);
+      value->type = copy_type_recursive (objfile, value->type, copied_types);
       type_incref (value->type);
     }
 
@@ -1198,7 +1198,8 @@ preserve_one_value (struct value *value, struct objfile *objfile,
     {
       /* No need to decref the old type here, since we know it has no
 	 reference count.  */
-      value->enclosing_type = copy_type_recursive (value->enclosing_type,
+      value->enclosing_type = copy_type_recursive (objfile,
+						   value->enclosing_type,
 						   copied_types);
       type_incref (value->enclosing_type);
     }
