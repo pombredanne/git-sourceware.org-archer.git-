@@ -50,7 +50,6 @@
 #include "addrmap.h"
 #include "arch-utils.h"
 #include "exec.h"
-#include "varobj.h"
 
 /* Prototypes for local functions */
 
@@ -410,7 +409,6 @@ free_objfile (struct objfile *objfile)
   /* Remove any references to this objfile in the global value
      lists.  */
   preserve_values (objfile);
-  varobj_invalidate (objfile);
 
   /* First do any symbol file specific actions required when we are
      finished with a particular symbol file.  Note that if the objfile

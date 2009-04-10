@@ -2752,7 +2752,7 @@ When non-zero, varobj debugging is enabled."),
    are defined on globals.
    Invalidated varobjs will be always printed in_scope="invalid".  */
 void 
-varobj_invalidate (struct objfile *objfile)
+varobj_invalidate (void)
 {
   struct varobj **all_rootvarobj;
   struct varobj **varp;
@@ -2762,81 +2762,34 @@ varobj_invalidate (struct objfile *objfile)
     varp = all_rootvarobj;
     while (*varp != NULL)
       {
-	struct varobj *var = *varp;
-
 	/* Floating varobjs are reparsed on each stop, so we don't care if
 	   the presently parsed expression refers to something that's gone.  */
-	if (var->root->floating)
+	if ((*varp)->root->floating)
 	  continue;
 
-        if (var->root->valid_block != NULL && var->root->is_valid)
-	  {
-	    struct block *block = var->root->valid_block;
-	    struct symbol *func = block_linkage_function (block);
-	    struct objfile *func_objfile = SYMBOL_SYMTAB (func)->objfile;
+        /* global var must be re-evaluated.  */     
+        if ((*varp)->root->valid_block == NULL)
+        {
+          struct varobj *tmp_var;
 
-	    if (func_objfile == objfile)
-	      var->root->is_valid = 0;
-	  }
-	
-	if (var->type && TYPE_OBJFILE (var->type) == objfile)
-	  {
-	    gdb_assert (!var->root->is_valid || !var->root->valid_block);
-	    var->type = NULL;
-	  }
-	if (var->value
-	    && TYPE_OBJFILE (value_type (var->value)) == objfile)
-	  {
-	    gdb_assert (!var->root->is_valid || !var->root->valid_block);
-	    value_free (var->value);
-	    var->value = NULL;
-	  }
+          /* Try to create a varobj with same expression.  If we succeed replace
+             the old varobj, otherwise invalidate it.  */
+          tmp_var = varobj_create (NULL, (*varp)->name, (CORE_ADDR) 0, USE_CURRENT_FRAME);
+          if (tmp_var != NULL) 
+            { 
+	      tmp_var->obj_name = xstrdup ((*varp)->obj_name);
+              varobj_delete (*varp, NULL, 0);
+              install_variable (tmp_var);
+            }
+          else
+              (*varp)->root->is_valid = 0;
+        }
+        else /* locals must be invalidated.  */
+          (*varp)->root->is_valid = 0;
 
         varp++;
       }
   }
   xfree (all_rootvarobj);
-}
-
-void 
-varobj_revalidate (void)
-{
-  struct varobj **all_rootvarobj;
-  struct varobj **varp;
-
-  if (varobj_list (&all_rootvarobj) > 0)
-    {
-      varp = all_rootvarobj;
-      while (*varp != NULL)
-	{
-	  struct varobj *var = *varp;
-
-	  /* Floating varobjs are reparsed on each stop, so we don't care if
-	     the presently parsed expression refers to something that's gone.
-	     */
-	  if (var->root->floating)
-	    continue;
-
-	  /* global var must be re-evaluated.  */     
-	  if (var->root->valid_block == NULL)
-	    {
-	      struct varobj *tmp_var;
-
-	      /* Try to create a varobj with same expression.  If we succeed
-		 replace the old varobj, otherwise invalidate it.  */
-	      tmp_var = varobj_create (NULL, var->name, 0, USE_CURRENT_FRAME);
-	      if (tmp_var != NULL) 
-		{ 
-		  tmp_var->obj_name = xstrdup (var->obj_name);
-		  varobj_delete (var, NULL, 0);
-		  install_variable (tmp_var);
-		}
-	      else
-		var->root->is_valid = 0;
-	    }
-
-	  varp++;
-	}
-    }
-  xfree (all_rootvarobj);
+  return;
 }
