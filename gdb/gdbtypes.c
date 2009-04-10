@@ -346,9 +346,6 @@ make_pointer_type (struct type *type, struct type **typeptr)
       smash_type (ntype);
       TYPE_CHAIN (ntype) = chain;
       TYPE_OBJFILE (ntype) = objfile;
-
-      /* Callers may only supply storage if there is an objfile.  */
-      gdb_assert (objfile);
     }
 
   TYPE_TARGET_TYPE (ntype) = type;
@@ -429,9 +426,6 @@ make_reference_type (struct type *type, struct type **typeptr)
       smash_type (ntype);
       TYPE_CHAIN (ntype) = chain;
       TYPE_OBJFILE (ntype) = objfile;
-
-      /* Callers may only supply storage if there is an objfile.  */
-      gdb_assert (objfile);
     }
 
   TYPE_TARGET_TYPE (ntype) = type;
@@ -490,9 +484,6 @@ make_function_type (struct type *type, struct type **typeptr,
       ntype = *typeptr;
       smash_type (ntype);
       TYPE_OBJFILE (ntype) = objfile;
-
-      /* Callers may only supply storage if there is an objfile.  */
-      gdb_assert (objfile);
     }
 
   TYPE_TARGET_TYPE (ntype) = type;
@@ -902,11 +893,6 @@ create_array_type (struct type *result_type,
     {
       result_type = alloc_type (TYPE_OBJFILE (range_type));
     }
-  else
-    {
-      /* Callers may only supply storage if there is an objfile.  */
-      gdb_assert (TYPE_OBJFILE (result_type));
-    }
 
   TYPE_CODE (result_type) = TYPE_CODE_ARRAY;
   TYPE_TARGET_TYPE (result_type) = element_type;
@@ -967,11 +953,6 @@ create_set_type (struct type *result_type, struct type *domain_type)
   if (result_type == NULL)
     {
       result_type = alloc_type (TYPE_OBJFILE (domain_type));
-    }
-  else
-    {
-      /* Callers may only supply storage if there is an objfile.  */
-      gdb_assert (TYPE_OBJFILE (result_type));
     }
   TYPE_CODE (result_type) = TYPE_CODE_SET;
   TYPE_NFIELDS (result_type) = 1;
