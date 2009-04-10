@@ -3328,10 +3328,6 @@ check_types_fail (const char *file, int line, const char *function)
   ((void) ((expr) ? 0 :							 \
 	   (check_types_fail (__FILE__, __LINE__, ASSERT_FUNCTION), 0)))
 
-/* Sanity check type_group_link_table uses disjunct REFC pointers for unconnected
-   interconnected TYPEs nests.  Also sanity check each interconnected TYPEs
-   nest uses the same REFC.  */
-
 /* Unify type_group of all the type structures found while crawling the
    type_group_link_table tree from every of its type_group_link entries.  This
    functionality protects free_all_types from freeing a type structure still
