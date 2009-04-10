@@ -1685,7 +1685,7 @@ again:
 
     case 'f':			/* Function returning another type */
       type1 = read_type (pp, objfile);
-      type = make_function_type (type1, dbx_lookup_type (typenums), objfile);
+      type = make_function_type (type1, dbx_lookup_type (typenums));
       break;
 
     case 'g':                   /* Prototyped function.  (Sun)  */
@@ -1708,8 +1708,7 @@ again:
         const char *type_start = (*pp) - 1;
         struct type *return_type = read_type (pp, objfile);
         struct type *func_type
-          = make_function_type (return_type, dbx_lookup_type (typenums),
-				objfile);
+          = make_function_type (return_type, dbx_lookup_type (typenums));
         struct type_list {
           struct type *type;
           struct type_list *next;
