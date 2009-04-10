@@ -464,7 +464,7 @@ lookup_reference_type (struct type *type)
 /* Lookup a function type that returns type TYPE.  TYPEPTR, if
    nonzero, points to a pointer to memory where the function type
    should be stored.  If *TYPEPTR is zero, update it to point to the
-   function type we return.  We allocate new memory from OBJFILE if needed.  */
+   function type we return.  We allocate new memory if needed.  */
 
 struct type *
 make_function_type (struct type *type, struct type **typeptr)
