@@ -148,49 +148,59 @@ static void dump_fn_fieldlists (struct type *, int);
 static void print_cplus_stuff (struct type *, int);
 static void type_init_group (struct type *type);
 
+/* Any type structures which are connected through their `struct type *' are
+   tracked by the same type_group.  Only the discardable (neither permanent
+   types nor types allocated from objfile obstack) type structures get tracked
+   by type_group structures.  */
+
 struct type_group
 {
+  /* Sum of all the external references to any of the type structures tracked
+     by this type_group.  */
   int use_count;
 
-  /* Number of type_group_link items in this GROUP.  It is only valid
-     if GROUP == thistype_group_link.  It is the length of list
-     group->group_next.  */
+  /* Number of the type_group_links structures tracked by this type_group.  It
+     matches the length of list `link_list->group_next->...->group_next'.  */
   int link_count;
 
+  /* Head of an unordered list of all type structures of this type_group.  Next
+     items are linked by `type_group_link->group_next'.  */
   struct type_group_link *link_list;
 };
 
-/* A reference count structure for the type reference count map.  Each
-   type in a hierarchy of types is mapped to the same reference
-   count.  type_group_link exists only once for (freeable) main_type.  Iterate
-   by TYPE_CHAIN (type_group_link->type) for the other TYPEs.  MAIN_TYPEs with
-   non-NULL TYPE_OBJFILE or permanent (GDB-internal) MAIN_TYPEs have no
-   associated type_group_link.  */
+/* Linking entry between a type structure and type_group structure.  Only
+   discardable types have such link present.  This link exists only once for
+   each discardable main_type, all type instances for such one main_type should
+   be iterated by `TYPE_CHAIN (type_group_link->type)'.  */
 
 struct type_group_link
 {
-  /* One type in the hierarchy.  Each type in the hierarchy gets its
-     own slot.  */
+  /* Arbitrary type for main_type being represented by this type_group_link.
+     Each discardable main_type gets its separate type_group_link.  */
   struct type *type;
 
-  /* Set to type_group_age during each type_group_link_check pass.  */
+  /* Marker this type_group_link has been visited by the type_group_link_check
+     graph traversal by this pass.  Current pass is represented by
+     TYPE_GROUP_AGE.  */
   unsigned age : 1;
 
-  /* Pointer to leading type_group_link of interconnected types group.  */
   struct type_group *group;
 
-  /* Next type_group_link in this GROUP or NULL.  */
+  /* Next type_group_link belonging to this type_group structure or NULL for
+     the last node of the list.  */
   struct type_group_link *group_next;
 };
 
-/* The hash table holding all reference counts.  */
+/* The hash table holding all `struct type_group_link *' references.  */
 static htab_t type_group_link_table;
 
-/* Current pass to invalidate obsolete info by type_group_link->age.  */
+/* Current type_group_link_check pass used for `type_group_link->age'.  */
 static unsigned type_group_age;
 
-/* The core code for alloc_type.  Call this function for allocating permanent
-   (GDB-internal) types.  */
+/* Alloc a new type structure and fill it with some defaults.  If
+   OBJFILE is non-NULL, then allocate the space for the type structure
+   in that objfile's objfile_obstack.  Otherwise allocate the new type
+   structure by xmalloc () (for permanent types).  */
 
 struct type *
 alloc_type (struct objfile *objfile)
@@ -222,31 +232,30 @@ alloc_type (struct objfile *objfile)
   return type;
 }
 
-/* Alloc a new type structure and fill it with some defaults.  If
-   OBJFILE is non-NULL, then allocate the space for the type structure
-   in that objfile's objfile_obstack.  Otherwise allocate the new type
-   structure by xmalloc () (for permanent types or types than can be freed
-   later).  */
+/* Allocate a new type by an alloc_type call but make the new type discardable
+   on next garbage collection by free_all_types.  Use type_incref for reference
+   counting of such new type.  */
 
 static struct type *
-alloc_type_discardable (struct objfile *objfile)
+alloc_type_discardable (void)
 {
-  struct type *type = alloc_type (objfile);
+  struct type *type = alloc_type (NULL);
 
   type_init_group (type);
 
   return type;
 }
 
-/* Like alloc_type but make the new type permanent if the original type was
-   also permanent.  */
+/* Alloc a new type like alloc_type or alloc_type_discardable copying the
+   discardability state of PARENT_TYPE (its current reference count
+   notwithstanding).  */
 
 static struct type *
 alloc_type_as_parent (struct type *parent_type)
 {
   struct type *type = alloc_type (TYPE_OBJFILE (parent_type));
 
-  if (!TYPE_OBJFILE (parent_type))
+  if (TYPE_OBJFILE (parent_type) == NULL)
     {
       struct type_group_link link, *found;
 
@@ -408,7 +417,7 @@ make_reference_type (struct type *type, struct type **typeptr)
 
   if (typeptr == 0 || *typeptr == 0)	/* We'll need to allocate one.  */
     {
-      ntype = alloc_type (TYPE_OBJFILE (type));
+      ntype = alloc_type_as_parent (type);
       if (typeptr)
 	*typeptr = ntype;
     }
@@ -3059,7 +3068,7 @@ copy_type_recursive_1 (struct objfile *objfile,
   if (*slot != NULL)
     return ((struct type_pair *) *slot)->new;
 
-  new_type = alloc_type_discardable (NULL);
+  new_type = alloc_type_discardable ();
 
   /* We must add the new type to the hash table immediately, in case
      we encounter this type again during a recursive call below.  Memory could
@@ -3461,8 +3470,7 @@ type_init_group (struct type *type)
   struct type_group *group;
   struct type_group_link *link;
 
-  if (TYPE_OBJFILE (type))
-    return;
+  gdb_assert (TYPE_OBJFILE (type) == NULL);
 
   group = XNEW (struct type_group);
   link = XNEW (struct type_group_link);
