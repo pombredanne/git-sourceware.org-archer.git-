@@ -2087,4 +2087,6 @@ Placeholder command for showing help on convenience functions."),
   TYPE_CODE (internal_fn_type) = TYPE_CODE_INTERNAL_FUNCTION;
   TYPE_LENGTH (internal_fn_type) = sizeof (struct internal_function *);
   TYPE_NAME (internal_fn_type) = "<internal function>";
+
+  make_final_cleanup (value_history_cleanup, NULL);
 }
