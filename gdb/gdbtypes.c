@@ -3020,7 +3020,7 @@ create_copied_types_hash (struct objfile *objfile)
    not associated with OBJFILE.  */
 
 struct type *
-copy_type_recursive (struct objfile *objfile,
+copy_type_recursive (struct objfile *objfile, 
 		     struct type *type,
 		     htab_t copied_types)
 {
