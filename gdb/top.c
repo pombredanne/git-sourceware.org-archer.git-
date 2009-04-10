@@ -377,7 +377,6 @@ execute_command (char *p, int from_tty)
     }
   
   free_all_values ();
-  free_all_types ();
 
   /* Force cleanup of any alloca areas if using C alloca instead of
      a builtin alloca.  */

@@ -1279,6 +1279,4 @@ extern void type_incref (struct type *type);
 
 extern void type_decref (struct type *type);
 
-extern void free_all_types (void);
-
 #endif /* GDBTYPES_H */
