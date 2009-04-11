@@ -3002,27 +3002,36 @@ type_pair_eq (const void *item_lhs, const void *item_rhs)
 }
 
 /* Allocate the hash table used by copy_type_recursive to walk
-   types without duplicates.  We use OBJFILE's obstack, because
-   OBJFILE is about to be deleted.  */
+   types without duplicates.   */
 
 htab_t
 create_copied_types_hash (struct objfile *objfile)
 {
-  return htab_create_alloc_ex (1, type_pair_hash, type_pair_eq,
-			       NULL, &objfile->objfile_obstack,
-			       hashtab_obstack_allocate,
-			       dummy_obstack_deallocate);
+  if (objfile == NULL)
+    {
+      /* NULL OBJFILE is for TYPE_DYNAMIC types already contained in
+	 OBJFILE_MALLOC memory, such as those from VALUE_HISTORY_CHAIN.  Table
+	 element entries get allocated by xmalloc - so use xfree.  */
+      return htab_create (1, type_pair_hash, type_pair_eq, xfree);
+    }
+  else
+    {
+      /* Use OBJFILE's obstack, because OBJFILE is about to be deleted.  Table
+	 element entries get allocated by xmalloc - so use xfree.  */
+      return htab_create_alloc_ex (1, type_pair_hash, type_pair_eq,
+				   xfree, &objfile->objfile_obstack,
+				   hashtab_obstack_allocate,
+				   dummy_obstack_deallocate);
+    }
 }
 
-/* Recursively copy (deep copy) TYPE, if it is associated with
-   OBJFILE.  Return a new type allocated using malloc, a saved type if
-   we have already visited TYPE (using COPIED_TYPES), or TYPE if it is
-   not associated with OBJFILE.  */
+/* A helper for copy_type_recursive.  This does all the work.  OBJFILE is used
+   only for an assertion checking.  */
 
-struct type *
-copy_type_recursive (struct objfile *objfile, 
-		     struct type *type,
-		     htab_t copied_types)
+static struct type *
+copy_type_recursive_1 (struct objfile *objfile, 
+		       struct type *type,
+		       htab_t copied_types)
 {
   struct type_pair *stored, pair;
   void **slot;
@@ -3043,8 +3052,10 @@ copy_type_recursive (struct objfile *objfile,
   new_type = alloc_type_discardable ();
 
   /* We must add the new type to the hash table immediately, in case
-     we encounter this type again during a recursive call below.  */
-  stored = obstack_alloc (&objfile->objfile_obstack, sizeof (struct type_pair));
+     we encounter this type again during a recursive call below.  Memory could
+     be allocated from OBJFILE in the case we will be removing OBJFILE, this
+     optimization is missed and xfree is called for it from COPIED_TYPES.  */
+  stored = xmalloc (sizeof (*stored));
   stored->old = type;
   stored->new = new_type;
   *slot = stored;
@@ -3053,6 +3064,13 @@ copy_type_recursive (struct objfile *objfile,
      copy the entire thing and then update specific fields as needed.  */
   *TYPE_MAIN_TYPE (new_type) = *TYPE_MAIN_TYPE (type);
   TYPE_OBJFILE (new_type) = NULL;
+
+  /* Pre-clear the fields processed by delete_main_type.  If DWARF block
+     evaluations below call error we would leave an unfreeable TYPE.  */
+  TYPE_TARGET_TYPE (new_type) = NULL;
+  TYPE_VPTR_BASETYPE (new_type) = NULL;
+  TYPE_NFIELDS (new_type) = 0;
+  TYPE_FIELDS (new_type) = NULL;
 
   if (TYPE_NAME (type))
     TYPE_NAME (new_type) = xstrdup (TYPE_NAME (type));
@@ -3068,6 +3086,7 @@ copy_type_recursive (struct objfile *objfile,
       int i, nfields;
 
       nfields = TYPE_NFIELDS (type);
+      TYPE_NFIELDS (new_type) = nfields;
       TYPE_FIELDS (new_type) = XCALLOC (nfields, struct field);
       for (i = 0; i < nfields; i++)
 	{
@@ -3076,8 +3095,8 @@ copy_type_recursive (struct objfile *objfile,
 	  TYPE_FIELD_BITSIZE (new_type, i) = TYPE_FIELD_BITSIZE (type, i);
 	  if (TYPE_FIELD_TYPE (type, i))
 	    TYPE_FIELD_TYPE (new_type, i)
-	      = copy_type_recursive (objfile, TYPE_FIELD_TYPE (type, i),
-				     copied_types);
+	      = copy_type_recursive_1 (objfile, TYPE_FIELD_TYPE (type, i),
+				       copied_types);
 	  if (TYPE_FIELD_NAME (type, i))
 	    TYPE_FIELD_NAME (new_type, i) = 
 	      xstrdup (TYPE_FIELD_NAME (type, i));
@@ -3107,14 +3126,14 @@ copy_type_recursive (struct objfile *objfile,
   /* Copy pointers to other types.  */
   if (TYPE_TARGET_TYPE (type))
     TYPE_TARGET_TYPE (new_type) = 
-      copy_type_recursive (objfile, 
-			   TYPE_TARGET_TYPE (type),
-			   copied_types);
+      copy_type_recursive_1 (objfile, 
+			     TYPE_TARGET_TYPE (type),
+			     copied_types);
   if (TYPE_VPTR_BASETYPE (type))
     TYPE_VPTR_BASETYPE (new_type) = 
-      copy_type_recursive (objfile,
-			   TYPE_VPTR_BASETYPE (type),
-			   copied_types);
+      copy_type_recursive_1 (objfile,
+			     TYPE_VPTR_BASETYPE (type),
+			     copied_types);
   /* Maybe copy the type_specific bits.
 
      NOTE drow/2005-12-09: We do not copy the C++-specific bits like
@@ -3130,6 +3149,17 @@ copy_type_recursive (struct objfile *objfile,
     INIT_CPLUS_SPECIFIC (new_type);
 
   return new_type;
+}
+
+/* Recursively copy (deep copy) TYPE.  Return a new type allocated using
+   malloc, a saved type if we have already visited TYPE (using COPIED_TYPES),
+   or TYPE if it is not associated with OBJFILE.  */
+
+struct type *
+copy_type_recursive (struct type *type,
+		     htab_t copied_types)
+{
+  return copy_type_recursive_1 (TYPE_OBJFILE (type), type, copied_types);
 }
 
 /* Make a copy of the given TYPE, except that the pointer & reference
