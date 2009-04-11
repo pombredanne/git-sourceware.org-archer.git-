@@ -146,56 +146,7 @@ static void print_bit_vector (B_TYPE *, int);
 static void print_arg_types (struct field *, int, int);
 static void dump_fn_fieldlists (struct type *, int);
 static void print_cplus_stuff (struct type *, int);
-static void type_init_group (struct type *type);
 
-/* Any type structures which are connected through their `struct type *' are
-   tracked by the same type_group.  Only the discardable (neither permanent
-   types nor types allocated from objfile obstack) type structures get tracked
-   by type_group structures.  */
-
-struct type_group
-{
-  /* Sum of all the external references to any of the type structures tracked
-     by this type_group.  */
-  int use_count;
-
-  /* Number of the type_group_links structures tracked by this type_group.  It
-     matches the length of list `link_list->group_next->...->group_next'.  */
-  int link_count;
-
-  /* Head of an unordered list of all type structures of this type_group.  Next
-     items are linked by `type_group_link->group_next'.  */
-  struct type_group_link *link_list;
-};
-
-/* Linking entry between a type structure and type_group structure.  Only
-   discardable types have such link present.  This link exists only once for
-   each discardable main_type, all type instances for such one main_type should
-   be iterated by `TYPE_CHAIN (type_group_link->type)'.  */
-
-struct type_group_link
-{
-  /* Arbitrary type for main_type being represented by this type_group_link.
-     Each discardable main_type gets its separate type_group_link.  */
-  struct type *type;
-
-  /* Marker this type_group_link has been visited by the type_group_link_check
-     graph traversal by this pass.  Current pass is represented by
-     TYPE_GROUP_AGE.  */
-  unsigned age : 1;
-
-  struct type_group *group;
-
-  /* Next type_group_link belonging to this type_group structure or NULL for
-     the last node of the list.  */
-  struct type_group_link *group_next;
-};
-
-/* The hash table holding all `struct type_group_link *' references.  */
-static htab_t type_group_link_table;
-
-/* Current type_group_link_check pass used for `type_group_link->age'.  */
-static unsigned type_group_age;
 
 /* Alloc a new type structure and fill it with some defaults.  If
    OBJFILE is non-NULL, then allocate the space for the type structure
@@ -228,43 +179,6 @@ alloc_type (struct objfile *objfile)
   TYPE_OBJFILE (type) = objfile;
   TYPE_VPTR_FIELDNO (type) = -1;
   TYPE_CHAIN (type) = type;	/* Chain back to itself.  */
-
-  return type;
-}
-
-/* Allocate a new type by an alloc_type call but make the new type discardable
-   on next garbage collection by free_all_types.  Use type_incref for reference
-   counting of such new type.  */
-
-static struct type *
-alloc_type_discardable (void)
-{
-  struct type *type = alloc_type (NULL);
-
-  type_init_group (type);
-
-  return type;
-}
-
-/* Allocate a new type like alloc_type or alloc_type_discardable copying the
-   discardability state of PARENT_TYPE (its current reference count
-   notwithstanding).  */
-
-static struct type *
-alloc_type_as_parent (struct type *parent_type)
-{
-  struct type *type = alloc_type (TYPE_OBJFILE (parent_type));
-
-  if (TYPE_OBJFILE (parent_type) == NULL)
-    {
-      struct type_group_link link, *found;
-
-      link.type = type;
-      found = htab_find (type_group_link_table, &link);
-      /* Not a permanent type?  */
-      if (found)
-	type_init_group (type);
-    }
 
   return type;
 }
@@ -334,7 +248,7 @@ make_pointer_type (struct type *type, struct type **typeptr)
 
   if (typeptr == 0 || *typeptr == 0)	/* We'll need to allocate one.  */
     {
-      ntype = alloc_type_as_parent (type);
+      ntype = alloc_type (TYPE_OBJFILE (type));
       if (typeptr)
 	*typeptr = ntype;
     }
@@ -414,7 +328,7 @@ make_reference_type (struct type *type, struct type **typeptr)
 
   if (typeptr == 0 || *typeptr == 0)	/* We'll need to allocate one.  */
     {
-      ntype = alloc_type_as_parent (type);
+      ntype = alloc_type (TYPE_OBJFILE (type));
       if (typeptr)
 	*typeptr = ntype;
     }
@@ -3040,7 +2954,7 @@ copy_type_recursive (struct objfile *objfile,
   if (*slot != NULL)
     return ((struct type_pair *) *slot)->new;
 
-  new_type = alloc_type_discardable ();
+  new_type = alloc_type (NULL);
 
   /* We must add the new type to the hash table immediately, in case
      we encounter this type again during a recursive call below.  */
@@ -3152,102 +3066,6 @@ copy_type (const struct type *type)
 	  sizeof (struct main_type));
 
   return new_type;
-}
-
-/* Hash function for type_group_link_table.  */
-
-static hashval_t
-type_group_link_hash (const void *p)
-{
-  const struct type_group_link *link = p;
-
-  return htab_hash_pointer (TYPE_MAIN_TYPE (link->type));
-}
-
-/* Equality function for type_group_link_table.  */
-
-static int
-type_group_link_equal (const void *a, const void *b)
-{
-  const struct type_group_link *left = a;
-  const struct type_group_link *right = b;
-
-  return TYPE_MAIN_TYPE (left->type) == TYPE_MAIN_TYPE (right->type);
-}
-
-/* Define currently permanent TYPE as being reclaimable during free_all_types.
-   TYPE is required to be now permanent.  TYPE will be left with zero reference
-   count, early type_incref call is probably appropriate.  */
-
-static void
-type_init_group (struct type *type)
-{
-  void **slot;
-  struct type_group *group;
-  struct type_group_link *link;
-
-  gdb_assert (TYPE_OBJFILE (type) == NULL);
-
-  group = XNEW (struct type_group);
-  link = XNEW (struct type_group_link);
-
-  group->use_count = 0;
-  group->link_count = 1;
-  group->link_list = link;
-
-  link->type = type;
-  link->age = type_group_age;
-  link->group = group;
-  link->group_next = NULL;
-
-  slot = htab_find_slot (type_group_link_table, link, INSERT);
-  gdb_assert (!*slot);
-  *slot = link;
-}
-
-/* Increment the reference count for TYPE.  For permanent or objfile associated
-   types nothing happens.  */
-
-void
-type_incref (struct type *type)
-{
-  struct type_group_link link, *found;
-
-  if (TYPE_OBJFILE (type))
-    return;
-
-  link.type = type;
-  found = htab_find (type_group_link_table, &link);
-  /* A permanent type?  */
-  if (!found)
-    return;
-
-  found->group->use_count++;
-}
-
-/* Decrement the reference count for TYPE.  For permanent or objfile associated
-   types nothing happens.  
-
-   Even if TYPE has no more references still do not delete it as callers may
-   hold pointers to types dynamically generated by check_typedef.  Always rely
-   just on the free_all_types garbage collector.  */
-
-void
-type_decref (struct type *type)
-{
-  struct type_group_link link, *found;
-
-  if (TYPE_OBJFILE (type))
-    return;
-
-  link.type = type;
-  found = htab_find (type_group_link_table, &link);
-  /* A permanent type?  */
-  if (!found)
-    return;
-
-  gdb_assert (found->group->use_count > 0);
-  found->group->use_count--;
 }
 
 static struct type *
@@ -3457,10 +3275,6 @@ void
 _initialize_gdbtypes (void)
 {
   gdbtypes_data = gdbarch_data_register_post_init (gdbtypes_post_init);
-
-  type_group_link_table = htab_create_alloc (20, type_group_link_hash,
-					     type_group_link_equal, NULL,
-					     xcalloc, xfree);
 
   /* FIXME: The following types are architecture-neutral.  However,
      they contain pointer_type and reference_type fields potentially

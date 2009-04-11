@@ -2320,7 +2320,6 @@ types map to one @code{TYPE_CODE_*} type, and are distinguished by
 other members of the type struct, such as whether the type is signed
 or unsigned, and how many bits it uses.
 
-@anchor{Builtin Types}
 @unnumberedsubsec Builtin Types (e.g., @code{builtin_type_void}, @code{builtin_type_char}).
 
 These are instances of type structs that roughly correspond to
@@ -2524,39 +2523,10 @@ released when the objfile is unloaded or reloaded.  Therefore one
 objfile must not reference symbol or type data from another objfile;
 they could be unloaded at different times.
 
-@subsection Memory Management for Types
-
-@code{TYPE_OBJFILE} macro indicates the current memory owner of the type.
-Non-@code{NULL} value indicates it is owned by an objfile (specifically by its
-obstack) and in such case the type remains valid till the objfile is unloaded
-or reloaded.  For such types with an associated objfile no reference counting
-is being made.
-
-User convenience variables, et cetera, have associated types.  Normally these
-types live in the associated objfile.  However, when the objfile is unloaded,
-those types are deep copied to global memory, so that the values of the user
-variables and history items are not lost.  During the copy they will get their
-@code{TYPE_OBJFILE} set to @code{NULL} and become so called reclaimable types.
-
-Types with @code{NULL TYPE_OBJFILE} can be either permanent types
-(@pxref{Builtin Types}) or reclaimable types which will be deallocated after the
-last object referencing them is removed.  Permanent types are allocated by the
-function @code{alloc_type} (and its derivations like @code{init_type})
-specifying objfile as @code{NULL}.  The reclaimable types are created the same
-way but moreover they need to have @code{type_init_group} called to start their
-tracking as being possibly deallocatable.
-
-When @value{GDBN} gets idle it always calls the @code{free_all_types} function
-which deallocates any unused types.  To prevent deallocation of types still in
-use you must use @code{type_incref} (and matching @code{type_decref}) for
-reference counting of any reclaimable type.  You will probably need to first
-increase the reference count right after calling @code{type_init_group}.
-
-@code{free_all_types} automatically checks for any cross-type references such
-as through @code{TYPE_TARGET_TYPE}, @code{TYPE_POINTER_TYPE} etc. and prevents
-early deallocation for any such existing references.  Reclaimable types may
-reference any other reclaimable types or even permanent types.  But permanent
-types must not reference reclaimable types (nor an objfile associated type).
+User convenience variables, et cetera, have associated types.  Normally
+these types live in the associated objfile.  However, when the objfile
+is unloaded, those types are deep copied to global memory, so that
+the values of the user variables and history items are not lost.
 
 
 @node Language Support
