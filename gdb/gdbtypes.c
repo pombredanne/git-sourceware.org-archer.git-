@@ -246,7 +246,7 @@ alloc_type_discardable (void)
   return type;
 }
 
-/* Alloc a new type like alloc_type or alloc_type_discardable copying the
+/* Allocate a new type like alloc_type or alloc_type_discardable copying the
    discardability state of PARENT_TYPE (its current reference count
    notwithstanding).  */
 
