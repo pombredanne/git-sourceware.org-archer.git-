@@ -1,6 +1,6 @@
 # New backtrace command.
 
-# Copyright (C) 2008 Free Software Foundation, Inc.
+# Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -172,8 +172,9 @@ Use of the 'raw' qualifier avoids any filtering by loadable modules.
 
         # FIXME: provide option to start at selected frame
         # However, should still number as if starting from newest
+	newest_frame = gdb.selected_thread ().newest_frame ()
         iter = itertools.imap (FrameWrapper,
-                               FrameIterator (gdb.newest_frame ()))
+                               FrameIterator (newest_frame)
         if filter:
             iter = gdb.backtrace.create_frame_filter (iter)
 

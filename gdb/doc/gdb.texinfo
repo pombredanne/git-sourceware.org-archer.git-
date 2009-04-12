@@ -18137,6 +18137,7 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 * Values From Inferior::	Python representation of values.
 * Types In Python::		Python representation of types.
 * Pretty Printing::		Pretty-printing values.
+* Inferiors In Python::		Python representation of inferiors (processes)
 * Threads In Python::           Accessing inferior threads from Python.
 * Commands In Python::          Implementing new commands in Python.
 * Parameters In Python::        Adding new @value{GDBN} parameters.
@@ -18900,33 +18901,87 @@ import gdb.libstdcxx.v6
 gdb.libstdcxx.v6.register_printers (gdb.current_objfile ())
 @end smallexample
 
+@node Inferiors In Python
+@subsubsection Inferiors In Python
+
+Programs which are being run under @value{GDBN} are called inferiors
+(@pxref{Inferiors}).  Python scripts can access information about and
+manipulate inferiors controlled by @value{GDBN} via objects of the
+@code{gdb.Inferior} class.
+
+The following inferior-related functions are available in the @code{gdb}
+module:
+
+@defun inferiors
+Return a tuple containing all inferior objects.
+@end defun
+
+A @code{gdb.Inferior} object has the following attributes:
+
+@table @code
+@defivar Inferior num 
+ID of inferior, as assigned by GDB.
+@end defivar
+
+@defivar Inferior pid 
+Process ID of the inferior, assigned by the underlying OS.
+@end defivar
+
+@defivar Inferior was_attached
+Boolean signaling whether the inferior was created using `attach', or
+started by @value{GDBN} itself.
+@end defivar
+@end table
+
+A @code{gdb.Inferior} object has the following methods:
+
+@table @code
+@defmethod Inferior threads 
+This method returns a tuple holding all the threads which are valid
+when it is called.  If there are no valid threads, the method will
+return an empty list.
+@end defmethod
+@end table
+
 @node Threads In Python
 @subsubsection Threads In Python
 
-Python scripts can access information about the inferior's threads
-using some functions provided by @value{GDBN}.  Like all of
-@value{GDBN}'s Python additions, these are in the @code{gdb} module:
+Python scripts can access information about and manipulate inferior threads
+controlled by @value{GDBN} via objects of the @code{gdb.InferiorThread} class.
 
-@findex gdb.threads
-@defun threads
-This function returns a tuple holding all the thread IDs which are
-valid when the function is called.  If there are no valid threads,
-this will return @code{None}.
-@end defun
+The following inferior-related functions are available in the @code{gdb}
+module:
 
-@findex gdb.current_thread
-@defun current_thread
-This function returns the thread ID of the selected thread.  If there
+@findex gdb.selected_thread
+@defun selected_thread
+This function returns the thread object for the selected thread.  If there
 is no selected thread, this will return @code{None}.
 @end defun
 
-@findex gdb.switch_to_thread
-@defun switch_to_thread id
-This changes @value{GDBN}'s currently selected thread to the thread
-given by @var{id}.  @var{id} must be a valid thread ID as returned by
-@code{threads}.  If @var{id} is invalid, this function throws an
-exception.
-@end defun
+A @code{gdb.InferiorThread} object has the following attributes:
+
+@table @code
+@defivar InferiorThread num 
+ID of the thread, as assigned by GDB.
+@end defivar
+@end table
+
+A @code{gdb.InferiorThread} object has the following methods:
+
+@table @code
+@defmethod InferiorThread frames
+Return a tuple containing all frames in the thread.
+@end defmethod
+
+@defmethod InferiorThread newest_frame
+Return the newest frame thread's stack.
+@end defmethod
+
+@defmethod InferiorThread switch_to_thread 
+This changes @value{GDBN}'s currently selected thread to the one represented
+by this object.
+@end defmethod
+@end table
 
 @node Commands In Python
 @subsubsection Commands In Python
@@ -19495,14 +19550,6 @@ True
 @end smallexample
 
 The following frame-related functions are available in the @code{gdb} module:
-
-@defun frames
-Return a tuple containing all frame objects.
-@end defun
-
-@defun newest_frame
-Return the newest frame object.
-@end defun
 
 @defun selected_frame
 Return the selected frame object.  (@pxref{Selection,,Selecting a Frame}).

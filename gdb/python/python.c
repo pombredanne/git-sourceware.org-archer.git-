@@ -744,89 +744,6 @@ gdbpy_initialize_events (void)
 
 
 
-/* Threads.  */
-
-/* Callback function for use with iterate_over_threads.  This function
-   just counts the number of threads.  */
-
-static int
-count_callback (struct thread_info *info, void *user_data)
-{
-  int *count = (int *) user_data;
-  ++*count;
-  return 0;
-}
-
-/* Structure for storing some state when iterating over threads.  */
-
-struct set_thread_info
-{
-  PyObject *tuple;
-  int index;
-};
-
-/* Callback function for use with iterate_over_threads.  This function
-   stores the thread ID into a Python tuple.  */
-
-static int
-update_tuple_callback (struct thread_info *info, void *user_data)
-{
-  struct set_thread_info *tinfo = (struct set_thread_info *) user_data;
-  PyTuple_SetItem (tinfo->tuple, tinfo->index, PyInt_FromLong (info->num));
-  ++tinfo->index;
-  return 0;
-}
-
-/* Python function which yields a tuple holding all valid thread IDs.  */
-
-static PyObject *
-gdbpy_threads (PyObject *unused1, PyObject *unused2)
-{
-  int thread_count = 0;
-  struct set_thread_info info;
-  PyObject *result;
-
-  prune_threads ();
-  target_find_new_threads ();
-
-  iterate_over_threads (count_callback, &thread_count);
-
-  if (!thread_count)
-    Py_RETURN_NONE;
-
-  result = PyTuple_New (thread_count);
-  info.tuple = result;
-  info.index = 0;
-  iterate_over_threads (update_tuple_callback, &info);
-  return result;
-}
-
-/* Python function that returns the current thread's ID.  */
-
-static PyObject *
-gdbpy_current_thread (PyObject *unused1, PyObject *unused2)
-{
-  if (PIDGET (inferior_ptid) == 0)
-    Py_RETURN_NONE;
-  return PyInt_FromLong (pid_to_thread_id (inferior_ptid));
-}
-
-/* Python function for switching to a given thread.  */
-
-static PyObject *
-gdbpy_switch_to_thread (PyObject *self, PyObject *args)
-{
-  int id;
-  if (! PyArg_ParseTuple (args, "i", &id))
-    return NULL;
-  if (! valid_thread_id (id))
-    return PyErr_Format (PyExc_RuntimeError, "invalid thread id");
-  switch_to_thread (thread_id_to_pid (id));
-  Py_RETURN_NONE;
-}
-
-
-
 /* Printing.  */
 
 /* A python function to write a single string using gdb's filtered
@@ -1767,6 +1684,8 @@ Enables or disables auto-loading of Python code when an object is opened."),
   gdbpy_initialize_types ();
   gdbpy_initialize_parameters ();
   gdbpy_initialize_objfile ();
+  gdbpy_initialize_thread ();
+  gdbpy_initialize_inferior ();
   gdbpy_initialize_events ();
   gdbpy_initialize_membuf ();
 
@@ -1848,12 +1767,6 @@ static PyMethodDef GdbMethods[] =
   { "objfiles", gdbpy_objfiles, METH_NOARGS,
     "Return a sequence of all loaded objfiles." },
 
-  { "frames", gdbpy_frames, METH_NOARGS,
-    "frames () -> (gdb.Frame, ...).\n\
-Return a tuple containing all frame objects." },
-  { "newest_frame", gdbpy_newest_frame, METH_NOARGS,
-    "newest_frame () -> gdb.Frame.\n\
-Return the newest frame object." },
   { "selected_frame", gdbpy_selected_frame, METH_NOARGS,
     "selected_frame () -> gdb.Frame.\n\
 Return the selected frame object." },
@@ -1884,12 +1797,12 @@ Return the name of the shared library holding a given address, or None." },
 Return a tuple holding the file name (or None) and line number (or None).\n\
 Note: may later change to return an object." },
 
-  { "threads", gdbpy_threads, METH_NOARGS,
-    "Return a tuple holding all the valid thread IDs." },
-  { "current_thread", gdbpy_current_thread, METH_NOARGS,
-    "Return the thread ID of the current thread." },
-  { "switch_to_thread", gdbpy_switch_to_thread, METH_VARARGS,
-    "Switch to a thread, given the thread ID." },
+  { "selected_thread", gdbpy_selected_thread, METH_NOARGS,
+    "selected_thread () -> gdb.InferiorThread.\n\
+Return the selected thread object." },
+  { "inferiors", gdbpy_inferiors, METH_NOARGS,
+    "inferiors () -> (gdb.Inferior, ...).\n\
+Return a tuple containing all inferiors." },
 
   { "parse_and_eval", gdbpy_parse_and_eval, METH_VARARGS,
     "Parse a string as an expression, evaluate it, and return the result." },

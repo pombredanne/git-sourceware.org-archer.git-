@@ -65,7 +65,7 @@ gdb_breakpoint "f2"
 gdb_continue_to_breakpoint "breakpoint at f2"
 gdb_test "up" "" ""
 
-gdb_py_test_silent_cmd "python frames = gdb.frames ()" "get frames list" 1
+gdb_py_test_silent_cmd "python frames = gdb.selected_thread ().frames ()" "get frames list" 1
 gdb_test "python print frames" "\\(<gdb.Frame object at 0x\[\[:xdigit:\]\]+>, <gdb.Frame object at 0x\[\[:xdigit:\]\]+>, <gdb.Frame object at 0x\[\[:xdigit:\]\]+>\\)" "verify frames list"
 gdb_py_test_silent_cmd "python f0 = frames\[0\]" "get first frame" 0
 gdb_py_test_silent_cmd "python f1 = frames\[1\]" "get second frame" 0
@@ -86,7 +86,7 @@ gdb_test "python print 'result =', f0.read_var ('variable_which_surely_doesnt_ex
   "test Frame.read_var - error"
 gdb_test "python print 'result =', f0.read_var ('a')" " = 1" "test Frame.read_var - success"
 
-gdb_test "python print 'result =', gdb.newest_frame () == f0" " = True" "test gdb.newest_frame"
+gdb_test "python print 'result =', gdb.selected_thread ().newest_frame () == f0" " = True" "test gdb.newest_frame"
 gdb_test "python print 'result =', gdb.selected_frame () == f1" " = True" "test gdb.selected_frame"
 
 gdb_test "python print 'result =', f0.block ()" "<gdb.Block object at 0x\[\[:xdigit:\]\]+>" "test Frame.block"

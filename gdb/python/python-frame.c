@@ -255,7 +255,7 @@ frapy_function (PyObject *self, PyObject *args)
 /* Convert a frame_info struct to a Python Frame object.
    Sets a Python exception and returns NULL on error.  */
 
-static frame_object *
+PyObject *
 frame_info_to_frame_object (struct frame_info *frame)
 {
   frame_object *frame_obj;
@@ -285,7 +285,7 @@ frame_info_to_frame_object (struct frame_info *frame)
 
   frame_obj->gdbarch = get_frame_arch (frame);
 
-  return frame_obj;
+  return (PyObject *) frame_obj;
 }
 
 /* Implementation of gdb.Frame.older (self) -> gdb.Frame.
@@ -305,7 +305,7 @@ frapy_older (PyObject *self, PyObject *args)
 
       prev = get_prev_frame (frame);
       if (prev)
-	prev_obj = (PyObject *) frame_info_to_frame_object (prev);
+	prev_obj = frame_info_to_frame_object (prev);
       else
 	{
 	  Py_INCREF (Py_None);
@@ -334,7 +334,7 @@ frapy_newer (PyObject *self, PyObject *args)
 
       next = get_next_frame (frame);
       if (next)
-	next_obj = (PyObject *) frame_info_to_frame_object (next);
+	next_obj = frame_info_to_frame_object (next);
       else
 	{
 	  Py_INCREF (Py_None);
@@ -441,79 +441,6 @@ frapy_read_var (PyObject *self, PyObject *args)
   Py_RETURN_NONE;
 }
 
-/* Implementation of gdb.frames () -> (gdb.Frame, ...).
-   Returns a tuple of all frame objects.  */
-
-PyObject *
-gdbpy_frames (PyObject *self, PyObject *args)
-{
-  int result = 0;
-  struct frame_info *frame;
-  frame_object *frame_obj;
-  PyObject *list, *tuple;
-  volatile struct gdb_exception except;
-
-  list = PyList_New (0);
-  if (list == NULL)
-    {
-      PyErr_SetString (PyExc_MemoryError, "Could not allocate frames list.");
-      return NULL;
-    }
-
-  TRY_CATCH (except, RETURN_MASK_ALL)
-    {
-      for (frame = get_current_frame (); frame; frame = get_prev_frame (frame))
-	{
-	  frame_obj = frame_info_to_frame_object (frame);
-	  if (frame_obj == NULL)
-	    {
-	      Py_DECREF (list);
-	      list = NULL;
-	      break;
-	    }
-
-	  PyList_Append (list, (PyObject *) frame_obj);
-	}
-    }
-  if (except.reason < 0)
-    {
-      Py_DECREF (list);
-      return PyErr_Format (except.reason == RETURN_QUIT
-			   ? PyExc_KeyboardInterrupt : PyExc_RuntimeError,
-			   "%s", except.message);
-    }
-
-  if (list)
-    {
-      tuple = PyList_AsTuple (list);
-      Py_DECREF (list);
-    }
-  else
-    tuple = NULL;
-
-  return tuple;
-}
-
-/* Implementation of gdb.newest_frame () -> gdb.Frame.
-   Returns the newest frame object.  */
-
-PyObject *
-gdbpy_newest_frame (PyObject *self, PyObject *args)
-{
-  struct frame_info *frame;
-  frame_object *frame_obj = NULL;   /* Initialize to appease gcc warning.  */
-  volatile struct gdb_exception except;
-
-  TRY_CATCH (except, RETURN_MASK_ALL)
-    {
-      frame = get_current_frame ();
-      frame_obj = frame_info_to_frame_object (frame);
-    }
-  GDB_PY_HANDLE_EXCEPTION (except);
-
-  return (PyObject *) frame_obj;
-}
-
 /* Implementation of gdb.selected_frame () -> gdb.Frame.
    Returns the selected frame object.  */
 
@@ -521,7 +448,7 @@ PyObject *
 gdbpy_selected_frame (PyObject *self, PyObject *args)
 {
   struct frame_info *frame;
-  frame_object *frame_obj = NULL;   /* Initialize to appease gcc warning.  */
+  PyObject *frame_obj = NULL;	/* Initialize to appease gcc warning.  */
   volatile struct gdb_exception except;
 
   TRY_CATCH (except, RETURN_MASK_ALL)
@@ -531,7 +458,7 @@ gdbpy_selected_frame (PyObject *self, PyObject *args)
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
-  return (PyObject *) frame_obj;
+  return frame_obj;
 }
 
 /* Implementation of gdb.stop_reason_string (Integer) -> String.
