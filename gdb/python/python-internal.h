@@ -91,8 +91,6 @@ PyObject *gdbpy_frame_stop_reason_string (PyObject *, PyObject *);
 PyObject *gdbpy_lookup_symbol (PyObject *self, PyObject *args, PyObject *kw);
 PyObject *gdbpy_selected_frame (PyObject *self, PyObject *args);
 PyObject *gdbpy_block_for_pc (PyObject *self, PyObject *args);
-PyObject *gdbpy_read_memory (PyObject *self, PyObject *args);
-PyObject *gdbpy_write_memory (PyObject *self, PyObject *args);
 PyObject *gdbpy_lookup_type (PyObject *self, PyObject *args, PyObject *kw);
 PyObject *gdbpy_inferiors (PyObject *unused, PyObject *unused2);
 PyObject *gdbpy_selected_thread (PyObject *self, PyObject *args);
@@ -132,7 +130,6 @@ void gdbpy_initialize_objfile (void);
 void gdbpy_initialize_parameters (void);
 void gdbpy_initialize_thread (void);
 void gdbpy_initialize_inferior (void);
-void gdbpy_initialize_membuf (void);
 
 struct cleanup *make_cleanup_py_decref (PyObject *py);
 struct cleanup *make_cleanup_py_restore_gil (PyGILState_STATE *state);
