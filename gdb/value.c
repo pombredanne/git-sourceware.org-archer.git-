@@ -861,6 +861,29 @@ show_values (char *num_exp, int from_tty)
       num_exp[1] = '\0';
     }
 }
+
+/* Sanity check for memory leaks and proper types reference counting.  */
+
+static void
+value_history_cleanup (void *unused)
+{
+  while (value_history_chain)
+    {
+      struct value_history_chunk *chunk = value_history_chain;
+      int i;
+
+      for (i = 0; i < ARRAY_SIZE (chunk->values); i++)
+      	value_free (chunk->values[i]);
+
+      value_history_chain = chunk->next;
+      xfree (chunk);
+    }
+  value_history_count = 0;
+
+  /* Free the unreferenced types above.  */
+  free_all_values ();
+  free_all_types ();
+}
 
 /* Internal variables.  These are variables within the debugger
    that hold values assigned by debugger commands.
@@ -2071,4 +2094,6 @@ Placeholder command for showing help on convenience functions."),
   TYPE_CODE (internal_fn_type) = TYPE_CODE_INTERNAL_FUNCTION;
   TYPE_LENGTH (internal_fn_type) = sizeof (struct internal_function *);
   TYPE_NAME (internal_fn_type) = "<internal function>";
+
+  make_final_cleanup (value_history_cleanup, NULL);
 }
