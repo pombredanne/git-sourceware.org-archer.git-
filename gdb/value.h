@@ -645,9 +645,6 @@ extern void typedef_print (struct type *type, struct symbol *news,
 
 extern char *internalvar_name (struct internalvar *var);
 
-extern void preserve_one_value (struct value *value, struct objfile *objfile,
-				htab_t copied_types);
-
 extern void preserve_values (struct objfile *);
 
 /* From values.c */

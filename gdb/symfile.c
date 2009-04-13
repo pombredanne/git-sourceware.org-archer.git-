@@ -927,6 +927,8 @@ new_symfile_objfile (struct objfile *objfile, int mainline, int verbo)
 
   /* We're done reading the symbol file; finish off complaints.  */
   clear_complaints (&symfile_complaints, 0, verbo);
+
+  varobj_revalidate ();
 }
 
 /* Process a symbol file, as either the main file or as a dynamically
@@ -1155,17 +1157,17 @@ symbol_file_clear (int from_tty)
 		    symfile_objfile->name)
 	  : !query (_("Discard symbol table? "))))
     error (_("Not confirmed."));
-    free_all_objfiles ();
 
-    /* solib descriptors may have handles to objfiles.  Since their
-       storage has just been released, we'd better wipe the solib
-       descriptors as well.
-     */
-    no_shared_libraries (NULL, from_tty);
+  free_all_objfiles ();
 
-    symfile_objfile = NULL;
-    if (from_tty)
-      printf_unfiltered (_("No symbol file now.\n"));
+  /* solib descriptors may have handles to objfiles.  Since their
+     storage has just been released, we'd better wipe the solib
+     descriptors as well.  */
+  no_shared_libraries (NULL, from_tty);
+
+  symfile_objfile = NULL;
+  if (from_tty)
+    printf_unfiltered (_("No symbol file now.\n"));
 }
 
 struct build_id
@@ -2341,6 +2343,7 @@ reread_symbols (void)
 	      /* Remove any references to this objfile in the global
 		 value lists.  */
 	      preserve_values (objfile);
+	      varobj_invalidate (objfile);
 
 	      /* Nuke all the state that we will re-read.  Much of the following
 	         code which sets things to NULL really is necessary to tell
@@ -2437,6 +2440,7 @@ reread_symbols (void)
 	         frameless.  */
 
 	      reinit_frame_cache ();
+	      varobj_revalidate ();
 
 	      /* Discard cleanups as symbol reading was successful.  */
 	      discard_cleanups (old_cleanups);
@@ -2817,10 +2821,6 @@ clear_symtab_users (void)
      between expressions and which ought to be reset each time.  */
   expression_context_block = NULL;
   innermost_block = NULL;
-
-  /* Varobj may refer to old symbols, perform a cleanup.  */
-  varobj_invalidate ();
-
 }
 
 static void

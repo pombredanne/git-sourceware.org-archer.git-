@@ -1621,8 +1621,8 @@ ada_type_of_array (struct value *arr, int bounds)
         return NULL;
       while (arity > 0)
         {
-          struct type *range_type = alloc_type (objf, NULL);
-          struct type *array_type = alloc_type (objf, NULL);
+          struct type *range_type = alloc_type (objf);
+          struct type *array_type = alloc_type (objf);
           struct value *low = desc_one_bound (descriptor, arity, 0);
           struct value *high = desc_one_bound (descriptor, arity, 1);
           arity -= 1;
@@ -1729,9 +1729,9 @@ packed_array_type (struct type *type, long *elt_bits)
   if (TYPE_CODE (type) != TYPE_CODE_ARRAY)
     return type;
 
+  new_type = alloc_type (TYPE_OBJFILE (type));
   new_elt_type = packed_array_type (ada_check_typedef (TYPE_TARGET_TYPE (type)),
                                     elt_bits);
-  new_type = alloc_type (TYPE_OBJFILE (type), new_elt_type);
   create_array_type (new_type, new_elt_type, TYPE_INDEX_TYPE (type));
   TYPE_FIELD_BITSIZE (new_type, 0) = *elt_bits;
   TYPE_NAME (new_type) = ada_type_name (type);
@@ -6752,7 +6752,7 @@ variant_field_index (struct type *type)
 static struct type *
 empty_record (struct objfile *objfile)
 {
-  struct type *type = alloc_type (objfile, NULL);
+  struct type *type = alloc_type (objfile);
   TYPE_CODE (type) = TYPE_CODE_STRUCT;
   TYPE_NFIELDS (type) = 0;
   TYPE_FIELDS (type) = NULL;
@@ -6809,7 +6809,7 @@ ada_template_to_fixed_record_type_1 (struct type *type,
         nfields++;
     }
 
-  rtype = alloc_type (TYPE_OBJFILE (type), NULL);
+  rtype = alloc_type (TYPE_OBJFILE (type));
   TYPE_CODE (rtype) = TYPE_CODE_STRUCT;
   INIT_CPLUS_SPECIFIC (rtype);
   TYPE_NFIELDS (rtype) = nfields;
@@ -6996,8 +6996,7 @@ template_to_static_fixed_type (struct type *type0)
         new_type = static_unwrap_type (field_type);
       if (type == type0 && new_type != field_type)
         {
-          TYPE_TARGET_TYPE (type0) = type = alloc_type (TYPE_OBJFILE (type0),
-							NULL);
+          TYPE_TARGET_TYPE (type0) = type = alloc_type (TYPE_OBJFILE (type0));
           TYPE_CODE (type) = TYPE_CODE (type0);
           INIT_CPLUS_SPECIFIC (type);
           TYPE_NFIELDS (type) = nfields;
@@ -7042,7 +7041,7 @@ to_record_with_fixed_variant_part (struct type *type, const gdb_byte *valaddr,
   else
     dval = dval0;
 
-  rtype = alloc_type (TYPE_OBJFILE (type), NULL);
+  rtype = alloc_type (TYPE_OBJFILE (type));
   TYPE_CODE (rtype) = TYPE_CODE_STRUCT;
   INIT_CPLUS_SPECIFIC (rtype);
   TYPE_NFIELDS (rtype) = nfields;
@@ -7214,7 +7213,7 @@ to_fixed_array_type (struct type *type0, struct value *dval,
       if (elt_type0 == elt_type)
         result = type0;
       else
-        result = create_array_type (alloc_type (TYPE_OBJFILE (type0), NULL),
+        result = create_array_type (alloc_type (TYPE_OBJFILE (type0)),
                                     elt_type, TYPE_INDEX_TYPE (type0));
     }
   else
@@ -7244,7 +7243,7 @@ to_fixed_array_type (struct type *type0, struct value *dval,
           struct type *range_type =
             to_fixed_range_type (TYPE_FIELD_NAME (index_type_desc, i),
                                  dval, TYPE_OBJFILE (type0));
-          result = create_array_type (alloc_type (TYPE_OBJFILE (type0), NULL),
+          result = create_array_type (alloc_type (TYPE_OBJFILE (type0)),
                                       result, range_type);
         }
       if (!ignore_too_big && TYPE_LENGTH (result) > varsize_limit)
@@ -9519,7 +9518,7 @@ to_fixed_range_type (char *name, struct value *dval, struct objfile *objfile)
       if (L < INT_MIN || U > INT_MAX)
 	return raw_type;
       else
-	return create_range_type (alloc_type (objfile, NULL), raw_type, 
+	return create_range_type (alloc_type (objfile), raw_type, 
 				  discrete_type_low_bound (raw_type),
 				  discrete_type_high_bound (raw_type));
     }
@@ -9584,7 +9583,7 @@ to_fixed_range_type (char *name, struct value *dval, struct objfile *objfile)
 
       if (objfile == NULL)
         objfile = TYPE_OBJFILE (base_type);
-      type = create_range_type (alloc_type (objfile, NULL), base_type, L, U);
+      type = create_range_type (alloc_type (objfile), base_type, L, U);
       TYPE_NAME (type) = name;
       return type;
     }

@@ -135,12 +135,12 @@ extern int varobj_list (struct varobj ***rootlist);
 extern VEC(varobj_update_result) *varobj_update (struct varobj **varp, 
 						 int explicit);
 
-extern void varobj_invalidate (void);
+extern void varobj_invalidate (struct objfile *objfile);
+
+extern void varobj_revalidate (void);
 
 extern int varobj_editable_p (struct varobj *var);
 
 extern int varobj_floating_p (struct varobj *var);
-
-extern void preserve_variables (struct objfile *objfile, htab_t copied_types);
 
 #endif /* VAROBJ_H */

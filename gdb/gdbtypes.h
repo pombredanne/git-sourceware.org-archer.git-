@@ -1156,16 +1156,6 @@ extern struct type *builtin_type_error;
    (TYPE_UNSIGNED(t) ? UMIN_OF_SIZE(TYPE_LENGTH(t)) \
     : MIN_OF_SIZE(TYPE_LENGTH(t)))
 
-/* Virtual OBJFILE used for builtin types.  */
-#define OBJFILE_INTERNAL ((struct objfile *) 1L)
-
-/* Virtual OBJFILE used for types allocated by malloc.  FIXME: Currently
-   backward compatible with the old NULL value; fix then also init_type.  */
-#define OBJFILE_MALLOC ((struct objfile *) 0L)
-
-#define OBJFILE_IS_VIRTUAL(objfile) ((objfile) == OBJFILE_INTERNAL	\
-				     || (objfile) == OBJFILE_MALLOC)
-
 /* Allocate space for storing data associated with a particular type.
    We ensure that the space is allocated using the same mechanism that
    was used to allocate the space for the type structure itself.  I.E.
@@ -1175,18 +1165,18 @@ extern struct type *builtin_type_error;
    builtin types), then the data space will be allocated with xmalloc,
    the same as for the type structure. */
 
-#define TYPE_ALLOC(t,size)						\
-   (OBJFILE_IS_VIRTUAL (TYPE_OBJFILE (t))				\
-    ? xmalloc (size)							\
-    : obstack_alloc (&TYPE_OBJFILE (t) -> objfile_obstack, size))
+#define TYPE_ALLOC(t,size)  \
+   (TYPE_OBJFILE (t) != NULL  \
+    ? obstack_alloc (&TYPE_OBJFILE (t) -> objfile_obstack, size) \
+    : xmalloc (size))
 
-#define TYPE_ZALLOC(t,size)						\
-   (OBJFILE_IS_VIRTUAL (TYPE_OBJFILE (t))				\
-    ? xzalloc (size)							\
-    : memset (obstack_alloc (&TYPE_OBJFILE (t)->objfile_obstack, size),	\
-	      0, size))
+#define TYPE_ZALLOC(t,size)  \
+   (TYPE_OBJFILE (t) != NULL  \
+    ? memset (obstack_alloc (&TYPE_OBJFILE (t)->objfile_obstack, size),  \
+	      0, size)  \
+    : xzalloc (size))
 
-extern struct type *alloc_type (struct objfile *, struct type *);
+extern struct type *alloc_type (struct objfile *);
 
 extern struct type *init_type (enum type_code, int, int, char *,
 			       struct objfile *);
@@ -1250,7 +1240,8 @@ extern struct type *make_pointer_type (struct type *, struct type **);
 
 extern struct type *lookup_pointer_type (struct type *);
 
-extern struct type *make_function_type (struct type *, struct type **);
+extern struct type *make_function_type (struct type *, struct type **,
+					struct objfile *);
 
 extern struct type *lookup_function_type (struct type *);
 

@@ -3952,7 +3952,7 @@ dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
   /* The name is already allocated along with this objfile, so we don't
      need to duplicate it for the type.  */
   fnp->physname = physname ? physname : "";
-  fnp->type = alloc_type (objfile, NULL);
+  fnp->type = alloc_type (objfile);
   this_type = read_type_die (die, cu);
   if (this_type && TYPE_CODE (this_type) == TYPE_CODE_FUNC)
     {
@@ -4136,7 +4136,7 @@ quirk_gcc_member_function_pointer (struct die_info *die, struct dwarf2_cu *cu)
     return NULL;
 
   domain_type = TYPE_TARGET_TYPE (TYPE_FIELD_TYPE (pfn_type, 0));
-  type = alloc_type (objfile, NULL);
+  type = alloc_type (objfile);
   smash_to_method_type (type, domain_type, TYPE_TARGET_TYPE (pfn_type),
 			TYPE_FIELDS (pfn_type), TYPE_NFIELDS (pfn_type),
 			TYPE_VARARGS (pfn_type));
@@ -4173,7 +4173,7 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
   if (type)
     return type;
 
-  type = alloc_type (objfile, NULL);
+  type = alloc_type (objfile);
   INIT_CPLUS_SPECIFIC (type);
   name = dwarf2_name (die, cu);
   if (name != NULL)
@@ -4386,7 +4386,7 @@ read_enumeration_type (struct die_info *die, struct dwarf2_cu *cu)
   struct attribute *attr;
   const char *name;
 
-  type = alloc_type (objfile, NULL);
+  type = alloc_type (objfile);
 
   TYPE_CODE (type) = TYPE_CODE_ENUM;
   name = dwarf2_full_name (die, cu);
@@ -4998,8 +4998,8 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
   int length;
 
   index_type = builtin_type_int32;
-  /* RANGE_TYPE is allocated from OBJFILE, not OBJFILE_INTERNAL.  */
-  range_type = alloc_type (objfile, index_type);
+  /* RANGE_TYPE is allocated from OBJFILE, not as a permanent type.  */
+  range_type = alloc_type (objfile);
   /* LOW_BOUND and HIGH_BOUND are set for real below.  */
   range_type = create_range_type (range_type, index_type, 0, -1);
 
@@ -5108,7 +5108,7 @@ read_subroutine_type (struct die_info *die, struct dwarf2_cu *cu)
   struct attribute *attr;
 
   type = die_type (die, cu);
-  ftype = make_function_type (type, (struct type **) 0);
+  ftype = make_function_type (type, (struct type **) 0, cu->objfile);
 
   /* All functions in C++, Pascal and Java have prototypes.  */
   attr = dwarf2_attr (die, DW_AT_prototyped, cu);

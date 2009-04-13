@@ -38,7 +38,6 @@
 #include "objfiles.h"
 #include "valprint.h"
 #include "cli/cli-decode.h"
-#include "varobj.h"
 
 #include "python/python.h"
 
@@ -294,9 +293,13 @@ struct value *
 allocate_repeat_value (struct type *type, int count)
 {
   int low_bound = current_language->string_lower_bound;		/* ??? */
+  /* FIXME-type-allocation: need a way to free this type when we are
+     done with it.  */
   struct type *range_type
   = create_range_type ((struct type *) NULL, builtin_type_int32,
 		       low_bound, count + low_bound - 1);
+  /* FIXME-type-allocation: need a way to free this type when we are
+     done with it.  */
   return allocate_value (create_array_type ((struct type *) NULL,
 					    type, range_type));
 }
@@ -879,6 +882,10 @@ value_history_cleanup (void *unused)
       xfree (chunk);
     }
   value_history_count = 0;
+
+  /* Free the unreferenced types above.  */
+  free_all_values ();
+  free_all_types ();
 }
 
 /* Internal variables.  These are variables within the debugger
@@ -1186,7 +1193,7 @@ add_internal_function (const char *name, const char *doc,
 /* Update VALUE before discarding OBJFILE.  COPIED_TYPES is used to
    prevent cycles / duplicates.  */
 
-void
+static void
 preserve_one_value (struct value *value, struct objfile *objfile,
 		    htab_t copied_types)
 {
@@ -1238,8 +1245,6 @@ preserve_values (struct objfile *objfile)
 
   for (val = values_in_python; val; val = val->next)
     preserve_one_value (val, objfile, copied_types);
-
-  preserve_variables (objfile, copied_types);
 
   htab_delete (copied_types);
 }
@@ -2088,7 +2093,7 @@ VARIABLE is already initialized."));
 Placeholder command for showing help on convenience functions."),
 		  &functionlist, "function ", 0, &cmdlist);
 
-  internal_fn_type = alloc_type (OBJFILE_INTERNAL, NULL);
+  internal_fn_type = alloc_type (NULL);
   TYPE_CODE (internal_fn_type) = TYPE_CODE_INTERNAL_FUNCTION;
   TYPE_LENGTH (internal_fn_type) = sizeof (struct internal_function *);
   TYPE_NAME (internal_fn_type) = "<internal function>";

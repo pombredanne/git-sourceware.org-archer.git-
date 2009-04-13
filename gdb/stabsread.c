@@ -322,7 +322,7 @@ dbx_alloc_type (int typenums[2], struct objfile *objfile)
 
   if (typenums[0] == -1)
     {
-      return (alloc_type (objfile, NULL));
+      return (alloc_type (objfile));
     }
 
   type_addr = dbx_lookup_type (typenums);
@@ -332,7 +332,7 @@ dbx_alloc_type (int typenums[2], struct objfile *objfile)
      We will fill it in later if we find out how.  */
   if (*type_addr == 0)
     {
-      *type_addr = alloc_type (objfile, NULL);
+      *type_addr = alloc_type (objfile);
     }
 
   return (*type_addr);
@@ -1685,7 +1685,7 @@ again:
 
     case 'f':			/* Function returning another type */
       type1 = read_type (pp, objfile);
-      type = make_function_type (type1, dbx_lookup_type (typenums));
+      type = make_function_type (type1, dbx_lookup_type (typenums), objfile);
       break;
 
     case 'g':                   /* Prototyped function.  (Sun)  */
@@ -1708,7 +1708,8 @@ again:
         const char *type_start = (*pp) - 1;
         struct type *return_type = read_type (pp, objfile);
         struct type *func_type
-          = make_function_type (return_type, dbx_lookup_type (typenums));
+          = make_function_type (return_type, dbx_lookup_type (typenums),
+				objfile);
         struct type_list {
           struct type *type;
           struct type_list *next;
