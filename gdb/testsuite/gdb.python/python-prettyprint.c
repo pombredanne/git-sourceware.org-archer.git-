@@ -15,6 +15,8 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
+#include <string.h>
+
 struct s
 {
   int a;
@@ -143,6 +145,11 @@ void do_nothing(void)
   c = 23;			/* Another MI breakpoint */
 }
 
+struct nullstr
+{
+  char *s;
+};
+
 int
 main ()
 {
@@ -151,10 +158,13 @@ main ()
   string x = make_string ("this is x");
   zzz_type c = make_container ("container");
   const struct string_repr cstring = { { "const string" } };
+  /* Clearing by being `static' could invoke an other GDB C++ bug.  */
+  struct nullstr nullstr;
 
   init_ss(&ss, 1, 2);
   init_ss(ssa+0, 3, 4);
   init_ss(ssa+1, 5, 6);
+  memset (&nullstr, 0, sizeof nullstr);
 
 #ifdef __cplusplus
   S cps;

@@ -92,6 +92,13 @@ class pp_vbase1:
     def to_string (self):
         return "pp class name: " + self.val.type.tag
 
+class pp_nullstr:
+    def __init__(self, val):
+        self.val = val
+
+    def to_string(self):
+        return self.val['s'].string(gdb.parameter('target-charset'))
+
 def lookup_function (val):
     "Look-up and return a pretty-printer that can print val."
 
@@ -135,6 +142,9 @@ def register_pretty_printers ():
     
     pretty_printers_dict[re.compile ('^VirtualTest$')] =  pp_multiple_virtual
     pretty_printers_dict[re.compile ('^Vbase1$')] =  pp_vbase1
+
+    pretty_printers_dict[re.compile ('^struct nullstr$')] = pp_nullstr
+    pretty_printers_dict[re.compile ('^nullstr$')] = pp_nullstr
     
     # Note that we purposely omit the typedef names here.
     # Printer lookup is based on canonical name.
