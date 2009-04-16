@@ -270,9 +270,23 @@ cp_lookup_symbol_nonlocal (const char *name,
 			   const struct block *block,
 			   const domain_enum domain)
 {
+  struct symbol* sym = NULL;
+  const struct block *global_block = block_global_block (block);
+  const char* scope = block_scope(block);
+    /* Check if either no block is specified or it's a global block.  */
 
-  struct symbol* sym = lookup_namespace_scope(name, linkage_name, block,
-      domain, block_scope(block), 0);
+  while (block != global_block)
+    while (block != global_block)
+      {
+      sym = lookup_namespace_scope(name, linkage_name, block,
+            domain, scope, 0, 0);
+
+      if (sym != NULL)
+        return sym;
+
+      block = BLOCK_SUPERBLOCK (block);
+    }
+
 
   if (sym != NULL)
     return sym;
@@ -301,7 +315,8 @@ lookup_namespace_scope (const char *name,
 			const struct block *block,
 			const domain_enum domain,
 			const char *scope,
-			int scope_len)
+			int scope_len,
+                        int declaration_only)
 {
   char *namespace;
 
@@ -320,7 +335,7 @@ lookup_namespace_scope (const char *name,
 	}
       new_scope_len += cp_find_first_component (scope + new_scope_len);
       sym = lookup_namespace_scope (name, linkage_name, block,
-				    domain, scope, new_scope_len);
+				    domain, scope, new_scope_len, declaration_only);
       if (sym != NULL)
 	return sym;
     }
@@ -331,8 +346,8 @@ lookup_namespace_scope (const char *name,
   namespace = alloca (scope_len + 1);
   strncpy (namespace, scope, scope_len);
   namespace[scope_len] = '\0';
-  return cp_lookup_symbol_namespace_incremental (namespace, name, linkage_name,
-				     block, domain);
+  return cp_lookup_symbol_namespace (namespace, name, linkage_name,
+				     block, domain, declaration_only);
 }
 
 /* Searches the for the given NAME in the given NAMESPACE, using import 
@@ -342,7 +357,8 @@ cp_lookup_symbol_namespace_incremental (const char *namespace,
                                         const char *name,
                                         const char *linkage_name,
                                         const struct block *block,
-                                        const domain_enum domain)
+                                        const domain_enum domain,
+                                        int declaration_only)
 {
   struct symbol *sym;
   const struct block *global_block = block_global_block (block);
@@ -354,7 +370,7 @@ cp_lookup_symbol_namespace_incremental (const char *namespace,
 
   while (block != global_block)
     {
-      sym = cp_lookup_symbol_namespace (namespace, name, linkage_name, block, domain);
+      sym = cp_lookup_symbol_namespace (namespace, name, linkage_name, block, domain, declaration_only);
 
       if (sym != NULL)
         return sym;
@@ -377,7 +393,8 @@ cp_lookup_symbol_namespace (const char *namespace,
 			    const char *name,
 			    const char *linkage_name,
 			    const struct block *block,
-			    const domain_enum domain)
+			    const domain_enum domain,
+			    int declaration_only)
 {
   const struct using_direct *current;
   struct symbol *sym = NULL;
@@ -402,16 +419,28 @@ cp_lookup_symbol_namespace (const char *namespace,
 	     imported namespace.  */
 	  if (strcmp ("", current->declaration) != 0)
 	    {
-	    if(strcmp (name, current->declaration) == 0){
-	      sym = cp_lookup_symbol_namespace (current->inner,
-	                                        name,
-	                                        linkage_name,
-	                                        block,
-	                                        domain);
+	    if (strcmp (name, current->declaration) == 0)
+	      {
+	        sym = cp_lookup_symbol_namespace (current->inner,
+	                                          name,
+	                                          linkage_name,
+	                                          block,
+	                                          domain,
+	                                          declaration_only);
+	      }
 	    }
 	   
-	    }
-	  else if(strcmp (name, current->alias) == 0)
+	  if (declaration_only)
+            {
+              if (sym)
+                {
+                  return sym;
+                } else {
+                  continue;
+                }
+            }
+
+	  if (strcmp (name, current->alias) == 0)
 	    /* If the import is creating an alias and the alias matches the
 	       sought name. Pass current->inner as the NAME to direct the
 	       search towards the aliased namespace */
@@ -420,15 +449,17 @@ cp_lookup_symbol_namespace (const char *namespace,
 	                                      current->inner,
 	                                      linkage_name,
 	                                      block,
-	                                      domain);
-	  }else if(strcmp ("", current->alias) == 0){
+	                                      domain,
+                                              declaration_only);
+	    } else if (strcmp ("", current->alias) == 0){
 	    /* If this import statement creates no alias, pass current->inner as
 	       NAMESPACE to direct the search towards the imported namespace. */
 	      sym = cp_lookup_symbol_namespace (current->inner,
 		                                name,
 		                                linkage_name,
 		                                block,
-		                                domain);
+		                                domain,
+                                                declaration_only);
 	    }
 
 	  if (sym != NULL){
@@ -441,7 +472,7 @@ cp_lookup_symbol_namespace (const char *namespace,
      that are still applicable; so let's see if we've got a match
      using the current namespace.  */
   
-  if (namespace[0] == '\0')
+  if (namespace[0] == '\0' && !declaration_only)
     {
       sym = lookup_symbol_file (name, linkage_name,
                                      block, domain, 
@@ -546,7 +577,7 @@ cp_lookup_nested_type (struct type *parent_type,
 							 nested_name,
 							 NULL,
 							 block,
-							 VAR_DOMAIN);
+							 VAR_DOMAIN,0);
 	if (sym == NULL || SYMBOL_CLASS (sym) != LOC_TYPEDEF)
 	  return NULL;
 	else

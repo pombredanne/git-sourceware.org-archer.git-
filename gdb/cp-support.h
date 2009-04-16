@@ -127,19 +127,22 @@ extern struct symbol *lookup_namespace_scope (const char *name,
                                               const struct block *block,
                                               const domain_enum domain,
                                               const char *scope,
-                                              int scope_len);
+                                              int scope_len,
+                                              int declaration_only);
 
 extern struct symbol *cp_lookup_symbol_namespace_incremental (const char *namespace,
                                                               const char *name,
                                                               const char *linkage_name,
                                                               const struct block *block,
-                                                              const domain_enum domain);
+                                                              const domain_enum domain,
+                                                              int declaration_only);
 
 extern struct symbol *cp_lookup_symbol_namespace (const char *namespace,
-						  const char *name,
-						  const char *linkage_name,
-						  const struct block *block,
-						  const domain_enum domain);
+                                                  const char *name,
+                                                  const char *linkage_name,
+                                                  const struct block *block,
+                                                  const domain_enum domain,
+                                                  int declaration_only);
 
 extern struct type *cp_lookup_nested_type (struct type *parent_type,
 					   const char *nested_name,
