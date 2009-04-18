@@ -28,35 +28,6 @@ if { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debu
     return -1
 }
 
-# Usage: gdb_py_test_multiple NAME INPUT RESULT {INPUT RESULT}...
-# Run a test named NAME, consisting of multiple lines of input.
-# After each input line INPUT, search for result line RESULT.
-# Succeed if all results are seen; fail otherwise.
-proc gdb_py_test_multiple {name args} {
-    global gdb_prompt
-    foreach {input result} $args {
-	if {[gdb_test_multiple $input "$name - $input" {
-	    -re "\[\r\n\]*($result)\[\r\n\]+($gdb_prompt | *>)$" {
-		pass "$name - $input"
-	    }
-	}]} {
-	    return 1
-	}
-    }
-    return 0
-}
-
-# Run a command in GDB, and report a failure if a Python exception is thrown.
-# If report_pass is true, report a pass if no exception is thrown.
-proc gdb_py_test_silent_cmd {cmd name report_pass} {
-  global gdb_prompt
-
-  gdb_test_multiple $cmd $name {
-      -re "Traceback.*$gdb_prompt $"  { fail $name }
-      -re "$gdb_prompt $"	      { if $report_pass { pass $name } }
-  }
-}
-
 proc test_value_creation {} {
   global gdb_prompt
 
@@ -290,12 +261,9 @@ gdb_start
 gdb_reinitialize_dir $srcdir/$subdir
 gdb_load ${binfile}
 
-gdb_test_multiple "python print 'hello, world!'" "verify python support" {
-    -re "not supported.*$gdb_prompt $"	{
-      unsupported "python support is disabled"
-      return -1
-    }
-    -re "$gdb_prompt $"	{}
+if ![python_supported] then {
+  unsupported "python support is disabled"
+  return -1
 }
 
 test_value_creation

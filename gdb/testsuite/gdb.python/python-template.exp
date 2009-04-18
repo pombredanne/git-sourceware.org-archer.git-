@@ -35,12 +35,9 @@ gdb_exit
 gdb_start
 gdb_reinitialize_dir $srcdir/$subdir
 
-gdb_test_multiple "python print 23" "verify python support" {
-    -re "not supported.*$gdb_prompt $"	{
-      unsupported "python support is disabled"
-      return -1
-    }
-    -re "$gdb_prompt $"	{}
+if ![python_supported] then {
+  unsupported "python support is disabled"
+  return -1
 }
 
 proc test_template_arg {type} {
