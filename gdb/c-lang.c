@@ -296,7 +296,7 @@ c_emit_char (int c, struct type *type, struct ui_file *stream, int quoter)
   obstack_init (&output);
   make_cleanup_obstack_free (&output);
 
-  convert_between_encodings ("wchar_t", host_charset (),
+  convert_between_encodings (INTERMEDIATE_ENCODING, host_charset (),
 			     obstack_base (&wchar_buf),
 			     obstack_object_size (&wchar_buf),
 			     1, &output, translit_char);
@@ -562,7 +562,7 @@ c_printstr (struct ui_file *stream, struct type *type, const gdb_byte *string,
   obstack_init (&output);
   make_cleanup_obstack_free (&output);
 
-  convert_between_encodings ("wchar_t", host_charset (),
+  convert_between_encodings (INTERMEDIATE_ENCODING, host_charset (),
 			     obstack_base (&wchar_buf),
 			     obstack_object_size (&wchar_buf),
 			     1, &output, translit_char);
@@ -657,7 +657,7 @@ c_get_string (struct value *value, gdb_byte **buffer, int *length,
 			 buffer, length);
       if (err)
 	{
-	  xfree (buffer);
+	  xfree (*buffer);
 	  error (_("Error reading string from inferior: %s"),
 		 safe_strerror (err));
 	}
@@ -941,7 +941,15 @@ evaluate_subexp_c (struct type *expect_type, struct expression *exp,
 	*pos += 2;
 
 	if (noside == EVAL_SKIP)
-	  return NULL;
+	  {
+	    /* Return a dummy value of the appropriate type.  */
+	    if ((dest_type & C_CHAR) != 0)
+	      result = allocate_value (type);
+	    else
+	      result = value_typed_string ("", 0, type);
+	    do_cleanups (cleanup);
+	    return result;
+	  }
 
 	if ((dest_type & C_CHAR) != 0)
 	  {

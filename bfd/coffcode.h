@@ -153,6 +153,14 @@ SUBSUBSECTION
 	points to a function that allows the value of the flag to be altered
 	at runtime, on formats that support long section names at all; on
 	other formats it points to a stub that returns an error indication.
+	
+	With input BFDs, the flag is set according to whether any long section
+	names are detected while reading the section headers.  For a completely
+	new BFD, the flag is set to the default for the target format.  This
+	information can be used by a client of the BFD library when deciding
+	what output format to generate, and means that a BFD that is opened
+	for read and subsequently converted to a writeable BFD and modified
+	in-place will retain whatever format it had on input.
 
 	If @code{COFF_LONG_SECTION_NAMES} is simply defined (blank), or is
 	defined to the value "1", then long section names are enabled by
@@ -936,7 +944,8 @@ handle_COMDAT (bfd * abfd,
 		   but there's some checking we can do to be
 		   sure.  */
 
-		if (! (isym.n_sclass == C_STAT
+		if (! ((isym.n_sclass == C_STAT
+			|| isym.n_sclass == C_EXT)
 		       && isym.n_type == T_NULL
 		       && isym.n_value == 0))
 		  abort ();
@@ -946,7 +955,7 @@ handle_COMDAT (bfd * abfd,
 		   names like .text$foo__Fv (in the case of a
 		   function).  See comment above for more.  */
 
-		if (strcmp (name, symname) != 0)
+		if (isym.n_sclass == C_STAT && strcmp (name, symname) != 0)
 		  _bfd_error_handler (_("%B: warning: COMDAT symbol '%s' does not match section name '%s'"),
 				      abfd, symname, name);
 
@@ -5589,6 +5598,10 @@ static bfd_coff_backend_data ticoff1_swap_table =
 #ifndef coff_section_already_linked
 #define coff_section_already_linked \
   _bfd_generic_section_already_linked
+#endif
+
+#ifndef coff_bfd_define_common_symbol
+#define coff_bfd_define_common_symbol	    bfd_generic_define_common_symbol
 #endif
 
 #define CREATE_BIG_COFF_TARGET_VEC(VAR, NAME, EXTRA_O_FLAGS, EXTRA_S_FLAGS, UNDER, ALTERNATIVE, SWAP_TABLE)	\

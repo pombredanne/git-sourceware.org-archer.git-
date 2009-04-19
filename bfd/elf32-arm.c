@@ -3832,12 +3832,29 @@ elf32_arm_size_stubs (bfd *output_bfd,
 					   + sym_sec->output_offset
 					   + sym_sec->output_section->vma);
 			}
-		      else if (hash->root.root.type == bfd_link_hash_undefweak
-			       || hash->root.root.type == bfd_link_hash_undefined)
-			/* For a shared library, these will need a PLT stub,
-			   which is treated separately.
-			   For absolute code, they cannot be handled.  */
-			continue;
+		      else if ((hash->root.root.type == bfd_link_hash_undefined)
+			       || (hash->root.root.type == bfd_link_hash_undefweak))
+			{
+			  /* For a shared library, use the PLT stub as
+			     target address to decide whether a long
+			     branch stub is needed.
+			     For absolute code, they cannot be handled.  */
+			  struct elf32_arm_link_hash_table *globals =
+			    elf32_arm_hash_table (info);
+
+			  if (globals->splt != NULL && hash != NULL
+			      && hash->root.plt.offset != (bfd_vma) -1)
+			    {
+			      sym_sec = globals->splt;
+			      sym_value = hash->root.plt.offset;
+			      if (sym_sec->output_section != NULL)
+				destination = (sym_value
+					       + sym_sec->output_offset
+					       + sym_sec->output_section->vma);
+			    }
+			  else
+			    continue;
+			}
 		      else
 			{
 			  bfd_set_error (bfd_error_bad_value);
@@ -6363,8 +6380,9 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
 	  signed_addend >>= howto->rightshift;
 
 	  /* A branch to an undefined weak symbol is turned into a jump to
-	     the next instruction.  */
-	  if (h && h->root.type == bfd_link_hash_undefweak)
+	     the next instruction unless a PLT entry will be created.  */
+	  if (h && h->root.type == bfd_link_hash_undefweak
+	      && !(splt != NULL && h->plt.offset != (bfd_vma) -1))
 	    {
 	      value = (bfd_get_32 (input_bfd, hit_data) & 0xf0000000)
 		      | 0x0affffff;
