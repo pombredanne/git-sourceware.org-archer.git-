@@ -441,7 +441,8 @@ BFD_JUMP_TABLE macros.
 .  NAME##_bfd_merge_sections, \
 .  NAME##_bfd_is_group_section, \
 .  NAME##_bfd_discard_group, \
-.  NAME##_section_already_linked \
+.  NAME##_section_already_linked, \
+.  NAME##_bfd_define_common_symbol
 .
 .  int         (*_bfd_sizeof_headers) (bfd *, struct bfd_link_info *);
 .  bfd_byte *  (*_bfd_get_relocated_section_contents)
@@ -488,6 +489,10 @@ BFD_JUMP_TABLE macros.
 .     final link.  *}
 .  void (*_section_already_linked) (bfd *, struct bfd_section *,
 .				    struct bfd_link_info *);
+.
+.  {* Define a common symbol.  *}
+.  bfd_boolean (*_bfd_define_common_symbol) (bfd *, struct bfd_link_info *,
+.					     struct bfd_link_hash_entry *);
 .
 .  {* Routines to handle dynamic symbols and relocs.  *}
 .#define BFD_JUMP_TABLE_DYNAMIC(NAME) \
@@ -589,6 +594,7 @@ extern const bfd_target bfd_elf32_dlx_big_vec;
 extern const bfd_target bfd_elf32_fr30_vec;
 extern const bfd_target bfd_elf32_frv_vec;
 extern const bfd_target bfd_elf32_frvfdpic_vec;
+extern const bfd_target bfd_elf32_moxie_vec;
 extern const bfd_target bfd_elf32_h8300_vec;
 extern const bfd_target bfd_elf32_hppa_linux_vec;
 extern const bfd_target bfd_elf32_hppa_nbsd_vec;
@@ -923,6 +929,7 @@ static const bfd_target * const _bfd_target_vector[] =
 	&bfd_elf32_fr30_vec,
 	&bfd_elf32_frv_vec,
 	&bfd_elf32_frvfdpic_vec,
+ 	&bfd_elf32_moxie_vec,
 	&bfd_elf32_h8300_vec,
 	&bfd_elf32_hppa_linux_vec,
 	&bfd_elf32_hppa_nbsd_vec,

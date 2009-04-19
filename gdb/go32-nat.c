@@ -167,8 +167,8 @@ static int dr_ref_count[4];
 static int prog_has_started = 0;
 static void go32_open (char *name, int from_tty);
 static void go32_close (int quitting);
-static void go32_attach (char *args, int from_tty);
-static void go32_detach (char *args, int from_tty);
+static void go32_attach (struct target_ops *ops, char *args, int from_tty);
+static void go32_detach (struct target_ops *ops, char *args, int from_tty);
 static void go32_resume (struct target_ops *ops,
 			 ptid_t ptid, int step,
 			 enum target_signal siggnal);
@@ -1216,7 +1216,7 @@ go32_sysinfo (char *arg, int from_tty)
       printf_filtered ("%s)\n", windows_flavor);
     }
   else if (true_dos_version == 0x532 && advertized_dos_version == 0x500)
-    printf_filtered ("Windows Version................Windows NT or Windows 2000\n");
+    printf_filtered ("Windows Version................Windows NT family (W2K/XP/W2K3/Vista/W2K8)\n");
   puts_filtered ("\n");
   if (dpmi_vendor_available == 0)
     {

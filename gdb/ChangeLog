@@ -1,3 +1,119 @@
+2009-04-17  Eli Zaretskii  <eliz@gnu.org>
+
+	* go32-nat.c (go32_sysinfo): Update list of Windows versions of
+	the NT family.
+
+2009-04-16  Pedro Alves  <pedro@codesourcery.com>
+
+	* remote.c (remote_query_attached): Fix pasto in packet_ok result
+	checking.
+
+2009-04-16  Joel Brobecker  <brobecker@adacore.com>
+
+	* procfs.c (solib_mappings_callback, find_memory_regions_callback):
+	Revert the previous change.  Might not be correct, actually.
+
+2009-04-16  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.h (ada_adjust_exception_stop, ada_print_exception_stop)
+	(ada_get_current_task, ada_print_exception_breakpoint_nontask)
+	(ada_print_exception_breakpoint_task, ada_reset_thread_registers):
+	Remove declaration. These are non-existent functions.
+
+2009-04-16  Joel Brobecker  <brobecker@adacore.com>
+
+	* procfs.c (solib_mappings_callback, find_memory_regions_callback):
+	Fix a compilation warning on mips-irix due to casting from
+	a pointer of different size.
+
+2009-04-16  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (symtab_for_sym): Delete.
+	(user_select_syms): Use sym->symtab instead of calling symtab_for_sym.
+
+2009-04-16  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (extract_string): Delete.
+	(ada_main_name): Reimplement using target_read_string instead of
+	extract_string.
+
+2009-04-16  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* m68klinux-nat.c: Remove obsolete comment.
+	(fetch_register, store_register): Don't call
+	gdbarch_cannot_fetch_register or gdbarch_cannot_store_register,
+	which are always nops here.
+
+2009-04-14  Tom Tromey  <tromey@redhat.com>
+
+	* c-lang.c (c_emit_char): Use INTERMEDIATE_ENCODING.
+	(c_printstr): Likewise.
+	* charset.c: Include gdb_wait.h.
+	(make_wchar_iterator): Use INTERMEDIATE_ENCODING.
+	(find_charset_names): Use pexecute.  Handle libiconv's output.
+	Detect errors.
+	(_initialize_charset): Use xstrdup.
+	* gdb_wchar.h: Check HAVE_BTOWC.  Split PHONY_ICONV and wchar
+	cases.
+	(INTERMEDIATE_ENCODING): New define.
+	* configure, config.in: Rebuild.
+	* configure.ac: Check for btowc.
+
+2009-04-15  Tom Tromey  <tromey@redhat.com>
+
+	* c-lang.c (evaluate_subexp_c): Correctly handle EVAL_SKIP.
+
+2009-04-15  Eli Zaretskii  <eliz@gnu.org>
+
+	* utils.c (parse_escape): Initialize target_char to pacify GCC.
+
+2009-04-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* c-lang.c (c_get_string): Fix xfree crash on a failed string read.
+
+2009-04-14  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	ARI fix: sprintf rule.
+	* ada-exp.y (convert_char_literal): Replace sprintf by xsnprintf.
+	* ada-lang.c (add_angle_brackets): Use xstrprintf.
+	(ada_decode): Replace sprintf by xsnprintf.
+	(find_old_style_renaming_symbol): Ditto.
+	(ada_to_fixed_type_1, ada_enum_name): Ditto.
+
+
+2009-04-14  Joel Brobecker  <brobecker@adacore.com>
+
+	* target.c (target_mourn_inferior): Call bfd_cache_close_all
+	after having executed the target mourn_inferior routine.
+
+2009-04-14  Eli Zaretskii  <eliz@gnu.org>
+
+	* config/djgpp/djconfig.sh (DEPDIR): Define to "_deps", if
+	undefined.
+
+2009-04-13  David Daney  <ddaney@caviumnetworks.com>
+
+	* infrun.c (maybe_software_singlestep): New function.
+	(resume): Call maybe_software_singlestep.
+	(handle_inferior_event): Same.
+
+2009-04-13  Tom Tromey  <tromey@redhat.com>
+
+	* python/python-frame.c (frapy_richcompare): Return
+	Py_NotImplemented, not an error.  Handle Py_NE as well.
+
+2009-04-13  Eli Zaretskii  <eliz@gnu.org>
+
+	* charset.c (EILSEQ): Define if not defined by system headers.
+
+2009-04-11  Eli Zaretskii  <eliz@gnu.org>
+
+	* config/djgpp/config.sed: Tweak ac_config_files in intl/configure
+	to be consistent with renaming config.intl.in into config_intl.in.
+
+	* go32-nat.c (go32_attach, go32_detach): Fix prototypes to be
+	consistent with the change from 2008-11-09.
+
 2009-04-10  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* gdbtypes.c: Remove excessive parentheses at the return keywords.
