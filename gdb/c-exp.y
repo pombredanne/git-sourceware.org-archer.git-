@@ -184,7 +184,6 @@ static int parse_number (char *, int, int, YYSTYPE *);
 
 %token <sval> STRING
 %token <ssym> NAME /* BLOCKNAME defined below to give it higher precedence. */
-%token <ssym> UNKNOWN_NAME 
 %token <voidval> COMPLETE
 %token <tsym> TYPENAME
 %type <sval> name string_exp
@@ -384,30 +383,6 @@ exp	:	exp '('
 			  write_exp_elt_longcst ((LONGEST) end_arglist ());
 			  write_exp_elt_opcode (OP_FUNCALL); }
 	;
-
-exp	:	adl_func '(' 
-			/* This is to save the value of arglist_len
-			   being accumulated by an outer function call.  */
-			{ start_arglist (); }
-		arglist ')'	%prec ARROW
-			{ 
-			  	
-			  write_exp_elt_opcode (OP_FUNCALL);
-			  write_exp_elt_longcst ((LONGEST) end_arglist ());
-			  write_exp_elt_opcode (OP_FUNCALL); 	      
-			}
-	;
-
-adl_func	:	UNKNOWN_NAME
-			{/* This could potentially be a an argument dependet lookup function (koenig) */
-			  write_exp_elt_opcode (OP_ADL_FUNC);
-			  write_exp_elt_block (expression_context_block);
-			  write_exp_elt_sym (NULL); /* Place holder */
-			  write_exp_string ($1.stoken);
-			  write_exp_elt_opcode (OP_ADL_FUNC);
-			}
-			;
-		
 
 lcurly	:	'{'
 			{ start_arglist (); }
@@ -821,7 +796,6 @@ variable:	name_not_typename
 	;
 
 space_identifier : '@' NAME
-		|  '@' UNKNOWN_NAME
 		{ push_type_address_space (copy_name ($2.stoken));
 		  push_type (tp_space_identifier);
 		}
@@ -1117,12 +1091,10 @@ name	:	NAME { $$ = $1.stoken; }
 	|	BLOCKNAME { $$ = $1.stoken; }
 	|	TYPENAME { $$ = $1.stoken; }
 	|	NAME_OR_INT  { $$ = $1.stoken; }
-	|	UNKNOWN_NAME  { $$ = $1.stoken; }
 	;
 
 name_not_typename :	NAME
 	|	BLOCKNAME
-	|	UNKNOWN_NAME
 /* These would be useful if name_not_typename was useful, but it is just
    a fake for "variable", so these cause reduce/reduce conflicts because
    the parser can't tell whether NAME_OR_INT is a name_not_typename (=variable,
@@ -2044,11 +2016,6 @@ yylex ()
     if (in_parse_field && *lexptr == '\0')
       saw_name_at_eof = 1;
         
-    if (sym == NULL && !lookup_minimal_symbol (tmp, NULL, NULL) && !is_a_field_of_this)
-      {
-        return UNKNOWN_NAME;
-      }
-    
     return NAME;
   }
 }
