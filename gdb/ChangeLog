@@ -1,9 +1,3 @@
-2009-05-14  Sami Wagiaalla  <swagiaal@redhat.com>
-
-	Patch provided by Michael Matz <matz@suse.de>
-	* dwarf2read.c (determine_prefix): Ignore explicit die representing
-	global scope '::' (gcc 4.1 bug). 
-
 2009-03-12  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* valops.c (find_overload_match): Creates its own list of argument
