@@ -8330,10 +8330,19 @@ determine_prefix (struct die_info *die, struct dwarf2_cu *cu)
       {
         
       case DW_TAG_namespace:
-	parent_type = read_type_die (parent, cu);
-	/* We give a name to even anonymous namespaces.  */
-	return TYPE_TAG_NAME (parent_type);
-      case DW_TAG_subprogram:
+        {
+          char *prefix;
+          parent_type = read_type_die (parent, cu);
+          /* We give a name to even anonymous namespaces.  */
+          prefix = TYPE_TAG_NAME (parent_type);
+          /* Special hack for bogus global namespace that is emitted as an
+             explicit namespace with the name '::' in g++ 4.1, for
+             some decls.  */
+          if (strcmp(prefix, "::")==0)
+            return "";
+          return prefix;
+        }
+    case DW_TAG_subprogram:
         /* If the die is a direct or indirect child of a function then 
            no prefix is nessesary; this variable cannot be reference 
            from outside the function. */
