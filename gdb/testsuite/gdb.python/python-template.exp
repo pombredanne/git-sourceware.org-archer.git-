@@ -20,15 +20,6 @@ if $tracelevel then {
     strace $tracelevel
 }
 
-set testfile "python-template"
-set srcfile ${testfile}.cc
-set binfile ${objdir}/${subdir}/${testfile}
-if { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable \
-	  {debug c++}] != "" } {
-    untested "Couldn't compile ${srcfile}"
-    return -1
-}
-
 # Start with a fresh gdb.
 
 gdb_exit
@@ -38,6 +29,15 @@ gdb_reinitialize_dir $srcdir/$subdir
 if ![python_supported] then {
   unsupported "python support is disabled"
   return -1
+}
+
+set testfile "python-template"
+set srcfile ${testfile}.cc
+set binfile ${objdir}/${subdir}/${testfile}
+if { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable \
+	  {debug c++}] != "" } {
+    untested "Couldn't compile ${srcfile}"
+    return -1
 }
 
 proc test_template_arg {type} {

@@ -20,25 +20,27 @@ if $tracelevel then {
     strace $tracelevel
 }
 
-set testfile "python-infthread"
-set srcfile ${testfile}.c
-set binfile ${objdir}/${subdir}/${testfile}
-if { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
-    untested "Couldn't compile ${srcfile}"
-    return -1
-}
-
 # Start with a fresh gdb.
 
 gdb_exit
 gdb_start
 gdb_reinitialize_dir $srcdir/$subdir
-gdb_load ${binfile}
 
 if ![python_supported] then {
   unsupported "python support is disabled"
   return -1
 }
+
+set testfile "python-infthread"
+set srcfile ${testfile}.c
+set binfile ${objdir}/${subdir}/${testfile}
+
+if { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
+    untested "Couldn't compile ${srcfile}"
+    return -1
+}
+
+gdb_load ${binfile}
 
 # The following tests require execution.
 

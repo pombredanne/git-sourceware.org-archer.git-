@@ -1,0 +1,53 @@
+global python_supported_saved
+
+# Return 1 if Python scripting is supported in GDB, 0 if not.
+proc python_supported { } {
+  global gdb_prompt
+  global python_supported_saved
+
+  if [info exists python_supported_saved] {
+      verbose "python_supported:  returning saved $python_supported_saved" 2
+      return $python_supported_saved
+  }
+
+  gdb_test_multiple "python print 'hello, world!'" "verify python support" {
+    -re "not supported.*$gdb_prompt $"	{
+      return [set python_supported_saved 0]
+    }
+    -re "$gdb_prompt $"	{
+      return [set python_supported_saved 1]
+    }
+  }
+
+  return [set python_supported_saved 0]
+}
+
+# Run a command in GDB, and report a failure if a Python exception is thrown.
+# If report_pass is true, report a pass if no exception is thrown.
+proc gdb_py_test_silent_cmd {cmd name report_pass} {
+  global gdb_prompt
+
+  gdb_test_multiple $cmd $name {
+      -re "Traceback.*$gdb_prompt $"  { fail $name }
+      -re "$gdb_prompt $"	      { if $report_pass { pass $name } }
+  }
+}
+
+# Usage: gdb_py_test_multiple NAME INPUT RESULT {INPUT RESULT}...
+# Run a test named NAME, consisting of multiple lines of input.
+# After each input line INPUT, search for result line RESULT.
+# Succeed if all results are seen; fail otherwise.
+proc gdb_py_test_multiple {name args} {
+    global gdb_prompt
+
+    foreach {input result} $args {
+	if {[gdb_test_multiple $input "$name - $input" {
+	    -re "\[\r\n\]*($result)\[\r\n\]+($gdb_prompt | *>)$" {
+		pass "$name - $input"
+	    }
+	}]} {
+	    return 1
+	}
+    }
+    return 0
+}
