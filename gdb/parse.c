@@ -1359,6 +1359,45 @@ parser_fprintf (FILE *x, const char *y, ...)
   va_end (args);
 }
 
+/* Return 1 if EXP uses OBJFILE (and will become dangling when OBJFILE
+   is unloaded), otherwise return 0.  */
+
+int
+exp_uses_objfile (struct expression *exp, struct objfile *objfile)
+{
+  int endpos;
+  const union exp_element *const elts = exp->elts;
+
+  for (endpos = exp->nelts; endpos > 0; )
+    {
+      int i, args, oplen = 0;
+
+      exp->language_defn->la_exp_desc->operator_length (exp, endpos,
+							&oplen, &args);
+      gdb_assert (oplen > 0);
+
+      i = endpos - oplen;
+      if (elts[i].opcode == OP_VAR_VALUE)
+	{
+	  const struct block *const block = elts[i + 1].block;
+	  const struct symbol *const symbol = elts[i + 2].symbol;
+	  const struct obj_section *const section =
+	    SYMBOL_OBJ_SECTION (symbol);
+
+	  /* Check objfile where is placed the code touching the variable.  */
+	  if (matching_objfiles (block_objfile (block), objfile))
+	    return 1;
+
+	  /* Check objfile where the variable itself is placed.  */
+	  if (section && section->objfile == objfile)
+	    return 1;
+	}
+      endpos -= oplen;
+    }
+
+  return 0;
+}
+
 void
 _initialize_parse (void)
 {

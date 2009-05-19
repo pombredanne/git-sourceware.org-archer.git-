@@ -26,6 +26,8 @@
 #include "gdbcmd.h"
 #include "block.h"
 #include "valprint.h"
+#include "objfiles.h"
+#include "parser-defs.h"
 
 #include "gdb_assert.h"
 #include "gdb_string.h"
@@ -2786,14 +2788,19 @@ varobj_invalidate (struct objfile *objfile)
 	  if (var->root->floating)
 	    continue;
 
-	  if (var->root->valid_block != NULL && var->root->is_valid)
+	  if (var->root->is_valid
+	      && matching_objfiles (block_objfile (var->root->valid_block),
+	                            objfile))
+	    var->root->is_valid = 0;
+	  
+	  if (var->root->is_valid
+	      && exp_uses_objfile (var->root->exp, objfile))
 	    {
-	      struct block *block = var->root->valid_block;
-	      struct symbol *func = block_linkage_function (block);
-	      struct objfile *func_objfile = SYMBOL_SYMTAB (func)->objfile;
+	      var->root->is_valid = 0;
 
-	      if (func_objfile == objfile)
-		var->root->is_valid = 0;
+	      /* No one touches EXP for !IS_VALID varobj.  */
+	      xfree (var->root->exp);
+	      var->root->exp = NULL;
 	    }
 	  
 	  if (var->type && TYPE_OBJFILE (var->type) == objfile)
@@ -2805,6 +2812,7 @@ varobj_invalidate (struct objfile *objfile)
 
 	      var->type = NULL;
 	    }
+
 	  if (var->value
 	      && TYPE_OBJFILE (value_type (var->value)) == objfile)
 	    {

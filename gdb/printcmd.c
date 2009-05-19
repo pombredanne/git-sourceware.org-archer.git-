@@ -1765,39 +1765,11 @@ disable_display_command (char *args, int from_tty)
 static int
 display_uses_objfile (const struct display *d, struct objfile *objfile)
 {
-  int endpos;
-  struct expression *const exp = d->exp;
-  const union exp_element *const elts = exp->elts;
-
   if (matching_objfiles (block_objfile (d->block), objfile))
     return 1;
 
-  for (endpos = exp->nelts; endpos > 0; )
-    {
-      int i, args, oplen = 0;
-
-      exp->language_defn->la_exp_desc->operator_length (exp, endpos,
-							&oplen, &args);
-      gdb_assert (oplen > 0);
-
-      i = endpos - oplen;
-      if (elts[i].opcode == OP_VAR_VALUE)
-	{
-	  const struct block *const block = elts[i + 1].block;
-	  const struct symbol *const symbol = elts[i + 2].symbol;
-	  const struct obj_section *const section =
-	    SYMBOL_OBJ_SECTION (symbol);
-
-	  /* Check objfile where is placed the code touching the variable.  */
-	  if (matching_objfiles (block_objfile (block), objfile))
-	    return 1;
-
-	  /* Check objfile where the variable itself is placed.  */
-	  if (section && section->objfile == objfile)
-	    return 1;
-	}
-      endpos -= oplen;
-    }
+  if (exp_uses_objfile (d->exp, objfile))
+    return 1;
 
   return 0;
 }
