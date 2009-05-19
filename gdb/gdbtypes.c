@@ -3265,8 +3265,8 @@ link_group_relabel (struct type_group *to, struct type_group *from)
 static unsigned type_group_link_check_grouping_markers;
 
 /* Unify type_group of all the type structures found while crawling the
-   type_group_link_table tree from the starting point type.  DATA contains
-   type_group_link reference of the starting point type.  Only during the first
+   type_group_link_table tree from the starting point TYPE.  DATA contains
+   type_group_link reference of the starting point TYPE.  Only during the first
    callback TYPE will always match type_group_link referenced by DATA.  */
 
 static int
@@ -3408,7 +3408,8 @@ delete_main_type (struct type *type)
 
 /* Delete all the instances on TYPE_CHAIN of TYPE, including their referenced
    main_type.  TYPE must be a reclaimable type - neither permanent nor objfile
-   associated.  */
+   associated.  The reclaimability is not assertion checked here as it means an
+   expensive type_group_link_table lookup for each MAIN_TYPE being deleted.  */
 
 static void
 delete_type_chain (struct type *type)
