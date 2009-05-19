@@ -1,3 +1,118 @@
+2009-05-15  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* gdb.texinfo (Threads): Document libthread-db-search-path.
+	
+2009-05-15  Nick Roberts  <nickrob@snap.net.nz>
+
+	* gdb.texinfo (GDB/MI General Design): Break up into four nodes.
+
+2009-05-12  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo: Document 'set/show debug gnu-nat'.  Replace 'maint
+	show-debug-regs' docs by 'maint set show-debug-regs' and 'maint
+	show show-debug-regs' docs.
+
+2009-05-08  Eli Zaretskii  <eliz@gnu.org>
+
+	* gdb.texinfo (Process Record and Replay): Add description of
+	reverse execution.
+
+2009-05-07  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdbint.texinfo (Adding support for debugging core files): New node.
+	(Native Debugging): Remove the ``Native core file Support'' section.
+
+2009-05-01  Eli Zaretskii  <eliz@gnu.org>
+
+	* gdb.texinfo (Process Record and Replay): Improve and clarify.
+	Add index entries.
+
+2009-04-30  Hui Zhu  <teawater@gmail.com>
+            Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.texinfo: (Process Record and Replay): Add documentation for
+	process record and replay.
+
+2009-04-29  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.texinfo (Macros): Note command-line for `info macro'.  Append
+	a new part on command-line defined macros.
+
+2009-04-25  Eli Zaretskii  <eliz@gnu.org>
+
+	* gdb.texinfo (Machine Code) <disassemble-next-line>: Improve and
+	clarify the wording.
+
+2009-04-23  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Data Files): New node.
+	(GDB Files): Update menu.
+
+2009-04-23  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdbint.texinfo (Defining Other Architecture Features): Remove
+	entry for PROCESS_LINENUMBER_HOOK.
+
+2009-04-22  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* gdb.texinfo (GDB/MI Program Execution): Document -exec-jump.
+
+2009-04-22  Hui Zhu  <teawater@gmail.com>
+
+	* gdb.texinfo (disassemble-next-line): Set the default of
+	disassemble-next-line to off.
+
+2009-04-21  Joseph Myers  <joseph@codesourcery.com>
+
+	* configure.ac (--with-datarootdir, --with-docdir, --with-pdfdir,
+	--with-htmldir): New.
+	* configure: Regenerate.
+	* Makefile.in (datarootdir, docdir): Define.
+	(gdb.dvi, gdb.pdf): Use same -I options as for building gdb.info
+	instead of $(SET_TEXINPUTS).
+	(gdbint.dvi, gdbint.pdf): Use same -I options as for building
+	gdbint.info instead of $(SET_TEXINPUTS).
+	(gdbint/index.html): Use same -I options as for building
+	gdbint.info.
+	(stabs.dvi, stabs.pdf): Use same -I options as for building
+	stabs.info instead of $(SET_TEXINPUTS).
+	(stabs/index.html): Use same -I options as for building
+	stabs.info.
+	(annotate.dvi, annotate.pdf): Use same -I options as for building
+	annotate.info instead of $(SET_TEXINPUTS).
+	(annotate/index.html): Use same -I options as for building
+	annotate.info.
+
+2009-04-21  David Daney  <ddaney@caviumnetworks.com>
+
+	* gdb.texinfo (maint show-debug-regs): Remove mention of x86.
+
+2009-04-21  Joseph Myers  <joseph@codesourcery.com>
+
+	* gdb.texinfo (Source Path): Document --with-relocated-sources.
+
+2009-04-18  Carlos O'Donell  <carlos@codesourcery.com>
+            Joseph Myers  <joseph@codesourcery.com>
+
+	* Makefile.in (MAKEHTML): Set to makeinfo --html.
+	(MAKEHTMLFLAGS): Set to empty.
+	(html__strip_dir): Define.
+	(HTMLFILES): Define.
+	(HTMLFILES_INSTALL): Define.
+	(install-html): Copy new automake rule.
+	(html): Depend on $(HTMLFILES).
+	(gdb_toc.html): Rename to gdb/index.html.
+	(gdbint_toc.html): Rename to gdbint/index.html.
+	(stabs_toc.html): Rename to stabs/index.html.
+	(annotate_toc.html): Rename to annotate/index.html.
+
+2009-04-17  Carlos O'Donell  <carlos@codesourcery.com>
+
+	* Makefile.in: Set pdfdir and htmldir from configure
+	substitutions.
+	* configure.ac: AC_SUBST datarootdir, docdir, htmldir, pdfdir.
+	* configure: Regenerate.
+
 2009-04-16  Joel Brobecker  <brobecker@adacore.com>
 
 	* gdbint.texinfo (Native Debugging): Remove entry for PROC_NAME_FMT.

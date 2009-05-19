@@ -1560,6 +1560,10 @@ Special entry points for gdb to swap in coff symbol table parts:
 .#define bfd_coff_print_pdata(a,p) \
 .  ((coff_backend_info (a)->_bfd_coff_print_pdata) (a, p))
 .
+.{* Macro: Returns true if the bfd is a PE executable as opposed to a
+.   PE object file.  *}
+.#define bfd_pei_p(abfd) \
+.  (CONST_STRNEQ ((abfd)->xvec->name, "pei-"))
 */
 
 /* See whether the magic number matches.  */
@@ -3181,6 +3185,13 @@ coff_compute_section_file_positions (bfd * abfd)
     unsigned int i;
     int target_index;
     bfd_size_type amt;
+
+#ifdef COFF_PAGE_SIZE
+    /* Clear D_PAGED if section alignment is smaller than
+       COFF_PAGE_SIZE.  */
+   if (pe_data (abfd)->pe_opthdr.SectionAlignment < COFF_PAGE_SIZE)
+     abfd->flags &= ~D_PAGED;
+#endif
 
     count = 0;
     for (current = abfd->sections; current != NULL; current = current->next)

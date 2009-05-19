@@ -19,6 +19,9 @@
 
 #include "server.h"
 #include "linux-low.h"
+#include "ansidecl.h" /* For ATTRIBUTE_PACKED, must be bug in external.h.  */
+#include "elf/common.h"
+#include "elf/external.h"
 
 #include <sys/wait.h>
 #include <stdio.h>
@@ -109,8 +112,6 @@ int stopping_threads;
 /* FIXME make into a target method?  */
 int using_threads = 1;
 
-static int must_set_ptrace_flags;
-
 /* This flag is true iff we've just created or attached to our first
    inferior but it has not stopped yet.  As soon as it does, we need
    to call the low target's arch_setup callback.  Doing this only on
@@ -156,6 +157,68 @@ static int linux_event_pipe[2] = { -1, -1 };
 static void send_sigstop (struct inferior_list_entry *entry);
 static void wait_for_sigstop (struct inferior_list_entry *entry);
 
+/* Accepts an integer PID; Returns a string representing a file that
+   can be opened to get info for the child process.
+   Space for the result is malloc'd, caller must free.  */
+
+char *
+linux_child_pid_to_exec_file (int pid)
+{
+  char *name1, *name2;
+
+  name1 = xmalloc (MAXPATHLEN);
+  name2 = xmalloc (MAXPATHLEN);
+  memset (name2, 0, MAXPATHLEN);
+
+  sprintf (name1, "/proc/%d/exe", pid);
+  if (readlink (name1, name2, MAXPATHLEN) > 0)
+    {
+      free (name1);
+      return name2;
+    }
+  else
+    {
+      free (name2);
+      return name1;
+    }
+}
+
+/* Return non-zero if HEADER is a 64-bit ELF file.  */
+
+static int
+elf_64_header_p (const Elf64_External_Ehdr *header)
+{
+  return (header->e_ident[EI_MAG0] == ELFMAG0
+          && header->e_ident[EI_MAG1] == ELFMAG1
+          && header->e_ident[EI_MAG2] == ELFMAG2
+          && header->e_ident[EI_MAG3] == ELFMAG3
+          && header->e_ident[EI_CLASS] == ELFCLASS64);
+}
+
+/* Return non-zero if FILE is a 64-bit ELF file,
+   zero if the file is not a 64-bit ELF file,
+   and -1 if the file is not accessible or doesn't exist.  */
+
+int
+elf_64_file_p (const char *file)
+{
+  Elf64_External_Ehdr header;
+  int fd;
+
+  fd = open (file, O_RDONLY);
+  if (fd < 0)
+    return -1;
+
+  if (read (fd, &header, sizeof (header)) != sizeof (header))
+    {
+      close (fd);
+      return 0;
+    }
+  close (fd);
+
+  return elf_64_header_p (&header);
+}
+
 static void
 delete_lwp (struct lwp_info *lwp)
 {
@@ -180,6 +243,16 @@ linux_add_process (int pid, int attached)
   proc->private = xcalloc (1, sizeof (*proc->private));
 
   return proc;
+}
+
+/* Remove a process from the common process list,
+   also freeing all private data.  */
+
+static void
+linux_remove_process (struct process_info *process)
+{
+  free (process->private);
+  remove_process (process);
 }
 
 /* Handle a GNU/Linux extended wait response.  If we see a clone
@@ -309,7 +382,7 @@ add_lwp (ptid_t ptid)
 static int
 linux_create_inferior (char *program, char **allargs)
 {
-  void *new_lwp;
+  struct lwp_info *new_lwp;
   int pid;
   ptid_t ptid;
 
@@ -344,7 +417,7 @@ linux_create_inferior (char *program, char **allargs)
   ptid = ptid_build (pid, pid, 0);
   new_lwp = add_lwp (ptid);
   add_thread (ptid, new_lwp);
-  must_set_ptrace_flags = 1;
+  new_lwp->must_set_ptrace_flags = 1;
 
   return pid;
 }
@@ -373,10 +446,6 @@ linux_attach_lwp_1 (unsigned long lwpid, int initial)
 	       strerror (errno), errno);
     }
 
-  /* FIXME: This intermittently fails.
-     We need to wait for SIGSTOP first.  */
-  ptrace (PTRACE_SETOPTIONS, lwpid, 0, PTRACE_O_TRACECLONE);
-
   if (initial)
     /* NOTE/FIXME: This lwp might have not been the tgid.  */
     ptid = ptid_build (lwpid, lwpid, 0);
@@ -391,6 +460,11 @@ linux_attach_lwp_1 (unsigned long lwpid, int initial)
 
   new_lwp = (struct lwp_info *) add_lwp (ptid);
   add_thread (ptid, new_lwp);
+
+
+  /* We need to wait for SIGSTOP before being able to make the next
+     ptrace call on this LWP.  */
+  new_lwp->must_set_ptrace_flags = 1;
 
   /* The next time we wait for this LWP we'll see a SIGSTOP as PTRACE_ATTACH
      brings it to a halt.
@@ -565,7 +639,7 @@ linux_kill (int pid)
     } while (lwpid > 0 && WIFSTOPPED (wstat));
 
   delete_lwp (lwp);
-  remove_process (process);
+  linux_remove_process (process);
   return 0;
 }
 
@@ -654,7 +728,7 @@ linux_detach (int pid)
 
   delete_all_breakpoints ();
   find_inferior (&all_threads, linux_detach_one_lwp, &pid);
-  remove_process (process);
+  linux_remove_process (process);
   return 0;
 }
 
@@ -986,6 +1060,13 @@ linux_wait_for_event_1 (ptid_t ptid, int *wstat, int options)
 	  continue;
 	}
 
+      if (event_child->must_set_ptrace_flags)
+	{
+	  ptrace (PTRACE_SETOPTIONS, lwpid_of (event_child),
+		  0, PTRACE_O_TRACECLONE);
+	  event_child->must_set_ptrace_flags = 0;
+	}
+
       if (WIFSTOPPED (*wstat)
 	  && WSTOPSIG (*wstat) == SIGSTOP
 	  && event_child->stop_expected)
@@ -1248,11 +1329,6 @@ retry:
 
   lwp = get_thread_lwp (current_inferior);
 
-  if (must_set_ptrace_flags)
-    {
-      ptrace (PTRACE_SETOPTIONS, lwpid_of (lwp), 0, PTRACE_O_TRACECLONE);
-      must_set_ptrace_flags = 0;
-    }
   /* If we are waiting for a particular child, and it exited,
      linux_wait_for_event will return its exit status.  Similarly if
      the last child exited.  If this is not the last child, however,
@@ -1273,7 +1349,7 @@ retry:
 	  struct process_info *process = find_process_pid (pid);
 
 	  delete_lwp (lwp);
-	  remove_process (process);
+	  linux_remove_process (process);
 
 	  current_inferior = NULL;
 
@@ -2081,6 +2157,7 @@ regsets_fetch_inferior_registers ()
 	      /* If we get EIO on a regset, do not try it again for
 		 this process.  */
 	      disabled_regsets[regset - target_regsets] = 1;
+	      free (buf);
 	      continue;
 	    }
 	  else
@@ -2095,6 +2172,7 @@ regsets_fetch_inferior_registers ()
 	saw_general_regs = 1;
       regset->store_function (buf);
       regset ++;
+      free (buf);
     }
   if (saw_general_regs)
     return 0;
@@ -2154,6 +2232,7 @@ regsets_store_inferior_registers ()
 	      /* If we get EIO on a regset, do not try it again for
 		 this process.  */
 	      disabled_regsets[regset - target_regsets] = 1;
+	      free (buf);
 	      continue;
 	    }
 	  else if (errno == ESRCH)
@@ -2162,6 +2241,7 @@ regsets_store_inferior_registers ()
 		 already gone, in which case we simply ignore attempts
 		 to change its registers.  See also the related
 		 comment in linux_resume_one_lwp.  */
+	      free (buf);
 	      return 0;
 	    }
 	  else
@@ -2771,12 +2851,35 @@ linux_qxfer_osdata (const char *annex,
   return len;
 }
 
+/* Convert a native/host siginfo object, into/from the siginfo in the
+   layout of the inferiors' architecture.  */
+
+static void
+siginfo_fixup (struct siginfo *siginfo, void *inf_siginfo, int direction)
+{
+  int done = 0;
+
+  if (the_low_target.siginfo_fixup != NULL)
+    done = the_low_target.siginfo_fixup (siginfo, inf_siginfo, direction);
+
+  /* If there was no callback, or the callback didn't do anything,
+     then just do a straight memcpy.  */
+  if (!done)
+    {
+      if (direction == 1)
+	memcpy (siginfo, inf_siginfo, sizeof (struct siginfo));
+      else
+	memcpy (inf_siginfo, siginfo, sizeof (struct siginfo));
+    }
+}
+
 static int
 linux_xfer_siginfo (const char *annex, unsigned char *readbuf,
 		    unsigned const char *writebuf, CORE_ADDR offset, int len)
 {
+  int pid;
   struct siginfo siginfo;
-  long pid = -1;
+  char inf_siginfo[sizeof (struct siginfo)];
 
   if (current_inferior == NULL)
     return -1;
@@ -2784,7 +2887,7 @@ linux_xfer_siginfo (const char *annex, unsigned char *readbuf,
   pid = lwpid_of (get_thread_lwp (current_inferior));
 
   if (debug_threads)
-    fprintf (stderr, "%s siginfo for lwp %ld.\n",
+    fprintf (stderr, "%s siginfo for lwp %d.\n",
 	     readbuf != NULL ? "Reading" : "Writing",
 	     pid);
 
@@ -2794,14 +2897,24 @@ linux_xfer_siginfo (const char *annex, unsigned char *readbuf,
   if (ptrace (PTRACE_GETSIGINFO, pid, 0, &siginfo) != 0)
     return -1;
 
+  /* When GDBSERVER is built as a 64-bit application, ptrace writes into
+     SIGINFO an object with 64-bit layout.  Since debugging a 32-bit
+     inferior with a 64-bit GDBSERVER should look the same as debugging it
+     with a 32-bit GDBSERVER, we need to convert it.  */
+  siginfo_fixup (&siginfo, inf_siginfo, 0);
+
   if (offset + len > sizeof (siginfo))
     len = sizeof (siginfo) - offset;
 
   if (readbuf != NULL)
-    memcpy (readbuf, (char *) &siginfo + offset, len);
+    memcpy (readbuf, inf_siginfo + offset, len);
   else
     {
-      memcpy ((char *) &siginfo + offset, writebuf, len);
+      memcpy (inf_siginfo + offset, writebuf, len);
+
+      /* Convert back to ptrace layout before flushing it out.  */
+      siginfo_fixup (&siginfo, inf_siginfo, 1);
+
       if (ptrace (PTRACE_SETSIGINFO, pid, 0, &siginfo) != 0)
 	return -1;
     }

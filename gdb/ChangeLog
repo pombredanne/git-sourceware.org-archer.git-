@@ -1,3 +1,1145 @@
+2009-05-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Remove the PROT parameter from openp.
+	* source.c (openp): Remove the parameter PROT.  Assertion check MODE.
+	defs.h (openp): Update the prototype.
+	Update all the openp callers.
+
+2009-05-19  Pedro Alves  <pedro@codesourcery.com>
+
+	* inflow.c (kill_command): Moved to infcmd.c.
+	(_initialize_inflow): Don't add the "kill" command or clear
+	inferior_ptid here.
+	* infcmd.c (kill_command): Moved here from inflow.c.
+	(_initialize_infcmd): Add the "kill" command here.
+
+2009-05-19  Pedro Alves  <pedro@codesourcery.com>
+
+	* fork-child.c: Don't include frame.h.  Include terminal.h.
+	(fork_inferior): Call new_tty_postfork after forking adn adding
+	the child to the inferior list.
+	* inferior.h (new_tty_prefork, gdb_has_a_terminal): Don't declare
+	here.
+	* inflow.c (struct terminal_info): Remove const qualifier from
+	`run_terminal' field.
+	(inferior_thisrun_terminal): Tweak comment.
+	(inflow_inferior_exit): Release the `run_terminal' field.
+	(copy_terminal_info): New function.
+	(new_tty_postfork): New function.
+	* terminal.h (new_tty_prefork, new_tty, new_tty_postfork,
+	(copy_terminal_info, gdb_has_a_terminal, gdb_setpgid): Declare.
+	* inf-ptrace.c: Include terminal.h.
+	(inf_ptrace_follow_fork): Copy the parent's terminal info to the
+	child.
+	* linux-nat.c: Include terminal.h.
+	(linux_child_follow_fork): Copy the parent's terminal info to the
+	child.
+	* inf-ttrace.c: Include terminal.h.
+	(inf_ttrace_follow_fork): Copy the parent's terminal info to the
+	child.
+
+2009-05-19  Pedro Alves  <pedro@codesourcery.com>
+
+	* breakpoint.c (insert_breakpoints, breakpoint_init_inferior)
+	(update_global_location_list): Use gdbarch_has_global_breakpoints
+	instead of gdbarch_has_global_solist and
+	target_supports_multi_process.
+	* dicos-tdep.c (dicos_init_abi): Set
+	gdbarch_has_global_breakpoints.
+	* gdbarch.sh (has_global_solist): Update comment.
+	(has_global_breakpoints): New.
+	* remote.c (remote_start_remote): Use
+	gdbarch_has_global_breakpoints instead of
+	gdbarch_has_global_solist.
+	* target.c (target_detach): Use gdbarch_has_global_breakpoints
+	instead of gdbarch_has_global_solist.
+	* infcmd.c (attach_command): Use gdbarch_has_global_solist instead
+	of target_supports_multi_process.
+
+2009-05-18  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* objc-lang.c (find_methods): Plug a small memory leak.
+
+2009-05-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* solib-svr4.c: Include observer.h.
+	(debug_base, debug_loader_offset_p, debug_loader_offset)
+	(debug_loader_name, main_lm_addr): Move these globals...
+	(struct svr4_info): ... into this new structure.
+	(svr4_info_p): New typedef.
+	(svr4_info): New global.
+	(get_svr4_info, remove_svr4_info, solib_svr4_inferior_exit): New
+	functions.
+	(locate_base, solib_svr4_r_map, solib_svr4_r_brk)
+	(solib_svr4_r_ldsomap): Add svr4_info argument.  Adjust to
+	per-inferior svr4.
+	(open_symbol_file_object): Adjust to per-inferior svr4.
+	(svr4_default_sos, svr4_current_sos, svr4_fetch_objfile_link_map):
+	Ditto.
+	(enable_break): Add svr4_info argument.  Adjust to per-inferior
+	svr4.
+	(enable_break, svr4_solib_create_inferior_hook, svr4_clear_solib):
+	Adjust to per-inferior svr4.
+	(_initialize_svr4_solib): Install the solib_svr4_inferior_exit
+	observer.
+
+2009-05-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* linux-nat.h (linux_proc_get_tgid): Declare.
+	* linux-nat.c (linux_proc_get_tgid): New.
+	* linux-thread-db.c (struct thread_db_info): New field
+	`need_stale_parent_threads_check'.
+	(add_thread_db_info): Set it.
+	(find_new_threads_callback): Ignore stale fork parent threads.
+	(thread_db_resume): New.
+	(init_thread_db_ops): Install thread_db_resume.
+
+2009-05-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* fork-child.c (fork_inferior): Only reset the thread list if this
+	is the first inferior.
+	(startup_inferior): If the target support multi-process, tell it
+	to resume only the new process.
+	* linux-nat.c (num_lwps): Delete global.
+	(purge_lwp_list): New function.
+	(num_lwps): New function.
+	(add_lwp, delete_lwp): Adjust.
+	(ptid_match): New.
+	(iterate_over_lwps): Add filter argument.  Handle it.
+	(linux_nat_attach): Remove FIXME note.
+	(linux_nat_detach): Adjust to iterate over threads of the inferior
+	we're detaching from.  Adjust to num_lwps being a function.  Don't
+	assume the head of the lwp list is the main thread of the process
+	we're detaching from.  Don't destroy the LWP list.
+	(resume_callback): Add debug output.
+	(linux_nat_resume): Handle resuming a single inferior.  Allow a
+	wildcard resume in non-stop mode.
+	(linux_handle_extended_wait): Don't assume inferior_ptid is the
+	correct inferior of the parent LWP.
+	(status_callback): Also check lp->waitstatus.
+	(select_event_lwp): Add new filter parameter.  Handle it.
+	(linux_nat_filter_event): Adjust to num_lwps being a function.
+	(linux_nat_wait_1): When adding the first lwp of the inferior, use
+	an is_lwp check instead of checking for the number of lwps.
+	(linux_nat_wait_1): Handle waiting for a specific tgid.  Handle
+	pending process exit statuses.
+	(linux_nat_mourn_inferior): Don't destroy all the LWP info.
+	Instead delete LWPs of the inferior that we're mourning.  Don't
+	unregister from the event loop here.
+	(linux_nat_pid_to_str): Use `num_lwps'.
+	(linux_nat_make_corefile_notes): Adjust to walk over lwps of a
+	single inferior.
+	(linux_nat_is_async_p): Check if async was masked out.
+	(linux_multi_process): New global.
+	(linux_nat_supports_multi_process): New.
+	(linux_nat_stop_lwp): Remove LWP filtering.  It is done by the
+	caller.
+	(linux_nat_stop): Adjust to make iterate_over_lwps itself do the
+	LWP filtering.
+	(linux_nat_close): New.
+	(linux_nat_add_target): Register linux_nat_close and
+	linux_nat_supports_multi_process.
+	* linux-nat.h (iterate_over_lwps): Add filter argument.
+	* linux-thread-db.c (thread_db_handle): Delete.
+	(proc_handle, thread_agent, td_init_p, td_ta_new_p)
+	(td_ta_map_id2thr_p, td_ta_map_lwp2thr_p, td_ta_thr_iter_p)
+	(td_ta_event_addr_p, td_ta_set_event_p, td_ta_event_getmsg_p)
+	(td_thr_validate_p, td_thr_get_info_p, td_thr_event_enable_p)
+	(td_thr_tls_get_addr_p, td_create_bp_addr, td_death_bp_addr): No
+	longer globals, moved to...
+	(struct thread_db_info): ... this new structure.
+	(thread_db_list): New.
+	(add_thread_db_info, get_thread_db_info, delete_thread_db_info):
+	New.
+	(have_threads_callback): Filter out threads of all inferiors but
+	the one specified by the ARGS argument.
+	(have_threads): Add ptid argument specifying the inferior we're
+	interested in.  Handle it.
+	(struct thread_get_info_inout): New.
+	(thread_get_info_callback, thread_from_lwp): Adjust to use it.
+	(thread_db_attach_lwp): Check that inferior of the passed in
+	thread is using thread-db.  Adjust.
+	(enable_thread_event): Remove thread_agent parameter.  Instead,
+	get it from the per-inferior thread-db info.
+	(dladdr_to_soname): Move higher up.
+	(enable_thread_event_reporting): Adjust to use per-inferior
+	thread-db info.
+	(try_thread_db_load_1): Replace `handle' parameter by a
+	thread_db_info parameter.  Adjust to use per-inferior thread-db
+	info.
+	(try_thread_db_load): Adjust to use per-inferior thread-db info.
+	(thread_db_load, disable_thread_event_reporting): Ditto.
+	(check_for_thread_db): Remove conditional reporting of which
+	libthread_db is in use.
+	(thread_db_new_objfile): Add comment about inferior_ptid.
+	(attach_thread): Adjust to use per-inferior thread-db info.
+	(thread_db_detach): Adjust to use per-inferior thread-db info.
+	Remove thread event breakpoints of the current inferior.  Only
+	unpush the thread-db target if there are no more processes using
+	it.
+	(check_event): Adjust to use per-inferior thread-db info.
+	(thread_db_wait): Adjust to use per-inferior thread-db info.  Only
+	unpush the thread-db target if there are no more processes using
+	it.
+	(thread_db_mourn_inferior): Adjust to use per-inferior thread-db
+	info.  Mark breakpoints of the current inferior out before
+	deleting them.  Only unpush the thread-db target if there are no
+	more processes using it.
+	(find_new_threads_callback): Adjust to use per-inferior thread_db
+	info.
+	(thread_db_find_new_threads_1): Add new ptid argument.  Adjust to
+	use per-inferior thread-db info.
+	(thread_db_find_new_threads): Adjust to use per-inferior thread-db
+	info.
+	(thread_db_get_thread_local_address): Adjust.
+	(thread_db_get_ada_task_ptid): Adjust.
+	* inf-ptrace.c (inf_ptrace_mourn_inferior): Only unpush the target
+	if there no more processes left to debug.
+	* thread.c (set_running, set_executing): Handle resuming all
+	threads of a single inferior.
+	* mi/mi-interp.c (mi_output_running_pid): New.
+	(mi_inferior_count): New.
+	(mi_on_resume): For backwards compatibility, if resuming all
+	threads of an inferior, and there is only one inferior, output
+	"all".
+
+2009-05-18  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* ada-lang.c (ada_find_any_type): Move check for primitive types ...
+	(to_fixed_range_type): ... to here.
+
+2009-05-18  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* ada-lang.c (desc_data_type): Remove, replace by ...
+	(desc_data_target_type): ... this.
+	(thin_data_pntr): Use desc_data_target_type instead of desc_data_type.
+	(ada_is_array_descriptor_type): Likewise.
+	(ada_type_of_array): Likewise.
+	(ada_coerce_to_simple_array_type): Likewise.
+	(ada_array_element_type): Likewise.
+
+2009-05-18  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* ada-valprint.c (ada_val_print_1): Use val_print_string to print
+	result of ada_vax_float_print_function inferior call.
+
+2009-05-18  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* ada-lang.c (ada_coerce_to_simple_array_type): Reimplement to
+	avoid creating a dummy value.
+
+2009-05-18  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* p-valprint.c (pascal_val_print): Use extract_typed_address
+	to extract reference value.
+
+2009-05-18  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* doublest.c (NAN): Remove unused define.
+	(extract_floating_by_length, deprecated_extract_floating): Remove.
+	(store_floating_by_length, deprecated_store_floating): Remove.
+	(extract_typed_floating): Do not call extract_floating_by_length.
+	(store_typed_floating): Do not call store_floating_by_length.
+	(convert_typed_floating): Remove redundant assertions.
+	* doublest.h (deprecated_extract_floating): Remove.
+	(deprecated_store_floating): Remove.
+	* sh64-tdep.c (sh64_register_convert_to_raw): Call
+	extract_typed_floating instead of deprecated_extract_floating.
+
+2009-05-18  Jon Beniston <jon@beniston.com>
+        
+        * MAINTAINERS: Add lm32 target.        
+        * Makefile.in: Add lm32 dependencies.        
+        * NEWS: Indicate lm32 is a new target.
+        * configure.tgt: Add lm32 targets.
+        * lm32-tdep.c: New file.
+
+2009-05-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* corelow.c (core_open): Flush the register cache before doing
+	anything with registers.
+
+2009-05-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* inflow.h (our_process_group): Remove declaration.
+	(inferior_process_group): Delete global variable declaration.
+	(inferior_process_group): New function declaration.
+	* inflow.c: Include observer.h.
+	(inferior_ttystate, our_ttystate, tflags_inferior, tflags_ours):
+	Delete.
+	(struct terminal_info): New struct.
+	(our_terminal_info): New global.
+	(inferior_process_group): New function.
+	(inferior_thisrun_terminal): Extend description comment.
+	(gdb_has_a_terminal): Adjust to write to our_terminal_info fields
+	instead of globals.
+	(terminal_init_inferior_with_pgrp): Adjust to per-inferior
+	terminal settings.
+	(terminal_inferior): Ditto.
+	(terminal_ours_1): Ditto.
+	(inflow_new_inferior, inflow_inferior_exit): New functions.
+	(child_terminal_info): Adjust to per-inferior terminal settings.
+	(osig_set): New global.
+	(set_sigint_trap): Adjust to per-inferior terminal settings.  Set
+	or clear `osig_set' accordingly.
+	(clear_sigint_trap): Check `osig_set' to decide wheater to restore
+	SIGINT handler, instead of checking the current inferior (which
+	may be none).
+	(_initialize_inflow): Attach inflow_new_inferior and
+	inflow_inferior_exit to the "new_inferior" and "inferior_exit"
+	notifications, respectively.
+	* inferior.h (struct terminal_info): Forward declare.
+	(struct inferior): Add `terminal_info' field.
+	* inferior.c (delete_inferior_1): Notify the inferior_exit
+	observers before removing the inferior from the lists and deleting
+	it.
+	* inf-ptrace.c (inf_ptrace_stop): `inferior_process_group' is now
+	a function instead of a variable.  Adjust.
+	* procfs.c (procfs_stop): Ditto.
+
+2009-05-17  Pedro Alves  <pedro@codesourcery.com>
+
+	* infrun.c (handle_inferior_event): When handling a
+	TARGET_WAITKIND_FORKED, detach breakpoints from the fork child
+	immediatelly.
+	* linux-nat.c (linux_child_follow_fork): Only detach breakpoints
+	from the child if vforking.
+	* inf-ptrace.c (inf_ptrace_follow_fork): No need to detach
+	breakpoints from the child here.
+
+2009-05-17  Pedro Alves  <pedro@codesourcery.com>
+
+	* infrun.c (pending_follow): Remove execd_pathname member.
+	(resume): No longer handle TARGET_WAITKIND_EXECD pending follow.
+	(handle_inferior_event): When handling a TARGET_WAITKIND_EXECD
+	event, don't copy `execd_pathname' to pending_follow, use the
+	event copy instead.  Release `execd_pathname' once done with
+	handling the event.
+
+	* infrun.c (pending_follow): Remove mention of exec events.
+
+2009-05-17  Hui Zhu  <teawater@gmail.com>
+
+	* i386-tdep.c (i386_process_record): Make it extern.
+	(i386_gdbarch_init): Don't call set_gdbarch_process_record
+	here.
+	* i386-tdep.h (i386_process_record): Declare.
+	* i386-linux-tdep.c (i386_linux_init_abi): Call
+	set_gdbarch_process_record.
+
+2009-05-17  Vladimir Prus  <vladimir@codesourcery.com>
+
+	Always report varobj as changed when in_scope attribute changes.
+
+	* varobj.c (install_new_value): If non-NULL-ness of value
+	changed, return 1.
+
+2009-05-15  Paul Pluzhnikov  <ppluzhnikov@google.com>
+	
+	* NEWS: Mention set/show libthread-db-search-path.
+	* gdb_thread_db.h (LIBTHREAD_DB_SEARCH_PATH): New define.
+	(LIBTHREAD_DB_SO): Moved from linux-thread-db.c
+	* linux-thread-db.c (libthread_db_search_path): New setting.
+	(thread_db_handle): New variable (replaces using_thread_db).
+	(try_thread_db_load_1): New function.
+	(try_thread_db_load, thread_db_load_search): Likewise.
+	(dladdr_to_soname): Likewise.
+	(thread_db_load): Iterate over possibly multiple libthread_db's.
+	(check_for_thread_db): Attempt to load new libthread_db.
+	(thread_db_detach, thread_db_wait): Unload libthread_db.
+	(thread_db_mourn_inferior): Likewise.
+	(_initialize_thread_db): Add new libthread-db-search-path option.
+	Defer loading of libthread_db to check_for_thread_db.
+	* solib.c (libpthread_name_p): New function.
+	(libpthread_solib_p): Call it.
+	* solib.h (libpthread_name_p): New prototype.
+	
+2009-05-15  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* MAINTAINERS: Update my email address.
+	
+2009-05-14  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* breakpoint.h: Add breakpoint_re_set_objfile prototype.
+	* breakpoint.c (create_overlay_event_breakpoint): Renamed
+	from create_overlay_event_breakpoint_1, old
+	create_overlay_event_breakpoint deleted.
+	(breakpoint_re_set_objfile): Don't rescan all objfiles
+	unnecessarily.
+	(breakpoint_re_set): New function.
+	* symfile.c (new_symfile_objfile): Call breakpoint_re_set_objfile
+	instead of breakpoint_re_set.
+	* objfiles.c (objfile_relocate): Likewise.
+	
+2009-05-14  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdbarch.sh: Add comment documenting the target_gdbarch global.
+	gdbarch.h does NOT need to be regenerated as the corresponding
+	change has already been made in a previous commit.
+
+2009-05-14  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	Remove all i386 debug register low level macros in config nm files.
+	(I386_DR_LOW_SET_ADDR, I386_DR_LOW_RESET_ADDR): Remove.
+	(I386_DR_LOW_GET_STATUS, I386_DR_LOW_SET_CONTROL): Remove.
+	(I386_USE_GENERIC_WATCHPOIINTS): Remove.
+
+	* i386-nat.h: New file (adapted from config/i386/nm-i386.h).
+	(struct i386_dr_low_type): New type.
+	(i386_dr_low): New global variable.
+	* i386-nat.c (TARGET_HAS_DR_LEN_8): Update macro.
+	(i386_insert_aligned_watchpoint): Replace i386 dr low macros by
+	i386_dr_low struct variable fields.
+	(i386_remove_aligned_watchpoint): Likewise.
+	(i386_stopped_data_address): Likewise.
+	(i386_stopped_by_hwbp): Likewise.
+	(show_debug_regs_command_added): New static variable.
+	(add_show_debug_regs_command): New static function.
+	(i386_use_watchpoints): Call add_show_debug_regs_command if not done.
+	(i386_set_debug_register_length): New function.
+	(_initialize_i386_nat): Delete.
+	
+	* amd64-linux-nat.c: Include "i386-nat.h".
+	(amd64_linux_dr_set_control):  Change to static.
+	(amd64_linux_dr_get_status): Change to static.
+	(amd64_linux_dr_set_addr,amd64_linux_dr_reset_addr): Likewise.
+	(_initialize_amd64_linux_nat): Set i386_dr_low variable fields.
+	
+	* go32-nat.c: Include "i386-nat.h".
+	(go32_set_addr): Change to static.
+	(go32_set_dr7): Change to static. Change arg type to unisgned long.
+	(go32_get_dr6): Change to static. Change return type to unisnged long.
+	(init_go32_ops):  Set i386_dr_low variable fields.
+	* i386-linux-nat.c: Include "i386-nat.h".
+	(i386_linux_dr_set_control, i386_linux_dr_get_status): Change to static.
+	(i386_linux_dr_set_addr, i386_linux_dr_reset_addr): Idem.
+	(_initialize_i386_linux_nat):  Set i386_dr_low variable fields.
+	* i386bsd-nat.h: Declare functions used for
+	i386_dr_low fields in i386fbsd-nat.c.
+	* i386fbsd-nat.c: Include "i386-nat.h".
+	(_initialize_i386fbsd_nat): Set i386_dr_low variable fields.
+	* windows-nat.c: Include "i386-nat.h".
+	(cygwin_set_dr, cygwin_get_dr6, cygwin_set_dr7): Add prototypes.
+	Change to static.
+	(cygwin_get_dr6): Change return type to unisnged long.
+	(cygwin_set_dr7): Change arg type to unisgned long.
+	(init_windows_ops): Set i386_dr_low function fields.
+
+	* amd64-windows-nat.c (_initialize_amd64_windows_nat): Call 
+	i386_set_debug_register_length.
+	* i386-windows-nat.c (_initialize_i386_windows_nat): Likewise.
+
+	* config/i386/nm-cygwin.h: Remove all I386_* macros.
+	* config/i386/nm-cygwin64.h: Likewise.
+	* config/i386/nm-fbsd.h: Likewise.
+	* config/i386/nm-linux.h: Likewise.
+	* config/i386/nm-i386.h: Remove completely.
+	* config/i386/nm-go32.h: Remove completely.
+	* config/i386/nm-linux64.h: Remove completely.
+	* config/i386/go32.mh (NAT_FILE): Remove entry.
+	* config/i386/linux64.h (NAT_FILE): Change to config/nm-linux.h.
+
+2009-05-14  Jon Beniston  <jon@beniston.com>
+
+	* MAINTAINERS: Add Jon Beniston to write after approval list.
+
+2009-05-13  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* objc-lang.c (objc_objfile_data): New variable.
+	(find_methods): Skip objfiles without Obj-C methods.
+	(_initialize_objc_lang): New function.
+
+2009-05-13  Joel Brobecker  <brobecker@adacore.com>
+
+	* c-lang.c (print_wchar): Remove unnecessary cast.
+
+2009-05-12  Jim Blandy  <jimb@red-bean.com>
+
+	* MAINTAINERS: Remove self as m32c target maintainer.
+
+2009-05-12  Pedro Alves  <pedro@codesourcery.com>
+
+	* cli/cli-decode.c (deprecated_add_set_cmd): Delete.
+	* command.h (deprecated_add_set_cmd): Delete declaration.
+	* gnu-nat.c (_initialize_gnu_nat): Replace 'maint gnu-debug' with
+	'set debug gnu-nat' and 'show debug gnu-nat'.
+	* i386-nat.c (_initialize_i386_nat): Replace 'maint
+	show-debug-registers' with 'maint set show-debug-registers' and
+	'maint show show-debug-registers'.
+	* mips-linux-nat.c (_initialize_mips_linux_nat): Replace 'maint
+	show-debug-registers' with 'maint set show-debug-registers' and
+	'maint show show-debug-registers'.
+
+2009-05-12  Joel Brobecker <brobecker@adacore.com>
+
+	* c-lang.c (print_wchar): Convert w into a gdb_wchar_t before
+	pushing it on the output obstack.
+
+2009-05-11  Joel Brobecker <brobecker@adacore.com>
+
+	Fix internal error on breaking at a multi-locations caller source line.
+	* breakpoint.c (parse_breakpoint_sals): Set EXPLICIT_PC for the `break'
+	command with no parameters.
+
+2009-05-11  Pedro Alves  <pedro@codesourcery.com>
+
+	* linux-nat.c (enum sigchld_state): Delete.
+	(linux_nat_async_events_state): Delete.
+	(struct waitpid_result): Delete.
+	(waitpid_queue): Delete.
+	(queued_waitpid_1): Delete.
+	(async_file_flush): New.
+	(queued_waitpid, push_waitpid): Delete.
+	(async_file_mark): New.
+	(drain_queued_events): Delete.
+	(my_waitpid): Remove locally queued events handling.
+	(linux_test_for_tracefork): Upjust.
+	(linux_child_follow_fork): Ditto.
+	(sync_sigchld_action): Delete.
+	(blocked_mask): Reinstate.
+	(async_sigchld_action): Rename to...
+	(sigchld_action): ... this.
+	(block_child_signals): New.
+	(restore_child_signals_mask): New.
+	(lin_lwp_attach_lwp): Adjust.
+	(linux_nat_create_inferior): Ditto.
+	(linux_nat_attach): Also use lp->status in async mode.
+	(get_pending_status): Don't use queued_waitpid.
+	(linux_nat_detach): Don't drain locally queued events.
+	(linux_nat_resume): Allow pending wait statuses stored lp->status
+	in async mode.  If returning early due to a pending event,
+	re-register the event source.
+	(stop_wait_callback): Allow pending wait statuses stored
+	lp->status in async mode.
+	(pipe_to_local_event_queue, local_event_queue_to_pipe): Delete.
+	(linux_nat_wait): Rename to ...
+	(linux_nat_wait_1): ... this.  Allow pending wait statuses stored
+	lp->status in async mode.  Always add WNOHANG to the waitpid
+	options in async mode.
+	(linux_nat_wait): New.
+	(kill_callback): Don't drain locally queued events.
+	(sigchld_handler): Rewrite.
+	(linux_nat_is_async_p, linux_nat_can_async_p): Fix comments to
+	refer to "set target-async".
+	(linux_nat_async_mask): If in non-stop, and re-enabling async
+	mode, re-register the target event source in the event loop.
+	(linux_nat_event_pipe_pop, linux_nat_event_pipe_push)
+	(get_pending_events, async_sigchld_handler)
+	(linux_nat_async_events): Delete.
+	(handle_target_event): New.
+	(linux_nat_async_file_handler): Delete.
+	(linux_async_pipe): New.
+	(linux_nat_async): Only re-register in the event loop if not
+	registered yet.  Always notify the event-loop once if enabling the
+	event source.
+	(linux_nat_stop_lwp): Rewrite to handle pending events stored in
+	lp->status, not in the locally queued event list.
+	(linux_nat_stop): Don't mask out async event handling.
+	(linux_nat_setup_async): Delete.
+	(_initialize_linux_nat): Adjust.
+	(lin_thread_get_thread_signals): blocked_mask is global again.
+	Adjust.
+
+2009-05-11  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	Unify target macros.
+
+	* target.h (STOPPED_BY_WATCHPOINT): Delete, replaced by ...
+	(target_stoppped_by_watchpoint): New macro.
+	(HAVE_STEPPABLE_WATCHPOINT): Delete, replaced by ...
+	(target_have_steppable_watchpoint): New macro.
+	(HAVE_CONTINUABLE_WATCHPOINT): Delete, replace by ...
+	(target_have_continuable_watchpoint): New macro.
+	(TARGET_CAN_USE_HARDWARE_WATCHPOINT):Delete, replaced by ...
+	(target_can_use_hardware_watchpoint): New macro.
+	(TARGET_REGION_OK_FOR_HW_WATCHPOINT):Delete, replaced by ...
+	(target_region_ok_for_hw_watchpoint): New macro.
+
+	* breakpoint.c (update_watchpoint): Use new macros.
+	(bpstat_alloc): Likewise.
+	(create_breakpoint): Likewise.
+	(watch_command_1): Likewise.
+	(can_use_hardware_watchpoint): Likewise.
+	(do_enable_breakpoint): Likewise.
+	* infrun.c (handle_inferior_event): Adapt to new macros.
+	* mips-tdep.c (mips_gdbarch_init): Update comments.
+	* procfs.c (procfs_set_watchpoint): Update comment.
+	(procfs_insert_watchpoint): Adapt to new macros.
+	* remote-m32r-sdi.c (m32r_stop):
+	* remote-mips.c (mips_remove_breakpoint):
+	* target.c (debug_to_region_ok_for_hw_watchpoint): Update to new macros.
+	(debug_to_stopped_by_watchpoint): Likewise.
+
+
+2009-05-10  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* src/gdb/target.h: Remove all tests for already defined
+	macros. All macros defined here should not be set in config
+	headers anymore.
+
+2009-05-08  Sergio Durigan Junior <sergiodj@linux.vnet.ibm.com>
+
+	* ppc-linux-nat.c (have_ptrace_getsetregs): New variable.
+	(have_ptrace_getsetfpregs): Likewise.
+	fetch_all_gp_regs): New function.
+	(fetch_gp_regs): New function.
+	(fetch_all_fp_regs): Likewise.
+	(fetch_fp_regs): New function.
+	(fetch_ppc_registers): Using the new methods to fetch general-
+	purpose and floating-pointer registers.
+	(store_all_gp_regs): New function.
+	(store_gp_regs): Likewise.
+	(store_all_fp_regs): New function.
+	(store_fp_regs): Likewise.
+	(store_ppc_registers): Using the new methods to store general-
+	purpose and floating-pointer registers.
+
+2009-05-08  Doug Evans  <dje@google.com>
+
+	* linux-nat.c (linux_xfer_siginfo): Delete unused locals lp, n.
+
+2009-05-07  Sergio Durigan Junior  <sergiodj@linux.vnet.ibm.com>
+
+	* MAINTAINERS (Write After Approval): Add self.
+
+2009-05-07  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdbarch.h (target_gdbarch): Add comment documenting this global.
+
+2009-05-06  Joel Brobecker  <brobecker@adacore.com>
+
+	* acinclude.m4 (AM_ICONV): Prefer in-tree libiconv if present over
+	system iconv.
+	* configure: Regenerate.
+
+2009-05-06  Joel Brobecker  <brobecker@adacore.com>
+
+	* utils.c: Add include of gdb_usleep.h.
+	(defaulted_query): Detect false EOF conditions that happen
+	on terminals opened with the O_NONBLOCK flag when there is
+	nothing to read.
+
+2009-05-06  Pedro Alves  <pedro@codesourcery.com>
+
+	* inferior.c (add_inferior): Move observer_notify_new_inferior
+	call to ...
+	(add_inferior_silent): ... here.
+
+2009-05-06  Pierre Muller  <muller@ics.u-strasbg.fr>
+	    Pedro Alves  <pedro@codesourcery.com>
+
+	* procfs.c (procfs_insert_watchpoint, procfs_remove_watchpoint)
+	(procfs_region_ok_for_hw_watchpoint, procfs_use_watchpoints): New
+	functions.
+	(procfs_stopped_by_watchpoint): Made static, ptid argument
+	removed.
+	(_initialize_procfs): Register new watchpoint related target
+	functions.
+	* config/i386/nm-i386sol2.h (TARGET_CAN_USE_HARDWARE_WATCHPOINT)
+	(TARGET_REGION_SIZE_OK_FOR_HW_WATCHPOINT, STOPPED_BY_WATCHPOINT)
+	(HAVE_CONTINUABLE_WATCHPOINT): Delete.
+	(target_insert_watchpoint, target_remove_watchpoint): Delete.
+	(procfs_stopped_by_watchpoint, procfs_set_watchpoint): Delete
+	declarations.
+	* config/mips/nm-irix5.h (STOPPED_BY_WATCHPOINT)
+	(TARGET_REGION_SIZE_OK_FOR_HW_WATCHPOINT): Delete.
+	(target_insert_watchpoint, target_remove_watchpoint): Delete.
+	(procfs_stopped_by_watchpoint, procfs_set_watchpoint): Delete
+	declarations.
+	* config/sparc/nm-sol2.h (TARGET_REGION_SIZE_OK_FOR_HW_WATCHPOINT)
+	(HAVE_CONTINUABLE_WATCHPOINT, STOPPED_BY_WATCHPOINT): Delete.
+	(target_insert_watchpoint, target_remove_watchpoint): Delete.
+	(procfs_stopped_by_watchpoint, procfs_set_watchpoint): Delete
+	declarations.
+
+2009-05-06  Hui Zhu  <teawater@gmail.com>
+
+	* i386-tdep.c (i386_process_record): Change bzero to memset.
+
+2009-05-06  Hui Zhu  <teawater@gmail.com>
+
+	* NEWS: Add item for process record and replay.
+
+2009-05-05  Maxim Grigoriev  <maxim2405@gmail.com>
+
+	* xtensa-tdep.c (xtensa_frame_cache): Use pc instead of cache->pc.
+
+2009-05-05  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* inferior.h (read_pc, write_pc): Remove.
+	* regcache.c (read_pc, write_pc): Remove.
+
+	* infrun.c (displaced_step_fixup): Use regcache_read_pc instead
+	of read_pc.
+	(handle_inferior_event): Use regcache_read_pc instead of read_pc
+	when determining value of stop_pc.  Replace subsequent uses of
+	read_pc by inspecting already-retrieved stop_pc value.
+	(keep_going): Use regcache_read_pc instead of read_pc.
+
+	* breakpoint.c (watchpoint_check): Use current frame architecture
+	and PC instead of current_gdbarch and read_pc ().
+	* tracepoint.c (set_traceframe_context): Replace PC argument
+	with FRAME argument.
+	(trace_start_command, finish_tfind_command): Update calls.
+	(finish_tfind_command): Compare frame IDs to identify transitions
+	between frames.
+	(trace_find_pc_command): Use regcache_read_pc instead of read_pc.
+	* rs6000-nat.c (exec_one_dummy_insn): Pass in regcache instead
+	of gdbarch.  Use regcache_read_pc and regcache_write_pc instead
+	of read_pc and write_pc.
+	(store_register): Make regcache argument non-const.  Update call
+	to exec_one_dummy_insn.
+
+	* thread.c (switch_to_thread): Use regcache_read_pc instead of read_pc.
+	* infcmd.c (post_create_inferior): Likewise.
+	* solib-darwin.c (darwin_solib_create_inferior_hook): Likewise.
+	* solib-pa64.c (pa64_solib_create_inferior_hook): Likewise.
+	* solib-sunos.c (sunos_solib_create_inferior_hook): Likewise.
+	* solib-svr4.c (enable_break, svr4_relocate_main_executable): Likewise.
+	* linux-fork.c (fork_load_infrun_state): Likewise.
+	* hppa-hpux-tdep.c (hppa_hpux_push_dummy_code): Likewise.
+	* record.c (record_wait): Likewise.
+	* procfs.c (procfs_wait): Likewise.
+	* remote-mips.c (common_open, mips_wait): Likewise.
+	* remote-m32r-sdi.c (m32r_resume): Likewise.
+
+	* symfile.c (generic_load): Use regcache_write_pc instead of write_pc.
+	* monitor.c (monitor_create_inferior, monitor_load): Likewise.
+	* m32r-rom.c (m32r_load, m32r_upload_command): Likewise.
+	* remote-m32r-sdi.c (m32r_create_inferior, m32r_load): Likewise.
+	* remote-mips.c (mips_create_inferior, mips_load): Likewise.
+
+	* solib-darwin.c: Include "regcache.h".
+	* solib-pa64.c: Include "regcache.h".
+	* solib-svr4.c: Include "regcache.h.".
+
+	* symfile.c: Do not mention read_pc or write_pc in comments.
+	* dink32-rom.c: Likewise.
+	* m32r-rom.c: Likewise.
+	* mips-tdep.c: Likewise.
+
+2009-05-05  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* fork-child.c (startup_inferior): Move setting stop_pc ...
+	* infcmd.c (post_create_inferior): ... to here.
+
+2009-05-04  Michael Snyder  <msnyder@vmware.com>
+
+	* NEWS: Add item for reverse debugging commands.
+
+2009-05-04  Pedro Alves  <pedro@codesourcery.com>
+
+	* go32-nat.c (go32_stop): Delete.
+	(go32_kill_inferior): Rewrite to only call go32_mourn_inferior.
+	(go32_create_inferior): Don't call go32_stop or
+	go32_kill_inferior.
+	(go32_mourn_inferior): Inline go32_stop and go32_kill_inferior
+	here.
+	(init_go32_ops): Don't register go32_stop.
+
+2009-05-02  Eli Zaretskii  <eliz@gnu.org>
+
+	* dbxread.c (read_dbx_symtab): Avoid compiler warnings for
+	sym_name.
+
+	* infcall.c (find_function_addr): Avoid compiler warnings for
+	funaddr.
+
+2009-05-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dictionary.c (dict_hashed_vector, dict_hashed_expandable_vector)
+	(dict_linear_vector, dict_linear_expandable_vector): Fix a comment typo.
+
+2009-05-01  Doug Evans  <dje@google.com>
+
+	* linux-thread-db.c (thread_db_pid_to_str): Delete unused assignment
+	to thread_info.
+
+2009-05-01  Eli Zaretskii  <eliz@gnu.org>
+
+	* record.c (_initialize_record): Reformat and clarify doc strings
+	for stop-at-limit and insn-number-max.
+
+	* go32-nat.c: Add comments about dirty secrets of DJGPP debugging.
+
+2009-05-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Make specifiable the make_function_type type memory ownership.
+	* gdbtypes.c (make_function_type): New parameter `objfile', use it
+	explicitely instead of TYPE-initialized removed local variable
+	`objfile'.  Describe `objfile' it in the function comment.
+	(lookup_function_type): Update make_function_type callers.
+	* gdbtypes.h (make_function_type): Update the prototype.
+	* jv-lang.c (java_link_class_type): Update make_function_type callers.
+	* dwarf2read.c (read_subroutine_type): Likewise.
+	* stabsread.c (read_type): Likewise.
+
+2009-05-01  Eli Zaretskii  <eliz@gnu.org>
+
+	* go32-nat.c (go32_pid_to_str): Call normal_pid_to_str instead of
+	printing a bogus "Thread <main>".
+	(go32_thread_alive): Don't return 1 for null_ptid.
+
+	* i386-tdep.c (i386_go32_init_abi): Override the number of
+	registers due to non-support of SSE.
+
+2009-04-30  Anthony Green  <green@moxielogic.com>
+
+	* configure.tgt: Link the moxie simulator in with gdb.
+
+2009-04-30  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* elfread.c (elf_symtab_read): Don't assume .data and .rodata
+	are present.
+
+2009-04-30  Hui Zhu  <teawater@gmail.com>
+            Michael Snyder  <msnyder@vmware.com>
+
+	I386 Linux process record and replay support.
+
+	* i386-linux-tdep.c (i386_linux_record_tdep): New variable.
+	This struct has the argument for the function
+	"record_linux_system_call".
+	(i386_linux_intx80_sysenter_record): New function. Parse the
+	system call instruction and call function
+	"record_linux_system_call" to record execute log.
+	(i386_linux_init_abi): Initialize "i386_linux_record_tdep".
+	Set "i386_linux_intx80_sysenter_record" to
+	"i386_intx80_record" and "i386_sysenter_record".
+
+2009-04-30  Hui Zhu  <teawater@gmail.com>
+            Michael Snyder  <msnyder@vmware.com>
+
+	I386 architecture process record and replay support.
+
+	* i386-tdep.c (PREFIX_REPZ, PREFIX_REPNZ, PREFIX_LOCK,
+	PREFIX_DATA, PREFIX_ADDR): New macros. Help decode the i386
+	instruction set.
+	(aflag, dflag, override, modrm, mod, reg, rm, ot,
+	i386_record_pc): New variables. Ditto.
+	(i386_record_modrm, i386_record_lea_modrm_addr,
+	i386_record_lea_modrm): New functions. Ditto.
+	(i386_process_record): New function. Parse the instruction in
+	address "addr" and record the values of registers and memory
+	that will be changed by this instruction.
+	(i386_gdbarch_init): Set "i386_process_record" to GDBARCH
+	"process_record" interface.
+	* i386-tdep.h (gdbarch_tdep): New function pointers
+	"i386_intx80_record" and "i386_sysenter_record" that point to
+	the function that can record "intx80" and "sysenter" execute
+	log.
+
+2009-04-30  Hui Zhu  <teawater@gmail.com>
+            Michael Snyder  <msnyder@vmware.com>
+
+	* infrun.c (use_displaced_stepping): Return false if process
+	record and replay target is used.
+	(proceed): Call function "record_not_record_set" if pocess
+	record and replay target is used.
+
+2009-04-30  Hui Zhu  <teawater@gmail.com>
+            Michael Snyder  <msnyder@vmware.com>
+
+	Linux process record and replay support.
+
+	* Makefile.in (ALLDEPFILES): Add linux-record.c.
+	(ALL_TARGET_OBS): Add linux-record.o.
+	* configure.tgt (x86_64-*-linux*): Add linux-record.o.
+	(i[34567]86-*-linux*): Add linux-record.o.
+	* linux-record.c, linux-record.h: New file.
+
+2009-04-30  Hui Zhu  <teawater@gmail.com>
+            Michael Snyder  <msnyder@vmware.com>
+
+	Process record and replay target.
+
+	* Makefile.in (SFILES): Add record.c.
+	(COMMON_OBS): Add record.o.
+	* record.c, record.h: New file.
+
+2009-04-30  Hui Zhu  <teawater@gmail.com>
+            Michael Snyder  <msnyder@vmware.com>
+
+	* target.h (strata): New stratum "record_stratum".
+
+2009-04-30  Hui Zhu  <teawater@gmail.com>
+            Michael Snyder  <msnyder@vmware.com>
+
+	GDBARCH interface for process record and replay.
+
+	* gdbarch.sh (process_record): This interface point to the
+	function that records the inferior execute log.
+
+2009-04-29  Doug Evans  <dje@google.com>
+
+	* i386-nat.c (child_post_startup_inferior): Delete, unused.
+
+2009-04-29  Pedro Alves  <pedro@codesourcery.com>
+
+	* breakpoint.c (print_exception_catchpoint): Access `b' directly
+	instead of `b->loc->owner'.
+	(print_mention_exception_catchpoint): Ditto.
+
+2009-04-29  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* macrocmd.c (info_macro_command): Print -Dname=value if LINE is zero.
+
+2009-04-27  Tom Tromey  <tromey@redhat.com>
+
+	* c-exp.y (yylex): Handle '[' and ']' like '(' and ')'.
+
+2009-04-27  Jerome Guitton  <guitton@adacore.com>
+
+	* symtab.c (append_exact_match_to_sals): New function, extracted
+	from expand_line_sal.
+	(expand_line_sal): Use append_exact_match_to_sals to append exact
+	matches. If none found, append all best items.
+
+2009-04-27  Jerome Guitton  <guitton@adacore.com>
+
+	* main.c (captured_main): Move gdbinit lookups after gdb_init.
+
+2009-04-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR gdb/9675:
+	* dwarf2read.c (unsigned_int_compar, inherit_abstract_dies): New.
+	(read_func_scope): Call inherit_abstract_dies.
+
+2009-04-25  Eli Zaretskii  <eliz@gnu.org>
+
+	* Makefile.in (ALLDEPFILES): Remove duplicate entries for
+	sparc-sol2-nat.c and sparc-sol2-tdep.c.
+
+	* stack.c (_initialize_stack) <disassemble-next-line>: Doc fix.
+
+2009-04-24  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	ARI change: Use "/* ARI: rule */" pattern.
+	* utils.c: Update ARI patterns.
+	* gdb_dirent.h: Likewise.
+
+2009-04-23  Anthony Green  <green@moxielogic.com>
+
+	* MAINTAINERS: Add moxie target.
+	* configure.tgt: Add moxie-*-elf target.
+	* moxie-tdep.c: New file.
+	* moxie-tdep.h: New file.
+
+2009-04-23  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c: Remove an extra empty line. No code change.
+
+2009-04-23  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix double free on error inserting the breakpoint instruction.
+	* breakpoint.c (create_breakpoints): Move the
+	update_global_location_list call to ...
+	(break_command_really): ... here together with the second local call
+	both unified after all the cleanups.
+
+2009-04-23  Sergio Durigan Junior <sergiodj@linux.vnet.ibm.com>
+	    Tom Tromey  <tromey@redhat.com>
+
+	* configure, config.in: Regenerate.
+	* configure.ac: Support for relocatable GDB datadir.  Use
+	GDB_AC_WITH_DIR.  Always define TARGET_SYSTEM_ROOT_RELOCATABLE.
+	* acinclude.m4 (GDB_AC_WITH_DIR): New defun.
+	* top.c (init_main): Add "set data-directory".
+	* defs.h (gdb_datadir): Declare.
+	* main.c (gdb_datadir): New global.
+	(captured_main): Initialize gdb_datadir.  Use relocate_directory.
+	(relocate_path): New function.
+	(relocate_directory): Likewise.
+	(get_init_files): Use relocate_path.
+	(README): Mention --with-gdb-datadir.
+
+2009-04-23  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-tasks (task_command_1): Call target_find_new_threads.
+
+2009-04-23  Joel Brobecker  <brobecker@adacore.com>
+
+	* stack.c (do_gdb_disassembly): Print the exception message if an
+	error was thrown while trying to perform the disassembly.
+
+2009-04-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* varobj.c (free_variable): Replace free_current_contents by xfree.
+
+2009-04-22  Kazu Hirata  <kazu@codesourcery.com>
+
+	* arm-linux-nat.c (fetch_register, store_register): Use
+	ARM_CPSR_GREGNUM instead of ARM_CPSR_REGNUM.
+	* arm-linux-tdep.c (arm_linux_supply_gregset,
+	arm_linux_collect_gregset): Likewise.
+	* arm-linux-tdep.h (ARM_CPSR_GREGNUM): New.
+	* arm-tdep.h (ARM_CPSR_REGNUM): Remove.
+
+2009-04-22  Hui Zhu  <teawater@gmail.com>
+
+	* stack.c (_initialize_stack): Set the default of
+	disassemble-next-line to off.
+
+2009-04-21  Tom Tromey  <tromey@redhat.com>
+
+	* acinclude.m4: Use AS_HELP_STRING, not AC_HELP_STRING.
+	* configure.ac: Use AS_HELP_STRING, not AC_HELP_STRING.
+
+2009-04-21  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* configure.ac: Add quotes to not lose brackets in help text.
+	* configure: Rebuild.
+
+2009-04-21  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* configure.ac: Don't postprocess Makefile in config.status.
+	Substitute GDB_NM_FILE.  Don't substitute nm_h.
+	* Makefile.in (GDB_NM_FILE): Substitute.
+	(TAGS): Use $(GDB_NM_FILE) instead of $(NAT_FILE).
+	* configure: Regenerate.
+	* gnulib/Makefile.in: Regenerate.
+
+2009-04-21  Joseph Myers  <joseph@codesourcery.com>
+
+	* configure.ac (--with-datarootdir, --with-docdir, --with-pdfdir,
+	--with-htmldir): New.
+	* configure: Regenerate.
+
+2009-04-21  Tom Tromey  <tromey@redhat.com>
+
+	* configure: Rebuild.
+	* configure.ac: Use lower case for start of help strings.  Clean
+	up --with-sysroot help.
+
+2009-04-21  Tom Tromey  <tromey@redhat.com>
+
+	* configure: Rebuild.
+	* acinclude.m4 (AM_ICONV): Use AC_HELP_STRING.
+	* configure.ac: Use AC_HELP_STRING.  Use upper case for variables
+	in help.
+
+2009-04-21  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	ARI fix: remove "%p".
+	* ia64-tdep.c (ia64_frame_this_id): Use host_address_to_string function.
+	(ia64_sigtramp_frame_this_id): Ditto.
+	(ia64_libunwind_frame_this_id): Ditto.
+	(ia64_libunwind_sigtramp_frame_this_id): Ditto.
+	* symmisc.c (maintenance_info_psymtabs): Ditto.
+
+2009-04-21  Joseph Myers  <joseph@codesourcery.com>
+
+	* configure.ac (--with-relocated-sources): New.
+	* configure, config.in: Regenerate.
+	* source.c (add_substitute_path_rule): Remove static.
+	* source.h (add_substitute_path_rule): Declare.
+	* main.c: Include "source.h".
+	(captured_main): Add substitution rule if RELOC_SRCDIR.
+
+2009-04-21  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* gnu-nat.h (proc_debug): Add missing continuation line in macro.
+
+2009-04-20  David Daney  <ddaney@caviumnetworks.com>
+
+	* NEWS: Mention MIPS/Linux hardware watchpoint support.
+
+2009-04-20  David Daney  <ddaney@caviumnetworks.com>
+
+	* mips-linux-nat.c (command.h, gdbcmd.h, gdb_assert.h): New #includes.
+	(maint_show_dr, super_close): New variables.
+	(super_fetch_registers, super_store_registers): Make static.
+	(PTRACE_GET_WATCH_REGS, PTRACE_SET_WATCH_REGS, W_BIT, R_BIT, I_BIT)
+	(W_MASK, R_MASK, I_MASK, IRW_MASK, MAX_DEBUG_REGISTER): Define.
+	(pt_watch_style): Define new enum.
+	(mips32_watch_regs, mips64_watch_regs, pt_watch_regs, mips_watchpoint):
+	Define new structs.
+	(watch_readback_valid, watch_readback, current_watches,	watch_mirror):
+	New variables.
+	(get_irw_mask, get_reg_mask, get_num_valid, get_watchlo)
+	(set_watchlo, get_watchhi, set_watchhi, mips_show_dr)
+	(mips_linux_read_watch_registers, mips_linux_can_use_hw_breakpoint)
+	(mips_linux_stopped_by_watchpoint, mips_linux_stopped_data_address)
+	(type_to_irw, fill_mask, try_one_watch)
+	(mips_linux_region_ok_for_hw_watchpoint, write_watchpoint_regs)
+	(mips_linux_new_thread, populate_regs_from_watches)
+	(mips_linux_insert_watchpoint, mips_linux_remove_watchpoint)
+	(mips_linux_close): New functions.
+	(_initialize_mips_linux_nat): Register watchpoint functions with
+	the target_ops.  Add show-debug-regs maintenance command.
+
+2009-04-20  David Daney  <ddaney@caviumnetworks.com>
+
+	* infrun.c (handle_inferior_event): Move gegisters_changed call down.
+
+2009-04-19  Pedro Alves  <pedro@codesourcery.com>
+
+	* NEWS: Mention gdbserver support for x86 Windows CE.
+
+2009-04-19  Eli Zaretskii  <eliz@gnu.org>
+
+	* config/djgpp/fnchange.lst: Fix typos.
+
+	Set default host and target charsets in the DJGPP port.
+
+	* config/djgpp/config.sed (am_cv_langinfo_codeset)
+	(bash_cv_langinfo_codeset, ac_cv_header_nl_types_h): Set to "yes"
+	in all configure scripts that define ac_cv_env_CPP_value.
+
+	* go32-nat.c (dos_codepage, nl_langinfo): New functions.
+	Include langinfo.h.
+
+	* config/djgpp/nl_types.h: New file.
+
+	* config/djgpp/langinfo.h: New file.
+
+	* config/i386/go32.mh (MH_CFLAGS): Add $(srcdir)/config/djgpp.
+
+2009-04-18  Carlos O'Donell  <carlos@codesourcery.com>
+
+	* Makefile.in (MAKEHTML): Set to makeinfo --html.
+	(MAKEHTMLFLAGS): Set to empty.
+
+2009-04-18  Eli Zaretskii  <eliz@gnu.org>
+
+	* NEWS: Mention all new set/show commands added since GDB 6.8 was
+	released.
+
+	* go32-nat.c (go32_sysinfo): Check if the call to
+	__dpmi_get_capabilities fills the buffer with information, and
+	don't use the buffer if not.
+
+2009-04-17  Tom Tromey  <tromey@redhat.com>
+
+	* charset.c (_initialize_charset): Add special case for "646".
+
+2009-04-17  Carlos O'Donell  <carlos@codesourcery.com>
+
+	* configure.ac: AC_SUBST datarootdir, docdir, htmldir, pdfdir.
+	* configure: Regenerate.
+	* Makefile.in: Set datarootdir, docdir, htmldir, and pdfdir from
+	configure substitutions.
+	(FLAGS_TO_PASS): Add datarootdir, docdir, and htmldir.
+
+2009-04-17  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	ARI fix: Do not use %p, replace by call to host_address_to_string
+	for host pointers.
+	* darwin-nat.c (darwin_xfer_partial): Apply change.
+	* gnu-nat.c (inf_continue, gnu_xfer_memory): Ditto.
+	* gnu-nat.h (proc_debug): Ditto.
+	* symmisc.c (maintenance_info_symtabs): Ditto.
+	(maintenance_info_psymtabs): Ditto.
+	* windows-nat.c (handle_load_dll): Ditto.
+	(handle_unload_dll, info_w32_command, handle_exception): Ditto.
+	* xtensa-tdep.c (xtensa_unwind_pc): Ditto.
+
+2009-04-17  Joseph Myers  <joseph@codesourcery.com>
+
+	* configure.tgt (i[34567]86-*-linux*): Use 64-bit configuration if
+	--enable-64-bit-bfd.
+	(sparc-*-linux*): Likewise.
+
 2009-04-17  Eli Zaretskii  <eliz@gnu.org>
 
 	* go32-nat.c (go32_sysinfo): Update list of Windows versions of
@@ -172,7 +1314,7 @@
 2009-04-01  Aleksandar Ristovski  <aristovski@qnx.com>
 
 	* mips-tdep.c (mips_numeric_register_alieses): New definition.
-	(mips_gdbarch_init): Add user registers from 
+	(mips_gdbarch_init): Add user registers from
 	mips_numeric_register_aliases.
 
 2009-04-01  Joel Brobecker  <brobecker@adacore.com>

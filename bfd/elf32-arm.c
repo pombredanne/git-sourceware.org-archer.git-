@@ -20,6 +20,8 @@
    MA 02110-1301, USA.  */
 
 #include "sysdep.h"
+#include <limits.h>
+
 #include "bfd.h"
 #include "libiberty.h"
 #include "libbfd.h"
@@ -60,6 +62,11 @@
 #define ARM_ELF_OS_ABI_VERSION		ELFOSABI_ARM
 
 static struct elf_backend_data elf32_arm_vxworks_bed;
+
+static bfd_boolean elf32_arm_write_section (bfd *output_bfd,
+					    struct bfd_link_info *link_info,
+					    asection *sec,
+					    bfd_byte *contents);
 
 /* Note: code such as elf32_arm_reloc_type_lookup expect to use e.g.
    R_ARM_PC24 as an index into this, and find the R_ARM_PC24 HOWTO
@@ -1881,7 +1888,8 @@ typedef unsigned short int insn16;
    interworkable.  */
 #define INTERWORK_FLAG(abfd)  \
   (EF_ARM_EABI_VERSION (elf_elfheader (abfd)->e_flags) >= EF_ARM_EABI_VER4 \
-  || (elf_elfheader (abfd)->e_flags & EF_ARM_INTERWORK))
+  || (elf_elfheader (abfd)->e_flags & EF_ARM_INTERWORK) \
+  || ((abfd)->flags & BFD_LINKER_CREATED))
 
 /* The linker script knows the section names for placement.
    The entry_names are used to do simple name mangling on the stubs.
@@ -2160,21 +2168,38 @@ static const insn_sequence elf32_arm_stub_long_branch_v4t_thumb_thumb_pic[] =
    string.  */
 #define STUB_SUFFIX ".stub"
 
-enum elf32_arm_stub_type
-{
+/* One entry per long/short branch stub defined above.  */
+#define DEF_STUBS \
+  DEF_STUB(long_branch_any_any)	\
+  DEF_STUB(long_branch_v4t_arm_thumb) \
+  DEF_STUB(long_branch_thumb_only) \
+  DEF_STUB(long_branch_v4t_thumb_thumb)	\
+  DEF_STUB(long_branch_v4t_thumb_arm) \
+  DEF_STUB(short_branch_v4t_thumb_arm) \
+  DEF_STUB(long_branch_any_arm_pic) \
+  DEF_STUB(long_branch_any_thumb_pic) \
+  DEF_STUB(long_branch_v4t_thumb_thumb_pic) \
+  DEF_STUB(long_branch_v4t_arm_thumb_pic) \
+  DEF_STUB(long_branch_v4t_thumb_arm_pic) \
+  DEF_STUB(long_branch_thumb_only_pic)
+
+#define DEF_STUB(x) arm_stub_##x,
+enum elf32_arm_stub_type {
   arm_stub_none,
-  arm_stub_long_branch_any_any,
-  arm_stub_long_branch_v4t_arm_thumb,
-  arm_stub_long_branch_thumb_only,
-  arm_stub_long_branch_v4t_thumb_thumb,
-  arm_stub_long_branch_v4t_thumb_arm,
-  arm_stub_short_branch_v4t_thumb_arm,
-  arm_stub_long_branch_any_arm_pic,
-  arm_stub_long_branch_any_thumb_pic,
-  arm_stub_long_branch_v4t_arm_thumb_pic,
-  arm_stub_long_branch_v4t_thumb_arm_pic,
-  arm_stub_long_branch_thumb_only_pic,
-  arm_stub_long_branch_v4t_thumb_thumb_pic,
+  DEF_STUBS
+};
+#undef DEF_STUB
+
+typedef struct
+{
+  const insn_sequence* template;
+  int template_size;
+} stub_def;
+
+#define DEF_STUB(x) {elf32_arm_stub_##x, ARRAY_SIZE(elf32_arm_stub_##x)},
+static const stub_def stub_definitions[] = {
+  {NULL, 0},
+  DEF_STUBS
 };
 
 struct elf32_arm_stub_hash_entry
@@ -2260,14 +2285,52 @@ typedef struct elf32_vfp11_erratum_list
 }
 elf32_vfp11_erratum_list;
 
+typedef enum
+{
+  DELETE_EXIDX_ENTRY,
+  INSERT_EXIDX_CANTUNWIND_AT_END
+}
+arm_unwind_edit_type;
+
+/* A (sorted) list of edits to apply to an unwind table.  */
+typedef struct arm_unwind_table_edit
+{
+  arm_unwind_edit_type type;
+  /* Note: we sometimes want to insert an unwind entry corresponding to a
+     section different from the one we're currently writing out, so record the
+     (text) section this edit relates to here.  */
+  asection *linked_section;
+  unsigned int index;
+  struct arm_unwind_table_edit *next;
+}
+arm_unwind_table_edit;
+
 typedef struct _arm_elf_section_data
 {
+  /* Information about mapping symbols.  */
   struct bfd_elf_section_data elf;
   unsigned int mapcount;
   unsigned int mapsize;
   elf32_arm_section_map *map;
+  /* Information about CPU errata.  */
   unsigned int erratumcount;
   elf32_vfp11_erratum_list *erratumlist;
+  /* Information about unwind tables.  */
+  union
+  {
+    /* Unwind info attached to a text section.  */
+    struct
+    {
+      asection *arm_exidx_sec;
+    } text;
+
+    /* Unwind info attached to an .ARM.exidx section.  */
+    struct
+    {
+      arm_unwind_table_edit *unwind_edit_list;
+      arm_unwind_table_edit *unwind_edit_tail;
+    } exidx;
+  } u;
 }
 _arm_elf_section_data;
 
@@ -2915,14 +2978,15 @@ arm_type_of_stub (struct bfd_link_info *info,
 	 places.  */
     }
 
-  if (r_type == R_ARM_THM_CALL)
+  if (r_type == R_ARM_THM_CALL || r_type == R_ARM_THM_JUMP24)
     {
       /* Handle cases where:
 	 - this call goes too far (different Thumb/Thumb2 max
            distance)
-	 - it's a Thumb->Arm call and blx is not available. A stub is
-           needed in this case, but only if this call is not through a
-           PLT entry. Indeed, PLT stubs handle mode switching already.
+	 - it's a Thumb->Arm call and blx is not available, or it's a
+           Thumb->Arm branch (not bl). A stub is needed in this case,
+           but only if this call is not through a PLT entry. Indeed,
+           PLT stubs handle mode switching already.
       */
       if ((!thumb2
 	    && (branch_offset > THM_MAX_FWD_BRANCH_OFFSET
@@ -2931,7 +2995,8 @@ arm_type_of_stub (struct bfd_link_info *info,
 	      && (branch_offset > THM2_MAX_FWD_BRANCH_OFFSET
 		  || (branch_offset < THM2_MAX_BWD_BRANCH_OFFSET)))
 	  || ((st_type != STT_ARM_TFUNC)
-	      && ((r_type == R_ARM_THM_CALL) && !globals->use_blx)
+	      && (((r_type == R_ARM_THM_CALL) && !globals->use_blx)
+		  || (r_type == R_ARM_THM_JUMP24))
 	      && !use_plt))
 	{
 	  if (st_type == STT_ARM_TFUNC)
@@ -2941,14 +3006,19 @@ arm_type_of_stub (struct bfd_link_info *info,
 		{
 		  stub_type = (info->shared | globals->pic_veneer)
 		    /* PIC stubs.  */
-		    ? ((globals->use_blx)
-		       /* V5T and above.  */
+		    ? ((globals->use_blx
+			&& (r_type ==R_ARM_THM_CALL))
+		       /* V5T and above. Stub starts with ARM code, so
+			  we must be able to switch mode before
+			  reaching it, which is only possible for 'bl'
+			  (ie R_ARM_THM_CALL relocation).  */
 		       ? arm_stub_long_branch_any_thumb_pic
 		       /* On V4T, use Thumb code only.  */
 		       : arm_stub_long_branch_v4t_thumb_thumb_pic)
 
 		    /* non-PIC stubs.  */
-		    : ((globals->use_blx)
+		    : ((globals->use_blx
+			&& (r_type ==R_ARM_THM_CALL))
 		       /* V5T and above.  */
 		       ? arm_stub_long_branch_any_any
 		       /* V4T.  */
@@ -2978,14 +3048,16 @@ arm_type_of_stub (struct bfd_link_info *info,
 
 	      stub_type = (info->shared | globals->pic_veneer)
 		/* PIC stubs.  */
-		? ((globals->use_blx)
+		? ((globals->use_blx
+		    && (r_type ==R_ARM_THM_CALL))
 		   /* V5T and above.  */
 		   ? arm_stub_long_branch_any_arm_pic
 		   /* V4T PIC stub.  */
 		   : arm_stub_long_branch_v4t_thumb_arm_pic)
 
 		/* non-PIC stubs.  */
-		: ((globals->use_blx)
+		: ((globals->use_blx
+		    && (r_type ==R_ARM_THM_CALL))
 		   /* V5T and above.  */
 		   ? arm_stub_long_branch_any_any
 		   /* V4T.  */
@@ -2999,7 +3071,7 @@ arm_type_of_stub (struct bfd_link_info *info,
 	    }
 	}
     }
-  else if (r_type == R_ARM_CALL)
+  else if (r_type == R_ARM_CALL || r_type == R_ARM_JUMP24 || r_type == R_ARM_PLT32)
     {
       if (st_type == STT_ARM_TFUNC)
 	{
@@ -3019,7 +3091,9 @@ arm_type_of_stub (struct bfd_link_info *info,
 	     the mode change (bit 24 (H) of BLX encoding).  */
 	  if (branch_offset > (ARM_MAX_FWD_BRANCH_OFFSET + 2)
 	      || (branch_offset < ARM_MAX_BWD_BRANCH_OFFSET)
-	      || !globals->use_blx)
+	      || ((r_type == R_ARM_CALL) && !globals->use_blx)
+	      || (r_type == R_ARM_JUMP24)
+	      || (r_type == R_ARM_PLT32))
 	    {
 	      stub_type = (info->shared | globals->pic_veneer)
 		/* PIC stubs.  */
@@ -3344,60 +3418,11 @@ arm_size_one_stub (struct bfd_hash_entry *gen_entry,
   stub_entry = (struct elf32_arm_stub_hash_entry *) gen_entry;
   htab = (struct elf32_arm_link_hash_table *) in_arg;
 
-  switch (stub_entry->stub_type)
-    {
-    case arm_stub_long_branch_any_any:
-      template =  elf32_arm_stub_long_branch_any_any;
-      template_size = ARRAY_SIZE (elf32_arm_stub_long_branch_any_any);
-      break;
-    case arm_stub_long_branch_v4t_arm_thumb:
-      template =  elf32_arm_stub_long_branch_v4t_arm_thumb;
-      template_size = ARRAY_SIZE (elf32_arm_stub_long_branch_v4t_arm_thumb);
-      break;
-    case arm_stub_long_branch_thumb_only:
-      template =  elf32_arm_stub_long_branch_thumb_only;
-      template_size = ARRAY_SIZE (elf32_arm_stub_long_branch_thumb_only);
-      break;
-    case arm_stub_long_branch_v4t_thumb_thumb:
-      template =  elf32_arm_stub_long_branch_v4t_thumb_thumb;
-      template_size = ARRAY_SIZE (elf32_arm_stub_long_branch_v4t_thumb_thumb);
-      break;
-    case arm_stub_long_branch_v4t_thumb_arm:
-      template =  elf32_arm_stub_long_branch_v4t_thumb_arm;
-      template_size = ARRAY_SIZE (elf32_arm_stub_long_branch_v4t_thumb_arm);
-      break;
-    case arm_stub_short_branch_v4t_thumb_arm:
-      template =  elf32_arm_stub_short_branch_v4t_thumb_arm;
-      template_size = ARRAY_SIZE (elf32_arm_stub_short_branch_v4t_thumb_arm);
-      break;
-    case arm_stub_long_branch_any_arm_pic:
-      template = elf32_arm_stub_long_branch_any_arm_pic;
-      template_size = ARRAY_SIZE (elf32_arm_stub_long_branch_any_arm_pic);
-      break;
-    case arm_stub_long_branch_any_thumb_pic:
-      template = elf32_arm_stub_long_branch_any_thumb_pic;
-      template_size = ARRAY_SIZE (elf32_arm_stub_long_branch_any_thumb_pic);
-      break;
-    case arm_stub_long_branch_v4t_arm_thumb_pic:
-      template = elf32_arm_stub_long_branch_v4t_arm_thumb_pic;
-      template_size = ARRAY_SIZE (elf32_arm_stub_long_branch_v4t_arm_thumb_pic);
-      break;
-    case arm_stub_long_branch_v4t_thumb_arm_pic:
-      template = elf32_arm_stub_long_branch_v4t_thumb_arm_pic;
-      template_size = ARRAY_SIZE (elf32_arm_stub_long_branch_v4t_thumb_arm_pic);
-      break;
-    case arm_stub_long_branch_thumb_only_pic:
-      template = elf32_arm_stub_long_branch_thumb_only_pic;
-      template_size = ARRAY_SIZE (elf32_arm_stub_long_branch_thumb_only_pic);
-      break;
-    case arm_stub_long_branch_v4t_thumb_thumb_pic:
-      template = elf32_arm_stub_long_branch_v4t_thumb_thumb_pic;
-      template_size = ARRAY_SIZE (elf32_arm_stub_long_branch_v4t_thumb_thumb_pic);
-      break;
-    default:
-      BFD_FAIL ();
-      return FALSE;
-    }
+  BFD_ASSERT((stub_entry->stub_type > arm_stub_none)
+	     && stub_entry->stub_type < ARRAY_SIZE(stub_definitions));
+
+  template = stub_definitions[stub_entry->stub_type].template;
+  template_size = stub_definitions[stub_entry->stub_type].template_size;
 
   size = 0;
   for (i = 0; i < template_size; i++)
@@ -3763,9 +3788,12 @@ elf32_arm_size_stubs (bfd *output_bfd,
 		      goto error_ret_free_local;
 		    }
 
-		  /* Only look for stubs on call instructions.  */
+		  /* Only look for stubs on branch instructions.  */
 		  if ((r_type != (unsigned int) R_ARM_CALL)
-		      && (r_type != (unsigned int) R_ARM_THM_CALL))
+		      && (r_type != (unsigned int) R_ARM_THM_CALL)
+		      && (r_type != (unsigned int) R_ARM_JUMP24)
+		      && (r_type != (unsigned int) R_ARM_THM_JUMP24)
+		      && (r_type != (unsigned int) R_ARM_PLT32))
 		    continue;
 
 		  /* Now determine the call target, its name, value,
@@ -3916,11 +3944,13 @@ elf32_arm_size_stubs (bfd *output_bfd,
 
 		  /* For historical reasons, use the existing names for
 		     ARM-to-Thumb and Thumb-to-ARM stubs.  */
-		  if (r_type == (unsigned int) R_ARM_THM_CALL
-		      && st_type != STT_ARM_TFUNC)
+		  if ( ((r_type == (unsigned int) R_ARM_THM_CALL)
+			|| (r_type == (unsigned int) R_ARM_THM_JUMP24))
+		       && st_type != STT_ARM_TFUNC)
 		    sprintf (stub_entry->output_name, THUMB2ARM_GLUE_ENTRY_NAME,
 			     sym_name);
-		  else if (r_type == (unsigned int) R_ARM_CALL
+		  else if ( ((r_type == (unsigned int) R_ARM_CALL)
+			     || (r_type == (unsigned int) R_ARM_JUMP24))
 			   && st_type == STT_ARM_TFUNC)
 		    sprintf (stub_entry->output_name, ARM2THUMB_GLUE_ENTRY_NAME,
 			     sym_name);
@@ -3945,7 +3975,13 @@ elf32_arm_size_stubs (bfd *output_bfd,
       for (stub_sec = htab->stub_bfd->sections;
 	   stub_sec != NULL;
 	   stub_sec = stub_sec->next)
-	stub_sec->size = 0;
+	{
+	  /* Ignore non-stub sections.  */
+	  if (!strstr (stub_sec->name, STUB_SUFFIX))
+	    continue;
+
+	  stub_sec->size = 0;
+	}
 
       bfd_hash_traverse (&htab->stub_hash_table, arm_size_one_stub, htab);
 
@@ -4143,7 +4179,16 @@ arm_allocate_glue_section_space (bfd * abfd, bfd_size_type size, const char * na
   bfd_byte * contents;
 
   if (size == 0)
-    return;
+    {
+      /* Do not include empty glue sections in the output.  */
+      if (abfd != NULL)
+	{
+	  s = bfd_get_section_by_name (abfd, name);
+	  if (s != NULL)
+	    s->flags |= SEC_EXCLUDE;
+	}
+      return;
+    }
 
   BFD_ASSERT (abfd != NULL);
 
@@ -4254,86 +4299,6 @@ record_arm_to_thumb_glue (struct bfd_link_info * link_info,
 
   return myh;
 }
-
-static void
-record_thumb_to_arm_glue (struct bfd_link_info *link_info,
-			  struct elf_link_hash_entry *h)
-{
-  const char *name = h->root.root.string;
-  asection *s;
-  char *tmp_name;
-  struct elf_link_hash_entry *myh;
-  struct bfd_link_hash_entry *bh;
-  struct elf32_arm_link_hash_table *hash_table;
-  bfd_vma val;
-
-  hash_table = elf32_arm_hash_table (link_info);
-
-  BFD_ASSERT (hash_table != NULL);
-  BFD_ASSERT (hash_table->bfd_of_glue_owner != NULL);
-
-  s = bfd_get_section_by_name
-    (hash_table->bfd_of_glue_owner, THUMB2ARM_GLUE_SECTION_NAME);
-
-  BFD_ASSERT (s != NULL);
-
-  tmp_name = bfd_malloc ((bfd_size_type) strlen (name)
-			 + strlen (THUMB2ARM_GLUE_ENTRY_NAME) + 1);
-
-  BFD_ASSERT (tmp_name);
-
-  sprintf (tmp_name, THUMB2ARM_GLUE_ENTRY_NAME, name);
-
-  myh = elf_link_hash_lookup
-    (&(hash_table)->root, tmp_name, FALSE, FALSE, TRUE);
-
-  if (myh != NULL)
-    {
-      /* We've already seen this guy.  */
-      free (tmp_name);
-      return;
-    }
-
-  /* The only trick here is using hash_table->thumb_glue_size as the value.
-     Even though the section isn't allocated yet, this is where we will be
-     putting it.  The +1 on the value marks that the stub has not been
-     output yet - not that it is a Thumb function.  */
-  bh = NULL;
-  val = hash_table->thumb_glue_size + 1;
-  _bfd_generic_link_add_one_symbol (link_info, hash_table->bfd_of_glue_owner,
-				    tmp_name, BSF_GLOBAL, s, val,
-				    NULL, TRUE, FALSE, &bh);
-
-  /* If we mark it 'Thumb', the disassembler will do a better job.  */
-  myh = (struct elf_link_hash_entry *) bh;
-  myh->type = ELF_ST_INFO (STB_LOCAL, STT_ARM_TFUNC);
-  myh->forced_local = 1;
-
-  free (tmp_name);
-
-#define CHANGE_TO_ARM "__%s_change_to_arm"
-#define BACK_FROM_ARM "__%s_back_from_arm"
-
-  /* Allocate another symbol to mark where we switch to Arm mode.  */
-  tmp_name = bfd_malloc ((bfd_size_type) strlen (name)
-			 + strlen (CHANGE_TO_ARM) + 1);
-
-  BFD_ASSERT (tmp_name);
-
-  sprintf (tmp_name, CHANGE_TO_ARM, name);
-
-  bh = NULL;
-  val = hash_table->thumb_glue_size + 4,
-  _bfd_generic_link_add_one_symbol (link_info, hash_table->bfd_of_glue_owner,
-				    tmp_name, BSF_LOCAL, s, val,
-				    NULL, TRUE, FALSE, &bh);
-
-  free (tmp_name);
-
-  s->size += THUMB2ARM_GLUE_SIZE;
-  hash_table->thumb_glue_size += THUMB2ARM_GLUE_SIZE;
-}
-
 
 /* Allocate space for ARMv4 BX veneers.  */
 
@@ -4545,11 +4510,9 @@ record_vfp11_erratum_veneer (struct bfd_link_info *link_info,
   return val;
 }
 
-/* Note: we do not include the flag SEC_LINKER_CREATED, as that
-   would prevent elf_link_input_bfd() from processing the contents
-   of the section.  */
 #define ARM_GLUE_SECTION_FLAGS \
-  (SEC_ALLOC | SEC_LOAD | SEC_HAS_CONTENTS | SEC_IN_MEMORY | SEC_CODE | SEC_READONLY)
+  (SEC_ALLOC | SEC_LOAD | SEC_HAS_CONTENTS | SEC_IN_MEMORY | SEC_CODE \
+   | SEC_READONLY | SEC_LINKER_CREATED)
 
 /* Create a fake section for use by the ARM backend of the linker.  */
 
@@ -4586,10 +4549,6 @@ bfd_elf32_arm_add_glue_sections_to_bfd (bfd *abfd,
   /* If we are only performing a partial
      link do not bother adding the glue.  */
   if (info->relocatable)
-    return TRUE;
-
-  /* Linker stubs don't need glue.  */
-  if (!strcmp (abfd->filename, "linker stubs"))
     return TRUE;
 
   return arm_make_glue_section (abfd, ARM2THUMB_GLUE_SECTION_NAME)
@@ -4710,9 +4669,6 @@ bfd_elf32_arm_process_before_allocation (bfd *abfd,
 
 	  /* These are the only relocation types we care about.  */
 	  if (   r_type != R_ARM_PC24
-	      && r_type != R_ARM_PLT32
-	      && r_type != R_ARM_JUMP24
-	      && r_type != R_ARM_THM_JUMP24
 	      && (r_type != R_ARM_V4BX || globals->fix_v4bx < 2))
 	    continue;
 
@@ -4764,23 +4720,11 @@ bfd_elf32_arm_process_before_allocation (bfd *abfd,
 	  switch (r_type)
 	    {
 	    case R_ARM_PC24:
-	    case R_ARM_PLT32:
-	    case R_ARM_JUMP24:
 	      /* This one is a call from arm code.  We need to look up
 	         the target of the call.  If it is a thumb target, we
 	         insert glue.  */
 	      if (ELF_ST_TYPE (h->type) == STT_ARM_TFUNC)
 		record_arm_to_thumb_glue (link_info, h);
-	      break;
-
-	    case R_ARM_THM_JUMP24:
-	      /* This one is a call from thumb code.  We look
-	         up the target of the call.  If it is not a thumb
-                 target, we insert glue.  */
-	      if (ELF_ST_TYPE (h->type) != STT_ARM_TFUNC
-		  && !(globals->use_blx && r_type == R_ARM_THM_CALL)
-		  && h->root.type != bfd_link_hash_undefweak)
-		record_thumb_to_arm_glue (link_info, h);
 	      break;
 
 	    default:
@@ -6128,7 +6072,9 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
 	 far away, in which case a long branch stub should be inserted.  */
       if ((r_type != R_ARM_ABS32 && r_type != R_ARM_REL32
            && r_type != R_ARM_ABS32_NOI && r_type != R_ARM_REL32_NOI
-	   && r_type != R_ARM_CALL)
+	   && r_type != R_ARM_CALL
+	   && r_type != R_ARM_JUMP24
+	   && r_type != R_ARM_PLT32)
 	  && h != NULL
 	  && splt != NULL
 	  && h->plt.offset != (bfd_vma) -1)
@@ -6296,7 +6242,7 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
 		   input_bfd,
 		   h ? h->root.root.string : "(local)");
 	    }
-	  else if (r_type != R_ARM_CALL)
+	  else if (r_type == R_ARM_PC24)
 	    {
 	      /* Check for Arm calling Thumb function.  */
 	      if (sym_flags == STT_ARM_TFUNC)
@@ -6314,7 +6260,9 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
 
 	  /* Check if a stub has to be inserted because the
 	     destination is too far or we are changing mode.  */
-	  if (r_type == R_ARM_CALL)
+	  if (   r_type == R_ARM_CALL
+	      || r_type == R_ARM_JUMP24
+	      || r_type == R_ARM_PLT32)
 	    {
 	      /* If the call goes through a PLT entry, make sure to
 		 check distance to the right destination address.  */
@@ -6333,7 +6281,11 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
 
 	      if (branch_offset > ARM_MAX_FWD_BRANCH_OFFSET
 		  || branch_offset < ARM_MAX_BWD_BRANCH_OFFSET
-		  || sym_flags == STT_ARM_TFUNC)
+		  || ((sym_flags == STT_ARM_TFUNC)
+		      && (((r_type == R_ARM_CALL) && !globals->use_blx)
+			  || (r_type == R_ARM_JUMP24)
+			  || (r_type == R_ARM_PLT32) ))
+		  )
 		{
 		  /* The target is out of reach, so redirect the
 		     branch to the local stub for this function.  */
@@ -6399,16 +6351,17 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
 	      value = (signed_addend & howto->dst_mask)
 		| (bfd_get_32 (input_bfd, hit_data) & (~ howto->dst_mask));
 
-	      /* Set the H bit in the BLX instruction.  */
-	      if (sym_flags == STT_ARM_TFUNC)
-		{
-		  if (addend)
-		    value |= (1 << 24);
-		  else
-		    value &= ~(bfd_vma)(1 << 24);
-		}
 	      if (r_type == R_ARM_CALL)
 		{
+		  /* Set the H bit in the BLX instruction.  */
+		  if (sym_flags == STT_ARM_TFUNC)
+		    {
+		      if (addend)
+			value |= (1 << 24);
+		      else
+			value &= ~(bfd_vma)(1 << 24);
+		    }
+
 		  /* Select the correct instruction (BL or BLX).  */
 		  /* Only if we are not handling a BL to a stub. In this
 		     case, mode switching is performed by the stub.  */
@@ -6652,7 +6605,8 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
 		    /* Convert BL to BLX.  */
 		    lower_insn = (lower_insn & ~0x1000) | 0x0800;
 		  }
-		else if (r_type != R_ARM_THM_CALL)
+		else if ((   r_type != R_ARM_THM_CALL)
+			 && (r_type != R_ARM_THM_JUMP24))
 		  {
 		    if (elf32_thumb_to_arm_stub
 			(info, sym_name, input_bfd, output_bfd, input_section,
@@ -6689,7 +6643,7 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
 	    *unresolved_reloc_p = FALSE;
 	  }
 
-	if (r_type == R_ARM_THM_CALL)
+	if (r_type == R_ARM_THM_CALL || r_type == R_ARM_THM_JUMP24)
 	  {
 	    /* Check if a stub has to be inserted because the destination
 	       is too far.  */
@@ -6709,7 +6663,9 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
 		(thumb2
 		 && (branch_offset > THM2_MAX_FWD_BRANCH_OFFSET
 		     || (branch_offset < THM2_MAX_BWD_BRANCH_OFFSET)))
-		|| ((sym_flags != STT_ARM_TFUNC) && !globals->use_blx))
+		|| ((sym_flags != STT_ARM_TFUNC)
+		    && (((r_type == R_ARM_THM_CALL) && !globals->use_blx)
+			|| r_type == R_ARM_THM_JUMP24)))
 	      {
 		/* The target is out of reach or we are changing modes, so
 		   redirect the branch to the local stub for this
@@ -6723,7 +6679,7 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
 			   + stub_entry->stub_sec->output_section->vma);
 
 		/* If this call becomes a call to Arm, force BLX.  */
-		if (globals->use_blx)
+		if (globals->use_blx && (r_type == R_ARM_THM_CALL))
 		  {
 		    if ((stub_entry
 			 && !arm_stub_is_thumb (stub_entry->stub_type))
@@ -8232,6 +8188,307 @@ elf32_arm_relocate_section (bfd *                  output_bfd,
   return TRUE;
 }
 
+/* Add a new unwind edit to the list described by HEAD, TAIL.  If INDEX is zero,
+   adds the edit to the start of the list.  (The list must be built in order of
+   ascending INDEX: the function's callers are primarily responsible for
+   maintaining that condition).  */
+
+static void
+add_unwind_table_edit (arm_unwind_table_edit **head,
+		       arm_unwind_table_edit **tail,
+		       arm_unwind_edit_type type,
+		       asection *linked_section,
+		       unsigned int index)
+{
+  arm_unwind_table_edit *new_edit = xmalloc (sizeof (arm_unwind_table_edit));
+  
+  new_edit->type = type;
+  new_edit->linked_section = linked_section;
+  new_edit->index = index;
+  
+  if (index > 0)
+    {
+      new_edit->next = NULL;
+
+      if (*tail)
+	(*tail)->next = new_edit;
+
+      (*tail) = new_edit;
+
+      if (!*head)
+	(*head) = new_edit;
+    }
+  else
+    {
+      new_edit->next = *head;
+
+      if (!*tail)
+	*tail = new_edit;
+
+      *head = new_edit;
+    }
+}
+
+static _arm_elf_section_data *get_arm_elf_section_data (asection *);
+
+/* Increase the size of EXIDX_SEC by ADJUST bytes.  ADJUST mau be negative.  */
+static void
+adjust_exidx_size(asection *exidx_sec, int adjust)
+{
+  asection *out_sec;
+
+  if (!exidx_sec->rawsize)
+    exidx_sec->rawsize = exidx_sec->size;
+
+  bfd_set_section_size (exidx_sec->owner, exidx_sec, exidx_sec->size + adjust);
+  out_sec = exidx_sec->output_section;
+  /* Adjust size of output section.  */
+  bfd_set_section_size (out_sec->owner, out_sec, out_sec->size +adjust);
+}
+
+/* Insert an EXIDX_CANTUNWIND marker at the end of a section.  */
+static void
+insert_cantunwind_after(asection *text_sec, asection *exidx_sec)
+{
+  struct _arm_elf_section_data *exidx_arm_data;
+
+  exidx_arm_data = get_arm_elf_section_data (exidx_sec);
+  add_unwind_table_edit (
+    &exidx_arm_data->u.exidx.unwind_edit_list,
+    &exidx_arm_data->u.exidx.unwind_edit_tail,
+    INSERT_EXIDX_CANTUNWIND_AT_END, text_sec, UINT_MAX);
+
+  adjust_exidx_size(exidx_sec, 8);
+}
+
+/* Scan .ARM.exidx tables, and create a list describing edits which should be
+   made to those tables, such that:
+   
+     1. Regions without unwind data are marked with EXIDX_CANTUNWIND entries.
+     2. Duplicate entries are merged together (EXIDX_CANTUNWIND, or unwind
+        codes which have been inlined into the index).
+
+   The edits are applied when the tables are written
+   (in elf32_arm_write_section).
+*/
+
+bfd_boolean
+elf32_arm_fix_exidx_coverage (asection **text_section_order,
+			      unsigned int num_text_sections,
+			      struct bfd_link_info *info)
+{
+  bfd *inp;
+  unsigned int last_second_word = 0, i;
+  asection *last_exidx_sec = NULL;
+  asection *last_text_sec = NULL;
+  int last_unwind_type = -1;
+
+  /* Walk over all EXIDX sections, and create backlinks from the corrsponding
+     text sections.  */
+  for (inp = info->input_bfds; inp != NULL; inp = inp->link_next)
+    {
+      asection *sec;
+      
+      for (sec = inp->sections; sec != NULL; sec = sec->next)
+        {
+	  struct bfd_elf_section_data *elf_sec = elf_section_data (sec);
+	  Elf_Internal_Shdr *hdr = &elf_sec->this_hdr;
+	  
+	  if (hdr->sh_type != SHT_ARM_EXIDX)
+	    continue;
+	  
+	  if (elf_sec->linked_to)
+	    {
+	      Elf_Internal_Shdr *linked_hdr
+	        = &elf_section_data (elf_sec->linked_to)->this_hdr;
+	      struct _arm_elf_section_data *linked_sec_arm_data
+	        = get_arm_elf_section_data (linked_hdr->bfd_section);
+
+	      if (linked_sec_arm_data == NULL)
+	        continue;
+
+	      /* Link this .ARM.exidx section back from the text section it
+	         describes.  */
+	      linked_sec_arm_data->u.text.arm_exidx_sec = sec;
+	    }
+	}
+    }
+
+  /* Walk all text sections in order of increasing VMA.  Eilminate duplicate
+     index table entries (EXIDX_CANTUNWIND and inlined unwind opcodes),
+     and add EXIDX_CANTUNWIND entries for sections with no unwind table data.
+   */
+
+  for (i = 0; i < num_text_sections; i++)
+    {
+      asection *sec = text_section_order[i];
+      asection *exidx_sec;
+      struct _arm_elf_section_data *arm_data = get_arm_elf_section_data (sec);
+      struct _arm_elf_section_data *exidx_arm_data;
+      bfd_byte *contents = NULL;
+      int deleted_exidx_bytes = 0;
+      bfd_vma j;
+      arm_unwind_table_edit *unwind_edit_head = NULL;
+      arm_unwind_table_edit *unwind_edit_tail = NULL;
+      Elf_Internal_Shdr *hdr;
+      bfd *ibfd;
+
+      if (arm_data == NULL)
+        continue;
+
+      exidx_sec = arm_data->u.text.arm_exidx_sec;
+      if (exidx_sec == NULL)
+	{
+	  /* Section has no unwind data.  */
+	  if (last_unwind_type == 0 || !last_exidx_sec)
+	    continue;
+
+	  /* Ignore zero sized sections.  */
+	  if (sec->size == 0)
+	    continue;
+
+	  insert_cantunwind_after(last_text_sec, last_exidx_sec);
+	  last_unwind_type = 0;
+	  continue;
+	}
+
+      /* Skip /DISCARD/ sections.  */
+      if (bfd_is_abs_section (exidx_sec->output_section))
+	continue;
+
+      hdr = &elf_section_data (exidx_sec)->this_hdr;
+      if (hdr->sh_type != SHT_ARM_EXIDX)
+        continue;
+      
+      exidx_arm_data = get_arm_elf_section_data (exidx_sec);
+      if (exidx_arm_data == NULL)
+        continue;
+      
+      ibfd = exidx_sec->owner;
+	  
+      if (hdr->contents != NULL)
+	contents = hdr->contents;
+      else if (! bfd_malloc_and_get_section (ibfd, exidx_sec, &contents))
+	/* An error?  */
+	continue;
+
+      for (j = 0; j < hdr->sh_size; j += 8)
+	{
+	  unsigned int second_word = bfd_get_32 (ibfd, contents + j + 4);
+	  int unwind_type;
+	  int elide = 0;
+
+	  /* An EXIDX_CANTUNWIND entry.  */
+	  if (second_word == 1)
+	    {
+	      if (last_unwind_type == 0)
+		elide = 1;
+	      unwind_type = 0;
+	    }
+	  /* Inlined unwinding data.  Merge if equal to previous.  */
+	  else if ((second_word & 0x80000000) != 0)
+	    {
+	      if (last_second_word == second_word && last_unwind_type == 1)
+		elide = 1;
+	      unwind_type = 1;
+	      last_second_word = second_word;
+	    }
+	  /* Normal table entry.  In theory we could merge these too,
+	     but duplicate entries are likely to be much less common.  */
+	  else
+	    unwind_type = 2;
+
+	  if (elide)
+	    {
+	      add_unwind_table_edit (&unwind_edit_head, &unwind_edit_tail,
+				     DELETE_EXIDX_ENTRY, NULL, j / 8);
+
+	      deleted_exidx_bytes += 8;
+	    }
+
+	  last_unwind_type = unwind_type;
+	}
+
+      /* Free contents if we allocated it ourselves.  */
+      if (contents != hdr->contents)
+        free (contents);
+
+      /* Record edits to be applied later (in elf32_arm_write_section).  */
+      exidx_arm_data->u.exidx.unwind_edit_list = unwind_edit_head;
+      exidx_arm_data->u.exidx.unwind_edit_tail = unwind_edit_tail;
+	  
+      if (deleted_exidx_bytes > 0)
+	adjust_exidx_size(exidx_sec, -deleted_exidx_bytes);
+
+      last_exidx_sec = exidx_sec;
+      last_text_sec = sec;
+    }
+
+  /* Add terminating CANTUNWIND entry.  */
+  if (last_exidx_sec && last_unwind_type != 0)
+    insert_cantunwind_after(last_text_sec, last_exidx_sec);
+
+  return TRUE;
+}
+
+static bfd_boolean
+elf32_arm_output_glue_section (struct bfd_link_info *info, bfd *obfd,
+			       bfd *ibfd, const char *name)
+{
+  asection *sec, *osec;
+
+  sec = bfd_get_section_by_name (ibfd, name);
+  if (sec == NULL || (sec->flags & SEC_EXCLUDE) != 0)
+    return TRUE;
+
+  osec = sec->output_section;
+  if (elf32_arm_write_section (obfd, info, sec, sec->contents))
+    return TRUE;
+
+  if (! bfd_set_section_contents (obfd, osec, sec->contents,
+				  sec->output_offset, sec->size))
+    return FALSE;
+
+  return TRUE;
+}
+
+static bfd_boolean
+elf32_arm_final_link (bfd *abfd, struct bfd_link_info *info)
+{
+  struct elf32_arm_link_hash_table *globals = elf32_arm_hash_table (info);
+
+  /* Invoke the regular ELF backend linker to do all the work.  */
+  if (!bfd_elf_final_link (abfd, info))
+    return FALSE;
+
+  /* Write out any glue sections now that we have created all the
+     stubs.  */
+  if (globals->bfd_of_glue_owner != NULL)
+    {
+      if (! elf32_arm_output_glue_section (info, abfd,
+					   globals->bfd_of_glue_owner,
+					   ARM2THUMB_GLUE_SECTION_NAME))
+	return FALSE;
+
+      if (! elf32_arm_output_glue_section (info, abfd,
+					   globals->bfd_of_glue_owner,
+					   THUMB2ARM_GLUE_SECTION_NAME))
+	return FALSE;
+
+      if (! elf32_arm_output_glue_section (info, abfd,
+					   globals->bfd_of_glue_owner,
+					   VFP11_ERRATUM_VENEER_SECTION_NAME))
+	return FALSE;
+
+      if (! elf32_arm_output_glue_section (info, abfd,
+					   globals->bfd_of_glue_owner,
+					   ARM_BX_GLUE_SECTION_NAME))
+	return FALSE;
+    }
+
+  return TRUE;
+}
+
 /* Set the right machine number.  */
 
 static bfd_boolean
@@ -8622,6 +8879,12 @@ elf32_arm_merge_eabi_attributes (bfd *ibfd, bfd *obfd)
   static const int order_01243[5] = {0, 1, 2, 4, 3};
   int i;
   bfd_boolean result = TRUE;
+
+  /* Skip the linker stubs file.  This preserves previous behavior
+     of accepting unknown attributes in the first input file - but
+     is that a bug?  */
+  if (ibfd->flags & BFD_LINKER_CREATED)
+    return TRUE;
 
   if (!elf_known_obj_attributes_proc (obfd)[0].i)
     {
@@ -9796,16 +10059,27 @@ elf32_arm_check_relocs (bfd *abfd, struct bfd_link_info *info,
 	    needs_plt = 1;
 	    goto normal_reloc;
 
+	  case R_ARM_MOVW_ABS_NC:
+	  case R_ARM_MOVT_ABS:
+	  case R_ARM_THM_MOVW_ABS_NC:
+	  case R_ARM_THM_MOVT_ABS:
+	    if (info->shared)
+	      {
+		(*_bfd_error_handler)
+		  (_("%B: relocation %s against `%s' can not be used when making a shared object; recompile with -fPIC"),
+		   abfd, elf32_arm_howto_table_1[r_type].name,
+		   (h) ? h->root.root.string : "a local symbol");
+		bfd_set_error (bfd_error_bad_value);
+		return FALSE;
+	      }
+
+	    /* Fall through.  */
 	  case R_ARM_ABS32:
 	  case R_ARM_ABS32_NOI:
 	  case R_ARM_REL32:
 	  case R_ARM_REL32_NOI:
-	  case R_ARM_MOVW_ABS_NC:
-	  case R_ARM_MOVT_ABS:
 	  case R_ARM_MOVW_PREL_NC:
 	  case R_ARM_MOVT_PREL:
-	  case R_ARM_THM_MOVW_ABS_NC:
-	  case R_ARM_THM_MOVT_ABS:
 	  case R_ARM_THM_MOVW_PREL_NC:
 	  case R_ARM_THM_MOVT_PREL:
 	    needs_plt = 0;
@@ -10780,6 +11054,9 @@ elf32_arm_size_dynamic_sections (bfd * output_bfd ATTRIBUTE_UNUSED,
         _bfd_error_handler (_("Errors encountered processing file %s"),
 			    ibfd->filename);
     }
+
+  /* Allocate space for the glue sections now that we've sized them.  */
+  bfd_elf32_arm_allocate_interworking_sections (info);
 
   /* The check_relocs and adjust_dynamic_symbol entry points have
      determined the sizes of the various dynamic sections.  Allocate
@@ -12137,6 +12414,35 @@ elf32_arm_compare_mapping (const void * a, const void * b)
     return 0;
 }
 
+/* Add OFFSET to lower 31 bits of ADDR, leaving other bits unmodified.  */
+
+static unsigned long
+offset_prel31 (unsigned long addr, bfd_vma offset)
+{
+  return (addr & ~0x7ffffffful) | ((addr + offset) & 0x7ffffffful);
+}
+
+/* Copy an .ARM.exidx table entry, adding OFFSET to (applied) PREL31
+   relocations.  */
+
+static void
+copy_exidx_entry (bfd *output_bfd, bfd_byte *to, bfd_byte *from, bfd_vma offset)
+{
+  unsigned long first_word = bfd_get_32 (output_bfd, from);
+  unsigned long second_word = bfd_get_32 (output_bfd, from + 4);
+  
+  /* High bit of first word is supposed to be zero.  */
+  if ((first_word & 0x80000000ul) == 0)
+    first_word = offset_prel31 (first_word, offset);
+  
+  /* If the high bit of the first word is clear, and the bit pattern is not 0x1
+     (EXIDX_CANTUNWIND), this is an offset to an .ARM.extab entry.  */
+  if ((second_word != 0x1) && ((second_word & 0x80000000ul) == 0))
+    second_word = offset_prel31 (second_word, offset);
+  
+  bfd_put_32 (output_bfd, first_word, to);
+  bfd_put_32 (output_bfd, second_word, to + 4);
+}
 
 /* Do code byteswapping.  Return FALSE afterwards so that the section is
    written out as normal.  */
@@ -12241,6 +12547,94 @@ elf32_arm_write_section (bfd *output_bfd,
               abort ();
             }
         }
+    }
+
+  if (arm_data->elf.this_hdr.sh_type == SHT_ARM_EXIDX)
+    {
+      arm_unwind_table_edit *edit_node
+        = arm_data->u.exidx.unwind_edit_list;
+      /* Now, sec->size is the size of the section we will write.  The original
+         size (before we merged duplicate entries and inserted EXIDX_CANTUNWIND
+	 markers) was sec->rawsize.  (This isn't the case if we perform no
+	 edits, then rawsize will be zero and we should use size).  */
+      bfd_byte *edited_contents = bfd_malloc (sec->size);
+      unsigned int input_size = sec->rawsize ? sec->rawsize : sec->size;
+      unsigned int in_index, out_index;
+      bfd_vma add_to_offsets = 0;
+
+      for (in_index = 0, out_index = 0; in_index * 8 < input_size || edit_node;)
+        {
+	  if (edit_node)
+	    {
+	      unsigned int edit_index = edit_node->index;
+	      
+	      if (in_index < edit_index && in_index * 8 < input_size)
+	        {
+		  copy_exidx_entry (output_bfd, edited_contents + out_index * 8,
+				    contents + in_index * 8, add_to_offsets);
+		  out_index++;
+		  in_index++;
+		}
+	      else if (in_index == edit_index
+		       || (in_index * 8 >= input_size
+			   && edit_index == UINT_MAX))
+	        {
+		  switch (edit_node->type)
+		    {
+		    case DELETE_EXIDX_ENTRY:
+		      in_index++;
+		      add_to_offsets += 8;
+		      break;
+		    
+		    case INSERT_EXIDX_CANTUNWIND_AT_END:
+		      {
+		        asection *text_sec = edit_node->linked_section;
+			bfd_vma text_offset = text_sec->output_section->vma
+					      + text_sec->output_offset
+					      + text_sec->size;
+			bfd_vma exidx_offset = offset + out_index * 8;
+		        unsigned long prel31_offset;
+
+			/* Note: this is meant to be equivalent to an
+			   R_ARM_PREL31 relocation.  These synthetic
+			   EXIDX_CANTUNWIND markers are not relocated by the
+			   usual BFD method.  */
+			prel31_offset = (text_offset - exidx_offset)
+					& 0x7ffffffful;
+
+			/* First address we can't unwind.  */
+			bfd_put_32 (output_bfd, prel31_offset,
+				    &edited_contents[out_index * 8]);
+
+			/* Code for EXIDX_CANTUNWIND.  */
+			bfd_put_32 (output_bfd, 0x1,
+				    &edited_contents[out_index * 8 + 4]);
+
+			out_index++;
+			add_to_offsets -= 8;
+		      }
+		      break;
+		    }
+		  
+		  edit_node = edit_node->next;
+		}
+	    }
+	  else
+	    {
+	      /* No more edits, copy remaining entries verbatim.  */
+	      copy_exidx_entry (output_bfd, edited_contents + out_index * 8,
+				contents + in_index * 8, add_to_offsets);
+	      out_index++;
+	      in_index++;
+	    }
+	}
+
+      if (!(sec->flags & SEC_EXCLUDE) && !(sec->flags & SEC_NEVER_LOAD))
+	bfd_set_section_contents (output_bfd, sec->output_section,
+				  edited_contents,
+				  (file_ptr) sec->output_offset, sec->size);
+
+      return TRUE;
     }
 
   if (mapcount == 0)
@@ -12519,6 +12913,7 @@ const struct elf_size_info elf32_arm_size_info =
 #define bfd_elf32_bfd_is_target_special_symbol	elf32_arm_is_target_special_symbol
 #define bfd_elf32_close_and_cleanup             elf32_arm_close_and_cleanup
 #define bfd_elf32_bfd_free_cached_info          elf32_arm_bfd_free_cached_info
+#define bfd_elf32_bfd_final_link		elf32_arm_final_link
 
 #define elf_backend_get_symbol_type             elf32_arm_get_symbol_type
 #define elf_backend_gc_mark_hook                elf32_arm_gc_mark_hook

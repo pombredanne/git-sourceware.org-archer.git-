@@ -40,8 +40,10 @@ man7dir = $(mandir)/man7
 man8dir = $(mandir)/man8
 man9dir = $(mandir)/man9
 infodir = @infodir@
-pdfdir = $(prefix)/share/doc/gdb
-htmldir = $(prefix)/html
+datarootdir = @datarootdir@
+docdir = @docdir@
+htmldir = @htmldir@
+pdfdir = @pdfdir@
 includedir = @includedir@
 
 # This can be referenced by `LIBINTL' as computed by
@@ -109,11 +111,8 @@ YLWRAP = $(srcdir)/../ylwrap
 # where to find makeinfo, preferably one designed for texinfo-2
 MAKEINFO=makeinfo
 
-# Contrary to documentation, the current directory is not
-# searched by texi2html, so specify it explicitly.
-# -macro 2007-07-26
-MAKEHTML = texi2html
-MAKEHTMLFLAGS = -menu -split_chapter -I .
+MAKEHTML = $(MAKEINFO) --html
+MAKEHTMLFLAGS =
 
 # Set this up with gcc if you have gnu ld and the loader will print out
 # line numbers for undefined references.
@@ -485,6 +484,7 @@ ALL_TARGET_OBS = \
 	i386-dicos-tdep.o \
 	iq2000-tdep.o \
 	linux-tdep.o \
+	lm32-tdep.o \
 	m32c-tdep.o \
 	m32r-linux-tdep.o m32r-tdep.o \
 	m68hc11-tdep.o \
@@ -520,7 +520,8 @@ ALL_TARGET_OBS = \
 	prologue-value.o \
 	symfile-mem.o \
 	corelow.o \
-	windows-tdep.o
+	windows-tdep.o \
+	linux-record.o
 
 # Host-dependent makefile fragment comes in here.
 @host_makefile_frag@
@@ -530,6 +531,9 @@ FLAGS_TO_PASS = \
 	"prefix=$(prefix)" \
 	"exec_prefix=$(exec_prefix)" \
 	"infodir=$(infodir)" \
+	"datarootdir=$(datarootdir)" \
+	"docdir=$(docdir)" \
+	"htmldir=$(htmldir)" \
 	"pdfdir=$(pdfdir)" \
 	"libdir=$(libdir)" \
 	"mandir=$(mandir)" \
@@ -662,7 +666,8 @@ SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c ada-tasks.c \
 	valarith.c valops.c valprint.c value.c varobj.c vec.c \
 	wrapper.c \
 	xml-tdesc.c xml-support.c \
-	inferior.c gdb_usleep.c
+	inferior.c gdb_usleep.c \
+	record.c
 
 LINTFILES = $(SFILES) $(YYFILES) $(CONFIG_SRCS) init.c
 
@@ -814,7 +819,7 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 	solib.o solib-null.o \
 	prologue-value.o memory-map.o xml-support.o \
 	target-descriptions.o target-memory.o xml-tdesc.o xml-builtin.o \
-	inferior.o osdata.o gdb_usleep.o
+	inferior.o osdata.o gdb_usleep.o record.o
 
 TSOBS = inflow.o
 
@@ -1105,9 +1110,10 @@ gdb1$(EXEEXT): gdb$(EXEEXT)
 # TAGS depends on all the files that go into it so you can rebuild TAGS
 # with `make TAGS' and not have to say `rm TAGS' first.
 
+GDB_NM_FILE = @GDB_NM_FILE@
 TAGS: $(DEPFILES) $(TAGFILES_NO_SRCDIR) $(TAGFILES_WITH_SRCDIR)
 	@echo Making TAGS
-	@etags $(srcdir)/$(NAT_FILE) \
+	@etags $(srcdir)/$(GDB_NM_FILE) \
 	`(for i in $(DEPFILES) $(TAGFILES_NO_SRCDIR); do \
 		echo $(srcdir)/$$i ; \
 	done ; for i in $(TAGFILES_WITH_SRCDIR); do \
@@ -1308,6 +1314,8 @@ ALLDEPFILES = \
 	libunwind-frame.c \
 	linux-fork.c \
 	linux-tdep.c \
+	linux-record.c \
+	lm32-tdep.c \
 	m68hc11-tdep.c \
 	m32r-tdep.c \
 	m32r-linux-nat.c m32r-linux-tdep.c \
@@ -1340,11 +1348,10 @@ ALLDEPFILES = \
 	sh-tdep.c sh64-tdep.c shnbsd-tdep.c shnbsd-nat.c \
 	sol2-tdep.c \
 	solib-irix.c solib-svr4.c solib-sunos.c \
-	sparc-linux-nat.c \
-	sparc-linux-tdep.c sparc-nat.c sparc-sol2-nat.c sparc-sol2-tdep.c \
-	sparc-tdep.c sparc-sol2-nat.c sparc-sol2-tdep.c sparc64-linux-nat.c \
-	sparc64-linux-tdep.c sparc64-nat.c sparc64-sol2-tdep.c \
-	sparc64-tdep.c sparc64fbsd-nat.c sparc64fbsd-tdep.c \
+	sparc-linux-nat.c sparc-linux-tdep.c \
+	sparc-sol2-nat.c sparc-sol2-tdep.c sparc64-sol2-tdep.c \
+	sparc-nat.c sparc-tdep.c sparc64-linux-nat.c sparc64-linux-tdep.c \
+	sparc64-nat.c sparc64-tdep.c sparc64fbsd-nat.c sparc64fbsd-tdep.c \
 	sparc64nbsd-nat.c sparc64nbsd-tdep.c sparc64obsd-tdep.c \
 	sparcnbsd-nat.c sparcnbsd-tdep.c sparcobsd-tdep.c \
 	spu-linux-nat.c spu-tdep.c \

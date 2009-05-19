@@ -129,6 +129,9 @@ _bfd_XXi_swap_sym_in (bfd * abfd, void * ext1, void * in1)
      they will be handled somewhat correctly in the bfd code.  */
   if (in->n_sclass == C_SECTION)
     {
+      char namebuf[SYMNMLEN + 1];
+      const char *name = NULL;
+
       in->n_value = 0x0;
 
       /* Create synthetic empty sections as needed.  DJ */
@@ -136,33 +139,38 @@ _bfd_XXi_swap_sym_in (bfd * abfd, void * ext1, void * in1)
 	{
 	  asection *sec;
 
-	  for (sec = abfd->sections; sec; sec = sec->next)
-	    {
-	      if (strcmp (sec->name, in->n_name) == 0)
-		{
-		  in->n_scnum = sec->target_index;
-		  break;
-		}
-	    }
+	  name = _bfd_coff_internal_syment_name (abfd, in, namebuf);
+	  if (name == NULL)
+	    /* FIXME: Return error.  */
+	    abort ();
+	  sec = bfd_get_section_by_name (abfd, name);
+	  if (sec != NULL)
+	    in->n_scnum = sec->target_index;
 	}
 
       if (in->n_scnum == 0)
 	{
 	  int unused_section_number = 0;
 	  asection *sec;
-	  char *name;
 	  flagword flags;
 
 	  for (sec = abfd->sections; sec; sec = sec->next)
 	    if (unused_section_number <= sec->target_index)
 	      unused_section_number = sec->target_index + 1;
 
-	  name = bfd_alloc (abfd, (bfd_size_type) strlen (in->n_name) + 10);
-	  if (name == NULL)
-	    return;
-	  strcpy (name, in->n_name);
+	  if (name == namebuf)
+	    {
+	      name = bfd_alloc (abfd, strlen (namebuf) + 1);
+	      if (name == NULL)
+		/* FIXME: Return error.  */
+		abort ();
+	      strcpy ((char *) name, namebuf);
+	    }
 	  flags = SEC_HAS_CONTENTS | SEC_ALLOC | SEC_DATA | SEC_LOAD;
 	  sec = bfd_make_section_anyway_with_flags (abfd, name, flags);
+	  if (sec == NULL)
+	    /* FIXME: Return error.  */
+	    abort ();
 
 	  sec->vma = 0;
 	  sec->lma = 0;
@@ -540,17 +548,6 @@ _bfd_XXi_swap_aouthdr_out (bfd * abfd, void * in, void * out)
   bfd_vma sa, fa, ib;
   IMAGE_DATA_DIRECTORY idata2, idata5, tls;
   
-  if (pe->force_minimum_alignment)
-    {
-      if (!extra->FileAlignment)
-	extra->FileAlignment = PE_DEF_FILE_ALIGNMENT;
-      if (!extra->SectionAlignment)
-	extra->SectionAlignment = PE_DEF_SECTION_ALIGNMENT;
-    }
-
-  if (extra->Subsystem == IMAGE_SUBSYSTEM_UNKNOWN)
-    extra->Subsystem = pe->target_subsystem;
-
   sa = extra->SectionAlignment;
   fa = extra->FileAlignment;
   ib = extra->ImageBase;
@@ -879,7 +876,7 @@ _bfd_XXi_swap_scnhdr_out (bfd * abfd, void * in, void * out)
      sometimes).  */
   if ((scnhdr_int->s_flags & IMAGE_SCN_CNT_UNINITIALIZED_DATA) != 0)
     {
-      if (bfd_pe_executable_p (abfd))
+      if (bfd_pei_p (abfd))
 	{
 	  ps = scnhdr_int->s_size;
 	  ss = 0;
@@ -892,7 +889,7 @@ _bfd_XXi_swap_scnhdr_out (bfd * abfd, void * in, void * out)
     }
   else
     {
-      if (bfd_pe_executable_p (abfd))
+      if (bfd_pei_p (abfd))
 	ps = scnhdr_int->s_paddr;
       else
 	ps = 0;
@@ -1895,87 +1892,6 @@ _bfd_XX_print_ce_compressed_pdata (bfd * abfd, void * vfile)
 #undef PDATA_ROW_SIZE
 }
 
-#ifdef COFF_WITH_pex64
-/* The PE+ x64 variant.  */
-bfd_boolean
-_bfd_pex64_print_pdata (bfd *abfd, void *vfile)
-{
-# define PDATA_ROW_SIZE	(3 * 4)
-  FILE *file = (FILE *) vfile;
-  bfd_byte *data = NULL;
-  asection *section = bfd_get_section_by_name (abfd, ".pdata");
-  bfd_size_type datasize = 0;
-  bfd_size_type i;
-  bfd_size_type start, stop;
-  int onaline = PDATA_ROW_SIZE;
-  struct sym_cache sym_cache = {0, 0};
-
-  if (section == NULL
-      || coff_section_data (abfd, section) == NULL
-      || pei_section_data (abfd, section) == NULL)
-    return TRUE;
-
-  stop = pei_section_data (abfd, section)->virt_size;
-  if ((stop % onaline) != 0)
-    fprintf (file,
-             _("warning: .pdata section size (%ld) is not a multiple of %d\n"),
-	     (long) stop, onaline);
-
-  fprintf (file,
-	   _("\nThe Function Table (interpreted .pdata section contents)\n"));
-
-  fprintf (file, _("vma:\t\t\tBeginAddress\t EndAddress\t  UnwindData\n"));
-
-  datasize = section->size;
-  if (datasize == 0)
-    return TRUE;
-
-  if (!bfd_malloc_and_get_section (abfd, section, &data))
-    {
-      if (data != NULL)
-	free (data);
-      return FALSE;
-    }
-
-  start = 0;
-
-  for (i = start; i < stop; i += onaline)
-    {
-      bfd_vma begin_addr;
-      bfd_vma end_addr;
-      bfd_vma unwind_data_addr;
-
-      if (i + PDATA_ROW_SIZE > stop)
-	break;
-
-      begin_addr = bfd_get_32 (abfd, data + i);
-      end_addr = bfd_get_32 (abfd, data + i + 4);
-      unwind_data_addr = bfd_get_32 (abfd, data + i +  8);
-
-      if (begin_addr == 0 && end_addr == 0 && unwind_data_addr == 0)
-	/* We are probably into the padding of the section now.  */
-	break;
-
-      fputc (' ', file);
-      fprintf_vma (file, i + section->vma);
-      fprintf (file, ":\t");
-      fprintf_vma (file, begin_addr);
-      fputc (' ', file);
-      fprintf_vma (file, end_addr);
-      fputc (' ', file);
-      fprintf_vma (file, unwind_data_addr);
-
-      fprintf (file, "\n");
-    }
-
-  free (data);
-
-  cleanup_syms (&sym_cache);
-
-  return TRUE;
-#undef PDATA_ROW_SIZE
-}
-#endif
 
 #define IMAGE_REL_BASED_HIGHADJ 4
 static const char * const tbl[] =
@@ -2198,6 +2114,7 @@ _bfd_XX_print_private_bfd_data_common (bfd * abfd, void * vfile)
     case IMAGE_SUBSYSTEM_WINDOWS_CE_GUI:
       subsystem_name = "Wince CUI";
       break;
+    // These are from UEFI Platform Initialization Specification 1.1.
     case IMAGE_SUBSYSTEM_EFI_APPLICATION:
       subsystem_name = "EFI application";
       break;
@@ -2207,10 +2124,10 @@ _bfd_XX_print_private_bfd_data_common (bfd * abfd, void * vfile)
     case IMAGE_SUBSYSTEM_EFI_RUNTIME_DRIVER:
       subsystem_name = "EFI runtime driver";
       break;
-    // These are from revision 8.0 of the MS PE/COFF spec
-    case IMAGE_SUBSYSTEM_EFI_ROM:
-      subsystem_name = "EFI ROM";
+    case IMAGE_SUBSYSTEM_SAL_RUNTIME_DRIVER:
+      subsystem_name = "SAL runtime driver";
       break;
+    // This is from revision 8.0 of the MS PE/COFF spec
     case IMAGE_SUBSYSTEM_XBOX:
       subsystem_name = "XBOX";
       break;
@@ -2271,7 +2188,7 @@ _bfd_XX_bfd_copy_private_bfd_data_common (bfd * ibfd, bfd * obfd)
   ipe = pe_data (ibfd);
   ope = pe_data (obfd);
  
-  ope->pe_opthdr = ipe->pe_opthdr;
+  /* pe_opthdr is copied in copy_object.  */
   ope->dll = ipe->dll;
 
   /* Don't copy input subsystem if output is different from input.  */

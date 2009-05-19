@@ -391,6 +391,9 @@ post_create_inferior (struct target_ops *target, int from_tty)
      don't need to.  */
   target_find_description ();
 
+  /* Now that we know the register layout, retrieve current PC.  */
+  stop_pc = regcache_read_pc (get_current_regcache ());
+
   /* If the solist is global across processes, there's no need to
      refetch it here.  */
   if (exec_bfd && !gdbarch_has_global_solist (target_gdbarch))
@@ -2034,6 +2037,37 @@ vector_info (char *args, int from_tty)
 		     get_selected_frame (NULL), args);
 }
 
+/* Kill the inferior process.  Make us have no inferior.  */
+
+static void
+kill_command (char *arg, int from_tty)
+{
+  /* FIXME:  This should not really be inferior_ptid (or target_has_execution).
+     It should be a distinct flag that indicates that a target is active, cuz
+     some targets don't have processes! */
+
+  if (ptid_equal (inferior_ptid, null_ptid))
+    error (_("The program is not being run."));
+  if (!query (_("Kill the program being debugged? ")))
+    error (_("Not confirmed."));
+  target_kill ();
+
+  /* If the current target interface claims there's still execution,
+     then don't mess with threads of other processes.  */
+  if (!target_has_execution)
+    {
+      init_thread_list ();		/* Destroy thread info */
+
+      /* Killing off the inferior can leave us with a core file.  If
+	 so, print the state we are left in.  */
+      if (target_has_stack)
+	{
+	  printf_filtered (_("In %s,\n"), target_longname);
+	  print_stack_frame (get_selected_frame (NULL), 1, SRC_AND_LOC);
+	}
+    }
+  bfd_cache_close_all ();
+}
 
 /* Used in `attach&' command.  ARG is a point to an integer
    representing a process id.  Proceed threads of this process iff
@@ -2217,8 +2251,9 @@ attach_command (char *args, int from_tty)
 
   dont_repeat ();		/* Not for the faint of heart */
 
-  if (target_supports_multi_process ())
-    /* Don't complain if we can be attached to multiple processes.  */
+  if (gdbarch_has_global_solist (target_gdbarch))
+    /* Don't complain if all processes share the same symbol
+       space.  */
     ;
   else if (target_has_execution)
     {
@@ -2590,6 +2625,9 @@ directories, separated by colons.  These directories are searched to find\n\
 fully linked executable files and separately compiled object files as needed."),
 	       &showlist);
   set_cmd_completer (c, noop_completer);
+
+  add_com ("kill", class_run, kill_command,
+	   _("Kill execution of program being debugged."));
 
   add_com ("attach", class_run, attach_command, _("\
 Attach to a process or file outside of GDB.\n\

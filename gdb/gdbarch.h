@@ -54,6 +54,17 @@ struct displaced_step_closure;
 struct core_regset_section;
 
 extern struct gdbarch *current_gdbarch;
+
+/* The architecture associated with the connection to the target.
+ 
+   The architecture vector provides some information that is really
+   a property of the target: The layout of certain packets, for instance;
+   or the solib_ops vector.  Etc.  To differentiate architecture accesses
+   to per-target properties from per-thread/per-frame/per-objfile properties,
+   accesses to per-target properties should be made through target_gdbarch.
+
+   Eventually, when support for multiple targets is implemented in
+   GDB, this global should be made target-specific.  */
 extern struct gdbarch *target_gdbarch;
 
 
@@ -807,6 +818,17 @@ extern void set_gdbarch_static_transform_name (struct gdbarch *gdbarch, gdbarch_
 extern int gdbarch_sofun_address_maybe_missing (struct gdbarch *gdbarch);
 extern void set_gdbarch_sofun_address_maybe_missing (struct gdbarch *gdbarch, int sofun_address_maybe_missing);
 
+/* Parse the instruction at ADDR storing in the record execution log
+   the registers REGCACHE and memory ranges that will be affected when
+   the instruction executes, along with their current values.
+   Return -1 if something goes wrong, 0 otherwise. */
+
+extern int gdbarch_process_record_p (struct gdbarch *gdbarch);
+
+typedef int (gdbarch_process_record_ftype) (struct gdbarch *gdbarch, struct regcache *regcache, CORE_ADDR addr);
+extern int gdbarch_process_record (struct gdbarch *gdbarch, struct regcache *regcache, CORE_ADDR addr);
+extern void set_gdbarch_process_record (struct gdbarch *gdbarch, gdbarch_process_record_ftype *process_record);
+
 /* Signal translation: translate inferior's signal (host's) number into
    GDB's representation. */
 
@@ -841,12 +863,20 @@ extern void set_gdbarch_record_special_symbol (struct gdbarch *gdbarch, gdbarch_
 
 /* True if the list of shared libraries is one and only for all
    processes, as opposed to a list of shared libraries per inferior.
-   When this property is true, GDB assumes that since shared libraries
-   are shared across processes, so is all code.  Hence, GDB further
-   assumes an inserted breakpoint location is visible to all processes. */
+   This usually means that all processes, although may or may not share
+   an address space, will see the same set of symbols at the same
+   addresses. */
 
 extern int gdbarch_has_global_solist (struct gdbarch *gdbarch);
 extern void set_gdbarch_has_global_solist (struct gdbarch *gdbarch, int has_global_solist);
+
+/* On some targets, even though each inferior has its own private
+   address space, the debug interface takes care of making breakpoints
+   visible to all address spaces automatically.  For such cases,
+   this property should be set to true. */
+
+extern int gdbarch_has_global_breakpoints (struct gdbarch *gdbarch);
+extern void set_gdbarch_has_global_breakpoints (struct gdbarch *gdbarch, int has_global_breakpoints);
 
 extern struct gdbarch_tdep *gdbarch_tdep (struct gdbarch *gdbarch);
 

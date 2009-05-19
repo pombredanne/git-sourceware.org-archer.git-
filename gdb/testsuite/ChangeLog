@@ -1,3 +1,83 @@
+2009-05-18  Jon Beniston <jon@beniston.com>
+
+        * gdb.asm/asm-source.exp: Add lm32 target.
+
+2009-05-17  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.base/foll-fork.c: Include stdlib.h.  Add markers for
+	`gdb_get_line_number'.  Call `callee' in both parent and child.
+	* gdb.base/foll-fork.exp (catch_fork_child_follow): Use
+	`gdb_get_line_number' instead of hardcoding line numbers.
+	(catch_fork_unpatch_child): New procedure to test detaching
+	breakpoints from child fork.
+	(tcatch_fork_parent_follow): Use `gdb_get_line_number' instead of
+	hardcoding line numbers.
+	(do_fork_tests): Run `catch_fork_unpatch_child'.
+
+2009-05-17  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* gdb.mi/mi-cmd-var.exp: Check that when varobj
+	of structure type enters or leaves the scope, it
+	is reported by -var-update.
+
+2009-05-11  Doug Evans  <dje@sebabeach.org>
+
+	* gdb.mi/nsintrall.c (main): Fix off-by-one error.
+	* gdb.threads/pending-step.c (main): Fix off-by-one error. 
+	* gdb.threads/schedlock.c (main): Fix off-by-one error.
+
+2009-05-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.cp/expand-sals.exp, gdb.cp/expand-sals.cc: New.
+
+2009-04-30  Doug Evans  <dje@google.com>
+
+	* gdb.threads/watchthreads2.exp: New testcase.
+	* gdb.threads/watchthreads2.c: New testcase.
+
+2009-04-29  Doug Evans  <dje@google.com>
+
+	* gdb.cp/mb-ctor.exp: Add multi-line source statement test.
+	* gdb.cp/mb-ctor.cc: Ditto.
+	* gdb.cp/mb-inline.exp: Add multi-line source statement test.
+	* gdb.cp/mb-inline.h (multi_line_foo): New function.
+	* gdb.cp/mb-inline1.cc: Call it.
+	* gdb.cp/mb-inline2.cc: Ditto.
+	* gdb.cp/mb-templates.exp: Add multi-line source statement test.
+	* gdb.cp/mb-templates.cc (multi_line_foo): New template.
+
+2009-04-29  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/macscp.exp: New `options' parameter `-DFROM_COMMANDLINE'.
+	(info_macro): Remova `decimal' declaration.  New variable `nonzero'.
+	Replace all uses of `decimal' by `nonzero'.
+	(info macro FROM_COMMANDLINE): New test.
+
+2009-04-27  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/printcmds.exp (test_printf): Test comma operator in [].
+
+2009-04-27  Doug Evans  <dje@google.com>
+
+	* gdb.threads/watchthreads.c (main): Initialize args before starting
+	the threads.  Plus formatting cleanup.
+	* gdb.threads/watchthreads.exp: Avoid errant failures due to
+	biased scheduling of one thread.
+
+2009-04-27  Jerome Guitton  <guitton@adacore.com>
+
+	* gdb.cp/templates.cc (GetMax): New template.
+	(main): Declare two instances of GetMax.
+	* gdb.cp/templates.exp: Add new test.
+
+2009-04-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.cp/abstract-origin.exp, gdb.cp/abstract-origin.cc: New test.
+
+2009-04-22  Joseph Myers  <joseph@codesourcery.com>
+
+	* lib/gdb.exp (get_compiler_info): Use -E -o in remote-host case.
+
 2009-04-15  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.base/charset.exp: Add regression test.

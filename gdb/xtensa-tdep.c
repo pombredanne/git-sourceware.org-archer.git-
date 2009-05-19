@@ -1018,7 +1018,8 @@ xtensa_unwind_pc (struct gdbarch *gdbarch, struct frame_info *next_frame)
   gdb_byte buf[8];
   CORE_ADDR pc;
 
-  DEBUGTRACE ("xtensa_unwind_pc (next_frame = %p)\n", next_frame);
+  DEBUGTRACE ("xtensa_unwind_pc (next_frame = %s)\n", 
+		host_address_to_string (next_frame));
 
   frame_unwind_register (next_frame, gdbarch_pc_regnum (gdbarch), buf);
   pc = extract_typed_address (buf, builtin_type (gdbarch)->builtin_func_ptr);
@@ -1241,7 +1242,7 @@ xtensa_frame_cache (struct frame_info *this_frame, void **this_cache)
 	  cache->wd.ws = ws & ~(1 << wb);
 
 	  cache->pc = get_frame_func (this_frame);
-	  cache->ra = (cache->pc & 0xc0000000) | (ra & 0x3fffffff);
+	  cache->ra = (pc & 0xc0000000) | (ra & 0x3fffffff);
 	  cache->ps = (ps & ~PS_CALLINC_MASK)
 	    | ((WINSIZE(ra)/4) << PS_CALLINC_SHIFT);
 	}

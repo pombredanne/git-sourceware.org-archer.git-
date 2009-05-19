@@ -30,6 +30,7 @@ struct type;
 struct gdbarch;
 struct regcache;
 struct ui_out;
+struct terminal_info;
 
 /* For bpstat.  */
 #include "breakpoint.h"
@@ -152,10 +153,6 @@ extern void terminal_save_ours (void);
 
 extern void terminal_ours (void);
 
-extern CORE_ADDR read_pc (void);
-
-extern void write_pc (CORE_ADDR);
-
 extern CORE_ADDR unsigned_pointer_to_address (struct type *type,
 					      const gdb_byte *buf);
 extern void unsigned_address_to_pointer (struct type *type, gdb_byte *buf,
@@ -215,12 +212,6 @@ extern int fork_inferior (char *, char *, char **,
 extern void startup_inferior (int);
 
 extern char *construct_inferior_arguments (struct gdbarch *, int, char **);
-
-/* From inflow.c */
-
-extern void new_tty_prefork (const char *);
-
-extern int gdb_has_a_terminal (void);
 
 /* From infrun.c */
 
@@ -425,6 +416,9 @@ struct inferior
      this inferior stops.  For continuations associated with a
      specific thread, see `struct thread_info'.  */
   struct continuation *continuations;
+
+  /* Terminal info and state managed by inflow.c.  */
+  struct terminal_info *terminal_info;
 
   /* Private data used by the target vector implementation.  */
   struct private_inferior *private;
