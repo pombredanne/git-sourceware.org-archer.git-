@@ -46,7 +46,6 @@
 #include "exceptions.h"
 #include "observer.h"
 #include "solist.h"
-#include "solib.h"
 #include "parser-defs.h"
 #include "charset.h"
 
@@ -1760,19 +1759,17 @@ disable_display_command (char *args, int from_tty)
       }
 }
 
-/* Return 1 if D uses SOLIB (and will become dangling when SOLIB
+/* Return 1 if D uses OBJFILE (and will become dangling when OBJFILE
    is unloaded), otherwise return 0.  */
 
 static int
-display_uses_solib_p (const struct display *d,
-		      const struct so_list *solib)
+display_uses_objfile (const struct display *d, struct objfile *objfile)
 {
   int endpos;
   struct expression *const exp = d->exp;
   const union exp_element *const elts = exp->elts;
 
-  if (d->block != NULL
-      && solib_contains_address_p (solib, d->block->startaddr))
+  if (matching_objfiles (block_objfile (d->block), objfile))
     return 1;
 
   for (endpos = exp->nelts; endpos > 0; )
@@ -1791,11 +1788,12 @@ display_uses_solib_p (const struct display *d,
 	  const struct obj_section *const section =
 	    SYMBOL_OBJ_SECTION (symbol);
 
-	  if (block != NULL
-	      && solib_contains_address_p (solib, block->startaddr))
+	  /* Check objfile where is placed the code touching the variable.  */
+	  if (matching_objfiles (block_objfile (block), objfile))
 	    return 1;
 
-	  if (section && section->objfile == solib->objfile)
+	  /* Check objfile where the variable itself is placed.  */
+	  if (section && section->objfile == objfile)
 	    return 1;
 	}
       endpos -= oplen;
@@ -1820,7 +1818,7 @@ clear_dangling_display_expressions (struct so_list *solib)
 
   for (d = display_chain; d; d = d->next)
     {
-      if (d->exp && display_uses_solib_p (d, solib))
+      if (d->exp && display_uses_objfile (d, solib->objfile))
 	{
 	  xfree (d->exp);
 	  d->exp = NULL;

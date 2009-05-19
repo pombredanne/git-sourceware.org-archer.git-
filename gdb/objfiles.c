@@ -893,3 +893,21 @@ objfile_data (struct objfile *objfile, const struct objfile_data *data)
   gdb_assert (data->index < objfile->num_data);
   return objfile->data[data->index];
 }
+
+/* Return non-zero if A and B point to the same OBJFILE, ignoring any binary
+   vs. debuginfo variants of the pointers.  If either A or B is NULL return
+   zero as not a match.  */
+
+int
+matching_objfiles (struct objfile *a, struct objfile *b)
+{
+  if (a == NULL || b == NULL)
+    return 0;
+
+  if (a->separate_debug_objfile_backlink)
+    a = a->separate_debug_objfile_backlink;
+  if (b->separate_debug_objfile_backlink)
+    b = b->separate_debug_objfile_backlink;
+
+  return a == b;
+}
