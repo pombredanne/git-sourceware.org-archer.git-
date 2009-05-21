@@ -1,3 +1,17 @@
+2009-05-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (set_cu_language): Recognize also DW_LANG_C99.
+
+2009-05-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix parsing DW_AT_const_value using DW_FORM_string.
+	* dwarf2read.c (dwarf2_const_value <DW_FORM_string>): New.
+
+2009-05-20  Joel Brobecker  <brobecker@adacore.com>
+
+	* aix-thread.c (giter_count): Do not count the main thread.
+	(giter_accum): Do not include the main thread.
+
 2009-05-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	Remove the PROT parameter from openp.
@@ -3979,7 +3993,7 @@
 
 2009-01-14  Kai Tietz  <kai.tietz@onevision.com>
 
-	* mingw-ser.c (console_select_thread): Add return to make
+	* ser-mingw.c (console_select_thread): Add return to make
 	compiler happy.
 	(pipe_select_thread): Likewise.
 	(file_select_thread): Likewise.

@@ -6876,6 +6876,7 @@ set_cu_language (unsigned int lang, struct dwarf2_cu *cu)
   switch (lang)
     {
     case DW_LANG_C89:
+    case DW_LANG_C99:
     case DW_LANG_C:
       cu->language = language_c;
       break;
@@ -7957,6 +7958,7 @@ dwarf2_const_value (struct attribute *attr, struct symbol *sym,
 			      DW_ADDR (attr));
       SYMBOL_CLASS (sym) = LOC_CONST_BYTES;
       break;
+    case DW_FORM_string:
     case DW_FORM_strp:
       /* DW_STRING is already allocated on the obstack, point directly
 	 to it.  */

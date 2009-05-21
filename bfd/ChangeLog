@@ -1,5 +1,9 @@
+2009-05-19  Dave Korn  <dave.korn.cygwin@gmail.com>
+
+	* cofflink.c (process_embedded_commands):  Ignore "-aligncomm".
+
 2009-05-15  Andrew Stubbs  <ams@codesourcery.com>
-	Paul Brook  <paul@codesourcery.com>
+	    Paul Brook  <paul@codesourcery.com>
 
 	* elf32-arm.c (elf32_arm_fix_exidx_coverage): Don't attempt to
 	fix discarded sections.
