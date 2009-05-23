@@ -36,6 +36,7 @@
 #include "gdbcore.h"
 #include "target.h"
 #include "inferior.h"
+#include "regcache.h"
 
 #include "hppa-tdep.h"
 #include "solist.h"
@@ -79,7 +80,7 @@ read_dynamic_info (asection *dyninfo_sect, dld_cache_t *dld_cache_p);
 
 static void
 pa64_relocate_section_addresses (struct so_list *so,
-				 struct section_table *sec)
+				 struct target_section *sec)
 {
   asection *asec = sec->the_bfd_section;
   CORE_ADDR load_offset;
@@ -421,7 +422,8 @@ pa64_solib_create_inferior_hook (void)
 
 	 Also note the breakpoint is the second instruction in the
 	 routine.  */
-      load_addr = read_pc () - tmp_bfd->start_address;
+      load_addr = regcache_read_pc (get_current_regcache ())
+		  - tmp_bfd->start_address;
       sym_addr = bfd_lookup_symbol (tmp_bfd, "__dld_break");
       sym_addr = load_addr + sym_addr + 4;
       

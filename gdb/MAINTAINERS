@@ -270,8 +270,9 @@ the native maintainer when resolving ABI issues.
 	ia64		--target=ia64-linux-gnu ,-Werror
 			(--target=ia64-elf broken)
 
+	lm32		--target=lm32-elf ,-Werror
+
 	m32c		--target=m32c-elf ,-Werror
-			Jim Blandy, jimb@codesourcery.com
 
 	m32r		--target=m32r-elf ,-Werror
 
@@ -293,6 +294,9 @@ the native maintainer when resolving ABI issues.
 	mn10300		--target=mn10300-elf broken
 			(sim/ dies with make -j)
 			Michael Snyder		msnyder@vmware.com
+
+	moxie		--target=moxie-elf ,-Werror
+			Anthony Green		green@moxielogic.com
 
 	ms1		--target=ms1-elf ,-Werror
 			Kevin Buettner		kevinb@redhat.com
@@ -440,7 +444,7 @@ elf reader		Elena Zannoni		elena.zannoni@oracle.com
 stabs reader		Elena Zannoni		elena.zannoni@oracle.com
 readline/		Elena Zannoni		elena.zannoni@oracle.com
 NetBSD native & host	Jason Thorpe		thorpej@netbsd.org
-Pascal support		Pierre Muller		muller@sources.redhat.com
+Pascal support		Pierre Muller		muller@sourceware.org
 avr			Theodore A. Roth	troth@openavr.org
 Modula-2 support	Gaius Mulley		gaius@glam.ac.uk
 
@@ -457,6 +461,7 @@ John David Anglin				dave.anglin@nrc-cnrc.gc.ca
 Shrinivas Atre					shrinivasa@kpitcummins.com
 Scott Bambrough					scottb@netwinder.org
 Thiago Jung Bauermann				bauerman@br.ibm.com
+Jon Beniston					jon@beniston.com
 Jan Beulich					jbeulich@novell.com
 Jim Blandy					jimb@codesourcery.com
 Philip Blundell					philb@gnu.org
@@ -540,7 +545,7 @@ Marko Mlinar                                    markom@opencores.org
 Alan Modra					amodra@bigpond.net.au
 Jason Molenda					jmolenda@apple.com
 Phil Muldoon					pmuldoon@redhat.com
-Pierre Muller					muller@sources.redhat.com
+Pierre Muller					muller@sourceware.org
 Gaius Mulley                                    gaius@glam.ac.uk
 Joseph Myers					joseph@codesourcery.com
 Fernando Nasser					fnasser@redhat.com
@@ -602,6 +607,7 @@ Eli Zaretskii					eliz@gnu.org
 Wu Zhou						woodzltc@cn.ibm.com
 Yoshinori Sato					ysato@users.sourceforge.jp
 Hui Zhu						teawater@gmail.com
+Sergio Durigan Junior				sergiodj@linux.vnet.ibm.com
 
 
 			Past Maintainers

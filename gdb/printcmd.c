@@ -46,7 +46,6 @@
 #include "exceptions.h"
 #include "observer.h"
 #include "solist.h"
-#include "solib.h"
 #include "parser-defs.h"
 #include "charset.h"
 
@@ -1365,6 +1364,22 @@ x_command (char *exp, int from_tty)
 	set_internalvar (lookup_internalvar ("__"), last_examine_value);
     }
 }
+
+/* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
+
+void
+print_types_mark_used (void)
+{
+  struct display *d;
+
+  if (last_examine_value)
+    type_mark_used (value_type (last_examine_value));
+
+  for (d = display_chain; d; d = d->next)
+    if (d->exp)
+      exp_types_mark_used (d->exp);
+}
+
 
 
 /* Add an expression to the auto-display chain.
@@ -1765,46 +1780,17 @@ disable_display_command (char *args, int from_tty)
       }
 }
 
-/* Return 1 if D uses SOLIB (and will become dangling when SOLIB
+/* Return 1 if D uses OBJFILE (and will become dangling when OBJFILE
    is unloaded), otherwise return 0.  */
 
 static int
-display_uses_solib_p (const struct display *d,
-		      const struct so_list *solib)
+display_uses_objfile (const struct display *d, struct objfile *objfile)
 {
-  int endpos;
-  struct expression *const exp = d->exp;
-  const union exp_element *const elts = exp->elts;
-
-  if (d->block != NULL
-      && solib_contains_address_p (solib, d->block->startaddr))
+  if (matching_objfiles (block_objfile (d->block), objfile))
     return 1;
 
-  for (endpos = exp->nelts; endpos > 0; )
-    {
-      int i, args, oplen = 0;
-
-      exp->language_defn->la_exp_desc->operator_length (exp, endpos,
-							&oplen, &args);
-      gdb_assert (oplen > 0);
-
-      i = endpos - oplen;
-      if (elts[i].opcode == OP_VAR_VALUE)
-	{
-	  const struct block *const block = elts[i + 1].block;
-	  const struct symbol *const symbol = elts[i + 2].symbol;
-	  const struct obj_section *const section =
-	    SYMBOL_OBJ_SECTION (symbol);
-
-	  if (block != NULL
-	      && solib_contains_address_p (solib, block->startaddr))
-	    return 1;
-
-	  if (section && section->objfile == solib->objfile)
-	    return 1;
-	}
-      endpos -= oplen;
-    }
+  if (exp_uses_objfile (d->exp, objfile))
+    return 1;
 
   return 0;
 }
@@ -1825,7 +1811,7 @@ clear_dangling_display_expressions (struct so_list *solib)
 
   for (d = display_chain; d; d = d->next)
     {
-      if (d->exp && display_uses_solib_p (d, solib))
+      if (d->exp && display_uses_objfile (d, solib->objfile))
 	{
 	  xfree (d->exp);
 	  d->exp = NULL;

@@ -247,9 +247,7 @@ allocate_value_lazy (struct type *type)
   val->next = all_values;
   all_values = val;
   val->type = type;
-  type_incref (type);
   val->enclosing_type = type;
-  type_incref (type);
   VALUE_LVAL (val) = not_lval;
   VALUE_ADDRESS (val) = 0;
   VALUE_FRAME_ID (val) = null_frame_id;
@@ -359,8 +357,6 @@ value_type (struct value *value)
 void
 deprecated_set_value_type (struct value *value, struct type *type)
 {
-  type_incref (type);
-  type_decref (value->type);
   value->type = type;
 }
 
@@ -578,9 +574,6 @@ value_free (struct value *val)
 {
   if (val)
     {
-      type_decref (val->type);
-      type_decref (val->enclosing_type);
-
       if (VALUE_LVAL (val) == lval_computed)
 	{
 	  struct lval_funcs *funcs = val->location.computed.funcs;
@@ -684,8 +677,6 @@ value_copy (struct value *arg)
     val = allocate_value_lazy (encl_type);
   else
     val = allocate_value (encl_type);
-  type_incref (arg->type);
-  type_decref (val->type);
   val->type = arg->type;
   VALUE_LVAL (val) = VALUE_LVAL (arg);
   val->location = arg->location;
@@ -1152,6 +1143,28 @@ call_internal_function (struct value *func, int argc, struct value **argv)
   return (*ifn->handler) (ifn->cookie, argc, argv);
 }
 
+/* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
+
+void
+value_types_mark_used (void)
+{
+  struct internalvar *var;
+  struct value_history_chunk *chunk;
+
+  for (var = internalvars; var != NULL; var = var->next)
+    if (var->value)
+      type_mark_used (value_type (var->value));
+
+  for (chunk = value_history_chain; chunk != NULL; chunk = chunk->next)
+    {
+      int i;
+
+      for (i = 0; i < ARRAY_SIZE (chunk->values); i++)
+	if (chunk->values[i])
+	  type_mark_used (value_type (chunk->values[i]));
+    }
+}
+
 /* The 'function' command.  This does nothing -- it is just a
    placeholder to let "help function NAME" work.  This is also used as
    the implementation of the sub-command that is created when
@@ -1198,21 +1211,11 @@ preserve_one_value (struct value *value, struct objfile *objfile,
 		    htab_t copied_types)
 {
   if (TYPE_OBJFILE (value->type) == objfile)
-    {
-      /* No need to decref the old type here, since we know it has no
-	 reference count.  */
-      value->type = copy_type_recursive (value->type, copied_types);
-      type_incref (value->type);
-    }
+    value->type = copy_type_recursive (value->type, copied_types);
 
   if (TYPE_OBJFILE (value->enclosing_type) == objfile)
-    {
-      /* No need to decref the old type here, since we know it has no
-	 reference count.  */
-      value->enclosing_type = copy_type_recursive (value->enclosing_type,
-						   copied_types);
-      type_incref (value->enclosing_type);
-    }
+    value->enclosing_type = copy_type_recursive (value->enclosing_type,
+						 copied_types);
 }
 
 /* Update the internal variables and value history when OBJFILE is
@@ -1601,8 +1604,6 @@ value_static_field (struct type *type, int fieldno)
 struct value *
 value_change_enclosing_type (struct value *val, struct type *new_encl_type)
 {
-  type_incref (new_encl_type);
-  type_decref (val->enclosing_type);
   if (TYPE_LENGTH (new_encl_type) > TYPE_LENGTH (value_enclosing_type (val))) 
     val->contents =
       (gdb_byte *) xrealloc (val->contents, TYPE_LENGTH (new_encl_type));
@@ -1658,8 +1659,6 @@ value_primitive_field (struct value *arg1, int offset,
 	  memcpy (value_contents_all_raw (v), value_contents_all_raw (arg1),
 		  TYPE_LENGTH (value_enclosing_type (arg1)));
 	}
-      type_incref (type);
-      type_decref (v->type);
       v->type = type;
       v->offset = value_offset (arg1);
       v->embedded_offset = (offset + value_embedded_offset (arg1)

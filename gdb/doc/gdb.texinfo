@@ -134,6 +134,7 @@ software in general.  We will miss him.
 * Running::                     Running programs under @value{GDBN}
 * Stopping::                    Stopping and continuing
 * Reverse Execution::           Running programs backward
+* Process Record and Replay::   Recording inferior's execution and replaying it
 * Stack::                       Examining the stack
 * Source::                      Examining source files
 * Data::                        Examining data
@@ -2429,6 +2430,9 @@ a command to apply a command to a list of threads
 @item thread-specific breakpoints
 @item @samp{set print thread-events}, which controls printing of 
 messages on thread start and exit.
+@item @samp{set libthread-db-search-path @var{path}}, which lets
+the user specify which @code{libthread_db} to use if the default choice
+isn't compatible with the program.
 @end itemize
 
 @quotation
@@ -2646,6 +2650,38 @@ programs with multiple threads.
 
 @xref{Set Watchpoints,,Setting Watchpoints}, for information about
 watchpoints in programs with multiple threads.
+
+@table @code
+@kindex set libthread-db-search-path
+@cindex search path for @code{libthread_db}
+@item set libthread-db-search-path @r{[}@var{path}@r{]}
+If this variable is set, @var{path} is a colon-separated list of
+directories @value{GDBN} will use to search for @code{libthread_db}.
+If you omit @var{path}, @samp{libthread-db-search-path} will be reset to
+an empty list.
+
+On @sc{gnu}/Linux and Solaris systems, @value{GDBN} uses a ``helper''
+@code{libthread_db} library to obtain information about threads in the
+inferior process.  @value{GDBN} will use @samp{libthread-db-search-path}
+to find @code{libthread_db}.  If that fails, @value{GDBN} will continue
+with default system shared library directories, and finally the directory
+from which @code{libpthread} was loaded in the inferior process.
+
+For any @code{libthread_db} library @value{GDBN} finds in above directories,
+@value{GDBN} attempts to initialize it with the current inferior process.
+If this initialization fails (which could happen because of a version
+mismatch between @code{libthread_db} and @code{libpthread}), @value{GDBN}
+will unload @code{libthread_db}, and continue with the next directory.
+If none of @code{libthread_db} libraries initialize successfully,
+@value{GDBN} will issue a warning and thread debugging will be disabled.
+
+Setting @code{libthread-db-search-path} is currently implemented
+only on some platforms.
+
+@kindex show libthread-db-search-path 
+@item show libthread-db-search-path 
+Display current libthread_db search path.
+@end table
 
 @node Processes
 @section Debugging Programs with Multiple Processes
@@ -5002,6 +5038,146 @@ This is the default.
 @end table
 
 
+@node Process Record and Replay
+@chapter Recording Inferior's Execution and Replaying It
+@cindex process record and replay
+@cindex recording inferior's execution and replaying it
+
+On some platforms, @value{GDBN} provides a special @dfn{process record
+and replay} target that can record a log of the process execution, and
+replay it later with both forward and reverse execution commands.
+
+@cindex replay mode
+When this target is in use, if the execution log includes the record
+for the next instruction, @value{GDBN} will debug in @dfn{replay
+mode}.  In the replay mode, the inferior does not really execute code
+instructions.  Instead, all the events that normally happen during
+code execution are taken from the execution log.  While code is not
+really executed in replay mode, the values of registers (including the
+program counter register) and the memory of the inferior are still
+changed as they normally would.  Their contents are taken from the
+execution log.
+
+@cindex record mode
+If the record for the next instruction is not in the execution log,
+@value{GDBN} will debug in @dfn{record mode}.  In this mode, the
+inferior executes normally, and @value{GDBN} records the execution log
+for future replay.
+
+The process record and replay target supports reverse execution
+(@pxref{Reverse Execution}), even if the platform on which the
+inferior runs does not.  However, the reverse execution is limited in
+this case by the range of the instructions recorded in the execution
+log.  In other words, reverse execution on platforms that don't
+support it directly can only be done in the replay mode.
+
+When debugging in the reverse direction, @value{GDBN} will work in
+replay mode as long as the execution log includes the record for the
+previous instruction; otherwise, it will work in record mode, if the
+platform supports reverse execution, or stop if not.
+
+For architecture environments that support process record and replay,
+@value{GDBN} provides the following commands:
+
+@table @code
+@kindex target record
+@kindex record
+@kindex rec
+@item target record
+This command starts the process record and replay target.  The process
+record and replay target can only debug a process that is already
+running.  Therefore, you need first to start the process with the
+@kbd{run} or @kbd{start} commands, and then start the recording with
+the @kbd{target record} command.
+
+Both @code{record} and @code{rec} are aliases of @code{target record}.
+
+@cindex displaced stepping, and process record and replay
+Displaced stepping (@pxref{Maintenance Commands,, displaced stepping})
+will be automatically disabled when process record and replay target
+is started.  That's because the process record and replay target
+doesn't support displaced stepping.
+
+@cindex non-stop mode, and process record and replay
+@cindex asynchronous execution, and process record and replay
+If the inferior is in the non-stop mode (@pxref{Non-Stop Mode}) or in
+the asynchronous execution mode (@pxref{Background Execution}), the
+process record and replay target cannot be started because it doesn't
+support these two modes.
+
+@kindex record stop
+@kindex rec s
+@item record stop
+Stop the process record and replay target.  When process record and
+replay target stops, the entire execution log will be deleted and the
+inferior will either be terminated, or will remain in its final state.
+
+When you stop the process record and replay target in record mode (at
+the end of the execution log), the inferior will be stopped at the
+next instruction that would have been recorded.  In other words, if
+you record for a while and then stop recording, the inferior process
+will be left in the same state as if the recording never happened.
+
+On the other hand, if the process record and replay target is stopped
+while in replay mode (that is, not at the end of the execution log,
+but at some earlier point), the inferior process will become ``live''
+at that earlier state, and it will then be possible to continue the
+usual ``live'' debugging of the process from that state.
+
+When the inferior process exits, or @value{GDBN} detaches from it,
+process record and replay target will automatically stop itself.
+
+@kindex set record insn-number-max
+@item set record insn-number-max @var{limit}
+Set the limit of instructions to be recorded.  Default value is 200000.
+
+If @var{limit} is a positive number, then @value{GDBN} will start
+deleting instructions from the log once the number of the record
+instructions becomes greater than @var{limit}.  For every new recorded
+instruction, @value{GDBN} will delete the earliest recorded
+instruction to keep the number of recorded instructions at the limit.
+(Since deleting recorded instructions loses information, @value{GDBN}
+lets you control what happens when the limit is reached, by means of
+the @code{stop-at-limit} option, described below.)
+
+If @var{limit} is zero, @value{GDBN} will never delete recorded
+instructions from the execution log.  The number of recorded
+instructions is unlimited in this case.
+
+@kindex show record insn-number-max
+@item show record insn-number-max
+Show the limit of instructions to be recorded.
+
+@kindex set record stop-at-limit
+@item set record stop-at-limit
+Control the behavior when the number of recorded instructions reaches
+the limit.  If ON (the default), @value{GDBN} will stop when the limit
+is reached for the first time and ask you whether you want to stop the
+inferior or continue running it and recording the execution log.  If
+you decide to continue recording, each new recorded instruction will
+cause the oldest one to be deleted.
+
+If this option is OFF, @value{GDBN} will automatically delete the
+oldest record to make room for each new one, without asking.
+
+@kindex show record stop-at-limit
+@item show record stop-at-limit
+Show the current setting of @code{stop-at-limit}.
+
+@kindex info record insn-number
+@item info record insn-number
+Show the current number of recorded instructions.
+
+@kindex record delete
+@kindex rec del
+@item record delete
+When record target runs in replay mode (``in the past''), delete the
+subsequent execution log and begin to record a new execution log starting
+from the current address.  This means you will abandon the previously
+recorded ``future'' and begin recording a new ``future''.
+@end table
+
+
 @node Stack
 @chapter Examining the Stack
 
@@ -5809,6 +5985,19 @@ for any reason a source file that is not relevant to your executable is
 located at the original location, a substitution rule is the only
 method available to point @value{GDBN} at the new location.
 
+@cindex @samp{--with-relocated-sources}
+@cindex default source path substitution
+You can configure a default source path substitution rule by
+configuring @value{GDBN} with the
+@samp{--with-relocated-sources=@var{dir}} option.  The @var{dir}
+should be the name of a directory under @value{GDBN}'s configured
+prefix (set with @samp{--prefix} or @samp{--exec-prefix}), and
+directory names in debug information under @var{dir} will be adjusted
+automatically if the installed @value{GDBN} is moved to a new
+location.  This is useful if @value{GDBN}, libraries or executables
+with debug information and corresponding source code are being moved
+together.
+
 @table @code
 @item directory @var{dirname} @dots{}
 @item dir @var{dirname} @dots{}
@@ -6058,12 +6247,21 @@ Show the current setting of the disassembly flavor.
 @kindex show disassemble-next-line
 @item set disassemble-next-line
 @itemx show disassemble-next-line
-Control whether or not @value{GDBN} will disassemble next source line
-when execution stops.  If ON, GDB will display disassembly of the next
-source line when execution of the program being debugged stops.
-If AUTO (which is the default), or there's no line info to determine
-the source line of the next instruction, display disassembly of next
-instruction instead.
+Control whether or not @value{GDBN} will disassemble the next source
+line or instruction when execution stops.  If ON, @value{GDBN} will
+display disassembly of the next source line when execution of the
+program being debugged stops.  This is @emph{in addition} to
+displaying the source line itself, which @value{GDBN} always does if
+possible.  If the next source line cannot be displayed for some reason
+(e.g., if @value{GDBN} cannot find the source file, or there's no line
+info in the debug info), @value{GDBN} will display disassembly of the
+next @emph{instruction} instead of showing the next source line.  If
+AUTO, @value{GDBN} will display disassembly of next instruction only
+if the source line cannot be displayed.  This setting causes
+@value{GDBN} to display some feedback when you step through a function
+with no line info or whose source file is unavailable.  The default is
+OFF, which means never display the disassembly of the next line or
+instruction.
 @end table
 
 
@@ -8360,7 +8558,7 @@ can be any string of tokens.
 @cindex definition, showing a macro's
 @item info macro @var{macro}
 Show the definition of the macro named @var{macro}, and describe the
-source location where that definition was established.
+source location or compiler command-line where that definition was established.
 
 @kindex macro define
 @cindex user-defined macros
@@ -8522,6 +8720,18 @@ Defined at /home/jimb/gdb/macros/play/sample.c:13
 expands to: 1729 < 42
 (@value{GDBP}) print N Q M
 $2 = 0
+(@value{GDBP})
+@end smallexample
+
+In addition to source files, macros can be defined on the compilation command
+line using the @option{-D@var{name}=@var{value}} syntax.  For macros defined in
+such a way, @value{GDBN} displays the location of their definition as line zero
+of the source file submitted to the compiler.
+
+@smallexample
+(@value{GDBP}) info macro __STDC__
+Defined at /home/jimb/gdb/macros/play/sample.c:0
+-D__STDC__=1
 (@value{GDBP})
 @end smallexample
 
@@ -12722,6 +12932,7 @@ program.  To debug a core dump of a previous run, you must also tell
 * Files::                       Commands to specify files
 * Separate Debug Files::        Debugging information in separate files
 * Symbol Errors::               Errors reading symbol files
+* Data Files::                  GDB data files
 @end menu
 
 @node Files
@@ -13555,6 +13766,36 @@ it.
 @value{GDBN} could not parse a type specification output by the compiler.
 
 @end table
+
+@node Data Files
+@section GDB Data Files
+
+@cindex prefix for data files
+@value{GDBN} will sometimes read an auxiliary data file.  These files
+are kept in a directory known as the @dfn{data directory}.
+
+You can set the data directory's name, and view the name @value{GDBN}
+is currently using.
+
+@table @code
+@kindex set data-directory
+@item set data-directory @var{directory}
+Set the directory which @value{GDBN} searches for auxiliary data files
+to @var{directory}.
+
+@kindex show data-directory
+@item show data-directory
+Show the directory @value{GDBN} searches for auxiliary data files.
+@end table
+
+@cindex default data directory
+@cindex @samp{--with-gdb-datadir}
+You can set the default data directory by using the configure-time
+@samp{--with-gdb-datadir} option.  If the data directory is inside
+@value{GDBN}'s configured binary prefix (set with @samp{--prefix} or
+@samp{--exec-prefix}), then the default data directory will be updated
+automatically if the installed @value{GDBN} is moved to a new
+location.
 
 @node Targets
 @chapter Specifying a Debugging Target
@@ -17623,6 +17864,11 @@ default is off.
 @item show debug frame
 Displays the current state of displaying @value{GDBN} frame debugging
 info.
+@item set debug gnu-nat
+@cindex @sc{gnu}/Hurd debug messages
+Turns on or off debugging messages from the @sc{gnu}/Hurd debug support.
+@item show debug gnu-nat
+Show the current state of @sc{gnu}/Hurd debugging messages.
 @item set debug infrun
 @cindex inferior debugging info
 Turns on or off display of @value{GDBN} debugging info for running the inferior.
@@ -19623,6 +19869,14 @@ processed.  Therefore, whenever an MI command results in an error,
 we recommend that the frontend refreshes all the information shown in 
 the user interface.
 
+
+@menu
+* Context management::
+* Asynchronous and non-stop modes::
+* Thread groups::
+@end menu
+
+@node Context management
 @subsection Context management
 
 In most cases when @value{GDBN} accesses the target, this access is
@@ -19675,6 +19929,7 @@ all subsequent commands.  No frontend is known to do this exactly
 right, so it is suggested to just always pass the @samp{--thread} and
 @samp{--frame} options.
 
+@node Asynchronous and non-stop modes
 @subsection Asynchronous command execution and non-stop mode
 
 On some targets, @value{GDBN} is capable of processing MI commands
@@ -19710,6 +19965,7 @@ highly target dependent.  However, the two commands
 @code{-exec-interrupt}, to stop a thread, and @code{-thread-info},
 to find the state of a thread, will always work.
 
+@node Thread groups
 @subsection Thread groups
 @value{GDBN} may be used to debug several processes at the same time.
 On some platfroms, @value{GDBN} may support debugging of several
@@ -21382,6 +21638,31 @@ fullname="/home/foo/bar/try.c",line="13"@}
 -exec-interrupt
 ^error,msg="mi_cmd_exec_interrupt: Inferior not executing."
 (gdb)
+@end smallexample
+
+@subheading The @code{-exec-jump} Command
+@findex -exec-jump
+
+@subsubheading Synopsis
+
+@smallexample
+ -exec-jump @var{location}
+@end smallexample
+
+Resumes execution of the inferior program at the location specified by
+parameter.  @xref{Specify Location}, for a description of the
+different forms of @var{location}.
+
+@subsubheading @value{GDBN} Command
+
+The corresponding @value{GDBN} command is @samp{jump}.
+
+@subsubheading Example
+
+@smallexample
+-exec-jump foo.c:10
+*running,thread-id="all"
+^running
 @end smallexample
 
 
@@ -25716,10 +25997,12 @@ data in a @file{gmon.out} file, be sure to move it to a safe location.
 Configuring with @samp{--enable-profiling} arranges for @value{GDBN} to be
 compiled with the @samp{-pg} compiler option.
 
-@kindex maint show-debug-regs
-@cindex x86 hardware debug registers
-@item maint show-debug-regs
-Control whether to show variables that mirror the x86 hardware debug
+@kindex maint set show-debug-regs
+@kindex maint show show-debug-regs
+@cindex hardware debug registers
+@item maint set show-debug-regs
+@itemx maint show show-debug-regs
+Control whether to show variables that mirror the hardware debug
 registers.  Use @code{ON} to enable, @code{OFF} to disable.  If
 enabled, the debug registers values are shown when @value{GDBN} inserts or
 removes a hardware breakpoint or watchpoint, and when the inferior

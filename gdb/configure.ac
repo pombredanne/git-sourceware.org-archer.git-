@@ -92,37 +92,28 @@ AC_SUBST(PACKAGE)
 # generate its Makefile.in.
 AM_INIT_AUTOMAKE(gdb, UNUSED-VERSION, [no-define])
 
-debugdir=${libdir}/debug
-	 
-AC_ARG_WITH(separate-debug-dir,
-[  --with-separate-debug-dir=path   Look for global separate debug info in this path [LIBDIR/debug]],
-[debugdir="${withval}"])
-	
-AC_DEFINE_DIR(DEBUGDIR, debugdir,
-              [Global directory for separate debug files. ])
-#AC_DEFINE_UNQUOTED(DEBUGDIR, "$debugdir"),
+GDB_AC_WITH_DIR(DEBUGDIR, separate-debug-dir,
+    [look for global separate debug info in this path @<:@LIBDIR/debug@:>@],
+    [${libdir}/debug])
 
-if test "x$exec_prefix" = xNONE || test "x$exec_prefix" = 'x${prefix}'; then
-  if test "x$prefix" = xNONE; then
-    test_prefix=/usr/local
-  else
-    test_prefix=$prefix
-  fi
-else
-  test_prefix=$exec_prefix
-fi
-case ${debugdir} in
-"${test_prefix}"|"${test_prefix}/"*|\
-'${exec_prefix}'|'${exec_prefix}/'*)
-  AC_DEFINE(DEBUGDIR_RELOCATABLE, 1, [Define if the debug directory should be relocated when GDB is moved.])
-  ;;
-esac
+# GDB's datadir relocation
+
+GDB_AC_WITH_DIR(GDB_DATADIR, gdb-datadir,
+    [look for global separate data files in this path @<:@DATADIR/gdb@:>@],
+    [${datadir}/gdb])
+
+AC_ARG_WITH(relocated-sources,
+AS_HELP_STRING([--with-relocated-sources=PATH], [automatically relocate this path for source files]),
+[reloc_srcdir="${withval}"
+ AC_DEFINE_DIR(RELOC_SRCDIR, reloc_srcdir,
+              [Relocated directory for source files. ])
+])
 
 AC_CONFIG_SUBDIRS(doc testsuite)
 
 # Check whether to support alternative target configurations
 AC_ARG_ENABLE(targets,
-[  --enable-targets        alternative target configurations],
+AS_HELP_STRING([--enable-targets=TARGETS], [alternative target configurations]),
 [case "${enableval}" in
   yes | "") AC_ERROR(enable-targets option must specify target names or 'all')
             ;;
@@ -132,7 +123,7 @@ esac])
 
 # Check whether to enable 64-bit support on 32-bit hosts
 AC_ARG_ENABLE(64-bit-bfd,
-[  --enable-64-bit-bfd     64-bit support (on hosts with narrower word sizes)],
+AS_HELP_STRING([--enable-64-bit-bfd], [64-bit support (on hosts with narrower word sizes)]),
 [case "${enableval}" in
   yes)  want64=true  ;;
   no)   want64=false ;;
@@ -240,7 +231,7 @@ fi
 
 # Enable CLI.
 AC_ARG_ENABLE(gdbcli,
-[  --disable-gdbcli        disable command-line interface (CLI)],
+AS_HELP_STRING([--disable-gdbcli], [disable command-line interface (CLI)]),
   [case $enableval in
     yes)
       ;;
@@ -261,7 +252,7 @@ fi
 
 # Enable MI.
 AC_ARG_ENABLE(gdbmi,
-[  --disable-gdbmi         disable machine-interface (MI)],
+AS_HELP_STRING([--disable-gdbmi], [disable machine-interface (MI)]),
   [case $enableval in
     yes | no)
       ;;
@@ -280,7 +271,7 @@ fi
 
 # Enable TUI.
 AC_ARG_ENABLE(tui,
-[  --enable-tui            enable full-screen terminal user interface (TUI)],
+AS_HELP_STRING([--enable-tui], [enable full-screen terminal user interface (TUI)]),
   [case $enableval in
     yes | no | auto)
       ;;
@@ -290,7 +281,7 @@ AC_ARG_ENABLE(tui,
 
 # Enable gdbtk.
 AC_ARG_ENABLE(gdbtk,
-[  --enable-gdbtk          enable gdbtk graphical user interface (GUI)],
+AS_HELP_STRING([--enable-gdbtk], [enable gdbtk graphical user interface (GUI)]),
   [case $enableval in
     yes | no)
       ;;
@@ -311,7 +302,7 @@ esac
 
 # Libunwind support.
 AC_ARG_WITH(libunwind,
-[  --with-libunwind            Use libunwind frame unwinding support],
+AS_HELP_STRING([--with-libunwind], [use libunwind frame unwinding support]),
 [case "${withval}" in
   yes)  enable_libunwind=yes ;;
   no)   enable_libunwind=no ;;
@@ -332,7 +323,7 @@ if test x"$enable_libunwind" = xyes; then
 fi
 
 opt_curses=no
-AC_ARG_WITH(curses, AC_HELP_STRING([--with-curses], [use the curses library instead of the termcap library]), opt_curses=$withval)
+AC_ARG_WITH(curses, AS_HELP_STRING([--with-curses], [use the curses library instead of the termcap library]), opt_curses=$withval)
 
 prefer_curses=no
 if test "$opt_curses" = "yes"; then
@@ -341,7 +332,7 @@ fi
 
 # Profiling support.
 AC_ARG_ENABLE(profiling,
-[  --enable-profiling      enable profiling of GDB],
+AS_HELP_STRING([--enable-profiling], [enable profiling of GDB]),
   [case $enableval in
     yes | no)
       ;;
@@ -920,9 +911,7 @@ if test $gdb_cv_have_gnu_regex = yes; then
 fi
 
 AC_ARG_WITH(included-regex,
-  [  --without-included-regex don't use included regex; this is the default
-                          on systems with version 2 of the GNU C library
-                          (use with caution on other system)],
+  AS_HELP_STRING([--without-included-regex], [don't use included regex; this is the default on systems with version 2 of the GNU C library (use with caution on other system)]),
   gdb_with_regex=$withval,
   gdb_with_regex=$gdb_use_included_regex)
 if test "$gdb_with_regex" = yes; then
@@ -1474,8 +1463,9 @@ fi
 
 dnl Handle optional features that can be enabled.
 
+target_sysroot_reloc=0
 AC_ARG_WITH(sysroot,
-[  --with-sysroot[=DIR] Search for usr/lib et al within DIR.],
+AS_HELP_STRING([--with-sysroot@<:@=DIR@:>@], [search for usr/lib et al within DIR]),
 [
  case ${with_sysroot} in
  yes) TARGET_SYSTEM_ROOT='${exec_prefix}/${target_alias}/sys-root' ;;
@@ -1499,47 +1489,23 @@ AC_ARG_WITH(sysroot,
  "${test_exec_prefix}"|"${test_exec_prefix}/"*|\
  '${prefix}'|'${prefix}/'*|\
  '${exec_prefix}'|'${exec_prefix}/'*)
-   t="$TARGET_SYSTEM_ROOT_DEFINE -DTARGET_SYSTEM_ROOT_RELOCATABLE"
-   TARGET_SYSTEM_ROOT_DEFINE="$t"
+   target_sysroot_reloc=1
    ;;
  esac
 ], [
  TARGET_SYSTEM_ROOT=
  TARGET_SYSTEM_ROOT_DEFINE='-DTARGET_SYSTEM_ROOT=\"\"'
 ])
+TARGET_SYSTEM_ROOT_DEFINE="$TARGET_SYSTEM_ROOT_DEFINE -DTARGET_SYSTEM_ROOT_RELOCATABLE=$target_sysroot_reloc"
 AC_SUBST(TARGET_SYSTEM_ROOT)
 AC_SUBST(TARGET_SYSTEM_ROOT_DEFINE)
 
-system_gdbinit=
-AC_ARG_WITH(system-gdbinit,
-[  --with-system-gdbinit=file       Automatically load a system-wide gdbinit file],
-[system_gdbinit=${withval}])
-
-AC_DEFINE_DIR(SYSTEM_GDBINIT, system_gdbinit,
-              [System-wide gdbinit file.])
-
-if test "x$prefix" = xNONE; then
-  test_prefix=$ac_default_prefix
-else
-  test_prefix=$prefix
-fi
-if test "x$exec_prefix" = xNONE || test "x$exec_prefix" = 'x${prefix}'; then
-  test_exec_prefix=$test_prefix
-else
-  test_exec_prefix=$exec_prefix
-fi
-case ${system_gdbinit} in
- "${test_prefix}"|"${test_prefix}/"*|\
- "${test_exec_prefix}"|"${test_exec_prefix}/"*|\
- '${prefix}'|'${prefix}/'*|\
- '${exec_prefix}'|'${exec_prefix}/'*)
-  AC_DEFINE(SYSTEM_GDBINIT_RELOCATABLE, 1,
-            [Define if the system-wide gdbinit file should be relocated when GDB is moved.])
-   ;;
-esac
+GDB_AC_WITH_DIR(SYSTEM_GDBINIT, system-gdbinit,
+    [automatically load a system-wide gdbinit file],
+    [])
 
 AC_ARG_ENABLE(werror,
-  [  --enable-werror    treat compile warnings as errors],
+  AS_HELP_STRING([--enable-werror], [treat compile warnings as errors]),
   [case "${enableval}" in
      yes | y) ERROR_ON_WARNING="yes" ;;
      no | n)  ERROR_ON_WARNING="no" ;;
@@ -1572,7 +1538,7 @@ case "${host}" in
 esac
 
 AC_ARG_ENABLE(build-warnings,
-[  --enable-build-warnings Enable build-time compiler warnings if gcc is used],
+AS_HELP_STRING([--enable-build-warnings], [enable build-time compiler warnings if gcc is used]),
 [case "${enableval}" in
   yes)	;;
   no)	build_warnings="-w";;
@@ -1586,7 +1552,7 @@ if test x"$silent" != x"yes" && test x"$build_warnings" != x""; then
   echo "Setting compiler warning flags = $build_warnings" 6>&1
 fi])dnl
 AC_ARG_ENABLE(gdb-build-warnings,
-[  --enable-gdb-build-warnings Enable GDB specific build-time compiler warnings if gcc is used],
+AS_HELP_STRING([--enable-gdb-build-warnings], [enable GDB specific build-time compiler warnings if gcc is used]),
 [case "${enableval}" in
   yes)	;;
   no)	build_warnings="-w";;
@@ -1824,7 +1790,7 @@ AC_PATH_X
 # not part of the source tree.
 #
 AC_ARG_ENABLE(sim,
-[  --enable-sim            Link gdb with simulator],
+AS_HELP_STRING([--enable-sim], [link gdb with simulator]),
 [echo "enable_sim = $enable_sim";
  echo "enableval = ${enableval}";
  case "${enableval}" in
@@ -1904,7 +1870,7 @@ fi
 
 # Enable multi-ice-gdb-server.
 AC_ARG_ENABLE(multi-ice,
-[  --enable-multi-ice      build the multi-ice-gdb-server],
+AS_HELP_STRING([--enable-multi-ice], [build the multi-ice-gdb-server]),
   [case $enableval in
     yes | no)
       ;;
@@ -1932,9 +1898,7 @@ files=
 links=
 
 rm -f nm.h
-nm_h=""
 if test "${nativefile}" != ""; then
-    nm_h=nm.h
     case "${nativefile}" in
       nm-*.h ) GDB_NM_FILE="config/${gdb_host_cpu}/${nativefile}" ;;
       * ) GDB_NM_FILE="${nativefile}"
@@ -1943,7 +1907,7 @@ if test "${nativefile}" != ""; then
     links="${links} nm.h"
     AC_DEFINE_UNQUOTED(GDB_NM_FILE, "${GDB_NM_FILE}", [nativefile])
 fi
-AC_SUBST(nm_h)
+AC_SUBST(GDB_NM_FILE)
 
 AC_LINK_FILES($files, $links)
 
@@ -1955,26 +1919,38 @@ dnl  At the moment, we just assume it's UTF-8.
 AC_DEFINE(GDB_DEFAULT_HOST_CHARSET, "UTF-8",
           [Define to be a string naming the default host character set.])
 
+# Flags needed to enable html installing and building
+AC_ARG_WITH(datarootdir,
+AC_HELP_STRING([--with-datarootdir], [use datarootdir as the data root directory.]),
+[datarootdir="\${prefix}/${withval}"],
+[datarootdir="\${prefix}/share"])
+
+AC_ARG_WITH(docdir,
+AC_HELP_STRING([--with-docdir], [install documentation in this directory.]),
+[docdir="\${prefix}/${withval}"],
+[docdir="\${datarootdir}/doc"])
+
+AC_ARG_WITH(pdfdir,
+AC_HELP_STRING([--with-pdfdir], [install pdf in this directory.]),
+[pdfdir="\${prefix}/${withval}"],
+[pdfdir="\${docdir}"])
+
+AC_ARG_WITH(htmldir,
+AC_HELP_STRING([--with-htmldir], [install html in this directory.]),
+[htmldir="\${prefix}/${withval}"],
+[htmldir="\${docdir}"])
+
+AC_SUBST(datarootdir)
+AC_SUBST(docdir)
+AC_SUBST(htmldir)
+AC_SUBST(pdfdir)
+
 AC_OUTPUT(Makefile .gdbinit:gdbinit.in gnulib/Makefile,
 [
-dnl Autoconf doesn't provide a mechanism for modifying definitions 
-dnl provided by makefile fragments.
-dnl
-
-changequote(,)dnl
-sed -e '/^NAT_FILE[ 	]*=/s,^NAT_FILE[ 	]*=[ 	]*,&config/'"${gdb_host_cpu}"'/,' <Makefile >Makefile.tmp
-mv -f Makefile.tmp Makefile
-changequote([,])dnl
-
-
 case x$CONFIG_HEADERS in
 xconfig.h:config.in)
 echo > stamp-h ;;
 esac
-],
-[
-gdb_host_cpu=$gdb_host_cpu
-nativefile=$nativefile
 ])
 
 exit 0

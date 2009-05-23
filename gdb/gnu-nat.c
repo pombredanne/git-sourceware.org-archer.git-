@@ -113,7 +113,8 @@ void inf_continue (struct inf *inf);
 
 #define inf_debug(_inf, msg, args...) \
   do { struct inf *__inf = (_inf); \
-       debug ("{inf %d %p}: " msg, __inf->pid, __inf , ##args); } while (0)
+       debug ("{inf %d %s}: " msg, __inf->pid, \
+       host_address_to_string (__inf) , ##args); } while (0)
 
 void proc_abort (struct proc *proc, int force);
 struct proc *make_proc (struct inf *inf, mach_port_t port, int tid);
@@ -1434,7 +1435,7 @@ struct inf *waiting_inf;
 /* Wait for something to happen in the inferior, returning what in STATUS. */
 static ptid_t
 gnu_wait (struct target_ops *ops,
-	  ptid_t ptid, struct target_waitstatus *status)
+	  ptid_t ptid, struct target_waitstatus *status, int options)
 {
   struct msg
     {
@@ -2490,9 +2491,9 @@ gnu_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int write,
     return 0;
   else
     {
-      inf_debug (gnu_current_inf, "%s %p[%d] %s %p",
-		 write ? "writing" : "reading", (void *) memaddr, len,
-		 write ? "<--" : "-->", myaddr);
+      inf_debug (gnu_current_inf, "%s %s[%d] %s %s",
+		 write ? "writing" : "reading", paddr (memaddr), len,
+		 write ? "<--" : "-->", host_address_to_string (myaddr));
       if (write)
 	return gnu_write_inferior (task, memaddr, myaddr, len);
       else
@@ -3409,10 +3410,15 @@ _initialize_gnu_nat (void)
 
   add_task_commands ();
   add_thread_commands ();
-  deprecated_add_set_cmd ("gnu-debug", class_maintenance,
-			  var_boolean, (char *) &gnu_debug_flag,
-			  "Set debugging output for the gnu backend.",
-			  &maintenancelist);
+  add_setshow_boolean_cmd ("gnu-nat", class_maintenance,
+			   &gnu_debug_flag,
+			   _("Set debugging output for the gnu backend."),
+			   _("Show debugging output for the gnu backend."),
+			   NULL,
+			   NULL,
+			   NULL,
+			   &setdebuglist,
+			   &showdebuglist);
 }
 
 #ifdef	FLUSH_INFERIOR_CACHE

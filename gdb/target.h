@@ -63,7 +63,8 @@ enum strata
     file_stratum,		/* Executable files, etc */
     core_stratum,		/* Core dump files */
     process_stratum,		/* Executing processes */
-    thread_stratum		/* Executing threads */
+    thread_stratum,		/* Executing threads */
+    record_stratum		/* Support record debugging */
   };
 
 enum thread_control_capabilities
@@ -151,6 +152,13 @@ struct target_waitstatus
       }
     value;
   };
+
+/* Options that can be passed to target_wait.  */
+
+/* Return immediately if there's no event already queued.  If this
+   options is not requested, target_wait blocks waiting for an
+   event.  */
+#define TARGET_WNOHANG 1
 
 /* Return a pretty printed form of target_waitstatus.
    Space for the result is malloc'd, caller must free.  */
@@ -326,7 +334,7 @@ struct target_ops
     void (*to_disconnect) (struct target_ops *, char *, int);
     void (*to_resume) (struct target_ops *, ptid_t, int, enum target_signal);
     ptid_t (*to_wait) (struct target_ops *,
-		      ptid_t, struct target_waitstatus *);
+		       ptid_t, struct target_waitstatus *, int);
     void (*to_fetch_registers) (struct target_ops *, struct regcache *, int);
     void (*to_store_registers) (struct target_ops *, struct regcache *, int);
     void (*to_prepare_to_store) (struct regcache *);
@@ -412,9 +420,9 @@ struct target_ops
     int to_has_execution;
     int to_has_thread_control;	/* control thread execution */
     int to_attach_no_wait;
-    struct section_table
+    struct target_section
      *to_sections;
-    struct section_table
+    struct target_section
      *to_sections_end;
     /* ASYNC target controls */
     int (*to_can_async_p) (void);
@@ -620,9 +628,11 @@ extern void target_resume (ptid_t ptid, int step, enum target_signal signal);
    _NOT_ OK to throw_exception() out of target_wait() without popping
    the debugging target from the stack; GDB isn't prepared to get back
    to the prompt with a debugging target but without the frame cache,
-   stop_pc, etc., set up.  */
+   stop_pc, etc., set up.  OPTIONS is a bitwise OR of TARGET_W*
+   options.  */
 
-extern ptid_t target_wait (ptid_t ptid, struct target_waitstatus *status);
+extern ptid_t target_wait (ptid_t ptid, struct target_waitstatus *status,
+			   int options);
 
 /* Fetch at least register REGNO, or all regs if regno == -1.  No result.  */
 
@@ -753,8 +763,7 @@ extern void print_section_info (struct target_ops *, bfd *);
 /* Put the inferior's terminal settings into effect.
    This is preparation for starting or resuming the inferior.  */
 
-#define target_terminal_inferior() \
-     (*current_target.to_terminal_inferior) ()
+extern void target_terminal_inferior (void);
 
 /* Put some of our terminal settings into effect,
    enough to get proper results from our output,
@@ -1052,24 +1061,18 @@ extern char *normal_pid_to_str (ptid_t ptid);
 /* Returns non-zero if we were stopped by a hardware watchpoint (memory read or
    write).  */
 
-#ifndef STOPPED_BY_WATCHPOINT
-#define STOPPED_BY_WATCHPOINT(w) \
-   (*current_target.to_stopped_by_watchpoint) ()
-#endif
+#define target_stopped_by_watchpoint \
+   (*current_target.to_stopped_by_watchpoint)
 
 /* Non-zero if we have steppable watchpoints  */
 
-#ifndef HAVE_STEPPABLE_WATCHPOINT
-#define HAVE_STEPPABLE_WATCHPOINT \
+#define target_have_steppable_watchpoint \
    (current_target.to_have_steppable_watchpoint)
-#endif
 
 /* Non-zero if we have continuable watchpoints  */
 
-#ifndef HAVE_CONTINUABLE_WATCHPOINT
-#define HAVE_CONTINUABLE_WATCHPOINT \
+#define target_have_continuable_watchpoint \
    (current_target.to_have_continuable_watchpoint)
-#endif
 
 /* Provide defaults for hardware watchpoint functions.  */
 
@@ -1081,41 +1084,31 @@ extern char *normal_pid_to_str (ptid_t ptid);
    bp_hardware_breakpoint.  CNT is the number of such watchpoints used so far
    (including this one?).  OTHERTYPE is who knows what...  */
 
-#ifndef TARGET_CAN_USE_HARDWARE_WATCHPOINT
-#define TARGET_CAN_USE_HARDWARE_WATCHPOINT(TYPE,CNT,OTHERTYPE) \
+#define target_can_use_hardware_watchpoint(TYPE,CNT,OTHERTYPE) \
  (*current_target.to_can_use_hw_breakpoint) (TYPE, CNT, OTHERTYPE);
-#endif
 
-#ifndef TARGET_REGION_OK_FOR_HW_WATCHPOINT
-#define TARGET_REGION_OK_FOR_HW_WATCHPOINT(addr, len) \
+#define target_region_ok_for_hw_watchpoint(addr, len) \
     (*current_target.to_region_ok_for_hw_watchpoint) (addr, len)
-#endif
 
 
 /* Set/clear a hardware watchpoint starting at ADDR, for LEN bytes.  TYPE is 0
    for write, 1 for read, and 2 for read/write accesses.  Returns 0 for
    success, non-zero for failure.  */
 
-#ifndef target_insert_watchpoint
 #define	target_insert_watchpoint(addr, len, type)	\
      (*current_target.to_insert_watchpoint) (addr, len, type)
 
 #define	target_remove_watchpoint(addr, len, type)	\
      (*current_target.to_remove_watchpoint) (addr, len, type)
-#endif
 
-#ifndef target_insert_hw_breakpoint
 #define target_insert_hw_breakpoint(bp_tgt) \
      (*current_target.to_insert_hw_breakpoint) (bp_tgt)
 
 #define target_remove_hw_breakpoint(bp_tgt) \
      (*current_target.to_remove_hw_breakpoint) (bp_tgt)
-#endif
 
-#ifndef target_stopped_data_address
 #define target_stopped_data_address(target, x) \
     (*target.to_stopped_data_address) (target, x)
-#endif
 
 #define target_watchpoint_addr_within_range(target, addr, start, length) \
   (*target.to_watchpoint_addr_within_range) (target, addr, start, length)
@@ -1201,11 +1194,11 @@ void target_mark_running (struct target_ops *);
 
 void target_mark_exited (struct target_ops *);
 
-/* Struct section_table maps address ranges to file sections.  It is
+/* Struct target_section maps address ranges to file sections.  It is
    mostly used with BFD files, but can be used without (e.g. for handling
    raw disks, or files not in formats handled by BFD).  */
 
-struct section_table
+struct target_section
   {
     CORE_ADDR addr;		/* Lowest address in section */
     CORE_ADDR endaddr;		/* 1+highest address in section */
@@ -1216,9 +1209,8 @@ struct section_table
   };
 
 /* Return the "section" containing the specified address.  */
-struct section_table *target_section_by_addr (struct target_ops *target,
-					      CORE_ADDR addr);
-
+struct target_section *target_section_by_addr (struct target_ops *target,
+					       CORE_ADDR addr);
 
 /* From mem-break.c */
 

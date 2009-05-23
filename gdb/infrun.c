@@ -48,6 +48,7 @@
 #include "gdb_assert.h"
 #include "mi/mi-common.h"
 #include "event-top.h"
+#include "record.h"
 
 /* Prototypes for local functions */
 
@@ -254,10 +255,9 @@ void init_thread_stepping_state (struct thread_info *tss);
 
 void init_infwait_state (void);
 
-/* This is used to remember when a fork, vfork or exec event
-   was caught by a catchpoint, and thus the event is to be
-   followed at the next resume of the inferior, and not
-   immediately. */
+/* This is used to remember when a fork or vfork event was caught by a
+   catchpoint, and thus the event is to be followed at the next resume
+   of the inferior, and not immediately.  */
 static struct
 {
   enum target_waitkind kind;
@@ -267,7 +267,6 @@ static struct
     ptid_t child_pid;
   }
   fork_event;
-  char *execd_pathname;
 }
 pending_follow;
 
@@ -603,7 +602,8 @@ use_displaced_stepping (struct gdbarch *gdbarch)
   return (((can_use_displaced_stepping == can_use_displaced_stepping_auto
 	    && non_stop)
 	   || can_use_displaced_stepping == can_use_displaced_stepping_on)
-	  && gdbarch_displaced_step_copy_insn_p (gdbarch));
+	  && gdbarch_displaced_step_copy_insn_p (gdbarch)
+	  && !RECORD_IS_USED);
 }
 
 /* Clean out any stray displaced stepping state.  */
@@ -836,7 +836,7 @@ displaced_step_fixup (ptid_t event_ptid, enum target_signal signal)
 
       context_switch (ptid);
 
-      actual_pc = read_pc ();
+      actual_pc = regcache_read_pc (get_thread_regcache (ptid));
 
       if (breakpoint_here_p (actual_pc))
 	{
@@ -1074,11 +1074,6 @@ a command like `return' or `jump' to continue execution."));
       regcache = get_current_regcache ();
       gdbarch = get_regcache_arch (regcache);
       pc = regcache_read_pc (regcache);
-      break;
-
-    case TARGET_WAITKIND_EXECD:
-      /* follow_exec is called as soon as the exec event is seen. */
-      pending_follow.kind = TARGET_WAITKIND_SPURIOUS;
       break;
 
     default:
@@ -1847,9 +1842,9 @@ wait_for_inferior (int treat_exec_as_sigtrap)
       struct cleanup *old_chain;
 
       if (deprecated_target_wait_hook)
-	ecs->ptid = deprecated_target_wait_hook (waiton_ptid, &ecs->ws);
+	ecs->ptid = deprecated_target_wait_hook (waiton_ptid, &ecs->ws, 0);
       else
-	ecs->ptid = target_wait (waiton_ptid, &ecs->ws);
+	ecs->ptid = target_wait (waiton_ptid, &ecs->ws, 0);
 
       if (debug_infrun)
 	print_target_wait_results (waiton_ptid, ecs->ptid, &ecs->ws);
@@ -1925,9 +1920,9 @@ fetch_inferior_event (void *client_data)
 
   if (deprecated_target_wait_hook)
     ecs->ptid =
-      deprecated_target_wait_hook (waiton_ptid, &ecs->ws);
+      deprecated_target_wait_hook (waiton_ptid, &ecs->ws, TARGET_WNOHANG);
   else
-    ecs->ptid = target_wait (waiton_ptid, &ecs->ws);
+    ecs->ptid = target_wait (waiton_ptid, &ecs->ws, TARGET_WNOHANG);
 
   if (debug_infrun)
     print_target_wait_results (waiton_ptid, ecs->ptid, &ecs->ws);
@@ -2130,6 +2125,10 @@ adjust_pc_after_break (struct execution_control_state *ecs)
   if (software_breakpoint_inserted_here_p (breakpoint_pc)
       || (non_stop && moribund_breakpoint_here_p (breakpoint_pc)))
     {
+      struct cleanup *old_cleanups = NULL;
+      if (RECORD_IS_USED)
+	old_cleanups = record_gdb_operation_disable_set ();
+
       /* When using hardware single-step, a SIGTRAP is reported for both
 	 a completed single-step and a software breakpoint.  Need to
 	 differentiate between the two, as the latter needs adjusting
@@ -2153,6 +2152,9 @@ adjust_pc_after_break (struct execution_control_state *ecs)
 	  || !currently_stepping (ecs->event_thread)
 	  || ecs->event_thread->prev_pc == breakpoint_pc)
 	regcache_write_pc (regcache, breakpoint_pc);
+
+      if (RECORD_IS_USED)
+	do_cleanups (old_cleanups);
     }
 }
 
@@ -2416,7 +2418,28 @@ handle_inferior_event (struct execution_control_state *ecs)
 	  reinit_frame_cache ();
 	}
 
-      stop_pc = read_pc ();
+      /* Immediately detach breakpoints from the child before there's
+	 any chance of letting the user delete breakpoints from the
+	 breakpoint lists.  If we don't do this early, it's easy to
+	 leave left over traps in the child, vis: "break foo; catch
+	 fork; c; <fork>; del; c; <child calls foo>".  We only follow
+	 the fork on the last `continue', and by that time the
+	 breakpoint at "foo" is long gone from the breakpoint table.
+	 If we vforked, then we don't need to unpatch here, since both
+	 parent and child are sharing the same memory pages; we'll
+	 need to unpatch at follow/detach time instead to be certain
+	 that new breakpoints added between catchpoint hit time and
+	 vfork follow are detached.  */
+      if (ecs->ws.kind != TARGET_WAITKIND_VFORKED)
+	{
+	  int child_pid = ptid_get_pid (ecs->ws.value.related_pid);
+
+	  /* This won't actually modify the breakpoint list, but will
+	     physically remove the breakpoints from the child.  */
+	  detach_breakpoints (child_pid);
+	}
+
+      stop_pc = regcache_read_pc (get_thread_regcache (ecs->ptid));
 
       ecs->event_thread->stop_bpstat = bpstat_stop_status (stop_pc, ecs->ptid);
 
@@ -2435,9 +2458,6 @@ handle_inferior_event (struct execution_control_state *ecs)
     case TARGET_WAITKIND_EXECD:
       if (debug_infrun)
         fprintf_unfiltered (gdb_stdlog, "infrun: TARGET_WAITKIND_EXECD\n");
-      pending_follow.execd_pathname =
-	savestring (ecs->ws.value.execd_pathname,
-		    strlen (ecs->ws.value.execd_pathname));
 
       if (!ptid_equal (ecs->ptid, inferior_ptid))
 	{
@@ -2445,16 +2465,20 @@ handle_inferior_event (struct execution_control_state *ecs)
 	  reinit_frame_cache ();
 	}
 
-      stop_pc = read_pc ();
+      stop_pc = regcache_read_pc (get_thread_regcache (ecs->ptid));
 
       /* This causes the eventpoints and symbol table to be reset.
          Must do this now, before trying to determine whether to
          stop.  */
-      follow_exec (inferior_ptid, pending_follow.execd_pathname);
-      xfree (pending_follow.execd_pathname);
+      follow_exec (inferior_ptid, ecs->ws.value.execd_pathname);
 
       ecs->event_thread->stop_bpstat = bpstat_stop_status (stop_pc, ecs->ptid);
       ecs->random_signal = !bpstat_explains_signal (ecs->event_thread->stop_bpstat);
+
+      /* Note that this may be referenced from inside
+	 bpstat_stop_status above, through inferior_has_execd.  */
+      xfree (ecs->ws.value.execd_pathname);
+      ecs->ws.value.execd_pathname = NULL;
 
       /* If no catchpoint triggered for this, then keep going.  */
       if (ecs->random_signal)
@@ -2495,7 +2519,7 @@ handle_inferior_event (struct execution_control_state *ecs)
 
     case TARGET_WAITKIND_NO_HISTORY:
       /* Reverse execution: target ran out of history info.  */
-      stop_pc = read_pc ();
+      stop_pc = regcache_read_pc (get_thread_regcache (ecs->ptid));
       print_stop_reason (NO_HISTORY, 0);
       stop_stepping (ecs);
       return;
@@ -2559,7 +2583,7 @@ targets should add new threads to the thread list themselves in non-stop mode.")
     {
       fprintf_unfiltered (gdb_stdlog, "infrun: stop_pc = 0x%s\n",
                           paddr_nz (stop_pc));
-      if (STOPPED_BY_WATCHPOINT (&ecs->ws))
+      if (target_stopped_by_watchpoint ())
 	{
           CORE_ADDR addr;
 	  fprintf_unfiltered (gdb_stdlog, "infrun: stopped by watchpoint\n");
@@ -2815,7 +2839,7 @@ targets should add new threads to the thread list themselves in non-stop mode.")
   /* If necessary, step over this watchpoint.  We'll be back to display
      it in a moment.  */
   if (stopped_by_watchpoint
-      && (HAVE_STEPPABLE_WATCHPOINT
+      && (target_have_steppable_watchpoint
 	  || gdbarch_have_nonsteppable_watchpoint (current_gdbarch)))
     {
       /* At this point, we are stopped at an instruction which has
@@ -2840,14 +2864,14 @@ targets should add new threads to the thread list themselves in non-stop mode.")
 	 disable all watchpoints and breakpoints.  */
       int hw_step = 1;
 
-      if (!HAVE_STEPPABLE_WATCHPOINT)
+      if (!target_have_steppable_watchpoint)
 	remove_breakpoints ();
-      registers_changed ();
 	/* Single step */
-      hw_step = maybe_software_singlestep (current_gdbarch, read_pc ());
+      hw_step = maybe_software_singlestep (current_gdbarch, stop_pc);
       target_resume (ecs->ptid, hw_step, TARGET_SIGNAL_0);
+      registers_changed ();
       waiton_ptid = ecs->ptid;
-      if (HAVE_STEPPABLE_WATCHPOINT)
+      if (target_have_steppable_watchpoint)
 	infwait_state = infwait_step_watch_state;
       else
 	infwait_state = infwait_nonstep_watch_state;
@@ -3074,7 +3098,7 @@ process_event_stop_test:
       if (signal_program[ecs->event_thread->stop_signal] == 0)
 	ecs->event_thread->stop_signal = TARGET_SIGNAL_0;
 
-      if (ecs->event_thread->prev_pc == read_pc ()
+      if (ecs->event_thread->prev_pc == stop_pc
 	  && ecs->event_thread->trap_expected
 	  && ecs->event_thread->step_resume_breakpoint == NULL)
 	{
@@ -4023,7 +4047,8 @@ static void
 keep_going (struct execution_control_state *ecs)
 {
   /* Save the pc before execution, to compare with pc after stop.  */
-  ecs->event_thread->prev_pc = read_pc ();		/* Might have been DECR_AFTER_BREAK */
+  ecs->event_thread->prev_pc
+    = regcache_read_pc (get_thread_regcache (ecs->ptid));
 
   /* If we did not do break;, it means we should keep running the
      inferior and not return to debugger.  */

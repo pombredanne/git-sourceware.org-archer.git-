@@ -676,7 +676,7 @@ objfile_relocate (struct objfile *objfile, struct section_offsets *new_offsets)
     }
 
   /* Relocate breakpoints as necessary, after things are relocated. */
-  breakpoint_re_set ();
+  breakpoint_re_set_objfile (objfile);
 }
 
 /* Many places in gdb want to test just to see if we have any partial
@@ -892,4 +892,22 @@ objfile_data (struct objfile *objfile, const struct objfile_data *data)
 {
   gdb_assert (data->index < objfile->num_data);
   return objfile->data[data->index];
+}
+
+/* Return non-zero if A and B point to the same OBJFILE, ignoring any binary
+   vs. debuginfo variants of the pointers.  If either A or B is NULL return
+   zero as not a match.  */
+
+int
+matching_objfiles (struct objfile *a, struct objfile *b)
+{
+  if (a == NULL || b == NULL)
+    return 0;
+
+  if (a->separate_debug_objfile_backlink)
+    a = a->separate_debug_objfile_backlink;
+  if (b->separate_debug_objfile_backlink)
+    b = b->separate_debug_objfile_backlink;
+
+  return a == b;
 }

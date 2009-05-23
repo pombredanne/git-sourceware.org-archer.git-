@@ -395,7 +395,7 @@ add_new_header_file (char *name, int instance)
 
   i = N_HEADER_FILES (current_objfile)++;
   hfile = HEADER_FILES (current_objfile) + i;
-  hfile->name = savestring (name, strlen (name));
+  hfile->name = xstrdup (name);
   hfile->instance = instance;
   hfile->length = 10;
   hfile->vector
@@ -1684,6 +1684,7 @@ pos %d"),
 	    continue;			/* Not a debugging symbol.   */
 
  	  sym_len = 0;
+	  sym_name = NULL;	/* pacify "gcc -Werror" */
  	  if (psymtab_language == language_cplus)
  	    {
  	      char *new_name, *name = alloca (p - namestring + 1);

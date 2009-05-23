@@ -1065,7 +1065,7 @@ monitor_wait_filter (char *buf,
 
 static ptid_t
 monitor_wait (struct target_ops *ops,
-	      ptid_t ptid, struct target_waitstatus *status)
+	      ptid_t ptid, struct target_waitstatus *status, int options)
 {
   int old_timeout = timeout;
   char buf[TARGET_BUF_SIZE];
@@ -2007,7 +2007,8 @@ monitor_create_inferior (struct target_ops *ops, char *exec_file,
 
   first_time = 1;
   clear_proceed_status ();
-  write_pc (bfd_get_start_address (exec_bfd));
+  regcache_write_pc (get_current_regcache (),
+		     bfd_get_start_address (exec_bfd));
 }
 
 /* Clean up when a program exits.
@@ -2155,7 +2156,8 @@ monitor_load (char *file, int from_tty)
 
   /* Finally, make the PC point at the start address */
   if (exec_bfd)
-    write_pc (bfd_get_start_address (exec_bfd));
+    regcache_write_pc (get_current_regcache (),
+		       bfd_get_start_address (exec_bfd));
 
   /* There used to be code here which would clear inferior_ptid and
      call clear_symtab_users.  None of that should be necessary:

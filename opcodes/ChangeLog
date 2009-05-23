@@ -1,3 +1,58 @@
+2009-05-22  DJ Delorie  <dj@redhat.com>
+
+	* mep-asm.c: Regenerate.
+	* mep-desc.c: Regenerate.
+	* mep-desc.h: Regenerate.
+	* mep-dis.c: Regenerate.
+	* mep-ibld.c: Regenerate.
+	* mep-opc.c: Regenerate.
+	* mep-opc.h: Regenerate.
+
+2009-05-22  Dwarakanath Rajagopal  <dwarak.rajagopal@amd.com>
+
+	* i386-opc.h (Cpusse5): Delete.
+	(i386_cpu_flags): Delete.
+	* i386-gen.c: Remove CpuSSE5, Drex, Drexv and Drexc.
+	* i386-opc.tbl: Remove SSE5 instructions.
+	* i386-tbl.h: Regenerate.
+	* i386-init.h: Regenerate.
+	* i386-dis.c (OP_E_memeory, OP_E_extended): Remove drex handling.
+	(print_drex_arg): Delete.
+	(OP_DREX4): Delete.
+	(OP_DREX3): Delete.
+	(OP_DREX_ICMP): Delete.
+	(OP_DREX_FCMP): Delete.
+	(DREX_*): Delete.
+	(THREE_BYTE_0F24, THREE_BYTE_0F25, THREE_BYTE_0f7B): Delete.
+	
+2009-05-22  Alan Modra  <amodra@bigpond.net.au>
+
+	* Makefile.am: Run "make dep-am".
+	* Makefile.in: Regenerate.
+	* po/POTFILES.in: Regenerate.
+
+2009-05-19  DJ Delorie  <dj@redhat.com>
+
+	* mep-asm.c: Regenerate.
+	* mep-opc.c: Regenerate.
+
+2009-04-30  DJ Delorie  <dj@redhat.com>
+
+	* mep-asm.c: Regenerate.
+	* mep-desc.c: Regenerate.
+	* mep-desc.h: Regenerate.
+	* mep-dis.c: Regenerate.
+	* mep-ibld.c: Regenerate.
+	* mep-opc.c: Regenerate.
+	* mep-opc.h: Regenerate.
+
+2009-04-17  DJ Delorie  <dj@redhat.com
+
+	* mep-desc.c: Regenerate.
+	* mep-ibld.c: Regenerate.
+	* mep-opc.c: Regenerate.
+	* mep-opc.h: Regenerate.
+
 2009-04-15  Anthony Green  <green@moxielogic.com>
 
 	* moxie-opc.c, moxie-dis.c: Created.
@@ -13,6 +68,16 @@
 	extension to None.
 	(pshab, pshaw, pshad, pshaq): Likewise.
 	* i386-tbl.h: Re-generate.
+
+2009-04-08  DJ Delorie  <dj@redhat.com
+
+	* mep-asm.c: Regenerate.
+	* mep-desc.c: Regenerate.
+	* mep-desc.h: Regenerate.
+	* mep-dis.c: Regenerate.
+	* mep-ibld.c: Regenerate.
+	* mep-opc.c: Regenerate.
+	* mep-opc.h: Regenerate.
 
 2009-04-07  Peter Bergner  <bergner@vnet.ibm.com>
 

@@ -825,6 +825,9 @@ extern void bfd_elf32_arm_init_maps
 extern void bfd_elf32_arm_set_vfp11_fix
   (bfd *, struct bfd_link_info *);
 
+extern void bfd_elf32_arm_set_cortex_a8_fix
+  (bfd *, struct bfd_link_info *);
+
 extern bfd_boolean bfd_elf32_arm_vfp11_erratum_scan
   (bfd *, struct bfd_link_info *);
 
@@ -860,7 +863,7 @@ extern bfd_boolean bfd_elf32_arm_process_before_allocation
 
 void bfd_elf32_arm_set_target_relocs
   (bfd *, struct bfd_link_info *, int, char *, int, int, bfd_arm_vfp11_fix,
-   int, int, int);
+   int, int, int, int);
 
 extern bfd_boolean bfd_elf32_arm_get_bfd_for_interworking
   (bfd *, struct bfd_link_info *);
@@ -898,7 +901,11 @@ extern bfd_boolean elf32_arm_size_stubs
    struct bfd_section * (*) (const char *, struct bfd_section *), void (*) (void));
 extern bfd_boolean elf32_arm_build_stubs
   (struct bfd_link_info *);
-  
+
+/* ARM unwind section editing support.  */
+extern bfd_boolean elf32_arm_fix_exidx_coverage
+  (struct bfd_section **, unsigned int, struct bfd_link_info *);
+
 /* TI COFF load page support.  */
 extern void bfd_ticoff_set_section_load_page
   (struct bfd_section *, int);

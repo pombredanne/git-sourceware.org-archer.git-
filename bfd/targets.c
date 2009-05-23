@@ -157,6 +157,7 @@ DESCRIPTION
 .  bfd_target_oasys_flavour,
 .  bfd_target_tekhex_flavour,
 .  bfd_target_srec_flavour,
+.  bfd_target_verilog_flavour,
 .  bfd_target_ihex_flavour,
 .  bfd_target_som_flavour,
 .  bfd_target_os9k_flavour,
@@ -565,15 +566,7 @@ extern const bfd_target armpei_big_vec;
 extern const bfd_target armpei_little_vec;
 extern const bfd_target b_out_vec_big_host;
 extern const bfd_target b_out_vec_little_host;
-extern const bfd_target bfd_efi_app_ia32_vec;
-extern const bfd_target bfd_efi_bsdrv_ia32_vec;
-extern const bfd_target bfd_efi_rtdrv_ia32_vec;
-extern const bfd_target bfd_efi_app_x86_64_vec;
-extern const bfd_target bfd_efi_bsdrv_x86_64_vec;
-extern const bfd_target bfd_efi_rtdrv_x86_64_vec;
-extern const bfd_target bfd_efi_app_ia64_vec;
-extern const bfd_target bfd_efi_bsdrv_ia64_vec;
-extern const bfd_target bfd_efi_rtdrv_ia64_vec;
+extern const bfd_target bfd_pei_ia64_vec;
 extern const bfd_target bfd_elf32_avr_vec;
 extern const bfd_target bfd_elf32_bfin_vec;
 extern const bfd_target bfd_elf32_bfinfdpic_vec;
@@ -824,6 +817,7 @@ extern const bfd_target z8kcoff_vec;
 
 /* These are always included.  */
 extern const bfd_target srec_vec;
+extern const bfd_target verilog_vec;
 extern const bfd_target symbolsrec_vec;
 extern const bfd_target tekhex_vec;
 extern const bfd_target binary_vec;
@@ -893,16 +887,8 @@ static const bfd_target * const _bfd_target_vector[] =
 	&armpei_little_vec,
 	&b_out_vec_big_host,
 	&b_out_vec_little_host,
-	&bfd_efi_app_ia32_vec,
-	&bfd_efi_bsdrv_ia32_vec,
-	&bfd_efi_rtdrv_ia32_vec,
 #ifdef BFD64
-	&bfd_efi_app_x86_64_vec,
-	&bfd_efi_bsdrv_x86_64_vec,
-	&bfd_efi_rtdrv_x86_64_vec,
-	&bfd_efi_app_ia64_vec,
-	&bfd_efi_bsdrv_ia64_vec,
-	&bfd_efi_rtdrv_ia64_vec,
+	&bfd_pei_ia64_vec,
 #endif
 	&bfd_elf32_avr_vec,
 	&bfd_elf32_bfin_vec,
@@ -1215,6 +1201,8 @@ static const bfd_target * const _bfd_target_vector[] =
 /* Always support S-records, for convenience.  */
 	&srec_vec,
 	&symbolsrec_vec,
+/* And verilog.  */
+	&verilog_vec,
 /* And tekhex */
 	&tekhex_vec,
 /* Likewise for binary output.  */

@@ -26,6 +26,8 @@
 #include "gdbcmd.h"
 #include "block.h"
 #include "valprint.h"
+#include "objfiles.h"
+#include "parser-defs.h"
 
 #include "gdb_assert.h"
 #include "gdb_string.h"
@@ -397,7 +399,6 @@ static int format_code[] = { 0, 't', 'd', 'x', 'o' };
 
 /* Header of the list of root variable objects */
 static struct varobj_root *rootlist;
-static int rootcount = 0;	/* number of root varobjs in the list */
 
 /* Prime number indicating the number of buckets in the hash table */
 /* A prime large enough to avoid too many colisions */
@@ -461,7 +462,6 @@ varobj_create (char *objname,
       char *p;
       enum varobj_languages lang;
       struct value *value = NULL;
-      int expr_len;
 
       /* Parse and evaluate the expression, filling in as much of the
          variable's data as possible.  */
@@ -512,10 +512,9 @@ varobj_create (char *objname,
 
       var->format = variable_default_display (var);
       var->root->valid_block = innermost_block;
-      expr_len = strlen (expression);
-      var->name = savestring (expression, expr_len);
+      var->name = xstrdup (expression);
       /* For a root var, the name and the expr are the same.  */
-      var->path_expr = savestring (expression, expr_len);
+      var->path_expr = xstrdup (expression);
 
       /* When the frame is different from the current frame, 
          we must select the appropriate frame before parsing
@@ -561,7 +560,7 @@ varobj_create (char *objname,
 
   if ((var != NULL) && (objname != NULL))
     {
-      var->obj_name = savestring (objname, strlen (objname));
+      var->obj_name = xstrdup (objname);
 
       /* If a varobj name is duplicated, the install will fail so
          we must clenup */
@@ -591,8 +590,8 @@ varobj_gen_name (void)
   return obj_name;
 }
 
-/* Given an "objname", returns the pointer to the corresponding varobj
-   or NULL if not found */
+/* Given an OBJNAME, returns the pointer to the corresponding varobj.  Call
+   error if OBJNAME cannot be found.  */
 
 struct varobj *
 varobj_get_handle (char *objname)
@@ -947,44 +946,16 @@ varobj_set_value (struct varobj *var, char *expression)
   return 1;
 }
 
-/* Returns a malloc'ed list with all root variable objects */
-int
-varobj_list (struct varobj ***varlist)
-{
-  struct varobj **cv;
-  struct varobj_root *croot;
-  int mycount = rootcount;
-
-  /* Alloc (rootcount + 1) entries for the result */
-  *varlist = xmalloc ((rootcount + 1) * sizeof (struct varobj *));
-
-  cv = *varlist;
-  croot = rootlist;
-  while ((croot != NULL) && (mycount > 0))
-    {
-      *cv = croot->rootvar;
-      mycount--;
-      cv++;
-      croot = croot->next;
-    }
-  /* Mark the end of the list */
-  *cv = NULL;
-
-  if (mycount || (croot != NULL))
-    warning
-      ("varobj_list: assertion failed - wrong tally of root vars (%d:%d)",
-       rootcount, mycount);
-
-  return rootcount;
-}
-
 /* Assign a new value to a variable object.  If INITIAL is non-zero,
    this is the first assignement after the variable object was just
    created, or changed type.  In that case, just assign the value 
    and return 0.
-   Otherwise, assign the value and if type_changeable returns non-zero,
-   find if the new value is different from the current value.
-   Return 1 if so, and 0 if the values are equal.  
+   Otherwise, assign the new value, and return 1 if the value is different
+   from the current one, 0 otherwise. The comparison is done on textual
+   representation of value. Therefore, some types need not be compared. E.g.
+   for structures the reported value is always "{...}", so no comparison is
+   necessary here. If the old value was NULL and new one is not, or vice versa,
+   we always return 1.
 
    The VALUE parameter should not be released -- the function will
    take care of releasing it when needed.  */
@@ -1103,6 +1074,15 @@ install_new_value (struct varobj *var, struct value *value, int initial)
 		changed = 1;
 	    }
 	}
+    }
+
+  if (!initial && !changeable)
+    {
+      /* For values that are not changeable, we don't compare the values.
+	 However, we want to notice if a value was not NULL and now is NULL,
+	 or vise versa, so that we report when top-level varobjs come in scope
+	 and leave the scope.  */
+      changed = (var->value != NULL) != (value != NULL);
     }
 
   /* We must always keep the new value, since children depend on it.  */
@@ -1343,7 +1323,6 @@ install_variable (struct varobj *var)
       else
 	var->root->next = rootlist;
       rootlist = var->root;
-      rootcount++;
     }
 
   return 1;			/* OK */
@@ -1420,7 +1399,6 @@ uninstall_variable (struct varobj *var)
 	  else
 	    prer->next = cr->next;
 	}
-      rootcount--;
     }
 
 }
@@ -1517,7 +1495,7 @@ free_variable (struct varobj *var)
   /* Free the expression if this is a root variable. */
   if (is_root_p (var))
     {
-      free_current_contents (&var->root->exp);
+      xfree (var->root->exp);
       xfree (var->root);
     }
 
@@ -1753,8 +1731,7 @@ value_of_root (struct varobj **var_handle, int *type_changed)
 	}
       else
 	{
-	  tmp_var->obj_name =
-	    savestring (var->obj_name, strlen (var->obj_name));
+	  tmp_var->obj_name = xstrdup (var->obj_name);
 	  varobj_delete (var, NULL, 0);
 
 	  install_variable (tmp_var);
@@ -2003,7 +1980,7 @@ c_number_of_children (struct varobj *var)
 static char *
 c_name_of_variable (struct varobj *parent)
 {
-  return savestring (parent->name, strlen (parent->name));
+  return xstrdup (parent->name);
 }
 
 /* Return the value of element TYPE_INDEX of a structure
@@ -2102,10 +2079,7 @@ c_describe_child (struct varobj *parent, int index,
     case TYPE_CODE_STRUCT:
     case TYPE_CODE_UNION:
       if (cname)
-	{
-	  char *string = TYPE_FIELD_NAME (type, index);
-	  *cname = savestring (string, strlen (string));
-	}
+	*cname = xstrdup (TYPE_FIELD_NAME (type, index));
 
       if (cvalue && value)
 	{
@@ -2728,6 +2702,74 @@ java_value_of_variable (struct varobj *var, enum varobj_display_formats format)
 {
   return cplus_value_of_variable (var, format);
 }
+
+/* Iterate all the existing VAROBJs and call the FUNC callback for them with an
+   arbitrary caller supplied DATA pointer.  */
+
+static void
+all_varobjs (void (*func) (struct varobj *var, void *data), void *data)
+{
+  struct vlist **vlp, *vl;
+
+  for (vlp = varobj_table; vlp < varobj_table + VAROBJ_TABLE_SIZE; vlp++)
+    for (vl = *vlp; vl != NULL; vl = vl->next)
+      (*func) (vl->var, data);
+}
+
+/* Iterate all the existing _root_ VAROBJs and call the FUNC callback for them
+   with an arbitrary caller supplied DATA pointer.  */
+
+void
+all_root_varobjs (void (*func) (struct varobj *var, void *data), void *data)
+{
+  struct varobj_root *var_root, *var_root_next;
+
+  /* Iterate "safely" - handle if the callee deletes its passed VAROBJ.  */
+
+  for (var_root = rootlist; var_root != NULL; var_root = var_root_next)
+    {
+      var_root_next = var_root->next;
+
+      (*func) (var_root->rootvar, data);
+    }
+}
+
+/* Helper for varobj_types_mark_used.  Call type_mark_used for any TYPEs
+   referenced from this VAR.  */
+
+static void
+varobj_types_mark_used_iter (struct varobj *var, void *unused)
+{
+  /* Even FLOATING or IS_INVALID VARs with non-NULL TYPE references will
+     free them in free_variable.  Still EXP may also reference TYPEs
+     but these belong to SYMBOLs which should be always associated with
+     an OBJFILE (and therefore not useful to be type_mark_used).  */
+
+  type_mark_used (var->type);
+  if (var->value)
+    type_mark_used (value_type (var->value));
+
+  /* Check VAROBJROOTs only once during the varobj_types_mark_used pass.  */
+
+  if (var->root->rootvar == var)
+    {
+      if (var->root->exp)
+	exp_types_mark_used (var->root->exp);
+    }
+}
+
+/* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
+
+void
+varobj_types_mark_used (void)
+{
+  /* Check all the VAROBJs, even non-root ones.  Child VAROBJs can reference
+     types from other OBJFILEs through TYPE_IS_OPAQUE resolutions by
+     check_typedef.  Such types references will not be interconnected into the
+     same TYPE_GROUP.  */
+
+  all_varobjs (varobj_types_mark_used_iter, NULL);
+}
 
 extern void _initialize_varobj (void);
 void
@@ -2748,6 +2790,51 @@ When non-zero, varobj debugging is enabled."),
 			    &setlist, &showlist);
 }
 
+/* Helper for varobj_invalidate.  */
+
+static void
+varobj_invalidate_iter (struct varobj *var, void *objfile_voidp)
+{
+  struct objfile *objfile = objfile_voidp;
+
+  /* Check VAROBJROOTs only once during the varobj_invalidate pass.  */
+
+  if (var->root->rootvar == var)
+    {
+      /* Check even FLOATING VAROBJROOTs as their data will be still checked
+	 during varobj_update by varobj_get_type.  */
+
+      if (var->root->is_valid
+	  && matching_objfiles (block_objfile (var->root->valid_block),
+				objfile))
+	var->root->is_valid = 0;
+
+      if (var->root->exp && exp_uses_objfile (var->root->exp, objfile))
+	{
+	  var->root->is_valid = 0;
+
+	  /* No one touches EXP for !IS_VALID varobj.  */
+	  xfree (var->root->exp);
+	  var->root->exp = NULL;
+	}
+    }
+
+  if (var->type && TYPE_OBJFILE (var->type) == objfile)
+    {
+      var->root->is_valid = 0;
+
+      var->type = NULL;
+    }
+
+  if (var->value && TYPE_OBJFILE (value_type (var->value)) == objfile)
+    {
+      var->root->is_valid = 0;
+
+      value_free (var->value);
+      var->value = NULL;
+    }
+}
+
 /* Invalidate the varobjs that are tied to the specified OBJFILE.  Call this
    function before you start removing OBJFILE.
 
@@ -2758,57 +2845,36 @@ When non-zero, varobj debugging is enabled."),
 void 
 varobj_invalidate (struct objfile *objfile)
 {
-  struct varobj **all_rootvarobj;
-  struct varobj **varp;
+  /* Check all the VAROBJs, even non-root ones.  Child VAROBJs can reference
+     types from other OBJFILEs through TYPE_IS_OPAQUE resolutions by
+     check_typedef.  */
 
-  if (varobj_list (&all_rootvarobj) > 0)
+  all_varobjs (varobj_invalidate_iter, objfile);
+}
+
+/* Helper for varobj_revalidate.  */
+
+static void
+varobj_revalidate_iter (struct varobj *var, void *unused)
+{
+  /* Global VAR must be re-evaluated.  */
+
+  if (var->root->valid_block == NULL)
     {
-      varp = all_rootvarobj;
-      while (*varp != NULL)
+      struct varobj *tmp_var;
+
+      /* Try to create a varobj with same expression.  If we succeed
+	 replace the old varobj, otherwise invalidate it.  */
+      tmp_var = varobj_create (NULL, var->name, 0, USE_CURRENT_FRAME);
+      if (tmp_var != NULL)
 	{
-	  struct varobj *var = *varp;
-
-	  /* Floating varobjs are reparsed on each stop, so we don't care if
-	     the presently parsed expression refers to something that's gone.
-	     */
-	  if (var->root->floating)
-	    continue;
-
-	  if (var->root->valid_block != NULL && var->root->is_valid)
-	    {
-	      struct block *block = var->root->valid_block;
-	      struct symbol *func = block_linkage_function (block);
-	      struct objfile *func_objfile = SYMBOL_SYMTAB (func)->objfile;
-
-	      if (func_objfile == objfile)
-		var->root->is_valid = 0;
-	    }
-	  
-	  if (var->type && TYPE_OBJFILE (var->type) == objfile)
-	    {
-	      if (!var->root->valid_block)
-		var->root->is_valid = 0;
-	      else
-		gdb_assert (!var->root->is_valid);
-
-	      var->type = NULL;
-	    }
-	  if (var->value
-	      && TYPE_OBJFILE (value_type (var->value)) == objfile)
-	    {
-	      if (!var->root->valid_block)
-		var->root->is_valid = 0;
-	      else
-		gdb_assert (!var->root->is_valid);
-
-	      value_free (var->value);
-	      var->value = NULL;
-	    }
-
-	  varp++;
+	  tmp_var->obj_name = xstrdup (var->obj_name);
+	  varobj_delete (var, NULL, 0);
+	  install_variable (tmp_var);
 	}
+      else
+	var->root->is_valid = 0;
     }
-  xfree (all_rootvarobj);
 }
 
 /* Recreate any global varobjs possibly previously invalidated.  If the
@@ -2817,42 +2883,5 @@ varobj_invalidate (struct objfile *objfile)
 void 
 varobj_revalidate (void)
 {
-  struct varobj **all_rootvarobj;
-  struct varobj **varp;
-
-  if (varobj_list (&all_rootvarobj) > 0)
-    {
-      varp = all_rootvarobj;
-      while (*varp != NULL)
-	{
-	  struct varobj *var = *varp;
-
-	  /* Floating varobjs are reparsed on each stop, so we don't care if
-	     the presently parsed expression refers to something that's gone.
-	     */
-	  if (var->root->floating)
-	    continue;
-
-	  /* global var must be re-evaluated.  */     
-	  if (var->root->valid_block == NULL)
-	    {
-	      struct varobj *tmp_var;
-
-	      /* Try to create a varobj with same expression.  If we succeed
-		 replace the old varobj, otherwise invalidate it.  */
-	      tmp_var = varobj_create (NULL, var->name, 0, USE_CURRENT_FRAME);
-	      if (tmp_var != NULL) 
-		{ 
-		  tmp_var->obj_name = xstrdup (var->obj_name);
-		  varobj_delete (var, NULL, 0);
-		  install_variable (tmp_var);
-		}
-	      else
-		var->root->is_valid = 0;
-	    }
-
-	  varp++;
-	}
-    }
-  xfree (all_rootvarobj);
+  all_root_varobjs (varobj_revalidate_iter, NULL);
 }

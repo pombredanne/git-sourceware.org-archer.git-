@@ -28,6 +28,7 @@
 #include "gdbcore.h"
 #include "gdbthread.h"
 #include "inferior.h"
+#include "terminal.h"
 #include "target.h"
 
 #include "gdb_assert.h"
@@ -457,6 +458,9 @@ inf_ttrace_follow_fork (struct target_ops *ops, int follow_child)
   if (follow_child)
     {
       struct inferior *inf;
+      struct inferior *parent_inf;
+
+      parent_inf = find_inferior_pid (pid);
 
       /* Copy user stepping state to the new inferior thread.  */
       step_resume_breakpoint = last_tp->step_resume_breakpoint;
@@ -470,7 +474,8 @@ inf_ttrace_follow_fork (struct target_ops *ops, int follow_child)
 
       inferior_ptid = ptid_build (fpid, flwpid, 0);
       inf = add_inferior (fpid);
-      inf->attach_flag = find_inferior_pid (pid)->attach_flag;
+      inf->attach_flag = parent_inf->attach_flag;
+      copy_terminal_info (inf, parent_inf);
       detach_breakpoints (pid);
 
       target_terminal_ours ();
@@ -919,7 +924,7 @@ inf_ttrace_resume (struct target_ops *ops,
 
 static ptid_t
 inf_ttrace_wait (struct target_ops *ops,
-		 ptid_t ptid, struct target_waitstatus *ourstatus)
+		 ptid_t ptid, struct target_waitstatus *ourstatus, int options)
 {
   pid_t pid = ptid_get_pid (ptid);
   lwpid_t lwpid = ptid_get_lwp (ptid);

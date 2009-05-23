@@ -121,8 +121,6 @@ typedef struct pe_tdata
   int has_reloc_section;
   bfd_boolean (*in_reloc_p) (bfd *, reloc_howto_type *);
   flagword real_flags;
-  int target_subsystem;
-  bfd_boolean force_minimum_alignment;
 } pe_data_type;
 
 #define pe_data(bfd)		((bfd)->tdata.pe_obj_data)
@@ -950,3 +948,7 @@ typedef struct
 #define bfd_coff_print_pdata(a,p) \
   ((coff_backend_info (a)->_bfd_coff_print_pdata) (a, p))
 
+/* Macro: Returns true if the bfd is a PE executable as opposed to a
+   PE object file.  */
+#define bfd_pei_p(abfd) \
+  (CONST_STRNEQ ((abfd)->xvec->name, "pei-"))

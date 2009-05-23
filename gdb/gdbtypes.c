@@ -38,6 +38,9 @@
 #include "cp-abi.h"
 #include "gdb_assert.h"
 #include "hashtab.h"
+#include "varobj.h"
+#include "breakpoint.h"
+#include "python/python.h"
 #include "dwarf2expr.h"
 #include "dwarf2loc.h"
 
@@ -157,9 +160,9 @@ static void type_init_group (struct type *type);
 
 struct type_group
 {
-  /* Sum of all the external references to any of the type structures tracked
-     by this type_group.  */
-  int use_count;
+  /* Marker this type_group has been visited by the type_mark_used by this
+     pass.  Current pass is represented by TYPE_GROUP_AGE.  */
+  unsigned age : 1;
 
   /* Number of the type_group_links structures tracked by this type_group.  It
      matches the length of list `link_list->group_next->...->group_next'.  */
@@ -235,8 +238,8 @@ alloc_type (struct objfile *objfile)
 }
 
 /* Allocate a new type by an alloc_type call but make the new type discardable
-   on next garbage collection by free_all_types.  Use type_incref for reference
-   counting of such new type.  */
+   on next garbage collection by free_all_types.  You must call type_mark_used
+   during each free_all_types to protect TYPE from being deallocated.  */
 
 static struct type *
 alloc_type_discardable (void)
@@ -3430,8 +3433,8 @@ link_group_relabel (struct type_group *to, struct type_group *from)
 static unsigned type_group_link_check_grouping_markers;
 
 /* Unify type_group of all the type structures found while crawling the
-   type_group_link_table tree from the starting point type.  DATA contains
-   type_group_link reference of the starting point type.  Only during the first
+   type_group_link_table tree from the starting point TYPE.  DATA contains
+   type_group_link reference of the starting point TYPE.  Only during the first
    callback TYPE will always match type_group_link referenced by DATA.  */
 
 static int
@@ -3491,11 +3494,10 @@ check_types_fail_iter (void **slot, void *unused)
   struct type *type = link->type;
 
   fprintf_unfiltered (gdb_stderr, "type %p main_type %p \"%s\" group %p "
-				  "use_count %d link_count %d\n",
+				  "link_count %d\n",
 		      type, TYPE_MAIN_TYPE (type),
 		      TYPE_NAME (type) ? TYPE_NAME (type) : "<null>",
-		      link->group, link->group->use_count,
-		      link->group->link_count);
+		      link->group, link->group->link_count);
 
   return 1;
 }
@@ -3530,11 +3532,6 @@ check_types_fail (const char *file, int line, const char *function)
 static void
 type_group_link_check (void)
 {
-  /* Mark a new pass.  As GDB checks all the entries were visited after each
-     pass there cannot be any stale entries already containing the changed
-     value.  */
-  type_group_age ^= 1;
-
   type_group_link_check_grouping_markers = 0;
   htab_traverse (type_group_link_table, type_group_link_check_grouping, NULL);
   check_types_assert (type_group_link_check_grouping_markers
@@ -3573,7 +3570,8 @@ delete_main_type (struct type *type)
 
 /* Delete all the instances on TYPE_CHAIN of TYPE, including their referenced
    main_type.  TYPE must be a reclaimable type - neither permanent nor objfile
-   associated.  */
+   associated.  The reclaimability is not assertion checked here as it means an
+   expensive type_group_link_table lookup for each MAIN_TYPE being deleted.  */
 
 static void
 delete_type_chain (struct type *type)
@@ -3616,8 +3614,7 @@ type_group_link_equal (const void *a, const void *b)
 }
 
 /* Define currently permanent TYPE as being reclaimable during free_all_types.
-   TYPE is required to be now permanent.  TYPE will be left with zero reference
-   count, early type_incref call is probably appropriate.  */
+   TYPE is required to be now permanent.  */
 
 static void
 type_init_group (struct type *type)
@@ -3631,7 +3628,7 @@ type_init_group (struct type *type)
   group = XNEW (struct type_group);
   link = XNEW (struct type_group_link);
 
-  group->use_count = 0;
+  group->age = type_group_age;
   group->link_count = 1;
   group->link_list = link;
 
@@ -3645,24 +3642,26 @@ type_init_group (struct type *type)
   *slot = link;
 }
 
-/* Increment the reference count for TYPE.  For permanent or objfile associated
-   types nothing happens.  */
+/* Mark TYPE (and its whole TYPE_GROUP) as used in this free_all_types pass.  */
 
 void
-type_incref (struct type *type)
+type_mark_used (struct type *type)
 {
-  struct type_group_link link, *found;
+  struct type_group_link link_local, *link;
 
-  if (TYPE_OBJFILE (type))
+  if (type == NULL)
     return;
 
-  link.type = type;
-  found = htab_find (type_group_link_table, &link);
+  if (TYPE_OBJFILE (type) != NULL)
+    return;
+
+  link_local.type = type;
+  link = htab_find (type_group_link_table, &link_local);
   /* A permanent type?  */
-  if (!found)
+  if (!link)
     return;
 
-  found->group->use_count++;
+  link->group->age = type_group_age;
 }
 
 /* A traverse callback for type_group_link_table which removes any
@@ -3673,7 +3672,7 @@ type_group_link_remove (void **slot, void *unused)
 {
   struct type_group_link *link = *slot;
 
-  if (link->group->use_count == 0)
+  if (link->group->age != type_group_age)
     {
       struct type_group *group = link->group;
 
@@ -3694,42 +3693,38 @@ type_group_link_remove (void **slot, void *unused)
   return 1;
 }
 
-/* Decrement the reference count for TYPE.  For permanent or objfile associated
-   types nothing happens.  
+/* Call type_mark_used for any TYPEs referenced by Python global variables.  */
 
-   Even if TYPE has no more references still do not delete it as callers may
-   hold pointers to types dynamically generated by check_typedef.  Always rely
-   just on the free_all_types garbage collector.  */
-
-void
-type_decref (struct type *type)
+static void
+python_types_mark_used (void)
 {
-  struct type_group_link link, *found;
+  struct value *val;
 
-  if (TYPE_OBJFILE (type))
-    return;
-
-  link.type = type;
-  found = htab_find (type_group_link_table, &link);
-  /* A permanent type?  */
-  if (!found)
-    return;
-
-  gdb_assert (found->group->use_count > 0);
-  found->group->use_count--;
+  for (val = values_in_python; val != NULL; val = value_next (val))
+    type_mark_used (value_type (val));
 }
 
 /* Free all the reclaimable types that have been allocated and that have
    currently zero reference counter.
 
    This function is called after each command, successful or not.  Use this
-   cleanup only in the GDB idle state as GDB code does not necessarily use
-   type_incref / type_decref during temporary use of types.  */
+   cleanup only in the GDB idle state as GDB only marks those types used by
+   globally tracked objects (with no autovariable references tracking).  */
 
 void
 free_all_types (void)
 {
+  /* Mark a new pass.  As GDB checks all the entries were visited after each
+     pass there cannot be any stale entries already containing the changed
+     value.  */
+  type_group_age ^= 1;
+
   type_group_link_check ();
+
+  value_types_mark_used ();
+  varobj_types_mark_used ();
+  print_types_mark_used ();
+  python_types_mark_used ();
 
   htab_traverse (type_group_link_table, type_group_link_remove, NULL);
 }

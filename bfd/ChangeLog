@@ -1,3 +1,432 @@
+2009-05-22  Julian Brown  <julian@codesourcery.com>
+
+	* elf32-arm.c (THUMB16_BCOND_INSN, THUMB32_INSN, THUMB32_B_INSN): New
+	macros.
+	(elf32_arm_stub_a8_veneer_b_cond, elf32_arm_stub_a8_veneer_b)
+	(elf32_arm_stub_a8_veneer_blx): New stub sequences.
+	(elf32_arm_stub_type): Add arm_stub_a8_veneer_b_cond,
+	arm_stub_a8_veneer_b and arm_stub_a8_veneer_blx.
+	(elf32_arm_stub_hash_entry): Add target_addend, orig_insn fields.
+	(a8_erratum_fix, a8_erratum_reloc): New structs.
+	(elf32_arm_link_hash_table): Add a8_erratum_fixes,
+	num_a8_erratum_fixes, fix_cortex_a8 fields.
+	(elf32_arm_link_hash_table_create): Zero fix_cortex_a8.
+	(elf32_arm_add_stub): Split into two parts, creating...
+	(elf32_arm_create_or_find_stub_sec): New function.
+	(elf32_arm_final_link_relocate): Add forward declaration.
+	(arm_build_one_stub): Add support for THUMB32_TYPE, Thumb-2
+	relocations, multiple relocations per stub.
+	(find_stub_size_and_template): New (using parts of arm_size_one_stub).
+	(arm_size_one_stub): Use find_stub_size_and_template.
+	(a8_reloc_compare): New.
+	(find_thumb_glue): Add forward declaration.
+	(cortex_a8_erratum_scan): New.
+	(elf32_arm_size_stubs): Add Cortex-A8 erratum workaround support.
+	(bfd_elf32_arm_set_cortex_a8_fix): New.
+	(bfd_elf32_arm_set_target_relocs): Add fix_cortex_a8 argument.
+	(arm_map_one_stub): Add THUMB32_TYPE support.
+	(a8_branch_to_stub_data): New.
+	(make_branch_to_a8_stub): New.
+	(elf32_arm_write_section): Add Cortex-A8 erratum workaround support.
+	* bfd-in.h (bfd_elf32_arm_set_cortex_a8_fix): New.
+	(bfd_elf32_arm_set_target_relocs): Add argument for controlling
+	Cortex-A8 erratum workaround.
+	* bfd-in2.h: Regenerate.
+
+2009-05-22  Alan Modra  <amodra@bigpond.net.au>
+
+	* Makefile.am: Run "make dep-am".
+	* Makefile.in: Regenerate.
+	* po/SRC-POTFILES.in: Regenerate.
+
+2009-05-21  Alan Modra  <amodra@bigpond.net.au>
+
+	* elflink.c (elf_link_input_bfd): Correct *pindex change in last
+	commit.
+
+2009-05-21  Alan Modra  <amodra@bigpond.net.au>
+
+	* elf-bfd.h (struct elf_backend_data
+	<elf_backend_link_output_symbol_hook>): Return an int.
+	* elf64-ppc.c (ppc64_elf_output_symbol_hook): Return 2 to drop
+	symbols on deleted .opd entries.
+	* elflink.c (elf_link_output_sym): Return without outputting sym
+	if output_symbol_hook returns 2.
+	(elf_link_output_extsym): Don't assign h->indx when symbol discarded.
+	Abort if we must not discard sym.
+	(elf_link_input_bfd): Similarly, don't set finfo->indices for
+	local syms.
+	(bfd_elf_final_link): Adjust elf_link_output_sym calls.
+	* elf-vxworks.c (elf_vxworks_link_output_symbol_hook): Adjust for
+	elf_backend_link_output_symbol_hook return type change.
+	* elf32-arm.c (output_arch_syminfo): Likewise.
+	(elf32_arm_output_map_sym, elf32_arm_output_stub_sym): Likewise.
+	(elf32_arm_output_arch_local_syms): Likewise.
+	* elf32-cr16c.c (elf32_cr16c_link_output_symbol_hook): Likewise.
+	* elf32-score.c (s3_bfd_score_elf_link_output_symbol_hook): Likewise.
+	(bfd_score_elf_link_output_symbol_hook): Likewise.
+	* elf32-score.h (s7_bfd_score_elf_link_output_symbol_hook): Likewise.
+	* elf32-score7.c (s7_bfd_score_elf_link_output_symbol_hook): Likewise.
+	* elf32-sh64.c (sh64_elf_link_output_symbol_hook): Likewise.
+	* elf32-spu.c (spu_elf_output_symbol_hook): Likewise.
+	* elf32-v850.c (v850_elf_link_output_symbol_hook): Likewise.
+	* elf64-hppa.c (elf64_hppa_link_output_symbol_hook): Likewise.
+	* elf64-mmix.c (mmix_elf_link_output_symbol_hook): Likewise.
+	* elf64-sh64.c (sh64_elf64_link_output_symbol_hook): Likewise.
+	* elf64-sparc.c (elf64_sparc_output_arch_syms): Likewise.
+	* elfxx-mips.c (_bfd_mips_elf_link_output_symbol_hook): Likewise.
+	* elfxx-mips.h (_bfd_mips_elf_link_output_symbol_hook): Likewise.
+
+2009-05-21  Alan Modra  <amodra@bigpond.net.au>
+
+	* elf64-ppc.c (ppc64_elf_get_synthetic_symtab): Don't segfault on
+	out of range .opd symbols.
+
+2009-05-21  Dave Korn  <dave.korn.cygwin@gmail.com>
+
+	* coffgen.c (coff_print_symbol):  Use bfd_fprintf_vma, not
+	fprintf_vma directly.
+	* peXXigen.c (pe_print_edata):  Likewise.
+	(pe_print_pdata):  Likewise.
+	(_bfd_XX_print_ce_compressed_pdata):  Likewise.
+	(_bfd_XX_print_private_bfd_data_common):  Likewise.
+
+2009-05-19  Dave Korn  <dave.korn.cygwin@gmail.com>
+
+	* cofflink.c (process_embedded_commands):  Ignore "-aligncomm".
+
+2009-05-15  Andrew Stubbs  <ams@codesourcery.com>
+	    Paul Brook  <paul@codesourcery.com>
+
+	* elf32-arm.c (elf32_arm_fix_exidx_coverage): Don't attempt to
+	fix discarded sections.
+
+2009-05-14  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* elf32-spu.c (mark_overlay_section): Move .init and .fini
+	sections into the software icache.
+
+2009-05-14  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* elf32-spu.c (build_stub): Always build "compact" sofware
+	i-cache stubs.
+
+2009-05-14  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* elf32-spu.c (struct spu_link_hash_table): Add fromelem_size_log2.
+	(spu_elf_setup): Initialize it.
+	(spu_elf_size_stubs): Move .ovtab into .bss for software i-cache.
+	Update to new-sytle cache manager data structures.
+	(spu_elf_build_stubs): Generate new-style cache manager data
+	structures and symbols.
+	(spu_elf_auto_overlay): Update size computation.
+
+2009-05-14  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* elf32-spu.c (spu_elf_modify_segment_map): Move all PF_OVERLAY
+	segments first amongst the program headers.
+
+2009-05-14  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* elf32-spu.c (spu_elf_relocate_section): Only encode overlay index
+	into addresses for relocation types that look at high bits.  Remove
+	special handling of relocation overflow warnings.
+
+2009-05-14  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* elf32-spu.c (mark_functions_via_relocs): Handle cycles in the
+	control flow graph between fragments of a function.
+
+2009-05-14  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* elf32-spu.c (spu_elf_size_stubs): Even in software i-cache mode,
+	generate only a 16-byte .toe section.
+	(spu_elf_build_stubs, spu_elf_auto_overlay): Likewise.
+
+2009-05-14  Alan Modra  <amodra@bigpond.net.au>
+
+	* elf32-spu.c (spu_elf_size_stubs): Split out section placement to..
+	(spu_elf_place_overlay_data): ..here.  New function.
+	* elf32-spu.h (spu_elf_place_overlay_data): Declare.
+
+2009-05-13  Andrew Jenner  <andrew@codesourcery.com>
+
+	* elf32-arm.c: Move sysdep.h to start of file.
+
+2009-05-11  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* elf32-spu.c (spu_elf_find_overlays): Don't use .ovl.init lma as
+	start of overlays.
+	(spu_elf_build_stubs): Don't define __icache_tagbase.  Define
+	__icache_tag_array and __icache_tag_array_size.
+
+2009-05-11  Masaki Muranaka  <monaka@monami-software.com>
+
+	* elf32-bfin.c (bfin_bfd_reloc_type_lookup): Remove unnecessary
+	ATTRIBUTE_UNUSED.
+	(bfinfdpic_link_omit_section_dynsym): Likewise.
+	(elf32_bfinfdpic_finish_dynamic_sections): Likewise.
+
+2009-05-05  Paul Brook  <paul@codesourcery.com>
+
+	* bfd-in.h (elf32_arm_fix_exidx_coverage): Add prototype.
+	* bfd-in2.h: Regenerate.
+	* elf32-arm.c (arm_unwind_edit_type, arm_unwind_table_edit): Define.
+	(_arm_elf_section_data): Add text and exidx fields.
+	(add_unwind_table_edit, get_arm_elf_section_data, adjust_exidx_size,
+	insert_cantunwind_after, elf32_arm_fix_exidx_coverage, offset_prel31,
+	copy_exidx_entry): New functions.
+	(elf32_arm_write_section): Fixup .ARM.exidx contents.
+
+2009-05-05  Christophe lyon  <christophe.lyon@st.com>
+
+	* elf32-arm.c (DEF_STUBS): New helper define.
+	(DEF_STUB): Likewise.
+	(stub_def): New type.
+	(stub_definitions): New array, containing stub template pointers
+	and sizes.
+	(arm_size_one_stub): Make use of stub_definitions.
+
+2009-05-04  Dave Korn  <dave.korn.cygwin@gmail.com>
+
+	* elflink.c (find_version_for_sym):  Remove from here, ...
+	* linker.c (bfd_find_version_for_sym):  ... rename, replace
+	here, make public and update all callers.
+	* bfd-in2.h:  Regenerate.
+
+2009-04-30  Nick Clifton  <nickc@redhat.com>
+
+	* elf-bfd.h (struct bfd_elf_section_data): Add indirect_relocs
+	section pointer.
+	(struct elf_obj_data): Add has_ifunc_symbols boolean.
+	* elf.c (swap_out_syms): Convert BSF_GNU_INDIRECT_FUNCTION flags
+	into a STT_GNU_IFUNC symbol type.
+	(_bfd_elf_is_function_type): Accept STT_GNU_IFUNC as a function
+	type.
+	(_bfd_elf_set_osabi): Set the osasbi field to ELFOSABI_LINUX if
+	the binary contains ifunc symbols.
+	* elfcode.h (elf_slurp_symbol_table): Translate the STT_GNU_IFUNC
+	symbol type into a BSF_GNU_INDIRECT_FUNCTION flag.
+	* elf32-i386.c (is_indirect_function): New function.
+	(elf_i386_check_relocs): Create an ifunc output section.
+	(allocate_dynrelocs): Create dynamic relocs in the ifunc output
+	section if necessary.
+	(elf_i386_relocate_section): Emit a reloc against an ifunc symbol
+	if necessary.
+	(elf_i386_add_symbol_hook): New function. Set the
+	has_ifunc_symbols field of the elf_obj_data structure if an ifunc
+	symbol is encountered.
+	(elf_backend_post_process_headers): Define.
+	(elf_backend_add_symbol_hook): Define.
+	(elf_i386_post_process_headers): Rename to
+	elf_i388_fbsd_post_process_headers.
+	* elf64-x86_64.c (IS_X86_64_PCREL_TYPE): New macro.
+	(is_indirect_function): New function.
+	(elf64_x86_64_check_relocs): Create an ifunc output section.
+	(allocate_dynrelocs): Create dynamic relocs in the ifunc output
+	section if necessary.
+	(elf64_x86_64_relocate_section): Emit a reloc against an ifunc
+	symbol if necessary.
+	(elf_i386_add_symbol_hook): Set the has_ifunc_symbols field of the
+	elf_obj_data structure if an ifunc symbol is encountered.
+	(elf_backend_post_process_headers): Define.
+	* elflink.c (_bfd_elf_adjust_dynamic_symbol): Always create a PLT
+	if we have ifunc symbols to handle.
+	(get_ifunc_reloc_section_name): New function.  Computes the name
+	for an ifunc section.
+	(_bfd_elf_make_ifunc_reloc_section): New function.  Creates a
+	section to hold ifunc relocs.
+	* syms.c (BSF_GNU_INDIRECT_FUNCTION): Define.
+	(bfd_print_symbol_vandf): Handle ifunc symbols.
+	(bfd_decode_symclass): Likewise.
+	* bfd-in2.h: Regenerate.
+
+2009-04-30  Joseph Myers  <joseph@codesourcery.com>
+
+	* elf32-arm.c (elf32_arm_check_relocs): Give errors for absolute
+	MOVW and MOVT relocations in a shared library link.
+
+2009-04-27  Anthony Green  <green@moxielogic.com>
+
+	* verilog.c: New file.
+	* Makefile.am (BFD32_LIBS): Add verilog.c.
+	(BFD32_LIBS_CFILES): Add verilog.c.
+	(verilog.lo): New build rule.
+	* Makefile.in: Rebuilt.
+	* targets.c: Add verilog support.
+	* bfd.c (tdata union): Add Verilog private data field.
+	* bfd-in2.h: Regenerate.
+
+2009-04-27  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* peXXigen.c (_bfd_XX_bfd_copy_private_bfd_data_common): Don't
+	copy pe_opthdr.
+
+2009-04-23  Matthias Klose  <doko@ubuntu.com>
+
+	* peXXigen.c (_bfd_XXi_swap_sym_in): Initialize `name'.
+
+2009-04-22  Christophe Lyon  <christophe.lyon@st.com>
+
+	PR9743
+	* elf32-arm.c (arm_type_of_stub): Handle R_ARM_THM_JUMP24,
+	R_ARM_JUMP24 and R_ARM_PLT32 relocations.
+	(elf32_arm_size_stubs): Likewise.
+	(record_thumb_to_arm_glue): Deleted unused function.
+	(bfd_elf32_arm_process_before_allocation): No longer handle
+	R_ARM_THM_JUMP24, R_ARM_JUMP24 and R_ARM_PLT32 relocations here.
+	(elf32_arm_final_link_relocate): Handle R_ARM_THM_JUMP24,
+	R_ARM_JUMP24 and R_ARM_PLT32 relocations.
+
+2009-04-21  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* elf32-arm.c (INTERWORK_FLAG): Check BFD_LINKER_CREATED.
+	(elf32_arm_write_section): Declare early.
+	(elf32_arm_size_stubs): Skip non-stub sections in the stub BFD.
+	(arm_allocate_glue_section_space): Exclude empty sections.
+	(ARM_GLUE_SECTION_FLAGS): Add SEC_LINKER_CREATED.
+	(bfd_elf32_arm_add_glue_sections_to_bfd): Do not skip the stub
+	BFD.
+	(elf32_arm_output_glue_section, elf32_arm_final_link): New.
+	(elf32_arm_merge_eabi_attributes): Skip the stub BFD.
+	(elf32_arm_size_dynamic_sections): Allocate interworking
+	sections here.
+	(bfd_elf32_bfd_final_link): Define.
+
+2009-04-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* coff-ia64.c (COFF_PAGE_SIZE): Changed to 8K.
+	
+	* coffcode.h (coff_compute_section_file_positions): Clear
+	D_PAGED if PE section alignment is smaller than COFF_PAGE_SIZE.
+
+	* libcoff-in.h (pe_tdata): Remove force_minimum_alignment and
+	force_minimum_alignment.
+
+	* libcoff.h: Regenerated.
+
+	* pei-ia64.c (PEI_TARGET_SUBSYSTEM): Removed.
+	(PEI_FORCE_MINIMUM_ALIGNMENT): Likewise.
+
+	* peicode.h (pe_mkobject): Don't set force_minimum_alignment
+	nor target_subsystem.
+
+	* peXXigen.c (_bfd_XXi_swap_aouthdr_out): Don't check
+	force_minimum_alignment nor target_subsystem.
+
+2009-04-21  Kai Tietz  <kai.tietz@onevision.com>
+
+	* coff-x86_64.c (PEI_HEADERS): Protect includes.
+	(bfd_pe_print_pdata): Remove #ifdef PE variation.
+	* pei-x86_64.c (PEI_HEADERS): Define to prevent double
+	include in coff-x86_64.c of headers.
+	(PDATA_ROW_SIZE): New define.
+	(pex_regs[]): New static array.
+	(pex64_get_runtime_function): New static function.
+	(pex64_get_unwind_info): Likewise.
+	(pex64_get_scope_entry): Likewise.
+	(pex64_xdata_print_uwd_codes): Likewise.
+	(pex64_get_section_by_rva): Likewise.
+	(pex64_dump_xdata): Likewise.
+	(pex64_bfd_print_pdata): Likewise.
+	(bfd_pe_print_pdata): Define as pex64_bfd_print_pdata.
+	* peXXigen.c (_bfd_pex64_print_pdata): Removed implementation.
+	* libpei.h (_bfd_pex64_print_pdata): Removed declaration.
+
+2009-04-19  Peter O'Gorman  <binutils@mlists.thewrittenword.com>
+	    Alan Modra  <amodra@bigpond.net.au>
+	    Dave Korn  <dave.korn.cygwin@gmail.com>
+
+	* peXXigen.c (_bfd_XXi_swap_sym_in): Fix name handling w.r.t
+	long names and non-NUL-terminated strings.
+
+2009-04-17  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* bfd-in2.h: Regenerated.
+
+2009-04-17  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* peXXigen.c (_bfd_XX_print_private_bfd_data_common): Replace
+	IMAGE_SUBSYSTEM_EFI_ROM with IMAGE_SUBSYSTEM_SAL_RUNTIME_DRIVER.
+
+2009-04-17  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR binutils/10074
+	* coffcode.h (bfd_pei_p): New.
+
+	* config.bfd: Remove bfd_efi_bsdrv_ia32_vec,
+	bfd_efi_rtdrv_ia32_vec, bfd_efi_bsdrv_x86_64_vec,
+	bfd_efi_rtdrv_x86_64_vec, bfd_efi_bsdrv_ia64_vec and
+	bfd_efi_rtdrv_ia64_vec.  Replace bfd_efi_app_ia32_vec,
+	bfd_efi_app_x86_64_vec and bfd_efi_app_ia64_vec with
+	i386pei_vec, x86_64pei_vec and bfd_pei_ia64_vec, respectively.
+
+	* configure.in: Remove bfd_efi_bsdrv_ia32_vec,
+	bfd_efi_rtdrv_ia32_vec, bfd_efi_bsdrv_x86_64_vec,
+	bfd_efi_rtdrv_x86_64_vec,
+	bfd_efi_bsdrv_ia64_vec and bfd_efi_rtdrv_ia64_vec.  Replace
+	bfd_efi_ia64_vec with bfd_pei_ia64_vec.
+	* targets.c: Likewise.
+
+	* configure: Regenerated.
+	* libcoff.h: Likewise.
+	* Makefile.in: Likewise.
+
+	* efi-app-ia32.c: Removed.
+	* efi-app-x86_64.c: Likewise.
+	* efi-bsdrv-ia32.c: Likewise.
+	* efi-bsdrv-ia64.c: Likewise.
+	* efi-bsdrv-x86_64.c: Likewise.
+	* efi-rtdrv-ia32.c: Likewise.
+	* efi-rtdrv-ia64.c: Likewise.
+	* efi-rtdrv-x86_64.c: Likewise.
+	* efi-rtdrv-ia32.c: Likewise.
+
+	* efi-app-ia64.c: Moved to ...
+	* pei-ia64.c: This.
+	(TARGET_SYM): Set to bfd_pei_ia64_vec.
+	(TARGET_NAME): Set to pei-ia64.
+
+	* libpei.h (bfd_target_pei_p): Removed.
+	(bfd_target_pei_arch): Likewise.
+	(bfd_target_efi_app_p): Likewise.
+	(bfd_target_efi_app_arch): Likewise.
+	(bfd_target_efi_bsdrv_p): Likewise.
+	(bfd_target_efi_bsdrv_arch): Likewise.
+	(bfd_target_efi_rtdrv_p): Likewise.
+	(bfd_target_efi_rtdrv_arch): Likewise.
+	(bfd_pe_executable_p): Likewise.
+
+	* Makefile.am (BFD32_BACKENDS): Remove efi-app-ia32.lo,
+	efi-bsdrv-ia32.lo and efi-rtdrv-ia32.lo.
+	(BFD32_BACKENDS_CFILES): Remove efi-app-ia32.c, efi-bsdrv-ia32.c
+	and efi-rtdrv-ia32.c.
+	(BFD64_BACKENDS): Remove efi-app-ia64.lo, efi-bsdrv-ia64.lo,
+	efi-rtdrv-ia64.lo, efi-app-x86_64.lo, efi-bsdrv-x86_64.lo and
+	efi-rtdrv-x86_64.lo. Add pei-ia64.lo.
+	(BFD64_BACKENDS_CFILES): Remove efi-app-ia64.c, efi-bsdrv-ia64.c,
+	efi-rtdrv-ia64.c, efi-app-x86_64.c, efi-bsdrv-x86_64.c and
+	efi-rtdrv-x86_64.c. Add pei-ia64.c.
+	(efi-app-ia64.lo): Removed.
+	(efi-bsdrv-ia32.lo): Likewise.
+	(efi-rtdrv-ia32.lo): Likewise.
+	(efi-app-ia64.lo): Likewise.
+	(efi-bsdrv-ia64.lo): Likewise.
+	(efi-rtdrv-ia64.lo): Likewise.
+	(efi-app-x86_64.lo): Likewise.
+	(efi-bsdrv-x86_64.lo): Likewise.
+	(efi-rtdrv-x86_64.lo): Likewise.
+	(pei-ia64.lo): New.
+
+	* peicode.h (coff_swap_scnhdr_in): Replace bfd_pe_executable_p
+	with bfd_pei_p.
+	(arch_type): Removed.
+	(pe_arch): Likewise.
+	(pe_bfd_object_p): Just return coff_object_p.
+
+	* peXXigen.c (_bfd_XXi_swap_scnhdr_out): Replace
+	bfd_pe_executable_p with bfd_pei_p.
+
 2009-04-17  Christophe Lyon  <christophe.lyon@st.com>
 
 	* elf32-arm.c (elf32_arm_size_stubs): Handle long branches through
@@ -311,7 +740,7 @@
 	    Andreas Krebbel  <Andreas.Krebbel@de.ibm.com>
 
 	* elf32-s390.c (elf_s390_check_relocs): Use the SYMBOL_*
-        macros for visibilty and locality checks.
+	macros for visibilty and locality checks.
 	(elf_s390_adjust_dynamic_symbol): Likewise.
 	(allocate_dynrelocs): Likewise.
 	(elf_s390_relocate_section): Likewise.

@@ -58,6 +58,7 @@
 #include "top.h"
 #include "wrapper.h"
 #include "valprint.h"
+#include "parser-defs.h"
 
 /* readline include files */
 #include "readline/readline.h"
@@ -149,8 +150,6 @@ static enum print_stop_action print_bp_stop_message (bpstat bs);
 static int watchpoint_check (void *);
 
 static void maintenance_info_breakpoints (char *, int);
-
-static void create_overlay_event_breakpoint (char *);
 
 static int hw_breakpoint_used_count (void);
 
@@ -599,7 +598,7 @@ condition_command (char *arg, int from_tty)
 	    arg = p;
 	    /* I don't know if it matters whether this is the string the user
 	       typed in or the decompiled expression.  */
-	    b->cond_string = savestring (arg, strlen (arg));
+	    b->cond_string = xstrdup (arg);
 	    b->condition_not_parsed = 0;
 	    for (loc = b->loc; loc; loc = loc->next)
 	      {
@@ -961,7 +960,7 @@ update_watchpoint (struct breakpoint *b, int reparse)
 	      b->type = bp_watchpoint;
 	    else
 	      {
-		int target_resources_ok = TARGET_CAN_USE_HARDWARE_WATCHPOINT
+		int target_resources_ok = target_can_use_hardware_watchpoint
 		  (bp_hardware_watchpoint, i + mem_cnt, other_type_used);
 		if (target_resources_ok <= 0)
 		  b->type = bp_watchpoint;
@@ -1292,8 +1291,7 @@ insert_breakpoints (void)
 
   if (!breakpoints_always_inserted_mode ()
       && (target_has_execution
- 	  || (gdbarch_has_global_solist (target_gdbarch)
-	      && target_supports_multi_process ())))
+ 	  || gdbarch_has_global_breakpoints (target_gdbarch)))
     /* update_global_location_list does not insert breakpoints
        when always_inserted_mode is not enabled.  Explicitly
        insert them now.  */
@@ -1459,12 +1457,58 @@ reattach_breakpoints (int pid)
   return 0;
 }
 
+static struct breakpoint *
+create_internal_breakpoint (CORE_ADDR address, enum bptype type)
+{
+  static int internal_breakpoint_number = -1;
+  struct symtab_and_line sal;
+  struct breakpoint *b;
+
+  init_sal (&sal);		/* initialize to zeroes */
+
+  sal.pc = address;
+  sal.section = find_pc_overlay (sal.pc);
+
+  b = set_raw_breakpoint (sal, type);
+  b->number = internal_breakpoint_number--;
+  b->disposition = disp_donttouch;
+
+  return b;
+}
+
+static void
+create_overlay_event_breakpoint (char *func_name, struct objfile *objfile)
+{
+  struct breakpoint *b;
+  struct minimal_symbol *m;
+
+  if ((m = lookup_minimal_symbol_text (func_name, objfile)) == NULL)
+    return;
+
+  b = create_internal_breakpoint (SYMBOL_VALUE_ADDRESS (m),
+				  bp_overlay_event);
+  b->addr_string = xstrdup (func_name);
+
+  if (overlay_debugging == ovly_auto)
+    {
+      b->enable_state = bp_enabled;
+      overlay_events_enabled = 1;
+    }
+  else
+    {
+      b->enable_state = bp_disabled;
+      overlay_events_enabled = 0;
+    }
+  update_global_location_list (1);
+}
+
 void
 update_breakpoints_after_exec (void)
 {
   struct breakpoint *b;
   struct breakpoint *temp;
   struct bp_location *bploc;
+  struct objfile *objfile;
 
   /* We're about to delete breakpoints from GDB's lists.  If the
      INSERTED flag is true, GDB will try to lift the breakpoints by
@@ -1559,7 +1603,8 @@ update_breakpoints_after_exec (void)
       }
   }
   /* FIXME what about longjmp breakpoints?  Re-create them here?  */
-  create_overlay_event_breakpoint ("_ovly_debug_event");
+  ALL_OBJFILES (objfile)
+    create_overlay_event_breakpoint ("_ovly_debug_event", objfile);
 }
 
 int
@@ -1735,7 +1780,7 @@ breakpoint_init_inferior (enum inf_context context)
 
   /* If breakpoint locations are shared across processes, then there's
      nothing to do.  */
-  if (gdbarch_has_global_solist (target_gdbarch))
+  if (gdbarch_has_global_breakpoints (target_gdbarch))
     return;
 
   ALL_BP_LOCATIONS (bpt)
@@ -2602,7 +2647,7 @@ bpstat_alloc (const struct bp_location *bl, bpstat cbs /* Current "bs" value */ 
 int
 watchpoints_triggered (struct target_waitstatus *ws)
 {
-  int stopped_by_watchpoint = STOPPED_BY_WATCHPOINT (*ws);
+  int stopped_by_watchpoint = target_stopped_by_watchpoint ();
   CORE_ADDR addr;
   struct breakpoint *b;
 
@@ -2712,9 +2757,15 @@ watchpoint_check (void *p)
 	 that the watchpoint frame couldn't be found by frame_find_by_id()
 	 because the current PC is currently in an epilogue.  Calling
 	 gdbarch_in_function_epilogue_p() also when fr == NULL fixes that. */
-      if ((!within_current_scope || fr == get_current_frame ())
-          && gdbarch_in_function_epilogue_p (current_gdbarch, read_pc ()))
-	return WP_VALUE_NOT_CHANGED;
+      if (!within_current_scope || fr == get_current_frame ())
+	{
+	  struct frame_info *frame = get_current_frame ();
+	  struct gdbarch *frame_arch = get_frame_arch (frame);
+	  CORE_ADDR frame_pc = get_frame_pc (frame);
+
+	  if (gdbarch_in_function_epilogue_p (frame_arch, frame_pc))
+	    return WP_VALUE_NOT_CHANGED;
+	}
       if (fr && within_current_scope)
 	/* If we end up stopping, the current frame will get selected
 	   in normal_stop.  So this call to select_frame won't affect
@@ -4344,8 +4395,7 @@ set_raw_breakpoint (struct symtab_and_line sal, enum bptype bptype)
   if (sal.symtab == NULL)
     b->source_file = NULL;
   else
-    b->source_file = savestring (sal.symtab->filename,
-				 strlen (sal.symtab->filename));
+    b->source_file = xstrdup (sal.symtab->filename);
   b->loc->section = sal.section;
   b->line_number = sal.line;
 
@@ -4373,26 +4423,6 @@ make_breakpoint_permanent (struct breakpoint *b)
   for (bl = b->loc; bl; bl = bl->next)
     bl->inserted = 1;
 }
-
-static struct breakpoint *
-create_internal_breakpoint (CORE_ADDR address, enum bptype type)
-{
-  static int internal_breakpoint_number = -1;
-  struct symtab_and_line sal;
-  struct breakpoint *b;
-
-  init_sal (&sal);		/* initialize to zeroes */
-
-  sal.pc = address;
-  sal.section = find_pc_overlay (sal.pc);
-
-  b = set_raw_breakpoint (sal, type);
-  b->number = internal_breakpoint_number--;
-  b->disposition = disp_donttouch;
-
-  return b;
-}
-
 
 static void
 create_longjmp_breakpoint (char *func_name)
@@ -4433,40 +4463,6 @@ delete_longjmp_breakpoint (int thread)
 	if (b->thread == thread)
 	  delete_breakpoint (b);
       }
-}
-
-static void
-create_overlay_event_breakpoint_1 (char *func_name, struct objfile *objfile)
-{
-  struct breakpoint *b;
-  struct minimal_symbol *m;
-
-  if ((m = lookup_minimal_symbol_text (func_name, objfile)) == NULL)
-    return;
- 
-  b = create_internal_breakpoint (SYMBOL_VALUE_ADDRESS (m), 
-				  bp_overlay_event);
-  b->addr_string = xstrdup (func_name);
-
-  if (overlay_debugging == ovly_auto)
-    {
-      b->enable_state = bp_enabled;
-      overlay_events_enabled = 1;
-    }
-  else 
-    {
-      b->enable_state = bp_disabled;
-      overlay_events_enabled = 0;
-    }
-  update_global_location_list (1);
-}
-
-static void
-create_overlay_event_breakpoint (char *func_name)
-{
-  struct objfile *objfile;
-  ALL_OBJFILES (objfile)
-    create_overlay_event_breakpoint_1 (func_name, objfile);
 }
 
 void
@@ -4820,8 +4816,7 @@ create_catchpoint (int tempflag, char *cond_string,
   set_breakpoint_count (breakpoint_count + 1);
   b->number = breakpoint_count;
 
-  b->cond_string = (cond_string == NULL) ? 
-    NULL : savestring (cond_string, strlen (cond_string));
+  b->cond_string = (cond_string == NULL) ? NULL : xstrdup (cond_string);
   b->thread = -1;
   b->addr_string = NULL;
   b->enable_state = bp_enabled;
@@ -5243,7 +5238,7 @@ create_breakpoint (struct symtabs_and_lines sals, char *addr_string,
     {
       int i = hw_breakpoint_used_count ();
       int target_resources_ok = 
-	TARGET_CAN_USE_HARDWARE_WATCHPOINT (bp_hardware_breakpoint, 
+	target_can_use_hardware_watchpoint (bp_hardware_breakpoint, 
 					    i + 1, 0);
       if (target_resources_ok == 0)
 	error (_("No hardware breakpoint support in the target."));
@@ -5458,8 +5453,6 @@ create_breakpoints (struct symtabs_and_lines sals, char **addr_string,
 			 cond_string, type, disposition,
 			 thread, task, ignore_count, ops, from_tty, enabled);
     }
-
-  update_global_location_list (1);
 }
 
 /* Parse ARG which is assumed to be a SAL specification possibly
@@ -5490,6 +5483,14 @@ parse_breakpoint_sals (char **address,
 	  sal.line = default_breakpoint_line;
 	  sal.symtab = default_breakpoint_symtab;
 	  sal.section = find_pc_overlay (sal.pc);
+
+	  /* "break" without arguments is equivalent to "break *PC" where PC is
+	     the default_breakpoint_address.  So make sure to set
+	     sal.explicit_pc to prevent GDB from trying to expand the list of
+	     sals to include all other instances with the same symtab and line.
+	   */
+	  sal.explicit_pc = 1;
+
 	  sals->sals[0] = sal;
 	  sals->nelts = 1;
 	}
@@ -5800,7 +5801,6 @@ break_command_really (char *arg, char *cond_string, int thread,
       b->ops = ops;
       b->enable_state = enabled ? bp_enabled : bp_disabled;
 
-      update_global_location_list (1);
       mention (b);
     }
   
@@ -5812,6 +5812,9 @@ break_command_really (char *arg, char *cond_string, int thread,
   discard_cleanups (breakpoint_chain);
   /* But cleanup everything else. */
   do_cleanups (old_chain);
+
+  /* error call may happen here - have BREAKPOINT_CHAIN already discarded.  */
+  update_global_location_list (1);
 }
 
 /* Set a breakpoint. 
@@ -6164,7 +6167,7 @@ watch_command_1 (char *arg, int accessflag, int from_tty)
     {
       i = hw_watchpoint_used_count (bp_type, &other_type_used);
       target_resources_ok = 
-	TARGET_CAN_USE_HARDWARE_WATCHPOINT (bp_type, i + mem_cnt, 
+	target_can_use_hardware_watchpoint (bp_type, i + mem_cnt, 
 					    other_type_used);
       if (target_resources_ok == 0 && bp_type != bp_hardware_watchpoint)
 	error (_("Target does not support this type of hardware watchpoint."));
@@ -6302,7 +6305,7 @@ can_use_hardware_watchpoint (struct value *v)
 		  CORE_ADDR vaddr = VALUE_ADDRESS (v) + value_offset (v);
 		  int       len   = TYPE_LENGTH (value_type (v));
 
-		  if (!TARGET_REGION_OK_FOR_HW_WATCHPOINT (vaddr, len))
+		  if (!target_region_ok_for_hw_watchpoint (vaddr, len))
 		    return 0;
 		  else
 		    found_memory_cnt++;
@@ -6631,7 +6634,7 @@ print_exception_catchpoint (struct breakpoint *b)
     breakpoint_adjustment_warning (b->loc->requested_address,
 	                           b->loc->address,
 				   b->number, 1);
-  bp_temp = b->loc->owner->disposition == disp_del;
+  bp_temp = b->disposition == disp_del;
   ui_out_text (uiout, 
 	       bp_temp ? "Temporary catchpoint "
 		       : "Catchpoint ");
@@ -6678,7 +6681,7 @@ print_mention_exception_catchpoint (struct breakpoint *b)
   int bp_temp;
   int bp_throw;
 
-  bp_temp = b->loc->owner->disposition == disp_del;
+  bp_temp = b->disposition == disp_del;
   bp_throw = strstr (b->addr_string, "throw") != NULL;
   ui_out_text (uiout, bp_temp ? _("Temporary catchpoint ")
 			      : _("Catchpoint "));
@@ -7195,8 +7198,7 @@ update_global_location_list (int should_insert)
 
   if (breakpoints_always_inserted_mode () && should_insert
       && (target_has_execution
-	  || (gdbarch_has_global_solist (target_gdbarch)
-	      && target_supports_multi_process ())))
+	  || (gdbarch_has_global_breakpoints (target_gdbarch))))
     insert_breakpoint_locations ();
 
   do_cleanups (cleanups);
@@ -7487,9 +7489,7 @@ update_breakpoint_locations (struct breakpoint *b,
       if (sals.sals[i].symtab == NULL)
 	b->source_file = NULL;
       else
-	b->source_file =
-	  savestring (sals.sals[i].symtab->filename,
-		      strlen (sals.sals[i].symtab->filename));
+	b->source_file = xstrdup (sals.sals[i].symtab->filename);
 
       if (b->line_number == 0)
 	b->line_number = sals.sals[i].line;
@@ -7709,9 +7709,13 @@ breakpoint_re_set_one (void *bint)
   return 0;
 }
 
-/* Re-set all breakpoints after symbols have been re-loaded.  */
+/* Re-set all breakpoints after symbols have been re-loaded.
+
+   If OBJFILE is non-null, create overlay break point only in OBJFILE
+   (speed optimization).  Otherwise rescan all loaded objfiles.  */
+
 void
-breakpoint_re_set (void)
+breakpoint_re_set_objfile (struct objfile *objfile)
 {
   struct breakpoint *b, *temp;
   enum language save_language;
@@ -7730,8 +7734,20 @@ breakpoint_re_set (void)
   }
   set_language (save_language);
   input_radix = save_input_radix;
-  
-  create_overlay_event_breakpoint ("_ovly_debug_event");
+
+  if (objfile == NULL)
+    ALL_OBJFILES (objfile)
+      create_overlay_event_breakpoint ("_ovly_debug_event", objfile);
+  else
+    create_overlay_event_breakpoint ("_ovly_debug_event", objfile);
+}
+
+/* Re-set all breakpoints after symbols have been re-loaded.  */
+
+void
+breakpoint_re_set (void)
+{
+  breakpoint_re_set_objfile (NULL);
 }
 
 /* Reset the thread number of this breakpoint:
@@ -7971,7 +7987,7 @@ do_enable_breakpoint (struct breakpoint *bpt, enum bpdisp disposition)
       int i;
       i = hw_breakpoint_used_count ();
       target_resources_ok = 
-	TARGET_CAN_USE_HARDWARE_WATCHPOINT (bp_hardware_breakpoint, 
+	target_can_use_hardware_watchpoint (bp_hardware_breakpoint, 
 					    i + 1, 0);
       if (target_resources_ok == 0)
 	error (_("No hardware breakpoint support in the target."));
@@ -8531,6 +8547,22 @@ all_tracepoints ()
   }
 
   return tp_vec;
+}
+
+/* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
+
+void
+brekpoint_types_mark_used (void)
+{
+  struct breakpoint *b;
+
+  ALL_BREAKPOINTS (b)
+    {
+      if (b->exp)
+	exp_types_mark_used (b->exp);
+      if (b->val)
+	type_mark_used (value_type (b->val));
+    }
 }
 
 

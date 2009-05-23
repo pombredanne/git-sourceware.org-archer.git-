@@ -476,7 +476,7 @@ catch_exception_raise (mach_port_t port,
 
 static ptid_t
 darwin_wait (struct target_ops *ops,
-	     ptid_t ptid, struct target_waitstatus *status)
+	     ptid_t ptid, struct target_waitstatus *status, int options)
 {
   kern_return_t kret;
   mach_msg_header_t *hdr = &msgin.hdr;
@@ -1197,8 +1197,10 @@ darwin_xfer_partial (struct target_ops *ops,
 		     gdb_byte *readbuf, const gdb_byte *writebuf,
 		     ULONGEST offset, LONGEST len)
 {
-  inferior_debug (8, _("darwin_xfer_partial(%s, %d, rbuf=%p, wbuf=%p)\n"),
-		  core_addr_to_string (offset), (int)len, readbuf, writebuf);
+  inferior_debug (8, _("darwin_xfer_partial(%s, %d, rbuf=%s, wbuf=%s)\n"),
+		  core_addr_to_string (offset), (int)len, 
+		  host_address_to_string (readbuf),
+		  host_address_to_string (writebuf));
 
   if (object != TARGET_OBJECT_MEMORY)
     return -1;

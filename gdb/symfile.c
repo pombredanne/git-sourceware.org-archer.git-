@@ -37,7 +37,8 @@
 #include "language.h"
 #include "complaints.h"
 #include "demangle.h"
-#include "inferior.h"		/* for write_pc */
+#include "inferior.h"
+#include "regcache.h"
 #include "filenames.h"		/* for DOSish file names */
 #include "gdb-stabs.h"
 #include "gdb_obstack.h"
@@ -368,11 +369,11 @@ copy_section_addr_info (struct section_addr_info *addrs)
    an existing section table. */
 
 extern struct section_addr_info *
-build_section_addr_info_from_section_table (const struct section_table *start,
-                                            const struct section_table *end)
+build_section_addr_info_from_section_table (const struct target_section *start,
+                                            const struct target_section *end)
 {
   struct section_addr_info *sap;
-  const struct section_table *stp;
+  const struct target_section *stp;
   int oidx;
 
   sap = alloc_section_addr_info (end - start);
@@ -922,7 +923,7 @@ new_symfile_objfile (struct objfile *objfile, int mainline, int verbo)
     }
   else
     {
-      breakpoint_re_set ();
+      breakpoint_re_set_objfile (objfile);
     }
 
   /* We're done reading the symbol file; finish off complaints.  */
@@ -1586,14 +1587,14 @@ symfile_bfd_open (char *name)
 
   /* Look down path for it, allocate 2nd new malloc'd copy.  */
   desc = openp (getenv ("PATH"), OPF_TRY_CWD_FIRST, name,
-		O_RDONLY | O_BINARY, 0, &absolute_name);
+		O_RDONLY | O_BINARY, &absolute_name);
 #if defined(__GO32__) || defined(_WIN32) || defined (__CYGWIN__)
   if (desc < 0)
     {
       char *exename = alloca (strlen (name) + 5);
       strcat (strcpy (exename, name), ".exe");
       desc = openp (getenv ("PATH"), OPF_TRY_CWD_FIRST, exename,
-		    O_RDONLY | O_BINARY, 0, &absolute_name);
+		    O_RDONLY | O_BINARY, &absolute_name);
     }
 #endif
   if (desc < 0)
@@ -1988,7 +1989,7 @@ generic_load (char *args, int from_tty)
   ui_out_text (uiout, "\n");
   /* We were doing this in remote-mips.c, I suspect it is right
      for other targets too.  */
-  write_pc (entry);
+  regcache_write_pc (get_current_regcache (), entry);
 
   /* FIXME: are we supposed to call symbol_file_add or not?  According
      to a comment from remote-mips.c (where a call to symbol_file_add

@@ -145,7 +145,7 @@ nto_find_and_open_solib (char *solib, unsigned o_flags, char **temp_pathname)
   else
     base++;			/* Skip over '/'.  */
 
-  ret = openp (buf, 1, base, o_flags, 0, temp_pathname);
+  ret = openp (buf, 1, base, o_flags, temp_pathname);
   if (ret < 0 && base != solib)
     {
       sprintf (arch_path, "/%s", solib);
@@ -318,7 +318,7 @@ find_load_phdr (bfd *abfd)
 }
 
 void
-nto_relocate_section_addresses (struct so_list *so, struct section_table *sec)
+nto_relocate_section_addresses (struct so_list *so, struct target_section *sec)
 {
   /* Neutrino treats the l_addr base address field in link.h as different than
      the base address in the System V ABI and so the offset needs to be

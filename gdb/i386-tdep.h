@@ -106,6 +106,12 @@ struct gdbarch_tdep
   /* ISA-specific data types.  */
   struct type *i386_mmx_type;
   struct type *i386_sse_type;
+
+  /* Process record/replay target.  */
+  /* Parse intx80 args.  */
+  int (*i386_intx80_record) (struct regcache *regcache);
+  /* Parse sysenter args.  */
+  int (*i386_sysenter_record) (struct regcache *regcache);
 };
 
 /* Floating-point registers.  */
@@ -214,6 +220,9 @@ extern void i386_elf_init_abi (struct gdbarch_info, struct gdbarch *);
 
 /* Initialize a SVR4 architecture variant.  */
 extern void i386_svr4_init_abi (struct gdbarch_info, struct gdbarch *);
+
+extern int i386_process_record (struct gdbarch *gdbarch,
+                                struct regcache *regcache, CORE_ADDR addr);
 
 
 /* Functions and variables exported from i386bsd-tdep.c.  */

@@ -364,7 +364,7 @@ coff_start_symtab (char *name)
      this pointer into last_source_file and we put it in
      subfiles->name, which end_symtab frees; that's why
      it must be malloc'd.  */
-		 savestring (name, strlen (name)),
+		 xstrdup (name),
   /* We never know the directory name for COFF.  */
 		 NULL,
   /* The start address is irrelevant, since we set
@@ -383,7 +383,7 @@ complete_symtab (char *name, CORE_ADDR start_addr, unsigned int size)
 {
   if (last_source_file != NULL)
     xfree (last_source_file);
-  last_source_file = savestring (name, strlen (name));
+  last_source_file = xstrdup (name);
   current_source_start_addr = start_addr;
   current_source_end_addr = start_addr + size;
 }
@@ -758,6 +758,11 @@ coff_symtab_read (long symtab_offset, unsigned int nsyms,
 	    coff_end_symtab (objfile);
 
 	  coff_start_symtab ("_globals_");
+	  /* coff_start_symtab will set the language of this symtab to
+	     language_unknown, since such a ``file name'' is not
+	     recognized.  Override that with the minimal language to
+	     allow printing values in this symtab.  */
+	  current_subfile->language = language_minimal;
 	  complete_symtab ("_globals_", 0, 0);
 	  /* done with all files, everything from here on out is globals */
 	}
@@ -1482,7 +1487,7 @@ process_coff_symbol (struct coff_symbol *cs,
   memset (sym, 0, sizeof (struct symbol));
   name = cs->c_name;
   name = EXTERNAL_NAME (name, objfile->obfd);
-  SYMBOL_LANGUAGE (sym) = language_auto;
+  SYMBOL_LANGUAGE (sym) = current_subfile->language;
   SYMBOL_SET_NAMES (sym, name, strlen (name), objfile);
 
   /* default assumptions */

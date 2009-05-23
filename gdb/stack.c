@@ -507,6 +507,10 @@ do_gdb_disassembly (int how_many, CORE_ADDR low, CORE_ADDR high)
     {
       gdb_disassembly_stub (&args);
     }
+  /* If an exception was thrown while doing the disassembly, print
+     the error message, to give the user a clue of what happened.  */
+  if (exception.reason == RETURN_ERROR)
+    exception_print (gdb_stderr, exception);
 }
 
 /* Print information about frame FRAME.  The output is format according
@@ -2145,17 +2149,21 @@ Usage: func <name>\n"));
 
   add_setshow_auto_boolean_cmd ("disassemble-next-line", class_stack,
 			        &disassemble_next_line, _("\
-Set whether to disassemble next source line when execution stops."), _("\
-Show whether to disassemble next source line when execution stops."), _("\
-If ON, GDB will display disassembly of the next source line when\n\
-execution of the program being debugged stops.\n\
-If AUTO (which is the default), or there's no line info to determine\n\
-the source line of the next instruction, display disassembly of next\n\
-instruction instead."),
+Set whether to disassemble next source line or insn when execution stops."), _("\
+Show whether to disassemble next source line or insn when execution stops."), _("\
+If ON, GDB will display disassembly of the next source line, in addition\n\
+to displaying the source line itself.  If the next source line cannot\n\
+be displayed (e.g., source is unavailable or there's no line info), GDB\n\
+will display disassembly of next instruction instead of showing the\n\
+source line.\n\
+If AUTO, display disassembly of next instruction only if the source line\n\
+cannot be displayed.\n\
+If OFF (which is the default), never display the disassembly of the next\n\
+source line."),
 			        NULL,
 			        show_disassemble_next_line,
 			        &setlist, &showlist);
-  disassemble_next_line = AUTO_BOOLEAN_AUTO;
+  disassemble_next_line = AUTO_BOOLEAN_FALSE;
 
 #if 0
   add_cmd ("backtrace-limit", class_stack, set_backtrace_limit_command, _(\

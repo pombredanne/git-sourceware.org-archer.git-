@@ -497,6 +497,8 @@ extern struct obj_section *find_pc_section (CORE_ADDR pc);
 
 extern int in_plt_section (CORE_ADDR, char *);
 
+extern int matching_objfiles (struct objfile *a, struct objfile *b);
+
 /* Keep a registry of per-objfile data-pointers required by other GDB
    modules.  */
 

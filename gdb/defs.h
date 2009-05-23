@@ -153,6 +153,9 @@ extern int dbx_commands;
 /* System root path, used to find libraries etc.  */
 extern char *gdb_sysroot;
 
+/* GDB datadir, used to store data files.  */
+extern char *gdb_datadir;
+
 /* Search path for separate debug files.  */
 extern char *debug_file_directory;
 
@@ -616,7 +619,7 @@ extern void print_address (CORE_ADDR, struct ui_file *);
 #define OPF_TRY_CWD_FIRST     0x01
 #define OPF_SEARCH_IN_PATH    0x02
 
-extern int openp (const char *, int, const char *, int, int, char **);
+extern int openp (const char *, int, const char *, int, char **);
 
 extern int source_full_path_of (const char *, char **);
 
@@ -1108,7 +1111,8 @@ extern void (*deprecated_register_changed_hook) (int regno);
 extern void (*deprecated_memory_changed_hook) (CORE_ADDR addr, int len);
 extern void (*deprecated_context_hook) (int);
 extern ptid_t (*deprecated_target_wait_hook) (ptid_t ptid,
-                                         struct target_waitstatus * status);
+					      struct target_waitstatus *status,
+					      int options);
 
 extern void (*deprecated_attach_hook) (void);
 extern void (*deprecated_detach_hook) (void);

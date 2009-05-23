@@ -2111,6 +2111,18 @@ time, and so we attempt to handle symbols incrementally.  For instance,
 we create @dfn{partial symbol tables} consisting of only selected
 symbols, and only expand them to full symbol tables when necessary.
 
+@menu
+* Symbol Reading::
+* Partial Symbol Tables::
+* Types::
+* Object File Formats::
+* Debugging File Formats::
+* Adding a New Symbol Reader to GDB::
+* Memory Management for Symbol Files::
+* Memory Management for Types::
+@end menu
+
+@node Symbol Reading
 @section Symbol Reading
 
 @cindex symbol reading
@@ -2203,6 +2215,7 @@ symtab.  Upon return, @code{pst->readin} should have been set to 1, and
 zero if there were no symbols in that part of the symbol file.
 @end table
 
+@node Partial Symbol Tables
 @section Partial Symbol Tables
 
 @value{GDBN} has three types of symbol tables:
@@ -2298,6 +2311,7 @@ and all the psymbols themselves are allocated in a pair of large arrays
 on an obstack, so there is little to be gained by trying to free them
 unless you want to do a lot more work.
 
+@node Types
 @section Types
 
 @unnumberedsubsec Fundamental Types (e.g., @code{FT_VOID}, @code{FT_BOOLEAN}).
@@ -2335,6 +2349,7 @@ only one instance exists, while @file{c-lang.c} builds as many
 @code{TYPE_CODE_INT} types as needed, with each one associated with
 some particular objfile.
 
+@node Object File Formats
 @section Object File Formats
 @cindex object file formats
 
@@ -2420,6 +2435,7 @@ SOM, which is a cross-language ABI).
 
 The SOM reader is in @file{somread.c}.
 
+@node Debugging File Formats
 @section Debugging File Formats
 
 This section describes characteristics of debugging information that
@@ -2491,6 +2507,7 @@ DWARF 3 is an improved version of DWARF 2.
 @cindex SOM debugging info
 Like COFF, the SOM definition includes debugging information.
 
+@node Adding a New Symbol Reader to GDB
 @section Adding a New Symbol Reader to @value{GDBN}
 
 @cindex adding debugging info reader
@@ -2513,6 +2530,7 @@ will only ever be implemented by one object file format may be called
 directly.  This interface should be described in a file
 @file{bfd/lib@var{xyz}.h}, which is included by @value{GDBN}.
 
+@node Memory Management for Symbol Files
 @section Memory Management for Symbol Files
 
 Most memory associated with a loaded symbol file is stored on
@@ -2524,8 +2542,11 @@ released when the objfile is unloaded or reloaded.  Therefore one
 objfile must not reference symbol or type data from another objfile;
 they could be unloaded at different times.
 
-@subsection Memory Management for Types
+@node Memory Management for Types
+@section Memory Management for Types
+@cindex memory management for types
 
+@findex TYPE_OBJFILE
 @code{TYPE_OBJFILE} macro indicates the current memory owner of the type.
 Non-@code{NULL} value indicates it is owned by an objfile (specifically by its
 obstack) and in such case the type remains valid till the objfile is unloaded
@@ -2536,27 +2557,30 @@ User convenience variables, et cetera, have associated types.  Normally these
 types live in the associated objfile.  However, when the objfile is unloaded,
 those types are deep copied to global memory, so that the values of the user
 variables and history items are not lost.  During the copy they will get their
-@code{TYPE_OBJFILE} set to @code{NULL} and become so called reclaimable types.
+@code{TYPE_OBJFILE} set to @code{NULL} and become so-called @dfn{reclaimable}
+types.
 
-Types with @code{NULL TYPE_OBJFILE} can be either permanent types
-(@pxref{Builtin Types}) or reclaimable types which will be deallocated after the
-last object referencing them is removed.  Permanent types are allocated by the
-function @code{alloc_type} (and its derivations like @code{init_type})
-specifying objfile as @code{NULL}.  The reclaimable types are created the same
-way but moreover they need to have @code{type_init_group} called to start their
-tracking as being possibly deallocatable.
+Types with null @code{TYPE_OBJFILE} can be either permanent types
+(@pxref{Builtin Types}) or reclaimable types which will be deallocated at the
+first idle @value{GDBN} moment if the last object referencing them is removed.
+Permanent types are allocated by the function @code{alloc_type} (and its
+derivations like @code{init_type}) specifying objfile as @code{NULL}.  The
+reclaimable types are created the same way but moreover they need to have
+@code{type_init_group} called to start their tracking as being possibly
+deallocatable.
 
+@findex free_all_types
 When @value{GDBN} gets idle it always calls the @code{free_all_types} function
-which deallocates any unused types.  To prevent deallocation of types still in
-use you must use @code{type_incref} (and matching @code{type_decref}) for
-reference counting of any reclaimable type.  You will probably need to first
-increase the reference count right after calling @code{type_init_group}.
+which deallocates any unused types.  All types currently not owned by an
+objfile must be marked as used on each @code{free_all_types} call as they would
+get deallocated as unused otherwise.
 
 @code{free_all_types} automatically checks for any cross-type references such
-as through @code{TYPE_TARGET_TYPE}, @code{TYPE_POINTER_TYPE} etc. and prevents
-early deallocation for any such existing references.  Reclaimable types may
-reference any other reclaimable types or even permanent types.  But permanent
-types must not reference reclaimable types (nor an objfile associated type).
+as through @code{TYPE_TARGET_TYPE}, @code{TYPE_POINTER_TYPE} etc.@: and
+prevents early deallocation for any such existing references.  Reclaimable
+types may reference any other reclaimable types or even permanent types.  But
+permanent types must not reference reclaimable types (nor an objfile associated
+type).
 
 
 @node Language Support
@@ -2861,6 +2885,7 @@ using the Bourne shell script @file{gdbarch.sh}.
 * Register Representation::
 * Frame Interpretation::
 * Inferior Call Setup::
+* Adding support for debugging core files::
 * Defining Other Architecture Features::
 * Adding a New Target::
 @end menu
@@ -4450,6 +4475,17 @@ Some Harvard architectures may not allow this.
 
 @end deftypefn
 
+@node Adding support for debugging core files
+@section Adding support for debugging core files
+@cindex core files
+
+The prerequisite for adding core file support in @value{GDBN} is to have
+core file support in BFD.
+
+Once BFD support is available, writing the apropriate
+@code{regset_from_core_section} architecture function should be all
+that is needed in order to add support for core files in @value{GDBN}.
+
 @node Defining Other Architecture Features 
 @section Defining Other Architecture Features 
 
@@ -4849,10 +4885,6 @@ guess the starting and ending addresses of the compilation unit from them.
 @anchor{gdbarch_stabs_argument_has_addr} Define this function to return
 nonzero if a function argument of type @var{type} is passed by reference
 instead of value.
-
-@item PROCESS_LINENUMBER_HOOK
-@findex PROCESS_LINENUMBER_HOOK
-A hook defined for XCOFF reading.
 
 @item CORE_ADDR gdbarch_push_dummy_call (@var{gdbarch}, @var{function}, @var{regcache}, @var{bp_addr}, @var{nargs}, @var{args}, @var{sp}, @var{struct_return}, @var{struct_addr})
 @findex gdbarch_push_dummy_call
@@ -5441,64 +5473,6 @@ and exec'' to start up a child process.
 This is the low level interface to inferior processes for systems using
 the Unix @code{ptrace} call in a vanilla way.
 @end table
-
-@section Native core file Support
-@cindex native core files
-
-@table @file
-@findex fetch_core_registers
-@item core-aout.c::fetch_core_registers()
-Support for reading registers out of a core file.  This routine calls
-@code{register_addr()}, see below.  Now that BFD is used to read core
-files, virtually all machines should use @code{core-aout.c}, and should
-just provide @code{fetch_core_registers} in @code{@var{xyz}-nat.c} (or
-@code{REGISTER_U_ADDR} in @code{nm-@var{xyz}.h}).
-
-@item core-aout.c::register_addr()
-If your @code{nm-@var{xyz}.h} file defines the macro
-@code{REGISTER_U_ADDR(addr, blockend, regno)}, it should be defined to
-set @code{addr} to the offset within the @samp{user} struct of @value{GDBN}
-register number @code{regno}.  @code{blockend} is the offset within the
-``upage'' of @code{u.u_ar0}.  If @code{REGISTER_U_ADDR} is defined,
-@file{core-aout.c} will define the @code{register_addr()} function and
-use the macro in it.  If you do not define @code{REGISTER_U_ADDR}, but
-you are using the standard @code{fetch_core_registers()}, you will need
-to define your own version of @code{register_addr()}, put it into your
-@code{@var{xyz}-nat.c} file, and be sure @code{@var{xyz}-nat.o} is in
-the @code{NATDEPFILES} list.  If you have your own
-@code{fetch_core_registers()}, you may not need a separate
-@code{register_addr()}.  Many custom @code{fetch_core_registers()}
-implementations simply locate the registers themselves.@refill
-@end table
-
-When making @value{GDBN} run native on a new operating system, to make it
-possible to debug core files, you will need to either write specific
-code for parsing your OS's core files, or customize
-@file{bfd/trad-core.c}.  First, use whatever @code{#include} files your
-machine uses to define the struct of registers that is accessible
-(possibly in the u-area) in a core file (rather than
-@file{machine/reg.h}), and an include file that defines whatever header
-exists on a core file (e.g., the u-area or a @code{struct core}).  Then
-modify @code{trad_unix_core_file_p} to use these values to set up the
-section information for the data segment, stack segment, any other
-segments in the core file (perhaps shared library contents or control
-information), ``registers'' segment, and if there are two discontiguous
-sets of registers (e.g., integer and float), the ``reg2'' segment.  This
-section information basically delimits areas in the core file in a
-standard way, which the section-reading routines in BFD know how to seek
-around in.
-
-Then back in @value{GDBN}, you need a matching routine called
-@code{fetch_core_registers}.  If you can use the generic one, it's in
-@file{core-aout.c}; if not, it's in your @file{@var{xyz}-nat.c} file.
-It will be passed a char pointer to the entire ``registers'' segment,
-its length, and a zero; or a char pointer to the entire ``regs2''
-segment, its length, and a 2.  The routine should suck out the supplied
-register values and install them into @value{GDBN}'s ``registers'' array.
-
-If your system uses @file{/proc} to control processes, and uses ELF
-format core files, then you may be able to use the same routines for
-reading the registers out of processes and out of core files.
 
 @section ptrace
 
