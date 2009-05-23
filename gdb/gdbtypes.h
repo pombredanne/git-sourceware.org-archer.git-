@@ -1208,6 +1208,8 @@ extern int get_discrete_bounds (struct type *, LONGEST *, LONGEST *);
 
 extern int is_ancestor (struct type *, struct type *);
 
+extern void type_mark_used (struct type *type);
+
 /* Overload resolution */
 
 #define LENGTH_MATCH(bv) ((bv)->rank[0])
@@ -1274,10 +1276,6 @@ extern struct type *copy_type_recursive (struct type *type,
 					 htab_t copied_types);
 
 extern struct type *copy_type (const struct type *type);
-
-extern void type_incref (struct type *type);
-
-extern void type_decref (struct type *type);
 
 extern void free_all_types (void);
 

@@ -2571,10 +2571,9 @@ deallocatable.
 
 @findex free_all_types
 When @value{GDBN} gets idle it always calls the @code{free_all_types} function
-which deallocates any unused types.  To prevent deallocation of types still in
-use you must use @code{type_incref} (and matching @code{type_decref}) for
-reference counting of any reclaimable type.  You will probably need to first
-increase the reference count right after calling @code{type_init_group}.
+which deallocates any unused types.  All types currently not owned by an
+objfile must be marked as used on each @code{free_all_types} call as they would
+get deallocated as unused otherwise.
 
 @code{free_all_types} automatically checks for any cross-type references such
 as through @code{TYPE_TARGET_TYPE}, @code{TYPE_POINTER_TYPE} etc.@: and

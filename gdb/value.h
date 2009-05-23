@@ -643,6 +643,8 @@ extern char *internalvar_name (struct internalvar *var);
 
 extern void preserve_values (struct objfile *);
 
+extern void value_types_mark_used (void);
+
 /* From values.c */
 
 extern struct value *value_copy (struct value *);

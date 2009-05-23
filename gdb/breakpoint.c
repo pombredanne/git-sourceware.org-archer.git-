@@ -58,6 +58,7 @@
 #include "top.h"
 #include "wrapper.h"
 #include "valprint.h"
+#include "parser-defs.h"
 
 /* readline include files */
 #include "readline/readline.h"
@@ -8546,6 +8547,22 @@ all_tracepoints ()
   }
 
   return tp_vec;
+}
+
+/* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
+
+void
+brekpoint_types_mark_used (void)
+{
+  struct breakpoint *b;
+
+  ALL_BREAKPOINTS (b)
+    {
+      if (b->exp)
+	exp_types_mark_used (b->exp);
+      if (b->val)
+	type_mark_used (value_type (b->val));
+    }
 }
 
 

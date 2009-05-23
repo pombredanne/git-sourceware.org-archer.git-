@@ -54,6 +54,7 @@
 #include "objfiles.h"
 #include "exceptions.h"
 #include "user-regs.h"
+#include "ada-lang.h"
 
 /* Standard set of definitions for printing, dumping, prefixifying,
  * and evaluating expressions.  */
@@ -1359,11 +1360,18 @@ parser_fprintf (FILE *x, const char *y, ...)
   va_end (args);
 }
 
-/* Return 1 if EXP uses OBJFILE (and will become dangling when OBJFILE
-   is unloaded), otherwise return 0.  */
+/* Call TYPE_FUNC and OBJFILE_FUNC for any TYPE and OBJFILE found being
+   referenced by EXP.  The functions are never called with NULL TYPE or NULL
+   OBJFILE.  Functions get passed an arbitrary caller supplied DATA pointer.
+   If any of the functions returns non-zero value then (any other) non-zero
+   value is immediately returned to the caller.  Otherwise zero is returned
+   after iterating through whole EXP.  */
 
-int
-exp_uses_objfile (struct expression *exp, struct objfile *objfile)
+static int
+exp_iterate (struct expression *exp,
+	     int (*type_func) (struct type *type, void *data),
+	     int (*objfile_func) (struct objfile *objfile, void *data),
+	     void *data)
 {
   int endpos;
   const union exp_element *const elts = exp->elts;
@@ -1371,31 +1379,115 @@ exp_uses_objfile (struct expression *exp, struct objfile *objfile)
   for (endpos = exp->nelts; endpos > 0; )
     {
       int i, args, oplen = 0;
+      struct type *type = NULL;
+      struct objfile *objfile = NULL;
 
       exp->language_defn->la_exp_desc->operator_length (exp, endpos,
 							&oplen, &args);
       gdb_assert (oplen > 0);
 
+      /* Track the callers of write_exp_elt_type for this table.  */
+
       i = endpos - oplen;
-      if (elts[i].opcode == OP_VAR_VALUE)
+      switch (elts[i].opcode)
 	{
-	  const struct block *const block = elts[i + 1].block;
-	  const struct symbol *const symbol = elts[i + 2].symbol;
-	  const struct obj_section *const section =
-	    SYMBOL_OBJ_SECTION (symbol);
+	case UNOP_IN_RANGE:
+	case UNOP_QUAL:
+	  if (exp->language_defn->la_language == language_ada)
+	    type = elts[i + 1].type;
+	  break;
 
-	  /* Check objfile where is placed the code touching the variable.  */
-	  if (matching_objfiles (block_objfile (block), objfile))
-	    return 1;
+	case BINOP_VAL:
+	case OP_COMPLEX:
+	case OP_DECFLOAT:
+	case OP_DOUBLE:
+	case OP_LONG:
+	case OP_SCOPE:
+	case OP_TYPE:
+	case UNOP_CAST:
+	case UNOP_MAX:
+	case UNOP_MEMVAL:
+	case UNOP_MIN:
+	  gdb_assert (elts[i].opcode < OP_EXTENDED0);
+	  type = elts[i + 1].type;
+	  break;
 
-	  /* Check objfile where the variable itself is placed.  */
-	  if (section && section->objfile == objfile)
-	    return 1;
+	case UNOP_MEMVAL_TLS:
+	  gdb_assert (elts[i].opcode < OP_EXTENDED0);
+	  objfile = elts[i + 1].objfile;
+	  type = elts[i + 2].type;
+	  break;
+
+	case OP_VAR_VALUE:
+	  {
+	    const struct block *const block = elts[i + 1].block;
+	    const struct symbol *const symbol = elts[i + 2].symbol;
+	    const struct obj_section *const section =
+	      SYMBOL_OBJ_SECTION (symbol);
+
+	    /* Check objfile where the variable itself is placed.  */
+	    if (section && objfile_func
+		&& (*objfile_func) (section->objfile, data))
+	      return 1;
+
+	    /* Check objfile where is placed the code touching the variable.  */
+	    objfile = block_objfile (block);
+
+	    type = SYMBOL_TYPE (symbol);
+	  }
+	  break;
 	}
       endpos -= oplen;
+
+      /* Invoke callbacks for TYPE and OBJFILE if they were set as non-NULL.  */
+
+      if (type && type_func && (*type_func) (type, data))
+	return 1;
+      if (type && TYPE_OBJFILE (type) && objfile_func
+          && (*objfile_func) (TYPE_OBJFILE (type), data))
+	return 1;
+      if (objfile && objfile_func && (*objfile_func) (objfile, data))
+	return 1;
     }
 
   return 0;
+}
+
+/* Helper for exp_uses_objfile.  */
+
+static int
+exp_uses_objfile_iter (struct objfile *exp_objfile, void *objfile_voidp)
+{
+  struct objfile *objfile = objfile_voidp;
+
+  return matching_objfiles (exp_objfile, objfile);
+}
+
+/* Return 1 if EXP uses OBJFILE (and will become dangling when OBJFILE
+   is unloaded), otherwise return 0.  */
+
+int
+exp_uses_objfile (struct expression *exp, struct objfile *objfile)
+{
+  return exp_iterate (exp, NULL, exp_uses_objfile_iter, objfile);
+}
+
+/* Helper for exp_types_mark_used.  */
+
+static int
+exp_types_mark_used_iter (struct type *type, void *unused)
+{
+  type_mark_used (type);
+
+  return 0;
+}
+
+/* Call type_mark_used for any TYPE contained in EXP.  */
+
+void
+exp_types_mark_used (struct expression *exp)
+{
+  exp_iterate (exp, exp_types_mark_used_iter, NULL, NULL);
 }
 
 void

@@ -1359,6 +1359,22 @@ x_command (char *exp, int from_tty)
 	set_internalvar (lookup_internalvar ("__"), last_examine_value);
     }
 }
+
+/* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
+
+void
+print_types_mark_used (void)
+{
+  struct display *d;
+
+  if (last_examine_value)
+    type_mark_used (value_type (last_examine_value));
+
+  for (d = display_chain; d; d = d->next)
+    if (d->exp)
+      exp_types_mark_used (d->exp);
+}
+
 
 
 /* Add an expression to the auto-display chain.
