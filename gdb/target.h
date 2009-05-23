@@ -153,6 +153,13 @@ struct target_waitstatus
     value;
   };
 
+/* Options that can be passed to target_wait.  */
+
+/* Return immediately if there's no event already queued.  If this
+   options is not requested, target_wait blocks waiting for an
+   event.  */
+#define TARGET_WNOHANG 1
+
 /* Return a pretty printed form of target_waitstatus.
    Space for the result is malloc'd, caller must free.  */
 extern char *target_waitstatus_to_string (const struct target_waitstatus *);
@@ -327,7 +334,7 @@ struct target_ops
     void (*to_disconnect) (struct target_ops *, char *, int);
     void (*to_resume) (struct target_ops *, ptid_t, int, enum target_signal);
     ptid_t (*to_wait) (struct target_ops *,
-		      ptid_t, struct target_waitstatus *);
+		       ptid_t, struct target_waitstatus *, int);
     void (*to_fetch_registers) (struct target_ops *, struct regcache *, int);
     void (*to_store_registers) (struct target_ops *, struct regcache *, int);
     void (*to_prepare_to_store) (struct regcache *);
@@ -413,9 +420,9 @@ struct target_ops
     int to_has_execution;
     int to_has_thread_control;	/* control thread execution */
     int to_attach_no_wait;
-    struct section_table
+    struct target_section
      *to_sections;
-    struct section_table
+    struct target_section
      *to_sections_end;
     /* ASYNC target controls */
     int (*to_can_async_p) (void);
@@ -621,9 +628,11 @@ extern void target_resume (ptid_t ptid, int step, enum target_signal signal);
    _NOT_ OK to throw_exception() out of target_wait() without popping
    the debugging target from the stack; GDB isn't prepared to get back
    to the prompt with a debugging target but without the frame cache,
-   stop_pc, etc., set up.  */
+   stop_pc, etc., set up.  OPTIONS is a bitwise OR of TARGET_W*
+   options.  */
 
-extern ptid_t target_wait (ptid_t ptid, struct target_waitstatus *status);
+extern ptid_t target_wait (ptid_t ptid, struct target_waitstatus *status,
+			   int options);
 
 /* Fetch at least register REGNO, or all regs if regno == -1.  No result.  */
 
@@ -754,8 +763,7 @@ extern void print_section_info (struct target_ops *, bfd *);
 /* Put the inferior's terminal settings into effect.
    This is preparation for starting or resuming the inferior.  */
 
-#define target_terminal_inferior() \
-     (*current_target.to_terminal_inferior) ()
+extern void target_terminal_inferior (void);
 
 /* Put some of our terminal settings into effect,
    enough to get proper results from our output,
@@ -1186,11 +1194,11 @@ void target_mark_running (struct target_ops *);
 
 void target_mark_exited (struct target_ops *);
 
-/* Struct section_table maps address ranges to file sections.  It is
+/* Struct target_section maps address ranges to file sections.  It is
    mostly used with BFD files, but can be used without (e.g. for handling
    raw disks, or files not in formats handled by BFD).  */
 
-struct section_table
+struct target_section
   {
     CORE_ADDR addr;		/* Lowest address in section */
     CORE_ADDR endaddr;		/* 1+highest address in section */
@@ -1201,9 +1209,8 @@ struct section_table
   };
 
 /* Return the "section" containing the specified address.  */
-struct section_table *target_section_by_addr (struct target_ops *target,
-					      CORE_ADDR addr);
-
+struct target_section *target_section_by_addr (struct target_ops *target,
+					       CORE_ADDR addr);
 
 /* From mem-break.c */
 

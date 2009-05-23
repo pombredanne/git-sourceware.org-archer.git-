@@ -463,7 +463,6 @@ varobj_create (char *objname,
       char *p;
       enum varobj_languages lang;
       struct value *value = NULL;
-      int expr_len;
 
       /* Parse and evaluate the expression, filling in as much of the
          variable's data as possible.  */
@@ -514,10 +513,9 @@ varobj_create (char *objname,
 
       var->format = variable_default_display (var);
       var->root->valid_block = innermost_block;
-      expr_len = strlen (expression);
-      var->name = savestring (expression, expr_len);
+      var->name = xstrdup (expression);
       /* For a root var, the name and the expr are the same.  */
-      var->path_expr = savestring (expression, expr_len);
+      var->path_expr = xstrdup (expression);
 
       /* When the frame is different from the current frame, 
          we must select the appropriate frame before parsing
@@ -563,7 +561,7 @@ varobj_create (char *objname,
 
   if ((var != NULL) && (objname != NULL))
     {
-      var->obj_name = savestring (objname, strlen (objname));
+      var->obj_name = xstrdup (objname);
 
       /* If a varobj name is duplicated, the install will fail so
          we must clenup */
@@ -593,8 +591,8 @@ varobj_gen_name (void)
   return obj_name;
 }
 
-/* Given an "objname", returns the pointer to the corresponding varobj
-   or NULL if not found */
+/* Given an OBJNAME, returns the pointer to the corresponding varobj.  Call
+   error if OBJNAME cannot be found.  */
 
 struct varobj *
 varobj_get_handle (char *objname)
@@ -1767,8 +1765,7 @@ value_of_root (struct varobj **var_handle, int *type_changed)
 	}
       else
 	{
-	  tmp_var->obj_name =
-	    savestring (var->obj_name, strlen (var->obj_name));
+	  tmp_var->obj_name = xstrdup (var->obj_name);
 	  varobj_delete (var, NULL, 0);
 
 	  install_variable (tmp_var);
@@ -2017,7 +2014,7 @@ c_number_of_children (struct varobj *var)
 static char *
 c_name_of_variable (struct varobj *parent)
 {
-  return savestring (parent->name, strlen (parent->name));
+  return xstrdup (parent->name);
 }
 
 /* Return the value of element TYPE_INDEX of a structure
@@ -2116,10 +2113,7 @@ c_describe_child (struct varobj *parent, int index,
     case TYPE_CODE_STRUCT:
     case TYPE_CODE_UNION:
       if (cname)
-	{
-	  char *string = TYPE_FIELD_NAME (type, index);
-	  *cname = savestring (string, strlen (string));
-	}
+	*cname = xstrdup (TYPE_FIELD_NAME (type, index));
 
       if (cvalue && value)
 	{

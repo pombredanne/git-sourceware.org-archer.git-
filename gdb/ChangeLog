@@ -1,3 +1,219 @@
+2009-05-23  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Replace the savestring calls by xstrdup calls where possible.
+	* breakpoint.c (condition_command, set_raw_breakpoint)
+	(create_catchpoint, update_breakpoint_locations): Replace the
+	savestring calls by xstrdup calls where possible.
+	* buildsym.c (start_subfile, patch_subfile_names, record_debugformat)
+	(record_producer): Likewise.
+	* coffread.c (coff_start_symtab, complete_symtab): Likewise.
+	* corefile.c (set_gnutarget): Likewise.
+	* dbxread.c (add_new_header_file): Likewise.
+	* demangle.c (set_demangling_command, set_demangling_style): Likewise.
+	* event-top.c (push_prompt, pop_prompt, command_line_handler)
+	(set_async_prompt): Likewise.
+	* infcmd.c (set_inferior_io_terminal, attach_command_post_wait):
+	Likewise.
+	* language.c (set_language_command, _initialize_language): Likewise.
+	* linespec.c (decode_line_2): Likewise.
+	* rs6000-nat.c (add_vmap): Likewise.
+	* top.c (set_prompt, init_history, init_main): Likewise.
+	* tracepoint.c (stringify_collection_list): Likewise.
+	* varobj.c (varobj_create): Remove variable expr_len.  Replace the 
+	savestring calls by xstrdup calls where possible.
+	(value_of_root, c_name_of_variable, c_describe_child): Replace the
+	savestring calls by xstrdup calls where possible.
+	* xcoffread.c (complete_symtab): Likewise.
+	* cli/cli-script.c (build_command_line, define_command): Likewise.
+	* cli/cli-setshow.c (do_setshow_command): Likewise.
+
+2009-05-23  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Remove already unreachable code.
+	* varobj.c (varobj_get_handle): Fix comment when error is called.
+	All callers updated.
+
+2009-05-23  Eli Zaretskii  <eliz@gnu.org>
+
+	* README (`configure' options): Document GDB-specific options to
+	`configure'.
+
+	* symtab.c (skip_prologue_using_lineinfo): New function.
+	(find_function_start_sal): Use it to get to the first line of
+	function's body that has an entry in the lineinfo table.
+
+	* symmisc.c (dump_symtab): Switch the current language to
+	the language of the symtab we are dumping only if the symtab's
+	language is neither language_auto nor language_unknown.
+
+	* coffread.c (coff_symtab_read): Set language_minimal as the
+	language for the "_globals_" pseudo-file.
+	(process_coff_symbol): Set the symbol's language to the language
+	of current_subfile.
+
+2009-05-22  Pedro Alves  <pedro@codesourcery.com>
+
+	* target.h (struct section_table): Rename to ...
+	(struct target_section): ... this.
+	* exec.c: Adjust all references.
+	* exec.h: Adjust all references.
+	* nto-tdep.c: Adjust all references.
+	* nto-tdep.h: Adjust all references.
+	* ppc-linux-tdep.c: Adjust all references.
+	* rs6000-nat.c: Adjust all references.
+	* s390-tdep.c: Adjust all references.
+	* solib-darwin.c: Adjust all references.
+	* solib-frv.c: Adjust all references.
+	* solib-irix.c: Adjust all references.
+	* solib-null.c: Adjust all references.
+	* solib-osf.c: Adjust all references.
+	* solib-pa64.c: Adjust all references.
+	* solib-som.c: Adjust all references.
+	* solib-sunos.c: Adjust all references.
+	* solib-svr4.c: Adjust all references.
+	* solib-target.c: Adjust all references.
+	* solib.c: Adjust all references.
+	* solist.h: Adjust all references.
+	* symfile.c: Adjust all references.
+	* symfile.h: Adjust all references.
+	* target.c: Adjust all references.
+
+2009-05-22  Hui Zhu  <teawater@gmail.com>
+
+	Add sys_fcntl argument interfaces to linux_record_tdep.
+
+	* linux-record.h (linux_record_tdep): Add fcntl_F_GETLK,
+	fcntl_F_GETLK64, fcntl_F_SETLK64 and fcntl_F_SETLKW64 to be
+	interfaces.
+	* i386-linux-tdep.c (I386_LINUX_RECORD_FCNTL_F_GETLK,
+	I386_LINUX_RECORD_FCNTL_F_GETLK64,
+	I386_LINUX_RECORD_FCNTL_F_SETLK64,
+	I386_LINUX_RECORD_FCNTL_F_SETLKW64): New macros. The values
+	of I386 Linux sys_fcntl arguments.
+	(i386_linux_init_abi): Set macros values to linux_record_tdep.
+	* linux-record.c (record_linux_system_call): Change to use
+	the interface in linux_record_tdep in sys_fcntl and
+	sys_fcntl64.
+
+	* linux-record.c (record_linux_system_call): Fix the process
+	record build error about type in CYGWIN.
+
+2009-05-22  Pedro Alves  <pedro@codesourcery.com>
+
+	* inflow.c (kill_command): Delete left over static declaration.
+
+2009-05-22  Pedro Alves  <pedro@codesourcery.com>
+
+	* bfd-target.c: Don't include gdb_assert.h or gdb_string.h.
+	Include exec.h.
+	(struct section_closure): Delete.
+	(add_to_section_table): Delete.
+	(build_target_sections_from_bfd): Delete.
+	(target_bfd_xfer_partial): Use section_table_xfer_memory_partial.
+	(target_bfd_reopen): Use build_section_table.
+	* exec.c (xfer_memory): Move most code except for overlay
+	debugging support from here...
+	(section_table_xfer_memory): ... to this new function.
+	(section_table_xfer_memory_partial): New.
+	* exec.h (section_table_xfer_memory_partial): Declare.
+	* bfd-target.h (build_target_sections_from_bfd): Delete
+	declaration.
+
+2009-05-22  Pedro Alves  <pedro@codesourcery.com>
+
+	* remote.c (compare_sections_command): Don't declare exec_bfd.
+	* tracepoint.c: Include "gdbcore.h".
+	(remote_set_transparent_ranges): Don't declare exec_bfd.
+
+2009-05-21  Pedro Alves  <pedro@codesourcery.com>
+
+	* aix-thread.c (init_aix_thread_ops): Whitespace.
+
+2009-05-21  Pedro Alves  <pedro@codesourcery.com>
+
+	* dec-thread.c (dec_thread_wait): Add options parameter.  Use it
+	to call the to_wait method in the target beneath.
+	* remote-m32r-sdi.c (m32r_wait): Add options parameter.
+
+2009-05-21  Joel Brobecker  <brobecker@adacore.com>
+
+	* aix-thread.c (aix_thread_wait): Add options parameter.  Use it
+	to call the to_wait method in the target_beneath.
+
+2009-05-21  Pedro Alves  <pedro@codesourcery.com>
+
+	* linux-nat.c (linux_nat_terminal_inferior)
+	(linux_nat_terminal_ours): Don't check sync_execution.
+	* remote.c (remote_terminal_inferior, remote_terminal_ours):
+	Don't check sync_execution.  Update comments.
+	* target.c (target_terminal_inferior): New.
+	* target.h (target_terminal_inferior): Delete macro, and declare
+	as function.
+	* event-top.c (async_disable_stdin): Make idempotent.  Don't give
+	the target the terminal here.
+	* inflow.c (terminal_ours_1): Don't return early without setting
+	`terminal_is_ours'.
+
+2009-05-21  Pedro Alves  <pedro@codesourcery.com>
+
+	* target.h (TARGET_WNOHANG): New.
+	* target.c (target_wait): Add `options' argument.  Adjust.
+	(struct target_ops) <to_wait>: Add `options' argument.
+	(target_wait): Add `options' argument.
+	* infrun.c (wait_for_inferior): Pass 0 as options to
+	target_wait (blocking wait).
+	(fetch_inferior_event): Pass TARGET_WNOHANG as options to
+	target_wait.
+	* fork-child.c (startup_inferior): Pass 0 as options to
+	target_wait (blocking wait).
+	* linux-nat.c (linux_nat_create_inferior): Remove async masking.
+	(linux_nat_wait_1): Add `target_options' argument.  Use it instead
+	of checking on target_can_async_p.
+	(linux_nat_wait): Add `target_options' argument.  Adjust.
+	* remote.c (remote_wait_ns): Add `options' argument.  Adjust to
+	check on TARGET_WNOWAIT instead of checking on remote_is_async_p.
+	(remote_wait_as): Add `options' argument.  Adjust to check on
+	TARGET_WNOWAIT instead of checking on remote_is_async_p.  If doing
+	a blocking wait, keep waiting until an interesting event comes
+	out.
+	(remote_wait): Add `options' argument.  Don't loop here if the
+	target is in async mode, and a blocking wait has been requested.
+
+	* top.c (deprecated_target_wait_hook): Add `options' argument.
+	* linux-thread-db.c (thread_db_wait): Add `options' argument, and
+	pass it down to the layer beneath.
+	* inf-ptrace.c (inf_ptrace_wait): Add `options' argument.
+	* record.c (record_beneath_to_wait): Add `options' argument.
+	(record_wait): Add `options' argument, and pass it down to the
+	layer beneath.
+	* bsd-uthread.c (bsd_uthread_wait): Add `options' argument.
+	* darwin-nat.c (darwin_wait): Likewise.
+	* defs.h (deprecated_target_wait_hook): Likewise.
+	* gnu-nat.c (gnu_wait): Add `options' argument.
+	* go32-nat.c (go32_wait): Likewise.
+	* hpux-thread.c (hpux_thread_wait): Add `options' argument, and
+	pass it down to the layer beneath.
+	* inf-ttrace.c (inf_ttrace_wait): Add `options' argument.
+	* monitor.c (monitor_wait): Likewise.
+	* nto-procfs.c (procfs_wait): Likewise.
+	* remote-mips.c (mips_wait): Add `options' argument.
+	* remote-sim.c (gdbsim_wait): Likewise.
+	* rs6000-nat.c (rs6000_wait): Add `options' argument.
+	* sol-thread.c (sol_thread_wait): Add `options' argument, and pass
+	it down to the layer beneath.
+	* spu-linux-nat.c (spu_child_wait): Add `options' argument.
+	* windows-nat.c (windows_wait): Likewise.
+	* tui/tui-hooks.c (tui_target_wait_hook): Likewise.  Adjust.
+
+2009-05-21  Pedro Alves  <pedro@codesourcery.com>
+
+	* mi/mi-interp.c (mi_on_resume): Account for whole process
+	resumes.
+
+2009-05-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* m2-exp.y (MAX_FUNC): Fix trailing UNOP_MAX.
+
 2009-05-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* dwarf2read.c (set_cu_language): Recognize also DW_LANG_C99.

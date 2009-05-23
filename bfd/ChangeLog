@@ -1,3 +1,96 @@
+2009-05-22  Julian Brown  <julian@codesourcery.com>
+
+	* elf32-arm.c (THUMB16_BCOND_INSN, THUMB32_INSN, THUMB32_B_INSN): New
+	macros.
+	(elf32_arm_stub_a8_veneer_b_cond, elf32_arm_stub_a8_veneer_b)
+	(elf32_arm_stub_a8_veneer_blx): New stub sequences.
+	(elf32_arm_stub_type): Add arm_stub_a8_veneer_b_cond,
+	arm_stub_a8_veneer_b and arm_stub_a8_veneer_blx.
+	(elf32_arm_stub_hash_entry): Add target_addend, orig_insn fields.
+	(a8_erratum_fix, a8_erratum_reloc): New structs.
+	(elf32_arm_link_hash_table): Add a8_erratum_fixes,
+	num_a8_erratum_fixes, fix_cortex_a8 fields.
+	(elf32_arm_link_hash_table_create): Zero fix_cortex_a8.
+	(elf32_arm_add_stub): Split into two parts, creating...
+	(elf32_arm_create_or_find_stub_sec): New function.
+	(elf32_arm_final_link_relocate): Add forward declaration.
+	(arm_build_one_stub): Add support for THUMB32_TYPE, Thumb-2
+	relocations, multiple relocations per stub.
+	(find_stub_size_and_template): New (using parts of arm_size_one_stub).
+	(arm_size_one_stub): Use find_stub_size_and_template.
+	(a8_reloc_compare): New.
+	(find_thumb_glue): Add forward declaration.
+	(cortex_a8_erratum_scan): New.
+	(elf32_arm_size_stubs): Add Cortex-A8 erratum workaround support.
+	(bfd_elf32_arm_set_cortex_a8_fix): New.
+	(bfd_elf32_arm_set_target_relocs): Add fix_cortex_a8 argument.
+	(arm_map_one_stub): Add THUMB32_TYPE support.
+	(a8_branch_to_stub_data): New.
+	(make_branch_to_a8_stub): New.
+	(elf32_arm_write_section): Add Cortex-A8 erratum workaround support.
+	* bfd-in.h (bfd_elf32_arm_set_cortex_a8_fix): New.
+	(bfd_elf32_arm_set_target_relocs): Add argument for controlling
+	Cortex-A8 erratum workaround.
+	* bfd-in2.h: Regenerate.
+
+2009-05-22  Alan Modra  <amodra@bigpond.net.au>
+
+	* Makefile.am: Run "make dep-am".
+	* Makefile.in: Regenerate.
+	* po/SRC-POTFILES.in: Regenerate.
+
+2009-05-21  Alan Modra  <amodra@bigpond.net.au>
+
+	* elflink.c (elf_link_input_bfd): Correct *pindex change in last
+	commit.
+
+2009-05-21  Alan Modra  <amodra@bigpond.net.au>
+
+	* elf-bfd.h (struct elf_backend_data
+	<elf_backend_link_output_symbol_hook>): Return an int.
+	* elf64-ppc.c (ppc64_elf_output_symbol_hook): Return 2 to drop
+	symbols on deleted .opd entries.
+	* elflink.c (elf_link_output_sym): Return without outputting sym
+	if output_symbol_hook returns 2.
+	(elf_link_output_extsym): Don't assign h->indx when symbol discarded.
+	Abort if we must not discard sym.
+	(elf_link_input_bfd): Similarly, don't set finfo->indices for
+	local syms.
+	(bfd_elf_final_link): Adjust elf_link_output_sym calls.
+	* elf-vxworks.c (elf_vxworks_link_output_symbol_hook): Adjust for
+	elf_backend_link_output_symbol_hook return type change.
+	* elf32-arm.c (output_arch_syminfo): Likewise.
+	(elf32_arm_output_map_sym, elf32_arm_output_stub_sym): Likewise.
+	(elf32_arm_output_arch_local_syms): Likewise.
+	* elf32-cr16c.c (elf32_cr16c_link_output_symbol_hook): Likewise.
+	* elf32-score.c (s3_bfd_score_elf_link_output_symbol_hook): Likewise.
+	(bfd_score_elf_link_output_symbol_hook): Likewise.
+	* elf32-score.h (s7_bfd_score_elf_link_output_symbol_hook): Likewise.
+	* elf32-score7.c (s7_bfd_score_elf_link_output_symbol_hook): Likewise.
+	* elf32-sh64.c (sh64_elf_link_output_symbol_hook): Likewise.
+	* elf32-spu.c (spu_elf_output_symbol_hook): Likewise.
+	* elf32-v850.c (v850_elf_link_output_symbol_hook): Likewise.
+	* elf64-hppa.c (elf64_hppa_link_output_symbol_hook): Likewise.
+	* elf64-mmix.c (mmix_elf_link_output_symbol_hook): Likewise.
+	* elf64-sh64.c (sh64_elf64_link_output_symbol_hook): Likewise.
+	* elf64-sparc.c (elf64_sparc_output_arch_syms): Likewise.
+	* elfxx-mips.c (_bfd_mips_elf_link_output_symbol_hook): Likewise.
+	* elfxx-mips.h (_bfd_mips_elf_link_output_symbol_hook): Likewise.
+
+2009-05-21  Alan Modra  <amodra@bigpond.net.au>
+
+	* elf64-ppc.c (ppc64_elf_get_synthetic_symtab): Don't segfault on
+	out of range .opd symbols.
+
+2009-05-21  Dave Korn  <dave.korn.cygwin@gmail.com>
+
+	* coffgen.c (coff_print_symbol):  Use bfd_fprintf_vma, not
+	fprintf_vma directly.
+	* peXXigen.c (pe_print_edata):  Likewise.
+	(pe_print_pdata):  Likewise.
+	(_bfd_XX_print_ce_compressed_pdata):  Likewise.
+	(_bfd_XX_print_private_bfd_data_common):  Likewise.
+
 2009-05-19  Dave Korn  <dave.korn.cygwin@gmail.com>
 
 	* cofflink.c (process_embedded_commands):  Ignore "-aligncomm".

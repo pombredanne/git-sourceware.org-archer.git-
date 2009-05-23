@@ -40,6 +40,7 @@
 #include "observer.h"
 #include "user-regs.h"
 #include "valprint.h"
+#include "gdbcore.h"
 
 #include "ax.h"
 #include "ax-gdb.h"
@@ -937,7 +938,7 @@ stringify_collection_list (struct collection_list *list, char *string)
 	  sprintf (end, "%02X", list->regs_mask[i]);
 	  end += 2;
 	}
-      (*str_list)[ndx] = savestring (temp_buf, end - temp_buf);
+      (*str_list)[ndx] = xstrdup (temp_buf);
       ndx++;
     }
   if (info_verbose)
@@ -1247,7 +1248,6 @@ static long target_buf_size;
 static void
 remote_set_transparent_ranges (void)
 {
-  extern bfd *exec_bfd;
   asection *s;
   bfd_size_type size;
   bfd_vma lma;
