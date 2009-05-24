@@ -38,9 +38,7 @@
 #include "cp-abi.h"
 #include "gdb_assert.h"
 #include "hashtab.h"
-#include "varobj.h"
-#include "breakpoint.h"
-#include "python/python.h"
+#include "observer.h"
 #include "dwarf2expr.h"
 #include "dwarf2loc.h"
 
@@ -3693,17 +3691,6 @@ type_group_link_remove (void **slot, void *unused)
   return 1;
 }
 
-/* Call type_mark_used for any TYPEs referenced by Python global variables.  */
-
-static void
-python_types_mark_used (void)
-{
-  struct value *val;
-
-  for (val = values_in_python; val != NULL; val = value_next (val))
-    type_mark_used (value_type (val));
-}
-
 /* Free all the reclaimable types that have been allocated and that have
    currently zero reference counter.
 
@@ -3721,10 +3708,7 @@ free_all_types (void)
 
   type_group_link_check ();
 
-  value_types_mark_used ();
-  varobj_types_mark_used ();
-  print_types_mark_used ();
-  python_types_mark_used ();
+  observer_notify_mark_used ();
 
   htab_traverse (type_group_link_table, type_group_link_remove, NULL);
 }

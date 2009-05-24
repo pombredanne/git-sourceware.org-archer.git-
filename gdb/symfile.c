@@ -51,7 +51,6 @@
 #include "observer.h"
 #include "exec.h"
 #include "parser-defs.h"
-#include "varobj.h"
 #include "elf-bfd.h"
 #include "solib.h"
 #include "remote.h"
@@ -929,7 +928,8 @@ new_symfile_objfile (struct objfile *objfile, int mainline, int verbo)
   /* We're done reading the symbol file; finish off complaints.  */
   clear_complaints (&symfile_complaints, 0, verbo);
 
-  varobj_revalidate ();
+  /* We have finished unloading of OBJFILE.  */
+  observer_notify_objfile_unloaded ();
 }
 
 /* Process a symbol file, as either the main file or as a dynamically
@@ -2343,8 +2343,7 @@ reread_symbols (void)
 
 	      /* Remove any references to this objfile in the global
 		 value lists.  */
-	      preserve_values (objfile);
-	      varobj_invalidate (objfile);
+	      observer_notify_objfile_unloading (objfile);
 
 	      /* Nuke all the state that we will re-read.  Much of the following
 	         code which sets things to NULL really is necessary to tell
@@ -2441,7 +2440,9 @@ reread_symbols (void)
 	         frameless.  */
 
 	      reinit_frame_cache ();
-	      varobj_revalidate ();
+
+	      /* We have finished reloading of OBJFILE.  */
+	      observer_notify_objfile_unloaded ();
 
 	      /* Discard cleanups as symbol reading was successful.  */
 	      discard_cleanups (old_cleanups);

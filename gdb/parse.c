@@ -1460,7 +1460,7 @@ exp_uses_objfile_iter (struct objfile *exp_objfile, void *objfile_voidp)
 {
   struct objfile *objfile = objfile_voidp;
 
-  return matching_objfiles (exp_objfile, objfile);
+  return exp_objfile == objfile;
 }
 
 /* Return 1 if EXP uses OBJFILE (and will become dangling when OBJFILE
@@ -1479,6 +1479,7 @@ exp_types_mark_used_iter (struct type *type, void *unused)
 {
   type_mark_used (type);
 
+  /* Continue the traversal.  */
   return 0;
 }
 

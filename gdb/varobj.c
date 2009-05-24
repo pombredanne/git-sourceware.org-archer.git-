@@ -36,6 +36,7 @@
 #include "vec.h"
 #include "gdbthread.h"
 #include "inferior.h"
+#include "observer.h"
 
 /* Non-zero if we want to see trace of varobj level stuff.  */
 
@@ -2760,7 +2761,7 @@ varobj_types_mark_used_iter (struct varobj *var, void *unused)
 
 /* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
 
-void
+static void
 varobj_types_mark_used (void)
 {
   /* Check all the VAROBJs, even non-root ones.  Child VAROBJs can reference
@@ -2770,27 +2771,13 @@ varobj_types_mark_used (void)
 
   all_varobjs (varobj_types_mark_used_iter, NULL);
 }
-
-extern void _initialize_varobj (void);
-void
-_initialize_varobj (void)
-{
-  int sizeof_table = sizeof (struct vlist *) * VAROBJ_TABLE_SIZE;
 
-  varobj_table = xmalloc (sizeof_table);
-  memset (varobj_table, 0, sizeof_table);
+/* Invalidate VAR if it is tied to the specified OBJFILE.  Call this function
+   before you start removing OBJFILE.
 
-  add_setshow_zinteger_cmd ("debugvarobj", class_maintenance,
-			    &varobjdebug, _("\
-Set varobj debugging."), _("\
-Show varobj debugging."), _("\
-When non-zero, varobj debugging is enabled."),
-			    NULL,
-			    show_varobjdebug,
-			    &setlist, &showlist);
-}
+   Call varobj_revalidate_iter after the OBJFILE update get finished.
 
-/* Helper for varobj_invalidate.  */
+   Invalidated varobjs will be always printed in_scope="invalid".  */
 
 static void
 varobj_invalidate_iter (struct varobj *var, void *objfile_voidp)
@@ -2805,8 +2792,7 @@ varobj_invalidate_iter (struct varobj *var, void *objfile_voidp)
 	 during varobj_update by varobj_get_type.  */
 
       if (var->root->is_valid
-	  && matching_objfiles (block_objfile (var->root->valid_block),
-				objfile))
+	  && block_objfile (var->root->valid_block) == objfile)
 	var->root->is_valid = 0;
 
       if (var->root->exp && exp_uses_objfile (var->root->exp, objfile))
@@ -2835,24 +2821,8 @@ varobj_invalidate_iter (struct varobj *var, void *objfile_voidp)
     }
 }
 
-/* Invalidate the varobjs that are tied to the specified OBJFILE.  Call this
-   function before you start removing OBJFILE.
-
-   Call varobj_revalidate after the OBJFILEs updates get finished.
-
-   Invalidated varobjs will be always printed in_scope="invalid".  */
-
-void 
-varobj_invalidate (struct objfile *objfile)
-{
-  /* Check all the VAROBJs, even non-root ones.  Child VAROBJs can reference
-     types from other OBJFILEs through TYPE_IS_OPAQUE resolutions by
-     check_typedef.  */
-
-  all_varobjs (varobj_invalidate_iter, objfile);
-}
-
-/* Helper for varobj_revalidate.  */
+/* Recreate any global varobjs possibly previously invalidated.  If the
+   expressions are no longer evaluatable set/keep the VAR invalid.  */
 
 static void
 varobj_revalidate_iter (struct varobj *var, void *unused)
@@ -2877,11 +2847,61 @@ varobj_revalidate_iter (struct varobj *var, void *unused)
     }
 }
 
-/* Recreate any global varobjs possibly previously invalidated.  If the
-   expressions are no longer evaluatable set/keep the varobj invalid.  */
+/* Call varobj_invalidate_iter for all the VAROBJs.  */
 
-void 
+static void 
+varobj_invalidate (struct objfile *objfile)
+{
+  /* Check all the VAROBJs, even non-root ones.  Child VAROBJs can reference
+     types from other OBJFILEs through TYPE_IS_OPAQUE resolutions by
+     check_typedef.  */
+
+  all_varobjs (varobj_invalidate_iter, objfile);
+}
+
+/* Call varobj_revalidate_iter for all the root VAROBJs.  */
+
+static void 
 varobj_revalidate (void)
 {
+  /* Check only root VAROBJs.  Any successful revalidation will replace the
+     whole VAROBJs tree starting with root VAROBJs and its children get created
+     later on-demand.  So there is no point trying to revalidate the child
+     VAROBJs.  */
+
   all_root_varobjs (varobj_revalidate_iter, NULL);
+}
+
+/* Call varobj_revalidate just providing a different function prototype.
+   Currently existing VAROBJs may become valid or change with new symbols
+   loaded.  */
+
+static void
+varobj_revalidate_for_objfile (struct objfile *objfile)
+{
+  varobj_revalidate ();
+}
+
+extern void _initialize_varobj (void);
+void
+_initialize_varobj (void)
+{
+  int sizeof_table = sizeof (struct vlist *) * VAROBJ_TABLE_SIZE;
+
+  varobj_table = xmalloc (sizeof_table);
+  memset (varobj_table, 0, sizeof_table);
+
+  add_setshow_zinteger_cmd ("debugvarobj", class_maintenance,
+			    &varobjdebug, _("\
+Set varobj debugging."), _("\
+Show varobj debugging."), _("\
+When non-zero, varobj debugging is enabled."),
+			    NULL,
+			    show_varobjdebug,
+			    &setlist, &showlist);
+
+  observer_attach_objfile_unloading (varobj_invalidate );
+  observer_attach_objfile_unloaded (varobj_revalidate);
+  observer_attach_new_objfile (varobj_revalidate_for_objfile);
+  observer_attach_mark_used (varobj_types_mark_used);
 }

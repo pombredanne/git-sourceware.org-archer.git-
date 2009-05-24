@@ -25,6 +25,7 @@
 #include "language.h"
 #include "dfp.h"
 #include "valprint.h"
+#include "observer.h"
 
 /* List of all values which are currently exposed to Python. It is
    maintained so that when an objfile is discarded, preserve_values
@@ -843,6 +844,17 @@ gdbpy_history (PyObject *self, PyObject *args)
   return value_to_value_object (res_val);
 }
 
+/* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
+
+static void
+python_types_mark_used (void)
+{
+  struct value *val;
+
+  for (val = values_in_python; val != NULL; val = value_next (val))
+    type_mark_used (value_type (val));
+}
+
 void
 gdbpy_initialize_values (void)
 {
@@ -853,6 +865,8 @@ gdbpy_initialize_values (void)
   PyModule_AddObject (gdb_module, "Value", (PyObject *) &value_object_type);
 
   values_in_python = NULL;
+
+  observer_attach_mark_used (python_types_mark_used);
 }
 
 static PyGetSetDef value_object_getset[] = {

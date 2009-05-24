@@ -1367,7 +1367,7 @@ x_command (char *exp, int from_tty)
 
 /* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
 
-void
+static void
 print_types_mark_used (void)
 {
   struct display *d;
@@ -1780,21 +1780,6 @@ disable_display_command (char *args, int from_tty)
       }
 }
 
-/* Return 1 if D uses OBJFILE (and will become dangling when OBJFILE
-   is unloaded), otherwise return 0.  */
-
-static int
-display_uses_objfile (const struct display *d, struct objfile *objfile)
-{
-  if (matching_objfiles (block_objfile (d->block), objfile))
-    return 1;
-
-  if (exp_uses_objfile (d->exp, objfile))
-    return 1;
-
-  return 0;
-}
-
 /* display_chain items point to blocks and expressions.  Some expressions in
    turn may point to symbols.
    Both symbols and blocks are obstack_alloc'd on objfile_stack, and are
@@ -1804,20 +1789,18 @@ display_uses_objfile (const struct display *d, struct objfile *objfile)
    an item by re-parsing .exp_string field in the new execution context.  */
 
 static void
-clear_dangling_display_expressions (struct so_list *solib)
+clear_dangling_display_expressions (struct objfile *objfile)
 {
   struct display *d;
-  struct objfile *objfile = NULL;
 
-  for (d = display_chain; d; d = d->next)
-    {
-      if (d->exp && display_uses_objfile (d, solib->objfile))
-	{
-	  xfree (d->exp);
-	  d->exp = NULL;
-	  d->block = NULL;
-	}
-    }
+  for (d = display_chain; d != NULL; d = d->next)
+    if (block_objfile (d->block) == objfile
+	|| (d->exp && exp_uses_objfile (d->exp, objfile)))
+      {
+	xfree (d->exp);
+	d->exp = NULL;
+	d->block = NULL;
+      }
 }
 
 
@@ -2535,7 +2518,7 @@ _initialize_printcmd (void)
 
   current_display_number = -1;
 
-  observer_attach_solib_unloaded (clear_dangling_display_expressions);
+  observer_attach_objfile_unloading (clear_dangling_display_expressions);
 
   add_info ("address", address_info,
 	    _("Describe where symbol SYM is stored."));
@@ -2702,4 +2685,5 @@ Show printing of source filename and line number with <symbol>."), NULL,
   examine_w_type = init_type (TYPE_CODE_INT, 4, 0, "examine_w_type", NULL);
   examine_g_type = init_type (TYPE_CODE_INT, 8, 0, "examine_g_type", NULL);
 
+  observer_attach_mark_used (print_types_mark_used);
 }

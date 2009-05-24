@@ -136,14 +136,8 @@ extern VEC(varobj_update_result) *varobj_update (struct varobj **varp,
 extern void all_root_varobjs (void (*func) (struct varobj *var, void *data),
 			      void *data);
 
-extern void varobj_invalidate (struct objfile *objfile);
-
-extern void varobj_revalidate (void);
-
 extern int varobj_editable_p (struct varobj *var);
 
 extern int varobj_floating_p (struct varobj *var);
-
-extern void varobj_types_mark_used (void);
 
 #endif /* VAROBJ_H */
