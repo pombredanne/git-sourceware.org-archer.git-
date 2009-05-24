@@ -8551,8 +8551,8 @@ all_tracepoints ()
 
 /* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
 
-void
-brekpoint_types_mark_used (void)
+static void
+breakpoint_types_mark_used (void)
 {
   struct breakpoint *b;
 
@@ -9070,4 +9070,5 @@ inferior in all-stop mode, gdb behaves as if always-inserted mode is off."),
   automatic_hardware_breakpoints = 1;
 
   observer_attach_about_to_proceed (breakpoint_about_to_proceed);
+  observer_attach_mark_used (breakpoint_types_mark_used);
 }
