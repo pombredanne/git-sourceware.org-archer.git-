@@ -1781,7 +1781,7 @@ disable_display_command (char *args, int from_tty)
 static int
 display_uses_objfile (const struct display *d, struct objfile *objfile)
 {
-  if (matching_objfiles (block_objfile (d->block), objfile))
+  if (block_objfile (d->block) == objfile)
     return 1;
 
   if (exp_uses_objfile (d->exp, objfile))

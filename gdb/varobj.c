@@ -2805,8 +2805,7 @@ varobj_invalidate_iter (struct varobj *var, void *objfile_voidp)
 	 during varobj_update by varobj_get_type.  */
 
       if (var->root->is_valid
-	  && matching_objfiles (block_objfile (var->root->valid_block),
-				objfile))
+	  && block_objfile (var->root->valid_block) == objfile)
 	var->root->is_valid = 0;
 
       if (var->root->exp && exp_uses_objfile (var->root->exp, objfile))
