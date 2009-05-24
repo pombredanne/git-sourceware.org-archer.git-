@@ -50,7 +50,7 @@
 #include "addrmap.h"
 #include "arch-utils.h"
 #include "exec.h"
-#include "varobj.h"
+#include "observer.h"
 
 /* Prototypes for local functions */
 
@@ -407,10 +407,8 @@ free_objfile (struct objfile *objfile)
       objfile->separate_debug_objfile_backlink->separate_debug_objfile = NULL;
     }
   
-  /* Remove any references to this objfile in the global value
-     lists.  */
-  preserve_values (objfile);
-  varobj_invalidate (objfile);
+  /* Remove any references to this objfile in the global value lists.  */
+  observer_notify_objfile_unloading (objfile);
 
   /* First do any symbol file specific actions required when we are
      finished with a particular symbol file.  Note that if the objfile

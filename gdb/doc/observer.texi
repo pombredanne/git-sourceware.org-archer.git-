@@ -130,6 +130,15 @@ Called with @var{objfile} equal to @code{NULL} to indicate
 previously loaded symbol table data has now been invalidated.
 @end deftypefun
 
+@deftypefun void objfile_unloading (struct objfile *@var{objfile})
+The file specified by @var{objfile} is going to be removed from @value{GDBN}.
+@end deftypefun
+
+@deftypefun void objfile_unloaded (void)
+Removal of @var{objfile} started by @code{objfile_unloading} finished and
+@var{objfile} is no longer known to @value{GDBN}.
+@end deftypefun
+
 @deftypefun void new_thread (struct thread_info *@var{t})
 The thread specified by @var{t} has been created.
 @end deftypefun

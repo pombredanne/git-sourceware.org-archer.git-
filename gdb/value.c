@@ -38,6 +38,7 @@
 #include "objfiles.h"
 #include "valprint.h"
 #include "cli/cli-decode.h"
+#include "observer.h"
 
 #include "python/python.h"
 
@@ -1221,7 +1222,7 @@ preserve_one_value (struct value *value, struct objfile *objfile,
    this objfile's types, and the convenience variables will be adjusted to
    use the new global types.  */
 
-void
+static void
 preserve_values (struct objfile *objfile)
 {
   htab_t copied_types;
@@ -2095,4 +2096,6 @@ Placeholder command for showing help on convenience functions."),
   TYPE_NAME (internal_fn_type) = "<internal function>";
 
   make_final_cleanup (value_history_cleanup, NULL);
+
+  observer_attach_objfile_unloading (preserve_values);
 }
