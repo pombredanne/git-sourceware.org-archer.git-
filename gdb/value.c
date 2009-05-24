@@ -1143,7 +1143,7 @@ call_internal_function (struct value *func, int argc, struct value **argv)
 
 /* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
 
-void
+static void
 value_types_mark_used (void)
 {
   struct internalvar *var;
@@ -2098,4 +2098,5 @@ Placeholder command for showing help on convenience functions."),
   make_final_cleanup (value_history_cleanup, NULL);
 
   observer_attach_objfile_unloading (preserve_values);
+  observer_attach_mark_used (value_types_mark_used);
 }

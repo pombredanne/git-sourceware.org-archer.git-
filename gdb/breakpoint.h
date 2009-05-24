@@ -816,8 +816,6 @@ extern void disable_display (int);
 
 extern void clear_displays (void);
 
-extern void print_types_mark_used (void);
-
 extern void disable_breakpoint (struct breakpoint *);
 
 extern void enable_breakpoint (struct breakpoint *);

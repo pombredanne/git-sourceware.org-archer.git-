@@ -2761,7 +2761,7 @@ varobj_types_mark_used_iter (struct varobj *var, void *unused)
 
 /* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
 
-void
+static void
 varobj_types_mark_used (void)
 {
   /* Check all the VAROBJs, even non-root ones.  Child VAROBJs can reference
@@ -2903,4 +2903,5 @@ When non-zero, varobj debugging is enabled."),
   observer_attach_objfile_unloading (varobj_invalidate );
   observer_attach_objfile_unloaded (varobj_revalidate);
   observer_attach_new_objfile (varobj_revalidate_for_objfile);
+  observer_attach_mark_used (varobj_types_mark_used);
 }

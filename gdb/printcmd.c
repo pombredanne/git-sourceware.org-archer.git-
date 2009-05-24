@@ -1362,7 +1362,7 @@ x_command (char *exp, int from_tty)
 
 /* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
 
-void
+static void
 print_types_mark_used (void)
 {
   struct display *d;
@@ -2680,4 +2680,5 @@ Show printing of source filename and line number with <symbol>."), NULL,
   examine_w_type = init_type (TYPE_CODE_INT, 4, 0, "examine_w_type", NULL);
   examine_g_type = init_type (TYPE_CODE_INT, 8, 0, "examine_g_type", NULL);
 
+  observer_attach_mark_used (print_types_mark_used);
 }
