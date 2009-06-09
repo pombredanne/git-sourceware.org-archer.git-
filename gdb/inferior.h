@@ -196,12 +196,6 @@ extern void terminal_init_inferior (void);
 
 extern void terminal_init_inferior_with_pgrp (int pgrp);
 
-/* From procfs.c */
-
-extern int proc_iterate_over_mappings (int (*)(int, CORE_ADDR));
-
-extern ptid_t procfs_first_available (void);
-
 /* From fork-child.c */
 
 extern int fork_inferior (char *, char *, char **,
@@ -490,6 +484,10 @@ extern void print_inferior (struct ui_out *uiout, int requested_inferior);
 
 /* Returns true if the inferior list is not empty.  */
 extern int have_inferiors (void);
+
+/* Returns true if there are any live inferiors in the inferior list
+   (not cores, not executables, real live processes).  */
+extern int have_live_inferiors (void);
 
 /* Return a pointer to the current inferior.  It is an error to call
    this if there is no current inferior.  */

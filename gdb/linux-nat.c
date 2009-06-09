@@ -575,19 +575,17 @@ static int
 linux_child_follow_fork (struct target_ops *ops, int follow_child)
 {
   sigset_t prev_mask;
-  ptid_t last_ptid;
-  struct target_waitstatus last_status;
   int has_vforked;
   int parent_pid, child_pid;
 
   block_child_signals (&prev_mask);
 
-  get_last_target_status (&last_ptid, &last_status);
-  has_vforked = (last_status.kind == TARGET_WAITKIND_VFORKED);
-  parent_pid = ptid_get_lwp (last_ptid);
+  has_vforked = (inferior_thread ()->pending_follow.kind
+		 == TARGET_WAITKIND_VFORKED);
+  parent_pid = ptid_get_lwp (inferior_ptid);
   if (parent_pid == 0)
-    parent_pid = ptid_get_pid (last_ptid);
-  child_pid = PIDGET (last_status.value.related_pid);
+    parent_pid = ptid_get_pid (inferior_ptid);
+  child_pid = PIDGET (inferior_thread ()->pending_follow.value.related_pid);
 
   if (! follow_child)
     {
@@ -625,7 +623,7 @@ linux_child_follow_fork (struct target_ops *ops, int follow_child)
 	  /* Add process to GDB's tables.  */
 	  child_inf = add_inferior (child_pid);
 
-	  parent_inf = find_inferior_pid (GET_PID (last_ptid));
+	  parent_inf = current_inferior ();
 	  child_inf->attach_flag = parent_inf->attach_flag;
 	  copy_terminal_info (child_inf, parent_inf);
 
@@ -692,20 +690,8 @@ linux_child_follow_fork (struct target_ops *ops, int follow_child)
     }
   else
     {
-      struct thread_info *last_tp = find_thread_pid (last_ptid);
       struct thread_info *tp;
-      char child_pid_spelling[40];
       struct inferior *parent_inf, *child_inf;
-
-      /* Copy user stepping state to the new inferior thread.  */
-      struct breakpoint *step_resume_breakpoint = last_tp->step_resume_breakpoint;
-      CORE_ADDR step_range_start = last_tp->step_range_start;
-      CORE_ADDR step_range_end = last_tp->step_range_end;
-      struct frame_id step_frame_id = last_tp->step_frame_id;
-
-      /* Otherwise, deleting the parent would get rid of this
-	 breakpoint.  */
-      last_tp->step_resume_breakpoint = NULL;
 
       /* Before detaching from the parent, remove all breakpoints from it. */
       remove_breakpoints ();
@@ -723,7 +709,7 @@ linux_child_follow_fork (struct target_ops *ops, int follow_child)
 
       child_inf = add_inferior (child_pid);
 
-      parent_inf = find_inferior_pid (GET_PID (last_ptid));
+      parent_inf = current_inferior ();
       child_inf->attach_flag = parent_inf->attach_flag;
       copy_terminal_info (child_inf, parent_inf);
 
@@ -772,15 +758,6 @@ linux_child_follow_fork (struct target_ops *ops, int follow_child)
 
       linux_nat_switch_fork (inferior_ptid);
       check_for_thread_db ();
-
-      tp = inferior_thread ();
-      tp->step_resume_breakpoint = step_resume_breakpoint;
-      tp->step_range_start = step_range_start;
-      tp->step_range_end = step_range_end;
-      tp->step_frame_id = step_frame_id;
-
-      /* Reset breakpoints in the child as appropriate.  */
-      follow_inferior_reset_breakpoints ();
     }
 
   restore_child_signals_mask (&prev_mask);
@@ -1119,7 +1096,7 @@ linux_nat_switch_fork (ptid_t new_ptid)
 static void
 exit_lwp (struct lwp_info *lp)
 {
-  struct thread_info *th = find_thread_pid (lp->ptid);
+  struct thread_info *th = find_thread_ptid (lp->ptid);
 
   if (th)
     {
@@ -1449,7 +1426,7 @@ get_pending_status (struct lwp_info *lp, int *status)
 	     have the last signal recorded in
 	     thread_info->stop_signal.  */
 
-	  struct thread_info *tp = find_thread_pid (lp->ptid);
+	  struct thread_info *tp = find_thread_ptid (lp->ptid);
 	  signo = tp->stop_signal;
 	}
 
@@ -1478,7 +1455,7 @@ GPT: lwp %s had signal %s, but it is in no pass state\n",
     {
       if (GET_LWP (lp->ptid) == GET_LWP (last_ptid))
 	{
-	  struct thread_info *tp = find_thread_pid (lp->ptid);
+	  struct thread_info *tp = find_thread_ptid (lp->ptid);
 	  if (tp->stop_signal != TARGET_SIGNAL_0
 	      && signal_pass_state (tp->stop_signal))
 	    *status = W_STOPCODE (target_signal_to_host (tp->stop_signal));
@@ -1915,6 +1892,11 @@ linux_handle_extended_wait (struct lwp_info *lp, int status,
 
   if (event == PTRACE_EVENT_EXEC)
     {
+      if (debug_linux_nat)
+	fprintf_unfiltered (gdb_stdlog,
+			    "LHEW: Got exec event from LWP %ld\n",
+			    GET_LWP (lp->ptid));
+
       ourstatus->kind = TARGET_WAITKIND_EXECD;
       ourstatus->value.execd_pathname
 	= xstrdup (linux_child_pid_to_exec_file (pid));
@@ -3308,6 +3290,12 @@ linux_nat_xfer_partial (struct target_ops *ops, enum target_object object,
     return linux_xfer_siginfo (ops, object, annex, readbuf, writebuf,
 			       offset, len);
 
+  /* The target is connected but no live inferior is selected.  Pass
+     this request down to a lower stratum (e.g., the executable
+     file).  */
+  if (object == TARGET_OBJECT_MEMORY && ptid_equal (inferior_ptid, null_ptid))
+    return 0;
+
   old_chain = save_inferior_ptid ();
 
   if (is_lwp (inferior_ptid))
@@ -4538,7 +4526,7 @@ linux_nat_stop_lwp (struct lwp_info *lwp, void *data)
 
       if (debug_linux_nat)
 	{
-	  if (find_thread_pid (lwp->ptid)->stop_requested)
+	  if (find_thread_ptid (lwp->ptid)->stop_requested)
 	    fprintf_unfiltered (gdb_stdlog, "\
 LNSL: already stopped/stop_requested %s\n",
 				target_pid_to_str (lwp->ptid));

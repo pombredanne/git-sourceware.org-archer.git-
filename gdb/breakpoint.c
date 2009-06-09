@@ -369,8 +369,7 @@ void
 set_breakpoint_count (int num)
 {
   breakpoint_count = num;
-  set_internalvar (lookup_internalvar ("bpnum"),
-		   value_from_longest (builtin_type_int32, (LONGEST) num));
+  set_internalvar_integer (lookup_internalvar ("bpnum"), num);
 }
 
 /* Used in run_command to zero the hit count when a new run starts. */
@@ -422,16 +421,15 @@ get_number_trailer (char **pp, int trailer)
          to pass to lookup_internalvar().  */
       char *varname;
       char *start = ++p;
-      struct value *val;
+      LONGEST val;
 
       while (isalnum (*p) || *p == '_')
 	p++;
       varname = (char *) alloca (p - start + 1);
       strncpy (varname, start, p - start);
       varname[p - start] = '\0';
-      val = value_of_internalvar (lookup_internalvar (varname));
-      if (TYPE_CODE (value_type (val)) == TYPE_CODE_INT)
-	retval = (int) value_as_long (val);
+      if (get_internalvar_integer (lookup_internalvar (varname), &val))
+	retval = (int) val;
       else
 	{
 	  printf_filtered (_("Convenience variable must have integer value.\n"));
@@ -993,7 +991,7 @@ update_watchpoint (struct breakpoint *b, int reparse)
 		  int len, type;
 		  struct bp_location *loc, **tmp;
 
-		  addr = VALUE_ADDRESS (v) + value_offset (v);
+		  addr = value_address (v);
 		  len = TYPE_LENGTH (value_type (v));
 		  type = hw_write;
 		  if (b->type == bp_read_watchpoint)
@@ -1289,12 +1287,10 @@ insert_breakpoints (void)
 
   update_global_location_list (1);
 
-  if (!breakpoints_always_inserted_mode ()
-      && (target_has_execution
- 	  || gdbarch_has_global_breakpoints (target_gdbarch)))
-    /* update_global_location_list does not insert breakpoints
-       when always_inserted_mode is not enabled.  Explicitly
-       insert them now.  */
+  /* update_global_location_list does not insert breakpoints when
+     always_inserted_mode is not enabled.  Explicitly insert them
+     now.  */
+  if (!breakpoints_always_inserted_mode ())
     insert_breakpoint_locations ();
 }
 
@@ -1457,10 +1453,11 @@ reattach_breakpoints (int pid)
   return 0;
 }
 
+static int internal_breakpoint_number = -1;
+
 static struct breakpoint *
 create_internal_breakpoint (CORE_ADDR address, enum bptype type)
 {
-  static int internal_breakpoint_number = -1;
   struct symtab_and_line sal;
   struct breakpoint *b;
 
@@ -5008,6 +5005,43 @@ set_momentary_breakpoint (struct symtab_and_line sal, struct frame_id frame_id,
   return b;
 }
 
+/* Make a deep copy of momentary breakpoint ORIG.  Returns NULL if
+   ORIG is NULL.  */
+
+struct breakpoint *
+clone_momentary_breakpoint (struct breakpoint *orig)
+{
+  struct breakpoint *copy;
+
+  /* If there's nothing to clone, then return nothing.  */
+  if (orig == NULL)
+    return NULL;
+
+  copy = set_raw_breakpoint_without_location (orig->type);
+  copy->loc = allocate_bp_location (copy);
+  set_breakpoint_location_function (copy->loc);
+
+  copy->loc->requested_address = orig->loc->requested_address;
+  copy->loc->address = orig->loc->address;
+  copy->loc->section = orig->loc->section;
+
+  if (orig->source_file == NULL)
+    copy->source_file = NULL;
+  else
+    copy->source_file = xstrdup (orig->source_file);
+
+  copy->line_number = orig->line_number;
+  copy->frame_id = orig->frame_id;
+  copy->thread = orig->thread;
+
+  copy->enable_state = bp_enabled;
+  copy->disposition = disp_donttouch;
+  copy->number = internal_breakpoint_number--;
+
+  update_global_location_list_nothrow (0);
+  return copy;
+}
+
 struct breakpoint *
 set_momentary_breakpoint_at_pc (CORE_ADDR pc, enum bptype type)
 {
@@ -6302,7 +6336,7 @@ can_use_hardware_watchpoint (struct value *v)
 		  || (TYPE_CODE (vtype) != TYPE_CODE_STRUCT
 		      && TYPE_CODE (vtype) != TYPE_CODE_ARRAY))
 		{
-		  CORE_ADDR vaddr = VALUE_ADDRESS (v) + value_offset (v);
+		  CORE_ADDR vaddr = value_address (v);
 		  int       len   = TYPE_LENGTH (value_type (v));
 
 		  if (!target_region_ok_for_hw_watchpoint (vaddr, len))
@@ -7197,7 +7231,7 @@ update_global_location_list (int should_insert)
     }
 
   if (breakpoints_always_inserted_mode () && should_insert
-      && (target_has_execution
+      && (have_live_inferiors ()
 	  || (gdbarch_has_global_breakpoints (target_gdbarch))))
     insert_breakpoint_locations ();
 
@@ -8238,8 +8272,7 @@ static void
 set_tracepoint_count (int num)
 {
   tracepoint_count = num;
-  set_internalvar (lookup_internalvar ("tpnum"),
-		   value_from_longest (builtin_type_int32, (LONGEST) num));
+  set_internalvar_integer (lookup_internalvar ("tpnum"), num);
 }
 
 void
@@ -8786,11 +8819,8 @@ BREAK_ARGS_HELP ("break")));
   add_com_alias ("bre", "break", class_run, 1);
   add_com_alias ("brea", "break", class_run, 1);
 
- if (xdb_commands)
-    {
-      add_com_alias ("ba", "break", class_breakpoint, 1);
-      add_com_alias ("bu", "ubreak", class_breakpoint, 1);
-    }
+  if (xdb_commands)
+   add_com_alias ("ba", "break", class_breakpoint, 1);
 
   if (dbx_commands)
     {

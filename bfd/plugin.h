@@ -1,7 +1,7 @@
-/* Native definitions for Intel x86 running CYGWIN.
-   Copyright 2002, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+/* Plugin support for BFD.
+   Copyright 2009  Free Software Foundation, Inc.
 
-   This file is part of GDB.
+   This file is part of BFD, the Binary File Descriptor library.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -14,7 +14,23 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston,
+   MA 02110-1301, USA.  */
 
-#define ADD_SHARED_SYMBOL_FILES dll_symbol_command
-void dll_symbol_command (char *, int);
+#ifndef _PLUGIN_H_
+#define _PLUGIN_H_
+
+#include "bfd.h"
+
+void bfd_plugin_set_program_name (const char *);
+void bfd_plugin_set_plugin (const char *);
+
+typedef struct plugin_data_struct
+{
+  int nsyms;
+  const struct ld_plugin_symbol *syms;
+}
+plugin_data_struct;
+
+#endif

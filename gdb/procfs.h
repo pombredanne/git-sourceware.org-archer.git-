@@ -1,4 +1,6 @@
-/* Copyright 2008, 2009 Free Software Foundation, Inc.
+/* Native debugging support for procfs targets.
+
+   Copyright (C) 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -15,5 +17,20 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#define ADD_SHARED_SYMBOL_FILES dll_symbol_command
-void dll_symbol_command (char *, int);
+struct target_ops;
+
+/* Create a prototype generic procfs target.  The client can override
+   it with local methods.  */
+
+extern struct target_ops *procfs_target (void);
+
+/* Call this in the native _initialize routine that creates and
+   customizes the prototype target returned by procfs_target, if the
+   native debug interface supports procfs watchpoints.  */
+
+extern void procfs_use_watchpoints (struct target_ops *t);
+
+/* Return a ptid for which we guarantee we will be able to find a
+   'live' procinfo.  */
+
+extern ptid_t procfs_first_available (void);

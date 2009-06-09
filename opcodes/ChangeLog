@@ -1,3 +1,62 @@
+2009-06-06  Anthony Green  <green@moxielogic.com>
+
+	* moxie-opc.c: Recode some MOXIE_F1_4 opcodes as MOXIE_F1_M.
+	* moxie-dis.c (print_insn_moxie): Handle MOXIE_F1_M case.
+
+2009-06-04  Alan Modra  <amodra@bigpond.net.au>
+
+	* dep-in.sed: Don't use \n in replacement part of s command.
+	* Makefile.am (DEP1): LC_ALL for uniq.
+	* Makefile.in: Regenerate.
+
+2009-06-02  Nick Clifton  <nickc@redhat.com>
+
+	* po/nl.po: Updated Dutch translation.
+
+2009-06-02  Tristan Gingold  <gingold@adacore.com>
+
+	* ia64-gen.c (parse_resource_users, print_dependency_table,
+	add_dis_table_ent, finish_distable, insert_bit_table_ent,
+	add_dis_entry, compact_distree, gen_dis_table, completer_entries_eq,
+	get_prefix_len, compute_completer_bits, insert_opcode_dependencies,
+	insert_completer_entry, print_completer_entry, print_completer_table,
+	opcodes_eq, add_opcode_entry, shrink): Use ISO C syntax for functions.
+
+2009-05-28  DJ Delorie  <dj@redhat.com>
+
+	* mep-asm.c: Regenerate.
+	* mep-desc.c: Regenerate.
+
+2009-05-26  DJ Delorie  <dj@redhat.com>
+
+	* mep-asm.c: Regenerate.
+	* mep-desc.c: Regenerate.
+	* mep-desc.h: Regenerate.
+	* mep-dis.c: Regenerate.
+	* mep-ibld.c: Regenerate.
+	* mep-opc.c: Regenerate.
+	* mep-opc.h: Regenerate.
+
+2009-05-26  Nick Clifton  <nickc@redhat.com>
+
+	* po/id.po: Updated Indonesian translation.
+	* po/opcodes.pot: Updated template file.
+
+2009-05-26  Alan Modra  <amodra@bigpond.net.au>
+
+	* dep-in.sed: Don't modify .o to .lo here.  Output one filename
+	per line with all lines having continuation backslash.  Prefix
+	first line with "A", following lines with "B".
+	* Makefile.am (DEP): Don't use dep.sed here.
+	(DEP1): Run $MKDEP on single files, modify .o to .lo here.  Use
+	dep.sed here on dependencies, sort and uniq.
+	* Makefile.in: Regenerate.
+
+2009-05-25  Tristan Gingold  <gingold@adacore.com>
+
+	* makefile.vms (OPT): New variable.
+	(CFLAGS): Update compilation flags.
+
 2009-05-22  DJ Delorie  <dj@redhat.com>
 
 	* mep-asm.c: Regenerate.

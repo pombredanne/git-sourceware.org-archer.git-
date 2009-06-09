@@ -1,9 +1,6 @@
-/* Definitions for native support of irix5.
+/* This testcase is part of GDB, the GNU debugger.
 
-   Copyright 1993, 1996, 1998, 1999, 2000, 2007, 2008, 2009
-   Free Software Foundation, Inc.
-
-   This file is part of GDB.
+   Copyright 2008 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -18,4 +15,16 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#define TARGET_HAS_HARDWARE_WATCHPOINTS
+template <typename T>
+struct Foo {
+};
+
+#ifndef TYPE
+#define TYPE int
+#endif
+
+int main()
+{
+  Foo<TYPE> foo;
+  return 0; // break here
+}

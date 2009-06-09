@@ -709,14 +709,14 @@ Can't resume all threads and specify proceed count simultaneously."));
       struct thread_info *tp;
 
       if (non_stop)
-	tp = find_thread_pid (inferior_ptid);
+	tp = find_thread_ptid (inferior_ptid);
       else
 	{
 	  ptid_t last_ptid;
 	  struct target_waitstatus ws;
 
 	  get_last_target_status (&last_ptid, &ws);
-	  tp = find_thread_pid (last_ptid);
+	  tp = find_thread_ptid (last_ptid);
 	}
       if (tp != NULL)
 	bs = tp->stop_bpstat;
@@ -1583,7 +1583,7 @@ program_info (char *args, int from_tty)
   else if (is_running (ptid))
     error (_("Selected thread is running."));
 
-  tp = find_thread_pid (ptid);
+  tp = find_thread_ptid (ptid);
   bs = tp->stop_bpstat;
   stat = bpstat_num (&bs, &num);
 
@@ -2052,9 +2052,9 @@ kill_command (char *arg, int from_tty)
     error (_("Not confirmed."));
   target_kill ();
 
-  /* If the current target interface claims there's still execution,
-     then don't mess with threads of other processes.  */
-  if (!target_has_execution)
+  /* If we still have other inferiors to debug, then don't mess with
+     with their threads.  */
+  if (!have_inferiors ())
     {
       init_thread_list ();		/* Destroy thread info */
 
@@ -2442,9 +2442,9 @@ detach_command (char *args, int from_tty)
   if (!gdbarch_has_global_solist (target_gdbarch))
     no_shared_libraries (NULL, from_tty);
 
-  /* If the current target interface claims there's still execution,
-     then don't mess with threads of other processes.  */
-  if (!target_has_execution)
+  /* If we still have inferiors to debug, then don't mess with their
+     threads.  */
+  if (!have_inferiors ())
     init_thread_list ();
 
   if (deprecated_detach_hook)
