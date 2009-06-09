@@ -1288,8 +1288,22 @@ value_types_mark_used (void)
   struct value_history_chunk *chunk;
 
   for (var = internalvars; var != NULL; var = var->next)
-    if (var->value)
-      type_mark_used (value_type (var->value));
+    {
+      type_mark_used (var->type);
+
+      switch (TYPE_CODE (var->type))
+	{
+	case TYPE_CODE_VOID:
+	case TYPE_CODE_INTERNAL_FUNCTION:
+	case TYPE_CODE_INT:
+	case TYPE_CODE_PTR:
+	  break;
+
+	default:
+	  type_mark_used (value_type (var->u.v));
+	  break;
+	}
+    }
 
   for (chunk = value_history_chain; chunk != NULL; chunk = chunk->next)
     {
@@ -1383,7 +1397,7 @@ preserve_values (struct objfile *objfile)
   for (var = internalvars; var; var = var->next)
     {
       if (TYPE_OBJFILE (var->type) == objfile)
-	var->type = copy_type_recursive (objfile, var->type, copied_types);
+	var->type = copy_type_recursive (var->type, copied_types);
 
       switch (TYPE_CODE (var->type))
 	{
