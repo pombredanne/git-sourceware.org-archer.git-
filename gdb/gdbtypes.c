@@ -817,9 +817,6 @@ get_discrete_bounds (struct type *type, LONGEST *lowp, LONGEST *highp)
   switch (TYPE_CODE (type))
     {
     case TYPE_CODE_RANGE:
-      if (TYPE_RANGE_UPPER_BOUND_IS_UNDEFINED (type) 
-	  || TYPE_RANGE_LOWER_BOUND_IS_UNDEFINED (type))
-	return -1;
       *lowp = TYPE_LOW_BOUND (type);
       *highp = TYPE_HIGH_BOUND (type);
       return 1;
