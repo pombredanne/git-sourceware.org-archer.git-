@@ -54,7 +54,6 @@
 #include "objfiles.h"
 #include "exceptions.h"
 #include "user-regs.h"
-#include "ada-lang.h"
 
 /* Standard set of definitions for printing, dumping, prefixifying,
  * and evaluating expressions.  */
@@ -63,6 +62,7 @@ const struct exp_descriptor exp_descriptor_standard =
   {
     print_subexp_standard,
     operator_length_standard,
+    operator_check_standard,
     op_name_standard,
     dump_subexp_body_standard,
     evaluate_subexp_standard
@@ -1360,6 +1360,77 @@ parser_fprintf (FILE *x, const char *y, ...)
   va_end (args);
 }
 
+/* Implementation of the exp_descriptor method operator_check.  */
+
+int
+operator_check_standard (struct expression *exp, int pos,
+			 int (*type_func) (struct type *type, void *data),
+			 int (*objfile_func) (struct objfile *objfile,
+					      void *data),
+			 void *data)
+{
+  const union exp_element *const elts = exp->elts;
+  struct type *type = NULL;
+  struct objfile *objfile = NULL;
+
+  /* Extended operators should have been already handled by exp_descriptor
+     iterate method of its specific language.  */
+  gdb_assert (elts[pos].opcode < OP_EXTENDED0);
+
+  /* Track the callers of write_exp_elt_type for this table.  */
+
+  switch (elts[pos].opcode)
+    {
+    case BINOP_VAL:
+    case OP_COMPLEX:
+    case OP_DECFLOAT:
+    case OP_DOUBLE:
+    case OP_LONG:
+    case OP_SCOPE:
+    case OP_TYPE:
+    case UNOP_CAST:
+    case UNOP_MAX:
+    case UNOP_MEMVAL:
+    case UNOP_MIN:
+      type = elts[pos + 1].type;
+      break;
+
+    case UNOP_MEMVAL_TLS:
+      objfile = elts[pos + 1].objfile;
+      type = elts[pos + 2].type;
+      break;
+
+    case OP_VAR_VALUE:
+      {
+	const struct block *const block = elts[pos + 1].block;
+	const struct symbol *const symbol = elts[pos + 2].symbol;
+	const struct obj_section *const section = SYMBOL_OBJ_SECTION (symbol);
+
+	/* Check objfile where the variable itself is placed.  */
+	if (section && objfile_func && (*objfile_func) (section->objfile, data))
+	  return 1;
+
+	/* Check objfile where is placed the code touching the variable.  */
+	objfile = block_objfile (block);
+
+	type = SYMBOL_TYPE (symbol);
+      }
+      break;
+    }
+
+  /* Invoke callbacks for TYPE and OBJFILE if they were set as non-NULL.  */
+
+  if (type && type_func && (*type_func) (type, data))
+    return 1;
+  if (type && TYPE_OBJFILE (type) && objfile_func
+      && (*objfile_func) (TYPE_OBJFILE (type), data))
+    return 1;
+  if (objfile && objfile_func && (*objfile_func) (objfile, data))
+    return 1;
+
+  return 0;
+}
+
 /* Call TYPE_FUNC and OBJFILE_FUNC for any TYPE and OBJFILE found being
    referenced by EXP.  The functions are never called with NULL TYPE or NULL
    OBJFILE.  Functions get passed an arbitrary caller supplied DATA pointer.
@@ -1378,76 +1449,18 @@ exp_iterate (struct expression *exp,
 
   for (endpos = exp->nelts; endpos > 0; )
     {
-      int i, args, oplen = 0;
-      struct type *type = NULL;
-      struct objfile *objfile = NULL;
+      int pos, args, oplen = 0;
 
       exp->language_defn->la_exp_desc->operator_length (exp, endpos,
 							&oplen, &args);
       gdb_assert (oplen > 0);
 
-      /* Track the callers of write_exp_elt_type for this table.  */
-
-      i = endpos - oplen;
-      switch (elts[i].opcode)
-	{
-	case UNOP_IN_RANGE:
-	case UNOP_QUAL:
-	  if (exp->language_defn->la_language == language_ada)
-	    type = elts[i + 1].type;
-	  break;
-
-	case BINOP_VAL:
-	case OP_COMPLEX:
-	case OP_DECFLOAT:
-	case OP_DOUBLE:
-	case OP_LONG:
-	case OP_SCOPE:
-	case OP_TYPE:
-	case UNOP_CAST:
-	case UNOP_MAX:
-	case UNOP_MEMVAL:
-	case UNOP_MIN:
-	  gdb_assert (elts[i].opcode < OP_EXTENDED0);
-	  type = elts[i + 1].type;
-	  break;
-
-	case UNOP_MEMVAL_TLS:
-	  gdb_assert (elts[i].opcode < OP_EXTENDED0);
-	  objfile = elts[i + 1].objfile;
-	  type = elts[i + 2].type;
-	  break;
-
-	case OP_VAR_VALUE:
-	  {
-	    const struct block *const block = elts[i + 1].block;
-	    const struct symbol *const symbol = elts[i + 2].symbol;
-	    const struct obj_section *const section =
-	      SYMBOL_OBJ_SECTION (symbol);
-
-	    /* Check objfile where the variable itself is placed.  */
-	    if (section && objfile_func
-		&& (*objfile_func) (section->objfile, data))
-	      return 1;
-
-	    /* Check objfile where is placed the code touching the variable.  */
-	    objfile = block_objfile (block);
-
-	    type = SYMBOL_TYPE (symbol);
-	  }
-	  break;
-	}
-      endpos -= oplen;
-
-      /* Invoke callbacks for TYPE and OBJFILE if they were set as non-NULL.  */
-
-      if (type && type_func && (*type_func) (type, data))
+      pos = endpos - oplen;
+      if (exp->language_defn->la_exp_desc->operator_check (exp, pos, type_func,
+							   objfile_func, data))
 	return 1;
-      if (type && TYPE_OBJFILE (type) && objfile_func
-          && (*objfile_func) (TYPE_OBJFILE (type), data))
-	return 1;
-      if (objfile && objfile_func && (*objfile_func) (objfile, data))
-	return 1;
+
+      endpos = pos;
     }
 
   return 0;
