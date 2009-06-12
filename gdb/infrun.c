@@ -1091,6 +1091,11 @@ set_schedlock_func (char *args, int from_tty, struct cmd_list_element *c)
     }
 }
 
+/* True if execution commands resume all threads of all processes by
+   default; otherwise, resume only threads of the current inferior
+   process.  */
+int sched_multi = 0;
+
 /* Try to setup for software single stepping over the specified location.
    Return 1 if target_resume() should use hardware single step.
 
@@ -1201,13 +1206,25 @@ a command like `return' or `jump' to continue execution."));
     {
       ptid_t resume_ptid;
 
-      resume_ptid = RESUME_ALL;	/* Default */
-
       /* If STEP is set, it's a request to use hardware stepping
 	 facilities.  But in that case, we should never
 	 use singlestep breakpoint.  */
       gdb_assert (!(singlestep_breakpoints_inserted_p && step));
 
+      /* Decide the set of threads to ask the target to resume.  Start
+	 by assuming everything will be resumed, than narrow the set
+	 by applying increasingly restricting conditions.  */
+
+      /* By default, resume all threads of all processes.  */
+      resume_ptid = RESUME_ALL;
+
+      /* Maybe resume only all threads of the current process.  */
+      if (!sched_multi && target_supports_multi_process ())
+	{
+	  resume_ptid = pid_to_ptid (ptid_get_pid (inferior_ptid));
+	}
+
+      /* Maybe resume a single thread after all.  */
       if (singlestep_breakpoints_inserted_p
 	  && stepping_past_singlestep_breakpoint)
 	{
@@ -1224,9 +1241,8 @@ a command like `return' or `jump' to continue execution."));
 	     to support, and has no value.  */
 	  resume_ptid = inferior_ptid;
 	}
-
-      if ((step || singlestep_breakpoints_inserted_p)
-	  && tp->trap_expected)
+      else if ((step || singlestep_breakpoints_inserted_p)
+	       && tp->trap_expected)
 	{
 	  /* We're allowing a thread to run past a breakpoint it has
 	     hit, by single-stepping the thread with the breakpoint
@@ -1240,8 +1256,7 @@ a command like `return' or `jump' to continue execution."));
 	     breakpoint, not just the one at PC.  */
 	  resume_ptid = inferior_ptid;
 	}
-
-      if (non_stop)
+      else if (non_stop)
 	{
 	  /* With non-stop mode on, threads are always handled
 	     individually.  */
@@ -1394,11 +1409,19 @@ prepare_to_proceed (int step)
 		       || (scheduler_mode == schedlock_step
 			   && step));
 
+  /* Don't switch over to WAIT_PTID if scheduler locking is on.  */
+  if (schedlock_enabled)
+    return 0;
+
+  /* Don't switch over if we're about to resume some other process
+     other than WAIT_PTID's, and schedule-multiple is off.  */
+  if (!sched_multi
+      && ptid_get_pid (wait_ptid) != ptid_get_pid (inferior_ptid))
+    return 0;
+
   /* Switched over from WAIT_PID.  */
   if (!ptid_equal (wait_ptid, minus_one_ptid)
-      && !ptid_equal (inferior_ptid, wait_ptid)
-      /* Don't single step WAIT_PID if scheduler locking is on.  */
-      && !schedlock_enabled)
+      && !ptid_equal (inferior_ptid, wait_ptid))
     {
       struct regcache *regcache = get_thread_regcache (wait_ptid);
 
@@ -3496,9 +3519,25 @@ infrun: BPSTAT_WHAT_SET_LONGJMP_RESUME (!gdbarch_get_longjmp_target)\n");
 	      return;
 	    }
 
-	  /* If the stepping thread exited, then don't try reverting
-	     back to it, just keep going.  We need to query the target
-	     in case it doesn't support thread exit events.  */
+	  /* If the stepping thread exited, then don't try to switch
+	     back and resume it, which could fail in several different
+	     ways depending on the target.  Instead, just keep going.
+
+	     We can find a stepping dead thread in the thread list in
+	     two cases:
+
+	     - The target supports thread exit events, and when the
+	     target tries to delete the thread from the thread list,
+	     inferior_ptid pointed at the exiting thread.  In such
+	     case, calling delete_thread does not really remove the
+	     thread from the list; instead, the thread is left listed,
+	     with 'exited' state.
+
+	     - The target's debug interface does not support thread
+	     exit events, and so we have no idea whatsoever if the
+	     previously stepping thread is still alive.  For that
+	     reason, we need to synchronously query the target
+	     now.  */
 	  if (is_exited (tp->ptid)
 	      || !target_thread_alive (tp->ptid))
 	    {
@@ -5551,6 +5590,13 @@ show_non_stop (struct ui_file *file, int from_tty,
 		    value);
 }
 
+static void
+show_schedule_multiple (struct ui_file *file, int from_tty,
+			struct cmd_list_element *c, const char *value)
+{
+  fprintf_filtered (file, _("\
+Resuming the execution of threads of all processes is %s.\n"), value);
+}
 
 void
 _initialize_infrun (void)
@@ -5729,6 +5775,18 @@ step == scheduler locked during every single-step operation.\n\
 			set_schedlock_func,	/* traps on target vector */
 			show_scheduler_mode,
 			&setlist, &showlist);
+
+  add_setshow_boolean_cmd ("schedule-multiple", class_run, &sched_multi, _("\
+Set mode for resuming threads of all processes."), _("\
+Show mode for resuming threads of all processes."), _("\
+When on, execution commands (such as 'continue' or 'next') resume all\n\
+threads of all processes.  When off (which is the default), execution\n\
+commands only resume the threads of the current process.  The set of\n\
+threads that are resumed is further refined by the scheduler-locking\n\
+mode (see help set scheduler-locking)."),
+			   NULL,
+			   show_schedule_multiple,
+			   &setlist, &showlist);
 
   add_setshow_boolean_cmd ("step-mode", class_run, &step_stop_if_no_debug, _("\
 Set mode of the step operation."), _("\

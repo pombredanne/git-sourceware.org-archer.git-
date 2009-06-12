@@ -463,6 +463,7 @@ extern int bfd_seek (bfd *, file_ptr, int);
 extern file_ptr bfd_tell (bfd *);
 extern int bfd_flush (bfd *);
 extern int bfd_stat (bfd *, struct stat *);
+extern void *bfd_mmap (bfd *, void *, bfd_size_type, int, int, file_ptr);
 
 /* Deprecated old routines.  */
 #if __GNUC__
@@ -2736,6 +2737,10 @@ to compensate for the borrow when the low bits are added.  */
   BFD_RELOC_MIPS_JUMP_SLOT,
 
 
+/* Moxie ELF relocations.  */
+  BFD_RELOC_MOXIE_10_PCREL,
+
+
 /* Fujitsu Frv Relocations.  */
   BFD_RELOC_FRV_LABEL16,
   BFD_RELOC_FRV_LABEL24,
@@ -4494,6 +4499,13 @@ BFD_RELOC_XTENSA_ASM_EXPAND.  */
   BFD_RELOC_LM32_GLOB_DAT,
   BFD_RELOC_LM32_JMP_SLOT,
   BFD_RELOC_LM32_RELATIVE,
+
+/* Difference between two section addreses.  Must be followed by a
+BFD_RELOC_MACH_O_PAIR.  */
+  BFD_RELOC_MACH_O_SECTDIFF,
+
+/* Mach-O generic relocations.  */
+  BFD_RELOC_MACH_O_PAIR,
   BFD_RELOC_UNUSED };
 typedef enum bfd_reloc_code_real bfd_reloc_code_real_type;
 reloc_howto_type *bfd_reloc_type_lookup

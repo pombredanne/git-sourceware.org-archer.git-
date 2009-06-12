@@ -1,3 +1,109 @@
+2009-06-12  Pedro Alves  <pedro@codesourcery.com>
+
+	* exec.h (section_table_xfer_memory_partial): Improve description,
+	mention SECTION_NAME.
+	* exec.c (section_table_xfer_memory_partial): Remove stale
+	description.
+
+2009-06-11  Aleksandar Ristovski  <aristovski@qnx.com>
+
+	* nto-tdep.h (nto_generic_supply_gpregset)
+	(nto_generic_supply_fpregset, nto_generic_supply_altregset): Remove.
+	* nto-tdep.c (nto_generic_supply_gpregset)
+	(nto_generic_supply_fpregset, nto_generic_supply_altregset): Remove.
+
+2009-06-11  Aleksandar Ristovski  <aristovski@qnx.com>
+
+	* i386-nto-tdep.c (I386_NTO_SIGCONTEXT_OFFSET): Remove define.
+	(i386nto_sigcontext_addr): Change the way context address is calculated.
+	(i386nto_init_abi): Remove usage of deprecated sc_reg_offset and
+	sc_sp_offset and set sc_reg_offset and sc_num_regs.
+
+2009-06-11  Aleksandar Ristovski  <aristovski@qnx.com>
+
+	* i386-nto-tdep.c (i386_nto_target): Remove definition.
+	(init_i386nto_ops): Use macros to set fields to global
+	current_nto_target directly.
+	(i386nto_init_abi): Remove unused nto_set_target call.
+	* nto-tdep.h (nto_set_target): Remove unused declaration.
+	* nto-tdep.c (nto_set_target): Remove unused function.
+
+2009-06-11  Pedro Alves  <pedro@codesourcery.com>
+
+	* breakpoint.c (break_command_really): Rename local variable
+	breakpoint_chain to bkpt_chain.
+
+2009-06-11  Aleksandar Ristovski  <aristovski@qnx.com>
+
+	Add support for XMM registers.
+	* i386-nto-tdep.c (i386nto_regset_id): Add case for SSE register set.
+	(i386nto_register_area): Correctly calculate offsets and sizes for
+	all supported registers.
+
+2009-06-11  Tom Tromey  <tromey@redhat.com>
+
+	* eval.c (evaluate_subexp_standard) <OP_OBJC_MSGCALL>: Remove
+	'static' from local variable definitions.
+
+2009-06-11  Pedro Alves  <pedro@codesourcery.com>
+
+	* symtab.c (append_expanded_sal): Remove unused local variables.
+
+2009-06-11  Pedro Alves  <pedro@codesourcery.com>
+
+	* infrun.c (sched_multi): New global.
+	(resume): If sched_multi is set, resume only threads of the
+	current inferior.
+	(prepare_to_proceed): Don't switch over to wait_ptid if we're
+	resuming a different inferior, and sched_multi is off.
+	(show_schedule_multiple): New.
+	(_initialize_infrun): Register new "set schedule-multiple" command.
+	* inferior.h (sched_multi): Declare.
+	* NEWS: Mention new "schedule-multiple" setting.
+
+2009-06-11  Pedro Alves  <pedro@codesourcery.com>
+
+	* varobj.c (varobj_create): Properly restore the selected frame.
+
+2009-06-05  Tom Tromey  <tromey@redhat.com>
+
+	* inferior.c (print_inferior): Make a table, not a list.  Emit
+	table headers.
+
+2009-06-10  Jonas Maebe  <jonas.maebe@elis.ugent.be>
+
+	* darwin-nat.c (darwin_stop_inferior): Pass 0 as options to
+	darwin_wait (blocking wait).
+	(darwin_kill_inferior): Likewise.
+
+2009-06-10  Pedro Alves  <pedro@codesourcery.com>
+
+	* infrun.c (handle_inferior_event): Update comment around trying
+	to revert back to a stepping thread that has exited.
+
+2009-06-10  Cary Coutant  <ccoutant@google.com>
+
+	* dwarf2read.c (dwarf_decode_lines): Recognize and ignore
+	DW_LNE_set_discriminator.
+
+2009-06-10  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* breakpoint.c: ARI fixes.
+	(create_overlay_event_breakpoint): Avoid assignment inside if statement.
+	(print_one_breakpoint_location): Likewise.
+	(create_longjmp_breakpoint): Likewise.
+	(tracepoint_save_command): Likewise
+	(bpstat_find_step_resume_breakpoint): No operator at end of line.
+	(bpstat_stop_status): Likewise.
+	(describe_other_breakpoints): Likewise.
+	(hw_watchpoint_used_count): Likewise.
+	(expand_line_sal_maybe): Likewise.
+	(break_command_really): Likewise.
+	(delete_command): Likewise.
+	(do_enable_breakpoint): Likewise.
+	(delete_trace_command): Likewise.
+	(catch_exception_command_1): Likewise and remove extra parentheses.
+
 2009-06-08  Pierre Muller  <muller@ics.u-strasbg.fr>
 
 	* breakpoint.c (_initialize_breakpoint): Remove "bu" command alias of

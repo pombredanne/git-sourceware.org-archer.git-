@@ -773,6 +773,9 @@ struct bfd_iovec
   int (*bclose) (struct bfd *abfd);
   int (*bflush) (struct bfd *abfd);
   int (*bstat) (struct bfd *abfd, struct stat *sb);
+  /* Just like mmap: (void*)-1 on failure, mmapped address on success.  */
+  void *(*bmmap) (struct bfd *abfd, void *addr, bfd_size_type len,
+                  int prot, int flags, file_ptr offset);
 };
 /* Extracted from bfdwin.c.  */
 struct _bfd_window_internal {
@@ -1029,6 +1032,8 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
 
   "BFD_RELOC_MIPS_COPY",
   "BFD_RELOC_MIPS_JUMP_SLOT",
+
+  "BFD_RELOC_MOXIE_10_PCREL",
 
   "BFD_RELOC_FRV_LABEL16",
   "BFD_RELOC_FRV_LABEL24",
@@ -2064,6 +2069,8 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_LM32_GLOB_DAT",
   "BFD_RELOC_LM32_JMP_SLOT",
   "BFD_RELOC_LM32_RELATIVE",
+  "BFD_RELOC_MACH_O_SECTDIFF",
+  "BFD_RELOC_MACH_O_PAIR",
  "@@overflow: BFD_RELOC_UNUSED@@",
 };
 #endif
