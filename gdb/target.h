@@ -30,6 +30,7 @@ struct mem_attrib;
 struct target_ops;
 struct bp_target_info;
 struct regcache;
+struct target_section_table;
 
 /* This include file defines the interface between the main part
    of the debugger, and the part which is target-specific, or
@@ -412,18 +413,15 @@ struct target_ops
     void (*to_rcmd) (char *command, struct ui_file *output);
     char *(*to_pid_to_exec_file) (int pid);
     void (*to_log_command) (const char *);
+    struct target_section_table *(*to_get_section_table) (struct target_ops *);
     enum strata to_stratum;
-    int to_has_all_memory;
-    int to_has_memory;
-    int to_has_stack;
-    int to_has_registers;
-    int to_has_execution;
+    int (*to_has_all_memory) (struct target_ops *);
+    int (*to_has_memory) (struct target_ops *);
+    int (*to_has_stack) (struct target_ops *);
+    int (*to_has_registers) (struct target_ops *);
+    int (*to_has_execution) (struct target_ops *);
     int to_has_thread_control;	/* control thread execution */
     int to_attach_no_wait;
-    struct target_section
-     *to_sections;
-    struct target_section
-     *to_sections_end;
     /* ASYNC target controls */
     int (*to_can_async_p) (void);
     int (*to_is_async_p) (void);
@@ -668,9 +666,6 @@ extern int target_read_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len);
 extern int target_write_memory (CORE_ADDR memaddr, const gdb_byte *myaddr,
 				int len);
 
-extern int xfer_memory (CORE_ADDR, gdb_byte *, int, int,
-			struct mem_attrib *, struct target_ops *);
-
 /* Fetches the target's memory map.  If one is found it is sorted
    and returned, after some consistency checking.  Otherwise, NULL
    is returned.  */
@@ -732,10 +727,6 @@ extern int inferior_has_forked (ptid_t pid, ptid_t *child_pid);
 extern int inferior_has_vforked (ptid_t pid, ptid_t *child_pid);
 
 extern int inferior_has_execd (ptid_t pid, char **execd_pathname);
-
-/* From exec.c */
-
-extern void print_section_info (struct target_ops *, bfd *);
 
 /* Print a line about the current target.  */
 
@@ -940,24 +931,24 @@ extern void target_find_new_threads (void);
    determines whether we look up the target chain for other parts of
    memory if this target can't satisfy a request.  */
 
-#define	target_has_all_memory	\
-     (current_target.to_has_all_memory)
+extern int target_has_all_memory_1 (void);
+#define target_has_all_memory target_has_all_memory_1 ()
 
 /* Does the target include memory?  (Dummy targets don't.)  */
 
-#define	target_has_memory	\
-     (current_target.to_has_memory)
+extern int target_has_memory_1 (void);
+#define target_has_memory target_has_memory_1 ()
 
 /* Does the target have a stack?  (Exec files don't, VxWorks doesn't, until
    we start a process.)  */
 
-#define	target_has_stack	\
-     (current_target.to_has_stack)
+extern int target_has_stack_1 (void);
+#define target_has_stack target_has_stack_1 ()
 
 /* Does the target have registers?  (Exec files don't.)  */
 
-#define	target_has_registers	\
-     (current_target.to_has_registers)
+extern int target_has_registers_1 (void);
+#define target_has_registers target_has_registers_1 ()
 
 /* Does the target have execution?  Can we make it jump (through
    hoops), or pop its stack a few times?  This means that the current
@@ -967,8 +958,17 @@ extern void target_find_new_threads (void);
    case this will become true after target_create_inferior or
    target_attach.  */
 
-#define	target_has_execution	\
-     (current_target.to_has_execution)
+extern int target_has_execution_1 (void);
+#define target_has_execution target_has_execution_1 ()
+
+/* Default implementations for process_stratum targets.  Return true
+   if there's a selected inferior, false otherwise.  */
+
+extern int default_child_has_all_memory (struct target_ops *ops);
+extern int default_child_has_memory (struct target_ops *ops);
+extern int default_child_has_stack (struct target_ops *ops);
+extern int default_child_has_registers (struct target_ops *ops);
+extern int default_child_has_execution (struct target_ops *ops);
 
 /* Can the target support the debugger control of thread execution?
    Can it lock the thread scheduler?  */
@@ -1187,13 +1187,6 @@ extern void pop_all_targets_above (enum strata above_stratum, int quitting);
 extern CORE_ADDR target_translate_tls_address (struct objfile *objfile,
 					       CORE_ADDR offset);
 
-/* Mark a pushed target as running or exited, for targets which do not
-   automatically pop when not active.  */
-
-void target_mark_running (struct target_ops *);
-
-void target_mark_exited (struct target_ops *);
-
 /* Struct target_section maps address ranges to file sections.  It is
    mostly used with BFD files, but can be used without (e.g. for handling
    raw disks, or files not in formats handled by BFD).  */
@@ -1208,9 +1201,23 @@ struct target_section
     bfd *bfd;			/* BFD file pointer */
   };
 
+/* Holds an array of target sections.  Defined by [SECTIONS..SECTIONS_END[.  */
+
+struct target_section_table
+{
+  struct target_section *sections;
+  struct target_section *sections_end;
+};
+
 /* Return the "section" containing the specified address.  */
 struct target_section *target_section_by_addr (struct target_ops *target,
 					       CORE_ADDR addr);
+
+/* Return the target section table this target (or the targets
+   beneath) currently manipulate.  */
+
+extern struct target_section_table *target_get_section_table
+  (struct target_ops *target);
 
 /* From mem-break.c */
 
@@ -1241,11 +1248,6 @@ extern struct target_ops *find_run_target (void);
 extern struct target_ops *find_core_target (void);
 
 extern struct target_ops *find_target_beneath (struct target_ops *);
-
-extern int target_resize_to_sections (struct target_ops *target,
-				      int num_added);
-
-extern void remove_target_sections (bfd *abfd);
 
 /* Read OS data object of type TYPE from the target, and return it in
    XML format.  The result is NUL-terminated and returned as a string,

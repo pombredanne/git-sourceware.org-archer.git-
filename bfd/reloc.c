@@ -2316,6 +2316,12 @@ ENUMDOC
 COMMENT
 
 ENUM
+  BFD_RELOC_MOXIE_10_PCREL
+ENUMDOC
+  Moxie ELF relocations.
+COMMENT
+
+ENUM
   BFD_RELOC_FRV_LABEL16
 ENUMX
   BFD_RELOC_FRV_LABEL24
@@ -2492,6 +2498,8 @@ ENUMX
   BFD_RELOC_386_TLS_DESC_CALL
 ENUMX
   BFD_RELOC_386_TLS_DESC
+ENUMX
+  BFD_RELOC_386_IRELATIVE
 ENUMDOC
   i386/elf relocations
 
@@ -2547,6 +2555,8 @@ ENUMX
   BFD_RELOC_X86_64_TLSDESC_CALL
 ENUMX
   BFD_RELOC_X86_64_TLSDESC
+ENUMX
+  BFD_RELOC_X86_64_IRELATIVE
 ENUMDOC
   x86-64/elf relocations
 
@@ -5170,6 +5180,16 @@ ENUMX
    BFD_RELOC_LM32_RELATIVE
 ENUMDOC
  Lattice Mico32 relocations.
+
+ENUM
+   BFD_RELOC_MACH_O_SECTDIFF
+ENUMDOC
+   Difference between two section addreses.  Must be followed by a
+   BFD_RELOC_MACH_O_PAIR.
+ENUM
+   BFD_RELOC_MACH_O_PAIR
+ENUMDOC
+ Mach-O generic relocations.
    
 ENDSENUM
   BFD_RELOC_UNUSED
@@ -5291,6 +5311,10 @@ bfd_generic_relax_section (bfd *abfd ATTRIBUTE_UNUSED,
 			   struct bfd_link_info *link_info ATTRIBUTE_UNUSED,
 			   bfd_boolean *again)
 {
+  if (link_info->relocatable)
+    (*link_info->callbacks->einfo)
+      (_("%P%F: --relax and -r may not be used together\n"));
+
   *again = FALSE;
   return TRUE;
 }

@@ -73,6 +73,8 @@ extern "C" {
 #define LITSTRCPY(DEST,STR2) memcpy ((DEST), (STR2), sizeof (STR2))
 
 
+#define BFD_SUPPORTS_PLUGINS @supports_plugins@
+
 /* The word size used by BFD on the host.  This may be 64 with a 32
    bit target if the host is 64 bit, or if other 64 bit targets have
    been selected with --enable-targets, or if --enable-64-bit-bfd.  */
@@ -461,6 +463,7 @@ extern int bfd_seek (bfd *, file_ptr, int);
 extern file_ptr bfd_tell (bfd *);
 extern int bfd_flush (bfd *);
 extern int bfd_stat (bfd *, struct stat *);
+extern void *bfd_mmap (bfd *, void *, bfd_size_type, int, int, file_ptr);
 
 /* Deprecated old routines.  */
 #if __GNUC__
@@ -1848,6 +1851,7 @@ enum bfd_architecture
 #define bfd_mach_h8300sx  6
 #define bfd_mach_h8300sxn 7
   bfd_arch_pdp11,     /* DEC PDP-11 */
+  bfd_arch_plugin,
   bfd_arch_powerpc,   /* PowerPC */
 #define bfd_mach_ppc           32
 #define bfd_mach_ppc64         64
@@ -2733,6 +2737,10 @@ to compensate for the borrow when the low bits are added.  */
   BFD_RELOC_MIPS_JUMP_SLOT,
 
 
+/* Moxie ELF relocations.  */
+  BFD_RELOC_MOXIE_10_PCREL,
+
+
 /* Fujitsu Frv Relocations.  */
   BFD_RELOC_FRV_LABEL16,
   BFD_RELOC_FRV_LABEL24,
@@ -2837,6 +2845,7 @@ relaxation.  */
   BFD_RELOC_386_TLS_GOTDESC,
   BFD_RELOC_386_TLS_DESC_CALL,
   BFD_RELOC_386_TLS_DESC,
+  BFD_RELOC_386_IRELATIVE,
 
 /* x86-64/elf relocations  */
   BFD_RELOC_X86_64_GOT32,
@@ -2865,6 +2874,7 @@ relaxation.  */
   BFD_RELOC_X86_64_GOTPC32_TLSDESC,
   BFD_RELOC_X86_64_TLSDESC_CALL,
   BFD_RELOC_X86_64_TLSDESC,
+  BFD_RELOC_X86_64_IRELATIVE,
 
 /* ns32k relocations  */
   BFD_RELOC_NS32K_IMM_8,
@@ -4489,6 +4499,13 @@ BFD_RELOC_XTENSA_ASM_EXPAND.  */
   BFD_RELOC_LM32_GLOB_DAT,
   BFD_RELOC_LM32_JMP_SLOT,
   BFD_RELOC_LM32_RELATIVE,
+
+/* Difference between two section addreses.  Must be followed by a
+BFD_RELOC_MACH_O_PAIR.  */
+  BFD_RELOC_MACH_O_SECTDIFF,
+
+/* Mach-O generic relocations.  */
+  BFD_RELOC_MACH_O_PAIR,
   BFD_RELOC_UNUSED };
 typedef enum bfd_reloc_code_real bfd_reloc_code_real_type;
 reloc_howto_type *bfd_reloc_type_lookup
@@ -4889,6 +4906,7 @@ struct bfd
       struct netbsd_core_struct *netbsd_core_data;
       struct mach_o_data_struct *mach_o_data;
       struct mach_o_fat_data_struct *mach_o_fat_data;
+      struct plugin_data_struct *plugin_data;
       struct bfd_pef_data_struct *pef_data;
       struct bfd_pef_xlib_data_struct *pef_xlib_data;
       struct bfd_sym_data_struct *sym_data;

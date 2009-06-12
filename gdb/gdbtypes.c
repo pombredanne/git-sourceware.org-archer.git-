@@ -149,56 +149,12 @@ static void print_bit_vector (B_TYPE *, int);
 static void print_arg_types (struct field *, int, int);
 static void dump_fn_fieldlists (struct type *, int);
 static void print_cplus_stuff (struct type *, int);
-static void type_init_group (struct type *type);
 
-/* Any type structures which are connected through their `struct type *' are
-   tracked by the same type_group.  Only the discardable (neither permanent
-   types nor types allocated from objfile obstack) type structures get tracked
-   by type_group structures.  */
+/* The hash table holding all discardable `struct type *' references.  */
+static htab_t type_discardable_table;
 
-struct type_group
-{
-  /* Marker this type_group has been visited by the type_mark_used by this
-     pass.  Current pass is represented by TYPE_GROUP_AGE.  */
-  unsigned age : 1;
-
-  /* Number of the type_group_links structures tracked by this type_group.  It
-     matches the length of list `link_list->group_next->...->group_next'.  */
-  int link_count;
-
-  /* Head of an unordered list of all type structures of this type_group.  Next
-     items are linked by `type_group_link->group_next'.  */
-  struct type_group_link *link_list;
-};
-
-/* Linking entry between a type structure and type_group structure.  Only
-   discardable types have such link present.  This link exists only once for
-   each discardable main_type, all type instances for such one main_type should
-   be iterated by `TYPE_CHAIN (type_group_link->type)'.  */
-
-struct type_group_link
-{
-  /* Arbitrary type for main_type being represented by this type_group_link.
-     Each discardable main_type gets its separate type_group_link.  */
-  struct type *type;
-
-  /* Marker this type_group_link has been visited by the type_group_link_check
-     graph traversal by this pass.  Current pass is represented by
-     TYPE_GROUP_AGE.  */
-  unsigned age : 1;
-
-  struct type_group *group;
-
-  /* Next type_group_link belonging to this type_group structure or NULL for
-     the last node of the list.  */
-  struct type_group_link *group_next;
-};
-
-/* The hash table holding all `struct type_group_link *' references.  */
-static htab_t type_group_link_table;
-
-/* Current type_group_link_check pass used for `type_group_link->age'.  */
-static unsigned type_group_age;
+/* Current type_discardable_check pass used for TYPE_DISCARDABLE_AGE.  */
+static int type_discardable_age_current;
 
 /* Alloc a new type structure and fill it with some defaults.  If
    OBJFILE is non-NULL, then allocate the space for the type structure
@@ -243,8 +199,16 @@ static struct type *
 alloc_type_discardable (void)
 {
   struct type *type = alloc_type (NULL);
+  void **slot;
 
-  type_init_group (type);
+  gdb_assert (!TYPE_DISCARDABLE (type));
+
+  TYPE_DISCARDABLE (type) = 1;
+  TYPE_DISCARDABLE_AGE (type) = type_discardable_age_current;
+
+  slot = htab_find_slot (type_discardable_table, type, INSERT);
+  gdb_assert (!*slot);
+  *slot = type;
 
   return type;
 }
@@ -256,20 +220,10 @@ alloc_type_discardable (void)
 static struct type *
 alloc_type_as_parent (struct type *parent_type)
 {
-  struct type *type = alloc_type (TYPE_OBJFILE (parent_type));
+  if (TYPE_DISCARDABLE (parent_type))
+    return alloc_type_discardable ();
 
-  if (TYPE_OBJFILE (parent_type) == NULL)
-    {
-      struct type_group_link link, *found;
-
-      link.type = type;
-      found = htab_find (type_group_link_table, &link);
-      /* Not a permanent type?  */
-      if (found)
-	type_init_group (type);
-    }
-
-  return type;
+  return alloc_type (TYPE_OBJFILE (parent_type));
 }
 
 /* Alloc a new type instance structure, fill it with some defaults,
@@ -3397,142 +3351,6 @@ main_type_crawl (struct type *type, main_type_crawl_iter iter, void *data)
   main_type_crawl (TYPE_VPTR_BASETYPE (type), iter, data);
 }
 
-/* Unify all the entries associated by type_group FROM with type_group TO.  The
-   new group will belong to type_group TO.  */
-
-static void
-link_group_relabel (struct type_group *to, struct type_group *from)
-{
-  struct type_group_link *iter, *iter_next;
-
-  gdb_assert (to != from);
-
-  to->link_count += from->link_count;
-
-  for (iter = from->link_list; iter; iter = iter_next)
-    {
-      iter_next = iter->group_next;
-
-      /* Relink ITER to the group list of TO.  */
-      iter->group_next = to->link_list;
-      to->link_list = iter;
-
-      iter->group = to;
-    }
-
-  xfree (from);
-}
-
-/* Number of visited type_group_link_table entries during this
-   type_group_link_check pass.  */
-static unsigned type_group_link_check_grouping_markers;
-
-/* Unify type_group of all the type structures found while crawling the
-   type_group_link_table tree from the starting point TYPE.  DATA contains
-   type_group_link reference of the starting point TYPE.  Only during the first
-   callback TYPE will always match type_group_link referenced by DATA.  */
-
-static int
-type_group_link_check_grouping_iter (struct type *type, void *data)
-{
-  /* The starting point referenced in type_group_link_table.  */
-  struct type_group_link *link_start = data;
-  struct type_group_link link_local, *link;
-  int crawl_into = 0;
-
-  link_local.type = type;
-  link = htab_find (type_group_link_table, &link_local);
-  /* A permanent type?  */
-  if (!link)
-    return 0;
-
-  /* Was this LINK already met during the current type_group_link_check pass?  */
-  if (link->age != type_group_age)
-    {
-      link->age = type_group_age;
-      type_group_link_check_grouping_markers++;
-      crawl_into = 1;
-    }
-
-  if (link != link_start && link->group != link_start->group)
-    {
-      /* Keep the time complexity linear by relabeling always the smaller
-	 group.  */
-      if (link->group->link_count < link_start->group->link_count)
-	link_group_relabel (link->group, link_start->group);
-      else
-	link_group_relabel (link_start->group, link->group);
-    }
-
-  return crawl_into;
-}
-
-/* Iterator to unify type_group of all the type structures connected with the
-   one referenced by LINK (therefore *SLOT).  */
-
-static int
-type_group_link_check_grouping (void **slot, void *unused)
-{
-  struct type_group_link *link = *slot;
-
-  main_type_crawl (link->type, type_group_link_check_grouping_iter, link);
-
-  return 1;
-}
-
-/* Helper iterator for check_types_fail.  */
-
-static int
-check_types_fail_iter (void **slot, void *unused)
-{
-  struct type_group_link *link = *slot;
-  struct type *type = link->type;
-
-  fprintf_unfiltered (gdb_stderr, "type %p main_type %p \"%s\" group %p "
-				  "link_count %d\n",
-		      type, TYPE_MAIN_TYPE (type),
-		      TYPE_NAME (type) ? TYPE_NAME (type) : "<null>",
-		      link->group, link->group->link_count);
-
-  return 1;
-}
-
-/* Called by check_types_assert to abort GDB execution printing the state of
-   type_group_link_table to make debugging GDB possible.  */
-
-static void
-check_types_fail (const char *file, int line, const char *function)
-{
-  target_terminal_ours ();
-  gdb_flush (gdb_stdout);
-
-  htab_traverse (type_group_link_table, check_types_fail_iter, NULL);
-
-  internal_error (file, line, _("%s: Type groups consistency fail"), function);
-}
-
-/* gdb_assert replacement for conditions being caused by wrong
-   type_group_link_table state.  This function is not intended for catching
-   bugs in these sanity checking functions themselves.  */
-
-#define check_types_assert(expr)					 \
-  ((void) ((expr) ? 0 :							 \
-	   (check_types_fail (__FILE__, __LINE__, ASSERT_FUNCTION), 0)))
-
-/* Unify type_group of all the type structures found while crawling the
-   type_group_link_table tree from every of its type_group_link entries.  This
-   functionality protects free_all_types from freeing a type structure still
-   being referenced by some other type.  */
-
-static void
-type_group_link_check (void)
-{
-  type_group_link_check_grouping_markers = 0;
-  htab_traverse (type_group_link_table, type_group_link_check_grouping, NULL);
-  check_types_assert (type_group_link_check_grouping_markers
-		      == htab_elements (type_group_link_table));
-}
-
 /* A helper for delete_type which deletes a main_type and the things to which
    it refers.  TYPE is a type whose main_type we wish to destroy.  */
 
@@ -3541,6 +3359,7 @@ delete_main_type (struct type *type)
 {
   int i;
 
+  gdb_assert (TYPE_DISCARDABLE (type));
   gdb_assert (TYPE_OBJFILE (type) == NULL);
 
   xfree (TYPE_NAME (type));
@@ -3565,14 +3384,14 @@ delete_main_type (struct type *type)
 
 /* Delete all the instances on TYPE_CHAIN of TYPE, including their referenced
    main_type.  TYPE must be a reclaimable type - neither permanent nor objfile
-   associated.  The reclaimability is not assertion checked here as it means an
-   expensive type_group_link_table lookup for each MAIN_TYPE being deleted.  */
+   associated.  */
 
 static void
 delete_type_chain (struct type *type)
 {
   struct type *type_iter, *type_iter_to_free;
 
+  gdb_assert (TYPE_DISCARDABLE (type));
   gdb_assert (TYPE_OBJFILE (type) == NULL);
 
   delete_main_type (type);
@@ -3587,102 +3406,73 @@ delete_type_chain (struct type *type)
   while (type_iter != type);
 }
 
-/* Hash function for type_group_link_table.  */
+/* Hash function for type_discardable_table.  */
 
 static hashval_t
-type_group_link_hash (const void *p)
+type_discardable_hash (const void *p)
 {
-  const struct type_group_link *link = p;
+  const struct type *type = p;
 
-  return htab_hash_pointer (TYPE_MAIN_TYPE (link->type));
+  return htab_hash_pointer (TYPE_MAIN_TYPE (type));
 }
 
-/* Equality function for type_group_link_table.  */
+/* Equality function for type_discardable_table.  */
 
 static int
-type_group_link_equal (const void *a, const void *b)
+type_discardable_equal (const void *a, const void *b)
 {
-  const struct type_group_link *left = a;
-  const struct type_group_link *right = b;
+  const struct type *left = a;
+  const struct type *right = b;
 
-  return TYPE_MAIN_TYPE (left->type) == TYPE_MAIN_TYPE (right->type);
+  return TYPE_MAIN_TYPE (left) == TYPE_MAIN_TYPE (right);
 }
 
-/* Define currently permanent TYPE as being reclaimable during free_all_types.
-   TYPE is required to be now permanent.  */
+/* A helper for type_mark_used.  */
 
-static void
-type_init_group (struct type *type)
+static int
+type_mark_used_crawl (struct type *type, void *unused)
 {
-  void **slot;
-  struct type_group *group;
-  struct type_group_link *link;
+  if (!TYPE_DISCARDABLE (type))
+    return 0;
 
-  gdb_assert (TYPE_OBJFILE (type) == NULL);
+  if (TYPE_DISCARDABLE_AGE (type) == type_discardable_age_current)
+    return 0;
 
-  group = XNEW (struct type_group);
-  link = XNEW (struct type_group_link);
+  TYPE_DISCARDABLE_AGE (type) = type_discardable_age_current;
 
-  group->age = type_group_age;
-  group->link_count = 1;
-  group->link_list = link;
-
-  link->type = type;
-  link->age = type_group_age;
-  link->group = group;
-  link->group_next = NULL;
-
-  slot = htab_find_slot (type_group_link_table, link, INSERT);
-  gdb_assert (!*slot);
-  *slot = link;
+  /* Continue the traversal.  */
+  return 1;
 }
 
-/* Mark TYPE (and its whole TYPE_GROUP) as used in this free_all_types pass.  */
+/* Mark TYPE and its connected types as used in this free_all_types pass.  */
 
 void
 type_mark_used (struct type *type)
 {
-  struct type_group_link link_local, *link;
-
   if (type == NULL)
     return;
 
-  if (TYPE_OBJFILE (type) != NULL)
+  if (!TYPE_DISCARDABLE (type))
     return;
 
-  link_local.type = type;
-  link = htab_find (type_group_link_table, &link_local);
-  /* A permanent type?  */
-  if (!link)
-    return;
-
-  link->group->age = type_group_age;
+  main_type_crawl (type, type_mark_used_crawl, NULL);
 }
 
-/* A traverse callback for type_group_link_table which removes any
-   type_group_link whose reference count is now zero (unused link).  */
+/* A traverse callback for type_discardable_table which removes any
+   type_discardable whose reference count is now zero (unused link).  */
 
 static int
-type_group_link_remove (void **slot, void *unused)
+type_discardable_remove (void **slot, void *unused)
 {
-  struct type_group_link *link = *slot;
+  struct type *type = *slot;
 
-  if (link->group->age != type_group_age)
+  gdb_assert (TYPE_DISCARDABLE (type));
+
+  if (TYPE_DISCARDABLE_AGE (type) != type_discardable_age_current)
     {
-      struct type_group *group = link->group;
+      delete_type_chain (type);
 
-      delete_type_chain (link->type);
-
-      /* The list `type_group->link_list' is left inconsistent during the
-	 traversal.  After free_all_types finishes the whole group will be
-	 deleted anyway.  */
-
-      gdb_assert (group->link_count > 0);
-      if (!--group->link_count)
-	xfree (group);
-
-      xfree (link);
-      htab_clear_slot (type_group_link_table, slot);
+      htab_clear_slot (type_discardable_table, slot);
     }
 
   return 1;
@@ -3701,13 +3491,11 @@ free_all_types (void)
   /* Mark a new pass.  As GDB checks all the entries were visited after each
      pass there cannot be any stale entries already containing the changed
      value.  */
-  type_group_age ^= 1;
-
-  type_group_link_check ();
+  type_discardable_age_current ^= 1;
 
   observer_notify_mark_used ();
 
-  htab_traverse (type_group_link_table, type_group_link_remove, NULL);
+  htab_traverse (type_discardable_table, type_discardable_remove, NULL);
 }
 
 static struct type *
@@ -3918,8 +3706,8 @@ _initialize_gdbtypes (void)
 {
   gdbtypes_data = gdbarch_data_register_post_init (gdbtypes_post_init);
 
-  type_group_link_table = htab_create_alloc (20, type_group_link_hash,
-					     type_group_link_equal, NULL,
+  type_discardable_table = htab_create_alloc (20, type_discardable_hash,
+					     type_discardable_equal, NULL,
 					     xcalloc, xfree);
 
   /* FIXME: The following types are architecture-neutral.  However,

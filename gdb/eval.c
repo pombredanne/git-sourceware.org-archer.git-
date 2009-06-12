@@ -1018,17 +1018,17 @@ evaluate_subexp_standard (struct type *expect_type,
     case OP_OBJC_MSGCALL:
       {				/* Objective C message (method) call.  */
 
-	static CORE_ADDR responds_selector = 0;
-	static CORE_ADDR method_selector = 0;
+	CORE_ADDR responds_selector = 0;
+	CORE_ADDR method_selector = 0;
 
 	CORE_ADDR selector = 0;
 
 	int struct_return = 0;
 	int sub_no_side = 0;
 
-	static struct value *msg_send = NULL;
-	static struct value *msg_send_stret = NULL;
-	static int gnu_runtime = 0;
+	struct value *msg_send = NULL;
+	struct value *msg_send_stret = NULL;
+	int gnu_runtime = 0;
 
 	struct value *target = NULL;
 	struct value *method = NULL;
@@ -1213,9 +1213,9 @@ evaluate_subexp_standard (struct type *expect_type,
 	    if (TYPE_CODE (value_type (method)) != TYPE_CODE_FUNC)
 	      error (_("method address has symbol information with non-function type; skipping"));
 	    if (struct_return)
-	      VALUE_ADDRESS (method) = value_as_address (msg_send_stret);
+	      set_value_address (method, value_as_address (msg_send_stret));
 	    else
-	      VALUE_ADDRESS (method) = value_as_address (msg_send);
+	      set_value_address (method, value_as_address (msg_send));
 	    called_method = method;
 	  }
 	else
@@ -1439,7 +1439,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	 	 of the ``this'' pointer if necessary, so modify argvec[1] to
 		 reflect any ``this'' changes.  */
 	      arg2 = value_from_longest (lookup_pointer_type(value_type (temp)),
-					 VALUE_ADDRESS (temp) + value_offset (temp)
+					 value_address (temp)
 					 + value_embedded_offset (temp));
 	      argvec[1] = arg2;	/* the ``this'' pointer */
 	    }
@@ -1538,7 +1538,7 @@ evaluate_subexp_standard (struct type *expect_type,
       /* First determine the type code we are dealing with.  */
       arg1 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
       old_chain = make_cleanup (null_cleanup, 0);
-      object_address_set (VALUE_ADDRESS (arg1));
+      object_address_set (value_raw_address (arg1));
       type = check_typedef (value_type (arg1));
       do_cleanups (old_chain);
       code = TYPE_CODE (type);
@@ -1985,7 +1985,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	  error (_("Too many subscripts for F77 (%d Max)"), MAX_FORTRAN_DIMS);
 
 	old_chain = make_cleanup (null_cleanup, 0);
-	object_address_set (VALUE_ADDRESS (arg1));
+	object_address_set (value_raw_address (arg1));
 
 	tmp_type = check_typedef (value_type (arg1));
 	ndimensions = calc_f77_array_dims (type);

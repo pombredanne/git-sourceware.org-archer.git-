@@ -274,6 +274,18 @@ enum type_instance_flag_value
 
 #define TYPE_NOTTEXT(t)		(TYPE_MAIN_TYPE (t)->flag_nottext)
 
+/* Define this type as being reclaimable during free_all_types.  Type is
+   required to be have TYPE_OBJFILE set to NULL.  Setting this flag requires
+   initializing TYPE_DISCARDABLE_AGE, see alloc_type_discardable.  */
+
+#define TYPE_DISCARDABLE(t)	(TYPE_MAIN_TYPE (t)->flag_discardable)
+
+/* Marker this type has been visited by the type_mark_used by this
+   mark-and-sweep types garbage collecting pass.  Current pass is represented
+   by TYPE_DISCARDABLE_AGE_CURRENT.  */
+
+#define TYPE_DISCARDABLE_AGE(t)	(TYPE_MAIN_TYPE (t)->flag_discardable_age)
+
 /* Is HIGH_BOUND a low-bound relative count (1) or the high bound itself (0)?  */
 
 #define TYPE_RANGE_HIGH_BOUND_IS_COUNT(range_type) \
@@ -298,7 +310,7 @@ enum type_instance_flag_value
    false.  If TYPE_DATA_LOCATION_IS_ADDR set then TYPE_DATA_LOCATION_ADDR value
    is the actual data address value.  If unset and
    TYPE_DATA_LOCATION_DWARF_BLOCK is NULL then the value is the normal
-   VALUE_ADDRESS copy.  If unset and TYPE_DATA_LOCATION_DWARF_BLOCK is not NULL
+   value_raw_address.  If unset and TYPE_DATA_LOCATION_DWARF_BLOCK is not NULL
    then its DWARF block determines the actual data address.  */
 
 #define TYPE_DATA_LOCATION_IS_ADDR(t) \
@@ -390,6 +402,8 @@ struct main_type
   unsigned int flag_stub_supported : 1;
   unsigned int flag_nottext : 1;
   unsigned int flag_fixed_instance : 1;
+  unsigned int flag_discardable : 1;
+  unsigned int flag_discardable_age : 1;
   unsigned int flag_dynamic : 1;
   unsigned int flag_range_high_bound_is_count : 1;
   unsigned int flag_not_allocated : 1;

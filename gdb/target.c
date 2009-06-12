@@ -41,6 +41,7 @@
 #include "target-descriptions.h"
 #include "gdbthread.h"
 #include "solib.h"
+#include "exec.h"
 
 static void target_info (char *, int);
 
@@ -212,6 +213,120 @@ target_command (char *arg, int from_tty)
 		  gdb_stdout);
 }
 
+/* Default target_has_* methods for process_stratum targets.  */
+
+int
+default_child_has_all_memory (struct target_ops *ops)
+{
+  /* If no inferior selected, then we can't read memory here.  */
+  if (ptid_equal (inferior_ptid, null_ptid))
+    return 0;
+
+  return 1;
+}
+
+int
+default_child_has_memory (struct target_ops *ops)
+{
+  /* If no inferior selected, then we can't read memory here.  */
+  if (ptid_equal (inferior_ptid, null_ptid))
+    return 0;
+
+  return 1;
+}
+
+int
+default_child_has_stack (struct target_ops *ops)
+{
+  /* If no inferior selected, there's no stack.  */
+  if (ptid_equal (inferior_ptid, null_ptid))
+    return 0;
+
+  return 1;
+}
+
+int
+default_child_has_registers (struct target_ops *ops)
+{
+  /* Can't read registers from no inferior.  */
+  if (ptid_equal (inferior_ptid, null_ptid))
+    return 0;
+
+  return 1;
+}
+
+int
+default_child_has_execution (struct target_ops *ops)
+{
+  /* If there's no thread selected, then we can't make it run through
+     hoops.  */
+  if (ptid_equal (inferior_ptid, null_ptid))
+    return 0;
+
+  return 1;
+}
+
+
+int
+target_has_all_memory_1 (void)
+{
+  struct target_ops *t;
+
+  for (t = current_target.beneath; t != NULL; t = t->beneath)
+    if (t->to_has_all_memory (t))
+      return 1;
+
+  return 0;
+}
+
+int
+target_has_memory_1 (void)
+{
+  struct target_ops *t;
+
+  for (t = current_target.beneath; t != NULL; t = t->beneath)
+    if (t->to_has_memory (t))
+      return 1;
+
+  return 0;
+}
+
+int
+target_has_stack_1 (void)
+{
+  struct target_ops *t;
+
+  for (t = current_target.beneath; t != NULL; t = t->beneath)
+    if (t->to_has_stack (t))
+      return 1;
+
+  return 0;
+}
+
+int
+target_has_registers_1 (void)
+{
+  struct target_ops *t;
+
+  for (t = current_target.beneath; t != NULL; t = t->beneath)
+    if (t->to_has_registers (t))
+      return 1;
+
+  return 0;
+}
+
+int
+target_has_execution_1 (void)
+{
+  struct target_ops *t;
+
+  for (t = current_target.beneath; t != NULL; t = t->beneath)
+    if (t->to_has_execution (t))
+      return 1;
+
+  return 0;
+}
+
 /* Add a possible target architecture to the list.  */
 
 void
@@ -220,6 +335,21 @@ add_target (struct target_ops *t)
   /* Provide default values for all "must have" methods.  */
   if (t->to_xfer_partial == NULL)
     t->to_xfer_partial = default_xfer_partial;
+
+  if (t->to_has_all_memory == NULL)
+    t->to_has_all_memory = (int (*) (struct target_ops *)) return_zero;
+
+  if (t->to_has_memory == NULL)
+    t->to_has_memory = (int (*) (struct target_ops *)) return_zero;
+
+  if (t->to_has_stack == NULL)
+    t->to_has_stack = (int (*) (struct target_ops *)) return_zero;
+
+  if (t->to_has_registers == NULL)
+    t->to_has_registers = (int (*) (struct target_ops *)) return_zero;
+
+  if (t->to_has_execution == NULL)
+    t->to_has_execution = (int (*) (struct target_ops *)) return_zero;
 
   if (!target_structs)
     {
@@ -485,14 +615,12 @@ update_current_target (void)
       INHERIT (to_pid_to_exec_file, t);
       INHERIT (to_log_command, t);
       INHERIT (to_stratum, t);
-      INHERIT (to_has_all_memory, t);
-      INHERIT (to_has_memory, t);
-      INHERIT (to_has_stack, t);
-      INHERIT (to_has_registers, t);
-      INHERIT (to_has_execution, t);
+      /* Do not inherit to_has_all_memory */
+      /* Do not inherit to_has_memory */
+      /* Do not inherit to_has_stack */
+      /* Do not inherit to_has_registers */
+      /* Do not inherit to_has_execution */
       INHERIT (to_has_thread_control, t);
-      INHERIT (to_sections, t);
-      INHERIT (to_sections_end, t);
       INHERIT (to_can_async_p, t);
       INHERIT (to_is_async_p, t);
       INHERIT (to_async, t);
@@ -657,56 +785,6 @@ update_current_target (void)
 
   if (targetdebug)
     setup_target_debug ();
-}
-
-/* Mark OPS as a running target.  This reverses the effect
-   of target_mark_exited.  */
-
-void
-target_mark_running (struct target_ops *ops)
-{
-  struct target_ops *t;
-
-  for (t = target_stack; t != NULL; t = t->beneath)
-    if (t == ops)
-      break;
-  if (t == NULL)
-    internal_error (__FILE__, __LINE__,
-		    "Attempted to mark unpushed target \"%s\" as running",
-		    ops->to_shortname);
-
-  ops->to_has_execution = 1;
-  ops->to_has_all_memory = 1;
-  ops->to_has_memory = 1;
-  ops->to_has_stack = 1;
-  ops->to_has_registers = 1;
-
-  update_current_target ();
-}
-
-/* Mark OPS as a non-running target.  This reverses the effect
-   of target_mark_running.  */
-
-void
-target_mark_exited (struct target_ops *ops)
-{
-  struct target_ops *t;
-
-  for (t = target_stack; t != NULL; t = t->beneath)
-    if (t == ops)
-      break;
-  if (t == NULL)
-    internal_error (__FILE__, __LINE__,
-		    "Attempted to mark unpushed target \"%s\" as running",
-		    ops->to_shortname);
-
-  ops->to_has_execution = 0;
-  ops->to_has_all_memory = 0;
-  ops->to_has_memory = 0;
-  ops->to_has_stack = 0;
-  ops->to_has_registers = 0;
-
-  update_current_target ();
 }
 
 /* Push a new target type into the stack of the existing target accessors,
@@ -1016,14 +1094,33 @@ done:
   return nbytes_read;
 }
 
+struct target_section_table *
+target_get_section_table (struct target_ops *target)
+{
+  struct target_ops *t;
+
+  if (targetdebug)
+    fprintf_unfiltered (gdb_stdlog, "target_get_section_table ()\n");
+
+  for (t = target; t != NULL; t = t->beneath)
+    if (t->to_get_section_table != NULL)
+      return (*t->to_get_section_table) (t);
+
+  return NULL;
+}
+
 /* Find a section containing ADDR.  */
+
 struct target_section *
 target_section_by_addr (struct target_ops *target, CORE_ADDR addr)
 {
+  struct target_section_table *table = target_get_section_table (target);
   struct target_section *secp;
-  for (secp = target->to_sections;
-       secp < target->to_sections_end;
-       secp++)
+
+  if (table == NULL)
+    return NULL;
+
+  for (secp = table->sections; secp < table->sections_end; secp++)
     {
       if (addr >= secp->addr && addr < secp->endaddr)
 	return secp;
@@ -1046,24 +1143,43 @@ memory_xfer_partial (struct target_ops *ops, void *readbuf, const void *writebuf
   if (len == 0)
     return 0;
 
-  /* Try the executable file, if "trust-readonly-sections" is set.  */
+  /* For accesses to unmapped overlay sections, read directly from
+     files.  Must do this first, as MEMADDR may need adjustment.  */
+  if (readbuf != NULL && overlay_debugging)
+    {
+      struct obj_section *section = find_pc_overlay (memaddr);
+      if (pc_in_unmapped_range (memaddr, section))
+	{
+	  struct target_section_table *table
+	    = target_get_section_table (ops);
+	  const char *section_name = section->the_bfd_section->name;
+	  memaddr = overlay_mapped_address (memaddr, section);
+	  return section_table_xfer_memory_partial (readbuf, writebuf,
+						    memaddr, len,
+						    table->sections,
+						    table->sections_end,
+						    section_name);
+	}
+    }
+
+  /* Try the executable files, if "trust-readonly-sections" is set.  */
   if (readbuf != NULL && trust_readonly)
     {
       struct target_section *secp;
+      struct target_section_table *table;
 
       secp = target_section_by_addr (ops, memaddr);
       if (secp != NULL
 	  && (bfd_get_section_flags (secp->bfd, secp->the_bfd_section)
 	      & SEC_READONLY))
-	return xfer_memory (memaddr, readbuf, len, 0, NULL, ops);
-    }
-
-  /* Likewise for accesses to unmapped overlay sections.  */
-  if (readbuf != NULL && overlay_debugging)
-    {
-      struct obj_section *section = find_pc_overlay (memaddr);
-      if (pc_in_unmapped_range (memaddr, section))
-	return xfer_memory (memaddr, readbuf, len, 0, NULL, ops);
+	{
+	  table = target_get_section_table (ops);
+	  return section_table_xfer_memory_partial (readbuf, writebuf,
+						    memaddr, len,
+						    table->sections,
+						    table->sections_end,
+						    NULL);
+	}
     }
 
   /* Try GDB's internal data cache.  */
@@ -1139,7 +1255,7 @@ memory_xfer_partial (struct target_ops *ops, void *readbuf, const void *writebuf
 
       /* We want to continue past core files to executables, but not
 	 past a running target's memory.  */
-      if (ops->to_has_all_memory)
+      if (ops->to_has_all_memory (ops))
 	break;
 
       ops = ops->beneath;
@@ -1256,7 +1372,10 @@ target_xfer_partial (struct target_ops *ops,
 int
 target_read_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len)
 {
-  if (target_read (&current_target, TARGET_OBJECT_MEMORY, NULL,
+  /* Dispatch to the topmost target, not the flattened current_target.
+     Memory accesses check target->to_has_(all_)memory, and the
+     flattened target doesn't inherit those.  */
+  if (target_read (current_target.beneath, TARGET_OBJECT_MEMORY, NULL,
 		   myaddr, memaddr, len) == len)
     return 0;
   else
@@ -1266,7 +1385,10 @@ target_read_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len)
 int
 target_write_memory (CORE_ADDR memaddr, const gdb_byte *myaddr, int len)
 {
-  if (target_write (&current_target, TARGET_OBJECT_MEMORY, NULL,
+  /* Dispatch to the topmost target, not the flattened current_target.
+     Memory accesses check target->to_has_(all_)memory, and the
+     flattened target doesn't inherit those.  */
+  if (target_write (current_target.beneath, TARGET_OBJECT_MEMORY, NULL,
 		    myaddr, memaddr, len) == len)
     return 0;
   else
@@ -1688,7 +1810,11 @@ void
 get_target_memory (struct target_ops *ops, CORE_ADDR addr, gdb_byte *buf,
 		   LONGEST len)
 {
-  if (target_read (ops, TARGET_OBJECT_MEMORY, NULL, buf, addr, len)
+  /* This method is used to read from an alternate, non-current
+     target.  This read must bypass the overlay support (as symbols
+     don't match this target), and GDB's internal cache (wrong cache
+     for this target).  */
+  if (target_read (ops, TARGET_OBJECT_RAW_MEMORY, NULL, buf, addr, len)
       != len)
     memory_error (EIO, addr);
 }
@@ -1715,7 +1841,7 @@ target_info (char *args, int from_tty)
 
   for (t = target_stack; t != NULL; t = t->beneath)
     {
-      if (!t->to_has_memory)
+      if (!(*t->to_has_memory) (t))
 	continue;
 
       if ((int) (t->to_stratum) <= (int) dummy_stratum)
@@ -1724,7 +1850,7 @@ target_info (char *args, int from_tty)
 	printf_unfiltered (_("\tWhile running this, GDB does not access memory from...\n"));
       printf_unfiltered ("%s:\n", t->to_longname);
       (t->to_files_info) (t);
-      has_all_mem = t->to_has_all_memory;
+      has_all_mem = (*t->to_has_all_memory) (t);
     }
 }
 
@@ -2128,7 +2254,7 @@ target_search_memory (CORE_ADDR start_addr, ULONGEST search_space_len,
     {
       /* If a special version of to_search_memory isn't available, use the
 	 simple version.  */
-      found = simple_search_memory (&current_target,
+      found = simple_search_memory (current_target.beneath,
 				    start_addr, search_space_len,
 				    pattern, pattern_len, found_addrp);
     }
@@ -2338,96 +2464,6 @@ return_minus_one (void)
   return -1;
 }
 
-/*
- * Resize the to_sections pointer.  Also make sure that anyone that
- * was holding on to an old value of it gets updated.
- * Returns the old size.
- */
-
-int
-target_resize_to_sections (struct target_ops *target, int num_added)
-{
-  struct target_ops **t;
-  struct target_section *old_value;
-  int old_count;
-
-  old_value = target->to_sections;
-
-  if (target->to_sections)
-    {
-      old_count = target->to_sections_end - target->to_sections;
-      target->to_sections = (struct target_section *)
-	xrealloc ((char *) target->to_sections,
-		  (sizeof (struct target_section)) * (num_added + old_count));
-    }
-  else
-    {
-      old_count = 0;
-      target->to_sections = (struct target_section *)
-	xmalloc ((sizeof (struct target_section)) * num_added);
-    }
-  target->to_sections_end = target->to_sections + (num_added + old_count);
-
-  /* Check to see if anyone else was pointing to this structure.
-     If old_value was null, then no one was. */
-
-  if (old_value)
-    {
-      for (t = target_structs; t < target_structs + target_struct_size;
-	   ++t)
-	{
-	  if ((*t)->to_sections == old_value)
-	    {
-	      (*t)->to_sections = target->to_sections;
-	      (*t)->to_sections_end = target->to_sections_end;
-	    }
-	}
-      /* There is a flattened view of the target stack in current_target,
-	 so its to_sections pointer might also need updating. */
-      if (current_target.to_sections == old_value)
-	{
-	  current_target.to_sections = target->to_sections;
-	  current_target.to_sections_end = target->to_sections_end;
-	}
-    }
-
-  return old_count;
-
-}
-
-/* Remove all target sections taken from ABFD.
-
-   Scan the current target stack for targets whose section tables
-   refer to sections from BFD, and remove those sections.  We use this
-   when we notice that the inferior has unloaded a shared object, for
-   example.  */
-void
-remove_target_sections (bfd *abfd)
-{
-  struct target_ops **t;
-
-  for (t = target_structs; t < target_structs + target_struct_size; t++)
-    {
-      struct target_section *src, *dest;
-
-      dest = (*t)->to_sections;
-      for (src = (*t)->to_sections; src < (*t)->to_sections_end; src++)
-	if (src->bfd != abfd)
-	  {
-	    /* Keep this section.  */
-	    if (dest < src) *dest = *src;
-	    dest++;
-	  }
-
-      /* If we've dropped any sections, resize the section table.  */
-      if (dest < src)
-	target_resize_to_sections (*t, dest - src);
-    }
-}
-
-
-
-
 /* Find a single runnable target in the stack and return it.  If for
    some reason there is more than one, return NULL.  */
 
@@ -2590,6 +2626,11 @@ init_dummy_target (void)
   dummy_target.to_find_memory_regions = dummy_find_memory_regions;
   dummy_target.to_make_corefile_notes = dummy_make_corefile_notes;
   dummy_target.to_xfer_partial = default_xfer_partial;
+  dummy_target.to_has_all_memory = (int (*) (struct target_ops *)) return_zero;
+  dummy_target.to_has_memory = (int (*) (struct target_ops *)) return_zero;
+  dummy_target.to_has_stack = (int (*) (struct target_ops *)) return_zero;
+  dummy_target.to_has_registers = (int (*) (struct target_ops *)) return_zero;
+  dummy_target.to_has_execution = (int (*) (struct target_ops *)) return_zero;
   dummy_target.to_magic = OPS_MAGIC;
 }
 
@@ -3313,7 +3354,7 @@ static void
 set_maintenance_target_async_permitted (char *args, int from_tty,
 					struct cmd_list_element *c)
 {
-  if (target_has_execution)
+  if (have_live_inferiors ())
     {
       target_async_permitted_1 = target_async_permitted;
       error (_("Cannot change this setting while the inferior is running."));

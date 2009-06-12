@@ -137,7 +137,7 @@ whatis_exp (char *exp, int show)
   else
     val = access_value_history (0);
 
-  object_address_set (VALUE_ADDRESS (val));
+  object_address_set (value_raw_address (val));
   type = value_type (val);
 
   get_user_print_options (&opts);

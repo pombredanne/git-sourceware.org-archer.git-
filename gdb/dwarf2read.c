@@ -7501,6 +7501,11 @@ dwarf_decode_lines (struct line_header *lh, char *comp_dir, bfd *abfd,
                     add_file_name (lh, cur_file, dir_index, mod_time, length);
                   }
 		  break;
+		case DW_LNE_set_discriminator:
+		  /* The discriminator is not interesting to the debugger;
+		     just ignore it.  */
+		  line_ptr = extended_end;
+		  break;
 		default:
 		  complaint (&symfile_complaints,
 			     _("mangled .debug_line section"));
@@ -7820,8 +7825,8 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
 					     sizeof (struct symbol));
       OBJSTAT (objfile, n_syms++);
       memset (sym, 0, sizeof (struct symbol));
-      /* Some methods are called without checking SYMBOL_OPS validity.  */
-      SYMBOL_OPS (sym) = &dwarf2_missing_funcs;
+      /* Some methods are called w/o checking SYMBOL_COMPUTED_OPS validity.  */
+      SYMBOL_COMPUTED_OPS (sym) = &dwarf2_missing_funcs;
 
       /* Cache this symbol's name and the name's demangled form (if any).  */
       SYMBOL_LANGUAGE (sym) = cu->language;
@@ -9737,6 +9742,10 @@ maybe_queue_comp_unit (struct dwarf2_cu *this_cu,
   queue_comp_unit (per_cu, this_cu->objfile);
 }
 
+/* Follow reference attribute ATTR of SRC_DIE.
+   On entry *REF_CU is the CU of SRC_DIE.
+   On exit *REF_CU is the CU of the result.  */
+
 static struct die_info *
 follow_die_ref (struct die_info *src_die, struct attribute *attr,
 		struct dwarf2_cu **ref_cu)
@@ -10661,12 +10670,12 @@ dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
 	complaint (&symfile_complaints,
 		   _("Location list used without specifying the CU base address."));
 
-      SYMBOL_OPS (sym) = &dwarf2_loclist_funcs;
+      SYMBOL_COMPUTED_OPS (sym) = &dwarf2_loclist_funcs;
       SYMBOL_LOCATION_BATON (sym) = baton;
     }
   else if (attr_form_is_block (attr))
     {
-      SYMBOL_OPS (sym) = &dwarf2_locexpr_funcs;
+      SYMBOL_COMPUTED_OPS (sym) = &dwarf2_locexpr_funcs;
       SYMBOL_LOCATION_BATON (sym) = dwarf2_attr_to_locexpr_baton (attr, cu);
     }
   else
@@ -10674,8 +10683,9 @@ dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
       dwarf2_invalid_attrib_class_complaint ("location description",
 					     SYMBOL_NATURAL_NAME (sym));
 
-      /* Some methods are called without checking SYMBOL_OPS validity.  */
-      SYMBOL_OPS (sym) = &dwarf2_missing_funcs;
+      /* Some methods are called w/o checking SYMBOL_COMPUTED_OPS validity.  */
+
+      SYMBOL_COMPUTED_OPS (sym) = &dwarf2_missing_funcs;
       SYMBOL_LOCATION_BATON (sym) = NULL;
 
       /* For functions a missing DW_AT_frame_base does not optimize out the
@@ -11034,9 +11044,6 @@ get_die_type (struct die_info *die, struct dwarf2_cu *cu)
     return NULL;
 }
 
-/* Set the mark field in CU and in every other compilation unit in the
-   cache that we must keep because we are keeping CU.  */
-
 /* Add a dependence relationship from CU to REF_PER_CU.  */
 
 static void
@@ -11057,7 +11064,8 @@ dwarf2_add_dependence (struct dwarf2_cu *cu,
     *slot = ref_per_cu;
 }
 
-/* Set the mark field in CU and in every other compilation unit in the
+/* Subroutine of dwarf2_mark to pass to htab_traverse.
+   Set the mark field in every compilation unit in the
    cache that we must keep because we are keeping CU.  */
 
 static int
@@ -11075,6 +11083,9 @@ dwarf2_mark_helper (void **slot, void *data)
 
   return 1;
 }
+
+/* Set the mark field in CU and in every other compilation unit in the
+   cache that we must keep because we are keeping CU.  */
 
 static void
 dwarf2_mark (struct dwarf2_cu *cu)

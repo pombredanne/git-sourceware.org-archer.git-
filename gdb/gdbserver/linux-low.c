@@ -121,7 +121,7 @@ int using_threads = 1;
    control of gdbserver have the same architecture.  */
 static int new_inferior;
 
-static void linux_resume_one_lwp (struct inferior_list_entry *entry,
+static void linux_resume_one_lwp (struct lwp_info *lwp,
 				  int step, int signal, siginfo_t *info);
 static void linux_resume (struct thread_resume *resume_info, size_t n);
 static void stop_all_lwps (void);
@@ -295,36 +295,38 @@ handle_extended_wait (struct lwp_info *event_child, int wstat)
       new_lwp = (struct lwp_info *) add_lwp (ptid);
       add_thread (ptid, new_lwp);
 
+      /* Either we're going to immediately resume the new thread
+	 or leave it stopped.  linux_resume_one_lwp is a nop if it
+	 thinks the thread is currently running, so set this first
+	 before calling linux_resume_one_lwp.  */
+      new_lwp->stopped = 1;
+
       /* Normally we will get the pending SIGSTOP.  But in some cases
 	 we might get another signal delivered to the group first.
 	 If we do get another signal, be sure not to lose it.  */
       if (WSTOPSIG (status) == SIGSTOP)
 	{
-	  if (stopping_threads)
-	    new_lwp->stopped = 1;
-	  else
-	    ptrace (PTRACE_CONT, new_pid, 0, 0);
+	  if (! stopping_threads)
+	    linux_resume_one_lwp (new_lwp, 0, 0, NULL);
 	}
       else
 	{
 	  new_lwp->stop_expected = 1;
 	  if (stopping_threads)
 	    {
-	      new_lwp->stopped = 1;
 	      new_lwp->status_pending_p = 1;
 	      new_lwp->status_pending = status;
 	    }
 	  else
 	    /* Pass the signal on.  This is what GDB does - except
 	       shouldn't we really report it instead?  */
-	    ptrace (PTRACE_CONT, new_pid, 0, WSTOPSIG (status));
+	    linux_resume_one_lwp (new_lwp, 0, WSTOPSIG (status), NULL);
 	}
 
       /* Always resume the current thread.  If we are stopping
 	 threads, it will have a pending SIGSTOP; we may as well
 	 collect it now.  */
-      linux_resume_one_lwp (&event_child->head,
-			    event_child->stepping, 0, NULL);
+      linux_resume_one_lwp (event_child, event_child->stepping, 0, NULL);
     }
 }
 
@@ -355,10 +357,13 @@ get_stop_pc (void)
 {
   CORE_ADDR stop_pc = (*the_low_target.get_pc) ();
 
-  if (get_thread_lwp (current_inferior)->stepping)
-    return stop_pc;
-  else
-    return stop_pc - the_low_target.decr_pc_after_break;
+  if (! get_thread_lwp (current_inferior)->stepping)
+    stop_pc -= the_low_target.decr_pc_after_break;
+
+  if (debug_threads)
+    fprintf (stderr, "stop pc is 0x%lx\n", (long) stop_pc);
+
+  return stop_pc;
 }
 
 static void *
@@ -688,7 +693,7 @@ linux_detach_one_lwp (struct inferior_list_entry *entry, void *args)
       /* Clear stop_expected, so that the SIGSTOP will be reported.  */
       lwp->stop_expected = 0;
       if (lwp->stopped)
-	linux_resume_one_lwp (&lwp->head, 0, 0, NULL);
+	linux_resume_one_lwp (lwp, 0, 0, NULL);
       linux_wait_for_event (lwp->head.id, &wstat, __WALL);
     }
 
@@ -815,7 +820,11 @@ check_removed_breakpoint (struct lwp_info *event_child)
      decrement.  We go immediately from this function to resuming,
      and can not safely call get_stop_pc () again.  */
   if (the_low_target.set_pc != NULL)
-    (*the_low_target.set_pc) (stop_pc);
+    {
+      if (debug_threads)
+	fprintf (stderr, "Set pc to 0x%lx\n", (long) stop_pc);
+      (*the_low_target.set_pc) (stop_pc);
+    }
 
   /* We consumed the pending SIGTRAP.  */
   event_child->pending_is_breakpoint = 0;
@@ -849,7 +858,7 @@ status_pending_p (struct inferior_list_entry *entry, void *arg)
 	   So instead of reporting the old SIGTRAP, pretend we got to
 	   the breakpoint just after it was removed instead of just
 	   before; resume the process.  */
-	linux_resume_one_lwp (&lwp->head, 0, 0, NULL);
+	linux_resume_one_lwp (lwp, 0, 0, NULL);
 	return 0;
       }
 
@@ -943,14 +952,16 @@ retry:
     }
 
   if (debug_threads
-      && WIFSTOPPED (*wstatp))
+      && WIFSTOPPED (*wstatp)
+      && the_low_target.get_pc != NULL)
     {
       struct thread_info *saved_inferior = current_inferior;
+      CORE_ADDR pc;
+
       current_inferior = (struct thread_info *)
 	find_inferior_id (&all_threads, child->head.id);
-      /* For testing only; i386_stop_pc prints out a diagnostic.  */
-      if (the_low_target.get_pc != NULL)
-	get_stop_pc ();
+      pc = (*the_low_target.get_pc) ();
+      fprintf (stderr, "linux_wait_for_lwp: pc is 0x%lx\n", (long) pc);
       current_inferior = saved_inferior;
     }
 
@@ -1074,8 +1085,7 @@ linux_wait_for_event_1 (ptid_t ptid, int *wstat, int options)
 	  if (debug_threads)
 	    fprintf (stderr, "Expected stop.\n");
 	  event_child->stop_expected = 0;
-	  linux_resume_one_lwp (&event_child->head,
-				event_child->stepping, 0, NULL);
+	  linux_resume_one_lwp (event_child, event_child->stepping, 0, NULL);
 	  continue;
 	}
 
@@ -1117,7 +1127,7 @@ linux_wait_for_event_1 (ptid_t ptid, int *wstat, int options)
 	    info_p = &info;
 	  else
 	    info_p = NULL;
-	  linux_resume_one_lwp (&event_child->head,
+	  linux_resume_one_lwp (event_child,
 				event_child->stepping,
 				WSTOPSIG (*wstat), info_p);
 	  continue;
@@ -1147,7 +1157,7 @@ linux_wait_for_event_1 (ptid_t ptid, int *wstat, int options)
 	  event_child->bp_reinsert = 0;
 
 	  /* Clear the single-stepping flag and SIGTRAP as we resume.  */
-	  linux_resume_one_lwp (&event_child->head, 0, 0, NULL);
+	  linux_resume_one_lwp (event_child, 0, 0, NULL);
 	  continue;
 	}
 
@@ -1189,18 +1199,18 @@ linux_wait_for_event_1 (ptid_t ptid, int *wstat, int options)
 	     events.  */
 	  if (bp_status == 2)
 	    /* No need to reinsert.  */
-	    linux_resume_one_lwp (&event_child->head, 0, 0, NULL);
+	    linux_resume_one_lwp (event_child, 0, 0, NULL);
 	  else if (the_low_target.breakpoint_reinsert_addr == NULL)
 	    {
 	      event_child->bp_reinsert = stop_pc;
 	      uninsert_breakpoint (stop_pc);
-	      linux_resume_one_lwp (&event_child->head, 1, 0, NULL);
+	      linux_resume_one_lwp (event_child, 1, 0, NULL);
 	    }
 	  else
 	    {
 	      reinsert_breakpoint_by_bp
 		(stop_pc, (*the_low_target.breakpoint_reinsert_addr) ());
-	      linux_resume_one_lwp (&event_child->head, 0, 0, NULL);
+	      linux_resume_one_lwp (event_child, 0, 0, NULL);
 	    }
 
 	  continue;
@@ -1645,10 +1655,9 @@ stop_all_lwps (void)
    If SIGNAL is nonzero, give it that signal.  */
 
 static void
-linux_resume_one_lwp (struct inferior_list_entry *entry,
+linux_resume_one_lwp (struct lwp_info *lwp,
 		      int step, int signal, siginfo_t *info)
 {
-  struct lwp_info *lwp = (struct lwp_info *) entry;
   struct thread_info *saved_inferior;
 
   if (lwp->stopped == 0)
@@ -1709,8 +1718,8 @@ linux_resume_one_lwp (struct inferior_list_entry *entry,
 
   if (debug_threads && the_low_target.get_pc != NULL)
     {
-      fprintf (stderr, "  ");
-      (*the_low_target.get_pc) ();
+      CORE_ADDR pc = (*the_low_target.get_pc) ();
+      fprintf (stderr, "  resuming from pc 0x%lx\n", (long) pc);
     }
 
   /* If we have pending signals, consume one unless we are trying to reinsert
@@ -1918,7 +1927,7 @@ linux_resume_one_thread (struct inferior_list_entry *entry, void *arg)
       else
 	step = (lwp->resume->kind == resume_step);
 
-      linux_resume_one_lwp (&lwp->head, step, lwp->resume->sig, NULL);
+      linux_resume_one_lwp (lwp, step, lwp->resume->sig, NULL);
     }
   else
     {

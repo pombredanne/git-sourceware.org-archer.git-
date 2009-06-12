@@ -33,6 +33,7 @@ static void *stream;
 /* Macros to extract operands from the instruction word.  */
 #define OP_A(i) ((i >> 4) & 0xf)
 #define OP_B(i) (i & 0xf)
+#define INST2OFFSET(o) ((((signed short)((o & ((1<<10)-1))<<6))>>6)<<1)
 
 static const char * reg_names[16] =
   { "$fp", "$sp", "$r0", "$r1", "$r2", "$r3", "$r4", "$r5",
@@ -90,6 +91,17 @@ print_insn_moxie (bfd_vma addr, struct disassemble_info * info)
 	      goto fail;
 	    imm = bfd_getb32 (buffer);
 	    fpr (stream, "%s\t0x%x", opcode->name, imm);
+	    length = 6;
+	  }
+	  break;
+	case MOXIE_F1_M:
+	  {
+	    unsigned imm;
+	    if ((status = info->read_memory_func (addr + 2, buffer, 4, info)))
+	      goto fail;
+	    imm = bfd_getb32 (buffer);
+	    fpr (stream, "%s\t", opcode->name);
+	    info->print_address_func ((bfd_vma) imm, info);
 	    length = 6;
 	  }
 	  break;
@@ -165,11 +177,13 @@ print_insn_moxie (bfd_vma addr, struct disassemble_info * info)
   else
     {
       /* Extract the Form 3 opcode.  */
-      opcode = &moxie_form2_opc_info[(iword >> 12) & 3];
+      opcode = &moxie_form3_opc_info[(iword >> 10) & 15];
       switch (opcode->itype)
 	{
-	case MOXIE_F3_NARG:
-	  fpr (stream, "%s", opcode->name);
+	case MOXIE_F3_PCREL:
+	  fpr (stream, "%s\t", opcode->name);
+	  info->print_address_func ((bfd_vma) (addr + INST2OFFSET(iword)), 
+				    info);
 	  break;
 	default:
 	  abort();

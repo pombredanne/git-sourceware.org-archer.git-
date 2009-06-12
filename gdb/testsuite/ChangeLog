@@ -1,3 +1,117 @@
+2009-06-09  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.mi/mi-async.exp, gdb.mi/mi-basics.exp,
+	gdb.mi/mi-break.exp, gdb.mi/mi-cli.exp,
+	gdb.mi/mi-disassemble.exp, gdb.mi/mi-eval.exp,
+	gdb.mi/mi-file-transfer.exp, gdb.mi/mi-file.exp,
+	gdb.mi/mi-regs.exp, gdb.mi/mi-return.exp,
+	gdb.mi/mi-simplerun.exp, gdb.mi/mi-stepi.exp,
+	gdb.mi/mi-var-block.exp, gdb.mi/mi-var-cmd.exp,
+	gdb.mi/mi-var-display.exp, gdb.mi/mi-var-invalidate.exp,
+	gdb.mi/mi-watch.exp, gdb.mi/mi2-basics.exp,
+	gdb.mi/mi2-break.exp, gdb.mi/mi2-cli.exp,
+	gdb.mi/mi2-disassemble.exp, gdb.mi/mi2-eval.exp,
+	gdb.mi/mi2-file.exp, gdb.mi/mi2-regs.exp,
+	gdb.mi/mi2-return.exp, gdb.mi/mi2-simplerun.exp,
+	gdb.mi/mi2-stepi.exp, gdb.mi/mi2-var-block.exp,
+	gdb.mi/mi2-var-child.exp, gdb.mi/mi2-var-cmd.exp,
+	gdb.mi/mi2-var-display.exp, gdb.mi/mi2-watch.exp,
+	gdb.server/ext-run.exp, gdb.server/file-transfer.exp,
+	gdb.server/server-mon.exp, gdb.server/server-run.exp,
+	gdb.trace/actions.exp, gdb.trace/backtrace.exp,
+	gdb.trace/deltrace.exp, gdb.trace/infotrace.exp,
+	gdb.trace/packetlen.exp, gdb.trace/passc-dyn.exp,
+	gdb.trace/passcount.exp, gdb.trace/report.exp,
+	gdb.trace/save-trace.exp, gdb.trace/tfind.exp,
+	gdb.trace/tracecmd.exp, gdb.trace/while-dyn.exp,
+	gdb.trace/while-stepping.exp: Use a unique name for the compiled
+	executable.
+
+2009-06-07  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.threads/manythreads.c (main): Check if PTHREAD_STACK_MIN is
+	defined before referencing it.
+
+2009-06-03  Doug Evans  <dje@google.com>
+
+	* gdb.arch/i386-sse.exp: Test xmm[8-15] if amd64.
+	* gdb.arch/i386-see.c: Ditto.
+
+2009-05-30  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* gdb.base/macscp.exp (info_macro): Return undefined if undefined.
+	(check_macro): Return 1 if undefined.
+	If first test fails, check if macro debug information is available,
+	and report unsupported test if no macro information is found.
+
+2009-05-29  Doug Evans  <dje@google.com>
+
+	* gdb.threads/hand-call-in-threads.exp: New.
+	* gdb.threads/hand-call-in-threads.c: New.
+
+2009-05-29  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.base/break-always.exp: Change "1" to "on".
+	Add confirmation check.
+
+2009-05-28  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.threads/threxit-hop-specific.c: New.
+	* gdb.threads/threxit-hop-specific.exp: New.
+	* gdb.threads/thread-execl.c: New.
+	* gdb.threads/thread-execl.exp: New.
+
+2009-05-27  Tom Tromey  <tromey@redhat.com>
+	    Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* lib/mi-support.exp (mi_varobj_update_dynamic): New proc.
+	(mi_child_regexp): Likewise.
+	(mi_list_varobj_children_range): Likewise.
+	(mi_get_features): Likewise.
+	(mi_list_varobj_children): Rewrite.
+	* gdb.python/python-mi.exp: New file.
+
+2009-05-27  Tom Tromey  <tromey@redhat.com>
+	    Thiago Jung Bauermann  <bauerman@br.ibm.com>
+	    Phil Muldoon  <pmuldoon@redhat.com>
+	    Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* gdb.python/python-prettyprint.exp: New file.
+	* gdb.python/python-prettyprint.c: New file.
+	* gdb.python/python-prettyprint.py: New file.
+	* gdb.base/display.exp: print/r is now valid.
+
+2009-05-27  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+	    Tom Tromey  <tromey@redhat.com>
+	    Pedro Alves  <pedro@codesourcery.com>
+	    Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* gdb.python/python-template.exp: New file.
+	* gdb.python/python-template.cc: New file.
+	* gdb.python/python.exp (gdb_py_test_multiple): Add two objfile
+	tests.
+	* gdb.python/python-value.exp (py_objfile_tests): New proc.
+	Call it.
+	(test_value_after_death): New proc.
+	* gdb.python/python-value.c (PTR): New typedef.
+	(main): New variable 'x'.
+
+2009-05-27  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.python/python.exp (gdb_py_test_multiple): Add two objfile
+	tests.
+	* gdb.python/python-value.exp (py_objfile_tests): New proc.
+	Call it.
+
+2009-05-27  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.mi/nsthrexec.c, gdb.mi/mi-nsthrexec.exp: New.
+
+2009-05-24  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.threads/fork-thread-pending.c: New.
+	* gdb.threads/fork-thread-pending.exp: New.
+
 2009-05-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* gdb.dwarf2/dw2-strp.exp (p a_string2, ptype a_string2): New.

@@ -135,6 +135,8 @@ extern void clear_proceed_status (void);
 
 extern void proceed (CORE_ADDR, enum target_signal, int);
 
+extern int sched_multi;
+
 /* When set, stop the 'step' command if we enter a function which has
    no line number information.  The normal behavior is that we step
    over such function.  */
@@ -195,12 +197,6 @@ extern void terminal_inferior (void);
 extern void terminal_init_inferior (void);
 
 extern void terminal_init_inferior_with_pgrp (int pgrp);
-
-/* From procfs.c */
-
-extern int proc_iterate_over_mappings (int (*)(int, CORE_ADDR));
-
-extern ptid_t procfs_first_available (void);
 
 /* From fork-child.c */
 
@@ -490,6 +486,10 @@ extern void print_inferior (struct ui_out *uiout, int requested_inferior);
 
 /* Returns true if the inferior list is not empty.  */
 extern int have_inferiors (void);
+
+/* Returns true if there are any live inferiors in the inferior list
+   (not cores, not executables, real live processes).  */
+extern int have_live_inferiors (void);
 
 /* Return a pointer to the current inferior.  It is an error to call
    this if there is no current inferior.  */

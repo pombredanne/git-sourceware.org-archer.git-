@@ -24,6 +24,7 @@
     Some use A and B registers                      (MOXIE_F1_AB)
     Some use A and consume a 4 byte immediate value (MOXIE_F1_A4)
     Some use just a 4 byte immediate value          (MOXIE_F1_4)
+    Some use just a 4 byte memory address           (MOXIE_F1_M)
     Some use B and an indirect A                    (MOXIE_F1_AiB)
     Some use A and an indirect B                    (MOXIE_F1_ABi)
     Some consume a 4 byte immediate value and use X (MOXIE_F1_4A)
@@ -37,7 +38,8 @@
 
   Form 3 instructions also come in different flavors:
 
-    Some have no arguments                          (MOXIE_F3_NARG).  */
+    Some have no arguments                          (MOXIE_F3_NARG)
+    Some have a 10-bit PC relative operand          (MOXIE_F3_PCREL).  */
 
 #define MOXIE_F1_NARG 0x100
 #define MOXIE_F1_A    0x101
@@ -50,11 +52,13 @@
 #define MOXIE_F1_4A   0x108
 #define MOXIE_F1_AiB4 0x109
 #define MOXIE_F1_ABi4 0x10a
+#define MOXIE_F1_M    0x10b
 
 #define MOXIE_F2_NARG 0x200
 #define MOXIE_F2_A8V  0x201
 
-#define MOXIE_F3_NARG 0x300
+#define MOXIE_F3_NARG  0x300
+#define MOXIE_F3_PCREL 0x301
 
 typedef struct moxie_opc_info_t
 {
@@ -65,4 +69,4 @@ typedef struct moxie_opc_info_t
 
 extern const moxie_opc_info_t moxie_form1_opc_info[64];
 extern const moxie_opc_info_t moxie_form2_opc_info[4];
-extern const moxie_opc_info_t moxie_form3_opc_info[4];
+extern const moxie_opc_info_t moxie_form3_opc_info[16];

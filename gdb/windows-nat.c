@@ -2164,11 +2164,11 @@ init_windows_ops (void)
   windows_ops.to_pid_to_str = windows_pid_to_str;
   windows_ops.to_stop = windows_stop;
   windows_ops.to_stratum = process_stratum;
-  windows_ops.to_has_all_memory = 1;
-  windows_ops.to_has_memory = 1;
-  windows_ops.to_has_stack = 1;
-  windows_ops.to_has_registers = 1;
-  windows_ops.to_has_execution = 1;
+  windows_ops.to_has_all_memory = default_child_has_all_memory;
+  windows_ops.to_has_memory = default_child_has_memory;
+  windows_ops.to_has_stack = default_child_has_stack;
+  windows_ops.to_has_registers = default_child_has_registers;
+  windows_ops.to_has_execution = default_child_has_execution;
   windows_ops.to_pid_to_exec_file = windows_pid_to_exec_file;
   windows_ops.to_get_ada_task_ptid = windows_get_ada_task_ptid;
 
@@ -2204,6 +2204,10 @@ _initialize_windows_nat (void)
   set_cmd_completer (c, filename_completer);
 
   add_com_alias ("sharedlibrary", "dll-symbols", class_alias, 1);
+
+  add_com_alias ("add-shared-symbol-files", "dll-symbols", class_alias, 1);
+
+  add_com_alias ("assf", "dll-symbols", class_alias, 1);
 
 #ifdef __CYGWIN__
   add_setshow_boolean_cmd ("shell", class_support, &useshell, _("\

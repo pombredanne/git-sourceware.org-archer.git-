@@ -1,3 +1,24 @@
+2009-05-24  Doug Evans  <dje@google.com>
+
+	Global renaming of find_thread_pid to find_thread_ptid.
+	* server.h (find_thread_ptid): Renamed from find_thread_pid.
+	* inferiors.c (find_thread_ptid): Renamed from find_thread_pid.
+	All callers updated.
+
+	* linux-low.c (handle_extended_wait): Use linux_resume_one_lwp
+	to resume the newly created thread, don't call ptrace (PTRACE_CONT)
+	directly.
+
+	* linux-low.c (get_stop_pc): Print pc if debug_threads.
+	(check_removed_breakpoint, linux_wait_for_lwp): Ditto.
+	(linux_resume_one_lwp): Ditto.
+
+2009-05-23  Doug Evans  <dje@google.com>
+
+	* linux-low.c (linux_resume_one_lwp): Change type of first arg
+	from struct inferior_list_entry * to struct lwp_info *.
+	All callers updated.
+
 2009-05-13  Doug Evans  <dje@google.com>
 
 	* linux-x86-low.c: Don't include assert.h.

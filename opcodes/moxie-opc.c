@@ -44,18 +44,18 @@
 
   FORM 3 instructions start with a bits "11"...
 
-    11oovvvvvvvvvvvv
+    11oooovvvvvvvvvv
     0              F
 
-   oo           - form 3 opcode number
-   vvvvvvvvvvvv - 12-bit immediate value.  */
+   oooo         - form 3 opcode number
+   vvvvvvvvvv   - 10-bit immediate value.  */
 
 const moxie_opc_info_t moxie_form1_opc_info[64] =
   {
     { 0x00, MOXIE_F1_NARG, "nop" },
     { 0x01, MOXIE_F1_A4,   "ldi.l" },
     { 0x02, MOXIE_F1_AB,   "mov" },
-    { 0x03, MOXIE_F1_4,    "jsra" },
+    { 0x03, MOXIE_F1_M,    "jsra" },
     { 0x04, MOXIE_F1_NARG, "ret" },
     { 0x05, MOXIE_F1_AB,   "add.l" },
     { 0x06, MOXIE_F1_AB,   "push" },
@@ -67,18 +67,18 @@ const moxie_opc_info_t moxie_form1_opc_info[64] =
     { 0x0c, MOXIE_F1_ABi4, "ldo.l" },
     { 0x0d, MOXIE_F1_AiB4, "sto.l" },
     { 0x0e, MOXIE_F1_AB,   "cmp" },
-    { 0x0f, MOXIE_F1_4,    "beq" },
-    { 0x10, MOXIE_F1_4,    "bne" },
-    { 0x11, MOXIE_F1_4,    "blt" },
-    { 0x12, MOXIE_F1_4,    "bgt" },
-    { 0x13, MOXIE_F1_4,    "bltu" },
-    { 0x14, MOXIE_F1_4,    "bgtu" },
-    { 0x15, MOXIE_F1_4,    "bge" },
-    { 0x16, MOXIE_F1_4,    "ble" },
-    { 0x17, MOXIE_F1_4,    "bgeu" },
-    { 0x18, MOXIE_F1_4,    "bleu" },
+    { 0x0f, MOXIE_F1_NARG, "bad" },
+    { 0x10, MOXIE_F1_NARG, "bad" },
+    { 0x11, MOXIE_F1_NARG, "bad" },
+    { 0x12, MOXIE_F1_NARG, "bad" },
+    { 0x13, MOXIE_F1_NARG, "bad" },
+    { 0x14, MOXIE_F1_NARG, "bad" },
+    { 0x15, MOXIE_F1_NARG, "bad" },
+    { 0x16, MOXIE_F1_NARG, "bad" },
+    { 0x17, MOXIE_F1_NARG, "bad" },
+    { 0x18, MOXIE_F1_NARG, "bad" },
     { 0x19, MOXIE_F1_A,    "jsr" },
-    { 0x1a, MOXIE_F1_4,    "jmpa" },
+    { 0x1a, MOXIE_F1_M,    "jmpa" },
     { 0x1b, MOXIE_F1_A4,   "ldi.b" },
     { 0x1c, MOXIE_F1_ABi,  "ld.b" },
     { 0x1d, MOXIE_F1_A4,   "lda.b" },
@@ -126,11 +126,24 @@ const moxie_opc_info_t moxie_form2_opc_info[4] =
     { 0x03, MOXIE_F2_A8V,  "ssr" }
   };
 
-const moxie_opc_info_t moxie_form3_opc_info[4] =
+const moxie_opc_info_t moxie_form3_opc_info[16] =
   {
-    { 0x00, MOXIE_F2_NARG, "bad" },
-    { 0x01, MOXIE_F2_NARG, "bad" },
-    { 0x02, MOXIE_F2_NARG, "bad" },
-    { 0x03, MOXIE_F2_NARG, "bad" }
+    { 0x00, MOXIE_F3_PCREL,"beq" },
+    { 0x01, MOXIE_F3_PCREL,"bne" },
+    { 0x02, MOXIE_F3_PCREL,"blt" },
+    { 0x03, MOXIE_F3_PCREL,"bgt" },
+    { 0x04, MOXIE_F3_PCREL,"bltu" },
+    { 0x05, MOXIE_F3_PCREL,"bgtu" },
+    { 0x06, MOXIE_F3_PCREL,"bge" },
+    { 0x07, MOXIE_F3_PCREL,"ble" },
+    { 0x08, MOXIE_F3_PCREL,"bgeu" },
+    { 0x09, MOXIE_F3_PCREL,"bleu" },
+    { 0x0a, MOXIE_F3_NARG, "bad" },
+    { 0x0b, MOXIE_F3_NARG, "bad" },
+    { 0x0c, MOXIE_F3_NARG, "bad" },
+    { 0x0d, MOXIE_F3_NARG, "bad" },
+    { 0x0e, MOXIE_F3_NARG, "bad" },
+    { 0x0f, MOXIE_F3_NARG, "bad" }
   };
+
 

@@ -1,5 +1,5 @@
 /* Mach-O support for BFD.
-   Copyright 1999, 2000, 2001, 2002, 2003, 2005, 2007, 2008
+   Copyright 1999, 2000, 2001, 2002, 2003, 2005, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
@@ -24,6 +24,7 @@
 
 #include "bfd.h"
 
+/* Symbol n_type values.  */
 #define BFD_MACH_O_N_STAB  0xe0	/* If any of these bits set, a symbolic debugging entry.  */
 #define BFD_MACH_O_N_PEXT  0x10	/* Private external symbol bit.  */
 #define BFD_MACH_O_N_TYPE  0x0e	/* Mask for the type bits.  */
@@ -34,11 +35,29 @@
 #define BFD_MACH_O_N_PBUD  0x0c /* Prebound undefined (defined in a dylib).  */
 #define BFD_MACH_O_N_SECT  0x0e	/* Defined in section number n_sect.  */
 
-#define BFD_MACH_O_NO_SECT 0
+#define BFD_MACH_O_NO_SECT 0	/* Symbol not in any section of the image.  */
 
-#define BFD_MACH_O_SYM_NTYPE(SYM) (((SYM)->udata.i >> 24) & 0xff)
-#define BFD_MACH_O_SYM_NSECT(SYM) (((SYM)->udata.i >> 16) & 0xff)
-#define BFD_MACH_O_SYM_NDESC(SYM) ((SYM)->udata.i & 0xffff)
+/* Symbol n_desc flags.  */
+#define BFD_MACH_O_REFERENCE_FLAG_UNDEFINED_NON_LAZY		0x00
+#define BFD_MACH_O_REFERENCE_FLAG_UNDEFINED_LAZY		0x01
+#define BFD_MACH_O_REFERENCE_FLAG_DEFINED			0x02
+#define BFD_MACH_O_REFERENCE_FLAG_PRIVATE_DEFINED		0x03
+#define BFD_MACH_O_REFERENCE_FLAG_PRIVATE_UNDEFINED_NON_LAZY	0x04
+#define BFD_MACH_O_REFERENCE_FLAG_PRIVATE_UNDEFINED_LAZY	0x05
+#define BFD_MACH_O_REFERENCED_DYNAMICALLY			0x10
+#define BFD_MACH_O_N_DESC_DISCARDED				0x20
+#define BFD_MACH_O_N_NO_DEAD_STRIP				0x20
+#define BFD_MACH_O_N_WEAK_REF					0x40
+#define BFD_MACH_O_N_WEAK_DEF					0x80
+
+typedef enum bfd_mach_o_mach_header_magic
+{
+  BFD_MACH_O_MH_MAGIC = 0xfeedface,
+  BFD_MACH_O_MH_CIGAM = 0xcefaedfe,
+  BFD_MACH_O_MH_MAGIC_64 = 0xfeedfacf,
+  BFD_MACH_O_MH_CIGAM_64 = 0xcffaedfe
+}
+bfd_mach_o_mach_header_magic;
 
 typedef enum bfd_mach_o_ppc_thread_flavour
 {
@@ -134,6 +153,12 @@ typedef enum bfd_mach_o_cpu_type
 }
 bfd_mach_o_cpu_type;
 
+typedef enum bfd_mach_o_cpu_subtype
+{
+  BFD_MACH_O_CPU_SUBTYPE_X86_ALL = 3
+}
+bfd_mach_o_cpu_subtype;
+
 typedef enum bfd_mach_o_filetype
 {
   BFD_MACH_O_MH_OBJECT = 1,
@@ -188,11 +213,33 @@ typedef enum bfd_mach_o_section_type
   /* Section with only lazy symbol pointers.  */
   BFD_MACH_O_S_LAZY_SYMBOL_POINTERS = 0x7,
 
-  /* Section with only symbol stubs, byte size of stub in the reserved2 field.  */
+  /* Section with only symbol stubs, byte size of stub in the reserved2
+     field.  */
   BFD_MACH_O_S_SYMBOL_STUBS = 0x8,
 
   /* Section with only function pointers for initialization.  */
-  BFD_MACH_O_S_MOD_INIT_FUNC_POINTERS = 0x9
+  BFD_MACH_O_S_MOD_INIT_FUNC_POINTERS = 0x9,
+
+  /* Section with only function pointers for termination.  */
+  BFD_MACH_O_S_MOD_FINI_FUNC_POINTERS = 0xa,
+
+  /* Section contains symbols that are coalesced by the linkers.  */
+  BFD_MACH_O_S_COALESCED = 0xb,
+
+  /* Zero fill on demand section (possibly larger than 4 GB).  */
+  BFD_MACH_O_S_GB_ZEROFILL = 0xc,
+
+  /* Section with only pairs of function pointers for interposing.  */
+  BFD_MACH_O_S_INTERPOSING = 0xd,
+
+  /* Section with only 16 byte literals.  */
+  BFD_MACH_O_S_16BYTE_LITERALS = 0xe,
+
+  /* Section contains DTrace Object Format.  */
+  BFD_MACH_O_S_DTRACE_DOF = 0xf,
+
+  /* Section with only lazy symbol pointers to lazy loaded dylibs.  */
+  BFD_MACH_O_S_LAZY_DYLIB_SYMBOL_POINTERS = 0x10
 }
 bfd_mach_o_section_type;
 
@@ -218,14 +265,29 @@ bfd_mach_o_section_type;
 #define BFD_MACH_O_S_ATTR_EXT_RELOC         0x00000200
 
 /* Section contains some machine instructions.  */
-#define BFD_MACH_O_S_ATTR_SOME_INSTRUCTIONS 0x00004000
+#define BFD_MACH_O_S_ATTR_SOME_INSTRUCTIONS 0x00000400
 
+/* A debug section.  */
 #define BFD_MACH_O_S_ATTR_DEBUG             0x02000000
+
+/* Used with i386 stubs.  */
+#define BFD_MACH_O_S_SELF_MODIFYING_CODE    0x04000000
+
+/* Blocks are live if they reference live blocks.  */
+#define BFD_MACH_O_S_ATTR_LIVE_SUPPORT      0x08000000
+
+/* No dead stripping.  */
+#define BFD_MACH_O_S_ATTR_NO_DEAD_STRIP     0x10000000
+
+/* Section symbols can be stripped in files with MH_DYLDLINK flag.  */
+#define BFD_MACH_O_S_ATTR_STRIP_STATIC_SYMS 0x20000000
+
+/* Section contains coalesced symbols that are not to be in the TOC of an
+   archive.  */
+#define BFD_MACH_O_S_ATTR_NO_TOC            0x40000000
 
 /* Section contains only true machine instructions.  */
 #define BFD_MACH_O_S_ATTR_PURE_INSTRUCTIONS 0x80000000
-
-typedef unsigned long bfd_mach_o_cpu_subtype;
 
 typedef struct bfd_mach_o_header
 {
@@ -242,6 +304,9 @@ typedef struct bfd_mach_o_header
   enum bfd_endian byteorder;
 }
 bfd_mach_o_header;
+
+#define BFD_MACH_O_HEADER_SIZE 28
+#define BFD_MACH_O_HEADER_64_SIZE 32
 
 typedef struct bfd_mach_o_section
 {
@@ -260,6 +325,8 @@ typedef struct bfd_mach_o_section
   unsigned long reserved3;
 }
 bfd_mach_o_section;
+#define BFD_MACH_O_SECTION_SIZE 68
+#define BFD_MACH_O_SECTION_64_SIZE 80
 
 typedef struct bfd_mach_o_segment_command
 {
@@ -276,22 +343,77 @@ typedef struct bfd_mach_o_segment_command
   asection *segment;
 }
 bfd_mach_o_segment_command;
+#define BFD_MACH_O_LC_SEGMENT_SIZE 56
+#define BFD_MACH_O_LC_SEGMENT_64_SIZE 72
 
 /* Protection flags.  */
 #define BFD_MACH_O_PROT_READ    0x01
 #define BFD_MACH_O_PROT_WRITE   0x02
 #define BFD_MACH_O_PROT_EXECUTE 0x04
 
+/* Generic relocation types (used by i386).  */
+#define BFD_MACH_O_GENERIC_RELOC_VANILLA 	0
+#define BFD_MACH_O_GENERIC_RELOC_PAIR	 	1
+#define BFD_MACH_O_GENERIC_RELOC_SECTDIFF	2
+#define BFD_MACH_O_GENERIC_RELOC_PB_LA_PTR	3
+#define BFD_MACH_O_GENERIC_RELOC_LOCAL_SECTDIFF	4
+
+/* Size of a relocation entry.  */
+#define BFD_MACH_O_RELENT_SIZE 8
+
+/* Fields for a normal (non-scattered) entry.  */
+#define BFD_MACH_O_R_PCREL		0x01000000
+#define BFD_MACH_O_GET_R_LENGTH(s)	(((s) >> 25) & 0x3)
+#define BFD_MACH_O_R_EXTERN		0x08000000
+#define BFD_MACH_O_GET_R_TYPE(s)	(((s) >> 28) & 0x0f)
+#define BFD_MACH_O_GET_R_SYMBOLNUM(s)	((s) & 0x00ffffff)
+#define BFD_MACH_O_SET_R_LENGTH(l)	(((l) & 0x3) << 25)
+#define BFD_MACH_O_SET_R_TYPE(t)	(((t) & 0xf) << 28)
+#define BFD_MACH_O_SET_R_SYMBOLNUM(s)	((s) & 0x00ffffff)
+
+/* Fields for a scattered entry.  */
+#define BFD_MACH_O_SR_SCATTERED		0x80000000
+#define BFD_MACH_O_SR_PCREL		0x40000000
+#define BFD_MACH_O_GET_SR_LENGTH(s)	(((s) >> 28) & 0x3)
+#define BFD_MACH_O_GET_SR_TYPE(s)	(((s) >> 24) & 0x0f)
+#define BFD_MACH_O_GET_SR_ADDRESS(s)	((s) & 0x00ffffff)
+#define BFD_MACH_O_SET_SR_LENGTH(l)	(((l) & 0x3) << 28)
+#define BFD_MACH_O_SET_SR_TYPE(t)	(((t) & 0xf) << 24)
+#define BFD_MACH_O_SET_SR_ADDRESS(s)	((s) & 0x00ffffff)
+
+/* Expanded internal representation of a relocation entry.  */
+typedef struct bfd_mach_o_reloc_info
+{
+  bfd_vma r_address;
+  bfd_vma r_value;
+  unsigned int r_scattered : 1;
+  unsigned int r_type : 4;
+  unsigned int r_pcrel : 1;
+  unsigned int r_length : 2;
+  unsigned int r_extern : 1;
+}
+bfd_mach_o_reloc_info;
+
+typedef struct bfd_mach_o_asymbol
+{
+  /* The actual symbol which the rest of BFD works with.  */
+  asymbol symbol;
+
+  /* Fields from Mach-O symbol.  */
+  unsigned char n_type;
+  unsigned char n_sect;
+  unsigned short n_desc;
+}
+bfd_mach_o_asymbol;
+
 typedef struct bfd_mach_o_symtab_command
 {
-  unsigned long symoff;
-  unsigned long nsyms;
-  unsigned long stroff;
-  unsigned long strsize;
-  asymbol *symbols;
+  unsigned int symoff;
+  unsigned int nsyms;
+  unsigned int stroff;
+  unsigned int strsize;
+  bfd_mach_o_asymbol *symbols;
   char *strtab;
-  asection *stabs_segment;
-  asection *stabstr_segment;
 }
 bfd_mach_o_symtab_command;
 
@@ -506,9 +628,9 @@ bfd_mach_o_uuid_command;
 typedef struct bfd_mach_o_load_command
 {
   bfd_mach_o_load_command_type type;
-  unsigned int type_required;
-  bfd_vma offset;
-  bfd_vma len;
+  bfd_boolean type_required;
+  unsigned int offset;
+  unsigned int len;
   union
   {
     bfd_mach_o_segment_command segment;
@@ -526,43 +648,79 @@ bfd_mach_o_load_command;
 
 typedef struct mach_o_data_struct
 {
+  /* Mach-O header.  */
   bfd_mach_o_header header;
+  /* Array of load commands (length is given by header.ncmds).  */
   bfd_mach_o_load_command *commands;
-  unsigned long nsymbols;
-  asymbol *symbols;
+
+  /* Flatten array of sections.  The array is 0-based.  */
   unsigned long nsects;
   bfd_mach_o_section **sections;
-  bfd *ibfd;
+
+  /* Used while writting: current length of the output file.  This is used
+     to allocate space in the file.  */
+  ufile_ptr filelen;
 }
 mach_o_data_struct;
-
-#define bfd_get_mach_o_data(abfd) ((abfd)->tdata.mach_o_data)
-
 typedef struct mach_o_data_struct bfd_mach_o_data_struct;
 
-bfd_boolean        bfd_mach_o_valid  (bfd *);
-int                bfd_mach_o_scan_read_symtab_symbol        (bfd *, bfd_mach_o_symtab_command *, asymbol *, unsigned long);
-int                bfd_mach_o_scan_read_symtab_strtab        (bfd *, bfd_mach_o_symtab_command *);
-int                bfd_mach_o_scan_read_symtab_symbols       (bfd *, bfd_mach_o_symtab_command *);
-int                bfd_mach_o_scan_read_dysymtab_symbol      (bfd *, bfd_mach_o_dysymtab_command *, bfd_mach_o_symtab_command *, asymbol *, unsigned long);
-int                bfd_mach_o_scan_start_address             (bfd *);
-int                bfd_mach_o_scan                           (bfd *, bfd_mach_o_header *, bfd_mach_o_data_struct *);
-bfd_boolean        bfd_mach_o_mkobject                       (bfd *);
-const bfd_target * bfd_mach_o_object_p                       (bfd *);
-const bfd_target * bfd_mach_o_core_p                         (bfd *);
-const bfd_target * bfd_mach_o_archive_p                      (bfd *);
-bfd *              bfd_mach_o_openr_next_archived_file       (bfd *, bfd *);
-int                bfd_mach_o_lookup_section                 (bfd *, asection *, bfd_mach_o_load_command **, bfd_mach_o_section **);
-int                bfd_mach_o_lookup_command                 (bfd *, bfd_mach_o_load_command_type, bfd_mach_o_load_command **);
-unsigned long      bfd_mach_o_stack_addr                     (enum bfd_mach_o_cpu_type);
-int                bfd_mach_o_core_fetch_environment         (bfd *, unsigned char **, unsigned int *);
-char *             bfd_mach_o_core_file_failing_command      (bfd *);
-int                bfd_mach_o_core_file_failing_signal       (bfd *);
-bfd_boolean        bfd_mach_o_core_file_matches_executable_p (bfd *, bfd *);
-bfd *bfd_mach_o_fat_extract (bfd *, bfd_format , const bfd_arch_info_type *);
+/* Target specific routines.  */
+typedef struct bfd_mach_o_backend_data
+{
+  bfd_boolean (*_bfd_mach_o_swap_reloc_in)(arelent *, bfd_mach_o_reloc_info *);
+  bfd_boolean (*_bfd_mach_o_swap_reloc_out)(arelent *, bfd_mach_o_reloc_info *);
+}
+bfd_mach_o_backend_data;
 
-extern const bfd_target mach_o_be_vec;
-extern const bfd_target mach_o_le_vec;
+#define bfd_get_mach_o_data(abfd) ((abfd)->tdata.mach_o_data)
+#define bfd_mach_o_get_backend_data(abfd) \
+  ((bfd_mach_o_backend_data*)(abfd)->xvec->backend_data)
+
+bfd_boolean bfd_mach_o_valid (bfd *);
+int bfd_mach_o_scan_read_symtab_symbol (bfd *, bfd_mach_o_symtab_command *, 
+                                        bfd_mach_o_asymbol *, unsigned long);
+int bfd_mach_o_scan_read_symtab_strtab (bfd *, bfd_mach_o_symtab_command *);
+int bfd_mach_o_scan_read_symtab_symbols (bfd *, bfd_mach_o_symtab_command *);
+int bfd_mach_o_scan_read_dysymtab_symbol (bfd *, bfd_mach_o_dysymtab_command *, bfd_mach_o_symtab_command *, bfd_mach_o_asymbol *, unsigned long);
+int bfd_mach_o_scan_start_address (bfd *);
+int bfd_mach_o_scan (bfd *, bfd_mach_o_header *, bfd_mach_o_data_struct *);
+bfd_boolean bfd_mach_o_mkobject_init (bfd *);
+const bfd_target *bfd_mach_o_object_p (bfd *);
+const bfd_target *bfd_mach_o_core_p (bfd *);
+const bfd_target *bfd_mach_o_archive_p (bfd *);
+bfd *bfd_mach_o_openr_next_archived_file (bfd *, bfd *);
+int bfd_mach_o_lookup_section (bfd *, asection *, bfd_mach_o_load_command **, bfd_mach_o_section **);
+int bfd_mach_o_lookup_command (bfd *, bfd_mach_o_load_command_type, bfd_mach_o_load_command **);
+bfd_boolean bfd_mach_o_write_contents (bfd *);
+bfd_boolean bfd_mach_o_bfd_copy_private_symbol_data (bfd *, asymbol *,
+                                                     bfd *, asymbol *);
+bfd_boolean bfd_mach_o_bfd_copy_private_section_data (bfd *, asection *,
+                                                      bfd *, asection *);
+bfd_boolean bfd_mach_o_bfd_copy_private_bfd_data (bfd *, bfd *);
+long bfd_mach_o_get_symtab_upper_bound (bfd *);
+long bfd_mach_o_canonicalize_symtab (bfd *, asymbol **);
+long bfd_mach_o_get_reloc_upper_bound (bfd *abfd ATTRIBUTE_UNUSED,
+                                       asection *asect);
+long bfd_mach_o_canonicalize_reloc (bfd *abfd, asection *asect,
+                                    arelent **rels, asymbol **syms);
+asymbol *bfd_mach_o_make_empty_symbol (bfd *);
+void bfd_mach_o_get_symbol_info (bfd *, asymbol *, symbol_info *);
+void bfd_mach_o_print_symbol (bfd *, PTR, asymbol *, bfd_print_symbol_type);
+bfd_boolean bfd_mach_o_bfd_print_private_bfd_data (bfd *, PTR);
+int bfd_mach_o_sizeof_headers (bfd *, struct bfd_link_info *);
+unsigned long bfd_mach_o_stack_addr (enum bfd_mach_o_cpu_type);
+int bfd_mach_o_core_fetch_environment (bfd *, unsigned char **, unsigned int *);
+char *bfd_mach_o_core_file_failing_command (bfd *);
+int bfd_mach_o_core_file_failing_signal (bfd *);
+bfd_boolean bfd_mach_o_core_file_matches_executable_p (bfd *, bfd *);
+bfd *bfd_mach_o_fat_extract (bfd *, bfd_format , const bfd_arch_info_type *);
+const bfd_target *bfd_mach_o_header_p (bfd *, bfd_mach_o_filetype,
+                                       bfd_mach_o_cpu_type);
+bfd_boolean bfd_mach_o_build_commands (bfd *abfd);
+bfd_boolean bfd_mach_o_set_section_contents (bfd *, asection *, const void *,
+                                             file_ptr, bfd_size_type);
+unsigned int bfd_mach_o_version (bfd *);
+
 extern const bfd_target mach_o_fat_vec;
 
 #endif /* _BFD_MACH_O_H_ */

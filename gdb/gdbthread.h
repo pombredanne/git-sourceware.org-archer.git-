@@ -165,6 +165,11 @@ struct thread_info
      next time inferior stops if it stops due to stepping.  */
   int step_multi;
 
+  /* This is used to remember when a fork or vfork event was caught by
+     a catchpoint, and thus the event is to be followed at the next
+     resume of the thread, and not immediately.  */
+  struct target_waitstatus pending_follow;
+
   /* Last signal that the inferior received (why it stopped).  */
   enum target_signal stop_signal;
 
@@ -224,7 +229,7 @@ extern int in_thread_list (ptid_t ptid);
 extern int valid_thread_id (int thread);
 
 /* Search function to lookup a thread by 'pid'.  */
-extern struct thread_info *find_thread_pid (ptid_t ptid);
+extern struct thread_info *find_thread_ptid (ptid_t ptid);
 
 /* Find thread by GDB user-visible thread number.  */
 struct thread_info *find_thread_id (int num);

@@ -157,7 +157,7 @@ dwarf_expr_frame_base (void *baton, gdb_byte **start, size_t * length)
      something has gone wrong.  */
   gdb_assert (framefunc != NULL);
 
-  if (SYMBOL_OPS (framefunc) == &dwarf2_loclist_funcs)
+  if (SYMBOL_COMPUTED_OPS (framefunc) == &dwarf2_loclist_funcs)
     {
       struct dwarf2_loclist_baton *symbaton;
       struct frame_info *frame = debaton->frame;
@@ -166,7 +166,7 @@ dwarf_expr_frame_base (void *baton, gdb_byte **start, size_t * length)
       *start = find_location_expression (symbaton, length,
 					 get_frame_address_in_block (frame));
     }
-  else if (SYMBOL_OPS (framefunc) == &dwarf2_locexpr_funcs)
+  else if (SYMBOL_COMPUTED_OPS (framefunc) == &dwarf2_locexpr_funcs)
     {
       struct dwarf2_locexpr_baton *symbaton;
 
@@ -175,7 +175,7 @@ dwarf_expr_frame_base (void *baton, gdb_byte **start, size_t * length)
       *start = symbaton->data;
       *length = symbaton->size;
     }
-  else if (SYMBOL_OPS (framefunc) == &dwarf2_missing_funcs)
+  else if (SYMBOL_COMPUTED_OPS (framefunc) == &dwarf2_missing_funcs)
     {
       struct dwarf2_locexpr_baton *symbaton;
 
@@ -186,8 +186,9 @@ dwarf_expr_frame_base (void *baton, gdb_byte **start, size_t * length)
     }
   else
     internal_error (__FILE__, __LINE__,
-		    _("Unsupported SYMBOL_OPS %p for \"%s\""),
-		    SYMBOL_OPS (framefunc), SYMBOL_PRINT_NAME (framefunc));
+		    _("Unsupported SYMBOL_COMPUTED_OPS %p for \"%s\""),
+		    SYMBOL_COMPUTED_OPS (framefunc),
+		    SYMBOL_PRINT_NAME (framefunc));
 
   if (*start == NULL)
     error (_("Could not find the frame base for \"%s\"."),
@@ -239,7 +240,7 @@ object_address_cleanup (void *prev_save_voidp)
    used to derive other object addresses by DW_OP_push_object_address.
 
    It would be useful to sanity check ADDRESS - such as for some objects with
-   unset VALUE_ADDRESS - but some valid addresses may be zero (such as first
+   unset value_raw_address - but some valid addresses may be zero (such as first
    objects in relocatable .o files).  */
 
 void
@@ -383,7 +384,7 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
       retval = allocate_value (SYMBOL_TYPE (var));
       VALUE_LVAL (retval) = lval_memory;
       set_value_lazy (retval, 1);
-      VALUE_ADDRESS (retval) = address;
+      set_value_address (retval, address);
     }
 
   set_value_initialized (retval, ctx->initialized);
@@ -651,7 +652,7 @@ locexpr_tracepoint_var_ref (struct symbol * symbol, struct agent_expr * ax,
 
 /* The set of location functions used with the DWARF-2 expression
    evaluator.  */
-const struct symbol_ops dwarf2_locexpr_funcs = {
+const struct symbol_computed_ops dwarf2_locexpr_funcs = {
   locexpr_read_variable,
   locexpr_read_needs_frame,
   locexpr_describe_location,
@@ -728,7 +729,7 @@ loclist_tracepoint_var_ref (struct symbol * symbol, struct agent_expr * ax,
 }
 
 /* The set of location functions used with the DWARF-2 location lists.  */
-const struct symbol_ops dwarf2_loclist_funcs = {
+const struct symbol_computed_ops dwarf2_loclist_funcs = {
   loclist_read_variable,
   loclist_read_needs_frame,
   loclist_describe_location,
@@ -769,7 +770,7 @@ missing_tracepoint_var_ref (struct symbol *symbol, struct agent_expr *ax,
 
 /* The set of location functions used with the DWARF-2 evaluator when we are
    unable to resolve the symbols.  */
-const struct symbol_ops dwarf2_missing_funcs = {
+const struct symbol_computed_ops dwarf2_missing_funcs = {
   missing_read_variable,
   missing_read_needs_frame,
   missing_describe_location,
