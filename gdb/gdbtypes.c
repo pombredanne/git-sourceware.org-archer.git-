@@ -191,14 +191,13 @@ alloc_type (struct objfile *objfile)
   return type;
 }
 
-/* Allocate a new type by an alloc_type call but make the new type discardable
-   on next garbage collection by free_all_types.  You must call type_mark_used
-   during each free_all_types to protect TYPE from being deallocated.  */
+/* Declare TYPE as discardable on next garbage collection by free_all_types.
+   You must call type_mark_used during each free_all_types to protect TYPE from
+   being deallocated.  */
 
-static struct type *
-alloc_type_discardable (void)
+static void
+set_type_as_discardable (struct type *type)
 {
-  struct type *type = alloc_type (NULL);
   void **slot;
 
   gdb_assert (!TYPE_DISCARDABLE (type));
@@ -209,21 +208,20 @@ alloc_type_discardable (void)
   slot = htab_find_slot (type_discardable_table, type, INSERT);
   gdb_assert (!*slot);
   *slot = type;
-
-  return type;
 }
 
-/* Allocate a new type like alloc_type or alloc_type_discardable copying the
-   discardability state of PARENT_TYPE (its current reference count
-   notwithstanding).  */
+/* Allocate a new type like alloc_type but preserve for it the discardability
+   state of PARENT_TYPE.  */
 
 static struct type *
 alloc_type_as_parent (struct type *parent_type)
 {
-  if (TYPE_DISCARDABLE (parent_type))
-    return alloc_type_discardable ();
+  struct type *new_type = alloc_type (TYPE_OBJFILE (parent_type));
 
-  return alloc_type (TYPE_OBJFILE (parent_type));
+  if (TYPE_DISCARDABLE (parent_type))
+    set_type_as_discardable (new_type);
+
+  return new_type;
 }
 
 /* Alloc a new type instance structure, fill it with some defaults,
@@ -3111,7 +3109,7 @@ copy_type_recursive_1 (struct objfile *objfile,
   if (*slot != NULL)
     return ((struct type_pair *) *slot)->new;
 
-  new_type = alloc_type_discardable ();
+  new_type = alloc_type (NULL);
 
   /* We must add the new type to the hash table immediately, in case
      we encounter this type again during a recursive call below.  Memory could
@@ -3126,6 +3124,12 @@ copy_type_recursive_1 (struct objfile *objfile,
      copy the entire thing and then update specific fields as needed.  */
   *TYPE_MAIN_TYPE (new_type) = *TYPE_MAIN_TYPE (type);
   TYPE_OBJFILE (new_type) = NULL;
+
+  /* TYPE_MAIN_TYPE memory copy above rewrote the TYPE_DISCARDABLE flag so we
+     need to initialize it again.  And even if TYPE was already discardable
+     NEW_TYPE so far is not registered in TYPE_DISCARDABLE_TABLE.  */
+  TYPE_DISCARDABLE (new_type) = 0;
+  set_type_as_discardable (new_type);
 
   /* Pre-clear the fields processed by delete_main_type.  If DWARF block
      evaluations below call error we would leave an unfreeable TYPE.  */
