@@ -269,6 +269,18 @@ enum type_instance_flag_value
 
 #define TYPE_NOTTEXT(t)		(TYPE_MAIN_TYPE (t)->flag_nottext)
 
+/* Define this type as being reclaimable during free_all_types.  Type is
+   required to be have TYPE_OBJFILE set to NULL.  Setting this flag requires
+   initializing TYPE_DISCARDABLE_AGE, see alloc_type_discardable.  */
+
+#define TYPE_DISCARDABLE(t)	(TYPE_MAIN_TYPE (t)->flag_discardable)
+
+/* Marker this type has been visited by the type_mark_used by this
+   mark-and-sweep types garbage collecting pass.  Current pass is represented
+   by TYPE_DISCARDABLE_AGE_CURRENT.  */
+
+#define TYPE_DISCARDABLE_AGE(t)	(TYPE_MAIN_TYPE (t)->flag_discardable_age)
+
 /* Constant type.  If this is set, the corresponding type has a
  * const modifier.
  */
@@ -355,6 +367,8 @@ struct main_type
   unsigned int flag_stub_supported : 1;
   unsigned int flag_nottext : 1;
   unsigned int flag_fixed_instance : 1;
+  unsigned int flag_discardable : 1;
+  unsigned int flag_discardable_age : 1;
 
   /* Number of fields described for this type.  This field appears at
      this location because it packs nicely here.  */
