@@ -26,6 +26,8 @@
 #include "cp-support.h"
 #include "demangle.h"
 #include "objfiles.h"
+#include "observer.h"
+#include "gdb_assert.h"
 
 typedef struct pyty_type_object
 {
@@ -34,10 +36,16 @@ typedef struct pyty_type_object
 
   /* If a Type object is associated with an objfile, it is kept on a
      doubly-linked list, rooted in the objfile.  This lets us copy the
-     underlying struct type when the objfile is deleted.  */
+     underlying struct type when the objfile is deleted.
+
+     With NULL objfile Type still can be doubly-linked in the list
+     PYTY_OBJECTS_DISCARDABLE.  */
   struct pyty_type_object *prev;
   struct pyty_type_object *next;
 } type_object;
+
+/* First element of a doubly-linked list of TYPE_DISCARDABLE Types.  */
+static type_object *pyty_objects_discardable;
 
 static PyTypeObject type_object_type;
 
@@ -522,7 +530,58 @@ typy_str (PyObject *self)
 
 
 
+/* Key associated with each objfile pointing to the first element of
+   a doubly-linked list of Types associated with this objfile.  */
 static const struct objfile_data *typy_objfile_data_key;
+
+/* Link TYPE_OBJ to its appropriate list.  Either to its objfile associated one
+   or at least to the global list for TYPE_DISCARDABLE Types.  Permanent types
+   do not get linked anywhere.  */
+static void
+typy_link (type_object *type_obj)
+{
+  type_obj->prev = NULL;
+
+  if (type_obj->type && TYPE_OBJFILE (type_obj->type))
+    {
+      struct objfile *objfile = TYPE_OBJFILE (type_obj->type);
+
+      type_obj->next = objfile_data (objfile, typy_objfile_data_key);
+      if (type_obj->next)
+	type_obj->next->prev = type_obj;
+      set_objfile_data (objfile, typy_objfile_data_key, type_obj);
+    }
+  else if (type_obj->type && TYPE_DISCARDABLE (type_obj->type))
+    {
+      type_obj->next = pyty_objects_discardable;
+      if (type_obj->next)
+	type_obj->next->prev = type_obj;
+      pyty_objects_discardable = type_obj;
+    }
+  else
+    type_obj->next = NULL;
+}
+
+/* Unlink TYPE_OBJ from its current list.  Permanent types are not linked
+   anywhere and this function has no effect on them.  */
+static void
+typy_unlink (type_object *type_obj)
+{
+  if (type_obj->prev)
+    type_obj->prev->next = type_obj->next;
+  else if (type_obj->type && TYPE_OBJFILE (type_obj->type))
+    {
+      /* Must reset head of list.  */
+      struct objfile *objfile = TYPE_OBJFILE (type_obj->type);
+
+      set_objfile_data (objfile, typy_objfile_data_key, type_obj->next);
+    }
+  else if (pyty_objects_discardable == type_obj)
+    pyty_objects_discardable = type_obj->next;
+
+  if (type_obj->next)
+    type_obj->next->prev = type_obj->prev;
+}
 
 static void
 clean_up_objfile_types (struct objfile *objfile, void *datum)
@@ -543,12 +602,13 @@ clean_up_objfile_types (struct objfile *objfile, void *datum)
     {
       type_object *next = obj->next;
 
-      htab_empty (copied_types);
+      gdb_assert (TYPE_OBJFILE (obj->type) == objfile);
+      typy_unlink (obj);
 
       obj->type = copy_type_recursive (obj->type, copied_types);
 
-      obj->next = NULL;
-      obj->prev = NULL;
+      gdb_assert (TYPE_OBJFILE (obj->type) == NULL);
+      typy_link (obj);
 
       obj = next;
     }
@@ -559,41 +619,25 @@ clean_up_objfile_types (struct objfile *objfile, void *datum)
 }
 
 static void
-set_type (type_object *obj, struct type *type)
-{
-  obj->type = type;
-  obj->prev = NULL;
-  if (type && TYPE_OBJFILE (type))
-    {
-      struct objfile *objfile = TYPE_OBJFILE (type);
-
-      obj->next = objfile_data (objfile, typy_objfile_data_key);
-      if (obj->next)
-	obj->next->prev = obj;
-      set_objfile_data (objfile, typy_objfile_data_key, obj);
-    }
-  else
-    obj->next = NULL;
-}
-
-static void
 typy_dealloc (PyObject *obj)
 {
-  type_object *type = (type_object *) obj;
+  type_object *type_obj = (type_object *) obj;
 
-  if (type->prev)
-    type->prev->next = type->next;
-  else if (type->type && TYPE_OBJFILE (type->type))
-    {
-      /* Must reset head of list.  */
-      struct objfile *objfile = TYPE_OBJFILE (type->type);
-      if (objfile)
-	set_objfile_data (objfile, typy_objfile_data_key, type->next);
-    }
-  if (type->next)
-    type->next->prev = type->prev;
+  typy_unlink (type_obj);
 
-  type->ob_type->tp_free (type);
+  type_obj->ob_type->tp_free (obj);
+}
+
+/* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
+static void
+typy_types_mark_used (void)
+{
+  type_object *type_obj;
+
+  for (type_obj = pyty_objects_discardable;
+       type_obj != NULL;
+       type_obj = type_obj->next)
+    type_mark_used (type_obj->type);
 }
 
 /* Create a new Type referring to TYPE.  */
@@ -604,7 +648,10 @@ type_to_type_object (struct type *type)
 
   type_obj = PyObject_New (type_object, &type_object_type);
   if (type_obj)
-    set_type (type_obj, type);
+    {
+      type_obj->type = type;
+      typy_link (type_obj);
+    }
 
   return (PyObject *) type_obj;
 }
@@ -664,6 +711,8 @@ gdbpy_initialize_types (void)
 
   Py_INCREF (&field_object_type);
   PyModule_AddObject (gdb_module, "Field", (PyObject *) &field_object_type);
+
+  observer_attach_mark_used (typy_types_mark_used);
 }
 
 
