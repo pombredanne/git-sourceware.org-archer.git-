@@ -26,15 +26,6 @@
 #include "dfp.h"
 #include "valprint.h"
 
-/* List of all values which are currently exposed to Python. It is
-   maintained so that when an objfile is discarded, preserve_values
-   can copy the values' types if needed.  This is declared
-   unconditionally to reduce the number of uses of HAVE_PYTHON in the
-   generic code.  */
-/* This variable is unnecessarily initialized to NULL in order to 
-   work around a linker bug on MacOS.  */
-struct value *values_in_python = NULL;
-
 #ifdef HAVE_PYTHON
 
 #include "python-internal.h"
@@ -59,20 +50,33 @@ struct value *values_in_python = NULL;
 #define builtin_type_pybool \
   language_bool_type (current_language, current_gdbarch)
 
-typedef struct {
+typedef struct value_object {
   PyObject_HEAD
+  struct value_object *next;
   struct value *value;
   PyObject *address;
   PyObject *type;
 } value_object;
+
+/* List of all values which are currently exposed to Python. It is
+   maintained so that when an objfile is discarded, preserve_values
+   can copy the values' types if needed.  */
+/* This variable is unnecessarily initialized to NULL in order to
+   work around a linker bug on MacOS.  */
+static value_object *values_in_python = NULL;
 
 /* Called by the Python interpreter when deallocating a value object.  */
 static void
 valpy_dealloc (PyObject *obj)
 {
   value_object *self = (value_object *) obj;
+  value_object **iter;
 
-  value_remove_from_list (&values_in_python, self->value);
+  /* Remove OBJ from the global list.  */
+  iter = &values_in_python;
+  while (*iter != self)
+    iter = &(*iter)->next;
+  *iter = (*iter)->next;
 
   value_free (self->value);
 
@@ -123,9 +127,21 @@ valpy_new (PyTypeObject *subtype, PyObject *args, PyObject *keywords)
   value_obj->address = NULL;
   value_obj->type = NULL;
   release_value (value);
-  value_prepend_to_list (&values_in_python, value);
+  value_obj->next = values_in_python;
+  values_in_python = value_obj;
 
   return (PyObject *) value_obj;
+}
+
+/* Iterate over all the Value objects, calling preserve_one_value on
+   each.  */
+void
+preserve_python_values (struct objfile *objfile, htab_t copied_types)
+{
+  value_object *iter;
+
+  for (iter = values_in_python; iter; iter = iter->next)
+    preserve_one_value (iter->value, objfile, copied_types);
 }
 
 /* Given a value of a pointer type, apply the C unary * operator to it.  */
@@ -547,9 +563,7 @@ valpy_negative (PyObject *self)
 static PyObject *
 valpy_positive (PyObject *self)
 {
-  struct value *copy = value_copy (((value_object *) self)->value);
-
-  return value_to_value_object (copy);
+  return value_to_value_object (((value_object *) self)->value);
 }
 
 static PyObject *
@@ -806,13 +820,15 @@ value_to_value_object (struct value *val)
       val_obj->address = NULL;
       val_obj->type = NULL;
       release_value (val);
-      value_prepend_to_list (&values_in_python, val);
+      val_obj->next = values_in_python;
+      values_in_python = val_obj;
     }
 
   return (PyObject *) val_obj;
 }
 
-/* Returns value structure corresponding to the given value object.  */
+/* Returns a borrowed reference to the struct value corresponding to
+   the given value object.  */
 struct value *
 value_object_to_value (PyObject *self)
 {
@@ -824,7 +840,8 @@ value_object_to_value (PyObject *self)
 }
 
 /* Try to convert a Python value to a gdb value.  If the value cannot
-   be converted, set a Python exception and return NULL.  */
+   be converted, set a Python exception and return NULL.  Returns a
+   borrowed reference to the resulting struct value.  */
 
 struct value *
 convert_value_from_python (PyObject *obj)
@@ -906,7 +923,7 @@ convert_value_from_python (PyObject *obj)
 	    }
 	}
       else if (PyObject_TypeCheck (obj, &value_object_type))
-	value = value_copy (((value_object *) obj)->value);
+	value = ((value_object *) obj)->value;
       else
 	PyErr_Format (PyExc_TypeError, _("Could not convert Python object: %s"),
 		      PyString_AsString (PyObject_Str (obj)));
@@ -1056,5 +1073,13 @@ PyTypeObject value_object_type = {
   0,				  /* tp_alloc */
   valpy_new			  /* tp_new */
 };
+
+#else
+
+void
+preserve_python_values (struct objfile *objfile, htab_t copied_types)
+{
+  /* Nothing.  */
+}
 
 #endif /* HAVE_PYTHON */

@@ -715,15 +715,8 @@ instantiate_pretty_printer (PyObject *constructor, struct value *value)
 #if HAVE_PYTHON
   PyObject *val_obj = NULL; 
   PyObject *printer;
-  volatile struct gdb_exception except;
 
-  TRY_CATCH (except, RETURN_MASK_ALL)
-    {
-      value = value_copy (value);
-    }
-  GDB_PY_HANDLE_EXCEPTION (except);
   val_obj = value_to_value_object (value);
-
   if (! val_obj)
     return NULL;
 
@@ -884,16 +877,7 @@ update_dynamic_varobj_children (struct varobj *var,
       if (!PyArg_ParseTuple (item, "sO", &name, &py_v))
 	error ("Invalid item from the child list");
       
-      if (PyObject_TypeCheck (py_v, &value_object_type))
-	{
-	  /* If we just call convert_value_from_python for this type,
-	     we won't know who owns the result.  For this one case we
-	     need to copy the resulting value.  */
-	  v = value_object_to_value (py_v);
-	  v = value_copy (v);
-	}
-      else
-	v = convert_value_from_python (py_v);
+      v = convert_value_from_python (py_v);
 
       /* TODO: This assume the name of the i-th child never changes.  */
 
@@ -2249,7 +2233,7 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
 {
   long dummy;
   struct ui_file *stb;
-  struct cleanup *old_chain;
+  struct cleanup *old_chain = make_cleanup (null_cleanup, 0);
   char *thevalue = NULL;
   struct value_print_options opts;
 
@@ -2282,14 +2266,19 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
 	    return thevalue;
 	  }
 	if (replacement)
-	  value = replacement;
+	  {
+	    value = replacement;
+	    /* We have a reference to the value, so we must arrange to
+	       free it later.  */
+	    make_cleanup (value_free_cleanup, value);
+	  }
       }
     PyGILState_Release (state);
   }
 #endif
 
   stb = mem_fileopen ();
-  old_chain = make_cleanup_ui_file_delete (stb);
+  make_cleanup_ui_file_delete (stb);
 
   get_formatted_print_options (&opts, format_code[(int) format]);
   opts.deref_ref = 0;

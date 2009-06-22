@@ -155,6 +155,14 @@ struct value
      taken off this list.  */
   struct value *next;
 
+  /* The reference count.  A value that is still on the `all_values'
+     list will have a reference count of 0.  A call to `release_value'
+     will increment the reference count (and remove the value from the
+     list, the first time).  A call to `value_free' will decrement the
+     reference count, and will free the value when there are no more
+     references.  */
+  int refcount;
+
   /* Register number if the value is from a register.  */
   short regnum;
 
@@ -555,11 +563,25 @@ value_free (struct value *val)
 {
   if (val)
     {
-      type_decref (val->type);
-      type_decref (val->enclosing_type);
-      xfree (val->contents);
-      xfree (val);
+      /* If the count was already 0, then the value was on the
+	 all_values list, and we must be freeing back to some
+	 point.  */
+      if (val->refcount <= 1)
+	{
+	  type_decref (val->type);
+	  type_decref (val->enclosing_type);
+	  xfree (val->contents);
+	  xfree (val);
+	}
+      else
+	--val->refcount;
     }
+}
+
+void
+value_free_cleanup (void *arg)
+{
+  value_free (arg);
 }
 
 /* Free all values allocated since MARK was obtained by value_mark
@@ -602,22 +624,26 @@ free_all_values (void)
 void
 release_value (struct value *val)
 {
-  struct value *v;
-
-  if (all_values == val)
+  /* If the reference count is nonzero, then we have already removed
+     the item from the list, so there is no reason to do it again.  */
+  if (val->refcount == 0)
     {
-      all_values = val->next;
-      return;
-    }
-
-  for (v = all_values; v; v = v->next)
-    {
-      if (v->next == val)
+      if (all_values == val)
+	all_values = val->next;
+      else
 	{
-	  v->next = val->next;
-	  break;
+	  struct value *v;
+	  for (v = all_values; v; v = v->next)
+	    {
+	      if (v->next == val)
+		{
+		  v->next = val->next;
+		  break;
+		}
+	    }
 	}
     }
+  ++val->refcount;
 }
 
 /* Release all values up to mark  */
@@ -1070,7 +1096,7 @@ add_internal_function (const char *name, const char *doc,
 /* Update VALUE before discarding OBJFILE.  COPIED_TYPES is used to
    prevent cycles / duplicates.  */
 
-static void
+void
 preserve_one_value (struct value *value, struct objfile *objfile,
 		    htab_t copied_types)
 {
@@ -1120,8 +1146,7 @@ preserve_values (struct objfile *objfile)
   for (var = internalvars; var; var = var->next)
     preserve_one_value (var->value, objfile, copied_types);
 
-  for (val = values_in_python; val; val = val->next)
-    preserve_one_value (val, objfile, copied_types);
+  preserve_python_values (objfile, copied_types);
 
   htab_delete (copied_types);
 }

@@ -519,6 +519,9 @@ extern int destructor_name_p (const char *name, const struct type *type);
 
 extern void value_free (struct value *val);
 
+/* The same as value_free, but suitable for use as a cleanup.  */
+extern void value_free_cleanup (void *val);
+
 extern void free_all_values (void);
 
 extern void release_value (struct value *val);
@@ -588,6 +591,8 @@ extern void preserve_values (struct objfile *);
 /* From values.c */
 
 extern struct value *value_copy (struct value *);
+
+extern void preserve_one_value (struct value *, struct objfile *, htab_t);
 
 /* From valops.c */
 
