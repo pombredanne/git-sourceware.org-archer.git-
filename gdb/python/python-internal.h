@@ -169,6 +169,7 @@ void gdbpy_print_stack (void);
 PyObject *python_string_to_unicode (PyObject *obj);
 char *unicode_to_target_string (PyObject *unicode_str);
 char *python_string_to_target_string (PyObject *obj);
+PyObject *python_string_to_target_python_string (PyObject *obj);
 char *python_string_to_host_string (PyObject *obj);
 PyObject *target_string_to_unicode (const gdb_byte *str, int length);
 int gdbpy_is_string (PyObject *obj);
@@ -177,8 +178,8 @@ int gdbpy_is_value_object (PyObject *obj);
 
 /* Note that these are declared here, and not in python.h with the
    other pretty-printer functions, because they refer to PyObject.  */
-char *apply_varobj_pretty_printer (PyObject *print_obj,
-				   struct value **replacement);
+PyObject *apply_varobj_pretty_printer (PyObject *print_obj,
+				       struct value **replacement);
 PyObject *gdbpy_get_varobj_pretty_printer (struct value *value);
 PyObject *gdbpy_instantiate_printer (PyObject *cons, PyObject *value);
 char *gdbpy_get_display_hint (PyObject *printer);

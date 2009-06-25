@@ -2234,8 +2234,9 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
   long dummy;
   struct ui_file *stb;
   struct cleanup *old_chain = make_cleanup (null_cleanup, 0);
-  char *thevalue = NULL;
+  gdb_byte *thevalue = NULL;
   struct value_print_options opts;
+  int len = 0;
 
   if (value == NULL)
     return NULL;
@@ -2249,6 +2250,7 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
 	char *hint;
 	struct value *replacement;
 	int string_print = 0;
+	PyObject *output = NULL;
 
 	hint = gdbpy_get_display_hint (value_formatter);
 	if (hint)
@@ -2258,19 +2260,32 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
 	    xfree (hint);
 	  }
 
-	thevalue = apply_varobj_pretty_printer (value_formatter,
+	output = apply_varobj_pretty_printer (value_formatter,
 						&replacement);
-	if (thevalue && !string_print)
-	  {
-	    PyGILState_Release (state);
-	    return thevalue;
-	  }
+	if (output)
+  	  {
+ 	    PyObject *py_str = python_string_to_target_python_string (output);
+ 	    if (py_str)
+ 	      {
+ 		char *s = PyString_AsString (py_str);
+ 		len = PyString_Size (py_str);
+ 		thevalue = xmemdup (s, len + 1, len + 1);
+ 		Py_DECREF (py_str);
+ 	      }
+ 	    Py_DECREF (output);
+  	  }
 	if (replacement)
 	  {
 	    value = replacement;
 	    /* We have a reference to the value, so we must arrange to
 	       free it later.  */
 	    make_cleanup (value_free_cleanup, value);
+	  }
+
+	if (thevalue && !string_print)
+	  {
+	    PyGILState_Release (state);
+	    return thevalue;
 	  }
       }
     PyGILState_Release (state);
@@ -2286,8 +2301,7 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
   if (thevalue)
     {
       make_cleanup (xfree, thevalue);
-      LA_PRINT_STRING (stb, (gdb_byte *) thevalue, strlen (thevalue),
-		       1, 0, &opts);
+      LA_PRINT_STRING (stb, thevalue, len, 1, 0, &opts);
     }
   else
     common_val_print (value, stb, 0, &opts, current_language);

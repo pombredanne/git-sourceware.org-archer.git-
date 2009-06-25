@@ -99,6 +99,19 @@ class pp_nullstr:
     def to_string(self):
         return self.val['s'].string(gdb.parameter('target-charset'))
 
+class pp_ns:
+    "Print a std::basic_string of some kind"
+
+    def __init__(self, val):
+        self.val = val
+
+    def to_string(self):
+        len = self.val['length']
+        return self.val['null_str'].string (gdb.parameter ('target-charset'), length = len)
+
+    def display_hint (self):
+        return 'string'
+
 def lookup_function (val):
     "Look-up and return a pretty-printer that can print val."
 
@@ -155,6 +168,8 @@ def register_pretty_printers ():
     pretty_printers_dict[re.compile ('^string_repr$')] = string_print
     pretty_printers_dict[re.compile ('^container$')] = ContainerPrinter
     
+    pretty_printers_dict[re.compile ('^struct ns$')]  = pp_ns
+    pretty_printers_dict[re.compile ('^ns$')]  = pp_ns
 pretty_printers_dict = {}
 
 register_pretty_printers ()
