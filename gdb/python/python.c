@@ -829,8 +829,8 @@ find_pretty_printer (PyObject *value)
 /* Pretty-print a single value, via the printer object PRINTER.
    If the function returns a string, a PyObject containing the string
    is returned.  Otherwise, if the function returns a value,
-   *OUT_VALUE is set to the value, and NULL is returned.  On error,
-   *OUT_VALUE is set to NULL, and NULL is returned.  */
+   the value (still on the all_values chain), and NULL is returned.
+   On error, *OUT_VALUE is set to NULL and NULL is returned.  */
 static PyObject *
 pretty_print_one_value (PyObject *printer, struct value **out_value)
 {
@@ -907,7 +907,6 @@ print_string_repr (PyObject *printer, const char *hint,
 {
   struct value *replacement = NULL;
   PyObject *py_str = NULL;
-  struct cleanup *cleanups = make_cleanup (null_cleanup, 0);
 
   py_str = pretty_print_one_value (printer, &replacement);
   if (py_str)
@@ -930,13 +929,9 @@ print_string_repr (PyObject *printer, const char *hint,
       Py_DECREF (py_str);
     }
   else if (replacement)
-    {
-      make_cleanup (value_free_cleanup, replacement);
-      common_val_print (replacement, stream, recurse, options, language);
-    }
+    common_val_print (replacement, stream, recurse, options, language);
   else
     gdbpy_print_stack ();
-  do_cleanups (cleanups);
 }
 
 static void
