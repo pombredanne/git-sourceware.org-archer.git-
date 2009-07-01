@@ -174,7 +174,7 @@ Use of the 'raw' qualifier avoids any filtering by loadable modules.
         # However, should still number as if starting from newest
 	newest_frame = gdb.selected_thread ().newest_frame ()
         iter = itertools.imap (FrameWrapper,
-                               FrameIterator (newest_frame)
+                               FrameIterator (newest_frame))
         if filter:
             iter = gdb.backtrace.create_frame_filter (iter)
 
