@@ -179,20 +179,16 @@ alloc_type (struct objfile *objfile, struct type *parent)
 
   if (objfile == NULL)
     {
-      type = xmalloc (sizeof (struct type));
-      memset (type, 0, sizeof (struct type));
-      TYPE_MAIN_TYPE (type) = xmalloc (sizeof (struct main_type));
+      type = XZALLOC (struct type);
+      TYPE_MAIN_TYPE (type) = XZALLOC (struct main_type);
     }
   else
     {
-      type = obstack_alloc (&objfile->objfile_obstack,
-			    sizeof (struct type));
-      memset (type, 0, sizeof (struct type));
-      TYPE_MAIN_TYPE (type) = obstack_alloc (&objfile->objfile_obstack,
-					     sizeof (struct main_type));
+      type = OBSTACK_ZALLOC (&objfile->objfile_obstack, struct type);
+      TYPE_MAIN_TYPE (type) = OBSTACK_ZALLOC (&objfile->objfile_obstack,
+					      struct main_type);
       OBJSTAT (objfile, n_types++);
     }
-  memset (TYPE_MAIN_TYPE (type), 0, sizeof (struct main_type));
 
   /* Initialize the fields that might not be zero.  */
 
@@ -204,7 +200,7 @@ alloc_type (struct objfile *objfile, struct type *parent)
   if (objfile == NULL)
     type_init_refc (type, parent);
 
-  return (type);
+  return type;
 }
 
 /* Alloc a new type instance structure, fill it with some defaults,
@@ -219,16 +215,11 @@ alloc_type_instance (struct type *oldtype)
   /* Allocate the structure.  */
 
   if (TYPE_OBJFILE (oldtype) == NULL)
-    {
-      type = xmalloc (sizeof (struct type));
-      memset (type, 0, sizeof (struct type));
-    }
+    type = XZALLOC (struct type);
   else
-    {
-      type = obstack_alloc (&TYPE_OBJFILE (oldtype)->objfile_obstack,
-			    sizeof (struct type));
-      memset (type, 0, sizeof (struct type));
-    }
+    type = OBSTACK_ZALLOC (&TYPE_OBJFILE (oldtype)->objfile_obstack,
+			   struct type);
+
   TYPE_MAIN_TYPE (type) = TYPE_MAIN_TYPE (oldtype);
 
   TYPE_CHAIN (type) = type;	/* Chain back to itself for now.  */
@@ -236,7 +227,7 @@ alloc_type_instance (struct type *oldtype)
   if (TYPE_OBJFILE (oldtype) == NULL)
     type_init_refc (type, oldtype);
 
-  return (type);
+  return type;
 }
 
 /* Clear all remnants of the previous type at TYPE, in preparation for
@@ -510,11 +501,13 @@ make_qualified_type (struct type *type, int new_flags,
   struct type *ntype;
 
   ntype = type;
-  do {
-    if (TYPE_INSTANCE_FLAGS (ntype) == new_flags)
-      return ntype;
-    ntype = TYPE_CHAIN (ntype);
-  } while (ntype != type);
+  do
+    {
+      if (TYPE_INSTANCE_FLAGS (ntype) == new_flags)
+	return ntype;
+      ntype = TYPE_CHAIN (ntype);
+    }
+  while (ntype != type);
 
   /* Create a new type instance.  */
   if (storage == NULL)
@@ -652,18 +645,20 @@ replace_type (struct type *ntype, struct type *type)
   /* The type length is not a part of the main type.  Update it for
      each type on the variant chain.  */
   chain = ntype;
-  do {
-    /* Assert that this element of the chain has no address-class bits
-       set in its flags.  Such type variants might have type lengths
-       which are supposed to be different from the non-address-class
-       variants.  This assertion shouldn't ever be triggered because
-       symbol readers which do construct address-class variants don't
-       call replace_type().  */
-    gdb_assert (TYPE_ADDRESS_CLASS_ALL (chain) == 0);
+  do
+    {
+      /* Assert that this element of the chain has no address-class bits
+	 set in its flags.  Such type variants might have type lengths
+	 which are supposed to be different from the non-address-class
+	 variants.  This assertion shouldn't ever be triggered because
+	 symbol readers which do construct address-class variants don't
+	 call replace_type().  */
+      gdb_assert (TYPE_ADDRESS_CLASS_ALL (chain) == 0);
 
-    TYPE_LENGTH (chain) = TYPE_LENGTH (type);
-    chain = TYPE_CHAIN (chain);
-  } while (ntype != chain);
+      TYPE_LENGTH (chain) = TYPE_LENGTH (type);
+      chain = TYPE_CHAIN (chain);
+    }
+  while (ntype != chain);
 
   /* Assert that the two types have equivalent instance qualifiers.
      This should be true for at least all of our debug readers.  */
@@ -682,7 +677,7 @@ lookup_memberptr_type (struct type *type, struct type *domain)
 
   mtype = alloc_type (TYPE_OBJFILE (type), NULL);
   smash_to_memberptr_type (mtype, domain, type);
-  return (mtype);
+  return mtype;
 }
 
 /* Return a pointer-to-method type, for a method of type TO_TYPE.  */
@@ -715,7 +710,7 @@ allocate_stub_method (struct type *type)
 		     TYPE_OBJFILE (type));
   TYPE_TARGET_TYPE (mtype) = type;
   /*  _DOMAIN_TYPE (mtype) = unknown yet */
-  return (mtype);
+  return mtype;
 }
 
 /* Create a range type using either a blank type supplied in
@@ -733,9 +728,7 @@ create_range_type (struct type *result_type, struct type *index_type,
 		   int low_bound, int high_bound)
 {
   if (result_type == NULL)
-    {
-      result_type = alloc_type (TYPE_OBJFILE (index_type), index_type);
-    }
+    result_type = alloc_type (TYPE_OBJFILE (index_type), index_type);
   TYPE_CODE (result_type) = TYPE_CODE_RANGE;
   TYPE_TARGET_TYPE (result_type) = index_type;
   if (TYPE_STUB (index_type))
@@ -743,11 +736,9 @@ create_range_type (struct type *result_type, struct type *index_type,
   else
     TYPE_LENGTH (result_type) = TYPE_LENGTH (check_typedef (index_type));
   TYPE_NFIELDS (result_type) = 2;
-  TYPE_FIELDS (result_type) = TYPE_ALLOC (result_type,
-					  TYPE_NFIELDS (result_type)
-					  * sizeof (struct field));
-  memset (TYPE_FIELDS (result_type), 0,
-	  TYPE_NFIELDS (result_type) * sizeof (struct field));
+  TYPE_FIELDS (result_type) = TYPE_ZALLOC (result_type,
+					   TYPE_NFIELDS (result_type)
+					   * sizeof (struct field));
   TYPE_LOW_BOUND (result_type) = low_bound;
   TYPE_HIGH_BOUND (result_type) = high_bound;
 
@@ -869,8 +860,7 @@ create_array_type (struct type *result_type,
       TYPE_LENGTH (element_type) * (high_bound - low_bound + 1);
   TYPE_NFIELDS (result_type) = 1;
   TYPE_FIELDS (result_type) =
-    (struct field *) TYPE_ALLOC (result_type, sizeof (struct field));
-  memset (TYPE_FIELDS (result_type), 0, sizeof (struct field));
+    (struct field *) TYPE_ZALLOC (result_type, sizeof (struct field));
   TYPE_INDEX_TYPE (result_type) = range_type;
   TYPE_VPTR_FIELDNO (result_type) = -1;
 
@@ -878,7 +868,7 @@ create_array_type (struct type *result_type,
   if (TYPE_LENGTH (result_type) == 0)
     TYPE_TARGET_STUB (result_type) = 1;
 
-  return (result_type);
+  return result_type;
 }
 
 /* Create a string type using either a blank type supplied in
@@ -894,18 +884,15 @@ create_array_type (struct type *result_type,
    type?  */
 
 struct type *
-create_string_type (struct type *result_type, 
+create_string_type (struct type *result_type,
+		    struct type *string_char_type,
 		    struct type *range_type)
 {
-  struct type *string_char_type;
-      
-  string_char_type = language_string_char_type (current_language,
-						current_gdbarch);
   result_type = create_array_type (result_type,
 				   string_char_type,
 				   range_type);
   TYPE_CODE (result_type) = TYPE_CODE_STRING;
-  return (result_type);
+  return result_type;
 }
 
 struct type *
@@ -922,9 +909,7 @@ create_set_type (struct type *result_type, struct type *domain_type)
     }
   TYPE_CODE (result_type) = TYPE_CODE_SET;
   TYPE_NFIELDS (result_type) = 1;
-  TYPE_FIELDS (result_type) = (struct field *)
-    TYPE_ALLOC (result_type, 1 * sizeof (struct field));
-  memset (TYPE_FIELDS (result_type), 0, sizeof (struct field));
+  TYPE_FIELDS (result_type) = TYPE_ZALLOC (result_type, sizeof (struct field));
 
   if (!TYPE_STUB (domain_type))
     {
@@ -939,7 +924,7 @@ create_set_type (struct type *result_type, struct type *domain_type)
     }
   TYPE_FIELD_TYPE (result_type, 0) = domain_type;
 
-  return (result_type);
+  return result_type;
 }
 
 void
@@ -970,9 +955,7 @@ init_flags_type (char *name, int length)
   type = init_type (TYPE_CODE_FLAGS, length, 
 		    TYPE_FLAG_UNSIGNED, name, NULL);
   TYPE_NFIELDS (type) = nfields;
-  TYPE_FIELDS (type) = TYPE_ALLOC (type, 
-				   nfields * sizeof (struct field));
-  memset (TYPE_FIELDS (type), 0, nfields * sizeof (struct field));
+  TYPE_FIELDS (type) = TYPE_ZALLOC (type, nfields * sizeof (struct field));
 
   return type;
 }
@@ -1093,7 +1076,9 @@ type_name_no_tag (const struct type *type)
    suitably defined.  */
 
 struct type *
-lookup_typename (char *name, struct block *block, int noerr)
+lookup_typename (const struct language_defn *language,
+		 struct gdbarch *gdbarch, char *name,
+		 struct block *block, int noerr)
 {
   struct symbol *sym;
   struct type *tmp;
@@ -1101,16 +1086,14 @@ lookup_typename (char *name, struct block *block, int noerr)
   sym = lookup_symbol (name, block, VAR_DOMAIN, 0);
   if (sym == NULL || SYMBOL_CLASS (sym) != LOC_TYPEDEF)
     {
-      tmp = language_lookup_primitive_type_by_name (current_language,
-						    current_gdbarch,
-						    name);
+      tmp = language_lookup_primitive_type_by_name (language, gdbarch, name);
       if (tmp)
 	{
-	  return (tmp);
+	  return tmp;
 	}
       else if (!tmp && noerr)
 	{
-	  return (NULL);
+	  return NULL;
 	}
       else
 	{
@@ -1121,28 +1104,30 @@ lookup_typename (char *name, struct block *block, int noerr)
 }
 
 struct type *
-lookup_unsigned_typename (char *name)
+lookup_unsigned_typename (const struct language_defn *language,
+			  struct gdbarch *gdbarch, char *name)
 {
   char *uns = alloca (strlen (name) + 10);
 
   strcpy (uns, "unsigned ");
   strcpy (uns + 9, name);
-  return (lookup_typename (uns, (struct block *) NULL, 0));
+  return lookup_typename (language, gdbarch, uns, (struct block *) NULL, 0);
 }
 
 struct type *
-lookup_signed_typename (char *name)
+lookup_signed_typename (const struct language_defn *language,
+			struct gdbarch *gdbarch, char *name)
 {
   struct type *t;
   char *uns = alloca (strlen (name) + 8);
 
   strcpy (uns, "signed ");
   strcpy (uns + 7, name);
-  t = lookup_typename (uns, (struct block *) NULL, 1);
+  t = lookup_typename (language, gdbarch, uns, (struct block *) NULL, 1);
   /* If we don't find "signed FOO" just try again with plain "FOO".  */
   if (t != NULL)
     return t;
-  return lookup_typename (name, (struct block *) NULL, 0);
+  return lookup_typename (language, gdbarch, name, (struct block *) NULL, 0);
 }
 
 /* Lookup a structure type named "struct NAME",
@@ -1184,14 +1169,14 @@ lookup_union (char *name, struct block *block)
   t = SYMBOL_TYPE (sym);
 
   if (TYPE_CODE (t) == TYPE_CODE_UNION)
-    return (t);
+    return t;
 
   /* C++ unions may come out with TYPE_CODE_CLASS, but we look at
    * a further "declared_type" field to discover it is really a union.
    */
   if (HAVE_CPLUS_STRUCT (t))
     if (TYPE_DECLARED_TYPE (t) == DECLARED_TYPE_UNION)
-      return (t);
+      return t;
 
   /* If we get here, it's not a union.  */
   error (_("This context has class, struct or enum %s, not a union."), 
@@ -1389,34 +1374,6 @@ get_vptr_fieldno (struct type *type, struct type **basetypep)
 	*basetypep = TYPE_VPTR_BASETYPE (type);
       return TYPE_VPTR_FIELDNO (type);
     }
-}
-
-/* Find the method and field indices for the destructor in class type T.
-   Return 1 if the destructor was found, otherwise, return 0.  */
-
-int
-get_destructor_fn_field (struct type *t, 
-			 int *method_indexp, 
-			 int *field_indexp)
-{
-  int i;
-
-  for (i = 0; i < TYPE_NFN_FIELDS (t); i++)
-    {
-      int j;
-      struct fn_field *f = TYPE_FN_FIELDLIST1 (t, i);
-
-      for (j = 0; j < TYPE_FN_FIELDLIST_LENGTH (t, i); j++)
-	{
-	  if (is_destructor_name (TYPE_FN_FIELD_PHYSNAME (f, j)) != 0)
-	    {
-	      *method_indexp = i;
-	      *field_indexp = j;
-	      return 1;
-	    }
-	}
-    }
-  return 0;
 }
 
 static void
@@ -1864,7 +1821,7 @@ init_type (enum type_code code, int length, int flags,
   if (!objfile)
     type_incref (type);
 
-  return (type);
+  return type;
 }
 
 /* Helper function.  Create an empty composite type.  */
@@ -1883,8 +1840,8 @@ init_composite_type (char *name, enum type_code code)
 /* Helper function.  Append a field to a composite type.  */
 
 void
-append_composite_type_field (struct type *t, char *name, 
-			     struct type *field)
+append_composite_type_field_aligned (struct type *t, char *name,
+				     struct type *field, int alignment)
 {
   struct field *f;
   TYPE_NFIELDS (t) = TYPE_NFIELDS (t) + 1;
@@ -1905,9 +1862,27 @@ append_composite_type_field (struct type *t, char *name,
       if (TYPE_NFIELDS (t) > 1)
 	{
 	  FIELD_BITPOS (f[0]) = (FIELD_BITPOS (f[-1])
-				 + TYPE_LENGTH (field) * TARGET_CHAR_BIT);
+				 + (TYPE_LENGTH (FIELD_TYPE (f[-1]))
+				    * TARGET_CHAR_BIT));
+
+	  if (alignment)
+	    {
+	      int left = FIELD_BITPOS (f[0]) % (alignment * TARGET_CHAR_BIT);
+	      if (left)
+		{
+		  FIELD_BITPOS (f[0]) += left;
+		  TYPE_LENGTH (t) += left / TARGET_CHAR_BIT;
+		}
+	    }
 	}
     }
+}
+
+void
+append_composite_type_field (struct type *t, char *name,
+			     struct type *field)
+{
+  append_composite_type_field_aligned (t, name, field, 0);
 }
 
 int
@@ -3029,8 +3004,7 @@ copy_type_recursive_1 (struct objfile *objfile,
       int i, nfields;
 
       nfields = TYPE_NFIELDS (type);
-      TYPE_FIELDS (new_type) = xmalloc (sizeof (struct field) * nfields);
-      memset (TYPE_FIELDS (new_type), 0, sizeof (struct field) * nfields);
+      TYPE_FIELDS (new_type) = XCALLOC (nfields, struct field);
       for (i = 0; i < nfields; i++)
 	{
 	  TYPE_FIELD_ARTIFICIAL (new_type, i) = 
@@ -3325,6 +3299,7 @@ type_decref (struct type *type)
   entry.type = type;
   found = htab_find (type_refc_table, &entry);
   gdb_assert (found);
+#if 0 /* We'll be replacing this with type GC soon.  */
   --*(found->refc);
   if (*(found->refc) == 0)
     {
@@ -3343,6 +3318,7 @@ type_decref (struct type *type)
       delete_type_recursive (representative, deleted);
       htab_delete (deleted);
     }
+#endif
 }
 
 static struct type *
@@ -3376,11 +3352,6 @@ static struct type *
 build_complex (int bit, char *name, struct type *target_type)
 {
   struct type *t;
-  if (bit <= 0 || target_type == builtin_type_error)
-    {
-      gdb_assert (builtin_type_error != NULL);
-      return builtin_type_error;
-    }
   t = init_type (TYPE_CODE_COMPLEX, 2 * bit / TARGET_CHAR_BIT,
 		 0, name, (struct objfile *) NULL);
   TYPE_TARGET_TYPE (t) = target_type;
@@ -3393,6 +3364,7 @@ gdbtypes_post_init (struct gdbarch *gdbarch)
   struct builtin_type *builtin_type
     = GDBARCH_OBSTACK_ZALLOC (gdbarch, struct builtin_type);
 
+  /* Basic types.  */
   builtin_type->builtin_void =
     init_type (TYPE_CODE_VOID, 1,
 	       0,
@@ -3485,7 +3457,130 @@ gdbtypes_post_init (struct gdbarch *gdbarch)
 	       0,
 	       "_Decimal128", (struct objfile *) NULL);
 
-  /* Pointer/Address types.  */
+  /* Default data/code pointer types.  */
+  builtin_type->builtin_data_ptr =
+    make_pointer_type (builtin_type->builtin_void, NULL);
+  builtin_type->builtin_func_ptr =
+    lookup_pointer_type (lookup_function_type (builtin_type->builtin_void));
+
+  return builtin_type;
+}
+
+
+/* This set of objfile-based types is intended to be used by symbol
+   readers as basic types.  */
+
+static const struct objfile_data *objfile_type_data;
+
+const struct objfile_type *
+objfile_type (struct objfile *objfile)
+{
+  struct gdbarch *gdbarch;
+  struct objfile_type *objfile_type
+    = objfile_data (objfile, objfile_type_data);
+
+  if (objfile_type)
+    return objfile_type;
+
+  objfile_type = OBSTACK_CALLOC (&objfile->objfile_obstack,
+				 1, struct objfile_type);
+
+  /* Use the objfile architecture to determine basic type properties.  */
+  gdbarch = get_objfile_arch (objfile);
+
+  /* Basic types.  */
+  objfile_type->builtin_void
+    = init_type (TYPE_CODE_VOID, 1,
+		 0,
+		 "void", objfile);
+
+  objfile_type->builtin_char
+    = init_type (TYPE_CODE_INT, TARGET_CHAR_BIT / TARGET_CHAR_BIT,
+		 (TYPE_FLAG_NOSIGN
+		  | (gdbarch_char_signed (gdbarch) ? 0 : TYPE_FLAG_UNSIGNED)),
+		 "char", objfile);
+  objfile_type->builtin_signed_char
+    = init_type (TYPE_CODE_INT, TARGET_CHAR_BIT / TARGET_CHAR_BIT,
+		 0,
+		 "signed char", objfile);
+  objfile_type->builtin_unsigned_char
+    = init_type (TYPE_CODE_INT, TARGET_CHAR_BIT / TARGET_CHAR_BIT,
+		 TYPE_FLAG_UNSIGNED,
+		 "unsigned char", objfile);
+  objfile_type->builtin_short
+    = init_type (TYPE_CODE_INT,
+		 gdbarch_short_bit (gdbarch) / TARGET_CHAR_BIT,
+		 0, "short", objfile);
+  objfile_type->builtin_unsigned_short
+    = init_type (TYPE_CODE_INT,
+		 gdbarch_short_bit (gdbarch) / TARGET_CHAR_BIT,
+		 TYPE_FLAG_UNSIGNED, "unsigned short", objfile);
+  objfile_type->builtin_int
+    = init_type (TYPE_CODE_INT,
+		 gdbarch_int_bit (gdbarch) / TARGET_CHAR_BIT,
+		 0, "int", objfile);
+  objfile_type->builtin_unsigned_int
+    = init_type (TYPE_CODE_INT,
+		 gdbarch_int_bit (gdbarch) / TARGET_CHAR_BIT,
+		 TYPE_FLAG_UNSIGNED, "unsigned int", objfile);
+  objfile_type->builtin_long
+    = init_type (TYPE_CODE_INT,
+		 gdbarch_long_bit (gdbarch) / TARGET_CHAR_BIT,
+		 0, "long", objfile);
+  objfile_type->builtin_unsigned_long
+    = init_type (TYPE_CODE_INT,
+		 gdbarch_long_bit (gdbarch) / TARGET_CHAR_BIT,
+		 TYPE_FLAG_UNSIGNED, "unsigned long", objfile);
+  objfile_type->builtin_long_long
+    = init_type (TYPE_CODE_INT,
+		 gdbarch_long_long_bit (gdbarch) / TARGET_CHAR_BIT,
+		 0, "long long", objfile);
+  objfile_type->builtin_unsigned_long_long
+    = init_type (TYPE_CODE_INT,
+		 gdbarch_long_long_bit (gdbarch) / TARGET_CHAR_BIT,
+		 TYPE_FLAG_UNSIGNED, "unsigned long long", objfile);
+
+  objfile_type->builtin_float
+    = init_type (TYPE_CODE_FLT,
+		 gdbarch_float_bit (gdbarch) / TARGET_CHAR_BIT,
+		 0, "float", objfile);
+  TYPE_FLOATFORMAT (objfile_type->builtin_float)
+    = gdbarch_float_format (gdbarch);
+  objfile_type->builtin_double
+    = init_type (TYPE_CODE_FLT,
+		 gdbarch_double_bit (gdbarch) / TARGET_CHAR_BIT,
+		 0, "double", objfile);
+  TYPE_FLOATFORMAT (objfile_type->builtin_double)
+    = gdbarch_double_format (gdbarch);
+  objfile_type->builtin_long_double
+    = init_type (TYPE_CODE_FLT,
+		 gdbarch_long_double_bit (gdbarch) / TARGET_CHAR_BIT,
+		 0, "long double", objfile);
+  TYPE_FLOATFORMAT (objfile_type->builtin_long_double)
+    = gdbarch_long_double_format (gdbarch);
+
+  /* This type represents a type that was unrecognized in symbol read-in.  */
+  objfile_type->builtin_error
+    = init_type (TYPE_CODE_ERROR, 0, 0, "<unknown type>", objfile);
+
+  /* The following set of types is used for symbols with no
+     debug information.  */
+  objfile_type->nodebug_text_symbol
+    = init_type (TYPE_CODE_FUNC, 1, 0,
+		 "<text variable, no debug info>", objfile);
+  TYPE_TARGET_TYPE (objfile_type->nodebug_text_symbol)
+    = objfile_type->builtin_int;
+  objfile_type->nodebug_data_symbol
+    = init_type (TYPE_CODE_INT,
+		 gdbarch_int_bit (gdbarch) / HOST_CHAR_BIT, 0,
+		 "<data variable, no debug info>", objfile);
+  objfile_type->nodebug_unknown_symbol
+    = init_type (TYPE_CODE_INT, 1, 0,
+		 "<variable (not text or data), no debug info>", objfile);
+  objfile_type->nodebug_tls_symbol
+    = init_type (TYPE_CODE_INT,
+		 gdbarch_int_bit (gdbarch) / HOST_CHAR_BIT, 0,
+		 "<thread local variable, no debug info>", objfile);
 
   /* NOTE: on some targets, addresses and pointers are not necessarily
      the same --- for example, on the D10V, pointers are 16 bits long,
@@ -3509,49 +3604,27 @@ gdbtypes_post_init (struct gdbarch *gdbarch)
      - If p is a D10V pointer type, TYPE_LENGTH (p) == 2, just as
        sizeof (void *) == 2 on the target.
 
-     In this context, builtin_type->CORE_ADDR is a bit odd: it's a
-     target type for a value the target will never see.  It's only
-     used to hold the values of (typeless) linker symbols, which are
-     indeed in the unified virtual address space.  */
+     In this context, objfile_type->builtin_core_addr is a bit odd:
+     it's a target type for a value the target will never see.  It's
+     only used to hold the values of (typeless) linker symbols, which
+     are indeed in the unified virtual address space.  */
 
-  builtin_type->builtin_data_ptr =
-    make_pointer_type (builtin_type->builtin_void, NULL);
-  builtin_type->builtin_func_ptr =
-    lookup_pointer_type (lookup_function_type (builtin_type->builtin_void));
-  builtin_type->builtin_core_addr =
-    init_type (TYPE_CODE_INT, 
-	       gdbarch_addr_bit (gdbarch) / 8,
-	       TYPE_FLAG_UNSIGNED,
-	       "__CORE_ADDR", (struct objfile *) NULL);
+  objfile_type->builtin_core_addr
+    = init_type (TYPE_CODE_INT,
+		 gdbarch_addr_bit (gdbarch) / 8,
+		 TYPE_FLAG_UNSIGNED, "__CORE_ADDR", objfile);
 
-
-  /* The following set of types is used for symbols with no
-     debug information.  */
-  builtin_type->nodebug_text_symbol =
-    init_type (TYPE_CODE_FUNC, 1, 0, 
-	       "<text variable, no debug info>", NULL);
-  TYPE_TARGET_TYPE (builtin_type->nodebug_text_symbol) =
-    builtin_type->builtin_int;
-  builtin_type->nodebug_data_symbol =
-    init_type (TYPE_CODE_INT, 
-	       gdbarch_int_bit (gdbarch) / HOST_CHAR_BIT, 0,
-	       "<data variable, no debug info>", NULL);
-  builtin_type->nodebug_unknown_symbol =
-    init_type (TYPE_CODE_INT, 1, 0,
-	       "<variable (not text or data), no debug info>", NULL);
-  builtin_type->nodebug_tls_symbol =
-    init_type (TYPE_CODE_INT, 
-	       gdbarch_int_bit (gdbarch) / HOST_CHAR_BIT, 0,
-	       "<thread local variable, no debug info>", NULL);
-
-  return builtin_type;
+  set_objfile_data (objfile, objfile_type_data, objfile_type);
+  return objfile_type;
 }
+
 
 extern void _initialize_gdbtypes (void);
 void
 _initialize_gdbtypes (void)
 {
   gdbtypes_data = gdbarch_data_register_post_init (gdbtypes_post_init);
+  objfile_type_data = register_objfile_data ();
 
   type_refc_table = htab_create_alloc (20, type_refc_hash, type_refc_equal,
 				       NULL, xcalloc, xfree);

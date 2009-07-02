@@ -61,7 +61,8 @@ static char *get_java_utf8_name (struct obstack *obstack, struct value *name);
 static int java_class_is_primitive (struct value *clas);
 static struct value *java_value_string (char *ptr, int len);
 
-static void java_emit_char (int c, struct ui_file * stream, int quoter);
+static void java_emit_char (int c, struct type *type,
+			    struct ui_file * stream, int quoter);
 
 static char *java_class_name_from_physname (const char *physname);
 
@@ -301,7 +302,10 @@ type_from_class (struct value *clas)
   if (type != NULL)
     return type;
 
-  type = alloc_type (objfile, NULL);
+  /* Do not use the "fake" dynamics objfile to own dynamically generated
+     types, as it does not provide an architecture, and it would not help
+     manage the lifetime of these types anyway.  */
+  type = alloc_type (NULL, NULL);
   TYPE_CODE (type) = TYPE_CODE_STRUCT;
   INIT_CPLUS_SPECIFIC (type);
 
@@ -420,8 +424,7 @@ java_link_class_type (struct type *type, struct value *clas)
 
   fields = NULL;
   nfields--;			/* First set up dummy "class" field. */
-  SET_FIELD_PHYSADDR (TYPE_FIELD (type, nfields),
-		      value_address (clas));
+  SET_FIELD_PHYSADDR (TYPE_FIELD (type, nfields), value_address (clas));
   TYPE_FIELD_NAME (type, nfields) = "class";
   TYPE_FIELD_TYPE (type, nfields) = value_type (clas);
   SET_TYPE_FIELD_PRIVATE (type, nfields);
@@ -559,7 +562,8 @@ java_link_class_type (struct type *type, struct value *clas)
 	}
       fn_fields[k].physname = "";
       fn_fields[k].is_stub = 1;
-      fn_fields[k].type = make_function_type (java_void_type, NULL);	/* FIXME */
+      /* FIXME */
+      fn_fields[k].type = lookup_function_type (java_void_type);
       TYPE_CODE (fn_fields[k].type) = TYPE_CODE_METHOD;
     }
 
@@ -588,11 +592,11 @@ get_java_object_type (void)
 }
 
 int
-get_java_object_header_size (void)
+get_java_object_header_size (struct gdbarch *gdbarch)
 {
   struct type *objtype = get_java_object_type ();
   if (objtype == NULL)
-    return (2 * gdbarch_ptr_bit (current_gdbarch) / TARGET_CHAR_BIT);
+    return (2 * gdbarch_ptr_bit (gdbarch) / TARGET_CHAR_BIT);
   else
     return TYPE_LENGTH (objtype);
 }
@@ -799,7 +803,7 @@ java_value_string (char *ptr, int len)
    characters and strings is language specific. */
 
 static void
-java_emit_char (int c, struct ui_file *stream, int quoter)
+java_emit_char (int c, struct type *type, struct ui_file *stream, int quoter)
 {
   switch (c)
     {
@@ -899,7 +903,7 @@ evaluate_subexp_java (struct type *expect_type, struct expression *exp,
 	  if (noside == EVAL_AVOID_SIDE_EFFECTS)
 	    return value_zero (el_type, VALUE_LVAL (arg1));
 	  address = value_as_address (arg1);
-	  address += JAVA_OBJECT_SIZE;
+	  address += get_java_object_header_size (exp->gdbarch);
 	  read_memory (address, buf4, 4);
 	  length = (long) extract_signed_integer (buf4, 4);
 	  index = (long) value_as_long (arg2);
@@ -914,7 +918,7 @@ evaluate_subexp_java (struct type *expect_type, struct expression *exp,
 	  if (noside == EVAL_AVOID_SIDE_EFFECTS)
 	    return value_zero (TYPE_TARGET_TYPE (type), VALUE_LVAL (arg1));
 	  else
-	    return value_subscript (arg1, arg2);
+	    return value_subscript (arg1, value_as_long (arg2));
 	}
       if (name)
 	error (_("cannot subscript something of type `%s'"), name);
@@ -1057,7 +1061,7 @@ enum java_primitive_types
   nr_java_primitive_types
 };
 
-void
+static void
 java_language_arch_info (struct gdbarch *gdbarch,
 			 struct language_arch_info *lai)
 {

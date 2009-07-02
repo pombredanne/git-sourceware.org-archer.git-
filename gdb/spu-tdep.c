@@ -327,7 +327,8 @@ spu_register_reggroup_p (struct gdbarch *gdbarch, int regnum,
 /* Address conversion.  */
 
 static CORE_ADDR
-spu_pointer_to_address (struct type *type, const gdb_byte *buf)
+spu_pointer_to_address (struct gdbarch *gdbarch,
+			struct type *type, const gdb_byte *buf)
 {
   ULONGEST addr = extract_unsigned_integer (buf, TYPE_LENGTH (type));
   ULONGEST lslr = SPU_LS_SIZE - 1; /* Hard-wired LS size.  */
@@ -1284,7 +1285,7 @@ spu_breakpoint_from_pc (struct gdbarch *gdbarch, CORE_ADDR * pcptr, int *lenptr)
 
 /* Software single-stepping support.  */
 
-int
+static int
 spu_software_single_step (struct frame_info *frame)
 {
   CORE_ADDR pc, next_pc;
@@ -1327,6 +1328,26 @@ spu_software_single_step (struct frame_info *frame)
 
   return 1;
 }
+
+
+/* Longjmp support.  */
+
+static int
+spu_get_longjmp_target (struct frame_info *frame, CORE_ADDR *pc)
+{
+  gdb_byte buf[4];
+  CORE_ADDR jb_addr;
+
+  /* Jump buffer is pointed to by the argument register $r3.  */
+  get_frame_register_bytes (frame, SPU_ARG1_REGNUM, 0, 4, buf);
+  jb_addr = extract_unsigned_integer (buf, 4);
+  if (target_read_memory (jb_addr, buf, 4))
+    return 0;
+
+  *pc = extract_unsigned_integer (buf, 4);
+  return 1;
+}
+
 
 /* Target overlays for the SPU overlay manager.
 
@@ -2147,12 +2168,16 @@ spu_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   set_gdbarch_breakpoint_from_pc (gdbarch, spu_breakpoint_from_pc);
   set_gdbarch_cannot_step_breakpoint (gdbarch, 1);
   set_gdbarch_software_single_step (gdbarch, spu_software_single_step);
+  set_gdbarch_get_longjmp_target (gdbarch, spu_get_longjmp_target);
 
   /* Overlays.  */
   set_gdbarch_overlay_update (gdbarch, spu_overlay_update);
 
   return gdbarch;
 }
+
+/* Provide a prototype to silence -Wmissing-prototypes.  */
+extern initialize_file_ftype _initialize_spu_tdep;
 
 void
 _initialize_spu_tdep (void)

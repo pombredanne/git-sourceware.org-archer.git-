@@ -87,12 +87,29 @@ xstrdup (const char *s)
   return ret;
 }
 
+/* Free a standard argv vector.  */
+
+void
+freeargv (char **vector)
+{
+  char **scan;
+
+  if (vector != NULL)
+    {
+      for (scan = vector; *scan != NULL; scan++)
+	{
+	  free (*scan);
+	}
+      free (vector);
+    }
+}
+
 /* Print the system error message for errno, and also mention STRING
    as the file name for which the error was encountered.
    Then return to command level.  */
 
 void
-perror_with_name (char *string)
+perror_with_name (const char *string)
 {
   const char *err;
   char *combined;
@@ -152,4 +169,47 @@ warning (const char *string,...)
   vfprintf (stderr, string, args);
   fprintf (stderr, "\n");
   va_end (args);
+}
+
+/* Temporary storage using circular buffer.  */
+#define NUMCELLS 4
+#define CELLSIZE 50
+
+/* Return the next entry in the circular buffer.  */
+
+static char *
+get_cell (void)
+{
+  static char buf[NUMCELLS][CELLSIZE];
+  static int cell = 0;
+  if (++cell >= NUMCELLS)
+    cell = 0;
+  return buf[cell];
+}
+
+/* Stdarg wrapper around vsnprintf.
+   SIZE is the size of the buffer pointed to by STR.  */
+
+static int
+xsnprintf (char *str, size_t size, const char *format, ...)
+{
+  va_list args;
+  int ret;
+
+  va_start (args, format);
+  ret = vsnprintf (str, size, format, args);
+  va_end (args);
+
+  return ret;
+}
+
+/* Convert a CORE_ADDR into a HEX string, like %lx.
+   The result is stored in a circular static buffer, NUMCELLS deep.  */
+
+char *
+paddress (CORE_ADDR addr)
+{
+  char *str = get_cell ();
+  xsnprintf (str, CELLSIZE, "%lx", (long) addr);
+  return str;
 }

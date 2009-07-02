@@ -5879,6 +5879,9 @@ _bfd_elf_mips_mach (flagword flags)
     case E_MIPS_MACH_OCTEON:
       return bfd_mach_mips_octeon;
 
+    case E_MIPS_MACH_XLR:
+      return bfd_mach_mips_xlr;
+
     default:
       switch (flags & EF_MIPS_ARCH)
 	{
@@ -6246,17 +6249,19 @@ _bfd_mips_elf_section_processing (bfd *abfd, Elf_Internal_Shdr *hdr)
     {
       const char *name = bfd_get_section_name (abfd, hdr->bfd_section);
 
+      /* .sbss is not handled specially here because the GNU/Linux
+	 prelinker can convert .sbss from NOBITS to PROGBITS and
+	 changing it back to NOBITS breaks the binary.  The entry in
+	 _bfd_mips_elf_special_sections will ensure the correct flags
+	 are set on .sbss if BFD creates it without reading it from an
+	 input file, and without special handling here the flags set
+	 on it in an input file will be followed.  */
       if (strcmp (name, ".sdata") == 0
 	  || strcmp (name, ".lit8") == 0
 	  || strcmp (name, ".lit4") == 0)
 	{
 	  hdr->sh_flags |= SHF_ALLOC | SHF_WRITE | SHF_MIPS_GPREL;
 	  hdr->sh_type = SHT_PROGBITS;
-	}
-      else if (strcmp (name, ".sbss") == 0)
-	{
-	  hdr->sh_flags |= SHF_ALLOC | SHF_WRITE | SHF_MIPS_GPREL;
-	  hdr->sh_type = SHT_NOBITS;
 	}
       else if (strcmp (name, ".srdata") == 0)
 	{
@@ -6780,7 +6785,7 @@ _bfd_mips_elf_add_symbol_hook (bfd *abfd, struct bfd_link_info *info,
    symbol.  We mark symbols as small common if appropriate.  This is
    also where we undo the increment of the value for a mips16 symbol.  */
 
-bfd_boolean
+int
 _bfd_mips_elf_link_output_symbol_hook
   (struct bfd_link_info *info ATTRIBUTE_UNUSED,
    const char *name ATTRIBUTE_UNUSED, Elf_Internal_Sym *sym,
@@ -6796,7 +6801,7 @@ _bfd_mips_elf_link_output_symbol_hook
   if (ELF_ST_IS_MIPS16 (sym->st_other))
     sym->st_value &= ~1;
 
-  return TRUE;
+  return 1;
 }
 
 /* Functions for the dynamic linker.  */
@@ -7575,7 +7580,7 @@ _bfd_mips_elf_check_relocs (bfd *abfd, struct bfd_link_info *info,
 	case R_MIPS_CALL_LO16:
 	  if (h != NULL)
 	    {
-	      /* VxWorks call relocations point the function's .got.plt
+	      /* VxWorks call relocations point at the function's .got.plt
 		 entry, which will be allocated by adjust_dynamic_symbol.
 		 Otherwise, this symbol requires a global GOT entry.  */
 	      if ((!htab->is_vxworks || h->forced_local)
@@ -10425,6 +10430,10 @@ mips_set_isa_flags (bfd *abfd)
       val = E_MIPS_ARCH_64R2 | E_MIPS_MACH_OCTEON;
       break;
 
+    case bfd_mach_mips_xlr:
+      val = E_MIPS_ARCH_64 | E_MIPS_MACH_XLR;
+      break;
+
     case bfd_mach_mipsisa32:
       val = E_MIPS_ARCH_32;
       break;
@@ -12120,6 +12129,7 @@ static const struct mips_mach_extension mips_mach_extensions[] = {
   /* MIPS64 extensions.  */
   { bfd_mach_mipsisa64r2, bfd_mach_mipsisa64 },
   { bfd_mach_mips_sb1, bfd_mach_mipsisa64 },
+  { bfd_mach_mips_xlr, bfd_mach_mipsisa64 },
 
   /* MIPS V extensions.  */
   { bfd_mach_mipsisa64, bfd_mach_mips5 },

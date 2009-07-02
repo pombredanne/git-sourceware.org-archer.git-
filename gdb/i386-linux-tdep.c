@@ -31,11 +31,16 @@
 
 #include "i386-tdep.h"
 #include "i386-linux-tdep.h"
+#include "linux-tdep.h"
 #include "glibc-tdep.h"
 #include "solib-svr4.h"
 #include "symtab.h"
 #include "arch-utils.h"
 #include "regset.h"
+
+#include "record.h"
+#include "linux-record.h"
+#include <stdint.h>
 
 /* Supported register note sections.  */
 static struct core_regset_section i386_linux_regset_sections[] =
@@ -346,6 +351,35 @@ i386_linux_write_pc (struct regcache *regcache, CORE_ADDR pc)
      restarted.  */
   regcache_cooked_write_unsigned (regcache, I386_LINUX_ORIG_EAX_REGNUM, -1);
 }
+
+/* Parse the arguments of current system call instruction and record
+   the values of the registers and memory that will be changed into
+   "record_arch_list".  This instruction is "int 0x80" (Linux
+   Kernel2.4) or "sysenter" (Linux Kernel 2.6).
+
+   Return -1 if something wrong.  */
+
+static struct linux_record_tdep i386_linux_record_tdep;
+
+static int
+i386_linux_intx80_sysenter_record (struct regcache *regcache)
+{
+  int ret;
+  uint32_t tmpu32;
+
+  regcache_raw_read (regcache, I386_EAX_REGNUM, (gdb_byte *)&tmpu32);
+
+  ret = record_linux_system_call (tmpu32, regcache,
+				  &i386_linux_record_tdep);
+  if (ret)
+    return ret;
+
+  /* Record the return value of the system call.  */
+  if (record_arch_list_add_reg (regcache, I386_EAX_REGNUM))
+    return -1;
+
+  return 0;
+}
 
 
 /* The register sets used in GNU/Linux ELF core-dumps are identical to
@@ -440,6 +474,161 @@ i386_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
   tdep->sc_reg_offset = i386_linux_sc_reg_offset;
   tdep->sc_num_regs = ARRAY_SIZE (i386_linux_sc_reg_offset);
 
+  set_gdbarch_process_record (gdbarch, i386_process_record);
+
+  /* Initialize the i386_linux_record_tdep.  */
+  /* These values are the size of the type that will be used in a system
+     call.  They are obtained from Linux Kernel source.  */
+  i386_linux_record_tdep.size__old_kernel_stat = 32;
+  i386_linux_record_tdep.size_tms = 16;
+  i386_linux_record_tdep.size_loff_t = 8;
+  i386_linux_record_tdep.size_flock = 16;
+  i386_linux_record_tdep.size_oldold_utsname = 45;
+  i386_linux_record_tdep.size_ustat = 20;
+  i386_linux_record_tdep.size_old_sigaction = 140;
+  i386_linux_record_tdep.size_old_sigset_t = 128;
+  i386_linux_record_tdep.size_rlimit = 8;
+  i386_linux_record_tdep.size_rusage = 72;
+  i386_linux_record_tdep.size_timeval = 8;
+  i386_linux_record_tdep.size_timezone = 8;
+  i386_linux_record_tdep.size_old_gid_t = 2;
+  i386_linux_record_tdep.size_old_uid_t = 2;
+  i386_linux_record_tdep.size_fd_set = 128;
+  i386_linux_record_tdep.size_dirent = 268;
+  i386_linux_record_tdep.size_dirent64 = 276;
+  i386_linux_record_tdep.size_statfs = 64;
+  i386_linux_record_tdep.size_statfs64 = 84;
+  i386_linux_record_tdep.size_sockaddr = 16;
+  i386_linux_record_tdep.size_int = 4;
+  i386_linux_record_tdep.size_long = 4;
+  i386_linux_record_tdep.size_ulong = 4;
+  i386_linux_record_tdep.size_msghdr = 28;
+  i386_linux_record_tdep.size_itimerval = 16;
+  i386_linux_record_tdep.size_stat = 88;
+  i386_linux_record_tdep.size_old_utsname = 325;
+  i386_linux_record_tdep.size_sysinfo = 64;
+  i386_linux_record_tdep.size_msqid_ds = 88;
+  i386_linux_record_tdep.size_shmid_ds = 84;
+  i386_linux_record_tdep.size_new_utsname = 390;
+  i386_linux_record_tdep.size_timex = 128;
+  i386_linux_record_tdep.size_mem_dqinfo = 24;
+  i386_linux_record_tdep.size_if_dqblk = 68;
+  i386_linux_record_tdep.size_fs_quota_stat = 68;
+  i386_linux_record_tdep.size_timespec = 8;
+  i386_linux_record_tdep.size_pollfd = 8;
+  i386_linux_record_tdep.size_NFS_FHSIZE = 32;
+  i386_linux_record_tdep.size_knfsd_fh = 132;
+  i386_linux_record_tdep.size_TASK_COMM_LEN = 16;
+  i386_linux_record_tdep.size_sigaction = 140;
+  i386_linux_record_tdep.size_sigset_t = 8;
+  i386_linux_record_tdep.size_siginfo_t = 128;
+  i386_linux_record_tdep.size_cap_user_data_t = 12;
+  i386_linux_record_tdep.size_stack_t = 12;
+  i386_linux_record_tdep.size_off_t = i386_linux_record_tdep.size_long;
+  i386_linux_record_tdep.size_stat64 = 96;
+  i386_linux_record_tdep.size_gid_t = 2;
+  i386_linux_record_tdep.size_uid_t = 2;
+  i386_linux_record_tdep.size_PAGE_SIZE = 4096;
+  i386_linux_record_tdep.size_flock64 = 24;
+  i386_linux_record_tdep.size_user_desc = 16;
+  i386_linux_record_tdep.size_io_event = 32;
+  i386_linux_record_tdep.size_iocb = 64;
+  i386_linux_record_tdep.size_epoll_event = 12;
+  i386_linux_record_tdep.size_itimerspec = i386_linux_record_tdep.size_timespec * 2;
+  i386_linux_record_tdep.size_mq_attr = 32;
+  i386_linux_record_tdep.size_siginfo = 128;
+  i386_linux_record_tdep.size_termios = 36;
+  i386_linux_record_tdep.size_termios2 = 44;
+  i386_linux_record_tdep.size_pid_t = 4;
+  i386_linux_record_tdep.size_winsize = 8;
+  i386_linux_record_tdep.size_serial_struct = 60;
+  i386_linux_record_tdep.size_serial_icounter_struct = 80;
+  i386_linux_record_tdep.size_hayes_esp_config = 12;
+
+  /* These values are the second argument of system call "sys_ioctl".
+     They are obtained from Linux Kernel source.  */
+  i386_linux_record_tdep.ioctl_TCGETS = 0x5401;
+  i386_linux_record_tdep.ioctl_TCSETS = 0x5402;
+  i386_linux_record_tdep.ioctl_TCSETSW = 0x5403;
+  i386_linux_record_tdep.ioctl_TCSETSF = 0x5404;
+  i386_linux_record_tdep.ioctl_TCGETA = 0x5405;
+  i386_linux_record_tdep.ioctl_TCSETA = 0x5406;
+  i386_linux_record_tdep.ioctl_TCSETAW = 0x5407;
+  i386_linux_record_tdep.ioctl_TCSETAF = 0x5408;
+  i386_linux_record_tdep.ioctl_TCSBRK = 0x5409;
+  i386_linux_record_tdep.ioctl_TCXONC = 0x540A;
+  i386_linux_record_tdep.ioctl_TCFLSH = 0x540B;
+  i386_linux_record_tdep.ioctl_TIOCEXCL = 0x540C;
+  i386_linux_record_tdep.ioctl_TIOCNXCL = 0x540D;
+  i386_linux_record_tdep.ioctl_TIOCSCTTY = 0x540E;
+  i386_linux_record_tdep.ioctl_TIOCGPGRP = 0x540F;
+  i386_linux_record_tdep.ioctl_TIOCSPGRP = 0x5410;
+  i386_linux_record_tdep.ioctl_TIOCOUTQ = 0x5411;
+  i386_linux_record_tdep.ioctl_TIOCSTI = 0x5412;
+  i386_linux_record_tdep.ioctl_TIOCGWINSZ = 0x5413;
+  i386_linux_record_tdep.ioctl_TIOCSWINSZ = 0x5414;
+  i386_linux_record_tdep.ioctl_TIOCMGET = 0x5415;
+  i386_linux_record_tdep.ioctl_TIOCMBIS = 0x5416;
+  i386_linux_record_tdep.ioctl_TIOCMBIC = 0x5417;
+  i386_linux_record_tdep.ioctl_TIOCMSET = 0x5418;
+  i386_linux_record_tdep.ioctl_TIOCGSOFTCAR = 0x5419;
+  i386_linux_record_tdep.ioctl_TIOCSSOFTCAR = 0x541A;
+  i386_linux_record_tdep.ioctl_FIONREAD = 0x541B;
+  i386_linux_record_tdep.ioctl_TIOCINQ = i386_linux_record_tdep.ioctl_FIONREAD;
+  i386_linux_record_tdep.ioctl_TIOCLINUX = 0x541C;
+  i386_linux_record_tdep.ioctl_TIOCCONS = 0x541D;
+  i386_linux_record_tdep.ioctl_TIOCGSERIAL = 0x541E;
+  i386_linux_record_tdep.ioctl_TIOCSSERIAL = 0x541F;
+  i386_linux_record_tdep.ioctl_TIOCPKT = 0x5420;
+  i386_linux_record_tdep.ioctl_FIONBIO = 0x5421;
+  i386_linux_record_tdep.ioctl_TIOCNOTTY = 0x5422;
+  i386_linux_record_tdep.ioctl_TIOCSETD = 0x5423;
+  i386_linux_record_tdep.ioctl_TIOCGETD = 0x5424;
+  i386_linux_record_tdep.ioctl_TCSBRKP = 0x5425;
+  i386_linux_record_tdep.ioctl_TIOCTTYGSTRUCT = 0x5426;
+  i386_linux_record_tdep.ioctl_TIOCSBRK = 0x5427;
+  i386_linux_record_tdep.ioctl_TIOCCBRK = 0x5428;
+  i386_linux_record_tdep.ioctl_TIOCGSID = 0x5429;
+  i386_linux_record_tdep.ioctl_TCGETS2 = 0x802c542a;
+  i386_linux_record_tdep.ioctl_TCSETS2 = 0x402c542b;
+  i386_linux_record_tdep.ioctl_TCSETSW2 = 0x402c542c;
+  i386_linux_record_tdep.ioctl_TCSETSF2 = 0x402c542d;
+  i386_linux_record_tdep.ioctl_TIOCGPTN = 0x80045430;
+  i386_linux_record_tdep.ioctl_TIOCSPTLCK = 0x40045431;
+  i386_linux_record_tdep.ioctl_FIONCLEX = 0x5450;
+  i386_linux_record_tdep.ioctl_FIOCLEX = 0x5451;
+  i386_linux_record_tdep.ioctl_FIOASYNC = 0x5452;
+  i386_linux_record_tdep.ioctl_TIOCSERCONFIG = 0x5453;
+  i386_linux_record_tdep.ioctl_TIOCSERGWILD = 0x5454;
+  i386_linux_record_tdep.ioctl_TIOCSERSWILD = 0x5455;
+  i386_linux_record_tdep.ioctl_TIOCGLCKTRMIOS = 0x5456;
+  i386_linux_record_tdep.ioctl_TIOCSLCKTRMIOS = 0x5457;
+  i386_linux_record_tdep.ioctl_TIOCSERGSTRUCT = 0x5458;
+  i386_linux_record_tdep.ioctl_TIOCSERGETLSR = 0x5459;
+  i386_linux_record_tdep.ioctl_TIOCSERGETMULTI = 0x545A;
+  i386_linux_record_tdep.ioctl_TIOCSERSETMULTI = 0x545B;
+  i386_linux_record_tdep.ioctl_TIOCMIWAIT = 0x545C;
+  i386_linux_record_tdep.ioctl_TIOCGICOUNT = 0x545D;
+  i386_linux_record_tdep.ioctl_TIOCGHAYESESP = 0x545E;
+  i386_linux_record_tdep.ioctl_TIOCSHAYESESP = 0x545F;
+  i386_linux_record_tdep.ioctl_FIOQSIZE = 0x5460;
+
+  /* These values are the second argument of system call "sys_fcntl"
+     and "sys_fcntl64".  They are obtained from Linux Kernel source.  */
+  i386_linux_record_tdep.fcntl_F_GETLK = 5;
+  i386_linux_record_tdep.fcntl_F_GETLK64 = 12;
+  i386_linux_record_tdep.fcntl_F_SETLK64 = 13;
+  i386_linux_record_tdep.fcntl_F_SETLKW64 = 14;
+
+  i386_linux_record_tdep.arg1 = I386_EBX_REGNUM;
+  i386_linux_record_tdep.arg2 = I386_ECX_REGNUM;
+  i386_linux_record_tdep.arg3 = I386_EDX_REGNUM;
+  i386_linux_record_tdep.arg4 = I386_ESI_REGNUM;
+  i386_linux_record_tdep.arg5 = I386_EDI_REGNUM;
+
+  tdep->i386_intx80_record = i386_linux_intx80_sysenter_record;
+  tdep->i386_sysenter_record = i386_linux_intx80_sysenter_record;
+
   /* N_FUN symbols in shared libaries have 0 for their values and need
      to be relocated. */
   set_gdbarch_sofun_address_maybe_missing (gdbarch, 1);
@@ -469,6 +658,8 @@ i386_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
                                            simple_displaced_step_free_closure);
   set_gdbarch_displaced_step_location (gdbarch,
                                        displaced_step_at_entry_point);
+
+  set_gdbarch_get_siginfo_type (gdbarch, linux_get_siginfo_type);
 }
 
 /* Provide a prototype to silence -Wmissing-prototypes.  */

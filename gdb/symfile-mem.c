@@ -107,8 +107,8 @@ symbol_file_add_from_memory (struct bfd *templ, CORE_ADDR addr, char *name,
 	++i;
       }
 
-  objf = symbol_file_add_from_bfd (nbfd, from_tty,
-                                   sai, 0, OBJF_SHARED);
+  objf = symbol_file_add_from_bfd (nbfd, from_tty ? SYMFILE_VERBOSE : 0,
+                                   sai, OBJF_SHARED);
 
   /* This might change our ideas about frames already looked at.  */
   reinit_frame_cache ();
@@ -208,6 +208,10 @@ try using the \"file\" command first."));
 }
 
 
+
+/* Provide a prototype to silence -Wmissing-prototypes.  */
+extern initialize_file_ftype _initialize_symfile_mem;
+
 void
 _initialize_symfile_mem (void)
 {

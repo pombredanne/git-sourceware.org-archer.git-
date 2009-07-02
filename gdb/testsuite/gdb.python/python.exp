@@ -42,7 +42,7 @@ gdb_py_test_multiple "show python command" \
   "print 23" "" \
   "end" "" \
   "end" "" \
-  "show user zzq" "User command zzq:.*  python.*print 23.*  end"
+  "show user zzq" "User command \"zzq\":.*  python.*print 23.*  end"
 
 gdb_py_test_multiple "indented multi-line python command" \
   "python" "" \
@@ -50,3 +50,6 @@ gdb_py_test_multiple "indented multi-line python command" \
   "  print 'hello, world!'" "" \
   "foo ()" "" \
   "end" "hello, world!"
+
+gdb_test "python print gdb.current_objfile()" "None"
+gdb_test "python print gdb.objfiles()" "\\\[\\\]"

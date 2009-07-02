@@ -73,7 +73,7 @@ const struct objfile_data *hppa_objfile_priv_data = NULL;
 /* This assumes that no garbage lies outside of the lower bits of 
    value. */
 
-int
+static int
 hppa_sign_extend (unsigned val, unsigned bits)
 {
   return (int) (val >> (bits - 1) ? (-1 << bits) | val : val);
@@ -81,7 +81,7 @@ hppa_sign_extend (unsigned val, unsigned bits)
 
 /* For many immediate values the sign bit is the low bit! */
 
-int
+static int
 hppa_low_hppa_sign_extend (unsigned val, unsigned bits)
 {
   return (int) ((val & 0x1 ? (-1 << (bits - 1)) : 0) | val >> 1);
@@ -1799,7 +1799,7 @@ hppa_find_unwind_entry_in_block (struct frame_info *this_frame)
   /* FIXME drow/20070101: Calling gdbarch_addr_bits_remove on the
      result of get_frame_address_in_block implies a problem.
      The bits should have been removed earlier, before the return
-     value of frame_pc_unwind.  That might be happening already;
+     value of gdbarch_unwind_pc.  That might be happening already;
      if it isn't, it should be fixed.  Then this call can be
      removed.  */
   pc = gdbarch_addr_bits_remove (get_frame_arch (this_frame), pc);
@@ -3144,6 +3144,9 @@ hppa_dump_tdep (struct gdbarch *gdbarch, struct ui_file *file)
                       tdep->bytes_per_address);
   fprintf_unfiltered (file, "elf = %s\n", tdep->is_elf ? "yes" : "no");
 }
+
+/* Provide a prototype to silence -Wmissing-prototypes.  */
+extern initialize_file_ftype _initialize_hppa_tdep;
 
 void
 _initialize_hppa_tdep (void)

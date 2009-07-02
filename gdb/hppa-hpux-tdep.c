@@ -1108,7 +1108,7 @@ hppa_hpux_push_dummy_code (struct gdbarch *gdbarch, CORE_ADDR sp,
   CORE_ADDR pc, stubaddr;
   int argreg = 0;
 
-  pc = read_pc ();
+  pc = regcache_read_pc (regcache);
 
   /* Note: we don't want to pass a function descriptor here; push_dummy_call
      fills in the PIC register for us.  */
@@ -1404,7 +1404,7 @@ hppa_hpux_write_pc (struct regcache *regcache, CORE_ADDR pc)
   if (flags & HPPA_HPUX_SS_INSYSCALL)
     regcache_cooked_write_unsigned (regcache, HPPA_R31_REGNUM, pc | 0x3);
 
-  return hppa_write_pc (regcache, pc);
+  hppa_write_pc (regcache, pc);
 }
 
 static CORE_ADDR

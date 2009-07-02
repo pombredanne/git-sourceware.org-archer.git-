@@ -94,13 +94,14 @@ extern struct lwp_info *lwp_list;
 /* Attempt to initialize libthread_db.  */
 void check_for_thread_db (void);
 
-/* Tell the thread_db layer what native target operations to use.  */
-void thread_db_init (struct target_ops *);
-
 int thread_db_attach_lwp (ptid_t ptid);
 
 /* Find process PID's pending signal set from /proc/pid/status.  */
 void linux_proc_pending_signals (int pid, sigset_t *pending, sigset_t *blocked, sigset_t *ignored);
+
+/* Return the TGID of LWPID from /proc/pid/status.  Returns -1 if not
+   found.  */
+extern int linux_proc_get_tgid (int lwpid);
 
 /* linux-nat functions for handling fork events.  */
 extern void linux_enable_event_reporting (ptid_t ptid);
@@ -108,7 +109,8 @@ extern void linux_enable_event_reporting (ptid_t ptid);
 extern int lin_lwp_attach_lwp (ptid_t ptid);
 
 /* Iterator function for lin-lwp's lwp list.  */
-struct lwp_info *iterate_over_lwps (int (*callback) (struct lwp_info *, 
+struct lwp_info *iterate_over_lwps (ptid_t filter,
+				    int (*callback) (struct lwp_info *,
 						     void *), 
 				    void *data);
 
@@ -127,6 +129,14 @@ void linux_nat_add_target (struct target_ops *);
 
 /* Register a method to call whenever a new thread is attached.  */
 void linux_nat_set_new_thread (struct target_ops *, void (*) (ptid_t));
+
+/* Register a method that converts a siginfo object between the layout
+   that ptrace returns, and the layout in the architecture of the
+   inferior.  */
+void linux_nat_set_siginfo_fixup (struct target_ops *,
+				  int (*) (struct siginfo *,
+					   gdb_byte *,
+					   int));
 
 /* Update linux-nat internal state when changing from one fork
    to another.  */

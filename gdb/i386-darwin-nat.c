@@ -43,7 +43,8 @@
    If REGNO is -1, do this for all registers.
    Otherwise, REGNO specifies which register (so we can save time).  */
 static void
-i386_darwin_fetch_inferior_registers (struct regcache *regcache, int regno)
+i386_darwin_fetch_inferior_registers (struct target_ops *ops,
+				      struct regcache *regcache, int regno)
 {
   thread_t current_thread = ptid_get_tid (inferior_ptid);
   int fetched = 0;
@@ -144,7 +145,8 @@ i386_darwin_fetch_inferior_registers (struct regcache *regcache, int regno)
    Otherwise, REGNO specifies which register (so we can save time).  */
 
 static void
-i386_darwin_store_inferior_registers (struct regcache *regcache, int regno)
+i386_darwin_store_inferior_registers (struct target_ops *ops,
+				      struct regcache *regcache, int regno)
 {
   thread_t current_thread = ptid_get_tid (inferior_ptid);
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
@@ -402,7 +404,7 @@ i386_darwin_dr_get_status (void)
 void
 darwin_check_osabi (darwin_inferior *inf, thread_t thread)
 {
-  if (gdbarch_osabi (current_gdbarch) == GDB_OSABI_UNKNOWN)
+  if (gdbarch_osabi (target_gdbarch) == GDB_OSABI_UNKNOWN)
     {
       /* Attaching to a process.  Let's figure out what kind it is.  */
       x86_thread_state_t gp_regs;
@@ -420,7 +422,7 @@ darwin_check_osabi (darwin_inferior *inf, thread_t thread)
 
       gdbarch_info_init (&info);
       gdbarch_info_fill (&info);
-      info.byte_order = gdbarch_byte_order (current_gdbarch);
+      info.byte_order = gdbarch_byte_order (target_gdbarch);
       info.osabi = GDB_OSABI_DARWIN;
       if (gp_regs.tsh.flavor == x86_THREAD_STATE64)
 	info.bfd_arch_info = bfd_lookup_arch (bfd_arch_i386,

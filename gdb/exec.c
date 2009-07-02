@@ -71,6 +71,16 @@ struct target_ops exec_ops;
 bfd *exec_bfd = NULL;
 long exec_bfd_mtime = 0;
 
+/* GDB currently only supports a single symbol/address space for the
+   whole debug session.  When that limitation is lifted, this global
+   goes away.  */
+static struct target_section_table current_target_sections_1;
+
+/* The set of target sections matching the sections mapped into the
+   current inferior's address space.  */
+static struct target_section_table *current_target_sections
+  = &current_target_sections_1;
+
 /* Whether to open exec and core files read-only or read-write.  */
 
 int write_files = 0;
@@ -90,6 +100,31 @@ exec_open (char *args, int from_tty)
 {
   target_preopen (from_tty);
   exec_file_attach (args, from_tty);
+}
+
+/* Close and clear exec_bfd.  If we end up with no target sections to
+   read memory from, this unpushes the exec_ops target.  */
+
+static void
+exec_close_1 (void)
+{
+  if (exec_bfd)
+    {
+      bfd *abfd = exec_bfd;
+      char *name = bfd_get_filename (abfd);
+
+      if (!bfd_close (abfd))
+	warning (_("cannot close \"%s\": %s"),
+		 name, bfd_errmsg (bfd_get_error ()));
+      xfree (name);
+
+      /* Removing target sections may close the exec_ops target.
+	 Clear exec_bfd before doing so to prevent recursion.  */
+      exec_bfd = NULL;
+      exec_bfd_mtime = 0;
+
+      remove_target_sections (abfd);
+    }
 }
 
 static void
@@ -128,37 +163,26 @@ exec_close (int quitting)
 
   vmap = NULL;
 
-  if (exec_bfd)
-    {
-      char *name = bfd_get_filename (exec_bfd);
+  /* Delete all target sections.  */
+  resize_section_table
+    (current_target_sections,
+     -resize_section_table (current_target_sections, 0));
 
-      if (!bfd_close (exec_bfd))
-	warning (_("cannot close \"%s\": %s"),
-		 name, bfd_errmsg (bfd_get_error ()));
-      xfree (name);
-      exec_bfd = NULL;
-      exec_bfd_mtime = 0;
-    }
-
-  if (exec_ops.to_sections)
-    {
-      xfree (exec_ops.to_sections);
-      exec_ops.to_sections = NULL;
-      exec_ops.to_sections_end = NULL;
-    }
+  /* Remove exec file.  */
+  exec_close_1 ();
 }
 
 void
 exec_file_clear (int from_tty)
 {
   /* Remove exec file.  */
-  unpush_target (&exec_ops);
+  exec_close_1 ();
 
   if (from_tty)
     printf_unfiltered (_("No executable file now.\n"));
 }
 
-/*  Process the first arg in ARGS as the new exec file.
+/* Set FILENAME as the new exec file.
 
    This function is intended to be behave essentially the same
    as exec_file_command, except that the latter will detect when
@@ -173,15 +197,13 @@ exec_file_clear (int from_tty)
    given a pid but not a exec pathname, and the attach command could
    figure out the pathname from the pid.  (In this case, we shouldn't
    ask the user whether the current target should be shut down --
-   we're supplying the exec pathname late for good reason.)
-   
-   ARGS is assumed to be the filename. */
+   we're supplying the exec pathname late for good reason.)  */
 
 void
 exec_file_attach (char *filename, int from_tty)
 {
   /* Remove any previous exec file.  */
-  unpush_target (&exec_ops);
+  exec_close_1 ();
 
   /* Now open and digest the file the user requested, if any.  */
 
@@ -194,11 +216,13 @@ exec_file_attach (char *filename, int from_tty)
     }
   else
     {
+      struct cleanup *cleanups;
       char *scratch_pathname;
       int scratch_chan;
+      struct target_section *sections = NULL, *sections_end = NULL;
 
       scratch_chan = openp (getenv ("PATH"), OPF_TRY_CWD_FIRST, filename,
-		   write_files ? O_RDWR | O_BINARY : O_RDONLY | O_BINARY, 0,
+		   write_files ? O_RDWR | O_BINARY : O_RDONLY | O_BINARY,
 			    &scratch_pathname);
 #if defined(__GO32__) || defined(_WIN32) || defined(__CYGWIN__)
       if (scratch_chan < 0)
@@ -206,7 +230,7 @@ exec_file_attach (char *filename, int from_tty)
 	  char *exename = alloca (strlen (filename) + 5);
 	  strcat (strcpy (exename, filename), ".exe");
 	  scratch_chan = openp (getenv ("PATH"), OPF_TRY_CWD_FIRST, exename,
-	     write_files ? O_RDWR | O_BINARY : O_RDONLY | O_BINARY, 0,
+	     write_files ? O_RDWR | O_BINARY : O_RDONLY | O_BINARY,
 	     &scratch_pathname);
 	}
 #endif
@@ -228,13 +252,13 @@ exec_file_attach (char *filename, int from_tty)
          via the exec_bfd->name pointer, so we need to make another copy and
          leave exec_bfd as the new owner of the original copy. */
       scratch_pathname = xstrdup (scratch_pathname);
-      make_cleanup (xfree, scratch_pathname);
+      cleanups = make_cleanup (xfree, scratch_pathname);
 
       if (!bfd_check_format (exec_bfd, bfd_object))
 	{
 	  /* Make sure to close exec_bfd, or else "run" might try to use
 	     it.  */
-	  exec_close (0);
+	  exec_close_1 ();
 	  error (_("\"%s\": not in executable format: %s"),
 		 scratch_pathname, bfd_errmsg (bfd_get_error ()));
 	}
@@ -249,18 +273,17 @@ exec_file_attach (char *filename, int from_tty)
 	{
 	  /* Make sure to close exec_bfd, or else "run" might try to use
 	     it.  */
-	  exec_close (0);
+	  exec_close_1 ();
 	  error (_("\"%s\": can't find the file sections: %s"),
 		 scratch_pathname, bfd_errmsg (bfd_get_error ()));
 	}
 #endif /* DEPRECATED_IBM6000_TARGET */
 
-      if (build_section_table (exec_bfd, &exec_ops.to_sections,
-			       &exec_ops.to_sections_end))
+      if (build_section_table (exec_bfd, &sections, &sections_end))
 	{
 	  /* Make sure to close exec_bfd, or else "run" might try to use
 	     it.  */
-	  exec_close (0);
+	  exec_close_1 ();
 	  error (_("\"%s\": can't find the file sections: %s"),
 		 scratch_pathname, bfd_errmsg (bfd_get_error ()));
 	}
@@ -271,11 +294,16 @@ exec_file_attach (char *filename, int from_tty)
 
       set_gdbarch_from_file (exec_bfd);
 
-      push_target (&exec_ops);
+      /* Add the executable's sections to the current address spaces'
+	 list of sections.  */
+      add_target_sections (sections, sections_end);
+      xfree (sections);
 
       /* Tell display code (if any) about the changed file name.  */
       if (deprecated_exec_file_display_hook)
 	(*deprecated_exec_file_display_hook) (filename);
+
+      do_cleanups (cleanups);
     }
   bfd_cache_close_all ();
   observer_notify_executable_changed ();
@@ -302,11 +330,13 @@ exec_file_command (char *args, int from_tty)
 
   if (args)
     {
+      struct cleanup *cleanups;
+
       /* Scan through the args and pick up the first non option arg
          as the filename.  */
 
       argv = gdb_buildargv (args);
-      make_cleanup_freeargv (argv);
+      cleanups = make_cleanup_freeargv (argv);
 
       for (; (*argv != NULL) && (**argv == '-'); argv++)
         {;
@@ -317,6 +347,8 @@ exec_file_command (char *args, int from_tty)
       filename = tilde_expand (*argv);
       make_cleanup (xfree, filename);
       exec_file_attach (filename, from_tty);
+
+      do_cleanups (cleanups);
     }
   else
     exec_file_attach (NULL, from_tty);
@@ -346,7 +378,7 @@ static void
 add_to_section_table (bfd *abfd, struct bfd_section *asect,
 		      void *table_pp_char)
 {
-  struct section_table **table_pp = (struct section_table **) table_pp_char;
+  struct target_section **table_pp = (struct target_section **) table_pp_char;
   flagword aflag;
 
   /* Check the section flags, but do not discard zero-length sections, since
@@ -365,19 +397,46 @@ add_to_section_table (bfd *abfd, struct bfd_section *asect,
   (*table_pp)++;
 }
 
+int
+resize_section_table (struct target_section_table *table, int num_added)
+{
+  struct target_section *old_value;
+  int old_count;
+  int new_count;
+
+  old_value = table->sections;
+  old_count = table->sections_end - table->sections;
+
+  new_count = num_added + old_count;
+
+  if (new_count)
+    {
+      table->sections = xrealloc (table->sections,
+				  sizeof (struct target_section) * new_count);
+      table->sections_end = table->sections + new_count;
+    }
+  else
+    {
+      xfree (table->sections);
+      table->sections = table->sections_end = NULL;
+    }
+
+  return old_count;
+}
+
 /* Builds a section table, given args BFD, SECTABLE_PTR, SECEND_PTR.
    Returns 0 if OK, 1 on error.  */
 
 int
-build_section_table (struct bfd *some_bfd, struct section_table **start,
-		     struct section_table **end)
+build_section_table (struct bfd *some_bfd, struct target_section **start,
+		     struct target_section **end)
 {
   unsigned count;
 
   count = bfd_count_sections (some_bfd);
   if (*start)
     xfree (* start);
-  *start = (struct section_table *) xmalloc (count * sizeof (**start));
+  *start = (struct target_section *) xmalloc (count * sizeof (**start));
   *end = *start;
   bfd_map_over_sections (some_bfd, add_to_section_table, (char *) end);
   if (*end > *start + count)
@@ -385,6 +444,65 @@ build_section_table (struct bfd *some_bfd, struct section_table **start,
   /* We could realloc the table, but it probably loses for most files.  */
   return 0;
 }
+
+/* Add the sections array defined by [SECTIONS..SECTIONS_END[ to the
+   current set of target sections.  */
+
+void
+add_target_sections (struct target_section *sections,
+		     struct target_section *sections_end)
+{
+  int count;
+  struct target_section_table *table = current_target_sections;
+
+  count = sections_end - sections;
+
+  if (count > 0)
+    {
+      int space = resize_section_table (table, count);
+      memcpy (table->sections + space,
+	      sections, count * sizeof (sections[0]));
+
+      /* If these are the first file sections we can provide memory
+	 from, push the file_stratum target.  */
+      if (space == 0)
+	push_target (&exec_ops);
+    }
+}
+
+/* Remove all target sections taken from ABFD.  */
+
+void
+remove_target_sections (bfd *abfd)
+{
+  struct target_section *src, *dest;
+
+  struct target_section_table *table = current_target_sections;
+
+  dest = table->sections;
+  for (src = table->sections; src < table->sections_end; src++)
+    if (src->bfd != abfd)
+      {
+	/* Keep this section.  */
+	if (dest < src)
+	  *dest = *src;
+	dest++;
+      }
+
+  /* If we've dropped any sections, resize the section table.  */
+  if (dest < src)
+    {
+      int old_count;
+
+      old_count = resize_section_table (table, dest - src);
+
+      /* If we don't have any more sections to read memory from,
+	 remove the file_stratum target from the stack.  */
+      if (old_count + (dest - src) == 0)
+	unpush_target (&exec_ops);
+    }
+}
+
 
 static void
 bfdsec_to_vmap (struct bfd *abfd, struct bfd_section *sect, void *arg3)
@@ -441,64 +559,38 @@ map_vmap (bfd *abfd, bfd *arch)
   return vp;
 }
 
-/* Read or write the exec file.
-
-   Args are address within a BFD file, address within gdb address-space,
-   length, and a flag indicating whether to read or write.
-
-   Result is a length:
-
-   0:    We cannot handle this address and length.
-   > 0:  We have handled N bytes starting at this address.
-   (If N == length, we did it all.)  We might be able
-   to handle more bytes beyond this length, but no
-   promises.
-   < 0:  We cannot handle this address, but if somebody
-   else handles (-N) bytes, we can start from there.
-
-   The same routine is used to handle both core and exec files;
-   we just tail-call it with more arguments to select between them.  */
 
 int
-xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int write,
-	     struct mem_attrib *attrib, struct target_ops *target)
+section_table_xfer_memory_partial (gdb_byte *readbuf, const gdb_byte *writebuf,
+				   ULONGEST offset, LONGEST len,
+				   struct target_section *sections,
+				   struct target_section *sections_end,
+				   const char *section_name)
 {
   int res;
-  struct section_table *p;
-  CORE_ADDR nextsectaddr, memend;
-  struct obj_section *section = NULL;
+  struct target_section *p;
+  ULONGEST memaddr = offset;
+  ULONGEST memend = memaddr + len;
 
   if (len <= 0)
     internal_error (__FILE__, __LINE__, _("failed internal consistency check"));
 
-  if (overlay_debugging)
+  for (p = sections; p < sections_end; p++)
     {
-      section = find_pc_overlay (memaddr);
-      if (pc_in_unmapped_range (memaddr, section))
-	memaddr = overlay_mapped_address (memaddr, section);
-    }
-
-  memend = memaddr + len;
-  nextsectaddr = memend;
-
-  for (p = target->to_sections; p < target->to_sections_end; p++)
-    {
-      if (overlay_debugging && section
-	  && strcmp (section->the_bfd_section->name,
-		     p->the_bfd_section->name) != 0)
+      if (section_name && strcmp (section_name, p->the_bfd_section->name) != 0)
 	continue;		/* not the section we need */
       if (memaddr >= p->addr)
         {
 	  if (memend <= p->endaddr)
 	    {
 	      /* Entire transfer is within this section.  */
-	      if (write)
+	      if (writebuf)
 		res = bfd_set_section_contents (p->bfd, p->the_bfd_section,
-						myaddr, memaddr - p->addr,
+						writebuf, memaddr - p->addr,
 						len);
 	      else
 		res = bfd_get_section_contents (p->bfd, p->the_bfd_section,
-						myaddr, memaddr - p->addr,
+						readbuf, memaddr - p->addr,
 						len);
 	      return (res != 0) ? len : 0;
 	    }
@@ -511,32 +603,51 @@ xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int write,
 	    {
 	      /* This section overlaps the transfer.  Just do half.  */
 	      len = p->endaddr - memaddr;
-	      if (write)
+	      if (writebuf)
 		res = bfd_set_section_contents (p->bfd, p->the_bfd_section,
-						myaddr, memaddr - p->addr,
+						writebuf, memaddr - p->addr,
 						len);
 	      else
 		res = bfd_get_section_contents (p->bfd, p->the_bfd_section,
-						myaddr, memaddr - p->addr,
+						readbuf, memaddr - p->addr,
 						len);
 	      return (res != 0) ? len : 0;
 	    }
         }
-      else
-	nextsectaddr = min (nextsectaddr, p->addr);
     }
 
-  if (nextsectaddr >= memend)
-    return 0;			/* We can't help */
+  return 0;			/* We can't help */
+}
+
+struct target_section_table *
+exec_get_section_table (struct target_ops *ops)
+{
+  return current_target_sections;
+}
+
+static LONGEST
+exec_xfer_partial (struct target_ops *ops, enum target_object object,
+		   const char *annex, gdb_byte *readbuf,
+		   const gdb_byte *writebuf,
+		   ULONGEST offset, LONGEST len)
+{
+  struct target_section_table *table = target_get_section_table (ops);
+
+  if (object == TARGET_OBJECT_MEMORY)
+    return section_table_xfer_memory_partial (readbuf, writebuf,
+					      offset, len,
+					      table->sections,
+					      table->sections_end,
+					      NULL);
   else
-    return -(nextsectaddr - memaddr);	/* Next boundary where we can help */
+    return -1;
 }
 
 
 void
-print_section_info (struct target_ops *t, bfd *abfd)
+print_section_info (struct target_section_table *t, bfd *abfd)
 {
-  struct section_table *p;
+  struct target_section *p;
   /* FIXME: 16 is not wide enough when gdbarch_addr_bit > 64.  */
   int wid = gdbarch_addr_bit (gdbarch_from_bfd (abfd)) <= 32 ? 8 : 16;
 
@@ -546,7 +657,7 @@ print_section_info (struct target_ops *t, bfd *abfd)
   if (abfd == exec_bfd)
     printf_filtered (_("\tEntry point: %s\n"),
                      paddress (bfd_get_start_address (abfd)));
-  for (p = t->to_sections; p < t->to_sections_end; p++)
+  for (p = t->sections; p < t->sections_end; p++)
     {
       printf_filtered ("\t%s", hex_string_custom (p->addr, wid));
       printf_filtered (" - %s", hex_string_custom (p->endaddr, wid));
@@ -570,7 +681,7 @@ print_section_info (struct target_ops *t, bfd *abfd)
 static void
 exec_files_info (struct target_ops *t)
 {
-  print_section_info (t, exec_bfd);
+  print_section_info (current_target_sections, exec_bfd);
 
   if (vmap)
     {
@@ -600,12 +711,13 @@ exec_files_info (struct target_ops *t)
 static void
 set_section_command (char *args, int from_tty)
 {
-  struct section_table *p;
+  struct target_section *p;
   char *secname;
   unsigned seclen;
   unsigned long secaddr;
   char secprint[100];
   long offset;
+  struct target_section_table *table;
 
   if (args == 0)
     error (_("Must specify section name and its virtual address"));
@@ -617,7 +729,8 @@ set_section_command (char *args, int from_tty)
   /* Parse out new virtual address */
   secaddr = parse_and_eval_address (args);
 
-  for (p = exec_ops.to_sections; p < exec_ops.to_sections_end; p++)
+  table = current_target_sections;
+  for (p = table->sections; p < table->sections_end; p++)
     {
       if (!strncmp (secname, bfd_section_name (exec_bfd, p->the_bfd_section), seclen)
 	  && bfd_section_name (exec_bfd, p->the_bfd_section)[seclen] == '\0')
@@ -643,9 +756,11 @@ set_section_command (char *args, int from_tty)
 void
 exec_set_section_address (const char *filename, int index, CORE_ADDR address)
 {
-  struct section_table *p;
+  struct target_section *p;
+  struct target_section_table *table;
 
-  for (p = exec_ops.to_sections; p < exec_ops.to_sections_end; p++)
+  table = current_target_sections;
+  for (p = table->sections; p < table->sections_end; p++)
     {
       if (strcmp (filename, p->bfd->filename) == 0
 	  && index == p->the_bfd_section->index)
@@ -664,6 +779,15 @@ static int
 ignore (struct bp_target_info *bp_tgt)
 {
   return 0;
+}
+
+static int
+exec_has_memory (struct target_ops *ops)
+{
+  /* We can provide memory if we have any file/target sections to read
+     from.  */
+  return (current_target_sections->sections
+	  != current_target_sections->sections_end);
 }
 
 /* Find mapped memory. */
@@ -693,13 +817,14 @@ Specify the filename of the executable file.";
   exec_ops.to_open = exec_open;
   exec_ops.to_close = exec_close;
   exec_ops.to_attach = find_default_attach;
-  exec_ops.deprecated_xfer_memory = xfer_memory;
+  exec_ops.to_xfer_partial = exec_xfer_partial;
+  exec_ops.to_get_section_table = exec_get_section_table;
   exec_ops.to_files_info = exec_files_info;
   exec_ops.to_insert_breakpoint = ignore;
   exec_ops.to_remove_breakpoint = ignore;
   exec_ops.to_create_inferior = find_default_create_inferior;
   exec_ops.to_stratum = file_stratum;
-  exec_ops.to_has_memory = 1;
+  exec_ops.to_has_memory = exec_has_memory;
   exec_ops.to_make_corefile_notes = exec_make_note_section;
   exec_ops.to_magic = OPS_MAGIC;
 }

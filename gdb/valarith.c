@@ -46,7 +46,7 @@ void _initialize_valarith (void);
    If the pointer type is void *, then return 1.
    If the target type is incomplete, then error out.
    This isn't a general purpose function, but just a 
-   helper for value_ptrsub & value_ptradd.
+   helper for value_ptradd.
 */
 
 static LONGEST
@@ -85,7 +85,7 @@ find_size_for_pointer_math (struct type *ptr_type)
    result of C-style pointer arithmetic ARG1 + ARG2.  */
 
 struct value *
-value_ptradd (struct value *arg1, struct value *arg2)
+value_ptradd (struct value *arg1, LONGEST arg2)
 {
   struct type *valptrtype;
   LONGEST sz;
@@ -94,33 +94,8 @@ value_ptradd (struct value *arg1, struct value *arg2)
   valptrtype = check_typedef (value_type (arg1));
   sz = find_size_for_pointer_math (valptrtype);
 
-  if (!is_integral_type (value_type (arg2)))
-    error (_("Argument to arithmetic operation not a number or boolean."));
-
   return value_from_pointer (valptrtype,
-			     value_as_address (arg1)
-			       + (sz * value_as_long (arg2)));
-}
-
-/* Given a pointer ARG1 and an integral value ARG2, return the
-   result of C-style pointer arithmetic ARG1 - ARG2.  */
-
-struct value *
-value_ptrsub (struct value *arg1, struct value *arg2)
-{
-  struct type *valptrtype;
-  LONGEST sz;
-
-  arg1 = coerce_array (arg1);
-  valptrtype = check_typedef (value_type (arg1));
-  sz = find_size_for_pointer_math (valptrtype);
-
-  if (!is_integral_type (value_type (arg2)))
-    error (_("Argument to arithmetic operation not a number or boolean."));
-
-  return value_from_pointer (valptrtype,
-			     value_as_address (arg1)
-			       - (sz * value_as_long (arg2)));
+			     value_as_address (arg1) + sz * arg2);
 }
 
 /* Given two compatible pointer values ARG1 and ARG2, return the
@@ -162,7 +137,7 @@ an integer nor a pointer of the same type."));
    verbosity is set, warn about invalid indices (but still use them). */
 
 struct value *
-value_subscript (struct value *array, struct value *idx)
+value_subscript (struct value *array, LONGEST index)
 {
   struct value *bound;
   int c_style = current_language->c_style_arrays;
@@ -179,13 +154,12 @@ value_subscript (struct value *array, struct value *idx)
       get_discrete_bounds (range_type, &lowerbound, &upperbound);
 
       if (VALUE_LVAL (array) != lval_memory)
-	return value_subscripted_rvalue (array, idx, lowerbound);
+	return value_subscripted_rvalue (array, index, lowerbound);
 
       if (c_style == 0)
 	{
-	  LONGEST index = value_as_long (idx);
 	  if (index >= lowerbound && index <= upperbound)
-	    return value_subscripted_rvalue (array, idx, lowerbound);
+	    return value_subscripted_rvalue (array, index, lowerbound);
 	  /* Emit warning unless we have an array of unknown size.
 	     An array of unknown size has lowerbound 0 and upperbound -1.  */
 	  if (upperbound > -1)
@@ -194,17 +168,12 @@ value_subscript (struct value *array, struct value *idx)
 	  c_style = 1;
 	}
 
-      if (lowerbound != 0)
-	{
-	  bound = value_from_longest (value_type (idx), (LONGEST) lowerbound);
-	  idx = value_binop (idx, bound, BINOP_SUB);
-	}
-
+      index -= lowerbound;
       array = value_coerce_array (array);
     }
 
   if (c_style)
-    return value_ind (value_ptradd (array, idx));
+    return value_ind (value_ptradd (array, index));
   else
     error (_("not an array or string"));
 }
@@ -214,12 +183,11 @@ value_subscript (struct value *array, struct value *idx)
    to doubles, but no longer does.  */
 
 struct value *
-value_subscripted_rvalue (struct value *array, struct value *idx, int lowerbound)
+value_subscripted_rvalue (struct value *array, LONGEST index, int lowerbound)
 {
   struct type *array_type = check_typedef (value_type (array));
   struct type *elt_type = check_typedef (TYPE_TARGET_TYPE (array_type));
   unsigned int elt_size = TYPE_LENGTH (elt_type);
-  LONGEST index = value_as_long (idx);
   unsigned int elt_offs = elt_size * longest_to_int (index - lowerbound);
   struct value *v;
 
@@ -233,16 +201,7 @@ value_subscripted_rvalue (struct value *array, struct value *idx, int lowerbound
     memcpy (value_contents_writeable (v),
 	    value_contents (array) + elt_offs, elt_size);
 
-  if (VALUE_LVAL (array) == lval_internalvar)
-    {
-      VALUE_LVAL (v) = lval_internalvar_component;
-      VALUE_INTERNALVAR (v) = VALUE_INTERNALVAR (array);
-    }
-  else
-    {
-      VALUE_LVAL (v) = VALUE_LVAL (array);
-      set_value_address (v, value_raw_address (array));
-    }
+  set_value_component_location (v, array);
   VALUE_REGNUM (v) = VALUE_REGNUM (array);
   VALUE_FRAME_ID (v) = VALUE_FRAME_ID (array);
   set_value_offset (v, value_offset (array) + elt_offs);
@@ -253,11 +212,10 @@ value_subscripted_rvalue (struct value *array, struct value *idx, int lowerbound
 
 struct value *
 value_bitstring_subscript (struct type *type,
-			   struct value *bitstring, struct value *idx)
+			   struct value *bitstring, LONGEST index)
 {
 
   struct type *bitstring_type, *range_type;
-  LONGEST index = value_as_long (idx);
   struct value *v;
   int offset, byte, bit_index;
   LONGEST lowerbound, upperbound;
@@ -282,15 +240,7 @@ value_bitstring_subscript (struct type *type,
 
   set_value_bitpos (v, bit_index);
   set_value_bitsize (v, 1);
-
-  VALUE_LVAL (v) = VALUE_LVAL (bitstring);
-  if (VALUE_LVAL (bitstring) == lval_internalvar)
-    {
-      VALUE_LVAL (v) = lval_internalvar_component;
-      VALUE_INTERNALVAR (v) = VALUE_INTERNALVAR (bitstring);
-    }
-  else
-    set_value_address (v, value_raw_address (bitstring));
+  set_value_component_location (v, bitstring);
   VALUE_FRAME_ID (v) = VALUE_FRAME_ID (bitstring);
 
   set_value_offset (v, offset + value_offset (bitstring));
@@ -641,6 +591,7 @@ value_concat (struct value *arg1, struct value *arg2)
   char inchar;
   struct type *type1 = check_typedef (value_type (arg1));
   struct type *type2 = check_typedef (value_type (arg2));
+  struct type *char_type;
 
   /* First figure out if we are dealing with two values to be concatenated
      or a repeat count and a value to be repeated.  INVAL1 is set to the
@@ -676,6 +627,7 @@ value_concat (struct value *arg1, struct value *arg2)
 	  ptr = (char *) alloca (count * inval2len);
 	  if (TYPE_CODE (type2) == TYPE_CODE_CHAR)
 	    {
+	      char_type = type2;
 	      inchar = (char) unpack_long (type2,
 					   value_contents (inval2));
 	      for (idx = 0; idx < count; idx++)
@@ -685,13 +637,14 @@ value_concat (struct value *arg1, struct value *arg2)
 	    }
 	  else
 	    {
+	      char_type = TYPE_TARGET_TYPE (type2);
 	      for (idx = 0; idx < count; idx++)
 		{
 		  memcpy (ptr + (idx * inval2len), value_contents (inval2),
 			  inval2len);
 		}
 	    }
-	  outval = value_string (ptr, count * inval2len);
+	  outval = value_string (ptr, count * inval2len, char_type);
 	}
       else if (TYPE_CODE (type2) == TYPE_CODE_BITSTRING
 	       || TYPE_CODE (type2) == TYPE_CODE_BOOL)
@@ -717,10 +670,12 @@ value_concat (struct value *arg1, struct value *arg2)
       ptr = (char *) alloca (inval1len + inval2len);
       if (TYPE_CODE (type1) == TYPE_CODE_CHAR)
 	{
+	  char_type = type1;
 	  *ptr = (char) unpack_long (type1, value_contents (inval1));
 	}
       else
 	{
+	  char_type = TYPE_TARGET_TYPE (type1);
 	  memcpy (ptr, value_contents (inval1), inval1len);
 	}
       if (TYPE_CODE (type2) == TYPE_CODE_CHAR)
@@ -732,7 +687,7 @@ value_concat (struct value *arg1, struct value *arg2)
 	{
 	  memcpy (ptr + inval1len, value_contents (inval2), inval2len);
 	}
-      outval = value_string (ptr, inval1len + inval2len);
+      outval = value_string (ptr, inval1len + inval2len, char_type);
     }
   else if (TYPE_CODE (type1) == TYPE_CODE_BITSTRING
 	   || TYPE_CODE (type1) == TYPE_CODE_BOOL)
@@ -904,22 +859,6 @@ value_binop (struct value *arg1, struct value *arg2, enum exp_opcode op)
       gdb_byte v1[16], v2[16];
       gdb_byte v[16];
 
-      value_args_as_decimal (arg1, arg2, v1, &len_v1, v2, &len_v2);
-
-      switch (op)
-	{
-	case BINOP_ADD:
-	case BINOP_SUB:
-	case BINOP_MUL:
-	case BINOP_DIV:
-	case BINOP_EXP:
-	  decimal_binop (op, v1, len_v1, v2, len_v2, v, &len_v);
-	  break;
-
-	default:
-	  error (_("Operation not valid for decimal floating point number."));
-	}
-
       /* If only one type is decimal float, use its type.
 	 Otherwise use the bigger type.  */
       if (TYPE_CODE (type1) != TYPE_CODE_DECFLOAT)
@@ -930,6 +869,24 @@ value_binop (struct value *arg1, struct value *arg2, enum exp_opcode op)
 	result_type = type2;
       else
 	result_type = type1;
+
+      len_v = TYPE_LENGTH (result_type);
+
+      value_args_as_decimal (arg1, arg2, v1, &len_v1, v2, &len_v2);
+
+      switch (op)
+	{
+	case BINOP_ADD:
+	case BINOP_SUB:
+	case BINOP_MUL:
+	case BINOP_DIV:
+	case BINOP_EXP:
+	  decimal_binop (op, v1, len_v1, v2, len_v2, v, len_v);
+	  break;
+
+	default:
+	  error (_("Operation not valid for decimal floating point number."));
+	}
 
       val = value_from_decfloat (result_type, v);
     }

@@ -29,6 +29,7 @@
 struct field;
 struct block;
 struct value_print_options;
+struct language_defn;
 
 /* Some macros for char-based bitfields.  */
 
@@ -956,33 +957,6 @@ extern void allocate_cplus_struct_type (struct type *);
 
 struct builtin_type
 {
-  /* Address/pointer types.  */
-
-  /* `pointer to data' type.  Some target platforms use an implicitly
-     {sign,zero} -extended 32-bit ABI pointer on a 64-bit ISA.  */
-  struct type *builtin_data_ptr;
-
-  /* `pointer to function (returning void)' type.  Harvard
-     architectures mean that ABI function and code pointers are not
-     interconvertible.  Similarly, since ANSI, C standards have
-     explicitly said that pointers to functions and pointers to data
-     are not interconvertible --- that is, you can't cast a function
-     pointer to void * and back, and expect to get the same value.
-     However, all function pointer types are interconvertible, so void
-     (*) () can server as a generic function pointer.  */
-  struct type *builtin_func_ptr;
-
-  /* The target CPU's address type.  This is the ISA address size.  */
-  struct type *builtin_core_addr;
-
-
-  /* Types used for symbols with no debug information.  */
-  struct type *nodebug_text_symbol;
-  struct type *nodebug_data_symbol;
-  struct type *nodebug_unknown_symbol;
-  struct type *nodebug_tls_symbol;
-
-
   /* Integral types.  */
 
   /* Implicit size/sign (based on the the architecture's ABI).  */
@@ -1008,10 +982,65 @@ struct builtin_type
   struct type *builtin_decfloat;
   struct type *builtin_decdouble;
   struct type *builtin_declong;
+
+
+  /* Pointer types.  */
+
+  /* `pointer to data' type.  Some target platforms use an implicitly
+     {sign,zero} -extended 32-bit ABI pointer on a 64-bit ISA.  */
+  struct type *builtin_data_ptr;
+
+  /* `pointer to function (returning void)' type.  Harvard
+     architectures mean that ABI function and code pointers are not
+     interconvertible.  Similarly, since ANSI, C standards have
+     explicitly said that pointers to functions and pointers to data
+     are not interconvertible --- that is, you can't cast a function
+     pointer to void * and back, and expect to get the same value.
+     However, all function pointer types are interconvertible, so void
+     (*) () can server as a generic function pointer.  */
+  struct type *builtin_func_ptr;
 };
 
 /* Return the type table for the specified architecture.  */
 extern const struct builtin_type *builtin_type (struct gdbarch *gdbarch);
+
+
+/* Per-objfile types used by symbol readers.  */
+
+struct objfile_type
+{
+  /* Basic types based on the objfile architecture.  */
+  struct type *builtin_void;
+  struct type *builtin_char;
+  struct type *builtin_short;
+  struct type *builtin_int;
+  struct type *builtin_long;
+  struct type *builtin_long_long;
+  struct type *builtin_signed_char;
+  struct type *builtin_unsigned_char;
+  struct type *builtin_unsigned_short;
+  struct type *builtin_unsigned_int;
+  struct type *builtin_unsigned_long;
+  struct type *builtin_unsigned_long_long;
+  struct type *builtin_float;
+  struct type *builtin_double;
+  struct type *builtin_long_double;
+
+  /* This type is used to represent symbol addresses.  */
+  struct type *builtin_core_addr;
+
+  /* This type represents a type that was unrecognized in symbol read-in.  */
+  struct type *builtin_error;
+
+  /* Types used for symbols with no debug information.  */
+  struct type *nodebug_text_symbol;
+  struct type *nodebug_data_symbol;
+  struct type *nodebug_unknown_symbol;
+  struct type *nodebug_tls_symbol;
+};
+
+/* Return the type table for the specified objfile.  */
+extern const struct objfile_type *objfile_type (struct objfile *objfile);
 
  
 /* Explicit sizes - see C9X <intypes.h> for naming scheme.  The "int0"
@@ -1063,14 +1092,6 @@ extern struct type *builtin_type_true_char;
 extern struct type *builtin_type_true_unsigned_char;
 
 
-/* This type represents a type that was unrecognized in symbol
-   read-in.  */
-extern struct type *builtin_type_error;
-
-
-/* RTTI for C++ */
-/* extern struct type *builtin_type_cxx_typeinfo; */
-
 /* Maximum and minimum values of built-in types */
 
 #define	MAX_OF_TYPE(t)	\
@@ -1115,6 +1136,10 @@ extern struct type *init_type (enum type_code, int, int, char *,
 extern struct type *init_composite_type (char *name, enum type_code code);
 extern void append_composite_type_field (struct type *t, char *name,
 					 struct type *field);
+extern void append_composite_type_field_aligned (struct type *t,
+						 char *name,
+						 struct type *field,
+						 int alignment);
 
 /* Helper functions to construct a bit flags type.  An initially empty
    type is created using init_flag_type().  Flags are then added using
@@ -1171,30 +1196,36 @@ extern struct type *create_range_type (struct type *, struct type *, int,
 extern struct type *create_array_type (struct type *, struct type *,
 				       struct type *);
 
-extern struct type *create_string_type (struct type *, struct type *);
+extern struct type *create_string_type (struct type *, struct type *,
+					struct type *);
 
 extern struct type *create_set_type (struct type *, struct type *);
 
-extern struct type *lookup_unsigned_typename (char *);
+extern struct type *lookup_unsigned_typename (const struct language_defn *,
+					      struct gdbarch *,char *);
 
-extern struct type *lookup_signed_typename (char *);
+extern struct type *lookup_signed_typename (const struct language_defn *,
+					    struct gdbarch *,char *);
 
 extern struct type *check_typedef (struct type *);
 
-#define CHECK_TYPEDEF(TYPE) (TYPE) = check_typedef (TYPE)
+#define CHECK_TYPEDEF(TYPE)			\
+  do {						\
+    (TYPE) = check_typedef (TYPE);		\
+  } while (0)
 
 extern void check_stub_method_group (struct type *, int);
 
 extern char *gdb_mangle_name (struct type *, int, int);
 
-extern struct type *lookup_typename (char *, struct block *, int);
+extern struct type *lookup_typename (const struct language_defn *,
+				     struct gdbarch *, char *,
+				     struct block *, int);
 
 extern struct type *lookup_template_type (char *, struct type *,
 					  struct block *);
 
 extern int get_vptr_fieldno (struct type *, struct type **);
-
-extern int get_destructor_fn_field (struct type *, int *, int *);
 
 extern int get_discrete_bounds (struct type *, LONGEST *, LONGEST *);
 

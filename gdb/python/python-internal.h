@@ -183,6 +183,7 @@ PyObject *apply_varobj_pretty_printer (PyObject *print_obj,
 PyObject *gdbpy_get_varobj_pretty_printer (struct value *value);
 PyObject *gdbpy_instantiate_printer (PyObject *cons, PyObject *value);
 char *gdbpy_get_display_hint (PyObject *printer);
+PyObject *gdbpy_default_visualizer (PyObject *self, PyObject *args);
 
 extern PyObject *gdbpy_children_cst;
 extern PyObject *gdbpy_to_string_cst;

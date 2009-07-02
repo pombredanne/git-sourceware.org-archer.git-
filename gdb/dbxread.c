@@ -395,7 +395,7 @@ add_new_header_file (char *name, int instance)
 
   i = N_HEADER_FILES (current_objfile)++;
   hfile = HEADER_FILES (current_objfile) + i;
-  hfile->name = savestring (name, strlen (name));
+  hfile->name = xstrdup (name);
   hfile->instance = instance;
   hfile->length = 10;
   hfile->vector
@@ -1384,6 +1384,7 @@ read_dbx_symtab (struct objfile *objfile)
 		  pst = (struct partial_symtab *) 0;
 		  includes_used = 0;
 		  dependencies_used = 0;
+		  has_line_numbers = 0;
 		}
 	      else
 		past_first_source_file = 1;
@@ -1508,6 +1509,7 @@ read_dbx_symtab (struct objfile *objfile)
 		    pst = (struct partial_symtab *) 0;
 		    includes_used = 0;
 		    dependencies_used = 0;
+		    has_line_numbers = 0;
 		  }
 	      }
 
@@ -1684,6 +1686,7 @@ pos %d"),
 	    continue;			/* Not a debugging symbol.   */
 
  	  sym_len = 0;
+	  sym_name = NULL;	/* pacify "gcc -Werror" */
  	  if (psymtab_language == language_cplus)
  	    {
  	      char *new_name, *name = alloca (p - namestring + 1);
@@ -2106,6 +2109,7 @@ pos %d"),
 	      pst = (struct partial_symtab *) 0;
 	      includes_used = 0;
 	      dependencies_used = 0;
+	      has_line_numbers = 0;
 	    }
 	  continue;
 
@@ -2789,7 +2793,11 @@ process_one_symbol (int type, int desc, CORE_ADDR valu, char *name,
 	     which may have an N_FUN stabs at the end of the function,
 	     but no N_SLINE stabs.  */
 	  if (sline_found_in_function)
-	    record_line (current_subfile, 0, last_function_start + valu);
+	    {
+	      CORE_ADDR addr = last_function_start + valu;
+	      record_line (current_subfile, 0,
+			   gdbarch_addr_bits_remove (gdbarch, addr));
+	    }
 
 	  within_function = 0;
 	  new = pop_context ();
@@ -3005,14 +3013,15 @@ no enclosing block"));
 
       if (within_function && sline_found_in_function == 0)
 	{
-	  if (processing_gcc_compilation == 2)
-	    record_line (current_subfile, desc, last_function_start);
-	  else
-	    record_line (current_subfile, desc, valu);
+	  CORE_ADDR addr = processing_gcc_compilation == 2 ?
+			   last_function_start : valu;
+	  record_line (current_subfile, desc,
+		       gdbarch_addr_bits_remove (gdbarch, addr));
 	  sline_found_in_function = 1;
 	}
       else
-	record_line (current_subfile, desc, valu);
+	record_line (current_subfile, desc,
+		     gdbarch_addr_bits_remove (gdbarch, valu));
       break;
 
     case N_BCOMM:

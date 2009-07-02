@@ -61,6 +61,8 @@
 
 #include "gdb_locale.h"
 
+#include "gdb_wchar.h"
+
 /* For ``enum target_signal''.  */
 #include "gdb/signals.h"
 
@@ -369,6 +371,9 @@ extern struct cleanup *make_cleanup_fclose (FILE *file);
 
 extern struct cleanup *make_cleanup_bfd_close (bfd *abfd);
 
+struct obstack;
+extern struct cleanup *make_cleanup_obstack_free (struct obstack *obstack);
+
 extern struct cleanup *make_cleanup_restore_integer (int *variable);
 
 extern struct cleanup *make_final_cleanup (make_cleanup_ftype *, void *);
@@ -614,9 +619,9 @@ extern void print_address (CORE_ADDR, struct ui_file *);
 #define OPF_TRY_CWD_FIRST     0x01
 #define OPF_SEARCH_IN_PATH    0x02
 
-extern int openp (const char *, int, const char *, int, int, char **);
+extern int openp (const char *, int, const char *, int, char **);
 
-extern int source_full_path_of (char *, char **);
+extern int source_full_path_of (const char *, char **);
 
 extern void mod_path (char *, char **);
 
@@ -655,7 +660,10 @@ enum lval_type
     /* In a gdb internal variable.  */
     lval_internalvar,
     /* Part of a gdb internal variable (structure field).  */
-    lval_internalvar_component
+    lval_internalvar_component,
+    /* Value's bits are fetched and stored using functions provided by
+       its creator.  */
+    lval_computed
   };
 
 /* Control types for commands */
@@ -1103,7 +1111,8 @@ extern void (*deprecated_register_changed_hook) (int regno);
 extern void (*deprecated_memory_changed_hook) (CORE_ADDR addr, int len);
 extern void (*deprecated_context_hook) (int);
 extern ptid_t (*deprecated_target_wait_hook) (ptid_t ptid,
-                                         struct target_waitstatus * status);
+					      struct target_waitstatus *status,
+					      int options);
 
 extern void (*deprecated_attach_hook) (void);
 extern void (*deprecated_detach_hook) (void);
@@ -1111,8 +1120,6 @@ extern void (*deprecated_call_command_hook) (struct cmd_list_element * c,
 					     char *cmd, int from_tty);
 
 extern void (*deprecated_set_hook) (struct cmd_list_element * c);
-
-extern void (*deprecated_error_hook) (void);
 
 extern void (*deprecated_error_begin_hook) (void);
 

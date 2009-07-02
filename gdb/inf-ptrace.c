@@ -23,6 +23,7 @@
 #include "command.h"
 #include "inferior.h"
 #include "inflow.h"
+#include "terminal.h"
 #include "gdbcore.h"
 #include "regcache.h"
 
@@ -32,6 +33,7 @@
 #include "gdb_wait.h"
 #include <signal.h>
 
+#include "inf-ptrace.h"
 #include "inf-child.h"
 #include "gdbthread.h"
 
@@ -44,20 +46,8 @@ inf_ptrace_follow_fork (struct target_ops *ops, int follow_child)
 {
   pid_t pid, fpid;
   ptrace_state_t pe;
-  struct thread_info *last_tp = NULL;
 
-  /* FIXME: kettenis/20050720: This stuff should really be passed as
-     an argument by our caller.  */
-  {
-    ptid_t ptid;
-    struct target_waitstatus status;
-
-    get_last_target_status (&ptid, &status);
-    gdb_assert (status.kind == TARGET_WAITKIND_FORKED);
-
-    pid = ptid_get_pid (ptid);
-    last_tp = find_thread_pid (ptid);
-  }
+  pid = ptid_get_pid (inferior_ptid);
 
   if (ptrace (PT_GET_PROCESS_STATE, pid,
 	       (PTRACE_TYPE_ARG3)&pe, sizeof pe) == -1)
@@ -68,21 +58,19 @@ inf_ptrace_follow_fork (struct target_ops *ops, int follow_child)
 
   if (follow_child)
     {
-      /* Copy user stepping state to the new inferior thread.  */
-      struct breakpoint *step_resume_breakpoint = last_tp->step_resume_breakpoint;
-      CORE_ADDR step_range_start = last_tp->step_range_start;
-      CORE_ADDR step_range_end = last_tp->step_range_end;
-      struct frame_id step_frame_id = last_tp->step_frame_id;
-
+      struct inferior *parent_inf, *child_inf;
       struct thread_info *tp;
 
-      /* Otherwise, deleting the parent would get rid of this
-	 breakpoint.  */
-      last_tp->step_resume_breakpoint = NULL;
+      parent_inf = find_inferior_pid (pid);
+
+      /* Add the child.  */
+      child_inf = add_inferior (fpid);
+      child_inf->attach_flag = parent_inf->attach_flag;
+      copy_terminal_info (child_inf, parent_inf);
 
       /* Before detaching from the parent, remove all breakpoints from
 	 it.  */
-      detach_breakpoints (pid);
+      remove_breakpoints ();
 
       if (ptrace (PT_DETACH, pid, (PTRACE_TYPE_ARG3)1, 0) == -1)
 	perror_with_name (("ptrace"));
@@ -93,26 +81,15 @@ inf_ptrace_follow_fork (struct target_ops *ops, int follow_child)
       /* Delete the parent.  */
       detach_inferior (pid);
 
-      /* Add the child.  */
-      add_inferior (fpid);
-      tp = add_thread_silent (inferior_ptid);
-
-      tp->step_resume_breakpoint = step_resume_breakpoint;
-      tp->step_range_start = step_range_start;
-      tp->step_range_end = step_range_end;
-      tp->step_frame_id = step_frame_id;
-
-      /* Reset breakpoints in the child as appropriate.  */
-      follow_inferior_reset_breakpoints ();
+      add_thread_silent (inferior_ptid);
     }
   else
     {
-      inferior_ptid = pid_to_ptid (pid);
-      detach_breakpoints (fpid);
+      /* Breakpoints have already been detached from the child by
+	 infrun.c.  */
 
       if (ptrace (PT_DETACH, fpid, (PTRACE_TYPE_ARG3)1, 0) == -1)
 	perror_with_name (("ptrace"));
-      detach_inferior (pid);
     }
 
   return 0;
@@ -194,8 +171,10 @@ inf_ptrace_mourn_inferior (struct target_ops *ops)
      only report its exit status to its original parent.  */
   waitpid (ptid_get_pid (inferior_ptid), &status, 0);
 
-  unpush_target (ops);
   generic_mourn_inferior ();
+
+  if (!have_inferiors ())
+    unpush_target (ops);
 }
 
 /* Attach to the process specified by ARGS.  If FROM_TTY is non-zero,
@@ -317,7 +296,7 @@ inf_ptrace_detach (struct target_ops *ops, char *args, int from_tty)
 /* Kill the inferior.  */
 
 static void
-inf_ptrace_kill (void)
+inf_ptrace_kill (struct target_ops *ops)
 {
   pid_t pid = ptid_get_pid (inferior_ptid);
   int status;
@@ -341,7 +320,7 @@ inf_ptrace_stop (ptid_t ptid)
      negative process number in kill() is a System V-ism.  The proper
      BSD interface is killpg().  However, all modern BSDs support the
      System V interface too.  */
-  kill (-inferior_process_group, SIGINT);
+  kill (-inferior_process_group (), SIGINT);
 }
 
 /* Resume execution of thread PTID, or all threads if PTID is -1.  If
@@ -349,7 +328,8 @@ inf_ptrace_stop (ptid_t ptid)
    that signal.  */
 
 static void
-inf_ptrace_resume (ptid_t ptid, int step, enum target_signal signal)
+inf_ptrace_resume (struct target_ops *ops,
+		   ptid_t ptid, int step, enum target_signal signal)
 {
   pid_t pid = ptid_get_pid (ptid);
   int request = PT_CONTINUE;
@@ -383,7 +363,8 @@ inf_ptrace_resume (ptid_t ptid, int step, enum target_signal signal)
    the status in *OURSTATUS.  */
 
 static ptid_t
-inf_ptrace_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
+inf_ptrace_wait (struct target_ops *ops,
+		 ptid_t ptid, struct target_waitstatus *ourstatus, int options)
 {
   pid_t pid;
   int status, save_errno;
@@ -595,7 +576,7 @@ inf_ptrace_xfer_partial (struct target_ops *ops, enum target_object object,
 /* Return non-zero if the thread specified by PTID is alive.  */
 
 static int
-inf_ptrace_thread_alive (ptid_t ptid)
+inf_ptrace_thread_alive (struct target_ops *ops, ptid_t ptid)
 {
   /* ??? Is kill the right way to do this?  */
   return (kill (ptid_get_pid (ptid), 0) != -1);
@@ -611,6 +592,12 @@ inf_ptrace_files_info (struct target_ops *ignore)
   printf_filtered (_("\tUsing the running image of %s %s.\n"),
 		   inf->attach_flag ? "attached" : "child",
 		   target_pid_to_str (inferior_ptid));
+}
+
+static char *
+inf_ptrace_pid_to_str (struct target_ops *ops, ptid_t ptid)
+{
+  return normal_pid_to_str (ptid);
 }
 
 /* Create a prototype ptrace target.  The client can override it with
@@ -635,7 +622,7 @@ inf_ptrace_target (void)
 #endif
   t->to_mourn_inferior = inf_ptrace_mourn_inferior;
   t->to_thread_alive = inf_ptrace_thread_alive;
-  t->to_pid_to_str = normal_pid_to_str;
+  t->to_pid_to_str = inf_ptrace_pid_to_str;
   t->to_stop = inf_ptrace_stop;
   t->to_xfer_partial = inf_ptrace_xfer_partial;
 
@@ -696,7 +683,8 @@ inf_ptrace_fetch_register (struct regcache *regcache, int regnum)
    for all registers.  */
 
 static void
-inf_ptrace_fetch_registers (struct regcache *regcache, int regnum)
+inf_ptrace_fetch_registers (struct target_ops *ops,
+			    struct regcache *regcache, int regnum)
 {
   if (regnum == -1)
     for (regnum = 0;
@@ -752,8 +740,9 @@ inf_ptrace_store_register (const struct regcache *regcache, int regnum)
 /* Store register REGNUM back into the inferior.  If REGNUM is -1, do
    this for all registers.  */
 
-void
-inf_ptrace_store_registers (struct regcache *regcache, int regnum)
+static void
+inf_ptrace_store_registers (struct target_ops *ops,
+			    struct regcache *regcache, int regnum)
 {
   if (regnum == -1)
     for (regnum = 0;

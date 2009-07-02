@@ -19,6 +19,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "i386-nat.h"
 #include "inferior.h"
 #include "gdbcore.h"
 #include "regcache.h"
@@ -450,7 +451,8 @@ static int store_fpxregs (const struct regcache *regcache, int tid, int regno) {
    registers).  */
 
 static void
-i386_linux_fetch_inferior_registers (struct regcache *regcache, int regno)
+i386_linux_fetch_inferior_registers (struct target_ops *ops,
+				     struct regcache *regcache, int regno)
 {
   int tid;
 
@@ -483,7 +485,7 @@ i386_linux_fetch_inferior_registers (struct regcache *regcache, int regno)
       /* The call above might reset `have_ptrace_getregs'.  */
       if (!have_ptrace_getregs)
 	{
-	  i386_linux_fetch_inferior_registers (regcache, regno);
+	  i386_linux_fetch_inferior_registers (ops, regcache, regno);
 	  return;
 	}
 
@@ -522,7 +524,8 @@ i386_linux_fetch_inferior_registers (struct regcache *regcache, int regno)
    do this for all registers (including the floating point and SSE
    registers).  */
 static void
-i386_linux_store_inferior_registers (struct regcache *regcache, int regno)
+i386_linux_store_inferior_registers (struct target_ops *ops,
+				     struct regcache *regcache, int regno)
 {
   int tid;
 
@@ -627,7 +630,7 @@ i386_linux_dr_set (ptid_t ptid, int regnum, unsigned long value)
     perror_with_name (_("Couldn't write debug register"));
 }
 
-void
+static void
 i386_linux_dr_set_control (unsigned long control)
 {
   struct lwp_info *lp;
@@ -638,7 +641,7 @@ i386_linux_dr_set_control (unsigned long control)
     i386_linux_dr_set (ptid, DR_CONTROL, control);
 }
 
-void
+static void
 i386_linux_dr_set_addr (int regnum, CORE_ADDR addr)
 {
   struct lwp_info *lp;
@@ -651,13 +654,13 @@ i386_linux_dr_set_addr (int regnum, CORE_ADDR addr)
     i386_linux_dr_set (ptid, DR_FIRSTADDR + regnum, addr);
 }
 
-void
+static void
 i386_linux_dr_reset_addr (int regnum)
 {
   i386_linux_dr_set_addr (regnum, 0);
 }
 
-unsigned long
+static unsigned long
 i386_linux_dr_get_status (void)
 {
   return i386_linux_dr_get (inferior_ptid, DR_STATUS);
@@ -744,7 +747,8 @@ static const unsigned char linux_syscall[] = { 0xcd, 0x80 };
    If SIGNAL is nonzero, give it that signal.  */
 
 static void
-i386_linux_resume (ptid_t ptid, int step, enum target_signal signal)
+i386_linux_resume (struct target_ops *ops,
+		   ptid_t ptid, int step, enum target_signal signal)
 {
   int pid = PIDGET (ptid);
 
@@ -821,6 +825,12 @@ _initialize_i386_linux_nat (void)
   t = linux_target ();
 
   i386_use_watchpoints (t);
+
+  i386_dr_low.set_control = i386_linux_dr_set_control;
+  i386_dr_low.set_addr = i386_linux_dr_set_addr;
+  i386_dr_low.reset_addr = i386_linux_dr_reset_addr;
+  i386_dr_low.get_status = i386_linux_dr_get_status;
+  i386_set_debug_register_length (4);
 
   /* Override the default ptrace resume method.  */
   t->to_resume = i386_linux_resume;

@@ -42,14 +42,12 @@
 #define Cpu586		(Cpu486 + 1)
 /* i686 or better required */
 #define Cpu686		(Cpu586 + 1)
-/* Pentium4 or better required */
-#define CpuP4		(Cpu686 + 1)
-/* AMD K6 or better required*/
-#define CpuK6		(CpuP4 + 1)
-/* AMD K8 or better required */
-#define CpuK8		(CpuK6 + 1)
+/* CLFLUSH Instuction support required */
+#define CpuClflush	(Cpu686 + 1)
+/* SYSCALL Instuctions support required */
+#define CpuSYSCALL	(CpuClflush + 1)
 /* MMX support required */
-#define CpuMMX		(CpuK8 + 1)
+#define CpuMMX		(CpuSYSCALL + 1)
 /* SSE support required */
 #define CpuSSE		(CpuMMX + 1)
 /* SSE2 support required */
@@ -78,10 +76,8 @@
 #define CpuSSE4_1	(CpuABM + 1)
 /* SSE4.2 support required */
 #define CpuSSE4_2	(CpuSSE4_1 + 1)
-/* SSE5 support required */
-#define CpuSSE5		(CpuSSE4_2 + 1)
 /* AVX support required */
-#define CpuAVX		(CpuSSE5 + 1)
+#define CpuAVX		(CpuSSE4_2 + 1)
 /* Xsave/xrstor New Instuctions support required */
 #define CpuXsave	(CpuAVX + 1)
 /* AES support required */
@@ -94,8 +90,10 @@
 #define CpuMovbe	(CpuFMA + 1)
 /* EPT Instructions required */
 #define CpuEPT		(CpuMovbe + 1)
+/* RDTSCP Instuction support required */
+#define CpuRdtscp	(CpuEPT + 1)
 /* 64bit support available, used by -march= in assembler.  */
-#define CpuLM		(CpuEPT + 1)
+#define CpuLM		(CpuRdtscp + 1)
 /* 64bit support required  */
 #define Cpu64		(CpuLM + 1)
 /* Not supported in the 64bit mode  */
@@ -124,9 +122,8 @@ typedef union i386_cpu_flags
       unsigned int cpui486:1;
       unsigned int cpui586:1;
       unsigned int cpui686:1;
-      unsigned int cpup4:1;
-      unsigned int cpuk6:1;
-      unsigned int cpuk8:1;
+      unsigned int cpuclflush:1;
+      unsigned int cpusyscall:1;
       unsigned int cpummx:1;
       unsigned int cpusse:1;
       unsigned int cpusse2:1;
@@ -142,7 +139,6 @@ typedef union i386_cpu_flags
       unsigned int cpuabm:1;
       unsigned int cpusse4_1:1;
       unsigned int cpusse4_2:1;
-      unsigned int cpusse5:1;
       unsigned int cpuavx:1;
       unsigned int cpuxsave:1;
       unsigned int cpuaes:1;
@@ -150,6 +146,7 @@ typedef union i386_cpu_flags
       unsigned int cpufma:1;
       unsigned int cpumovbe:1;
       unsigned int cpuept:1;
+      unsigned int cpurdtscp:1;
       unsigned int cpulm:1;
       unsigned int cpu64:1;
       unsigned int cpuno64:1;
@@ -239,13 +236,8 @@ typedef union i386_cpu_flags
 #define Rex64			(NoRex64 + 1)
 /* deprecated fp insn, gets a warning */
 #define Ugh			(Rex64 + 1)
-#define Drex			(Ugh + 1)
-/* instruction needs DREX with multiple encodings for memory ops */
-#define Drexv			(Drex + 1)
-/* special DREX for comparisons */
-#define Drexc			(Drexv + 1)
 /* insn has VEX prefix. */
-#define Vex			(Drexc + 1)
+#define Vex			(Ugh + 1)
 /* insn has 256bit VEX prefix. */
 #define Vex256			(Vex + 1)
 /* insn has VEX NDS. Register-only source is encoded in Vex prefix.
@@ -323,9 +315,6 @@ typedef struct i386_opcode_modifier
   unsigned int norex64:1;
   unsigned int rex64:1;
   unsigned int ugh:1;
-  unsigned int drex:1;
-  unsigned int drexv:1;
-  unsigned int drexc:1;
   unsigned int vex:1;
   unsigned int vex256:1;
   unsigned int vexnds:1;
@@ -447,11 +436,8 @@ typedef struct i386_opcode_modifier
 /* Any memory size.  */
 #define Anysize			(Unspecified  + 1)
 
-/* VEX 4 bit immediate */
-#define Vex_Imm4		(Anysize + 1)
-
 /* The last bitfield in i386_operand_type.  */
-#define OTMax			Vex_Imm4
+#define OTMax			Anysize
 
 #define OTNumOfUints \
   (OTMax / sizeof (unsigned int) / CHAR_BIT + 1)
@@ -510,7 +496,6 @@ typedef union i386_operand_type
       unsigned int ymmword:1;
       unsigned int unspecified:1;
       unsigned int anysize:1;
-      unsigned int vex_imm4:1;
 #ifdef OTUnused
       unsigned int unused:(OTNumOfBits - OTUnused);
 #endif
@@ -539,7 +524,7 @@ typedef struct template
      This field is also used to store the 8-bit opcode suffix for the
      AMD 3DNow! instructions.
      If this template has no extension opcode (the usual case) use None 
-     Instructions with Drex use this to specify 2 bits for OC */
+     Instructions */
   unsigned int extension_opcode;
 #define None 0xffff		/* If no extension_opcode is possible.  */
 

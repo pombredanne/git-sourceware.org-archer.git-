@@ -91,10 +91,6 @@ static void remote_files_info (struct target_ops *ignore);
 
 static void remote_prepare_to_store (struct regcache *regcache);
 
-static void remote_fetch_registers (struct regcache *regcache, int regno);
-
-static void remote_resume (ptid_t ptid, int step,
-                           enum target_signal siggnal);
 static void remote_open (char *name, int from_tty);
 
 static void extended_remote_open (char *name, int from_tty);
@@ -102,8 +98,6 @@ static void extended_remote_open (char *name, int from_tty);
 static void remote_open_1 (char *, int, struct target_ops *, int extended_p);
 
 static void remote_close (int quitting);
-
-static void remote_store_registers (struct regcache *regcache, int regno);
 
 static void remote_mourn (struct target_ops *ops);
 
@@ -117,10 +111,7 @@ static void remote_send (char **buf, long *sizeof_buf_p);
 
 static int readchar (int timeout);
 
-static ptid_t remote_wait (ptid_t ptid,
-			   struct target_waitstatus *status);
-
-static void remote_kill (void);
+static void remote_kill (struct target_ops *ops);
 
 static int tohex (int nib);
 
@@ -143,8 +134,6 @@ static void interrupt_query (void);
 
 static void set_general_thread (struct ptid ptid);
 static void set_continue_thread (struct ptid ptid);
-
-static int remote_thread_alive (ptid_t);
 
 static void get_offsets (void);
 
@@ -1001,6 +990,9 @@ enum {
   PACKET_vRun,
   PACKET_QStartNoAckMode,
   PACKET_vKill,
+  PACKET_qXfer_siginfo_read,
+  PACKET_qXfer_siginfo_write,
+  PACKET_qAttached,
   PACKET_MAX
 };
 
@@ -1127,9 +1119,92 @@ static ptid_t any_thread_ptid;
 static ptid_t general_thread;
 static ptid_t continue_thread;
 
-static void
-notice_new_inferiors (ptid_t currthread)
+/* Find out if the stub attached to PID (and hence GDB should offer to
+   detach instead of killing it when bailing out).  */
+
+static int
+remote_query_attached (int pid)
 {
+  struct remote_state *rs = get_remote_state ();
+
+  if (remote_protocol_packets[PACKET_qAttached].support == PACKET_DISABLE)
+    return 0;
+
+  if (remote_multi_process_p (rs))
+    sprintf (rs->buf, "qAttached:%x", pid);
+  else
+    sprintf (rs->buf, "qAttached");
+
+  putpkt (rs->buf);
+  getpkt (&rs->buf, &rs->buf_size, 0);
+
+  switch (packet_ok (rs->buf,
+		     &remote_protocol_packets[PACKET_qAttached]))
+    {
+    case PACKET_OK:
+      if (strcmp (rs->buf, "1") == 0)
+	return 1;
+      break;
+    case PACKET_ERROR:
+      warning (_("Remote failure reply: %s"), rs->buf);
+      break;
+    case PACKET_UNKNOWN:
+      break;
+    }
+
+  return 0;
+}
+
+/* Add PID to GDB's inferior table.  Since we can be connected to a
+   remote system before before knowing about any inferior, mark the
+   target with execution when we find the first inferior.  If ATTACHED
+   is 1, then we had just attached to this inferior.  If it is 0, then
+   we just created this inferior.  If it is -1, then try querying the
+   remote stub to find out if it had attached to the inferior or
+   not.  */
+
+static struct inferior *
+remote_add_inferior (int pid, int attached)
+{
+  struct remote_state *rs = get_remote_state ();
+  struct inferior *inf;
+
+  /* Check whether this process we're learning about is to be
+     considered attached, or if is to be considered to have been
+     spawned by the stub.  */
+  if (attached == -1)
+    attached = remote_query_attached (pid);
+
+  inf = add_inferior (pid);
+
+  inf->attach_flag = attached;
+
+  return inf;
+}
+
+/* Add thread PTID to GDB's thread list.  Tag it as executing/running
+   according to RUNNING.  */
+
+static void
+remote_add_thread (ptid_t ptid, int running)
+{
+  add_thread (ptid);
+
+  set_executing (ptid, running);
+  set_running (ptid, running);
+}
+
+/* Come here when we learn about a thread id from the remote target.
+   It may be the first time we hear about such thread, so take the
+   opportunity to add it to GDB's thread list.  In case this is the
+   first time we're noticing its corresponding inferior, add it to
+   GDB's inferior list as well.  */
+
+static void
+remote_notice_new_inferior (ptid_t currthread, int running)
+{
+  struct remote_state *rs = get_remote_state ();
+
   /* If this is a new thread, add it to GDB's thread list.
      If we leave it up to WFI to do this, bad things will happen.  */
 
@@ -1137,20 +1212,30 @@ notice_new_inferiors (ptid_t currthread)
     {
       /* We're seeing an event on a thread id we knew had exited.
 	 This has to be a new thread reusing the old id.  Add it.  */
-      add_thread (currthread);
+      remote_add_thread (currthread, running);
       return;
     }
 
   if (!in_thread_list (currthread))
     {
-      if (ptid_equal (pid_to_ptid (ptid_get_pid (currthread)), inferior_ptid))
+      struct inferior *inf = NULL;
+      int pid = ptid_get_pid (currthread);
+
+      if (ptid_is_pid (inferior_ptid)
+	  && pid == ptid_get_pid (inferior_ptid))
 	{
 	  /* inferior_ptid has no thread member yet.  This can happen
 	     with the vAttach -> remote_wait,"TAAthread:" path if the
 	     stub doesn't support qC.  This is the first stop reported
 	     after an attach, so this is the main thread.  Update the
 	     ptid in the thread list.  */
-  	  thread_change_ptid (inferior_ptid, currthread);
+	  if (in_thread_list (pid_to_ptid (pid)))
+	    thread_change_ptid (inferior_ptid, currthread);
+	  else
+	    {
+	      remote_add_thread (currthread, running);
+	      inferior_ptid = currthread;
+	    }
  	  return;
 	}
 
@@ -1170,10 +1255,16 @@ notice_new_inferiors (ptid_t currthread)
 	 may not know about it yet.  Add it before adding its child
 	 thread, so notifications are emitted in a sensible order.  */
       if (!in_inferior_list (ptid_get_pid (currthread)))
-	add_inferior (ptid_get_pid (currthread));
+	inf = remote_add_inferior (ptid_get_pid (currthread), -1);
 
       /* This is really a new thread.  Add it.  */
-      add_thread (currthread);
+      remote_add_thread (currthread, running);
+
+      /* If we found a new inferior, let the common code do whatever
+	 it needs to with it (e.g., read shared libraries, insert
+	 breakpoints).  */
+      if (inf != NULL)
+	notice_new_inferior (currthread, running, 0);
     }
 }
 
@@ -1192,7 +1283,7 @@ record_currthread (ptid_t currthread)
     /* We're just invalidating the local thread mirror.  */
     return;
 
-  notice_new_inferiors (currthread);
+  remote_notice_new_inferior (currthread, 0);
 }
 
 static char *last_pass_packet;
@@ -1328,7 +1419,7 @@ set_general_process (void)
     system.  */
 
 static int
-remote_thread_alive (ptid_t ptid)
+remote_thread_alive (struct target_ops *ops, ptid_t ptid)
 {
   struct remote_state *rs = get_remote_state ();
   int tid = ptid_get_tid (ptid);
@@ -2134,7 +2225,7 @@ remote_find_new_threads (void)
  */
 
 static void
-remote_threads_info (void)
+remote_threads_info (struct target_ops *ops)
 {
   struct remote_state *rs = get_remote_state ();
   char *bufp;
@@ -2155,27 +2246,15 @@ remote_threads_info (void)
 	      do
 		{
 		  new_thread = read_ptid (bufp, &bufp);
-		  if (!ptid_equal (new_thread, null_ptid)
-		      && (!in_thread_list (new_thread)
-			  || is_exited (new_thread)))
+		  if (!ptid_equal (new_thread, null_ptid))
 		    {
-		      /* When connected to a multi-process aware stub,
-			 "info threads" may show up threads of
-			 inferiors we didn't know about yet.  Add them
-			 now, and before adding any of its child
-			 threads, so notifications are emitted in a
-			 sensible order.  */
-		      if (!in_inferior_list (ptid_get_pid (new_thread)))
-			add_inferior (ptid_get_pid (new_thread));
-
-		      add_thread (new_thread);
-
 		      /* In non-stop mode, we assume new found threads
-			 are running until we proven otherwise with a
+			 are running until proven otherwise with a
 			 stop reply.  In all-stop, we can only get
 			 here if all threads are stopped.  */
-		      set_executing (new_thread, non_stop ? 1 : 0);
-		      set_running (new_thread, non_stop ? 1 : 0);
+		      int running = non_stop ? 1 : 0;
+
+		      remote_notice_new_inferior (new_thread, running);
 		    }
 		}
 	      while (*bufp++ == ',');	/* comma-separated list */
@@ -2318,8 +2397,6 @@ remote_close (int quitting)
     delete_async_event_handler (&remote_async_inferior_event_token);
   if (remote_async_get_pending_events_token)
     delete_async_event_handler (&remote_async_get_pending_events_token);
-
-  generic_mourn_inferior ();
 }
 
 /* Query the remote side for the text, data and bss offsets.  */
@@ -2581,7 +2658,7 @@ remote_start_remote (struct ui_out *uiout, void *opaque)
 	 controlling.  We default to adding them in the running state.
 	 The '?' query below will then tell us about which threads are
 	 stopped.  */
-      remote_threads_info ();
+      remote_threads_info (args->target);
     }
   else if (rs->non_stop_aware)
     {
@@ -2602,21 +2679,15 @@ remote_start_remote (struct ui_out *uiout, void *opaque)
     {
       if (rs->buf[0] == 'W' || rs->buf[0] == 'X')
 	{
-	  if (args->extended_p)
-	    {
-	      /* We're connected, but not running.  Drop out before we
-		 call start_remote.  */
-	      target_mark_exited (args->target);
-	      return;
-	    }
-	  else
+	  if (!args->extended_p)
 	    error (_("The target is not running (try extended-remote?)"));
+
+	  /* We're connected, but not running.  Drop out before we
+	     call start_remote.  */
+	  return;
 	}
       else
 	{
-	  if (args->extended_p)
-	    target_mark_running (args->target);
-
 	  /* Save the reply for later.  */
 	  wait_status = alloca (strlen (rs->buf) + 1);
 	  strcpy (wait_status, rs->buf);
@@ -2637,7 +2708,7 @@ remote_start_remote (struct ui_out *uiout, void *opaque)
       /* Now, if we have thread information, update inferior_ptid.  */
       inferior_ptid = remote_current_thread (inferior_ptid);
 
-      add_inferior (ptid_get_pid (inferior_ptid));
+      remote_add_inferior (ptid_get_pid (inferior_ptid), -1);
 
       /* Always add the main thread.  */
       add_thread_silent (inferior_ptid);
@@ -2665,6 +2736,13 @@ remote_start_remote (struct ui_out *uiout, void *opaque)
     }
   else
     {
+      /* Clear WFI global state.  Do this before finding about new
+	 threads and inferiors, and setting the current inferior.
+	 Otherwise we would clear the proceed status of the current
+	 inferior when we want its stop_soon state to be preserved
+	 (see notice_new_inferior).  */
+      init_wait_for_inferior ();
+
       /* In non-stop, we will either get an "OK", meaning that there
 	 are no stopped threads at this time; or, a regular stop
 	 reply.  In the latter case, there may be more than one thread
@@ -2696,19 +2774,13 @@ remote_start_remote (struct ui_out *uiout, void *opaque)
 
       if (thread_count () == 0)
 	{
-	  if (args->extended_p)
-	    {
-	      /* We're connected, but not running.  Drop out before we
-		 call start_remote.  */
-	      target_mark_exited (args->target);
-	      return;
-	    }
-	  else
+	  if (!args->extended_p)
 	    error (_("The target is not running (try extended-remote?)"));
-	}
 
-      if (args->extended_p)
-	target_mark_running (args->target);
+	  /* We're connected, but not running.  Drop out before we
+	     call start_remote.  */
+	  return;
+	}
 
       /* Let the stub know that we want it to return the thread.  */
 
@@ -2734,9 +2806,8 @@ remote_start_remote (struct ui_out *uiout, void *opaque)
 	remote_check_symbols (symfile_objfile);
     }
 
-  /* If code is shared between processes, then breakpoints are global
-     too; Insert them now.  */
-  if (gdbarch_has_global_solist (target_gdbarch)
+  /* If breakpoints are global, insert them now.  */
+  if (gdbarch_has_global_breakpoints (target_gdbarch)
       && breakpoints_always_inserted_mode ())
     insert_breakpoints ();
 }
@@ -2965,6 +3036,10 @@ static struct protocol_feature remote_protocol_features[] = {
     PACKET_QStartNoAckMode },
   { "multiprocess", PACKET_DISABLE, remote_multi_process_feature, -1 },
   { "QNonStop", PACKET_DISABLE, remote_non_stop_feature, -1 },
+  { "qXfer:siginfo:read", PACKET_DISABLE, remote_supported_packet,
+    PACKET_qXfer_siginfo_read },
+  { "qXfer:siginfo:write", PACKET_DISABLE, remote_supported_packet,
+    PACKET_qXfer_siginfo_write },
 };
 
 static void
@@ -3116,7 +3191,7 @@ remote_open_1 (char *name, int from_tty, struct target_ops *target, int extended
      But if we're connected to a target system with no running process,
      then we will still be connected when it returns.  Ask this question
      first, before target_preopen has a chance to kill anything.  */
-  if (remote_desc != NULL && !target_has_execution)
+  if (remote_desc != NULL && !have_inferiors ())
     {
       if (!from_tty
 	  || query (_("Already connected to a remote target.  Disconnect? ")))
@@ -3134,7 +3209,7 @@ remote_open_1 (char *name, int from_tty, struct target_ops *target, int extended
      process, we may still be connected.  If we are starting "target
      remote" now, the extended-remote target will not have been
      removed by unpush_target.  */
-  if (remote_desc != NULL && !target_has_execution)
+  if (remote_desc != NULL && !have_inferiors ())
     pop_target ();
 
   /* Make sure we send the passed signals list the next time we resume.  */
@@ -3176,10 +3251,6 @@ remote_open_1 (char *name, int from_tty, struct target_ops *target, int extended
       puts_filtered ("\n");
     }
   push_target (target);		/* Switch to using remote target now.  */
-
-  /* Assume that the target is not running, until we learn otherwise.  */
-  if (extended_p)
-    target_mark_exited (target);
 
   /* Register extra event sources in the event loop.  */
   remote_async_inferior_event_token
@@ -3358,7 +3429,6 @@ extended_remote_attach_1 (struct target_ops *target, char *args, int from_tty)
   int pid;
   char *dummy;
   char *wait_status = NULL;
-  struct inferior *inf;
 
   if (!args)
     error_no_arg (_("process-id to attach"));
@@ -3399,21 +3469,34 @@ extended_remote_attach_1 (struct target_ops *target, char *args, int from_tty)
     error (_("Attaching to %s failed"),
 	   target_pid_to_str (pid_to_ptid (pid)));
 
-  target_mark_running (target);
+  remote_add_inferior (pid, 1);
+
   inferior_ptid = pid_to_ptid (pid);
 
-  /* Now, if we have thread information, update inferior_ptid.  */
-  inferior_ptid = remote_current_thread (inferior_ptid);
-
-  inf = add_inferior (pid);
-  inf->attach_flag = 1;
-
   if (non_stop)
-    /* Get list of threads.  */
-    remote_threads_info ();
+    {
+      struct thread_info *thread;
+
+      /* Get list of threads.  */
+      remote_threads_info (target);
+
+      thread = first_thread_of_process (pid);
+      if (thread)
+	inferior_ptid = thread->ptid;
+      else
+	inferior_ptid = pid_to_ptid (pid);
+
+      /* Invalidate our notion of the remote current thread.  */
+      record_currthread (minus_one_ptid);
+    }
   else
-    /* Add the main thread to the thread list.  */
-    add_thread_silent (inferior_ptid);
+    {
+      /* Now, if we have thread information, update inferior_ptid.  */
+      inferior_ptid = remote_current_thread (inferior_ptid);
+
+      /* Add the main thread to the thread list.  */
+      add_thread_silent (inferior_ptid);
+    }
 
   /* Next, if the target can specify a description, read it.  We do
      this before anything involving memory or registers.  */
@@ -3566,6 +3649,50 @@ remote_vcont_probe (struct remote_state *rs)
   packet_ok (buf, &remote_protocol_packets[PACKET_vCont]);
 }
 
+/* Helper function for building "vCont" resumptions.  Write a
+   resumption to P.  ENDP points to one-passed-the-end of the buffer
+   we're allowed to write to.  Returns BUF+CHARACTERS_WRITTEN.  The
+   thread to be resumed is PTID; STEP and SIGGNAL indicate whether the
+   resumed thread should be single-stepped and/or signalled.  If PTID
+   equals minus_one_ptid, then all threads are resumed; if PTID
+   represents a process, then all threads of the process are resumed;
+   the thread to be stepped and/or signalled is given in the global
+   INFERIOR_PTID.  */
+
+static char *
+append_resumption (char *p, char *endp,
+		   ptid_t ptid, int step, enum target_signal siggnal)
+{
+  struct remote_state *rs = get_remote_state ();
+
+  if (step && siggnal != TARGET_SIGNAL_0)
+    p += xsnprintf (p, endp - p, ";S%02x", siggnal);
+  else if (step)
+    p += xsnprintf (p, endp - p, ";s");
+  else if (siggnal != TARGET_SIGNAL_0)
+    p += xsnprintf (p, endp - p, ";C%02x", siggnal);
+  else
+    p += xsnprintf (p, endp - p, ";c");
+
+  if (remote_multi_process_p (rs) && ptid_is_pid (ptid))
+    {
+      ptid_t nptid;
+
+      /* All (-1) threads of process.  */
+      nptid = ptid_build (ptid_get_pid (ptid), 0, -1);
+
+      p += xsnprintf (p, endp - p, ":");
+      p = write_ptid (p, endp, nptid);
+    }
+  else if (!ptid_equal (ptid, minus_one_ptid))
+    {
+      p += xsnprintf (p, endp - p, ":");
+      p = write_ptid (p, endp, ptid);
+    }
+
+  return p;
+}
+
 /* Resume the remote inferior by using a "vCont" packet.  The thread
    to be resumed is PTID; STEP and SIGGNAL indicate whether the
    resumed thread should be single-stepped and/or signalled.  If PTID
@@ -3596,78 +3723,35 @@ remote_vcont_resume (ptid_t ptid, int step, enum target_signal siggnal)
      about overflowing BUF.  Should there be a generic
      "multi-part-packet" packet?  */
 
+  p += xsnprintf (p, endp - p, "vCont");
+
   if (ptid_equal (ptid, magic_null_ptid))
     {
       /* MAGIC_NULL_PTID means that we don't have any active threads,
 	 so we don't have any TID numbers the inferior will
 	 understand.  Make sure to only send forms that do not specify
 	 a TID.  */
-      if (step && siggnal != TARGET_SIGNAL_0)
-	xsnprintf (p, endp - p, "vCont;S%02x", siggnal);
-      else if (step)
-	xsnprintf (p, endp - p, "vCont;s");
-      else if (siggnal != TARGET_SIGNAL_0)
-	xsnprintf (p, endp - p, "vCont;C%02x", siggnal);
-      else
-	xsnprintf (p, endp - p, "vCont;c");
+      p = append_resumption (p, endp, minus_one_ptid, step, siggnal);
     }
-  else if (ptid_equal (ptid, minus_one_ptid))
+  else if (ptid_equal (ptid, minus_one_ptid) || ptid_is_pid (ptid))
     {
-      /* Resume all threads, with preference for INFERIOR_PTID.  */
-      if (step && siggnal != TARGET_SIGNAL_0)
+      /* Resume all threads (of all processes, or of a single
+	 process), with preference for INFERIOR_PTID.  This assumes
+	 inferior_ptid belongs to the set of all threads we are about
+	 to resume.  */
+      if (step || siggnal != TARGET_SIGNAL_0)
 	{
-	  /* Step inferior_ptid with signal.  */
-	  p += xsnprintf (p, endp - p, "vCont;S%02x:", siggnal);
-	  p = write_ptid (p, endp, inferior_ptid);
-	  /* And continue others.  */
-	  p += xsnprintf (p, endp - p, ";c");
+	  /* Step inferior_ptid, with or without signal.  */
+	  p = append_resumption (p, endp, inferior_ptid, step, siggnal);
 	}
-      else if (step)
-	{
-	  /* Step inferior_ptid.  */
-	  p += xsnprintf (p, endp - p, "vCont;s:");
-	  p = write_ptid (p, endp, inferior_ptid);
-	  /* And continue others.  */
-	  p += xsnprintf (p, endp - p, ";c");
-	}
-      else if (siggnal != TARGET_SIGNAL_0)
-	{
-	  /* Continue inferior_ptid with signal.  */
-	  p += xsnprintf (p, endp - p, "vCont;C%02x:", siggnal);
-	  p = write_ptid (p, endp, inferior_ptid);
-	  /* And continue others.  */
-	  p += xsnprintf (p, endp - p, ";c");
-	}
-      else
-	xsnprintf (p, endp - p, "vCont;c");
+
+      /* And continue others without a signal.  */
+      p = append_resumption (p, endp, ptid, /*step=*/ 0, TARGET_SIGNAL_0);
     }
   else
     {
       /* Scheduler locking; resume only PTID.  */
-      if (step && siggnal != TARGET_SIGNAL_0)
-	{
-	  /* Step ptid with signal.  */
-	  p += xsnprintf (p, endp - p, "vCont;S%02x:", siggnal);
-	  p = write_ptid (p, endp, ptid);
-	}
-      else if (step)
-	{
-	  /* Step ptid.  */
-	  p += xsnprintf (p, endp - p, "vCont;s:");
-	  p = write_ptid (p, endp, ptid);
-	}
-      else if (siggnal != TARGET_SIGNAL_0)
-	{
-	  /* Continue ptid with signal.  */
-	  p += xsnprintf (p, endp - p, "vCont;C%02x:", siggnal);
-	  p = write_ptid (p, endp, ptid);
-	}
-      else
-	{
-	  /* Continue ptid.  */
-	  p += xsnprintf (p, endp - p, "vCont;c:");
-	  p = write_ptid (p, endp, ptid);
-	}
+      p = append_resumption (p, endp, ptid, step, siggnal);
     }
 
   gdb_assert (strlen (rs->buf) < get_remote_packet_size ());
@@ -3693,7 +3777,8 @@ static enum target_signal last_sent_signal = TARGET_SIGNAL_0;
 static int last_sent_step;
 
 static void
-remote_resume (ptid_t ptid, int step, enum target_signal siggnal)
+remote_resume (struct target_ops *ops,
+	       ptid_t ptid, int step, enum target_signal siggnal)
 {
   struct remote_state *rs = get_remote_state ();
   char *buf;
@@ -3861,13 +3946,13 @@ remote_stop_ns (ptid_t ptid)
   if (!rs->support_vCont_t)
     error (_("Remote server does not support stopping threads"));
 
-  if (ptid_equal (ptid, minus_one_ptid))
+  if (ptid_equal (ptid, minus_one_ptid)
+      || (!remote_multi_process_p (rs) && ptid_is_pid (ptid)))
     p += xsnprintf (p, endp - p, "vCont;t");
   else
     {
       ptid_t nptid;
 
-      /* Step inferior_ptid.  */
       p += xsnprintf (p, endp - p, "vCont;t:");
 
       if (ptid_is_pid (ptid))
@@ -3948,8 +4033,8 @@ interrupt_query (void)
     }
   else
     {
-      if (query ("Interrupted while waiting for the program.\n\
-Give up (and stop debugging it)? "))
+      if (query (_("Interrupted while waiting for the program.\n\
+Give up (and stop debugging it)? ")))
 	{
 	  pop_target ();
 	  deprecated_throw_reason (RETURN_QUIT);
@@ -3971,19 +4056,12 @@ remote_terminal_inferior (void)
     /* Nothing to do.  */
     return;
 
-  /* FIXME: cagney/1999-09-27: Shouldn't need to test for
-     sync_execution here.  This function should only be called when
-     GDB is resuming the inferior in the forground.  A background
-     resume (``run&'') should leave GDB in control of the terminal and
-     consequently should not call this code.  */
-  if (!sync_execution)
-    return;
-  /* FIXME: cagney/1999-09-27: Closely related to the above.  Make
-     calls target_terminal_*() idenpotent. The event-loop GDB talking
-     to an asynchronous target with a synchronous command calls this
-     function from both event-top.c and infrun.c/infcmd.c.  Once GDB
-     stops trying to transfer the terminal to the target when it
-     shouldn't this guard can go away.  */
+  /* FIXME: cagney/1999-09-27: Make calls to target_terminal_*()
+     idempotent.  The event-loop GDB talking to an asynchronous target
+     with a synchronous command calls this function from both
+     event-top.c and infrun.c/infcmd.c.  Once GDB stops trying to
+     transfer the terminal to the target when it shouldn't this guard
+     can go away.  */
   if (!remote_async_terminal_ours_p)
     return;
   delete_file_handler (input_fd);
@@ -4001,9 +4079,6 @@ remote_terminal_ours (void)
     /* Nothing to do.  */
     return;
 
-  /* See FIXME in remote_terminal_inferior.  */
-  if (!sync_execution)
-    return;
   /* See FIXME in remote_terminal_inferior.  */
   if (remote_async_terminal_ours_p)
     return;
@@ -4512,8 +4587,6 @@ process_stop_reply (struct stop_reply *stop_reply,
   if (status->kind != TARGET_WAITKIND_EXITED
       && status->kind != TARGET_WAITKIND_SIGNALLED)
     {
-      notice_new_inferiors (ptid);
-
       /* Expedited registers.  */
       if (stop_reply->regcache)
 	{
@@ -4530,6 +4603,8 @@ process_stop_reply (struct stop_reply *stop_reply,
 
       remote_stopped_by_watchpoint_p = stop_reply->stopped_by_watchpoint_p;
       remote_watch_data_address = stop_reply->watch_data_address;
+
+      remote_notice_new_inferior (ptid, 0);
     }
 
   stop_reply_xfree (stop_reply);
@@ -4539,7 +4614,7 @@ process_stop_reply (struct stop_reply *stop_reply,
 /* The non-stop mode version of target_wait.  */
 
 static ptid_t
-remote_wait_ns (ptid_t ptid, struct target_waitstatus *status)
+remote_wait_ns (ptid_t ptid, struct target_waitstatus *status, int options)
 {
   struct remote_state *rs = get_remote_state ();
   struct remote_arch_state *rsa = get_remote_arch_state ();
@@ -4581,16 +4656,15 @@ remote_wait_ns (ptid_t ptid, struct target_waitstatus *status)
       if (stop_reply != NULL)
 	return process_stop_reply (stop_reply, status);
 
-      /* Still no event.  If we're in asynchronous mode, then just
+      /* Still no event.  If we're just polling for an event, then
 	 return to the event loop.  */
-      if (remote_is_async_p ())
+      if (options & TARGET_WNOHANG)
 	{
 	  status->kind = TARGET_WAITKIND_IGNORE;
 	  return minus_one_ptid;
 	}
 
-      /* Otherwise, asynchronous mode is masked, so do a blocking
-	 wait.  */
+      /* Otherwise do a blocking wait.  */
       ret = getpkt_or_notif_sane (&rs->buf, &rs->buf_size,
 				  1 /* forever */);
     }
@@ -4600,7 +4674,7 @@ remote_wait_ns (ptid_t ptid, struct target_waitstatus *status)
    STATUS just as `wait' would.  */
 
 static ptid_t
-remote_wait_as (ptid_t ptid, struct target_waitstatus *status)
+remote_wait_as (ptid_t ptid, struct target_waitstatus *status, int options)
 {
   struct remote_state *rs = get_remote_state ();
   struct remote_arch_state *rsa = get_remote_arch_state ();
@@ -4609,6 +4683,8 @@ remote_wait_as (ptid_t ptid, struct target_waitstatus *status)
   int solibs_changed = 0;
   char *buf, *p;
   struct stop_reply *stop_reply;
+
+ again:
 
   status->kind = TARGET_WAITKIND_IGNORE;
   status->value.integer = 0;
@@ -4712,8 +4788,14 @@ remote_wait_as (ptid_t ptid, struct target_waitstatus *status)
     }
 
   if (status->kind == TARGET_WAITKIND_IGNORE)
-    /* Nothing interesting happened.  */
-    return minus_one_ptid;
+    {
+      /* Nothing interesting happened.  If we're doing a non-blocking
+	 poll, we're done.  Otherwise, go back to waiting.  */
+      if (options & TARGET_WNOHANG)
+	return minus_one_ptid;
+      else
+	goto again;
+    }
   else if (status->kind != TARGET_WAITKIND_EXITED
 	   && status->kind != TARGET_WAITKIND_SIGNALLED)
     {
@@ -4733,24 +4815,15 @@ remote_wait_as (ptid_t ptid, struct target_waitstatus *status)
    STATUS just as `wait' would.  */
 
 static ptid_t
-remote_wait (ptid_t ptid, struct target_waitstatus *status)
+remote_wait (struct target_ops *ops,
+	     ptid_t ptid, struct target_waitstatus *status, int options)
 {
   ptid_t event_ptid;
 
   if (non_stop)
-    event_ptid = remote_wait_ns (ptid, status);
+    event_ptid = remote_wait_ns (ptid, status, options);
   else
-    {
-      /* In synchronous mode, keep waiting until the target stops.  In
-	 asynchronous mode, always return to the event loop.  */
-
-      do
-	{
-	  event_ptid = remote_wait_as (ptid, status);
-	}
-      while (status->kind == TARGET_WAITKIND_IGNORE
-	     && !target_can_async_p ());
-    }
+    event_ptid = remote_wait_as (ptid, status, options);
 
   if (target_can_async_p ())
     {
@@ -4956,7 +5029,8 @@ fetch_registers_using_g (struct regcache *regcache)
 }
 
 static void
-remote_fetch_registers (struct regcache *regcache, int regnum)
+remote_fetch_registers (struct target_ops *ops,
+			struct regcache *regcache, int regnum)
 {
   struct remote_state *rs = get_remote_state ();
   struct remote_arch_state *rsa = get_remote_arch_state ();
@@ -5105,7 +5179,8 @@ store_registers_using_G (const struct regcache *regcache)
    of the register cache buffer.  FIXME: ignores errors.  */
 
 static void
-remote_store_registers (struct regcache *regcache, int regnum)
+remote_store_registers (struct target_ops *ops,
+			struct regcache *regcache, int regnum)
 {
   struct remote_state *rs = get_remote_state ();
   struct remote_arch_state *rsa = get_remote_arch_state ();
@@ -5705,7 +5780,7 @@ remote_xfer_memory (CORE_ADDR mem_addr, gdb_byte *buffer, int mem_len,
    FORMAT and the remaining arguments, then gets the reply.  Returns
    whether the packet was a success, a failure, or unknown.  */
 
-enum packet_result
+static enum packet_result
 remote_send_printf (const char *format, ...)
 {
   struct remote_state *rs = get_remote_state ();
@@ -6305,7 +6380,7 @@ getpkt_or_notif_sane_1 (char **buf, long *sizeof_buf, int forever,
   int c;
   int tries;
   int timeout;
-  int val;
+  int val = -1;
 
   /* We're reading a new response.  Make sure we don't look at a
      previously cached response.  */
@@ -6446,7 +6521,7 @@ getpkt_or_notif_sane (char **buf, long *sizeof_buf, int forever)
 
 
 static void
-remote_kill (void)
+remote_kill (struct target_ops *ops)
 {
   /* Use catch_errors so the user can quit from gdb even when we
      aren't on speaking terms with the remote system.  */
@@ -6478,7 +6553,7 @@ remote_vkill (int pid, struct remote_state *rs)
 }
 
 static void
-extended_remote_kill (void)
+extended_remote_kill (struct target_ops *ops)
 {
   int res;
   int pid = ptid_get_pid (inferior_ptid);
@@ -6520,20 +6595,8 @@ remote_mourn_1 (struct target_ops *target)
 {
   unpush_target (target);
 
-  /* remote_close takes care of cleaning up.  */
-}
-
-static int
-select_new_thread_callback (struct thread_info *th, void* data)
-{
-  if (!is_exited (th->ptid))
-    {
-      switch_to_thread (th->ptid);
-      printf_filtered (_("[Switching to %s]\n"),
-		       target_pid_to_str (inferior_ptid));
-      return 1;
-    }
-  return 0;
+  /* remote_close takes care of doing most of the clean up.  */
+  generic_mourn_inferior ();
 }
 
 static void
@@ -6548,22 +6611,38 @@ extended_remote_mourn_1 (struct target_ops *target)
   /* We're no longer interested in these events.  */
   discard_pending_stop_replies (ptid_get_pid (inferior_ptid));
 
+  /* If the current general thread belonged to the process we just
+     detached from or has exited, the remote side current general
+     thread becomes undefined.  Considering a case like this:
+
+     - We just got here due to a detach.
+     - The process that we're detaching from happens to immediately
+       report a global breakpoint being hit in non-stop mode, in the
+       same thread we had selected before.
+     - GDB attaches to this process again.
+     - This event happens to be the next event we handle.
+
+     GDB would consider that the current general thread didn't need to
+     be set on the stub side (with Hg), since for all it knew,
+     GENERAL_THREAD hadn't changed.
+
+     Notice that although in all-stop mode, the remote server always
+     sets the current thread to the thread reporting the stop event,
+     that doesn't happen in non-stop mode; in non-stop, the stub *must
+     not* change the current thread when reporting a breakpoint hit,
+     due to the decoupling of event reporting and event handling.
+
+     To keep things simple, we always invalidate our notion of the
+     current thread.  */
+  record_currthread (minus_one_ptid);
+
   /* Unlike "target remote", we do not want to unpush the target; then
      the next time the user says "run", we won't be connected.  */
 
   /* Call common code to mark the inferior as not running.	*/
   generic_mourn_inferior ();
 
-  if (have_inferiors ())
-    {
-      extern void nullify_last_target_wait_ptid ();
-      /* Multi-process case.  The current process has exited, but
-	 there are other processes to debug.  Switch to the first
-	 available.  */
-      iterate_over_threads (select_new_thread_callback, NULL);
-      nullify_last_target_wait_ptid ();
-    }
-  else
+  if (!have_inferiors ())
     {
       if (!remote_multi_process_p (rs))
 	{
@@ -6579,16 +6658,7 @@ extended_remote_mourn_1 (struct target_ops *target)
 		 so that the user can say "kill" again.	 */
 	      inferior_ptid = magic_null_ptid;
 	    }
-	  else
-	    {
-	      /* Mark this (still pushed) target as not executable until we
-		 restart it.  */
-	      target_mark_exited (target);
-	    }
 	}
-      else
-	/* Always remove execution if this was the last process.  */
-	target_mark_exited (target);
     }
 }
 
@@ -6701,10 +6771,8 @@ extended_remote_create_inferior_1 (char *exec_file, char *args,
   /* Now, if we have thread information, update inferior_ptid.  */
   inferior_ptid = remote_current_thread (inferior_ptid);
 
-  add_inferior (ptid_get_pid (inferior_ptid));
+  remote_add_inferior (ptid_get_pid (inferior_ptid), 0);
   add_thread_silent (inferior_ptid);
-
-  target_mark_running (&extended_remote_ops);
 
   /* Get updated offsets, if the stub uses qOffsets.  */
   get_offsets ();
@@ -7053,7 +7121,6 @@ compare_sections_command (char *args, int from_tty)
   struct remote_state *rs = get_remote_state ();
   asection *s;
   unsigned long host_crc, target_crc;
-  extern bfd *exec_bfd;
   struct cleanup *old_chain;
   char *tmp;
   char *sectdata;
@@ -7298,6 +7365,19 @@ remote_xfer_partial (struct target_ops *ops, enum target_object object,
 	return remote_write_qxfer (ops, "spu", annex, writebuf, offset, len,
 				   &remote_protocol_packets
 				     [PACKET_qXfer_spu_write]);
+    }
+
+  /* Handle extra signal info using qxfer packets.  */
+  if (object == TARGET_OBJECT_SIGNAL_INFO)
+    {
+      if (readbuf)
+	return remote_read_qxfer (ops, "siginfo", annex, readbuf, offset, len,
+				  &remote_protocol_packets
+				  [PACKET_qXfer_siginfo_read]);
+      else
+	return remote_write_qxfer (ops, "siginfo", annex, writebuf, offset, len,
+				   &remote_protocol_packets
+				   [PACKET_qXfer_siginfo_write]);
     }
 
   /* Only handle flash writes.  */
@@ -7744,7 +7824,7 @@ Fetch and print the remote list of thread identifiers, one pkt only"));
    buffer.  */
 
 static char *
-remote_pid_to_str (ptid_t ptid)
+remote_pid_to_str (struct target_ops *ops, ptid_t ptid)
 {
   static char buf[64];
   struct remote_state *rs = get_remote_state ();
@@ -7775,7 +7855,8 @@ remote_pid_to_str (ptid_t ptid)
    stored at OFFSET within the thread local storage for thread PTID.  */
 
 static CORE_ADDR
-remote_get_thread_local_address (ptid_t ptid, CORE_ADDR lm, CORE_ADDR offset)
+remote_get_thread_local_address (struct target_ops *ops,
+				 ptid_t ptid, CORE_ADDR lm, CORE_ADDR offset)
 {
   if (remote_protocol_packets[PACKET_qGetTLSAddr].support != PACKET_DISABLE)
     {
@@ -8700,11 +8781,11 @@ Specify the serial device it is connected to\n\
   remote_ops.to_log_command = serial_log_command;
   remote_ops.to_get_thread_local_address = remote_get_thread_local_address;
   remote_ops.to_stratum = process_stratum;
-  remote_ops.to_has_all_memory = 1;
-  remote_ops.to_has_memory = 1;
-  remote_ops.to_has_stack = 1;
-  remote_ops.to_has_registers = 1;
-  remote_ops.to_has_execution = 1;
+  remote_ops.to_has_all_memory = default_child_has_all_memory;
+  remote_ops.to_has_memory = default_child_has_memory;
+  remote_ops.to_has_stack = default_child_has_stack;
+  remote_ops.to_has_registers = default_child_has_registers;
+  remote_ops.to_has_execution = default_child_has_execution;
   remote_ops.to_has_thread_control = tc_schedlock;	/* can lock scheduler */
   remote_ops.to_can_execute_reverse = remote_can_execute_reverse;
   remote_ops.to_magic = OPS_MAGIC;
@@ -9056,6 +9137,12 @@ Show the maximum size of the address (in bits) in a memory packet."), NULL,
   add_packet_config_cmd (&remote_protocol_packets[PACKET_qXfer_osdata],
                         "qXfer:osdata:read", "osdata", 0);
 
+  add_packet_config_cmd (&remote_protocol_packets[PACKET_qXfer_siginfo_read],
+                         "qXfer:siginfo:read", "read-siginfo-object", 0);
+
+  add_packet_config_cmd (&remote_protocol_packets[PACKET_qXfer_siginfo_write],
+                         "qXfer:siginfo:write", "write-siginfo-object", 0);
+
   add_packet_config_cmd (&remote_protocol_packets[PACKET_qGetTLSAddr],
 			 "qGetTLSAddr", "get-thread-local-storage-address",
 			 0);
@@ -9092,6 +9179,9 @@ Show the maximum size of the address (in bits) in a memory packet."), NULL,
 
   add_packet_config_cmd (&remote_protocol_packets[PACKET_vKill],
 			 "vKill", "kill", 0);
+
+  add_packet_config_cmd (&remote_protocol_packets[PACKET_qAttached],
+			 "qAttached", "query-attached", 0);
 
   /* Keep the old ``set remote Z-packet ...'' working.  Each individual
      Z sub-packet has its own set and show commands, but users may

@@ -1,3 +1,62 @@
+2009-06-18  Nick Clifton  <nickc@redhat.com>
+
+	* dis-asm.h (USER_SPECIFIED_MACHINE_TYPE): New value for the flags
+	field of struct disassemble_info.
+
+2009-06-09  Ian Lance Taylor  <ian@airs.com>
+
+	* ansidecl.h (ATTRIBUTE_UNUSED_LABEL): Define for C++.
+
+2009-06-15  Nick Clifton  <nickc@redhat.com>
+
+	* dis-asm.h (DISASSEMBLE_DATA): New value for the flags field of
+	struct disassemble_info.
+
+2009-06-02  Ian Lance Taylor  <iant@google.com>
+
+	* ansidecl.h (EXPORTED_CONST): Define.
+
+2009-05-31  Ian Lance Taylor  <iant@google.com>
+
+	* ansidecl.h: Add extern "C" when compiling with C++.  Treat C++
+	the way we treat an ISO C compiler.  Don't define inline as a
+	macdro when compiling with C++.
+	* dyn-string.h: Add header guard DYN_STRING_H.  Add extern "C"
+	when compiling with C++.
+	* fibheap.h: Add extern "C" when compiling with C++.
+
+2009-05-25  Tristan Gingold  <gingold@adacore.com>
+
+	* fopen-vms.h (FOPEN_RB, FOPEN_WB, FOPEN_AB, FOPEN_RUB, FOPEN_WUB,
+	FOPEN_AUB): Use "rfm=udf,rat=none" attribute.
+
+2009-04-22  Taras Glek <tglek@mozilla.com>
+
+	* hashtab.h: Update GTY annotations to new syntax.
+	* splay-tree.h: Likewise.
+
+2009-04-08  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* bfdlink.h (bfd_link_info): Add warn_alternate_em.
+
+2009-03-18  Alan Modra  <amodra@bigpond.net.au>
+
+	* alloca-conf.h: Revise based on autoconf-2.61, autoconf-2.13
+	documentation.
+
+2009-03-17  Jason Merrill  <jason@redhat.com>
+
+	* demangle.h (enum demangle_component_type): Add
+	DEMANGLE_COMPONENT_FUNCTION_PARAM.
+
+2008-12-01  Cary Coutant  <ccoutant@google.com>
+
+	* plugin-api.h (LDPS_BAD_HANDLE): New constant.
+	(ld_plugin_get_input_file): New typedef.
+	(ld_plugin_release_input_file): New typedef.
+	(LDPT_GET_INPUT_FILE, LDPT_RELEASE_INPUT_FILE): New constants.
+	(struct ld_plugin_tv): Add two new fields.
+
 2008-12-23  Jon Beniston <jon@beniston.com>
 
 	* dis-asm.h: Add LM32 disassembler function prototype.

@@ -169,6 +169,10 @@
   _bfd_elf_section_already_linked
 #endif
 
+#ifndef bfd_elfNN_bfd_define_common_symbol
+#define bfd_elfNN_bfd_define_common_symbol bfd_generic_define_common_symbol
+#endif
+
 #ifndef bfd_elfNN_bfd_make_debug_symbol
 #define bfd_elfNN_bfd_make_debug_symbol \
   ((asymbol * (*) (bfd *, void *, unsigned long)) bfd_nullvoidptr)
@@ -461,6 +465,9 @@
 #ifndef elf_backend_obj_attrs_section_type
 #define elf_backend_obj_attrs_section_type		SHT_GNU_ATTRIBUTES
 #endif
+#ifndef elf_backend_obj_attrs_order
+#define elf_backend_obj_attrs_order		NULL
+#endif
 #ifndef elf_backend_post_process_headers
 #define elf_backend_post_process_headers	NULL
 #endif
@@ -720,6 +727,7 @@ static struct elf_backend_data elfNN_bed =
   elf_backend_obj_attrs_section,
   elf_backend_obj_attrs_arg_type,
   elf_backend_obj_attrs_section_type,
+  elf_backend_obj_attrs_order,
   elf_backend_collect,
   elf_backend_type_change_ok,
   elf_backend_may_use_rel_p,

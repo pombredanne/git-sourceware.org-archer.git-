@@ -100,8 +100,8 @@ python_string_to_unicode (PyObject *obj)
 }
 
 /* Returns a newly allocated string with the contents of the given unicode
-   string object converted to a named charset.  If an error occurs during
-   the conversion, NULL will be returned and a python exception will be set.
+   string object converted to CHARSET.  If an error occurs during the
+   conversion, NULL will be returned and a python exception will be set.
 
    The caller is responsible for xfree'ing the string.  */
 static char *

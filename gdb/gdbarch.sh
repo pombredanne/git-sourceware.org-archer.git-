@@ -343,7 +343,7 @@ i:int:byte_order_for_code:::BFD_ENDIAN_BIG
 #
 i:enum gdb_osabi:osabi:::GDB_OSABI_UNKNOWN
 #
-i:const struct target_desc *:target_desc:::::::plongest ((long) gdbarch->target_desc)
+i:const struct target_desc *:target_desc:::::::host_address_to_string (gdbarch->target_desc)
 
 # The bit byte-order has to do just with numbering of bits in debugging symbols
 # and such.  Conceptually, it's quite separate from byte/word byte order.
@@ -466,8 +466,8 @@ f:void:value_to_register:struct frame_info *frame, int regnum, struct type *type
 # (but not the value contents) filled in.
 f:struct value *:value_from_register:struct type *type, int regnum, struct frame_info *frame:type, regnum, frame::default_value_from_register::0
 #
-f:CORE_ADDR:pointer_to_address:struct type *type, const gdb_byte *buf:type, buf::unsigned_pointer_to_address::0
-f:void:address_to_pointer:struct type *type, gdb_byte *buf, CORE_ADDR addr:type, buf, addr::unsigned_address_to_pointer::0
+m:CORE_ADDR:pointer_to_address:struct type *type, const gdb_byte *buf:type, buf::unsigned_pointer_to_address::0
+m:void:address_to_pointer:struct type *type, gdb_byte *buf, CORE_ADDR addr:type, buf, addr::unsigned_address_to_pointer::0
 M:CORE_ADDR:integer_to_address:struct type *type, const gdb_byte *buf:type, buf
 
 # Return the return-value convention that will be used by FUNCTYPE
@@ -575,15 +575,6 @@ f:int:in_solib_return_trampoline:CORE_ADDR pc, char *name:pc, name::generic_in_s
 # which don't suffer from that problem could just let this functionality
 # untouched.
 m:int:in_function_epilogue_p:CORE_ADDR addr:addr:0:generic_in_function_epilogue_p::0
-# Given a vector of command-line arguments, return a newly allocated
-# string which, when passed to the create_inferior function, will be
-# parsed (on Unix systems, by the shell) to yield the same vector.
-# This function should call error() if the argument vector is not
-# representable for this target or if this target does not support
-# command-line arguments.
-# ARGC is the number of elements in the vector.
-# ARGV is an array of strings, one per argument.
-m:char *:construct_inferior_arguments:int argc, char **argv:argc, argv::construct_inferior_arguments::0
 f:void:elf_make_msymbol_special:asymbol *sym, struct minimal_symbol *msym:sym, msym::default_elf_make_msymbol_special::0
 f:void:coff_make_msymbol_special:int val, struct minimal_symbol *msym:val, msym::default_coff_make_msymbol_special::0
 v:int:cannot_step_breakpoint:::0:0::0
@@ -600,12 +591,26 @@ F:CORE_ADDR:fetch_pointer_argument:struct frame_info *frame, int argi, struct ty
 # name SECT_NAME and size SECT_SIZE.
 M:const struct regset *:regset_from_core_section:const char *sect_name, size_t sect_size:sect_name, sect_size
 
+# When creating core dumps, some systems encode the PID in addition
+# to the LWP id in core file register section names.  In those cases, the
+# "XXX" in ".reg/XXX" is encoded as [LWPID << 16 | PID].  This setting
+# is set to true for such architectures; false if "XXX" represents an LWP
+# or thread id with no special encoding.
+v:int:core_reg_section_encodes_pid:::0:0::0
+
 # Supported register notes in a core file.
 v:struct core_regset_section *:core_regset_sections:const char *name, int len::::::host_address_to_string (gdbarch->core_regset_sections)
 
 # Read offset OFFSET of TARGET_OBJECT_LIBRARIES formatted shared libraries list from
 # core file into buffer READBUF with length LEN.
 M:LONGEST:core_xfer_shared_libraries:gdb_byte *readbuf, ULONGEST offset, LONGEST len:readbuf, offset, len
+
+# How the core_stratum layer converts a PTID from a core file to a
+# string.
+M:char *:core_pid_to_str:ptid_t ptid:ptid
+
+# BFD target to use when generating a core file.
+V:const char *:gcore_bfd_target:::0:0:::gdbarch->gcore_bfd_target
 
 # If the elements of C++ vtables are in-place function descriptors rather
 # than normal function pointers (which may point to code or a descriptor),
@@ -698,6 +703,12 @@ F:char *:static_transform_name:char *name:name
 # Set if the address in N_SO or N_FUN stabs may be zero.
 v:int:sofun_address_maybe_missing:::0:0::0
 
+# Parse the instruction at ADDR storing in the record execution log
+# the registers REGCACHE and memory ranges that will be affected when
+# the instruction executes, along with their current values.
+# Return -1 if something goes wrong, 0 otherwise.
+M:int:process_record:struct regcache *regcache, CORE_ADDR addr:regcache, addr
+
 # Signal translation: translate inferior's signal (host's) number into
 # GDB's representation.
 m:enum target_signal:target_signal_from_host:int signo:signo::default_target_signal_from_host::0
@@ -705,15 +716,26 @@ m:enum target_signal:target_signal_from_host:int signo:signo::default_target_sig
 # signal number.
 m:int:target_signal_to_host:enum target_signal ts:ts::default_target_signal_to_host::0
 
+# Extra signal info inspection.
+#
+# Return a type suitable to inspect extra signal information.
+M:struct type *:get_siginfo_type:void:
+
 # Record architecture-specific information from the symbol table.
 M:void:record_special_symbol:struct objfile *objfile, asymbol *sym:objfile, sym
 
 # True if the list of shared libraries is one and only for all
 # processes, as opposed to a list of shared libraries per inferior.
-# When this property is true, GDB assumes that since shared libraries
-# are shared across processes, so is all code.  Hence, GDB further
-# assumes an inserted breakpoint location is visible to all processes.
+# This usually means that all processes, although may or may not share
+# an address space, will see the same set of symbols at the same
+# addresses.
 v:int:has_global_solist:::0:0::0
+
+# On some targets, even though each inferior has its own private
+# address space, the debug interface takes care of making breakpoints
+# visible to all address spaces automatically.  For such cases,
+# this property should be set to true.
+v:int:has_global_breakpoints:::0:0::0
 EOF
 }
 
@@ -828,6 +850,17 @@ struct displaced_step_closure;
 struct core_regset_section;
 
 extern struct gdbarch *current_gdbarch;
+
+/* The architecture associated with the connection to the target.
+ 
+   The architecture vector provides some information that is really
+   a property of the target: The layout of certain packets, for instance;
+   or the solib_ops vector.  Etc.  To differentiate architecture accesses
+   to per-target properties from per-thread/per-frame/per-objfile properties,
+   accesses to per-target properties should be made through target_gdbarch.
+
+   Eventually, when support for multiple targets is implemented in
+   GDB, this global should be made target-specific.  */
 extern struct gdbarch *target_gdbarch;
 EOF
 
@@ -1474,8 +1507,8 @@ do
     if class_is_function_p
     then
 	printf "  fprintf_unfiltered (file,\n"
-	printf "                      \"gdbarch_dump: ${function} = <0x%%lx>\\\\n\",\n"
-	printf "                      (long) gdbarch->${function});\n"
+	printf "                      \"gdbarch_dump: ${function} = <%%s>\\\\n\",\n"
+	printf "                      host_address_to_string (gdbarch->${function}));\n"
     else
 	# It is a variable
 	case "${print}:${returntype}" in
@@ -1826,9 +1859,9 @@ gdbarch_register (enum bfd_architecture bfd_architecture,
     }
   /* log it */
   if (gdbarch_debug)
-    fprintf_unfiltered (gdb_stdlog, "register_gdbarch_init (%s, 0x%08lx)\n",
+    fprintf_unfiltered (gdb_stdlog, "register_gdbarch_init (%s, %s)\n",
 			bfd_arch_info->printable_name,
-			(long) init);
+			host_address_to_string (init));
   /* Append it */
   (*curr) = XMALLOC (struct gdbarch_registration);
   (*curr)->bfd_architecture = bfd_architecture;
@@ -1907,11 +1940,11 @@ find_arch_by_info (struct gdbarch_info info)
 			  "find_arch_by_info: info.osabi %d (%s)\n",
 			  info.osabi, gdbarch_osabi_name (info.osabi));
       fprintf_unfiltered (gdb_stdlog,
-			  "find_arch_by_info: info.abfd 0x%lx\n",
-			  (long) info.abfd);
+			  "find_arch_by_info: info.abfd %s\n",
+			  host_address_to_string (info.abfd));
       fprintf_unfiltered (gdb_stdlog,
-			  "find_arch_by_info: info.tdep_info 0x%lx\n",
-			  (long) info.tdep_info);
+			  "find_arch_by_info: info.tdep_info %s\n",
+			  host_address_to_string (info.tdep_info));
     }
 
   /* Find the tdep code that knows about this architecture.  */
@@ -1950,8 +1983,8 @@ find_arch_by_info (struct gdbarch_info info)
       struct gdbarch_list *this;
       if (gdbarch_debug)
 	fprintf_unfiltered (gdb_stdlog, "find_arch_by_info: "
-			    "Previous architecture 0x%08lx (%s) selected\n",
-			    (long) new_gdbarch,
+			    "Previous architecture %s (%s) selected\n",
+			    host_address_to_string (new_gdbarch),
 			    new_gdbarch->bfd_arch_info->printable_name);
       /* Find the existing arch in the list.  */
       for (list = &rego->arches;
@@ -1972,8 +2005,8 @@ find_arch_by_info (struct gdbarch_info info)
   /* It's a new architecture.  */
   if (gdbarch_debug)
     fprintf_unfiltered (gdb_stdlog, "find_arch_by_info: "
-			"New architecture 0x%08lx (%s) selected\n",
-			(long) new_gdbarch,
+			"New architecture %s (%s) selected\n",
+			host_address_to_string (new_gdbarch),
 			new_gdbarch->bfd_arch_info->printable_name);
   
   /* Insert the new architecture into the front of the architecture

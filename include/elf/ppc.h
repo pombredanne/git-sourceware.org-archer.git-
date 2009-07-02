@@ -1,6 +1,6 @@
 /* PPC ELF support for BFD.
-   Copyright 1995, 1996, 1998, 2000, 2001, 2002, 2003, 2005, 2007, 2008
-   Free Software Foundation, Inc.
+   Copyright 1995, 1996, 1998, 2000, 2001, 2002, 2003, 2005, 2007, 2008,
+   2009 Free Software Foundation, Inc.
 
    By Michael Meissner, Cygnus Support, <meissner@cygnus.com>, from information
    in the System V Application Binary Interface, PowerPC Processor Supplement
@@ -100,6 +100,8 @@ START_RELOC_NUMBERS (elf_ppc_reloc_type)
   RELOC_NUMBER (R_PPC_GOT_DTPREL16_LO,	 92)
   RELOC_NUMBER (R_PPC_GOT_DTPREL16_HI,	 93)
   RELOC_NUMBER (R_PPC_GOT_DTPREL16_HA,	 94)
+  RELOC_NUMBER (R_PPC_TLSGD,		 95)
+  RELOC_NUMBER (R_PPC_TLSLD,		 96)
 
 /* The remaining relocs are from the Embedded ELF ABI, and are not
    in the SVR4 ELF ABI.  */
@@ -120,11 +122,13 @@ START_RELOC_NUMBERS (elf_ppc_reloc_type)
   RELOC_NUMBER (R_PPC_EMB_BIT_FLD,	115)
   RELOC_NUMBER (R_PPC_EMB_RELSDA,	116)
 
+#ifndef RELOC_MACROS_GEN_FUNC
 /* Fake relocations for branch stubs, only used internally by ld.  */
-#define R_PPC_RELAX32 245
-#define R_PPC_RELAX32PC 246
-#define R_PPC_RELAX32_PLT 247
-#define R_PPC_RELAX32PC_PLT 248
+  RELOC_NUMBER (R_PPC_RELAX32,		245)
+  RELOC_NUMBER (R_PPC_RELAX32PC,	246)
+  RELOC_NUMBER (R_PPC_RELAX32_PLT,	247)
+  RELOC_NUMBER (R_PPC_RELAX32PC_PLT,	248)
+#endif
 
 /* These are GNU extensions used in PIC code sequences.  */
   RELOC_NUMBER (R_PPC_REL16,		249)

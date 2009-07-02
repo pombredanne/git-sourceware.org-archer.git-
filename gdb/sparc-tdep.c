@@ -388,7 +388,7 @@ sparc32_push_dummy_code (struct gdbarch *gdbarch, CORE_ADDR sp,
   *bp_addr = sp - 4;
   *real_pc = funcaddr;
 
-  if (using_struct_return (NULL, value_type))
+  if (using_struct_return (gdbarch, NULL, value_type))
     {
       gdb_byte buf[4];
 
@@ -1324,7 +1324,7 @@ sparc_write_pc (struct regcache *regcache, CORE_ADDR pc)
 /* Return the appropriate register set for the core section identified
    by SECT_NAME and SECT_SIZE.  */
 
-const struct regset *
+static const struct regset *
 sparc_regset_from_core_section (struct gdbarch *gdbarch,
 				const char *sect_name, size_t sect_size)
 {

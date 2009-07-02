@@ -65,9 +65,6 @@ static ptid_t main_ptid;		/* Real process ID */
 static CORE_ADDR P_cma__g_known_threads;
 static CORE_ADDR P_cma__g_current_thread;
 
-static void hpux_thread_resume (ptid_t ptid, int step,
-                                enum target_signal signo);
-
 static void init_hpux_thread_ops (void);
 
 static struct target_ops hpux_thread_ops;
@@ -171,7 +168,8 @@ hpux_thread_detach (struct target_ops *ops, char *args, int from_tty)
    for procfs.  */
 
 static void
-hpux_thread_resume (ptid_t ptid, int step, enum target_signal signo)
+hpux_thread_resume (struct target_ops *ops,
+		    ptid_t ptid, int step, enum target_signal signo)
 {
   struct cleanup *old_chain;
 
@@ -180,7 +178,7 @@ hpux_thread_resume (ptid_t ptid, int step, enum target_signal signo)
   ptid = main_ptid;
   inferior_ptid = main_ptid;
 
-  deprecated_child_ops.to_resume (ptid, step, signo);
+  deprecated_child_ops.to_resume (&deprecated_child_ops, ptid, step, signo);
 
   cached_thread = 0;
 
@@ -191,7 +189,8 @@ hpux_thread_resume (ptid_t ptid, int step, enum target_signal signo)
    to a LWP id, and vice versa on the way out.  */
 
 static ptid_t
-hpux_thread_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
+hpux_thread_wait (struct target_ops *ops,
+		  ptid_t ptid, struct target_waitstatus *ourstatus, int options)
 {
   ptid_t rtnval;
   struct cleanup *old_chain;
@@ -203,7 +202,8 @@ hpux_thread_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
   if (!ptid_equal (ptid, minus_one_ptid))
     ptid = main_ptid;
 
-  rtnval = deprecated_child_ops.to_wait (ptid, ourstatus);
+  rtnval = deprecated_child_ops.to_wait (&deprecated_child_ops,
+					 ptid, ourstatus, options);
 
   rtnval = find_active_thread ();
 
@@ -239,7 +239,8 @@ static char regmap[] =
 };
 
 static void
-hpux_thread_fetch_registers (struct regcache *regcache, int regno)
+hpux_thread_fetch_registers (struct target_ops *ops,
+			     struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
   cma__t_int_tcb tcb, *tcb_ptr;
@@ -255,7 +256,8 @@ hpux_thread_fetch_registers (struct regcache *regcache, int regno)
 
   if (tcb_ptr->state == cma__c_state_running)
     {
-      deprecated_child_ops.to_fetch_registers (regcache, regno);
+      deprecated_child_ops.to_fetch_registers (&deprecated_child_ops,
+					       regcache, regno);
 
       do_cleanups (old_chain);
 
@@ -276,7 +278,8 @@ hpux_thread_fetch_registers (struct regcache *regcache, int regno)
   for (regno = first_regno; regno <= last_regno; regno++)
     {
       if (regmap[regno] == -1)
-	deprecated_child_ops.to_fetch_registers (regcache, regno);
+	deprecated_child_ops.to_fetch_registers (&deprecated_child_ops,
+						 regcache, regno);
       else
 	{
 	  unsigned char buf[MAX_REGISTER_SIZE];
@@ -303,7 +306,8 @@ hpux_thread_fetch_registers (struct regcache *regcache, int regno)
 }
 
 static void
-hpux_thread_store_registers (struct regcache *regcache, int regno)
+hpux_thread_store_registers (struct target_ops *ops,
+			     struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
   cma__t_int_tcb tcb, *tcb_ptr;
@@ -319,7 +323,8 @@ hpux_thread_store_registers (struct regcache *regcache, int regno)
 
   if (tcb_ptr->state == cma__c_state_running)
     {
-      deprecated_child_ops.to_store_registers (regcache, regno);
+      deprecated_child_ops.to_store_registers (&deprecated_child_ops,
+					       regcache, regno);
 
       do_cleanups (old_chain);
 
@@ -349,7 +354,11 @@ hpux_thread_store_registers (struct regcache *regcache, int regno)
 	  sp = (CORE_ADDR) tcb_ptr->static_ctx.sp - 160;
 
 	  if (regno == HPPA_FLAGS_REGNUM)
-	    deprecated_child_ops.to_store_registers (regcache, regno);	/* Let lower layer handle this... */
+	    {
+	      /* Let lower layer handle this... */
+	      deprecated_child_ops.to_store_registers
+		(&deprecated_child_ops, regcache, regno);
+	    }
 	  else if (regno == HPPA_SP_REGNUM)
 	    {
 	      regcache_raw_collect (regcache, regno, buf);
@@ -417,9 +426,9 @@ hpux_thread_files_info (struct target_ops *ignore)
 }
 
 static void
-hpux_thread_kill_inferior (void)
+hpux_thread_kill_inferior (struct target_ops *ops)
 {
-  deprecated_child_ops.to_kill ();
+  deprecated_child_ops.to_kill (&deprecated_child_ops);
 }
 
 static void
@@ -500,7 +509,7 @@ hpux_thread_can_run (void)
 }
 
 static int
-hpux_thread_alive (ptid_t ptid)
+hpux_thread_alive (struct target_ops *ops, ptid_t ptid)
 {
   return 1;
 }
@@ -556,11 +565,11 @@ init_hpux_thread_ops (void)
   hpux_thread_ops.to_thread_alive = hpux_thread_alive;
   hpux_thread_ops.to_stop = hpux_thread_stop;
   hpux_thread_ops.to_stratum = process_stratum;
-  hpux_thread_ops.to_has_all_memory = 1;
-  hpux_thread_ops.to_has_memory = 1;
-  hpux_thread_ops.to_has_stack = 1;
-  hpux_thread_ops.to_has_registers = 1;
-  hpux_thread_ops.to_has_execution = 1;
+  hpux_thread_ops.to_has_all_memory = default_child_has_all_memory;
+  hpux_thread_ops.to_has_memory = default_child_has_memory;
+  hpux_thread_ops.to_has_stack = default_child_has_stack;
+  hpux_thread_ops.to_has_registers = default_child_has_registers;
+  hpux_thread_ops.to_has_execution = default_child_has_execution;
   hpux_thread_ops.to_magic = OPS_MAGIC;
 }
 

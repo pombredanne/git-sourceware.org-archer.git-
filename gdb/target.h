@@ -30,6 +30,7 @@ struct mem_attrib;
 struct target_ops;
 struct bp_target_info;
 struct regcache;
+struct target_section_table;
 
 /* This include file defines the interface between the main part
    of the debugger, and the part which is target-specific, or
@@ -55,6 +56,7 @@ struct regcache;
 #include "dcache.h"
 #include "memattr.h"
 #include "vec.h"
+#include "gdb_signals.h"
 
 enum strata
   {
@@ -62,7 +64,8 @@ enum strata
     file_stratum,		/* Executable files, etc */
     core_stratum,		/* Core dump files */
     process_stratum,		/* Executing processes */
-    thread_stratum		/* Executing threads */
+    thread_stratum,		/* Executing threads */
+    record_stratum		/* Support record debugging */
   };
 
 enum thread_control_capabilities
@@ -151,6 +154,17 @@ struct target_waitstatus
     value;
   };
 
+/* Options that can be passed to target_wait.  */
+
+/* Return immediately if there's no event already queued.  If this
+   options is not requested, target_wait blocks waiting for an
+   event.  */
+#define TARGET_WNOHANG 1
+
+/* Return a pretty printed form of target_waitstatus.
+   Space for the result is malloc'd, caller must free.  */
+extern char *target_waitstatus_to_string (const struct target_waitstatus *);
+
 /* Possible types of events that the inferior handler will have to
    deal with.  */
 enum inferior_event_type
@@ -172,15 +186,6 @@ enum inferior_event_type
        'step n' like commands.  */
     INF_EXEC_CONTINUE
   };
-
-/* Return the string for a signal.  */
-extern char *target_signal_to_string (enum target_signal);
-
-/* Return the name (SIGHUP, etc.) for a signal.  */
-extern char *target_signal_to_name (enum target_signal);
-
-/* Given a name (SIGHUP, etc.), return its signal.  */
-enum target_signal target_signal_from_name (char *);
 
 /* Target objects which can be transfered using target_read,
    target_write, et cetera.  */
@@ -217,7 +222,10 @@ enum target_object
   TARGET_OBJECT_LIBRARIES,
   /* Get OS specific data.  The ANNEX specifies the type (running
      processes, etc.).  */
-  TARGET_OBJECT_OSDATA
+  TARGET_OBJECT_OSDATA,
+  /* Extra signal info.  Usually the contents of `siginfo_t' on unix
+     platforms.  */
+  TARGET_OBJECT_SIGNAL_INFO,
   /* Possible future objects: TARGET_OBJECT_FILE, ... */
 };
 
@@ -325,10 +333,11 @@ struct target_ops
     void (*to_post_attach) (int);
     void (*to_detach) (struct target_ops *ops, char *, int);
     void (*to_disconnect) (struct target_ops *, char *, int);
-    void (*to_resume) (ptid_t, int, enum target_signal);
-    ptid_t (*to_wait) (ptid_t, struct target_waitstatus *);
-    void (*to_fetch_registers) (struct regcache *, int);
-    void (*to_store_registers) (struct regcache *, int);
+    void (*to_resume) (struct target_ops *, ptid_t, int, enum target_signal);
+    ptid_t (*to_wait) (struct target_ops *,
+		       ptid_t, struct target_waitstatus *, int);
+    void (*to_fetch_registers) (struct target_ops *, struct regcache *, int);
+    void (*to_store_registers) (struct target_ops *, struct regcache *, int);
     void (*to_prepare_to_store) (struct regcache *);
 
     /* Transfer LEN bytes of memory between GDB address MYADDR and
@@ -378,7 +387,7 @@ struct target_ops
     void (*to_terminal_ours) (void);
     void (*to_terminal_save_ours) (void);
     void (*to_terminal_info) (char *, int);
-    void (*to_kill) (void);
+    void (*to_kill) (struct target_ops *);
     void (*to_load) (char *, int);
     int (*to_lookup_symbol) (char *, CORE_ADDR *);
     void (*to_create_inferior) (struct target_ops *, 
@@ -396,26 +405,23 @@ struct target_ops
     void (*to_mourn_inferior) (struct target_ops *);
     int (*to_can_run) (void);
     void (*to_notice_signals) (ptid_t ptid);
-    int (*to_thread_alive) (ptid_t ptid);
-    void (*to_find_new_threads) (void);
-    char *(*to_pid_to_str) (ptid_t);
+    int (*to_thread_alive) (struct target_ops *, ptid_t ptid);
+    void (*to_find_new_threads) (struct target_ops *);
+    char *(*to_pid_to_str) (struct target_ops *, ptid_t);
     char *(*to_extra_thread_info) (struct thread_info *);
     void (*to_stop) (ptid_t);
     void (*to_rcmd) (char *command, struct ui_file *output);
     char *(*to_pid_to_exec_file) (int pid);
     void (*to_log_command) (const char *);
+    struct target_section_table *(*to_get_section_table) (struct target_ops *);
     enum strata to_stratum;
-    int to_has_all_memory;
-    int to_has_memory;
-    int to_has_stack;
-    int to_has_registers;
-    int to_has_execution;
+    int (*to_has_all_memory) (struct target_ops *);
+    int (*to_has_memory) (struct target_ops *);
+    int (*to_has_stack) (struct target_ops *);
+    int (*to_has_registers) (struct target_ops *);
+    int (*to_has_execution) (struct target_ops *);
     int to_has_thread_control;	/* control thread execution */
     int to_attach_no_wait;
-    struct section_table
-     *to_sections;
-    struct section_table
-     *to_sections_end;
     /* ASYNC target controls */
     int (*to_can_async_p) (void);
     int (*to_is_async_p) (void);
@@ -434,7 +440,8 @@ struct target_ops
        or executable file given by OBJFILE.  If that block of
        thread-local storage hasn't been allocated yet, this function
        may return an error.  */
-    CORE_ADDR (*to_get_thread_local_address) (ptid_t ptid,
+    CORE_ADDR (*to_get_thread_local_address) (struct target_ops *ops,
+					      ptid_t ptid,
 					      CORE_ADDR load_module_addr,
 					      CORE_ADDR offset);
 
@@ -529,7 +536,7 @@ struct target_ops
 			     CORE_ADDR *found_addrp);
 
     /* Can target execute in reverse?  */
-    int (*to_can_execute_reverse) ();
+    int (*to_can_execute_reverse) (void);
 
     /* Does this target support debugging multiple processes
        simultaneously?  */
@@ -619,22 +626,21 @@ extern void target_resume (ptid_t ptid, int step, enum target_signal signal);
    _NOT_ OK to throw_exception() out of target_wait() without popping
    the debugging target from the stack; GDB isn't prepared to get back
    to the prompt with a debugging target but without the frame cache,
-   stop_pc, etc., set up.  */
+   stop_pc, etc., set up.  OPTIONS is a bitwise OR of TARGET_W*
+   options.  */
 
-#define	target_wait(ptid, status)		\
-     (*current_target.to_wait) (ptid, status)
+extern ptid_t target_wait (ptid_t ptid, struct target_waitstatus *status,
+			   int options);
 
 /* Fetch at least register REGNO, or all regs if regno == -1.  No result.  */
 
-#define	target_fetch_registers(regcache, regno)	\
-     (*current_target.to_fetch_registers) (regcache, regno)
+extern void target_fetch_registers (struct regcache *regcache, int regno);
 
 /* Store at least register REGNO, or all regs if REGNO == -1.
    It can store as many registers as it wants to, so target_prepare_to_store
    must have been previously called.  Calls error() if there are problems.  */
 
-#define	target_store_registers(regcache, regs)	\
-     (*current_target.to_store_registers) (regcache, regs)
+extern void target_store_registers (struct regcache *regcache, int regs);
 
 /* Get ready to modify the registers array.  On machines which store
    individual registers, this doesn't need to do anything.  On machines
@@ -659,9 +665,6 @@ extern int target_read_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len);
 
 extern int target_write_memory (CORE_ADDR memaddr, const gdb_byte *myaddr,
 				int len);
-
-extern int xfer_memory (CORE_ADDR, gdb_byte *, int, int,
-			struct mem_attrib *, struct target_ops *);
 
 /* Fetches the target's memory map.  If one is found it is sorted
    and returned, after some consistency checking.  Otherwise, NULL
@@ -725,10 +728,6 @@ extern int inferior_has_vforked (ptid_t pid, ptid_t *child_pid);
 
 extern int inferior_has_execd (ptid_t pid, char **execd_pathname);
 
-/* From exec.c */
-
-extern void print_section_info (struct target_ops *, bfd *);
-
 /* Print a line about the current target.  */
 
 #define	target_files_info()	\
@@ -755,8 +754,7 @@ extern void print_section_info (struct target_ops *, bfd *);
 /* Put the inferior's terminal settings into effect.
    This is preparation for starting or resuming the inferior.  */
 
-#define target_terminal_inferior() \
-     (*current_target.to_terminal_inferior) ()
+extern void target_terminal_inferior (void);
 
 /* Put some of our terminal settings into effect,
    enough to get proper results from our output,
@@ -792,8 +790,7 @@ extern void print_section_info (struct target_ops *, bfd *);
 
 /* Kill the inferior process.   Make it go away.  */
 
-#define target_kill() \
-     (*current_target.to_kill) ()
+extern void target_kill (void);
 
 /* Load an executable file into the target process.  This is expected
    to not only bring new code into the target process, but also to
@@ -910,13 +907,11 @@ void target_mourn_inferior (void);
 
 /* Check to see if a thread is still alive.  */
 
-#define target_thread_alive(ptid) \
-     (*current_target.to_thread_alive) (ptid)
+extern int target_thread_alive (ptid_t ptid);
 
 /* Query for new threads and add them to the thread list.  */
 
-#define target_find_new_threads() \
-     (*current_target.to_find_new_threads) ()
+extern void target_find_new_threads (void);
 
 /* Make target stop in a continuable fashion.  (For instance, under
    Unix, this should act like SIGSTOP).  This function is normally
@@ -936,24 +931,24 @@ void target_mourn_inferior (void);
    determines whether we look up the target chain for other parts of
    memory if this target can't satisfy a request.  */
 
-#define	target_has_all_memory	\
-     (current_target.to_has_all_memory)
+extern int target_has_all_memory_1 (void);
+#define target_has_all_memory target_has_all_memory_1 ()
 
 /* Does the target include memory?  (Dummy targets don't.)  */
 
-#define	target_has_memory	\
-     (current_target.to_has_memory)
+extern int target_has_memory_1 (void);
+#define target_has_memory target_has_memory_1 ()
 
 /* Does the target have a stack?  (Exec files don't, VxWorks doesn't, until
    we start a process.)  */
 
-#define	target_has_stack	\
-     (current_target.to_has_stack)
+extern int target_has_stack_1 (void);
+#define target_has_stack target_has_stack_1 ()
 
 /* Does the target have registers?  (Exec files don't.)  */
 
-#define	target_has_registers	\
-     (current_target.to_has_registers)
+extern int target_has_registers_1 (void);
+#define target_has_registers target_has_registers_1 ()
 
 /* Does the target have execution?  Can we make it jump (through
    hoops), or pop its stack a few times?  This means that the current
@@ -963,8 +958,17 @@ void target_mourn_inferior (void);
    case this will become true after target_create_inferior or
    target_attach.  */
 
-#define	target_has_execution	\
-     (current_target.to_has_execution)
+extern int target_has_execution_1 (void);
+#define target_has_execution target_has_execution_1 ()
+
+/* Default implementations for process_stratum targets.  Return true
+   if there's a selected inferior, false otherwise.  */
+
+extern int default_child_has_all_memory (struct target_ops *ops);
+extern int default_child_has_memory (struct target_ops *ops);
+extern int default_child_has_stack (struct target_ops *ops);
+extern int default_child_has_registers (struct target_ops *ops);
+extern int default_child_has_execution (struct target_ops *ops);
 
 /* Can the target support the debugger control of thread execution?
    Can it lock the thread scheduler?  */
@@ -1009,14 +1013,9 @@ int target_supports_non_stop (void);
    `process xyz', but on some systems it may contain
    `process xyz thread abc'.  */
 
-#undef target_pid_to_str
-#define target_pid_to_str(PID) current_target.to_pid_to_str (PID)
+extern char *target_pid_to_str (ptid_t ptid);
 
-#ifndef target_tid_to_str
-#define target_tid_to_str(PID) \
-     target_pid_to_str (PID)
 extern char *normal_pid_to_str (ptid_t ptid);
-#endif
 
 /* Return a short string describing extra information about PID,
    e.g. "sleeping", "runnable", "running on LWP 3".  Null return value
@@ -1057,36 +1056,23 @@ extern char *normal_pid_to_str (ptid_t ptid);
 #define target_make_corefile_notes(BFD, SIZE_P) \
      (current_target.to_make_corefile_notes) (BFD, SIZE_P)
 
-/* Thread-local values.  */
-#define target_get_thread_local_address \
-    (current_target.to_get_thread_local_address)
-#define target_get_thread_local_address_p() \
-    (target_get_thread_local_address != NULL)
-
-
 /* Hardware watchpoint interfaces.  */
 
 /* Returns non-zero if we were stopped by a hardware watchpoint (memory read or
    write).  */
 
-#ifndef STOPPED_BY_WATCHPOINT
-#define STOPPED_BY_WATCHPOINT(w) \
-   (*current_target.to_stopped_by_watchpoint) ()
-#endif
+#define target_stopped_by_watchpoint \
+   (*current_target.to_stopped_by_watchpoint)
 
 /* Non-zero if we have steppable watchpoints  */
 
-#ifndef HAVE_STEPPABLE_WATCHPOINT
-#define HAVE_STEPPABLE_WATCHPOINT \
+#define target_have_steppable_watchpoint \
    (current_target.to_have_steppable_watchpoint)
-#endif
 
 /* Non-zero if we have continuable watchpoints  */
 
-#ifndef HAVE_CONTINUABLE_WATCHPOINT
-#define HAVE_CONTINUABLE_WATCHPOINT \
+#define target_have_continuable_watchpoint \
    (current_target.to_have_continuable_watchpoint)
-#endif
 
 /* Provide defaults for hardware watchpoint functions.  */
 
@@ -1098,46 +1084,31 @@ extern char *normal_pid_to_str (ptid_t ptid);
    bp_hardware_breakpoint.  CNT is the number of such watchpoints used so far
    (including this one?).  OTHERTYPE is who knows what...  */
 
-#ifndef TARGET_CAN_USE_HARDWARE_WATCHPOINT
-#define TARGET_CAN_USE_HARDWARE_WATCHPOINT(TYPE,CNT,OTHERTYPE) \
+#define target_can_use_hardware_watchpoint(TYPE,CNT,OTHERTYPE) \
  (*current_target.to_can_use_hw_breakpoint) (TYPE, CNT, OTHERTYPE);
-#endif
 
-#ifndef TARGET_REGION_OK_FOR_HW_WATCHPOINT
-#define TARGET_REGION_OK_FOR_HW_WATCHPOINT(addr, len) \
+#define target_region_ok_for_hw_watchpoint(addr, len) \
     (*current_target.to_region_ok_for_hw_watchpoint) (addr, len)
-#endif
 
 
 /* Set/clear a hardware watchpoint starting at ADDR, for LEN bytes.  TYPE is 0
    for write, 1 for read, and 2 for read/write accesses.  Returns 0 for
    success, non-zero for failure.  */
 
-#ifndef target_insert_watchpoint
 #define	target_insert_watchpoint(addr, len, type)	\
      (*current_target.to_insert_watchpoint) (addr, len, type)
 
 #define	target_remove_watchpoint(addr, len, type)	\
      (*current_target.to_remove_watchpoint) (addr, len, type)
-#endif
 
-#ifndef target_insert_hw_breakpoint
 #define target_insert_hw_breakpoint(bp_tgt) \
      (*current_target.to_insert_hw_breakpoint) (bp_tgt)
 
 #define target_remove_hw_breakpoint(bp_tgt) \
      (*current_target.to_remove_hw_breakpoint) (bp_tgt)
-#endif
 
-extern int target_stopped_data_address_p (struct target_ops *);
-
-#ifndef target_stopped_data_address
 #define target_stopped_data_address(target, x) \
     (*target.to_stopped_data_address) (target, x)
-#else
-/* Horrible hack to get around existing macros :-(.  */
-#define target_stopped_data_address_p(CURRENT_TARGET) (1)
-#endif
 
 #define target_watchpoint_addr_within_range(target, addr, start, length) \
   (*target.to_watchpoint_addr_within_range) (target, addr, start, length)
@@ -1230,18 +1201,11 @@ extern void pop_all_targets_above (enum strata above_stratum, int quitting);
 extern CORE_ADDR target_translate_tls_address (struct objfile *objfile,
 					       CORE_ADDR offset);
 
-/* Mark a pushed target as running or exited, for targets which do not
-   automatically pop when not active.  */
-
-void target_mark_running (struct target_ops *);
-
-void target_mark_exited (struct target_ops *);
-
-/* Struct section_table maps address ranges to file sections.  It is
+/* Struct target_section maps address ranges to file sections.  It is
    mostly used with BFD files, but can be used without (e.g. for handling
    raw disks, or files not in formats handled by BFD).  */
 
-struct section_table
+struct target_section
   {
     CORE_ADDR addr;		/* Lowest address in section */
     CORE_ADDR endaddr;		/* 1+highest address in section */
@@ -1251,10 +1215,23 @@ struct section_table
     bfd *bfd;			/* BFD file pointer */
   };
 
-/* Return the "section" containing the specified address.  */
-struct section_table *target_section_by_addr (struct target_ops *target,
-					      CORE_ADDR addr);
+/* Holds an array of target sections.  Defined by [SECTIONS..SECTIONS_END[.  */
 
+struct target_section_table
+{
+  struct target_section *sections;
+  struct target_section *sections_end;
+};
+
+/* Return the "section" containing the specified address.  */
+struct target_section *target_section_by_addr (struct target_ops *target,
+					       CORE_ADDR addr);
+
+/* Return the target section table this target (or the targets
+   beneath) currently manipulate.  */
+
+extern struct target_section_table *target_get_section_table
+  (struct target_ops *target);
 
 /* From mem-break.c */
 
@@ -1271,7 +1248,7 @@ extern int default_memory_insert_breakpoint (struct gdbarch *, struct bp_target_
 
 extern void initialize_targets (void);
 
-extern void noprocess (void);
+extern NORETURN void noprocess (void) ATTR_NORETURN;
 
 extern void target_require_runnable (void);
 
@@ -1286,10 +1263,13 @@ extern struct target_ops *find_core_target (void);
 
 extern struct target_ops *find_target_beneath (struct target_ops *);
 
-extern int target_resize_to_sections (struct target_ops *target,
-				      int num_added);
+/* Read OS data object of type TYPE from the target, and return it in
+   XML format.  The result is NUL-terminated and returned as a string,
+   allocated using xmalloc.  If an error occurs or the transfer is
+   unsupported, NULL is returned.  Empty objects are returned as
+   allocated but empty strings.  */
 
-extern void remove_target_sections (bfd *abfd);
+extern char *target_get_osdata (const char *type);
 
 /* Read OS data object of type TYPE from the target, and return it in
    XML format.  The result is NUL-terminated and returned as a string,
@@ -1317,28 +1297,7 @@ extern int remote_timeout;
 /* This is for native targets which use a unix/POSIX-style waitstatus.  */
 extern void store_waitstatus (struct target_waitstatus *, int);
 
-/* Predicate to target_signal_to_host(). Return non-zero if the enum
-   targ_signal SIGNO has an equivalent ``host'' representation.  */
-/* FIXME: cagney/1999-11-22: The name below was chosen in preference
-   to the shorter target_signal_p() because it is far less ambigious.
-   In this context ``target_signal'' refers to GDB's internal
-   representation of the target's set of signals while ``host signal''
-   refers to the target operating system's signal.  Confused?  */
-
-extern int target_signal_to_host_p (enum target_signal signo);
-
-/* Convert between host signal numbers and enum target_signal's.
-   target_signal_to_host() returns 0 and prints a warning() on GDB's
-   console if SIGNO has no equivalent host representation.  */
-/* FIXME: cagney/1999-11-22: Here ``host'' is used incorrectly, it is
-   refering to the target operating system's signal numbering.
-   Similarly, ``enum target_signal'' is named incorrectly, ``enum
-   gdb_signal'' would probably be better as it is refering to GDB's
-   internal representation of a target operating system's signal.  */
-
-extern enum target_signal target_signal_from_host (int);
-extern int target_signal_to_host (enum target_signal);
-
+/* These are in common/signals.c, but they're only used by gdb.  */
 extern enum target_signal default_target_signal_from_host (struct gdbarch *,
 							   int);
 extern int default_target_signal_to_host (struct gdbarch *, 
@@ -1346,6 +1305,7 @@ extern int default_target_signal_to_host (struct gdbarch *,
 
 /* Convert from a number used in a GDB command to an enum target_signal.  */
 extern enum target_signal target_signal_from_command (int);
+/* End of files in common/signals.c.  */
 
 /* Set the show memory breakpoints mode to show, and installs a cleanup
    to restore it back to the current value.  */

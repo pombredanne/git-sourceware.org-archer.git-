@@ -1,6 +1,6 @@
 /* Object file "section" support for the BFD library.
    Copyright 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007
+   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
    Written by Cygnus Support.
 
@@ -343,6 +343,10 @@ CODE_FRAGMENT
 .     TMS320C54X only.  *}
 .#define SEC_TIC54X_CLINK 0x20000000
 .
+.  {* Indicate that section has the no read flag set. This happens
+.     when memory read flag isn't set. *}
+.#define SEC_COFF_NOREAD 0x40000000
+.
 .  {*  End of section flags.  *}
 .
 .  {* Some internal packed boolean fields.  *}
@@ -381,6 +385,9 @@ CODE_FRAGMENT
 .
 .  {* Nonzero if this section has TLS related relocations.  *}
 .  unsigned int has_tls_reloc:1;
+.
+.  {* Nonzero if this section has a call to __tls_get_addr.  *}
+.  unsigned int has_tls_get_addr_call:1;
 .
 .  {* Nonzero if this section has a gp reloc.  *}
 .  unsigned int has_gp_reloc:1;
@@ -642,11 +649,11 @@ CODE_FRAGMENT
 .  {* segment_mark, sec_info_type, use_rela_p, has_tls_reloc,       *}	\
 .     0,            0,             0,          0,			\
 .									\
-.  {* has_gp_reloc, need_finalize_relax, reloc_done,                *}	\
-.     0,            0,                   0,				\
+.  {* has_tls_get_addr_call, has_gp_reloc, need_finalize_relax,     *}	\
+.     0,                     0,            0,				\
 .									\
-.  {* vma, lma, size, rawsize                                       *}	\
-.     0,   0,   0,    0,						\
+.  {* reloc_done, vma, lma, size, rawsize                           *}	\
+.     0,          0,   0,   0,    0,					\
 .									\
 .  {* output_offset, output_section,              alignment_power,  *}	\
 .     0,             (struct bfd_section *) &SEC, 0,			\
@@ -1429,6 +1436,16 @@ bfd_get_section_contents (bfd *abfd,
 
   if ((section->flags & SEC_IN_MEMORY) != 0)
     {
+      if (section->contents == NULL)
+	{
+	  /* This can happen because of errors earlier on in the linking process.
+	     We do not want to seg-fault here, so clear the flag and return an
+	     error code.  */
+	  section->flags &= ~ SEC_IN_MEMORY;
+	  bfd_set_error (bfd_error_invalid_operation);
+	  return FALSE;
+	}
+      
       memcpy (location, section->contents + offset, (size_t) count);
       return TRUE;
     }

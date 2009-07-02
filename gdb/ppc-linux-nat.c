@@ -63,8 +63,8 @@
 #ifndef PPC_FEATURE_BOOKE
 #define PPC_FEATURE_BOOKE 0x00008000
 #endif
-#ifndef PPC_FEATURE_ARCH_2_05
-#define PPC_FEATURE_ARCH_2_05	0x00001000 /* ISA 2.05 */
+#ifndef PPC_FEATURE_HAS_DFP
+#define PPC_FEATURE_HAS_DFP	0x00000400  /* Decimal Floating Point.  */
 #endif
 
 /* Glibc's headers don't define PTRACE_GETVRREGS so we cannot use a
@@ -106,6 +106,21 @@
 #endif
 #ifndef PTRACE_GETSIGINFO
 #define PTRACE_GETSIGINFO    0x4202
+#endif
+
+/* Similarly for the general-purpose (gp0 -- gp31)
+   and floating-point registers (fp0 -- fp31).  */
+#ifndef PTRACE_GETREGS
+#define PTRACE_GETREGS 12
+#endif
+#ifndef PTRACE_SETREGS
+#define PTRACE_SETREGS 13
+#endif
+#ifndef PTRACE_GETFPREGS
+#define PTRACE_GETFPREGS 14
+#endif
+#ifndef PTRACE_SETFPREGS
+#define PTRACE_SETFPREGS 15
 #endif
 
 /* This oddity is because the Linux kernel defines elf_vrregset_t as
@@ -217,6 +232,18 @@ int have_ptrace_getvrregs = 1;
    registers.  Zero if we've tried one of them and gotten an
    error.  */
 int have_ptrace_getsetevrregs = 1;
+
+/* Non-zero if our kernel may support the PTRACE_GETREGS and
+   PTRACE_SETREGS requests, for reading and writing the
+   general-purpose registers.  Zero if we've tried one of
+   them and gotten an error.  */
+int have_ptrace_getsetregs = 1;
+
+/* Non-zero if our kernel may support the PTRACE_GETFPREGS and
+   PTRACE_SETFPREGS requests, for reading and writing the
+   floating-pointers registers.  Zero if we've tried one of
+   them and gotten an error.  */
+int have_ptrace_getsetfpregs = 1;
 
 /* *INDENT-OFF* */
 /* registers layout, as presented by the ptrace interface:
@@ -601,6 +628,112 @@ fetch_altivec_registers (struct regcache *regcache, int tid)
   supply_vrregset (regcache, &regs);
 }
 
+/* This function actually issues the request to ptrace, telling
+   it to get all general-purpose registers and put them into the
+   specified regset.
+   
+   If the ptrace request does not exist, this function returns 0
+   and properly sets the have_ptrace_* flag.  If the request fails,
+   this function calls perror_with_name.  Otherwise, if the request
+   succeeds, then the regcache gets filled and 1 is returned.  */
+static int
+fetch_all_gp_regs (struct regcache *regcache, int tid)
+{
+  struct gdbarch *gdbarch = get_regcache_arch (regcache);
+  struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
+  gdb_gregset_t gregset;
+
+  if (ptrace (PTRACE_GETREGS, tid, 0, (void *) &gregset) < 0)
+    {
+      if (errno == EIO)
+        {
+          have_ptrace_getsetregs = 0;
+          return 0;
+        }
+      perror_with_name (_("Couldn't get general-purpose registers."));
+    }
+
+  supply_gregset (regcache, (const gdb_gregset_t *) &gregset);
+
+  return 1;
+}
+
+/* This is a wrapper for the fetch_all_gp_regs function.  It is
+   responsible for verifying if this target has the ptrace request
+   that can be used to fetch all general-purpose registers at one
+   shot.  If it doesn't, then we should fetch them using the
+   old-fashioned way, which is to iterate over the registers and
+   request them one by one.  */
+static void
+fetch_gp_regs (struct regcache *regcache, int tid)
+{
+  struct gdbarch *gdbarch = get_regcache_arch (regcache);
+  struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
+  int i;
+
+  if (have_ptrace_getsetregs)
+    if (fetch_all_gp_regs (regcache, tid))
+      return;
+
+  /* If we've hit this point, it doesn't really matter which
+     architecture we are using.  We just need to read the
+     registers in the "old-fashioned way".  */
+  for (i = 0; i < ppc_num_gprs; i++)
+    fetch_register (regcache, tid, tdep->ppc_gp0_regnum + i);
+}
+
+/* This function actually issues the request to ptrace, telling
+   it to get all floating-point registers and put them into the
+   specified regset.
+   
+   If the ptrace request does not exist, this function returns 0
+   and properly sets the have_ptrace_* flag.  If the request fails,
+   this function calls perror_with_name.  Otherwise, if the request
+   succeeds, then the regcache gets filled and 1 is returned.  */
+static int
+fetch_all_fp_regs (struct regcache *regcache, int tid)
+{
+  gdb_fpregset_t fpregs;
+
+  if (ptrace (PTRACE_GETFPREGS, tid, 0, (void *) &fpregs) < 0)
+    {
+      if (errno == EIO)
+        {
+          have_ptrace_getsetfpregs = 0;
+          return 0;
+        }
+      perror_with_name (_("Couldn't get floating-point registers."));
+    }
+
+  supply_fpregset (regcache, (const gdb_fpregset_t *) &fpregs);
+
+  return 1;
+}
+
+/* This is a wrapper for the fetch_all_fp_regs function.  It is
+   responsible for verifying if this target has the ptrace request
+   that can be used to fetch all floating-point registers at one
+   shot.  If it doesn't, then we should fetch them using the
+   old-fashioned way, which is to iterate over the registers and
+   request them one by one.  */
+static void
+fetch_fp_regs (struct regcache *regcache, int tid)
+{
+  struct gdbarch *gdbarch = get_regcache_arch (regcache);
+  struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
+  int i;
+
+  if (have_ptrace_getsetfpregs)
+    if (fetch_all_fp_regs (regcache, tid))
+      return;
+ 
+  /* If we've hit this point, it doesn't really matter which
+     architecture we are using.  We just need to read the
+     registers in the "old-fashioned way".  */
+  for (i = 0; i < ppc_num_fprs; i++)
+    fetch_register (regcache, tid, tdep->ppc_fp0_regnum + i);
+}
+
 static void 
 fetch_ppc_registers (struct regcache *regcache, int tid)
 {
@@ -608,11 +741,9 @@ fetch_ppc_registers (struct regcache *regcache, int tid)
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
   struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
 
-  for (i = 0; i < ppc_num_gprs; i++)
-    fetch_register (regcache, tid, tdep->ppc_gp0_regnum + i);
+  fetch_gp_regs (regcache, tid);
   if (tdep->ppc_fp0_regnum >= 0)
-    for (i = 0; i < ppc_num_fprs; i++)
-      fetch_register (regcache, tid, tdep->ppc_fp0_regnum + i);
+    fetch_fp_regs (regcache, tid);
   fetch_register (regcache, tid, gdbarch_pc_regnum (gdbarch));
   if (tdep->ppc_ps_regnum != -1)
     fetch_register (regcache, tid, tdep->ppc_ps_regnum);
@@ -647,7 +778,8 @@ fetch_ppc_registers (struct regcache *regcache, int tid)
    regno == -1, otherwise fetch all general registers or all floating
    point registers depending upon the value of regno.  */
 static void
-ppc_linux_fetch_inferior_registers (struct regcache *regcache, int regno)
+ppc_linux_fetch_inferior_registers (struct target_ops *ops,
+				    struct regcache *regcache, int regno)
 {
   /* Overload thread id onto process id */
   int tid = TIDGET (inferior_ptid);
@@ -969,18 +1101,142 @@ store_altivec_registers (const struct regcache *regcache, int tid)
     perror_with_name (_("Couldn't write AltiVec registers"));
 }
 
+/* This function actually issues the request to ptrace, telling
+   it to store all general-purpose registers present in the specified
+   regset.
+   
+   If the ptrace request does not exist, this function returns 0
+   and properly sets the have_ptrace_* flag.  If the request fails,
+   this function calls perror_with_name.  Otherwise, if the request
+   succeeds, then the regcache is stored and 1 is returned.  */
+static int
+store_all_gp_regs (const struct regcache *regcache, int tid, int regno)
+{
+  struct gdbarch *gdbarch = get_regcache_arch (regcache);
+  struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
+  gdb_gregset_t gregset;
+
+  if (ptrace (PTRACE_GETREGS, tid, 0, (void *) &gregset) < 0)
+    {
+      if (errno == EIO)
+        {
+          have_ptrace_getsetregs = 0;
+          return 0;
+        }
+      perror_with_name (_("Couldn't get general-purpose registers."));
+    }
+
+  fill_gregset (regcache, &gregset, regno);
+
+  if (ptrace (PTRACE_SETREGS, tid, 0, (void *) &gregset) < 0)
+    {
+      if (errno == EIO)
+        {
+          have_ptrace_getsetregs = 0;
+          return 0;
+        }
+      perror_with_name (_("Couldn't set general-purpose registers."));
+    }
+
+  return 1;
+}
+
+/* This is a wrapper for the store_all_gp_regs function.  It is
+   responsible for verifying if this target has the ptrace request
+   that can be used to store all general-purpose registers at one
+   shot.  If it doesn't, then we should store them using the
+   old-fashioned way, which is to iterate over the registers and
+   store them one by one.  */
+static void
+store_gp_regs (const struct regcache *regcache, int tid, int regno)
+{
+  struct gdbarch *gdbarch = get_regcache_arch (regcache);
+  struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
+  int i;
+
+  if (have_ptrace_getsetregs)
+    if (store_all_gp_regs (regcache, tid, regno))
+      return;
+
+  /* If we hit this point, it doesn't really matter which
+     architecture we are using.  We just need to store the
+     registers in the "old-fashioned way".  */
+  for (i = 0; i < ppc_num_gprs; i++)
+    store_register (regcache, tid, tdep->ppc_gp0_regnum + i);
+}
+
+/* This function actually issues the request to ptrace, telling
+   it to store all floating-point registers present in the specified
+   regset.
+   
+   If the ptrace request does not exist, this function returns 0
+   and properly sets the have_ptrace_* flag.  If the request fails,
+   this function calls perror_with_name.  Otherwise, if the request
+   succeeds, then the regcache is stored and 1 is returned.  */
+static int
+store_all_fp_regs (const struct regcache *regcache, int tid, int regno)
+{
+  gdb_fpregset_t fpregs;
+
+  if (ptrace (PTRACE_GETFPREGS, tid, 0, (void *) &fpregs) < 0)
+    {
+      if (errno == EIO)
+        {
+          have_ptrace_getsetfpregs = 0;
+          return 0;
+        }
+      perror_with_name (_("Couldn't get floating-point registers."));
+    }
+
+  fill_fpregset (regcache, &fpregs, regno);
+
+  if (ptrace (PTRACE_SETFPREGS, tid, 0, (void *) &fpregs) < 0)
+    {
+      if (errno == EIO)
+        {
+          have_ptrace_getsetfpregs = 0;
+          return 0;
+        }
+      perror_with_name (_("Couldn't set floating-point registers."));
+    }
+
+  return 1;
+}
+
+/* This is a wrapper for the store_all_fp_regs function.  It is
+   responsible for verifying if this target has the ptrace request
+   that can be used to store all floating-point registers at one
+   shot.  If it doesn't, then we should store them using the
+   old-fashioned way, which is to iterate over the registers and
+   store them one by one.  */
+static void
+store_fp_regs (const struct regcache *regcache, int tid, int regno)
+{
+  struct gdbarch *gdbarch = get_regcache_arch (regcache);
+  struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
+  int i;
+
+  if (have_ptrace_getsetfpregs)
+    if (store_all_fp_regs (regcache, tid, regno))
+      return;
+
+  /* If we hit this point, it doesn't really matter which
+     architecture we are using.  We just need to store the
+     registers in the "old-fashioned way".  */
+  for (i = 0; i < ppc_num_fprs; i++)
+    store_register (regcache, tid, tdep->ppc_fp0_regnum + i);
+}
+
 static void
 store_ppc_registers (const struct regcache *regcache, int tid)
 {
   int i;
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
   struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
-  
-  for (i = 0; i < ppc_num_gprs; i++)
-    store_register (regcache, tid, tdep->ppc_gp0_regnum + i);
+ 
+  store_gp_regs (regcache, tid, -1);
   if (tdep->ppc_fp0_regnum >= 0)
-    for (i = 0; i < ppc_num_fprs; i++)
-      store_register (regcache, tid, tdep->ppc_fp0_regnum + i);
+    store_fp_regs (regcache, tid, -1);
   store_register (regcache, tid, gdbarch_pc_regnum (gdbarch));
   if (tdep->ppc_ps_regnum != -1)
     store_register (regcache, tid, tdep->ppc_ps_regnum);
@@ -1179,7 +1435,8 @@ ppc_linux_watchpoint_addr_within_range (struct target_ops *target,
 }
 
 static void
-ppc_linux_store_inferior_registers (struct regcache *regcache, int regno)
+ppc_linux_store_inferior_registers (struct target_ops *ops,
+				    struct regcache *regcache, int regno)
 {
   /* Overload thread id onto process id */
   int tid = TIDGET (inferior_ptid);
@@ -1238,6 +1495,51 @@ fill_fpregset (const struct regcache *regcache,
 			fpregsetp, sizeof (*fpregsetp));
 }
 
+static int
+ppc_linux_target_wordsize (void)
+{
+  int wordsize = 4;
+
+  /* Check for 64-bit inferior process.  This is the case when the host is
+     64-bit, and in addition the top bit of the MSR register is set.  */
+#ifdef __powerpc64__
+  long msr;
+
+  int tid = TIDGET (inferior_ptid);
+  if (tid == 0)
+    tid = PIDGET (inferior_ptid);
+
+  errno = 0;
+  msr = (long) ptrace (PTRACE_PEEKUSER, tid, PT_MSR * 8, 0);
+  if (errno == 0 && msr < 0)
+    wordsize = 8;
+#endif
+
+  return wordsize;
+}
+
+static int
+ppc_linux_auxv_parse (struct target_ops *ops, gdb_byte **readptr,
+                      gdb_byte *endptr, CORE_ADDR *typep, CORE_ADDR *valp)
+{
+  int sizeof_auxv_field = ppc_linux_target_wordsize ();
+  gdb_byte *ptr = *readptr;
+
+  if (endptr == ptr)
+    return 0;
+
+  if (endptr - ptr < sizeof_auxv_field * 2)
+    return -1;
+
+  *typep = extract_unsigned_integer (ptr, sizeof_auxv_field);
+  ptr += sizeof_auxv_field;
+  *valp = extract_unsigned_integer (ptr, sizeof_auxv_field);
+  ptr += sizeof_auxv_field;
+
+  *readptr = ptr;
+  return 1;
+}
+
 static const struct target_desc *
 ppc_linux_read_description (struct target_ops *ops)
 {
@@ -1288,27 +1590,24 @@ ppc_linux_read_description (struct target_ops *ops)
 	perror_with_name (_("Unable to fetch AltiVec registers"));
     }
 
-  if (ppc_linux_get_hwcap () & PPC_FEATURE_ARCH_2_05)
+  /* Power ISA 2.05 (implemented by Power 6 and newer processors) increases
+     the FPSCR from 32 bits to 64 bits. Even though Power 7 supports this
+     ISA version, it doesn't have PPC_FEATURE_ARCH_2_05 set, only
+     PPC_FEATURE_ARCH_2_06.  Since for now the only bits used in the higher
+     half of the register are for Decimal Floating Point, we check if that
+     feature is available to decide the size of the FPSCR.  */
+  if (ppc_linux_get_hwcap () & PPC_FEATURE_HAS_DFP)
     isa205 = 1;
 
-  /* Check for 64-bit inferior process.  This is the case when the host is
-     64-bit, and in addition the top bit of the MSR register is set.  */
-#ifdef __powerpc64__
-  {
-    long msr;
-    errno = 0;
-    msr = (long) ptrace (PTRACE_PEEKUSER, tid, PT_MSR * 8, 0);
-    if (errno == 0 && msr < 0)
-      {
-	if (vsx)
-	  return isa205? tdesc_powerpc_isa205_vsx64l : tdesc_powerpc_vsx64l;
-	else if (altivec)
-	  return isa205? tdesc_powerpc_isa205_altivec64l : tdesc_powerpc_altivec64l;
+  if (ppc_linux_target_wordsize () == 8)
+    {
+      if (vsx)
+	return isa205? tdesc_powerpc_isa205_vsx64l : tdesc_powerpc_vsx64l;
+      else if (altivec)
+	return isa205? tdesc_powerpc_isa205_altivec64l : tdesc_powerpc_altivec64l;
 
-	return isa205? tdesc_powerpc_isa205_64l : tdesc_powerpc_64l;
-      }
-  }
-#endif
+      return isa205? tdesc_powerpc_isa205_64l : tdesc_powerpc_64l;
+    }
 
   if (vsx)
     return isa205? tdesc_powerpc_isa205_vsx32l : tdesc_powerpc_vsx32l;
@@ -1342,6 +1641,7 @@ _initialize_ppc_linux_nat (void)
   t->to_watchpoint_addr_within_range = ppc_linux_watchpoint_addr_within_range;
 
   t->to_read_description = ppc_linux_read_description;
+  t->to_auxv_parse = ppc_linux_auxv_parse;
 
   /* Register the target.  */
   linux_nat_add_target (t);

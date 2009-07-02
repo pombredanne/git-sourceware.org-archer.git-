@@ -139,7 +139,7 @@ extract_mips_address (void *addr, int len)
    this routine automatically determines which (of three) link map
    formats is in use by the target.  */
 
-struct lm_info
+static struct lm_info
 fetch_lm_info (CORE_ADDR addr)
 {
   struct lm_info li;
@@ -611,7 +611,7 @@ irix_open_symbol_file_object (void *from_ttyp)
   char *filename;
 
   if (symfile_objfile)
-    if (!query ("Attempt to reload symbols from process? "))
+    if (!query (_("Attempt to reload symbols from process? ")))
       return 0;
 
   if ((debug_base = locate_base ()) == 0)
@@ -687,7 +687,7 @@ irix_special_symbol_handling (void)
 
 static void
 irix_relocate_section_addresses (struct so_list *so,
-				 struct section_table *sec)
+				 struct target_section *sec)
 {
   sec->addr += so->lm_info->reloc_offset;
   sec->endaddr += so->lm_info->reloc_offset;
@@ -718,6 +718,9 @@ irix_in_dynsym_resolve_code (CORE_ADDR pc)
 }
 
 struct target_so_ops irix_so_ops;
+
+/* Provide a prototype to silence -Wmissing-prototypes.  */
+extern initialize_file_ftype _initialize_irix_solib;
 
 void
 _initialize_irix_solib (void)

@@ -143,6 +143,15 @@ const struct register_alias mips_register_aliases[] = {
   { "fsr", MIPS_EMBED_FP0_REGNUM + 32 }
 };
 
+const struct register_alias mips_numeric_register_aliases[] = {
+#define R(n) { #n, n }
+  R(0), R(1), R(2), R(3), R(4), R(5), R(6), R(7),
+  R(8), R(9), R(10), R(11), R(12), R(13), R(14), R(15),
+  R(16), R(17), R(18), R(19), R(20), R(21), R(22), R(23),
+  R(24), R(25), R(26), R(27), R(28), R(29), R(30), R(31),
+#undef R
+};
+
 #ifndef MIPS_DEFAULT_FPU_TYPE
 #define MIPS_DEFAULT_FPU_TYPE MIPS_FPU_DOUBLE
 #endif
@@ -4645,7 +4654,7 @@ is_delayed (unsigned long insn)
 				       | INSN_COND_BRANCH_LIKELY)));
 }
 
-int
+static int
 mips_single_step_through_delay (struct gdbarch *gdbarch,
 				struct frame_info *frame)
 {
@@ -4686,7 +4695,8 @@ mips_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR pc)
      is greater.  */
   if (find_pc_partial_function (pc, NULL, &func_addr, NULL))
     {
-      CORE_ADDR post_prologue_pc = skip_prologue_using_sal (func_addr);
+      CORE_ADDR post_prologue_pc
+	= skip_prologue_using_sal (gdbarch, func_addr);
       if (post_prologue_pc != 0)
 	return max (pc, post_prologue_pc);
     }
@@ -4697,7 +4707,7 @@ mips_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR pc)
   /* Find an upper limit on the function prologue using the debug
      information.  If the debug information could not be used to provide
      that bound, then use an arbitrary large number as the upper bound.  */
-  limit_pc = skip_prologue_using_sal (pc);
+  limit_pc = skip_prologue_using_sal (gdbarch, pc);
   if (limit_pc == 0)
     limit_pc = pc + 100;          /* Magic.  */
 
@@ -5787,7 +5797,7 @@ mips_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
 	  reg_names = mips_generic_reg_names;
       }
     /* FIXME: cagney/2003-11-15: For MIPS, hasn't gdbarch_pc_regnum been
-       replaced by read_pc?  */
+       replaced by gdbarch_read_pc?  */
     set_gdbarch_pc_regnum (gdbarch, regnum->pc + num_regs);
     set_gdbarch_sp_regnum (gdbarch, MIPS_SP_REGNUM + num_regs);
     set_gdbarch_fp0_regnum (gdbarch, regnum->fp0);
@@ -5996,11 +6006,11 @@ mips_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   else
     set_gdbarch_print_insn (gdbarch, gdb_print_insn_mips);
 
-  /* FIXME: cagney/2003-08-29: The macros HAVE_STEPPABLE_WATCHPOINT,
-     HAVE_NONSTEPPABLE_WATCHPOINT, and HAVE_CONTINUABLE_WATCHPOINT
+  /* FIXME: cagney/2003-08-29: The macros target_have_steppable_watchpoint,
+     HAVE_NONSTEPPABLE_WATCHPOINT, and target_have_continuable_watchpoint
      need to all be folded into the target vector.  Since they are
-     being used as guards for STOPPED_BY_WATCHPOINT, why not have
-     STOPPED_BY_WATCHPOINT return the type of watchpoint that the code
+     being used as guards for target_stopped_by_watchpoint, why not have
+     target_stopped_by_watchpoint return the type of watchpoint that the code
      is sitting on?  */
   set_gdbarch_have_nonsteppable_watchpoint (gdbarch, 1);
 
@@ -6057,6 +6067,11 @@ mips_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   for (i = 0; i < ARRAY_SIZE (mips_register_aliases); i++)
     user_reg_add (gdbarch, mips_register_aliases[i].name,
 		  value_of_mips_user_reg, &mips_register_aliases[i].regnum);
+
+  for (i = 0; i < ARRAY_SIZE (mips_numeric_register_aliases); i++)
+    user_reg_add (gdbarch, mips_numeric_register_aliases[i].name,
+		  value_of_mips_user_reg, 
+		  &mips_numeric_register_aliases[i].regnum);
 
   return gdbarch;
 }

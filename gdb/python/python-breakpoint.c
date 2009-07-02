@@ -440,7 +440,7 @@ bppy_new (PyTypeObject *subtype, PyObject *args, PyObject *kwargs)
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      set_breakpoint (spec, NULL, 0, 0, -1, 0, AUTO_BOOLEAN_TRUE);
+      set_breakpoint (spec, NULL, 0, 0, -1, 0, AUTO_BOOLEAN_TRUE, 1);
     }
   if (except.reason < 0)
     {

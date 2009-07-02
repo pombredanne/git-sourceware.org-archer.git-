@@ -34,6 +34,7 @@
 #include "mi-common.h"
 #include "observer.h"
 #include "gdbthread.h"
+#include "solist.h"
 
 /* These are the interpreter setup, etc. functions for the MI interpreter */
 static void mi_execute_command_wrapper (char *cmd);
@@ -51,13 +52,16 @@ static void mi1_command_loop (void);
 
 static void mi_insert_notify_hooks (void);
 static void mi_remove_notify_hooks (void);
-static void mi_on_normal_stop (struct bpstats *bs);
+static void mi_on_normal_stop (struct bpstats *bs, int print_frame);
 
 static void mi_new_thread (struct thread_info *t);
-static void mi_thread_exit (struct thread_info *t);
+static void mi_thread_exit (struct thread_info *t, int silent);
 static void mi_new_inferior (int pid);
 static void mi_inferior_exit (int pid);
 static void mi_on_resume (ptid_t ptid);
+static void mi_solib_loaded (struct so_list *solib);
+static void mi_solib_unloaded (struct so_list *solib);
+static void mi_about_to_proceed (void);
 
 static void *
 mi_interpreter_init (int top_level)
@@ -86,6 +90,9 @@ mi_interpreter_init (int top_level)
       observer_attach_inferior_exit (mi_inferior_exit);
       observer_attach_normal_stop (mi_on_normal_stop);
       observer_attach_target_resumed (mi_on_resume);
+      observer_attach_solib_loaded (mi_solib_loaded);
+      observer_attach_solib_unloaded (mi_solib_unloaded);
+      observer_attach_about_to_proceed (mi_about_to_proceed);
     }
 
   return mi;
@@ -286,9 +293,14 @@ mi_new_thread (struct thread_info *t)
 }
 
 static void
-mi_thread_exit (struct thread_info *t)
+mi_thread_exit (struct thread_info *t, int silent)
 {
-  struct mi_interp *mi = top_level_interpreter_data ();
+  struct mi_interp *mi;
+
+  if (silent)
+    return;
+
+  mi = top_level_interpreter_data ();
   target_terminal_ours ();
   fprintf_unfiltered (mi->event_channel, 
 		      "thread-exited,id=\"%d\",group-id=\"%d\"", 
@@ -317,24 +329,105 @@ mi_inferior_exit (int pid)
 }
 
 static void
-mi_on_normal_stop (struct bpstats *bs)
+mi_on_normal_stop (struct bpstats *bs, int print_frame)
 {
   /* Since this can be called when CLI command is executing,
      using cli interpreter, be sure to use MI uiout for output,
      not the current one.  */
-  struct ui_out *uiout = interp_ui_out (top_level_interpreter ());
+  struct ui_out *mi_uiout = interp_ui_out (top_level_interpreter ());
   struct mi_interp *mi = top_level_interpreter_data ();
 
+  if (print_frame)
+    {
+      if (uiout != mi_uiout)
+	{
+	  /* The normal_stop function has printed frame information into 
+	     CLI uiout, or some other non-MI uiout.  There's no way we
+	     can extract proper fields from random uiout object, so we print
+	     the frame again.  In practice, this can only happen when running
+	     a CLI command in MI.  */
+	  struct ui_out *saved_uiout = uiout;
+	  uiout = mi_uiout;
+	  print_stack_frame (get_selected_frame (NULL), 0, SRC_AND_LOC);
+	  uiout = saved_uiout;
+	}
+
+      ui_out_field_int (mi_uiout, "thread-id",
+			pid_to_thread_id (inferior_ptid));
+      if (non_stop)
+	{
+	  struct cleanup *back_to = make_cleanup_ui_out_list_begin_end 
+	    (mi_uiout, "stopped-threads");
+	  ui_out_field_int (mi_uiout, NULL,
+			    pid_to_thread_id (inferior_ptid));		  		  
+	  do_cleanups (back_to);
+	}
+      else
+	ui_out_field_string (mi_uiout, "stopped-threads", "all");
+    }
+  
   fputs_unfiltered ("*stopped", raw_stdout);
-  mi_out_put (uiout, raw_stdout);
-  mi_out_rewind (uiout);
+  mi_out_put (mi_uiout, raw_stdout);
+  mi_out_rewind (mi_uiout);
+  mi_print_timing_maybe ();
   fputs_unfiltered ("\n", raw_stdout);
   gdb_flush (raw_stdout);
 }
 
 static void
+mi_about_to_proceed (void)
+{
+  /* Suppress output while calling an inferior function.  */
+
+  if (!ptid_equal (inferior_ptid, null_ptid))
+    {
+      struct thread_info *tp = inferior_thread ();
+      if (tp->in_infcall)
+	return;
+    }
+
+  mi_proceeded = 1;
+}
+
+static int
+mi_output_running_pid (struct thread_info *info, void *arg)
+{
+  ptid_t *ptid = arg;
+
+  if (ptid_get_pid (*ptid) == ptid_get_pid (info->ptid))
+    fprintf_unfiltered (raw_stdout,
+			"*running,thread-id=\"%d\"\n",
+			info->num);
+
+  return 0;
+}
+
+static int
+mi_inferior_count (struct inferior *inf, void *arg)
+{
+  if (inf->pid != 0)
+    {
+      int *count_p = arg;
+      (*count_p)++;
+    }
+
+  return 0;
+}
+
+static void
 mi_on_resume (ptid_t ptid)
 {
+  struct thread_info *tp = NULL;
+
+  if (ptid_equal (ptid, minus_one_ptid) || ptid_is_pid (ptid))
+    tp = inferior_thread ();
+  else
+    tp = find_thread_ptid (ptid);
+
+  /* Suppress output while calling an inferior function.  */
+  if (tp->in_infcall)
+    return;
+
   /* To cater for older frontends, emit ^running, but do it only once
      per each command.  We do it here, since at this point we know
      that the target was successfully resumed, and in non-async mode,
@@ -343,7 +436,7 @@ mi_on_resume (ptid_t ptid)
      will make it impossible for frontend to know what's going on.
 
      In future (MI3), we'll be outputting "^done" here.  */
-  if (!running_result_record_printed)
+  if (!running_result_record_printed && mi_proceeded)
     {
       if (current_token)
 	fputs_unfiltered (current_token, raw_stdout);
@@ -352,20 +445,28 @@ mi_on_resume (ptid_t ptid)
 
   if (PIDGET (ptid) == -1)
     fprintf_unfiltered (raw_stdout, "*running,thread-id=\"all\"\n");
-  else if (thread_count () == 0)
+  else if (ptid_is_pid (ptid))
     {
-      /* This is a target where for single-threaded programs the thread
-	 table has zero threads.  Don't print any thread-id field.  */
-      fprintf_unfiltered (raw_stdout, "*running\n");
+      int count = 0;
+
+      /* Backwards compatibility.  If there's only one inferior,
+	 output "all", otherwise, output each resumed thread
+	 individually.  */
+      iterate_over_inferiors (mi_inferior_count, &count);
+
+      if (count == 1)
+	fprintf_unfiltered (raw_stdout, "*running,thread-id=\"all\"\n");
+      else
+	iterate_over_threads (mi_output_running_pid, &ptid);
     }
   else
     {
-      struct thread_info *ti = find_thread_pid (ptid);
+      struct thread_info *ti = find_thread_ptid (ptid);
       gdb_assert (ti);
       fprintf_unfiltered (raw_stdout, "*running,thread-id=\"%d\"\n", ti->num);
     }
 
-  if (!running_result_record_printed)
+  if (!running_result_record_printed && mi_proceeded)
     {
       running_result_record_printed = 1;
       /* This is what gdb used to do historically -- printing prompt even if
@@ -378,6 +479,31 @@ mi_on_resume (ptid_t ptid)
     }
   gdb_flush (raw_stdout);
 }
+
+static void
+mi_solib_loaded (struct so_list *solib)
+{
+  struct mi_interp *mi = top_level_interpreter_data ();
+  target_terminal_ours ();
+  fprintf_unfiltered (mi->event_channel, 
+		      "library-loaded,id=\"%s\",target-name=\"%s\",host-name=\"%s\",symbols-loaded=\"%d\"", 
+		      solib->so_original_name, solib->so_original_name, 
+		      solib->so_name, solib->symbols_loaded);
+  gdb_flush (mi->event_channel);
+}
+
+static void
+mi_solib_unloaded (struct so_list *solib)
+{
+  struct mi_interp *mi = top_level_interpreter_data ();
+  target_terminal_ours ();
+  fprintf_unfiltered (mi->event_channel, 
+		      "library-unloaded,id=\"%s\",target-name=\"%s\",host-name=\"%s\"", 
+		      solib->so_original_name, solib->so_original_name, 
+		      solib->so_name);
+  gdb_flush (mi->event_channel);
+}
+
 
 extern initialize_file_ftype _initialize_mi_interp; /* -Wmissing-prototypes */
 

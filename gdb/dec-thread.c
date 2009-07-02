@@ -40,9 +40,6 @@ pthreadDebugContext_t debug_context;
 /* The dec-thread target_ops structure.  */
 static struct target_ops dec_thread_ops;
 
-/* A copy of the target_ops over which our dec_thread_ops is pushed.  */
-static struct target_ops base_target;
-
 /* Print a debug trace if DEBUG_DEC_THREAD is set (its value is adjusted
    by the user using "set debug dec-thread ...").  */
 
@@ -253,7 +250,6 @@ enable_dec_thread (void)
       return;
     }
 
-  base_target = current_target;
   push_target (&dec_thread_ops);
   dec_thread_active = 1;
 
@@ -424,12 +420,14 @@ resync_thread_list (void)
 /* The "to_detach" method of the dec_thread_ops.  */
 
 static void
-dec_thread_detach (char *args, int from_tty)
+dec_thread_detach (struct target_ops *ops, char *args, int from_tty)
 {   
+  struct target_ops *beneath = find_target_beneath (ops);
+
   debug ("dec_thread_detach");
 
   disable_dec_thread ();
-  base_target.to_detach (&base_target, args, from_tty);
+  beneath->to_detach (beneath, args, from_tty);
 }
 
 /* Return the ptid of the thread that is currently active.  */
@@ -453,17 +451,18 @@ get_active_ptid (void)
 /* The "to_wait" method of the dec_thread_ops.  */
 
 static ptid_t
-dec_thread_wait (ptid_t ptid, struct target_waitstatus *status)
+dec_thread_wait (struct target_ops *ops,
+		 ptid_t ptid, struct target_waitstatus *status, int options)
 {
   ptid_t active_ptid;
+  struct target_ops *beneath = find_target_beneath (ops);
 
   debug ("dec_thread_wait");
 
-  ptid = base_target.to_wait (ptid, status);
+  ptid = beneath->to_wait (beneath, ptid, status, options);
 
-  /* The ptid returned by the base_target is the ptid of the process.
-     We need to find which thread is currently active and return its
-     ptid.  */
+  /* The ptid returned by the target beneath us is the ptid of the process.
+     We need to find which thread is currently active and return its ptid.  */
   resync_thread_list ();
   active_ptid = get_active_ptid ();
   if (ptid_equal (active_ptid, null_ptid))
@@ -486,7 +485,7 @@ dec_thread_get_regsets (pthreadDebugId_t tid, gdb_gregset_t *gregset,
   res = pthreadDebugThdGetReg (debug_context, tid, &regs);
   if (res != ESUCCESS)
     {
-      debug ("dec_thread_fetch_registers: pthreadDebugThdGetReg -> %d", res);
+      debug ("dec_thread_get_regsets: pthreadDebugThdGetReg -> %d", res);
       return -1;
     }
   memcpy (gregset->regs, &regs, sizeof (regs));
@@ -494,7 +493,7 @@ dec_thread_get_regsets (pthreadDebugId_t tid, gdb_gregset_t *gregset,
   res = pthreadDebugThdGetFreg (debug_context, tid, &fregs);
   if (res != ESUCCESS)
     {
-      debug ("dec_thread_fetch_registers: pthreadDebugThdGetFreg -> %d", res);
+      debug ("dec_thread_get_regsets: pthreadDebugThdGetFreg -> %d", res);
       return -1;
     }
   memcpy (fpregset->regs, &fregs, sizeof (fregs));
@@ -509,7 +508,8 @@ dec_thread_get_regsets (pthreadDebugId_t tid, gdb_gregset_t *gregset,
    registers.  */
 
 static void
-dec_thread_fetch_registers (struct regcache *regcache, int regno)
+dec_thread_fetch_registers (struct target_ops *ops,
+                            struct regcache *regcache, int regno)
 {
   pthreadDebugId_t tid = ptid_get_tid (inferior_ptid);
   gregset_t gregset;
@@ -521,7 +521,9 @@ dec_thread_fetch_registers (struct regcache *regcache, int regno)
 
   if (tid == 0 || ptid_equal (inferior_ptid, get_active_ptid ()))
     {
-      base_target.to_fetch_registers (regcache, regno);
+      struct target_ops *beneath = find_target_beneath (ops);
+
+      beneath->to_fetch_registers (beneath, regcache, regno);
       return;
     }
 
@@ -549,7 +551,7 @@ dec_thread_set_regsets (pthreadDebugId_t tid, gdb_gregset_t gregset,
   res = pthreadDebugThdSetReg (debug_context, tid, &regs);
   if (res != ESUCCESS)
     {
-      debug ("dec_thread_fetch_registers: pthreadDebugThdSetReg -> %d", res);
+      debug ("dec_thread_set_regsets: pthreadDebugThdSetReg -> %d", res);
       return -1;
     }
 
@@ -557,7 +559,7 @@ dec_thread_set_regsets (pthreadDebugId_t tid, gdb_gregset_t gregset,
   res = pthreadDebugThdSetFreg (debug_context, tid, &fregs);
   if (res != ESUCCESS)
     {
-      debug ("dec_thread_fetch_registers: pthreadDebugThdSetFreg -> %d", res);
+      debug ("dec_thread_set_regsets: pthreadDebugThdSetFreg -> %d", res);
       return -1;
     }
 
@@ -570,7 +572,8 @@ dec_thread_set_regsets (pthreadDebugId_t tid, gdb_gregset_t gregset,
    just one register, we store all the registers.  */
 
 static void
-dec_thread_store_registers (struct regcache *regcache, int regno)
+dec_thread_store_registers (struct target_ops *ops,
+                            struct regcache *regcache, int regno)
 {
   pthreadDebugId_t tid = ptid_get_tid (inferior_ptid);
   gregset_t gregset;
@@ -581,7 +584,9 @@ dec_thread_store_registers (struct regcache *regcache, int regno)
 
   if (tid == 0 || ptid_equal (inferior_ptid, get_active_ptid ()))
     {
-      base_target.to_store_registers (regcache, regno);
+      struct target_ops *beneath = find_target_beneath (ops);
+
+      beneath->to_store_registers (beneath, regcache, regno);
       return;
     }
 
@@ -600,17 +605,19 @@ dec_thread_store_registers (struct regcache *regcache, int regno)
 /* The "to_mourn_inferior" method of the dec_thread_ops.  */
 
 static void
-dec_thread_mourn_inferior (void)
+dec_thread_mourn_inferior (struct target_ops *ops)
 {
+  struct target_ops *beneath = find_target_beneath (ops);
+
   debug ("dec_thread_mourn_inferior");
 
   disable_dec_thread ();
-  base_target.to_mourn_inferior (&base_target);
+  beneath->to_mourn_inferior (beneath);
 }
 
 /* The "to_thread_alive" method of the dec_thread_ops.  */
 static int
-dec_thread_thread_alive (ptid_t ptid)
+dec_thread_thread_alive (struct target_ops *ops, ptid_t ptid)
 {
   debug ("dec_thread_thread_alive (tid=%ld)", ptid_get_tid (ptid));
 
@@ -622,12 +629,16 @@ dec_thread_thread_alive (ptid_t ptid)
 /* The "to_pid_to_str" method of the dec_thread_ops.  */
 
 static char *
-dec_thread_pid_to_str (ptid_t ptid)
+dec_thread_pid_to_str (struct target_ops *ops, ptid_t ptid)
 {
   static char *ret = NULL;
 
   if (ptid_get_tid (ptid) == 0)
-    return base_target.to_pid_to_str (ptid);
+    {
+      struct target_ops *beneath = find_target_beneath (ops);
+
+      return beneath->to_pid_to_str (beneath, ptid);
+    }
 
   /* Free previous return value; a new one will be allocated by
      xstrprintf().  */
@@ -649,6 +660,26 @@ dec_thread_new_objfile_observer (struct objfile *objfile)
      disable_dec_thread ();
 }
 
+/* The "to_get_ada_task_ptid" method of the dec_thread_ops.  */
+
+static ptid_t
+dec_thread_get_ada_task_ptid (long lwp, long thread)
+{
+  int i;
+  struct dec_thread_info *info;
+
+  debug ("dec_thread_get_ada_task_ptid (lwp=0x%lx, thread=0x%lx)",
+         lwp, thread);
+
+  for (i = 0; VEC_iterate (dec_thread_info_s, dec_thread_list, i, info);
+       i++)
+    if (info->info.teb == (pthread_t) thread)
+      return ptid_build_from_info (*info);
+  
+  warning (_("Could not find thread id from THREAD = 0x%lx\n"), thread);
+  return inferior_ptid;
+}
+
 static void
 init_dec_thread_ops (void)
 {
@@ -663,6 +694,7 @@ init_dec_thread_ops (void)
   dec_thread_ops.to_thread_alive       = dec_thread_thread_alive;
   dec_thread_ops.to_pid_to_str         = dec_thread_pid_to_str;
   dec_thread_ops.to_stratum            = thread_stratum;
+  dec_thread_ops.to_get_ada_task_ptid  = dec_thread_get_ada_task_ptid;
   dec_thread_ops.to_magic              = OPS_MAGIC;
 }
 

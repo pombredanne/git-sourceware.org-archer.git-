@@ -854,10 +854,11 @@ avr_final_link_relocate (reloc_howto_type *                 howto,
 	{
           /* Relative distance is too large.  */
 
-	  /* Always apply WRAPAROUND for avr2 and avr4.  */
+	  /* Always apply WRAPAROUND for avr2, avr25, and avr4.  */
 	  switch (bfd_get_mach (input_bfd))
 	    {
 	    case bfd_mach_avr2:
+	    case bfd_mach_avr25:
 	    case bfd_mach_avr4:
 	      break;
 
@@ -1414,7 +1415,6 @@ elf32_avr_relax_delete_bytes (bfd *abfd,
   Elf_Internal_Rela *irelalign;
   Elf_Internal_Sym *isym;
   Elf_Internal_Sym *isymbuf = NULL;
-  Elf_Internal_Sym *isymend;
   bfd_vma toaddr;
   struct elf_link_hash_entry **sym_hashes;
   struct elf_link_hash_entry **end_hashes;
@@ -1552,13 +1552,19 @@ elf32_avr_relax_delete_bytes (bfd *abfd,
 
   /* Adjust the local symbols defined in this section.  */
   isym = (Elf_Internal_Sym *) symtab_hdr->contents;
-  isymend = isym + symtab_hdr->sh_info;
-  for (; isym < isymend; isym++)
+  /* Fix PR 9841, there may be no local symbols.  */
+  if (isym != NULL)
     {
-      if (isym->st_shndx == sec_shndx
-          && isym->st_value > addr
-          && isym->st_value < toaddr)
-        isym->st_value -= count;
+      Elf_Internal_Sym *isymend;
+
+      isymend = isym + symtab_hdr->sh_info;
+      for (; isym < isymend; isym++)
+	{
+	  if (isym->st_shndx == sec_shndx
+	      && isym->st_value > addr
+	      && isym->st_value < toaddr)
+	    isym->st_value -= count;
+	}
     }
 
   /* Now adjust the global symbols defined in this section.  */
@@ -1627,6 +1633,10 @@ elf32_avr_relax_section (bfd *abfd,
   static asection *last_input_section = NULL;
   static Elf_Internal_Rela *last_reloc = NULL;
   struct elf32_avr_link_hash_table *htab;
+
+  if (link_info->relocatable)
+    (*link_info->callbacks->einfo)
+      (_("%P%F: --relax and -r may not be used together\n"));
 
   htab = avr_link_hash_table (link_info);
   if (htab == NULL)

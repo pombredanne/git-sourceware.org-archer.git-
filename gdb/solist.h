@@ -62,8 +62,8 @@ struct so_list
     char symbols_loaded;	/* flag: symbols read in yet? */
     char from_tty;		/* flag: print msgs? */
     struct objfile *objfile;	/* objfile for loaded lib */
-    struct section_table *sections;
-    struct section_table *sections_end;
+    struct target_section *sections;
+    struct target_section *sections_end;
 
     /* Record the range of addresses belonging to this shared library.
        There may not be just one (e.g. if two segments are relocated
@@ -76,7 +76,7 @@ struct target_so_ops
     /* Adjust the section binding addresses by the base address at
        which the object was actually mapped.  */
     void (*relocate_section_addresses) (struct so_list *so,
-                                        struct section_table *);
+                                        struct target_section *);
 
     /* Free the the link map info and any other private data
        structures associated with a so_list entry.  */
@@ -103,6 +103,9 @@ struct target_so_ops
        the run time loader */
     int (*in_dynsym_resolve_code) (CORE_ADDR pc);
 
+    /* Find and open shared library binary file.  */
+    bfd *(*bfd_open) (char *pathname);
+
     /* Extra hook for finding and opening a solib.  
        Convenience function for remote debuggers finding host libs.  */
     int (*find_and_open_solib) (char *soname,
@@ -116,7 +119,9 @@ struct target_so_ops
 
     /* Given two so_list objects, one from the GDB thread list
        and another from the list returned by current_sos, return 1
-       if they represent the same library.  */
+       if they represent the same library.
+       Falls back to using strcmp on so_original_name field when set
+       to NULL.  */
     int (*same) (struct so_list *gdb, struct so_list *inferior);
   };
 
@@ -125,6 +130,12 @@ void free_so (struct so_list *so);
 
 /* Return address of first so_list entry in master shared object list.  */
 struct so_list *master_so_list (void);
+
+/* Find shared library binary file.  */
+extern char *solib_find (char *in_pathname, int *fd);
+
+/* Open BFD for shared library file.  */
+extern bfd *solib_bfd_fopen (char *pathname, int fd);
 
 /* Find solib binary file and open it.  */
 extern bfd *solib_bfd_open (char *in_pathname);

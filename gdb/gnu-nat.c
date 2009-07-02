@@ -113,7 +113,8 @@ void inf_continue (struct inf *inf);
 
 #define inf_debug(_inf, msg, args...) \
   do { struct inf *__inf = (_inf); \
-       debug ("{inf %d %p}: " msg, __inf->pid, __inf , ##args); } while (0)
+       debug ("{inf %d %s}: " msg, __inf->pid, \
+       host_address_to_string (__inf) , ##args); } while (0)
 
 void proc_abort (struct proc *proc, int force);
 struct proc *make_proc (struct inf *inf, mach_port_t port, int tid);
@@ -854,8 +855,8 @@ inf_validate_task_sc (struct inf *inf)
       int abort;
 
       target_terminal_ours ();	/* Allow I/O.  */
-      abort = !query ("Pid %d has an additional task suspend count of %d;"
-		      " clear it? ", inf->pid,
+      abort = !query (_("Pid %d has an additional task suspend count of %d;"
+		      " clear it? "), inf->pid,
 		      suspend_count - inf->task->cur_sc);
       target_terminal_inferior ();	/* Give it back to the child.  */
 
@@ -1433,7 +1434,8 @@ struct inf *waiting_inf;
 
 /* Wait for something to happen in the inferior, returning what in STATUS. */
 static ptid_t
-gnu_wait (ptid_t ptid, struct target_waitstatus *status)
+gnu_wait (struct target_ops *ops,
+	  ptid_t ptid, struct target_waitstatus *status, int options)
 {
   struct msg
     {
@@ -1954,7 +1956,8 @@ port_msgs_queued (mach_port_t port)
    in multiple events returned by wait).
  */
 static void
-gnu_resume (ptid_t ptid, int step, enum target_signal sig)
+gnu_resume (struct target_ops *ops,
+	    ptid_t ptid, int step, enum target_signal sig)
 {
   struct proc *step_thread = 0;
   int resume_all;
@@ -2028,7 +2031,7 @@ gnu_resume (ptid_t ptid, int step, enum target_signal sig)
 
 
 static void
-gnu_kill_inferior (void)
+gnu_kill_inferior (struct target_ops *ops)
 {
   struct proc *task = gnu_current_inf->task;
   if (task)
@@ -2261,7 +2264,7 @@ gnu_stop (ptid_t ptid)
 }
 
 static int
-gnu_thread_alive (ptid_t ptid)
+gnu_thread_alive (struct target_ops *ops, ptid_t ptid)
 {
   inf_update_procs (gnu_current_inf);
   return !!inf_tid_to_thread (gnu_current_inf,
@@ -2488,9 +2491,9 @@ gnu_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int write,
     return 0;
   else
     {
-      inf_debug (gnu_current_inf, "%s %p[%d] %s %p",
-		 write ? "writing" : "reading", (void *) memaddr, len,
-		 write ? "<--" : "-->", myaddr);
+      inf_debug (gnu_current_inf, "%s %s[%d] %s %s",
+		 write ? "writing" : "reading", paddr (memaddr), len,
+		 write ? "<--" : "-->", host_address_to_string (myaddr));
       if (write)
 	return gnu_write_inferior (task, memaddr, myaddr, len);
       else
@@ -2594,7 +2597,7 @@ proc_string (struct proc *proc)
 }
 
 static char *
-gnu_pid_to_str (ptid_t ptid)
+gnu_pid_to_str (struct target_ops *ops, ptid_t ptid)
 {
   struct inf *inf = gnu_current_inf;
   int tid = ptid_get_tid (ptid);
@@ -2611,8 +2614,10 @@ gnu_pid_to_str (ptid_t ptid)
 }
 
 
-extern void gnu_store_registers (struct regcache *regcache, int regno);
-extern void gnu_fetch_registers (struct regcache *regcache, int regno);
+extern void gnu_store_registers (struct target_ops *ops,
+				 struct regcache *regcache, int regno);
+extern void gnu_fetch_registers (struct target_ops *ops,
+				 struct regcache *regcache, int regno);
 
 struct target_ops gnu_ops;
 
@@ -2649,11 +2654,11 @@ init_gnu_ops (void)
   gnu_ops.to_pid_to_str = gnu_pid_to_str;   /* to_pid_to_str */
   gnu_ops.to_stop = gnu_stop;	/* to_stop */
   gnu_ops.to_stratum = process_stratum;		/* to_stratum */
-  gnu_ops.to_has_all_memory = 1;	/* to_has_all_memory */
-  gnu_ops.to_has_memory = 1;		/* to_has_memory */
-  gnu_ops.to_has_stack = 1;		/* to_has_stack */
-  gnu_ops.to_has_registers = 1;		/* to_has_registers */
-  gnu_ops.to_has_execution = 1;		/* to_has_execution */
+  gnu_ops.to_has_all_memory = default_child_has_all_memory;
+  gnu_ops.to_has_memory = default_child_has_memory;
+  gnu_ops.to_has_stack = default_child_has_stack;
+  gnu_ops.to_has_registers = default_child_has_registers;
+  gnu_ops.to_has_execution = default_child_has_execution;
   gnu_ops.to_magic = OPS_MAGIC;		/* to_magic */
 }				/* init_gnu_ops */
 
@@ -3405,10 +3410,15 @@ _initialize_gnu_nat (void)
 
   add_task_commands ();
   add_thread_commands ();
-  deprecated_add_set_cmd ("gnu-debug", class_maintenance,
-			  var_boolean, (char *) &gnu_debug_flag,
-			  "Set debugging output for the gnu backend.",
-			  &maintenancelist);
+  add_setshow_boolean_cmd ("gnu-nat", class_maintenance,
+			   &gnu_debug_flag,
+			   _("Set debugging output for the gnu backend."),
+			   _("Show debugging output for the gnu backend."),
+			   NULL,
+			   NULL,
+			   NULL,
+			   &setdebuglist,
+			   &showdebuglist);
 }
 
 #ifdef	FLUSH_INFERIOR_CACHE

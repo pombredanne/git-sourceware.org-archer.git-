@@ -112,18 +112,6 @@ get_cmd_context (struct cmd_list_element *cmd)
   return cmd->context;
 }
 
-void
-set_cmd_no_selected_thread_ok (struct cmd_list_element *cmd)
-{
-  cmd->flags |= CMD_NO_SELECTED_THREAD_OK;
-}
-
-int
-get_cmd_no_selected_thread_ok (struct cmd_list_element *cmd)
-{
-  return cmd->flags & CMD_NO_SELECTED_THREAD_OK;
-}
-
 enum cmd_types
 cmd_type (struct cmd_list_element *cmd)
 {
@@ -263,7 +251,7 @@ add_alias_cmd (char *name, char *oldname, enum command_class class,
 						     &prehook, &prehookee,
 						     &posthook, &posthookee);
       /* If this happens, it means a programmer error somewhere.  */
-      gdb_assert (!aliases && !prehook && prehookee
+      gdb_assert (!aliases && !prehook && !prehookee
 		  && !posthook && ! posthookee);
       return 0;
     }
@@ -407,17 +395,6 @@ add_setshow_cmd_full (char *name,
     *set_result = set;
   if (show_result != NULL)
     *show_result = show;
-}
-
-struct cmd_list_element *
-deprecated_add_set_cmd (char *name,
-			enum command_class class,
-			var_types var_type,
-			void *var,
-			char *doc,
-			struct cmd_list_element **list)
-{
-  return add_set_or_show_cmd (name, set_cmd, class, var_type, var, doc, list);
 }
 
 /* Add element named NAME to command list LIST (the list for set or
@@ -641,6 +618,27 @@ add_setshow_zinteger_cmd (char *name, enum command_class class,
 			NULL, NULL);
 }
 
+/* Add element named NAME to both the set and show command LISTs (the
+   list for set/show or some sublist thereof).  CLASS is as in
+   add_cmd.  VAR is address of the variable which will contain the
+   value.  SET_DOC and SHOW_DOC are the documentation strings.  */
+void
+add_setshow_zuinteger_cmd (char *name, enum command_class class,
+			   unsigned int *var,
+			   const char *set_doc, const char *show_doc,
+			   const char *help_doc,
+			   cmd_sfunc_ftype *set_func,
+			   show_value_ftype *show_func,
+			   struct cmd_list_element **set_list,
+			   struct cmd_list_element **show_list)
+{
+  add_setshow_cmd_full (name, class, var_zuinteger, var,
+			set_doc, show_doc, help_doc,
+			set_func, show_func,
+			set_list, show_list,
+			NULL, NULL);
+}
+
 /* Remove the command named NAME from the command list.  Return the
    list commands which were aliased to the deleted command.  If the
    command had no aliases, return NULL.  The various *HOOKs are set to
@@ -669,6 +667,8 @@ delete_cmd (char *name, struct cmd_list_element **list,
     {
       if (strcmp (iter->name, name) == 0)
 	{
+	  if (iter->destroyer)
+	    iter->destroyer (iter, iter->context);
 	  if (iter->hookee_pre)
 	    iter->hookee_pre->hook_pre = 0;
 	  *prehook = iter->hook_pre;
@@ -755,10 +755,11 @@ apropos_cmd (struct ui_file *stream, struct cmd_list_element *commandlist,
 			 struct re_pattern_buffer *regex, char *prefix)
 {
   struct cmd_list_element *c;
-  int returnvalue=1; /*Needed to avoid double printing*/
+  int returnvalue;
   /* Walk through the commands */
   for (c=commandlist;c;c=c->next)
     {
+      returnvalue = -1; /*Needed to avoid double printing*/
       if (c->name != NULL)
 	{
 	  /* Try to match against the name*/
@@ -769,7 +770,7 @@ apropos_cmd (struct ui_file *stream, struct cmd_list_element *commandlist,
 				      0 /* don't recurse */, stream);
 	    }
 	}
-      if (c->doc != NULL && returnvalue != 0)
+      if (c->doc != NULL && returnvalue < 0)
 	{
 	  /* Try to match against documentation */
 	  if (re_search(regex,c->doc,strlen(c->doc),0,strlen(c->doc),NULL) >=0)
@@ -778,8 +779,11 @@ apropos_cmd (struct ui_file *stream, struct cmd_list_element *commandlist,
 				      0 /* don't recurse */, stream);
 	    }
 	}
-      /* Check if this command has subcommands */
-      if (c->prefixlist != NULL)
+      /* Check if this command has subcommands and is not an abbreviation.
+	 We skip listing subcommands of abbreviations in order to avoid
+	 duplicates in the output.
+       */
+      if (c->prefixlist != NULL && !c->abbrev_flag)
 	{
 	  /* Recursively call ourselves on the subcommand list,
 	     passing the right prefix in.
@@ -1054,6 +1058,10 @@ help_cmd_list (struct cmd_list_element *list, enum command_class class,
 	{
 	  print_help_for_command (c, prefix, recurse, stream);
 	}
+      else if (c->abbrev_flag == 0 && recurse
+	       && class == class_user && c->prefixlist != NULL)
+	/* User-defined commands may be subcommands.  */
+	help_cmd_list (*c->prefixlist, class, c->prefixname, recurse, stream);
     }
 }
 

@@ -273,18 +273,21 @@ PACKAGE_BUGREPORT=
 
 ac_unique_file="Makefile.in"
 ac_subdirs_all="$ac_subdirs_all arm"
+ac_subdirs_all="$ac_subdirs_all avr"
 ac_subdirs_all="$ac_subdirs_all cr16"
 ac_subdirs_all="$ac_subdirs_all cris"
 ac_subdirs_all="$ac_subdirs_all d10v"
 ac_subdirs_all="$ac_subdirs_all frv"
 ac_subdirs_all="$ac_subdirs_all h8300"
 ac_subdirs_all="$ac_subdirs_all iq2000"
+ac_subdirs_all="$ac_subdirs_all lm32"
 ac_subdirs_all="$ac_subdirs_all m32c"
 ac_subdirs_all="$ac_subdirs_all m32r"
 ac_subdirs_all="$ac_subdirs_all m68hc11"
 ac_subdirs_all="$ac_subdirs_all mcore"
 ac_subdirs_all="$ac_subdirs_all mips"
 ac_subdirs_all="$ac_subdirs_all mn10300"
+ac_subdirs_all="$ac_subdirs_all moxie"
 ac_subdirs_all="$ac_subdirs_all sh64"
 ac_subdirs_all="$ac_subdirs_all sh"
 ac_subdirs_all="$ac_subdirs_all erc32"
@@ -3424,6 +3427,12 @@ subdirs="$subdirs arm"
 
 	   testsuite=yes
 	   ;;
+       avr*-*-*)
+
+
+subdirs="$subdirs avr"
+
+	   ;;
        cr16*-*-*)
 
 
@@ -3465,6 +3474,13 @@ subdirs="$subdirs iq2000"
 
 	   testsuite=yes
 	   ;;
+       lm32-*-*)
+
+
+subdirs="$subdirs lm32"
+
+           testsuite=yes
+           ;;
        m32c-*-*)
 
 
@@ -3506,6 +3522,13 @@ subdirs="$subdirs mips"
 subdirs="$subdirs mn10300"
 
 	   igen=yes
+	   ;;
+       moxie-*-*)
+
+
+subdirs="$subdirs moxie"
+
+	   testsuite=yes
 	   ;;
        sh64*-*-*)
 

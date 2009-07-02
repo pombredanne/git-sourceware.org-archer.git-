@@ -45,6 +45,8 @@
 #include "valprint.h"
 #include "gdbthread.h"
 #include "cp-support.h"
+#include "disasm.h"
+#include "inline-frame.h"
 
 #include "gdb_assert.h"
 #include <ctype.h>
@@ -96,6 +98,30 @@ print_stack_frame_stub (void *args)
   print_frame_info (p->frame, p->print_level, p->print_what, p->print_args);
   set_current_sal_from_frame (p->frame, center);
   return 0;
+}
+
+/* Return 1 if we should display the address in addition to the location,
+   because we are in the middle of a statement.  */
+
+static int
+frame_show_address (struct frame_info *frame,
+		    struct symtab_and_line sal)
+{
+  /* If there is a line number, but no PC, then there is no location
+     information associated with this sal.  The only way that should
+     happen is for the call sites of inlined functions (SAL comes from
+     find_frame_sal).  Otherwise, we would have some PC range if the
+     SAL came from a line table.  */
+  if (sal.line != 0 && sal.pc == 0 && sal.end == 0)
+    {
+      if (get_next_frame (frame) == NULL)
+	gdb_assert (inline_skipped_frames (inferior_ptid) > 0);
+      else
+	gdb_assert (get_frame_type (get_next_frame (frame)) == INLINE_FRAME);
+      return 0;
+    }
+
+  return get_frame_pc (frame) != sal.pc;
 }
 
 /* Show or print a stack frame FRAME briefly.  The output is format
@@ -420,6 +446,62 @@ set_current_sal_from_frame (struct frame_info *frame, int center)
     }
 }
 
+/* If ON, GDB will display disassembly of the next source line when
+   execution of the program being debugged stops.
+   If AUTO (which is the default), or there's no line info to determine
+   the source line of the next instruction, display disassembly of next
+   instruction instead.  */
+
+static enum auto_boolean disassemble_next_line;
+
+static void
+show_disassemble_next_line (struct ui_file *file, int from_tty,
+				 struct cmd_list_element *c,
+				 const char *value)
+{
+  fprintf_filtered (file, _("\
+Debugger's willingness to use disassemble-next-line is %s.\n"),
+                    value);
+}
+
+/* Show assembly codes; stub for catch_errors.  */
+
+struct gdb_disassembly_stub_args
+{
+  int how_many;
+  CORE_ADDR low;
+  CORE_ADDR high;
+};
+
+static void
+gdb_disassembly_stub (void *args)
+{
+  struct gdb_disassembly_stub_args *p = args;
+  gdb_disassembly (uiout, 0, 0, p->how_many, p->low, p->high);
+}
+
+/* Use TRY_CATCH to catch the exception from the gdb_disassembly
+   because it will be broken by filter sometime.  */
+
+static void
+do_gdb_disassembly (int how_many, CORE_ADDR low, CORE_ADDR high)
+{
+  volatile struct gdb_exception exception;
+  struct gdb_disassembly_stub_args args;
+
+  args.how_many = how_many;
+  args.low = low;
+  args.high = high;
+  TRY_CATCH (exception, RETURN_MASK_ALL)
+    {
+      gdb_disassembly_stub (&args);
+    }
+  /* If an exception was thrown while doing the disassembly, print
+     the error message, to give the user a clue of what happened.  */
+  if (exception.reason == RETURN_ERROR)
+    exception_print (gdb_stderr, exception);
+}
+
 /* Print information about frame FRAME.  The output is format according
    to PRINT_LEVEL and PRINT_WHAT and PRINT ARGS.  The meaning of
    PRINT_WHAT is:
@@ -497,11 +579,18 @@ print_frame_info (struct frame_info *frame, int print_level,
 
   source_print = (print_what == SRC_LINE || print_what == SRC_AND_LOC);
 
+  /* If disassemble-next-line is set to auto or on and doesn't have
+     the line debug messages for $pc, output the next instruction.  */
+  if ((disassemble_next_line == AUTO_BOOLEAN_AUTO
+       || disassemble_next_line == AUTO_BOOLEAN_TRUE)
+      && source_print && !sal.symtab)
+    do_gdb_disassembly (1, get_frame_pc (frame), get_frame_pc (frame) + 1);
+
   if (source_print && sal.symtab)
     {
       int done = 0;
       int mid_statement = ((print_what == SRC_LINE)
-			   && (get_frame_pc (frame) != sal.pc));
+			   && frame_show_address (frame, sal));
 
       if (annotation_level)
 	done = identify_source_line (sal.symtab, sal.line, mid_statement,
@@ -533,6 +622,11 @@ print_frame_info (struct frame_info *frame, int print_level,
 	      print_source_lines (sal.symtab, sal.line, sal.line + 1, 0);
 	    }
 	}
+
+      /* If disassemble-next-line is set to on and there is line debug
+         messages, output assembly codes for next line.  */
+      if (disassemble_next_line == AUTO_BOOLEAN_TRUE)
+	do_gdb_disassembly (-1, get_frame_pc (frame), sal.end);
     }
 
   if (print_what != LOCATION)
@@ -554,7 +648,7 @@ find_frame_funname (struct frame_info *frame, char **funname,
   *funname = NULL;
   *funlang = language_unknown;
 
-  func = find_pc_function (get_frame_address_in_block (frame));
+  func = get_frame_function (frame);
   if (func)
     {
       /* In certain pathological cases, the symtabs give the wrong
@@ -575,8 +669,13 @@ find_frame_funname (struct frame_info *frame, char **funname,
          changed (and we'll create a find_pc_minimal_function or some
          such).  */
 
-      struct minimal_symbol *msymbol =
-	lookup_minimal_symbol_by_pc (get_frame_address_in_block (frame));
+      struct minimal_symbol *msymbol = NULL;
+
+      /* Don't attempt to do this for inlined functions, which do not
+	 have a corresponding minimal symbol.  */
+      if (!block_inlined_p (SYMBOL_BLOCK_VALUE (func)))
+	msymbol
+	  = lookup_minimal_symbol_by_pc (get_frame_address_in_block (frame));
 
       if (msymbol != NULL
 	  && (SYMBOL_VALUE_ADDRESS (msymbol)
@@ -650,7 +749,7 @@ print_frame (struct frame_info *frame, int print_level,
     }
   get_user_print_options (&opts);
   if (opts.addressprint)
-    if (get_frame_pc (frame) != sal.pc || !sal.symtab
+    if (frame_show_address (frame, sal) || !sal.symtab
 	|| print_what == LOC_AND_ADDRESS)
       {
 	annotate_frame_address ();
@@ -707,7 +806,7 @@ print_frame (struct frame_info *frame, int print_level,
 #ifdef PC_SOLIB
       char *lib = PC_SOLIB (get_frame_pc (frame));
 #else
-      char *lib = solib_address (get_frame_pc (frame));
+      char *lib = solib_name_from_address (get_frame_pc (frame));
 #endif
       if (lib)
 	{
@@ -809,7 +908,7 @@ parse_frame_specification_1 (const char *frame_exp, const char *message,
   {
     int i;
     for (i = 0; i < numargs; i++)
-      addrs[i] = value_as_address (args[0]);
+      addrs[i] = value_as_address (args[i]);
   }
 
   /* Assume that the single arg[0] is an address, use that to identify
@@ -830,8 +929,16 @@ parse_frame_specification_1 (const char *frame_exp, const char *message,
 	{
 	  if (frame_id_eq (id, get_frame_id (fid)))
 	    {
-	      while (frame_id_eq (id, frame_unwind_id (fid)))
-		fid = get_prev_frame (fid);
+	      struct frame_info *prev_frame;
+
+	      while (1)
+		{
+		  prev_frame = get_prev_frame (fid);
+		  if (!prev_frame
+		      || !frame_id_eq (id, get_frame_id (prev_frame)))
+		    break;
+		  fid = prev_frame;
+		}
 	      return fid;
 	    }
 	}
@@ -953,7 +1060,7 @@ frame_info (char *addr_exp, int from_tty)
   puts_filtered ("; ");
   wrap_here ("    ");
   printf_filtered ("saved %s ", pc_regname);
-  fputs_filtered (paddress (frame_pc_unwind (fi)), gdb_stdout);
+  fputs_filtered (paddress (frame_unwind_caller_pc (fi)), gdb_stdout);
   printf_filtered ("\n");
 
   if (calling_frame_info == NULL)
@@ -965,8 +1072,10 @@ frame_info (char *addr_exp, int from_tty)
 	printf_filtered (_(" Outermost frame: %s\n"),
 			 frame_stop_reason_string (reason));
     }
-
-  if (calling_frame_info)
+  else if (get_frame_type (fi) == INLINE_FRAME)
+    printf_filtered (" inlined into frame %d",
+		     frame_relative_level (get_prev_frame (fi)));
+  else
     {
       printf_filtered (" called by frame at ");
       fputs_filtered (paddress (get_frame_base (calling_frame_info)),
@@ -1426,7 +1535,9 @@ print_frame_local_vars (struct frame_info *frame, int num_tabs,
       if (print_block_frame_locals (block, frame, num_tabs, stream))
 	values_printed = 1;
       /* After handling the function's top-level block, stop.  Don't
-         continue to its superblock, the block of per-file symbols.  */
+         continue to its superblock, the block of per-file symbols.
+         Also do not continue to the containing function of an inlined
+         function.  */
       if (BLOCK_FUNCTION (block))
 	break;
       block = BLOCK_SUPERBLOCK (block);
@@ -1497,7 +1608,9 @@ print_frame_label_vars (struct frame_info *frame, int this_level_only,
 	return;
 
       /* After handling the function's top-level block, stop.  Don't
-         continue to its superblock, the block of per-file symbols.  */
+         continue to its superblock, the block of per-file symbols.
+         Also do not continue to the containing function of an inlined
+         function.  */
       if (BLOCK_FUNCTION (block))
 	break;
       block = BLOCK_SUPERBLOCK (block);
@@ -1606,13 +1719,7 @@ select_and_print_frame (struct frame_info *frame)
 struct block *
 get_selected_block (CORE_ADDR *addr_in_block)
 {
-  if (!target_has_stack)
-    return 0;
-
-  if (is_exited (inferior_ptid))
-    return 0;
-
-  if (is_executing (inferior_ptid))
+  if (!has_stack_frames ())
     return 0;
 
   return get_frame_block (get_selected_frame (NULL), addr_in_block);
@@ -1760,12 +1867,17 @@ void
 return_command (char *retval_exp, int from_tty)
 {
   struct frame_info *thisframe;
+  struct gdbarch *gdbarch;
   struct symbol *thisfun;
   struct value *return_value = NULL;
   const char *query_prefix = "";
 
   thisframe = get_selected_frame ("No selected frame.");
   thisfun = get_frame_function (thisframe);
+  gdbarch = get_frame_arch (thisframe);
+
+  if (get_frame_type (get_current_frame ()) == INLINE_FRAME)
+    error (_("Can not force return from an inlined function."));
 
   /* Compute the return value.  If the computation triggers an error,
      let it bail.  If the return type can't be handled, set
@@ -1773,18 +1885,27 @@ return_command (char *retval_exp, int from_tty)
      message.  */
   if (retval_exp)
     {
+      struct expression *retval_expr = parse_expression (retval_exp);
+      struct cleanup *old_chain = make_cleanup (xfree, retval_expr);
       struct type *return_type = NULL;
 
       /* Compute the return value.  Should the computation fail, this
          call throws an error.  */
-      return_value = parse_and_eval (retval_exp);
+      return_value = evaluate_expression (retval_expr);
 
       /* Cast return value to the return type of the function.  Should
          the cast fail, this call throws an error.  */
       if (thisfun != NULL)
 	return_type = TYPE_TARGET_TYPE (SYMBOL_TYPE (thisfun));
       if (return_type == NULL)
-	return_type = builtin_type (get_frame_arch (thisframe))->builtin_int;
+      	{
+	  if (retval_expr->elts[0].opcode != UNOP_CAST)
+	    error (_("Return value type not available for selected "
+		     "stack frame.\n"
+		     "Please use an explicit cast of the value to return."));
+	  return_type = value_type (return_value);
+	}
+      do_cleanups (old_chain);
       CHECK_TYPEDEF (return_type);
       return_value = value_cast (return_type, return_value);
 
@@ -1800,7 +1921,9 @@ return_command (char *retval_exp, int from_tty)
            is discarded, side effects such as "return i++" still
            occur.  */
 	return_value = NULL;
-      else if (using_struct_return (SYMBOL_TYPE (thisfun), return_type))
+      else if (thisfun != NULL
+	       && using_struct_return (gdbarch,
+				       SYMBOL_TYPE (thisfun), return_type))
 	{
 	  query_prefix = "\
 The location at which to store the function's return value is unknown.\n\
@@ -1833,10 +1956,12 @@ If you continue, the return value that you specified will be ignored.\n";
     {
       struct type *return_type = value_type (return_value);
       struct gdbarch *gdbarch = get_regcache_arch (get_current_regcache ());
-      gdb_assert (gdbarch_return_value (gdbarch, SYMBOL_TYPE (thisfun),
-      					return_type, NULL, NULL, NULL)
+      struct type *func_type = thisfun == NULL ? NULL : SYMBOL_TYPE (thisfun);
+
+      gdb_assert (gdbarch_return_value (gdbarch, func_type, return_type, NULL,
+					NULL, NULL)
 		  == RETURN_VALUE_REGISTER_CONVENTION);
-      gdbarch_return_value (gdbarch, SYMBOL_TYPE (thisfun), return_type,
+      gdbarch_return_value (gdbarch, func_type, return_type,
 			    get_current_regcache (), NULL /*read*/,
 			    value_contents (return_value) /*write*/);
     }
@@ -2035,6 +2160,24 @@ Usage: func <name>\n"));
 			_("Set printing of non-scalar frame arguments"),
 			_("Show printing of non-scalar frame arguments"),
 			NULL, NULL, NULL, &setprintlist, &showprintlist);
+
+  add_setshow_auto_boolean_cmd ("disassemble-next-line", class_stack,
+			        &disassemble_next_line, _("\
+Set whether to disassemble next source line or insn when execution stops."), _("\
+Show whether to disassemble next source line or insn when execution stops."), _("\
+If ON, GDB will display disassembly of the next source line, in addition\n\
+to displaying the source line itself.  If the next source line cannot\n\
+be displayed (e.g., source is unavailable or there's no line info), GDB\n\
+will display disassembly of next instruction instead of showing the\n\
+source line.\n\
+If AUTO, display disassembly of next instruction only if the source line\n\
+cannot be displayed.\n\
+If OFF (which is the default), never display the disassembly of the next\n\
+source line."),
+			        NULL,
+			        show_disassemble_next_line,
+			        &setlist, &showlist);
+  disassemble_next_line = AUTO_BOOLEAN_FALSE;
 
 #if 0
   add_cmd ("backtrace-limit", class_stack, set_backtrace_limit_command, _(\

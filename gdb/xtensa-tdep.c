@@ -1018,7 +1018,8 @@ xtensa_unwind_pc (struct gdbarch *gdbarch, struct frame_info *next_frame)
   gdb_byte buf[8];
   CORE_ADDR pc;
 
-  DEBUGTRACE ("xtensa_unwind_pc (next_frame = %p)\n", next_frame);
+  DEBUGTRACE ("xtensa_unwind_pc (next_frame = %s)\n", 
+		host_address_to_string (next_frame));
 
   frame_unwind_register (next_frame, gdbarch_pc_regnum (gdbarch), buf);
   pc = extract_typed_address (buf, builtin_type (gdbarch)->builtin_func_ptr);
@@ -1241,7 +1242,7 @@ xtensa_frame_cache (struct frame_info *this_frame, void **this_cache)
 	  cache->wd.ws = ws & ~(1 << wb);
 
 	  cache->pc = get_frame_func (this_frame);
-	  cache->ra = (cache->pc & 0xc0000000) | (ra & 0x3fffffff);
+	  cache->ra = (pc & 0xc0000000) | (ra & 0x3fffffff);
 	  cache->ps = (ps & ~PS_CALLINC_MASK)
 	    | ((WINSIZE(ra)/4) << PS_CALLINC_SHIFT);
 	}
@@ -2092,8 +2093,7 @@ call0_analyze_prologue (CORE_ADDR start, CORE_ADDR pc, CORE_ADDR litbase,
   CORE_ADDR ia;		    /* Current insn address in prologue.  */
   CORE_ADDR ba = 0;	    /* Current address at base of insn buffer.  */
   CORE_ADDR bt;		    /* Current address at top+1 of insn buffer.  */
-  #define BSZ 32	    /* Instruction buffer size.  */
-  char ibuf[BSZ];	    /* Instruction buffer for decoding prologue.  */
+  char ibuf[XTENSA_ISA_BSZ];/* Instruction buffer for decoding prologue.  */
   xtensa_isa isa;	    /* libisa ISA handle.  */
   xtensa_insnbuf ins, slot; /* libisa handle to decoded insn, slot.  */
   xtensa_format ifmt;	    /* libisa instruction format.  */
@@ -2153,7 +2153,7 @@ call0_analyze_prologue (CORE_ADDR start, CORE_ADDR pc, CORE_ADDR litbase,
   if (!xtensa_default_isa)
     xtensa_default_isa = xtensa_isa_init (0, 0);
   isa = xtensa_default_isa;
-  gdb_assert (BSZ >= xtensa_isa_maxlength (isa));
+  gdb_assert (XTENSA_ISA_BSZ >= xtensa_isa_maxlength (isa));
   ins = xtensa_insnbuf_alloc (isa);
   slot = xtensa_insnbuf_alloc (isa);
 
@@ -2166,7 +2166,7 @@ call0_analyze_prologue (CORE_ADDR start, CORE_ADDR pc, CORE_ADDR litbase,
       if (ia + xtensa_isa_maxlength (isa) > bt)
         {
 	  ba = ia;
-	  bt = (ba + BSZ) < body_pc ? ba + BSZ : body_pc;
+	  bt = (ba + XTENSA_ISA_BSZ) < body_pc ? ba + XTENSA_ISA_BSZ : body_pc;
 	  read_memory (ba, ibuf, bt - ba);
 	}
 
@@ -2446,7 +2446,7 @@ call0_frame_cache (struct frame_info *this_frame,
 
 /* #define DONT_SKIP_PROLOGUE  */
 
-CORE_ADDR
+static CORE_ADDR
 xtensa_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR start_pc)
 {
   struct symtab_and_line prologue_sal;
@@ -2535,7 +2535,7 @@ xtensa_verify_config (struct gdbarch *gdbarch)
 
 /* Derive specific register numbers from the array of registers.  */
 
-void
+static void
 xtensa_derive_tdep (struct gdbarch_tdep *tdep)
 {
   xtensa_register_t* rmap;
@@ -2706,6 +2706,9 @@ xtensa_dump_tdep (struct gdbarch *gdbarch, struct ui_file *file)
 {
   error (_("xtensa_dump_tdep(): not implemented"));
 }
+
+/* Provide a prototype to silence -Wmissing-prototypes.  */
+extern initialize_file_ftype _initialize_xtensa_tdep;
 
 void
 _initialize_xtensa_tdep (void)

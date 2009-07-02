@@ -1,6 +1,6 @@
 /* SPU specific support for 32-bit ELF.
 
-   Copyright 2006, 2007, 2008 Free Software Foundation, Inc.
+   Copyright 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
 
@@ -35,7 +35,8 @@ struct spu_elf_params
 #define OVERLAY_RODATA 4
 
   /* Type of overlays, enum _ovly_flavour.  */
-  unsigned int ovly_flavour : 2;
+  unsigned int ovly_flavour : 1;
+  unsigned int compact_stub : 1;
 
   /* Set if we should emit symbols for stubs.  */
   unsigned int emit_stub_syms : 1;
@@ -44,18 +45,26 @@ struct spu_elf_params
      non-overlay regions.  */
   unsigned int non_overlay_stubs : 1;
 
+  /* Set if lr liveness analysis should be done.  */
+  unsigned int lrlive_analysis : 1;
+
   /* Set if stack size analysis should be done.  */
   unsigned int stack_analysis : 1;
 
   /* Set if __stack_* syms will be emitted.  */
   unsigned int emit_stack_syms : 1;
 
+  /* Set if non-icache code should be allowed in icache lines.  */
+  unsigned int non_ia_text : 1;
+
   /* Range of valid addresses for loadable sections.  */
   bfd_vma local_store_lo;
   bfd_vma local_store_hi;
 
   /* Control --auto-overlay feature.  */
-  unsigned int num_regions;
+  unsigned int num_lines;
+  unsigned int line_size;
+  unsigned int max_branch;
   unsigned int auto_overlay_fixed;
   unsigned int auto_overlay_reserved;
   int extra_stack_space;
@@ -90,9 +99,8 @@ struct _spu_elf_section_data
 
 enum _ovly_flavour
 {
-  ovly_compact,
   ovly_normal,
-  ovly_none
+  ovly_soft_icache
 };
 
 struct _ovl_stream
@@ -106,7 +114,7 @@ extern void spu_elf_plugin (int);
 extern bfd_boolean spu_elf_open_builtin_lib (bfd **,
 					     const struct _ovl_stream *);
 extern bfd_boolean spu_elf_create_sections (struct bfd_link_info *);
-extern bfd_boolean spu_elf_find_overlays (struct bfd_link_info *);
+extern int spu_elf_find_overlays (struct bfd_link_info *);
 extern int spu_elf_size_stubs (struct bfd_link_info *);
-extern bfd_boolean spu_elf_build_stubs (struct bfd_link_info *);
+extern void spu_elf_place_overlay_data (struct bfd_link_info *);
 extern asection *spu_elf_check_vma (struct bfd_link_info *);

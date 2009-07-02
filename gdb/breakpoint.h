@@ -110,7 +110,16 @@ enum bptype
 
     bp_overlay_event, 
 
+    /* Master copies of longjmp breakpoints.  These are always installed
+       as soon as an objfile containing longjmp is loaded, but they are
+       always disabled.  While necessary, temporary clones of bp_longjmp
+       type will be created and enabled.  */
+
+    bp_longjmp_master,
+
     bp_catchpoint,
+
+    bp_tracepoint,
   };
 
 /* States of enablement of breakpoint. */
@@ -423,8 +432,11 @@ struct breakpoint
        hardware.  */
     enum watchpoint_triggered watchpoint_triggered;
 
-    /* Thread number for thread-specific breakpoint, or -1 if don't care */
+    /* Thread number for thread-specific breakpoint, or -1 if don't care.  */
     int thread;
+
+    /* Ada task number for task-specific breakpoint, or 0 if don't care.  */
+    int task;
 
     /* Count of the number of times this breakpoint was taken, dumped
        with the info, but not used for anything else.  Useful for
@@ -449,6 +461,17 @@ struct breakpoint
        no location initially so had no context to parse
        the condition in.  */
     int condition_not_parsed;
+
+    /* Number of times this tracepoint should single-step 
+       and collect additional data.  */
+    long step_count;
+
+    /* Number of times this tracepoint should be hit before 
+       disabling/ending.  */
+    int pass_count;
+
+    /* Chain of action lines to execute when this tracepoint is hit.  */
+    struct action_line *actions;
   };
 
 typedef struct breakpoint *breakpoint_p;
@@ -680,6 +703,8 @@ extern struct breakpoint *set_momentary_breakpoint
 extern struct breakpoint *set_momentary_breakpoint_at_pc
   (CORE_ADDR pc, enum bptype type);
 
+extern struct breakpoint *clone_momentary_breakpoint (struct breakpoint *bpkt);
+
 extern void set_ignore_count (int, int, int);
 
 extern void set_default_breakpoint (int, CORE_ADDR, struct symtab *, int);
@@ -705,7 +730,8 @@ extern void tbreak_command (char *, int);
 extern void set_breakpoint (char *address, char *condition,
 			    int hardwareflag, int tempflag,
 			    int thread, int ignore_count,
-			    int pending);
+			    int pending,
+			    int enabled);
 
 extern void insert_breakpoints (void);
 
@@ -746,7 +772,7 @@ extern void update_breakpoints_after_exec (void);
    inferior_ptid.  */
 extern int detach_breakpoints (int);
 
-extern void set_longjmp_breakpoint (void);
+extern void set_longjmp_breakpoint (int thread);
 extern void delete_longjmp_breakpoint (int thread);
 
 extern void enable_overlay_breakpoints (void);
@@ -861,5 +887,16 @@ extern void make_breakpoint_silent (struct breakpoint *);
 
 /* Set break condition of breakpoint B to EXP.  */
 extern void set_breakpoint_condition (struct breakpoint *b, char *exp, int from_tty);
+
+/* Return a tracepoint with the given number if found.  */
+extern struct breakpoint *get_tracepoint (int num);
+
+/* Find a tracepoint by parsing a number in the supplied string.  */
+extern struct breakpoint *get_tracepoint_by_number (char **arg, int multi_p,
+						    int optional_p);
+
+/* Return a vector of all tracepoints currently defined.  The vector
+   is newly allocated; the caller should free when done with it.  */
+extern VEC(breakpoint_p) *all_tracepoints (void);
 
 #endif /* !defined (BREAKPOINT_H) */

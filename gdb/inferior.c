@@ -84,6 +84,8 @@ add_inferior_silent (int pid)
   inf->next = inferior_list;
   inferior_list = inf;
 
+  observer_notify_new_inferior (pid);
+
   return inf;
 }
 
@@ -91,8 +93,6 @@ struct inferior *
 add_inferior (int pid)
 {
   struct inferior *inf = add_inferior_silent (pid);
-
-  observer_notify_new_inferior (pid);
 
   if (print_inferior_events)
     printf_unfiltered (_("[New inferior %d]\n"), pid);
@@ -139,19 +139,21 @@ delete_inferior_1 (int pid, int silent)
   if (!inf)
     return;
 
+  arg.pid = pid;
+  arg.silent = silent;
+
+  iterate_over_threads (delete_thread_of_inferior, &arg);
+
+  /* Notify the observers before removing the inferior from the list,
+     so that the observers have a change to look it up.  */
+  observer_notify_inferior_exit (pid);
+
   if (infprev)
     infprev->next = inf->next;
   else
     inferior_list = inf->next;
 
   free_inferior (inf);
-
-  arg.pid = pid;
-  arg.silent = silent;
-
-  iterate_over_threads (delete_thread_of_inferior, &arg);
-
-  observer_notify_inferior_exit (pid);
 }
 
 void
@@ -282,6 +284,14 @@ have_inferiors (void)
   return inferior_list != NULL;
 }
 
+int
+have_live_inferiors (void)
+{
+  /* The check on stratum suffices, as GDB doesn't currently support
+     multiple target interfaces.  */
+  return (current_target.to_stratum >= process_stratum && have_inferiors ());
+}
+
 /* Prints the list of inferiors and their details on UIOUT.  This is a
    version of 'info_inferior_command' suitable for use from MI.
 
@@ -292,8 +302,31 @@ print_inferior (struct ui_out *uiout, int requested_inferior)
 {
   struct inferior *inf;
   struct cleanup *old_chain;
+  int inf_count = 0;
 
-  old_chain = make_cleanup_ui_out_list_begin_end (uiout, "inferiors");
+  /* Compute number of inferiors we will print.  */
+  for (inf = inferior_list; inf; inf = inf->next)
+    {
+      struct cleanup *chain2;
+
+      if (requested_inferior != -1 && inf->num != requested_inferior)
+	continue;
+
+      ++inf_count;
+    }
+
+  if (inf_count == 0)
+    {
+      ui_out_message (uiout, 0, "No inferiors.\n");
+      return;
+    }
+
+  old_chain = make_cleanup_ui_out_table_begin_end (uiout, 3, inf_count,
+						   "inferiors");
+  ui_out_table_header (uiout, 3, ui_right, "current", "Cur");
+  ui_out_table_header (uiout, 4, ui_right, "id", "Id");
+  ui_out_table_header (uiout, 7, ui_right, "target-id", "PID");
+  ui_out_table_body (uiout);
 
   for (inf = inferior_list; inf; inf = inf->next)
     {
@@ -305,12 +338,11 @@ print_inferior (struct ui_out *uiout, int requested_inferior)
       chain2 = make_cleanup_ui_out_tuple_begin_end (uiout, NULL);
 
       if (inf->pid == ptid_get_pid (inferior_ptid))
-	ui_out_text (uiout, "* ");
+	ui_out_field_string (uiout, "current", "*");
       else
-	ui_out_text (uiout, "  ");
+	ui_out_field_skip (uiout, "current");
 
       ui_out_field_int (uiout, "id", inf->num);
-      ui_out_text (uiout, " ");
       ui_out_field_int (uiout, "target-id", inf->pid);
 
       ui_out_text (uiout, "\n");

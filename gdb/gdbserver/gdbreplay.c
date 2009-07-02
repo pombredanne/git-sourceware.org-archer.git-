@@ -131,7 +131,7 @@ strerror (DWORD error)
    Then return to command level.  */
 
 static void
-perror_with_name (char *string)
+perror_with_name (const char *string)
 {
 #ifndef STDC_HEADERS
   extern int errno;
@@ -236,7 +236,7 @@ remote_open (char *name)
       setsockopt (tmp_desc, SOL_SOCKET, SO_KEEPALIVE, (char *) &tmp, sizeof (tmp));
 
       /* Tell TCP not to delay small packets.  This greatly speeds up
-         interactive response. */
+	 interactive response. */
       tmp = 1;
       setsockopt (remote_desc, IPPROTO_TCP, TCP_NODELAY,
 		  (char *) &tmp, sizeof (tmp));

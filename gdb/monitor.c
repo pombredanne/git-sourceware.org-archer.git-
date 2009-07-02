@@ -912,7 +912,8 @@ monitor_supply_register (struct regcache *regcache, int regno, char *valstr)
 /* Tell the remote machine to resume.  */
 
 static void
-monitor_resume (ptid_t ptid, int step, enum target_signal sig)
+monitor_resume (struct target_ops *ops,
+		ptid_t ptid, int step, enum target_signal sig)
 {
   /* Some monitors require a different command when starting a program */
   monitor_debug ("MON resume\n");
@@ -1007,8 +1008,8 @@ monitor_interrupt_query (void)
 {
   target_terminal_ours ();
 
-  if (query ("Interrupted while waiting for the program.\n\
-Give up (and stop debugging it)? "))
+  if (query (_("Interrupted while waiting for the program.\n\
+Give up (and stop debugging it)? ")))
     {
       target_mourn_inferior ();
       deprecated_throw_reason (RETURN_QUIT);
@@ -1063,7 +1064,8 @@ monitor_wait_filter (char *buf,
    status just as `wait' would.  */
 
 static ptid_t
-monitor_wait (ptid_t ptid, struct target_waitstatus *status)
+monitor_wait (struct target_ops *ops,
+	      ptid_t ptid, struct target_waitstatus *status, int options)
 {
   int old_timeout = timeout;
   char buf[TARGET_BUF_SIZE];
@@ -1285,7 +1287,8 @@ monitor_dump_regs (struct regcache *regcache)
 }
 
 static void
-monitor_fetch_registers (struct regcache *regcache, int regno)
+monitor_fetch_registers (struct target_ops *ops,
+			 struct regcache *regcache, int regno)
 {
   monitor_debug ("MON fetchregs\n");
   if (current_monitor->getreg.cmd)
@@ -1367,7 +1370,8 @@ monitor_store_register (struct regcache *regcache, int regno)
 /* Store the remote registers.  */
 
 static void
-monitor_store_registers (struct regcache *regcache, int regno)
+monitor_store_registers (struct target_ops *ops,
+			 struct regcache *regcache, int regno)
 {
   if (regno >= 0)
     {
@@ -1408,7 +1412,7 @@ monitor_write_memory (CORE_ADDR memaddr, char *myaddr, int len)
   monitor_debug ("MON write %d %s\n", len, paddr (memaddr));
 
   if (current_monitor->flags & MO_ADDR_BITS_REMOVE)
-    memaddr = gdbarch_addr_bits_remove (current_gdbarch, memaddr);
+    memaddr = gdbarch_addr_bits_remove (target_gdbarch, memaddr);
 
   /* Use memory fill command for leading 0 bytes.  */
 
@@ -1807,7 +1811,7 @@ monitor_read_memory (CORE_ADDR memaddr, char *myaddr, int len)
 		 paddr_nz (memaddr), (long) myaddr, len);
 
   if (current_monitor->flags & MO_ADDR_BITS_REMOVE)
-    memaddr = gdbarch_addr_bits_remove (current_gdbarch, memaddr);
+    memaddr = gdbarch_addr_bits_remove (target_gdbarch, memaddr);
 
   if (current_monitor->flags & MO_GETMEM_READ_SINGLE)
     return monitor_read_memory_single (memaddr, myaddr, len);
@@ -1987,7 +1991,7 @@ monitor_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int write,
 }
 
 static void
-monitor_kill (void)
+monitor_kill (struct target_ops *ops)
 {
   return;			/* ignore attempts to kill target system */
 }
@@ -2003,7 +2007,8 @@ monitor_create_inferior (struct target_ops *ops, char *exec_file,
 
   first_time = 1;
   clear_proceed_status ();
-  write_pc (bfd_get_start_address (exec_bfd));
+  regcache_write_pc (get_current_regcache (),
+		     bfd_get_start_address (exec_bfd));
 }
 
 /* Clean up when a program exits.
@@ -2151,7 +2156,8 @@ monitor_load (char *file, int from_tty)
 
   /* Finally, make the PC point at the start address */
   if (exec_bfd)
-    write_pc (bfd_get_start_address (exec_bfd));
+    regcache_write_pc (get_current_regcache (),
+		       bfd_get_start_address (exec_bfd));
 
   /* There used to be code here which would clear inferior_ptid and
      call clear_symtab_users.  None of that should be necessary:
@@ -2231,7 +2237,7 @@ monitor_get_dev_name (void)
 /* Check to see if a thread is still alive.  */
 
 static int
-monitor_thread_alive (ptid_t ptid)
+monitor_thread_alive (struct target_ops *ops, ptid_t ptid)
 {
   if (ptid_equal (ptid, monitor_ptid))
     /* The monitor's task is always alive.  */
@@ -2244,7 +2250,7 @@ monitor_thread_alive (ptid_t ptid)
    buffer.  */
 
 static char *
-monitor_pid_to_str (ptid_t ptid)
+monitor_pid_to_str (struct target_ops *ops, ptid_t ptid)
 {
   static char buf[64];
 
@@ -2283,11 +2289,11 @@ init_base_monitor_ops (void)
   monitor_ops.to_thread_alive = monitor_thread_alive;
   monitor_ops.to_pid_to_str = monitor_pid_to_str;
   monitor_ops.to_stratum = process_stratum;
-  monitor_ops.to_has_all_memory = 1;
-  monitor_ops.to_has_memory = 1;
-  monitor_ops.to_has_stack = 1;
-  monitor_ops.to_has_registers = 1;
-  monitor_ops.to_has_execution = 1;
+  monitor_ops.to_has_all_memory = default_child_has_all_memory;
+  monitor_ops.to_has_memory = default_child_has_memory;
+  monitor_ops.to_has_stack = default_child_has_stack;
+  monitor_ops.to_has_registers = default_child_has_registers;
+  monitor_ops.to_has_execution = default_child_has_execution;
   monitor_ops.to_magic = OPS_MAGIC;
 }				/* init_base_monitor_ops */
 

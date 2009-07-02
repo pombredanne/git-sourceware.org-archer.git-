@@ -29,6 +29,9 @@ sinclude([../config/depstand.m4])
 dnl For AM_LC_MESSAGES
 sinclude([../config/lcmessage.m4])
 
+dnl For AM_LANGINFO_CODESET.
+sinclude([../config/codeset.m4])
+
 #
 # Sometimes the native compiler is a bogus stub for gcc or /usr/ucb/cc. This
 # makes configure think it's cross compiling. If --target wasn't used, then
@@ -172,24 +175,59 @@ AC_DEFUN([AM_ICONV],
   dnl those with the standalone portable GNU libiconv installed).
 
   AC_ARG_WITH([libiconv-prefix],
-[  --with-libiconv-prefix=DIR  search for libiconv in DIR/include and DIR/lib], [
+    AS_HELP_STRING([--with-libiconv-prefix=DIR], [search for libiconv in DIR/include and DIR/lib]), [
     for dir in `echo "$withval" | tr : ' '`; do
-      if test -d $dir/include; then CPPFLAGS="$CPPFLAGS -I$dir/include"; fi
-      if test -d $dir/lib; then LDFLAGS="$LDFLAGS -L$dir/lib"; fi
+      if test -d $dir/include; then LIBICONV_INCLUDE="-I$dir/include"; fi
+      if test -d $dir/lib; then LIBICONV_LIBDIR="-L$dir/lib"; fi
     done
    ])
+
+  BUILD_LIBICONV_LIBDIR="-L../libiconv/lib/.libs -L../libiconv/lib/_libs"
+  BUILD_LIBICONV_INCLUDE="-I../libiconv/include"
 
   AC_CACHE_CHECK(for iconv, am_cv_func_iconv, [
     am_cv_func_iconv="no, consider installing GNU libiconv"
     am_cv_lib_iconv=no
-    AC_TRY_LINK([#include <stdlib.h>
-#include <iconv.h>],
-      [iconv_t cd = iconv_open("","");
-       iconv(cd,NULL,NULL,NULL,NULL);
-       iconv_close(cd);],
-      am_cv_func_iconv=yes)
-    if test "$am_cv_func_iconv" != yes; then
+    am_cv_use_build_libiconv=no
+
+    # If libiconv is part of the build tree, then try using it over
+    # any system iconv.
+    if test -d ../libiconv; then
       am_save_LIBS="$LIBS"
+      am_save_CPPFLAGS="$CPPFLAGS"
+      LIBS="$LIBS $BUILD_LIBICONV_LIBDIR -liconv"
+      CPPFLAGS="$CPPFLAGS $BUILD_LIBICONV_INCLUDE"
+      AC_TRY_LINK([#include <stdlib.h>
+#include <iconv.h>],
+        [iconv_t cd = iconv_open("","");
+         iconv(cd,NULL,NULL,NULL,NULL);
+         iconv_close(cd);],
+	am_cv_use_build_libiconv=yes
+        am_cv_lib_iconv=yes
+        am_cv_func_iconv=yes)
+      LIBS="$am_save_LIBS"
+      CPPFLAGS="$am_save_CPPFLAGS"
+    fi
+
+    # Next, try to find iconv in libc.
+    if test "$am_cv_func_iconv" != yes; then
+      AC_TRY_LINK([#include <stdlib.h>
+#include <iconv.h>],
+        [iconv_t cd = iconv_open("","");
+         iconv(cd,NULL,NULL,NULL,NULL);
+         iconv_close(cd);],
+        am_cv_func_iconv=yes)
+    fi
+
+    # If iconv was not in libc, try -liconv.  In this case, arrange to
+    # look in the libiconv prefix, if it was specified by the user.
+    if test "$am_cv_func_iconv" != yes; then
+      am_save_CPPFLAGS="$CPPFLAGS"
+      am_save_LIBS="$LIBS"
+      if test -n "$LIBICONV_INCLUDE"; then
+        CPPFLAGS="$CPPFLAGS $LIBICONV_INCLUDE"
+        LIBS="$LIBS $LIBICONV_LIBDIR"
+      fi
       LIBS="$LIBS -liconv"
       AC_TRY_LINK([#include <stdlib.h>
 #include <iconv.h>],
@@ -199,8 +237,26 @@ AC_DEFUN([AM_ICONV],
         am_cv_lib_iconv=yes
         am_cv_func_iconv=yes)
       LIBS="$am_save_LIBS"
+      CPPFLAGS="$am_save_CPPFLAGS"
     fi
   ])
+
+  # Set the various flags based on the cache variables.  We can't rely
+  # on the flags to remain set from the above code, due to caching.
+  LIBICONV=
+  if test "$am_cv_lib_iconv" = yes; then
+    LIBICONV="-liconv"
+  else
+    LIBICONV_LIBDIR=
+    LIBICONV_INCLUDE=
+  fi
+  if test "$am_cv_use_build_libiconv" = yes; then
+    LIBICONV_LIBDIR="$BUILD_LIBICONV_LIBDIR"
+    LIBICONV_INCLUDE="$BUILD_LIBICONV_INCLUDE"
+  fi
+  CPPFLAGS="$CPPFLAGS $LIBICONV_INCLUDE"
+  LIBS="$LIBS $LIBICONV_LIBDIR $LIBICONV"
+
   if test "$am_cv_func_iconv" = yes; then
     AC_DEFINE(HAVE_ICONV, 1, [Define if you have the iconv() function.])
     AC_MSG_CHECKING([for iconv declaration])
@@ -225,11 +281,6 @@ size_t iconv();
     AC_DEFINE_UNQUOTED(ICONV_CONST, $am_cv_proto_iconv_arg1,
       [Define as const if the declaration of iconv() needs const.])
   fi
-  LIBICONV=
-  if test "$am_cv_lib_iconv" = yes; then
-    LIBICONV="-liconv"
-  fi
-  AC_SUBST(LIBICONV)
 ])
 
 dnl written by Guido Draheim <guidod@gmx.de>, original by Alexandre Oliva 
@@ -340,3 +391,38 @@ AC_DEFUN([CY_AC_TK_PRIVATE_HEADERS], [
     AC_MSG_RESULT(${private_dir})
   fi
 ])
+
+dnl GDB_AC_WITH_DIR([VARIABLE], [ARG-NAME], [HELP], [DEFAULT])
+dnl Add a new --with option that defines a directory.
+dnl The result is stored in VARIABLE.  AC_DEFINE_DIR is called
+dnl on this variable, as is AC_SUBST.
+dnl ARG-NAME is the base name of the argument (without "--with").
+dnl HELP is the help text to use.
+dnl If the user's choice is relative to the prefix, then the
+dnl result is relocatable, then this will define the C macro
+dnl VARIABLE_RELOCATABLE to 1; otherwise it is defined as 0.
+dnl DEFAULT is the default value, which is used if the user
+dnl does not specify the argument.
+AC_DEFUN([GDB_AC_WITH_DIR], [
+  AC_ARG_WITH([$2], AS_HELP_STRING([--with-][$2][=PATH], [$3]), [
+    [$1]=$withval], [[$1]=[$4]])
+  AC_DEFINE_DIR([$1], [$1], [$3])
+  AC_SUBST([$1])
+  if test "x$exec_prefix" = xNONE || test "x$exec_prefix" = 'x${prefix}'; then
+     if test "x$prefix" = xNONE; then
+     	test_prefix=/usr/local
+     else
+	test_prefix=$prefix
+     fi
+  else
+     test_prefix=$exec_prefix
+  fi
+  value=0
+  case ${ac_define_dir} in
+     "${test_prefix}"|"${test_prefix}/"*|\
+	'${exec_prefix}'|'${exec_prefix}/'*)
+     value=1
+     ;;
+  esac
+  AC_DEFINE_UNQUOTED([$1]_RELOCATABLE, $value, [Define if the $2 directory should be relocated when GDB is moved.])
+  ])

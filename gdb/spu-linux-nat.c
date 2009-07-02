@@ -308,6 +308,7 @@ static bfd *
 spu_bfd_open (ULONGEST addr)
 {
   struct bfd *nbfd;
+  asection *spu_name;
 
   ULONGEST *open_closure = xmalloc (sizeof (ULONGEST));
   *open_closure = addr;
@@ -323,6 +324,22 @@ spu_bfd_open (ULONGEST addr)
     {
       bfd_close (nbfd);
       return NULL;
+    }
+
+  /* Retrieve SPU name note and update BFD name.  */
+  spu_name = bfd_get_section_by_name (nbfd, ".note.spu_name");
+  if (spu_name)
+    {
+      int sect_size = bfd_section_size (nbfd, spu_name);
+      if (sect_size > 20)
+	{
+	  char *buf = alloca (sect_size - 20 + 1);
+	  bfd_get_section_contents (nbfd, spu_name, buf, 20, sect_size - 20);
+	  buf[sect_size - 20] = '\0';
+
+	  xfree ((char *)nbfd->filename);
+	  nbfd->filename = xstrdup (buf);
+	}
     }
 
   return nbfd;
@@ -355,7 +372,8 @@ spu_symbol_file_add_from_memory (int inferior_fd)
   /* Open BFD representing SPE executable and read its symbols.  */
   nbfd = spu_bfd_open (addr);
   if (nbfd)
-    symbol_file_add_from_bfd (nbfd, 0, NULL, 1, 0);
+    symbol_file_add_from_bfd (nbfd, SYMFILE_VERBOSE | SYMFILE_MAINLINE,
+                              NULL, 0);
 }
 
 
@@ -404,7 +422,8 @@ spu_child_post_attach (int pid)
 /* Wait for child PTID to do something.  Return id of the child,
    minus_one_ptid in case of error; store status into *OURSTATUS.  */
 static ptid_t
-spu_child_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
+spu_child_wait (struct target_ops *ops,
+		ptid_t ptid, struct target_waitstatus *ourstatus, int options)
 {
   int save_errno;
   int status;
@@ -451,7 +470,8 @@ spu_child_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
 
 /* Override the fetch_inferior_register routine.  */
 static void
-spu_fetch_inferior_registers (struct regcache *regcache, int regno)
+spu_fetch_inferior_registers (struct target_ops *ops,
+			      struct regcache *regcache, int regno)
 {
   int fd;
   ULONGEST addr;
@@ -492,7 +512,8 @@ spu_fetch_inferior_registers (struct regcache *regcache, int regno)
 
 /* Override the store_inferior_register routine.  */
 static void
-spu_store_inferior_registers (struct regcache *regcache, int regno)
+spu_store_inferior_registers (struct target_ops *ops,
+			      struct regcache *regcache, int regno)
 {
   int fd;
   ULONGEST addr;
@@ -580,4 +601,3 @@ _initialize_spu_nat (void)
   /* Register SPU target.  */
   add_target (t);
 }
-

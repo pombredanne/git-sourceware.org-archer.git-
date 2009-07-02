@@ -20,6 +20,7 @@
 
 #include "server.h"
 #include "terminal.h"
+#include "target.h"
 #include <stdio.h>
 #include <string.h>
 #if HAVE_SYS_IOCTL_H
@@ -78,17 +79,10 @@ typedef int socklen_t;
 /* A cache entry for a successfully looked-up symbol.  */
 struct sym_cache
 {
-  const char *name;
+  char *name;
   CORE_ADDR addr;
   struct sym_cache *next;
 };
-
-/* The symbol cache.  */
-static struct sym_cache *symbol_cache;
-
-/* If this flag has been set, assume cache misses are
-   failures.  */
-int all_symbols_looked_up;
 
 int remote_debug = 0;
 struct ui_file *gdb_stdlog;
@@ -256,7 +250,7 @@ remote_open (char *name)
 		  (char *) &tmp, sizeof (tmp));
 
       /* Tell TCP not to delay small packets.  This greatly speeds up
-         interactive response. */
+	 interactive response. */
       tmp = 1;
       setsockopt (remote_desc, IPPROTO_TCP, TCP_NODELAY,
 		  (char *) &tmp, sizeof (tmp));
@@ -272,8 +266,8 @@ remote_open (char *name)
 #endif
 
       /* Convert IP address to string.  */
-      fprintf (stderr, "Remote debugging from host %s\n", 
-         inet_ntoa (sockaddr.sin_addr));
+      fprintf (stderr, "Remote debugging from host %s\n",
+	       inet_ntoa (sockaddr.sin_addr));
 
       transport_is_reliable = 1;
     }
@@ -285,11 +279,16 @@ remote_open (char *name)
   fcntl (remote_desc, F_SETOWN, getpid ());
 #endif
 #endif
+
+  /* Register the event loop handler.  */
+  add_file_handler (remote_desc, handle_serial_event, NULL);
 }
 
 void
 remote_close (void)
 {
+  delete_file_handler (remote_desc);
+
 #ifdef USE_WIN32API
   closesocket (remote_desc);
 #else
@@ -311,6 +310,29 @@ fromhex (int a)
   return 0;
 }
 
+static const char hexchars[] = "0123456789abcdef";
+
+static int
+ishex (int ch, int *val)
+{
+  if ((ch >= 'a') && (ch <= 'f'))
+    {
+      *val = ch - 'a' + 10;
+      return 1;
+    }
+  if ((ch >= 'A') && (ch <= 'F'))
+    {
+      *val = ch - 'A' + 10;
+      return 1;
+    }
+  if ((ch >= '0') && (ch <= '9'))
+    {
+      *val = ch - '0';
+      return 1;
+    }
+  return 0;
+}
+
 int
 unhexify (char *bin, const char *hex, int count)
 {
@@ -319,11 +341,11 @@ unhexify (char *bin, const char *hex, int count)
   for (i = 0; i < count; i++)
     {
       if (hex[0] == 0 || hex[1] == 0)
-        {
-          /* Hex string is short, or of uneven length.
-             Return the count that has been converted so far. */
-          return i;
-        }
+	{
+	  /* Hex string is short, or of uneven length.
+	     Return the count that has been converted so far. */
+	  return i;
+	}
       *bin++ = fromhex (hex[0]) * 16 + fromhex (hex[1]);
       hex += 2;
     }
@@ -517,12 +539,109 @@ try_rle (char *buf, int remaining, unsigned char *csum, char **p)
   return n + 1;
 }
 
+char *
+unpack_varlen_hex (char *buff,	/* packet to parse */
+		   ULONGEST *result)
+{
+  int nibble;
+  ULONGEST retval = 0;
+
+  while (ishex (*buff, &nibble))
+    {
+      buff++;
+      retval = retval << 4;
+      retval |= nibble & 0x0f;
+    }
+  *result = retval;
+  return buff;
+}
+
+/* Write a PTID to BUF.  Returns BUF+CHARACTERS_WRITTEN.  */
+
+char *
+write_ptid (char *buf, ptid_t ptid)
+{
+  int pid, tid;
+
+  if (multi_process)
+    {
+      pid = ptid_get_pid (ptid);
+      if (pid < 0)
+	buf += sprintf (buf, "p-%x.", -pid);
+      else
+	buf += sprintf (buf, "p%x.", pid);
+    }
+  tid = ptid_get_lwp (ptid);
+  if (tid < 0)
+    buf += sprintf (buf, "-%x", -tid);
+  else
+    buf += sprintf (buf, "%x", tid);
+
+  return buf;
+}
+
+ULONGEST
+hex_or_minus_one (char *buf, char **obuf)
+{
+  ULONGEST ret;
+
+  if (strncmp (buf, "-1", 2) == 0)
+    {
+      ret = (ULONGEST) -1;
+      buf += 2;
+    }
+  else
+    buf = unpack_varlen_hex (buf, &ret);
+
+  if (obuf)
+    *obuf = buf;
+
+  return ret;
+}
+
+/* Extract a PTID from BUF.  If non-null, OBUF is set to the to one
+   passed the last parsed char.  Returns null_ptid on error.  */
+ptid_t
+read_ptid (char *buf, char **obuf)
+{
+  char *p = buf;
+  char *pp;
+  ULONGEST pid = 0, tid = 0;
+
+  if (*p == 'p')
+    {
+      /* Multi-process ptid.  */
+      pp = unpack_varlen_hex (p + 1, &pid);
+      if (*pp != '.')
+	error ("invalid remote ptid: %s\n", p);
+
+      p = pp + 1;
+
+      tid = hex_or_minus_one (p, &pp);
+
+      if (obuf)
+	*obuf = pp;
+      return ptid_build (pid, tid, 0);
+    }
+
+  /* No multi-process.  Just a tid.  */
+  tid = hex_or_minus_one (p, &pp);
+
+  /* Since the stub is not sending a process id, then default to
+     what's in the current inferior.  */
+  pid = ptid_get_pid (((struct inferior_list_entry *) current_inferior)->id);
+
+  if (obuf)
+    *obuf = pp;
+  return ptid_build (pid, tid, 0);
+}
+
 /* Send a packet to the remote machine, with error checking.
    The data of the packet is in BUF, and the length of the
    packet is in CNT.  Returns >= 0 on success, -1 otherwise.  */
 
-int
-putpkt_binary (char *buf, int cnt)
+static int
+putpkt_binary_1 (char *buf, int cnt, int is_notif)
 {
   int i;
   unsigned char csum = 0;
@@ -536,7 +655,10 @@ putpkt_binary (char *buf, int cnt)
      and giving it a checksum.  */
 
   p = buf2;
-  *p++ = '$';
+  if (is_notif)
+    *p++ = '%';
+  else
+    *p++ = '$';
 
   for (i = 0; i < cnt;)
     i += try_rle (buf + i, cnt - i, &csum, &p);
@@ -560,12 +682,15 @@ putpkt_binary (char *buf, int cnt)
 	  return -1;
 	}
 
-      if (noack_mode)
+      if (noack_mode || is_notif)
 	{
 	  /* Don't expect an ack then.  */
 	  if (remote_debug)
 	    {
-	      fprintf (stderr, "putpkt (\"%s\"); [noack mode]\n", buf2);
+	      if (is_notif)
+		fprintf (stderr, "putpkt (\"%s\"); [notif]\n", buf2);
+	      else
+		fprintf (stderr, "putpkt (\"%s\"); [noack mode]\n", buf2);
 	      fflush (stderr);
 	    }
 	  break;
@@ -604,6 +729,12 @@ putpkt_binary (char *buf, int cnt)
   return 1;			/* Success! */
 }
 
+int
+putpkt_binary (char *buf, int cnt)
+{
+  return putpkt_binary_1 (buf, cnt, 0);
+}
+
 /* Send a packet to the remote machine, with error checking.  The data
    of the packet is in BUF, and the packet should be a NUL-terminated
    string.  Returns >= 0 on success, -1 otherwise.  */
@@ -612,6 +743,12 @@ int
 putpkt (char *buf)
 {
   return putpkt_binary (buf, strlen (buf));
+}
+
+int
+putpkt_notif (char *buf)
+{
+  return putpkt_binary_1 (buf, strlen (buf), 1);
 }
 
 /* Come here when we get an input interrupt from the remote side.  This
@@ -823,6 +960,14 @@ getpkt (char *buf)
 	  fflush (stderr);
 	}
     }
+  else
+    {
+      if (remote_debug)
+	{
+	  fprintf (stderr, "getpkt (\"%s\");  [no ack sent] \n", buf);
+	  fflush (stderr);
+	}
+    }
 
   return bp - buf;
 }
@@ -925,88 +1070,113 @@ dead_thread_notify (int id)
 }
 
 void
-prepare_resume_reply (char *buf, char status, unsigned char sig)
+prepare_resume_reply (char *buf, ptid_t ptid,
+		      struct target_waitstatus *status)
 {
-  int nib;
+  if (debug_threads)
+    fprintf (stderr, "Writing resume reply for %s:%d\n\n",
+	     target_pid_to_str (ptid), status->kind);
 
-  *buf++ = status;
-
-  nib = ((sig & 0xf0) >> 4);
-  *buf++ = tohex (nib);
-  nib = sig & 0x0f;
-  *buf++ = tohex (nib);
-
-  if (status == 'T')
+  switch (status->kind)
     {
-      const char **regp = gdbserver_expedite_regs;
+    case TARGET_WAITKIND_STOPPED:
+      {
+	struct thread_info *saved_inferior;
+	const char **regp;
 
-      if (the_target->stopped_by_watchpoint != NULL
-	  && (*the_target->stopped_by_watchpoint) ())
-	{
-	  CORE_ADDR addr;
-	  int i;
+	sprintf (buf, "T%02x", status->value.sig);
+	buf += strlen (buf);
 
-	  strncpy (buf, "watch:", 6);
-	  buf += 6;
+	regp = gdbserver_expedite_regs;
 
-	  addr = (*the_target->stopped_data_address) ();
+	saved_inferior = current_inferior;
 
-	  /* Convert each byte of the address into two hexadecimal chars.
-	     Note that we take sizeof (void *) instead of sizeof (addr);
-	     this is to avoid sending a 64-bit address to a 32-bit GDB.  */
-	  for (i = sizeof (void *) * 2; i > 0; i--)
-	    {
+	current_inferior = find_thread_ptid (ptid);
+
+	if (the_target->stopped_by_watchpoint != NULL
+	    && (*the_target->stopped_by_watchpoint) ())
+	  {
+	    CORE_ADDR addr;
+	    int i;
+
+	    strncpy (buf, "watch:", 6);
+	    buf += 6;
+
+	    addr = (*the_target->stopped_data_address) ();
+
+	    /* Convert each byte of the address into two hexadecimal
+	       chars.  Note that we take sizeof (void *) instead of
+	       sizeof (addr); this is to avoid sending a 64-bit
+	       address to a 32-bit GDB.  */
+	    for (i = sizeof (void *) * 2; i > 0; i--)
 	      *buf++ = tohex ((addr >> (i - 1) * 4) & 0xf);
-	    }
-	  *buf++ = ';';
-	}
+	    *buf++ = ';';
+	  }
 
-      while (*regp)
-	{
-	  buf = outreg (find_regno (*regp), buf);
-	  regp ++;
-	}
+	while (*regp)
+	  {
+	    buf = outreg (find_regno (*regp), buf);
+	    regp ++;
+	  }
+	*buf = '\0';
 
-      /* Formerly, if the debugger had not used any thread features we would not
-	 burden it with a thread status response.  This was for the benefit of
-	 GDB 4.13 and older.  However, in recent GDB versions the check
-	 (``if (cont_thread != 0)'') does not have the desired effect because of
-	 sillyness in the way that the remote protocol handles specifying a thread.
-	 Since thread support relies on qSymbol support anyway, assume GDB can handle
-	 threads.  */
+	/* Formerly, if the debugger had not used any thread features
+	   we would not burden it with a thread status response.  This
+	   was for the benefit of GDB 4.13 and older.  However, in
+	   recent GDB versions the check (``if (cont_thread != 0)'')
+	   does not have the desired effect because of sillyness in
+	   the way that the remote protocol handles specifying a
+	   thread.  Since thread support relies on qSymbol support
+	   anyway, assume GDB can handle threads.  */
 
-      if (using_threads && !disable_packet_Tthread)
-	{
-	  unsigned int gdb_id_from_wait;
+	if (using_threads && !disable_packet_Tthread)
+	  {
+	    /* This if (1) ought to be unnecessary.  But remote_wait
+	       in GDB will claim this event belongs to inferior_ptid
+	       if we do not specify a thread, and there's no way for
+	       gdbserver to know what inferior_ptid is.  */
+	    if (1 || !ptid_equal (general_thread, ptid))
+	      {
+		/* In non-stop, don't change the general thread behind
+		   GDB's back.  */
+		if (!non_stop)
+		  general_thread = ptid;
+		sprintf (buf, "thread:");
+		buf += strlen (buf);
+		buf = write_ptid (buf, ptid);
+		strcat (buf, ";");
+		buf += strlen (buf);
+	      }
+	  }
 
-	  /* FIXME right place to set this? */
-	  thread_from_wait = ((struct inferior_list_entry *)current_inferior)->id;
-	  gdb_id_from_wait = thread_to_gdb_id (current_inferior);
+	if (dlls_changed)
+	  {
+	    strcpy (buf, "library:;");
+	    buf += strlen (buf);
+	    dlls_changed = 0;
+	  }
 
-	  if (debug_threads)
-	    fprintf (stderr, "Writing resume reply for %ld\n\n", thread_from_wait);
-	  /* This if (1) ought to be unnecessary.  But remote_wait in GDB
-	     will claim this event belongs to inferior_ptid if we do not
-	     specify a thread, and there's no way for gdbserver to know
-	     what inferior_ptid is.  */
-	  if (1 || old_thread_from_wait != thread_from_wait)
-	    {
-	      general_thread = thread_from_wait;
-	      sprintf (buf, "thread:%x;", gdb_id_from_wait);
-	      buf += strlen (buf);
-	      old_thread_from_wait = thread_from_wait;
-	    }
-	}
-
-      if (dlls_changed)
-	{
-	  strcpy (buf, "library:;");
-	  buf += strlen (buf);
-	  dlls_changed = 0;
-	}
+	current_inferior = saved_inferior;
+      }
+      break;
+    case TARGET_WAITKIND_EXITED:
+      if (multi_process)
+	sprintf (buf, "W%x;process:%x",
+		 status->value.integer, ptid_get_pid (ptid));
+      else
+	sprintf (buf, "W%02x", status->value.integer);
+      break;
+    case TARGET_WAITKIND_SIGNALLED:
+      if (multi_process)
+	sprintf (buf, "X%x;process:%x",
+		 status->value.sig, ptid_get_pid (ptid));
+      else
+	sprintf (buf, "X%02x", status->value.sig);
+      break;
+    default:
+      error ("unhandled waitkind");
+      break;
     }
-  /* For W and X, we're done.  */
-  *buf++ = 0;
 }
 
 void
@@ -1129,6 +1299,31 @@ decode_search_memory_packet (const char *buf, int packet_len,
   return 0;
 }
 
+static void
+free_sym_cache (struct sym_cache *sym)
+{
+  if (sym != NULL)
+    {
+      free (sym->name);
+      free (sym);
+    }
+}
+
+void
+clear_symbol_cache (struct sym_cache **symcache_p)
+{
+  struct sym_cache *sym, *next;
+
+  /* Check the cache first.  */
+  for (sym = *symcache_p; sym; sym = next)
+    {
+      next = sym->next;
+      free_sym_cache (sym);
+    }
+
+  *symcache_p = NULL;
+}
+
 /* Ask GDB for the address of NAME, and return it in ADDRP if found.
    Returns 1 if the symbol is found, 0 if it is not, -1 on error.  */
 
@@ -1138,9 +1333,12 @@ look_up_one_symbol (const char *name, CORE_ADDR *addrp)
   char own_buf[266], *p, *q;
   int len;
   struct sym_cache *sym;
+  struct process_info *proc;
+
+  proc = current_process ();
 
   /* Check the cache first.  */
-  for (sym = symbol_cache; sym; sym = sym->next)
+  for (sym = proc->symbol_cache; sym; sym = sym->next)
     if (strcmp (name, sym->name) == 0)
       {
 	*addrp = sym->addr;
@@ -1152,7 +1350,7 @@ look_up_one_symbol (const char *name, CORE_ADDR *addrp)
      in any libraries loaded after that point, only in symbols in
      libpthread.so.  It might not be an appropriate time to look
      up a symbol, e.g. while we're trying to fetch registers.  */
-  if (all_symbols_looked_up)
+  if (proc->all_symbols_looked_up)
     return 0;
 
   /* Send the request.  */
@@ -1190,7 +1388,7 @@ look_up_one_symbol (const char *name, CORE_ADDR *addrp)
       if (len < 0)
 	return -1;
     }
-  
+
   if (strncmp (own_buf, "qSymbol:", strlen ("qSymbol:")) != 0)
     {
       warning ("Malformed response to qSymbol, ignoring: %s\n", own_buf);
@@ -1212,8 +1410,8 @@ look_up_one_symbol (const char *name, CORE_ADDR *addrp)
   sym = xmalloc (sizeof (*sym));
   sym->name = xstrdup (name);
   sym->addr = *addrp;
-  sym->next = symbol_cache;
-  symbol_cache = sym;
+  sym->next = proc->symbol_cache;
+  proc->symbol_cache = sym;
 
   return 1;
 }
@@ -1360,21 +1558,21 @@ buffer_xml_printf (struct buffer *buffer, const char *format, ...)
     {
       if (percent)
        {
-         switch (*f)
-           {
-           case 's':
-             {
-               char *p;
-               char *a = va_arg (ap, char *);
-               buffer_grow (buffer, prev, f - prev - 1);
-               p = xml_escape_text (a);
-               buffer_grow_str (buffer, p);
-               free (p);
-               prev = f + 1;
-             }
-             break;
-           }
-         percent = 0;
+	 switch (*f)
+	   {
+	   case 's':
+	     {
+	       char *p;
+	       char *a = va_arg (ap, char *);
+	       buffer_grow (buffer, prev, f - prev - 1);
+	       p = xml_escape_text (a);
+	       buffer_grow_str (buffer, p);
+	       free (p);
+	       prev = f + 1;
+	     }
+	     break;
+	   }
+	 percent = 0;
        }
       else if (*f == '%')
        percent = 1;

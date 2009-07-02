@@ -41,6 +41,7 @@
 #include "main.h"
 
 #include "python/python.h"
+#include "source.h"
 
 /* If nonzero, display time usage both at startup and for each command.  */
 
@@ -88,12 +89,134 @@ int return_child_result_value = -1;
 /* Whether to enable writing into executable and core files */
 extern int write_files;
 
+/* GDB as it has been invoked from the command line (i.e. argv[0]).  */
+static char *gdb_program_name;
+
 static void print_gdb_help (struct ui_file *);
 
 /* These two are used to set the external editor commands when gdb is farming
    out files to be edited by another program. */
 
 extern char *external_editor_command;
+
+/* Relocate a file or directory.  PROGNAME is the name by which gdb
+   was invoked (i.e., argv[0]).  INITIAL is the default value for the
+   file or directory.  FLAG is true if the value is relocatable, false
+   otherwise.  Returns a newly allocated string; this may return NULL
+   under the same conditions as make_relative_prefix.  */
+static char *
+relocate_path (const char *progname, const char *initial, int flag)
+{
+  if (flag)
+    return make_relative_prefix (progname, BINDIR, initial);
+  return xstrdup (initial);
+}
+
+/* Like relocate_path, but specifically checks for a directory.
+   INITIAL is relocated according to the rules of relocate_path.  If
+   the result is a directory, it is used; otherwise, INITIAL is used.
+   The chosen directory is then canonicalized using lrealpath.  This
+   function always returns a newly-allocated string.  */
+static char *
+relocate_directory (const char *progname, const char *initial, int flag)
+{
+  char *dir;
+
+  dir = relocate_path (progname, initial, flag);
+  if (dir)
+    {
+      struct stat s;
+
+      if (stat (dir, &s) != 0 || !S_ISDIR (s.st_mode))
+	{
+	  xfree (dir);
+	  dir = NULL;
+	}
+    }
+  if (!dir)
+    dir = xstrdup (initial);
+
+  /* Canonicalize the directory.  */
+  if (*dir)
+    {
+      char *canon_sysroot = lrealpath (dir);
+      if (canon_sysroot)
+	{
+	  xfree (dir);
+	  dir = canon_sysroot;
+	}
+    }
+
+  return dir;
+}
+
+/* Compute the locations of init files that GDB should source and return
+   them in SYSTEM_GDBINIT, HOME_GDBINIT, LOCAL_GDBINIT.  If there is 
+   no system gdbinit (resp. home gdbinit and local gdbinit) to be loaded,
+   then SYSTEM_GDBINIT (resp. HOME_GDBINIT and LOCAL_GDBINIT) is set to
+   NULL.  */
+static void
+get_init_files (char **system_gdbinit,
+		char **home_gdbinit,
+		char **local_gdbinit)
+{
+  static char *sysgdbinit = NULL;
+  static char *homeinit = NULL;
+  static char *localinit = NULL;
+  static int initialized = 0;
+
+  if (!initialized)
+    {
+      struct stat homebuf, cwdbuf, s;
+      char *homedir, *relocated_sysgdbinit;
+
+      if (SYSTEM_GDBINIT[0])
+	{
+	  relocated_sysgdbinit = relocate_path (gdb_program_name,
+						SYSTEM_GDBINIT,
+						SYSTEM_GDBINIT_RELOCATABLE);
+	  if (relocated_sysgdbinit && stat (relocated_sysgdbinit, &s) == 0)
+	    sysgdbinit = relocated_sysgdbinit;
+	  else
+	    xfree (relocated_sysgdbinit);
+	}
+
+      homedir = getenv ("HOME");
+
+      /* If the .gdbinit file in the current directory is the same as
+	 the $HOME/.gdbinit file, it should not be sourced.  homebuf
+	 and cwdbuf are used in that purpose. Make sure that the stats
+	 are zero in case one of them fails (this guarantees that they
+	 won't match if either exists).  */
+
+      memset (&homebuf, 0, sizeof (struct stat));
+      memset (&cwdbuf, 0, sizeof (struct stat));
+
+      if (homedir)
+	{
+	  homeinit = xstrprintf ("%s/%s", homedir, gdbinit);
+	  if (stat (homeinit, &homebuf) != 0)
+	    {
+	      xfree (homeinit);
+	      homeinit = NULL;
+	    }
+	}
+
+      if (stat (gdbinit, &cwdbuf) == 0)
+	{
+	  if (!homeinit
+	      || memcmp ((char *) &homebuf, (char *) &cwdbuf,
+			 sizeof (struct stat)))
+	    localinit = gdbinit;
+	}
+      
+      initialized = 1;
+    }
+
+  *system_gdbinit = sysgdbinit;
+  *home_gdbinit = homeinit;
+  *local_gdbinit = localinit;
+}
 
 /* Call command_loop.  If it happens to return, pass that through as a
    non-zero return status. */
@@ -163,8 +286,10 @@ captured_main (void *data)
   /* Number of elements used.  */
   int ndir;
 
-  struct stat homebuf, cwdbuf;
-  char *homedir;
+  /* gdb init files.  */
+  char *system_gdbinit;
+  char *home_gdbinit;
+  char *local_gdbinit;
 
   int i;
 
@@ -203,6 +328,8 @@ captured_main (void *data)
   gdb_stdtargerr = gdb_stderr;	/* for moment */
   gdb_stdtargin = gdb_stdin;	/* for moment */
 
+  gdb_program_name = xstrdup (argv[0]);
+
   if (! getcwd (gdb_dirbuf, sizeof (gdb_dirbuf)))
     /* Don't use *_filtered or warning() (which relies on
        current_target) until after initialize_all_files(). */
@@ -213,107 +340,20 @@ captured_main (void *data)
   current_directory = gdb_dirbuf;
 
   /* Set the sysroot path.  */
-#ifdef TARGET_SYSTEM_ROOT_RELOCATABLE
-  gdb_sysroot = make_relative_prefix (argv[0], BINDIR, TARGET_SYSTEM_ROOT);
-  if (gdb_sysroot)
-    {
-      struct stat s;
-      int res = 0;
+  gdb_sysroot = relocate_directory (argv[0], TARGET_SYSTEM_ROOT,
+				    TARGET_SYSTEM_ROOT_RELOCATABLE);
 
-      if (stat (gdb_sysroot, &s) == 0)
-	if (S_ISDIR (s.st_mode))
-	  res = 1;
+  debug_file_directory = relocate_directory (argv[0], DEBUGDIR,
+					     DEBUGDIR_RELOCATABLE);
 
-      if (res == 0)
-	{
-	  xfree (gdb_sysroot);
-	  gdb_sysroot = xstrdup (TARGET_SYSTEM_ROOT);
-	}
-    }
-  else
-    gdb_sysroot = xstrdup (TARGET_SYSTEM_ROOT);
-#else
-  gdb_sysroot = xstrdup (TARGET_SYSTEM_ROOT);
+  gdb_datadir = relocate_directory (argv[0], GDB_DATADIR,
+				    GDB_DATADIR_RELOCATABLE);
+
+#ifdef RELOC_SRCDIR
+  add_substitute_path_rule (RELOC_SRCDIR,
+			    make_relative_prefix (argv[0], BINDIR,
+						  RELOC_SRCDIR));
 #endif
-
-  /* Canonicalize the sysroot path.  */
-  if (*gdb_sysroot)
-    {
-      char *canon_sysroot = lrealpath (gdb_sysroot);
-      if (canon_sysroot)
-	{
-	  xfree (gdb_sysroot);
-	  gdb_sysroot = canon_sysroot;
-	}
-    }
-
-#ifdef DEBUGDIR_RELOCATABLE
-  debug_file_directory = make_relative_prefix (argv[0], BINDIR, DEBUGDIR);
-  if (debug_file_directory)
-    {
-      struct stat s;
-      int res = 0;
-
-      if (stat (debug_file_directory, &s) == 0)
-	if (S_ISDIR (s.st_mode))
-	  res = 1;
-
-      if (res == 0)
-	{
-	  xfree (debug_file_directory);
-	  debug_file_directory = xstrdup (DEBUGDIR);
-	}
-    }
-  else
-    debug_file_directory = xstrdup (DEBUGDIR);
-#else
-  debug_file_directory = xstrdup (DEBUGDIR);
-#endif
-
-  /* Canonicalize the debugfile path.  */
-  if (*debug_file_directory)
-    {
-      char *canon_debug = lrealpath (debug_file_directory);
-      if (canon_debug)
-	{
-	  xfree (debug_file_directory);
-	  debug_file_directory = canon_debug;
-	}
-    }
-
-#ifdef GDB_DATADIR_RELOCATABLE
-  gdb_datadir = make_relative_prefix (argv[0], BINDIR, GDB_DATADIR);
-  if (gdb_datadir)
-    {
-      struct stat s;
-      int res = 0;
-
-      if (stat (gdb_datadir, &s) == 0)
-	if (S_ISDIR (s.st_mode))
-	  res = 1;
-
-      if (res == 0)
-	{
-	  xfree (gdb_datadir);
-	  gdb_datadir = xstrdup (GDB_DATADIR);
-	}
-    }
-  else
-    gdb_datadir = xstrdup (GDB_DATADIR);
-#else
-  gdb_datadir = xstrdup (GDB_DATADIR);
-#endif /* GDB_DATADIR_RELOCATABLE */
-
-  /* Canonicalize the GDB's datadir path.  */
-  if (*gdb_datadir)
-    {
-      char *canon_debug = lrealpath (gdb_datadir);
-      if (canon_debug)
-	{
-	  xfree (gdb_datadir);
-	  gdb_datadir = canon_debug;
-	}
-    }
 
   /* There will always be an interpreter.  Either the one passed into
      this captured main, or one specified by the user at start up, or
@@ -681,6 +721,11 @@ Excess command line arguments ignored. (%s%s)\n"),
      control of the console via the deprecated_init_ui_hook ().  */
   gdb_init (argv[0]);
 
+  /* Lookup gdbinit files. Note that the gdbinit file name may be overriden
+     during file initialization, so get_init_files should be called after
+     gdb_init.  */
+  get_init_files (&system_gdbinit, &home_gdbinit, &local_gdbinit);
+
   /* Do these (and anything which might call wrap_here or *_filtered)
      after initialize_all_files() but before the interpreter has been
      installed.  Otherwize the help/version messages will be eaten by
@@ -757,33 +802,20 @@ Excess command line arguments ignored. (%s%s)\n"),
   quit_pre_print = error_pre_print;
   warning_pre_print = _("\nwarning: ");
 
+  /* Read and execute the system-wide gdbinit file, if it exists.
+     This is done *before* all the command line arguments are
+     processed; it sets global parameters, which are independent of
+     what file you are debugging or what directory you are in.  */
+  if (system_gdbinit && !inhibit_gdbinit)
+    catch_command_errors (source_script, system_gdbinit, 0, RETURN_MASK_ALL);
+
   /* Read and execute $HOME/.gdbinit file, if it exists.  This is done
      *before* all the command line arguments are processed; it sets
      global parameters, which are independent of what file you are
      debugging or what directory you are in.  */
-  homedir = getenv ("HOME");
-  if (homedir)
-    {
-      char *homeinit = xstrprintf ("%s/%s", homedir, gdbinit);
 
-      if (!inhibit_gdbinit)
-	{
-	  catch_command_errors (source_script, homeinit, 0, RETURN_MASK_ALL);
-	}
-
-      /* Do stats; no need to do them elsewhere since we'll only
-         need them if homedir is set.  Make sure that they are
-         zero in case one of them fails (this guarantees that they
-         won't match if either exists).  */
-
-      memset (&homebuf, 0, sizeof (struct stat));
-      memset (&cwdbuf, 0, sizeof (struct stat));
-
-      stat (homeinit, &homebuf);
-      stat (gdbinit, &cwdbuf);	/* We'll only need this if
-				   homedir was set.  */
-      xfree (homeinit);
-    }
+  if (home_gdbinit && !inhibit_gdbinit)
+    catch_command_errors (source_script, home_gdbinit, 0, RETURN_MASK_ALL);
 
   /* Now perform all the actions indicated by the arguments.  */
   if (cdarg != NULL)
@@ -851,13 +883,8 @@ Can't attach to process and specify a core file at the same time."));
 
   /* Read the .gdbinit file in the current directory, *if* it isn't
      the same as the $HOME/.gdbinit file (it should exist, also).  */
-
-  if (!homedir
-      || memcmp ((char *) &homebuf, (char *) &cwdbuf, sizeof (struct stat)))
-    if (!inhibit_gdbinit)
-      {
-	catch_command_errors (source_script, gdbinit, 0, RETURN_MASK_ALL);
-      }
+  if (local_gdbinit && !inhibit_gdbinit)
+    catch_command_errors (source_script, local_gdbinit, 0, RETURN_MASK_ALL);
 
   for (i = 0; i < ncmd; i++)
     {
@@ -942,6 +969,12 @@ gdb_main (struct captured_main_args *args)
 static void
 print_gdb_help (struct ui_file *stream)
 {
+  char *system_gdbinit;
+  char *home_gdbinit;
+  char *local_gdbinit;
+
+  get_init_files (&system_gdbinit, &home_gdbinit, &local_gdbinit);
+
   fputs_unfiltered (_("\
 This is the GNU debugger.  Usage:\n\n\
     gdb [options] [executable-file [core-file or process-id]]\n\
@@ -1014,6 +1047,21 @@ Options:\n\n\
   --write            Set writing into executable and core files.\n\
   --xdb              XDB compatibility mode.\n\
 "), stream);
+  fputs_unfiltered (_("\n\
+At startup, GDB reads the following init files and executes their commands:\n\
+"), stream);
+  if (system_gdbinit)
+    fprintf_unfiltered (stream, _("\
+   * system-wide init file: %s\n\
+"), system_gdbinit);
+  if (home_gdbinit)
+    fprintf_unfiltered (stream, _("\
+   * user-specific init file: %s\n\
+"), home_gdbinit);
+  if (local_gdbinit)
+    fprintf_unfiltered (stream, _("\
+   * local init file: ./%s\n\
+"), local_gdbinit);
   fputs_unfiltered (_("\n\
 For more information, type \"help\" from within GDB, or consult the\n\
 GDB manual (available as on-line info or a printed manual).\n\

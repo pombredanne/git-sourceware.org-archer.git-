@@ -2,22 +2,20 @@
    Copyright (C) 1986, 1989, 1990, 1991, 1993, 1994, 1997, 2000, 2003, 2004,
    2007, 2008, 2009 Free Software Foundation, Inc.
 
-This file is part of GDB.
+   This file is part of GDB.
 
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2 of the License, or
-(at your option) any later version.
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation; either version 3 of the License, or
+   (at your option) any later version.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 51 Franklin Street, Fifth Floor,
-Boston, MA 02110-1301, USA.  */
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 /* Parse an Ada expression from text in a string,
    and return the result as a  struct expression  pointer.
@@ -1209,6 +1207,7 @@ get_symbol_field_type (struct symbol *sym, char *encoded_field_name)
 
   if (type == NULL || field_name == NULL)
     return NULL;
+  type = check_typedef (type);
 
   while (field_name[0] != '\0')
     {
@@ -1453,7 +1452,7 @@ convert_char_literal (struct type *type, LONGEST val)
 
   if (type == NULL || TYPE_CODE (type) != TYPE_CODE_ENUM)
     return val;
-  sprintf (name, "QU%02x", (int) val);
+  xsnprintf (name, sizeof (name), "QU%02x", (int) val);
   for (f = 0; f < TYPE_NFIELDS (type); f += 1)
     {
       if (strcmp (name, TYPE_FIELD_NAME (type, f)) == 0)
@@ -1519,6 +1518,9 @@ type_system_address (void)
 					      "system__address");
   return  type != NULL ? type : parse_type->builtin_data_ptr;
 }
+
+/* Provide a prototype to silence -Wmissing-prototypes.  */
+extern initialize_file_ftype _initialize_ada_exp;
 
 void
 _initialize_ada_exp (void)

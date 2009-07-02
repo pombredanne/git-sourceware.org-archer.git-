@@ -67,11 +67,13 @@
 #include <sys/time.h>
 #include <time.h>
 
+#include "gdb_usleep.h"
+
 #if !HAVE_DECL_MALLOC
-extern PTR malloc ();		/* OK: PTR */
+extern PTR malloc ();		/* ARI: PTR */
 #endif
 #if !HAVE_DECL_REALLOC
-extern PTR realloc ();		/* OK: PTR */
+extern PTR realloc ();		/* ARI: PTR */
 #endif
 #if !HAVE_DECL_FREE
 extern void free ();
@@ -269,6 +271,23 @@ struct cleanup *
 make_cleanup_fclose (FILE *file)
 {
   return make_cleanup (do_fclose_cleanup, file);
+}
+
+/* Helper function which does the work for make_cleanup_obstack_free.  */
+
+static void
+do_obstack_free (void *arg)
+{
+  struct obstack *ob = arg;
+  obstack_free (ob, NULL);
+}
+
+/* Return a new cleanup that frees OBSTACK.  */
+
+struct cleanup *
+make_cleanup_obstack_free (struct obstack *obstack)
+{
+  return make_cleanup (do_obstack_free, obstack);
 }
 
 static void
@@ -825,6 +844,21 @@ error_stream (struct ui_file *stream)
   error (("%s"), message);
 }
 
+/* Allow the user to configure the debugger behavior with respect to
+   what to do when an internal problem is detected.  */
+
+const char internal_problem_ask[] = "ask";
+const char internal_problem_yes[] = "yes";
+const char internal_problem_no[] = "no";
+static const char *internal_problem_modes[] =
+{
+  internal_problem_ask,
+  internal_problem_yes,
+  internal_problem_no,
+  NULL
+};
+static const char *internal_problem_mode = internal_problem_ask;
+
 /* Print a message reporting an internal error/warning. Ask the user
    if they want to continue, dump core, or just exit.  Return
    something to indicate a quit.  */
@@ -832,10 +866,8 @@ error_stream (struct ui_file *stream)
 struct internal_problem
 {
   const char *name;
-  /* FIXME: cagney/2002-08-15: There should be ``maint set/show''
-     commands available for controlling these variables.  */
-  enum auto_boolean should_quit;
-  enum auto_boolean should_dump_core;
+  const char *should_quit;
+  const char *should_dump_core;
 };
 
 /* Report a problem, internal to GDB, to the user.  Once the problem
@@ -896,42 +928,33 @@ further debugging may prove unreliable.", file, line, problem->name, msg);
     make_cleanup (xfree, reason);
   }
 
-  switch (problem->should_quit)
+  if (problem->should_quit == internal_problem_ask)
     {
-    case AUTO_BOOLEAN_AUTO:
       /* Default (yes/batch case) is to quit GDB.  When in batch mode
-         this lessens the likelhood of GDB going into an infinate
-         loop.  */
+	 this lessens the likelihood of GDB going into an infinite
+	 loop.  */
       quit_p = query (_("%s\nQuit this debugging session? "), reason);
-      break;
-    case AUTO_BOOLEAN_TRUE:
-      quit_p = 1;
-      break;
-    case AUTO_BOOLEAN_FALSE:
-      quit_p = 0;
-      break;
-    default:
-      internal_error (__FILE__, __LINE__, _("bad switch"));
     }
+  else if (problem->should_quit == internal_problem_yes)
+    quit_p = 1;
+  else if (problem->should_quit == internal_problem_no)
+    quit_p = 0;
+  else
+    internal_error (__FILE__, __LINE__, _("bad switch"));
 
-  switch (problem->should_dump_core)
+  if (problem->should_dump_core == internal_problem_ask)
     {
-    case AUTO_BOOLEAN_AUTO:
       /* Default (yes/batch case) is to dump core.  This leaves a GDB
          `dropping' so that it is easier to see that something went
          wrong in GDB.  */
       dump_core_p = query (_("%s\nCreate a core file of GDB? "), reason);
-      break;
-      break;
-    case AUTO_BOOLEAN_TRUE:
-      dump_core_p = 1;
-      break;
-    case AUTO_BOOLEAN_FALSE:
-      dump_core_p = 0;
-      break;
-    default:
-      internal_error (__FILE__, __LINE__, _("bad switch"));
     }
+  else if (problem->should_dump_core == internal_problem_yes)
+    dump_core_p = 1;
+  else if (problem->should_dump_core == internal_problem_no)
+    dump_core_p = 0;
+  else
+    internal_error (__FILE__, __LINE__, _("bad switch"));
 
   if (quit_p)
     {
@@ -955,7 +978,7 @@ further debugging may prove unreliable.", file, line, problem->name, msg);
 }
 
 static struct internal_problem internal_error_problem = {
-  "internal-error", AUTO_BOOLEAN_AUTO, AUTO_BOOLEAN_AUTO
+  "internal-error", internal_problem_ask, internal_problem_ask
 };
 
 NORETURN void
@@ -975,7 +998,7 @@ internal_error (const char *file, int line, const char *string, ...)
 }
 
 static struct internal_problem internal_warning_problem = {
-  "internal-warning", AUTO_BOOLEAN_AUTO, AUTO_BOOLEAN_AUTO
+  "internal-warning", internal_problem_ask, internal_problem_ask
 };
 
 void
@@ -991,6 +1014,99 @@ internal_warning (const char *file, int line, const char *string, ...)
   va_start (ap, string);
   internal_vwarning (file, line, string, ap);
   va_end (ap);
+}
+
+/* Dummy functions to keep add_prefix_cmd happy.  */
+
+static void
+set_internal_problem_cmd (char *args, int from_tty)
+{
+}
+
+static void
+show_internal_problem_cmd (char *args, int from_tty)
+{
+}
+
+/* When GDB reports an internal problem (error or warning) it gives
+   the user the opportunity to quit GDB and/or create a core file of
+   the current debug session.  This function registers a few commands
+   that make it possible to specify that GDB should always or never
+   quit or create a core file, without asking.  The commands look
+   like:
+
+   maint set PROBLEM-NAME quit ask|yes|no
+   maint show PROBLEM-NAME quit
+   maint set PROBLEM-NAME corefile ask|yes|no
+   maint show PROBLEM-NAME corefile
+
+   Where PROBLEM-NAME is currently "internal-error" or
+   "internal-warning".  */
+
+static void
+add_internal_problem_command (struct internal_problem *problem)
+{
+  struct cmd_list_element **set_cmd_list;
+  struct cmd_list_element **show_cmd_list;
+  char *set_doc;
+  char *show_doc;
+
+  set_cmd_list = xmalloc (sizeof (*set_cmd_list));
+  show_cmd_list = xmalloc (sizeof (*set_cmd_list));
+  *set_cmd_list = NULL;
+  *show_cmd_list = NULL;
+
+  set_doc = xstrprintf (_("Configure what GDB does when %s is detected."),
+			problem->name);
+
+  show_doc = xstrprintf (_("Show what GDB does when %s is detected."),
+			 problem->name);
+
+  add_prefix_cmd ((char*) problem->name,
+		  class_maintenance, set_internal_problem_cmd, set_doc,
+		  set_cmd_list,
+		  concat ("maintenance set ", problem->name, " ", NULL),
+		  0/*allow-unknown*/, &maintenance_set_cmdlist);
+
+  add_prefix_cmd ((char*) problem->name,
+		  class_maintenance, show_internal_problem_cmd, show_doc,
+		  show_cmd_list,
+		  concat ("maintenance show ", problem->name, " ", NULL),
+		  0/*allow-unknown*/, &maintenance_show_cmdlist);
+
+  set_doc = xstrprintf (_("\
+Set whether GDB should quit when an %s is detected"),
+			problem->name);
+  show_doc = xstrprintf (_("\
+Show whether GDB will quit when an %s is detected"),
+			 problem->name);
+  add_setshow_enum_cmd ("quit", class_maintenance,
+			internal_problem_modes,
+			&problem->should_quit,
+			set_doc,
+			show_doc,
+			NULL, /* help_doc */
+			NULL, /* setfunc */
+			NULL, /* showfunc */
+			set_cmd_list,
+			show_cmd_list);
+
+  set_doc = xstrprintf (_("\
+Set whether GDB should create a core file of GDB when %s is detected"),
+			problem->name);
+  show_doc = xstrprintf (_("\
+Show whether GDB will create a core file of GDB when %s is detected"),
+			 problem->name);
+  add_setshow_enum_cmd ("corefile", class_maintenance,
+			internal_problem_modes,
+			&problem->should_dump_core,
+			set_doc,
+			show_doc,
+			NULL, /* help_doc */
+			NULL, /* setfunc */
+			NULL, /* showfunc */
+			set_cmd_list,
+			show_cmd_list);
 }
 
 /* Print the system error message for errno, and also mention STRING
@@ -1087,7 +1203,7 @@ nomem (long size)
 /* NOTE: These are declared using PTR to ensure consistency with
    "libiberty.h".  xfree() is GDB local.  */
 
-PTR				/* OK: PTR */
+PTR				/* ARI: PTR */
 xmalloc (size_t size)
 {
   void *val;
@@ -1097,7 +1213,7 @@ xmalloc (size_t size)
   if (size == 0)
     size = 1;
 
-  val = malloc (size);		/* OK: malloc */
+  val = malloc (size);		/* ARI: malloc */
   if (val == NULL)
     nomem (size);
 
@@ -1110,8 +1226,8 @@ xzalloc (size_t size)
   return xcalloc (1, size);
 }
 
-PTR				/* OK: PTR */
-xrealloc (PTR ptr, size_t size)	/* OK: PTR */
+PTR				/* ARI: PTR */
+xrealloc (PTR ptr, size_t size)	/* ARI: PTR */
 {
   void *val;
 
@@ -1121,16 +1237,16 @@ xrealloc (PTR ptr, size_t size)	/* OK: PTR */
     size = 1;
 
   if (ptr != NULL)
-    val = realloc (ptr, size);	/* OK: realloc */
+    val = realloc (ptr, size);	/* ARI: realloc */
   else
-    val = malloc (size);		/* OK: malloc */
+    val = malloc (size);		/* ARI: malloc */
   if (val == NULL)
     nomem (size);
 
   return (val);
 }
 
-PTR				/* OK: PTR */
+PTR				/* ARI: PTR */
 xcalloc (size_t number, size_t size)
 {
   void *mem;
@@ -1143,7 +1259,7 @@ xcalloc (size_t number, size_t size)
       size = 1;
     }
 
-  mem = calloc (number, size);		/* OK: xcalloc */
+  mem = calloc (number, size);		/* ARI: xcalloc */
   if (mem == NULL)
     nomem (number * size);
 
@@ -1154,7 +1270,7 @@ void
 xfree (void *ptr)
 {
   if (ptr != NULL)
-    free (ptr);		/* OK: free */
+    free (ptr);		/* ARI: free */
 }
 
 
@@ -1261,12 +1377,7 @@ print_spaces (int n, struct ui_file *file)
 void
 gdb_print_host_address (const void *addr, struct ui_file *stream)
 {
-
-  /* We could use the %p conversion specifier to fprintf if we had any
-     way of knowing whether this host supports it.  But the following
-     should work on the Alpha and on 32 bit machines.  */
-
-  fprintf_filtered (stream, "0x%lx", (unsigned long) addr);
+  fprintf_filtered (stream, "%s", host_address_to_string (addr));
 }
 
 
@@ -1368,6 +1479,25 @@ defaulted_query (const char *ctlstr, const char defchar, va_list args)
       gdb_flush (gdb_stdout);
 
       answer = fgetc (stdin);
+
+      /* We expect fgetc to block until a character is read.  But
+         this may not be the case if the terminal was opened with
+         the NONBLOCK flag.  In that case, if there is nothing to
+         read on stdin, fgetc returns EOF, but also sets the error
+         condition flag on stdin and errno to EAGAIN.  With a true
+         EOF, stdin's error condition flag is not set.
+
+         A situation where this behavior was observed is a pseudo
+         terminal on AIX.  */
+      while (answer == EOF && ferror (stdin) && errno == EAGAIN)
+        {
+          /* Not a real EOF.  Wait a little while and try again until
+             we read something.  */
+          clearerr (stdin);
+          gdb_usleep (10000);
+          answer = fgetc (stdin);
+        }
+
       clearerr (stdin);		/* in case of C-d */
       if (answer == EOF)	/* C-d */
 	{
@@ -1462,21 +1592,33 @@ query (const char *ctlstr, ...)
   va_end (args);
 }
 
-/* Print an error message saying that we couldn't make sense of a
-   \^mumble sequence in a string or character constant.  START and END
-   indicate a substring of some larger string that contains the
-   erroneous backslash sequence, missing the initial backslash.  */
-static NORETURN int
-no_control_char_error (const char *start, const char *end)
+/* A helper for parse_escape that converts a host character to a
+   target character.  C is the host character.  If conversion is
+   possible, then the target character is stored in *TARGET_C and the
+   function returns 1.  Otherwise, the function returns 0.  */
+
+static int
+host_char_to_target (int c, int *target_c)
 {
-  int len = end - start;
-  char *copy = alloca (end - start + 1);
+  struct obstack host_data;
+  char the_char = c;
+  struct cleanup *cleanups;
+  int result = 0;
 
-  memcpy (copy, start, len);
-  copy[len] = '\0';
+  obstack_init (&host_data);
+  cleanups = make_cleanup_obstack_free (&host_data);
 
-  error (_("There is no control character `\\%s' in the `%s' character set."),
-	 copy, target_charset ());
+  convert_between_encodings (target_charset (), host_charset (),
+			     &the_char, 1, 1, &host_data, translit_none);
+
+  if (obstack_object_size (&host_data) == 1)
+    {
+      result = 1;
+      *target_c = *(char *) obstack_base (&host_data);
+    }
+
+  do_cleanups (cleanups);
+  return result;
 }
 
 /* Parse a C escape sequence.  STRING_PTR points to a variable
@@ -1497,55 +1639,15 @@ no_control_char_error (const char *start, const char *end)
 int
 parse_escape (char **string_ptr)
 {
-  int target_char;
+  int target_char = -2;	/* initialize to avoid GCC warnings */
   int c = *(*string_ptr)++;
-  if (c_parse_backslash (c, &target_char))
-    return target_char;
-  else
-    switch (c)
-      {
+  switch (c)
+    {
       case '\n':
 	return -2;
       case 0:
 	(*string_ptr)--;
 	return 0;
-      case '^':
-	{
-	  /* Remember where this escape sequence started, for reporting
-	     errors.  */
-	  char *sequence_start_pos = *string_ptr - 1;
-
-	  c = *(*string_ptr)++;
-
-	  if (c == '?')
-	    {
-	      /* XXXCHARSET: What is `delete' in the host character set?  */
-	      c = 0177;
-
-	      if (!host_char_to_target (c, &target_char))
-		error (_("There is no character corresponding to `Delete' "
-		       "in the target character set `%s'."), host_charset ());
-
-	      return target_char;
-	    }
-	  else if (c == '\\')
-	    target_char = parse_escape (string_ptr);
-	  else
-	    {
-	      if (!host_char_to_target (c, &target_char))
-		no_control_char_error (sequence_start_pos, *string_ptr);
-	    }
-
-	  /* Now target_char is something like `c', and we want to find
-	     its control-character equivalent.  */
-	  if (!target_char_to_control_char (target_char, &target_char))
-	    no_control_char_error (sequence_start_pos, *string_ptr);
-
-	  return target_char;
-	}
-
-	/* XXXCHARSET: we need to use isdigit and value-of-digit
-	   methods of the host character set here.  */
 
       case '0':
       case '1':
@@ -1556,16 +1658,16 @@ parse_escape (char **string_ptr)
       case '6':
       case '7':
 	{
-	  int i = c - '0';
+	  int i = host_hex_value (c);
 	  int count = 0;
 	  while (++count < 3)
 	    {
 	      c = (**string_ptr);
-	      if (c >= '0' && c <= '7')
+	      if (isdigit (c) && c != '8' && c != '9')
 		{
 		  (*string_ptr)++;
 		  i *= 8;
-		  i += c - '0';
+		  i += host_hex_value (c);
 		}
 	      else
 		{
@@ -1574,14 +1676,39 @@ parse_escape (char **string_ptr)
 	    }
 	  return i;
 	}
-      default:
-	if (!host_char_to_target (c, &target_char))
-	  error
-	    ("The escape sequence `\%c' is equivalent to plain `%c', which"
-	     " has no equivalent\n" "in the `%s' character set.", c, c,
-	     target_charset ());
-	return target_char;
-      }
+
+    case 'a':
+      c = '\a';
+      break;
+    case 'b':
+      c = '\b';
+      break;
+    case 'f':
+      c = '\f';
+      break;
+    case 'n':
+      c = '\n';
+      break;
+    case 'r':
+      c = '\r';
+      break;
+    case 't':
+      c = '\t';
+      break;
+    case 'v':
+      c = '\v';
+      break;
+
+    default:
+      break;
+    }
+
+  if (!host_char_to_target (c, &target_char))
+    error
+      ("The escape sequence `\%c' is equivalent to plain `%c', which"
+       " has no equivalent\n" "in the `%s' character set.", c, c,
+       target_charset ());
+  return target_char;
 }
 
 /* Print the character C on STREAM as part of the contents of a literal
@@ -3027,7 +3154,6 @@ core_addr_to_string_nz (const CORE_ADDR addr)
 CORE_ADDR
 string_to_core_addr (const char *my_string)
 {
-  int addr_bit = gdbarch_addr_bit (current_gdbarch);
   CORE_ADDR addr = 0;
 
   if (my_string[0] == '0' && tolower (my_string[1]) == 'x')
@@ -3043,17 +3169,6 @@ string_to_core_addr (const char *my_string)
 	  else
 	    error (_("invalid hex \"%s\""), my_string);
 	}
-
-      /* Not very modular, but if the executable format expects
-         addresses to be sign-extended, then do so if the address was
-         specified with only 32 significant bits.  Really this should
-         be determined by the target architecture, not by the object
-         file.  */
-      if (i - 2 == addr_bit / 4
-	  && exec_bfd
-	  && bfd_get_sign_extend_vma (exec_bfd))
-	addr = (addr ^ ((CORE_ADDR) 1 << (addr_bit - 1)))
-	       - ((CORE_ADDR) 1 << (addr_bit - 1));
     }
   else
     {
@@ -3075,7 +3190,8 @@ const char *
 host_address_to_string (const void *addr)
 {
   char *str = get_cell ();
-  sprintf (str, "0x%lx", (unsigned long) addr);
+
+  xsnprintf (str, CELLSIZE, "0x%s", phex_nz ((uintptr_t) addr, sizeof (addr)));
   return str;
 }
 
@@ -3446,4 +3562,14 @@ gdb_buildargv (const char *s)
   if (s != NULL && argv == NULL)
     nomem (0);
   return argv;
+}
+
+/* Provide a prototype to silence -Wmissing-prototypes.  */
+extern initialize_file_ftype _initialize_utils;
+
+void
+_initialize_utils (void)
+{
+  add_internal_problem_command (&internal_error_problem);
+  add_internal_problem_command (&internal_warning_problem);
 }

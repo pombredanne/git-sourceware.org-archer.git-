@@ -255,8 +255,7 @@ value_cast_structs (struct type *type, struct value *v2)
 	{
 	  /* Downcasting is possible (t1 is superclass of v2).  */
 	  CORE_ADDR addr2 = value_address (v2);
-	  addr2 -= (value_address (v)
-		    + value_embedded_offset (v));
+	  addr2 -= value_address (v) + value_embedded_offset (v);
 	  return value_at (type, addr2);
 	}
     }
@@ -507,8 +506,7 @@ value_cast (struct type *type, struct value *arg2)
       return arg2;
     }
   else if (VALUE_LVAL (arg2) == lval_memory)
-    return value_at_lazy (type, 
-			  value_address (arg2));
+    return value_at_lazy (type, value_address (arg2));
   else if (code1 == TYPE_CODE_VOID)
     {
       return value_zero (builtin_type_void, not_lval);
@@ -537,15 +535,12 @@ struct value *
 value_one (struct type *type, enum lval_type lv)
 {
   struct type *type1 = check_typedef (type);
-  struct value *val = NULL; /* avoid -Wall warning */
+  struct value *val;
 
   if (TYPE_CODE (type1) == TYPE_CODE_DECFLOAT)
     {
-      struct value *int_one = value_from_longest (builtin_type_int32, 1);
-      struct value *val;
       gdb_byte v[16];
-
-      decimal_from_integral (int_one, v, TYPE_LENGTH (builtin_type_int32));
+      decimal_from_string (v, TYPE_LENGTH (type), "1");
       val = value_from_decfloat (type, v);
     }
   else if (TYPE_CODE (type1) == TYPE_CODE_FLT)
@@ -609,7 +604,6 @@ value_at_lazy (struct type *type, CORE_ADDR addr)
 
   VALUE_LVAL (val) = lval_memory;
   set_value_address (val, addr);
-  set_value_lazy (val, 1);
 
   return val;
 }
@@ -725,6 +719,8 @@ value_fetch_lazy (struct value *val)
 	 watchpoints from trying to watch the saved frame pointer.  */
       value_free_to_mark (mark);
     }
+  else if (VALUE_LVAL (val) == lval_computed)
+    value_computed_funcs (val)->read (val);
   else
     internal_error (__FILE__, __LINE__, "Unexpected lazy value type.");
 
@@ -773,7 +769,7 @@ value_assign (struct value *toval, struct value *fromval)
     {
     case lval_internalvar:
       set_internalvar (VALUE_INTERNALVAR (toval), fromval);
-      val = value_copy (VALUE_INTERNALVAR (toval)->value);
+      val = value_copy (fromval);
       val = value_change_enclosing_type (val, 
 					 value_enclosing_type (fromval));
       set_value_embedded_offset (val, value_embedded_offset (fromval));
@@ -831,6 +827,7 @@ value_assign (struct value *toval, struct value *fromval)
     case lval_register:
       {
 	struct frame_info *frame;
+	struct gdbarch *gdbarch;
 	int value_reg;
 
 	/* Figure out which frame this is in currently.  */
@@ -839,14 +836,14 @@ value_assign (struct value *toval, struct value *fromval)
 
 	if (!frame)
 	  error (_("Value being assigned to is no longer active."));
-	
-	if (gdbarch_convert_register_p
-	    (current_gdbarch, VALUE_REGNUM (toval), type))
+
+	gdbarch = get_frame_arch (frame);
+	if (gdbarch_convert_register_p (gdbarch, VALUE_REGNUM (toval), type))
 	  {
 	    /* If TOVAL is a special machine register requiring
 	       conversion of program values to a special raw
 	       format.  */
-	    gdbarch_value_to_register (current_gdbarch, frame, 
+	    gdbarch_value_to_register (gdbarch, frame,
 				       VALUE_REGNUM (toval), type,
 				       value_contents (fromval));
 	  }
@@ -892,7 +889,15 @@ value_assign (struct value *toval, struct value *fromval)
 	observer_notify_target_changed (&current_target);
 	break;
       }
-      
+
+    case lval_computed:
+      {
+	struct lval_funcs *funcs = value_computed_funcs (toval);
+
+	funcs->write (toval, fromval);
+      }
+      break;
+
     default:
       error (_("Left operand of assignment is not an lvalue."));
     }
@@ -985,16 +990,18 @@ struct value *
 value_of_variable (struct symbol *var, struct block *b)
 {
   struct value *val;
-  struct frame_info *frame = NULL;
+  struct frame_info *frame;
 
-  if (!b)
-    frame = NULL;		/* Use selected frame.  */
-  else if (symbol_read_needs_frame (var))
+  if (!symbol_read_needs_frame (var))
+    frame = NULL;
+  else if (!b)
+    frame = get_selected_frame (_("No frame selected."));
+  else
     {
       frame = block_innermost_frame (b);
       if (!frame)
 	{
-	  if (BLOCK_FUNCTION (b)
+	  if (BLOCK_FUNCTION (b) && !block_inlined_p (b)
 	      && SYMBOL_PRINT_NAME (BLOCK_FUNCTION (b)))
 	    error (_("No frame is currently executing in block %s."),
 		   SYMBOL_PRINT_NAME (BLOCK_FUNCTION (b)));
@@ -1006,6 +1013,54 @@ value_of_variable (struct symbol *var, struct block *b)
   val = read_var_value (var, frame);
   if (!val)
     error (_("Address of symbol \"%s\" is unknown."), SYMBOL_PRINT_NAME (var));
+
+  return val;
+}
+
+struct value *
+address_of_variable (struct symbol *var, struct block *b)
+{
+  struct type *type = SYMBOL_TYPE (var);
+  struct value *val;
+
+  /* Evaluate it first; if the result is a memory address, we're fine.
+     Lazy evaluation pays off here. */
+
+  val = value_of_variable (var, b);
+
+  if ((VALUE_LVAL (val) == lval_memory && value_lazy (val))
+      || TYPE_CODE (type) == TYPE_CODE_FUNC)
+    {
+      CORE_ADDR addr = value_address (val);
+      return value_from_pointer (lookup_pointer_type (type), addr);
+    }
+
+  /* Not a memory address; check what the problem was.  */
+  switch (VALUE_LVAL (val))
+    {
+    case lval_register:
+      {
+	struct frame_info *frame;
+	const char *regname;
+
+	frame = frame_find_by_id (VALUE_FRAME_ID (val));
+	gdb_assert (frame);
+
+	regname = gdbarch_register_name (get_frame_arch (frame),
+					 VALUE_REGNUM (val));
+	gdb_assert (regname && *regname);
+
+	error (_("Address requested for identifier "
+		 "\"%s\" which is in register $%s"),
+	       SYMBOL_PRINT_NAME (var), regname);
+	break;
+      }
+
+    default:
+      error (_("Can't take address of \"%s\" which isn't an lvalue."),
+	     SYMBOL_PRINT_NAME (var));
+      break;
+    }
 
   return val;
 }
@@ -1092,7 +1147,7 @@ value_coerce_array (struct value *arg1)
     error (_("Attempt to take address of value not located in memory."));
 
   return value_from_pointer (lookup_pointer_type (TYPE_TARGET_TYPE (type)),
-			     (value_address (arg1)));
+			     value_address (arg1));
 }
 
 /* Given a value which is a function, return a value which is a pointer
@@ -1107,7 +1162,7 @@ value_coerce_function (struct value *arg1)
     error (_("Attempt to take address of value not located in memory."));
 
   retval = value_from_pointer (lookup_pointer_type (value_type (arg1)),
-			       (value_address (arg1)));
+			       value_address (arg1));
   return retval;
 }
 
@@ -1288,6 +1343,24 @@ value_array (int lowbound, int highbound, struct value **elemvec)
   return val;
 }
 
+struct value *
+value_cstring (char *ptr, int len, struct type *char_type)
+{
+  struct value *val;
+  int lowbound = current_language->string_lower_bound;
+  int highbound = len / TYPE_LENGTH (char_type);
+  struct type *rangetype = create_range_type ((struct type *) NULL,
+					      builtin_type_int32,
+					      lowbound, 
+					      highbound + lowbound - 1);
+  struct type *stringtype
+    = create_array_type ((struct type *) NULL, char_type, rangetype);
+
+  val = allocate_value (stringtype);
+  memcpy (value_contents_raw (val), ptr, len);
+  return val;
+}
+
 /* Create a value for a string constant by allocating space in the
    inferior, copying the data into that space, and returning the
    address with type TYPE_CODE_STRING.  PTR points to the string
@@ -1298,34 +1371,21 @@ value_array (int lowbound, int highbound, struct value **elemvec)
    string may contain embedded null bytes.  */
 
 struct value *
-value_string (char *ptr, int len)
+value_string (char *ptr, int len, struct type *char_type)
 {
   struct value *val;
   int lowbound = current_language->string_lower_bound;
+  int highbound = len / TYPE_LENGTH (char_type);
   struct type *rangetype = create_range_type ((struct type *) NULL,
 					      builtin_type_int32,
 					      lowbound, 
-					      len + lowbound - 1);
+					      highbound + lowbound - 1);
   struct type *stringtype
-    = create_string_type ((struct type *) NULL, rangetype);
-  CORE_ADDR addr;
+    = create_string_type ((struct type *) NULL, char_type, rangetype);
 
-  if (current_language->c_style_arrays == 0)
-    {
-      val = allocate_value (stringtype);
-      memcpy (value_contents_raw (val), ptr, len);
-      return val;
-    }
-
-
-  /* Allocate space to store the string in the inferior, and then copy
-     LEN bytes from PTR in gdb to that address in the inferior.  */
-
-  addr = allocate_space_in_inferior (len);
-  write_memory (addr, (gdb_byte *) ptr, len);
-
-  val = value_at_lazy (stringtype, addr);
-  return (val);
+  val = allocate_value (stringtype);
+  memcpy (value_contents_raw (val), ptr, len);
+  return val;
 }
 
 struct value *
@@ -1550,8 +1610,7 @@ search_struct_field (char *name, struct value *arg1, int offset,
 	      CORE_ADDR base_addr;
 
 	      v2  = allocate_value (basetype);
-	      base_addr = 
-		value_address (arg1) + boffset;
+	      base_addr = value_address (arg1) + boffset;
 	      if (target_read_memory (base_addr, 
 				      value_contents_raw (v2),
 				      TYPE_LENGTH (basetype)) != 0)
@@ -1570,8 +1629,7 @@ search_struct_field (char *name, struct value *arg1, int offset,
 			  value_contents_raw (arg1) + boffset,
 			  TYPE_LENGTH (basetype));
 		}
-	      VALUE_LVAL (v2) = VALUE_LVAL (arg1);
-	      set_value_address (v2, value_raw_address (arg1));
+	      set_value_component_location (v2, arg1);
 	      VALUE_FRAME_ID (v2) = VALUE_FRAME_ID (arg1);
 	      set_value_offset (v2, value_offset (arg1) + boffset);
 	    }
@@ -1774,10 +1832,6 @@ value_struct_elt (struct value **argp, struct value **args,
 
       /* C++: If it was not found as a data field, then try to
          return it as a pointer to a method.  */
-
-      if (destructor_name_p (name, t))
-	error (_("Cannot get value of destructor"));
-
       v = search_struct_method (name, argp, args, 0, 
 				static_memfuncp, t);
 
@@ -1793,32 +1847,6 @@ value_struct_elt (struct value **argp, struct value **args,
       return v;
     }
 
-  if (destructor_name_p (name, t))
-    {
-      if (!args[1])
-	{
-	  /* Destructors are a special case.  */
-	  int m_index, f_index;
-
-	  v = NULL;
-	  if (get_destructor_fn_field (t, &m_index, &f_index))
-	    {
-	      v = value_fn_field (NULL, 
-				  TYPE_FN_FIELDLIST1 (t, m_index),
-				  f_index, NULL, 0);
-	    }
-	  if (v == NULL)
-	    error (_("could not find destructor function named %s."), 
-		   name);
-	  else
-	    return v;
-	}
-      else
-	{
-	  error (_("destructor should not have any argument"));
-	}
-    }
-  else
     v = search_struct_method (name, argp, args, 0, 
 			      static_memfuncp, t);
   
@@ -2117,9 +2145,11 @@ find_overload_match (struct type **arg_types, int nargs,
 
   if (objp)
     {
-      if (TYPE_CODE (value_type (temp)) != TYPE_CODE_PTR
-	  && (TYPE_CODE (value_type (*objp)) == TYPE_CODE_PTR
-	      || TYPE_CODE (value_type (*objp)) == TYPE_CODE_REF))
+      struct type *temp_type = check_typedef (value_type (temp));
+      struct type *obj_type = check_typedef (value_type (*objp));
+      if (TYPE_CODE (temp_type) != TYPE_CODE_PTR
+	  && (TYPE_CODE (obj_type) == TYPE_CODE_PTR
+	      || TYPE_CODE (obj_type) == TYPE_CODE_REF))
 	{
 	  temp = value_addr (temp);
 	}
@@ -2422,8 +2452,6 @@ classify_oload_match (struct badness_vector *oload_champ_bv,
 int
 destructor_name_p (const char *name, const struct type *type)
 {
-  /* Destructors are a special case.  */
-
   if (name[0] == '~')
     {
       char *dname = type_name_no_tag (type);
@@ -2461,14 +2489,6 @@ check_field (struct type *type, const char *name)
 
   /* C++: If it was not found as a data field, then try to return it
      as a pointer to a method.  */
-
-  /* Destructors are a special case.  */
-  if (destructor_name_p (name, type))
-    {
-      int m_index, f_index;
-
-      return get_destructor_fn_field (type, &m_index, &f_index);
-    }
 
   for (i = TYPE_NFN_FIELDS (type) - 1; i >= 0; --i)
     {
@@ -2564,12 +2584,6 @@ value_struct_elt_for_reference (struct type *domain, int offset,
 
   /* C++: If it was not found as a data field, then try to return it
      as a pointer to a method.  */
-
-  /* Destructors are a special case.  */
-  if (destructor_name_p (name, t))
-    {
-      error (_("member pointers to destructors not implemented yet"));
-    }
 
   /* Perform all necessary dereferencing.  */
   while (intype && TYPE_CODE (intype) == TYPE_CODE_PTR)
@@ -2975,12 +2989,7 @@ value_slice (struct value *array, int lowbound, int length)
 		  TYPE_LENGTH (slice_type));
 	}
 
-      if (VALUE_LVAL (array) == lval_internalvar)
-	VALUE_LVAL (slice) = lval_internalvar_component;
-      else
-	VALUE_LVAL (slice) = VALUE_LVAL (array);
-
-      set_value_address (slice, value_raw_address (array));
+      set_value_component_location (slice, array);
       VALUE_FRAME_ID (slice) = VALUE_FRAME_ID (array);
       set_value_offset (slice, value_offset (array) + offset);
     }

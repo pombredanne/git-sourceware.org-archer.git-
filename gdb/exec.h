@@ -22,7 +22,7 @@
 
 #include "target.h"
 
-struct section_table;
+struct target_section;
 struct target_ops;
 struct bfd;
 
@@ -31,10 +31,56 @@ extern struct target_ops exec_ops;
 /* Builds a section table, given args BFD, SECTABLE_PTR, SECEND_PTR.
    Returns 0 if OK, 1 on error.  */
 
-extern int build_section_table (struct bfd *, struct section_table **,
-				struct section_table **);
+extern int build_section_table (struct bfd *, struct target_section **,
+				struct target_section **);
+
+/* Resize the section table held by TABLE, by NUM_ADDED.  Returns the
+   old size.  */
+
+extern int resize_section_table (struct target_section_table *, int);
+
+/* Read or write from mappable sections of BFD executable files.
+
+   Request to transfer up to LEN 8-bit bytes of the target sections
+   defined by SECTIONS and SECTIONS_END.  The OFFSET specifies the
+   starting address.
+   If SECTION_NAME is not NULL, only access sections with that same
+   name.
+
+   Return the number of bytes actually transfered, or zero when no
+   data is available for the requested range.
+
+   This function is intended to be used from target_xfer_partial
+   implementations.  See target_read and target_write for more
+   information.
+
+   One, and only one, of readbuf or writebuf must be non-NULL.  */
+
+extern int section_table_xfer_memory_partial (gdb_byte *, const gdb_byte *,
+					      ULONGEST, LONGEST,
+					      struct target_section *,
+					      struct target_section *,
+					      const char *);
 
 /* Set the loaded address of a section.  */
 extern void exec_set_section_address (const char *, int, CORE_ADDR);
+
+/* Remove all target sections taken from ABFD.  */
+
+extern void remove_target_sections (bfd *abfd);
+
+/* Add the sections array defined by [SECTIONS..SECTIONS_END[ to the
+   current set of target sections.  */
+
+extern void add_target_sections (struct target_section *sections,
+				 struct target_section *sections_end);
+
+/* Prints info about all sections defined in the TABLE.  ABFD is
+   special cased --- it's filename is omitted; if it is the executable
+   file, its entry point is printed.  */
+
+extern void print_section_info (struct target_section_table *table,
+				bfd *abfd);
+
 
 #endif

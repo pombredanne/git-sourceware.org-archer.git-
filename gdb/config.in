@@ -26,10 +26,11 @@
 /* Define to 1 if using `alloca.c'. */
 #undef C_ALLOCA
 
-/* Global directory for separate debug files. */
+/* look for global separate debug info in this path [LIBDIR/debug] */
 #undef DEBUGDIR
 
-/* Define if the debug directory should be relocated when GDB is moved. */
+/* Define if the separate-debug-dir directory should be relocated when GDB is
+   moved. */
 #undef DEBUGDIR_RELOCATABLE
 
 /* Define to BFD's default architecture. */
@@ -75,6 +76,9 @@
 
 /* Define to 1 if you have the <bp-sym.h> header file. */
 #undef HAVE_BP_SYM_H
+
+/* Define to 1 if you have the `btowc' function. */
+#undef HAVE_BTOWC
 
 /* Define to 1 if you have the `canonicalize_file_name' function. */
 #undef HAVE_CANONICALIZE_FILE_NAME
@@ -175,11 +179,17 @@
 /* Define if you have the iconv() function. */
 #undef HAVE_ICONV
 
+/* Define to 1 if you have the `iconvlist' function. */
+#undef HAVE_ICONVLIST
+
 /* Define if your compiler supports the #include_next directive. */
 #undef HAVE_INCLUDE_NEXT
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
+
+/* Define if you have <langinfo.h> and nl_langinfo(CODESET). */
+#undef HAVE_LANGINFO_CODESET
 
 /* Define if your <locale.h> file defines LC_MESSAGES. */
 #undef HAVE_LC_MESSAGES
@@ -189,6 +199,9 @@
 
 /* Define if you have the expat library. */
 #undef HAVE_LIBEXPAT
+
+/* Define to 1 if you have the `libiconvlist' function. */
+#undef HAVE_LIBICONVLIST
 
 /* Define to 1 if you have the `m' library (-lm). */
 #undef HAVE_LIBM
@@ -627,6 +640,9 @@
 /* Define to install path for Python sources */
 #undef PYTHONDIR
 
+/* Relocated directory for source files. */
+#undef RELOC_SRCDIR
+
 /* Bug reporting address */
 #undef REPORT_BUGS_TO
 
@@ -663,6 +679,13 @@
 
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
+
+/* automatically load a system-wide gdbinit file */
+#undef SYSTEM_GDBINIT
+
+/* Define if the system-gdbinit directory should be relocated when GDB is
+   moved. */
+#undef SYSTEM_GDBINIT_RELOCATABLE
 
 /* Define if <thread_db.h> has the TD_NOTALLOC error code. */
 #undef THREAD_DB_HAS_TD_NOTALLOC

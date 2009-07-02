@@ -153,6 +153,7 @@ reopen_exec_file (void)
   int res;
   struct stat st;
   long mtime;
+  struct cleanup *cleanups;
 
   /* Don't do anything if there isn't an exec file. */
   if (exec_bfd == NULL)
@@ -160,7 +161,7 @@ reopen_exec_file (void)
 
   /* If the timestamp of the exec file has changed, reopen it. */
   filename = xstrdup (bfd_get_filename (exec_bfd));
-  make_cleanup (xfree, filename);
+  cleanups = make_cleanup (xfree, filename);
   res = stat (filename, &st);
 
   if (exec_bfd_mtime && exec_bfd_mtime != st.st_mtime)
@@ -170,6 +171,8 @@ reopen_exec_file (void)
        this stops GDB from holding the executable open after it
        exits.  */
     bfd_cache_close_all ();
+
+  do_cleanups (cleanups);
 #endif
 }
 
@@ -365,40 +368,6 @@ write_memory_signed_integer (CORE_ADDR addr, int len, LONGEST value)
   store_signed_integer (buf, len, value);
   write_memory (addr, buf, len);
 }
-
-
-
-#if 0
-/* Enable after 4.12.  It is not tested.  */
-
-/* Search code.  Targets can just make this their search function, or
-   if the protocol has a less general search function, they can call this
-   in the cases it can't handle.  */
-void
-generic_search (int len, char *data, char *mask, CORE_ADDR startaddr,
-		int increment, CORE_ADDR lorange, CORE_ADDR hirange,
-		CORE_ADDR *addr_found, char *data_found)
-{
-  int i;
-  CORE_ADDR curaddr = startaddr;
-
-  while (curaddr >= lorange && curaddr < hirange)
-    {
-      read_memory (curaddr, data_found, len);
-      for (i = 0; i < len; ++i)
-	if ((data_found[i] & mask[i]) != data[i])
-	  goto try_again;
-      /* It matches.  */
-      *addr_found = curaddr;
-      return;
-
-    try_again:
-      curaddr += increment;
-    }
-  *addr_found = (CORE_ADDR) 0;
-  return;
-}
-#endif /* 0 */
 
 /* The current default bfd target.  Points to storage allocated for
    gnutarget_string.  */
@@ -430,7 +399,7 @@ set_gnutarget (char *newtarget)
 {
   if (gnutarget_string != NULL)
     xfree (gnutarget_string);
-  gnutarget_string = savestring (newtarget, strlen (newtarget));
+  gnutarget_string = xstrdup (newtarget);
   set_gnutarget_command (NULL, 0, NULL);
 }
 

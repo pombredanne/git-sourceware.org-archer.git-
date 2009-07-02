@@ -3095,7 +3095,7 @@ _bfd_generic_section_already_linked (bfd *abfd, asection *sec,
 
   /* This is the first section with this name.  Record it.  */
   if (! bfd_section_already_linked_table_insert (already_linked_list, sec))
-    info->callbacks->einfo (_("%F%P: already_linked_table: %E"));
+    info->callbacks->einfo (_("%F%P: already_linked_table: %E\n"));
 }
 
 /* Convert symbols in excluded output sections to use a kept section.  */
@@ -3186,3 +3186,154 @@ _bfd_fix_excluded_sec_syms (bfd *obfd, struct bfd_link_info *info)
 {
   bfd_link_hash_traverse (info->hash, fix_syms, obfd);
 }
+
+/*
+FUNCTION
+	bfd_generic_define_common_symbol
+
+SYNOPSIS
+	bfd_boolean bfd_generic_define_common_symbol
+	  (bfd *output_bfd, struct bfd_link_info *info,
+	   struct bfd_link_hash_entry *h);
+
+DESCRIPTION
+	Convert common symbol @var{h} into a defined symbol.
+	Return TRUE on success and FALSE on failure.
+
+.#define bfd_define_common_symbol(output_bfd, info, h) \
+.       BFD_SEND (output_bfd, _bfd_define_common_symbol, (output_bfd, info, h))
+.
+*/
+
+bfd_boolean
+bfd_generic_define_common_symbol (bfd *output_bfd,
+				  struct bfd_link_info *info ATTRIBUTE_UNUSED,
+				  struct bfd_link_hash_entry *h)
+{
+  unsigned int power_of_two;
+  bfd_vma alignment, size;
+  asection *section;
+
+  BFD_ASSERT (h != NULL && h->type == bfd_link_hash_common);
+
+  size = h->u.c.size;
+  power_of_two = h->u.c.p->alignment_power;
+  section = h->u.c.p->section;
+
+  /* Increase the size of the section to align the common symbol.
+     The alignment must be a power of two.  */
+  alignment = bfd_octets_per_byte (output_bfd) << power_of_two;
+  BFD_ASSERT (alignment != 0 && (alignment & -alignment) == alignment);
+  section->size += alignment - 1;
+  section->size &= -alignment;
+
+  /* Adjust the section's overall alignment if necessary.  */
+  if (power_of_two > section->alignment_power)
+    section->alignment_power = power_of_two;
+
+  /* Change the symbol from common to defined.  */
+  h->type = bfd_link_hash_defined;
+  h->u.def.section = section;
+  h->u.def.value = section->size;
+
+  /* Increase the size of the section.  */
+  section->size += size;
+
+  /* Make sure the section is allocated in memory, and make sure that
+     it is no longer a common section.  */
+  section->flags |= SEC_ALLOC;
+  section->flags &= ~SEC_IS_COMMON;
+  return TRUE;
+}
+
+/*
+FUNCTION
+	bfd_find_version_for_sym 
+
+SYNOPSIS
+	struct bfd_elf_version_tree * bfd_find_version_for_sym
+	  (struct bfd_elf_version_tree *verdefs,
+	   const char *sym_name, bfd_boolean *hide);
+
+DESCRIPTION
+	Search an elf version script tree for symbol versioning
+	info and export / don't-export status for a given symbol.
+	Return non-NULL on success and NULL on failure; also sets
+	the output @samp{hide} boolean parameter.
+
+*/
+
+struct bfd_elf_version_tree *
+bfd_find_version_for_sym (struct bfd_elf_version_tree *verdefs,
+		      const char *sym_name,
+		      bfd_boolean *hide)
+{
+  struct bfd_elf_version_tree *t;
+  struct bfd_elf_version_tree *local_ver, *global_ver, *exist_ver;
+
+  local_ver = NULL;
+  global_ver = NULL;
+  exist_ver = NULL;
+  for (t = verdefs; t != NULL; t = t->next)
+    {
+      if (t->globals.list != NULL)
+	{
+	  struct bfd_elf_version_expr *d = NULL;
+
+	  while ((d = (*t->match) (&t->globals, d, sym_name)) != NULL)
+	    {
+	      global_ver = t;
+	      if (d->symver)
+		exist_ver = t;
+	      d->script = 1;
+	      /* If the match is a wildcard pattern, keep looking for
+		 a more explicit, perhaps even local, match.  */
+	      if (d->literal)
+		break;
+	    }
+
+	  if (d != NULL)
+	    break;
+	}
+
+      if (t->locals.list != NULL)
+	{
+	  struct bfd_elf_version_expr *d = NULL;
+
+	  while ((d = (*t->match) (&t->locals, d, sym_name)) != NULL)
+	    {
+	      local_ver = t;
+	      /* If the match is a wildcard pattern, keep looking for
+		 a more explicit, perhaps even global, match.  */
+	      if (d->literal)
+		{
+		  /* An exact match overrides a global wildcard.  */
+		  global_ver = NULL;
+		  break;
+		}
+	    }
+
+	  if (d != NULL)
+	    break;
+	}
+    }
+
+  if (global_ver != NULL)
+    {
+      /* If we already have a versioned symbol that matches the
+	 node for this symbol, then we don't want to create a
+	 duplicate from the unversioned symbol.  Instead hide the
+	 unversioned symbol.  */
+      *hide = exist_ver == global_ver;
+      return global_ver;
+    }
+
+  if (local_ver != NULL)
+    {
+      *hide = TRUE;
+      return local_ver;
+    }
+
+  return NULL;
+}
+

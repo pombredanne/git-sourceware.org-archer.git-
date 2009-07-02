@@ -31,6 +31,7 @@
 #include "regcache.h"
 #include "objfiles.h"
 #include "exceptions.h"
+#include "block.h"
 
 #include "elf/dwarf2.h"
 #include "dwarf2expr.h"
@@ -147,14 +148,19 @@ dwarf_expr_frame_base (void *baton, gdb_byte **start, size_t * length)
   struct symbol *framefunc;
   struct dwarf_expr_baton *debaton = (struct dwarf_expr_baton *) baton;
 
-  framefunc = get_frame_function (debaton->frame);
+  /* Use block_linkage_function, which returns a real (not inlined)
+     function, instead of get_frame_function, which may return an
+     inlined function.  */
+  framefunc = block_linkage_function (get_frame_block (debaton->frame, NULL));
 
   /* If we found a frame-relative symbol then it was certainly within
      some function associated with a frame. If we can't find the frame,
      something has gone wrong.  */
   gdb_assert (framefunc != NULL);
 
-  if (SYMBOL_OPS (framefunc) == &dwarf2_loclist_funcs)
+  if (SYMBOL_LOCATION_BATON (framefunc) == NULL)
+    *start = NULL;
+  else if (SYMBOL_COMPUTED_OPS (framefunc) == &dwarf2_loclist_funcs)
     {
       struct dwarf2_loclist_baton *symbaton;
       struct frame_info *frame = debaton->frame;
@@ -199,7 +205,6 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
 			  gdb_byte *data, unsigned short size,
 			  struct dwarf2_per_cu_data *per_cu)
 {
-  struct gdbarch *arch = get_frame_arch (frame);
   struct value *retval;
   struct dwarf_expr_baton baton;
   struct dwarf_expr_context *ctx;
@@ -238,9 +243,9 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
 	  struct dwarf_expr_piece *p = &ctx->pieces[i];
 	  if (p->in_reg)
 	    {
+	      struct gdbarch *arch = get_frame_arch (frame);
 	      bfd_byte regval[MAX_REGISTER_SIZE];
-	      int gdb_regnum = gdbarch_dwarf2_reg_to_regnum
-				 (arch, p->value);
+	      int gdb_regnum = gdbarch_dwarf2_reg_to_regnum (arch, p->value);
 	      get_frame_register (frame, gdb_regnum, regval);
 	      memcpy (contents + offset, regval, p->size);
 	    }
@@ -253,9 +258,9 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
     }
   else if (ctx->in_reg)
     {
+      struct gdbarch *arch = get_frame_arch (frame);
       CORE_ADDR dwarf_regnum = dwarf_expr_fetch (ctx, 0);
-      int gdb_regnum = gdbarch_dwarf2_reg_to_regnum
-			 (arch, dwarf_regnum);
+      int gdb_regnum = gdbarch_dwarf2_reg_to_regnum (arch, dwarf_regnum);
       retval = value_from_register (SYMBOL_TYPE (var), gdb_regnum, frame);
     }
   else
@@ -367,9 +372,9 @@ dwarf2_loc_desc_needs_frame (gdb_byte *data, unsigned short size,
 }
 
 static void
-dwarf2_tracepoint_var_ref (struct symbol *symbol, struct agent_expr *ax,
-			   struct axs_value *value, gdb_byte *data,
-			   int size)
+dwarf2_tracepoint_var_ref (struct symbol *symbol, struct gdbarch *gdbarch,
+			   struct agent_expr *ax, struct axs_value *value,
+			   gdb_byte *data, int size)
 {
   if (size == 0)
     error (_("Symbol \"%s\" has been optimized out."),
@@ -402,7 +407,7 @@ dwarf2_tracepoint_var_ref (struct symbol *symbol, struct agent_expr *ax,
 	error (_("Unexpected opcode after DW_OP_fbreg for symbol \"%s\"."),
 	       SYMBOL_PRINT_NAME (symbol));
 
-      gdbarch_virtual_frame_pointer (current_gdbarch, 
+      gdbarch_virtual_frame_pointer (gdbarch,
 				     ax->scope, &frame_reg, &frame_offset);
       ax_reg (ax, frame_reg);
       ax_const_l (ax, frame_offset);
@@ -523,17 +528,18 @@ locexpr_describe_location (struct symbol *symbol, struct ui_file *stream)
    against.  When there is one this function should be revisited.  */
 
 static void
-locexpr_tracepoint_var_ref (struct symbol * symbol, struct agent_expr * ax,
-			    struct axs_value * value)
+locexpr_tracepoint_var_ref (struct symbol *symbol, struct gdbarch *gdbarch,
+			    struct agent_expr *ax, struct axs_value *value)
 {
   struct dwarf2_locexpr_baton *dlbaton = SYMBOL_LOCATION_BATON (symbol);
 
-  dwarf2_tracepoint_var_ref (symbol, ax, value, dlbaton->data, dlbaton->size);
+  dwarf2_tracepoint_var_ref (symbol, gdbarch, ax, value,
+			     dlbaton->data, dlbaton->size);
 }
 
 /* The set of location functions used with the DWARF-2 expression
    evaluator.  */
-const struct symbol_ops dwarf2_locexpr_funcs = {
+const struct symbol_computed_ops dwarf2_locexpr_funcs = {
   locexpr_read_variable,
   locexpr_read_needs_frame,
   locexpr_describe_location,
@@ -595,8 +601,8 @@ loclist_describe_location (struct symbol *symbol, struct ui_file *stream)
 /* Describe the location of SYMBOL as an agent value in VALUE, generating
    any necessary bytecode in AX.  */
 static void
-loclist_tracepoint_var_ref (struct symbol * symbol, struct agent_expr * ax,
-			    struct axs_value * value)
+loclist_tracepoint_var_ref (struct symbol *symbol, struct gdbarch *gdbarch,
+			    struct agent_expr *ax, struct axs_value *value)
 {
   struct dwarf2_loclist_baton *dlbaton = SYMBOL_LOCATION_BATON (symbol);
   gdb_byte *data;
@@ -606,12 +612,12 @@ loclist_tracepoint_var_ref (struct symbol * symbol, struct agent_expr * ax,
   if (data == NULL)
     error (_("Variable \"%s\" is not available."), SYMBOL_NATURAL_NAME (symbol));
 
-  dwarf2_tracepoint_var_ref (symbol, ax, value, data, size);
+  dwarf2_tracepoint_var_ref (symbol, gdbarch, ax, value, data, size);
 }
 
 /* The set of location functions used with the DWARF-2 expression
    evaluator and location lists.  */
-const struct symbol_ops dwarf2_loclist_funcs = {
+const struct symbol_computed_ops dwarf2_loclist_funcs = {
   loclist_read_variable,
   loclist_read_needs_frame,
   loclist_describe_location,

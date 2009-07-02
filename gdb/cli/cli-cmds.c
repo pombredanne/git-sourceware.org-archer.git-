@@ -455,7 +455,7 @@ source_script (char *file, int from_tty)
   /* Search for and open 'file' on the search path used for source
      files.  Put the full location in 'full_pathname'.  */
   fd = openp (source_path, OPF_TRY_CWD_FIRST,
-	      file, O_RDONLY, 0, &full_pathname);
+	      file, O_RDONLY, &full_pathname);
   make_cleanup (xfree, full_pathname);
 
   /* Use the full path name, if it is found.  */
@@ -937,7 +937,7 @@ print_disassembly (const char *name, CORE_ADDR low, CORE_ADDR high, int mixed)
         printf_filtered ("from %s to %s:\n", paddress (low), paddress (high));
 
       /* Dump the specified range.  */
-      gdb_disassembly (uiout, 0, 0, mixed, -1, low, high);
+      gdb_disassembly (uiout, 0, mixed, -1, low, high);
 
       printf_filtered ("End of assembler dump.\n");
       gdb_flush (gdb_stdout);
@@ -1082,17 +1082,18 @@ show_user (char *args, int from_tty)
 
   if (args)
     {
-      c = lookup_cmd (&args, cmdlist, "", 0, 1);
+      char *comname = args;
+      c = lookup_cmd (&comname, cmdlist, "", 0, 1);
       if (c->class != class_user)
 	error (_("Not a user command."));
-      show_user_1 (c, gdb_stdout);
+      show_user_1 (c, "", args, gdb_stdout);
     }
   else
     {
       for (c = cmdlist; c; c = c->next)
 	{
-	  if (c->class == class_user)
-	    show_user_1 (c, gdb_stdout);
+	  if (c->class == class_user || c->prefixlist != NULL)
+	    show_user_1 (c, "", c->name, gdb_stdout);
 	}
     }
 }
@@ -1143,7 +1144,7 @@ ambiguous_line_spec (struct symtabs_and_lines *sals)
 static void
 set_debug (char *arg, int from_tty)
 {
-  printf_unfiltered (_("\"set debug\" must be followed by the name of a print subcommand.\n"));
+  printf_unfiltered (_("\"set debug\" must be followed by the name of a debug subcommand.\n"));
   help_list (setdebuglist, "set debug ", -1, gdb_stdout);
 }
 
@@ -1279,9 +1280,8 @@ The commands below can be used to select other frames by number or address."),
 
   /* Define general commands. */
 
-  c = add_com ("pwd", class_files, pwd_command, _("\
+  add_com ("pwd", class_files, pwd_command, _("\
 Print working directory.  This is used for your program as well."));
-  set_cmd_no_selected_thread_ok (c);
 
   c = add_cmd ("cd", class_files, cd_command, _("\
 Set working directory to DIR for debugger and program being debugged.\n\
@@ -1324,7 +1324,6 @@ as Python code."), gdbinit);
   c = add_com ("help", class_support, help_command,
 	       _("Print list of commands."));
   set_cmd_completer (c, command_completer);
-  set_cmd_no_selected_thread_ok (c);
   add_com_alias ("q", "quit", class_support, 1);
   add_com_alias ("h", "help", class_support, 1);
 
@@ -1350,19 +1349,17 @@ Without an argument, history expansion is enabled."),
 			   show_history_expansion_p,
 			   &sethistlist, &showhistlist);
 
-  c = add_prefix_cmd ("info", class_info, info_command, _("\
+  add_prefix_cmd ("info", class_info, info_command, _("\
 Generic command for showing things about the program being debugged."),
-		      &infolist, "info ", 0, &cmdlist);
-  set_cmd_no_selected_thread_ok (c);
+		  &infolist, "info ", 0, &cmdlist);
   add_com_alias ("i", "info", class_info, 1);
 
   add_com ("complete", class_obscure, complete_command,
 	   _("List the completions for the rest of the line as a command."));
 
-  c = add_prefix_cmd ("show", class_info, show_command, _("\
+  add_prefix_cmd ("show", class_info, show_command, _("\
 Generic command for showing things about the debugger."),
-		      &showlist, "show ", 0, &cmdlist);
-  set_cmd_no_selected_thread_ok (c);
+		  &showlist, "show ", 0, &cmdlist);
   /* Another way to get at the same thing.  */
   add_info ("set", show_command, _("Show all GDB settings."));
 

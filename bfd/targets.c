@@ -157,6 +157,7 @@ DESCRIPTION
 .  bfd_target_oasys_flavour,
 .  bfd_target_tekhex_flavour,
 .  bfd_target_srec_flavour,
+.  bfd_target_verilog_flavour,
 .  bfd_target_ihex_flavour,
 .  bfd_target_som_flavour,
 .  bfd_target_os9k_flavour,
@@ -441,7 +442,8 @@ BFD_JUMP_TABLE macros.
 .  NAME##_bfd_merge_sections, \
 .  NAME##_bfd_is_group_section, \
 .  NAME##_bfd_discard_group, \
-.  NAME##_section_already_linked \
+.  NAME##_section_already_linked, \
+.  NAME##_bfd_define_common_symbol
 .
 .  int         (*_bfd_sizeof_headers) (bfd *, struct bfd_link_info *);
 .  bfd_byte *  (*_bfd_get_relocated_section_contents)
@@ -488,6 +490,10 @@ BFD_JUMP_TABLE macros.
 .     final link.  *}
 .  void (*_section_already_linked) (bfd *, struct bfd_section *,
 .				    struct bfd_link_info *);
+.
+.  {* Define a common symbol.  *}
+.  bfd_boolean (*_bfd_define_common_symbol) (bfd *, struct bfd_link_info *,
+.					     struct bfd_link_hash_entry *);
 .
 .  {* Routines to handle dynamic symbols and relocs.  *}
 .#define BFD_JUMP_TABLE_DYNAMIC(NAME) \
@@ -560,15 +566,7 @@ extern const bfd_target armpei_big_vec;
 extern const bfd_target armpei_little_vec;
 extern const bfd_target b_out_vec_big_host;
 extern const bfd_target b_out_vec_little_host;
-extern const bfd_target bfd_efi_app_ia32_vec;
-extern const bfd_target bfd_efi_bsdrv_ia32_vec;
-extern const bfd_target bfd_efi_rtdrv_ia32_vec;
-extern const bfd_target bfd_efi_app_x86_64_vec;
-extern const bfd_target bfd_efi_bsdrv_x86_64_vec;
-extern const bfd_target bfd_efi_rtdrv_x86_64_vec;
-extern const bfd_target bfd_efi_app_ia64_vec;
-extern const bfd_target bfd_efi_bsdrv_ia64_vec;
-extern const bfd_target bfd_efi_rtdrv_ia64_vec;
+extern const bfd_target bfd_pei_ia64_vec;
 extern const bfd_target bfd_elf32_avr_vec;
 extern const bfd_target bfd_elf32_bfin_vec;
 extern const bfd_target bfd_elf32_bfinfdpic_vec;
@@ -589,6 +587,7 @@ extern const bfd_target bfd_elf32_dlx_big_vec;
 extern const bfd_target bfd_elf32_fr30_vec;
 extern const bfd_target bfd_elf32_frv_vec;
 extern const bfd_target bfd_elf32_frvfdpic_vec;
+extern const bfd_target bfd_elf32_moxie_vec;
 extern const bfd_target bfd_elf32_h8300_vec;
 extern const bfd_target bfd_elf32_hppa_linux_vec;
 extern const bfd_target bfd_elf32_hppa_nbsd_vec;
@@ -680,6 +679,7 @@ extern const bfd_target bfd_elf64_hppa_vec;
 extern const bfd_target bfd_elf64_ia64_big_vec;
 extern const bfd_target bfd_elf64_ia64_hpux_big_vec;
 extern const bfd_target bfd_elf64_ia64_little_vec;
+extern const bfd_target bfd_elf64_ia64_vms_vec;
 extern const bfd_target bfd_elf64_little_generic_vec;
 extern const bfd_target bfd_elf64_littlemips_vec;
 extern const bfd_target bfd_elf64_mmix_vec;
@@ -747,6 +747,7 @@ extern const bfd_target m88kopenbsd_vec;
 extern const bfd_target mach_o_be_vec;
 extern const bfd_target mach_o_le_vec;
 extern const bfd_target mach_o_fat_vec;
+extern const bfd_target mach_o_i386_vec;
 extern const bfd_target maxqcoff_vec;
 extern const bfd_target mcore_pe_big_vec;
 extern const bfd_target mcore_pe_little_vec;
@@ -766,6 +767,7 @@ extern const bfd_target pc532netbsd_vec;
 extern const bfd_target pdp11_aout_vec;
 extern const bfd_target pef_vec;
 extern const bfd_target pef_xlib_vec;
+extern const bfd_target plugin_vec;
 extern const bfd_target pmac_xcoff_vec;
 extern const bfd_target ppcboot_vec;
 extern const bfd_target riscix_vec;
@@ -817,6 +819,7 @@ extern const bfd_target z8kcoff_vec;
 
 /* These are always included.  */
 extern const bfd_target srec_vec;
+extern const bfd_target verilog_vec;
 extern const bfd_target symbolsrec_vec;
 extern const bfd_target tekhex_vec;
 extern const bfd_target binary_vec;
@@ -886,16 +889,8 @@ static const bfd_target * const _bfd_target_vector[] =
 	&armpei_little_vec,
 	&b_out_vec_big_host,
 	&b_out_vec_little_host,
-	&bfd_efi_app_ia32_vec,
-	&bfd_efi_bsdrv_ia32_vec,
-	&bfd_efi_rtdrv_ia32_vec,
 #ifdef BFD64
-	&bfd_efi_app_x86_64_vec,
-	&bfd_efi_bsdrv_x86_64_vec,
-	&bfd_efi_rtdrv_x86_64_vec,
-	&bfd_efi_app_ia64_vec,
-	&bfd_efi_bsdrv_ia64_vec,
-	&bfd_efi_rtdrv_ia64_vec,
+	&bfd_pei_ia64_vec,
 #endif
 	&bfd_elf32_avr_vec,
 	&bfd_elf32_bfin_vec,
@@ -922,6 +917,7 @@ static const bfd_target * const _bfd_target_vector[] =
 	&bfd_elf32_fr30_vec,
 	&bfd_elf32_frv_vec,
 	&bfd_elf32_frvfdpic_vec,
+ 	&bfd_elf32_moxie_vec,
 	&bfd_elf32_h8300_vec,
 	&bfd_elf32_hppa_linux_vec,
 	&bfd_elf32_hppa_nbsd_vec,
@@ -979,8 +975,10 @@ static const bfd_target * const _bfd_target_vector[] =
 	&bfd_elf32_powerpc_vxworks_vec,
 	&bfd_elf32_powerpcle_vec,
 	&bfd_elf32_s390_vec,
+#ifdef BFD64
 	&bfd_elf32_bigscore_vec,
-	&bfd_elf32_littlescore_vec, 
+	&bfd_elf32_littlescore_vec,
+#endif
         &bfd_elf32_sh_vec,
         &bfd_elf32_shblin_vec,
         &bfd_elf32_shl_vec,
@@ -1020,6 +1018,7 @@ static const bfd_target * const _bfd_target_vector[] =
 	&bfd_elf64_ia64_big_vec,
 	&bfd_elf64_ia64_hpux_big_vec,
 	&bfd_elf64_ia64_little_vec,
+	&bfd_elf64_ia64_vms_vec,
 	&bfd_elf64_little_generic_vec,
 	&bfd_elf64_littlemips_vec,
 	&bfd_elf64_mmix_vec,
@@ -1117,6 +1116,7 @@ static const bfd_target * const _bfd_target_vector[] =
 	&mach_o_be_vec,
 	&mach_o_le_vec,
 	&mach_o_fat_vec,
+	&mach_o_i386_vec,
 	&maxqcoff_vec,
 	&mcore_pe_big_vec,
 	&mcore_pe_little_vec,
@@ -1147,6 +1147,9 @@ static const bfd_target * const _bfd_target_vector[] =
 	&pdp11_aout_vec,
 	&pef_vec,
 	&pef_xlib_vec,
+#if BFD_SUPPORTS_PLUGINS
+	&plugin_vec,
+#endif
 #if 0
 	/* This has the same magic number as RS/6000.  */
 	&pmac_xcoff_vec,
@@ -1204,6 +1207,8 @@ static const bfd_target * const _bfd_target_vector[] =
 /* Always support S-records, for convenience.  */
 	&srec_vec,
 	&symbolsrec_vec,
+/* And verilog.  */
+	&verilog_vec,
 /* And tekhex */
 	&tekhex_vec,
 /* Likewise for binary output.  */

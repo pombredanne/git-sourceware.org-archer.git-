@@ -1,6 +1,6 @@
 /* BFD COFF object file private structure.
    Copyright 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
+   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
    Written by Cygnus Support.
 
@@ -117,8 +117,6 @@ typedef struct pe_tdata
   int has_reloc_section;
   bfd_boolean (*in_reloc_p) (bfd *, reloc_howto_type *);
   flagword real_flags;
-  int target_subsystem;
-  bfd_boolean force_minimum_alignment;
 } pe_data_type;
 
 #define pe_data(bfd)		((bfd)->tdata.pe_obj_data)
@@ -165,7 +163,8 @@ struct xcoff_tdata
 
   /* Used by the XCOFF backend linker.  */
   asection **csects;
-  unsigned long *debug_indices;
+  long *debug_indices;
+  unsigned int *lineno_counts;
   unsigned int import_file_id;
 };
 
@@ -215,8 +214,7 @@ struct xcoff_section_tdata
   /* The lineno_count field for the enclosing section, because we are
      going to clobber it there.  */
   unsigned int lineno_count;
-  /* The first and one past the last symbol indices for symbols used
-     by this csect.  */
+  /* The first and last symbol indices for symbols used by this csect.  */
   unsigned long first_symndx;
   unsigned long last_symndx;
 };
@@ -589,11 +587,13 @@ extern bfd_boolean _bfd_xcoff_bfd_link_add_symbols
   (bfd *, struct bfd_link_info *);
 extern bfd_boolean _bfd_xcoff_bfd_final_link
   (bfd *, struct bfd_link_info *);
+extern bfd_boolean _bfd_xcoff_define_common_symbol
+  (bfd *, struct bfd_link_info *, struct bfd_link_hash_entry *);
 extern bfd_boolean _bfd_ppc_xcoff_relocate_section
   (bfd *, struct bfd_link_info *, bfd *, asection *, bfd_byte *,
    struct internal_reloc *, struct internal_syment *, asection **);
 
-/* Functions in coff-ppc.c.  FIXME: These are called be pe.em in the
+/* Functions in coff-ppc.c.  FIXME: These are called by pe.em in the
    linker, and so should start with bfd and be declared in bfd.h.  */
 
 extern bfd_boolean ppc_allocate_toc_section

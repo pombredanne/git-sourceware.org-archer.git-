@@ -29,6 +29,7 @@
 #include "hppa-tdep.h"
 #include "solist.h"
 #include "solib.h"
+#include "solib-som.h"
 
 #include <sys/utsname.h>
 #include <string.h>
@@ -110,7 +111,7 @@ dld_cache;
 
 static void
 som_relocate_section_addresses (struct so_list *so,
-				struct section_table *sec)
+				struct target_section *sec)
 {
   flagword aflag = bfd_get_section_flags(so->abfd, sec->the_bfd_section);
 
@@ -695,7 +696,7 @@ som_open_symbol_file_object (void *from_ttyp)
   char buf[4];
 
   if (symfile_objfile)
-    if (!query ("Attempt to reload symbols from process? "))
+    if (!query (_("Attempt to reload symbols from process? ")))
       return 0;
 
   /* First link map member should be the executable.  */
@@ -806,7 +807,8 @@ _initialize_som_solib (void)
   som_so_ops.in_dynsym_resolve_code = som_in_dynsym_resolve_code;
 }
 
-void som_solib_select (struct gdbarch *gdbarch)
+void
+som_solib_select (struct gdbarch *gdbarch)
 {
   struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
   set_solib_ops (gdbarch, &som_so_ops);

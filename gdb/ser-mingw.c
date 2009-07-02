@@ -61,7 +61,7 @@ ser_windows_open (struct serial *scb, const char *name)
       return -1;
     }
 
-  scb->fd = _open_osfhandle ((long) h, O_RDWR);
+  scb->fd = _open_osfhandle ((intptr_t) h, O_RDWR);
   if (scb->fd < 0)
     {
       errno = ENOENT;
@@ -573,6 +573,7 @@ console_select_thread (void *arg)
 
       SetEvent(state->have_stopped);
     }
+  return 0;
 }
 
 static int
@@ -633,6 +634,7 @@ pipe_select_thread (void *arg)
 
       SetEvent (state->have_stopped);
     }
+  return 0;
 }
 
 static DWORD WINAPI
@@ -657,6 +659,7 @@ file_select_thread (void *arg)
 
       SetEvent (state->have_stopped);
     }
+  return 0;
 }
 
 static void

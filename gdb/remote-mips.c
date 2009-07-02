@@ -86,19 +86,9 @@ static void mips_close (int quitting);
 
 static void mips_detach (struct target_ops *ops, char *args, int from_tty);
 
-static void mips_resume (ptid_t ptid, int step,
-                         enum target_signal siggnal);
-
-static ptid_t mips_wait (ptid_t ptid,
-                               struct target_waitstatus *status);
-
 static int mips_map_regno (struct gdbarch *, int);
 
-static void mips_fetch_registers (struct regcache *regcache, int regno);
-
 static void mips_prepare_to_store (struct regcache *regcache);
-
-static void mips_store_registers (struct regcache *regcache, int regno);
 
 static unsigned int mips_fetch_word (CORE_ADDR addr);
 
@@ -112,7 +102,7 @@ static int mips_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len,
 
 static void mips_files_info (struct target_ops *ignore);
 
-static void mips_mourn_inferior (void);
+static void mips_mourn_inferior (struct target_ops *ops);
 
 static int pmon_makeb64 (unsigned long v, char *p, int n, int *chksum);
 
@@ -1583,7 +1573,7 @@ device is attached to the target board (e.g., /dev/ttya).\n"
 
   reinit_frame_cache ();
   registers_changed ();
-  stop_pc = read_pc ();
+  stop_pc = regcache_read_pc (get_current_regcache ());
   print_stack_frame (get_selected_frame (NULL), 0, SRC_AND_LOC);
   xfree (serial_port_name);
 }
@@ -1670,7 +1660,8 @@ mips_detach (struct target_ops *ops, char *args, int from_tty)
    where PMON does return a reply.  */
 
 static void
-mips_resume (ptid_t ptid, int step, enum target_signal siggnal)
+mips_resume (struct target_ops *ops,
+	     ptid_t ptid, int step, enum target_signal siggnal)
 {
   int err;
 
@@ -1703,7 +1694,8 @@ mips_signal_from_protocol (int sig)
 /* Wait until the remote stops, and return a wait status.  */
 
 static ptid_t
-mips_wait (ptid_t ptid, struct target_waitstatus *status)
+mips_wait (struct target_ops *ops,
+	   ptid_t ptid, struct target_waitstatus *status, int options)
 {
   int rstatus;
   int err;
@@ -1800,7 +1792,7 @@ mips_wait (ptid_t ptid, struct target_waitstatus *status)
          fetch breakpoint, not a data watchpoint.  FIXME when PMON
          provides some way to tell us what type of breakpoint it is.  */
       int i;
-      CORE_ADDR pc = read_pc ();
+      CORE_ADDR pc = regcache_read_pc (get_current_regcache ());
 
       hit_watchpoint = 1;
       for (i = 0; i < MAX_LSI_BREAKPOINTS; i++)
@@ -1851,7 +1843,7 @@ mips_wait (ptid_t ptid, struct target_waitstatus *status)
 	{
 	  char *func_name;
 	  CORE_ADDR func_start;
-	  CORE_ADDR pc = read_pc ();
+	  CORE_ADDR pc = regcache_read_pc (get_current_regcache ());
 
 	  find_pc_partial_function (pc, &func_name, &func_start, NULL);
 	  if (func_name != NULL && strcmp (func_name, "_exit") == 0
@@ -1901,7 +1893,8 @@ mips_map_regno (struct gdbarch *gdbarch, int regno)
 /* Fetch the remote registers.  */
 
 static void
-mips_fetch_registers (struct regcache *regcache, int regno)
+mips_fetch_registers (struct target_ops *ops,
+		      struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
   unsigned LONGEST val;
@@ -1910,7 +1903,7 @@ mips_fetch_registers (struct regcache *regcache, int regno)
   if (regno == -1)
     {
       for (regno = 0; regno < gdbarch_num_regs (gdbarch); regno++)
-	mips_fetch_registers (regcache, regno);
+	mips_fetch_registers (ops, regcache, regno);
       return;
     }
 
@@ -1964,7 +1957,8 @@ mips_prepare_to_store (struct regcache *regcache)
 /* Store remote register(s).  */
 
 static void
-mips_store_registers (struct regcache *regcache, int regno)
+mips_store_registers (struct target_ops *ops,
+		      struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
   ULONGEST val;
@@ -1973,7 +1967,7 @@ mips_store_registers (struct regcache *regcache, int regno)
   if (regno == -1)
     {
       for (regno = 0; regno < gdbarch_num_regs (gdbarch); regno++)
-	mips_store_registers (regcache, regno);
+	mips_store_registers (ops, regcache, regno);
       return;
     }
 
@@ -2135,7 +2129,7 @@ mips_files_info (struct target_ops *ignore)
    right port, we could interrupt the process with a break signal.  */
 
 static void
-mips_kill (void)
+mips_kill (struct target_ops *ops)
 {
   if (!mips_wait_flag)
     return;
@@ -2148,8 +2142,8 @@ mips_kill (void)
 
       target_terminal_ours ();
 
-      if (query ("Interrupted while waiting for the program.\n\
-Give up (and stop debugging it)? "))
+      if (query (_("Interrupted while waiting for the program.\n\
+Give up (and stop debugging it)? ")))
 	{
 	  /* Clean up in such a way that mips_close won't try to talk to the
 	     board (it almost surely won't work since we weren't able to talk to
@@ -2188,7 +2182,8 @@ Give up (and stop debugging it)? "))
 /* Start running on the target board.  */
 
 static void
-mips_create_inferior (char *execfile, char *args, char **env, int from_tty)
+mips_create_inferior (struct target_ops *ops, char *execfile,
+		      char *args, char **env, int from_tty)
 {
   CORE_ADDR entry_pt;
 
@@ -2209,13 +2204,13 @@ Can't pass arguments to remote MIPS board; arguments ignored.");
 
   /* FIXME: Should we set inferior_ptid here?  */
 
-  write_pc (entry_pt);
+  regcache_write_pc (get_current_regcache (), entry_pt);
 }
 
 /* Clean up after a process.  Actually nothing to do.  */
 
 static void
-mips_mourn_inferior (void)
+mips_mourn_inferior (struct target_ops *ops)
 {
   if (current_ops != NULL)
     unpush_target (current_ops);
@@ -2254,7 +2249,7 @@ mips_remove_breakpoint (struct bp_target_info *bp_tgt)
 
 /* Tell whether this target can support a hardware breakpoint.  CNT
    is the number of hardware breakpoints already installed.  This
-   implements the TARGET_CAN_USE_HARDWARE_WATCHPOINT macro.  */
+   implements the target_can_use_hardware_watchpoint macro.  */
 
 int
 mips_can_use_watchpoint (int type, int cnt, int othertype)
@@ -3263,6 +3258,8 @@ pmon_load_fast (char *file)
 static void
 mips_load (char *file, int from_tty)
 {
+  struct regcache *regcache;
+
   /* Get the board out of remote debugging mode.  */
   if (mips_exit_debug ())
     error ("mips_load:  Couldn't get into monitor mode.");
@@ -3275,18 +3272,17 @@ mips_load (char *file, int from_tty)
   mips_initialize ();
 
   /* Finally, make the PC point at the start address */
+  regcache = get_current_regcache ();
   if (mips_monitor != MON_IDT)
     {
       /* Work around problem where PMON monitor updates the PC after a load
          to a different value than GDB thinks it has. The following ensures
-         that the write_pc() WILL update the PC value: */
-      struct regcache *regcache = get_current_regcache ();
-      regcache_set_valid_p (regcache,
-			    gdbarch_pc_regnum (get_regcache_arch (regcache)),
-					       0);
+         that the regcache_write_pc() WILL update the PC value: */
+      regcache_invalidate (regcache,
+			   gdbarch_pc_regnum (get_regcache_arch (regcache)));
     }
   if (exec_bfd)
-    write_pc (bfd_get_start_address (exec_bfd));
+    regcache_write_pc (regcache, bfd_get_start_address (exec_bfd));
 
   inferior_ptid = null_ptid;	/* No process now */
 
@@ -3344,11 +3340,11 @@ _initialize_remote_mips (void)
   mips_ops.to_mourn_inferior = mips_mourn_inferior;
   mips_ops.to_log_command = serial_log_command;
   mips_ops.to_stratum = process_stratum;
-  mips_ops.to_has_all_memory = 1;
-  mips_ops.to_has_memory = 1;
-  mips_ops.to_has_stack = 1;
-  mips_ops.to_has_registers = 1;
-  mips_ops.to_has_execution = 1;
+  mips_ops.to_has_all_memory = default_child_has_all_memory;
+  mips_ops.to_has_memory = default_child_has_memory;
+  mips_ops.to_has_stack = default_child_has_stack;
+  mips_ops.to_has_registers = default_child_has_registers;
+  mips_ops.to_has_execution = default_child_has_execution;
   mips_ops.to_magic = OPS_MAGIC;
 
   /* Copy the common fields to all four target vectors.  */

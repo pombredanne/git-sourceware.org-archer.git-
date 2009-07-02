@@ -421,6 +421,9 @@ extern bfd_boolean _bfd_generic_set_section_contents
   ((bfd_boolean (*) (bfd *, struct bfd_section *)) bfd_false)
 #define _bfd_nolink_section_already_linked \
   ((void (*) (bfd *, struct bfd_section *, struct bfd_link_info *)) bfd_void)
+#define _bfd_nolink_bfd_define_common_symbol \
+  ((bfd_boolean (*) (bfd *, struct bfd_link_info *, \
+		     struct bfd_link_hash_entry *)) bfd_false)
 
 /* Routines to use for BFD_JUMP_TABLE_DYNAMIC for targets which do not
    have dynamic symbols or relocs.  Use BFD_JUMP_TABLE_DYNAMIC
@@ -770,6 +773,9 @@ struct bfd_iovec
   int (*bclose) (struct bfd *abfd);
   int (*bflush) (struct bfd *abfd);
   int (*bstat) (struct bfd *abfd, struct stat *sb);
+  /* Just like mmap: (void*)-1 on failure, mmapped address on success.  */
+  void *(*bmmap) (struct bfd *abfd, void *addr, bfd_size_type len,
+                  int prot, int flags, file_ptr offset);
 };
 /* Extracted from bfdwin.c.  */
 struct _bfd_window_internal {
@@ -829,6 +835,21 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_68K_GLOB_DAT",
   "BFD_RELOC_68K_JMP_SLOT",
   "BFD_RELOC_68K_RELATIVE",
+  "BFD_RELOC_68K_TLS_GD32",
+  "BFD_RELOC_68K_TLS_GD16",
+  "BFD_RELOC_68K_TLS_GD8",
+  "BFD_RELOC_68K_TLS_LDM32",
+  "BFD_RELOC_68K_TLS_LDM16",
+  "BFD_RELOC_68K_TLS_LDM8",
+  "BFD_RELOC_68K_TLS_LDO32",
+  "BFD_RELOC_68K_TLS_LDO16",
+  "BFD_RELOC_68K_TLS_LDO8",
+  "BFD_RELOC_68K_TLS_IE32",
+  "BFD_RELOC_68K_TLS_IE16",
+  "BFD_RELOC_68K_TLS_IE8",
+  "BFD_RELOC_68K_TLS_LE32",
+  "BFD_RELOC_68K_TLS_LE16",
+  "BFD_RELOC_68K_TLS_LE8",
   "BFD_RELOC_32_BASEREL",
   "BFD_RELOC_16_BASEREL",
   "BFD_RELOC_LO16_BASEREL",
@@ -942,6 +963,10 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_ALPHA_GPREL_HI16",
   "BFD_RELOC_ALPHA_GPREL_LO16",
   "BFD_RELOC_ALPHA_BRSGP",
+  "BFD_RELOC_ALPHA_NOP",
+  "BFD_RELOC_ALPHA_BSR",
+  "BFD_RELOC_ALPHA_LDA",
+  "BFD_RELOC_ALPHA_BOH",
   "BFD_RELOC_ALPHA_TLSGD",
   "BFD_RELOC_ALPHA_TLSLDM",
   "BFD_RELOC_ALPHA_DTPMOD64",
@@ -1007,6 +1032,8 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
 
   "BFD_RELOC_MIPS_COPY",
   "BFD_RELOC_MIPS_JUMP_SLOT",
+
+  "BFD_RELOC_MOXIE_10_PCREL",
 
   "BFD_RELOC_FRV_LABEL16",
   "BFD_RELOC_FRV_LABEL24",
@@ -1082,6 +1109,7 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_386_TLS_GOTDESC",
   "BFD_RELOC_386_TLS_DESC_CALL",
   "BFD_RELOC_386_TLS_DESC",
+  "BFD_RELOC_386_IRELATIVE",
   "BFD_RELOC_X86_64_GOT32",
   "BFD_RELOC_X86_64_PLT32",
   "BFD_RELOC_X86_64_COPY",
@@ -1108,6 +1136,7 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_X86_64_GOTPC32_TLSDESC",
   "BFD_RELOC_X86_64_TLSDESC_CALL",
   "BFD_RELOC_X86_64_TLSDESC",
+  "BFD_RELOC_X86_64_IRELATIVE",
   "BFD_RELOC_NS32K_IMM_8",
   "BFD_RELOC_NS32K_IMM_16",
   "BFD_RELOC_NS32K_IMM_32",
@@ -1182,6 +1211,8 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_PPC64_PLTGOT16_DS",
   "BFD_RELOC_PPC64_PLTGOT16_LO_DS",
   "BFD_RELOC_PPC_TLS",
+  "BFD_RELOC_PPC_TLSGD",
+  "BFD_RELOC_PPC_TLSLD",
   "BFD_RELOC_PPC_DTPMOD",
   "BFD_RELOC_PPC_TPREL16",
   "BFD_RELOC_PPC_TPREL16_LO",
@@ -1664,13 +1695,15 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_390_GOT20",
   "BFD_RELOC_390_GOTPLT20",
   "BFD_RELOC_390_TLS_GOTIE20",
-  "BFD_RELOC_SCORE_DUMMY1",
   "BFD_RELOC_SCORE_GPREL15",
   "BFD_RELOC_SCORE_DUMMY2",
   "BFD_RELOC_SCORE_JMP",
   "BFD_RELOC_SCORE_BRANCH",
+  "BFD_RELOC_SCORE_IMM30",
+  "BFD_RELOC_SCORE_IMM32",
   "BFD_RELOC_SCORE16_JMP",
   "BFD_RELOC_SCORE16_BRANCH",
+  "BFD_RELOC_SCORE_BCMP",
   "BFD_RELOC_SCORE_GOT15",
   "BFD_RELOC_SCORE_GOT_LO16",
   "BFD_RELOC_SCORE_CALL15",
@@ -2036,6 +2069,8 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_LM32_GLOB_DAT",
   "BFD_RELOC_LM32_JMP_SLOT",
   "BFD_RELOC_LM32_RELATIVE",
+  "BFD_RELOC_MACH_O_SECTDIFF",
+  "BFD_RELOC_MACH_O_PAIR",
  "@@overflow: BFD_RELOC_UNUSED@@",
 };
 #endif
@@ -2075,5 +2110,3 @@ bfd_boolean bfd_default_scan
    (const struct bfd_arch_info *info, const char *string);
 
 /* Extracted from elf.c.  */
-struct elf_internal_shdr *bfd_elf_find_section (bfd *abfd, char *name);
-

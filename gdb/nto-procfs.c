@@ -59,13 +59,9 @@ static void procfs_open (char *, int);
 
 static int procfs_can_run (void);
 
-static ptid_t procfs_wait (ptid_t, struct target_waitstatus *);
-
 static int procfs_xfer_memory (CORE_ADDR, gdb_byte *, int, int,
 			       struct mem_attrib *attrib,
 			       struct target_ops *);
-
-static void procfs_fetch_registers (struct regcache *, int);
 
 static void notice_signals (void);
 
@@ -201,7 +197,7 @@ procfs_open (char *arg, int from_tty)
 	    {
 	      if (sysinfo->type !=
 		  nto_map_arch_to_cputype (gdbarch_bfd_arch_info
-					   (current_gdbarch)->arch_name))
+					   (target_gdbarch)->arch_name))
 		error (_("Invalid target CPU."));
 	    }
 	}
@@ -221,7 +217,7 @@ procfs_set_thread (ptid_t ptid)
 
 /*  Return nonzero if the thread TH is still alive.  */
 static int
-procfs_thread_alive (ptid_t ptid)
+procfs_thread_alive (struct target_ops *ops, ptid_t ptid)
 {
   pid_t tid;
 
@@ -232,7 +228,7 @@ procfs_thread_alive (ptid_t ptid)
 }
 
 void
-procfs_find_new_threads (void)
+procfs_find_new_threads (struct target_ops *ops)
 {
   procfs_status status;
   pid_t pid;
@@ -549,9 +545,9 @@ procfs_attach (struct target_ops *ops, char *args, int from_tty)
   inf = add_inferior (pid);
   inf->attach_flag = 1;
 
-  push_target (&procfs_ops);
+  push_target (ops);
 
-  procfs_find_new_threads ();
+  procfs_find_new_threads (ops);
 }
 
 static void
@@ -597,8 +593,8 @@ interrupt_query (void)
 {
   target_terminal_ours ();
 
-  if (query ("Interrupted while waiting for the program.\n\
-Give up (and stop debugging it)? "))
+  if (query (_("Interrupted while waiting for the program.\n\
+Give up (and stop debugging it)? ")))
     {
       target_mourn_inferior ();
       deprecated_throw_reason (RETURN_QUIT);
@@ -626,7 +622,8 @@ nto_interrupt (int signo)
 }
 
 static ptid_t
-procfs_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
+procfs_wait (struct target_ops *ops,
+	     ptid_t ptid, struct target_waitstatus *ourstatus, int options)
 {
   sigset_t set;
   siginfo_t info;
@@ -728,7 +725,8 @@ procfs_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
    general register set and floating point registers (if supported)
    and update gdb's idea of their current values.  */
 static void
-procfs_fetch_registers (struct regcache *regcache, int regno)
+procfs_fetch_registers (struct target_ops *ops,
+			struct regcache *regcache, int regno)
 {
   union
   {
@@ -852,7 +850,8 @@ procfs_remove_hw_breakpoint (struct bp_target_info *bp_tgt)
 }
 
 static void
-procfs_resume (ptid_t ptid, int step, enum target_signal signo)
+procfs_resume (struct target_ops *ops,
+	       ptid_t ptid, int step, enum target_signal signo)
 {
   int signal_to_pass;
   procfs_status status;
@@ -1093,7 +1092,7 @@ procfs_create_inferior (struct target_ops *ops, char *exec_file,
     close (fds[2]);
 
   inferior_ptid = do_attach (pid_to_ptid (pid));
-  procfs_find_new_threads ();
+  procfs_find_new_threads (ops);
 
   inf = add_inferior (pid);
   inf->attach_flag = 0;
@@ -1106,7 +1105,7 @@ procfs_create_inferior (struct target_ops *ops, char *exec_file,
       /* warning( "Failed to set Kill-on-Last-Close flag: errno = %d(%s)\n",
          errn, strerror(errn) ); */
     }
-  push_target (&procfs_ops);
+  push_target (ops);
   target_terminal_init ();
 
   if (exec_bfd != NULL
@@ -1121,7 +1120,7 @@ procfs_stop (ptid_t ptid)
 }
 
 static void
-procfs_kill_inferior (void)
+procfs_kill_inferior (struct target_ops *ops)
 {
   target_mourn_inferior ();
 }
@@ -1160,14 +1159,15 @@ get_regset (int regset, char *buf, int bufsize, int *regsize)
     default:
       return -1;
     }
-  if (devctl (ctl_fd, dev_get, &buf, bufsize, regsize) != EOK)
+  if (devctl (ctl_fd, dev_get, buf, bufsize, regsize) != EOK)
     return -1;
 
   return dev_set;
 }
 
 void
-procfs_store_registers (struct regcache *regcache, int regno)
+procfs_store_registers (struct target_ops *ops,
+			struct regcache *regcache, int regno)
 {
   union
   {
@@ -1265,7 +1265,7 @@ procfs_thread_info (pid_t pid, short tid)
 }
 
 char *
-procfs_pid_to_str (ptid_t ptid)
+procfs_pid_to_str (struct target_ops *ops, ptid_t ptid)
 {
   static char buf[1024];
   int pid, tid, n;
@@ -1327,11 +1327,11 @@ init_procfs_ops (void)
   procfs_ops.to_pid_to_str = procfs_pid_to_str;
   procfs_ops.to_stop = procfs_stop;
   procfs_ops.to_stratum = process_stratum;
-  procfs_ops.to_has_all_memory = 1;
-  procfs_ops.to_has_memory = 1;
-  procfs_ops.to_has_stack = 1;
-  procfs_ops.to_has_registers = 1;
-  procfs_ops.to_has_execution = 1;
+  procfs_ops.to_has_all_memory = default_child_has_all_memory;
+  procfs_ops.to_has_memory = default_child_has_memory;
+  procfs_ops.to_has_stack = default_child_has_stack;
+  procfs_ops.to_has_registers = default_child_has_registers;
+  procfs_ops.to_has_execution = default_child_has_execution;
   procfs_ops.to_magic = OPS_MAGIC;
   procfs_ops.to_have_continuable_watchpoint = 1;
 }

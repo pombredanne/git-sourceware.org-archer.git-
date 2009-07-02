@@ -41,6 +41,7 @@
 #include "user-regs.h"
 #include "python/python.h"
 #include "valprint.h"
+#include "python/python.h"
 
 #include "gdb_assert.h"
 
@@ -56,9 +57,6 @@ static struct value *evaluate_subexp_for_sizeof (struct expression *, int *);
 static struct value *evaluate_subexp_for_address (struct expression *,
 						  int *, enum noside);
 
-static struct value *evaluate_subexp (struct type *, struct expression *,
-				      int *, enum noside);
-
 static char *get_label (struct expression *, int *);
 
 static struct value *evaluate_struct_tuple (struct value *,
@@ -69,7 +67,7 @@ static LONGEST init_array_element (struct value *, struct value *,
 				   struct expression *, int *, enum noside,
 				   LONGEST, LONGEST);
 
-static struct value *
+struct value *
 evaluate_subexp (struct type *expect_type, struct expression *exp,
 		 int *pos, enum noside noside)
 {
@@ -416,7 +414,7 @@ init_array_element (struct value *array, struct value *element,
   return index;
 }
 
-struct value *
+static struct value *
 value_f90_subarray (struct value *array,
 		    struct expression *exp, int *pos, enum noside noside)
 {
@@ -754,7 +752,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	struct value *val;
 
 	(*pos) += 3 + BYTES_TO_EXP_ELEM (exp->elts[pc + 1].longconst + 1);
-	regno = user_reg_map_name_to_regnum (current_gdbarch,
+	regno = user_reg_map_name_to_regnum (exp->gdbarch,
 					     name, strlen (name));
 	if (regno == -1)
 	  error (_("Register $%s not available."), name);
@@ -765,9 +763,9 @@ evaluate_subexp_standard (struct type *expect_type,
            So for these registers, we fetch the register value regardless
            of the evaluation mode.  */
 	if (noside == EVAL_AVOID_SIDE_EFFECTS
-	    && regno < gdbarch_num_regs (current_gdbarch)
-	       + gdbarch_num_pseudo_regs (current_gdbarch))
-	  val = value_zero (register_type (current_gdbarch, regno), not_lval);
+	    && regno < gdbarch_num_regs (exp->gdbarch)
+			+ gdbarch_num_pseudo_regs (exp->gdbarch))
+	  val = value_zero (register_type (exp->gdbarch, regno), not_lval);
 	else
 	  val = value_of_register (regno, get_selected_frame (NULL));
 	if (val == NULL)
@@ -789,7 +787,8 @@ evaluate_subexp_standard (struct type *expect_type,
       (*pos) += 3 + BYTES_TO_EXP_ELEM (tem + 1);
       if (noside == EVAL_SKIP)
 	goto nosideret;
-      return value_string (&exp->elts[pc + 2].string, tem);
+      type = language_string_char_type (exp->language_defn, exp->gdbarch);
+      return value_string (&exp->elts[pc + 2].string, tem, type);
 
     case OP_OBJC_NSSTRING:		/* Objective C Foundation Class NSString constant.  */
       tem = longest_to_int (exp->elts[pc + 1].longconst);
@@ -798,7 +797,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	{
 	  goto nosideret;
 	}
-      return (struct value *) value_nsstring (&exp->elts[pc + 2].string, tem + 1);
+      return value_nsstring (exp->gdbarch, &exp->elts[pc + 2].string, tem + 1);
 
     case OP_BITSTRING:
       tem = longest_to_int (exp->elts[pc + 1].longconst);
@@ -940,7 +939,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	      for (; range_low <= range_high; range_low++)
 		{
 		  int bit_index = (unsigned) range_low % TARGET_CHAR_BIT;
-		  if (gdbarch_bits_big_endian (current_gdbarch))
+		  if (gdbarch_bits_big_endian (exp->gdbarch))
 		    bit_index = TARGET_CHAR_BIT - 1 - bit_index;
 		  valaddr[(unsigned) range_low / TARGET_CHAR_BIT]
 		    |= 1 << bit_index;
@@ -1010,23 +1009,24 @@ evaluate_subexp_standard (struct type *expect_type,
 	  sel[len] = 0;		/* Make sure it's terminated.  */
 
 	selector_type = builtin_type (exp->gdbarch)->builtin_data_ptr;
-	return value_from_longest (selector_type, lookup_child_selector (sel));
+	return value_from_longest (selector_type,
+				   lookup_child_selector (exp->gdbarch, sel));
       }
 
     case OP_OBJC_MSGCALL:
       {				/* Objective C message (method) call.  */
 
-	static CORE_ADDR responds_selector = 0;
-	static CORE_ADDR method_selector = 0;
+	CORE_ADDR responds_selector = 0;
+	CORE_ADDR method_selector = 0;
 
 	CORE_ADDR selector = 0;
 
 	int struct_return = 0;
 	int sub_no_side = 0;
 
-	static struct value *msg_send = NULL;
-	static struct value *msg_send_stret = NULL;
-	static int gnu_runtime = 0;
+	struct value *msg_send = NULL;
+	struct value *msg_send_stret = NULL;
+	int gnu_runtime = 0;
 
 	struct value *target = NULL;
 	struct value *method = NULL;
@@ -1098,16 +1098,20 @@ evaluate_subexp_standard (struct type *expect_type,
 	   the verification method than the non-standard, but more
 	   often used, 'NSObject' class. Make sure we check for both. */
 
-	responds_selector = lookup_child_selector ("respondsToSelector:");
+	responds_selector
+	  = lookup_child_selector (exp->gdbarch, "respondsToSelector:");
 	if (responds_selector == 0)
-	  responds_selector = lookup_child_selector ("respondsTo:");
+	  responds_selector
+	    = lookup_child_selector (exp->gdbarch, "respondsTo:");
 	
 	if (responds_selector == 0)
 	  error (_("no 'respondsTo:' or 'respondsToSelector:' method"));
 	
-	method_selector = lookup_child_selector ("methodForSelector:");
+	method_selector
+	  = lookup_child_selector (exp->gdbarch, "methodForSelector:");
 	if (method_selector == 0)
-	  method_selector = lookup_child_selector ("methodFor:");
+	  method_selector
+	    = lookup_child_selector (exp->gdbarch, "methodFor:");
 	
 	if (method_selector == 0)
 	  error (_("no 'methodFor:' or 'methodForSelector:' method"));
@@ -1185,11 +1189,12 @@ evaluate_subexp_standard (struct type *expect_type,
 		  val_type = expect_type;
 	      }
 
-	    struct_return = using_struct_return (value_type (method), val_type);
+	    struct_return = using_struct_return (exp->gdbarch,
+						 value_type (method), val_type);
 	  }
 	else if (expect_type != NULL)
 	  {
-	    struct_return = using_struct_return (NULL,
+	    struct_return = using_struct_return (exp->gdbarch, NULL,
 						 check_typedef (expect_type));
 	  }
 	
@@ -1570,7 +1575,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	  else
 	    {
 	      arg2 = evaluate_subexp_with_coercion (exp, pos, noside);
-	      return value_subscript (arg1, arg2);
+	      return value_subscript (arg1, value_as_long (arg2));
 	    }
 
 	case TYPE_CODE_PTR:
@@ -1732,10 +1737,12 @@ evaluate_subexp_standard (struct type *expect_type,
       op = exp->elts[pc + 1].opcode;
       if (binop_user_defined_p (op, arg1, arg2))
 	return value_x_binop (arg1, arg2, BINOP_ASSIGN_MODIFY, op, noside);
-      else if (op == BINOP_ADD && ptrmath_type_p (value_type (arg1)))
-	arg2 = value_ptradd (arg1, arg2);
-      else if (op == BINOP_SUB && ptrmath_type_p (value_type (arg1)))
-	arg2 = value_ptrsub (arg1, arg2);
+      else if (op == BINOP_ADD && ptrmath_type_p (value_type (arg1))
+	       && is_integral_type (value_type (arg2)))
+	arg2 = value_ptradd (arg1, value_as_long (arg2));
+      else if (op == BINOP_SUB && ptrmath_type_p (value_type (arg1))
+	       && is_integral_type (value_type (arg2)))
+	arg2 = value_ptradd (arg1, - value_as_long (arg2));
       else
 	{
 	  struct value *tmp = arg1;
@@ -1759,10 +1766,12 @@ evaluate_subexp_standard (struct type *expect_type,
 	goto nosideret;
       if (binop_user_defined_p (op, arg1, arg2))
 	return value_x_binop (arg1, arg2, op, OP_NULL, noside);
-      else if (ptrmath_type_p (value_type (arg1)))
-	return value_ptradd (arg1, arg2);
-      else if (ptrmath_type_p (value_type (arg2)))
-	return value_ptradd (arg2, arg1);
+      else if (ptrmath_type_p (value_type (arg1))
+	       && is_integral_type (value_type (arg2)))
+	return value_ptradd (arg1, value_as_long (arg2));
+      else if (ptrmath_type_p (value_type (arg2))
+	       && is_integral_type (value_type (arg1)))
+	return value_ptradd (arg2, value_as_long (arg1));
       else
 	{
 	  binop_promote (exp->language_defn, exp->gdbarch, &arg1, &arg2);
@@ -1776,17 +1785,16 @@ evaluate_subexp_standard (struct type *expect_type,
 	goto nosideret;
       if (binop_user_defined_p (op, arg1, arg2))
 	return value_x_binop (arg1, arg2, op, OP_NULL, noside);
-      else if (ptrmath_type_p (value_type (arg1)))
+      else if (ptrmath_type_p (value_type (arg1))
+	       && ptrmath_type_p (value_type (arg2)))
 	{
-	  if (ptrmath_type_p (value_type (arg2)))
-	    {
-	      /* FIXME -- should be ptrdiff_t */
-	      type = builtin_type (exp->gdbarch)->builtin_long;
-	      return value_from_longest (type, value_ptrdiff (arg1, arg2));
-	    }
-	  else
-	    return value_ptrsub (arg1, arg2);
+	  /* FIXME -- should be ptrdiff_t */
+	  type = builtin_type (exp->gdbarch)->builtin_long;
+	  return value_from_longest (type, value_ptrdiff (arg1, arg2));
 	}
+      else if (ptrmath_type_p (value_type (arg1))
+	       && is_integral_type (value_type (arg2)))
+	return value_ptradd (arg1, - value_as_long (arg2));
       else
 	{
 	  binop_promote (exp->language_defn, exp->gdbarch, &arg1, &arg2);
@@ -1881,7 +1889,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	  if (noside == EVAL_AVOID_SIDE_EFFECTS)
 	    return value_zero (TYPE_TARGET_TYPE (type), VALUE_LVAL (arg1));
 	  else
-	    return value_subscript (arg1, arg2);
+	    return value_subscript (arg1, value_as_long (arg2));
 	}
 
     case BINOP_IN:
@@ -1946,12 +1954,13 @@ evaluate_subexp_standard (struct type *expect_type,
 		case TYPE_CODE_PTR:
 		case TYPE_CODE_ARRAY:
 		case TYPE_CODE_STRING:
-		  arg1 = value_subscript (arg1, arg2);
+		  arg1 = value_subscript (arg1, value_as_long (arg2));
 		  break;
 
 		case TYPE_CODE_BITSTRING:
 		  type = language_bool_type (exp->language_defn, exp->gdbarch);
-		  arg1 = value_bitstring_subscript (type, arg1, arg2);
+		  arg1 = value_bitstring_subscript (type, arg1,
+						    value_as_long (arg2));
 		  break;
 
 		default:
@@ -2031,10 +2040,6 @@ evaluate_subexp_standard (struct type *expect_type,
 	  offset_item =
 	    array_size_array[i - 1] * offset_item + subscript_array[i - 1];
 
-	/* Construct a value node with the value of the offset */
-
-	arg2 = value_from_longest (builtin_type_int32, offset_item);
-
 	/* Let us now play a dirty trick: we will take arg1 
 	   which is a value node pointing to the topmost level
 	   of the multidimensional array-set and pretend
@@ -2043,7 +2048,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	   returns the correct type value */
 
 	deprecated_set_value_type (arg1, tmp_type);
-	return value_subscripted_rvalue (arg1, arg2, 0);
+	return value_subscripted_rvalue (arg1, offset_item, 0);
       }
 
     case BINOP_LOGICAL_AND:
@@ -2382,12 +2387,12 @@ evaluate_subexp_standard (struct type *expect_type,
 	}
       else
 	{
-	  arg2 = value_from_longest (builtin_type_uint8, (LONGEST) 1);
 	  if (ptrmath_type_p (value_type (arg1)))
-	    arg2 = value_ptradd (arg1, arg2);
+	    arg2 = value_ptradd (arg1, 1);
 	  else
 	    {
 	      struct value *tmp = arg1;
+	      arg2 = value_one (value_type (arg1), not_lval);
 	      binop_promote (exp->language_defn, exp->gdbarch, &tmp, &arg2);
 	      arg2 = value_binop (tmp, arg2, BINOP_ADD);
 	    }
@@ -2405,12 +2410,12 @@ evaluate_subexp_standard (struct type *expect_type,
 	}
       else
 	{
-	  arg2 = value_from_longest (builtin_type_uint8, (LONGEST) 1);
 	  if (ptrmath_type_p (value_type (arg1)))
-	    arg2 = value_ptrsub (arg1, arg2);
+	    arg2 = value_ptradd (arg1, -1);
 	  else
 	    {
 	      struct value *tmp = arg1;
+	      arg2 = value_one (value_type (arg1), not_lval);
 	      binop_promote (exp->language_defn, exp->gdbarch, &tmp, &arg2);
 	      arg2 = value_binop (tmp, arg2, BINOP_SUB);
 	    }
@@ -2428,12 +2433,12 @@ evaluate_subexp_standard (struct type *expect_type,
 	}
       else
 	{
-	  arg2 = value_from_longest (builtin_type_uint8, (LONGEST) 1);
 	  if (ptrmath_type_p (value_type (arg1)))
-	    arg2 = value_ptradd (arg1, arg2);
+	    arg2 = value_ptradd (arg1, 1);
 	  else
 	    {
 	      struct value *tmp = arg1;
+	      arg2 = value_one (value_type (arg1), not_lval);
 	      binop_promote (exp->language_defn, exp->gdbarch, &tmp, &arg2);
 	      arg2 = value_binop (tmp, arg2, BINOP_ADD);
 	    }
@@ -2452,12 +2457,12 @@ evaluate_subexp_standard (struct type *expect_type,
 	}
       else
 	{
-	  arg2 = value_from_longest (builtin_type_uint8, (LONGEST) 1);
 	  if (ptrmath_type_p (value_type (arg1)))
-	    arg2 = value_ptrsub (arg1, arg2);
+	    arg2 = value_ptradd (arg1, -1);
 	  else
 	    {
 	      struct value *tmp = arg1;
+	      arg2 = value_one (value_type (arg1), not_lval);
 	      binop_promote (exp->language_defn, exp->gdbarch, &tmp, &arg2);
 	      arg2 = value_binop (tmp, arg2, BINOP_SUB);
 	    }
@@ -2481,7 +2486,17 @@ evaluate_subexp_standard (struct type *expect_type,
       if (noside == EVAL_SKIP)
         goto nosideret;
       else if (noside == EVAL_AVOID_SIDE_EFFECTS)
-        return allocate_value (exp->elts[pc + 1].type);
+	{
+	  struct type *type = exp->elts[pc + 1].type;
+	  /* If this is a typedef, then find its immediate target.  We
+	     use check_typedef to resolve stubs, but we ignore its
+	     result because we do not want to dig past all
+	     typedefs.  */
+	  check_typedef (type);
+	  if (TYPE_CODE (type) == TYPE_CODE_TYPEDEF)
+	    type = TYPE_TARGET_TYPE (type);
+	  return allocate_value (type);
+	}
       else
         error (_("Attempt to use a type name as an expression"));
 
@@ -2566,13 +2581,8 @@ evaluate_subexp_for_address (struct expression *exp, int *pos,
 	  return
 	    value_zero (type, not_lval);
 	}
-      else if (symbol_read_needs_frame (var))
-	return
-	  locate_var_value
-	  (var,
-	   block_innermost_frame (exp->elts[pc + 1].block));
       else
-	return locate_var_value (var, NULL);
+	return address_of_variable (var, exp->elts[pc + 1].block);
 
     case OP_SCOPE:
       tem = longest_to_int (exp->elts[pc + 2].longconst);
@@ -2626,6 +2636,7 @@ evaluate_subexp_with_coercion (struct expression *exp,
   int pc;
   struct value *val;
   struct symbol *var;
+  struct type *type;
 
   pc = (*pos);
   op = exp->elts[pc].opcode;
@@ -2634,14 +2645,13 @@ evaluate_subexp_with_coercion (struct expression *exp,
     {
     case OP_VAR_VALUE:
       var = exp->elts[pc + 2].symbol;
-      if (TYPE_CODE (check_typedef (SYMBOL_TYPE (var))) == TYPE_CODE_ARRAY
+      type = check_typedef (SYMBOL_TYPE (var));
+      if (TYPE_CODE (type) == TYPE_CODE_ARRAY
 	  && CAST_IS_CONVERSION)
 	{
 	  (*pos) += 4;
-	  val =
-	    locate_var_value
-	    (var, block_innermost_frame (exp->elts[pc + 1].block));
-	  return value_cast (lookup_pointer_type (TYPE_TARGET_TYPE (check_typedef (SYMBOL_TYPE (var)))),
+	  val = address_of_variable (var, exp->elts[pc + 1].block);
+	  return value_cast (lookup_pointer_type (TYPE_TARGET_TYPE (type)),
 			     val);
 	}
       /* FALLTHROUGH */

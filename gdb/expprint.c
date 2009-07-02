@@ -186,8 +186,8 @@ print_subexp_standard (struct expression *exp, int *pos,
 	   If necessary, we can temporarily set it to zero, or pass it as an
 	   additional parameter to LA_PRINT_STRING.  -fnf */
 	get_user_print_options (&opts);
-	LA_PRINT_STRING (stream, &exp->elts[pc + 2].string, nargs, 1, 0,
-			 &opts);
+	LA_PRINT_STRING (stream, builtin_type (exp->gdbarch)->builtin_char,
+			 &exp->elts[pc + 2].string, nargs, 0, &opts);
       }
       return;
 
@@ -205,8 +205,8 @@ print_subexp_standard (struct expression *exp, int *pos,
 	(*pos) += 3 + BYTES_TO_EXP_ELEM (nargs + 1);
 	fputs_filtered ("@\"", stream);
 	get_user_print_options (&opts);
-	LA_PRINT_STRING (stream, &exp->elts[pc + 2].string, nargs, 1, 0,
-			 &opts);
+	LA_PRINT_STRING (stream, builtin_type (exp->gdbarch)->builtin_char,
+			 &exp->elts[pc + 2].string, nargs, 0, &opts);
 	fputs_filtered ("\"", stream);
       }
       return;
@@ -291,8 +291,8 @@ print_subexp_standard (struct expression *exp, int *pos,
 	{
 	  struct value_print_options opts;
 	  get_user_print_options (&opts);
-	  LA_PRINT_STRING (stream, tempstr, nargs - 1, 1, 0,
-			   &opts);
+	  LA_PRINT_STRING (stream, builtin_type (exp->gdbarch)->builtin_char,
+			   tempstr, nargs - 1, 0, &opts);
 	  (*pos) = pc;
 	}
       else
@@ -802,6 +802,9 @@ op_name_standard (enum exp_opcode opcode)
     }
 }
 
+/* Print a raw dump of expression EXP to STREAM.
+   NOTE, if non-NULL, is printed as extra explanatory text.  */
+
 void
 dump_raw_expression (struct expression *exp, struct ui_file *stream,
 		     char *note)
@@ -813,7 +816,9 @@ dump_raw_expression (struct expression *exp, struct ui_file *stream,
 
   fprintf_filtered (stream, "Dump of expression @ ");
   gdb_print_host_address (exp, stream);
-  fprintf_filtered (stream, "'\n\tLanguage %s, %d elements, %ld bytes each.\n",
+  if (note)
+    fprintf_filtered (stream, ", %s:", note);
+  fprintf_filtered (stream, "\n\tLanguage %s, %d elements, %ld bytes each.\n",
 		    exp->language_defn->la_name, exp->nelts,
 		    (long) sizeof (union exp_element));
   fprintf_filtered (stream, "\t%5s  %20s  %16s  %s\n", "Index", "Opcode",
@@ -997,7 +1002,7 @@ dump_subexp_body_standard (struct expression *exp,
       fprintf_filtered (stream, "Internal var @");
       gdb_print_host_address (exp->elts[elt].internalvar, stream);
       fprintf_filtered (stream, " (%s)",
-			exp->elts[elt].internalvar->name);
+			internalvar_name (exp->elts[elt].internalvar));
       elt += 2;
       break;
     case OP_FUNCALL:

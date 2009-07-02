@@ -49,7 +49,9 @@ enum task_states
   Timer_Server_Sleep,
   AST_Server_Sleep,
   Asynchronous_Hold,
-  Interrupt_Server_Blocked_On_Event_Flag
+  Interrupt_Server_Blocked_On_Event_Flag,
+  Activating,
+  Acceptor_Delay_Sleep
 };
 
 /* A short description corresponding to each possible task state.  */
@@ -58,7 +60,7 @@ static const char *task_states[] = {
   N_("Runnable"),
   N_("Terminated"),
   N_("Child Activation Wait"),
-  N_("Accept Statement"),
+  N_("Accept or Select Term"),
   N_("Waiting on entry call"),
   N_("Async Select Wait"),
   N_("Delay Sleep"),
@@ -69,7 +71,9 @@ static const char *task_states[] = {
   "",
   "",
   N_("Asynchronous Hold"),
-  ""
+  "",
+  N_("Activating"),
+  N_("Selective Wait")
 };
 
 /* A longer description corresponding to each possible task state.  */
@@ -78,7 +82,7 @@ static const char *long_task_states[] = {
   N_("Runnable"),
   N_("Terminated"),
   N_("Waiting for child activation"),
-  N_("Blocked in accept statement"),
+  N_("Blocked in accept or select with terminate"),
   N_("Waiting on entry call"),
   N_("Asynchronous Selective Wait"),
   N_("Delay Sleep"),
@@ -89,7 +93,9 @@ static const char *long_task_states[] = {
   "",
   "",
   N_("Asynchronous Hold"),
-  ""
+  "",
+  N_("Activating"),
+  N_("Blocked in selective wait statement")
 };
 
 /* The index of certain important fields in the Ada Task Control Block
@@ -196,41 +202,13 @@ valid_task_id (int task_num)
           && task_num <= VEC_length (ada_task_info_s, task_list));
 }
 
-/* Return the task info associated to the Environment Task.
-   This function assumes that the inferior does in fact use tasking.  */
+/* Return non-zero iff the task STATE corresponds to a non-terminated
+   task state.  */
 
-struct ada_task_info *
-ada_get_environment_task (void)
+static int
+ada_task_is_alive (struct ada_task_info *task_info)
 {
-  ada_build_task_list (0);
-  gdb_assert (VEC_length (ada_task_info_s, task_list) > 0);
-
-  /* We use a little bit of insider knowledge to determine which task
-     is the Environment Task:  We know that this task is created first,
-     and thus should always be task #1, which is at index 0 of the
-     TASK_LIST.  */
-  return (VEC_index (ada_task_info_s, task_list, 0));
-}
-
-/* Call the ITERATOR function once for each Ada task that hasn't been
-   terminated yet.  */
-
-void
-iterate_over_live_ada_tasks (ada_task_list_iterator_ftype *iterator)
-{
-  int i, nb_tasks;
-  struct ada_task_info *task;
-
-  ada_build_task_list (0);
-  nb_tasks = VEC_length (ada_task_info_s, task_list);
-
-  for (i = 0; i < nb_tasks; i++)
-    {
-      task = VEC_index (ada_task_info_s, task_list, i);
-      if (!ada_task_is_alive (task))
-        continue;
-      iterator (task);
-    }
+  return (task_info->state != Terminated);
 }
 
 /* Extract the contents of the value as a string whose length is LENGTH,
@@ -570,7 +548,8 @@ read_atcb (CORE_ADDR task_id, struct ada_task_info *task_info)
         ada_coerce_to_simple_array_ptr (value_field (tcb_value,
                                                      fieldno.entry_calls));
       entry_calls_value_element =
-        value_subscript (entry_calls_value, atc_nesting_level_value);
+        value_subscript (entry_calls_value,
+			 value_as_long (atc_nesting_level_value));
       called_task_fieldno =
         ada_get_field_index (value_type (entry_calls_value_element),
                              "called_task", 0);
@@ -631,7 +610,7 @@ static int
 read_known_tasks_array (void)
 {
   const int target_ptr_byte =
-    gdbarch_ptr_bit (current_gdbarch) / TARGET_CHAR_BIT;
+    gdbarch_ptr_bit (target_gdbarch) / TARGET_CHAR_BIT;
   const CORE_ADDR known_tasks_addr = get_known_tasks_addr ();
   const int known_tasks_size = target_ptr_byte * MAX_NUMBER_OF_KNOWN_TASKS;
   gdb_byte *known_tasks = alloca (known_tasks_size);
@@ -654,7 +633,7 @@ read_known_tasks_array (void)
   for (i = 0; i < MAX_NUMBER_OF_KNOWN_TASKS; i++)
     {
       struct type *data_ptr_type =
-        builtin_type (current_gdbarch)->builtin_data_ptr;
+        builtin_type (target_gdbarch)->builtin_data_ptr;
       CORE_ADDR task_id =
         extract_typed_address (known_tasks + i * target_ptr_byte,
 			       data_ptr_type);
@@ -691,15 +670,6 @@ ada_build_task_list (int warn_if_null)
     }
 
   return 1;
-}
-
-/* Return non-zero iff the task STATE corresponds to a non-terminated
-   task state.  */
-
-int
-ada_task_is_alive (struct ada_task_info *task_info)
-{
-  return (task_info->state != Terminated);
 }
 
 /* Print a one-line description of the task whose number is TASKNO.
@@ -742,9 +712,6 @@ short_task_info (int taskno)
   else if (task_info->state == Entry_Caller_Sleep && task_info->called_task)
     printf_filtered (_(" Waiting on RV with %-3d"),
                      get_task_number_from_id (task_info->called_task));
-  else if (task_info->state == Runnable && active_task_p)
-    /* Replace "Runnable" by "Running" since this is the active task.  */
-    printf_filtered (" %-22s", _("Running"));
   else
     printf_filtered (" %-22s", _(task_states[task_info->state]));
 
@@ -899,6 +866,15 @@ task_command_1 (char *taskno_str, int from_tty)
   if (!ada_task_is_alive (task_info))
     error (_("Cannot switch to task %d: Task is no longer running"), taskno);
    
+  /* On some platforms, the thread list is not updated until the user
+     performs a thread-related operation (by using the "info threads"
+     command, for instance).  So this thread list may not be up to date
+     when the user attempts this task switch.  Since we cannot switch
+     to the thread associated to our task if GDB does not know about
+     that thread, we need to make sure that any new threads gets added
+     to the thread list.  */
+  target_find_new_threads ();
+
   switch_to_thread (task_info->ptid);
   ada_find_printable_frame (get_selected_frame (NULL));
   printf_filtered (_("[Switching to task %d]\n"), taskno);
@@ -942,7 +918,7 @@ Task switching not supported when debugging from core files\n\
 
 /* Indicate that the task list may have changed, so invalidate the cache.  */
 
-void
+static void
 ada_task_list_changed (void)
 {
   stale_task_list_p = 1;  
@@ -951,7 +927,7 @@ ada_task_list_changed (void)
 /* The 'normal_stop' observer notification callback.  */
 
 static void
-ada_normal_stop_observer (struct bpstats *unused_args)
+ada_normal_stop_observer (struct bpstats *unused_args, int unused_args2)
 {
   /* The inferior has been resumed, and just stopped. This means that
      our task_list needs to be recomputed before it can be used again.  */
@@ -960,7 +936,7 @@ ada_normal_stop_observer (struct bpstats *unused_args)
 
 /* A routine to be called when the objfiles have changed.  */
 
-void
+static void
 ada_new_objfile_observer (struct objfile *objfile)
 {
   /* Invalidate all cached data that were extracted from an objfile.  */
@@ -972,6 +948,9 @@ ada_new_objfile_observer (struct objfile *objfile)
 
   ada_tasks_check_symbol_table = 1;
 }
+
+/* Provide a prototype to silence -Wmissing-prototypes.  */
+extern initialize_file_ftype _initialize_tasks;
 
 void
 _initialize_tasks (void)

@@ -76,6 +76,8 @@ struct objc_method {
   CORE_ADDR imp;
 };
 
+static const struct objfile_data *objc_objfile_data;
+
 /* Lookup a structure type named "struct NAME", visible in lexical
    block BLOCK.  If NOERR is nonzero, return zero if NAME is not
    suitably defined.  */
@@ -106,8 +108,9 @@ lookup_struct_typedef (char *name, struct block *block, int noerr)
 }
 
 CORE_ADDR 
-lookup_objc_class (char *classname)
+lookup_objc_class (struct gdbarch *gdbarch, char *classname)
 {
+  struct type *char_type = builtin_type (gdbarch)->builtin_char;
   struct value * function, *classval;
 
   if (! target_has_execution)
@@ -126,15 +129,16 @@ lookup_objc_class (char *classname)
       return 0;
     }
 
-  classval = value_string (classname, strlen (classname) + 1);
+  classval = value_string (classname, strlen (classname) + 1, char_type);
   classval = value_coerce_array (classval);
   return (CORE_ADDR) value_as_long (call_function_by_hand (function, 
 							   1, &classval));
 }
 
 CORE_ADDR
-lookup_child_selector (char *selname)
+lookup_child_selector (struct gdbarch *gdbarch, char *selname)
 {
+  struct type *char_type = builtin_type (gdbarch)->builtin_char;
   struct value * function, *selstring;
 
   if (! target_has_execution)
@@ -154,52 +158,49 @@ lookup_child_selector (char *selname)
     }
 
   selstring = value_coerce_array (value_string (selname, 
-						strlen (selname) + 1));
+						strlen (selname) + 1, char_type));
   return value_as_long (call_function_by_hand (function, 1, &selstring));
 }
 
 struct value * 
-value_nsstring (char *ptr, int len)
+value_nsstring (struct gdbarch *gdbarch, char *ptr, int len)
 {
+  struct type *char_type = builtin_type (gdbarch)->builtin_char;
   struct value *stringValue[3];
   struct value *function, *nsstringValue;
   struct symbol *sym;
   struct type *type;
-  struct objfile *objf;
-  struct gdbarch *gdbarch;
 
   if (!target_has_execution)
     return 0;		/* Can't call into inferior to create NSString.  */
 
-  stringValue[2] = value_string(ptr, len);
+  stringValue[2] = value_string(ptr, len, char_type);
   stringValue[2] = value_coerce_array(stringValue[2]);
   /* _NSNewStringFromCString replaces "istr" after Lantern2A.  */
   if (lookup_minimal_symbol("_NSNewStringFromCString", 0, 0))
     {
-      function = find_function_in_inferior("_NSNewStringFromCString", &objf);
+      function = find_function_in_inferior("_NSNewStringFromCString", NULL);
       nsstringValue = call_function_by_hand(function, 1, &stringValue[2]);
     }
   else if (lookup_minimal_symbol("istr", 0, 0))
     {
-      function = find_function_in_inferior("istr", &objf);
+      function = find_function_in_inferior("istr", NULL);
       nsstringValue = call_function_by_hand(function, 1, &stringValue[2]);
     }
   else if (lookup_minimal_symbol("+[NSString stringWithCString:]", 0, 0))
     {
       function
-	= find_function_in_inferior("+[NSString stringWithCString:]", &objf);
-      type = builtin_type (get_objfile_arch (objf))->builtin_long;
+	= find_function_in_inferior("+[NSString stringWithCString:]", NULL);
+      type = builtin_type (gdbarch)->builtin_long;
 
       stringValue[0] = value_from_longest 
-	(type, lookup_objc_class ("NSString"));
+	(type, lookup_objc_class (gdbarch, "NSString"));
       stringValue[1] = value_from_longest 
-	(type, lookup_child_selector ("stringWithCString:"));
+	(type, lookup_child_selector (gdbarch, "stringWithCString:"));
       nsstringValue = call_function_by_hand(function, 3, &stringValue[0]);
     }
   else
     error (_("NSString: internal error -- no way to create new NSString"));
-
-  gdbarch = get_objfile_arch (objf);
 
   sym = lookup_struct_typedef("NSString", 0, 1);
   if (sym == NULL)
@@ -280,7 +281,7 @@ objc_demangle (const char *mangled, int options)
    for printing characters and strings is language specific.  */
 
 static void
-objc_emit_char (int c, struct ui_file *stream, int quoter)
+objc_emit_char (int c, struct type *type, struct ui_file *stream, int quoter)
 {
 
   c &= 0xFF;			/* Avoid sign bit follies.  */
@@ -326,10 +327,10 @@ objc_emit_char (int c, struct ui_file *stream, int quoter)
 }
 
 static void
-objc_printchar (int c, struct ui_file *stream)
+objc_printchar (int c, struct type *type, struct ui_file *stream)
 {
   fputs_filtered ("'", stream);
-  objc_emit_char (c, stream, '\'');
+  objc_emit_char (c, type, stream, '\'');
   fputs_filtered ("'", stream);
 }
 
@@ -340,14 +341,16 @@ objc_printchar (int c, struct ui_file *stream)
    FORCE_ELLIPSES.  */
 
 static void
-objc_printstr (struct ui_file *stream, const gdb_byte *string, 
-	       unsigned int length, int width, int force_ellipses,
+objc_printstr (struct ui_file *stream, struct type *type,
+	       const gdb_byte *string, unsigned int length,
+	       int force_ellipses,
 	       const struct value_print_options *options)
 {
   unsigned int i;
   unsigned int things_printed = 0;
   int in_quotes = 0;
   int need_comma = 0;
+  int width = TYPE_LENGTH (type);
 
   /* If the string was not truncated due to `set print elements', and
      the last byte of it is a null, we don't print that, in
@@ -395,7 +398,7 @@ objc_printstr (struct ui_file *stream, const gdb_byte *string,
 		fputs_filtered ("\", ", stream);
 	      in_quotes = 0;
 	    }
-	  objc_printchar (string[i], stream);
+	  objc_printchar (string[i], type, stream);
 	  fprintf_filtered (stream, " <repeats %u times>", reps);
 	  i = rep1 - 1;
 	  things_printed += options->repeat_count_threshold;
@@ -411,7 +414,7 @@ objc_printstr (struct ui_file *stream, const gdb_byte *string,
 		fputs_filtered ("\"", stream);
 	      in_quotes = 1;
 	    }
-	  objc_emit_char (string[i], stream, '"');
+	  objc_emit_char (string[i], type, stream, '"');
 	  ++things_printed;
 	}
     }
@@ -438,11 +441,11 @@ objc_printstr (struct ui_file *stream, const gdb_byte *string,
 static CORE_ADDR 
 objc_skip_trampoline (struct frame_info *frame, CORE_ADDR stop_pc)
 {
+  struct gdbarch *gdbarch = get_frame_arch (frame);
   CORE_ADDR real_stop_pc;
   CORE_ADDR method_stop_pc;
   
-  real_stop_pc = gdbarch_skip_trampoline_code
-		   (current_gdbarch, frame, stop_pc);
+  real_stop_pc = gdbarch_skip_trampoline_code (gdbarch, frame, stop_pc);
 
   if (real_stop_pc != 0)
     find_objc_msgcall (real_stop_pc, &method_stop_pc);
@@ -452,7 +455,7 @@ objc_skip_trampoline (struct frame_info *frame, CORE_ADDR stop_pc)
   if (method_stop_pc)
     {
       real_stop_pc = gdbarch_skip_trampoline_code
-		       (current_gdbarch, frame, method_stop_pc);
+		       (gdbarch, frame, method_stop_pc);
       if (real_stop_pc == 0)
 	real_stop_pc = method_stop_pc;
     }
@@ -608,7 +611,7 @@ end_msglist(void)
   selname_chain = sel->next;
   msglist_len = sel->msglist_len;
   msglist_sel = sel->msglist_sel;
-  selid = lookup_child_selector(p);
+  selid = lookup_child_selector (parse_gdbarch, p);
   if (!selid)
     error (_("Can't find selector \"%s\""), p);
   write_exp_elt_longcst (selid);
@@ -1152,88 +1155,117 @@ find_methods (struct symtab *symtab, char type,
   if (symtab)
     block = BLOCKVECTOR_BLOCK (BLOCKVECTOR (symtab), STATIC_BLOCK);
 
-  ALL_MSYMBOLS (objfile, msymbol)
+  ALL_OBJFILES (objfile)
     {
-      QUIT;
+      unsigned int *objc_csym;
 
-      if ((MSYMBOL_TYPE (msymbol) != mst_text)
-	  && (MSYMBOL_TYPE (msymbol) != mst_file_text))
-	/* Not a function or method.  */
+      /* The objfile_csym variable counts the number of ObjC methods
+	 that this objfile defines.  We save that count as a private
+	 objfile data.	If we have already determined that this objfile
+	 provides no ObjC methods, we can skip it entirely.  */
+
+      unsigned int objfile_csym = 0;
+
+      objc_csym = objfile_data (objfile, objc_objfile_data);
+      if (objc_csym != NULL && *objc_csym == 0)
+	/* There are no ObjC symbols in this objfile.  Skip it entirely.  */
 	continue;
 
-      if (symtab)
-	if ((SYMBOL_VALUE_ADDRESS (msymbol) <  BLOCK_START (block)) ||
-	    (SYMBOL_VALUE_ADDRESS (msymbol) >= BLOCK_END (block)))
-	  /* Not in the specified symtab.  */
-	  continue;
-
-      symname = SYMBOL_NATURAL_NAME (msymbol);
-      if (symname == NULL)
-	continue;
-
-      if ((symname[0] != '-' && symname[0] != '+') || (symname[1] != '['))
-	/* Not a method name.  */
-	continue;
-      
-      while ((strlen (symname) + 1) >= tmplen)
+      ALL_OBJFILE_MSYMBOLS (objfile, msymbol)
 	{
-	  tmplen = (tmplen == 0) ? 1024 : tmplen * 2;
-	  tmp = xrealloc (tmp, tmplen);
-	}
-      strcpy (tmp, symname);
+	  QUIT;
 
-      if (parse_method (tmp, &ntype, &nclass, &ncategory, &nselector) == NULL)
-	continue;
+	  if ((MSYMBOL_TYPE (msymbol) != mst_text)
+	      && (MSYMBOL_TYPE (msymbol) != mst_file_text))
+	    /* Not a function or method.  */
+	    continue;
+
+	  if (symtab)
+	    if ((SYMBOL_VALUE_ADDRESS (msymbol) <  BLOCK_START (block)) ||
+		(SYMBOL_VALUE_ADDRESS (msymbol) >= BLOCK_END (block)))
+	      /* Not in the specified symtab.  */
+	      continue;
+
+	  symname = SYMBOL_NATURAL_NAME (msymbol);
+	  if (symname == NULL)
+	    continue;
+
+	  if ((symname[0] != '-' && symname[0] != '+') || (symname[1] != '['))
+	    /* Not a method name.  */
+	    continue;
       
-      if ((type != '\0') && (ntype != type))
-	continue;
+	  while ((strlen (symname) + 1) >= tmplen)
+	    {
+	      tmplen = (tmplen == 0) ? 1024 : tmplen * 2;
+	      tmp = xrealloc (tmp, tmplen);
+	    }
+	  strcpy (tmp, symname);
 
-      if ((class != NULL) 
-	  && ((nclass == NULL) || (strcmp (class, nclass) != 0)))
-	continue;
+	  if (parse_method (tmp, &ntype, &nclass, &ncategory, &nselector) == NULL)
+	    continue;
+      
+	  objfile_csym++;
 
-      if ((category != NULL) && 
-	  ((ncategory == NULL) || (strcmp (category, ncategory) != 0)))
-	continue;
+	  if ((type != '\0') && (ntype != type))
+	    continue;
 
-      if ((selector != NULL) && 
-	  ((nselector == NULL) || (strcmp (selector, nselector) != 0)))
-	continue;
+	  if ((class != NULL) 
+	      && ((nclass == NULL) || (strcmp (class, nclass) != 0)))
+	    continue;
 
-      sym = find_pc_function (SYMBOL_VALUE_ADDRESS (msymbol));
-      if (sym != NULL)
-        {
-          const char *newsymname = SYMBOL_NATURAL_NAME (sym);
+	  if ((category != NULL) && 
+	      ((ncategory == NULL) || (strcmp (category, ncategory) != 0)))
+	    continue;
+
+	  if ((selector != NULL) && 
+	      ((nselector == NULL) || (strcmp (selector, nselector) != 0)))
+	    continue;
+
+	  sym = find_pc_function (SYMBOL_VALUE_ADDRESS (msymbol));
+	  if (sym != NULL)
+	    {
+	      const char *newsymname = SYMBOL_NATURAL_NAME (sym);
 	  
-          if (strcmp (symname, newsymname) == 0)
-            {
-              /* Found a high-level method sym: swap it into the
-                 lower part of sym_arr (below num_debuggable).  */
-              if (syms != NULL)
-                {
-                  syms[csym] = syms[cdebug];
-                  syms[cdebug] = sym;
-                }
-              csym++;
-              cdebug++;
-            }
-          else
-            {
-              warning (
+	      if (strcmp (symname, newsymname) == 0)
+		{
+		  /* Found a high-level method sym: swap it into the
+		     lower part of sym_arr (below num_debuggable).  */
+		  if (syms != NULL)
+		    {
+		      syms[csym] = syms[cdebug];
+		      syms[cdebug] = sym;
+		    }
+		  csym++;
+		  cdebug++;
+		}
+	      else
+		{
+		  warning (
 "debugging symbol \"%s\" does not match minimal symbol (\"%s\"); ignoring",
-                       newsymname, symname);
-              if (syms != NULL)
-                syms[csym] = (struct symbol *) msymbol;
-              csym++;
-            }
-        }
-      else 
-	{
-	  /* Found a non-debuggable method symbol.  */
-	  if (syms != NULL)
-	    syms[csym] = (struct symbol *) msymbol;
-	  csym++;
+                           newsymname, symname);
+		  if (syms != NULL)
+		    syms[csym] = (struct symbol *) msymbol;
+		  csym++;
+		}
+	    }
+	  else
+	    {
+	      /* Found a non-debuggable method symbol.  */
+	      if (syms != NULL)
+		syms[csym] = (struct symbol *) msymbol;
+	      csym++;
+	    }
 	}
+      if (objc_csym == NULL)
+	{
+	  objc_csym = obstack_alloc (&objfile->objfile_obstack,
+				     sizeof (*objc_csym));
+	  *objc_csym = objfile_csym;
+	  set_objfile_data (objfile, objc_objfile_data, objc_csym);
+	}
+      else
+	/* Count of ObjC methods in this objfile should be constant.  */
+	gdb_assert (*objc_csym == objfile_csym);
     }
 
   if (nsym != NULL)
@@ -1389,8 +1421,8 @@ print_object_command (char *args, int from_tty)
       make_cleanup (free_current_contents, &expr);
     int pc = 0;
 
-    object = expr->language_defn->la_exp_desc->evaluate_exp 
-      (builtin_type (expr->gdbarch)->builtin_data_ptr, expr, &pc, EVAL_NORMAL);
+    object = evaluate_subexp (builtin_type (expr->gdbarch)->builtin_data_ptr,
+			      expr, &pc, EVAL_NORMAL);
     do_cleanups (old_chain);
   }
 
@@ -1789,4 +1821,10 @@ resolve_msgsend_super_stret (CORE_ADDR pc, CORE_ADDR *new_pc)
   if (res == 0)
     return 1;
   return 0;
+}
+
+void
+_initialize_objc_lang (void)
+{
+  objc_objfile_data = register_objfile_data ();
 }

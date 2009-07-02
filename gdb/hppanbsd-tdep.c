@@ -6,7 +6,7 @@
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
+   the Free Software Foundation; either version 3 of the License, or
    (at your option) any later version.
 
    This program is distributed in the hope that it will be useful,
@@ -15,9 +15,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor,
-   Boston, MA 02110-1301, USA.  */
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
 #include "osabi.h"
@@ -31,6 +29,7 @@
 #include "gdb_string.h"
 
 #include "hppa-tdep.h"
+#include "hppabsd-tdep.h"
 
 /* From <machine/mcontext.h>.  */
 static int hppanbsd_mc_reg_offset[] =
@@ -201,8 +200,6 @@ hppanbsd_regset_from_core_section (struct gdbarch *gdbarch,
   return NULL;
 }
 
-void hppabsd_init_abi (struct gdbarch_info, struct gdbarch *);
-
 static void
 hppanbsd_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
 {
@@ -218,7 +215,7 @@ hppanbsd_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
 
 
 /* Provide a prototype to silence -Wmissing-prototypes.  */
-void _initialize_hppabsd_tdep (void);
+extern initialize_file_ftype _initialize_hppanbsd_tdep;
 
 void
 _initialize_hppanbsd_tdep (void)

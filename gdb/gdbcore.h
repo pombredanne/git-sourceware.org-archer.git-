@@ -82,11 +82,6 @@ extern void write_memory_unsigned_integer (CORE_ADDR addr, int len,
 /* Store VALUE at ADDR in the inferior as a LEN-byte unsigned integer.  */
 extern void write_memory_signed_integer (CORE_ADDR addr, int len,
                                          LONGEST value);
-
-extern void generic_search (int len, char *data, char *mask,
-			    CORE_ADDR startaddr, int increment,
-			    CORE_ADDR lorange, CORE_ADDR hirange,
-			    CORE_ADDR * addr_found, char *data_found);
 
 /* Hook for `exec_file_command' command to call.  */
 
@@ -118,10 +113,6 @@ extern void exec_file_attach (char *filename, int from_tty);
 extern void exec_file_clear (int from_tty);
 
 extern void validate_files (void);
-
-/* The target vector for core files. */
-
-extern struct target_ops core_ops;
 
 /* The current default bfd target.  */
 
@@ -197,5 +188,7 @@ struct core_fns
 extern void deprecated_add_core_fns (struct core_fns *cf);
 extern int default_core_sniffer (struct core_fns *cf, bfd * abfd);
 extern int default_check_format (bfd * abfd);
+
+struct target_section *deprecated_core_resize_section_table (int num_added);
 
 #endif /* !defined (GDBCORE_H) */

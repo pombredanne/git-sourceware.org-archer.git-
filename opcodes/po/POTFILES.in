@@ -80,6 +80,14 @@ iq2000-dis.c
 iq2000-ibld.c
 iq2000-opc.c
 iq2000-opc.h
+lm32-asm.c
+lm32-desc.c
+lm32-desc.h
+lm32-dis.c
+lm32-ibld.c
+lm32-opc.c
+lm32-opc.h
+lm32-opinst.c
 m10200-dis.c
 m10200-opc.c
 m10300-dis.c
@@ -119,6 +127,8 @@ mips-opc.c
 mips16-opc.c
 mmix-dis.c
 mmix-opc.c
+moxie-dis.c
+moxie-opc.c
 mt-asm.c
 mt-desc.c
 mt-desc.h
@@ -147,6 +157,7 @@ s390-mkopc.c
 s390-opc.c
 score-dis.c
 score-opc.h
+score7-dis.c
 sh-dis.c
 sh-opc.h
 sh64-dis.c

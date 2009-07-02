@@ -37,6 +37,7 @@
 #include "rs6000-tdep.h"
 #include "exec.h"
 #include "observer.h"
+#include "xcoffread.h"
 
 #include <sys/ptrace.h>
 #include <sys/reg.h>
@@ -74,7 +75,7 @@
 #ifndef ARCH3264
 # define ARCH64() 0
 #else
-# define ARCH64() (register_size (current_gdbarch, 0) == 8)
+# define ARCH64() (register_size (target_gdbarch, 0) == 8)
 #endif
 
 /* Union of 32-bit and 64-bit versions of ld_info. */
@@ -129,7 +130,7 @@ static int objfile_symbol_add (void *);
 
 static void vmap_symtab (struct vmap *);
 
-static void exec_one_dummy_insn (struct gdbarch *);
+static void exec_one_dummy_insn (struct regcache *);
 
 extern void fixup_breakpoints (CORE_ADDR low, CORE_ADDR high, CORE_ADDR delta);
 
@@ -266,7 +267,7 @@ fetch_register (struct regcache *regcache, int regno)
 /* Store register REGNO back into the inferior. */
 
 static void
-store_register (const struct regcache *regcache, int regno)
+store_register (struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
   int addr[MAX_REGISTER_SIZE];
@@ -302,7 +303,7 @@ store_register (const struct regcache *regcache, int regno)
 	   Otherwise the following ptrace(2) calls will mess up user stack
 	   since kernel will get confused about the bottom of the stack
 	   (%sp). */
-	exec_one_dummy_insn (gdbarch);
+	exec_one_dummy_insn (regcache);
 
       /* The PT_WRITE_GPR operation is rather odd.  For 32-bit inferiors,
          the register's value is passed by value, but for 64-bit inferiors,
@@ -333,7 +334,8 @@ store_register (const struct regcache *regcache, int regno)
    REGNO otherwise. */
 
 static void
-rs6000_fetch_inferior_registers (struct regcache *regcache, int regno)
+rs6000_fetch_inferior_registers (struct target_ops *ops,
+				 struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
   if (regno != -1)
@@ -375,7 +377,8 @@ rs6000_fetch_inferior_registers (struct regcache *regcache, int regno)
    Otherwise, REGNO specifies which register (so we can save time).  */
 
 static void
-rs6000_store_inferior_registers (struct regcache *regcache, int regno)
+rs6000_store_inferior_registers (struct target_ops *ops,
+				 struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
   if (regno != -1)
@@ -517,7 +520,8 @@ rs6000_xfer_partial (struct target_ops *ops, enum target_object object,
    the status in *OURSTATUS.  */
 
 static ptid_t
-rs6000_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
+rs6000_wait (struct target_ops *ops,
+	     ptid_t ptid, struct target_waitstatus *ourstatus, int options)
 {
   pid_t pid;
   int status, save_errno;
@@ -573,7 +577,7 @@ rs6000_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
    including u_area. */
 
 static void
-exec_one_dummy_insn (struct gdbarch *gdbarch)
+exec_one_dummy_insn (struct regcache *regcache)
 {
 #define	DUMMY_INSN_ADDR	AIX_TEXT_SEGMENT_BASE+0x200
 
@@ -592,8 +596,8 @@ exec_one_dummy_insn (struct gdbarch *gdbarch)
      on.  However, rs6000-ibm-aix4.1.3 seems to have screwed this up --
      the inferior never hits the breakpoint (it's also worth noting
      powerpc-ibm-aix4.1.3 works correctly).  */
-  prev_pc = read_pc ();
-  write_pc (DUMMY_INSN_ADDR);
+  prev_pc = regcache_read_pc (regcache);
+  regcache_write_pc (regcache, DUMMY_INSN_ADDR);
   if (ARCH64 ())
     ret = rs6000_ptrace64 (PT_CONTINUE, PIDGET (inferior_ptid), 1, 0, NULL);
   else
@@ -608,7 +612,7 @@ exec_one_dummy_insn (struct gdbarch *gdbarch)
     }
   while (pid != PIDGET (inferior_ptid));
 
-  write_pc (prev_pc);
+  regcache_write_pc (regcache, prev_pc);
   deprecated_remove_raw_breakpoint (bp);
 }
 
@@ -687,8 +691,8 @@ objfile_symbol_add (void *arg)
 {
   struct objfile *obj = (struct objfile *) arg;
 
-  syms_from_objfile (obj, NULL, 0, 0, 0, 0);
-  new_symfile_objfile (obj, 0, 0);
+  syms_from_objfile (obj, NULL, 0, 0, 0);
+  new_symfile_objfile (obj, 0);
   return 1;
 }
 
@@ -732,8 +736,8 @@ add_vmap (LdInfo *ldi)
 
   filename = LDI_FILENAME (ldi, arch64);
   mem = filename + strlen (filename) + 1;
-  mem = savestring (mem, strlen (mem));
-  objname = savestring (filename, strlen (filename));
+  mem = xstrdup (mem);
+  objname = xstrdup (filename);
 
   fd = LDI_FD (ldi, arch64);
   if (fd < 0)
@@ -1032,7 +1036,8 @@ xcoff_relocate_symtab (unsigned int pid)
   int ldisize = arch64 ? sizeof (ldi->l64) : sizeof (ldi->l32);
   int size;
 
-  if (ptid_equal (inferior_ptid, null_ptid))
+  /* Nothing to do if we are debugging a core file.  */
+  if (!target_has_execution)
     return;
 
   do
@@ -1153,10 +1158,9 @@ xcoff_relocate_core (struct target_ops *target)
          add our sections to the section table for the core target.  */
       if (vp != vmap)
 	{
-	  struct section_table *stp;
+	  struct target_section *stp;
 
-	  target_resize_to_sections (target, 2);
-	  stp = target->to_sections_end - 2;
+	  stp = deprecated_core_resize_section_table (2);
 
 	  stp->bfd = vp->bfd;
 	  stp->the_bfd_section = bfd_get_section_by_name (stp->bfd, ".text");
@@ -1190,16 +1194,15 @@ static CORE_ADDR
 find_toc_address (CORE_ADDR pc)
 {
   struct vmap *vp;
-  extern CORE_ADDR get_toc_offset (struct objfile *);	/* xcoffread.c */
 
   for (vp = vmap; vp; vp = vp->nxt)
     {
       if (pc >= vp->tstart && pc < vp->tend)
 	{
 	  /* vp->objfile is only NULL for the exec file.  */
-	  return vp->dstart + get_toc_offset (vp->objfile == NULL
-					      ? symfile_objfile
-					      : vp->objfile);
+	  return vp->dstart + xcoff_get_toc_offset (vp->objfile == NULL
+						    ? symfile_objfile
+						    : vp->objfile);
 	}
     }
   error (_("Unable to find TOC entry for pc %s."), hex_string (pc));

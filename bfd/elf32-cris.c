@@ -1528,7 +1528,16 @@ cris_elf_relocate_section (output_bfd, info, input_bfd, input_section,
 					 rel->r_offset);
 	      if (outrel.r_offset == (bfd_vma) -1)
 		skip = TRUE;
-	      else if (outrel.r_offset == (bfd_vma) -2)
+	      else if (outrel.r_offset == (bfd_vma) -2
+		       /* For now, undefined weak symbols with non-default
+			  visibility (yielding 0), like exception info for
+			  discarded sections, will get a R_CRIS_NONE
+			  relocation rather than no relocation, because we
+			  notice too late that the symbol doesn't need a
+			  relocation.  */
+		       || (h != NULL
+			   && h->root.type == bfd_link_hash_undefweak
+			   && ELF_ST_VISIBILITY (h->other) != STV_DEFAULT))
 		skip = TRUE, relocate = TRUE;
 	      outrel.r_offset += (input_section->output_section->vma
 				  + input_section->output_offset);
@@ -1606,10 +1615,12 @@ cris_elf_relocate_section (output_bfd, info, input_bfd, input_section,
 	case R_CRIS_16_DTPREL:
 	case R_CRIS_32_DTPREL:
 	  /* This relocation must only be performed against local
-	     symbols.  It's also ok when we link a program and the
-	     symbol is defined in an ordinary (non-DSO) object (if
-	     it's undefined there, we've already seen an error).  */
+	     symbols, or to sections that are not loadable.  It's also
+	     ok when we link a program and the symbol is defined in an
+	     ordinary (non-DSO) object (if it's undefined there, we've
+	     already seen an error).  */
 	  if (h != NULL
+	      && (input_section->flags & SEC_ALLOC) != 0
 	      && ELF_ST_VISIBILITY (h->other) == STV_DEFAULT
 	      && (info->shared
 		  || (!h->def_regular
@@ -1632,14 +1643,16 @@ cris_elf_relocate_section (output_bfd, info, input_bfd, input_section,
 	      return FALSE;
 	    }
 
-	  BFD_ASSERT (elf_cris_hash_table (info)->dtpmod_refcount != 0);
+	  BFD_ASSERT ((input_section->flags & SEC_ALLOC) == 0
+		      || elf_cris_hash_table (info)->dtpmod_refcount != 0);
 
 	  /* Fill in a R_CRIS_DTPMOD reloc at offset 3 if we haven't
 	     already done so.  Note that we do this in .got.plt, not
 	     in .got, as .got.plt contains the first part, still the
 	     reloc is against .got, because the linker script directs
 	     (is required to direct) them both into .got.  */
-	  if (elf_cris_hash_table (info)->dtpmod_refcount > 0)
+	  if (elf_cris_hash_table (info)->dtpmod_refcount > 0
+	      && (input_section->flags & SEC_ALLOC) != 0)
 	    {
 	      asection *sgotplt = bfd_get_section_by_name (dynobj, ".got.plt");
 	      BFD_ASSERT (sgotplt != NULL);
@@ -1678,9 +1691,14 @@ cris_elf_relocate_section (output_bfd, info, input_bfd, input_section,
 	    }
 
 	  /* The thread-based offset to the local symbol is the
-	     relocation.  */
+	     relocation.
+	     For the executable, TLS data begins at the thread pointer plus
+	     the negative size of the TLS data.  For a DSO, that's part of
+	     the module TLS offset.  */
 	  relocation -= elf_hash_table (info)->tls_sec == NULL
-	    ? 0 : elf_hash_table (info)->tls_sec->vma;
+	    ? 0 : (elf_hash_table (info)->tls_sec->vma
+		   + (info->shared
+		      ? 0 : elf_hash_table (info)->tls_size));
 	  break;
 
 	case R_CRIS_32_GD:
@@ -1715,7 +1733,8 @@ cris_elf_relocate_section (output_bfd, info, input_bfd, input_section,
 	      return FALSE;
 	    }
 
-	  if (!info->shared && (h == NULL || h->def_regular))
+	  if (!info->shared
+	      && (h == NULL || h->def_regular || ELF_COMMON_DEF_P (h)))
 	    {
 	      /* Known contents of the GOT.  */
 	      bfd_vma off;
@@ -1872,8 +1891,9 @@ cris_elf_relocate_section (output_bfd, info, input_bfd, input_section,
 	      bfd_vma off;
 
 	      /* The symbol is defined in the program, so just write
-		 the known_tpoffset into the GOT.  */
+		 the -prog_tls_size+known_tpoffset into the GOT.  */
 	      relocation -= elf_hash_table (info)->tls_sec->vma;
+	      relocation -= elf_hash_table (info)->tls_size;
 
 	      if (h != NULL)
 		off = h->got.offset;
@@ -1981,7 +2001,7 @@ cris_elf_relocate_section (output_bfd, info, input_bfd, input_section,
 
 	  if (h != NULL
 	      && ELF_ST_VISIBILITY (h->other) == STV_DEFAULT
-	      && !h->def_regular
+	      && !(h->def_regular || ELF_COMMON_DEF_P (h))
 	      /* If it's undefined, then an error message has already
 		 been emitted.  */
 	      && h->root.type != bfd_link_hash_undefined)
@@ -2001,7 +2021,9 @@ cris_elf_relocate_section (output_bfd, info, input_bfd, input_section,
 
 	  /* NULL if we had an error.  */
 	  relocation -= elf_hash_table (info)->tls_sec == NULL
-	    ? 0 : elf_hash_table (info)->tls_sec->vma;
+	    ? 0
+	    : (elf_hash_table (info)->tls_sec->vma
+	       + elf_hash_table (info)->tls_size);
 
 	  /* The TLS-relative offset is the relocation.  */
 	  break;
@@ -2667,6 +2689,10 @@ cris_elf_gc_sweep_hook (bfd *abfd,
 	  break;
 
 	case R_CRIS_32_DTPREL:
+	  /* This'd be a .dtpreld entry in e.g. debug info.  */
+	  if ((sec->flags & SEC_ALLOC) == 0)
+	    break;
+	  /* Fall through.  */
 	case R_CRIS_16_DTPREL:
 	  elf_cris_hash_table (info)->dtpmod_refcount--;
 	  if (elf_cris_hash_table (info)->dtpmod_refcount == 0)
@@ -3051,7 +3077,11 @@ elf_cris_copy_indirect_symbol (struct bfd_link_info *info,
   /* Only indirect symbols are replaced; we're not interested in
      updating any of EIND's fields for other symbols.  */
   if (eind->root.root.type != bfd_link_hash_indirect)
-    return;
+    {
+      /* Still, we need to copy flags for e.g. weak definitions.  */
+      _bfd_elf_link_hash_copy_indirect (info, dir, ind);
+      return;
+    }
 
   BFD_ASSERT (edir->pcrel_relocs_copied == NULL);
   BFD_ASSERT (edir->gotplt_offset == 0 || eind->gotplt_offset == 0);
@@ -3130,8 +3160,17 @@ cris_elf_check_relocs (abfd, info, sec, relocs)
 	 on the first input bfd we found that contained dynamic relocs.  */
       switch (r_type)
 	{
-	case R_CRIS_16_DTPREL:
 	case R_CRIS_32_DTPREL:
+	  if ((sec->flags & SEC_ALLOC) == 0)
+	    /* This'd be a .dtpreld entry in e.g. debug info.  We have
+	       several different switch statements below, but none of
+	       that is needed; we need no preparations for resolving
+	       R_CRIS_32_DTPREL into a non-allocated section (debug
+	       info), so let's just move on to the next
+	       relocation.  */
+	    continue;
+	  /* Fall through.  */
+	case R_CRIS_16_DTPREL:
 	  /* The first .got.plt entry is right after the R_CRIS_DTPMOD
 	     entry at index 3. */
 	  if (elf_cris_hash_table (info)->dtpmod_refcount == 0)

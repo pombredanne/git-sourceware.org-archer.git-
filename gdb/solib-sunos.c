@@ -791,7 +791,7 @@ sunos_solib_create_inferior_hook (void)
   if (gdbarch_decr_pc_after_break (target_gdbarch))
     {
       stop_pc -= gdbarch_decr_pc_after_break (target_gdbarch);
-      write_pc (stop_pc);
+      regcache_write_pc (get_current_regcache (), stop_pc);
     }
 
   if (!disable_break ())
@@ -817,7 +817,7 @@ sunos_free_so (struct so_list *so)
 
 static void
 sunos_relocate_section_addresses (struct so_list *so,
-                                 struct section_table *sec)
+				  struct target_section *sec)
 {
   sec->addr += LM_ADDR (so);
   sec->endaddr += LM_ADDR (so);

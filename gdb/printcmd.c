@@ -43,6 +43,12 @@
 #include "disasm.h"
 #include "dfp.h"
 #include "valprint.h"
+#include "exceptions.h"
+#include "observer.h"
+#include "solist.h"
+#include "solib.h"
+#include "parser-defs.h"
+#include "charset.h"
 
 #ifdef TUI
 #include "tui/tui.h"		/* For tui_active et.al.   */
@@ -128,6 +134,8 @@ struct display
   {
     /* Chain link to next auto-display item.  */
     struct display *next;
+    /* The expression as the user typed it.  */
+    char *exp_string;
     /* Expression to be evaluated and displayed.  */
     struct expression *exp;
     /* Item number of this auto-display item.  */
@@ -279,10 +287,13 @@ print_formatted (struct value *val, int size,
       switch (options->format)
 	{
 	case 's':
-	  /* FIXME: Need to handle wchar_t's here... */
-	  next_address = value_address (val)
-	    + val_print_string (value_address (val), -1, 1, stream,
-				options);
+	  {
+	    struct type *elttype = value_type (val);
+	    next_address = (value_address (val)
+			    + val_print_string (elttype,
+						value_address (val), -1,
+						stream, options));
+	  }
 	  return;
 
 	case 'i':
@@ -377,7 +388,7 @@ print_scalar_formatted (const void *valaddr, struct type *type,
 	  print_hex_chars (stream, valaddr, len, byte_order);
 	  return;
 	case 'c':
-	  print_char_chars (stream, valaddr, len, byte_order);
+	  print_char_chars (stream, type, valaddr, len, byte_order);
 	  return;
 	default:
 	  break;
@@ -396,7 +407,7 @@ print_scalar_formatted (const void *valaddr, struct type *type,
   /* If we are printing it as unsigned, truncate it in case it is actually
      a negative signed value (e.g. "print/u (short)-1" should print 65535
      (if shorts are 16 bits) instead of 4294967295).  */
-  if (options->format != 'd')
+  if (options->format != 'd' || TYPE_UNSIGNED (type))
     {
       if (len < sizeof (LONGEST))
 	val_long &= ((LONGEST) 1 << HOST_CHAR_BIT * len) - 1;
@@ -612,7 +623,7 @@ build_address_symbolic (CORE_ADDR addr,  /* IN */
   struct obj_section *section = NULL;
   char *name_temp = "";
   
-  /* Let's say it is unmapped.  */
+  /* Let's say it is mapped (not unmapped).  */
   *unmapped = 0;
 
   /* Determine if the address is in an overlay, and whether it is
@@ -1039,9 +1050,9 @@ sym_info (char *arg, int from_tty)
 	/* Don't print the offset if it is zero.
 	   We assume there's no need to handle i18n of "sym + offset".  */
 	if (offset)
-	  xasprintf (&loc_string, "%s + %u", msym_name, offset);
+	  loc_string = xstrprintf ("%s + %u", msym_name, offset);
 	else
-	  xasprintf (&loc_string, "%s", msym_name);
+	  loc_string = xstrprintf ("%s", msym_name);
 
 	/* Use a cleanup to free loc_string in case the user quits
 	   a pagination request inside printf_filtered.  */
@@ -1094,6 +1105,8 @@ sym_info (char *arg, int from_tty)
 static void
 address_info (char *exp, int from_tty)
 {
+  struct gdbarch *gdbarch;
+  int regno;
   struct symbol *sym;
   struct minimal_symbol *msymbol;
   long val;
@@ -1156,6 +1169,7 @@ address_info (char *exp, int from_tty)
   printf_filtered ("\" is ");
   val = SYMBOL_VALUE (sym);
   section = SYMBOL_OBJ_SECTION (sym);
+  gdbarch = get_objfile_arch (SYMBOL_SYMTAB (sym)->objfile);
 
   switch (SYMBOL_CLASS (sym))
     {
@@ -1180,20 +1194,28 @@ address_info (char *exp, int from_tty)
 
     case LOC_COMPUTED:
       /* FIXME: cagney/2004-01-26: It should be possible to
-	 unconditionally call the SYMBOL_OPS method when available.
+	 unconditionally call the SYMBOL_COMPUTED_OPS method when available.
 	 Unfortunately DWARF 2 stores the frame-base (instead of the
 	 function) location in a function's symbol.  Oops!  For the
 	 moment enable this when/where applicable.  */
-      SYMBOL_OPS (sym)->describe_location (sym, gdb_stdout);
+      SYMBOL_COMPUTED_OPS (sym)->describe_location (sym, gdb_stdout);
       break;
 
     case LOC_REGISTER:
+      /* GDBARCH is the architecture associated with the objfile the symbol
+	 is defined in; the target architecture may be different, and may
+	 provide additional registers.  However, we do not know the target
+	 architecture at this point.  We assume the objfile architecture
+	 will contain all the standard registers that occur in debug info
+	 in that objfile.  */
+      regno = SYMBOL_REGISTER_OPS (sym)->register_number (sym, gdbarch);
+
       if (SYMBOL_IS_ARGUMENT (sym))
 	printf_filtered (_("an argument in register %s"),
-			 gdbarch_register_name (current_gdbarch, val));
+			 gdbarch_register_name (gdbarch, regno));
       else
 	printf_filtered (_("a variable in register %s"),
-			 gdbarch_register_name (current_gdbarch, val));
+			 gdbarch_register_name (gdbarch, regno));
       break;
 
     case LOC_STATIC:
@@ -1211,8 +1233,10 @@ address_info (char *exp, int from_tty)
       break;
 
     case LOC_REGPARM_ADDR:
+      /* Note comment at LOC_REGISTER.  */
+      regno = SYMBOL_REGISTER_OPS (sym)->register_number (sym, gdbarch);
       printf_filtered (_("address of an argument in register %s"),
-		       gdbarch_register_name (current_gdbarch, val));
+		       gdbarch_register_name (gdbarch, regno));
       break;
 
     case LOC_ARG:
@@ -1358,8 +1382,7 @@ x_command (char *exp, int from_tty)
 	 then don't fetch it now; instead mark it by voiding the $__
 	 variable.  */
       if (value_lazy (last_examine_value))
-	set_internalvar (lookup_internalvar ("__"),
-			 allocate_value (builtin_type_void));
+	clear_internalvar (lookup_internalvar ("__"));
       else
 	set_internalvar (lookup_internalvar ("__"), last_examine_value);
     }
@@ -1409,11 +1432,12 @@ display_command (char *exp, int from_tty)
 	  fmt.raw = 0;
 	}
 
-      innermost_block = 0;
+      innermost_block = NULL;
       expr = parse_expression (exp);
 
       new = (struct display *) xmalloc (sizeof (struct display));
 
+      new->exp_string = xstrdup (exp);
       new->exp = expr;
       new->block = innermost_block;
       new->next = display_chain;
@@ -1432,6 +1456,7 @@ display_command (char *exp, int from_tty)
 static void
 free_display (struct display *d)
 {
+  xfree (d->exp_string);
   xfree (d->exp);
   xfree (d);
 }
@@ -1446,9 +1471,8 @@ clear_displays (void)
 
   while ((d = display_chain) != NULL)
     {
-      xfree (d->exp);
       display_chain = d->next;
-      xfree (d);
+      free_display (d);
     }
 }
 
@@ -1495,7 +1519,7 @@ undisplay_command (char *args, int from_tty)
 
   if (args == 0)
     {
-      if (query ("Delete all auto-display expressions? "))
+      if (query (_("Delete all auto-display expressions? ")))
 	clear_displays ();
       dont_repeat ();
       return;
@@ -1532,6 +1556,25 @@ do_one_display (struct display *d)
   if (d->enabled_p == 0)
     return;
 
+  if (d->exp == NULL)
+    {
+      volatile struct gdb_exception ex;
+      TRY_CATCH (ex, RETURN_MASK_ALL)
+	{
+	  innermost_block = NULL;
+	  d->exp = parse_expression (d->exp_string);
+	  d->block = innermost_block;
+	}
+      if (ex.reason < 0)
+	{
+	  /* Can't re-parse the expression.  Disable this display item.  */
+	  d->enabled_p = 0;
+	  warning (_("Unable to display \"%s\": %s"),
+		   d->exp_string, ex.message);
+	  return;
+	}
+    }
+
   if (d->block)
     within_current_scope = contained_in (get_selected_block (0), d->block);
   else
@@ -1562,7 +1605,7 @@ do_one_display (struct display *d)
 
       annotate_display_expression ();
 
-      print_expression (d->exp, gdb_stdout);
+      puts_filtered (d->exp_string);
       annotate_display_expression_end ();
 
       if (d->format.count != 1 || d->format.format == 'i')
@@ -1573,7 +1616,7 @@ do_one_display (struct display *d)
       val = evaluate_expression (d->exp);
       addr = value_as_address (val);
       if (d->format.format == 'i')
-	addr = gdbarch_addr_bits_remove (current_gdbarch, addr);
+	addr = gdbarch_addr_bits_remove (d->exp->gdbarch, addr);
 
       annotate_display_value ();
 
@@ -1590,7 +1633,7 @@ do_one_display (struct display *d)
 
       annotate_display_expression ();
 
-      print_expression (d->exp, gdb_stdout);
+      puts_filtered (d->exp_string);
       annotate_display_expression_end ();
 
       printf_filtered (" = ");
@@ -1671,7 +1714,7 @@ Num Enb Expression\n"));
 			 d->format.format);
       else if (d->format.format)
 	printf_filtered ("/%c ", d->format.format);
-      print_expression (d->exp, gdb_stdout);
+      puts_filtered (d->exp_string);
       if (d->block && !contained_in (get_selected_block (0), d->block))
 	printf_filtered (_(" (cannot be evaluated in the current context)"));
       printf_filtered ("\n");
@@ -1744,6 +1787,75 @@ disable_display_command (char *args, int from_tty)
 	while (*p == ' ' || *p == '\t')
 	  p++;
       }
+}
+
+/* Return 1 if D uses SOLIB (and will become dangling when SOLIB
+   is unloaded), otherwise return 0.  */
+
+static int
+display_uses_solib_p (const struct display *d,
+		      const struct so_list *solib)
+{
+  int endpos;
+  struct expression *const exp = d->exp;
+  const union exp_element *const elts = exp->elts;
+
+  if (d->block != NULL
+      && solib_contains_address_p (solib, d->block->startaddr))
+    return 1;
+
+  for (endpos = exp->nelts; endpos > 0; )
+    {
+      int i, args, oplen = 0;
+
+      exp->language_defn->la_exp_desc->operator_length (exp, endpos,
+							&oplen, &args);
+      gdb_assert (oplen > 0);
+
+      i = endpos - oplen;
+      if (elts[i].opcode == OP_VAR_VALUE)
+	{
+	  const struct block *const block = elts[i + 1].block;
+	  const struct symbol *const symbol = elts[i + 2].symbol;
+	  const struct obj_section *const section =
+	    SYMBOL_OBJ_SECTION (symbol);
+
+	  if (block != NULL
+	      && solib_contains_address_p (solib, block->startaddr))
+	    return 1;
+
+	  if (section && section->objfile == solib->objfile)
+	    return 1;
+	}
+      endpos -= oplen;
+    }
+
+  return 0;
+}
+
+/* display_chain items point to blocks and expressions.  Some expressions in
+   turn may point to symbols.
+   Both symbols and blocks are obstack_alloc'd on objfile_stack, and are
+   obstack_free'd when a shared library is unloaded.
+   Clear pointers that are about to become dangling.
+   Both .exp and .block fields will be restored next time we need to display
+   an item by re-parsing .exp_string field in the new execution context.  */
+
+static void
+clear_dangling_display_expressions (struct so_list *solib)
+{
+  struct display *d;
+  struct objfile *objfile = NULL;
+
+  for (d = display_chain; d; d = d->next)
+    {
+      if (d->exp && display_uses_solib_p (d, solib))
+	{
+	  xfree (d->exp);
+	  d->exp = NULL;
+	  d->block = NULL;
+	}
+    }
 }
 
 
@@ -1879,7 +1991,8 @@ printf_command (char *arg, int from_tty)
 
     enum argclass
       {
-	int_arg, long_arg, long_long_arg, ptr_arg, string_arg,
+	int_arg, long_arg, long_long_arg, ptr_arg,
+	string_arg, wide_string_arg, wide_char_arg,
 	double_arg, long_double_arg, decfloat_arg
       };
     enum argclass *argclass;
@@ -2011,8 +2124,8 @@ printf_command (char *arg, int from_tty)
 	      break;
 
 	    case 'c':
-	      this_argclass = int_arg;
-	      if (lcount || seen_h || seen_big_l)
+	      this_argclass = lcount == 0 ? int_arg : wide_char_arg;
+	      if (lcount > 1 || seen_h || seen_big_l)
 		bad = 1;
 	      if (seen_prec || seen_zero || seen_space || seen_plus)
 		bad = 1;
@@ -2027,8 +2140,8 @@ printf_command (char *arg, int from_tty)
 	      break;
 
 	    case 's':
-	      this_argclass = string_arg;
-	      if (lcount || seen_h || seen_big_l)
+	      this_argclass = lcount == 0 ? string_arg : wide_string_arg;
+	      if (lcount > 1 || seen_h || seen_big_l)
 		bad = 1;
 	      if (seen_zero || seen_space || seen_plus)
 		bad = 1;
@@ -2079,6 +2192,15 @@ printf_command (char *arg, int from_tty)
 	      current_substring[length_before_ll + 3] =
 		last_arg[length_before_ll + lcount];
 	      current_substring += length_before_ll + 4;
+	    }
+	  else if (this_argclass == wide_string_arg
+		   || this_argclass == wide_char_arg)
+	    {
+	      /* Convert %ls or %lc to %s.  */
+	      int length_before_ls = f - last_arg - 2;
+	      strncpy (current_substring, last_arg, length_before_ls);
+	      strcpy (current_substring + length_before_ls, "s");
+	      current_substring += length_before_ls + 2;
 	    }
 	  else
 	    {
@@ -2142,6 +2264,80 @@ printf_command (char *arg, int from_tty)
 	      str[j] = 0;
 
 	      printf_filtered (current_substring, (char *) str);
+	    }
+	    break;
+	  case wide_string_arg:
+	    {
+	      gdb_byte *str;
+	      CORE_ADDR tem;
+	      int j;
+	      struct type *wctype = lookup_typename (current_language,
+						     current_gdbarch,
+						     "wchar_t", NULL, 0);
+	      int wcwidth = TYPE_LENGTH (wctype);
+	      gdb_byte *buf = alloca (wcwidth);
+	      struct obstack output;
+	      struct cleanup *inner_cleanup;
+
+	      tem = value_as_address (val_args[i]);
+
+	      /* This is a %s argument.  Find the length of the string.  */
+	      for (j = 0;; j += wcwidth)
+		{
+		  QUIT;
+		  read_memory (tem + j, buf, wcwidth);
+		  if (extract_unsigned_integer (buf, wcwidth) == 0)
+		    break;
+		}
+
+	      /* Copy the string contents into a string inside GDB.  */
+	      str = (gdb_byte *) alloca (j + wcwidth);
+	      if (j != 0)
+		read_memory (tem, str, j);
+	      memset (&str[j], 0, wcwidth);
+
+	      obstack_init (&output);
+	      inner_cleanup = make_cleanup_obstack_free (&output);
+
+	      convert_between_encodings (target_wide_charset (),
+					 host_charset (),
+					 str, j, wcwidth,
+					 &output, translit_char);
+	      obstack_grow_str0 (&output, "");
+
+	      printf_filtered (current_substring, obstack_base (&output));
+	      do_cleanups (inner_cleanup);
+	    }
+	    break;
+	  case wide_char_arg:
+	    {
+	      struct type *wctype = lookup_typename (current_language,
+						     current_gdbarch,
+						     "wchar_t", NULL, 0);
+	      struct type *valtype;
+	      struct obstack output;
+	      struct cleanup *inner_cleanup;
+	      const gdb_byte *bytes;
+
+	      valtype = value_type (val_args[i]);
+	      if (TYPE_LENGTH (valtype) != TYPE_LENGTH (wctype)
+		  || TYPE_CODE (valtype) != TYPE_CODE_INT)
+		error (_("expected wchar_t argument for %%lc"));
+
+	      bytes = value_contents (val_args[i]);
+
+	      obstack_init (&output);
+	      inner_cleanup = make_cleanup_obstack_free (&output);
+
+	      convert_between_encodings (target_wide_charset (),
+					 host_charset (),
+					 bytes, TYPE_LENGTH (valtype),
+					 TYPE_LENGTH (valtype),
+					 &output, translit_char);
+	      obstack_grow_str0 (&output, "");
+
+	      printf_filtered (current_substring, obstack_base (&output));
+	      do_cleanups (inner_cleanup);
 	    }
 	    break;
 	  case double_arg:
@@ -2380,6 +2576,8 @@ _initialize_printcmd (void)
   struct cmd_list_element *c;
 
   current_display_number = -1;
+
+  observer_attach_solib_unloaded (clear_dangling_display_expressions);
 
   add_info ("address", address_info,
 	    _("Describe where symbol SYM is stored."));

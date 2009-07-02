@@ -103,7 +103,6 @@ macho_symtab_read (struct objfile *objfile,
 {
   struct gdbarch *gdbarch = get_objfile_arch (objfile);
   long storage_needed;
-  asymbol *sym;
   long i, j;
   CORE_ADDR offset;
   enum minimal_symbol_type ms_type;
@@ -114,15 +113,16 @@ macho_symtab_read (struct objfile *objfile,
 
   for (i = 0; i < number_of_symbols; i++)
     {
-      sym = symbol_table[i];
+      asymbol *sym = symbol_table[i];
+      bfd_mach_o_asymbol *mach_o_sym = (bfd_mach_o_asymbol *)sym;
+
       offset = ANOFFSET (objfile->section_offsets, sym->section->index);
 
       if (sym->flags & BSF_DEBUGGING)
 	{
-	  unsigned char type = BFD_MACH_O_SYM_NTYPE(sym);
 	  bfd_vma addr;
 
-	  switch (type)
+	  switch (mach_o_sym->n_type)
 	    {
 	    case N_SO:
 	      if ((sym->name == NULL || sym->name[0] == 0)
@@ -406,7 +406,7 @@ macho_oso_symfile (struct objfile *main_objfile)
 	      bfd_close (member_bfd);
 	    }
 	    else
-	      symbol_file_add_from_bfd (member_bfd, 0, addrs, 0, 0);
+	      symbol_file_add_from_bfd (member_bfd, 0, addrs, 0);
 	}
       else
 	{
@@ -429,7 +429,7 @@ macho_oso_symfile (struct objfile *main_objfile)
 	      continue;
 	    }
   
-	  symbol_file_add_from_bfd (abfd, 0, addrs, 0, 0);
+	  symbol_file_add_from_bfd (abfd, 0, addrs, 0);
 	}
       xfree (oso->symbols);
       xfree (oso->offsets);
@@ -538,7 +538,7 @@ macho_symfile_read (struct objfile *objfile, int mainline)
   /* Get symbols from the symbol table only if the file is an executable.
      The symbol table of object files is not relocated and is expected to
      be in the executable.  */
-  if (bfd_get_file_flags (abfd) & EXEC_P)
+  if (bfd_get_file_flags (abfd) & (EXEC_P | DYNAMIC))
     {
       /* Process the normal symbol table first.  */
       storage_needed = bfd_get_symtab_upper_bound (objfile->obfd);
@@ -566,6 +566,12 @@ macho_symfile_read (struct objfile *objfile, int mainline)
       
       install_minimal_symbols (objfile);
 
+      /* Try to read .eh_frame / .debug_frame.  */
+      /* First, locate these sections.  We ignore the result status
+	 as it only checks for debug info.  */
+      dwarf2_has_info (objfile);
+      dwarf2_build_frame_info (objfile);
+      
       /* Check for DSYM file.  */
       dsym_bfd = macho_check_dsym (objfile);
       if (dsym_bfd != NULL)
@@ -586,9 +592,9 @@ macho_symfile_read (struct objfile *objfile, int mainline)
 	  oso_vector = NULL;
 
 	  /* Now recurse: read dwarf from dsym.  */
-	  symbol_file_add_from_bfd (dsym_bfd, 0, NULL, 0, 0);
+	  symbol_file_add_from_bfd (dsym_bfd, 0, NULL, 0);
       
-	  /* Don't try to read dwarf2 from main file.  */
+	  /* Don't try to read dwarf2 from main file or shared libraries.  */
 	  return;
 	}
     }
@@ -599,9 +605,8 @@ macho_symfile_read (struct objfile *objfile, int mainline)
       dwarf2_build_psymtabs (objfile, mainline);
     }
 
-  /* FIXME: kettenis/20030504: This still needs to be integrated with
-     dwarf2read.c in a better way.  */
-  dwarf2_build_frame_info (objfile);
+  /* Do not try to read .eh_frame/.debug_frame as they are not relocated
+     and dwarf2_build_frame_info cannot deal with unrelocated sections.  */
 
   /* Then the oso.  */
   if (oso_vector != NULL)
@@ -661,10 +666,11 @@ macho_symfile_offsets (struct objfile *objfile,
     {
       const char *bfd_sect_name = osect->the_bfd_section->name;
       int sect_index = osect->the_bfd_section->index;
-
-      if (strcmp (bfd_sect_name, "LC_SEGMENT.__TEXT") == 0)
-	objfile->sect_index_text = sect_index;
-      else if (strcmp (bfd_sect_name, "LC_SEGMENT.__TEXT.__text") == 0)
+      
+      if (strncmp (bfd_sect_name, "LC_SEGMENT.", 11) == 0)
+	bfd_sect_name += 11;
+      if (strcmp (bfd_sect_name, "__TEXT") == 0
+	  || strcmp (bfd_sect_name, "__TEXT.__text") == 0)
 	objfile->sect_index_text = sect_index;
     }
 }

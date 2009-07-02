@@ -70,13 +70,9 @@ static void gdb_os_vprintf_filtered (host_callback *, const char *, va_list);
 
 static void gdb_os_evprintf_filtered (host_callback *, const char *, va_list);
 
-static void gdb_os_error (host_callback *, const char *, ...);
+static void gdb_os_error (host_callback *, const char *, ...) ATTR_NORETURN;
 
-static void gdbsim_fetch_register (struct regcache *regcache, int regno);
-
-static void gdbsim_store_register (struct regcache *regcache, int regno);
-
-static void gdbsim_kill (void);
+static void gdbsim_kill (struct target_ops *);
 
 static void gdbsim_load (char *prog, int fromtty);
 
@@ -85,10 +81,6 @@ static void gdbsim_open (char *args, int from_tty);
 static void gdbsim_close (int quitting);
 
 static void gdbsim_detach (struct target_ops *ops, char *args, int from_tty);
-
-static void gdbsim_resume (ptid_t ptid, int step, enum target_signal siggnal);
-
-static ptid_t gdbsim_wait (ptid_t ptid, struct target_waitstatus *status);
 
 static void gdbsim_prepare_to_store (struct regcache *regcache);
 
@@ -262,17 +254,12 @@ gdb_os_evprintf_filtered (host_callback * p, const char *format, va_list ap)
 /* GDB version of error callback.  */
 
 static void
-gdb_os_error (host_callback * p, const char *format,...)
+gdb_os_error (host_callback * p, const char *format, ...)
 {
-  if (deprecated_error_hook)
-    (*deprecated_error_hook) ();
-  else
-    {
-      va_list args;
-      va_start (args, format);
-      verror (format, args);
-      va_end (args);
-    }
+  va_list args;
+  va_start (args, format);
+  verror (format, args);
+  va_end (args);
 }
 
 int
@@ -284,13 +271,14 @@ one2one_register_sim_regno (struct gdbarch *gdbarch, int regnum)
 }
 
 static void
-gdbsim_fetch_register (struct regcache *regcache, int regno)
+gdbsim_fetch_register (struct target_ops *ops,
+		       struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
   if (regno == -1)
     {
       for (regno = 0; regno < gdbarch_num_regs (gdbarch); regno++)
-	gdbsim_fetch_register (regcache, regno);
+	gdbsim_fetch_register (ops, regcache, regno);
       return;
     }
 
@@ -352,13 +340,14 @@ gdbsim_fetch_register (struct regcache *regcache, int regno)
 
 
 static void
-gdbsim_store_register (struct regcache *regcache, int regno)
+gdbsim_store_register (struct target_ops *ops,
+		       struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
   if (regno == -1)
     {
       for (regno = 0; regno < gdbarch_num_regs (gdbarch); regno++)
-	gdbsim_store_register (regcache, regno);
+	gdbsim_store_register (ops, regcache, regno);
       return;
     }
   else if (gdbarch_register_sim_regno (gdbarch, regno) >= 0)
@@ -389,7 +378,7 @@ gdbsim_store_register (struct regcache *regcache, int regno)
    and releasing other resources acquired by the simulated program.  */
 
 static void
-gdbsim_kill (void)
+gdbsim_kill (struct target_ops *ops)
 {
   if (remote_debug)
     printf_filtered ("gdbsim_kill\n");
@@ -462,7 +451,7 @@ gdbsim_create_inferior (struct target_ops *target, char *exec_file, char *args,
 		     args);
 
   if (ptid_equal (inferior_ptid, remote_sim_ptid))
-    gdbsim_kill ();
+    gdbsim_kill (target);
   remove_breakpoints ();
   init_wait_for_inferior ();
 
@@ -485,7 +474,6 @@ gdbsim_create_inferior (struct target_ops *target, char *exec_file, char *args,
   add_inferior_silent (ptid_get_pid (inferior_ptid));
   add_thread_silent (inferior_ptid);
 
-  target_mark_running (&gdbsim_ops);
   insert_breakpoints ();	/* Needed to get correct instruction in cache */
 
   clear_proceed_status ();
@@ -563,7 +551,6 @@ gdbsim_open (char *args, int from_tty)
   /* There's nothing running after "target sim" or "load"; not until
      "run".  */
   inferior_ptid = null_ptid;
-  target_mark_exited (&gdbsim_ops);
 }
 
 /* Does whatever cleanup is required for a target that we are no longer
@@ -623,7 +610,8 @@ static enum target_signal resume_siggnal;
 static int resume_step;
 
 static void
-gdbsim_resume (ptid_t ptid, int step, enum target_signal siggnal)
+gdbsim_resume (struct target_ops *ops,
+	       ptid_t ptid, int step, enum target_signal siggnal)
 {
   if (!ptid_equal (inferior_ptid, remote_sim_ptid))
     error (_("The program is not being run."));
@@ -685,7 +673,8 @@ gdbsim_cntrl_c (int signo)
 }
 
 static ptid_t
-gdbsim_wait (ptid_t ptid, struct target_waitstatus *status)
+gdbsim_wait (struct target_ops *ops,
+	     ptid_t ptid, struct target_waitstatus *status, int options)
 {
   static RETSIGTYPE (*prev_sigint) ();
   int sigrc = 0;
@@ -829,7 +818,6 @@ gdbsim_mourn_inferior (struct target_ops *target)
     printf_filtered ("gdbsim_mourn_inferior:\n");
 
   remove_breakpoints ();
-  target_mark_exited (target);
   generic_mourn_inferior ();
   delete_thread_silent (remote_sim_ptid);
 }
@@ -866,7 +854,7 @@ simulator_command (char *args, int from_tty)
 /* Check to see if a thread is still alive.  */
 
 static int
-gdbsim_thread_alive (ptid_t ptid)
+gdbsim_thread_alive (struct target_ops *ops, ptid_t ptid)
 {
   if (ptid_equal (ptid, remote_sim_ptid))
     /* The simulators' task is always alive.  */
@@ -879,7 +867,7 @@ gdbsim_thread_alive (ptid_t ptid)
    buffer.  */
 
 static char *
-gdbsim_pid_to_str (ptid_t ptid)
+gdbsim_pid_to_str (struct target_ops *ops, ptid_t ptid)
 {
   static char buf[64];
 
@@ -922,11 +910,11 @@ init_gdbsim_ops (void)
   gdbsim_ops.to_thread_alive = gdbsim_thread_alive;
   gdbsim_ops.to_pid_to_str = gdbsim_pid_to_str;
   gdbsim_ops.to_stratum = process_stratum;
-  gdbsim_ops.to_has_all_memory = 1;
-  gdbsim_ops.to_has_memory = 1;
-  gdbsim_ops.to_has_stack = 1;
-  gdbsim_ops.to_has_registers = 1;
-  gdbsim_ops.to_has_execution = 1;
+  gdbsim_ops.to_has_all_memory = default_child_has_all_memory;
+  gdbsim_ops.to_has_memory = default_child_has_memory;
+  gdbsim_ops.to_has_stack = default_child_has_stack;
+  gdbsim_ops.to_has_registers = default_child_has_registers;
+  gdbsim_ops.to_has_execution = default_child_has_execution;
   gdbsim_ops.to_magic = OPS_MAGIC;
 }
 

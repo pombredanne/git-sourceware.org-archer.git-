@@ -1,6 +1,6 @@
 /* DWARF 2 support.
    Copyright 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003,
-   2004, 2005, 2006, 2007, 2008 Free Software Foundation, Inc.
+   2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    Adapted from gdb/dwarf2read.c by Gavin Koch of Cygnus Solutions
    (gavin@cygnus.com).
@@ -417,48 +417,47 @@ read_section (bfd *           abfd,
   bfd_boolean section_is_compressed = FALSE;
 
   /* read_section is a noop if the section has already been read.  */
-  if (*section_buffer)
-    return TRUE;
-
-  msec = bfd_get_section_by_name (abfd, section_name);
-  if (! msec && compressed_section_name)
+  if (!*section_buffer)
     {
-      msec = bfd_get_section_by_name (abfd, compressed_section_name);
-      section_is_compressed = TRUE;
-    }
-  if (! msec)
-    {
-      (*_bfd_error_handler) (_("Dwarf Error: Can't find %s section."), section_name);
-      bfd_set_error (bfd_error_bad_value);
-      return FALSE;
-    }
-
-  if (syms)
-    {
-      *section_size = msec->size;
-      *section_buffer
-	  = bfd_simple_get_relocated_section_contents (abfd, msec, NULL, syms);
-      if (! *section_buffer)
-	return FALSE;
-    }
-  else
-    {
-      *section_size = msec->rawsize ? msec->rawsize : msec->size;
-      *section_buffer = bfd_malloc (*section_size);
-      if (! *section_buffer)
-	return FALSE;
-      if (! bfd_get_section_contents (abfd, msec, *section_buffer,
-				      0, *section_size))
-	return FALSE;
-    }
-
-  if (section_is_compressed)
-    {
-      if (! bfd_uncompress_section_contents (section_buffer, section_size))
+      msec = bfd_get_section_by_name (abfd, section_name);
+      if (! msec && compressed_section_name)
 	{
-	  (*_bfd_error_handler) (_("Dwarf Error: unable to decompress %s section."), compressed_section_name);
+	  msec = bfd_get_section_by_name (abfd, compressed_section_name);
+	  section_is_compressed = TRUE;
+	}
+      if (! msec)
+	{
+	  (*_bfd_error_handler) (_("Dwarf Error: Can't find %s section."), section_name);
 	  bfd_set_error (bfd_error_bad_value);
 	  return FALSE;
+	}
+
+      *section_size = msec->rawsize ? msec->rawsize : msec->size;
+      if (syms)
+	{
+	  *section_buffer
+	      = bfd_simple_get_relocated_section_contents (abfd, msec, NULL, syms);
+	  if (! *section_buffer)
+	    return FALSE;
+	}
+      else
+	{
+	  *section_buffer = bfd_malloc (*section_size);
+	  if (! *section_buffer)
+	    return FALSE;
+	  if (! bfd_get_section_contents (abfd, msec, *section_buffer,
+					  0, *section_size))
+	    return FALSE;
+	}
+
+      if (section_is_compressed)
+	{
+	  if (! bfd_uncompress_section_contents (section_buffer, section_size))
+	    {
+	      (*_bfd_error_handler) (_("Dwarf Error: unable to decompress %s section."), compressed_section_name);
+	      bfd_set_error (bfd_error_bad_value);
+	      return FALSE;
+	    }
 	}
     }
 
@@ -1803,20 +1802,11 @@ read_rangelist (struct comp_unit *unit, struct arange *arange, bfd_uint64_t offs
       bfd_vma low_pc;
       bfd_vma high_pc;
 
-      if (unit->addr_size == 4)
-	{
-	  low_pc = read_4_bytes (unit->abfd, ranges_ptr);
-	  ranges_ptr += 4;
-	  high_pc = read_4_bytes (unit->abfd, ranges_ptr);
-	  ranges_ptr += 4;
-	}
-      else
-	{
-	  low_pc = read_8_bytes (unit->abfd, ranges_ptr);
-	  ranges_ptr += 8;
-	  high_pc = read_8_bytes (unit->abfd, ranges_ptr);
-	  ranges_ptr += 8;
-	}
+      low_pc = read_address (unit, ranges_ptr);
+      ranges_ptr += unit->addr_size;
+      high_pc = read_address (unit, ranges_ptr);
+      ranges_ptr += unit->addr_size;
+
       if (low_pc == 0 && high_pc == 0)
 	break;
       if (low_pc == -1UL && high_pc != -1UL)
@@ -3189,13 +3179,6 @@ find_line (bfd *abfd,
 	    break;
 	  stash->info_ptr += length;
 
-	  if ((bfd_vma) (stash->info_ptr - stash->sec_info_ptr)
-	      == stash->sec->size)
-	    {
-	      stash->sec = find_debug_info (stash->bfd, stash->sec);
-	      stash->sec_info_ptr = stash->info_ptr;
-	    }
-
 	  if (stash->all_comp_units)
 	    stash->all_comp_units->prev_unit = each;
 	  else
@@ -3225,6 +3208,14 @@ find_line (bfd *abfd,
 						     functionname_ptr,
 						     linenumber_ptr,
 						     stash));
+
+	  if ((bfd_vma) (stash->info_ptr - stash->sec_info_ptr)
+	      == stash->sec->size)
+	    {
+	      stash->sec = find_debug_info (stash->bfd, stash->sec);
+	      stash->sec_info_ptr = stash->info_ptr;
+	    }
+
 	  if (found)
 	    goto done;
 	}

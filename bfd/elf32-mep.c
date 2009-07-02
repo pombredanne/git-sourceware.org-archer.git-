@@ -684,8 +684,7 @@ static const char * config_names[] =
 {
   "basic"
   /* start-mepcfgtool */
-  ,"simple"
-  ,"fmax"
+  ,"default"
   /* end-mepcfgtool */
 };
 
@@ -732,6 +731,7 @@ elf32_mep_machine (bfd * abfd)
     case EF_MEP_CPU_C2: return bfd_mach_mep;
     case EF_MEP_CPU_C3: return bfd_mach_mep;
     case EF_MEP_CPU_C4: return bfd_mach_mep;
+    case EF_MEP_CPU_C5: return bfd_mach_mep_c5;
     case EF_MEP_CPU_H1: return bfd_mach_mep_h1;
     }
 

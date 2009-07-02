@@ -36,6 +36,7 @@
 #include "gdbcore.h"
 #include "target.h"
 #include "inferior.h"
+#include "regcache.h"
 
 #include "hppa-tdep.h"
 #include "solist.h"
@@ -79,7 +80,7 @@ read_dynamic_info (asection *dyninfo_sect, dld_cache_t *dld_cache_p);
 
 static void
 pa64_relocate_section_addresses (struct so_list *so,
-				 struct section_table *sec)
+				 struct target_section *sec)
 {
   asection *asec = sec->the_bfd_section;
   CORE_ADDR load_offset;
@@ -212,9 +213,7 @@ read_dynamic_info (asection *dyninfo_sect, dld_cache_t *dld_cache_p)
       Elf64_Dyn *x_dynp = (Elf64_Dyn*)buf;
       Elf64_Sxword dyn_tag;
       CORE_ADDR	dyn_ptr;
-      char *pbuf;
 
-      pbuf = alloca (gdbarch_ptr_bit (current_gdbarch) / HOST_CHAR_BIT);
       dyn_tag = bfd_h_get_64 (symfile_objfile->obfd, 
 			      (bfd_byte*) &x_dynp->d_tag);
 
@@ -421,7 +420,8 @@ pa64_solib_create_inferior_hook (void)
 
 	 Also note the breakpoint is the second instruction in the
 	 routine.  */
-      load_addr = read_pc () - tmp_bfd->start_address;
+      load_addr = regcache_read_pc (get_current_regcache ())
+		  - tmp_bfd->start_address;
       sym_addr = bfd_lookup_symbol (tmp_bfd, "__dld_break");
       sym_addr = load_addr + sym_addr + 4;
       
@@ -529,7 +529,7 @@ pa64_open_symbol_file_object (void *from_ttyp)
   char *dll_path;
 
   if (symfile_objfile)
-    if (!query ("Attempt to reload symbols from process? "))
+    if (!query (_("Attempt to reload symbols from process? ")))
       return 0;
 
   /* Read in the load map pointer if we have not done so already.  */

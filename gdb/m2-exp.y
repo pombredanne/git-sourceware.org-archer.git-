@@ -4,22 +4,20 @@
    Generated from expread.y (now c-exp.y) and contributed by the Department
    of Computer Science at the State University of New York at Buffalo, 1991.
 
-This file is part of GDB.
+   This file is part of GDB.
 
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2 of the License, or
-(at your option) any later version.
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation; either version 3 of the License, or
+   (at your option) any later version.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 51 Franklin Street, Fifth Floor,
-Boston, MA 02110-1301, USA.  */
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 /* Parse a Modula-2 expression from text in a string,
    and return the result as a  struct expression  pointer.
@@ -267,7 +265,7 @@ exp 	:	MIN_FUNC '(' type ')'
 exp	: 	MAX_FUNC '(' type ')'
 			{ write_exp_elt_opcode (UNOP_MAX);
 			  write_exp_elt_type ($3);
-			  write_exp_elt_opcode (UNOP_MIN); }
+			  write_exp_elt_opcode (UNOP_MAX); }
 	;
 
 exp	:	FLOAT_FUNC '(' exp ')'
@@ -645,7 +643,8 @@ variable:	NAME
 
 type
 	:	TYPENAME
-			{ $$ = lookup_typename (copy_name ($1),
+			{ $$ = lookup_typename (parse_language, parse_gdbarch,
+						copy_name ($1),
 						expression_context_block, 0); }
 
 	;
@@ -1028,7 +1027,8 @@ yylex ()
     sym = lookup_symbol (tmp, expression_context_block, VAR_DOMAIN, 0);
     if (sym && SYMBOL_CLASS (sym) == LOC_BLOCK)
       return BLOCKNAME;
-    if (lookup_typename (copy_name (yylval.sval), expression_context_block, 1))
+    if (lookup_typename (parse_language, parse_gdbarch,
+			 copy_name (yylval.sval), expression_context_block, 1))
       return TYPENAME;
 
     if(sym)

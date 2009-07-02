@@ -244,7 +244,7 @@ add_thread_object (struct thread_info *tp)
 }
 
 static void
-delete_thread_object (struct thread_info *tp)
+delete_thread_object (struct thread_info *tp, int ignore)
 {
   PyGILState_STATE state;
   inferior_object *inf_obj;

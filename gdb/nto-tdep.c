@@ -67,19 +67,6 @@ nto_target (void)
 #endif
 }
 
-void
-nto_set_target (struct nto_target_ops *targ)
-{
-  nto_regset_id = targ->regset_id;
-  nto_supply_gregset = targ->supply_gregset;
-  nto_supply_fpregset = targ->supply_fpregset;
-  nto_supply_altregset = targ->supply_altregset;
-  nto_supply_regset = targ->supply_regset;
-  nto_register_area = targ->register_area;
-  nto_regset_fill = targ->regset_fill;
-  nto_fetch_link_map_offsets = targ->fetch_link_map_offsets;
-}
-
 /* Take a string such as i386, rs6000, etc. and map it onto CPUTYPE_X86,
    CPUTYPE_PPC, etc. as defined in nto-share/dsmsgs.h.  */
 int
@@ -145,7 +132,7 @@ nto_find_and_open_solib (char *solib, unsigned o_flags, char **temp_pathname)
   else
     base++;			/* Skip over '/'.  */
 
-  ret = openp (buf, 1, base, o_flags, 0, temp_pathname);
+  ret = openp (buf, 1, base, o_flags, temp_pathname);
   if (ret < 0 && base != solib)
     {
       sprintf (arch_path, "/%s", solib);
@@ -299,7 +286,7 @@ nto_truncate_ptr (CORE_ADDR addr)
     return addr & (((CORE_ADDR) 1 << gdbarch_ptr_bit (target_gdbarch)) - 1);
 }
 
-Elf_Internal_Phdr *
+static Elf_Internal_Phdr *
 find_load_phdr (bfd *abfd)
 {
   Elf_Internal_Phdr *phdr;
@@ -318,7 +305,7 @@ find_load_phdr (bfd *abfd)
 }
 
 void
-nto_relocate_section_addresses (struct so_list *so, struct section_table *sec)
+nto_relocate_section_addresses (struct so_list *so, struct target_section *sec)
 {
   /* Neutrino treats the l_addr base address field in link.h as different than
      the base address in the System V ABI and so the offset needs to be
@@ -338,27 +325,6 @@ nto_in_dynsym_resolve_code (CORE_ADDR pc)
   if (in_plt_section (pc, NULL))
     return 1;
   return 0;
-}
-
-void
-nto_generic_supply_gpregset (const struct regset *regset,
-			     struct regcache *regcache, int regnum,
-			     const void *gregs, size_t len)
-{
-}
-
-void
-nto_generic_supply_fpregset (const struct regset *regset,
-			     struct regcache *regcache, int regnum,
-			     const void *fpregs, size_t len)
-{
-}
-
-void
-nto_generic_supply_altregset (const struct regset *regset,
-			      struct regcache *regcache, int regnum,
-			      const void *altregs, size_t len)
-{
 }
 
 void
@@ -397,6 +363,9 @@ nto_initialize_signals (void)
   signal_pass_update (SIGPHOTON, 1);
 #endif
 }
+
+/* Provide a prototype to silence -Wmissing-prototypes.  */
+extern initialize_file_ftype _initialize_nto_tdep;
 
 void
 _initialize_nto_tdep (void)

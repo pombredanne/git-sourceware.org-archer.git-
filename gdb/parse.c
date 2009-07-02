@@ -352,6 +352,65 @@ write_exp_string (struct stoken str)
   write_exp_elt_longcst ((LONGEST) len);
 }
 
+/* Add a vector of string constants to the end of the expression.
+
+   This adds an OP_STRING operation, but encodes the contents
+   differently from write_exp_string.  The language is expected to
+   handle evaluation of this expression itself.
+   
+   After the usual OP_STRING header, TYPE is written into the
+   expression as a long constant.  The interpretation of this field is
+   up to the language evaluator.
+   
+   Next, each string in VEC is written.  The length is written as a
+   long constant, followed by the contents of the string.  */
+
+void
+write_exp_string_vector (int type, struct stoken_vector *vec)
+{
+  int i, n_slots, len;
+
+  /* Compute the size.  We compute the size in number of slots to
+     avoid issues with string padding.  */
+  n_slots = 0;
+  for (i = 0; i < vec->len; ++i)
+    {
+      /* One slot for the length of this element, plus the number of
+	 slots needed for this string.  */
+      n_slots += 1 + BYTES_TO_EXP_ELEM (vec->tokens[i].length);
+    }
+
+  /* One more slot for the type of the string.  */
+  ++n_slots;
+
+  /* Now compute a phony string length.  */
+  len = EXP_ELEM_TO_BYTES (n_slots) - 1;
+
+  n_slots += 4;
+  if ((expout_ptr + n_slots) >= expout_size)
+    {
+      expout_size = max (expout_size * 2, expout_ptr + n_slots + 10);
+      expout = (struct expression *)
+	xrealloc ((char *) expout, (sizeof (struct expression)
+				    + EXP_ELEM_TO_BYTES (expout_size)));
+    }
+
+  write_exp_elt_opcode (OP_STRING);
+  write_exp_elt_longcst (len);
+  write_exp_elt_longcst (type);
+
+  for (i = 0; i < vec->len; ++i)
+    {
+      write_exp_elt_longcst (vec->tokens[i].length);
+      memcpy (&expout->elts[expout_ptr], vec->tokens[i].ptr,
+	      vec->tokens[i].length);
+      expout_ptr += BYTES_TO_EXP_ELEM (vec->tokens[i].length);
+    }
+
+  write_exp_elt_longcst (len);
+  write_exp_elt_opcode (OP_STRING);
+}
+
 /* Add a bitstring constant to the end of the expression.
 
    Bitstring constants are stored by first writing an expression element
@@ -430,7 +489,7 @@ write_exp_msymbol (struct minimal_symbol *msymbol)
 
   write_exp_elt_opcode (OP_LONG);
   /* Let's make the type big enough to hold a 64-bit address.  */
-  write_exp_elt_type (builtin_type (gdbarch)->builtin_core_addr);
+  write_exp_elt_type (objfile_type (objfile)->builtin_core_addr);
   write_exp_elt_longcst ((LONGEST) addr);
   write_exp_elt_opcode (OP_LONG);
 
@@ -438,7 +497,7 @@ write_exp_msymbol (struct minimal_symbol *msymbol)
     {
       write_exp_elt_opcode (UNOP_MEMVAL_TLS);
       write_exp_elt_objfile (objfile);
-      write_exp_elt_type (builtin_type (gdbarch)->nodebug_tls_symbol);
+      write_exp_elt_type (objfile_type (objfile)->nodebug_tls_symbol);
       write_exp_elt_opcode (UNOP_MEMVAL_TLS);
       return;
     }
@@ -449,18 +508,18 @@ write_exp_msymbol (struct minimal_symbol *msymbol)
     case mst_text:
     case mst_file_text:
     case mst_solib_trampoline:
-      write_exp_elt_type (builtin_type (gdbarch)->nodebug_text_symbol);
+      write_exp_elt_type (objfile_type (objfile)->nodebug_text_symbol);
       break;
 
     case mst_data:
     case mst_file_data:
     case mst_bss:
     case mst_file_bss:
-      write_exp_elt_type (builtin_type (gdbarch)->nodebug_data_symbol);
+      write_exp_elt_type (objfile_type (objfile)->nodebug_data_symbol);
       break;
 
     default:
-      write_exp_elt_type (builtin_type (gdbarch)->nodebug_unknown_symbol);
+      write_exp_elt_type (objfile_type (objfile)->nodebug_unknown_symbol);
       break;
     }
   write_exp_elt_opcode (UNOP_MEMVAL);
@@ -538,7 +597,7 @@ write_dollar_variable (struct stoken str)
 
   /* Handle tokens that refer to machine registers:
      $ followed by a register name.  */
-  i = user_reg_map_name_to_regnum (current_gdbarch,
+  i = user_reg_map_name_to_regnum (parse_gdbarch,
 				   str.ptr + 1, str.length - 1);
   if (i >= 0)
     goto handle_register;

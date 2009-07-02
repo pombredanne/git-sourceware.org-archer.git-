@@ -54,6 +54,17 @@ struct displaced_step_closure;
 struct core_regset_section;
 
 extern struct gdbarch *current_gdbarch;
+
+/* The architecture associated with the connection to the target.
+ 
+   The architecture vector provides some information that is really
+   a property of the target: The layout of certain packets, for instance;
+   or the solib_ops vector.  Etc.  To differentiate architecture accesses
+   to per-target properties from per-thread/per-frame/per-objfile properties,
+   accesses to per-target properties should be made through target_gdbarch.
+
+   Eventually, when support for multiple targets is implemented in
+   GDB, this global should be made target-specific.  */
 extern struct gdbarch *target_gdbarch;
 
 
@@ -348,11 +359,11 @@ typedef struct value * (gdbarch_value_from_register_ftype) (struct type *type, i
 extern struct value * gdbarch_value_from_register (struct gdbarch *gdbarch, struct type *type, int regnum, struct frame_info *frame);
 extern void set_gdbarch_value_from_register (struct gdbarch *gdbarch, gdbarch_value_from_register_ftype *value_from_register);
 
-typedef CORE_ADDR (gdbarch_pointer_to_address_ftype) (struct type *type, const gdb_byte *buf);
+typedef CORE_ADDR (gdbarch_pointer_to_address_ftype) (struct gdbarch *gdbarch, struct type *type, const gdb_byte *buf);
 extern CORE_ADDR gdbarch_pointer_to_address (struct gdbarch *gdbarch, struct type *type, const gdb_byte *buf);
 extern void set_gdbarch_pointer_to_address (struct gdbarch *gdbarch, gdbarch_pointer_to_address_ftype *pointer_to_address);
 
-typedef void (gdbarch_address_to_pointer_ftype) (struct type *type, gdb_byte *buf, CORE_ADDR addr);
+typedef void (gdbarch_address_to_pointer_ftype) (struct gdbarch *gdbarch, struct type *type, gdb_byte *buf, CORE_ADDR addr);
 extern void gdbarch_address_to_pointer (struct gdbarch *gdbarch, struct type *type, gdb_byte *buf, CORE_ADDR addr);
 extern void set_gdbarch_address_to_pointer (struct gdbarch *gdbarch, gdbarch_address_to_pointer_ftype *address_to_pointer);
 
@@ -570,19 +581,6 @@ typedef int (gdbarch_in_function_epilogue_p_ftype) (struct gdbarch *gdbarch, COR
 extern int gdbarch_in_function_epilogue_p (struct gdbarch *gdbarch, CORE_ADDR addr);
 extern void set_gdbarch_in_function_epilogue_p (struct gdbarch *gdbarch, gdbarch_in_function_epilogue_p_ftype *in_function_epilogue_p);
 
-/* Given a vector of command-line arguments, return a newly allocated
-   string which, when passed to the create_inferior function, will be
-   parsed (on Unix systems, by the shell) to yield the same vector.
-   This function should call error() if the argument vector is not
-   representable for this target or if this target does not support
-   command-line arguments.
-   ARGC is the number of elements in the vector.
-   ARGV is an array of strings, one per argument. */
-
-typedef char * (gdbarch_construct_inferior_arguments_ftype) (struct gdbarch *gdbarch, int argc, char **argv);
-extern char * gdbarch_construct_inferior_arguments (struct gdbarch *gdbarch, int argc, char **argv);
-extern void set_gdbarch_construct_inferior_arguments (struct gdbarch *gdbarch, gdbarch_construct_inferior_arguments_ftype *construct_inferior_arguments);
-
 typedef void (gdbarch_elf_make_msymbol_special_ftype) (asymbol *sym, struct minimal_symbol *msym);
 extern void gdbarch_elf_make_msymbol_special (struct gdbarch *gdbarch, asymbol *sym, struct minimal_symbol *msym);
 extern void set_gdbarch_elf_make_msymbol_special (struct gdbarch *gdbarch, gdbarch_elf_make_msymbol_special_ftype *elf_make_msymbol_special);
@@ -638,6 +636,15 @@ typedef const struct regset * (gdbarch_regset_from_core_section_ftype) (struct g
 extern const struct regset * gdbarch_regset_from_core_section (struct gdbarch *gdbarch, const char *sect_name, size_t sect_size);
 extern void set_gdbarch_regset_from_core_section (struct gdbarch *gdbarch, gdbarch_regset_from_core_section_ftype *regset_from_core_section);
 
+/* When creating core dumps, some systems encode the PID in addition
+   to the LWP id in core file register section names.  In those cases, the
+   "XXX" in ".reg/XXX" is encoded as [LWPID << 16 | PID].  This setting
+   is set to true for such architectures; false if "XXX" represents an LWP
+   or thread id with no special encoding. */
+
+extern int gdbarch_core_reg_section_encodes_pid (struct gdbarch *gdbarch);
+extern void set_gdbarch_core_reg_section_encodes_pid (struct gdbarch *gdbarch, int core_reg_section_encodes_pid);
+
 /* Supported register notes in a core file. */
 
 extern struct core_regset_section * gdbarch_core_regset_sections (struct gdbarch *gdbarch);
@@ -651,6 +658,22 @@ extern int gdbarch_core_xfer_shared_libraries_p (struct gdbarch *gdbarch);
 typedef LONGEST (gdbarch_core_xfer_shared_libraries_ftype) (struct gdbarch *gdbarch, gdb_byte *readbuf, ULONGEST offset, LONGEST len);
 extern LONGEST gdbarch_core_xfer_shared_libraries (struct gdbarch *gdbarch, gdb_byte *readbuf, ULONGEST offset, LONGEST len);
 extern void set_gdbarch_core_xfer_shared_libraries (struct gdbarch *gdbarch, gdbarch_core_xfer_shared_libraries_ftype *core_xfer_shared_libraries);
+
+/* How the core_stratum layer converts a PTID from a core file to a
+   string. */
+
+extern int gdbarch_core_pid_to_str_p (struct gdbarch *gdbarch);
+
+typedef char * (gdbarch_core_pid_to_str_ftype) (struct gdbarch *gdbarch, ptid_t ptid);
+extern char * gdbarch_core_pid_to_str (struct gdbarch *gdbarch, ptid_t ptid);
+extern void set_gdbarch_core_pid_to_str (struct gdbarch *gdbarch, gdbarch_core_pid_to_str_ftype *core_pid_to_str);
+
+/* BFD target to use when generating a core file. */
+
+extern int gdbarch_gcore_bfd_target_p (struct gdbarch *gdbarch);
+
+extern const char * gdbarch_gcore_bfd_target (struct gdbarch *gdbarch);
+extern void set_gdbarch_gcore_bfd_target (struct gdbarch *gdbarch, const char * gcore_bfd_target);
 
 /* If the elements of C++ vtables are in-place function descriptors rather
    than normal function pointers (which may point to code or a descriptor),
@@ -789,6 +812,17 @@ extern void set_gdbarch_static_transform_name (struct gdbarch *gdbarch, gdbarch_
 extern int gdbarch_sofun_address_maybe_missing (struct gdbarch *gdbarch);
 extern void set_gdbarch_sofun_address_maybe_missing (struct gdbarch *gdbarch, int sofun_address_maybe_missing);
 
+/* Parse the instruction at ADDR storing in the record execution log
+   the registers REGCACHE and memory ranges that will be affected when
+   the instruction executes, along with their current values.
+   Return -1 if something goes wrong, 0 otherwise. */
+
+extern int gdbarch_process_record_p (struct gdbarch *gdbarch);
+
+typedef int (gdbarch_process_record_ftype) (struct gdbarch *gdbarch, struct regcache *regcache, CORE_ADDR addr);
+extern int gdbarch_process_record (struct gdbarch *gdbarch, struct regcache *regcache, CORE_ADDR addr);
+extern void set_gdbarch_process_record (struct gdbarch *gdbarch, gdbarch_process_record_ftype *process_record);
+
 /* Signal translation: translate inferior's signal (host's) number into
    GDB's representation. */
 
@@ -803,6 +837,16 @@ typedef int (gdbarch_target_signal_to_host_ftype) (struct gdbarch *gdbarch, enum
 extern int gdbarch_target_signal_to_host (struct gdbarch *gdbarch, enum target_signal ts);
 extern void set_gdbarch_target_signal_to_host (struct gdbarch *gdbarch, gdbarch_target_signal_to_host_ftype *target_signal_to_host);
 
+/* Extra signal info inspection.
+  
+   Return a type suitable to inspect extra signal information. */
+
+extern int gdbarch_get_siginfo_type_p (struct gdbarch *gdbarch);
+
+typedef struct type * (gdbarch_get_siginfo_type_ftype) (struct gdbarch *gdbarch);
+extern struct type * gdbarch_get_siginfo_type (struct gdbarch *gdbarch);
+extern void set_gdbarch_get_siginfo_type (struct gdbarch *gdbarch, gdbarch_get_siginfo_type_ftype *get_siginfo_type);
+
 /* Record architecture-specific information from the symbol table. */
 
 extern int gdbarch_record_special_symbol_p (struct gdbarch *gdbarch);
@@ -813,12 +857,20 @@ extern void set_gdbarch_record_special_symbol (struct gdbarch *gdbarch, gdbarch_
 
 /* True if the list of shared libraries is one and only for all
    processes, as opposed to a list of shared libraries per inferior.
-   When this property is true, GDB assumes that since shared libraries
-   are shared across processes, so is all code.  Hence, GDB further
-   assumes an inserted breakpoint location is visible to all processes. */
+   This usually means that all processes, although may or may not share
+   an address space, will see the same set of symbols at the same
+   addresses. */
 
 extern int gdbarch_has_global_solist (struct gdbarch *gdbarch);
 extern void set_gdbarch_has_global_solist (struct gdbarch *gdbarch, int has_global_solist);
+
+/* On some targets, even though each inferior has its own private
+   address space, the debug interface takes care of making breakpoints
+   visible to all address spaces automatically.  For such cases,
+   this property should be set to true. */
+
+extern int gdbarch_has_global_breakpoints (struct gdbarch *gdbarch);
+extern void set_gdbarch_has_global_breakpoints (struct gdbarch *gdbarch, int has_global_breakpoints);
 
 extern struct gdbarch_tdep *gdbarch_tdep (struct gdbarch *gdbarch);
 

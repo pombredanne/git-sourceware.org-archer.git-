@@ -65,7 +65,8 @@ static struct symtabs_and_lines decode_compound (char **argptr,
 						 int funfirstline,
 						 char ***canonical,
 						 char *saved_arg,
-						 char *p);
+						 char *p,
+						 int *not_found_ptr);
 
 static struct symbol *lookup_prefix_sym (char **argptr, char *p);
 
@@ -74,11 +75,8 @@ static struct symtabs_and_lines find_method (int funfirstline,
 					     char *saved_arg,
 					     char *copy,
 					     struct type *t,
-					     struct symbol *sym_class);
-
-static int collect_methods (char *copy, struct type *t,
-			    struct symbol *sym_class,
-			    struct symbol **sym_arr);
+					     struct symbol *sym_class,
+					     int *not_found_ptr);
 
 static NORETURN void cplusplus_error (const char *name,
 				      const char *fmt, ...)
@@ -152,6 +150,8 @@ static NORETURN void
 cplusplus_error (const char *name, const char *fmt, ...)
 {
   struct ui_file *tmp_stream;
+  long len;
+  char *message;
   tmp_stream = mem_fileopen ();
   make_cleanup_ui_file_delete (tmp_stream);
 
@@ -168,7 +168,10 @@ cplusplus_error (const char *name, const char *fmt, ...)
 		      ("Hint: try '%s<TAB> or '%s<ESC-?>\n"
 		       "(Note leading single quote.)"),
 		      name, name);
-  error_stream (tmp_stream);
+
+  message = ui_file_xstrdup (tmp_stream, &len);                                   
+  make_cleanup (xfree, message);                                              
+  throw_error (NOT_FOUND_ERROR, "%s", message);  
 }
 
 /* Return the number of methods described for TYPE, including the
@@ -305,11 +308,6 @@ add_matching_methods (int method_counter, struct type *t,
 	}
       else
 	phys_name = TYPE_FN_FIELD_PHYSNAME (f, field_counter);
-
-      /* Destructor is handled by caller, don't add it to
-	 the list.  */
-      if (is_destructor_name (phys_name) != 0)
-	continue;
 
       sym_arr[i1] = lookup_symbol_in_language (phys_name,
 				   NULL, VAR_DOMAIN,
@@ -587,7 +585,7 @@ See set/show multiple-symbol."));
 		  if (canonical_arr[i] == NULL)
 		    {
 		      symname = SYMBOL_LINKAGE_NAME (sym_arr[i]);
-		      canonical_arr[i] = savestring (symname, strlen (symname));
+		      canonical_arr[i] = xstrdup (symname);
 		    }
 		}
 	    }
@@ -611,7 +609,7 @@ See set/show multiple-symbol."));
 		{
 		  symname = SYMBOL_LINKAGE_NAME (sym_arr[num]);
 		  make_cleanup (xfree, symname);
-		  canonical_arr[i] = savestring (symname, strlen (symname));
+		  canonical_arr[i] = xstrdup (symname);
 		}
 	      return_values.sals[i++] = values.sals[num];
 	      values.sals[num].pc = 0;
@@ -765,7 +763,7 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
 	
       if (p[0] == '.' || p[1] == ':')
 	return decode_compound (argptr, funfirstline, canonical,
-				saved_arg, p);
+				saved_arg, p, not_found_ptr);
 
       /* No, the first part is a filename; set file_symtab to be that file's
 	 symtab.  Also, move argptr past the filename.  */
@@ -848,6 +846,10 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
     {
       p = skip_quoted (*argptr);
     }
+
+  /* Keep any template parameters */
+  if (*p == '<')
+    p = find_template_name_end (p);
 
   copy = (char *) alloca (p - *argptr + 1);
   memcpy (copy, *argptr, p - *argptr);
@@ -1195,7 +1197,7 @@ decode_objc (char **argptr, int funfirstline, struct symtab *file_symtab,
 
 static struct symtabs_and_lines
 decode_compound (char **argptr, int funfirstline, char ***canonical,
-		 char *saved_arg, char *p)
+		 char *saved_arg, char *p, int *not_found_ptr)
 {
   struct symtabs_and_lines values;
   char *p2;
@@ -1362,7 +1364,7 @@ decode_compound (char **argptr, int funfirstline, char ***canonical,
 	 we'll lookup the whole string in the symbol tables.  */
 
       return find_method (funfirstline, canonical, saved_arg,
-			  copy, t, sym_class);
+			  copy, t, sym_class, not_found_ptr);
 
     } /* End if symbol found */
 
@@ -1385,6 +1387,8 @@ decode_compound (char **argptr, int funfirstline, char ***canonical,
 
   /* Couldn't find any interpretation as classes/namespaces, so give
      up.  The quotes are important if copy is empty.  */
+  if (not_found_ptr)
+    *not_found_ptr = 1;
   cplusplus_error (saved_arg,
 		   "Can't find member of namespace, class, struct, or union named \"%s\"\n",
 		   copy);
@@ -1430,7 +1434,7 @@ lookup_prefix_sym (char **argptr, char *p)
 
 static struct symtabs_and_lines
 find_method (int funfirstline, char ***canonical, char *saved_arg,
-	     char *copy, struct type *t, struct symbol *sym_class)
+	     char *copy, struct type *t, struct symbol *sym_class, int *not_found_ptr)
 {
   struct symtabs_and_lines values;
   struct symbol *sym = NULL;
@@ -1441,7 +1445,7 @@ find_method (int funfirstline, char ***canonical, char *saved_arg,
   /* Find all methods with a matching name, and put them in
      sym_arr.  */
 
-  i1 = collect_methods (copy, t, sym_class, sym_arr);
+  i1 = find_methods (t, copy, SYMBOL_LANGUAGE (sym_class), sym_arr);
 
   if (i1 == 1)
     {
@@ -1481,6 +1485,8 @@ find_method (int funfirstline, char ***canonical, char *saved_arg,
 	}
       else
 	tmp = copy;
+      if (not_found_ptr)
+        *not_found_ptr = 1;
       if (tmp[0] == '~')
 	cplusplus_error (saved_arg,
 			 "the class `%s' does not have destructor defined\n",
@@ -1490,37 +1496,6 @@ find_method (int funfirstline, char ***canonical, char *saved_arg,
 			 "the class %s does not have any method named %s\n",
 			 SYMBOL_PRINT_NAME (sym_class), tmp);
     }
-}
-
-/* Find all methods named COPY in the class whose type is T, and put
-   them in SYM_ARR.  Return the number of methods found.  */
-
-static int
-collect_methods (char *copy, struct type *t,
-		 struct symbol *sym_class, struct symbol **sym_arr)
-{
-  int i1 = 0;	/*  Counter for the symbol array.  */
-
-  if (destructor_name_p (copy, t))
-    {
-      /* Destructors are a special case.  */
-      int m_index, f_index;
-
-      if (get_destructor_fn_field (t, &m_index, &f_index))
-	{
-	  struct fn_field *f = TYPE_FN_FIELDLIST1 (t, m_index);
-
-	  sym_arr[i1] =
-	    lookup_symbol (TYPE_FN_FIELD_PHYSNAME (f, f_index),
-			   NULL, VAR_DOMAIN, (int *) NULL);
-	  if (sym_arr[i1])
-	    i1++;
-	}
-    }
-  else
-    i1 = find_methods (t, copy, SYMBOL_LANGUAGE (sym_class), sym_arr);
-
-  return i1;
 }
 
 
@@ -1669,7 +1644,7 @@ static struct symtabs_and_lines
 decode_dollar (char *copy, int funfirstline, struct symtab *default_symtab,
 	       char ***canonical, struct symtab *file_symtab)
 {
-  struct value *valx;
+  LONGEST valx;
   int index = 0;
   int need_canonical = 0;
   struct symtabs_and_lines values;
@@ -1684,10 +1659,12 @@ decode_dollar (char *copy, int funfirstline, struct symtab *default_symtab,
   if (!*p)		/* Reached end of token without hitting non-digit.  */
     {
       /* We have a value history reference.  */
+      struct value *val_history;
       sscanf ((copy[1] == '$') ? copy + 2 : copy + 1, "%d", &index);
-      valx = access_value_history ((copy[1] == '$') ? -index : index);
-      if (TYPE_CODE (value_type (valx)) != TYPE_CODE_INT)
+      val_history = access_value_history ((copy[1] == '$') ? -index : index);
+      if (TYPE_CODE (value_type (val_history)) != TYPE_CODE_INT)
 	error (_("History values used in line specs must have integer values."));
+      valx = value_as_long (val_history);
     }
   else
     {
@@ -1709,8 +1686,7 @@ decode_dollar (char *copy, int funfirstline, struct symtab *default_symtab,
 	return minsym_found (funfirstline, msymbol);
 
       /* Not a user variable or function -- must be convenience variable.  */
-      valx = value_of_internalvar (lookup_internalvar (copy + 1));
-      if (TYPE_CODE (value_type (valx)) != TYPE_CODE_INT)
+      if (!get_internalvar_integer (lookup_internalvar (copy + 1), &valx))
 	error (_("Convenience variables used in line specs must have integer values."));
     }
 
@@ -1718,7 +1694,7 @@ decode_dollar (char *copy, int funfirstline, struct symtab *default_symtab,
 
   /* Either history value or convenience value from above, in valx.  */
   val.symtab = file_symtab ? file_symtab : default_symtab;
-  val.line = value_as_long (valx);
+  val.line = valx;
   val.pc = 0;
 
   values.sals = (struct symtab_and_line *) xmalloc (sizeof val);

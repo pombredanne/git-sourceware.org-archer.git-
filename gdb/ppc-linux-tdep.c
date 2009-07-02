@@ -178,7 +178,7 @@
    else in the event that some other platform has similar needs with
    regard to removing breakpoints in some potentially self modifying
    code.  */
-int
+static int
 ppc_linux_memory_remove_breakpoint (struct gdbarch *gdbarch,
 				    struct bp_target_info *bp_tgt)
 {
@@ -621,7 +621,7 @@ ppc64_linux_convert_from_func_ptr_addr (struct gdbarch *gdbarch,
 					CORE_ADDR addr,
 					struct target_ops *targ)
 {
-  struct section_table *s = target_section_by_addr (targ, addr);
+  struct target_section *s = target_section_by_addr (targ, addr);
 
   /* Check if ADDR points to a function descriptor.  */
   if (s && strcmp (s->the_bfd_section->name, ".opd") == 0)
@@ -1102,6 +1102,12 @@ ppc_linux_init_abi (struct gdbarch_info info,
       /* Trampolines.  */
       tramp_frame_prepend_unwinder (gdbarch, &ppc32_linux_sigaction_tramp_frame);
       tramp_frame_prepend_unwinder (gdbarch, &ppc32_linux_sighandler_tramp_frame);
+
+      /* BFD target for core files.  */
+      if (gdbarch_byte_order (gdbarch) == BFD_ENDIAN_LITTLE)
+	set_gdbarch_gcore_bfd_target (gdbarch, "elf32-powerpcle");
+      else
+	set_gdbarch_gcore_bfd_target (gdbarch, "elf32-powerpc");
     }
   
   if (tdep->wordsize == 8)
@@ -1119,6 +1125,12 @@ ppc_linux_init_abi (struct gdbarch_info info,
       /* Trampolines.  */
       tramp_frame_prepend_unwinder (gdbarch, &ppc64_linux_sigaction_tramp_frame);
       tramp_frame_prepend_unwinder (gdbarch, &ppc64_linux_sighandler_tramp_frame);
+
+      /* BFD target for core files.  */
+      if (gdbarch_byte_order (gdbarch) == BFD_ENDIAN_LITTLE)
+	set_gdbarch_gcore_bfd_target (gdbarch, "elf64-powerpcle");
+      else
+	set_gdbarch_gcore_bfd_target (gdbarch, "elf64-powerpc");
     }
   set_gdbarch_regset_from_core_section (gdbarch, ppc_linux_regset_from_core_section);
   set_gdbarch_core_read_description (gdbarch, ppc_linux_core_read_description);
@@ -1159,6 +1171,9 @@ ppc_linux_init_abi (struct gdbarch_info info,
 	}
     }
 }
+
+/* Provide a prototype to silence -Wmissing-prototypes.  */
+extern initialize_file_ftype _initialize_ppc_linux_tdep;
 
 void
 _initialize_ppc_linux_tdep (void)

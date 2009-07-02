@@ -1,6 +1,6 @@
 /* Generic symbol-table support for the BFD library.
    Copyright 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003, 2004, 2007, 2008
+   2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009
    Free Software Foundation, Inc.
    Written by Cygnus Support.
 
@@ -297,6 +297,12 @@ CODE_FRAGMENT
 .  {* This symbol was created by bfd_get_synthetic_symtab.  *}
 .#define BSF_SYNTHETIC		(1 << 21)
 .
+.  {* This symbol is an indirect code object.  Unrelated to BSF_INDIRECT.
+.     The dynamic linker will compute the value of this symbol by
+.     calling the function that it points to.  BSF_FUNCTION must
+.     also be also set.  *}
+.#define BSF_GNU_INDIRECT_FUNCTION (1 << 22)
+.
 .  flagword flags;
 .
 .  {* A pointer to the section to which this symbol is
@@ -483,7 +489,7 @@ bfd_print_symbol_vandf (bfd *abfd, void *arg, asymbol *symbol)
 	   (type & BSF_WEAK) ? 'w' : ' ',
 	   (type & BSF_CONSTRUCTOR) ? 'C' : ' ',
 	   (type & BSF_WARNING) ? 'W' : ' ',
-	   (type & BSF_INDIRECT) ? 'I' : ' ',
+	   (type & BSF_INDIRECT) ? 'I' : (type & BSF_GNU_INDIRECT_FUNCTION) ? 'i' : ' ',
 	   (type & BSF_DEBUGGING) ? 'd' : (type & BSF_DYNAMIC) ? 'D' : ' ',
 	   ((type & BSF_FUNCTION)
 	    ? 'F'
@@ -669,6 +675,8 @@ bfd_decode_symclass (asymbol *symbol)
     }
   if (bfd_is_ind_section (symbol->section))
     return 'I';
+  if (symbol->flags & BSF_GNU_INDIRECT_FUNCTION)
+    return 'i';
   if (symbol->flags & BSF_WEAK)
     {
       /* If weak, determine if it's specifically an object
@@ -1376,10 +1384,11 @@ _bfd_stab_section_find_nearest_line (bfd *abfd,
 	{
 	  size_t len;
 
-	  if (info->filename != NULL)
-	    free (info->filename);
+	  /* Don't free info->filename here.  objdump and other
+	     apps keep a copy of a previously returned file name
+	     pointer.  */
 	  len = strlen (file_name) + 1;
-	  info->filename = bfd_malloc (dirlen + len);
+	  info->filename = bfd_alloc (abfd, dirlen + len);
 	  if (info->filename == NULL)
 	    return FALSE;
 	  memcpy (info->filename, directory_name, dirlen);

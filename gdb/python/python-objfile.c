@@ -87,6 +87,7 @@ objfpy_get_printers (PyObject *o, void *ignore)
 static int
 objfpy_set_printers (PyObject *o, PyObject *value, void *ignore)
 {
+  PyObject *tmp;
   objfile_object *self = (objfile_object *) o;
   if (! value)
     {
@@ -102,9 +103,11 @@ objfpy_set_printers (PyObject *o, PyObject *value, void *ignore)
       return -1;
     }
 
-  Py_XDECREF (self->printers);
+  /* Take care in case the LHS and RHS are related somehow.  */
+  tmp = self->printers;
   Py_INCREF (value);
   self->printers = value;
+  Py_XDECREF (tmp);
 
   return 0;
 }
@@ -125,9 +128,10 @@ clean_up_objfile (struct objfile *objfile, void *datum)
   PyGILState_Release (state);
 }
 
-/* Return the Python object of type Objfile representing OBJFILE.  If
-   the object has already been created, return it.  Otherwise, create
-   it.  Return NULL and set the Python error on failure.  */
+/* Return a borrowed reference to the Python object of type Objfile
+   representing OBJFILE.  If the object has already been created,
+   return it.  Otherwise, create it.  Return NULL and set the Python
+   error on failure.  */
 PyObject *
 objfile_to_objfile_object (struct objfile *objfile)
 {

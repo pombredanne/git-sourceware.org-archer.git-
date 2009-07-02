@@ -348,7 +348,7 @@ m32r_create_inferior (struct target_ops *ops, char *execfile,
   /* Install inferior's terminal modes.  */
   target_terminal_inferior ();
 
-  write_pc (entry_pt);
+  regcache_write_pc (get_current_regcache (), entry_pt);
 }
 
 /* Open a connection to a remote debugger.
@@ -446,7 +446,8 @@ m32r_close (int quitting)
 /* Tell the remote machine to resume.  */
 
 static void
-m32r_resume (ptid_t ptid, int step, enum target_signal sig)
+m32r_resume (struct target_ops *ops,
+	     ptid_t ptid, int step, enum target_signal sig)
 {
   unsigned long pc_addr, bp_addr, ab_addr;
   int ib_breakpoints;
@@ -463,7 +464,7 @@ m32r_resume (ptid_t ptid, int step, enum target_signal sig)
 
   check_mmu_status ();
 
-  pc_addr = read_pc ();
+  pc_addr = regcache_read_pc (get_current_regcache ());
   if (remote_debug)
     fprintf_unfiltered (gdb_stdlog, "pc <= 0x%lx\n", pc_addr);
 
@@ -693,7 +694,8 @@ gdb_cntrl_c (int signo)
 }
 
 static ptid_t
-m32r_wait (ptid_t ptid, struct target_waitstatus *status)
+m32r_wait (struct target_ops *ops,
+	   ptid_t ptid, struct target_waitstatus *status, int options)
 {
   static RETSIGTYPE (*prev_sigint) ();
   unsigned long bp_addr, pc_addr;
@@ -878,7 +880,7 @@ m32r_detach (struct target_ops *ops, char *args, int from_tty)
   if (remote_debug)
     fprintf_unfiltered (gdb_stdlog, "m32r_detach(%d)\n", from_tty);
 
-  m32r_resume (inferior_ptid, 0, 0);
+  m32r_resume (ops, inferior_ptid, 0, 0);
 
   /* calls m32r_close to do the real work */
   pop_target ();
@@ -909,30 +911,21 @@ get_reg_id (int regno)
   return regno;
 }
 
-/* Read the remote registers into the block REGS.  */
-
-static void m32r_fetch_register (struct regcache *, int);
-
-static void
-m32r_fetch_registers (struct regcache *regcache)
-{
-  int regno;
-
-  for (regno = 0;
-       regno < gdbarch_num_regs (get_regcache_arch (regcache));
-       regno++)
-    m32r_fetch_register (regcache, regno);
-}
-
 /* Fetch register REGNO, or all registers if REGNO is -1.
    Returns errno value.  */
 static void
-m32r_fetch_register (struct regcache *regcache, int regno)
+m32r_fetch_register (struct target_ops *ops,
+		     struct regcache *regcache, int regno)
 {
   unsigned long val, val2, regid;
 
   if (regno == -1)
-    m32r_fetch_registers (regcache);
+    {
+      for (regno = 0;
+	   regno < gdbarch_num_regs (get_regcache_arch (regcache));
+	   regno++)
+	m32r_fetch_register (ops, regcache, regno);
+    }
   else
     {
       char buffer[MAX_REGISTER_SIZE];
@@ -960,33 +953,22 @@ m32r_fetch_register (struct regcache *regcache, int regno)
   return;
 }
 
-/* Store the remote registers from the contents of the block REGS.  */
-
-static void m32r_store_register (struct regcache *, int);
-
-static void
-m32r_store_registers (struct regcache *regcache)
-{
-  int regno;
-
-  for (regno = 0;
-       regno < gdbarch_num_regs (get_regcache_arch (regcache));
-       regno++)
-    m32r_store_register (regcache, regno);
-
-  registers_changed ();
-}
-
 /* Store register REGNO, or all if REGNO == 0.
    Return errno value.  */
 static void
-m32r_store_register (struct regcache *regcache, int regno)
+m32r_store_register (struct target_ops *ops,
+		     struct regcache *regcache, int regno)
 {
   int regid;
   ULONGEST regval, tmp;
 
   if (regno == -1)
-    m32r_store_registers (regcache);
+    {
+      for (regno = 0;
+	   regno < gdbarch_num_regs (get_regcache_arch (regcache));
+	   regno++)
+	m32r_store_register (ops, regcache, regno);
+    }
   else
     {
       regcache_cooked_read_unsigned (regcache, regno, &regval);
@@ -1130,7 +1112,7 @@ m32r_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len,
 }
 
 static void
-m32r_kill (void)
+m32r_kill (struct target_ops *ops)
 {
   if (remote_debug)
     fprintf_unfiltered (gdb_stdlog, "m32r_kill()\n");
@@ -1373,7 +1355,8 @@ m32r_load (char *args, int from_tty)
 
   /* Make the PC point at the start address */
   if (exec_bfd)
-    write_pc (bfd_get_start_address (exec_bfd));
+    regcache_write_pc (get_current_regcache (),
+		       bfd_get_start_address (exec_bfd));
 
   inferior_ptid = null_ptid;	/* No process now */
   delete_thread_silent (remote_m32r_ptid);
@@ -1415,9 +1398,9 @@ m32r_stop (ptid_t ptid)
 
 /* Tell whether this target can support a hardware breakpoint.  CNT
    is the number of hardware breakpoints already installed.  This
-   implements the TARGET_CAN_USE_HARDWARE_WATCHPOINT macro.  */
+   implements the target_can_use_hardware_watchpoint macro.  */
 
-int
+static int
 m32r_can_use_hw_watchpoint (int type, int cnt, int othertype)
 {
   return sdi_desc != NULL && cnt < max_access_breaks;
@@ -1427,7 +1410,7 @@ m32r_can_use_hw_watchpoint (int type, int cnt, int othertype)
    for a write watchpoint, 1 for a read watchpoint, or 2 for a read/write
    watchpoint. */
 
-int
+static int
 m32r_insert_watchpoint (CORE_ADDR addr, int len, int type)
 {
   int i;
@@ -1451,7 +1434,7 @@ m32r_insert_watchpoint (CORE_ADDR addr, int len, int type)
   return 1;
 }
 
-int
+static int
 m32r_remove_watchpoint (CORE_ADDR addr, int len, int type)
 {
   int i;
@@ -1472,7 +1455,7 @@ m32r_remove_watchpoint (CORE_ADDR addr, int len, int type)
   return 0;
 }
 
-int
+static int
 m32r_stopped_data_address (struct target_ops *target, CORE_ADDR *addr_p)
 {
   int rc = 0;
@@ -1484,7 +1467,7 @@ m32r_stopped_data_address (struct target_ops *target, CORE_ADDR *addr_p)
   return rc;
 }
 
-int
+static int
 m32r_stopped_by_watchpoint (void)
 {
   CORE_ADDR addr;
@@ -1494,7 +1477,7 @@ m32r_stopped_by_watchpoint (void)
 /* Check to see if a thread is still alive.  */
 
 static int
-m32r_thread_alive (ptid_t ptid)
+m32r_thread_alive (struct target_ops *ops, ptid_t ptid)
 {
   if (ptid_equal (ptid, remote_m32r_ptid))
     /* The main task is always alive.  */
@@ -1507,7 +1490,7 @@ m32r_thread_alive (ptid_t ptid)
    buffer.  */
 
 static char *
-m32r_pid_to_str (ptid_t ptid)
+m32r_pid_to_str (struct target_ops *ops, ptid_t ptid)
 {
   static char buf[64];
 
@@ -1607,6 +1590,11 @@ use_dbt_breakpoints_command (char *args, int from_tty)
   use_ib_breakpoints = 0;
 }
 
+static int
+m32r_return_one (struct target_ops *target)
+{
+  return 1;
+}
 
 /* Define the target subroutine names */
 
@@ -1644,11 +1632,11 @@ init_m32r_ops (void)
   m32r_ops.to_thread_alive = m32r_thread_alive;
   m32r_ops.to_pid_to_str = m32r_pid_to_str;
   m32r_ops.to_stratum = process_stratum;
-  m32r_ops.to_has_all_memory = 1;
-  m32r_ops.to_has_memory = 1;
-  m32r_ops.to_has_stack = 1;
-  m32r_ops.to_has_registers = 1;
-  m32r_ops.to_has_execution = 1;
+  m32r_ops.to_has_all_memory = m32r_return_one;
+  m32r_ops.to_has_memory = m32r_return_one;
+  m32r_ops.to_has_stack = m32r_return_one;
+  m32r_ops.to_has_registers = m32r_return_one;
+  m32r_ops.to_has_execution = m32r_return_one;
   m32r_ops.to_magic = OPS_MAGIC;
 };
 

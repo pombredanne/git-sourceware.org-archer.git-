@@ -122,7 +122,7 @@ print_optional_low_bound (struct ui_file *stream, struct type *type,
 	return 0;
       break;
     case TYPE_CODE_UNDEF:
-      index_type = builtin_type_int32;
+      index_type = NULL;
       /* FALL THROUGH */
     default:
       if (low_bound == 1)
@@ -269,7 +269,8 @@ printable_val_type (struct type *type, const gdb_byte *valaddr)
    (1 or 2) of the character.  */
 
 void
-ada_emit_char (int c, struct ui_file *stream, int quoter, int type_len)
+ada_emit_char (int c, struct type *type, struct ui_file *stream,
+	       int quoter, int type_len)
 {
   if (type_len != 2)
     type_len = 1;
@@ -366,21 +367,28 @@ ada_print_floating (const gdb_byte *valaddr, struct type *type,
 }
 
 void
-ada_printchar (int c, struct ui_file *stream)
+ada_printchar (int c, struct type *type, struct ui_file *stream)
 {
   fputs_filtered ("'", stream);
-  ada_emit_char (c, stream, '\'', 1);
+  ada_emit_char (c, type, stream, '\'', 1);
   fputs_filtered ("'", stream);
 }
 
 /* [From print_type_scalar in typeprint.c].   Print VAL on STREAM in a
-   form appropriate for TYPE.  */
+   form appropriate for TYPE, if non-NULL.  If TYPE is NULL, print VAL
+   like a default signed integer.  */
 
 void
 ada_print_scalar (struct type *type, LONGEST val, struct ui_file *stream)
 {
   unsigned int i;
   unsigned len;
+
+  if (!type)
+    {
+      print_longest (stream, 'd', 0, val);
+      return;
+    }
 
   type = ada_check_typedef (type);
 
@@ -411,7 +419,7 @@ ada_print_scalar (struct type *type, LONGEST val, struct ui_file *stream)
       break;
 
     case TYPE_CODE_CHAR:
-      LA_PRINT_CHAR ((unsigned char) val, stream);
+      LA_PRINT_CHAR ((unsigned char) val, type, stream);
       break;
 
     case TYPE_CODE_BOOL:
@@ -454,7 +462,7 @@ ada_print_scalar (struct type *type, LONGEST val, struct ui_file *stream)
  */
 
 static void
-printstr (struct ui_file *stream, const gdb_byte *string,
+printstr (struct ui_file *stream, struct type *elttype, const gdb_byte *string,
 	  unsigned int length, int force_ellipses, int type_len,
 	  const struct value_print_options *options)
 {
@@ -506,7 +514,7 @@ printstr (struct ui_file *stream, const gdb_byte *string,
 	      in_quotes = 0;
 	    }
 	  fputs_filtered ("'", stream);
-	  ada_emit_char (char_at (string, i, type_len), stream, '\'',
+	  ada_emit_char (char_at (string, i, type_len), elttype, stream, '\'',
 			 type_len);
 	  fputs_filtered ("'", stream);
 	  fprintf_filtered (stream, _(" <repeats %u times>"), reps);
@@ -524,7 +532,7 @@ printstr (struct ui_file *stream, const gdb_byte *string,
 		fputs_filtered ("\"", stream);
 	      in_quotes = 1;
 	    }
-	  ada_emit_char (char_at (string, i, type_len), stream, '"',
+	  ada_emit_char (char_at (string, i, type_len), elttype, stream, '"',
 			 type_len);
 	  things_printed += 1;
 	}
@@ -544,11 +552,12 @@ printstr (struct ui_file *stream, const gdb_byte *string,
 }
 
 void
-ada_printstr (struct ui_file *stream, const gdb_byte *string,
-	      unsigned int length, int width, int force_ellipses,
+ada_printstr (struct ui_file *stream, struct type *type, const gdb_byte *string,
+	      unsigned int length, int force_ellipses,
 	      const struct value_print_options *options)
 {
-  printstr (stream, string, length, force_ellipses, width, options);
+  printstr (stream, type, string, length, force_ellipses, TYPE_LENGTH (type),
+	    options);
 }
 
 
@@ -637,7 +646,7 @@ ada_val_print_array (struct type *type, const gdb_byte *valaddr,
           len = temp_len;
         }
 
-      printstr (stream, valaddr, len, 0, eltlen, options);
+      printstr (stream, elttype, valaddr, len, 0, eltlen, options);
       result = len;
     }
   else
@@ -737,22 +746,10 @@ ada_val_print_1 (struct type *type, const gdb_byte *valaddr0,
 	  struct value *func = ada_vax_float_print_function (type);
 	  if (func != 0)
 	    {
-	      static struct type *parray_of_char = NULL;
-	      struct value *printable_val;
-
-	      if (parray_of_char == NULL)
-		parray_of_char =
-		  make_pointer_type
-		  (create_array_type
-		   (NULL, builtin_type_true_char,
-		    create_range_type (NULL, builtin_type_int32, 0, 32)), NULL);
-
-	      printable_val =
-		value_ind (value_cast (parray_of_char,
-				       call_function_by_hand (func, 1,
-							      &val)));
-
-	      fprintf_filtered (stream, "%s", value_contents (printable_val));
+	      CORE_ADDR addr;
+	      addr = value_as_address (call_function_by_hand (func, 1, &val));
+	      val_print_string (builtin_type_true_char,
+				addr, -1, stream, options);
 	      return 0;
 	    }
 	  /* No special printing function.  Do as best we can.  */
@@ -817,7 +814,7 @@ ada_val_print_1 (struct type *type, const gdb_byte *valaddr0,
 		{
 		  fputs_filtered (" ", stream);
 		  ada_printchar ((unsigned char) unpack_long (type, valaddr),
-				 stream);
+				 type, stream);
 		}
 	    }
 	  return 0;

@@ -1,6 +1,6 @@
 /* BFD library support routines for architectures.
    Copyright 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
+   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
    Hacked by John Gilmore and Steve Chamberlain of Cygnus Support.
 
@@ -175,6 +175,7 @@ DESCRIPTION
 .#define bfd_mach_mips_loongson_2f      3002
 .#define bfd_mach_mips_sb1              12310201 {* octal 'SB', 01 *}
 .#define bfd_mach_mips_octeon		6501
+.#define bfd_mach_mips_xlr              887682   {* decimal 'XLR'  *}
 .#define bfd_mach_mipsisa32             32
 .#define bfd_mach_mipsisa32r2           33
 .#define bfd_mach_mipsisa64             64
@@ -203,6 +204,7 @@ DESCRIPTION
 .#define bfd_mach_h8300sx  6
 .#define bfd_mach_h8300sxn 7
 .  bfd_arch_pdp11,     {* DEC PDP-11 *}
+.  bfd_arch_plugin,
 .  bfd_arch_powerpc,   {* PowerPC *}
 .#define bfd_mach_ppc		32
 .#define bfd_mach_ppc64		64
@@ -330,10 +332,13 @@ DESCRIPTION
 .#define bfd_mach_frvtomcat	499	{* fr500 prototype *}
 .#define bfd_mach_fr500		500
 .#define bfd_mach_fr550		550
+.  bfd_arch_moxie,       {* The moxie processor *}
+.#define bfd_mach_moxie		1
 .  bfd_arch_mcore,
 .  bfd_arch_mep,
 .#define bfd_mach_mep		1
 .#define bfd_mach_mep_h1	0x6831
+.#define bfd_mach_mep_c5	0x6335
 .  bfd_arch_ia64,      {* HP/Intel ia64 *}
 .#define bfd_mach_ia64_elf64	64
 .#define bfd_mach_ia64_elf32	32
@@ -375,6 +380,8 @@ DESCRIPTION
 .#define bfd_mach_s390_31       31
 .#define bfd_mach_s390_64       64
 .  bfd_arch_score,     {* Sunplus score *} 
+.#define bfd_mach_score3         3
+.#define bfd_mach_score7         7
 .  bfd_arch_openrisc,  {* OpenRISC *}
 .  bfd_arch_mmix,      {* Donald Knuth's educational processor.  *}
 .  bfd_arch_xstormy16,
@@ -463,6 +470,7 @@ extern const bfd_arch_info_type bfd_d30v_arch;
 extern const bfd_arch_info_type bfd_dlx_arch;
 extern const bfd_arch_info_type bfd_fr30_arch;
 extern const bfd_arch_info_type bfd_frv_arch;
+extern const bfd_arch_info_type bfd_moxie_arch;
 extern const bfd_arch_info_type bfd_h8300_arch;
 extern const bfd_arch_info_type bfd_h8500_arch;
 extern const bfd_arch_info_type bfd_hppa_arch;
@@ -494,6 +502,7 @@ extern const bfd_arch_info_type bfd_openrisc_arch;
 extern const bfd_arch_info_type bfd_or32_arch;
 extern const bfd_arch_info_type bfd_pdp11_arch;
 extern const bfd_arch_info_type bfd_pj_arch;
+extern const bfd_arch_info_type bfd_plugin_arch;
 extern const bfd_arch_info_type bfd_powerpc_archs[];
 #define bfd_powerpc_arch bfd_powerpc_archs[0]
 extern const bfd_arch_info_type bfd_rs6000_arch;
@@ -535,6 +544,7 @@ static const bfd_arch_info_type * const bfd_archures_list[] =
     &bfd_dlx_arch,
     &bfd_fr30_arch,
     &bfd_frv_arch,
+    &bfd_moxie_arch,
     &bfd_h8300_arch,
     &bfd_h8500_arch,
     &bfd_hppa_arch,

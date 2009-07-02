@@ -414,7 +414,11 @@ enum address_class
 
   LOC_STATIC,
 
-  /* Value is in register.  SYMBOL_VALUE is the register number.
+  /* Value is in register.  SYMBOL_VALUE is the register number
+     in the original debug format.  SYMBOL_REGISTER_OPS holds a
+     function that can be called to transform this into the
+     actual register number this represents in a specific target
+     architecture (gdbarch).
 
      For some symbol formats (stabs, for some compilers at least),
      the compiler generates two symbols, an argument and a register.
@@ -472,7 +476,13 @@ enum address_class
      in another object file or runtime common storage.
      The linker might even remove the minimal symbol if the global
      symbol is never referenced, in which case the symbol remains
-     unresolved.  */
+     unresolved.
+     
+     GDB would normally find the symbol in the minimal symbol table if it will
+     not find it in the full symbol table.  But a reference to an external
+     symbol in a local block shadowing other definition requires full symbol
+     without possibly having its address available for LOC_STATIC.  Testcase
+     is provided as `gdb.dwarf2/dw2-unresolved.exp'.  */
 
   LOC_UNRESOLVED,
 
@@ -482,16 +492,16 @@ enum address_class
   LOC_OPTIMIZED_OUT,
 
   /* The variable's address is computed by a set of location
-     functions (see "struct symbol_ops" below).  */
+     functions (see "struct symbol_computed_ops" below).  */
   LOC_COMPUTED,
 };
 
-/* The methods needed to implement a symbol class.  These methods can
+/* The methods needed to implement LOC_COMPUTED.  These methods can
    use the symbol's .aux_value for additional per-symbol information.
 
    At present this is only used to implement location expressions.  */
 
-struct symbol_ops
+struct symbol_computed_ops
 {
 
   /* Return the value of the variable SYMBOL, relative to the stack
@@ -517,8 +527,15 @@ struct symbol_ops
      the caller will generate the right code in the process of
      treating this as an lvalue or rvalue.  */
 
-  void (*tracepoint_var_ref) (struct symbol * symbol, struct agent_expr * ax,
-			      struct axs_value * value);
+  void (*tracepoint_var_ref) (struct symbol *symbol, struct gdbarch *gdbarch,
+			      struct agent_expr *ax, struct axs_value *value);
+};
+
+/* Functions used with LOC_REGISTER and LOC_REGPARM_ADDR.  */
+
+struct symbol_register_ops
+{
+  int (*register_number) (struct symbol *symbol, struct gdbarch *gdbarch);
 };
 
 /* This structure is space critical.  See space comments at the top. */
@@ -556,16 +573,32 @@ struct symbol
 
   unsigned is_argument : 1;
 
-  /* Line number of definition.  FIXME:  Should we really make the assumption
-     that nobody will try to debug files longer than 64K lines?  What about
-     machine generated programs? */
+  /* Whether this is an inlined function (class LOC_BLOCK only).  */
+  unsigned is_inlined : 1;
+
+  /* Line number of this symbol's definition, except for inlined
+     functions.  For an inlined function (class LOC_BLOCK and
+     SYMBOL_INLINED set) this is the line number of the function's call
+     site.  Inlined function symbols are not definitions, and they are
+     never found by symbol table lookup.
+
+     FIXME: Should we really make the assumption that nobody will try
+     to debug files longer than 64K lines?  What about machine
+     generated programs?  */
 
   unsigned short line;
 
   /* Method's for symbol's of this class.  */
   /* NOTE: cagney/2003-11-02: See comment above attached to "aclass".  */
 
-  const struct symbol_ops *ops;
+  union
+    {
+      /* Used with LOC_COMPUTED.  */
+      const struct symbol_computed_ops *ops_computed;
+
+      /* Used with LOC_REGISTER and LOC_REGPARM_ADDR.  */
+      const struct symbol_register_ops *ops_register;
+    } ops;
 
   /* An arbitrary data pointer, allowing symbol readers to record
      additional information on a per-symbol basis.  Note that this data
@@ -589,10 +622,12 @@ struct symbol
 #define SYMBOL_DOMAIN(symbol)	(symbol)->domain
 #define SYMBOL_CLASS(symbol)		(symbol)->aclass
 #define SYMBOL_IS_ARGUMENT(symbol)	(symbol)->is_argument
+#define SYMBOL_INLINED(symbol)		(symbol)->is_inlined
 #define SYMBOL_TYPE(symbol)		(symbol)->type
 #define SYMBOL_LINE(symbol)		(symbol)->line
 #define SYMBOL_SYMTAB(symbol)		(symbol)->symtab
-#define SYMBOL_OPS(symbol)              (symbol)->ops
+#define SYMBOL_COMPUTED_OPS(symbol)     (symbol)->ops.ops_computed
+#define SYMBOL_REGISTER_OPS(symbol)     (symbol)->ops.ops_register
 #define SYMBOL_LOCATION_BATON(symbol)   (symbol)->aux_value
 
 /* A partial_symbol records the name, domain, and address class of
@@ -1267,9 +1302,11 @@ extern enum language deduce_language_from_filename (char *);
 
 /* symtab.c */
 
-extern int in_prologue (CORE_ADDR pc, CORE_ADDR func_start);
+extern int in_prologue (struct gdbarch *gdbarch,
+			CORE_ADDR pc, CORE_ADDR func_start);
 
-extern CORE_ADDR skip_prologue_using_sal (CORE_ADDR func_addr);
+extern CORE_ADDR skip_prologue_using_sal (struct gdbarch *gdbarch,
+					  CORE_ADDR func_addr);
 
 extern struct symbol *fixup_symbol_section (struct symbol *,
 					    struct objfile *);

@@ -31,6 +31,7 @@ global mi_inferior_tty_name
 set MIFLAGS "-i=mi"
 
 set thread_selected_re "=thread-selected,id=\"\[0-9+\]\"\r\n"
+set library_loaded_re "=library-loaded\[^\n\]+\"\r\n"
 
 #
 # mi_gdb_exit -- exit the GDB, killing the target program if necessary
@@ -332,7 +333,7 @@ proc mi_gdb_target_cmd { targetname serialport } {
     for {set i 1} {$i <= 3} {incr i} {
 	send_gdb "47-target-select $targetname $serialport\n"
 	gdb_expect 60 {
-	    -re "47\\^connected.*$mi_gdb_prompt$" {
+	    -re "47\\^connected.*$mi_gdb_prompt" {
 		verbose "Set target to $targetname";
 		return 0;
 	    }
@@ -363,6 +364,10 @@ proc mi_gdb_target_cmd { targetname serialport } {
 		verbose "Connection refused by remote target.  Pausing, and trying again."
 		sleep 5
 		continue
+	    }
+	    -re "Non-stop mode requested, but remote does not support non-stop.*$mi_gdb_prompt" {
+		unsupported "Non-stop mode not supported"
+		return 1
 	    }
 	    -re "Timeout reading from remote system.*$mi_gdb_prompt$" {
 		verbose "Got timeout error from gdb.";
@@ -778,6 +783,7 @@ proc mi_run_cmd {args} {
     }
     global mi_gdb_prompt
     global thread_selected_re
+    global library_loaded_re
 
     if [target_info exists gdb_init_command] {
 	send_gdb "[target_info gdb_init_command]\n";
@@ -785,13 +791,13 @@ proc mi_run_cmd {args} {
 	    -re "$mi_gdb_prompt$" { }
 	    default {
 		perror "gdb_init_command for target failed";
-		return;
+		return -1;
 	    }
 	}
     }
 
     if { [mi_gdb_target_load] < 0 } {
-	return
+	return -1
     }
 
     if [target_info exists use_gdb_stub] {
@@ -801,7 +807,7 @@ proc mi_run_cmd {args} {
 		-re "220\\^running\[\r\n\]+\\*running,thread-id=\"\[^\"\]+\"\r\n$mi_gdb_prompt" {}
 		default {}
 	    }
-	    return;
+	    return 0;
 	}
 
 	if [target_info exists gdb,start_symbol] {
@@ -814,19 +820,25 @@ proc mi_run_cmd {args} {
 	# to better handle RUN.
 	send_gdb  "jump *$start\n"
 	warning "Using CLI jump command, expect run-to-main FAIL"
-	return
+	return 0
     }
 
     send_gdb "220-exec-run $args\n"
     gdb_expect {
-	-re "220\\^running\r\n(\\*running,thread-id=\"\[^\"\]+\"\r\n|=thread-created,id=\"1\",group-id=\"\[0-9\]+\"\r\n)*(${thread_selected_re})?${mi_gdb_prompt}" {
+	-re "220\\^running\r\n(\\*running,thread-id=\"\[^\"\]+\"\r\n|=thread-created,id=\"1\",group-id=\"\[0-9\]+\"\r\n)*(${library_loaded_re})*(${thread_selected_re})?${mi_gdb_prompt}" {
+	}
+	-re "\\^error,msg=\"The target does not support running in non-stop mode.\"" {
+	    unsupported "Non-stop mode not supported"
+	    return -1
 	}
 	timeout {
 	    perror "Unable to start target"
-	    return
+	    return -1
 	}
     }
     # NOTE: Shortly after this there will be a ``000*stopped,...(gdb)''
+
+    return 0
 }
 
 #
@@ -882,7 +894,9 @@ proc mi_runto_helper {func run_or_continue} {
   }
 
   if {$run_or_continue == "run"} {
-      mi_run_cmd
+      if { [mi_run_cmd] < 0 } {
+	  return -1
+      }
   } else {
       mi_send_resuming_command "exec-continue" "$test"
   }
@@ -891,7 +905,7 @@ proc mi_runto_helper {func run_or_continue} {
 }
 
 proc mi_runto {func} {
-    mi_runto_helper $func "run"
+    return [mi_runto_helper $func "run"]
 }
 
 # Next to the next statement
@@ -1018,13 +1032,13 @@ proc mi_expect_stop { reason func args file line extra test } {
 
     set any "\[^\n\]*"
 
-    verbose -log "mi_expect_stop: expecting: \\*stopped,${r}${a}${bn}thread-id=\"$decimal\",stopped-threads=$any,frame=\{addr=\"$hex\",func=\"$func\",args=$args,file=\"$any$file\",fullname=\"${fullname_syntax}$file\",line=\"$line\"\}$after_stopped\r\n($thread_selected_re)?$prompt_re"
+    verbose -log "mi_expect_stop: expecting: \\*stopped,${r}${a}${bn}frame=\{addr=\"$hex\",func=\"$func\",args=$args,file=\"$any$file\",fullname=\"${fullname_syntax}$file\",line=\"$line\"\}$after_stopped,thread-id=\"$decimal\",stopped-threads=$any\r\n($thread_selected_re)?$prompt_re"
     gdb_expect {
-	-re "\\*stopped,${r}${a}${bn}thread-id=\"$decimal\",stopped-threads=$any,frame=\{addr=\"$hex\",func=\"$func\",args=$args,file=\"$any$file\",fullname=\"${fullname_syntax}$file\",line=\"($line)\"\}$after_stopped\r\n($thread_selected_re)?$prompt_re" {
+	-re "\\*stopped,${r}${a}${bn}frame=\{addr=\"$hex\",func=\"$func\",args=$args,file=\"$any$file\",fullname=\"${fullname_syntax}$file\",line=\"($line)\"\}$after_stopped,thread-id=\"$decimal\",stopped-threads=$any\r\n($thread_selected_re)?$prompt_re" {
 	    pass "$test"
             return $expect_out(2,string)
 	}
-	-re "\\*stopped,${r}${a}${bn}thread-id=\"$decimal\",stopped-threads=$any,frame=\{addr=\"$hex\",func=\"$any\",args=\[\\\[\{\]$any\[\\\]\}\],file=\"$any\",fullname=\"${fullname_syntax}$any\",line=\"\[0-9\]*\"\}$any\r\n$prompt_re" {
+	-re "\\*stopped,${r}${a}${bn}frame=\{addr=\"$hex\",func=\"$any\",args=\[\\\[\{\]$any\[\\\]\}\],file=\"$any\",fullname=\"${fullname_syntax}$any\",line=\"\[0-9\]*\"\}thread-id=\"$decimal\",stopped-threads=$any\r\n$prompt_re" {
             verbose -log "got $expect_out(buffer)"
 	    fail "$test (stopped at wrong place)"
 	    return -1
@@ -1059,9 +1073,9 @@ proc mi_expect_interrupt { test } {
     set any "\[^\n\]*"
 
     # A signal can land anywhere, just ignore the location
-    verbose -log "mi_expect_interrupt: expecting: \\*stopped,${r},thread-id=\"$decimal\",stopped-threads=$any\r\n$prompt_re"
+    verbose -log "mi_expect_interrupt: expecting: \\*stopped,${r}$any\r\n$prompt_re"
     gdb_expect {
-	-re "\\*stopped,${r},thread-id=\"$decimal\",stopped-threads=$any\r\n$prompt_re" {
+	-re "\\*stopped,${r}$any\r\n$prompt_re" {
 	    pass "$test"
 	    return 0;
 	}
@@ -1470,10 +1484,11 @@ proc mi_send_resuming_command_raw {command test} {
 
     global mi_gdb_prompt
     global thread_selected_re
+    global library_loaded_re
 
     send_gdb "$command\n"
     gdb_expect {
-        -re "\\^running\r\n\\*running,thread-id=\"\[^\"\]+\"\r\n($thread_selected_re)?${mi_gdb_prompt}" {
+        -re "\\^running\r\n\\*running,thread-id=\"\[^\"\]+\"\r\n($library_loaded_re)*($thread_selected_re)?${mi_gdb_prompt}" {
             # Note that lack of 'pass' call here -- this works around limitation
             # in DejaGNU xfail mechanism. mi-until.exp has this:
             #
@@ -1640,7 +1655,7 @@ proc get_mi_thread_list {name} {
   # ^done,thread-ids=[thread-id="1",thread-id="2",...],number-of-threads="N"
   # (gdb)
   mi_gdb_test "-thread-list-ids" \
-    {.*\^done,thread-ids={(thread-id="[0-9]+"(,)?)+},number-of-threads="[0-9]+"} \
+    {.*\^done,thread-ids={(thread-id="[0-9]+"(,)?)+},current-thread-id="[0-9]+",number-of-threads="[0-9]+"} \
     "-thread_list_ids ($name)"
 
   set output {}
@@ -1674,7 +1689,7 @@ proc check_mi_and_console_threads {name} {
   global expect_out
 
   mi_gdb_test "-thread-list-ids" \
-    {.*\^done,thread-ids={(thread-id="[0-9]+"(,)*)+},number-of-threads="[0-9]+"} \
+    {.*\^done,thread-ids={(thread-id="[0-9]+"(,)*)+},current-thread-id="[0-9]+",number-of-threads="[0-9]+"} \
     "-thread-list-ids ($name)"
   set mi_output {}
   if {[info exists expect_out(buffer)]} {
@@ -1793,7 +1808,7 @@ proc mi_reverse_list { list } {
 proc mi_check_thread_states { xstates test } {
     global expect_out
     set states [mi_reverse_list $xstates]
-    set pattern "\\^done,threads=\\\["
+    set pattern ".*\\^done,threads=\\\["
     foreach s $states {
 	set pattern "${pattern}(.*)state=\"$s\""
     }

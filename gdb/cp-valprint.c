@@ -502,7 +502,7 @@ cp_print_static_field (struct type *type,
 
       CHECK_TYPEDEF (type);
       cp_print_value_fields (type, type, value_contents_all (val),
-			     value_embedded_offset (val), value_address (val),
+			     value_embedded_offset (val), addr,
 			     stream, recurse, options, NULL, 1);
       return;
     }
@@ -520,7 +520,7 @@ cp_print_static_field (struct type *type,
    field number.  If OFFSET is not exactly at the start of some field, set
    *DOMAIN to NULL.  */
 
-void
+static void
 cp_find_class_member (struct type **domain_p, int *fieldno,
 		      LONGEST offset)
 {

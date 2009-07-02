@@ -1,3 +1,115 @@
+2009-06-22  Alan Modra  <amodra@bigpond.net.au>
+
+	* ppc.h (R_PPC_RELAX*): Define as enum.
+
+2009-06-11  Anthony Green  <green@moxielogic.org>
+
+	* moxie.h (R_MOXIE_PCREL10): New.
+
+2009-06-01  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/10205
+	* i386.h (R_386_IRELATIVE): New.
+	* x86-64.h (R_X86_64_IRELATIVE): Likewise.
+
+2009-05-27  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* common.h: Update comments for dynamic tag ranges.
+
+2009-04-30  DJ Delorie  <dj@redhat.com>
+
+	* mep.h (EF_MEP_COP_*): New.
+	(EF_MEP_ALL_FLAGS): Add them.
+
+2009-04-30  Nick Clifton  <nickc@redhat.com>
+
+	* common.h (STT_GNU_IFUNC): Define.
+
+2009-04-24  Cary Coutant  <ccoutant@google.com>
+
+	 * dwarf2.h (DW_LNE_set_discriminator): New enum value.
+
+2009-04-15  Anthony Green  <green@moxielogic.com>
+
+	* common.h (EM_MOXIE): Define.
+	* moxie.h: New file.
+
+2009-04-07  DJ Delorie  <dj@redhat.com>
+
+	* mep.h (EF_MEP_CPU_C5): New.
+
+2009-04-01  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* common.h (EM_INTEL178): Removed.
+	(EM_INTEL179): Likewise.
+	(EM_ETPU): New.
+	(EM_SLE9X): Likewise.
+	(EM_INTEL181): Likewise.
+	(EM_INTEL182): Likewise.
+
+2009-03-31  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* common.h (EM_INTEL178): New.
+	(EM_INTEL179): Likewise.
+	(EM_INTEL180): Likewise.
+
+2009-03-20  Mikolaj Zalewski  <mikolajz@google.com>
+
+	* common.h (SHT_GNU_INCREMENTAL_INPUTS): Define.
+
+2009-03-14  Mark Kettenis  <kettenis@gnu.org>
+
+	* common.h (NT_OPENBSD_PROCINFO, NT_OPENBSD_AUXV) 
+	(NT_OPENBSD_REGS, NT_OPENBSD_FPREGS, NT_OPENBSD_XFPREGS) 
+	(NT_OPENBSD_WCOOKIE): New defines.
+
+2009-03-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* common.h (AT_RANDOM): Define.
+
+2009-03-04  Alan Modra  <amodra@bigpond.net.au>
+
+	* ppc.h (R_PPC_TLSGD, R_PPC_TLSLD): Add new relocs.
+	* ppc64.h (R_PPC64_TLSGD, R_PPC64_TLSLD): Add new relocs.
+
+2009-03-02  Qinwei  <qinwei@sunnorth.com.cn>
+
+	* score.h (RELOC_NUMBER): Add R_SCORE_IMM32.
+	* common.h (EM_SCORE_OLD): Define.
+
+2009-02-23  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* common.h (STB_LOPROC): Replace Application-specific with
+	Processor-specific in comments.
+	(STB_HIPROC): Likewise.
+	(STT_LOPROC): Likewise.
+	(STT_HIPROC): Likewise.
+
+2009-02-03  Sandip Matte  <sandip@rmicorp.com>
+
+	* mips.h (E_MIPS_MACH_XLR): Define.
+
+2009-02-03  Maxim Kuvyrkov  <maxim@codesourcery.com>
+
+	* m68k.h: Map TLS relocations to numbers.
+
+2009-01-15  Andrew Stubbs  <ams@codesourcery.com>
+	    Julian Brown   <julian@codesourcery.com>
+
+	* arm.h (TAG_CPU_ARCH_V6_M, TAG_CPU_ARCH_V6S_M): New defines.
+	(MAX_TAG_CPU_ARCH, TAG_CPU_ARCH_V4T_PLUS_V6_M): New defines.
+	(Tag_NEON_arch): Rename to Tag_Advanced_SIMD_arch to match ARM ABI
+	version 2.07.
+	(Tag_undefined39, Tag_nodefaults): New enum values.
+	(Tag_also_compatible_with, Tag_T2EE_use): Likewise.
+	(Tag_conformance, Tag_Virtualization_use): Likewise.
+	(Tag_undefined69, Tag_MPextension_use): Likewise.
+
+2009-01-15  Douglas B Rupp  <rupp@gnat.com>
+
+	* ia64.h (SHT_IA_64_VMS_DISPLAY_NAME_INFO, EF_IA_64_ARCHVER_1):
+	New macros. Minor reformatting.
+
 2008-12-23  Jon Beniston <jon@beniston.com>
 
 	* lm32.h: New file.

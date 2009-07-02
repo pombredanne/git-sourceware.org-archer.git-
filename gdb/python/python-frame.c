@@ -130,7 +130,7 @@ frapy_name (PyObject *self, PyObject *args)
   GDB_PY_HANDLE_EXCEPTION (except);
 
   if (name)
-    result = target_string_to_unicode (name, strlen (name));
+    result = PyUnicode_Decode (name, strlen (name), host_charset (), NULL);
   else
     {
       result = Py_None;
@@ -305,7 +305,7 @@ frapy_older (PyObject *self, PyObject *args)
 
       prev = get_prev_frame (frame);
       if (prev)
-	prev_obj = frame_info_to_frame_object (prev);
+	prev_obj = (PyObject *) frame_info_to_frame_object (prev);
       else
 	{
 	  Py_INCREF (Py_None);
@@ -334,7 +334,7 @@ frapy_newer (PyObject *self, PyObject *args)
 
       next = get_next_frame (frame);
       if (next)
-	next_obj = frame_info_to_frame_object (next);
+	next_obj = (PyObject *) frame_info_to_frame_object (next);
       else
 	{
 	  Py_INCREF (Py_None);
@@ -370,9 +370,8 @@ frapy_find_sal (PyObject *self, PyObject *args)
 }
 
 /* Implementation of gdb.Frame.read_var (self, variable) -> gdb.Value.
-   Returns the value of the given variable in this frame.  The argument can be
-   either a gdb.Symbol or a string.  Returns None if GDB can't find the
-   specified variable.  */
+   Returns the value of the given variable in this frame.  The argument must be
+   a string.  Returns None if GDB can't find the specified variable.  */
 
 static PyObject *
 frapy_read_var (PyObject *self, PyObject *args)
@@ -448,7 +447,7 @@ PyObject *
 gdbpy_selected_frame (PyObject *self, PyObject *args)
 {
   struct frame_info *frame;
-  PyObject *frame_obj = NULL;	/* Initialize to appease gcc warning.  */
+  PyObject *frame_obj = NULL;   /* Initialize to appease gcc warning.  */
   volatile struct gdb_exception except;
 
   TRY_CATCH (except, RETURN_MASK_ALL)

@@ -344,9 +344,7 @@ find_command (char *args, int from_tty)
 
   /* Record and print the results.  */
 
-  set_internalvar (lookup_internalvar ("numfound"),
-		   value_from_longest (builtin_type_int32,
-				       (LONGEST) found_count));
+  set_internalvar_integer (lookup_internalvar ("numfound"), found_count);
   if (found_count > 0)
     {
       struct gdbarch *gdbarch = current_gdbarch;
@@ -363,6 +361,9 @@ find_command (char *args, int from_tty)
 
   do_cleanups (old_cleanups);
 }
+
+/* Provide a prototype to silence -Wmissing-prototypes.  */
+extern initialize_file_ftype _initialize_mem_search;
 
 void
 _initialize_mem_search (void)

@@ -36,5 +36,4 @@ int apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
 
 void preserve_python_values (struct objfile *objfile, htab_t copied_types);
 
-
 #endif /* GDB_PYTHON_H */
