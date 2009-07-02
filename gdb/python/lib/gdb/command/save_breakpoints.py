@@ -50,7 +50,7 @@ The breakpoints can be restored using the 'source' command."""
                     print >> f, " if", bp.condition,
                 print >> f
                 if not bp.enabled:
-                    print >> f, "disable %d" % bp.number
+                    print >> f, "disable $bpnum"
                 # Note: we don't save the ignore count; there doesn't
                 # seem to be much point.
                 commands = bp.commands
