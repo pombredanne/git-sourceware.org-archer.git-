@@ -1,137 +1,3 @@
-<<<<<<< HEAD:gdb/doc/ChangeLog
-2009-02-06  Thiago Jung Bauermann  <bauerman@br.ibm.com>
-
-	* gdb.texinfo (Commands In Python):  Update names of COMMAND_
-	constants.
-
-2009-02-05  Thiago Jung Bauermann  <bauerman@br.ibm.com>
-
-	* gdb.texinfo (Values From Inferior): Better explain
-	Value.string's encoding argument.
-
-2009-02-05  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Commands In Python): Update for change to 'invoke'
-	argument.  Fix a couple typos.  Update documentation for COMMAND_
-	constants.
-
-2009-02-03  Thiago Jung Bauermann  <bauerman@br.ibm.com>
-
-	* gdb.texinfo (Functions in Python): Rephrasing as suggested by
-	Eli Zaretskii.
-
-2009-01-29  Phil Muldoon  <pmuldoon@redhat.com>
-
-	* gdb.texinfo (Types From Inferior): Remove
-	duplicate const qualified text.
-
-2009-01-14  Phil Muldoon  <pmuldoon@redhat.com>
-
-	* gdb.texinfo (Python Commands): Remove documentation
-	prompts from scripted example.
-
-2009-01-13  Phil Muldoon  <pmuldoon@redhat.com>
-
-	* gdb.texinfo (Basic Python):  Fix typos.
-	(Commands In Python): Likewise.
-	(Types From Inferior): Likewise.
-	(Frames In Python): Likewise.
-
-2009-01-07  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Python API): Normalize capitalization.
-	(Basic Python): Likewise.
-	(Auto-loading): Likewise.
-	(Functions In Python): Likewise.
-	(Objfiles In Python): Likewise.
-	(Breakpoints In Python): Likewise.
-	(Frames In Python): Likewise.  Fix typo.  Comment out bad xref.
-
-2008-12-29  Thiago Jung Bauermann  <bauerman@br.ibm.com>
-
-	* gdb.texinfo (Basic Python): Document gdb.read_memory and
-	gdb.write_memory.
-
-2008-12-24  Thiago Jung Bauermann  <bauerman@br.ibm.com>
-
-	* gdb.texinfo (Basic Python): Document Frame-related functions.
-	(Frames in Python): New node.
-	(Python API): Update.
-
-2008-12-17  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Types From Inferior): Document const, volatile,
-	and unqualified methods.
-
-2008-12-16  Thiago Jung Bauermann  <bauerman@br.ibm.com>
-
-	* gdb.texinfo (Commands in Python): Mention need of importing the gdb
-	Python module.
-	(Functions In Python): Add example.
-
-2008-12-16  Thiago Jung Bauermann  <bauerman@br.ibm.com>
-
-	* gdb.texinfo (GDB/MI Variable Objects): Fix references to renamed
-	`gdb.default_visualizer' Python function.
-
-2008-12-15  Paul Pluzhnikov  <ppluzhnikov@google.com>
-
-	* gdb.texinfo (Basic Python): Clarify gdb.parameter argument.
-	
-2008-12-15  Paul Pluzhnikov  <ppluzhnikov@google.com>
-
-	* gdb.texinfo: Fix GDBN references.
-	
-2008-12-15  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Auto-loading): Document debug-file-directory
-	search.
-
-2008-12-15  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Basic Python): Document gdb.breakpoints.
-	(Breakpoints in Python): New node.
-
-2008-12-12  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Pretty Printing): Document 'array' hint.
-
-2008-12-12  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Pretty Printing): Document 'string' hint.
-
-2008-12-10  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Basic Python): Document post_event.
-
-2008-12-05  Thiago Jung Bauermann  <bauerman@br.ibm.com>
-
-	* gdb.texinfo: Fix references to renamed gdb module functions.
-
-2008-12-05  Thiago Jung Bauermann  <bauerman@br.ibm.com>
-
-	* gdb.texinfo: Fix references to renamed gdb module functions.
-
-2008-12-03  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Basic Python): Document gdb.history.
-
-2008-12-02  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Pretty Printing): Update to_string documentation.
-	Mention package recommendation.
-
-2008-12-02  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Values From Inferior): Document new string
-	argument.
-
-2008-12-01  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Basic Python): Document parse_and_eval.
-
-2008-12-01  Tom Tromey  <tromey@redhat.com>
-=======
 2009-06-28  Paul Pluzhnikov  <ppluzhnikov@google.com>
 	
 	* gdb.texinfo (GDB/MI Program Context): @ignore unimplemented
@@ -434,82 +300,11 @@
 	to what the function accepts as keywords.
 
 2008-03-20  Tom Tromey  <tromey@redhat.com>
->>>>>>> master:gdb/doc/ChangeLog
 
 	* gdb.texinfo (Convenience Vars): Document convenience functions.
 	(Functions In Python): New node.
 	(Python API): Update.
 
-<<<<<<< HEAD:gdb/doc/ChangeLog
-2008-11-21  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Values From Inferior): Document Value.string.
-
-2008-11-18  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Commands In Python): Document prefix commands.
-
-2008-11-18  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Parameters In Python): Document set_doc, show_doc.
-
-2008-11-16  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Types From Inferior): Update.
-
-2008-11-16  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Types From Inferior): Update.
-
-2008-11-13  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Basic Python): Document gdb.get_objfiles and
-	gdb.get_current_objfile.
-	(Objfiles in Python): New node.
-	(Auto-loading): Change to -gdb.py convention.
-	(Pretty Printing): Update example.  Document objfile search.
-
-2008-11-06  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (File Options): Document -x on .py files.
-	(Command Files): Document source -p.
-
-2008-11-06  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Pretty Printing): Update.
-	(GDB/MI Variable Objects): Likewise.
-
-2008-10-27  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Pretty Printing): Reword list of predefined display
-	hints.
-
-2008-10-23  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Pretty Printing): Update.
-
-2008-10-22  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Pretty Printing): Remove comments.  Add missing
-	'$'.  Document mi_pretty_printers.
-	(GDB/MI Variable Objects): Document -var-set-visualizer and
-	-var-set-child-range.
-
-2008-10-22  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Pretty Printing): Remove 'header'.
-
-2008-10-20  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (GDB/MI Miscellaneous Commands): Mention 'python'
-	feature.
-
-2008-10-17  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Pretty Printing): Update.
-
-2008-10-16  Tom Tromey  <tromey@redhat.com>
-=======
 2009-03-20  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.texinfo (Character Sets): Remove obsolete text.  Document
@@ -592,43 +387,10 @@
 	* gdb.texinfo (Values From Inferior): Document Value.string.
 
 2009-02-05  Tom Tromey  <tromey@redhat.com>
->>>>>>> master:gdb/doc/ChangeLog
 
 	* gdb.texinfo (Basic Python): Document execute's from_tty
 	argument.
 
-<<<<<<< HEAD:gdb/doc/ChangeLog
-2008-10-13  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Parameters In Python): New node.
-	(Python API): Update.
-
-2008-10-12  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Commands In Python): Update for multi-word
-	commands.
-
-2008-10-09  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Pretty Printing): Mention object-style printers.
-
-2008-10-06  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Types From Inferior): Document block argument to
-	template_argument.
-
-2008-10-06  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Types From Inferior): Document Type constructor.
-
-2008-10-05  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Types From Inferior): Document new methods.
-
-2008-09-29  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.texinfo (Pretty Printing): Update example.
-=======
 2009-02-04  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.texinfo (Basic Python): Document gdb.history.
@@ -702,7 +464,6 @@
 	emacs local variable to be placed at the end of the ChangeLog.
 	Add server.c and gdbreplay.c to the list of files where the
 	copyright year needs to be updated.
->>>>>>> master:gdb/doc/ChangeLog
 
 2009-01-06  Sandra Loosemore  <sandra@codesourcery.com>
 

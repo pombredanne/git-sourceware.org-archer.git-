@@ -1,76 +1,3 @@
-<<<<<<< HEAD:gdb/testsuite/ChangeLog
-2009-02-08  Thiago Jung Bauermann  <bauerman@br.ibm.com>
-
-	* gdb.python/python-function.exp: Add test for function returning
-	a GDB value.
-
-2009-02-01  Thiago Jung Bauermann  <bauerman@br.ibm.com>
-
-	* gdb.python/python-cmd.exp: New file.
-
-2009-01-28  Thiago Jung Bauermann  <bauerman@br.ibm.com>
-
-	* gdb.python/python-frame.exp: Add test for `block' method.
-
-2009-01-28  Thiago Jung Bauermann  <bauerman@br.ibm.com>
-
-	* gdb.python/python-function.exp: New file.
-
-2009-01-27  Thiago Jung Bauermann  <bauerman@br.ibm.com>
-
-	* gdb.python/python-frame.c: New file.
-	* gdb.python/python-frame.exp: New file.
-
-2008-12-09  Thiago Jung Bauermann  <bauerman@br.ibm.com>
-
-	* gdb.python/python-mi.exp: Use `gdb.default_visualizer' instead of
-	`gdb.get_default_visualizer'.
-
-2008-12-08  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.base/help.exp: Update.
-
-2008-12-03  Thiago Jung Bauermann  <bauerman@br.ibm.com>
-
-	* gdb.python/python-template.exp: Use `gdb.history' instead of
-	`gdb.value_from_history'.
-	* gdb.python/python-value.exp: Likewise.
-
-2008-12-01  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.python/python-value.exp (test_value_numeric_ops): Add
-	test for conversion of enum constant.
-	* gdb.python/python-value.c (enum e): New type.
-	(evalue): New global.
-
-2008-11-25  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.python/python-value.c (PTR): New typedef.
-	* gdb.python/python-value.exp (test_value_after_death): New proc.
-	Call it.
-
-2008-11-17  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.python/python-prettyprint.c (do_nothing): New function.
-	(main): Call it.
-	* gdb.python/python-prettyprint.exp (run_lang_tests): Update for
-	reference-printing change.
-
-2008-11-11  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.python/python-prettyprint.exp (run_lang_tests): Ensure "set
-	print pretty" is on.  Update for recent changes.
-
-2008-11-10  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.python/Makefile.in (EXECUTABLES): Add python-template.
-
-2008-11-07  Paul Pluzhnikov  <ppluzhnikov@google.com>
-
-	* gdb.python/python-template.exp: Make failures clearer.
-	
-2008-11-07  Daniel Jacobowitz  <dan@codesourcery.com>
-=======
 2009-07-01  Tristan Gingold  <gingold@adacore.com>
 
 	* gdb.base/bigcore.exp: Make darwin untested.
@@ -516,36 +443,12 @@
 
 2009-03-31  Daniel Jacobowitz  <dan@codesourcery.com>
 	    Jan Kratochvil  <jan.kratochvil@redhat.com>
->>>>>>> master:gdb/testsuite/ChangeLog
 
 	PR gdb/931
 	* gdb.cp/gdb1355.exp (f_li, f_lui, f_si, f_sui): Allow canonical
 	output.
 	* gdb.cp/templates.exp: Allow canonical output.  Remove KFAILs
 	for gdb/931.
-<<<<<<< HEAD:gdb/testsuite/ChangeLog
-
-2008-11-07  Paul Pluzhnikov  <ppluzhnikov@google.com>
-
-	* gdb.python/python-template.exp,
-	gdb.python/python-template.cc: New test for const, volatile
-	qualified pointer and reference template args.
-	
-2008-11-06  Tom Tromey  <tromey@redhat.com>
-
-	* gdb.python/python-mi.exp: Update.
-	* gdb.python/python-prettyprint.py: Move to purely class-based
-	printers.
-
-2008-11-03  Paul Pluzhnikov  <ppluzhnikov@google.com>
-
-	* gdb.gdb/selftest.exp: captured_main source has changed.
-	
-2008-11-03  Paul Pluzhnikov  <ppluzhnikov@google.com>
-
-	* gdb.base/display.exp: print/r is now valid.
-	
-=======
 	* dw2-strp.S (DW_AT_language): Change to C++.
 	(DW_TAG_variable (name ""), Abbrev code 7, .Lemptyname): New.
 
@@ -953,7 +856,6 @@
 	* gdb.fortran/subarray.exp: Expect also the output of gfortran-4.3.
 	Remove gdb_test test names where matching the command.
 
->>>>>>> master:gdb/testsuite/ChangeLog
 2009-01-01  Pedro Alves  <pedro@codesourcery.com>
 
 	PR breakpoints/9681:
