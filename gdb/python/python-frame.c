@@ -440,6 +440,25 @@ frapy_read_var (PyObject *self, PyObject *args)
   Py_RETURN_NONE;
 }
 
+/* Select this frame.  */
+
+static PyObject *
+frapy_select (PyObject *self, PyObject *args)
+{
+  struct frame_info *fi;
+  frame_object *frame = (frame_object *) self;
+  volatile struct gdb_exception except;
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      FRAPY_REQUIRE_VALID (frame, fi);
+      select_frame (fi);
+    }
+  GDB_PY_HANDLE_EXCEPTION (except);
+
+  Py_RETURN_NONE;
+}
+
 /* Implementation of gdb.selected_frame () -> gdb.Frame.
    Returns the selected frame object.  */
 
@@ -577,6 +596,8 @@ Return the frame's symtab and line." },
   { "read_var", frapy_read_var, METH_VARARGS,
     "read_var (variable) -> gdb.Value.\n\
 Return the value of the variable in this frame." },
+  { "select", frapy_select, METH_NOARGS,
+    "Select this frame as the user's current frame." },
   {NULL}  /* Sentinel */
 };
 

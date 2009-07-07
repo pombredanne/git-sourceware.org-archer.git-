@@ -1,6 +1,6 @@
 /* Python interface to symbol tables.
 
-   Copyright (C) 2008 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -75,6 +75,15 @@ stpy_get_filename (PyObject *self, void *closure)
     }
 
   return str_obj;
+}
+
+static PyObject *
+stpy_get_objfile (PyObject *self, void *closure)
+{
+  symtab_object *self_symtab = (symtab_object *) self;
+  PyObject *result = objfile_to_objfile_object (self_symtab->symtab->objfile);
+  Py_INCREF (result);
+  return result;
 }
 
 static PyObject *
@@ -225,6 +234,8 @@ gdbpy_initialize_symtabs (void)
 static PyGetSetDef symtab_object_getset[] = {
   { "filename", stpy_get_filename, NULL,
     "The symbol table's source filename.", NULL },
+  { "objfile", stpy_get_objfile, NULL, "The symtab's objfile.",
+    NULL },
   {NULL}  /* Sentinel */
 };
 

@@ -1957,9 +1957,9 @@ python-value.o: $(srcdir)/python/python-value.c
 
 # All python library files, with the "python/lib" stripped off.
 # Note that we should only install files in the "gdb" module.
-PY_FILES = gdb/FrameIterator.py gdb/command/alias.py \
+PY_FILES = gdb/FrameIterator.py gdb/FrameWrapper.py gdb/command/alias.py \
     gdb/command/backtrace.py gdb/command/require.py \
-    gdb/command/pahole.py gdb/command/__init__.py \
+    gdb/command/pahole.py gdb/command/upto.py gdb/command/__init__.py \
     gdb/command/ignore_errors.py gdb/command/save_breakpoints.py \
     gdb/function/caller_is.py gdb/function/in_scope.py \
     gdb/function/__init__.py gdb/backtrace.py gdb/__init__.py

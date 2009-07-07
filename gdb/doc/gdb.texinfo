@@ -20262,6 +20262,10 @@ Return the frame's symtab and line object. @c (@pxref{Symtab_and_line,, Symtab a
 Return the value of the given variable in this frame.  @var{variable} must
 be a string.
 @end defmethod
+
+@defmethod Frame select
+Set this frame to be the user's selected frame.
+@end defmethod
 @end table
 
 @node Interpreters
