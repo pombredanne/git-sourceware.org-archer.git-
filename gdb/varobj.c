@@ -182,6 +182,11 @@ struct varobj
   int from;
   int to;
 
+  /* The pretty-printer constructor.  If NULL, then the default
+     pretty-printer will be looked up.  If None, then no
+     pretty-printer will be installed.  */
+  PyObject *constructor;
+
   /* The pretty-printer that has been constructed.  If NULL, then a
      new printer object is needed, and one will be constructed.  */
   PyObject *pretty_printer;
@@ -244,8 +249,6 @@ static char *cppop (struct cpstack **pstack);
 
 static int install_new_value (struct varobj *var, struct value *value, 
 			      int initial);
-
-static void install_default_visualizer (struct varobj *var);
 
 /* Language-specific routines. */
 
@@ -615,7 +618,6 @@ varobj_create (char *objname,
 	}
     }
 
-  install_default_visualizer (var);
   discard_cleanups (old_chain);
   return var;
 }
@@ -999,7 +1001,6 @@ varobj_list_children (struct varobj *var)
 	  name = name_of_child (var, i);
 	  existing = create_child (var, i, name);
 	  VEC_replace (varobj_p, var->children, i, existing);
-	  install_default_visualizer (existing);
 	}
     }
 
@@ -1013,7 +1014,6 @@ varobj_add_child (struct varobj *var, const char *name, struct value *value)
 					VEC_length (varobj_p, var->children), 
 					name, value);
   VEC_safe_push (varobj_p, var->children, v);
-  install_default_visualizer (v);
   return v;
 }
 
@@ -1183,6 +1183,117 @@ varobj_list (struct varobj ***varlist)
   return rootcount;
 }
 
+#if HAVE_PYTHON
+
+/* A helper function to install a constructor function and visualizer
+   in a varobj.  */
+
+static void
+install_visualizer (struct varobj *var, PyObject *constructor,
+		    PyObject *visualizer)
+{
+  Py_XDECREF (var->constructor);
+  var->constructor = constructor;
+
+  Py_XDECREF (var->pretty_printer);
+  var->pretty_printer = visualizer;
+}
+
+/* Install the default visualizer for VAR.  */
+
+static void
+install_default_visualizer (struct varobj *var)
+{
+  struct cleanup *cleanup;
+  PyGILState_STATE state;
+  PyObject *pretty_printer = NULL;
+
+  state = PyGILState_Ensure ();
+  cleanup = make_cleanup_py_restore_gil (&state);
+
+  if (var->value)
+    {
+      pretty_printer = gdbpy_get_varobj_pretty_printer (var->value);
+      if (! pretty_printer)
+	{
+	  gdbpy_print_stack ();
+	  error (_("Cannot instantiate printer for default visualizer"));
+	}
+    }
+      
+  if (pretty_printer == Py_None)
+    {
+      Py_DECREF (pretty_printer);
+      pretty_printer = NULL;
+    }
+  
+  install_visualizer (var, NULL, pretty_printer);
+  do_cleanups (cleanup);
+}
+
+/* Instantiate and install a visualizer for VAR using CONSTRUCTOR to
+   make a new object.  */
+
+static void
+construct_visualizer (struct varobj *var, PyObject *constructor)
+{
+  PyObject *pretty_printer;
+
+  Py_INCREF (constructor);
+  if (constructor == Py_None)
+    pretty_printer = NULL;
+  else
+    {
+      pretty_printer = instantiate_pretty_printer (constructor, var->value);
+      if (! pretty_printer)
+	{
+	  gdbpy_print_stack ();
+	  Py_DECREF (constructor);
+	  constructor = Py_None;
+	  Py_INCREF (constructor);
+	}
+
+      if (pretty_printer == Py_None)
+	{
+	  Py_DECREF (pretty_printer);
+	  pretty_printer = NULL;
+	}
+    }
+
+  install_visualizer (var, constructor, pretty_printer);
+}
+
+#endif /* HAVE_PYTHON */
+
+/* A helper function for install_new_value.  This creates and installs
+   a visualizer for VAR, if appropriate.  */
+
+static void
+install_new_value_visualizer (struct varobj *var)
+{
+#if HAVE_PYTHON
+  /* If the constructor is None, then we want the raw value.  */
+  if (var->constructor != Py_None)
+    {
+      struct cleanup *cleanup;
+      PyGILState_STATE state;
+      PyObject *pretty_printer = NULL;
+
+      state = PyGILState_Ensure ();
+      cleanup = make_cleanup_py_restore_gil (&state);
+
+      if (!var->constructor)
+	install_default_visualizer (var);
+      else
+	construct_visualizer (var, var->constructor);
+
+      do_cleanups (cleanup);
+    }
+#else
+  /* Do nothing.  */
+#endif
+}
+
 /* Assign a new value to a variable object.  If INITIAL is non-zero,
    this is the first assignement after the variable object was just
    created, or changed type.  In that case, just assign the value 
@@ -1290,7 +1401,7 @@ install_new_value (struct varobj *var, struct value *value, int initial)
 	{
 	  changed = 1;
 	}
-      else 
+      else if (! var->pretty_printer)
 	{
 	  /* Try to compare the values.  That requires that both
 	     values are non-lazy.  */
@@ -1344,6 +1455,8 @@ install_new_value (struct varobj *var, struct value *value, int initial)
     var->not_fetched = 0;
   var->updated = 0;
 
+  install_new_value_visualizer (var);
+
   gdb_assert (!var->value || value_type (var->value));
 
   return changed;
@@ -1385,64 +1498,6 @@ varobj_set_child_range (struct varobj *var, int from, int to)
   var->to = to;
 }
 
-static void
-install_visualizer (struct varobj *var, PyObject *visualizer)
-{
-#if HAVE_PYTHON
-  /* If there are any children now, wipe them.  */
-  varobj_delete (var, NULL, 1 /* children only */);
-  var->num_children = -1;
-
-  Py_XDECREF (var->pretty_printer);
-  var->pretty_printer = visualizer;
-
-  install_new_value (var, var->value, 1);
-
-  /* If we removed the visualizer, and the user ever requested the
-     object's children, then we must compute the list of children.
-     Note that we needn't do this when installing a visualizer,
-     because updating will recompute dynamic children.  */
-  if (!visualizer && var->children_requested)
-    varobj_list_children (var);
-#else
-  error (_("Python support required"));
-#endif
-}
-
-static void
-install_default_visualizer (struct varobj *var)
-{
-#if HAVE_PYTHON
-  struct cleanup *cleanup;
-  PyGILState_STATE state;
-  PyObject *pretty_printer = NULL;
-
-  state = PyGILState_Ensure ();
-  cleanup = make_cleanup_py_restore_gil (&state);
-
-  if (var->value)
-    {
-      pretty_printer = gdbpy_get_varobj_pretty_printer (var->value);
-      if (! pretty_printer)
-	{
-	  gdbpy_print_stack ();
-	  error (_("Cannot instantiate printer for default visualizer"));
-	}
-    }
-      
-  if (pretty_printer == Py_None)
-    {
-      Py_DECREF (pretty_printer);
-      pretty_printer = NULL;
-    }
-  
-  install_visualizer (var, pretty_printer);
-  do_cleanups (cleanup);
-#else
-  /* No error is right as this function is inserted just as a hook.  */
-#endif
-}
-
 void 
 varobj_set_visualizer (struct varobj *var, const char *visualizer)
 {
@@ -1461,31 +1516,19 @@ varobj_set_visualizer (struct varobj *var, const char *visualizer)
   make_cleanup_py_decref (globals);
 
   constructor = PyRun_String (visualizer, Py_eval_input, globals, globals);
-  
-  /* Do not instantiate NoneType. */
-  if (constructor == Py_None)
-    {
-      pretty_printer = Py_None;
-      Py_INCREF (pretty_printer);
-    }
-  else
-    pretty_printer = instantiate_pretty_printer (constructor, var->value);
 
-  Py_XDECREF (constructor);
-
-  if (! pretty_printer)
+  if (! constructor)
     {
       gdbpy_print_stack ();
       error (_("Could not evaluate visualizer expression: %s"), visualizer);
     }
 
-  if (pretty_printer == Py_None)
-    {
-      Py_DECREF (pretty_printer);
-      pretty_printer = NULL;
-    }
+  construct_visualizer (var, constructor);
+  Py_XDECREF (constructor);
 
-  install_visualizer (var, pretty_printer);
+  /* If there are any children now, wipe them.  */
+  varobj_delete (var, NULL, 1 /* children only */);
+  var->num_children = -1;
 
   do_cleanups (back_to);
 #else
@@ -1925,6 +1968,7 @@ new_variable (void)
   var->children_requested = 0;
   var->from = -1;
   var->to = -1;
+  var->constructor = 0;
   var->pretty_printer = 0;
 
   return var;
