@@ -879,7 +879,7 @@ update_dynamic_varobj_children (struct varobj *var,
     }
   make_cleanup_py_decref (iterator);
 
-  for (i = 0; ; ++i)
+  for (i = 0; var->to < 0 || i < var->to; ++i)
     {
       PyObject *item = PyIter_Next (iterator);
       PyObject *py_v;
