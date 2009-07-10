@@ -1258,7 +1258,7 @@ proc mi_varobj_update_dynamic {name children testname} {
     set er "\\^done,changelist=\\\["
 
     append er "{name=\"$name\",in_scope=\"true\",type_changed=\"false\""
-    append er ",children=\\\[$children_exp_j.*\\\]}\\\]"
+    append er ",children=\\\[$children_exp_j.*\\\],has_more=\".\"}\\\]"
 
     verbose -log "Expecting: $er"
     mi_gdb_test "-var-update $name" $er $testname
@@ -1328,14 +1328,13 @@ proc mi_child_regexp {children add_child} {
 # have no value.
 #
 proc mi_list_varobj_children { varname children testname } {
-    mi_list_varobj_children_range $varname [llength $children] $children \
+    mi_list_varobj_children_range $varname "" "" [llength $children] $children \
       $testname
 }
 
-# Like mi_list_varobj_children, but assumes that a subrange has been
-# selected with -var-set-child-range.  NUMCHILDREN is the total number
-# of children.
-proc mi_list_varobj_children_range {varname numchildren children testname} {
+# Like mi_list_varobj_children, but sets a subrange.  NUMCHILDREN is
+# the total number of children.
+proc mi_list_varobj_children_range {varname from to numchildren children testname} {
     set options ""
     if {[llength $varname] == 2} {
         set options [lindex $varname 1]
@@ -1351,9 +1350,18 @@ proc mi_list_varobj_children_range {varname numchildren children testname} {
         set expected "\\^done,numchild=\"0\""
     }
 
+    if {"$to" == ""} {
+        append expected ",has_more=\"0\""
+    } elseif {$to >= 0 && $numchildren > $to} {
+        append expected ",has_more=\"1\""
+    } else {
+        append expected ",has_more=\"0\""
+    }
+
     verbose -log "Expecting: $expected"
 
-    mi_gdb_test "-var-list-children $options $varname" $expected $testname
+    mi_gdb_test "-var-list-children $options $varname $from $to" \
+      $expected $testname
 }
 
 # Verifies that variable object VARNAME has NUMBER children,

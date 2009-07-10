@@ -259,25 +259,6 @@ mi_cmd_var_set_visualizer (char *command, char **argv, int argc)
 }
 
 void
-mi_cmd_var_set_child_range (char *command, char **argv, int argc)
-{
-  struct varobj *var;
-  int from, to;
-
-  if (argc != 3)
-    error (_("-var-set-child-range: NAME FROM TO"));
-
-  var = varobj_get_handle (argv[0]);
-  if (var == NULL)
-    error (_("Variable object not found"));
-
-  from = atoi (argv[1]);
-  to = atoi (argv[2]);
-
-  varobj_set_child_range (var, from, to);
-}
-
-void
 mi_cmd_var_set_frozen (char *command, char **argv, int argc)
 {
   struct varobj *var;
@@ -388,32 +369,38 @@ mi_cmd_var_list_children (char *command, char **argv, int argc)
   struct varobj *var;  
   VEC(varobj_p) *children;
   struct varobj *child;
-  struct cleanup *cleanup_children;
   int numchild;
   enum print_values print_values;
   int ix;
   int from, to;
   char *display_hint;
 
-  if (argc != 1 && argc != 2)
-    error (_("mi_cmd_var_list_children: Usage: [PRINT_VALUES] NAME"));
+  if (argc < 1 || argc > 4)
+    error (_("mi_cmd_var_list_children: Usage: [PRINT_VALUES] NAME [FROM TO]"));
 
   /* Get varobj handle, if a valid var obj name was specified */
-  if (argc == 1)
+  if (argc == 1 || argc == 3)
     var = varobj_get_handle (argv[0]);
   else
     var = varobj_get_handle (argv[1]);
 
+  if (argc > 2)
+    {
+      from = atoi (argv[argc - 2]);
+      to = atoi (argv[argc - 1]);
+      varobj_set_child_range (var, from, to);
+    }
+
   children = varobj_list_children (var);
   ui_out_field_int (uiout, "numchild", VEC_length (varobj_p, children));
-  if (argc == 2)
+  if (argc == 2 || argc == 4)
     print_values = mi_parse_values_option (argv[0]);
   else
     print_values = PRINT_NO_VALUES;
 
+  /* Re-fetch the child range, because varobj_get_child_range computes
+     the real start and end indices for us.  */
   varobj_get_child_range (var, children, &from, &to);
-  if (from >= to)
-    return;
 
   display_hint = varobj_get_display_hint (var);
   if (display_hint)
@@ -422,18 +409,29 @@ mi_cmd_var_list_children (char *command, char **argv, int argc)
       xfree (display_hint);
     }
 
-  if (mi_version (uiout) == 1)
-    cleanup_children = make_cleanup_ui_out_tuple_begin_end (uiout, "children");
-  else
-    cleanup_children = make_cleanup_ui_out_list_begin_end (uiout, "children");
-  for (ix = from; ix < to && VEC_iterate (varobj_p, children, ix, child); ++ix)
+  if (from < to)
     {
-      struct cleanup *cleanup_child;
-      cleanup_child = make_cleanup_ui_out_tuple_begin_end (uiout, "child");
-      print_varobj (child, print_values, 1 /* print expression */);
-      do_cleanups (cleanup_child);
+      struct cleanup *cleanup_children;
+      if (mi_version (uiout) == 1)
+	cleanup_children
+	  = make_cleanup_ui_out_tuple_begin_end (uiout, "children");
+      else
+	cleanup_children
+	  = make_cleanup_ui_out_list_begin_end (uiout, "children");
+      for (ix = from;
+	   ix < to && VEC_iterate (varobj_p, children, ix, child);
+	   ++ix)
+	{
+	  struct cleanup *cleanup_child;
+	  cleanup_child = make_cleanup_ui_out_tuple_begin_end (uiout, "child");
+	  print_varobj (child, print_values, 1 /* print expression */);
+	  do_cleanups (cleanup_child);
+	}
+      do_cleanups (cleanup_children);
     }
-  do_cleanups (cleanup_children);
+
+  ui_out_field_int (uiout, "has_more",
+		    VEC_length (varobj_p, children) > to);
 }
 
 void
@@ -743,6 +741,9 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
 	    }
 
 	  do_cleanups (cleanup);
+
+	  ui_out_field_int (uiout, "has_more",
+			    VEC_length (varobj_p, children) > to);
 	}
   
       if (mi_version (uiout) > 1)

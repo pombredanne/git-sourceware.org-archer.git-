@@ -23754,7 +23754,7 @@ Returns the number of children of a variable object @var{name}:
 @subsubheading Synopsis
 
 @smallexample
- -var-list-children [@var{print-values}] @var{name}
+ -var-list-children [@var{print-values}] @var{name} [@var{from} @var{to}]
 @end smallexample
 @anchor{-var-list-children} 
 
@@ -23766,6 +23766,18 @@ a single argument or if @var{print-values} has a value for of 0 or
 values; and if it is 2 or @code{--simple-values} print the name and
 value for simple data types and just the name for arrays, structures
 and unions.
+
+@var{from} and @var{to}, if specified, indicate the range of children
+to report.  If @var{from} or @var{to} is less than zero, the range is
+reset and all children will be reported.  Otherwise, children starting
+at @var{from} (zero-based) and ending just before @var{to} will be
+reported.  The selected range is sticky; future calls to
+@code{-var-update} or @code{-var-list-children} will use any
+previously set range.
+
+The result may include a @code{has_more} attribute.  This is an
+integer attribute which is nonzero if there are children remaining
+after the end of the selected range.
 
 @subsubheading Example
 
@@ -24073,46 +24085,6 @@ can be used to instantiate this class for a varobj:
 -var-set-visualizer V "lambda val: SomeClass()"
 ^done
 @end smallexample
-
-@subheading The @code{-var-set-child-range} command
-@findex -var-set-child-range
-@anchor{-var-set-child-range}
-
-@subsubheading Synopsis
-
-@smallexample
- -var-set-child-range @var{name} @var{from} @var{to}
-@end smallexample
-
-Select a sub-range of the children of the variable object @var{name};
-future calls to @code{-var-list-children} will only report the
-selected range of children.  This allows an MI consumer to avoid
-inefficiencies if the varobj has very many children.
-
-If either @var{from} or @var{to} is less than zero, then sub-range
-selection is disabled, and @code{-var-list-children} will report all
-children.
-
-Otherwise, @var{from} and @var{to} are indexes into the array of
-children.  Children starting at @var{from} and stopping jsut before
-@var{to} will be reported.
-
-@subsubheading Example
-
-@smallexample
-(gdb)
- -var-list-children n
- ^done,numchild=3,children=[@{name="a",numchild=0,type="int"@},
- @{name="b",numchild=0,type="int"@},
- @{name="c",numchild=0,type="int"@}]
-(gdb)
- -var-set-child-range n 1 2
-(gdb)
- -var-list-children n
- ^done,numchild=3,children=[@{name="b",numchild=0,type="int"@},
- @{name="c",numchild=0,type="int"@}]
-@end smallexample
-
 
 @c %%%%%%%%%%%%%%%%%%%%%%%%%%%% SECTION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 @node GDB/MI Data Manipulation

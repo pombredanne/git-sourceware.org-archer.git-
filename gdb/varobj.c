@@ -879,7 +879,9 @@ update_dynamic_varobj_children (struct varobj *var,
     }
   make_cleanup_py_decref (iterator);
 
-  for (i = 0; var->to < 0 || i < var->to; ++i)
+  /* We ask for one extra child, so that MI can report whether there
+     are more children.  */
+  for (i = 0; var->to < 0 || i < var->to + 1; ++i)
     {
       PyObject *item = PyIter_Next (iterator);
       PyObject *py_v;
