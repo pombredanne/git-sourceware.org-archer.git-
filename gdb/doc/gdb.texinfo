@@ -23587,6 +23587,8 @@ access this functionality:
 @item @strong{Operation}
 @tab @strong{Description}
 
+@item @code{-enable-pretty-printing}
+@tab enable Python-based pretty-printing
 @item @code{-var-create}
 @tab create a variable object
 @item @code{-var-delete}
@@ -23621,6 +23623,23 @@ In the next subsection we describe each operation in detail and suggest
 how it can be used.
 
 @subheading Description And Use of Operations on Variable Objects
+
+@subheading The @code{-enable-pretty-printing} Command
+@findex -enable-pretty-printing
+
+@smallexample
+-enable-pretty-printing
+@end smallexample
+
+@var{GDBN} allows Python-based visualizers to affect the output of the
+MI variable object commands.  However, because there was no way to
+implement this in a fully backward-compatible way, a front end must
+request that this functionality be enabled.
+
+Once sent, this command cannot be undone.
+
+Note that if Python support has not been compiled into @var{GDBN},
+this command will still succeed.
 
 @subheading The @code{-var-create} Command
 @findex -var-create

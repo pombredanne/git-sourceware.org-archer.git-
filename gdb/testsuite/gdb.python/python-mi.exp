@@ -48,7 +48,21 @@ mi_gdb_test "python execfile ('${srcdir}/${subdir}/${testfile}.py')" ""
 mi_continue_to_line [gdb_get_line_number {MI breakpoint here} ${testfile}.c] \
   "step to breakpoint"
 
-mi_create_floating_varobj container c "create container varobj"
+mi_create_floating_varobj container c \
+  "create container varobj, no pretty-printing"
+
+mi_list_varobj_children container {
+  { container.name name 1 string }
+  { container.len len 0 int }
+  { container.elements elements 1 "int ." }
+} "examine container children=0, no pretty-printing"
+
+mi_delete_varobj container "delete varobj"
+
+mi_gdb_test "-enable-pretty-printing" ""
+
+mi_create_floating_varobj container c \
+  "create container varobj"
 
 mi_list_varobj_children container {
 } "examine container children=0"

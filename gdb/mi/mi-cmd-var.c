@@ -751,3 +751,11 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
     }
   VEC_free (varobj_update_result, changes);
 }
+
+void
+mi_cmd_enable_pretty_printing (char *command, char **argv, int argc)
+{
+  if (argc != 0)
+    error (_("mi_cmd_enable_pretty_printing: no arguments allowed"));
+  varobj_enable_pretty_printing ();
+}

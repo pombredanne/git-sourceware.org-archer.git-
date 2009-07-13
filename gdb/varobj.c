@@ -62,6 +62,15 @@ char *varobj_format_string[] =
 /* String representations of gdb's known languages */
 char *varobj_language_string[] = { "unknown", "C", "C++", "Java" };
 
+/* True if we want to allow Python-based pretty-printing.  */
+static int pretty_printing = 0;
+
+void
+varobj_enable_pretty_printing (void)
+{
+  pretty_printing = 1;
+}
+
 /* Data structures */
 
 /* Every root variable has one of these structures saved in its
@@ -1206,31 +1215,34 @@ install_visualizer (struct varobj *var, PyObject *constructor,
 static void
 install_default_visualizer (struct varobj *var)
 {
-  struct cleanup *cleanup;
-  PyGILState_STATE state;
-  PyObject *pretty_printer = NULL;
-
-  state = PyGILState_Ensure ();
-  cleanup = make_cleanup_py_restore_gil (&state);
-
-  if (var->value)
+  if (pretty_printing)
     {
-      pretty_printer = gdbpy_get_varobj_pretty_printer (var->value);
-      if (! pretty_printer)
+      struct cleanup *cleanup;
+      PyGILState_STATE state;
+      PyObject *pretty_printer = NULL;
+
+      state = PyGILState_Ensure ();
+      cleanup = make_cleanup_py_restore_gil (&state);
+
+      if (var->value)
 	{
-	  gdbpy_print_stack ();
-	  error (_("Cannot instantiate printer for default visualizer"));
+	  pretty_printer = gdbpy_get_varobj_pretty_printer (var->value);
+	  if (! pretty_printer)
+	    {
+	      gdbpy_print_stack ();
+	      error (_("Cannot instantiate printer for default visualizer"));
+	    }
 	}
-    }
       
-  if (pretty_printer == Py_None)
-    {
-      Py_DECREF (pretty_printer);
-      pretty_printer = NULL;
-    }
+      if (pretty_printer == Py_None)
+	{
+	  Py_DECREF (pretty_printer);
+	  pretty_printer = NULL;
+	}
   
-  install_visualizer (var, NULL, pretty_printer);
-  do_cleanups (cleanup);
+      install_visualizer (var, NULL, pretty_printer);
+      do_cleanups (cleanup);
+    }
 }
 
 /* Instantiate and install a visualizer for VAR using CONSTRUCTOR to
