@@ -142,11 +142,11 @@ static const struct opcode32 coprocessor_opcodes[] =
   {ARM_CEXT_XSCALE, 0x0e100110, 0x0ff00ff0, "tmrc%c\t%12-15r, %16-19G"},
   {ARM_CEXT_XSCALE, 0x0c500000, 0x0ff00ff0, "tmrrc%c\t%12-15r, %16-19r, %0-3g"},
   {ARM_CEXT_XSCALE, 0x0e130150, 0x0f3f0fff, "torc%22-23w%c\t%12-15r"},
-  {ARM_CEXT_XSCALE, 0x0e130190, 0x0f3f0fff, "torvsc%22-23w%c\t%12-15r"},
+  {ARM_CEXT_XSCALE, 0x0e120190, 0x0f3f0fff, "torvsc%22-23w%c\t%12-15r"},
   {ARM_CEXT_XSCALE, 0x0e2001c0, 0x0f300fff, "wabs%22-23w%c\t%12-15g, %16-19g"},
   {ARM_CEXT_XSCALE, 0x0e0001c0, 0x0f300fff, "wacc%22-23w%c\t%12-15g, %16-19g"},
   {ARM_CEXT_XSCALE, 0x0e000180, 0x0f000ff0, "wadd%20-23w%c\t%12-15g, %16-19g, %0-3g"},
-  {ARM_CEXT_XSCALE, 0x0e2001a0, 0x0f300ff0, "waddbhus%22?ml%c\t%12-15g, %16-19g, %0-3g"},
+  {ARM_CEXT_XSCALE, 0x0e2001a0, 0x0fb00ff0, "waddbhus%22?ml%c\t%12-15g, %16-19g, %0-3g"},
   {ARM_CEXT_XSCALE, 0x0ea001a0, 0x0ff00ff0, "waddsubhx%c\t%12-15g, %16-19g, %0-3g"},
   {ARM_CEXT_XSCALE, 0x0e000020, 0x0f800ff0, "waligni%c\t%12-15g, %16-19g, %0-3g, #%20-22d"},
   {ARM_CEXT_XSCALE, 0x0e800020, 0x0fc00ff0, "walignr%20-21d%c\t%12-15g, %16-19g, %0-3g"},
@@ -1003,24 +1003,66 @@ static const struct opcode32 arm_opcodes[] =
   {ARM_EXT_V1, 0x04000000, 0x0e100000, "str%22'b%t%c\t%12-15r, %a"},
   {ARM_EXT_V1, 0x06000000, 0x0e100ff0, "str%22'b%t%c\t%12-15r, %a"},
   {ARM_EXT_V1, 0x04000000, 0x0c100010, "str%22'b%t%c\t%12-15r, %a"},
-  {ARM_EXT_V1, 0x04400000, 0x0c500000, "strb%c\t%12-15r, %a"},
+  {ARM_EXT_V1, 0x04400000, 0x0e500000, "strb%c\t%12-15r, %a"},
+  {ARM_EXT_V1, 0x06400000, 0x0e500010, "strb%c\t%12-15r, %a"},
   {ARM_EXT_V1, 0x000000b0, 0x0e1000f0, "strh%c\t%12-15r, %s"},
   {ARM_EXT_V1, 0x00100090, 0x0e100090, "ldr%6's%5?hb%c\t%12-15r, %s"},
-  {ARM_EXT_V1, 0x00000000, 0x0de00000, "and%20's%c\t%12-15r, %16-19r, %o"},
-  {ARM_EXT_V1, 0x00200000, 0x0de00000, "eor%20's%c\t%12-15r, %16-19r, %o"},
-  {ARM_EXT_V1, 0x00400000, 0x0de00000, "sub%20's%c\t%12-15r, %16-19r, %o"},
-  {ARM_EXT_V1, 0x00600000, 0x0de00000, "rsb%20's%c\t%12-15r, %16-19r, %o"},
-  {ARM_EXT_V1, 0x00800000, 0x0de00000, "add%20's%c\t%12-15r, %16-19r, %o"},
-  {ARM_EXT_V1, 0x00a00000, 0x0de00000, "adc%20's%c\t%12-15r, %16-19r, %o"},
-  {ARM_EXT_V1, 0x00c00000, 0x0de00000, "sbc%20's%c\t%12-15r, %16-19r, %o"},
-  {ARM_EXT_V1, 0x00e00000, 0x0de00000, "rsc%20's%c\t%12-15r, %16-19r, %o"},
+
+  {ARM_EXT_V1, 0x02000000, 0x0fe00000, "and%20's%c\t%12-15r, %16-19r, %o"},
+  {ARM_EXT_V1, 0x00000000, 0x0fe00010, "and%20's%c\t%12-15r, %16-19r, %o"},
+  {ARM_EXT_V1, 0x00000010, 0x0fe00090, "and%20's%c\t%12-15r, %16-19r, %o"},
+
+  {ARM_EXT_V1, 0x02200000, 0x0fe00000, "eor%20's%c\t%12-15r, %16-19r, %o"},
+  {ARM_EXT_V1, 0x00200000, 0x0fe00010, "eor%20's%c\t%12-15r, %16-19r, %o"},
+  {ARM_EXT_V1, 0x00200010, 0x0fe00090, "eor%20's%c\t%12-15r, %16-19r, %o"},
+
+  {ARM_EXT_V1, 0x02400000, 0x0fe00000, "sub%20's%c\t%12-15r, %16-19r, %o"},
+  {ARM_EXT_V1, 0x00400000, 0x0fe00010, "sub%20's%c\t%12-15r, %16-19r, %o"},
+  {ARM_EXT_V1, 0x00400010, 0x0fe00090, "sub%20's%c\t%12-15r, %16-19r, %o"},
+
+  {ARM_EXT_V1, 0x02600000, 0x0fe00000, "rsb%20's%c\t%12-15r, %16-19r, %o"},
+  {ARM_EXT_V1, 0x00600000, 0x0fe00010, "rsb%20's%c\t%12-15r, %16-19r, %o"},
+  {ARM_EXT_V1, 0x00600010, 0x0fe00090, "rsb%20's%c\t%12-15r, %16-19r, %o"},
+
+  {ARM_EXT_V1, 0x02800000, 0x0fe00000, "add%20's%c\t%12-15r, %16-19r, %o"},
+  {ARM_EXT_V1, 0x00800000, 0x0fe00010, "add%20's%c\t%12-15r, %16-19r, %o"},
+  {ARM_EXT_V1, 0x00800010, 0x0fe00090, "add%20's%c\t%12-15r, %16-19r, %o"},
+
+  {ARM_EXT_V1, 0x02a00000, 0x0fe00000, "adc%20's%c\t%12-15r, %16-19r, %o"},
+  {ARM_EXT_V1, 0x00a00000, 0x0fe00010, "adc%20's%c\t%12-15r, %16-19r, %o"},
+  {ARM_EXT_V1, 0x00a00010, 0x0fe00090, "adc%20's%c\t%12-15r, %16-19r, %o"},
+
+  {ARM_EXT_V1, 0x02c00000, 0x0fe00000, "sbc%20's%c\t%12-15r, %16-19r, %o"},
+  {ARM_EXT_V1, 0x00c00000, 0x0fe00010, "sbc%20's%c\t%12-15r, %16-19r, %o"},
+  {ARM_EXT_V1, 0x00c00010, 0x0fe00090, "sbc%20's%c\t%12-15r, %16-19r, %o"},
+
+  {ARM_EXT_V1, 0x02e00000, 0x0fe00000, "rsc%20's%c\t%12-15r, %16-19r, %o"},
+  {ARM_EXT_V1, 0x00e00000, 0x0fe00010, "rsc%20's%c\t%12-15r, %16-19r, %o"},
+  {ARM_EXT_V1, 0x00e00010, 0x0fe00090, "rsc%20's%c\t%12-15r, %16-19r, %o"},
+
   {ARM_EXT_V3, 0x0120f000, 0x0db0f000, "msr%c\t%22?SCPSR%C, %o"},
   {ARM_EXT_V3, 0x010f0000, 0x0fbf0fff, "mrs%c\t%12-15r, %22?SCPSR"},
-  {ARM_EXT_V1, 0x01000000, 0x0de00000, "tst%p%c\t%16-19r, %o"},
-  {ARM_EXT_V1, 0x01200000, 0x0de00000, "teq%p%c\t%16-19r, %o"},
-  {ARM_EXT_V1, 0x01400000, 0x0de00000, "cmp%p%c\t%16-19r, %o"},
-  {ARM_EXT_V1, 0x01600000, 0x0de00000, "cmn%p%c\t%16-19r, %o"},
-  {ARM_EXT_V1, 0x01800000, 0x0de00000, "orr%20's%c\t%12-15r, %16-19r, %o"},
+
+  {ARM_EXT_V1, 0x03000000, 0x0fe00000, "tst%p%c\t%16-19r, %o"},
+  {ARM_EXT_V1, 0x01000000, 0x0fe00010, "tst%p%c\t%16-19r, %o"},
+  {ARM_EXT_V1, 0x01000010, 0x0fe00090, "tst%p%c\t%16-19r, %o"},
+
+  {ARM_EXT_V1, 0x03200000, 0x0fe00000, "teq%p%c\t%16-19r, %o"},
+  {ARM_EXT_V1, 0x01200000, 0x0fe00010, "teq%p%c\t%16-19r, %o"},
+  {ARM_EXT_V1, 0x01200010, 0x0fe00090, "teq%p%c\t%16-19r, %o"},
+
+  {ARM_EXT_V1, 0x03400000, 0x0fe00000, "cmp%p%c\t%16-19r, %o"},
+  {ARM_EXT_V1, 0x01400000, 0x0fe00010, "cmp%p%c\t%16-19r, %o"},
+  {ARM_EXT_V1, 0x01400010, 0x0fe00090, "cmp%p%c\t%16-19r, %o"},
+
+  {ARM_EXT_V1, 0x03600000, 0x0fe00000, "cmn%p%c\t%16-19r, %o"},
+  {ARM_EXT_V1, 0x01600000, 0x0fe00010, "cmn%p%c\t%16-19r, %o"},
+  {ARM_EXT_V1, 0x01600010, 0x0fe00090, "cmn%p%c\t%16-19r, %o"},
+
+  {ARM_EXT_V1, 0x03800000, 0x0fe00000, "orr%20's%c\t%12-15r, %16-19r, %o"},
+  {ARM_EXT_V1, 0x01800000, 0x0fe00010, "orr%20's%c\t%12-15r, %16-19r, %o"},
+  {ARM_EXT_V1, 0x01800010, 0x0fe00090, "orr%20's%c\t%12-15r, %16-19r, %o"},
+
   {ARM_EXT_V1, 0x03a00000, 0x0fef0000, "mov%20's%c\t%12-15r, %o"},
   {ARM_EXT_V1, 0x01a00000, 0x0def0ff0, "mov%20's%c\t%12-15r, %0-3r"},
   {ARM_EXT_V1, 0x01a00000, 0x0def0060, "lsl%20's%c\t%12-15r, %q"},
@@ -1028,8 +1070,15 @@ static const struct opcode32 arm_opcodes[] =
   {ARM_EXT_V1, 0x01a00040, 0x0def0060, "asr%20's%c\t%12-15r, %q"},
   {ARM_EXT_V1, 0x01a00060, 0x0def0ff0, "rrx%20's%c\t%12-15r, %0-3r"},
   {ARM_EXT_V1, 0x01a00060, 0x0def0060, "ror%20's%c\t%12-15r, %q"},
-  {ARM_EXT_V1, 0x01c00000, 0x0de00000, "bic%20's%c\t%12-15r, %16-19r, %o"},
-  {ARM_EXT_V1, 0x01e00000, 0x0de00000, "mvn%20's%c\t%12-15r, %o"},
+
+  {ARM_EXT_V1, 0x03c00000, 0x0fe00000, "bic%20's%c\t%12-15r, %16-19r, %o"},
+  {ARM_EXT_V1, 0x01c00000, 0x0fe00010, "bic%20's%c\t%12-15r, %16-19r, %o"},
+  {ARM_EXT_V1, 0x01c00010, 0x0fe00090, "bic%20's%c\t%12-15r, %16-19r, %o"},
+
+  {ARM_EXT_V1, 0x03e00000, 0x0fe00000, "mvn%20's%c\t%12-15r, %o"},
+  {ARM_EXT_V1, 0x01e00000, 0x0fe00010, "mvn%20's%c\t%12-15r, %o"},
+  {ARM_EXT_V1, 0x01e00010, 0x0fe00090, "mvn%20's%c\t%12-15r, %o"},
+
   {ARM_EXT_V1, 0x06000010, 0x0e000010, UNDEFINED_INSTRUCTION},
   {ARM_EXT_V1, 0x049d0004, 0x0fff0fff, "pop%c\t{%12-15r}\t\t; (ldr%c %12-15r, %a)"},
   {ARM_EXT_V1, 0x04100000, 0x0c100000, "ldr%22'b%t%c\t%12-15r, %a"},
@@ -1599,7 +1648,7 @@ arm_decode_bitfield (const char *ptr,
 
 static void
 arm_decode_shift (long given, fprintf_ftype func, void *stream,
-		  int print_shift)
+		  bfd_boolean print_shift)
 {
   func (stream, "%s", arm_regnames[given & 0xf]);
 
@@ -1626,6 +1675,8 @@ arm_decode_shift (long given, fprintf_ftype func, void *stream,
 	  else
 	    func (stream, ", #%d", amount);
 	}
+      else if ((given & 0x80) == 0x80)
+	func (stream, ", <illegal shifter operand>");
       else if (print_shift)
 	func (stream, ", %s %s", arm_shift[(given & 0x60) >> 5],
 	      arm_regnames[(given & 0xf00) >> 8]);
@@ -1954,7 +2005,7 @@ print_insn_coprocessor (bfd_vma pc,
 			break;
 
 		      case 'x':
-			func (stream, "0x%lx", value);
+			func (stream, "0x%lx", (value & 0xffffffffUL));
 			break;
 
 		      case '`':
@@ -2166,7 +2217,7 @@ print_insn_coprocessor (bfd_vma pc,
 	}
 
       if (value_in_comment > 32 || value_in_comment < -16)
-	func (stream, "\t; 0x%lx", value_in_comment);
+	func (stream, "\t; 0x%lx", (value_in_comment & 0xffffffffUL));
 
       return TRUE;
     }
@@ -2241,7 +2292,7 @@ print_arm_address (bfd_vma pc, struct disassemble_info *info, long given)
 	      func (stream, ", %s",
 		    (((given & 0x00800000) == 0)
 		     ? "-" : ""));
-	      arm_decode_shift (given, func, stream, 1);
+	      arm_decode_shift (given, func, stream, TRUE);
 	    }
 
 	  func (stream, "]%s",
@@ -2264,7 +2315,7 @@ print_arm_address (bfd_vma pc, struct disassemble_info *info, long given)
 	      func (stream, "], %s",
 		    (((given & 0x00800000) == 0)
 		     ? "-" : ""));
-	      arm_decode_shift (given, func, stream, 1);
+	      arm_decode_shift (given, func, stream, TRUE);
 	    }
 	}
     }
@@ -2804,9 +2855,10 @@ print_insn_arm (bfd_vma pc, struct disassemble_info *info, long given)
 			}
 		      else
 			{
+			  bfd_boolean negative = (given & 0x00800000) == 0;
 			  int offset = ((given & 0xf00) >> 4) | (given & 0xf);
 
-			  if ((given & 0x00800000) == 0)
+			  if (negative)
 			    offset = -offset;
 
 			  func (stream, "[%s",
@@ -2825,7 +2877,7 @@ print_insn_arm (bfd_vma pc, struct disassemble_info *info, long given)
 			      else
 				{
                                   /* Register.  */
-				  func (stream, ", %s%s", offset < 0 ? "-" : "",
+				  func (stream, ", %s%s", negative ? "-" : "",
                                         arm_regnames[given & 0xf]);
 				}
 
@@ -2848,7 +2900,7 @@ print_insn_arm (bfd_vma pc, struct disassemble_info *info, long given)
 			      else
 				{
                                   /* Register.  */
-				  func (stream, "], %s%s", offset < 0 ? "-" : "",
+				  func (stream, "], %s%s", negative ? "-" : "",
                                         arm_regnames[given & 0xf]);
 				}
 			    }
@@ -2887,7 +2939,7 @@ print_insn_arm (bfd_vma pc, struct disassemble_info *info, long given)
 		      break;
 
 		    case 'q':
-		      arm_decode_shift (given, func, stream, 0);
+		      arm_decode_shift (given, func, stream, FALSE);
 		      break;
 
 		    case 'o':
@@ -2902,7 +2954,7 @@ print_insn_arm (bfd_vma pc, struct disassemble_info *info, long given)
 			  value_in_comment = immed;
 			}
 		      else
-			arm_decode_shift (given, func, stream, 1);
+			arm_decode_shift (given, func, stream, TRUE);
 		      break;
 
 		    case 'p':
@@ -3106,7 +3158,7 @@ print_insn_arm (bfd_vma pc, struct disassemble_info *info, long given)
 	    }
 
 	  if (value_in_comment > 32 || value_in_comment < -16)
-	    func (stream, "\t; 0x%lx", value_in_comment);
+	    func (stream, "\t; 0x%lx", (value_in_comment & 0xffffffffUL));
 	  return;
 	}
     }

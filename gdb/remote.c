@@ -294,6 +294,9 @@ struct remote_state
 
   /* True if the stub reports support for vCont;t.  */
   int support_vCont_t;
+
+  /* True if the stub reports support for conditional tracepoints.  */
+  int cond_tracepoints;
 };
 
 /* Returns true if the multi-process extensions are in effect.  */
@@ -993,6 +996,7 @@ enum {
   PACKET_qXfer_siginfo_read,
   PACKET_qXfer_siginfo_write,
   PACKET_qAttached,
+  PACKET_ConditionalTracepoints,
   PACKET_MAX
 };
 
@@ -2877,6 +2881,7 @@ remote_check_symbols (struct objfile *objfile)
 	xsnprintf (msg, get_remote_packet_size (), "qSymbol::%s", &reply[8]);
       else
 	{
+	  int addr_size = gdbarch_addr_bit (target_gdbarch) / 8;
 	  CORE_ADDR sym_addr = SYMBOL_VALUE_ADDRESS (sym);
 
 	  /* If this is a function address, return the start of code
@@ -2886,7 +2891,7 @@ remote_check_symbols (struct objfile *objfile)
 							 &current_target);
 
 	  xsnprintf (msg, get_remote_packet_size (), "qSymbol:%s:%s",
-		     paddr_nz (sym_addr), &reply[8]);
+		     phex_nz (sym_addr, addr_size), &reply[8]);
 	}
   
       putpkt (msg);
@@ -3014,6 +3019,15 @@ remote_non_stop_feature (const struct protocol_feature *feature,
   rs->non_stop_aware = (support == PACKET_ENABLE);
 }
 
+static void
+remote_cond_tracepoint_feature (const struct protocol_feature *feature,
+				       enum packet_support support,
+				       const char *value)
+{
+  struct remote_state *rs = get_remote_state ();
+  rs->cond_tracepoints = (support == PACKET_ENABLE);
+}
+
 static struct protocol_feature remote_protocol_features[] = {
   { "PacketSize", PACKET_DISABLE, remote_packet_size, -1 },
   { "qXfer:auxv:read", PACKET_DISABLE, remote_supported_packet,
@@ -3040,6 +3054,8 @@ static struct protocol_feature remote_protocol_features[] = {
     PACKET_qXfer_siginfo_read },
   { "qXfer:siginfo:write", PACKET_DISABLE, remote_supported_packet,
     PACKET_qXfer_siginfo_write },
+  { "ConditionalTracepoints", PACKET_DISABLE, remote_cond_tracepoint_feature,
+    PACKET_ConditionalTracepoints },
 };
 
 static void
@@ -4590,14 +4606,15 @@ process_stop_reply (struct stop_reply *stop_reply,
       /* Expedited registers.  */
       if (stop_reply->regcache)
 	{
+	  struct regcache *regcache
+	    = get_thread_arch_regcache (ptid, target_gdbarch);
 	  cached_reg_t *reg;
 	  int ix;
 
 	  for (ix = 0;
 	       VEC_iterate(cached_reg_t, stop_reply->regcache, ix, reg);
 	       ix++)
-	    regcache_raw_supply (get_thread_regcache (ptid),
-				 reg->num, reg->data);
+	    regcache_raw_supply (regcache, reg->num, reg->data);
 	  VEC_free (cached_reg_t, stop_reply->regcache);
 	}
 
@@ -5818,6 +5835,7 @@ static void
 remote_flash_erase (struct target_ops *ops,
                     ULONGEST address, LONGEST length)
 {
+  int addr_size = gdbarch_addr_bit (target_gdbarch) / 8;
   int saved_remote_timeout = remote_timeout;
   enum packet_result ret;
 
@@ -5826,7 +5844,7 @@ remote_flash_erase (struct target_ops *ops,
   remote_timeout = remote_flash_timeout;
 
   ret = remote_send_printf ("vFlashErase:%s,%s",
-			    paddr (address),
+			    phex (address, addr_size),
 			    phex (length, 4));
   switch (ret)
     {
@@ -6792,7 +6810,8 @@ extended_remote_create_inferior (struct target_ops *ops,
    which don't, we insert a traditional memory breakpoint.  */
 
 static int
-remote_insert_breakpoint (struct bp_target_info *bp_tgt)
+remote_insert_breakpoint (struct gdbarch *gdbarch,
+			  struct bp_target_info *bp_tgt)
 {
   /* Try the "Z" s/w breakpoint packet if it is not already disabled.
      If it succeeds, then set the support to PACKET_ENABLE.  If it
@@ -6806,7 +6825,7 @@ remote_insert_breakpoint (struct bp_target_info *bp_tgt)
       char *p;
       int bpsize;
 
-      gdbarch_breakpoint_from_pc (target_gdbarch, &addr, &bpsize);
+      gdbarch_breakpoint_from_pc (gdbarch, &addr, &bpsize);
 
       rs = get_remote_state ();
       p = rs->buf;
@@ -6834,11 +6853,12 @@ remote_insert_breakpoint (struct bp_target_info *bp_tgt)
 	}
     }
 
-  return memory_insert_breakpoint (bp_tgt);
+  return memory_insert_breakpoint (gdbarch, bp_tgt);
 }
 
 static int
-remote_remove_breakpoint (struct bp_target_info *bp_tgt)
+remote_remove_breakpoint (struct gdbarch *gdbarch,
+			  struct bp_target_info *bp_tgt)
 {
   CORE_ADDR addr = bp_tgt->placed_address;
   struct remote_state *rs = get_remote_state ();
@@ -6862,7 +6882,7 @@ remote_remove_breakpoint (struct bp_target_info *bp_tgt)
       return (rs->buf[0] == 'E');
     }
 
-  return memory_remove_breakpoint (bp_tgt);
+  return memory_remove_breakpoint (gdbarch, bp_tgt);
 }
 
 static int
@@ -6998,7 +7018,8 @@ remote_stopped_data_address (struct target_ops *target, CORE_ADDR *addr_p)
 
 
 static int
-remote_insert_hw_breakpoint (struct bp_target_info *bp_tgt)
+remote_insert_hw_breakpoint (struct gdbarch *gdbarch,
+			     struct bp_target_info *bp_tgt)
 {
   CORE_ADDR addr;
   struct remote_state *rs;
@@ -7008,7 +7029,7 @@ remote_insert_hw_breakpoint (struct bp_target_info *bp_tgt)
      instruction, even though we aren't inserting one ourselves.  */
 
   gdbarch_breakpoint_from_pc
-    (target_gdbarch, &bp_tgt->placed_address, &bp_tgt->placed_size);
+    (gdbarch, &bp_tgt->placed_address, &bp_tgt->placed_size);
 
   if (remote_protocol_packets[PACKET_Z1].support == PACKET_DISABLE)
     return -1;
@@ -7041,7 +7062,8 @@ remote_insert_hw_breakpoint (struct bp_target_info *bp_tgt)
 
 
 static int
-remote_remove_hw_breakpoint (struct bp_target_info *bp_tgt)
+remote_remove_hw_breakpoint (struct gdbarch *gdbarch,
+			     struct bp_target_info *bp_tgt)
 {
   CORE_ADDR addr;
   struct remote_state *rs = get_remote_state ();
@@ -7165,16 +7187,18 @@ compare_sections_command (char *args, int from_tty)
 
       getpkt (&rs->buf, &rs->buf_size, 0);
       if (rs->buf[0] == 'E')
-	error (_("target memory fault, section %s, range 0x%s -- 0x%s"),
-	       sectname, paddr (lma), paddr (lma + size));
+	error (_("target memory fault, section %s, range %s -- %s"), sectname,
+	       paddress (target_gdbarch, lma),
+	       paddress (target_gdbarch, lma + size));
       if (rs->buf[0] != 'C')
 	error (_("remote target does not support this operation"));
 
       for (target_crc = 0, tmp = &rs->buf[1]; *tmp; tmp++)
 	target_crc = target_crc * 16 + fromhex (*tmp);
 
-      printf_filtered ("Section %s, range 0x%s -- 0x%s: ",
-		       sectname, paddr (lma), paddr (lma + size));
+      printf_filtered ("Section %s, range %s -- %s: ", sectname,
+		       paddress (target_gdbarch, lma),
+		       paddress (target_gdbarch, lma + size));
       if (host_crc == target_crc)
 	printf_filtered ("matched.\n");
       else
@@ -7494,6 +7518,7 @@ remote_search_memory (struct target_ops* ops,
 		      const gdb_byte *pattern, ULONGEST pattern_len,
 		      CORE_ADDR *found_addrp)
 {
+  int addr_size = gdbarch_addr_bit (target_gdbarch) / 8;
   struct remote_state *rs = get_remote_state ();
   int max_size = get_memory_write_packet_size ();
   struct packet_config *packet =
@@ -7532,7 +7557,7 @@ remote_search_memory (struct target_ops* ops,
   /* Insert header.  */
   i = snprintf (rs->buf, max_size, 
 		"qSearch:memory:%s;%s;",
-		paddr_nz (start_addr),
+		phex_nz (start_addr, addr_size),
 		phex_nz (search_space_len, sizeof (search_space_len)));
   max_size -= (i + 1);
 
@@ -8730,13 +8755,11 @@ remote_supports_multi_process (void)
   return remote_multi_process_p (rs);
 }
 
-static int
-extended_remote_can_run (void)
+int
+remote_supports_cond_tracepoints (void)
 {
-  if (remote_desc != NULL)
-    return 1;
-
-  return 0;
+  struct remote_state *rs = get_remote_state ();
+  return rs->cond_tracepoints;
 }
 
 static void
@@ -8824,7 +8847,6 @@ Specify the serial device it is connected to (e.g. /dev/ttya).";
   extended_remote_ops.to_detach = extended_remote_detach;
   extended_remote_ops.to_attach = extended_remote_attach;
   extended_remote_ops.to_kill = extended_remote_kill;
-  extended_remote_ops.to_can_run = extended_remote_can_run;
 }
 
 static int
@@ -9182,6 +9204,9 @@ Show the maximum size of the address (in bits) in a memory packet."), NULL,
 
   add_packet_config_cmd (&remote_protocol_packets[PACKET_qAttached],
 			 "qAttached", "query-attached", 0);
+
+  add_packet_config_cmd (&remote_protocol_packets[PACKET_ConditionalTracepoints],
+			 "ConditionalTracepoints", "conditional-tracepoints", 0);
 
   /* Keep the old ``set remote Z-packet ...'' working.  Each individual
      Z sub-packet has its own set and show commands, but users may

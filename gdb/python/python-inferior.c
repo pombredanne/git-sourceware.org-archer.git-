@@ -24,6 +24,8 @@
 #include "inferior.h"
 #include "observer.h"
 #include "python-internal.h"
+#include "arch-utils.h"
+#include "language.h"
 
 struct threadlist_entry {
   thread_object *thread_obj;
@@ -94,7 +96,6 @@ add_inferior_object (int pid)
   struct inferior *inf = find_inferior_pid (pid);
   inferior_object *inf_obj;
   struct inflist_entry *entry;
-  PyGILState_STATE state;
   struct cleanup *cleanup;
 
   if (!inf)
@@ -103,8 +104,7 @@ add_inferior_object (int pid)
       return;
     }
 
-  state = PyGILState_Ensure ();
-  cleanup = make_cleanup_py_restore_gil (&state);
+  cleanup = ensure_python_env (get_current_arch (), current_language);
 
   inf_obj = PyObject_New (inferior_object, &inferior_object_type);
   if (!inf_obj)
@@ -484,7 +484,7 @@ mbpy_str (PyObject *self)
   membuf_object *membuf_obj = (membuf_object *) self;
 
   return PyString_FromFormat ("memory buffer for address %s, %s bytes long",
-			      paddress (membuf_obj->addr),
+			      paddress (python_gdbarch, membuf_obj->addr),
 			      pulongest (membuf_obj->length));
 }
 
@@ -552,7 +552,7 @@ add_value_pattern (struct value *v, int size, char **pattern_buf,
       else
 	{
 	  put_bits (x, *pattern_buf_end, size * 8,
-		    gdbarch_byte_order (current_gdbarch) == BFD_ENDIAN_BIG);
+		    gdbarch_byte_order (python_gdbarch) == BFD_ENDIAN_BIG);
 	  *pattern_buf_end += size;
 	}
     }

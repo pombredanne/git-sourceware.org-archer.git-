@@ -19,6 +19,7 @@
 
 
 #include "defs.h"
+#include "arch-utils.h"
 #include "value.h"
 #include "exceptions.h"
 #include "python-internal.h"
@@ -26,6 +27,7 @@
 #include "gdbcmd.h"
 #include "cli/cli-decode.h"
 #include "completer.h"
+#include "language.h"
 
 /* Struct representing built-in completion types.  */
 struct cmdpy_completer
@@ -88,9 +90,9 @@ static void
 cmdpy_destroyer (struct cmd_list_element *self, void *context)
 {
   cmdpy_object *cmd;
-  PyGILState_STATE state;
+  struct cleanup *cleanup;
 
-  state = PyGILState_Ensure ();
+  cleanup = ensure_python_env (get_current_arch (), current_language);
 
   /* Release our hold on the command object.  */
   cmd = (cmdpy_object *) context;
@@ -103,7 +105,7 @@ cmdpy_destroyer (struct cmd_list_element *self, void *context)
   xfree (self->doc);
   xfree (self->prefixname);
 
-  PyGILState_Release (state);
+  do_cleanups (cleanup);
 }
 
 /* Called by gdb to invoke the command.  */
@@ -113,10 +115,8 @@ cmdpy_function (struct cmd_list_element *command, char *args, int from_tty)
   cmdpy_object *obj = (cmdpy_object *) get_cmd_context (command);
   PyObject *argobj, *ttyobj, *result;
   struct cleanup *cleanup;
-  PyGILState_STATE state;
 
-  state = PyGILState_Ensure ();
-  cleanup = make_cleanup_py_restore_gil (&state);
+  cleanup = ensure_python_env (get_current_arch (), current_language);
 
   if (! obj)
     error (_("Invalid invocation of Python command object."));
@@ -180,10 +180,8 @@ cmdpy_completer (struct cmd_list_element *command, char *text, char *word)
   PyObject *textobj, *wordobj, *resultobj = NULL;
   char **result = NULL;
   struct cleanup *cleanup;
-  PyGILState_STATE state;
 
-  state = PyGILState_Ensure ();
-  cleanup = make_cleanup_py_restore_gil (&state);
+  cleanup = ensure_python_env (get_current_arch (), current_language);
 
   if (! obj)
     error (_("Invalid invocation of Python command object."));

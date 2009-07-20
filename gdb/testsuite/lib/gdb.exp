@@ -1173,6 +1173,19 @@ proc default_gdb_start { } {
 
     set env(LC_CTYPE) C
 
+    # Don't let a .inputrc file or an existing setting of INPUTRC mess up
+    # the test results.  Even if /dev/null doesn't exist on the particular
+    # platform, the readline library will use the default setting just by
+    # failing to open the file.  OTOH, opening /dev/null successfully will
+    # also result in the default settings being used since nothing will be
+    # read from this file.
+    set env(INPUTRC) "/dev/null"
+
+    # The gdb.base/readline.exp arrow key test relies on the standard VT100
+    # bindings, so make sure that an appropriate terminal is selected.
+    # The same bug doesn't show up if we use ^P / ^N instead.
+    set env(TERM) "vt100"
+
     verbose "Spawning $GDB $INTERNAL_GDBFLAGS $GDBFLAGS"
 
     if [info exists gdb_spawn_id] {
@@ -2984,3 +2997,49 @@ proc get_sizeof { type default } {
     return [get_integer_valueof "sizeof (${type})" $default]
 }
 
+# Log gdb command line and script if requested.
+if {[info exists TRANSCRIPT]} {
+  rename send_gdb real_send_gdb
+  rename remote_spawn real_remote_spawn
+  rename remote_close real_remote_close
+
+  global gdb_transcript
+  set gdb_transcript ""
+
+  global gdb_trans_count
+  set gdb_trans_count 1
+
+  proc remote_spawn {args} {
+    global gdb_transcript gdb_trans_count outdir
+
+    if {$gdb_transcript != ""} {
+      close $gdb_transcript
+    }
+    set gdb_transcript [open [file join $outdir transcript.$gdb_trans_count] w]
+    puts $gdb_transcript [lindex $args 1]
+    incr gdb_trans_count
+
+    return [uplevel real_remote_spawn $args]
+  }
+
+  proc remote_close {args} {
+    global gdb_transcript
+
+    if {$gdb_transcript != ""} {
+      close $gdb_transcript
+      set gdb_transcript ""
+    }
+
+    return [uplevel real_remote_close $args]
+  }
+
+  proc send_gdb {args} {
+    global gdb_transcript
+
+    if {$gdb_transcript != ""} {
+      puts -nonewline $gdb_transcript [lindex $args 0]
+    }
+
+    return [uplevel real_send_gdb $args]
+  }
+}

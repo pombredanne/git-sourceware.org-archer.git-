@@ -1,3 +1,137 @@
+2009-07-14  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.reverse/finish-reverse.exp: Do not expect reverse-finish
+	to bring gdb to the beginning of the calling line.
+
+	* gdb.arch/i386-signal.c (sigframe): Add a nop to avoid
+	confusing the i386 epilogue unwinder.
+
+2009-07-14  Stan Shebs  <stan@codesourcery.com>
+
+	* gdb.trace/tracecmd.exp: Add basic test of tracepoint conditions.
+
+2009-07-14  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.reverse/step-reverse.exp (stepi into function call):
+	Call instruction may not be first instruction in the line.
+	(reverse stepi from a function call): Used wrong line number.
+
+2009-07-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.arch/amd64-i386-address.exp, gdb.arch/amd64-i386-address.S: New.
+
+2009-07-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix gdb.base/macscp.exp when using custom inputrc.
+	* gdb.base/completion.exp: Remove env(INPUTRC) set and restore.
+	* gdb.base/readline.exp: Remove env(INPUTRC) set and restore.  Remove
+	env(TERM) set.
+	* gdb.cp/cpcompletion.exp: Remove env(INPUTRC) set.
+	* lib/gdb.exp (default_gdb_start): Add env(INPUTRC) and env(TERM) set.
+
+2009-07-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix racy clashing of output files for gdb.base{1,2}/ parallel run.
+	* gdb.base/annota1.exp (thread_test): Import global $testfile.
+	Change the compilation target to match the testcase name.
+	* gdb.base/sect-cmd.exp: Change the compilation target to match the
+	testcase name.
+	* a2-run.exp: Use for setup prepare_for_testing.  Change the
+	compilation target to match the testcase name.
+	* gdb.base/commands.exp: Likewise.
+	* gdb.base/finish.exp: Likewise.
+	* gdb.base/float.exp: Likewise.
+	* gdb.base/info-target.exp: Likewise.
+	* gdb.base/relational.exp: Likewise.
+	* gdb.base/term.exp: Likewise.
+	* gdb.base/until.exp: Likewise.
+	* gdb.base/volatile.exp: Likewise.
+	* gdb.base/whatis-exp.exp: Likewise.
+
+2009-07-11  Hui Zhu  <teawater@gmail.com>
+
+	* gdb.base/help.exp (disassemble): Update expected help text.
+
+2009-07-09  Tom Tromey  <tromey@redhat.com>
+
+	* lib/gdb.exp: Handle TRANSCRIPT.
+	(remote_spawn, remote_close, send_gdb): New procs.
+
+2009-07-10 Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.python/python-prettyprint.c: Add counted null string
+	structure.
+	* gdb.python/python-prettyprint.exp: Print null string. Test for
+	embedded nulls.
+	* gdb.python/python-prettyprint.py (pp_ns): New Function.
+	* gdb.python/python-value.exp (test_value_in_inferior): Add
+	variable length string fetch tests.
+	* gdb.python/python-value.c (main): Add strings for string fetch tests.
+
+2009-07-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/dump.exp (inaccessible memory is reported): New test.
+
+2009-07-07  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/call-rt-st.exp: Update for change to escape output.
+	* gdb.base/callfuncs.exp: Likewise.
+	* gdb.base/charset.exp: Likewise.
+	* gdb.base/constvars.exp: Likewise.
+	* gdb.base/long_long.exp: Likewise.
+	* gdb.base/pointers.exp: Likewise.
+	* gdb.base/printcmds.exp: Likewise.
+	* gdb.base/setvar.exp: Likewise.
+	* gdb.base/store.exp: Likewise.
+	* gdb.cp/ref-types.exp: Likewise.
+	* gdb.mi/mi-var-child.exp: Likewise.
+	* gdb.mi/mi-var-display.exp: Likewise.
+	* gdb.mi/mi2-var-display.exp: Likewise.
+	* gdb.base/charset.exp: Test octal escape sequence length.
+	Update for change to escape output.
+
+2009-07-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.mi/mi2-var-cmd.exp (floating varobj invalidation): New test.
+
+2009-07-06  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* lib/java.exp (java_init): Ignore $GCJ if it is empty.
+
+2009-07-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* lib/gdbserver-support.exp (gdbserver_start): Loop spawning
+	gdbserver increasing $portnum if "Can't bind address" has been seen.
+
+2009-07-05  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.base/ending-run.exp: Add "step out of main" pattern for
+	mingw32ce.
+
+2009-07-05  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.base/long_long.exp: arm-mingw32ce defaults to natural-endian
+	VFP format.
+
+2009-07-02  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.base/multi-forks.exp: Only run detach-on-fork tests on
+	linux.  Adjust to use "inferior", "info inferiors", "detach
+	inferior" and "kill inferior" instead of "restart", "info fork",
+	"detach fork" and "delete fork".
+	* gdb.base/ending-run.exp: Spell out "info".
+	* gdb.base/help.exp: Adjust to use test_prefix_command_help for
+	the "kill" command.
+
+2009-07-02  Ulrich Weigand  <Ulrich.Weigand@de.ibm.com>
+
+	* gdb.threads/tls-shared.exp: Update to locexpr_describe_location
+	change to prefix TLS offset in hex with 0x.
+
+2009-07-02  Ulrich Weigand  <Ulrich.Weigand@de.ibm.com>
+
+	* gdb.base/default.exp: Update test case for "x" changes.
+
 2009-07-01  Tristan Gingold  <gingold@adacore.com>
 
 	* gdb.base/bigcore.exp: Make darwin untested.

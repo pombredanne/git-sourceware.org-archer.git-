@@ -125,8 +125,8 @@ find_pretty_printer (PyObject *value)
 /* Pretty-print a single value, via the printer object PRINTER.
    If the function returns a string, a PyObject containing the string
    is returned.  Otherwise, if the function returns a value,
-   the value (still on the all_values chain), and NULL is returned.
-   On error, *OUT_VALUE is set to NULL and NULL is returned.  */
+   *OUT_VALUE is set to the value, and NULL is returned.  On error,
+   *OUT_VALUE is set to NULL, and NULL is returned.  */
 static PyObject *
 pretty_print_one_value (PyObject *printer, struct value **out_value)
 {
@@ -188,7 +188,8 @@ static void
 print_string_repr (PyObject *printer, const char *hint,
 		   struct ui_file *stream, int recurse,
 		   const struct value_print_options *options,
-		   const struct language_defn *language)
+		   const struct language_defn *language,
+		   struct gdbarch *gdbarch)
 {
   struct value *replacement = NULL;
   PyObject *py_str = NULL;
@@ -198,18 +199,17 @@ print_string_repr (PyObject *printer, const char *hint,
     {
       PyObject *string = python_string_to_target_python_string (py_str);
       if (string)
- 	{
- 	  gdb_byte *output = PyString_AsString (string);
- 	  int len = PyString_Size (string);
+	{
+	  gdb_byte *output = PyString_AsString (string);
+	  int len = PyString_Size (string);
 	  
- 	  if (hint && !strcmp (hint, "string"))
- 	    LA_PRINT_STRING (stream,
-			     builtin_type (current_gdbarch)->builtin_char,
- 			     output, len, 0, options);
- 	  else
- 	    fputs_filtered (output, stream);
- 	  Py_DECREF (string);
- 	}
+	  if (hint && !strcmp (hint, "string"))
+	    LA_PRINT_STRING (stream, builtin_type (gdbarch)->builtin_char,
+			     output, len, 0, options);
+	  else
+	    fputs_filtered (output, stream);
+	  Py_DECREF (string);
+	}
       else
 	gdbpy_print_stack ();
       Py_DECREF (py_str);
@@ -483,16 +483,15 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
 			  const struct value_print_options *options,
 			  const struct language_defn *language)
 {
+  struct gdbarch *gdbarch = get_type_arch (type);
   PyObject *printer = NULL;
   PyObject *val_obj = NULL;
   struct value *value;
   char *hint = NULL;
   struct cleanup *cleanups;
   int result = 0;
-  PyGILState_STATE state;
 
-  state = PyGILState_Ensure ();
-  cleanups = make_cleanup_py_restore_gil (&state);
+  cleanups = ensure_python_env (gdbarch, language);
 
   /* Instantiate the printer.  */
   if (valaddr)
@@ -515,7 +514,8 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
   make_cleanup (free_current_contents, &hint);
 
   /* Print the section */
-  print_string_repr (printer, hint, stream, recurse, options, language);
+  print_string_repr (printer, hint, stream, recurse, options, language,
+		     gdbarch);
   print_children (printer, hint, stream, recurse, options, language);
   result = 1;
 
@@ -527,29 +527,28 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
   return result;
 }
 
+
 /* Apply a pretty-printer for the varobj code.  PRINTER_OBJ is the
    print object.  It must have a 'to_string' method (but this is
-   checked by varobj, not here) which takes no arguments and returns a
-   string.  The printer will return a value and in the case of a
-   Python string being returned, this function will return a PyObject
-   containing the string.  For any other type, *REPLACEMENT is set to
-   the replacement value and this function returns NULL.  On error,
-   *REPLACEMENT is set to NULL and this function also returns
+   checked by varobj, not here) which takes no arguments and
+   returns a string.  The printer will return a value and in the case
+   of a Python string being returned, this function will return a
+   PyObject containing the string.  For any other type, *REPLACEMENT is
+   set to the replacement value and this function returns NULL.  On
+   error, *REPLACEMENT is set to NULL and this function also returns
    NULL.  */
 PyObject *
 apply_varobj_pretty_printer (PyObject *printer_obj,
 			     struct value **replacement)
 {
   int size = 0;
-  PyGILState_STATE state = PyGILState_Ensure ();
   PyObject *py_str = NULL;
 
   *replacement = NULL;
   py_str = pretty_print_one_value (printer_obj, replacement);
 
-  if (*replacement == NULL && py_str == NULL);
+  if (*replacement == NULL && py_str == NULL)
     gdbpy_print_stack ();
-  PyGILState_Release (state);
 
   return py_str;
 }

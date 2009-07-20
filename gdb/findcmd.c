@@ -18,6 +18,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "arch-utils.h"
 #include <ctype.h>
 #include "gdb_string.h"
 #include "gdbcmd.h"
@@ -85,7 +86,8 @@ increase_pattern_buffer (char **pattern_buf, char **pattern_buf_end,
 static void
 parse_find_args (char *args, ULONGEST *max_countp,
 		 char **pattern_bufp, ULONGEST *pattern_lenp,
-		 CORE_ADDR *start_addrp, ULONGEST *search_space_lenp)
+		 CORE_ADDR *start_addrp, ULONGEST *search_space_lenp,
+		 bfd_boolean big_p)
 {
   /* Default to using the specified type.  */
   char size = '\0';
@@ -101,7 +103,6 @@ parse_find_args (char *args, ULONGEST *max_countp,
   CORE_ADDR start_addr;
   ULONGEST search_space_len;
   char *s = args;
-  bfd_boolean big_p = gdbarch_byte_order (current_gdbarch) == BFD_ENDIAN_BIG;
   struct cleanup *old_cleanups;
   struct value *v;
 
@@ -303,6 +304,8 @@ search_memory (CORE_ADDR *start_addr, ULONGEST *search_space_len,
 static void
 find_command (char *args, int from_tty)
 {
+  struct gdbarch *gdbarch = get_current_arch ();
+  bfd_boolean big_p = gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG;
   /* Command line parameters.
      These are initialized to avoid uninitialized warnings from -Wall.  */
   ULONGEST max_count = 0;
@@ -316,7 +319,7 @@ find_command (char *args, int from_tty)
   struct cleanup *old_cleanups;
 
   parse_find_args (args, &max_count, &pattern_buf, &pattern_len, 
-		   &start_addr, &search_space_len);
+		   &start_addr, &search_space_len, big_p);
 
   old_cleanups = make_cleanup (free_current_contents, &pattern_buf);
 
@@ -336,7 +339,7 @@ find_command (char *args, int from_tty)
       if (found <= 0)
 	break;
 
-      print_address (found_addr, gdb_stdout);
+      print_address (gdbarch, found_addr, gdb_stdout);
       printf_filtered ("\n");
       ++found_count;
       last_found_addr = found_addr;
@@ -347,7 +350,6 @@ find_command (char *args, int from_tty)
   set_internalvar_integer (lookup_internalvar ("numfound"), found_count);
   if (found_count > 0)
     {
-      struct gdbarch *gdbarch = current_gdbarch;
       struct type *ptr_type = builtin_type (gdbarch)->builtin_data_ptr;
       set_internalvar (lookup_internalvar ("_"),
 		       value_from_pointer (ptr_type, last_found_addr));

@@ -175,6 +175,10 @@ main ()
   ns.null_str = "embedded\0null\0string";
   ns.length = 20;
 
+  struct ns  ns;
+  ns.null_str = "embedded\0null\0string";
+  ns.length = 20;
+
 #ifdef __cplusplus
   S cps;
 

@@ -22,7 +22,7 @@
 
 #include "defs.h"
 #include "dwarf2expr.h"
-#include "elf/dwarf2.h"
+#include "dwarf2.h"
 #include "frame.h"
 #include "frame-base.h"
 #include "frame-unwind.h"
@@ -334,11 +334,11 @@ dwarf2_restore_rule (struct gdbarch *gdbarch, ULONGEST reg_num,
   if (fs->regs.reg[reg].how == DWARF2_FRAME_REG_UNSPECIFIED)
     complaint (&symfile_complaints, _("\
 incomplete CFI data; DW_CFA_restore unspecified\n\
-register %s (#%d) at 0x%s"),
+register %s (#%d) at %s"),
 		       gdbarch_register_name
 		       (gdbarch, gdbarch_dwarf2_reg_to_regnum (gdbarch, reg)),
 		       gdbarch_dwarf2_reg_to_regnum (gdbarch, reg),
-		       paddr (fs->pc));
+		       paddress (gdbarch, fs->pc));
 }
 
 static CORE_ADDR
@@ -379,6 +379,7 @@ execute_cfa_program (struct dwarf2_fde *fde, gdb_byte *insn_ptr,
   CORE_ADDR pc = get_frame_pc (this_frame);
   int bytes_read;
   struct gdbarch *gdbarch = get_frame_arch (this_frame);
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
 
   while (insn_ptr < insn_end && fs->pc <= pc)
     {
@@ -418,17 +419,17 @@ execute_cfa_program (struct dwarf2_fde *fde, gdb_byte *insn_ptr,
 	      break;
 
 	    case DW_CFA_advance_loc1:
-	      utmp = extract_unsigned_integer (insn_ptr, 1);
+	      utmp = extract_unsigned_integer (insn_ptr, 1, byte_order);
 	      fs->pc += utmp * fs->code_align;
 	      insn_ptr++;
 	      break;
 	    case DW_CFA_advance_loc2:
-	      utmp = extract_unsigned_integer (insn_ptr, 2);
+	      utmp = extract_unsigned_integer (insn_ptr, 2, byte_order);
 	      fs->pc += utmp * fs->code_align;
 	      insn_ptr += 2;
 	      break;
 	    case DW_CFA_advance_loc4:
-	      utmp = extract_unsigned_integer (insn_ptr, 4);
+	      utmp = extract_unsigned_integer (insn_ptr, 4, byte_order);
 	      fs->pc += utmp * fs->code_align;
 	      insn_ptr += 4;
 	      break;
@@ -490,7 +491,8 @@ execute_cfa_program (struct dwarf2_fde *fde, gdb_byte *insn_ptr,
 		if (old_rs == NULL)
 		  {
 		    complaint (&symfile_complaints, _("\
-bad CFI data; mismatched DW_CFA_restore_state at 0x%s"), paddr (fs->pc));
+bad CFI data; mismatched DW_CFA_restore_state at %s"),
+			       paddress (gdbarch, fs->pc));
 		  }
 		else
 		  {
@@ -997,9 +999,9 @@ dwarf2_frame_cache (struct frame_info *this_frame, void **this_cache)
 	  {
 	    if (cache->reg[regnum].how == DWARF2_FRAME_REG_UNSPECIFIED)
 	      complaint (&symfile_complaints, _("\
-incomplete CFI data; unspecified registers (e.g., %s) at 0x%s"),
+incomplete CFI data; unspecified registers (e.g., %s) at %s"),
 			 gdbarch_register_name (gdbarch, regnum),
-			 paddr_nz (fs->pc));
+			 paddress (gdbarch, fs->pc));
 	  }
 	else
 	  cache->reg[regnum] = fs->regs.reg[column];
