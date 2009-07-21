@@ -50,6 +50,7 @@
 #include "gdb_assert.h"
 #include "inflow.h"
 #include "auxv.h"
+#include "procfs.h"
 
 /*
  * PROCFS.C
@@ -123,12 +124,12 @@ static void procfs_fetch_registers (struct target_ops *,
 static void procfs_store_registers (struct target_ops *,
 				    struct regcache *, int);
 static void procfs_notice_signals (ptid_t);
-static void procfs_kill_inferior (void);
+static void procfs_kill_inferior (struct target_ops *ops);
 static void procfs_mourn_inferior (struct target_ops *ops);
 static void procfs_create_inferior (struct target_ops *, char *, 
 				    char *, char **, int);
 static ptid_t procfs_wait (struct target_ops *,
-			   ptid_t, struct target_waitstatus *);
+			   ptid_t, struct target_waitstatus *, int);
 static int procfs_xfer_memory (CORE_ADDR, gdb_byte *, int, int,
 			       struct mem_attrib *attrib,
 			       struct target_ops *);
@@ -161,6 +162,7 @@ static int
 procfs_auxv_parse (struct target_ops *ops, gdb_byte **readptr,
                   gdb_byte *endptr, CORE_ADDR *typep, CORE_ADDR *valp)
 {
+  enum bfd_endian byte_order = gdbarch_byte_order (target_gdbarch);
   gdb_byte *ptr = *readptr;
 
   if (endptr == ptr)
@@ -169,11 +171,11 @@ procfs_auxv_parse (struct target_ops *ops, gdb_byte **readptr,
   if (endptr - ptr < 8 * 2)
     return -1;
 
-  *typep = extract_unsigned_integer (ptr, 4);
+  *typep = extract_unsigned_integer (ptr, 4, byte_order);
   ptr += 8;
   /* The size of data is always 64-bit.  If the application is 32-bit,
      it will be zero extended, as expected.  */
-  *valp = extract_unsigned_integer (ptr, 8);
+  *valp = extract_unsigned_integer (ptr, 8, byte_order);
   ptr += 8;
 
   *readptr = ptr;
@@ -181,7 +183,7 @@ procfs_auxv_parse (struct target_ops *ops, gdb_byte **readptr,
 }
 #endif
 
-static struct target_ops *
+struct target_ops *
 procfs_target (void)
 {
   struct target_ops *t = inf_child_target ();
@@ -212,7 +214,6 @@ procfs_target (void)
   t->to_has_thread_control  = tc_schedlock;
   t->to_find_memory_regions = proc_find_memory_regions;
   t->to_make_corefile_notes = procfs_make_note_section;
-  t->to_can_use_hw_breakpoint = procfs_can_use_hw_breakpoint;
 
 #if defined(PR_MODEL_NATIVE) && (PR_MODEL_NATIVE == PR_MODEL_LP64)
   t->to_auxv_parse = procfs_auxv_parse;
@@ -2902,7 +2903,10 @@ procfs_address_to_host_pointer (CORE_ADDR addr)
 int
 proc_set_watchpoint (procinfo *pi, CORE_ADDR addr, int len, int wflags)
 {
-#if !defined (TARGET_HAS_HARDWARE_WATCHPOINTS)
+#if !defined (PCWATCH) && !defined (PIOCSWATCH)
+  /* If neither or these is defined, we can't support watchpoints.
+     This just avoids possibly failing to compile the below on such
+     systems.  */
   return 0;
 #else
 /* Horrible hack!  Detect Solaris 2.5, because this doesn't work on 2.5 */
@@ -3947,7 +3951,7 @@ syscall_is_lwp_create (procinfo *pi, int scall)
 
 static ptid_t
 procfs_wait (struct target_ops *ops,
-	     ptid_t ptid, struct target_waitstatus *status)
+	     ptid_t ptid, struct target_waitstatus *status, int options)
 {
   /* First cut: loosely based on original version 2.1 */
   procinfo *pi;
@@ -4278,7 +4282,8 @@ wait_again:
                      then remove it.  See comments in procfs_init_inferior()
                      for more details.  */
                   if (dbx_link_bpt_addr != 0
-                      && dbx_link_bpt_addr == read_pc ())
+                      && dbx_link_bpt_addr
+			 == regcache_read_pc (get_current_regcache ()))
                     remove_dbx_link_breakpoint ();
 
 		  wstat = (SIGTRAP << 8) | 0177;
@@ -4469,7 +4474,7 @@ invalidate_cache (procinfo *parent, procinfo *pi, void *ptr)
       if (!proc_set_gregs (pi))	/* flush gregs cache */
 	proc_warn (pi, "target_resume, set_gregs",
 		   __LINE__);
-  if (gdbarch_fp0_regnum (current_gdbarch) >= 0)
+  if (gdbarch_fp0_regnum (target_gdbarch) >= 0)
     if (pi->fpregs_dirty)
       if (parent == NULL ||
 	  proc_get_current_thread (parent) != pi->tid)
@@ -4689,7 +4694,7 @@ procfs_files_info (struct target_ops *ignore)
 static void
 procfs_stop (ptid_t ptid)
 {
-  kill (-inferior_process_group, SIGINT);
+  kill (-inferior_process_group (), SIGINT);
 }
 
 /*
@@ -4764,7 +4769,7 @@ unconditionally_kill_inferior (procinfo *pi)
  */
 
 static void
-procfs_kill_inferior (void)
+procfs_kill_inferior (struct target_ops *ops)
 {
   if (!ptid_equal (inferior_ptid, null_ptid)) /* ? */
     {
@@ -4799,7 +4804,7 @@ procfs_mourn_inferior (struct target_ops *ops)
 
   if (dbx_link_bpt != NULL)
     {
-      deprecated_remove_raw_breakpoint (dbx_link_bpt);
+      deprecated_remove_raw_breakpoint (target_gdbarch, dbx_link_bpt);
       dbx_link_bpt_addr = 0;
       dbx_link_bpt = NULL;
     }
@@ -5288,14 +5293,11 @@ procfs_set_watchpoint (ptid_t ptid, CORE_ADDR addr, int len, int rwflag,
 
    Note:  procfs_can_use_hw_breakpoint() is not yet used by all
    procfs.c targets due to the fact that some of them still define
-   TARGET_CAN_USE_HARDWARE_WATCHPOINT.  */
+   target_can_use_hardware_watchpoint.  */
 
 static int
 procfs_can_use_hw_breakpoint (int type, int cnt, int othertype)
 {
-#ifndef TARGET_HAS_HARDWARE_WATCHPOINTS
-  return 0;
-#else
   /* Due to the way that proc_set_watchpoint() is implemented, host
      and target pointers must be of the same size.  If they are not,
      we can't use hardware watchpoints.  This limitation is due to the
@@ -5311,7 +5313,6 @@ procfs_can_use_hw_breakpoint (int type, int cnt, int othertype)
   /* Other tests here???  */
 
   return 1;
-#endif
 }
 
 /*
@@ -5321,13 +5322,12 @@ procfs_can_use_hw_breakpoint (int type, int cnt, int othertype)
  * else returns zero.
  */
 
-int
-procfs_stopped_by_watchpoint (ptid_t ptid)
+static int
+procfs_stopped_by_watchpoint (void)
 {
   procinfo *pi;
 
-  pi = find_procinfo_or_die (PIDGET (ptid) == -1 ?
-			     PIDGET (inferior_ptid) : PIDGET (ptid), 0);
+  pi = find_procinfo_or_die (PIDGET (inferior_ptid), 0);
 
   if (!pi)	/* If no process, then not stopped by watchpoint!  */
     return 0;
@@ -5347,6 +5347,54 @@ procfs_stopped_by_watchpoint (ptid_t ptid)
 	}
     }
   return 0;
+}
+
+static int
+procfs_insert_watchpoint (CORE_ADDR addr, int len, int type)
+{
+  if (!target_have_steppable_watchpoint
+      && !gdbarch_have_nonsteppable_watchpoint (target_gdbarch))
+    {
+      /* When a hardware watchpoint fires off the PC will be left at
+	 the instruction following the one which caused the
+	 watchpoint.  It will *NOT* be necessary for GDB to step over
+	 the watchpoint.  */
+      return procfs_set_watchpoint (inferior_ptid, addr, len, type, 1);
+    }
+  else
+    {
+      /* When a hardware watchpoint fires off the PC will be left at
+	 the instruction which caused the watchpoint.  It will be
+	 necessary for GDB to step over the watchpoint.  */
+      return procfs_set_watchpoint (inferior_ptid, addr, len, type, 0);
+    }
+}
+
+static int
+procfs_remove_watchpoint (CORE_ADDR addr, int len, int type)
+{
+  return procfs_set_watchpoint (inferior_ptid, addr, 0, 0, 0);
+}
+
+static int
+procfs_region_ok_for_hw_watchpoint (CORE_ADDR addr, int len)
+{
+  /* The man page for proc(4) on Solaris 2.6 and up says that the
+     system can support "thousands" of hardware watchpoints, but gives
+     no method for finding out how many; It doesn't say anything about
+     the allowed size for the watched area either.  So we just tell
+     GDB 'yes'.  */
+  return 1;
+}
+
+void
+procfs_use_watchpoints (struct target_ops *t)
+{
+  t->to_stopped_by_watchpoint = procfs_stopped_by_watchpoint;
+  t->to_insert_watchpoint = procfs_insert_watchpoint;
+  t->to_remove_watchpoint = procfs_remove_watchpoint;
+  t->to_region_ok_for_hw_watchpoint = procfs_region_ok_for_hw_watchpoint;
+  t->to_can_use_hw_breakpoint = procfs_can_use_hw_breakpoint;
 }
 
 /*
@@ -5477,31 +5525,6 @@ int solib_mappings_callback (struct prmap *map,
 }
 
 /*
- * Function: proc_iterate_over_mappings
- *
- * Uses the unified "iterate_over_mappings" function
- * to implement the exported interface to solib-svr4.c.
- *
- * Given a pointer to a function, call that function once for every
- * mapped address space in the process.  The callback function
- * receives an open file descriptor for the file corresponding to
- * that mapped address space (if there is one), and the base address
- * of the mapped space.  Quit when the callback function returns a
- * nonzero value, or at teh end of the mappings.
- *
- * Returns: the first non-zero return value of the callback function,
- * or zero.
- */
-
-int
-proc_iterate_over_mappings (int (*func) (int, CORE_ADDR))
-{
-  procinfo *pi = find_procinfo_or_die (PIDGET (inferior_ptid), 0);
-
-  return iterate_over_mappings (pi, func, pi, solib_mappings_callback);
-}
-
-/*
  * Function: find_memory_regions_callback
  *
  * Implements the to_find_memory_regions method.
@@ -5570,7 +5593,7 @@ remove_dbx_link_breakpoint (void)
   if (dbx_link_bpt_addr == 0)
     return;
 
-  if (deprecated_remove_raw_breakpoint (dbx_link_bpt) != 0)
+  if (deprecated_remove_raw_breakpoint (target_gdbarch, dbx_link_bpt) != 0)
     warning (_("Unable to remove __dbx_link breakpoint."));
 
   dbx_link_bpt_addr = 0;
@@ -5642,7 +5665,8 @@ insert_dbx_link_bpt_in_file (int fd, CORE_ADDR ignored)
     {
       /* Insert the breakpoint.  */
       dbx_link_bpt_addr = sym_addr;
-      dbx_link_bpt = deprecated_insert_raw_breakpoint (sym_addr);
+      dbx_link_bpt = deprecated_insert_raw_breakpoint (target_gdbarch,
+						       sym_addr);
       if (dbx_link_bpt == NULL)
         {
           warning (_("Failed to insert dbx_link breakpoint."));
@@ -5734,7 +5758,7 @@ info_mappings_callback (struct prmap *map, int (*ignore) (), void *unused)
   pr_off = map->pr_off;
 #endif
 
-  if (gdbarch_addr_bit (current_gdbarch) == 32)
+  if (gdbarch_addr_bit (target_gdbarch) == 32)
     printf_filtered ("\t%#10lx %#10lx %#10lx %#10x %7s\n",
 		     (unsigned long) map->pr_vaddr,
 		     (unsigned long) map->pr_vaddr + map->pr_size - 1,
@@ -5765,7 +5789,7 @@ info_proc_mappings (procinfo *pi, int summary)
     return;	/* No output for summary mode. */
 
   printf_filtered (_("Mapped address spaces:\n\n"));
-  if (gdbarch_ptr_bit (current_gdbarch) == 32)
+  if (gdbarch_ptr_bit (target_gdbarch) == 32)
     printf_filtered ("\t%10s %10s %10s %10s %7s\n",
 		     "Start Addr",
 		     "  End Addr",
@@ -5966,12 +5990,6 @@ proc_untrace_sysexit_cmd (char *args, int from_tty)
 void
 _initialize_procfs (void)
 {
-  struct target_ops * t;
-
-  t = procfs_target ();
-
-  add_target (t);
-
   add_info ("proc", info_proc_cmd, _("\
 Show /proc process information about any running process.\n\
 Specify process id, or use the program being debugged by default.\n\

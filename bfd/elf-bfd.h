@@ -31,8 +31,11 @@
 
 /* The number of entries in a section is its size divided by the size
    of a single entry.  This is normally only applicable to reloc and
-   symbol table sections.  */
-#define NUM_SHDR_ENTRIES(shdr) ((shdr)->sh_size / (shdr)->sh_entsize)
+   symbol table sections.
+   PR 9934: It is possible to have relocations that do not refer to
+   symbols, thus it is also possible to have a relocation section in
+   an object file, but no symbol table.  */
+#define NUM_SHDR_ENTRIES(shdr) ((shdr)->sh_entsize > 0 ? (shdr)->sh_size / (shdr)->sh_entsize : 0)
 
 /* If size isn't specified as 64 or 32, NAME macro should fail.  */
 #ifndef NAME
@@ -135,7 +138,8 @@ struct elf_link_hash_entry
   /* Symbol st_other value, symbol visibility.  */
   unsigned int other : 8;
 
-  /* Symbol is referenced by a non-shared object.  */
+  /* Symbol is referenced by a non-shared object (other than the object
+     in which it is defined).  */
   unsigned int ref_regular : 1;
   /* Symbol is defined by a non-shared object.  */
   unsigned int def_regular : 1;
@@ -143,7 +147,8 @@ struct elf_link_hash_entry
   unsigned int ref_dynamic : 1;
   /* Symbol is defined by a shared object.  */
   unsigned int def_dynamic : 1;
-  /* Symbol has a non-weak reference from a non-shared object.  */
+  /* Symbol has a non-weak reference from a non-shared object (other than
+     the object in which it is defined).  */
   unsigned int ref_regular_nonweak : 1;
   /* Dynamic symbol has been adjustd.  */
   unsigned int dynamic_adjusted : 1;
@@ -454,6 +459,17 @@ struct elf_link_hash_table
 
   /* A linked list of BFD's loaded in the link.  */
   struct elf_link_loaded_list *loaded;
+
+  /* Short-cuts to get to dynamic linker sections.  */
+  asection *sgot;
+  asection *sgotplt;
+  asection *srelgot;
+  asection *splt;
+  asection *srelplt;
+  asection *igotplt;
+  asection *iplt;
+  asection *irelplt;
+  asection *irelifunc;
 };
 
 /* Look up an entry in an ELF linker hash table.  */
@@ -479,14 +495,14 @@ struct elf_link_hash_table
 #define is_elf_hash_table(htab)					      	\
   (((struct bfd_link_hash_table *) (htab))->type == bfd_link_elf_hash_table)
 
-/* Used by bfd_section_from_r_symndx to cache a small number of local
-   symbol to section mappings.  */
+/* Used by bfd_sym_from_r_symndx to cache a small number of local
+   symbols.  */
 #define LOCAL_SYM_CACHE_SIZE 32
-struct sym_sec_cache
+struct sym_cache
 {
   bfd *abfd;
   unsigned long indx[LOCAL_SYM_CACHE_SIZE];
-  unsigned int shndx[LOCAL_SYM_CACHE_SIZE];
+  Elf_Internal_Sym sym[LOCAL_SYM_CACHE_SIZE];
 };
 
 /* Constant information held for an ELF backend.  */
@@ -742,8 +758,10 @@ struct elf_backend_data
      const char **name, flagword *flags, asection **sec, bfd_vma *value);
 
   /* If this field is not NULL, it is called by the elf_link_output_sym
-     phase of a link for each symbol which will appear in the object file.  */
-  bfd_boolean (*elf_backend_link_output_symbol_hook)
+     phase of a link for each symbol which will appear in the object file.
+     On error, this function returns 0.  1 is returned when the symbol
+     should be output, 2 is returned when the symbol should be discarded.  */
+  int (*elf_backend_link_output_symbol_hook)
     (struct bfd_link_info *info, const char *, Elf_Internal_Sym *,
      asection *, struct elf_link_hash_entry *);
 
@@ -1556,6 +1574,11 @@ struct elf_obj_tdata
   bfd_size_type build_id_size;
   bfd_byte *build_id;
 
+  /* True if the bfd contains symbols that have the STT_GNU_IFUNC
+     symbol type.  Used to set the osabi field in the ELF header
+     structure.  */
+  bfd_boolean has_ifunc_symbols;
+
   /* An identifier used to distinguish different target
      specific extensions to this structure.  */
   enum elf_object_id object_id;
@@ -1786,8 +1809,8 @@ extern bfd_boolean bfd_section_from_phdr
 extern int _bfd_elf_symbol_from_bfd_symbol
   (bfd *, asymbol **);
 
-extern asection *bfd_section_from_r_symndx
-  (bfd *, struct sym_sec_cache *, asection *, unsigned long);
+extern Elf_Internal_Sym *bfd_sym_from_r_symndx 
+  (struct sym_cache *, bfd *, unsigned long);
 extern asection *bfd_section_from_elf_index
   (bfd *, unsigned int);
 extern struct bfd_strtab_hash *_bfd_elf_stringtab_init
@@ -2136,8 +2159,43 @@ extern int _bfd_elf_obj_attrs_arg_type (bfd *, int, int);
 extern void _bfd_elf_parse_attributes (bfd *, Elf_Internal_Shdr *);
 extern bfd_boolean _bfd_elf_merge_object_attributes (bfd *, bfd *);
 
+/* The linker may needs to keep track of the number of relocs that it
+   decides to copy as dynamic relocs in check_relocs for each symbol.
+   This is so that it can later discard them if they are found to be
+   unnecessary.  We can store the information in a field extending the
+   regular ELF linker hash table.  */
+
+struct elf_dyn_relocs
+{
+  struct elf_dyn_relocs *next;
+
+  /* The input section of the reloc.  */
+  asection *sec;
+
+  /* Total number of relocs copied for the input section.  */
+  bfd_size_type count;
+
+  /* Number of pc-relative relocs copied for the input section.  */
+  bfd_size_type pc_count;
+};
+
+extern bfd_boolean _bfd_elf_create_ifunc_sections
+  (bfd *, struct bfd_link_info *);
+extern asection * _bfd_elf_create_ifunc_dyn_reloc
+  (bfd *, struct bfd_link_info *, asection *sec, asection *sreloc,
+   struct elf_dyn_relocs **);
+extern bfd_boolean _bfd_elf_allocate_ifunc_dyn_relocs
+  (struct bfd_link_info *, struct elf_link_hash_entry *,
+   struct elf_dyn_relocs **, unsigned int, unsigned int);
+
 /* Large common section.  */
 extern asection _bfd_elf_large_com_section;
+
+/* Hash for local symbol with the first section id, ID, in the input
+   file and the local symbol index, SYM.  */
+#define ELF_LOCAL_SYMBOL_HASH(ID, SYM) \
+  (((((ID) & 0xff) << 24) | (((ID) & 0xff00) << 8)) \
+   ^ (SYM) ^ ((ID) >> 16))
 
 /* This is the condition under which finish_dynamic_symbol will be called.
    If our finish_dynamic_symbol isn't called, we'll need to do something

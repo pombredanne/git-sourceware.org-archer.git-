@@ -72,7 +72,7 @@ static void gdb_os_evprintf_filtered (host_callback *, const char *, va_list);
 
 static void gdb_os_error (host_callback *, const char *, ...) ATTR_NORETURN;
 
-static void gdbsim_kill (void);
+static void gdbsim_kill (struct target_ops *);
 
 static void gdbsim_load (char *prog, int fromtty);
 
@@ -378,7 +378,7 @@ gdbsim_store_register (struct target_ops *ops,
    and releasing other resources acquired by the simulated program.  */
 
 static void
-gdbsim_kill (void)
+gdbsim_kill (struct target_ops *ops)
 {
   if (remote_debug)
     printf_filtered ("gdbsim_kill\n");
@@ -451,7 +451,7 @@ gdbsim_create_inferior (struct target_ops *target, char *exec_file, char *args,
 		     args);
 
   if (ptid_equal (inferior_ptid, remote_sim_ptid))
-    gdbsim_kill ();
+    gdbsim_kill (target);
   remove_breakpoints ();
   init_wait_for_inferior ();
 
@@ -474,7 +474,6 @@ gdbsim_create_inferior (struct target_ops *target, char *exec_file, char *args,
   add_inferior_silent (ptid_get_pid (inferior_ptid));
   add_thread_silent (inferior_ptid);
 
-  target_mark_running (&gdbsim_ops);
   insert_breakpoints ();	/* Needed to get correct instruction in cache */
 
   clear_proceed_status ();
@@ -552,7 +551,6 @@ gdbsim_open (char *args, int from_tty)
   /* There's nothing running after "target sim" or "load"; not until
      "run".  */
   inferior_ptid = null_ptid;
-  target_mark_exited (&gdbsim_ops);
 }
 
 /* Does whatever cleanup is required for a target that we are no longer
@@ -676,7 +674,7 @@ gdbsim_cntrl_c (int signo)
 
 static ptid_t
 gdbsim_wait (struct target_ops *ops,
-	     ptid_t ptid, struct target_waitstatus *status)
+	     ptid_t ptid, struct target_waitstatus *status, int options)
 {
   static RETSIGTYPE (*prev_sigint) ();
   int sigrc = 0;
@@ -773,8 +771,8 @@ gdbsim_xfer_inferior_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len,
       /* FIXME: Send to something other than STDOUT? */
       printf_filtered ("gdbsim_xfer_inferior_memory: myaddr 0x");
       gdb_print_host_address (myaddr, gdb_stdout);
-      printf_filtered (", memaddr 0x%s, len %d, write %d\n",
-		       paddr_nz (memaddr), len, write);
+      printf_filtered (", memaddr %s, len %d, write %d\n",
+		       paddress (target_gdbarch, memaddr), len, write);
       if (remote_debug && write)
 	dump_mem (myaddr, len);
     }
@@ -820,7 +818,6 @@ gdbsim_mourn_inferior (struct target_ops *target)
     printf_filtered ("gdbsim_mourn_inferior:\n");
 
   remove_breakpoints ();
-  target_mark_exited (target);
   generic_mourn_inferior ();
   delete_thread_silent (remote_sim_ptid);
 }
@@ -913,11 +910,11 @@ init_gdbsim_ops (void)
   gdbsim_ops.to_thread_alive = gdbsim_thread_alive;
   gdbsim_ops.to_pid_to_str = gdbsim_pid_to_str;
   gdbsim_ops.to_stratum = process_stratum;
-  gdbsim_ops.to_has_all_memory = 1;
-  gdbsim_ops.to_has_memory = 1;
-  gdbsim_ops.to_has_stack = 1;
-  gdbsim_ops.to_has_registers = 1;
-  gdbsim_ops.to_has_execution = 1;
+  gdbsim_ops.to_has_all_memory = default_child_has_all_memory;
+  gdbsim_ops.to_has_memory = default_child_has_memory;
+  gdbsim_ops.to_has_stack = default_child_has_stack;
+  gdbsim_ops.to_has_registers = default_child_has_registers;
+  gdbsim_ops.to_has_execution = default_child_has_execution;
   gdbsim_ops.to_magic = OPS_MAGIC;
 }
 

@@ -5,7 +5,7 @@
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
+   the Free Software Foundation; either version 3 of the License, or
    (at your option) any later version.
 
    This program is distributed in the hope that it will be useful,
@@ -14,9 +14,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor,
-   Boston, MA 02110-1301, USA.  */
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 /* Parse a C expression from text in a string, and return the result
    as a struct expression pointer.  That structure contains arithmetic
@@ -335,7 +333,8 @@ exp	: 	'[' TYPENAME
 			{
 			  CORE_ADDR class;
 
-			  class = lookup_objc_class (copy_name ($2.stoken));
+			  class = lookup_objc_class (parse_gdbarch,
+						     copy_name ($2.stoken));
 			  if (class == 0)
 			    error ("%s is not an ObjC Class", 
 				   copy_name ($2.stoken));
@@ -900,11 +899,15 @@ typebase  /* Implements (approximately): (type-qualifier)* type-specifier.  */
 			{ $$ = lookup_enum (copy_name ($2),
 					    expression_context_block); }
 	|	UNSIGNED typename
-			{ $$ = lookup_unsigned_typename (TYPE_NAME($2.type)); }
+			{ $$ = lookup_unsigned_typename (parse_language,
+							 parse_gdbarch,
+							 TYPE_NAME($2.type)); }
 	|	UNSIGNED
 			{ $$ = parse_type->builtin_unsigned_int; }
 	|	SIGNED_KEYWORD typename
-			{ $$ = lookup_signed_typename (TYPE_NAME($2.type)); }
+			{ $$ = lookup_signed_typename (parse_language,
+						       parse_gdbarch,
+						       TYPE_NAME($2.type)); }
 	|	SIGNED_KEYWORD
 			{ $$ = parse_type->builtin_int; }
 	|	TEMPLATE name '<' type '>'
@@ -1746,7 +1749,7 @@ yylex ()
     /* See if it's an ObjC classname.  */
     if (!sym)
       {
-	CORE_ADDR Class = lookup_objc_class(tmp);
+	CORE_ADDR Class = lookup_objc_class (parse_gdbarch, tmp);
 	if (Class)
 	  {
 	    yylval.class.class = Class;

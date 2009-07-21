@@ -83,6 +83,11 @@ struct thread_info
      This is how we know when we step into a subroutine call, and how
      to set the frame for the breakpoint used to step out.  */
   struct frame_id step_frame_id;
+
+  /* Similarly, the frame ID of the underlying stack frame (skipping
+     any inlined frames).  */
+  struct frame_id step_stack_frame_id;
+
   int current_line;
   struct symtab *current_symtab;
 
@@ -152,6 +157,10 @@ struct thread_info
      or a similar situation when stop_registers should be saved.  */
   int proceed_to_finish;
 
+  /* Nonzero if the thread is being proceeded for an inferior function
+     call.  */
+  int in_infcall;
+
   enum step_over_calls_kind step_over_calls;
 
   /* Nonzero if stopped due to a step command.  */
@@ -160,6 +169,11 @@ struct thread_info
   /* If stepping, nonzero means step count is > 1 so don't print frame
      next time inferior stops if it stops due to stepping.  */
   int step_multi;
+
+  /* This is used to remember when a fork or vfork event was caught by
+     a catchpoint, and thus the event is to be followed at the next
+     resume of the thread, and not immediately.  */
+  struct target_waitstatus pending_follow;
 
   /* Last signal that the inferior received (why it stopped).  */
   enum target_signal stop_signal;
@@ -220,10 +234,17 @@ extern int in_thread_list (ptid_t ptid);
 extern int valid_thread_id (int thread);
 
 /* Search function to lookup a thread by 'pid'.  */
-extern struct thread_info *find_thread_pid (ptid_t ptid);
+extern struct thread_info *find_thread_ptid (ptid_t ptid);
 
 /* Find thread by GDB user-visible thread number.  */
 struct thread_info *find_thread_id (int num);
+
+/* Finds the first thread of the inferior given by PID.  If PID is -1,
+   returns the first thread in the list.  */
+struct thread_info *first_thread_of_process (int pid);
+
+/* Returns any thread of process PID.  */
+extern struct thread_info *any_thread_of_process (int pid);
 
 /* Change the ptid of thread OLD_PTID to NEW_PTID.  */
 void thread_change_ptid (ptid_t old_ptid, ptid_t new_ptid);

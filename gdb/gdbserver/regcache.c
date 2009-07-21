@@ -53,7 +53,7 @@ get_regcache (struct thread_info *inf, int fetch)
   /* FIXME - fetch registers for INF */
   if (fetch && regcache->registers_valid == 0)
     {
-      fetch_inferior_registers (0);
+      fetch_inferior_registers (-1);
       regcache->registers_valid = 1;
     }
 
@@ -132,7 +132,7 @@ void
 set_register_cache (struct reg *regs, int n)
 {
   int offset, i;
-  
+
   reg_defs = regs;
   num_registers = n;
 
@@ -169,7 +169,8 @@ registers_from_string (char *buf)
 
   if (len != register_bytes * 2)
     {
-      warning ("Wrong sized register packet (expected %d bytes, got %d)", 2*register_bytes, len);
+      warning ("Wrong sized register packet (expected %d bytes, got %d)",
+	       2*register_bytes, len);
       if (len > register_bytes * 2)
 	len = register_bytes * 2;
     }

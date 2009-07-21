@@ -1,3 +1,20 @@
+2009-06-11  Anthony Green  <green@moxielogic.com>
+
+	* moxie.h (MOXIE_F3_PCREL): Define.
+	(moxie_form3_opc_info): Grow.
+
+2009-06-06  Anthony Green  <green@moxielogic.com>
+
+	* moxie.h (MOXIE_F1_M): Define.
+
+2009-04-15  Anthony Green  <green@moxielogic.com>
+
+	* moxie.h: Created.
+
+2009-04-06  DJ Delorie  <dj@redhat.com>
+
+	* h8300.h: Add relaxation attributes to MOVA opcodes.
+
 2009-03-10  Alan Modra  <amodra@bigpond.net.au>
 
 	* ppc.h (ppc_parse_cpu): Declare.

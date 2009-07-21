@@ -84,6 +84,12 @@ struct value_print_options
   /* If nonzero, print static fields for Pascal.  FIXME: C++ and Java
      share one flag, why not Pascal too?  */
   int pascal_static_field_print;
+
+  /* Controls Python pretty-printing.  */
+  int raw;
+
+  /* If nonzero, print the value in "summary" form.  */
+  int summary;
 };
 
 /* The global print options set by the user.  In general this should
@@ -134,9 +140,11 @@ extern void print_decimal_chars (struct ui_file *, const gdb_byte *,
 extern void print_hex_chars (struct ui_file *, const gdb_byte *,
 			     unsigned int, enum bfd_endian);
 
-extern void print_char_chars (struct ui_file *, const gdb_byte *,
-			      unsigned int, enum bfd_endian);
+extern void print_char_chars (struct ui_file *, struct type *,
+			      const gdb_byte *, unsigned int, enum bfd_endian);
 
 int read_string (CORE_ADDR addr, int len, int width, unsigned int fetchlimit,
-		 gdb_byte **buffer, int *bytes_read);
+		 enum bfd_endian byte_order, gdb_byte **buffer,
+		 int *bytes_read);
+
 #endif

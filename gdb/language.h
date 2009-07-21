@@ -186,14 +186,15 @@ struct language_defn
 
     void (*la_post_parser) (struct expression ** expp, int void_context_p);
 
-    void (*la_printchar) (int ch, struct ui_file * stream);
+    void (*la_printchar) (int ch, struct type *chtype, struct ui_file * stream);
 
-    void (*la_printstr) (struct ui_file * stream, const gdb_byte *string,
-			 unsigned int length, int width,
+    void (*la_printstr) (struct ui_file * stream, struct type *elttype,
+			 const gdb_byte *string, unsigned int length,
 			 int force_ellipses,
 			 const struct value_print_options *);
 
-    void (*la_emitchar) (int ch, struct ui_file * stream, int quoter);
+    void (*la_emitchar) (int ch, struct type *chtype,
+			 struct ui_file * stream, int quoter);
 
     /* Print a type using syntax appropriate for this language. */
 
@@ -283,10 +284,15 @@ struct language_defn
     int (*la_pass_by_reference) (struct type *type);
 
     /* Obtain a string from the inferior, storing it in a newly allocated
-       buffer in BUFFER, which should be freed by the caller.  LENGTH will
-       hold the size in bytes of the string (only actual characters, excluding
-       an eventual terminating null character).  CHARSET will hold the encoding
-       used in the string.  */
+       buffer in BUFFER, which should be freed by the caller.  If the
+       in- and out-parameter *LENGTH is specified at -1, the string is
+       read until a null character of the appropriate width is found -
+       otherwise the string is read to the length of characters specified.
+       On completion, *LENGTH will hold the size of the string in characters.
+       If a *LENGTH of -1 was specified it will count only actual
+       characters, excluding any eventual terminating null character.
+       Otherwise *LENGTH will include all characters - including any nulls.
+       CHARSET will hold the encoding used in the string.  */
     void (*la_get_string) (struct value *value, gdb_byte **buffer, int *length,
 			  const char **charset);
 
@@ -381,13 +387,13 @@ extern enum language set_language (enum language);
 #define LA_VALUE_PRINT(val,stream,options) \
   (current_language->la_value_print(val,stream,options))
 
-#define LA_PRINT_CHAR(ch, stream) \
-  (current_language->la_printchar(ch, stream))
-#define LA_PRINT_STRING(stream, string, length, width, force_ellipses,options) \
-  (current_language->la_printstr(stream, string, length, width, \
+#define LA_PRINT_CHAR(ch, type, stream) \
+  (current_language->la_printchar(ch, type, stream))
+#define LA_PRINT_STRING(stream, elttype, string, length, force_ellipses,options) \
+  (current_language->la_printstr(stream, elttype, string, length, \
 				 force_ellipses,options))
-#define LA_EMIT_CHAR(ch, stream, quoter) \
-  (current_language->la_emitchar(ch, stream, quoter))
+#define LA_EMIT_CHAR(ch, type, stream, quoter) \
+  (current_language->la_emitchar(ch, type, stream, quoter))
 #define LA_GET_STRING(value, buffer, length, encoding) \
   (current_language->la_get_string(value, buffer, length, encoding))
 

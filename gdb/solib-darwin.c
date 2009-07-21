@@ -26,6 +26,7 @@
 #include "gdbcore.h"
 #include "target.h"
 #include "inferior.h"
+#include "regcache.h"
 #include "gdbthread.h"
 
 #include "gdb_assert.h"
@@ -78,6 +79,7 @@ static void
 darwin_load_image_infos (void)
 {
   gdb_byte buf[24];
+  enum bfd_endian byte_order = gdbarch_byte_order (target_gdbarch);
   struct type *ptr_type = builtin_type (target_gdbarch)->builtin_data_ptr;
   int len;
 
@@ -96,11 +98,11 @@ darwin_load_image_infos (void)
     return;
 
   /* Extract the fields.  */
-  dyld_all_image.version = extract_unsigned_integer (buf, 4);
+  dyld_all_image.version = extract_unsigned_integer (buf, 4, byte_order);
   if (dyld_all_image.version != DYLD_VERSION)
     return;
 
-  dyld_all_image.count = extract_unsigned_integer (buf + 4, 4);
+  dyld_all_image.count = extract_unsigned_integer (buf + 4, 4, byte_order);
   dyld_all_image.info = extract_typed_address (buf + 8, ptr_type);
   dyld_all_image.notifier = extract_typed_address
     (buf + 8 + ptr_type->length, ptr_type);
@@ -312,7 +314,7 @@ darwin_solib_create_inferior_hook (void)
     {
       bfd *sub;
       sub = bfd_mach_o_fat_extract (dyld_bfd, bfd_object,
-				    gdbarch_bfd_arch_info (current_gdbarch));
+				    gdbarch_bfd_arch_info (target_gdbarch));
       if (sub)
 	dyld_bfd = sub;
       else
@@ -332,7 +334,8 @@ darwin_solib_create_inferior_hook (void)
       /* We find the dynamic linker's base address by examining
 	 the current pc (which should point at the entry point for the
 	 dynamic linker) and subtracting the offset of the entry point.  */
-      load_addr = (read_pc () - bfd_get_start_address (dyld_bfd));
+      load_addr = (regcache_read_pc (get_current_regcache ())
+		   - bfd_get_start_address (dyld_bfd));
     }
   else
     {
@@ -358,7 +361,7 @@ darwin_solib_create_inferior_hook (void)
   darwin_load_image_infos ();
 
   if (dyld_all_image.version == DYLD_VERSION)
-    create_solib_event_breakpoint (dyld_all_image.notifier);
+    create_solib_event_breakpoint (target_gdbarch, dyld_all_image.notifier);
 }
 
 static void
@@ -377,7 +380,7 @@ darwin_free_so (struct so_list *so)
    Relocate these VMAs according to solib info.  */
 static void
 darwin_relocate_section_addresses (struct so_list *so,
-				   struct section_table *sec)
+				   struct target_section *sec)
 {
   sec->addr += so->lm_info->lm_addr;
   sec->endaddr += so->lm_info->lm_addr;
@@ -421,7 +424,7 @@ darwin_bfd_open (char *pathname)
   abfd = solib_bfd_fopen (found_pathname, found_file);
 
   res = bfd_mach_o_fat_extract (abfd, bfd_object,
-				gdbarch_bfd_arch_info (current_gdbarch));
+				gdbarch_bfd_arch_info (target_gdbarch));
   if (!res)
     {
       bfd_close (abfd);

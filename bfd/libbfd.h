@@ -421,6 +421,9 @@ extern bfd_boolean _bfd_generic_set_section_contents
   ((bfd_boolean (*) (bfd *, struct bfd_section *)) bfd_false)
 #define _bfd_nolink_section_already_linked \
   ((void (*) (bfd *, struct bfd_section *, struct bfd_link_info *)) bfd_void)
+#define _bfd_nolink_bfd_define_common_symbol \
+  ((bfd_boolean (*) (bfd *, struct bfd_link_info *, \
+		     struct bfd_link_hash_entry *)) bfd_false)
 
 /* Routines to use for BFD_JUMP_TABLE_DYNAMIC for targets which do not
    have dynamic symbols or relocs.  Use BFD_JUMP_TABLE_DYNAMIC
@@ -770,6 +773,9 @@ struct bfd_iovec
   int (*bclose) (struct bfd *abfd);
   int (*bflush) (struct bfd *abfd);
   int (*bstat) (struct bfd *abfd, struct stat *sb);
+  /* Just like mmap: (void*)-1 on failure, mmapped address on success.  */
+  void *(*bmmap) (struct bfd *abfd, void *addr, bfd_size_type len,
+                  int prot, int flags, file_ptr offset);
 };
 /* Extracted from bfdwin.c.  */
 struct _bfd_window_internal {
@@ -1027,6 +1033,8 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_MIPS_COPY",
   "BFD_RELOC_MIPS_JUMP_SLOT",
 
+  "BFD_RELOC_MOXIE_10_PCREL",
+
   "BFD_RELOC_FRV_LABEL16",
   "BFD_RELOC_FRV_LABEL24",
   "BFD_RELOC_FRV_LO16",
@@ -1101,6 +1109,7 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_386_TLS_GOTDESC",
   "BFD_RELOC_386_TLS_DESC_CALL",
   "BFD_RELOC_386_TLS_DESC",
+  "BFD_RELOC_386_IRELATIVE",
   "BFD_RELOC_X86_64_GOT32",
   "BFD_RELOC_X86_64_PLT32",
   "BFD_RELOC_X86_64_COPY",
@@ -1127,6 +1136,7 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_X86_64_GOTPC32_TLSDESC",
   "BFD_RELOC_X86_64_TLSDESC_CALL",
   "BFD_RELOC_X86_64_TLSDESC",
+  "BFD_RELOC_X86_64_IRELATIVE",
   "BFD_RELOC_NS32K_IMM_8",
   "BFD_RELOC_NS32K_IMM_16",
   "BFD_RELOC_NS32K_IMM_32",
@@ -2059,6 +2069,8 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_LM32_GLOB_DAT",
   "BFD_RELOC_LM32_JMP_SLOT",
   "BFD_RELOC_LM32_RELATIVE",
+  "BFD_RELOC_MACH_O_SECTDIFF",
+  "BFD_RELOC_MACH_O_PAIR",
  "@@overflow: BFD_RELOC_UNUSED@@",
 };
 #endif

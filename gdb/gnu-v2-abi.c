@@ -97,8 +97,7 @@ gnuv2_virtual_fn_field (struct value **arg1p, struct fn_field * f, int j,
   struct value *entry;
   struct value *vfn;
   struct value *vtbl;
-  struct value *vi = value_from_longest (builtin_type_int32,
-				     (LONGEST) TYPE_FN_FIELD_VOFFSET (f, j));
+  LONGEST vi = (LONGEST) TYPE_FN_FIELD_VOFFSET (f, j);
   struct type *fcontext = TYPE_FN_FIELD_FCONTEXT (f, j);
   struct type *context;
   struct type *context_vptr_basetype;
@@ -242,7 +241,7 @@ gnuv2_value_rtti_type (struct value *v, int *full, int *top, int *using_enc)
     we'd waste a bunch of time figuring out we already know the type.
     Besides, we don't care about the type, just the actual pointer
   */
-  if (VALUE_ADDRESS (value_field (v, known_type_vptr_fieldno)) == 0)
+  if (value_address (value_field (v, known_type_vptr_fieldno)) == 0)
     return NULL;
 
   vtbl = value_as_address (value_field (v, known_type_vptr_fieldno));

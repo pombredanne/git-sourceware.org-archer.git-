@@ -55,6 +55,7 @@
 #include "gdb_stat.h"
 #include <ctype.h>
 #include "cp-abi.h"
+#include "cp-support.h"
 #include "observer.h"
 #include "gdb_assert.h"
 #include "solist.h"
@@ -144,9 +145,6 @@ multiple_symbols_select_mode (void)
 {
   return multiple_symbols_mode;
 }
-
-/* The single non-language-specific builtin type */
-struct type *builtin_type_error;
 
 /* Block in which the most recently searched-for symbol was found.
    Might be better to make this a parameter to lookup_symbol and
@@ -1220,8 +1218,8 @@ lookup_symbol_in_language (const char *name, const struct block *block,
   char *demangled_name = NULL;
   const char *modified_name = NULL;
   const char *mangled_name = NULL;
-  int needtofreename = 0;
   struct symbol *returnval;
+  struct cleanup *cleanup = make_cleanup (null_cleanup, 0);
 
   modified_name = name;
 
@@ -1234,7 +1232,18 @@ lookup_symbol_in_language (const char *name, const struct block *block,
 	{
 	  mangled_name = name;
 	  modified_name = demangled_name;
-	  needtofreename = 1;
+	  make_cleanup (xfree, demangled_name);
+	}
+      else
+	{
+	  /* If we were given a non-mangled name, canonicalize it
+	     according to the language (so far only for C++).  */
+	  demangled_name = cp_canonicalize_string (name);
+	  if (demangled_name)
+	    {
+	      modified_name = demangled_name;
+	      make_cleanup (xfree, demangled_name);
+	    }
 	}
     }
   else if (lang == language_java)
@@ -1245,7 +1254,7 @@ lookup_symbol_in_language (const char *name, const struct block *block,
 	{
 	  mangled_name = name;
 	  modified_name = demangled_name;
-	  needtofreename = 1;
+	  make_cleanup (xfree, demangled_name);
 	}
     }
 
@@ -1264,8 +1273,7 @@ lookup_symbol_in_language (const char *name, const struct block *block,
 
   returnval = lookup_symbol_aux (modified_name, mangled_name, block,
 				 domain, lang, is_a_field_of_this);
-  if (needtofreename)
-    xfree (demangled_name);
+  do_cleanups (cleanup);
 
   return returnval;
 }
@@ -1396,10 +1404,13 @@ lookup_symbol_aux_local (const char *name, const char *linkage_name,
       sym = lookup_symbol_aux_block (name, linkage_name, block, domain);
       if (sym != NULL)
 	return sym;
+
+      if (BLOCK_FUNCTION (block) != NULL && block_inlined_p (block))
+	break;
       block = BLOCK_SUPERBLOCK (block);
     }
 
-  /* We've reached the static block without finding a result.  */
+  /* We've reached the edge of the function without finding a result.  */
 
   return NULL;
 }
@@ -2115,8 +2126,8 @@ find_pc_sect_symtab (CORE_ADDR pc, struct obj_section *section)
 	   will cause a core dump), but maybe we can successfully
 	   continue, so let's not.  */
 	warning (_("\
-(Internal error: pc 0x%s in read in psymtab, but not in symtab.)\n"),
-		 paddr_nz (pc));
+(Internal error: pc %s in read in psymtab, but not in symtab.)\n"),
+		 paddress (get_objfile_arch (ps->objfile), pc));
       s = PSYMTAB_TO_SYMTAB (ps);
     }
   return (s);
@@ -2635,6 +2646,47 @@ find_function_start_pc (struct gdbarch *gdbarch,
   return pc;
 }
 
+/* Given a function start address FUNC_ADDR and SYMTAB, find the first
+   address for that function that has an entry in SYMTAB's line info
+   table.  If such an entry cannot be found, return FUNC_ADDR
+   unaltered.  */
+CORE_ADDR
+skip_prologue_using_lineinfo (CORE_ADDR func_addr, struct symtab *symtab)
+{
+  CORE_ADDR func_start, func_end;
+  struct linetable *l;
+  int ind, i, len;
+  int best_lineno = 0;
+  CORE_ADDR best_pc = func_addr;
+
+  /* Give up if this symbol has no lineinfo table.  */
+  l = LINETABLE (symtab);
+  if (l == NULL)
+    return func_addr;
+
+  /* Get the range for the function's PC values, or give up if we
+     cannot, for some reason.  */
+  if (!find_pc_partial_function (func_addr, NULL, &func_start, &func_end))
+    return func_addr;
+
+  /* Linetable entries are ordered by PC values, see the commentary in
+     symtab.h where `struct linetable' is defined.  Thus, the first
+     entry whose PC is in the range [FUNC_START..FUNC_END[ is the
+     address we are looking for.  */
+  for (i = 0; i < l->nitems; i++)
+    {
+      struct linetable_entry *item = &(l->item[i]);
+
+      /* Don't use line numbers of zero, they mark special entries in
+	 the table.  See the commentary on symtab.h before the
+	 definition of struct linetable.  */
+      if (item->line > 0 && func_start <= item->pc && item->pc < func_end)
+	return item->pc;
+    }
+
+  return func_addr;
+}
+
 /* Given a function symbol SYM, find the symtab and line for the start
    of the function.
    If the argument FUNFIRSTLINE is nonzero, we want the first line
@@ -2649,6 +2701,7 @@ find_function_start_sal (struct symbol *sym, int funfirstline)
 
   CORE_ADDR pc;
   struct symtab_and_line sal;
+  struct block *b, *function_block;
 
   pc = BLOCK_START (block);
   fixup_symbol_section (sym, objfile);
@@ -2676,16 +2729,50 @@ find_function_start_sal (struct symbol *sym, int funfirstline)
      to `__main' in `main' between the prologue and before user
      code.  */
   if (funfirstline
-      && gdbarch_skip_main_prologue_p (current_gdbarch)
+      && gdbarch_skip_main_prologue_p (gdbarch)
       && SYMBOL_LINKAGE_NAME (sym)
       && strcmp (SYMBOL_LINKAGE_NAME (sym), "main") == 0)
     {
-      pc = gdbarch_skip_main_prologue (current_gdbarch, pc);
+      pc = gdbarch_skip_main_prologue (gdbarch, pc);
       /* Recalculate the line number (might not be N+1).  */
       sal = find_pc_sect_line (pc, SYMBOL_OBJ_SECTION (sym), 0);
     }
 
+  /* If we still don't have a valid source line, try to find the first
+     PC in the lineinfo table that belongs to the same function.  This
+     happens with COFF debug info, which does not seem to have an
+     entry in lineinfo table for the code after the prologue which has
+     no direct relation to source.  For example, this was found to be
+     the case with the DJGPP target using "gcc -gcoff" when the
+     compiler inserted code after the prologue to make sure the stack
+     is aligned.  */
+  if (funfirstline && sal.symtab == NULL)
+    {
+      pc = skip_prologue_using_lineinfo (pc, SYMBOL_SYMTAB (sym));
+      /* Recalculate the line number.  */
+      sal = find_pc_sect_line (pc, SYMBOL_OBJ_SECTION (sym), 0);
+    }
+
   sal.pc = pc;
+
+  /* Check if we are now inside an inlined function.  If we can,
+     use the call site of the function instead.  */
+  b = block_for_pc_sect (sal.pc, SYMBOL_OBJ_SECTION (sym));
+  function_block = NULL;
+  while (b != NULL)
+    {
+      if (BLOCK_FUNCTION (b) != NULL && block_inlined_p (b))
+	function_block = b;
+      else if (BLOCK_FUNCTION (b) != NULL)
+	break;
+      b = BLOCK_SUPERBLOCK (b);
+    }
+  if (function_block != NULL
+      && SYMBOL_LINE (BLOCK_FUNCTION (function_block)) != 0)
+    {
+      sal.line = SYMBOL_LINE (BLOCK_FUNCTION (function_block));
+      sal.symtab = SYMBOL_SYMTAB (BLOCK_FUNCTION (function_block));
+    }
 
   return sal;
 }
@@ -3379,9 +3466,10 @@ print_symbol_info (domain_enum kind, struct symtab *s, struct symbol *sym,
 static void
 print_msymbol_info (struct minimal_symbol *msymbol)
 {
+  struct gdbarch *gdbarch = get_objfile_arch (msymbol_objfile (msymbol));
   char *tmp;
 
-  if (gdbarch_addr_bit (current_gdbarch) <= 32)
+  if (gdbarch_addr_bit (gdbarch) <= 32)
     tmp = hex_string_custom (SYMBOL_VALUE_ADDRESS (msymbol)
 			     & (CORE_ADDR) 0xffffffff,
 			     8);
@@ -3686,6 +3774,24 @@ language_search_unquoted_string (char *text, char *p)
   return p;
 }
 
+static void
+completion_list_add_fields (struct symbol *sym, char *sym_text,
+			    int sym_text_len, char *text, char *word)
+{
+  if (SYMBOL_CLASS (sym) == LOC_TYPEDEF)
+    {
+      struct type *t = SYMBOL_TYPE (sym);
+      enum type_code c = TYPE_CODE (t);
+      int j;
+
+      if (c == TYPE_CODE_UNION || c == TYPE_CODE_STRUCT)
+	for (j = TYPE_N_BASECLASSES (t); j < TYPE_NFIELDS (t); j++)
+	  if (TYPE_FIELD_NAME (t, j))
+	    completion_list_add_name (TYPE_FIELD_NAME (t, j),
+				      sym_text, sym_text_len, text, word);
+    }
+}
+
 /* Type of the user_data argument passed to add_macro_name.  The
    contents are simply whatever is needed by
    completion_list_add_name.  */
@@ -3721,9 +3827,9 @@ default_make_symbol_completion_list (char *text, char *word)
   struct partial_symtab *ps;
   struct minimal_symbol *msymbol;
   struct objfile *objfile;
-  struct block *b, *surrounding_static_block = 0;
+  struct block *b;
+  const struct block *surrounding_static_block, *surrounding_global_block;
   struct dict_iterator iter;
-  int j;
   struct partial_symbol **psym;
   /* The symbol we are completing on.  Points in same buffer as text.  */
   char *sym_text;
@@ -3833,41 +3939,43 @@ default_make_symbol_completion_list (char *text, char *word)
   }
 
   /* Search upwards from currently selected frame (so that we can
-     complete on local vars.  */
+     complete on local vars).  Also catch fields of types defined in
+     this places which match our text string.  Only complete on types
+     visible from current context. */
 
-  for (b = get_selected_block (0); b != NULL; b = BLOCK_SUPERBLOCK (b))
-    {
-      if (!BLOCK_SUPERBLOCK (b))
-	{
-	  surrounding_static_block = b;		/* For elmin of dups */
-	}
+  b = get_selected_block (0);
+  surrounding_static_block = block_static_block (b);
+  surrounding_global_block = block_global_block (b);
+  if (surrounding_static_block != NULL)
+    while (b != surrounding_static_block)
+      {
+	QUIT;
 
-      /* Also catch fields of types defined in this places which match our
-         text string.  Only complete on types visible from current context. */
+	ALL_BLOCK_SYMBOLS (b, iter, sym)
+	  {
+	    COMPLETION_LIST_ADD_SYMBOL (sym, sym_text, sym_text_len, text,
+					word);
+	    completion_list_add_fields (sym, sym_text, sym_text_len, text,
+					word);
+	  }
 
-      ALL_BLOCK_SYMBOLS (b, iter, sym)
-	{
-	  QUIT;
-	  COMPLETION_LIST_ADD_SYMBOL (sym, sym_text, sym_text_len, text, word);
-	  if (SYMBOL_CLASS (sym) == LOC_TYPEDEF)
-	    {
-	      struct type *t = SYMBOL_TYPE (sym);
-	      enum type_code c = TYPE_CODE (t);
+	/* Stop when we encounter an enclosing function.  Do not stop for
+	   non-inlined functions - the locals of the enclosing function
+	   are in scope for a nested function.  */
+	if (BLOCK_FUNCTION (b) != NULL && block_inlined_p (b))
+	  break;
+	b = BLOCK_SUPERBLOCK (b);
+      }
 
-	      if (c == TYPE_CODE_UNION || c == TYPE_CODE_STRUCT)
-		{
-		  for (j = TYPE_N_BASECLASSES (t); j < TYPE_NFIELDS (t); j++)
-		    {
-		      if (TYPE_FIELD_NAME (t, j))
-			{
-			  completion_list_add_name (TYPE_FIELD_NAME (t, j),
-					sym_text, sym_text_len, text, word);
-			}
-		    }
-		}
-	    }
-	}
-    }
+  /* Add fields from the file's types; symbols will be added below.  */
+
+  if (surrounding_static_block != NULL)
+    ALL_BLOCK_SYMBOLS (surrounding_static_block, iter, sym)
+      completion_list_add_fields (sym, sym_text, sym_text_len, text, word);
+
+  if (surrounding_global_block != NULL)
+      ALL_BLOCK_SYMBOLS (surrounding_global_block, iter, sym)
+	completion_list_add_fields (sym, sym_text, sym_text_len, text, word);
 
   /* Go through the symtabs and check the externs and statics for
      symbols which match.  */
@@ -3886,9 +3994,6 @@ default_make_symbol_completion_list (char *text, char *word)
   {
     QUIT;
     b = BLOCKVECTOR_BLOCK (BLOCKVECTOR (s), STATIC_BLOCK);
-    /* Don't do this block twice.  */
-    if (b == surrounding_static_block)
-      continue;
     ALL_BLOCK_SYMBOLS (b, iter, sym)
       {
 	COMPLETION_LIST_ADD_SYMBOL (sym, sym_text, sym_text_len, text, word);
@@ -4217,7 +4322,7 @@ make_source_files_completion_list (char *text, char *word)
  */
 
 int
-in_prologue (CORE_ADDR pc, CORE_ADDR func_start)
+in_prologue (struct gdbarch *gdbarch, CORE_ADDR pc, CORE_ADDR func_start)
 {
   struct symtab_and_line sal;
   CORE_ADDR func_addr, func_end;
@@ -4249,7 +4354,7 @@ in_prologue (CORE_ADDR pc, CORE_ADDR func_start)
       if (! func_start)
 	return 1;		/* We *might* be in a prologue.  */
 
-      prologue_end = gdbarch_skip_prologue (current_gdbarch, func_start);
+      prologue_end = gdbarch_skip_prologue (gdbarch, func_start);
 
       return func_start <= pc && pc < prologue_end;
     }
@@ -4273,8 +4378,7 @@ in_prologue (CORE_ADDR pc, CORE_ADDR func_start)
       /* We don't have any good line number info, so use the minsym
 	 information, together with the architecture-specific prologue
 	 scanning code.  */
-      CORE_ADDR prologue_end = gdbarch_skip_prologue
-			         (current_gdbarch, func_addr);
+      CORE_ADDR prologue_end = gdbarch_skip_prologue (gdbarch, func_addr);
 
       return func_addr <= pc && pc < prologue_end;
     }
@@ -4301,7 +4405,7 @@ in_prologue (CORE_ADDR pc, CORE_ADDR func_start)
    found in both ia64 and ppc).  */
 
 CORE_ADDR
-skip_prologue_using_sal (CORE_ADDR func_addr)
+skip_prologue_using_sal (struct gdbarch *gdbarch, CORE_ADDR func_addr)
 {
   struct symtab_and_line prologue_sal;
   CORE_ADDR start_pc;
@@ -4310,7 +4414,7 @@ skip_prologue_using_sal (CORE_ADDR func_addr)
 
   /* Get an initial range for the function.  */
   find_pc_partial_function (func_addr, NULL, &start_pc, &end_pc);
-  start_pc += gdbarch_deprecated_function_start_offset (current_gdbarch);
+  start_pc += gdbarch_deprecated_function_start_offset (gdbarch);
 
   prologue_sal = find_pc_line (start_pc, 0);
   if (prologue_sal.line != 0)
@@ -4355,6 +4459,25 @@ skip_prologue_using_sal (CORE_ADDR func_addr)
 	     line mark the prologue -> body transition.  */
 	  if (sal.line >= prologue_sal.line)
 	    break;
+
+	  /* The line number is smaller.  Check that it's from the
+	     same function, not something inlined.  If it's inlined,
+	     then there is no point comparing the line numbers.  */
+	  bl = block_for_pc (prologue_sal.end);
+	  while (bl)
+	    {
+	      if (block_inlined_p (bl))
+		break;
+	      if (BLOCK_FUNCTION (bl))
+		{
+		  bl = NULL;
+		  break;
+		}
+	      bl = BLOCK_SUPERBLOCK (bl);
+	    }
+	  if (bl != NULL)
+	    break;
+
 	  /* The case in which compiler's optimizer/scheduler has
 	     moved instructions into the prologue.  We look ahead in
 	     the function looking for address ranges whose
@@ -4482,8 +4605,6 @@ append_expanded_sal (struct symtabs_and_lines *sal,
 		     struct symtab *symtab,
 		     int lineno, CORE_ADDR pc)
 {
-  CORE_ADDR func_addr, func_end;
-
   sal->sals = xrealloc (sal->sals,
 			sizeof (sal->sals[0])
 			* (sal->nelts + 1));
@@ -4494,6 +4615,57 @@ append_expanded_sal (struct symtabs_and_lines *sal,
   sal->sals[sal->nelts].line = lineno;
   sal->sals[sal->nelts].pc = pc;
   ++sal->nelts;
+}
+
+/* Helper to expand_line_sal below.  Search in the symtabs for any
+   linetable entry that exactly matches FILENAME and LINENO and append
+   them to RET. If there is at least one match, return 1; otherwise,
+   return 0, and return the best choice in BEST_ITEM and BEST_SYMTAB.  */
+
+static int
+append_exact_match_to_sals (char *filename, int lineno,
+			    struct symtabs_and_lines *ret,
+			    struct linetable_entry **best_item,
+			    struct symtab **best_symtab)
+{
+  struct objfile *objfile;
+  struct symtab *symtab;
+  int exact = 0;
+  int j;
+  *best_item = 0;
+  *best_symtab = 0;
+  
+  ALL_SYMTABS (objfile, symtab)
+    {
+      if (strcmp (filename, symtab->filename) == 0)
+	{
+	  struct linetable *l;
+	  int len;
+	  l = LINETABLE (symtab);
+	  if (!l)
+	    continue;
+	  len = l->nitems;
+
+	  for (j = 0; j < len; j++)
+	    {
+	      struct linetable_entry *item = &(l->item[j]);
+
+	      if (item->line == lineno)
+		{
+		  exact = 1;
+		  append_expanded_sal (ret, symtab, lineno, item->pc);
+		}
+	      else if (!exact && item->line > lineno
+		       && (*best_item == NULL
+			   || item->line < (*best_item)->line))
+		{
+		  *best_item = item;
+		  *best_symtab = symtab;
+		}
+	    }
+	}
+    }
+  return exact;
 }
 
 /* Compute a set of all sals in
@@ -4551,42 +4723,14 @@ expand_line_sal (struct symtab_and_line sal)
 	    PSYMTAB_TO_SYMTAB (psymtab);
 	}
 
-      /* For each symtab, we add all pcs to ret.sals.  I'm actually
-	 not sure what to do if we have exact match in one symtab,
-	 and non-exact match on another symtab.  */
-
-      ALL_SYMTABS (objfile, symtab)
-	{
-	  if (strcmp (sal.symtab->filename,
-		      symtab->filename) == 0)
-	    {
-	      struct linetable *l;
-	      int len;
-	      l = LINETABLE (symtab);
-	      if (!l)
-		continue;
-	      len = l->nitems;
-
-	      for (j = 0; j < len; j++)
-		{
-		  struct linetable_entry *item = &(l->item[j]);
-
-		  if (item->line == lineno)
-		    {
-		      exact = 1;
-		      append_expanded_sal (&ret, symtab, lineno, item->pc);
-		    }
-		  else if (!exact && item->line > lineno
-			   && (best_item == NULL || item->line < best_item->line))
-		    {
-		      best_item = item;
-		      best_symtab = symtab;
-		    }
-		}
-	    }
-	}
+      /* Now search the symtab for exact matches and append them.  If
+	 none is found, append the best_item and all its exact
+	 matches.  */
+      exact = append_exact_match_to_sals (sal.symtab->filename, lineno,
+					  &ret, &best_item, &best_symtab);
       if (!exact && best_item)
-	append_expanded_sal (&ret, best_symtab, lineno, best_item->pc);
+	append_exact_match_to_sals (best_symtab->filename, best_item->line,
+				    &ret, &best_item, &best_symtab);
     }
 
   /* For optimized code, compiler can scatter one source line accross
@@ -4678,10 +4822,6 @@ in an expression."), _("\
 Show how the debugger handles ambiguities in expressions."), _("\
 Valid values are \"ask\", \"all\", \"cancel\", and the default is \"all\"."),
                         NULL, NULL, &setlist, &showlist);
-
-  /* Initialize the one built-in type that isn't language dependent... */
-  builtin_type_error = init_type (TYPE_CODE_ERROR, 0, 0,
-				  "<unknown type>", (struct objfile *) NULL);
 
   observer_attach_executable_changed (symtab_observer_executable_changed);
 }

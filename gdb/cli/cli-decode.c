@@ -112,18 +112,6 @@ get_cmd_context (struct cmd_list_element *cmd)
   return cmd->context;
 }
 
-void
-set_cmd_no_selected_thread_ok (struct cmd_list_element *cmd)
-{
-  cmd->flags |= CMD_NO_SELECTED_THREAD_OK;
-}
-
-int
-get_cmd_no_selected_thread_ok (struct cmd_list_element *cmd)
-{
-  return cmd->flags & CMD_NO_SELECTED_THREAD_OK;
-}
-
 enum cmd_types
 cmd_type (struct cmd_list_element *cmd)
 {
@@ -263,7 +251,7 @@ add_alias_cmd (char *name, char *oldname, enum command_class class,
 						     &prehook, &prehookee,
 						     &posthook, &posthookee);
       /* If this happens, it means a programmer error somewhere.  */
-      gdb_assert (!aliases && !prehook && prehookee
+      gdb_assert (!aliases && !prehook && !prehookee
 		  && !posthook && ! posthookee);
       return 0;
     }
@@ -407,17 +395,6 @@ add_setshow_cmd_full (char *name,
     *set_result = set;
   if (show_result != NULL)
     *show_result = show;
-}
-
-struct cmd_list_element *
-deprecated_add_set_cmd (char *name,
-			enum command_class class,
-			var_types var_type,
-			void *var,
-			char *doc,
-			struct cmd_list_element **list)
-{
-  return add_set_or_show_cmd (name, set_cmd, class, var_type, var, doc, list);
 }
 
 /* Add element named NAME to command list LIST (the list for set or
@@ -778,10 +755,11 @@ apropos_cmd (struct ui_file *stream, struct cmd_list_element *commandlist,
 			 struct re_pattern_buffer *regex, char *prefix)
 {
   struct cmd_list_element *c;
-  int returnvalue=1; /*Needed to avoid double printing*/
+  int returnvalue;
   /* Walk through the commands */
   for (c=commandlist;c;c=c->next)
     {
+      returnvalue = -1; /*Needed to avoid double printing*/
       if (c->name != NULL)
 	{
 	  /* Try to match against the name*/
@@ -792,7 +770,7 @@ apropos_cmd (struct ui_file *stream, struct cmd_list_element *commandlist,
 				      0 /* don't recurse */, stream);
 	    }
 	}
-      if (c->doc != NULL && returnvalue != 0)
+      if (c->doc != NULL && returnvalue < 0)
 	{
 	  /* Try to match against documentation */
 	  if (re_search(regex,c->doc,strlen(c->doc),0,strlen(c->doc),NULL) >=0)
@@ -801,8 +779,11 @@ apropos_cmd (struct ui_file *stream, struct cmd_list_element *commandlist,
 				      0 /* don't recurse */, stream);
 	    }
 	}
-      /* Check if this command has subcommands */
-      if (c->prefixlist != NULL)
+      /* Check if this command has subcommands and is not an abbreviation.
+	 We skip listing subcommands of abbreviations in order to avoid
+	 duplicates in the output.
+       */
+      if (c->prefixlist != NULL && !c->abbrev_flag)
 	{
 	  /* Recursively call ourselves on the subcommand list,
 	     passing the right prefix in.

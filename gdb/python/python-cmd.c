@@ -19,6 +19,7 @@
 
 
 #include "defs.h"
+#include "arch-utils.h"
 #include "value.h"
 #include "exceptions.h"
 #include "python-internal.h"
@@ -26,6 +27,7 @@
 #include "gdbcmd.h"
 #include "cli/cli-decode.h"
 #include "completer.h"
+#include "language.h"
 
 /* Struct representing built-in completion types.  */
 struct cmdpy_completer
@@ -90,9 +92,9 @@ static void
 cmdpy_destroyer (struct cmd_list_element *self, void *context)
 {
   cmdpy_object *cmd;
-  PyGILState_STATE state;
+  struct cleanup *cleanup;
 
-  state = PyGILState_Ensure ();
+  cleanup = ensure_python_env (get_current_arch (), current_language);
 
   /* Release our hold on the command object.  */
   cmd = (cmdpy_object *) context;
@@ -105,7 +107,7 @@ cmdpy_destroyer (struct cmd_list_element *self, void *context)
   xfree (self->doc);
   xfree (self->prefixname);
 
-  PyGILState_Release (state);
+  do_cleanups (cleanup);
 }
 
 /* Called by gdb to invoke the command.  */
@@ -115,10 +117,8 @@ cmdpy_function (struct cmd_list_element *command, char *args, int from_tty)
   cmdpy_object *obj = (cmdpy_object *) get_cmd_context (command);
   PyObject *argobj, *ttyobj, *result;
   struct cleanup *cleanup;
-  PyGILState_STATE state;
 
-  state = PyGILState_Ensure ();
-  cleanup = make_cleanup_py_restore_gil (&state);
+  cleanup = ensure_python_env (get_current_arch (), current_language);
 
   if (! obj)
     error (_("Invalid invocation of Python command object."));
@@ -182,10 +182,8 @@ cmdpy_completer (struct cmd_list_element *command, char *text, char *word)
   PyObject *textobj, *wordobj, *resultobj = NULL;
   char **result = NULL;
   struct cleanup *cleanup;
-  PyGILState_STATE state;
 
-  state = PyGILState_Ensure ();
-  cleanup = make_cleanup_py_restore_gil (&state);
+  cleanup = ensure_python_env (get_current_arch (), current_language);
 
   if (! obj)
     error (_("Invalid invocation of Python command object."));
@@ -336,16 +334,16 @@ parse_command_name (char *text, struct cmd_list_element ***base_list)
 
 /* Object initializer; sets up gdb-side structures for command.
 
-   Use: __init__(NAME, CMDCLASS, [COMPLETERCLASS, [PREFIX]]).
+   Use: __init__(NAME, COMMAND_CLASS [, COMPLETER_CLASS][, PREFIX]]).
 
    NAME is the name of the command.  It may consist of multiple words,
    in which case the final word is the name of the new command, and
    earlier words must be prefix commands.
 
-   CMDCLASS is the kind of command.  It should be one of the COMMAND_*
+   COMMAND_CLASS is the kind of command.  It should be one of the COMMAND_*
    constants defined in the gdb module.
 
-   COMPLETERCLASS is the kind of completer.  If not given, the
+   COMPLETER_CLASS is the kind of completer.  If not given, the
    "complete" method will be used.  Otherwise, it should be one of the
    COMPLETE_* constants defined in the gdb module.
 
@@ -356,7 +354,7 @@ parse_command_name (char *text, struct cmd_list_element ***base_list)
    
 */
 static int
-cmdpy_init (PyObject *self, PyObject *args, PyObject *kwds)
+cmdpy_init (PyObject *self, PyObject *args, PyObject *kw)
 {
   cmdpy_object *obj = (cmdpy_object *) self;
   char *name;
@@ -366,6 +364,8 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kwds)
   volatile struct gdb_exception except;
   struct cmd_list_element **cmd_list;
   char *cmd_name, *pfx_name;
+  static char *keywords[] = { "name", "command_class", "completer_class",
+			      "prefix", NULL };
   PyObject *is_prefix = NULL;
   int cmp;
 
@@ -378,7 +378,7 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kwds)
       return -1;
     }
 
-  if (! PyArg_ParseTuple (args, "si|iO", &name, &cmdtype,
+  if (! PyArg_ParseTupleAndKeywords (args, kw, "si|iO", keywords, &name, &cmdtype,
 			  &completetype, &is_prefix))
     return -1;
 

@@ -197,7 +197,7 @@ procfs_open (char *arg, int from_tty)
 	    {
 	      if (sysinfo->type !=
 		  nto_map_arch_to_cputype (gdbarch_bfd_arch_info
-					   (current_gdbarch)->arch_name))
+					   (target_gdbarch)->arch_name))
 		error (_("Invalid target CPU."));
 	    }
 	}
@@ -623,7 +623,7 @@ nto_interrupt (int signo)
 
 static ptid_t
 procfs_wait (struct target_ops *ops,
-	     ptid_t ptid, struct target_waitstatus *ourstatus)
+	     ptid_t ptid, struct target_waitstatus *ourstatus, int options)
 {
   sigset_t set;
   siginfo_t info;
@@ -824,26 +824,30 @@ procfs_breakpoint (CORE_ADDR addr, int type, int size)
 }
 
 static int
-procfs_insert_breakpoint (struct bp_target_info *bp_tgt)
+procfs_insert_breakpoint (struct gdbarch *gdbarch,
+			  struct bp_target_info *bp_tgt)
 {
   return procfs_breakpoint (bp_tgt->placed_address, _DEBUG_BREAK_EXEC, 0);
 }
 
 static int
-procfs_remove_breakpoint (struct bp_target_info *bp_tgt)
+procfs_remove_breakpoint (struct gdbarch *gdbarch,
+			  struct bp_target_info *bp_tgt)
 {
   return procfs_breakpoint (bp_tgt->placed_address, _DEBUG_BREAK_EXEC, -1);
 }
 
 static int
-procfs_insert_hw_breakpoint (struct bp_target_info *bp_tgt)
+procfs_insert_hw_breakpoint (struct gdbarch *gdbarch,
+			     struct bp_target_info *bp_tgt)
 {
   return procfs_breakpoint (bp_tgt->placed_address,
 			    _DEBUG_BREAK_EXEC | _DEBUG_BREAK_HW, 0);
 }
 
 static int
-procfs_remove_hw_breakpoint (struct bp_target_info *bp_tgt)
+procfs_remove_hw_breakpoint (struct gdbarch *gdbarch,
+			     struct bp_target_info *bp_tgt)
 {
   return procfs_breakpoint (bp_tgt->placed_address,
 			    _DEBUG_BREAK_EXEC | _DEBUG_BREAK_HW, -1);
@@ -1120,7 +1124,7 @@ procfs_stop (ptid_t ptid)
 }
 
 static void
-procfs_kill_inferior (void)
+procfs_kill_inferior (struct target_ops *ops)
 {
   target_mourn_inferior ();
 }
@@ -1159,7 +1163,7 @@ get_regset (int regset, char *buf, int bufsize, int *regsize)
     default:
       return -1;
     }
-  if (devctl (ctl_fd, dev_get, &buf, bufsize, regsize) != EOK)
+  if (devctl (ctl_fd, dev_get, buf, bufsize, regsize) != EOK)
     return -1;
 
   return dev_set;
@@ -1327,11 +1331,11 @@ init_procfs_ops (void)
   procfs_ops.to_pid_to_str = procfs_pid_to_str;
   procfs_ops.to_stop = procfs_stop;
   procfs_ops.to_stratum = process_stratum;
-  procfs_ops.to_has_all_memory = 1;
-  procfs_ops.to_has_memory = 1;
-  procfs_ops.to_has_stack = 1;
-  procfs_ops.to_has_registers = 1;
-  procfs_ops.to_has_execution = 1;
+  procfs_ops.to_has_all_memory = default_child_has_all_memory;
+  procfs_ops.to_has_memory = default_child_has_memory;
+  procfs_ops.to_has_stack = default_child_has_stack;
+  procfs_ops.to_has_registers = default_child_has_registers;
+  procfs_ops.to_has_execution = default_child_has_execution;
   procfs_ops.to_magic = OPS_MAGIC;
   procfs_ops.to_have_continuable_watchpoint = 1;
 }

@@ -190,7 +190,7 @@ hpux_thread_resume (struct target_ops *ops,
 
 static ptid_t
 hpux_thread_wait (struct target_ops *ops,
-		  ptid_t ptid, struct target_waitstatus *ourstatus)
+		  ptid_t ptid, struct target_waitstatus *ourstatus, int options)
 {
   ptid_t rtnval;
   struct cleanup *old_chain;
@@ -203,7 +203,7 @@ hpux_thread_wait (struct target_ops *ops,
     ptid = main_ptid;
 
   rtnval = deprecated_child_ops.to_wait (&deprecated_child_ops,
-					 ptid, ourstatus);
+					 ptid, ourstatus, options);
 
   rtnval = find_active_thread ();
 
@@ -243,6 +243,7 @@ hpux_thread_fetch_registers (struct target_ops *ops,
 			     struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   cma__t_int_tcb tcb, *tcb_ptr;
   struct cleanup *old_chain;
   int i;
@@ -291,7 +292,7 @@ hpux_thread_fetch_registers (struct target_ops *ops,
 	    /* Flags must be 0 to avoid bogus value for SS_INSYSCALL */
 	    memset (buf, '\000', register_size (gdbarch, regno));
 	  else if (regno == HPPA_SP_REGNUM)
-	    store_unsigned_integer (buf, sizeof sp, sp);
+	    store_unsigned_integer (buf, sizeof sp, byte_order, sp);
 	  else if (regno == HPPA_PCOQ_HEAD_REGNUM)
 	    read_memory (sp - 20, buf, register_size (gdbarch, regno));
 	  else
@@ -426,9 +427,9 @@ hpux_thread_files_info (struct target_ops *ignore)
 }
 
 static void
-hpux_thread_kill_inferior (void)
+hpux_thread_kill_inferior (struct target_ops *ops)
 {
-  deprecated_child_ops.to_kill ();
+  deprecated_child_ops.to_kill (&deprecated_child_ops);
 }
 
 static void
@@ -565,11 +566,11 @@ init_hpux_thread_ops (void)
   hpux_thread_ops.to_thread_alive = hpux_thread_alive;
   hpux_thread_ops.to_stop = hpux_thread_stop;
   hpux_thread_ops.to_stratum = process_stratum;
-  hpux_thread_ops.to_has_all_memory = 1;
-  hpux_thread_ops.to_has_memory = 1;
-  hpux_thread_ops.to_has_stack = 1;
-  hpux_thread_ops.to_has_registers = 1;
-  hpux_thread_ops.to_has_execution = 1;
+  hpux_thread_ops.to_has_all_memory = default_child_has_all_memory;
+  hpux_thread_ops.to_has_memory = default_child_has_memory;
+  hpux_thread_ops.to_has_stack = default_child_has_stack;
+  hpux_thread_ops.to_has_registers = default_child_has_registers;
+  hpux_thread_ops.to_has_execution = default_child_has_execution;
   hpux_thread_ops.to_magic = OPS_MAGIC;
 }
 

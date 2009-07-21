@@ -21,6 +21,8 @@
 #include <thread_db.h>
 #endif
 
+#include "gdb_proc_service.h"
+
 #ifdef HAVE_LINUX_REGSETS
 typedef void (*regset_fill_func) (void *);
 typedef void (*regset_store_func) (const void *);
@@ -41,6 +43,26 @@ struct regset_info
 extern struct regset_info target_regsets[];
 #endif
 
+struct siginfo;
+
+struct process_info_private
+{
+  /* True if this process has loaded thread_db, and it is active.  */
+  int thread_db_active;
+
+  /* Structure that identifies the child process for the
+     <proc_service.h> interface.  */
+  struct ps_prochandle proc_handle;
+
+  /* Connection to the libthread_db library.  */
+  td_thragent_t *thread_agent;
+
+  /* Arch-specific additions.  */
+  struct arch_process_info *arch_private;
+};
+
+struct lwp_info;
+
 struct linux_target_ops
 {
   /* Architecture-specific setup.  */
@@ -60,13 +82,13 @@ struct linux_target_ops
   int breakpoint_len;
   CORE_ADDR (*breakpoint_reinsert_addr) (void);
 
-
   int decr_pc_after_break;
   int (*breakpoint_at) (CORE_ADDR pc);
 
-  /* Watchpoint related functions.  See target.h for comments.  */
-  int (*insert_watchpoint) (char type, CORE_ADDR addr, int len);
-  int (*remove_watchpoint) (char type, CORE_ADDR addr, int len);
+  /* Breakpoint and watchpoint related functions.  See target.h for
+     comments.  */
+  int (*insert_point) (char type, CORE_ADDR addr, int len);
+  int (*remove_point) (char type, CORE_ADDR addr, int len);
   int (*stopped_by_watchpoint) (void);
   CORE_ADDR (*stopped_data_address) (void);
 
@@ -74,20 +96,42 @@ struct linux_target_ops
      for registers smaller than an xfer unit).  */
   void (*collect_ptrace_register) (int regno, char *buf);
   void (*supply_ptrace_register) (int regno, const char *buf);
+
+  /* Hook to convert from target format to ptrace format and back.
+     Returns true if any conversion was done; false otherwise.
+     If DIRECTION is 1, then copy from INF to NATIVE.
+     If DIRECTION is 0, copy from NATIVE to INF.  */
+  int (*siginfo_fixup) (struct siginfo *native, void *inf, int direction);
+
+  /* Hook to call when a new process is created or attached to.
+     If extra per-process architecture-specific data is needed,
+     allocate it here.  */
+  struct arch_process_info * (*new_process) (void);
+
+  /* Hook to call when a new thread is detected.
+     If extra per-thread architecture-specific data is needed,
+     allocate it here.  */
+  struct arch_lwp_info * (*new_thread) (void);
+
+  /* Hook to call prior to resuming a thread.  */
+  void (*prepare_to_resume) (struct lwp_info *);
 };
 
 extern struct linux_target_ops the_low_target;
 
-#define get_process(inf) ((struct process_info *)(inf))
-#define get_thread_process(thr) (get_process (inferior_target_data (thr)))
-#define get_process_thread(proc) ((struct thread_info *) \
-				  find_inferior_id (&all_threads, \
-				  get_process (proc)->lwpid))
+#define ptid_of(proc) ((proc)->head.id)
+#define pid_of(proc) ptid_get_pid ((proc)->head.id)
+#define lwpid_of(proc) ptid_get_lwp ((proc)->head.id)
 
-struct process_info
+#define get_lwp(inf) ((struct lwp_info *)(inf))
+#define get_thread_lwp(thr) (get_lwp (inferior_target_data (thr)))
+#define get_lwp_thread(proc) ((struct thread_info *)			\
+			      find_inferior_id (&all_threads,		\
+						get_lwp (proc)->head.id))
+
+struct lwp_info
 {
   struct inferior_list_entry head;
-  unsigned long lwpid;
 
   /* If this flag is set, the next SIGSTOP will be ignored (the
      process will be immediately resumed).  This means that either we
@@ -97,11 +141,19 @@ struct process_info
      yet.  */
   int stop_expected;
 
-  /* If this flag is set, the process is known to be stopped right now (stop
+  /* True if this thread was suspended (with vCont;t).  */
+  int suspended;
+
+  /* If this flag is set, the lwp is known to be stopped right now (stop
      event already received in a wait()).  */
   int stopped;
 
-  /* When stopped is set, the last wait status recorded for this process.  */
+  /* If this flag is set, the lwp is known to be dead already (exit
+     event already received in a wait(), and is cached in
+     status_pending).  */
+  int dead;
+
+  /* When stopped is set, the last wait status recorded for this lwp.  */
   int last_status;
 
   /* If this flag is set, STATUS_PENDING is a waitstatus that has not yet
@@ -121,12 +173,16 @@ struct process_info
      was a single-step.  */
   int stepping;
 
+  /* If this flag is set, we need to set the event request flags the
+     next time we see this LWP stop.  */
+  int must_set_ptrace_flags;
+
   /* If this is non-zero, it points to a chain of signals which need to
      be delivered to this process.  */
   struct pending_signals *pending_signals;
 
   /* A link used when resuming.  It is initialized from the resume request,
-     and then processed and cleared in linux_resume_one_process.  */
+     and then processed and cleared in linux_resume_one_lwp.  */
 
   struct thread_resume *resume;
 
@@ -136,12 +192,20 @@ struct process_info
      THREAD_KNOWN is set.  */
   td_thrhandle_t th;
 #endif
+
+  /* Arch-specific additions.  */
+  struct arch_lwp_info *arch_private;
 };
 
-extern struct inferior_list all_processes;
+extern struct inferior_list all_lwps;
+
+char *linux_child_pid_to_exec_file (int pid);
+int elf_64_file_p (const char *file);
 
 void linux_attach_lwp (unsigned long pid);
 
 int thread_db_init (int use_events);
 int thread_db_get_tls_address (struct thread_info *thread, CORE_ADDR offset,
 			       CORE_ADDR load_module, CORE_ADDR *address);
+
+struct lwp_info *find_lwp_pid (ptid_t ptid);

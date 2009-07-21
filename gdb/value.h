@@ -272,11 +272,18 @@ extern void set_value_component_location (struct value *component,
 extern enum lval_type *deprecated_value_lval_hack (struct value *);
 #define VALUE_LVAL(val) (*deprecated_value_lval_hack (val))
 
-/* If lval == lval_memory, this is the address in the inferior.  If
-   lval == lval_register, this is the byte offset into the registers
-   structure.  */
-extern CORE_ADDR *deprecated_value_address_hack (struct value *);
-#define VALUE_ADDRESS(val) (*deprecated_value_address_hack (val))
+/* If lval == lval_memory, return the address in the inferior.  If
+   lval == lval_register, return the byte offset into the registers
+   structure.  Otherwise, return 0.  The returned address
+   includes the offset, if any.  */
+extern CORE_ADDR value_address (struct value *);
+
+/* Like value_address, except the result does not include value's
+   offset.  */
+extern CORE_ADDR value_raw_address (struct value *);
+
+/* Set the address of a value.  */
+extern void set_value_address (struct value *, CORE_ADDR);
 
 /* Pointer to internal variable.  */
 extern struct internalvar **deprecated_value_internalvar_hack (struct value *);
@@ -302,20 +309,6 @@ extern struct value *coerce_ref (struct value *value);
 
 extern struct value *coerce_array (struct value *value);
 
-/* Internal variables (variables for convenience of use of debugger)
-   are recorded as a chain of these structures.  */
-
-typedef struct value * (*internalvar_make_value) (struct internalvar *);
-
-struct internalvar
-{
-  struct internalvar *next;
-  char *name;
-  struct value *value;
-  internalvar_make_value make_value;
-  int endian;
-};
-
 
 
 #include "symtab.h"
@@ -325,7 +318,8 @@ struct internalvar
 struct frame_info;
 struct fn_field;
 
-extern void print_address_demangle (CORE_ADDR, struct ui_file *, int);
+extern void print_address_demangle (struct gdbarch *, CORE_ADDR,
+				    struct ui_file *, int);
 
 extern LONGEST value_as_long (struct value *val);
 extern DOUBLEST value_as_double (struct value *val);
@@ -346,7 +340,6 @@ extern struct value *value_from_pointer (struct type *type, CORE_ADDR addr);
 extern struct value *value_from_double (struct type *type, DOUBLEST num);
 extern struct value *value_from_decfloat (struct type *type,
 					  const gdb_byte *decbytes);
-extern struct value *value_from_string (char *string);
 
 extern struct value *value_at (struct type *type, CORE_ADDR addr);
 extern struct value *value_at_lazy (struct type *type, CORE_ADDR addr);
@@ -388,8 +381,12 @@ extern struct value *value_mark (void);
 
 extern void value_free_to_mark (struct value *mark);
 
-extern struct value *value_string (char *ptr, int len);
-extern struct value *value_bitstring (char *ptr, int len);
+extern struct value *value_cstring (char *ptr, int len,
+				    struct type *char_type);
+extern struct value *value_string (char *ptr, int len,
+				   struct type *char_type);
+extern struct value *value_bitstring (char *ptr, int len,
+				      struct type *index_type);
 
 extern struct value *value_array (int lowbound, int highbound,
 				  struct value **elemvec);
@@ -399,9 +396,7 @@ extern struct value *value_concat (struct value *arg1, struct value *arg2);
 extern struct value *value_binop (struct value *arg1, struct value *arg2,
 				  enum exp_opcode op);
 
-extern struct value *value_ptradd (struct value *arg1, struct value *arg2);
-
-extern struct value *value_ptrsub (struct value *arg1, struct value *arg2);
+extern struct value *value_ptradd (struct value *arg1, LONGEST arg2);
 
 extern LONGEST value_ptrdiff (struct value *arg1, struct value *arg2);
 
@@ -473,11 +468,11 @@ extern struct value *value_one (struct type *type, enum lval_type lv);
 
 extern struct value *value_repeat (struct value *arg1, int count);
 
-extern struct value *value_subscript (struct value *array, struct value *idx);
+extern struct value *value_subscript (struct value *array, LONGEST index);
 
 extern struct value *value_bitstring_subscript (struct type *type,
 						struct value *bitstring,
-						struct value *idx);
+						LONGEST index);
 
 extern struct value *register_value_being_returned (struct type *valtype,
 						    struct regcache *retbuf);
@@ -487,12 +482,17 @@ extern int value_in (struct value *element, struct value *set);
 extern int value_bit_index (struct type *type, const gdb_byte *addr,
 			    int index);
 
-extern int using_struct_return (struct type *func_type,
+extern int using_struct_return (struct gdbarch *gdbarch,
+				struct type *func_type,
 				struct type *value_type);
 
 extern struct value *evaluate_expression (struct expression *exp);
 
 extern struct value *evaluate_type (struct expression *exp);
+
+extern struct value *evaluate_subexp (struct type *expect_type,
+				      struct expression *exp,
+				      int *pos, enum noside noside);
 
 extern struct value *evaluate_subexpression_type (struct expression *exp,
 						  int subexp);
@@ -524,23 +524,35 @@ extern void binop_promote (const struct language_defn *language,
 
 extern struct value *access_value_history (int num);
 
-extern struct value *value_of_internalvar (struct internalvar *var);
+extern struct value *value_of_internalvar (struct gdbarch *gdbarch,
+					   struct internalvar *var);
+
+extern int get_internalvar_integer (struct internalvar *var, LONGEST *l);
 
 extern void set_internalvar (struct internalvar *var, struct value *val);
+
+extern void set_internalvar_integer (struct internalvar *var, LONGEST l);
+
+extern void set_internalvar_string (struct internalvar *var,
+				    const char *string);
+
+extern void clear_internalvar (struct internalvar *var);
 
 extern void set_internalvar_component (struct internalvar *var,
 				       int offset,
 				       int bitpos, int bitsize,
 				       struct value *newvalue);
 
-extern struct internalvar *lookup_only_internalvar (char *name);
+extern struct internalvar *lookup_only_internalvar (const char *name);
 
-extern struct internalvar *create_internalvar (char *name);
+extern struct internalvar *create_internalvar (const char *name);
 
+typedef struct value * (*internalvar_make_value) (struct gdbarch *,
+						  struct internalvar *);
 extern struct internalvar *
   create_internalvar_type_lazy (char *name, internalvar_make_value fun);
 
-extern struct internalvar *lookup_internalvar (char *name);
+extern struct internalvar *lookup_internalvar (const char *name);
 
 extern int value_equal (struct value *arg1, struct value *arg2);
 
@@ -578,8 +590,8 @@ extern void release_value (struct value *val);
 
 extern int record_latest_value (struct value *val);
 
-extern void modify_field (gdb_byte *addr, LONGEST fieldval, int bitpos,
-			  int bitsize);
+extern void modify_field (struct type *type, gdb_byte *addr,
+			  LONGEST fieldval, int bitpos, int bitsize);
 
 extern void type_print (struct type *type, char *varstring,
 			struct ui_file *stream, int show);
@@ -619,7 +631,7 @@ extern int common_val_print (struct value *val,
 			     const struct value_print_options *options,
 			     const struct language_defn *language);
 
-extern int val_print_string (CORE_ADDR addr, int len, int width,
+extern int val_print_string (struct type *elttype, CORE_ADDR addr, int len,
 			     struct ui_file *stream,
 			     const struct value_print_options *options);
 
@@ -658,5 +670,26 @@ extern struct value *value_allocate_space_in_inferior (int);
 
 extern struct value *value_of_local (const char *name, int complain);
 
-extern struct value * value_subscripted_rvalue (struct value *array, struct value *idx, int lowerbound);
+extern struct value *value_subscripted_rvalue (struct value *array,
+					       LONGEST index, int lowerbound);
+
+/* User function handler.  */
+
+typedef struct value *(*internal_function_fn) (struct gdbarch *gdbarch,
+					       const struct language_defn *language,
+					       void *cookie,
+					       int argc,
+					       struct value **argv);
+
+void add_internal_function (const char *name, const char *doc,
+			    internal_function_fn handler,
+			    void *cookie);
+
+struct value *call_internal_function (struct gdbarch *gdbarch,
+				      const struct language_defn *language,
+				      struct value *function,
+				      int argc, struct value **argv);
+
+char *value_internal_function_name (struct value *);
+
 #endif /* !defined (VALUE_H) */

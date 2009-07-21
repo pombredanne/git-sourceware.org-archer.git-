@@ -6,7 +6,7 @@
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
+# the Free Software Foundation; either version 3 of the License, or
 # (at your option) any later version.
 #
 # This program is distributed in the hope that it will be useful,
@@ -15,9 +15,7 @@
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor,
-# Boston, MA 02110-1301, USA.
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 prefix = @prefix@
 exec_prefix = @exec_prefix@
@@ -42,8 +40,10 @@ man7dir = $(mandir)/man7
 man8dir = $(mandir)/man8
 man9dir = $(mandir)/man9
 infodir = @infodir@
-pdfdir = $(prefix)/share/doc/gdb
-htmldir = $(prefix)/html
+datarootdir = @datarootdir@
+docdir = @docdir@
+htmldir = @htmldir@
+pdfdir = @pdfdir@
 includedir = @includedir@
 
 # This can be referenced by `LIBINTL' as computed by
@@ -111,11 +111,8 @@ YLWRAP = $(srcdir)/../ylwrap
 # where to find makeinfo, preferably one designed for texinfo-2
 MAKEINFO=makeinfo
 
-# Contrary to documentation, the current directory is not
-# searched by texi2html, so specify it explicitly.
-# -macro 2007-07-26
-MAKEHTML = texi2html
-MAKEHTMLFLAGS = -menu -split_chapter -I .
+MAKEHTML = $(MAKEINFO) --html
+MAKEHTMLFLAGS =
 
 # Set this up with gcc if you have gnu ld and the loader will print out
 # line numbers for undefined references.
@@ -164,9 +161,6 @@ GDB_WARN_CFLAGS_NO_FORMAT = `echo " $(GDB_WARN_CFLAGS) " | sed "s/ -Wformat-nonl
 INTL = @LIBINTL@
 INTL_DEPS = @LIBINTL_DEP@
 INTL_CFLAGS = @INCINTL@
-
-# Where is the ICONV library?  This can be empty if libc has iconv.
-LIBICONV = @LIBICONV@
 
 # Did the user give us a --with-sysroot option?
 TARGET_SYSTEM_ROOT = @TARGET_SYSTEM_ROOT@
@@ -271,11 +265,21 @@ SUBDIR_TUI_CFLAGS= \
 SUBDIR_PYTHON_OBS = \
 	python.o \
 	python-cmd.o \
+	python-frame.o \
+	python-function.o \
+	python-objfile.o \
+	python-prettyprint.o \
+	python-type.o \
 	python-utils.o \
 	python-value.o
 SUBDIR_PYTHON_SRCS = \
 	python/python.c \
 	python/python-cmd.c \
+	python/python-frame.c \
+	python/python-function.c \
+	python/python-objfile.c \
+	python/python-prettyprint.c \
+	python/python-type.c \
 	python/python-utils.c \
 	python/python-value.c
 SUBDIR_PYTHON_DEPS =
@@ -417,7 +421,7 @@ INSTALLED_LIBS=-lbfd -lreadline -lopcodes -liberty -ldecnumber \
 	-lintl -liberty $(LIBGNU)
 CLIBS = $(SIM) $(READLINE) $(OPCODES) $(BFD) $(INTL) $(LIBIBERTY) $(LIBDECNUMBER) \
 	$(XM_CLIBS) $(NAT_CLIBS) $(GDBTKLIBS) @LIBS@ \
-	$(LIBICONV) $(LIBEXPAT) \
+	$(LIBEXPAT) \
 	$(LIBIBERTY) $(WIN32LIBS) $(LIBGNU)
 CDEPS = $(XM_CDEPS) $(NAT_CDEPS) $(SIM) $(BFD) $(READLINE_DEPS) \
 	$(OPCODES) $(INTL_DEPS) $(LIBIBERTY) $(CONFIG_DEPS) $(LIBGNU)
@@ -462,8 +466,9 @@ TARGET_OBS = @TARGET_OBS@
 ALL_64_TARGET_OBS = \
 	alphabsd-tdep.o alphafbsd-tdep.o alpha-linux-tdep.o alpha-mdebug-tdep.o \
 	alphanbsd-tdep.o alphaobsd-tdep.o alpha-osf1-tdep.o alpha-tdep.o \
-	amd64fbsd-tdep.o amd64-dicos-tdep.o amd64-linux-tdep.o amd64nbsd-tdep.o \
-	amd64obsd-tdep.o amd64-sol2-tdep.o amd64-tdep.o \
+	amd64fbsd-tdep.o amd64-darwin-tdep.o amd64-dicos-tdep.o \
+	amd64-linux-tdep.o amd64nbsd-tdep.o \
+	amd64obsd-tdep.o amd64-sol2-tdep.o amd64-tdep.o amd64-windows-tdep.o \
 	ia64-linux-tdep.o ia64-tdep.o \
 	mips64obsd-tdep.o \
 	sparc64fbsd-tdep.o sparc64-linux-tdep.o sparc64nbsd-tdep.o \
@@ -483,9 +488,10 @@ ALL_TARGET_OBS = \
 	i386bsd-tdep.o i386-cygwin-tdep.o i386fbsd-tdep.o i386gnu-tdep.o \
 	i386-linux-tdep.o i386nbsd-tdep.o i386-nto-tdep.o i386obsd-tdep.o \
 	i386-sol2-tdep.o i386-tdep.o i387-tdep.o \
-	i386-dicos-tdep.o \
+	i386-dicos-tdep.o i386-darwin-tdep.o \
 	iq2000-tdep.o \
 	linux-tdep.o \
+	lm32-tdep.o \
 	m32c-tdep.o \
 	m32r-linux-tdep.o m32r-tdep.o \
 	m68hc11-tdep.o \
@@ -495,6 +501,7 @@ ALL_TARGET_OBS = \
 	mips-irix-tdep.o mips-linux-tdep.o \
 	mipsnbsd-tdep.o mips-tdep.o \
 	mn10300-linux-tdep.o mn10300-tdep.o \
+	moxie-tdep.o \
 	mt-tdep.o \
 	nto-tdep.o \
 	ppc-linux-tdep.o ppcnbsd-tdep.o ppcobsd-tdep.o ppc-sysv-tdep.o \
@@ -514,14 +521,15 @@ ALL_TARGET_OBS = \
 	nbsd-tdep.o obsd-tdep.o \
 	sol2-tdep.o \
 	solib.o solib-frv.o solib-irix.o solib-svr4.o solib-target.o \
-	solib-som.o solib-pa64.o \
+	solib-som.o solib-pa64.o solib-darwin.o \
 	dbug-rom.o dink32-rom.o ppcbug-rom.o m32r-rom.o dsrec.o monitor.o \
 	remote-m32r-sdi.o \
 	xcoffread.o \
 	prologue-value.o \
 	symfile-mem.o \
 	corelow.o \
-	windows-tdep.o
+	windows-tdep.o \
+	linux-record.o
 
 # Host-dependent makefile fragment comes in here.
 @host_makefile_frag@
@@ -531,6 +539,9 @@ FLAGS_TO_PASS = \
 	"prefix=$(prefix)" \
 	"exec_prefix=$(exec_prefix)" \
 	"infodir=$(infodir)" \
+	"datarootdir=$(datarootdir)" \
+	"docdir=$(docdir)" \
+	"htmldir=$(htmldir)" \
 	"pdfdir=$(pdfdir)" \
 	"libdir=$(libdir)" \
 	"mandir=$(mandir)" \
@@ -610,7 +621,8 @@ TARGET_FLAGS_TO_PASS = \
 	"MAKEINFO=$(MAKEINFO)" \
 	"MAKEHTML=$(MAKEHTML)" \
 	"RUNTEST=$(RUNTEST)" \
-	"RUNTESTFLAGS=$(RUNTESTFLAGS)"
+	"RUNTESTFLAGS=$(RUNTESTFLAGS)" \
+	"FORCE_PARALLEL=$(FORCE_PARALLEL)"
 
 # All source files that go into linking GDB.
 # Links made at configuration time should not be specified here, since
@@ -636,6 +648,7 @@ SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c ada-tasks.c \
 	inf-loop.c \
 	infcall.c \
 	infcmd.c inflow.c infrun.c \
+	inline-frame.c \
 	interps.c \
 	jv-exp.y jv-lang.c jv-valprint.c jv-typeprint.c \
 	language.c linespec.c \
@@ -663,7 +676,8 @@ SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c ada-tasks.c \
 	valarith.c valops.c valprint.c value.c varobj.c vec.c \
 	wrapper.c \
 	xml-tdesc.c xml-support.c \
-	inferior.c
+	inferior.c gdb_usleep.c \
+	record.c
 
 LINTFILES = $(SFILES) $(YYFILES) $(CONFIG_SRCS) init.c
 
@@ -725,15 +739,14 @@ gdb_locale.h gdb_dirent.h arch-utils.h trad-frame.h gnu-nat.h \
 language.h nbsd-tdep.h wrapper.h solib-svr4.h \
 macroexp.h ui-file.h regcache.h gdb_string.h tracepoint.h i386-tdep.h \
 inf-child.h p-lang.h event-top.h gdbtypes.h scm-tags.h user-regs.h \
-regformats/regdef.h config/alpha/nm-osf3.h config/i386/nm-cygwin.h \
-config/i386/nm-linux64.h config/i386/nm-i386gnu.h \
+regformats/regdef.h config/alpha/nm-osf3.h  config/i386/nm-i386gnu.h \
 config/i386/nm-fbsd.h config/i386/nm-i386sol2.h config/i386/nm-linux.h \
-config/i386/nm-i386.h config/i386/nm-go32.h config/nm-nto.h \
-config/sparc/nm-sol2.h config/nm-linux.h config/mips/nm-irix5.h	\
+config/nm-nto.h config/sparc/nm-sol2.h config/nm-linux.h \
 config/rs6000/nm-rs6000.h top.h bsd-kvm.h gdb-stabs.h reggroups.h \
 annotate.h sim-regno.h dictionary.h dfp.h main.h frame-unwind.h	\
 remote-fileio.h i386-linux-tdep.h vax-tdep.h objc-lang.h \
-sentinel-frame.h bcache.h symfile.h windows-tdep.h linux-tdep.h
+sentinel-frame.h bcache.h symfile.h windows-tdep.h linux-tdep.h \
+gdb_usleep.h
 
 # Header files that already have srcdir in them, or which are in objdir.
 
@@ -806,6 +819,7 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 	user-regs.o \
 	frame.o frame-unwind.o doublest.o \
 	frame-base.o \
+	inline-frame.o \
 	gnu-v2-abi.o gnu-v3-abi.o cp-abi.o cp-support.o \
 	cp-namespace.o \
 	reggroups.o regset.o \
@@ -814,7 +828,7 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 	solib.o solib-null.o \
 	prologue-value.o memory-map.o xml-support.o \
 	target-descriptions.o target-memory.o xml-tdesc.o xml-builtin.o \
-	inferior.o osdata.o
+	inferior.o osdata.o gdb_usleep.o record.o
 
 TSOBS = inflow.o
 
@@ -871,7 +885,8 @@ check: force
 # will run 3 concurrent sessions of check, eventually testing all 10
 # combinations.  GNU make is required for the % pattern to work, as is
 # a shell that expands alternations within braces.  If GNU make is not
-# used, this rule will harmlessly fail to match.
+# used, this rule will harmlessly fail to match.  Used FORCE_PARALLEL to
+# prevent serialized checking due to the passed RUNTESTFLAGS.
 check//%: force
 	@if [ -f testsuite/config.status ]; then \
 	  rootme=`pwd`; export rootme; \
@@ -891,6 +906,7 @@ check//%: force
 	  else :; fi && cd $$testdir && \
 	  $(MAKE) $(TARGET_FLAGS_TO_PASS) \
 	    RUNTESTFLAGS="--target_board=$$variant $(RUNTESTFLAGS)" \
+	    FORCE_PARALLEL=$(if $(FORCE_PARALLEL),1,$(if $(RUNTESTFLAGS),,1)) \
 	    "$$target"; \
 	else true; fi
 
@@ -1105,9 +1121,10 @@ gdb1$(EXEEXT): gdb$(EXEEXT)
 # TAGS depends on all the files that go into it so you can rebuild TAGS
 # with `make TAGS' and not have to say `rm TAGS' first.
 
+GDB_NM_FILE = @GDB_NM_FILE@
 TAGS: $(DEPFILES) $(TAGFILES_NO_SRCDIR) $(TAGFILES_WITH_SRCDIR)
 	@echo Making TAGS
-	@etags $(srcdir)/$(NAT_FILE) \
+	@etags $(srcdir)/$(GDB_NM_FILE) \
 	`(for i in $(DEPFILES) $(TAGFILES_NO_SRCDIR); do \
 		echo $(srcdir)/$$i ; \
 	done ; for i in $(TAGFILES_WITH_SRCDIR); do \
@@ -1274,6 +1291,7 @@ ALLDEPFILES = \
 	amd64bsd-nat.c amd64fbsd-nat.c amd64fbsd-tdep.c \
 	amd64nbsd-nat.c amd64nbsd-tdep.c \
 	amd64obsd-nat.c amd64obsd-tdep.c \
+	amd64-darwin-tdep.c \
 	amd64-dicos-tdep.c \
 	amd64-linux-nat.c amd64-linux-tdep.c \
 	amd64-sol2-tdep.c \
@@ -1282,7 +1300,7 @@ ALLDEPFILES = \
 	avr-tdep.c \
 	bsd-uthread.c bsd-kvm.c \
 	core-regset.c corelow.c \
-	dcache.c dicos-tdep.c \
+	dcache.c dicos-tdep.c darwin-nat.c \
 	exec.c \
 	fbsd-nat.c \
 	fork-child.c \
@@ -1298,6 +1316,7 @@ ALLDEPFILES = \
 	i386bsd-nat.c i386bsd-tdep.c i386fbsd-nat.c i386fbsd-tdep.c \
 	i386nbsd-nat.c i386nbsd-tdep.c i386obsd-nat.c i386obsd-tdep.c \
 	i387-tdep.c \
+	i386-darwin-tdep.c i386-darwin-nat.c \
 	i386-dicos-tdep.c \
 	i386-linux-tdep.c i386-nat.c \
 	i386-sol2-nat.c i386-sol2-tdep.c \
@@ -1308,6 +1327,8 @@ ALLDEPFILES = \
 	libunwind-frame.c \
 	linux-fork.c \
 	linux-tdep.c \
+	linux-record.c \
+	lm32-tdep.c \
 	m68hc11-tdep.c \
 	m32r-tdep.c \
 	m32r-linux-nat.c m32r-linux-tdep.c \
@@ -1340,11 +1361,10 @@ ALLDEPFILES = \
 	sh-tdep.c sh64-tdep.c shnbsd-tdep.c shnbsd-nat.c \
 	sol2-tdep.c \
 	solib-irix.c solib-svr4.c solib-sunos.c \
-	sparc-linux-nat.c \
-	sparc-linux-tdep.c sparc-nat.c sparc-sol2-nat.c sparc-sol2-tdep.c \
-	sparc-tdep.c sparc-sol2-nat.c sparc-sol2-tdep.c sparc64-linux-nat.c \
-	sparc64-linux-tdep.c sparc64-nat.c sparc64-sol2-tdep.c \
-	sparc64-tdep.c sparc64fbsd-nat.c sparc64fbsd-tdep.c \
+	sparc-linux-nat.c sparc-linux-tdep.c \
+	sparc-sol2-nat.c sparc-sol2-tdep.c sparc64-sol2-tdep.c \
+	sparc-nat.c sparc-tdep.c sparc64-linux-nat.c sparc64-linux-tdep.c \
+	sparc64-nat.c sparc64-tdep.c sparc64fbsd-nat.c sparc64fbsd-tdep.c \
 	sparc64nbsd-nat.c sparc64nbsd-tdep.c sparc64obsd-tdep.c \
 	sparcnbsd-nat.c sparcnbsd-tdep.c sparcobsd-tdep.c \
 	spu-linux-nat.c spu-tdep.c \
@@ -1847,6 +1867,26 @@ python.o: $(srcdir)/python/python.c
 
 python-cmd.o: $(srcdir)/python/python-cmd.c
 	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-cmd.c
+	$(POSTCOMPILE)
+
+python-frame.o: $(srcdir)/python/python-frame.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-frame.c
+	$(POSTCOMPILE)
+
+python-function.o: $(srcdir)/python/python-function.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-function.c
+	$(POSTCOMPILE)
+
+python-objfile.o: $(srcdir)/python/python-objfile.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-objfile.c
+	$(POSTCOMPILE)
+
+python-prettyprint.o: $(srcdir)/python/python-prettyprint.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-prettyprint.c
+	$(POSTCOMPILE)
+
+python-type.o: $(srcdir)/python/python-type.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-type.c
 	$(POSTCOMPILE)
 
 python-utils.o: $(srcdir)/python/python-utils.c

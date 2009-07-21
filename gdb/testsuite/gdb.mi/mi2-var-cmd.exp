@@ -30,7 +30,7 @@ if [mi_gdb_start] {
 
 set testfile "var-cmd"
 set srcfile ${testfile}.c
-set binfile ${objdir}/${subdir}/${testfile}
+set binfile ${objdir}/${subdir}/mi2-var-cmd
 if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug additional_flags=-DFAKEARGV}] != "" } {
     untested mi2-var-cmd.exp
     return -1
@@ -522,6 +522,10 @@ mi_next "return from incr_a to do_special_tests"
 mi_gdb_test "-var-update selected_a" \
 	"\\^done,changelist=\\\[\{name=\"selected_a\",in_scope=\"true\",type_changed=\"true\",new_type=\"int\",new_num_children=\"0\"\}\\\]" \
 	"update selected_a in do_special_tests"
+
+mi_gdb_test "-file-exec-and-symbols ${binfile}" "\\^done" \
+	    "floating varobj invalidation"
+
 
 mi_gdb_exit
 return 0

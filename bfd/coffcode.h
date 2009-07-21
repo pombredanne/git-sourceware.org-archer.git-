@@ -153,6 +153,14 @@ SUBSUBSECTION
 	points to a function that allows the value of the flag to be altered
 	at runtime, on formats that support long section names at all; on
 	other formats it points to a stub that returns an error indication.
+	
+	With input BFDs, the flag is set according to whether any long section
+	names are detected while reading the section headers.  For a completely
+	new BFD, the flag is set to the default for the target format.  This
+	information can be used by a client of the BFD library when deciding
+	what output format to generate, and means that a BFD that is opened
+	for read and subsequently converted to a writeable BFD and modified
+	in-place will retain whatever format it had on input.
 
 	If @code{COFF_LONG_SECTION_NAMES} is simply defined (blank), or is
 	defined to the value "1", then long section names are enabled by
@@ -363,6 +371,7 @@ CODE_FRAGMENT
 
 #define DOT_DEBUG	".debug"
 #define GNU_LINKONCE_WI ".gnu.linkonce.wi."
+#define DOT_RELOC	".reloc"
 
 #if defined (COFF_LONG_SECTION_NAMES)
 /* Needed to expand the inputs to BLANKOR1TOODD.  */
@@ -637,7 +646,7 @@ sec_to_styp_flags (const char *sec_name, flagword sec_flags)
   /* FIXME: There is no gas syntax to specify the debug section flag.  */
   if (CONST_STRNEQ (sec_name, DOT_DEBUG)
       || CONST_STRNEQ (sec_name, GNU_LINKONCE_WI))
-    sec_flags = SEC_DEBUGGING;
+    sec_flags = SEC_DEBUGGING | SEC_READONLY;
 
   /* skip LOAD */
   /* READONLY later */
@@ -666,19 +675,14 @@ sec_to_styp_flags (const char *sec_name, flagword sec_flags)
   /* skip LINK_DUPLICATES */
   /* skip LINKER_CREATED */
 
-  if (sec_flags & (SEC_ALLOC | SEC_LOAD))
-    {
-      /* For now, the read/write bits are mapped onto SEC_READONLY, even
-	 though the semantics don't quite match.  The bits from the input
-	 are retained in pei_section_data(abfd, section)->pe_flags.  */
-      styp_flags |= IMAGE_SCN_MEM_READ;       /* Always readable.  */
-      if ((sec_flags & SEC_READONLY) == 0)
-	styp_flags |= IMAGE_SCN_MEM_WRITE;    /* Invert READONLY for write.  */
-      if (sec_flags & SEC_CODE)
-	styp_flags |= IMAGE_SCN_MEM_EXECUTE;  /* CODE->EXECUTE.  */
-      if (sec_flags & SEC_COFF_SHARED)
-	styp_flags |= IMAGE_SCN_MEM_SHARED;   /* Shared remains meaningful.  */
-    }
+  if ((sec_flags & SEC_COFF_NOREAD) == 0)
+    styp_flags |= IMAGE_SCN_MEM_READ;     /* Invert NOREAD for read.  */
+  if ((sec_flags & SEC_READONLY) == 0)
+    styp_flags |= IMAGE_SCN_MEM_WRITE;    /* Invert READONLY for write.  */
+  if (sec_flags & SEC_CODE)
+    styp_flags |= IMAGE_SCN_MEM_EXECUTE;  /* CODE->EXECUTE.  */
+  if (sec_flags & SEC_COFF_SHARED)
+    styp_flags |= IMAGE_SCN_MEM_SHARED;   /* Shared remains meaningful.  */
 
   return styp_flags;
 }
@@ -941,7 +945,8 @@ handle_COMDAT (bfd * abfd,
 		   but there's some checking we can do to be
 		   sure.  */
 
-		if (! (isym.n_sclass == C_STAT
+		if (! ((isym.n_sclass == C_STAT
+			|| isym.n_sclass == C_EXT)
 		       && isym.n_type == T_NULL
 		       && isym.n_value == 0))
 		  abort ();
@@ -951,7 +956,7 @@ handle_COMDAT (bfd * abfd,
 		   names like .text$foo__Fv (in the case of a
 		   function).  See comment above for more.  */
 
-		if (strcmp (name, symname) != 0)
+		if (isym.n_sclass == C_STAT && strcmp (name, symname) != 0)
 		  _bfd_error_handler (_("%B: warning: COMDAT symbol '%s' does not match section name '%s'"),
 				      abfd, symname, name);
 
@@ -1117,6 +1122,10 @@ styp_to_sec_flags (bfd *abfd,
   /* Assume read only unless IMAGE_SCN_MEM_WRITE is specified.  */
   sec_flags = SEC_READONLY;
 
+  /* If section disallows read, then set the NOREAD flag. */
+  if ((styp_flags & IMAGE_SCN_MEM_READ) == 0)
+    sec_flags |= SEC_COFF_NOREAD;
+
   /* Process each flag bit in styp_flags in turn.  */
   while (styp_flags)
     {
@@ -1149,7 +1158,7 @@ styp_to_sec_flags (bfd *abfd,
 	  break;
 #endif
 	case IMAGE_SCN_MEM_READ:
-	  /* Ignored, assume it always to be true.  */
+	  sec_flags &= ~SEC_COFF_NOREAD;
 	  break;
 	case IMAGE_SCN_TYPE_NO_PAD:
 	  /* Skip.  */
@@ -1552,6 +1561,10 @@ Special entry points for gdb to swap in coff symbol table parts:
 .#define bfd_coff_print_pdata(a,p) \
 .  ((coff_backend_info (a)->_bfd_coff_print_pdata) (a, p))
 .
+.{* Macro: Returns true if the bfd is a PE executable as opposed to a
+.   PE object file.  *}
+.#define bfd_pei_p(abfd) \
+.  (CONST_STRNEQ ((abfd)->xvec->name, "pei-"))
 */
 
 /* See whether the magic number matches.  */
@@ -2416,7 +2429,7 @@ symname_in_debug_hook (bfd * abfd ATTRIBUTE_UNUSED, struct internal_syment *sym)
 #define FORCE_SYMNAMES_IN_STRINGS
 #endif
 
-/* Handle the csect auxent of a C_EXT or C_HIDEXT symbol.  */
+/* Handle the csect auxent of a C_EXT, C_AIX_WEAKEXT or C_HIDEXT symbol.  */
 
 static bfd_boolean
 coff_pointerize_aux_hook (bfd *abfd ATTRIBUTE_UNUSED,
@@ -2427,7 +2440,7 @@ coff_pointerize_aux_hook (bfd *abfd ATTRIBUTE_UNUSED,
 {
   int class = symbol->u.syment.n_sclass;
 
-  if ((class == C_EXT || class == C_HIDEXT)
+  if (CSECT_SYM_P (class)
       && indaux + 1 == symbol->u.syment.n_numaux)
     {
       if (SMTYP_SMTYP (aux->u.auxent.x_csect.x_smtyp) == XTY_LD)
@@ -2485,8 +2498,7 @@ coff_print_aux (bfd *abfd ATTRIBUTE_UNUSED,
 		unsigned int indaux ATTRIBUTE_UNUSED)
 {
 #ifdef RS6000COFF_C
-  if ((symbol->u.syment.n_sclass == C_EXT
-       || symbol->u.syment.n_sclass == C_HIDEXT)
+  if (CSECT_SYM_P (symbol->u.syment.n_sclass)
       && indaux + 1 == symbol->u.syment.n_numaux)
     {
       /* This is a csect entry.  */
@@ -3175,6 +3187,13 @@ coff_compute_section_file_positions (bfd * abfd)
     int target_index;
     bfd_size_type amt;
 
+#ifdef COFF_PAGE_SIZE
+    /* Clear D_PAGED if section alignment is smaller than
+       COFF_PAGE_SIZE.  */
+   if (pe_data (abfd)->pe_opthdr.SectionAlignment < COFF_PAGE_SIZE)
+     abfd->flags &= ~D_PAGED;
+#endif
+
     count = 0;
     for (current = abfd->sections; current != NULL; current = current->next)
       ++count;
@@ -3607,7 +3626,7 @@ coff_write_object_contents (bfd * abfd)
       bfd_boolean is_reloc_section = FALSE;
 
 #ifdef COFF_IMAGE_WITH_PE
-      if (strcmp (current->name, ".reloc") == 0)
+      if (strcmp (current->name, DOT_RELOC) == 0)
 	{
 	  is_reloc_section = TRUE;
 	  hasrelocs = TRUE;
@@ -5591,6 +5610,10 @@ static bfd_coff_backend_data ticoff1_swap_table =
 #ifndef coff_section_already_linked
 #define coff_section_already_linked \
   _bfd_generic_section_already_linked
+#endif
+
+#ifndef coff_bfd_define_common_symbol
+#define coff_bfd_define_common_symbol	    bfd_generic_define_common_symbol
 #endif
 
 #define CREATE_BIG_COFF_TARGET_VEC(VAR, NAME, EXTRA_O_FLAGS, EXTRA_S_FLAGS, UNDER, ALTERNATIVE, SWAP_TABLE)	\

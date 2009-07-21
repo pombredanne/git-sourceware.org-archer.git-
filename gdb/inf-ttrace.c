@@ -28,6 +28,7 @@
 #include "gdbcore.h"
 #include "gdbthread.h"
 #include "inferior.h"
+#include "terminal.h"
 #include "target.h"
 
 #include "gdb_assert.h"
@@ -411,25 +412,13 @@ inf_ttrace_follow_fork (struct target_ops *ops, int follow_child)
   pid_t pid, fpid;
   lwpid_t lwpid, flwpid;
   ttstate_t tts;
-  struct thread_info *last_tp = NULL;
-  struct breakpoint *step_resume_breakpoint = NULL;
-  CORE_ADDR step_range_start = 0, step_range_end = 0;
-  struct frame_id step_frame_id = null_frame_id;
+  struct thread_info *tp = inferior_thread ();
 
-  /* FIXME: kettenis/20050720: This stuff should really be passed as
-     an argument by our caller.  */
-  {
-    ptid_t ptid;
-    struct target_waitstatus status;
+  gdb_assert (tp->pending_follow.kind == TARGET_WAITKIND_FORKED
+	      || tp->pending_follow.kind == TARGET_WAITKIND_VFORKED);
 
-    get_last_target_status (&ptid, &status);
-    gdb_assert (status.kind == TARGET_WAITKIND_FORKED
-		|| status.kind == TARGET_WAITKIND_VFORKED);
-
-    pid = ptid_get_pid (ptid);
-    lwpid = ptid_get_lwp (ptid);
-    last_tp = find_thread_pid (ptid);
-  }
+  pid = ptid_get_pid (inferior_ptid);
+  lwpid = ptid_get_lwp (inferior_ptid);
 
   /* Get all important details that core GDB doesn't (and shouldn't)
      know about.  */
@@ -457,20 +446,14 @@ inf_ttrace_follow_fork (struct target_ops *ops, int follow_child)
   if (follow_child)
     {
       struct inferior *inf;
+      struct inferior *parent_inf;
 
-      /* Copy user stepping state to the new inferior thread.  */
-      step_resume_breakpoint = last_tp->step_resume_breakpoint;
-      step_range_start = last_tp->step_range_start;
-      step_range_end = last_tp->step_range_end;
-      step_frame_id = last_tp->step_frame_id;
-
-      /* Otherwise, deleting the parent would get rid of this
-	 breakpoint.  */
-      last_tp->step_resume_breakpoint = NULL;
+      parent_inf = find_inferior_pid (pid);
 
       inferior_ptid = ptid_build (fpid, flwpid, 0);
       inf = add_inferior (fpid);
-      inf->attach_flag = find_inferior_pid (pid)->attach_flag;
+      inf->attach_flag = parent_inf->attach_flag;
+      copy_terminal_info (inf, parent_inf);
       detach_breakpoints (pid);
 
       target_terminal_ours ();
@@ -548,14 +531,6 @@ Detaching after fork from child process %ld.\n"), (long)fpid);
 	xmalloc (sizeof (struct inf_ttrace_private_thread_info));
       memset (ti->private, 0,
 	      sizeof (struct inf_ttrace_private_thread_info));
-
-      ti->step_resume_breakpoint = step_resume_breakpoint;
-      ti->step_range_start = step_range_start;
-      ti->step_range_end = step_range_end;
-      ti->step_frame_id = step_frame_id;
-
-      /* Reset breakpoints in the child as appropriate.  */
-      follow_inferior_reset_breakpoints ();
     }
 
   return 0;
@@ -814,7 +789,7 @@ inf_ttrace_detach (struct target_ops *ops, char *args, int from_tty)
 }
 
 static void
-inf_ttrace_kill (void)
+inf_ttrace_kill (struct target_ops *ops)
 {
   pid_t pid = ptid_get_pid (inferior_ptid);
 
@@ -909,7 +884,7 @@ inf_ttrace_resume (struct target_ops *ops,
   if (resume_all)
     ptid = inferior_ptid;
 
-  info = find_thread_pid (ptid);
+  info = find_thread_ptid (ptid);
   inf_ttrace_resume_lwp (info, request, sig);
 
   if (resume_all)
@@ -919,7 +894,7 @@ inf_ttrace_resume (struct target_ops *ops,
 
 static ptid_t
 inf_ttrace_wait (struct target_ops *ops,
-		 ptid_t ptid, struct target_waitstatus *ourstatus)
+		 ptid_t ptid, struct target_waitstatus *ourstatus, int options)
 {
   pid_t pid = ptid_get_pid (ptid);
   lwpid_t lwpid = ptid_get_lwp (ptid);
@@ -982,7 +957,7 @@ inf_ttrace_wait (struct target_ops *ops,
 
       /* We haven't set the private member on the main thread yet.  Do
 	 it now.  */
-      ti = find_thread_pid (inferior_ptid);
+      ti = find_thread_ptid (inferior_ptid);
       gdb_assert (ti != NULL && ti->private == NULL);
       ti->private =
 	xmalloc (sizeof (struct inf_ttrace_private_thread_info));
@@ -1083,7 +1058,7 @@ inf_ttrace_wait (struct target_ops *ops,
     case TTEVT_LWP_EXIT:
       if (print_thread_events)
 	printf_unfiltered (_("[%s exited]\n"), target_pid_to_str (ptid));
-      ti = find_thread_pid (ptid);
+      ti = find_thread_ptid (ptid);
       gdb_assert (ti != NULL);
       ((struct inf_ttrace_private_thread_info *)ti->private)->dying = 1;
       inf_ttrace_num_lwps--;
@@ -1100,7 +1075,7 @@ inf_ttrace_wait (struct target_ops *ops,
       if (print_thread_events)
 	printf_unfiltered(_("[%s has been terminated]\n"),
 			  target_pid_to_str (ptid));
-      ti = find_thread_pid (ptid);
+      ti = find_thread_ptid (ptid);
       gdb_assert (ti != NULL);
       ((struct inf_ttrace_private_thread_info *)ti->private)->dying = 1;
       inf_ttrace_num_lwps--;

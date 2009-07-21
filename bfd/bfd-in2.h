@@ -73,6 +73,8 @@ extern "C" {
 #define LITSTRCPY(DEST,STR2) memcpy ((DEST), (STR2), sizeof (STR2))
 
 
+#define BFD_SUPPORTS_PLUGINS @supports_plugins@
+
 /* The word size used by BFD on the host.  This may be 64 with a 32
    bit target if the host is 64 bit, or if other 64 bit targets have
    been selected with --enable-targets, or if --enable-64-bit-bfd.  */
@@ -772,6 +774,10 @@ extern bfd_boolean bfd_get_file_window
 
 /* XCOFF support routines for the linker.  */
 
+extern bfd_boolean bfd_xcoff_split_import_path
+  (bfd *, const char *, const char **, const char **);
+extern bfd_boolean bfd_xcoff_set_archive_import_path
+  (struct bfd_link_info *, bfd *, const char *);
 extern bfd_boolean bfd_xcoff_link_record_set
   (bfd *, struct bfd_link_info *, struct bfd_link_hash_entry *, bfd_size_type);
 extern bfd_boolean bfd_xcoff_import_symbol
@@ -786,7 +792,7 @@ extern bfd_boolean bfd_xcoff_record_link_assignment
 extern bfd_boolean bfd_xcoff_size_dynamic_sections
   (bfd *, struct bfd_link_info *, const char *, const char *,
    unsigned long, unsigned long, unsigned long, bfd_boolean,
-   int, bfd_boolean, bfd_boolean, struct bfd_section **, bfd_boolean);
+   int, bfd_boolean, unsigned int, struct bfd_section **, bfd_boolean);
 extern bfd_boolean bfd_xcoff_link_generate_rtinit
   (bfd *, const char *, const char *, bfd_boolean);
 
@@ -828,6 +834,9 @@ extern void bfd_elf32_arm_init_maps
 extern void bfd_elf32_arm_set_vfp11_fix
   (bfd *, struct bfd_link_info *);
 
+extern void bfd_elf32_arm_set_cortex_a8_fix
+  (bfd *, struct bfd_link_info *);
+
 extern bfd_boolean bfd_elf32_arm_vfp11_erratum_scan
   (bfd *, struct bfd_link_info *);
 
@@ -863,7 +872,7 @@ extern bfd_boolean bfd_elf32_arm_process_before_allocation
 
 void bfd_elf32_arm_set_target_relocs
   (bfd *, struct bfd_link_info *, int, char *, int, int, bfd_arm_vfp11_fix,
-   int, int, int);
+   int, int, int, int);
 
 extern bfd_boolean bfd_elf32_arm_get_bfd_for_interworking
   (bfd *, struct bfd_link_info *);
@@ -901,7 +910,11 @@ extern bfd_boolean elf32_arm_size_stubs
    struct bfd_section * (*) (const char *, struct bfd_section *), void (*) (void));
 extern bfd_boolean elf32_arm_build_stubs
   (struct bfd_link_info *);
-  
+
+/* ARM unwind section editing support.  */
+extern bfd_boolean elf32_arm_fix_exidx_coverage
+  (struct bfd_section **, unsigned int, struct bfd_link_info *);
+
 /* TI COFF load page support.  */
 extern void bfd_ticoff_set_section_load_page
   (struct bfd_section *, int);
@@ -1109,6 +1122,9 @@ long bfd_get_mtime (bfd *abfd);
 
 file_ptr bfd_get_size (bfd *abfd);
 
+void *bfd_mmap (bfd *abfd, void *addr, bfd_size_type len,
+    int prot, int flags, file_ptr offset);
+
 /* Extracted from bfdwin.c.  */
 /* Extracted from section.c.  */
 typedef struct bfd_section
@@ -1303,6 +1319,10 @@ typedef struct bfd_section
      references found to any symbol in the section.  This is for TI
      TMS320C54X only.  */
 #define SEC_TIC54X_CLINK 0x20000000
+
+  /* Indicate that section has the no read flag set. This happens
+     when memory read flag isn't set. */
+#define SEC_COFF_NOREAD 0x40000000
 
   /*  End of section flags.  */
 
@@ -1833,6 +1853,7 @@ enum bfd_architecture
 #define bfd_mach_h8300sx  6
 #define bfd_mach_h8300sxn 7
   bfd_arch_pdp11,     /* DEC PDP-11 */
+  bfd_arch_plugin,
   bfd_arch_powerpc,   /* PowerPC */
 #define bfd_mach_ppc           32
 #define bfd_mach_ppc64         64
@@ -1960,10 +1981,13 @@ enum bfd_architecture
 #define bfd_mach_frvtomcat     499     /* fr500 prototype */
 #define bfd_mach_fr500         500
 #define bfd_mach_fr550         550
+  bfd_arch_moxie,       /* The moxie processor */
+#define bfd_mach_moxie         1
   bfd_arch_mcore,
   bfd_arch_mep,
 #define bfd_mach_mep           1
 #define bfd_mach_mep_h1        0x6831
+#define bfd_mach_mep_c5        0x6335
   bfd_arch_ia64,      /* HP/Intel ia64 */
 #define bfd_mach_ia64_elf64    64
 #define bfd_mach_ia64_elf32    32
@@ -2715,6 +2739,10 @@ to compensate for the borrow when the low bits are added.  */
   BFD_RELOC_MIPS_JUMP_SLOT,
 
 
+/* Moxie ELF relocations.  */
+  BFD_RELOC_MOXIE_10_PCREL,
+
+
 /* Fujitsu Frv Relocations.  */
   BFD_RELOC_FRV_LABEL16,
   BFD_RELOC_FRV_LABEL24,
@@ -2819,6 +2847,7 @@ relaxation.  */
   BFD_RELOC_386_TLS_GOTDESC,
   BFD_RELOC_386_TLS_DESC_CALL,
   BFD_RELOC_386_TLS_DESC,
+  BFD_RELOC_386_IRELATIVE,
 
 /* x86-64/elf relocations  */
   BFD_RELOC_X86_64_GOT32,
@@ -2847,6 +2876,7 @@ relaxation.  */
   BFD_RELOC_X86_64_GOTPC32_TLSDESC,
   BFD_RELOC_X86_64_TLSDESC_CALL,
   BFD_RELOC_X86_64_TLSDESC,
+  BFD_RELOC_X86_64_IRELATIVE,
 
 /* ns32k relocations  */
   BFD_RELOC_NS32K_IMM_8,
@@ -4471,6 +4501,13 @@ BFD_RELOC_XTENSA_ASM_EXPAND.  */
   BFD_RELOC_LM32_GLOB_DAT,
   BFD_RELOC_LM32_JMP_SLOT,
   BFD_RELOC_LM32_RELATIVE,
+
+/* Difference between two section addreses.  Must be followed by a
+BFD_RELOC_MACH_O_PAIR.  */
+  BFD_RELOC_MACH_O_SECTDIFF,
+
+/* Mach-O generic relocations.  */
+  BFD_RELOC_MACH_O_PAIR,
   BFD_RELOC_UNUSED };
 typedef enum bfd_reloc_code_real bfd_reloc_code_real_type;
 reloc_howto_type *bfd_reloc_type_lookup
@@ -4596,6 +4633,12 @@ typedef struct bfd_symbol
 
   /* This symbol was created by bfd_get_synthetic_symtab.  */
 #define BSF_SYNTHETIC          (1 << 21)
+
+  /* This symbol is an indirect code object.  Unrelated to BSF_INDIRECT.
+     The dynamic linker will compute the value of this symbol by
+     calling the function that it points to.  BSF_FUNCTION must
+     also be also set.  */
+#define BSF_GNU_INDIRECT_FUNCTION (1 << 22)
 
   flagword flags;
 
@@ -4844,6 +4887,7 @@ struct bfd
       struct ieee_data_struct *ieee_data;
       struct ieee_ar_data_struct *ieee_ar_data;
       struct srec_data_struct *srec_data;
+      struct verilog_data_struct *verilog_data;
       struct ihex_data_struct *ihex_data;
       struct tekhex_data_struct *tekhex_data;
       struct elf_obj_tdata *elf_obj_data;
@@ -4864,6 +4908,7 @@ struct bfd
       struct netbsd_core_struct *netbsd_core_data;
       struct mach_o_data_struct *mach_o_data;
       struct mach_o_fat_data_struct *mach_o_fat_data;
+      struct plugin_data_struct *plugin_data;
       struct bfd_pef_data_struct *pef_data;
       struct bfd_pef_xlib_data_struct *pef_xlib_data;
       struct bfd_sym_data_struct *sym_data;
@@ -5165,6 +5210,7 @@ enum bfd_flavour
   bfd_target_oasys_flavour,
   bfd_target_tekhex_flavour,
   bfd_target_srec_flavour,
+  bfd_target_verilog_flavour,
   bfd_target_ihex_flavour,
   bfd_target_som_flavour,
   bfd_target_os9k_flavour,
@@ -5447,7 +5493,8 @@ typedef struct bfd_target
   NAME##_bfd_merge_sections, \
   NAME##_bfd_is_group_section, \
   NAME##_bfd_discard_group, \
-  NAME##_section_already_linked \
+  NAME##_section_already_linked, \
+  NAME##_bfd_define_common_symbol
 
   int         (*_bfd_sizeof_headers) (bfd *, struct bfd_link_info *);
   bfd_byte *  (*_bfd_get_relocated_section_contents)
@@ -5494,6 +5541,10 @@ typedef struct bfd_target
      final link.  */
   void (*_section_already_linked) (bfd *, struct bfd_section *,
                                    struct bfd_link_info *);
+
+  /* Define a common symbol.  */
+  bfd_boolean (*_bfd_define_common_symbol) (bfd *, struct bfd_link_info *,
+                                            struct bfd_link_hash_entry *);
 
   /* Routines to handle dynamic symbols and relocs.  */
 #define BFD_JUMP_TABLE_DYNAMIC(NAME) \
@@ -5558,6 +5609,17 @@ void bfd_section_already_linked (bfd *abfd, asection *sec,
 
 #define bfd_section_already_linked(abfd, sec, info) \
        BFD_SEND (abfd, _section_already_linked, (abfd, sec, info))
+
+bfd_boolean bfd_generic_define_common_symbol
+   (bfd *output_bfd, struct bfd_link_info *info,
+    struct bfd_link_hash_entry *h);
+
+#define bfd_define_common_symbol(output_bfd, info, h) \
+       BFD_SEND (output_bfd, _bfd_define_common_symbol, (output_bfd, info, h))
+
+struct bfd_elf_version_tree * bfd_find_version_for_sym
+   (struct bfd_elf_version_tree *verdefs,
+    const char *sym_name, bfd_boolean *hide);
 
 /* Extracted from simple.c.  */
 bfd_byte *bfd_simple_get_relocated_section_contents

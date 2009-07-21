@@ -1,3 +1,92 @@
+2009-07-10  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2.h: Move to `..'.
+
+2009-07-10  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* dwarf2.h: Just include ../dwarf2.h.
+
+2009-07-10  Alan Modra  <amodra@bigpond.net.au>
+
+	* ppc.h (R_PPC_IRELATIVE): Add.
+	(R_PPC_RELAX32, R_PPC_RELAX32PC,
+	R_PPC_RELAX32_PLT, R_PPC_RELAX32PC_PLT): Renumber.
+	* ppc64.h (R_PPC64_IRELATIVE): Add.
+
+2009-07-03  Jakub Jelinek  <jakub@redhat.com>
+
+	* dwarf2.h (enum dwarf_location_atom): Add DW_OP_implicit_value
+	and DW_OP_stack_value.
+
+2009-06-22  Alan Modra  <amodra@bigpond.net.au>
+
+	* ppc.h (R_PPC_RELAX*): Define as enum.
+
+2009-06-11  Anthony Green  <green@moxielogic.org>
+
+	* moxie.h (R_MOXIE_PCREL10): New.
+
+2009-06-01  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/10205
+	* i386.h (R_386_IRELATIVE): New.
+	* x86-64.h (R_X86_64_IRELATIVE): Likewise.
+
+2009-05-27  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* common.h: Update comments for dynamic tag ranges.
+
+2009-04-30  DJ Delorie  <dj@redhat.com>
+
+	* mep.h (EF_MEP_COP_*): New.
+	(EF_MEP_ALL_FLAGS): Add them.
+
+2009-04-30  Nick Clifton  <nickc@redhat.com>
+
+	* common.h (STT_GNU_IFUNC): Define.
+
+2009-04-24  Cary Coutant  <ccoutant@google.com>
+
+	 * dwarf2.h (DW_LNE_set_discriminator): New enum value.
+
+2009-04-15  Anthony Green  <green@moxielogic.com>
+
+	* common.h (EM_MOXIE): Define.
+	* moxie.h: New file.
+
+2009-04-07  DJ Delorie  <dj@redhat.com>
+
+	* mep.h (EF_MEP_CPU_C5): New.
+
+2009-04-01  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* common.h (EM_INTEL178): Removed.
+	(EM_INTEL179): Likewise.
+	(EM_ETPU): New.
+	(EM_SLE9X): Likewise.
+	(EM_INTEL181): Likewise.
+	(EM_INTEL182): Likewise.
+
+2009-03-31  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* common.h (EM_INTEL178): New.
+	(EM_INTEL179): Likewise.
+	(EM_INTEL180): Likewise.
+
+2009-03-20  Mikolaj Zalewski  <mikolajz@google.com>
+
+	* common.h (SHT_GNU_INCREMENTAL_INPUTS): Define.
+
+2009-03-14  Mark Kettenis  <kettenis@gnu.org>
+
+	* common.h (NT_OPENBSD_PROCINFO, NT_OPENBSD_AUXV) 
+	(NT_OPENBSD_REGS, NT_OPENBSD_FPREGS, NT_OPENBSD_XFPREGS) 
+	(NT_OPENBSD_WCOOKIE): New defines.
+
+2009-03-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* common.h (AT_RANDOM): Define.
+
 2009-03-04  Alan Modra  <amodra@bigpond.net.au>
 
 	* ppc.h (R_PPC_TLSGD, R_PPC_TLSLD): Add new relocs.

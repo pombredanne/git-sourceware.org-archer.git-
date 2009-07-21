@@ -328,7 +328,7 @@ solib_target_free_so (struct so_list *so)
 
 static void
 solib_target_relocate_section_addresses (struct so_list *so,
-					 struct section_table *sec)
+					 struct target_section *sec)
 {
   int flags = bfd_get_section_flags (sec->bfd, sec->the_bfd_section);
   CORE_ADDR offset;
@@ -492,4 +492,5 @@ _initialize_solib_target (void)
     = solib_target_open_symbol_file_object;
   solib_target_so_ops.in_dynsym_resolve_code
     = solib_target_in_dynsym_resolve_code;
+  solib_target_so_ops.bfd_open = solib_bfd_open;
 }

@@ -1728,8 +1728,11 @@ bfd_section_from_shdr (bfd *abfd, unsigned int shindex)
 	   reject them, but, unfortunately, some people need to use
 	   them.  We scan through the section headers; if we find only
 	   one suitable symbol table, we clobber the sh_link to point
-	   to it.  I hope this doesn't break anything.  */
-	if (elf_elfsections (abfd)[hdr->sh_link]->sh_type != SHT_SYMTAB
+	   to it.  I hope this doesn't break anything.
+
+	   Don't do it on executable nor shared library.  */
+	if ((abfd->flags & (DYNAMIC | EXEC_P)) == 0
+	    && elf_elfsections (abfd)[hdr->sh_link]->sh_type != SHT_SYMTAB
 	    && elf_elfsections (abfd)[hdr->sh_link]->sh_type != SHT_DYNSYM)
 	  {
 	    unsigned int scan;
@@ -1764,8 +1767,10 @@ bfd_section_from_shdr (bfd *abfd, unsigned int shindex)
 	   represent such a section, so at least for now, we don't
 	   try.  We just present it as a normal section.  We also
 	   can't use it as a reloc section if it points to the null
-	   section, an invalid section, or another reloc section.  */
+	   section, an invalid section, another reloc section, or its
+	   sh_link points to the null section.  */
 	if (hdr->sh_link != elf_onesymtab (abfd)
+	    || hdr->sh_link == SHN_UNDEF
 	    || hdr->sh_info == SHN_UNDEF
 	    || hdr->sh_info >= num_sec
 	    || elf_elfsections (abfd)[hdr->sh_info]->sh_type == SHT_REL
@@ -1921,28 +1926,24 @@ bfd_section_from_shdr (bfd *abfd, unsigned int shindex)
   return TRUE;
 }
 
-/* Return the section for the local symbol specified by ABFD, R_SYMNDX.
-   Return SEC for sections that have no elf section, and NULL on error.  */
+/* Return the local symbol specified by ABFD, R_SYMNDX.  */
 
-asection *
-bfd_section_from_r_symndx (bfd *abfd,
-			   struct sym_sec_cache *cache,
-			   asection *sec,
-			   unsigned long r_symndx)
+Elf_Internal_Sym *
+bfd_sym_from_r_symndx (struct sym_cache *cache,
+		       bfd *abfd,
+		       unsigned long r_symndx)
 {
   unsigned int ent = r_symndx % LOCAL_SYM_CACHE_SIZE;
-  asection *s;
 
   if (cache->abfd != abfd || cache->indx[ent] != r_symndx)
     {
       Elf_Internal_Shdr *symtab_hdr;
       unsigned char esym[sizeof (Elf64_External_Sym)];
       Elf_External_Sym_Shndx eshndx;
-      Elf_Internal_Sym isym;
 
       symtab_hdr = &elf_tdata (abfd)->symtab_hdr;
       if (bfd_elf_get_elf_syms (abfd, symtab_hdr, 1, r_symndx,
-				&isym, esym, &eshndx) == NULL)
+				&cache->sym[ent], esym, &eshndx) == NULL)
 	return NULL;
 
       if (cache->abfd != abfd)
@@ -1951,14 +1952,9 @@ bfd_section_from_r_symndx (bfd *abfd,
 	  cache->abfd = abfd;
 	}
       cache->indx[ent] = r_symndx;
-      cache->shndx[ent] = isym.st_shndx;
     }
 
-  s = bfd_section_from_elf_index (abfd, cache->shndx[ent]);
-  if (s != NULL)
-    return s;
-
-  return sec;
+  return &cache->sym[ent];
 }
 
 /* Given an ELF section number, retrieve the corresponding BFD
@@ -2774,6 +2770,7 @@ assign_section_numbers (bfd *abfd, struct bfd_link_info *link_info)
   unsigned int section_number, secn;
   Elf_Internal_Shdr **i_shdrp;
   struct bfd_elf_section_data *d;
+  bfd_boolean need_symtab;
 
   section_number = 1;
 
@@ -2829,7 +2826,11 @@ assign_section_numbers (bfd *abfd, struct bfd_link_info *link_info)
   _bfd_elf_strtab_addref (elf_shstrtab (abfd), t->shstrtab_hdr.sh_name);
   elf_elfheader (abfd)->e_shstrndx = t->shstrtab_section;
 
-  if (bfd_get_symcount (abfd) > 0)
+  need_symtab = (bfd_get_symcount (abfd) > 0
+		|| (link_info == NULL
+		    && ((abfd->flags & (EXEC_P | DYNAMIC | HAS_RELOC))
+			== HAS_RELOC)));
+  if (need_symtab)
     {
       t->symtab_section = section_number++;
       _bfd_elf_strtab_addref (elf_shstrtab (abfd), t->symtab_hdr.sh_name);
@@ -2868,7 +2869,7 @@ assign_section_numbers (bfd *abfd, struct bfd_link_info *link_info)
   elf_elfsections (abfd) = i_shdrp;
 
   i_shdrp[t->shstrtab_section] = &t->shstrtab_hdr;
-  if (bfd_get_symcount (abfd) > 0)
+  if (need_symtab)
     {
       i_shdrp[t->symtab_section] = &t->symtab_hdr;
       if (elf_numsections (abfd) > (SHN_LORESERVE & 0xFFFF))
@@ -3261,6 +3262,7 @@ _bfd_elf_compute_section_file_positions (bfd *abfd,
   bfd_boolean failed;
   struct bfd_strtab_hash *strtab = NULL;
   Elf_Internal_Shdr *shstrtab_hdr;
+  bfd_boolean need_symtab;
 
   if (abfd->output_has_begun)
     return TRUE;
@@ -3285,7 +3287,11 @@ _bfd_elf_compute_section_file_positions (bfd *abfd,
     return FALSE;
 
   /* The backend linker builds symbol table information itself.  */
-  if (link_info == NULL && bfd_get_symcount (abfd) > 0)
+  need_symtab = (link_info == NULL
+		 && (bfd_get_symcount (abfd) > 0
+		     || ((abfd->flags & (EXEC_P | DYNAMIC | HAS_RELOC))
+			 == HAS_RELOC)));
+  if (need_symtab)
     {
       /* Non-zero if doing a relocatable link.  */
       int relocatable_p = ! (abfd->flags & (EXEC_P | DYNAMIC));
@@ -3316,7 +3322,7 @@ _bfd_elf_compute_section_file_positions (bfd *abfd,
   if (!assign_file_positions_except_relocs (abfd, link_info))
     return FALSE;
 
-  if (link_info == NULL && bfd_get_symcount (abfd) > 0)
+  if (need_symtab)
     {
       file_ptr off;
       Elf_Internal_Shdr *hdr;
@@ -4673,13 +4679,11 @@ assign_file_positions_for_non_load_sections (bfd *abfd,
 	      p->p_align = 1;
 	      p->p_flags = (lp->p_flags & ~PF_W);
 	    }
-	  else if (link_info != NULL)
+	  else
 	    {
 	      memset (p, 0, sizeof *p);
 	      p->p_type = PT_NULL;
 	    }
-	  else
-	    abort ();
 	}
       else if (m->count != 0)
 	{
@@ -5828,14 +5832,13 @@ copy_elf_program_header (bfd *ibfd, bfd *obfd)
       map->p_align_valid = 1;
       map->p_vaddr_offset = 0;
 
-      if (map->p_type == PT_GNU_RELRO
-	  && segment->p_filesz == segment->p_memsz)
+      if (map->p_type == PT_GNU_RELRO)
 	{
 	  /* The PT_GNU_RELRO segment may contain the first a few
 	     bytes in the .got.plt section even if the whole .got.plt
 	     section isn't in the PT_GNU_RELRO segment.  We won't
 	     change the size of the PT_GNU_RELRO segment.  */
-	  map->p_size = segment->p_filesz;
+	  map->p_size = segment->p_memsz;
 	  map->p_size_valid = 1;
 	}
 
@@ -6392,6 +6395,8 @@ Unable to find equivalent output section for symbol '%s' from section '%s'"),
 
       if ((flags & BSF_THREAD_LOCAL) != 0)
 	type = STT_TLS;
+      else if ((flags & BSF_GNU_INDIRECT_FUNCTION) != 0)
+	type = STT_GNU_IFUNC;
       else if ((flags & BSF_FUNCTION) != 0)
 	type = STT_FUNC;
       else if ((flags & BSF_OBJECT) != 0)
@@ -8101,6 +8106,70 @@ elfcore_grok_netbsd_note (bfd *abfd, Elf_Internal_Note *note)
 }
 
 static bfd_boolean
+elfcore_grok_openbsd_procinfo (bfd *abfd, Elf_Internal_Note *note)
+{
+  /* Signal number at offset 0x08. */
+  elf_tdata (abfd)->core_signal
+    = bfd_h_get_32 (abfd, (bfd_byte *) note->descdata + 0x08);
+
+  /* Process ID at offset 0x20. */
+  elf_tdata (abfd)->core_pid
+    = bfd_h_get_32 (abfd, (bfd_byte *) note->descdata + 0x20);
+
+  /* Command name at 0x48 (max 32 bytes, including nul). */
+  elf_tdata (abfd)->core_command
+    = _bfd_elfcore_strndup (abfd, note->descdata + 0x48, 31);
+
+  return TRUE;
+}
+
+static bfd_boolean
+elfcore_grok_openbsd_note (bfd *abfd, Elf_Internal_Note *note)
+{
+  if (note->type == NT_OPENBSD_PROCINFO)
+    return elfcore_grok_openbsd_procinfo (abfd, note);
+
+  if (note->type == NT_OPENBSD_REGS)
+    return elfcore_make_note_pseudosection (abfd, ".reg", note);
+
+  if (note->type == NT_OPENBSD_FPREGS)
+    return elfcore_make_note_pseudosection (abfd, ".reg2", note);
+
+  if (note->type == NT_OPENBSD_XFPREGS)
+    return elfcore_make_note_pseudosection (abfd, ".reg-xfp", note);
+
+  if (note->type == NT_OPENBSD_AUXV)
+    {
+      asection *sect = bfd_make_section_anyway_with_flags (abfd, ".auxv",
+							   SEC_HAS_CONTENTS);
+
+      if (sect == NULL)
+	return FALSE;
+      sect->size = note->descsz;
+      sect->filepos = note->descpos;
+      sect->alignment_power = 1 + bfd_get_arch_size (abfd) / 32;
+
+      return TRUE;
+    }
+
+  if (note->type == NT_OPENBSD_WCOOKIE)
+    {
+      asection *sect = bfd_make_section_anyway_with_flags (abfd, ".wcookie",
+							   SEC_HAS_CONTENTS);
+
+      if (sect == NULL)
+	return FALSE;
+      sect->size = note->descsz;
+      sect->filepos = note->descpos;
+      sect->alignment_power = 1 + bfd_get_arch_size (abfd) / 32;
+
+      return TRUE;
+    }
+
+  return TRUE;
+}
+
+static bfd_boolean
 elfcore_grok_nto_status (bfd *abfd, Elf_Internal_Note *note, long *tid)
 {
   void *ddata = note->descdata;
@@ -8587,6 +8656,11 @@ elf_parse_notes (bfd *abfd, char *buf, size_t size, file_ptr offset)
 	      if (! elfcore_grok_netbsd_note (abfd, &in))
 		return FALSE;
 	    }
+	  else if (CONST_STRNEQ (in.namedata, "OpenBSD"))
+	    {
+	      if (! elfcore_grok_openbsd_note (abfd, &in))
+		return FALSE;
+	    }
 	  else if (CONST_STRNEQ (in.namedata, "QNX"))
 	    {
 	      if (! elfcore_grok_nto_note (abfd, &in))
@@ -8848,7 +8922,17 @@ _bfd_elf_get_synthetic_symtab (bfd *abfd,
   size = count * sizeof (asymbol);
   p = relplt->relocation;
   for (i = 0; i < count; i++, p += bed->s->int_rels_per_ext_rel)
-    size += strlen ((*p->sym_ptr_ptr)->name) + sizeof ("@plt");
+    {
+      size += strlen ((*p->sym_ptr_ptr)->name) + sizeof ("@plt");
+      if (p->addend != 0)
+	{
+#ifdef BFD64
+	  size += sizeof ("+0x") - 1 + 8 + 8 * (bed->s->elfclass == ELFCLASS64);
+#else
+	  size += sizeof ("+0x") - 1 + 8;
+#endif
+	}
+    }
 
   s = *ret = bfd_malloc (size);
   if (s == NULL)
@@ -8879,6 +8963,19 @@ _bfd_elf_get_synthetic_symtab (bfd *abfd,
       len = strlen ((*p->sym_ptr_ptr)->name);
       memcpy (names, (*p->sym_ptr_ptr)->name, len);
       names += len;
+      if (p->addend != 0)
+	{
+	  char buf[30], *a;
+	  int len;
+	  memcpy (names, "+0x", sizeof ("+0x") - 1);
+	  names += sizeof ("+0x") - 1;
+	  bfd_sprintf_vma (abfd, buf, p->addend);
+	  for (a = buf; *a == '0'; ++a)
+	    ;
+	  len = strlen (a);
+	  memcpy (names, a, len);
+	  names += len;
+	}
       memcpy (names, "@plt", sizeof ("@plt"));
       names += sizeof ("@plt");
       ++s, ++n;
@@ -8901,15 +8998,23 @@ _bfd_elf_set_osabi (bfd * abfd,
   i_ehdrp = elf_elfheader (abfd);
 
   i_ehdrp->e_ident[EI_OSABI] = get_elf_backend_data (abfd)->elf_osabi;
+
+  /* To make things simpler for the loader on Linux systems we set the
+     osabi field to ELFOSABI_LINUX if the binary contains symbols of
+     the STT_GNU_IFUNC type.  */
+  if (i_ehdrp->e_ident[EI_OSABI] == ELFOSABI_NONE
+      && elf_tdata (abfd)->has_ifunc_symbols)
+    i_ehdrp->e_ident[EI_OSABI] = ELFOSABI_LINUX;
 }
 
 
 /* Return TRUE for ELF symbol types that represent functions.
    This is the default version of this function, which is sufficient for
-   most targets.  It returns true if TYPE is STT_FUNC.  */
+   most targets.  It returns true if TYPE is STT_FUNC or STT_GNU_IFUNC.  */
 
 bfd_boolean
 _bfd_elf_is_function_type (unsigned int type)
 {
-  return (type == STT_FUNC);
+  return (type == STT_FUNC
+	  || type == STT_GNU_IFUNC);
 }

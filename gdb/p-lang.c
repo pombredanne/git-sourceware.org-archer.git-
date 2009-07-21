@@ -97,7 +97,8 @@ pascal_main_name (void)
    but this does not happen for Free Pascal nor for GPC.  */
 int
 is_pascal_string_type (struct type *type,int *length_pos,
-                       int *length_size, int *string_pos, int *char_size,
+                       int *length_size, int *string_pos,
+		       struct type **char_type,
 		       char **arrayname)
 {
   if (TYPE_CODE (type) == TYPE_CODE_STRUCT)
@@ -114,8 +115,8 @@ is_pascal_string_type (struct type *type,int *length_pos,
 	    *length_size = TYPE_LENGTH (TYPE_FIELD_TYPE (type, 0));
           if (string_pos)
 	    *string_pos = TYPE_FIELD_BITPOS (type, 1) / TARGET_CHAR_BIT;
-          if (char_size)
-	    *char_size = 1;
+          if (char_type)
+	    *char_type = TYPE_TARGET_TYPE (TYPE_FIELD_TYPE (type, 1));
  	  if (arrayname)
 	    *arrayname = TYPE_FIELDS (type)[1].name;
          return 2;
@@ -126,7 +127,6 @@ is_pascal_string_type (struct type *type,int *length_pos,
           && strcmp (TYPE_FIELDS (type)[0].name, "Capacity") == 0
           && strcmp (TYPE_FIELDS (type)[1].name, "length") == 0)
         {
-	  struct type *char_type;
 	  if (length_pos)
 	    *length_pos = TYPE_FIELD_BITPOS (type, 1) / TARGET_CHAR_BIT;
 	  if (length_size)
@@ -134,13 +134,12 @@ is_pascal_string_type (struct type *type,int *length_pos,
 	  if (string_pos)
 	    *string_pos = TYPE_FIELD_BITPOS (type, 2) / TARGET_CHAR_BIT;
           /* FIXME: how can I detect wide chars in GPC ?? */
-	  char_type = TYPE_FIELD_TYPE (type,2);
-	  if (char_size && TYPE_CODE (char_type) == TYPE_CODE_ARRAY)
+          if (char_type)
 	    {
-	      *char_size = TYPE_LENGTH (TYPE_TARGET_TYPE (char_type));
+	      *char_type = TYPE_TARGET_TYPE (TYPE_FIELD_TYPE (type, 2));
+	      if (TYPE_CODE (*char_type) == TYPE_CODE_ARRAY)
+		*char_type = TYPE_TARGET_TYPE (*char_type);
 	    }
-	  else if (char_size)
-	    *char_size = 1;
  	  if (arrayname)
 	    *arrayname = TYPE_FIELDS (type)[2].name;
          return 3;
@@ -182,14 +181,15 @@ pascal_one_char (int c, struct ui_file *stream, int *in_quotes)
     }
 }
 
-static void pascal_emit_char (int c, struct ui_file *stream, int quoter);
+static void pascal_emit_char (int c, struct type *type,
+			      struct ui_file *stream, int quoter);
 
 /* Print the character C on STREAM as part of the contents of a literal
    string whose delimiter is QUOTER.  Note that that format for printing
    characters and strings is language specific. */
 
 static void
-pascal_emit_char (int c, struct ui_file *stream, int quoter)
+pascal_emit_char (int c, struct type *type, struct ui_file *stream, int quoter)
 {
   int in_quotes = 0;
   pascal_one_char (c, stream, &in_quotes);
@@ -198,7 +198,7 @@ pascal_emit_char (int c, struct ui_file *stream, int quoter)
 }
 
 void
-pascal_printchar (int c, struct ui_file *stream)
+pascal_printchar (int c, struct type *type, struct ui_file *stream)
 {
   int in_quotes = 0;
   pascal_one_char (c, stream, &in_quotes);
@@ -212,20 +212,24 @@ pascal_printchar (int c, struct ui_file *stream)
    had to stop before printing LENGTH characters, or if FORCE_ELLIPSES.  */
 
 void
-pascal_printstr (struct ui_file *stream, const gdb_byte *string,
-		 unsigned int length, int width, int force_ellipses,
+pascal_printstr (struct ui_file *stream, struct type *type,
+		 const gdb_byte *string, unsigned int length,
+		 int force_ellipses,
 		 const struct value_print_options *options)
 {
+  enum bfd_endian byte_order = gdbarch_byte_order (get_type_arch (type));
   unsigned int i;
   unsigned int things_printed = 0;
   int in_quotes = 0;
   int need_comma = 0;
+  int width = TYPE_LENGTH (type);
 
   /* If the string was not truncated due to `set print elements', and
      the last byte of it is a null, we don't print that, in traditional C
      style.  */
   if ((!force_ellipses) && length > 0
-	&& extract_unsigned_integer (string + (length - 1) * width, width) == 0)
+	&& extract_unsigned_integer (string + (length - 1) * width, width,
+				     byte_order) == 0)
     length--;
 
   if (length == 0)
@@ -251,13 +255,14 @@ pascal_printstr (struct ui_file *stream, const gdb_byte *string,
 	  need_comma = 0;
 	}
 
-      current_char = extract_unsigned_integer (string + i * width, width);
+      current_char = extract_unsigned_integer (string + i * width, width,
+					       byte_order);
 
       rep1 = i + 1;
       reps = 1;
       while (rep1 < length 
-	     && extract_unsigned_integer (string + rep1 * width, width) 
-		== current_char)
+	     && extract_unsigned_integer (string + rep1 * width, width,
+					  byte_order) == current_char)
 	{
 	  ++rep1;
 	  ++reps;
@@ -273,7 +278,7 @@ pascal_printstr (struct ui_file *stream, const gdb_byte *string,
 		fputs_filtered ("', ", stream);
 	      in_quotes = 0;
 	    }
-	  pascal_printchar (current_char, stream);
+	  pascal_printchar (current_char, type, stream);
 	  fprintf_filtered (stream, " <repeats %u times>", reps);
 	  i = rep1 - 1;
 	  things_printed += options->repeat_count_threshold;

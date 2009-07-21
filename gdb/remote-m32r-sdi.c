@@ -348,7 +348,7 @@ m32r_create_inferior (struct target_ops *ops, char *execfile,
   /* Install inferior's terminal modes.  */
   target_terminal_inferior ();
 
-  write_pc (entry_pt);
+  regcache_write_pc (get_current_regcache (), entry_pt);
 }
 
 /* Open a connection to a remote debugger.
@@ -464,7 +464,7 @@ m32r_resume (struct target_ops *ops,
 
   check_mmu_status ();
 
-  pc_addr = read_pc ();
+  pc_addr = regcache_read_pc (get_current_regcache ());
   if (remote_debug)
     fprintf_unfiltered (gdb_stdlog, "pc <= 0x%lx\n", pc_addr);
 
@@ -695,7 +695,7 @@ gdb_cntrl_c (int signo)
 
 static ptid_t
 m32r_wait (struct target_ops *ops,
-	   ptid_t ptid, struct target_waitstatus *status)
+	   ptid_t ptid, struct target_waitstatus *status, int options)
 {
   static RETSIGTYPE (*prev_sigint) ();
   unsigned long bp_addr, pc_addr;
@@ -917,6 +917,8 @@ static void
 m32r_fetch_register (struct target_ops *ops,
 		     struct regcache *regcache, int regno)
 {
+  struct gdbarch *gdbarch = get_regcache_arch (regcache);
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   unsigned long val, val2, regid;
 
   if (regno == -1)
@@ -947,7 +949,7 @@ m32r_fetch_register (struct target_ops *ops,
 
       /* We got the number the register holds, but gdb expects to see a
          value in the target byte ordering.  */
-      store_unsigned_integer (buffer, 4, val);
+      store_unsigned_integer (buffer, 4, byte_order, val);
       regcache_raw_supply (regcache, regno, buffer);
     }
   return;
@@ -1050,10 +1052,10 @@ m32r_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len,
     {
       if (write)
 	fprintf_unfiltered (gdb_stdlog, "m32r_xfer_memory(%s,%d,write)\n",
-			    paddr (memaddr), len);
+			    paddress (target_gdbarch, memaddr), len);
       else
 	fprintf_unfiltered (gdb_stdlog, "m32r_xfer_memory(%s,%d,read)\n",
-			    paddr (memaddr), len);
+			    paddress (target_gdbarch, memaddr), len);
     }
 
   if (write)
@@ -1112,7 +1114,7 @@ m32r_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len,
 }
 
 static void
-m32r_kill (void)
+m32r_kill (struct target_ops *ops)
 {
   if (remote_debug)
     fprintf_unfiltered (gdb_stdlog, "m32r_kill()\n");
@@ -1140,7 +1142,8 @@ m32r_mourn_inferior (struct target_ops *ops)
 }
 
 static int
-m32r_insert_breakpoint (struct bp_target_info *bp_tgt)
+m32r_insert_breakpoint (struct gdbarch *gdbarch,
+			struct bp_target_info *bp_tgt)
 {
   CORE_ADDR addr = bp_tgt->placed_address;
   int ib_breakpoints;
@@ -1149,7 +1152,7 @@ m32r_insert_breakpoint (struct bp_target_info *bp_tgt)
 
   if (remote_debug)
     fprintf_unfiltered (gdb_stdlog, "m32r_insert_breakpoint(%s,...)\n",
-			paddr (addr));
+			paddress (gdbarch, addr));
 
   if (use_ib_breakpoints)
     ib_breakpoints = max_ib_breakpoints;
@@ -1183,14 +1186,15 @@ m32r_insert_breakpoint (struct bp_target_info *bp_tgt)
 }
 
 static int
-m32r_remove_breakpoint (struct bp_target_info *bp_tgt)
+m32r_remove_breakpoint (struct gdbarch *gdbarch,
+			struct bp_target_info *bp_tgt)
 {
   CORE_ADDR addr = bp_tgt->placed_address;
   int i;
 
   if (remote_debug)
     fprintf_unfiltered (gdb_stdlog, "m32r_remove_breakpoint(%s)\n",
-			paddr (addr));
+			paddress (gdbarch, addr));
 
   for (i = 0; i < MAX_BREAKPOINTS; i++)
     {
@@ -1355,7 +1359,8 @@ m32r_load (char *args, int from_tty)
 
   /* Make the PC point at the start address */
   if (exec_bfd)
-    write_pc (bfd_get_start_address (exec_bfd));
+    regcache_write_pc (get_current_regcache (),
+		       bfd_get_start_address (exec_bfd));
 
   inferior_ptid = null_ptid;	/* No process now */
   delete_thread_silent (remote_m32r_ptid);
@@ -1397,7 +1402,7 @@ m32r_stop (ptid_t ptid)
 
 /* Tell whether this target can support a hardware breakpoint.  CNT
    is the number of hardware breakpoints already installed.  This
-   implements the TARGET_CAN_USE_HARDWARE_WATCHPOINT macro.  */
+   implements the target_can_use_hardware_watchpoint macro.  */
 
 static int
 m32r_can_use_hw_watchpoint (int type, int cnt, int othertype)
@@ -1416,7 +1421,7 @@ m32r_insert_watchpoint (CORE_ADDR addr, int len, int type)
 
   if (remote_debug)
     fprintf_unfiltered (gdb_stdlog, "m32r_insert_watchpoint(%s,%d,%d)\n",
-			paddr (addr), len, type);
+			paddress (target_gdbarch, addr), len, type);
 
   for (i = 0; i < MAX_ACCESS_BREAKS; i++)
     {
@@ -1440,7 +1445,7 @@ m32r_remove_watchpoint (CORE_ADDR addr, int len, int type)
 
   if (remote_debug)
     fprintf_unfiltered (gdb_stdlog, "m32r_remove_watchpoint(%s,%d,%d)\n",
-			paddr (addr), len, type);
+			paddress (target_gdbarch, addr), len, type);
 
   for (i = 0; i < MAX_ACCESS_BREAKS; i++)
     {
@@ -1589,6 +1594,11 @@ use_dbt_breakpoints_command (char *args, int from_tty)
   use_ib_breakpoints = 0;
 }
 
+static int
+m32r_return_one (struct target_ops *target)
+{
+  return 1;
+}
 
 /* Define the target subroutine names */
 
@@ -1626,11 +1636,11 @@ init_m32r_ops (void)
   m32r_ops.to_thread_alive = m32r_thread_alive;
   m32r_ops.to_pid_to_str = m32r_pid_to_str;
   m32r_ops.to_stratum = process_stratum;
-  m32r_ops.to_has_all_memory = 1;
-  m32r_ops.to_has_memory = 1;
-  m32r_ops.to_has_stack = 1;
-  m32r_ops.to_has_registers = 1;
-  m32r_ops.to_has_execution = 1;
+  m32r_ops.to_has_all_memory = m32r_return_one;
+  m32r_ops.to_has_memory = m32r_return_one;
+  m32r_ops.to_has_stack = m32r_return_one;
+  m32r_ops.to_has_registers = m32r_return_one;
+  m32r_ops.to_has_execution = m32r_return_one;
   m32r_ops.to_magic = OPS_MAGIC;
 };
 

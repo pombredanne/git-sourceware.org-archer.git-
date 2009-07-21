@@ -25,6 +25,7 @@
 #include "gdbthread.h"
 #include "ui-out.h"
 #include "observer.h"
+#include "gdbthread.h"
 
 void _initialize_inferiors (void);
 
@@ -84,6 +85,8 @@ add_inferior_silent (int pid)
   inf->next = inferior_list;
   inferior_list = inf;
 
+  observer_notify_new_inferior (pid);
+
   return inf;
 }
 
@@ -91,8 +94,6 @@ struct inferior *
 add_inferior (int pid)
 {
   struct inferior *inf = add_inferior_silent (pid);
-
-  observer_notify_new_inferior (pid);
 
   if (print_inferior_events)
     printf_unfiltered (_("[New inferior %d]\n"), pid);
@@ -139,19 +140,21 @@ delete_inferior_1 (int pid, int silent)
   if (!inf)
     return;
 
+  arg.pid = pid;
+  arg.silent = silent;
+
+  iterate_over_threads (delete_thread_of_inferior, &arg);
+
+  /* Notify the observers before removing the inferior from the list,
+     so that the observers have a change to look it up.  */
+  observer_notify_inferior_exit (pid);
+
   if (infprev)
     infprev->next = inf->next;
   else
     inferior_list = inf->next;
 
   free_inferior (inf);
-
-  arg.pid = pid;
-  arg.silent = silent;
-
-  iterate_over_threads (delete_thread_of_inferior, &arg);
-
-  observer_notify_inferior_exit (pid);
 }
 
 void
@@ -282,6 +285,14 @@ have_inferiors (void)
   return inferior_list != NULL;
 }
 
+int
+have_live_inferiors (void)
+{
+  /* The check on stratum suffices, as GDB doesn't currently support
+     multiple target interfaces.  */
+  return (current_target.to_stratum >= process_stratum && have_inferiors ());
+}
+
 /* Prints the list of inferiors and their details on UIOUT.  This is a
    version of 'info_inferior_command' suitable for use from MI.
 
@@ -292,8 +303,31 @@ print_inferior (struct ui_out *uiout, int requested_inferior)
 {
   struct inferior *inf;
   struct cleanup *old_chain;
+  int inf_count = 0;
 
-  old_chain = make_cleanup_ui_out_list_begin_end (uiout, "inferiors");
+  /* Compute number of inferiors we will print.  */
+  for (inf = inferior_list; inf; inf = inf->next)
+    {
+      struct cleanup *chain2;
+
+      if (requested_inferior != -1 && inf->num != requested_inferior)
+	continue;
+
+      ++inf_count;
+    }
+
+  if (inf_count == 0)
+    {
+      ui_out_message (uiout, 0, "No inferiors.\n");
+      return;
+    }
+
+  old_chain = make_cleanup_ui_out_table_begin_end (uiout, 3, inf_count,
+						   "inferiors");
+  ui_out_table_header (uiout, 3, ui_right, "current", "Cur");
+  ui_out_table_header (uiout, 4, ui_right, "id", "Id");
+  ui_out_table_header (uiout, 7, ui_right, "target-id", "PID");
+  ui_out_table_body (uiout);
 
   for (inf = inferior_list; inf; inf = inf->next)
     {
@@ -305,12 +339,11 @@ print_inferior (struct ui_out *uiout, int requested_inferior)
       chain2 = make_cleanup_ui_out_tuple_begin_end (uiout, NULL);
 
       if (inf->pid == ptid_get_pid (inferior_ptid))
-	ui_out_text (uiout, "* ");
+	ui_out_field_string (uiout, "current", "*");
       else
-	ui_out_text (uiout, "  ");
+	ui_out_field_skip (uiout, "current");
 
       ui_out_field_int (uiout, "id", inf->num);
-      ui_out_text (uiout, " ");
       ui_out_field_int (uiout, "target-id", inf->pid);
 
       ui_out_text (uiout, "\n");
@@ -320,12 +353,112 @@ print_inferior (struct ui_out *uiout, int requested_inferior)
   do_cleanups (old_chain);
 }
 
+static void
+detach_inferior_command (char *args, int from_tty)
+{
+  int num, pid;
+  struct thread_info *tp;
+
+  if (!args || !*args)
+    error (_("Requires argument (inferior id to detach)"));
+
+  num = parse_and_eval_long (args);
+
+  if (!valid_gdb_inferior_id (num))
+    error (_("Inferior ID %d not known."), num);
+
+  pid = gdb_inferior_id_to_pid (num);
+
+  tp = any_thread_of_process (pid);
+  if (!tp)
+    error (_("Inferior has no threads."));
+
+  switch_to_thread (tp->ptid);
+
+  detach_command (NULL, from_tty);
+}
+
+static void
+kill_inferior_command (char *args, int from_tty)
+{
+  int num, pid;
+  struct thread_info *tp;
+
+  if (!args || !*args)
+    error (_("Requires argument (inferior id to kill)"));
+
+  num = parse_and_eval_long (args);
+
+  if (!valid_gdb_inferior_id (num))
+    error (_("Inferior ID %d not known."), num);
+
+  pid = gdb_inferior_id_to_pid (num);
+
+  tp = any_thread_of_process (pid);
+  if (!tp)
+    error (_("Inferior has no threads."));
+
+  switch_to_thread (tp->ptid);
+
+  target_kill ();
+
+  bfd_cache_close_all ();
+}
+
+static void
+inferior_command (char *args, int from_tty)
+{
+  int num, pid;
+
+  if (!have_inferiors ())
+    error (_("No inferiors"));
+
+  num = parse_and_eval_long (args);
+
+  if (!valid_gdb_inferior_id (num))
+    error (_("Inferior ID %d not known."), num);
+
+  pid = gdb_inferior_id_to_pid (num);
+
+  if (pid != ptid_get_pid (inferior_ptid))
+    {
+      struct thread_info *tp;
+
+      tp = any_thread_of_process (pid);
+      if (!tp)
+	error (_("Inferior has no threads."));
+
+      switch_to_thread (tp->ptid);
+    }
+
+  printf_filtered (_("[Switching to thread %d (%s)] "),
+		   pid_to_thread_id (inferior_ptid),
+		   target_pid_to_str (inferior_ptid));
+
+  if (is_running (inferior_ptid))
+    ui_out_text (uiout, "(running)\n");
+  else
+    {
+      ui_out_text (uiout, "\n");
+      print_stack_frame (get_selected_frame (NULL), 1, SRC_AND_LOC);
+    }
+}
+
 /* Print information about currently known inferiors.  */
 
 static void
-info_inferiors_command (char *arg, int from_tty)
+info_inferiors_command (char *args, int from_tty)
 {
-  print_inferior (uiout, -1);
+  int requested = -1;
+
+  if (args && *args)
+    {
+      requested = parse_and_eval_long (args);
+      if (!valid_gdb_inferior_id (requested))
+	error (_("Inferior ID %d not known."), requested);
+    }
+
+  print_inferior (uiout, requested);
 }
 
 /* Print notices when new inferiors are created and die.  */
@@ -349,4 +482,17 @@ Show printing of inferior events (e.g., inferior start and exit)."), NULL,
          NULL,
          show_print_inferior_events,
          &setprintlist, &showprintlist);
+
+  add_cmd ("inferior", class_run, detach_inferior_command, _("\
+Detach from inferior ID."),
+	   &detachlist);
+
+  add_cmd ("inferior", class_run, kill_inferior_command, _("\
+Kill inferior ID."),
+	   &killlist);
+
+  add_cmd ("inferior", class_run, inferior_command, _("\
+Use this command to switch between inferiors.\n\
+The new inferior ID must be currently known."),
+	   &cmdlist);
 }

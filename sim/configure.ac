@@ -51,6 +51,9 @@ if test "${enable_sim}" != no; then
            AC_CONFIG_SUBDIRS(arm)
 	   testsuite=yes
 	   ;;
+       avr*-*-*)
+           AC_CONFIG_SUBDIRS(avr)
+	   ;;
        cr16*-*-*)
 	   AC_CONFIG_SUBDIRS(cr16)
 	   testsuite=yes
@@ -74,6 +77,10 @@ if test "${enable_sim}" != no; then
            AC_CONFIG_SUBDIRS(iq2000)
 	   testsuite=yes
 	   ;;
+       lm32-*-*)
+           AC_CONFIG_SUBDIRS(lm32)
+	   testsuite=yes
+           ;;
        m32c-*-*)
            AC_CONFIG_SUBDIRS(m32c)
            ;;
@@ -97,6 +104,10 @@ if test "${enable_sim}" != no; then
        mn10300*-*-*)
            AC_CONFIG_SUBDIRS(mn10300)
 	   igen=yes
+	   ;;
+       moxie-*-*)
+	   AC_CONFIG_SUBDIRS(moxie)
+	   testsuite=yes
 	   ;;
        sh64*-*-*)
            AC_CONFIG_SUBDIRS(sh64)

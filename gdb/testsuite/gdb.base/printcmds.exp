@@ -136,7 +136,7 @@ proc test_integer_literals_rejected {} {
 proc test_print_all_chars {} {
     global gdb_prompt
 
-    gdb_test "p ctable1\[0\]"   " = 0 '\\\\0'"
+    gdb_test "p ctable1\[0\]"   " = 0 '\\\\000'"
     gdb_test "p ctable1\[1\]"   " = 1 '\\\\001'"
     gdb_test "p ctable1\[2\]"   " = 2 '\\\\002'"
     gdb_test "p ctable1\[3\]"   " = 3 '\\\\003'"
@@ -666,6 +666,9 @@ proc test_printf {} {
     gdb_test "printf \"x=%d,y=%f,z=%d\\n\", 5, 6.0, 7" "x=5,y=6\.0+,z=7"
     gdb_test "printf \"%x %f, %c %x, %x, %f\\n\", 0xbad, -99.541, 'z',\
 0xfeedface, 0xdeadbeef, 5.0" "bad -99.54\[0-9\]+, z feedface, deadbeef, 5.0+"
+
+    # Regression test for C lexer bug.
+    gdb_test "printf \"%c\\n\", \"x\"\[1,0\]" "x"
 }
 
 #Test printing DFP values with printf

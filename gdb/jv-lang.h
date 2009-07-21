@@ -27,18 +27,20 @@ extern int java_parse (void);	/* Defined in jv-exp.y */
 
 extern void java_error (char *);	/* Defined in jv-exp.y */
 
-/* sizeof (struct Object) */
-#define JAVA_OBJECT_SIZE (get_java_object_header_size ())
+struct builtin_java_type
+{
+  struct type *builtin_int;
+  struct type *builtin_byte;
+  struct type *builtin_short;
+  struct type *builtin_long;
+  struct type *builtin_boolean;
+  struct type *builtin_char;
+  struct type *builtin_float;
+  struct type *builtin_double;
+  struct type *builtin_void;
+};
 
-extern struct type *java_int_type;
-extern struct type *java_byte_type;
-extern struct type *java_short_type;
-extern struct type *java_long_type;
-extern struct type *java_boolean_type;
-extern struct type *java_char_type;
-extern struct type *java_float_type;
-extern struct type *java_double_type;
-extern struct type *java_void_type;
+extern const struct builtin_java_type *builtin_java_type (struct gdbarch *);
 
 extern int java_val_print (struct type *, const gdb_byte *, int, CORE_ADDR,
 			   struct ui_file *, int,
@@ -49,16 +51,17 @@ extern int java_value_print (struct value *, struct ui_file *,
 
 extern struct value *java_class_from_object (struct value *);
 
-extern struct type *type_from_class (struct value *);
+extern struct type *type_from_class (struct gdbarch *, struct value *);
 
-extern struct type *java_primitive_type (int signature);
+extern struct type *java_primitive_type (struct gdbarch *, int signature);
 
-extern struct type *java_primitive_type_from_name (char *, int);
+extern struct type *java_primitive_type_from_name (struct gdbarch *,
+						   char *, int);
 
 extern struct type *java_array_type (struct type *, int);
 
 extern struct type *get_java_object_type (void);
-extern int get_java_object_header_size (void);
+extern int get_java_object_header_size (struct gdbarch *);
 
 extern struct type *java_lookup_class (char *);
 

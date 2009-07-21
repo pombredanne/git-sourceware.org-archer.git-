@@ -234,7 +234,7 @@ fetch_sec_names (struct lm_info *lmi)
 
 static void
 osf_relocate_section_addresses (struct so_list *so,
-				struct section_table *sec)
+				struct target_section *sec)
 {
   struct lm_info *lmi;
   struct lm_sec lms_key, *lms;
@@ -631,6 +631,7 @@ _initialize_osf_solib (void)
   osf_so_ops.current_sos = osf_current_sos;
   osf_so_ops.open_symbol_file_object = osf_open_symbol_file_object;
   osf_so_ops.in_dynsym_resolve_code = osf_in_dynsym_resolve_code;
+  osf_so_ops.bfd_open = solib_bfd_open;
 
   /* FIXME: Don't do this here.  *_gdbarch_init() should set so_ops. */
   current_target_so_ops = &osf_so_ops;

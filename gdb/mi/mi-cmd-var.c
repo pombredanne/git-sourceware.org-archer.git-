@@ -128,8 +128,8 @@ mi_cmd_var_create (char *command, char **argv, int argc)
 
   if (varobjdebug)
     fprintf_unfiltered (gdb_stdlog,
-		    "Name=\"%s\", Frame=\"%s\" (0x%s), Expression=\"%s\"\n",
-			name, frame, paddr (frameaddr), expr);
+		    "Name=\"%s\", Frame=\"%s\" (%s), Expression=\"%s\"\n",
+			name, frame, hex_string (frameaddr), expr);
 
   var = varobj_create (name, expr, frameaddr, var_type);
 
@@ -185,9 +185,6 @@ mi_cmd_var_delete (char *command, char **argv, int argc)
 
   var = varobj_get_handle (name);
 
-  if (var == NULL)
-    error (_("mi_cmd_var_delete: Variable object not found."));
-
   numdel = varobj_delete (var, NULL, children_only_p);
 
   ui_out_field_int (uiout, "ndeleted", numdel);
@@ -233,9 +230,6 @@ mi_cmd_var_set_format (char *command, char **argv, int argc)
   /* Get varobj handle, if a valid var obj name was specified */
   var = varobj_get_handle (argv[0]);
 
-  if (var == NULL)
-    error (_("mi_cmd_var_set_format: Variable object not found"));
-
   format = mi_parse_format (argv[1]);
   
   /* Set the format of VAR to given format */
@@ -249,6 +243,22 @@ mi_cmd_var_set_format (char *command, char **argv, int argc)
 }
 
 void
+mi_cmd_var_set_visualizer (char *command, char **argv, int argc)
+{
+  struct varobj *var;
+
+  if (argc != 2)
+    error ("Usage: NAME VISUALIZER_FUNCTION.");
+
+  var = varobj_get_handle (argv[0]);
+
+  if (var == NULL)
+    error ("Variable object not found");
+
+  varobj_set_visualizer (var, argv[1]);
+}
+
+void
 mi_cmd_var_set_frozen (char *command, char **argv, int argc)
 {
   struct varobj *var;
@@ -258,8 +268,6 @@ mi_cmd_var_set_frozen (char *command, char **argv, int argc)
     error (_("-var-set-format: Usage: NAME FROZEN_FLAG."));
 
   var = varobj_get_handle (argv[0]);
-  if (var == NULL)
-    error (_("Variable object not found"));
 
   if (strcmp (argv[1], "0") == 0)
     frozen = 0;
@@ -287,8 +295,6 @@ mi_cmd_var_show_format (char *command, char **argv, int argc)
 
   /* Get varobj handle, if a valid var obj name was specified */
   var = varobj_get_handle (argv[0]);
-  if (var == NULL)
-    error (_("mi_cmd_var_show_format: Variable object not found"));
 
   format = varobj_get_display_format (var);
 
@@ -306,8 +312,6 @@ mi_cmd_var_info_num_children (char *command, char **argv, int argc)
 
   /* Get varobj handle, if a valid var obj name was specified */
   var = varobj_get_handle (argv[0]);
-  if (var == NULL)
-    error (_("mi_cmd_var_info_num_children: Variable object not found"));
 
   ui_out_field_int (uiout, "numchild", varobj_get_num_children (var));
 }
@@ -369,6 +373,7 @@ mi_cmd_var_list_children (char *command, char **argv, int argc)
   int numchild;
   enum print_values print_values;
   int ix;
+  char *display_hint;
 
   if (argc != 1 && argc != 2)
     error (_("mi_cmd_var_list_children: Usage: [PRINT_VALUES] NAME"));
@@ -378,8 +383,6 @@ mi_cmd_var_list_children (char *command, char **argv, int argc)
     var = varobj_get_handle (argv[0]);
   else
     var = varobj_get_handle (argv[1]);
-  if (var == NULL)
-    error (_("Variable object not found"));
 
   children = varobj_list_children (var);
   ui_out_field_int (uiout, "numchild", VEC_length (varobj_p, children));
@@ -387,6 +390,13 @@ mi_cmd_var_list_children (char *command, char **argv, int argc)
     print_values = mi_parse_values_option (argv[0]);
   else
     print_values = PRINT_NO_VALUES;
+
+  display_hint = varobj_get_display_hint (var);
+  if (display_hint)
+    {
+      ui_out_field_string (uiout, "displayhint", display_hint);
+      xfree (display_hint);
+    }
 
   if (VEC_length (varobj_p, children) == 0)
     return;
@@ -415,8 +425,6 @@ mi_cmd_var_info_type (char *command, char **argv, int argc)
 
   /* Get varobj handle, if a valid var obj name was specified */
   var = varobj_get_handle (argv[0]);
-  if (var == NULL)
-    error (_("mi_cmd_var_info_type: Variable object not found"));
 
   ui_out_field_string (uiout, "type", varobj_get_type (var));
 }
@@ -432,8 +440,6 @@ mi_cmd_var_info_path_expression (char *command, char **argv, int argc)
 
   /* Get varobj handle, if a valid var obj name was specified.  */
   var = varobj_get_handle (argv[0]);
-  if (var == NULL)
-    error (_("Variable object not found"));
   
   path_expr = varobj_get_path_expr (var);
 
@@ -451,8 +457,6 @@ mi_cmd_var_info_expression (char *command, char **argv, int argc)
 
   /* Get varobj handle, if a valid var obj name was specified */
   var = varobj_get_handle (argv[0]);
-  if (var == NULL)
-    error (_("mi_cmd_var_info_expression: Variable object not found"));
 
   lang = varobj_get_language (var);
 
@@ -472,8 +476,6 @@ mi_cmd_var_show_attributes (char *command, char **argv, int argc)
 
   /* Get varobj handle, if a valid var obj name was specified */
   var = varobj_get_handle (argv[0]);
-  if (var == NULL)
-    error (_("mi_cmd_var_show_attributes: Variable object not found"));
 
   attr = varobj_get_attributes (var);
   /* FIXME: define masks for attributes */
@@ -534,8 +536,6 @@ mi_cmd_var_evaluate_expression (char *command, char **argv, int argc)
  
      /* Get varobj handle, if a valid var obj name was specified */
   var = varobj_get_handle (argv[optind]);
-  if (var == NULL)
-    error (_("Variable object not found"));
    
   if (formatFound)
     ui_out_field_string (uiout, "value", varobj_get_formatted_value (var, format));
@@ -554,8 +554,6 @@ mi_cmd_var_assign (char *command, char **argv, int argc)
 
   /* Get varobj handle, if a valid var obj name was specified */
   var = varobj_get_handle (argv[0]);
-  if (var == NULL)
-    error (_("mi_cmd_var_assign: Variable object not found"));
 
   if (!varobj_editable_p (var))
     error (_("mi_cmd_var_assign: Variable object is not editable"));
@@ -571,12 +569,8 @@ mi_cmd_var_assign (char *command, char **argv, int argc)
 void
 mi_cmd_var_update (char *command, char **argv, int argc)
 {
-  struct varobj *var;
-  struct varobj **rootlist;
-  struct varobj **cr;
   struct cleanup *cleanup;
   char *name;
-  int nv;
   enum print_values print_values;
 
   if (argc != 1 && argc != 2)
@@ -592,58 +586,51 @@ mi_cmd_var_update (char *command, char **argv, int argc)
   else
     print_values = PRINT_NO_VALUES;
 
+  if (mi_version (uiout) <= 1)
+    cleanup = make_cleanup_ui_out_tuple_begin_end (uiout, "changelist");
+  else
+    cleanup = make_cleanup_ui_out_list_begin_end (uiout, "changelist");
+
   /* Check if the parameter is a "*" which means that we want
      to update all variables */
 
   if ((*name == '*' || *name == '@') && (*(name + 1) == '\0'))
     {
-      nv = varobj_list (&rootlist);
-      cleanup = make_cleanup (xfree, rootlist);
-      if (mi_version (uiout) <= 1)
-        make_cleanup_ui_out_tuple_begin_end (uiout, "changelist");
-      else
-        make_cleanup_ui_out_list_begin_end (uiout, "changelist");
-      if (nv <= 0)
-	{
-	  do_cleanups (cleanup);
-	  return;
-	}
-      cr = rootlist;
-      while (*cr != NULL)
+      struct varobj **rootlist, **cr;
+
+      varobj_list (&rootlist);
+      make_cleanup (xfree, rootlist);
+
+      for (cr = rootlist; *cr != NULL; cr++)
 	{
 	  int thread_id = varobj_get_thread_id (*cr);
 	  int thread_stopped = 0;
+
 	  if (thread_id == -1 && is_stopped (inferior_ptid))
 	    thread_stopped = 1;
 	  else
-	    {	      
+	    {
 	      struct thread_info *tp = find_thread_id (thread_id);
 	      if (tp)
 		thread_stopped = is_stopped (tp->ptid);
 	      else
 		thread_stopped = 1;
 	    }
+
 	  if (thread_stopped)
 	    if (*name == '*' || varobj_floating_p (*cr))
 	      varobj_update_one (*cr, print_values, 0 /* implicit */);
-	  cr++;
 	}
-      do_cleanups (cleanup);
     }
   else
     {
       /* Get varobj handle, if a valid var obj name was specified */
-      var = varobj_get_handle (name);
-      if (var == NULL)
-	error (_("mi_cmd_var_update: Variable object not found"));
+      struct varobj *var = varobj_get_handle (name);
 
-      if (mi_version (uiout) <= 1)
-        cleanup = make_cleanup_ui_out_tuple_begin_end (uiout, "changelist");
-      else
-        cleanup = make_cleanup_ui_out_list_begin_end (uiout, "changelist");
       varobj_update_one (var, print_values, 1 /* explicit */);
-      do_cleanups (cleanup);
     }
+
+  do_cleanups (cleanup);
 }
 
 /* Helper for mi_cmd_var_update().  */
@@ -662,6 +649,8 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
   
   for (i = 0; VEC_iterate (varobj_update_result, changes, i, r); ++i)
     {
+      char *display_hint;
+
       if (mi_version (uiout) > 1)
         cleanup = make_cleanup_ui_out_tuple_begin_end (uiout, NULL);
       ui_out_field_string (uiout, "name", varobj_get_objname (r->varobj));
@@ -694,6 +683,33 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
           ui_out_field_string (uiout, "new_type", varobj_get_type (r->varobj));
           ui_out_field_int (uiout, "new_num_children", 
 			    varobj_get_num_children (r->varobj));
+	}
+
+      display_hint = varobj_get_display_hint (var);
+      if (display_hint)
+	{
+	  ui_out_field_string (uiout, "displayhint", display_hint);
+	  xfree (display_hint);
+	}
+
+      if (r->children_changed)
+	{
+	  int ix;
+	  struct varobj *child;
+	  struct cleanup *cleanup =
+	    make_cleanup_ui_out_list_begin_end (uiout, "children");
+
+	  VEC (varobj_p)* children = varobj_list_children (r->varobj);
+
+	  for (ix = 0; VEC_iterate (varobj_p, children, ix, child); ++ix)
+	    {
+	      struct cleanup *cleanup_child;
+	      cleanup_child = make_cleanup_ui_out_tuple_begin_end (uiout, NULL);
+	      print_varobj (child, print_values, 1 /* print expression */);
+	      do_cleanups (cleanup_child);
+	    }
+
+	  do_cleanups (cleanup);
 	}
   
       if (mi_version (uiout) > 1)

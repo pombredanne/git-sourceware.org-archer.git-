@@ -166,18 +166,19 @@ static void
 s390_pseudo_register_read (struct gdbarch *gdbarch, struct regcache *regcache,
 			   int regnum, gdb_byte *buf)
 {
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   ULONGEST val;
 
   switch (regnum)
     {
     case S390_PC_REGNUM:
       regcache_raw_read_unsigned (regcache, S390_PSWA_REGNUM, &val);
-      store_unsigned_integer (buf, 4, val & 0x7fffffff);
+      store_unsigned_integer (buf, 4, byte_order, val & 0x7fffffff);
       break;
 
     case S390_CC_REGNUM:
       regcache_raw_read_unsigned (regcache, S390_PSWM_REGNUM, &val);
-      store_unsigned_integer (buf, 4, (val >> 12) & 3);
+      store_unsigned_integer (buf, 4, byte_order, (val >> 12) & 3);
       break;
 
     default:
@@ -189,19 +190,20 @@ static void
 s390_pseudo_register_write (struct gdbarch *gdbarch, struct regcache *regcache,
 			    int regnum, const gdb_byte *buf)
 {
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   ULONGEST val, psw;
 
   switch (regnum)
     {
     case S390_PC_REGNUM:
-      val = extract_unsigned_integer (buf, 4);
+      val = extract_unsigned_integer (buf, 4, byte_order);
       regcache_raw_read_unsigned (regcache, S390_PSWA_REGNUM, &psw);
       psw = (psw & 0x80000000) | (val & 0x7fffffff);
       regcache_raw_write_unsigned (regcache, S390_PSWA_REGNUM, psw);
       break;
 
     case S390_CC_REGNUM:
-      val = extract_unsigned_integer (buf, 4);
+      val = extract_unsigned_integer (buf, 4, byte_order);
       regcache_raw_read_unsigned (regcache, S390_PSWM_REGNUM, &psw);
       psw = (psw & ~((ULONGEST)3 << 12)) | ((val & 3) << 12);
       regcache_raw_write_unsigned (regcache, S390_PSWM_REGNUM, psw);
@@ -216,6 +218,7 @@ static void
 s390x_pseudo_register_read (struct gdbarch *gdbarch, struct regcache *regcache,
 			    int regnum, gdb_byte *buf)
 {
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   ULONGEST val;
 
   switch (regnum)
@@ -226,7 +229,7 @@ s390x_pseudo_register_read (struct gdbarch *gdbarch, struct regcache *regcache,
 
     case S390_CC_REGNUM:
       regcache_raw_read_unsigned (regcache, S390_PSWM_REGNUM, &val);
-      store_unsigned_integer (buf, 4, (val >> 44) & 3);
+      store_unsigned_integer (buf, 4, byte_order, (val >> 44) & 3);
       break;
 
     default:
@@ -238,6 +241,7 @@ static void
 s390x_pseudo_register_write (struct gdbarch *gdbarch, struct regcache *regcache,
 			     int regnum, const gdb_byte *buf)
 {
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   ULONGEST val, psw;
 
   switch (regnum)
@@ -247,7 +251,7 @@ s390x_pseudo_register_write (struct gdbarch *gdbarch, struct regcache *regcache,
       break;
 
     case S390_CC_REGNUM:
-      val = extract_unsigned_integer (buf, 4);
+      val = extract_unsigned_integer (buf, 4, byte_order);
       regcache_raw_read_unsigned (regcache, S390_PSWM_REGNUM, &psw);
       psw = (psw & ~((ULONGEST)3 << 44)) | ((val & 3) << 44);
       regcache_raw_write_unsigned (regcache, S390_PSWM_REGNUM, psw);
@@ -677,9 +681,10 @@ struct s390_prologue_data {
   /* The stack.  */
   struct pv_area *stack;
 
-  /* The size of a GPR or FPR.  */
+  /* The size and byte-order of a GPR or FPR.  */
   int gpr_size;
   int fpr_size;
+  enum bfd_endian byte_order;
 
   /* The general-purpose registers.  */
   pv_t gpr[S390_NUM_GPRS];
@@ -772,12 +777,13 @@ s390_load (struct s390_prologue_data *data,
      we're analyzing the code to unwind past that frame.  */
   if (pv_is_constant (addr))
     {
-      struct section_table *secp;
+      struct target_section *secp;
       secp = target_section_by_addr (&current_target, addr.k);
       if (secp != NULL
           && (bfd_get_section_flags (secp->bfd, secp->the_bfd_section)
               & SEC_READONLY))
-        return pv_constant (read_memory_integer (addr.k, size));
+        return pv_constant (read_memory_integer (addr.k, size,
+						 data->byte_order));
     }
 
   /* Check whether we are accessing one of our save slots.  */
@@ -857,13 +863,14 @@ s390_analyze_prologue (struct gdbarch *gdbarch,
   {
     int i;
 
-    data->stack = make_pv_area (S390_SP_REGNUM);
+    data->stack = make_pv_area (S390_SP_REGNUM, gdbarch_addr_bit (gdbarch));
 
     /* For the purpose of prologue tracking, we consider the GPR size to
        be equal to the ABI word size, even if it is actually larger
        (i.e. when running a 32-bit binary under a 64-bit kernel).  */
     data->gpr_size = word_size;
     data->fpr_size = 8;
+    data->byte_order = gdbarch_byte_order (gdbarch);
 
     for (i = 0; i < S390_NUM_GPRS; i++)
       data->gpr[i] = pv_register (S390_R0_REGNUM + i, 0);
@@ -1182,6 +1189,7 @@ s390_prologue_frame_unwind_cache (struct frame_info *this_frame,
   CORE_ADDR prev_sp;
   int frame_pointer;
   int size;
+  struct frame_info *next_frame;
 
   /* Try to find the function start address.  If we can't find it, we don't
      bother searching for it -- with modern compilers this would be mostly
@@ -1215,7 +1223,10 @@ s390_prologue_frame_unwind_cache (struct frame_info *this_frame,
       /* FIXME: cagney/2004-05-01: This sanity check shouldn't be
 	 needed, instead the code should simpliy rely on its
 	 analysis.  */
-      if (get_next_frame (this_frame)
+      next_frame = get_next_frame (this_frame);
+      while (next_frame && get_frame_type (next_frame) == INLINE_FRAME)
+	next_frame = get_next_frame (next_frame);
+      if (next_frame
 	  && get_frame_type (get_next_frame (this_frame)) == NORMAL_FRAME)
 	return 0;
 
@@ -1261,8 +1272,11 @@ s390_prologue_frame_unwind_cache (struct frame_info *this_frame,
      This can only happen in an innermost frame.  */
   /* FIXME: cagney/2004-05-01: This sanity check shouldn't be needed,
      instead the code should simpliy rely on its analysis.  */
+  next_frame = get_next_frame (this_frame);
+  while (next_frame && get_frame_type (next_frame) == INLINE_FRAME)
+    next_frame = get_next_frame (next_frame);
   if (size > 0
-      && (!get_next_frame (this_frame)
+      && (next_frame == NULL
 	  || get_frame_type (get_next_frame (this_frame)) != NORMAL_FRAME))
     {
       /* See the comment in s390_in_function_epilogue_p on why this is
@@ -1349,20 +1363,22 @@ s390_backchain_frame_unwind_cache (struct frame_info *this_frame,
 {
   struct gdbarch *gdbarch = get_frame_arch (this_frame);
   int word_size = gdbarch_ptr_bit (gdbarch) / 8;
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   CORE_ADDR backchain;
   ULONGEST reg;
   LONGEST sp;
 
   /* Get the backchain.  */
   reg = get_frame_register_unsigned (this_frame, S390_SP_REGNUM);
-  backchain = read_memory_unsigned_integer (reg, word_size);
+  backchain = read_memory_unsigned_integer (reg, word_size, byte_order);
 
   /* A zero backchain terminates the frame chain.  As additional
      sanity check, let's verify that the spill slot for SP in the
      save area pointed to by the backchain in fact links back to
      the save area.  */
   if (backchain != 0
-      && safe_read_memory_integer (backchain + 15*word_size, word_size, &sp)
+      && safe_read_memory_integer (backchain + 15*word_size,
+				   word_size, byte_order, &sp)
       && (CORE_ADDR)sp == backchain)
     {
       /* We don't know which registers were saved, but it will have
@@ -1533,6 +1549,7 @@ s390_sigtramp_frame_unwind_cache (struct frame_info *this_frame,
 {
   struct gdbarch *gdbarch = get_frame_arch (this_frame);
   int word_size = gdbarch_ptr_bit (gdbarch) / 8;
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   struct s390_sigtramp_unwind_cache *info;
   ULONGEST this_sp, prev_sp;
   CORE_ADDR next_ra, next_cfa, sigreg_ptr;
@@ -1563,7 +1580,8 @@ s390_sigtramp_frame_unwind_cache (struct frame_info *this_frame,
 	pointer to sigregs  */
   else
     {
-      sigreg_ptr = read_memory_unsigned_integer (next_cfa + 8, word_size);
+      sigreg_ptr = read_memory_unsigned_integer (next_cfa + 8,
+						 word_size, byte_order);
     }
 
   /* The sigregs structure looks like this:
@@ -1610,7 +1628,7 @@ s390_sigtramp_frame_unwind_cache (struct frame_info *this_frame,
   /* Restore the previous frame's SP.  */
   prev_sp = read_memory_unsigned_integer (
 			info->saved_regs[S390_SP_REGNUM].addr,
-			word_size);
+			word_size, byte_order);
 
   /* Determine our frame base.  */
   info->frame_base = prev_sp + 16*word_size + 32;
@@ -1903,8 +1921,9 @@ s390_function_arg_integer (struct type *type)
 /* Return ARG, a `SIMPLE_ARG', sign-extended or zero-extended to a full
    word as required for the ABI.  */
 static LONGEST
-extend_simple_arg (struct value *arg)
+extend_simple_arg (struct gdbarch *gdbarch, struct value *arg)
 {
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   struct type *type = value_type (arg);
 
   /* Even structs get passed in the least significant bits of the
@@ -1912,10 +1931,10 @@ extend_simple_arg (struct value *arg)
      an integer, but it does take care of the extension.  */
   if (TYPE_UNSIGNED (type))
     return extract_unsigned_integer (value_contents (arg),
-                                     TYPE_LENGTH (type));
+                                     TYPE_LENGTH (type), byte_order);
   else
     return extract_signed_integer (value_contents (arg),
-                                   TYPE_LENGTH (type));
+                                   TYPE_LENGTH (type), byte_order);
 }
 
 
@@ -1978,6 +1997,7 @@ s390_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 {
   struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
   int word_size = gdbarch_ptr_bit (gdbarch) / 8;
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   ULONGEST orig_sp;
   int i;
 
@@ -2043,7 +2063,8 @@ s390_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 	      }
 	    else
 	      {
-		write_memory_unsigned_integer (starg, word_size, copy_addr[i]);
+		write_memory_unsigned_integer (starg, word_size, byte_order,
+					       copy_addr[i]);
 		starg += word_size;
 	      }
 	  }
@@ -2073,14 +2094,14 @@ s390_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 	      {
 		/* Integer arguments are always extended to word size.  */
 		regcache_cooked_write_signed (regcache, S390_R0_REGNUM + gr,
-					      extend_simple_arg (arg));
+					      extend_simple_arg (gdbarch, arg));
 		gr++;
 	      }
 	    else
 	      {
 		/* Integer arguments are always extended to word size.  */
-		write_memory_signed_integer (starg, word_size,
-                                             extend_simple_arg (arg));
+		write_memory_signed_integer (starg, word_size, byte_order,
+                                             extend_simple_arg (gdbarch, arg));
                 starg += word_size;
 	      }
 	  }
@@ -2175,6 +2196,7 @@ s390_return_value (struct gdbarch *gdbarch, struct type *func_type,
 		   struct type *type, struct regcache *regcache,
 		   gdb_byte *out, const gdb_byte *in)
 {
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   int word_size = gdbarch_ptr_bit (gdbarch) / 8;
   int length = TYPE_LENGTH (type);
   enum return_value_convention rvc = 
@@ -2197,10 +2219,10 @@ s390_return_value (struct gdbarch *gdbarch, struct type *func_type,
 	      /* Integer arguments are always extended to word size.  */
 	      if (TYPE_UNSIGNED (type))
 		regcache_cooked_write_unsigned (regcache, S390_R2_REGNUM,
-			extract_unsigned_integer (in, length));
+			extract_unsigned_integer (in, length, byte_order));
 	      else
 		regcache_cooked_write_signed (regcache, S390_R2_REGNUM,
-			extract_signed_integer (in, length));
+			extract_signed_integer (in, length, byte_order));
 	    }
 	  else if (length == 2*word_size)
 	    {

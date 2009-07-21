@@ -19,6 +19,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "arch-utils.h"
 #include "symtab.h"
 #include "expression.h"
 #include "language.h"
@@ -658,7 +659,8 @@ is_regular_file (const char *name)
 }
 
 /* Open a file named STRING, searching path PATH (dir names sep by some char)
-   using mode MODE and protection bits PROT in the calls to open.
+   using mode MODE in the calls to open.  You cannot use this function to
+   create files (O_CREAT).
 
    OPTS specifies the function behaviour in specific cases.
 
@@ -685,8 +687,7 @@ is_regular_file (const char *name)
     >>>>  eg executable, non-directory */
 int
 openp (const char *path, int opts, const char *string,
-       int mode, int prot,
-       char **filename_opened)
+       int mode, char **filename_opened)
 {
   int fd;
   char *filename;
@@ -694,6 +695,9 @@ openp (const char *path, int opts, const char *string,
   const char *p1;
   int len;
   int alloclen;
+
+  /* The open syscall MODE parameter is not specified.  */
+  gdb_assert ((mode & O_CREAT) == 0);
 
   if (!path)
     path = ".";
@@ -708,7 +712,7 @@ openp (const char *path, int opts, const char *string,
 	{
 	  filename = alloca (strlen (string) + 1);
 	  strcpy (filename, string);
-	  fd = open (filename, mode, prot);
+	  fd = open (filename, mode);
 	  if (fd >= 0)
 	    goto done;
 	}
@@ -822,12 +826,12 @@ done:
 
    Else, this functions returns 0, and FULL_PATHNAME is set to NULL.  */
 int
-source_full_path_of (char *filename, char **full_pathname)
+source_full_path_of (const char *filename, char **full_pathname)
 {
   int fd;
 
   fd = openp (source_path, OPF_TRY_CWD_FIRST | OPF_SEARCH_IN_PATH, filename,
-	      O_RDONLY, 0, full_pathname);
+	      O_RDONLY, full_pathname);
   if (fd < 0)
     {
       *full_pathname = NULL;
@@ -918,11 +922,9 @@ rewrite_source_path (const char *path)
 }
 
 /* This function is capable of finding the absolute path to a
-   source file, and opening it, provided you give it an 
-   OBJFILE and FILENAME. Both the DIRNAME and FULLNAME are only
-   added suggestions on where to find the file. 
+   source file, and opening it, provided you give it a FILENAME. Both the
+   DIRNAME and FULLNAME are only added suggestions on where to find the file. 
 
-   OBJFILE should be the objfile associated with a psymtab or symtab. 
    FILENAME should be the filename to open.
    DIRNAME is the compilation directory of a particular source file.
            Only some debug formats provide this info.
@@ -940,8 +942,7 @@ rewrite_source_path (const char *path)
      FULLNAME is set to NULL.  */
 
 static int
-find_and_open_source (struct objfile *objfile,
-		      const char *filename,
+find_and_open_source (const char *filename,
 		      const char *dirname,
 		      char **fullname)
 {
@@ -1017,13 +1018,13 @@ find_and_open_source (struct objfile *objfile,
         }
     }
 
-  result = openp (path, OPF_SEARCH_IN_PATH, filename, OPEN_MODE, 0, fullname);
+  result = openp (path, OPF_SEARCH_IN_PATH, filename, OPEN_MODE, fullname);
   if (result < 0)
     {
       /* Didn't work.  Try using just the basename. */
       p = lbasename (filename);
       if (p != filename)
-	result = openp (path, OPF_SEARCH_IN_PATH, p, OPEN_MODE, 0, fullname);
+	result = openp (path, OPF_SEARCH_IN_PATH, p, OPEN_MODE, fullname);
     }
 
   return result;
@@ -1040,8 +1041,7 @@ open_source_file (struct symtab *s)
   if (!s)
     return -1;
 
-  return find_and_open_source (s->objfile, s->filename, s->dirname, 
-			       &s->fullname);
+  return find_and_open_source (s->filename, s->dirname, &s->fullname);
 }
 
 /* Finds the fullname that a symtab represents.
@@ -1061,8 +1061,7 @@ symtab_to_fullname (struct symtab *s)
 
   /* Don't check s->fullname here, the file could have been 
      deleted/moved/..., look for it again */
-  r = find_and_open_source (s->objfile, s->filename, s->dirname,
-			    &s->fullname);
+  r = find_and_open_source (s->filename, s->dirname, &s->fullname);
 
   if (r >= 0)
     {
@@ -1090,8 +1089,7 @@ psymtab_to_fullname (struct partial_symtab *ps)
 
   /* Don't check ps->fullname here, the file could have been
      deleted/moved/..., look for it again */
-  r = find_and_open_source (ps->objfile, ps->filename, ps->dirname,
-			    &ps->fullname);
+  r = find_and_open_source (ps->filename, ps->dirname, &ps->fullname);
 
   if (r >= 0)
     {
@@ -1292,7 +1290,7 @@ identify_source_line (struct symtab *s, int line, int mid_statement,
     /* Don't index off the end of the line_charpos array.  */
     return 0;
   annotate_source (s->fullname, line, s->line_charpos[line - 1],
-		   mid_statement, pc);
+		   mid_statement, get_objfile_arch (s->objfile), pc);
 
   current_source_line = line;
   first_line_listed = line;
@@ -1471,6 +1469,8 @@ line_info (char *arg, int from_tty)
 
       if (sal.symtab == 0)
 	{
+	  struct gdbarch *gdbarch = get_current_arch ();
+
 	  printf_filtered (_("No line number information available"));
 	  if (sal.pc != 0)
 	    {
@@ -1479,7 +1479,7 @@ line_info (char *arg, int from_tty)
 	         address.  */
 	      printf_filtered (" for address ");
 	      wrap_here ("  ");
-	      print_address (sal.pc, gdb_stdout);
+	      print_address (gdbarch, sal.pc, gdb_stdout);
 	    }
 	  else
 	    printf_filtered (".");
@@ -1488,13 +1488,15 @@ line_info (char *arg, int from_tty)
       else if (sal.line > 0
 	       && find_line_pc_range (sal, &start_pc, &end_pc))
 	{
+	  struct gdbarch *gdbarch = get_objfile_arch (sal.symtab->objfile);
+
 	  if (start_pc == end_pc)
 	    {
 	      printf_filtered ("Line %d of \"%s\"",
 			       sal.line, sal.symtab->filename);
 	      wrap_here ("  ");
 	      printf_filtered (" is at address ");
-	      print_address (start_pc, gdb_stdout);
+	      print_address (gdbarch, start_pc, gdb_stdout);
 	      wrap_here ("  ");
 	      printf_filtered (" but contains no code.\n");
 	    }
@@ -1504,15 +1506,15 @@ line_info (char *arg, int from_tty)
 			       sal.line, sal.symtab->filename);
 	      wrap_here ("  ");
 	      printf_filtered (" starts at address ");
-	      print_address (start_pc, gdb_stdout);
+	      print_address (gdbarch, start_pc, gdb_stdout);
 	      wrap_here ("  ");
 	      printf_filtered (" and ends at ");
-	      print_address (end_pc, gdb_stdout);
+	      print_address (gdbarch, end_pc, gdb_stdout);
 	      printf_filtered (".\n");
 	    }
 
 	  /* x/i should display this line's code.  */
-	  set_next_address (current_gdbarch, start_pc);
+	  set_next_address (gdbarch, start_pc);
 
 	  /* Repeating "info line" should do the following line.  */
 	  last_line_listed = sal.line + 1;
@@ -1612,9 +1614,7 @@ forward_search_command (char *regex, int from_tty)
 	  /* Match! */
 	  fclose (stream);
 	  print_source_lines (current_source_symtab, line, line + 1, 0);
-	  set_internalvar (lookup_internalvar ("_"),
-			   value_from_longest (builtin_type_int32,
-					       (LONGEST) line));
+	  set_internalvar_integer (lookup_internalvar ("_"), line);
 	  current_source_line = max (line - lines_to_list / 2, 1);
 	  return;
 	}
@@ -1692,9 +1692,7 @@ reverse_search_command (char *regex, int from_tty)
 	  /* Match! */
 	  fclose (stream);
 	  print_source_lines (current_source_symtab, line, line + 1, 0);
-	  set_internalvar (lookup_internalvar ("_"),
-			   value_from_longest (builtin_type_int32,
-					       (LONGEST) line));
+	  set_internalvar_integer (lookup_internalvar ("_"), line);
 	  current_source_line = max (line - lines_to_list / 2, 1);
 	  return;
 	}
@@ -1746,7 +1744,7 @@ find_substitute_path_rule (const char *from)
 /* Add a new substitute-path rule at the end of the current list of rules.
    The new rule will replace FROM into TO.  */
 
-static void
+void
 add_substitute_path_rule (char *from, char *to)
 {
   struct substitute_path_rule *rule;

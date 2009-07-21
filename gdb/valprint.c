@@ -34,6 +34,7 @@
 #include "doublest.h"
 #include "exceptions.h"
 #include "dfp.h"
+#include "python/python.h"
 
 #include <errno.h>
 
@@ -80,7 +81,9 @@ struct value_print_options user_print_options =
   0,				/* print_array_indexes */
   0,				/* deref_ref */
   1,				/* static_field_print */
-  1				/* pascal_static_field_print */
+  1,				/* pascal_static_field_print */
+  0,				/* raw */
+  0				/* summary */
 };
 
 /* Initialize *OPTS to be a copy of the user print options.  */
@@ -214,6 +217,33 @@ show_addressprint (struct ui_file *file, int from_tty,
 }
 
 
+/* A helper function for val_print.  When printing in "summary" mode,
+   we want to print scalar arguments, but not aggregate arguments.
+   This function distinguishes between the two.  */
+
+static int
+scalar_type_p (struct type *type)
+{
+  CHECK_TYPEDEF (type);
+  while (TYPE_CODE (type) == TYPE_CODE_REF)
+    {
+      type = TYPE_TARGET_TYPE (type);
+      CHECK_TYPEDEF (type);
+    }
+  switch (TYPE_CODE (type))
+    {
+    case TYPE_CODE_ARRAY:
+    case TYPE_CODE_STRUCT:
+    case TYPE_CODE_UNION:
+    case TYPE_CODE_SET:
+    case TYPE_CODE_STRING:
+    case TYPE_CODE_BITSTRING:
+      return 0;
+    default:
+      return 1;
+    }
+}
+
 /* Print using the given LANGUAGE the data of type TYPE located at VALADDR
    (within GDB), which came from the inferior at address ADDRESS, onto
    stdio stream STREAM according to OPTIONS.
@@ -257,6 +287,23 @@ val_print (struct type *type, const gdb_byte *valaddr, int embedded_offset,
       return (0);
     }
 
+  if (!options->raw)
+    {
+      ret = apply_val_pretty_printer (type, valaddr, embedded_offset,
+				      address, stream, recurse, options,
+				      language);
+      if (ret)
+	return ret;
+    }
+
+  /* Handle summary mode.  If the value is a scalar, print it;
+     otherwise, print an ellipsis.  */
+  if (options->summary && !scalar_type_p (type))
+    {
+      fprintf_filtered (stream, "...");
+      return 0;
+    }
+
   TRY_CATCH (except, RETURN_MASK_ERROR)
     {
       ret = language->la_val_print (type, valaddr, embedded_offset, address,
@@ -287,6 +334,13 @@ value_check_printable (struct value *val, struct ui_file *stream)
       return 0;
     }
 
+  if (TYPE_CODE (value_type (val)) == TYPE_CODE_INTERNAL_FUNCTION)
+    {
+      fprintf_filtered (stream, _("<internal function %s>"),
+			value_internal_function_name (val));
+      return 0;
+    }
+
   return 1;
 }
 
@@ -308,7 +362,7 @@ common_val_print (struct value *val, struct ui_file *stream, int recurse,
     return 0;
 
   return val_print (value_type (val), value_contents_all (val),
-		    value_embedded_offset (val), VALUE_ADDRESS (val),
+		    value_embedded_offset (val), value_address (val),
 		    stream, recurse, options, language);
 }
 
@@ -324,6 +378,18 @@ value_print (struct value *val, struct ui_file *stream,
   if (!value_check_printable (val, stream))
     return 0;
 
+  if (!options->raw)
+    {
+      int r = apply_val_pretty_printer (value_type (val),
+					value_contents_all (val),
+					value_embedded_offset (val),
+					value_address (val),
+					stream, 0, options,
+					current_language);
+      if (r)
+	return r;
+    }
+
   return LA_VALUE_PRINT (val, stream, options);
 }
 
@@ -335,7 +401,7 @@ void
 val_print_type_code_int (struct type *type, const gdb_byte *valaddr,
 			 struct ui_file *stream)
 {
-  enum bfd_endian byte_order = gdbarch_byte_order (current_gdbarch);
+  enum bfd_endian byte_order = gdbarch_byte_order (get_type_arch (type));
 
   if (TYPE_LENGTH (type) > sizeof (LONGEST))
     {
@@ -343,7 +409,7 @@ val_print_type_code_int (struct type *type, const gdb_byte *valaddr,
 
       if (TYPE_UNSIGNED (type)
 	  && extract_long_unsigned_integer (valaddr, TYPE_LENGTH (type),
-					    &val))
+					    byte_order, &val))
 	{
 	  print_longest (stream, 'u', 0, val);
 	}
@@ -539,10 +605,11 @@ void
 print_decimal_floating (const gdb_byte *valaddr, struct type *type,
 			struct ui_file *stream)
 {
+  enum bfd_endian byte_order = gdbarch_byte_order (get_type_arch (type));
   char decstr[MAX_DECIMAL_STRING];
   unsigned len = TYPE_LENGTH (type);
 
-  decimal_to_string (valaddr, len, decstr);
+  decimal_to_string (valaddr, len, byte_order, decstr);
   fputs_filtered (decstr, stream);
   return;
 }
@@ -919,7 +986,8 @@ print_hex_chars (struct ui_file *stream, const gdb_byte *valaddr,
    Omit any leading zero chars.  */
 
 void
-print_char_chars (struct ui_file *stream, const gdb_byte *valaddr,
+print_char_chars (struct ui_file *stream, struct type *type,
+		  const gdb_byte *valaddr,
 		  unsigned len, enum bfd_endian byte_order)
 {
   const gdb_byte *p;
@@ -932,7 +1000,7 @@ print_char_chars (struct ui_file *stream, const gdb_byte *valaddr,
 
       while (p < valaddr + len)
 	{
-	  LA_EMIT_CHAR (*p, stream, '\'');
+	  LA_EMIT_CHAR (*p, type, stream, '\'');
 	  ++p;
 	}
     }
@@ -944,7 +1012,7 @@ print_char_chars (struct ui_file *stream, const gdb_byte *valaddr,
 
       while (p >= valaddr)
 	{
-	  LA_EMIT_CHAR (*p, stream, '\'');
+	  LA_EMIT_CHAR (*p, type, stream, '\'');
 	  --p;
 	}
     }
@@ -1201,7 +1269,7 @@ partial_memory_read (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int *errnoptr
 
 int
 read_string (CORE_ADDR addr, int len, int width, unsigned int fetchlimit,
-	     gdb_byte **buffer, int *bytes_read)
+	     enum bfd_endian byte_order, gdb_byte **buffer, int *bytes_read)
 {
   int found_nul;		/* Non-zero if we found the nul char.  */
   int errcode;			/* Errno returned from bad reads.  */
@@ -1273,7 +1341,7 @@ read_string (CORE_ADDR addr, int len, int width, unsigned int fetchlimit,
 	    {
 	      unsigned long c;
 
-	      c = extract_unsigned_integer (bufptr, width);
+	      c = extract_unsigned_integer (bufptr, width, byte_order);
 	      addr += width;
 	      bufptr += width;
 	      if (c == 0)
@@ -1315,7 +1383,8 @@ read_string (CORE_ADDR addr, int len, int width, unsigned int fetchlimit,
    whichever is smaller.  */
 
 int
-val_print_string (CORE_ADDR addr, int len, int width, struct ui_file *stream,
+val_print_string (struct type *elttype, CORE_ADDR addr, int len,
+		  struct ui_file *stream,
 		  const struct value_print_options *options)
 {
   int force_ellipsis = 0;	/* Force ellipsis to be printed if nonzero.  */
@@ -1325,6 +1394,9 @@ val_print_string (CORE_ADDR addr, int len, int width, struct ui_file *stream,
   int bytes_read;
   gdb_byte *buffer = NULL;	/* Dynamically growable fetch buffer.  */
   struct cleanup *old_chain = NULL;	/* Top of the old cleanup chain.  */
+  struct gdbarch *gdbarch = get_type_arch (elttype);
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+  int width = TYPE_LENGTH (elttype);
 
   /* First we need to figure out the limit on the number of characters we are
      going to attempt to fetch and print.  This is actually pretty simple.  If
@@ -1336,7 +1408,8 @@ val_print_string (CORE_ADDR addr, int len, int width, struct ui_file *stream,
 
   fetchlimit = (len == -1 ? options->print_max : min (len, options->print_max));
 
-  errcode = read_string (addr, len, width, fetchlimit, &buffer, &bytes_read);
+  errcode = read_string (addr, len, width, fetchlimit, byte_order,
+			 &buffer, &bytes_read);
   old_chain = make_cleanup (xfree, buffer);
 
   addr += bytes_read;
@@ -1345,8 +1418,8 @@ val_print_string (CORE_ADDR addr, int len, int width, struct ui_file *stream,
      terminated early due to an error or finding a null char when LEN is -1.  */
 
   /* Determine found_nul by looking at the last character read.  */
-  found_nul = extract_unsigned_integer (buffer + bytes_read - width, width) == 0;
-
+  found_nul = extract_unsigned_integer (buffer + bytes_read - width, width,
+					byte_order) == 0;
   if (len == -1 && !found_nul)
     {
       gdb_byte *peekbuf;
@@ -1358,7 +1431,7 @@ val_print_string (CORE_ADDR addr, int len, int width, struct ui_file *stream,
       peekbuf = (gdb_byte *) alloca (width);
 
       if (target_read_memory (addr, peekbuf, width) == 0
-	  && extract_unsigned_integer (peekbuf, width) != 0)
+	  && extract_unsigned_integer (peekbuf, width, byte_order) != 0)
 	force_ellipsis = 1;
     }
   else if ((len >= 0 && errcode != 0) || (len > bytes_read / width))
@@ -1378,7 +1451,7 @@ val_print_string (CORE_ADDR addr, int len, int width, struct ui_file *stream,
 	{
 	  fputs_filtered (" ", stream);
 	}
-      LA_PRINT_STRING (stream, buffer, bytes_read / width, width, force_ellipsis, options);
+      LA_PRINT_STRING (stream, elttype, buffer, bytes_read / width, force_ellipsis, options);
     }
 
   if (errcode != 0)
@@ -1386,13 +1459,13 @@ val_print_string (CORE_ADDR addr, int len, int width, struct ui_file *stream,
       if (errcode == EIO)
 	{
 	  fprintf_filtered (stream, " <Address ");
-	  fputs_filtered (paddress (addr), stream);
+	  fputs_filtered (paddress (gdbarch, addr), stream);
 	  fprintf_filtered (stream, " out of bounds>");
 	}
       else
 	{
 	  fprintf_filtered (stream, " <Error reading address ");
-	  fputs_filtered (paddress (addr), stream);
+	  fputs_filtered (paddress (gdbarch, addr), stream);
 	  fprintf_filtered (stream, ": %s>", safe_strerror (errcode));
 	}
     }

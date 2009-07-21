@@ -70,8 +70,9 @@ static SAVED_F77_COMMON_PTR allocate_saved_f77_common_node (void);
 static void patch_common_entries (SAVED_F77_COMMON_PTR, CORE_ADDR, int);
 #endif
 
-static void f_printchar (int c, struct ui_file * stream);
-static void f_emit_char (int c, struct ui_file * stream, int quoter);
+static void f_printchar (int c, struct type *type, struct ui_file * stream);
+static void f_emit_char (int c, struct type *type,
+			 struct ui_file * stream, int quoter);
 
 /* Print the character C on STREAM as part of the contents of a literal
    string whose delimiter is QUOTER.  Note that that format for printing
@@ -80,7 +81,7 @@ static void f_emit_char (int c, struct ui_file * stream, int quoter);
    be replaced with a true F77 version.  */
 
 static void
-f_emit_char (int c, struct ui_file *stream, int quoter)
+f_emit_char (int c, struct type *type, struct ui_file *stream, int quoter)
 {
   c &= 0xFF;			/* Avoid sign bit follies */
 
@@ -126,10 +127,10 @@ f_emit_char (int c, struct ui_file *stream, int quoter)
    be replaced with a true F77version. */
 
 static void
-f_printchar (int c, struct ui_file *stream)
+f_printchar (int c, struct type *type, struct ui_file *stream)
 {
   fputs_filtered ("'", stream);
-  LA_EMIT_CHAR (c, stream, '\'');
+  LA_EMIT_CHAR (c, type, stream, '\'');
   fputs_filtered ("'", stream);
 }
 
@@ -141,14 +142,15 @@ f_printchar (int c, struct ui_file *stream)
    be replaced with a true F77 version. */
 
 static void
-f_printstr (struct ui_file *stream, const gdb_byte *string,
-	    unsigned int length, int width, int force_ellipses,
+f_printstr (struct ui_file *stream, struct type *type, const gdb_byte *string,
+	    unsigned int length, int force_ellipses,
 	    const struct value_print_options *options)
 {
   unsigned int i;
   unsigned int things_printed = 0;
   int in_quotes = 0;
   int need_comma = 0;
+  int width = TYPE_LENGTH (type);
 
   if (length == 0)
     {
@@ -190,7 +192,7 @@ f_printstr (struct ui_file *stream, const gdb_byte *string,
 		fputs_filtered ("', ", stream);
 	      in_quotes = 0;
 	    }
-	  f_printchar (string[i], stream);
+	  f_printchar (string[i], type, stream);
 	  fprintf_filtered (stream, " <repeats %u times>", reps);
 	  i = rep1 - 1;
 	  things_printed += options->repeat_count_threshold;
@@ -206,7 +208,7 @@ f_printstr (struct ui_file *stream, const gdb_byte *string,
 		fputs_filtered ("'", stream);
 	      in_quotes = 1;
 	    }
-	  LA_EMIT_CHAR (string[i], stream, '"');
+	  LA_EMIT_CHAR (string[i], type, stream, '"');
 	  ++things_printed;
 	}
     }
@@ -353,85 +355,50 @@ build_fortran_types (struct gdbarch *gdbarch)
   struct builtin_f_type *builtin_f_type
     = GDBARCH_OBSTACK_ZALLOC (gdbarch, struct builtin_f_type);
 
-  builtin_f_type->builtin_void =
-    init_type (TYPE_CODE_VOID, 1,
-	       0,
-	       "VOID", (struct objfile *) NULL);
+  builtin_f_type->builtin_void
+    = arch_type (gdbarch, TYPE_CODE_VOID, 1, "VOID");
 
-  builtin_f_type->builtin_character =
-    init_type (TYPE_CODE_INT, TARGET_CHAR_BIT / TARGET_CHAR_BIT,
-	       0,
-	       "character", (struct objfile *) NULL);
+  builtin_f_type->builtin_character
+    = arch_integer_type (gdbarch, TARGET_CHAR_BIT, 0, "character");
 
-  builtin_f_type->builtin_logical_s1 =
-    init_type (TYPE_CODE_BOOL, TARGET_CHAR_BIT / TARGET_CHAR_BIT,
-	       TYPE_FLAG_UNSIGNED,
-	       "logical*1", (struct objfile *) NULL);
+  builtin_f_type->builtin_logical_s1
+    = arch_boolean_type (gdbarch, TARGET_CHAR_BIT, 1, "logical*1");
 
-  builtin_f_type->builtin_integer_s2 =
-    init_type (TYPE_CODE_INT,
-	       gdbarch_short_bit (gdbarch) / TARGET_CHAR_BIT,
-	       0, "integer*2", (struct objfile *) NULL);
+  builtin_f_type->builtin_integer_s2
+    = arch_integer_type (gdbarch, gdbarch_short_bit (gdbarch), 0,
+			 "integer*2");
 
-  builtin_f_type->builtin_logical_s2 =
-    init_type (TYPE_CODE_BOOL,
-	       gdbarch_short_bit (gdbarch) / TARGET_CHAR_BIT,
-	       TYPE_FLAG_UNSIGNED, "logical*2", (struct objfile *) NULL);
+  builtin_f_type->builtin_logical_s2
+    = arch_boolean_type (gdbarch, gdbarch_short_bit (gdbarch), 1,
+			 "logical*2");
 
-  builtin_f_type->builtin_integer =
-    init_type (TYPE_CODE_INT, 
-	       gdbarch_int_bit (gdbarch) / TARGET_CHAR_BIT,
-	       0, "integer", (struct objfile *) NULL);
+  builtin_f_type->builtin_integer
+    = arch_integer_type (gdbarch, gdbarch_int_bit (gdbarch), 0,
+			 "integer");
 
-  builtin_f_type->builtin_logical =
-    init_type (TYPE_CODE_BOOL, 
-	       gdbarch_int_bit (gdbarch) / TARGET_CHAR_BIT,
-	       TYPE_FLAG_UNSIGNED, "logical*4", (struct objfile *) NULL);
+  builtin_f_type->builtin_logical
+    = arch_boolean_type (gdbarch, gdbarch_int_bit (gdbarch), 1,
+			 "logical*4");
 
-  builtin_f_type->builtin_real =
-    init_type (TYPE_CODE_FLT,
-	       gdbarch_float_bit (gdbarch) / TARGET_CHAR_BIT,
-	       0,
-	       "real", (struct objfile *) NULL);
+  builtin_f_type->builtin_real
+    = arch_float_type (gdbarch, gdbarch_float_bit (gdbarch),
+		       "real", NULL);
+  builtin_f_type->builtin_real_s8
+    = arch_float_type (gdbarch, gdbarch_double_bit (gdbarch),
+		       "real*8", NULL);
+  builtin_f_type->builtin_real_s16
+    = arch_float_type (gdbarch, gdbarch_long_double_bit (gdbarch),
+		       "real*16", NULL);
 
-  builtin_f_type->builtin_real_s8 =
-    init_type (TYPE_CODE_FLT,
-	       gdbarch_double_bit (gdbarch) / TARGET_CHAR_BIT,
-	       0,
-	       "real*8", (struct objfile *) NULL);
-
-  builtin_f_type->builtin_real_s16 =
-    init_type (TYPE_CODE_FLT,
-	       gdbarch_long_double_bit (gdbarch) / TARGET_CHAR_BIT,
-	       0,
-	       "real*16", (struct objfile *) NULL);
-
-  builtin_f_type->builtin_complex_s8 =
-    init_type (TYPE_CODE_COMPLEX,
-	       2 * gdbarch_float_bit (gdbarch) / TARGET_CHAR_BIT,
-	       0,
-	       "complex*8", (struct objfile *) NULL);
-  TYPE_TARGET_TYPE (builtin_f_type->builtin_complex_s8)
-    = builtin_f_type->builtin_real;
-
-  builtin_f_type->builtin_complex_s16 =
-    init_type (TYPE_CODE_COMPLEX,
-	       2 * gdbarch_double_bit (gdbarch) / TARGET_CHAR_BIT,
-	       0,
-	       "complex*16", (struct objfile *) NULL);
-  TYPE_TARGET_TYPE (builtin_f_type->builtin_complex_s16)
-    = builtin_f_type->builtin_real_s8;
-
-  /* We have a new size == 4 double floats for the
-     complex*32 data type */
-
-  builtin_f_type->builtin_complex_s32 =
-    init_type (TYPE_CODE_COMPLEX,
-	       2 * gdbarch_long_double_bit (gdbarch) / TARGET_CHAR_BIT,
-	       0,
-	       "complex*32", (struct objfile *) NULL);
-  TYPE_TARGET_TYPE (builtin_f_type->builtin_complex_s32)
-    = builtin_f_type->builtin_real_s16;
+  builtin_f_type->builtin_complex_s8
+    = arch_complex_type (gdbarch, "complex*8",
+			 builtin_f_type->builtin_real);
+  builtin_f_type->builtin_complex_s16
+    = arch_complex_type (gdbarch, "complex*16",
+			 builtin_f_type->builtin_real_s8);
+  builtin_f_type->builtin_complex_s32
+    = arch_complex_type (gdbarch, "complex*32",
+			 builtin_f_type->builtin_real_s16);
 
   return builtin_f_type;
 }

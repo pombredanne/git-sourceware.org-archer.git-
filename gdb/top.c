@@ -266,7 +266,8 @@ void (*deprecated_memory_changed_hook) (CORE_ADDR addr, int len);
    while waiting for target events.  */
 
 ptid_t (*deprecated_target_wait_hook) (ptid_t ptid,
-				       struct target_waitstatus * status);
+				       struct target_waitstatus *status,
+				       int options);
 
 /* Used by UI as a wrapper around command execution.  May do various things
    like enabling/disabling buttons, etc...  */
@@ -400,14 +401,6 @@ execute_command (char *p, int from_tty)
 
       c = lookup_cmd (&p, cmdlist, "", 0, 1);
 
-      /* If the selected thread has terminated, we allow only a
-	 limited set of commands.  */
-      if (target_can_async_p ()
-	  && is_exited (inferior_ptid)
-	  && !get_cmd_no_selected_thread_ok (c))
-	error (_("\
-Cannot execute this command without a live selected thread.  See `help thread'."));
-
       /* Pass null arg rather than an empty one.  */
       arg = *p ? p : 0;
 
@@ -469,7 +462,7 @@ Cannot execute this command without a live selected thread.  See `help thread'."
   /* FIXME:  This should be cacheing the frame and only running when
      the frame changes.  */
 
-  if (target_has_stack && is_stopped (inferior_ptid))
+  if (has_stack_frames ())
     {
       flang = get_frame_language ();
       if (!warned
@@ -1160,11 +1153,11 @@ void
 set_prompt (char *s)
 {
 /* ??rehrauer: I don't know why this fails, since it looks as though
-   assignments to prompt are wrapped in calls to savestring...
+   assignments to prompt are wrapped in calls to xstrdup...
    if (prompt != NULL)
    xfree (prompt);
  */
-  PROMPT (0) = savestring (s, strlen (s));
+  PROMPT (0) = xstrdup (s);
 }
 
 
@@ -1229,10 +1222,15 @@ kill_or_detach (struct inferior *inf, void *args)
   if (thread)
     {
       switch_to_thread (thread->ptid);
-      if (inf->attach_flag)
-	target_detach (qt->args, qt->from_tty);
-      else
-	target_kill ();
+
+      /* Leave core files alone.  */
+      if (target_has_execution)
+	{
+	  if (inf->attach_flag)
+	    target_detach (qt->args, qt->from_tty);
+	  else
+	    target_kill ();
+	}
     }
 
   return 0;
@@ -1246,8 +1244,7 @@ quit_target (void *arg)
   struct qt_args *qt = (struct qt_args *)arg;
 
   /* Kill or detach all inferiors.  */
-  if (target_has_execution)
-    iterate_over_inferiors (kill_or_detach, qt);
+  iterate_over_inferiors (kill_or_detach, qt);
 
   /* Give all pushed targets a chance to do minimal cleanup, and pop
      them all out.  */
@@ -1465,7 +1462,7 @@ init_history (void)
 
   tmpenv = getenv ("GDBHISTFILE");
   if (tmpenv)
-    history_filename = savestring (tmpenv, strlen (tmpenv));
+    history_filename = xstrdup (tmpenv);
   else if (!history_filename)
     {
       /* We include the current directory so that if the user changes
@@ -1523,13 +1520,13 @@ init_main (void)
      whatever the DEFAULT_PROMPT is.  */
   the_prompts.top = 0;
   PREFIX (0) = "";
-  PROMPT (0) = savestring (DEFAULT_PROMPT, strlen (DEFAULT_PROMPT));
+  PROMPT (0) = xstrdup (DEFAULT_PROMPT);
   SUFFIX (0) = "";
   /* Set things up for annotation_level > 1, if the user ever decides
      to use it.  */
   async_annotation_suffix = "prompt";
   /* Set the variable associated with the setshow prompt command.  */
-  new_async_prompt = savestring (PROMPT (0), strlen (PROMPT (0)));
+  new_async_prompt = xstrdup (PROMPT (0));
 
   /* If gdb was started with --annotate=2, this is equivalent to the
      user entering the command 'set annotate 2' at the gdb prompt, so
@@ -1543,6 +1540,7 @@ init_main (void)
   write_history_p = 0;
 
   /* Setup important stuff for command line editing.  */
+  rl_completion_word_break_hook = gdb_completion_word_break_characters;
   rl_completion_entry_function = readline_line_completion_function;
   rl_completer_word_break_characters = default_word_break_characters ();
   rl_completer_quote_characters = get_gdb_completer_quote_characters ();
@@ -1626,6 +1624,15 @@ Use \"on\" to enable the notification, and \"off\" to disable it."),
 			   NULL,
 			   show_exec_done_display_p,
 			   &setlist, &showlist);
+
+  add_setshow_filename_cmd ("data-directory", class_maintenance,
+                           &gdb_datadir, _("Set GDB's data directory."),
+                           _("Show GDB's data directory."),
+                           _("\
+When set, GDB uses the specified path to search for data files."),
+                           NULL, NULL,
+                           &setlist,
+                           &showlist);
 }
 
 void

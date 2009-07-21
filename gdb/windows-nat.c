@@ -38,6 +38,7 @@
 #include <stdlib.h>
 #include <windows.h>
 #include <imagehlp.h>
+#include <psapi.h>
 #ifdef __CYGWIN__
 #include <sys/cygwin.h>
 #endif
@@ -62,6 +63,31 @@
 
 #include "windows-tdep.h"
 #include "windows-nat.h"
+#include "i386-nat.h"
+
+#define AdjustTokenPrivileges		dyn_AdjustTokenPrivileges
+#define DebugActiveProcessStop		dyn_DebugActiveProcessStop
+#define DebugBreakProcess		dyn_DebugBreakProcess
+#define DebugSetProcessKillOnExit	dyn_DebugSetProcessKillOnExit
+#define EnumProcessModules		dyn_EnumProcessModules
+#define GetModuleFileNameExA		dyn_GetModuleFileNameExA
+#define GetModuleInformation		dyn_GetModuleInformation
+#define LookupPrivilegeValueA		dyn_LookupPrivilegeValueA
+#define OpenProcessToken		dyn_OpenProcessToken
+
+static BOOL WINAPI (*AdjustTokenPrivileges)(HANDLE, BOOL, PTOKEN_PRIVILEGES,
+					    DWORD, PTOKEN_PRIVILEGES, PDWORD);
+static BOOL WINAPI (*DebugActiveProcessStop) (DWORD);
+static BOOL WINAPI (*DebugBreakProcess) (HANDLE);
+static BOOL WINAPI (*DebugSetProcessKillOnExit) (BOOL);
+static BOOL WINAPI (*EnumProcessModules) (HANDLE, HMODULE *, DWORD,
+					  LPDWORD);
+static DWORD WINAPI (*GetModuleFileNameExA) (HANDLE, HMODULE, LPSTR,
+					    DWORD);
+static BOOL WINAPI (*GetModuleInformation) (HANDLE, HMODULE, LPMODULEINFO,
+					    DWORD);
+static BOOL WINAPI (*LookupPrivilegeValueA)(LPCSTR, LPCSTR, PLUID);
+static BOOL WINAPI (*OpenProcessToken)(HANDLE, DWORD, PHANDLE);
 
 static struct target_ops windows_ops;
 
@@ -84,7 +110,6 @@ enum
     CONTEXT_DEBUGGER = (CONTEXT_FULL | CONTEXT_FLOATING_POINT)
   };
 #endif
-#include <psapi.h>
 
 #ifndef CONTEXT_EXTENDED_REGISTERS
 /* This macro is only defined on ia32.  It only makes sense on this target,
@@ -114,7 +139,11 @@ static int debug_registers_used;
 
 static void windows_stop (ptid_t);
 static int windows_thread_alive (struct target_ops *, ptid_t);
-static void windows_kill_inferior (void);
+static void windows_kill_inferior (struct target_ops *);
+
+static void cygwin_set_dr (int i, CORE_ADDR addr);
+static void cygwin_set_dr7 (unsigned long val);
+static unsigned long cygwin_get_dr6 (void);
 
 static enum target_signal last_sig = TARGET_SIGNAL_0;
 /* Set if a signal was received from the debugged process */
@@ -366,7 +395,7 @@ do_windows_fetch_inferior_registers (struct regcache *regcache, int r)
 	  thread_info *th = current_thread;
 	  th->context.ContextFlags = CONTEXT_DEBUGGER_DR;
 	  GetThreadContext (th->h, &th->context);
-	  /* Copy dr values from that thread. 
+	  /* Copy dr values from that thread.
 	     But only if there were not modified since last stop. PR gdb/2388 */
 	  if (!debug_registers_changed)
 	    {
@@ -438,14 +467,6 @@ windows_store_inferior_registers (struct target_ops *ops,
     do_windows_store_inferior_registers (regcache, r);
 }
 
-static int psapi_loaded = 0;
-static BOOL WINAPI (*psapi_EnumProcessModules) (HANDLE, HMODULE *, DWORD,
-						LPDWORD);
-static BOOL WINAPI (*psapi_GetModuleInformation) (HANDLE, HMODULE, LPMODULEINFO,
-						  DWORD);
-static DWORD WINAPI (*psapi_GetModuleFileNameExA) (HANDLE, HMODULE, LPSTR,
-						   DWORD);
-
 /* Get the name of a given module at at given base address.  If base_address
    is zero return the first loaded module (which is always the name of the
    executable).  */
@@ -465,15 +486,10 @@ get_module_name (LPVOID base_address, char *dll_name_ret)
   char *pathbuf = dll_name_ret;	/* Just copy directly to passed-in arg */
 #endif
 
-  /* If psapi_loaded < 0 either psapi.dll is not available or it does not contain
-     the needed functions. */
-  if (psapi_loaded <= 0)
-    goto failed;
-
   cbNeeded = 0;
   /* Find size of buffer needed to handle list of modules loaded in inferior */
-  if (!psapi_EnumProcessModules (current_process_handle, DllHandle,
-				 sizeof (HMODULE), &cbNeeded) || !cbNeeded)
+  if (!EnumProcessModules (current_process_handle, DllHandle,
+			   sizeof (HMODULE), &cbNeeded) || !cbNeeded)
     goto failed;
 
   /* Allocate correct amount of space for module list */
@@ -482,22 +498,22 @@ get_module_name (LPVOID base_address, char *dll_name_ret)
     goto failed;
 
   /* Get the list of modules */
-  if (!psapi_EnumProcessModules (current_process_handle, DllHandle, cbNeeded,
+  if (!EnumProcessModules (current_process_handle, DllHandle, cbNeeded,
 				 &cbNeeded))
     goto failed;
 
   for (i = 0; i < (int) (cbNeeded / sizeof (HMODULE)); i++)
     {
       /* Get information on this module */
-      if (!psapi_GetModuleInformation (current_process_handle, DllHandle[i],
-				       &mi, sizeof (mi)))
+      if (!GetModuleInformation (current_process_handle, DllHandle[i],
+				 &mi, sizeof (mi)))
 	error (_("Can't get module info"));
 
       if (!base_address || mi.lpBaseOfDll == base_address)
 	{
 	  /* Try to find the name of the given module */
-	  len = psapi_GetModuleFileNameExA (current_process_handle,
-					    DllHandle[i], pathbuf, MAX_PATH);
+	  len = GetModuleFileNameExA (current_process_handle,
+				      DllHandle[i], pathbuf, MAX_PATH);
 	  if (len == 0)
 	    error (_("Error getting dll name: %u."), (unsigned) GetLastError ());
 #ifdef __CYGWIN__
@@ -540,7 +556,9 @@ static int
 safe_symbol_file_add_stub (void *argv)
 {
 #define p ((struct safe_symbol_file_add_args *) argv)
-  p->ret = symbol_file_add (p->name, p->from_tty, p->addrs, p->mainline, p->flags);
+  const int add_flags = ((p->from_tty ? SYMFILE_VERBOSE : 0)
+                         | (p->mainline ? SYMFILE_MAINLINE : 0));
+  p->ret = symbol_file_add (p->name, add_flags, p->addrs, p->flags);
   return !!p->ret;
 #undef p
 }
@@ -729,8 +747,8 @@ handle_load_dll (void *dummy)
   solib_end->next = windows_make_so (dll_name, event->lpBaseOfDll);
   solib_end = solib_end->next;
 
-  DEBUG_EVENTS (("gdb: Loading dll \"%s\" at %p.\n", solib_end->so_name,
-		 solib_end->lm_info->load_addr));
+  DEBUG_EVENTS (("gdb: Loading dll \"%s\" at %s.\n", solib_end->so_name,
+		 host_address_to_string (solib_end->lm_info->load_addr)));
 
   return 1;
 }
@@ -763,7 +781,8 @@ handle_unload_dll (void *dummy)
 	return 1;
       }
 
-  error (_("Error: dll starting at %p not found."), lpBaseOfDll);
+  error (_("Error: dll starting at %s not found."),
+	   host_address_to_string (lpBaseOfDll));
 
   return 0;
 }
@@ -975,8 +994,9 @@ info_w32_command (char *args, int from_tty)
 
 
 #define DEBUG_EXCEPTION_SIMPLE(x)       if (debug_exceptions) \
-  printf_unfiltered ("gdb: Target exception %s at %p\n", x, \
-          current_event.u.Exception.ExceptionRecord.ExceptionAddress)
+  printf_unfiltered ("gdb: Target exception %s at %s\n", x, \
+    host_address_to_string (\
+      current_event.u.Exception.ExceptionRecord.ExceptionAddress))
 
 static int
 handle_exception (struct target_waitstatus *ourstatus)
@@ -1087,9 +1107,10 @@ handle_exception (struct target_waitstatus *ourstatus)
       /* Treat unhandled first chance exceptions specially. */
       if (current_event.u.Exception.dwFirstChance)
 	return -1;
-      printf_unfiltered ("gdb: unknown target exception 0x%08lx at %p\n",
-		    current_event.u.Exception.ExceptionRecord.ExceptionCode,
-	        current_event.u.Exception.ExceptionRecord.ExceptionAddress);
+      printf_unfiltered ("gdb: unknown target exception 0x%08lx at %s\n",
+	current_event.u.Exception.ExceptionRecord.ExceptionCode,
+	host_address_to_string (
+	  current_event.u.Exception.ExceptionRecord.ExceptionAddress));
       ourstatus->value.sig = TARGET_SIGNAL_UNKNOWN;
       break;
     }
@@ -1227,9 +1248,10 @@ windows_resume (struct target_ops *ops,
       if (step)
 	{
 	  /* Single step by setting t bit */
-	  windows_fetch_inferior_registers (ops,
-					    get_current_regcache (),
-					    gdbarch_ps_regnum (current_gdbarch));
+	  struct regcache *regcache = get_current_regcache ();
+	  struct gdbarch *gdbarch = get_regcache_arch (regcache);
+	  windows_fetch_inferior_registers (ops, regcache,
+					    gdbarch_ps_regnum (gdbarch));
 	  th->context.EFlags |= FLAG_TRACE_BIT;
 	}
 
@@ -1258,9 +1280,34 @@ windows_resume (struct target_ops *ops,
     windows_continue (continue_status, ptid_get_tid (ptid));
 }
 
+/* Ctrl-C handler used when the inferior is not run in the same console.  The
+   handler is in charge of interrupting the inferior using DebugBreakProcess.
+   Note that this function is not available prior to Windows XP.  In this case
+   we emit a warning.  */
+BOOL WINAPI
+ctrl_c_handler (DWORD event_type)
+{
+  const int attach_flag = current_inferior ()->attach_flag;
+
+  /* Only handle Ctrl-C event.  Ignore others.  */
+  if (event_type != CTRL_C_EVENT)
+    return FALSE;
+
+  /* If the inferior and the debugger share the same console, do nothing as
+     the inferior has also received the Ctrl-C event.  */
+  if (!new_console && !attach_flag)
+    return TRUE;
+
+  if (!DebugBreakProcess (current_process_handle))
+    warning (_("\
+Could not interrupt program.  Press Ctrl-c in the program console."));
+
+  /* Return true to tell that Ctrl-C has been handled.  */
+  return TRUE;
+}
+
 /* Get the next event from the child.  Return 1 if the event requires
-   handling by WFI (or whatever).
- */
+   handling by WFI (or whatever).  */
 static int
 get_windows_debug_event (struct target_ops *ops,
 			 int pid, struct target_waitstatus *ourstatus)
@@ -1337,13 +1384,13 @@ get_windows_debug_event (struct target_ops *ops,
 
       current_process_handle = current_event.u.CreateProcessInfo.hProcess;
       if (main_thread_id)
- 	windows_delete_thread (ptid_build (current_event.dwProcessId, 0,
-					 main_thread_id));
+	windows_delete_thread (ptid_build (current_event.dwProcessId, 0,
+					   main_thread_id));
       main_thread_id = current_event.dwThreadId;
       /* Add the main thread */
       th = windows_add_thread (ptid_build (current_event.dwProcessId, 0,
-					 current_event.dwThreadId),
-			     current_event.u.CreateProcessInfo.hThread);
+					   current_event.dwThreadId),
+			       current_event.u.CreateProcessInfo.hThread);
       retval = current_event.dwThreadId;
       break;
 
@@ -1450,7 +1497,7 @@ out:
 /* Wait for interesting events to occur in the target process.  */
 static ptid_t
 windows_wait (struct target_ops *ops,
-	      ptid_t ptid, struct target_waitstatus *ourstatus)
+	      ptid_t ptid, struct target_waitstatus *ourstatus, int options)
 {
   int pid = -1;
 
@@ -1465,23 +1512,36 @@ windows_wait (struct target_ops *ops,
   while (1)
     {
       int retval;
-      
-      /* Ignore CTRL+C signals while waiting for a debug event.
-         FIXME: brobecker/2008-05-20: When the user presses CTRL+C while
-         the inferior is running, both the inferior and GDB receive the
-         associated signal.  If the inferior receives the signal first
-         and the delay until GDB receives that signal is sufficiently long,
-         GDB can sometimes receive the SIGINT after we have unblocked
-         the CTRL+C handler.  This would lead to the debugger to stop
-         prematurely while handling the new-thread event that comes
-         with the handling of the SIGINT inside the inferior, and then
-         stop again immediately when the user tries to resume the execution
-         in the inferior.  This is a classic race, and it would be nice
-         to find a better solution to that problem.  But in the meantime,
-         the current approach already greatly mitigate this issue.  */
-      SetConsoleCtrlHandler (NULL, TRUE);
+
+      /* If the user presses Ctrl-c while the debugger is waiting
+	 for an event, he expects the debugger to interrupt his program
+	 and to get the prompt back.  There are two possible situations:
+
+	   - The debugger and the program do not share the console, in
+	     which case the Ctrl-c event only reached the debugger.
+	     In that case, the ctrl_c handler will take care of interrupting
+	     the inferior. Note that this case is working starting with
+	     Windows XP. For Windows 2000, Ctrl-C should be pressed in the
+	     inferior console.
+
+	   - The debugger and the program share the same console, in which
+	     case both debugger and inferior will receive the Ctrl-c event.
+	     In that case the ctrl_c handler will ignore the event, as the
+	     Ctrl-c event generated inside the inferior will trigger the
+	     expected debug event.
+
+	     FIXME: brobecker/2008-05-20: If the inferior receives the
+	     signal first and the delay until GDB receives that signal
+	     is sufficiently long, GDB can sometimes receive the SIGINT
+	     after we have unblocked the CTRL+C handler.  This would
+	     lead to the debugger stopping prematurely while handling
+	     the new-thread event that comes with the handling of the SIGINT
+	     inside the inferior, and then stop again immediately when
+	     the user tries to resume the execution in the inferior.
+	     This is a classic race that we should try to fix one day.  */
+      SetConsoleCtrlHandler (&ctrl_c_handler, TRUE);
       retval = get_windows_debug_event (ops, pid, ourstatus);
-      SetConsoleCtrlHandler (NULL, FALSE);
+      SetConsoleCtrlHandler (&ctrl_c_handler, FALSE);
 
       if (retval)
 	return ptid_build (current_event.dwProcessId, 0, retval);
@@ -1493,7 +1553,7 @@ windows_wait (struct target_ops *ops,
 	    detach = deprecated_ui_loop_hook (0);
 
 	  if (detach)
-	    windows_kill_inferior ();
+	    windows_kill_inferior (ops);
 	}
     }
 }
@@ -1554,36 +1614,6 @@ do_initial_windows_stuff (struct target_ops *ops, DWORD pid, int attaching)
   return;
 }
 
-/* Since Windows XP, detaching from a process is supported by Windows.
-   The following code tries loading the appropriate functions dynamically.
-   If loading these functions succeeds use them to actually detach from
-   the inferior process, otherwise behave as usual, pretending that
-   detach has worked. */
-static BOOL WINAPI (*kernel32_DebugSetProcessKillOnExit)(BOOL);
-static BOOL WINAPI (*kernel32_DebugActiveProcessStop)(DWORD);
-
-static int
-has_detach_ability (void)
-{
-  static HMODULE kernel32 = NULL;
-
-  if (!kernel32)
-    kernel32 = LoadLibrary ("kernel32.dll");
-  if (kernel32)
-    {
-      if (!kernel32_DebugSetProcessKillOnExit)
-	kernel32_DebugSetProcessKillOnExit =
-	  (void *) GetProcAddress (kernel32, "DebugSetProcessKillOnExit");
-      if (!kernel32_DebugActiveProcessStop)
-	kernel32_DebugActiveProcessStop =
-	  (void *) GetProcAddress (kernel32, "DebugActiveProcessStop");
-      if (kernel32_DebugSetProcessKillOnExit
-	  && kernel32_DebugActiveProcessStop)
-	return 1;
-    }
-  return 0;
-}
-
 /* Try to set or remove a user privilege to the current process.  Return -1
    if that fails, the previous setting of that privilege otherwise.
 
@@ -1593,47 +1623,18 @@ has_detach_ability (void)
 static int
 set_process_privilege (const char *privilege, BOOL enable)
 {
-  static HMODULE advapi32 = NULL;
-  static BOOL WINAPI (*OpenProcessToken)(HANDLE, DWORD, PHANDLE);
-  static BOOL WINAPI (*LookupPrivilegeValue)(LPCSTR, LPCSTR, PLUID);
-  static BOOL WINAPI (*AdjustTokenPrivileges)(HANDLE, BOOL, PTOKEN_PRIVILEGES,
-					      DWORD, PTOKEN_PRIVILEGES, PDWORD);
-
   HANDLE token_hdl = NULL;
   LUID restore_priv;
   TOKEN_PRIVILEGES new_priv, orig_priv;
   int ret = -1;
   DWORD size;
 
-  if (GetVersion () >= 0x80000000)  /* No security availbale on 9x/Me */
-    return 0;
-
-  if (!advapi32)
-    {
-      if (!(advapi32 = LoadLibrary ("advapi32.dll")))
-	goto out;
-      if (!OpenProcessToken)
-	OpenProcessToken =
-          (void *) GetProcAddress (advapi32, "OpenProcessToken");
-      if (!LookupPrivilegeValue)
-	LookupPrivilegeValue =
-          (void *) GetProcAddress (advapi32, "LookupPrivilegeValueA");
-      if (!AdjustTokenPrivileges)
-	AdjustTokenPrivileges =
-          (void *) GetProcAddress (advapi32, "AdjustTokenPrivileges");
-      if (!OpenProcessToken || !LookupPrivilegeValue || !AdjustTokenPrivileges)
-	{
-	  advapi32 = NULL;
-	  goto out;
-	}
-    }
-
   if (!OpenProcessToken (GetCurrentProcess (),
 			 TOKEN_QUERY | TOKEN_ADJUST_PRIVILEGES,
 			 &token_hdl))
     goto out;
 
-  if (!LookupPrivilegeValue (NULL, privilege, &restore_priv))
+  if (!LookupPrivilegeValueA (NULL, privilege, &restore_priv))
     goto out;
 
   new_priv.PrivilegeCount = 1;
@@ -1698,8 +1699,7 @@ windows_attach (struct target_ops *ops, char *args, int from_tty)
   if (!ok)
     error (_("Can't attach to process."));
 
-  if (has_detach_ability ())
-    kernel32_DebugSetProcessKillOnExit (FALSE);
+  DebugSetProcessKillOnExit (FALSE);
 
   if (from_tty)
     {
@@ -1724,19 +1724,17 @@ windows_detach (struct target_ops *ops, char *args, int from_tty)
 {
   int detached = 1;
 
-  if (has_detach_ability ())
-    {
-      ptid_t ptid = {-1};
-      windows_resume (ops, ptid, 0, TARGET_SIGNAL_0);
+  ptid_t ptid = {-1};
+  windows_resume (ops, ptid, 0, TARGET_SIGNAL_0);
 
-      if (!kernel32_DebugActiveProcessStop (current_event.dwProcessId))
-	{
-	  error (_("Can't detach process %lu (error %lu)"),
-		 current_event.dwProcessId, GetLastError ());
-	  detached = 0;
-	}
-      kernel32_DebugSetProcessKillOnExit (FALSE);
+  if (!DebugActiveProcessStop (current_event.dwProcessId))
+    {
+      error (_("Can't detach process %lu (error %lu)"),
+	     current_event.dwProcessId, GetLastError ());
+      detached = 0;
     }
+  DebugSetProcessKillOnExit (FALSE);
+
   if (detached && from_tty)
     {
       char *exec_file = get_exec_file (0);
@@ -1994,18 +1992,18 @@ windows_xfer_memory (CORE_ADDR memaddr, gdb_byte *our, int len,
     {
       DEBUG_MEM (("gdb: write target memory, %d bytes at 0x%08lx\n",
 		  len, (DWORD) (uintptr_t) memaddr));
-      if (!WriteProcessMemory (current_process_handle, 
+      if (!WriteProcessMemory (current_process_handle,
 			       (LPVOID) (uintptr_t) memaddr, our,
 			       len, &done))
 	done = 0;
-      FlushInstructionCache (current_process_handle, 
+      FlushInstructionCache (current_process_handle,
 			     (LPCVOID) (uintptr_t) memaddr, len);
     }
   else
     {
       DEBUG_MEM (("gdb: read target memory, %d bytes at 0x%08lx\n",
 		  len, (DWORD) (uintptr_t) memaddr));
-      if (!ReadProcessMemory (current_process_handle, 
+      if (!ReadProcessMemory (current_process_handle,
 			      (LPCVOID) (uintptr_t) memaddr, our,
 			      len, &done))
 	done = 0;
@@ -2014,7 +2012,7 @@ windows_xfer_memory (CORE_ADDR memaddr, gdb_byte *our, int len,
 }
 
 static void
-windows_kill_inferior (void)
+windows_kill_inferior (struct target_ops *ops)
 {
   CHECK (TerminateProcess (current_process_handle, 0));
 
@@ -2084,7 +2082,7 @@ windows_xfer_shared_libraries (struct target_ops *ops,
   obstack_grow_str (&obstack, "<library-list>\n");
   for (so = solib_start.next; so; so = so->next)
     windows_xfer_shared_library (so->so_name, (CORE_ADDR) (uintptr_t) so->lm_info->load_addr,
-				 &obstack);
+				 target_gdbarch, &obstack);
   obstack_grow_str0 (&obstack, "</library-list>\n");
 
   buf = obstack_finish (&obstack);
@@ -2128,6 +2126,12 @@ windows_xfer_partial (struct target_ops *ops, enum target_object object,
     }
 }
 
+static ptid_t
+windows_get_ada_task_ptid (long lwp, long thread)
+{
+  return ptid_build (ptid_get_pid (inferior_ptid), 0, lwp);
+}
+
 static void
 init_windows_ops (void)
 {
@@ -2163,13 +2167,24 @@ init_windows_ops (void)
   windows_ops.to_pid_to_str = windows_pid_to_str;
   windows_ops.to_stop = windows_stop;
   windows_ops.to_stratum = process_stratum;
-  windows_ops.to_has_all_memory = 1;
-  windows_ops.to_has_memory = 1;
-  windows_ops.to_has_stack = 1;
-  windows_ops.to_has_registers = 1;
-  windows_ops.to_has_execution = 1;
+  windows_ops.to_has_all_memory = default_child_has_all_memory;
+  windows_ops.to_has_memory = default_child_has_memory;
+  windows_ops.to_has_stack = default_child_has_stack;
+  windows_ops.to_has_registers = default_child_has_registers;
+  windows_ops.to_has_execution = default_child_has_execution;
   windows_ops.to_pid_to_exec_file = windows_pid_to_exec_file;
+  windows_ops.to_get_ada_task_ptid = windows_get_ada_task_ptid;
+
   i386_use_watchpoints (&windows_ops);
+
+  i386_dr_low.set_control = cygwin_set_dr7;
+  i386_dr_low.set_addr = cygwin_set_dr;
+  i386_dr_low.reset_addr = NULL;
+  i386_dr_low.get_status = cygwin_get_dr6;
+
+  /* i386_dr_low.debug_register_length field is set by
+     calling i386_set_debug_register_length function
+     in processor windows specific native file.  */
 
   windows_ops.to_magic = OPS_MAGIC;
 }
@@ -2192,6 +2207,10 @@ _initialize_windows_nat (void)
   set_cmd_completer (c, filename_completer);
 
   add_com_alias ("sharedlibrary", "dll-symbols", class_alias, 1);
+
+  add_com_alias ("add-shared-symbol-files", "dll-symbols", class_alias, 1);
+
+  add_com_alias ("assf", "dll-symbols", class_alias, 1);
 
 #ifdef __CYGWIN__
   add_setshow_boolean_cmd ("shell", class_support, &useshell, _("\
@@ -2268,7 +2287,7 @@ Show whether to display kernel exceptions in child process."), NULL,
 /* Pass the address ADDR to the inferior in the I'th debug register.
    Here we just store the address in dr array, the registers will be
    actually set up when windows_continue is called.  */
-void
+static void
 cygwin_set_dr (int i, CORE_ADDR addr)
 {
   if (i < 0 || i > 3)
@@ -2282,10 +2301,10 @@ cygwin_set_dr (int i, CORE_ADDR addr)
 /* Pass the value VAL to the inferior in the DR7 debug control
    register.  Here we just store the address in D_REGS, the watchpoint
    will be actually set up in windows_wait.  */
-void
-cygwin_set_dr7 (unsigned val)
+static void
+cygwin_set_dr7 (unsigned long val)
 {
-  dr[7] = val;
+  dr[7] = (CORE_ADDR) val;
   debug_registers_changed = 1;
   debug_registers_used = 1;
 }
@@ -2293,10 +2312,10 @@ cygwin_set_dr7 (unsigned val)
 /* Get the value of the DR6 debug status register from the inferior.
    Here we just return the value stored in dr[6]
    by the last call to thread_rec for current_event.dwThreadId id.  */
-unsigned
+static unsigned long
 cygwin_get_dr6 (void)
 {
-  return dr[6];
+  return (unsigned long) dr[6];
 }
 
 /* Determine if the thread referenced by "ptid" is alive
@@ -2343,33 +2362,110 @@ _initialize_check_for_gdb_ini (void)
     }
 }
 
-void
-_initialize_psapi (void)
+/* Define dummy functions which always return error for the rare cases where
+   these functions could not be found. */
+static BOOL WINAPI
+bad_DebugActiveProcessStop (DWORD w)
 {
-  /* Load optional functions used for retrieving filename information
-     associated with the currently debugged process or its dlls. */
-  if (!psapi_loaded)
+  return FALSE;
+}
+static BOOL WINAPI
+bad_DebugBreakProcess (HANDLE w)
+{
+  return FALSE;
+}
+static BOOL WINAPI
+bad_DebugSetProcessKillOnExit (BOOL w)
+{
+  return FALSE;
+}
+static BOOL WINAPI
+bad_EnumProcessModules (HANDLE w, HMODULE *x, DWORD y, LPDWORD z)
+{
+  return FALSE;
+}
+static DWORD WINAPI
+bad_GetModuleFileNameExA (HANDLE w, HMODULE x, LPSTR y, DWORD z)
+{
+  return 0;
+}
+static BOOL WINAPI
+bad_GetModuleInformation (HANDLE w, HMODULE x, LPMODULEINFO y, DWORD z)
+{
+  return FALSE;
+}
+
+static BOOL WINAPI
+bad_OpenProcessToken (HANDLE w, DWORD x, PHANDLE y)
+{
+  return FALSE;
+}
+
+/* Load any functions which may not be available in ancient versions
+   of Windows. */
+void
+_initialize_loadable (void)
+{
+  HMODULE hm = NULL;
+
+  hm = LoadLibrary ("kernel32.dll");
+  if (hm)
     {
-      HMODULE psapi_module_handle;
-
-      psapi_loaded = -1;
-
-      psapi_module_handle = LoadLibrary ("psapi.dll");
-      if (psapi_module_handle)
-	{
-	  psapi_EnumProcessModules = (void *) GetProcAddress (psapi_module_handle, "EnumProcessModules");
-	  psapi_GetModuleInformation = (void *) GetProcAddress (psapi_module_handle, "GetModuleInformation");
-	  psapi_GetModuleFileNameExA = (void *) GetProcAddress (psapi_module_handle, "GetModuleFileNameExA");
-
-	  if (psapi_EnumProcessModules != NULL
-	      && psapi_GetModuleInformation != NULL
-	      && psapi_GetModuleFileNameExA != NULL)
-	    psapi_loaded = 1;
-	}
+      dyn_DebugActiveProcessStop = (void *)
+	GetProcAddress (hm, "DebugActiveProcessStop");
+      dyn_DebugBreakProcess = (void *)
+	GetProcAddress (hm, "DebugBreakProcess");
+      dyn_DebugSetProcessKillOnExit = (void *)
+	GetProcAddress (hm, "DebugSetProcessKillOnExit");
     }
 
-  /* This will probably fail on Windows 9x/Me.  Let the user know that we're
-     missing some functionality. */
-  if (psapi_loaded < 0)
-    warning(_("cannot automatically find executable file or library to read symbols.  Use \"file\" or \"dll\" command to load executable/libraries directly."));
+  /* Set variables to dummy versions of these processes if the function
+     wasn't found in kernel32.dll. */
+  if (!dyn_DebugBreakProcess)
+    dyn_DebugBreakProcess = bad_DebugBreakProcess;
+  if (!dyn_DebugActiveProcessStop || !dyn_DebugSetProcessKillOnExit)
+    {
+      dyn_DebugActiveProcessStop = bad_DebugActiveProcessStop;
+      dyn_DebugSetProcessKillOnExit = bad_DebugSetProcessKillOnExit;
+    }
+
+  /* Load optional functions used for retrieving filename information
+     associated with the currently debugged process or its dlls. */
+  hm = LoadLibrary ("psapi.dll");
+  if (hm)
+    {
+      dyn_EnumProcessModules = (void *)
+	GetProcAddress (hm, "EnumProcessModules");
+      dyn_GetModuleInformation = (void *)
+	GetProcAddress (hm, "GetModuleInformation");
+      dyn_GetModuleFileNameExA = (void *)
+	GetProcAddress (hm, "GetModuleFileNameExA");
+    }
+
+  if (!dyn_EnumProcessModules || !dyn_GetModuleInformation || !dyn_GetModuleFileNameExA)
+    {
+      /* Set variables to dummy versions of these processes if the function
+	 wasn't found in psapi.dll. */
+      dyn_EnumProcessModules = bad_EnumProcessModules;
+      dyn_GetModuleInformation = bad_GetModuleInformation;
+      dyn_GetModuleFileNameExA = bad_GetModuleFileNameExA;
+      /* This will probably fail on Windows 9x/Me.  Let the user know that we're
+	 missing some functionality. */
+      warning(_("cannot automatically find executable file or library to read symbols.\nUse \"file\" or \"dll\" command to load executable/libraries directly."));
+    }
+
+  hm = LoadLibrary ("advapi32.dll");
+  if (hm)
+    {
+      dyn_OpenProcessToken = (void *)
+	GetProcAddress (hm, "OpenProcessToken");
+      dyn_LookupPrivilegeValueA = (void *)
+	GetProcAddress (hm, "LookupPrivilegeValueA");
+      dyn_AdjustTokenPrivileges = (void *)
+	GetProcAddress (hm, "AdjustTokenPrivileges");
+      /* Only need to set one of these since if OpenProcessToken fails nothing
+	 else is needed. */
+      if (!dyn_OpenProcessToken || !dyn_LookupPrivilegeValueA || !dyn_AdjustTokenPrivileges)
+	dyn_OpenProcessToken = bad_OpenProcessToken;
+    }
 }

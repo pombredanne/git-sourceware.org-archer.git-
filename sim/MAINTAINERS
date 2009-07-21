@@ -13,9 +13,10 @@ arm	        Nick Clifton <nickc@redhat.com>
 cr16	        M R Swami Reddy <MR.Swami.Reddy@nsc.com>
 frv		Dave Brolley <brolley@redhat.com>
 igen		(igen simulators)
-ppc		Andrew Cagney <ac131313@redhat.com>
+lm32		Jon Beniston <jon@beniston.com>
 m68hc11		Stephane Carrez <stcarrez@nerim.fr>
 mips		Thiemo Seufer <ths@networkno.de>
+moxie		Anthony Green <green@moxielogic.com>
 sh		(global maintainers)
 sh64		Dave Brolley <brolley@redhat.com>
 m32c		DJ Delorie <dj@redhat.com>
@@ -32,3 +33,4 @@ v850		DJ Delorie <dj@redhat.com>
 mips		Andrew Cagney <ac131313@redhat.com>
 mips		Chris Demetriou <cgd@netbsd.org>
 ppc		Geoff Keating <geoffk@geoffk.org>
+ppc		Andrew Cagney <cagney@gnu.org>

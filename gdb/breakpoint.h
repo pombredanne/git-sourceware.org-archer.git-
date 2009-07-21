@@ -110,7 +110,16 @@ enum bptype
 
     bp_overlay_event, 
 
+    /* Master copies of longjmp breakpoints.  These are always installed
+       as soon as an objfile containing longjmp is loaded, but they are
+       always disabled.  While necessary, temporary clones of bp_longjmp
+       type will be created and enabled.  */
+
+    bp_longjmp_master,
+
     bp_catchpoint,
+
+    bp_tracepoint,
   };
 
 /* States of enablement of breakpoint. */
@@ -249,6 +258,10 @@ struct bp_location
   /* Data for specific breakpoint types.  These could be a union, but
      simplicity is more important than memory usage for breakpoints.  */
 
+  /* Architecture associated with this location's address.  May be
+     different from the breakpoint architecture.  */
+  struct gdbarch *gdbarch;
+
   /* Note that zero is a perfectly valid code address on some platforms
      (for example, the mn10200 (OBSOLETE) and mn10300 simulators).  NULL
      is not a special value for this field.  Valid for all types except
@@ -317,7 +330,7 @@ struct breakpoint_ops
   enum print_stop_action (*print_it) (struct breakpoint *);
 
   /* Display information about this breakpoint, for "info breakpoints".  */
-  void (*print_one) (struct breakpoint *, CORE_ADDR *);
+  void (*print_one) (struct breakpoint *, struct bp_location **);
 
   /* Display information about this breakpoint after setting it (roughly
      speaking; this is called from "mention").  */
@@ -385,6 +398,8 @@ struct breakpoint
 
     /* String we used to set the breakpoint (malloc'd).  */
     char *addr_string;
+    /* Architecture we used to set the breakpoint.  */
+    struct gdbarch *gdbarch;
     /* Language we used to set the breakpoint.  */
     enum language language;
     /* Input radix we used to set the breakpoint.  */
@@ -423,8 +438,11 @@ struct breakpoint
        hardware.  */
     enum watchpoint_triggered watchpoint_triggered;
 
-    /* Thread number for thread-specific breakpoint, or -1 if don't care */
+    /* Thread number for thread-specific breakpoint, or -1 if don't care.  */
     int thread;
+
+    /* Ada task number for task-specific breakpoint, or 0 if don't care.  */
+    int task;
 
     /* Count of the number of times this breakpoint was taken, dumped
        with the info, but not used for anything else.  Useful for
@@ -449,6 +467,17 @@ struct breakpoint
        no location initially so had no context to parse
        the condition in.  */
     int condition_not_parsed;
+
+    /* Number of times this tracepoint should single-step 
+       and collect additional data.  */
+    long step_count;
+
+    /* Number of times this tracepoint should be hit before 
+       disabling/ending.  */
+    int pass_count;
+
+    /* Chain of action lines to execute when this tracepoint is hit.  */
+    struct action_line *actions;
   };
 
 typedef struct breakpoint *breakpoint_p;
@@ -675,10 +704,12 @@ extern void breakpoint_re_set (void);
 extern void breakpoint_re_set_thread (struct breakpoint *);
 
 extern struct breakpoint *set_momentary_breakpoint
-  (struct symtab_and_line, struct frame_id, enum bptype);
+  (struct gdbarch *, struct symtab_and_line, struct frame_id, enum bptype);
 
 extern struct breakpoint *set_momentary_breakpoint_at_pc
-  (CORE_ADDR pc, enum bptype type);
+  (struct gdbarch *, CORE_ADDR pc, enum bptype type);
+
+extern struct breakpoint *clone_momentary_breakpoint (struct breakpoint *bpkt);
 
 extern void set_ignore_count (int, int, int);
 
@@ -702,7 +733,8 @@ extern void awatch_command_wrapper (char *, int);
 extern void rwatch_command_wrapper (char *, int);
 extern void tbreak_command (char *, int);
 
-extern void set_breakpoint (char *address, char *condition,
+extern void set_breakpoint (struct gdbarch *gdbarch,
+			    char *address, char *condition,
 			    int hardwareflag, int tempflag,
 			    int thread, int ignore_count,
 			    int pending,
@@ -747,7 +779,7 @@ extern void update_breakpoints_after_exec (void);
    inferior_ptid.  */
 extern int detach_breakpoints (int);
 
-extern void set_longjmp_breakpoint (void);
+extern void set_longjmp_breakpoint (int thread);
 extern void delete_longjmp_breakpoint (int thread);
 
 extern void enable_overlay_breakpoints (void);
@@ -809,9 +841,11 @@ extern void mark_breakpoints_out (void);
 
 extern void make_breakpoint_permanent (struct breakpoint *);
 
-extern struct breakpoint *create_solib_event_breakpoint (CORE_ADDR);
+extern struct breakpoint *create_solib_event_breakpoint (struct gdbarch *,
+							 CORE_ADDR);
 
-extern struct breakpoint *create_thread_event_breakpoint (CORE_ADDR);
+extern struct breakpoint *create_thread_event_breakpoint (struct gdbarch *,
+							  CORE_ADDR);
 
 extern void remove_solib_event_breakpoints (void);
 
@@ -832,14 +866,14 @@ extern int remove_hw_watchpoints (void);
 
 /* Manage a software single step breakpoint (or two).  Insert may be called
    twice before remove is called.  */
-extern void insert_single_step_breakpoint (CORE_ADDR);
+extern void insert_single_step_breakpoint (struct gdbarch *, CORE_ADDR);
 extern void remove_single_step_breakpoints (void);
 
 /* Manage manual breakpoints, separate from the normal chain of
    breakpoints.  These functions are used in murky target-specific
    ways.  Please do not add more uses!  */
-extern void *deprecated_insert_raw_breakpoint (CORE_ADDR);
-extern int deprecated_remove_raw_breakpoint (void *);
+extern void *deprecated_insert_raw_breakpoint (struct gdbarch *, CORE_ADDR);
+extern int deprecated_remove_raw_breakpoint (struct gdbarch *, void *);
 
 /* Check if any hardware watchpoints have triggered, according to the
    target.  */
@@ -859,5 +893,16 @@ extern void breakpoint_retire_moribund (void);
 
 /* Tell a breakpoint to be quiet.  */
 extern void make_breakpoint_silent (struct breakpoint *);
+
+/* Return a tracepoint with the given number if found.  */
+extern struct breakpoint *get_tracepoint (int num);
+
+/* Find a tracepoint by parsing a number in the supplied string.  */
+extern struct breakpoint *get_tracepoint_by_number (char **arg, int multi_p,
+						    int optional_p);
+
+/* Return a vector of all tracepoints currently defined.  The vector
+   is newly allocated; the caller should free when done with it.  */
+extern VEC(breakpoint_p) *all_tracepoints (void);
 
 #endif /* !defined (BREAKPOINT_H) */

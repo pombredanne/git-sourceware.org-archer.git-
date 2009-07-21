@@ -20,6 +20,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "arch-utils.h"
 #include "gdb_string.h"
 #include "symtab.h"
 #include "gdbtypes.h"
@@ -37,12 +38,30 @@
 #include "dfp.h"
 #include "objfiles.h"
 #include "valprint.h"
+#include "cli/cli-decode.h"
 
 #include "python/python.h"
 
 /* Prototypes for exported functions. */
 
 void _initialize_values (void);
+
+/* Definition of a user function.  */
+struct internal_function
+{
+  /* The name of the function.  It is a bit odd to have this in the
+     function itself -- the user might use a differently-named
+     convenience variable to hold the function.  */
+  char *name;
+
+  /* The handler.  */
+  internal_function_fn handler;
+
+  /* User data for the handler.  */
+  void *cookie;
+};
+
+static struct cmd_list_element *functionlist;
 
 struct value
 {
@@ -203,6 +222,7 @@ struct value_history_chunk
 static struct value_history_chunk *value_history_chain;
 
 static int value_history_count;	/* Abs number of last entry stored */
+
 
 /* List of all value objects currently allocated
    (except for those released by calls to release_value)
@@ -227,7 +247,7 @@ allocate_value_lazy (struct type *type)
   val->type = type;
   val->enclosing_type = type;
   VALUE_LVAL (val) = not_lval;
-  VALUE_ADDRESS (val) = 0;
+  val->location.address = 0;
   VALUE_FRAME_ID (val) = null_frame_id;
   val->offset = 0;
   val->bitpos = 0;
@@ -271,13 +291,9 @@ allocate_repeat_value (struct type *type, int count)
   int low_bound = current_language->string_lower_bound;		/* ??? */
   /* FIXME-type-allocation: need a way to free this type when we are
      done with it.  */
-  struct type *range_type
-  = create_range_type ((struct type *) NULL, builtin_type_int32,
-		       low_bound, count + low_bound - 1);
-  /* FIXME-type-allocation: need a way to free this type when we are
-     done with it.  */
-  return allocate_value (create_array_type ((struct type *) NULL,
-					    type, range_type));
+  struct type *array_type
+    = lookup_array_range_type (type, low_bound, count + low_bound - 1);
+  return allocate_value (array_type);
 }
 
 /* Needed if another module needs to maintain its on list of values.  */
@@ -503,10 +519,30 @@ deprecated_value_lval_hack (struct value *value)
   return &value->lval;
 }
 
-CORE_ADDR *
-deprecated_value_address_hack (struct value *value)
+CORE_ADDR
+value_address (struct value *value)
 {
-  return &value->location.address;
+  if (value->lval == lval_internalvar
+      || value->lval == lval_internalvar_component)
+    return 0;
+  return value->location.address + value->offset;
+}
+
+CORE_ADDR
+value_raw_address (struct value *value)
+{
+  if (value->lval == lval_internalvar
+      || value->lval == lval_internalvar_component)
+    return 0;
+  return value->location.address;
+}
+
+void
+set_value_address (struct value *value, CORE_ADDR addr)
+{
+  gdb_assert (value->lval != lval_internalvar
+	      && value->lval != lval_internalvar_component);
+  value->location.address = addr;
 }
 
 struct internalvar **
@@ -836,6 +872,74 @@ show_values (char *num_exp, int from_tty)
    The user refers to them with a '$' prefix
    that does not appear in the variable names stored internally.  */
 
+struct internalvar
+{
+  struct internalvar *next;
+  char *name;
+
+  /* We support various different kinds of content of an internal variable.
+     enum internalvar_kind specifies the kind, and union internalvar_data
+     provides the data associated with this particular kind.  */
+
+  enum internalvar_kind
+    {
+      /* The internal variable is empty.  */
+      INTERNALVAR_VOID,
+
+      /* The value of the internal variable is provided directly as
+	 a GDB value object.  */
+      INTERNALVAR_VALUE,
+
+      /* A fresh value is computed via a call-back routine on every
+	 access to the internal variable.  */
+      INTERNALVAR_MAKE_VALUE,
+
+      /* The internal variable holds a GDB internal convenience function.  */
+      INTERNALVAR_FUNCTION,
+
+      /* The variable holds a simple scalar value.  */
+      INTERNALVAR_SCALAR,
+
+      /* The variable holds a GDB-provided string.  */
+      INTERNALVAR_STRING,
+
+    } kind;
+
+  union internalvar_data
+    {
+      /* A value object used with INTERNALVAR_VALUE.  */
+      struct value *value;
+
+      /* The call-back routine used with INTERNALVAR_MAKE_VALUE.  */
+      internalvar_make_value make_value;
+
+      /* The internal function used with INTERNALVAR_FUNCTION.  */
+      struct
+	{
+	  struct internal_function *function;
+	  /* True if this is the canonical name for the function.  */
+	  int canonical;
+	} fn;
+
+      /* A scalar value used with INTERNALVAR_SCALAR.  */
+      struct
+        {
+	  /* If type is non-NULL, it will be used as the type to generate
+	     a value for this internal variable.  If type is NULL, a default
+	     integer type for the architecture is used.  */
+	  struct type *type;
+	  union
+	    {
+	      LONGEST l;    /* Used with TYPE_CODE_INT and NULL types.  */
+	      CORE_ADDR a;  /* Used with TYPE_CODE_PTR types.  */
+	    } val;
+        } scalar;
+
+      /* A string value used with INTERNALVAR_STRING.  */
+      char *string;
+    } u;
+};
+
 static struct internalvar *internalvars;
 
 /* If the variable does not already exist create it and give it the value given.
@@ -864,7 +968,7 @@ init_if_undefined_command (char* args, int from_tty)
 
   /* Only evaluate the expression if the lvalue is void.
      This may still fail if the expresssion is invalid.  */
-  if (TYPE_CODE (value_type (intvar->value)) == TYPE_CODE_VOID)
+  if (intvar->kind == INTERNALVAR_VOID)
     evaluate_expression (expr);
 
   do_cleanups (old_chain);
@@ -878,7 +982,7 @@ init_if_undefined_command (char* args, int from_tty)
    the return value is NULL.  */
 
 struct internalvar *
-lookup_only_internalvar (char *name)
+lookup_only_internalvar (const char *name)
 {
   struct internalvar *var;
 
@@ -894,15 +998,12 @@ lookup_only_internalvar (char *name)
    NAME should not normally include a dollar sign.  */
 
 struct internalvar *
-create_internalvar (char *name)
+create_internalvar (const char *name)
 {
   struct internalvar *var;
   var = (struct internalvar *) xmalloc (sizeof (struct internalvar));
   var->name = concat (name, (char *)NULL);
-  var->value = allocate_value (builtin_type_void);
-  var->endian = gdbarch_byte_order (current_gdbarch);
-  var->make_value = NULL;
-  release_value (var->value);
+  var->kind = INTERNALVAR_VOID;
   var->next = internalvars;
   internalvars = var;
   return var;
@@ -916,14 +1017,9 @@ create_internalvar (char *name)
 struct internalvar *
 create_internalvar_type_lazy (char *name, internalvar_make_value fun)
 {
-  struct internalvar *var;
-  var = (struct internalvar *) xmalloc (sizeof (struct internalvar));
-  var->name = concat (name, (char *)NULL);
-  var->value = NULL;
-  var->make_value = fun;
-  var->endian = gdbarch_byte_order (current_gdbarch);
-  var->next = internalvars;
-  internalvars = var;
+  struct internalvar *var = create_internalvar (name);
+  var->kind = INTERNALVAR_MAKE_VALUE;
+  var->u.make_value = fun;
   return var;
 }
 
@@ -934,7 +1030,7 @@ create_internalvar_type_lazy (char *name, internalvar_make_value fun)
    one is created, with a void value.  */
 
 struct internalvar *
-lookup_internalvar (char *name)
+lookup_internalvar (const char *name)
 {
   struct internalvar *var;
 
@@ -945,118 +1041,342 @@ lookup_internalvar (char *name)
   return create_internalvar (name);
 }
 
+/* Return current value of internal variable VAR.  For variables that
+   are not inherently typed, use a value type appropriate for GDBARCH.  */
+
 struct value *
-value_of_internalvar (struct internalvar *var)
+value_of_internalvar (struct gdbarch *gdbarch, struct internalvar *var)
 {
   struct value *val;
-  int i, j;
-  gdb_byte temp;
 
-  if (var->make_value != NULL)
-    val = (*var->make_value) (var);
-  else
+  switch (var->kind)
     {
-      val = value_copy (var->value);
+    case INTERNALVAR_VOID:
+      val = allocate_value (builtin_type (gdbarch)->builtin_void);
+      break;
+
+    case INTERNALVAR_FUNCTION:
+      val = allocate_value (builtin_type (gdbarch)->internal_fn);
+      break;
+
+    case INTERNALVAR_SCALAR:
+      if (!var->u.scalar.type)
+	val = value_from_longest (builtin_type (gdbarch)->builtin_int,
+				  var->u.scalar.val.l);
+      else if (TYPE_CODE (var->u.scalar.type) == TYPE_CODE_INT)
+	val = value_from_longest (var->u.scalar.type, var->u.scalar.val.l);
+      else if (TYPE_CODE (var->u.scalar.type) == TYPE_CODE_PTR)
+	val = value_from_pointer (var->u.scalar.type, var->u.scalar.val.a);
+      else
+        internal_error (__FILE__, __LINE__, "bad type");
+      break;
+
+    case INTERNALVAR_STRING:
+      val = value_cstring (var->u.string, strlen (var->u.string),
+			   builtin_type (gdbarch)->builtin_char);
+      break;
+
+    case INTERNALVAR_VALUE:
+      val = value_copy (var->u.value);
       if (value_lazy (val))
 	value_fetch_lazy (val);
+      break;
 
-      /* If the variable's value is a computed lvalue, we want
-	 references to it to produce another computed lvalue, where
-	 referencces and assignments actually operate through the
-	 computed value's functions.
+    case INTERNALVAR_MAKE_VALUE:
+      val = (*var->u.make_value) (gdbarch, var);
+      break;
 
-	 This means that internal variables with computed values
-	 behave a little differently from other internal variables:
-	 assignments to them don't just replace the previous value
-	 altogether.  At the moment, this seems like the behavior we
-	 want.  */
-      if (var->value->lval == lval_computed)
-	VALUE_LVAL (val) = lval_computed;
-      else
-	{
-	  VALUE_LVAL (val) = lval_internalvar;
-	  VALUE_INTERNALVAR (val) = var;
-	}
+    default:
+      internal_error (__FILE__, __LINE__, "bad kind");
     }
 
-  /* Values are always stored in the target's byte order.  When connected to a
-     target this will most likely always be correct, so there's normally no
-     need to worry about it.
+  /* Change the VALUE_LVAL to lval_internalvar so that future operations
+     on this value go back to affect the original internal variable.
 
-     However, internal variables can be set up before the target endian is
-     known and so may become out of date.  Fix it up before anybody sees.
+     Do not do this for INTERNALVAR_MAKE_VALUE variables, as those have
+     no underlying modifyable state in the internal variable.
 
-     Internal variables usually hold simple scalar values, and we can
-     correct those.  More complex values (e.g. structures and floating
-     point types) are left alone, because they would be too complicated
-     to correct.  */
+     Likewise, if the variable's value is a computed lvalue, we want
+     references to it to produce another computed lvalue, where
+     references and assignments actually operate through the
+     computed value's functions.
 
-  if (var->endian != gdbarch_byte_order (current_gdbarch))
+     This means that internal variables with computed values
+     behave a little differently from other internal variables:
+     assignments to them don't just replace the previous value
+     altogether.  At the moment, this seems like the behavior we
+     want.  */
+
+  if (var->kind != INTERNALVAR_MAKE_VALUE
+      && val->lval != lval_computed)
     {
-      gdb_byte *array = value_contents_raw (val);
-      struct type *type = check_typedef (value_enclosing_type (val));
-      switch (TYPE_CODE (type))
-	{
-	case TYPE_CODE_INT:
-	case TYPE_CODE_PTR:
-	  /* Reverse the bytes.  */
-	  for (i = 0, j = TYPE_LENGTH (type) - 1; i < j; i++, j--)
-	    {
-	      temp = array[j];
-	      array[j] = array[i];
-	      array[i] = temp;
-	    }
-	  break;
-	}
+      VALUE_LVAL (val) = lval_internalvar;
+      VALUE_INTERNALVAR (val) = var;
     }
 
   return val;
+}
+
+int
+get_internalvar_integer (struct internalvar *var, LONGEST *result)
+{
+  switch (var->kind)
+    {
+    case INTERNALVAR_SCALAR:
+      if (var->u.scalar.type == NULL
+	  || TYPE_CODE (var->u.scalar.type) == TYPE_CODE_INT)
+	{
+	  *result = var->u.scalar.val.l;
+	  return 1;
+	}
+      /* Fall through.  */
+
+    default:
+      return 0;
+    }
+}
+
+static int
+get_internalvar_function (struct internalvar *var,
+			  struct internal_function **result)
+{
+  switch (var->kind)
+    {
+    case INTERNALVAR_FUNCTION:
+      *result = var->u.fn.function;
+      return 1;
+
+    default:
+      return 0;
+    }
 }
 
 void
 set_internalvar_component (struct internalvar *var, int offset, int bitpos,
 			   int bitsize, struct value *newval)
 {
-  gdb_byte *addr = value_contents_writeable (var->value) + offset;
+  gdb_byte *addr;
 
-  if (bitsize)
-    modify_field (addr, value_as_long (newval),
-		  bitpos, bitsize);
-  else
-    memcpy (addr, value_contents (newval), TYPE_LENGTH (value_type (newval)));
+  switch (var->kind)
+    {
+    case INTERNALVAR_VALUE:
+      addr = value_contents_writeable (var->u.value);
+
+      if (bitsize)
+	modify_field (value_type (var->u.value), addr + offset,
+		      value_as_long (newval), bitpos, bitsize);
+      else
+	memcpy (addr + offset, value_contents (newval),
+		TYPE_LENGTH (value_type (newval)));
+      break;
+
+    default:
+      /* We can never get a component of any other kind.  */
+      internal_error (__FILE__, __LINE__, "set_internalvar_component");
+    }
 }
 
 void
 set_internalvar (struct internalvar *var, struct value *val)
 {
-  struct value *newval;
+  enum internalvar_kind new_kind;
+  union internalvar_data new_data = { 0 };
 
-  newval = value_copy (val);
-  newval->modifiable = 1;
+  if (var->kind == INTERNALVAR_FUNCTION && var->u.fn.canonical)
+    error (_("Cannot overwrite convenience function %s"), var->name);
 
-  /* Force the value to be fetched from the target now, to avoid problems
-     later when this internalvar is referenced and the target is gone or
-     has changed.  */
-  if (value_lazy (newval))
-    value_fetch_lazy (newval);
+  /* Prepare new contents.  */
+  switch (TYPE_CODE (check_typedef (value_type (val))))
+    {
+    case TYPE_CODE_VOID:
+      new_kind = INTERNALVAR_VOID;
+      break;
 
-  /* Begin code which must not call error().  If var->value points to
-     something free'd, an error() obviously leaves a dangling pointer.
-     But we also get a danling pointer if var->value points to
-     something in the value chain (i.e., before release_value is
-     called), because after the error free_all_values will get called before
-     long.  */
-  value_free (var->value);
-  var->value = newval;
-  var->endian = gdbarch_byte_order (current_gdbarch);
-  release_value (newval);
+    case TYPE_CODE_INTERNAL_FUNCTION:
+      gdb_assert (VALUE_LVAL (val) == lval_internalvar);
+      new_kind = INTERNALVAR_FUNCTION;
+      get_internalvar_function (VALUE_INTERNALVAR (val),
+				&new_data.fn.function);
+      /* Copies created here are never canonical.  */
+      break;
+
+    case TYPE_CODE_INT:
+      new_kind = INTERNALVAR_SCALAR;
+      new_data.scalar.type = value_type (val);
+      new_data.scalar.val.l = value_as_long (val);
+      break;
+
+    case TYPE_CODE_PTR:
+      new_kind = INTERNALVAR_SCALAR;
+      new_data.scalar.type = value_type (val);
+      new_data.scalar.val.a = value_as_address (val);
+      break;
+
+    default:
+      new_kind = INTERNALVAR_VALUE;
+      new_data.value = value_copy (val);
+      new_data.value->modifiable = 1;
+
+      /* Force the value to be fetched from the target now, to avoid problems
+	 later when this internalvar is referenced and the target is gone or
+	 has changed.  */
+      if (value_lazy (new_data.value))
+       value_fetch_lazy (new_data.value);
+
+      /* Release the value from the value chain to prevent it from being
+	 deleted by free_all_values.  From here on this function should not
+	 call error () until new_data is installed into the var->u to avoid
+	 leaking memory.  */
+      release_value (new_data.value);
+      break;
+    }
+
+  /* Clean up old contents.  */
+  clear_internalvar (var);
+
+  /* Switch over.  */
+  var->kind = new_kind;
+  var->u = new_data;
   /* End code which must not call error().  */
+}
+
+void
+set_internalvar_integer (struct internalvar *var, LONGEST l)
+{
+  /* Clean up old contents.  */
+  clear_internalvar (var);
+
+  var->kind = INTERNALVAR_SCALAR;
+  var->u.scalar.type = NULL;
+  var->u.scalar.val.l = l;
+}
+
+void
+set_internalvar_string (struct internalvar *var, const char *string)
+{
+  /* Clean up old contents.  */
+  clear_internalvar (var);
+
+  var->kind = INTERNALVAR_STRING;
+  var->u.string = xstrdup (string);
+}
+
+static void
+set_internalvar_function (struct internalvar *var, struct internal_function *f)
+{
+  /* Clean up old contents.  */
+  clear_internalvar (var);
+
+  var->kind = INTERNALVAR_FUNCTION;
+  var->u.fn.function = f;
+  var->u.fn.canonical = 1;
+  /* Variables installed here are always the canonical version.  */
+}
+
+void
+clear_internalvar (struct internalvar *var)
+{
+  /* Clean up old contents.  */
+  switch (var->kind)
+    {
+    case INTERNALVAR_VALUE:
+      value_free (var->u.value);
+      break;
+
+    case INTERNALVAR_STRING:
+      xfree (var->u.string);
+      break;
+
+    default:
+      break;
+    }
+
+  /* Reset to void kind.  */
+  var->kind = INTERNALVAR_VOID;
 }
 
 char *
 internalvar_name (struct internalvar *var)
 {
   return var->name;
+}
+
+static struct internal_function *
+create_internal_function (const char *name,
+			  internal_function_fn handler, void *cookie)
+{
+  struct internal_function *ifn = XNEW (struct internal_function);
+  ifn->name = xstrdup (name);
+  ifn->handler = handler;
+  ifn->cookie = cookie;
+  return ifn;
+}
+
+char *
+value_internal_function_name (struct value *val)
+{
+  struct internal_function *ifn;
+  int result;
+
+  gdb_assert (VALUE_LVAL (val) == lval_internalvar);
+  result = get_internalvar_function (VALUE_INTERNALVAR (val), &ifn);
+  gdb_assert (result);
+
+  return ifn->name;
+}
+
+struct value *
+call_internal_function (struct gdbarch *gdbarch,
+			const struct language_defn *language,
+			struct value *func, int argc, struct value **argv)
+{
+  struct internal_function *ifn;
+  int result;
+
+  gdb_assert (VALUE_LVAL (func) == lval_internalvar);
+  result = get_internalvar_function (VALUE_INTERNALVAR (func), &ifn);
+  gdb_assert (result);
+
+  return (*ifn->handler) (gdbarch, language, ifn->cookie, argc, argv);
+}
+
+/* The 'function' command.  This does nothing -- it is just a
+   placeholder to let "help function NAME" work.  This is also used as
+   the implementation of the sub-command that is created when
+   registering an internal function.  */
+static void
+function_command (char *command, int from_tty)
+{
+  /* Do nothing.  */
+}
+
+/* Clean up if an internal function's command is destroyed.  */
+static void
+function_destroyer (struct cmd_list_element *self, void *ignore)
+{
+  xfree (self->name);
+  xfree (self->doc);
+}
+
+/* Add a new internal function.  NAME is the name of the function; DOC
+   is a documentation string describing the function.  HANDLER is
+   called when the function is invoked.  COOKIE is an arbitrary
+   pointer which is passed to HANDLER and is intended for "user
+   data".  */
+void
+add_internal_function (const char *name, const char *doc,
+		       internal_function_fn handler, void *cookie)
+{
+  struct cmd_list_element *cmd;
+  struct internal_function *ifn;
+  struct internalvar *var = lookup_internalvar (name);
+
+  ifn = create_internal_function (name, handler, cookie);
+  set_internalvar_function (var, ifn);
+
+  cmd = add_cmd (xstrdup (name), no_class, function_command, (char *) doc,
+		 &functionlist);
+  cmd->destroyer = function_destroyer;
 }
 
 /* Update VALUE before discarding OBJFILE.  COPIED_TYPES is used to
@@ -1073,6 +1393,26 @@ preserve_one_value (struct value *value, struct objfile *objfile,
     value->enclosing_type = copy_type_recursive (objfile,
 						 value->enclosing_type,
 						 copied_types);
+}
+
+/* Likewise for internal variable VAR.  */
+
+static void
+preserve_one_internalvar (struct internalvar *var, struct objfile *objfile,
+			  htab_t copied_types)
+{
+  switch (var->kind)
+    {
+    case INTERNALVAR_SCALAR:
+      if (var->u.scalar.type && TYPE_OBJFILE (var->u.scalar.type) == objfile)
+	var->u.scalar.type
+	  = copy_type_recursive (objfile, var->u.scalar.type, copied_types);
+      break;
+
+    case INTERNALVAR_VALUE:
+      preserve_one_value (var->u.value, objfile, copied_types);
+      break;
+    }
 }
 
 /* Update the internal variables and value history when OBJFILE is
@@ -1100,8 +1440,7 @@ preserve_values (struct objfile *objfile)
 	preserve_one_value (cur->values[i], objfile, copied_types);
 
   for (var = internalvars; var; var = var->next)
-    if (var->value)
-      preserve_one_value (var->value, objfile, copied_types);
+    preserve_one_internalvar (var, objfile, copied_types);
 
   for (val = values_in_python; val; val = val->next)
     preserve_one_value (val, objfile, copied_types);
@@ -1112,6 +1451,7 @@ preserve_values (struct objfile *objfile)
 static void
 show_convenience (char *ignore, int from_tty)
 {
+  struct gdbarch *gdbarch = get_current_arch ();
   struct internalvar *var;
   int varseen = 0;
   struct value_print_options opts;
@@ -1124,7 +1464,7 @@ show_convenience (char *ignore, int from_tty)
 	  varseen = 1;
 	}
       printf_filtered (("$%s = "), var->name);
-      value_print (value_of_internalvar (var), gdb_stdout,
+      value_print (value_of_internalvar (gdbarch, var), gdb_stdout,
 		   &opts);
       printf_filtered (("\n"));
     }
@@ -1168,13 +1508,15 @@ value_as_double (struct value *val)
 CORE_ADDR
 value_as_address (struct value *val)
 {
+  struct gdbarch *gdbarch = get_type_arch (value_type (val));
+
   /* Assume a CORE_ADDR can fit in a LONGEST (for now).  Not sure
      whether we want this to be true eventually.  */
 #if 0
   /* gdbarch_addr_bits_remove is wrong if we are being called for a
      non-address (e.g. argument to "signal", "info break", etc.), or
      for pointers to char, in which the low bits *are* significant.  */
-  return gdbarch_addr_bits_remove (current_gdbarch, value_as_long (val));
+  return gdbarch_addr_bits_remove (gdbarch, value_as_long (val));
 #else
 
   /* There are several targets (IA-64, PowerPC, and others) which
@@ -1196,7 +1538,7 @@ value_as_address (struct value *val)
 
      Upon entry to this function, if VAL is a value of type `function'
      (that is, TYPE_CODE (VALUE_TYPE (val)) == TYPE_CODE_FUNC), then
-     VALUE_ADDRESS (val) is the address of the function.  This is what
+     value_address (val) is the address of the function.  This is what
      you'll get if you evaluate an expression like `main'.  The call
      to COERCE_ARRAY below actually does all the usual unary
      conversions, which includes converting values of type `function'
@@ -1216,7 +1558,7 @@ value_as_address (struct value *val)
      function, just return its address directly.  */
   if (TYPE_CODE (value_type (val)) == TYPE_CODE_FUNC
       || TYPE_CODE (value_type (val)) == TYPE_CODE_METHOD)
-    return VALUE_ADDRESS (val);
+    return value_address (val);
 
   val = coerce_array (val);
 
@@ -1259,8 +1601,8 @@ value_as_address (struct value *val)
 
   if (TYPE_CODE (value_type (val)) != TYPE_CODE_PTR
       && TYPE_CODE (value_type (val)) != TYPE_CODE_REF
-      && gdbarch_integer_to_address_p (current_gdbarch))
-    return gdbarch_integer_to_address (current_gdbarch, value_type (val),
+      && gdbarch_integer_to_address_p (gdbarch))
+    return gdbarch_integer_to_address (gdbarch, value_type (val),
 				       value_contents (val));
 
   return unpack_long (value_type (val), value_contents (val));
@@ -1284,6 +1626,7 @@ value_as_address (struct value *val)
 LONGEST
 unpack_long (struct type *type, const gdb_byte *valaddr)
 {
+  enum bfd_endian byte_order = gdbarch_byte_order (get_type_arch (type));
   enum type_code code = TYPE_CODE (type);
   int len = TYPE_LENGTH (type);
   int nosign = TYPE_UNSIGNED (type);
@@ -1300,9 +1643,9 @@ unpack_long (struct type *type, const gdb_byte *valaddr)
     case TYPE_CODE_RANGE:
     case TYPE_CODE_MEMBERPTR:
       if (nosign)
-	return extract_unsigned_integer (valaddr, len);
+	return extract_unsigned_integer (valaddr, len, byte_order);
       else
-	return extract_signed_integer (valaddr, len);
+	return extract_signed_integer (valaddr, len, byte_order);
 
     case TYPE_CODE_FLT:
       return extract_typed_floating (valaddr, type);
@@ -1310,7 +1653,7 @@ unpack_long (struct type *type, const gdb_byte *valaddr)
     case TYPE_CODE_DECFLOAT:
       /* libdecnumber has a function to convert from decimal to integer, but
 	 it doesn't work when the decimal number has a fractional part.  */
-      return decimal_to_doublest (valaddr, len);
+      return decimal_to_doublest (valaddr, len, byte_order);
 
     case TYPE_CODE_PTR:
     case TYPE_CODE_REF:
@@ -1333,6 +1676,7 @@ unpack_long (struct type *type, const gdb_byte *valaddr)
 DOUBLEST
 unpack_double (struct type *type, const gdb_byte *valaddr, int *invp)
 {
+  enum bfd_endian byte_order = gdbarch_byte_order (get_type_arch (type));
   enum type_code code;
   int len;
   int nosign;
@@ -1370,7 +1714,7 @@ unpack_double (struct type *type, const gdb_byte *valaddr, int *invp)
       return extract_typed_floating (valaddr, type);
     }
   else if (code == TYPE_CODE_DECFLOAT)
-    return decimal_to_doublest (valaddr, len);
+    return decimal_to_doublest (valaddr, len, byte_order);
   else if (nosign)
     {
       /* Unsigned -- be sure we compensate for signed LONGEST.  */
@@ -1447,7 +1791,7 @@ value_static_field (struct type *type, int fieldno)
  	}
       if (retval && VALUE_LVAL (retval) == lval_memory)
 	SET_FIELD_PHYSADDR (TYPE_FIELD (type, fieldno),
-			    VALUE_ADDRESS (retval));
+			    value_address (retval));
     }
   return retval;
 }
@@ -1592,7 +1936,7 @@ value_fn_field (struct value **arg1p, struct fn_field *f, int j, struct type *ty
   v = allocate_value (ftype);
   if (sym)
     {
-      VALUE_ADDRESS (v) = BLOCK_START (SYMBOL_BLOCK_VALUE (sym));
+      set_value_address (v, BLOCK_START (SYMBOL_BLOCK_VALUE (sym)));
     }
   else
     {
@@ -1601,9 +1945,9 @@ value_fn_field (struct value **arg1p, struct fn_field *f, int j, struct type *ty
       struct objfile *objfile = msymbol_objfile (msym);
       struct gdbarch *gdbarch = get_objfile_arch (objfile);
 
-      VALUE_ADDRESS (v)
-	= gdbarch_convert_from_func_ptr_addr
-	   (gdbarch, SYMBOL_VALUE_ADDRESS (msym), &current_target);
+      set_value_address (v,
+	gdbarch_convert_from_func_ptr_addr
+	   (gdbarch, SYMBOL_VALUE_ADDRESS (msym), &current_target));
     }
 
   if (arg1p)
@@ -1638,6 +1982,7 @@ value_fn_field (struct value **arg1p, struct fn_field *f, int j, struct type *ty
 LONGEST
 unpack_field_as_long (struct type *type, const gdb_byte *valaddr, int fieldno)
 {
+  enum bfd_endian byte_order = gdbarch_byte_order (get_type_arch (type));
   ULONGEST val;
   ULONGEST valmask;
   int bitpos = TYPE_FIELD_BITPOS (type, fieldno);
@@ -1645,13 +1990,14 @@ unpack_field_as_long (struct type *type, const gdb_byte *valaddr, int fieldno)
   int lsbcount;
   struct type *field_type;
 
-  val = extract_unsigned_integer (valaddr + bitpos / 8, sizeof (val));
+  val = extract_unsigned_integer (valaddr + bitpos / 8,
+				  sizeof (val), byte_order);
   field_type = TYPE_FIELD_TYPE (type, fieldno);
   CHECK_TYPEDEF (field_type);
 
   /* Extract bits.  See comment above. */
 
-  if (gdbarch_bits_big_endian (current_gdbarch))
+  if (gdbarch_bits_big_endian (get_type_arch (type)))
     lsbcount = (sizeof val * 8 - bitpos % 8 - bitsize);
   else
     lsbcount = (bitpos % 8);
@@ -1683,8 +2029,10 @@ unpack_field_as_long (struct type *type, const gdb_byte *valaddr, int fieldno)
    0 <= BITPOS, where lbits is the size of a LONGEST in bits.  */
 
 void
-modify_field (gdb_byte *addr, LONGEST fieldval, int bitpos, int bitsize)
+modify_field (struct type *type, gdb_byte *addr,
+	      LONGEST fieldval, int bitpos, int bitsize)
 {
+  enum bfd_endian byte_order = gdbarch_byte_order (get_type_arch (type));
   ULONGEST oword;
   ULONGEST mask = (ULONGEST) -1 >> (8 * sizeof (ULONGEST) - bitsize);
 
@@ -1704,16 +2052,16 @@ modify_field (gdb_byte *addr, LONGEST fieldval, int bitpos, int bitsize)
       fieldval &= mask;
     }
 
-  oword = extract_unsigned_integer (addr, sizeof oword);
+  oword = extract_unsigned_integer (addr, sizeof oword, byte_order);
 
   /* Shifting for bit field depends on endianness of the target machine.  */
-  if (gdbarch_bits_big_endian (current_gdbarch))
+  if (gdbarch_bits_big_endian (get_type_arch (type)))
     bitpos = sizeof (oword) * 8 - bitpos - bitsize;
 
   oword &= ~(mask << bitpos);
   oword |= fieldval << bitpos;
 
-  store_unsigned_integer (addr, sizeof oword, oword);
+  store_unsigned_integer (addr, sizeof oword, byte_order, oword);
 }
 
 /* Pack NUM into BUF using a target format of TYPE.  */
@@ -1721,6 +2069,7 @@ modify_field (gdb_byte *addr, LONGEST fieldval, int bitpos, int bitsize)
 void
 pack_long (gdb_byte *buf, struct type *type, LONGEST num)
 {
+  enum bfd_endian byte_order = gdbarch_byte_order (get_type_arch (type));
   int len;
 
   type = check_typedef (type);
@@ -1735,7 +2084,7 @@ pack_long (gdb_byte *buf, struct type *type, LONGEST num)
     case TYPE_CODE_BOOL:
     case TYPE_CODE_RANGE:
     case TYPE_CODE_MEMBERPTR:
-      store_signed_integer (buf, len, num);
+      store_signed_integer (buf, len, byte_order, num);
       break;
 
     case TYPE_CODE_REF:
@@ -1774,34 +2123,6 @@ value_from_pointer (struct type *type, CORE_ADDR addr)
 }
 
 
-/* Create a value for a string constant to be stored locally
-   (not in the inferior's memory space, but in GDB memory).
-   This is analogous to value_from_longest, which also does not
-   use inferior memory.  String shall NOT contain embedded nulls.  */
-
-struct value *
-value_from_string (char *ptr)
-{
-  struct value *val;
-  int len = strlen (ptr);
-  int lowbound = current_language->string_lower_bound;
-  struct type *string_char_type;
-  struct type *rangetype;
-  struct type *stringtype;
-
-  rangetype = create_range_type ((struct type *) NULL,
-				 builtin_type_int32,
-				 lowbound, len + lowbound - 1);
-  string_char_type = language_string_char_type (current_language,
-						current_gdbarch);
-  stringtype = create_array_type ((struct type *) NULL,
-				  string_char_type,
-				  rangetype);
-  val = allocate_value (stringtype);
-  memcpy (value_contents_raw (val), ptr, len);
-  return val;
-}
-
 /* Create a value of type TYPE whose contents come from VALADDR, if it
    is non-null, and whose memory address (in the inferior) is
    ADDRESS.  */
@@ -1816,7 +2137,7 @@ value_from_contents_and_address (struct type *type,
     set_value_lazy (v, 1);
   else
     memcpy (value_contents_raw (v), valaddr, TYPE_LENGTH (type));
-  VALUE_ADDRESS (v) = address;
+  set_value_address (v, address);
   VALUE_LVAL (v) = lval_memory;
   return v;
 }
@@ -1887,7 +2208,8 @@ coerce_array (struct value *arg)
    address as a hidden first parameter).  */
 
 int
-using_struct_return (struct type *func_type, struct type *value_type)
+using_struct_return (struct gdbarch *gdbarch,
+		     struct type *func_type, struct type *value_type)
 {
   enum type_code code = TYPE_CODE (value_type);
 
@@ -1900,7 +2222,7 @@ using_struct_return (struct type *func_type, struct type *value_type)
     return 0;
 
   /* Probe the architecture for the return-value convention.  */
-  return (gdbarch_return_value (current_gdbarch, func_type, value_type,
+  return (gdbarch_return_value (gdbarch, func_type, value_type,
 				NULL, NULL, NULL)
 	  != RETURN_VALUE_REGISTER_CONVENTION);
 }
@@ -1944,4 +2266,8 @@ init-if-undefined VARIABLE = EXPRESSION\n\
 Set an internal VARIABLE to the result of the EXPRESSION if it does not\n\
 exist or does not contain a value.  The EXPRESSION is not evaluated if the\n\
 VARIABLE is already initialized."));
+
+  add_prefix_cmd ("function", no_class, function_command, _("\
+Placeholder command for showing help on convenience functions."),
+		  &functionlist, "function ", 0, &cmdlist);
 }

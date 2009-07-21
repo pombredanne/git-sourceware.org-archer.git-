@@ -107,8 +107,8 @@ symbol_file_add_from_memory (struct bfd *templ, CORE_ADDR addr, char *name,
 	++i;
       }
 
-  objf = symbol_file_add_from_bfd (nbfd, from_tty,
-                                   sai, 0, OBJF_SHARED);
+  objf = symbol_file_add_from_bfd (nbfd, from_tty ? SYMFILE_VERBOSE : 0,
+                                   sai, OBJF_SHARED);
 
   /* This might change our ideas about frames already looked at.  */
   reinit_frame_cache ();
@@ -196,8 +196,8 @@ try using the \"file\" command first."));
 	}
       args.bfd = bfd;
       args.sysinfo_ehdr = sysinfo_ehdr;
-      args.name = xstrprintf ("system-supplied DSO at 0x%s",
-		 paddr_nz (sysinfo_ehdr));
+      args.name = xstrprintf ("system-supplied DSO at %s",
+			      paddress (target_gdbarch, sysinfo_ehdr));
       /* Pass zero for FROM_TTY, because the action of loading the
 	 vsyscall DSO was not triggered by the user, even if the user
 	 typed "run" at the TTY.  */

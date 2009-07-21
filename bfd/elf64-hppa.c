@@ -19,6 +19,7 @@
    Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston,
    MA 02110-1301, USA.  */
 
+#include "alloca-conf.h"
 #include "sysdep.h"
 #include "bfd.h"
 #include "libbfd.h"
@@ -26,31 +27,6 @@
 #include "elf/hppa.h"
 #include "libhppa.h"
 #include "elf64-hppa.h"
-
-/* This is the code recommended in the autoconf documentation, almost
-   verbatim.  */
-#ifndef __GNUC__
-# if HAVE_ALLOCA_H
-#  include <alloca.h>
-# else
-#  ifdef _AIX
-/* Indented so that pre-ansi C compilers will ignore it, rather than
-   choke on it.  Some versions of AIX require this to be the first
-   thing in the file.  */
- #pragma alloca
-#  else
-#   ifndef alloca /* predefined by HP cc +Olibcalls */
-#    if !defined (__STDC__) && !defined (__hpux)
-extern char *alloca ();
-#    else
-extern void *alloca ();
-#    endif /* __STDC__, __hpux */
-#   endif /* alloca */
-#  endif /* _AIX */
-# endif /* HAVE_ALLOCA_H */
-#else
-extern void *alloca (size_t);
-#endif /* __GNUC__ */
 
 
 #define ARCH_SIZE	       64
@@ -208,7 +184,7 @@ static bfd_boolean elf64_hppa_mark_milli_and_exported_functions
 static bfd_boolean elf64_hppa_size_dynamic_sections
   (bfd *, struct bfd_link_info *);
 
-static bfd_boolean elf64_hppa_link_output_symbol_hook
+static int elf64_hppa_link_output_symbol_hook
   (struct bfd_link_info *, const char *, Elf_Internal_Sym *,
    asection *, struct elf_link_hash_entry *);
 
@@ -1938,7 +1914,7 @@ elf64_hppa_size_dynamic_sections (bfd *output_bfd, struct bfd_link_info *info)
    the symbols have their expected value in the normal symbol
    table.  Ick.  */
 
-static bfd_boolean
+static int
 elf64_hppa_link_output_symbol_hook (struct bfd_link_info *info ATTRIBUTE_UNUSED,
 				    const char *name,
 				    Elf_Internal_Sym *sym,
@@ -1950,7 +1926,7 @@ elf64_hppa_link_output_symbol_hook (struct bfd_link_info *info ATTRIBUTE_UNUSED,
   /* We may be called with the file symbol or section symbols.
      They never need munging, so it is safe to ignore them.  */
   if (!name || !eh)
-    return TRUE;
+    return 1;
 
   /* Function symbols for which we created .opd entries *may* have been
      munged by finish_dynamic_symbol and have to be un-munged here.
@@ -1966,7 +1942,7 @@ elf64_hppa_link_output_symbol_hook (struct bfd_link_info *info ATTRIBUTE_UNUSED,
       sym->st_shndx = hh->st_shndx;
     }
 
-  return TRUE;
+  return 1;
 }
 
 /* Finish up dynamic symbol handling.  We set the contents of various

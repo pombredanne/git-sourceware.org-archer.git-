@@ -33,19 +33,23 @@ enum e
     TWO = 2
   };
 
+typedef struct s *PTR;
+
 enum e evalue = TWO;
 
 int
 main (int argc, char *argv[])
 {
+  char *cp = argv[0]; /* Prevent gcc from optimizing argv[] out.  */
   struct s s;
   union u u;
+  PTR x = &s;
+  char st[17] = "divide et impera";
+  char nullst[17] = "divide\0et\0impera";
 
   s.a = 3;
   s.b = 5;
   u.a = 7;
-
-  argv[0][0] = 'a';   /* Just to avoid getting argv optimized out.  */
 
   return 0;      /* break to inspect struct and union */
 }

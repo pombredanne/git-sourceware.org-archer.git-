@@ -29,8 +29,8 @@
 #include "valprint.h"
 
 extern void _initialize_m2_language (void);
-static void m2_printchar (int, struct ui_file *);
-static void m2_emit_char (int, struct ui_file *, int);
+static void m2_printchar (int, struct type *, struct ui_file *);
+static void m2_emit_char (int, struct type *, struct ui_file *, int);
 
 /* Print the character C on STREAM as part of the contents of a literal
    string whose delimiter is QUOTER.  Note that that format for printing
@@ -39,7 +39,7 @@ static void m2_emit_char (int, struct ui_file *, int);
    be replaced with a true Modula version.  */
 
 static void
-m2_emit_char (int c, struct ui_file *stream, int quoter)
+m2_emit_char (int c, struct type *type, struct ui_file *stream, int quoter)
 {
 
   c &= 0xFF;			/* Avoid sign bit follies */
@@ -88,10 +88,10 @@ m2_emit_char (int c, struct ui_file *stream, int quoter)
    be replaced with a true Modula version.  */
 
 static void
-m2_printchar (int c, struct ui_file *stream)
+m2_printchar (int c, struct type *type, struct ui_file *stream)
 {
   fputs_filtered ("'", stream);
-  LA_EMIT_CHAR (c, stream, '\'');
+  LA_EMIT_CHAR (c, type, stream, '\'');
   fputs_filtered ("'", stream);
 }
 
@@ -103,14 +103,15 @@ m2_printchar (int c, struct ui_file *stream)
    be replaced with a true Modula version.  */
 
 static void
-m2_printstr (struct ui_file *stream, const gdb_byte *string,
-	     unsigned int length, int width, int force_ellipses,
+m2_printstr (struct ui_file *stream, struct type *type, const gdb_byte *string,
+	     unsigned int length, int force_ellipses,
 	     const struct value_print_options *options)
 {
   unsigned int i;
   unsigned int things_printed = 0;
   int in_quotes = 0;
   int need_comma = 0;
+  int width = TYPE_LENGTH (type);
 
   if (length == 0)
     {
@@ -152,7 +153,7 @@ m2_printstr (struct ui_file *stream, const gdb_byte *string,
 		fputs_filtered ("\", ", stream);
 	      in_quotes = 0;
 	    }
-	  m2_printchar (string[i], stream);
+	  m2_printchar (string[i], type, stream);
 	  fprintf_filtered (stream, " <repeats %u times>", reps);
 	  i = rep1 - 1;
 	  things_printed += options->repeat_count_threshold;
@@ -168,7 +169,7 @@ m2_printstr (struct ui_file *stream, const gdb_byte *string,
 		fputs_filtered ("\"", stream);
 	      in_quotes = 1;
 	    }
-	  LA_EMIT_CHAR (string[i], stream, '"');
+	  LA_EMIT_CHAR (string[i], type, stream, '"');
 	  ++things_printed;
 	}
     }
@@ -252,7 +253,7 @@ evaluate_subexp_modula2 (struct type *expect_type, struct expression *exp,
 	    arg1 = value_cast (type, arg1);
 
 	  type = check_typedef (value_type (arg1));
-	  return value_ind (value_ptradd (arg1, arg2));
+	  return value_ind (value_ptradd (arg1, value_as_long (arg2)));
 	}
       else
 	if (TYPE_CODE (type) != TYPE_CODE_ARRAY)
@@ -267,14 +268,14 @@ evaluate_subexp_modula2 (struct type *expect_type, struct expression *exp,
       if (noside == EVAL_AVOID_SIDE_EFFECTS)
 	return value_zero (TYPE_TARGET_TYPE (type), VALUE_LVAL (arg1));
       else
-	return value_subscript (arg1, arg2);
+	return value_subscript (arg1, value_as_long (arg2));
 
     default:
       return evaluate_subexp_standard (expect_type, exp, pos, noside);
     }
 
  nosideret:
-  return value_from_longest (builtin_type_int8, (LONGEST) 1);
+  return value_from_longest (builtin_type (exp->gdbarch)->builtin_int, 1);
 }
 
 
@@ -405,29 +406,16 @@ build_m2_types (struct gdbarch *gdbarch)
     = GDBARCH_OBSTACK_ZALLOC (gdbarch, struct builtin_m2_type);
 
   /* Modula-2 "pervasive" types.  NOTE:  these can be redefined!!! */
-  builtin_m2_type->builtin_int =
-    init_type (TYPE_CODE_INT,
-	       gdbarch_int_bit (gdbarch) / TARGET_CHAR_BIT,
-	       0, "INTEGER", (struct objfile *) NULL);
-  builtin_m2_type->builtin_card =
-    init_type (TYPE_CODE_INT, 
-	       gdbarch_int_bit (gdbarch) / TARGET_CHAR_BIT,
-	       TYPE_FLAG_UNSIGNED,
-	       "CARDINAL", (struct objfile *) NULL);
-  builtin_m2_type->builtin_real =
-    init_type (TYPE_CODE_FLT,
-	       gdbarch_float_bit (gdbarch) / TARGET_CHAR_BIT,
-	       0,
-	       "REAL", (struct objfile *) NULL);
-  builtin_m2_type->builtin_char =
-    init_type (TYPE_CODE_CHAR, TARGET_CHAR_BIT / TARGET_CHAR_BIT,
-	       TYPE_FLAG_UNSIGNED,
-	       "CHAR", (struct objfile *) NULL);
-  builtin_m2_type->builtin_bool =
-    init_type (TYPE_CODE_BOOL, 
-	       gdbarch_int_bit (gdbarch) / TARGET_CHAR_BIT,
-	       TYPE_FLAG_UNSIGNED,
-	       "BOOLEAN", (struct objfile *) NULL);
+  builtin_m2_type->builtin_int
+    = arch_integer_type (gdbarch, gdbarch_int_bit (gdbarch), 0, "INTEGER");
+  builtin_m2_type->builtin_card
+    = arch_integer_type (gdbarch, gdbarch_int_bit (gdbarch), 1, "CARDINAL");
+  builtin_m2_type->builtin_real
+    = arch_float_type (gdbarch, gdbarch_float_bit (gdbarch), "REAL", NULL);
+  builtin_m2_type->builtin_char
+    = arch_character_type (gdbarch, TARGET_CHAR_BIT, 1, "CHAR");
+  builtin_m2_type->builtin_bool
+    = arch_boolean_type (gdbarch, gdbarch_int_bit (gdbarch), 1, "BOOLEAN");
 
   return builtin_m2_type;
 }

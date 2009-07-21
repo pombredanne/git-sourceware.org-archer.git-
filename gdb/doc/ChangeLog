@@ -1,3 +1,389 @@
+2009-07-14  Stan Shebs  <stan@codesourcery.com>
+
+	* gdb.texinfo (Tracepoint Conditions): New section.
+	(General Query Packets): Describe ConditionalTracepoints.
+	(Tracepoint Packets): Describe condition field.
+	(Maintenance Commands): Describe maint agent-eval.
+	* agentexpr.texi (Using Agent Expressions): Mention eval usage.
+
+2009-07-11  Hui Zhu  <teawater@gmail.com>
+
+	* gdb.texinfo (disassemble): Add a new modifier /r
+	to "disassemble" command to make it print the raw instructions
+	in hex as well as in symbolic form.
+
+2009-07-09  Tom Tromey  <tromey@redhat.com>
+
+	* gdbint.texinfo (Testsuite): Document parallel make check.
+
+2009-07-09  Tom Tromey  <tromey@redhat.com>
+
+	* gdbint.texinfo (Testsuite): Document test transcripts.
+
+2009-07-10  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.texinfo (Values From Inferior): Add length parameter
+	description.
+
+2009-07-04  Chris Genly  <chris@genly.us>
+
+	* gdb.texinfo (GDB/MI Variable Objects): Document child definition
+	in -var-list-children.  Fix example according to what the code
+	does.
+
+2009-07-02  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo (Debugging multiple inferiors): Document the
+	"inferior", "detach inferior" and "kill inferior" commands.
+	(Debugging Programs with Multiple Processes): Adjust to mention
+	generic "inferior" commands.  Delete mention of "detach fork" and
+	"delete fork".  Cross reference to "Debugging multiple inferiors"
+	section.
+
+2009-07-02  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdbint.texinfo (Item Output Functions): Update signature
+	for ui_out_field_core_addr.
+
+2009-07-02  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdbint.texinfo (Examples of Use of @code{ui_out} functions):
+	Update example code extrated from breakpoint.c.
+
+2009-06-28  Paul Pluzhnikov  <ppluzhnikov@google.com>
+	
+	* gdb.texinfo (GDB/MI Program Context): @ignore unimplemented
+	MI commands.
+	(GDB/MI Symbol Query): Likewise.
+	(GDB/MI File Commands): Likewise.
+	(GDB/MI File Transfer Commands): Likewise.
+	(GDB/MI Target Manipulation): Likewise.
+	(GDB/MI Miscellaneous Commands): Likewise.
+	
+2009-06-27  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.texinfo (Debugging Optimized Code): New chapter.
+	(Compiling for Debugging): Reference it.  Move some
+	text to the new section.
+
+2009-06-15  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* doc/gdb.texinfo (Calling): Document
+	set-unwind-on-terminating-exception usage.
+
+2009-06-11  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo (All-Stop): Document new 'set schedule-multiple'
+	command.
+
+2009-06-07  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdbint.texinfo (TARGET_HAS_HARDWARE_WATCHPOINTS): Delete all
+	references.
+
+2009-06-04  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdbint.texinfo: Rename formal parameters to gdbarch function
+	protoypes from "current_gdbarch" to "gdbarch".
+
+2009-05-28  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Basic Python): Change get_parameter to parameter.
+
+2009-05-27  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (GDB/MI Miscellaneous Commands): Document "python"
+	feature.
+	(GDB/MI Variable Objects): Document -var-set-visualizer.
+
+2009-04-02  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (GDB/MI Miscellaneous Commands): Document "python"
+	feature.
+	(GDB/MI Variable Objects): Document -var-set-visualizer.
+
+2009-05-27  Tom Tromey  <tromey@redhat.com>
+	    Thiago Jung Bauermann  <bauerman@br.ibm.com>
+	    Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.texinfo (Objfiles In Python): Reference pretty printing.
+	(Pretty Printing): New node.
+	(Selecting Pretty-Printers): Likewise.
+	(Python API): Update.
+	(Output Formats): Document /r format.
+
+2009-05-27  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+	    Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Types In Python): New node.
+	(Values From Inferior): "type" is now an attribute.
+	(Python API): Update.
+
+2009-05-27  Tom Tromey  <tromey@redhat.com>
+	    Thiago Jung Bauermann  <bauerman@br.ibm.com>
+	    Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.texinfo: Add @syncodeindex for `tp'.
+	(Python API): Update.
+	(Auto-loading): New node.
+	(Objfiles In Python): New node.
+
+2009-05-15  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* gdb.texinfo (Threads): Document libthread-db-search-path.
+	
+2009-05-15  Nick Roberts  <nickrob@snap.net.nz>
+
+	* gdb.texinfo (GDB/MI General Design): Break up into four nodes.
+
+2009-05-12  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo: Document 'set/show debug gnu-nat'.  Replace 'maint
+	show-debug-regs' docs by 'maint set show-debug-regs' and 'maint
+	show show-debug-regs' docs.
+
+2009-05-08  Eli Zaretskii  <eliz@gnu.org>
+
+	* gdb.texinfo (Process Record and Replay): Add description of
+	reverse execution.
+
+2009-05-07  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdbint.texinfo (Adding support for debugging core files): New node.
+	(Native Debugging): Remove the ``Native core file Support'' section.
+
+2009-05-01  Eli Zaretskii  <eliz@gnu.org>
+
+	* gdb.texinfo (Process Record and Replay): Improve and clarify.
+	Add index entries.
+
+2009-04-30  Hui Zhu  <teawater@gmail.com>
+            Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.texinfo: (Process Record and Replay): Add documentation for
+	process record and replay.
+
+2009-04-29  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.texinfo (Macros): Note command-line for `info macro'.  Append
+	a new part on command-line defined macros.
+
+2009-04-25  Eli Zaretskii  <eliz@gnu.org>
+
+	* gdb.texinfo (Machine Code) <disassemble-next-line>: Improve and
+	clarify the wording.
+
+2009-04-23  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Data Files): New node.
+	(GDB Files): Update menu.
+
+2009-04-23  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdbint.texinfo (Defining Other Architecture Features): Remove
+	entry for PROCESS_LINENUMBER_HOOK.
+
+2009-04-22  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* gdb.texinfo (GDB/MI Program Execution): Document -exec-jump.
+
+2009-04-22  Hui Zhu  <teawater@gmail.com>
+
+	* gdb.texinfo (disassemble-next-line): Set the default of
+	disassemble-next-line to off.
+
+2009-04-21  Joseph Myers  <joseph@codesourcery.com>
+
+	* configure.ac (--with-datarootdir, --with-docdir, --with-pdfdir,
+	--with-htmldir): New.
+	* configure: Regenerate.
+	* Makefile.in (datarootdir, docdir): Define.
+	(gdb.dvi, gdb.pdf): Use same -I options as for building gdb.info
+	instead of $(SET_TEXINPUTS).
+	(gdbint.dvi, gdbint.pdf): Use same -I options as for building
+	gdbint.info instead of $(SET_TEXINPUTS).
+	(gdbint/index.html): Use same -I options as for building
+	gdbint.info.
+	(stabs.dvi, stabs.pdf): Use same -I options as for building
+	stabs.info instead of $(SET_TEXINPUTS).
+	(stabs/index.html): Use same -I options as for building
+	stabs.info.
+	(annotate.dvi, annotate.pdf): Use same -I options as for building
+	annotate.info instead of $(SET_TEXINPUTS).
+	(annotate/index.html): Use same -I options as for building
+	annotate.info.
+
+2009-04-21  David Daney  <ddaney@caviumnetworks.com>
+
+	* gdb.texinfo (maint show-debug-regs): Remove mention of x86.
+
+2009-04-21  Joseph Myers  <joseph@codesourcery.com>
+
+	* gdb.texinfo (Source Path): Document --with-relocated-sources.
+
+2009-04-18  Carlos O'Donell  <carlos@codesourcery.com>
+            Joseph Myers  <joseph@codesourcery.com>
+
+	* Makefile.in (MAKEHTML): Set to makeinfo --html.
+	(MAKEHTMLFLAGS): Set to empty.
+	(html__strip_dir): Define.
+	(HTMLFILES): Define.
+	(HTMLFILES_INSTALL): Define.
+	(install-html): Copy new automake rule.
+	(html): Depend on $(HTMLFILES).
+	(gdb_toc.html): Rename to gdb/index.html.
+	(gdbint_toc.html): Rename to gdbint/index.html.
+	(stabs_toc.html): Rename to stabs/index.html.
+	(annotate_toc.html): Rename to annotate/index.html.
+
+2009-04-17  Carlos O'Donell  <carlos@codesourcery.com>
+
+	* Makefile.in: Set pdfdir and htmldir from configure
+	substitutions.
+	* configure.ac: AC_SUBST datarootdir, docdir, htmldir, pdfdir.
+	* configure: Regenerate.
+
+2009-04-16  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdbint.texinfo (Native Debugging): Remove entry for PROC_NAME_FMT.
+	This macro is no longer used.
+
+2009-04-15  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Character Sets): Document default character set.
+
+2009-04-14  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* gdbint.texinfo: Change server name from sources.redhat.com to
+	sourceware.org throughout.
+
+2009-04-09  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.texinfo (Set Breaks): Rewrite a paragraph to avoid a warning
+	about a missing dot or coma after @xref.
+
+2009-04-02  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.texinfo (Backtrace): Add a parameter in frame 1 of the first
+	example, and add a small explanation about it.
+	(Print Settings): Change the documentation of the "set print
+	frame-arguments" to reflect the fact that the default is now "scalars".
+
+2009-04-02  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.texinfo (Print Settings): Add kindex for command "set
+	print frame-arguments".
+
+2009-03-31  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.texinfo (Ada Tasks): Add documentation about task-specific
+	breakpoints.
+	(Set Breaks): Add reference to thread-specific and task-specific
+	breakpoints.
+
+2009-03-31  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.texinfo (Ada Tasks): Remove the documentation about
+	the "Running" state, as this state has been eliminated.
+	Now all runnable tasks are shown as "Runnable".
+
+2009-03-30  Stan Shebs  <stan@codesourcery.com>
+
+	* gdb.texinfo (Tracepoints): Describe tracepoints as a
+	special case of breakpoints.
+	(Enable and Disable Tracepoints): Mention deprecation.
+	(Listing Tracepoints): Update description and example.
+
+2009-03-30  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.texinfo (Frames in Python): New node.
+	(Python API): Update.
+
+2009-03-29  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.texinfo (Values From Inferior): Change gdb.Value.address
+	from a method to an attribute.
+
+2009-03-26  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.texinfo (Values From Inferior): Document is_optimized_out
+	attribute.
+
+2009-03-25  Pedro Alves  <pedro@codesourcery.com>
+
+	* observer.texi (thread_exit): Add "silent" parameter.
+
+2009-03-22  Pedro Alves  <pedro@codesourcery.com>
+
+	* observer.texi (about_to_proceed): New.
+
+2009-03-21  Jeremy Bennett  <jeremy.bennett@embecosm.com>
+
+	* gdbint.texinfo (everywhere): Use braces {} in @deftypeXX type
+	field throughout to handle types with spaces in them.  Fix typos
+	found by aspell.
+	(Summary, Requirements, Contributors): New first chapter,
+	"Summary" added, old Requirements section moved there, and new
+	section, "Contributors" added.
+	(Initializing a New Architecture, Register Representation)
+	(Frame Interpretation, Inferior Call Setup, Adding a New Target)
+	(Porting gdb): These sections extended and updated.
+	(Compiler Characteristics): This section (empty) deleted.
+	(Defining Other Architecture Features): This section renamed and
+	duplicate material removed from (formerly "Target Conditionals").
+	Use braces {} in @deftypeXX type field throughout to handle types
+	with spaces in them. Typos found by aspell fixed.
+
+	* stack_frame.svg: New file, source of image for gdbint.texinfo.
+	* stack_frame.pdf: Version of image for PDF output.
+	* stack_frame.png: Version of image for HTML output and for Emacs.
+	* stack_frame.txt: Version of image for Info output.
+	* stack_frame.eps: Version of image for TeX DVI output.
+
+2009-03-21  Eli Zaretskii  <eliz@gnu.org>
+
+	* gdb.texinfo (Character Sets): Fix last change.
+
+2009-03-21  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.texinfo (Values From Inferior): Fix optional arguments
+	markup.
+	(Commands In Python): Adjust argument names of gdb.Command.__init__
+	to what the function accepts as keywords.
+
+2008-03-20  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Convenience Vars): Document convenience functions.
+	(Functions In Python): New node.
+	(Python API): Update.
+
+2009-03-20  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Character Sets): Remove obsolete text.  Document
+	set target-wide-charset.
+	(Requirements): Mention iconv.
+
+2009-03-17  Hui Zhu  <teawater@gmail.com>
+
+	* gdb.texinfo: Change the introduce of "disassemble-next-line".
+
+2009-03-17  Hui Zhu  <teawater@gmail.com>
+
+	* gdb.texinfo: Add documentation for disassemble-next-line.
+
+2009-03-16  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.texinfo (Commands In Python): Remove tindex entries.
+
+2009-03-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.texinfo (Returning): New description for missing debug info.
+
+2009-03-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo (Remote Configuration): Document query-attached.
+	(General Query Packets): Document qAttached.
+
 2009-03-05  Pedro Alves  <pedro@codesourcery.com>
 
 	* gdb.texinfo (Background Execution): Better describe the set
@@ -21,8 +407,8 @@
 
 2009-02-14  Vladimir Prus  <vladimir@codesourcery.com>
 
-        * observer.texi: Add parameter 'print_frame' to normal_stop
-        observer.
+	* observer.texi: Add parameter 'print_frame' to normal_stop
+	observer.
 
 2009-02-07  Eli Zaretskii  <eliz@gnu.org>
 

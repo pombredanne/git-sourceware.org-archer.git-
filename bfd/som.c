@@ -23,6 +23,7 @@
    Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston, MA
    02110-1301, USA.  */
 
+#include "alloca-conf.h"
 #include "sysdep.h"
 #include "bfd.h"
 
@@ -36,32 +37,6 @@
 #include <signal.h>
 #include <machine/reg.h>
 #include <sys/file.h>
-
-/* This is the code recommended in the autoconf documentation, almost
-   verbatim.  */
-
-#ifndef __GNUC__
-# if HAVE_ALLOCA_H
-#  include <alloca.h>
-# else
-#  ifdef _AIX
-/* Indented so that pre-ansi C compilers will ignore it, rather than
-   choke on it.  Some versions of AIX require this to be the first
-   thing in the file.  */
- #pragma alloca
-#  else
-#   ifndef alloca /* predefined by HP cc +Olibcalls */
-#    if !defined (__STDC__) && !defined (__hpux)
-extern char *alloca ();
-#    else
-extern void *alloca ();
-#    endif /* __STDC__, __hpux */
-#   endif /* alloca */
-#  endif /* _AIX */
-# endif /* HAVE_ALLOCA_H */
-#else
-extern void *alloca (size_t);
-#endif /* __GNUC__ */
 
 static bfd_reloc_status_type hppa_som_reloc
   (bfd *, arelent *, asymbol *, void *, asection *, bfd *, char **);
@@ -6374,6 +6349,7 @@ som_bfd_link_split_section (bfd *abfd ATTRIBUTE_UNUSED, asection *sec)
 #define som_bfd_is_group_section	        bfd_generic_is_group_section
 #define som_bfd_discard_group		        bfd_generic_discard_group
 #define som_section_already_linked              _bfd_generic_section_already_linked
+#define som_bfd_define_common_symbol            bfd_generic_define_common_symbol
 #define som_bfd_merge_private_bfd_data		_bfd_generic_bfd_merge_private_bfd_data
 #define som_bfd_copy_private_header_data	_bfd_generic_bfd_copy_private_header_data
 #define som_bfd_set_private_flags		_bfd_generic_bfd_set_private_flags

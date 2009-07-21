@@ -70,6 +70,9 @@ proc test_value_creation {} {
   gdb_py_test_silent_cmd "python a = gdb.Value (u'unicode test')" "create unicode value" 1
   gdb_test "python print a" "\"unicode test\"" "print Unicode string"
   gdb_test "python print a.__class__" "<type 'gdb.Value'>" "verify type of unicode string"
+
+  # Test address attribute is None in a non-addressable value
+  gdb_test "python print 'result =', i.address" "= None" "Test address attribute in non-addressable value"
 }
 
 proc test_value_numeric_ops {} {
@@ -225,8 +228,69 @@ proc test_value_in_inferior {} {
 
   # Check that the dereferenced value is sane
   gdb_test "python print arg0" "0x.*$testfile\"" "verify dereferenced value"
+
+  # Smoke-test is_optimized_out attribute
+  gdb_test "python print 'result =', arg0.is_optimized_out" "= False" "Test is_optimized_out attribute"
+
+  # Test address attribute
+  gdb_test "python print 'result =', arg0.address" "= 0x\[\[:xdigit:\]\]+" "Test address attribute"
+
+  # Test string fetches,  both partial and whole.
+  gdb_test "print st" "\"divide et impera\""
+  gdb_py_test_silent_cmd "python st = gdb.history (0)" "get value from history" 1
+  gdb_test "python print st.string ()"  "divide et impera"  "Test string with no length"
+  gdb_test "python print st.string (length = -1)" "divide et impera" "Test string (length = -1) is all of the string"
+  gdb_test "python print st.string (length = 6)" "divide"
+  gdb_test "python print \"---\"+st.string (length = 0)+\"---\"" "------" "Test string (length = 0) is empty"
+  gdb_test "python print len(st.string (length = 0))" "0" "Test length is 0"
+
+
+  # Fetch a string that has embedded nulls.
+  gdb_test "print nullst" "\"divide\\\\000et\\\\000impera\".*"
+  gdb_py_test_silent_cmd "python nullst = gdb.history (0)" "get value from history" 1
+  gdb_test "python print nullst.string ()" "divide" "Test string to first null"
+  # Python cannot print strings that contain the null (\0) character.
+  # For the purposes of this test, use repr()
+  gdb_py_test_silent_cmd "python nullst = nullst.string (length = 9)" "get string beyond null" 1
+  gdb_test "python print repr(nullst)" "u'divide\\\\x00et'"
 }
 
+# A few objfile tests.
+proc test_objfiles {} {
+    gdb_test "python\nok=False\nfor file in gdb.objfiles():\n  if 'python-value' in file.filename:\n    ok=True\nprint ok\nend" "True"
+
+    gdb_test "python print gdb.objfiles()\[0\].pretty_printers" "\\\[\\\]"
+
+    gdb_test "python gdb.objfiles()\[0\].pretty_printers = 0" \
+      "pretty_printers attribute must be a list.*Error while executing Python code."
+}
+
+proc test_value_after_death {} {
+  # Construct a type while the inferior is still running.
+  gdb_py_test_silent_cmd "python ptrtype = gdb.lookup_type('PTR')" \
+    "create PTR type" 1
+
+  # Kill the inferior and remove the symbols.
+  gdb_test "kill" "" "kill the inferior" \
+    "Kill the program being debugged. .y or n. $" \
+    "y"
+  gdb_test "file" "" "Discard the symbols" \
+    "Discard symbol table from.*y or n. $" \
+    "y"
+
+  # Now create a value using that type.  Relies on arg0, created by
+  # test_value_in_inferior.
+  gdb_py_test_silent_cmd "python castval = arg0.cast(ptrtype.pointer())" \
+    "cast arg0 to PTR" 1
+
+  # Make sure the type is deleted.
+  gdb_py_test_silent_cmd "python ptrtype = None" \
+    "delete PTR type" 1
+
+  # Now see if the value's type is still valid.
+  gdb_test "python print castval.type" "PTR ." \
+    "print value's type"
+}
 
 # Start with a fresh gdb.
 
@@ -247,6 +311,7 @@ test_value_creation
 test_value_numeric_ops
 test_value_boolean
 test_value_compare
+test_objfiles
 
 # The following tests require execution.
 
@@ -256,3 +321,4 @@ if ![runto_main] then {
 }
 
 test_value_in_inferior
+test_value_after_death

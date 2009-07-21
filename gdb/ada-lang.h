@@ -226,8 +226,6 @@ struct ada_task_info
   CORE_ADDR caller_task;
 };
 
-int ada_task_is_alive (struct ada_task_info *task);
-
 /* Assuming V points to an array of S objects,  make sure that it contains at
    least M objects, updating V and S as necessary. */
 
@@ -257,16 +255,17 @@ extern int ada_value_print (struct value *, struct ui_file *,
 
                                 /* Defined in ada-lang.c */
 
-extern void ada_emit_char (int, struct ui_file *, int, int);
+extern void ada_emit_char (int, struct type *, struct ui_file *, int, int);
 
-extern void ada_printchar (int, struct ui_file *);
+extern void ada_printchar (int, struct type *, struct ui_file *);
 
-extern void ada_printstr (struct ui_file *, const gdb_byte *,
-			  unsigned int, int, int,
+extern void ada_printstr (struct ui_file *, struct type *, const gdb_byte *,
+			  unsigned int, int,
 			  const struct value_print_options *);
 
 struct value *ada_convert_actual (struct value *actual,
                                   struct type *formal_type0,
+				  struct gdbarch *gdbarch,
                                   CORE_ADDR *sp);
 
 extern struct value *ada_value_subscript (struct value *, int,
@@ -285,10 +284,6 @@ extern int ada_is_simple_array_type (struct type *);
 extern int ada_is_array_descriptor_type (struct type *);
 
 extern int ada_is_bogus_array_descriptor (struct type *);
-
-extern struct type *ada_index_type (struct type *, int);
-
-extern struct value *ada_array_bound (struct value *, int, int);
 
 extern char *ada_decode_symbol (const struct general_symbol_info*);
 
@@ -463,19 +458,7 @@ extern char *ada_main_name (void);
 
 extern int valid_task_id (int);
 
-extern void ada_adjust_exception_stop (bpstat bs);
-
-extern void ada_print_exception_stop (bpstat bs);
-
-extern int ada_get_current_task (ptid_t);
-
-extern int breakpoint_ada_task_match (CORE_ADDR, ptid_t);
-
-extern int ada_print_exception_breakpoint_nontask (struct breakpoint *);
-
-extern void ada_print_exception_breakpoint_task (struct breakpoint *);
-
-extern void ada_reset_thread_registers (void);
+extern int ada_get_task_number (ptid_t);
 
 extern int ada_build_task_list (int warn_if_null);
 

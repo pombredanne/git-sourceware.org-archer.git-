@@ -2,22 +2,20 @@
    Copyright (C) 1997, 1998, 1999, 2000, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
 
-This file is part of GDB.
+   This file is part of GDB.
 
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2 of the License, or
-(at your option) any later version.
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation; either version 3 of the License, or
+   (at your option) any later version.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 51 Franklin Street, Fifth Floor,
-Boston, MA 02110-1301, USA.  */
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 /* Parse a Java expression from text in a string,
    and return the result as a  struct expression  pointer.
@@ -52,6 +50,7 @@ Boston, MA 02110-1301, USA.  */
 #include "block.h"
 
 #define parse_type builtin_type (parse_gdbarch)
+#define parse_java_type builtin_java_type (parse_gdbarch)
 
 /* Remap normal yacc parser interface names (yyparse, yylex, yyerror, etc),
    as well as gratuitiously global symbol names, so we can have multiple
@@ -251,7 +250,7 @@ Literal:
 		  write_exp_elt_opcode (OP_DOUBLE); }
 |	BOOLEAN_LITERAL
 		{ write_exp_elt_opcode (OP_LONG);
-		  write_exp_elt_type (java_boolean_type);
+		  write_exp_elt_type (parse_java_type->builtin_boolean);
 		  write_exp_elt_longcst ((LONGEST)$1);
 		  write_exp_elt_opcode (OP_LONG); }
 |	StringLiteral
@@ -267,7 +266,7 @@ Type:
 PrimitiveType:
 	NumericType
 |	BOOLEAN
-		{ $$ = java_boolean_type; }
+		{ $$ = parse_java_type->builtin_boolean; }
 ;
 
 NumericType:
@@ -277,22 +276,22 @@ NumericType:
 
 IntegralType:
 	BYTE
-		{ $$ = java_byte_type; }
+		{ $$ = parse_java_type->builtin_byte; }
 |	SHORT
-		{ $$ = java_short_type; }
+		{ $$ = parse_java_type->builtin_short; }
 |	INT
-		{ $$ = java_int_type; }
+		{ $$ = parse_java_type->builtin_int; }
 |	LONG
-		{ $$ = java_long_type; }
+		{ $$ = parse_java_type->builtin_long; }
 |	CHAR
-		{ $$ = java_char_type; }
+		{ $$ = parse_java_type->builtin_char; }
 ;
 
 FloatingPointType:
 	FLOAT
-		{ $$ = java_float_type; }
+		{ $$ = parse_java_type->builtin_float; }
 |	DOUBLE
-		{ $$ = java_double_type; }
+		{ $$ = parse_java_type->builtin_double; }
 ;
 
 /* UNUSED:
@@ -767,12 +766,12 @@ parse_number (char *p, int len, int parsed_float, YYSTYPE *putithere)
   limit = ((limit << 16) << 16) | limit;
   if (c == 'l' || c == 'L')
     {
-      type = java_long_type;
+      type = parse_java_type->builtin_long;
       len--;
     }
   else
     {
-      type = java_int_type;
+      type = parse_java_type->builtin_int;
     }
   limit_div_base = limit / (ULONGEST) base;
 
@@ -796,12 +795,12 @@ parse_number (char *p, int len, int parsed_float, YYSTYPE *putithere)
 	}
 
   /* If the type is bigger than a 32-bit signed integer can be, implicitly
-     promote to long.  Java does not do this, so mark it as builtin_type_uint64
-     rather than java_long_type.  0x80000000 will become -0x80000000 instead
-     of 0x80000000L, because we don't know the sign at this point.
-  */
-  if (type == java_int_type && n > (ULONGEST)0x80000000)
-    type = builtin_type_uint64;
+     promote to long.  Java does not do this, so mark it as
+     parse_type->builtin_uint64 rather than parse_java_type->builtin_long.
+     0x80000000 will become -0x80000000 instead of 0x80000000L, because we
+     don't know the sign at this point.  */
+  if (type == parse_java_type->builtin_int && n > (ULONGEST)0x80000000)
+    type = parse_type->builtin_uint64;
 
   putithere->typed_val_int.val = n;
   putithere->typed_val_int.type = type;
@@ -904,7 +903,7 @@ yylex (void)
 	error (_("Empty character constant"));
 
       yylval.typed_val_int.val = c;
-      yylval.typed_val_int.type = java_char_type;
+      yylval.typed_val_int.type = parse_java_type->builtin_char;
 
       c = *lexptr++;
       if (c != '\'')

@@ -19,6 +19,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "i386-nat.h"
 #include "inferior.h"
 #include "gdbcore.h"
 #include "regcache.h"
@@ -629,7 +630,7 @@ i386_linux_dr_set (ptid_t ptid, int regnum, unsigned long value)
     perror_with_name (_("Couldn't write debug register"));
 }
 
-void
+static void
 i386_linux_dr_set_control (unsigned long control)
 {
   struct lwp_info *lp;
@@ -640,7 +641,7 @@ i386_linux_dr_set_control (unsigned long control)
     i386_linux_dr_set (ptid, DR_CONTROL, control);
 }
 
-void
+static void
 i386_linux_dr_set_addr (int regnum, CORE_ADDR addr)
 {
   struct lwp_info *lp;
@@ -653,13 +654,13 @@ i386_linux_dr_set_addr (int regnum, CORE_ADDR addr)
     i386_linux_dr_set (ptid, DR_FIRSTADDR + regnum, addr);
 }
 
-void
+static void
 i386_linux_dr_reset_addr (int regnum)
 {
   i386_linux_dr_set_addr (regnum, 0);
 }
 
-unsigned long
+static unsigned long
 i386_linux_dr_get_status (void)
 {
   return i386_linux_dr_get (inferior_ptid, DR_STATUS);
@@ -756,13 +757,15 @@ i386_linux_resume (struct target_ops *ops,
   if (step)
     {
       struct regcache *regcache = get_thread_regcache (pid_to_ptid (pid));
+      struct gdbarch *gdbarch = get_regcache_arch (regcache);
+      enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
       ULONGEST pc;
       gdb_byte buf[LINUX_SYSCALL_LEN];
 
       request = PTRACE_SINGLESTEP;
 
-      regcache_cooked_read_unsigned
-	(regcache, gdbarch_pc_regnum (get_regcache_arch (regcache)), &pc);
+      regcache_cooked_read_unsigned (regcache,
+				     gdbarch_pc_regnum (gdbarch), &pc);
 
       /* Returning from a signal trampoline is done by calling a
          special system call (sigreturn or rt_sigreturn, see
@@ -788,7 +791,7 @@ i386_linux_resume (struct target_ops *ops,
 
 	      regcache_cooked_read_unsigned (regcache, I386_ESP_REGNUM, &sp);
 	      if (syscall == SYS_rt_sigreturn)
-		addr = read_memory_integer (sp + 8, 4) + 20;
+		addr = read_memory_integer (sp + 8, 4, byte_order) + 20;
 	      else
 		addr = sp;
 
@@ -824,6 +827,12 @@ _initialize_i386_linux_nat (void)
   t = linux_target ();
 
   i386_use_watchpoints (t);
+
+  i386_dr_low.set_control = i386_linux_dr_set_control;
+  i386_dr_low.set_addr = i386_linux_dr_set_addr;
+  i386_dr_low.reset_addr = i386_linux_dr_reset_addr;
+  i386_dr_low.get_status = i386_linux_dr_get_status;
+  i386_set_debug_register_length (4);
 
   /* Override the default ptrace resume method.  */
   t->to_resume = i386_linux_resume;

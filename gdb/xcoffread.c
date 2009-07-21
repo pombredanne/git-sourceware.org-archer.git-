@@ -765,6 +765,8 @@ enter_line_range (struct subfile *subfile, unsigned beginoffset, unsigned endoff
 		  CORE_ADDR startaddr,	/* offsets to line table */
 		  CORE_ADDR endaddr, unsigned *firstLine)
 {
+  struct objfile *objfile = this_symtab_psymtab->objfile;
+  struct gdbarch *gdbarch = get_objfile_arch (objfile);
   unsigned int curoffset;
   CORE_ADDR addr;
   void *ext_lnno;
@@ -777,7 +779,7 @@ enter_line_range (struct subfile *subfile, unsigned beginoffset, unsigned endoff
     return;
   curoffset = beginoffset;
   limit_offset =
-    ((struct coff_symfile_info *) this_symtab_psymtab->objfile->deprecated_sym_private)
+    ((struct coff_symfile_info *) objfile->deprecated_sym_private)
     ->max_lineno_offset;
 
   if (endoffset != 0)
@@ -793,7 +795,7 @@ enter_line_range (struct subfile *subfile, unsigned beginoffset, unsigned endoff
   else
     limit_offset -= 1;
 
-  abfd = this_symtab_psymtab->objfile->obfd;
+  abfd = objfile->obfd;
   linesz = coff_data (abfd)->local_linesz;
   ext_lnno = alloca (linesz);
 
@@ -807,8 +809,7 @@ enter_line_range (struct subfile *subfile, unsigned beginoffset, unsigned endoff
       addr = (int_lnno.l_lnno
 	      ? int_lnno.l_addr.l_paddr
 	      : read_symbol_nvalue (int_lnno.l_addr.l_symndx));
-      addr += ANOFFSET (this_symtab_psymtab->objfile->section_offsets,
-			SECT_OFF_TEXT (this_symtab_psymtab->objfile));
+      addr += ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
 
       if (addr < startaddr || (endaddr && addr >= endaddr))
 	return;
@@ -816,11 +817,12 @@ enter_line_range (struct subfile *subfile, unsigned beginoffset, unsigned endoff
       if (int_lnno.l_lnno == 0)
 	{
 	  *firstLine = read_symbol_lineno (int_lnno.l_addr.l_symndx);
-	  record_line (subfile, 0, addr);
+	  record_line (subfile, 0, gdbarch_addr_bits_remove (gdbarch, addr));
 	  --(*firstLine);
 	}
       else
-	record_line (subfile, *firstLine + int_lnno.l_lnno, addr);
+	record_line (subfile, *firstLine + int_lnno.l_lnno,
+		     gdbarch_addr_bits_remove (gdbarch, addr));
       curoffset += linesz;
     }
 }
@@ -831,8 +833,8 @@ enter_line_range (struct subfile *subfile, unsigned beginoffset, unsigned endoff
    text address for the file, and SIZE is the number of bytes of text.  */
 
 #define complete_symtab(name, start_addr) {	\
-  last_source_file = savestring (name, strlen (name));	\
-  last_source_start_addr = start_addr;			\
+  last_source_file = xstrdup (name);		\
+  last_source_start_addr = start_addr;		\
 }
 
 
@@ -1452,7 +1454,6 @@ read_xcoff_symtab (struct partial_symtab *pst)
 static struct symbol *
 process_xcoff_symbol (struct coff_symbol *cs, struct objfile *objfile)
 {
-  struct gdbarch *gdbarch = get_objfile_arch (objfile);
   struct symbol onesymbol;
   struct symbol *sym = &onesymbol;
   struct symbol *sym2 = NULL;
@@ -1492,7 +1493,7 @@ process_xcoff_symbol (struct coff_symbol *cs, struct objfile *objfile)
          patch_block_stabs (), unless the file was compiled without -g.  */
 
       SYMBOL_SET_LINKAGE_NAME (sym, SYMNAME_ALLOC (name, symname_alloced));
-      SYMBOL_TYPE (sym) = builtin_type (gdbarch)->nodebug_text_symbol;
+      SYMBOL_TYPE (sym) = objfile_type (objfile)->nodebug_text_symbol;
 
       SYMBOL_CLASS (sym) = LOC_BLOCK;
       SYMBOL_DUP (sym, sym2);
@@ -1505,7 +1506,7 @@ process_xcoff_symbol (struct coff_symbol *cs, struct objfile *objfile)
   else
     {
       /* In case we can't figure out the type, provide default. */
-      SYMBOL_TYPE (sym) = builtin_type (gdbarch)->nodebug_data_symbol;
+      SYMBOL_TYPE (sym) = objfile_type (objfile)->nodebug_data_symbol;
 
       switch (cs->c_sclass)
 	{

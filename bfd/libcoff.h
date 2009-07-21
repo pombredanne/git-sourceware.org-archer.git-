@@ -121,8 +121,6 @@ typedef struct pe_tdata
   int has_reloc_section;
   bfd_boolean (*in_reloc_p) (bfd *, reloc_howto_type *);
   flagword real_flags;
-  int target_subsystem;
-  bfd_boolean force_minimum_alignment;
 } pe_data_type;
 
 #define pe_data(bfd)		((bfd)->tdata.pe_obj_data)
@@ -169,7 +167,8 @@ struct xcoff_tdata
 
   /* Used by the XCOFF backend linker.  */
   asection **csects;
-  unsigned long *debug_indices;
+  long *debug_indices;
+  unsigned int *lineno_counts;
   unsigned int import_file_id;
 };
 
@@ -219,8 +218,7 @@ struct xcoff_section_tdata
   /* The lineno_count field for the enclosing section, because we are
      going to clobber it there.  */
   unsigned int lineno_count;
-  /* The first and one past the last symbol indices for symbols used
-     by this csect.  */
+  /* The first and last symbol indices for symbols used by this csect.  */
   unsigned long first_symndx;
   unsigned long last_symndx;
 };
@@ -593,6 +591,8 @@ extern bfd_boolean _bfd_xcoff_bfd_link_add_symbols
   (bfd *, struct bfd_link_info *);
 extern bfd_boolean _bfd_xcoff_bfd_final_link
   (bfd *, struct bfd_link_info *);
+extern bfd_boolean _bfd_xcoff_define_common_symbol
+  (bfd *, struct bfd_link_info *, struct bfd_link_hash_entry *);
 extern bfd_boolean _bfd_ppc_xcoff_relocate_section
   (bfd *, struct bfd_link_info *, bfd *, asection *, bfd_byte *,
    struct internal_reloc *, struct internal_syment *, asection **);
@@ -948,3 +948,7 @@ typedef struct
 #define bfd_coff_print_pdata(a,p) \
   ((coff_backend_info (a)->_bfd_coff_print_pdata) (a, p))
 
+/* Macro: Returns true if the bfd is a PE executable as opposed to a
+   PE object file.  */
+#define bfd_pei_p(abfd) \
+  (CONST_STRNEQ ((abfd)->xvec->name, "pei-"))

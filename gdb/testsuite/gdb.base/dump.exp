@@ -42,6 +42,12 @@ if {[istarget "ia64*-*-*"] || [istarget "hppa64-*-*"]} then {
     set is64bitonly "yes"
 }
 
+if {[istarget "spu*-*-*"]} then {
+    # The internal address format used for the combined Cell/B.E.
+    # debugger requires 64-bit.
+    set is64bitonly "yes"
+}
+
 if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable ${options}] != "" } {
      untested dump.exp
      return -1
@@ -52,6 +58,10 @@ if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable ${op
 gdb_exit
 gdb_start
 gdb_reinitialize_dir $srcdir/$subdir
+
+gdb_test "dump mem /dev/null 0x10 0x20" "Cannot access memory at address 0x10" \
+	 "inaccessible memory is reported"
+
 gdb_load ${binfile}
 
 # Clean up any stale output files from previous test runs
