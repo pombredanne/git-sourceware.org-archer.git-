@@ -53,8 +53,6 @@ struct target_desc;
 struct displaced_step_closure;
 struct core_regset_section;
 
-extern struct gdbarch *current_gdbarch;
-
 /* The architecture associated with the connection to the target.
  
    The architecture vector provides some information that is really
@@ -359,11 +357,11 @@ typedef struct value * (gdbarch_value_from_register_ftype) (struct type *type, i
 extern struct value * gdbarch_value_from_register (struct gdbarch *gdbarch, struct type *type, int regnum, struct frame_info *frame);
 extern void set_gdbarch_value_from_register (struct gdbarch *gdbarch, gdbarch_value_from_register_ftype *value_from_register);
 
-typedef CORE_ADDR (gdbarch_pointer_to_address_ftype) (struct type *type, const gdb_byte *buf);
+typedef CORE_ADDR (gdbarch_pointer_to_address_ftype) (struct gdbarch *gdbarch, struct type *type, const gdb_byte *buf);
 extern CORE_ADDR gdbarch_pointer_to_address (struct gdbarch *gdbarch, struct type *type, const gdb_byte *buf);
 extern void set_gdbarch_pointer_to_address (struct gdbarch *gdbarch, gdbarch_pointer_to_address_ftype *pointer_to_address);
 
-typedef void (gdbarch_address_to_pointer_ftype) (struct type *type, gdb_byte *buf, CORE_ADDR addr);
+typedef void (gdbarch_address_to_pointer_ftype) (struct gdbarch *gdbarch, struct type *type, gdb_byte *buf, CORE_ADDR addr);
 extern void gdbarch_address_to_pointer (struct gdbarch *gdbarch, struct type *type, gdb_byte *buf, CORE_ADDR addr);
 extern void set_gdbarch_address_to_pointer (struct gdbarch *gdbarch, gdbarch_address_to_pointer_ftype *address_to_pointer);
 
@@ -563,7 +561,7 @@ extern void set_gdbarch_skip_solib_resolver (struct gdbarch *gdbarch, gdbarch_sk
 
 /* Some systems also have trampoline code for returning from shared libs. */
 
-typedef int (gdbarch_in_solib_return_trampoline_ftype) (CORE_ADDR pc, char *name);
+typedef int (gdbarch_in_solib_return_trampoline_ftype) (struct gdbarch *gdbarch, CORE_ADDR pc, char *name);
 extern int gdbarch_in_solib_return_trampoline (struct gdbarch *gdbarch, CORE_ADDR pc, char *name);
 extern void set_gdbarch_in_solib_return_trampoline (struct gdbarch *gdbarch, gdbarch_in_solib_return_trampoline_ftype *in_solib_return_trampoline);
 
@@ -580,19 +578,6 @@ extern void set_gdbarch_in_solib_return_trampoline (struct gdbarch *gdbarch, gdb
 typedef int (gdbarch_in_function_epilogue_p_ftype) (struct gdbarch *gdbarch, CORE_ADDR addr);
 extern int gdbarch_in_function_epilogue_p (struct gdbarch *gdbarch, CORE_ADDR addr);
 extern void set_gdbarch_in_function_epilogue_p (struct gdbarch *gdbarch, gdbarch_in_function_epilogue_p_ftype *in_function_epilogue_p);
-
-/* Given a vector of command-line arguments, return a newly allocated
-   string which, when passed to the create_inferior function, will be
-   parsed (on Unix systems, by the shell) to yield the same vector.
-   This function should call error() if the argument vector is not
-   representable for this target or if this target does not support
-   command-line arguments.
-   ARGC is the number of elements in the vector.
-   ARGV is an array of strings, one per argument. */
-
-typedef char * (gdbarch_construct_inferior_arguments_ftype) (struct gdbarch *gdbarch, int argc, char **argv);
-extern char * gdbarch_construct_inferior_arguments (struct gdbarch *gdbarch, int argc, char **argv);
-extern void set_gdbarch_construct_inferior_arguments (struct gdbarch *gdbarch, gdbarch_construct_inferior_arguments_ftype *construct_inferior_arguments);
 
 typedef void (gdbarch_elf_make_msymbol_special_ftype) (asymbol *sym, struct minimal_symbol *msym);
 extern void gdbarch_elf_make_msymbol_special (struct gdbarch *gdbarch, asymbol *sym, struct minimal_symbol *msym);
@@ -680,6 +665,13 @@ extern int gdbarch_core_pid_to_str_p (struct gdbarch *gdbarch);
 typedef char * (gdbarch_core_pid_to_str_ftype) (struct gdbarch *gdbarch, ptid_t ptid);
 extern char * gdbarch_core_pid_to_str (struct gdbarch *gdbarch, ptid_t ptid);
 extern void set_gdbarch_core_pid_to_str (struct gdbarch *gdbarch, gdbarch_core_pid_to_str_ftype *core_pid_to_str);
+
+/* BFD target to use when generating a core file. */
+
+extern int gdbarch_gcore_bfd_target_p (struct gdbarch *gdbarch);
+
+extern const char * gdbarch_gcore_bfd_target (struct gdbarch *gdbarch);
+extern void set_gdbarch_gcore_bfd_target (struct gdbarch *gdbarch, const char * gcore_bfd_target);
 
 /* If the elements of C++ vtables are in-place function descriptors rather
    than normal function pointers (which may point to code or a descriptor),
@@ -925,8 +917,7 @@ extern struct gdbarch_tdep *gdbarch_tdep (struct gdbarch *gdbarch);
    of all the previously created architures for this architecture
    family.  The (possibly NULL) ARCHES->gdbarch can used to access
    values from the previously selected architecture for this
-   architecture family.  The global ``current_gdbarch'' shall not be
-   used.
+   architecture family.
 
    The INIT function shall return any of: NULL - indicating that it
    doesn't recognize the selected architecture; an existing ``struct
@@ -1035,12 +1026,12 @@ extern int gdbarch_update_p (struct gdbarch_info info);
    set, and then finished using gdbarch_info_fill.
 
    Returns the corresponding architecture, or NULL if no matching
-   architecture was found.  "current_gdbarch" is not updated.  */
+   architecture was found.  */
 
 extern struct gdbarch *gdbarch_find_by_info (struct gdbarch_info info);
 
 
-/* Helper function.  Set the global "current_gdbarch" to "gdbarch".
+/* Helper function.  Set the global "target_gdbarch" to "gdbarch".
 
    FIXME: kettenis/20031124: Of the functions that follow, only
    gdbarch_from_bfd is supposed to survive.  The others will
@@ -1048,7 +1039,7 @@ extern struct gdbarch *gdbarch_find_by_info (struct gdbarch_info info);
    multi-arch.  However, for now we're still stuck with the concept of
    a single active architecture.  */
 
-extern void deprecated_current_gdbarch_select_hack (struct gdbarch *gdbarch);
+extern void deprecated_target_gdbarch_select_hack (struct gdbarch *gdbarch);
 
 
 /* Register per-architecture data-pointer.

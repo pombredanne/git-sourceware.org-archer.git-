@@ -155,13 +155,17 @@ extern void terminal_save_ours (void);
 
 extern void terminal_ours (void);
 
-extern CORE_ADDR unsigned_pointer_to_address (struct type *type,
+extern CORE_ADDR unsigned_pointer_to_address (struct gdbarch *gdbarch,
+					      struct type *type,
 					      const gdb_byte *buf);
-extern void unsigned_address_to_pointer (struct type *type, gdb_byte *buf,
+extern void unsigned_address_to_pointer (struct gdbarch *gdbarch,
+					 struct type *type, gdb_byte *buf,
 					 CORE_ADDR addr);
-extern CORE_ADDR signed_pointer_to_address (struct type *type,
+extern CORE_ADDR signed_pointer_to_address (struct gdbarch *gdbarch,
+					    struct type *type,
 					    const gdb_byte *buf);
-extern void address_to_signed_pointer (struct type *type, gdb_byte *buf,
+extern void address_to_signed_pointer (struct gdbarch *gdbarch,
+				       struct type *type, gdb_byte *buf,
 				       CORE_ADDR addr);
 
 extern void wait_for_inferior (int treat_exec_as_sigtrap);
@@ -207,7 +211,7 @@ extern int fork_inferior (char *, char *, char **,
 
 extern void startup_inferior (int);
 
-extern char *construct_inferior_arguments (struct gdbarch *, int, char **);
+extern char *construct_inferior_arguments (int, char **);
 
 /* From infrun.c */
 
@@ -237,6 +241,8 @@ extern void error_is_running (void);
 
 /* Calls error_is_running if the current thread is running.  */
 extern void ensure_not_running (void);
+
+void set_step_info (struct frame_info *frame, struct symtab_and_line sal);
 
 /* From infcmd.c */
 
@@ -283,8 +289,9 @@ extern int stop_stack_dummy;
 
 extern int stopped_by_random_signal;
 
-/* 1 means step over all subroutine calls.
-   -1 means step over calls to undebuggable functions.  */
+/* STEP_OVER_ALL means step over all subroutine calls.
+   STEP_OVER_UNDEBUGGABLE means step over calls to undebuggable functions.
+   STEP_OVER_NONE means don't step over any subroutine calls.  */
 
 enum step_over_calls_kind
   {

@@ -83,6 +83,11 @@ struct thread_info
      This is how we know when we step into a subroutine call, and how
      to set the frame for the breakpoint used to step out.  */
   struct frame_id step_frame_id;
+
+  /* Similarly, the frame ID of the underlying stack frame (skipping
+     any inlined frames).  */
+  struct frame_id step_stack_frame_id;
+
   int current_line;
   struct symtab *current_symtab;
 
@@ -237,6 +242,9 @@ struct thread_info *find_thread_id (int num);
 /* Finds the first thread of the inferior given by PID.  If PID is -1,
    returns the first thread in the list.  */
 struct thread_info *first_thread_of_process (int pid);
+
+/* Returns any thread of process PID.  */
+extern struct thread_info *any_thread_of_process (int pid);
 
 /* Change the ptid of thread OLD_PTID to NEW_PTID.  */
 void thread_change_ptid (ptid_t old_ptid, ptid_t new_ptid);

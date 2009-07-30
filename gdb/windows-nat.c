@@ -556,7 +556,9 @@ static int
 safe_symbol_file_add_stub (void *argv)
 {
 #define p ((struct safe_symbol_file_add_args *) argv)
-  p->ret = symbol_file_add (p->name, p->from_tty, p->addrs, p->mainline, p->flags);
+  const int add_flags = ((p->from_tty ? SYMFILE_VERBOSE : 0)
+                         | (p->mainline ? SYMFILE_MAINLINE : 0));
+  p->ret = symbol_file_add (p->name, add_flags, p->addrs, p->flags);
   return !!p->ret;
 #undef p
 }
@@ -1246,9 +1248,10 @@ windows_resume (struct target_ops *ops,
       if (step)
 	{
 	  /* Single step by setting t bit */
-	  windows_fetch_inferior_registers (ops,
-					    get_current_regcache (),
-					    gdbarch_ps_regnum (current_gdbarch));
+	  struct regcache *regcache = get_current_regcache ();
+	  struct gdbarch *gdbarch = get_regcache_arch (regcache);
+	  windows_fetch_inferior_registers (ops, regcache,
+					    gdbarch_ps_regnum (gdbarch));
 	  th->context.EFlags |= FLAG_TRACE_BIT;
 	}
 
@@ -2079,7 +2082,7 @@ windows_xfer_shared_libraries (struct target_ops *ops,
   obstack_grow_str (&obstack, "<library-list>\n");
   for (so = solib_start.next; so; so = so->next)
     windows_xfer_shared_library (so->so_name, (CORE_ADDR) (uintptr_t) so->lm_info->load_addr,
-				 &obstack);
+				 target_gdbarch, &obstack);
   obstack_grow_str0 (&obstack, "</library-list>\n");
 
   buf = obstack_finish (&obstack);

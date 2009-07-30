@@ -933,7 +933,15 @@ further debugging may prove unreliable.", file, line, problem->name, msg);
       /* Default (yes/batch case) is to quit GDB.  When in batch mode
 	 this lessens the likelihood of GDB going into an infinite
 	 loop.  */
-      quit_p = query (_("%s\nQuit this debugging session? "), reason);
+      if (caution == 0)
+        {
+          /* Emit the message and quit.  */
+          fputs_unfiltered (reason, gdb_stderr);
+          fputs_unfiltered ("\n", gdb_stderr);
+          quit_p = 1;
+        }
+      else
+        quit_p = query (_("%s\nQuit this debugging session? "), reason);
     }
   else if (problem->should_quit == internal_problem_yes)
     quit_p = 1;
@@ -1433,7 +1441,7 @@ defaulted_query (const char *ctlstr, const char defchar, va_list args)
     return def_value;
 
   /* If input isn't coming from the user directly, just say what
-     question we're asking, and then answer "yes" automatically.  This
+     question we're asking, and then answer the default automatically.  This
      way, important error messages don't get lost when talking to GDB
      over a pipe.  */
   if (! input_from_terminal_p ())
@@ -1447,11 +1455,6 @@ defaulted_query (const char *ctlstr, const char defchar, va_list args)
 
       return def_value;
     }
-
-  /* Automatically answer the default value if input is not from the user
-     directly, or if the user did not want prompts.  */
-  if (!input_from_terminal_p () || !caution)
-    return def_value;
 
   if (deprecated_query_hook)
     {
@@ -2847,26 +2850,8 @@ get_cell (void)
   return buf[cell];
 }
 
-int
-strlen_paddr (void)
-{
-  return (gdbarch_addr_bit (current_gdbarch) / 8 * 2);
-}
-
-char *
-paddr (CORE_ADDR addr)
-{
-  return phex (addr, gdbarch_addr_bit (current_gdbarch) / 8);
-}
-
-char *
-paddr_nz (CORE_ADDR addr)
-{
-  return phex_nz (addr, gdbarch_addr_bit (current_gdbarch) / 8);
-}
-
 const char *
-paddress (CORE_ADDR addr)
+paddress (struct gdbarch *gdbarch, CORE_ADDR addr)
 {
   /* Truncate address to the size of a target address, avoiding shifts
      larger or equal than the width of a CORE_ADDR.  The local
@@ -2877,7 +2862,7 @@ paddress (CORE_ADDR addr)
      either zero or sign extended.  Should gdbarch_address_to_pointer or
      some ADDRESS_TO_PRINTABLE() be used to do the conversion?  */
 
-  int addr_bit = gdbarch_addr_bit (current_gdbarch);
+  int addr_bit = gdbarch_addr_bit (gdbarch);
 
   if (addr_bit < (sizeof (CORE_ADDR) * HOST_CHAR_BIT))
     addr &= ((CORE_ADDR) 1 << addr_bit) - 1;
@@ -3154,7 +3139,6 @@ core_addr_to_string_nz (const CORE_ADDR addr)
 CORE_ADDR
 string_to_core_addr (const char *my_string)
 {
-  int addr_bit = gdbarch_addr_bit (current_gdbarch);
   CORE_ADDR addr = 0;
 
   if (my_string[0] == '0' && tolower (my_string[1]) == 'x')
@@ -3170,17 +3154,6 @@ string_to_core_addr (const char *my_string)
 	  else
 	    error (_("invalid hex \"%s\""), my_string);
 	}
-
-      /* Not very modular, but if the executable format expects
-         addresses to be sign-extended, then do so if the address was
-         specified with only 32 significant bits.  Really this should
-         be determined by the target architecture, not by the object
-         file.  */
-      if (i - 2 == addr_bit / 4
-	  && exec_bfd
-	  && bfd_get_sign_extend_vma (exec_bfd))
-	addr = (addr ^ ((CORE_ADDR) 1 << (addr_bit - 1)))
-	       - ((CORE_ADDR) 1 << (addr_bit - 1));
     }
   else
     {

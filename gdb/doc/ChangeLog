@@ -1,3 +1,87 @@
+2009-07-28  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.texinfo (ARM Features): Document org.gnu.gdb.arm.vfp and
+	org.gnu.gdb.arm.neon.
+
+2009-07-20  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo (Target Description Format): Mention the new <osabi>
+	optional element.
+	(subsection OS ABI): New subsection.
+
+2009-07-14  Stan Shebs  <stan@codesourcery.com>
+
+	* gdb.texinfo (Tracepoint Conditions): New section.
+	(General Query Packets): Describe ConditionalTracepoints.
+	(Tracepoint Packets): Describe condition field.
+	(Maintenance Commands): Describe maint agent-eval.
+	* agentexpr.texi (Using Agent Expressions): Mention eval usage.
+
+2009-07-11  Hui Zhu  <teawater@gmail.com>
+
+	* gdb.texinfo (disassemble): Add a new modifier /r
+	to "disassemble" command to make it print the raw instructions
+	in hex as well as in symbolic form.
+
+2009-07-09  Tom Tromey  <tromey@redhat.com>
+
+	* gdbint.texinfo (Testsuite): Document parallel make check.
+
+2009-07-09  Tom Tromey  <tromey@redhat.com>
+
+	* gdbint.texinfo (Testsuite): Document test transcripts.
+
+2009-07-10  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.texinfo (Values From Inferior): Add length parameter
+	description.
+
+2009-07-04  Chris Genly  <chris@genly.us>
+
+	* gdb.texinfo (GDB/MI Variable Objects): Document child definition
+	in -var-list-children.  Fix example according to what the code
+	does.
+
+2009-07-02  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo (Debugging multiple inferiors): Document the
+	"inferior", "detach inferior" and "kill inferior" commands.
+	(Debugging Programs with Multiple Processes): Adjust to mention
+	generic "inferior" commands.  Delete mention of "detach fork" and
+	"delete fork".  Cross reference to "Debugging multiple inferiors"
+	section.
+
+2009-07-02  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdbint.texinfo (Item Output Functions): Update signature
+	for ui_out_field_core_addr.
+
+2009-07-02  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdbint.texinfo (Examples of Use of @code{ui_out} functions):
+	Update example code extrated from breakpoint.c.
+
+2009-06-28  Paul Pluzhnikov  <ppluzhnikov@google.com>
+	
+	* gdb.texinfo (GDB/MI Program Context): @ignore unimplemented
+	MI commands.
+	(GDB/MI Symbol Query): Likewise.
+	(GDB/MI File Commands): Likewise.
+	(GDB/MI File Transfer Commands): Likewise.
+	(GDB/MI Target Manipulation): Likewise.
+	(GDB/MI Miscellaneous Commands): Likewise.
+	
+2009-06-27  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.texinfo (Debugging Optimized Code): New chapter.
+	(Compiling for Debugging): Reference it.  Move some
+	text to the new section.
+
+2009-06-15  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* doc/gdb.texinfo (Calling): Document
+	set-unwind-on-terminating-exception usage.
+
 2009-06-11  Pedro Alves  <pedro@codesourcery.com>
 
 	* gdb.texinfo (All-Stop): Document new 'set schedule-multiple'

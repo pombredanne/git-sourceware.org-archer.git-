@@ -166,7 +166,7 @@ host_libs="intl mmalloc libiberty opcodes bfd readline tcl tk itcl libgui zlib l
 # binutils, gas and ld appear in that order because it makes sense to run
 # "make check" in that particular order.
 # If --enable-gold is used, "gold" will replace "ld".
-host_tools="texinfo byacc flex bison binutils gas ld fixincludes gcc sid sim gdb make patch prms send-pr gprof etc expect dejagnu ash bash bzip2 m4 autoconf automake libtool diff rcs fileutils shellutils time textutils wdiff find uudecode hello tar gzip indent recode release sed utils guile perl gawk findutils gettext zip fastjar gnattools"
+host_tools="texinfo byacc flex bison binutils gas ld fixincludes gcc cgen sid sim gdb make patch prms send-pr gprof etc expect dejagnu ash bash bzip2 m4 autoconf automake libtool diff rcs fileutils shellutils time textutils wdiff find uudecode hello tar gzip indent recode release sed utils guile perl gawk findutils gettext zip fastjar gnattools"
 
 # libgcj represents the runtime libraries only used by gcj.
 libgcj="target-libffi \
@@ -305,7 +305,7 @@ if test "${ENABLE_GOLD}" = "yes"; then
   case "${target}" in
     *-*-elf* | *-*-sysv4* | *-*-unixware* | *-*-eabi* | hppa*64*-*-hpux* \
     | *-*-linux* | frv-*-uclinux* | *-*-irix5* | *-*-irix6* \
-    | *-*-netbsd* | *-*-openbsd* | *-*-freebsd* | *-*-solaris2*)
+    | *-*-netbsd* | *-*-openbsd* | *-*-freebsd* | *-*-solaris2* | *-*-nto*)
       case "${target}" in
         *-*-linux*aout* | *-*-linux*oldld*)
           ;;
@@ -450,7 +450,11 @@ case "${target}" in
     noconfigdirs="$noconfigdirs ld gas gdb gprof"
     noconfigdirs="$noconfigdirs sim target-rda"
     ;;
-  i[[3456789]]86-*-darwin* | x86_64-*-darwin9*)
+  i[[3456789]]86-*-darwin*)
+    noconfigdirs="$noconfigdirs ld gprof"
+    noconfigdirs="$noconfigdirs sim target-rda"
+    ;;
+  x86_64-*-darwin9*)
     noconfigdirs="$noconfigdirs ld gas gprof"
     noconfigdirs="$noconfigdirs sim target-rda"
     ;;

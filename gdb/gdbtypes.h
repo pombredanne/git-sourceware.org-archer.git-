@@ -29,6 +29,7 @@
 struct field;
 struct block;
 struct value_print_options;
+struct language_defn;
 
 /* Some macros for char-based bitfields.  */
 
@@ -274,6 +275,14 @@ enum type_instance_flag_value
 
 #define TYPE_NOTTEXT(t)		(TYPE_MAIN_TYPE (t)->flag_nottext)
 
+/* Type owner.  If TYPE_OBJFILE_OWNED is true, the type is owned by
+   the objfile retrieved as TYPE_OBJFILE.  Otherweise, the type is
+   owned by an architecture; TYPE_OBJFILE is NULL in this case.  */
+
+#define TYPE_OBJFILE_OWNED(t) (TYPE_MAIN_TYPE (t)->flag_objfile_owned)
+#define TYPE_OWNER(t) TYPE_MAIN_TYPE(t)->owner
+#define TYPE_OBJFILE(t) (TYPE_OBJFILE_OWNED(t)? TYPE_OWNER(t).objfile : NULL)
+
 /* Define this type as being reclaimable during free_all_types.  Type is
    required to be have TYPE_OBJFILE set to NULL.  Setting this flag requires
    initializing TYPE_DISCARDABLE_AGE, see alloc_type_discardable.  */
@@ -402,6 +411,7 @@ struct main_type
   unsigned int flag_stub_supported : 1;
   unsigned int flag_nottext : 1;
   unsigned int flag_fixed_instance : 1;
+  unsigned int flag_objfile_owned : 1;
   unsigned int flag_discardable : 1;
   unsigned int flag_discardable_age : 1;
   unsigned int flag_dynamic : 1;
@@ -460,7 +470,11 @@ struct main_type
      major overhaul of the internal type system, it can't be avoided
      for now. */
 
-  struct objfile *objfile;
+  union type_owner
+    {
+      struct objfile *objfile;
+      struct gdbarch *gdbarch;
+    } owner;
 
   /* For a pointer type, describes the type of object pointed to.
      For an array type, describes the type of the elements.
@@ -871,7 +885,6 @@ extern void allocate_cplus_struct_type (struct type *);
    type, so you only have to call check_typedef once.  Since allocate_value
    calls check_typedef, TYPE_LENGTH (VALUE_TYPE (X)) is safe.  */
 #define TYPE_LENGTH(thistype) (thistype)->length
-#define TYPE_OBJFILE(thistype) TYPE_MAIN_TYPE(thistype)->objfile
 /* Note that TYPE_CODE can be TYPE_CODE_TYPEDEF, so if you want the real
    type, you need to do TYPE_CODE (check_type (this_type)). */
 #define TYPE_CODE(thistype) TYPE_MAIN_TYPE(thistype)->code
@@ -1045,33 +1058,6 @@ extern void allocate_cplus_struct_type (struct type *);
 
 struct builtin_type
 {
-  /* Address/pointer types.  */
-
-  /* `pointer to data' type.  Some target platforms use an implicitly
-     {sign,zero} -extended 32-bit ABI pointer on a 64-bit ISA.  */
-  struct type *builtin_data_ptr;
-
-  /* `pointer to function (returning void)' type.  Harvard
-     architectures mean that ABI function and code pointers are not
-     interconvertible.  Similarly, since ANSI, C standards have
-     explicitly said that pointers to functions and pointers to data
-     are not interconvertible --- that is, you can't cast a function
-     pointer to void * and back, and expect to get the same value.
-     However, all function pointer types are interconvertible, so void
-     (*) () can server as a generic function pointer.  */
-  struct type *builtin_func_ptr;
-
-  /* The target CPU's address type.  This is the ISA address size.  */
-  struct type *builtin_core_addr;
-
-
-  /* Types used for symbols with no debug information.  */
-  struct type *nodebug_text_symbol;
-  struct type *nodebug_data_symbol;
-  struct type *nodebug_unknown_symbol;
-  struct type *nodebug_tls_symbol;
-
-
   /* Integral types.  */
 
   /* Implicit size/sign (based on the the architecture's ABI).  */
@@ -1097,27 +1083,95 @@ struct builtin_type
   struct type *builtin_decfloat;
   struct type *builtin_decdouble;
   struct type *builtin_declong;
+
+  /* "True" character types.
+      We use these for the '/c' print format, because c_char is just a
+      one-byte integral type, which languages less laid back than C
+      will print as ... well, a one-byte integral type.  */
+  struct type *builtin_true_char;
+  struct type *builtin_true_unsigned_char;
+
+  /* Explicit sizes - see C9X <intypes.h> for naming scheme.  The "int0"
+     is for when an architecture needs to describe a register that has
+     no size.  */
+  struct type *builtin_int0;
+  struct type *builtin_int8;
+  struct type *builtin_uint8;
+  struct type *builtin_int16;
+  struct type *builtin_uint16;
+  struct type *builtin_int32;
+  struct type *builtin_uint32;
+  struct type *builtin_int64;
+  struct type *builtin_uint64;
+  struct type *builtin_int128;
+  struct type *builtin_uint128;
+
+
+  /* Pointer types.  */
+
+  /* `pointer to data' type.  Some target platforms use an implicitly
+     {sign,zero} -extended 32-bit ABI pointer on a 64-bit ISA.  */
+  struct type *builtin_data_ptr;
+
+  /* `pointer to function (returning void)' type.  Harvard
+     architectures mean that ABI function and code pointers are not
+     interconvertible.  Similarly, since ANSI, C standards have
+     explicitly said that pointers to functions and pointers to data
+     are not interconvertible --- that is, you can't cast a function
+     pointer to void * and back, and expect to get the same value.
+     However, all function pointer types are interconvertible, so void
+     (*) () can server as a generic function pointer.  */
+  struct type *builtin_func_ptr;
+
+
+  /* Special-purpose types.  */
+
+  /* This type is used to represent a GDB internal function.  */
+  struct type *internal_fn;
 };
 
 /* Return the type table for the specified architecture.  */
 extern const struct builtin_type *builtin_type (struct gdbarch *gdbarch);
 
- 
-/* Explicit sizes - see C9X <intypes.h> for naming scheme.  The "int0"
-   is for when an architecture needs to describe a register that has
-   no size.  */
-extern struct type *builtin_type_int0;
-extern struct type *builtin_type_int8;
-extern struct type *builtin_type_uint8;
-extern struct type *builtin_type_int16;
-extern struct type *builtin_type_uint16;
-extern struct type *builtin_type_int32;
-extern struct type *builtin_type_uint32;
-extern struct type *builtin_type_int64;
-extern struct type *builtin_type_uint64;
-extern struct type *builtin_type_int128;
-extern struct type *builtin_type_uint128;
 
+/* Per-objfile types used by symbol readers.  */
+
+struct objfile_type
+{
+  /* Basic types based on the objfile architecture.  */
+  struct type *builtin_void;
+  struct type *builtin_char;
+  struct type *builtin_short;
+  struct type *builtin_int;
+  struct type *builtin_long;
+  struct type *builtin_long_long;
+  struct type *builtin_signed_char;
+  struct type *builtin_unsigned_char;
+  struct type *builtin_unsigned_short;
+  struct type *builtin_unsigned_int;
+  struct type *builtin_unsigned_long;
+  struct type *builtin_unsigned_long_long;
+  struct type *builtin_float;
+  struct type *builtin_double;
+  struct type *builtin_long_double;
+
+  /* This type is used to represent symbol addresses.  */
+  struct type *builtin_core_addr;
+
+  /* This type represents a type that was unrecognized in symbol read-in.  */
+  struct type *builtin_error;
+
+  /* Types used for symbols with no debug information.  */
+  struct type *nodebug_text_symbol;
+  struct type *nodebug_data_symbol;
+  struct type *nodebug_unknown_symbol;
+  struct type *nodebug_tls_symbol;
+};
+
+/* Return the type table for the specified objfile.  */
+extern const struct objfile_type *objfile_type (struct objfile *objfile);
+
+ 
 /* Explicit floating-point formats.  See "floatformat.h".  */
 extern const struct floatformat *floatformats_ieee_single[BFD_ENDIAN_UNKNOWN];
 extern const struct floatformat *floatformats_ieee_double[BFD_ENDIAN_UNKNOWN];
@@ -1131,34 +1185,6 @@ extern const struct floatformat *floatformats_vax_f[BFD_ENDIAN_UNKNOWN];
 extern const struct floatformat *floatformats_vax_d[BFD_ENDIAN_UNKNOWN];
 extern const struct floatformat *floatformats_ibm_long_double[BFD_ENDIAN_UNKNOWN];
 
-extern struct type *builtin_type_ieee_single;
-extern struct type *builtin_type_ieee_double;
-extern struct type *builtin_type_i387_ext;
-extern struct type *builtin_type_m68881_ext;
-extern struct type *builtin_type_arm_ext;
-extern struct type *builtin_type_ia64_spill;
-extern struct type *builtin_type_ia64_quad;
-
-/* Platform-neutral void type.  Never attempt to construct a pointer
-   or reference type to this, because those cannot be platform-neutral.
-   You must use builtin_type (...)->builtin_void in those cases.  */
-extern struct type *builtin_type_void;
-
-/* Platform-neutral character types.
-   We use these for the '/c' print format, because c_char is just a
-   one-byte integral type, which languages less laid back than C
-   will print as ... well, a one-byte integral type.  */
-extern struct type *builtin_type_true_char;
-extern struct type *builtin_type_true_unsigned_char;
-
-
-/* This type represents a type that was unrecognized in symbol
-   read-in.  */
-extern struct type *builtin_type_error;
-
-
-/* RTTI for C++ */
-/* extern struct type *builtin_type_cxx_typeinfo; */
 
 /* Maximum and minimum values of built-in types */
 
@@ -1180,28 +1206,51 @@ extern struct type *builtin_type_error;
    the same as for the type structure. */
 
 #define TYPE_ALLOC(t,size)  \
-   (TYPE_OBJFILE (t) != NULL  \
+   (TYPE_OBJFILE_OWNED (t) \
     ? obstack_alloc (&TYPE_OBJFILE (t) -> objfile_obstack, size) \
     : xmalloc (size))
 
 #define TYPE_ZALLOC(t,size)  \
-   (TYPE_OBJFILE (t) != NULL  \
+   (TYPE_OBJFILE_OWNED (t) \
     ? memset (obstack_alloc (&TYPE_OBJFILE (t)->objfile_obstack, size),  \
 	      0, size)  \
     : xzalloc (size))
 
+/* Use alloc_type to allocate a type owned by an objfile.
+   Use alloc_type_arch to allocate a type owned by an architecture.
+   Use alloc_type_copy to allocate a type with the same owner as a
+   pre-existing template type, no matter whether objfile or gdbarch.  */
 extern struct type *alloc_type (struct objfile *);
+extern struct type *alloc_type_arch (struct gdbarch *);
+extern struct type *alloc_type_copy (const struct type *);
 
+/* Return the type's architecture.  For types owned by an architecture,
+   that architecture is returned.  For types owned by an objfile, that
+   objfile's architecture is returned.  */
+extern struct gdbarch *get_type_arch (const struct type *);
+
+/* Helper function to construct objfile-owned types.  */
 extern struct type *init_type (enum type_code, int, int, char *,
 			       struct objfile *);
 
+/* Helper functions to construct architecture-owned types.  */
+extern struct type *arch_type (struct gdbarch *, enum type_code, int, char *);
+extern struct type *arch_integer_type (struct gdbarch *, int, int, char *);
+extern struct type *arch_character_type (struct gdbarch *, int, int, char *);
+extern struct type *arch_boolean_type (struct gdbarch *, int, int, char *);
+extern struct type *arch_float_type (struct gdbarch *, int, char *,
+				     const struct floatformat **);
+extern struct type *arch_complex_type (struct gdbarch *, char *,
+				       struct type *);
+
 /* Helper functions to construct a struct or record type.  An
-   initially empty type is created using init_composite_type().
+   initially empty type is created using arch_composite_type().
    Fields are then added using append_struct_type_field().  A union
    type has its size set to the largest field.  A struct type has each
    field packed against the previous.  */
 
-extern struct type *init_composite_type (char *name, enum type_code code);
+extern struct type *arch_composite_type (struct gdbarch *gdbarch,
+					 char *name, enum type_code code);
 extern void append_composite_type_field (struct type *t, char *name,
 					 struct type *field);
 extern void append_composite_type_field_aligned (struct type *t,
@@ -1210,9 +1259,10 @@ extern void append_composite_type_field_aligned (struct type *t,
 						 int alignment);
 
 /* Helper functions to construct a bit flags type.  An initially empty
-   type is created using init_flag_type().  Flags are then added using
+   type is created using arch_flag_type().  Flags are then added using
    append_flag_type_flag().  */
-extern struct type *init_flags_type (char *name, int length);
+extern struct type *arch_flags_type (struct gdbarch *gdbarch,
+				     char *name, int length);
 extern void append_flags_type_flag (struct type *type, int bitpos, char *name);
 
 extern void make_vector_type (struct type *array_type);
@@ -1226,9 +1276,9 @@ extern struct type *make_cv_type (int, int, struct type *, struct type **);
 
 extern void replace_type (struct type *, struct type *);
 
-extern int address_space_name_to_int (char *);
+extern int address_space_name_to_int (struct gdbarch *, char *);
 
-extern const char *address_space_int_to_name (int);
+extern const char *address_space_int_to_name (struct gdbarch *, int);
 
 extern struct type *make_type_with_address_space (struct type *type, 
 						  int space_identifier);
@@ -1254,8 +1304,7 @@ extern struct type *make_pointer_type (struct type *, struct type **);
 
 extern struct type *lookup_pointer_type (struct type *);
 
-extern struct type *make_function_type (struct type *, struct type **,
-					struct objfile *);
+extern struct type *make_function_type (struct type *, struct type **);
 
 extern struct type *lookup_function_type (struct type *);
 
@@ -1264,6 +1313,7 @@ extern struct type *create_range_type (struct type *, struct type *, int,
 
 extern struct type *create_array_type (struct type *, struct type *,
 				       struct type *);
+extern struct type *lookup_array_range_type (struct type *, int, int);
 
 extern CORE_ADDR type_range_any_field_internal (struct type *range_type,
 						int fieldno);
@@ -1277,13 +1327,17 @@ extern CORE_ADDR type_range_byte_stride_internal (struct type *range_type,
 
 extern void finalize_type (struct type *type);
 
-extern struct type *create_string_type (struct type *, struct type *);
+extern struct type *create_string_type (struct type *, struct type *,
+					struct type *);
+extern struct type *lookup_string_range_type (struct type *, int, int);
 
 extern struct type *create_set_type (struct type *, struct type *);
 
-extern struct type *lookup_unsigned_typename (char *);
+extern struct type *lookup_unsigned_typename (const struct language_defn *,
+					      struct gdbarch *,char *);
 
-extern struct type *lookup_signed_typename (char *);
+extern struct type *lookup_signed_typename (const struct language_defn *,
+					    struct gdbarch *,char *);
 
 extern struct type *check_typedef (struct type *);
 
@@ -1296,14 +1350,14 @@ extern void check_stub_method_group (struct type *, int);
 
 extern char *gdb_mangle_name (struct type *, int, int);
 
-extern struct type *lookup_typename (char *, struct block *, int);
+extern struct type *lookup_typename (const struct language_defn *,
+				     struct gdbarch *, char *,
+				     struct block *, int);
 
 extern struct type *lookup_template_type (char *, struct type *,
 					  struct block *);
 
 extern int get_vptr_fieldno (struct type *, struct type **);
-
-extern int get_destructor_fn_field (struct type *, int *, int *);
 
 extern int get_discrete_bounds (struct type *, LONGEST *, LONGEST *);
 

@@ -548,7 +548,8 @@ read_atcb (CORE_ADDR task_id, struct ada_task_info *task_info)
         ada_coerce_to_simple_array_ptr (value_field (tcb_value,
                                                      fieldno.entry_calls));
       entry_calls_value_element =
-        value_subscript (entry_calls_value, atc_nesting_level_value);
+        value_subscript (entry_calls_value,
+			 value_as_long (atc_nesting_level_value));
       called_task_fieldno =
         ada_get_field_index (value_type (entry_calls_value_element),
                              "called_task", 0);
@@ -609,7 +610,7 @@ static int
 read_known_tasks_array (void)
 {
   const int target_ptr_byte =
-    gdbarch_ptr_bit (current_gdbarch) / TARGET_CHAR_BIT;
+    gdbarch_ptr_bit (target_gdbarch) / TARGET_CHAR_BIT;
   const CORE_ADDR known_tasks_addr = get_known_tasks_addr ();
   const int known_tasks_size = target_ptr_byte * MAX_NUMBER_OF_KNOWN_TASKS;
   gdb_byte *known_tasks = alloca (known_tasks_size);
@@ -632,7 +633,7 @@ read_known_tasks_array (void)
   for (i = 0; i < MAX_NUMBER_OF_KNOWN_TASKS; i++)
     {
       struct type *data_ptr_type =
-        builtin_type (current_gdbarch)->builtin_data_ptr;
+        builtin_type (target_gdbarch)->builtin_data_ptr;
       CORE_ADDR task_id =
         extract_typed_address (known_tasks + i * target_ptr_byte,
 			       data_ptr_type);
@@ -751,7 +752,8 @@ info_task (char *taskno_str, int from_tty)
   task_info = VEC_index (ada_task_info_s, task_list, taskno - 1);
 
   /* Print the Ada task ID.  */
-  printf_filtered (_("Ada Task: %s\n"), paddr_nz (task_info->task_id));
+  printf_filtered (_("Ada Task: %s\n"),
+		   paddress (target_gdbarch, task_info->task_id));
 
   /* Print the name of the task.  */
   if (task_info->name[0] != '\0')

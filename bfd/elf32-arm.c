@@ -1,6 +1,6 @@
 /* 32-bit ELF support for ARM
    Copyright 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008 Free Software Foundation, Inc.
+   2008, 2009  Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
 
@@ -2618,8 +2618,8 @@ struct elf32_arm_link_hash_table
     bfd_vma offset;
   } tls_ldm_got;
 
-  /* Small local sym to section mapping cache.  */
-  struct sym_sec_cache sym_sec;
+  /* Small local sym cache.  */
+  struct sym_cache sym_cache;
 
   /* For convenience in allocate_dynrelocs.  */
   bfd * obfd;
@@ -2716,12 +2716,15 @@ stub_hash_newfunc (struct bfd_hash_entry *entry,
       eh->stub_offset = 0;
       eh->target_value = 0;
       eh->target_section = NULL;
+      eh->target_addend = 0;
+      eh->orig_insn = 0;
       eh->stub_type = arm_stub_none;
       eh->stub_size = 0;
       eh->stub_template = NULL;
       eh->stub_template_size = 0;
       eh->h = NULL;
       eh->id_sec = NULL;
+      eh->output_name = NULL;
     }
 
   return entry;
@@ -2748,15 +2751,9 @@ create_got_section (bfd *dynobj, struct bfd_link_info *info)
   if (!htab->sgot || !htab->sgotplt)
     abort ();
 
-  htab->srelgot = bfd_make_section_with_flags (dynobj,
-					       RELOC_SECTION (htab, ".got"),
-					       (SEC_ALLOC | SEC_LOAD
-						| SEC_HAS_CONTENTS
-						| SEC_IN_MEMORY
-						| SEC_LINKER_CREATED
-						| SEC_READONLY));
-  if (htab->srelgot == NULL
-      || ! bfd_set_section_alignment (dynobj, htab->srelgot, 2))
+  htab->srelgot = bfd_get_section_by_name (dynobj,
+					   RELOC_SECTION (htab, ".got"));
+  if (htab->srelgot == NULL)
     return FALSE;
   return TRUE;
 }
@@ -2927,7 +2924,7 @@ elf32_arm_link_hash_table_create (bfd *abfd)
   ret->vxworks_p = 0;
   ret->symbian_p = 0;
   ret->use_rel = 1;
-  ret->sym_sec.abfd = NULL;
+  ret->sym_cache.abfd = NULL;
   ret->obfd = abfd;
   ret->tls_ldm_got.refcount = 0;
   ret->stub_bfd = NULL;
@@ -3175,12 +3172,11 @@ arm_type_of_stub (struct bfd_link_info *info,
 
 	  /* We have an extra 2-bytes reach because of
 	     the mode change (bit 24 (H) of BLX encoding).  */
-	  if ((branch_offset > (ARM_MAX_FWD_BRANCH_OFFSET + 2)
-               || (branch_offset < ARM_MAX_BWD_BRANCH_OFFSET)
-               || ((r_type == R_ARM_CALL) && !globals->use_blx)
-               || (r_type == R_ARM_JUMP24)
-               || (r_type == R_ARM_PLT32))
-              && !use_plt)
+	  if (branch_offset > (ARM_MAX_FWD_BRANCH_OFFSET + 2)
+	      || (branch_offset < ARM_MAX_BWD_BRANCH_OFFSET)
+	      || ((r_type == R_ARM_CALL) && !globals->use_blx)
+	      || (r_type == R_ARM_JUMP24)
+	      || (r_type == R_ARM_PLT32))
 	    {
 	      stub_type = (info->shared | globals->pic_veneer)
 		/* PIC stubs.  */
@@ -3556,6 +3552,9 @@ arm_build_one_stub (struct bfd_hash_entry *gen_entry,
 	     branch.  */
 	  points_to = sym_value;
 
+	/* There may be unintended consequences if this is not true.  */
+	BFD_ASSERT (stub_entry->h == NULL);
+
 	/* Note: _bfd_final_link_relocate doesn't handle these relocations
 	   properly.  We should probably use this function unconditionally,
 	   rather than only for certain relocations listed in the enclosing
@@ -3564,7 +3563,7 @@ arm_build_one_stub (struct bfd_hash_entry *gen_entry,
 	    (template[stub_reloc_idx[i]].r_type),
 	  stub_bfd, info->output_bfd, stub_sec, stub_sec->contents, &rel,
 	  points_to, info, stub_entry->target_section, "", sym_flags,
-	  (struct elf_link_hash_entry *) stub_entry, &unresolved_reloc,
+	  (struct elf_link_hash_entry *) stub_entry->h, &unresolved_reloc,
 	  &error_message);
       }
     else
@@ -3884,11 +3883,12 @@ static struct elf_link_hash_entry *find_thumb_glue (struct bfd_link_info *,
 
 /* Helper function to scan code for sequences which might trigger the Cortex-A8
    branch/TLB erratum.  Fill in the table described by A8_FIXES_P,
-   NUM_A8_FIXES_P, A8_FIX_TABLE_SIZE_P.  Return 1 if an error occurs, 0
+   NUM_A8_FIXES_P, A8_FIX_TABLE_SIZE_P.  Returns true if an error occurs, false
    otherwise.  */
 
-static int
-cortex_a8_erratum_scan (bfd *input_bfd, struct bfd_link_info *info,
+static bfd_boolean
+cortex_a8_erratum_scan (bfd *input_bfd,
+			struct bfd_link_info *info,
 			struct a8_erratum_fix **a8_fixes_p,
 			unsigned int *num_a8_fixes_p,
 			unsigned int *a8_fix_table_size_p,
@@ -3922,7 +3922,7 @@ cortex_a8_erratum_scan (bfd *input_bfd, struct bfd_link_info *info,
       if (elf_section_data (section)->this_hdr.contents != NULL)
         contents = elf_section_data (section)->this_hdr.contents;
       else if (! bfd_malloc_and_get_section (input_bfd, section, &contents))
-        return 1;
+        return TRUE;
 
       sec_data = elf32_arm_section_data (section);
 
@@ -3949,9 +3949,7 @@ cortex_a8_erratum_scan (bfd *input_bfd, struct bfd_link_info *info,
                * The branch target is in the same 4KB region as the
                  first half of the branch.
                * The instruction before the branch is a 32-bit
-                 length non-branch instruction.
-          */
-
+                 length non-branch instruction.  */
           for (i = span_start; i < span_end;)
             {
               unsigned int insn = bfd_getl16 (&contents[i]);
@@ -3979,10 +3977,13 @@ cortex_a8_erratum_scan (bfd *input_bfd, struct bfd_link_info *info,
 
 	      is_32bit_branch = is_b || is_bl || is_blx || is_bcc;
 			   
-              if (((base_vma + i) & 0xfff) == 0xffe && insn_32bit
-		  && is_32bit_branch && last_was_32bit && !last_was_branch)
+              if (((base_vma + i) & 0xfff) == 0xffe
+		  && insn_32bit
+		  && is_32bit_branch
+		  && last_was_32bit
+		  && ! last_was_branch)
                 {
-                  bfd_vma offset;
+                  bfd_signed_vma offset;
                   bfd_boolean force_target_arm = FALSE;
 		  bfd_boolean force_target_thumb = FALSE;
                   bfd_vma target;
@@ -4031,7 +4032,7 @@ cortex_a8_erratum_scan (bfd *input_bfd, struct bfd_link_info *info,
                       offset |= (insn & 0x800) ? 0x80000 : 0;
                       offset |= (insn & 0x4000000) ? 0x100000 : 0;
                       if (offset & 0x100000)
-                        offset |= ~0xfffff;
+                        offset |= ~ ((bfd_signed_vma) 0xfffff);
                       stub_type = arm_stub_a8_veneer_b_cond;
                     }
                   else if (is_b || is_bl || is_blx)
@@ -4048,10 +4049,10 @@ cortex_a8_erratum_scan (bfd *input_bfd, struct bfd_link_info *info,
                       offset |= i1 << 23;
                       offset |= s << 24;
                       if (offset & 0x1000000)
-                        offset |= ~0xffffff;
+                        offset |= ~ ((bfd_signed_vma) 0xffffff);
 
                       if (is_blx)
-                        offset &= ~3u;
+                        offset &= ~ ((bfd_signed_vma) 3);
 
                       stub_type = is_blx ? arm_stub_a8_veneer_blx :
                         is_bl ? arm_stub_a8_veneer_bl : arm_stub_a8_veneer_b;
@@ -4084,14 +4085,15 @@ cortex_a8_erratum_scan (bfd *input_bfd, struct bfd_link_info *info,
 			}
 
                       if (is_blx)
-                        pc_for_insn &= ~3u;
+                        pc_for_insn &= ~ ((bfd_vma) 3);
 
                       /* If we found a relocation, use the proper destination,
 		         not the offset in the (unrelocated) instruction.
 			 Note this is always done if we switched the stub type
 			 above.  */
                       if (found)
-                        offset = found->destination - pc_for_insn;
+                        offset =
+			  (bfd_signed_vma) (found->destination - pc_for_insn);
 
                       target = pc_for_insn + offset;
 
@@ -4144,7 +4146,7 @@ cortex_a8_erratum_scan (bfd *input_bfd, struct bfd_link_info *info,
   *num_a8_fixes_p = num_a8_fixes;
   *a8_fix_table_size_p = a8_fix_table_size;
   
-  return 0;
+  return FALSE;
 }
 
 /* Determine and set the size of the stub section for a final link.
@@ -4365,7 +4367,25 @@ elf32_arm_size_stubs (bfd *output_bfd,
 			{
 			  sym_sec = hash->root.root.u.def.section;
 			  sym_value = hash->root.root.u.def.value;
-			  if (sym_sec->output_section != NULL)
+
+			  struct elf32_arm_link_hash_table *globals =
+						  elf32_arm_hash_table (info);
+
+			  /* For a destination in a shared library,
+			     use the PLT stub as target address to
+			     decide whether a branch stub is
+			     needed.  */
+			  if (globals->splt != NULL && hash != NULL
+			      && hash->root.plt.offset != (bfd_vma) -1)
+			    {
+			      sym_sec = globals->splt;
+			      sym_value = hash->root.plt.offset;
+			      if (sym_sec->output_section != NULL)
+				destination = (sym_value
+					       + sym_sec->output_offset
+					       + sym_sec->output_section->vma);
+			    }
+			  else if (sym_sec->output_section != NULL)
 			    destination = (sym_value + irela->r_addend
 					   + sym_sec->output_offset
 					   + sym_sec->output_section->vma);
@@ -7160,6 +7180,40 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
 
 	bfd_put_16 (input_bfd, insn >> 16, hit_data);
 	bfd_put_16 (input_bfd, insn & 0xffff, hit_data + 2);
+
+        return bfd_reloc_ok;
+      }
+
+    case R_ARM_THM_PC8:
+      /* PR 10073:  This reloc is not generated by the GNU toolchain,
+	 but it is supported for compatibility with third party libraries
+	 generated by other compilers, specifically the ARM/IAR.  */
+      {
+	bfd_vma insn;
+	bfd_signed_vma relocation;
+
+	insn = bfd_get_16 (input_bfd, hit_data);
+
+        if (globals->use_rel)
+	  addend = (insn & 0x00ff) << 2;
+
+	relocation = value + addend;
+	relocation -= (input_section->output_section->vma
+		       + input_section->output_offset
+		       + rel->r_offset);
+
+        value = abs (relocation);
+
+	/* We do not check for overflow of this reloc.  Although strictly
+	   speaking this is incorrect, it appears to be necessary in order
+	   to work with IAR generated relocs.  Since GCC and GAS do not
+	   generate R_ARM_THM_PC8 relocs, the lack of a check should not be
+	   a problem for them.  */
+	value &= 0x3fc;
+
+	insn = (insn & 0xff00) | (value >> 2);
+
+	bfd_put_16 (input_bfd, insn, hit_data);
 
         return bfd_reloc_ok;
       }
@@ -10840,14 +10894,18 @@ elf32_arm_check_relocs (bfd *abfd, struct bfd_link_info *info,
 		    /* Track dynamic relocs needed for local syms too.
 		       We really need local syms available to do this
 		       easily.  Oh well.  */
-
 		    asection *s;
 		    void *vpp;
+		    Elf_Internal_Sym *isym;
 
-		    s = bfd_section_from_r_symndx (abfd, &htab->sym_sec,
-						   sec, r_symndx);
-		    if (s == NULL)
+		    isym = bfd_sym_from_r_symndx (&htab->sym_cache,
+						  abfd, r_symndx);
+		    if (isym == NULL)
 		      return FALSE;
+
+		    s = bfd_section_from_elf_index (abfd, isym->st_shndx);
+		    if (s == NULL)
+		      s = sec;
 
 		    vpp = &elf_section_data (s)->local_dynrel;
 		    head = (struct elf32_arm_relocs_copied **) vpp;
@@ -11277,13 +11335,13 @@ allocate_dynrelocs (struct elf_link_hash_entry *h, void * inf)
 	    {
 	      h->root.u.def.section = s;
 	      h->root.u.def.value = h->plt.offset;
-
-	      /* Make sure the function is not marked as Thumb, in case
-		 it is the target of an ABS32 relocation, which will
-		 point to the PLT entry.  */
-	      if (ELF_ST_TYPE (h->type) == STT_ARM_TFUNC)
-		h->type = ELF_ST_INFO (ELF_ST_BIND (h->type), STT_FUNC);
 	    }
+
+	  /* Make sure the function is not marked as Thumb, in case
+	     it is the target of an ABS32 relocation, which will
+	     point to the PLT entry.  */
+	  if (ELF_ST_TYPE (h->type) == STT_ARM_TFUNC)
+	    h->type = ELF_ST_INFO (ELF_ST_BIND (h->type), STT_FUNC);
 
 	  /* Make room for this entry.  */
 	  s->size += htab->plt_entry_size;

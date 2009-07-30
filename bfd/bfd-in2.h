@@ -463,7 +463,6 @@ extern int bfd_seek (bfd *, file_ptr, int);
 extern file_ptr bfd_tell (bfd *);
 extern int bfd_flush (bfd *);
 extern int bfd_stat (bfd *, struct stat *);
-extern void *bfd_mmap (bfd *, void *, bfd_size_type, int, int, file_ptr);
 
 /* Deprecated old routines.  */
 #if __GNUC__
@@ -1122,6 +1121,9 @@ bfd_boolean bfd_fill_in_gnu_debuglink_section
 long bfd_get_mtime (bfd *abfd);
 
 file_ptr bfd_get_size (bfd *abfd);
+
+void *bfd_mmap (bfd *abfd, void *addr, bfd_size_type len,
+    int prot, int flags, file_ptr offset);
 
 /* Extracted from bfdwin.c.  */
 /* Extracted from section.c.  */
@@ -1833,6 +1835,9 @@ enum bfd_architecture
 #define bfd_mach_i386_i386_intel_syntax 3
 #define bfd_mach_x86_64 64
 #define bfd_mach_x86_64_intel_syntax 65
+  bfd_arch_l1om,   /* Intel L1OM */
+#define bfd_mach_l1om 66
+#define bfd_mach_l1om_intel_syntax 67
   bfd_arch_we32k,     /* AT&T WE32xxx */
   bfd_arch_tahoe,     /* CCI/Harris Tahoe */
   bfd_arch_i860,      /* Intel 860 */
@@ -1857,6 +1862,7 @@ enum bfd_architecture
 #define bfd_mach_ppc64         64
 #define bfd_mach_ppc_403       403
 #define bfd_mach_ppc_403gc     4030
+#define bfd_mach_ppc_405       405
 #define bfd_mach_ppc_505       505
 #define bfd_mach_ppc_601       601
 #define bfd_mach_ppc_602       602
@@ -2543,6 +2549,7 @@ relocation types already defined.  */
   BFD_RELOC_SPU_HI16,
   BFD_RELOC_SPU_PPU32,
   BFD_RELOC_SPU_PPU64,
+  BFD_RELOC_SPU_ADD_PIC,
 
 /* Alpha ECOFF and ELF relocations.  Some of these treat the symbol or
 "addend" in some special way.
@@ -4637,6 +4644,10 @@ typedef struct bfd_symbol
      calling the function that it points to.  BSF_FUNCTION must
      also be also set.  */
 #define BSF_GNU_INDIRECT_FUNCTION (1 << 22)
+  /* This symbol is a globally unique data object.  The dynamic linker
+     will make sure that in the entire process there is just one symbol
+     with this name and type in use.  BSF_OBJECT must also be set.  */
+#define BSF_GNU_UNIQUE         (1 << 23)
 
   flagword flags;
 

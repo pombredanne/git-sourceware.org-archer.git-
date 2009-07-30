@@ -68,19 +68,6 @@ static int arm_debug;
 #define MSYMBOL_IS_SPECIAL(msym)				\
 	MSYMBOL_TARGET_FLAG_1 (msym)
 
-/* Macros for swapping shorts and ints. In the unlikely case that anybody else needs these,
-   move to a general header. (A better solution might be to define memory read routines that
-   know whether they are reading code or data.)  */
-
-#define SWAP_SHORT(x) \
-  ((((x) & 0xff00) >> 8) | (((x) & 0x00ff) << 8));
-
-#define SWAP_INT(x) \
-  (  ((x & 0xff000000) >> 24) \
-   | ((x & 0x00ff0000) >> 8)  \
-   | ((x & 0x0000ff00) << 8)  \
-   | ((x & 0x000000ff) << 24))
-
 /* Per-objfile data used for mapping symbols.  */
 static const struct objfile_data *arm_objfile_data_key;
 
@@ -220,6 +207,13 @@ static void convert_from_extended (const struct floatformat *, const void *,
 				   void *, int);
 static void convert_to_extended (const struct floatformat *, void *,
 				 const void *, int);
+
+static void arm_neon_quad_read (struct gdbarch *gdbarch,
+				struct regcache *regcache,
+				int regnum, gdb_byte *buf);
+static void arm_neon_quad_write (struct gdbarch *gdbarch,
+				 struct regcache *regcache,
+				 int regnum, const gdb_byte *buf);
 
 struct arm_prologue_cache
 {
@@ -387,6 +381,7 @@ thumb_analyze_prologue (struct gdbarch *gdbarch,
 			CORE_ADDR start, CORE_ADDR limit,
 			struct arm_prologue_cache *cache)
 {
+  enum bfd_endian byte_order_for_code = gdbarch_byte_order_for_code (gdbarch);
   int i;
   pv_t regs[16];
   struct pv_area *stack;
@@ -395,17 +390,14 @@ thumb_analyze_prologue (struct gdbarch *gdbarch,
 
   for (i = 0; i < 16; i++)
     regs[i] = pv_register (i, 0);
-  stack = make_pv_area (ARM_SP_REGNUM);
+  stack = make_pv_area (ARM_SP_REGNUM, gdbarch_addr_bit (gdbarch));
   back_to = make_cleanup_free_pv_area (stack);
 
   while (start < limit)
     {
       unsigned short insn;
 
-      insn = read_memory_unsigned_integer (start, 2);
-
-      if (gdbarch_byte_order_for_code (gdbarch) != gdbarch_byte_order (gdbarch))
-	insn = SWAP_SHORT (insn);
+      insn = read_memory_unsigned_integer (start, 2, byte_order_for_code);
 
       if ((insn & 0xfe00) == 0xb400)		/* push { rlist } */
 	{
@@ -533,13 +525,14 @@ thumb_analyze_prologue (struct gdbarch *gdbarch,
 static CORE_ADDR
 arm_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR pc)
 {
+  enum bfd_endian byte_order_for_code = gdbarch_byte_order_for_code (gdbarch);
   unsigned long inst;
   CORE_ADDR skip_pc;
   CORE_ADDR func_addr, limit_pc;
   struct symtab_and_line sal;
 
   /* If we're in a dummy frame, don't even try to skip the prologue.  */
-  if (deprecated_pc_in_call_dummy (pc))
+  if (deprecated_pc_in_call_dummy (gdbarch, pc))
     return pc;
 
   /* See if we can determine the end of the prologue via the symbol table.
@@ -547,7 +540,8 @@ arm_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR pc)
      is greater.  */
   if (find_pc_partial_function (pc, NULL, &func_addr, NULL))
     {
-      CORE_ADDR post_prologue_pc = skip_prologue_using_sal (func_addr);
+      CORE_ADDR post_prologue_pc
+	= skip_prologue_using_sal (gdbarch, func_addr);
       if (post_prologue_pc != 0)
 	return max (pc, post_prologue_pc);
     }
@@ -559,7 +553,7 @@ arm_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR pc)
      information.  If the debug information could not be used to provide
      that bound, then use an arbitrary large number as the upper bound.  */
   /* Like arm_scan_prologue, stop no later than pc + 64. */
-  limit_pc = skip_prologue_using_sal (pc);
+  limit_pc = skip_prologue_using_sal (gdbarch, pc);
   if (limit_pc == 0)
     limit_pc = pc + 64;          /* Magic.  */
 
@@ -570,10 +564,7 @@ arm_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR pc)
 
   for (skip_pc = pc; skip_pc < limit_pc; skip_pc += 4)
     {
-      inst = read_memory_unsigned_integer (skip_pc, 4);
-
-      if (gdbarch_byte_order_for_code (gdbarch) != gdbarch_byte_order (gdbarch))
-	inst = SWAP_INT (inst);
+      inst = read_memory_unsigned_integer (skip_pc, 4, byte_order_for_code);
 
       /* "mov ip, sp" is no longer a required part of the prologue.  */
       if (inst == 0xe1a0c00d)			/* mov ip, sp */
@@ -753,6 +744,8 @@ arm_scan_prologue (struct frame_info *this_frame,
 		   struct arm_prologue_cache *cache)
 {
   struct gdbarch *gdbarch = get_frame_arch (this_frame);
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+  enum bfd_endian byte_order_for_code = gdbarch_byte_order_for_code (gdbarch);
   int regno;
   CORE_ADDR prologue_start, prologue_end, current_pc;
   CORE_ADDR prev_pc = get_frame_pc (this_frame);
@@ -826,7 +819,7 @@ arm_scan_prologue (struct frame_info *this_frame,
       LONGEST return_value;
 
       frame_loc = get_frame_register_unsigned (this_frame, ARM_FP_REGNUM);
-      if (!safe_read_memory_integer (frame_loc, 4, &return_value))
+      if (!safe_read_memory_integer (frame_loc, 4, byte_order, &return_value))
         return;
       else
         {
@@ -862,17 +855,15 @@ arm_scan_prologue (struct frame_info *this_frame,
 
   for (regno = 0; regno < ARM_FPS_REGNUM; regno++)
     regs[regno] = pv_register (regno, 0);
-  stack = make_pv_area (ARM_SP_REGNUM);
+  stack = make_pv_area (ARM_SP_REGNUM, gdbarch_addr_bit (gdbarch));
   back_to = make_cleanup_free_pv_area (stack);
 
   for (current_pc = prologue_start;
        current_pc < prologue_end;
        current_pc += 4)
     {
-      unsigned int insn = read_memory_unsigned_integer (current_pc, 4);
-
-      if (gdbarch_byte_order_for_code (gdbarch) != gdbarch_byte_order (gdbarch))
-	insn = SWAP_INT (insn);
+      unsigned int insn
+	= read_memory_unsigned_integer (current_pc, 4, byte_order_for_code);
 
       if (insn == 0xe1a0c00d)		/* mov ip, sp */
 	{
@@ -1389,8 +1380,222 @@ arm_type_align (struct type *t)
     }
 }
 
-/* We currently only support passing parameters in integer registers.  This
-   conforms with GCC's default model.  Several other variants exist and
+/* Possible base types for a candidate for passing and returning in
+   VFP registers.  */
+
+enum arm_vfp_cprc_base_type
+{
+  VFP_CPRC_UNKNOWN,
+  VFP_CPRC_SINGLE,
+  VFP_CPRC_DOUBLE,
+  VFP_CPRC_VEC64,
+  VFP_CPRC_VEC128
+};
+
+/* The length of one element of base type B.  */
+
+static unsigned
+arm_vfp_cprc_unit_length (enum arm_vfp_cprc_base_type b)
+{
+  switch (b)
+    {
+    case VFP_CPRC_SINGLE:
+      return 4;
+    case VFP_CPRC_DOUBLE:
+      return 8;
+    case VFP_CPRC_VEC64:
+      return 8;
+    case VFP_CPRC_VEC128:
+      return 16;
+    default:
+      internal_error (__FILE__, __LINE__, _("Invalid VFP CPRC type: %d."),
+		      (int) b);
+    }
+}
+
+/* The character ('s', 'd' or 'q') for the type of VFP register used
+   for passing base type B.  */
+
+static int
+arm_vfp_cprc_reg_char (enum arm_vfp_cprc_base_type b)
+{
+  switch (b)
+    {
+    case VFP_CPRC_SINGLE:
+      return 's';
+    case VFP_CPRC_DOUBLE:
+      return 'd';
+    case VFP_CPRC_VEC64:
+      return 'd';
+    case VFP_CPRC_VEC128:
+      return 'q';
+    default:
+      internal_error (__FILE__, __LINE__, _("Invalid VFP CPRC type: %d."),
+		      (int) b);
+    }
+}
+
+/* Determine whether T may be part of a candidate for passing and
+   returning in VFP registers, ignoring the limit on the total number
+   of components.  If *BASE_TYPE is VFP_CPRC_UNKNOWN, set it to the
+   classification of the first valid component found; if it is not
+   VFP_CPRC_UNKNOWN, all components must have the same classification
+   as *BASE_TYPE.  If it is found that T contains a type not permitted
+   for passing and returning in VFP registers, a type differently
+   classified from *BASE_TYPE, or two types differently classified
+   from each other, return -1, otherwise return the total number of
+   base-type elements found (possibly 0 in an empty structure or
+   array).  Vectors and complex types are not currently supported,
+   matching the generic AAPCS support.  */
+
+static int
+arm_vfp_cprc_sub_candidate (struct type *t,
+			    enum arm_vfp_cprc_base_type *base_type)
+{
+  t = check_typedef (t);
+  switch (TYPE_CODE (t))
+    {
+    case TYPE_CODE_FLT:
+      switch (TYPE_LENGTH (t))
+	{
+	case 4:
+	  if (*base_type == VFP_CPRC_UNKNOWN)
+	    *base_type = VFP_CPRC_SINGLE;
+	  else if (*base_type != VFP_CPRC_SINGLE)
+	    return -1;
+	  return 1;
+
+	case 8:
+	  if (*base_type == VFP_CPRC_UNKNOWN)
+	    *base_type = VFP_CPRC_DOUBLE;
+	  else if (*base_type != VFP_CPRC_DOUBLE)
+	    return -1;
+	  return 1;
+
+	default:
+	  return -1;
+	}
+      break;
+
+    case TYPE_CODE_ARRAY:
+      {
+	int count;
+	unsigned unitlen;
+	count = arm_vfp_cprc_sub_candidate (TYPE_TARGET_TYPE (t), base_type);
+	if (count == -1)
+	  return -1;
+	if (TYPE_LENGTH (t) == 0)
+	  {
+	    gdb_assert (count == 0);
+	    return 0;
+	  }
+	else if (count == 0)
+	  return -1;
+	unitlen = arm_vfp_cprc_unit_length (*base_type);
+	gdb_assert ((TYPE_LENGTH (t) % unitlen) == 0);
+	return TYPE_LENGTH (t) / unitlen;
+      }
+      break;
+
+    case TYPE_CODE_STRUCT:
+      {
+	int count = 0;
+	unsigned unitlen;
+	int i;
+	for (i = 0; i < TYPE_NFIELDS (t); i++)
+	  {
+	    int sub_count = arm_vfp_cprc_sub_candidate (TYPE_FIELD_TYPE (t, i),
+							base_type);
+	    if (sub_count == -1)
+	      return -1;
+	    count += sub_count;
+	  }
+	if (TYPE_LENGTH (t) == 0)
+	  {
+	    gdb_assert (count == 0);
+	    return 0;
+	  }
+	else if (count == 0)
+	  return -1;
+	unitlen = arm_vfp_cprc_unit_length (*base_type);
+	if (TYPE_LENGTH (t) != unitlen * count)
+	  return -1;
+	return count;
+      }
+
+    case TYPE_CODE_UNION:
+      {
+	int count = 0;
+	unsigned unitlen;
+	int i;
+	for (i = 0; i < TYPE_NFIELDS (t); i++)
+	  {
+	    int sub_count = arm_vfp_cprc_sub_candidate (TYPE_FIELD_TYPE (t, i),
+							base_type);
+	    if (sub_count == -1)
+	      return -1;
+	    count = (count > sub_count ? count : sub_count);
+	  }
+	if (TYPE_LENGTH (t) == 0)
+	  {
+	    gdb_assert (count == 0);
+	    return 0;
+	  }
+	else if (count == 0)
+	  return -1;
+	unitlen = arm_vfp_cprc_unit_length (*base_type);
+	if (TYPE_LENGTH (t) != unitlen * count)
+	  return -1;
+	return count;
+      }
+
+    default:
+      break;
+    }
+
+  return -1;
+}
+
+/* Determine whether T is a VFP co-processor register candidate (CPRC)
+   if passed to or returned from a non-variadic function with the VFP
+   ABI in effect.  Return 1 if it is, 0 otherwise.  If it is, set
+   *BASE_TYPE to the base type for T and *COUNT to the number of
+   elements of that base type before returning.  */
+
+static int
+arm_vfp_call_candidate (struct type *t, enum arm_vfp_cprc_base_type *base_type,
+			int *count)
+{
+  enum arm_vfp_cprc_base_type b = VFP_CPRC_UNKNOWN;
+  int c = arm_vfp_cprc_sub_candidate (t, &b);
+  if (c <= 0 || c > 4)
+    return 0;
+  *base_type = b;
+  *count = c;
+  return 1;
+}
+
+/* Return 1 if the VFP ABI should be used for passing arguments to and
+   returning values from a function of type FUNC_TYPE, 0
+   otherwise.  */
+
+static int
+arm_vfp_abi_for_function (struct gdbarch *gdbarch, struct type *func_type)
+{
+  struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
+  /* Variadic functions always use the base ABI.  Assume that functions
+     without debug info are not variadic.  */
+  if (func_type && TYPE_VARARGS (check_typedef (func_type)))
+    return 0;
+  /* The VFP ABI is only supported as a variant of AAPCS.  */
+  if (tdep->arm_abi != ARM_ABI_AAPCS)
+    return 0;
+  return gdbarch_tdep (gdbarch)->fp_model == ARM_FLOAT_VFP;
+}
+
+/* We currently only support passing parameters in integer registers, which
+   conforms with GCC's default model, and VFP argument passing following
+   the VFP variant of AAPCS.  Several other variants exist and
    we should probably support some of them based on the selected ABI.  */
 
 static CORE_ADDR
@@ -1399,10 +1604,21 @@ arm_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 		     struct value **args, CORE_ADDR sp, int struct_return,
 		     CORE_ADDR struct_addr)
 {
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   int argnum;
   int argreg;
   int nstack;
   struct stack_item *si = NULL;
+  int use_vfp_abi;
+  struct type *ftype;
+  unsigned vfp_regs_free = (1 << 16) - 1;
+
+  /* Determine the type of this function and whether the VFP ABI
+     applies.  */
+  ftype = check_typedef (value_type (function));
+  if (TYPE_CODE (ftype) == TYPE_CODE_PTR)
+    ftype = check_typedef (TYPE_TARGET_TYPE (ftype));
+  use_vfp_abi = arm_vfp_abi_for_function (gdbarch, ftype);
 
   /* Set the return address.  For the ARM, the return breakpoint is
      always at BP_ADDR.  */
@@ -1422,9 +1638,9 @@ arm_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
   if (struct_return)
     {
       if (arm_debug)
-	fprintf_unfiltered (gdb_stdlog, "struct return in %s = 0x%s\n",
+	fprintf_unfiltered (gdb_stdlog, "struct return in %s = %s\n",
 			    gdbarch_register_name (gdbarch, argreg),
-			    paddr (struct_addr));
+			    paddress (gdbarch, struct_addr));
       regcache_cooked_write_unsigned (regcache, argreg, struct_addr);
       argreg++;
     }
@@ -1437,6 +1653,9 @@ arm_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
       enum type_code typecode;
       bfd_byte *val;
       int align;
+      enum arm_vfp_cprc_base_type vfp_base_type;
+      int vfp_base_count;
+      int may_use_core_reg = 1;
 
       arg_type = check_typedef (value_type (args[argnum]));
       len = TYPE_LENGTH (arg_type);
@@ -1460,6 +1679,65 @@ arm_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 	    align = INT_REGISTER_SIZE * 2;
 	}
 
+      if (use_vfp_abi
+	  && arm_vfp_call_candidate (arg_type, &vfp_base_type,
+				     &vfp_base_count))
+	{
+	  int regno;
+	  int unit_length;
+	  int shift;
+	  unsigned mask;
+
+	  /* Because this is a CPRC it cannot go in a core register or
+	     cause a core register to be skipped for alignment.
+	     Either it goes in VFP registers and the rest of this loop
+	     iteration is skipped for this argument, or it goes on the
+	     stack (and the stack alignment code is correct for this
+	     case).  */
+	  may_use_core_reg = 0;
+
+	  unit_length = arm_vfp_cprc_unit_length (vfp_base_type);
+	  shift = unit_length / 4;
+	  mask = (1 << (shift * vfp_base_count)) - 1;
+	  for (regno = 0; regno < 16; regno += shift)
+	    if (((vfp_regs_free >> regno) & mask) == mask)
+	      break;
+
+	  if (regno < 16)
+	    {
+	      int reg_char;
+	      int reg_scaled;
+	      int i;
+
+	      vfp_regs_free &= ~(mask << regno);
+	      reg_scaled = regno / shift;
+	      reg_char = arm_vfp_cprc_reg_char (vfp_base_type);
+	      for (i = 0; i < vfp_base_count; i++)
+		{
+		  char name_buf[4];
+		  int regnum;
+		  if (reg_char == 'q')
+		    arm_neon_quad_write (gdbarch, regcache, reg_scaled + i,
+					 val + i * unit_length);
+		  else
+		    {
+		      sprintf (name_buf, "%c%d", reg_char, reg_scaled + i);
+		      regnum = user_reg_map_name_to_regnum (gdbarch, name_buf,
+							    strlen (name_buf));
+		      regcache_cooked_write (regcache, regnum,
+					     val + i * unit_length);
+		    }
+		}
+	      continue;
+	    }
+	  else
+	    {
+	      /* This CPRC could not go in VFP registers, so all VFP
+		 registers are now marked as used.  */
+	      vfp_regs_free = 0;
+	    }
+	}
+
       /* Push stack padding for dowubleword alignment.  */
       if (nstack & (align - 1))
 	{
@@ -1468,7 +1746,8 @@ arm_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 	}
       
       /* Doubleword aligned quantities must go in even register pairs.  */
-      if (argreg <= ARM_LAST_ARG_REGNUM
+      if (may_use_core_reg
+	  && argreg <= ARM_LAST_ARG_REGNUM
 	  && align > INT_REGISTER_SIZE
 	  && argreg & 1)
 	argreg++;
@@ -1480,11 +1759,12 @@ arm_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 	  && target_type != NULL
 	  && TYPE_CODE_FUNC == TYPE_CODE (target_type))
 	{
-	  CORE_ADDR regval = extract_unsigned_integer (val, len);
+	  CORE_ADDR regval = extract_unsigned_integer (val, len, byte_order);
 	  if (arm_pc_is_thumb (regval))
 	    {
 	      val = alloca (len);
-	      store_unsigned_integer (val, len, MAKE_THUMB_ADDR (regval));
+	      store_unsigned_integer (val, len, byte_order,
+				      MAKE_THUMB_ADDR (regval));
 	    }
 	}
 
@@ -1495,12 +1775,13 @@ arm_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 	{
 	  int partial_len = len < INT_REGISTER_SIZE ? len : INT_REGISTER_SIZE;
 
-	  if (argreg <= ARM_LAST_ARG_REGNUM)
+	  if (may_use_core_reg && argreg <= ARM_LAST_ARG_REGNUM)
 	    {
 	      /* The argument is being passed in a general purpose
 		 register.  */
-	      CORE_ADDR regval = extract_unsigned_integer (val, partial_len);
-	      if (gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG)
+	      CORE_ADDR regval
+		= extract_unsigned_integer (val, partial_len, byte_order);
+	      if (byte_order == BFD_ENDIAN_BIG)
 		regval <<= (INT_REGISTER_SIZE - partial_len) * 8;
 	      if (arm_debug)
 		fprintf_unfiltered (gdb_stdlog, "arg %d in %s = 0x%s\n",
@@ -1592,14 +1873,129 @@ arm_print_float_info (struct gdbarch *gdbarch, struct ui_file *file,
   print_fpu_flags (status);
 }
 
+/* Construct the ARM extended floating point type.  */
+static struct type *
+arm_ext_type (struct gdbarch *gdbarch)
+{
+  struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
+
+  if (!tdep->arm_ext_type)
+    tdep->arm_ext_type
+      = arch_float_type (gdbarch, -1, "builtin_type_arm_ext",
+			 floatformats_arm_ext);
+
+  return tdep->arm_ext_type;
+}
+
+static struct type *
+arm_neon_double_type (struct gdbarch *gdbarch)
+{
+  struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
+
+  if (tdep->neon_double_type == NULL)
+    {
+      struct type *t, *elem;
+
+      t = arch_composite_type (gdbarch, "__gdb_builtin_type_neon_d",
+			       TYPE_CODE_UNION);
+      elem = builtin_type (gdbarch)->builtin_uint8;
+      append_composite_type_field (t, "u8", init_vector_type (elem, 8));
+      elem = builtin_type (gdbarch)->builtin_uint16;
+      append_composite_type_field (t, "u16", init_vector_type (elem, 4));
+      elem = builtin_type (gdbarch)->builtin_uint32;
+      append_composite_type_field (t, "u32", init_vector_type (elem, 2));
+      elem = builtin_type (gdbarch)->builtin_uint64;
+      append_composite_type_field (t, "u64", elem);
+      elem = builtin_type (gdbarch)->builtin_float;
+      append_composite_type_field (t, "f32", init_vector_type (elem, 2));
+      elem = builtin_type (gdbarch)->builtin_double;
+      append_composite_type_field (t, "f64", elem);
+
+      TYPE_VECTOR (t) = 1;
+      TYPE_NAME (t) = "neon_d";
+      tdep->neon_double_type = t;
+    }
+
+  return tdep->neon_double_type;
+}
+
+/* FIXME: The vector types are not correctly ordered on big-endian
+   targets.  Just as s0 is the low bits of d0, d0[0] is also the low
+   bits of d0 - regardless of what unit size is being held in d0.  So
+   the offset of the first uint8 in d0 is 7, but the offset of the
+   first float is 4.  This code works as-is for little-endian
+   targets.  */
+
+static struct type *
+arm_neon_quad_type (struct gdbarch *gdbarch)
+{
+  struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
+
+  if (tdep->neon_quad_type == NULL)
+    {
+      struct type *t, *elem;
+
+      t = arch_composite_type (gdbarch, "__gdb_builtin_type_neon_q",
+			       TYPE_CODE_UNION);
+      elem = builtin_type (gdbarch)->builtin_uint8;
+      append_composite_type_field (t, "u8", init_vector_type (elem, 16));
+      elem = builtin_type (gdbarch)->builtin_uint16;
+      append_composite_type_field (t, "u16", init_vector_type (elem, 8));
+      elem = builtin_type (gdbarch)->builtin_uint32;
+      append_composite_type_field (t, "u32", init_vector_type (elem, 4));
+      elem = builtin_type (gdbarch)->builtin_uint64;
+      append_composite_type_field (t, "u64", init_vector_type (elem, 2));
+      elem = builtin_type (gdbarch)->builtin_float;
+      append_composite_type_field (t, "f32", init_vector_type (elem, 4));
+      elem = builtin_type (gdbarch)->builtin_double;
+      append_composite_type_field (t, "f64", init_vector_type (elem, 2));
+
+      TYPE_VECTOR (t) = 1;
+      TYPE_NAME (t) = "neon_q";
+      tdep->neon_quad_type = t;
+    }
+
+  return tdep->neon_quad_type;
+}
+
 /* Return the GDB type object for the "standard" data type of data in
    register N.  */
 
 static struct type *
 arm_register_type (struct gdbarch *gdbarch, int regnum)
 {
+  int num_regs = gdbarch_num_regs (gdbarch);
+
+  if (gdbarch_tdep (gdbarch)->have_vfp_pseudos
+      && regnum >= num_regs && regnum < num_regs + 32)
+    return builtin_type (gdbarch)->builtin_float;
+
+  if (gdbarch_tdep (gdbarch)->have_neon_pseudos
+      && regnum >= num_regs + 32 && regnum < num_regs + 32 + 16)
+    return arm_neon_quad_type (gdbarch);
+
+  /* If the target description has register information, we are only
+     in this function so that we can override the types of
+     double-precision registers for NEON.  */
+  if (tdesc_has_registers (gdbarch_target_desc (gdbarch)))
+    {
+      struct type *t = tdesc_register_type (gdbarch, regnum);
+
+      if (regnum >= ARM_D0_REGNUM && regnum < ARM_D0_REGNUM + 32
+	  && TYPE_CODE (t) == TYPE_CODE_FLT
+	  && gdbarch_tdep (gdbarch)->have_neon)
+	return arm_neon_double_type (gdbarch);
+      else
+	return t;
+    }
+
   if (regnum >= ARM_F0_REGNUM && regnum < ARM_F0_REGNUM + NUM_FREGS)
-    return builtin_type_arm_ext;
+    {
+      if (!gdbarch_tdep (gdbarch)->have_fpa_registers)
+	return builtin_type (gdbarch)->builtin_void;
+
+      return arm_ext_type (gdbarch);
+    }
   else if (regnum == ARM_SP_REGNUM)
     return builtin_type (gdbarch)->builtin_data_ptr;
   else if (regnum == ARM_PC_REGNUM)
@@ -1607,9 +2003,9 @@ arm_register_type (struct gdbarch *gdbarch, int regnum)
   else if (regnum >= ARRAY_SIZE (arm_register_names))
     /* These registers are only supported on targets which supply
        an XML description.  */
-    return builtin_type_int0;
+    return builtin_type (gdbarch)->builtin_int0;
   else
-    return builtin_type_uint32;
+    return builtin_type (gdbarch)->builtin_uint32;
 }
 
 /* Map a DWARF register REGNUM onto the appropriate GDB register
@@ -1642,6 +2038,34 @@ arm_dwarf_reg_to_regnum (struct gdbarch *gdbarch, int reg)
 
   if (reg >= 192 && reg <= 199)
     return ARM_WC0_REGNUM + reg - 192;
+
+  /* VFP v2 registers.  A double precision value is actually
+     in d1 rather than s2, but the ABI only defines numbering
+     for the single precision registers.  This will "just work"
+     in GDB for little endian targets (we'll read eight bytes,
+     starting in s0 and then progressing to s1), but will be
+     reversed on big endian targets with VFP.  This won't
+     be a problem for the new Neon quad registers; you're supposed
+     to use DW_OP_piece for those.  */
+  if (reg >= 64 && reg <= 95)
+    {
+      char name_buf[4];
+
+      sprintf (name_buf, "s%d", reg - 64);
+      return user_reg_map_name_to_regnum (gdbarch, name_buf,
+					  strlen (name_buf));
+    }
+
+  /* VFP v3 / Neon registers.  This range is also used for VFP v2
+     registers, except that it now describes d0 instead of s0.  */
+  if (reg >= 256 && reg <= 287)
+    {
+      char name_buf[4];
+
+      sprintf (name_buf, "d%d", reg - 256);
+      return user_reg_map_name_to_regnum (gdbarch, name_buf,
+					  strlen (name_buf));
+    }
 
   return -1;
 }
@@ -1828,13 +2252,14 @@ static CORE_ADDR
 thumb_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+  enum bfd_endian byte_order_for_code = gdbarch_byte_order_for_code (gdbarch);
   unsigned long pc_val = ((unsigned long) pc) + 4;	/* PC after prefetch */
-  unsigned short inst1 = read_memory_unsigned_integer (pc, 2);
+  unsigned short inst1;
   CORE_ADDR nextpc = pc + 2;		/* default is next instruction */
   unsigned long offset;
 
-  if (gdbarch_byte_order_for_code (gdbarch) != gdbarch_byte_order (gdbarch))
-    inst1 = SWAP_SHORT (inst1);
+  inst1 = read_memory_unsigned_integer (pc, 2, byte_order_for_code);
 
   if ((inst1 & 0xff00) == 0xbd00)	/* pop {rlist, pc} */
     {
@@ -1844,7 +2269,7 @@ thumb_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
          all of the other registers.  */
       offset = bitcount (bits (inst1, 0, 7)) * INT_REGISTER_SIZE;
       sp = get_frame_register_unsigned (frame, ARM_SP_REGNUM);
-      nextpc = (CORE_ADDR) read_memory_unsigned_integer (sp + offset, 4);
+      nextpc = read_memory_unsigned_integer (sp + offset, 4, byte_order);
       nextpc = gdbarch_addr_bits_remove (gdbarch, nextpc);
       if (nextpc == pc)
 	error (_("Infinite loop detected"));
@@ -1862,9 +2287,8 @@ thumb_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
     }
   else if ((inst1 & 0xf800) == 0xf000)	/* long branch with link, and blx */
     {
-      unsigned short inst2 = read_memory_unsigned_integer (pc + 2, 2);
-      if (gdbarch_byte_order_for_code (gdbarch) != gdbarch_byte_order (gdbarch))
-	inst2 = SWAP_SHORT (inst2);
+      unsigned short inst2;
+      inst2 = read_memory_unsigned_integer (pc + 2, 2, byte_order_for_code);
       offset = (sbits (inst1, 0, 10) << 12) + (bits (inst2, 0, 10) << 1);
       nextpc = pc_val + offset;
       /* For BLX make sure to clear the low bits.  */
@@ -1890,6 +2314,8 @@ CORE_ADDR
 arm_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+  enum bfd_endian byte_order_for_code = gdbarch_byte_order_for_code (gdbarch);
   unsigned long pc_val;
   unsigned long this_instr;
   unsigned long status;
@@ -1899,10 +2325,7 @@ arm_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
     return thumb_get_next_pc (frame, pc);
 
   pc_val = (unsigned long) pc;
-  this_instr = read_memory_unsigned_integer (pc, 4);
-
-  if (gdbarch_byte_order_for_code (gdbarch) != gdbarch_byte_order (gdbarch))
-    this_instr = SWAP_INT (this_instr);
+  this_instr = read_memory_unsigned_integer (pc, 4, byte_order_for_code);
 
   status = get_frame_register_unsigned (frame, ARM_PS_REGNUM);
   nextpc = (CORE_ADDR) (pc_val + 4);	/* Default case */
@@ -2083,7 +2506,7 @@ arm_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
 			base -= offset;
 		    }
 		  nextpc = (CORE_ADDR) read_memory_integer ((CORE_ADDR) base,
-							    4);
+							    4, byte_order);
 
 		  nextpc = gdbarch_addr_bits_remove (gdbarch, nextpc);
 
@@ -2121,7 +2544,7 @@ arm_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
 		    nextpc =
 		      (CORE_ADDR) read_memory_integer ((CORE_ADDR) (rn_val
 								  + offset),
-						       4);
+						       4, byte_order);
 		  }
 		  nextpc = gdbarch_addr_bits_remove
 			     (gdbarch, nextpc);
@@ -2165,12 +2588,14 @@ arm_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
 int
 arm_software_single_step (struct frame_info *frame)
 {
+  struct gdbarch *gdbarch = get_frame_arch (frame);
+
   /* NOTE: This may insert the wrong breakpoint instruction when
      single-stepping over a mode-changing instruction, if the
      CPSR heuristics are used.  */
 
   CORE_ADDR next_pc = arm_get_next_pc (frame, get_frame_pc (frame));
-  insert_single_step_breakpoint (next_pc);
+  insert_single_step_breakpoint (gdbarch, next_pc);
 
   return 1;
 }
@@ -2292,6 +2717,7 @@ arm_extract_return_value (struct type *type, struct regcache *regs,
 			  gdb_byte *valbuf)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regs);
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
 
   if (TYPE_CODE_FLT == TYPE_CODE (type))
     {
@@ -2312,6 +2738,9 @@ arm_extract_return_value (struct type *type, struct regcache *regs,
 
 	case ARM_FLOAT_SOFT_FPA:
 	case ARM_FLOAT_SOFT_VFP:
+	  /* ARM_FLOAT_VFP can arise if this is a variadic function so
+	     not using the VFP ABI code.  */
+	case ARM_FLOAT_VFP:
 	  regcache_cooked_read (regs, ARM_A1_REGNUM, valbuf);
 	  if (TYPE_LENGTH (type) > 4)
 	    regcache_cooked_read (regs, ARM_A1_REGNUM + 1,
@@ -2346,7 +2775,7 @@ arm_extract_return_value (struct type *type, struct regcache *regs,
 	  store_unsigned_integer (valbuf, 
 				  (len > INT_REGISTER_SIZE
 				   ? INT_REGISTER_SIZE : len),
-				  tmp);
+				  byte_order, tmp);
 	  len -= INT_REGISTER_SIZE;
 	  valbuf += INT_REGISTER_SIZE;
 	}
@@ -2481,6 +2910,7 @@ arm_store_return_value (struct type *type, struct regcache *regs,
 			const gdb_byte *valbuf)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regs);
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
 
   if (TYPE_CODE (type) == TYPE_CODE_FLT)
     {
@@ -2497,6 +2927,9 @@ arm_store_return_value (struct type *type, struct regcache *regs,
 
 	case ARM_FLOAT_SOFT_FPA:
 	case ARM_FLOAT_SOFT_VFP:
+	  /* ARM_FLOAT_VFP can arise if this is a variadic function so
+	     not using the VFP ABI code.  */
+	case ARM_FLOAT_VFP:
 	  regcache_cooked_write (regs, ARM_A1_REGNUM, valbuf);
 	  if (TYPE_LENGTH (type) > 4)
 	    regcache_cooked_write (regs, ARM_A1_REGNUM + 1, 
@@ -2524,7 +2957,7 @@ arm_store_return_value (struct type *type, struct regcache *regs,
 	  bfd_byte tmpbuf[INT_REGISTER_SIZE];
 	  LONGEST val = unpack_long (type, valbuf);
 
-	  store_signed_integer (tmpbuf, INT_REGISTER_SIZE, val);
+	  store_signed_integer (tmpbuf, INT_REGISTER_SIZE, byte_order, val);
 	  regcache_cooked_write (regs, ARM_A1_REGNUM, tmpbuf);
 	}
       else
@@ -2572,6 +3005,45 @@ arm_return_value (struct gdbarch *gdbarch, struct type *func_type,
 		  gdb_byte *readbuf, const gdb_byte *writebuf)
 {
   struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
+  enum arm_vfp_cprc_base_type vfp_base_type;
+  int vfp_base_count;
+
+  if (arm_vfp_abi_for_function (gdbarch, func_type)
+      && arm_vfp_call_candidate (valtype, &vfp_base_type, &vfp_base_count))
+    {
+      int reg_char = arm_vfp_cprc_reg_char (vfp_base_type);
+      int unit_length = arm_vfp_cprc_unit_length (vfp_base_type);
+      int i;
+      for (i = 0; i < vfp_base_count; i++)
+	{
+	  if (reg_char == 'q')
+	    {
+	      if (writebuf)
+		arm_neon_quad_write (gdbarch, regcache, i,
+				     writebuf + i * unit_length);
+
+	      if (readbuf)
+		arm_neon_quad_read (gdbarch, regcache, i,
+				    readbuf + i * unit_length);
+	    }
+	  else
+	    {
+	      char name_buf[4];
+	      int regnum;
+
+	      sprintf (name_buf, "%c%d", reg_char, i);
+	      regnum = user_reg_map_name_to_regnum (gdbarch, name_buf,
+						    strlen (name_buf));
+	      if (writebuf)
+		regcache_cooked_write (regcache, regnum,
+				       writebuf + i * unit_length);
+	      if (readbuf)
+		regcache_cooked_read (regcache, regnum,
+				      readbuf + i * unit_length);
+	    }
+	}
+      return RETURN_VALUE_REGISTER_CONVENTION;
+    }
 
   if (TYPE_CODE (valtype) == TYPE_CODE_STRUCT
       || TYPE_CODE (valtype) == TYPE_CODE_UNION
@@ -2595,9 +3067,11 @@ arm_return_value (struct gdbarch *gdbarch, struct type *func_type,
 static int
 arm_get_longjmp_target (struct frame_info *frame, CORE_ADDR *pc)
 {
+  struct gdbarch *gdbarch = get_frame_arch (frame);
+  struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   CORE_ADDR jb_addr;
   char buf[INT_REGISTER_SIZE];
-  struct gdbarch_tdep *tdep = gdbarch_tdep (get_frame_arch (frame));
   
   jb_addr = get_frame_register_unsigned (frame, ARM_A1_REGNUM);
 
@@ -2605,7 +3079,7 @@ arm_get_longjmp_target (struct frame_info *frame, CORE_ADDR *pc)
 			  INT_REGISTER_SIZE))
     return 0;
 
-  *pc = extract_unsigned_integer (buf, INT_REGISTER_SIZE);
+  *pc = extract_unsigned_integer (buf, INT_REGISTER_SIZE, byte_order);
   return 1;
 }
 
@@ -2823,6 +3297,32 @@ set_disassembly_style_sfunc (char *args, int from_tty,
 static const char *
 arm_register_name (struct gdbarch *gdbarch, int i)
 {
+  const int num_regs = gdbarch_num_regs (gdbarch);
+
+  if (gdbarch_tdep (gdbarch)->have_vfp_pseudos
+      && i >= num_regs && i < num_regs + 32)
+    {
+      static const char *const vfp_pseudo_names[] = {
+	"s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7",
+	"s8", "s9", "s10", "s11", "s12", "s13", "s14", "s15",
+	"s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23",
+	"s24", "s25", "s26", "s27", "s28", "s29", "s30", "s31",
+      };
+
+      return vfp_pseudo_names[i - num_regs];
+    }
+
+  if (gdbarch_tdep (gdbarch)->have_neon_pseudos
+      && i >= num_regs + 32 && i < num_regs + 32 + 16)
+    {
+      static const char *const neon_pseudo_names[] = {
+	"q0", "q1", "q2", "q3", "q4", "q5", "q6", "q7",
+	"q8", "q9", "q10", "q11", "q12", "q13", "q14", "q15",
+      };
+
+      return neon_pseudo_names[i - num_regs - 32];
+    }
+
   if (i >= ARRAY_SIZE (arm_register_names))
     /* These registers are only supported on targets which supply
        an XML description.  */
@@ -2960,6 +3460,140 @@ arm_write_pc (struct regcache *regcache, CORE_ADDR pc)
     }
 }
 
+/* Read the contents of a NEON quad register, by reading from two
+   double registers.  This is used to implement the quad pseudo
+   registers, and for argument passing in case the quad registers are
+   missing; vectors are passed in quad registers when using the VFP
+   ABI, even if a NEON unit is not present.  REGNUM is the index of
+   the quad register, in [0, 15].  */
+
+static void
+arm_neon_quad_read (struct gdbarch *gdbarch, struct regcache *regcache,
+		    int regnum, gdb_byte *buf)
+{
+  char name_buf[4];
+  gdb_byte reg_buf[8];
+  int offset, double_regnum;
+
+  sprintf (name_buf, "d%d", regnum << 1);
+  double_regnum = user_reg_map_name_to_regnum (gdbarch, name_buf,
+					       strlen (name_buf));
+
+  /* d0 is always the least significant half of q0.  */
+  if (gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG)
+    offset = 8;
+  else
+    offset = 0;
+
+  regcache_raw_read (regcache, double_regnum, reg_buf);
+  memcpy (buf + offset, reg_buf, 8);
+
+  offset = 8 - offset;
+  regcache_raw_read (regcache, double_regnum + 1, reg_buf);
+  memcpy (buf + offset, reg_buf, 8);
+}
+
+static void
+arm_pseudo_read (struct gdbarch *gdbarch, struct regcache *regcache,
+		 int regnum, gdb_byte *buf)
+{
+  const int num_regs = gdbarch_num_regs (gdbarch);
+  char name_buf[4];
+  gdb_byte reg_buf[8];
+  int offset, double_regnum;
+
+  gdb_assert (regnum >= num_regs);
+  regnum -= num_regs;
+
+  if (gdbarch_tdep (gdbarch)->have_neon_pseudos && regnum >= 32 && regnum < 48)
+    /* Quad-precision register.  */
+    arm_neon_quad_read (gdbarch, regcache, regnum - 32, buf);
+  else
+    {
+      /* Single-precision register.  */
+      gdb_assert (regnum < 32);
+
+      /* s0 is always the least significant half of d0.  */
+      if (gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG)
+	offset = (regnum & 1) ? 0 : 4;
+      else
+	offset = (regnum & 1) ? 4 : 0;
+
+      sprintf (name_buf, "d%d", regnum >> 1);
+      double_regnum = user_reg_map_name_to_regnum (gdbarch, name_buf,
+						   strlen (name_buf));
+
+      regcache_raw_read (regcache, double_regnum, reg_buf);
+      memcpy (buf, reg_buf + offset, 4);
+    }
+}
+
+/* Store the contents of BUF to a NEON quad register, by writing to
+   two double registers.  This is used to implement the quad pseudo
+   registers, and for argument passing in case the quad registers are
+   missing; vectors are passed in quad registers when using the VFP
+   ABI, even if a NEON unit is not present.  REGNUM is the index
+   of the quad register, in [0, 15].  */
+
+static void
+arm_neon_quad_write (struct gdbarch *gdbarch, struct regcache *regcache,
+		     int regnum, const gdb_byte *buf)
+{
+  char name_buf[4];
+  gdb_byte reg_buf[8];
+  int offset, double_regnum;
+
+  sprintf (name_buf, "d%d", regnum << 1);
+  double_regnum = user_reg_map_name_to_regnum (gdbarch, name_buf,
+					       strlen (name_buf));
+
+  /* d0 is always the least significant half of q0.  */
+  if (gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG)
+    offset = 8;
+  else
+    offset = 0;
+
+  regcache_raw_write (regcache, double_regnum, buf + offset);
+  offset = 8 - offset;
+  regcache_raw_write (regcache, double_regnum + 1, buf + offset);
+}
+
+static void
+arm_pseudo_write (struct gdbarch *gdbarch, struct regcache *regcache,
+		  int regnum, const gdb_byte *buf)
+{
+  const int num_regs = gdbarch_num_regs (gdbarch);
+  char name_buf[4];
+  gdb_byte reg_buf[8];
+  int offset, double_regnum;
+
+  gdb_assert (regnum >= num_regs);
+  regnum -= num_regs;
+
+  if (gdbarch_tdep (gdbarch)->have_neon_pseudos && regnum >= 32 && regnum < 48)
+    /* Quad-precision register.  */
+    arm_neon_quad_write (gdbarch, regcache, regnum - 32, buf);
+  else
+    {
+      /* Single-precision register.  */
+      gdb_assert (regnum < 32);
+
+      /* s0 is always the least significant half of d0.  */
+      if (gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG)
+	offset = (regnum & 1) ? 0 : 4;
+      else
+	offset = (regnum & 1) ? 4 : 0;
+
+      sprintf (name_buf, "d%d", regnum >> 1);
+      double_regnum = user_reg_map_name_to_regnum (gdbarch, name_buf,
+						   strlen (name_buf));
+
+      regcache_raw_read (regcache, double_regnum, reg_buf);
+      memcpy (reg_buf + offset, buf, 4);
+      regcache_raw_write (regcache, double_regnum, reg_buf);
+    }
+}
+
 static struct value *
 value_of_arm_user_reg (struct frame_info *frame, const void *baton)
 {
@@ -3004,6 +3638,8 @@ arm_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   enum arm_float_model fp_model = arm_fp_model;
   struct tdesc_arch_data *tdesc_data = NULL;
   int i;
+  int have_vfp_registers = 0, have_vfp_pseudos = 0, have_neon_pseudos = 0;
+  int have_neon = 0;
   int have_fpa_registers = 1;
 
   /* Check any target description for validity.  */
@@ -3016,7 +3652,7 @@ arm_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
       static const char *const arm_pc_names[] = { "r15", "pc", NULL };
 
       const struct tdesc_feature *feature;
-      int i, valid_p;
+      int valid_p;
 
       feature = tdesc_find_feature (info.target_desc,
 				    "org.gnu.gdb.arm.core");
@@ -3098,6 +3734,67 @@ arm_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
 	      return NULL;
 	    }
 	}
+
+      /* If we have a VFP unit, check whether the single precision registers
+	 are present.  If not, then we will synthesize them as pseudo
+	 registers.  */
+      feature = tdesc_find_feature (info.target_desc,
+				    "org.gnu.gdb.arm.vfp");
+      if (feature != NULL)
+	{
+	  static const char *const vfp_double_names[] = {
+	    "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7",
+	    "d8", "d9", "d10", "d11", "d12", "d13", "d14", "d15",
+	    "d16", "d17", "d18", "d19", "d20", "d21", "d22", "d23",
+	    "d24", "d25", "d26", "d27", "d28", "d29", "d30", "d31",
+	  };
+
+	  /* Require the double precision registers.  There must be either
+	     16 or 32.  */
+	  valid_p = 1;
+	  for (i = 0; i < 32; i++)
+	    {
+	      valid_p &= tdesc_numbered_register (feature, tdesc_data,
+						  ARM_D0_REGNUM + i,
+						  vfp_double_names[i]);
+	      if (!valid_p)
+		break;
+	    }
+
+	  if (!valid_p && i != 16)
+	    {
+	      tdesc_data_cleanup (tdesc_data);
+	      return NULL;
+	    }
+
+	  if (tdesc_unnumbered_register (feature, "s0") == 0)
+	    have_vfp_pseudos = 1;
+
+	  have_vfp_registers = 1;
+
+	  /* If we have VFP, also check for NEON.  The architecture allows
+	     NEON without VFP (integer vector operations only), but GDB
+	     does not support that.  */
+	  feature = tdesc_find_feature (info.target_desc,
+					"org.gnu.gdb.arm.neon");
+	  if (feature != NULL)
+	    {
+	      /* NEON requires 32 double-precision registers.  */
+	      if (i != 32)
+		{
+		  tdesc_data_cleanup (tdesc_data);
+		  return NULL;
+		}
+
+	      /* If there are quad registers defined by the stub, use
+		 their type; otherwise (normally) provide them with
+		 the default type.  */
+	      if (tdesc_unnumbered_register (feature, "q0") == 0)
+		have_neon_pseudos = 1;
+
+	      have_neon = 1;
+	    }
+	}
     }
 
   /* If we have an object to base this architecture on, try to determine
@@ -3145,9 +3842,45 @@ arm_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
 		case EF_ARM_EABI_VER4:
 		case EF_ARM_EABI_VER5:
 		  arm_abi = ARM_ABI_AAPCS;
-		  /* EABI binaries default to VFP float ordering.  */
+		  /* EABI binaries default to VFP float ordering.
+		     They may also contain build attributes that can
+		     be used to identify if the VFP argument-passing
+		     ABI is in use.  */
 		  if (fp_model == ARM_FLOAT_AUTO)
-		    fp_model = ARM_FLOAT_SOFT_VFP;
+		    {
+#ifdef HAVE_ELF
+		      switch (bfd_elf_get_obj_attr_int (info.abfd,
+							OBJ_ATTR_PROC,
+							Tag_ABI_VFP_args))
+			{
+			case 0:
+			  /* "The user intended FP parameter/result
+			     passing to conform to AAPCS, base
+			     variant".  */
+			  fp_model = ARM_FLOAT_SOFT_VFP;
+			  break;
+			case 1:
+			  /* "The user intended FP parameter/result
+			     passing to conform to AAPCS, VFP
+			     variant".  */
+			  fp_model = ARM_FLOAT_VFP;
+			  break;
+			case 2:
+			  /* "The user intended FP parameter/result
+			     passing to conform to tool chain-specific
+			     conventions" - we don't know any such
+			     conventions, so leave it as "auto".  */
+			  break;
+			default:
+			  /* Attribute value not mentioned in the
+			     October 2008 ABI, so leave it as
+			     "auto".  */
+			  break;
+			}
+#else
+		      fp_model = ARM_FLOAT_SOFT_VFP;
+#endif
+		    }
 		  break;
 
 		default:
@@ -3205,6 +3938,11 @@ arm_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
 	  && fp_model != gdbarch_tdep (best_arch->gdbarch)->fp_model)
 	continue;
 
+      /* There are various other properties in tdep that we do not
+	 need to check here: those derived from a target description,
+	 since gdbarches with a different target description are
+	 automatically disqualified.  */
+
       /* Found a match.  */
       break;
     }
@@ -3224,6 +3962,10 @@ arm_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   tdep->arm_abi = arm_abi;
   tdep->fp_model = fp_model;
   tdep->have_fpa_registers = have_fpa_registers;
+  tdep->have_vfp_registers = have_vfp_registers;
+  tdep->have_vfp_pseudos = have_vfp_pseudos;
+  tdep->have_neon_pseudos = have_neon_pseudos;
+  tdep->have_neon = have_neon;
 
   /* Breakpoints.  */
   switch (info.byte_order_for_code)
@@ -3363,8 +4105,30 @@ arm_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
       set_gdbarch_long_double_format (gdbarch, floatformats_ieee_double);
     }
 
+  if (have_vfp_pseudos)
+    {
+      /* NOTE: These are the only pseudo registers used by
+	 the ARM target at the moment.  If more are added, a
+	 little more care in numbering will be needed.  */
+
+      int num_pseudos = 32;
+      if (have_neon_pseudos)
+	num_pseudos += 16;
+      set_gdbarch_num_pseudo_regs (gdbarch, num_pseudos);
+      set_gdbarch_pseudo_register_read (gdbarch, arm_pseudo_read);
+      set_gdbarch_pseudo_register_write (gdbarch, arm_pseudo_write);
+    }
+
   if (tdesc_data)
-    tdesc_use_registers (gdbarch, info.target_desc, tdesc_data);
+    {
+      set_tdesc_pseudo_register_name (gdbarch, arm_register_name);
+
+      tdesc_use_registers (gdbarch, info.target_desc, tdesc_data);
+
+      /* Override tdesc_register_type to adjust the types of VFP
+	 registers for NEON.  */
+      set_gdbarch_register_type (gdbarch, arm_register_type);
+    }
 
   /* Add standard register aliases.  We add aliases even for those
      nanes which are used by the current architecture - it's simpler,

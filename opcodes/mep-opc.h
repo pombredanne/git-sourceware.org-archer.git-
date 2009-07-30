@@ -2,7 +2,7 @@
 
 THIS FILE IS MACHINE GENERATED WITH CGEN.
 
-Copyright 1996-2007 Free Software Foundation, Inc.
+Copyright 1996-2009 Free Software Foundation, Inc.
 
 This file is part of the GNU Binutils and/or GDB, the GNU debugger.
 
@@ -96,6 +96,7 @@ extern CGEN_ATTR_VALUE_BITSET_TYPE mep_all_cop_isas_mask;
 )
 
 extern int mep_cgen_insn_supported (CGEN_CPU_DESC, const CGEN_INSN *);
+extern int mep_cgen_insn_supported_asm (CGEN_CPU_DESC, const CGEN_INSN *);
 
 /* -- asm.c */
 /* Enum declaration for mep instruction types.  */

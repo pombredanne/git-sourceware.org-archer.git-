@@ -23,7 +23,7 @@
 #include "libbfd.h"
 #include "elf-bfd.h"
 #include "elf/bfin.h"
-#include "elf/dwarf2.h"
+#include "dwarf2.h"
 #include "hashtab.h"
 
 /* FUNCTION : bfin_pltpc_reloc
@@ -4966,8 +4966,8 @@ struct bfin_link_hash_table
 {
   struct elf_link_hash_table root;
 
-  /* Small local sym to section mapping cache.  */
-  struct sym_sec_cache sym_sec;
+  /* Small local sym cache.  */
+  struct sym_cache sym_cache;
 };
 
 #define bfin_hash_entry(ent) ((struct bfin_link_hash_entry *) (ent))
@@ -5013,7 +5013,7 @@ bfin_link_hash_table_create (bfd * abfd)
       return NULL;
     }
 
-  ret->sym_sec.abfd = NULL;
+  ret->sym_cache.abfd = NULL;
 
   return &ret->root.root;
 }

@@ -124,10 +124,10 @@ static void gen_complement (struct agent_expr *ax, struct axs_value *value);
 static void gen_deref (struct agent_expr *, struct axs_value *);
 static void gen_address_of (struct agent_expr *, struct axs_value *);
 static int find_field (struct type *type, char *name);
-static void gen_bitfield_ref (struct agent_expr *ax,
+static void gen_bitfield_ref (struct expression *exp, struct agent_expr *ax,
 			      struct axs_value *value,
 			      struct type *type, int start, int end);
-static void gen_struct_ref (struct agent_expr *ax,
+static void gen_struct_ref (struct expression *exp, struct agent_expr *ax,
 			    struct axs_value *value,
 			    char *field,
 			    char *operator_name, char *operand_name);
@@ -623,7 +623,7 @@ gen_var_ref (struct gdbarch *gdbarch, struct agent_expr *ax,
 	 Unfortunately DWARF 2 stores the frame-base (instead of the
 	 function) location in a function's symbol.  Oops!  For the
 	 moment enable this when/where applicable.  */
-      SYMBOL_COMPUTED_OPS (var)->tracepoint_var_ref (var, ax, value);
+      SYMBOL_COMPUTED_OPS (var)->tracepoint_var_ref (var, gdbarch, ax, value);
       break;
 
     case LOC_OPTIMIZED_OUT:
@@ -1147,8 +1147,9 @@ find_field (struct type *type, char *name)
    starting and one-past-ending *bit* numbers of the field within the
    structure.  */
 static void
-gen_bitfield_ref (struct agent_expr *ax, struct axs_value *value,
-		  struct type *type, int start, int end)
+gen_bitfield_ref (struct expression *exp, struct agent_expr *ax,
+		  struct axs_value *value, struct type *type,
+		  int start, int end)
 {
   /* Note that ops[i] fetches 8 << i bits.  */
   static enum agent_op ops[]
@@ -1274,7 +1275,7 @@ gen_bitfield_ref (struct agent_expr *ax, struct axs_value *value,
 	     the sign/zero extension will wipe them out.
 	     - If we're in the interior of the word, then there is no garbage
 	     on either end, because the ref operators zero-extend.  */
-	  if (gdbarch_byte_order (current_gdbarch) == BFD_ENDIAN_BIG)
+	  if (gdbarch_byte_order (exp->gdbarch) == BFD_ENDIAN_BIG)
 	    gen_left_shift (ax, end - (offset + op_size));
 	  else
 	    gen_left_shift (ax, offset - start);
@@ -1308,7 +1309,8 @@ gen_bitfield_ref (struct agent_expr *ax, struct axs_value *value,
    the operator being compiled, and OPERAND_NAME is the kind of thing
    it operates on; we use them in error messages.  */
 static void
-gen_struct_ref (struct agent_expr *ax, struct axs_value *value, char *field,
+gen_struct_ref (struct expression *exp, struct agent_expr *ax,
+		struct axs_value *value, char *field,
 		char *operator_name, char *operand_name)
 {
   struct type *type;
@@ -1339,7 +1341,7 @@ gen_struct_ref (struct agent_expr *ax, struct axs_value *value, char *field,
 
   /* Is this a bitfield?  */
   if (TYPE_FIELD_PACKED (type, i))
-    gen_bitfield_ref (ax, value, TYPE_FIELD_TYPE (type, i),
+    gen_bitfield_ref (exp, ax, value, TYPE_FIELD_TYPE (type, i),
 		      TYPE_FIELD_BITPOS (type, i),
 		      (TYPE_FIELD_BITPOS (type, i)
 		       + TYPE_FIELD_BITSIZE (type, i)));
@@ -1392,9 +1394,8 @@ gen_repeat (struct expression *exp, union exp_element **pc,
     {
       /* FIXME-type-allocation: need a way to free this type when we are
          done with it.  */
-      struct type *range
-      = create_range_type (0, builtin_type_int32, 0, length - 1);
-      struct type *array = create_array_type (0, value1.type, range);
+      struct type *array
+	= lookup_array_range_type (value1.type, 0, length - 1);
 
       value->kind = axs_lvalue_memory;
       value->type = array;
@@ -1467,6 +1468,12 @@ gen_expr (struct expression *exp, union exp_element **pc,
     case BINOP_BITWISE_AND:
     case BINOP_BITWISE_IOR:
     case BINOP_BITWISE_XOR:
+    case BINOP_EQUAL:
+    case BINOP_NOTEQUAL:
+    case BINOP_LESS:
+    case BINOP_GTR:
+    case BINOP_LEQ:
+    case BINOP_GEQ:
       (*pc)++;
       gen_expr (exp, pc, ax, &value1);
       gen_usual_unary (exp, ax, &value1);
@@ -1534,6 +1541,47 @@ gen_expr (struct expression *exp, union exp_element **pc,
 	case BINOP_BITWISE_XOR:
 	  gen_binop (ax, value, &value1, &value2,
 		     aop_bit_xor, aop_bit_xor, 0, "bitwise exclusive-or");
+	  break;
+
+	case BINOP_EQUAL:
+	  gen_binop (ax, value, &value1, &value2,
+		     aop_equal, aop_equal, 0, "equal");
+	  break;
+
+	case BINOP_NOTEQUAL:
+	  gen_binop (ax, value, &value1, &value2,
+		     aop_equal, aop_equal, 0, "equal");
+	  gen_logical_not (ax, value,
+			   language_bool_type (exp->language_defn,
+					       exp->gdbarch));
+	  break;
+
+	case BINOP_LESS:
+	  gen_binop (ax, value, &value1, &value2,
+		     aop_less_signed, aop_less_unsigned, 0, "less than");
+	  break;
+
+	case BINOP_GTR:
+	  ax_simple (ax, aop_swap);
+	  gen_binop (ax, value, &value1, &value2,
+		     aop_less_signed, aop_less_unsigned, 0, "less than");
+	  break;
+
+	case BINOP_LEQ:
+	  ax_simple (ax, aop_swap);
+	  gen_binop (ax, value, &value1, &value2,
+		     aop_less_signed, aop_less_unsigned, 0, "less than");
+	  gen_logical_not (ax, value,
+			   language_bool_type (exp->language_defn,
+					       exp->gdbarch));
+	  break;
+
+	case BINOP_GEQ:
+	  gen_binop (ax, value, &value1, &value2,
+		     aop_less_signed, aop_less_unsigned, 0, "less than");
+	  gen_logical_not (ax, value,
+			   language_bool_type (exp->language_defn,
+					       exp->gdbarch));
 	  break;
 
 	default:
@@ -1641,7 +1689,8 @@ gen_expr (struct expression *exp, union exp_element **pc,
     case UNOP_NEG:
       (*pc)++;
       /* -FOO is equivalent to 0 - FOO.  */
-      gen_int_literal (ax, &value1, (LONGEST) 0, builtin_type_int8);
+      gen_int_literal (ax, &value1, 0,
+		       builtin_type (exp->gdbarch)->builtin_int);
       gen_usual_unary (exp, ax, &value1);	/* shouldn't do much */
       gen_expr (exp, pc, ax, &value2);
       gen_usual_unary (exp, ax, &value2);
@@ -1698,9 +1747,9 @@ gen_expr (struct expression *exp, union exp_element **pc,
 	(*pc) += 4 + BYTES_TO_EXP_ELEM (length + 1);
 	gen_expr (exp, pc, ax, value);
 	if (op == STRUCTOP_STRUCT)
-	  gen_struct_ref (ax, value, name, ".", "structure or union");
+	  gen_struct_ref (exp, ax, value, name, ".", "structure or union");
 	else if (op == STRUCTOP_PTR)
-	  gen_struct_ref (ax, value, name, "->",
+	  gen_struct_ref (exp, ax, value, name, "->",
 			  "pointer to a structure or union");
 	else
 	  /* If this `if' chain doesn't handle it, then the case list
@@ -1754,6 +1803,37 @@ gen_trace_for_expr (CORE_ADDR scope, struct expression *expr)
   return ax;
 }
 
+/* Given a GDB expression EXPR, return a bytecode sequence that will
+   evaluate and return a result.  The bytecodes will do a direct
+   evaluation, using the current data on the target, rather than
+   recording blocks of memory and registers for later use, as
+   gen_trace_for_expr does.  The generated bytecode sequence leaves
+   the result of expression evaluation on the top of the stack.  */
+
+struct agent_expr *
+gen_eval_for_expr (CORE_ADDR scope, struct expression *expr)
+{
+  struct cleanup *old_chain = 0;
+  struct agent_expr *ax = new_agent_expr (scope);
+  union exp_element *pc;
+  struct axs_value value;
+
+  old_chain = make_cleanup_free_agent_expr (ax);
+
+  pc = expr->elts;
+  trace_kludge = 0;
+  gen_expr (expr, &pc, ax, &value);
+
+  /* Oh, and terminate.  */
+  ax_simple (ax, aop_end);
+
+  /* We have successfully built the agent expr, so cancel the cleanup
+     request.  If we add more cleanups that we always want done, this
+     will have to get more complicated.  */
+  discard_cleanups (old_chain);
+  return ax;
+}
+
 static void
 agent_command (char *exp, int from_tty)
 {
@@ -1784,6 +1864,41 @@ agent_command (char *exp, int from_tty)
   do_cleanups (old_chain);
   dont_repeat ();
 }
+
+/* Parse the given expression, compile it into an agent expression
+   that does direct evaluation, and display the resulting
+   expression.  */
+
+static void
+agent_eval_command (char *exp, int from_tty)
+{
+  struct cleanup *old_chain = 0;
+  struct expression *expr;
+  struct agent_expr *agent;
+  struct frame_info *fi = get_current_frame ();	/* need current scope */
+
+  /* We don't deal with overlay debugging at the moment.  We need to
+     think more carefully about this.  If you copy this code into
+     another command, change the error message; the user shouldn't
+     have to know anything about agent expressions.  */
+  if (overlay_debugging)
+    error (_("GDB can't do agent expression translation with overlays."));
+
+  if (exp == 0)
+    error_no_arg (_("expression to translate"));
+
+  expr = parse_expression (exp);
+  old_chain = make_cleanup (free_current_contents, &expr);
+  agent = gen_eval_for_expr (get_frame_pc (fi), expr);
+  make_cleanup_free_agent_expr (agent);
+  ax_print (gdb_stdout, agent);
+
+  /* It would be nice to call ax_reqs here to gather some general info
+     about the expression, and then print out the result.  */
+
+  do_cleanups (old_chain);
+  dont_repeat ();
+}
 
 
 /* Initialization code.  */
@@ -1793,6 +1908,10 @@ void
 _initialize_ax_gdb (void)
 {
   add_cmd ("agent", class_maintenance, agent_command,
-	   _("Translate an expression into remote agent bytecode."),
+	   _("Translate an expression into remote agent bytecode for tracing."),
+	   &maintenancelist);
+
+  add_cmd ("agent-eval", class_maintenance, agent_eval_command,
+	   _("Translate an expression into remote agent bytecode for evaluation."),
 	   &maintenancelist);
 }

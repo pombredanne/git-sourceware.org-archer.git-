@@ -212,7 +212,6 @@ struct gdbarch
   gdbarch_skip_solib_resolver_ftype *skip_solib_resolver;
   gdbarch_in_solib_return_trampoline_ftype *in_solib_return_trampoline;
   gdbarch_in_function_epilogue_p_ftype *in_function_epilogue_p;
-  gdbarch_construct_inferior_arguments_ftype *construct_inferior_arguments;
   gdbarch_elf_make_msymbol_special_ftype *elf_make_msymbol_special;
   gdbarch_coff_make_msymbol_special_ftype *coff_make_msymbol_special;
   int cannot_step_breakpoint;
@@ -227,6 +226,7 @@ struct gdbarch
   struct core_regset_section * core_regset_sections;
   gdbarch_core_xfer_shared_libraries_ftype *core_xfer_shared_libraries;
   gdbarch_core_pid_to_str_ftype *core_pid_to_str;
+  const char * gcore_bfd_target;
   int vtable_function_descriptors;
   int vbit_in_delta;
   gdbarch_skip_permanent_breakpoint_ftype *skip_permanent_breakpoint;
@@ -317,8 +317,8 @@ struct gdbarch startup_gdbarch =
   0,  /* register_to_value */
   0,  /* value_to_register */
   0,  /* value_from_register */
-  0,  /* pointer_to_address */
-  0,  /* address_to_pointer */
+  unsigned_pointer_to_address,  /* pointer_to_address */
+  unsigned_address_to_pointer,  /* address_to_pointer */
   0,  /* integer_to_address */
   0,  /* return_value */
   0,  /* skip_prologue */
@@ -347,9 +347,8 @@ struct gdbarch startup_gdbarch =
   0,  /* print_insn */
   0,  /* skip_trampoline_code */
   generic_skip_solib_resolver,  /* skip_solib_resolver */
-  0,  /* in_solib_return_trampoline */
+  generic_in_solib_return_trampoline,  /* in_solib_return_trampoline */
   generic_in_function_epilogue_p,  /* in_function_epilogue_p */
-  construct_inferior_arguments,  /* construct_inferior_arguments */
   0,  /* elf_make_msymbol_special */
   0,  /* coff_make_msymbol_special */
   0,  /* cannot_step_breakpoint */
@@ -364,6 +363,7 @@ struct gdbarch startup_gdbarch =
   0,  /* core_regset_sections */
   0,  /* core_xfer_shared_libraries */
   0,  /* core_pid_to_str */
+  0,  /* gcore_bfd_target */
   0,  /* vtable_function_descriptors */
   0,  /* vbit_in_delta */
   0,  /* skip_permanent_breakpoint */
@@ -386,7 +386,6 @@ struct gdbarch startup_gdbarch =
   /* startup_gdbarch() */
 };
 
-struct gdbarch *current_gdbarch = &startup_gdbarch;
 struct gdbarch *target_gdbarch = &startup_gdbarch;
 
 /* Create a new ``struct gdbarch'' based on information provided by
@@ -458,7 +457,6 @@ gdbarch_alloc (const struct gdbarch_info *info,
   gdbarch->skip_solib_resolver = generic_skip_solib_resolver;
   gdbarch->in_solib_return_trampoline = generic_in_solib_return_trampoline;
   gdbarch->in_function_epilogue_p = generic_in_function_epilogue_p;
-  gdbarch->construct_inferior_arguments = construct_inferior_arguments;
   gdbarch->elf_make_msymbol_special = default_elf_make_msymbol_special;
   gdbarch->coff_make_msymbol_special = default_coff_make_msymbol_special;
   gdbarch->register_reggroup_p = default_register_reggroup_p;
@@ -606,7 +604,6 @@ verify_gdbarch (struct gdbarch *gdbarch)
   /* Skip verify of skip_solib_resolver, invalid_p == 0 */
   /* Skip verify of in_solib_return_trampoline, invalid_p == 0 */
   /* Skip verify of in_function_epilogue_p, invalid_p == 0 */
-  /* Skip verify of construct_inferior_arguments, invalid_p == 0 */
   /* Skip verify of elf_make_msymbol_special, invalid_p == 0 */
   /* Skip verify of coff_make_msymbol_special, invalid_p == 0 */
   /* Skip verify of cannot_step_breakpoint, invalid_p == 0 */
@@ -620,6 +617,7 @@ verify_gdbarch (struct gdbarch *gdbarch)
   /* Skip verify of core_reg_section_encodes_pid, invalid_p == 0 */
   /* Skip verify of core_xfer_shared_libraries, has predicate */
   /* Skip verify of core_pid_to_str, has predicate */
+  /* Skip verify of gcore_bfd_target, has predicate */
   /* Skip verify of vtable_function_descriptors, invalid_p == 0 */
   /* Skip verify of vbit_in_delta, invalid_p == 0 */
   /* Skip verify of skip_permanent_breakpoint, has predicate */
@@ -732,9 +730,6 @@ gdbarch_dump (struct gdbarch *gdbarch, struct ui_file *file)
   fprintf_unfiltered (file,
                       "gdbarch_dump: coff_make_msymbol_special = <%s>\n",
                       host_address_to_string (gdbarch->coff_make_msymbol_special));
-  fprintf_unfiltered (file,
-                      "gdbarch_dump: construct_inferior_arguments = <%s>\n",
-                      host_address_to_string (gdbarch->construct_inferior_arguments));
   fprintf_unfiltered (file,
                       "gdbarch_dump: convert_from_func_ptr_addr = <%s>\n",
                       host_address_to_string (gdbarch->convert_from_func_ptr_addr));
@@ -852,6 +847,12 @@ gdbarch_dump (struct gdbarch *gdbarch, struct ui_file *file)
   fprintf_unfiltered (file,
                       "gdbarch_dump: frame_red_zone_size = %s\n",
                       plongest (gdbarch->frame_red_zone_size));
+  fprintf_unfiltered (file,
+                      "gdbarch_dump: gdbarch_gcore_bfd_target_p() = %d\n",
+                      gdbarch_gcore_bfd_target_p (gdbarch));
+  fprintf_unfiltered (file,
+                      "gdbarch_dump: gcore_bfd_target = %s\n",
+                      gdbarch->gcore_bfd_target);
   fprintf_unfiltered (file,
                       "gdbarch_dump: gdbarch_get_longjmp_target_p() = %d\n",
                       gdbarch_get_longjmp_target_p (gdbarch));
@@ -2094,7 +2095,7 @@ gdbarch_pointer_to_address (struct gdbarch *gdbarch, struct type *type, const gd
   gdb_assert (gdbarch->pointer_to_address != NULL);
   if (gdbarch_debug >= 2)
     fprintf_unfiltered (gdb_stdlog, "gdbarch_pointer_to_address called\n");
-  return gdbarch->pointer_to_address (type, buf);
+  return gdbarch->pointer_to_address (gdbarch, type, buf);
 }
 
 void
@@ -2111,7 +2112,7 @@ gdbarch_address_to_pointer (struct gdbarch *gdbarch, struct type *type, gdb_byte
   gdb_assert (gdbarch->address_to_pointer != NULL);
   if (gdbarch_debug >= 2)
     fprintf_unfiltered (gdb_stdlog, "gdbarch_address_to_pointer called\n");
-  gdbarch->address_to_pointer (type, buf, addr);
+  gdbarch->address_to_pointer (gdbarch, type, buf, addr);
 }
 
 void
@@ -2680,7 +2681,7 @@ gdbarch_in_solib_return_trampoline (struct gdbarch *gdbarch, CORE_ADDR pc, char 
   gdb_assert (gdbarch->in_solib_return_trampoline != NULL);
   if (gdbarch_debug >= 2)
     fprintf_unfiltered (gdb_stdlog, "gdbarch_in_solib_return_trampoline called\n");
-  return gdbarch->in_solib_return_trampoline (pc, name);
+  return gdbarch->in_solib_return_trampoline (gdbarch, pc, name);
 }
 
 void
@@ -2705,23 +2706,6 @@ set_gdbarch_in_function_epilogue_p (struct gdbarch *gdbarch,
                                     gdbarch_in_function_epilogue_p_ftype in_function_epilogue_p)
 {
   gdbarch->in_function_epilogue_p = in_function_epilogue_p;
-}
-
-char *
-gdbarch_construct_inferior_arguments (struct gdbarch *gdbarch, int argc, char **argv)
-{
-  gdb_assert (gdbarch != NULL);
-  gdb_assert (gdbarch->construct_inferior_arguments != NULL);
-  if (gdbarch_debug >= 2)
-    fprintf_unfiltered (gdb_stdlog, "gdbarch_construct_inferior_arguments called\n");
-  return gdbarch->construct_inferior_arguments (gdbarch, argc, argv);
-}
-
-void
-set_gdbarch_construct_inferior_arguments (struct gdbarch *gdbarch,
-                                          gdbarch_construct_inferior_arguments_ftype construct_inferior_arguments)
-{
-  gdbarch->construct_inferior_arguments = construct_inferior_arguments;
 }
 
 void
@@ -3008,6 +2992,31 @@ set_gdbarch_core_pid_to_str (struct gdbarch *gdbarch,
                              gdbarch_core_pid_to_str_ftype core_pid_to_str)
 {
   gdbarch->core_pid_to_str = core_pid_to_str;
+}
+
+int
+gdbarch_gcore_bfd_target_p (struct gdbarch *gdbarch)
+{
+  gdb_assert (gdbarch != NULL);
+  return gdbarch->gcore_bfd_target != 0;
+}
+
+const char *
+gdbarch_gcore_bfd_target (struct gdbarch *gdbarch)
+{
+  gdb_assert (gdbarch != NULL);
+  /* Check variable changed from pre-default.  */
+  gdb_assert (gdbarch->gcore_bfd_target != 0);
+  if (gdbarch_debug >= 2)
+    fprintf_unfiltered (gdb_stdlog, "gdbarch_gcore_bfd_target called\n");
+  return gdbarch->gcore_bfd_target;
+}
+
+void
+set_gdbarch_gcore_bfd_target (struct gdbarch *gdbarch,
+                              const char * gcore_bfd_target)
+{
+  gdbarch->gcore_bfd_target = gcore_bfd_target;
 }
 
 int
@@ -3650,18 +3659,13 @@ gdbarch_list_lookup_by_info (struct gdbarch_list *arches,
 
 
 /* Find an architecture that matches the specified INFO.  Create a new
-   architecture if needed.  Return that new architecture.  Assumes
-   that there is no current architecture.  */
+   architecture if needed.  Return that new architecture.  */
 
-static struct gdbarch *
-find_arch_by_info (struct gdbarch_info info)
+struct gdbarch *
+gdbarch_find_by_info (struct gdbarch_info info)
 {
   struct gdbarch *new_gdbarch;
   struct gdbarch_registration *rego;
-
-  /* The existing architecture has been swapped out - all this code
-     works from a clean slate.  */
-  gdb_assert (current_gdbarch == NULL);
 
   /* Fill in missing parts of the INFO struct using a number of
      sources: "set ..."; INFOabfd supplied; and the global
@@ -3674,24 +3678,24 @@ find_arch_by_info (struct gdbarch_info info)
   if (gdbarch_debug)
     {
       fprintf_unfiltered (gdb_stdlog,
-			  "find_arch_by_info: info.bfd_arch_info %s\n",
+			  "gdbarch_find_by_info: info.bfd_arch_info %s\n",
 			  (info.bfd_arch_info != NULL
 			   ? info.bfd_arch_info->printable_name
 			   : "(null)"));
       fprintf_unfiltered (gdb_stdlog,
-			  "find_arch_by_info: info.byte_order %d (%s)\n",
+			  "gdbarch_find_by_info: info.byte_order %d (%s)\n",
 			  info.byte_order,
 			  (info.byte_order == BFD_ENDIAN_BIG ? "big"
 			   : info.byte_order == BFD_ENDIAN_LITTLE ? "little"
 			   : "default"));
       fprintf_unfiltered (gdb_stdlog,
-			  "find_arch_by_info: info.osabi %d (%s)\n",
+			  "gdbarch_find_by_info: info.osabi %d (%s)\n",
 			  info.osabi, gdbarch_osabi_name (info.osabi));
       fprintf_unfiltered (gdb_stdlog,
-			  "find_arch_by_info: info.abfd %s\n",
+			  "gdbarch_find_by_info: info.abfd %s\n",
 			  host_address_to_string (info.abfd));
       fprintf_unfiltered (gdb_stdlog,
-			  "find_arch_by_info: info.tdep_info %s\n",
+			  "gdbarch_find_by_info: info.tdep_info %s\n",
 			  host_address_to_string (info.tdep_info));
     }
 
@@ -3704,7 +3708,7 @@ find_arch_by_info (struct gdbarch_info info)
   if (rego == NULL)
     {
       if (gdbarch_debug)
-	fprintf_unfiltered (gdb_stdlog, "find_arch_by_info: "
+	fprintf_unfiltered (gdb_stdlog, "gdbarch_find_by_info: "
 			    "No matching architecture\n");
       return 0;
     }
@@ -3717,7 +3721,7 @@ find_arch_by_info (struct gdbarch_info info)
   if (new_gdbarch == NULL)
     {
       if (gdbarch_debug)
-	fprintf_unfiltered (gdb_stdlog, "find_arch_by_info: "
+	fprintf_unfiltered (gdb_stdlog, "gdbarch_find_by_info: "
 			    "Target rejected architecture\n");
       return NULL;
     }
@@ -3730,7 +3734,7 @@ find_arch_by_info (struct gdbarch_info info)
       struct gdbarch_list **list;
       struct gdbarch_list *this;
       if (gdbarch_debug)
-	fprintf_unfiltered (gdb_stdlog, "find_arch_by_info: "
+	fprintf_unfiltered (gdb_stdlog, "gdbarch_find_by_info: "
 			    "Previous architecture %s (%s) selected\n",
 			    host_address_to_string (new_gdbarch),
 			    new_gdbarch->bfd_arch_info->printable_name);
@@ -3752,7 +3756,7 @@ find_arch_by_info (struct gdbarch_info info)
 
   /* It's a new architecture.  */
   if (gdbarch_debug)
-    fprintf_unfiltered (gdb_stdlog, "find_arch_by_info: "
+    fprintf_unfiltered (gdb_stdlog, "gdbarch_find_by_info: "
 			"New architecture %s (%s) selected\n",
 			host_address_to_string (new_gdbarch),
 			new_gdbarch->bfd_arch_info->printable_name);
@@ -3778,39 +3782,13 @@ find_arch_by_info (struct gdbarch_info info)
   return new_gdbarch;
 }
 
-struct gdbarch *
-gdbarch_find_by_info (struct gdbarch_info info)
-{
-  struct gdbarch *new_gdbarch;
-
-  /* Save the previously selected architecture, setting the global to
-     NULL.  This stops things like gdbarch->init() trying to use the
-     previous architecture's configuration.  The previous architecture
-     may not even be of the same architecture family.  The most recent
-     architecture of the same family is found at the head of the
-     rego->arches list.  */
-  struct gdbarch *old_gdbarch = current_gdbarch;
-  current_gdbarch = NULL;
-
-  /* Find the specified architecture.  */
-  new_gdbarch = find_arch_by_info (info);
-
-  /* Restore the existing architecture.  */
-  gdb_assert (current_gdbarch == NULL);
-  current_gdbarch = old_gdbarch;
-
-  return new_gdbarch;
-}
-
 /* Make the specified architecture current.  */
 
 void
-deprecated_current_gdbarch_select_hack (struct gdbarch *new_gdbarch)
+deprecated_target_gdbarch_select_hack (struct gdbarch *new_gdbarch)
 {
   gdb_assert (new_gdbarch != NULL);
-  gdb_assert (current_gdbarch != NULL);
   gdb_assert (new_gdbarch->initialized_p);
-  current_gdbarch = new_gdbarch;
   target_gdbarch = new_gdbarch;
   observer_notify_architecture_changed (new_gdbarch);
   registers_changed ();

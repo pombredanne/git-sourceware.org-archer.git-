@@ -108,8 +108,9 @@ lookup_struct_typedef (char *name, struct block *block, int noerr)
 }
 
 CORE_ADDR 
-lookup_objc_class (char *classname)
+lookup_objc_class (struct gdbarch *gdbarch, char *classname)
 {
+  struct type *char_type = builtin_type (gdbarch)->builtin_char;
   struct value * function, *classval;
 
   if (! target_has_execution)
@@ -128,15 +129,16 @@ lookup_objc_class (char *classname)
       return 0;
     }
 
-  classval = value_string (classname, strlen (classname) + 1);
+  classval = value_string (classname, strlen (classname) + 1, char_type);
   classval = value_coerce_array (classval);
   return (CORE_ADDR) value_as_long (call_function_by_hand (function, 
 							   1, &classval));
 }
 
 CORE_ADDR
-lookup_child_selector (char *selname)
+lookup_child_selector (struct gdbarch *gdbarch, char *selname)
 {
+  struct type *char_type = builtin_type (gdbarch)->builtin_char;
   struct value * function, *selstring;
 
   if (! target_has_execution)
@@ -156,52 +158,49 @@ lookup_child_selector (char *selname)
     }
 
   selstring = value_coerce_array (value_string (selname, 
-						strlen (selname) + 1));
+						strlen (selname) + 1, char_type));
   return value_as_long (call_function_by_hand (function, 1, &selstring));
 }
 
 struct value * 
-value_nsstring (char *ptr, int len)
+value_nsstring (struct gdbarch *gdbarch, char *ptr, int len)
 {
+  struct type *char_type = builtin_type (gdbarch)->builtin_char;
   struct value *stringValue[3];
   struct value *function, *nsstringValue;
   struct symbol *sym;
   struct type *type;
-  struct objfile *objf;
-  struct gdbarch *gdbarch;
 
   if (!target_has_execution)
     return 0;		/* Can't call into inferior to create NSString.  */
 
-  stringValue[2] = value_string(ptr, len);
+  stringValue[2] = value_string(ptr, len, char_type);
   stringValue[2] = value_coerce_array(stringValue[2]);
   /* _NSNewStringFromCString replaces "istr" after Lantern2A.  */
   if (lookup_minimal_symbol("_NSNewStringFromCString", 0, 0))
     {
-      function = find_function_in_inferior("_NSNewStringFromCString", &objf);
+      function = find_function_in_inferior("_NSNewStringFromCString", NULL);
       nsstringValue = call_function_by_hand(function, 1, &stringValue[2]);
     }
   else if (lookup_minimal_symbol("istr", 0, 0))
     {
-      function = find_function_in_inferior("istr", &objf);
+      function = find_function_in_inferior("istr", NULL);
       nsstringValue = call_function_by_hand(function, 1, &stringValue[2]);
     }
   else if (lookup_minimal_symbol("+[NSString stringWithCString:]", 0, 0))
     {
       function
-	= find_function_in_inferior("+[NSString stringWithCString:]", &objf);
-      type = builtin_type (get_objfile_arch (objf))->builtin_long;
+	= find_function_in_inferior("+[NSString stringWithCString:]", NULL);
+      type = builtin_type (gdbarch)->builtin_long;
 
       stringValue[0] = value_from_longest 
-	(type, lookup_objc_class ("NSString"));
+	(type, lookup_objc_class (gdbarch, "NSString"));
       stringValue[1] = value_from_longest 
-	(type, lookup_child_selector ("stringWithCString:"));
+	(type, lookup_child_selector (gdbarch, "stringWithCString:"));
       nsstringValue = call_function_by_hand(function, 3, &stringValue[0]);
     }
   else
     error (_("NSString: internal error -- no way to create new NSString"));
-
-  gdbarch = get_objfile_arch (objf);
 
   sym = lookup_struct_typedef("NSString", 0, 1);
   if (sym == NULL)
@@ -442,11 +441,11 @@ objc_printstr (struct ui_file *stream, struct type *type,
 static CORE_ADDR 
 objc_skip_trampoline (struct frame_info *frame, CORE_ADDR stop_pc)
 {
+  struct gdbarch *gdbarch = get_frame_arch (frame);
   CORE_ADDR real_stop_pc;
   CORE_ADDR method_stop_pc;
   
-  real_stop_pc = gdbarch_skip_trampoline_code
-		   (current_gdbarch, frame, stop_pc);
+  real_stop_pc = gdbarch_skip_trampoline_code (gdbarch, frame, stop_pc);
 
   if (real_stop_pc != 0)
     find_objc_msgcall (real_stop_pc, &method_stop_pc);
@@ -456,7 +455,7 @@ objc_skip_trampoline (struct frame_info *frame, CORE_ADDR stop_pc)
   if (method_stop_pc)
     {
       real_stop_pc = gdbarch_skip_trampoline_code
-		       (current_gdbarch, frame, method_stop_pc);
+		       (gdbarch, frame, method_stop_pc);
       if (real_stop_pc == 0)
 	real_stop_pc = method_stop_pc;
     }
@@ -612,7 +611,7 @@ end_msglist(void)
   selname_chain = sel->next;
   msglist_len = sel->msglist_len;
   msglist_sel = sel->msglist_sel;
-  selid = lookup_child_selector(p);
+  selid = lookup_child_selector (parse_gdbarch, p);
   if (!selid)
     error (_("Can't find selector \"%s\""), p);
   write_exp_elt_longcst (selid);
@@ -1422,8 +1421,8 @@ print_object_command (char *args, int from_tty)
       make_cleanup (free_current_contents, &expr);
     int pc = 0;
 
-    object = expr->language_defn->la_exp_desc->evaluate_exp 
-      (builtin_type (expr->gdbarch)->builtin_data_ptr, expr, &pc, EVAL_NORMAL);
+    object = evaluate_subexp (builtin_type (expr->gdbarch)->builtin_data_ptr,
+			      expr, &pc, EVAL_NORMAL);
     do_cleanups (old_chain);
   }
 
@@ -1611,58 +1610,69 @@ _initialize_objc_language (void)
 }
 
 static void 
-read_objc_method (CORE_ADDR addr, struct objc_method *method)
+read_objc_method (struct gdbarch *gdbarch, CORE_ADDR addr,
+		  struct objc_method *method)
 {
-  method->name  = read_memory_unsigned_integer (addr + 0, 4);
-  method->types = read_memory_unsigned_integer (addr + 4, 4);
-  method->imp   = read_memory_unsigned_integer (addr + 8, 4);
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+  method->name  = read_memory_unsigned_integer (addr + 0, 4, byte_order);
+  method->types = read_memory_unsigned_integer (addr + 4, 4, byte_order);
+  method->imp   = read_memory_unsigned_integer (addr + 8, 4, byte_order);
 }
 
-static 
-unsigned long read_objc_methlist_nmethods (CORE_ADDR addr)
+static unsigned long
+read_objc_methlist_nmethods (struct gdbarch *gdbarch, CORE_ADDR addr)
 {
-  return read_memory_unsigned_integer (addr + 4, 4);
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+  return read_memory_unsigned_integer (addr + 4, 4, byte_order);
 }
 
 static void 
-read_objc_methlist_method (CORE_ADDR addr, unsigned long num, 
-			   struct objc_method *method)
+read_objc_methlist_method (struct gdbarch *gdbarch, CORE_ADDR addr,
+			   unsigned long num, struct objc_method *method)
 {
-  gdb_assert (num < read_objc_methlist_nmethods (addr));
-  read_objc_method (addr + 8 + (12 * num), method);
+  gdb_assert (num < read_objc_methlist_nmethods (gdbarch, addr));
+  read_objc_method (gdbarch, addr + 8 + (12 * num), method);
 }
   
 static void 
-read_objc_object (CORE_ADDR addr, struct objc_object *object)
+read_objc_object (struct gdbarch *gdbarch, CORE_ADDR addr,
+		  struct objc_object *object)
 {
-  object->isa = read_memory_unsigned_integer (addr, 4);
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+  object->isa = read_memory_unsigned_integer (addr, 4, byte_order);
 }
 
 static void 
-read_objc_super (CORE_ADDR addr, struct objc_super *super)
+read_objc_super (struct gdbarch *gdbarch, CORE_ADDR addr,
+		 struct objc_super *super)
 {
-  super->receiver = read_memory_unsigned_integer (addr, 4);
-  super->class = read_memory_unsigned_integer (addr + 4, 4);
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+  super->receiver = read_memory_unsigned_integer (addr, 4, byte_order);
+  super->class = read_memory_unsigned_integer (addr + 4, 4, byte_order);
 };
 
 static void 
-read_objc_class (CORE_ADDR addr, struct objc_class *class)
+read_objc_class (struct gdbarch *gdbarch, CORE_ADDR addr,
+		 struct objc_class *class)
 {
-  class->isa = read_memory_unsigned_integer (addr, 4);
-  class->super_class = read_memory_unsigned_integer (addr + 4, 4);
-  class->name = read_memory_unsigned_integer (addr + 8, 4);
-  class->version = read_memory_unsigned_integer (addr + 12, 4);
-  class->info = read_memory_unsigned_integer (addr + 16, 4);
-  class->instance_size = read_memory_unsigned_integer (addr + 18, 4);
-  class->ivars = read_memory_unsigned_integer (addr + 24, 4);
-  class->methods = read_memory_unsigned_integer (addr + 28, 4);
-  class->cache = read_memory_unsigned_integer (addr + 32, 4);
-  class->protocols = read_memory_unsigned_integer (addr + 36, 4);
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+  class->isa = read_memory_unsigned_integer (addr, 4, byte_order);
+  class->super_class = read_memory_unsigned_integer (addr + 4, 4, byte_order);
+  class->name = read_memory_unsigned_integer (addr + 8, 4, byte_order);
+  class->version = read_memory_unsigned_integer (addr + 12, 4, byte_order);
+  class->info = read_memory_unsigned_integer (addr + 16, 4, byte_order);
+  class->instance_size = read_memory_unsigned_integer (addr + 18, 4, byte_order);
+  class->ivars = read_memory_unsigned_integer (addr + 24, 4, byte_order);
+  class->methods = read_memory_unsigned_integer (addr + 28, 4, byte_order);
+  class->cache = read_memory_unsigned_integer (addr + 32, 4, byte_order);
+  class->protocols = read_memory_unsigned_integer (addr + 36, 4, byte_order);
 }
 
 static CORE_ADDR
-find_implementation_from_class (CORE_ADDR class, CORE_ADDR sel)
+find_implementation_from_class (struct gdbarch *gdbarch,
+				CORE_ADDR class, CORE_ADDR sel)
 {
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   CORE_ADDR subclass = class;
 
   while (subclass != 0) 
@@ -1671,7 +1681,7 @@ find_implementation_from_class (CORE_ADDR class, CORE_ADDR sel)
       struct objc_class class_str;
       unsigned mlistnum = 0;
 
-      read_objc_class (subclass, &class_str);
+      read_objc_class (gdbarch, subclass, &class_str);
 
       for (;;) 
 	{
@@ -1680,16 +1690,17 @@ find_implementation_from_class (CORE_ADDR class, CORE_ADDR sel)
 	  unsigned long i;
       
 	  mlist = read_memory_unsigned_integer (class_str.methods + 
-						(4 * mlistnum), 4);
+						(4 * mlistnum),
+						4, byte_order);
 	  if (mlist == 0) 
 	    break;
 
-	  nmethods = read_objc_methlist_nmethods (mlist);
+	  nmethods = read_objc_methlist_nmethods (gdbarch, mlist);
 
 	  for (i = 0; i < nmethods; i++) 
 	    {
 	      struct objc_method meth_str;
-	      read_objc_methlist_method (mlist, i, &meth_str);
+	      read_objc_methlist_method (gdbarch, mlist, i, &meth_str);
 
 #if 0
 	      fprintf (stderr, 
@@ -1711,17 +1722,18 @@ find_implementation_from_class (CORE_ADDR class, CORE_ADDR sel)
 }
 
 static CORE_ADDR
-find_implementation (CORE_ADDR object, CORE_ADDR sel)
+find_implementation (struct gdbarch *gdbarch,
+		     CORE_ADDR object, CORE_ADDR sel)
 {
   struct objc_object ostr;
 
   if (object == 0)
     return 0;
-  read_objc_object (object, &ostr);
+  read_objc_object (gdbarch, object, &ostr);
   if (ostr.isa == 0)
     return 0;
 
-  return find_implementation_from_class (ostr.isa, sel);
+  return find_implementation_from_class (gdbarch, ostr.isa, sel);
 }
 
 static int
@@ -1738,7 +1750,7 @@ resolve_msgsend (CORE_ADDR pc, CORE_ADDR *new_pc)
   object = gdbarch_fetch_pointer_argument (gdbarch, frame, 0, ptr_type);
   sel = gdbarch_fetch_pointer_argument (gdbarch, frame, 1, ptr_type);
 
-  res = find_implementation (object, sel);
+  res = find_implementation (gdbarch, object, sel);
   if (new_pc != 0)
     *new_pc = res;
   if (res == 0)
@@ -1760,7 +1772,7 @@ resolve_msgsend_stret (CORE_ADDR pc, CORE_ADDR *new_pc)
   object = gdbarch_fetch_pointer_argument (gdbarch, frame, 1, ptr_type);
   sel = gdbarch_fetch_pointer_argument (gdbarch, frame, 2, ptr_type);
 
-  res = find_implementation (object, sel);
+  res = find_implementation (gdbarch, object, sel);
   if (new_pc != 0)
     *new_pc = res;
   if (res == 0)
@@ -1784,11 +1796,11 @@ resolve_msgsend_super (CORE_ADDR pc, CORE_ADDR *new_pc)
   super = gdbarch_fetch_pointer_argument (gdbarch, frame, 0, ptr_type);
   sel = gdbarch_fetch_pointer_argument (gdbarch, frame, 1, ptr_type);
 
-  read_objc_super (super, &sstr);
+  read_objc_super (gdbarch, super, &sstr);
   if (sstr.class == 0)
     return 0;
   
-  res = find_implementation_from_class (sstr.class, sel);
+  res = find_implementation_from_class (gdbarch, sstr.class, sel);
   if (new_pc != 0)
     *new_pc = res;
   if (res == 0)
@@ -1812,11 +1824,11 @@ resolve_msgsend_super_stret (CORE_ADDR pc, CORE_ADDR *new_pc)
   super = gdbarch_fetch_pointer_argument (gdbarch, frame, 1, ptr_type);
   sel = gdbarch_fetch_pointer_argument (gdbarch, frame, 2, ptr_type);
 
-  read_objc_super (super, &sstr);
+  read_objc_super (gdbarch, super, &sstr);
   if (sstr.class == 0)
     return 0;
   
-  res = find_implementation_from_class (sstr.class, sel);
+  res = find_implementation_from_class (gdbarch, sstr.class, sel);
   if (new_pc != 0)
     *new_pc = res;
   if (res == 0)

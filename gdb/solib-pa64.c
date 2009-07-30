@@ -213,9 +213,7 @@ read_dynamic_info (asection *dyninfo_sect, dld_cache_t *dld_cache_p)
       Elf64_Dyn *x_dynp = (Elf64_Dyn*)buf;
       Elf64_Sxword dyn_tag;
       CORE_ADDR	dyn_ptr;
-      char *pbuf;
 
-      pbuf = alloca (gdbarch_ptr_bit (current_gdbarch) / HOST_CHAR_BIT);
       dyn_tag = bfd_h_get_64 (symfile_objfile->obfd, 
 			      (bfd_byte*) &x_dynp->d_tag);
 
@@ -430,7 +428,7 @@ pa64_solib_create_inferior_hook (void)
       /* Create the shared library breakpoint.  */
       {
 	struct breakpoint *b
-	  = create_solib_event_breakpoint (sym_addr);
+	  = create_solib_event_breakpoint (target_gdbarch, sym_addr);
 
 	/* The breakpoint is actually hard-coded into the dynamic linker,
 	   so we don't need to actually insert a breakpoint instruction
@@ -660,6 +658,7 @@ _initialize_pa64_solib (void)
   pa64_so_ops.current_sos = pa64_current_sos;
   pa64_so_ops.open_symbol_file_object = pa64_open_symbol_file_object;
   pa64_so_ops.in_dynsym_resolve_code = pa64_in_dynsym_resolve_code;
+  pa64_so_ops.bfd_open = solib_bfd_open;
 
   memset (&dld_cache, 0, sizeof (dld_cache));
 }

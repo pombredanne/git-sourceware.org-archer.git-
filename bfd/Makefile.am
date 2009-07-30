@@ -83,6 +83,7 @@ ALL_MACHINES = \
 	cpu-hppa.lo \
 	cpu-i370.lo \
 	cpu-i386.lo \
+	cpu-l1om.lo \
 	cpu-i860.lo \
 	cpu-i960.lo \
 	cpu-ia64.lo \
@@ -152,6 +153,7 @@ ALL_MACHINES_CFILES = \
 	cpu-hppa.c \
 	cpu-i370.c \
 	cpu-i386.c \
+	cpu-l1om.c \
 	cpu-i860.c \
 	cpu-i960.c \
 	cpu-ia64.c \
@@ -250,6 +252,7 @@ BFD32_BACKENDS = \
 	ecofflink.lo \
 	elf-attrs.lo \
 	elf-eh-frame.lo \
+	elf-ifunc.lo \
 	elf-m10200.lo \
 	elf-m10300.lo \
 	elf-strtab.lo \
@@ -432,6 +435,7 @@ BFD32_BACKENDS_CFILES = \
 	ecofflink.c \
 	elf-attrs.c \
 	elf-eh-frame.c \
+	elf-ifunc.c \
 	elf-m10200.c \
 	elf-m10300.c \
 	elf-strtab.c \
@@ -1202,8 +1206,8 @@ merge.lo: \
 dwarf2.lo: \
   dwarf2.c \
   $(INCDIR)/bfdlink.h \
+  $(INCDIR)/dwarf2.h \
   $(INCDIR)/elf/common.h \
-  $(INCDIR)/elf/dwarf2.h \
   $(INCDIR)/elf/external.h \
   $(INCDIR)/elf/internal.h \
   $(INCDIR)/filenames.h \
@@ -1305,6 +1309,10 @@ cpu-i370.lo: \
   $(INCDIR)/hashtab.h
 cpu-i386.lo: \
   cpu-i386.c \
+  $(INCDIR)/filenames.h \
+  $(INCDIR)/hashtab.h
+cpu-l1om.lo: \
+  cpu-l1om.c \
   $(INCDIR)/filenames.h \
   $(INCDIR)/hashtab.h
 cpu-i860.lo: \
@@ -2039,12 +2047,24 @@ elf-attrs.lo: \
 elf-eh-frame.lo: \
   elf-eh-frame.c \
   $(INCDIR)/bfdlink.h \
+  $(INCDIR)/dwarf2.h \
   $(INCDIR)/elf/common.h \
-  $(INCDIR)/elf/dwarf2.h \
   $(INCDIR)/elf/external.h \
   $(INCDIR)/elf/internal.h \
   $(INCDIR)/filenames.h \
   $(INCDIR)/hashtab.h \
+  elf-bfd.h
+elf-ifunc.lo: \
+  elf-ifunc.c \
+  $(INCDIR)/bfdlink.h \
+  $(INCDIR)/elf/common.h \
+  $(INCDIR)/elf/external.h \
+  $(INCDIR)/elf/internal.h \
+  $(INCDIR)/filenames.h \
+  $(INCDIR)/hashtab.h \
+  $(INCDIR)/libiberty.h \
+  $(INCDIR)/objalloc.h \
+  $(INCDIR)/safe-ctype.h \
   elf-bfd.h
 elf-m10200.lo: \
   elf-m10200.c \
@@ -2158,9 +2178,9 @@ elf32-avr.lo: \
 elf32-bfin.lo: \
   elf32-bfin.c \
   $(INCDIR)/bfdlink.h \
+  $(INCDIR)/dwarf2.h \
   $(INCDIR)/elf/bfin.h \
   $(INCDIR)/elf/common.h \
-  $(INCDIR)/elf/dwarf2.h \
   $(INCDIR)/elf/external.h \
   $(INCDIR)/elf/internal.h \
   $(INCDIR)/elf/reloc-macros.h \
@@ -2268,8 +2288,8 @@ elf32-fr30.lo: \
 elf32-frv.lo: \
   elf32-frv.c \
   $(INCDIR)/bfdlink.h \
+  $(INCDIR)/dwarf2.h \
   $(INCDIR)/elf/common.h \
-  $(INCDIR)/elf/dwarf2.h \
   $(INCDIR)/elf/external.h \
   $(INCDIR)/elf/frv.h \
   $(INCDIR)/elf/internal.h \
@@ -2337,6 +2357,7 @@ elf32-i386.lo: \
   $(INCDIR)/elf/reloc-macros.h \
   $(INCDIR)/filenames.h \
   $(INCDIR)/hashtab.h \
+  $(INCDIR)/objalloc.h \
   bfd_stdint.h \
   elf-bfd.h \
   elf-vxworks.h \
@@ -2761,8 +2782,8 @@ elf32-vax.lo: \
 elf32-xc16x.lo: \
   elf32-xc16x.c \
   $(INCDIR)/bfdlink.h \
+  $(INCDIR)/dwarf2.h \
   $(INCDIR)/elf/common.h \
-  $(INCDIR)/elf/dwarf2.h \
   $(INCDIR)/elf/external.h \
   $(INCDIR)/elf/internal.h \
   $(INCDIR)/elf/reloc-macros.h \
@@ -3577,6 +3598,7 @@ vms.lo: \
   vms.h
 vmsutil.lo: \
   vmsutil.c \
+  $(INCDIR)/filenames.h \
   vmsutil.h
 xcofflink.lo: \
   xcofflink.c \
@@ -3841,6 +3863,7 @@ elf64-x86-64.lo: \
   $(INCDIR)/elf/x86-64.h \
   $(INCDIR)/filenames.h \
   $(INCDIR)/hashtab.h \
+  $(INCDIR)/objalloc.h \
   bfd_stdint.h \
   elf-bfd.h \
   elf64-target.h

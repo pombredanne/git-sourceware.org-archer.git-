@@ -969,11 +969,15 @@ typebase  /* Implements (approximately): (type-qualifier)* type-specifier */
 			{ $$ = lookup_enum (copy_name ($2),
 					    expression_context_block); }
 	|	UNSIGNED typename
-			{ $$ = lookup_unsigned_typename (TYPE_NAME($2.type)); }
+			{ $$ = lookup_unsigned_typename (parse_language,
+							 parse_gdbarch,
+							 TYPE_NAME($2.type)); }
 	|	UNSIGNED
 			{ $$ = parse_type->builtin_unsigned_int; }
 	|	SIGNED_KEYWORD typename
-			{ $$ = lookup_signed_typename (TYPE_NAME($2.type)); }
+			{ $$ = lookup_signed_typename (parse_language,
+						       parse_gdbarch,
+						       TYPE_NAME($2.type)); }
 	|	SIGNED_KEYWORD
 			{ $$ = parse_type->builtin_int; }
                 /* It appears that this rule for templates is never
@@ -1177,7 +1181,8 @@ parse_number (char *p, int len, int parsed_float, YYSTYPE *putithere)
 	  p[len - 2] = '\0';
 	  putithere->typed_val_decfloat.type
 	    = parse_type->builtin_decfloat;
-	  decimal_from_string (putithere->typed_val_decfloat.val, 4, p);
+	  decimal_from_string (putithere->typed_val_decfloat.val, 4,
+			       gdbarch_byte_order (parse_gdbarch), p);
 	  p[len - 2] = 'd';
 	  return DECFLOAT;
 	}
@@ -1187,7 +1192,8 @@ parse_number (char *p, int len, int parsed_float, YYSTYPE *putithere)
 	  p[len - 2] = '\0';
 	  putithere->typed_val_decfloat.type
 	    = parse_type->builtin_decdouble;
-	  decimal_from_string (putithere->typed_val_decfloat.val, 8, p);
+	  decimal_from_string (putithere->typed_val_decfloat.val, 8,
+			       gdbarch_byte_order (parse_gdbarch), p);
 	  p[len - 2] = 'd';
 	  return DECFLOAT;
 	}
@@ -1197,7 +1203,8 @@ parse_number (char *p, int len, int parsed_float, YYSTYPE *putithere)
 	  p[len - 2] = '\0';
 	  putithere->typed_val_decfloat.type
 	    = parse_type->builtin_declong;
-	  decimal_from_string (putithere->typed_val_decfloat.val, 16, p);
+	  decimal_from_string (putithere->typed_val_decfloat.val, 16,
+			       gdbarch_byte_order (parse_gdbarch), p);
 	  p[len - 2] = 'd';
 	  return DECFLOAT;
 	}
@@ -1433,14 +1440,19 @@ c_parse_escape (char **ptr, struct obstack *output)
     case '5':
     case '6':
     case '7':
-      if (output)
-	obstack_grow_str (output, "\\");
-      while (isdigit (*tokptr) && *tokptr != '8' && *tokptr != '9')
-	{
-	  if (output)
-	    obstack_1grow (output, *tokptr);
-	  ++tokptr;
-	}
+      {
+	int i;
+	if (output)
+	  obstack_grow_str (output, "\\");
+	for (i = 0;
+	     i < 3 && isdigit (*tokptr) && *tokptr != '8' && *tokptr != '9';
+	     ++i)
+	  {
+	    if (output)
+	      obstack_1grow (output, *tokptr);
+	    ++tokptr;
+	  }
+      }
       break;
 
       /* We handle UCNs later.  We could handle them here, but that

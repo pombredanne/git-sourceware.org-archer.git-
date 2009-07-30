@@ -20,6 +20,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "arch-utils.h"
 #include <signal.h>
 #include "gdb_string.h"
 #include "symtab.h"
@@ -52,6 +53,7 @@
 #include "cli/cli-decode.h"
 #include "gdbthread.h"
 #include "valprint.h"
+#include "inline-frame.h"
 
 /* Functions exported for general use, in inferior.h: */
 
@@ -194,8 +196,7 @@ get_inferior_args (void)
     {
       char *n, *old;
 
-      n = gdbarch_construct_inferior_arguments (current_gdbarch,
-						inferior_argc, inferior_argv);
+      n = construct_inferior_arguments (inferior_argc, inferior_argv);
       old = set_inferior_args (n);
       xfree (old);
     }
@@ -247,7 +248,7 @@ notice_args_read (struct ui_file *file, int from_tty,
 /* Compute command-line string given argument vector.  This does the
    same shell processing as fork_inferior.  */
 char *
-construct_inferior_arguments (struct gdbarch *gdbarch, int argc, char **argv)
+construct_inferior_arguments (int argc, char **argv)
 {
   char *result;
 
@@ -420,6 +421,18 @@ post_create_inferior (struct target_ops *target, int from_tty)
       solib_create_inferior_hook ();
 #endif
     }
+
+  /* If the user sets watchpoints before execution having started,
+     then she gets software watchpoints, because GDB can't know which
+     target will end up being pushed, or if it supports hardware
+     watchpoints or not.  breakpoint_re_set takes care of promoting
+     watchpoints to hardware watchpoints if possible, however, if this
+     new inferior doesn't load shared libraries or we don't pull in
+     symbols from any other source on this target/arch,
+     breakpoint_re_set is never called.  Call it now so that software
+     watchpoints get a chance to be promoted to hardware watchpoints
+     if the now pushed target supports hardware watchpoints.  */
+  breakpoint_re_set ();
 
   observer_notify_inferior_created (target, from_tty);
 }
@@ -747,6 +760,17 @@ Can't resume all threads and specify proceed count simultaneously."));
   continue_1 (all_threads);
 }
 
+/* Record the starting point of a "step" or "next" command.  */
+
+static void
+set_step_frame (void)
+{
+  struct symtab_and_line sal;
+
+  find_frame_sal (get_current_frame (), &sal);
+  set_step_info (get_current_frame (), sal);
+}
+
 /* Step until outside of current statement.  */
 
 static void
@@ -820,7 +844,7 @@ step_1 (int skip_subroutines, int single_inst, char *count_string)
       if (in_thread_list (inferior_ptid))
  	thread = pid_to_thread_id (inferior_ptid);
 
-      set_longjmp_breakpoint ();
+      set_longjmp_breakpoint (thread);
 
       make_cleanup (delete_longjmp_breakpoint_cleanup, &thread);
     }
@@ -915,7 +939,7 @@ step_1_continuation (void *args)
 static void
 step_once (int skip_subroutines, int single_inst, int count, int thread)
 {
-  struct frame_info *frame;
+  struct frame_info *frame = get_current_frame ();
 
   if (count > 0)
     {
@@ -925,13 +949,24 @@ step_once (int skip_subroutines, int single_inst, int count, int thread)
 	 THREAD is set.  */
       struct thread_info *tp = inferior_thread ();
       clear_proceed_status ();
-
-      frame = get_current_frame ();
-      tp->step_frame_id = get_frame_id (frame);
+      set_step_frame ();
 
       if (!single_inst)
 	{
 	  CORE_ADDR pc;
+
+	  /* Step at an inlined function behaves like "down".  */
+	  if (!skip_subroutines && !single_inst
+	      && inline_skipped_frames (inferior_ptid))
+	    {
+	      step_into_inline_frame (inferior_ptid);
+	      if (count > 1)
+		step_once (skip_subroutines, single_inst, count - 1, thread);
+	      else
+		/* Pretend that we've stopped.  */
+		normal_stop ();
+	      return;
+	    }
 
 	  pc = get_frame_pc (frame);
 	  find_pc_line_pc_range (pc,
@@ -939,9 +974,7 @@ step_once (int skip_subroutines, int single_inst, int count, int thread)
 
 	  /* If we have no line info, switch to stepi mode.  */
 	  if (tp->step_range_end == 0 && step_stop_if_no_debug)
-	    {
-	      tp->step_range_start = tp->step_range_end = 1;
-	    }
+	    tp->step_range_start = tp->step_range_end = 1;
 	  else if (tp->step_range_end == 0)
 	    {
 	      char *name;
@@ -997,6 +1030,7 @@ which has no line number information.\n"), name);
 static void
 jump_command (char *arg, int from_tty)
 {
+  struct gdbarch *gdbarch = get_current_arch ();
   CORE_ADDR addr;
   struct symtabs_and_lines sals;
   struct symtab_and_line sal;
@@ -1066,7 +1100,7 @@ jump_command (char *arg, int from_tty)
   if (from_tty)
     {
       printf_filtered (_("Continuing at "));
-      fputs_filtered (paddress (addr), gdb_stdout);
+      fputs_filtered (paddress (gdbarch, addr), gdb_stdout);
       printf_filtered (".\n");
     }
 
@@ -1177,6 +1211,7 @@ until_next_command (int from_tty)
   struct thread_info *tp = inferior_thread ();
 
   clear_proceed_status ();
+  set_step_frame ();
 
   frame = get_current_frame ();
 
@@ -1206,7 +1241,6 @@ until_next_command (int from_tty)
     }
 
   tp->step_over_calls = STEP_OVER_ALL;
-  tp->step_frame_id = get_frame_id (frame);
 
   tp->step_multi = 0;		/* Only one call to proceed */
 
@@ -1280,7 +1314,7 @@ advance_command (char *arg, int from_tty)
 static void
 print_return_value (struct type *func_type, struct type *value_type)
 {
-  struct gdbarch *gdbarch = current_gdbarch;
+  struct gdbarch *gdbarch = get_regcache_arch (stop_registers);
   struct cleanup *old_chain;
   struct ui_stream *stb;
   struct value *value;
@@ -1429,10 +1463,13 @@ finish_backward (struct symbol *function)
 
   if (sal.pc != pc)
     {
+      struct frame_info *frame = get_selected_frame (NULL);
+      struct gdbarch *gdbarch = get_frame_arch (frame);
+
       /* Set breakpoint and continue.  */
       breakpoint =
-	set_momentary_breakpoint (sal,
-				  get_frame_id (get_selected_frame (NULL)),
+	set_momentary_breakpoint (gdbarch, sal,
+				  get_stack_frame_id (frame),
 				  bp_breakpoint);
       /* Tell the breakpoint to keep quiet.  We won't be done
          until we've done another reverse single-step.  */
@@ -1461,6 +1498,7 @@ finish_backward (struct symbol *function)
 static void
 finish_forward (struct symbol *function, struct frame_info *frame)
 {
+  struct gdbarch *gdbarch = get_frame_arch (frame);
   struct symtab_and_line sal;
   struct thread_info *tp = inferior_thread ();
   struct breakpoint *breakpoint;
@@ -1470,7 +1508,8 @@ finish_forward (struct symbol *function, struct frame_info *frame)
   sal = find_pc_line (get_frame_pc (frame), 0);
   sal.pc = get_frame_pc (frame);
 
-  breakpoint = set_momentary_breakpoint (sal, get_frame_id (frame),
+  breakpoint = set_momentary_breakpoint (gdbarch, sal,
+					 get_stack_frame_id (frame),
                                          bp_finish);
 
   old_chain = make_cleanup_delete_breakpoint (breakpoint);
@@ -1533,6 +1572,36 @@ finish_command (char *arg, int from_tty)
 
   clear_proceed_status ();
 
+  /* Finishing from an inline frame is completely different.  We don't
+     try to show the "return value" - no way to locate it.  So we do
+     not need a completion.  */
+  if (get_frame_type (get_selected_frame (_("No selected frame.")))
+      == INLINE_FRAME)
+    {
+      /* Claim we are stepping in the calling frame.  An empty step
+	 range means that we will stop once we aren't in a function
+	 called by that frame.  We don't use the magic "1" value for
+	 step_range_end, because then infrun will think this is nexti,
+	 and not step over the rest of this inlined function call.  */
+      struct thread_info *tp = inferior_thread ();
+      struct symtab_and_line empty_sal;
+      init_sal (&empty_sal);
+      set_step_info (frame, empty_sal);
+      tp->step_range_start = tp->step_range_end = get_frame_pc (frame);
+      tp->step_over_calls = STEP_OVER_ALL;
+
+      /* Print info on the selected frame, including level number but not
+	 source.  */
+      if (from_tty)
+	{
+	  printf_filtered (_("Run till exit from "));
+	  print_stack_frame (get_selected_frame (NULL), 1, LOCATION);
+	}
+
+      proceed ((CORE_ADDR) -1, TARGET_SIGNAL_DEFAULT, 1);
+      return;
+    }
+
   /* Find the function we will return from.  */
 
   function = find_pc_function (get_frame_pc (get_selected_frame (NULL)));
@@ -1588,7 +1657,8 @@ program_info (char *args, int from_tty)
   stat = bpstat_num (&bs, &num);
 
   target_files_info ();
-  printf_filtered (_("Program stopped at %s.\n"), paddress (stop_pc));
+  printf_filtered (_("Program stopped at %s.\n"),
+		   paddress (target_gdbarch, stop_pc));
   if (tp->stop_step)
     printf_filtered (_("It stopped after being stepped.\n"));
   else if (stat != 0)
@@ -2001,9 +2071,11 @@ nofp_registers_info (char *addr_exp, int from_tty)
 }
 
 static void
-print_vector_info (struct gdbarch *gdbarch, struct ui_file *file,
+print_vector_info (struct ui_file *file,
 		   struct frame_info *frame, const char *args)
 {
+  struct gdbarch *gdbarch = get_frame_arch (frame);
+
   if (gdbarch_print_vector_info_p (gdbarch))
     gdbarch_print_vector_info (gdbarch, file, frame, args);
   else
@@ -2033,8 +2105,7 @@ vector_info (char *args, int from_tty)
   if (!target_has_registers)
     error (_("The program has no registers now."));
 
-  print_vector_info (current_gdbarch, gdb_stdout,
-		     get_selected_frame (NULL), args);
+  print_vector_info (gdb_stdout, get_selected_frame (NULL), args);
 }
 
 /* Kill the inferior process.  Make us have no inferior.  */
@@ -2517,9 +2588,11 @@ interrupt_target_command (char *args, int from_tty)
 }
 
 static void
-print_float_info (struct gdbarch *gdbarch, struct ui_file *file,
+print_float_info (struct ui_file *file,
 		  struct frame_info *frame, const char *args)
 {
+  struct gdbarch *gdbarch = get_frame_arch (frame);
+
   if (gdbarch_print_float_info_p (gdbarch))
     gdbarch_print_float_info (gdbarch, file, frame, args);
   else
@@ -2550,8 +2623,7 @@ float_info (char *args, int from_tty)
   if (!target_has_registers)
     error (_("The program has no registers now."));
 
-  print_float_info (current_gdbarch, gdb_stdout, 
-		    get_selected_frame (NULL), args);
+  print_float_info (gdb_stdout, get_selected_frame (NULL), args);
 }
 
 static void
@@ -2626,8 +2698,9 @@ fully linked executable files and separately compiled object files as needed."),
 	       &showlist);
   set_cmd_completer (c, noop_completer);
 
-  add_com ("kill", class_run, kill_command,
-	   _("Kill execution of program being debugged."));
+  add_prefix_cmd ("kill", class_run, kill_command,
+		  _("Kill execution of program being debugged."),
+		  &killlist, "kill ", 0, &cmdlist);
 
   add_com ("attach", class_run, attach_command, _("\
 Attach to a process or file outside of GDB.\n\

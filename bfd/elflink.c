@@ -101,42 +101,43 @@ _bfd_elf_create_got_section (bfd *abfd, struct bfd_link_info *info)
   asection *s;
   struct elf_link_hash_entry *h;
   const struct elf_backend_data *bed = get_elf_backend_data (abfd);
-  int ptralign;
+  struct elf_link_hash_table *htab = elf_hash_table (info);
 
   /* This function may be called more than once.  */
   s = bfd_get_section_by_name (abfd, ".got");
   if (s != NULL && (s->flags & SEC_LINKER_CREATED) != 0)
     return TRUE;
 
-  switch (bed->s->arch_size)
-    {
-    case 32:
-      ptralign = 2;
-      break;
-
-    case 64:
-      ptralign = 3;
-      break;
-
-    default:
-      bfd_set_error (bfd_error_bad_value);
-      return FALSE;
-    }
-
   flags = bed->dynamic_sec_flags;
+
+  s = bfd_make_section_with_flags (abfd,
+				   (bed->rela_plts_and_copies_p
+				    ? ".rela.got" : ".rel.got"),
+				   (bed->dynamic_sec_flags
+				    | SEC_READONLY));
+  if (s == NULL
+      || ! bfd_set_section_alignment (abfd, s, bed->s->log_file_align))
+    return FALSE;
+  htab->srelgot = s;
 
   s = bfd_make_section_with_flags (abfd, ".got", flags);
   if (s == NULL
-      || !bfd_set_section_alignment (abfd, s, ptralign))
+      || !bfd_set_section_alignment (abfd, s, bed->s->log_file_align))
     return FALSE;
+  htab->sgot = s;
 
   if (bed->want_got_plt)
     {
       s = bfd_make_section_with_flags (abfd, ".got.plt", flags);
       if (s == NULL
-	  || !bfd_set_section_alignment (abfd, s, ptralign))
+	  || !bfd_set_section_alignment (abfd, s,
+					 bed->s->log_file_align))
 	return FALSE;
+      htab->sgotplt = s;
     }
+
+  /* The first bit of the global offset table is the header.  */
+  s->size += bed->got_header_size;
 
   if (bed->want_got_sym)
     {
@@ -144,14 +145,12 @@ _bfd_elf_create_got_section (bfd *abfd, struct bfd_link_info *info)
 	 (or .got.plt) section.  We don't do this in the linker script
 	 because we don't want to define the symbol if we are not creating
 	 a global offset table.  */
-      h = _bfd_elf_define_linkage_sym (abfd, info, s, "_GLOBAL_OFFSET_TABLE_");
+      h = _bfd_elf_define_linkage_sym (abfd, info, s,
+				       "_GLOBAL_OFFSET_TABLE_");
       elf_hash_table (info)->hgot = h;
       if (h == NULL)
 	return FALSE;
     }
-
-  /* The first bit of the global offset table is the header.  */
-  s->size += bed->got_header_size;
 
   return TRUE;
 }
@@ -303,6 +302,7 @@ _bfd_elf_create_dynamic_sections (bfd *abfd, struct bfd_link_info *info)
   struct elf_link_hash_entry *h;
   asection *s;
   const struct elf_backend_data *bed = get_elf_backend_data (abfd);
+  struct elf_link_hash_table *htab = elf_hash_table (info);
 
   /* We need to create .plt, .rel[a].plt, .got, .got.plt, .dynbss, and
      .rel[a].bss sections.  */
@@ -323,6 +323,7 @@ _bfd_elf_create_dynamic_sections (bfd *abfd, struct bfd_link_info *info)
   if (s == NULL
       || ! bfd_set_section_alignment (abfd, s, bed->plt_alignment))
     return FALSE;
+  htab->splt = s;
 
   /* Define the symbol _PROCEDURE_LINKAGE_TABLE_ at the start of the
      .plt section.  */
@@ -342,6 +343,7 @@ _bfd_elf_create_dynamic_sections (bfd *abfd, struct bfd_link_info *info)
   if (s == NULL
       || ! bfd_set_section_alignment (abfd, s, bed->s->log_file_align))
     return FALSE;
+  htab->srelplt = s;
 
   if (! _bfd_elf_create_got_section (abfd, info))
     return FALSE;
@@ -1245,6 +1247,9 @@ _bfd_elf_merge_symbol (bfd *abfd,
   newweak = bind == STB_WEAK;
   oldweak = (h->root.type == bfd_link_hash_defweak
 	     || h->root.type == bfd_link_hash_undefweak);
+
+  if (bind == STB_GNU_UNIQUE)
+    h->unique_global = 1;
 
   /* If a new weak symbol definition comes from a regular file and the
      old symbol comes from a dynamic library, we treat the new one as
@@ -3547,7 +3552,11 @@ elf_link_add_object_symbols (bfd *abfd, struct bfd_link_info *info)
 	  unsigned long shlink;
 
 	  if (!bfd_malloc_and_get_section (abfd, s, &dynbuf))
-	    goto error_free_dyn;
+	    {
+error_free_dyn:
+	      free (dynbuf);
+	      goto error_return;
+	    }
 
 	  elfsec = _bfd_elf_section_from_bfd_section (abfd, s);
 	  if (elfsec == SHN_BAD)
@@ -3631,11 +3640,7 @@ elf_link_add_object_symbols (bfd *abfd, struct bfd_link_info *info)
 		  amt = strlen (fnm) + 1;
 		  anm = bfd_alloc (abfd, amt);
 		  if (anm == NULL)
-		    {
-		    error_free_dyn:
-		      free (dynbuf);
-		      goto error_return;
-		    }
+		    goto error_free_dyn;
 		  memcpy (anm, fnm, amt);
 		  n->name = anm;
 		  n->by = abfd;
@@ -3869,24 +3874,31 @@ elf_link_add_object_symbols (bfd *abfd, struct bfd_link_info *info)
       common = bed->common_definition (isym);
 
       bind = ELF_ST_BIND (isym->st_info);
-      if (bind == STB_LOCAL)
+      switch (bind)
 	{
+	case STB_LOCAL:
 	  /* This should be impossible, since ELF requires that all
 	     global symbols follow all local symbols, and that sh_info
 	     point to the first global symbol.  Unfortunately, Irix 5
 	     screws this up.  */
 	  continue;
-	}
-      else if (bind == STB_GLOBAL)
-	{
+
+	case STB_GLOBAL:
 	  if (isym->st_shndx != SHN_UNDEF && !common)
 	    flags = BSF_GLOBAL;
-	}
-      else if (bind == STB_WEAK)
-	flags = BSF_WEAK;
-      else
-	{
+	  break;
+
+	case STB_WEAK:
+	  flags = BSF_WEAK;
+	  break;
+
+	case STB_GNU_UNIQUE:
+	  flags = BSF_GNU_UNIQUE;
+	  break;
+
+	default:
 	  /* Leave it up to the processor backend.  */
+	  break;
 	}
 
       if (isym->st_shndx == SHN_UNDEF)
@@ -4138,7 +4150,9 @@ elf_link_add_object_symbols (bfd *abfd, struct bfd_link_info *info)
       while (h->root.type == bfd_link_hash_indirect
 	     || h->root.type == bfd_link_hash_warning)
 	h = (struct elf_link_hash_entry *) h->root.u.i.link;
+
       *sym_hash = h;
+      h->unique_global = (flags & BSF_GNU_UNIQUE) != 0;
 
       new_weakdef = FALSE;
       if (dynamic
@@ -4277,20 +4291,25 @@ elf_link_add_object_symbols (bfd *abfd, struct bfd_link_info *info)
 	  if (ELF_ST_TYPE (isym->st_info) != STT_NOTYPE
 	      && (definition || h->type == STT_NOTYPE))
 	    {
-	      if (h->type != STT_NOTYPE
-		  && h->type != ELF_ST_TYPE (isym->st_info)
-		  && ! type_change_ok)
-		(*_bfd_error_handler)
-		  (_("Warning: type of symbol `%s' changed"
-		     " from %d to %d in %B"),
-		   abfd, name, h->type, ELF_ST_TYPE (isym->st_info));
+	      unsigned int type = ELF_ST_TYPE (isym->st_info);
 
-	      h->type = ELF_ST_TYPE (isym->st_info);
+	      /* Turn an IFUNC symbol from a DSO into a normal FUNC
+		 symbol.  */
+	      if (type == STT_GNU_IFUNC
+		  && (abfd->flags & DYNAMIC) != 0)
+		type = STT_FUNC;
+
+	      if (h->type != type)
+		{
+		  if (h->type != STT_NOTYPE && ! type_change_ok)
+		    (*_bfd_error_handler)
+		      (_("Warning: type of symbol `%s' changed"
+			 " from %d to %d in %B"),
+		       abfd, name, h->type, type);
+
+		  h->type = type;
+		}
 	    }
-
-	  /* STT_GNU_IFUNC symbol must go through PLT.  */
-	  if (h->type == STT_GNU_IFUNC)
-	    h->needs_plt = 1;
 
 	  /* Merge st_other field.  */
 	  elf_merge_st_other (abfd, h, isym, definition, dynamic);
@@ -8080,6 +8099,8 @@ elf_link_sort_relocs (bfd *abfd, struct bfd_link_info *info, asection **psec)
 	      + (i2e - 1) * sizeof (Elf_Internal_Rela));
 
   count = dynamic_relocs->size / ext_size;
+  if (count == 0)
+    return 0;
   sort = bfd_zmalloc (sort_elt * count);
 
   if (sort == NULL)
@@ -8562,6 +8583,8 @@ elf_link_output_extsym (struct elf_link_hash_entry *h, void *data)
   sym.st_other = h->other;
   if (h->forced_local)
     sym.st_info = ELF_ST_INFO (STB_LOCAL, h->type);
+  else if (h->unique_global)
+    sym.st_info = ELF_ST_INFO (STB_GNU_UNIQUE, h->type);
   else if (h->root.type == bfd_link_hash_undefweak
 	   || h->root.type == bfd_link_hash_defweak)
     sym.st_info = ELF_ST_INFO (STB_WEAK, h->type);
@@ -8653,7 +8676,7 @@ elf_link_output_extsym (struct elf_link_hash_entry *h, void *data)
      forced local syms when non-shared is due to a historical quirk.
      STT_GNU_IFUNC symbol must go through PLT.  */
   if ((h->type == STT_GNU_IFUNC
-       && h->ref_regular
+       && h->def_regular
        && !finfo->info->relocatable)
       || ((h->dynindx != -1
 	   || h->forced_local)
@@ -8683,12 +8706,17 @@ elf_link_output_extsym (struct elf_link_hash_entry *h, void *data)
 	  || ELF_ST_BIND (sym.st_info) == STB_WEAK))
     {
       int bindtype;
+      unsigned int type = ELF_ST_TYPE (sym.st_info);
+
+      /* Turn an undefined IFUNC symbol into a normal FUNC symbol. */
+      if (type == STT_GNU_IFUNC)
+	type = STT_FUNC;
 
       if (h->ref_regular_nonweak)
 	bindtype = STB_GLOBAL;
       else
 	bindtype = STB_WEAK;
-      sym.st_info = ELF_ST_INFO (bindtype, ELF_ST_TYPE (sym.st_info));
+      sym.st_info = ELF_ST_INFO (bindtype, type);
     }
 
   /* If this is a symbol defined in a dynamic library, don't use the
@@ -12490,96 +12518,4 @@ _bfd_elf_make_dynamic_reloc_section (asection *         sec,
     }
 
   return reloc_sec;
-}
-
-/* Create sections needed by STT_GNU_IFUNC symbol.  */
-
-bfd_boolean
-_bfd_elf_create_ifunc_sections (bfd *abfd, struct bfd_link_info *info)
-{
-  flagword flags, pltflags;
-  int ptralign;
-  asection *s;
-  const struct elf_backend_data *bed = get_elf_backend_data (abfd);
-
-  flags = bed->dynamic_sec_flags;
-  pltflags = flags;
-  if (bed->plt_not_loaded)
-    /* We do not clear SEC_ALLOC here because we still want the OS to
-       allocate space for the section; it's just that there's nothing
-       to read in from the object file.  */
-    pltflags &= ~ (SEC_CODE | SEC_LOAD | SEC_HAS_CONTENTS);
-  else
-    pltflags |= SEC_ALLOC | SEC_CODE | SEC_LOAD;
-  if (bed->plt_readonly)
-    pltflags |= SEC_READONLY;
-
-  if (info->shared)
-    {
-      /* We need to create .rel[a].ifunc for shared objects.  */
-      const char *rel_sec = (bed->rela_plts_and_copies_p
-			     ? ".rela.ifunc" : ".rel.ifunc");
-
-      /* This function should be called only once.  */
-      s = bfd_get_section_by_name (abfd, rel_sec);
-      if (s != NULL)
-	abort ();
-
-      s = bfd_make_section_with_flags (abfd, rel_sec,
-				       flags | SEC_READONLY);
-      if (s == NULL
-	  || ! bfd_set_section_alignment (abfd, s,
-					  bed->s->log_file_align))
-	return FALSE;
-    }
-  else
-    {
-      /* This function should be called only once.  */
-      s = bfd_get_section_by_name (abfd, ".iplt");
-      if (s != NULL)
-	abort ();
-
-      /* We need to create .iplt, .rel[a].iplt, .igot and .igot.plt
-	 for static executables.   */
-      s = bfd_make_section_with_flags (abfd, ".iplt", pltflags);
-      if (s == NULL
-	  || ! bfd_set_section_alignment (abfd, s, bed->plt_alignment))
-	return FALSE;
-
-      s = bfd_make_section_with_flags (abfd,
-				       (bed->rela_plts_and_copies_p
-					? ".rela.iplt" : ".rel.iplt"),
-				       flags | SEC_READONLY);
-      if (s == NULL
-	  || ! bfd_set_section_alignment (abfd, s,
-					  bed->s->log_file_align))
-	return FALSE;
-
-      switch (bed->s->arch_size)
-	{ 
-	case 32:
-	  ptralign = 2;
-	  break;
-
-	case 64:
-	  ptralign = 3;
-	  break;
-
-	default:
-	  bfd_set_error (bfd_error_bad_value);
-	  return FALSE;
-	}
-
-      /* We don't need the .igot section if we have the .igot.plt
-	 section.  */
-      if (bed->want_got_plt)
-	s = bfd_make_section_with_flags (abfd, ".igot.plt", flags);
-      else
-	s = bfd_make_section_with_flags (abfd, ".igot", flags);
-      if (s == NULL
-	  || !bfd_set_section_alignment (abfd, s, ptralign))
-	return FALSE;
-    }
-
-  return TRUE;
 }

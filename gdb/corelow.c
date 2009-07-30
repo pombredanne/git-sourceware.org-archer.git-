@@ -695,7 +695,7 @@ core_xfer_partial (struct target_ops *ops, enum target_object object,
    `gdb internal error' (since generic_mourn calls breakpoint_init_inferior).  */
 
 static int
-ignore (struct bp_target_info *bp_tgt)
+ignore (struct gdbarch *gdbarch, struct bp_target_info *bp_tgt)
 {
   return 0;
 }
@@ -721,8 +721,8 @@ core_thread_alive (struct target_ops *ops, ptid_t ptid)
 static const struct target_desc *
 core_read_description (struct target_ops *target)
 {
-  if (gdbarch_core_read_description_p (current_gdbarch))
-    return gdbarch_core_read_description (current_gdbarch, target, core_bfd);
+  if (core_gdbarch && gdbarch_core_read_description_p (core_gdbarch))
+    return gdbarch_core_read_description (core_gdbarch, target, core_bfd);
 
   return NULL;
 }

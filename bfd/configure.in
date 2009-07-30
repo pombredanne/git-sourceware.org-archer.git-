@@ -143,7 +143,7 @@ bfd_default_target_size=32
 
 # host stuff:
 
-ALL_LINGUAS="fr tr ja es sv da zh_CN ro rw vi fi id"
+ALL_LINGUAS="fr tr ja es sv da zh_CN ro rw vi fi id ru"
 ZW_GNU_GETTEXT_SISTER_DIR
 AM_PO_SUBDIRS
 
@@ -197,7 +197,7 @@ AC_SUBST(BFD_HOSTPTR_T)
 BFD_CC_FOR_BUILD
 
 AC_CHECK_HEADERS(alloca.h stddef.h string.h strings.h stdlib.h time.h unistd.h)
-AC_CHECK_HEADERS(fcntl.h sys/file.h sys/time.h)
+AC_CHECK_HEADERS(fcntl.h sys/file.h sys/time.h sys/stat.h)
 GCC_HEADER_STDINT(bfd_stdint.h)
 AC_HEADER_TIME
 AC_HEADER_DIRENT
@@ -222,6 +222,17 @@ AC_CHECK_DECLS(stpcpy)
 AC_CHECK_DECLS(strstr)
 AC_CHECK_DECLS(snprintf)
 AC_CHECK_DECLS(vsnprintf)
+
+# Support for VMS timestamps via cross compile
+
+if test "$ac_cv_header_time_h" = yes; then
+  BFD_HAVE_TIME_TYPE_MEMBER(struct tm, tm_gmtoff)
+fi
+
+if test "$ac_cv_header_sys_stat_h" = yes; then
+    BFD_HAVE_SYS_STAT_TYPE_MEMBER(struct stat, st_mtim, tv_sec)
+    BFD_HAVE_SYS_STAT_TYPE_MEMBER(struct stat, st_mtim, tv_nsec)
+fi
 
 # Link in zlib if we can.  This allows us to read compressed debug sections.
 # This is used only by compress.c.
@@ -639,7 +650,8 @@ selarchs="$f"
 # Target backend .o files.
 tb=
 
-elf="elf.lo elflink.lo elf-attrs.lo elf-strtab.lo elf-eh-frame.lo dwarf1.lo"
+elf="elf.lo elflink.lo elf-attrs.lo elf-ifunc.lo elf-strtab.lo
+     elf-eh-frame.lo dwarf1.lo"
 
 for vec in $selvecs
 do
@@ -815,6 +827,8 @@ do
     bfd_elf64_tradlittlemips_vec) tb="$tb elf64-mips.lo elf64.lo elfxx-mips.lo elf-vxworks.lo elf32.lo $elf ecofflink.lo"; target_size=64 ;;
     bfd_elf64_x86_64_freebsd_vec) tb="$tb elf64-x86-64.lo elf64.lo $elf"; target_size=64 ;;
     bfd_elf64_x86_64_vec)	tb="$tb elf64-x86-64.lo elf64.lo $elf"; target_size=64 ;;
+    bfd_elf64_l1om_vec)		tb="$tb elf64-x86-64.lo elf64.lo $elf"; target_size=64 ;;
+    bfd_elf64_l1om_freebsd_vec) tb="$tb elf64-x86-64.lo elf64.lo $elf"; target_size=64 ;;
     bfd_mmo_vec)		tb="$tb mmo.lo" target_size=64 ;;
     bfd_powerpc_pe_vec)         tb="$tb pe-ppc.lo peigen.lo cofflink.lo" ;;
     bfd_powerpc_pei_vec)        tb="$tb pei-ppc.lo peigen.lo cofflink.lo" ;;

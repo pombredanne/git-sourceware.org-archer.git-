@@ -34,6 +34,7 @@
 #include <ctype.h>
 
 #include "defs.h"
+#include "arch-utils.h"
 #include "gdb_string.h"
 #include "symtab.h"
 #include "gdbtypes.h"
@@ -490,7 +491,7 @@ write_exp_msymbol (struct minimal_symbol *msymbol)
 
   write_exp_elt_opcode (OP_LONG);
   /* Let's make the type big enough to hold a 64-bit address.  */
-  write_exp_elt_type (builtin_type (gdbarch)->builtin_core_addr);
+  write_exp_elt_type (objfile_type (objfile)->builtin_core_addr);
   write_exp_elt_longcst ((LONGEST) addr);
   write_exp_elt_opcode (OP_LONG);
 
@@ -498,7 +499,7 @@ write_exp_msymbol (struct minimal_symbol *msymbol)
     {
       write_exp_elt_opcode (UNOP_MEMVAL_TLS);
       write_exp_elt_objfile (objfile);
-      write_exp_elt_type (builtin_type (gdbarch)->nodebug_tls_symbol);
+      write_exp_elt_type (objfile_type (objfile)->nodebug_tls_symbol);
       write_exp_elt_opcode (UNOP_MEMVAL_TLS);
       return;
     }
@@ -509,18 +510,18 @@ write_exp_msymbol (struct minimal_symbol *msymbol)
     case mst_text:
     case mst_file_text:
     case mst_solib_trampoline:
-      write_exp_elt_type (builtin_type (gdbarch)->nodebug_text_symbol);
+      write_exp_elt_type (objfile_type (objfile)->nodebug_text_symbol);
       break;
 
     case mst_data:
     case mst_file_data:
     case mst_bss:
     case mst_file_bss:
-      write_exp_elt_type (builtin_type (gdbarch)->nodebug_data_symbol);
+      write_exp_elt_type (objfile_type (objfile)->nodebug_data_symbol);
       break;
 
     default:
-      write_exp_elt_type (builtin_type (gdbarch)->nodebug_unknown_symbol);
+      write_exp_elt_type (objfile_type (objfile)->nodebug_unknown_symbol);
       break;
     }
   write_exp_elt_opcode (UNOP_MEMVAL);
@@ -598,7 +599,7 @@ write_dollar_variable (struct stoken str)
 
   /* Handle tokens that refer to machine registers:
      $ followed by a register name.  */
-  i = user_reg_map_name_to_regnum (current_gdbarch,
+  i = user_reg_map_name_to_regnum (parse_gdbarch,
 				   str.ptr + 1, str.length - 1);
   if (i >= 0)
     goto handle_register;
@@ -1087,7 +1088,7 @@ parse_exp_in_context (char **stringptr, struct block *block, int comma,
   expout = (struct expression *)
     xmalloc (sizeof (struct expression) + EXP_ELEM_TO_BYTES (expout_size));
   expout->language_defn = current_language;
-  expout->gdbarch = current_gdbarch;
+  expout->gdbarch = get_current_arch ();
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
@@ -1228,7 +1229,7 @@ push_type_int (int n)
 void
 push_type_address_space (char *string)
 {
-  push_type_int (address_space_name_to_int (string));
+  push_type_int (address_space_name_to_int (parse_gdbarch, string));
 }
 
 enum type_pieces
@@ -1258,7 +1259,6 @@ follow_types (struct type *follow_type)
   int make_volatile = 0;
   int make_addr_space = 0;
   int array_size;
-  struct type *range_type;
 
   while (!done)
     switch (pop_type ())
@@ -1324,13 +1324,9 @@ follow_types (struct type *follow_type)
 	array_size = pop_type_int ();
 	/* FIXME-type-allocation: need a way to free this type when we are
 	   done with it.  */
-	range_type =
-	  create_range_type ((struct type *) NULL,
-			     builtin_type_int32, 0,
-			     array_size >= 0 ? array_size - 1 : 0);
 	follow_type =
-	  create_array_type ((struct type *) NULL,
-			     follow_type, range_type);
+	  lookup_array_range_type (follow_type,
+				   0, array_size >= 0 ? array_size - 1 : 0);
 	if (array_size < 0)
 	  TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED (follow_type) = 1;
 	break;

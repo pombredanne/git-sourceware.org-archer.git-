@@ -1728,8 +1728,11 @@ bfd_section_from_shdr (bfd *abfd, unsigned int shindex)
 	   reject them, but, unfortunately, some people need to use
 	   them.  We scan through the section headers; if we find only
 	   one suitable symbol table, we clobber the sh_link to point
-	   to it.  I hope this doesn't break anything.  */
-	if (elf_elfsections (abfd)[hdr->sh_link]->sh_type != SHT_SYMTAB
+	   to it.  I hope this doesn't break anything.
+
+	   Don't do it on executable nor shared library.  */
+	if ((abfd->flags & (DYNAMIC | EXEC_P)) == 0
+	    && elf_elfsections (abfd)[hdr->sh_link]->sh_type != SHT_SYMTAB
 	    && elf_elfsections (abfd)[hdr->sh_link]->sh_type != SHT_DYNSYM)
 	  {
 	    unsigned int scan;
@@ -1764,8 +1767,10 @@ bfd_section_from_shdr (bfd *abfd, unsigned int shindex)
 	   represent such a section, so at least for now, we don't
 	   try.  We just present it as a normal section.  We also
 	   can't use it as a reloc section if it points to the null
-	   section, an invalid section, or another reloc section.  */
+	   section, an invalid section, another reloc section, or its
+	   sh_link points to the null section.  */
 	if (hdr->sh_link != elf_onesymtab (abfd)
+	    || hdr->sh_link == SHN_UNDEF
 	    || hdr->sh_info == SHN_UNDEF
 	    || hdr->sh_info >= num_sec
 	    || elf_elfsections (abfd)[hdr->sh_info]->sh_type == SHT_REL
@@ -1921,28 +1926,24 @@ bfd_section_from_shdr (bfd *abfd, unsigned int shindex)
   return TRUE;
 }
 
-/* Return the section for the local symbol specified by ABFD, R_SYMNDX.
-   Return SEC for sections that have no elf section, and NULL on error.  */
+/* Return the local symbol specified by ABFD, R_SYMNDX.  */
 
-asection *
-bfd_section_from_r_symndx (bfd *abfd,
-			   struct sym_sec_cache *cache,
-			   asection *sec,
-			   unsigned long r_symndx)
+Elf_Internal_Sym *
+bfd_sym_from_r_symndx (struct sym_cache *cache,
+		       bfd *abfd,
+		       unsigned long r_symndx)
 {
   unsigned int ent = r_symndx % LOCAL_SYM_CACHE_SIZE;
-  asection *s;
 
   if (cache->abfd != abfd || cache->indx[ent] != r_symndx)
     {
       Elf_Internal_Shdr *symtab_hdr;
       unsigned char esym[sizeof (Elf64_External_Sym)];
       Elf_External_Sym_Shndx eshndx;
-      Elf_Internal_Sym isym;
 
       symtab_hdr = &elf_tdata (abfd)->symtab_hdr;
       if (bfd_elf_get_elf_syms (abfd, symtab_hdr, 1, r_symndx,
-				&isym, esym, &eshndx) == NULL)
+				&cache->sym[ent], esym, &eshndx) == NULL)
 	return NULL;
 
       if (cache->abfd != abfd)
@@ -1951,14 +1952,9 @@ bfd_section_from_r_symndx (bfd *abfd,
 	  cache->abfd = abfd;
 	}
       cache->indx[ent] = r_symndx;
-      cache->shndx[ent] = isym.st_shndx;
     }
 
-  s = bfd_section_from_elf_index (abfd, cache->shndx[ent]);
-  if (s != NULL)
-    return s;
-
-  return sec;
+  return &cache->sym[ent];
 }
 
 /* Given an ELF section number, retrieve the corresponding BFD
@@ -6450,6 +6446,8 @@ Unable to find equivalent output section for symbol '%s' from section '%s'"),
 
 	  if (flags & BSF_LOCAL)
 	    bind = STB_LOCAL;
+	  else if (flags & BSF_GNU_UNIQUE)
+	    bind = STB_GNU_UNIQUE;
 	  else if (flags & BSF_WEAK)
 	    bind = STB_WEAK;
 	  else if (flags & BSF_GLOBAL)
@@ -8926,7 +8924,17 @@ _bfd_elf_get_synthetic_symtab (bfd *abfd,
   size = count * sizeof (asymbol);
   p = relplt->relocation;
   for (i = 0; i < count; i++, p += bed->s->int_rels_per_ext_rel)
-    size += strlen ((*p->sym_ptr_ptr)->name) + sizeof ("@plt");
+    {
+      size += strlen ((*p->sym_ptr_ptr)->name) + sizeof ("@plt");
+      if (p->addend != 0)
+	{
+#ifdef BFD64
+	  size += sizeof ("+0x") - 1 + 8 + 8 * (bed->s->elfclass == ELFCLASS64);
+#else
+	  size += sizeof ("+0x") - 1 + 8;
+#endif
+	}
+    }
 
   s = *ret = bfd_malloc (size);
   if (s == NULL)
@@ -8957,6 +8965,19 @@ _bfd_elf_get_synthetic_symtab (bfd *abfd,
       len = strlen ((*p->sym_ptr_ptr)->name);
       memcpy (names, (*p->sym_ptr_ptr)->name, len);
       names += len;
+      if (p->addend != 0)
+	{
+	  char buf[30], *a;
+	  int len;
+	  memcpy (names, "+0x", sizeof ("+0x") - 1);
+	  names += sizeof ("+0x") - 1;
+	  bfd_sprintf_vma (abfd, buf, p->addend);
+	  for (a = buf; *a == '0'; ++a)
+	    ;
+	  len = strlen (a);
+	  memcpy (names, a, len);
+	  names += len;
+	}
       memcpy (names, "@plt", sizeof ("@plt"));
       names += sizeof ("@plt");
       ++s, ++n;

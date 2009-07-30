@@ -162,6 +162,7 @@ static int
 procfs_auxv_parse (struct target_ops *ops, gdb_byte **readptr,
                   gdb_byte *endptr, CORE_ADDR *typep, CORE_ADDR *valp)
 {
+  enum bfd_endian byte_order = gdbarch_byte_order (target_gdbarch);
   gdb_byte *ptr = *readptr;
 
   if (endptr == ptr)
@@ -170,11 +171,11 @@ procfs_auxv_parse (struct target_ops *ops, gdb_byte **readptr,
   if (endptr - ptr < 8 * 2)
     return -1;
 
-  *typep = extract_unsigned_integer (ptr, 4);
+  *typep = extract_unsigned_integer (ptr, 4, byte_order);
   ptr += 8;
   /* The size of data is always 64-bit.  If the application is 32-bit,
      it will be zero extended, as expected.  */
-  *valp = extract_unsigned_integer (ptr, 8);
+  *valp = extract_unsigned_integer (ptr, 8, byte_order);
   ptr += 8;
 
   *readptr = ptr;
@@ -4473,7 +4474,7 @@ invalidate_cache (procinfo *parent, procinfo *pi, void *ptr)
       if (!proc_set_gregs (pi))	/* flush gregs cache */
 	proc_warn (pi, "target_resume, set_gregs",
 		   __LINE__);
-  if (gdbarch_fp0_regnum (current_gdbarch) >= 0)
+  if (gdbarch_fp0_regnum (target_gdbarch) >= 0)
     if (pi->fpregs_dirty)
       if (parent == NULL ||
 	  proc_get_current_thread (parent) != pi->tid)
@@ -4803,7 +4804,7 @@ procfs_mourn_inferior (struct target_ops *ops)
 
   if (dbx_link_bpt != NULL)
     {
-      deprecated_remove_raw_breakpoint (dbx_link_bpt);
+      deprecated_remove_raw_breakpoint (target_gdbarch, dbx_link_bpt);
       dbx_link_bpt_addr = 0;
       dbx_link_bpt = NULL;
     }
@@ -5352,7 +5353,7 @@ static int
 procfs_insert_watchpoint (CORE_ADDR addr, int len, int type)
 {
   if (!target_have_steppable_watchpoint
-      && !gdbarch_have_nonsteppable_watchpoint (current_gdbarch))
+      && !gdbarch_have_nonsteppable_watchpoint (target_gdbarch))
     {
       /* When a hardware watchpoint fires off the PC will be left at
 	 the instruction following the one which caused the
@@ -5592,7 +5593,7 @@ remove_dbx_link_breakpoint (void)
   if (dbx_link_bpt_addr == 0)
     return;
 
-  if (deprecated_remove_raw_breakpoint (dbx_link_bpt) != 0)
+  if (deprecated_remove_raw_breakpoint (target_gdbarch, dbx_link_bpt) != 0)
     warning (_("Unable to remove __dbx_link breakpoint."));
 
   dbx_link_bpt_addr = 0;
@@ -5664,7 +5665,8 @@ insert_dbx_link_bpt_in_file (int fd, CORE_ADDR ignored)
     {
       /* Insert the breakpoint.  */
       dbx_link_bpt_addr = sym_addr;
-      dbx_link_bpt = deprecated_insert_raw_breakpoint (sym_addr);
+      dbx_link_bpt = deprecated_insert_raw_breakpoint (target_gdbarch,
+						       sym_addr);
       if (dbx_link_bpt == NULL)
         {
           warning (_("Failed to insert dbx_link breakpoint."));
@@ -5756,7 +5758,7 @@ info_mappings_callback (struct prmap *map, int (*ignore) (), void *unused)
   pr_off = map->pr_off;
 #endif
 
-  if (gdbarch_addr_bit (current_gdbarch) == 32)
+  if (gdbarch_addr_bit (target_gdbarch) == 32)
     printf_filtered ("\t%#10lx %#10lx %#10lx %#10x %7s\n",
 		     (unsigned long) map->pr_vaddr,
 		     (unsigned long) map->pr_vaddr + map->pr_size - 1,
@@ -5787,7 +5789,7 @@ info_proc_mappings (procinfo *pi, int summary)
     return;	/* No output for summary mode. */
 
   printf_filtered (_("Mapped address spaces:\n\n"));
-  if (gdbarch_ptr_bit (current_gdbarch) == 32)
+  if (gdbarch_ptr_bit (target_gdbarch) == 32)
     printf_filtered ("\t%10s %10s %10s %10s %7s\n",
 		     "Start Addr",
 		     "  End Addr",

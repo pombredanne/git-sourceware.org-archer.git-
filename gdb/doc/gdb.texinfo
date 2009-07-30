@@ -139,6 +139,7 @@ software in general.  We will miss him.
 * Stack::                       Examining the stack
 * Source::                      Examining source files
 * Data::                        Examining data
+* Optimized Code::              Debugging optimized code
 * Macros::                      Preprocessor Macros
 * Tracepoints::                 Debugging remote targets non-intrusively
 * Overlays::                    Debugging programs that use overlays
@@ -1808,7 +1809,7 @@ To request debugging information, specify the @samp{-g} option when you run
 the compiler.
 
 Programs that are to be shipped to your customers are compiled with
-optimizations, using the @samp{-O} compiler option.  However, many
+optimizations, using the @samp{-O} compiler option.  However, some
 compilers are unable to handle the @samp{-g} and @samp{-O} options
 together.  Using those compilers, you cannot generate optimized
 executables containing debugging information.
@@ -1817,22 +1818,7 @@ executables containing debugging information.
 without @samp{-O}, making it possible to debug optimized code.  We
 recommend that you @emph{always} use @samp{-g} whenever you compile a
 program.  You may think your program is correct, but there is no sense
-in pushing your luck.
-
-@cindex optimized code, debugging
-@cindex debugging optimized code
-When you debug a program compiled with @samp{-g -O}, remember that the
-optimizer is rearranging your code; the debugger shows you what is
-really there.  Do not be too surprised when the execution path does not
-exactly match your source file!  An extreme example: if you define a
-variable, but never use it, @value{GDBN} never sees that
-variable---because the compiler optimizes it out of existence.
-
-Some things do not work as well with @samp{-g -O} as with just
-@samp{-g}, particularly on machines with instruction scheduling.  If in
-doubt, recompile with @samp{-g} alone, and if this fixes the problem,
-please report it to us as a bug (including a test case!).
-@xref{Variables}, for more information about debugging optimized code.
+in pushing your luck.  For more information, see @ref{Optimized Code}.
 
 Older versions of the @sc{gnu} C compiler permitted a variant option
 @w{@samp{-gg}} for debugging information.  @value{GDBN} no longer supports this
@@ -2388,7 +2374,39 @@ To find out what inferiors exist at any moment, use @code{info inferiors}:
 @kindex info inferiors
 @item info inferiors
 Print a list of all inferiors currently being managed by @value{GDBN}.
+@end table
 
+To switch focus between inferiors, use the @code{inferior} command:
+
+@table @code
+@kindex inferior @var{inferior-id}
+@item inferior @var{inferior-id}
+Make inferior number @var{inferior-id} the current inferior.  The
+argument @var{inferior-id} is the internal inferior number assigned by
+@value{GDBN}, as shown in the first field of the @samp{info inferiors}
+display.
+@end table
+
+To quit debugging one of the inferiors, you can either detach from it
+by using the @w{@code{detach inferior}} command (allowing it to run
+independently), or kill it using the @w{@code{kill inferior}} command:
+
+@table @code
+@kindex detach inferior @var{inferior-id}
+@item detach inferior @var{inferior-id}
+Detach from the inferior identified by @value{GDBN} inferior number
+@var{inferior-id}, and remove it from the inferior list.
+
+@kindex kill inferior @var{inferior-id}
+@item kill inferior @var{inferior-id}
+Kill the inferior identified by @value{GDBN} inferior number
+@var{inferior-id}, and remove it from the inferior list.
+@end table
+
+To be notified when inferiors are started or exit under @value{GDBN}'s
+control use @w{@code{set print inferior-events}}:
+
+@table @code
 @kindex set print inferior-events
 @cindex print messages on inferior start and exit
 @item set print inferior-events
@@ -2772,51 +2790,17 @@ is held suspended.
 Show whether detach-on-fork mode is on/off.
 @end table
 
-If you choose to set @samp{detach-on-fork} mode off, then
-@value{GDBN} will retain control of all forked processes (including
-nested forks).  You can list the forked processes under the control of
-@value{GDBN} by using the @w{@code{info forks}} command, and switch
-from one fork to another by using the @w{@code{fork}} command.
-
-@table @code
-@kindex info forks
-@item info forks
-Print a list of all forked processes under the control of @value{GDBN}.
-The listing will include a fork id, a process id, and the current 
-position (program counter) of the process.
-
-@kindex fork @var{fork-id}
-@item fork @var{fork-id}
-Make fork number @var{fork-id} the current process.  The argument
-@var{fork-id} is the internal fork number assigned by @value{GDBN},
-as shown in the first field of the @samp{info forks} display.
-
-@kindex process @var{process-id}
-@item process @var{process-id}
-Make process number @var{process-id} the current process.  The
-argument @var{process-id} must be one that is listed in the output of
-@samp{info forks}.
-
-@end table
+If you choose to set @samp{detach-on-fork} mode off, then @value{GDBN}
+will retain control of all forked processes (including nested forks).
+You can list the forked processes under the control of @value{GDBN} by
+using the @w{@code{info inferiors}} command, and switch from one fork
+to another by using the @code{inferior} command (@pxref{Inferiors,
+,Debugging Multiple Inferiors}).
 
 To quit debugging one of the forked processes, you can either detach
-from it by using the @w{@code{detach fork}} command (allowing it to
-run independently), or delete (and kill) it using the
-@w{@code{delete fork}} command.
-
-@table @code
-@kindex detach fork @var{fork-id}
-@item detach fork @var{fork-id}
-Detach from the process identified by @value{GDBN} fork number
-@var{fork-id}, and remove it from the fork list.  The process will be
-allowed to run independently.
-
-@kindex delete fork @var{fork-id}
-@item delete fork @var{fork-id}
-Kill the process identified by @value{GDBN} fork number @var{fork-id},
-and remove it from the fork list.
-
-@end table
+from it by using the @w{@code{detach inferior}} command (allowing it
+to run independently), or kill it using the @w{@code{kill inferior}}
+command.  @xref{Inferiors, ,Debugging Multiple Inferiors}.
 
 If you ask to debug a child process and a @code{vfork} is followed by an
 @code{exec}, @value{GDBN} executes the new target up to the first
@@ -2824,8 +2808,8 @@ breakpoint in the new target.  If you have a breakpoint set on
 @code{main} in your original program, the breakpoint will also be set on
 the child process's @code{main}.
 
-When a child process is spawned by @code{vfork}, you cannot debug the
-child or parent until an @code{exec} call completes.
+On some systems, when a child process is spawned by @code{vfork}, you
+cannot debug the child or parent until an @code{exec} call completes.
 
 If you issue a @code{run} command to @value{GDBN} after an @code{exec}
 call executes, the new target restarts.  To restart the parent process,
@@ -6194,9 +6178,11 @@ Variables}).
 @cindex listing machine instructions
 @item disassemble
 @itemx disassemble /m
+@itemx disassemble /r
 This specialized command dumps a range of memory as machine
 instructions.  It can also print mixed source+disassembly by specifying
-the @code{/m} modifier.
+the @code{/m} modifier and print the raw instructions in hex as well as
+in symbolic form by specifying the @code{/r}.
 The default memory range is the function surrounding the
 program counter of the selected frame.  A single argument to this
 command is a program counter value; @value{GDBN} dumps the function
@@ -8538,6 +8524,107 @@ $1 = 1
 $2 = (void *) 0x8049560
 @end smallexample
 
+@node Optimized Code
+@chapter Debugging Optimized Code
+@cindex optimized code, debugging
+@cindex debugging optimized code
+
+Almost all compilers support optimization.  With optimization
+disabled, the compiler generates assembly code that corresponds
+directly to your source code, in a simplistic way.  As the compiler
+applies more powerful optimizations, the generated assembly code
+diverges from your original source code.  With help from debugging
+information generated by the compiler, @value{GDBN} can map from
+the running program back to constructs from your original source.
+
+@value{GDBN} is more accurate with optimization disabled.  If you
+can recompile without optimization, it is easier to follow the
+progress of your program during debugging.  But, there are many cases
+where you may need to debug an optimized version.
+
+When you debug a program compiled with @samp{-g -O}, remember that the
+optimizer has rearranged your code; the debugger shows you what is
+really there.  Do not be too surprised when the execution path does not
+exactly match your source file!  An extreme example: if you define a
+variable, but never use it, @value{GDBN} never sees that
+variable---because the compiler optimizes it out of existence.
+
+Some things do not work as well with @samp{-g -O} as with just
+@samp{-g}, particularly on machines with instruction scheduling.  If in
+doubt, recompile with @samp{-g} alone, and if this fixes the problem,
+please report it to us as a bug (including a test case!).
+@xref{Variables}, for more information about debugging optimized code.
+
+@menu
+* Inline Functions::            How @value{GDBN} presents inlining
+@end menu
+
+@node Inline Functions
+@section Inline Functions
+@cindex inline functions, debugging
+
+@dfn{Inlining} is an optimization that inserts a copy of the function
+body directly at each call site, instead of jumping to a shared
+routine.  @value{GDBN} displays inlined functions just like
+non-inlined functions.  They appear in backtraces.  You can view their
+arguments and local variables, step into them with @code{step}, skip
+them with @code{next}, and escape from them with @code{finish}.
+You can check whether a function was inlined by using the
+@code{info frame} command.
+
+For @value{GDBN} to support inlined functions, the compiler must
+record information about inlining in the debug information ---
+@value{NGCC} using the @sc{dwarf 2} format does this, and several
+other compilers do also.  @value{GDBN} only supports inlined functions
+when using @sc{dwarf 2}.  Versions of @value{NGCC} before 4.1
+do not emit two required attributes (@samp{DW_AT_call_file} and
+@samp{DW_AT_call_line}); @value{GDBN} does not display inlined
+function calls with earlier versions of @value{NGCC}.  It instead
+displays the arguments and local variables of inlined functions as
+local variables in the caller.
+
+The body of an inlined function is directly included at its call site;
+unlike a non-inlined function, there are no instructions devoted to
+the call.  @value{GDBN} still pretends that the call site and the
+start of the inlined function are different instructions.  Stepping to
+the call site shows the call site, and then stepping again shows
+the first line of the inlined function, even though no additional
+instructions are executed.
+
+This makes source-level debugging much clearer; you can see both the
+context of the call and then the effect of the call.  Only stepping by
+a single instruction using @code{stepi} or @code{nexti} does not do
+this; single instruction steps always show the inlined body.
+
+There are some ways that @value{GDBN} does not pretend that inlined
+function calls are the same as normal calls:
+
+@itemize @bullet
+@item
+You cannot set breakpoints on inlined functions.  @value{GDBN}
+either reports that there is no symbol with that name, or else sets the
+breakpoint only on non-inlined copies of the function.  This limitation
+will be removed in a future version of @value{GDBN}; until then,
+set a breakpoint by line number on the first line of the inlined
+function instead.
+
+@item
+Setting breakpoints at the call site of an inlined function may not
+work, because the call site does not contain any code.  @value{GDBN}
+may incorrectly move the breakpoint to the next line of the enclosing
+function, after the call.  This limitation will be removed in a future
+version of @value{GDBN}; until then, set a breakpoint on an earlier line
+or inside the inlined function instead.
+
+@item
+@value{GDBN} cannot locate the return value of inlined calls after
+using the @code{finish} command.  This is a limitation of compiler-generated
+debugging information; after @code{finish}, you can step to the next line
+and print a variable where your program stored the return value.
+
+@end itemize
+
+
 @node Macros
 @chapter C Preprocessor Macros
 
@@ -8845,6 +8932,7 @@ conditions and actions.
 * Create and Delete Tracepoints::
 * Enable and Disable Tracepoints::
 * Tracepoint Passcounts::
+* Tracepoint Conditions::
 * Tracepoint Actions::
 * Listing Tracepoints::
 * Starting and Stopping Trace Experiments::
@@ -8883,6 +8971,13 @@ Here are some examples of using the @code{trace} command:
 
 @noindent
 You can abbreviate @code{trace} as @code{tr}.
+
+@item trace @var{location} if @var{cond}
+Set a tracepoint with condition @var{cond}; evaluate the expression
+@var{cond} each time the tracepoint is reached, and collect data only
+if the value is nonzero---that is, if @var{cond} evaluates as true.
+@xref{Tracepoint Conditions, ,Tracepoint Conditions}, for more
+information on tracepoint conditions.
 
 @vindex $tpnum
 @cindex last tracepoint number
@@ -8965,6 +9060,44 @@ Examples:
 @exdent @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @code{// OR when baz has been executed 1 time.}
 @end smallexample
 @end table
+
+@node Tracepoint Conditions
+@subsection Tracepoint Conditions
+@cindex conditional tracepoints
+@cindex tracepoint conditions
+
+The simplest sort of tracepoint collects data every time your program
+reaches a specified place.  You can also specify a @dfn{condition} for
+a tracepoint.  A condition is just a Boolean expression in your
+programming language (@pxref{Expressions, ,Expressions}).  A
+tracepoint with a condition evaluates the expression each time your
+program reaches it, and data collection happens only if the condition
+is true.
+
+Tracepoint conditions can be specified when a tracepoint is set, by
+using @samp{if} in the arguments to the @code{trace} command.
+@xref{Create and Delete Tracepoints, ,Setting Tracepoints}.  They can
+also be set or changed at any time with the @code{condition} command,
+just as with breakpoints.
+
+Unlike breakpoint conditions, @value{GDBN} does not actually evaluate
+the conditional expression itself.  Instead, @value{GDBN} encodes the
+expression into an agent expression (@pxref{Agent Expressions}
+suitable for execution on the target, independently of @value{GDBN}.
+Global variables become raw memory locations, locals become stack
+accesses, and so forth.
+
+For instance, suppose you have a function that is usually called
+frequently, but should not be called after an error has occurred.  You
+could use the following tracepoint command to collect data about calls
+of that function that happen while the error code is propagating
+through the program; an unconditional tracepoint could end up
+collecting thousands of useless trace frames that you would have to
+search through.
+
+@smallexample
+(@value{GDBP}) @kbd{trace normal_operation if errcode > 0}
+@end smallexample
 
 @node Tracepoint Actions
 @subsection Tracepoint Action Lists
@@ -12895,6 +13028,16 @@ It is possible for the function you call via the @code{print} or
 the function, or if you passed it incorrect arguments).  What happens
 in that case is controlled by the @code{set unwindonsignal} command.
 
+Similarly, with a C@t{++} program it is possible for the function you
+call via the @code{print} or @code{call} command to generate an
+exception that is not handled due to the constraints of the dummy
+frame.  In this case, any exception that is raised in the frame, but has
+an out-of-frame exception handler will not be found.  GDB builds a
+dummy-frame for the inferior function call, and the unwinder cannot
+seek for exception handlers outside of this dummy-frame.  What happens
+in that case is controlled by the
+@code{set unwind-on-terminating-exception} command.
+
 @table @code
 @item set unwindonsignal
 @kindex set unwindonsignal
@@ -12911,6 +13054,23 @@ received.
 @kindex show unwindonsignal
 Show the current setting of stack unwinding in the functions called by
 @value{GDBN}.
+
+@item set unwind-on-terminating-exception
+@kindex set unwind-on-terminating-exception
+@cindex unwind stack in called functions with unhandled exceptions
+@cindex call dummy stack unwinding on unhandled exception.
+Set unwinding of the stack if a C@t{++} exception is raised, but left
+unhandled while in a function that @value{GDBN} called in the program being
+debugged.  If set to on (the default), @value{GDBN} unwinds the stack
+it created for the call and restores the context to what it was before
+the call.  If set to off, @value{GDBN} the exception is delivered to
+the default C@t{++} exception handler and the inferior terminated.
+
+@item show unwind-on-terminating-exception
+@kindex show unwind-on-terminating-exception
+Show the current setting of stack unwinding in the functions called by
+@value{GDBN}.
+
 @end table
 
 @cindex weak alias functions
@@ -18782,7 +18942,7 @@ The result @code{bar} will be a @code{gdb.Value} object holding the
 value pointed to by @code{foo}.
 @end defmethod
 
-@defmethod Value string @r{[}encoding@r{]} @r{[}errors@r{]}
+@defmethod Value string @r{[}encoding@r{]} @r{[}errors@r{]} @r{[}length@r{]}
 If this @code{gdb.Value} represents a string, then this method
 converts the contents to a Python string.  Otherwise, this method will
 throw an exception.
@@ -18793,7 +18953,9 @@ language.
 
 For C-like languages, a value is a string if it is a pointer to or an
 array of characters or ints.  The string is assumed to be terminated
-by a zero of the appropriate width.
+by a zero of the appropriate width.  However if the optional length
+argument is given, the string will be converted to that given length,
+ignoring any embedded zeros that the string may contain.
 
 If the optional @var{encoding} argument is given, it must be a string
 naming the encoding of the string in the @code{gdb.Value}, such as
@@ -18807,6 +18969,9 @@ will be used, if the current language is able to supply one.
 
 The optional @var{errors} argument is the same as the corresponding
 argument to Python's @code{string.decode} method.
+
+If the optional @var{length} argument is given, the string will be
+fetched and converted to the given length.
 @end defmethod
 @end table
 
@@ -21829,6 +21994,7 @@ The corresponding @value{GDBN} command is @samp{set args}.
 @end smallexample
 
 
+@ignore
 @subheading The @code{-exec-show-arguments} Command
 @findex -exec-show-arguments
 
@@ -21846,6 +22012,7 @@ The corresponding @value{GDBN} command is @samp{show args}.
 
 @subsubheading Example
 N.A.
+@end ignore
 
 
 @subheading The @code{-environment-cd} Command
@@ -23213,7 +23380,7 @@ Returns the number of children of a variable object @var{name}:
 @smallexample
  -var-list-children [@var{print-values}] @var{name}
 @end smallexample
-@anchor{-var-list-children} 
+@anchor{-var-list-children}
 
 Return a list of the children of the specified variable object and
 create variable objects for them, if they do not already exist.  With
@@ -23224,16 +23391,49 @@ values; and if it is 2 or @code{--simple-values} print the name and
 value for simple data types and just the name for arrays, structures
 and unions.
 
+For each child the following results are returned:
+
+@table @var
+
+@item name
+Name of the variable object created for this child.
+
+@item exp
+The expression to be shown to the user by the front end to designate this child.
+For example this may be the name of a structure member.
+
+For C/C@t{++} structures there are several pseudo children returned to
+designate access qualifiers.  For these pseudo children @var{exp} is
+@samp{public}, @samp{private}, or @samp{protected}.  In this case the
+type and value are not present.
+
+@item numchild
+Number of children this child has.
+
+@item type
+The type of the child.
+
+@item value
+If values were requested, this is the value.
+
+@item thread-id
+If this variable object is associated with a thread, this is the thread id.  
+Otherwise this result is not present.
+
+@item frozen
+If the variable object is frozen, this variable will be present with a value of 1.
+@end table
+
 @subsubheading Example
 
 @smallexample
 (gdb)
  -var-list-children n
- ^done,numchild=@var{n},children=[@{name=@var{name},
+ ^done,numchild=@var{n},children=[child=@{name=@var{name},exp=@var{exp},
  numchild=@var{n},type=@var{type}@},@r{(repeats N times)}]
 (gdb)
  -var-list-children --all-values n
- ^done,numchild=@var{n},children=[@{name=@var{name},
+ ^done,numchild=@var{n},children=[child=@{name=@var{name},exp=@var{exp},
  numchild=@var{n},value=@var{value},type=@var{type}@},@r{(repeats N times)}]
 @end smallexample
 
@@ -24046,6 +24246,7 @@ The tracepoint commands are not yet implemented.
 @section @sc{gdb/mi} Symbol Query Commands
 
 
+@ignore
 @subheading The @code{-symbol-info-address} Command
 @findex -symbol-info-address
 
@@ -24161,6 +24362,7 @@ List the functions in the executable.
 
 @subsubheading Example
 N.A.
+@end ignore
 
 
 @subheading The @code{-symbol-list-lines} Command
@@ -24189,6 +24391,7 @@ There is no corresponding @value{GDBN} command.
 @end smallexample
 
 
+@ignore
 @subheading The @code{-symbol-list-types} Command
 @findex -symbol-list-types
 
@@ -24263,6 +24466,7 @@ The corresponding @value{GDBN} command is @samp{ptype}, @code{gdbtk} has
 
 @subsubheading Example
 N.A.
+@end ignore
 
 
 @c %%%%%%%%%%%%%%%%%%%%%%%%%%%% SECTION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -24331,6 +24535,7 @@ The corresponding @value{GDBN} command is @samp{exec-file}.
 @end smallexample
 
 
+@ignore
 @subheading The @code{-file-list-exec-sections} Command
 @findex -file-list-exec-sections
 
@@ -24350,6 +24555,7 @@ information as this command.  @code{gdbtk} has a corresponding command
 
 @subsubheading Example
 N.A.
+@end ignore
 
 
 @subheading The @code{-file-list-exec-source-file} Command
@@ -24410,6 +24616,7 @@ The @value{GDBN} equivalent is @samp{info sources}.
 (gdb)
 @end smallexample
 
+@ignore
 @subheading The @code{-file-list-shared-libraries} Command
 @findex -file-list-shared-libraries
 
@@ -24446,6 +24653,7 @@ The corresponding @value{GDBN} command is @samp{info file} (part of it).
 
 @subsubheading Example
 N.A.
+@end ignore
 
 
 @subheading The @code{-file-symbol-file} Command
@@ -24542,6 +24750,7 @@ The corresponding @value{GDBN} command is @samp{attach}.
 (gdb)
 @end smallexample
 
+@ignore
 @subheading The @code{-target-compare-sections} Command
 @findex -target-compare-sections
 
@@ -24560,6 +24769,7 @@ The @value{GDBN} equivalent is @samp{compare-sections}.
 
 @subsubheading Example
 N.A.
+@end ignore
 
 
 @subheading The @code{-target-detach} Command
@@ -24719,6 +24929,7 @@ write-rate="429"
 @end smallexample
 
 
+@ignore
 @subheading The @code{-target-exec-status} Command
 @findex -target-exec-status
 
@@ -24788,6 +24999,7 @@ N.A.
 @end smallexample
 
 @c ????
+@end ignore
 
 @subsubheading @value{GDBN} Command
 
@@ -24949,6 +25161,7 @@ Approximately corresponds to @samp{quit}.
 @end smallexample
 
 
+@ignore
 @subheading The @code{-exec-abort} Command
 @findex -exec-abort
 
@@ -24966,6 +25179,7 @@ The corresponding @value{GDBN} command is @samp{kill}.
 
 @subsubheading Example
 N.A.
+@end ignore
 
 
 @subheading The @code{-gdb-set} Command
@@ -26366,10 +26580,19 @@ messages, see @ref{Debugging Output}.)
 
 @table @code
 @kindex maint agent
+@kindex maint agent-eval
 @item maint agent @var{expression}
+@itemx maint agent-eval @var{expression}
 Translate the given @var{expression} into remote agent bytecodes.
 This command is useful for debugging the Agent Expression mechanism
-(@pxref{Agent Expressions}).
+(@pxref{Agent Expressions}).  The @samp{agent} version produces an
+expression useful for data collection, such as by tracepoints, while
+@samp{maint agent-eval} produces an expression that evaluates directly
+to a result.  For instance, a collection expression for @code{globa +
+globb} will include bytecodes to record four bytes of memory at each
+of the addresses of @code{globa} and @code{globb}, while discarding
+the result of the addition, while an evaluation expression will do the
+addition and return the sum.
 
 @kindex maint info breakpoints
 @item @anchor{maint info breakpoints}maint info breakpoints
@@ -28247,6 +28470,11 @@ These are the currently defined stub features and their properties:
 @tab @samp{-}
 @tab No
 
+@item @samp{ConditionalTracepoints}
+@tab No
+@tab @samp{-}
+@tab No
+
 @end multitable
 
 These are the currently defined stub features, in more detail:
@@ -28323,6 +28551,10 @@ indicated it supports them in its @samp{qSupported} request.
 @item qXfer:osdata:read
 The remote stub understands the @samp{qXfer:osdata:read} packet
 ((@pxref{qXfer osdata read}).
+
+@item ConditionalTracepoints
+The remote stub accepts and implements conditional expressions defined
+for tracepoints (@pxref{Tracepoint Conditions}).
 
 @end table
 
@@ -28636,11 +28868,14 @@ tracepoints (@pxref{Tracepoints}).
 
 @table @samp
 
-@item QTDP:@var{n}:@var{addr}:@var{ena}:@var{step}:@var{pass}@r{[}-@r{]}
+@item QTDP:@var{n}:@var{addr}:@var{ena}:@var{step}:@var{pass}[:X@var{len},@var{bytes}]@r{[}-@r{]}
 Create a new tracepoint, number @var{n}, at @var{addr}.  If @var{ena}
 is @samp{E}, then the tracepoint is enabled; if it is @samp{D}, then
 the tracepoint is disabled.  @var{step} is the tracepoint's step
-count, and @var{pass} is its pass count.  If the trailing @samp{-} is
+count, and @var{pass} is its pass count.  If an @samp{X} is present,
+it introduces a tracepoint condition, which consists of a hexadecimal
+length, followed by a comma and hex-encoded bytes, in a manner similar
+to action encodings as described below.  If the trailing @samp{-} is
 present, further @samp{QTDP} packets will follow to specify this
 tracepoint's actions.
 
@@ -30546,7 +30781,8 @@ their targets, we also describe the grammar here.
 
 Target descriptions can identify the architecture of the remote target
 and (for some architectures) provide information about custom register
-sets.  @value{GDBN} can use this information to autoconfigure for your
+sets.  They can also identify the OS ABI of the remote target.
+@value{GDBN} can use this information to autoconfigure for your
 target, or to warn you if you connect to an unsupported target.
 
 Here is a simple target description:
@@ -30570,6 +30806,7 @@ are explained further below.
 <!DOCTYPE target SYSTEM "gdb-target.dtd">
 <target version="1.0">
   @r{[}@var{architecture}@r{]}
+  @r{[}@var{osabi}@r{]}
   @r{[}@var{feature}@dots{}@r{]}
 </target>
 @end smallexample
@@ -30624,6 +30861,21 @@ An @samp{<architecture>} element has this form:
 @var{arch} is an architecture name from the same selection
 accepted by @code{set architecture} (@pxref{Targets, ,Specifying a
 Debugging Target}).
+
+@subsection OS ABI
+@cindex @code{<osabi>}
+
+This optional field was introduced in @value{GDBN} version 7.0.
+Previous versions of @value{GDBN} ignore it.
+
+An @samp{<osabi>} element has this form:
+
+@smallexample
+  <osabi>@var{abi-name}</osabi>
+@end smallexample
+
+@var{abi-name} is an OS ABI name from the same selection accepted by
+@w{@code{set osabi}} (@pxref{ABI, ,Configuring the Current ABI}).
 
 @subsection Features
 @cindex <feature>
@@ -30839,6 +31091,19 @@ The @samp{org.gnu.gdb.xscale.iwmmxt} feature is optional.  If present,
 it should contain at least registers @samp{wR0} through @samp{wR15} and
 @samp{wCGR0} through @samp{wCGR3}.  The @samp{wCID}, @samp{wCon},
 @samp{wCSSF}, and @samp{wCASF} registers are optional.
+
+The @samp{org.gnu.gdb.arm.vfp} feature is optional.  If present, it
+should contain at least registers @samp{d0} through @samp{d15}.  If
+they are present, @samp{d16} through @samp{d31} should also be included.
+@value{GDBN} will synthesize the single-precision registers from
+halves of the double-precision registers.
+
+The @samp{org.gnu.gdb.arm.neon} feature is optional.  It does not
+need to contain registers; it instructs @value{GDBN} to display the
+VFP double-precision registers as vectors and to synthesize the
+quad-precision registers from pairs of double-precision registers.
+If this feature is present, @samp{org.gnu.gdb.arm.vfp} must also
+be present and include 32 double-precision registers.
 
 @node MIPS Features
 @subsection MIPS Features

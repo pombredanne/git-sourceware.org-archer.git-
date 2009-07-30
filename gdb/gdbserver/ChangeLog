@@ -1,3 +1,173 @@
+2009-07-28  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* linux-low.c (linux_write_memory): Update debugging output.
+	* Makefile.in (clean): Add new descriptions.
+	(arm-with-vfpv2.o, arm-with-vfpv2.c, arm-with-vfpv3.o)
+	(arm-with-vfpv3.c, arm-with-neon.o, arm-with-neon.c): New rules.
+	* configure.srv: Add new files for arm*-*-linux*.
+	* linux-arm-low.c: Add new declarations.
+	(PTRACE_GETVFPREGS, PTRACE_SETVFPREGS): Define if undefined.
+	(arm_hwcap, HWCAP_VFP, HWCAP_IWMMXT, HWCAP_NEON, HWCAP_VFPv3)
+	(HWCAP_VFPv3D16): New.
+	(arm_fill_wmmxregset, arm_store_wmmxregset): Check HWCAP_IWMMXT
+	instead of __IWMMXT__.
+	(arm_fill_vfpregset, arm_store_vfpregset, arm_get_hwcap)
+	(arm_arch_setup): New.
+	(target_regsets): Remove #ifdef.  Add VFP regset.
+	(the_low_target): Use arm_arch_setup.
+
+2009-07-28  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* linux-low.c (linux_kill_one_lwp): Adjust kernel workaround to skip
+	the main thread again.
+
+2009-07-06  Aleksandar Ristovski  <aristovski@qnx.com>
+
+	Adding Neutrino gdbserver.
+	* configure: Regenerated.
+	* configure.ac: Add case for srv_qnx and set LIBS accordingly.
+	* configure.srv (i[34567]86-*-nto*): New target.
+	* nto-low.c, nto-low.h, nto-x86-low.c: New files.
+	* remote-utils.c [__QNX__]: Include sys/iomgr.h
+	(nto_comctrl) [__QNX__]: New function.
+	(enable_async_io, disable_async_io) [__QNX__]: Call nto_comctrl.
+
+2009-07-05  Danny Backx  <dannybackx@users.sourceforge.net>
+
+	* configure.srv (i[34567]86-*-mingw32ce*): Add i386-low.o to
+	srv_tgtobj.
+
+2009-07-04  Danny Backx  <dannybackx@users.sourceforge.net>
+	    Pedro Alves  <pedro@codesourcery.com>
+
+	* win32-i386-low.c (i386_get_thread_context): Handle systems that
+	don't support CONTEXT_EXTENDED_REGISTERS.
+	(i386_win32_breakpoint, i386_win32_breakpoint_len): New.
+	(the_low_target): Install them.
+	* win32-low.c (get_child_debug_event): Handle WaitForDebugEvent
+	failing with ERROR_PIPE_NOT_CONNECTED.
+
+2009-06-30  Doug Evans  <dje@google.com>
+	    Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	Add h/w watchpoint support to x86-linux, win32-i386.
+	* Makefile.in (SFILES): Add i386-low.c
+	(i386_low_h): Define.
+	(i386-low.o): Add dependencies.
+	(linux-x86-low.o): Add i386-low.h dependency.
+	(win32-i386-low.o): Ditto.
+	* i386-low.c: New file.
+	* i386-low.h: New file.
+	* configure.srv (i[34567]86-*-cygwin*): Add i386-low.o to srv_tgtobj.
+	(i[34567]86-*-linux*, i[34567]86-*-mingw*, x86_64-*-linux*): Ditto.
+	* linux-low.c (linux_add_process): Initialize arch_private.
+	(linux_remove_process): Free arch_private.
+	(add_lwp): Initialize arch_private.
+	(delete_lwp): Free arch_private.
+	(linux_resume_one_lwp): Call the_low_target.prepare_to_resume if
+	provided.
+	* linux-low.h (process_info_private): New member arch_private.
+	(lwp_info): New member arch_private.
+	(linux_target_ops): New members new_process, new_thread,
+	prepare_to_resume.
+	(ptid_of): New macro.
+	* linux-x86-low.c: Include stddef.h, i386-low.h.
+	(arch_process_info): New struct.
+	(arch_lwp_info): New struct.
+	(x86_linux_dr_get, x86_linux_dr_set): New functions.
+	(i386_dr_low_set_addr, i386_dr_low_set_control): New functions.
+	(i386_dr_low_get_status): New function.
+	(x86_insert_point, x86_remove_point): New functions.
+	(x86_stopped_by_watchpoint): New function.
+	(x86_stopped_data_address): New function.
+	(x86_linux_new_process, x86_linux_new_thread): New functions.
+	(x86_linux_prepare_to_resume): New function.
+	(the_low_target): Add entries for insert_point, remove_point,
+	stopped_by_watchpoint, stopped_data_address, new_process, new_thread,
+	prepare_to_resume.
+	* server.c (debug_hw_points): New global.
+	(monitor_show_help): Document set debug-hw-points.
+	(handle_query): Process "set debug-hw-points".
+	* server.h (debug_hw_points): Declare.
+	(paddress): Declare.
+	* utils.c (NUMCELLS, CELLSIZE): New macros.
+	(get_sell, xsnprintf, paddress): New functions.
+	* win32-arm-low.c (the_low_target): Add entries for insert_point,
+	remove_point, stopped_by_watchpoint, stopped_data_address.
+	* win32-i386-low.c: Include i386-low.h.
+	(debug_reg_state): Replaces dr.
+	(i386_dr_low_set_addr, i386_dr_low_set_control): New functions.
+	(i386_dr_low_get_status): New function.
+	(i386_insert_point, i386_remove_point): New functions.
+	(i386_stopped_by_watchpoint): New function.
+	(i386_stopped_data_address): New function.
+	(i386_initial_stuff): Update.
+	(get_thread_context,set_thread_context,i386_thread_added): Update.
+	(the_low_target): Add entries for insert_point,
+	remove_point, stopped_by_watchpoint, stopped_data_address.
+	* win32-low.c (win32_insert_watchpoint): New function.
+	(win32_remove_watchpoint): New function.
+	(win32_stopped_by_watchpoint): New function.
+	(win32_stopped_data_address): New function.
+	(win32_target_ops): Add entries for insert_watchpoint,
+	remove_watchpoint, stopped_by_watchpoint, stopped_data_address.
+	* win32-low.h (win32_target_ops): New members insert_point,
+	remove_point, stopped_by_watchpoint, stopped_data_address.
+
+2009-06-25  Pedro Alves  <pedro@codesourcery.com>
+
+	* server.c (process_serial_event): Re-return unsupported, not
+	error, if the type isn't recognized.  Re-allow supporting only
+	insert or remove packets.  Also call require_running for
+	breakpoints.  Add missing break statement to default case.  Tidy.
+	* target.h (struct target_ops): Rename insert_watchpoint to
+	insert_point, and remove_watchpoint to remove_point.
+
+	* linux-low.h (struct linux_target_ops): Likewise.
+	* linux-low.c (linux_insert_watchpoint): Rename to ...
+	(linux_insert_point): ... this.  Adjust.
+	(linux_remove_watchpoint): Rename to ...
+	(linux_remove_point): ... this.  Adjust.
+	(linux_target_ops): Adjust.
+	* linux-crisv32-low.c (cris_insert_watchpoint): Rename to ...
+	(cris_insert_point): ... this.
+	(cris_remove_watchpoint): Rename to ...
+	(cris_remove_point): ... this.
+	(the_low_target): Adjust.
+
+2009-06-24  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* server.c (handle_v_kill): Pass signal_pid to
+	kill_inferior if multi_process is zero.
+
+2009-06-23  Aleksandar Ristovski  <aristovski@qnx.com>
+
+	* server.c (process_serial_event): Add support for Z0 and Z1 packet.
+	* target.h (target_ops): Comment for *_watchpoint to make it clear
+	the functions can get types '0' and '1'.
+
+2009-06-22  Aleksandar Ristovski  <aristovski@qnx.com>
+
+	* linux-low.c (usr_fetch_inferior_registers): Remove check for regno 0.
+	* proc-service.c (ps_lgetregs): Pass -1 to fetch all registers.
+	* regcache.c (get_regcache): Likewise.
+	* spu-low.c (spu_fetch_registers): Remove 0 to -1 conversion.
+	* win32-low.c (child_fetch_inferior_registers): Remove check for
+	regno 0.
+
+2009-06-19  Aleksandar Ristovski  <aristovski@qnx.com>
+	    Pedro Alves <pedro@codesourcery.com>
+
+	* target.h (struct target_ops) <supports_multi_process>: New
+	callback.
+	(target_supports_multi_process): New.
+	* server.c (handle_query): Even if GDB reports support, only
+	enable multi-process if the target also supports it.  Report
+	multi-process support only if the target backend supports it.
+	* linux-low.c (linux_supports_multi_process): New function.
+	(linux_target_ops): Install it as target_supports_multi_process
+	callback.
+
 2009-05-24  Doug Evans  <dje@google.com>
 
 	Global renaming of find_thread_pid to find_thread_ptid.

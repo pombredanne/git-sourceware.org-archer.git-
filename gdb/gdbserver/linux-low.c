@@ -224,6 +224,7 @@ delete_lwp (struct lwp_info *lwp)
 {
   remove_thread (get_lwp_thread (lwp));
   remove_inferior (&all_lwps, &lwp->head);
+  free (lwp->arch_private);
   free (lwp);
 }
 
@@ -242,6 +243,9 @@ linux_add_process (int pid, int attached)
   proc = add_process (pid, attached);
   proc->private = xcalloc (1, sizeof (*proc->private));
 
+  if (the_low_target.new_process != NULL)
+    proc->private->arch_private = the_low_target.new_process ();
+
   return proc;
 }
 
@@ -251,6 +255,7 @@ linux_add_process (int pid, int attached)
 static void
 linux_remove_process (struct process_info *process)
 {
+  free (process->private->arch_private);
   free (process->private);
   remove_process (process);
 }
@@ -376,6 +381,9 @@ add_lwp (ptid_t ptid)
 
   lwp->head.id = ptid;
 
+  if (the_low_target.new_thread != NULL)
+    lwp->arch_private = the_low_target.new_thread ();
+
   add_inferior_to_list (&all_lwps, &lwp->head);
 
   return lwp;
@@ -465,7 +473,6 @@ linux_attach_lwp_1 (unsigned long lwpid, int initial)
 
   new_lwp = (struct lwp_info *) add_lwp (ptid);
   add_thread (ptid, new_lwp);
-
 
   /* We need to wait for SIGSTOP before being able to make the next
      ptrace call on this LWP.  */
@@ -582,7 +589,7 @@ linux_kill_one_lwp (struct inferior_list_entry *entry, void *args)
      the children get a chance to be reaped, it will remain a zombie
      forever.  */
 
-  if (last_thread_of_process_p (thread))
+  if (lwpid_of (lwp) == pid)
     {
       if (debug_threads)
 	fprintf (stderr, "lkop: is last of process %s\n",
@@ -1740,6 +1747,9 @@ linux_resume_one_lwp (struct lwp_info *lwp,
       *p_sig = NULL;
     }
 
+  if (the_low_target.prepare_to_resume != NULL)
+    the_low_target.prepare_to_resume (lwp);
+
   regcache_invalidate_one ((struct inferior_list_entry *)
 			   get_lwp_thread (lwp));
   errno = 0;
@@ -2054,7 +2064,7 @@ error_exit:;
 static void
 usr_fetch_inferior_registers (int regno)
 {
-  if (regno == -1 || regno == 0)
+  if (regno == -1)
     for (regno = 0; regno < the_low_target.num_regs; regno++)
       fetch_register (regno);
   else
@@ -2384,7 +2394,16 @@ linux_write_memory (CORE_ADDR memaddr, const unsigned char *myaddr, int len)
 
   if (debug_threads)
     {
-      fprintf (stderr, "Writing %02x to %08lx\n", (unsigned)myaddr[0], (long)memaddr);
+      /* Dump up to four bytes.  */
+      unsigned int val = * (unsigned int *) myaddr;
+      if (len == 1)
+	val = val & 0xff;
+      else if (len == 2)
+	val = val & 0xffff;
+      else if (len == 3)
+	val = val & 0xffffff;
+      fprintf (stderr, "Writing %0*x to 0x%08lx\n", 2 * ((len < 4) ? len : 4),
+	       val, (long)memaddr);
     }
 
   /* Fill start and end extra bytes of buffer with existing memory data.  */
@@ -2671,24 +2690,25 @@ linux_read_auxv (CORE_ADDR offset, unsigned char *myaddr, unsigned int len)
   return n;
 }
 
-/* These watchpoint related wrapper functions simply pass on the function call
-   if the target has registered a corresponding function.  */
+/* These breakpoint and watchpoint related wrapper functions simply
+   pass on the function call if the target has registered a
+   corresponding function.  */
 
 static int
-linux_insert_watchpoint (char type, CORE_ADDR addr, int len)
+linux_insert_point (char type, CORE_ADDR addr, int len)
 {
-  if (the_low_target.insert_watchpoint != NULL)
-    return the_low_target.insert_watchpoint (type, addr, len);
+  if (the_low_target.insert_point != NULL)
+    return the_low_target.insert_point (type, addr, len);
   else
     /* Unsupported (see target.h).  */
     return 1;
 }
 
 static int
-linux_remove_watchpoint (char type, CORE_ADDR addr, int len)
+linux_remove_point (char type, CORE_ADDR addr, int len)
 {
-  if (the_low_target.remove_watchpoint != NULL)
-    return the_low_target.remove_watchpoint (type, addr, len);
+  if (the_low_target.remove_point != NULL)
+    return the_low_target.remove_point (type, addr, len);
   else
     /* Unsupported (see target.h).  */
     return 1;
@@ -3008,6 +3028,12 @@ linux_start_non_stop (int nonstop)
   return 0;
 }
 
+static int
+linux_supports_multi_process (void)
+{
+  return 1;
+}
+
 static struct target_ops linux_target_ops = {
   linux_create_inferior,
   linux_attach,
@@ -3024,8 +3050,8 @@ static struct target_ops linux_target_ops = {
   linux_look_up_symbols,
   linux_request_interrupt,
   linux_read_auxv,
-  linux_insert_watchpoint,
-  linux_remove_watchpoint,
+  linux_insert_point,
+  linux_remove_point,
   linux_stopped_by_watchpoint,
   linux_stopped_data_address,
 #if defined(__UCLIBC__) && defined(HAS_NOMMU)
@@ -3045,6 +3071,7 @@ static struct target_ops linux_target_ops = {
   linux_supports_non_stop,
   linux_async,
   linux_start_non_stop,
+  linux_supports_multi_process
 };
 
 static void

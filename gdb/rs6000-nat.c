@@ -75,7 +75,7 @@
 #ifndef ARCH3264
 # define ARCH64() 0
 #else
-# define ARCH64() (register_size (current_gdbarch, 0) == 8)
+# define ARCH64() (register_size (target_gdbarch, 0) == 8)
 #endif
 
 /* Union of 32-bit and 64-bit versions of ld_info. */
@@ -581,6 +581,7 @@ exec_one_dummy_insn (struct regcache *regcache)
 {
 #define	DUMMY_INSN_ADDR	AIX_TEXT_SEGMENT_BASE+0x200
 
+  struct gdbarch *gdbarch = get_regcache_arch (regcache);
   int ret, status, pid;
   CORE_ADDR prev_pc;
   void *bp;
@@ -589,7 +590,7 @@ exec_one_dummy_insn (struct regcache *regcache)
      assume that this address will never be executed again by the real
      code. */
 
-  bp = deprecated_insert_raw_breakpoint (DUMMY_INSN_ADDR);
+  bp = deprecated_insert_raw_breakpoint (gdbarch, DUMMY_INSN_ADDR);
 
   /* You might think this could be done with a single ptrace call, and
      you'd be correct for just about every platform I've ever worked
@@ -613,7 +614,7 @@ exec_one_dummy_insn (struct regcache *regcache)
   while (pid != PIDGET (inferior_ptid));
 
   regcache_write_pc (regcache, prev_pc);
-  deprecated_remove_raw_breakpoint (bp);
+  deprecated_remove_raw_breakpoint (gdbarch, bp);
 }
 
 
@@ -691,8 +692,8 @@ objfile_symbol_add (void *arg)
 {
   struct objfile *obj = (struct objfile *) arg;
 
-  syms_from_objfile (obj, NULL, 0, 0, 0, 0);
-  new_symfile_objfile (obj, 0, 0);
+  syms_from_objfile (obj, NULL, 0, 0, 0);
+  new_symfile_objfile (obj, 0);
   return 1;
 }
 

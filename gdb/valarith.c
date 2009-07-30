@@ -46,7 +46,7 @@ void _initialize_valarith (void);
    If the pointer type is void *, then return 1.
    If the target type is incomplete, then error out.
    This isn't a general purpose function, but just a 
-   helper for value_ptrsub & value_ptradd.
+   helper for value_ptradd.
 */
 
 static LONGEST
@@ -85,7 +85,7 @@ find_size_for_pointer_math (struct type *ptr_type)
    result of C-style pointer arithmetic ARG1 + ARG2.  */
 
 struct value *
-value_ptradd (struct value *arg1, struct value *arg2)
+value_ptradd (struct value *arg1, LONGEST arg2)
 {
   struct type *valptrtype;
   LONGEST sz;
@@ -94,33 +94,8 @@ value_ptradd (struct value *arg1, struct value *arg2)
   valptrtype = check_typedef (value_type (arg1));
   sz = find_size_for_pointer_math (valptrtype);
 
-  if (!is_integral_type (value_type (arg2)))
-    error (_("Argument to arithmetic operation not a number or boolean."));
-
   return value_from_pointer (valptrtype,
-			     value_as_address (arg1)
-			       + (sz * value_as_long (arg2)));
-}
-
-/* Given a pointer ARG1 and an integral value ARG2, return the
-   result of C-style pointer arithmetic ARG1 - ARG2.  */
-
-struct value *
-value_ptrsub (struct value *arg1, struct value *arg2)
-{
-  struct type *valptrtype;
-  LONGEST sz;
-
-  arg1 = coerce_array (arg1);
-  valptrtype = check_typedef (value_type (arg1));
-  sz = find_size_for_pointer_math (valptrtype);
-
-  if (!is_integral_type (value_type (arg2)))
-    error (_("Argument to arithmetic operation not a number or boolean."));
-
-  return value_from_pointer (valptrtype,
-			     value_as_address (arg1)
-			       - (sz * value_as_long (arg2)));
+			     value_as_address (arg1) + sz * arg2);
 }
 
 /* Given two compatible pointer values ARG1 and ARG2, return the
@@ -162,11 +137,10 @@ an integer nor a pointer of the same type."));
    verbosity is set, warn about invalid indices (but still use them). */
 
 struct value *
-value_subscript (struct value *array, struct value *idx)
+value_subscript (struct value *array, LONGEST index)
 {
   int c_style = current_language->c_style_arrays;
   struct type *tarray;
-  LONGEST index = value_as_long (idx);
 
   array = coerce_ref (array);
   tarray = check_typedef (value_type (array));
@@ -212,12 +186,7 @@ value_subscript (struct value *array, struct value *idx)
     }
 
   if (c_style)
-    {
-      struct value *idx;
-
-      idx = value_from_longest (builtin_type_int32, index);
-      return value_ind (value_ptradd (array, idx));
-    }
+    return value_ind (value_ptradd (array, index));
   else
     error (_("not an array or string"));
 }
@@ -260,11 +229,10 @@ value_subscripted_rvalue (struct value *array, CORE_ADDR offset)
 
 struct value *
 value_bitstring_subscript (struct type *type,
-			   struct value *bitstring, struct value *idx)
+			   struct value *bitstring, LONGEST index)
 {
 
   struct type *bitstring_type, *range_type;
-  LONGEST index = value_as_long (idx);
   struct value *v;
   int offset, byte, bit_index;
   LONGEST lowerbound, upperbound;
@@ -282,7 +250,7 @@ value_bitstring_subscript (struct type *type,
   byte = *((char *) value_contents (bitstring) + offset);
 
   bit_index = index % TARGET_CHAR_BIT;
-  byte >>= (gdbarch_bits_big_endian (current_gdbarch) ?
+  byte >>= (gdbarch_bits_big_endian (get_type_arch (bitstring_type)) ?
 	    TARGET_CHAR_BIT - 1 - bit_index : bit_index);
 
   v = value_from_longest (type, byte & 1);
@@ -520,6 +488,7 @@ value_x_binop (struct value *arg1, struct value *arg2, enum exp_opcode op,
 struct value *
 value_x_unop (struct value *arg1, enum exp_opcode op, enum noside noside)
 {
+  struct gdbarch *gdbarch = get_type_arch (value_type (arg1));
   struct value **argvec;
   char *ptr, *mangle_ptr;
   char tstr[13], mangle_tstr[13];
@@ -554,13 +523,13 @@ value_x_unop (struct value *arg1, enum exp_opcode op, enum noside noside)
       break;
     case UNOP_POSTINCREMENT:
       strcpy (ptr, "++");
-      argvec[2] = value_from_longest (builtin_type_int8, 0);
+      argvec[2] = value_from_longest (builtin_type (gdbarch)->builtin_int, 0);
       argvec[3] = 0;
       nargs ++;
       break;
     case UNOP_POSTDECREMENT:
       strcpy (ptr, "--");
-      argvec[2] = value_from_longest (builtin_type_int8, 0);
+      argvec[2] = value_from_longest (builtin_type (gdbarch)->builtin_int, 0);
       argvec[3] = 0;
       nargs ++;
       break;
@@ -640,6 +609,7 @@ value_concat (struct value *arg1, struct value *arg2)
   char inchar;
   struct type *type1 = check_typedef (value_type (arg1));
   struct type *type2 = check_typedef (value_type (arg2));
+  struct type *char_type;
 
   /* First figure out if we are dealing with two values to be concatenated
      or a repeat count and a value to be repeated.  INVAL1 is set to the
@@ -675,6 +645,7 @@ value_concat (struct value *arg1, struct value *arg2)
 	  ptr = (char *) alloca (count * inval2len);
 	  if (TYPE_CODE (type2) == TYPE_CODE_CHAR)
 	    {
+	      char_type = type2;
 	      inchar = (char) unpack_long (type2,
 					   value_contents (inval2));
 	      for (idx = 0; idx < count; idx++)
@@ -684,13 +655,14 @@ value_concat (struct value *arg1, struct value *arg2)
 	    }
 	  else
 	    {
+	      char_type = TYPE_TARGET_TYPE (type2);
 	      for (idx = 0; idx < count; idx++)
 		{
 		  memcpy (ptr + (idx * inval2len), value_contents (inval2),
 			  inval2len);
 		}
 	    }
-	  outval = value_string (ptr, count * inval2len);
+	  outval = value_string (ptr, count * inval2len, char_type);
 	}
       else if (TYPE_CODE (type2) == TYPE_CODE_BITSTRING
 	       || TYPE_CODE (type2) == TYPE_CODE_BOOL)
@@ -716,10 +688,12 @@ value_concat (struct value *arg1, struct value *arg2)
       ptr = (char *) alloca (inval1len + inval2len);
       if (TYPE_CODE (type1) == TYPE_CODE_CHAR)
 	{
+	  char_type = type1;
 	  *ptr = (char) unpack_long (type1, value_contents (inval1));
 	}
       else
 	{
+	  char_type = TYPE_TARGET_TYPE (type1);
 	  memcpy (ptr, value_contents (inval1), inval1len);
 	}
       if (TYPE_CODE (type2) == TYPE_CODE_CHAR)
@@ -731,7 +705,7 @@ value_concat (struct value *arg1, struct value *arg2)
 	{
 	  memcpy (ptr + inval1len, value_contents (inval2), inval2len);
 	}
-      outval = value_string (ptr, inval1len + inval2len);
+      outval = value_string (ptr, inval1len + inval2len, char_type);
     }
   else if (TYPE_CODE (type1) == TYPE_CODE_BITSTRING
 	   || TYPE_CODE (type1) == TYPE_CODE_BOOL)
@@ -816,7 +790,8 @@ uinteger_pow (ULONGEST v1, LONGEST v2)
    other types if one of them is not decimal floating point.  */
 static void
 value_args_as_decimal (struct value *arg1, struct value *arg2,
-		       gdb_byte *x, int *len_x, gdb_byte *y, int *len_y)
+		       gdb_byte *x, int *len_x, enum bfd_endian *byte_order_x,
+		       gdb_byte *y, int *len_y, enum bfd_endian *byte_order_y)
 {
   struct type *type1, *type2;
 
@@ -839,13 +814,15 @@ value_args_as_decimal (struct value *arg1, struct value *arg2,
 
   if (TYPE_CODE (type1) == TYPE_CODE_DECFLOAT)
     {
+      *byte_order_x = gdbarch_byte_order (get_type_arch (type1));
       *len_x = TYPE_LENGTH (type1);
       memcpy (x, value_contents (arg1), *len_x);
     }
   else if (is_integral_type (type1))
     {
+      *byte_order_x = gdbarch_byte_order (get_type_arch (type2));
       *len_x = TYPE_LENGTH (type2);
-      decimal_from_integral (arg1, x, *len_x);
+      decimal_from_integral (arg1, x, *len_x, *byte_order_x);
     }
   else
     error (_("Don't know how to convert from %s to %s."), TYPE_NAME (type1),
@@ -856,13 +833,15 @@ value_args_as_decimal (struct value *arg1, struct value *arg2,
 
   if (TYPE_CODE (type2) == TYPE_CODE_DECFLOAT)
     {
+      *byte_order_y = gdbarch_byte_order (get_type_arch (type2));
       *len_y = TYPE_LENGTH (type2);
       memcpy (y, value_contents (arg2), *len_y);
     }
   else if (is_integral_type (type2))
     {
+      *byte_order_y = gdbarch_byte_order (get_type_arch (type1));
       *len_y = TYPE_LENGTH (type1);
-      decimal_from_integral (arg2, y, *len_y);
+      decimal_from_integral (arg2, y, *len_y, *byte_order_y);
     }
   else
     error (_("Don't know how to convert from %s to %s."), TYPE_NAME (type1),
@@ -900,6 +879,7 @@ value_binop (struct value *arg1, struct value *arg2, enum exp_opcode op)
     {
       struct type *v_type;
       int len_v1, len_v2, len_v;
+      enum bfd_endian byte_order_v1, byte_order_v2, byte_order_v;
       gdb_byte v1[16], v2[16];
       gdb_byte v[16];
 
@@ -915,8 +895,10 @@ value_binop (struct value *arg1, struct value *arg2, enum exp_opcode op)
 	result_type = type1;
 
       len_v = TYPE_LENGTH (result_type);
+      byte_order_v = gdbarch_byte_order (get_type_arch (result_type));
 
-      value_args_as_decimal (arg1, arg2, v1, &len_v1, v2, &len_v2);
+      value_args_as_decimal (arg1, arg2, v1, &len_v1, &byte_order_v1,
+					 v2, &len_v2, &byte_order_v2);
 
       switch (op)
 	{
@@ -925,7 +907,9 @@ value_binop (struct value *arg1, struct value *arg2, enum exp_opcode op)
 	case BINOP_MUL:
 	case BINOP_DIV:
 	case BINOP_EXP:
-	  decimal_binop (op, v1, len_v1, v2, len_v2, v, len_v);
+	  decimal_binop (op, v1, len_v1, byte_order_v1,
+			     v2, len_v2, byte_order_v2,
+			     v, len_v, byte_order_v);
 	  break;
 
 	default:
@@ -1033,6 +1017,7 @@ value_binop (struct value *arg1, struct value *arg2, enum exp_opcode op)
       val = allocate_value (result_type);
       store_signed_integer (value_contents_raw (val),
 			    TYPE_LENGTH (result_type),
+			    gdbarch_byte_order (get_type_arch (result_type)),
 			    v);
     }
   else
@@ -1167,6 +1152,8 @@ value_binop (struct value *arg1, struct value *arg2, enum exp_opcode op)
 	  val = allocate_value (result_type);
 	  store_unsigned_integer (value_contents_raw (val),
 				  TYPE_LENGTH (value_type (val)),
+				  gdbarch_byte_order
+				    (get_type_arch (result_type)),
 				  v);
 	}
       else
@@ -1278,6 +1265,8 @@ value_binop (struct value *arg1, struct value *arg2, enum exp_opcode op)
 	  val = allocate_value (result_type);
 	  store_signed_integer (value_contents_raw (val),
 				TYPE_LENGTH (value_type (val)),
+				gdbarch_byte_order
+				  (get_type_arch (result_type)),
 				v);
 	}
     }
@@ -1300,7 +1289,8 @@ value_logical_not (struct value *arg1)
   if (TYPE_CODE (type1) == TYPE_CODE_FLT)
     return 0 == value_as_double (arg1);
   else if (TYPE_CODE (type1) == TYPE_CODE_DECFLOAT)
-    return decimal_is_zero (value_contents (arg1), TYPE_LENGTH (type1));
+    return decimal_is_zero (value_contents (arg1), TYPE_LENGTH (type1),
+			    gdbarch_byte_order (get_type_arch (type1)));
 
   len = TYPE_LENGTH (type1);
   p = value_contents (arg1);
@@ -1384,10 +1374,13 @@ value_equal (struct value *arg1, struct value *arg2)
     {
       gdb_byte v1[16], v2[16];
       int len_v1, len_v2;
+      enum bfd_endian byte_order_v1, byte_order_v2;
 
-      value_args_as_decimal (arg1, arg2, v1, &len_v1, v2, &len_v2);
+      value_args_as_decimal (arg1, arg2, v1, &len_v1, &byte_order_v1,
+					 v2, &len_v2, &byte_order_v2);
 
-      return decimal_compare (v1, len_v1, v2, len_v2) == 0;
+      return decimal_compare (v1, len_v1, byte_order_v1,
+			      v2, len_v2, byte_order_v2) == 0;
     }
 
   /* FIXME: Need to promote to either CORE_ADDR or LONGEST, whichever
@@ -1458,10 +1451,13 @@ value_less (struct value *arg1, struct value *arg2)
     {
       gdb_byte v1[16], v2[16];
       int len_v1, len_v2;
+      enum bfd_endian byte_order_v1, byte_order_v2;
 
-      value_args_as_decimal (arg1, arg2, v1, &len_v1, v2, &len_v2);
+      value_args_as_decimal (arg1, arg2, v1, &len_v1, &byte_order_v1,
+					 v2, &len_v2, &byte_order_v2);
 
-      return decimal_compare (v1, len_v1, v2, len_v2) == -1;
+      return decimal_compare (v1, len_v1, byte_order_v1,
+			      v2, len_v2, byte_order_v2) == -1;
     }
   else if (code1 == TYPE_CODE_PTR && code2 == TYPE_CODE_PTR)
     return value_as_address (arg1) < value_as_address (arg2);
@@ -1522,7 +1518,7 @@ value_neg (struct value *arg1)
 
       memcpy (decbytes, value_contents (arg1), len);
 
-      if (gdbarch_byte_order (current_gdbarch) == BFD_ENDIAN_LITTLE)
+      if (gdbarch_byte_order (get_type_arch (type)) == BFD_ENDIAN_LITTLE)
 	decbytes[len-1] = decbytes[len - 1] | 0x80;
       else
 	decbytes[0] = decbytes[0] | 0x80;
@@ -1564,6 +1560,7 @@ value_complement (struct value *arg1)
 int
 value_bit_index (struct type *type, const gdb_byte *valaddr, int index)
 {
+  struct gdbarch *gdbarch = get_type_arch (type);
   LONGEST low_bound, high_bound;
   LONGEST word;
   unsigned rel_index;
@@ -1573,9 +1570,10 @@ value_bit_index (struct type *type, const gdb_byte *valaddr, int index)
   if (index < low_bound || index > high_bound)
     return -1;
   rel_index = index - low_bound;
-  word = extract_unsigned_integer (valaddr + (rel_index / TARGET_CHAR_BIT), 1);
+  word = extract_unsigned_integer (valaddr + (rel_index / TARGET_CHAR_BIT), 1,
+				   gdbarch_byte_order (gdbarch));
   rel_index %= TARGET_CHAR_BIT;
-  if (gdbarch_bits_big_endian (current_gdbarch))
+  if (gdbarch_bits_big_endian (gdbarch))
     rel_index = TARGET_CHAR_BIT - 1 - rel_index;
   return (word >> rel_index) & 1;
 }

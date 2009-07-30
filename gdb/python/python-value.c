@@ -45,16 +45,19 @@ struct value *values_in_python = NULL;
    GDB (which uses target arithmetic).  */
 
 /* Python's integer type corresponds to C's long type.  */
-#define builtin_type_pyint builtin_type (current_gdbarch)->builtin_long
+#define builtin_type_pyint builtin_type (python_gdbarch)->builtin_long
 
 /* Python's float type corresponds to C's double type.  */
-#define builtin_type_pyfloat builtin_type (current_gdbarch)->builtin_double
+#define builtin_type_pyfloat builtin_type (python_gdbarch)->builtin_double
 
 /* Python's long type corresponds to C's long long type.  */
-#define builtin_type_pylong builtin_type (current_gdbarch)->builtin_long_long
+#define builtin_type_pylong builtin_type (python_gdbarch)->builtin_long_long
 
 #define builtin_type_pybool \
-  language_bool_type (current_language, current_gdbarch)
+  language_bool_type (python_language, python_gdbarch)
+
+#define builtin_type_pychar \
+  language_string_char_type (python_language, python_gdbarch)
 
 typedef struct {
   PyObject_HEAD
@@ -187,13 +190,16 @@ valpy_get_type (PyObject *self, void *closure)
   return obj->type;
 }
 
-/* Implementation of gdb.Value.string ([encoding] [, errors]) -> string
-   Return Unicode string with value contents.  If ENCODING is not given,
-   the string is assumed to be encoded in the target's charset.  */
+/* Implementation of gdb.Value.string ([encoding] [, errors]
+   [, length]) -> string.  Return Unicode string with value contents.
+   If ENCODING is not given, the string is assumed to be encoded in
+   the target's charset.  If LENGTH is provided, only fetch string to
+   the length provided.  */
+
 static PyObject *
 valpy_string (PyObject *self, PyObject *args, PyObject *kw)
 {
-  int length, ret = 0;
+  int length = -1, ret = 0;
   gdb_byte *buffer;
   struct value *value = ((value_object *) self)->value;
   volatile struct gdb_exception except;
@@ -202,10 +208,10 @@ valpy_string (PyObject *self, PyObject *args, PyObject *kw)
   const char *errors = NULL;
   const char *user_encoding = NULL;
   const char *la_encoding = NULL;
-  static char *keywords[] = { "encoding", "errors" };
+  static char *keywords[] = { "encoding", "errors", "length" };
 
-  if (!PyArg_ParseTupleAndKeywords (args, kw, "|ss", keywords,
-				    &user_encoding, &errors))
+  if (!PyArg_ParseTupleAndKeywords (args, kw, "|ssi", keywords,
+				    &user_encoding, &errors, &length))
     return NULL;
 
   TRY_CATCH (except, RETURN_MASK_ALL)
@@ -265,8 +271,7 @@ valpy_getitem (PyObject *self, PyObject *key)
 {
   value_object *self_value = (value_object *) self;
   char *field = NULL;
-  struct value *idx = NULL;
-  struct value *res_val = NULL;	  /* Initialize to appease gcc warning.  */
+  struct value *res_val = NULL;
   volatile struct gdb_exception except;
 
   if (gdbpy_is_string (key))
@@ -288,17 +293,15 @@ valpy_getitem (PyObject *self, PyObject *key)
 	     value code throw an exception if the index has an invalid
 	     type.  */
 	  struct value *idx = convert_value_from_python (key);
-	  if (idx == NULL)
-	    return NULL;
-
-	  res_val = value_subscript (tmp, idx);
+	  if (idx != NULL)
+	    res_val = value_subscript (tmp, value_as_long (idx));
 	}
     }
-  if (field)
-    xfree (field);
+
+  xfree (field);
   GDB_PY_HANDLE_EXCEPTION (except);
 
-  return value_to_value_object (res_val);
+  return res_val ? value_to_value_object (res_val) : NULL;
 }
 
 static int
@@ -331,7 +334,7 @@ valpy_str (PyObject *self)
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
       common_val_print (((value_object *) self)->value, stb, 0,
-			&opts, current_language);
+			&opts, python_language);
       s = ui_file_xstrdup (stb, &dummy);
     }
   GDB_PY_HANDLE_EXCEPTION (except);
@@ -411,10 +414,12 @@ valpy_binop (enum valpy_opcode opcode, PyObject *self, PyObject *other)
 	    CHECK_TYPEDEF (rtype);
 	    rtype = STRIP_REFERENCE (rtype);
 
-	    if (TYPE_CODE (ltype) == TYPE_CODE_PTR)
-	      res_val = value_ptradd (arg1, arg2);
-	    else if (TYPE_CODE (rtype) == TYPE_CODE_PTR)
-	      res_val = value_ptradd (arg2, arg1);
+	    if (TYPE_CODE (ltype) == TYPE_CODE_PTR
+		&& is_integral_type (rtype))
+	      res_val = value_ptradd (arg1, value_as_long (arg2));
+	    else if (TYPE_CODE (rtype) == TYPE_CODE_PTR
+		     && is_integral_type (ltype))
+	      res_val = value_ptradd (arg2, value_as_long (arg1));
 	    else
 	      res_val = value_binop (arg1, arg2, BINOP_ADD);
 	  }
@@ -429,16 +434,14 @@ valpy_binop (enum valpy_opcode opcode, PyObject *self, PyObject *other)
 	    CHECK_TYPEDEF (rtype);
 	    rtype = STRIP_REFERENCE (rtype);
 
-	    if (TYPE_CODE (ltype) == TYPE_CODE_PTR)
-	      {
-		if (TYPE_CODE (rtype) == TYPE_CODE_PTR)
-		    /* A ptrdiff_t for the target would be preferable
-		       here.  */
-		    res_val = value_from_longest (builtin_type_pyint,
-						  value_ptrdiff (arg1, arg2));
-		else
-		  res_val = value_ptrsub (arg1, arg2);
-	      }
+	    if (TYPE_CODE (ltype) == TYPE_CODE_PTR
+		&& TYPE_CODE (rtype) == TYPE_CODE_PTR)
+	      /* A ptrdiff_t for the target would be preferable here.  */
+	      res_val = value_from_longest (builtin_type_pyint,
+					    value_ptrdiff (arg1, arg2));
+	    else if (TYPE_CODE (ltype) == TYPE_CODE_PTR
+		     && is_integral_type (rtype))
+	      res_val = value_ptradd (arg1, - value_as_long (arg2));
 	    else
 	      res_val = value_binop (arg1, arg2, BINOP_SUB);
 	  }
@@ -549,8 +552,8 @@ valpy_positive (PyObject *self)
 static PyObject *
 valpy_absolute (PyObject *self)
 {
-  if (value_less (((value_object *) self)->value,
-		  value_from_longest (builtin_type_int8, 0)))
+  struct value *value = ((value_object *) self)->value;
+  if (value_less (value, value_zero (value_type (value), not_lval)))
     return valpy_negative (self);
   else
     return valpy_positive (self);
@@ -571,7 +574,8 @@ valpy_nonzero (PyObject *self)
     return value_as_double (self_value->value) != 0;
   else if (TYPE_CODE (type) == TYPE_CODE_DECFLOAT)
     return !decimal_is_zero (value_contents (self_value->value),
-			     TYPE_LENGTH (type));
+			     TYPE_LENGTH (type),
+			     gdbarch_byte_order (get_type_arch (type)));
   else
     {
       PyErr_SetString (PyExc_TypeError, _("Attempted truth testing on invalid "
@@ -868,7 +872,7 @@ convert_value_from_python (PyObject *obj)
 	  if (s != NULL)
 	    {
 	      old = make_cleanup (xfree, s);
-	      value = value_from_string (s);
+	      value = value_cstring (s, strlen (s), builtin_type_pychar);
 	      do_cleanups (old);
 	    }
 	}
@@ -950,7 +954,7 @@ static PyMethodDef value_object_methods[] = {
   { "cast", valpy_cast, METH_VARARGS, "Cast the value to the supplied type." },
   { "dereference", valpy_dereference, METH_NOARGS, "Dereferences the value." },
   { "string", (PyCFunction) valpy_string, METH_VARARGS | METH_KEYWORDS,
-    "string ([encoding] [, errors]) -> string\n\
+    "string ([encoding] [, errors] [, length]) -> string\n\
 Return Unicode string representation of the value." },
   {NULL}  /* Sentinel */
 };

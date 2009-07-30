@@ -371,6 +371,7 @@ CODE_FRAGMENT
 
 #define DOT_DEBUG	".debug"
 #define GNU_LINKONCE_WI ".gnu.linkonce.wi."
+#define DOT_RELOC	".reloc"
 
 #if defined (COFF_LONG_SECTION_NAMES)
 /* Needed to expand the inputs to BLANKOR1TOODD.  */
@@ -3625,7 +3626,7 @@ coff_write_object_contents (bfd * abfd)
       bfd_boolean is_reloc_section = FALSE;
 
 #ifdef COFF_IMAGE_WITH_PE
-      if (strcmp (current->name, ".reloc") == 0)
+      if (strcmp (current->name, DOT_RELOC) == 0)
 	{
 	  is_reloc_section = TRUE;
 	  hasrelocs = TRUE;
