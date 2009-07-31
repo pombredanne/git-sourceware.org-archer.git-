@@ -1,3 +1,306 @@
+2009-07-31  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* spu-tdep.c: Include "infcall.h".
+	(spu_address_class_type_flags): New function.
+	(spu_address_class_type_flags_to_name): Likewise.
+	(spu_address_class_name_to_type_flags): Likewise.
+	(spu_pointer_to_address): Handle __ea pointers.
+	(spu_auto_flush_cache_p): New static variable.
+	(spu_objfile_from_frame): New function.
+	(flush_ea_cache, spu_attach_normal_stop): Likewise.
+	(show_spu_auto_flush_cache): Likewise.
+	(spu_gdbarch_init): Install address class handlers.
+	(_initialize_spu_tdep): Attach to normal_stop observer.
+	Install "set spu auto-flush-cache" / "show spu auto-flush-cache"
+	commands.
+
+	* NEWS: Mention "set/show spu auto-flush-cache" commands.
+
+2009-07-31  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* spu-tdep.c: Include "block.h".
+	(setspucmdlist, showspucmdlist): New static variables.
+	(spu_stop_on_load_p): Likewise.
+	(spu_catch_start): New function.
+	(show_spu_command, set_spu_command): New functions.
+	(show_spu_stop_on_load): Likewise.
+	(_initialize_spu_tdep): Attach spu_catch_start to new_objfile observer.
+	Install "set spu" / "show spu" prefix command handler.
+	Install "set spu stop-on-load" / "show spu stop-on-load" command.
+
+	* NEWS: Mention "set/show spu stop-on-load" commands.
+
+2009-07-31  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* ppc-linux-tdep.c: Include "solib.h", "solist.h", "exceptions.h",
+	"arch-utils.h", and "spu-tdep.h".
+	(spu_context_objfile, spe_context_lm_addr, spe_context_offset):
+	New static variables.
+	(spe_context_cache_ptid, spe_context_cache_address): Likewise.
+	(ppc_linux_spe_context_lookup): New function.
+	(ppc_linux_spe_context_inferior_created): Likewise.
+	(ppc_linux_spe_context_solib_loaded): Likewise.
+	(ppc_linux_spe_context_solib_unloaded): Likewise.
+	(ppc_linux_spe_context): Likewise.
+	(struct ppu2spu_cache, struct ppu2spu_data): New data types.
+	(ppu2spu_prev_arch, ppu2spu_this_id, ppu2spu_prev_register,
+	ppu2spu_unwind_register, ppu2spu_sniffer,
+	ppu2spu_dealloc_cache): New functions.
+	(ppu2spu_unwind): New static variable.
+	(ppc_linux_init_abi): Install cross-architecture unwinder.
+	(_initialize_ppc_linux_tdep): Attach to observers.
+
+	* spu-tdep.c (struct spu2ppu_cache): New data type.
+	(spu2ppu_prev_arch, spu2ppu_this_id, spu2ppu_prev_register,
+	spu2ppu_sniffer, spu2ppu_dealloc_cache): New functions.
+	(spu2ppu_unwind): New static variable.
+	(spu_gdbarch_init): Install cross-architecture unwinder.
+
+2009-07-31  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* target.h (enum strata): New value arch_stratum.
+	* target.c (target_require_runnable): Skip arch_stratum targets.
+
+	* configure.tgt (powerpc-*-linux* | powerpc64-*-linux*): Add
+	solib-spu.o and spu-multiarch.o to gdb_target_obs.
+	* Makefile.in (ALL_TARGET_OBS): Add solib-spu.o and spu-multiarch.o.
+	(ALLDEPFILES): Add solib-spu.c and spu-multiarch.c.
+
+	* solib-spu.c: New file.
+	* solib-spu.h: New file.
+	* spu-multiarch.c: New file.
+
+	* spu-tdep.h (SPUADDR, SPUADDR_SPU, SPUADDR_ADDR): New macros.
+
+	* spu-tdep.c (struct gdbarch_tdep): New member id.
+	(spu_gdbarch_id): New function.
+	(spu_lslr): New function.
+
+	(spu_address_to_pointer): New function.
+	(spu_pointer_to_address): Support SPU ID address encoding.  Use
+	spu_gdbarch_id and spu_lslr.
+	(spu_integer_to_address): Likewise.
+	(spu_frame_unwind_cache): Update for encoded addresses.
+	(spu_unwind_pc, spu_unwind_sp): Likewise.
+	(spu_read_pc, spu_write_pc): Likewise.
+	(spu_push_dummy_call): Likewise.
+	(spu_software_single_step): Likewise.
+	(spu_get_longjmp_target): Likewise.
+	(spu_overlay_update_osect): Likewise.
+
+	(spu_dis_asm_print_address): New function.
+	(gdb_print_insn_spu): Likewise.
+
+	(spu_gdbarch_init): Store SPU ID in tdep structure.
+	Install spu_address_to_pointer and gdb_print_insn_spu.
+
+	* ppc-linux-tdep.c: Include "observer.h", "auxv.h", "elf/common.h"
+	and "solib-spu.h".
+	(ppc_linux_entry_point_addr): New static variable.
+	(ppc_linux_inferior_created): New function.
+	(ppc_linux_displaced_step_location): Likewise.
+	(ppc_linux_init_abi): Enable Cell/B.E. support if supported
+	by the target.
+	(_initialize_ppc_linux_tdep): Attach to inferior_created observer.
+
+	* NEWS: Mention multi-architecture and Cell/B.E. debugging
+	capabilities.
+
+2009-07-31  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* linux-nat.c: Include <sys/vfs.h>.
+	(SPUFS_MAGIC): Define.
+	(spu_enumerate_spu_ids): New function.
+	(linux_proc_xfer_spu): New function.
+	(linux_xfer_partial): Handle TARGET_OBJECT_SPU.
+
+	(iterate_over_spus): New function.
+	(struct linux_spu_corefile_data): New data type.
+	(linux_spu_corefile_callback): New function.
+	(linux_spu_make_corefile_notes): New function.
+	(linux_nat_make_corefile_notes): Call it.
+
+	* corelow.c (struct spuid_list): New data type.
+	(add_to_spuid_list): New function.
+	(core_xfer_partial): Handle TARGET_OBJECT_SPU.
+
+2009-07-31  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* features/Makefile: Allow sub-platform specific expedite settings.
+	(WHICH): Add rs6000/powerpc-cell32l and rs6000/powerpc-cell64l.
+	(rs6000/powerpc-cell32l-expedite): Define.
+	(rs6000/powerpc-cell64l-expedite): Likewise.
+	* features/rs6000/powerpc-cell32l.xml: New file.
+	* features/rs6000/powerpc-cell64l.xml: New file.
+	* features/rs6000/powerpc-cell32l.c: New generated file.
+	* features/rs6000/powerpc-cell64l.c: New generated file.
+
+	* regformats/rs6000/powerpc-cell32l.dat: New generated file.
+	* regformats/rs6000/powerpc-cell64l.dat: New generated file.
+
+	* config/djgpp/fnchange.lst: Add mappings for new files.
+
+	* ppc-linux-tdep.h (tdesc_powerpc_cell32l): Add prototype.
+	(tdesc_powerpc_cell64l): Likewise.
+	* ppc-linux-tdep.c: Include "features/rs6000/powerpc-cell32l.c"
+	and "features/rs6000/powerpc-cell64l.c".
+	(_initialize_ppc_linux_tdep): Initialize target descriptions.
+	(ppc_linux_spu_section): New function.
+	(ppc_linux_core_read_description): Detect Cell/B.E. core files.
+	* ppc-linux-nat.c (PPC_FEATURE_CELL): Define.
+	(ppc_linux_read_description): Detect Cell/B.E. architecture.
+
+	* rs6000-tdep.c (rs6000_gdbarch_init): Do not trust BFD wordsize
+	if exec file is not PowerPC architecture.
+
+2009-07-31  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* features/gdb-target.dtd (target): Accept optional
+	<compatible> elements.
+	(compatible): Define element.
+
+	* target-descriptions.h (tdesc_compatible_p): New.
+	(tdesc_add_compatible): New.
+	* target-descriptions.c (arch_p): New VEC_P type.
+	(struct target_desc): New member compatible.
+	(free_target_description): Handle it.
+	(maint_print_c_tdesc_cmd): Likewise.
+	(tdesc_compatible_p): New function.
+	(tdesc_add_compatible): New function.
+
+	* xml-tdesc.c (tdesc_end_compatible): New function.
+	(target_children): Handle <compatible> element.
+
+	* arch-utils.c (choose_architecture_for_target): Accept target
+	description instead of BFD architecture as input.  Query target
+	description for compatible architectures.
+	(gdbarch_info_fill): Update call.
+
+	* NEWS: Mention <compatible> element of target descriptions.
+
+2009-07-31  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* breakpoint.c (remove_breakpoints): If removing one breakpoint
+	location fails, still continue to remove other locations.
+	(remove_hw_watchpoints): Likewise.
+	(detach_breakpoints): Likewise.
+
+2009-07-31  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* breakpoint.h (enum enable_state): Add bp_startup_disabled.
+	(disable_breakpoints_before_startup): Add prototype.
+	(enable_breakpoints_after_startup): Likewise.
+
+	* breakpoint.c (executing_startup): New static variable.
+	(describe_other_breakpoints): Handle bp_startup_disabled.
+	(check_duplicates_for): Likewise.
+	(disable_breakpoints_before_startup): New function.
+	(enable_breakpoints_after_startup): New function.
+	(create_breakpoint): Mark new breakpoints as bp_startup_disabled
+	if executing_startup flag is true.
+	(break_command_really): Likewise.
+	(breakpoint_re_set_one): Skip bp_startup_disabled breakpoints.
+
+2009-07-31  Julian Brown  <julian@codesourcery.com>
+
+	* arm-linux-tdep.c (arch-utils.h, inferior.h, gdbthread.h, symfile.h):
+	Include files.
+	(arm_linux_cleanup_svc, arm_linux_copy_svc): New.
+	(cleanup_kernel_helper_return, arm_catch_kernel_helper_return): New.
+	(arm_linux_displaced_step_copy_insn): New.
+	(arm_linux_init_abi): Initialise displaced stepping callbacks.
+	* arm-tdep.c (DISPLACED_STEPPING_ARCH_VERSION): New macro.
+	(ARM_NOP): New.
+	(displaced_read_reg, displaced_in_arm_mode, branch_write_pc)
+	(bx_write_pc, load_write_pc, alu_write_pc, displaced_write_reg)
+	(insn_references_pc, copy_unmodified, cleanup_preload, copy_preload)
+	(copy_preload_reg, cleanup_copro_load_store, copy_copro_load_store)
+	(cleanup_branch, copy_b_bl_blx, copy_bx_blx_reg, cleanup_alu_imm)
+	(copy_alu_imm, cleanup_alu_reg, copy_alu_reg)
+	(cleanup_alu_shifted_reg, copy_alu_shifted_reg, cleanup_load)
+	(cleanup_store, copy_extra_ld_st, copy_ldr_str_ldrb_strb)
+	(cleanup_block_load_all, cleanup_block_store_pc)
+	(cleanup_block_load_pc, copy_block_xfer, cleanup_svc, copy_svc)
+	(copy_undef, copy_unpred): New.
+	(decode_misc_memhint_neon, decode_unconditional)
+	(decode_miscellaneous, decode_dp_misc, decode_ld_st_word_ubyte)
+	(decode_media, decode_b_bl_ldmstm, decode_ext_reg_ld_st)
+	(decode_svc_copro, arm_process_displaced_insn)
+	(arm_displaced_init_closure, arm_displaced_step_copy_insn)
+	(arm_displaced_step_fixup): New.
+	(arm_gdbarch_init): Initialise max insn length field.
+	* arm-tdep.h (DISPLACED_TEMPS, DISPLACED_MODIFIED_INSNS): New
+	macros.
+	(displaced_step_closure, pc_write_style): New.
+	(arm_displaced_init_closure, displaced_read_reg)
+	(arm_process_displaced_insn, arm_displaced_init_closure)
+	(displaced_read_reg, displaced_write_reg, arm_displaced_step_copy_insn)
+	(arm_displaced_step_fixup): Add prototypes.
+
+2009-07-31  Pedro Alves  <pedro@codesourcery.com>
+	    Julian Brown  <julian@codesourcery.com>
+
+	* infrun.c (displaced_step_fixup): If this is a software
+	single-stepping arch, don't tell the target to single-step.
+	(maybe_software_singlestep): Return 0 if we're using displaced
+	stepping.
+	(resume): If this is a software single-stepping arch, and
+	displaced-stepping is enabled, use it for all single-step
+	requests.
+
+2009-07-30  Ralf Wildenhues  <Ralf.Wildenhues@gmx.de>
+
+	* Makefile.in (ACLOCAL, ACLOCAL_AMFLAGS, aclocal_m4_deps)
+	(AUTOCONF, configure_deps, AUTOHEADER): New variables.
+	($(srcdir)/aclocal.m4, $(srcdir)/configure, $(srcdir)/config.in)
+	(am--refresh): New rules.
+	(stamp-h, config.status): List config.in and configure including
+	$(srcdir)/ prefix.
+	* aclocal.m4: Regenerate.
+	* configure: Regenerate.
+
+2009-07-30  Thomas Schwinge  <tschwinge@gnu.org>
+
+	* gnu-nat.c (add_task_commands) <stopped>: Register the correct
+	callback function.
+
+2009-07-30  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* ia64-tdep.c (ia64_access_reg): Correct paddress.
+
+2009-07-30  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Replace public function varobj_list by all_root_varobjs iterator.
+	* mi/mi-cmd-var.c (struct mi_cmd_var_update, mi_cmd_var_update_iter):
+	New.
+	(mi_cmd_var_update): Replace the varobj_list call by all_root_varobjs.
+	Remove the variables rootlist, cr.  New variable data.
+	* varobj.c (rootcount, varobj_list): Remove.
+	(install_variable, uninstall_variable): Remove the rootcount updates.
+	(all_root_varobjs): New function.
+	(varobj_invalidate): Use the all_root_varobjs call.  Move the code to...
+	(varobj_invalidate_iter): ... a new function.
+	* varobj.h (varobj_list): Remove the prototype.
+	(all_root_varobjs): New prototype.
+
+2009-07-29  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	PR gdb/6817
+	* dbxread.c (read_dbx_symtab): Reduce stack use.
+	
+2009-07-29  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix gcc-4.5 HEAD warnings.
+	* cp-name-parser.y (%union <typed_val_int>, %token GLOBAL)
+	(GLOBAL_CONSTRUCTORS, GLOBAL_DESTRUCTORS, demangler_special <GLOBAL>):
+	Remove.
+	(yylex <"global constructors keyed to ">)
+	(yylex <"global destructors keyed to ">): Base it on DEMANGLER_SPECIAL.
+	(cp_comp_to_string): Remove variables str, prefix and buf.  Remove the
+	GLOBAL_DESTRUCTORS and GLOBAL_CONSTRUCTORS handling.
+	(cp_print): Remove the GLOBAL_DESTRUCTORS and GLOBAL_CONSTRUCTORS
+	handling.
+
 2009-07-28  Daniel Jacobowitz  <dan@codesourcery.com>
 
 	* NEWS: Mention ARM VFP support.

@@ -137,11 +137,11 @@ extern char *varobj_get_value (struct varobj *var);
 
 extern int varobj_set_value (struct varobj *var, char *expression);
 
-extern VEC(varobj_update_result) *varobj_update (struct varobj **varp, 
-						 int explicit);
-
 extern void all_root_varobjs (void (*func) (struct varobj *var, void *data),
 			      void *data);
+
+extern VEC(varobj_update_result) *varobj_update (struct varobj **varp, 
+						 int explicit);
 
 extern int varobj_editable_p (struct varobj *var);
 

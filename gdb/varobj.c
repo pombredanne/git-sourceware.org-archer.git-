@@ -3372,6 +3372,7 @@ When non-zero, varobj debugging is enabled."),
 			    show_varobjdebug,
 			    &setlist, &showlist);
 
+
   observer_attach_objfile_unloading (varobj_invalidate );
   observer_attach_objfile_unloaded (varobj_revalidate);
   observer_attach_new_objfile (varobj_revalidate_for_objfile);
