@@ -378,11 +378,13 @@ infpy_read_memory (PyObject *self, PyObject *args)
   void *buffer = NULL;
   membuf_object *membuf_obj;
   PyObject *addr_obj, *length_obj;
-  struct cleanup *cleanups = NULL;
+  struct cleanup *cleanups;
   volatile struct gdb_exception except;
 
   if (! PyArg_ParseTuple (args, "OO", &addr_obj, &length_obj))
     return NULL;
+
+  cleanups = make_cleanup (null_cleanup, NULL);
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
@@ -394,25 +396,28 @@ infpy_read_memory (PyObject *self, PyObject *args)
 	}
 
       buffer = xmalloc (length);
-      cleanups = make_cleanup (xfree, buffer);
+      make_cleanup (xfree, buffer);
 
       read_memory (addr, buffer, length);
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
   if (error)
-    return NULL;
-
-  discard_cleanups (cleanups);
+    {
+      do_cleanups (cleanups);
+      return NULL;
+    }
 
   membuf_obj = PyObject_New (membuf_object, &membuf_object_type);
   if (membuf_obj == NULL)
     {
-      xfree (buffer);
       PyErr_SetString (PyExc_MemoryError,
 		       "Could not allocate memory buffer object.");
+      do_cleanups (cleanups);
       return NULL;
     }
+
+  discard_cleanups (cleanups);
 
   membuf_obj->buffer = buffer;
   membuf_obj->addr = addr;
