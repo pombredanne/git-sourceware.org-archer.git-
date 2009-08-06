@@ -1,3 +1,95 @@
+2009-08-06  Don Lee <don.lee@sunplusct.com>
+
+	* score-tdep.c: Support a new Sunplus CT S+core variant, S+core 3.
+	* score-tdep.h: Ditto.
+	* NEWS: Ditto.
+	* configure.tgt: Test do we have a simulator.
+	* MAINTAINERS: Add myself under target score
+
+2009-08-06  Nick Roberts  <nickrob@snap.net.nz>
+
+	* utils.c (defaulted_query): Don't ask for confirmation if server
+	prefix is used.
+
+2009-08-05  Tom Tromey  <tromey@redhat.com>
+
+	* spu-tdep.h (SPUADDR_SPU): Cast result to int.
+
+2009-08-04  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* objfiles.h (OBJF_KEEPBFD): Delete.
+	(gdb_bfd_unref): New prototype.
+	* objfiles.c (gdb_bfd_unref): New function.
+	(free_objfile): Call gdb_bfd_unref.
+	* solib.c (free_so): Likewise.
+	(symbol_add_stub): Set refcount.
+
+2009-08-04  Hui Zhu  <teawater@gmail.com>
+	    Michael Snyder  <msnyder@vmware.com>
+
+	* record.c (record_mem_entry): New field 'mem_entry_not_accessible'.
+	(record_arch_list_add_mem): Initialize 'mem_entry_not_accessible'.
+	(record_wait): Set 'mem_entry_not_accessible' flag if target
+	memory not readable.  Don't try to change target memory if
+	'mem_entry_not_accessible' is set.
+
+2009-08-03  Richard Guenther  <rguenther@suse.de>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix memory corruption on reread of file through a symbolic link.
+	* symfile.c (find_separate_debug_file): Initialize CANON_NAME earlier.
+	Allocate DEBUGFILE with length based on CANON_NAME.  Free CANON_NAME on
+	all the return paths.
+
+2009-08-03  Jim Ingham  <jingham@apple.com>
+	    Vladimir Prus  <vladimir@codesourcery.com>
+
+	Implement -break-commands
+
+	* breakpoint.c (get_breakpoint, breakpoint_set_commands): New.
+	(commands_command): Use breakpoint_set_commands.
+	* breakpoint.h (get_breakpoint, breakpoint_set_commands): Declare.
+
+	* mi/mi-cmds.h (mi_cmd_break_commands): New.
+	* mi/mi-cmds.c: Register -break-commands.
+	* mi/mi-cmd-break.c (mi_cmd_break_commands, mi_read_next_line)
+	(mi_command_line_array, mi_command_line_array_cnt)
+	(mi_command_line_array_ptr): New.
+
+2009-08-03  Jim Ingham  <jingham@apple.com>
+	    Vladimir Prus  <vladimir@codesourcery.com>
+
+	Refactor reading of commands
+
+	* defs.h (read_command_lines_1): Declare.
+	* cli/cli-script.c (read_next_line): Only return string,
+	do not process.
+	(process_next_line): New, extracted from read_next_line.
+	(recurse_read_control_structure): Take a function pointer to the
+	read function.
+	(get_command_line) Pass the read_next_line as reader function
+	into recurse_read_control_structure.
+	(read_command_lines_1): New, extracted from...
+	(read_command_lines): ...here.
+
+2009-07-31  Kazu Hirata  <kazu@codesourcery.com>
+
+	* procfs.c (proc_set_current_signal): Populate mysinfo before
+	copying it to arg.
+	(proc_clear_current_signal): Likewise.
+	(proc_set_watchpoint): Populate pwatch before copying it to arg.
+
+2009-07-31  Michael Snyder  <msnyder@vmware.com>
+
+	* remote.c (store_register_using_P): Call putpkt and getpkt
+	directly instead of calling remote_send.
+	(store_registers_using_G): Ditto.
+	(fetch_register_using_p): Ditto.
+
+	* remote.c (store_register_using_P): Make error msg more verbose.
+	(store_registers_using_G): Ditto.
+	(fetch_register_using_p): Ditto.
+
 2009-07-31  Ulrich Weigand  <uweigand@de.ibm.com>
 
 	* spu-tdep.c: Include "infcall.h".

@@ -331,7 +331,7 @@ bfd_elf_string_from_elf_section (bfd *abfd,
 	 (shindex == shstrndx && strindex == hdr->sh_name
 	  ? ".shstrtab"
 	  : bfd_elf_string_from_elf_section (abfd, shstrndx, hdr->sh_name)));
-      return "";
+      return NULL;
     }
 
   return ((char *) hdr->contents) + strindex;
@@ -3084,7 +3084,7 @@ sym_is_global (bfd *abfd, asymbol *sym)
   if (bed->elf_backend_sym_is_global)
     return (*bed->elf_backend_sym_is_global) (abfd, sym);
 
-  return ((sym->flags & (BSF_GLOBAL | BSF_WEAK)) != 0
+  return ((sym->flags & (BSF_GLOBAL | BSF_WEAK | BSF_GNU_UNIQUE)) != 0
 	  || bfd_is_und_section (bfd_get_section (sym))
 	  || bfd_is_com_section (bfd_get_section (sym)));
 }
