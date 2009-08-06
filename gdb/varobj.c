@@ -197,6 +197,17 @@ struct varobj
   /* The pretty-printer that has been constructed.  If NULL, then a
      new printer object is needed, and one will be constructed.  */
   PyObject *pretty_printer;
+
+  /* The iterator returned by the printer's 'children' method, or NULL
+     if not available.  */
+  PyObject *child_iter;
+
+  /* We request one extra item from the iterator, so that we can
+     report to the caller whether there are more items than we have
+     already reported.  However, we don't want to install this value
+     when we read it, because that will mess up future updates.  So,
+     we stash it here instead.  */
+  PyObject *saved_item;
 };
 
 struct cpstack
@@ -815,6 +826,17 @@ varobj_get_display_hint (struct varobj *var)
   return result;
 }
 
+/* Return true if the varobj has items after TO, false otherwise.  */
+
+int
+varobj_has_more (struct varobj *var, int to)
+{
+  if (VEC_length (varobj_p, var->children) > to)
+    return 1;
+  return (VEC_length (varobj_p, var->children) == to
+	  && var->saved_item != NULL);
+}
+
 /* If the variable object is bound to a specific thread, that
    is its evaluation can always be done in context of a frame
    inside that thread, returns GDB id of the thread -- which
@@ -847,22 +869,73 @@ varobj_get_frozen (struct varobj *var)
   return var->frozen;
 }
 
+/* A helper function that restricts a range to what is actually
+   available in a VEC.  This follows the usual rules for the meaning
+   of FROM and TO -- if either is negative, the entire range is
+   used.  */
+
+static void
+restrict_range (VEC (varobj_p) *children, int *from, int *to)
+{
+  if (*from < 0 || *to < 0)
+    {
+      *from = 0;
+      *to = VEC_length (varobj_p, children);
+    }
+  else
+    {
+      if (*from > VEC_length (varobj_p, children))
+	*from = VEC_length (varobj_p, children);
+      if (*to > VEC_length (varobj_p, children))
+	*to = VEC_length (varobj_p, children);
+      if (*from > *to)
+	*from = *to;
+    }
+}
+
+/* A helper for update_dynamic_varobj_children that installs a new
+   child when needed.  */
+
+static void
+install_dynamic_child (struct varobj *var,
+		       VEC (varobj_p) **changed,
+		       VEC (varobj_p) **new,
+		       int *cchanged,
+		       int index,
+		       const char *name,
+		       struct value *value)
+{
+  if (VEC_length (varobj_p, var->children) < index + 1)
+    {
+      /* There's no child yet.  */
+      struct varobj *child = varobj_add_child (var, name, value);
+      if (new)
+	VEC_safe_push (varobj_p, *new, child);
+      *cchanged = 1;
+    }
+  else 
+    {
+      varobj_p existing = VEC_index (varobj_p, var->children, index);
+      if (install_new_value (existing, value, 0))
+	{
+	  if (changed)
+	    VEC_safe_push (varobj_p, *changed, existing);
+	}
+    }
+}
+
 static int
 update_dynamic_varobj_children (struct varobj *var,
 				VEC (varobj_p) **changed,
-				VEC (varobj_p) **new_and_unchanged,
-				int *cchanged)
-
+				VEC (varobj_p) **new,
+				int *cchanged,
+				int update_children,
+				int to)
 {
 #if HAVE_PYTHON
-  /* FIXME: we *might* want to provide this functionality as
-     a standalone function, so that other interested parties
-     than varobj code can benefit for this.  */
   struct cleanup *back_to;
   PyObject *children;
-  PyObject *iterator;
   int i;
-  int children_changed = 0;
   PyObject *printer = var->pretty_printer;
 
   back_to = varobj_ensure_python_env (var);
@@ -874,89 +947,103 @@ update_dynamic_varobj_children (struct varobj *var,
       return 0;
     }
 
-  children = PyObject_CallMethodObjArgs (printer, gdbpy_children_cst,
-					 NULL);
-
-  if (!children)
+  if (update_children || !var->child_iter)
     {
-      gdbpy_print_stack ();
-      error (_("Null value returned for children"));
+      children = PyObject_CallMethodObjArgs (printer, gdbpy_children_cst,
+					     NULL);
+
+      if (!children)
+	{
+	  gdbpy_print_stack ();
+	  error (_("Null value returned for children"));
+	}
+
+      make_cleanup_py_decref (children);
+
+      if (!PyIter_Check (children))
+	error (_("Returned value is not iterable"));
+
+      Py_XDECREF (var->child_iter);
+      var->child_iter = PyObject_GetIter (children);
+      if (!var->child_iter)
+	{
+	  gdbpy_print_stack ();
+	  error (_("Could not get children iterator"));
+	}
+
+      Py_XDECREF (var->saved_item);
+      var->saved_item = NULL;
+
+      i = 0;
     }
-
-  make_cleanup_py_decref (children);
-
-  if (!PyIter_Check (children))
-    error (_("Returned value is not iterable"));
-
-  iterator = PyObject_GetIter (children);
-  if (!iterator)
-    {
-      gdbpy_print_stack ();
-      error (_("Could not get children iterator"));
-    }
-  make_cleanup_py_decref (iterator);
+  else
+    i = VEC_length (varobj_p, var->children);
 
   /* We ask for one extra child, so that MI can report whether there
      are more children.  */
-  for (i = 0; var->to < 0 || i < var->to + 1; ++i)
+  for (; to < 0 || i < to + 1; ++i)
     {
-      PyObject *item = PyIter_Next (iterator);
-      PyObject *py_v;
-      struct value *v;
-      char *name;
-      struct cleanup *inner;
-      
+      PyObject *item;
+
+      /* See if there was a leftover from last time.  */
+      if (var->saved_item)
+	{
+	  item = var->saved_item;
+	  var->saved_item = NULL;
+	}
+      else
+	item = PyIter_Next (var->child_iter);
+
       if (!item)
 	break;
-      inner = make_cleanup_py_decref (item);
 
-      if (!PyArg_ParseTuple (item, "sO", &name, &py_v))
-	error (_("Invalid item from the child list"));
-      
-      v = convert_value_from_python (py_v);
-
-      /* TODO: This assume the name of the i-th child never changes.  */
-
-      /* Now see what to do here.  */
-      if (VEC_length (varobj_p, var->children) < i + 1)
+      /* We don't want to push the extra child on any report list.  */
+      if (to < 0 || i < to)
 	{
-	  /* There's no child yet.  */
-	  struct varobj *child = varobj_add_child (var, name, v);
-	  if (new_and_unchanged)
-	    VEC_safe_push (varobj_p, *new_and_unchanged, child);
-	  children_changed = 1;
-	}
-      else 
-	{
-	  varobj_p existing = VEC_index (varobj_p, var->children, i);
-	  if (install_new_value (existing, v, 0) && changed)
-	    {
-	      if (changed)
-		VEC_safe_push (varobj_p, *changed, existing);
-	    }
-	  else
-	    {
-	      if (new_and_unchanged)
-		VEC_safe_push (varobj_p, *new_and_unchanged, existing);
-	    }
-	}
+	  PyObject *py_v;
+	  char *name;
+	  struct value *v;
+	  struct cleanup *inner;
 
-      do_cleanups (inner);
+	  inner = make_cleanup_py_decref (item);
+
+	  if (!PyArg_ParseTuple (item, "sO", &name, &py_v))
+	    error (_("Invalid item from the child list"));
+
+	  v = convert_value_from_python (py_v);
+	  install_dynamic_child (var, changed, new,
+				 cchanged, i, name, v);
+	  do_cleanups (inner);
+	}
+      else
+	{
+	  Py_XDECREF (var->saved_item);
+	  var->saved_item = item;
+
+	  /* We want to truncate the child list just before this
+	     element.  */
+	  break;
+	}
     }
 
   if (i < VEC_length (varobj_p, var->children))
     {
-      int i;
-      children_changed = 1;
-      for (i = 0; i < VEC_length (varobj_p, var->children); ++i)
-	varobj_delete (VEC_index (varobj_p, var->children, i), NULL, 0);
+      int j;
+      *cchanged = 1;
+      for (j = i; j < VEC_length (varobj_p, var->children); ++j)
+	varobj_delete (VEC_index (varobj_p, var->children, j), NULL, 0);
+      VEC_truncate (varobj_p, var->children, i);
     }
-  VEC_truncate (varobj_p, var->children, i);
+
+  /* If there are fewer children than requested, note that the list of
+     children changed.  */
+  if (to >= 0 && VEC_length (varobj_p, var->children) < to)
+    *cchanged = 1;
+
   var->num_children = VEC_length (varobj_p, var->children);
  
   do_cleanups (back_to);
 
-  *cchanged = children_changed;
   return 1;
 #else
   gdb_assert (0 && "should never be called if Python is not enabled");
@@ -969,8 +1056,7 @@ varobj_get_num_children (struct varobj *var)
   if (var->num_children == -1)
     {
       int changed;
-      if (!var->pretty_printer
-	  || !update_dynamic_varobj_children (var, NULL, NULL, &changed))
+      if (!var->pretty_printer)
 	var->num_children = number_of_children (var);
     }
 
@@ -981,7 +1067,7 @@ varobj_get_num_children (struct varobj *var)
    the return code is the number of such children or -1 on error */
 
 VEC (varobj_p)*
-varobj_list_children (struct varobj *var)
+varobj_list_children (struct varobj *var, int *from, int *to)
 {
   struct varobj *child;
   char *name;
@@ -993,8 +1079,12 @@ varobj_list_children (struct varobj *var)
       /* This, in theory, can result in the number of children changing without
 	 frontend noticing.  But well, calling -var-list-children on the same
 	 varobj twice is not something a sane frontend would do.  */
-      && update_dynamic_varobj_children (var, NULL, NULL, &children_changed))
-    return var->children;
+      && update_dynamic_varobj_children (var, NULL, NULL, &children_changed,
+					 0, *to))
+    {
+      restrict_range (var->children, from, to);
+      return var->children;
+    }
 
   if (var->num_children == -1)
     var->num_children = number_of_children (var);
@@ -1023,6 +1113,7 @@ varobj_list_children (struct varobj *var)
 	}
     }
 
+  restrict_range (var->children, from, to);
   return var->children;
 }
 
@@ -1216,6 +1307,9 @@ install_visualizer (struct varobj *var, PyObject *constructor,
 
   Py_XDECREF (var->pretty_printer);
   var->pretty_printer = visualizer;
+
+  Py_XDECREF (var->child_iter);
+  var->child_iter = NULL;
 }
 
 /* Install the default visualizer for VAR.  */
@@ -1475,30 +1569,15 @@ install_new_value (struct varobj *var, struct value *value, int initial)
   return changed;
 }
 
-/* Return the effective requested range for a varobj.  VAR is the
-   varobj.  CHILDREN is the computed list of children.  FROM and TO
-   are out parameters.  If VAR has no bounds selected, *FROM and *TO
-   will be set to the full range of CHILDREN.  Otherwise, *FROM and
-   *TO will be set to the selected sub-range of VAR, clipped to be in
-   range of CHILDREN.  */
+/* Return the requested range for a varobj.  VAR is the varobj.  FROM
+   and TO are out parameters; *FROM and *TO will be set to the
+   selected sub-range of VAR.  If no range was selected using
+   -var-set-update-range, then both will be -1.  */
 void
-varobj_get_child_range (struct varobj *var, VEC (varobj_p) *children,
-			int *from, int *to)
+varobj_get_child_range (struct varobj *var, int *from, int *to)
 {
-  if (var->from < 0 || var->to < 0)
-    {
-      *from = 0;
-      *to = VEC_length (varobj_p, children);
-    }
-  else
-    {
-      *from = var->from;
-      if (*from > VEC_length (varobj_p, children))
-	*from = VEC_length (varobj_p, children);
-      *to = var->to;
-      if (*to > VEC_length (varobj_p, children))
-	*to = VEC_length (varobj_p, children);
-    }
+  *from = var->from;
+  *to = var->to;
 }
 
 /* Set the selected sub-range of children of VAR to start at index
@@ -1653,7 +1732,7 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
 	 UI, so we need not bother getting it.  */
       if (v->pretty_printer)
 	{
-	  VEC (varobj_p) *changed = 0, *new_and_unchanged = 0;
+	  VEC (varobj_p) *changed = 0, *new = 0;
 	  int i, children_changed;
 	  varobj_p tmp;
 
@@ -1665,11 +1744,14 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
 
 	  /* If update_dynamic_varobj_children returns 0, then we have
 	     a non-conforming pretty-printer, so we skip it.  */
-	  if (update_dynamic_varobj_children (v, &changed, &new_and_unchanged,
-					      &children_changed))
+	  if (update_dynamic_varobj_children (v, &changed, &new,
+					      &children_changed, 1, v->to))
 	    {
-	      if (children_changed)
-		r.children_changed = 1;
+	      if (children_changed || new)
+		{
+		  r.children_changed = 1;
+		  r.new = new;
+		}
 	      for (i = 0; VEC_iterate (varobj_p, changed, i, tmp); ++i)
 		{
 		  varobj_update_result r = {tmp};
@@ -1677,16 +1759,13 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
 		  r.value_installed = 1;
 		  VEC_safe_push (varobj_update_result, stack, &r);
 		}
-	      for (i = 0;
-		   VEC_iterate (varobj_p, new_and_unchanged, i, tmp);
-		   ++i)
-		{
-		  varobj_update_result r = {tmp};
-		  r.value_installed = 1;
-		  VEC_safe_push (varobj_update_result, stack, &r);
-		}
 	      if (r.changed || r.children_changed)
 		VEC_safe_push (varobj_update_result, result, &r);
+
+	      /* Free CHANGED, but not NEW, because NEW has been put
+		 into the result vector.  */
+	      VEC_free (varobj_p, changed);
+
 	      continue;
 	    }
 	}
@@ -1980,6 +2059,8 @@ new_variable (void)
   var->to = -1;
   var->constructor = 0;
   var->pretty_printer = 0;
+  var->child_iter = 0;
+  var->saved_item = 0;
 
   return var;
 }
@@ -2009,7 +2090,10 @@ free_variable (struct varobj *var)
   if (var->pretty_printer)
     {
       struct cleanup *cleanup = varobj_ensure_python_env (var);
-      Py_DECREF (var->pretty_printer);
+      Py_XDECREF (var->constructor);
+      Py_XDECREF (var->pretty_printer);
+      Py_XDECREF (var->child_iter);
+      Py_XDECREF (var->saved_item);
       do_cleanups (cleanup);
     }
 #endif
@@ -2256,6 +2340,8 @@ value_of_root (struct varobj **var_handle, int *type_changed)
       else
 	{
 	  tmp_var->obj_name = xstrdup (var->obj_name);
+	  tmp_var->from = var->from;
+	  tmp_var->to = var->to;
 	  varobj_delete (var, NULL, 0);
 
 	  install_variable (tmp_var);

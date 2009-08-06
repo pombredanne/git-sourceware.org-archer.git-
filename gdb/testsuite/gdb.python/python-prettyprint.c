@@ -203,6 +203,9 @@ main ()
   add_item (&c, 72);
 
 #ifdef MI
+  add_item (&c, 1011);
+  c.elements[0] = 1023;
+
   do_nothing ();
 #endif
 

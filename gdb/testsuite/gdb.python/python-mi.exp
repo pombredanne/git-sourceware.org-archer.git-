@@ -69,16 +69,21 @@ mi_list_varobj_children container {
 
 mi_next "next over update 1"
 
-mi_varobj_update_dynamic container {
-    { {container.\[0\]} {\[0\]} 0 int }
-} "varobj update 1"
+mi_varobj_update_dynamic container "varobj update 1" {
+    type_changed false new_num_children 1 has_more 0
+} {
+} {
+    { name {container.\[0\]} exp {\[0\]} numchild 0 type int thread-id 1 }
+}
 
 mi_next "next over update 2"
 
-mi_varobj_update_dynamic container {
-    { {container.\[0\]} {\[0\]} 0 int }
-    { {container.\[1\]} {\[1\]} 0 int }
-} "varobj update 2"
+mi_varobj_update_dynamic container "varobj update 2" {
+    type_changed false new_num_children 2 has_more 0
+} {
+} {
+    { name {container.\[1\]} exp {\[1\]} numchild 0 type int thread-id 1 }
+}
 
 mi_gdb_test "-var-set-visualizer container None" \
   "\\^done" \
@@ -92,19 +97,26 @@ mi_gdb_test "-var-set-visualizer container gdb.default_visualizer" \
   "\\^done" \
   "choose default visualizer"
 
-mi_varobj_update_dynamic container {
-    { {container.\[0\]} {\[0\]} 0 int }
-    { {container.\[1\]} {\[1\]} 0 int }
-} "varobj update after choosing default"
+mi_varobj_update_dynamic container "varobj update after choosing default" {
+    type_changed false new_num_children 2 has_more 0
+} {
+} {
+    { name {container.\[0\]} exp {\[0\]} numchild 0 type int thread-id 1 }
+    { name {container.\[1\]} exp {\[1\]} numchild 0 type int thread-id 1 }
+}
 
 mi_gdb_test "-var-set-visualizer container ContainerPrinter" \
   "\\^done" \
   "choose visualizer using expression"
 
-mi_varobj_update_dynamic container {
-    { {container.\[0\]} {\[0\]} 0 int }
-    { {container.\[1\]} {\[1\]} 0 int }
-} "varobj update after choosing via expression"
+mi_varobj_update_dynamic container \
+  "varobj update after choosing via expression" {
+      type_changed false new_num_children 2 has_more 0
+  } {
+  } {
+      { name {container.\[0\]} exp {\[0\]} numchild 0 type int thread-id 1 }
+      { name {container.\[1\]} exp {\[1\]} numchild 0 type int thread-id 1 }
+  }
 
 mi_list_varobj_children_range container 1 2 2 {
     { {container.\[1\]} {\[1\]} 0 int }
@@ -114,6 +126,39 @@ mi_list_varobj_children_range container -1 -1 2 {
     { {container.\[0\]} {\[0\]} 0 int }
     { {container.\[1\]} {\[1\]} 0 int }
 } "list varobj children after resetting child range"
+
+mi_next "next over update 3"
+
+mi_gdb_test "-var-set-update-range container 0 1" \
+  "\\^done" \
+  "set update range"
+
+# This should truncate the list.
+mi_list_varobj_children container {
+    { {container.\[0\]} {\[0\]} 0 int }
+} "list children after setting update range"
+
+# This should return just the items in [1,2).
+mi_list_varobj_children_range container 1 2 2 {
+    { {container.\[1\]} {\[1\]} 0 int }
+} "list selected children after setting range"
+
+# This should not be affected by the previous list-children request.
+mi_list_varobj_children container {
+    { {container.\[0\]} {\[0\]} 0 int }
+} "list children after listing selected range"
+
+mi_next "next over update 4"
+
+# This should only show the first child, because the update range has
+# been set.
+mi_varobj_update_dynamic container \
+  "update after next with restricted range" {
+      type_changed false new_num_children 1 has_more 1
+  } {
+      { name {container.\[0\]} in_scope true type_changed false }
+  } {
+  }
 
 mi_continue_to_line \
     [gdb_get_line_number {Another MI breakpoint} ${testfile}.c] \

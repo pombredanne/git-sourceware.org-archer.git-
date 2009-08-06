@@ -1200,7 +1200,7 @@ proc mi_create_varobj { name expression testname } {
 
 proc mi_create_floating_varobj { name expression testname } {
     mi_gdb_test "-var-create $name @ $expression" \
-        "\\^done,name=\"$name\",numchild=\"\[0-9\]+\",value=\".*\",type=.*" \
+        "\\^done,name=\"$name\",numchild=\"\(-1\|\[0-9\]+\)\",value=\".*\",type=.*" \
         $testname
 }
 
@@ -1249,16 +1249,64 @@ proc mi_varobj_update_with_type_change { name new_type new_children testname } {
     mi_gdb_test "-var-update $name" $er $testname
 }
 
-# Update a dynamic varobj named NAME.  CHILDREN is a list of children,
-# in the same form as mi_list_varobj_children.  TESTNAME is the name
-# of the test.
-proc mi_varobj_update_dynamic {name children testname} {
-    set children_exp_j [mi_child_regexp $children 0]
+# A helper that turns a key/value list into a regular expression
+# matching some MI output.
+proc mi_varobj_update_kv_helper {list} {
+    set first 1
+    set rx ""
+    foreach {key value} $list {
+	if {!$first} {
+	    append rx ,
+	}
+	set first 0
+	if {$key == "new_children"} {
+	    append rx "$key=\\\[$value\\\]"
+	} else {
+	    append rx "$key=\"$value\""
+	}
+    }
+    return $rx
+}
 
-    set er "\\^done,changelist=\\\["
+# A helper for mi_varobj_update_dynamic that computes a match
+# expression given a child list.
+proc mi_varobj_update_dynamic_helper {children} {
+    set crx ""
 
-    append er "{name=\"$name\",in_scope=\"true\",type_changed=\"false\""
-    append er ",children=\\\[$children_exp_j.*\\\],has_more=\".\"}\\\]"
+    set first 1
+    foreach child $children {
+	if {!$first} {
+	    append crx ,
+	}
+	set first 0
+	append crx "{"
+	append crx [mi_varobj_update_kv_helper $child]
+	append crx "}"
+    }
+
+    return $crx
+}
+
+# Update a dynamic varobj named NAME.  CHILDREN is a list of children
+# that have been updated; NEW_CHILDREN is a list of children that were
+# added to the primary varobj.  Each child is a list of key/value
+# pairs that are expected.  SELF is a key/value list holding
+# information about the varobj itself.  TESTNAME is the name of the
+# test.
+proc mi_varobj_update_dynamic {name testname self children new_children} {
+    if {[llength $new_children]} {
+	set newrx [mi_varobj_update_dynamic_helper $new_children]
+	lappend self new_children $newrx
+    }
+    set selfrx [mi_varobj_update_kv_helper $self]
+    set crx [mi_varobj_update_dynamic_helper $children]
+
+    set er "\\^done,changelist=\\\[\{name=\"$name\",in_scope=\"true\""
+    append er ",$selfrx\}"
+    if {"$crx" != ""} {
+	append er ",$crx"
+    }
+    append er "\\\]"
 
     verbose -log "Expecting: $er"
     mi_gdb_test "-var-update $name" $er $testname

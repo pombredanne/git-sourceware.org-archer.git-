@@ -23663,6 +23663,8 @@ access this functionality:
 @tab update the variable and its children
 @item @code{-var-set-frozen}
 @tab set frozeness attribute
+@item @code{-var-set-update-range}
+@tab set range of children to display on update
 @end multitable
 
 In the next subsection we describe each operation in detail and suggest
@@ -23836,9 +23838,7 @@ and unions.
 to report.  If @var{from} or @var{to} is less than zero, the range is
 reset and all children will be reported.  Otherwise, children starting
 at @var{from} (zero-based) and ending just before @var{to} will be
-reported.  The selected range is sticky; future calls to
-@code{-var-update} or @code{-var-list-children} will use any
-previously set range.
+reported.
 
 For each child the following results are returned:
 
@@ -23871,7 +23871,11 @@ Otherwise this result is not present.
 
 @item frozen
 If the variable object is frozen, this variable will be present with a value of 1.
+@end table
 
+The result may have its own attributes:
+
+@table @var
 @item has_more
 This is an integer attribute which is nonzero if there are children
 remaining after the end of the selected range.
@@ -24058,6 +24062,9 @@ With the @samp{*} parameter, if a variable object is bound to a
 currently running thread, it will not be updated, without any
 diagnostic.
 
+If @code{-var-set-update-range} was previously used on a varobj, then
+only the selected range of children will be reported.
+
 @subsubheading Example
 
 @smallexample
@@ -24123,6 +24130,32 @@ Unfreezing a variable does not update it, only subsequent
 -var-set-frozen V 1
 ^done
 (gdb)
+@end smallexample
+
+@subheading The @code{-var-set-update-range} command
+@findex -var-set-update-range
+@anchor{-var-set-update-range}
+
+@subsubheading Synopsis
+
+@smallexample
+ -var-set-update-range @var{name} @var{from} @var{to}
+@end smallexample
+
+Set the range of children to be returned by future invocations of
+@code{-var-update}.
+
+@var{from} and @var{to} indicate the range of children to report.  If
+@var{from} or @var{to} is less than zero, the range is reset and all
+children will be reported.  Otherwise, children starting at @var{from}
+(zero-based) and ending just before @var{to} will be reported.
+
+@subsubheading Example
+
+@smallexample
+(gdb)
+-var-set-update-range V 1 2
+^done
 @end smallexample
 
 @subheading The @code{-var-set-visualizer} command
