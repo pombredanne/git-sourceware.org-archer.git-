@@ -76,10 +76,6 @@ displaced_step_at_entry_point (struct gdbarch *gdbarch)
 
   addr = entry_point_address ();
 
-  /* Make certain that the address points at real code, and not a
-     function descriptor.  */
-  addr = gdbarch_convert_from_func_ptr_addr (gdbarch, addr, &current_target);
-
   /* Inferior calls also use the entry point as a breakpoint location.
      We don't want displaced stepping to interfere with those
      breakpoints, so leave space.  */
@@ -324,15 +320,24 @@ set_endian (char *ignore_args, int from_tty, struct cmd_list_element *c)
 }
 
 /* Given SELECTED, a currently selected BFD architecture, and
-   FROM_TARGET, a BFD architecture reported by the target description,
-   return what architecture to use.  Either may be NULL; if both are
-   specified, we use the more specific.  If the two are obviously
-   incompatible, warn the user.  */
+   TARGET_DESC, the current target description, return what
+   architecture to use.
+
+   SELECTED may be NULL, in which case we return the architecture
+   associated with TARGET_DESC.  If SELECTED specifies a variant
+   of the architecture associtated with TARGET_DESC, return the
+   more specific of the two.
+
+   If SELECTED is a different architecture, but it is accepted as
+   compatible by the target, we can use the target architecture.
+
+   If SELECTED is obviously incompatible, warn the user.  */
 
 static const struct bfd_arch_info *
-choose_architecture_for_target (const struct bfd_arch_info *selected,
-				const struct bfd_arch_info *from_target)
+choose_architecture_for_target (const struct target_desc *target_desc,
+				const struct bfd_arch_info *selected)
 {
+  const struct bfd_arch_info *from_target = tdesc_architecture (target_desc);
   const struct bfd_arch_info *compat1, *compat2;
 
   if (selected == NULL)
@@ -362,6 +367,11 @@ choose_architecture_for_target (const struct bfd_arch_info *selected,
 
   if (compat1 == NULL && compat2 == NULL)
     {
+      /* BFD considers the architectures incompatible.  Check our target
+	 description whether it accepts SELECTED as compatible anyway.  */
+      if (tdesc_compatible_p (target_desc, selected))
+	return from_target;
+
       warning (_("Selected architecture %s is not compatible "
 		 "with reported target architecture %s"),
 	       selected->printable_name, from_target->printable_name);
@@ -689,7 +699,7 @@ gdbarch_info_fill (struct gdbarch_info *info)
   /* From the target.  */
   if (info->target_desc != NULL)
     info->bfd_arch_info = choose_architecture_for_target
-      (info->bfd_arch_info, tdesc_architecture (info->target_desc));
+			   (info->target_desc, info->bfd_arch_info);
   /* From the default.  */
   if (info->bfd_arch_info == NULL)
     info->bfd_arch_info = default_bfd_arch;
@@ -710,8 +720,17 @@ gdbarch_info_fill (struct gdbarch_info *info)
   info->byte_order_for_code = info->byte_order;
 
   /* "(gdb) set osabi ...".  Handled by gdbarch_lookup_osabi.  */
+  /* From the manual override, or from file.  */
   if (info->osabi == GDB_OSABI_UNINITIALIZED)
     info->osabi = gdbarch_lookup_osabi (info->abfd);
+  /* From the target.  */
+  if (info->osabi == GDB_OSABI_UNKNOWN && info->target_desc != NULL)
+    info->osabi = tdesc_osabi (info->target_desc);
+  /* From the configured default.  */
+#ifdef GDB_OSABI_DEFAULT
+  if (info->osabi == GDB_OSABI_UNKNOWN)
+    info->osabi = GDB_OSABI_DEFAULT;
+#endif
 
   /* Must have at least filled in the architecture.  */
   gdb_assert (info->bfd_arch_info != NULL);

@@ -1,3 +1,38 @@
+2009-08-05  Jeremy Bennett  <jeremy.bennett@embecosm.com>
+
+        * gdb.texinfo (Separate Debug Files, Remote Protocol): Clarified
+        CRC definitions.
+
+2009-08-03  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* gdb.texinfo (GDB/MI Breakpoint Commands): Document
+    	-break-commands.
+
+2009-07-31  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.texinfo (Cell Broadband Engine SPU architecture): Document the
+	"set spu auto-flush-cache" and "show spu auto-flush-cache" commands.
+
+2009-07-31  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.texinfo (Cell Broadband Engine SPU architecture): Document the
+	"set spu stop-on-load" and "show spu stop-on-load" commands.
+
+2009-07-31  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.texinfo (Target Descriptions): Document <compatible> element.
+
+2009-07-28  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.texinfo (ARM Features): Document org.gnu.gdb.arm.vfp and
+	org.gnu.gdb.arm.neon.
+
+2009-07-20  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo (Target Description Format): Mention the new <osabi>
+	optional element.
+	(subsection OS ABI): New subsection.
+
 2009-07-14  Stan Shebs  <stan@codesourcery.com>
 
 	* gdb.texinfo (Tracepoint Conditions): New section.

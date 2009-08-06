@@ -3290,6 +3290,8 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
     {
       ALL_MSYMBOLS (objfile, msymbol)
       {
+        QUIT;
+
 	if (MSYMBOL_TYPE (msymbol) == ourtype ||
 	    MSYMBOL_TYPE (msymbol) == ourtype2 ||
 	    MSYMBOL_TYPE (msymbol) == ourtype3 ||
@@ -3380,6 +3382,8 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
     {
       ALL_MSYMBOLS (objfile, msymbol)
       {
+        QUIT;
+
 	if (MSYMBOL_TYPE (msymbol) == ourtype ||
 	    MSYMBOL_TYPE (msymbol) == ourtype2 ||
 	    MSYMBOL_TYPE (msymbol) == ourtype3 ||

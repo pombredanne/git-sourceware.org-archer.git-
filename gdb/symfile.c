@@ -1099,7 +1099,10 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
   do_cleanups (my_cleanups);
 
   if (objfile->sf == NULL)
-    return objfile;	/* No symbols. */
+    {
+      observer_notify_new_objfile (objfile);
+      return objfile;	/* No symbols. */
+    }
 
   new_symfile_objfile (objfile, add_flags);
 
@@ -1404,8 +1407,14 @@ find_separate_debug_file (struct objfile *objfile)
   gdb_assert (i >= 0 && IS_DIR_SEPARATOR (dir[i]));
   dir[i+1] = '\0';
 
+  /* Set I to max (strlen (canon_name), strlen (dir)). */
+  canon_name = lrealpath (dir);
+  i = strlen (dir);
+  if (canon_name && strlen (canon_name) > i)
+    i = strlen (canon_name);
+
   debugfile = alloca (strlen (debug_file_directory) + 1
-                      + strlen (dir)
+                      + i
                       + strlen (DEBUG_SUBDIRECTORY)
                       + strlen ("/")
                       + strlen (basename)
@@ -1419,6 +1428,7 @@ find_separate_debug_file (struct objfile *objfile)
     {
       xfree (basename);
       xfree (dir);
+      xfree (canon_name);
       return xstrdup (debugfile);
     }
 
@@ -1432,6 +1442,7 @@ find_separate_debug_file (struct objfile *objfile)
     {
       xfree (basename);
       xfree (dir);
+      xfree (canon_name);
       return xstrdup (debugfile);
     }
 
@@ -1445,12 +1456,12 @@ find_separate_debug_file (struct objfile *objfile)
     {
       xfree (basename);
       xfree (dir);
+      xfree (canon_name);
       return xstrdup (debugfile);
     }
 
   /* If the file is in the sysroot, try using its base path in the
      global debugfile directory.  */
-  canon_name = lrealpath (dir);
   if (canon_name
       && strncmp (canon_name, gdb_sysroot, strlen (gdb_sysroot)) == 0
       && IS_DIR_SEPARATOR (canon_name[strlen (gdb_sysroot)]))
@@ -1465,6 +1476,7 @@ find_separate_debug_file (struct objfile *objfile)
 	  xfree (canon_name);
 	  xfree (basename);
 	  xfree (dir);
+	  xfree (canon_name);
 	  return xstrdup (debugfile);
 	}
     }
@@ -2478,8 +2490,10 @@ reread_symbols (void)
       /* At least one objfile has changed, so we can consider that
          the executable we're debugging has changed too.  */
       observer_notify_executable_changed ();
+
+      /* Notify objfiles that we've modified objfile sections.  */
+      objfiles_changed ();
     }
-      
 }
 
 

@@ -1261,6 +1261,7 @@ static const struct elf_reloc_map mips_reloc_map[] =
   { BFD_RELOC_MIPS_GOT_PAGE, R_MIPS_GOT_PAGE },
   { BFD_RELOC_MIPS_GOT_OFST, R_MIPS_GOT_OFST },
   { BFD_RELOC_MIPS_GOT_DISP, R_MIPS_GOT_DISP },
+  { BFD_RELOC_MIPS_JALR, R_MIPS_JALR },
   { BFD_RELOC_MIPS_TLS_DTPMOD32, R_MIPS_TLS_DTPMOD32 },
   { BFD_RELOC_MIPS_TLS_DTPREL32, R_MIPS_TLS_DTPREL32 },
   { BFD_RELOC_MIPS_TLS_DTPMOD64, R_MIPS_TLS_DTPMOD64 },
@@ -1449,7 +1450,7 @@ mips_elf_sym_is_global (bfd *abfd ATTRIBUTE_UNUSED, asymbol *sym)
   if (SGI_COMPAT (abfd))
     return (sym->flags & BSF_SECTION_SYM) == 0;
   else
-    return ((sym->flags & (BSF_GLOBAL | BSF_WEAK)) != 0
+    return ((sym->flags & (BSF_GLOBAL | BSF_WEAK | BSF_GNU_UNIQUE)) != 0
 	    || bfd_is_und_section (bfd_get_section (sym))
 	    || bfd_is_com_section (bfd_get_section (sym)));
 }

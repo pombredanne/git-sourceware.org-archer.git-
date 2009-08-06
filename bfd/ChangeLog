@@ -1,3 +1,290 @@
+2009-08-06  Michael Eager <eager@eagercon.com>
+
+	* Makefile.am: Add cpu-microblaze.{lo,c}, elf32-microblaze.{lo,c}.
+	* Makefile.in: Regenerate.
+	* archures.c: Add bfd_arch_microblaze.
+	* bfd-in2.h: Regenerate.
+	* config.bfd: Add microblaze target.
+	* configure.in: Add bfd_elf32_microblaze_vec target.
+	* configure: Regenerate.
+	* cpu-microblaze.c: New.
+	* elf32-microblaze.c: New.
+	* libbfd-in.h: Add prototype _bfd_dwarf2_fixup_section_debug_loc().
+	* libbfd.h: Regenerate.
+	* reloc.c: Add MICROBLAZE relocations.
+	* section.c: Add struct relax_table and relax_count to section.
+	* targets.c: Add bfd_elf32_microblaze_vec.
+
+2009-08-06  Jakub Jelinek  <jakub@redhat.com>
+	    Alan Modra  <amodra@bigpond.net.au>
+
+	PR binutils/10492
+	* elf.c (sym_is_global): Return true even for BSF_GNU_UNIQUE
+	symbols.
+	* elf32-mips.c (mips_elf_sym_is_global): Likewise.
+	* elfn32-mips.c (mips_elf_sym_is_global): Likewise.
+
+2009-08-06  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* elf32-arm.c (elf32_arm_size_stubs): Call layout_sections_again
+	at least once when fixing cortex-a8.
+
+2009-08-05  Chao-ying Fu  <fu@mips.com>
+
+	* elf32-mips.c (mips_reloc_map): Add BFD_RELOC_MIPS_JALR.
+	* elfxx-mips.c (JAL_TO_BAL_P): New define to transform JAL to BAL
+	for CPUs.  It is true for RM9000.
+	(JALR_TO_BAL_P): New define to transform JALR to BAL.  It is true
+	for all CPUs.
+	(mips_elf_perform_relocation): Use JAL_TO_BAL_P and JALR_TO_BAL_P
+	to guard the transformation.
+
+2009-08-05  Trevor Smigiel  <Trevor_Smigiel@playstation.sony.com>
+
+	* elf32-spu.h (spu_elf_params): Add member emit_fixups.
+	(spu_elf_size_sections): Declare prototype.
+	* elf32-spu.c (spu_link_hash_table): Add member sfixup.
+	(FIXUP_RECORD_SIZE, FIXUP_GET, FIXUP_PUT): New macros.
+	(spu_elf_emit_fixup): New function.
+	(spu_elf_relocate_section): Emit fixup for each SPU_ADDR32.
+	(spu_elf_size_sections): New function.
+
+2009-08-05  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* elf32-arm.c (elf32_arm_stub_type): Add arm_stub_a8_veneer_lwm.
+	(arm_build_one_stub): Build a8 veneers as a separate pass.
+	(cortex_a8_erratum_scan): Add prev_num_a8_fixes and stub_changed_p
+	parameters.  Use them to check if we create a different a8 fixup
+	than the previous pass.
+	(elf32_arm_size_stubs): Move scope of stub_changed and
+	prev_num_a8_fixes into main loop.
+	(elf32_arm_build_stubs): Build a8 veneers in a second pass.
+
+2009-08-04  Alan Modra  <amodra@bigpond.net.au>
+
+	* elf32-ppc.c (ppc_elf_relax_section): Correct conditions under
+	which find_plt_ent is called.  Delete redundant code.
+
+2009-08-03  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR binutils/10363
+	* elf.c (bfd_elf_string_from_elf_section): Return NULL on
+	invalid string offset.
+
+2009-08-03  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/10433
+	* elf-ifunc.c (_bfd_elf_allocate_ifunc_dyn_relocs): Set got
+	to htab->init_got_offset and plt to htab->init_plt_offset
+	when discarding space for dynamic relocations.
+
+2009-08-03  Alan Modra  <amodra@bigpond.net.au>
+
+	* elf32-ppc.c (struct plt_entry): Revise comments.
+	(ppc_elf_check_relocs): Don't create needless plt_entry info
+	for non-pie executables.  Don't test info->pie when info->shared
+	already covers that case.
+	(ppc_elf_gc_sweep_hook): Adjust for above change.
+	(add_stub_sym): Don't test info->pie when info->shared tested.
+	(allocate_dynrelocs, ppc_elf_size_dynamic_sections): Likewise.
+	(write_glink_stub, ppc_elf_finish_dynamic_symbol): Likewise.
+	(ppc_elf_relax_section): Adjust find_plt_ent arguments.
+	(ppc_elf_relocate_section): Likewise.
+
+2009-08-03  Alan Modra  <amodra@bigpond.net.au>
+
+	* elf32-ppc.c (ppc_elf_check_relocs): Always add a plt ref count
+	for local ifunc symbols in non-pie executables, regardless of
+	reloc type.  Don't specially create ifunc dyn relocs.  Tidy ifunc
+	code so that it's obvious that we only do anything special for
+	local ifunc syms.
+	(ppc_elf_gc_sweep_hook): Adjust to suit check_relocs changes.
+	(allocate_dynrelocs): Correct comment for syms defined in plt.
+	Don't specially allocate ifunc dyn relocs.
+	(ppc_elf_relax_section): Relax branches to ifunc plt entries too.
+	(ppc_elf_relocate_section): Set "relocation" value for ifunc
+	syms in non-pie executables.  No specially allocated dyn relocs
+	for ifunc to write.  Allow for local sym on R_PPC_RELAX32_PLT.
+	(ppc_elf_finish_dynamic_symbol): Set value of ifunc symbols in
+	a non-pie executable.
+
+2009-08-02  H.J. Lu  <hongjiu.lu@intel.com>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	PR ld/6443
+	* elf32-i386.c (elf_i386_tls_transition): Check executable
+	instead of shared for TLS when building PIE.
+	(elf_i386_check_relocs): Likewise.
+	(elf_i386_allocate_dynrelocs): Likewise.
+	(elf_i386_relocate_section): Likewise.
+
+	* elf64-x86-64.c (elf64_x86_64_tls_transition): Check executable
+	instead of shared for TLS when building PIE.
+	(elf64_x86_64_check_relocs): Likewise.
+	(elf64_x86_64_allocate_dynrelocs): Likewise.
+	(elf64_x86_64_relocate_section): Likewise.
+
+2009-07-31  Anthony Green  <green@moxielogic.com>
+
+	* config.bfd (targ_cpu): Add moxie-uclinux support.
+
+2009-07-31  Hans-Peter Nilsson  <hp@bitrange.com>
+
+	* linker.c (fix_syms): Consider SEC_LOAD when choosing section.
+
+2009-07-30  Alan Modra  <amodra@bigpond.net.au>
+
+	* elf32-ppc.c (ppc_elf_check_relocs): Always set up sections
+	used by indirect function support.  Count dynamic relocs for
+	ifunc syms.
+	(ppc_elf_adjust_dynamic_symbol): Tweak for ifunc.
+	(allocate_dynrelocs): Allocate all non-dynamic ifunc plt entries
+	in iplt and their relocs in reliplt.  Don't make ifunc syms
+	dynamic.  Allocate got entry relocs for non-dynamic ifunc in
+	reliplt.  Handle other dynamic relocs for ifunc.
+	(ppc_elf_size_dynamic_sections): Alloc dyn relocs for static
+	ifunc in reliplt, likewise relocs for got against local ifunc.
+	Typo fix on reliplt size adjust.
+	(ppc_elf_relocate_section): Don't use plt scheme of allocating
+	relocs 1-1 with entries for iplt, instead just add using
+	reloc_count.  Write got relocs and dyn relocs for ifunc to reliplt.
+	Error on invalid ifunc dyn relocs.
+	(ppc_elf_finish_dynamic_symbol): Adjust for non-dynamic ifunc plt
+	in iplt/reliplt.
+	* elf64-ppc.c (ppc64_elf_howto_raw): Add R_PPC64_JMP_IREL,
+	R_PPC64_REL16, R_PPC64_REL16_LO, R_PPC64_REL16_HI, R_PPC64_REL16_HA.
+	(ppc64_elf_reloc_type_lookup): Handle new relocs.
+	(ppc64_elf_check_relocs): Likewise.  Count dyn relocs for ifunc.
+	(allocate_dynrelocs): As for elf32-ppc.c above.
+	(ppc64_elf_size_dynamic_sections): Likewise.
+	(ppc_build_one_stub): Put non-dynamic ifunc plt call stubs in iplt,
+	and their relocs in reliplt.  Use R_PPC64_JMP_IREL.
+	(ppc_size_one_stub): Similarly.
+	(ppc64_elf_relocate_section): As for elf32-ppc.c above.  Handle new
+	relocs too.
+	(ppc64_elf_finish_dynamic_symbol): As for elf32-ppc.c above.
+
+2009-07-29  Hans-Peter Nilsson  <hp@bitrange.com>
+
+	* elf64-mmix.c (mmix_elf_relax_section): Revert 2009-05-27
+	change.  Add note to head comment.
+
+2009-07-28  Jan Beulich  <jbeulich@novell.com>
+
+	* archive.c (get_extended_arelt_filename): Remove redundant
+	range check on index.
+
+2009-07-27  Doug Kwan  <dougkwan@google.com>
+
+	* elf32-arm.c (stub_hash_newfunc): Initialize field output_name.
+
+2009-07-27  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* archures.c bfd_*_arch): Sorted.
+	(bfd_archures_list): Likewise.
+
+2009-07-27  M R Swami Reddy <MR.Swami.Reddy@nsc.com>
+
+	* elf32-cr16.c (elf_cr16_final_link_relocate): Add code to handle
+	to R_cr16_NUM32 relocation.
+
+2009-07-26  Michael Eager  <eager@eagercon.com>
+
+	* archures.c: Add bfd_mach_ppc_405
+	* bfd-in2.h: Same.
+
+2009-07-25  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* cpu-i386.c (bfd_x86_64_arch): Fix comment typos.
+	* cpu-l1om.c (bfd_l1om_arch): Likewise.
+
+2009-07-25  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* archures.c (bfd_architecture): Add bfd_arch_l1om.
+	(bfd_l1om_arch): New.
+	(bfd_archures_list): Add &bfd_l1om_arch.
+	* bfd-in2.h: Regenerated.
+
+	* config.bfd (targ64_selvecs): Add bfd_elf64_l1om_vec if
+	bfd_elf64_x86_64_vec is supported.  Add bfd_elf64_l1om_freebsd_vec
+	if bfd_elf64_x86_64_freebsd_vec is supported.
+	(targ_selvecs): Likewise.
+
+	* configure.in: Support bfd_elf64_l1om_vec and
+	bfd_elf64_l1om_freebsd_vec.
+	* configure: Regenerated.
+
+	* cpu-l1om.c: New.
+
+	* elf64-x86-64.c (elf64_l1om_elf_object_p): New.
+	(bfd_elf64_l1om_vec): Likewise.
+	(bfd_elf64_l1om_freebsd_vec): Likewise.
+
+	* Makefile.am (ALL_MACHINES): Add cpu-l1om.lo.
+	(ALL_MACHINES_CFILES): Add cpu-l1om.c.
+	* Makefile.in: Regenerated.
+
+	* targets.c (bfd_elf64_l1om_vec): New.
+	(bfd_elf64_l1om_freebsd_vec): Likewise.
+	(_bfd_target_vector): Add bfd_elf64_l1om_vec and
+	bfd_elf64_l1om_freebsd_vec.
+
+2009-07-24  Trevor Smigiel  <Trevor_Smigiel@playstation.sony.com>
+	    Alan Modra  <amodra@bigpond.net.au>
+
+	* reloc.c (BFD_RELOC_SPU_ADD_PIC): Define.
+	* bfd-in2.h: Regenerate.
+	* libbfd.h: Regenerate.
+	* elf32-spu.c (elf_howto_table): Add entries SPU_ADD_PIC.
+	(spu_elf_bfd_to_reloc_type): Handle SPU_ADD_PIC.
+	(spu_elf_relocate_section): Patch instructions marked by SPU_ADD_PIC.
+
+2009-07-23  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/10434
+	* elf64-x86-64.c (elf64_x86_64_check_relocs): Check executable
+	instead of shared for R_X86_64_TPOFF32.
+	(elf64_x86_64_relocate_section): Likewise.
+
+2009-07-23  Ulrich Drepper  <drepper@redhat.com>
+
+	* elf-bfd.h (struct elf_link_hash_entry): Add unique_global field.
+	* elf.c (swap_out_syms): Set binding to STB_GNU_UNIQUE for symbols
+	with the BSF_GNU_UNIQUE flag bit set.
+	* elfcode.h (elf_slurp_symbol_table): Set the BSF_GNU_UNIQUE flag
+	for symbols with STB_GNU_UNIQUE binding.
+	* elflink.c (_bfd_elf_merge_symbol): Set unique_global for symbols
+	with the STB_GNU_UNIQUE binding.
+	(elf_link_add_object_symbols): Set the BSF_GNU_UNIQUE flag for
+	symbols with STB_GNU_UNIQUE binding.  Set STB_GNU_UNIQUE for
+	symbols with the unique_global field set.
+	(elf_link_output_extsym): Set unique_global field for symbols with
+	the STB_GNU_UNIQUE binding.
+	* syms.c (struct bfd_symbol): Define BSF_GNU_UNIQUE flag bit.
+	(bfd_print_symbol_vandf): Print a 'u' character for BSF_GNU_UNIQUE
+	symbols.
+	(bfd_decode_symclass): Return a 'u' character for BSF_GNU_UNIQUE
+	symbols.
+	* bfd-in2.h: Regenerate.
+
+2009-07-22  H.J. Lu  <hongjiu.lu@intel.com>
+
+	 * elflink.c (elf_link_output_extsym): Revert the last change.
+
+2009-07-22  H.J. Lu  <hongjiu.lu@intel.com>
+
+	 PR ld/10433
+	 * elflink.c (elf_link_output_extsym): Special case ifunc syms
+	 when ref_regular, not def_regular.
+
+2009-07-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	 PR ld/10426
+	 * elflink.c (elf_link_add_object_symbols): Turn an IFUNC symbol
+	 from a DSO into a normal FUNC symbol.
+	 (elf_link_output_extsym): Turn an undefined IFUNC symbol into
+	 a normal FUNC symbol.
+
 2009-07-17  Chao-ying Fu  <fu@mips.com>
 
 	* elfxx-mips.c (LOAD_INTERLOCKS_P): New define.

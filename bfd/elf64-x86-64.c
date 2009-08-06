@@ -950,7 +950,7 @@ elf64_x86_64_tls_transition (struct bfd_link_info *info, bfd *abfd,
     case R_X86_64_GOTPC32_TLSDESC:
     case R_X86_64_TLSDESC_CALL:
     case R_X86_64_GOTTPOFF:
-      if (!info->shared)
+      if (info->executable)
 	{
 	  if (h == NULL)
 	    to_type = R_X86_64_TPOFF32;
@@ -965,7 +965,7 @@ elf64_x86_64_tls_transition (struct bfd_link_info *info, bfd *abfd,
 	{
 	  unsigned int new_to_type = to_type;
 
-	  if (!info->shared
+	  if (info->executable
 	      && h != NULL
 	      && h->dynindx == -1
 	      && tls_type == GOT_TLS_IE)
@@ -989,7 +989,7 @@ elf64_x86_64_tls_transition (struct bfd_link_info *info, bfd *abfd,
       break;
 
     case R_X86_64_TLSLD:
-      if (!info->shared)
+      if (info->executable)
 	to_type = R_X86_64_TPOFF32;
       break;
 
@@ -1231,7 +1231,7 @@ elf64_x86_64_check_relocs (bfd *abfd, struct bfd_link_info *info,
 	  goto create_got;
 
 	case R_X86_64_TPOFF32:
-	  if (info->shared)
+	  if (!info->executable)
 	    {
 	      if (h)
 		name = h->root.root.string;
@@ -1248,7 +1248,7 @@ elf64_x86_64_check_relocs (bfd *abfd, struct bfd_link_info *info,
 	  break;
 
 	case R_X86_64_GOTTPOFF:
-	  if (info->shared)
+	  if (!info->executable)
 	    info->flags |= DF_STATIC_TLS;
 	  /* Fall through */
 
@@ -1942,7 +1942,7 @@ elf64_x86_64_allocate_dynrelocs (struct elf_link_hash_entry *h, void * inf)
   /* If R_X86_64_GOTTPOFF symbol is now local to the binary,
      make it a R_X86_64_TPOFF32 requiring no GOT entry.  */
   if (h->got.refcount > 0
-      && !info->shared
+      && info->executable
       && h->dynindx == -1
       && elf64_x86_64_hash_entry (h)->tls_type == GOT_TLS_IE)
     {
@@ -3632,14 +3632,14 @@ elf64_x86_64_relocate_section (bfd *output_bfd, struct bfd_link_info *info,
 	  break;
 
 	case R_X86_64_DTPOFF32:
-	  if (info->shared || (input_section->flags & SEC_CODE) == 0)
+	  if (!info->executable|| (input_section->flags & SEC_CODE) == 0)
 	    relocation -= elf64_x86_64_dtpoff_base (info);
 	  else
 	    relocation = elf64_x86_64_tpoff (info, relocation);
 	  break;
 
 	case R_X86_64_TPOFF32:
-	  BFD_ASSERT (! info->shared);
+	  BFD_ASSERT (info->executable);
 	  relocation = elf64_x86_64_tpoff (info, relocation);
 	  break;
 
@@ -4481,5 +4481,55 @@ static const struct bfd_elf_special_section
 
 #undef  elf64_bed
 #define elf64_bed elf64_x86_64_fbsd_bed
+
+#include "elf64-target.h"
+
+/* Intel L1OM support.  */
+
+static bfd_boolean
+elf64_l1om_elf_object_p (bfd *abfd)
+{
+  /* Set the right machine number for an L1OM elf64 file.  */
+  bfd_default_set_arch_mach (abfd, bfd_arch_l1om, bfd_mach_l1om);
+  return TRUE;
+}
+
+#undef  TARGET_LITTLE_SYM
+#define TARGET_LITTLE_SYM		    bfd_elf64_l1om_vec
+#undef  TARGET_LITTLE_NAME
+#define TARGET_LITTLE_NAME		    "elf64-l1om"
+#undef ELF_ARCH
+#define ELF_ARCH			    bfd_arch_l1om
+
+#undef	ELF_MACHINE_CODE
+#define ELF_MACHINE_CODE		    EM_L1OM
+
+#undef	ELF_OSABI
+
+#undef  elf64_bed
+#define elf64_bed elf64_l1om_bed
+
+#undef elf_backend_object_p
+#define elf_backend_object_p		    elf64_l1om_elf_object_p
+
+#undef  elf_backend_post_process_headers
+
+#include "elf64-target.h"
+
+/* FreeBSD L1OM support.  */
+
+#undef  TARGET_LITTLE_SYM
+#define TARGET_LITTLE_SYM		    bfd_elf64_l1om_freebsd_vec
+#undef  TARGET_LITTLE_NAME
+#define TARGET_LITTLE_NAME		    "elf64-l1om-freebsd"
+
+#undef	ELF_OSABI
+#define	ELF_OSABI			    ELFOSABI_FREEBSD
+
+#undef  elf64_bed
+#define elf64_bed elf64_l1om_fbsd_bed
+
+#undef  elf_backend_post_process_headers
+#define elf_backend_post_process_headers  _bfd_elf_set_osabi
 
 #include "elf64-target.h"
