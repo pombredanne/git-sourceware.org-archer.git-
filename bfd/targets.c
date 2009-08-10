@@ -625,6 +625,7 @@ extern const bfd_target bfd_elf32_mcore_big_vec;
 extern const bfd_target bfd_elf32_mcore_little_vec;
 extern const bfd_target bfd_elf32_mep_vec;
 extern const bfd_target bfd_elf32_mep_little_vec;
+extern const bfd_target bfd_elf32_microblaze_vec;
 extern const bfd_target bfd_elf32_mn10200_vec;
 extern const bfd_target bfd_elf32_mn10300_vec;
 extern const bfd_target bfd_elf32_mt_vec;
@@ -698,6 +699,8 @@ extern const bfd_target bfd_elf64_tradbigmips_vec;
 extern const bfd_target bfd_elf64_tradlittlemips_vec;
 extern const bfd_target bfd_elf64_x86_64_freebsd_vec;
 extern const bfd_target bfd_elf64_x86_64_vec;
+extern const bfd_target bfd_elf64_l1om_freebsd_vec;
+extern const bfd_target bfd_elf64_l1om_vec;
 extern const bfd_target bfd_mmo_vec;
 extern const bfd_target bfd_powerpc_pe_vec;
 extern const bfd_target bfd_powerpc_pei_vec;
@@ -957,6 +960,7 @@ static const bfd_target * const _bfd_target_vector[] =
 	&bfd_elf32_mcore_big_vec,
 	&bfd_elf32_mcore_little_vec,
 	&bfd_elf32_mep_vec,
+	&bfd_elf32_microblaze_vec,
 	&bfd_elf32_mn10200_vec,
 	&bfd_elf32_mn10300_vec,
 	&bfd_elf32_mt_vec,
@@ -1037,6 +1041,8 @@ static const bfd_target * const _bfd_target_vector[] =
 	&bfd_elf64_tradlittlemips_vec,
 	&bfd_elf64_x86_64_freebsd_vec,
 	&bfd_elf64_x86_64_vec,
+	&bfd_elf64_l1om_freebsd_vec,
+	&bfd_elf64_l1om_vec,
 	&bfd_mmo_vec,
 #endif
 	&bfd_powerpc_pe_vec,

@@ -158,12 +158,23 @@ typedef struct tdesc_feature
 } *tdesc_feature_p;
 DEF_VEC_P(tdesc_feature_p);
 
+/* A compatible architecture from a target description.  */
+typedef const struct bfd_arch_info *arch_p;
+DEF_VEC_P(arch_p);
+
 /* A target description.  */
 
 struct target_desc
 {
   /* The architecture reported by the target, if any.  */
   const struct bfd_arch_info *arch;
+
+  /* The osabi reported by the target, if any; GDB_OSABI_UNKNOWN
+     otherwise.  */
+  enum gdb_osabi osabi;
+
+  /* The list of compatible architectures reported by the target.  */
+  VEC(arch_p) *compatible;
 
   /* Any architecture-specific properties specified by the target.  */
   VEC(property_s) *properties;
@@ -322,6 +333,28 @@ target_current_description (void)
 
   return NULL;
 }
+
+/* Return non-zero if this target description is compatible
+   with the given BFD architecture.  */
+
+int
+tdesc_compatible_p (const struct target_desc *target_desc,
+		    const struct bfd_arch_info *arch)
+{
+  const struct bfd_arch_info *compat;
+  int ix;
+
+  for (ix = 0; VEC_iterate (arch_p, target_desc->compatible, ix, compat);
+       ix++)
+    {
+      if (compat == arch
+	  || arch->compatible (arch, compat)
+	  || compat->compatible (compat, arch))
+	return 1;
+    }
+
+  return 0;
+}
 
 
 /* Direct accessors for target descriptions.  */
@@ -351,6 +384,16 @@ tdesc_architecture (const struct target_desc *target_desc)
 {
   return target_desc->arch;
 }
+
+/* Return the OSABI associated with this target description, or
+   GDB_OSABI_UNKNOWN if no osabi was specified.  */
+
+enum gdb_osabi
+tdesc_osabi (const struct target_desc *target_desc)
+{
+  return target_desc->osabi;
+}
+
 
 
 /* Return 1 if this target description includes any registers.  */
@@ -619,6 +662,21 @@ tdesc_numbered_register (const struct tdesc_feature *feature,
   return 1;
 }
 
+/* Search FEATURE for a register named NAME, but do not assign a fixed
+   register number to it.  */
+
+int
+tdesc_unnumbered_register (const struct tdesc_feature *feature,
+			   const char *name)
+{
+  struct tdesc_reg *reg = tdesc_find_register_early (feature, name);
+
+  if (reg == NULL)
+    return 0;
+
+  return 1;
+}
+
 /* Search FEATURE for a register whose name is in NAMES and assign
    REGNO to it.  */
 
@@ -694,7 +752,7 @@ tdesc_register_name (struct gdbarch *gdbarch, int regno)
   return "";
 }
 
-static struct type *
+struct type *
 tdesc_register_type (struct gdbarch *gdbarch, int regno)
 {
   struct tdesc_arch_reg *arch_reg = tdesc_find_arch_register (gdbarch, regno);
@@ -842,8 +900,9 @@ tdesc_register_reggroup_p (struct gdbarch *gdbarch, int regno,
   if (regno >= num_regs && regno < num_regs + num_pseudo_regs)
     {
       struct tdesc_arch_data *data = gdbarch_data (gdbarch, tdesc_data);
-      gdb_assert (data->pseudo_register_reggroup_p != NULL);
-      return data->pseudo_register_reggroup_p (gdbarch, regno, reggroup);
+      if (data->pseudo_register_reggroup_p != NULL)
+	return data->pseudo_register_reggroup_p (gdbarch, regno, reggroup);
+      /* Otherwise fall through to the default reggroup_p.  */
     }
 
   ret = tdesc_register_in_reggroup_p (gdbarch, regno, reggroup);
@@ -1126,6 +1185,8 @@ free_target_description (void *arg)
     }
   VEC_free (property_s, target_desc->properties);
 
+  VEC_free (arch_p, target_desc->compatible);
+
   xfree (target_desc);
 }
 
@@ -1133,6 +1194,30 @@ struct cleanup *
 make_cleanup_free_target_description (struct target_desc *target_desc)
 {
   return make_cleanup (free_target_description, target_desc);
+}
+
+void
+tdesc_add_compatible (struct target_desc *target_desc,
+		      const struct bfd_arch_info *compatible)
+{
+  const struct bfd_arch_info *compat;
+  int ix;
+
+  /* If this instance of GDB is compiled without BFD support for the
+     compatible architecture, simply ignore it -- we would not be able
+     to handle it anyway.  */
+  if (compatible == NULL)
+    return;
+
+  for (ix = 0; VEC_iterate (arch_p, target_desc->compatible, ix, compat);
+       ix++)
+    if (compat == compatible)
+      internal_error (__FILE__, __LINE__,
+		      _("Attempted to add duplicate "
+			"compatible architecture \"%s\""),
+		      compatible->printable_name);
+
+  VEC_safe_push (arch_p, target_desc->compatible, compatible);
 }
 
 void
@@ -1160,6 +1245,12 @@ set_tdesc_architecture (struct target_desc *target_desc,
 			const struct bfd_arch_info *arch)
 {
   target_desc->arch = arch;
+}
+
+void
+set_tdesc_osabi (struct target_desc *target_desc, enum gdb_osabi osabi)
+{
+  target_desc->osabi = osabi;
 }
 
 
@@ -1221,6 +1312,7 @@ static void
 maint_print_c_tdesc_cmd (char *args, int from_tty)
 {
   const struct target_desc *tdesc;
+  const struct bfd_arch_info *compatible;
   const char *filename, *inp;
   char *function, *outp;
   struct property *prop;
@@ -1276,6 +1368,16 @@ maint_print_c_tdesc_cmd (char *args, int from_tty)
 	 tdesc_architecture (tdesc)->printable_name);
       printf_unfiltered ("\n");
     }
+
+  for (ix = 0; VEC_iterate (arch_p, tdesc->compatible, ix, compatible);
+       ix++)
+    {
+      printf_unfiltered
+	("  tdesc_add_compatible (result, bfd_scan_arch (\"%s\"));\n",
+	 compatible->printable_name);
+    }
+  if (ix)
+    printf_unfiltered ("\n");
 
   for (ix = 0; VEC_iterate (property_s, tdesc->properties, ix, prop);
        ix++)

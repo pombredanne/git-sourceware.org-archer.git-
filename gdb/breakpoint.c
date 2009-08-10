@@ -319,6 +319,9 @@ static int executing_breakpoint_commands;
 /* Are overlay event breakpoints enabled? */
 static int overlay_events_enabled;
 
+/* Are we executing startup code?  */
+static int executing_startup;
+
 /* Walk the following statement or block through all breakpoints.
    ALL_BREAKPOINTS_SAFE does so even if the statment deletes the current
    breakpoint.  */
@@ -559,6 +562,20 @@ get_number_or_range (char **pp)
   return last_retval;
 }
 
+/* Return the breakpoint with the specified number, or NULL
+   if the number does not refer to an existing breakpoint.  */
+
+struct breakpoint *
+get_breakpoint (int num)
+{
+  struct breakpoint *b;
+
+  ALL_BREAKPOINTS (b)
+    if (b->number == num)
+      return b;
+  
+  return NULL;
+}
 
 
 /* Set break condition of breakpoint B to EXP.  */
@@ -635,6 +652,17 @@ condition_command (char *arg, int from_tty)
   error (_("No breakpoint number %d."), bnum);
 }
 
+/* Set the command list of B to COMMANDS.  */
+
+void
+breakpoint_set_commands (struct breakpoint *b, struct command_line *commands)
+{
+  free_command_lines (&b->commands);
+  b->commands = commands;
+  breakpoints_changed ();
+  observer_notify_breakpoint_modified (b->number);
+}
+
 static void
 commands_command (char *arg, int from_tty)
 {
@@ -664,10 +692,7 @@ commands_command (char *arg, int from_tty)
 	struct cleanup *cleanups = make_cleanup (xfree, tmpbuf);
 	l = read_command_lines (tmpbuf, from_tty, 1);
 	do_cleanups (cleanups);
-	free_command_lines (&b->commands);
-	b->commands = l;
-	breakpoints_changed ();
-	observer_notify_breakpoint_modified (b->number);
+	breakpoint_set_commands (b, l);
 	return;
     }
   error (_("No breakpoint number %d."), bnum);
@@ -1418,36 +1443,28 @@ int
 remove_breakpoints (void)
 {
   struct bp_location *b;
-  int val;
+  int val = 0;
 
   ALL_BP_LOCATIONS (b)
   {
     if (b->inserted)
-      {
-	val = remove_breakpoint (b, mark_uninserted);
-	if (val != 0)
-	  return val;
-      }
+      val |= remove_breakpoint (b, mark_uninserted);
   }
-  return 0;
+  return val;
 }
 
 int
 remove_hw_watchpoints (void)
 {
   struct bp_location *b;
-  int val;
+  int val = 0;
 
   ALL_BP_LOCATIONS (b)
   {
     if (b->inserted && b->loc_type == bp_loc_hardware_watchpoint)
-      {
-	val = remove_breakpoint (b, mark_uninserted);
-	if (val != 0)
-	  return val;
-      }
+      val |= remove_breakpoint (b, mark_uninserted);
   }
-  return 0;
+  return val;
 }
 
 int
@@ -1672,7 +1689,7 @@ int
 detach_breakpoints (int pid)
 {
   struct bp_location *b;
-  int val;
+  int val = 0;
   struct cleanup *old_chain = save_inferior_ptid ();
 
   if (pid == PIDGET (inferior_ptid))
@@ -1683,17 +1700,10 @@ detach_breakpoints (int pid)
   ALL_BP_LOCATIONS (b)
   {
     if (b->inserted)
-      {
-	val = remove_breakpoint (b, mark_inserted);
-	if (val != 0)
-	  {
-	    do_cleanups (old_chain);
-	    return val;
-	  }
-      }
+      val |= remove_breakpoint (b, mark_inserted);
   }
   do_cleanups (old_chain);
-  return 0;
+  return val;
 }
 
 static int
@@ -4152,7 +4162,8 @@ describe_other_breakpoints (struct gdbarch *gdbarch, CORE_ADDR pc,
 	      printf_filtered (" (thread %d)", b->thread);
 	    printf_filtered ("%s%s ",
 			     ((b->enable_state == bp_disabled
-			       || b->enable_state == bp_call_disabled) 
+			       || b->enable_state == bp_call_disabled
+			       || b->enable_state == bp_startup_disabled)
 			      ? " (disabled)"
 			      : b->enable_state == bp_permanent 
 			      ? " (permanent)"
@@ -4223,6 +4234,7 @@ check_duplicates_for (CORE_ADDR address, struct obj_section *section)
   ALL_BP_LOCATIONS (b)
     if (b->owner->enable_state != bp_disabled
 	&& b->owner->enable_state != bp_call_disabled
+	&& b->owner->enable_state != bp_startup_disabled
 	&& b->enabled
 	&& !b->shlib_disabled
 	&& b->address == address	/* address / overlay match */
@@ -4259,6 +4271,7 @@ check_duplicates_for (CORE_ADDR address, struct obj_section *section)
 	    if (b->owner->enable_state != bp_permanent
 		&& b->owner->enable_state != bp_disabled
 		&& b->owner->enable_state != bp_call_disabled
+		&& b->owner->enable_state != bp_startup_disabled
 		&& b->enabled && !b->shlib_disabled		
 		&& b->address == address	/* address / overlay match */
 		&& (!overlay_debugging || b->section == section)
@@ -5107,6 +5120,52 @@ enable_watchpoints_after_interactive_call_stop (void)
   }
 }
 
+void
+disable_breakpoints_before_startup (void)
+{
+  struct breakpoint *b;
+  int found = 0;
+
+  ALL_BREAKPOINTS (b)
+    {
+      if ((b->type == bp_breakpoint
+	   || b->type == bp_hardware_breakpoint)
+	  && breakpoint_enabled (b))
+	{
+	  b->enable_state = bp_startup_disabled;
+	  found = 1;
+	}
+    }
+
+  if (found)
+    update_global_location_list (0);
+
+  executing_startup = 1;
+}
+
+void
+enable_breakpoints_after_startup (void)
+{
+  struct breakpoint *b;
+  int found = 0;
+
+  executing_startup = 0;
+
+  ALL_BREAKPOINTS (b)
+    {
+      if ((b->type == bp_breakpoint
+	   || b->type == bp_hardware_breakpoint)
+	  && b->enable_state == bp_startup_disabled)
+	{
+	  b->enable_state = bp_enabled;
+	  found = 1;
+	}
+    }
+
+  if (found)
+    breakpoint_re_set ();
+}
+
 
 /* Set a breakpoint that will evaporate an end of command
    at address specified by SAL.
@@ -5449,6 +5508,11 @@ create_breakpoint (struct gdbarch *gdbarch,
 	  b->ignore_count = ignore_count;
 	  b->enable_state = enabled ? bp_enabled : bp_disabled;
 	  b->disposition = disposition;
+
+	  if (enabled && executing_startup
+	      && (b->type == bp_breakpoint
+		  || b->type == bp_hardware_breakpoint))
+	    b->enable_state = bp_startup_disabled;
 
 	  loc = b->loc;
 	}
@@ -6004,6 +6068,11 @@ break_command_really (struct gdbarch *gdbarch,
       b->condition_not_parsed = 1;
       b->ops = ops;
       b->enable_state = enabled ? bp_enabled : bp_disabled;
+
+      if (enabled && executing_startup
+	  && (b->type == bp_breakpoint
+	      || b->type == bp_hardware_breakpoint))
+	b->enable_state = bp_startup_disabled;
 
       mention (b);
     }
@@ -7804,6 +7873,10 @@ breakpoint_re_set_one (void *bint)
     case bp_breakpoint:
     case bp_hardware_breakpoint:
     case bp_tracepoint:
+      /* Do not attempt to re-set breakpoints disabled during startup.  */
+      if (b->enable_state == bp_startup_disabled)
+	return 0;
+
       if (b->addr_string == NULL)
 	{
 	  /* Anything without a string can't be re-set. */

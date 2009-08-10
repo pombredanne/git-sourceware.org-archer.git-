@@ -1661,7 +1661,7 @@ short paragraph on how to use that command.
 @item apropos @var{args}
 The @code{apropos} command searches through all of the @value{GDBN}
 commands, and their documentation, for the regular expression specified in
-@var{args}. It prints out all matches found. For example:
+@var{args}.  It prints out all matches found.  For example:
 
 @smallexample
 apropos reload
@@ -3899,7 +3899,7 @@ one.
 Break conditions can have side effects, and may even call functions in
 your program.  This can be useful, for example, to activate functions
 that log program progress, or to use your own print functions to
-format special data structures. The effects are completely predictable
+format special data structures.  The effects are completely predictable
 unless there is another enabled breakpoint at the same address.  (In
 that case, @value{GDBN} might see the other breakpoint first and stop your
 program without checking the condition of this one.)  Note that
@@ -10846,7 +10846,7 @@ specified by the extension to support decimal floating-point arithmetic.
 
 There are two encodings in use, depending on the architecture: BID (Binary
 Integer Decimal) for x86 and x86-64, and DPD (Densely Packed Decimal) for
-PowerPC. @value{GDBN} will use the appropriate encoding for the configured
+PowerPC.  @value{GDBN} will use the appropriate encoding for the configured
 target.
 
 Because of a limitation in @file{libdecnumber}, the library used by @value{GDBN}
@@ -10858,8 +10858,8 @@ point computations, error checking in decimal float operations ignores
 underflow, overflow and divide by zero exceptions.
 
 In the PowerPC architecture, @value{GDBN} provides a set of pseudo-registers
-to inspect @code{_Decimal128} values stored in floating point registers. See
-@ref{PowerPC,,PowerPC} for more details.
+to inspect @code{_Decimal128} values stored in floating point registers.
+See @ref{PowerPC,,PowerPC} for more details.
 
 @node Objective-C
 @subsection Objective-C
@@ -10994,7 +10994,7 @@ arithmetic types.  Operators are often defined on groups of types.
 
 @table @code
 @item **
-The exponentiation operator. It raises the first operand to the power
+The exponentiation operator.  It raises the first operand to the power
 of the second one.
 
 @item :
@@ -11166,7 +11166,7 @@ Integer division and remainder.  Defined on integral types.  Same
 precedence as @code{*}.
 
 @item -
-Negative. Defined on @code{INTEGER} and @code{REAL} data.
+Negative.  Defined on @code{INTEGER} and @code{REAL} data.
 
 @item ^
 Pointer dereferencing.  Defined on pointer types.
@@ -13656,9 +13656,9 @@ the separate debug info file.  The separate debug file's name is
 usually @file{@var{executable}.debug}, where @var{executable} is the
 name of the corresponding executable file without leading directories
 (e.g., @file{ls.debug} for @file{/usr/bin/ls}).  In addition, the
-debug link specifies a CRC32 checksum for the debug file, which
-@value{GDBN} uses to validate that the executable and the debug file
-came from the same build.
+debug link specifies a 32-bit @dfn{Cyclic Redundancy Check} (CRC)
+checksum for the debug file, which @value{GDBN} uses to validate that
+the executable and the debug file came from the same build.
 
 @item
 The executable contains a @dfn{build ID}, a unique bit string that is
@@ -13808,10 +13808,47 @@ utilities (Binutils) package since version 2.18.
 
 @noindent
 
-Since there are many different ways to compute CRC's for the debug
-link (different polynomials, reversals, byte ordering, etc.), the
-simplest way to describe the CRC used in @code{.gnu_debuglink}
-sections is to give the complete code for a function that computes it:
+@cindex CRC algorithm definition
+The CRC used in @code{.gnu_debuglink} is the CRC-32 defined in
+IEEE 802.3 using the polynomial:
+
+@c TexInfo requires naked braces for multi-digit exponents for Tex
+@c output, but this causes HTML output to barf. HTML has to be set using
+@c raw commands. So we end up having to specify this equation in 2
+@c different ways!
+@ifhtml
+@display
+@html
+ <em>x</em><sup>32</sup> + <em>x</em><sup>26</sup> + <em>x</em><sup>23</sup> + <em>x</em><sup>22</sup> + <em>x</em><sup>16</sup> + <em>x</em><sup>12</sup> + <em>x</em><sup>11</sup>
+ + <em>x</em><sup>10</sup> + <em>x</em><sup>8</sup> + <em>x</em><sup>7</sup> + <em>x</em><sup>5</sup> + <em>x</em><sup>4</sup> + <em>x</em><sup>2</sup> + <em>x</em> + 1
+@end html
+@end display
+@end ifhtml
+@ifnothtml
+@display
+ @math{x^{32} + x^{26} + x^{23} + x^{22} + x^{16} + x^{12} + x^{11}}
+ @math{+ x^{10} + x^8 + x^7 + x^5 + x^4 + x^2 + x + 1}
+@end display
+@end ifnothtml
+
+The function is computed byte at a time, taking the least
+significant bit of each byte first.  The initial pattern
+@code{0xffffffff} is used, to ensure leading zeros affect the CRC and
+the final result is inverted to ensure trailing zeros also affect the
+CRC.
+
+@emph{Note:} This is the same CRC polynomial as used in handling the
+@dfn{Remote Serial Protocol} @code{qCRC} packet (@pxref{Remote Protocol,
+, @value{GDBN} Remote Serial Protocol}).  However in the
+case of the Remote Serial Protocol, the CRC is computed @emph{most}
+significant bit first, and the result is not inverted, so trailing
+zeros have no effect on the CRC value.
+
+To complete the description, we show below the code of the function
+which produces the CRC used in @code{.gnu_debuglink}.  Inverting the
+initially supplied @code{crc} argument means that an initial call to
+this function passing in zero will start computing the CRC using
+@code{0xffffffff}.
 
 @kindex gnu_debuglink_crc32
 @smallexample
@@ -15847,14 +15884,14 @@ In keeping with the naming conventions used by the Microsoft debugging
 tools, DLL export symbols are made available with a prefix based on the
 DLL name, for instance @code{KERNEL32!CreateFileA}.  The plain name is
 also entered into the symbol table, so @code{CreateFileA} is often
-sufficient. In some cases there will be name clashes within a program
+sufficient.  In some cases there will be name clashes within a program
 (particularly if the executable itself includes full debugging symbols)
 necessitating the use of the fully qualified name when referring to the
-contents of the DLL. Use single-quotes around the name to avoid the
+contents of the DLL.  Use single-quotes around the name to avoid the
 exclamation mark (``!'')  being interpreted as a language operator.
 
 Note that the internal name of the DLL may be all upper-case, even
-though the file name of the DLL is lower-case, or vice-versa. Since
+though the file name of the DLL is lower-case, or vice-versa.  Since
 symbols within @value{GDBN} are @emph{case-sensitive} this may cause
 some confusion. If in doubt, try the @code{info functions} and
 @code{info variables} commands or even @code{maint print msymbols}
@@ -17502,6 +17539,33 @@ and local store addresses and transfer size are shown.
 
 @end table
  
+When @value{GDBN} is debugging a combined PowerPC/SPU application
+on the Cell Broadband Engine, it provides in addition the following
+special commands:
+
+@table @code
+@item set spu stop-on-load @var{arg}
+@kindex set spu
+Set whether to stop for new SPE threads.  When set to @code{on}, @value{GDBN}
+will give control to the user when a new SPE thread enters its @code{main}
+function.  The default is @code{off}.
+
+@item show spu stop-on-load
+@kindex show spu
+Show whether to stop for new SPE threads.
+
+@item set spu auto-flush-cache @var{arg}
+Set whether to automatically flush the software-managed cache.  When set to
+@code{on}, @value{GDBN} will automatically cause the SPE software-managed
+cache to be flushed whenever SPE execution stops.  This provides a consistent
+view of PowerPC memory that is accessed via the cache.  If an application
+does not use the software-managed cache, this option has no effect.
+
+@item show spu auto-flush-cache
+Show whether to automatically flush the software-managed cache.
+
+@end table
+
 @node PowerPC
 @subsection PowerPC
 @cindex PowerPC architecture
@@ -17957,6 +18021,7 @@ Displays how many symbol complaints @value{GDBN} is permitted to produce.
 
 @end table
 
+@anchor{confirmation requests}
 By default, @value{GDBN} is cautious, and asks what sometimes seems to be a
 lot of stupid questions to confirm certain commands.  For example, if
 you try to run a program which is already running:
@@ -21887,11 +21952,41 @@ line="5",times="0",ignore="3"@}]@}
 @ignore
 @subheading The @code{-break-catch} Command
 @findex -break-catch
+@end ignore
 
 @subheading The @code{-break-commands} Command
 @findex -break-commands
-@end ignore
 
+@subsubheading Synopsis
+
+@smallexample
+ -break-commands @var{number} [ @var{command1} ... @var{commandN} ]
+@end smallexample
+
+Specifies the CLI commands that should be executed when breakpoint
+@var{number} is hit.  The parameters @var{command1} to @var{commandN}
+are the commands.  If no command is specified, any previously-set
+commands are cleared.  @xref{Break Commands}.  Typical use of this
+functionality is tracing a program, that is, printing of values of
+some variables whenever breakpoint is hit and then continuing.
+
+@subsubheading @value{GDBN} Command
+
+The corresponding @value{GDBN} command is @samp{commands}.
+
+@subsubheading Example
+
+@smallexample
+(gdb)
+-break-insert main
+^done,bkpt=@{number="1",type="breakpoint",disp="keep",
+enabled="y",addr="0x000100d0",func="main",file="hello.c",
+fullname="/home/foo/hello.c",line="5",times="0"@}
+(gdb)
+-break-commands 1 "print v" "continue"
+^done
+(gdb)
+@end smallexample
 
 @subheading The @code{-break-condition} Command
 @findex -break-condition
@@ -26089,9 +26184,13 @@ command to repeat if @key{RET} is pressed on a line by itself.  This
 means that commands can be run behind a user's back by a front-end in
 a transparent manner.
 
-The server prefix does not affect the recording of values into the value
-history; to print a value without recording it into the value history,
-use the @code{output} command instead of the @code{print} command.
+The @code{server } prefix does not affect the recording of values into
+the value history; to print a value without recording it into the
+value history, use the @code{output} command instead of the
+@code{print} command.
+
+Using this prefix also disables confirmation requests
+(@pxref{confirmation requests}).
 
 @node Prompting
 @section Annotation for @value{GDBN} Input
@@ -28521,7 +28620,18 @@ Any other reply implies the old thread ID.
 @item qCRC:@var{addr},@var{length}
 @cindex CRC of memory block, remote request
 @cindex @samp{qCRC} packet
-Compute the CRC checksum of a block of memory.
+Compute the CRC checksum of a block of memory using CRC-32 defined in
+IEEE 802.3.  The CRC is computed byte at a time, taking the most
+significant bit of each byte first.  The initial pattern code
+@code{0xffffffff} is used to ensure leading zeros affect the CRC.
+
+@emph{Note:} This is the same CRC used in validating separate debug
+files (@pxref{Separate Debug Files, , Debugging Information in Separate
+Files}).  However the algorithm is slightly different.  When validating
+separate debug files, the CRC is computed taking the @emph{least}
+significant bit of each byte first, and the final result is inverted to
+detect trailing zeros.
+
 Reply:
 @table @samp
 @item E @var{NN}
@@ -31267,7 +31377,8 @@ their targets, we also describe the grammar here.
 
 Target descriptions can identify the architecture of the remote target
 and (for some architectures) provide information about custom register
-sets.  @value{GDBN} can use this information to autoconfigure for your
+sets.  They can also identify the OS ABI of the remote target.
+@value{GDBN} can use this information to autoconfigure for your
 target, or to warn you if you connect to an unsupported target.
 
 Here is a simple target description:
@@ -31291,6 +31402,8 @@ are explained further below.
 <!DOCTYPE target SYSTEM "gdb-target.dtd">
 <target version="1.0">
   @r{[}@var{architecture}@r{]}
+  @r{[}@var{osabi}@r{]}
+  @r{[}@var{compatible}@r{]}
   @r{[}@var{feature}@dots{}@r{]}
 </target>
 @end smallexample
@@ -31342,9 +31455,51 @@ An @samp{<architecture>} element has this form:
   <architecture>@var{arch}</architecture>
 @end smallexample
 
-@var{arch} is an architecture name from the same selection
-accepted by @code{set architecture} (@pxref{Targets, ,Specifying a
-Debugging Target}).
+@var{arch} is one of the architectures from the set accepted by
+@code{set architecture} (@pxref{Targets, ,Specifying a Debugging Target}).
+
+@subsection OS ABI
+@cindex @code{<osabi>}
+
+This optional field was introduced in @value{GDBN} version 7.0.
+Previous versions of @value{GDBN} ignore it.
+
+An @samp{<osabi>} element has this form:
+
+@smallexample
+  <osabi>@var{abi-name}</osabi>
+@end smallexample
+
+@var{abi-name} is an OS ABI name from the same selection accepted by
+@w{@code{set osabi}} (@pxref{ABI, ,Configuring the Current ABI}).
+
+@subsection Compatible Architecture
+@cindex @code{<compatible>}
+
+This optional field was introduced in @value{GDBN} version 7.0.
+Previous versions of @value{GDBN} ignore it.
+
+A @samp{<compatible>} element has this form:
+
+@smallexample
+  <compatible>@var{arch}</compatible>
+@end smallexample
+
+@var{arch} is one of the architectures from the set accepted by
+@code{set architecture} (@pxref{Targets, ,Specifying a Debugging Target}).
+
+A @samp{<compatible>} element is used to specify that the target
+is able to run binaries in some other than the main target architecture
+given by the @samp{<architecture>} element.  For example, on the
+Cell Broadband Engine, the main architecture is @code{powerpc:common}
+or @code{powerpc:common64}, but the system is able to run binaries
+in the @code{spu} architecture as well.  The way to describe this
+capability with @samp{<compatible>} is as follows:
+
+@smallexample
+  <architecture>powerpc:common</architecture>
+  <compatible>spu</compatible>
+@end smallexample
 
 @subsection Features
 @cindex <feature>
@@ -31560,6 +31715,19 @@ The @samp{org.gnu.gdb.xscale.iwmmxt} feature is optional.  If present,
 it should contain at least registers @samp{wR0} through @samp{wR15} and
 @samp{wCGR0} through @samp{wCGR3}.  The @samp{wCID}, @samp{wCon},
 @samp{wCSSF}, and @samp{wCASF} registers are optional.
+
+The @samp{org.gnu.gdb.arm.vfp} feature is optional.  If present, it
+should contain at least registers @samp{d0} through @samp{d15}.  If
+they are present, @samp{d16} through @samp{d31} should also be included.
+@value{GDBN} will synthesize the single-precision registers from
+halves of the double-precision registers.
+
+The @samp{org.gnu.gdb.arm.neon} feature is optional.  It does not
+need to contain registers; it instructs @value{GDBN} to display the
+VFP double-precision registers as vectors and to synthesize the
+quad-precision registers from pairs of double-precision registers.
+If this feature is present, @samp{org.gnu.gdb.arm.vfp} must also
+be present and include 32 double-precision registers.
 
 @node MIPS Features
 @subsection MIPS Features

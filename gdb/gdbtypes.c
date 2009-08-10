@@ -3212,8 +3212,8 @@ type_decref (struct type *type)
 
   entry.type = type;
   found = htab_find (type_refc_table, &entry);
-  gdb_assert (found);
 #if 0 /* We'll be replacing this with type GC soon.  */
+  gdb_assert (found);
   --*(found->refc);
   if (*(found->refc) == 0)
     {

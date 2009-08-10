@@ -148,7 +148,7 @@ pretty_print_one_value (PyObject *printer, struct value **out_value)
 		/* We must increment the value's refcount, because we
 		   are about to decref RESULT, and this may result in
 		   the value being destroyed.  */
-		release_value (*out_value);
+		value_incref (*out_value);
  	      Py_DECREF (result);
  	      result = NULL;
 	    }

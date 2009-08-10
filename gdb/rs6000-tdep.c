@@ -66,6 +66,7 @@
 #include "features/rs6000/powerpc-vsx32.c"
 #include "features/rs6000/powerpc-403.c"
 #include "features/rs6000/powerpc-403gc.c"
+#include "features/rs6000/powerpc-405.c"
 #include "features/rs6000/powerpc-505.c"
 #include "features/rs6000/powerpc-601.c"
 #include "features/rs6000/powerpc-602.c"
@@ -2948,6 +2949,8 @@ static struct variant variants[] =
    bfd_mach_rs6k, &tdesc_rs6000},
   {"403", "IBM PowerPC 403", bfd_arch_powerpc,
    bfd_mach_ppc_403, &tdesc_powerpc_403},
+  {"405", "IBM PowerPC 405", bfd_arch_powerpc,
+   bfd_mach_ppc_405, &tdesc_powerpc_405},
   {"601", "Motorola PowerPC 601", bfd_arch_powerpc,
    bfd_mach_ppc_601, &tdesc_powerpc_601},
   {"602", "Motorola PowerPC 602", bfd_arch_powerpc,
@@ -3356,6 +3359,16 @@ rs6000_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   struct tdesc_arch_data *tdesc_data = NULL;
   int num_pseudoregs = 0;
   int cur_reg;
+
+  /* INFO may refer to a binary that is not of the PowerPC architecture,
+     e.g. when debugging a stand-alone SPE executable on a Cell/B.E. system.
+     In this case, we must not attempt to infer properties of the (PowerPC
+     side) of the target system from properties of that executable.  Trust
+     the target description instead.  */
+  if (info.abfd
+      && bfd_get_arch (info.abfd) != bfd_arch_powerpc
+      && bfd_get_arch (info.abfd) != bfd_arch_rs6000)
+    info.abfd = NULL;
 
   from_xcoff_exec = info.abfd && info.abfd->format == bfd_object &&
     bfd_get_flavour (info.abfd) == bfd_target_xcoff_flavour;
@@ -4038,6 +4051,7 @@ _initialize_rs6000_tdep (void)
   initialize_tdesc_powerpc_vsx32 ();
   initialize_tdesc_powerpc_403 ();
   initialize_tdesc_powerpc_403gc ();
+  initialize_tdesc_powerpc_405 ();
   initialize_tdesc_powerpc_505 ();
   initialize_tdesc_powerpc_601 ();
   initialize_tdesc_powerpc_602 ();

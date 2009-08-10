@@ -129,7 +129,7 @@ valpy_new (PyTypeObject *subtype, PyObject *args, PyObject *keywords)
   value_obj->value = value;
   value_obj->address = NULL;
   value_obj->type = NULL;
-  release_value (value);
+  value_incref (value);
   value_obj->next = values_in_python;
   values_in_python = value_obj;
 
@@ -820,7 +820,7 @@ value_to_value_object (struct value *val)
       val_obj->value = val;
       val_obj->address = NULL;
       val_obj->type = NULL;
-      release_value (val);
+      value_incref (val);
       val_obj->next = values_in_python;
       values_in_python = val_obj;
     }
@@ -928,7 +928,8 @@ convert_value_from_python (PyObject *obj)
 	  /* This lets callers freely decref the Value wrapper object
 	     and not worry about whether or not the value will
 	     disappear.  */
-	  value = value_copy (((value_object *) obj)->value);
+	  value = ((value_object *) obj)->value;
+	  value_incref (value);
 	}
       else
 	PyErr_Format (PyExc_TypeError, _("Could not convert Python object: %s"),
