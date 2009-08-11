@@ -1078,14 +1078,7 @@ static int is_ref_attr (struct attribute *);
 
 static unsigned int dwarf2_get_ref_die_offset (struct attribute *);
 
-enum dwarf2_get_attr_constant_value
-  {
-    dwarf2_attr_unknown,
-    dwarf2_attr_const,
-    dwarf2_attr_block
-  };
-static enum dwarf2_get_attr_constant_value dwarf2_get_attr_constant_value
-  (struct attribute *attr, int *val_return);
+static int dwarf2_get_attr_constant_value (struct attribute *, int);
 
 static struct die_info *follow_die_ref_or_sig (struct die_info *,
 					       struct attribute *,
@@ -5749,80 +5742,77 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
   TYPE_LOW_BOUND (range_type) = 1;
 
   attr = dwarf2_attr (die, DW_AT_string_length, cu);
-  switch (dwarf2_get_attr_constant_value (attr, &length))
+  if (attr && attr_form_is_block (attr))
     {
-    case dwarf2_attr_const:
-      /* We currently do not support a constant address where the location
-	 should be read from - DWARF2_ATTR_BLOCK is expected instead.  See
-	 DWARF for the DW_AT_STRING_LENGTH vs. DW_AT_BYTE_SIZE difference.  */
-      /* PASSTHRU */
-    case dwarf2_attr_unknown:
-      attr = dwarf2_attr (die, DW_AT_byte_size, cu);
-      switch (dwarf2_get_attr_constant_value (attr, &length))
+      /* Security check for a size overflow.  */
+      if (DW_BLOCK (attr)->size + 2 < DW_BLOCK (attr)->size)
+	TYPE_HIGH_BOUND (range_type) = 1;
+      /* Extend the DWARF block by a new DW_OP_deref/DW_OP_deref_size
+	 instruction as DW_AT_string_length specifies the length location, not
+	 its value.  */
+      else
 	{
-	case dwarf2_attr_unknown:
-	  length = 1;
+	  struct dwarf2_locexpr_baton *length_baton;
+	  struct attribute *size_attr;
+
+	  length_baton = obstack_alloc (&cu->comp_unit_obstack,
+					sizeof (*length_baton));
+	  length_baton->per_cu = cu->per_cu;
+	  length_baton->data = obstack_alloc (&cu->comp_unit_obstack,
+					      DW_BLOCK (attr)->size + 2);
+	  memcpy (length_baton->data, DW_BLOCK (attr)->data,
+		  DW_BLOCK (attr)->size);
+
+	  /* DW_AT_BYTE_SIZE existing together with DW_AT_STRING_LENGTH
+	     specifies the size of an integer to fetch.  */
+
+	  size_attr = dwarf2_attr (die, DW_AT_byte_size, cu);
+	  if (size_attr)
+	    {
+	      length_baton->size = DW_BLOCK (attr)->size + 2;
+	      length_baton->data[DW_BLOCK (attr)->size] = DW_OP_deref_size;
+	      length_baton->data[DW_BLOCK (attr)->size + 1]
+							 = DW_UNSND (size_attr);
+	      if (length_baton->data[DW_BLOCK (attr)->size + 1]
+		  != DW_UNSND (size_attr))
+		complaint (&symfile_complaints,
+			   _("DW_AT_string_length's DW_AT_byte_size integer "
+			     "exceeds the byte size storage"));
+	    }
+	  else
+	    {
+	      length_baton->size = DW_BLOCK (attr)->size + 1;
+	      length_baton->data[DW_BLOCK (attr)->size] = DW_OP_deref;
+	    }
+
+	  TYPE_RANGE_BOUND_SET_DWARF_BLOCK (range_type, 1);
+	  TYPE_FIELD_DWARF_BLOCK (range_type, 1) = length_baton;
+	  TYPE_DYNAMIC (range_type) = 1;
+	}
+    }
+  else
+    {
+      if (attr && attr_form_is_constant (attr))
+	{
+	  /* We currently do not support a constant address where the location
+	     should be read from - attr_form_is_block is expected instead.  See
+	     DWARF for the DW_AT_STRING_LENGTH vs. DW_AT_BYTE_SIZE difference.
+	     */
 	  /* PASSTHRU */
-	case dwarf2_attr_const:
-	  TYPE_HIGH_BOUND (range_type) = length;
-	  break;
-	case dwarf2_attr_block:
+	}
+
+      attr = dwarf2_attr (die, DW_AT_byte_size, cu);
+      if (attr && attr_form_is_block (attr))
+	{
 	  TYPE_RANGE_BOUND_SET_DWARF_BLOCK (range_type, 1);
 	  TYPE_FIELD_DWARF_BLOCK (range_type, 1) =
 					dwarf2_attr_to_locexpr_baton (attr, cu);
 	  TYPE_DYNAMIC (range_type) = 1;
-	  break;
 	}
-      break;
-    case dwarf2_attr_block:
-      /* Security check for a size overflow.  */
-      if (DW_BLOCK (attr)->size + 2 < DW_BLOCK (attr)->size)
-	{
-	  TYPE_HIGH_BOUND (range_type) = 1;
-	  break;
-	}
-      /* Extend the DWARF block by a new DW_OP_deref/DW_OP_deref_size
-	 instruction as DW_AT_string_length specifies the length location, not
-	 its value.  */
-      {
-	struct dwarf2_locexpr_baton *length_baton;
-	struct attribute *size_attr;
-
-	length_baton = obstack_alloc (&cu->comp_unit_obstack,
-				      sizeof (*length_baton));
-	length_baton->per_cu = cu->per_cu;
-	length_baton->data = obstack_alloc (&cu->comp_unit_obstack,
-					    DW_BLOCK (attr)->size + 2);
-	memcpy (length_baton->data, DW_BLOCK (attr)->data,
-		DW_BLOCK (attr)->size);
-
-	/* DW_AT_BYTE_SIZE existing together with DW_AT_STRING_LENGTH specifies
-	   the size of an integer to fetch.  */
-
-	size_attr = dwarf2_attr (die, DW_AT_byte_size, cu);
-	if (size_attr)
-	  {
-	    length_baton->size = DW_BLOCK (attr)->size + 2;
-	    length_baton->data[DW_BLOCK (attr)->size] = DW_OP_deref_size;
-	    length_baton->data[DW_BLOCK (attr)->size + 1]
-							 = DW_UNSND (size_attr);
-	    if (length_baton->data[DW_BLOCK (attr)->size + 1]
-	        != DW_UNSND (size_attr))
-	      complaint (&symfile_complaints,
-	                 _("DW_AT_string_length's DW_AT_byte_size integer "
-			   "exceeds the byte size storage"));
-	  }
-	else
-	  {
-	    length_baton->size = DW_BLOCK (attr)->size + 1;
-	    length_baton->data[DW_BLOCK (attr)->size] = DW_OP_deref;
-	  }
-
-	TYPE_RANGE_BOUND_SET_DWARF_BLOCK (range_type, 1);
-	TYPE_FIELD_DWARF_BLOCK (range_type, 1) = length_baton;
-	TYPE_DYNAMIC (range_type) = 1;
-      }
-      break;
+      else if (attr && attr_form_is_constant (attr))
+	TYPE_HIGH_BOUND (range_type) = dwarf2_get_attr_constant_value (attr, 0);
+      else
+	TYPE_HIGH_BOUND (range_type) = 1;
     }
 
   char_type = language_string_char_type (cu->language_defn, gdbarch);
@@ -6026,8 +6016,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
   struct type *base_type;
   struct type *range_type;
   struct attribute *attr;
-  int low, high, byte_stride_int;
-  enum dwarf2_get_attr_constant_value high_type;
+  int low;
   char *name;
   
   base_type = die_type (die, cu);
@@ -6044,85 +6033,84 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
   range_type = create_range_type (NULL, base_type, 0, -1);
 
   attr = dwarf2_attr (die, DW_AT_lower_bound, cu);
-  switch (dwarf2_get_attr_constant_value (attr, &low))
+  if (attr && attr_form_is_block (attr))
     {
-    case dwarf2_attr_unknown:
-      if (cu->language == language_fortran)
-	{
-	  /* FORTRAN implies a lower bound of 1, if not given.  */
-	  low = 1;
-	}
-      else
-        {
-	  /* According to DWARF we should assume the value 0 only for
-	     LANGUAGE_C and LANGUAGE_CPLUS.  */
-	  low = 0;
-	}
-      /* PASSTHRU */
-    case dwarf2_attr_const:
-      TYPE_LOW_BOUND (range_type) = low;
-      if (low >= 0)
-	TYPE_UNSIGNED (range_type) = 1;
-      break;
-    case dwarf2_attr_block:
       TYPE_RANGE_BOUND_SET_DWARF_BLOCK (range_type, 0);
       TYPE_FIELD_DWARF_BLOCK (range_type, 0) = dwarf2_attr_to_locexpr_baton
 								     (attr, cu);
       TYPE_DYNAMIC (range_type) = 1;
       /* For setting a default if DW_AT_UPPER_BOUND would be missing.  */
       low = 0;
-      break;
+    }
+  else
+    {
+      if (attr && attr_form_is_constant (attr))
+	low = dwarf2_get_attr_constant_value (attr, 0);
+      else
+	{
+	  if (cu->language == language_fortran)
+	    {
+	      /* FORTRAN implies a lower bound of 1, if not given.  */
+	      low = 1;
+	    }
+	  else
+	    {
+	      /* According to DWARF we should assume the value 0 only for
+		 LANGUAGE_C and LANGUAGE_CPLUS.  */
+	      low = 0;
+	    }
+	}
+      TYPE_LOW_BOUND (range_type) = low;
+      if (low >= 0)
+	TYPE_UNSIGNED (range_type) = 1;
     }
 
   attr = dwarf2_attr (die, DW_AT_upper_bound, cu);
-  high_type = dwarf2_get_attr_constant_value (attr, &high);
-  if (high_type == dwarf2_attr_unknown)
+  if (!attr || (!attr_form_is_block (attr) && !attr_form_is_constant (attr)))
     {
       attr = dwarf2_attr (die, DW_AT_count, cu);
-      high_type = dwarf2_get_attr_constant_value (attr, &high);
       /* It does not hurt but it is needlessly ineffective in check_typedef.  */
-      if (high_type != dwarf2_attr_unknown)
+      if (attr && (attr_form_is_block (attr) || attr_form_is_constant (attr)))
       	{
 	  TYPE_RANGE_HIGH_BOUND_IS_COUNT (range_type) = 1;
 	  TYPE_DYNAMIC (range_type) = 1;
 	}
       /* Pass it now as the regular DW_AT_upper_bound.  */
     }
-  switch (high_type)
+
+  if (attr && attr_form_is_block (attr))
     {
-    case dwarf2_attr_unknown:
-      TYPE_RANGE_UPPER_BOUND_IS_UNDEFINED (range_type) = 1;
-      high = low - 1;
-      /* PASSTHRU */
-    case dwarf2_attr_const:
-      TYPE_HIGH_BOUND (range_type) = high;
-      break;
-    case dwarf2_attr_block:
       TYPE_RANGE_BOUND_SET_DWARF_BLOCK (range_type, 1);
       TYPE_FIELD_DWARF_BLOCK (range_type, 1) = dwarf2_attr_to_locexpr_baton
 								     (attr, cu);
       TYPE_DYNAMIC (range_type) = 1;
-      break;
+    }
+  else
+    {
+      if (attr && attr_form_is_constant (attr))
+	TYPE_HIGH_BOUND (range_type) = dwarf2_get_attr_constant_value (attr, 0);
+      else
+	{
+	  TYPE_RANGE_UPPER_BOUND_IS_UNDEFINED (range_type) = 1;
+	  TYPE_HIGH_BOUND (range_type) = low - 1;
+	}
     }
 
   /* DW_AT_bit_stride is currently unsupported as we count in bytes.  */
   attr = dwarf2_attr (die, DW_AT_byte_stride, cu);
-  switch (dwarf2_get_attr_constant_value (attr, &byte_stride_int))
+  if (attr && attr_form_is_block (attr))
     {
-    case dwarf2_attr_unknown:
-      break;
-    case dwarf2_attr_const:
-      if (byte_stride_int == 0)
-	complaint (&symfile_complaints,
-		   _("Found DW_AT_byte_stride with unsupported value 0"));
-      TYPE_BYTE_STRIDE (range_type) = byte_stride_int;
-      break;
-    case dwarf2_attr_block:
       TYPE_RANGE_BOUND_SET_DWARF_BLOCK (range_type, 2);
       TYPE_FIELD_DWARF_BLOCK (range_type, 2) = dwarf2_attr_to_locexpr_baton
 								     (attr, cu);
       TYPE_DYNAMIC (range_type) = 1;
-      break;
+    }
+  else if (attr && attr_form_is_constant (attr))
+    {
+      TYPE_BYTE_STRIDE (range_type) = dwarf2_get_attr_constant_value (attr, 0);
+      if (TYPE_BYTE_STRIDE (range_type) == 0)
+	complaint (&symfile_complaints,
+		   _("Found DW_AT_byte_stride with unsupported value 0"));
     }
 
   name = dwarf2_name (die, cu);
@@ -10332,35 +10320,26 @@ dwarf2_get_ref_die_offset (struct attribute *attr)
   return 0;
 }
 
-/* (*val_return) is filled only if returning dwarf2_attr_const.  */
+/* Return the constant value held by the given attribute.  Return -1
+   if the value held by the attribute is not constant.  */
 
-static enum dwarf2_get_attr_constant_value
-dwarf2_get_attr_constant_value (struct attribute *attr, int *val_return)
+static int
+dwarf2_get_attr_constant_value (struct attribute *attr, int default_value)
 {
-  if (attr == NULL)
-    return dwarf2_attr_unknown;
   if (attr->form == DW_FORM_sdata)
+    return DW_SND (attr);
+  else if (attr->form == DW_FORM_udata
+           || attr->form == DW_FORM_data1
+           || attr->form == DW_FORM_data2
+           || attr->form == DW_FORM_data4
+           || attr->form == DW_FORM_data8)
+    return DW_UNSND (attr);
+  else
     {
-      *val_return = DW_SND (attr);
-      return dwarf2_attr_const;
+      complaint (&symfile_complaints, _("Attribute value is not a constant (%s)"),
+                 dwarf_form_name (attr->form));
+      return default_value;
     }
-  if (attr->form == DW_FORM_udata
-      || attr->form == DW_FORM_data1
-      || attr->form == DW_FORM_data2
-      || attr->form == DW_FORM_data4
-      || attr->form == DW_FORM_data8)
-    {
-      *val_return = DW_UNSND (attr);
-      return dwarf2_attr_const;
-    }
-  if (attr->form == DW_FORM_block
-      || attr->form == DW_FORM_block1
-      || attr->form == DW_FORM_block2
-      || attr->form == DW_FORM_block4)
-    return dwarf2_attr_block;
-  complaint (&symfile_complaints, _("Attribute value is not a constant (%s)"),
-             dwarf_form_name (attr->form));
-  return dwarf2_attr_unknown;
 }
 
 /* THIS_CU has a reference to PER_CU.  If necessary, load the new compilation
