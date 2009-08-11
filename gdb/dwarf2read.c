@@ -1078,13 +1078,13 @@ static int is_ref_attr (struct attribute *);
 
 static unsigned int dwarf2_get_ref_die_offset (struct attribute *);
 
-enum get_attr_constant_value
+enum dwarf2_get_attr_constant_value
   {
     dwarf2_attr_unknown,
     dwarf2_attr_const,
     dwarf2_attr_block
   };
-static enum get_attr_constant_value get_attr_constant_value
+static enum dwarf2_get_attr_constant_value dwarf2_get_attr_constant_value
   (struct attribute *attr, int *val_return);
 
 static struct die_info *follow_die_ref_or_sig (struct die_info *,
@@ -4406,12 +4406,7 @@ dwarf2_add_field (struct field_info *fip, struct die_info *die,
               byte_offset = 0;
             }
           else if (attr_form_is_constant (attr))
-            {
-	      enum get_attr_constant_value type;
-	      
-	      type = get_attr_constant_value (attr, &byte_offset);
-	      gdb_assert (type == dwarf2_attr_const);
-	    }
+            byte_offset = dwarf2_get_attr_constant_value (attr, 0);
           else
             byte_offset = decode_locdesc (DW_BLOCK (attr), cu);
 
@@ -5754,7 +5749,7 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
   TYPE_LOW_BOUND (range_type) = 1;
 
   attr = dwarf2_attr (die, DW_AT_string_length, cu);
-  switch (get_attr_constant_value (attr, &length))
+  switch (dwarf2_get_attr_constant_value (attr, &length))
     {
     case dwarf2_attr_const:
       /* We currently do not support a constant address where the location
@@ -5763,7 +5758,7 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
       /* PASSTHRU */
     case dwarf2_attr_unknown:
       attr = dwarf2_attr (die, DW_AT_byte_size, cu);
-      switch (get_attr_constant_value (attr, &length))
+      switch (dwarf2_get_attr_constant_value (attr, &length))
 	{
 	case dwarf2_attr_unknown:
 	  length = 1;
@@ -6032,7 +6027,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
   struct type *range_type;
   struct attribute *attr;
   int low, high, byte_stride_int;
-  enum get_attr_constant_value high_type;
+  enum dwarf2_get_attr_constant_value high_type;
   char *name;
   
   base_type = die_type (die, cu);
@@ -6049,7 +6044,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
   range_type = create_range_type (NULL, base_type, 0, -1);
 
   attr = dwarf2_attr (die, DW_AT_lower_bound, cu);
-  switch (get_attr_constant_value (attr, &low))
+  switch (dwarf2_get_attr_constant_value (attr, &low))
     {
     case dwarf2_attr_unknown:
       if (cu->language == language_fortran)
@@ -6080,11 +6075,11 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
     }
 
   attr = dwarf2_attr (die, DW_AT_upper_bound, cu);
-  high_type = get_attr_constant_value (attr, &high);
+  high_type = dwarf2_get_attr_constant_value (attr, &high);
   if (high_type == dwarf2_attr_unknown)
     {
       attr = dwarf2_attr (die, DW_AT_count, cu);
-      high_type = get_attr_constant_value (attr, &high);
+      high_type = dwarf2_get_attr_constant_value (attr, &high);
       /* It does not hurt but it is needlessly ineffective in check_typedef.  */
       if (high_type != dwarf2_attr_unknown)
       	{
@@ -6112,7 +6107,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
 
   /* DW_AT_bit_stride is currently unsupported as we count in bytes.  */
   attr = dwarf2_attr (die, DW_AT_byte_stride, cu);
-  switch (get_attr_constant_value (attr, &byte_stride_int))
+  switch (dwarf2_get_attr_constant_value (attr, &byte_stride_int))
     {
     case dwarf2_attr_unknown:
       break;
@@ -10339,8 +10334,8 @@ dwarf2_get_ref_die_offset (struct attribute *attr)
 
 /* (*val_return) is filled only if returning dwarf2_attr_const.  */
 
-static enum get_attr_constant_value
-get_attr_constant_value (struct attribute *attr, int *val_return)
+static enum dwarf2_get_attr_constant_value
+dwarf2_get_attr_constant_value (struct attribute *attr, int *val_return)
 {
   if (attr == NULL)
     return dwarf2_attr_unknown;
@@ -11437,7 +11432,7 @@ attr_form_is_section_offset (struct attribute *attr)
 
 /* Return non-zero if ATTR's value falls in the 'constant' class, or
    zero otherwise.  When this function returns true, you can apply
-   get_attr_constant_value to it.
+   dwarf2_get_attr_constant_value to it.
 
    However, note that for some attributes you must check
    attr_form_is_section_offset before using this test.  DW_FORM_data4
