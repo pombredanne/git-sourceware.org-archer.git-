@@ -796,10 +796,28 @@ qsort_cmp (const void *a, const void *b)
       gdb_assert (sect1_addr >= obj_section_endaddr (sect2));
       return 1;
     }
-  /* This can happen for separate debug-info files.  */
-  gdb_assert (obj_section_endaddr (sect1) == obj_section_endaddr (sect2));
 
   return 0;
+}
+
+/* Select "better" obj_section to keep.  We prefer the one that came from
+   the real object, rather than the one from separate debuginfo.
+   Most of the time the two sections are exactly identical, but with
+   prelinking the .rel.dyn section in the real object may have different
+   size.  */
+
+static struct obj_section *
+preferred_obj_section (struct obj_section *a, struct obj_section *b)
+{
+  gdb_assert (obj_section_addr (a) == obj_section_addr (b));
+  gdb_assert ((a->objfile->separate_debug_objfile == b->objfile)
+	      || (b->objfile->separate_debug_objfile == a->objfile));
+  gdb_assert ((a->objfile->separate_debug_objfile_backlink == b->objfile)
+	      || (b->objfile->separate_debug_objfile_backlink == a->objfile));
+
+  if (a->objfile->separate_debug_objfile != NULL)
+    return a;
+  return b;
 }
 
 /* Update PMAP, PMAP_SIZE with non-TLS sections from all objfiles.  */
@@ -807,7 +825,7 @@ qsort_cmp (const void *a, const void *b)
 static void
 update_section_map (struct obj_section ***pmap, int *pmap_size)
 {
-  int map_size, idx;
+  int map_size, i, j;
   struct obj_section *s, **map;
   struct objfile *objfile;
 
@@ -827,14 +845,44 @@ update_section_map (struct obj_section ***pmap, int *pmap_size)
 
   map = xmalloc (map_size * sizeof (*map));
 
-  idx = 0;
+  i = 0;
   ALL_OBJSECTIONS (objfile, s)
     if (insert_p (objfile, s))
-      map[idx++] = s;
+      map[i++] = s;
 
 #undef insert_p
 
   qsort (map, map_size, sizeof (*map), qsort_cmp);
+
+  /* With separate debuginfo files, we may have up to two (almost)
+     identical copies of some obj_sections in the map.
+     Filter out duplicates.  */
+  for (i = 0, j = 0; i < map_size; ++i)
+    {
+      struct obj_section *sect1 = map[i];
+      struct obj_section *sect2 = (i + 1 < map_size) ? map[i + 1] : NULL;
+
+      if (sect2 == NULL
+	  || obj_section_addr (sect1) != obj_section_addr (sect2))
+	map[j++] = sect1;
+      else
+	{
+	  map[j++] = preferred_obj_section (sect1, sect2);
+	  ++i;
+	}
+    }
+
+  if (j < map_size)
+    {
+      /* Some duplicates were eliminated.
+	 The new size shouldn't be less than half of the original. */
+      gdb_assert (map_size / 2 <= j);
+      map_size = j;
+
+      map = xrealloc (map, map_size * sizeof (*map));  /* Trim excess space.  */
+    }
+  else
+    gdb_assert (j == map_size);
 
   *pmap = map;
   *pmap_size = map_size;
@@ -1021,7 +1069,7 @@ gdb_bfd_unref (struct bfd *abfd)
   if (abfd == NULL)
     return;
 
-  p_refcount = abfd->usrdata;
+  p_refcount = bfd_usrdata (abfd);
 
   /* Valid range for p_refcount: NULL (single owner), or a pointer
      to int counter, which has a value of 1 (single owner) or 2 (shared).  */
@@ -1034,7 +1082,7 @@ gdb_bfd_unref (struct bfd *abfd)
 	return;
     }
   xfree (p_refcount);
-  abfd->usrdata = NULL;  /* Paranoia.  */
+  bfd_usrdata (abfd) = NULL;  /* Paranoia.  */
 
   name = bfd_get_filename (abfd);
   if (!bfd_close (abfd))

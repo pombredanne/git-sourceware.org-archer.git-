@@ -1640,6 +1640,9 @@ symfile_bfd_open (char *name)
 	     bfd_errmsg (bfd_get_error ()));
     }
 
+  /* bfd_usrdata exists for applications and libbfd must not touch it.  */
+  gdb_assert (bfd_usrdata (sym_bfd) == NULL);
+
   return sym_bfd;
 }
 

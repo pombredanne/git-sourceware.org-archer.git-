@@ -1,3 +1,144 @@
+2009-08-10  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* objfiles.c (gdb_bfd_unref): Use the bfd_usrdata accessor.
+	* solib.c (symbol_add_stub): Likewise.
+	* symfile.c (symfile_bfd_open): Assert BFD_USRDATA is NULL.
+
+2009-08-10  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* objfiles.c (qsort_cmp): Remove assert.
+	(preferred_obj_section): New function.
+	(update_section_map): Filter duplicates.
+	
+2009-08-10  Tristan Gingold  <gingold@adacore.com>
+
+	* solib-darwin.c (find_program_interpreter): Simplify the code by
+	looking up for the load_dylinker command instead of reading the
+	corresponding (but deprecated) section.
+	(darwin_solib_create_inferior_hook): Adjust: do not free the
+	interpreter path.
+
+2009-08-10  Tristan Gingold  <gingold@adacore.com>
+
+	* i386-darwin-tdep.c (i386_m128_p): New function.
+	(i386_darwin_arg_type_alignment): Ditto.
+	(i386_darwin_push_dummy_call): Ditto.
+	(i386_darwin_init_abi): Define Darwin specific push_dummy_call.
+	Adjust long_double size.  Adjust pc offset in setjump buffer.
+
+2009-08-10  Hui Zhu  <teawater@gmail.com>
+
+	Add Linux AMD64 process record support.
+
+	* amd64-linux-tdep.c (amd64_linux_record_tdep): New variable.
+	This struct has the argument for the function
+	"record_linux_system_call".
+	(amd64_linux_syscall_record): New function. Parse the
+	system call instruction and call function
+	"record_linux_system_call" to record execute log.
+	(i386_linux_init_abi): Initialize "amd64_linux_record_tdep".
+	Set "amd64_linux_syscall_record" to "i386_syscall_record".
+
+2009-08-10  Hui Zhu  <teawater@gmail.com>
+
+	Add process record Linux system call 64 bits support.
+
+        * linux-record.h (linux_record_tdep): Add size_pointer,
+        size_size_t, size_iovec and arg6.  Change the values of
+	size_int, size_long and size_ulong to
+	gdbarch_int_bit (gdbarch) / TARGET_CHAR_BIT,
+	gdbarch_long_bit (gdbarch) / TARGET_CHAR_BIT,
+	gdbarch_long_bit (gdbarch) / TARGET_CHAR_BIT.
+	* i386-linux-tdep.c (i386_linux_init_abi): Ditto.
+	(i386_linux_intx80_sysenter_record): Add a check for system
+	call number.
+        * linux-record.c (record_linux_system_call): Make this
+        function support 64 bits.
+
+2009-08-10  Hui Zhu  <teawater@gmail.com>
+
+	Add AMD64 process record instruction set support.
+
+	* i386-tdep.h (gdbarch_tdep): Add record_regmap for registers
+	because the AMD64's registers order in GDB is not same with
+	I386 instructions.
+	Add i386_syscall_record to be the syscall function handle
+	interface.
+	(record_i386_regnum): Number for record_regmap.
+	* i386-tdep.c (OT_QUAD): For 64 bits.
+	(i386_record_s): Add rex_x, rex_b, rip_offset and
+	popl_esp_hack for AMD64 instruction set. And regmap for
+	record_regmap.
+	(i386_record_lea_modrm_addr): Support AMD64 instruction set
+	64 bits lea.
+	(i386_record_lea_modrm): Ditto.
+	(i386_record_push): New function.  Record the execution log
+	of push.
+	(I386_RECORD_ARCH_LIST_ADD_REG): New macro to record the
+	register.
+	(i386_process_record): Support AMD64 instruction set.
+	* amd64-tdep.c (amd64_record_regmap): For record_regmap.
+	(amd64_init_abi): Set amd64_record_regmap to record_regmap.
+
+2009-08-08  Pedro Alves  <pedro@codesourcery.com>
+
+	* bfd-target.c (struct target_bfd_data): New.
+	(target_bfd_xfer_partial): Adjust to get at the section table from
+	the new structure.
+	(target_bfd_get_section_table): Ditto.
+	(target_bfd_xclose): Ditto.  Get the bfd pointer from the
+	target_bfd_data structure, from the section table.
+	(target_bfd_reopen): Store a struct target_bfd_data in the
+	target_ops to_data field, instead of a target_section_table.
+
+2009-08-08  Aleksandar Ristovski  <aristovski@qnx.com>
+            Hui Zhu  <teawater@gmail.com>
+
+	* record.c (record_store_registers): Remove unused variable.
+
+2009-08-07  Tom Tromey  <tromey@redhat.com>
+
+	* language.c (set_language_command): Strip whitespace.
+	(set_type_command): Likewise.
+	(set_range_command): Likewise.
+
+2009-08-07  Tom Tromey  <tromey@redhat.com>
+
+	PR gdb/8869:
+	* language.c (language_completer): New function.
+	(range_or_type_completer): New function.
+	(case_completer): New function.
+	(_initialize_language): Set completers.
+	* cli/cli-decode.c (add_setshow_string_cmd): Return the "set"
+	command.
+	(add_setshow_string_noescape_cmd): Likewise.
+	(add_setshow_integer_cmd): Likewise.
+	(add_setshow_uinteger_cmd): Likewise.
+	(add_setshow_zinteger_cmd): Likewise.
+	(add_setshow_zuinteger_cmd): Likewise.
+	* command.h (add_setshow_string_cmd,
+	add_setshow_string_noescape_cmd, add_setshow_uinteger_cmd,
+	add_setshow_zinteger_cmd, add_setshow_zuinteger_cmd): Update.
+
+2009-08-06  Paul Pluzhnikov  <ppluzhnikov@google.com>
+	
+	gold/10400
+	* dwarf2-frame.c (qsort_fde_cmp): Use stable sort.	
+	
+2009-08-06  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* dwarf2-frame.c (struct dwarf2_cie): Remove 'next'.
+	(struct dwarf2_cie_table): New.
+	(struct dwarf2_fde): Remove 'next'.
+	(struct dwarf2_fde_table): New.
+	(struct comp_unit): Remove 'cie'.
+	(bsearch_cie_cmp, bsearch_fde_cmp): New function.
+	(find_cie, dwarf2_frame_find_fde): Use bsearch.
+	(add_cie, add_fde): Use array instead of linked list.
+	(decode_frame_entry, decode_frame_entry_1): New parameters.
+	(qsort_fde_cmp): New function.
+	(dwarf2_build_frame_info): Adjust.
+	
 2009-08-06  Don Lee <don.lee@sunplusct.com>
 
 	* score-tdep.c: Support a new Sunplus CT S+core variant, S+core 3.
