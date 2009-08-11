@@ -1530,7 +1530,7 @@ preserve_one_internalvar (struct internalvar *var, struct objfile *objfile,
    this objfile's types, and the convenience variables will be adjusted to
    use the new global types.  */
 
-static void
+void
 preserve_values (struct objfile *objfile)
 {
   htab_t copied_types;
@@ -2406,6 +2406,5 @@ Placeholder command for showing help on convenience functions."),
 
   make_final_cleanup (value_history_cleanup, NULL);
 
-  observer_attach_objfile_unloading (preserve_values);
   observer_attach_mark_used (value_types_mark_used);
 }

@@ -1827,9 +1827,13 @@ disable_display_command (char *args, int from_tty)
    an item by re-parsing .exp_string field in the new execution context.  */
 
 static void
-clear_dangling_display_expressions (struct objfile *objfile)
+clear_dangling_display_expressions (struct so_list *solib)
 {
+  struct objfile *objfile = solib->objfile;
   struct display *d;
+
+  if (objfile == NULL)
+    return;
 
   for (d = display_chain; d != NULL; d = d->next)
     if (block_objfile (d->block) == objfile
@@ -2567,7 +2571,7 @@ _initialize_printcmd (void)
 
   current_display_number = -1;
 
-  observer_attach_objfile_unloading (clear_dangling_display_expressions);
+  observer_attach_solib_unloaded (clear_dangling_display_expressions);
 
   add_info ("address", address_info,
 	    _("Describe where symbol SYM is stored."));
