@@ -926,8 +926,6 @@ new_symfile_objfile (struct objfile *objfile, int add_flags)
 
   /* We're done reading the symbol file; finish off complaints.  */
   clear_complaints (&symfile_complaints, 0, add_flags & SYMFILE_VERBOSE);
-
-  varobj_revalidate ();
 }
 
 /* Process a symbol file, as either the main file or as a dynamically
@@ -2352,7 +2350,6 @@ reread_symbols (void)
 	      /* Remove any references to this objfile in the global
 		 value lists.  */
 	      preserve_values (objfile);
-	      varobj_invalidate (objfile);
 
 	      /* Nuke all the state that we will re-read.  Much of the following
 	         code which sets things to NULL really is necessary to tell
@@ -2454,7 +2451,6 @@ reread_symbols (void)
 	         frameless.  */
 
 	      reinit_frame_cache ();
-	      varobj_revalidate ();
 
 	      /* Discard cleanups as symbol reading was successful.  */
 	      discard_cleanups (old_cleanups);
@@ -2836,6 +2832,10 @@ clear_symtab_users (void)
      between expressions and which ought to be reset each time.  */
   expression_context_block = NULL;
   innermost_block = NULL;
+
+  /* Varobj may refer to old symbols, perform a cleanup.  */
+  varobj_invalidate ();
+
 }
 
 static void

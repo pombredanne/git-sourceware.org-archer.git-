@@ -3262,83 +3262,28 @@ When non-zero, varobj debugging is enabled."),
 			    &setlist, &showlist);
 }
 
-/* Helper for varobj_invalidate.  */
+/* Invalidate varobj VAR if it is tied to locals and re-create it if it is
+   defined on globals.  It is a helper for varobj_invalidate.  */
 
 static void
-varobj_invalidate_iter (struct varobj *var, void *objfile_voidp)
+varobj_invalidate_iter (struct varobj *var, void *unused)
 {
-  struct objfile *objfile = objfile_voidp;
+  /* Floating varobjs are reparsed on each stop, so we don't care if the
+     presently parsed expression refers to something that's gone.  */
+  if (var->root->floating)
+    return;
 
-  /* Check VAROBJROOTs only once during the varobj_invalidate pass.  */
-
-  if (var->root->rootvar == var)
-    {
-      /* Check even FLOATING VAROBJROOTs as their data will be still checked
-	 during varobj_update by varobj_get_type.  */
-
-      if (var->root->is_valid
-	  && block_objfile (var->root->valid_block) == objfile)
-	var->root->is_valid = 0;
-
-      if (var->root->exp && exp_uses_objfile (var->root->exp, objfile))
-	{
-	  var->root->is_valid = 0;
-
-	  /* No one touches EXP for !IS_VALID varobj.  */
-	  xfree (var->root->exp);
-	  var->root->exp = NULL;
-	}
-    }
-
-  if (var->type && TYPE_OBJFILE (var->type) == objfile)
-    {
-      var->root->is_valid = 0;
-
-      var->type = NULL;
-    }
-
-  if (var->value && TYPE_OBJFILE (value_type (var->value)) == objfile)
-    {
-      var->root->is_valid = 0;
-
-      value_free (var->value);
-      var->value = NULL;
-    }
-}
-
-/* Invalidate the varobjs that are tied to the specified OBJFILE.  Call this
-   function before you start removing OBJFILE.
-
-   Call varobj_revalidate after the OBJFILEs updates get finished.
-
-   Invalidated varobjs will be always printed in_scope="invalid".  */
-
-void 
-varobj_invalidate (struct objfile *objfile)
-{
-  /* Check all the VAROBJs, even non-root ones.  Child VAROBJs can reference
-     types from other OBJFILEs through TYPE_IS_OPAQUE resolutions by
-     check_typedef.  */
-
-  all_varobjs (varobj_invalidate_iter, objfile);
-}
-
-/* Helper for varobj_revalidate.  */
-
-static void
-varobj_revalidate_iter (struct varobj *var, void *unused)
-{
-  /* Global VAR must be re-evaluated.  */
-
+  /* global var must be re-evaluated.  */     
   if (var->root->valid_block == NULL)
     {
       struct varobj *tmp_var;
 
       /* Try to create a varobj with same expression.  If we succeed
 	 replace the old varobj, otherwise invalidate it.  */
-      tmp_var = varobj_create (NULL, var->name, 0, USE_CURRENT_FRAME);
-      if (tmp_var != NULL)
-	{
+      tmp_var = varobj_create (NULL, var->name, (CORE_ADDR) 0,
+			       USE_CURRENT_FRAME);
+      if (tmp_var != NULL) 
+	{ 
 	  tmp_var->obj_name = xstrdup (var->obj_name);
 	  varobj_delete (var, NULL, 0);
 	  install_variable (tmp_var);
@@ -3346,18 +3291,16 @@ varobj_revalidate_iter (struct varobj *var, void *unused)
       else
 	var->root->is_valid = 0;
     }
+  else /* locals must be invalidated.  */
+    var->root->is_valid = 0;
 }
 
-/* Recreate any global varobjs possibly previously invalidated.  If the
-   expressions are no longer evaluatable set/keep the varobj invalid.  */
+/* Invalidate the varobjs that are tied to locals and re-create the ones that
+   are defined on globals.
+   Invalidated varobjs will be always printed in_scope="invalid".  */
 
 void 
-varobj_revalidate (void)
+varobj_invalidate (void)
 {
-  /* Check only root VAROBJs.  Any successful revalidation will replace the
-     whole VAROBJs tree starting with root VAROBJs and its children get created
-     later on-demand.  So there is no point trying to revalidate the child
-     VAROBJs.  */
-
-  all_root_varobjs (varobj_revalidate_iter, NULL);
+  all_root_varobjs (varobj_invalidate_iter, NULL);
 }

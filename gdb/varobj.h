@@ -143,9 +143,7 @@ extern void all_root_varobjs (void (*func) (struct varobj *var, void *data),
 extern VEC(varobj_update_result) *varobj_update (struct varobj **varp, 
 						 int explicit);
 
-extern void varobj_invalidate (struct objfile *objfile);
-
-extern void varobj_revalidate (void);
+extern void varobj_invalidate (void);
 
 extern int varobj_editable_p (struct varobj *var);
 
