@@ -323,31 +323,6 @@ allocate_repeat_value (struct type *type, int count)
   return allocate_value (array_type);
 }
 
-/* Needed if another module needs to maintain its on list of values.  */
-void
-value_prepend_to_list (struct value **head, struct value *val)
-{
-  val->next = *head;
-  *head = val;
-}
-
-/* Needed if another module needs to maintain its on list of values.  */
-void
-value_remove_from_list (struct value **head, struct value *val)
-{
-  struct value *prev;
-
-  if (*head == val)
-    *head = (*head)->next;
-  else
-    for (prev = *head; prev->next; prev = prev->next)
-      if (prev->next == val)
-      {
-	prev->next = val->next;
-	break;
-      }
-}
-
 struct value *
 allocate_computed_value (struct type *type,
                          struct lval_funcs *funcs,

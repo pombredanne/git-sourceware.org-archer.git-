@@ -56,6 +56,7 @@
 typedef struct value_object {
   PyObject_HEAD
   struct value_object *next;
+  struct value_object *prev;
   struct value *value;
   PyObject *address;
   PyObject *type;
@@ -73,13 +74,17 @@ static void
 valpy_dealloc (PyObject *obj)
 {
   value_object *self = (value_object *) obj;
-  value_object **iter;
 
-  /* Remove OBJ from the global list.  */
-  iter = &values_in_python;
-  while (*iter != self)
-    iter = &(*iter)->next;
-  *iter = (*iter)->next;
+  /* Remove SELF from the global list.  */
+  if (self->prev)
+    self->prev->next = self->next;
+  else
+    {
+      gdb_assert (values_in_python == self);
+      values_in_python = self->next;
+    }
+  if (self->next)
+    self->next->prev = self->prev;
 
   value_free (self->value);
 
@@ -95,6 +100,17 @@ valpy_dealloc (PyObject *obj)
     }
 
   self->ob_type->tp_free (self);
+}
+
+/* Helper to push a Value object on the global list.  */
+static void
+note_value (value_object *value_obj)
+{
+  value_obj->next = values_in_python;
+  if (value_obj->next)
+    value_obj->next->prev = value_obj;
+  value_obj->prev = NULL;
+  values_in_python = value_obj;
 }
 
 /* Called when a new gdb.Value object needs to be allocated.  */
@@ -127,11 +143,10 @@ valpy_new (PyTypeObject *subtype, PyObject *args, PyObject *keywords)
     }
 
   value_obj->value = value;
+  value_incref (value);
   value_obj->address = NULL;
   value_obj->type = NULL;
-  value_incref (value);
-  value_obj->next = values_in_python;
-  values_in_python = value_obj;
+  note_value (value_obj);
 
   return (PyObject *) value_obj;
 }
@@ -818,11 +833,10 @@ value_to_value_object (struct value *val)
   if (val_obj != NULL)
     {
       val_obj->value = val;
+      value_incref (val);
       val_obj->address = NULL;
       val_obj->type = NULL;
-      value_incref (val);
-      val_obj->next = values_in_python;
-      values_in_python = val_obj;
+      note_value (val_obj);
     }
 
   return (PyObject *) val_obj;
@@ -842,7 +856,7 @@ value_object_to_value (PyObject *self)
 
 /* Try to convert a Python value to a gdb value.  If the value cannot
    be converted, set a Python exception and return NULL.  Returns a
-   borrowed reference to the resulting struct value.  */
+   reference to a new value on the all_values chain.  */
 
 struct value *
 convert_value_from_python (PyObject *obj)
@@ -924,13 +938,7 @@ convert_value_from_python (PyObject *obj)
 	    }
 	}
       else if (PyObject_TypeCheck (obj, &value_object_type))
-	{
-	  /* This lets callers freely decref the Value wrapper object
-	     and not worry about whether or not the value will
-	     disappear.  */
-	  value = ((value_object *) obj)->value;
-	  value_incref (value);
-	}
+	value = value_copy (((value_object *) obj)->value);
       else
 	PyErr_Format (PyExc_TypeError, _("Could not convert Python object: %s"),
 		      PyString_AsString (PyObject_Str (obj)));
