@@ -1436,6 +1436,13 @@ dwarf2_create_quick_addrmap (struct objfile *objfile)
 		     _("aranges entry runs off end of `.debug_aranges' section, ignored"));
 	  return;
 	}
+      if (cu_header.addr_size == 0)
+	{
+	  do_cleanups (old);
+	  complaint (&symfile_complaints,
+		     _("aranges entry has zero addr_size, ignored"));
+	  return;
+	}
 
       segment_size = read_1_byte (abfd, aranges_ptr);
       aranges_ptr += 1;
@@ -1462,9 +1469,18 @@ dwarf2_create_quick_addrmap (struct objfile *objfile)
 	  if (address == 0 && length == 0)
 	    break;
 
+	  if (length == 0)
+	    {
+	      do_cleanups (old);
+	      complaint (&symfile_complaints,
+			 _("aranges entry has zero length, ignored"));
+	      return;
+	    }
+
 	  address += baseaddr;
 
-	  addrmap_set_empty (mutable_map, address, address + length, objfile);
+	  addrmap_set_empty (mutable_map, address, address + length - 1,
+			     objfile);
 	}
 
       /* Some older versions of GCC incorrectly started the arange
