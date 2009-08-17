@@ -1518,7 +1518,8 @@ install_new_value (struct varobj *var, struct value *value, int initial)
   if (var->value != NULL && var->value != value)
     value_free (var->value);
   var->value = value;
-  value_incref (value);
+  if (value != NULL)
+    value_incref (value);
   if (var->print_value)
     xfree (var->print_value);
   var->print_value = print_value;
