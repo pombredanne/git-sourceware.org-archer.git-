@@ -1052,11 +1052,20 @@ update_dynamic_varobj_children (struct varobj *var,
 int
 varobj_get_num_children (struct varobj *var)
 {
+  int result = var->num_children;
+
   if (var->num_children == -1)
     {
-      int changed;
-      if (!var->pretty_printer)
-	var->num_children = number_of_children (var);
+      if (var->pretty_printer)
+	{
+	  /* If we have a dynamic varobj, don't report -1 children.  */
+	  result = 0;
+	}
+      else
+	{
+	  var->num_children = number_of_children (var);
+	  result = var->num_children;
+	}
     }
 
   return var->num_children;
