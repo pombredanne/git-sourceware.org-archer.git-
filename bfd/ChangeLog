@@ -1,3 +1,124 @@
+2009-08-16  Doug Evans  <dje@google.com>
+
+	* opncls.c (bfd_close): Until BFD_IN_MEMORY has an iovec,
+	at least don't leak memory.
+
+2009-08-13  DJ Delorie  <dj@redhat.com>
+
+	* elf32-m32c.c (m32c_elf_relax_delete_bytes): Adjust symbol sizes
+	if needed.
+
+2009-08-12  Nick Clifton  <nickc@redhat.com>
+
+	* po/fi.po: Updated Finnish translation.
+
+2009-08-11  Bernd Schmidt  <bernd.schmidt@analog.com>
+
+	Merge some FRV FDPIC changes into the Blackfin code.
+	* elf32-bfin.c (struct bfinfdpic_elf_link_hash_table): Add pointer to
+	summary reloc information.
+	(bfinfdpic_dynamic_got_plt_info): New.
+	(_bfin_create_got_section): Create the PLT section here.
+	(elf32_bfinfdpic_create_dynamic_sections): Not here.
+	(_bfinfdpic_count_nontls_entries): Move out of...
+	(_bfinfdpic_count_got_plt_entries): ... here.
+	(_bfinfdpic_count_relocs_fixups): Likewise.
+	(_bfinfdpic_reset_got_plt_entries): New.
+	(_bfinfdpic_size_got_plt): Move out of...
+	(elf32_bfinfdpic_size_dynamic_sections): ... here.
+	(bfinfdpic_relocate_section): Be careful not to call
+	_bfinfdpic_add_rofixup or _bfinfdpic_add_dyn_reloc for deleted relocs.
+	(bfinfdpic_check_discarded_relocs, bfinfdpic_elf_discard_info):
+	New functions.
+	(elf_backend_discard_info): Define for FD-PIC.
+
+2009-08-11  Alan Modra  <amodra@bigpond.net.au>
+
+	* elflink.c: Add FIXMEs for some places that require octets_per_byte
+	adjustments.
+	* elf-eh-frame.c: Likewise.
+	* merge.c: Likewise.
+
+2009-08-11  Alan Modra  <amodra@bigpond.net.au>
+
+	* configure.in:  Remove elf-ifunc.lo from common ELF files.  Add
+	to x86 and x86_64 configurations.
+	* configure: Regenerate.
+
+2009-08-10  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Stop using bfd_usrdata in libbfd.
+	* coff-stgo32.c (bfd_coff_go32stub): Remove.
+	(stub_bytes, comment): Replace STUBSIZE by GO32_STUBSIZE.
+	(adjust_filehdr_in_post): Declare the abfd parameter as unused.
+	Replace STUBSIZE by GO32_STUBSIZE.  Save now the stub in
+	filehdr_dst->u.go32.stub.  New comment with the reason.
+	(adjust_filehdr_out_pre): Replace STUBSIZE by GO32_STUBSIZE.
+	Substitute the removed macro bfd_coff_go32stub.
+	(adjust_filehdr_out_post, adjust_scnhdr_in_post, adjust_scnhdr_out_pre)
+	(adjust_scnhdr_out_post, adjust_aux_in_post, adjust_aux_out_pre)
+	(adjust_aux_out_post): Replace STUBSIZE by GO32_STUBSIZE.
+	(create_go32_stub, go32_stubbed_coff_bfd_copy_private_bfd_data):
+	Replace STUBSIZE by GO32_STUBSIZE.  Substitute the removed macro
+	bfd_coff_go32stub.
+	* coffcode.h (coff_mkobject_hook): Initialize coff->go32stub.
+	* libcoff-in.h (coff_data_type): New field go32stub.
+	* libcoff.h: Regenerated.
+
+2009-08-10  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix go32 stub preservation by objcopy.
+	* coff-stgo32.c (adjust_filehdr_in_post): Use bfd_malloc.
+	(go32_stubbed_coff_bfd_copy_private_bfd_data): Optionally allocate OBFD
+	go32stub.
+
+2009-08-10  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* elf32-arm.c (elf32_arm_size_stubs): Don't die on undefined local
+	symbols.
+	(elf32_arm_final_link_relocate): Treat local undefined symbols the
+	same as global undefined symbols.
+	(elf32_arm_relocate_section): Give an error for local undefined
+	non-weak symbols, unless the reloc will not use the symbol.
+
+2009-08-10  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* elf32-ppc.c (shared_stub_entry, stub_entry): Use r12, not r11.
+	(ppc_elf_relax_section): Use symbol index to distinguish
+	relocatable stubs.
+
+2009-08-10  Alan Modra  <amodra@bigpond.net.au>
+
+	* elf32-ppc.c (ppc_elf_relax_section): Ignore non-code sections.
+
+2009-08-10  Alan Modra  <amodra@bigpond.net.au>
+
+	* elflink.c (_bfd_elf_adjust_dynamic_symbol): Don't clear plt
+	info for STT_GNU_IFUNC.
+	* elf32-ppc.c (ppc_elf_check_relocs): Count a needed plt entry
+	on got refs in case the symbol turns out to be ifunc.
+	(ppc_elf_gc_sweep_hook): Similarly.
+	(ppc_elf_adjust_dynamic_symbol): Adjust assertion.
+	(allocate_dynrelocs): Don't specially allocate got relocs for ifunc.
+	(ppc_elf_size_dynamic_sections): Likewise.
+	(ppc_elf_relocate_section): Likewise.
+
+2009-08-09  Bernd Schmidt  <bernd.schmidt@analog.com>
+
+	From Mike Frysinger <michael.frysinger@analog.com>
+	* elf32-bfin.c (bfin_howto_table, bfin_reloc_map, bfin_check_relocs,
+	bfin_final_link_relocate, bfin_relocate_section, bfin_gc_sweep_hook,
+	_bfinfdpic_emit_got_relocs_plt_entries, bfinfdpic_relocate_section,
+	bfinfdpic_gc_sweep_hook, bfinfdpic_check_relocs,
+	bfin_finish_dynamic_symbol, bfd_bfin_elf32_create_embedded_relocs):
+	Adjust to match the renamed reloc definitions.
+	
+2009-08-08  Alan Modra  <amodra@bigpond.net.au>
+
+	PR 10494
+	* elf.c (_bfd_elf_make_section_from_shdr): When setting up section
+	LMAs, use ELF_IS_SECTION_IN_SEGMENT to match sections with headers.
+
 2009-08-07  Tom Tromey  <tromey@redhat.com>
 
 	* elf32-microblaze.c (microblaze_elf_check_relocs): Avoid strict

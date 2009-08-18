@@ -1,3 +1,321 @@
+2009-08-18  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in (ALL_TARGET_OBS): Remove prologue-value.o, solib.o.
+
+2009-08-17  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* symfile.c (reread_symbols): Call objfiles_changed *before*
+	calling clear_symtab_users.
+
+2009-08-17  Michael Snyder  <msnyder@vmware.com>
+
+	* amd64-tdep.c: Add a frame unwinder for function epilogues.
+	(amd64_in_function_epilogue_p): New function.
+	(amd64_epilogue_frame_sniffer): New function.
+	(amd64_epilogue_frame_cache): New function.
+	(amd64_epilogue_frame_this_id): New function.
+	(amd64_epilogue_frame_unwind): New struct frame_unwind.
+	(amd64_init_abi): Hook the new unwinder.
+
+	* amd64-linux-tdep.c (amd64_linux_init_abi): Set gdbarch to use
+	SVR4 method for skip_trampoline_code.
+
+2009-08-17  Pedro Alves  <pedro@codesourcery.com>>
+
+	* objfiles.c (objfile_relocate): Relocate the entry point before
+	relocating the section offsets.  Flush the section map before
+	resetting breakpoints.
+
+2009-08-14  Doug Evans  <dje@google.com>
+
+	* symfile.c (find_separate_debug_file): Remove double free of
+	canon_name.
+
+2009-08-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* top.c (any_thread_of): Delete.
+	(kill_or_detach): Use any_thread_of_process.
+	* top.c (print_inferior_quit_action): New.
+	(quit_confirm): Rewrite to print info about all inferiors.
+	* target.c (dispose_inferior): New.
+	(target_preopen): Use it.
+
+2009-08-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* ui-file.h (ui_file_xstrdup): Mention that the length argument
+	may be NULL.
+	* ui-file.c (ui_file_xstrdup): Don't dereference LENGTH if it is
+	NULL.
+	* aix-thread.c (aix_thread_extra_thread_info): Pass NULL as length
+	parameter to ui_file_xstrdup.
+	* arm-tdep.c (_initialize_arm_tdep): Ditto.
+	* infrun.c (print_target_wait_results): Ditto.
+	* language.c (add_language): Ditto.
+	* linespec.c (cplusplus_error): Ditto.
+	* remote.c (escape_buffer): Ditto.
+	* typeprint.c (type_to_string): Ditto.
+	* utils.c (error_stream): Ditto.
+	* varobj.c (value_get_print_value): Ditto.
+	* xtensa-tdep.c (xtensa_verify_config): Replace `dummy' local with
+	`length' local.  Pass it to ui_file_xstrdup, and avoid an strlen
+	call.
+	* gdbarch.sh (verify_gdbarch): Ditto.
+	* gdbarch.c: Regenerate.
+	* cli/cli-setshow.c (do_setshow_command): Pass NULL as length
+	parameter to ui_file_xstrdup.
+	* python/python-frame.c (frapy_str): Ditto.
+	* python/python-type.c (typy_str): Use the length local instead of
+	calling strlen.
+	* python/python-value.c (valpy_str): Pass NULL as length parameter
+	to ui_file_xstrdup.
+
+2009-08-13  Doug Evans  <dje@google.com>
+
+	* utils.c (gnu_debuglink_crc32): Store crc32_table as unsigned int
+	instead of unsigned long.
+
+2009-08-13  Tom Tromey  <tromey@redhat.com>
+
+	* varobj.c (update_dynamic_varobj_children): Don't use
+	value_copy.
+	* value.h: (preserve_one_value): Declare.
+	(value_prepend_to_list, value_remove_from_list): Remove.
+	* value.c (preserve_one_value): No longer static.
+	(preserve_values): Call preserve_python_values.
+	(value_prepend_to_list): Remove.
+	(value_remove_from_list): Remove.
+	* python/python.h (values_in_python): Don't declare.
+	(preserve_python_values): Declare.
+	* python/python-value.c (values_in_python): Change type.  Move
+	lower.  Now static.
+	(struct value_object): Add struct tag.
+	<next, prev>: New fields.
+	(valpy_dealloc): Update.
+	(note_value): New function.
+	(valpy_new): Use value_incref, note_value.
+	(preserve_python_values): New function.
+	(valpy_positive): Don't use value_copy.
+	(value_to_value_object): Use value_incref, note_value.
+	(convert_value_from_python): Update comment.
+
+2009-08-13  Pedro Alves  <pedro@codesourcery.com>
+
+	* remote.c (remote_pid_to_str): If printing a process id and we
+	don't know what the remote pid could be, output "Remote target";
+	otherwise, use normal_pid_to_str.
+
+2009-08-13  Tom Tromey  <tromey@redhat.com>
+
+	* language.h (longest_raw_hex_string): Remove unused declaration.
+
+2009-08-13  Pedro Alves  <pedro@codesourcery.com>
+
+	PR gdb/8869:
+
+	* language.c (language, type, range, case_sensitive): Make const.
+	(show_language_command): Don't call deprecated_show_value_hack.
+	Special case "auto".
+	(set_language_command): An unrecognized language is now an
+	internal error instead of a user error.  Don't call set_lang_str.
+	(show_type_command): Don't call deprecated_show_value_hack.
+	Special case "auto".  Use warning.
+	(set_type_command): An unrecognized type is now an internal error
+	instead of a user error.  Output type check mismatch with language
+	here.  Don't call set_type_str.
+	(show_range_command): Don't call deprecated_show_value_hack.
+	Special case "auto".  Use warning.
+	(set_range_command): An unrecognized range check is now an
+	internal error instead of a warning.  Output range check mismatch
+	with language here.  Don't call set_range_str.
+	(show_case_command): Don't call deprecated_show_value_hack.
+	Special case "auto".  Use warning.
+	(set_case_command): Don't call set_case_str.  An unrecognized case
+	check is now an internal error instead of a warning.  Output range
+	check mismatch with language here.  Don't call set_case_str.
+	(set_type_range_case): Don't call set_type_str, set_range_str or
+	set_case_str here.
+	(set_lang_str, set_type_str, set_range_str, set_case_str): Delete.
+	(add_language): Install or reinstall the "set language" command
+	here, and make it an enum command.  Build the enumeration and the
+	help string from the current list of known languages.
+	(_initialize_language): Don't install "set language" here.  Make
+	"set check type", "set check range" and "set case-sensitive" enum
+	commands.  Register the "auto" "local" and "unknown" languages in
+	that order.
+
+2009-08-13  Pedro Alves  <pedro@codesourcery.com>
+
+	Revert 2009-08-07 changes for PR gdb/8869:
+
+	* language.c (set_language_command): Strip whitespace.
+	(set_type_command): Likewise.
+	(set_range_command): Likewise.
+
+	* language.c (language_completer): New function.
+	(range_or_type_completer): New function.
+	(case_completer): New function.
+	(_initialize_language): Set completers.
+	* cli/cli-decode.c (add_setshow_string_cmd): Return the "set"
+	command.
+	(add_setshow_string_noescape_cmd): Likewise.
+	(add_setshow_integer_cmd): Likewise.
+	(add_setshow_uinteger_cmd): Likewise.
+	(add_setshow_zinteger_cmd): Likewise.
+	(add_setshow_zuinteger_cmd): Likewise.
+	* command.h (add_setshow_string_cmd,
+	add_setshow_string_noescape_cmd, add_setshow_uinteger_cmd,
+	add_setshow_zinteger_cmd, add_setshow_zuinteger_cmd): Update.
+
+2009-08-12  Michael Snyder  <msnyder@vmware.com>
+
+	* remote.c (remote_add_inferior): Remove unused local.
+	(remote_add_thread): Ditto.
+	(read_ptid): Ditto.
+	(remote_current_thread): Ditto.
+	(remote_stop_ns): Ditto.
+	(remote_parse_stop_reply): Ditto.
+	(remote_get_pending_stop_replies): Ditto.
+	(remote_wait_ns): Ditto.
+	(remote_wait_as): Ditto.
+	(send_g_packet): Ditto.
+	(remote_fetch_registers): Ditto.
+	(store_register_using_P): Ditto.
+	(remote_store_registers): Ditto.
+	(remote_remove_breakpoint): Ditto.
+	(remote_write_qxfer): Ditto.
+	(remote_read_qxfer): Ditto.
+
+2009-08-11  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2loc.c (dwarf2_evaluate_loc_desc): Make a cleanup.
+	(dwarf2_loc_desc_needs_frame): Likewise.
+	* dwarf2expr.h (make_cleanup_free_dwarf_expr_context): Declare.
+	* dwarf2expr.c (free_dwarf_expr_context_cleanup): New function.
+	(make_cleanup_free_dwarf_expr_context): Likewise.
+	* dwarf2-frame.c (execute_stack_op): Make a cleanup.
+
+2009-08-10  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* objfiles.c (gdb_bfd_unref): Use the bfd_usrdata accessor.
+	* solib.c (symbol_add_stub): Likewise.
+	* symfile.c (symfile_bfd_open): Assert BFD_USRDATA is NULL.
+
+2009-08-10  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* objfiles.c (qsort_cmp): Remove assert.
+	(preferred_obj_section): New function.
+	(update_section_map): Filter duplicates.
+	
+2009-08-10  Tristan Gingold  <gingold@adacore.com>
+
+	* solib-darwin.c (find_program_interpreter): Simplify the code by
+	looking up for the load_dylinker command instead of reading the
+	corresponding (but deprecated) section.
+	(darwin_solib_create_inferior_hook): Adjust: do not free the
+	interpreter path.
+
+2009-08-10  Tristan Gingold  <gingold@adacore.com>
+
+	* i386-darwin-tdep.c (i386_m128_p): New function.
+	(i386_darwin_arg_type_alignment): Ditto.
+	(i386_darwin_push_dummy_call): Ditto.
+	(i386_darwin_init_abi): Define Darwin specific push_dummy_call.
+	Adjust long_double size.  Adjust pc offset in setjump buffer.
+
+2009-08-10  Hui Zhu  <teawater@gmail.com>
+
+	Add Linux AMD64 process record support.
+
+	* amd64-linux-tdep.c (amd64_linux_record_tdep): New variable.
+	This struct has the argument for the function
+	"record_linux_system_call".
+	(amd64_linux_syscall_record): New function. Parse the
+	system call instruction and call function
+	"record_linux_system_call" to record execute log.
+	(i386_linux_init_abi): Initialize "amd64_linux_record_tdep".
+	Set "amd64_linux_syscall_record" to "i386_syscall_record".
+
+2009-08-10  Hui Zhu  <teawater@gmail.com>
+
+	Add process record Linux system call 64 bits support.
+
+        * linux-record.h (linux_record_tdep): Add size_pointer,
+        size_size_t, size_iovec and arg6.  Change the values of
+	size_int, size_long and size_ulong to
+	gdbarch_int_bit (gdbarch) / TARGET_CHAR_BIT,
+	gdbarch_long_bit (gdbarch) / TARGET_CHAR_BIT,
+	gdbarch_long_bit (gdbarch) / TARGET_CHAR_BIT.
+	* i386-linux-tdep.c (i386_linux_init_abi): Ditto.
+	(i386_linux_intx80_sysenter_record): Add a check for system
+	call number.
+        * linux-record.c (record_linux_system_call): Make this
+        function support 64 bits.
+
+2009-08-10  Hui Zhu  <teawater@gmail.com>
+
+	Add AMD64 process record instruction set support.
+
+	* i386-tdep.h (gdbarch_tdep): Add record_regmap for registers
+	because the AMD64's registers order in GDB is not same with
+	I386 instructions.
+	Add i386_syscall_record to be the syscall function handle
+	interface.
+	(record_i386_regnum): Number for record_regmap.
+	* i386-tdep.c (OT_QUAD): For 64 bits.
+	(i386_record_s): Add rex_x, rex_b, rip_offset and
+	popl_esp_hack for AMD64 instruction set. And regmap for
+	record_regmap.
+	(i386_record_lea_modrm_addr): Support AMD64 instruction set
+	64 bits lea.
+	(i386_record_lea_modrm): Ditto.
+	(i386_record_push): New function.  Record the execution log
+	of push.
+	(I386_RECORD_ARCH_LIST_ADD_REG): New macro to record the
+	register.
+	(i386_process_record): Support AMD64 instruction set.
+	* amd64-tdep.c (amd64_record_regmap): For record_regmap.
+	(amd64_init_abi): Set amd64_record_regmap to record_regmap.
+
+2009-08-08  Pedro Alves  <pedro@codesourcery.com>
+
+	* bfd-target.c (struct target_bfd_data): New.
+	(target_bfd_xfer_partial): Adjust to get at the section table from
+	the new structure.
+	(target_bfd_get_section_table): Ditto.
+	(target_bfd_xclose): Ditto.  Get the bfd pointer from the
+	target_bfd_data structure, from the section table.
+	(target_bfd_reopen): Store a struct target_bfd_data in the
+	target_ops to_data field, instead of a target_section_table.
+
+2009-08-08  Aleksandar Ristovski  <aristovski@qnx.com>
+            Hui Zhu  <teawater@gmail.com>
+
+	* record.c (record_store_registers): Remove unused variable.
+
+2009-08-07  Tom Tromey  <tromey@redhat.com>
+
+	* language.c (set_language_command): Strip whitespace.
+	(set_type_command): Likewise.
+	(set_range_command): Likewise.
+
+2009-08-07  Tom Tromey  <tromey@redhat.com>
+
+	PR gdb/8869:
+	* language.c (language_completer): New function.
+	(range_or_type_completer): New function.
+	(case_completer): New function.
+	(_initialize_language): Set completers.
+	* cli/cli-decode.c (add_setshow_string_cmd): Return the "set"
+	command.
+	(add_setshow_string_noescape_cmd): Likewise.
+	(add_setshow_integer_cmd): Likewise.
+	(add_setshow_uinteger_cmd): Likewise.
+	(add_setshow_zinteger_cmd): Likewise.
+	(add_setshow_zuinteger_cmd): Likewise.
+	* command.h (add_setshow_string_cmd,
+	add_setshow_string_noescape_cmd, add_setshow_uinteger_cmd,
+	add_setshow_zinteger_cmd, add_setshow_zuinteger_cmd): Update.
+
 2009-08-06  Paul Pluzhnikov  <ppluzhnikov@google.com>
 	
 	gold/10400

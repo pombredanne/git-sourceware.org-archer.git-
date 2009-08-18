@@ -2360,7 +2360,6 @@ static char *
 value_get_print_value (struct value *value, enum varobj_display_formats format,
 		       struct varobj *var)
 {
-  long dummy;
   struct ui_file *stb;
   struct cleanup *old_chain;
   gdb_byte *thevalue = NULL;
@@ -2432,7 +2431,7 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
     }
   else
     common_val_print (value, stb, 0, &opts, current_language);
-  thevalue = ui_file_xstrdup (stb, &dummy);
+  thevalue = ui_file_xstrdup (stb, NULL);
 
   do_cleanups (old_chain);
   return thevalue;

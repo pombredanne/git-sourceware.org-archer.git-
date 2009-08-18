@@ -1457,7 +1457,6 @@ find_separate_debug_file (struct objfile *objfile)
 	  xfree (canon_name);
 	  xfree (basename);
 	  xfree (dir);
-	  xfree (canon_name);
 	  return xstrdup (debugfile);
 	}
     }
@@ -1637,6 +1636,9 @@ symfile_bfd_open (char *name)
       error (_("`%s': can't read symbols: %s."), name,
 	     bfd_errmsg (bfd_get_error ()));
     }
+
+  /* bfd_usrdata exists for applications and libbfd must not touch it.  */
+  gdb_assert (bfd_usrdata (sym_bfd) == NULL);
 
   return sym_bfd;
 }
@@ -2465,13 +2467,13 @@ reread_symbols (void)
 
   if (reread_one)
     {
+      /* Notify objfiles that we've modified objfile sections.  */
+      objfiles_changed ();
+
       clear_symtab_users ();
       /* At least one objfile has changed, so we can consider that
          the executable we're debugging has changed too.  */
       observer_notify_executable_changed ();
-
-      /* Notify objfiles that we've modified objfile sections.  */
-      objfiles_changed ();
     }
 }
 
