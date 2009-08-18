@@ -901,16 +901,7 @@ update_dynamic_varobj_children (struct varobj *var,
       if (!PyArg_ParseTuple (item, "sO", &name, &py_v))
 	error (_("Invalid item from the child list"));
       
-      if (PyObject_TypeCheck (py_v, &value_object_type))
-	{
-	  /* If we just call convert_value_from_python for this type,
-	     we won't know who owns the result.  For this one case we
-	     need to copy the resulting value.  */
-	  v = value_object_to_value (py_v);
-	  v = value_copy (v);
-	}
-      else
-	v = convert_value_from_python (py_v);
+      v = convert_value_from_python (py_v);
 
       /* TODO: This assume the name of the i-th child never changes.  */
 
@@ -2186,7 +2177,6 @@ static char *
 value_get_print_value (struct value *value, enum varobj_display_formats format,
 		       struct varobj *var)
 {
-  long dummy;
   struct ui_file *stb;
   struct cleanup *old_chain;
   gdb_byte *thevalue = NULL;
@@ -2258,7 +2248,7 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
     }
   else
     common_val_print (value, stb, 0, &opts, current_language);
-  thevalue = ui_file_xstrdup (stb, &dummy);
+  thevalue = ui_file_xstrdup (stb, NULL);
 
   do_cleanups (old_chain);
   return thevalue;

@@ -288,6 +288,8 @@ dwarf_expr_prep_ctx (struct frame_info *frame, gdb_byte *data,
   baton.object_address = object_address;
 
   ctx = new_dwarf_expr_context ();
+  make_cleanup_free_dwarf_expr_context (ctx);
+
   ctx->gdbarch = get_objfile_arch (baton.objfile);
   ctx->addr_size = dwarf2_per_cu_addr_size (per_cu);
   ctx->baton = &baton;
@@ -296,8 +298,6 @@ dwarf_expr_prep_ctx (struct frame_info *frame, gdb_byte *data,
   ctx->get_frame_base = dwarf_expr_frame_base;
   ctx->get_tls_address = dwarf_expr_tls_address;
   ctx->get_object_address = dwarf_expr_object_address;
-
-  make_cleanup ((make_cleanup_ftype *) free_dwarf_expr_context, ctx);
 
   dwarf_expr_eval (ctx, data, size);
 
@@ -341,7 +341,7 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
 {
   struct value *retval;
   struct dwarf_expr_context *ctx;
-  struct cleanup *back_to = make_cleanup (null_cleanup, 0);
+  struct cleanup *old_chain = make_cleanup (null_cleanup, 0);
 
   if (size == 0)
     {
@@ -402,7 +402,7 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
 
   set_value_initialized (retval, ctx->initialized);
 
-  do_cleanups (back_to);
+  do_cleanups (old_chain);
 
   return retval;
 }
@@ -466,10 +466,13 @@ dwarf2_loc_desc_needs_frame (gdb_byte *data, unsigned short size,
   struct needs_frame_baton baton;
   struct dwarf_expr_context *ctx;
   int in_reg;
+  struct cleanup *old_chain;
 
   baton.needs_frame = 0;
 
   ctx = new_dwarf_expr_context ();
+  old_chain = make_cleanup_free_dwarf_expr_context (ctx);
+
   ctx->gdbarch = get_objfile_arch (dwarf2_per_cu_objfile (per_cu));
   ctx->addr_size = dwarf2_per_cu_addr_size (per_cu);
   ctx->baton = &baton;
@@ -493,7 +496,7 @@ dwarf2_loc_desc_needs_frame (gdb_byte *data, unsigned short size,
           in_reg = 1;
     }
 
-  free_dwarf_expr_context (ctx);
+  do_cleanups (old_chain);
 
   return baton.needs_frame || in_reg;
 }
