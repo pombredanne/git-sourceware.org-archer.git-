@@ -41,7 +41,7 @@ static void varobj_update_one (struct varobj *var,
 			      enum print_values print_values,
 			      int explicit);
 
-static int mi_print_value_p (struct type *type, enum print_values print_values);
+static int mi_print_value_p (struct varobj *var, enum print_values print_values);
 
 /* Print variable object VAR.  The PRINT_VALUES parameter controls
    if the value should be printed.  The PRINT_EXPRESSION parameter
@@ -59,8 +59,12 @@ print_varobj (struct varobj *var, enum print_values print_values,
     ui_out_field_string (uiout, "exp", varobj_get_expression (var));
   ui_out_field_int (uiout, "numchild", varobj_get_num_children (var));
   
-  if (mi_print_value_p (varobj_get_gdb_type (var), print_values))
-    ui_out_field_string (uiout, "value", varobj_get_value (var));
+  if (mi_print_value_p (var, print_values))
+    {
+      char *val = varobj_get_value (var);
+      ui_out_field_string (uiout, "value", val);
+      xfree (val);
+    }
 
   type = varobj_get_type (var);
   if (type != NULL)
@@ -223,6 +227,7 @@ mi_cmd_var_set_format (char *command, char **argv, int argc)
 {
   enum varobj_display_formats format;
   struct varobj *var;
+  char *val;
 
   if (argc != 2)
     error (_("mi_cmd_var_set_format: Usage: NAME FORMAT."));
@@ -239,7 +244,9 @@ mi_cmd_var_set_format (char *command, char **argv, int argc)
   ui_out_field_string (uiout, "format", varobj_format_string[(int) format]);
  
   /* Report the value in the new format */
-  ui_out_field_string (uiout, "value", varobj_get_value (var));
+  val = varobj_get_value (var);
+  ui_out_field_string (uiout, "value", val);
+  xfree (val);
 }
 
 void
@@ -337,11 +344,12 @@ Must be: 0 or \"%s\", 1 or \"%s\", 2 or \"%s\""),
 }
 
 /* Return 1 if given the argument PRINT_VALUES we should display
-   a value of type TYPE.  */
+   the varobj VAR.  */
 
 static int
-mi_print_value_p (struct type *type, enum print_values print_values)
+mi_print_value_p (struct varobj *var, enum print_values print_values)
 {
+  struct type *type;
 
   if (print_values == PRINT_NO_VALUES)
     return 0;
@@ -349,6 +357,10 @@ mi_print_value_p (struct type *type, enum print_values print_values)
   if (print_values == PRINT_ALL_VALUES)
     return 1;
 
+  if (varobj_pretty_printed_p (var))
+    return 1;
+
+  type = varobj_get_gdb_type (var);
   if (type == NULL)
     return 1;
   else
@@ -556,16 +568,24 @@ mi_cmd_var_evaluate_expression (char *command, char **argv, int argc)
   var = varobj_get_handle (argv[optind]);
    
   if (formatFound)
-    ui_out_field_string (uiout, "value", varobj_get_formatted_value (var, format));
+    {
+      char *val = varobj_get_formatted_value (var, format);
+      ui_out_field_string (uiout, "value", val);
+      xfree (val);
+    }
   else
-    ui_out_field_string (uiout, "value", varobj_get_value (var));
+    {
+      char *val = varobj_get_value (var);
+      ui_out_field_string (uiout, "value", val);
+      xfree (val);
+    }
 }
 
 void
 mi_cmd_var_assign (char *command, char **argv, int argc)
 {
   struct varobj *var;
-  char *expression;
+  char *expression, *val;
 
   if (argc != 2)
     error (_("mi_cmd_var_assign: Usage: NAME EXPRESSION."));
@@ -581,7 +601,9 @@ mi_cmd_var_assign (char *command, char **argv, int argc)
   if (!varobj_set_value (var, expression))
     error (_("mi_cmd_var_assign: Could not assign expression to variable object"));
 
-  ui_out_field_string (uiout, "value", varobj_get_value (var));
+  val = varobj_get_value (var);
+  ui_out_field_string (uiout, "value", val);
+  xfree (val);
 }
 
 /* Type used for parameters passing to mi_cmd_var_update_iter.  */
@@ -696,8 +718,12 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
       switch (r->status)
 	{
 	case VAROBJ_IN_SCOPE:
-	  if (mi_print_value_p (varobj_get_gdb_type (r->varobj), print_values))
-	    ui_out_field_string (uiout, "value", varobj_get_value (r->varobj));
+	  if (mi_print_value_p (r->varobj, print_values))
+	    {
+	      char *val = varobj_get_value (r->varobj);
+	      ui_out_field_string (uiout, "value", val);
+	      xfree (val);
+	    }
 	  ui_out_field_string (uiout, "in_scope", "true");
 	  break;
         case VAROBJ_NOT_IN_SCOPE:

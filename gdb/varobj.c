@@ -1074,13 +1074,13 @@ varobj_list_children (struct varobj *var, int *from, int *to)
 
   var->children_requested = 1;
 
-  if (var->pretty_printer
+  if (var->pretty_printer)
+    {
       /* This, in theory, can result in the number of children changing without
 	 frontend noticing.  But well, calling -var-list-children on the same
 	 varobj twice is not something a sane frontend would do.  */
-      && update_dynamic_varobj_children (var, NULL, NULL, &children_changed,
-					 0, *to))
-    {
+      update_dynamic_varobj_children (var, NULL, NULL, &children_changed,
+				      0, *to);
       restrict_range (var->children, from, to);
       return var->children;
     }
@@ -1182,6 +1182,12 @@ varobj_get_attributes (struct varobj *var)
     attributes |= 0x00000001;	/* Editable */
 
   return attributes;
+}
+
+int
+varobj_pretty_printed_p (struct varobj *var)
+{
+  return var->pretty_printer != NULL;
 }
 
 char *
@@ -1457,7 +1463,7 @@ install_new_value (struct varobj *var, struct value *value, int initial)
      values.  Don't get string rendering if the value is
      lazy -- if it is, the code above has decided that the value
      should not be fetched.  */
-  if (value && !value_lazy (value))
+  if (value && !value_lazy (value) && !var->pretty_printer)
     print_value = value_get_print_value (value, var->format, var);
 
   /* If the type is changeable, compare the old and the new values.
@@ -2341,7 +2347,11 @@ static char *
 my_value_of_variable (struct varobj *var, enum varobj_display_formats format)
 {
   if (var->root->is_valid)
-    return (*var->root->lang->value_of_variable) (var, format);
+    {
+      if (var->pretty_printer)
+	return value_get_print_value (var->value, var->format, var);
+      return (*var->root->lang->value_of_variable) (var, format);
+    }
   else
     return NULL;
 }
