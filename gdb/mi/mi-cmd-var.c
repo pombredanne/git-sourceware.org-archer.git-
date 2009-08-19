@@ -142,6 +142,8 @@ mi_cmd_var_create (char *command, char **argv, int argc)
 
   print_varobj (var, PRINT_ALL_VALUES, 0 /* don't print expression */);
 
+  ui_out_field_int (uiout, "has_more", varobj_has_more (var, 0));
+
   do_cleanups (old_cleanups);
 }
 
@@ -408,7 +410,7 @@ mi_cmd_var_list_children (char *command, char **argv, int argc)
     }
 
   children = varobj_list_children (var, &from, &to);
-  ui_out_field_int (uiout, "numchild", VEC_length (varobj_p, children));
+  ui_out_field_int (uiout, "numchild", to - from);
   if (argc == 2 || argc == 4)
     print_values = mi_parse_values_option (argv[0]);
   else

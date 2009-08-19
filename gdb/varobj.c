@@ -1052,23 +1052,21 @@ update_dynamic_varobj_children (struct varobj *var,
 int
 varobj_get_num_children (struct varobj *var)
 {
-  int result = var->num_children;
-
   if (var->num_children == -1)
     {
       if (var->pretty_printer)
 	{
-	  /* If we have a dynamic varobj, don't report -1 children.  */
-	  result = 0;
+	  int dummy;
+
+	  /* If we have a dynamic varobj, don't report -1 children.
+	     So, try to fetch some children first.  */
+	  update_dynamic_varobj_children (var, NULL, NULL, &dummy, 0, 0);
 	}
       else
-	{
-	  var->num_children = number_of_children (var);
-	  result = var->num_children;
-	}
+	var->num_children = number_of_children (var);
     }
 
-  return var->num_children;
+  return var->num_children >= 0 ? var->num_children : 0;
 }
 
 /* Creates a list of the immediate children of a variable object;
@@ -2383,43 +2381,56 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
     struct cleanup *back_to = varobj_ensure_python_env (var);
     PyObject *value_formatter = var->pretty_printer;
 
-    if (value_formatter && PyObject_HasAttr (value_formatter,
-					     gdbpy_to_string_cst))
+    if (value_formatter)
       {
-	char *hint;
-	struct value *replacement;
-	int string_print = 0;
-	PyObject *output = NULL;
-
-	hint = gdbpy_get_display_hint (value_formatter);
-	if (hint)
+	/* First check to see if we have any children at all.  If so,
+	   we simply return {...}.  */
+	if (var->num_children == -1)
 	  {
-	    if (!strcmp (hint, "string"))
-	      string_print = 1;
-	    xfree (hint);
+	    int dummy;
+	    update_dynamic_varobj_children (var, NULL, NULL, &dummy, 0, 0);
 	  }
+	if (var->num_children > 0 || var->saved_item)
+	  return xstrdup ("{...}");
 
-	output = apply_varobj_pretty_printer (value_formatter,
-					      &replacement);
- 	if (output)
-  	  {
- 	    PyObject *py_str = python_string_to_target_python_string (output);
- 	    if (py_str)
- 	      {
- 		char *s = PyString_AsString (py_str);
- 		len = PyString_Size (py_str);
-		thevalue = xmemdup (s, len + 1, len + 1);
- 		Py_DECREF (py_str);
+	if (PyObject_HasAttr (value_formatter, gdbpy_to_string_cst))
+	  {
+	    char *hint;
+	    struct value *replacement;
+	    int string_print = 0;
+	    PyObject *output = NULL;
+
+	    hint = gdbpy_get_display_hint (value_formatter);
+	    if (hint)
+	      {
+		if (!strcmp (hint, "string"))
+		  string_print = 1;
+		xfree (hint);
 	      }
- 	    Py_DECREF (output);
+
+	    output = apply_varobj_pretty_printer (value_formatter,
+						  &replacement);
+	    if (output)
+	      {
+		PyObject *py_str
+		  = python_string_to_target_python_string (output);
+		if (py_str)
+		  {
+		    char *s = PyString_AsString (py_str);
+		    len = PyString_Size (py_str);
+		    thevalue = xmemdup (s, len + 1, len + 1);
+		    Py_DECREF (py_str);
+		  }
+		Py_DECREF (output);
+	      }
+	    if (thevalue && !string_print)
+	      {
+		do_cleanups (back_to);
+		return thevalue;
+	      }
+	    if (replacement)
+	      value = replacement;
 	  }
-	if (thevalue && !string_print)
-	  {
-	    do_cleanups (back_to);
-	    return thevalue;
-	  }
-	if (replacement)
-	  value = replacement;
       }
     do_cleanups (back_to);
   }
