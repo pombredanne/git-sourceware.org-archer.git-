@@ -1408,7 +1408,12 @@ evaluate_subexp_standard (struct type *expect_type,
 	      /* Language is C++, do some overload resolution before evaluation */
 	      struct value *valp = NULL;
 
-	      (void) find_overload_match (argvec, nargs, tstr,
+	      /* Prepare list of argument types for overload resolution */
+	      arg_types = (struct type **) alloca (nargs * (sizeof (struct type *)));
+	      for (ix = 1; ix <= nargs; ix++)
+		arg_types[ix - 1] = value_type (argvec[ix]);
+
+	      (void) find_overload_match (arg_types, nargs, tstr,
 				     1 /* method */ , 0 /* strict match */ ,
 					  &arg2 /* the object */ , NULL,
 					  &valp, NULL, &static_memfuncp);
@@ -1458,7 +1463,12 @@ evaluate_subexp_standard (struct type *expect_type,
 	      /* Language is C++, do some overload resolution before evaluation */
 	      struct symbol *symp;
 
-	      (void) find_overload_match (argvec, nargs, NULL /* no need for name */ ,
+	      /* Prepare list of argument types for overload resolution */
+	      arg_types = (struct type **) alloca (nargs * (sizeof (struct type *)));
+	      for (ix = 1; ix <= nargs; ix++)
+		arg_types[ix - 1] = value_type (argvec[ix]);
+
+	      (void) find_overload_match (arg_types, nargs, NULL /* no need for name */ ,
 				 0 /* not method */ , 0 /* strict match */ ,
 		      NULL, exp->elts[save_pos1+2].symbol /* the function */ ,
 					  NULL, &symp, NULL);
