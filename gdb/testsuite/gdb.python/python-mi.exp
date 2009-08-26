@@ -48,7 +48,7 @@ mi_gdb_test "python execfile ('${srcdir}/${subdir}/${testfile}.py')" ""
 mi_continue_to_line [gdb_get_line_number {MI breakpoint here} ${testfile}.c] \
   "step to breakpoint"
 
-mi_create_floating_varobj container c \
+mi_create_dynamic_varobj container c \
   "create container varobj, no pretty-printing"
 
 mi_list_varobj_children container {
@@ -61,7 +61,7 @@ mi_delete_varobj container "delete varobj"
 
 mi_gdb_test "-enable-pretty-printing" ""
 
-mi_create_floating_varobj container c \
+mi_create_dynamic_varobj container c \
   "create container varobj"
 
 mi_list_varobj_children container {
@@ -149,6 +149,16 @@ mi_list_varobj_children container {
 } "list children after listing selected range"
 
 mi_next "next over update 4"
+
+
+# Regression test: examine an object that has no children, then update
+# it to ensure that we don't print the children.
+mi_create_dynamic_varobj container2 c2 \
+  "create second container varobj"
+
+mi_gdb_test "-var-update container2" \
+  "\\^done,changelist=.." \
+  "update varobj, no children requested"
 
 # This should only show the first child, because the update range has
 # been set.

@@ -923,6 +923,23 @@ install_dynamic_child (struct varobj *var,
     }
 }
 
+#if HAVE_PYTHON
+
+static int
+dynamic_varobj_has_child_method (struct varobj *var)
+{
+  struct cleanup *back_to;
+  PyObject *printer = var->pretty_printer;
+  int result;
+
+  back_to = varobj_ensure_python_env (var);
+  result = PyObject_HasAttr (printer, gdbpy_children_cst);
+  do_cleanups (back_to);
+  return result;
+}
+
+#endif
+
 static int
 update_dynamic_varobj_children (struct varobj *var,
 				VEC (varobj_p) **changed,
@@ -1363,8 +1380,9 @@ static void
 install_new_value_visualizer (struct varobj *var)
 {
 #if HAVE_PYTHON
-  /* If the constructor is None, then we want the raw value.  */
-  if (var->constructor != Py_None)
+  /* If the constructor is None, then we want the raw value.  If VAR
+     does not have a value, just skip this.  */
+  if (var->constructor != Py_None && var->value)
     {
       struct cleanup *cleanup;
       PyObject *pretty_printer = NULL;
@@ -2385,12 +2403,7 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
       {
 	/* First check to see if we have any children at all.  If so,
 	   we simply return {...}.  */
-	if (var->num_children == -1)
-	  {
-	    int dummy;
-	    update_dynamic_varobj_children (var, NULL, NULL, &dummy, 0, 0);
-	  }
-	if (var->num_children > 0 || var->saved_item)
+	if (dynamic_varobj_has_child_method (var))
 	  return xstrdup ("{...}");
 
 	if (PyObject_HasAttr (value_formatter, gdbpy_to_string_cst))

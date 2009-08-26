@@ -162,6 +162,7 @@ main ()
   struct ss  ssa[2];
   string x = make_string ("this is x");
   zzz_type c = make_container ("container");
+  zzz_type c2 = make_container ("container2");
   const struct string_repr cstring = { { "const string" } };
   /* Clearing by being `static' could invoke an other GDB C++ bug.  */
   struct nullstr nullstr;
@@ -206,6 +207,7 @@ main ()
   add_item (&c, 1011);
   c.elements[0] = 1023;
 
+  add_item (&c, 2222);		/* dummy */
   do_nothing ();
 #endif
 

@@ -1214,6 +1214,14 @@ proc mi_create_varobj_checked { name expression type testname } {
         $testname
 }
 
+# Same as mi_create_floating_varobj, but assumes the test is creating
+# a dynamic varobj that has children, so the value must be "{...}".
+proc mi_create_dynamic_varobj {name expression testname} {
+    mi_gdb_test "-var-create $name @ $expression" \
+        "\\^done,name=\"$name\",numchild=\"\(-1\|\[0-9\]+\)\",value=\"{\\.\\.\\.}\",type=.*" \
+        $testname
+}
+
 # Deletes the specified NAME. 
 proc mi_delete_varobj { name testname } {
     mi_gdb_test "-var-delete $name" \
