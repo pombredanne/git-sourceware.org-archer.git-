@@ -321,10 +321,19 @@ dwarf_locexpr_baton_eval (struct dwarf2_locexpr_baton *dlbaton)
 			     dlbaton->per_cu);
   if (ctx->num_pieces > 0)
     error (_("DW_OP_*piece is unsupported for DW_FORM_block"));
-  else if (ctx->in_reg)
-    error (_("Register result is unsupported for DW_FORM_block"));
 
   retval = dwarf_expr_fetch (ctx, 0);
+
+  if (ctx->in_reg)
+    {
+      /* Inlined dwarf_expr_read_reg as we no longer have the baton. */
+
+      int gdb_regnum = gdbarch_dwarf2_reg_to_regnum (ctx->gdbarch, retval);
+      struct type *type = builtin_type (ctx->gdbarch)->builtin_data_ptr;
+      struct frame_info *frame = get_selected_frame (NULL);
+
+      retval = address_from_register (type, gdb_regnum, frame);
+    }
 
   do_cleanups (back_to);
 

@@ -236,7 +236,6 @@ scalar_type_p (struct type *type)
     case TYPE_CODE_STRUCT:
     case TYPE_CODE_UNION:
     case TYPE_CODE_SET:
-    case TYPE_CODE_STRING:
     case TYPE_CODE_BITSTRING:
       return 0;
     default:

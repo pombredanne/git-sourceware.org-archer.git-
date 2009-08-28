@@ -5752,37 +5752,58 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
 	 its value.  */
       else
 	{
-	  struct dwarf2_locexpr_baton *length_baton;
-	  struct attribute *size_attr;
+	  struct dwarf2_locexpr_baton *length_baton = NULL;
+	  struct dwarf_block *blk = DW_BLOCK (attr);
 
-	  length_baton = obstack_alloc (&cu->comp_unit_obstack,
-					sizeof (*length_baton));
-	  length_baton->per_cu = cu->per_cu;
-	  length_baton->data = obstack_alloc (&cu->comp_unit_obstack,
-					      DW_BLOCK (attr)->size + 2);
-	  memcpy (length_baton->data, DW_BLOCK (attr)->data,
-		  DW_BLOCK (attr)->size);
+	  /* Turn any single DW_OP_reg* into DW_OP_breg*(0) but clearing
+	     DW_OP_deref* in such case.  */
 
-	  /* DW_AT_BYTE_SIZE existing together with DW_AT_STRING_LENGTH
-	     specifies the size of an integer to fetch.  */
-
-	  size_attr = dwarf2_attr (die, DW_AT_byte_size, cu);
-	  if (size_attr)
+	  if (blk->size == 1 && blk->data[0] >= DW_OP_reg0
+	      && blk->data[0] <= DW_OP_reg31)
+	    length_baton = dwarf2_attr_to_locexpr_baton (attr, cu);
+	  else if (blk->size > 1 && blk->data[0] == DW_OP_regx)
 	    {
-	      length_baton->size = DW_BLOCK (attr)->size + 2;
-	      length_baton->data[DW_BLOCK (attr)->size] = DW_OP_deref_size;
-	      length_baton->data[DW_BLOCK (attr)->size + 1]
-							 = DW_UNSND (size_attr);
-	      if (length_baton->data[DW_BLOCK (attr)->size + 1]
-		  != DW_UNSND (size_attr))
-		complaint (&symfile_complaints,
-			   _("DW_AT_string_length's DW_AT_byte_size integer "
-			     "exceeds the byte size storage"));
+	      ULONGEST ulongest;
+	      gdb_byte *end;
+
+	      end = read_uleb128 (&blk->data[1], &blk->data[blk->size],
+				  &ulongest);
+	      if (end == &blk->data[blk->size])
+		length_baton = dwarf2_attr_to_locexpr_baton (attr, cu);
 	    }
-	  else
+
+	  if (length_baton == NULL)
 	    {
-	      length_baton->size = DW_BLOCK (attr)->size + 1;
-	      length_baton->data[DW_BLOCK (attr)->size] = DW_OP_deref;
+	      struct attribute *size_attr;
+
+	      length_baton = obstack_alloc (&cu->comp_unit_obstack,
+					    sizeof (*length_baton));
+	      length_baton->per_cu = cu->per_cu;
+	      length_baton->size = DW_BLOCK (attr)->size + 2;
+	      length_baton->data = obstack_alloc (&cu->comp_unit_obstack,
+						  length_baton->size);
+	      memcpy (length_baton->data, DW_BLOCK (attr)->data,
+		      DW_BLOCK (attr)->size);
+
+	      /* DW_AT_BYTE_SIZE existing together with DW_AT_STRING_LENGTH
+		 specifies the size of an integer to fetch.  */
+	      size_attr = dwarf2_attr (die, DW_AT_byte_size, cu);
+	      if (size_attr)
+		{
+		  length_baton->data[DW_BLOCK (attr)->size] = DW_OP_deref_size;
+		  length_baton->data[DW_BLOCK (attr)->size + 1] =
+							   DW_UNSND (size_attr);
+		  if (length_baton->data[DW_BLOCK (attr)->size + 1]
+		      != DW_UNSND (size_attr))
+		    complaint (&symfile_complaints,
+			       _("DW_AT_string_length's DW_AT_byte_size "
+				 "integer exceeds the byte size storage"));
+		}
+	      else
+		{
+		  length_baton->data[DW_BLOCK (attr)->size] = DW_OP_deref;
+		  length_baton->data[DW_BLOCK (attr)->size + 1] = DW_OP_nop;
+		}
 	    }
 
 	  TYPE_RANGE_BOUND_SET_DWARF_BLOCK (range_type, 1);
