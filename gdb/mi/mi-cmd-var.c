@@ -712,6 +712,7 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
   for (i = 0; VEC_iterate (varobj_update_result, changes, i, r); ++i)
     {
       char *display_hint;
+      int from, to;
 
       if (mi_version (uiout) > 1)
         cleanup = make_cleanup_ui_out_tuple_begin_end (uiout, NULL);
@@ -758,13 +759,9 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
 	  xfree (display_hint);
 	}
 
-      if (r->children_changed)
-	{
-	  int from, to;
-	  varobj_get_child_range (r->varobj, &from, &to);
-	  ui_out_field_int (uiout, "has_more",
-			    varobj_has_more (r->varobj, to));
-	}
+      varobj_get_child_range (r->varobj, &from, &to);
+      ui_out_field_int (uiout, "has_more",
+			varobj_has_more (r->varobj, to));
 
       if (r->new)
 	{

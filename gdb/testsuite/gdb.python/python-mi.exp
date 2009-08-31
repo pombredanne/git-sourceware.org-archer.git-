@@ -160,13 +160,23 @@ mi_gdb_test "-var-update container2" \
   "\\^done,changelist=.." \
   "update varobj, no children requested"
 
+mi_next "next over update 5"
+
+# Now container2 has an element -- and an update should mention that
+# it has_more.  But, because we did not request children, we still
+# should not actually see them.
+mi_varobj_update_dynamic container2 \
+    "update varobj 2, no children requested" {
+	type_changed false has_more 1
+    } {} {}
+
 # This should only show the first child, because the update range has
 # been set.
 mi_varobj_update_dynamic container \
   "update after next with restricted range" {
       type_changed false new_num_children 1 has_more 1
   } {
-      { name {container.\[0\]} in_scope true type_changed false }
+      { name {container.\[0\]} in_scope true type_changed false has_more 0 }
   } {
   }
 

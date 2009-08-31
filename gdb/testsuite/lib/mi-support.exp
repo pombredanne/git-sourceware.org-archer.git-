@@ -1195,7 +1195,7 @@ proc mi_list_breakpoints { expected test } {
 # Name cannot be "-".
 proc mi_create_varobj { name expression testname } {
     mi_gdb_test "-var-create $name * $expression" \
-        "\\^done,name=\"$name\",numchild=\"\[0-9\]+\",value=\".*\",type=.*" \
+        "\\^done,name=\"$name\",numchild=\"\[0-9\]+\",value=\".*\",type=.*,has_more=\"0\"" \
         $testname
 }
 
@@ -1237,7 +1237,7 @@ proc mi_varobj_update { name expected testname } {
     set er "\\^done,changelist=\\\["
     set first 1
     foreach item $expected {
-        set v "{name=\"$item\",in_scope=\"true\",type_changed=\"false\"}"
+        set v "{name=\"$item\",in_scope=\"true\",type_changed=\"false\",has_more=\".\"}"
         if {$first == 1} {
             set er "$er$v"
             set first 0
@@ -1252,7 +1252,7 @@ proc mi_varobj_update { name expected testname } {
 }
 
 proc mi_varobj_update_with_type_change { name new_type new_children testname } {
-    set v "{name=\"$name\",in_scope=\"true\",type_changed=\"true\",new_type=\"$new_type\",new_num_children=\"$new_children\"}"
+    set v "{name=\"$name\",in_scope=\"true\",type_changed=\"true\",new_type=\"$new_type\",new_num_children=\"$new_children\",has_more=\".\"}"
     set er "\\^done,changelist=\\\[$v\\\]"
     verbose -log "Expecting: $er"
     mi_gdb_test "-var-update $name" $er $testname

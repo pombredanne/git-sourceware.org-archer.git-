@@ -207,7 +207,8 @@ main ()
   add_item (&c, 1011);
   c.elements[0] = 1023;
 
-  add_item (&c, 2222);		/* dummy */
+  add_item (&c2, 2222);
+  add_item (&c2, 3333);
   do_nothing ();
 #endif
 

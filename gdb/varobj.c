@@ -832,7 +832,7 @@ varobj_has_more (struct varobj *var, int to)
 {
   if (VEC_length (varobj_p, var->children) > to)
     return 1;
-  return (VEC_length (varobj_p, var->children) == to
+  return ((to == -1 || VEC_length (varobj_p, var->children) == to)
 	  && var->saved_item != NULL);
 }
 
@@ -1726,19 +1726,35 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
 
       /* We probably should not get children of a varobj that has a
 	 pretty-printer, but for which -var-list-children was never
-	 invoked.  Presumably, such varobj is not yet expanded in the
-	 UI, so we need not bother getting it.  */
+	 invoked.    */
       if (v->pretty_printer)
 	{
 	  VEC (varobj_p) *changed = 0, *new = 0;
 	  int i, children_changed;
 	  varobj_p tmp;
 
-	  if (!v->children_requested)
-	    continue;
-
 	  if (v->frozen)
 	    continue;
+
+	  if (!v->children_requested)
+	    {
+	      int dummy;
+
+	      /* If we initially did not have potential children, but
+		 now we do, consider the varobj as changed.
+		 Otherwise, if children were never requested, consider
+		 it as unchanged -- presumably, such varobj is not yet
+		 expanded in the UI, so we need not bother getting
+		 it.  */
+	      if (varobj_has_more (v, 0))
+		continue;
+
+	      update_dynamic_varobj_children (v, NULL, NULL, &dummy, 0, 0);
+	      if (varobj_has_more (v, 0))
+		VEC_safe_push (varobj_update_result, result, &r);
+
+	      continue;
+	    }
 
 	  /* If update_dynamic_varobj_children returns 0, then we have
 	     a non-conforming pretty-printer, so we skip it.  */
