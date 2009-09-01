@@ -345,10 +345,22 @@ do_chdir_cleanup (void *old_dir)
 }
 #endif
 
-/* Execute the line P as a command.
-   Pass FROM_TTY as second argument to the defining function.  */
+void
+prepare_execute_command (void)
+{
+  free_all_values ();
+  free_all_types ();
 
-/* Execute command P, in the current user context.  */
+  /* With multiple threads running while the one we're examining is stopped,
+     the dcache can get stale without us being able to detect it.
+     For the duration of the command, though, use the dcache to help
+     things like backtrace.  */
+  if (non_stop)
+    target_dcache_invalidate ();
+}
+
+/* Execute the line P as a command, in the current user context.
+   Pass FROM_TTY as second argument to the defining function.  */
 
 void
 execute_command (char *p, int from_tty)
@@ -376,9 +388,8 @@ execute_command (char *p, int from_tty)
 #endif
 	}
     }
-  
-  free_all_values ();
-  free_all_types ();
+
+  prepare_execute_command ();
 
   /* Force cleanup of any alloca areas if using C alloca instead of
      a builtin alloca.  */

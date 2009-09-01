@@ -157,7 +157,7 @@ record_list_release_next (void)
   while (tmp)
     {
       rec = tmp->next;
-      if (tmp->type == record_reg)
+      if (tmp->type == record_end)
 	record_insn_num--;
       else if (tmp->type == record_reg)
 	xfree (tmp->u.reg.val);
@@ -514,7 +514,6 @@ record_close (int quitting)
 }
 
 static int record_resume_step = 0;
-static enum target_signal record_resume_siggnal;
 static int record_resume_error;
 
 static void
@@ -522,7 +521,6 @@ record_resume (struct target_ops *ops, ptid_t ptid, int step,
                enum target_signal siggnal)
 {
   record_resume_step = step;
-  record_resume_siggnal = siggnal;
 
   if (!RECORD_IS_REPLAY)
     {
@@ -598,7 +596,7 @@ record_wait (struct target_ops *ops,
 	{
 	  /* This is a single step.  */
 	  return record_beneath_to_wait (record_beneath_to_wait_ops,
-					 ptid, status, 0);
+					 ptid, status, options);
 	}
       else
 	{
@@ -609,7 +607,7 @@ record_wait (struct target_ops *ops,
 	  while (1)
 	    {
 	      ret = record_beneath_to_wait (record_beneath_to_wait_ops,
-					    ptid, status, 0);
+					    ptid, status, options);
 
 	      if (status->kind == TARGET_WAITKIND_STOPPED
 		  && status->value.sig == TARGET_SIGNAL_TRAP)
@@ -638,7 +636,7 @@ record_wait (struct target_ops *ops,
 			}
 		      record_beneath_to_resume (record_beneath_to_resume_ops,
 						ptid, 1,
-						record_resume_siggnal);
+						TARGET_SIGNAL_0);
 		      continue;
 		    }
 		}

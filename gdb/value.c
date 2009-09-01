@@ -197,6 +197,10 @@ struct value
   /* If value is a variable, is it initialized or not.  */
   int initialized;
 
+  /* If value is from the stack.  If this is set, read_stack will be
+     used instead of read_memory to enable extra caching.  */
+  int stack;
+
   /* Actual contents of the value.  Target byte-order.  NULL or not
      valid if lazy is nonzero.  */
   gdb_byte *contents;
@@ -425,6 +429,18 @@ set_value_lazy (struct value *value, int val)
   value->lazy = val;
 }
 
+int
+value_stack (struct value *value)
+{
+  return value->stack;
+}
+
+void
+set_value_stack (struct value *value, int val)
+{
+  value->stack = val;
+}
+
 const gdb_byte *
 value_contents (struct value *value)
 {
@@ -639,7 +655,8 @@ value_free_to_mark (struct value *mark)
 }
 
 /* Free all the values that have been allocated (except for those released).
-   Called after each command, successful or not.  */
+   Call after each command, successful or not.
+   In practice this is called before each command, which is sufficient.  */
 
 void
 free_all_values (void)
@@ -1941,7 +1958,7 @@ value_primitive_field (struct value *arg1, int offset,
 	v->bitpos = bitpos % container_bitsize;
       else
 	v->bitpos = bitpos % 8;
-      v->offset = value_offset (arg1) + value_embedded_offset (arg1)
+      v->offset = value_embedded_offset (arg1)
 	+ (bitpos - v->bitpos) / 8;
       v->parent = arg1;
       value_incref (v->parent);
@@ -2094,15 +2111,23 @@ unpack_bits_as_long (struct type *field_type, const gdb_byte *valaddr,
   ULONGEST val;
   ULONGEST valmask;
   int lsbcount;
+  int bytes_read;
+
+  /* Read the minimum number of bytes required; there may not be
+     enough bytes to read an entire ULONGEST.  */
+  CHECK_TYPEDEF (field_type);
+  if (bitsize)
+    bytes_read = ((bitpos % 8) + bitsize + 7) / 8;
+  else
+    bytes_read = TYPE_LENGTH (field_type);
 
   val = extract_unsigned_integer (valaddr + bitpos / 8,
-				  sizeof (val), byte_order);
-  CHECK_TYPEDEF (field_type);
+				  bytes_read, byte_order);
 
   /* Extract bits.  See comment above. */
 
   if (gdbarch_bits_big_endian (get_type_arch (field_type)))
-    lsbcount = (sizeof val * 8 - bitpos % 8 - bitsize);
+    lsbcount = (bytes_read * 8 - bitpos % 8 - bitsize);
   else
     lsbcount = (bitpos % 8);
   val >>= lsbcount;

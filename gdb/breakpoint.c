@@ -59,6 +59,7 @@
 #include "top.h"
 #include "wrapper.h"
 #include "valprint.h"
+#include "jit.h"
 #include "parser-defs.h"
 
 /* readline include files */
@@ -1593,6 +1594,13 @@ update_breakpoints_after_exec (void)
 	continue;
       }
 
+    /* JIT breakpoints must be explicitly reset after an exec(). */
+    if (b->type == bp_jit_event)
+      {
+	delete_breakpoint (b);
+	continue;
+      }
+
     /* Thread event breakpoints must be set anew after an exec(),
        as must overlay event and longjmp master breakpoints.  */
     if (b->type == bp_thread_event || b->type == bp_overlay_event
@@ -2584,6 +2592,7 @@ print_it_typical (bpstat bs)
     case bp_watchpoint_scope:
     case bp_call_dummy:
     case bp_tracepoint:
+    case bp_jit_event:
     default:
       result = PRINT_UNKNOWN;
       break;
@@ -3309,6 +3318,9 @@ bpstat_what (bpstat bs)
       /* We hit the shared library event breakpoint.  */
       shlib_event,
 
+      /* We hit the jit event breakpoint.  */
+      jit_event,
+
       /* This is just used to count how many enums there are.  */
       class_last
     };
@@ -3324,6 +3336,7 @@ bpstat_what (bpstat bs)
 #define clr BPSTAT_WHAT_CLEAR_LONGJMP_RESUME
 #define sr BPSTAT_WHAT_STEP_RESUME
 #define shl BPSTAT_WHAT_CHECK_SHLIBS
+#define jit BPSTAT_WHAT_CHECK_JIT
 
 /* "Can't happen."  Might want to print an error message.
    abort() is not out of the question, but chances are GDB is just
@@ -3344,12 +3357,13 @@ bpstat_what (bpstat bs)
      back and decide something of a lower priority is better.  The
      ordering is:
 
-     kc   < clr sgl shl slr sn sr ss
-     sgl  < shl slr sn sr ss
-     slr  < err shl sn sr ss
-     clr  < err shl sn sr ss
-     ss   < shl sn sr
-     sn   < shl sr
+     kc   < jit clr sgl shl slr sn sr ss
+     sgl  < jit shl slr sn sr ss
+     slr  < jit err shl sn sr ss
+     clr  < jit err shl sn sr ss
+     ss   < jit shl sn sr
+     sn   < jit shl sr
+     jit  < shl sr
      shl  < sr
      sr   <
 
@@ -3367,28 +3381,18 @@ bpstat_what (bpstat bs)
     table[(int) class_last][(int) BPSTAT_WHAT_LAST] =
   {
   /*                              old action */
-  /*       kc    ss    sn    sgl    slr   clr   sr   shl
-   */
-/*no_effect */
-    {kc, ss, sn, sgl, slr, clr, sr, shl},
-/*wp_silent */
-    {ss, ss, sn, ss, ss, ss, sr, shl},
-/*wp_noisy */
-    {sn, sn, sn, sn, sn, sn, sr, shl},
-/*bp_nostop */
-    {sgl, ss, sn, sgl, slr, slr, sr, shl},
-/*bp_silent */
-    {ss, ss, sn, ss, ss, ss, sr, shl},
-/*bp_noisy */
-    {sn, sn, sn, sn, sn, sn, sr, shl},
-/*long_jump */
-    {slr, ss, sn, slr, slr, err, sr, shl},
-/*long_resume */
-    {clr, ss, sn, err, err, err, sr, shl},
-/*step_resume */
-    {sr, sr, sr, sr, sr, sr, sr, sr},
-/*shlib */
-    {shl, shl, shl, shl, shl, shl, sr, shl}
+  /*               kc   ss   sn   sgl  slr  clr  sr  shl  jit */
+/* no_effect */   {kc,  ss,  sn,  sgl, slr, clr, sr, shl, jit},
+/* wp_silent */   {ss,  ss,  sn,  ss,  ss,  ss,  sr, shl, jit},
+/* wp_noisy */    {sn,  sn,  sn,  sn,  sn,  sn,  sr, shl, jit},
+/* bp_nostop */   {sgl, ss,  sn,  sgl, slr, slr, sr, shl, jit},
+/* bp_silent */   {ss,  ss,  sn,  ss,  ss,  ss,  sr, shl, jit},
+/* bp_noisy */    {sn,  sn,  sn,  sn,  sn,  sn,  sr, shl, jit},
+/* long_jump */   {slr, ss,  sn,  slr, slr, err, sr, shl, jit},
+/* long_resume */ {clr, ss,  sn,  err, err, err, sr, shl, jit},
+/* step_resume */ {sr,  sr,  sr,  sr,  sr,  sr,  sr, sr,  sr },
+/* shlib */       {shl, shl, shl, shl, shl, shl, sr, shl, shl},
+/* jit_event */   {jit, jit, jit, jit, jit, jit, sr, jit, jit}
   };
 
 #undef kc
@@ -3401,6 +3405,7 @@ bpstat_what (bpstat bs)
 #undef sr
 #undef ts
 #undef shl
+#undef jit
   enum bpstat_what_main_action current_action = BPSTAT_WHAT_KEEP_CHECKING;
   struct bpstat_what retval;
 
@@ -3470,6 +3475,9 @@ bpstat_what (bpstat bs)
 	  break;
 	case bp_shlib_event:
 	  bs_class = shlib_event;
+	  break;
+	case bp_jit_event:
+	  bs_class = jit_event;
 	  break;
 	case bp_thread_event:
 	case bp_overlay_event:
@@ -3604,6 +3612,7 @@ print_one_breakpoint_location (struct breakpoint *b,
     {bp_longjmp_master, "longjmp master"},
     {bp_catchpoint, "catchpoint"},
     {bp_tracepoint, "tracepoint"},
+    {bp_jit_event, "jit events"},
   };
   
   static char bpenables[] = "nynny";
@@ -3732,6 +3741,7 @@ print_one_breakpoint_location (struct breakpoint *b,
       case bp_overlay_event:
       case bp_longjmp_master:
       case bp_tracepoint:
+      case bp_jit_event:
 	if (opts.addressprint)
 	  {
 	    annotate_field (4);
@@ -4376,6 +4386,7 @@ allocate_bp_location (struct breakpoint *bpt)
     case bp_shlib_event:
     case bp_thread_event:
     case bp_overlay_event:
+    case bp_jit_event:
     case bp_longjmp_master:
       loc->loc_type = bp_loc_software_breakpoint;
       break;
@@ -4658,6 +4669,17 @@ struct lang_and_radix
     int radix;
   };
 
+/* Create a breakpoint for JIT code registration and unregistration.  */
+
+struct breakpoint *
+create_jit_event_breakpoint (struct gdbarch *gdbarch, CORE_ADDR address)
+{
+  struct breakpoint *b;
+
+  b = create_internal_breakpoint (gdbarch, address, bp_jit_event);
+  update_global_location_list_nothrow (1);
+  return b;
+}
 
 void
 remove_solib_event_breakpoints (void)
@@ -5339,6 +5361,7 @@ mention (struct breakpoint *b)
       case bp_shlib_event:
       case bp_thread_event:
       case bp_overlay_event:
+      case bp_jit_event:
       case bp_longjmp_master:
 	break;
       }
@@ -7655,6 +7678,7 @@ delete_command (char *arg, int from_tty)
       {
 	if (b->type != bp_call_dummy
 	    && b->type != bp_shlib_event
+	    && b->type != bp_jit_event
 	    && b->type != bp_thread_event
 	    && b->type != bp_overlay_event
 	    && b->type != bp_longjmp_master
@@ -7674,6 +7698,7 @@ delete_command (char *arg, int from_tty)
 	    if (b->type != bp_call_dummy
 		&& b->type != bp_shlib_event
 		&& b->type != bp_thread_event
+		&& b->type != bp_jit_event
 		&& b->type != bp_overlay_event
 		&& b->type != bp_longjmp_master
 		&& b->number >= 0)
@@ -8000,6 +8025,7 @@ breakpoint_re_set_one (void *bint)
     case bp_step_resume:
     case bp_longjmp:
     case bp_longjmp_resume:
+    case bp_jit_event:
       break;
     }
 
@@ -8027,6 +8053,8 @@ breakpoint_re_set (void)
   }
   set_language (save_language);
   input_radix = save_input_radix;
+
+  jit_breakpoint_re_set ();
 
   create_overlay_event_breakpoint ("_ovly_debug_event");
   create_longjmp_master_breakpoint ("longjmp");

@@ -694,7 +694,10 @@ valpy_richcompare (PyObject *self, PyObject *other, int op)
     {
       value_other = convert_value_from_python (other);
       if (value_other == NULL)
-	return NULL;
+	{
+	  result = -1;
+	  break;
+	}
 
       switch (op) {
         case Py_LT:
@@ -721,10 +724,15 @@ valpy_richcompare (PyObject *self, PyObject *other, int op)
 	  /* Can't happen.  */
 	  PyErr_SetString (PyExc_NotImplementedError,
 			   "Invalid operation on gdb.Value.");
-	  return NULL;
+	  result = -1;
+	  break;
       }
     }
   GDB_PY_HANDLE_EXCEPTION (except);
+
+  /* In this case, the Python exception has already been set.  */
+  if (result < 0)
+    return NULL;
 
   if (result == 1)
     Py_RETURN_TRUE;

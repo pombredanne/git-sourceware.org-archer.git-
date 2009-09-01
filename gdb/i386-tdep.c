@@ -3280,23 +3280,23 @@ i386_process_record (struct gdbarch *gdbarch, struct regcache *regcache,
 	case 0x67:
 	  prefixes |= PREFIX_ADDR;
 	  break;
-        case 0x40:
-        case 0x41:
-        case 0x42:
-        case 0x43:
-        case 0x44:
-        case 0x45:
-        case 0x46:
-        case 0x47:
-        case 0x48:
-        case 0x49:
-        case 0x4a:
-        case 0x4b:
-        case 0x4c:
-        case 0x4d:
-        case 0x4e:
-        case 0x4f:
-          if (ir.regmap[X86_RECORD_R8_REGNUM])
+        case 0x40:	/* i386 inc %eax */
+        case 0x41:	/* i386 inc %ecx */
+        case 0x42:	/* i386 inc %edx */
+        case 0x43:	/* i386 inc %ebx */
+        case 0x44:	/* i386 inc %esp */
+        case 0x45:	/* i386 inc %ebp */
+        case 0x46:	/* i386 inc %esi */
+        case 0x47:	/* i386 inc %edi */
+        case 0x48:	/* i386 dec %eax */
+        case 0x49:	/* i386 dec %ecx */
+        case 0x4a:	/* i386 dec %edx */
+        case 0x4b:	/* i386 dec %ebx */
+        case 0x4c:	/* i386 dec %esp */
+        case 0x4d:	/* i386 dec %ebp */
+        case 0x4e:	/* i386 dec %esi */
+        case 0x4f:	/* i386 dec %edi */
+          if (ir.regmap[X86_RECORD_R8_REGNUM])	/* 64 bit target */
             {
                /* REX */
                rex = 1;
@@ -3305,6 +3305,8 @@ i386_process_record (struct gdbarch *gdbarch, struct regcache *regcache,
                ir.rex_x = (tmpu8 & 0x2) << 2;
                ir.rex_b = (tmpu8 & 0x1) << 3;
             }
+	  else					/* 32 bit target */
+	    goto out_prefixes;
           break;
 	default:
 	  goto out_prefixes;
@@ -4441,50 +4443,47 @@ reswitch:
       /* insS */
     case 0x6c:
     case 0x6d:
-      if ((opcode & 1) == 0)
-	ir.ot = OT_BYTE;
-      else
-	ir.ot = ir.dflag + OT_WORD;
       regcache_raw_read_unsigned (ir.regcache,
-                                  ir.regmap[X86_RECORD_REDI_REGNUM],
+                                  ir.regmap[X86_RECORD_RECX_REGNUM],
                                   &tmpulongest);
-      if (!ir.aflag)
+      if (tmpulongest)
         {
-          tmpulongest &= 0xffff;
-          /* addr += ((uint32_t) read_register (I386_ES_REGNUM)) << 4; */
-          if (record_debug)
-            printf_unfiltered (_("Process record ignores the memory change "
-                                 "of instruction at address 0x%s because "
-                                 "it can't get the value of the segment "
-                                 "register.\n"),
-                               paddress (gdbarch, ir.addr));
-        }
-      if (prefixes & (PREFIX_REPZ | PREFIX_REPNZ))
-        {
-          ULONGEST count, eflags;
+          ULONGEST es, ds;
+
+          if ((opcode & 1) == 0)
+	    ir.ot = OT_BYTE;
+          else
+	    ir.ot = ir.dflag + OT_WORD;
           regcache_raw_read_unsigned (ir.regcache,
                                       ir.regmap[X86_RECORD_REDI_REGNUM],
-                                      &count);
-          if (!ir.aflag)
-            count &= 0xffff;
+                                      &tmpulongest);
+
           regcache_raw_read_unsigned (ir.regcache,
-                                      ir.regmap[X86_RECORD_EFLAGS_REGNUM],
-                                      &eflags);
-          if ((eflags >> 10) & 0x1)
-            tmpulongest -= (count - 1) * (1 << ir.ot);
-          if (record_arch_list_add_mem (tmpulongest, count * (1 << ir.ot)))
-            return -1;
-          I386_RECORD_ARCH_LIST_ADD_REG (X86_RECORD_RECX_REGNUM);
-        }
-      else
-        {
+                                      ir.regmap[X86_RECORD_ES_REGNUM],
+                                      &es);
+          regcache_raw_read_unsigned (ir.regcache,
+                                      ir.regmap[X86_RECORD_DS_REGNUM],
+                                      &ds);
+          if (ir.aflag && (es != ds))
+            {
+              /* addr += ((uint32_t) read_register (I386_ES_REGNUM)) << 4; */
+              if (record_debug)
+                printf_unfiltered (_("Process record ignores the memory "
+				     "change of instruction at address 0x%s "
+				     "because it can't get the value of the "
+				     "ES segment register.\n"),
+                                   paddress (gdbarch, ir.addr));
+            }
+
+          if (prefixes & (PREFIX_REPZ | PREFIX_REPNZ))
+            I386_RECORD_ARCH_LIST_ADD_REG (X86_RECORD_RECX_REGNUM);
           if (record_arch_list_add_mem (tmpulongest, 1 << ir.ot))
             return -1;
-        }
-      if (opcode == 0xa4 || opcode == 0xa5)
-        I386_RECORD_ARCH_LIST_ADD_REG (X86_RECORD_RESI_REGNUM);
-      I386_RECORD_ARCH_LIST_ADD_REG (X86_RECORD_REDI_REGNUM);
-      I386_RECORD_ARCH_LIST_ADD_REG (X86_RECORD_EFLAGS_REGNUM);
+          if (opcode == 0xa4 || opcode == 0xa5)
+            I386_RECORD_ARCH_LIST_ADD_REG (X86_RECORD_RESI_REGNUM);
+          I386_RECORD_ARCH_LIST_ADD_REG (X86_RECORD_REDI_REGNUM);
+          I386_RECORD_ARCH_LIST_ADD_REG (X86_RECORD_EFLAGS_REGNUM);
+	}
       break;
 
       /* cmpsS */

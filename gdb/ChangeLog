@@ -1,3 +1,283 @@
+2009-09-01  Hui Zhu  <teawater@gmail.com>
+
+	* record.c (record_resume_siggnal): Deleted.
+	(record_resume): Ditto.
+	(record_wait): Change record_resume_siggnal to
+	TARGET_SIGNAL_0.
+
+2009-08-31  Jacob Potter  <jdpotter@google.com>
+	    Doug Evans  <dje@google.com>
+
+	Implement TARGET_OBJECT_STACK_MEMORY.
+	* NEWS: Add note on new "set stack-cache" option.
+	* corefile.c (read_stack): New function.
+	* dcache.c (dcache_struct): New member ptid.
+	(dcache_enable_p): Mark as obsolete.
+	(show_dcache_enabled_p): Flag option as deprecated.
+	(dcache_invalidate): Update ptid.
+	(dcache_invalidate_line): New function.
+	(dcache_read_line): No longer check cacheable attribute, stack
+	accesses get cached despite attribute.
+	(dcache_init): Set ptid.
+	(dcache_xfer_memory): Flush cache if from different ptid than before.
+	Update cache after write.
+	(dcache_update): New function.
+	(dcache_info): Report ptid.
+	(_initialize_dcache): Update text for `remotecache' to indicate it
+	is obsolete.
+	* dcache.h (dcache_update): Declare.
+	* dwarf2loc.c (dwarf2_evaluate_loc_desc): Mark values on stack with
+	set_value_stack.
+	* frame-unwind.c (frame_unwind_got_memory): Ditto.
+	* gdbcore.h (read_stack): Declare.
+	* memattr.c (mem_enable_command): Call target_dcache_invalidate
+	instead of dcache_invalidate.
+	(mem_disable_command, mem_delete_command): Ditto.
+	* target.c (stack_cache_enabled_p_1): New static global.
+	(stack_cache_enabled_p): New static global.
+	(set_stack_cache_enabled_p): New function.
+	(show_stack_cache_enabled_p): New function.
+	(target_dcache): Make static.
+	(target_dcache_invalidate): New function.
+	(target_load, target_resume): Call target_dcache_invalidate
+	instead of dcache_invalidate.
+	(memory_xfer_partial): New arg object, all callers updated.
+	Check for existing inferior before calling dcache routines.
+	When writing non-TARGET_OBJECT_STACK_MEMORY, notify dcache.
+	(target_xfer_partial): Call memory_xfer_partial for
+	TARGET_OBJECT_STACK_MEMORY.
+	(target_read_stack): New function.
+	(initialize_targets): Install new option `stack-cache'.
+	* target.h: Remove #include of dcache.h.
+	(enum target_object): New value TARGET_OBJECT_STACK_MEMORY.
+	(target_dcache): Delete.
+	(target_dcache_invalidate): Declare.
+	(target_read_stack): Declare.
+	* top.c (prepare_execute_command): New function.
+	(execute_command): Call prepare_execute_command
+	instead of free_all_values.
+	* top.h (prepare_execute_command): Declare.
+	* valops.c (get_value_at): New function.
+	(value_at): Guts moved to get_value_at.
+	(value_at_lazy): Similarly.
+	(value_fetch_lazy): Call read_stack for stack values.
+	* value.c (struct value): New member `stack'.
+	(value_stack, set_value_stack): New functions.
+	* value.h (value_stack, set_value_stack): Declare.
+	* mi/mi-main.c (mi_cmd_execute): Call prepare_execute_command
+	instead of free_all_values.
+
+2009-08-29  Hui Zhu  <teawater@gmail.com>
+
+	* i386-tdep.c (i386_process_record): Fix the error of string
+	ops instructions's handler.
+
+2009-08-28  Doug Evans  <dje@google.com>
+
+	* top.c (execute_command): Remove redundant comment.
+
+2009-08-28  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	PR gdb/10565
+
+	* value.c (value_primitive_field): Do not save value_offset for
+	bitfields.
+	(unpack_bits_as_long): Do not read an entire ULONGEST.
+
+2009-08-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Support constant DW_AT_data_member_location by GCC PR debug/40659.
+	* dwarf2read.c
+	(dwarf2_add_field <DW_TAG_member> <DW_AT_data_member_location>):
+	Initialize BYTE_OFFSET to 0 by default.  Explicitly check if
+	attr_form_is_block.
+	(dwarf2_add_field <DW_TAG_inheritance> <DW_AT_data_member_location>)
+	(read_common_block <DW_AT_data_member_location>): New variable
+	byte_offset.  Fix crash on non-DW_BLOCK ATTR values.
+
+2009-08-28  Hui Zhu  <teawater@gmail.com>
+
+	* record.c (record_list_release_next): Change the first
+	record_reg to record_end.
+
+2009-08-27  Doug Evans  <dje@google.com>
+
+	* value.c (free_all_values): Tweak comment.
+
+	* NEWS: Add note on "info sharedlibrary".
+	Remove note on "set print symbol-loading".
+	* main.c (captured_main): Pass !batch for from_tty when calling
+	symbol_file_add_main.
+	* objfiles.h (objfile_has_partial_symbols): Declare.
+	(objfile_has_full_symbols): Declare.
+	* objfiles.c (objfile_has_partial_symbols): New function.
+	(have_partial_symbols): Use it.
+	(objfile_has_full_symbols): New function.
+	(have_full_symbols): Use it.
+	* solib.c: Include interps.h.
+	(solib_read_symbols): Back out patch of 2008-07-10.
+	Add test for info_verbose for symbol loading messages for
+	consistency with symfile.c.
+	(info_sharedlibrary_command): Handle optional parameter of regex of
+	libraries to list.  Inform user of libraries without debugging info.
+	Rewrite to use ui_out routines to format output.
+	* symfile.c (print_symbol_loading): Delete.
+	(symbol_file_add_with_addrs_or_offsets): Back out patch of 2008-07-10.
+	Print "no debugging symbols found" only if from_tty || info_verbose;
+	and only check file being loaded, not all files.
+	(reread_symbols): Test file being loaded for whether it has symbols,
+	not all files.
+	(__initialize_symfile): Delete `set print symbol-loading'.
+	* symfile.h (print_symbol_loading): Delete.
+
+2009-08-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* varobj.c (varobj_create): Error if the specified frame was not found
+	and it is needed.
+
+2009-08-26  Michael Snyder  <msnyder@vmware.com>
+
+	* i386-tdep.c (i386_process_record): Break out of prefix loop
+	if not amd64.  Otherwise inc/dec instructions are lost.
+
+2009-08-25  Keith Seitz  <keiths@redhat.com>
+
+	* c-exp.y (yylex): Add cxx_only check for tokentab2 and tokentab3
+	searches. 
+	(tokentab3): Add cxx_only for DOT_STAR.
+
+2009-08-25  Pedro Alves  <pedro@codesourcery.com>
+
+	* inferior.c (print_inferior): Align columns left.  Remove header
+	for the the "current" column.  Rename column "Id" to "Num".
+	Rename column "PID" to "Description".  Print if there's no selected
+	inferior.
+
+2009-08-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix ia64 start crash when GDB built with -lmcheck.
+	* ia64-tdep.c (ia64_gdbarch_init): Allocate TDEP as cleared.  Remove
+	specific clearing of TDEP SIGCONTEXT_REGISTER_ADDRESS and
+	PC_IN_SIGTRAMP.
+
+2009-08-24  Keith Seitz  <keiths@redhat.com>
+
+	* c-exp.y (tokentab3): Add new token, ARROW_STAR. Changed all users.
+	(tokentab2): Add new token, DOT_STAR. Changed all users.
+
+2009-08-24  Keith Seitz  <keiths@redhat.com>
+
+	* symtab.c (default_make_symbol_completion_list): Keep
+	':', too, so that we can limit searches in namespaces
+	and classes. 
+
+2009-08-24  Tom Tromey  <tromey@redhat.com>
+
+	* python/python-value.c (valpy_richcompare): Don't return from
+	inside a TRY_CATCH.
+
+2009-08-22  Ralf Wildenhues  <Ralf.Wildenhues@gmx.de>
+
+	* CONTRIBUTE: Bump documented Autoconf version.
+	* configure.ac: Do not substitute datarootdir, htmldir,
+	pdfdir, docdir.  Do not process --with-datarootdir,
+	--with-htmldir, --with-pdfdir, --with-docdir.
+	* configure: Regenerate.
+
+	* aclocal.m4: Regenerate.
+	* config.in: Likewise.
+	* configure: Likewise.
+	* gnulib/Makefile.in: Likewise.
+
+	* configure.ac: Use AC_USE_SYSTEM_EXTENSIONS instead of
+	AC_GNU_SOURCE, AC_AIX, AC_ISC_POSIX.
+
+2009-08-21  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* objfiles.h (gdb_bfd_ref): New prototype.
+	* objfiles.c (gdb_bfd_ref): New function.
+	(allocate_objfile): Call it.
+	(gdb_bfd_unref): Adjust assertion.
+	* solib.c (solib_map_sections): Add reference.
+	(symbol_add_stub): Don't add reference here.
+	* symfile.c (reread_symbols): Add reference.
+
+2009-08-21  Ken Werner <ken@linux.vnet.ibm.com>
+	    Doug Evans  <dje@google.com>
+
+	* jit.c (jit_event_handler): Use paddress to print target addresses.
+	Wrap printf string in _().
+
+2009-08-21  Doug Evans  <dje@google.com>
+
+	* jit.c (jit_read_descriptor): New arg gdbarch, all callers updated.
+	(jit_read_code_entry, jit_register_code): Ditto.
+	(jit_event_handler): Ditto.
+	(jit_inferior_init): Renamed from previous jit_inferior_created_hook.
+	(jit_inferior_created_hook, jit_breakpoint_re_set): New functions.
+	(jit_inferior_created_observer): Renamed from
+	jit_inferior_created_hook1, all callers updated.
+	* jit.h (jit_breakpoint_re_set): Declare.
+	(jit_event_handler): Update prototype.
+	* breakpoint.c (breakpoint_re_set): Call jit_breakpoint_re_set instead
+	of jit_inferior_created_hook.
+
+2009-08-21  Hui Zhu  <teawater@gmail.com>
+
+	* record.c (record_wait): Change the argument of
+	record_beneath_to_wait to options.
+
+2009-08-20  Jacob Potter  <jdpotter@google.com>
+
+	Replace dcache with splay tree.
+	Remove partially implemented writeback support.
+	* dcache.c: Include splay-tree.h.
+	(LINE_SIZE_POWER): Change from 5 to 6.
+	(DCACHE_SIZE): Change from 64 to 4096.
+	(ENTRY_INVALID, ENTRY_VALID, ENTRY_DIRTY): Delete.
+	(state_chars): Delete.
+	(struct dcache_block): Clean up; remove state and anydirty fields.
+	(struct dcache_struct): Redefine as a splay tree and linked list.
+	(last_cache): Make static.
+	(dcache_invalidate, dcache_hit): Rewrite for new cache structure.
+	(dcache_read_line, dcache_alloc): Rewrite for new cache structure.
+	(dcache_write_line): Delete.
+	(dcache_writeback): Delete.
+	(dcache_peek_byte): Clean up; remove "invalid" state check.
+	(dcache_poke_byte): Rewrite for new cache structure; clarify comment.
+	(dcache_splay_tree_compare): New function.
+	(dcache_init, dcache_free): Rewrite for new cache structure.
+	(dcache_xfer_memory): Rewrite for new write-through cache structure.
+	(dcache_print_line): New function.
+	(dcache_info): Rewrite for new cache structure.
+	(_initialize_dcache): Update "info dcache" help text.
+	* dcache.h (dcache_xfer_memory): Update declaration.
+	* target.c (memory_xfer_partial): Update calls to dcache_xfer_memory.
+
+2009-08-19  Reid Kleckner  <reid@kleckner.net>
+
+	Add interface for JIT code generation.
+	* NEWS: Announce JIT interface.
+	* Makefile.in (SFILES): Add jit.c.
+	(HFILES_NO_SRCDIR): Add jit.h.
+	(COMMON_OBS): Add jit.o.
+	* jit.c: New file.
+	* jit.h: New file.
+	* breakpoint.h (enum bptype): Add bp_jit_event to enum.
+	* breakpoint.c:
+	(update_breakpoints_after_exec): Delete jit breakpoints after exec.
+	(bpstat_what): Update event table for bp_jit_event.
+	(print_it_typical): Added case for bp_jit_event.
+	(print_one_breakpoint_location): Added case for bp_jit_event.
+	(allocate_bp_location): Added case for bp_jit_event.
+	(mention): Added case for bp_jit_event.
+	(delete_command): Added case for bp_jit_event.
+	(breakpoint_re_set_one): Added case for bp_jit_event.
+	(breakpoint_re_set): Added call to jit_inferior_created_hook.
+	(create_jit_event_breakpoint): New.
+	* infrun.c (handle_inferior_event): Add handler for jit event.
+	(follow_exec): Add call to jit_inferior_created_hook.
+
 2009-08-19  Ulrich Weigand  <uweigand@de.ibm.com>
 
 	* value.c (enum internalvar_kind): Replace INTERNALVAR_SCALAR by

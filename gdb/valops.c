@@ -624,6 +624,32 @@ object_address_get_data (struct type *type, CORE_ADDR *address_return)
   return 1;
 }
 
+/* Helper function for value_at, value_at_lazy, and value_at_lazy_stack.  */
+
+static struct value *
+get_value_at (struct type *type, CORE_ADDR addr, int lazy)
+{
+  struct value *val;
+
+  if (TYPE_CODE (check_typedef (type)) == TYPE_CODE_VOID)
+    error (_("Attempt to dereference a generic pointer."));
+
+  if (lazy)
+    {
+      val = allocate_value_lazy (type);
+    }
+  else
+    {
+      val = allocate_value (type);
+      read_memory (addr, value_contents_all_raw (val), TYPE_LENGTH (type));
+    }
+
+  VALUE_LVAL (val) = lval_memory;
+  set_value_address (val, addr);
+
+  return val;
+}
+
 /* Return a value with type TYPE located at ADDR.
 
    Call value_at only if the data needs to be fetched immediately;
@@ -639,19 +665,7 @@ object_address_get_data (struct type *type, CORE_ADDR *address_return)
 struct value *
 value_at (struct type *type, CORE_ADDR addr)
 {
-  struct value *val;
-
-  if (TYPE_CODE (check_typedef (type)) == TYPE_CODE_VOID)
-    error (_("Attempt to dereference a generic pointer."));
-
-  val = allocate_value (type);
-
-  read_memory (addr, value_contents_all_raw (val), TYPE_LENGTH (type));
-
-  VALUE_LVAL (val) = lval_memory;
-  set_value_address (val, addr);
-
-  return val;
+  return get_value_at (type, addr, 0);
 }
 
 /* Return a lazy value with type TYPE located at ADDR (cf. value_at).  */
@@ -659,17 +673,7 @@ value_at (struct type *type, CORE_ADDR addr)
 struct value *
 value_at_lazy (struct type *type, CORE_ADDR addr)
 {
-  struct value *val;
-
-  if (TYPE_CODE (check_typedef (type)) == TYPE_CODE_VOID)
-    error (_("Attempt to dereference a generic pointer."));
-
-  val = allocate_value_lazy (type);
-
-  VALUE_LVAL (val) = lval_memory;
-  set_value_address (val, addr);
-
-  return val;
+  return get_value_at (type, addr, 1);
 }
 
 /* Called only from the value_contents and value_contents_all()
@@ -721,7 +725,10 @@ value_fetch_lazy (struct value *val)
 	  if (length)
 	    {
 	      addr += value_offset (val);
-	      read_memory (addr, value_contents_all_raw (val), length);
+	      if (value_stack (val))
+		read_stack (addr, value_contents_all_raw (val), length);
+	      else
+		read_memory (addr, value_contents_all_raw (val), length);
 	    }
 	}
     }
