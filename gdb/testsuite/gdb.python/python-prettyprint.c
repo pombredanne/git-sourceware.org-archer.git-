@@ -155,6 +155,9 @@ struct nullstr
   char *s;
 };
 
+struct string_repr string_1 = { { "one" } };
+struct string_repr string_2 = { { "two" } };
+
 int
 main ()
 {

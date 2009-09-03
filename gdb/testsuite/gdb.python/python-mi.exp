@@ -61,6 +61,17 @@ mi_delete_varobj container "delete varobj"
 
 mi_gdb_test "-enable-pretty-printing" ""
 
+mi_create_varobj_checked string string_1 \
+    "struct string_repr" \
+    "create string_1 varobj"
+
+mi_gdb_test "-data-evaluate-expression \"string_1 = string_2\"" ".*" \
+    "assign string_1 from string_2"
+
+mi_gdb_test "-var-update string" \
+    "\\^done,changelist=\\\[{name=\"string\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"}\\\]" \
+    "update string varobj after assignment"
+
 mi_create_dynamic_varobj container c \
   "create container varobj"
 

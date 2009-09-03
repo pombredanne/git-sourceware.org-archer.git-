@@ -1551,9 +1551,6 @@ install_new_value (struct varobj *var, struct value *value, int initial)
   var->value = value;
   if (value != NULL)
     value_incref (value);
-  if (var->print_value)
-    xfree (var->print_value);
-  var->print_value = print_value;
   if (value && value_lazy (value) && intentionally_not_fetched)
     var->not_fetched = 1;
   else
@@ -1561,6 +1558,19 @@ install_new_value (struct varobj *var, struct value *value, int initial)
   var->updated = 0;
 
   install_new_value_visualizer (var);
+
+  /* If we installed a pretty-printer, re-compare the printed version
+     to see if the variable changed.  */
+  if (var->pretty_printer)
+    {
+      xfree (print_value);
+      print_value = value_get_print_value (var->value, var->format, var);
+      if (!var->print_value || strcmp (var->print_value, print_value) != 0)
+	changed = 1;
+    }
+  if (var->print_value)
+    xfree (var->print_value);
+  var->print_value = print_value;
 
   gdb_assert (!var->value || value_type (var->value));
 
@@ -1746,11 +1756,14 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
 		 it as unchanged -- presumably, such varobj is not yet
 		 expanded in the UI, so we need not bother getting
 		 it.  */
-	      if (varobj_has_more (v, 0))
-		continue;
+	      if (!varobj_has_more (v, 0))
+		{
+		  update_dynamic_varobj_children (v, NULL, NULL, &dummy, 0, 0);
+		  if (varobj_has_more (v, 0))
+		    r.changed = 1;
+		}
 
-	      update_dynamic_varobj_children (v, NULL, NULL, &dummy, 0, 0);
-	      if (varobj_has_more (v, 0))
+	      if (r.changed)
 		VEC_safe_push (varobj_update_result, result, &r);
 
 	      continue;
