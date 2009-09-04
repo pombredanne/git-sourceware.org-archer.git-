@@ -23823,7 +23823,7 @@ begin with a @samp{*}), or one of the following:
 @samp{$@var{regname}} --- a CPU register name
 @end itemize
 
-A varobj's may be provided by a Python-based pretty-printer.  In this
+A varobj's contents may be provided by a Python-based pretty-printer.  In this
 case the varobj is known as a @dfn{dynamic varobj}.  Dynamic varobjs
 have slightly different semantics in some cases.  If the
 @code{-enable-pretty-printing} command is not sent, then @value{GDBN}
