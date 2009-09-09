@@ -82,6 +82,29 @@ class Derived : public Vbase1, public Vbase2, public Vbase3
 
 #endif
 
+struct substruct {
+  int a;
+  int b;
+};
+
+struct outerstruct {
+  struct substruct s;
+  int x;
+};
+
+struct outerstruct
+substruct_test (void)
+{
+  struct outerstruct outer;
+  outer.s.a = 0;
+  outer.s.b = 0;
+  outer.x = 0;
+
+  outer.s.a = 3;		/* MI outer breakpoint here */
+
+  return outer;  
+}
+
 typedef struct string_repr
 {
   struct whybother
@@ -212,6 +235,8 @@ main ()
 
   add_item (&c2, 2222);
   add_item (&c2, 3333);
+
+  substruct_test ();
   do_nothing ();
 #endif
 

@@ -192,6 +192,29 @@ mi_varobj_update_dynamic container \
   }
 
 mi_continue_to_line \
+    [gdb_get_line_number {MI outer breakpoint here} ${testfile}.c] \
+    "step to outer breakpoint"
+
+mi_create_dynamic_varobj outer outer \
+  "create outer varobj"
+
+mi_list_varobj_children outer {
+  { outer.s s 2 "struct substruct" }
+  { outer.x x 0 "int" }
+} "list children of outer"
+
+mi_list_varobj_children outer.s {
+  { outer.s.a a 0 int }
+  { outer.s.b b 0 int }
+} "list children of outer.s"
+
+mi_next "next over outer update"
+
+mi_gdb_test "-var-update outer" \
+  ".done,changelist=.{name=\"outer.s.a\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"}." \
+  "update after updating element of outer"
+
+mi_continue_to_line \
     [gdb_get_line_number {Another MI breakpoint} ${testfile}.c] \
     "step to second breakpoint"
 

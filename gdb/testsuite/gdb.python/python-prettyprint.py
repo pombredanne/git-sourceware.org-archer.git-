@@ -112,6 +112,19 @@ class pp_ns:
     def display_hint (self):
         return 'string'
 
+class pp_outer:
+    "Print struct outer"
+
+    def __init__ (self, val):
+        self.val = val
+
+    def to_string (self):
+        return "x = %s" % self.val['x']
+
+    def children (self):
+        yield 's', self.val['s']
+        yield 'x', self.val['x']
+
 def lookup_function (val):
     "Look-up and return a pretty-printer that can print val."
 
@@ -170,6 +183,10 @@ def register_pretty_printers ():
     
     pretty_printers_dict[re.compile ('^struct ns$')]  = pp_ns
     pretty_printers_dict[re.compile ('^ns$')]  = pp_ns
+
+    pretty_printers_dict[re.compile ('^struct outerstruct$')]  = pp_outer
+    pretty_printers_dict[re.compile ('^outerstruct$')]  = pp_outer
+
 pretty_printers_dict = {}
 
 register_pretty_printers ()
