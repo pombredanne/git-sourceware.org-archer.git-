@@ -2867,6 +2867,7 @@ struct i386_record_s
 {
   struct gdbarch *gdbarch;
   struct regcache *regcache;
+  CORE_ADDR orig_addr;
   CORE_ADDR addr;
   int aflag;
   int dflag;
@@ -3159,11 +3160,10 @@ i386_record_lea_modrm (struct i386_record_s *irp)
 
   if (irp->override >= 0)
     {
-      if (record_debug)
-	printf_unfiltered (_("Process record ignores the memory change "
-			     "of instruction at address %s because it "
-			     "can't get the value of the segment register.\n"),
-			   paddress (gdbarch, irp->addr));
+      warning (_("Process record ignores the memory change "
+                 "of instruction at address %s because it "
+                 "can't get the value of the segment register."),
+               paddress (gdbarch, irp->orig_addr));
       return 0;
     }
 
@@ -3221,6 +3221,7 @@ i386_process_record (struct gdbarch *gdbarch, struct regcache *regcache,
   memset (&ir, 0, sizeof (struct i386_record_s));
   ir.regcache = regcache;
   ir.addr = addr;
+  ir.orig_addr = addr;
   ir.aflag = 1;
   ir.dflag = 1;
   ir.override = -1;
@@ -4041,12 +4042,11 @@ reswitch:
     case 0xa3:
       if (ir.override >= 0)
         {
-	  if (record_debug)
-	    printf_unfiltered (_("Process record ignores the memory change "
-				 "of instruction at address 0x%s because "
-				 "it can't get the value of the segment "
-				 "register.\n"),
-			       paddress (gdbarch, ir.addr));
+	  warning (_("Process record ignores the memory change "
+                     "of instruction at address 0x%s because "
+                     "it can't get the value of the segment "
+                     "register."),
+                   paddress (gdbarch, ir.orig_addr));
 	}
       else
 	{
@@ -4467,18 +4467,20 @@ reswitch:
           if (ir.aflag && (es != ds))
             {
               /* addr += ((uint32_t) read_register (I386_ES_REGNUM)) << 4; */
-              if (record_debug)
-                printf_unfiltered (_("Process record ignores the memory "
-				     "change of instruction at address 0x%s "
-				     "because it can't get the value of the "
-				     "ES segment register.\n"),
-                                   paddress (gdbarch, ir.addr));
+              warning (_("Process record ignores the memory "
+                         "change of instruction at address 0x%s "
+                         "because it can't get the value of the "
+                         "ES segment register."),
+                       paddress (gdbarch, ir.orig_addr));
+            }
+          else
+            {
+              if (record_arch_list_add_mem (tmpulongest, 1 << ir.ot))
+                return -1;
             }
 
           if (prefixes & (PREFIX_REPZ | PREFIX_REPNZ))
             I386_RECORD_ARCH_LIST_ADD_REG (X86_RECORD_RECX_REGNUM);
-          if (record_arch_list_add_mem (tmpulongest, 1 << ir.ot))
-            return -1;
           if (opcode == 0xa4 || opcode == 0xa5)
             I386_RECORD_ARCH_LIST_ADD_REG (X86_RECORD_RESI_REGNUM);
           I386_RECORD_ARCH_LIST_ADD_REG (X86_RECORD_REDI_REGNUM);
@@ -5088,13 +5090,12 @@ reswitch:
 	      }
 	    if (ir.override >= 0)
 	      {
-		if (record_debug)
-		  printf_unfiltered (_("Process record ignores the memory "
-				       "change of instruction at "
-				       "address %s because it can't get "
-				       "the value of the segment "
-				       "register.\n"),
-				     paddress (gdbarch, ir.addr));
+		warning (_("Process record ignores the memory "
+                           "change of instruction at "
+                           "address %s because it can't get "
+                           "the value of the segment "
+                           "register."),
+                         paddress (gdbarch, ir.orig_addr));
 	      }
 	    else
 	      {
@@ -5140,13 +5141,12 @@ reswitch:
 	      /* sidt */
 	      if (ir.override >= 0)
 		{
-		  if (record_debug)
-		    printf_unfiltered (_("Process record ignores the memory "
-					 "change of instruction at "
-					 "address %s because it can't get "
-					 "the value of the segment "
-					 "register.\n"),
-				       paddress (gdbarch, ir.addr));
+		  warning (_("Process record ignores the memory "
+                             "change of instruction at "
+                             "address %s because it can't get "
+                             "the value of the segment "
+                             "register."),
+                           paddress (gdbarch, ir.orig_addr));
 		}
 	      else
 		{

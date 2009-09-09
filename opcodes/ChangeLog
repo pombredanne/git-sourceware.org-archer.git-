@@ -1,3 +1,99 @@
+2009-09-08  DJ Delorie  <dj@redhat.com>
+
+	* mep-opc.c: Regenerate.
+
+2009-09-08  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* z8kgen.c (struct op): Replace unused flavor with id.
+	(opt): Remove extra xorb entry.
+	(func): Use id field as fallback.
+	(sub): Return new string, caller changed.
+	(internal): Allocate end marker.  Assign unique id before sorting.
+	(gas): Likewise.  Fix loop end condition.
+	* z8k-opc.h: Regenerate.
+
+2009-09-08  Alan Modra  <amodra@bigpond.net.au>
+
+	* ppc-opc.c (powerpc_macros <extrdi>): Allow n+b of 64.
+
+2009-09-07  Alan Modra  <amodra@bigpond.net.au>
+
+	* z8kgen.c (func): Fix thinko last patch.
+
+2009-09-07  Alan Modra  <amodra@bigpond.net.au>
+
+	* z8kgen.c (func): Stabilize qsort of identically named entries.
+	* z8k-opc.h: Regenerate.
+
+2009-09-07  Tristan Gingold  <gingold@adacore.com>
+
+	* po/opcodes.pot: Regenerate.
+
+2009-09-07  Alan Modra  <amodra@bigpond.net.au>
+
+	* configure.in (BUILD_LIBS, BUILD_LIB_DEPS): Define and subst.
+	* configure: Regenerate.
+	* Makefile.am (LIBIBERTY, BUILD_LIBIBERTY, BUILD_LIBINTL): Delete.
+	(BUILD_LIBS, BUILD_LIB_DEPS): Define.  Use..
+	(i386-gen, ia64-gen, z8kgen): ..here.
+	* Makefile.in: Regenerate.
+
+2009-09-07  Tristan Gingold  <gingold@adacore.com>
+
+	* z8k-opc.h: Regenerate.
+
+2009-09-05  Martin Thuresson  <martin@mtme.org>
+
+	* ia64-dis.c (print_insn_ia64): Update code to use renamed member.
+	* m88k-dis.c (m88kdis): Rename variable class to in_class.
+	* tic80-opc.c (tic80_symbol_to_value, tic80_value_to_symbol):
+	Rename argument class to symbol_class.
+
+2009-09-04  Jie Zhang  <jie.zhang@analog.com>
+
+	* bfin-dis.c (decode_pseudodbg_assert_0): Change according
+	to the new encoding of DBGA, DBGAH, and DBGAL.
+	(_print_insn_bfin): Likewise.
+
+2009-09-03  Jie Zhang  <jie.zhang@analog.com>
+
+	* bfin-dis.c (_print_insn_bfin): Don't declare.
+	(print_insn_bfin): Don't declare.
+	(dregs_pair): Remove.
+	(ignore_bits): Remove.
+	(ccstat): Remove.
+
+2009-09-03  Jie Zhang  <jie.zhang@analog.com>
+
+	* bfin-dis.c (IS_DREG): Define.
+	(IS_PREG): Define.
+	(IS_AREG): Define.
+	(IS_GENREG): Define.
+	(IS_DAGREG): Define.
+	(IS_SYSREG): Define.
+	(decode_REGMV_0): Check illegal register move instructions.
+
+2009-09-03  Dave Korn  <dave.korn.cygwin@gmail.com>
+
+	* Makefile.am (BUILD_LIBINTL): New variable.
+	(i386-gen$(EXEEXT_FOR_BUILD)): Use it.
+	(ia64-gen$(EXEEXT_FOR_BUILD)): And here.
+	(z8kgen$(EXEEXT_FOR_BUILD)): And here.
+	* Makefile.in: Regenerate.
+
+2009-09-01  DJ Delorie  <dj@redhat.com>
+
+	* mep-asm.c: Regenerate.
+	* mep-desc.c: Regenerate.
+	* mep-opc.c: Regenerate.
+
+2009-09-01  Tristan Gingold  <gingold@adacore.com>
+
+	* makefile.vms: Ported to Itanium VMS.  Remove useless targets and
+	dependencies.  Remove unused FORMAT variable.
+	* configure.com: New file to create build.com DCL script for
+	Itanium VMS or Alpha VMS.
+
 2009-08-29  Martin Thuresson  <martin@mtme.org>
 
 	* cris-dis.c (bytes_to_skip): Update code to use new name.

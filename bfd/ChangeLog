@@ -1,3 +1,126 @@
+2009-09-09  M R Swami Reddy <MR.Swami.Reddy@nsc.com>
+
+	* elf32-cr16.c (elf32_cr16_relocate_section): Add code to discard the
+	linkonce or linker script discarded section.
+
+2009-09-09  Alan Modra  <amodra@bigpond.net.au>
+
+	* elf32-xtensa.c (elf_xtensa_relax_section): Delete -r check.
+
+2009-09-07  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* elf32-m68k.c (rtype_to_howto): If the reloc index is out of
+	range call the bfd error hander and use R_68K_NONE instead.
+
+2009-09-07  Tristan Gingold  <gingold@adacore.com>
+
+	* po/SRC-POTFILES.in: Regenerate.
+	* po/bfd.pot: Regenerate.
+
+	* bfd.m4 (BFD_HAVE_TIME_TYPE_MEMBER,
+	BFD_HAVE_SYS_STAT_TYPE_MEMBER): Moved to gas/acinclude.m4
+	* configure.in: Move tests for tm_gmtoff, st_mtim.tv_sec and
+	st_mtim.tv_nsec to gas/configure.in
+	(bfd_elf64_ia64_vms_vec): Remove vmsutil.lo
+	* configure: Regenerate.
+	* config.in: Regenerate.
+	* vmsutil.c: Moved to gas/config/te-vms.c
+	* vmsutil.h: Removed.
+	* Makefile.am (BFD32_BACKENDS_CFILES): Remove vmsutil.c
+	(BFD32_BACKENDS): Remove vmsutil.lo
+	* Makefile.in: Regenerate.
+
+2009-09-05  Eli Zaretskii  <eliz@gnu.org>
+
+	* coffcode.h: Include libiberty.h.
+
+2009-09-05  Martin Thuresson  <martin@mtme.org>
+
+	* coff-arm.c (coff_arm_relocate_section)
+	(record_thumb_to_arm_glue, bfd_arm_process_before_allocation):
+	Change member name class to symbol_class.
+	* coff-i960.c (coff_i960_relocate_section) Rename variable
+	class to class_val. Change member name class to symbol_class.
+	* coff-rs6000.c (_bfd_xcoff_swap_aux_in)
+	(_bfd_xcoff_swap_aux_out): Rename arguments class to in_class.
+	* coff-stgo32.c (adjust_aux_in_post)
+	(adjust_aux_out_pre, adjust_aux_out_post): Rename arguments class
+	to in_class.
+	* coff64-rs6000.c (_bfd_xcoff64_swap_aux_in)
+	(_bfd_xcoff64_swap_aux_out): Rename arguments class to in_class.
+	* coffcode.h (coff_pointerize_aux_hook): Rename variable class
+	to n_sclass.
+	* coffgen.c (coff_write_symbol, coff_pointerize_aux): Rename
+	variables named class to n_sclass. (coff_write_symbols): Rename
+	variable class to sym_class. (bfd_coff_set_symbol_class): Rename
+	argument class to symbol_class.
+	* cofflink.c (_bfd_coff_link_hash_newfunc)
+	(coff_link_add_symbols, _bfd_coff_link_input_bfd)
+	(_bfd_coff_write_global_sym, _bfd_coff_generic_relocate_section):
+	Update code to use renamed members.
+	* coffswap.h (coff_swap_aux_in, coff_swap_aux_out): Rename
+	argument class to in_class.
+	* libcoff-in.h (struct coff_link_hash_entry, struct
+	coff_debug_merge_type) Renamed members class to symbol_class and
+	type_class.
+	* libcoff.h Regenerated.
+	* peXXigen.c: (_bfd_XXi_swap_aux_in, _bfd_XXi_swap_aux_out):
+	Rename argument class to in_class.
+	* pef.c (bfd_pef_parse_imported_symbol): Update code to use
+	renamed members.
+	* pef.h (struct bfd_pef_imported_symbol): Changed name of
+	member class to symbol_class.
+
+2009-09-04  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* configure: Regenerated.
+
+2009-09-04  Tristan Gingold  <gingold@adacore.com>
+
+	* configure.in: Bump version to 2.20.51
+
+2009-09-04  Alan Modra  <amodra@bigpond.net.au>
+
+	* elf32-spu.c (spu_elf_relocate_section): Correct 2009-07-24 logic.
+
+2009-09-04  Jie Zhang  <jie.zhang@analog.com>
+
+	* elf32-bfin.c (elf32_bfinfdpic_create_dynamic_sections): Always
+	create .rela.bss.
+	(elf32_bfinfdpic_size_dynamic_sections): Set SEC_EXCLUDE flag
+	for empty .rela.bss and .rel.plt sections.
+
+2009-09-03  Adam Nemet  <anemet@caviumnetworks.com>
+
+	* elfxx-mips.c (mips_elf_calculate_relocation): Don't relocate
+	R_MIPS_JALR unless symbol resolves locally.
+
+2009-09-03  Adam Nemet  <anemet@caviumnetworks.com>
+
+	* elfxx-mips.c (_bfd_mips_elf_check_relocs): Don't set
+	has_static_relocs for R_MIPS_JALR.
+
+2009-09-03  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* elf64-mips.c (mips_elf64_howto_table_rela): Add support for
+	R_MIPS_TLS_DTPMOD64 and R_MIPS_TLS_TPREL64, replacing the
+	respective stubs.
+
+2009-09-01  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elf64-x86-64.c (elf64_x86_64_finish_dynamic_symbol): Declare
+	plt earlier.
+
+2009-09-01  Tristan Gingold  <gingold@adacore.com>
+
+	* makefile.vms: Ported to Itanium VMS.  Remove useless variable and
+	dependencies.  Reindent.
+	* configure.com: Ported to Itanium VMS.  Now generates a build.com
+	to build without make.  Add messages but make edit silent.
+	* hosts/alphavms.h: Add a prototype for stpcpy.
+	* vms.c: Add a missing include for Alpha VMS.
+	* elfxx-ia64.c (ELF_OSABI): Define for OpenVMS.
+
 2009-08-31  Jan Beulich  <jbeulich@novell.com>
 
 	* elf-bfd.h (bfd_elf_get_default_section_type): Declare.
@@ -731,7 +854,7 @@
 	BFD_HAVE_SYS_STAT_TYPE_MEMBER): New config functions.
 	* configure.in: Use them.
 	* configure: Regenerate.
-	* config.in: Regnerate.
+	* config.in: Regenerate.
 	* vmsutil.c: Include sysdep.h, remove ansidecl.h.
 	#define _BSD_SOURCE. Add comments.
 	(vms_file_stats_name): Calculate creation date based on available

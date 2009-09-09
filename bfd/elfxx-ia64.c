@@ -1,6 +1,6 @@
 /* IA-64 support for 64-bit ELF
    Copyright 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2009  Free Software Foundation, Inc.
+   2008, 2009  Free Software Foundation, Inc.
    Contributed by David Mosberger-Tang <davidm@hpl.hp.com>
 
    This file is part of BFD, the Binary File Descriptor library.
@@ -6030,6 +6030,9 @@ elfNN_vms_close_and_cleanup (bfd *abfd)
 #undef  elf_backend_symbol_processing
 
 #undef  elf_backend_want_p_paddr_set_to_zero
+
+#undef ELF_OSABI
+#define ELF_OSABI			ELFOSABI_OPENVMS
 
 #undef  ELF_MAXPAGESIZE
 #define ELF_MAXPAGESIZE			0x10000	/* 64KB */

@@ -1,3 +1,49 @@
+2009-09-08  Ralf Wildenhues  <Ralf.Wildenhues@gmx.de>
+
+	* configure.ac: Do not use $extrasub for replacing @if/@endif
+	parts in Makefile; instead, use additional arguments to
+	AC_CONFIG_COMMANDS to do the replacement manually, with several
+	sed invocations, to avoid HP-UX sed command limits.
+	* configure: Regenerate.
+
+2009-09-04  Alexandre Oliva  <aoliva@redhat.com>
+
+	* configure.ac (with-build-config): Document.  Handle without.
+	Handle missing argument.
+	* configure: Rebuilt.
+
+2009-09-03  Alexandre Oliva  <aoliva@redhat.com>
+
+	* configure.ac (--with-build-config): New.  Set BUILD_CONFIG.
+	Default to bootstrap-debug only if compare-debug works.
+	* configure: Rebuilt.
+	* Makefile.tpl: Make BUILD_CONFIG configure-configurable.
+	* Makefile.in: Rebuilt.
+
+2009-09-01  Alexandre Oliva  <aoliva@redhat.com>
+
+	* Makefile.tpl (BUILD_CONFIG): Default to bootstrap-debug.
+	* Makefile.in: Rebuilt.
+
+2009-09-02  Paolo Bonzini  <bonzini@gnu.org>
+
+	* Makefile.tpl (AWK): Fix typo.
+	* Makefile.in: Regenerate.
+
+2009-09-02  Paolo Bonzini  <bonzini@gnu.org>
+
+	* configure.ac: Detect awk and sed.
+	* Makefile.def (flags_to_pass): Add AWK and SED.
+	* Makefile.tpl (AWK, SED): New.
+	(BASE_FLAGS_TO_PASS): Add AWK and SED.
+	* configure: Regenerate.
+	* Makefile.in: Regenerate.
+
+2009-09-01  Tristan Gingold  <gingold@adacore.com>
+
+	* setup.com: Ported to Itanium VMS.  Can also build using DCL scripts.
+	Remove logical names.
+
 2009-08-31  Dave Korn  <dave.korn.cygwin@gmail.com>
 
 	* ltmain.sh (func_normal_abspath): New function.

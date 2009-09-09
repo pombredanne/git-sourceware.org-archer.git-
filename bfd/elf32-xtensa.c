@@ -1,5 +1,6 @@
 /* Xtensa-specific support for 32-bit ELF.
-   Copyright 2003, 2004, 2005, 2006, 2007, 2008 Free Software Foundation, Inc.
+   Copyright 2003, 2004, 2005, 2006, 2007, 2008, 2009
+   Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
 
@@ -6632,10 +6633,6 @@ elf_xtensa_relax_section (bfd *abfd,
   static value_map_hash_table *values = NULL;
   static bfd_boolean relocations_analyzed = FALSE;
   xtensa_relax_info *relax_info;
-
-  if (link_info->relocatable)
-    (*link_info->callbacks->einfo)
-      (_("%P%F: --relax and -r may not be used together\n"));
 
   if (!relocations_analyzed)
     {
