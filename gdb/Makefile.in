@@ -520,12 +520,11 @@ ALL_TARGET_OBS = \
 	bsd-uthread.o \
 	nbsd-tdep.o obsd-tdep.o \
 	sol2-tdep.o \
-	solib.o solib-frv.o solib-irix.o solib-svr4.o solib-target.o \
+	solib-frv.o solib-irix.o solib-svr4.o solib-target.o \
 	solib-som.o solib-pa64.o solib-darwin.o \
 	dbug-rom.o dink32-rom.o ppcbug-rom.o m32r-rom.o dsrec.o monitor.o \
 	remote-m32r-sdi.o \
 	xcoffread.o \
-	prologue-value.o \
 	symfile-mem.o \
 	corelow.o \
 	windows-tdep.o \
@@ -677,7 +676,8 @@ SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c ada-tasks.c \
 	wrapper.c \
 	xml-tdesc.c xml-support.c \
 	inferior.c gdb_usleep.c \
-	record.c
+	record.c \
+	jit.c
 
 LINTFILES = $(SFILES) $(YYFILES) $(CONFIG_SRCS) init.c
 
@@ -746,7 +746,7 @@ config/rs6000/nm-rs6000.h top.h bsd-kvm.h gdb-stabs.h reggroups.h \
 annotate.h sim-regno.h dictionary.h dfp.h main.h frame-unwind.h	\
 remote-fileio.h i386-linux-tdep.h vax-tdep.h objc-lang.h \
 sentinel-frame.h bcache.h symfile.h windows-tdep.h linux-tdep.h \
-gdb_usleep.h
+gdb_usleep.h jit.h
 
 # Header files that already have srcdir in them, or which are in objdir.
 
@@ -828,7 +828,8 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 	solib.o solib-null.o \
 	prologue-value.o memory-map.o xml-support.o \
 	target-descriptions.o target-memory.o xml-tdesc.o xml-builtin.o \
-	inferior.o osdata.o gdb_usleep.o record.o
+	inferior.o osdata.o gdb_usleep.o record.o \
+	jit.o
 
 TSOBS = inflow.o
 
@@ -887,6 +888,7 @@ check: force
 # a shell that expands alternations within braces.  If GNU make is not
 # used, this rule will harmlessly fail to match.  Used FORCE_PARALLEL to
 # prevent serialized checking due to the passed RUNTESTFLAGS.
+# FIXME: use config.status --config not --version, when available.
 check//%: force
 	@if [ -f testsuite/config.status ]; then \
 	  rootme=`pwd`; export rootme; \
@@ -895,14 +897,14 @@ check//%: force
 	  variant=`echo "$@" | sed 's,^[^/]*//,,'`; \
 	  vardots=`echo "$$variant" | sed 's,/,.,g'`; \
 	  testdir=testsuite.$$vardots; \
-	  if [ ! -f $$testdir/Makefile ]; then \
-	    (cd testsuite && find . -name config.status) | \
-	    sed s,/config.status$$,, | sort | while read subdir; do \
-	      $(SHELL) $(srcdir)/../mkinstalldirs $$testdir/$$subdir && \
-	      (cd $$testdir/$$subdir && \
-	       $(SHELL) $$rootme/testsuite/$$subdir/config.status \
-		 --recheck && \
-	       $(SHELL) ./config.status); done; \
+	  if [ ! -f $$testdir/Makefile ] && [ -f testsuite/config.status ]; then \
+	    configargs=`cd testsuite && ./config.status --version | \
+	      sed -n -e 's,"$$,,' -e 's,^ *with options ",,p'`; \
+	    $(SHELL) $(srcdir)/../mkinstalldirs $$testdir && \
+	    (cd $$testdir && \
+	     eval $(SHELL) "\"\$$rootsrc/testsuite/configure\" $$configargs" \
+			   "\"--srcdir=\$$rootsrc/testsuite\"" \
+	     ); \
 	  else :; fi && cd $$testdir && \
 	  $(MAKE) $(TARGET_FLAGS_TO_PASS) \
 	    RUNTESTFLAGS="--target_board=$$variant $(RUNTESTFLAGS)" \

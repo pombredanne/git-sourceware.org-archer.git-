@@ -1,8 +1,4 @@
-/* vmsutil.h -- Header file for utilities for VMS.
-   Copyright 2009 Free Software Foundation, Inc.
-
-   Written by Douglas B Rupp <rupp@gnat.com>
-
+/* Copyright 2009 Free Software Foundation, Inc.
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 3 of the License, or
@@ -14,7 +10,16 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston, MA 02110-1301, USA.  */
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-extern int vms_file_stats_name (const char *, long long *, long *, char *, int *);
+   Contributed by Jan Kratochvil <jan.kratochvil@redhat.com>.  */
+
+#include <unistd.h>
+
+int
+main (void)
+{
+  sleep (60);
+
+  return 1;
+}

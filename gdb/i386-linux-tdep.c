@@ -354,6 +354,24 @@ i386_linux_write_pc (struct regcache *regcache, CORE_ADDR pc)
   regcache_cooked_write_unsigned (regcache, I386_LINUX_ORIG_EAX_REGNUM, -1);
 }
 
+static struct linux_record_tdep i386_linux_record_tdep;
+
+/* i386_canonicalize_syscall maps from the native i386 Linux set
+   of syscall ids into a canonical set of syscall ids used by
+   process record (a mostly trivial mapping, since the canonical
+   set was originally taken from the i386 set).  */
+
+static enum gdb_syscall
+i386_canonicalize_syscall (int syscall)
+{
+  enum { i386_syscall_max = 499 };
+
+  if (syscall <= i386_syscall_max)
+    return syscall;
+  else
+    return -1;
+}
+
 /* Parse the arguments of current system call instruction and record
    the values of the registers and memory that will be changed into
    "record_arch_list".  This instruction is "int 0x80" (Linux
@@ -361,17 +379,26 @@ i386_linux_write_pc (struct regcache *regcache, CORE_ADDR pc)
 
    Return -1 if something wrong.  */
 
-static struct linux_record_tdep i386_linux_record_tdep;
-
 static int
 i386_linux_intx80_sysenter_record (struct regcache *regcache)
 {
   int ret;
-  uint32_t tmpu32;
+  LONGEST syscall_native;
+  enum gdb_syscall syscall_gdb;
 
-  regcache_raw_read (regcache, I386_EAX_REGNUM, (gdb_byte *)&tmpu32);
+  regcache_raw_read_signed (regcache, I386_EAX_REGNUM, &syscall_native);
 
-  ret = record_linux_system_call (tmpu32, regcache,
+  syscall_gdb = i386_canonicalize_syscall (syscall_native);
+
+  if (syscall_gdb < 0)
+    {
+      printf_unfiltered (_("Process record and replay target doesn't "
+                           "support syscall number %s\n"), 
+			 plongest (syscall_native));
+      return -1;
+    }
+
+  ret = record_linux_system_call (syscall_gdb, regcache,
 				  &i386_linux_record_tdep);
   if (ret)
     return ret;
@@ -481,6 +508,8 @@ i386_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
   /* Initialize the i386_linux_record_tdep.  */
   /* These values are the size of the type that will be used in a system
      call.  They are obtained from Linux Kernel source.  */
+  i386_linux_record_tdep.size_pointer
+    = gdbarch_ptr_bit (gdbarch) / TARGET_CHAR_BIT;
   i386_linux_record_tdep.size__old_kernel_stat = 32;
   i386_linux_record_tdep.size_tms = 16;
   i386_linux_record_tdep.size_loff_t = 8;
@@ -501,9 +530,12 @@ i386_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
   i386_linux_record_tdep.size_statfs = 64;
   i386_linux_record_tdep.size_statfs64 = 84;
   i386_linux_record_tdep.size_sockaddr = 16;
-  i386_linux_record_tdep.size_int = 4;
-  i386_linux_record_tdep.size_long = 4;
-  i386_linux_record_tdep.size_ulong = 4;
+  i386_linux_record_tdep.size_int
+    = gdbarch_int_bit (gdbarch) / TARGET_CHAR_BIT;
+  i386_linux_record_tdep.size_long
+    = gdbarch_long_bit (gdbarch) / TARGET_CHAR_BIT;
+  i386_linux_record_tdep.size_ulong
+    = gdbarch_long_bit (gdbarch) / TARGET_CHAR_BIT;
   i386_linux_record_tdep.size_msghdr = 28;
   i386_linux_record_tdep.size_itimerval = 16;
   i386_linux_record_tdep.size_stat = 88;
@@ -536,7 +568,8 @@ i386_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
   i386_linux_record_tdep.size_io_event = 32;
   i386_linux_record_tdep.size_iocb = 64;
   i386_linux_record_tdep.size_epoll_event = 12;
-  i386_linux_record_tdep.size_itimerspec = i386_linux_record_tdep.size_timespec * 2;
+  i386_linux_record_tdep.size_itimerspec
+    = i386_linux_record_tdep.size_timespec * 2;
   i386_linux_record_tdep.size_mq_attr = 32;
   i386_linux_record_tdep.size_siginfo = 128;
   i386_linux_record_tdep.size_termios = 36;
@@ -546,6 +579,8 @@ i386_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
   i386_linux_record_tdep.size_serial_struct = 60;
   i386_linux_record_tdep.size_serial_icounter_struct = 80;
   i386_linux_record_tdep.size_hayes_esp_config = 12;
+  i386_linux_record_tdep.size_size_t = 4;
+  i386_linux_record_tdep.size_iovec = 8;
 
   /* These values are the second argument of system call "sys_ioctl".
      They are obtained from Linux Kernel source.  */
@@ -627,6 +662,7 @@ i386_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
   i386_linux_record_tdep.arg3 = I386_EDX_REGNUM;
   i386_linux_record_tdep.arg4 = I386_ESI_REGNUM;
   i386_linux_record_tdep.arg5 = I386_EDI_REGNUM;
+  i386_linux_record_tdep.arg6 = I386_EBP_REGNUM;
 
   tdep->i386_intx80_record = i386_linux_intx80_sysenter_record;
   tdep->i386_sysenter_record = i386_linux_intx80_sysenter_record;

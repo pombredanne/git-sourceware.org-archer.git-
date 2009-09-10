@@ -171,13 +171,6 @@ Dynamic symbol table reloading multiple times in one run is %s.\n"),
 		    value);
 }
 
-/* If non-zero, gdb will notify the user when it is loading symbols
-   from a file.  This is almost always what users will want to have happen;
-   but for programs with lots of dynamically linked libraries, the output
-   can be more noise than signal.  */
-
-int print_symbol_loading = 1;
-
 /* If non-zero, shared library symbols will be added automatically
    when the inferior is created, new libraries are loaded, or when
    attaching to the inferior.  This is almost always what users will
@@ -1003,12 +996,9 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
 	deprecated_pre_add_symbol_hook (name);
       else
 	{
-          if (print_symbol_loading)
-	    {
-	      printf_unfiltered (_("Reading symbols from %s..."), name);
-	      wrap_here ("");
-	      gdb_flush (gdb_stdout);
-	    }
+	  printf_unfiltered (_("Reading symbols from %s..."), name);
+	  wrap_here ("");
+	  gdb_flush (gdb_stdout);
 	}
     }
   syms_from_objfile (objfile, addrs, offsets, num_offsets,
@@ -1023,7 +1013,7 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
     {
       require_partial_symbols (objfile);
 
-      if ((from_tty || info_verbose) && print_symbol_loading)
+      if (from_tty || info_verbose)
 	{
 	  printf_unfiltered (_("expanding to full symbols..."));
 	  wrap_here ("");
@@ -1067,16 +1057,11 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
 
   /* has_any_debug_symbols is not fully compatible with the former calls which
      would just be needlessly expensive here.  */
-  if ((from_tty || info_verbose) && print_symbol_loading
-      && (add_flags & SYMFILE_MAINLINE)
+  if ((from_tty || info_verbose)
       && !has_any_debug_symbols (objfile))
     {
       wrap_here ("");
-      printf_unfiltered (_("(no debugging symbols found)"));
-      if (from_tty || info_verbose)
-        printf_unfiltered ("...");
-      else
-        printf_unfiltered ("\n");
+      printf_unfiltered (_("(no debugging symbols found)..."));
       wrap_here ("");
     }
 
@@ -1085,10 +1070,7 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
       if (deprecated_post_add_symbol_hook)
 	deprecated_post_add_symbol_hook ();
       else
-	{
-	  if (print_symbol_loading)
-	    printf_unfiltered (_("done.\n"));
-	}
+	printf_unfiltered (_("done.\n"));
     }
 
   /* We print some messages regardless of whether 'from_tty ||
@@ -1476,7 +1458,6 @@ find_separate_debug_file (struct objfile *objfile)
 	  xfree (canon_name);
 	  xfree (basename);
 	  xfree (dir);
-	  xfree (canon_name);
 	  return xstrdup (debugfile);
 	}
     }
@@ -1656,6 +1637,9 @@ symfile_bfd_open (char *name)
       error (_("`%s': can't read symbols: %s."), name,
 	     bfd_errmsg (bfd_get_error ()));
     }
+
+  /* bfd_usrdata exists for applications and libbfd must not touch it.  */
+  gdb_assert (bfd_usrdata (sym_bfd) == NULL);
 
   return sym_bfd;
 }
@@ -2350,6 +2334,8 @@ reread_symbols (void)
 		objfile->obfd = bfd_openr (obfd_filename, gnutarget);
 	      if (objfile->obfd == NULL)
 		error (_("Can't open %s to read symbols."), objfile->name);
+	      else
+		objfile->obfd = gdb_bfd_ref (objfile->obfd);
 	      /* bfd_openr sets cacheable to true, which is what we want.  */
 	      if (!bfd_check_format (objfile->obfd, bfd_object))
 		error (_("Can't read symbols from %s: %s."), objfile->name,
@@ -2486,13 +2472,13 @@ reread_symbols (void)
 
   if (reread_one)
     {
+      /* Notify objfiles that we've modified objfile sections.  */
+      objfiles_changed ();
+
       clear_symtab_users ();
       /* At least one objfile has changed, so we can consider that
          the executable we're debugging has changed too.  */
       observer_notify_executable_changed ();
-
-      /* Notify objfiles that we've modified objfile sections.  */
-      objfiles_changed ();
     }
 }
 
@@ -4224,12 +4210,4 @@ the global debug-file directory prepended."),
 				     NULL,
 				     show_debug_file_directory,
 				     &setlist, &showlist);
-
-  add_setshow_boolean_cmd ("symbol-loading", no_class,
-                           &print_symbol_loading, _("\
-Set printing of symbol loading messages."), _("\
-Show printing of symbol loading messages."), NULL,
-                           NULL,
-                           NULL,
-                           &setprintlist, &showprintlist);
 }
