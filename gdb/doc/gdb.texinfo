@@ -23860,6 +23860,11 @@ the thread's identifier.
 @item has_more
 For a dynamic varobj, this indicates whether there appear to be any
 children available.  For a non-dynamic varobj, this will be 0.
+
+@item dynamic
+This attribute will be present and have the value @samp{1} if the
+varobj is a dynamic varobj.  If the varobj is not a dynamic varobj,
+then this attribute will not be present.
 @end table
 
 Typical output will look like this:
@@ -24269,6 +24274,11 @@ The display hint, if any.
 @item has_more
 This is an integer value, which will be 1 if there are more children
 available outside the varobj's update range.
+
+@item dynamic
+This attribute will be present and have the value @samp{1} if the
+varobj is a dynamic varobj.  If the varobj is not a dynamic varobj,
+then this attribute will not be present.
 
 @item new_children
 If new children were added to a dynamic varobj within the selected

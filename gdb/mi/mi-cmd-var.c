@@ -79,6 +79,9 @@ print_varobj (struct varobj *var, enum print_values print_values,
 
   if (varobj_get_frozen (var))
     ui_out_field_int (uiout, "frozen", 1);
+
+  if (varobj_pretty_printed_p (var))
+    ui_out_field_int (uiout, "dynamic", 1);
 }
 
 /* VAROBJ operations */
@@ -758,6 +761,9 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
 	  ui_out_field_string (uiout, "displayhint", display_hint);
 	  xfree (display_hint);
 	}
+
+      if (varobj_pretty_printed_p (var))
+	ui_out_field_int (uiout, "dynamic", 1);
 
       varobj_get_child_range (r->varobj, &from, &to);
       ui_out_field_int (uiout, "has_more",

@@ -69,7 +69,7 @@ mi_gdb_test "-data-evaluate-expression \"string_1 = string_2\"" ".*" \
     "assign string_1 from string_2"
 
 mi_gdb_test "-var-update string" \
-    "\\^done,changelist=\\\[{name=\"string\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"}\\\]" \
+    "\\^done,changelist=\\\[{name=\"string\",in_scope=\"true\",type_changed=\"false\",dynamic=\"1\",has_more=\"0\"}\\\]" \
     "update string varobj after assignment"
 
 mi_create_dynamic_varobj container c \
@@ -81,7 +81,7 @@ mi_list_varobj_children container {
 mi_next "next over update 1"
 
 mi_varobj_update_dynamic container "varobj update 1" {
-    type_changed false new_num_children 1 has_more 0
+    type_changed false new_num_children 1 dynamic 1 has_more 0
 } {
 } {
     { name {container.\[0\]} exp {\[0\]} numchild 0 type int thread-id 1 }
@@ -90,7 +90,7 @@ mi_varobj_update_dynamic container "varobj update 1" {
 mi_next "next over update 2"
 
 mi_varobj_update_dynamic container "varobj update 2" {
-    type_changed false new_num_children 2 has_more 0
+    type_changed false new_num_children 2 dynamic 1 has_more 0
 } {
 } {
     { name {container.\[1\]} exp {\[1\]} numchild 0 type int thread-id 1 }
@@ -109,7 +109,7 @@ mi_gdb_test "-var-set-visualizer container gdb.default_visualizer" \
   "choose default visualizer"
 
 mi_varobj_update_dynamic container "varobj update after choosing default" {
-    type_changed false new_num_children 2 has_more 0
+    type_changed false new_num_children 2 dynamic 1 has_more 0
 } {
 } {
     { name {container.\[0\]} exp {\[0\]} numchild 0 type int thread-id 1 }
@@ -122,7 +122,7 @@ mi_gdb_test "-var-set-visualizer container ContainerPrinter" \
 
 mi_varobj_update_dynamic container \
   "varobj update after choosing via expression" {
-      type_changed false new_num_children 2 has_more 0
+      type_changed false new_num_children 2 dynamic 1 has_more 0
   } {
   } {
       { name {container.\[0\]} exp {\[0\]} numchild 0 type int thread-id 1 }
@@ -178,16 +178,16 @@ mi_next "next over update 5"
 # should not actually see them.
 mi_varobj_update_dynamic container2 \
     "update varobj 2, no children requested" {
-	type_changed false has_more 1
+	type_changed false dynamic 1 has_more 1
     } {} {}
 
 # This should only show the first child, because the update range has
 # been set.
 mi_varobj_update_dynamic container \
   "update after next with restricted range" {
-      type_changed false new_num_children 1 has_more 1
+      type_changed false new_num_children 1 dynamic 1 has_more 1
   } {
-      { name {container.\[0\]} in_scope true type_changed false has_more 0 }
+      { name {container.\[0\]} in_scope true type_changed false dynamic 1 has_more 0 }
   } {
   }
 
@@ -211,7 +211,7 @@ mi_list_varobj_children outer.s {
 mi_next "next over outer update"
 
 mi_gdb_test "-var-update outer" \
-  ".done,changelist=.{name=\"outer.s.a\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"}." \
+  ".done,changelist=.{name=\"outer.s.a\",in_scope=\"true\",type_changed=\"false\",dynamic=\"1\",has_more=\"0\"}." \
   "update after updating element of outer"
 
 mi_continue_to_line \
