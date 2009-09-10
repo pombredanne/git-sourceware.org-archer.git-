@@ -622,26 +622,46 @@ ia64_memory_insert_breakpoint (struct gdbarch *gdbarch,
 
   addr &= ~0x0f;
 
-  /* Disable the automatic memory restoration from breakpoints while
-     we read our instruction bundle.  Otherwise, the general restoration
-     mechanism kicks in and we would possibly remove parts of the adjacent
+  /* Enable the automatic memory restoration from breakpoints while
+     we read our instruction bundle for the purpose of SHADOW_CONTENTS.
+     Otherwise, we could possibly store into the shadow parts of the adjacent
      placed breakpoints.  It is due to our SHADOW_CONTENTS overlapping the real
      breakpoint instruction bits region.  */
-  cleanup = make_show_memory_breakpoints_cleanup (1);
+  cleanup = make_show_memory_breakpoints_cleanup (0);
   val = target_read_memory (addr, bundle, BUNDLE_LEN);
+  if (val != 0)
+    {
+      do_cleanups (cleanup);
+      return val;
+    }
+
+  /* Slot number 2 may skip at most 2 bytes at the beginning.  */
+  bp_tgt->shadow_len = BUNDLE_LEN - 2;
+
+  /* Store the whole bundle, except for the initial skipped bytes by the slot
+     number interpreted as bytes offset in PLACED_ADDRESS.  */
+  memcpy (bp_tgt->shadow_contents, bundle + slotnum, bp_tgt->shadow_len);
+
+  /* Re-read the same bundle as above except that, this time, read it in order
+     to compute the new bundle inside which we will be inserting the
+     breakpoint.  Therefore, disable the automatic memory restoration from
+     breakpoints while we read our instruction bundle.  Otherwise, the general
+     restoration mechanism kicks in and we would possibly remove parts of the
+     adjacent placed breakpoints.  It is due to our SHADOW_CONTENTS overlapping
+     the real breakpoint instruction bits region.  */
+  make_show_memory_breakpoints_cleanup (1);
+  val = target_read_memory (addr, bundle, BUNDLE_LEN);
+  if (val != 0)
+    {
+      do_cleanups (cleanup);
+      return val;
+    }
 
   /* Check for L type instruction in slot 1, if present then bump up the slot
      number to the slot 2.  */
   template = extract_bit_field (bundle, 0, 5);
   if (slotnum == 1 && template_encoding_table[template][slotnum] == L)
     slotnum = 2;
-
-  /* Slot number 2 may skip at most 2 bytes at the beginning.  */
-  bp_tgt->placed_size = bp_tgt->shadow_len = BUNDLE_LEN - 2;
-
-  /* Store the whole bundle, except for the initial skipped bytes by the slot
-     number interpreted as bytes offset in PLACED_ADDRESS.  */
-  memcpy (bp_tgt->shadow_contents, bundle + slotnum, bp_tgt->shadow_len);
 
   /* Breakpoints already present in the code will get deteacted and not get
      reinserted by bp_loc_is_permanent.  Multiple breakpoints at the same
@@ -654,9 +674,10 @@ ia64_memory_insert_breakpoint (struct gdbarch *gdbarch,
 		    paddress (gdbarch, bp_tgt->placed_address));
   replace_slotN_contents (bundle, IA64_BREAKPOINT, slotnum);
 
-  if (val == 0)
-    val = target_write_memory (addr + slotnum, bundle + slotnum,
-			       bp_tgt->shadow_len);
+  bp_tgt->placed_size = bp_tgt->shadow_len;
+
+  val = target_write_memory (addr + slotnum, bundle + slotnum,
+			     bp_tgt->shadow_len);
 
   do_cleanups (cleanup);
   return val;
@@ -683,6 +704,11 @@ ia64_memory_remove_breakpoint (struct gdbarch *gdbarch,
      breakpoint instruction bits region.  */
   cleanup = make_show_memory_breakpoints_cleanup (1);
   val = target_read_memory (addr, bundle_mem, BUNDLE_LEN);
+  if (val != 0)
+    {
+      do_cleanups (cleanup);
+      return val;
+    }
 
   /* Check for L type instruction in slot 1, if present then bump up the slot
      number to the slot 2.  */
@@ -699,6 +725,7 @@ ia64_memory_remove_breakpoint (struct gdbarch *gdbarch,
       warning (_("Cannot remove breakpoint at address %s, "
 		 "no break instruction at such address."),
 	       paddress (gdbarch, bp_tgt->placed_address));
+      do_cleanups (cleanup);
       return -1;
     }
 
@@ -711,8 +738,7 @@ ia64_memory_remove_breakpoint (struct gdbarch *gdbarch,
   /* In BUNDLE_MEM be careful to modify only the bits belonging to SLOTNUM and
      never any other possibly also stored in SHADOW_CONTENTS.  */
   replace_slotN_contents (bundle_mem, instr_saved, slotnum);
-  if (val == 0)
-    val = target_write_memory (addr, bundle_mem, BUNDLE_LEN);
+  val = target_write_memory (addr, bundle_mem, BUNDLE_LEN);
 
   do_cleanups (cleanup);
   return val;
@@ -3671,11 +3697,8 @@ ia64_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   if (arches != NULL)
     return arches->gdbarch;
 
-  tdep = xmalloc (sizeof (struct gdbarch_tdep));
+  tdep = xzalloc (sizeof (struct gdbarch_tdep));
   gdbarch = gdbarch_alloc (&info, tdep);
-
-  tdep->sigcontext_register_address = 0;
-  tdep->pc_in_sigtramp = 0;
 
   /* According to the ia64 specs, instructions that store long double
      floats in memory use a long-double format different than that

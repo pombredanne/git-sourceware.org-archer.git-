@@ -271,40 +271,40 @@ SUBDIR_TUI_CFLAGS= \
 #
 SUBDIR_PYTHON_OBS = \
 	python.o \
-	python-block.o \
-	python-breakpoint.o \
-	python-cmd.o \
-	python-frame.o \
-	python-function.o \
-	python-hooks.o \
-	python-inferior.o \
-	python-infthread.o \
-	python-objfile.o \
-	python-param.o \
-	python-prettyprint.o \
-	python-symbol.o \
-	python-symtab.o \
-	python-type.o \
-	python-utils.o \
-	python-value.o
+	py-block.o \
+	py-breakpoint.o \
+	py-cmd.o \
+	py-frame.o \
+	py-function.o \
+	py-hooks.o \
+	py-inferior.o \
+	py-infthread.o \
+	py-objfile.o \
+	py-param.o \
+	py-prettyprint.o \
+	py-symbol.o \
+	py-symtab.o \
+	py-type.o \
+	py-utils.o \
+	py-value.o
 SUBDIR_PYTHON_SRCS = \
 	python/python.c \
-	python/python-block.c \
-	python/python-breakpoint.c \
-	python/python-cmd.c \
-	python/python-frame.c \
-	python/python-function.c \
-	python/python-hooks.c \
-	python/python-inferior.c \
-	python/python-infthread.c \
-	python/python-objfile.c \
-	python/python-param.c \
-	python/python-prettyprint.c \
-	python/python-symbol.c \
-	python/python-symtab.c \
-	python/python-type.c \
-	python/python-utils.c \
-	python/python-value.c
+	python/py-block.c \
+	python/py-breakpoint.c \
+	python/py-cmd.c \
+	python/py-frame.c \
+	python/py-function.c \
+	python/py-hooks.c \
+	python/py-inferior.c \
+	python/py-infthread.c \
+	python/py-objfile.c \
+	python/py-param.c \
+	python/py-prettyprint.c \
+	python/py-symbol.c \
+	python/py-symtab.c \
+	python/py-type.c \
+	python/py-utils.c \
+	python/py-value.c
 SUBDIR_PYTHON_DEPS =
 SUBDIR_PYTHON_LDFLAGS=
 SUBDIR_PYTHON_CFLAGS=
@@ -699,7 +699,8 @@ SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c ada-tasks.c \
 	wrapper.c \
 	xml-tdesc.c xml-support.c \
 	inferior.c gdb_usleep.c \
-	record.c
+	record.c \
+	jit.c
 
 LINTFILES = $(SFILES) $(YYFILES) $(CONFIG_SRCS) init.c
 
@@ -768,7 +769,7 @@ config/rs6000/nm-rs6000.h top.h bsd-kvm.h gdb-stabs.h reggroups.h \
 annotate.h sim-regno.h dictionary.h dfp.h main.h frame-unwind.h	\
 remote-fileio.h i386-linux-tdep.h vax-tdep.h objc-lang.h \
 sentinel-frame.h bcache.h symfile.h windows-tdep.h linux-tdep.h \
-gdb_usleep.h python/python.h python/python-internal.h
+gdb_usleep.h jit.h python/python.h python/python-internal.h
 
 # Header files that already have srcdir in them, or which are in objdir.
 
@@ -850,7 +851,8 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 	solib.o solib-null.o \
 	prologue-value.o memory-map.o xml-support.o \
 	target-descriptions.o target-memory.o xml-tdesc.o xml-builtin.o \
-	inferior.o osdata.o gdb_usleep.o record.o
+	inferior.o osdata.o gdb_usleep.o record.o \
+	jit.o
 
 TSOBS = inflow.o
 
@@ -909,6 +911,7 @@ check: force
 # a shell that expands alternations within braces.  If GNU make is not
 # used, this rule will harmlessly fail to match.  Used FORCE_PARALLEL to
 # prevent serialized checking due to the passed RUNTESTFLAGS.
+# FIXME: use config.status --config not --version, when available.
 check//%: force
 	@if [ -f testsuite/config.status ]; then \
 	  rootme=`pwd`; export rootme; \
@@ -917,14 +920,14 @@ check//%: force
 	  variant=`echo "$@" | sed 's,^[^/]*//,,'`; \
 	  vardots=`echo "$$variant" | sed 's,/,.,g'`; \
 	  testdir=testsuite.$$vardots; \
-	  if [ ! -f $$testdir/Makefile ]; then \
-	    (cd testsuite && find . -name config.status) | \
-	    sed s,/config.status$$,, | sort | while read subdir; do \
-	      $(SHELL) $(srcdir)/../mkinstalldirs $$testdir/$$subdir && \
-	      (cd $$testdir/$$subdir && \
-	       $(SHELL) $$rootme/testsuite/$$subdir/config.status \
-		 --recheck && \
-	       $(SHELL) ./config.status); done; \
+	  if [ ! -f $$testdir/Makefile ] && [ -f testsuite/config.status ]; then \
+	    configargs=`cd testsuite && ./config.status --version | \
+	      sed -n -e 's,"$$,,' -e 's,^ *with options ",,p'`; \
+	    $(SHELL) $(srcdir)/../mkinstalldirs $$testdir && \
+	    (cd $$testdir && \
+	     eval $(SHELL) "\"\$$rootsrc/testsuite/configure\" $$configargs" \
+			   "\"--srcdir=\$$rootsrc/testsuite\"" \
+	     ); \
 	  else :; fi && cd $$testdir && \
 	  $(MAKE) $(TARGET_FLAGS_TO_PASS) \
 	    RUNTESTFLAGS="--target_board=$$variant $(RUNTESTFLAGS)" \
@@ -1946,68 +1949,68 @@ python.o: $(srcdir)/python/python.c
 	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python.c
 	$(POSTCOMPILE)
 
-python-block.o: $(srcdir)/python/python-block.c
-	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-block.c
+py-block.o: $(srcdir)/python/py-block.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-block.c
 	$(POSTCOMPILE)
 
-python-breakpoint.o: $(srcdir)/python/python-breakpoint.c
-	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-breakpoint.c
+py-breakpoint.o: $(srcdir)/python/py-breakpoint.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-breakpoint.c
 	$(POSTCOMPILE)
 
-python-cmd.o: $(srcdir)/python/python-cmd.c
-	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-cmd.c
+py-cmd.o: $(srcdir)/python/py-cmd.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-cmd.c
 	$(POSTCOMPILE)
 
-python-frame.o: $(srcdir)/python/python-frame.c
-	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-frame.c
+py-frame.o: $(srcdir)/python/py-frame.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-frame.c
 	$(POSTCOMPILE)
 
-python-function.o: $(srcdir)/python/python-function.c
-	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-function.c
+py-function.o: $(srcdir)/python/py-function.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-function.c
 	$(POSTCOMPILE)
 
-python-hooks.o: $(srcdir)/python/python-hooks.c
-	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-hooks.c
+py-hooks.o: $(srcdir)/python/py-hooks.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-hooks.c
 	$(POSTCOMPILE)
 
-python-inferior.o: $(srcdir)/python/python-inferior.c
-	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-inferior.c
+py-inferior.o: $(srcdir)/python/py-inferior.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-inferior.c
 	$(POSTCOMPILE)
 
-python-infthread.o: $(srcdir)/python/python-infthread.c
-	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-infthread.c
+py-infthread.o: $(srcdir)/python/py-infthread.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-infthread.c
 	$(POSTCOMPILE)
 
-python-objfile.o: $(srcdir)/python/python-objfile.c
-	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-objfile.c
+py-objfile.o: $(srcdir)/python/py-objfile.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-objfile.c
 	$(POSTCOMPILE)
 
-python-param.o: $(srcdir)/python/python-param.c
-	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-param.c
+py-param.o: $(srcdir)/python/py-param.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-param.c
 	$(POSTCOMPILE)
 
-python-prettyprint.o: $(srcdir)/python/python-prettyprint.c
-	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-prettyprint.c
+py-prettyprint.o: $(srcdir)/python/py-prettyprint.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-prettyprint.c
 	$(POSTCOMPILE)
 
-python-symbol.o: $(srcdir)/python/python-symbol.c
-	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-symbol.c
+py-symbol.o: $(srcdir)/python/py-symbol.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-symbol.c
 	$(POSTCOMPILE)
 
-python-symtab.o: $(srcdir)/python/python-symtab.c
-	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-symtab.c
+py-symtab.o: $(srcdir)/python/py-symtab.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-symtab.c
 	$(POSTCOMPILE)
 
-python-type.o: $(srcdir)/python/python-type.c
-	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-type.c
+py-type.o: $(srcdir)/python/py-type.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-type.c
 	$(POSTCOMPILE)
 
-python-utils.o: $(srcdir)/python/python-utils.c
-	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-utils.c
+py-utils.o: $(srcdir)/python/py-utils.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-utils.c
 	$(POSTCOMPILE)
 
-python-value.o: $(srcdir)/python/python-value.c
-	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python-value.c
+py-value.o: $(srcdir)/python/py-value.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-value.c
 	$(POSTCOMPILE)
 
 # All python library files, with the "python/lib" stripped off.

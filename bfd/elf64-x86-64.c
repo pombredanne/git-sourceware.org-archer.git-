@@ -1,5 +1,5 @@
 /* X86-64 specific support for 64-bit ELF
-   Copyright 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
+   Copyright 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
    Contributed by Jan Hubicka <jh@suse.cz>.
 
@@ -517,8 +517,9 @@ elf64_x86_64_link_hash_newfunc (struct bfd_hash_entry *entry,
      subclass.  */
   if (entry == NULL)
     {
-      entry = bfd_hash_allocate (table,
-				 sizeof (struct elf64_x86_64_link_hash_entry));
+      entry = (struct bfd_hash_entry *)
+          bfd_hash_allocate (table,
+                             sizeof (struct elf64_x86_64_link_hash_entry));
       if (entry == NULL)
 	return entry;
     }
@@ -3883,13 +3884,15 @@ elf64_x86_64_finish_dynamic_symbol (bfd *output_bfd,
 	    }
 	  else
 	    {
+	      asection *plt;
+
 	      if (!h->pointer_equality_needed)
 		abort ();
 
 	      /* For non-shared object, we can't use .got.plt, which
 		 contains the real function addres if we need pointer
 		 equality.  We load the GOT entry with the PLT entry.  */
-	      asection *plt = htab->elf.splt ? htab->elf.splt : htab->elf.iplt;
+	      plt = htab->elf.splt ? htab->elf.splt : htab->elf.iplt;
 	      bfd_put_64 (output_bfd, (plt->output_section->vma
 				       + plt->output_offset
 				       + h->plt.offset),

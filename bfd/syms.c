@@ -1,6 +1,6 @@
 /* Generic symbol-table support for the BFD library.
    Copyright 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009
+   2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009
    Free Software Foundation, Inc.
    Written by Cygnus Support.
 
@@ -474,7 +474,7 @@ DESCRIPTION
 void
 bfd_print_symbol_vandf (bfd *abfd, void *arg, asymbol *symbol)
 {
-  FILE *file = arg;
+  FILE *file = (FILE *) arg;
 
   flagword type = symbol->flags;
 
@@ -539,10 +539,10 @@ asymbol *
 _bfd_generic_make_empty_symbol (bfd *abfd)
 {
   bfd_size_type amt = sizeof (asymbol);
-  asymbol *new = bfd_zalloc (abfd, amt);
-  if (new)
-    new->the_bfd = abfd;
-  return new;
+  asymbol *new_symbol = (asymbol *) bfd_zalloc (abfd, amt);
+  if (new_symbol)
+    new_symbol->the_bfd = abfd;
+  return new_symbol;
 }
 
 /*
@@ -811,7 +811,7 @@ _bfd_generic_read_minisymbols (bfd *abfd,
   if (storage == 0)
     return 0;
 
-  syms = bfd_malloc (storage);
+  syms = (asymbol **) bfd_malloc (storage);
   if (syms == NULL)
     goto error_return;
 
@@ -878,8 +878,8 @@ struct indexentry
 static int
 cmpindexentry (const void *a, const void *b)
 {
-  const struct indexentry *contestantA = a;
-  const struct indexentry *contestantB = b;
+  const struct indexentry *contestantA = (const struct indexentry *) a;
+  const struct indexentry *contestantB = (const struct indexentry *) b;
 
   if (contestantA->val < contestantB->val)
     return -1;
@@ -966,7 +966,7 @@ _bfd_stab_section_find_nearest_line (bfd *abfd,
 #define VALOFF (8)
 #define STABSIZE (12)
 
-  info = *pinfo;
+  info = (struct stab_find_info *) *pinfo;
   if (info != NULL)
     {
       if (info->stabsec == NULL || info->strsec == NULL)
@@ -991,7 +991,7 @@ _bfd_stab_section_find_nearest_line (bfd *abfd,
       char *function_name;
       bfd_size_type amt = sizeof *info;
 
-      info = bfd_zalloc (abfd, amt);
+      info = (struct stab_find_info *) bfd_zalloc (abfd, amt);
       if (info == NULL)
 	return FALSE;
 
@@ -1024,8 +1024,8 @@ _bfd_stab_section_find_nearest_line (bfd *abfd,
 		 ? info->strsec->rawsize
 		 : info->strsec->size);
 
-      info->stabs = bfd_alloc (abfd, stabsize);
-      info->strs = bfd_alloc (abfd, strsize);
+      info->stabs = (bfd_byte *) bfd_alloc (abfd, stabsize);
+      info->strs = (bfd_byte *) bfd_alloc (abfd, strsize);
       if (info->stabs == NULL || info->strs == NULL)
 	return FALSE;
 
@@ -1042,7 +1042,7 @@ _bfd_stab_section_find_nearest_line (bfd *abfd,
       reloc_size = bfd_get_reloc_upper_bound (abfd, info->stabsec);
       if (reloc_size < 0)
 	return FALSE;
-      reloc_vector = bfd_malloc (reloc_size);
+      reloc_vector = (arelent **) bfd_malloc (reloc_size);
       if (reloc_vector == NULL && reloc_size != 0)
 	return FALSE;
       reloc_count = bfd_canonicalize_reloc (abfd, info->stabsec, reloc_vector,
@@ -1139,7 +1139,7 @@ _bfd_stab_section_find_nearest_line (bfd *abfd,
 
       amt = info->indextablesize;
       amt *= sizeof (struct indexentry);
-      info->indextable = bfd_alloc (abfd, amt);
+      info->indextable = (struct indexentry *) bfd_alloc (abfd, amt);
       if (info->indextable == NULL)
 	return FALSE;
 
@@ -1395,7 +1395,7 @@ _bfd_stab_section_find_nearest_line (bfd *abfd,
 	     apps keep a copy of a previously returned file name
 	     pointer.  */
 	  len = strlen (file_name) + 1;
-	  info->filename = bfd_alloc (abfd, dirlen + len);
+	  info->filename = (char *) bfd_alloc (abfd, dirlen + len);
 	  if (info->filename == NULL)
 	    return FALSE;
 	  memcpy (info->filename, directory_name, dirlen);

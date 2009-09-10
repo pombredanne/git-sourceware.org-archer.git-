@@ -31,7 +31,7 @@ if ![python_supported] then {
   return -1
 }
 
-set testfile "python-infthread"
+set testfile "py-infthread"
 set srcfile ${testfile}.c
 set binfile ${objdir}/${subdir}/${testfile}
 

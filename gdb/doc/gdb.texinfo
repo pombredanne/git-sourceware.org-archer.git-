@@ -159,6 +159,7 @@ software in general.  We will miss him.
 * Emacs::                       Using @value{GDBN} under @sc{gnu} Emacs
 * GDB/MI::                      @value{GDBN}'s Machine Interface.
 * Annotations::                 @value{GDBN}'s annotation interface.
+* JIT Interface::               Using the JIT debugging interface.
 
 * GDB Bugs::                    Reporting bugs in @value{GDBN}
 
@@ -2386,17 +2387,40 @@ To find out what inferiors exist at any moment, use @code{info inferiors}:
 @kindex info inferiors
 @item info inferiors
 Print a list of all inferiors currently being managed by @value{GDBN}.
+
+@value{GDBN} displays for each inferior (in this order):
+
+@enumerate
+@item
+the inferior number assigned by @value{GDBN}
+
+@item
+the target system's inferior identifier
+@end enumerate
+
+@noindent
+An asterisk @samp{*} preceding the @value{GDBN} inferior number
+indicates the current inferior.
+
+For example,
 @end table
+@c end table here to get a little more width for example
+
+@smallexample
+(@value{GDBP}) info inferiors
+  Num  Description
+* 1    process 2307
+  2    process 3401
+@end smallexample
 
 To switch focus between inferiors, use the @code{inferior} command:
 
 @table @code
-@kindex inferior @var{inferior-id}
-@item inferior @var{inferior-id}
-Make inferior number @var{inferior-id} the current inferior.  The
-argument @var{inferior-id} is the internal inferior number assigned by
-@value{GDBN}, as shown in the first field of the @samp{info inferiors}
-display.
+@kindex inferior @var{infno}
+@item inferior @var{infno}
+Make inferior number @var{infno} the current inferior.  The argument
+@var{infno} is the inferior number assigned by @value{GDBN}, as shown
+in the first field of the @samp{info inferiors} display.
 @end table
 
 To quit debugging one of the inferiors, you can either detach from it
@@ -2404,15 +2428,15 @@ by using the @w{@code{detach inferior}} command (allowing it to run
 independently), or kill it using the @w{@code{kill inferior}} command:
 
 @table @code
-@kindex detach inferior @var{inferior-id}
-@item detach inferior @var{inferior-id}
+@kindex detach inferior @var{infno}
+@item detach inferior @var{infno}
 Detach from the inferior identified by @value{GDBN} inferior number
-@var{inferior-id}, and remove it from the inferior list.
+@var{infno}, and remove it from the inferior list.
 
-@kindex kill inferior @var{inferior-id}
-@item kill inferior @var{inferior-id}
+@kindex kill inferior @var{infno}
+@item kill inferior @var{infno}
 Kill the inferior identified by @value{GDBN} inferior number
-@var{inferior-id}, and remove it from the inferior list.
+@var{infno}, and remove it from the inferior list.
 @end table
 
 To be notified when inferiors are started or exit under @value{GDBN}'s
@@ -8409,32 +8433,53 @@ character.
 @section Caching Data of Remote Targets
 @cindex caching data of remote targets
 
-@value{GDBN} can cache data exchanged between the debugger and a
+@value{GDBN} caches data exchanged between the debugger and a
 remote target (@pxref{Remote Debugging}).  Such caching generally improves
 performance, because it reduces the overhead of the remote protocol by
-bundling memory reads and writes into large chunks.  Unfortunately,
-@value{GDBN} does not currently know anything about volatile
-registers, and thus data caching will produce incorrect results when
-volatile registers are in use.
+bundling memory reads and writes into large chunks.  Unfortunately, simply
+caching everything would lead to incorrect results, since @value{GDBN} 
+does not necessarily know anything about volatile values, memory-mapped I/O
+addresses, etc.  Furthermore, in non-stop mode (@pxref{Non-Stop Mode})
+memory can be changed @emph{while} a gdb command is executing.
+Therefore, by default, @value{GDBN} only caches data
+known to be on the stack@footnote{In non-stop mode, it is moderately
+rare for a running thread to modify the stack of a stopped thread
+in a way that would interfere with a backtrace, and caching of
+stack reads provides a significant speed up of remote backtraces.}.
+Other regions of memory can be explicitly marked as
+cacheable; see @pxref{Memory Region Attributes}.
 
 @table @code
 @kindex set remotecache
 @item set remotecache on
 @itemx set remotecache off
-Set caching state for remote targets.  When @code{ON}, use data
-caching.  By default, this option is @code{OFF}.
+This option no longer does anything; it exists for compatibility
+with old scripts.
 
 @kindex show remotecache
 @item show remotecache
-Show the current state of data caching for remote targets.
+Show the current state of the obsolete remotecache flag.
+
+@kindex set stack-cache
+@item set stack-cache on
+@itemx set stack-cache off
+Enable or disable caching of stack accesses.  When @code{ON}, use
+caching.  By default, this option is @code{ON}.
+
+@kindex show stack-cache
+@item show stack-cache
+Show the current state of data caching for memory accesses.
 
 @kindex info dcache
-@item info dcache
+@item info dcache @r{[}line@r{]}
 Print the information about the data cache performance.  The
-information displayed includes: the dcache width and depth; and for
-each cache line, how many times it was referenced, and its data and
-state (invalid, dirty, valid).  This command is useful for debugging
-the data cache operation.
+information displayed includes the dcache width and depth, and for
+each cache line, its number, address, and how many times it was
+referenced.  This command is useful for debugging the data cache
+operation.
+
+If a line number is specified, the contents of that line will be
+printed in hex.
 @end table
 
 @node Searching Memory
@@ -12625,22 +12670,6 @@ is printed as follows:
 @item show opaque-type-resolution
 Show whether opaque types are resolved or not.
 
-@kindex set print symbol-loading
-@cindex print messages when symbols are loaded
-@item set print symbol-loading
-@itemx set print symbol-loading on
-@itemx set print symbol-loading off
-The @code{set print symbol-loading} command allows you to enable or
-disable printing of messages when @value{GDBN} loads symbols.
-By default, these messages will be printed, and normally this is what
-you want.  Disabling these messages is useful when debugging applications
-with lots of shared libraries where the quantity of output can be more
-annoying than useful.
-
-@kindex show print symbol-loading
-@item show print symbol-loading
-Show whether messages will be printed when @value{GDBN} loads symbols.
-
 @kindex maint print symbols
 @cindex symbol dump
 @kindex maint print psymbols
@@ -13513,9 +13542,11 @@ command:
 @table @code
 @kindex info sharedlibrary
 @kindex info share
-@item info share
-@itemx info sharedlibrary
-Print the names of the shared libraries which are currently loaded.
+@item info share @var{regex}
+@itemx info sharedlibrary @var{regex}
+Print the names of the shared libraries which are currently loaded
+that match @var{regex}.  If @var{regex} is omitted then print
+all shared libraries that are loaded.
 
 @kindex sharedlibrary
 @kindex share
@@ -17601,6 +17632,7 @@ described here.
 * ABI::                         Configuring the current ABI
 * Messages/Warnings::           Optional warnings and messages
 * Debugging Output::            Optional messages about internal happenings
+* Other Misc Settings::         Other Miscellaneous Settings
 @end menu
 
 @node Prompt
@@ -18229,6 +18261,28 @@ debugging info.
 Turns on or off debugging messages for built-in XML parsers.
 @item show debug xml
 Displays the current state of XML debugging messages.
+@end table
+
+@node Other Misc Settings
+@section Other Miscellaneous Settings
+@cindex miscellaneous settings
+
+@table @code
+@kindex set interactive-mode
+@item set interactive-mode
+If @code{on}, forces @value{GDBN} to operate interactively.
+If @code{off}, forces @value{GDBN} to operate non-interactively,
+If @code{auto} (the default), @value{GDBN} guesses which mode to use,
+based on whether the debugger was started in a terminal or not.
+
+In the vast majority of cases, the debugger should be able to guess
+correctly which mode should be used.  But this setting can be useful
+in certain specific cases, such as running a MinGW @value{GDBN}
+inside a cygwin window.
+
+@kindex show interactive-mode
+@item show interactive-mode
+Displays whether the debugger is operating in interactive mode or not.
 @end table
 
 @node Extending GDB
@@ -26532,6 +26586,136 @@ line, or @samp{beg} if @var{addr} is at the beginning of the line, and
 source which is being displayed.  @var{addr} is in the form @samp{0x}
 followed by one or more lowercase hex digits (note that this does not
 depend on the language).
+
+@node JIT Interface
+@chapter JIT Compilation Interface
+@cindex just-in-time compilation
+@cindex JIT compilation interface
+
+This chapter documents @value{GDBN}'s @dfn{just-in-time} (JIT) compilation
+interface.  A JIT compiler is a program or library that generates native
+executable code at runtime and executes it, usually in order to achieve good
+performance while maintaining platform independence. 
+
+Programs that use JIT compilation are normally difficult to debug because
+portions of their code are generated at runtime, instead of being loaded from
+object files, which is where @value{GDBN} normally finds the program's symbols
+and debug information.  In order to debug programs that use JIT compilation,
+@value{GDBN} has an interface that allows the program to register in-memory
+symbol files with @value{GDBN} at runtime.
+
+If you are using @value{GDBN} to debug a program that uses this interface, then
+it should work transparently so long as you have not stripped the binary.  If
+you are developing a JIT compiler, then the interface is documented in the rest
+of this chapter.  At this time, the only known client of this interface is the
+LLVM JIT.
+
+Broadly speaking, the JIT interface mirrors the dynamic loader interface.  The
+JIT compiler communicates with @value{GDBN} by writing data into a global
+variable and calling a fuction at a well-known symbol.  When @value{GDBN}
+attaches, it reads a linked list of symbol files from the global variable to
+find existing code, and puts a breakpoint in the function so that it can find
+out about additional code.
+
+@menu
+* Declarations::                Relevant C struct declarations
+* Registering Code::            Steps to register code
+* Unregistering Code::          Steps to unregister code
+@end menu
+
+@node Declarations
+@section JIT Declarations
+
+These are the relevant struct declarations that a C program should include to
+implement the interface:
+
+@smallexample
+typedef enum
+@{
+  JIT_NOACTION = 0,
+  JIT_REGISTER_FN,
+  JIT_UNREGISTER_FN
+@} jit_actions_t;
+
+struct jit_code_entry
+@{
+  struct jit_code_entry *next_entry;
+  struct jit_code_entry *prev_entry;
+  const char *symfile_addr;
+  uint64_t symfile_size;
+@};
+
+struct jit_descriptor
+@{
+  uint32_t version;
+  /* This type should be jit_actions_t, but we use uint32_t
+     to be explicit about the bitwidth.  */
+  uint32_t action_flag;
+  struct jit_code_entry *relevant_entry;
+  struct jit_code_entry *first_entry;
+@};
+
+/* GDB puts a breakpoint in this function.  */
+void __attribute__((noinline)) __jit_debug_register_code() @{ @};
+
+/* Make sure to specify the version statically, because the
+   debugger may check the version before we can set it.  */
+struct jit_descriptor __jit_debug_descriptor = @{ 1, 0, 0, 0 @};
+@end smallexample
+
+If the JIT is multi-threaded, then it is important that the JIT synchronize any
+modifications to this global data properly, which can easily be done by putting
+a global mutex around modifications to these structures.
+
+@node Registering Code
+@section Registering Code
+
+To register code with @value{GDBN}, the JIT should follow this protocol:
+
+@itemize @bullet
+@item
+Generate an object file in memory with symbols and other desired debug
+information.  The file must include the virtual addresses of the sections.
+
+@item
+Create a code entry for the file, which gives the start and size of the symbol
+file.
+
+@item
+Add it to the linked list in the JIT descriptor.
+
+@item
+Point the relevant_entry field of the descriptor at the entry.
+
+@item
+Set @code{action_flag} to @code{JIT_REGISTER} and call
+@code{__jit_debug_register_code}.
+@end itemize
+
+When @value{GDBN} is attached and the breakpoint fires, @value{GDBN} uses the
+@code{relevant_entry} pointer so it doesn't have to walk the list looking for
+new code.  However, the linked list must still be maintained in order to allow
+@value{GDBN} to attach to a running process and still find the symbol files.
+
+@node Unregistering Code
+@section Unregistering Code
+
+If code is freed, then the JIT should use the following protocol:
+
+@itemize @bullet
+@item
+Remove the code entry corresponding to the code from the linked list.
+
+@item
+Point the @code{relevant_entry} field of the descriptor at the code entry.
+
+@item
+Set @code{action_flag} to @code{JIT_UNREGISTER} and call
+@code{__jit_debug_register_code}.
+@end itemize
+
+If the JIT frees or recompiles code without unregistering it, then @value{GDBN}
+and the JIT will leak the memory used for the associated symbol files.
 
 @node GDB Bugs
 @chapter Reporting Bugs in @value{GDBN}

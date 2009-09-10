@@ -1,6 +1,6 @@
 /* bfdlink.h -- header file for BFD link routines
    Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
-   2003, 2004, 2005, 2006, 2007, 2008 Free Software Foundation, Inc.
+   2003, 2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
    Written by Steve Chamberlain and Ian Lance Taylor, Cygnus Support.
 
    This file is part of BFD, the Binary File Descriptor library.
@@ -75,6 +75,12 @@ enum bfd_link_common_skip_ar_aymbols
   bfd_link_common_skip_all
 };
 
+struct bfd_link_hash_common_entry
+  {
+    unsigned int alignment_power;	/* Alignment.  */
+    asection *section;		/* Symbol section.  */
+  };
+
 /* The linking routines use a hash table which uses this structure for
    its elements.  */
 
@@ -143,11 +149,7 @@ struct bfd_link_hash_entry
 	     directly because we don't want to increase the size of
 	     the union; this structure is a major space user in the
 	     linker.  */
-	  struct bfd_link_hash_common_entry
-	    {
-	      unsigned int alignment_power;	/* Alignment.  */
-	      asection *section;		/* Symbol section.  */
-	    } *p;
+	  struct bfd_link_hash_common_entry *p;
 	  bfd_size_type size;	/* Common symbol size.  */
 	} c;
     } u;

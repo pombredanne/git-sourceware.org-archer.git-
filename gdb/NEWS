@@ -3,6 +3,12 @@
 
 *** Changes since GDB 6.8
 
+* GDB now has an interface for JIT compilation.  Applications that
+dynamically generate code can create symbol files in memory and register
+them with GDB.  For users, the feature should work transparently, and
+for JIT developers, the interface is documented in the GDB manual in the
+"JIT Compilation Interface" chapter.
+
 * Tracepoints may now be conditional.  The syntax is as for
 breakpoints; either an "if" clause appended to the "trace" command,
 or the "condition" command is available.  GDB sends the condition to
@@ -41,6 +47,9 @@ the installation instructions for more information.
 remote targets.  To use this feature, specify a system root that begins
 with the `remote:' prefix, either via the `set sysroot' command or via
 the `--with-sysroot' configure-time option.
+
+* "info sharedlibrary" now takes an optional regex of libraries to show,
+and it now reports if a shared library has no debugging information.
 
 * Commands `set debug-file-directory', `set solib-search-path' and `set args'
 now complete on file names.
@@ -272,10 +281,6 @@ set sh calling-convention
 show sh calling-convention
   Control the calling convention used when calling SH target functions.
 
-set print symbol-loading
-show print symbol-loading
-  Control printing of symbol loading messages.
-
 set debug timestamp
 show debug timestamp
   Control display of timestamps with GDB debugging output.
@@ -388,6 +393,20 @@ set schedule-multiple (on|off)
 show schedule-multiple
   Allow GDB to resume all threads of all processes or only threads of
   the current process.
+
+set stack-cache
+show stack-cache
+  Use more aggressive caching for accesses to the stack.  This improves
+  performance of remote debugging (particularly backtraces) without
+  affecting correctness.
+
+set interactive-mode (on|off|auto)
+show interactive-mode
+  Control whether GDB runs in interactive mode (on) or not (off).
+  When in interactive mode, GDB waits for the user to answer all
+  queries.  Otherwise, GDB does not wait and assumes the default
+  answer.  When set to auto (the default), GDB determines which
+  mode to use based on the stdin settings.
 
 * Removed commands
 

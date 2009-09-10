@@ -1,7 +1,7 @@
 /* BFD library -- caching of file descriptors.
 
    Copyright 1990, 1991, 1992, 1993, 1994, 1996, 2000, 2001, 2002,
-   2003, 2004, 2005, 2007 Free Software Foundation, Inc.
+   2003, 2004, 2005, 2007, 2008, 2009 Free Software Foundation, Inc.
 
    Hacked by Steve Chamberlain of Cygnus Support (steve@cygnus.com).
 
@@ -240,7 +240,7 @@ cache_btell (struct bfd *abfd)
 static int
 cache_bseek (struct bfd *abfd, file_ptr offset, int whence)
 {
-  FILE *f = bfd_cache_lookup (abfd, whence != SEEK_CUR ? CACHE_NO_SEEK : 0);
+  FILE *f = bfd_cache_lookup (abfd, whence != SEEK_CUR ? CACHE_NO_SEEK : CACHE_NORMAL);
   if (f == NULL)
     return -1;
   return real_fseek (f, offset, whence);
@@ -270,7 +270,7 @@ cache_bread_1 (struct bfd *abfd, void *buf, file_ptr nbytes)
   if (nbytes == 0)
     return 0;
 
-  f = bfd_cache_lookup (abfd, 0);
+  f = bfd_cache_lookup (abfd, CACHE_NORMAL);
   if (f == NULL)
     return 0;
 
@@ -345,7 +345,7 @@ static file_ptr
 cache_bwrite (struct bfd *abfd, const void *where, file_ptr nbytes)
 {
   file_ptr nwrite;
-  FILE *f = bfd_cache_lookup (abfd, 0);
+  FILE *f = bfd_cache_lookup (abfd, CACHE_NORMAL);
 
   if (f == NULL)
     return 0;

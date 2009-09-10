@@ -160,7 +160,7 @@ _bfd_XXi_swap_sym_in (bfd * abfd, void * ext1, void * in1)
 
 	  if (name == namebuf)
 	    {
-	      name = bfd_alloc (abfd, strlen (namebuf) + 1);
+	      name = (const char *) bfd_alloc (abfd, strlen (namebuf) + 1);
 	      if (name == NULL)
 		/* FIXME: Return error.  */
 		abort ();
@@ -231,7 +231,7 @@ void
 _bfd_XXi_swap_aux_in (bfd *	abfd,
 		      void *	ext1,
 		      int       type,
-		      int       class,
+		      int       in_class,
 		      int	indx ATTRIBUTE_UNUSED,
 		      int	numaux ATTRIBUTE_UNUSED,
 		      void * 	in1)
@@ -239,7 +239,7 @@ _bfd_XXi_swap_aux_in (bfd *	abfd,
   AUXENT *ext = (AUXENT *) ext1;
   union internal_auxent *in = (union internal_auxent *) in1;
 
-  switch (class)
+  switch (in_class)
     {
     case C_FILE:
       if (ext->x_file.x_fname[0] == 0)
@@ -270,7 +270,8 @@ _bfd_XXi_swap_aux_in (bfd *	abfd,
   in->x_sym.x_tagndx.l = H_GET_32 (abfd, ext->x_sym.x_tagndx);
   in->x_sym.x_tvndx = H_GET_16 (abfd, ext->x_sym.x_tvndx);
 
-  if (class == C_BLOCK || class == C_FCN || ISFCN (type) || ISTAG (class))
+  if (in_class == C_BLOCK || in_class == C_FCN || ISFCN (type)
+      || ISTAG (in_class))
     {
       in->x_sym.x_fcnary.x_fcn.x_lnnoptr = GET_FCN_LNNOPTR (abfd, ext);
       in->x_sym.x_fcnary.x_fcn.x_endndx.l = GET_FCN_ENDNDX (abfd, ext);
@@ -302,7 +303,7 @@ unsigned int
 _bfd_XXi_swap_aux_out (bfd *  abfd,
 		       void * inp,
 		       int    type,
-		       int    class,
+		       int    in_class,
 		       int    indx ATTRIBUTE_UNUSED,
 		       int    numaux ATTRIBUTE_UNUSED,
 		       void * extp)
@@ -312,7 +313,7 @@ _bfd_XXi_swap_aux_out (bfd *  abfd,
 
   memset (ext, 0, AUXESZ);
 
-  switch (class)
+  switch (in_class)
     {
     case C_FILE:
       if (in->x_file.x_fname[0] == 0)
@@ -344,7 +345,8 @@ _bfd_XXi_swap_aux_out (bfd *  abfd,
   H_PUT_32 (abfd, in->x_sym.x_tagndx.l, ext->x_sym.x_tagndx);
   H_PUT_16 (abfd, in->x_sym.x_tvndx, ext->x_sym.x_tvndx);
 
-  if (class == C_BLOCK || class == C_FCN || ISFCN (type) || ISTAG (class))
+  if (in_class == C_BLOCK || in_class == C_FCN || ISFCN (type)
+      || ISTAG (in_class))
     {
       PUT_FCN_LNNOPTR (abfd, in->x_sym.x_fcnary.x_fcn.x_lnnoptr,  ext);
       PUT_FCN_ENDNDX  (abfd, in->x_sym.x_fcnary.x_fcn.x_endndx.l, ext);
@@ -1261,7 +1263,7 @@ pe_print_idata (bfd * abfd, void * vfile)
 	      else
 		{
 		  ft_idx = first_thunk - (ft_section->vma - extra->ImageBase);
-		  ft_data = bfd_malloc (datasize);
+		  ft_data = (bfd_byte *) bfd_malloc (datasize);
 		  if (ft_data == NULL)
 		    continue;
 
@@ -1430,7 +1432,7 @@ pe_print_edata (bfd * abfd, void * vfile)
   fprintf (file, _("\nThere is an export table in %s at 0x%lx\n"),
 	   section->name, (unsigned long) addr);
 
-  data = bfd_malloc (datasize);
+  data = (bfd_byte *) bfd_malloc (datasize);
   if (data == NULL)
     return FALSE;
 
@@ -1734,7 +1736,7 @@ slurp_symtab (bfd *abfd, sym_cache *psc)
   if (storage < 0)
     return NULL;
   if (storage)
-    sy = bfd_malloc (storage);
+    sy = (asymbol **) bfd_malloc (storage);
 
   psc->symcount = bfd_canonicalize_symtab (abfd, sy);
   if (psc->symcount < 0)
@@ -1855,7 +1857,7 @@ _bfd_XX_print_ce_compressed_pdata (bfd * abfd, void * vfile)
 	    {
 	      int xx = (begin_addr - 8) - tsection->vma;
 
-	      tdata = bfd_malloc (8);
+	      tdata = (bfd_byte *) bfd_malloc (8);
 	      if (bfd_get_section_contents (abfd, tsection, tdata, (bfd_vma) xx, 8))
 		{
 		  bfd_vma eh, eh_data;

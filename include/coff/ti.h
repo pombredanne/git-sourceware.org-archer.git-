@@ -2,7 +2,8 @@
    customized in a target-specific file, and then this file included (see
    tic54x.h for an example).
    
-   Copyright 2000, 2001, 2002, 2003, 2008 Free Software Foundation, Inc.
+   Copyright 2000, 2001, 2002, 2003, 2005, 2008, 2009
+   Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -475,10 +476,10 @@ union external_auxent {
 
 /* lnsz size is in bits in COFF file, in bytes in BFD */
 #define GET_LNSZ_SIZE(abfd, ext) \
- (H_GET_16 (abfd, ext->x_sym.x_misc.x_lnsz.x_size) / (class != C_FIELD ? 8 : 1))
+ (H_GET_16 (abfd, ext->x_sym.x_misc.x_lnsz.x_size) / (in_class != C_FIELD ? 8 : 1))
 
 #define PUT_LNSZ_SIZE(abfd, in, ext) \
-  H_PUT_16 (abfd, ((class != C_FIELD) ? (in) * 8 : (in)), \
+  H_PUT_16 (abfd, ((in_class != C_FIELD) ? (in) * 8 : (in)), \
 	   ext->x_sym.x_misc.x_lnsz.x_size)
  
 /* TI COFF stores offsets for MOS and MOU in bits; BFD expects bytes 
