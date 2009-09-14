@@ -917,8 +917,10 @@ install_dynamic_child (struct varobj *var,
       /* There's no child yet.  */
       struct varobj *child = varobj_add_child (var, name, value);
       if (new)
-	VEC_safe_push (varobj_p, *new, child);
-      *cchanged = 1;
+	{
+	  VEC_safe_push (varobj_p, *new, child);
+	  *cchanged = 1;
+	}
     }
   else 
     {
@@ -957,6 +959,7 @@ update_dynamic_varobj_children (struct varobj *var,
 				VEC (varobj_p) **unchanged,
 				int *cchanged,
 				int update_children,
+				int from,
 				int to)
 {
 #if HAVE_PYTHON
@@ -1031,6 +1034,7 @@ update_dynamic_varobj_children (struct varobj *var,
 	  char *name;
 	  struct value *v;
 	  struct cleanup *inner;
+	  int can_mention = from < 0 || i >= from;
 
 	  inner = make_cleanup_py_decref (item);
 
@@ -1038,8 +1042,10 @@ update_dynamic_varobj_children (struct varobj *var,
 	    error (_("Invalid item from the child list"));
 
 	  v = convert_value_from_python (py_v);
-	  install_dynamic_child (var, changed, new, unchanged,
-				 cchanged, i, name, v);
+	  install_dynamic_child (var, can_mention ? changed : NULL,
+				 can_mention ? new : NULL,
+				 can_mention ? unchanged : NULL,
+				 can_mention ? cchanged : NULL, i, name, v);
 	  do_cleanups (inner);
 	}
       else
@@ -1088,7 +1094,8 @@ varobj_get_num_children (struct varobj *var)
 
 	  /* If we have a dynamic varobj, don't report -1 children.
 	     So, try to fetch some children first.  */
-	  update_dynamic_varobj_children (var, NULL, NULL, NULL, &dummy, 0, 0);
+	  update_dynamic_varobj_children (var, NULL, NULL, NULL, &dummy,
+					  0, 0, 0);
 	}
       else
 	var->num_children = number_of_children (var);
@@ -1115,7 +1122,7 @@ varobj_list_children (struct varobj *var, int *from, int *to)
 	 frontend noticing.  But well, calling -var-list-children on the same
 	 varobj twice is not something a sane frontend would do.  */
       update_dynamic_varobj_children (var, NULL, NULL, NULL, &children_changed,
-				      0, *to);
+				      0, 0, *to);
       restrict_range (var->children, from, to);
       return var->children;
     }
@@ -1770,7 +1777,7 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
 	      if (!varobj_has_more (v, 0))
 		{
 		  update_dynamic_varobj_children (v, NULL, NULL, NULL,
-						  &dummy, 0, 0);
+						  &dummy, 0, 0, 0);
 		  if (varobj_has_more (v, 0))
 		    r.changed = 1;
 		}
@@ -1784,7 +1791,8 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
 	  /* If update_dynamic_varobj_children returns 0, then we have
 	     a non-conforming pretty-printer, so we skip it.  */
 	  if (update_dynamic_varobj_children (v, &changed, &new, &unchanged,
-					      &children_changed, 1, v->to))
+					      &children_changed, 1,
+					      v->from, v->to))
 	    {
 	      if (children_changed || new)
 		{

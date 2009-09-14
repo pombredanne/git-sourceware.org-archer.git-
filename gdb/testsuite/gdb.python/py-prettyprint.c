@@ -232,6 +232,7 @@ main ()
 #ifdef MI
   add_item (&c, 1011);
   c.elements[0] = 1023;
+  c.elements[0] = 2323;
 
   add_item (&c2, 2222);
   add_item (&c2, 3333);

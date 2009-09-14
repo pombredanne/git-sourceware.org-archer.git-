@@ -161,6 +161,29 @@ mi_list_varobj_children container {
 
 mi_next "next over update 4"
 
+# This should only show the first child, because the update range has
+# been set.
+mi_varobj_update_dynamic container \
+  "update after next with restricted range" {
+      type_changed false new_num_children 1 dynamic 1 has_more 1
+  } {
+      { name {container.\[0\]} in_scope true type_changed false dynamic 1 has_more 0 }
+  } {
+  }
+
+mi_gdb_test "-var-set-update-range container 3 4" \
+  "\\^done" \
+  "set update range with non-zero start"
+
+# Elements were updated but should not be reported.
+mi_varobj_update_dynamic container \
+  "update varobj with change outside selected range" {
+      type_changed false new_num_children 3 dynamic 1 has_more 0
+  } {
+  } {
+  }
+
+mi_next "next over update 5"
 
 # Regression test: examine an object that has no children, then update
 # it to ensure that we don't print the children.
@@ -171,7 +194,7 @@ mi_gdb_test "-var-update container2" \
   "\\^done,changelist=.." \
   "update varobj, no children requested"
 
-mi_next "next over update 5"
+mi_next "next over update 6"
 
 # Now container2 has an element -- and an update should mention that
 # it has_more.  But, because we did not request children, we still
@@ -180,16 +203,6 @@ mi_varobj_update_dynamic container2 \
     "update varobj 2, no children requested" {
 	type_changed false dynamic 1 has_more 1
     } {} {}
-
-# This should only show the first child, because the update range has
-# been set.
-mi_varobj_update_dynamic container \
-  "update after next with restricted range" {
-      type_changed false new_num_children 1 dynamic 1 has_more 1
-  } {
-      { name {container.\[0\]} in_scope true type_changed false dynamic 1 has_more 0 }
-  } {
-  }
 
 mi_continue_to_line \
     [gdb_get_line_number {MI outer breakpoint here} ${testfile}.c] \
