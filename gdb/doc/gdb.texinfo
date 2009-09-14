@@ -23888,7 +23888,7 @@ compatibility for existing clients.
 @subsubheading Result
 
 This operation returns attributes of the newly-created varobj.  These
-include, but are not limited to:
+are:
 
 @table @samp
 @item name
@@ -24055,14 +24055,17 @@ Name of the variable object created for this child.
 The expression to be shown to the user by the front end to designate this child.
 For example this may be the name of a structure member.
 
+For a dynamic varobj, this value cannot be used to form an
+expression.  There is no way to do this at all with a dynamic varobj.
+
 For C/C@t{++} structures there are several pseudo children returned to
 designate access qualifiers.  For these pseudo children @var{exp} is
 @samp{public}, @samp{private}, or @samp{protected}.  In this case the
 type and value are not present.
 
-For a dynamic varobj, this value cannot reliably be used to form an
-expression.  Also, a dynamic varobj will not report the access
-qualifying pseudo-children, regardless of the language.
+A dynamic varobj will not report the access qualifying
+pseudo-children, regardless of the language.  This information is not
+available at all with a dynamic varobj.
 
 @item numchild
 Number of children this child has.  For a dynamic varobj, this will be
