@@ -23833,10 +23833,10 @@ MI variable object commands.  However, because there was no way to
 implement this in a fully backward-compatible way, a front end must
 request that this functionality be enabled.
 
-Once sent, this command cannot be undone.
+Once enabled, this feature cannot be disabled.
 
 Note that if Python support has not been compiled into @value{GDBN},
-this command will still succeed.
+this command will still succeed (and do nothing).
 
 @subheading The @code{-var-create} Command
 @findex -var-create
@@ -23877,6 +23877,7 @@ begin with a @samp{*}), or one of the following:
 @samp{$@var{regname}} --- a CPU register name
 @end itemize
 
+@cindex dynamic varobj
 A varobj's contents may be provided by a Python-based pretty-printer.  In this
 case the varobj is known as a @dfn{dynamic varobj}.  Dynamic varobjs
 have slightly different semantics in some cases.  If the
@@ -23908,8 +23909,8 @@ The varobj's type.  This is a string representation of the type, as
 would be printed by the @value{GDBN} CLI.
 
 @item thread-id
-If a fixed variable object is bound to a specific thread, then this is
-the thread's identifier.
+If a variable object is bound to a specific thread, then this is the
+thread's identifier.
 
 @item has_more
 For a dynamic varobj, this indicates whether there appear to be any
@@ -24030,18 +24031,18 @@ and unions.
 @var{from} and @var{to}, if specified, indicate the range of children
 to report.  If @var{from} or @var{to} is less than zero, the range is
 reset and all children will be reported.  Otherwise, children starting
-at @var{from} (zero-based) and ending just before @var{to} will be
+at @var{from} (zero-based) and up to and excluding @var{to} will be
 reported.
 
-If a child range is requested, it will not affect the range of
-children reported by a future call to @code{-var-update}.  For this,
-you must instead use @code{-var-set-update-range}.  The intent of this
-approach is to enable a front end to implement any update approach it
-likes; for example, scrolling a view may cause the front end to
-request more children with @code{-var-list-children}, and then the
-front end could call @code{-var-set-update-range} with a different
-range to ensure that future updates are restricted to just the visible
-items.
+If a child range is requested, it will only affect the current call to
+@code{-var-list-children}, but not future calls to @code{-var-update}.
+For this, you must instead use @code{-var-set-update-range}.  The
+intent of this approach is to enable a front end to implement any
+update approach it likes; for example, scrolling a view may cause the
+front end to request more children with @code{-var-list-children}, and
+then the front end could call @code{-var-set-update-range} with a
+different range to ensure that future updates are restricted to just
+the visible items.
 
 For each child the following results are returned:
 
@@ -24086,7 +24087,7 @@ The result may have its own attributes:
 @table @samp
 @item displayhint
 A dynamic varobj can supply a display hint to the front end.  The
-comes directly from the Python pretty-printer object's
+value comes directly from the Python pretty-printer object's
 @code{display_hint} method.  @xref{Pretty Printing}.
 
 @item has_more
@@ -24295,8 +24296,28 @@ If values were requested for this update, then this field will be
 present and will hold the value of the varobj.
 
 @item in_scope
-This is a string, either @samp{false} if the varobj is not in scope,
-or @samp{true} if it is in scope.
+@anchor{-var-update}
+This field is a string which may take one of three values:
+
+@table @code
+@item "true"
+The variable object's current value is valid.
+
+@item "false"
+The variable object does not currently hold a valid value but it may
+hold one in the future if its associated expression comes back into
+scope.
+
+@item "invalid"
+The variable object no longer holds a valid value.
+This can occur when the executable file being debugged has changed,
+either through recompilation or by using the @value{GDBN} @code{file}
+command.  The front end should normally choose to delete these variable
+objects.
+@end table
+
+In the future new values may be added to this list so the front should
+be prepared for this possibility.  @xref{GDB/MI Development and Front Ends, ,@sc{GDB/MI} Development and Front Ends}.
 
 @item type_changed
 This is only present if the varobj is still valid.  If the type
@@ -24353,29 +24374,6 @@ type_changed="false"@}]
 (gdb)
 @end smallexample
 
-@anchor{-var-update}
-The field in_scope may take three values:
-
-@table @code
-@item "true"
-The variable object's current value is valid.
-
-@item "false"
-The variable object does not currently hold a valid value but it may
-hold one in the future if its associated expression comes back into
-scope.
-
-@item "invalid"
-The variable object no longer holds a valid value.
-This can occur when the executable file being debugged has changed,
-either through recompilation or by using the @value{GDBN} @code{file}
-command.  The front end should normally choose to delete these variable
-objects.
-@end table
-
-In the future new values may be added to this list so the front should
-be prepared for this possibility.  @xref{GDB/MI Development and Front Ends, ,@sc{GDB/MI} Development and Front Ends}.
-
 @subheading The @code{-var-set-frozen} Command
 @findex -var-set-frozen
 @anchor{-var-set-frozen}
@@ -24423,7 +24421,7 @@ Set the range of children to be returned by future invocations of
 @var{from} and @var{to} indicate the range of children to report.  If
 @var{from} or @var{to} is less than zero, the range is reset and all
 children will be reported.  Otherwise, children starting at @var{from}
-(zero-based) and ending just before @var{to} will be reported.
+(zero-based) and up to and excluding @var{to} will be reported.
 
 @subsubheading Example
 
