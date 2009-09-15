@@ -53,6 +53,7 @@ print_varobj (struct varobj *var, enum print_values print_values,
   struct type *gdb_type;
   char *type;
   int thread_id;
+  char *display_hint;
 
   ui_out_field_string (uiout, "name", varobj_get_objname (var));
   if (print_expression)
@@ -79,6 +80,13 @@ print_varobj (struct varobj *var, enum print_values print_values,
 
   if (varobj_get_frozen (var))
     ui_out_field_int (uiout, "frozen", 1);
+
+  display_hint = varobj_get_display_hint (var);
+  if (display_hint)
+    {
+      ui_out_field_string (uiout, "displayhint", display_hint);
+      xfree (display_hint);
+    }
 
   if (varobj_pretty_printed_p (var))
     ui_out_field_int (uiout, "dynamic", 1);

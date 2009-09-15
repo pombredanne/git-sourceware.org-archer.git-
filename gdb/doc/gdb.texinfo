@@ -23920,6 +23920,11 @@ children available.  For a non-dynamic varobj, this will be 0.
 This attribute will be present and have the value @samp{1} if the
 varobj is a dynamic varobj.  If the varobj is not a dynamic varobj,
 then this attribute will not be present.
+
+@item displayhint
+A dynamic varobj can supply a display hint to the front end.  The
+value comes directly from the Python pretty-printer object's
+@code{display_hint} method.  @xref{Pretty Printing}.
 @end table
 
 Typical output will look like this:
