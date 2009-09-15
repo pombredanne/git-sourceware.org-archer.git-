@@ -1759,7 +1759,6 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
 	{
 	  VEC (varobj_p) *changed = 0, *new = 0, *unchanged = 0;
 	  int i, children_changed;
-	  varobj_p tmp;
 
 	  if (v->frozen)
 	    continue;
@@ -1799,15 +1798,21 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
 		  r.children_changed = 1;
 		  r.new = new;
 		}
-	      for (i = 0; VEC_iterate (varobj_p, changed, i, tmp); ++i)
+	      /* Push in reverse order so that the first child is
+		 popped from the work stack first, and so will be
+		 added to result first.  This does not affect
+		 correctness, just "nicer".  */
+	      for (i = VEC_length (varobj_p, changed) - 1; i >= 0; --i)
 		{
+		  varobj_p tmp = VEC_index (varobj_p, changed, i);
 		  varobj_update_result r = {tmp};
 		  r.changed = 1;
 		  r.value_installed = 1;
 		  VEC_safe_push (varobj_update_result, stack, &r);
 		}
-	      for (i = 0; VEC_iterate (varobj_p, unchanged, i, tmp); ++i)
+	      for (i = VEC_length (varobj_p, unchanged) - 1; i >= 0; --i)
 	      	{
+		  varobj_p tmp = VEC_index (varobj_p, unchanged, i);
 	      	  if (!tmp->frozen)
 	      	    {
 	      	      varobj_update_result r = {tmp};
