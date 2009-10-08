@@ -1,3 +1,35 @@
+2009-10-07  Michael Eager  <eager@eagercon.com>
+
+	* opcodes/microblaze-dis.c: Add include for microblaze-dis.h,
+	eliminate local extern decls.
+	* opcodes/microblaze-dis.h: New.
+
+2009-10-06  Nick Clifton  <nickc@redhat.com>
+
+	* po/fi.po: Updated Finnish translation.
+
+2009-10-03  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* opc2c.c: Include "libiberty.h" and <errno.h>.
+	(orig_filename): Constify.
+	(dump_lines): Fix line number directive.
+	(main): Set orig_filename to basename of input file.  Use
+	xstrerror.
+
+	* Makefile.am (rx-dis.lo): Remove explicit dependencies.
+	($(srcdir)/rx-decode.c): Use @MAINT@.  Use $(EXEEXT_FOR_BUILD)
+	instead of $(EXEEXT).
+	(opc2c$(EXEEXT_FOR_BUILD)): Renamed from opc2c$(EXEEXT) and use
+	$(LINK_FOR_BUILD).  Link with libiberty.
+	(MOSTLYCLEANFILES): Add opc2c$(EXEEXT_FOR_BUILD).
+	(MAINTAINERCLEANFILES): Add $(srcdir)/rx-decode.c.
+	* Makefile.in: Regenerated.
+	* rx-decode.c: Regenerated.
+
+2009-10-03  Paul Reed  <paulreed@paddedcell.com>
+
+	* arm-dis.c (print_insn): Check symtab_size not *symtab.
+
 2009-10-02  H.J. Lu  <hongjiu.lu@intel.com>
 
 	* i386-opc.tbl: Drop Disp64 on jump and loop instructions.

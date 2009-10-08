@@ -1,3 +1,84 @@
+2009-10-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* i386-nat.c (i386_stopped_by_hwbp): Remove.
+
+2009-10-07  Joel Brobecker  <brobecker@adacore.com>
+
+	* NEWS: Update following the GDB 7.0 release.
+
+2009-10-07  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	ARI fix: OP eol rule.
+	* doublest.c (floatformat_from_length): Avoid operator at end of line.
+	* dwarf2-frame.c (dwarf2_build_frame_info): Idem.
+	* dwarf2read.c (read_array_order, dwarf_decode_macros): Idem.
+	* eval.c (evaluate_subexp_standard): Idem.
+	* event-loop.c (create_timer, handle_timer_event): Idem.
+	* expprint.c (print_subexp_standard): Idem.
+	* f-exp.y (variable): Idem.
+	* f-typeprint.c (f_print_type): Idem.
+
+2009-10-06  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	ARI fix: OP eol rule.
+	* blockframe.c (find_pc_partial_function): Avoid operator at end of
+	line.
+	* buildsym.c (find_symbol_in_list): Idem.
+	(start_subfile, patch_subfile_names): Idem.
+	* c-exp.y (variable, yylex): Idem.
+	* c-typeprint.c (c_print_type, c_type_print_base): Idem.
+	* c-valprint.c (c_val_print): Idem.
+	* coffread.c (patch_opaque_types, process_coff_symbol): Idem.
+	* corelow.c (core_open): Idem.
+	* cris-tdep.c (move_reg_to_mem_movem_op): Idem.
+	* cli/cli-decode.c (help_cmd_list, find_command_name_length): Idem.
+
+2009-10-06  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	ARI fix: OP eol rule.
+	* ada-exp.y (block_lookup): Avoid operator at end of line.
+	* aix-thread.c (pd_enable): Idem.
+	* alpha-tdep.c (alpha_next_pc): Idem.
+	* arm-tdep.c (arm_skip_prologue, arm_scan_prologue): Idem.
+	(condition_true, coff_sym_is_thumb): Idem.
+
+2009-10-06  Joel Brobecker  <brobecker@adacore.com>
+
+	GDB 7.0 released.
+
+2009-10-06  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	ARI fix: "%p" rule.
+	* target.c (debug_to_thread_architecture): Replace %p by %s using
+	host_address_to_string function.
+
+2009-10-06  Tristan Gingold  <gingold@adacore.com>
+
+	* darwin-nat.c: Add __TEXT __info_plist content.
+	(darwin_attach_pid): Update error message.
+
+2009-10-06  Joel Brobecker  <brobecker@adacore.com>
+
+	* MAINTAINERS: Add Tristan Gingold as Maintainer of the Darwin port.
+
+2009-10-06  Joel Brobecker  <brobecker@adacore.com>
+
+	* MAINTAINERS: Add Jan Kratochvil as Maintainer of the ia64 target.
+
+2009-10-05  Pedro Alves  <pedro@codesourcery.com>
+
+	Revert:
+	2009-10-04  Pedro Alves  <pedro@codesourcery.com>
+	* gdbinit.in: Set data-directory to @srcdir@.
+
+2009-10-04  Pedro Alves  <pedro@codesourcery.com>
+
+	* NEWS: Mention non-stop mode.
+
+2009-10-04  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdbinit.in: Set data-directory to @srcdir@.
+
 2009-10-02  Pedro Alves  <pedro@codesourcery.com>
 
 	* linux-nat.c (TRAP_IS_SYSCALL, TRAP_REMOVE_SYSCALL_FLAG): Delete.

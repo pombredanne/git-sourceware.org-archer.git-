@@ -1,8 +1,39 @@
+2009-10-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/hbreak.exp, gdb.base/hbreak.c: New.
+
+2009-10-07  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.base/watchpoints.c: Add copyright header.  Reformat one
+	of the comments.
+
+2009-10-06  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* gdb.base/annota1.exp: Remove obsolete match_max increase.
+	* gdb.base/annota3.exp: Idem.
+	* gdb.base/maint.exp: Idem.
+
+2009-10-05  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* lib/gdb.exp (default_gdb_init): Set current value of match_max 
+	to default.
+
+2009-10-02  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* lib/gdb.exp (gdb_compile): Add --enable-auto-import option for 
+	mingw and cygwin targets.
+
+2009-10-02  Pierre Muller  <muller@ics.u-strasbg.fr>
+	    Pedro Alves  <pedro@codesourcery.com>
+
+	* lib/gdb.exp (gdb_compile): Avoid adding 
+	gdb_saved_unbuffered_mode_obj if -nostdlib option is used.
+
 2009-10-01  Pierre Muller  <muller@ics.u-strasbg.fr>
 
-	* src/gdb/testsuite/gdb.base/shr1.c: Use %p in format string.
-	* src/gdb/testsuite/gdb.base/unload.c: Avoid warning in fprintf.
-	* src/gdb/testsuite/gdb.base/watchpoint-solib.c: Idem.
+	* gdb.base/shr1.c: Use %p in format string.
+	* gdb.base/unload.c: Avoid warning in fprintf.
+	* gdb.base/watchpoint-solib.c: Idem.
 
 2009-10-01  Pierre Muller  <muller@ics.u-strasbg.fr>
 
