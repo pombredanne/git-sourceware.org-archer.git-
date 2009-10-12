@@ -1,3 +1,21 @@
+2009-10-11  Pedro Alves  <pedro@codesourcery.com>
+
+	* procfs.c (procfs_make_note_section): Go back to only outputing
+	an NT_PSTATUS note when UNIXWARE is defined.
+
+2009-10-11  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* features/xinclude.dtd: Correct EMPTY typo.
+
+2009-10-10  Michael Snyder  <msnyder@vmware.com>
+
+	* i386-tdep.c (i386_process_record): Or-equals, not not-equals.
+
+2009-10-10  Pedro Alves  <pedro@codesourcery.com>
+
+	* mi/mi-cmd-stack.c (list_args_or_locals): Use internal_error.
+	Put "break" statements on their own line.
+
 2009-10-09  Pedro Alves  <pedro@codesourcery.com>
 
 	* linux-nat.c (linux_nat_wait_1): Bail out, if TARGET_WNOHANG and
