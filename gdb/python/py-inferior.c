@@ -104,7 +104,10 @@ add_inferior_object (int pid)
       return;
     }
 
-  cleanup = ensure_python_env (get_current_arch (), current_language);
+  /* While creating new inferior no inferior thread is available.  Therefore
+     get_current_arch has no valid current frame (and it would crash).  */
+
+  cleanup = ensure_python_env (target_gdbarch, current_language);
 
   inf_obj = PyObject_New (inferior_object, &inferior_object_type);
   if (!inf_obj)
