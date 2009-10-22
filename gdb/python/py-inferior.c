@@ -139,7 +139,7 @@ add_inferior_object (int pid)
 static void
 delete_inferior_object (int pid)
 {
-  PyGILState_STATE state;
+  struct cleanup *cleanup;
   struct inflist_entry **inf_entry, *inf_tmp;
   struct threadlist_entry *th_entry, *th_tmp;
 
@@ -152,7 +152,7 @@ delete_inferior_object (int pid)
   if (!*inf_entry)
     return;
 
-  state = PyGILState_Ensure ();
+  cleanup = ensure_python_env (get_current_arch (), current_language);
 
   inf_tmp = *inf_entry;
   inf_tmp->inf_obj->inferior = NULL;
@@ -175,7 +175,7 @@ delete_inferior_object (int pid)
 
   ninferiors--;
 
-  PyGILState_Release (state);
+  do_cleanups (cleanup);
 }
 
 /* Finds the Python Inferior object for the given pid.  Returns a borrowed
@@ -218,19 +218,19 @@ find_thread_object (ptid_t ptid)
 static void
 add_thread_object (struct thread_info *tp)
 {
-  PyGILState_STATE state;
+  struct cleanup *cleanup;
   thread_object *thread_obj;
   inferior_object *inf_obj;
   struct threadlist_entry *entry;
 
-  state = PyGILState_Ensure ();
+  cleanup = ensure_python_env (get_current_arch (), current_language);
 
   thread_obj = create_thread_object (tp);
   if (!thread_obj)
     {
       warning (_("Can't create Python InferiorThread object."));
       gdbpy_print_stack ();
-      PyGILState_Release (state);
+      do_cleanups (cleanup);
       return;
     }
 
@@ -243,13 +243,13 @@ add_thread_object (struct thread_info *tp)
   inf_obj->threads = entry;
   inf_obj->nthreads++;
 
-  PyGILState_Release (state);
+  do_cleanups (cleanup);
 }
 
 static void
 delete_thread_object (struct thread_info *tp, int ignore)
 {
-  PyGILState_STATE state;
+  struct cleanup *cleanup;
   inferior_object *inf_obj;
   thread_object *thread_obj;
   struct threadlist_entry **entry, *tmp;
@@ -266,7 +266,7 @@ delete_thread_object (struct thread_info *tp, int ignore)
   if (!*entry)
     return;
 
-  state = PyGILState_Ensure ();
+  cleanup = ensure_python_env (get_current_arch (), current_language);
 
   tmp = *entry;
   tmp->thread_obj->thread = NULL;
@@ -278,7 +278,7 @@ delete_thread_object (struct thread_info *tp, int ignore)
   xfree (tmp);
 
 
-  PyGILState_Release (state);
+  do_cleanups (cleanup);
 }
 
 static PyObject *

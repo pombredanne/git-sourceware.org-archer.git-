@@ -26,7 +26,8 @@
 #include "gdbcmd.h"
 #include "gdbthread.h"
 #include "observer.h"
-
+#include "arch-utils.h"
+#include "language.h"
 
 /* From breakpoint.c.  */
 extern struct breakpoint *breakpoint_chain;
@@ -494,7 +495,7 @@ gdbpy_breakpoint_created (int num)
 {
   breakpoint_object *newbp;
   struct breakpoint *bp;
-  PyGILState_STATE state;
+  struct cleanup *cleanup;
 
   if (num < 0)
     return;
@@ -519,7 +520,7 @@ gdbpy_breakpoint_created (int num)
 
   ++bppy_live;
 
-  state = PyGILState_Ensure ();
+  cleanup = ensure_python_env (get_current_arch (), current_language);
 
   if (bppy_pending_object)
     {
@@ -552,7 +553,7 @@ gdbpy_breakpoint_created (int num)
   /* Just ignore errors here.  */
   PyErr_Clear ();
 
-  PyGILState_Release (state);
+  do_cleanups (cleanup);
 }
 
 /* Callback that is used when a breakpoint is deleted.  This will
@@ -560,9 +561,9 @@ gdbpy_breakpoint_created (int num)
 static void
 gdbpy_breakpoint_deleted (int num)
 {
-  PyGILState_STATE state;
+  struct cleanup *cleanup;
 
-  state = PyGILState_Ensure ();
+  cleanup = ensure_python_env (get_current_arch (), current_language);
   if (BPPY_VALID_P (num))
     {
       bppy_breakpoints[num]->bp = NULL;
@@ -570,7 +571,7 @@ gdbpy_breakpoint_deleted (int num)
       bppy_breakpoints[num] = NULL;
       --bppy_live;
     }
-  PyGILState_Release (state);
+  do_cleanups (cleanup);
 }
 
 

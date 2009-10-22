@@ -474,11 +474,11 @@ static int gdbpy_event_fds[2];
 static void
 gdbpy_run_events (int err, gdb_client_data ignore)
 {
-  PyGILState_STATE state;
+  struct cleanup *cleanup;
   char buffer[100];
   int r;
 
-  state = PyGILState_Ensure ();
+  cleanup = ensure_python_env (get_current_arch (), current_language);
 
   /* Just read whatever is available on the fd.  It is relatively
      harmless if there are any bytes left over.  */
@@ -500,7 +500,7 @@ gdbpy_run_events (int err, gdb_client_data ignore)
       xfree (item);
     }
 
-  PyGILState_Release (state);
+  do_cleanups (cleanup);
 }
 
 /* Submit an event to the gdb thread.  */
@@ -622,10 +622,9 @@ void
 run_python_script (int argc, char **argv)
 {
   FILE *input;
-  PyGILState_STATE state;
 
   /* We never free this, since we plan to exit at the end.  */
-  state = PyGILState_Ensure ();
+  ensure_python_env (get_current_arch (), current_language);
 
   running_python_script = 1;
   PySys_SetArgv (argc - 1, argv + 1);
@@ -643,14 +642,13 @@ run_python_script (int argc, char **argv)
 void
 source_python_script (FILE *stream, char *file)
 {
-  PyGILState_STATE state;
+  struct cleanup *cleanup;
 
-  state = PyGILState_Ensure ();
-
+  cleanup = ensure_python_env (get_current_arch (), current_language);
   PyRun_SimpleFile (stream, file);
 
   fclose (stream);
-  PyGILState_Release (state);
+  do_cleanups (cleanup);
 }
 
 
