@@ -1,8 +1,6 @@
-/* Target-dependent definitions for SuperH running NetBSD, for GDB.
-   Copyright (C) 2002, 2007, 2008, 2009 Free Software Foundation, Inc.
-   Contributed by Wasabi Systems, Inc.
+/* This testcase is part of GDB, the GNU debugger.
 
-   This file is part of GDB.
+   Copyright 2009 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,10 +15,48 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#ifndef SH_NBSD_TDEP_H
-#define SH_NBSD_TDEP_H
+int gglob = 2;
 
-void shnbsd_supply_reg (struct regcache *, const char *, int);
-void shnbsd_fill_reg (const struct regcache *, char *, int);
+int glob = 45;
 
-#endif /* SH_NBSD_TDEP_H */
+int verylongfun()
+{
+  glob += 2;
+  glob *= 2;
+  glob += 3;
+  glob *= 3;
+  glob += 4;
+  glob *= 4;
+  glob += 5;
+  glob *= 5;
+  glob += 6;
+  glob *= 6;
+  glob += 7;
+  glob *= 7;
+  glob += 8;
+  glob *= 8;
+  glob += 9;
+  glob *= 9;
+}
+
+main() {
+  mailand();
+  foo(glob);
+  verylongfun();
+  goodbye();
+}
+
+foo(int x) {
+  return x + 92;
+}
+
+mailand()
+{
+  glob = 46;
+}
+
+void commonfun() { mailand(); } /* from goodbye */
+
+goodbye() {
+  ++glob;
+}

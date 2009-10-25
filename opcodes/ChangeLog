@@ -1,8 +1,86 @@
+2009-10-23  Doug Evans  <dje@sebabeach.org>
+
+	* cgen-ops.h: Delete, moved to ../include/cgen/basic-ops.h.
+	* cgen-types.h: Delete, moved to ../include/cgen/basic-modes.h.
+	* cgen-bitset.c: Update.
+	* fr30-desc.h: Regenerate.
+	* frv-desc.h: Regenerate.
+	* ip2k-desc.h: Regenerate.
+	* iq2000-desc.h: Regenerate.
+	* lm32-desc.h: Regenerate.
+	* m32c-desc.h: Regenerate.
+	* m32c-opc.h: Regenerate.
+	* m32r-desc.h: Regenerate.
+	* mep-desc.h: Regenerate.
+	* mt-desc.h: Regenerate.
+	* openrisc-desc.h: Regenerate.
+	* xc16x-desc.h: Regenerate.
+	* xstormy16-desc.h: Regenerate.
+
+2009-10-22  DJ Delorie  <dj@redhat.com>
+
+	* rx-decode.opc (decode_opcode): Fix flags for MUL, SUNTIL, and SWHILE.
+	* rx-decode.c: Regenerated.
+
+2009-10-20  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR gas/10775
+	* i386-dis.c: Document LB, LS and LV macros.
+	(dis386): Use mov%LB, mov%LS and mov%LV on mov instruction
+	with the 64-bit displacement or immediate operand.
+	(putop): Handle LB, LS and LV macros.
+
+2009-10-18  Doug Evans  <dje@sebabeach.org>
+
+	* lm32-opinst.c: Regenerate.
+	* m32c-desc.c: Regenerate.
+	* m32r-opinst.c: Regenerate.
+	* openrisc-ibld.c: Regenerate.
+	* xc16x-desc.c: Regenerate.
+	* xc16x-desc.h: Regenerate.
+
+2009-10-17  Doug Evans  <dje@sebabeach.org>
+
+	* Makefile.am (CGEN_CPUS): Add iq2000, lm32.
+	(FR30_DEPS, FRV_DEPS, IQ2000_DEPS): Move so all cgen *_DEPS are
+	sorted alphabetically.
+	(stamp-fr30, stamp-frv, stamp-iq2000, stamp-xc16x): Move so all cgen
+	stamp-* rules are sorted alphabetically.
+	* Makefile.in: Regenerate.
+
+2009-10-16  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* i386-opc.h: Use enum instead of nested macros.
+
+2009-10-16  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* i386-dis.c: Simplify enums.
+
+2009-10-15  H.J. Lu  <hongjiu.lu@intel.com>
+	    Ineiev <ineiev@gmail.com>
+
+	PR binutils/10767
+	* i386-dis.c: Use enum instead of nested macros.
+
+2009-10-15  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* i386-dis.c (MAX_BYTEMODE): Removed.
+
+2009-10-14  Tomas Hurka  <tom@hukatronic.cz>
+
+	PR 969
+	* m68k-opc.c (m68k_opcodes): Correct mask for macl and msacl.
+
+2009-10-13  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* i386-dis.c (print_insn): Always clear need_vex, need_vex_reg
+	and vex_w_done.
+
 2009-10-07  Michael Eager  <eager@eagercon.com>
 
-	* opcodes/microblaze-dis.c: Add include for microblaze-dis.h,
+	* microblaze-dis.c: Add include for microblaze-dis.h,
 	eliminate local extern decls.
-	* opcodes/microblaze-dis.h: New.
+	* microblaze-dis.h: New.
 
 2009-10-06  Nick Clifton  <nickc@redhat.com>
 

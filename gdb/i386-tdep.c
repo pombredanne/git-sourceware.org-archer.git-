@@ -4146,7 +4146,7 @@ reswitch:
 	return -1;
       if (ir.mod == 3)
 	{
-	  ir.rm != ir.rex_b;
+	  ir.rm |= ir.rex_b;
 	  if (ir.ot == OT_BYTE && !ir.regmap[X86_RECORD_R8_REGNUM])
 	    ir.rm &= 0x3;
 	  I386_RECORD_ARCH_LIST_ADD_REG (ir.rm);
@@ -5172,6 +5172,19 @@ reswitch:
 	  break;
 	  /* lgdt */
 	case 2:
+	  if (ir.mod == 3)
+	    {
+	      /* xgetbv */
+	      if (ir.rm == 0)
+		{
+		  I386_RECORD_ARCH_LIST_ADD_REG (X86_RECORD_REAX_REGNUM);
+		  I386_RECORD_ARCH_LIST_ADD_REG (X86_RECORD_REDX_REGNUM);
+		  break;
+		}
+	      /* xsetbv */
+	      else if (ir.rm == 1)
+		break;
+	    }
 	  /* lidt */
 	case 3:
 	  if (ir.mod == 3)

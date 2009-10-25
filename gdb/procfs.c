@@ -3705,7 +3705,8 @@ do_attach (ptid_t ptid)
   if ((fail = procfs_debug_inferior (pi)) != 0)
     dead_procinfo (pi, "do_attach: failed in procfs_debug_inferior", NOKILL);
 
-  inf = add_inferior (pi->pid);
+  inf = current_inferior ();
+  inferior_appeared (inf, pi->pid);
   /* Let GDB know that the inferior was attached.  */
   inf->attach_flag = 1;
 
@@ -5665,7 +5666,7 @@ insert_dbx_link_bpt_in_file (int fd, CORE_ADDR ignored)
     {
       /* Insert the breakpoint.  */
       dbx_link_bpt_addr = sym_addr;
-      dbx_link_bpt = deprecated_insert_raw_breakpoint (target_gdbarch,
+      dbx_link_bpt = deprecated_insert_raw_breakpoint (target_gdbarch, NULL,
 						       sym_addr);
       if (dbx_link_bpt == NULL)
         {
@@ -6153,7 +6154,7 @@ procfs_make_note_section (bfd *obfd, int *note_size)
 
   stop_signal = find_stop_signal ();
 
-#ifdef NEW_PROC_API
+#ifdef UNIXWARE
   fill_gregset (get_current_regcache (), &gregs, -1);
   note_data = elfcore_write_pstatus (obfd, note_data, note_size,
 				     PIDGET (inferior_ptid),
