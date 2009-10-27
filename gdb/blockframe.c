@@ -38,6 +38,8 @@
 #include "block.h"
 #include "inline-frame.h"
 
+#include "psympriv.h"		/* FIXME */
+
 /* Prototypes for exported functions. */
 
 void _initialize_blockframe (void);

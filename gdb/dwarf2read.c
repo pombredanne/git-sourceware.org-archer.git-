@@ -48,6 +48,7 @@
 #include "gdbcmd.h"
 #include "block.h"
 #include "addrmap.h"
+#include "psympriv.h"
 
 #include <fcntl.h>
 #include "gdb_string.h"

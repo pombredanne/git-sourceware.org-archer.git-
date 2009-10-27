@@ -52,6 +52,8 @@
 #include "exec.h"
 #include "observer.h"
 
+#include "psymtab.h"
+
 /* Prototypes for local functions */
 
 static void objfile_alloc_data (struct objfile *objfile);
@@ -623,38 +625,7 @@ objfile_relocate (struct objfile *objfile, struct section_offsets *new_offsets)
     }
   }
 
-  {
-    struct partial_symtab *p;
-
-    ALL_OBJFILE_PSYMTABS (objfile, p)
-    {
-      p->textlow += ANOFFSET (delta, SECT_OFF_TEXT (objfile));
-      p->texthigh += ANOFFSET (delta, SECT_OFF_TEXT (objfile));
-    }
-  }
-
-  {
-    struct partial_symbol **psym;
-
-    for (psym = objfile->global_psymbols.list;
-	 psym < objfile->global_psymbols.next;
-	 psym++)
-      {
-	fixup_psymbol_section (*psym, objfile);
-	if (SYMBOL_SECTION (*psym) >= 0)
-	  SYMBOL_VALUE_ADDRESS (*psym) += ANOFFSET (delta,
-						    SYMBOL_SECTION (*psym));
-      }
-    for (psym = objfile->static_psymbols.list;
-	 psym < objfile->static_psymbols.next;
-	 psym++)
-      {
-	fixup_psymbol_section (*psym, objfile);
-	if (SYMBOL_SECTION (*psym) >= 0)
-	  SYMBOL_VALUE_ADDRESS (*psym) += ANOFFSET (delta,
-						    SYMBOL_SECTION (*psym));
-      }
-  }
+  relocate_psymtabs (objfile, new_offsets, delta);
 
   {
     struct minimal_symbol *msym;
@@ -714,37 +685,6 @@ int
 objfile_has_full_symbols (struct objfile *objfile)
 {
   return objfile->symtabs != NULL;
-}
-
-/* Many places in gdb want to test just to see if we have any partial
-   symbols available.  This function returns zero if none are currently
-   available, nonzero otherwise. */
-
-int
-have_partial_symbols (void)
-{
-  struct objfile *ofp;
-
-  ALL_OBJFILES (ofp)
-  {
-    if (objfile_has_partial_symbols (ofp))
-      return 1;
-  }
-
-  /* Try again, after reading partial symbols.  We do this in two
-     passes because objfiles are always added to the head of the list,
-     and there might be a later objfile for which we've already read
-     partial symbols.  */
-  ALL_OBJFILES (ofp)
-  {
-    require_partial_symbols (ofp);
-    if (ofp->psymtabs != NULL)
-      {
-	return 1;
-      }
-  }
-
-  return 0;
 }
 
 /* Many places in gdb want to test just to see if we have any full

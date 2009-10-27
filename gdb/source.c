@@ -46,6 +46,8 @@
 #include "ui-out.h"
 #include "readline/readline.h"
 
+#include "psymtab.h"		/* FIXME */
+
 
 #define OPEN_MODE (O_RDONLY | O_BINARY)
 #define FDOPEN_MODE FOPEN_RB
@@ -224,8 +226,6 @@ select_source_symtab (struct symtab *s)
 {
   struct symtabs_and_lines sals;
   struct symtab_and_line sal;
-  struct partial_symtab *ps;
-  struct partial_symtab *cs_pst = 0;
   struct objfile *ofp;
 
   if (s)
@@ -271,31 +271,12 @@ select_source_symtab (struct symtab *s)
     return;
 
   /* How about the partial symbol tables?  */
-
-  for (ofp = object_files; ofp != NULL; ofp = ofp->next)
-    {
-      for (ps = ofp->psymtabs; ps != NULL; ps = ps->next)
-	{
-	  const char *name = ps->filename;
-	  int len = strlen (name);
-	  if (!(len > 2 && (strcmp (&name[len - 2], ".h") == 0
-	      || strcmp (name, "<<C++-namespaces>>") == 0)))
-	    cs_pst = ps;
-	}
-    }
-  if (cs_pst)
-    {
-      if (cs_pst->readin)
-	{
-	  internal_error (__FILE__, __LINE__,
-			  _("select_source_symtab: "
-			  "readin pst found and no symtabs."));
-	}
-      else
-	{
-	  current_source_symtab = PSYMTAB_TO_SYMTAB (cs_pst);
-	}
-    }
+  ALL_OBJFILES (ofp)
+  {
+    s = find_last_source_symtab_from_partial (ofp);
+    if (s)
+      current_source_symtab = s;
+  }
   if (current_source_symtab)
     return;
 
@@ -319,7 +300,6 @@ forget_cached_source_info (void)
 {
   struct symtab *s;
   struct objfile *objfile;
-  struct partial_symtab *pst;
 
   for (objfile = object_files; objfile != NULL; objfile = objfile->next)
     {
@@ -337,14 +317,7 @@ forget_cached_source_info (void)
 	    }
 	}
 
-      ALL_OBJFILE_PSYMTABS (objfile, pst)
-      {
-	if (pst->fullname != NULL)
-	  {
-	    xfree (pst->fullname);
-	    pst->fullname = NULL;
-	  }
-      }
+      forget_cached_source_info_partial (objfile);
     }
 }
 
@@ -941,7 +914,7 @@ rewrite_source_path (const char *path)
      An invalid file descriptor is returned. ( the return value is negative ) 
      FULLNAME is set to NULL.  */
 
-static int
+int
 find_and_open_source (const char *filename,
 		      const char *dirname,
 		      char **fullname)
@@ -1067,34 +1040,6 @@ symtab_to_fullname (struct symtab *s)
     {
       close (r);
       return s->fullname;
-    }
-
-  return NULL;
-}
-
-/* Finds the fullname that a partial_symtab represents.
-
-   If this functions finds the fullname, it will save it in ps->fullname
-   and it will also return the value.
-
-   If this function fails to find the file that this partial_symtab represents,
-   NULL will be returned and ps->fullname will be set to NULL.  */
-char *
-psymtab_to_fullname (struct partial_symtab *ps)
-{
-  int r;
-
-  if (!ps)
-    return NULL;
-
-  /* Don't check ps->fullname here, the file could have been
-     deleted/moved/..., look for it again */
-  r = find_and_open_source (ps->filename, ps->dirname, &ps->fullname);
-
-  if (r >= 0)
-    {
-      close (r);
-      return ps->fullname;
     }
 
   return NULL;

@@ -50,6 +50,7 @@
 #include "stabsread.h"
 #include "expression.h"
 #include "complaints.h"
+#include "psympriv.h"
 
 #include "gdb-stabs.h"
 

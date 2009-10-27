@@ -36,6 +36,7 @@
 #include "gdb-stabs.h"
 #include "complaints.h"
 #include "demangle.h"
+#include "psympriv.h"
 
 extern void _initialize_elfread (void);
 

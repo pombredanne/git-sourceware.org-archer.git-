@@ -543,11 +543,6 @@ extern void gdb_bfd_unref (struct bfd *abfd);
 #define	ALL_OBJFILE_SYMTABS(objfile, s) \
     for ((s) = (objfile) -> symtabs; (s) != NULL; (s) = (s) -> next)
 
-/* Traverse all psymtabs in one objfile.  */
-
-#define	ALL_OBJFILE_PSYMTABS(objfile, p) \
-    for ((p) = (objfile) -> psymtabs; (p) != NULL; (p) = (p) -> next)
-
 /* Traverse all minimal symbols in one objfile.  */
 
 #define	ALL_OBJFILE_MSYMBOLS(objfile, m) \
@@ -566,19 +561,6 @@ extern void gdb_bfd_unref (struct bfd *abfd);
   ALL_OBJFILES (objfile)		\
     ALL_OBJFILE_SYMTABS (objfile, s)	\
       if ((s)->primary)
-
-/* Traverse all psymtabs in all objfiles.  */
-
-#define	ALL_PSYMTABS(objfile, p) \
-  ALL_OBJFILES (objfile)	 \
-    ALL_OBJFILE_PSYMTABS (objfile, p)
-
-/* Like ALL_PSYMTABS, but ensure that partial symbols have been read
-   before examining the objfile.  */
-
-#define ALL_PSYMTABS_REQUIRED(objfile, p)			\
-  ALL_OBJFILES (objfile)					\
-    ALL_OBJFILE_PSYMTABS (require_partial_symbols (objfile), p)
 
 /* Traverse all minimal symbols in all objfiles.  */
 

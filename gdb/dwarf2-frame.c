@@ -40,6 +40,8 @@
 #include "dwarf2-frame.h"
 #include "addrmap.h"
 
+#include "psympriv.h"		/* FIXME */
+
 struct comp_unit;
 
 /* Call Frame Information (CFI).  */
@@ -1573,7 +1575,7 @@ dwarf2_frame_find_fde (CORE_ADDR *pc)
 	    continue;
 	}
       /* FIXME: Read-in only .debug_frame/.eh_frame without .debug_info?  */
-      require_partial_symbols (objfile);
+      require_partial_symbols (objfile); /* double FIXME!! */
 
       fde_table = objfile_data (objfile, dwarf2_frame_objfile_data);
       if (fde_table == NULL)

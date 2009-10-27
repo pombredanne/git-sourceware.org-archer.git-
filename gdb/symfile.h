@@ -208,8 +208,6 @@ struct partial_symbol *add_psymbol_to_list (char *, int, domain_enum,
 
 extern void init_psymbol_list (struct objfile *, int);
 
-extern void sort_pst_symbols (struct partial_symtab *);
-
 extern struct symtab *allocate_symtab (char *, struct objfile *);
 
 extern int free_named_symtabs (char *);

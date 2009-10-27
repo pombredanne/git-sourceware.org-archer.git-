@@ -52,6 +52,8 @@
 #include <ctype.h>
 #include "gdb_string.h"
 
+#include "psymtab.h"
+
 void (*deprecated_selected_frame_level_changed_hook) (int);
 
 /* The possible choices of "set print frame-arguments, and the value
@@ -1309,8 +1311,6 @@ backtrace_command_1 (char *count_exp, int show_locals, int from_tty)
     count = -1;
 
   {
-    struct partial_symtab *ps;
-
     /* Read in symbols for all of the frames.  Need to do this
        unconditionally to ensure that psymbols are read.  Also need to
        do this in a separate pass so that "Reading in symbols for xxx"
@@ -1321,9 +1321,7 @@ backtrace_command_1 (char *count_exp, int show_locals, int from_tty)
     for (fi = trailing; fi != NULL && i--; fi = get_prev_frame (fi))
       {
 	QUIT;
-	ps = find_pc_psymtab (get_frame_address_in_block (fi));
-	if (info_verbose && ps)
-	  PSYMTAB_TO_SYMTAB (ps); /* Force syms to come in.  */
+	find_pc_symtab_from_partial (get_frame_address_in_block (fi));
       }
   }
 

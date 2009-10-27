@@ -57,6 +57,8 @@
 #include "observer.h"
 #include "vec.h"
 
+#include "psympriv.h"		/* FIXME */
+
 /* Define whether or not the C operator '/' truncates towards zero for
    differently signed operands (truncation direction is undefined in C). 
    Copied from valarith.c.  */
@@ -649,13 +651,10 @@ base_type (struct type *type)
                                 /* Language Selection */
 
 /* If the main program is in Ada, return language_ada, otherwise return LANG
-   (the main program is in Ada iif the adainit symbol is found).
-
-   MAIN_PST is not used.  */
+   (the main program is in Ada iif the adainit symbol is found).  */
 
 enum language
-ada_update_initial_language (enum language lang,
-                             struct partial_symtab *main_pst)
+ada_update_initial_language (enum language lang)
 {
   if (lookup_minimal_symbol ("adainit", (const char *) NULL,
                              (struct objfile *) NULL) != NULL)
@@ -5204,6 +5203,27 @@ symbol_completion_add (VEC(char_ptr) **sv,
   VEC_safe_push (char_ptr, *sv, completion);
 }
 
+struct add_partial_datum
+{
+  VEC(char_ptr) **completions;
+  char *text;
+  int text_len;
+  char *text0;
+  char *word;
+  int wild_match;
+  int encoded;
+};
+
+/* A callback for map_partial_symbol_names.  */
+static void
+ada_add_partial_symbol_completions (const char *name, void *user_data)
+{
+  struct add_partial_datum *data = user_data;
+  symbol_completion_add (data->completions, name,
+			 data->text, data->text_len, data->text0, data->word,
+			 data->wild_match, data->encoded);
+}
+
 /* Return a list of possible symbol names completing TEXT0.  The list
    is NULL terminated.  WORD is the entire command on which completion
    is made.  */
@@ -5218,7 +5238,6 @@ ada_make_symbol_completion_list (char *text0, char *word)
   VEC(char_ptr) *completions = VEC_alloc (char_ptr, 128);
   struct symbol *sym;
   struct symtab *s;
-  struct partial_symtab *ps;
   struct minimal_symbol *msymbol;
   struct objfile *objfile;
   struct block *b, *surrounding_static_block = 0;
@@ -5250,34 +5269,17 @@ ada_make_symbol_completion_list (char *text0, char *word)
     }
 
   /* First, look at the partial symtab symbols.  */
-  ALL_PSYMTABS (objfile, ps)
   {
-    struct partial_symbol **psym;
+    struct add_partial_datum data;
 
-    /* If the psymtab's been read in we'll get it when we search
-       through the blockvector.  */
-    if (ps->readin)
-      continue;
-
-    for (psym = objfile->global_psymbols.list + ps->globals_offset;
-         psym < (objfile->global_psymbols.list + ps->globals_offset
-                 + ps->n_global_syms); psym++)
-      {
-        QUIT;
-        symbol_completion_add (&completions, SYMBOL_LINKAGE_NAME (*psym),
-                               text, text_len, text0, word,
-                               wild_match, encoded);
-      }
-
-    for (psym = objfile->static_psymbols.list + ps->statics_offset;
-         psym < (objfile->static_psymbols.list + ps->statics_offset
-                 + ps->n_static_syms); psym++)
-      {
-        QUIT;
-        symbol_completion_add (&completions, SYMBOL_LINKAGE_NAME (*psym),
-                               text, text_len, text0, word,
-                               wild_match, encoded);
-      }
+    data.completions = &completions;
+    data.text = text;
+    data.text_len = text_len;
+    data.text0 = text0;
+    data.word = word;
+    data.wild_match = wild_match;
+    data.encoded = encoded;
+    map_partial_symbol_names (ada_add_partial_symbol_completions, &data);
   }
 
   /* At this point scan through the misc symbol vectors and add each
@@ -10013,7 +10015,7 @@ ada_exception_support_info_sniffer (void)
      started yet.  Inform the user of these two possible causes if
      applicable.  */
 
-  if (ada_update_initial_language (language_unknown, NULL) != language_ada)
+  if (ada_update_initial_language (language_unknown) != language_ada)
     error (_("Unable to insert catchpoint.  Is this an Ada main program?"));
 
   /* If the symbol does not exist, then check that the program is
