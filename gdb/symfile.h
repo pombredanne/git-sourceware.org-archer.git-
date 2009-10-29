@@ -139,6 +139,12 @@ struct quick_symbol_functions
   void (*read_symtabs_with_filename) (struct objfile *objfile,
 				      const char *filename);
   char *(*find_symbol_file) (struct objfile *, char *);
+  void (*map_ada_symtabs) (struct objfile *objfile,
+			   void (*callback) (struct objfile *,
+					     struct symtab *, void *),
+			   const char *name, int global,
+			   domain_enum namespace, int wild,
+			   void *data);
 };
 
 /* Structure to keep track of symbol reading functions for various

@@ -1706,6 +1706,169 @@ find_symbol_file_from_partial (struct objfile *objfile, char *name)
   return NULL;
 }
 
+/* FIXME */
+extern int ada_wild_match (const char *patn0, int patn_len, const char *name0);
+extern int ada_is_name_suffix (const char *);
+
+/* Look, in partial_symtab PST, for symbol NAME in given namespace.
+   Check the global symbols if GLOBAL, the static symbols if not.
+   Do wild-card match if WILD.  */
+
+static struct partial_symbol *
+ada_lookup_partial_symbol (struct partial_symtab *pst, const char *name,
+                           int global, domain_enum namespace, int wild)
+{
+  struct partial_symbol **start;
+  int name_len = strlen (name);
+  int length = (global ? pst->n_global_syms : pst->n_static_syms);
+  int i;
+
+  if (length == 0)
+    {
+      return (NULL);
+    }
+
+  start = (global ?
+           pst->objfile->global_psymbols.list + pst->globals_offset :
+           pst->objfile->static_psymbols.list + pst->statics_offset);
+
+  if (wild)
+    {
+      for (i = 0; i < length; i += 1)
+        {
+          struct partial_symbol *psym = start[i];
+
+          if (symbol_matches_domain (SYMBOL_LANGUAGE (psym),
+                                     SYMBOL_DOMAIN (psym), namespace)
+              && ada_wild_match (name, name_len, SYMBOL_LINKAGE_NAME (psym)))
+            return psym;
+        }
+      return NULL;
+    }
+  else
+    {
+      if (global)
+        {
+          int U;
+          i = 0;
+          U = length - 1;
+          while (U - i > 4)
+            {
+              int M = (U + i) >> 1;
+              struct partial_symbol *psym = start[M];
+              if (SYMBOL_LINKAGE_NAME (psym)[0] < name[0])
+                i = M + 1;
+              else if (SYMBOL_LINKAGE_NAME (psym)[0] > name[0])
+                U = M - 1;
+              else if (strcmp (SYMBOL_LINKAGE_NAME (psym), name) < 0)
+                i = M + 1;
+              else
+                U = M;
+            }
+        }
+      else
+        i = 0;
+
+      while (i < length)
+        {
+          struct partial_symbol *psym = start[i];
+
+          if (symbol_matches_domain (SYMBOL_LANGUAGE (psym),
+                                     SYMBOL_DOMAIN (psym), namespace))
+            {
+              int cmp = strncmp (name, SYMBOL_LINKAGE_NAME (psym), name_len);
+
+              if (cmp < 0)
+                {
+                  if (global)
+                    break;
+                }
+              else if (cmp == 0
+                       && ada_is_name_suffix (SYMBOL_LINKAGE_NAME (psym)
+					      + name_len))
+                return psym;
+            }
+          i += 1;
+        }
+
+      if (global)
+        {
+          int U;
+          i = 0;
+          U = length - 1;
+          while (U - i > 4)
+            {
+              int M = (U + i) >> 1;
+              struct partial_symbol *psym = start[M];
+              if (SYMBOL_LINKAGE_NAME (psym)[0] < '_')
+                i = M + 1;
+              else if (SYMBOL_LINKAGE_NAME (psym)[0] > '_')
+                U = M - 1;
+              else if (strcmp (SYMBOL_LINKAGE_NAME (psym), "_ada_") < 0)
+                i = M + 1;
+              else
+                U = M;
+            }
+        }
+      else
+        i = 0;
+
+      while (i < length)
+        {
+          struct partial_symbol *psym = start[i];
+
+          if (symbol_matches_domain (SYMBOL_LANGUAGE (psym),
+                                     SYMBOL_DOMAIN (psym), namespace))
+            {
+              int cmp;
+
+              cmp = (int) '_' - (int) SYMBOL_LINKAGE_NAME (psym)[0];
+              if (cmp == 0)
+                {
+                  cmp = strncmp ("_ada_", SYMBOL_LINKAGE_NAME (psym), 5);
+                  if (cmp == 0)
+                    cmp = strncmp (name, SYMBOL_LINKAGE_NAME (psym) + 5,
+                                   name_len);
+                }
+
+              if (cmp < 0)
+                {
+                  if (global)
+                    break;
+                }
+              else if (cmp == 0
+                       && ada_is_name_suffix (SYMBOL_LINKAGE_NAME (psym)
+					      + name_len + 5))
+                return psym;
+            }
+          i += 1;
+        }
+    }
+  return NULL;
+}
+
+static void
+map_ada_symtabs (struct objfile *objfile,
+		 void (*callback) (struct objfile *, struct symtab *, void *),
+		 const char *name, int global, domain_enum namespace, int wild,
+		 void *data)
+{
+  struct partial_symtab *ps;
+
+  ALL_OBJFILE_PSYMTABS (objfile, ps)
+    {
+      QUIT;
+      if (ps->readin
+	  || ada_lookup_partial_symbol (ps, name, global, namespace, wild))
+	{
+	  struct symtab *s = PSYMTAB_TO_SYMTAB (ps);
+	  if (s == NULL || !s->primary)
+	    continue;
+	  (*callback) (objfile, s, data);
+	}
+    }
+}
+
 const struct quick_symbol_functions psym_functions =
 {
   find_last_source_symtab_from_partial,
@@ -1720,5 +1883,6 @@ const struct quick_symbol_functions psym_functions =
   read_symtabs_for_function,
   expand_partial_symbol_tables,
   read_psymtabs_with_filename,
-  find_symbol_file_from_partial
+  find_symbol_file_from_partial,
+  map_ada_symtabs
 };
