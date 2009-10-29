@@ -291,6 +291,10 @@ the native maintainer when resolving ABI issues.
 	mep		--target=mep-elf ,-Werror
 			Kevin Buettner		kevinb@redhat.com
 
+	microblaze	--target=microblaze-xilinx-elf ,-Werror
+			--target=microblaze-linux-gnu ,-Werror
+			Michael Eager		eager@eagercon.com
+
 	mips		--target=mips-elf ,-Werror
 
 	mn10300		--target=mn10300-elf broken
@@ -490,6 +494,7 @@ Dhananjay Deshpande				dhananjayd@kpitcummins.com
 Markus Deuling					deuling@de.ibm.com
 Klee Dienes					kdienes@apple.com
 Gabriel Dos Reis                                gdr@integrable-solutions.net
+Michael Eager					eager@eagercon.com
 Richard Earnshaw				rearnsha@arm.com
 Steve Ellcey					sje@cup.hp.com
 Frank Ch. Eigler				fche@redhat.com
@@ -559,6 +564,7 @@ David O'Brien					obrien@freebsd.org
 Alexandre Oliva					aoliva@redhat.com
 Karen Osmond					karen.osmond@gmail.com
 Denis Pilat					denis.pilat@st.com
+Paul Pluzhnikov					ppluzhnikov@google.com
 Vladimir Prus                                   vladimir@codesourcery.com
 Qinwei						qinwei@sunnorth.com.cn
 Frederic Riss					frederic.riss@st.com

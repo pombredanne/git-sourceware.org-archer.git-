@@ -1,3 +1,19 @@
+2009-10-29  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* configure.ac: New --with-libthread-db option.
+	* thread-db.c: Allow direct dependence on libthread_db.
+	(thread_db_free): Adjust.
+	* config.in: Regenerate.
+	* configure: Likewise.
+	
+2009-10-28  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	PR gdb/10757
+	* thread-db.c (attach_thread): New function.
+	(maybe_attach_thread): Return success/failure.
+	(find_new_threads_callback): Adjust.
+	(thread_db_find_new_threads): Loop until no new threads.	
+	
 2009-10-13  Pedro Alves  <pedro@codesourcery.com>
 
 	* proc-service.c (ps_lgetregs): Formatting.
