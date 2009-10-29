@@ -684,6 +684,7 @@ static struct sym_fns macho_sym_fns = {
   NULL,				/* sym_read_psymbols */
   macho_symfile_finish,         /* sym_finish: finished with file, cleanup */
   macho_symfile_offsets,        /* sym_offsets:  xlate external to internal form */
+  psym_functions,
   NULL                          /* next: pointer to next struct sym_fns */
 };
 

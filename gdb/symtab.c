@@ -222,7 +222,7 @@ got_symtab:
 
   ALL_OBJFILES (objfile)
   {
-    s = lookup_symtab_via_partial_symtab (objfile, name, full_path, real_path);
+    s = objfile->sf->qf->lookup_symtab (objfile, name, full_path, real_path);
     if (s)
       return s;
   }
@@ -990,8 +990,8 @@ lookup_symbol_aux (const char *name, const char *linkage_name,
 
   ALL_OBJFILES (objfile)
   {
-    sym = lookup_symbol_aux_psymtabs (objfile, STATIC_BLOCK, name,
-				      linkage_name, domain);
+    sym = objfile->sf->qf->lookup_symbol_aux (objfile, STATIC_BLOCK, name,
+					      linkage_name, domain);
     if (sym != NULL)
       return sym;
   }
@@ -1099,8 +1099,8 @@ lookup_global_symbol_from_objfile (const struct objfile *objfile,
   }
 
   /* Now go through psymtabs.  */
-  sym = lookup_global_symbol_from_objfile_via_partial (objfile, name,
-						       linkage_name, domain);
+  sym = objfile->sf->qf->lookup_global_symbol (objfile, name,
+					       linkage_name, domain);
   if (sym)
     return sym;
 
@@ -1231,8 +1231,8 @@ lookup_symbol_global (const char *name,
 
   ALL_OBJFILES (objfile)
   {
-    sym = lookup_symbol_aux_psymtabs (objfile, GLOBAL_BLOCK, name,
-				      linkage_name, domain);
+    sym = objfile->sf->qf->lookup_symbol_aux (objfile, GLOBAL_BLOCK, name,
+					      linkage_name, domain);
     if (sym)
       return sym;
   }
@@ -1304,7 +1304,8 @@ basic_lookup_transparent_type (const char *name)
 
   ALL_OBJFILES (objfile)
   {
-    t = basic_lookup_transparent_type_via_partial (objfile, name, GLOBAL_BLOCK);
+    t = objfile->sf->qf->basic_lookup_transparent_type (objfile, name,
+							GLOBAL_BLOCK);
     if (t)
       return t;
   }
@@ -1330,7 +1331,8 @@ basic_lookup_transparent_type (const char *name)
 
   ALL_OBJFILES (objfile)
   {
-    t = basic_lookup_transparent_type_via_partial (objfile, name, STATIC_BLOCK);
+    t = objfile->sf->qf->basic_lookup_transparent_type (objfile, name,
+							STATIC_BLOCK);
     if (t)
       return t;
   }
@@ -1352,14 +1354,14 @@ find_main_filename (void)
   {
     if ((objfile->flags & OBJF_MAIN) == 0)
       continue;
-    result = find_symbol_file_from_partial (objfile, name);
+    result = objfile->sf->qf->find_symbol_file (objfile, name);
     if (result)
       return result;
   }
 
   ALL_OBJFILES (objfile)
   {
-    result = find_symbol_file_from_partial (objfile, name);
+    result = objfile->sf->qf->find_symbol_file (objfile, name);
     if (result)
       return result;
   }
@@ -1849,7 +1851,7 @@ find_line_symtab (struct symtab *symtab, int line, int *index, int *exact_match)
 
       ALL_OBJFILES (objfile)
       {
-	read_psymtabs_with_filename (objfile, symtab->filename);
+	objfile->sf->qf->read_symtabs_with_filename (objfile, symtab->filename);
       }
 
       ALL_SYMTABS (objfile, s)
@@ -4117,7 +4119,8 @@ expand_line_sal (struct symtab_and_line sal)
 
       ALL_OBJFILES (objfile)
       {
-	read_psymtabs_with_filename (objfile, sal.symtab->filename);
+	objfile->sf->qf->read_symtabs_with_filename (objfile,
+						     sal.symtab->filename);
       }
 
       /* Now search the symtab for exact matches and append them.  If

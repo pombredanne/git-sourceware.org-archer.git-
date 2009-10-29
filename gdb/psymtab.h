@@ -20,50 +20,11 @@
 #ifndef PSYMTAB_H
 #define PSYMTAB_H
 
-struct symtab *find_last_source_symtab_from_partial (struct objfile *);
-
-void forget_cached_source_info_partial (struct objfile *);
-
-struct symtab *lookup_symtab_via_partial_symtab (struct objfile *objfile,
-						 const char *name,
-						 const char *full_path,
-						 const char *real_path);
-
-struct symbol *lookup_symbol_aux_psymtabs (struct objfile *objfile,
-					   int block_index, const char *name,
-					   const char *linkage_name,
-					   const domain_enum domain);
-
-struct symbol *lookup_global_symbol_from_objfile_via_partial
-    (const struct objfile *objfile,
-     const char *name,
-     const char *linkage_name,
-     const domain_enum domain);
-
-struct type *basic_lookup_transparent_type_via_partial (struct objfile *objfile,
-							const char *name,
-							int kind);
-
-void print_psymtab_stats_for_objfile (struct objfile *objfile);
-
-void dump_psymtabs_for_objfile (struct objfile *objfile);
-
-void relocate_psymtabs (struct objfile *objfile,
-			struct section_offsets *new_offsets,
-			struct section_offsets *delta);
-
-void read_symtabs_for_function (struct objfile *objfile, const char *func_name);
-
-void expand_partial_symbol_tables (struct objfile *objfile, int from_tty);
-
 void find_pc_symtab_from_partial (CORE_ADDR pc);
 
 struct symtab *find_pc_sect_symtab_from_partial (CORE_ADDR pc,
 						 struct obj_section *section,
 						 int warn_if_readin);
-
-void read_psymtabs_with_filename (struct objfile *objfile,
-				  const char *filename);
 
 void map_partial_symbol_names (void (*) (const char *, void *), void *);
 
@@ -71,6 +32,6 @@ void map_partial_symbol_filenames (void (*) (const char *, const char *,
 					     void *),
 				   void *);
 
-char *find_symbol_file_from_partial (struct objfile *, char *);
+extern const struct quick_symbol_functions psym_functions;
 
 #endif /* PSYMTAB_H */

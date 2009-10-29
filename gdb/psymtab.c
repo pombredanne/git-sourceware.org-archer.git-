@@ -101,7 +101,7 @@ lookup_partial_symtab (struct objfile *objfile, const char *name,
   return (NULL);
 }
 
-struct symtab *
+static struct symtab *
 lookup_symtab_via_partial_symtab (struct objfile *objfile, const char *name,
 				  const char *full_path, const char *real_path)
 {
@@ -454,7 +454,7 @@ require_partial_symbols (struct objfile *objfile)
   return objfile;
 }
 
-struct symbol *
+static struct symbol *
 lookup_global_symbol_from_objfile_via_partial (const struct objfile *objfile,
 					       const char *name,
 					       const char *linkage_name,
@@ -488,7 +488,7 @@ lookup_global_symbol_from_objfile_via_partial (const struct objfile *objfile,
    STATIC_BLOCK, depending on whether or not we want to search global
    symbols or static symbols.  */
 
-struct symbol *
+static struct symbol *
 lookup_symbol_aux_psymtabs (struct objfile *objfile,
 			    int block_index, const char *name,
 			    const char *linkage_name,
@@ -635,7 +635,7 @@ lookup_partial_symbol (struct partial_symtab *pst, const char *name,
   return (NULL);
 }
 
-struct type *
+static struct type *
 basic_lookup_transparent_type_via_partial (struct objfile *objfile,
 					   const char *name, int kind)
 {
@@ -907,7 +907,7 @@ init_psymbol_list (struct objfile *objfile, int total_symbols)
     }
 }
 
-void
+static void
 relocate_psymtabs (struct objfile *objfile,
 		   struct section_offsets *new_offsets,
 		   struct section_offsets *delta)
@@ -1010,7 +1010,7 @@ discard_psymtab (struct partial_symtab *pst)
 
 
 
-struct symtab *
+static struct symtab *
 find_last_source_symtab_from_partial (struct objfile *ofp)
 {
   struct symtab *result;
@@ -1040,7 +1040,7 @@ find_last_source_symtab_from_partial (struct objfile *ofp)
   return NULL;
 }
 
-void
+static void
 forget_cached_source_info_partial (struct objfile *objfile)
 {
   struct partial_symtab *pst;
@@ -1215,7 +1215,7 @@ dump_psymtab (struct objfile *objfile, struct partial_symtab *psymtab,
   fprintf_filtered (outfile, "\n");
 }
 
-void
+static void
 print_psymtab_stats_for_objfile (struct objfile *objfile)
 {
   int i;
@@ -1229,7 +1229,7 @@ print_psymtab_stats_for_objfile (struct objfile *objfile)
   printf_filtered (_("  Number of psym tables (not yet expanded): %d\n"), i);
 }
 
-void
+static void
 dump_psymtabs_for_objfile (struct objfile *objfile)
 {
   struct partial_symtab *psymtab;
@@ -1258,7 +1258,7 @@ dump_psymtabs_for_objfile (struct objfile *objfile)
 /* Look through the partial symtabs for all symbols which begin
    by matching FUNC_NAME.  Make sure we read that symbol table in. */
 
-void
+static void
 read_symtabs_for_function (struct objfile *objfile, const char *func_name)
 {
   struct partial_symtab *ps;
@@ -1567,7 +1567,7 @@ have_partial_symbols (void)
   return 0;
 }
 
-void
+static void
 expand_partial_symbol_tables (struct objfile *objfile, int from_tty)
 {
   struct partial_symtab *psymtab;
@@ -1589,7 +1589,7 @@ expand_partial_symbol_tables (struct objfile *objfile, int from_tty)
     }
 }
 
-void
+static void
 read_psymtabs_with_filename (struct objfile *objfile, const char *filename)
 {
   struct partial_symtab *p;
@@ -1692,7 +1692,7 @@ psymtab_to_fullname (struct partial_symtab *ps)
   return NULL;
 }
 
-char *
+static char *
 find_symbol_file_from_partial (struct objfile *objfile, char *name)
 {
   struct partial_symtab *pst;
@@ -1705,3 +1705,20 @@ find_symbol_file_from_partial (struct objfile *objfile, char *name)
     }
   return NULL;
 }
+
+const struct quick_symbol_functions psym_functions =
+{
+  find_last_source_symtab_from_partial,
+  forget_cached_source_info_partial,
+  lookup_symtab_via_partial_symtab,
+  lookup_symbol_aux_psymtabs,
+  lookup_global_symbol_from_objfile_via_partial,
+  basic_lookup_transparent_type_via_partial,
+  print_psymtab_stats_for_objfile,
+  dump_psymtabs_for_objfile,
+  relocate_psymtabs,
+  read_symtabs_for_function,
+  expand_partial_symbol_tables,
+  read_psymtabs_with_filename,
+  find_symbol_file_from_partial
+};

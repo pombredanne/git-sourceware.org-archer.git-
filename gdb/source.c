@@ -273,7 +273,7 @@ select_source_symtab (struct symtab *s)
   /* How about the partial symbol tables?  */
   ALL_OBJFILES (ofp)
   {
-    s = find_last_source_symtab_from_partial (ofp);
+    s = ofp->sf->qf->find_last_source_symtab (ofp);
     if (s)
       current_source_symtab = s;
   }
@@ -317,7 +317,7 @@ forget_cached_source_info (void)
 	    }
 	}
 
-      forget_cached_source_info_partial (objfile);
+      objfile->sf->qf->forget_cached_source_info (objfile);
     }
 }
 

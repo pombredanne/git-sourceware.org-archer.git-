@@ -163,7 +163,7 @@ print_objfile_statistics (void)
     if (OBJSTAT (objfile, n_types) > 0)
       printf_filtered (_("  Number of \"types\" defined: %d\n"),
 		       OBJSTAT (objfile, n_types));
-    print_psymtab_stats_for_objfile (objfile);
+    objfile->sf->qf->print_stats (objfile);
     i = linetables = blockvectors = 0;
     ALL_OBJFILE_SYMTABS (objfile, s)
       {
@@ -205,7 +205,7 @@ dump_objfile (struct objfile *objfile)
   printf_filtered (", %d minsyms\n\n",
 		   objfile->minimal_symbol_count);
 
-  dump_psymtabs_for_objfile (objfile);
+  objfile->sf->qf->dump (objfile);
 
   if (objfile->symtabs)
     {

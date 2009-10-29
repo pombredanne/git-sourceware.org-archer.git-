@@ -109,6 +109,38 @@ struct symfile_segment_data
   int *segment_info;
 };
 
+struct quick_symbol_functions
+{
+  struct symtab *(*find_last_source_symtab) (struct objfile *);
+  void (*forget_cached_source_info) (struct objfile *);
+  struct symtab *(*lookup_symtab) (struct objfile *,
+				   const char *,
+				   const char *,
+				   const char *);
+  struct symbol *(*lookup_symbol_aux) (struct objfile *,
+				       int block_index, const char *name,
+				       const char *linkage_name,
+				       const domain_enum domain);
+  struct symbol *(*lookup_global_symbol) (const struct objfile *objfile,
+					  const char *name,
+					  const char *linkage_name,
+					  const domain_enum domain);
+  struct type *(*basic_lookup_transparent_type) (struct objfile *objfile,
+						 const char *name,
+						 int kind);
+  void (*print_stats) (struct objfile *objfile);
+  void (*dump) (struct objfile *objfile);
+  void (*relocate) (struct objfile *objfile,
+		    struct section_offsets *new_offsets,
+		    struct section_offsets *delta);
+  void (*read_symtabs_for_function) (struct objfile *objfile,
+				     const char *func_name);
+  void (*expand_symbol_tables) (struct objfile *objfile, int from_tty);
+  void (*read_symtabs_with_filename) (struct objfile *objfile,
+				      const char *filename);
+  char *(*find_symbol_file) (struct objfile *, char *);
+};
+
 /* Structure to keep track of symbol reading functions for various
    object file types.  */
 
@@ -171,6 +203,8 @@ struct sym_fns
      the line table cannot be read while processing the debugging
      information.  */
   void (*sym_read_linetable) (void);
+
+  const struct quick_symbol_functions *qf;
 
   /* Finds the next struct sym_fns.  They are allocated and
      initialized in whatever module implements the functions pointed

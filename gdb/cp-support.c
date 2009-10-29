@@ -759,7 +759,7 @@ make_symbol_overload_list_qualified (const char *func_name)
 
   ALL_OBJFILES (objfile)
   {
-    read_symtabs_for_function (objfile, func_name);
+    objfile->sf->qf->read_symtabs_for_function (objfile, func_name);
   }
 
   /* Search upwards from currently selected frame (so that we can

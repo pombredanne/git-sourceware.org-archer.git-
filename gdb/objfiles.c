@@ -625,7 +625,7 @@ objfile_relocate (struct objfile *objfile, struct section_offsets *new_offsets)
     }
   }
 
-  relocate_psymtabs (objfile, new_offsets, delta);
+  objfile->sf->qf->relocate (objfile, new_offsets, delta);
 
   {
     struct minimal_symbol *msym;

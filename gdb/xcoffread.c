@@ -3045,6 +3045,7 @@ static struct sym_fns xcoff_sym_fns =
   default_symfile_segments,	/* sym_segments: Get segment information from
 				   a file.  */
   aix_process_linenos,          /* sym_read_linetable */
+  &psym_functions,
   NULL				/* next: pointer to next struct sym_fns */
 };
 
