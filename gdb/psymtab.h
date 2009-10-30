@@ -20,8 +20,6 @@
 #ifndef PSYMTAB_H
 #define PSYMTAB_H
 
-void find_pc_symtab_from_partial (CORE_ADDR pc);
-
 struct symtab *find_pc_sect_symtab_from_partial (CORE_ADDR pc,
 						 struct obj_section *section,
 						 int warn_if_readin);

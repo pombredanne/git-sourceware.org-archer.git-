@@ -306,23 +306,6 @@ find_pc_sect_psymtab (CORE_ADDR pc, struct obj_section *section)
   return NULL;
 }
 
-/* Find which partial symtab contains PC.  Return 0 if none.
-   Backward compatibility, no section */
-
-static struct partial_symtab *
-find_pc_psymtab (CORE_ADDR pc)
-{
-  return find_pc_sect_psymtab (pc, find_pc_mapped_section (pc));
-}
-
-void
-find_pc_symtab_from_partial (CORE_ADDR pc)
-{
-  struct partial_symtab *ps = find_pc_psymtab (pc);
-  if (ps)
-    PSYMTAB_TO_SYMTAB (ps);
-}
-
 struct symtab *
 find_pc_sect_symtab_from_partial (CORE_ADDR pc, struct obj_section *section,
 				  int warn_if_readin)
@@ -343,7 +326,7 @@ find_pc_sect_symtab_from_partial (CORE_ADDR pc, struct obj_section *section,
 }
 
 /* Find which partial symbol within a psymtab matches PC and SECTION.
-   Return 0 if none.  Check all psymtabs if PSYMTAB is 0.  */
+   Return 0 if none.  */
 
 static struct partial_symbol *
 find_pc_sect_psymbol (struct partial_symtab *psymtab, CORE_ADDR pc,
@@ -352,10 +335,7 @@ find_pc_sect_psymbol (struct partial_symtab *psymtab, CORE_ADDR pc,
   struct partial_symbol *best = NULL, *p, **pp;
   CORE_ADDR best_pc;
 
-  if (!psymtab)
-    psymtab = find_pc_sect_psymtab (pc, section);
-  if (!psymtab)
-    return 0;
+  gdb_assert (psymtab != NULL);
 
   /* Cope with programs that start at address 0 */
   best_pc = (psymtab->textlow != 0) ? psymtab->textlow - 1 : 0;
@@ -412,15 +392,6 @@ find_pc_sect_psymbol (struct partial_symtab *psymtab, CORE_ADDR pc,
     }
 
   return best;
-}
-
-/* Find which partial symbol within a psymtab matches PC.  Return 0 if none.
-   Check all psymtabs if PSYMTAB is 0.  Backwards compatibility, no section. */
-
-static struct partial_symbol *
-find_pc_psymbol (struct partial_symtab *psymtab, CORE_ADDR pc)
-{
-  return find_pc_sect_psymbol (psymtab, pc, find_pc_mapped_section (pc));
 }
 
 static struct partial_symbol *

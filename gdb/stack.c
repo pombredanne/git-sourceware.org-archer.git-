@@ -53,6 +53,7 @@
 #include "gdb_string.h"
 
 #include "psymtab.h"
+#include "symfile.h"
 
 void (*deprecated_selected_frame_level_changed_hook) (int);
 
@@ -1320,8 +1321,10 @@ backtrace_command_1 (char *count_exp, int show_locals, int from_tty)
     i = count;
     for (fi = trailing; fi != NULL && i--; fi = get_prev_frame (fi))
       {
+	CORE_ADDR pc;
 	QUIT;
-	find_pc_symtab_from_partial (get_frame_address_in_block (fi));
+	pc = get_frame_address_in_block (fi);
+	find_pc_sect_symtab_from_partial (pc, find_pc_mapped_section (pc), 0);
       }
   }
 
