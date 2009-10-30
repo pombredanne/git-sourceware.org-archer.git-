@@ -314,7 +314,7 @@ find_pc_sect_symtab_from_partial (CORE_ADDR pc, struct obj_section *section,
   struct partial_symtab *ps = find_pc_sect_psymtab (pc, section);
   if (ps)
     {
-      if (ps->readin)
+      if (warn_if_readin && ps->readin)
 	/* Might want to error() here (in case symtab is corrupt and
 	   will cause a core dump), but maybe we can successfully
 	   continue, so let's not.  */
