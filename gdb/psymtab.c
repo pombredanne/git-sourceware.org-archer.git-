@@ -37,11 +37,27 @@
 #define DEV_TTY "/dev/tty"
 #endif
 
+/* A fast way to get from a psymtab to its symtab (after the first time).  */
+#define	PSYMTAB_TO_SYMTAB(pst)  \
+    ((pst) -> symtab != NULL ? (pst) -> symtab : psymtab_to_symtab (pst))
+
 /* Lookup a partial symbol.  */
 static struct partial_symbol *lookup_partial_symbol (struct partial_symtab *,
 						     const char *,
 						     const char *, int,
 						     domain_enum);
+
+static char *psymtab_to_fullname (struct partial_symtab *ps);
+
+static struct partial_symbol *find_pc_sect_psymbol (struct partial_symtab *,
+						    CORE_ADDR,
+						    struct obj_section *);
+
+static struct partial_symbol *fixup_psymbol_section (struct partial_symbol
+						     *psym,
+						     struct objfile *objfile);
+
+static struct symtab *psymtab_to_symtab (struct partial_symtab *pst);
 
 /* Lookup the partial symbol table of a source file named NAME.
    *If* there is no '/' in the name, a match after a '/'
@@ -199,7 +215,7 @@ find_pc_sect_psymtab_closer (CORE_ADDR pc, struct obj_section *section,
    none.  We return the psymtab that contains a symbol whose address
    exactly matches PC, or, if we cannot find an exact match, the
    psymtab that contains a symbol whose address is closest to PC.  */
-struct partial_symtab *
+static struct partial_symtab *
 find_pc_sect_psymtab (CORE_ADDR pc, struct obj_section *section)
 {
   struct objfile *objfile;
@@ -329,7 +345,7 @@ find_pc_sect_symtab_from_partial (CORE_ADDR pc, struct obj_section *section,
 /* Find which partial symbol within a psymtab matches PC and SECTION.
    Return 0 if none.  Check all psymtabs if PSYMTAB is 0.  */
 
-struct partial_symbol *
+static struct partial_symbol *
 find_pc_sect_psymbol (struct partial_symtab *psymtab, CORE_ADDR pc,
 		      struct obj_section *section)
 {
@@ -401,13 +417,13 @@ find_pc_sect_psymbol (struct partial_symtab *psymtab, CORE_ADDR pc,
 /* Find which partial symbol within a psymtab matches PC.  Return 0 if none.
    Check all psymtabs if PSYMTAB is 0.  Backwards compatibility, no section. */
 
-struct partial_symbol *
+static struct partial_symbol *
 find_pc_psymbol (struct partial_symtab *psymtab, CORE_ADDR pc)
 {
   return find_pc_sect_psymbol (psymtab, pc, find_pc_mapped_section (pc));
 }
 
-struct partial_symbol *
+static struct partial_symbol *
 fixup_psymbol_section (struct partial_symbol *psym, struct objfile *objfile)
 {
   CORE_ADDR addr;
@@ -724,7 +740,7 @@ decrement_reading_symtab (void *dummy)
    is an even faster macro PSYMTAB_TO_SYMTAB that does the fast
    case inline.  */
 
-struct symtab *
+static struct symtab *
 psymtab_to_symtab (struct partial_symtab *pst)
 {
   /* If it's been looked up before, return it. */
@@ -1145,7 +1161,7 @@ print_partial_symbols (struct gdbarch *gdbarch,
     }
 }
 
-void
+static void
 dump_psymtab (struct objfile *objfile, struct partial_symtab *psymtab,
 	      struct ui_file *outfile)
 {
@@ -1671,7 +1687,7 @@ int find_and_open_source (const char *filename,
 
    If this function fails to find the file that this partial_symtab represents,
    NULL will be returned and ps->fullname will be set to NULL.  */
-char *
+static char *
 psymtab_to_fullname (struct partial_symtab *ps)
 {
   int r;

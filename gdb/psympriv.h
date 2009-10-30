@@ -150,45 +150,9 @@ struct partial_symtab
   unsigned char readin;
 };
 
-/* A fast way to get from a psymtab to its symtab (after the first time).  */
-#define	PSYMTAB_TO_SYMTAB(pst)  \
-    ((pst) -> symtab != NULL ? (pst) -> symtab : psymtab_to_symtab (pst))
-
-
-void dump_psymtab (struct objfile *objfile, struct partial_symtab *psymtab,
-		   struct ui_file *outfile);
-
 struct objfile *require_partial_symbols (struct objfile *);
 
-/* lookup partial symbol table by filename */
-
-/* extern struct partial_symtab *lookup_partial_symtab (const char *); */
-
-/* lookup partial symbol table by address and section */
-
-extern struct partial_symtab *find_pc_sect_psymtab (CORE_ADDR,
-						    struct obj_section *);
-
-/* lookup partial symbol by address */
-
-extern struct partial_symbol *find_pc_psymbol (struct partial_symtab *,
-					       CORE_ADDR);
-
-/* lookup partial symbol by address and section */
-
-extern struct partial_symbol *find_pc_sect_psymbol (struct partial_symtab *,
-						    CORE_ADDR,
-						    struct obj_section *);
-
-extern struct symtab *psymtab_to_symtab (struct partial_symtab *);
-
-extern struct partial_symbol *fixup_psymbol_section (struct partial_symbol
-						     *psym,
-						     struct objfile *objfile);
-
 extern void sort_pst_symbols (struct partial_symtab *);
-
-extern char* psymtab_to_fullname (struct partial_symtab *ps);
 
 /* Traverse all psymtabs in one objfile.  */
 
