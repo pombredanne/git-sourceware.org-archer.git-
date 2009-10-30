@@ -145,6 +145,11 @@ struct quick_symbol_functions
 			   const char *name, int global,
 			   domain_enum namespace, int wild,
 			   void *data);
+  void (*expand_symtabs_matching) (struct objfile *objfile,
+				   int (*file_matcher) (char *, void *),
+				   int (*name_matcher) (char *, void *),
+				   domain_enum kind,
+				   void *data);
 };
 
 /* Structure to keep track of symbol reading functions for various

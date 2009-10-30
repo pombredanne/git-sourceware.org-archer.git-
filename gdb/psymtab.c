@@ -1869,6 +1869,70 @@ map_ada_symtabs (struct objfile *objfile,
     }
 }
 
+static void
+expand_symtabs_matching_via_partial (struct objfile *objfile,
+				     int (*file_matcher) (char *, void *),
+				     int (*name_matcher) (char *, void *),
+				     domain_enum kind,
+				     void *data)
+{
+  struct partial_symtab *ps;
+
+  require_partial_symbols (objfile);
+  ALL_OBJFILE_PSYMTABS (objfile, ps)
+    {
+      struct partial_symbol **psym;
+      struct partial_symbol **bound, **gbound, **sbound;
+      int keep_going = 1;
+
+      if (ps->readin)
+	continue;
+
+      if (! (*file_matcher) (ps->filename, data))
+	continue;
+
+      gbound = objfile->global_psymbols.list + ps->globals_offset + ps->n_global_syms;
+      sbound = objfile->static_psymbols.list + ps->statics_offset + ps->n_static_syms;
+      bound = gbound;
+
+      /* Go through all of the symbols stored in a partial
+	 symtab in one loop. */
+      psym = objfile->global_psymbols.list + ps->globals_offset;
+      while (keep_going)
+	{
+	  if (psym >= bound)
+	    {
+	      if (bound == gbound && ps->n_static_syms != 0)
+		{
+		  psym = objfile->static_psymbols.list + ps->statics_offset;
+		  bound = sbound;
+		}
+	      else
+		keep_going = 0;
+	      continue;
+	    }
+	  else
+	    {
+	      QUIT;
+
+	      if ((*name_matcher) (SYMBOL_NATURAL_NAME (*psym), data)
+		  && ((kind == VARIABLES_DOMAIN
+		       && SYMBOL_CLASS (*psym) != LOC_TYPEDEF
+		       && SYMBOL_CLASS (*psym) != LOC_BLOCK)
+		      || (kind == FUNCTIONS_DOMAIN
+			  && SYMBOL_CLASS (*psym) == LOC_BLOCK)
+		      || (kind == TYPES_DOMAIN
+			  && SYMBOL_CLASS (*psym) == LOC_TYPEDEF)))
+		{
+		  PSYMTAB_TO_SYMTAB (ps);
+		  keep_going = 0;
+		}
+	    }
+	  psym++;
+	}
+    }
+}
+
 const struct quick_symbol_functions psym_functions =
 {
   find_last_source_symtab_from_partial,
@@ -1884,5 +1948,6 @@ const struct quick_symbol_functions psym_functions =
   expand_partial_symbol_tables,
   read_psymtabs_with_filename,
   find_symbol_file_from_partial,
-  map_ada_symtabs
+  map_ada_symtabs,
+  expand_symtabs_matching_via_partial
 };

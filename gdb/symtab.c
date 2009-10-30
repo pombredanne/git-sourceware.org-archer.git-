@@ -62,7 +62,7 @@
 #include "macrotab.h"
 #include "macroscope.h"
 
-#include "psympriv.h"		/* FIXME */
+#include "psymtab.h"
 
 /* Prototypes for local functions */
 
@@ -2510,6 +2510,27 @@ sort_search_symbols (struct symbol_search *prevtail, int nfound)
   return symp;
 }
 
+struct search_symbols_data
+{
+  int nfiles;
+  char **files;
+  char *regexp;
+};
+
+static int
+search_symbols_file_matches (char *filename, void *user_data)
+{
+  struct search_symbols_data *data = user_data;
+  return file_matches (filename, data->files, data->nfiles);
+}
+
+static int
+search_symbols_name_matches (char *symname, void *user_data)
+{
+  struct search_symbols_data *data = user_data;
+  return data->regexp == NULL || re_exec (symname);
+}
+
 /* Search the symbol table for matches to the regular expression REGEXP,
    returning the results in *MATCHES.
 
@@ -2529,13 +2550,11 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
 		struct symbol_search **matches)
 {
   struct symtab *s;
-  struct partial_symtab *ps;
   struct blockvector *bv;
   struct block *b;
   int i = 0;
   struct dict_iterator iter;
   struct symbol *sym;
-  struct partial_symbol **psym;
   struct objfile *objfile;
   struct minimal_symbol *msymbol;
   char *val;
@@ -2560,6 +2579,7 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
   struct symbol_search *psr;
   struct symbol_search *tail;
   struct cleanup *old_chain = NULL;
+  struct search_symbols_data datum;
 
   if (kind < VARIABLES_DOMAIN)
     error (_("must search on specific domain"));
@@ -2612,58 +2632,16 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
      matching the regexp.  That way we don't have to reproduce all of
      the machinery below. */
 
-  ALL_PSYMTABS_REQUIRED (objfile, ps)
+  datum.nfiles = nfiles;
+  datum.files = files;
+  datum.regexp = regexp;
+  ALL_OBJFILES (objfile)
   {
-    struct partial_symbol **bound, **gbound, **sbound;
-    int keep_going = 1;
-
-    if (ps->readin)
-      continue;
-
-    gbound = objfile->global_psymbols.list + ps->globals_offset + ps->n_global_syms;
-    sbound = objfile->static_psymbols.list + ps->statics_offset + ps->n_static_syms;
-    bound = gbound;
-
-    /* Go through all of the symbols stored in a partial
-       symtab in one loop. */
-    psym = objfile->global_psymbols.list + ps->globals_offset;
-    while (keep_going)
-      {
-	if (psym >= bound)
-	  {
-	    if (bound == gbound && ps->n_static_syms != 0)
-	      {
-		psym = objfile->static_psymbols.list + ps->statics_offset;
-		bound = sbound;
-	      }
-	    else
-	      keep_going = 0;
-	    continue;
-	  }
-	else
-	  {
-	    QUIT;
-
-	    /* If it would match (logic taken from loop below)
-	       load the file and go on to the next one.  We check the
-	       filename here, but that's a bit bogus: we don't know
-	       what file it really comes from until we have full
-	       symtabs.  The symbol might be in a header file included by
-	       this psymtab.  This only affects Insight.  */
-	    if (file_matches (ps->filename, files, nfiles)
-		&& ((regexp == NULL
-		     || re_exec (SYMBOL_NATURAL_NAME (*psym)) != 0)
-		    && ((kind == VARIABLES_DOMAIN && SYMBOL_CLASS (*psym) != LOC_TYPEDEF
-			 && SYMBOL_CLASS (*psym) != LOC_BLOCK)
-			|| (kind == FUNCTIONS_DOMAIN && SYMBOL_CLASS (*psym) == LOC_BLOCK)
-			|| (kind == TYPES_DOMAIN && SYMBOL_CLASS (*psym) == LOC_TYPEDEF))))
-	      {
-		PSYMTAB_TO_SYMTAB (ps);
-		keep_going = 0;
-	      }
-	  }
-	psym++;
-      }
+    objfile->sf->qf->expand_symtabs_matching (objfile,
+					      search_symbols_file_matches,
+					      search_symbols_name_matches,
+					      kind,
+					      &datum);
   }
 
   /* Here, we search through the minimal symbol tables for functions
