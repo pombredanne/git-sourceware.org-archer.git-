@@ -1311,23 +1311,23 @@ backtrace_command_1 (char *count_exp, int show_locals, int from_tty)
   else
     count = -1;
 
-  {
-    /* Read in symbols for all of the frames.  Need to do this
-       unconditionally to ensure that psymbols are read.  Also need to
-       do this in a separate pass so that "Reading in symbols for xxx"
-       messages don't screw up the appearance of the backtrace.  Also
-       if people have strong opinions against reading symbols for
-       backtrace this may have to be an option.  */
-    i = count;
-    for (fi = trailing; fi != NULL && i--; fi = get_prev_frame (fi))
-      {
-	CORE_ADDR pc;
-	struct objfile *objfile;
-	QUIT;
-	pc = get_frame_address_in_block (fi);
-	find_pc_sect_symtab_via_partial (pc, find_pc_mapped_section (pc));
-      }
-  }
+  if (info_verbose)
+    {
+      /* Read in symbols for all of the frames.  Need to do this in a
+	 separate pass so that "Reading in symbols for xxx" messages
+	 don't screw up the appearance of the backtrace.  Also if
+	 people have strong opinions against reading symbols for
+	 backtrace this may have to be an option.  */
+      i = count;
+      for (fi = trailing; fi != NULL && i--; fi = get_prev_frame (fi))
+	{
+	  CORE_ADDR pc;
+	  struct objfile *objfile;
+	  QUIT;
+	  pc = get_frame_address_in_block (fi);
+	  find_pc_sect_symtab_via_partial (pc, find_pc_mapped_section (pc));
+	}
+    }
 
   for (i = 0, fi = trailing; fi && count--; i++, fi = get_prev_frame (fi))
     {
