@@ -1,3 +1,50 @@
+2009-11-02  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* elfread.c (elf_symfile_segments): Do not warn about
+	uninitialized sections outside of load segments.
+
+2009-11-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symfile.c (build_id_to_debug_filename): New variable debugdir.  Move
+	variables size, s and data into a new inner block.  Change xmalloc for
+	alloca, use direct BUILDID->SIZE there now.  Loop for the
+	DEBUG_FILE_DIRECTORY components.
+	(find_separate_debug_file): New variable debugdir and debugdir_end.
+	Loop for the DEBUG_FILE_DIRECTORY components.
+	(_initialize_symfile): For "debug-file-directory" use plural and note
+	one can use multiple components now.
+
+2009-11-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symfile.c (find_separate_debug_file): Initialize dir, debugfile and
+	canon_name to NULL.  Change alloca to xmalloc, newly call xfree for it.
+	New label cleanup_return_debugfile, jump to it from the failure paths.
+
+2009-11-02  Andrew Cagney  <cagney@gnu.org>
+
+	* symfile.c (separate_debug_file_exists): When the CRCs mismatch
+	print a warning.
+	(find_separate_debug_file): Pass in the objfile's name.
+
+2009-11-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Remove INVALID_ENTRY_POINT.
+	* frame.c (inside_entry_func): New variable entry_point.  Return 0 if
+	the entry point is not known.
+	* solib-irix.c (enable_break): Likewise.
+	* objfiles.c (init_entry_point_info): Stop using INVALID_ENTRY_POINT.
+	Initialize EI.ENTRY_POINT_P.
+	(entry_point_address): Rename to ...
+	(entry_point_address_query): ... a new function.  Use EI.ENTRY_POINT_P.
+	(entry_point_address): New function.
+	(objfile_relocate): Use EI.ENTRY_POINT_P.
+	* objfiles.h (struct entry_info): Simplify entry_point comment.  New
+	field entry_point_p.
+	(INVALID_ENTRY_POINT): Remove.
+	(entry_point_address_query): New prototype.
+	* solib-frv.c (enable_break): Check for NULL SYMFILE_OBJFILE and its
+	EI.ENTRY_POINT_P.  Return 0 if ".interp" is not found.
+
 2009-11-01  Michael Snyder  <msnyder@vmware.com>
 
 	* NEWS (New Commands): Mention record save/restore.
