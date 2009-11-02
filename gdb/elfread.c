@@ -742,10 +742,6 @@ read_psyms (struct objfile *objfile)
       /* DWARF 2 sections */
       dwarf2_build_psymtabs (objfile, 0);
     }
-
-  /* FIXME: kettenis/20030504: This still needs to be integrated with
-     dwarf2read.c in a better way.  */
-  dwarf2_build_frame_info (objfile);
 }
 
 /* This cleans up the objfile's deprecated_sym_stab_info pointer, and

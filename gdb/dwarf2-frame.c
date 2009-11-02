@@ -40,8 +40,6 @@
 #include "dwarf2-frame.h"
 #include "addrmap.h"
 
-#include "psympriv.h"		/* FIXME */
-
 struct comp_unit;
 
 /* Call Frame Information (CFI).  */
@@ -1574,11 +1572,16 @@ dwarf2_frame_find_fde (CORE_ADDR *pc)
 	  if (!addrmap_find (objfile->quick_addrmap, *pc))
 	    continue;
 	}
-      /* FIXME: Read-in only .debug_frame/.eh_frame without .debug_info?  */
-      require_partial_symbols (objfile); /* double FIXME!! */
 
       fde_table = objfile_data (objfile, dwarf2_frame_objfile_data);
       if (fde_table == NULL)
+	{
+	  dwarf2_build_frame_info (objfile);
+	  fde_table = objfile_data (objfile, dwarf2_frame_objfile_data);
+	}
+      gdb_assert (fde_table != NULL);
+
+      if (fde_table->num_entries == 0)
 	continue;
 
       gdb_assert (objfile->section_offsets);
@@ -2022,6 +2025,7 @@ dwarf2_build_frame_info (struct objfile *objfile)
   gdb_byte *frame_ptr;
   struct dwarf2_cie_table cie_table;
   struct dwarf2_fde_table fde_table;
+  struct dwarf2_fde_table *fde_table2;
 
   cie_table.num_entries = 0;
   cie_table.entries = NULL;
@@ -2093,18 +2097,22 @@ dwarf2_build_frame_info (struct objfile *objfile)
       cie_table.num_entries = 0;  /* Paranoia.  */
     }
 
-  if (fde_table.num_entries != 0)
+  /* Copy fde_table to obstack: it is needed at runtime.  */
+  fde_table2 = (struct dwarf2_fde_table *)
+    obstack_alloc (&objfile->objfile_obstack, sizeof (*fde_table2));
+
+  if (fde_table.num_entries == 0)
     {
-      struct dwarf2_fde_table *fde_table2;
+      fde_table2->entries = NULL;
+      fde_table2->num_entries = 0;
+    }
+  else
+    {
       int i, j;
 
       /* Prepare FDE table for lookups.  */
       qsort (fde_table.entries, fde_table.num_entries,
              sizeof (fde_table.entries[0]), qsort_fde_cmp);
-
-      /* Copy fde_table to obstack: it is needed at runtime.  */
-      fde_table2 = (struct dwarf2_fde_table *)
-          obstack_alloc (&objfile->objfile_obstack, sizeof (*fde_table2));
 
       /* Since we'll be doing bsearch, squeeze out identical (except for
          eh_frame_p) fde entries so bsearch result is predictable.  */
@@ -2121,11 +2129,12 @@ dwarf2_build_frame_info (struct objfile *objfile)
         }
       fde_table2->entries = obstack_finish (&objfile->objfile_obstack);
       fde_table2->num_entries = i;
-      set_objfile_data (objfile, dwarf2_frame_objfile_data, fde_table2);
 
       /* Discard the original fde_table.  */
       xfree (fde_table.entries);
     }
+
+  set_objfile_data (objfile, dwarf2_frame_objfile_data, fde_table2);
 }
 
 /* Provide a prototype to silence -Wmissing-prototypes.  */
