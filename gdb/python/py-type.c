@@ -169,7 +169,10 @@ convert_field (struct type *type, int field)
   if (PyObject_SetAttrString (result, "artificial", arg) < 0)
     goto failarg;
 
-  arg = field < TYPE_N_BASECLASSES (type) ? Py_True : Py_False;
+  if (TYPE_CODE (type) == TYPE_CODE_CLASS)
+    arg = field < TYPE_N_BASECLASSES (type) ? Py_True : Py_False;
+  else
+    arg = Py_False;
   Py_INCREF (arg);
   if (PyObject_SetAttrString (result, "is_base_class", arg) < 0)
     goto failarg;
