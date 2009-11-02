@@ -1,3 +1,16 @@
+2009-10-31  Sergio Durigan Junior <sergiodj@linux.vnet.ibm.com>
+
+	* gdb.base/catch-syscall.exp: Adapt the testcase in order to accept
+	the modified warnings for catch syscall.  Verify if GDB was compiled
+	with support for lib expat, and choose which tests to run depending
+	on this.
+
+2009-10-30  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* gdb.mi/mi-break.exp (test_breakpoint_commands): Test
+	that composite commands are parsed OK. And also test
+	that breakpoint commands do work.
+
 2009-10-23  Michael Snyder  <msnyder@vmware.com>
 
 	gdb.reverse/consecutive-precsave.exp: Change expect pattern
