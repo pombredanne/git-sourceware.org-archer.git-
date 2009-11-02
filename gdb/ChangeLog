@@ -1,3 +1,41 @@
+2009-11-01  Michael Snyder  <msnyder@vmware.com>
+
+	* NEWS (New Commands): Mention record save/restore.
+
+2009-10-31  Michael Snyder  <msnyder@vmware.com>
+
+	* breakpoint.c (bpstat_stop_status): Fix broken comment.
+
+2009-10-31  Pedro Alves  <pedro@codesourcery.com>
+
+	* record.c (record_restore, cmd_record_save): Debug output goes to
+	gdb_stdlog.
+
+2009-10-31  Sergio Durigan Junior <sergiodj@linux.vnet.ibm.com>
+
+	* breakpoint.c (catch_syscall_split_args): Remove unecessary warning
+	displayed when the user provided a syscall name and there is no
+	XML support.
+	* xml-syscall.c: Renamed `_sysinfo' to `sysinfo'.
+	(set_xml_syscall_file_name): Remove syscall_warn_user.
+	(xml_init_syscalls_info): Remove warning.
+	(init_sysinfo): Update warnings.
+
+2009-10-30  Vladimir Prus  <vladimir@codesourcery.com>
+
+	Fix breakpoint commands in MI.
+
+	* mi/mi-main.c (mi_execute_command): Run bpstat_do_actions.
+	* mi/mi-cmd-break.c (mi_cmd_break_commands): Pass 1 to
+	read_command_line_1 to actually parse composite commands.
+
+2009-10-29  Sandra Loosemore  <sandra@codesourcery.com>
+
+	PR gdb/10783
+
+	* target.c (simple_search_memory): Correct read_addr initialization
+	in loop for searching subsequent chunks.
+
 2009-10-28  Daniel Jacobowitz  <dan@codesourcery.com>
 
 	Reported by Antti Hatala <ahatala@nvidia.com>.
