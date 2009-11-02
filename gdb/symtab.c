@@ -155,7 +155,8 @@ const struct block *block_found;
 struct symtab *
 lookup_symtab (const char *name)
 {
-  struct symtab *s;
+  int found;
+  struct symtab *s = NULL;
   struct objfile *objfile;
   char *real_path = NULL;
   char *full_path = NULL;
@@ -220,12 +221,21 @@ got_symtab:
   /* Same search rules as above apply here, but now we look thru the
      psymtabs.  */
 
+  found = 0;
   ALL_OBJFILES (objfile)
   {
-    s = objfile->sf->qf->lookup_symtab (objfile, name, full_path, real_path);
-    if (s)
-      return s;
+    if (objfile->sf->qf->lookup_symtab (objfile, name, full_path, real_path,
+					&s))
+      {
+	found = 1;
+	break;
+      }
   }
+
+  if (s != NULL)
+    return s;
+  if (!found)
+    return NULL;
 
   /* At this point, we have located the psymtab for this file, but
      the conversion to a symtab has failed.  This usually happens
@@ -684,6 +694,37 @@ matching_obj_sections (struct obj_section *obj_first,
 
   return 0;
 }
+
+struct symtab *
+find_pc_sect_symtab_via_partial (CORE_ADDR pc, struct obj_section *section)
+{
+  struct objfile *objfile;
+  struct minimal_symbol *msymbol;
+
+  /* If we know that this is not a text address, return failure.  This is
+     necessary because we loop based on texthigh and textlow, which do
+     not include the data ranges.  */
+  msymbol = lookup_minimal_symbol_by_pc_section (pc, section);
+  if (msymbol
+      && (MSYMBOL_TYPE (msymbol) == mst_data
+	  || MSYMBOL_TYPE (msymbol) == mst_bss
+	  || MSYMBOL_TYPE (msymbol) == mst_abs
+	  || MSYMBOL_TYPE (msymbol) == mst_file_data
+	  || MSYMBOL_TYPE (msymbol) == mst_file_bss))
+    return NULL;
+
+  ALL_OBJFILES (objfile)
+  {
+    struct symtab *result;
+    result = objfile->sf->qf->find_pc_sect_symtab (objfile, msymbol,
+						   pc, section, 0);
+    if (result)
+      return result;
+  }
+
+  return NULL;
+}
+
 
 /* Debug symbols usually don't have section information.  We need to dig that
    out of the minimal symbols and stash that in the debug symbol.  */
@@ -1497,9 +1538,12 @@ find_pc_sect_symtab (CORE_ADDR pc, struct obj_section *section)
 	   can't be found. */
 	if ((objfile->flags & OBJF_REORDERED) && objfile->psymtabs)
 	  {
-	    struct symtab *result = find_pc_sect_symtab_from_partial (pc,
-								      section,
-								      0);
+	    struct symtab *result;
+	    result
+	      = objfile->sf->qf->find_pc_sect_symtab (objfile,
+						      msymbol,
+						      pc, section,
+						      0);
 	    if (result)
 	      return result;
 	  }
@@ -1525,7 +1569,18 @@ find_pc_sect_symtab (CORE_ADDR pc, struct obj_section *section)
   if (best_s != NULL)
     return (best_s);
 
-  return find_pc_sect_symtab_from_partial (pc, section, 1);
+  ALL_OBJFILES (objfile)
+  {
+    struct symtab *result;
+    result = objfile->sf->qf->find_pc_sect_symtab (objfile,
+						   msymbol,
+						   pc, section,
+						   1);
+    if (result)
+      return result;
+  }
+
+  return NULL;
 }
 
 /* Find the symtab associated with PC.  Look through the psymtabs and

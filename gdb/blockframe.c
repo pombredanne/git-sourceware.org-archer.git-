@@ -196,7 +196,8 @@ find_pc_partial_function (CORE_ADDR pc, char **name, CORE_ADDR *address,
   struct obj_section *section;
   struct symbol *f;
   struct minimal_symbol *msymbol;
-  struct symtab *symtab;
+  struct symtab *symtab = NULL;
+  struct objfile *objfile;
   int i;
   CORE_ADDR mapped_pc;
 
@@ -217,7 +218,14 @@ find_pc_partial_function (CORE_ADDR pc, char **name, CORE_ADDR *address,
     goto return_cached_value;
 
   msymbol = lookup_minimal_symbol_by_pc_section (mapped_pc, section);
-  symtab = find_pc_sect_symtab_from_partial (mapped_pc, section, 0);
+  ALL_OBJFILES (objfile)
+  {
+    symtab = objfile->sf->qf->find_pc_sect_symtab (objfile, msymbol,
+						   mapped_pc, section, 0);
+    if (symtab)
+      break;
+  }
+
   if (symtab)
     {
       /* Checking whether the msymbol has a larger value is for the

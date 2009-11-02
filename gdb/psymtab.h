@@ -20,10 +20,6 @@
 #ifndef PSYMTAB_H
 #define PSYMTAB_H
 
-struct symtab *find_pc_sect_symtab_from_partial (CORE_ADDR pc,
-						 struct obj_section *section,
-						 int warn_if_readin);
-
 void map_partial_symbol_names (void (*) (const char *, void *), void *);
 
 void map_partial_symbol_filenames (void (*) (const char *, const char *,

@@ -117,21 +117,23 @@ lookup_partial_symtab (struct objfile *objfile, const char *name,
   return (NULL);
 }
 
-static struct symtab *
+static int
 lookup_symtab_via_partial_symtab (struct objfile *objfile, const char *name,
-				  const char *full_path, const char *real_path)
+				  const char *full_path, const char *real_path,
+				  struct symtab **result)
 {
   struct partial_symtab *ps;
 
   ps = lookup_partial_symtab (objfile, name, full_path, real_path);
   if (!ps)
-    return (NULL);
+    return 0;
 
   if (ps->readin)
     error (_("Internal: readin %s pst for `%s' found when no symtab found."),
 	   ps->filename, name);
 
-  return PSYMTAB_TO_SYMTAB (ps);
+  *result = PSYMTAB_TO_SYMTAB (ps);
+  return 1;
 }
 
 /* Find which partial symtab contains PC and SECTION starting at psymtab PST.
@@ -216,101 +218,84 @@ find_pc_sect_psymtab_closer (CORE_ADDR pc, struct obj_section *section,
    exactly matches PC, or, if we cannot find an exact match, the
    psymtab that contains a symbol whose address is closest to PC.  */
 static struct partial_symtab *
-find_pc_sect_psymtab (CORE_ADDR pc, struct obj_section *section)
+find_pc_sect_psymtab (struct objfile *objfile, CORE_ADDR pc,
+		      struct obj_section *section,
+		      struct minimal_symbol *msymbol)
 {
-  struct objfile *objfile;
-  struct minimal_symbol *msymbol;
-
-  /* If we know that this is not a text address, return failure.  This is
-     necessary because we loop based on texthigh and textlow, which do
-     not include the data ranges.  */
-  msymbol = lookup_minimal_symbol_by_pc_section (pc, section);
-  if (msymbol
-      && (MSYMBOL_TYPE (msymbol) == mst_data
-	  || MSYMBOL_TYPE (msymbol) == mst_bss
-	  || MSYMBOL_TYPE (msymbol) == mst_abs
-	  || MSYMBOL_TYPE (msymbol) == mst_file_data
-	  || MSYMBOL_TYPE (msymbol) == mst_file_bss))
-    return NULL;
+  struct partial_symtab *pst;
 
   /* Try just the PSYMTABS_ADDRMAP mapping first as it has better granularity
      than the later used TEXTLOW/TEXTHIGH one.  */
 
-  ALL_OBJFILES (objfile)
-  {
-    if (objfile->quick_addrmap)
-      {
-	if (!addrmap_find (objfile->quick_addrmap, pc))
-	  continue;
-      }
-    if (require_partial_symbols (objfile)->psymtabs_addrmap != NULL)
-      {
-	struct partial_symtab *pst;
+  if (objfile->quick_addrmap)
+    {
+      if (!addrmap_find (objfile->quick_addrmap, pc))
+	goto next;
+    }
+  if (require_partial_symbols (objfile)->psymtabs_addrmap != NULL)
+    {
+      pst = addrmap_find (objfile->psymtabs_addrmap, pc);
+      if (pst != NULL)
+	{
+	  /* FIXME: addrmaps currently do not handle overlayed sections,
+	     so fall back to the non-addrmap case if we're debugging
+	     overlays and the addrmap returned the wrong section.  */
+	  if (overlay_debugging && msymbol && section)
+	    {
+	      struct partial_symbol *p;
+	      /* NOTE: This assumes that every psymbol has a
+		 corresponding msymbol, which is not necessarily
+		 true; the debug info might be much richer than the
+		 object's symbol table.  */
+	      p = find_pc_sect_psymbol (pst, pc, section);
+	      if (!p
+		  || SYMBOL_VALUE_ADDRESS (p)
+		  != SYMBOL_VALUE_ADDRESS (msymbol))
+		goto next;
+	    }
 
-	pst = addrmap_find (objfile->psymtabs_addrmap, pc);
-	if (pst != NULL)
-	  {
-	    /* FIXME: addrmaps currently do not handle overlayed sections,
-	       so fall back to the non-addrmap case if we're debugging
-	       overlays and the addrmap returned the wrong section.  */
-	    if (overlay_debugging && msymbol && section)
-	      {
-		struct partial_symbol *p;
-		/* NOTE: This assumes that every psymbol has a
-		   corresponding msymbol, which is not necessarily
-		   true; the debug info might be much richer than the
-		   object's symbol table.  */
-		p = find_pc_sect_psymbol (pst, pc, section);
-		if (!p
-		    || SYMBOL_VALUE_ADDRESS (p)
-		       != SYMBOL_VALUE_ADDRESS (msymbol))
-		  continue;
-	      }
+	  /* We do not try to call FIND_PC_SECT_PSYMTAB_CLOSER as
+	     PSYMTABS_ADDRMAP we used has already the best 1-byte
+	     granularity and FIND_PC_SECT_PSYMTAB_CLOSER may mislead us into
+	     a worse chosen section due to the TEXTLOW/TEXTHIGH ranges
+	     overlap.  */
 
-	    /* We do not try to call FIND_PC_SECT_PSYMTAB_CLOSER as
-	       PSYMTABS_ADDRMAP we used has already the best 1-byte
-	       granularity and FIND_PC_SECT_PSYMTAB_CLOSER may mislead us into
-	       a worse chosen section due to the TEXTLOW/TEXTHIGH ranges
-	       overlap.  */
+	  return pst;
+	}
+    }
 
-	    return pst;
-	  }
-      }
-  }
+ next:
 
   /* Existing PSYMTABS_ADDRMAP mapping is present even for PARTIAL_SYMTABs
      which still have no corresponding full SYMTABs read.  But it is not
      present for non-DWARF2 debug infos not supporting PSYMTABS_ADDRMAP in GDB
      so far.  */
 
-  ALL_OBJFILES (objfile)
-    {
-      struct partial_symtab *pst;
+  /* Check even OBJFILE with non-zero PSYMTABS_ADDRMAP as only several of
+     its CUs may be missing in PSYMTABS_ADDRMAP as they may be varying
+     debug info type in single OBJFILE.  */
 
-      /* Check even OBJFILE with non-zero PSYMTABS_ADDRMAP as only several of
-	 its CUs may be missing in PSYMTABS_ADDRMAP as they may be varying
-	 debug info type in single OBJFILE.  */
+  ALL_OBJFILE_PSYMTABS (objfile, pst)
+    if (pc >= pst->textlow && pc < pst->texthigh)
+      {
+	struct partial_symtab *best_pst;
 
-      ALL_OBJFILE_PSYMTABS (objfile, pst)
-	if (pc >= pst->textlow && pc < pst->texthigh)
-	  {
-	    struct partial_symtab *best_pst;
-
-	    best_pst = find_pc_sect_psymtab_closer (pc, section, pst,
-						    msymbol);
-	    if (best_pst != NULL)
-	      return best_pst;
-	  }
-    }
+	best_pst = find_pc_sect_psymtab_closer (pc, section, pst, msymbol);
+	if (best_pst != NULL)
+	  return best_pst;
+      }
 
   return NULL;
 }
 
-struct symtab *
-find_pc_sect_symtab_from_partial (CORE_ADDR pc, struct obj_section *section,
+static struct symtab *
+find_pc_sect_symtab_from_partial (struct objfile *objfile,
+				  struct minimal_symbol *msymbol,
+				  CORE_ADDR pc, struct obj_section *section,
 				  int warn_if_readin)
 {
-  struct partial_symtab *ps = find_pc_sect_psymtab (pc, section);
+  struct partial_symtab *ps = find_pc_sect_psymtab (objfile, pc, section,
+						    msymbol);
   if (ps)
     {
       if (warn_if_readin && ps->readin)
@@ -1589,13 +1574,12 @@ read_psymtabs_with_filename (struct objfile *objfile, const char *filename)
     }
 }
 
-void
-map_partial_symbol_names (void (*fun) (const char *, void *), void *data)
+static void
+map_symbol_names_psymtab (struct objfile *objfile,
+			  void (*fun) (const char *, void *), void *data)
 {
-  struct objfile *objfile;
   struct partial_symtab *ps;
-
-  ALL_PSYMTABS (objfile, ps)
+  ALL_OBJFILE_PSYMTABS (objfile, ps)
     {
       struct partial_symbol **psym;
 
@@ -1626,14 +1610,25 @@ map_partial_symbol_names (void (*fun) (const char *, void *), void *data)
 }
 
 void
-map_partial_symbol_filenames (void (*fun) (const char *, const char *,
+map_partial_symbol_names (void (*fun) (const char *, void *), void *data)
+{
+  struct objfile *objfile;
+
+  ALL_OBJFILES (objfile)
+  {
+    objfile->sf->qf->map_symbol_names (objfile, fun, data);
+  }
+}
+
+static void
+map_symbol_filenames_psymtab (struct objfile *objfile,
+			      void (*fun) (const char *, const char *,
 					   void *),
 			      void *data)
 {
-  struct objfile *objfile;
   struct partial_symtab *ps;
 
-  ALL_PSYMTABS (objfile, ps)
+  ALL_OBJFILE_PSYMTABS (objfile, ps)
     {
       /* FIXME: require psymtab?? */
       const char *fullname;
@@ -1644,6 +1639,19 @@ map_partial_symbol_filenames (void (*fun) (const char *, const char *,
       fullname = psymtab_to_fullname (ps);
       (*fun) (fullname, ps->filename, data);
     }
+}
+
+void
+map_partial_symbol_filenames (void (*fun) (const char *, const char *,
+					   void *),
+			      void *data)
+{
+  struct objfile *objfile;
+
+  ALL_OBJFILES (objfile)
+  {
+    objfile->sf->qf->map_symbol_filenames (objfile, fun, data);
+  }
 }
 
 /* FIXME */
@@ -1936,5 +1944,8 @@ const struct quick_symbol_functions psym_functions =
   read_psymtabs_with_filename,
   find_symbol_file_from_partial,
   map_ada_symtabs,
-  expand_symtabs_matching_via_partial
+  expand_symtabs_matching_via_partial,
+  find_pc_sect_symtab_from_partial,
+  map_symbol_names_psymtab,
+  map_symbol_filenames_psymtab
 };

@@ -113,10 +113,11 @@ struct quick_symbol_functions
 {
   struct symtab *(*find_last_source_symtab) (struct objfile *);
   void (*forget_cached_source_info) (struct objfile *);
-  struct symtab *(*lookup_symtab) (struct objfile *,
-				   const char *,
-				   const char *,
-				   const char *);
+  int (*lookup_symtab) (struct objfile *,
+			const char *,
+			const char *,
+			const char *,
+			struct symtab **);
   struct symbol *(*lookup_symbol_aux) (struct objfile *,
 				       int block_index, const char *name,
 				       const char *linkage_name,
@@ -150,6 +151,18 @@ struct quick_symbol_functions
 				   int (*name_matcher) (char *, void *),
 				   domain_enum kind,
 				   void *data);
+  struct symtab *(*find_pc_sect_symtab) (struct objfile *objfile,
+					 struct minimal_symbol *msymbol,
+					 CORE_ADDR pc,
+					 struct obj_section *section,
+					 int warn_if_readin);
+  void (*map_symbol_names) (struct objfile *objfile,
+				    void (*fun) (const char *, void *),
+				    void *data);
+  void (*map_symbol_filenames) (struct objfile *objfile,
+				void (*fun) (const char *, const char *,
+					     void *),
+				void *data);
 };
 
 /* Structure to keep track of symbol reading functions for various

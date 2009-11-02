@@ -919,6 +919,11 @@ extern int find_pc_partial_function (CORE_ADDR, char **, CORE_ADDR *,
 
 extern void clear_pc_function_cache (void);
 
+/* lookup partial symbol table by address and section */
+
+extern struct symtab *find_pc_sect_symtab_via_partial (CORE_ADDR,
+						       struct obj_section *);
+
 /* lookup full symbol table by address */
 
 extern struct symtab *find_pc_symtab (CORE_ADDR);
