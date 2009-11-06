@@ -1,3 +1,84 @@
+2009-11-06  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* m68k-tdep.c (m68k_convert_register_p): Compare with
+	the actual type of fp registers, not one of the possible
+	values.
+
+2009-11-06  Vladimir Prus  <vladimir@codesourcery.com>
+
+        Prevent program output from mix with "^running".
+
+	gdb/
+	* mi/mi-interp.c (mi_on_resume): Output token
+	and "^running" together, so that nothing else gets
+	in between.
+
+2009-11-05  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* dwarf2read.c (struct dwarf2_cu): Remove ranges_offset and
+	has_ranges_offset.
+	(struct partial_die_info): Remove language, has_stmt_list, dirname,
+	and line_offset.
+	(dwarf2_build_include_psymtabs): Take a die_info.  Handle a missing
+	line table.
+	(dwarf2_get_pc_bounds): Take PST argument.  Pass it
+	to dwarf2_ranges_read.  Update all callers.
+	(init_cu_die_reader): Move earlier.
+	(dwarf2_find_base_address): New function.
+	(process_psymtab_comp_unit): Rewrite to use a full DIE for the
+	compilation unit.  Use dwarf2_get_pc_bounds and
+	dwarf2_find_base_address.
+	(load_comp_unit): Rewrite to use a full DIE for the compilation unit.
+	(process_full_comp_unit): Use dwarf2_find_base_address.
+	(read_partial_die): Remove support for attributes only used
+	in the compilation unit DIE.
+	* symfile.c (allocate_psymtab): Make FILENAME const.
+	(start_psymtab_common): Likewise.
+	* symfile.h (allocate_psymtab, start_psymtab_common): Update
+	prototypes.
+
+2009-11-05  Tom Tromey  <tromey@redhat.com>
+
+	* symmisc.c (print_symbol_bcache_statistics): Print filename cache
+	statistics.
+	(print_objfile_statistics): Likewise.
+	* symfile.c (reread_symbols): Initialize filename_cache.
+	(allocate_symtab): Cache the file name.
+	(allocate_psymtab): Likewise.
+	* solib-sunos.c (allocate_rt_common_objfile): Initialize
+	filename_cache.
+	* objfiles.h (struct objfile) <filename_cache>: New field.
+	* objfiles.c (allocate_objfile): Initialize filename_cache.
+	(free_objfile): Free filename_cache.
+
+2009-11-05  Tom Tromey  <tromey@redhat.com>
+
+	* symfile.c (add_psymbol_to_bcache): Make 'psymbol' static again.
+	Zero the 'value' field.
+
+2009-11-05  Doug Evans  <dje@google.com>
+
+	* amd64-tdep.c (amd64_init_frame_cache): Enhance comment describing
+	saved_regs.
+
+2009-11-05  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* top.c (execute_command): Select a frame before checking the current
+	language.  Only output a message if verbose.
+
+2009-11-05  Tom Tromey  <tromey@redhat.com>
+
+	* symtab.h (SYMBOL_SET_LINKAGE_NAME): Update comment.
+	* symfile.c (allocate_symtab): Don't use obsavestring on a
+	constant string.
+	* stabsread.c (define_symbol): Don't use obsavestring on a
+	constant string.
+	* mdebugread.c (parse_type): Don't use obsavestring on a constant
+	string.
+	(new_symtab): Likewise.
+	* elfread.c (elf_symtab_read): Don't use obsavestring on a
+	constant string.
+
 2009-11-04  Tom Tromey  <tromey@redhat.com>
 
 	* symfile.c (add_psymbol_to_bcache): Don't copy name.  Make

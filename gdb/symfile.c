@@ -2402,6 +2402,8 @@ reread_symbols (void)
 	      objfile->psymbol_cache = bcache_xmalloc ();
 	      bcache_xfree (objfile->macro_cache);
 	      objfile->macro_cache = bcache_xmalloc ();
+	      bcache_xfree (objfile->filename_cache);
+	      objfile->filename_cache = bcache_xmalloc ();
 	      if (objfile->demangled_names_hash != NULL)
 		{
 		  htab_delete (objfile->demangled_names_hash);
@@ -2424,6 +2426,7 @@ reread_symbols (void)
 
 	      objfile->psymbol_cache = bcache_xmalloc ();
 	      objfile->macro_cache = bcache_xmalloc ();
+	      objfile->filename_cache = bcache_xmalloc ();
 	      /* obstack_init also initializes the obstack so it is
 	         empty.  We could use obstack_specify_allocation but
 	         gdb_obstack.h specifies the alloc/dealloc
@@ -2746,12 +2749,11 @@ allocate_symtab (char *filename, struct objfile *objfile)
   symtab = (struct symtab *)
     obstack_alloc (&objfile->objfile_obstack, sizeof (struct symtab));
   memset (symtab, 0, sizeof (*symtab));
-  symtab->filename = obsavestring (filename, strlen (filename),
-				   &objfile->objfile_obstack);
+  symtab->filename = (char *) bcache (filename, strlen (filename) + 1,
+				      objfile->filename_cache);
   symtab->fullname = NULL;
   symtab->language = deduce_language_from_filename (filename);
-  symtab->debugformat = obsavestring ("unknown", 7,
-				      &objfile->objfile_obstack);
+  symtab->debugformat = "unknown";
 
   /* Hook it to the objfile it comes from */
 
@@ -2763,7 +2765,7 @@ allocate_symtab (char *filename, struct objfile *objfile)
 }
 
 struct partial_symtab *
-allocate_psymtab (char *filename, struct objfile *objfile)
+allocate_psymtab (const char *filename, struct objfile *objfile)
 {
   struct partial_symtab *psymtab;
 
@@ -2778,8 +2780,8 @@ allocate_psymtab (char *filename, struct objfile *objfile)
 		     sizeof (struct partial_symtab));
 
   memset (psymtab, 0, sizeof (struct partial_symtab));
-  psymtab->filename = obsavestring (filename, strlen (filename),
-				    &objfile->objfile_obstack);
+  psymtab->filename = (char *) bcache (filename, strlen (filename) + 1,
+				       objfile->filename_cache);
   psymtab->symtab = NULL;
 
   /* Prepend it to the psymtab list for the objfile it belongs to.
@@ -3077,7 +3079,8 @@ again2:
 
 struct partial_symtab *
 start_psymtab_common (struct objfile *objfile,
-		      struct section_offsets *section_offsets, char *filename,
+		      struct section_offsets *section_offsets,
+		      const char *filename,
 		      CORE_ADDR textlow, struct partial_symbol **global_syms,
 		      struct partial_symbol **static_syms)
 {
@@ -3106,9 +3109,15 @@ add_psymbol_to_bcache (char *name, int namelength, domain_enum domain,
 		       enum language language, struct objfile *objfile,
 		       int *added)
 {
-  struct partial_symbol psymbol;
+  /* psymbol is static so that there will be no uninitialized gaps in the
+     structure which might contain random data, causing cache misses in
+     bcache. */
+  static struct partial_symbol psymbol;
 
-  memset (&psymbol, 0, sizeof (struct partial_symbol));
+  /* However, we must ensure that the entire 'value' field has been
+     zeroed before assigning to it, because an assignment may not
+     write the entire field.  */
+  memset (&psymbol.ginfo.value, 0, sizeof (psymbol.ginfo.value));
   /* val and coreaddr are mutually exclusive, one of them *will* be zero */
   if (val != 0)
     {
