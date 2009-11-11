@@ -59,6 +59,8 @@ static struct partial_symbol *fixup_psymbol_section (struct partial_symbol
 
 static struct symtab *psymtab_to_symtab (struct partial_symtab *pst);
 
+static struct objfile *require_partial_symbols (struct objfile *);
+
 /* Lookup the partial symbol table of a source file named NAME.
    *If* there is no '/' in the name, a match after a '/'
    in the psymtab filename will also work.  */
@@ -410,22 +412,6 @@ fixup_psymbol_section (struct partial_symbol *psym, struct objfile *objfile)
   return psym;
 }
 
-/* Ensure that the partial symbols for OBJFILE have been loaded.  This
-   function always returns its argument, as a convenience.  */
-
-struct objfile *
-require_partial_symbols (struct objfile *objfile)
-{
-  if ((objfile->flags & OBJF_SYMTABS_READ) == 0)
-    {
-      objfile->flags |= OBJF_SYMTABS_READ;
-
-      if (objfile->sf->sym_read_psymbols)
-	(*objfile->sf->sym_read_psymbols) (objfile);
-    }
-  return objfile;
-}
-
 static struct symbol *
 lookup_global_symbol_from_objfile_via_partial (const struct objfile *objfile,
 					       const char *name,
@@ -658,29 +644,6 @@ basic_lookup_transparent_type_via_partial (struct objfile *objfile,
   return NULL;
 }
 
-/* This compares two partial symbols by names, using strcmp_iw_ordered
-   for the comparison.  */
-
-static int
-compare_psymbols (const void *s1p, const void *s2p)
-{
-  struct partial_symbol *const *s1 = s1p;
-  struct partial_symbol *const *s2 = s2p;
-
-  return strcmp_iw_ordered (SYMBOL_SEARCH_NAME (*s1),
-			    SYMBOL_SEARCH_NAME (*s2));
-}
-
-void
-sort_pst_symbols (struct partial_symtab *pst)
-{
-  /* Sort the global list; don't sort the static list */
-
-  qsort (pst->objfile->global_psymbols.list + pst->globals_offset,
-	 pst->n_global_syms, sizeof (struct partial_symbol *),
-	 compare_psymbols);
-}
-
 /* True if we are nested inside psymtab_to_symtab. */
 
 int currently_reading_symtab = 0;
@@ -713,170 +676,6 @@ psymtab_to_symtab (struct partial_symtab *pst)
     }
 
   return pst->symtab;
-}
-
-/* Allocate and partially fill a partial symtab.  It will be
-   completely filled at the end of the symbol list.
-
-   FILENAME is the name of the symbol-file we are reading from. */
-
-struct partial_symtab *
-start_psymtab_common (struct objfile *objfile,
-		      struct section_offsets *section_offsets, char *filename,
-		      CORE_ADDR textlow, struct partial_symbol **global_syms,
-		      struct partial_symbol **static_syms)
-{
-  struct partial_symtab *psymtab;
-
-  psymtab = allocate_psymtab (filename, objfile);
-  psymtab->section_offsets = section_offsets;
-  psymtab->textlow = textlow;
-  psymtab->texthigh = psymtab->textlow;		/* default */
-  psymtab->globals_offset = global_syms - objfile->global_psymbols.list;
-  psymtab->statics_offset = static_syms - objfile->static_psymbols.list;
-  return (psymtab);
-}
-
-/* Helper function, initialises partial symbol structure and stashes 
-   it into objfile's bcache.  Note that our caching mechanism will
-   use all fields of struct partial_symbol to determine hash value of the
-   structure.  In other words, having two symbols with the same name but
-   different domain (or address) is possible and correct.  */
-
-static const struct partial_symbol *
-add_psymbol_to_bcache (char *name, int namelength, domain_enum domain,
-		       enum address_class class,
-		       long val,	/* Value as a long */
-		       CORE_ADDR coreaddr,	/* Value as a CORE_ADDR */
-		       enum language language, struct objfile *objfile,
-		       int *added)
-{
-  char *buf = name;  
-  /* psymbol is static so that there will be no uninitialized gaps in the
-     structure which might contain random data, causing cache misses in
-     bcache. */
-  static struct partial_symbol psymbol;
-  
-  if (name[namelength] != '\0')
-    {
-      buf = alloca (namelength + 1);
-      /* Create local copy of the partial symbol */
-      memcpy (buf, name, namelength);
-      buf[namelength] = '\0';
-    }
-  /* val and coreaddr are mutually exclusive, one of them *will* be zero */
-  if (val != 0)
-    {
-      SYMBOL_VALUE (&psymbol) = val;
-    }
-  else
-    {
-      SYMBOL_VALUE_ADDRESS (&psymbol) = coreaddr;
-    }
-  SYMBOL_SECTION (&psymbol) = 0;
-  SYMBOL_LANGUAGE (&psymbol) = language;
-  PSYMBOL_DOMAIN (&psymbol) = domain;
-  PSYMBOL_CLASS (&psymbol) = class;
-
-  SYMBOL_SET_NAMES (&psymbol, buf, namelength, objfile);
-
-  /* Stash the partial symbol away in the cache */
-  return bcache_full (&psymbol, sizeof (struct partial_symbol),
-		      objfile->psymbol_cache, added);
-}
-
-/* Helper function, adds partial symbol to the given partial symbol
-   list.  */
-
-static void
-append_psymbol_to_list (struct psymbol_allocation_list *list,
-			const struct partial_symbol *psym,
-			struct objfile *objfile)
-{
-  if (list->next >= list->list + list->size)
-    extend_psymbol_list (list, objfile);
-  *list->next++ = (struct partial_symbol *) psym;
-  OBJSTAT (objfile, n_psyms++);
-}
-
-/* Add a symbol with a long value to a psymtab.
-   Since one arg is a struct, we pass in a ptr and deref it (sigh).
-   Return the partial symbol that has been added.  */
-
-/* NOTE: carlton/2003-09-11: The reason why we return the partial
-   symbol is so that callers can get access to the symbol's demangled
-   name, which they don't have any cheap way to determine otherwise.
-   (Currenly, dwarf2read.c is the only file who uses that information,
-   though it's possible that other readers might in the future.)
-   Elena wasn't thrilled about that, and I don't blame her, but we
-   couldn't come up with a better way to get that information.  If
-   it's needed in other situations, we could consider breaking up
-   SYMBOL_SET_NAMES to provide access to the demangled name lookup
-   cache.  */
-
-const struct partial_symbol *
-add_psymbol_to_list (char *name, int namelength, domain_enum domain,
-		     enum address_class class,
-		     struct psymbol_allocation_list *list, 
-		     long val,	/* Value as a long */
-		     CORE_ADDR coreaddr,	/* Value as a CORE_ADDR */
-		     enum language language, struct objfile *objfile)
-{
-  const struct partial_symbol *psym;
-
-  int added;
-
-  /* Stash the partial symbol away in the cache */
-  psym = add_psymbol_to_bcache (name, namelength, domain, class,
-				val, coreaddr, language, objfile, &added);
-
-  /* Do not duplicate global partial symbols.  */
-  if (list == &objfile->global_psymbols
-      && !added)
-    return psym;
-
-  /* Save pointer to partial symbol in psymtab, growing symtab if needed. */
-  append_psymbol_to_list (list, psym, objfile);
-  return psym;
-}
-
-/* Initialize storage for partial symbols.  */
-
-void
-init_psymbol_list (struct objfile *objfile, int total_symbols)
-{
-  /* Free any previously allocated psymbol lists.  */
-
-  if (objfile->global_psymbols.list)
-    {
-      xfree (objfile->global_psymbols.list);
-    }
-  if (objfile->static_psymbols.list)
-    {
-      xfree (objfile->static_psymbols.list);
-    }
-
-  /* Current best guess is that approximately a twentieth
-     of the total symbols (in a debugging file) are global or static
-     oriented symbols */
-
-  objfile->global_psymbols.size = total_symbols / 10;
-  objfile->static_psymbols.size = total_symbols / 10;
-
-  if (objfile->global_psymbols.size > 0)
-    {
-      objfile->global_psymbols.next =
-	objfile->global_psymbols.list = (struct partial_symbol **)
-	xmalloc ((objfile->global_psymbols.size
-		  * sizeof (struct partial_symbol *)));
-    }
-  if (objfile->static_psymbols.size > 0)
-    {
-      objfile->static_psymbols.next =
-	objfile->static_psymbols.list = (struct partial_symbol **)
-	xmalloc ((objfile->static_psymbols.size
-		  * sizeof (struct partial_symbol *)));
-    }
 }
 
 static void
@@ -912,75 +711,6 @@ relocate_psymtabs (struct objfile *objfile,
 						  SYMBOL_SECTION (*psym));
     }
 }
-
-struct partial_symtab *
-allocate_psymtab (char *filename, struct objfile *objfile)
-{
-  struct partial_symtab *psymtab;
-
-  if (objfile->free_psymtabs)
-    {
-      psymtab = objfile->free_psymtabs;
-      objfile->free_psymtabs = psymtab->next;
-    }
-  else
-    psymtab = (struct partial_symtab *)
-      obstack_alloc (&objfile->objfile_obstack,
-		     sizeof (struct partial_symtab));
-
-  memset (psymtab, 0, sizeof (struct partial_symtab));
-  psymtab->filename = obsavestring (filename, strlen (filename),
-				    &objfile->objfile_obstack);
-  psymtab->symtab = NULL;
-
-  /* Prepend it to the psymtab list for the objfile it belongs to.
-     Psymtabs are searched in most recent inserted -> least recent
-     inserted order. */
-
-  psymtab->objfile = objfile;
-  psymtab->next = objfile->psymtabs;
-  objfile->psymtabs = psymtab;
-#if 0
-  {
-    struct partial_symtab **prev_pst;
-    psymtab->objfile = objfile;
-    psymtab->next = NULL;
-    prev_pst = &(objfile->psymtabs);
-    while ((*prev_pst) != NULL)
-      prev_pst = &((*prev_pst)->next);
-    (*prev_pst) = psymtab;
-  }
-#endif
-
-  return (psymtab);
-}
-
-void
-discard_psymtab (struct partial_symtab *pst)
-{
-  struct partial_symtab **prev_pst;
-
-  /* From dbxread.c:
-     Empty psymtabs happen as a result of header files which don't
-     have any symbols in them.  There can be a lot of them.  But this
-     check is wrong, in that a psymtab with N_SLINE entries but
-     nothing else is not empty, but we don't realize that.  Fixing
-     that without slowing things down might be tricky.  */
-
-  /* First, snip it out of the psymtab chain */
-
-  prev_pst = &(pst->objfile->psymtabs);
-  while ((*prev_pst) != pst)
-    prev_pst = &((*prev_pst)->next);
-  (*prev_pst) = pst->next;
-
-  /* Next, put it on a free list for recycling */
-
-  pst->next = pst->objfile->free_psymtabs;
-  pst->objfile->free_psymtabs = pst;
-}
-
-
 
 static struct symtab *
 find_last_source_symtab_from_partial (struct objfile *ofp)
@@ -1295,250 +1025,6 @@ maintenance_print_psymbols (char *args, int from_tty)
   do_cleanups (cleanups);
 }
 
-
-/* List all the partial symbol tables whose names match REGEXP (optional).  */
-void
-maintenance_info_psymtabs (char *regexp, int from_tty)
-{
-  struct objfile *objfile;
-
-  if (regexp)
-    re_comp (regexp);
-
-  ALL_OBJFILES (objfile)
-    {
-      struct gdbarch *gdbarch = get_objfile_arch (objfile);
-      struct partial_symtab *psymtab;
-
-      /* We don't want to print anything for this objfile until we
-         actually find a symtab whose name matches.  */
-      int printed_objfile_start = 0;
-
-      ALL_OBJFILE_PSYMTABS (objfile, psymtab)
-	{
-	  QUIT;
-
-	  if (! regexp
-	      || re_exec (psymtab->filename))
-	    {
-	      if (! printed_objfile_start)
-		{
-		  printf_filtered ("{ objfile %s ", objfile->name);
-		  wrap_here ("  ");
-		  printf_filtered ("((struct objfile *) %s)\n", 
-				   host_address_to_string (objfile));
-		  printed_objfile_start = 1;
-		}
-
-	      printf_filtered ("  { psymtab %s ", psymtab->filename);
-	      wrap_here ("    ");
-	      printf_filtered ("((struct partial_symtab *) %s)\n", 
-			       host_address_to_string (psymtab));
-
-	      printf_filtered ("    readin %s\n",
-			       psymtab->readin ? "yes" : "no");
-	      printf_filtered ("    fullname %s\n",
-			       psymtab->fullname ? psymtab->fullname : "(null)");
-	      printf_filtered ("    text addresses ");
-	      fputs_filtered (paddress (gdbarch, psymtab->textlow),
-			      gdb_stdout);
-	      printf_filtered (" -- ");
-	      fputs_filtered (paddress (gdbarch, psymtab->texthigh),
-			      gdb_stdout);
-	      printf_filtered ("\n");
-	      printf_filtered ("    globals ");
-	      if (psymtab->n_global_syms)
-		{
-		  printf_filtered ("(* (struct partial_symbol **) %s @ %d)\n",
-				   host_address_to_string (psymtab->objfile->global_psymbols.list
-				    + psymtab->globals_offset),
-				   psymtab->n_global_syms);
-		}
-	      else
-		printf_filtered ("(none)\n");
-	      printf_filtered ("    statics ");
-	      if (psymtab->n_static_syms)
-		{
-		  printf_filtered ("(* (struct partial_symbol **) %s @ %d)\n",
-				   host_address_to_string (psymtab->objfile->static_psymbols.list
-				    + psymtab->statics_offset),
-				   psymtab->n_static_syms);
-		}
-	      else
-		printf_filtered ("(none)\n");
-	      printf_filtered ("    dependencies ");
-	      if (psymtab->number_of_dependencies)
-		{
-		  int i;
-
-		  printf_filtered ("{\n");
-		  for (i = 0; i < psymtab->number_of_dependencies; i++)
-		    {
-		      struct partial_symtab *dep = psymtab->dependencies[i];
-
-		      /* Note the string concatenation there --- no comma.  */
-		      printf_filtered ("      psymtab %s "
-				       "((struct partial_symtab *) %s)\n",
-				       dep->filename, 
-				       host_address_to_string (dep));
-		    }
-		  printf_filtered ("    }\n");
-		}
-	      else
-		printf_filtered ("(none)\n");
-	      printf_filtered ("  }\n");
-	    }
-	}
-
-      if (printed_objfile_start)
-        printf_filtered ("}\n");
-    }
-}
-
-/* Check consistency of psymtabs and symtabs.  */
-
-void
-maintenance_check_symtabs (char *ignore, int from_tty)
-{
-  struct symbol *sym;
-  struct partial_symbol **psym;
-  struct symtab *s = NULL;
-  struct partial_symtab *ps;
-  struct blockvector *bv;
-  struct objfile *objfile;
-  struct block *b;
-  int length;
-
-  ALL_PSYMTABS (objfile, ps)
-  {
-    struct gdbarch *gdbarch = get_objfile_arch (objfile);
-    s = PSYMTAB_TO_SYMTAB (ps);
-    if (s == NULL)
-      continue;
-    bv = BLOCKVECTOR (s);
-    b = BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK);
-    psym = ps->objfile->static_psymbols.list + ps->statics_offset;
-    length = ps->n_static_syms;
-    while (length--)
-      {
-	sym = lookup_block_symbol (b, SYMBOL_LINKAGE_NAME (*psym),
-				   NULL, SYMBOL_DOMAIN (*psym));
-	if (!sym)
-	  {
-	    printf_filtered ("Static symbol `");
-	    puts_filtered (SYMBOL_LINKAGE_NAME (*psym));
-	    printf_filtered ("' only found in ");
-	    puts_filtered (ps->filename);
-	    printf_filtered (" psymtab\n");
-	  }
-	psym++;
-      }
-    b = BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK);
-    psym = ps->objfile->global_psymbols.list + ps->globals_offset;
-    length = ps->n_global_syms;
-    while (length--)
-      {
-	sym = lookup_block_symbol (b, SYMBOL_LINKAGE_NAME (*psym),
-				   NULL, SYMBOL_DOMAIN (*psym));
-	if (!sym)
-	  {
-	    printf_filtered ("Global symbol `");
-	    puts_filtered (SYMBOL_LINKAGE_NAME (*psym));
-	    printf_filtered ("' only found in ");
-	    puts_filtered (ps->filename);
-	    printf_filtered (" psymtab\n");
-	  }
-	psym++;
-      }
-    if (ps->texthigh < ps->textlow)
-      {
-	printf_filtered ("Psymtab ");
-	puts_filtered (ps->filename);
-	printf_filtered (" covers bad range ");
-	fputs_filtered (paddress (gdbarch, ps->textlow), gdb_stdout);
-	printf_filtered (" - ");
-	fputs_filtered (paddress (gdbarch, ps->texthigh), gdb_stdout);
-	printf_filtered ("\n");
-	continue;
-      }
-    if (ps->texthigh == 0)
-      continue;
-    if (ps->textlow < BLOCK_START (b) || ps->texthigh > BLOCK_END (b))
-      {
-	printf_filtered ("Psymtab ");
-	puts_filtered (ps->filename);
-	printf_filtered (" covers ");
-	fputs_filtered (paddress (gdbarch, ps->textlow), gdb_stdout);
-	printf_filtered (" - ");
-	fputs_filtered (paddress (gdbarch, ps->texthigh), gdb_stdout);
-	printf_filtered (" but symtab covers only ");
-	fputs_filtered (paddress (gdbarch, BLOCK_START (b)), gdb_stdout);
-	printf_filtered (" - ");
-	fputs_filtered (paddress (gdbarch, BLOCK_END (b)), gdb_stdout);
-	printf_filtered ("\n");
-      }
-  }
-}
-
-/* Increase the space allocated for LISTP, which is probably
-   global_psymbols or static_psymbols. This space will eventually
-   be freed in free_objfile().  */
-
-void
-extend_psymbol_list (struct psymbol_allocation_list *listp,
-		     struct objfile *objfile)
-{
-  int new_size;
-  if (listp->size == 0)
-    {
-      new_size = 255;
-      listp->list = (struct partial_symbol **)
-	xmalloc (new_size * sizeof (struct partial_symbol *));
-    }
-  else
-    {
-      new_size = listp->size * 2;
-      listp->list = (struct partial_symbol **)
-	xrealloc ((char *) listp->list,
-		  new_size * sizeof (struct partial_symbol *));
-    }
-  /* Next assumes we only went one over.  Should be good if
-     program works correctly */
-  listp->next = listp->list + listp->size;
-  listp->size = new_size;
-}
-
-/* Many places in gdb want to test just to see if we have any partial
-   symbols available.  This function returns zero if none are currently
-   available, nonzero otherwise. */
-
-int
-have_partial_symbols (void)
-{
-  struct objfile *ofp;
-
-  ALL_OBJFILES (ofp)
-  {
-    if (objfile_has_partial_symbols (ofp))
-      return 1;
-  }
-
-  /* Try again, after reading partial symbols.  We do this in two
-     passes because objfiles are always added to the head of the list,
-     and there might be a later objfile for which we've already read
-     partial symbols.  */
-  ALL_OBJFILES (ofp)
-  {
-    require_partial_symbols (ofp);
-    if (ofp->psymtabs != NULL)
-      {
-	return 1;
-      }
-  }
-
-  return 0;
-}
-
 static void
 expand_partial_symbol_tables (struct objfile *objfile, int from_tty)
 {
@@ -1609,17 +1095,6 @@ map_symbol_names_psymtab (struct objfile *objfile,
     }
 }
 
-void
-map_partial_symbol_names (void (*fun) (const char *, void *), void *data)
-{
-  struct objfile *objfile;
-
-  ALL_OBJFILES (objfile)
-  {
-    objfile->sf->qf->map_symbol_names (objfile, fun, data);
-  }
-}
-
 static void
 map_symbol_filenames_psymtab (struct objfile *objfile,
 			      void (*fun) (const char *, const char *,
@@ -1639,19 +1114,6 @@ map_symbol_filenames_psymtab (struct objfile *objfile,
       fullname = psymtab_to_fullname (ps);
       (*fun) (fullname, ps->filename, data);
     }
-}
-
-void
-map_partial_symbol_filenames (void (*fun) (const char *, const char *,
-					   void *),
-			      void *data)
-{
-  struct objfile *objfile;
-
-  ALL_OBJFILES (objfile)
-  {
-    objfile->sf->qf->map_symbol_filenames (objfile, fun, data);
-  }
 }
 
 /* FIXME */
@@ -1949,3 +1411,548 @@ const struct quick_symbol_functions psym_functions =
   map_symbol_names_psymtab,
   map_symbol_filenames_psymtab
 };
+
+
+
+/* Ensure that the partial symbols for OBJFILE have been loaded.  This
+   function always returns its argument, as a convenience.  */
+
+static struct objfile *
+require_partial_symbols (struct objfile *objfile)
+{
+  if ((objfile->flags & OBJF_SYMTABS_READ) == 0)
+    {
+      objfile->flags |= OBJF_SYMTABS_READ;
+
+      if (objfile->sf->sym_read_psymbols)
+	(*objfile->sf->sym_read_psymbols) (objfile);
+    }
+  return objfile;
+}
+
+
+
+/* This compares two partial symbols by names, using strcmp_iw_ordered
+   for the comparison.  */
+
+static int
+compare_psymbols (const void *s1p, const void *s2p)
+{
+  struct partial_symbol *const *s1 = s1p;
+  struct partial_symbol *const *s2 = s2p;
+
+  return strcmp_iw_ordered (SYMBOL_SEARCH_NAME (*s1),
+			    SYMBOL_SEARCH_NAME (*s2));
+}
+
+void
+sort_pst_symbols (struct partial_symtab *pst)
+{
+  /* Sort the global list; don't sort the static list */
+
+  qsort (pst->objfile->global_psymbols.list + pst->globals_offset,
+	 pst->n_global_syms, sizeof (struct partial_symbol *),
+	 compare_psymbols);
+}
+
+/* Allocate and partially fill a partial symtab.  It will be
+   completely filled at the end of the symbol list.
+
+   FILENAME is the name of the symbol-file we are reading from. */
+
+struct partial_symtab *
+start_psymtab_common (struct objfile *objfile,
+		      struct section_offsets *section_offsets, char *filename,
+		      CORE_ADDR textlow, struct partial_symbol **global_syms,
+		      struct partial_symbol **static_syms)
+{
+  struct partial_symtab *psymtab;
+
+  psymtab = allocate_psymtab (filename, objfile);
+  psymtab->section_offsets = section_offsets;
+  psymtab->textlow = textlow;
+  psymtab->texthigh = psymtab->textlow;		/* default */
+  psymtab->globals_offset = global_syms - objfile->global_psymbols.list;
+  psymtab->statics_offset = static_syms - objfile->static_psymbols.list;
+  return (psymtab);
+}
+
+/* Helper function, initialises partial symbol structure and stashes 
+   it into objfile's bcache.  Note that our caching mechanism will
+   use all fields of struct partial_symbol to determine hash value of the
+   structure.  In other words, having two symbols with the same name but
+   different domain (or address) is possible and correct.  */
+
+static const struct partial_symbol *
+add_psymbol_to_bcache (char *name, int namelength, domain_enum domain,
+		       enum address_class class,
+		       long val,	/* Value as a long */
+		       CORE_ADDR coreaddr,	/* Value as a CORE_ADDR */
+		       enum language language, struct objfile *objfile,
+		       int *added)
+{
+  char *buf = name;  
+  /* psymbol is static so that there will be no uninitialized gaps in the
+     structure which might contain random data, causing cache misses in
+     bcache. */
+  static struct partial_symbol psymbol;
+  
+  if (name[namelength] != '\0')
+    {
+      buf = alloca (namelength + 1);
+      /* Create local copy of the partial symbol */
+      memcpy (buf, name, namelength);
+      buf[namelength] = '\0';
+    }
+  /* val and coreaddr are mutually exclusive, one of them *will* be zero */
+  if (val != 0)
+    {
+      SYMBOL_VALUE (&psymbol) = val;
+    }
+  else
+    {
+      SYMBOL_VALUE_ADDRESS (&psymbol) = coreaddr;
+    }
+  SYMBOL_SECTION (&psymbol) = 0;
+  SYMBOL_LANGUAGE (&psymbol) = language;
+  PSYMBOL_DOMAIN (&psymbol) = domain;
+  PSYMBOL_CLASS (&psymbol) = class;
+
+  SYMBOL_SET_NAMES (&psymbol, buf, namelength, objfile);
+
+  /* Stash the partial symbol away in the cache */
+  return bcache_full (&psymbol, sizeof (struct partial_symbol),
+		      objfile->psymbol_cache, added);
+}
+
+/* Helper function, adds partial symbol to the given partial symbol
+   list.  */
+
+static void
+append_psymbol_to_list (struct psymbol_allocation_list *list,
+			const struct partial_symbol *psym,
+			struct objfile *objfile)
+{
+  if (list->next >= list->list + list->size)
+    extend_psymbol_list (list, objfile);
+  *list->next++ = (struct partial_symbol *) psym;
+  OBJSTAT (objfile, n_psyms++);
+}
+
+/* Add a symbol with a long value to a psymtab.
+   Since one arg is a struct, we pass in a ptr and deref it (sigh).
+   Return the partial symbol that has been added.  */
+
+/* NOTE: carlton/2003-09-11: The reason why we return the partial
+   symbol is so that callers can get access to the symbol's demangled
+   name, which they don't have any cheap way to determine otherwise.
+   (Currenly, dwarf2read.c is the only file who uses that information,
+   though it's possible that other readers might in the future.)
+   Elena wasn't thrilled about that, and I don't blame her, but we
+   couldn't come up with a better way to get that information.  If
+   it's needed in other situations, we could consider breaking up
+   SYMBOL_SET_NAMES to provide access to the demangled name lookup
+   cache.  */
+
+const struct partial_symbol *
+add_psymbol_to_list (char *name, int namelength, domain_enum domain,
+		     enum address_class class,
+		     struct psymbol_allocation_list *list, 
+		     long val,	/* Value as a long */
+		     CORE_ADDR coreaddr,	/* Value as a CORE_ADDR */
+		     enum language language, struct objfile *objfile)
+{
+  const struct partial_symbol *psym;
+
+  int added;
+
+  /* Stash the partial symbol away in the cache */
+  psym = add_psymbol_to_bcache (name, namelength, domain, class,
+				val, coreaddr, language, objfile, &added);
+
+  /* Do not duplicate global partial symbols.  */
+  if (list == &objfile->global_psymbols
+      && !added)
+    return psym;
+
+  /* Save pointer to partial symbol in psymtab, growing symtab if needed. */
+  append_psymbol_to_list (list, psym, objfile);
+  return psym;
+}
+
+/* Initialize storage for partial symbols.  */
+
+void
+init_psymbol_list (struct objfile *objfile, int total_symbols)
+{
+  /* Free any previously allocated psymbol lists.  */
+
+  if (objfile->global_psymbols.list)
+    {
+      xfree (objfile->global_psymbols.list);
+    }
+  if (objfile->static_psymbols.list)
+    {
+      xfree (objfile->static_psymbols.list);
+    }
+
+  /* Current best guess is that approximately a twentieth
+     of the total symbols (in a debugging file) are global or static
+     oriented symbols */
+
+  objfile->global_psymbols.size = total_symbols / 10;
+  objfile->static_psymbols.size = total_symbols / 10;
+
+  if (objfile->global_psymbols.size > 0)
+    {
+      objfile->global_psymbols.next =
+	objfile->global_psymbols.list = (struct partial_symbol **)
+	xmalloc ((objfile->global_psymbols.size
+		  * sizeof (struct partial_symbol *)));
+    }
+  if (objfile->static_psymbols.size > 0)
+    {
+      objfile->static_psymbols.next =
+	objfile->static_psymbols.list = (struct partial_symbol **)
+	xmalloc ((objfile->static_psymbols.size
+		  * sizeof (struct partial_symbol *)));
+    }
+}
+
+struct partial_symtab *
+allocate_psymtab (char *filename, struct objfile *objfile)
+{
+  struct partial_symtab *psymtab;
+
+  if (objfile->free_psymtabs)
+    {
+      psymtab = objfile->free_psymtabs;
+      objfile->free_psymtabs = psymtab->next;
+    }
+  else
+    psymtab = (struct partial_symtab *)
+      obstack_alloc (&objfile->objfile_obstack,
+		     sizeof (struct partial_symtab));
+
+  memset (psymtab, 0, sizeof (struct partial_symtab));
+  psymtab->filename = obsavestring (filename, strlen (filename),
+				    &objfile->objfile_obstack);
+  psymtab->symtab = NULL;
+
+  /* Prepend it to the psymtab list for the objfile it belongs to.
+     Psymtabs are searched in most recent inserted -> least recent
+     inserted order. */
+
+  psymtab->objfile = objfile;
+  psymtab->next = objfile->psymtabs;
+  objfile->psymtabs = psymtab;
+#if 0
+  {
+    struct partial_symtab **prev_pst;
+    psymtab->objfile = objfile;
+    psymtab->next = NULL;
+    prev_pst = &(objfile->psymtabs);
+    while ((*prev_pst) != NULL)
+      prev_pst = &((*prev_pst)->next);
+    (*prev_pst) = psymtab;
+  }
+#endif
+
+  return (psymtab);
+}
+
+void
+discard_psymtab (struct partial_symtab *pst)
+{
+  struct partial_symtab **prev_pst;
+
+  /* From dbxread.c:
+     Empty psymtabs happen as a result of header files which don't
+     have any symbols in them.  There can be a lot of them.  But this
+     check is wrong, in that a psymtab with N_SLINE entries but
+     nothing else is not empty, but we don't realize that.  Fixing
+     that without slowing things down might be tricky.  */
+
+  /* First, snip it out of the psymtab chain */
+
+  prev_pst = &(pst->objfile->psymtabs);
+  while ((*prev_pst) != pst)
+    prev_pst = &((*prev_pst)->next);
+  (*prev_pst) = pst->next;
+
+  /* Next, put it on a free list for recycling */
+
+  pst->next = pst->objfile->free_psymtabs;
+  pst->objfile->free_psymtabs = pst;
+}
+
+/* Increase the space allocated for LISTP, which is probably
+   global_psymbols or static_psymbols. This space will eventually
+   be freed in free_objfile().  */
+
+void
+extend_psymbol_list (struct psymbol_allocation_list *listp,
+		     struct objfile *objfile)
+{
+  int new_size;
+  if (listp->size == 0)
+    {
+      new_size = 255;
+      listp->list = (struct partial_symbol **)
+	xmalloc (new_size * sizeof (struct partial_symbol *));
+    }
+  else
+    {
+      new_size = listp->size * 2;
+      listp->list = (struct partial_symbol **)
+	xrealloc ((char *) listp->list,
+		  new_size * sizeof (struct partial_symbol *));
+    }
+  /* Next assumes we only went one over.  Should be good if
+     program works correctly */
+  listp->next = listp->list + listp->size;
+  listp->size = new_size;
+}
+
+/* Many places in gdb want to test just to see if we have any partial
+   symbols available.  This function returns zero if none are currently
+   available, nonzero otherwise. */
+
+int
+have_partial_symbols (void)
+{
+  struct objfile *ofp;
+
+  ALL_OBJFILES (ofp)
+  {
+    if (objfile_has_partial_symbols (ofp))
+      return 1;
+  }
+
+  /* Try again, after reading partial symbols.  We do this in two
+     passes because objfiles are always added to the head of the list,
+     and there might be a later objfile for which we've already read
+     partial symbols.  */
+  ALL_OBJFILES (ofp)
+  {
+    require_partial_symbols (ofp);
+    if (ofp->psymtabs != NULL)
+      {
+	return 1;
+      }
+  }
+
+  return 0;
+}
+
+
+
+/* List all the partial symbol tables whose names match REGEXP (optional).  */
+void
+maintenance_info_psymtabs (char *regexp, int from_tty)
+{
+  struct objfile *objfile;
+
+  if (regexp)
+    re_comp (regexp);
+
+  ALL_OBJFILES (objfile)
+    {
+      struct gdbarch *gdbarch = get_objfile_arch (objfile);
+      struct partial_symtab *psymtab;
+
+      /* We don't want to print anything for this objfile until we
+         actually find a symtab whose name matches.  */
+      int printed_objfile_start = 0;
+
+      ALL_OBJFILE_PSYMTABS (objfile, psymtab)
+	{
+	  QUIT;
+
+	  if (! regexp
+	      || re_exec (psymtab->filename))
+	    {
+	      if (! printed_objfile_start)
+		{
+		  printf_filtered ("{ objfile %s ", objfile->name);
+		  wrap_here ("  ");
+		  printf_filtered ("((struct objfile *) %s)\n", 
+				   host_address_to_string (objfile));
+		  printed_objfile_start = 1;
+		}
+
+	      printf_filtered ("  { psymtab %s ", psymtab->filename);
+	      wrap_here ("    ");
+	      printf_filtered ("((struct partial_symtab *) %s)\n", 
+			       host_address_to_string (psymtab));
+
+	      printf_filtered ("    readin %s\n",
+			       psymtab->readin ? "yes" : "no");
+	      printf_filtered ("    fullname %s\n",
+			       psymtab->fullname ? psymtab->fullname : "(null)");
+	      printf_filtered ("    text addresses ");
+	      fputs_filtered (paddress (gdbarch, psymtab->textlow),
+			      gdb_stdout);
+	      printf_filtered (" -- ");
+	      fputs_filtered (paddress (gdbarch, psymtab->texthigh),
+			      gdb_stdout);
+	      printf_filtered ("\n");
+	      printf_filtered ("    globals ");
+	      if (psymtab->n_global_syms)
+		{
+		  printf_filtered ("(* (struct partial_symbol **) %s @ %d)\n",
+				   host_address_to_string (psymtab->objfile->global_psymbols.list
+				    + psymtab->globals_offset),
+				   psymtab->n_global_syms);
+		}
+	      else
+		printf_filtered ("(none)\n");
+	      printf_filtered ("    statics ");
+	      if (psymtab->n_static_syms)
+		{
+		  printf_filtered ("(* (struct partial_symbol **) %s @ %d)\n",
+				   host_address_to_string (psymtab->objfile->static_psymbols.list
+				    + psymtab->statics_offset),
+				   psymtab->n_static_syms);
+		}
+	      else
+		printf_filtered ("(none)\n");
+	      printf_filtered ("    dependencies ");
+	      if (psymtab->number_of_dependencies)
+		{
+		  int i;
+
+		  printf_filtered ("{\n");
+		  for (i = 0; i < psymtab->number_of_dependencies; i++)
+		    {
+		      struct partial_symtab *dep = psymtab->dependencies[i];
+
+		      /* Note the string concatenation there --- no comma.  */
+		      printf_filtered ("      psymtab %s "
+				       "((struct partial_symtab *) %s)\n",
+				       dep->filename, 
+				       host_address_to_string (dep));
+		    }
+		  printf_filtered ("    }\n");
+		}
+	      else
+		printf_filtered ("(none)\n");
+	      printf_filtered ("  }\n");
+	    }
+	}
+
+      if (printed_objfile_start)
+        printf_filtered ("}\n");
+    }
+}
+
+/* Check consistency of psymtabs and symtabs.  */
+
+void
+maintenance_check_symtabs (char *ignore, int from_tty)
+{
+  struct symbol *sym;
+  struct partial_symbol **psym;
+  struct symtab *s = NULL;
+  struct partial_symtab *ps;
+  struct blockvector *bv;
+  struct objfile *objfile;
+  struct block *b;
+  int length;
+
+  ALL_PSYMTABS (objfile, ps)
+  {
+    struct gdbarch *gdbarch = get_objfile_arch (objfile);
+    s = PSYMTAB_TO_SYMTAB (ps);
+    if (s == NULL)
+      continue;
+    bv = BLOCKVECTOR (s);
+    b = BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK);
+    psym = ps->objfile->static_psymbols.list + ps->statics_offset;
+    length = ps->n_static_syms;
+    while (length--)
+      {
+	sym = lookup_block_symbol (b, SYMBOL_LINKAGE_NAME (*psym),
+				   NULL, SYMBOL_DOMAIN (*psym));
+	if (!sym)
+	  {
+	    printf_filtered ("Static symbol `");
+	    puts_filtered (SYMBOL_LINKAGE_NAME (*psym));
+	    printf_filtered ("' only found in ");
+	    puts_filtered (ps->filename);
+	    printf_filtered (" psymtab\n");
+	  }
+	psym++;
+      }
+    b = BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK);
+    psym = ps->objfile->global_psymbols.list + ps->globals_offset;
+    length = ps->n_global_syms;
+    while (length--)
+      {
+	sym = lookup_block_symbol (b, SYMBOL_LINKAGE_NAME (*psym),
+				   NULL, SYMBOL_DOMAIN (*psym));
+	if (!sym)
+	  {
+	    printf_filtered ("Global symbol `");
+	    puts_filtered (SYMBOL_LINKAGE_NAME (*psym));
+	    printf_filtered ("' only found in ");
+	    puts_filtered (ps->filename);
+	    printf_filtered (" psymtab\n");
+	  }
+	psym++;
+      }
+    if (ps->texthigh < ps->textlow)
+      {
+	printf_filtered ("Psymtab ");
+	puts_filtered (ps->filename);
+	printf_filtered (" covers bad range ");
+	fputs_filtered (paddress (gdbarch, ps->textlow), gdb_stdout);
+	printf_filtered (" - ");
+	fputs_filtered (paddress (gdbarch, ps->texthigh), gdb_stdout);
+	printf_filtered ("\n");
+	continue;
+      }
+    if (ps->texthigh == 0)
+      continue;
+    if (ps->textlow < BLOCK_START (b) || ps->texthigh > BLOCK_END (b))
+      {
+	printf_filtered ("Psymtab ");
+	puts_filtered (ps->filename);
+	printf_filtered (" covers ");
+	fputs_filtered (paddress (gdbarch, ps->textlow), gdb_stdout);
+	printf_filtered (" - ");
+	fputs_filtered (paddress (gdbarch, ps->texthigh), gdb_stdout);
+	printf_filtered (" but symtab covers only ");
+	fputs_filtered (paddress (gdbarch, BLOCK_START (b)), gdb_stdout);
+	printf_filtered (" - ");
+	fputs_filtered (paddress (gdbarch, BLOCK_END (b)), gdb_stdout);
+	printf_filtered ("\n");
+      }
+  }
+}
+
+
+
+void
+map_partial_symbol_names (void (*fun) (const char *, void *), void *data)
+{
+  struct objfile *objfile;
+
+  ALL_OBJFILES (objfile)
+  {
+    objfile->sf->qf->map_symbol_names (objfile, fun, data);
+  }
+}
+
+void
+map_partial_symbol_filenames (void (*fun) (const char *, const char *,
+					   void *),
+			      void *data)
+{
+  struct objfile *objfile;
+
+  ALL_OBJFILES (objfile)
+  {
+    objfile->sf->qf->map_symbol_filenames (objfile, fun, data);
+  }
+}

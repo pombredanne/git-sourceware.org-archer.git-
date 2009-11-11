@@ -150,8 +150,6 @@ struct partial_symtab
   unsigned char readin;
 };
 
-struct objfile *require_partial_symbols (struct objfile *);
-
 extern void sort_pst_symbols (struct partial_symtab *);
 
 /* Traverse all psymtabs in one objfile.  */
