@@ -1140,8 +1140,10 @@ lookup_global_symbol_from_objfile (const struct objfile *objfile,
   }
 
   /* Now go through psymtabs.  */
-  sym = objfile->sf->qf->lookup_global_symbol (objfile, name,
-					       linkage_name, domain);
+  sym = objfile->sf->qf->lookup_symbol_aux ((struct objfile *) objfile,
+					    GLOBAL_BLOCK,
+					    name, linkage_name,
+					    domain);
   if (sym)
     return sym;
 

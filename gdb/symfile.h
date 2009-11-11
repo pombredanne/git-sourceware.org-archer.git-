@@ -109,56 +109,154 @@ struct symfile_segment_data
   int *segment_info;
 };
 
+/* The "quick" symbol functions exist so that symbol readers can
+   avoiding an initial read of all the symbols.  For example, symbol
+   readers might choose to use the "partial symbol table" utilities,
+   which is one implementation of the quick symbol functions.
+
+   The quick symbol functions are generally opaque: the underlying
+   representation is hidden from the caller.
+
+   In general, these functions should only look at whatever special
+   index the symbol reader creates -- looking through the symbol
+   tables themselves is handled by generic code.  If a function is
+   defined as returning a "symbol table", this means that the function
+   should only return a newly-created symbol table; it should not
+   examine pre-existing ones.
+
+   The exact list of functions here was determined in an ad hoc way
+   based on gdb's history.  */
+
 struct quick_symbol_functions
 {
-  struct symtab *(*find_last_source_symtab) (struct objfile *);
-  void (*forget_cached_source_info) (struct objfile *);
-  int (*lookup_symtab) (struct objfile *,
-			const char *,
-			const char *,
-			const char *,
-			struct symtab **);
-  struct symbol *(*lookup_symbol_aux) (struct objfile *,
+  /* Return the symbol table for the "last" file appearing in
+     OBJFILE.  */
+  struct symtab *(*find_last_source_symtab) (struct objfile *objfile);
+
+  /* Forget all cached full file names for OBJFILE.  */
+  void (*forget_cached_source_info) (struct objfile *objfile);
+
+  /* Look up the symbol table, in OBJFILE, of a source file named
+     NAME.  If there is no '/' in the name, a match after a '/' in the
+     symbol table's file name will also work.  FULL_PATH is the
+     absolute file name, and REAL_PATH is the same, run through
+     gdb_realpath.
+     
+     If no such symbol table can be found, returns 0.
+     
+     Otherwise, sets *RESULT to the symbol table and returns 1.  This
+     might return 1 and set *RESULT to NULL; see lookup_symtab.  */
+  int (*lookup_symtab) (struct objfile *objfile,
+			const char *name,
+			const char *full_path,
+			const char *real_path,
+			struct symtab **result);
+
+  /* Check to see if the symbol is defined in a "partial" symbol table
+     of OBJFILE.  BLOCK_INDEX should be either GLOBAL_BLOCK or
+     STATIC_BLOCK, depending on whether we want to search global
+     symbols or static symbols.  NAME is the name of the symbol to
+     look for, and LINKAGE_NAME is the linkage name (or NULL).  DOMAIN
+     indicates what sort of symbol to search for. */
+  struct symbol *(*lookup_symbol_aux) (struct objfile *objfile,
 				       int block_index, const char *name,
 				       const char *linkage_name,
 				       const domain_enum domain);
-  struct symbol *(*lookup_global_symbol) (const struct objfile *objfile,
-					  const char *name,
-					  const char *linkage_name,
-					  const domain_enum domain);
+
+  /* Look up a type in OBJFILE.  NAME is the name of the type.  KIND
+     is either GLOBAL_BLOCK or STATIC_BLOCK, depending on whether we
+     want to search global symbols or static symbols.  */
   struct type *(*basic_lookup_transparent_type) (struct objfile *objfile,
 						 const char *name,
 						 int kind);
+
+  /* Print statistics about any indices loaded for OBJFILE.  The
+     statistics should be printed to gdb_stdout.  This is used for
+     "maint print statistics".  */
   void (*print_stats) (struct objfile *objfile);
+
+  /* Dump any indices loaded for OBJFILE.  The dump should go to
+     gdb_stdout.  This is used for "maint print objfiles".  */
   void (*dump) (struct objfile *objfile);
+
+  /* This is called by objfile_relocate to relocate any indices loaded
+     for OBJFILE.  */
   void (*relocate) (struct objfile *objfile,
 		    struct section_offsets *new_offsets,
 		    struct section_offsets *delta);
+
+  /* Find all the symbols in OBJFILE named FUNC_NAME, and ensure that
+     the corresponding symbol tables are loaded.  */
   void (*read_symtabs_for_function) (struct objfile *objfile,
 				     const char *func_name);
+
+  /* Read all symbol tables associated with OBJFILE.  If FROM_TTY is
+     true (or if INFO_VERBOSE), this should print some sort of message
+     to gdb_stdout.  */
   void (*expand_symbol_tables) (struct objfile *objfile, int from_tty);
+
+  /* Read all symbol tables associated with OBJFILE which have the
+     file name FILENAME.  */
   void (*read_symtabs_with_filename) (struct objfile *objfile,
 				      const char *filename);
-  char *(*find_symbol_file) (struct objfile *, char *);
+
+  /* Return the file name of the file holding the symbol in OBJFILE
+     named NAME.  If no such symbol exists in OBJFILE, return NULL.  */
+  char *(*find_symbol_file) (struct objfile *objfile, char *name);
+
+  /* FIXME: document.  */
   void (*map_ada_symtabs) (struct objfile *objfile,
 			   void (*callback) (struct objfile *,
 					     struct symtab *, void *),
 			   const char *name, int global,
 			   domain_enum namespace, int wild,
 			   void *data);
+
+  /* Expand all symbol tables in OBJFILE matching some criteria.
+     
+     FILE_MATCHER is called for each file in OBJFILE.  The file name
+     and the DATA argument are passed to it.  If it returns zero, this
+     file is skipped.
+     
+     Otherwise, if the file is not skipped, then NAME_MATCHER is
+     called for each symbol defined in the file.  The symbol's
+     "natural" name and DATA are passed to NAME_MATCHER.
+     
+     If NAME_MATCHER returns zero, then this symbol is skipped.
+     
+     Otherwise, if this symbol is not skipped, and it matches KIND,
+     then this symbol's symbol table is expanded.
+     
+     DATA is user data that is passed unmodified to the callback
+     functions.  */
   void (*expand_symtabs_matching) (struct objfile *objfile,
 				   int (*file_matcher) (char *, void *),
 				   int (*name_matcher) (char *, void *),
 				   domain_enum kind,
 				   void *data);
+
+  /* Return the symbol table from OBJFILE that contains PC and
+     SECTION.  Return NULL if there is no such symbol table.  This
+     should return the symbol table that contains a symbol whose
+     address exactly matches PC, or, if there is no exact match, the
+     symbol table that contains a symbol whose address is closest to
+     PC.  */
   struct symtab *(*find_pc_sect_symtab) (struct objfile *objfile,
 					 struct minimal_symbol *msymbol,
 					 CORE_ADDR pc,
 					 struct obj_section *section,
 					 int warn_if_readin);
+
+  /* Call a callback for every symbol defined in OBJFILE.  FUN is the
+     callback.  It is passed the symbol's natural name, and the DATA
+     passed to this function.  */
   void (*map_symbol_names) (struct objfile *objfile,
-				    void (*fun) (const char *, void *),
-				    void *data);
+			    void (*fun) (const char *, void *),
+			    void *data);
+
+  /* Call a callback for every file defined in OBJFILE.  FUN is the
+     callback.  It is passed the file's name, the file's full name,
+     and the DATA passed to this function.  */
   void (*map_symbol_filenames) (struct objfile *objfile,
 				void (*fun) (const char *, const char *,
 					     void *),

@@ -412,35 +412,6 @@ fixup_psymbol_section (struct partial_symbol *psym, struct objfile *objfile)
   return psym;
 }
 
-static struct symbol *
-lookup_global_symbol_from_objfile_via_partial (const struct objfile *objfile,
-					       const char *name,
-					       const char *linkage_name,
-					       const domain_enum domain)
-{
-  struct partial_symtab *ps;
-  require_partial_symbols ((struct objfile *) objfile);
-  ALL_OBJFILE_PSYMTABS (objfile, ps)
-  {
-    if (!ps->readin
-	&& lookup_partial_symbol (ps, name, linkage_name,
-				  1, domain))
-      {
-	struct symtab *s;
-	struct blockvector *bv;
-	struct block *block;
-	struct symbol *sym;
-
-	s = PSYMTAB_TO_SYMTAB (ps);
-	bv = BLOCKVECTOR (s);
-	block = BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK);
-	sym = lookup_block_symbol (block, name, linkage_name, domain);
-	return fixup_symbol_section (sym, (struct objfile *) objfile);
-      }
-  }
-  return NULL;
-}
-
 /* Check to see if the symbol is defined in one of the partial
    symtabs.  BLOCK_INDEX should be either GLOBAL_BLOCK or
    STATIC_BLOCK, depending on whether or not we want to search global
@@ -1082,7 +1053,7 @@ map_symbol_names_psymtab (struct objfile *objfile,
 	  /* If interrupted, then quit. */
 	  QUIT;
 	  (*fun) (SYMBOL_NATURAL_NAME (*psym), data);
-      }
+	}
 
       for (psym = objfile->static_psymbols.list + ps->statics_offset;
 	   psym < (objfile->static_psymbols.list + ps->statics_offset
@@ -1396,7 +1367,6 @@ const struct quick_symbol_functions psym_functions =
   forget_cached_source_info_partial,
   lookup_symtab_via_partial_symtab,
   lookup_symbol_aux_psymtabs,
-  lookup_global_symbol_from_objfile_via_partial,
   basic_lookup_transparent_type_via_partial,
   print_psymtab_stats_for_objfile,
   dump_psymtabs_for_objfile,
