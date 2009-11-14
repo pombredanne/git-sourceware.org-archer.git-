@@ -110,6 +110,15 @@ enum target_waitkind
 
     TARGET_WAITKIND_EXECD,
 
+    /* The program had previously vforked, and now the child is done
+       with the shared memory region, because it exec'ed or exited.
+       Note that the event is reported to the vfork parent.  This is
+       only used if GDB did not stay attached to the vfork child,
+       otherwise, a TARGET_WAITKIND_EXECD or
+       TARGET_WAITKIND_EXIT|SIGNALLED event associated with the child
+       has the same effect.  */
+    TARGET_WAITKIND_VFORK_DONE,
+
     /* The program has entered or returned from a system call.  On
        HP-UX, this is used in the hardware watchpoint implementation.
        The syscall's unique integer ID number is in value.syscall_id */
@@ -576,6 +585,13 @@ struct target_ops
        The default implementation always returns target_gdbarch.  */
     struct gdbarch *(*to_thread_architecture) (struct target_ops *, ptid_t);
 
+    /* Determine current address space of thread PTID.
+
+       The default implementation always returns the inferior's
+       address space.  */
+    struct address_space *(*to_thread_address_space) (struct target_ops *,
+						      ptid_t);
+
     int to_magic;
     /* Need sub-structure for target machine related rather than comm related?
      */
@@ -684,6 +700,10 @@ extern void target_store_registers (struct regcache *regcache, int regs);
 
 #define	target_prepare_to_store(regcache)	\
      (*current_target.to_prepare_to_store) (regcache)
+
+/* Determine current address space of thread PTID.  */
+
+struct address_space *target_thread_address_space (ptid_t);
 
 /* Returns true if this target can debug multiple processes
    simultaneously.  */

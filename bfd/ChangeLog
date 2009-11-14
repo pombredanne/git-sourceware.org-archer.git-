@@ -1,3 +1,128 @@
+2009-11-12  Nick Clifton  <nickc@redhat.com>
+
+	* po/ru.po: Updates Russian translation.
+
+2009-11-11  Nick Clifton  <nickc@redhat.com>
+
+	* po/id.po: Updated Indonesian translation.
+
+2009-11-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* configure.in: Call ACX_LARGEFILE.  Stop calling AC_PLUGINS,
+	AC_SYS_LARGEFILE and checking the Solaris largefile exception.
+	* aclocal.m4: Regenerate.
+	* configure: Regenerate.
+
+2009-11-09  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/10911
+	* elflink.c (elf_link_output_extsym): Don't return on
+	STT_GNU_IFUNC symbol when stripping.
+
+2009-11-08  John David Anglin  <dave.anglin@nrc-cnrc.gc.ca>
+
+	* elf32-hppa.c (elf32_hppa_final_link): Don't sort unwind information
+	in a relocatable link.
+	* elf64-hppa.c (elf_hppa_final_link): Likewise.
+
+2009-11-05  Nick Clifton  <nickc@redhat.com>
+
+	* elflink.c (elf_link_add_object_symbols): Improve error
+	message generated when a symbol is left unresolved because a
+	--no-add-needed command line option has prevented the
+	inclusion of the DSO defining it.
+
+2009-11-03  Alan Modra  <amodra@bigpond.net.au>
+	    Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* elf32-spu.c (mark_functions_via_relocs): Handle non-branch relocs
+	(jump tables or other references to code labels) as well.
+
+2009-11-02  Paul Brook  <paul@codesourcery.com>
+
+	* elf32-arm.c (elf32_arm_merge_eabi_attributes): Handle VFPv4
+	attributes.
+
+2009-11-02  Alan Modra  <amodra@bigpond.net.au>
+
+	* elflink.c (elf_link_add_object_symbols): Don't force debug
+	symbols local.
+
+2009-10-29  Johan Kristell  <johankri@axis.com>
+
+	* elf32-cris.c (cris_elf_plt_sym_val): New function.
+	(elf_backend_plt_sym_val): Define.
+
+2009-10-27  Kai Tietz  <kai.tietz@onevision.com>
+
+	* peXXigen.c (bfdver.h): Add include.
+	(LINKER_VERSION): Do calculation based on BFD_VERSION.
+
+2009-10-25  Maciej W. Rozycki  <macro@linux-mips.org>
+
+	* elf32-vax.c (elf_vax_relocate_section): Correct assertion.
+
+2009-10-25  Maciej W. Rozycki  <macro@linux-mips.org>
+
+	* elf32-vax.c (elf_vax_plt_entry): Fix formatting.
+
+2009-10-25  Maciej W. Rozycki  <macro@linux-mips.org>
+
+	* elf32-vax.c (elf_vax_relocate_section): Fix a typo.
+
+2009-10-23  Kai Tietz  <kai.tietz@onevision.com>
+
+	* coff-x86_64.c (coff_amd64_rtype_to_howto): Subtract offset
+	of R_AMD64_PCRLONG_<X> relocations from addend.
+
+2009-10-23  Alan Modra  <amodra@bigpond.net.au>
+
+	* plugin.c: Produce empty object if not BFD_SUPPORTS_PLUGINS.
+
+2009-10-20  Alan Modra  <amodra@bigpond.net.au>
+
+	PR binutils/10802
+	* opncls.c (_maybe_make_executable): Make DYNAMIC files executable.
+
+2009-10-19  Hans-Peter Nilsson  <hp@axis.com>
+
+	* elf32-cris.c (cris_elf_relocate_section) <case R_CRIS_32_DTPREL>:
+	Don't subtract the size of the TLS block for non-shared objects
+	from the relocation.
+
+2009-10-17  Arnold Metselaar  <arnold.metselaar@planet.nl>
+
+	* coff-z80.c (z80coff_vec): Allow sections to be of type
+	SEC_CODE or SEC_DATA
+
+2009-10-16  Alan Modra  <amodra@bigpond.net.au>
+
+	PR binutils/10785
+	* coff-alpha.c (alpha_ecoff_get_elt_at_filepos): Don't bfd_alloc
+	bim and bim->buffer.  bfd_malloc instead.
+	* peicode.h (pe_ILF_build_a_bfd): Similarly.
+	(ILF_DATA_SIZE): Don't include bim.
+	* opncls.c (bfd_close): Test bim->buffer non-NULL before freeing.
+
+2009-10-14  Alan Modra  <amodra@bigpond.net.au>
+
+	* aoutx.h (aout_link_check_ar_symbols): Typo fix.
+
+2009-10-13  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR binutils/10763
+	* elf32-i386.c (elf_i386_finish_dynamic_symbol): Declare plt
+	earlier.
+
+2009-10-13  Alan Modra  <amodra@bigpond.net.au>
+
+	* elflink.c (_bfd_elf_merge_symbol): Revert previous patch.
+
+2009-10-12  Roland McGrath  <roland@frob.com>
+
+	* elflink.c (elf_link_add_object_symbols, _bfd_elf_merge_symbol):
+	Fix %s that should be %B in several message formats.
+
 2009-10-10  Alan Modra  <amodra@bigpond.net.au>
 
 	* cofflink.c (_bfd_coff_link_input_bfd): Skip section symbols for
@@ -135,7 +260,7 @@
 2009-09-29 M R Swami Reddy <MR.Swami.Reddy@nsc.com>
 
 	* elf32-cr16.c (elf32_cr16_relocate_section): Removed
-	info->relocatable to fix the ld/testsuites/ld-elf/linkonce1 test case. 
+	info->relocatable to fix the ld/testsuites/ld-elf/linkonce1 test case.
 
 2009-09-28  Nick Clifton  <nickc@redhat.com>
 

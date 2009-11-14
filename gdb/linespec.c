@@ -1428,6 +1428,7 @@ lookup_prefix_sym (char **argptr, char *p)
 {
   char *p1;
   char *copy;
+  struct symbol *sym;
 
   /* Extract the class name.  */
   p1 = p;
@@ -1446,7 +1447,26 @@ lookup_prefix_sym (char **argptr, char *p)
   /* At this point p1->"::inA::fun", p->"inA::fun" copy->"AAA",
      argptr->"inA::fun" */
 
-  return lookup_symbol (copy, 0, STRUCT_DOMAIN, 0);
+  sym = lookup_symbol (copy, 0, STRUCT_DOMAIN, 0);
+  if (sym == NULL)
+    {
+      /* Typedefs are in VAR_DOMAIN so the above symbol lookup will
+	 fail when the user attempts to lookup a method of a class
+	 via a typedef'd name (NOT via the class's name, which is already
+	 handled in symbol_matches_domain).  So try the lookup again
+	 using VAR_DOMAIN (where typedefs live) and double-check that we
+	 found a struct/class type.  */
+      struct symbol *s = lookup_symbol (copy, 0, VAR_DOMAIN, 0);
+      if (s != NULL)
+	{
+	  struct type *t = SYMBOL_TYPE (s);
+	  CHECK_TYPEDEF (t);
+	  if (TYPE_CODE (t) == TYPE_CODE_STRUCT)
+	    return s;
+	}
+    }
+
+  return sym;
 }
 
 /* This finds the method COPY in the class whose type is T and whose
@@ -1584,6 +1604,8 @@ decode_all_digits (char **argptr, struct symtab *default_symtab,
 
   init_sal (&val);
 
+  val.pspace = current_program_space;
+
   /* This is where we need to make sure that we have good defaults.
      We must guarantee that this section of code is never executed
      when we are called with just a function name, since
@@ -1635,6 +1657,7 @@ decode_all_digits (char **argptr, struct symtab *default_symtab,
   if (val.symtab == 0)
     val.symtab = file_symtab;
 
+  val.pspace = SYMTAB_PSPACE (val.symtab);
   val.pc = 0;
   values.sals = (struct symtab_and_line *)
     xmalloc (sizeof (struct symtab_and_line));
@@ -1706,6 +1729,7 @@ decode_dollar (char *copy, int funfirstline, struct symtab *default_symtab,
   val.symtab = file_symtab ? file_symtab : default_symtab;
   val.line = valx;
   val.pc = 0;
+  val.pspace = current_program_space;
 
   values.sals = (struct symtab_and_line *) xmalloc (sizeof val);
   values.sals[0] = val;

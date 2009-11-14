@@ -457,10 +457,13 @@ execute_command (char *p, int from_tty)
 
     }
 
-  /* Tell the user if the language has changed (except first time).  */
+  /* Tell the user if the language has changed (except first time).
+     First make sure that a new frame has been selected, in case this
+     command or the hooks changed the program state.  */
+  deprecated_safe_get_selected_frame ();
   if (current_language != expected_language)
     {
-      if (language_mode == language_mode_auto)
+      if (language_mode == language_mode_auto && info_verbose)
 	{
 	  language_info (1);	/* Print what changed.  */
 	}
@@ -1187,6 +1190,9 @@ kill_or_detach (struct inferior *inf, void *args)
   struct qt_args *qt = args;
   struct thread_info *thread;
 
+  if (inf->pid == 0)
+    return 0;
+
   thread = any_thread_of_process (inf->pid);
   if (thread != NULL)
     {
@@ -1213,6 +1219,9 @@ static int
 print_inferior_quit_action (struct inferior *inf, void *arg)
 {
   struct ui_file *stb = arg;
+
+  if (inf->pid == 0)
+    return 0;
 
   if (inf->attach_flag)
     fprintf_filtered (stb,
@@ -1721,6 +1730,13 @@ gdb_init (char *argv0)
   initialize_targets ();	/* Setup target_terminal macros for utils.c */
   initialize_utils ();		/* Make errors and warnings possible */
   initialize_all_files ();
+  /* This creates the current_program_space.  Do this after all the
+     _initialize_foo routines have had a chance to install their
+     per-sspace data keys.  Also do this before
+     initialize_current_architecture is called, because it accesses
+     exec_bfd of the current program space.  */
+  initialize_progspace ();
+  initialize_inferiors ();
   initialize_current_architecture ();
   init_cli_cmds();
   init_main ();			/* But that omits this file!  Do it now */

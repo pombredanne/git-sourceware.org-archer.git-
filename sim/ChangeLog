@@ -1,3 +1,53 @@
+2009-11-12  Tristan Gingold  <gingold@adacore.com>
+
+	* avr/interp.c (sim_write): Allow byte access.
+	(sim_read): Ditto.
+
+2009-11-12  Tristan Gingold  <gingold@adacore.com>
+
+	* avr/interp.c (sim_load): Clear memory before loading.
+
+2009-11-09  Tristan Gingold  <gingold@adacore.com>
+
+	* avr/interp.c (sim_resume): Fix typo for OP_ret.
+
+2009-10-23  Doug Evans  <dje@sebabeach.org>
+
+	* cris/arch.c: Regenerate.
+	* cris/arch.h: Regenerate.
+	* cris/cpuall.h: Regenerate.
+	* cris/cpuv10.c: Regenerate.
+	* cris/cpuv10.h: Regenerate.
+	* cris/cpuv32.c: Regenerate.
+	* cris/cpuv32.h: Regenerate.
+	* cris/cris-desc.c: Regenerate.
+	* cris/cris-desc.h: Regenerate.
+	* cris/cris-opc.h: Regenerate.
+	* cris/decodev10.c: Regenerate.
+	* cris/decodev10.h: Regenerate.
+	* cris/decodev32.c: Regenerate.
+	* cris/decodev32.h: Regenerate.
+	* cris/modelv10.c: Regenerate.
+	* cris/modelv32.c: Regenerate.
+	* cris/semcrisv10f-switch.c: Regenerate.
+	* cris/semcrisv32f-switch.c: Regenerate.
+
+2009-10-22  Tristan Gingold  <gingold@adacore.com>
+
+	* avr/interp.c (sim_stop): Return 1.
+
+2009-10-16  Doug Evans  <dje@sebabeach.org>
+
+	* MAINTAINERS: Add myself as m32r maintainer.
+
+2009-10-15  Michael Egaer  <eager@eagercon.com>
+
+	* MAINTAINERS: Add self as MicroBlaze maintainer.
+
+2009-10-14  Ben Elliston  <bje@gnu.org>
+
+	* MAINTAINERS (common): Move myself to "past maintainers" section.
+
 2009-10-06  Michael Eager  <eager@eagercon.com>
 
 	* microblaze/interp.c: Add include microblaze-dis.h.

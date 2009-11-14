@@ -1,3 +1,1440 @@
+2009-11-13  Doug Evans  <dje@google.com>
+
+	* dcache.c (dcache_hit, dcache_read_line): Tweak comments.
+	(dcache_peek_byte, dcache_init, dcache_xfer_memory): Ditto.
+	* target.c (memory_xfer_partial): Tweak comments.
+	(target_xfer_partial, target_write_memory): Add comment.
+	(target_read_partial): Remove note from 2003-10-21.
+	(target_read, target_write): Add comments.
+
+2009-11-13  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* inline-frame.c (find_inline_frame_state): Check for changed PC
+	here...
+	(inline_frame_sniffer): ... not here.
+
+2009-11-13  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* ui-file.c (stdio_file_read): Call gdb_select before read.
+
+2009-11-13  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* mips-tdep.c (mips_insn16_frame_this_id): Mark the outermost
+	frame.
+	(mips_insn32_frame_this_id): Likewise.
+
+2009-11-13  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* elfread.c (elf_symtab_read): Only mark a minimal symbol as
+	special if it actually exists.  Merge the checks for this
+	conditions.
+
+2009-11-13  Kazu Hirata  <kazu@codesourcery.com>
+	    Maxim Kuvyrkov  <maxim@codesourcery.com>
+
+	* remote-fileio.c (remote_fileio_request): Send Ctrl-C if it is
+	pending.
+	* remote-fileio.h: Update the prototype for remote_fileio_request.
+	* remote.c (struct remote_state): Add ctrlc_pending_p.
+	(remote_open_1): Clear ctrlc_pending_p.
+	(remote_stop_as): Set ctrlc_pending_p to 1.
+	(remote_wait_as): Pass ctrlc_pending_p to remote_fileio_request.
+
+2009-11-13  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* arm-tdep.c (arm_skip_stub): Recognize RealView veneer functions.
+
+2009-11-13  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* breakpoint.c (update_watchpoint): Only fiddle with frames for
+	local watchpoints.
+
+2009-11-13  Pedro Alves  <pedro@codesourcery.com>
+
+	* infrun.c (handle_inferior_event): Set stop_print_frame on
+	TARGET_WAITKIND_LOADED events, if stopping on solib-events.
+
+2009-11-13  Doug Evans  <dje@google.com>
+
+	* dcache.c (dcache_block): Replace member newer with next,prev.
+	(dcache_struct): Delete member newest.
+	(block_func): New typedef.
+	(append_block, remove_block, for_each_block): New functions.
+	(invalidate_block, free_block): New functions.
+	(dcache_invalidate): Update
+	(dcache_invalidate_line, dcache_alloc): Update to use new list
+	accessors.
+	(dcache_free): Ditto.  Fix memory leak.
+
+2009-11-13  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* python/py-prettyprint.c (print_string_repr): Suppress
+	address printing
+	
+2009-11-13  Tristan Gingold  <gingold@adacore.com>
+
+	* avr-tdep.c (avr_push_dummy_call): Fix endianness issue and avoid
+	overlap between returned structure and return address/parameters.
+
+2009-11-12  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* remote-fileio.c (remote_fileio_func_read): Limit console
+	reads to 16K.
+
+2009-11-12  Daniel Jacobowitz  <dan@codesourcery.com>
+	    Paul Brook  <paul@codesourcery.com>
+
+	* c-typeprint.c (c_type_print_base): Skip artificial fields.
+	Use get_vptr_fieldno to skip the vtable pointer.
+	* dwarf2read.c (dwarf2_add_field): Set FIELD_ARTIFICIAL on artificial
+	fields.
+	(dwarf2_add_member_fn): Complain about virtual member functions
+	without DW_AT_vtable_elem_location and force TYPE_CPLUS_DYNAMIC.
+	* gdbtypes.c (get_vptr_fieldno): Update comment.
+	* gdbtypes.h (struct cplus_struct_type): Add is_dynamic.
+	(TYPE_CPLUS_DYNAMIC): New macro.
+	* gnu-v3-abi.c (gnuv3_dynamic_class): New.
+	(gnuv3_get_vtable): Rewrite to use gnuv3_dynamic_class.  Move higher.
+	(gnuv3_rtti_type, gnuv3_get_virtual_fn, gnuv3_baseclass_offset): Use
+	gnuv3_get_vtable.
+	* varobj.c (cplus_class_num_children, cplus_describe_child): Skip
+	artificial fields.  Use get_vptr_fieldno to skip the vtable pointer.
+
+2009-11-12  Paul Brook  <paul@codesourcery.com>
+	    Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* dwarf2read.c (dwarf2_add_member_fn): Calculate virtual function
+	offset for classes without DW_AT_containing_type.
+
+2009-11-12  Paul Brook  <paul@codesourcery.com>
+	    Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* dwarf2read.c (struct field_info): Add baseclasses.
+	(dwarf2_add_field): Add base classes to a separate list.
+	(dwarf2_attach_fields_to_type): Merge base classes and fields.
+
+2009-11-12  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* dwarf2read.c (process_psymtab_comp_unit): Initialize per_cu backlink
+	at the same time as the forward link.
+	(load_partial_comp_unit): Initialize per_cu links before calling
+	init_cu_die_reader.
+
+2009-11-11  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	PR gdb/10838
+	* linux-thread-db.c (thread_db_info): New member.
+	(disable_thread_event_reporting): Call td_ta_clear_event.
+
+2009-11-11  Keith Seitz  <keiths@redhat.com>
+
+	* linespec.c (lookup_prefix_sym): Lookup the symbol
+	in both STRUCT_DOMAIN and VAR_DOMAIN.
+
+2009-11-11  Michael Snyder  <msnyder@vmware.com>
+
+	* darwin-nat-info.c: Update copyright.
+	* dbxread.c: Ditto.
+	* gdbarch.sh: Ditto.
+	* gdbarch.c: Ditto.
+	* gdbarch.h: Ditto.
+	* inline-frame.c: Ditto.
+	* inline-frame.h: Ditto.
+	* s390-nat.c: Ditto.
+
+2009-11-11  Michael Snyder  <msnyder@vmware.com>
+
+        * findvar.c (top level): Fix and add comments.
+
+2009-11-10  Keith Seitz  <keiths@redhat.com>
+
+	* c-exp.y (operator_stoken): New function.
+	(OPERATOR): New token.
+	(NEW): New token.
+	(DELETE): New token.
+	(operator): New rule.
+	(name): Add operator.
+	(ident_tokens): Add "new", "delete", and "operator".
+	* gdbtypes.c (rank_one_type): Don't complain about
+	void pointer conversion badness if both types are
+	void pointers.
+
+2009-11-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symfile.c (separate_debug_file_exists): Change parameter parent_name
+	to parent_objfile.  New variables parent_stat and abfd_stat.  Call
+	strcmp and then bfd_stat functions to verify if NAME matches.
+	(find_separate_debug_file): Update the passed parameter at caller.
+
+2009-11-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* objfiles.c (objfile_relocate): Update also the field psymtabs_addrmap.
+
+2009-11-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* configure.ac: Call ACX_LARGEFILE.
+	* aclocal.m4: Call m4_include for ../config/largefile.m4 and
+	../config/plugins.m4.
+	* configure: Regenerate.
+	* config.in: Regenerate.
+
+2009-11-10  Keith Seitz  <keiths@redhat.com>
+
+	* c-exp.y: Add new rule for resolving method overloads.
+	* eval.c (make_params): New function.
+	(free_param_types): New function.
+	(evaluate_subexp_standard): Pass expect_type to value_aggregate_elt.
+	Handle case TYPE_INSTANCE.
+	(evaluate_subexp_for_address): Pass expect_type to value_aggregate_elt.
+	* expression.h (enum exp_opcode): Add TYPE_INSTANCE.
+	(compare_parameters): Add declaration.
+	* parse.c (operator_length_standard): Add TYPE_INSTANCE.
+	* valops.c (value_aggregate_elt): Add new expect_type parameter.
+	Pass expect_type to value_struct_elt_for_reference.
+	(value_struct_elt_for_reference): Add expect_type parameter and use
+	compare_parameters.
+	Check for overload matches with and without artificial parameters.
+	Skip artificial methods.
+	(compare_parameters): New function.
+	* value.h (value_aggregate_elt): Add new expect_type parameter.
+
+2009-11-10  Joseph Myers  <joseph@codesourcery.com>
+
+	* solib-svr4.c (enable_break): Call
+	gdbarch_convert_from_func_ptr_addr on results of looking up
+	fallback symbol names.
+
+2009-11-10  Daniel Gutson  <dgutson@codesourcery.com>
+
+	* procfs.c (procfs_do_thread_registers): Added a call to fetch
+	register values before saving them in the core file
+	through the gcore command.
+	(procfs_corefile_thread_callback): Removed the backup of
+	inferior_ptid before calling procfs_do_thread_registers since
+	the function already saves and restores it before returning.
+
+2009-11-10  Michael Snyder  <msnyder@vmware.com>
+
+	* dcache.c (dcache_invalidate_line): Remove block from used list
+	when adding it to freed list.
+
+2009-11-10  Michael Snyder  <msnyder@vmware.com>
+
+	* dcache.c: Fix typo, shorten long lines in comment.
+
+2009-11-10  Tristan Gingold  <gingold@adacore.com>
+
+	* avr-tdep.c: Add AVR_PSEUDO_PC_REGNUM and AVR_NUM_PSEUDO_REGS.
+	(struct gdbarch_tdep): Add void_type, func_void_type and pc_type
+	fields.
+	(avr_register_name): Add "pc" name, renames "PC" to "PC2".
+	(avr_register_type): Handle AVR_PSEUDO_PC_REGNUM.
+	(avr_write_pc): Fix indentation.
+	(avr_pseudo_register_read): New function.
+	(avr_pseudo_register_write): New function.
+	(avr_frame_prev_register): Handle AVR_PSEUDO_PC_REGNUM.
+	(avr_gdbarch_init): Create types for pc.  Register pseudo regs.
+
+2009-11-10  Tristan Gingold  <gingold@adacore.com>
+
+	* avr-tdep.c (avr_integer_to_address): New function.
+	(avr_gdbarch_init): Set integer_to_address.
+
+2009-11-10  Tristan Gingold  <gingold@adacore.com>
+
+	* avr-tdep.c (avr_skip_prologue): First try to skip prologue
+	using skip_prologue_using_sal.
+
+2009-11-10  Tristan Gingold  <gingold@adacore.com>
+
+	* avr-tdep.c (avr_extract_return_value): Remove.
+	(avr_return_value): Mostly rewritten.  Fix handling for structures.
+	(avr_push_dummy_call): Handle struct_return.
+
+2009-11-10  Tristan Gingold  <gingold@adacore.com>
+
+	* avr-tdep.c (avr_scan_prologue): Decode instructions used for
+	small stack allocation.
+	Adjust code for prologue that don't write SP.
+
+2009-11-10  Tristan Gingold  <gingold@adacore.com>
+
+	* avr-tdep.c (avr_make_saddr): Return 0 for NULL.
+
+2009-11-10  Tristan Gingold  <gingold@adacore.com>
+
+	* avr-tdep.c (avr_dwarf_reg_to_regnum): New function.
+	(avr_gdbarch_init): Call set_gdbarch_dwarf2_reg_to_regnum.
+
+2009-11-09  Sebastien Granjoux  <seb.sfo@free.fr>
+
+	PR mi/9583:
+	* symtab.c (find_line_symtab, append_exact_match_to_sals)
+	(expand_line_sal): Use full filename when setting breakpoints if
+	available
+
+2009-11-09  Cary Coutant  <ccoutant@google.com>
+
+	* dwarf2read.c (read_import_statement): Don't clobber original cu.
+
+2009-11-09  Tom Tromey  <tromey@redhat.com>
+
+	* python/python.c (execute_gdb_command): Copy the argument text.
+
+2009-11-06  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* m68k-tdep.c (m68k_convert_register_p): Correct
+	messup.
+
+2009-11-06  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* m68k-tdep.c (m68k_convert_register_p): Compare with
+	the actual type of fp registers, not one of the possible
+	values.
+
+2009-11-06  Vladimir Prus  <vladimir@codesourcery.com>
+
+        Prevent program output from mix with "^running".
+
+	gdb/
+	* mi/mi-interp.c (mi_on_resume): Output token
+	and "^running" together, so that nothing else gets
+	in between.
+
+2009-11-05  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* dwarf2read.c (struct dwarf2_cu): Remove ranges_offset and
+	has_ranges_offset.
+	(struct partial_die_info): Remove language, has_stmt_list, dirname,
+	and line_offset.
+	(dwarf2_build_include_psymtabs): Take a die_info.  Handle a missing
+	line table.
+	(dwarf2_get_pc_bounds): Take PST argument.  Pass it
+	to dwarf2_ranges_read.  Update all callers.
+	(init_cu_die_reader): Move earlier.
+	(dwarf2_find_base_address): New function.
+	(process_psymtab_comp_unit): Rewrite to use a full DIE for the
+	compilation unit.  Use dwarf2_get_pc_bounds and
+	dwarf2_find_base_address.
+	(load_comp_unit): Rewrite to use a full DIE for the compilation unit.
+	(process_full_comp_unit): Use dwarf2_find_base_address.
+	(read_partial_die): Remove support for attributes only used
+	in the compilation unit DIE.
+	* symfile.c (allocate_psymtab): Make FILENAME const.
+	(start_psymtab_common): Likewise.
+	* symfile.h (allocate_psymtab, start_psymtab_common): Update
+	prototypes.
+
+2009-11-05  Tom Tromey  <tromey@redhat.com>
+
+	* symmisc.c (print_symbol_bcache_statistics): Print filename cache
+	statistics.
+	(print_objfile_statistics): Likewise.
+	* symfile.c (reread_symbols): Initialize filename_cache.
+	(allocate_symtab): Cache the file name.
+	(allocate_psymtab): Likewise.
+	* solib-sunos.c (allocate_rt_common_objfile): Initialize
+	filename_cache.
+	* objfiles.h (struct objfile) <filename_cache>: New field.
+	* objfiles.c (allocate_objfile): Initialize filename_cache.
+	(free_objfile): Free filename_cache.
+
+2009-11-05  Tom Tromey  <tromey@redhat.com>
+
+	* symfile.c (add_psymbol_to_bcache): Make 'psymbol' static again.
+	Zero the 'value' field.
+
+2009-11-05  Doug Evans  <dje@google.com>
+
+	* amd64-tdep.c (amd64_init_frame_cache): Enhance comment describing
+	saved_regs.
+
+2009-11-05  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* top.c (execute_command): Select a frame before checking the current
+	language.  Only output a message if verbose.
+
+2009-11-05  Tom Tromey  <tromey@redhat.com>
+
+	* symtab.h (SYMBOL_SET_LINKAGE_NAME): Update comment.
+	* symfile.c (allocate_symtab): Don't use obsavestring on a
+	constant string.
+	* stabsread.c (define_symbol): Don't use obsavestring on a
+	constant string.
+	* mdebugread.c (parse_type): Don't use obsavestring on a constant
+	string.
+	(new_symtab): Likewise.
+	* elfread.c (elf_symtab_read): Don't use obsavestring on a
+	constant string.
+
+2009-11-04  Tom Tromey  <tromey@redhat.com>
+
+	* symfile.c (add_psymbol_to_bcache): Don't copy name.  Make
+	'psymbol' non-static.
+
+2009-11-03  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* linux-thread-db.c (disable_thread_event_reporting): Adjust.
+	
+2009-11-03  Joel Brobecker  <brobecker@adacore.com>
+
+	* MAINTAINERS (Responsible Maintainers): Add Tristan Gingold as
+	maintainer of the avr target.
+
+2009-11-02  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* elfread.c (elf_symfile_segments): Do not warn about
+	uninitialized sections outside of load segments.
+
+2009-11-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symfile.c (build_id_to_debug_filename): New variable debugdir.  Move
+	variables size, s and data into a new inner block.  Change xmalloc for
+	alloca, use direct BUILDID->SIZE there now.  Loop for the
+	DEBUG_FILE_DIRECTORY components.
+	(find_separate_debug_file): New variable debugdir and debugdir_end.
+	Loop for the DEBUG_FILE_DIRECTORY components.
+	(_initialize_symfile): For "debug-file-directory" use plural and note
+	one can use multiple components now.
+
+2009-11-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symfile.c (find_separate_debug_file): Initialize dir, debugfile and
+	canon_name to NULL.  Change alloca to xmalloc, newly call xfree for it.
+	New label cleanup_return_debugfile, jump to it from the failure paths.
+
+2009-11-02  Andrew Cagney  <cagney@gnu.org>
+
+	* symfile.c (separate_debug_file_exists): When the CRCs mismatch
+	print a warning.
+	(find_separate_debug_file): Pass in the objfile's name.
+
+2009-11-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Remove INVALID_ENTRY_POINT.
+	* frame.c (inside_entry_func): New variable entry_point.  Return 0 if
+	the entry point is not known.
+	* solib-irix.c (enable_break): Likewise.
+	* objfiles.c (init_entry_point_info): Stop using INVALID_ENTRY_POINT.
+	Initialize EI.ENTRY_POINT_P.
+	(entry_point_address): Rename to ...
+	(entry_point_address_query): ... a new function.  Use EI.ENTRY_POINT_P.
+	(entry_point_address): New function.
+	(objfile_relocate): Use EI.ENTRY_POINT_P.
+	* objfiles.h (struct entry_info): Simplify entry_point comment.  New
+	field entry_point_p.
+	(INVALID_ENTRY_POINT): Remove.
+	(entry_point_address_query): New prototype.
+	* solib-frv.c (enable_break): Check for NULL SYMFILE_OBJFILE and its
+	EI.ENTRY_POINT_P.  Return 0 if ".interp" is not found.
+
+2009-11-01  Michael Snyder  <msnyder@vmware.com>
+
+	* NEWS (New Commands): Mention record save/restore.
+
+2009-10-31  Michael Snyder  <msnyder@vmware.com>
+
+	* breakpoint.c (bpstat_stop_status): Fix broken comment.
+
+2009-10-31  Pedro Alves  <pedro@codesourcery.com>
+
+	* record.c (record_restore, cmd_record_save): Debug output goes to
+	gdb_stdlog.
+
+2009-10-31  Sergio Durigan Junior <sergiodj@linux.vnet.ibm.com>
+
+	* breakpoint.c (catch_syscall_split_args): Remove unecessary warning
+	displayed when the user provided a syscall name and there is no
+	XML support.
+	* xml-syscall.c: Renamed `_sysinfo' to `sysinfo'.
+	(set_xml_syscall_file_name): Remove syscall_warn_user.
+	(xml_init_syscalls_info): Remove warning.
+	(init_sysinfo): Update warnings.
+
+2009-10-30  Vladimir Prus  <vladimir@codesourcery.com>
+
+	Fix breakpoint commands in MI.
+
+	* mi/mi-main.c (mi_execute_command): Run bpstat_do_actions.
+	* mi/mi-cmd-break.c (mi_cmd_break_commands): Pass 1 to
+	read_command_line_1 to actually parse composite commands.
+
+2009-10-29  Sandra Loosemore  <sandra@codesourcery.com>
+
+	PR gdb/10783
+
+	* target.c (simple_search_memory): Correct read_addr initialization
+	in loop for searching subsequent chunks.
+
+2009-10-28  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	Reported by Antti Hatala <ahatala@nvidia.com>.
+
+	* arm-tdep.c (thumb_get_next_pc): Limit check to IT instructions
+	correctly.
+
+2009-10-28  Pedro Alves  <pedro@codesourcery.com>
+
+        * dwarf2-frame.c (dwarf2_build_frame_info): Discard --gc-section
+	leftover FDEs.
+
+2009-10-28  Pedro Alves  <pedro@codesourcery.com>
+
+	* infrun.c (keep_going): Wrap with resume_cleanups.
+
+2009-10-27  Paul Pluzhnikov  <ppluzhnikov@google.com>
+	
+	* MAINTAINERS: Add self to "modify-after-approval" maintainers.
+
+2009-10-27  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	PR gdb/10757
+	* linux-thread-db.c (attach_thread): Return success/failure
+	indicator.
+	(thread_db_find_new_threads_silently): Retry until no new threads.
+	(struct callback_data): New.
+	(find_new_threads_callback): Count new threads, stop iteration
+	on error.
+	(find_new_threads_once): New function.
+	(thread_db_find_new_threads_2): Rename from
+	thread_db_find_new_threads_1 and adjust.
+	(thread_db_find_new_threads_1): New function.
+	
+2009-10-26  Michael Eager  <eager@eagercon.com>
+
+	* MAINTAINERS: Add self to "modify-after-approval" maintainers.
+
+2009-10-26  Michael Snyder  <msnyder@vmware.com>
+	    Hui Zhu  <teawater@gmail.com>
+
+	* Makefile.in (SFILES): Add gcore.c.
+	(COMMON_OBS): Add gcore.o.
+	* config/alpha/alpha-linux.mh (NATDEPFILES): Delete gcore.o.
+	* config/alpha/fbsd.mh (NATDEPFILES): Ditto.
+	* config/arm/linux.mh (NATDEPFILES): Ditto.
+	* config/i386/fbsd.mh (NATDEPFILES): Ditto.
+	* config/i386/fbsd64.mh (NATDEPFILES): Ditto.
+	* config/i386/i386sol2.mh (NATDEPFILES): Ditto.
+	* config/i386/linux.mh (NATDEPFILES): Ditto.
+	* config/i386/linux64.mh (NATDEPFILES): Ditto.
+	* config/i386/sol2-64.mh (NATDEPFILES): Ditto.
+	* config/ia64/linux.mh (NATDEPFILES): Ditto.
+	* config/m32r/linux.mh (NATDEPFILES): Ditto.
+	* config/m68k/linux.mh (NATDEPFILES): Ditto.
+	* config/mips/linux.mh (NATDEPFILES): Ditto.
+	* config/pa/linux.mh (NATDEPFILES): Ditto.
+	* config/powerpc/linux.mh (NATDEPFILES): Ditto.
+	* config/powerpc/ppc64-linux.mh (NATDEPFILES): Ditto.
+	* config/s390/s390.mh (NATDEPFILES): Ditto.
+	* config/sparc/fbsd.mh (NATDEPFILES): Ditto.
+	* config/sparc/linux.mh (NATDEPFILES): Ditto.
+	* config/sparc/linux64.mh (NATDEPFILES): Ditto.
+	* config/sparc/sol2.mh (NATDEPFILES): Ditto.
+	* config/xtensa/linux.mh (NATDEPFILES): Ditto.
+	* target.c (dummy_find_memory_regions): Change output.
+	(dummy_make_corefile_notes): Ditto.
+
+2009-10-26  Tristan Gingold  <gingold@adacore.com>
+	
+	* charset.c (_initialize_charset): Set a default value to
+	auto_host_charset_name if empty.
+
+2009-10-26  Tristan Gingold  <gingold@adacore.com>
+
+	* avr-tdep.c (avr_push_dummy_call): Handle avr6 architecture.
+	Fix the returned value.  Fix style.
+
+2009-10-26  Joel Brobecker  <brobecker@adacore.com>
+
+	* MAINTAINERS (Responsible Maintainers): Add info about the microblaze
+	targets.  Add Michael Eager as the maintainer for this target.
+
+2009-10-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Performance optimize large bp_location count.
+	* breakpoint.c (ALL_BP_LOCATIONS_SAFE): Remove.
+	(ALL_BP_LOCATIONS): New parameter BP_TMP.  Use now bp_location and
+	bp_location_count.
+	(bp_location_chain): Remove variable.
+	(bp_location, bp_location_count)
+	(bp_location_placed_address_before_address_max)
+	(bp_location_shadow_len_after_address_max): New variables.
+	(moribund_locations, update_watchpoint): Update the bp_location
+	variable name.
+	(breakpoint_restore_shadows): Extend the comment.  Move the variable
+	b to local blocks.  Move the variables bp_addr, bp_size and bptoffset
+	to a local block.  New variables bc_l, bc_r and bc.  New binary search
+	for the left range boundary.  New break on reaching the right range
+	boundary.  Move shadow existence conditionals to ...
+	(bp_location_has_shadow): ... a new function.
+	(insert_breakpoint_locations): Replace the temp variable by bp_tmp.
+	Use now ALL_BP_LOCATIONS instead of ALL_BP_LOCATIONS_SAFE.
+	(remove_breakpoints, remove_hw_watchpoints, reattach_breakpoints)
+	(detach_breakpoints): New variable bp_tmp.  Update the ALL_BP_LOCATIONS
+	calling convention.
+	(update_breakpoints_after_exec): New variable bplocp_tmp.  Update the
+	ALL_BP_LOCATIONS calling convention.
+	(breakpoint_here_p, software_breakpoint_inserted_here_p)
+	(breakpoint_thread_match): New variable bptp_tmp.  Drop the const
+	attribute of bpt.  Update the ALL_BP_LOCATIONS calling convention.
+	(regular_breakpoint_inserted_here_p): Likewise.  Update the bp_location
+	variable name.
+	(mark_breakpoints_out, breakpoint_init_inferior): New variable
+	bptp_tmp.  Update the ALL_BP_LOCATIONS calling convention.
+	(bpstat_stop_status): New variables blp_tmp and update_locations.  Drop
+	the const attribute of bl.  Update the ALL_BP_LOCATIONS calling
+	convention.  Protect HIT_COUNT increment by an ENABLE_STATE check.
+	Delay the update_global_location_list call using update_locations.
+	(set_default_breakpoint): Drop the check_duplicates name from comment.
+	(disable_breakpoints_in_shlibs, disable_breakpoints_in_unloaded_shlib):
+	New variable locp_tmp.  Update the ALL_BP_LOCATIONS calling convention.
+	(bp_location_compare, bp_location_compare_for_qsort)
+	(bp_location_target_extensions_update): New functions.
+	(check_duplicates, check_duplicates_for): Remove, moving their code ...
+	(update_global_location_list): ... into this existing function.  Remove
+	variables next, loc2, old_locations, ret and ix.  New variables locp,
+	loc_first, old_location, old_locp and old_location_count.  Stop using
+	global_next, create now the array bp_location, sort it by
+	bp_location_compare_for_qsort and call
+	bp_location_target_extensions_update.  Change quadratic iteration by
+	loc2 into an in-sync scanning by locp and loc2p.  Rename former loc
+	usage as old_loc.
+	(do_vec_free): Remove.
+	(breakpoint_program_space_exit): Update the ALL_BP_LOCATIONS calling
+	convention.
+	(remove_breakpoints_pid): New variable b_tmp.  Update the
+	ALL_BP_LOCATIONS calling convention.
+	* breakpoint.h (struct bp_location <global_next>): Remove.
+
+2009-10-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* mep-tdep.c: Update include for the new location cgen/bitset.h.
+
+2009-10-23  Tom Tromey  <tromey@redhat.com>
+
+	* blockframe.c (_initialize_blockframe): Remove declaration.
+
+2009-10-23  Doug Evans  <dje@google.com>
+
+	* record.c (record_core_xfer_partial): Pass correct offset to
+	record_beneath_to_xfer_partial.
+
+2009-10-23  Michael Snyder  <msnyder@vmware.com>
+
+	* record.c (top level): Don't include byteswap.h.
+	(netorder64): Use store_unsigned_integer instead of bswap_64.
+	(netorder32): Use store_unsigned_integer instead of bswap_32.
+	(netorder16): Use store_unsigned_integer instead of bswap_16.
+
+2009-10-23  Michael Snyder  <msnyder@vmware.com>
+
+	* record.c (netorder64): Use BFD_ENDIAN_LITTLE not LITTLE_ENDIAN.
+	(netorder32): Ditto.
+	(netorder16): Ditto.
+
+2009-10-23  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* objfiles.c (allocate_objfile): Use xzalloc.
+
+2009-10-23  Hui Zhu  <teawater@gmail.com>
+
+	* record.c (record_restore): Use phex_nz.
+
+2009-10-23  Tristan Gingold  <gingold@adacore.com>
+
+	* frame.c (frame_unwind_pc): Fix typo: remove duplicate 0x.
+
+2009-10-23  Tristan Gingold  <gingold@adacore.com>
+	
+	* objfiles.c (allocate_objfile): Remove useless test.  Move
+	declaration of last_one to the block that uses it.
+
+2009-10-22  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* record.c (record_restore, cmd_record_save): Fix warnings.
+	
+2009-10-22  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* disasm.h (DISASSEMBLY_OMIT_FNAME) New define.
+	(gdb_disassembly): Correct parameter name.
+	* disasm.c (dump_insns): Adjust.
+	(gdb_disassembly): Fix indentation.
+	* cli/cli-cmds.c (disassemble_command): Adjust.
+	
+2009-10-22  Michael Snyder  <msnyder@vmware.com>
+
+	* infrun.c (keep_going): If insert_breakpoints fails, 
+	print the reason.
+
+2009-10-22  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	PR gdb/10819
+	* dwarf2-frame.c (find_cie): Don't call bsearch on empty cie_table.
+	* objfiles.c (find_pc_section): Likewise.
+	(update_section_map): Don't allocate empty table.
+	
+2009-10-22  Hui Zhu  <teawater@gmail.com>
+	    Michael Snyder  <msnyder@vmware.com>
+
+	* record.c (RECORD_FILE_MAGIC): New constant.
+	(record_arch_list_cleanups): Renamed from record_message_cleanups.
+	(bfdcore_read): New function.
+	(netorder64): New function.
+	(netorder32): New function.
+	(netorder16): New function.
+	(record_restore): New function.  Restore a saved record log.
+	(bfdcore_write): New function.
+	(cmd_record_restore): New function.
+	(cmd_record_save): New function.  Save a record log to a file.
+	(_initialize_record): Set up commands for save and restore.
+
+2009-10-22  Michael Snyder  <msnyder@vmware.com>
+
+	* gcore.h: New file.
+	* gcore.c (create_gcore_bfd): New function.
+	(write_gcore_file): New function.
+	(call_target_sbrk): New function.  Abstracted from gcore_command.
+	(gcore_command): Call call_target_sbrk.
+
+2009-10-22  Hui Zhu  <teawater@gmail.com>
+	    Michael Snyder  <msnyder@vmware.com>
+
+	* record.c (record_core_ops): New ops target vector.
+	(record_core_open_1): New function.  Open core target.
+	(record_open_1): New function.  Open normal process record.
+	(record_open): Call one of the above.
+	(record_close): Allow for both core and normal targets.
+	(record_core_resume): New function.
+	(record_core_kill): New function.
+	(record_core_fetch_registers): New function.
+	(record_core_prepare_to_store): New function.
+	(record_core_store_registers): New function.
+	(record_core_xfer_partial): New function.
+	(record_core_insert_breakpoint): New function.
+	(record_core_remove_breakpoint): New function.
+	(record_core_has_execution): New function.
+	(init_record_core_ops): New function.
+	(_initialize_record): Call init_record_core_ops, add_target.
+
+2009-10-22  Tristan Gingold  <gingold@adacore.com>
+
+	* i386-darwin-nat.c (i386_darwin_fetch_inferior_registers): Use
+	amd64_supply_fxsave for amd64.  Fix the offset.
+	(i386_darwin_store_inferior_registers): Use amd64_collect_fxsave
+	for amd64.
+
+2009-10-21  Maxim Grigoriev  <maxim2405@gmail.com>
+
+        * xtensa-tdep.c (XTENSA_ISA_BADPC): New.
+	(xtensa_scan_prologue): Replace read_memory with target_read_memory.
+	(call0_analyze_prologue): Use XTENSA_ISA_BADPC instead of "0".
+	(call0_frame_cache): Check error conditions on call0_analyze_prologue.
+
+2009-10-21  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* defs.h (pc_prefix): New prototype.
+	* disasm.c (dump_insns): Mark current instruction.
+	* printcmd.c (do_examine): Likewise.
+	(pc_prefix): New function.
+	* stack.c (print_frame_info): Disassemble entire current line.
+
+2009-10-21  Michael Snyder  <msnyder@vmware.com>
+
+	Elaborate "info record".
+	* record.c (struct record_end_entry): New field 'insn_num'.
+	(record_insn_count): New variable.
+	(record_open): Initialize record_insn_count.
+	(info_record_command): Display contents of record log as
+	lowest, current, and highest instruction counts.
+	(show_record_insn_number): Delete.
+	(_initialize_record): Remove add_cmd show_record_insn_number.
+
+2009-10-21  Andrew Stubbs  <ams@codesourcery.com>
+	    Joel Brobecker  <brobecker@adacore.com>
+
+	* Makefile.in (HFILES_NO_SRCDIR): Remove shnbsd-tdep.h
+	* configure.tgt (sh*-*-linux*): Add corelow.o to gdb_target_obs.
+	* sh-linux-tdep.c: Include sh-tdep.h.
+	(REGSx16): New macro.
+	(gregs_table, fpregs_table): New variables.
+	(sh_linux_init_abi): Set core_gregmap and fpregmap.
+	* sh-tdep.c: Include regset.h.
+	(sh_corefile_supply_regset): New function.
+	(sh_corefile_collect_regset): New function.
+	(sh_corefile_gregset, sh_corefile_fpregset): New variables.
+	(sh_regset_from_core_section): New function.
+	(sh_gdbarch_init): Set up tdep value.
+	Call set_gdbarch_regset_from_core_section.
+	* sh-tdep.h (PC_REGNUM): New enum value.
+	(struct sh_corefile_regs): New type.
+	(sh_corefile_gregset): Export variable.
+	(sh_corefile_supply_regset): New prototype.
+	(sh_corefile_collect_regset): New prototype.
+	* shnbsd-tdep.c: Remove include of regcache.h, gdb_assert.h and
+	shnbsd-tdep.h.
+	(regmap): Use new definition using struct sh_corefile_regs.
+	(shnbsd_supply_gregset, shnbsd_collect_gregset): Delete.
+	(shnbsd_gregset): Delete.
+	(shnbsd_regset_from_core_section): Delete.
+	(shnbsd_supply_reg, shnbsd_fill_reg): Use new regset interface.
+	(shnbsd_init_abi): Set core_gregmap.
+	(shnbsd_supply_reg): Delete.
+	(shnbsd_fill_reg): Delete.
+	(SHNBSD_SIZEOF_GREGS): Move ...
+	* shnbsd-nat.c (SHNBSD_SIZEOF_GREGS): ... to here.
+	Remove include of shnbsd-tdep.h.
+	(shnbsd_fetch_inferior_registers): Replace shnbsd_supply_reg call
+	with sh_corefile_supply_regset.
+	(shnbsd_store_inferior_registers): Replace shnbsd_fill_reg call with
+	sh_corefile_collect_regset.
+	* shnbsd-tdep.h: Delete file.
+
+2009-10-21  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* rs6000-nat.c (exec_one_dummy_insn): Add missing new ASPACE parameter
+	to depreacted_insert_raw_breakpoint function call.
+	* procfs.c (insert_dbx_link_bpt_in_file): Likewise.
+
+2009-10-20  Michael Snyder  <msnyder@vmware.com>
+
+	* record.c: Add some top-level comments for general explanation.
+
+2009-10-20  Hui Zhu  <teawater@gmail.com>
+	    Michael Snyder  <msnyder@vmware.com>
+
+	* record.c (record_exec_insn): New function.  Emulate one
+	instruction, forward or backward.  Abstracted from record_wait.
+	(record_wait) Call record_exec_insn.
+
+2009-10-20  Michael Snyder  <msnyder@msnyder-server.eng.vmware.com>
+
+	* infrun.c (handle_inferior_event): Add pspace field to sal
+	for reverse execution cases.
+
+2009-10-20  Ken Werner  <ken@linux.vnet.ibm.com>
+
+	* go32-nat.c (go32_create_inferior): Use inferior_appeared, not
+	inferior_appeared_silent.
+	* remote-sim.c (gdbsim_create_inferior): Ditto.
+
+2009-10-20  Pedro Alves  <pedro@codesourcery.com>
+
+	* darwin-nat.c (cancel_breakpoint): Pass the regcache's address
+	space to breakpoint_inserted_here_p.
+
+2009-10-20  Pedro Alves  <pedro@codesourcery.com>
+
+	* linux-nat.c (linux_nat_thread_address_space): New.
+	(linux_nat_add_target): Install it.
+	* progspace.c (address_space_num): New.
+	* progspace.h (address_space_num): Declare.
+	* target.c (target_thread_address_space): Really query the target.
+	* target.h (struct target_ops) <to_thread_address_space>: New
+	field.
+
+2009-10-19  Joel Brobecker  <brobecker@adacore.com>
+
+	* amd64fbsd-nat.c (amd64fbsd_supply_pcb): Add comment.
+
+2009-10-19  Pedro Alves  <pedro@codesourcery.com>
+	    Stan Shebs  <stan@codesourcery.com>
+
+	Add base multi-executable/process support to GDB.
+
+	* Makefile.in (SFILES): Add progspace.c.
+	(COMMON_OBS): Add progspace.o.
+	* progspace.h: New.
+	* progspace.c: New.
+
+	* breakpoint.h (struct bp_target_info) <placed_address_space>: New
+	field.
+	(struct bp_location) <pspace>: New field.
+	(struct breakpoint) <pspace>: New field.
+	(bpstat_stop_status, breakpoint_here_p)
+	(moribund_breakpoint_here_p, breakpoint_inserted_here_p)
+	(regular_breakpoint_inserted_here_p)
+	(software_breakpoint_inserted_here_p, breakpoint_thread_match)
+	(set_default_breakpoint): Adjust prototypes.
+	(remove_breakpoints_pid, breakpoint_program_space_exit): Declare.
+	(insert_single_step_breakpoint, deprecated_insert_raw_breakpoint):
+	Adjust prototypes.
+	* breakpoint.c (executing_startup): Delete.
+	(default_breakpoint_sspace): New.
+	(breakpoint_restore_shadows): Skip if the address space doesn't
+	match.
+	(update_watchpoint): Record the frame's program space in the
+	breakpoint location.
+	(insert_bp_location): Record the address space in target_info.
+	Adjust to pass the symbol space to solib_name_from_address.
+	(breakpoint_program_space_exit): New.
+	(insert_breakpoint_locations): Switch the symbol space and thread
+	when inserting breakpoints.  Don't insert breakpoints in a vfork
+	parent waiting for vfork done if we're not attached to the vfork
+	child.
+	(remove_breakpoints_pid): New.
+	(reattach_breakpoints): Switch to a thread of PID.  Ignore
+	breakpoints of other symbol spaces.
+	(create_internal_breakpoint): Store the symbol space in the sal.
+	(create_longjmp_master_breakpoint): Iterate over all symbol
+	spaces.
+	(update_breakpoints_after_exec): Ignore breakpoints for other
+	symbol spaces.
+	(remove_breakpoint): Rename to ...
+	(remove_breakpoint_1): ... this.  Pass the breakpoints symbol
+	space to solib_name_from_address.
+	(remove_breakpoint): New.
+	(mark_breakpoints_out): Ignore breakpoints from other symbol
+	spaces.
+	(breakpoint_init_inferior): Ditto.
+	(breakpoint_here_p): Add an address space argument and adjust to
+	use breakpoint_address_match.
+	(moribund_breakpoint_here_p): Ditto.
+	(regular_breakpoint_inserted_here_p): Ditto.
+	(breakpoint_inserted_here_p): Ditto.
+	(software_breakpoint_inserted_here_p): Ditto.
+	(breakpoint_thread_match): Ditto.
+	(bpstat_check_location): Ditto.
+	(bpstat_stop_status): Ditto.
+	(print_breakpoint_location): If there's a location to print,
+	switch the current symbol space.
+	(print_one_breakpoint_location): Add `allflag' argument.
+	(print_one_breakpoint): Ditto.	Adjust.
+	(do_captured_breakpoint_query): Adjust.
+	(breakpoint_1): Adjust.
+	(breakpoint_has_pc): Also match the symbol space.
+	(describe_other_breakpoints): Add a symbol space argument and
+	adjust.
+	(set_default_breakpoint): Add a symbol space argument.	Set
+	default_breakpoint_sspace.
+	(breakpoint_address_match): New.
+	(check_duplicates_for): Add an address space argument, and adjust.
+	(set_raw_breakpoint): Record the symbol space in the location and
+	in the breakpoint.
+	(set_longjmp_breakpoint): Skip longjmp master breakpoints from
+	other symbol spaces.
+	(remove_thread_event_breakpoints, remove_solib_event_breakpoints)
+	(disable_breakpoints_in_shlibs): Skip breakpoints from other
+	symbol spaces.
+	(disable_breakpoints_in_unloaded_shlib): Match symbol spaces.
+	(create_catchpoint): Set the symbol space in the sal.
+	(disable_breakpoints_before_startup): Skip breakpoints from other
+	symbol spaces.	Set executing_startup in the current symbol space.
+	(enable_breakpoints_after_startup): Clear executing_startup in the
+	current symbol space.  Skip breakpoints from other symbol spaces.
+	(clone_momentary_breakpoint): Also copy the symbol space.
+	(add_location_to_breakpoint): Set the location's symbol space.
+	(bp_loc_is_permanent): Switch thread and symbol space.
+	(create_breakpoint): Adjust.
+	(expand_line_sal_maybe): Expand comment to mention symbol spaces.
+	Switch thread and symbol space when reading memory.
+	(parse_breakpoint_sals): Set the symbol space in the sal.
+	(break_command_really): Ditto.
+	(skip_prologue_sal): Switch and space.
+	(resolve_sal_pc): Ditto.
+	(watch_command_1): Record the symbol space in the sal.
+	(create_ada_exception_breakpoint): Adjust.
+	(clear_command): Adjust.  Match symbol spaces.
+	(update_global_location_list): Use breakpoint_address_match.
+	(breakpoint_re_set_one): Switch thread and space.
+	(breakpoint_re_set): Save symbol space.
+	(breakpoint_re_set_thread): Also reset the symbol space.
+	(deprecated_insert_raw_breakpoint): Add an address space argument.
+	Adjust.
+	(insert_single_step_breakpoint): Ditto.
+	(single_step_breakpoint_inserted_here_p): Ditto.
+	(clear_syscall_counts): New.
+	(_initialize_breakpoint): Install it as inferior_exit observer.
+
+	* exec.h: Include "progspace.h".
+	(exec_bfd, exec_bfd_mtime): New defines.
+	(exec_close): Declare.
+	* exec.c: Include "gdbthread.h" and "progspace.h".
+	(exec_bfd, exec_bfd_mtime, current_target_sections_1): Delete.
+	(using_exec_ops): New.
+	(exec_close_1): Rename to exec_close, and make public.
+	(exec_close): Rename to exec_close_1, and adjust all callers.  Add
+	description.  Remove target sections and close executables from
+	all program spaces.
+	(exec_file_attach): Add comment.
+	(add_target_sections): Check on `using_exec_ops' to check if the
+	target should be pushed.
+	(remove_target_sections): Only unpush the target if there are no
+	more target sections in any symbol space.
+	* gdbcore.h: Include "exec.h".
+	(exec_bfd, exec_bfd_mtime): Remove declarations.
+
+	* frame.h (get_frame_program_space, get_frame_address_space)
+	(frame_unwind_program_space): Declare.
+	* frame.c (struct frame_info) <pspace, aspace>: New fields.
+	(create_sentinel_frame): Add program space argument.  Set the
+	pspace and aspace fields of the frame object.
+	(get_current_frame, create_new_frame): Adjust.
+	(get_frame_program_space): New.
+	(frame_unwind_program_space): New.
+	(get_frame_address_space): New.
+	* stack.c (print_frame_info): Adjust.
+	(print_frame): Use the frame's program space.
+
+	* gdbthread.h (any_live_thread_of_process): Declare.
+	* thread.c (any_live_thread_of_process): New.
+	(switch_to_thread): Switch the program space as well.
+	(restore_selected_frame): Don't warn if trying to restore frame
+	level 0.
+
+	* inferior.h: Include "progspace.h".
+	(detach_fork): Declare.
+	(struct inferior) <removable, aspace, pspace>
+	<vfork_parent, vfork_child, pending_detach>
+	<waiting_for_vfork_done>: New fields.
+	<terminal_info>: Remove field.
+	<data, num_data>: New fields.
+	(register_inferior_data, register_inferior_data_with_cleanup)
+	(clear_inferior_data, set_inferior_data, inferior_data): Declare.
+	(exit_inferior, exit_inferior_silent, exit_inferior_num_silent)
+	(inferior_appeared): Declare.
+	(find_inferior_pid): Typo.
+	(find_inferior_id, find_inferior_for_program_space): Declare.
+	(set_current_inferior, save_current_inferior, prune_inferiors)
+	(number_of_inferiors): Declare.
+	(inferior_list): Declare.
+	* inferior.c: Include "gdbcore.h" and "symfile.h".
+	(inferior_list): Make public.
+	(delete_inferior_1): Always delete thread silently.
+	(find_inferior_id): Make public.
+	(current_inferior_): New.
+	(current_inferior): Use it.
+	(set_current_inferior): New.
+	(restore_inferior): New.
+	(save_current_inferior): New.
+	(free_inferior): Free the per-inferior data.
+	(add_inferior_silent): Allocate per-inferior data.
+	Call inferior_appeared.
+	(delete_threads_of_inferior): New.
+	(delete_inferior_1): Adjust interface to take an inferior pointer.
+	(delete_inferior): Adjust.
+	(delete_inferior_silent): Adjust.
+	(exit_inferior_1): New.
+	(exit_inferior): New.
+	(exit_inferior_silent): New.
+	(exit_inferior_num_silent): New.
+	(detach_inferior): Adjust.
+	(inferior_appeared): New.
+	(discard_all_inferiors): Adjust.
+	(find_inferior_id): Make public.  Assert pid is not zero.
+	(find_inferior_for_program_space): New.
+	(have_inferiors): Check if we have any inferior with pid not zero.
+	(have_live_inferiors): Go over all pushed targets looking for
+	process_stratum.
+	(prune_inferiors): New.
+	(number_of_inferiors): New.
+	(print_inferior): Add executable column.  Print vfork parent/child
+	relationships.
+	(inferior_command): Adjust to cope with not running inferiors.
+	(remove_inferior_command): New.
+	(add_inferior_command): New.
+	(clone_inferior_command): New.
+	(struct inferior_data): New.
+	(struct inferior_data_registration): New.
+	(struct inferior_data_registry): New.
+	(inferior_data_registry): New.
+	(register_inferior_data_with_cleanup): New.
+	(register_inferior_data): New.
+	(inferior_alloc_data): New.
+	(inferior_free_data): New.
+	(clear_inferior_data): New.
+	(set_inferior_data): New.
+	(inferior_data): New.
+	(initialize_inferiors): New.
+	(_initialize_inferiors): Register "add-inferior",
+	"remove-inferior" and "clone-inferior" commands.
+
+	* objfiles.h: Include "progspace.h".
+	(struct objfile) <pspace>: New field.
+	(symfile_objfile, object_files): Don't declare.
+	(ALL_PSPACE_OBJFILES): New.
+	(ALL_PSPACE_OBJFILES_SAFE): New.
+	(ALL_OBJFILES, ALL_OBJFILES_SAFE): Adjust.
+	(ALL_PSPACE_SYMTABS): New.
+	(ALL_PRIMARY_SYMTABS): Adjust.
+	(ALL_PSPACE_PRIMARY_SYMTABS): New.
+	(ALL_PSYMTABS): Adjust.
+	(ALL_PSPACE_PSYMTABS): New.
+	* objfiles.c (object_files, symfile_objfile): Delete.
+	(struct objfile_sspace_info): New.
+	(objfiles_pspace_data): New.
+	(objfiles_pspace_data_cleanup): New.
+	(get_objfile_pspace_data): New.
+	(objfiles_changed_p): Delete.
+	(allocate_objfile): Set the objfile's program space.  Adjust to
+	reference objfiles_changed_p in pspace data.
+	(free_objfile): Adjust to reference objfiles_changed_p in pspace
+	data.
+	(objfile_relocate): Ditto.
+	(update_section_map): Add pspace argument.  Adjust to iterate over
+	objfiles in the passed in pspace.
+	(find_pc_section): Delete sections and num_sections statics.
+	Adjust to refer to program space's objfiles_changed_p.	Adjust to
+	refer to sections and num_sections store in the objfile's pspace
+	data.
+	(objfiles_changed): Adjust to reference objfiles_changed_p in
+	pspace data.
+	(_initialize_objfiles): New.
+	* linespec.c (decode_all_digits, decode_dollar): Set the sal's
+	program space.
+	* source.c (current_source_pspace): New.
+	(get_current_source_symtab_and_line): Set the sal's program space.
+	(set_current_source_symtab_and_line): Set current_source_pspace.
+	(select_source_symtab): Ditto.	Use ALL_OBJFILES.
+	(forget_cached_source_info): Iterate over all program spaces.
+	* symfile.c (clear_symtab_users): Adjust.
+	* symmisc.c (print_symbol_bcache_statistics): Iterate over all
+	program spaces.
+	(print_objfile_statistics): Ditto.
+	(maintenance_print_msymbols): Ditto.
+	(maintenance_print_objfiles): Ditto.
+	(maintenance_info_symtabs): Ditto.
+	(maintenance_info_psymtabs): Ditto.
+	* symtab.h (SYMTAB_PSPACE): New.
+	(struct symtab_and_line) <pspace>: New field.
+	* symtab.c (init_sal): Clear the sal's program space.
+	(find_pc_sect_symtab): Set the sal's program space.  Switch thread
+	and space.
+	(append_expanded_sal): Add program space argument.  Iterate over
+	all program spaces.
+	(expand_line_sal): Iterate over all program spaces.  Switch
+	program space.
+
+	* target.h (enum target_waitkind) <TARGET_WAITKIND_VFORK_DONE>: New.
+	(struct target_ops) <to_thread_address_space>: New field.
+	(target_thread_address_space): Define.
+	* target.c (target_detach): Only remove breakpoints from the
+	inferior we're detaching.
+	(target_thread_address_space): New.
+
+	* defs.h (initialize_progspace): Declare.
+	* top.c (gdb_init): Call it.
+
+	* solist.h (struct so_list) <sspace>: New field.
+	* solib.h (struct program_space): Forward declare.
+	(solib_name_from_address): Adjust prototype.
+	* solib.c (so_list_head): Replace with a macro referencing the
+	program space.
+	(update_solib_list): Set the so's program space.
+	(solib_name_from_address): Add a program space argument and adjust.
+
+	* solib-svr4.c (struct svr4_info) <pid>: Delete field.
+	<interp_text_sect_low, interp_text_sect_high, interp_plt_sect_low>
+	<interp_plt_sect_high>: New fields.
+	(svr4_info_p, svr4_info): Delete.
+	(solib_svr4_sspace_data): New.
+	(get_svr4_info): Rewrite.
+	(svr4_sspace_data_cleanup): New.
+	(open_symbol_file_object): Adjust.
+	(svr4_default_sos): Adjust.
+	(svr4_fetch_objfile_link_map): Adjust.
+	(interp_text_sect_low, interp_text_sect_high, interp_plt_sect_low)
+	(interp_plt_sect_high): Delete.
+	(svr4_in_dynsym_resolve_code): Adjust.
+	(enable_break): Adjust.
+	(svr4_clear_solib): Revert bit that removed the svr4_info here,
+	and reinstate clearing debug_base, debug_loader_offset_p,
+	debug_loader_offset and debug_loader_name.
+	(_initialize_svr4_solib): Register solib_svr4_pspace_data.  Don't
+	install an inferior_exit observer anymore.
+
+	* printcmd.c (struct display) <pspace>: New field.
+	(display_command): Set the display's sspace.
+	(do_one_display): Match the display's sspace.
+	(display_uses_solib_p): Ditto.
+
+	* linux-fork.c (detach_fork): Moved to infrun.c.
+	(_initialize_linux_fork): Moved "detach-on-fork" command to
+	infrun.c.
+	* infrun.c (detach_fork): Moved from linux-fork.c.
+	(proceed_after_vfork_done): New.
+	(handle_vfork_child_exec_or_exit): New.
+	(follow_exec_mode_replace, follow_exec_mode_keep)
+	(follow_exec_mode_names, follow_exec_mode_string)
+	(show_follow_exec_mode_string): New.
+	(follow_exec): New.  Reinstate the mark_breakpoints_out call.
+	Remove shared libraries before attaching new executable.  If user
+	wants to keep the inferior, keep it.
+	(displaced_step_fixup): Adjust to pass an address space to the
+	breakpoints module.
+	(resume): Ditto.
+	(clear_proceed_status): In all-stop mode, always clear the proceed
+	status of all threads.
+	(prepare_to_proceed): Adjust to pass an address space to the
+	breakpoints module.
+	(proceed): Ditto.
+	(adjust_pc_after_break): Ditto.
+	(handle_inferior_event): When handling a process exit, switch the
+	program space to the inferior's that had exited.  Call
+	handle_vfork_child_exec_or_exit.  Adjust to pass an address space
+	to the breakpoints module.  In non-stop mode, when following a
+	fork and detach-fork is off, also resume the other branch.  Handle
+	TARGET_WAITKIND_VFORK_DONE.  Set the program space in sals.
+	(normal_stop): Prune inferiors.
+	(_initialize_infrun): Install the new "follow-exec-mode" command.
+	"detach-on-fork" moved here.
+
+	* regcache.h (get_regcache_aspace): Declare.
+	* regcache.c (struct regcache) <aspace>: New field.
+	(regcache_xmalloc): Clear the aspace.
+	(get_regcache_aspace): New.
+	(regcache_cpy): Copy the aspace field.
+	(regcache_cpy_no_passthrough): Ditto.
+	(get_thread_regcache): Fetch the thread's address space from the
+	target, and store it in the regcache.
+
+	* infcall.c (call_function_by_hand): Set the sal's pspace.
+
+	* arch-utils.c (default_has_shared_address_space): New.
+	* arch-utils.h (default_has_shared_address_space): Declare.
+
+	* gdbarch.sh (has_shared_address_space): New.
+	* gdbarch.h, gdbarch.c: Regenerate.
+
+	* linux-tdep.c: Include auxv.h, target.h, elf/common.h.
+	(linux_has_shared_address_space): New.
+	(_initialize_linux_tdep): Declare.
+
+	* arm-tdep.c (arm_software_single_step): Pass the frame's address
+	space to insert_single_step_breakpoint.
+	* arm-linux-tdep.c (arm_linux_software_single_step): Pass the
+	frame's pspace to breakpoint functions.
+	* cris-tdep.c (crisv32_single_step_through_delay): Ditto.
+	(cris_software_single_step): Ditto.
+	* mips-tdep.c (deal_with_atomic_sequence): Add frame argument.
+	Pass the frame's pspace to breakpoint functions.
+	(mips_software_single_step): Adjust.
+	(mips_single_step_through_delay): Adjust.
+	* rs6000-aix-tdep.c (rs6000_software_single_step): Adjust.
+	* rs6000-tdep.c (ppc_deal_with_atomic_sequence): Adjust.
+	* solib-irix.c (enable_break): Adjust to pass the current frame's
+	address space to breakpoint functions.
+	* sparc-tdep.c (sparc_software_single_step): Ditto.
+	* spu-tdep.c (spu_software_single_step): Ditto.
+	* alpha-tdep.c (alpha_software_single_step): Ditto.
+	* record.c (record_wait): Adjust to pass an address space to the
+	breakpoints module.
+
+	* fork-child.c (fork_inferior): Set the new inferior's program and
+	address spaces.
+	* inf-ptrace.c (inf_ptrace_follow_fork): Copy the parent's program
+	and address spaces.
+	(inf_ptrace_attach): Set the inferior's program and address spaces.
+	* linux-nat.c: Include "solib.h".
+	(linux_child_follow_fork): Manage parent and child's program and
+	address spaces.	 Clone the parent's program space if necessary.
+	Don't wait for the vfork to be done here.  Refuse to resume if
+	following the vfork parent while leaving the child stopped.
+	(resume_callback): Don't resume a vfork parent.
+	(linux_nat_resume): Also check for pending events in the
+	lp->waitstatus field.
+	(linux_handle_extended_wait): Report TARGET_WAITKIND_VFORK_DONE
+	events to the core.
+	(stop_wait_callback): Don't wait for SIGSTOP on vfork parents.
+	(cancel_breakpoint): Adjust.
+	* linux-thread-db.c (thread_db_wait): Don't remove thread event
+	breakpoints here.
+	(thread_db_mourn_inferior): Don't mark breakpoints out here.
+	Remove thread event breakpoints after mourning.
+	* corelow.c: Include progspace.h.
+	(core_open): Set the inferior's program and address spaces.
+	* remote.c (remote_add_inferior): Set the new inferior's program
+	and address spaces.
+	(remote_start_remote): Update address spaces.
+	(extended_remote_create_inferior_1): Don't init the thread list if
+	we already debugging other inferiors.
+	* darwin-nat.c (darwin_attach): Set the new inferior's program and
+	address spaces.
+	* gnu-nat.c (gnu_attach): Ditto.
+	* go32-nat.c (go32_create_inferior): Ditto.
+	* inf-ttrace.c (inf_ttrace_follow_fork, inf_ttrace_attach): Ditto.
+	* monitor.c (monitor_open): Ditto.
+	* nto-procfs.c (procfs_attach, procfs_create_inferior): Ditto.
+	* procfs.c (do_attach): Ditto.
+	* windows-nat.c (do_initial_windows_stuff): Ditto.
+
+	* inflow.c (inferior_process_group)
+	(terminal_init_inferior_with_pgrp, terminal_inferior,
+	(terminal_ours_1, inflow_inferior_exit, copy_terminal_info)
+	(child_terminal_info, new_tty_postfork, set_sigint_trap): Adjust
+	to use per-inferior data instead of inferior->terminal_info.
+	(inflow_inferior_data): New.
+	(inflow_new_inferior): Delete.
+	(inflow_inferior_data_cleanup): New.
+	(get_inflow_inferior_data): New.
+
+	* mi/mi-interp.c (mi_new_inferior): Rename to...
+	(mi_inferior_appeared): ... this.
+	(mi_interpreter_init): Adjust.
+
+	* tui/tui-disasm.c: Include "progspace.h".
+	(tui_set_disassem_content): Pass an address space to
+	breakpoint_here_p.
+
+	* NEWS: Mention multi-program debugging support.  Mention new
+	commands "add-inferior", "clone-inferior", "remove-inferior",
+	"maint info program-spaces", and new option "set
+	follow-exec-mode".
+
+2009-10-19  Don Lee  <don.lee@sunplusct.com>
+
+	* score-tdep.c: Delete dead codes.
+
+2009-10-15  Michael Snyder  <msnyder@vmware.com>
+
+	* record.c (struct record_reg_entry): Replace ptr with union 
+	of ptr and buf.
+	(struct record_mem_entry): Ditto.
+	(record_reg_alloc): Don't alloc ptr if reg will fit into buf.
+	(record_mem_alloc): Ditto.
+	(record_reg_release): Don't free ptr if reg was stored in buf.
+	(record_mem_release): Ditto.
+	(record_get_loc): New function.  Return a pointer to where the
+	value (mem or reg) is to be stored.
+	(record_arch_list_add_reg): Call record_get_loc instead of using ptr.
+	(record_arch_list_add_mem): Ditto.
+	(record_wait): Ditto.
+
+2009-10-16  Michael Eager  <eager@eagercon.com>
+
+	* microblaze-linux-tdep.c:
+	microblaze_linux_memory_remove_breakpoint(): Add gdbarch to param,
+	replace frame_pc_unwind with get_frame_address_in_block.
+	* microblaze-tdep.c: Remove MICROBLAZE_REGISTER_SIZE.
+	* microblaze-tdep.h: Add MICROBLAZE_REGISTER_SIZE.
+
+2008-10-15  Steven G. Kargl  <kargl@gcc.gnu.org>  (tiny patch)
+
+	* amd64fbsd-nat.c (amd64fbsd_supply_pcb): Conditionally compile in
+	support for pcb->pcb_{fs,ds,es,gs} on FreeBSD older than 8.0.
+
+2009-10-15  Michael Eager  <eager@eagercon.com>
+
+	* config/djgpp/fnchange.lst: Add translations for cpu-microblaze.c,
+	elf32-microblaze.c, microblaze-rom.c, microblaze-linux-tdep.c,
+	microblaze-tdep.h, microblaze-tdep.c, microblaze-opc.h,
+	microblaze-opcm.h, microblaze-dis.c, microblaze-dis.h, sim/microblaze,
+	microblaze.h, and microblaze.isa.
+	* configure.tgt: Add targets microblaze*-linux-*, microblaze*-xilinx-*.
+	* Makefile.in: Build microblaze-tdep.o, microblaze-linux-tdep.o.
+	HFILES_NO_SRCDIR: Add microblaze-tdep.h.
+	* microblaze-linux-tdep.c: New.
+	* microblaze-tdep.c: New.
+	* microblaze-tdep.h: New.
+	* NEWS: Announce Xilinx MicroBlaze support.
+
+2009-10-15  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	PR gdb/10757
+	* linux-nat.c (linux_nat_post_attach_wait): Adjust assert.
+	(lin_lwp_attach_lwp, linux_nat_attach): Handle disappearing LWP.
+	
+2009-10-15  Michael Snyder  <msnyder@vmware.com>
+
+	* record.c (record_insn_max_num): Make unsigned.
+	(_initialize_record): Use uinteger instead of zinteger for
+	set command, so that it will report "unlimited" for zero.
+
+2009-10-15  Michael Snyder  <msnyder@vmware.com>
+
+	* record.c (record_reg_alloc): New function.
+	(record_reg_release): New function.
+	(record_mem_alloc): New function.
+	(record_mem_release): New function.
+	(record_end_alloc): New function.
+	(record_end_release): New function.
+	(record_entry_release): New function.
+	(record_list_release): Simplify, call record_entry_release.
+	(record_list_release_next): Rename to record_list_release_following.
+	Simplify and call record_entry_release.
+	(record_list_release_first): Simplify, comment, and use
+	record_entry_release.
+	(record_arch_list_add_reg): Simplify, call record_reg_alloc.
+	(record_arch_list_add_mem): Simplify, call record_mem_alloc.
+	(record_arch_list_add_end): Simplify, call record_end_alloc.
+
+2009-10-14  Michael Snyder  <msnyder@vmware.com>
+
+	* record.c (record_list_release_first): Do not decrement
+	record_insn_num.
+	(set_insn_num_max): Remove printf.
+	Decrement record_insn_num in the loop.
+
+2009-10-14  Cary Coutant  <ccoutant@google.com>
+
+	* dwarf2read.c (read_import_statement): Call follow_die_ref_or_sig.
+
+2009-10-14  Keith Seitz  <keiths@redhat.com>
+
+	* dwarf2read.c (dwarf2_const_value): Fix order of arguments to
+	store_unsigned_integer.
+
+2009-10-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* configure.ac (build_warnings): Add -Wunused-value.
+	* configure: Regenerate.
+
+2009-10-14  Tristan Gingold  <gingold@adacore.com>
+
+	* solib-darwin.c: Remove trailing whitespaces.
+	(darwin_dyld_version_ok): Fix typo.
+
+2009-10-14  Andrew Stubbs  <ams@codesourcery.com>
+
+	* sh-tdep.c (sh_gdbarch_init): Add show_regs settings for
+	bfd_mach_sh3_nommu, bfd_mach_sh2a_nofpu_or_sh3_nommu,
+	bfd_mach_sh2a_or_sh3e, bfd_mach_sh2a_or_sh4, bfd_mach_sh4_nommu_nofpu,
+	and bfd_mach_sh2a_nofpu_or_sh4_nommu_nofpu.
+	Move bfd_mach_sh2a_or_sh4 to use the same configuration as
+	bfd_mach_sh4.
+
+2009-10-13  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* arm-tdep.c (arm_push_dummy_call): Set the low bit of LR for
+	a Thumb entry point.
+	(thumb_get_next_pc): Handle Thumb-2 and ARM v6 instructions.  Refuse
+	to single step into IT blocks.
+
+2009-10-13  Pedro Alves  <pedro@codesourcery.com>
+
+	* infcall.c (call_function_by_hand): Formatting.
+
+2009-10-13  Tristan Gingold  <gingold@adacore.com>
+
+	* solib-darwin.c: Add an empty line after comment for functions.
+	(struct gdb_dyld_all_image_infos): Improve comment.
+	(DYLD_VERSION): Removed and replaced by ...
+	(DYLD_VERSION_MAX, DYLD_VERSION_MIN): ... New macros.
+	(darwin_dyld_version_ok): New function.
+	(darwin_load_image_infos): Call darwin_dyld_version_ok.
+	(darwin_current_sos): Ditto.
+	(darwin_solib_create_inferior_hook): Ditto.
+
+2009-10-13  Tristan Gingold  <gingold@adacore.com>
+
+	* machoread.c: Add an empty line after comment for functions.
+	(oso_el_compare_name): New function.
+	(macho_add_oso_symfile): New function.
+	(macho_oso_symfile): Use macho_add_oso_symfile.  Sort the oso
+	and optimize accesses to libraries.
+
+2009-10-13  Tristan Gingold  <gingold@adacore.com>
+
+	* objfiles.c (objfile_has_symbols): New function.
+	* objfiles.h (objfile_has_symbols): Add prototype.
+	* symfile.c (symbol_file_add_with_addrs_or_offsets): Call
+	objfile_has_symbols.
+	(reread_symbols): Ditto.
+
+2009-10-12  Jiang Jilin  <freephp@gmail.com>
+
+	* i386-tdep.c (i386_process_record): Add xgetbv/xsetbv
+	instructions support.
+
 2009-10-11  Pedro Alves  <pedro@codesourcery.com>
 
 	* procfs.c (procfs_make_note_section): Go back to only outputing

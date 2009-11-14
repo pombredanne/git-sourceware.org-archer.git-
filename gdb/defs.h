@@ -608,6 +608,7 @@ extern int build_address_symbolic (CORE_ADDR addr,
 				   int *unmapped);
 
 extern void print_address (struct gdbarch *, CORE_ADDR, struct ui_file *);
+extern const char *pc_prefix (CORE_ADDR);
 
 /* From source.c */
 
@@ -1217,5 +1218,10 @@ extern ULONGEST align_down (ULONGEST v, int n);
    which use obstacks.  */
 void *hashtab_obstack_allocate (void *data, size_t size, size_t count);
 void dummy_obstack_deallocate (void *object, void *data);
+
+/* From progspace.c */
+
+extern void initialize_progspace (void);
+extern void initialize_inferiors (void);
 
 #endif /* #ifndef DEFS_H */

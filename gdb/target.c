@@ -1181,8 +1181,8 @@ target_section_by_addr (struct target_ops *target, CORE_ADDR addr)
   return NULL;
 }
 
-/* Perform a partial memory transfer.  The arguments and return
-   value are just as for target_xfer_partial.  */
+/* Perform a partial memory transfer.
+   For docs see target.h, to_xfer_partial.  */
 
 static LONGEST
 memory_xfer_partial (struct target_ops *ops, enum target_object object,
@@ -1267,7 +1267,10 @@ memory_xfer_partial (struct target_ops *ops, enum target_object object,
       return -1;
     }
 
-  inf = find_inferior_pid (ptid_get_pid (inferior_ptid));
+  if (!ptid_equal (inferior_ptid, null_ptid))
+    inf = find_inferior_pid (ptid_get_pid (inferior_ptid));
+  else
+    inf = NULL;
 
   if (inf != NULL
       && (region->attrib.cache
@@ -1356,6 +1359,8 @@ make_show_memory_breakpoints_cleanup (int show)
   return make_cleanup (restore_show_memory_breakpoints,
 		       (void *) (uintptr_t) current);
 }
+
+/* For docs see target.h, to_xfer_partial.  */
 
 static LONGEST
 target_xfer_partial (struct target_ops *ops,
@@ -1470,6 +1475,11 @@ target_read_stack (CORE_ADDR memaddr, gdb_byte *myaddr, int len)
   else
     return EIO;
 }
+
+/* Write LEN bytes from MYADDR to target memory at address MEMADDR.
+   Returns either 0 for success or an errno value if any error occurs.
+   If an error occurs, no guarantee is made about how much data got written.
+   Callers that can deal with partial writes should call target_write.  */
 
 int
 target_write_memory (CORE_ADDR memaddr, const gdb_byte *myaddr, int len)
@@ -1634,11 +1644,7 @@ current_xfer_partial (struct target_ops *ops, enum target_object object,
     return -1;
 }
 
-/* Target vector read/write partial wrapper functions.
-
-   NOTE: cagney/2003-10-21: I wonder if having "to_xfer_partial
-   (inbuf, outbuf)", instead of separate read/write methods, make life
-   easier.  */
+/* Target vector read/write partial wrapper functions.  */
 
 static LONGEST
 target_read_partial (struct target_ops *ops,
@@ -1659,6 +1665,9 @@ target_write_partial (struct target_ops *ops,
 }
 
 /* Wrappers to perform the full transfer.  */
+
+/* For docs on target_read see target.h.  */
+
 LONGEST
 target_read (struct target_ops *ops,
 	     enum target_object object,
@@ -1747,7 +1756,6 @@ target_read_until_error (struct target_ops *ops,
   return len;
 }
 
-
 /* An alternative to target_write with progress callbacks.  */
 
 LONGEST
@@ -1782,6 +1790,8 @@ target_write_with_progress (struct target_ops *ops,
     }
   return len;
 }
+
+/* For docs on target_write see target.h.  */
 
 LONGEST
 target_write (struct target_ops *ops,
@@ -2046,7 +2056,7 @@ target_detach (char *args, int from_tty)
   else
     /* If we're in breakpoints-always-inserted mode, have to remove
        them before detaching.  */
-    remove_breakpoints ();
+    remove_breakpoints_pid (PIDGET (inferior_ptid));
 
   for (t = current_target.beneath; t != NULL; t = t->beneath)
     {
@@ -2302,7 +2312,7 @@ simple_search_memory (struct target_ops *ops,
       if (search_space_len >= pattern_len)
 	{
 	  unsigned keep_len = search_buf_size - chunk_size;
-	  CORE_ADDR read_addr = start_addr + keep_len;
+	  CORE_ADDR read_addr = start_addr + chunk_size + keep_len;
 	  int nr_to_read;
 
 	  /* Copy the trailing part of the previous iteration to the front
@@ -2547,6 +2557,42 @@ target_get_osdata (const char *type)
   return target_read_stralloc (t, TARGET_OBJECT_OSDATA, type);
 }
 
+/* Determine the current address space of thread PTID.  */
+
+struct address_space *
+target_thread_address_space (ptid_t ptid)
+{
+  struct address_space *aspace;
+  struct inferior *inf;
+  struct target_ops *t;
+
+  for (t = current_target.beneath; t != NULL; t = t->beneath)
+    {
+      if (t->to_thread_address_space != NULL)
+	{
+	  aspace = t->to_thread_address_space (t, ptid);
+	  gdb_assert (aspace);
+
+	  if (targetdebug)
+	    fprintf_unfiltered (gdb_stdlog,
+				"target_thread_address_space (%s) = %d\n",
+				target_pid_to_str (ptid),
+				address_space_num (aspace));
+	  return aspace;
+	}
+    }
+
+  /* Fall-back to the "main" address space of the inferior.  */
+  inf = find_inferior_pid (ptid_get_pid (ptid));
+
+  if (inf == NULL || inf->aspace == NULL)
+    internal_error (__FILE__, __LINE__, "\
+Can't determine the current address space of thread %s\n",
+		    target_pid_to_str (ptid));
+
+  return inf->aspace;
+}
+
 static int
 default_region_ok_for_hw_watchpoint (CORE_ADDR addr, int len)
 {
@@ -2658,7 +2704,7 @@ generic_mourn_inferior (void)
   if (!ptid_equal (ptid, null_ptid))
     {
       int pid = ptid_get_pid (ptid);
-      delete_inferior (pid);
+      exit_inferior (pid);
     }
 
   breakpoint_init_inferior (inf_exited);
@@ -2712,17 +2758,19 @@ dummy_pid_to_str (struct target_ops *ops, ptid_t ptid)
   return normal_pid_to_str (ptid);
 }
 
-/* Error-catcher for target_find_memory_regions */
-static int dummy_find_memory_regions (int (*ignore1) (), void *ignore2)
+/* Error-catcher for target_find_memory_regions.  */
+static int
+dummy_find_memory_regions (int (*ignore1) (), void *ignore2)
 {
-  error (_("No target."));
+  error (_("Command not implemented for this target."));
   return 0;
 }
 
-/* Error-catcher for target_make_corefile_notes */
-static char * dummy_make_corefile_notes (bfd *ignore1, int *ignore2)
+/* Error-catcher for target_make_corefile_notes.  */
+static char *
+dummy_make_corefile_notes (bfd *ignore1, int *ignore2)
 {
-  error (_("No target."));
+  error (_("Command not implemented for this target."));
   return NULL;
 }
 

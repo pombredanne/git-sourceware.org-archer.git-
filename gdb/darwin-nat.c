@@ -995,7 +995,7 @@ cancel_breakpoint (ptid_t ptid)
   CORE_ADDR pc;
 
   pc = regcache_read_pc (regcache) - gdbarch_decr_pc_after_break (gdbarch);
-  if (breakpoint_inserted_here_p (pc))
+  if (breakpoint_inserted_here_p (get_regcache_aspace (regcache), pc))
     {
       inferior_debug (4, "cancel_breakpoint for thread %x\n",
 		      ptid_get_tid (ptid));
@@ -1543,8 +1543,10 @@ darwin_attach (struct target_ops *ops, char *args, int from_tty)
            pid, safe_strerror (errno), errno);
 
   inferior_ptid = pid_to_ptid (pid);
-  inf = add_inferior (pid);
+  inf = current_inferior ();
+  inferior_appeared (inf, pid);
   inf->attach_flag = 1;
+
   /* Always add a main thread.  */
   add_thread_silent (inferior_ptid);
 

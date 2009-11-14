@@ -731,6 +731,7 @@ call_function_by_hand (struct value *function, int nargs, struct value **args)
     struct breakpoint *bpt;
     struct symtab_and_line sal;
     init_sal (&sal);		/* initialize to zeroes */
+    sal.pspace = current_program_space;
     sal.pc = bp_addr;
     sal.section = find_pc_overlay (sal.pc);
     /* Sanity.  The exact same SP value is returned by
@@ -940,7 +941,7 @@ When the function is done executing, GDB will silently stop."),
 		 user.  */
 
 	      if (terminate_bp != NULL
-		  && (inferior_thread()->stop_bpstat->breakpoint_at->address
+		  && (inferior_thread ()->stop_bpstat->breakpoint_at->address
 		      == terminate_bp->loc->address))
 		{
 		  /* We must get back to the frame we were before the

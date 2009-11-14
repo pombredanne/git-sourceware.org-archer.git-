@@ -28,6 +28,7 @@ AM_MAINTAINER_MODE
 AC_PROG_CC
 AC_USE_SYSTEM_EXTENSIONS
 gl_EARLY
+ACX_LARGEFILE
 AM_PROG_CC_STDC
 
 AC_CONFIG_AUX_DIR(..)
@@ -1542,7 +1543,7 @@ fi
 # gdb/doc/gdbint.texinfo.
 build_warnings="-Wall -Wdeclaration-after-statement -Wpointer-arith \
 -Wformat-nonliteral -Wno-pointer-sign \
--Wno-unused -Wno-switch -Wno-char-subscripts"
+-Wno-unused -Wunused-value -Wno-switch -Wno-char-subscripts"
 
 # Enable -Wno-format by default when using gcc on mingw since many
 # GCC versions complain about %I64.
