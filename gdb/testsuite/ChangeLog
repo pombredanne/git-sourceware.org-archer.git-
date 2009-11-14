@@ -1,3 +1,178 @@
+2009-11-13  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* lib/gdb.exp (current_target_name): New procedure.
+	(gdb_wrapper_target): New variable.
+	(gdb_wrapper_init): Set gdb_wrapper_target.
+	(default_gdb_init): Check gdb_wrapper_target before rebuilding the
+	wrapper.
+
+2009-11-13  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.base/remote.exp: Delete the slowest load test.
+	Do not load with fixed packet sizes.
+
+2009-11-13  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.cp/virtfunc.exp (do_tests): If runto_main fails, give up.
+
+2009-11-13  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.base/freebpcmd.exp: Delete unused variable.  Specify
+	srcfile when setting a breakpoint.
+
+2009-11-13  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* gdb.base/find.c (int8_t, int16_t, int32_t, int64_t): Undefine
+	macros.
+
+2009-11-13  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.cp/formatted-ref.exp (test_p_x_ref_addr): Allow the reference
+	to be in memory.
+	* gdb.base/display.c (force_mem): New.
+	(do_loops): Use it.  Add breakpoint comments.
+	(do_vars): Add a breakpoint comment.
+	* gdb.base/display.exp: Use gdb_get_line_number.  Remove hardcoded
+	line numbers.
+
+2009-11-13  Nathan Froyd  <froydnj@codesourcery.com>
+
+	* gdb.base/pending.exp: Use gdb_run_cmd to start the program
+	instead of a bare "run".
+
+2009-11-13  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* gdb.python/py-prettyprint.exp: Adjust.
+	
+2009-11-12  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* lib/cell.exp (skip_cell_tests): Clean up test files before
+	returning.
+
+2009-11-12  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* lib/gdb.exp (gdb_test_multiple): Handle "y or [n]", "[y] or n",
+	and the breakpoint menu.  Do not call perror if a prompt is seen.
+	Consume the following GDB prompt.
+	* gdb.cp/method2.exp (test_break): Use gdb_test_multiple.
+	* gdb.cp/namespace.exp: Use gdb_test.
+	* gdb.cp/templates.exp: Use gdb_test.
+	(test_template_breakpoints): Use gdb_test_multiple.
+
+2009-11-12  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.base/break1.c (struct some_struct, values): Move earlier.
+	(marker4): Reference values.
+
+2009-11-12  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.base/macscp.exp: Avoid the first FAIL if macro information
+	is missing.
+
+2009-11-12  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.base/break.c (need_malloc): New.
+	* gdb.base/constvars.c (main): Reference crass and crisp.
+	* gdb.base/gdb1821.c (main): Reference bar.
+	* gdb.cp/gdb1355.cc (main): Reference s1.
+	* gdb.cp/hang1.cc (dummy2, dummy3): Declare.
+	(main): Call them.
+	* gdb.cp/hang2.cc (dummy2): Define.
+	* gdb.cp/hang3.cc (dummy3): Define.
+	* gdb.cp/m-data.cc (main): Reference shadow.
+
+2009-11-12  Daniel Jacobowitz  <dan@codesourcery.com>
+	    Nathan Froyd  <froydnj@codesourcery.com>
+
+	* lib/gdb.exp (gdb_compile): Also set rpath for shlib=, on a
+	remote host.
+
+2009-11-12  Nathan Froyd  <froydnj@codesourcery.com>
+
+	* gdb.base/step-line.exp: Copy step-line.inp to the remote host.
+	* gdb.dwarf2/dw2-basic.exp: Copy file1.txt to the remote host.
+	* gdb.dwarf2/dw2-compressed.exp: Likewise.
+	* gdb.dwarf2/dw2-intercu.exp: Likewise.
+	* gdb.dwarf2/dw2-intermix.exp: Likewise.
+	* gdb.dwarf2/dw2-producer.exp: Likewise.
+	* gdb.dwarf2/mac-fileno.exp: Likewise.
+	* gdb.python/py-prettyprint.exp (run_lang_tests): Copy
+	py-prettyprint.py to the remote host.
+	* gdb.python/py-mi.exp: Copy py-mi.py to the remote host.
+
+2009-11-11  Keith Seitz  <keiths@redhat.com>
+
+	* gdb.cp/classes.cc (ByAnyOtherName): Add typedef and
+	use it instead of "Foo".
+	* gdb.cp/classes.exp (do_tests): Add a test to access
+	a method through a typedef'd class name.
+
+2009-11-11  Nathan Froyd  <froydnj@codesourcery.com>
+
+	* gdb.base/long_long.exp: Permit leading zeros on floating-point
+	exponents.
+	* gdb.base/pointers.exp: Likewise.
+	* gdb.cp/ref-types.exp: Likewise.
+
+2009-11-11  Keith Seitz  <keiths@redhat.com>
+
+	* gdb.cp/cplusfuncs.cc (class foo): Add operators
+	new[] and delete[].
+	* gdb.cp/cplusfuncs.exp (dm_type_void): Change to
+	"void".
+	(probe_demangler): Remove all single-quoting of
+	method and variable names.
+	(info_func_regexp): Remove the word "void" from any
+	occurrence of "(void)".
+	(print_addr_2): Remove all single-quoting of
+	method names.
+	(print_addr_2_kfail): Likewise.
+	(print_addr): Single-quote C function names before
+	passing to print_addr_2.
+	(test_paddr_operator_functions): Remove single-quoting
+	for method names.
+	Add tests for operator new[] and operator delete[].
+
+2009-11-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-ranges.exp: Call runto_main.
+
+2009-11-09  Keith Seitz  <keiths@redhat.com>
+
+	* gdb.cp/overload.exp: Add tests for resolving overloaded
+	methods in expression parsing/evaluation.
+
+2009-11-10  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* lib/gdb.exp (default_gdb_version): Use --version instead of
+	--command.
+
+2009-11-10  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* lib/gdb.exp (gdb_compile_test): New.
+	(skip_ada_tests, skip_java_tests): New.
+	(gdb_compile): Use gdb_compile_test for f77.
+	* lib/ada.exp (gdb_compile_ada): Use gdb_compile_test to record result.
+	* lib/java.exp (compile_java_from_source): Remove runtests check,
+	use gdb_compile_test to record result.
+	* gdb.ada/packed_array.exp, gdb.ada/fixed_points.exp,
+	gdb.ada/exec_changed.exp, gdb.ada/start.exp,
+	gdb.ada/watch_arg.exp, gdb.ada/null_record.exp,
+	gdb.ada/array_return.exp, gdb.ada/arrayidx.exp,
+	gdb.mi/mi-var-child-f.exp, gdb.fortran/types.exp,
+	gdb.fortran/array-element.exp, gdb.fortran/subarray.exp,
+	gdb.fortran/derived-type.exp, gdb.fortran/exprs.exp,
+	gdb.java/jmisc.exp, gdb.java/jmisc1.exp, gdb.java/jprint.exp,
+	gdb.java/jv-print.exp, gdb.java/jmain.exp: Add language skip,
+	adjust gdb_compile invocations.
+
+2009-11-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* Makefile.in (abs_builddir): New.
+	(site.exp): New target `$(abs_builddir)/site.exp'.  New comment.
+	(check-single, $(TEST_TARGETS), check-gdb.base%): Change `site.exp' to
+	`$(abs_builddir)/site.exp'.
+
 2009-11-05  Daniel Jacobowitz  <dan@codesourcery.com>
 
 	* config/m68k-emc.exp, lib/emc-support.exp,

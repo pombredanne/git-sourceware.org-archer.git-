@@ -1,3 +1,286 @@
+2009-11-13  Doug Evans  <dje@google.com>
+
+	* dcache.c (dcache_hit, dcache_read_line): Tweak comments.
+	(dcache_peek_byte, dcache_init, dcache_xfer_memory): Ditto.
+	* target.c (memory_xfer_partial): Tweak comments.
+	(target_xfer_partial, target_write_memory): Add comment.
+	(target_read_partial): Remove note from 2003-10-21.
+	(target_read, target_write): Add comments.
+
+2009-11-13  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* inline-frame.c (find_inline_frame_state): Check for changed PC
+	here...
+	(inline_frame_sniffer): ... not here.
+
+2009-11-13  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* ui-file.c (stdio_file_read): Call gdb_select before read.
+
+2009-11-13  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* mips-tdep.c (mips_insn16_frame_this_id): Mark the outermost
+	frame.
+	(mips_insn32_frame_this_id): Likewise.
+
+2009-11-13  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* elfread.c (elf_symtab_read): Only mark a minimal symbol as
+	special if it actually exists.  Merge the checks for this
+	conditions.
+
+2009-11-13  Kazu Hirata  <kazu@codesourcery.com>
+	    Maxim Kuvyrkov  <maxim@codesourcery.com>
+
+	* remote-fileio.c (remote_fileio_request): Send Ctrl-C if it is
+	pending.
+	* remote-fileio.h: Update the prototype for remote_fileio_request.
+	* remote.c (struct remote_state): Add ctrlc_pending_p.
+	(remote_open_1): Clear ctrlc_pending_p.
+	(remote_stop_as): Set ctrlc_pending_p to 1.
+	(remote_wait_as): Pass ctrlc_pending_p to remote_fileio_request.
+
+2009-11-13  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* arm-tdep.c (arm_skip_stub): Recognize RealView veneer functions.
+
+2009-11-13  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* breakpoint.c (update_watchpoint): Only fiddle with frames for
+	local watchpoints.
+
+2009-11-13  Pedro Alves  <pedro@codesourcery.com>
+
+	* infrun.c (handle_inferior_event): Set stop_print_frame on
+	TARGET_WAITKIND_LOADED events, if stopping on solib-events.
+
+2009-11-13  Doug Evans  <dje@google.com>
+
+	* dcache.c (dcache_block): Replace member newer with next,prev.
+	(dcache_struct): Delete member newest.
+	(block_func): New typedef.
+	(append_block, remove_block, for_each_block): New functions.
+	(invalidate_block, free_block): New functions.
+	(dcache_invalidate): Update
+	(dcache_invalidate_line, dcache_alloc): Update to use new list
+	accessors.
+	(dcache_free): Ditto.  Fix memory leak.
+
+2009-11-13  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* python/py-prettyprint.c (print_string_repr): Suppress
+	address printing
+	
+2009-11-13  Tristan Gingold  <gingold@adacore.com>
+
+	* avr-tdep.c (avr_push_dummy_call): Fix endianness issue and avoid
+	overlap between returned structure and return address/parameters.
+
+2009-11-12  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* remote-fileio.c (remote_fileio_func_read): Limit console
+	reads to 16K.
+
+2009-11-12  Daniel Jacobowitz  <dan@codesourcery.com>
+	    Paul Brook  <paul@codesourcery.com>
+
+	* c-typeprint.c (c_type_print_base): Skip artificial fields.
+	Use get_vptr_fieldno to skip the vtable pointer.
+	* dwarf2read.c (dwarf2_add_field): Set FIELD_ARTIFICIAL on artificial
+	fields.
+	(dwarf2_add_member_fn): Complain about virtual member functions
+	without DW_AT_vtable_elem_location and force TYPE_CPLUS_DYNAMIC.
+	* gdbtypes.c (get_vptr_fieldno): Update comment.
+	* gdbtypes.h (struct cplus_struct_type): Add is_dynamic.
+	(TYPE_CPLUS_DYNAMIC): New macro.
+	* gnu-v3-abi.c (gnuv3_dynamic_class): New.
+	(gnuv3_get_vtable): Rewrite to use gnuv3_dynamic_class.  Move higher.
+	(gnuv3_rtti_type, gnuv3_get_virtual_fn, gnuv3_baseclass_offset): Use
+	gnuv3_get_vtable.
+	* varobj.c (cplus_class_num_children, cplus_describe_child): Skip
+	artificial fields.  Use get_vptr_fieldno to skip the vtable pointer.
+
+2009-11-12  Paul Brook  <paul@codesourcery.com>
+	    Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* dwarf2read.c (dwarf2_add_member_fn): Calculate virtual function
+	offset for classes without DW_AT_containing_type.
+
+2009-11-12  Paul Brook  <paul@codesourcery.com>
+	    Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* dwarf2read.c (struct field_info): Add baseclasses.
+	(dwarf2_add_field): Add base classes to a separate list.
+	(dwarf2_attach_fields_to_type): Merge base classes and fields.
+
+2009-11-12  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* dwarf2read.c (process_psymtab_comp_unit): Initialize per_cu backlink
+	at the same time as the forward link.
+	(load_partial_comp_unit): Initialize per_cu links before calling
+	init_cu_die_reader.
+
+2009-11-11  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	PR gdb/10838
+	* linux-thread-db.c (thread_db_info): New member.
+	(disable_thread_event_reporting): Call td_ta_clear_event.
+
+2009-11-11  Keith Seitz  <keiths@redhat.com>
+
+	* linespec.c (lookup_prefix_sym): Lookup the symbol
+	in both STRUCT_DOMAIN and VAR_DOMAIN.
+
+2009-11-11  Michael Snyder  <msnyder@vmware.com>
+
+	* darwin-nat-info.c: Update copyright.
+	* dbxread.c: Ditto.
+	* gdbarch.sh: Ditto.
+	* gdbarch.c: Ditto.
+	* gdbarch.h: Ditto.
+	* inline-frame.c: Ditto.
+	* inline-frame.h: Ditto.
+	* s390-nat.c: Ditto.
+
+2009-11-11  Michael Snyder  <msnyder@vmware.com>
+
+        * findvar.c (top level): Fix and add comments.
+
+2009-11-10  Keith Seitz  <keiths@redhat.com>
+
+	* c-exp.y (operator_stoken): New function.
+	(OPERATOR): New token.
+	(NEW): New token.
+	(DELETE): New token.
+	(operator): New rule.
+	(name): Add operator.
+	(ident_tokens): Add "new", "delete", and "operator".
+	* gdbtypes.c (rank_one_type): Don't complain about
+	void pointer conversion badness if both types are
+	void pointers.
+
+2009-11-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symfile.c (separate_debug_file_exists): Change parameter parent_name
+	to parent_objfile.  New variables parent_stat and abfd_stat.  Call
+	strcmp and then bfd_stat functions to verify if NAME matches.
+	(find_separate_debug_file): Update the passed parameter at caller.
+
+2009-11-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* objfiles.c (objfile_relocate): Update also the field psymtabs_addrmap.
+
+2009-11-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* configure.ac: Call ACX_LARGEFILE.
+	* aclocal.m4: Call m4_include for ../config/largefile.m4 and
+	../config/plugins.m4.
+	* configure: Regenerate.
+	* config.in: Regenerate.
+
+2009-11-10  Keith Seitz  <keiths@redhat.com>
+
+	* c-exp.y: Add new rule for resolving method overloads.
+	* eval.c (make_params): New function.
+	(free_param_types): New function.
+	(evaluate_subexp_standard): Pass expect_type to value_aggregate_elt.
+	Handle case TYPE_INSTANCE.
+	(evaluate_subexp_for_address): Pass expect_type to value_aggregate_elt.
+	* expression.h (enum exp_opcode): Add TYPE_INSTANCE.
+	(compare_parameters): Add declaration.
+	* parse.c (operator_length_standard): Add TYPE_INSTANCE.
+	* valops.c (value_aggregate_elt): Add new expect_type parameter.
+	Pass expect_type to value_struct_elt_for_reference.
+	(value_struct_elt_for_reference): Add expect_type parameter and use
+	compare_parameters.
+	Check for overload matches with and without artificial parameters.
+	Skip artificial methods.
+	(compare_parameters): New function.
+	* value.h (value_aggregate_elt): Add new expect_type parameter.
+
+2009-11-10  Joseph Myers  <joseph@codesourcery.com>
+
+	* solib-svr4.c (enable_break): Call
+	gdbarch_convert_from_func_ptr_addr on results of looking up
+	fallback symbol names.
+
+2009-11-10  Daniel Gutson  <dgutson@codesourcery.com>
+
+	* procfs.c (procfs_do_thread_registers): Added a call to fetch
+	register values before saving them in the core file
+	through the gcore command.
+	(procfs_corefile_thread_callback): Removed the backup of
+	inferior_ptid before calling procfs_do_thread_registers since
+	the function already saves and restores it before returning.
+
+2009-11-10  Michael Snyder  <msnyder@vmware.com>
+
+	* dcache.c (dcache_invalidate_line): Remove block from used list
+	when adding it to freed list.
+
+2009-11-10  Michael Snyder  <msnyder@vmware.com>
+
+	* dcache.c: Fix typo, shorten long lines in comment.
+
+2009-11-10  Tristan Gingold  <gingold@adacore.com>
+
+	* avr-tdep.c: Add AVR_PSEUDO_PC_REGNUM and AVR_NUM_PSEUDO_REGS.
+	(struct gdbarch_tdep): Add void_type, func_void_type and pc_type
+	fields.
+	(avr_register_name): Add "pc" name, renames "PC" to "PC2".
+	(avr_register_type): Handle AVR_PSEUDO_PC_REGNUM.
+	(avr_write_pc): Fix indentation.
+	(avr_pseudo_register_read): New function.
+	(avr_pseudo_register_write): New function.
+	(avr_frame_prev_register): Handle AVR_PSEUDO_PC_REGNUM.
+	(avr_gdbarch_init): Create types for pc.  Register pseudo regs.
+
+2009-11-10  Tristan Gingold  <gingold@adacore.com>
+
+	* avr-tdep.c (avr_integer_to_address): New function.
+	(avr_gdbarch_init): Set integer_to_address.
+
+2009-11-10  Tristan Gingold  <gingold@adacore.com>
+
+	* avr-tdep.c (avr_skip_prologue): First try to skip prologue
+	using skip_prologue_using_sal.
+
+2009-11-10  Tristan Gingold  <gingold@adacore.com>
+
+	* avr-tdep.c (avr_extract_return_value): Remove.
+	(avr_return_value): Mostly rewritten.  Fix handling for structures.
+	(avr_push_dummy_call): Handle struct_return.
+
+2009-11-10  Tristan Gingold  <gingold@adacore.com>
+
+	* avr-tdep.c (avr_scan_prologue): Decode instructions used for
+	small stack allocation.
+	Adjust code for prologue that don't write SP.
+
+2009-11-10  Tristan Gingold  <gingold@adacore.com>
+
+	* avr-tdep.c (avr_make_saddr): Return 0 for NULL.
+
+2009-11-10  Tristan Gingold  <gingold@adacore.com>
+
+	* avr-tdep.c (avr_dwarf_reg_to_regnum): New function.
+	(avr_gdbarch_init): Call set_gdbarch_dwarf2_reg_to_regnum.
+
+2009-11-09  Sebastien Granjoux  <seb.sfo@free.fr>
+
+	PR mi/9583:
+	* symtab.c (find_line_symtab, append_exact_match_to_sals)
+	(expand_line_sal): Use full filename when setting breakpoints if
+	available
+
+2009-11-09  Cary Coutant  <ccoutant@google.com>
+
+	* dwarf2read.c (read_import_statement): Don't clobber original cu.
+
+2009-11-09  Tom Tromey  <tromey@redhat.com>
+
+	* python/python.c (execute_gdb_command): Copy the argument text.
+
 2009-11-06  Vladimir Prus  <vladimir@codesourcery.com>
 
 	* m68k-tdep.c (m68k_convert_register_p): Correct
@@ -250,6 +533,11 @@
 	* config/xtensa/linux.mh (NATDEPFILES): Ditto.
 	* target.c (dummy_find_memory_regions): Change output.
 	(dummy_make_corefile_notes): Ditto.
+
+2009-10-26  Tristan Gingold  <gingold@adacore.com>
+	
+	* charset.c (_initialize_charset): Set a default value to
+	auto_host_charset_name if empty.
 
 2009-10-26  Tristan Gingold  <gingold@adacore.com>
 
