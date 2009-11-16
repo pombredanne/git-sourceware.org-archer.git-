@@ -1210,8 +1210,8 @@ map_ada_symtabs (struct objfile *objfile,
 
 static void
 expand_symtabs_matching_via_partial (struct objfile *objfile,
-				     int (*file_matcher) (char *, void *),
-				     int (*name_matcher) (char *, void *),
+				     int (*file_matcher) (const char *, void *),
+				     int (*name_matcher) (const char *, void *),
 				     domain_enum kind,
 				     void *data)
 {

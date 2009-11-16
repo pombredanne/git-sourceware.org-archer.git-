@@ -112,8 +112,6 @@ struct symbol *lookup_symbol_aux_quick (struct objfile *objfile,
 					const char *linkage_name,
 					const domain_enum domain);
 
-static int file_matches (char *, char **, int);
-
 static void print_symbol_info (domain_enum,
 			       struct symtab *, struct symbol *, int, char *);
 
@@ -2572,7 +2570,7 @@ sources_info (char *ignore, int from_tty)
 }
 
 static int
-file_matches (char *file, char *files[], int nfiles)
+file_matches (const char *file, char *files[], int nfiles)
 {
   int i;
 
@@ -2670,14 +2668,14 @@ struct search_symbols_data
 };
 
 static int
-search_symbols_file_matches (char *filename, void *user_data)
+search_symbols_file_matches (const char *filename, void *user_data)
 {
   struct search_symbols_data *data = user_data;
   return file_matches (filename, data->files, data->nfiles);
 }
 
 static int
-search_symbols_name_matches (char *symname, void *user_data)
+search_symbols_name_matches (const char *symname, void *user_data)
 {
   struct search_symbols_data *data = user_data;
   return data->regexp == NULL || re_exec (symname);

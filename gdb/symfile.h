@@ -228,8 +228,8 @@ struct quick_symbol_functions
      DATA is user data that is passed unmodified to the callback
      functions.  */
   void (*expand_symtabs_matching) (struct objfile *objfile,
-				   int (*file_matcher) (char *, void *),
-				   int (*name_matcher) (char *, void *),
+				   int (*file_matcher) (const char *, void *),
+				   int (*name_matcher) (const char *, void *),
 				   domain_enum kind,
 				   void *data);
 
