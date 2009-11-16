@@ -145,7 +145,8 @@ struct quick_symbol_functions
      If no such symbol table can be found, returns 0.
      
      Otherwise, sets *RESULT to the symbol table and returns 1.  This
-     might return 1 and set *RESULT to NULL; see lookup_symtab.  */
+     might return 1 and set *RESULT to NULL if the requested file is
+     an include file that does not have a symtab of its own.  */
   int (*lookup_symtab) (struct objfile *objfile,
 			const char *name,
 			const char *full_path,
@@ -153,22 +154,19 @@ struct quick_symbol_functions
 			struct symtab **result);
 
   /* Check to see if the symbol is defined in a "partial" symbol table
-     of OBJFILE.  BLOCK_INDEX should be either GLOBAL_BLOCK or
-     STATIC_BLOCK, depending on whether we want to search global
-     symbols or static symbols.  NAME is the name of the symbol to
-     look for, and LINKAGE_NAME is the linkage name (or NULL).  DOMAIN
-     indicates what sort of symbol to search for. */
-  struct symbol *(*lookup_symbol_aux) (struct objfile *objfile,
-				       int block_index, const char *name,
-				       const char *linkage_name,
-				       const domain_enum domain);
-
-  /* Look up a type in OBJFILE.  NAME is the name of the type.  KIND
-     is either GLOBAL_BLOCK or STATIC_BLOCK, depending on whether we
-     want to search global symbols or static symbols.  */
-  struct type *(*basic_lookup_transparent_type) (struct objfile *objfile,
-						 const char *name,
-						 int kind);
+     of OBJFILE.  KIND should be either GLOBAL_BLOCK or STATIC_BLOCK,
+     depending on whether we want to search global symbols or static
+     symbols.  NAME is the name of the symbol to look for, and
+     LINKAGE_NAME is the linkage name (or NULL).  DOMAIN indicates
+     what sort of symbol to search for.  If DOMAIN is STRUCT_DOMAIN,
+     then LINKAGE_NAME is ignored.
+     
+     Returns the newly-expanded symbol table in which the symbol is
+     defined, or NULL if no such symbol table exists.  */
+  struct symtab *(*lookup_symbol) (struct objfile *objfile,
+				   int kind, const char *name,
+				   const char *linkage_name,
+				   domain_enum domain);
 
   /* Print statistics about any indices loaded for OBJFILE.  The
      statistics should be printed to gdb_stdout.  This is used for
@@ -187,22 +185,22 @@ struct quick_symbol_functions
 
   /* Find all the symbols in OBJFILE named FUNC_NAME, and ensure that
      the corresponding symbol tables are loaded.  */
-  void (*read_symtabs_for_function) (struct objfile *objfile,
-				     const char *func_name);
+  void (*expand_symtabs_for_function) (struct objfile *objfile,
+				       const char *func_name);
 
   /* Read all symbol tables associated with OBJFILE.  If FROM_TTY is
      true (or if INFO_VERBOSE), this should print some sort of message
      to gdb_stdout.  */
-  void (*expand_symbol_tables) (struct objfile *objfile, int from_tty);
+  void (*expand_all_symtabs) (struct objfile *objfile, int from_tty);
 
   /* Read all symbol tables associated with OBJFILE which have the
      file name FILENAME.  */
-  void (*read_symtabs_with_filename) (struct objfile *objfile,
-				      const char *filename);
+  void (*expand_symtabs_with_filename) (struct objfile *objfile,
+					const char *filename);
 
   /* Return the file name of the file holding the symbol in OBJFILE
      named NAME.  If no such symbol exists in OBJFILE, return NULL.  */
-  char *(*find_symbol_file) (struct objfile *objfile, char *name);
+  char *(*find_symbol_file) (struct objfile *objfile, const char *name);
 
   /* FIXME: document.  */
   void (*map_ada_symtabs) (struct objfile *objfile,

@@ -71,9 +71,9 @@ lookup_partial_symtab (struct objfile *objfile, const char *name,
 {
   struct partial_symtab *pst;
 
+  require_partial_symbols (objfile);
   ALL_OBJFILE_PSYMTABS (objfile, pst)
   {
-    require_partial_symbols (objfile);
     if (FILENAME_CMP (name, pst->filename) == 0)
       {
 	return (pst);
@@ -412,59 +412,21 @@ fixup_psymbol_section (struct partial_symbol *psym, struct objfile *objfile)
   return psym;
 }
 
-/* Check to see if the symbol is defined in one of the partial
-   symtabs.  BLOCK_INDEX should be either GLOBAL_BLOCK or
-   STATIC_BLOCK, depending on whether or not we want to search global
-   symbols or static symbols.  */
-
-static struct symbol *
+static struct symtab *
 lookup_symbol_aux_psymtabs (struct objfile *objfile,
 			    int block_index, const char *name,
 			    const char *linkage_name,
 			    const domain_enum domain)
 {
-  struct symbol *sym;
-  struct blockvector *bv;
-  const struct block *block;
   struct partial_symtab *ps;
-  struct symtab *s;
   const int psymtab_index = (block_index == GLOBAL_BLOCK ? 1 : 0);
 
+  require_partial_symbols (objfile);
   ALL_OBJFILE_PSYMTABS (objfile, ps)
   {
-    require_partial_symbols (objfile);
-    if (!ps->readin
-	&& lookup_partial_symbol (ps, name, linkage_name,
-				  psymtab_index, domain))
-      {
-	s = PSYMTAB_TO_SYMTAB (ps);
-	bv = BLOCKVECTOR (s);
-	block = BLOCKVECTOR_BLOCK (bv, block_index);
-	sym = lookup_block_symbol (block, name, linkage_name, domain);
-	if (!sym)
-	  {
-	    /* This shouldn't be necessary, but as a last resort try
-	       looking in the statics even though the psymtab claimed
-	       the symbol was global, or vice-versa. It's possible
-	       that the psymtab gets it wrong in some cases.  */
-
-	    /* FIXME: carlton/2002-09-30: Should we really do that?
-	       If that happens, isn't it likely to be a GDB error, in
-	       which case we should fix the GDB error rather than
-	       silently dealing with it here?  So I'd vote for
-	       removing the check for the symbol in the other
-	       block.  */
-	    block = BLOCKVECTOR_BLOCK (bv,
-				       block_index == GLOBAL_BLOCK ?
-				       STATIC_BLOCK : GLOBAL_BLOCK);
-	    sym = lookup_block_symbol (block, name, linkage_name, domain);
-	    if (!sym)
-	      error (_("Internal: %s symbol `%s' found in %s psymtab but not in symtab.\n%s may be an inlined function, or may be a template function\n(if a template, try specifying an instantiation: %s<type>)."),
-		     block_index == GLOBAL_BLOCK ? "global" : "static",
-		     name, ps->filename, name, name);
-	  }
-	return fixup_symbol_section (sym, objfile);
-      }
+    if (!ps->readin && lookup_partial_symbol (ps, name, linkage_name,
+					      psymtab_index, domain))
+      return PSYMTAB_TO_SYMTAB (ps);
   }
 
   return NULL;
@@ -562,57 +524,6 @@ lookup_partial_symbol (struct partial_symtab *pst, const char *name,
     }
 
   return (NULL);
-}
-
-static struct type *
-basic_lookup_transparent_type_via_partial (struct objfile *objfile,
-					   const char *name, int kind)
-{
-  struct partial_symtab *ps;
-  int other_kind = kind == GLOBAL_BLOCK ? STATIC_BLOCK : GLOBAL_BLOCK;
-
-  /* FIXME: .debug_pubnames should be read in.
-     
-     One may also try to the first pass without the require_partial_symbols
-     call but that would behave nondeterministically.  */
-  ALL_OBJFILE_PSYMTABS (objfile, ps)
-  {
-    require_partial_symbols (objfile);
-    if (!ps->readin && lookup_partial_symbol (ps, name, NULL,
-					      kind == GLOBAL_BLOCK,
-					      STRUCT_DOMAIN))
-      {
-	struct symtab *s;
-	struct blockvector *bv;
-	struct block *block;
-	struct symbol *sym;
-
-	s = PSYMTAB_TO_SYMTAB (ps);
-	bv = BLOCKVECTOR (s);
-	block = BLOCKVECTOR_BLOCK (bv, kind);
-	sym = lookup_block_symbol (block, name, NULL, STRUCT_DOMAIN);
-	if (!sym)
-	  {
-	    /* This shouldn't be necessary, but as a last resort
-	     * try looking in the 'other kind' even though the psymtab
-	     * claimed the symbol was one thing. It's possible that
-	     * the psymtab gets it wrong in some cases.
-	     */
-	    block = BLOCKVECTOR_BLOCK (bv, other_kind);
-	    sym = lookup_block_symbol (block, name, NULL, STRUCT_DOMAIN);
-	    if (!sym)
-	      /* FIXME; error is wrong in one case */
-	      error (_("Internal: global symbol `%s' found in %s psymtab but not in symtab.\n\
-%s may be an inlined function, or may be a template function\n\
-(if a template, try specifying an instantiation: %s<type>)."),
-		     name, ps->filename, name, name);
-	  }
-	if (!TYPE_IS_OPAQUE (SYMBOL_TYPE (sym)))
-	  return SYMBOL_TYPE (sym);
-      }
-  }
-
-  return NULL;
 }
 
 /* True if we are nested inside psymtab_to_symtab. */
@@ -1121,7 +1032,7 @@ psymtab_to_fullname (struct partial_symtab *ps)
 }
 
 static char *
-find_symbol_file_from_partial (struct objfile *objfile, char *name)
+find_symbol_file_from_partial (struct objfile *objfile, const char *name)
 {
   struct partial_symtab *pst;
 
@@ -1367,7 +1278,6 @@ const struct quick_symbol_functions psym_functions =
   forget_cached_source_info_partial,
   lookup_symtab_via_partial_symtab,
   lookup_symbol_aux_psymtabs,
-  basic_lookup_transparent_type_via_partial,
   print_psymtab_stats_for_objfile,
   dump_psymtabs_for_objfile,
   relocate_psymtabs,

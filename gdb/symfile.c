@@ -953,7 +953,7 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
      all partial symbol tables for this objfile if so. */
 
   if ((flags & OBJF_READNOW) || readnow_symbol_files)
-    objfile->sf->qf->expand_symbol_tables (objfile, from_tty);
+    objfile->sf->qf->expand_all_symtabs (objfile, from_tty);
 
   /* If the file has its own symbol tables it has no separate debug info.
      `.dynsym'/`.symtab' go to MSYMBOLS, `.debug_info' goes to SYMTABS/PSYMTABS.

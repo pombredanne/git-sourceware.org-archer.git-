@@ -105,6 +105,13 @@ struct symbol *lookup_symbol_aux_symtabs (int block_index,
 					  const char *linkage_name,
 					  const domain_enum domain);
 
+static
+struct symbol *lookup_symbol_aux_quick (struct objfile *objfile,
+					int block_index,
+					const char *name,
+					const char *linkage_name,
+					const domain_enum domain);
+
 static int file_matches (char *, char **, int);
 
 static void print_symbol_info (domain_enum,
@@ -1031,8 +1038,8 @@ lookup_symbol_aux (const char *name, const char *linkage_name,
 
   ALL_OBJFILES (objfile)
   {
-    sym = objfile->sf->qf->lookup_symbol_aux (objfile, STATIC_BLOCK, name,
-					      linkage_name, domain);
+    sym = lookup_symbol_aux_quick (objfile, STATIC_BLOCK, name,
+				   linkage_name, domain);
     if (sym != NULL)
       return sym;
   }
@@ -1140,10 +1147,8 @@ lookup_global_symbol_from_objfile (const struct objfile *objfile,
   }
 
   /* Now go through psymtabs.  */
-  sym = objfile->sf->qf->lookup_symbol_aux ((struct objfile *) objfile,
-					    GLOBAL_BLOCK,
-					    name, linkage_name,
-					    domain);
+  sym = lookup_symbol_aux_quick ((struct objfile *) objfile, GLOBAL_BLOCK,
+				 name, linkage_name, domain);
   if (sym)
     return sym;
 
@@ -1183,6 +1188,53 @@ lookup_symbol_aux_symtabs (int block_index,
   }
 
   return NULL;
+}
+
+/* A helper function for lookup_symbol_aux that interfaces with the
+   "quick" symbol table functions.  */
+
+static struct symbol *
+lookup_symbol_aux_quick (struct objfile *objfile, int kind,
+			 const char *name, const char *linkage_name,
+			 const domain_enum domain)
+{
+  struct symtab *symtab;
+  struct blockvector *bv;
+  const struct block *block;
+  struct partial_symtab *ps;
+  struct symbol *sym;
+
+  symtab = objfile->sf->qf->lookup_symbol (objfile, kind, name,
+					   linkage_name, domain);
+  if (!symtab)
+    return NULL;
+
+  bv = BLOCKVECTOR (symtab);
+  block = BLOCKVECTOR_BLOCK (bv, kind);
+  sym = lookup_block_symbol (block, name, linkage_name, domain);
+  if (!sym)
+    {
+      /* This shouldn't be necessary, but as a last resort try
+	 looking in the statics even though the psymtab claimed
+	 the symbol was global, or vice-versa. It's possible
+	 that the psymtab gets it wrong in some cases.  */
+
+      /* FIXME: carlton/2002-09-30: Should we really do that?
+	 If that happens, isn't it likely to be a GDB error, in
+	 which case we should fix the GDB error rather than
+	 silently dealing with it here?  So I'd vote for
+	 removing the check for the symbol in the other
+	 block.  */
+      block = BLOCKVECTOR_BLOCK (bv,
+				 kind == GLOBAL_BLOCK ?
+				 STATIC_BLOCK : GLOBAL_BLOCK);
+      sym = lookup_block_symbol (block, name, linkage_name, domain);
+      if (!sym)
+	error (_("Internal: %s symbol `%s' found in %s psymtab but not in symtab.\n%s may be an inlined function, or may be a template function\n(if a template, try specifying an instantiation: %s<type>)."),
+	       kind == GLOBAL_BLOCK ? "global" : "static",
+	       name, symtab->filename, name, name);
+    }
+  return fixup_symbol_section (sym, objfile);
 }
 
 /* A default version of lookup_symbol_nonlocal for use by languages
@@ -1274,8 +1326,8 @@ lookup_symbol_global (const char *name,
 
   ALL_OBJFILES (objfile)
   {
-    sym = objfile->sf->qf->lookup_symbol_aux (objfile, GLOBAL_BLOCK, name,
-					      linkage_name, domain);
+    sym = lookup_symbol_aux_quick (objfile, GLOBAL_BLOCK, name,
+				   linkage_name, domain);
     if (sym)
       return sym;
   }
@@ -1313,6 +1365,50 @@ lookup_transparent_type (const char *name)
   return current_language->la_lookup_transparent_type (name);
 }
 
+/* A helper for basic_lookup_transparent_type that interfaces with the
+   "quick" symbol table functions.  */
+
+static struct type *
+basic_lookup_transparent_type_quick (struct objfile *objfile, int kind,
+				     const char *name)
+{
+  struct symtab *symtab;
+  struct blockvector *bv;
+  struct block *block;
+  struct symbol *sym;
+
+  symtab = objfile->sf->qf->lookup_symbol (objfile, kind, name, NULL,
+					   STRUCT_DOMAIN);
+  if (!symtab)
+    return NULL;
+
+  bv = BLOCKVECTOR (symtab);
+  block = BLOCKVECTOR_BLOCK (bv, kind);
+  sym = lookup_block_symbol (block, name, NULL, STRUCT_DOMAIN);
+  if (!sym)
+    {
+      int other_kind = kind == GLOBAL_BLOCK ? STATIC_BLOCK : GLOBAL_BLOCK;
+
+      /* This shouldn't be necessary, but as a last resort
+       * try looking in the 'other kind' even though the psymtab
+       * claimed the symbol was one thing. It's possible that
+       * the psymtab gets it wrong in some cases.
+       */
+      block = BLOCKVECTOR_BLOCK (bv, other_kind);
+      sym = lookup_block_symbol (block, name, NULL, STRUCT_DOMAIN);
+      if (!sym)
+	/* FIXME; error is wrong in one case */
+	error (_("Internal: global symbol `%s' found in %s psymtab but not in symtab.\n\
+%s may be an inlined function, or may be a template function\n\
+(if a template, try specifying an instantiation: %s<type>)."),
+	       name, symtab->filename, name, name);
+    }
+  if (!TYPE_IS_OPAQUE (SYMBOL_TYPE (sym)))
+    return SYMBOL_TYPE (sym);
+
+  return NULL;
+}
+
 /* The standard implementation of lookup_transparent_type.  This code
    was modeled on lookup_symbol -- the parts not relevant to looking
    up types were just left out.  In particular it's assumed here that
@@ -1347,8 +1443,7 @@ basic_lookup_transparent_type (const char *name)
 
   ALL_OBJFILES (objfile)
   {
-    t = objfile->sf->qf->basic_lookup_transparent_type (objfile, name,
-							GLOBAL_BLOCK);
+    t = basic_lookup_transparent_type_quick (objfile, GLOBAL_BLOCK, name);
     if (t)
       return t;
   }
@@ -1374,8 +1469,7 @@ basic_lookup_transparent_type (const char *name)
 
   ALL_OBJFILES (objfile)
   {
-    t = objfile->sf->qf->basic_lookup_transparent_type (objfile, name,
-							STATIC_BLOCK);
+    t = basic_lookup_transparent_type_quick (objfile, STATIC_BLOCK, name);
     if (t)
       return t;
   }
@@ -1908,7 +2002,8 @@ find_line_symtab (struct symtab *symtab, int line, int *index, int *exact_match)
 
       ALL_OBJFILES (objfile)
       {
-	objfile->sf->qf->read_symtabs_with_filename (objfile, symtab->filename);
+	objfile->sf->qf->expand_symtabs_with_filename (objfile,
+						       symtab->filename);
       }
 
       ALL_SYMTABS (objfile, s)
@@ -4154,8 +4249,8 @@ expand_line_sal (struct symtab_and_line sal)
 
       ALL_OBJFILES (objfile)
       {
-	objfile->sf->qf->read_symtabs_with_filename (objfile,
-						     sal.symtab->filename);
+	objfile->sf->qf->expand_symtabs_with_filename (objfile,
+						       sal.symtab->filename);
       }
 
       /* Now search the symtab for exact matches and append them.  If
