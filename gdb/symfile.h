@@ -188,10 +188,8 @@ struct quick_symbol_functions
   void (*expand_symtabs_for_function) (struct objfile *objfile,
 				       const char *func_name);
 
-  /* Read all symbol tables associated with OBJFILE.  If FROM_TTY is
-     true (or if INFO_VERBOSE), this should print some sort of message
-     to gdb_stdout.  */
-  void (*expand_all_symtabs) (struct objfile *objfile, int from_tty);
+  /* Read all symbol tables associated with OBJFILE.  */
+  void (*expand_all_symtabs) (struct objfile *objfile);
 
   /* Read all symbol tables associated with OBJFILE which have the
      file name FILENAME.  */

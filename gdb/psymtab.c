@@ -908,18 +908,11 @@ maintenance_print_psymbols (char *args, int from_tty)
 }
 
 static void
-expand_partial_symbol_tables (struct objfile *objfile, int from_tty)
+expand_partial_symbol_tables (struct objfile *objfile)
 {
   struct partial_symtab *psymtab;
 
   require_partial_symbols (objfile);
-
-  if (from_tty || info_verbose)
-    {
-      printf_unfiltered (_("expanding to full symbols..."));
-      wrap_here ("");
-      gdb_flush (gdb_stdout);
-    }
 
   for (psymtab = objfile->psymtabs;
        psymtab != NULL;

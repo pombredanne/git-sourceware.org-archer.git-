@@ -953,7 +953,15 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
      all partial symbol tables for this objfile if so. */
 
   if ((flags & OBJF_READNOW) || readnow_symbol_files)
-    objfile->sf->qf->expand_all_symtabs (objfile, from_tty);
+    {
+      if (from_tty || info_verbose)
+	{
+	  printf_unfiltered (_("expanding to full symbols..."));
+	  wrap_here ("");
+	  gdb_flush (gdb_stdout);
+	}
+      objfile->sf->qf->expand_all_symtabs (objfile);
+    }
 
   /* If the file has its own symbol tables it has no separate debug info.
      `.dynsym'/`.symtab' go to MSYMBOLS, `.debug_info' goes to SYMTABS/PSYMTABS.
