@@ -28,4 +28,6 @@ void map_partial_symbol_filenames (void (*) (const char *, const char *,
 
 extern const struct quick_symbol_functions psym_functions;
 
+extern const struct quick_symbol_functions dwarf2_gnu_index_functions;
+
 #endif /* PSYMTAB_H */
