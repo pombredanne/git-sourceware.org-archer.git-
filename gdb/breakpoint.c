@@ -993,7 +993,46 @@ fetch_watchpoint_value (struct expression *exp, struct value **valp,
    - Update the list of values that must be watched in B->loc.
 
    If the watchpoint disposition is disp_del_at_next_stop, then do nothing.
-   If this is local watchpoint that is out of scope, delete it.  */
+   If this is local watchpoint that is out of scope, delete it.
+
+   Even with `set breakpoint always-inserted on' the watchpoints are removed
+   + inserted on each stop here.  Normal breakpoints must never be removed
+   because they might be missed by a running thread when debugging in non-stop
+   mode.  On the other hand, hardware watchpoints (is_hardware_watchpoint;
+   processed here) are specific to each LWP since they are stored in each LWP's
+   hardware debug registers.  Therefore, such LWP must be stopped first in
+   order to be able to modify its hardware watchpoints.
+
+   Hardware watchpoints must be reset exactly once after being presented to the
+   user.  It cannot be done sooner, because it would reset the data used to
+   present the watchpoint hit to the user.  And it must not be done later
+   because it could display the same single watchpoint hit during multiple GDB
+   stops.  Note that the latter is relevant only to the hardware watchpoint
+   types bp_read_watchpoint and bp_access_watchpoint.  False hit by
+   bp_hardware_watchpoint is not user-visible - its hit is suppressed if the
+   memory content has not changed.
+
+   The following constraints influence the location where we can reset hardware
+   watchpoints:
+
+   * target_stopped_by_watchpoint and target_stopped_data_address are called
+     several times when GDB stops.
+
+   [linux]
+   * Multiple hardware watchpoints can be hit at the same time, causing GDB to
+     stop.  GDB only presents one hardware watchpoint hit at a time as the
+     reason for stopping, and all the other hits are presented later, one after
+     the other, each time the user requests the execution to be resumed.
+     Execution is not resumed for the threads still having pending hit event
+     stored in LWP_INFO->STATUS.  While the watchpoint is already removed from
+     the inferior on the first stop the thread hit event is kept being reported
+     from its cached value by linux_nat_stopped_data_address until the real
+     thread resume happens after the watchpoint gets presented and thus its
+     LWP_INFO->STATUS gets reset.
+
+   Therefore the hardware watchpoint hit can get safely reset on the watchpoint
+   removal from inferior.  */
+
 static void
 update_watchpoint (struct breakpoint *b, int reparse)
 {
@@ -8073,15 +8112,17 @@ breakpoint_auto_delete (bpstat bs)
   }
 }
 
-/* A comparison function for bp_location A and B being interfaced to qsort.
+/* A comparison function for bp_location AP and BP being interfaced to qsort.
    Sort elements primarily by their ADDRESS (no matter what does
    breakpoint_address_is_meaningful say for its OWNER), secondarily by ordering
    first bp_permanent OWNERed elements and terciarily just ensuring the array
    is sorted stable way despite qsort being an instable algorithm.  */
 
 static int
-bp_location_compare (struct bp_location *a, struct bp_location *b)
+bp_location_compare (const void *ap, const void *bp)
 {
+  struct bp_location *a = *(void **) ap;
+  struct bp_location *b = *(void **) bp;
   int a_perm = a->owner->enable_state == bp_permanent;
   int b_perm = b->owner->enable_state == bp_permanent;
 
@@ -8100,17 +8141,6 @@ bp_location_compare (struct bp_location *a, struct bp_location *b)
            - (a->owner->number < b->owner->number);
 
   return (a > b) - (a < b);
-}
-
-/* Interface bp_location_compare as the COMPAR parameter of qsort function.  */
-
-static int
-bp_location_compare_for_qsort (const void *ap, const void *bp)
-{
-  struct bp_location *a = *(void **) ap;
-  struct bp_location *b = *(void **) bp;
-
-  return bp_location_compare (a, b);
 }
 
 /* Set bp_location_placed_address_before_address_max and
@@ -8196,7 +8226,7 @@ update_global_location_list (int should_insert)
     for (loc = b->loc; loc; loc = loc->next)
       *locp++ = loc;
   qsort (bp_location, bp_location_count, sizeof (*bp_location),
-	 bp_location_compare_for_qsort);
+	 bp_location_compare);
 
   bp_location_target_extensions_update ();
 
@@ -10141,6 +10171,8 @@ are set to the address of the last breakpoint listed unless the command\n\
 is prefixed with \"server \".\n\n\
 Convenience variable \"$bpnum\" contains the number of the last\n\
 breakpoint set."));
+
+  add_info_alias ("b", "breakpoints", 1);
 
   if (xdb_commands)
     add_com ("lb", class_breakpoint, breakpoints_info, _("\

@@ -1,3 +1,66 @@
+2009-11-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* breakpoint.c (bp_location_compare): Change parameter a to ap and b to
+	bp.  New variables a and b.
+	(bp_location_compare_for_qsort): Remove.
+	(update_global_location_list): Use now bp_location_compare.
+
+2009-11-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix repeated rwatch output.
+	* amd64-linux-nat.c (amd64_linux_dr_set, amd64_linux_dr_set_control)
+	(amd64_linux_dr_set_addr, amd64_linux_dr_reset_addr)
+	(amd64_linux_dr_get_status): New comments.
+	(amd64_linux_dr_unset_status): New function.
+	(_initialize_amd64_linux_nat): Install it.
+	* i386-linux-nat.c (i386_linux_dr_get, i386_linux_dr_set)
+	(i386_linux_dr_set_control, i386_linux_dr_set_addr)
+	(i386_linux_dr_reset_addr, i386_linux_dr_get_status): New comments.
+	(i386_linux_dr_unset_status): New function.
+	(_initialize_i386_linux_nat): Install it.
+	* i386-nat.c (I386_DR_WATCH_MASK): New macro.
+	(I386_DR_WATCH_HIT): Use I386_DR_WATCH_MASK.
+	(i386_insert_aligned_watchpoint): Call i386_dr_low.unset_status.
+	* i386-nat.h (struct i386_dr_low_type): Extend comments for
+	set_control, set_addr, reset_addr and get_status.  New unset_status.
+	* breakpoint.c (update_watchpoint): Extend the comment.
+
+2009-11-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Pedro Alves  <pedro@codesourcery.com>
+
+	Fix reordered watchpoints triggered in other threads during all-stop.
+
+	* linux-nat.c (resume_callback, linux_nat_resume): Clear
+	stopped_by_watchpoint.
+	(save_sigtrap, linux_nat_stopped_by_watchpoint)
+	(linux_nat_stopped_data_address): New.
+	(stop_wait_callback, linux_nat_filter_event): Call save_sigtrap.
+	(linux_nat_add_target): Install linux_nat_stopped_by_watchpoint
+	and linux_nat_stopped_data_address.
+	* linux-nat.h (struct lwp_info): New fields stopped_by_watchpoint,
+	stopped_data_address_p and stopped_data_address.
+
+2009-11-20  Michael Snyder  <msnyder@vmware.com>
+
+        * target.h (struct target_ops): New methods to_get_bookmark
+        and to_goto_bookmark.
+        (target_get_bookmark): New macro.
+        (target_goto_bookmark): New macro.
+        * target.c (dummy_get_bookmark): New function, default implementation.
+        (dummy_goto_bookmark): New function, default implementation.
+        (update_current_target): Inherit new methods.
+        * record.c (record_get_bookmark): New function.
+        (record_goto_bookmark): New function.
+        (init_record_ops): Set to_get_bookmark and to_goto_bookmark methods.
+        * reverse.c (struct bookmark): New type.
+        (save_bookmark_command): New function (command).
+        (delete_bookmark_command): New function (command).
+        (goto_bookmark_command): New function (command).
+        (bookmarks_info): New function (command).
+        (_initialize_reverse): Add new bookmark commands.
+	* command.h (enum command_class): Add class_bookmark.
+	* NEWS: Mention bookmark commands.
+
 2009-11-20  Pedro Alves  <pedro@codesourcery.com>
 
 	* breakpoint.c (update_global_location_list): Fix duplicate

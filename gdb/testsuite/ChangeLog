@@ -1,3 +1,13 @@
+2009-11-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/watchpoint-hw-hit-once.exp,
+	gdb.base/watchpoint-hw-hit-once.c: New.
+
+2009-11-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.threads/watchthreads-reorder.exp,
+	gdb.threads/watchthreads-reorder.c: New.
+
 2009-11-17  Nathan Sidwell  <nathan@codesourcery.com>
 
 	* gdb.xml/tdesc-regs.exp: Use for m68k.
