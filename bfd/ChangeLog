@@ -1,3 +1,41 @@
+2009-11-19  Tristan Gingold  <gingold@adacore.com>
+
+	* coff-rs6000.c (rs6000coff_vec): Use generic routines instead of
+	hard-coded casts.
+	(pmac_xcoff_vec): Ditto.
+	* coff64-rs6000.c (rs6000coff64_vec): Ditto.
+	(aix5coff64_vec): Ditto.
+
+2009-11-18  Alan Modra  <amodra@bigpond.net.au>
+
+	* bfd-in.h (_bfd_elf_ppc_at_tls_transform): Declare.
+	* bfd-in2.h: Regenerate.
+	* elf64-ppc.c (ppc64_elf_relocate_section): Move code for R_PPC64_TLS
+	insn optimisation to..
+	* elf32-ppc.c (_bfd_elf_ppc_at_tls_transform): ..here.  New function.
+	(ppc_elf_relocate_section): Use it.
+
+2009-11-18  Alan Modra  <amodra@bigpond.net.au>
+
+	* targets.c: Don't include alloca-conf.h.
+	(bfd_get_target_info): Don't use alloca.
+
+2009-11-17  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/10955
+	* elfxx-ia64.c (elfNN_ia64_update_short_info): Also skip ABS
+	sections.
+
+2009-11-17  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/10955
+	* elfxx-ia64.c (elfNN_ia64_link_hash_table): Update comments.
+	(elfNN_ia64_update_short_info): Remove "->output_section" from
+	ia64_info->max_short_sec and ia64_info->min_short_sec.
+	(elfNN_ia64_choose_gp): Likewise.
+	(elfNN_ia64_relax_section): Pass tsec->output_section to
+	elfNN_ia64_update_short_info.
+
 2009-11-17  H.J. Lu  <hongjiu.lu@intel.com>
 
 	PR ld/10955

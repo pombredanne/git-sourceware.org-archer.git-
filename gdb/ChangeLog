@@ -1,3 +1,90 @@
+2009-11-20  Pedro Alves  <pedro@codesourcery.com>
+
+	* breakpoint.c (update_global_location_list): Fix duplicate
+	locations detection.
+
+2009-11-20  Pedro Alves  <pedro@codesourcery.com>
+
+	* infrun.c (handle_inferior_event): Hardware hatchpoint traps are
+	never random signals.
+	* breakpoint.c (update_global_location_list): Always delete
+	immediately delete hardware watchpoint locations and other
+	locations whose target address isn't meaningful.  Update comment
+	explaining the hazard of moribund locations.
+
+2009-11-19  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (discrete_type_p): TYPE_CODE_BOOL is also a discrete type.
+
+2009-11-19  Joel Brobecker  <brobecker@adacore.com>
+
+	* completer.c (complete_line_internal): Make sure the command
+	completer is not NULL before calling it.
+
+2009-11-19  Jerome Guitton  <guitton@adacore.com>
+
+	* ada-lang.c (packed_array_type): Rename to...
+	(constrained_packed_array_type): ...and update comment.
+	(decode_packed_array, decode_constrained_packed_array): Ditto.
+	(decode_packed_array_type, decode_constrained_packed_array_type):
+	Ditto.
+	(ada_is_constrained_packed_array_type): New function.
+	(ada_is_unconstrained_packed_array_type): New function.
+	(decode_packed_array_bitsize): New function, extracted from
+	decode_packed_array_type.
+	(ada_type_of_array): Add support for unconstrained packed arrays.
+	(ada_coerce_to_simple_array_ptr, ada_coerce_to_simple_array)
+	(ada_array_bound_from_type, ada_array_bound, ada_array_length)
+	(ada_prefer_type, to_fixed_array_type, ada_evaluate_subexp): Resync.
+	* ada-lang.h (ada_is_packed_array_type,
+	ada_is_constrained_packed_array_type): Renaming.
+	* ada-valprint.c (ada_val_print_1): Resync.
+	* ada-typeprint.c (print_array_type, ada_print_type): Resync.
+
+2009-11-19  Joel Brobecker  <brobecker@adacore.com>
+
+	Wrong function used to perform address addition/subtraction.
+	* ada-lang.c (ada_type_match): Stop making TYPE_CODE_VOID
+	a wildcard matching any type.  For types that we don't already
+	handle specifically, make sure that both types have the same code.
+
+2009-11-19  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (ada_decode): Add handling of "TB" suffixes for
+	task bodies.  
+
+2009-11-19  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (ada_remove_Xbn_suffix): New function.
+	(find_old_style_renaming_symbol): Add handling for function suffixes
+	present in the name of various procedures.
+	Do not overwrite the function symbol's name.
+
+2009-11-19  Pedro Alves  <pedro@codesourcery.com>
+
+	* breakpoint.c (breakpoint_address_bits): Visit all locations'
+	gdbarchs, not the breakpoint's gdbarch.
+
+2009-11-18  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* cli/cli-script.c (process_next_line): Recognize 'end'
+	even when the line has leading space and we're not parsing
+	commands.
+
+2009-11-18  Tom Tromey  <tromey@redhat.com>
+
+	* symtab.c (symbol_set_names): Correctly set 'name' on symbol when
+	lookup name differs.
+
+2009-11-18  Tristan Gingold  <gingold@adacore.com>
+
+	* machoread.c (macho_oso_symfile): Fix typo.  Add comments.
+
+2009-11-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dbxread.c (set_namestring): Remove cast to unsigned.  Check N_STRX
+	overflow.
+
 2009-11-17  Nathan Sidwell  <nathan@codesourcery.com>
 
 	* features/m68k-core.xml: New file.

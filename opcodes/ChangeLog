@@ -1,3 +1,67 @@
+2009-11-19  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* i386-opc.tbl: Add IsLockable to cmpxch16b.
+	* i386-tbl.h: Regenerated.
+
+2009-11-19  Nick Clifton  <nickc@redhat.com>
+
+	PR binutils/10924
+	* arm-dis.c (print_insn_arm): Do not print an offset of zero when
+	decoding Immediaate Offset addressing.
+
+2009-11-18  Sebastian Pop  <sebastian.pop@amd.com>
+
+	PR binutils/10973
+	* i386-dis.c (get_vex_imm8): Do not increment codep.
+	Avoid incrementing bytes_before_imm when OP_E_memory
+	has already forwarded the codep pointer.
+	(OP_EX_VexW): Increment codep to skip mod/rm byte.
+
+2009-11-18  Sebastian Pop  <sebastian.pop@amd.com>
+
+	* i386-dis.c (VEX_LEN_XOP_08_A0): Removed.
+	(VEX_LEN_XOP_08_A1): Removed.
+	(xop_table): Remove entries for VEX_LEN_XOP_08_A0 and
+	VEX_LEN_XOP_08_A1.
+	(vex_len_table): Same.
+	* i386-gen.c (CPU_CVT16_FLAGS): Removed.
+	(cpu_flags): Remove field for CpuCVT16.
+	* i386-opc.h (CpuCVT16): Removed.
+	(i386_cpu_flags): Remove bitfield cpucvt16.
+	(i386-opc.tbl): Remove CVT16 instructions.
+	* i386-init.h: Regenerated.
+	* i386-tbl.h: Regenerated.
+
+2009-11-17  Sebastian Pop  <sebastian.pop@amd.com>
+	    Quentin Neill  <quentin.neill@amd.com>
+
+	* i386-dis.c (OP_Vex_2src_1): New.
+	(OP_Vex_2src_2): New.
+	(Vex_2src_1): New.
+	(Vex_2src_2): New.
+	(XOP_08): Added.
+	(VEX_LEN_XOP_08_A0): Added.
+	(VEX_LEN_XOP_08_A1): Added.
+	(VEX_LEN_XOP_09_80): Added.
+	(VEX_LEN_XOP_09_81): Added.
+	(xop_table): Added an entry for XOP_08.  Handle xop instructions.
+	(vex_len_table): Added entries for VEX_LEN_XOP_08_A0,
+	VEX_LEN_XOP_08_A1, VEX_LEN_XOP_09_80, VEX_LEN_XOP_09_81.
+	(get_valid_dis386): Handle XOP_08.
+	(OP_Vex_2src): New.
+	* i386-gen.c (cpu_flag_init): Add CPU_XOP_FLAGS and CPU_CVT16_FLAGS.
+	(cpu_flags): Add CpuXOP and CpuCVT16.
+	(opcode_modifiers): Add XOP08, Vex2Sources.
+	* i386-opc.h (CpuXOP): Added.
+	(CpuCVT16): Added.
+	(i386_cpu_flags): Add cpuxop and cpucvt16.
+	(XOP08): Added.
+	(Vex2Sources): Added.
+	(i386_opcode_modifier): Add xop08, vex2sources.
+	* i386-opc.tbl: Add entries for XOP and CVT16 instructions.
+	* i386-init.h: Regenerated.
+	* i386-tbl.h: Regenerated.
+
 2009-11-17  Nick Clifton  <nickc@redhat.com>
 
 	PR binutils/10924

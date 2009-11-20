@@ -4268,7 +4268,7 @@ breakpoint_address_bits (struct breakpoint *b)
 
   for (loc = b->loc; loc; loc = loc->next)
     {
-      int addr_bit = gdbarch_addr_bit (b->gdbarch);
+      int addr_bit = gdbarch_addr_bit (loc->gdbarch);
       if (addr_bit > print_address_bits)
 	print_address_bits = addr_bit;
     }
@@ -8214,10 +8214,11 @@ update_global_location_list (int should_insert)
        old_locp++)
     {
       struct bp_location *old_loc = *old_locp;
+      struct bp_location **loc2p;
 
       /* Tells if 'old_loc' is found amoung the new locations.  If not, we
 	 have to free it.  */
-      int found_object;
+      int found_object = 0;
       /* Tells if the location should remain inserted in the target.  */
       int keep_in_target = 0;
       int removed = 0;
@@ -8225,9 +8226,20 @@ update_global_location_list (int should_insert)
       /* Skip LOCP entries which will definitely never be needed.  Stop either
 	 at or being the one matching OLD_LOC.  */
       while (locp < bp_location + bp_location_count
-	     && bp_location_compare (*locp, old_loc) < 0)
+	     && (*locp)->address < old_loc->address)
 	locp++;
-      found_object = locp < bp_location + bp_location_count && *locp == old_loc;
+
+      for (loc2p = locp;
+	   (loc2p < bp_location + bp_location_count
+	    && (*loc2p)->address == old_loc->address);
+	   loc2p++)
+	{
+	  if (*loc2p == old_loc)
+	    {
+	      found_object = 1;
+	      break;
+	    }
+	}
 
       /* If this location is no longer present, and inserted, look if there's
 	 maybe a new location at the same address.  If so, mark that one 
@@ -8253,27 +8265,28 @@ update_global_location_list (int should_insert)
 
 	      if (breakpoint_address_is_meaningful (old_loc->owner))
 		{
-		  struct bp_location **loc2p;
-
 		  for (loc2p = locp;
-		       loc2p < bp_location + bp_location_count
-		       && breakpoint_address_match ((*loc2p)->pspace->aspace,
-						    (*loc2p)->address,
-						    old_loc->pspace->aspace,
-						    old_loc->address);
+		       (loc2p < bp_location + bp_location_count
+			&& (*loc2p)->address == old_loc->address);
 		       loc2p++)
 		    {
 		      struct bp_location *loc2 = *loc2p;
 
-		      /* For the sake of should_be_inserted.
-			 Duplicates check below will fix up this later.  */
-		      loc2->duplicate = 0;
-		      if (loc2 != old_loc && should_be_inserted (loc2))
-			{		  
-			  loc2->inserted = 1;
-			  loc2->target_info = old_loc->target_info;
-			  keep_in_target = 1;
-			  break;
+		      if (breakpoint_address_match (loc2->pspace->aspace,
+						    loc2->address,
+						    old_loc->pspace->aspace,
+						    old_loc->address))
+			{
+			  /* For the sake of should_be_inserted.
+			     Duplicates check below will fix up this later.  */
+			  loc2->duplicate = 0;
+			  if (loc2 != old_loc && should_be_inserted (loc2))
+			    {
+			      loc2->inserted = 1;
+			      loc2->target_info = old_loc->target_info;
+			      keep_in_target = 1;
+			      break;
+			    }
 			}
 		    }
 		}
@@ -8300,20 +8313,55 @@ update_global_location_list (int should_insert)
 
       if (!found_object)
 	{
-	  if (removed && non_stop)
+	  if (removed && non_stop
+	      && breakpoint_address_is_meaningful (old_loc->owner)
+	      && !is_hardware_watchpoint (old_loc->owner))
 	    {
-	      /* This location was removed from the targets.  In non-stop mode,
-		 a race condition is possible where we've removed a breakpoint,
-		 but stop events for that breakpoint are already queued and will
-		 arrive later.  To suppress spurious SIGTRAPs reported to user,
-		 we keep this breakpoint location for a bit, and will retire it
-		 after we see 3 * thread_count events.
-		 The theory here is that reporting of events should,
-		 "on the average", be fair, so after that many event we'll see
-		 events from all threads that have anything of interest, and no
-		 longer need to keep this breakpoint.  This is just a
-		 heuristic, but if it's wrong, we'll report unexpected SIGTRAP,
-		 which is usability issue, but not a correctness problem.  */
+	      /* This location was removed from the target.  In
+		 non-stop mode, a race condition is possible where
+		 we've removed a breakpoint, but stop events for that
+		 breakpoint are already queued and will arrive later.
+		 We apply an heuristic to be able to distinguish such
+		 SIGTRAPs from other random SIGTRAPs: we keep this
+		 breakpoint location for a bit, and will retire it
+		 after we see some number of events.  The theory here
+		 is that reporting of events should, "on the average",
+		 be fair, so after a while we'll see events from all
+		 threads that have anything of interest, and no longer
+		 need to keep this breakpoint location around.  We
+		 don't hold locations forever so to reduce chances of
+		 mistaking a non-breakpoint SIGTRAP for a breakpoint
+		 SIGTRAP.
+
+		 The heuristic failing can be disastrous on
+		 decr_pc_after_break targets.
+
+		 On decr_pc_after_break targets, like e.g., x86-linux,
+		 if we fail to recognize a late breakpoint SIGTRAP,
+		 because events_till_retirement has reached 0 too
+		 soon, we'll fail to do the PC adjustment, and report
+		 a random SIGTRAP to the user.  When the user resumes
+		 the inferior, it will most likely immediately crash
+		 with SIGILL/SIGBUS/SEGSEGV, or worse, get silently
+		 corrupted, because of being resumed e.g., in the
+		 middle of a multi-byte instruction, or skipped a
+		 one-byte instruction.  This was actually seen happen
+		 on native x86-linux, and should be less rare on
+		 targets that do not support new thread events, like
+		 remote, due to the heuristic depending on
+		 thread_count.
+
+		 Mistaking a random SIGTRAP for a breakpoint trap
+		 causes similar symptoms (PC adjustment applied when
+		 it shouldn't), but then again, playing with SIGTRAPs
+		 behind the debugger's back is asking for trouble.
+
+		 Since hardware watchpoint traps are always
+		 distinguishable from other traps, so we don't need to
+		 apply keep hardware watchpoint moribund locations
+		 around.  We simply always ignore hardware watchpoint
+		 traps we can no longer explain.  */
+
 	      old_loc->events_till_retirement = 3 * (thread_count () + 1);
 	      old_loc->owner = NULL;
 

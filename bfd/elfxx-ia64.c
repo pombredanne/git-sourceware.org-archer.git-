@@ -176,9 +176,9 @@ struct elfNN_ia64_link_hash_table
      optimized from R_IA64_LTOFF22X, against non-SHF_IA_64_SHORT
      sections.  We need to record those sections so that we can choose
      a proper GP to cover all R_IA64_GPREL22 relocations.  */
-  asection *max_short_sec;	/* maximum short section */
+  asection *max_short_sec;	/* maximum short output section */
   bfd_vma max_short_offset;	/* maximum short offset */
-  asection *min_short_sec;	/* minimum short section */
+  asection *min_short_sec;	/* minimum short output section */
   bfd_vma min_short_offset;	/* minimum short offset */
 
   htab_t loc_hash_table;
@@ -764,8 +764,9 @@ static void
 elfNN_ia64_update_short_info (asection *sec, bfd_vma offset,
 			      struct elfNN_ia64_link_hash_table *ia64_info)
 {
-  /* Skip SHF_IA_64_SHORT sections.  */
-  if (sec->flags & SEC_SMALL_DATA)
+  /* Skip ABS and SHF_IA_64_SHORT sections.  */
+  if (sec == bfd_abs_section_ptr
+      || (sec->flags & SEC_SMALL_DATA) != 0)
     return;
 
   if (!ia64_info->min_short_sec)
@@ -782,13 +783,13 @@ elfNN_ia64_update_short_info (asection *sec, bfd_vma offset,
 	   && offset < ia64_info->min_short_offset)
     ia64_info->min_short_offset = offset;
   else if (sec->output_section->vma
-	   > ia64_info->max_short_sec->output_section->vma)
+	   > ia64_info->max_short_sec->vma)
     {
       ia64_info->max_short_sec = sec;
       ia64_info->max_short_offset = offset;
     }
   else if (sec->output_section->vma
-	   < ia64_info->min_short_sec->output_section->vma)
+	   < ia64_info->min_short_sec->vma)
     {
       ia64_info->min_short_sec = sec;
       ia64_info->min_short_offset = offset;
@@ -1218,7 +1219,7 @@ elfNN_ia64_relax_section (bfd *abfd, asection *sec,
 	    continue;
 
 	  if (r_type == R_IA64_GPREL22)
-	    elfNN_ia64_update_short_info (tsec,
+	    elfNN_ia64_update_short_info (tsec->output_section,
 					  tsec->output_offset + toff,
 					  ia64_info);
 	  else if (r_type == R_IA64_LTOFF22X)
@@ -1232,7 +1233,7 @@ elfNN_ia64_relax_section (bfd *abfd, asection *sec,
 		  changed_got |= !dyn_i->want_got;
 		}
 
-	      elfNN_ia64_update_short_info (tsec,
+	      elfNN_ia64_update_short_info (tsec->output_section,
 					    tsec->output_offset + toff,
 					    ia64_info);
 	    }
@@ -4313,14 +4314,14 @@ elfNN_ia64_choose_gp (bfd *abfd, struct bfd_link_info *info)
   if (ia64_info->min_short_sec)
     {
       if (min_short_vma 
-	  > (ia64_info->min_short_sec->output_section->vma
+	  > (ia64_info->min_short_sec->vma
 	     + ia64_info->min_short_offset))
-	min_short_vma = (ia64_info->min_short_sec->output_section->vma
+	min_short_vma = (ia64_info->min_short_sec->vma
 			 + ia64_info->min_short_offset);
       if (max_short_vma
-	  < (ia64_info->max_short_sec->output_section->vma
+	  < (ia64_info->max_short_sec->vma
 	     + ia64_info->max_short_offset))
-	max_short_vma = (ia64_info->max_short_sec->output_section->vma
+	max_short_vma = (ia64_info->max_short_sec->vma
 			 + ia64_info->max_short_offset);
     }
 
