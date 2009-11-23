@@ -526,16 +526,6 @@ lookup_partial_symbol (struct partial_symtab *pst, const char *name,
   return (NULL);
 }
 
-/* True if we are nested inside psymtab_to_symtab. */
-
-int currently_reading_symtab = 0;
-
-static void
-decrement_reading_symtab (void *dummy)
-{
-  currently_reading_symtab--;
-}
-
 /* Get the symbol table that corresponds to a partial_symtab.
    This is fast after the first time you do it.  In fact, there
    is an even faster macro PSYMTAB_TO_SYMTAB that does the fast
@@ -551,7 +541,7 @@ psymtab_to_symtab (struct partial_symtab *pst)
   /* If it has not yet been read in, read it.  */
   if (!pst->readin)
     {
-      struct cleanup *back_to = make_cleanup (decrement_reading_symtab, NULL);
+      struct cleanup *back_to = increment_reading_symtab ();
       currently_reading_symtab++;
       (*pst->read_symtab) (pst);
       do_cleanups (back_to);

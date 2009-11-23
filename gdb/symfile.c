@@ -233,6 +233,25 @@ obconcat (struct obstack *obstackp, const char *s1, const char *s2,
   return val;
 }
 
+/* True if we are reading a symbol table. */
+
+int currently_reading_symtab = 0;
+
+static void
+decrement_reading_symtab (void *dummy)
+{
+  currently_reading_symtab--;
+}
+
+/* Increment currently_reading_symtab and return a cleanup that can be
+   used to decrement it.  */
+struct cleanup *
+increment_reading_symtab (void)
+{
+  ++currently_reading_symtab;
+  return make_cleanup (decrement_reading_symtab, NULL);
+}
+
 /* Remember the lowest-addressed loadable section we've seen.
    This function is called via bfd_map_over_sections.
 

@@ -1657,6 +1657,7 @@ dw2_instantiate_symtab (struct objfile *objfile,
   if (!per_cu->v.quick->symtab)
     {
       struct cleanup *back_to = make_cleanup (free_cached_comp_units, NULL);
+      increment_reading_symtab ();
       dw2_do_instantiate_symtab (objfile, per_cu);
       do_cleanups (back_to);
     }

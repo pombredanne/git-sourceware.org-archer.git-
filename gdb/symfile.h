@@ -531,6 +531,8 @@ extern int symfile_map_offsets_to_segments (bfd *,
 struct symfile_segment_data *get_symfile_segment_data (bfd *abfd);
 void free_symfile_segment_data (struct symfile_segment_data *data);
 
+extern struct cleanup *increment_reading_symtab (void);
+
 /* From dwarf2read.c */
 
 extern int dwarf2_has_info (struct objfile *);
