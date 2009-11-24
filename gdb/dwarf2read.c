@@ -51,6 +51,7 @@
 #include "psympriv.h"
 #include "exceptions.h"
 #include "vec.h"
+#include "top.h"		/* readnow_symbol_files */
 
 #include <fcntl.h>
 #include "gdb_string.h"
@@ -1502,7 +1503,7 @@ dwarf2_create_quick_addrmap (struct objfile *objfile)
 	  return 0;
 	}
 
-      /* FIXME: we don't handle duplicates or missing ones.  */
+      /* This loses if we see a duplicate.  */
       the_cu = OBSTACK_ZALLOC (&objfile->objfile_obstack,
 			       struct dwarf2_per_cu_data);
       /* Note that we can't set the length.  This is ok because we
@@ -2222,6 +2223,10 @@ dw2_lookup_symbol_internal (struct objfile *objfile, int block_index,
   int len = strlen (name);
 
   dw2_setup (objfile);
+
+  if (!dwarf2_per_objfile->index_table)
+    return NULL;
+
   lookup.name = name;
   entry = htab_find (dwarf2_per_objfile->index_table, &lookup);
 
@@ -2294,6 +2299,10 @@ dw2_expand_symtabs_for_function (struct objfile *objfile,
   struct index_entry *entry, lookup;
 
   dw2_setup (objfile);
+
+  if (!dwarf2_per_objfile->index_table)
+    return;
+
   lookup.name = func_name;
   entry = htab_find (dwarf2_per_objfile->index_table, &lookup);
   /* We could decode the type here if we wanted to filter out the
@@ -2530,6 +2539,10 @@ dw2_map_symbol_names (struct objfile *objfile,
 {
   struct traverse_syms_data local_data;
   dw2_setup (objfile);
+
+  if (!dwarf2_per_objfile->index_table)
+    return;
+
   local_data.fun = fun;
   local_data.data = data;
   htab_traverse_noresize (dwarf2_per_objfile->index_table,
@@ -2595,6 +2608,31 @@ int
 dwarf2_initialize_objfile (struct objfile *objfile)
 {
   dwarf2_read_section (objfile, &dwarf2_per_objfile->info);
+
+  /* If we're about to read full symbols, don't bother with the
+     indices.  */
+  if ((objfile->flags & OBJF_READNOW) || readnow_symbol_files)
+    {
+      int i;
+      struct dwarf2_per_cu_data *cu;
+
+      dwarf2_per_objfile->using_gnu_index = 1;
+      dwarf2_read_all_sections (objfile);
+      create_all_comp_units (objfile);
+
+      for (i = 0;
+	   VEC_iterate (dwarf2_per_cu_data_ptr,
+			dwarf2_per_objfile->all_comp_units,
+			i, cu);
+	   ++i)
+	cu->v.quick = OBSTACK_ZALLOC (&objfile->objfile_obstack,
+				      struct dwarf2_per_cu_quick_data);
+
+      /* Return 1 so that gdb sees the "quick" functions.  However,
+	 these functions will be no-ops because we will have expanded
+	 all symtabs.  */
+      return 1;
+    }
 
   if (!dwarf2_create_quick_addrmap (objfile)
       || objfile->global_psymbols.size != 0
