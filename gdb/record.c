@@ -224,6 +224,9 @@ static int (*record_beneath_to_insert_breakpoint) (struct gdbarch *,
 						   struct bp_target_info *);
 static int (*record_beneath_to_remove_breakpoint) (struct gdbarch *,
 						   struct bp_target_info *);
+static int (*record_beneath_to_stopped_by_watchpoint) (void);
+static int (*record_beneath_to_stopped_data_address) (struct target_ops *,
+						      CORE_ADDR *);
 
 /* Alloc and free functions for record_reg, record_mem, and record_end 
    entries.  */
@@ -673,6 +676,9 @@ record_gdb_operation_disable_set (void)
   return old_cleanups;
 }
 
+/* Flag set to TRUE for target_stopped_by_watchpoint.  */
+static int record_hw_watchpoint = 0;
+
 /* Execute one instruction from the record log.  Each instruction in
    the log will be represented by an arbitrary sequence of register
    entries and memory entries, followed by an 'end' entry.  */
@@ -739,7 +745,22 @@ record_exec_insn (struct regcache *regcache, struct gdbarch *gdbarch,
                                entry->u.mem.len);
                   }
                 else
-                  memcpy (record_get_loc (entry), mem, entry->u.mem.len);
+		  {
+		    memcpy (record_get_loc (entry), mem, entry->u.mem.len);
+
+		    /* We've changed memory --- check if a hardware
+		       watchpoint should trap.  Note that this
+		       presently assumes the target beneath supports
+		       continuable watchpoints.  On non-continuable
+		       watchpoints target, we'll want to check this
+		       _before_ actually doing the memory change, and
+		       not doing the change at all if the watchpoint
+		       traps.  */
+		    if (hardware_watchpoint_inserted_in_range
+			(get_regcache_aspace (regcache),
+			 entry->u.mem.addr, entry->u.mem.len))
+		      record_hw_watchpoint = 1;
+		  }
               }
           }
       }
@@ -770,6 +791,8 @@ static int (*tmp_to_insert_breakpoint) (struct gdbarch *,
 					struct bp_target_info *);
 static int (*tmp_to_remove_breakpoint) (struct gdbarch *,
 					struct bp_target_info *);
+static int (*tmp_to_stopped_by_watchpoint) (void);
+static int (*tmp_to_stopped_data_address) (struct target_ops *, CORE_ADDR *);
 
 static void record_restore (void);
 
@@ -894,6 +917,10 @@ record_open (char *name, int from_tty)
 	tmp_to_insert_breakpoint = t->to_insert_breakpoint;
       if (!tmp_to_remove_breakpoint)
 	tmp_to_remove_breakpoint = t->to_remove_breakpoint;
+      if (!tmp_to_stopped_by_watchpoint)
+	tmp_to_stopped_by_watchpoint = t->to_stopped_by_watchpoint;
+      if (!tmp_to_stopped_data_address)
+	tmp_to_stopped_data_address = t->to_stopped_data_address;
     }
   if (!tmp_to_xfer_partial)
     error (_("Could not find 'to_xfer_partial' method on the target stack."));
@@ -915,6 +942,8 @@ record_open (char *name, int from_tty)
   record_beneath_to_xfer_partial = tmp_to_xfer_partial;
   record_beneath_to_insert_breakpoint = tmp_to_insert_breakpoint;
   record_beneath_to_remove_breakpoint = tmp_to_remove_breakpoint;
+  record_beneath_to_stopped_by_watchpoint = tmp_to_stopped_by_watchpoint;
+  record_beneath_to_stopped_data_address = tmp_to_stopped_data_address;
 
   if (current_target.to_stratum == core_stratum)
     record_core_open_1 (name, from_tty);
@@ -1068,28 +1097,39 @@ record_wait (struct target_ops *ops,
 		  && status->value.sig == TARGET_SIGNAL_TRAP)
 		{
 		  struct regcache *regcache;
+		  struct address_space *aspace;
 
-		  /* Yes -- check if there is a breakpoint.  */
+		  /* Yes -- this is likely our single-step finishing,
+		     but check if there's any reason the core would be
+		     interested in the event.  */
+
 		  registers_changed ();
 		  regcache = get_current_regcache ();
 		  tmp_pc = regcache_read_pc (regcache);
-		  if (breakpoint_inserted_here_p (get_regcache_aspace (regcache),
-						  tmp_pc))
+		  aspace = get_regcache_aspace (regcache);
+
+		  if (target_stopped_by_watchpoint ())
 		    {
-		      /* There is a breakpoint.  GDB will want to stop.  */
-		      struct gdbarch *gdbarch = get_regcache_arch (regcache);
-		      CORE_ADDR decr_pc_after_break
-			= gdbarch_decr_pc_after_break (gdbarch);
-		      if (decr_pc_after_break)
-			regcache_write_pc (regcache,
-					   tmp_pc + decr_pc_after_break);
+		      /* Always interested in watchpoints.  */
+		    }
+		  else if (breakpoint_inserted_here_p (aspace, tmp_pc))
+		    {
+		      /* There is a breakpoint here.  Let the core
+			 handle it.  */
+		      if (software_breakpoint_inserted_here_p (aspace, tmp_pc))
+			{
+			  struct gdbarch *gdbarch = get_regcache_arch (regcache);
+			  CORE_ADDR decr_pc_after_break
+			    = gdbarch_decr_pc_after_break (gdbarch);
+			  if (decr_pc_after_break)
+			    regcache_write_pc (regcache,
+					       tmp_pc + decr_pc_after_break);
+			}
 		    }
 		  else
 		    {
-		      /* There is not a breakpoint, and gdb is not
-		         stepping, therefore gdb will not stop.
-			 Therefore we will not return to gdb.
-		         Record the insn and resume.  */
+		      /* This must be a single-step trap.  Record the
+		         insn and issue another step.  */
 		      if (!do_record_message (regcache, TARGET_SIGNAL_0))
 			break;
 
@@ -1111,29 +1151,33 @@ record_wait (struct target_ops *ops,
     {
       struct regcache *regcache = get_current_regcache ();
       struct gdbarch *gdbarch = get_regcache_arch (regcache);
+      struct address_space *aspace = get_regcache_aspace (regcache);
       int continue_flag = 1;
       int first_record_end = 1;
       struct cleanup *old_cleanups = make_cleanup (record_wait_cleanups, 0);
       CORE_ADDR tmp_pc;
 
+      record_hw_watchpoint = 0;
       status->kind = TARGET_WAITKIND_STOPPED;
 
       /* Check breakpoint when forward execute.  */
       if (execution_direction == EXEC_FORWARD)
 	{
 	  tmp_pc = regcache_read_pc (regcache);
-	  if (breakpoint_inserted_here_p (get_regcache_aspace (regcache),
-					  tmp_pc))
+	  if (breakpoint_inserted_here_p (aspace, tmp_pc))
 	    {
+	      int decr_pc_after_break = gdbarch_decr_pc_after_break (gdbarch);
+
 	      if (record_debug)
 		fprintf_unfiltered (gdb_stdlog,
 				    "Process record: break at %s.\n",
 				    paddress (gdbarch, tmp_pc));
-	      if (gdbarch_decr_pc_after_break (gdbarch)
-		  && !record_resume_step)
+
+	      if (decr_pc_after_break
+		  && !record_resume_step
+		  && software_breakpoint_inserted_here_p (aspace, tmp_pc))
 		regcache_write_pc (regcache,
-				   tmp_pc +
-				   gdbarch_decr_pc_after_break (gdbarch));
+				   tmp_pc + decr_pc_after_break);
 	      goto replay_out;
 	    }
 	}
@@ -1203,20 +1247,31 @@ record_wait (struct target_ops *ops,
 
 		  /* check breakpoint */
 		  tmp_pc = regcache_read_pc (regcache);
-		  if (breakpoint_inserted_here_p (get_regcache_aspace (regcache),
-						  tmp_pc))
+		  if (breakpoint_inserted_here_p (aspace, tmp_pc))
 		    {
+		      int decr_pc_after_break
+			= gdbarch_decr_pc_after_break (gdbarch);
+
 		      if (record_debug)
 			fprintf_unfiltered (gdb_stdlog,
 					    "Process record: break "
 					    "at %s.\n",
 					    paddress (gdbarch, tmp_pc));
-		      if (gdbarch_decr_pc_after_break (gdbarch)
+		      if (decr_pc_after_break
 			  && execution_direction == EXEC_FORWARD
-			  && !record_resume_step)
+			  && !record_resume_step
+			  && software_breakpoint_inserted_here_p (aspace,
+								  tmp_pc))
 			regcache_write_pc (regcache,
-					   tmp_pc +
-					   gdbarch_decr_pc_after_break (gdbarch));
+					   tmp_pc + decr_pc_after_break);
+		      continue_flag = 0;
+		    }
+
+		  if (record_hw_watchpoint)
+		    {
+		      if (record_debug)
+			fprintf_unfiltered (gdb_stdlog, "\
+Process record: hit hw watchpoint.\n");
 		      continue_flag = 0;
 		    }
 		  /* Check target signal */
@@ -1258,6 +1313,24 @@ replay_out:
 
   do_cleanups (set_cleanups);
   return inferior_ptid;
+}
+
+static int
+record_stopped_by_watchpoint (void)
+{
+  if (RECORD_IS_REPLAY)
+    return record_hw_watchpoint;
+  else
+    return record_beneath_to_stopped_by_watchpoint ();
+}
+
+static int
+record_stopped_data_address (struct target_ops *ops, CORE_ADDR *addr_p)
+{
+  if (RECORD_IS_REPLAY)
+    return 0;
+  else
+    return record_beneath_to_stopped_data_address (ops, addr_p);
 }
 
 /* "to_disconnect" method for process record target.  */
@@ -1594,6 +1667,8 @@ init_record_ops (void)
   record_ops.to_xfer_partial = record_xfer_partial;
   record_ops.to_insert_breakpoint = record_insert_breakpoint;
   record_ops.to_remove_breakpoint = record_remove_breakpoint;
+  record_ops.to_stopped_by_watchpoint = record_stopped_by_watchpoint;
+  record_ops.to_stopped_data_address = record_stopped_data_address;
   record_ops.to_can_execute_reverse = record_can_execute_reverse;
   record_ops.to_stratum = record_stratum;
   /* Add bookmark target methods.  */
@@ -1801,6 +1876,8 @@ init_record_core_ops (void)
   record_core_ops.to_xfer_partial = record_core_xfer_partial;
   record_core_ops.to_insert_breakpoint = record_core_insert_breakpoint;
   record_core_ops.to_remove_breakpoint = record_core_remove_breakpoint;
+  record_core_ops.to_stopped_by_watchpoint = record_stopped_by_watchpoint;
+  record_core_ops.to_stopped_data_address = record_stopped_data_address;
   record_core_ops.to_can_execute_reverse = record_can_execute_reverse;
   record_core_ops.to_has_execution = record_core_has_execution;
   record_core_ops.to_stratum = record_stratum;

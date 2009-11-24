@@ -32,6 +32,12 @@ This file is part of the GNU simulators.
 /* Maximum number of instructions that can be executed in parallel.  */
 #define MAX_PARALLEL_INSNS 8
 
+/* The size of an "int" needed to hold an instruction word.
+   This is usually 32 bits, but some architectures needs 64 bits.  */
+typedef CGEN_INSN_INT CGEN_INSN_WORD;
+
+#include "cgen-engine.h"
+
 /* CPU state information.  */
 typedef struct {
   /* Hardware elements.  */
@@ -1810,7 +1816,7 @@ struct scache {
   f_GRk = EXTRACT_LSB0_UINT (insn, 32, 30, 6); \
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_GRi = EXTRACT_LSB0_UINT (insn, 32, 17, 6); \
-  f_d12 = EXTRACT_LSB0_INT (insn, 32, 11, 12); \
+  f_d12 = EXTRACT_LSB0_SINT (insn, 32, 11, 12); \
 
 #define EXTRACT_IFMT_SMULI_VARS \
   UINT f_pack; \
@@ -1825,7 +1831,7 @@ struct scache {
   f_GRk = EXTRACT_LSB0_UINT (insn, 32, 30, 6); \
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_GRi = EXTRACT_LSB0_UINT (insn, 32, 17, 6); \
-  f_d12 = EXTRACT_LSB0_INT (insn, 32, 11, 12); \
+  f_d12 = EXTRACT_LSB0_SINT (insn, 32, 11, 12); \
 
 #define EXTRACT_IFMT_ADDICC_VARS \
   UINT f_pack; \
@@ -1842,7 +1848,7 @@ struct scache {
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_GRi = EXTRACT_LSB0_UINT (insn, 32, 17, 6); \
   f_ICCi_1 = EXTRACT_LSB0_UINT (insn, 32, 11, 2); \
-  f_s10 = EXTRACT_LSB0_INT (insn, 32, 9, 10); \
+  f_s10 = EXTRACT_LSB0_SINT (insn, 32, 9, 10); \
 
 #define EXTRACT_IFMT_SMULICC_VARS \
   UINT f_pack; \
@@ -1859,7 +1865,7 @@ struct scache {
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_GRi = EXTRACT_LSB0_UINT (insn, 32, 17, 6); \
   f_ICCi_1 = EXTRACT_LSB0_UINT (insn, 32, 11, 2); \
-  f_s10 = EXTRACT_LSB0_INT (insn, 32, 9, 10); \
+  f_s10 = EXTRACT_LSB0_SINT (insn, 32, 9, 10); \
 
 #define EXTRACT_IFMT_CMPB_VARS \
   UINT f_pack; \
@@ -1923,7 +1929,7 @@ struct scache {
   f_GRk = EXTRACT_LSB0_UINT (insn, 32, 30, 6); \
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_misc_null_4 = EXTRACT_LSB0_UINT (insn, 32, 17, 2); \
-  f_s16 = EXTRACT_LSB0_INT (insn, 32, 15, 16); \
+  f_s16 = EXTRACT_LSB0_SINT (insn, 32, 15, 16); \
 
 #define EXTRACT_IFMT_LDBF_VARS \
   UINT f_pack; \
@@ -2023,7 +2029,7 @@ struct scache {
   f_GRk = EXTRACT_LSB0_UINT (insn, 32, 30, 6); \
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_GRi = EXTRACT_LSB0_UINT (insn, 32, 17, 6); \
-  f_d12 = EXTRACT_LSB0_INT (insn, 32, 11, 12); \
+  f_d12 = EXTRACT_LSB0_SINT (insn, 32, 11, 12); \
 
 #define EXTRACT_IFMT_LDBFI_VARS \
   UINT f_pack; \
@@ -2038,7 +2044,7 @@ struct scache {
   f_FRk = EXTRACT_LSB0_UINT (insn, 32, 30, 6); \
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_GRi = EXTRACT_LSB0_UINT (insn, 32, 17, 6); \
-  f_d12 = EXTRACT_LSB0_INT (insn, 32, 11, 12); \
+  f_d12 = EXTRACT_LSB0_SINT (insn, 32, 11, 12); \
 
 #define EXTRACT_IFMT_LDDI_VARS \
   UINT f_pack; \
@@ -2053,7 +2059,7 @@ struct scache {
   f_GRk = EXTRACT_LSB0_UINT (insn, 32, 30, 6); \
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_GRi = EXTRACT_LSB0_UINT (insn, 32, 17, 6); \
-  f_d12 = EXTRACT_LSB0_INT (insn, 32, 11, 12); \
+  f_d12 = EXTRACT_LSB0_SINT (insn, 32, 11, 12); \
 
 #define EXTRACT_IFMT_LDDFI_VARS \
   UINT f_pack; \
@@ -2068,7 +2074,7 @@ struct scache {
   f_FRk = EXTRACT_LSB0_UINT (insn, 32, 30, 6); \
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_GRi = EXTRACT_LSB0_UINT (insn, 32, 17, 6); \
-  f_d12 = EXTRACT_LSB0_INT (insn, 32, 11, 12); \
+  f_d12 = EXTRACT_LSB0_SINT (insn, 32, 11, 12); \
 
 #define EXTRACT_IFMT_CLDBF_VARS \
   UINT f_pack; \
@@ -2186,7 +2192,7 @@ struct scache {
   f_ICCi_2_null = EXTRACT_LSB0_UINT (insn, 32, 26, 2); \
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_hint = EXTRACT_LSB0_UINT (insn, 32, 17, 2); \
-  f_label16 = ((((EXTRACT_LSB0_INT (insn, 32, 15, 16)) << (2))) + (pc)); \
+  f_label16 = ((((EXTRACT_LSB0_SINT (insn, 32, 15, 16)) << (2))) + (pc)); \
 
 #define EXTRACT_IFMT_BNO_VARS \
   UINT f_pack; \
@@ -2220,7 +2226,7 @@ struct scache {
   f_ICCi_2 = EXTRACT_LSB0_UINT (insn, 32, 26, 2); \
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_hint = EXTRACT_LSB0_UINT (insn, 32, 17, 2); \
-  f_label16 = ((((EXTRACT_LSB0_INT (insn, 32, 15, 16)) << (2))) + (pc)); \
+  f_label16 = ((((EXTRACT_LSB0_SINT (insn, 32, 15, 16)) << (2))) + (pc)); \
 
 #define EXTRACT_IFMT_FBRA_VARS \
   UINT f_pack; \
@@ -2237,7 +2243,7 @@ struct scache {
   f_FCCi_2_null = EXTRACT_LSB0_UINT (insn, 32, 26, 2); \
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_hint = EXTRACT_LSB0_UINT (insn, 32, 17, 2); \
-  f_label16 = ((((EXTRACT_LSB0_INT (insn, 32, 15, 16)) << (2))) + (pc)); \
+  f_label16 = ((((EXTRACT_LSB0_SINT (insn, 32, 15, 16)) << (2))) + (pc)); \
 
 #define EXTRACT_IFMT_FBNO_VARS \
   UINT f_pack; \
@@ -2271,7 +2277,7 @@ struct scache {
   f_FCCi_2 = EXTRACT_LSB0_UINT (insn, 32, 26, 2); \
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_hint = EXTRACT_LSB0_UINT (insn, 32, 17, 2); \
-  f_label16 = ((((EXTRACT_LSB0_INT (insn, 32, 15, 16)) << (2))) + (pc)); \
+  f_label16 = ((((EXTRACT_LSB0_SINT (insn, 32, 15, 16)) << (2))) + (pc)); \
 
 #define EXTRACT_IFMT_BCTRLR_VARS \
   UINT f_pack; \
@@ -2557,7 +2563,7 @@ struct scache {
   f_LI_off = EXTRACT_LSB0_UINT (insn, 32, 25, 1); \
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_GRi = EXTRACT_LSB0_UINT (insn, 32, 17, 6); \
-  f_d12 = EXTRACT_LSB0_INT (insn, 32, 11, 12); \
+  f_d12 = EXTRACT_LSB0_SINT (insn, 32, 11, 12); \
 
 #define EXTRACT_IFMT_CALLIL_VARS \
   UINT f_pack; \
@@ -2574,7 +2580,7 @@ struct scache {
   f_LI_on = EXTRACT_LSB0_UINT (insn, 32, 25, 1); \
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_GRi = EXTRACT_LSB0_UINT (insn, 32, 17, 6); \
-  f_d12 = EXTRACT_LSB0_INT (insn, 32, 11, 12); \
+  f_d12 = EXTRACT_LSB0_SINT (insn, 32, 11, 12); \
 
 #define EXTRACT_IFMT_CALL_VARS \
   UINT f_pack; \
@@ -2587,7 +2593,7 @@ struct scache {
   length = 4; \
   f_pack = EXTRACT_LSB0_UINT (insn, 32, 31, 1); \
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
-  f_labelH6 = EXTRACT_LSB0_INT (insn, 32, 30, 6); \
+  f_labelH6 = EXTRACT_LSB0_SINT (insn, 32, 30, 6); \
   f_labelL18 = EXTRACT_LSB0_UINT (insn, 32, 17, 18); \
 {\
   f_label24 = ((((((((f_labelH6) << (18))) | (f_labelL18))) << (2))) + (pc));\
@@ -2766,7 +2772,7 @@ struct scache {
   f_ICCi_2_null = EXTRACT_LSB0_UINT (insn, 32, 26, 2); \
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_GRi = EXTRACT_LSB0_UINT (insn, 32, 17, 6); \
-  f_d12 = EXTRACT_LSB0_INT (insn, 32, 11, 12); \
+  f_d12 = EXTRACT_LSB0_SINT (insn, 32, 11, 12); \
 
 #define EXTRACT_IFMT_TINO_VARS \
   UINT f_pack; \
@@ -2800,7 +2806,7 @@ struct scache {
   f_ICCi_2 = EXTRACT_LSB0_UINT (insn, 32, 26, 2); \
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_GRi = EXTRACT_LSB0_UINT (insn, 32, 17, 6); \
-  f_d12 = EXTRACT_LSB0_INT (insn, 32, 11, 12); \
+  f_d12 = EXTRACT_LSB0_SINT (insn, 32, 11, 12); \
 
 #define EXTRACT_IFMT_FTIRA_VARS \
   UINT f_pack; \
@@ -2817,7 +2823,7 @@ struct scache {
   f_ICCi_2_null = EXTRACT_LSB0_UINT (insn, 32, 26, 2); \
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_GRi = EXTRACT_LSB0_UINT (insn, 32, 17, 6); \
-  f_d12 = EXTRACT_LSB0_INT (insn, 32, 11, 12); \
+  f_d12 = EXTRACT_LSB0_SINT (insn, 32, 11, 12); \
 
 #define EXTRACT_IFMT_FTINO_VARS \
   UINT f_pack; \
@@ -2851,7 +2857,7 @@ struct scache {
   f_FCCi_2 = EXTRACT_LSB0_UINT (insn, 32, 26, 2); \
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_GRi = EXTRACT_LSB0_UINT (insn, 32, 17, 6); \
-  f_d12 = EXTRACT_LSB0_INT (insn, 32, 11, 12); \
+  f_d12 = EXTRACT_LSB0_SINT (insn, 32, 11, 12); \
 
 #define EXTRACT_IFMT_BREAK_VARS \
   UINT f_pack; \
@@ -3243,7 +3249,7 @@ struct scache {
   f_CPRk = EXTRACT_LSB0_UINT (insn, 32, 30, 6); \
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_CPRi = EXTRACT_LSB0_UINT (insn, 32, 17, 6); \
-  f_s6_1 = EXTRACT_LSB0_INT (insn, 32, 11, 6); \
+  f_s6_1 = EXTRACT_LSB0_SINT (insn, 32, 11, 6); \
   f_CPRj = EXTRACT_LSB0_UINT (insn, 32, 5, 6); \
 
 #define EXTRACT_IFMT_CLRGR_VARS \
@@ -3576,7 +3582,7 @@ struct scache {
   f_FRk = EXTRACT_LSB0_UINT (insn, 32, 30, 6); \
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_ope1 = EXTRACT_LSB0_UINT (insn, 32, 11, 6); \
-  f_u12_h = EXTRACT_LSB0_INT (insn, 32, 17, 6); \
+  f_u12_h = EXTRACT_LSB0_SINT (insn, 32, 17, 6); \
   f_u12_l = EXTRACT_LSB0_UINT (insn, 32, 5, 6); \
 {\
   f_u12 = ((((f_u12_h) << (6))) | (f_u12_l));\
@@ -3597,7 +3603,7 @@ struct scache {
   f_FRk = EXTRACT_LSB0_UINT (insn, 32, 30, 6); \
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_ope1 = EXTRACT_LSB0_UINT (insn, 32, 11, 6); \
-  f_u12_h = EXTRACT_LSB0_INT (insn, 32, 17, 6); \
+  f_u12_h = EXTRACT_LSB0_SINT (insn, 32, 17, 6); \
   f_u12_l = EXTRACT_LSB0_UINT (insn, 32, 5, 6); \
 {\
   f_u12 = ((((f_u12_h) << (6))) | (f_u12_l));\
@@ -3618,7 +3624,7 @@ struct scache {
   f_FRk = EXTRACT_LSB0_UINT (insn, 32, 30, 6); \
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_ope1 = EXTRACT_LSB0_UINT (insn, 32, 11, 6); \
-  f_u12_h = EXTRACT_LSB0_INT (insn, 32, 17, 6); \
+  f_u12_h = EXTRACT_LSB0_SINT (insn, 32, 17, 6); \
   f_u12_l = EXTRACT_LSB0_UINT (insn, 32, 5, 6); \
 {\
   f_u12 = ((((f_u12_h) << (6))) | (f_u12_l));\
@@ -3641,7 +3647,7 @@ struct scache {
   f_FRi_null = EXTRACT_LSB0_UINT (insn, 32, 17, 6); \
   f_ope1 = EXTRACT_LSB0_UINT (insn, 32, 11, 6); \
   f_misc_null_11 = EXTRACT_LSB0_UINT (insn, 32, 5, 1); \
-  f_s5 = EXTRACT_LSB0_INT (insn, 32, 4, 5); \
+  f_s5 = EXTRACT_LSB0_SINT (insn, 32, 4, 5); \
 
 #define EXTRACT_IFMT_MHSETHIH_VARS \
   UINT f_pack; \
@@ -3660,7 +3666,7 @@ struct scache {
   f_FRi_null = EXTRACT_LSB0_UINT (insn, 32, 17, 6); \
   f_ope1 = EXTRACT_LSB0_UINT (insn, 32, 11, 6); \
   f_misc_null_11 = EXTRACT_LSB0_UINT (insn, 32, 5, 1); \
-  f_s5 = EXTRACT_LSB0_INT (insn, 32, 4, 5); \
+  f_s5 = EXTRACT_LSB0_SINT (insn, 32, 4, 5); \
 
 #define EXTRACT_IFMT_MHDSETH_VARS \
   UINT f_pack; \
@@ -3679,7 +3685,7 @@ struct scache {
   f_FRi_null = EXTRACT_LSB0_UINT (insn, 32, 17, 6); \
   f_ope1 = EXTRACT_LSB0_UINT (insn, 32, 11, 6); \
   f_misc_null_11 = EXTRACT_LSB0_UINT (insn, 32, 5, 1); \
-  f_s5 = EXTRACT_LSB0_INT (insn, 32, 4, 5); \
+  f_s5 = EXTRACT_LSB0_SINT (insn, 32, 4, 5); \
 
 #define EXTRACT_IFMT_MAND_VARS \
   UINT f_pack; \
@@ -3806,7 +3812,7 @@ struct scache {
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_ACC40Si = EXTRACT_LSB0_UINT (insn, 32, 17, 6); \
   f_ope1 = EXTRACT_LSB0_UINT (insn, 32, 11, 6); \
-  f_s6 = EXTRACT_LSB0_INT (insn, 32, 5, 6); \
+  f_s6 = EXTRACT_LSB0_SINT (insn, 32, 5, 6); \
 
 #define EXTRACT_IFMT_MDCUTSSI_VARS \
   UINT f_pack; \
@@ -3823,7 +3829,7 @@ struct scache {
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_ACC40Si = EXTRACT_LSB0_UINT (insn, 32, 17, 6); \
   f_ope1 = EXTRACT_LSB0_UINT (insn, 32, 11, 6); \
-  f_s6 = EXTRACT_LSB0_INT (insn, 32, 5, 6); \
+  f_s6 = EXTRACT_LSB0_SINT (insn, 32, 5, 6); \
 
 #define EXTRACT_IFMT_MDROTLI_VARS \
   UINT f_pack; \
@@ -3840,7 +3846,7 @@ struct scache {
   f_op = EXTRACT_LSB0_UINT (insn, 32, 24, 7); \
   f_FRi = EXTRACT_LSB0_UINT (insn, 32, 17, 6); \
   f_ope1 = EXTRACT_LSB0_UINT (insn, 32, 11, 6); \
-  f_s6 = EXTRACT_LSB0_INT (insn, 32, 5, 6); \
+  f_s6 = EXTRACT_LSB0_SINT (insn, 32, 5, 6); \
 
 #define EXTRACT_IFMT_MQSATHS_VARS \
   UINT f_pack; \

@@ -32,6 +32,12 @@ This file is part of the GNU simulators.
 /* Maximum number of instructions that can be executed in parallel.  */
 #define MAX_PARALLEL_INSNS 1
 
+/* The size of an "int" needed to hold an instruction word.
+   This is usually 32 bits, but some architectures needs 64 bits.  */
+typedef CGEN_INSN_INT CGEN_INSN_WORD;
+
+#include "cgen-engine.h"
+
 /* CPU state information.  */
 typedef struct {
   /* Hardware elements.  */
@@ -703,7 +709,7 @@ struct scache {
   f_operand2 = EXTRACT_LSB0_UINT (insn, 16, 15, 4); \
   f_mode = EXTRACT_LSB0_UINT (insn, 16, 11, 2); \
   f_opcode = EXTRACT_LSB0_UINT (insn, 16, 9, 4); \
-  f_s6 = EXTRACT_LSB0_INT (insn, 16, 5, 6); \
+  f_s6 = EXTRACT_LSB0_SINT (insn, 16, 5, 6); \
 
 #define EXTRACT_IFMT_MOVECBR_VARS \
   UINT f_operand2; \
@@ -1076,7 +1082,7 @@ struct scache {
   f_operand2 = EXTRACT_LSB0_UINT (insn, 16, 15, 4); \
   f_mode = EXTRACT_LSB0_UINT (insn, 16, 11, 2); \
   f_opcode_hi = EXTRACT_LSB0_UINT (insn, 16, 9, 2); \
-  f_disp9_hi = EXTRACT_LSB0_INT (insn, 16, 0, 1); \
+  f_disp9_hi = EXTRACT_LSB0_SINT (insn, 16, 0, 1); \
   f_disp9_lo = EXTRACT_LSB0_UINT (insn, 16, 7, 7); \
 {\
   SI tmp_abslo;\
@@ -1099,7 +1105,7 @@ struct scache {
   f_operand2 = EXTRACT_LSB0_UINT (insn, 16, 15, 4); \
   f_mode = EXTRACT_LSB0_UINT (insn, 16, 11, 2); \
   f_opcode_hi = EXTRACT_LSB0_UINT (insn, 16, 9, 2); \
-  f_disp9_hi = EXTRACT_LSB0_INT (insn, 16, 0, 1); \
+  f_disp9_hi = EXTRACT_LSB0_SINT (insn, 16, 0, 1); \
   f_disp9_lo = EXTRACT_LSB0_UINT (insn, 16, 7, 7); \
 {\
   SI tmp_abslo;\
@@ -1245,7 +1251,7 @@ struct scache {
   f_operand2 = EXTRACT_LSB0_UINT (insn, 16, 15, 4); \
   f_mode = EXTRACT_LSB0_UINT (insn, 16, 11, 2); \
   f_opcode_hi = EXTRACT_LSB0_UINT (insn, 16, 9, 2); \
-  f_s8 = EXTRACT_LSB0_INT (insn, 16, 7, 8); \
+  f_s8 = EXTRACT_LSB0_SINT (insn, 16, 7, 8); \
 
 #define EXTRACT_IFMT_FIDXI_VARS \
   UINT f_operand2; \

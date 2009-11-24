@@ -1,3 +1,84 @@
+2009-11-24  Pedro Alves  <pedro@codesourcery.com>
+
+	* record.c (init_record_ops, init_record_core_ops): Actually
+	install record_stopped_data_address.
+
+2009-11-23  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* dwarf2read.c [HAVE_MMAP] (MAP_FAILED): Define if missing.
+
+2009-11-23  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (find_partial_die): Don't reassign to 'back_to'.
+
+2009-11-23  Michael Snyder  <msnyder@vmware.com>
+
+	* NEWS: Mention hw watchpoint fix for process record.
+
+2009-11-23  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* cli/cli-cmds.c (disassemble_command): Split on comma.
+	(init_cli_cmds): Update help.
+	* NEWS: Mention incompatible change to 'disassemble'.
+	
+2009-11-22  Pedro Alves  <pedro@codesourcery.com>
+
+        Make hardware breakpoints work for process repord.
+
+	* record.c (record_wait): Only adjust PC on software breakpoints
+	hits.
+
+2009-11-22  Pedro Alves  <pedro@codesourcery.com>
+	    Michael Snyder  <msnyder@vmware.com>
+
+        Make hardware watchpoints work for process record.
+
+        * breakpoint.c (hardware_watchpoint_inserted_in_range): New.
+	* breakpoint.h (hardware_watchpoint_inserted_in_range): Declare.
+	* record.c (record_beneath_to_stopped_by_watchpoint)
+	(record_beneath_to_stopped_data_address, record_hw_watchpoint):
+	New globals.
+	(record_exec_insn): Check for watchpoint hits.
+	(tmp_to_stopped_by_watchpoint, tmp_to_stopped_data_address): New
+	globals.
+	(record_open): Set tmp_to_stopped_by_watchpoint,
+	tmp_to_stopped_data_address,
+	record_beneath_to_stopped_by_watchpoint and
+	record_beneath_to_stopped_data_address.
+	(record_wait): Report watchpoint hits to the core.  Update and
+	extend comments.
+	(record_stopped_by_watchpoint): New.
+	(record_stopped_data_address): New.
+	(init_record_ops): Install them.
+	(init_record_core_ops): Ditto.
+
+2009-11-21  Pedro Alves  <pedro@codesourcery.com>
+
+	* breakpoint.c (update_watchpoint): Skip creating locations and
+	reading the selected frame if there's no execution.
+	(bpstat_stop_status): Use is_hardware_watchpoint.  If not
+	stopping, update watchpoints and the global location list, instead
+	of removing and inserting all breakpoints.
+	(breakpoint_address_is_meaningful): Hardware watchpoints also have
+	a meaningful target address.
+	(watchpoint_locations_match): New.
+	(breakpoint_locations_match): New.
+	(watch_command_1): Create the watchpoint breakpoint without any
+	location initially.  Use update_watchpoint to create the
+	watchpoint locations.
+	(update_global_location_list): Use breakpoint_locations_match, so
+	watchpoint locations are handled too.  Also detect duplicate
+	watchpoint locations.
+
+2009-11-21  Pedro Alves  <pedro@codesourcery.com>
+
+	* breakpoint.h (struct breakpoint) <watchpoint_thread>: New field.
+	* breakpoint.c (watchpoint_in_thread_scope): New.
+	(update_watchpoint): Skip if the local watchpoint's thread doesn't
+	match the current thread, or if the current thread is running.
+	(watchpoint_check): Ditto.
+	(watch_command_1): Set the watchpoint's watchpoint_thread field.
+
 2009-11-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* breakpoint.c (bp_location_compare): Change parameter a to ap and b to

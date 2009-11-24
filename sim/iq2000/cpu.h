@@ -32,6 +32,12 @@ This file is part of the GNU simulators.
 /* Maximum number of instructions that can be executed in parallel.  */
 #define MAX_PARALLEL_INSNS 1
 
+/* The size of an "int" needed to hold an instruction word.
+   This is usually 32 bits, but some architectures needs 64 bits.  */
+typedef CGEN_INSN_INT CGEN_INSN_WORD;
+
+#include "cgen-engine.h"
+
 /* CPU state information.  */
 typedef struct {
   /* Hardware elements.  */
@@ -272,7 +278,7 @@ struct scache {
   f_opcode = EXTRACT_LSB0_UINT (insn, 32, 31, 6); \
   f_rs = EXTRACT_LSB0_UINT (insn, 32, 25, 5); \
   f_rt = EXTRACT_LSB0_UINT (insn, 32, 20, 5); \
-  f_offset = ((((EXTRACT_LSB0_INT (insn, 32, 15, 16)) << (2))) + (((pc) + (4)))); \
+  f_offset = ((((EXTRACT_LSB0_SINT (insn, 32, 15, 16)) << (2))) + (((pc) + (4)))); \
 
 #define EXTRACT_IFMT_BBV_VARS \
   UINT f_opcode; \
@@ -285,7 +291,7 @@ struct scache {
   f_opcode = EXTRACT_LSB0_UINT (insn, 32, 31, 6); \
   f_rs = EXTRACT_LSB0_UINT (insn, 32, 25, 5); \
   f_rt = EXTRACT_LSB0_UINT (insn, 32, 20, 5); \
-  f_offset = ((((EXTRACT_LSB0_INT (insn, 32, 15, 16)) << (2))) + (((pc) + (4)))); \
+  f_offset = ((((EXTRACT_LSB0_SINT (insn, 32, 15, 16)) << (2))) + (((pc) + (4)))); \
 
 #define EXTRACT_IFMT_BGEZ_VARS \
   UINT f_opcode; \
@@ -298,7 +304,7 @@ struct scache {
   f_opcode = EXTRACT_LSB0_UINT (insn, 32, 31, 6); \
   f_rs = EXTRACT_LSB0_UINT (insn, 32, 25, 5); \
   f_rt = EXTRACT_LSB0_UINT (insn, 32, 20, 5); \
-  f_offset = ((((EXTRACT_LSB0_INT (insn, 32, 15, 16)) << (2))) + (((pc) + (4)))); \
+  f_offset = ((((EXTRACT_LSB0_SINT (insn, 32, 15, 16)) << (2))) + (((pc) + (4)))); \
 
 #define EXTRACT_IFMT_JALR_VARS \
   UINT f_opcode; \
@@ -431,7 +437,7 @@ struct scache {
   f_opcode = EXTRACT_LSB0_UINT (insn, 32, 31, 6); \
   f_rs = EXTRACT_LSB0_UINT (insn, 32, 25, 5); \
   f_rt = EXTRACT_LSB0_UINT (insn, 32, 20, 5); \
-  f_offset = ((((EXTRACT_LSB0_INT (insn, 32, 15, 16)) << (2))) + (((pc) + (4)))); \
+  f_offset = ((((EXTRACT_LSB0_SINT (insn, 32, 15, 16)) << (2))) + (((pc) + (4)))); \
 
 #define EXTRACT_IFMT_CFC0_VARS \
   UINT f_opcode; \

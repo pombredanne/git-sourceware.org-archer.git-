@@ -32,6 +32,12 @@ This file is part of the GNU simulators.
 /* Maximum number of instructions that can be executed in parallel.  */
 #define MAX_PARALLEL_INSNS 1
 
+/* The size of an "int" needed to hold an instruction word.
+   This is usually 32 bits, but some architectures needs 64 bits.  */
+typedef CGEN_INSN_INT CGEN_INSN_WORD;
+
+#include "cgen-engine.h"
+
 /* CPU state information.  */
 typedef struct {
   /* Hardware elements.  */
@@ -192,7 +198,7 @@ struct scache {
   f_opcode = EXTRACT_LSB0_UINT (insn, 32, 31, 6); \
   f_r0 = EXTRACT_LSB0_UINT (insn, 32, 25, 5); \
   f_r1 = EXTRACT_LSB0_UINT (insn, 32, 20, 5); \
-  f_imm = EXTRACT_LSB0_INT (insn, 32, 15, 16); \
+  f_imm = EXTRACT_LSB0_SINT (insn, 32, 15, 16); \
 
 #define EXTRACT_IFMT_ANDI_VARS \
   UINT f_opcode; \
@@ -242,7 +248,7 @@ struct scache {
 #define EXTRACT_IFMT_BI_CODE \
   length = 4; \
   f_opcode = EXTRACT_LSB0_UINT (insn, 32, 31, 6); \
-  f_call = ((pc) + (((int) (((EXTRACT_LSB0_INT (insn, 32, 25, 26)) << (6))) >> (4)))); \
+  f_call = ((pc) + (((int) (((EXTRACT_LSB0_SINT (insn, 32, 25, 26)) << (6))) >> (4)))); \
 
 #define EXTRACT_IFMT_BE_VARS \
   UINT f_opcode; \
@@ -255,7 +261,7 @@ struct scache {
   f_opcode = EXTRACT_LSB0_UINT (insn, 32, 31, 6); \
   f_r0 = EXTRACT_LSB0_UINT (insn, 32, 25, 5); \
   f_r1 = EXTRACT_LSB0_UINT (insn, 32, 20, 5); \
-  f_branch = ((pc) + (((int) (((EXTRACT_LSB0_INT (insn, 32, 15, 16)) << (16))) >> (14)))); \
+  f_branch = ((pc) + (((int) (((EXTRACT_LSB0_SINT (insn, 32, 15, 16)) << (16))) >> (14)))); \
 
 #define EXTRACT_IFMT_ORI_VARS \
   UINT f_opcode; \

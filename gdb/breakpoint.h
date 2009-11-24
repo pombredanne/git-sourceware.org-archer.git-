@@ -457,6 +457,11 @@ struct breakpoint
        should be evaluated on the outermost frame.  */
     struct frame_id watchpoint_frame;
 
+    /* Holds the thread which identifies the frame this watchpoint
+       should be considered in scope for, or `null_ptid' if the
+       watchpoint should be evaluated in all threads.  */
+    ptid_t watchpoint_thread;
+
     /* For hardware watchpoints, the triggered status according to the
        hardware.  */
     enum watchpoint_triggered watchpoint_triggered;
@@ -730,6 +735,12 @@ extern int breakpoint_inserted_here_p (struct address_space *, CORE_ADDR);
 extern int regular_breakpoint_inserted_here_p (struct address_space *, CORE_ADDR);
 
 extern int software_breakpoint_inserted_here_p (struct address_space *, CORE_ADDR);
+
+/* Returns true if there's a hardware watchpoint or access watchpoint
+   inserted in the range defined by ADDR and LEN.  */
+extern int hardware_watchpoint_inserted_in_range (struct address_space *,
+						  CORE_ADDR addr,
+						  ULONGEST len);
 
 extern int breakpoint_thread_match (struct address_space *, CORE_ADDR, ptid_t);
 

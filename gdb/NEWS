@@ -22,6 +22,12 @@ Xilinx MicroBlaze		microblaze
   lists inferiors that are not running yet or that have exited
   already.  See also "New commands" and "New options" below.
 
+* Changed commands
+
+disassemble
+  The disassemble command, when invoked with two arguments, now requires
+  the arguments to be comma-separated.
+
 * New commands (for set/show, see "New options" below)
 
 record save [<FILENAME>]
@@ -70,6 +76,10 @@ show follow-exec-mode
   Control whether GDB reuses the same inferior across an exec call or
   creates a new one.  This is useful to be able to restart the old
   executable after the inferior having done an exec call.
+
+* Bug fixes
+
+Process record now works correctly with hardware watchpoints.
 
 *** Changes in GDB 7.0
 
