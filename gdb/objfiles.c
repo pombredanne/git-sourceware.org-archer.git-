@@ -676,7 +676,9 @@ objfile_relocate (struct objfile *objfile, struct section_offsets *new_offsets)
 int
 objfile_has_partial_symbols (struct objfile *objfile)
 {
-  return objfile->psymtabs != NULL;
+  /* It is cheaper to try the non-reading form first.  */
+  return (objfile->sf->qf->has_symbols (objfile, 0)
+	  || objfile->sf->qf->has_symbols (objfile, 1));
 }
 
 /* Return non-zero if OBJFILE has full symbols.  */
@@ -685,6 +687,34 @@ int
 objfile_has_full_symbols (struct objfile *objfile)
 {
   return objfile->symtabs != NULL;
+}
+
+/* Many places in gdb want to test just to see if we have any partial
+   symbols available.  This function returns zero if none are currently
+   available, nonzero otherwise. */
+
+int
+have_partial_symbols (void)
+{
+  struct objfile *ofp;
+
+  ALL_OBJFILES (ofp)
+  {
+    if (ofp->sf->qf->has_symbols (ofp, 0))
+      return 1;
+  }
+
+  /* Try again, after reading partial symbols.  We do this in two
+     passes because objfiles are always added to the head of the list,
+     and there might be a later objfile for which we've already read
+     partial symbols.  */
+  ALL_OBJFILES (ofp)
+  {
+    if (ofp->sf->qf->has_symbols (ofp, 1))
+      return 1;
+  }
+
+  return 0;
 }
 
 /* Many places in gdb want to test just to see if we have any full

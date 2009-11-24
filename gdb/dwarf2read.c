@@ -2583,8 +2583,19 @@ dw2_map_symbol_filenames (struct objfile *objfile,
     }
 }
 
+static int
+dw2_has_symbols (struct objfile *objfile, int try_read)
+{
+  dw2_setup (objfile);
+
+  if (!dwarf2_per_objfile->index_table)
+    return 0;
+  return htab_elements (dwarf2_per_objfile->index_table) > 0;
+}
+
 const struct quick_symbol_functions dwarf2_gnu_index_functions =
 {
+  dw2_has_symbols,
   dw2_find_last_source_symtab,
   dw2_forget_cached_source_info,
   dw2_lookup_symtab,

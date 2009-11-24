@@ -889,10 +889,15 @@ new_symfile_objfile (struct objfile *objfile, int add_flags)
 static int
 has_any_debug_symbols (struct objfile *objfile)
 {
-  return (objfile->psymtabs || objfile->quick_addrmap
-	  || (objfile->separate_debug_objfile
-	      && (objfile->separate_debug_objfile->psymtabs
-		  || objfile->separate_debug_objfile->quick_addrmap)));
+  /* This is ordered according to the cost of calling each
+     function.  */
+  return
+    (objfile_has_full_symbols (objfile)
+     || (objfile->separate_debug_objfile
+	 && objfile_has_full_symbols (objfile->separate_debug_objfile))
+     || objfile_has_partial_symbols (objfile)
+     || (objfile->separate_debug_objfile
+	 && objfile_has_partial_symbols (objfile->separate_debug_objfile)));
 }
 
 /* Process a symbol file, as either the main file or as a dynamically

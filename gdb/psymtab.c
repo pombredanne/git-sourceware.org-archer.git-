@@ -1255,8 +1255,17 @@ expand_symtabs_matching_via_partial (struct objfile *objfile,
     }
 }
 
+static int
+objfile_has_psyms (struct objfile *objfile, int try_read)
+{
+  if (try_read)
+    require_partial_symbols (objfile);
+  return objfile->quick_addrmap != NULL || objfile->psymtabs != NULL;
+}
+
 const struct quick_symbol_functions psym_functions =
 {
+  objfile_has_psyms,
   find_last_source_symtab_from_partial,
   forget_cached_source_info_partial,
   lookup_symtab_via_partial_symtab,
@@ -1575,37 +1584,6 @@ extend_psymbol_list (struct psymbol_allocation_list *listp,
      program works correctly */
   listp->next = listp->list + listp->size;
   listp->size = new_size;
-}
-
-/* Many places in gdb want to test just to see if we have any partial
-   symbols available.  This function returns zero if none are currently
-   available, nonzero otherwise. */
-
-int
-have_partial_symbols (void)
-{
-  struct objfile *ofp;
-
-  ALL_OBJFILES (ofp)
-  {
-    if (objfile_has_partial_symbols (ofp))
-      return 1;
-  }
-
-  /* Try again, after reading partial symbols.  We do this in two
-     passes because objfiles are always added to the head of the list,
-     and there might be a later objfile for which we've already read
-     partial symbols.  */
-  ALL_OBJFILES (ofp)
-  {
-    require_partial_symbols (ofp);
-    if (ofp->psymtabs != NULL)
-      {
-	return 1;
-      }
-  }
-
-  return 0;
 }
 
 

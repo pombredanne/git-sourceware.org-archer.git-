@@ -129,6 +129,12 @@ struct symfile_segment_data
 
 struct quick_symbol_functions
 {
+  /* Return true if this objfile has any "partial" symbols available.
+     If TRY_READ is zero, do not do any extra work, just return the
+     answer.  If TRY_READ is nonzero, try to read partial symbols
+     first, if appropriate.  */
+  int (*has_symbols) (struct objfile *objfile, int try_read);
+
   /* Return the symbol table for the "last" file appearing in
      OBJFILE.  */
   struct symtab *(*find_last_source_symtab) (struct objfile *objfile);

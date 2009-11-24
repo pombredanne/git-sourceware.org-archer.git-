@@ -1630,7 +1630,7 @@ find_pc_sect_symtab (CORE_ADDR pc, struct obj_section *section)
 	/* In order to better support objfiles that contain both
 	   stabs and coff debugging info, we continue on if a psymtab
 	   can't be found. */
-	if ((objfile->flags & OBJF_REORDERED) && objfile->psymtabs)
+	if ((objfile->flags & OBJF_REORDERED))
 	  {
 	    struct symtab *result;
 	    result
