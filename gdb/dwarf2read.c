@@ -1900,16 +1900,18 @@ dwarf2_read_gnu_index (struct objfile *objfile)
     {
       /* Reset all 'quick' pointers; we're about to reuse these slots
 	 as pointers to psymtabs.  */
-        for (i = 0;
+      for (i = 0;
 	   VEC_iterate (dwarf2_per_cu_data_ptr,
 			dwarf2_per_objfile->all_comp_units,
 			i, iter);
 	   ++i)
 	iter->v.quick = NULL;
+      dwarf2_per_objfile->using_gnu_index = 0;
       do_cleanups (cleanups);
       return 0;
     }
 
+  /* Read in each CU that did not have a corresponding index.  */
   for (i = 0;
        VEC_iterate (dwarf2_per_cu_data_ptr,
 		    dwarf2_per_objfile->all_comp_units,
