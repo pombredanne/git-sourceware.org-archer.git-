@@ -1571,6 +1571,12 @@ dwarf2_create_quick_addrmap (struct objfile *objfile)
 }
 
 /* An entry in the DWARF index hash table.  */
+struct index_entry_head
+{
+  hashval_t hash;
+  struct index_entry *entry;
+};
+
 struct index_entry
 {
   /* This points to the name in an entry in the .debug_gnu_index
@@ -1589,17 +1595,18 @@ struct index_entry
 static hashval_t
 hash_index_entry (const void *e)
 {
-  const struct index_entry *entry = e;
-  return htab_hash_string (entry->name);
+  const struct index_entry_head *entry = e;
+  return entry->hash;
 }
 
 /* Equality function for the DWARF index hash table.  */
 static int
 eq_index_entry (const void *a, const void *b)
 {
-  const struct index_entry *ea = a;
-  const struct index_entry *eb = b;
-  return !strcmp (ea->name, eb->name);
+  const struct index_entry_head *head = a;
+  const struct index_entry_head *search = b;
+  return head->hash == search->hash && !strcmp (head->entry->name,
+						search->entry->name);
 }
 
 /* A cleanup function that calls htab_delete.  */
@@ -1613,13 +1620,15 @@ cleanup_htab (void *p)
 static void
 del_index_entry (void *p)
 {
-  struct index_entry *e = p;
-  while (e)
+  struct index_entry_head *e = p;
+  struct index_entry *iter = e->entry;
+  while (iter)
     {
-      struct index_entry *n = e->next;
-      xfree (e);
-      e = n;
+      struct index_entry *n = iter->next;
+      xfree (iter);
+      iter = n;
     }
+  xfree (e);
 }
 
 /* Read in the symbols for PER_CU.  OBJFILE is the objfile from which
@@ -1678,9 +1687,9 @@ cleanup_vec (void *p)
 static int
 compare_cus (const void *a, const void *b)
 {
-  const struct dwarf2_per_cu_data *cua = a;
-  const struct dwarf2_per_cu_data *cub = b;
-  return (cua->offset > cub->offset) - (cub->offset > cua->offset);
+  const struct dwarf2_per_cu_data * const *cua = a;
+  const struct dwarf2_per_cu_data * const *cub = b;
+  return ((*cua)->offset > (*cub)->offset) - ((*cub)->offset > (*cua)->offset);
 }
 
 /* A helper for dwarf2_read_gnu_index that finds a CU if it already
@@ -1782,7 +1791,8 @@ dwarf2_read_gnu_index (struct objfile *objfile)
       while (1)
 	{
 	  unsigned int die_offset, tag;
-	  struct index_entry *entry, **slot;
+	  struct index_entry_head search_head, **slot;
+	  struct index_entry *entry;
 	  char *name;
 
 	  /* FIXME: check that we're still in bounds.  */
@@ -1801,10 +1811,20 @@ dwarf2_read_gnu_index (struct objfile *objfile)
 	  entry->name = name;
 	  entry->cu = cu;
 
-	  slot = (struct index_entry **) htab_find_slot (index_table, entry,
-							 INSERT);
-	  entry->next = *slot;
-	  *slot = entry;
+	  search_head.hash = htab_hash_string (name);
+	  search_head.entry = entry;
+
+	  slot = (struct index_entry_head **) htab_find_slot (index_table,
+							      &search_head,
+							      INSERT);
+	  if (!*slot)
+	    {
+	      *slot = xmalloc (sizeof (struct index_entry_head));
+	      (*slot)->hash = search_head.hash;
+	    }
+
+	  entry->next = (*slot)->entry;
+	  (*slot)->entry = entry;
 	}
     }
 
@@ -2221,6 +2241,7 @@ dw2_lookup_symbol_internal (struct objfile *objfile, int block_index,
 			    const char *name, const char *linkage_name,
 			    domain_enum domain)
 {
+  struct index_entry_head search_head, *head;
   struct index_entry *entry, lookup;
   int len = strlen (name);
 
@@ -2229,11 +2250,13 @@ dw2_lookup_symbol_internal (struct objfile *objfile, int block_index,
   if (!dwarf2_per_objfile->index_table)
     return NULL;
 
+  search_head.hash = htab_hash_string (name);
+  search_head.entry = &lookup;
   lookup.name = name;
-  entry = htab_find (dwarf2_per_objfile->index_table, &lookup);
+  head = htab_find (dwarf2_per_objfile->index_table, &search_head);
 
   /* FIXME: we ignore linkage_name.  */
-  for (; entry; entry = entry->next)
+  for (entry = head ? head->entry : NULL; entry; entry = entry->next)
     {
       unsigned long value;
       unsigned int bytes_read;
@@ -2298,6 +2321,7 @@ static void
 dw2_expand_symtabs_for_function (struct objfile *objfile,
 				 const char *func_name)
 {
+  struct index_entry_head search_head, *head;
   struct index_entry *entry, lookup;
 
   dw2_setup (objfile);
@@ -2305,11 +2329,13 @@ dw2_expand_symtabs_for_function (struct objfile *objfile,
   if (!dwarf2_per_objfile->index_table)
     return;
 
+  search_head.hash = htab_hash_string (func_name);
+  search_head.entry = &lookup;
   lookup.name = func_name;
-  entry = htab_find (dwarf2_per_objfile->index_table, &lookup);
+  head = htab_find (dwarf2_per_objfile->index_table, &search_head);
   /* We could decode the type here if we wanted to filter out the
      non-function entries.  */
-  for (; entry; entry = entry->next)
+  for (entry = head ? head->entry : NULL; entry; entry = entry->next)
     dw2_instantiate_symtab (objfile, entry->cu);
 }
 
@@ -2406,10 +2432,11 @@ static int
 dw2_call_name_matcher (void **slot, void *d)
 {
   struct name_matcher_data *data = d;
-  struct index_entry *entry = *slot;
+  struct index_entry_head *head = *slot;
+  struct index_entry *entry;
   int len = -1;
 
-  for (; entry; entry = entry->next)
+  for (entry = head->entry; entry; entry = entry->next)
     {
       unsigned int bytes_read;
       unsigned long value;
@@ -2528,9 +2555,9 @@ static int
 dw2_map_symnames (void **slot, void *d)
 {
   struct traverse_syms_data *data = d;
-  struct index_entry *entry = *slot;
+  struct index_entry_head *head = *slot;
 
-  (*data->fun) (entry->name, data->data);
+  (*data->fun) (head->entry->name, data->data);
   return 1;
 }
 
