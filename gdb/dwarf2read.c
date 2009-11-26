@@ -2647,11 +2647,15 @@ const struct quick_symbol_functions dwarf2_gnu_index_functions =
 int
 dwarf2_initialize_objfile (struct objfile *objfile)
 {
+  int must_use_psyms = (objfile->global_psymbols.size != 0
+			|| objfile->static_psymbols.size != 0);
+
   dwarf2_read_section (objfile, &dwarf2_per_objfile->info);
 
   /* If we're about to read full symbols, don't bother with the
      indices.  */
-  if ((objfile->flags & OBJF_READNOW) || readnow_symbol_files)
+  if (((objfile->flags & OBJF_READNOW) || readnow_symbol_files)
+      && !must_use_psyms)
     {
       int i;
       struct dwarf2_per_cu_data *cu;
@@ -2674,9 +2678,13 @@ dwarf2_initialize_objfile (struct objfile *objfile)
       return 1;
     }
 
+  /* We want to create the quick address map, if we can, regardless of
+     whether we want to build psymtabs.  */
   if (!dwarf2_create_quick_addrmap (objfile)
-      || objfile->global_psymbols.size != 0
-      || objfile->static_psymbols.size != 0
+      || must_use_psyms
+      /* We could actually read the dwarf and make the index the hard
+	 way.  FIXME.  This would probably save memory over using
+	 psymtabs.  */
       || !dwarf2_per_objfile->gnu_index.asection)
     /* We have to build psymtabs, so don't bother reading the GNU
        index.  */
