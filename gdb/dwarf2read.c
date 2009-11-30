@@ -363,6 +363,9 @@ struct dwarf2_per_cu_quick_data
 
   /* True if we've tried to read the line table.  */
   unsigned int read_lines : 1;
+
+  /* True if we must read in this symbol table immediately.  */
+  unsigned int must_read : 1;
 };
 
 /* Persistent data held for a compilation unit, even when not
@@ -403,6 +406,9 @@ struct dwarf2_per_cu_data
      to reconstruct this information later, so we have to preserve
      it.  */
   htab_t type_hash;
+
+  /* The corresponding objfile.  */
+  struct objfile *objfile;
 
   /* When using partial symbol tables, the 'psymtab' field is active.
      Otherwise the 'quick' field is active.  */
@@ -1446,6 +1452,58 @@ destroy_section_cleanup (void *arg)
   destroy_section (arg);
 }
 
+/* A helper for dwarf2_read_gnu_index and dwarf2_create_quick_addrmap
+   that finds a CU if it already exists.  */
+static struct dwarf2_per_cu_data *
+find_existing_cu (unsigned int offset, int *index_hint)
+{
+  int i;
+  struct dwarf2_per_cu_data *cu;
+
+  for (i = index_hint ? *index_hint : 0;
+       VEC_iterate (dwarf2_per_cu_data_ptr,
+		    dwarf2_per_objfile->all_comp_units,
+		    i, cu);
+       ++i)
+    {
+      if (cu->offset == offset)
+	{
+	  if (index_hint)
+	    *index_hint = i + 1;
+	  return cu;
+	}
+      /* The list is kept sorted at all times.  */
+      if (offset > cu->offset)
+	break;
+    }
+
+  if (index_hint)
+    *index_hint = i + 1;
+  return NULL;
+}
+
+/* A comparison function for qsort that compares two CUs by
+   offset.  */
+static int
+compare_cus (const void *a, const void *b)
+{
+  const struct dwarf2_per_cu_data * const *cua = a;
+  const struct dwarf2_per_cu_data * const *cub = b;
+  return ((*cua)->offset > (*cub)->offset) - ((*cub)->offset > (*cua)->offset);
+}
+
+/* Sort the list of CUs.  */
+static void
+sort_cus (void)
+{
+  qsort (VEC_address (dwarf2_per_cu_data_ptr,
+		      dwarf2_per_objfile->all_comp_units),
+	 VEC_length (dwarf2_per_cu_data_ptr,
+		     dwarf2_per_objfile->all_comp_units),
+	 sizeof (dwarf2_per_cu_data_ptr),
+	 compare_cus);
+}
+
 /* Read the .debug_aranges section and construct an address map.
    Returns 1 on success, 0 if anything went wrong.  */
 
@@ -1458,6 +1516,7 @@ dwarf2_create_quick_addrmap (struct objfile *objfile)
   struct cleanup *old;
   struct obstack temp_obstack;
   struct addrmap *mutable_map;
+  unsigned int high_water = 0;
 
   if (!dwarf2_per_objfile->aranges.asection)
     return 0;
@@ -1481,6 +1540,7 @@ dwarf2_create_quick_addrmap (struct objfile *objfile)
       struct dwarf2_cu cu;
       struct dwarf2_per_cu_data *the_cu = NULL;
       char *end_ptr;
+      int ordered;
 
       cu_header.initial_length_size = 0;
       end_ptr = aranges_ptr;
@@ -1503,14 +1563,42 @@ dwarf2_create_quick_addrmap (struct objfile *objfile)
 	  return 0;
 	}
 
-      /* This loses if we see a duplicate.  */
-      the_cu = OBSTACK_ZALLOC (&objfile->objfile_obstack,
-			       struct dwarf2_per_cu_data);
-      /* Note that we can't set the length.  This is ok because we
-	 either set it when reading .debug_gnu_info, or we throw all
-	 these CU objects away when reading psymtabs.  In the latter
-	 case, we never use the result of the arange mapping.  */	 
-      the_cu->offset = cu_header.abbrev_offset;
+      /* CUs are ordinarily in order, so optimize for that case.  */
+      if (cu_header.abbrev_offset > high_water)
+	{
+	  the_cu = NULL;
+	  high_water = cu_header.abbrev_offset;
+	  ordered = 1;
+	}
+      else
+	{
+	  the_cu = find_existing_cu (cu_header.abbrev_offset, NULL);
+	  ordered = VEC_empty (dwarf2_per_cu_data_ptr,
+			       dwarf2_per_objfile->all_comp_units);
+	}
+
+      if (the_cu)
+	complaint (&symfile_complaints,
+		   _("duplicate CU %ud in `.debug_aranges' section"),
+		   cu_header.abbrev_offset);
+      else
+	{
+	  the_cu = OBSTACK_ZALLOC (&objfile->objfile_obstack,
+				   struct dwarf2_per_cu_data);
+	  /* Note that we can't set the length.  This is ok because we
+	     either set it when reading .debug_gnu_info, or we throw
+	     all these CU objects away when reading psymtabs.  In the
+	     latter case, we never use the result of the arange
+	     mapping.  */	 
+	  the_cu->offset = cu_header.abbrev_offset;
+	  the_cu->objfile = objfile;
+
+	  VEC_safe_push (dwarf2_per_cu_data_ptr,
+			 dwarf2_per_objfile->all_comp_units,
+			 the_cu);
+	  if (!ordered)
+	    sort_cus ();
+	}
 
       segment_size = read_1_byte (abfd, aranges_ptr);
       aranges_ptr += 1;
@@ -1682,37 +1770,6 @@ cleanup_vec (void *p)
   VEC_free (dwarf2_per_cu_data_ptr, *v);
 }
 
-/* A comparison function for qsort that compares two CUs by
-   offset.  */
-static int
-compare_cus (const void *a, const void *b)
-{
-  const struct dwarf2_per_cu_data * const *cua = a;
-  const struct dwarf2_per_cu_data * const *cub = b;
-  return ((*cua)->offset > (*cub)->offset) - ((*cub)->offset > (*cua)->offset);
-}
-
-/* A helper for dwarf2_read_gnu_index that finds a CU if it already
-   exists.  FIXME: bad time complexity.  */
-static struct dwarf2_per_cu_data *
-find_existing_cu (unsigned int offset)
-{
-  int i;
-  struct dwarf2_per_cu_data *cu;
-
-  for (i = 0;
-       VEC_iterate (dwarf2_per_cu_data_ptr,
-		    dwarf2_per_objfile->all_comp_units,
-		    i, cu);
-       ++i)
-    {
-      if (cu->offset == offset)
-	return cu;
-    }
-
-  return NULL;
-}
-
 /* Read the .debug_gnu_index section.  If everything went ok,
    initializes the "quick" elements of all the CUs and returns 1.
    Otherwise, returns 0.  */
@@ -1723,8 +1780,18 @@ dwarf2_read_gnu_index (struct objfile *objfile)
   bfd *abfd = objfile->obfd;
   htab_t index_table;
   struct cleanup *cleanups;
-  int i, quick_count;
+  int i, quick_count, cu_index = 0;
   struct dwarf2_per_cu_data *iter;
+  unsigned int high_water;
+  int incoming_len = VEC_length (dwarf2_per_cu_data_ptr,
+				 dwarf2_per_objfile->all_comp_units);
+
+  if (incoming_len == 0)
+    high_water = 0;
+  else
+    high_water = VEC_index (dwarf2_per_cu_data_ptr,
+			    dwarf2_per_objfile->all_comp_units,
+			    incoming_len - 1)->offset;
 
   index_table = htab_create (100, hash_index_entry, eq_index_entry,
 			     del_index_entry);
@@ -1742,6 +1809,7 @@ dwarf2_read_gnu_index (struct objfile *objfile)
       struct dwarf2_per_cu_data *cu = NULL;
       unsigned int bytes_read, initial_length, offset;
       unsigned int info_length, offset_size, version;
+      int ordered, new_cu;
 
       initial_length = read_initial_length (abfd, ptr, &bytes_read);
       offset_size = (bytes_read == 4) ? 4 : 8;
@@ -1766,15 +1834,39 @@ dwarf2_read_gnu_index (struct objfile *objfile)
 	  return 0;
 	}
 
-      cu = find_existing_cu (offset);
+      /* CUs are ordinarily listed in order, so optimize for this
+	 case.  First, if the new CU comes after the last one we saw,
+	 then we need a new CU.  Otherwise, search the list starting
+	 at `cu_index'.  */
+      ordered = 0;
+      if (cu_index < VEC_length (dwarf2_per_cu_data_ptr,
+				 dwarf2_per_objfile->all_comp_units))
+	cu = find_existing_cu (offset, &cu_index);
+      else
+	{
+	  cu = NULL;
+	  if (offset > high_water)
+	    {
+	      high_water = offset;
+	      ordered = 1;
+	    }
+	}
+
+      new_cu = 0;
       if (!cu)
 	{
 	  cu = OBSTACK_ZALLOC (&objfile->objfile_obstack,
 			       struct dwarf2_per_cu_data);
 	  cu->offset = offset;
+	  cu->objfile = objfile;
 	  VEC_safe_push (dwarf2_per_cu_data_ptr,
 			 dwarf2_per_objfile->all_comp_units,
 			 cu);
+
+	  if (!ordered)
+	    sort_cus ();
+
+	  new_cu = 1;
 	}
       /* We always set the length, because we could not set it while
 	 reading aranges.  */
@@ -1787,6 +1879,11 @@ dwarf2_read_gnu_index (struct objfile *objfile)
       else
 	cu->v.quick = OBSTACK_ZALLOC (&objfile->objfile_obstack,
 				      struct dwarf2_per_cu_quick_data);
+
+      /* If we just saw this CU for the first time, it means that it
+	 did not appear in .debug_aranges, so we must read it now.  */
+      if (new_cu)
+	cu->v.quick->must_read = 1;
 
       while (1)
 	{
@@ -1811,6 +1908,11 @@ dwarf2_read_gnu_index (struct objfile *objfile)
 	  entry->name = name;
 	  entry->cu = cu;
 
+	  /* If we are just going to read the CU anyway, don't bother
+	     building up the index.  */
+	  if (new_cu)
+	    continue;
+
 	  search_head.hash = htab_hash_string (name);
 	  search_head.entry = entry;
 
@@ -1821,6 +1923,7 @@ dwarf2_read_gnu_index (struct objfile *objfile)
 	    {
 	      *slot = xmalloc (sizeof (struct index_entry_head));
 	      (*slot)->hash = search_head.hash;
+	      (*slot)->entry = NULL;
 	    }
 
 	  entry->next = (*slot)->entry;
@@ -1837,19 +1940,13 @@ dwarf2_read_gnu_index (struct objfile *objfile)
      now.  */
   {
     unsigned int offset = 0;
-    int len;
+    int len, added_one = 0;
 
     /* Compute the length first, because may add extra elements to the
        VEC as we go along.  */
     len = VEC_length (dwarf2_per_cu_data_ptr,
 		      dwarf2_per_objfile->all_comp_units);
     quick_count = len;
-
-    qsort (VEC_address (dwarf2_per_cu_data_ptr,
-			dwarf2_per_objfile->all_comp_units),
-	   len,
-	   sizeof (dwarf2_per_cu_data_ptr),
-	   compare_cus);
 
     /* We do one extra iteration, so that we can find any skipped CUs
        after the last one we have an index for.  */
@@ -1886,29 +1983,27 @@ dwarf2_read_gnu_index (struct objfile *objfile)
 				     struct dwarf2_per_cu_data);
 	    new_cu->offset = offset;
 	    new_cu->length = length + initial_length_size;
+	    new_cu->objfile = objfile;
 
 	    VEC_safe_push (dwarf2_per_cu_data_ptr,
 			   dwarf2_per_objfile->all_comp_units, new_cu);
 
 	    offset += new_cu->length;
+
+	    added_one = 1;
 	  }
 
 	if (offset != new_offset)
-	  {
-	    /* complaint */
-	  }
+	  complaint (&symfile_complaints,
+		     _(".debug_gnu_index refers to non-existent CU %ud"),
+		     offset);
 
 	offset = target_offset;
       }
 
     /* Re-sort the final list.  */
-    len = VEC_length (dwarf2_per_cu_data_ptr,
-		      dwarf2_per_objfile->all_comp_units);
-    qsort (VEC_address (dwarf2_per_cu_data_ptr,
-			dwarf2_per_objfile->all_comp_units),
-	   len,
-	   sizeof (dwarf2_per_cu_data_ptr),
-	   compare_cus);
+    if (added_one)
+      sort_cus ();
   }
 
   /* Some CUs in this objfile may not have an associated GNU index.
@@ -1945,6 +2040,9 @@ dwarf2_read_gnu_index (struct objfile *objfile)
 	  /* FIXME: do we need cleanup handling here?  what kind?  */
 	  dw2_instantiate_symtab (objfile, iter);
 	}
+      else if (iter->v.quick->must_read)
+	/* FIXME: do we need cleanup handling here?  what kind?  */
+	dw2_instantiate_symtab (objfile, iter);
     }
 
   discard_cleanups (cleanups);
@@ -2123,7 +2221,7 @@ dw2_lookup_symtab (struct objfile *objfile, const char *name,
 
       for (j = 0; j < cu->v.quick->lines->num_file_names; ++j)
 	{
-	  const char *this_name = cu->v.quick->full_names[j];
+	  const char *this_name = cu->v.quick->file_names[j];
 
 	  if (FILENAME_CMP (name, this_name) == 0)
 	    {
@@ -3504,7 +3602,7 @@ create_all_comp_units (struct objfile *objfile)
 {
   gdb_byte *info_ptr = dwarf2_per_objfile->info.buffer;
 
-  VEC_empty (dwarf2_per_cu_data_ptr, dwarf2_per_objfile->all_comp_units);
+  VEC_free (dwarf2_per_cu_data_ptr, dwarf2_per_objfile->all_comp_units);
 
   while (info_ptr < dwarf2_per_objfile->info.buffer + dwarf2_per_objfile->info.size)
     {
@@ -3526,6 +3624,7 @@ create_all_comp_units (struct objfile *objfile)
       memset (this_cu, 0, sizeof (*this_cu));
       this_cu->offset = offset;
       this_cu->length = length + initial_length_size;
+      this_cu->objfile = objfile;
 
       VEC_safe_push (dwarf2_per_cu_data_ptr,
 		     dwarf2_per_objfile->all_comp_units,
@@ -12716,7 +12815,7 @@ dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
 struct objfile *
 dwarf2_per_cu_objfile (struct dwarf2_per_cu_data *per_cu)
 {
-  struct objfile *objfile = per_cu->v.psymtab->objfile;
+  struct objfile *objfile = per_cu->objfile;
 
   /* Return the master objfile, so that we can report and look up the
      correct file containing this variable.  */
@@ -12736,7 +12835,7 @@ dwarf2_per_cu_addr_size (struct dwarf2_per_cu_data *per_cu)
   else
     {
       /* If the CU is not currently read in, we re-read its header.  */
-      struct objfile *objfile = per_cu->v.psymtab->objfile;
+      struct objfile *objfile = per_cu->objfile;
       struct dwarf2_per_objfile *per_objfile
 	= objfile_data (objfile, dwarf2_objfile_data_key);
       gdb_byte *info_ptr = per_objfile->info.buffer + per_cu->offset;
@@ -12987,6 +13086,9 @@ dwarf2_free_objfile (struct objfile *objfile)
 	{
 	  int j;
 
+	  if (!cu->v.quick->lines)
+	    continue;
+
 	  for (j = 0; j < cu->v.quick->lines->num_file_names; ++j)
 	    {
 	      if (cu->v.quick->file_names)
@@ -12994,6 +13096,8 @@ dwarf2_free_objfile (struct objfile *objfile)
 	      if (cu->v.quick->full_names)
 		xfree ((void *) cu->v.quick->full_names[j]);
 	    }
+
+	  free_line_header (cu->v.quick->lines);
 	}
     }
 
