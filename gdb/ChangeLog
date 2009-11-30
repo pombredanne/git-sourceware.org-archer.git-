@@ -1,3 +1,42 @@
+2009-11-28  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* target.c (target_terminal_inferior): Use target_can_async_p, not
+	target_is_async_p.
+
+2009-11-27  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* s390-nat.c (s390_can_use_hw_breakpoint): Only support breakpoints
+	of type bp_hardware_watchpoint.
+
+2009-11-27  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c: Apply some corrections to the previous comment addition.
+
+2009-11-26  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c: Update the comment explaining how to evaluate
+	Ada expressions.
+
+2009-11-24  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	PR gdb/8704
+
+	* breakpoint.c (find_condition_and_thread): Correct task error message.
+	* c-exp.y (yylex): Stop before "thread N", "task N", or abbreviations
+	of those.
+
+2009-11-24  Joel Brobecker  <brobecker@adacore.com>
+
+	* acinclude.m4: Include ../config/zlib.m4.
+	* configure.ac: Use AM_ZLIB to check for zlib support.
+	* configure: Regenerate.
+
+2009-11-24  Joel Brobecker  <brobecker@adacore.com>
+
+	* breakpoint.c (expand_line_sal_maybe): Adjust adjust the SAL
+	past the function prologue in the case where we were given only
+	one SAL.
+
 2009-11-24  Pedro Alves  <pedro@codesourcery.com>
 
 	* record.c (init_record_ops, init_record_core_ops): Actually
