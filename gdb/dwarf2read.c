@@ -1904,14 +1904,14 @@ dwarf2_read_gnu_index (struct objfile *objfile)
 	  tag = read_unsigned_leb128 (abfd, ptr, &bytes_read);
 	  ptr += bytes_read;
 
-	  entry = xmalloc (sizeof (struct index_entry));
-	  entry->name = name;
-	  entry->cu = cu;
-
 	  /* If we are just going to read the CU anyway, don't bother
 	     building up the index.  */
 	  if (new_cu)
 	    continue;
+
+	  entry = xmalloc (sizeof (struct index_entry));
+	  entry->name = name;
+	  entry->cu = cu;
 
 	  search_head.hash = htab_hash_string (name);
 	  search_head.entry = entry;
