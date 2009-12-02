@@ -1586,7 +1586,7 @@ dwarf2_create_quick_addrmap (struct objfile *objfile)
 	  the_cu = OBSTACK_ZALLOC (&objfile->objfile_obstack,
 				   struct dwarf2_per_cu_data);
 	  /* Note that we can't set the length.  This is ok because we
-	     either set it when reading .debug_gnu_info, or we throw
+	     either set it when reading .debug_gnu_index, or we throw
 	     all these CU objects away when reading psymtabs.  In the
 	     latter case, we never use the result of the arange
 	     mapping.  */	 
