@@ -1,3 +1,25 @@
+2009-12-03  Tristan Gingold  <gingold@adacore.com>
+
+	* mach-o.c (bfd_mach_o_make_bfd_section): Force debug flags for
+	all sections of the __DWARF segment.
+
+2009-12-03  Alan Modra  <amodra@bigpond.net.au>
+
+	PR ld/11047
+	* elf32-ppc.c (ppc_elf_relocate_section): Delete __tls_get_addr
+	symbol reference from relocs belonging to calls that are
+	optimized away.
+	* elf64-ppc.c (ppc64_elf_relocate_section): Likewise.
+
+2009-12-02  Jerker Bäck  <jerker.back@gmail.com>
+
+	PR binutils/11017
+	* coff-i386.h (COFF_PAGE_SIZE): Definition moved to coff/i386.h
+
+2009-11-30  Joseph Myers  <joseph@codesourcery.com>
+
+	* configure: Regenerate.
+
 2009-11-26  Per Øyvind Karlsen <peroyvind@mandriva.org>
 
 	* plugin.c (bfd_plugin_bfd_copy_link_hash_symbol_type): Define.

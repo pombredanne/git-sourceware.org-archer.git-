@@ -1,3 +1,64 @@
+2009-12-03  Tristan Gingold  <gingold@adacore.com>
+
+	* machoread.c (macho_sym_fns): Set sym_segment routine.
+
+2009-12-02  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* ada-lang.c (ada_value_assign): Use observer_notify_memory_changed.
+	* valops.c (value_assign): Likewise.
+	* defs.h (deprecated_memory_changed_hook): Remove.
+	* top.c (deprecated_memory_changed_hook): Likewise.
+	* interps.c (clear_interpreter_hooks): Adjust.	
+	
+2009-12-02  Tristan Gingold  <gingold@adacore.com>
+
+	* symfile.h (dwarf2_build_psymtabs): Remove mainline parameter in
+	prototype.
+	* dwarf2read.c (dwarf2_build_psymtabs): Remove mainline paramter in
+	definition, simplify code assuming it is always 0.
+	* coffread.c (coff_symfile_read): Adjust call.
+	* elfread.c (elf_symfile_read): Ditto.
+	* machoread.c (macho_symfile_read): Explicitely calls
+	init_psymbol_list if mainline is set.
+
+2009-12-02  Tristan Gingold  <gingold@adacore.com>
+
+	* dwarf2read.c (dwarf2_build_psymtabs_easy): Remove mainline parameter.
+	(dwarf2_build_psymtabs_hard): Ditto.
+	(dwarf2_build_psymtabs): Ajust calls.
+	* stabsread.h (elfstab_build_psymtabs): Remove mainline parameter on
+	the prototype.
+	(coffstab_build_psymtabs): Ditto.
+	(stabsect_build_psymtabs): Ditto.
+	* dbxread.c (coffstab_build_psymtabs): Remove mainline parameter on
+	the definition.
+	(elfstab_build_psymtabs): Ditto.
+	(stabsect_build_psymtabs): Ditto.
+	* coffread.c (coff_symfile_read): Adjust call.
+	* elfread.c (elf_symfile_read): Ditto.
+	* somread.c (som_symfile_read): Ditto.
+
+2009-12-02  Tristan Gingold  <gingold@adacore.com>
+
+	* charset.c (_initialize_charset): Set a default value to
+	auto_host_charset_name if empty.
+
+2009-12-01  Joseph Myers  <joseph@codesourcery.com>
+
+	* gcore.c: Include solib.h.
+	(gcore_create_callback): Call solib_keep_data_in_core when
+	considering not saving memory in core file.
+	* solib-svr4.c (svr4_keep_data_in_core): New.
+	(_initialize_svr4_solib): Initialize
+	svr4_so_ops.keep_data_in_core.
+	* solib.c (solib_keep_data_in_core): New.
+	* solib.h (solib_keep_data_in_core): Declare.
+	* solist.h (struct target_so_ops): Add keep_data_in_core.
+
+2009-11-30  Joseph Myers  <joseph@codesourcery.com>
+
+	* configure: Regenerate.
+
 2009-11-28  Vladimir Prus  <vladimir@codesourcery.com>
 
 	* target.c (target_terminal_inferior): Use target_can_async_p, not
