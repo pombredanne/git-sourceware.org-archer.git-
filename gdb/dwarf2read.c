@@ -1083,7 +1083,9 @@ static void process_die (struct die_info *, struct dwarf2_cu *);
 
 static char *dwarf2_linkage_name (struct die_info *, struct dwarf2_cu *);
 
-static char *dwarf2_canonicalize_name (char *, struct dwarf2_cu *,
+static enum language get_language (unsigned int);
+
+static char *dwarf2_canonicalize_name (char *, enum language,
 				       struct obstack *);
 
 static char *dwarf2_name (struct die_info *die, struct dwarf2_cu *);
@@ -1473,7 +1475,7 @@ find_existing_cu (unsigned int offset, int *index_hint)
 	  return cu;
 	}
       /* The list is kept sorted at all times.  */
-      if (offset > cu->offset)
+      if (cu->offset > offset)
 	break;
     }
 
@@ -1667,9 +1669,16 @@ struct index_entry_head
 
 struct index_entry
 {
-  /* This points to the name in an entry in the .debug_gnu_index
-     section.  So, the name is always followed by the tag.  */
+  /* The name of the symbol.  This is stored either in the section
+     data, or on the objfile's obstack.  It is in canonical form.  */
   const char *name;
+
+  /* The tag indicating what kind of entry this is.  */
+  ENUM_BITFIELD (dwarf_tag) tag : 16;
+
+  /* The CU's language.  We store it here because it fits in a
+     hole in the struct.  */
+  ENUM_BITFIELD (language) language : 8;
 
   /* The CU holding this entry.  */
   struct dwarf2_per_cu_data *cu;
@@ -1808,8 +1817,9 @@ dwarf2_read_gnu_index (struct objfile *objfile)
       char *end_ptr;
       struct dwarf2_per_cu_data *cu = NULL;
       unsigned int bytes_read, initial_length, offset;
-      unsigned int info_length, offset_size, version;
+      unsigned int info_length, offset_size, version, dwlang;
       int ordered, new_cu;
+      enum language lang;
 
       initial_length = read_initial_length (abfd, ptr, &bytes_read);
       offset_size = (bytes_read == 4) ? 4 : 8;
@@ -1825,6 +1835,10 @@ dwarf2_read_gnu_index (struct objfile *objfile)
 
       info_length = read_offset_1 (abfd, ptr, offset_size);
       ptr += offset_size;
+
+      dwlang = read_unsigned_leb128 (abfd, ptr, &bytes_read);
+      ptr += bytes_read;
+      lang = get_language (dwlang);
 
       if (end_ptr - ptr >= dwarf2_per_objfile->gnu_index.size)
 	{
@@ -1909,12 +1923,17 @@ dwarf2_read_gnu_index (struct objfile *objfile)
 	  if (new_cu)
 	    continue;
 
+	  name = dwarf2_canonicalize_name (name, lang,
+					   &objfile->objfile_obstack);
+
 	  entry = xmalloc (sizeof (struct index_entry));
 	  entry->name = name;
+	  entry->tag = (enum dwarf_tag) tag;
+	  entry->language = lang;
 	  entry->cu = cu;
 
-	  search_head.hash = htab_hash_string (name);
-	  search_head.entry = entry;
+ 	  search_head.hash = htab_hash_string (name);
+ 	  search_head.entry = entry;
 
 	  slot = (struct index_entry_head **) htab_find_slot (index_table,
 							      &search_head,
@@ -2356,15 +2375,9 @@ dw2_lookup_symbol_internal (struct objfile *objfile, int block_index,
   /* FIXME: we ignore linkage_name.  */
   for (entry = head ? head->entry : NULL; entry; entry = entry->next)
     {
-      unsigned long value;
-      unsigned int bytes_read;
-
-      value = read_unsigned_leb128 (objfile->obfd,
-				    (gdb_byte *) entry->name + len + 1,
-				    &bytes_read);
-      /* FIXME: should use symbol_matches_domain here.
-	 This means reading the CU DIE to determine the language.  */
-      if (dw2_tag_domain (value) == domain)
+      if (symbol_matches_domain (entry->language,
+				 dw2_tag_domain (entry->tag),
+				 domain))
 	return entry->cu;
     }
 
@@ -2536,8 +2549,6 @@ dw2_call_name_matcher (void **slot, void *d)
 
   for (entry = head->entry; entry; entry = entry->next)
     {
-      unsigned int bytes_read;
-      unsigned long value;
       int found_kind;
       enum address_class klass;
 
@@ -2552,10 +2563,7 @@ dw2_call_name_matcher (void **slot, void *d)
       if (len == -1)
 	len = strlen (entry->name);
 
-      value = read_unsigned_leb128 (data->objfile->obfd,
-				    (gdb_byte *) entry->name + len + 1,
-				    &bytes_read);
-      klass = dw2_tag_class (value);
+      klass = dw2_tag_class (entry->tag);
       if ((data->kind == VARIABLES_DOMAIN
 	   && klass != LOC_TYPEDEF
 	   && klass != LOC_BLOCK)
@@ -8111,7 +8119,7 @@ read_partial_die (struct partial_die_info *part_die,
 	      break;
 	    default:
 	      part_die->name
-		= dwarf2_canonicalize_name (DW_STRING (&attr), cu,
+		= dwarf2_canonicalize_name (DW_STRING (&attr), cu->language,
 					    &cu->comp_unit_obstack);
 	      break;
 	    }
@@ -8888,49 +8896,45 @@ skip_leb128 (bfd *abfd, gdb_byte *buf)
     }
 }
 
-static void
-set_cu_language (unsigned int lang, struct dwarf2_cu *cu)
+static enum language
+get_language (unsigned int dw_lang)
 {
-  switch (lang)
+  switch (dw_lang)
     {
     case DW_LANG_C89:
     case DW_LANG_C99:
     case DW_LANG_C:
-      cu->language = language_c;
-      break;
+      return language_c;
     case DW_LANG_C_plus_plus:
-      cu->language = language_cplus;
-      break;
+      return language_cplus;
     case DW_LANG_Fortran77:
     case DW_LANG_Fortran90:
     case DW_LANG_Fortran95:
-      cu->language = language_fortran;
-      break;
+      return language_fortran;
     case DW_LANG_Mips_Assembler:
-      cu->language = language_asm;
-      break;
+      return language_asm;
     case DW_LANG_Java:
-      cu->language = language_java;
-      break;
+      return language_java;
     case DW_LANG_Ada83:
     case DW_LANG_Ada95:
-      cu->language = language_ada;
-      break;
+      return language_ada;
     case DW_LANG_Modula2:
-      cu->language = language_m2;
-      break;
+      return language_m2;
     case DW_LANG_Pascal83:
-      cu->language = language_pascal;
-      break;
+      return language_pascal;
     case DW_LANG_ObjC:
-      cu->language = language_objc;
-      break;
+      return language_objc;
     case DW_LANG_Cobol74:
     case DW_LANG_Cobol85:
     default:
-      cu->language = language_minimal;
-      break;
+      return language_minimal;
     }
+}
+
+static void
+set_cu_language (unsigned int lang, struct dwarf2_cu *cu)
+{
+  cu->language = get_language (lang);
   cu->language_defn = language_def (cu->language);
 }
 
@@ -10408,10 +10412,10 @@ dwarf2_linkage_name (struct die_info *die, struct dwarf2_cu *cu)
 /* Get name of a die, return NULL if not found.  */
 
 static char *
-dwarf2_canonicalize_name (char *name, struct dwarf2_cu *cu,
+dwarf2_canonicalize_name (char *name, enum language lang,
 			  struct obstack *obstack)
 {
-  if (name && cu->language == language_cplus)
+  if (name && lang == language_cplus)
     {
       char *canon_name = cp_canonicalize_string (name);
 
@@ -10452,7 +10456,7 @@ dwarf2_name (struct die_info *die, struct dwarf2_cu *cu)
       if ((int) attr->form != (int) GDB_FORM_cached_string)
 	{
 	  DW_STRING (attr)
-	    = dwarf2_canonicalize_name (DW_STRING (attr), cu,
+	    = dwarf2_canonicalize_name (DW_STRING (attr), cu->language,
 					&cu->objfile->objfile_obstack);
 	  attr->form = GDB_FORM_cached_string;
 	}
