@@ -1,3 +1,31 @@
+2009-12-04  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* valops.c (value_struct_elt_for_reference): Do not rely on
+	field order.
+
+2009-12-03  Richard Ward  <richard.j.ward1@googlemail.com>
+
+	* python/py-type.c (convert_field): New attribute "is_base_class".
+
+2009-12-03  Tom Tromey  <tromey@redhat.com>
+
+	* python/python.c (gdbpy_parse_and_eval): New function.
+	(GdbMethods): Add "parse_and_eval".
+
+2009-12-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linux-thread-db.c (find_new_threads_once): Change errp and err types
+	to td_err_e.
+	(thread_db_find_new_threads_2): Change err type to td_err_e.
+
+2009-12-03  Paul Pluzhnikov  <ppluzhnikov@google.com>
+	
+	PR gdb/11022
+
+	* breakpoint.c (invalidate_bp_value_on_memory_change):
+	New function.
+	(_initialize_breakpoint): Add it as memory change observer.
+
 2009-12-03  Tristan Gingold  <gingold@adacore.com>
 
 	* machoread.c (macho_sym_fns): Set sym_segment routine.

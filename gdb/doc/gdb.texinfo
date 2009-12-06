@@ -19328,6 +19328,19 @@ If no exception is raised, the return value is always an instance of
 @code{gdb.Value} (@pxref{Values From Inferior}).
 @end defun
 
+@findex gdb.parse_and_eval
+@defun parse_and_eval expression
+Parse @var{expression} as an expression in the current language,
+evaluate it, and return the result as a @code{gdb.Value}.
+@var{expression} must be a string.
+
+This function can be useful when implementing a new command
+(@pxref{Commands In Python}), as it provides a way to parse the
+command's argument as an expression.  It is also useful simply to
+compute values, for example, it is the only way to get the value of a
+convenience variable (@pxref{Convenience Vars}) as a @code{gdb.Value}.
+@end defun
+
 @findex gdb.write
 @defun write string
 Print a string to @value{GDBN}'s paginated standard output stream.
@@ -19607,6 +19620,12 @@ The name of the field, or @code{None} for anonymous fields.
 This is @code{True} if the field is artificial, usually meaning that
 it was provided by the compiler and not the user.  This attribute is
 always provided, and is @code{False} if the field is not artificial.
+
+@item is_base_class
+This is @code{True} if the field represents a base class of a C@t{++}
+structure.  This attribute is always provided, and is @code{False}
+if the field is not a base class of the type that is the argument of
+@code{fields}, or if that type was not a C@t{++} class.
 
 @item bitsize
 If the field is packed, or is a bitfield, then this will have a
