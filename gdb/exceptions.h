@@ -248,4 +248,13 @@ extern int catch_errors (catch_errors_ftype *, void *, char *, return_mask);
 typedef void (catch_command_errors_ftype) (char *, int);
 extern int catch_command_errors (catch_command_errors_ftype *func, char *command, int from_tty, return_mask);
 
+
+/* This is used when initializing the exception system to mark gdb's
+   main thread.  */
+extern void this_is_the_main_thread (void);
+
+/* This is called by a thread just before shutdown to free any
+   per-thread exception information.  */
+extern void clear_exception_cache (void);
+
 #endif

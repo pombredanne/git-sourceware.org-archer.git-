@@ -305,6 +305,8 @@ captured_main (void *data)
   lim_at_start = (char *) sbrk (0);
 #endif
 
+  this_is_the_main_thread ();
+
   cmdsize = 1;
   cmdarg = (struct cmdarg *) xmalloc (cmdsize * sizeof (*cmdarg));
   ncmd = 0;

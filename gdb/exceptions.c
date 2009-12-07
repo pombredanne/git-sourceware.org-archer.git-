@@ -67,7 +67,10 @@ struct catcher
 };
 
 /* Where to go for throw_exception().  */
-static struct catcher *current_catcher;
+static __thread struct catcher *current_catcher;
+
+/* True if this is the main thread.  */
+static __thread int main_thread;
 
 EXCEPTIONS_SIGJMP_BUF *
 exceptions_state_mc_init (struct ui_out *func_uiout,
@@ -213,20 +216,24 @@ exceptions_state_mc_action_iter_1 (void)
 NORETURN void
 throw_exception (struct gdb_exception exception)
 {
-  struct thread_info *tp = NULL;
-
   quit_flag = 0;
   immediate_quit = 0;
 
-  if (!ptid_equal (inferior_ptid, null_ptid))
-    tp = find_thread_ptid (inferior_ptid);
+  if (main_thread)
+    {
+      struct thread_info *tp = NULL;
 
-  /* Perhaps it would be cleaner to do this via the cleanup chain (not sure
-     I can think of a reason why that is vital, though).  */
-  if (tp != NULL)
-    bpstat_clear_actions (tp->stop_bpstat);	/* Clear queued breakpoint commands */
+      if (!ptid_equal (inferior_ptid, null_ptid))
+	tp = find_thread_ptid (inferior_ptid);
 
-  disable_current_display ();
+      /* Perhaps it would be cleaner to do this via the cleanup chain
+	 (not sure I can think of a reason why that is vital,
+	 though).  */
+      if (tp != NULL)
+	bpstat_clear_actions (tp->stop_bpstat);	/* Clear queued breakpoint commands */
+
+      disable_current_display ();
+    }
   do_cleanups (ALL_CLEANUPS);
 
   /* Jump to the containing catch_errors() call, communicating REASON
@@ -237,7 +244,7 @@ throw_exception (struct gdb_exception exception)
   EXCEPTIONS_SIGLONGJMP (current_catcher->buf, exception.reason);
 }
 
-static char *last_message;
+static __thread char *last_message;
 
 NORETURN void
 deprecated_throw_reason (enum return_reason reason)
@@ -528,4 +535,18 @@ catch_command_errors (catch_command_errors_ftype * command,
   if (e.reason < 0)
     return 0;
   return 1;
+}
+
+void
+this_is_the_main_thread (void)
+{
+  main_thread = 1;
+}
+
+void
+clear_exception_cache (void)
+{
+  gdb_assert (!main_thread);
+  gdb_assert (current_catcher == NULL);
+  xfree (last_message);
 }

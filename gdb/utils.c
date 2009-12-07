@@ -105,7 +105,7 @@ static int debug_timestamp = 0;
 /* Chain of cleanup actions established with make_cleanup,
    to be executed if an error happens.  */
 
-static struct cleanup *cleanup_chain;	/* cleaned up after a failed command */
+static __thread struct cleanup *cleanup_chain;	/* cleaned up after a failed command */
 static struct cleanup *final_cleanup_chain;	/* cleaned up when gdb exits */
 
 /* Nonzero if we have job control. */

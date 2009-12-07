@@ -666,7 +666,7 @@ SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c ada-tasks.c \
 	stabsread.c stack.c std-regs.c symfile.c symfile-mem.c symmisc.c \
 	symtab.c \
 	target.c target-descriptions.c target-memory.c \
-	thread.c top.c tracepoint.c \
+	thread.c threadpool.c top.c tracepoint.c \
 	trad-frame.c \
 	tramp-frame.c \
 	typeprint.c \
@@ -746,7 +746,7 @@ config/rs6000/nm-rs6000.h top.h bsd-kvm.h gdb-stabs.h reggroups.h \
 annotate.h sim-regno.h dictionary.h dfp.h main.h frame-unwind.h	\
 remote-fileio.h i386-linux-tdep.h vax-tdep.h objc-lang.h \
 sentinel-frame.h bcache.h symfile.h windows-tdep.h linux-tdep.h \
-gdb_usleep.h jit.h
+gdb_usleep.h jit.h threadpool.h
 
 # Header files that already have srcdir in them, or which are in objdir.
 
@@ -829,7 +829,7 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 	prologue-value.o memory-map.o xml-support.o \
 	target-descriptions.o target-memory.o xml-tdesc.o xml-builtin.o \
 	inferior.o osdata.o gdb_usleep.o record.o \
-	jit.o
+	jit.o threadpool.o
 
 TSOBS = inflow.o
 
@@ -1083,13 +1083,13 @@ gdb$(EXEEXT): gdb.o libgdb.a $(ADD_DEPS) $(CDEPS) $(TDEPLIBS)
 	rm -f gdb$(EXEEXT)
 	$(CC_LD) $(INTERNAL_LDFLAGS) $(WIN32LDAPP) \
 		-o gdb$(EXEEXT) gdb.o libgdb.a \
-		$(TDEPLIBS) $(TUI_LIBRARY) $(CLIBS) $(LOADLIBES)
+		$(TDEPLIBS) $(TUI_LIBRARY) $(CLIBS) $(LOADLIBES) -lpthread
 
 $(TUI)$(EXEEXT): tui-main.o libgdb.a $(ADD_DEPS) $(CDEPS) $(TDEPLIBS)
 	rm -f $(TUI)$(EXEEXT)
 	$(CC_LD) $(INTERNAL_LDFLAGS) $(WIN32LDAPP) \
 		-o $(TUI)$(EXEEXT) tui-main.o libgdb.a \
-		$(TDEPLIBS) $(TUI_LIBRARY) $(CLIBS) $(LOADLIBES)
+		$(TDEPLIBS) $(TUI_LIBRARY) $(CLIBS) $(LOADLIBES) -lpthread
 
 # Convenience rule to handle recursion.
 $(LIBGNU) $(GNULIB_H): all-lib

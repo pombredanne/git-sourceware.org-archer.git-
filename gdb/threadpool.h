@@ -1,0 +1,76 @@
+/* Task pool implementation.
+
+   Copyright (C) 2009 Free Software Foundation, Inc.
+
+   This file is part of GDB.
+
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation; either version 3 of the License, or
+   (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+
+#ifndef THREADPOOL_H
+#define THREADPOOL_H
+
+struct task_pool;
+struct task;
+
+/* The GDB thread pool provides a simple way to hide work in the
+   background.
+
+   A thread pool manages a number of threads, with the maximum number
+   set at the time the pool is created.  It holds a queue of tasks,
+   sorted by priority.  A worker thread simply loops, pulling the next
+   task off the queue and running it.
+
+   There is currently no way to destroy a task pool.
+
+   The threads associated with a task pool will exit if no jobs are
+   available for a certain amount of time.  They will be restarted as
+   needed.
+
+   Task pools are designed to work even if threads are not available
+   on the host.  See get_task_answer.  */
+struct task_pool *create_task_pool (int max_workers);
+   
+/* A task is simply a user-provided function with some user-provided
+   data.  When run it can either throw an exception, or return a
+   result.
+
+   A task has a priority, also provided by the user.  Priorities must
+   be comparable within a given pool but are not otherwise meaningful
+   to the pool code.
+
+   Every task is associated with a pool.
+
+   It is up to the task's creator to ensure that the task is in fact
+   thread-safe.  Be warned!  In GDB this can be tricky due to all the
+   lurking global variables.  */
+struct task *create_task (struct task_pool *pool,
+			  unsigned long priority,
+			  void *(*function) (void *),
+			  void *user_data);
+
+/* get_task_answer returns the result of a task.  This must be called
+   exactly once for every task.  (There is currently no facility for
+   cancelling tasks.)
+
+   If the task's function returned an answer, this will return it.
+   Otherwise, if the task's function threw an exception, this function
+   will throw the same exception.
+
+   If the task was not yet processed by some worker thread, it will be
+   processed immediately in the thread that calls get_task_answer.
+   This also enables task pools to work even when threads are
+   unavailable.  */
+void *get_task_answer (struct task *task);
+
+#endif /* THREADPOOL_H */

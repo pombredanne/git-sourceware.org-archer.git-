@@ -52,6 +52,7 @@
 #include "exceptions.h"
 #include "vec.h"
 #include "top.h"		/* readnow_symbol_files */
+#include "threadpool.h"
 
 #include <fcntl.h>
 #include "gdb_string.h"
@@ -167,6 +168,17 @@ struct dwarf2_per_objfile
   /* Back link.  */
   struct objfile *objfile;
 
+  /* The obstack on which we should do our allocations.  This may
+     point to either self_obstack or to the objfile's obstack.  */
+  struct obstack *obstack;
+  /* In some situations we may do allocations on this obstack rather
+     than the objfile's obstack.  This should not be used directly;
+     instead, use the `obstack' field.  */
+  struct obstack self_obstack;
+  /* If non-NULL, a task on the DWARF 2 task pool that must be run
+     before using fields of this struct.  */
+  struct task *reader;
+
   /* A list of all the compilation units.  This is used to locate
      the target compilation unit of a particular reference.  */
   VEC (dwarf2_per_cu_data_ptr) *all_comp_units;
@@ -191,7 +203,10 @@ struct dwarf2_per_objfile
   htab_t index_table;
 };
 
-static struct dwarf2_per_objfile *dwarf2_per_objfile;
+static __thread struct dwarf2_per_objfile *dwarf2_per_objfile;
+
+/* Our task pool.  */
+static struct task_pool *dwarf2_task_pool;
 
 /* names of the debugging sections */
 
@@ -1265,6 +1280,7 @@ dwarf2_has_info (struct objfile *objfile)
 
       bfd_map_over_sections (objfile->obfd, dwarf2_locate_sections, NULL);
       dwarf2_per_objfile->objfile = objfile;
+      dwarf2_per_objfile->obstack = &objfile->objfile_obstack;
     }
   return (dwarf2_per_objfile->info.asection != NULL
 	  && dwarf2_per_objfile->abbrev.asection != NULL);
@@ -1587,7 +1603,7 @@ dwarf2_create_quick_addrmap (struct objfile *objfile)
 		   cu_header.abbrev_offset);
       else
 	{
-	  the_cu = OBSTACK_ZALLOC (&objfile->objfile_obstack,
+	  the_cu = OBSTACK_ZALLOC (dwarf2_per_objfile->obstack,
 				   struct dwarf2_per_cu_data);
 	  /* Note that we can't set the length.  This is ok because we
 	     either set it when reading .debug_gnu_index, or we throw
@@ -1657,7 +1673,7 @@ dwarf2_create_quick_addrmap (struct objfile *objfile)
     }
 
   objfile->quick_addrmap = addrmap_create_fixed (mutable_map,
-						 &objfile->objfile_obstack);
+						 dwarf2_per_objfile->obstack);
   do_cleanups (old);
   return 1;
 }
@@ -1773,6 +1789,25 @@ dw2_instantiate_symtab (struct objfile *objfile,
   return per_cu->v.quick->symtab;
 }
 
+/* Read full symbols for all CUs that need this done immediately.  */
+static void
+dw2_pre_read_full_symtabs (void)
+{
+  int i;
+  struct dwarf2_per_cu_data *iter;
+
+  for (i = 0;
+       VEC_iterate (dwarf2_per_cu_data_ptr,
+		    dwarf2_per_objfile->all_comp_units,
+		    i, iter);
+       ++i)
+    {
+      if (iter->v.quick->must_read)
+	/* FIXME: do we need cleanup handling here?  what kind?  */
+	dw2_instantiate_symtab (dwarf2_per_objfile->objfile, iter);
+    }
+}
+
 /* A cleanup function to destroy a dwarf2_per_cu_data_ptr VEC.  */
 static void
 cleanup_vec (void *p)
@@ -1781,10 +1816,8 @@ cleanup_vec (void *p)
   VEC_free (dwarf2_per_cu_data_ptr, *v);
 }
 
-/* Read the .debug_gnu_index section.  If everything went ok,
-   initializes the "quick" elements of all the CUs and returns 1.
-   Otherwise, returns 0.  */
-static int
+/* Read the .debug_gnu_index section.  */
+static void
 dwarf2_read_gnu_index (struct objfile *objfile)
 {
   char *buffer, *ptr;
@@ -1847,7 +1880,7 @@ dwarf2_read_gnu_index (struct objfile *objfile)
 	  do_cleanups (cleanups);
 	  complaint (&symfile_complaints,
 		     _("gnu_index entry runs off end of `.debug_gnu_index' section, ignored"));
-	  return 0;
+	  return;
 	}
 
       /* CUs are ordinarily listed in order, so optimize for this
@@ -1871,7 +1904,7 @@ dwarf2_read_gnu_index (struct objfile *objfile)
       new_cu = 0;
       if (!cu)
 	{
-	  cu = OBSTACK_ZALLOC (&objfile->objfile_obstack,
+	  cu = OBSTACK_ZALLOC (dwarf2_per_objfile->obstack,
 			       struct dwarf2_per_cu_data);
 	  cu->offset = offset;
 	  cu->objfile = objfile;
@@ -1893,7 +1926,7 @@ dwarf2_read_gnu_index (struct objfile *objfile)
 		   _("duplicate CU %ud while reading .debug_gnu_index"),
 		   offset);
       else
-	cu->v.quick = OBSTACK_ZALLOC (&objfile->objfile_obstack,
+	cu->v.quick = OBSTACK_ZALLOC (dwarf2_per_objfile->obstack,
 				      struct dwarf2_per_cu_quick_data);
 
       /* If we just saw this CU for the first time, it means that it
@@ -1926,7 +1959,7 @@ dwarf2_read_gnu_index (struct objfile *objfile)
 	    continue;
 
 	  name = dwarf2_canonicalize_name (name, lang,
-					   &objfile->objfile_obstack);
+					   dwarf2_per_objfile->obstack);
 
 	  entry = xmalloc (sizeof (struct index_entry));
 	  entry->name = name;
@@ -2001,7 +2034,7 @@ dwarf2_read_gnu_index (struct objfile *objfile)
 
 	    length = read_initial_length (abfd, info_ptr, &initial_length_size);
 
-	    new_cu = OBSTACK_ZALLOC (&objfile->objfile_obstack,
+	    new_cu = OBSTACK_ZALLOC (dwarf2_per_objfile->obstack,
 				     struct dwarf2_per_cu_data);
 	    new_cu->offset = offset;
 	    new_cu->length = length + initial_length_size;
@@ -2028,27 +2061,8 @@ dwarf2_read_gnu_index (struct objfile *objfile)
       sort_cus ();
   }
 
-  /* Some CUs in this objfile may not have an associated GNU index.
-     If too many (more than half -- chosen arbitrarily) do not, then
-     fall back to constructing psymtabs.  Otherwise, read full symbols
-     for those CUs that do not have an index.  */
-  if (quick_count < VEC_length (dwarf2_per_cu_data_ptr,
-				dwarf2_per_objfile->all_comp_units) / 2)
-    {
-      /* Reset all 'quick' pointers; we're about to reuse these slots
-	 as pointers to psymtabs.  */
-      for (i = 0;
-	   VEC_iterate (dwarf2_per_cu_data_ptr,
-			dwarf2_per_objfile->all_comp_units,
-			i, iter);
-	   ++i)
-	iter->v.quick = NULL;
-      dwarf2_per_objfile->using_gnu_index = 0;
-      do_cleanups (cleanups);
-      return 0;
-    }
-
-  /* Read in each CU that did not have a corresponding index.  */
+  /* If a CU does not have a corresponding index, mark it for full
+     reading.  */
   for (i = 0;
        VEC_iterate (dwarf2_per_cu_data_ptr,
 		    dwarf2_per_objfile->all_comp_units,
@@ -2057,19 +2071,14 @@ dwarf2_read_gnu_index (struct objfile *objfile)
     {
       if (!iter->v.quick)
 	{
-	  iter->v.quick = OBSTACK_ZALLOC (&objfile->objfile_obstack,
+	  iter->v.quick = OBSTACK_ZALLOC (dwarf2_per_objfile->obstack,
 					  struct dwarf2_per_cu_quick_data);
-	  /* FIXME: do we need cleanup handling here?  what kind?  */
-	  dw2_instantiate_symtab (objfile, iter);
+	  iter->v.quick->must_read = 1;
 	}
-      else if (iter->v.quick->must_read)
-	/* FIXME: do we need cleanup handling here?  what kind?  */
-	dw2_instantiate_symtab (objfile, iter);
     }
 
   discard_cleanups (cleanups);
   dwarf2_per_objfile->index_table = index_table;
-  return 1;
 }
 
 /* A helper for the "quick" functions which sets the global
@@ -2079,6 +2088,17 @@ dw2_setup (struct objfile *objfile)
 {
   dwarf2_per_objfile = objfile_data (objfile, dwarf2_objfile_data_key);
   gdb_assert (dwarf2_per_objfile);
+
+  if (!dwarf2_per_objfile->reader)
+    {
+      struct task *tem = dwarf2_per_objfile->reader;
+      dwarf2_per_objfile->reader = NULL;
+      get_task_answer (tem);
+      /* Read full symbols for all CUs requiring that.  We have to do
+	 this in the main thread because reading full symbols is not
+	 currently thread-safe.  FIXME.  */
+      dw2_pre_read_full_symtabs ();
+    }
 }
 
 /* A helper for the "quick" functions which attempts to read the line
@@ -2152,7 +2172,7 @@ dw2_require_line_header (struct objfile *objfile,
   this_cu->v.quick->lines = lh;
 
   this_cu->v.quick->file_names
-    = obstack_alloc (&objfile->objfile_obstack,
+    = obstack_alloc (dwarf2_per_objfile->obstack,
 		     lh->num_file_names * sizeof (char *));
   for (i = 0; i < lh->num_file_names; ++i)
     this_cu->v.quick->file_names[i] = file_full_name (i + 1, lh, comp_dir);
@@ -2171,7 +2191,7 @@ dw2_require_full_path (struct objfile *objfile,
 {
   if (!cu->v.quick->full_names)
     cu->v.quick->full_names
-      = OBSTACK_CALLOC (&objfile->objfile_obstack,
+      = OBSTACK_CALLOC (dwarf2_per_objfile->obstack,
 			cu->v.quick->lines->num_file_names,
 			sizeof (char *));
 
@@ -2723,11 +2743,9 @@ dw2_map_symbol_filenames (struct objfile *objfile,
 static int
 dw2_has_symbols (struct objfile *objfile, int try_read)
 {
-  dw2_setup (objfile);
-
-  if (!dwarf2_per_objfile->index_table)
-    return 0;
-  return htab_elements (dwarf2_per_objfile->index_table) > 0;
+  /* If we did not have symbols then this code path would never have
+     been entered.  */
+  return 1;
 }
 
 const struct quick_symbol_functions dwarf2_gnu_index_functions =
@@ -2750,6 +2768,19 @@ const struct quick_symbol_functions dwarf2_gnu_index_functions =
   dw2_map_symbol_names,
   dw2_map_symbol_filenames
 };
+
+static void *
+reader_task (void *p)
+{
+  /* Thread-local assignment.  */
+  dwarf2_per_objfile = p;
+
+  dwarf2_create_quick_addrmap (dwarf2_per_objfile->objfile);
+  dwarf2_read_gnu_index (dwarf2_per_objfile->objfile);
+
+  /* We don't use the result.  */
+  return NULL;
+}
 
 /* Initialize for reading DWARF for this objfile.  Return 0 if this
    file will use psymtabs, or 1 if using the GNU index.  */
@@ -2774,7 +2805,7 @@ dwarf2_initialize_objfile (struct objfile *objfile)
 			dwarf2_per_objfile->all_comp_units,
 			i, cu);
 	   ++i)
-	cu->v.quick = OBSTACK_ZALLOC (&objfile->objfile_obstack,
+	cu->v.quick = OBSTACK_ZALLOC (dwarf2_per_objfile->obstack,
 				      struct dwarf2_per_cu_quick_data);
 
       /* Return 1 so that gdb sees the "quick" functions.  However,
@@ -2783,20 +2814,30 @@ dwarf2_initialize_objfile (struct objfile *objfile)
       return 1;
     }
 
-  /* We want to create the quick address map, if we can, regardless of
-     whether we want to build psymtabs.  */
-  if (!dwarf2_create_quick_addrmap (objfile)
-      || objfile->global_psymbols.size != 0
-      || objfile->static_psymbols.size != 0
-      /* We could actually read the dwarf and make the index the hard
-	 way.  FIXME.  This would probably save memory over using
-	 psymtabs.  */
-      || !dwarf2_per_objfile->gnu_index.asection)
-    /* We have to build psymtabs, so don't bother reading the GNU
-       index.  */
-    return 0;
+  /* If we have the index section, don't bother reading anything now,
+     we will read it all in a new thread.  */
+  if (dwarf2_per_objfile->gnu_index.asection)
+    {
+      unsigned long prio;
+      obstack_init (&dwarf2_per_objfile->self_obstack);
+      dwarf2_per_objfile->obstack = &dwarf2_per_objfile->self_obstack;
 
-  return dwarf2_read_gnu_index (objfile);
+      /* We want to read the data largest-first, to try to hide as
+	 much of the work as possible.  However, we often want the
+	 main objfile, so we make it more important than any
+	 other.  */
+      prio = dwarf2_per_objfile->gnu_index.size;
+      if ((objfile->flags & OBJF_MAIN) != 0)
+	prio = (unsigned long) -1;
+      dwarf2_per_objfile->reader = create_task (dwarf2_task_pool,
+						prio,
+						reader_task,
+						dwarf2_per_objfile);
+      return 1;
+    }
+
+  dwarf2_create_quick_addrmap (objfile);
+  return 0;
 }
 
 /* Free a section buffer allocated with xmalloc.  */
@@ -2927,7 +2968,7 @@ dwarf2_read_section_1 (struct objfile *objfile,
 static void
 dwarf2_read_section (struct objfile *objfile, struct dwarf2_section_info *info)
 {
-  dwarf2_read_section_1 (objfile, &objfile->objfile_obstack, info);
+  dwarf2_read_section_1 (objfile, dwarf2_per_objfile->obstack, info);
 }
 
 /* Fill in SECTP, BUFP and SIZEP with section info, given OBJFILE and
@@ -3099,7 +3140,7 @@ dwarf2_create_include_psymtab (char *name, struct partial_symtab *pst,
   subpst->texthigh = 0;
 
   subpst->dependencies = (struct partial_symtab **)
-    obstack_alloc (&objfile->objfile_obstack,
+    obstack_alloc (dwarf2_per_objfile->obstack,
                    sizeof (struct partial_symtab *));
   subpst->dependencies[0] = pst;
   subpst->number_of_dependencies = 1;
@@ -3183,7 +3224,7 @@ create_debug_types_hash_table (struct objfile *objfile)
 				     hash_type_signature,
 				     eq_type_signature,
 				     NULL,
-				     &objfile->objfile_obstack,
+				     dwarf2_per_objfile->obstack,
 				     hashtab_obstack_allocate,
 				     dummy_obstack_deallocate);
 
@@ -3227,7 +3268,7 @@ create_debug_types_hash_table (struct objfile *objfile)
       ptr += 8;
       type_offset = read_offset_1 (objfile->obfd, ptr, offset_size);
 
-      type_sig = obstack_alloc (&objfile->objfile_obstack, sizeof (*type_sig));
+      type_sig = obstack_alloc (dwarf2_per_objfile->obstack, sizeof (*type_sig));
       memset (type_sig, 0, sizeof (*type_sig));
       type_sig->signature = signature;
       type_sig->offset = offset;
@@ -3348,7 +3389,7 @@ process_psymtab_comp_unit (struct objfile *objfile,
   if (comp_unit_die.dirname)
     pst->dirname = obsavestring (comp_unit_die.dirname,
 				 strlen (comp_unit_die.dirname),
-				 &objfile->objfile_obstack);
+				 dwarf2_per_objfile->obstack);
 
   pst->read_symtab_private = (char *) this_cu;
 
@@ -3515,7 +3556,7 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile, int mainline)
   create_all_comp_units (objfile);
 
   objfile->psymtabs_addrmap =
-    addrmap_create_mutable (&objfile->objfile_obstack);
+    addrmap_create_mutable (dwarf2_per_objfile->obstack);
 
   /* Since the objects we're extracting from .debug_info vary in
      length, only the individual functions to extract them (like
@@ -3546,7 +3587,7 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile, int mainline)
     }
 
   objfile->psymtabs_addrmap = addrmap_create_fixed (objfile->psymtabs_addrmap,
-						    &objfile->objfile_obstack);
+						    dwarf2_per_objfile->obstack);
 
   do_cleanups (back_to);
 }
@@ -3640,7 +3681,7 @@ create_all_comp_units (struct objfile *objfile)
 				    &initial_length_size);
 
       /* Save the compilation unit for later lookup.  */
-      this_cu = obstack_alloc (&objfile->objfile_obstack,
+      this_cu = obstack_alloc (dwarf2_per_objfile->obstack,
 			       sizeof (struct dwarf2_per_cu_data));
       memset (this_cu, 0, sizeof (*this_cu));
       this_cu->offset = offset;
@@ -4542,7 +4583,7 @@ load_full_comp_unit (struct dwarf2_per_cu_data *per_cu, struct objfile *objfile)
   /* Set local variables from the partial symbol table info.  */
   offset = per_cu->offset;
 
-  gdb_assert (dwarf2_per_objfile->info.readin);
+  dwarf2_read_section (objfile, &dwarf2_per_objfile->info);
   info_ptr = dwarf2_per_objfile->info.buffer + offset;
   beg_of_comp_unit = info_ptr;
 
@@ -5316,7 +5357,7 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
 
   /* For C++, set the block's scope.  */
   if (cu->language == language_cplus)
-    cp_set_block_scope (new->name, block, &objfile->objfile_obstack,
+    cp_set_block_scope (new->name, block, dwarf2_per_objfile->obstack,
 			determine_prefix (die, cu),
 			processing_has_namespace_info);
 
@@ -6947,7 +6988,7 @@ read_namespace_type (struct die_info *die, struct dwarf2_cu *cu)
 
   previous_prefix = determine_prefix (die, cu);
   if (previous_prefix[0] != '\0')
-    name = typename_concat (&objfile->objfile_obstack,
+    name = typename_concat (dwarf2_per_objfile->obstack,
 			    previous_prefix, name, cu);
 
   /* Create the type.  */
@@ -9756,7 +9797,7 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
 
   if (name)
     {
-      sym = (struct symbol *) obstack_alloc (&objfile->objfile_obstack,
+      sym = (struct symbol *) obstack_alloc (dwarf2_per_objfile->obstack,
 					     sizeof (struct symbol));
       OBJSTAT (objfile, n_syms++);
       memset (sym, 0, sizeof (struct symbol));
@@ -10058,7 +10099,7 @@ dwarf2_const_value (struct attribute *attr, struct symbol *sym,
 						      TYPE_LENGTH (SYMBOL_TYPE
 								   (sym)));
       SYMBOL_VALUE_BYTES (sym) = 
-	obstack_alloc (&objfile->objfile_obstack, cu_header->addr_size);
+	obstack_alloc (dwarf2_per_objfile->obstack, cu_header->addr_size);
       /* NOTE: cagney/2003-05-09: In-lined store_address call with
          it's body - store_unsigned_integer.  */
       store_unsigned_integer (SYMBOL_VALUE_BYTES (sym), cu_header->addr_size,
@@ -10083,7 +10124,7 @@ dwarf2_const_value (struct attribute *attr, struct symbol *sym,
 						      TYPE_LENGTH (SYMBOL_TYPE
 								   (sym)));
       SYMBOL_VALUE_BYTES (sym) =
-	obstack_alloc (&objfile->objfile_obstack, blk->size);
+	obstack_alloc (dwarf2_per_objfile->obstack, blk->size);
       memcpy (SYMBOL_VALUE_BYTES (sym), blk->data, blk->size);
       SYMBOL_CLASS (sym) = LOC_CONST_BYTES;
       break;
@@ -12276,7 +12317,7 @@ macro_start_file (int file, int line,
   /* We don't create a macro table for this compilation unit
      at all until we actually get a filename.  */
   if (! pending_macros)
-    pending_macros = new_macro_table (&objfile->objfile_obstack,
+    pending_macros = new_macro_table (dwarf2_per_objfile->obstack,
                                       objfile->macro_cache);
 
   if (! current_file)
@@ -13352,6 +13393,9 @@ dwarf2_per_objfile_cleanup (struct objfile *objfile, void *d)
 
   if (data->index_table)
     htab_delete (data->index_table);
+
+  if (data->obstack == &data->self_obstack)
+    obstack_free (data->obstack, NULL);
 }
 
 void _initialize_dwarf2_read (void);
@@ -13361,6 +13405,9 @@ _initialize_dwarf2_read (void)
 {
   dwarf2_objfile_data_key
     = register_objfile_data_with_cleanup (dwarf2_per_objfile_cleanup);
+
+  /* FIXME: should scale by number of processors.  */
+  dwarf2_task_pool = create_task_pool (5);
 
   add_prefix_cmd ("dwarf2", class_maintenance, set_dwarf2_cmd, _("\
 Set DWARF 2 specific variables.\n\
