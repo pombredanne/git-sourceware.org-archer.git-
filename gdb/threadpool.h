@@ -38,7 +38,10 @@ struct task;
    needed.
 
    Task pools are designed to work even if threads are not available
-   on the host.  See get_task_answer.  */
+   on the host.  See get_task_answer.
+   
+   If MAX_WORKERS is -1, then create_task_pool tries to choose a
+   number based on the number of available processors.  */
 struct task_pool *create_task_pool (int max_workers);
    
 /* A task is simply a user-provided function with some user-provided

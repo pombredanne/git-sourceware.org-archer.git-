@@ -154,9 +154,7 @@ worker_thread (void *p)
 	  --pool->worker_count;
 	}
       else
-	{
-	  job = VEC_pop (task_p, pool->queue);
-	}
+	job = VEC_pop (task_p, pool->queue);
 
       pthread_mutex_unlock (&pool->lock);
 
@@ -281,6 +279,16 @@ create_task_pool (int max_workers)
   pthread_mutex_init (&result->lock, NULL);
   pthread_cond_init (&result->condition, NULL);
 
+  if (max_workers == -1)
+    {
+#ifdef _SC_NPROCESSORS_ONLN
+      max_workers = (int) sysconf (_SC_NPROCESSORS_ONLN);
+#endif
+      if (max_workers <= 0)
+	max_workers = 5;
+      else
+	max_workers *= 2;
+    }
   result->max_workers = max_workers;
 
   return result;

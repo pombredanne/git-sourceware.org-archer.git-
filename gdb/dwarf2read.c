@@ -13406,8 +13406,7 @@ _initialize_dwarf2_read (void)
   dwarf2_objfile_data_key
     = register_objfile_data_with_cleanup (dwarf2_per_objfile_cleanup);
 
-  /* FIXME: should scale by number of processors.  */
-  dwarf2_task_pool = create_task_pool (5);
+  dwarf2_task_pool = create_task_pool (-1);
 
   add_prefix_cmd ("dwarf2", class_maintenance, set_dwarf2_cmd, _("\
 Set DWARF 2 specific variables.\n\
