@@ -1547,7 +1547,6 @@ evaluate_subexp_standard (struct type *expect_type,
       old_chain = make_cleanup (null_cleanup, 0);
       object_address_set (value_raw_address (arg1));
       type = check_typedef (value_type (arg1));
-      do_cleanups (old_chain);
       code = TYPE_CODE (type);
 
       if (code == TYPE_CODE_PTR)
@@ -1567,6 +1566,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	      code = TYPE_CODE (type);
 	    }
 	} 
+      do_cleanups (old_chain);
 
       switch (code)
 	{
@@ -2310,14 +2310,22 @@ evaluate_subexp_standard (struct type *expect_type,
       if (expect_type && TYPE_CODE (expect_type) == TYPE_CODE_PTR)
 	expect_type = TYPE_TARGET_TYPE (check_typedef (expect_type));
       arg1 = evaluate_subexp (expect_type, exp, pos, noside);
+      old_chain = make_cleanup (null_cleanup, 0);
+      object_address_set (value_raw_address (arg1));
       type = check_typedef (value_type (arg1));
       if (TYPE_CODE (type) == TYPE_CODE_METHODPTR
 	  || TYPE_CODE (type) == TYPE_CODE_MEMBERPTR)
 	error (_("Attempt to dereference pointer to member without an object"));
       if (noside == EVAL_SKIP)
-	goto nosideret;
+	{
+	  do_cleanups (old_chain);
+	  goto nosideret;
+	}
       if (unop_user_defined_p (op, arg1))
-	return value_x_unop (arg1, op, noside);
+	{
+	  do_cleanups (old_chain);
+	  return value_x_unop (arg1, op, noside);
+	}
       else if (noside == EVAL_AVOID_SIDE_EFFECTS)
 	{
 	  type = check_typedef (value_type (arg1));
@@ -2326,12 +2334,18 @@ evaluate_subexp_standard (struct type *expect_type,
 	  /* In C you can dereference an array to get the 1st elt.  */
 	      || TYPE_CODE (type) == TYPE_CODE_ARRAY
 	    )
-	    return value_zero (TYPE_TARGET_TYPE (type),
-			       lval_memory);
+	    {
+	      do_cleanups (old_chain);
+	      return value_zero (TYPE_TARGET_TYPE (type),
+				 lval_memory);
+	    }
 	  else if (TYPE_CODE (type) == TYPE_CODE_INT)
-	    /* GDB allows dereferencing an int.  */
-	    return value_zero (builtin_type (exp->gdbarch)->builtin_int,
-			       lval_memory);
+	    {
+	      do_cleanups (old_chain);
+	      /* GDB allows dereferencing an int.  */
+	      return value_zero (builtin_type (exp->gdbarch)->builtin_int,
+				 lval_memory);
+	    }
 	  else
 	    error (_("Attempt to take contents of a non-pointer value."));
 	}
@@ -2341,9 +2355,14 @@ evaluate_subexp_standard (struct type *expect_type,
 	 do.  "long long" variables are rare enough that
 	 BUILTIN_TYPE_LONGEST would seem to be a mistake.  */
       if (TYPE_CODE (type) == TYPE_CODE_INT)
-	return value_at_lazy (builtin_type (exp->gdbarch)->builtin_int,
-			      (CORE_ADDR) value_as_address (arg1));
-      return value_ind (arg1);
+	{
+	  do_cleanups (old_chain);
+	  return value_at_lazy (builtin_type (exp->gdbarch)->builtin_int,
+				(CORE_ADDR) value_as_address (arg1));
+	}
+      arg1 = value_ind (arg1);
+      do_cleanups (old_chain);
+      return arg1;
 
     case UNOP_ADDR:
       /* C++: check for and handle pointer to members.  */
