@@ -28,6 +28,8 @@
    too messy, particularly when such includes can be inserted at random
    times by the parser generator.  */
 
+%define api.pure
+
 %{
 
 #include "defs.h"
@@ -51,7 +53,12 @@
    ERROR_LEXPTR is the first place an error occurred.  GLOBAL_ERRMSG
    is the first error message encountered.  */
 
-static const char *lexptr, *prev_lexptr, *error_lexptr, *global_errmsg;
+static __thread const char *lexptr;
+static __thread const char *prev_lexptr;
+static __thread const char *error_lexptr;
+static __thread const char *global_errmsg;
+
+static __thread char errbuf[60];
 
 /* The components built by the parser are allocated ahead of time,
    and cached in this structure.  */
@@ -64,7 +71,7 @@ struct demangle_info {
   struct demangle_component comps[ALLOC_CHUNK];
 };
 
-static struct demangle_info *demangle_info;
+static __thread struct demangle_info *demangle_info;
 
 static struct demangle_component *
 d_grab (void)
@@ -92,7 +99,7 @@ d_grab (void)
 /* The parse tree created by the parser is stored here after a successful
    parse.  */
 
-static struct demangle_component *global_result;
+static __thread struct demangle_component *global_result;
 
 /* Prototypes for helper functions used when constructing the parse
    tree.  */
@@ -173,7 +180,7 @@ static struct demangle_component *d_binary (const char *,
 #define yycheck	 cpname_yycheck
 
 int yyparse (void);
-static int yylex (void);
+/* static int yylex (YYSTYPE *); */
 static void yyerror (char *);
 
 /* Enable yydebug for the stand-alone parser.  */
@@ -349,6 +356,11 @@ make_name (const char *name, int len)
 
 %right ARROW '.' '[' /* '(' */
 %left COLONCOLON
+
+%{
+static int yylex (YYSTYPE *);
+%}
+
 
 
 %%
@@ -1310,7 +1322,7 @@ symbol_end (const char *lexptr)
    YYLVAL.  */
 
 static int
-parse_number (const char *p, int len, int parsed_float)
+parse_number (const char *p, int len, int parsed_float, YYSTYPE *lvalp)
 {
   int unsigned_p = 0;
 
@@ -1360,7 +1372,7 @@ parse_number (const char *p, int len, int parsed_float)
 	return ERROR;
 
       name = make_name (p, len);
-      yylval.comp = fill_comp (literal_type, type, name);
+      lvalp->comp = fill_comp (literal_type, type, name);
 
       return FLOAT;
     }
@@ -1409,7 +1421,7 @@ parse_number (const char *p, int len, int parsed_float)
      type = signed_type;
 
    name = make_name (p, len);
-   yylval.comp = fill_comp (literal_type, type, name);
+   lvalp->comp = fill_comp (literal_type, type, name);
 
    return INT;
 }
@@ -1514,7 +1526,7 @@ cp_parse_escape (const char **string_ptr)
   if (strncmp (tokstart, string, sizeof (string) - 1) == 0)	\
     {								\
       lexptr = tokstart + sizeof (string) - 1;			\
-      yylval.lval = comp;					\
+      lvalp->lval = comp;					\
       return DEMANGLER_SPECIAL;					\
     }
 
@@ -1522,7 +1534,7 @@ cp_parse_escape (const char **string_ptr)
   if (lexptr[1] == string[1])				\
     {							\
       lexptr += 2;					\
-      yylval.opname = string;				\
+      lvalp->opname = string;				\
       return token;					\
     }      
 
@@ -1530,14 +1542,14 @@ cp_parse_escape (const char **string_ptr)
   if (lexptr[1] == string[1] && lexptr[2] == string[2])	\
     {							\
       lexptr += 3;					\
-      yylval.opname = string;				\
+      lvalp->opname = string;				\
       return token;					\
     }      
 
 /* Read one token, getting characters through LEXPTR.  */
 
 static int
-yylex (void)
+yylex (YYSTYPE *lvalp)
 {
   int c;
   int namelen;
@@ -1583,7 +1595,7 @@ yylex (void)
 	 presumably the same one that appears in manglings - the decimal
 	 representation.  But if that isn't in our input then we have to
 	 allocate memory for it somewhere.  */
-      yylval.comp = fill_comp (DEMANGLE_COMPONENT_LITERAL,
+      lvalp->comp = fill_comp (DEMANGLE_COMPONENT_LITERAL,
 				 make_builtin_type ("char"),
 				 make_name (tokstart, lexptr - tokstart));
 
@@ -1593,7 +1605,7 @@ yylex (void)
       if (strncmp (tokstart, "(anonymous namespace)", 21) == 0)
 	{
 	  lexptr += 21;
-	  yylval.comp = make_name ("(anonymous namespace)",
+	  lvalp->comp = make_name ("(anonymous namespace)",
 				     sizeof "(anonymous namespace)" - 1);
 	  return NAME;
 	}
@@ -1692,7 +1704,8 @@ yylex (void)
 	    else if (! ISALNUM (*p))
 	      break;
 	  }
-	toktype = parse_number (tokstart, p - tokstart, got_dot|got_e);
+	toktype = parse_number (tokstart, p - tokstart, got_dot|got_e,
+				lvalp);
         if (toktype == ERROR)
 	  {
 	    char *err_copy = (char *) alloca (p - tokstart + 1);
@@ -1845,10 +1858,10 @@ yylex (void)
 	{
 	  const char *p;
 	  lexptr = tokstart + 29;
-	  yylval.lval = DEMANGLE_COMPONENT_GLOBAL_CONSTRUCTORS;
+	  lvalp->lval = DEMANGLE_COMPONENT_GLOBAL_CONSTRUCTORS;
 	  /* Find the end of the symbol.  */
 	  p = symbol_end (lexptr);
-	  yylval.comp = make_name (lexptr, p - lexptr);
+	  lvalp->comp = make_name (lexptr, p - lexptr);
 	  lexptr = p;
 	  return DEMANGLER_SPECIAL;
 	}
@@ -1856,10 +1869,10 @@ yylex (void)
 	{
 	  const char *p;
 	  lexptr = tokstart + 28;
-	  yylval.lval = DEMANGLE_COMPONENT_GLOBAL_DESTRUCTORS;
+	  lvalp->lval = DEMANGLE_COMPONENT_GLOBAL_DESTRUCTORS;
 	  /* Find the end of the symbol.  */
 	  p = symbol_end (lexptr);
-	  yylval.comp = make_name (lexptr, p - lexptr);
+	  lvalp->comp = make_name (lexptr, p - lexptr);
 	  lexptr = p;
 	  return DEMANGLER_SPECIAL;
 	}
@@ -1917,7 +1930,7 @@ yylex (void)
       break;
     }
 
-  yylval.comp = make_name (tokstart, namelen);
+  lvalp->comp = make_name (tokstart, namelen);
   return NAME;
 }
 
@@ -1975,7 +1988,6 @@ cp_comp_to_string (struct demangle_component *result, int estimated_len)
 struct demangle_component *
 cp_demangled_name_to_comp (const char *demangled_name, const char **errmsg)
 {
-  static char errbuf[60];
   struct demangle_component *result;
 
   prev_lexptr = lexptr = demangled_name;

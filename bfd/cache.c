@@ -50,6 +50,8 @@ SUBSECTION
 #include <sys/mman.h>
 #endif
 
+#include <pthread.h>
+
 /* In some cases we can optimize cache operation when reopening files.
    For instance, a flush is entirely unnecessary if the file is already
    closed, so a flush would use CACHE_NO_OPEN.  Similarly, a seek using
@@ -79,6 +81,15 @@ static int open_files;
    determine when it can avoid a function call.  */
 
 static bfd *bfd_last_cache = NULL;
+
+/* The lock held when accessing the cache or modifying any
+   cache-related fields of a cached BFD.  This approach is only
+   semi-complete because we may have more than BFD_CACHE_MAX_OPEN
+   threads working at the same time -- leading to failure.  */
+
+static pthread_mutex_t cache_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static FILE *bfd_do_open_file (bfd *abfd);
 
 /* Insert a BFD into the cache.  */
 
@@ -173,16 +184,6 @@ close_one (void)
   return bfd_cache_delete (kill);
 }
 
-/* Check to see if the required BFD is the same as the last one
-   looked up. If so, then it can use the stream in the BFD with
-   impunity, since it can't have changed since the last lookup;
-   otherwise, it has to perform the complicated lookup function.  */
-
-#define bfd_cache_lookup(x, flag) \
-  ((x) == bfd_last_cache			\
-   ? (FILE *) (bfd_last_cache->iostream)	\
-   : bfd_cache_lookup_worker (x, flag))
-
 /* Called when the macro <<bfd_cache_lookup>> fails to find a
    quick answer.  Find a file descriptor for @var{abfd}.  If
    necessary, it open it.  If there are already more than
@@ -214,7 +215,7 @@ bfd_cache_lookup_worker (bfd *abfd, enum cache_flag flag)
   if (flag & CACHE_NO_OPEN)
     return NULL;
 
-  if (bfd_open_file (abfd) == NULL)
+  if (bfd_do_open_file (abfd) == NULL)
     ;
   else if (!(flag & CACHE_NO_SEEK)
 	   && real_fseek ((FILE *) abfd->iostream, abfd->where, SEEK_SET) != 0
@@ -226,6 +227,24 @@ bfd_cache_lookup_worker (bfd *abfd, enum cache_flag flag)
   (*_bfd_error_handler) (_("reopening %B: %s\n"),
 			 orig_bfd, bfd_errmsg (bfd_get_error ()));
   return NULL;
+}
+
+/* Check to see if the required BFD is the same as the last one
+   looked up. If so, then it can use the stream in the BFD with
+   impunity, since it can't have changed since the last lookup;
+   otherwise, it has to perform the complicated lookup function.  */
+
+static FILE *
+bfd_cache_lookup (struct bfd *x, enum cache_flag flag)
+{
+  FILE *result;
+  pthread_mutex_lock (&cache_lock);
+  if (x == bfd_last_cache)
+    result = (FILE *) (bfd_last_cache->iostream);
+  else
+    result = bfd_cache_lookup_worker (x, flag);
+  pthread_mutex_unlock (&cache_lock);
+  return result;
 }
 
 static file_ptr
@@ -426,6 +445,21 @@ static const struct bfd_iovec cache_iovec =
   &cache_bclose, &cache_bflush, &cache_bstat, &cache_bmmap
 };
 
+static bfd_boolean
+bfd_do_cache_init (bfd *abfd)
+{
+  BFD_ASSERT (abfd->iostream != NULL);
+  if (open_files >= BFD_CACHE_MAX_OPEN)
+    {
+      if (! close_one ())
+	return FALSE;
+    }
+  abfd->iovec = &cache_iovec;
+  insert (abfd);
+  ++open_files;
+  return TRUE;
+}
+
 /*
 INTERNAL_FUNCTION
 	bfd_cache_init
@@ -440,16 +474,24 @@ DESCRIPTION
 bfd_boolean
 bfd_cache_init (bfd *abfd)
 {
-  BFD_ASSERT (abfd->iostream != NULL);
-  if (open_files >= BFD_CACHE_MAX_OPEN)
-    {
-      if (! close_one ())
-	return FALSE;
-    }
-  abfd->iovec = &cache_iovec;
-  insert (abfd);
-  ++open_files;
-  return TRUE;
+  bfd_boolean result;
+  pthread_mutex_lock (&cache_lock);
+  result = bfd_do_cache_init (abfd);
+  pthread_mutex_unlock (&cache_lock);
+  return result;
+}
+
+static bfd_boolean
+bfd_cache_do_close (bfd *abfd)
+{
+  if (abfd->iovec != &cache_iovec)
+    return TRUE;
+
+  if (abfd->iostream == NULL)
+    /* Previously closed.  */
+    return TRUE;
+
+  return bfd_cache_delete (abfd);
 }
 
 /*
@@ -471,14 +513,12 @@ RETURNS
 bfd_boolean
 bfd_cache_close (bfd *abfd)
 {
-  if (abfd->iovec != &cache_iovec)
-    return TRUE;
+  bfd_boolean result;
 
-  if (abfd->iostream == NULL)
-    /* Previously closed.  */
-    return TRUE;
-
-  return bfd_cache_delete (abfd);
+  pthread_mutex_lock (&cache_lock);
+  result = bfd_cache_do_close (abfd);
+  pthread_mutex_unlock (&cache_lock);
+  return result;
 }
 
 /*
@@ -502,8 +542,10 @@ bfd_cache_close_all ()
 {
   bfd_boolean ret = TRUE;
 
+  pthread_mutex_lock (&cache_lock);
   while (bfd_last_cache != NULL)
-    ret &= bfd_cache_close (bfd_last_cache);
+    ret &= bfd_cache_do_close (bfd_last_cache);
+  pthread_mutex_unlock (&cache_lock);
 
   return ret;
 }
@@ -523,8 +565,8 @@ DESCRIPTION
 	cache, so it won't have to be removed from it.
 */
 
-FILE *
-bfd_open_file (bfd *abfd)
+static FILE *
+bfd_do_open_file (bfd *abfd)
 {
   abfd->cacheable = TRUE;	/* Allow it to be closed later.  */
 
@@ -586,9 +628,19 @@ bfd_open_file (bfd *abfd)
     bfd_set_error (bfd_error_system_call);
   else
     {
-      if (! bfd_cache_init (abfd))
+      if (! bfd_do_cache_init (abfd))
 	return NULL;
     }
 
   return (FILE *) abfd->iostream;
+}
+
+FILE *
+bfd_open_file (bfd *abfd)
+{
+  FILE *result;
+  pthread_mutex_lock (&cache_lock);
+  result = bfd_do_open_file (abfd);
+  pthread_mutex_unlock (&cache_lock);
+  return result;
 }
