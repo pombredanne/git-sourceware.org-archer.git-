@@ -174,13 +174,14 @@ worker_thread (void *p)
   return NULL;
 }
 
-/* A qsort comparison function that compares unsigned longs.  */
+/* A qsort comparison function that compares task priorities.  */
 static int
-compare_ulongs (const void *a, const void *b)
+compare_priorities (const void *a, const void *b)
 {
-  const unsigned long *la = a;
-  const unsigned long *lb = b;
-  return *la < *lb ? -1 : (*la > *lb ? 1 : 0);
+  const struct task *ta = a;
+  const struct task *tb = b;
+  return (ta->priority < tb->priority ? -1
+	  : (ta->priority > tb->priority ? 1 : 0));
 }
 
 /* Add a task to the task pool POOL, and return it.  */
@@ -207,7 +208,7 @@ create_task (struct task_pool *pool, unsigned long priority,
   qsort (VEC_address (task_p, pool->queue),
 	 VEC_length (task_p, pool->queue),
 	 sizeof (task_p),
-	 compare_ulongs);
+	 compare_priorities);
 
   /* If a thread is already waiting for a job, or if we are already
      running the maximum number of worker threads, then we just notify
