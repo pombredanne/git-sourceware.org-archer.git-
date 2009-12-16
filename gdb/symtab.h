@@ -191,10 +191,14 @@ extern void symbol_init_language_specific (struct general_symbol_info *symbol,
 /* Set the linkage and natural names of a symbol, by demangling
    the linkage name.  */
 #define SYMBOL_SET_NAMES(symbol,linkage_name,len,objfile) \
-  symbol_set_names (&(symbol)->ginfo, linkage_name, len, objfile)
+  symbol_set_names (&(symbol)->ginfo, linkage_name, len, objfile, \
+		    &objfile->objfile_obstack)
+#define SYMBOL_SET_NAMES_FULL(symbol,linkage_name,len,objfile,obstack)	\
+  symbol_set_names (&(symbol)->ginfo, linkage_name, len, objfile, obstack)
 extern void symbol_set_names (struct general_symbol_info *symbol,
 			      const char *linkage_name, int len,
-			      struct objfile *objfile);
+			      struct objfile *objfile,
+			      struct obstack *obstack);
 
 /* Now come lots of name accessor macros.  Short version as to when to
    use which: Use SYMBOL_NATURAL_NAME to refer to the name of the

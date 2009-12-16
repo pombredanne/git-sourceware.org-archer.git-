@@ -350,22 +350,6 @@ extern void default_symfile_offsets (struct objfile *objfile,
 
 extern struct symfile_segment_data *default_symfile_segments (bfd *abfd);
 
-extern void extend_psymbol_list (struct psymbol_allocation_list *,
-				 struct objfile *);
-
-/* Add any kind of symbol to a psymbol_allocation_list.  */
-
-/* #include "demangle.h" */
-
-extern const
-struct partial_symbol *add_psymbol_to_list (char *, int, domain_enum,
-					    enum address_class,
-					    struct psymbol_allocation_list *,
-					    long, CORE_ADDR,
-					    enum language, struct objfile *);
-
-extern void init_psymbol_list (struct objfile *, int);
-
 extern struct symtab *allocate_symtab (char *, struct objfile *);
 
 extern int free_named_symtabs (char *);
@@ -426,12 +410,6 @@ extern struct section_addr_info
 extern void free_section_addr_info (struct section_addr_info *);
 
 
-extern struct partial_symtab *start_psymtab_common (struct objfile *,
-						    struct section_offsets *,
-						    char *, CORE_ADDR,
-						    struct partial_symbol **,
-						    struct partial_symbol **);
-
 /* Make a copy of the string at PTR with SIZE characters in the symbol
    obstack (and add a null character at the end in the copy).  Returns
    the address of the copy.  */
@@ -470,10 +448,6 @@ extern int auto_solib_limit;
 /* From symfile.c */
 
 extern void set_initial_language (void);
-
-extern struct partial_symtab *allocate_psymtab (char *, struct objfile *);
-
-extern void discard_psymtab (struct partial_symtab *);
 
 extern void find_lowest_section (bfd *, asection *, void *);
 

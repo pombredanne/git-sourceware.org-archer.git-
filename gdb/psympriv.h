@@ -22,6 +22,8 @@
 
 #include "psymtab.h"
 
+struct psymbol_allocation_list;
+
 /* A partial_symbol records the name, domain, and address class of
    symbols whose types we have not parsed yet.  For functions, it also
    contains their memory address, so we can find them from a PC value.
@@ -150,8 +152,6 @@ struct partial_symtab
   unsigned char readin;
 };
 
-extern void sort_pst_symbols (struct partial_symtab *);
-
 /* Traverse all psymtabs in one objfile.  */
 
 #define	ALL_OBJFILE_PSYMTABS(objfile, p) \
@@ -169,5 +169,57 @@ extern void sort_pst_symbols (struct partial_symtab *);
 #define ALL_PSYMTABS_REQUIRED(objfile, p)			\
   ALL_OBJFILES (objfile)					\
     ALL_OBJFILE_PSYMTABS (require_partial_symbols (objfile), p)
+
+void sort_pst_symbols (struct partial_symtab *);
+
+void sort_pst_symbols_full (struct partial_symtab *pst,
+			    struct psymbol_allocation_list *globals);
+
+struct partial_symtab *allocate_psymtab (char *, struct objfile *);
+
+struct partial_symtab *allocate_psymtab_full (char *, struct objfile *,
+					      struct obstack *,
+					      struct partial_symtab **);
+
+void discard_psymtab (struct partial_symtab *);
+
+/* Add any kind of symbol to a psymbol_allocation_list.  */
+
+const struct partial_symbol *add_psymbol_to_list
+    (char *, int, domain_enum,
+     enum address_class,
+     struct psymbol_allocation_list *,
+     long, CORE_ADDR,
+     enum language, struct objfile *);
+
+const struct partial_symbol *add_psymbol_to_list_full
+    (char *name, int namelength, domain_enum domain,
+     enum address_class class,
+     struct psymbol_allocation_list *list, 
+     long val,	/* Value as a long */
+     CORE_ADDR coreaddr,	/* Value as a CORE_ADDR */
+     enum language language, struct objfile *objfile,
+     struct obstack *obstack,
+     int is_global);
+
+void init_psymbol_list (struct objfile *, int);
+
+struct partial_symtab *start_psymtab_common (struct objfile *,
+					     struct section_offsets *,
+					     char *, CORE_ADDR,
+					     struct partial_symbol **,
+					     struct partial_symbol **);
+
+struct partial_symtab *start_psymtab_common_full
+    (struct objfile *objfile,
+     struct obstack *obstack,
+     struct section_offsets *section_offsets,
+     char *filename,
+     CORE_ADDR textlow,
+     struct psymbol_allocation_list *global_alloc,
+     struct partial_symbol **global_syms,
+     struct psymbol_allocation_list *static_alloc,
+     struct partial_symbol **static_syms,
+     struct partial_symtab **head);
 
 #endif /* PSYMPRIV_H */

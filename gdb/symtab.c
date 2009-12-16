@@ -457,7 +457,8 @@ symbol_find_demangled_name (struct general_symbol_info *gsymbol,
 
 void
 symbol_set_names (struct general_symbol_info *gsymbol,
-		  const char *linkage_name, int len, struct objfile *objfile)
+		  const char *linkage_name, int len, struct objfile *objfile,
+		  struct obstack *obstack)
 {
   char **slot;
   /* A 0-terminated copy of the linkage name.  */
@@ -481,7 +482,7 @@ symbol_set_names (struct general_symbol_info *gsymbol,
          been observed with Java.  Because we don't store the demangled
          name with the symbol, we don't need to use the same trick
          as Java.  */
-      gsymbol->name = obstack_alloc (&objfile->objfile_obstack, len + 1);
+      gsymbol->name = obstack_alloc (obstack, len + 1);
       memcpy (gsymbol->name, linkage_name, len);
       gsymbol->name[len] = '\0';
       gsymbol->language_specific.cplus_specific.demangled_name = NULL;
@@ -537,8 +538,7 @@ symbol_set_names (struct general_symbol_info *gsymbol,
       /* If there is a demangled name, place it right after the mangled name.
 	 Otherwise, just place a second zero byte after the end of the mangled
 	 name.  */
-      *slot = obstack_alloc (&objfile->objfile_obstack,
-			     lookup_len + demangled_len + 2);
+      *slot = obstack_alloc (obstack, lookup_len + demangled_len + 2);
       memcpy (*slot, lookup_name, lookup_len + 1);
       if (demangled_name != NULL)
 	{

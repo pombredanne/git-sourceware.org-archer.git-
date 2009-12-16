@@ -45,7 +45,7 @@
 
 #include "coff-pe-read.h"
 
-#include "psymtab.h"
+#include "psympriv.h"
 
 extern void _initialize_coffread (void);
 
