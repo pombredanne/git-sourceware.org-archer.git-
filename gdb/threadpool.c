@@ -178,10 +178,10 @@ worker_thread (void *p)
 static int
 compare_priorities (const void *a, const void *b)
 {
-  const struct task *ta = a;
-  const struct task *tb = b;
-  return (ta->priority < tb->priority ? -1
-	  : (ta->priority > tb->priority ? 1 : 0));
+  const struct task * const *ta = a;
+  const struct task * const *tb = b;
+  return ((*ta)->priority < (*tb)->priority ? -1
+	  : ((*ta)->priority > (*tb)->priority ? 1 : 0));
 }
 
 /* Add a task to the task pool POOL, and return it.  */
