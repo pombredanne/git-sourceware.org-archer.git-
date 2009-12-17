@@ -737,16 +737,6 @@ elf_symfile_read (struct objfile *objfile, int mainline)
     objfile->sf = &elf_sym_fns_gnu_index;
 }
 
-static void
-read_psyms (struct objfile *objfile)
-{
-  if (dwarf2_has_info (objfile))
-    {
-      /* DWARF 2 sections */
-      dwarf2_build_psymtabs (objfile, (objfile->flags & OBJF_MAIN) != 0);
-    }
-}
-
 /* This cleans up the objfile's deprecated_sym_stab_info pointer, and
    the chain of stab_section_info's, that might be dangling from
    it.  */
@@ -889,7 +879,7 @@ static struct sym_fns elf_sym_fns =
   elf_new_init,			/* sym_new_init: init anything gbl to entire symtab */
   elf_symfile_init,		/* sym_init: read initial info, setup for sym_read() */
   elf_symfile_read,		/* sym_read: read a symbol file into symtab */
-  read_psyms,			/* sym_read_psymbols */
+  NULL,				/* sym_read_psymbols */
   elf_symfile_finish,		/* sym_finish: finished with file, cleanup */
   default_symfile_offsets,	/* sym_offsets:  Translate ext. to int. relocation */
   elf_symfile_segments,		/* sym_segments: Get segment information from
@@ -899,6 +889,8 @@ static struct sym_fns elf_sym_fns =
   NULL				/* next: pointer to next struct sym_fns */
 };
 
+extern void dwarf2_read_psymtabs_locked (struct objfile *objfile);
+
 /* The same as elf_sym_fns, but not registered and uses the
    DWARF-specific GNU index rather than psymtab.  */
 static struct sym_fns elf_sym_fns_gnu_index =
@@ -907,13 +899,13 @@ static struct sym_fns elf_sym_fns_gnu_index =
   elf_new_init,			/* sym_new_init: init anything gbl to entire symtab */
   elf_symfile_init,		/* sym_init: read initial info, setup for sym_read() */
   elf_symfile_read,		/* sym_read: read a symbol file into symtab */
-  NULL,				/* sym_read_psymbols */
+  dwarf2_read_psymtabs_locked,	/* sym_read_psymbols */
   elf_symfile_finish,		/* sym_finish: finished with file, cleanup */
   default_symfile_offsets,	/* sym_offsets:  Translate ext. to int. relocation */
   elf_symfile_segments,		/* sym_segments: Get segment information from
 				   a file.  */
   NULL,                         /* sym_read_linetable */
-  &dwarf2_gnu_index_functions,
+  &dwarf2_locked_functions,
   NULL				/* next: pointer to next struct sym_fns */
 };
 
