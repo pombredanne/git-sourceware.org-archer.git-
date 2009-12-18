@@ -41,6 +41,6 @@ extern const struct quick_symbol_functions psym_functions;
 
 extern const struct quick_symbol_functions dwarf2_gnu_index_functions;
 
-extern const struct quick_symbol_functions dwarf2_locked_functions;
+extern struct quick_symbol_functions dwarf2_background_functions;
 
 #endif /* PSYMTAB_H */

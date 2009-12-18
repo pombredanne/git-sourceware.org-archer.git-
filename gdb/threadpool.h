@@ -56,15 +56,18 @@ struct task_pool *create_task_pool (int max_workers);
 
    It is up to the task's creator to ensure that the task is in fact
    thread-safe.  Be warned!  In GDB this can be tricky due to all the
-   lurking global variables.  */
+   lurking global variables.
+
+   A task is not destroyed until either cancel_task or get_task_answer
+   has been called on it.  */
 struct task *create_task (struct task_pool *pool,
 			  unsigned long priority,
 			  void *(*function) (void *),
 			  void *user_data);
 
-/* get_task_answer returns the result of a task.  This must be called
-   exactly once for every task.  (There is currently no facility for
-   cancelling tasks.)
+/* get_task_answer returns the result of a task.  This may only be
+   called once per task, and cannot be called if cancel_task has
+   already been called.
 
    If the task's function returned an answer, this will return it.
    Otherwise, if the task's function threw an exception, this function
@@ -75,5 +78,12 @@ struct task *create_task (struct task_pool *pool,
    This also enables task pools to work even when threads are
    unavailable.  */
 void *get_task_answer (struct task *task);
+
+/* Cancel a task.  This may only be called once per task, and cannot
+   be called if get_task_answer has already been called.
+   
+   If the task is already running, this waits until the task has
+   completed.  */
+void cancel_task (struct task *task);
 
 #endif /* THREADPOOL_H */

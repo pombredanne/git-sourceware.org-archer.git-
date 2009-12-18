@@ -181,12 +181,14 @@ struct dwarf2_per_objfile
      before using fields of this struct.  */
   struct task *reader;
 
+  /* The psymbol state we are modifying.  */
   struct psymtab_state *psyms;
 
   /* A list of all the compilation units.  This is used to locate
      the target compilation unit of a particular reference.  */
   VEC (dwarf2_per_cu_data_ptr) *all_comp_units;
 
+  /* Reference count.  */
   int refc;
 
   /* A flag indicating wether this objfile has a section loaded at a
@@ -207,8 +209,6 @@ struct dwarf2_per_objfile
      .debug_gnu_index section.  It is NULL if that section does not
      exist or if it is not being used for some reason.  */
   htab_t index_table;
-
-  pthread_mutex_t lock;
 };
 
 static __thread struct dwarf2_per_objfile *dwarf2_per_objfile;
@@ -1252,8 +1252,6 @@ static void queue_comp_unit (struct dwarf2_per_cu_data *per_cu,
 
 static void process_queue (struct objfile *objfile);
 
-static void dwarf2_read_all_sections (struct objfile *objfile);
-
 static void find_file_and_directory (struct die_info *die,
 				     struct dwarf2_cu *cu,
 				     char **name, char **comp_dir);
@@ -1286,7 +1284,6 @@ dwarf2_has_info (struct objfile *objfile)
       struct dwarf2_per_objfile *data
 	= obstack_alloc (&objfile->objfile_obstack, sizeof (*data));
       memset (data, 0, sizeof (*data));
-      pthread_mutex_init (&data->lock, NULL);
       data->refc = 1;
       set_objfile_data (objfile, dwarf2_objfile_data_key, data);
       dwarf2_per_objfile = data;
@@ -2101,8 +2098,8 @@ dw2_setup (struct objfile *objfile)
 {
   dwarf2_per_objfile = objfile_data (objfile, dwarf2_objfile_data_key);
   gdb_assert (dwarf2_per_objfile);
+  gdb_assert (dwarf2_per_objfile->using_gnu_index);
 
-#if 0
   if (!dwarf2_per_objfile->reader)
     {
       struct task *tem = dwarf2_per_objfile->reader;
@@ -2113,7 +2110,6 @@ dw2_setup (struct objfile *objfile)
 	 currently thread-safe.  FIXME.  */
       dw2_pre_read_full_symtabs ();
     }
-#endif
 }
 
 /* A helper for the "quick" functions which attempts to read the line
@@ -2784,6 +2780,8 @@ const struct quick_symbol_functions dwarf2_gnu_index_functions =
   dw2_map_symbol_filenames
 };
 
+
+
 static void *
 reader_task (void *p)
 {
@@ -2805,7 +2803,8 @@ dw2_read_psymtabs_task (void *p)
 
   dwarf2_build_psymtabs_hard (dwarf2_per_objfile->objfile, 0);
 
-  unref_dwarf2_per_objfile (dwarf2_per_objfile->objfile, dwarf2_per_objfile);
+  unref_dwarf2_per_objfile (dwarf2_per_objfile->objfile,
+			    dwarf2_per_objfile);
 
   /* We don't use the result.  */
   return NULL;
@@ -2819,12 +2818,14 @@ dwarf2_initialize_objfile (struct objfile *objfile)
 {
   unsigned long prio;
 
-#if 0 /* FIXME: we need some do-nothing quick reader functions.  */
   /* If we're about to read full symbols, don't bother with the
      indices.  In this case we also don't care if some other debug
      format is making psymtabs, because they are all about to be
-     expanded anyway.  */
-  if ((objfile->flags & OBJF_READNOW) || readnow_symbol_files)
+     expanded anyway.  We can only do this if we haven't already read
+     other psymtabs for this objfile.  */
+  if (objfile->psyms->global_psymbols.size == 0
+      && objfile->psyms->static_psymbols.size == 0
+      && ((objfile->flags & OBJF_READNOW) || readnow_symbol_files))
     {
       int i;
       struct dwarf2_per_cu_data *cu;
@@ -2840,9 +2841,8 @@ dwarf2_initialize_objfile (struct objfile *objfile)
 	cu->v.quick = OBSTACK_ZALLOC (dwarf2_per_objfile->obstack,
 				      struct dwarf2_per_cu_quick_data);
       
-      /* FIXME */
+      return 2;
     }
-#endif
 
   /* We want to read the data largest-first, to try to hide as much of
      the work as possible.  However, we often want the main objfile,
@@ -3025,20 +3025,6 @@ dwarf2_get_section_info (struct objfile *objfile, const char *section_name,
   *sectp = info->asection;
   *bufp = info->buffer;
   *sizep = info->size;
-}
-
-static void
-dwarf2_read_all_sections (struct objfile *objfile)
-{
-  dwarf2_read_section (objfile, &dwarf2_per_objfile->abbrev);
-  dwarf2_read_section (objfile, &dwarf2_per_objfile->line);
-  dwarf2_read_section (objfile, &dwarf2_per_objfile->str);
-  dwarf2_read_section (objfile, &dwarf2_per_objfile->macinfo);
-  dwarf2_read_section (objfile, &dwarf2_per_objfile->ranges);
-  dwarf2_read_section (objfile, &dwarf2_per_objfile->types);
-  dwarf2_read_section (objfile, &dwarf2_per_objfile->loc);
-  dwarf2_read_section (objfile, &dwarf2_per_objfile->eh_frame);
-  dwarf2_read_section (objfile, &dwarf2_per_objfile->frame);
 }
 
 /* Build a partial symbol table.  */
@@ -13180,6 +13166,12 @@ dwarf2_free_objfile (struct objfile *objfile)
   if (dwarf2_per_objfile == NULL)
     return;
 
+  if (dwarf2_per_objfile->reader)
+    {
+      cancel_task (dwarf2_per_objfile->reader);
+      dwarf2_per_objfile->reader = NULL;
+    }
+
   /* Cached DIE trees use xmalloc and the comp_unit_obstack.  */
   free_cached_comp_units (NULL);
 
@@ -13212,8 +13204,6 @@ dwarf2_free_objfile (struct objfile *objfile)
     }
 
   VEC_free (dwarf2_per_cu_data_ptr, dwarf2_per_objfile->all_comp_units);
-
-  /* Everything else should be on the objfile obstack.  */
 }
 
 /* A pair of DIE offset and GDB type pointer.  We store these
@@ -13261,7 +13251,7 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
 				offset_and_type_hash,
 				offset_and_type_eq,
 				NULL,
-				&dwarf2_per_objfile->obstack,
+				dwarf2_per_objfile->obstack,
 				hashtab_obstack_allocate,
 				dummy_obstack_deallocate);
       cu->type_hash = cu->per_cu->type_hash;
@@ -13382,46 +13372,10 @@ partial_die_eq (const void *item_lhs, const void *item_rhs)
 
 
 
-/* Locking forms of the quick functions.  */
-
-/* Cleanup function that releases a mutex.  */
-static void
-cleanup_unlock (void *p)
-{
-  pthread_mutex_unlock (p);
-}
-
-#define INTRO								\
-  struct cleanup *cleanup;						\
-  dw2_setup (objfile);							\
-  pthread_mutex_lock (&dwarf2_per_objfile->lock);			\
-  cleanup = make_cleanup (cleanup_unlock, &dwarf2_per_objfile->lock);
-
-#define DONE \
-  do_cleanups (cleanup);
-
-#define VOIDFN(NAME, PARAMS, ARGS)		\
-  void lock_ ## NAME PARAMS			\
-  {						\
-    INTRO					\
-    psym_functions.NAME ARGS;			\
-    DONE					\
-  }
-
-#define TYPEFN(TYPE, NAME, PARAMS, ARGS)	\
-  TYPE lock_ ## NAME PARAMS			\
-  {						\
-    TYPE answer;				\
-    INTRO					\
-    answer = psym_functions.NAME ARGS;		\
-    DONE					\
-    return answer;				\
-  }
-
 void
-dwarf2_read_psymtabs_locked (struct objfile *objfile)
+dwarf2_require_psymtabs (struct objfile *objfile)
 {
-  dw2_setup (objfile);
+  dwarf2_per_objfile = objfile_data (objfile, dwarf2_objfile_data_key);
   if (dwarf2_per_objfile->reader)
     {
       struct task *tem = dwarf2_per_objfile->reader;
@@ -13432,103 +13386,7 @@ dwarf2_read_psymtabs_locked (struct objfile *objfile)
     }
 }
 
-TYPEFN (int, has_symbols, (struct objfile *objfile, int try_read),
-	(objfile, try_read))
-
-TYPEFN (struct symtab *, find_last_source_symtab, (struct objfile *objfile),
-	(objfile))
-
-VOIDFN (forget_cached_source_info, (struct objfile *objfile), (objfile))
-
-TYPEFN (int, lookup_symtab, (struct objfile *objfile,
-			     const char *name,
-			     const char *full_path,
-			     const char *real_path,
-			     struct symtab **result),
-	(objfile, name, full_path, real_path, result))
-
-TYPEFN (struct symtab *, lookup_symbol,
-	(struct objfile *objfile,
-	 int kind, const char *name,
-	 const char *linkage_name,
-	 domain_enum domain),
-	(objfile, kind, name, linkage_name, domain))
-
-VOIDFN (print_stats, (struct objfile *objfile), (objfile))
-
-VOIDFN (dump, (struct objfile *objfile), (objfile))
-
-VOIDFN (relocate, (struct objfile *objfile,
-		   struct section_offsets *new_offsets,
-		   struct section_offsets *delta),
-	(objfile, new_offsets, delta))
-
-VOIDFN (expand_symtabs_for_function, (struct objfile *objfile,
-				      const char *func_name),
-	(objfile, func_name))
-
-VOIDFN (expand_all_symtabs, (struct objfile *objfile), (objfile))
-
-VOIDFN (expand_symtabs_with_filename, (struct objfile *objfile,
-				       const char *filename),
-	(objfile, filename))
-
-TYPEFN (char *, find_symbol_file, (struct objfile *objfile, const char *name),
-	(objfile, name))
-
-VOIDFN (map_ada_symtabs, (struct objfile *objfile,
-			  void (*callback) (struct objfile *,
-					    struct symtab *, void *),
-			  const char *name, int global,
-			  domain_enum namespace, int wild,
-			  void *data),
-	(objfile, callback, name, global, namespace, wild, data))
-
-VOIDFN (expand_symtabs_matching, (struct objfile *objfile,
-				  int (*file_matcher) (const char *, void *),
-				  int (*name_matcher) (const char *, void *),
-				  domain_enum kind,
-				  void *data),
-	(objfile, file_matcher, name_matcher, kind, data))
-
-TYPEFN (struct symtab *, find_pc_sect_symtab, (struct objfile *objfile,
-					       struct minimal_symbol *msymbol,
-					       CORE_ADDR pc,
-					       struct obj_section *section,
-					       int warn_if_readin),
-	(objfile, msymbol, pc, section, warn_if_readin))
-
-VOIDFN (map_symbol_names, (struct objfile *objfile,
-			   void (*fun) (const char *, void *),
-			   void *data),
-	(objfile, fun, data))
-
-VOIDFN (map_symbol_filenames, (struct objfile *objfile,
-			       void (*fun) (const char *, const char *,
-					    void *),
-			       void *data),
-	(objfile, fun, data))
-
-const struct quick_symbol_functions dwarf2_locked_functions =
-{
-  lock_has_symbols,
-  lock_find_last_source_symtab,
-  lock_forget_cached_source_info,
-  lock_lookup_symtab,
-  lock_lookup_symbol,
-  lock_print_stats,
-  lock_dump,
-  lock_relocate,
-  lock_expand_symtabs_for_function,
-  lock_expand_all_symtabs,
-  lock_expand_symtabs_with_filename,
-  lock_find_symbol_file,
-  lock_map_ada_symtabs,
-  lock_expand_symtabs_matching,
-  lock_find_pc_sect_symtab,
-  lock_map_symbol_names,
-  lock_map_symbol_filenames
-};
+struct quick_symbol_functions dwarf2_background_functions;
 
 
 
@@ -13583,8 +13441,6 @@ unref_dwarf2_per_objfile (struct objfile *objfile,
 
       if (data->obstack == &data->self_obstack)
 	obstack_free (data->obstack, NULL);
-
-      pthread_mutex_destroy (&data->lock);
     }
 }
 
@@ -13636,4 +13492,7 @@ The value is the maximum depth to print."),
 			    NULL,
 			    NULL,
 			    &setdebuglist, &showdebuglist);
+
+  dwarf2_background_functions = psym_functions;
+  dwarf2_background_functions.has_symbols = dw2_has_symbols;
 }

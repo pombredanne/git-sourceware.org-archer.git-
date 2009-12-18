@@ -76,8 +76,8 @@ struct task
   /* Any exception that was thrown.  */
   struct gdb_exception exception;
 
-  /* The task lock.  This must be acquired, while the queue lock is
-     held, before modifying any field of this task.  */
+  /* The task lock.  This must be acquired before modifying any field
+     of this task.  */
   pthread_mutex_t lock;
 };
 
@@ -266,6 +266,20 @@ get_task_answer (struct task *task)
   if (destroy)
     free_task (task);
   return result;
+}
+
+void
+cancel_task (struct task *task)
+{
+  int destroy;
+
+  pthread_mutex_lock (&task->lock);
+  destroy = task->completed;
+  if (!task->completed)
+    task->completed = 1;
+  pthread_mutex_unlock (&task->lock);
+  if (destroy)
+    free_task (task);
 }
 
 /* Create a new task pool.  */
