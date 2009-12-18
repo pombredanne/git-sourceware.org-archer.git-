@@ -2661,9 +2661,7 @@ parse_partial_symbols (struct objfile *objfile)
 	textlow = 0;
       pst = start_psymtab_common (objfile, objfile->section_offsets,
 				  fdr_name (fh),
-				  textlow,
-				  objfile->global_psymbols.next,
-				  objfile->static_psymbols.next);
+				  textlow);
       pst->read_symtab_private = ((char *)
 				  obstack_alloc (&objfile->objfile_obstack,
 						 sizeof (struct symloc)));
@@ -3100,7 +3098,7 @@ parse_partial_symbols (struct objfile *objfile)
 
 			add_psymbol_to_list (namestring, p - namestring,
 					     VAR_DOMAIN, LOC_STATIC,
-					     &objfile->static_psymbols,
+					     0,
 					     0, sh.value,
 					     psymtab_language, objfile);
 			continue;
@@ -3110,7 +3108,7 @@ parse_partial_symbols (struct objfile *objfile)
 			   wrong.  See the code that reads 'G's for symtabs. */
 			add_psymbol_to_list (namestring, p - namestring,
 					     VAR_DOMAIN, LOC_STATIC,
-					     &objfile->global_psymbols,
+					     1,
 					     0, sh.value,
 					     psymtab_language, objfile);
 			continue;
@@ -3128,7 +3126,7 @@ parse_partial_symbols (struct objfile *objfile)
 			  {
 			    add_psymbol_to_list (namestring, p - namestring,
 						 STRUCT_DOMAIN, LOC_TYPEDEF,
-						 &objfile->static_psymbols,
+						 0,
 						 sh.value, 0,
 						 psymtab_language, objfile);
 			    if (p[2] == 't')
@@ -3136,7 +3134,7 @@ parse_partial_symbols (struct objfile *objfile)
 				/* Also a typedef with the same name.  */
 				add_psymbol_to_list (namestring, p - namestring,
 						     VAR_DOMAIN, LOC_TYPEDEF,
-						     &objfile->static_psymbols,
+						     0,
 						     sh.value, 0,
 						     psymtab_language, objfile);
 				p += 1;
@@ -3148,7 +3146,7 @@ parse_partial_symbols (struct objfile *objfile)
 			  {
 			    add_psymbol_to_list (namestring, p - namestring,
 						 VAR_DOMAIN, LOC_TYPEDEF,
-						 &objfile->static_psymbols,
+						 0,
 						 sh.value, 0,
 						 psymtab_language, objfile);
 			  }
@@ -3210,7 +3208,7 @@ parse_partial_symbols (struct objfile *objfile)
 				   enum constants in psymtabs, just in symtabs.  */
 				add_psymbol_to_list (p, q - p,
 						     VAR_DOMAIN, LOC_CONST,
-						     &objfile->static_psymbols, 0,
+						     0, 0,
 						     0, psymtab_language, objfile);
 				/* Point past the name.  */
 				p = q;
@@ -3227,7 +3225,7 @@ parse_partial_symbols (struct objfile *objfile)
 			/* Constant, e.g. from "const" in Pascal.  */
 			add_psymbol_to_list (namestring, p - namestring,
 					     VAR_DOMAIN, LOC_CONST,
-					     &objfile->static_psymbols, sh.value,
+					     0, sh.value,
 					     0, psymtab_language, objfile);
 			continue;
 
@@ -3244,7 +3242,7 @@ parse_partial_symbols (struct objfile *objfile)
 			sh.value += ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
 			add_psymbol_to_list (namestring, p - namestring,
 					     VAR_DOMAIN, LOC_BLOCK,
-					     &objfile->static_psymbols,
+					     0,
 					     0, sh.value,
 					     psymtab_language, objfile);
 			continue;
@@ -3265,7 +3263,7 @@ parse_partial_symbols (struct objfile *objfile)
 			sh.value += ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
 			add_psymbol_to_list (namestring, p - namestring,
 					     VAR_DOMAIN, LOC_BLOCK,
-					     &objfile->global_psymbols,
+					     1,
 					     0, sh.value,
 					     psymtab_language, objfile);
 			continue;
@@ -3494,12 +3492,12 @@ parse_partial_symbols (struct objfile *objfile)
 		  if (sh.st == stProc)
 		    add_psymbol_to_list (name, strlen (name),
 					 VAR_DOMAIN, LOC_BLOCK,
-					 &objfile->global_psymbols,
+					 1,
 				    0, sh.value, psymtab_language, objfile);
 		  else
 		    add_psymbol_to_list (name, strlen (name),
 					 VAR_DOMAIN, LOC_BLOCK,
-					 &objfile->static_psymbols,
+					 0,
 				    0, sh.value, psymtab_language, objfile);
 
 		  procaddr = sh.value;
@@ -3568,7 +3566,7 @@ parse_partial_symbols (struct objfile *objfile)
 		    {
 		      add_psymbol_to_list (name, strlen (name),
 					   STRUCT_DOMAIN, LOC_TYPEDEF,
-					   &objfile->static_psymbols,
+					   0,
 					   0, (CORE_ADDR) 0,
 					   psymtab_language, objfile);
 		    }
@@ -3609,7 +3607,7 @@ parse_partial_symbols (struct objfile *objfile)
 	      /* Use this gdb symbol */
 	      add_psymbol_to_list (name, strlen (name),
 				   VAR_DOMAIN, class,
-				   &objfile->static_psymbols,
+				   0,
 				   0, sh.value, psymtab_language, objfile);
 	    skip:
 	      cur_sdx++;	/* Go to next file symbol */
@@ -3685,7 +3683,7 @@ parse_partial_symbols (struct objfile *objfile)
 	      name = debug_info->ssext + psh->iss;
 	      add_psymbol_to_list (name, strlen (name),
 				   VAR_DOMAIN, class,
-				   &objfile->global_psymbols,
+				   1,
 				   0, svalue,
 				   psymtab_language, objfile);
 	    }
@@ -3778,11 +3776,11 @@ parse_partial_symbols (struct objfile *objfile)
 
   /* Remove the dummy psymtab created for -O3 images above, if it is
      still empty, to enable the detection of stripped executables.  */
-  if (objfile->psymtabs->next == NULL
-      && objfile->psymtabs->number_of_dependencies == 0
-      && objfile->psymtabs->n_global_syms == 0
-      && objfile->psymtabs->n_static_syms == 0)
-    objfile->psymtabs = NULL;
+  if (objfile->psyms->psymtabs->next == NULL
+      && objfile->psyms->psymtabs->number_of_dependencies == 0
+      && objfile->psyms->psymtabs->n_global_syms == 0
+      && objfile->psyms->psymtabs->n_static_syms == 0)
+    objfile->psyms->psymtabs = NULL;
   do_cleanups (old_chain);
 }
 
@@ -3848,7 +3846,7 @@ handle_psymbol_enumerators (struct objfile *objfile, FDR *fh, int stype,
          in psymtabs, just in symtabs.  */
       add_psymbol_to_list (name, strlen (name),
 			   VAR_DOMAIN, LOC_CONST,
-			   &objfile->static_psymbols, 0,
+			   0, 0,
 			   (CORE_ADDR) 0, psymtab_language, objfile);
       ext_sym += external_sym_size;
     }

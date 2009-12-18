@@ -169,11 +169,11 @@ allocate_objfile (bfd *abfd, int flags)
     {
       objfile = (struct objfile *) xmalloc (sizeof (struct objfile));
       memset (objfile, 0, sizeof (struct objfile));
-      objfile->psymbol_cache = bcache_xmalloc ();
       objfile->macro_cache = bcache_xmalloc ();
       /* We could use obstack_specify_allocation here instead, but
 	 gdb_obstack.h specifies the alloc/dealloc functions.  */
       obstack_init (&objfile->objfile_obstack);
+      objfile->psyms = allocate_psymtab_state (&objfile->objfile_obstack);
       terminate_minimal_symbol_table (objfile);
     }
 
@@ -503,12 +503,8 @@ free_objfile (struct objfile *objfile)
     {
       xfree (objfile->name);
     }
-  if (objfile->global_psymbols.list)
-    xfree (objfile->global_psymbols.list);
-  if (objfile->static_psymbols.list)
-    xfree (objfile->static_psymbols.list);
+  destroy_psymtab_state (objfile->psyms);
   /* Free the obstacks for non-reusable objfiles */
-  bcache_xfree (objfile->psymbol_cache);
   bcache_xfree (objfile->macro_cache);
   if (objfile->demangled_names_hash)
     htab_delete (objfile->demangled_names_hash);

@@ -61,8 +61,6 @@ static struct symtab *psymtab_to_symtab (struct partial_symtab *pst);
 
 static struct objfile *require_partial_symbols (struct objfile *);
 
-static void extend_psymbol_list (struct psymbol_allocation_list *);
-
 /* Lookup the partial symbol table of a source file named NAME.
    *If* there is no '/' in the name, a match after a '/'
    in the psymtab filename will also work.  */
@@ -236,9 +234,10 @@ find_pc_sect_psymtab (struct objfile *objfile, CORE_ADDR pc,
       if (!addrmap_find (objfile->quick_addrmap, pc))
 	goto next;
     }
-  if (require_partial_symbols (objfile)->psymtabs_addrmap != NULL)
+  require_partial_symbols (objfile);
+  if (objfile->psyms->psymtabs_addrmap != NULL)
     {
-      pst = addrmap_find (objfile->psymtabs_addrmap, pc);
+      pst = addrmap_find (objfile->psyms->psymtabs_addrmap, pc);
       if (pst != NULL)
 	{
 	  /* FIXME: addrmaps currently do not handle overlayed sections,
@@ -332,8 +331,8 @@ find_pc_sect_psymbol (struct partial_symtab *psymtab, CORE_ADDR pc,
   /* Search the global symbols as well as the static symbols, so that
      find_pc_partial_function doesn't use a minimal symbol and thus
      cache a bad endaddr.  */
-  for (pp = psymtab->objfile->global_psymbols.list + psymtab->globals_offset;
-    (pp - (psymtab->objfile->global_psymbols.list + psymtab->globals_offset)
+  for (pp = psymtab->objfile->psyms->global_psymbols.list + psymtab->globals_offset;
+    (pp - (psymtab->objfile->psyms->global_psymbols.list + psymtab->globals_offset)
      < psymtab->n_global_syms);
        pp++)
     {
@@ -356,8 +355,8 @@ find_pc_sect_psymbol (struct partial_symtab *psymtab, CORE_ADDR pc,
 	}
     }
 
-  for (pp = psymtab->objfile->static_psymbols.list + psymtab->statics_offset;
-    (pp - (psymtab->objfile->static_psymbols.list + psymtab->statics_offset)
+  for (pp = psymtab->objfile->psyms->static_psymbols.list + psymtab->statics_offset;
+    (pp - (psymtab->objfile->psyms->static_psymbols.list + psymtab->statics_offset)
      < psymtab->n_static_syms);
        pp++)
     {
@@ -455,8 +454,8 @@ lookup_partial_symbol (struct partial_symtab *pst, const char *name,
       return (NULL);
     }
   start = (global ?
-	   pst->objfile->global_psymbols.list + pst->globals_offset :
-	   pst->objfile->static_psymbols.list + pst->statics_offset);
+	   pst->objfile->psyms->global_psymbols.list + pst->globals_offset :
+	   pst->objfile->psyms->static_psymbols.list + pst->statics_offset);
 
   if (global)			/* This means we can use a binary search. */
     {
@@ -566,8 +565,8 @@ relocate_psymtabs (struct objfile *objfile,
       p->texthigh += ANOFFSET (delta, SECT_OFF_TEXT (objfile));
     }
 
-  for (psym = objfile->global_psymbols.list;
-       psym < objfile->global_psymbols.next;
+  for (psym = objfile->psyms->global_psymbols.list;
+       psym < objfile->psyms->global_psymbols.next;
        psym++)
     {
       fixup_psymbol_section (*psym, objfile);
@@ -575,8 +574,8 @@ relocate_psymtabs (struct objfile *objfile,
 	SYMBOL_VALUE_ADDRESS (*psym) += ANOFFSET (delta,
 						  SYMBOL_SECTION (*psym));
     }
-  for (psym = objfile->static_psymbols.list;
-       psym < objfile->static_psymbols.next;
+  for (psym = objfile->psyms->static_psymbols.list;
+       psym < objfile->psyms->static_psymbols.next;
        psym++)
     {
       fixup_psymbol_section (*psym, objfile);
@@ -778,14 +777,14 @@ dump_psymtab (struct objfile *objfile, struct partial_symtab *psymtab,
   if (psymtab->n_global_syms > 0)
     {
       print_partial_symbols (gdbarch,
-			     objfile->global_psymbols.list
+			     objfile->psyms->global_psymbols.list
 			     + psymtab->globals_offset,
 			     psymtab->n_global_syms, "Global", outfile);
     }
   if (psymtab->n_static_syms > 0)
     {
       print_partial_symbols (gdbarch,
-			     objfile->static_psymbols.list
+			     objfile->psyms->static_psymbols.list
 			     + psymtab->statics_offset,
 			     psymtab->n_static_syms, "Static", outfile);
     }
@@ -811,10 +810,10 @@ dump_psymtabs_for_objfile (struct objfile *objfile)
 {
   struct partial_symtab *psymtab;
 
-  if (objfile->psymtabs)
+  if (objfile->psyms->psymtabs)
     {
       printf_filtered ("Psymtabs:\n");
-      for (psymtab = objfile->psymtabs;
+      for (psymtab = objfile->psyms->psymtabs;
 	   psymtab != NULL;
 	   psymtab = psymtab->next)
 	{
@@ -907,7 +906,7 @@ expand_partial_symbol_tables (struct objfile *objfile)
 
   require_partial_symbols (objfile);
 
-  for (psymtab = objfile->psymtabs;
+  for (psymtab = objfile->psyms->psymtabs;
        psymtab != NULL;
        psymtab = psymtab->next)
     {
@@ -942,8 +941,8 @@ map_symbol_names_psymtab (struct objfile *objfile,
       if (ps->readin)
 	continue;
 
-      for (psym = objfile->global_psymbols.list + ps->globals_offset;
-	   psym < (objfile->global_psymbols.list + ps->globals_offset
+      for (psym = objfile->psyms->global_psymbols.list + ps->globals_offset;
+	   psym < (objfile->psyms->global_psymbols.list + ps->globals_offset
 		   + ps->n_global_syms);
 	   psym++)
 	{
@@ -952,8 +951,8 @@ map_symbol_names_psymtab (struct objfile *objfile,
 	  (*fun) (SYMBOL_NATURAL_NAME (*psym), data);
 	}
 
-      for (psym = objfile->static_psymbols.list + ps->statics_offset;
-	   psym < (objfile->static_psymbols.list + ps->statics_offset
+      for (psym = objfile->psyms->static_psymbols.list + ps->statics_offset;
+	   psym < (objfile->psyms->static_psymbols.list + ps->statics_offset
 		   + ps->n_static_syms);
 	   psym++)
 	{
@@ -1054,8 +1053,8 @@ ada_lookup_partial_symbol (struct partial_symtab *pst, const char *name,
     }
 
   start = (global ?
-           pst->objfile->global_psymbols.list + pst->globals_offset :
-           pst->objfile->static_psymbols.list + pst->statics_offset);
+           pst->objfile->psyms->global_psymbols.list + pst->globals_offset :
+           pst->objfile->psyms->static_psymbols.list + pst->statics_offset);
 
   if (wild)
     {
@@ -1216,20 +1215,20 @@ expand_symtabs_matching_via_partial (struct objfile *objfile,
       if (! (*file_matcher) (ps->filename, data))
 	continue;
 
-      gbound = objfile->global_psymbols.list + ps->globals_offset + ps->n_global_syms;
-      sbound = objfile->static_psymbols.list + ps->statics_offset + ps->n_static_syms;
+      gbound = objfile->psyms->global_psymbols.list + ps->globals_offset + ps->n_global_syms;
+      sbound = objfile->psyms->static_psymbols.list + ps->statics_offset + ps->n_static_syms;
       bound = gbound;
 
       /* Go through all of the symbols stored in a partial
 	 symtab in one loop. */
-      psym = objfile->global_psymbols.list + ps->globals_offset;
+      psym = objfile->psyms->global_psymbols.list + ps->globals_offset;
       while (keep_going)
 	{
 	  if (psym >= bound)
 	    {
 	      if (bound == gbound && ps->n_static_syms != 0)
 		{
-		  psym = objfile->static_psymbols.list + ps->statics_offset;
+		  psym = objfile->psyms->static_psymbols.list + ps->statics_offset;
 		  bound = sbound;
 		}
 	      else
@@ -1263,7 +1262,7 @@ objfile_has_psyms (struct objfile *objfile, int try_read)
 {
   if (try_read)
     require_partial_symbols (objfile);
-  return objfile->quick_addrmap != NULL || objfile->psymtabs != NULL;
+  return objfile->quick_addrmap != NULL || objfile->psyms->psymtabs != NULL;
 }
 
 const struct quick_symbol_functions psym_functions =
@@ -1307,6 +1306,14 @@ require_partial_symbols (struct objfile *objfile)
 
 
 
+static void
+check_writeable (struct psymtab_state *state)
+{
+  if (!state->writeable)
+    internal_error (__FILE__, __LINE__,
+		    _("attempt to write to readonly psymtab_state"));
+}
+
 /* This compares two partial symbols by names, using strcmp_iw_ordered
    for the comparison.  */
 
@@ -1321,63 +1328,46 @@ compare_psymbols (const void *s1p, const void *s2p)
 }
 
 void
-sort_pst_symbols_full (struct partial_symtab *pst,
-		       struct psymbol_allocation_list *globals)
+sort_pst_symbols (struct psymtab_state *state, struct partial_symtab *pst)
 {
-  qsort (globals->list + pst->globals_offset,
+  check_writeable (state);
+  qsort (state->global_psymbols.list + pst->globals_offset,
 	 pst->n_global_syms, sizeof (struct partial_symbol *),
 	 compare_psymbols);
 }
 
-void
-sort_pst_symbols (struct partial_symtab *pst)
-{
-  /* Sort the global list; don't sort the static list */
-  sort_pst_symbols_full (pst, &pst->objfile->global_psymbols);
-}
-
-/* Allocate and partially fill a partial symtab.  It will be
-   completely filled at the end of the symbol list.
-
-   FILENAME is the name of the symbol-file we are reading from. */
-
 struct partial_symtab *
-start_psymtab_common_full (struct objfile *objfile,
+start_psymtab_common_full (struct psymtab_state *state,
+			   struct objfile *objfile,
 			   struct obstack *obstack,
 			   struct section_offsets *section_offsets,
 			   char *filename,
-			   CORE_ADDR textlow,
-			   struct psymbol_allocation_list *global_alloc,
-			   struct partial_symbol **global_syms,
-			   struct psymbol_allocation_list *static_alloc,
-			   struct partial_symbol **static_syms,
-			   struct partial_symtab **head)
+			   CORE_ADDR textlow)
 {
   struct partial_symtab *psymtab;
 
-  psymtab = allocate_psymtab_full (filename, objfile, obstack, head);
+  check_writeable (state);
+
+  psymtab = allocate_psymtab_full (state, filename, objfile, obstack);
   psymtab->section_offsets = section_offsets;
   psymtab->textlow = textlow;
   psymtab->texthigh = psymtab->textlow;		/* default */
-  psymtab->globals_offset = global_syms - global_alloc->list;
-  psymtab->statics_offset = static_syms - static_alloc->list;
+  psymtab->globals_offset = (state->global_psymbols.next
+			     - state->global_psymbols.list);
+  psymtab->statics_offset = (state->static_psymbols.next
+			     - state->static_psymbols.list);
   return (psymtab);
 }
 
 struct partial_symtab *
 start_psymtab_common (struct objfile *objfile,
 		      struct section_offsets *section_offsets, char *filename,
-		      CORE_ADDR textlow, struct partial_symbol **global_syms,
-		      struct partial_symbol **static_syms)
+		      CORE_ADDR textlow)
 {
-  return start_psymtab_common_full (objfile, &objfile->objfile_obstack,
+  return start_psymtab_common_full (objfile->psyms,
+				    objfile, &objfile->objfile_obstack,
 				    section_offsets, filename,
-				    textlow,
-				    &objfile->global_psymbols,
-				    global_syms,
-				    &objfile->static_psymbols,
-				    static_syms,
-				    &objfile->psymtabs);
+				    textlow);
 }
 
 /* Helper function, initialises partial symbol structure and stashes 
@@ -1387,7 +1377,8 @@ start_psymtab_common (struct objfile *objfile,
    different domain (or address) is possible and correct.  */
 
 static const struct partial_symbol *
-add_psymbol_to_bcache (char *name, int namelength, domain_enum domain,
+add_psymbol_to_bcache (struct psymtab_state *state,
+		       char *name, int namelength, domain_enum domain,
 		       enum address_class class,
 		       long val,	/* Value as a long */
 		       CORE_ADDR coreaddr,	/* Value as a CORE_ADDR */
@@ -1426,7 +1417,34 @@ add_psymbol_to_bcache (char *name, int namelength, domain_enum domain,
 
   /* Stash the partial symbol away in the cache */
   return bcache_full (&psymbol, sizeof (struct partial_symbol),
-		      objfile->psymbol_cache, added);
+		      state->psymbol_cache, added);
+}
+
+/* Increase the space allocated for LISTP, which is probably
+   global_psymbols or static_psymbols. This space will eventually
+   be freed in free_objfile().  */
+
+static void
+extend_psymbol_list (struct psymbol_allocation_list *listp)
+{
+  int new_size;
+  if (listp->size == 0)
+    {
+      new_size = 255;
+      listp->list = (struct partial_symbol **)
+	xmalloc (new_size * sizeof (struct partial_symbol *));
+    }
+  else
+    {
+      new_size = listp->size * 2;
+      listp->list = (struct partial_symbol **)
+	xrealloc ((char *) listp->list,
+		  new_size * sizeof (struct partial_symbol *));
+    }
+  /* Next assumes we only went one over.  Should be good if
+     program works correctly */
+  listp->next = listp->list + listp->size;
+  listp->size = new_size;
 }
 
 /* Helper function, adds partial symbol to the given partial symbol
@@ -1459,9 +1477,9 @@ append_psymbol_to_list (struct psymbol_allocation_list *list,
    cache.  */
 
 const struct partial_symbol *
-add_psymbol_to_list_full (char *name, int namelength, domain_enum domain,
+add_psymbol_to_list_full (struct psymtab_state *state,
+			  char *name, int namelength, domain_enum domain,
 			  enum address_class class,
-			  struct psymbol_allocation_list *list, 
 			  long val,	/* Value as a long */
 			  CORE_ADDR coreaddr,	/* Value as a CORE_ADDR */
 			  enum language language, struct objfile *objfile,
@@ -1469,11 +1487,12 @@ add_psymbol_to_list_full (char *name, int namelength, domain_enum domain,
 			  int is_global)
 {
   const struct partial_symbol *psym;
-
   int added;
 
+  check_writeable (state);
+
   /* Stash the partial symbol away in the cache */
-  psym = add_psymbol_to_bcache (name, namelength, domain, class,
+  psym = add_psymbol_to_bcache (state, name, namelength, domain, class,
 				val, coreaddr, language, objfile, &added,
 				obstack);
 
@@ -1482,76 +1501,40 @@ add_psymbol_to_list_full (char *name, int namelength, domain_enum domain,
     return psym;
 
   /* Save pointer to partial symbol in psymtab, growing symtab if needed. */
-  append_psymbol_to_list (list, psym, objfile);
+  append_psymbol_to_list ((is_global ? &state->global_psymbols
+			   : &state->static_psymbols),
+			  psym, objfile);
   return psym;
 }
 
 const struct partial_symbol *
 add_psymbol_to_list (char *name, int namelength, domain_enum domain,
 		     enum address_class class,
-		     struct psymbol_allocation_list *list, 
+		     int is_global,
 		     long val,	/* Value as a long */
 		     CORE_ADDR coreaddr,	/* Value as a CORE_ADDR */
 		     enum language language, struct objfile *objfile)
 {
-  return add_psymbol_to_list_full (name, namelength, domain, class, list,
+  return add_psymbol_to_list_full (objfile->psyms,
+				   name, namelength, domain, class,
 				   val, coreaddr, language, objfile,
 				   &objfile->objfile_obstack,
-				   list == &objfile->global_psymbols);
-}
-
-/* Initialize storage for partial symbols.  */
-
-void
-init_psymbol_list (struct objfile *objfile, int total_symbols)
-{
-  /* Free any previously allocated psymbol lists.  */
-
-  if (objfile->global_psymbols.list)
-    {
-      xfree (objfile->global_psymbols.list);
-    }
-  if (objfile->static_psymbols.list)
-    {
-      xfree (objfile->static_psymbols.list);
-    }
-
-  /* Current best guess is that approximately a twentieth
-     of the total symbols (in a debugging file) are global or static
-     oriented symbols */
-
-  objfile->global_psymbols.size = total_symbols / 10;
-  objfile->static_psymbols.size = total_symbols / 10;
-
-  if (objfile->global_psymbols.size > 0)
-    {
-      objfile->global_psymbols.next =
-	objfile->global_psymbols.list = (struct partial_symbol **)
-	xmalloc ((objfile->global_psymbols.size
-		  * sizeof (struct partial_symbol *)));
-    }
-  if (objfile->static_psymbols.size > 0)
-    {
-      objfile->static_psymbols.next =
-	objfile->static_psymbols.list = (struct partial_symbol **)
-	xmalloc ((objfile->static_psymbols.size
-		  * sizeof (struct partial_symbol *)));
-    }
+				   is_global);
 }
 
 struct partial_symtab *
-allocate_psymtab_full (char *filename, struct objfile *objfile,
-		       struct obstack *obstack,
-		       struct partial_symtab **head)
+allocate_psymtab_full (struct psymtab_state *state,
+		       char *filename, struct objfile *objfile,
+		       struct obstack *obstack)
 {
   struct partial_symtab *psymtab;
 
-  /* This is ok even in the threaded mode, because no other code
-     examines free_psymtabs.  */
-  if (objfile->free_psymtabs)
+  check_writeable (state);
+
+  if (state->free_psymtabs)
     {
-      psymtab = objfile->free_psymtabs;
-      objfile->free_psymtabs = psymtab->next;
+      psymtab = state->free_psymtabs;
+      state->free_psymtabs = psymtab->next;
     }
   else
     psymtab = (struct partial_symtab *)
@@ -1566,8 +1549,8 @@ allocate_psymtab_full (char *filename, struct objfile *objfile,
      inserted order. */
 
   psymtab->objfile = objfile;
-  psymtab->next = *head;
-  *head = psymtab;
+  psymtab->next = state->psymtabs;
+  state->psymtabs = psymtab;
 
   return psymtab;
 }
@@ -1575,15 +1558,16 @@ allocate_psymtab_full (char *filename, struct objfile *objfile,
 struct partial_symtab *
 allocate_psymtab (char *filename, struct objfile *objfile)
 {
-  return allocate_psymtab_full (filename, objfile,
-				&objfile->objfile_obstack,
-				&objfile->psymtabs);
+  return allocate_psymtab_full (objfile->psyms, filename, objfile,
+				&objfile->objfile_obstack);
 }
 
 void
-discard_psymtab (struct partial_symtab *pst)
+discard_psymtab (struct psymtab_state *state, struct partial_symtab *pst)
 {
   struct partial_symtab **prev_pst;
+
+  check_writeable (state);
 
   /* From dbxread.c:
      Empty psymtabs happen as a result of header files which don't
@@ -1594,43 +1578,57 @@ discard_psymtab (struct partial_symtab *pst)
 
   /* First, snip it out of the psymtab chain */
 
-  prev_pst = &(pst->objfile->psymtabs);
+  prev_pst = &(state->psymtabs);
   while ((*prev_pst) != pst)
     prev_pst = &((*prev_pst)->next);
   (*prev_pst) = pst->next;
 
   /* Next, put it on a free list for recycling */
 
-  pst->next = pst->objfile->free_psymtabs;
-  pst->objfile->free_psymtabs = pst;
+  pst->next = state->free_psymtabs;
+  state->free_psymtabs = pst;
 }
 
-/* Increase the space allocated for LISTP, which is probably
-   global_psymbols or static_psymbols. This space will eventually
-   be freed in free_objfile().  */
-
-static void
-extend_psymbol_list (struct psymbol_allocation_list *listp)
+void
+finalize_psymtab (struct psymtab_state *state,
+		  struct partial_symtab *psymtab)
 {
-  int new_size;
-  if (listp->size == 0)
-    {
-      new_size = 255;
-      listp->list = (struct partial_symbol **)
-	xmalloc (new_size * sizeof (struct partial_symbol *));
-    }
-  else
-    {
-      new_size = listp->size * 2;
-      listp->list = (struct partial_symbol **)
-	xrealloc ((char *) listp->list,
-		  new_size * sizeof (struct partial_symbol *));
-    }
-  /* Next assumes we only went one over.  Should be good if
-     program works correctly */
-  listp->next = listp->list + listp->size;
-  listp->size = new_size;
+  check_writeable (state);
+
+  psymtab->n_global_syms
+    = state->global_psymbols.next - (state->global_psymbols.list
+				     + psymtab->globals_offset);
+  psymtab->n_static_syms =
+    state->static_psymbols.next - (state->static_psymbols.list
+				   + psymtab->statics_offset);
 }
+
+void
+destroy_psymtab_state (struct psymtab_state *state)
+{
+  xfree (state->global_psymbols.list);
+  memset (&state->global_psymbols, 0, sizeof (state->global_psymbols));
+  xfree (state->static_psymbols.list);
+  memset (&state->static_psymbols, 0, sizeof (state->static_psymbols));
+  bcache_xfree (state->psymbol_cache);
+}
+
+struct psymtab_state *
+allocate_psymtab_state (struct obstack *obstack)
+{
+  struct psymtab_state *state;
+
+  state
+    = (struct psymtab_state *) obstack_alloc (obstack,
+					      sizeof (struct psymtab_state));
+  memset (state, 0, sizeof (struct psymtab_state));
+  state->writeable = 1;
+  state->psymbol_cache = bcache_xmalloc ();
+  return state;
+}
+
+/* A global readonly state.  */
+struct psymtab_state readonly_psymtab_state;
 
 
 
@@ -1688,7 +1686,7 @@ maintenance_info_psymtabs (char *regexp, int from_tty)
 	      if (psymtab->n_global_syms)
 		{
 		  printf_filtered ("(* (struct partial_symbol **) %s @ %d)\n",
-				   host_address_to_string (psymtab->objfile->global_psymbols.list
+				   host_address_to_string (psymtab->objfile->psyms->global_psymbols.list
 				    + psymtab->globals_offset),
 				   psymtab->n_global_syms);
 		}
@@ -1698,7 +1696,7 @@ maintenance_info_psymtabs (char *regexp, int from_tty)
 	      if (psymtab->n_static_syms)
 		{
 		  printf_filtered ("(* (struct partial_symbol **) %s @ %d)\n",
-				   host_address_to_string (psymtab->objfile->static_psymbols.list
+				   host_address_to_string (psymtab->objfile->psyms->static_psymbols.list
 				    + psymtab->statics_offset),
 				   psymtab->n_static_syms);
 		}
@@ -1755,7 +1753,7 @@ maintenance_check_symtabs (char *ignore, int from_tty)
       continue;
     bv = BLOCKVECTOR (s);
     b = BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK);
-    psym = ps->objfile->static_psymbols.list + ps->statics_offset;
+    psym = ps->objfile->psyms->static_psymbols.list + ps->statics_offset;
     length = ps->n_static_syms;
     while (length--)
       {
@@ -1772,7 +1770,7 @@ maintenance_check_symtabs (char *ignore, int from_tty)
 	psym++;
       }
     b = BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK);
-    psym = ps->objfile->global_psymbols.list + ps->globals_offset;
+    psym = ps->objfile->psyms->global_psymbols.list + ps->globals_offset;
     length = ps->n_global_syms;
     while (length--)
       {

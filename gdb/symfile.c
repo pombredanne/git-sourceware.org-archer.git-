@@ -100,8 +100,6 @@ static void add_symbol_file_command (char *, int);
 
 static void reread_separate_symbols (struct objfile *objfile);
 
-static void cashier_psymtab (struct partial_symtab *);
-
 bfd *symfile_bfd_open (char *);
 
 int get_section_index (struct objfile *, char *);
@@ -2322,20 +2320,9 @@ reread_symbols (void)
 
 	      clear_objfile_data (objfile);
 
-	      /* FIXME: Do we have to free a whole linked list, or is this
-	         enough?  */
-	      if (objfile->global_psymbols.list)
-		xfree (objfile->global_psymbols.list);
-	      memset (&objfile->global_psymbols, 0,
-		      sizeof (objfile->global_psymbols));
-	      if (objfile->static_psymbols.list)
-		xfree (objfile->static_psymbols.list);
-	      memset (&objfile->static_psymbols, 0,
-		      sizeof (objfile->static_psymbols));
+	      destroy_psymtab_state (objfile->psyms);
 
 	      /* Free the obstacks for non-reusable objfiles */
-	      bcache_xfree (objfile->psymbol_cache);
-	      objfile->psymbol_cache = bcache_xmalloc ();
 	      bcache_xfree (objfile->macro_cache);
 	      objfile->macro_cache = bcache_xmalloc ();
 	      if (objfile->demangled_names_hash != NULL)
@@ -2346,9 +2333,6 @@ reread_symbols (void)
 	      obstack_free (&objfile->objfile_obstack, 0);
 	      objfile->sections = NULL;
 	      objfile->symtabs = NULL;
-	      objfile->psymtabs = NULL;
-	      objfile->psymtabs_addrmap = NULL;
-	      objfile->free_psymtabs = NULL;
 	      objfile->cp_namespace_symtab = NULL;
 	      objfile->msymbols = NULL;
 	      objfile->deprecated_sym_private = NULL;
@@ -2358,7 +2342,6 @@ reread_symbols (void)
 	      memset (&objfile->msymbol_demangled_hash, 0,
 		      sizeof (objfile->msymbol_demangled_hash));
 
-	      objfile->psymbol_cache = bcache_xmalloc ();
 	      objfile->macro_cache = bcache_xmalloc ();
 	      /* obstack_init also initializes the obstack so it is
 	         empty.  We could use obstack_specify_allocation but
@@ -2371,6 +2354,9 @@ reread_symbols (void)
 			 objfile->name, bfd_errmsg (bfd_get_error ()));
 		}
               terminate_minimal_symbol_table (objfile);
+
+	      objfile->psyms
+		= allocate_psymtab_state (&objfile->objfile_obstack);
 
 	      /* We use the same section offsets as from last time.  I'm not
 	         sure whether that is always correct for shared libraries.  */

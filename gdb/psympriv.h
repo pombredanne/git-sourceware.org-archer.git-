@@ -22,8 +22,6 @@
 
 #include "psymtab.h"
 
-struct psymbol_allocation_list;
-
 /* A partial_symbol records the name, domain, and address class of
    symbols whose types we have not parsed yet.  For functions, it also
    contains their memory address, so we can find them from a PC value.
@@ -155,7 +153,7 @@ struct partial_symtab
 /* Traverse all psymtabs in one objfile.  */
 
 #define	ALL_OBJFILE_PSYMTABS(objfile, p) \
-    for ((p) = (objfile) -> psymtabs; (p) != NULL; (p) = (p) -> next)
+    for ((p) = (objfile)->psyms->psymtabs; (p) != NULL; (p) = (p) -> next)
 
 /* Traverse all psymtabs in all objfiles.  */
 
@@ -170,56 +168,139 @@ struct partial_symtab
   ALL_OBJFILES (objfile)					\
     ALL_OBJFILE_PSYMTABS (require_partial_symbols (objfile), p)
 
-void sort_pst_symbols (struct partial_symtab *);
 
-void sort_pst_symbols_full (struct partial_symtab *pst,
-			    struct psymbol_allocation_list *globals);
+/* Partial symbols are stored in the psymbol_cache and pointers to
+   them are kept in a dynamically grown array that is obtained from
+   malloc and grown as necessary via realloc.  Each objfile typically
+   has two of these, one for global symbols and one for static
+   symbols.  Although this adds a level of indirection for storing or
+   accessing the partial symbols, it allows us to throw away duplicate
+   psymbols and set all pointers to the single saved instance.  */
 
+struct psymbol_allocation_list
+{
+
+  /* Pointer to beginning of dynamically allocated array of pointers
+     to partial symbols.  The array is dynamically expanded as
+     necessary to accommodate more pointers.  */
+
+  struct partial_symbol **list;
+
+  /* Pointer to next available slot in which to store a pointer to a
+     partial symbol.  */
+
+  struct partial_symbol **next;
+
+  /* Number of allocated pointer slots in current dynamic array (not
+     the number of bytes of storage).  The "next" pointer will always
+     point somewhere between list[0] and list[size], and when at
+     list[size] the array will be expanded on the next attempt to
+     store a pointer.  */
+
+  int size;
+};
+
+/* Partial symbols and partial symbol tables are managed using an
+   instance of this structure.  In normal use, a structure is
+   allocated on an objfile's obstack and assigned to the objfile's
+   'psyms' field.  */
+struct psymtab_state
+{
+  int writeable;
+
+  /* Vectors of all partial symbols read in from file.  The actual data
+     is stored in the objfile_obstack. */
+  struct psymbol_allocation_list global_psymbols;
+  struct psymbol_allocation_list static_psymbols;
+
+  /* Each objfile points to a linked list of partial symtabs derived from
+     this file, one partial symtab structure for each compilation unit
+     (source file). */
+  struct partial_symtab *psymtabs;
+
+  /* Map addresses to the entries of PSYMTABS.  It would be more efficient to
+     have a map per the whole process but ADDRMAP cannot selectively remove
+     its items during FREE_OBJFILE.  This mapping is already present even for
+     PARTIAL_SYMTABs which still have no corresponding full SYMTABs read.  */
+  struct addrmap *psymtabs_addrmap;
+
+  /* List of freed partial symtabs, available for re-use */
+  struct partial_symtab *free_psymtabs;
+
+  /* Byte cache for partial syms.  */
+  struct bcache *psymbol_cache;
+};
+
+
+/* Sort the global symbols associated with PST which are held in
+   STATE.  */
+void sort_pst_symbols (struct psymtab_state *state,
+		       struct partial_symtab *pst);
+
+/* Allocate a partial symbol table in STATE.  FILENAME and OBJFILE are
+   the file name and objfile associated with the new table.  OBSTACK
+   is used for allocating memory.  */
+struct partial_symtab *allocate_psymtab_full (struct psymtab_state *state,
+					      char *filename,
+					      struct objfile *objfile,
+					      struct obstack *obstack);
+
+/* A legacy function that calls allocate_psymtab_full using the
+   objfile's obstack and psymtab_state.  */
 struct partial_symtab *allocate_psymtab (char *, struct objfile *);
 
-struct partial_symtab *allocate_psymtab_full (char *, struct objfile *,
-					      struct obstack *,
-					      struct partial_symtab **);
-
-void discard_psymtab (struct partial_symtab *);
+/* Discard a partial symbol table.  */
+void discard_psymtab (struct psymtab_state *state, struct partial_symtab *);
 
 /* Add any kind of symbol to a psymbol_allocation_list.  */
-
-const struct partial_symbol *add_psymbol_to_list
-    (char *, int, domain_enum,
-     enum address_class,
-     struct psymbol_allocation_list *,
-     long, CORE_ADDR,
-     enum language, struct objfile *);
-
 const struct partial_symbol *add_psymbol_to_list_full
-    (char *name, int namelength, domain_enum domain,
+    (struct psymtab_state *state,
+     char *name, int namelength, domain_enum domain,
      enum address_class class,
-     struct psymbol_allocation_list *list, 
      long val,	/* Value as a long */
      CORE_ADDR coreaddr,	/* Value as a CORE_ADDR */
      enum language language, struct objfile *objfile,
      struct obstack *obstack,
      int is_global);
 
-void init_psymbol_list (struct objfile *, int);
+/* A legacy function that calls add_psymbol_to_list_full using the
+   objfile's obstack and psymtab_state.  */
+const struct partial_symbol *add_psymbol_to_list
+    (char *, int, domain_enum,
+     enum address_class,
+     int,
+     long, CORE_ADDR,
+     enum language, struct objfile *);
 
-struct partial_symtab *start_psymtab_common (struct objfile *,
-					     struct section_offsets *,
-					     char *, CORE_ADDR,
-					     struct partial_symbol **,
-					     struct partial_symbol **);
+/* Allocate and partially fill a partial symtab.  It will be
+   completely filled at the end of the symbol list.
 
+   STATE is the psymtab state object holding all the necessary state.
+   OBJFILE is the objfile associated with the symbol table.
+   OBSTACK is used to allocate memory.
+   FILENAME is the name of the symbol-file we are reading from.  */
 struct partial_symtab *start_psymtab_common_full
-    (struct objfile *objfile,
+    (struct psymtab_state *state,
+     struct objfile *objfile,
      struct obstack *obstack,
      struct section_offsets *section_offsets,
      char *filename,
-     CORE_ADDR textlow,
-     struct psymbol_allocation_list *global_alloc,
-     struct partial_symbol **global_syms,
-     struct psymbol_allocation_list *static_alloc,
-     struct partial_symbol **static_syms,
-     struct partial_symtab **head);
+     CORE_ADDR textlow);
+
+/* A legacy function that calls start_psymtab_common_full with the
+   objfile's psymtab_state and objstack.  */
+struct partial_symtab *start_psymtab_common
+    (struct objfile *objfile,
+     struct section_offsets *section_offsets, char *filename,
+     CORE_ADDR textlow);
+
+/* Set n_global_syms and n_static_syms on PSYMTAB.  */
+void finalize_psymtab (struct psymtab_state *state,
+		       struct partial_symtab *psymtab);
+
+/* A readonly psymtab_state.  This is temporarily put into an
+   objfile's psyms slot when reading psymtabs in a background
+   thread.  */
+extern struct psymtab_state readonly_psymtab_state;
 
 #endif /* PSYMPRIV_H */

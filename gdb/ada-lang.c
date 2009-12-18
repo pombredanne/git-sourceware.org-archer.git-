@@ -122,10 +122,6 @@ static int num_defns_collected (struct obstack *);
 
 static struct ada_symbol_info *defns_collected (struct obstack *, int);
 
-static struct partial_symbol *ada_lookup_partial_symbol (struct partial_symtab
-                                                         *, const char *, int,
-                                                         domain_enum, int);
-
 static struct value *resolve_subexp (struct expression **, int *, int,
                                      struct type *);
 

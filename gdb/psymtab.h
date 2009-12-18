@@ -26,6 +26,17 @@ void map_partial_symbol_filenames (void (*) (const char *, const char *,
 					     void *),
 				   void *);
 
+struct psymtab_state;
+
+/* Allocate a new psymtab_state on OBSTACK.  The new psymtab_state is
+   initialized.  */
+struct psymtab_state *allocate_psymtab_state (struct obstack *obstack);
+
+/* Free any memory allocated by the psymtab_state object.  After this
+   call, the contents of the object are invalid.  The object itself is
+   not deallocated, however.  */
+void destroy_psymtab_state (struct psymtab_state *state);
+
 extern const struct quick_symbol_functions psym_functions;
 
 extern const struct quick_symbol_functions dwarf2_gnu_index_functions;

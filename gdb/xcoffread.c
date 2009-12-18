@@ -1937,8 +1937,7 @@ init_stringtab (bfd *abfd, file_ptr offset, struct objfile *objfile)
 static unsigned int first_fun_line_offset;
 
 static struct partial_symtab *xcoff_start_psymtab
-  (struct objfile *, char *, int,
-   struct partial_symbol **, struct partial_symbol **);
+  (struct objfile *, char *, int);
 
 /* Allocate and partially fill a partial symtab.  It will be
    completely filled at the end of the symbol list.
@@ -1948,16 +1947,13 @@ static struct partial_symtab *xcoff_start_psymtab
    (normal). */
 
 static struct partial_symtab *
-xcoff_start_psymtab (struct objfile *objfile, char *filename, int first_symnum,
-		     struct partial_symbol **global_syms,
-		     struct partial_symbol **static_syms)
+xcoff_start_psymtab (struct objfile *objfile, char *filename, int first_symnum)
 {
   struct partial_symtab *result =
   start_psymtab_common (objfile, objfile->section_offsets,
 			filename,
 			/* We fill in textlow later.  */
-			0,
-			global_syms, static_syms);
+			0);
 
   result->read_symtab_private = (char *)
     obstack_alloc (&objfile->objfile_obstack, sizeof (struct symloc));
@@ -1998,10 +1994,7 @@ xcoff_end_psymtab (struct partial_symtab *pst, char **include_list,
   ((struct symloc *) pst->read_symtab_private)->lineno_off =
     first_fun_line_offset;
   first_fun_line_offset = 0;
-  pst->n_global_syms =
-    objfile->global_psymbols.next - (objfile->global_psymbols.list + pst->globals_offset);
-  pst->n_static_syms =
-    objfile->static_psymbols.next - (objfile->static_psymbols.list + pst->statics_offset);
+  finalize_psymtab (objfile->psyms, pst);
 
   pst->number_of_dependencies = number_dependencies;
   if (number_dependencies)
@@ -2047,7 +2040,7 @@ xcoff_end_psymtab (struct partial_symtab *pst, char **include_list,
       subpst->read_symtab = pst->read_symtab;
     }
 
-  sort_pst_symbols (pst);
+  sort_pst_symbols (objfile->psyms, pst);
 
   /* If there is already a psymtab or symtab for a file of this name,
      remove it.  (If there is a symtab, more drastic things also
@@ -2064,7 +2057,7 @@ xcoff_end_psymtab (struct partial_symtab *pst, char **include_list,
       /* Empty psymtabs happen as a result of header files which don't have
          any symbols in them.  There can be a lot of them.  */
 
-      discard_psymtab (pst);
+      discard_psymtab (pst->objfile->psyms, pst);
 
       /* Indicate that psymtab was thrown away.  */
       pst = (struct partial_symtab *) NULL;
@@ -2268,9 +2261,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 			    pst = xcoff_start_psymtab
 			      (objfile,
 			       filestring,
-			       symnum_before,
-			       objfile->global_psymbols.next,
-			       objfile->static_psymbols.next);
+			       symnum_before);
 			  }
 		      }
 		    /* Activate the misc_func_recorded mechanism for
@@ -2453,9 +2444,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 
 	    pst = xcoff_start_psymtab (objfile,
 				       filestring,
-				       symnum_before,
-				       objfile->global_psymbols.next,
-				       objfile->static_psymbols.next);
+				       symnum_before);
 	    last_csect_name = NULL;
 	  }
 	  break;
@@ -2609,7 +2598,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 
 		add_psymbol_to_list (namestring, p - namestring,
 				     VAR_DOMAIN, LOC_STATIC,
-				     &objfile->static_psymbols,
+				     0,
 				     0, symbol.n_value,
 				     psymtab_language, objfile);
 		continue;
@@ -2620,7 +2609,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 		   wrong.  See the code that reads 'G's for symtabs. */
 		add_psymbol_to_list (namestring, p - namestring,
 				     VAR_DOMAIN, LOC_STATIC,
-				     &objfile->global_psymbols,
+				     1,
 				     0, symbol.n_value,
 				     psymtab_language, objfile);
 		continue;
@@ -2638,7 +2627,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 		  {
 		    add_psymbol_to_list (namestring, p - namestring,
 					 STRUCT_DOMAIN, LOC_TYPEDEF,
-					 &objfile->static_psymbols,
+					 0,
 					 symbol.n_value, 0,
 					 psymtab_language, objfile);
 		    if (p[2] == 't')
@@ -2646,7 +2635,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 			/* Also a typedef with the same name.  */
 			add_psymbol_to_list (namestring, p - namestring,
 					     VAR_DOMAIN, LOC_TYPEDEF,
-					     &objfile->static_psymbols,
+					     0,
 					     symbol.n_value, 0,
 					     psymtab_language, objfile);
 			p += 1;
@@ -2659,7 +2648,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 		  {
 		    add_psymbol_to_list (namestring, p - namestring,
 					 VAR_DOMAIN, LOC_TYPEDEF,
-					 &objfile->static_psymbols,
+					 0,
 					 symbol.n_value, 0,
 					 psymtab_language, objfile);
 		  }
@@ -2721,7 +2710,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 			   enum constants in psymtabs, just in symtabs.  */
 			add_psymbol_to_list (p, q - p,
 					     VAR_DOMAIN, LOC_CONST,
-					     &objfile->static_psymbols, 0,
+					     0, 0,
 					     0, psymtab_language, objfile);
 			/* Point past the name.  */
 			p = q;
@@ -2739,7 +2728,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 		/* Constant, e.g. from "const" in Pascal.  */
 		add_psymbol_to_list (namestring, p - namestring,
 				     VAR_DOMAIN, LOC_CONST,
-				     &objfile->static_psymbols, symbol.n_value,
+				     0, symbol.n_value,
 				     0, psymtab_language, objfile);
 		continue;
 
@@ -2756,7 +2745,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 		symbol.n_value += ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
 		add_psymbol_to_list (namestring, p - namestring,
 				     VAR_DOMAIN, LOC_BLOCK,
-				     &objfile->static_psymbols,
+				     0,
 				     0, symbol.n_value,
 				     psymtab_language, objfile);
 		continue;
@@ -2785,7 +2774,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 		symbol.n_value += ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
 		add_psymbol_to_list (namestring, p - namestring,
 				     VAR_DOMAIN, LOC_BLOCK,
-				     &objfile->global_psymbols,
+				     1,
 				     0, symbol.n_value,
 				     psymtab_language, objfile);
 		continue;
@@ -2947,16 +2936,6 @@ xcoff_initial_scan (struct objfile *objfile, int mainline)
 		   size, abfd);
   if (val != size)
     perror_with_name (_("reading symbol table"));
-
-  /* If we are reinitializing, or if we have never loaded syms yet, init */
-  if (mainline
-      || (objfile->global_psymbols.size == 0
-	  && objfile->static_psymbols.size == 0))
-    /* I'm not sure how how good num_symbols is; the rule of thumb in
-       init_psymbol_list was developed for a.out.  On the one hand,
-       num_symbols includes auxents.  On the other hand, it doesn't
-       include N_SLINE.  */
-    init_psymbol_list (objfile, num_symbols);
 
   free_pending_blocks ();
   back_to = make_cleanup (really_free_pendings, 0);
