@@ -1,6 +1,6 @@
 /* Data structures associated with breakpoints in GDB.
    Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001,
-   2002, 2003, 2004, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2002, 2003, 2004, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -121,6 +121,7 @@ enum bptype
     bp_catchpoint,
 
     bp_tracepoint,
+    bp_fast_tracepoint,
 
     /* Event for JIT compiled code generation or deletion.  */
     bp_jit_event,
@@ -512,6 +513,9 @@ struct breakpoint
 
     /* Chain of action lines to execute when this tracepoint is hit.  */
     struct action_line *actions;
+
+    /* The number of the tracepoint on the target.  */
+    int number_on_target;
   };
 
 typedef struct breakpoint *breakpoint_p;
@@ -983,6 +987,8 @@ extern void make_breakpoint_silent (struct breakpoint *);
 
 /* Return a tracepoint with the given number if found.  */
 extern struct breakpoint *get_tracepoint (int num);
+
+extern struct breakpoint *get_tracepoint_by_number_on_target (int num);
 
 /* Find a tracepoint by parsing a number in the supplied string.  */
 extern struct breakpoint *get_tracepoint_by_number (char **arg, int multi_p,

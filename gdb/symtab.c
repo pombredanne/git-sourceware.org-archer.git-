@@ -1,8 +1,8 @@
 /* Symbol table lookup for the GNU debugger, GDB.
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009
-   Free Software Foundation, Inc.
+   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009,
+   2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1499,48 +1499,50 @@ lookup_symbol_aux_block (const char *name, const char *linkage_name,
    psymtabs.  */
 
 struct symbol *
-lookup_global_symbol_from_objfile (const struct objfile *objfile,
+lookup_global_symbol_from_objfile (const struct objfile *main_objfile,
 				   const char *name,
 				   const char *linkage_name,
 				   const domain_enum domain)
 {
+  const struct objfile *objfile;
   struct symbol *sym;
   struct blockvector *bv;
   const struct block *block;
   struct symtab *s;
   struct partial_symtab *ps;
 
-  /* Go through symtabs.  */
-  ALL_OBJFILE_SYMTABS (objfile, s)
-  {
-    bv = BLOCKVECTOR (s);
-    block = BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK);
-    sym = lookup_block_symbol (block, name, linkage_name, domain);
-    if (sym)
-      {
-	block_found = block;
-	return fixup_symbol_section (sym, (struct objfile *)objfile);
-      }
-  }
+  for (objfile = main_objfile;
+       objfile;
+       objfile = objfile_separate_debug_iterate (main_objfile, objfile))
+    {
+      /* Go through symtabs.  */
+      ALL_OBJFILE_SYMTABS (objfile, s)
+        {
+          bv = BLOCKVECTOR (s);
+          block = BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK);
+          sym = lookup_block_symbol (block, name, linkage_name, domain);
+          if (sym)
+            {
+              block_found = block;
+              return fixup_symbol_section (sym, (struct objfile *)objfile);
+            }
+        }
 
-  /* Now go through psymtabs.  */
-  ALL_OBJFILE_PSYMTABS (objfile, ps)
-  {
-    if (!ps->readin
-	&& lookup_partial_symbol (ps, name, linkage_name,
-				  1, domain))
-      {
-	s = PSYMTAB_TO_SYMTAB (ps);
-	bv = BLOCKVECTOR (s);
-	block = BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK);
-	sym = lookup_block_symbol (block, name, linkage_name, domain);
-	return fixup_symbol_section (sym, (struct objfile *)objfile);
-      }
-  }
-
-  if (objfile->separate_debug_objfile)
-    return lookup_global_symbol_from_objfile (objfile->separate_debug_objfile,
-					      name, linkage_name, domain);
+      /* Now go through psymtabs.  */
+      ALL_OBJFILE_PSYMTABS (objfile, ps)
+        {
+          if (!ps->readin
+              && lookup_partial_symbol (ps, name, linkage_name,
+                                        1, domain))
+            {
+              s = PSYMTAB_TO_SYMTAB (ps);
+              bv = BLOCKVECTOR (s);
+              block = BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK);
+              sym = lookup_block_symbol (block, name, linkage_name, domain);
+              return fixup_symbol_section (sym, (struct objfile *)objfile);
+            }
+        }
+    }
 
   return NULL;
 }
@@ -3296,7 +3298,9 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
 		&& ((regexp == NULL
 		     || re_exec (SYMBOL_NATURAL_NAME (*psym)) != 0)
 		    && ((kind == VARIABLES_DOMAIN && SYMBOL_CLASS (*psym) != LOC_TYPEDEF
-			 && SYMBOL_CLASS (*psym) != LOC_BLOCK)
+			 && SYMBOL_CLASS (*psym) != LOC_UNRESOLVED
+			 && SYMBOL_CLASS (*psym) != LOC_BLOCK
+			 && SYMBOL_CLASS (*psym) != LOC_CONST)
 			|| (kind == FUNCTIONS_DOMAIN && SYMBOL_CLASS (*psym) == LOC_BLOCK)
 			|| (kind == TYPES_DOMAIN && SYMBOL_CLASS (*psym) == LOC_TYPEDEF))))
 	      {
@@ -3372,6 +3376,7 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
 		  && ((regexp == NULL
 		       || re_exec (SYMBOL_NATURAL_NAME (sym)) != 0)
 		      && ((kind == VARIABLES_DOMAIN && SYMBOL_CLASS (sym) != LOC_TYPEDEF
+			   && SYMBOL_CLASS (sym) != LOC_UNRESOLVED
 			   && SYMBOL_CLASS (sym) != LOC_BLOCK
 			   && SYMBOL_CLASS (sym) != LOC_CONST)
 			  || (kind == FUNCTIONS_DOMAIN && SYMBOL_CLASS (sym) == LOC_BLOCK)

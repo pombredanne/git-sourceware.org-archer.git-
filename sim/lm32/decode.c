@@ -2,7 +2,7 @@
 
 THIS FILE IS MACHINE GENERATED WITH CGEN.
 
-Copyright 1996-2009 Free Software Foundation, Inc.
+Copyright 1996-2010 Free Software Foundation, Inc.
 
 This file is part of the GNU simulators.
 
@@ -474,7 +474,7 @@ lm32bf_decode (SIM_CPU *current_cpu, IADDR pc,
 #define FLD(f) abuf->fields.sfmt_bi.f
     SI f_call;
 
-    f_call = ((pc) + (((int) (((EXTRACT_LSB0_SINT (insn, 32, 25, 26)) << (6))) >> (4))));
+    f_call = ((pc) + (((SI) (((EXTRACT_LSB0_SINT (insn, 32, 25, 26)) << (6))) >> (4))));
 
   /* Record the fields for the semantic handler.  */
   FLD (i_call) = f_call;
@@ -495,7 +495,7 @@ lm32bf_decode (SIM_CPU *current_cpu, IADDR pc,
 
     f_r0 = EXTRACT_LSB0_UINT (insn, 32, 25, 5);
     f_r1 = EXTRACT_LSB0_UINT (insn, 32, 20, 5);
-    f_branch = ((pc) + (((int) (((EXTRACT_LSB0_SINT (insn, 32, 15, 16)) << (16))) >> (14))));
+    f_branch = ((pc) + (((SI) (((EXTRACT_LSB0_SINT (insn, 32, 15, 16)) << (16))) >> (14))));
 
   /* Record the fields for the semantic handler.  */
   FLD (f_r0) = f_r0;
@@ -531,7 +531,7 @@ lm32bf_decode (SIM_CPU *current_cpu, IADDR pc,
 #define FLD(f) abuf->fields.sfmt_bi.f
     SI f_call;
 
-    f_call = ((pc) + (((int) (((EXTRACT_LSB0_SINT (insn, 32, 25, 26)) << (6))) >> (4))));
+    f_call = ((pc) + (((SI) (((EXTRACT_LSB0_SINT (insn, 32, 25, 26)) << (6))) >> (4))));
 
   /* Record the fields for the semantic handler.  */
   FLD (i_call) = f_call;

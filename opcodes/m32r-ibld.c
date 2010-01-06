@@ -4,7 +4,7 @@
    - the resultant file is machine generated, cgen-ibld.in isn't
 
    Copyright 1996, 1997, 1998, 1999, 2000, 2001, 2005, 2006, 2007,
-   2008  Free Software Foundation, Inc.
+   2008, 2010  Free Software Foundation, Inc.
 
    This file is part of libopcodes.
 
@@ -33,6 +33,7 @@
 #include "symcat.h"
 #include "m32r-desc.h"
 #include "m32r-opc.h"
+#include "cgen/basic-modes.h"
 #include "opintl.h"
 #include "safe-ctype.h"
 
@@ -580,21 +581,21 @@ m32r_cgen_insert_operand (CGEN_CPU_DESC cd,
     case M32R_OPERAND_DISP16 :
       {
         long value = fields->f_disp16;
-        value = ((int) (((value) - (pc))) >> (2));
+        value = ((SI) (((value) - (pc))) >> (2));
         errmsg = insert_normal (cd, value, 0|(1<<CGEN_IFLD_SIGNED)|(1<<CGEN_IFLD_RELOC)|(1<<CGEN_IFLD_PCREL_ADDR), 0, 16, 16, 32, total_length, buffer);
       }
       break;
     case M32R_OPERAND_DISP24 :
       {
         long value = fields->f_disp24;
-        value = ((int) (((value) - (pc))) >> (2));
+        value = ((SI) (((value) - (pc))) >> (2));
         errmsg = insert_normal (cd, value, 0|(1<<CGEN_IFLD_SIGNED)|(1<<CGEN_IFLD_RELOC)|(1<<CGEN_IFLD_PCREL_ADDR), 0, 8, 24, 32, total_length, buffer);
       }
       break;
     case M32R_OPERAND_DISP8 :
       {
         long value = fields->f_disp8;
-        value = ((int) (((value) - (((pc) & (-4))))) >> (2));
+        value = ((SI) (((value) - (((pc) & (-4))))) >> (2));
         errmsg = insert_normal (cd, value, 0|(1<<CGEN_IFLD_SIGNED)|(1<<CGEN_IFLD_RELOC)|(1<<CGEN_IFLD_PCREL_ADDR), 0, 8, 8, 32, total_length, buffer);
       }
       break;

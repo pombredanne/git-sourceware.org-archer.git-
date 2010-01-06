@@ -1,6 +1,6 @@
 /* rx.c --- opcode semantics for stand-alone RX simulator.
 
-Copyright (C) 2008, 2009 Free Software Foundation, Inc.
+Copyright (C) 2008, 2009, 2010 Free Software Foundation, Inc.
 Contributed by Red Hat, Inc.
 
 This file is part of the GNU simulators.
@@ -676,7 +676,7 @@ decode_opcode ()
     case RXO_btst:
       ma = GS ();
       mb = GS2 ();
-      if (opcode.op[0].type == RX_Operand_Register)
+      if (opcode.op[1].type == RX_Operand_Register)
 	mb &= 0x1f;
       else
 	mb &= 0x07;

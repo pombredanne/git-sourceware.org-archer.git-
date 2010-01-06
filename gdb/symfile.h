@@ -1,7 +1,7 @@
 /* Definitions for reading symbol files into GDB.
 
    Copyright (C) 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009
+   2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -132,11 +132,10 @@ struct sym_fns
 
   void (*sym_init) (struct objfile *);
 
-  /* sym_read (objfile, mainline) Reads a symbol file into a psymtab
+  /* sym_read (objfile, symfile_flags) Reads a symbol file into a psymtab
      (or possibly a symtab).  OBJFILE is the objfile struct for the
-     file we are reading.  MAINLINE is 1 if this is the main symbol
-     table being read, and 0 if a secondary symbol file (e.g. shared
-     library or dynamically loaded file) is being read.  */
+     file we are reading.  SYMFILE_FLAGS are the flags passed to
+     symbol_file_add & co.  */
 
   void (*sym_read) (struct objfile *, int);
 
@@ -239,6 +238,10 @@ extern struct objfile *symbol_file_add_from_bfd (bfd *, int,
                                                  struct section_addr_info *,
                                                  int);
 
+extern void symbol_file_add_separate (bfd *, int, struct objfile *);
+
+extern char *find_separate_debug_file_by_debuglink (struct objfile *);
+
 /* Create a new section_addr_info, with room for NUM_SECTIONS.  */
 
 extern struct section_addr_info *alloc_section_addr_info (size_t
@@ -317,6 +320,8 @@ extern void discard_psymtab (struct partial_symtab *);
 extern void find_lowest_section (bfd *, asection *, void *);
 
 extern bfd *symfile_bfd_open (char *);
+
+extern bfd *bfd_open_maybe_remote (const char *);
 
 extern int get_section_index (struct objfile *, char *);
 

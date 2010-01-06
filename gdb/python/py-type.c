@@ -1,6 +1,6 @@
 /* Python interface to types.
 
-   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -271,6 +271,71 @@ typy_pointer (PyObject *self, PyObject *args)
   GDB_PY_HANDLE_EXCEPTION (except);
 
   return type_to_type_object (type);
+}
+
+/* Return the range of a type represented by SELF.  The return type is
+   a tuple.  The first element of the tuple contains the low bound,
+   while the second element of the tuple contains the high bound.  */
+static PyObject *
+typy_range (PyObject *self, PyObject *args)
+{
+  struct type *type = ((type_object *) self)->type;
+  PyObject *result;
+  PyObject *low_bound = NULL, *high_bound = NULL;
+  /* Initialize these to appease GCC warnings.  */
+  LONGEST low = 0, high = 0;
+
+  if (TYPE_CODE (type) != TYPE_CODE_ARRAY
+      && TYPE_CODE (type) != TYPE_CODE_STRING
+      && TYPE_CODE (type) != TYPE_CODE_RANGE)
+    {
+      PyErr_SetString (PyExc_RuntimeError,
+		       "This type does not have a range.");
+      return NULL;
+    }
+
+  switch (TYPE_CODE (type))
+    {
+    case TYPE_CODE_ARRAY:
+    case TYPE_CODE_STRING:
+      low = TYPE_LOW_BOUND (TYPE_INDEX_TYPE (type));
+      high = TYPE_HIGH_BOUND (TYPE_INDEX_TYPE (type));
+      break;
+    case TYPE_CODE_RANGE:
+      low = TYPE_LOW_BOUND (type);
+      high = TYPE_HIGH_BOUND (type);
+      break;
+    }
+
+  low_bound = PyLong_FromLong (low);
+  if (!low_bound)
+    goto failarg;
+
+  high_bound = PyLong_FromLong (high);
+  if (!high_bound)
+    goto failarg;
+
+  result = PyTuple_New (2);
+  if (!result)
+    goto failarg;
+
+  if (PyTuple_SetItem (result, 0, low_bound) != 0)
+    {
+      Py_DECREF (result);
+      goto failarg;
+    }
+  if (PyTuple_SetItem (result, 1, high_bound) != 0)
+    {
+      Py_DECREF (high_bound);
+      Py_DECREF (result);
+      return NULL;
+    }
+  return result;
+  
+ failarg:
+  Py_XDECREF (high_bound);
+  Py_XDECREF (low_bound);
+  return NULL;
 }
 
 /* Return a Type object which represents a reference to SELF.  */
@@ -699,6 +764,9 @@ Each field is a dictionary." },
   { "pointer", typy_pointer, METH_NOARGS,
     "pointer () -> Type\n\
 Return a type of pointer to this type." },
+  { "range", typy_range, METH_NOARGS,
+    "range () -> tuple\n\
+Return a tuple containing the lower and upper range for this type."},
   { "reference", typy_reference, METH_NOARGS,
     "reference () -> Type\n\
 Return a type of reference to this type." },

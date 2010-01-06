@@ -1,7 +1,7 @@
 /* Read AIX xcoff symbol tables and convert to internal format, for GDB.
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009
-   Free Software Foundation, Inc.
+   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009,
+   2010 Free Software Foundation, Inc.
    Derived from coffread.c, dbxread.c, and a lot of hacking.
    Contributed by IBM Corporation.
 
@@ -2868,11 +2868,10 @@ xcoff_get_toc_offset (struct objfile *objfile)
 
    SECTION_OFFSETS contains offsets relative to which the symbols in the
    various sections are (depending where the sections were actually loaded).
-   MAINLINE is true if we are reading the main symbol
-   table (as opposed to a shared lib or dynamically loaded file).  */
+*/
 
 static void
-xcoff_initial_scan (struct objfile *objfile, int mainline)
+xcoff_initial_scan (struct objfile *objfile, int symfile_flags)
 {
   bfd *abfd;
   int val;
@@ -2948,9 +2947,7 @@ xcoff_initial_scan (struct objfile *objfile, int mainline)
     perror_with_name (_("reading symbol table"));
 
   /* If we are reinitializing, or if we have never loaded syms yet, init */
-  if (mainline
-      || (objfile->global_psymbols.size == 0
-	  && objfile->static_psymbols.size == 0))
+  if (objfile->global_psymbols.size == 0 && objfile->static_psymbols.size == 0)
     /* I'm not sure how how good num_symbols is; the rule of thumb in
        init_psymbol_list was developed for a.out.  On the one hand,
        num_symbols includes auxents.  On the other hand, it doesn't
