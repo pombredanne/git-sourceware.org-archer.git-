@@ -783,7 +783,9 @@ set_value_component_location (struct value *component, struct value *whole)
 
   addr = value_raw_address (component);
   object_address_get_data (value_type (whole), &addr);
-  set_value_address (component, addr);
+  if (component->lval != lval_internalvar
+      && component->lval != lval_internalvar_component)
+    set_value_address (component, addr);
 }
 
 
