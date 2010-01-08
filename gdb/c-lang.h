@@ -1,7 +1,7 @@
 /* C language support definitions for GDB, the GNU debugger.
 
    Copyright (C) 1992, 1994, 1995, 1996, 1997, 1998, 2000, 2002, 2005, 2006,
-   2007, 2008, 2009 Free Software Foundation, Inc.
+   2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -105,6 +105,10 @@ extern void cp_print_value_fields (struct type *, struct type *,
 extern int cp_is_vtbl_ptr_type (struct type *);
 
 extern int cp_is_vtbl_member (struct type *);
+
+/* These are in c-valprint.c.  */
+
+extern int c_textual_element_type (struct type *, char);
 
 
 #endif /* !defined (C_LANG_H) */

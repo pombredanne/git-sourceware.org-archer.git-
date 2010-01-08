@@ -1,6 +1,6 @@
 /* Python interface to inferiors.
 
-   Copyright (C) 2009 Free Software Foundation, Inc.
+   Copyright (C) 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -82,7 +82,7 @@ struct inflist_entry {
 
 /* List containing inferior_objects.  This list owns a reference to each
    object it contains.  */
-static struct inflist_entry *inferior_list;
+static struct inflist_entry *gdbpy_inferior_list;
 
 static int ninferiors;
 
@@ -124,9 +124,9 @@ add_inferior_object (int pid)
 
   entry = xmalloc (sizeof (struct inflist_entry));
   entry->inf_obj = inf_obj;
-  entry->next = inferior_list;
+  entry->next = gdbpy_inferior_list;
 
-  inferior_list = entry;
+  gdbpy_inferior_list = entry;
 
   ninferiors++;
 
@@ -144,7 +144,7 @@ delete_inferior_object (int pid)
   struct threadlist_entry *th_entry, *th_tmp;
 
   /* Find inferior_object for the given PID.  */
-  for (inf_entry = &inferior_list; *inf_entry != NULL;
+  for (inf_entry = &gdbpy_inferior_list; *inf_entry != NULL;
        inf_entry = &(*inf_entry)->next)
     if ((*inf_entry)->inf_obj->inferior->pid == pid)
       break;
@@ -185,7 +185,7 @@ find_inferior_object (int pid)
 {
   struct inflist_entry *p;
 
-  for (p = inferior_list; p != NULL; p = p->next)
+  for (p = gdbpy_inferior_list; p != NULL; p = p->next)
     if (p->inf_obj->inferior->pid == pid)
       return (PyObject *) p->inf_obj;
 
@@ -202,7 +202,7 @@ find_thread_object (ptid_t ptid)
   struct threadlist_entry *q;
 
   pid = PIDGET (ptid);
-  for (p = inferior_list; p != NULL; p = p->next)
+  for (p = gdbpy_inferior_list; p != NULL; p = p->next)
     if (p->inf_obj->inferior->pid == pid)
       for (q = p->inf_obj->threads; q != NULL; q = q->next)
 	if (ptid_equal (q->thread_obj->thread->ptid, ptid))
@@ -223,7 +223,10 @@ add_thread_object (struct thread_info *tp)
   inferior_object *inf_obj;
   struct threadlist_entry *entry;
 
-  cleanup = ensure_python_env (get_current_arch (), current_language);
+  /* Note that the arch does not matter here, because we can't run
+     arbitrary Python code.  Calling get_current_arch here will
+     crash.  */
+  cleanup = ensure_python_env (target_gdbarch, current_language);
 
   thread_obj = create_thread_object (tp);
   if (!thread_obj)
@@ -356,7 +359,9 @@ gdbpy_inferiors (PyObject *unused, PyObject *unused2)
 
   /* The list is in reverse order of inferior age (i.e., newest comes first),
      is this a problem?  */
-  for (i = 0, entry = inferior_list; i < ninferiors; i++, entry = entry->next)
+  for (i = 0, entry = gdbpy_inferior_list;
+       i < ninferiors;
+       i++, entry = entry->next)
     {
       Py_INCREF (entry->inf_obj);
       PyTuple_SET_ITEM (tuple, i, (PyObject *) entry->inf_obj);
@@ -780,10 +785,10 @@ gdbpy_initialize_inferior (void)
   PyModule_AddObject (gdb_module, "Inferior",
 		      (PyObject *) &inferior_object_type);
 
-  inferior_list = NULL;
+  gdbpy_inferior_list = NULL;
   ninferiors = 0;
 
-  observer_attach_new_inferior (add_inferior_object);
+  observer_attach_inferior_appeared (add_inferior_object);
   observer_attach_inferior_exit (delete_inferior_object);
   observer_attach_new_thread (add_thread_object);
   observer_attach_thread_exit (delete_thread_object);

@@ -1,7 +1,8 @@
 /* Support for printing Ada values for GDB, the GNU debugger.
 
    Copyright (C) 1986, 1988, 1989, 1991, 1992, 1993, 1994, 1997, 2001, 2002,
-   2003, 2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
+   Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -686,7 +687,8 @@ ada_val_print_1 (struct type *type, const gdb_byte *valaddr0,
 
   type = ada_check_typedef (type);
 
-  if (ada_is_array_descriptor_type (type) || ada_is_packed_array_type (type))
+  if (ada_is_array_descriptor_type (type)
+      || ada_is_constrained_packed_array_type (type))
     {
       int retn;
       struct value *mark = value_mark ();

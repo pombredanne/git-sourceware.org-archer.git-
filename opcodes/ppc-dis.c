@@ -1,6 +1,6 @@
 /* ppc-dis.c -- Disassemble PowerPC instructions
    Copyright 1994, 1995, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008, 2009 Free Software Foundation, Inc.
+   2008, 2009, 2010 Free Software Foundation, Inc.
    Written by Ian Lance Taylor, Cygnus Support
 
    This file is part of the GNU opcodes library.
@@ -62,6 +62,10 @@ struct ppc_mopt ppc_opts[] = {
   { "464",     (PPC_OPCODE_PPC | PPC_OPCODE_BOOKE | PPC_OPCODE_32
 		| PPC_OPCODE_440 | PPC_OPCODE_ISEL | PPC_OPCODE_RFMCI),
     0 },
+  { "476",     (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_ISEL
+		| PPC_OPCODE_440 | PPC_OPCODE_476 | PPC_OPCODE_POWER4
+		| PPC_OPCODE_POWER5),
+    0 },
   { "601",     (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_601
 		| PPC_OPCODE_32),
     0 },
@@ -110,6 +114,11 @@ struct ppc_mopt ppc_opts[] = {
 		| PPC_OPCODE_PMR | PPC_OPCODE_CACHELCK | PPC_OPCODE_RFMCI
 		| PPC_OPCODE_E500MC),
     0 },
+  { "e500mc64",  (PPC_OPCODE_PPC | PPC_OPCODE_BOOKE | PPC_OPCODE_ISEL
+		| PPC_OPCODE_PMR | PPC_OPCODE_CACHELCK | PPC_OPCODE_RFMCI
+		| PPC_OPCODE_64 | PPC_OPCODE_POWER5 | PPC_OPCODE_POWER6
+		| PPC_OPCODE_POWER7),
+    0 },
   { "e500x2",  (PPC_OPCODE_PPC | PPC_OPCODE_BOOKE | PPC_OPCODE_SPE
 		| PPC_OPCODE_ISEL | PPC_OPCODE_EFS | PPC_OPCODE_BRLOCK
 		| PPC_OPCODE_PMR | PPC_OPCODE_CACHELCK | PPC_OPCODE_RFMCI
@@ -140,6 +149,10 @@ struct ppc_mopt ppc_opts[] = {
     0 },
   { "ppc64bridge", (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_64_BRIDGE
 		    | PPC_OPCODE_64),
+    0 },
+  { "a2",      (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_ISEL
+		| PPC_OPCODE_POWER4 | PPC_OPCODE_POWER5 | PPC_OPCODE_CACHELCK
+		| PPC_OPCODE_64 | PPC_OPCODE_A2),
     0 },
   { "ppcps",   (PPC_OPCODE_PPC | PPC_OPCODE_PPCPS),
     0 },

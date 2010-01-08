@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008, 2009 Free Software Foundation, Inc.
+   2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -259,9 +259,6 @@ void (*deprecated_interactive_hook) (void);
    that several registers have changed (see value_assign). */
 void (*deprecated_register_changed_hook) (int regno);
 
-/* Tell the GUI someone changed LEN bytes of memory at ADDR */
-void (*deprecated_memory_changed_hook) (CORE_ADDR addr, int len);
-
 /* Called when going to wait for the target.  Usually allows the GUI to run
    while waiting for target events.  */
 
@@ -457,10 +454,13 @@ execute_command (char *p, int from_tty)
 
     }
 
-  /* Tell the user if the language has changed (except first time).  */
+  /* Tell the user if the language has changed (except first time).
+     First make sure that a new frame has been selected, in case this
+     command or the hooks changed the program state.  */
+  deprecated_safe_get_selected_frame ();
   if (current_language != expected_language)
     {
-      if (language_mode == language_mode_auto)
+      if (language_mode == language_mode_auto && info_verbose)
 	{
 	  language_info (1);	/* Print what changed.  */
 	}
@@ -1118,7 +1118,7 @@ print_gdb_version (struct ui_file *stream)
 
   /* Second line is a copyright notice. */
 
-  fprintf_filtered (stream, "Copyright (C) 2009 Free Software Foundation, Inc.\n");
+  fprintf_filtered (stream, "Copyright (C) 2010 Free Software Foundation, Inc.\n");
 
   /* Following the copyright is a brief statement that the program is
      free software, that users are free to copy and change it on
@@ -1187,6 +1187,9 @@ kill_or_detach (struct inferior *inf, void *args)
   struct qt_args *qt = args;
   struct thread_info *thread;
 
+  if (inf->pid == 0)
+    return 0;
+
   thread = any_thread_of_process (inf->pid);
   if (thread != NULL)
     {
@@ -1213,6 +1216,9 @@ static int
 print_inferior_quit_action (struct inferior *inf, void *arg)
 {
   struct ui_file *stb = arg;
+
+  if (inf->pid == 0)
+    return 0;
 
   if (inf->attach_flag)
     fprintf_filtered (stb,
@@ -1721,6 +1727,13 @@ gdb_init (char *argv0)
   initialize_targets ();	/* Setup target_terminal macros for utils.c */
   initialize_utils ();		/* Make errors and warnings possible */
   initialize_all_files ();
+  /* This creates the current_program_space.  Do this after all the
+     _initialize_foo routines have had a chance to install their
+     per-sspace data keys.  Also do this before
+     initialize_current_architecture is called, because it accesses
+     exec_bfd of the current program space.  */
+  initialize_progspace ();
+  initialize_inferiors ();
   initialize_current_architecture ();
   init_cli_cmds();
   init_main ();			/* But that omits this file!  Do it now */

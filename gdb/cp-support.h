@@ -1,5 +1,5 @@
 /* Helper routines for C++ support in GDB.
-   Copyright (C) 2002, 2003, 2004, 2005, 2007, 2008, 2009
+   Copyright (C) 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    Contributed by MontaVista Software.
@@ -71,6 +71,8 @@ extern struct symbol **make_symbol_overload_list (const char *,
 
 extern struct type *cp_lookup_rtti_type (const char *name,
 					 struct block *block);
+
+extern int cp_validate_operator (const char *input);
 
 /* Functions/variables from cp-namespace.c.  */
 

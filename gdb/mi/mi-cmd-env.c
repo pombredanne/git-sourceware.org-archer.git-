@@ -1,6 +1,6 @@
 /* MI Command Set - environment commands.
 
-   Copyright (C) 2002, 2003, 2004, 2007, 2008, 2009
+   Copyright (C) 2002, 2003, 2004, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    Contributed by Red Hat Inc.
@@ -232,7 +232,6 @@ mi_cmd_env_dir (char *command, char **argv, int argc)
 
   for (i = argc - 1; i >= 0; --i)
     env_mod_path (argv[i], &source_path);
-  init_last_source_visited ();
 
   ui_out_field_string (uiout, "source-path", source_path);
   forget_cached_source_info ();

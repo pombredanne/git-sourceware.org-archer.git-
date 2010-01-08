@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008, 2009 Free Software Foundation, Inc.
+   2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -54,6 +54,8 @@
 #include "gdbthread.h"
 #include "valprint.h"
 #include "inline-frame.h"
+
+extern void disconnect_or_stop_tracing (int from_tty);
 
 /* Functions exported for general use, in inferior.h: */
 
@@ -1515,14 +1517,13 @@ finish_forward (struct symbol *function, struct frame_info *frame)
   old_chain = make_cleanup_delete_breakpoint (breakpoint);
 
   tp->proceed_to_finish = 1;    /* We want stop_registers, please...  */
-  proceed ((CORE_ADDR) -1, TARGET_SIGNAL_DEFAULT, 0);
-
   cargs = xmalloc (sizeof (*cargs));
 
   cargs->breakpoint = breakpoint;
   cargs->function = function;
   add_continuation (tp, finish_command_continuation, cargs,
                     finish_command_continuation_free_arg);
+  proceed ((CORE_ADDR) -1, TARGET_SIGNAL_DEFAULT, 0);
 
   discard_cleanups (old_chain);
   if (!target_can_async_p ())
@@ -2505,6 +2506,8 @@ detach_command (char *args, int from_tty)
 
   if (ptid_equal (inferior_ptid, null_ptid))
     error (_("The program is not being run."));
+
+  disconnect_or_stop_tracing (from_tty);
 
   target_detach (args, from_tty);
 

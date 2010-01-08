@@ -1,6 +1,6 @@
 /* MI Command Set for GDB, the GNU debugger.
 
-   Copyright (C) 2000, 2001, 2003, 2007, 2008, 2009
+   Copyright (C) 2000, 2001, 2003, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    Contributed by Cygnus Solutions (a Red Hat company).
@@ -89,6 +89,7 @@ struct mi_cmd mi_cmds[] =
   { "stack-list-arguments", { NULL, 0 }, mi_cmd_stack_list_args},
   { "stack-list-frames", { NULL, 0 }, mi_cmd_stack_list_frames},
   { "stack-list-locals", { NULL, 0 }, mi_cmd_stack_list_locals},
+  { "stack-list-variables", { NULL, 0 }, mi_cmd_stack_list_variables},
   { "stack-select-frame", { NULL, 0 }, mi_cmd_stack_select_frame},
   { "symbol-list-lines", { NULL, 0 }, mi_cmd_symbol_list_lines},
   { "target-attach", { "attach", 1 }, NULL },

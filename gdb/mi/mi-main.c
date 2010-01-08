@@ -1,6 +1,6 @@
 /* MI Command Set.
 
-   Copyright (C) 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009
+   Copyright (C) 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    Contributed by Cygnus Solutions (a Red Hat company).
@@ -111,6 +111,7 @@ mi_cmd_gdb_exit (char *command, char **argv, int argc)
     fputs_unfiltered (current_token, raw_stdout);
   fputs_unfiltered ("^exit\n", raw_stdout);
   mi_out_put (uiout, raw_stdout);
+  gdb_flush (raw_stdout);
   /* FIXME: The function called is not yet a formal libgdb function.  */
   quit_force (NULL, FROM_TTY);
 }
@@ -362,13 +363,18 @@ mi_cmd_thread_info (char *command, char **argv, int argc)
 static int
 print_one_inferior (struct inferior *inferior, void *arg)
 {
-  struct cleanup *back_to = make_cleanup_ui_out_tuple_begin_end (uiout, NULL);
+  if (inferior->pid != 0)
+    {
+      struct cleanup *back_to
+	= make_cleanup_ui_out_tuple_begin_end (uiout, NULL);
 
-  ui_out_field_fmt (uiout, "id", "%d", inferior->pid);
-  ui_out_field_string (uiout, "type", "process");
-  ui_out_field_int (uiout, "pid", inferior->pid);
-  
-  do_cleanups (back_to);
+      ui_out_field_fmt (uiout, "id", "%d", inferior->pid);
+      ui_out_field_string (uiout, "type", "process");
+      ui_out_field_int (uiout, "pid", inferior->pid);
+
+      do_cleanups (back_to);
+    }
+
   return 0;
 }
 
@@ -1300,6 +1306,8 @@ mi_execute_command (char *cmd, int from_tty)
 	  fputs_unfiltered ("\"\n", raw_stdout);
 	  mi_out_rewind (uiout);
 	}
+
+      bpstat_do_actions ();
 
       if (/* The notifications are only output when the top-level
 	     interpreter (specified on the command line) is MI.  */      

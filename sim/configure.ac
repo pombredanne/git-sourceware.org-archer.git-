@@ -97,6 +97,10 @@ if test "${enable_sim}" != no; then
            AC_CONFIG_SUBDIRS(mcore)
 	   testsuite=yes
 	   ;;
+       microblaze-*-*)
+           AC_CONFIG_SUBDIRS(microblaze)
+	   testsuite=yes
+	   ;;
        mips*-*-*)
            AC_CONFIG_SUBDIRS(mips)
 	   testsuite=yes
@@ -109,6 +113,9 @@ if test "${enable_sim}" != no; then
        moxie-*-*)
 	   AC_CONFIG_SUBDIRS(moxie)
 	   testsuite=yes
+	   ;;
+       rx-*-*)
+           AC_CONFIG_SUBDIRS(rx)
 	   ;;
        sh64*-*-*)
            AC_CONFIG_SUBDIRS(sh64)

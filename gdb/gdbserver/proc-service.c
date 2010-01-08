@@ -1,5 +1,5 @@
 /* libthread_db helper functions for the remote server for GDB.
-   Copyright (C) 2002, 2004, 2005, 2006, 2007, 2008, 2009
+   Copyright (C) 2002, 2004, 2005, 2006, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    Contributed by MontaVista Software.
@@ -111,7 +111,7 @@ ps_lgetregs (gdb_ps_prochandle_t ph, lwpid_t lwpid, prgregset_t gregset)
   current_inferior = reg_inferior;
 
   the_target->fetch_registers (-1);
-  gregset_info()->fill_function (gregset);
+  gregset_info ()->fill_function (gregset);
 
   current_inferior = save_inferior;
   return PS_OK;

@@ -635,8 +635,8 @@ extern struct bfd_link_needed_list *bfd_elf_get_needed_list
 extern bfd_boolean bfd_elf_get_bfd_needed_list
   (bfd *, struct bfd_link_needed_list **);
 extern bfd_boolean bfd_elf_size_dynamic_sections
-  (bfd *, const char *, const char *, const char *, const char * const *,
-   struct bfd_link_info *, struct bfd_section **,
+  (bfd *, const char *, const char *, const char *, const char *, const char *,
+   const char * const *, struct bfd_link_info *, struct bfd_section **,
    struct bfd_elf_version_tree *);
 extern bfd_boolean bfd_elf_size_dynsym_hash_dynstr
   (bfd *, struct bfd_link_info *);
@@ -907,6 +907,10 @@ extern bfd_boolean elf32_arm_build_stubs
 /* ARM unwind section editing support.  */
 extern bfd_boolean elf32_arm_fix_exidx_coverage
   (struct bfd_section **, unsigned int, struct bfd_link_info *);
+
+/* PowerPC @tls opcode transform/validate.  */
+extern unsigned int _bfd_elf_ppc_at_tls_transform
+  (unsigned int, unsigned int);
 
 /* TI COFF load page support.  */
 extern void bfd_ticoff_set_section_load_page

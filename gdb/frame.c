@@ -1,7 +1,7 @@
 /* Cache and manage frames for GDB, the GNU debugger.
 
    Copyright (C) 1986, 1987, 1989, 1991, 1994, 1995, 1996, 1998, 2000, 2001,
-   2002, 2003, 2004, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2002, 2003, 2004, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -69,6 +69,12 @@ struct frame_info
      just to keep GDB happy (GDB always needs a frame).  For the
      moment leave this as speculation.  */
   int level;
+
+  /* The frame's program space.  */
+  struct program_space *pspace;
+
+  /* The frame's address space.  */
+  struct address_space *aspace;
 
   /* The frame's low-level unwinder and corresponding cache.  The
      low-level unwinder is responsible for unwinding register values
@@ -324,7 +330,10 @@ get_frame_id (struct frame_info *fi)
       if (fi->unwind == NULL)
 	fi->unwind = frame_unwind_find_by_frame (fi, &fi->prologue_cache);
       /* Find THIS frame's ID.  */
+      /* Default to outermost if no ID is found.  */
+      fi->this_id.value = outer_frame_id;
       fi->unwind->this_id (fi, &fi->prologue_cache, &fi->this_id.value);
+      gdb_assert (frame_id_p (fi->this_id.value));
       fi->this_id.p = 1;
       if (frame_debug)
 	{
@@ -364,6 +373,7 @@ frame_unwind_caller_id (struct frame_info *next_frame)
 }
 
 const struct frame_id null_frame_id; /* All zeros.  */
+const struct frame_id outer_frame_id = { 0, 0, 0, 0, 0, 1, 0 };
 
 struct frame_id
 frame_id_build_special (CORE_ADDR stack_addr, CORE_ADDR code_addr,
@@ -405,6 +415,9 @@ frame_id_p (struct frame_id l)
   int p;
   /* The frame is valid iff it has a valid stack address.  */
   p = l.stack_addr_p;
+  /* outer_frame_id is also valid.  */
+  if (!p && memcmp (&l, &outer_frame_id, sizeof (l)) == 0)
+    p = 1;
   if (frame_debug)
     {
       fprintf_unfiltered (gdb_stdlog, "{ frame_id_p (l=");
@@ -427,7 +440,14 @@ int
 frame_id_eq (struct frame_id l, struct frame_id r)
 {
   int eq;
-  if (!l.stack_addr_p || !r.stack_addr_p)
+  if (!l.stack_addr_p && l.special_addr_p && !r.stack_addr_p && r.special_addr_p)
+    /* The outermost frame marker is equal to itself.  This is the
+       dodgy thing about outer_frame_id, since between execution steps
+       we might step into another function - from which we can't
+       unwind either.  More thought required to get rid of
+       outer_frame_id.  */
+    eq = 1;
+  else if (!l.stack_addr_p || !r.stack_addr_p)
     /* Like a NaN, if either ID is invalid, the result is false.
        Note that a frame ID is invalid iff it is the null frame ID.  */
     eq = 0;
@@ -619,7 +639,7 @@ frame_unwind_pc (struct frame_info *this_frame)
       this_frame->prev_pc.p = 1;
       if (frame_debug)
 	fprintf_unfiltered (gdb_stdlog,
-			    "{ frame_unwind_caller_pc (this_frame=%d) -> 0x%s }\n",
+			    "{ frame_unwind_caller_pc (this_frame=%d) -> %s }\n",
 			    this_frame->level,
 			    hex_string (this_frame->prev_pc.value));
     }
@@ -1045,10 +1065,12 @@ put_frame_register_bytes (struct frame_info *frame, int regnum,
 /* Create a sentinel frame.  */
 
 static struct frame_info *
-create_sentinel_frame (struct regcache *regcache)
+create_sentinel_frame (struct program_space *pspace, struct regcache *regcache)
 {
   struct frame_info *frame = FRAME_OBSTACK_ZALLOC (struct frame_info);
   frame->level = -1;
+  frame->pspace = pspace;
+  frame->aspace = get_regcache_aspace (regcache);
   /* Explicitly initialize the sentinel frame's cache.  Provide it
      with the underlying regcache.  In the future additional
      information, such as the frame's thread will be added.  */
@@ -1130,7 +1152,7 @@ get_current_frame (void)
   if (current_frame == NULL)
     {
       struct frame_info *sentinel_frame =
-	create_sentinel_frame (get_current_regcache ());
+	create_sentinel_frame (current_program_space, get_current_regcache ());
       if (catch_exceptions (uiout, unwind_to_current_frame, sentinel_frame,
 			    RETURN_MASK_ERROR) != 0)
 	{
@@ -1261,7 +1283,7 @@ create_new_frame (CORE_ADDR addr, CORE_ADDR pc)
 
   fi = FRAME_OBSTACK_ZALLOC (struct frame_info);
 
-  fi->next = create_sentinel_frame (get_current_regcache ());
+  fi->next = create_sentinel_frame (current_program_space, get_current_regcache ());
 
   /* Set/update this frame's cached PC value, found in the next frame.
      Do this before looking for this frame's unwinder.  A sniffer is
@@ -1269,6 +1291,10 @@ create_new_frame (CORE_ADDR addr, CORE_ADDR pc)
      entitled to rely that the PC doesn't magically change.  */
   fi->next->prev_pc.value = pc;
   fi->next->prev_pc.p = 1;
+
+  /* We currently assume that frame chain's can't cross spaces.  */
+  fi->pspace = fi->next->pspace;
+  fi->aspace = fi->next->aspace;
 
   /* Select/initialize both the unwind function and the frame's type
      based on the PC.  */
@@ -1425,7 +1451,7 @@ get_prev_frame_1 (struct frame_info *this_frame)
      unwind to the prev frame.  Be careful to not apply this test to
      the sentinel frame.  */
   this_id = get_frame_id (this_frame);
-  if (this_frame->level >= 0 && !frame_id_p (this_id))
+  if (this_frame->level >= 0 && frame_id_eq (this_id, outer_frame_id))
     {
       if (frame_debug)
 	{
@@ -1543,6 +1569,11 @@ get_prev_frame_raw (struct frame_info *this_frame)
   prev_frame = FRAME_OBSTACK_ZALLOC (struct frame_info);
   prev_frame->level = this_frame->level + 1;
 
+  /* For now, assume we don't have frame chains crossing address
+     spaces.  */
+  prev_frame->pspace = this_frame->pspace;
+  prev_frame->aspace = this_frame->aspace;
+
   /* Don't yet compute ->unwind (and hence ->type).  It is computed
      on-demand in get_frame_type, frame_register_unwind, and
      get_frame_id.  */
@@ -1619,7 +1650,12 @@ inside_main_func (struct frame_info *this_frame)
 static int
 inside_entry_func (struct frame_info *this_frame)
 {
-  return (get_frame_func (this_frame) == entry_point_address ());
+  CORE_ADDR entry_point;
+
+  if (!entry_point_address_query (&entry_point))
+    return 0;
+
+  return get_frame_func (this_frame) == entry_point;
 }
 
 /* Return a structure containing various interesting information about
@@ -1923,6 +1959,29 @@ get_frame_type (struct frame_info *frame)
        provides the frame's type.  */
     frame->unwind = frame_unwind_find_by_frame (frame, &frame->prologue_cache);
   return frame->unwind->type;
+}
+
+struct program_space *
+get_frame_program_space (struct frame_info *frame)
+{
+  return frame->pspace;
+}
+
+struct program_space *
+frame_unwind_program_space (struct frame_info *this_frame)
+{
+  gdb_assert (this_frame);
+
+  /* This is really a placeholder to keep the API consistent --- we
+     assume for now that we don't have frame chains crossing
+     spaces.  */
+  return this_frame->pspace;
+}
+
+struct address_space *
+get_frame_address_space (struct frame_info *frame)
+{
+  return frame->aspace;
 }
 
 /* Memory access methods.  */

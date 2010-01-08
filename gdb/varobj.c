@@ -1,7 +1,7 @@
 /* Implementation of the GDB variable objects API.
 
    Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008,
-   2009 Free Software Foundation, Inc.
+   2009, 2010 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1758,7 +1758,7 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
       if (v->pretty_printer)
 	{
 	  VEC (varobj_p) *changed = 0, *new = 0, *unchanged = 0;
-	  int i, children_changed;
+	  int i, children_changed = 0;
 
 	  if (v->frozen)
 	    continue;
@@ -2793,8 +2793,9 @@ c_describe_child (struct varobj *parent, int index,
     {
     case TYPE_CODE_ARRAY:
       if (cname)
-	*cname = xstrprintf ("%d", index
-			     + TYPE_LOW_BOUND (TYPE_INDEX_TYPE (type)));
+	*cname = xstrdup (int_string (index 
+				      + TYPE_LOW_BOUND (TYPE_INDEX_TYPE (type)),
+				      10, 1, 0, 0));
 
       if (cvalue && value)
 	{
@@ -2806,9 +2807,11 @@ c_describe_child (struct varobj *parent, int index,
 	*ctype = get_target_type (type);
 
       if (cfull_expression)
-	*cfull_expression = xstrprintf ("(%s)[%d]", parent_expression, 
-					index
-					+ TYPE_LOW_BOUND (TYPE_INDEX_TYPE (type)));
+	*cfull_expression = 
+	  xstrprintf ("(%s)[%s]", parent_expression, 
+		      int_string (index
+				  + TYPE_LOW_BOUND (TYPE_INDEX_TYPE (type)),
+				  10, 1, 0, 0));
 
 
       break;
@@ -3103,16 +3106,21 @@ cplus_number_of_children (struct varobj *var)
 static void
 cplus_class_num_children (struct type *type, int children[3])
 {
-  int i;
+  int i, vptr_fieldno;
+  struct type *basetype = NULL;
 
   children[v_public] = 0;
   children[v_private] = 0;
   children[v_protected] = 0;
 
+  vptr_fieldno = get_vptr_fieldno (type, &basetype);
   for (i = TYPE_N_BASECLASSES (type); i < TYPE_NFIELDS (type); i++)
     {
-      /* If we have a virtual table pointer, omit it. */
-      if (TYPE_VPTR_BASETYPE (type) == type && TYPE_VPTR_FIELDNO (type) == i)
+      /* If we have a virtual table pointer, omit it.  Even if virtual
+	 table pointers are not specifically marked in the debug info,
+	 they should be artificial.  */
+      if ((type == basetype && i == vptr_fieldno)
+	  || TYPE_FIELD_ARTIFICIAL (type, i))
 	continue;
 
       if (TYPE_FIELD_PROTECTED (type, i))
@@ -3199,6 +3207,10 @@ cplus_describe_child (struct varobj *parent, int index,
 	     find the indexed field. */
 	  int type_index = TYPE_N_BASECLASSES (type);
 	  enum accessibility acc = public_field;
+	  int vptr_fieldno;
+	  struct type *basetype = NULL;
+
+	  vptr_fieldno = get_vptr_fieldno (type, &basetype);
 	  if (strcmp (parent->name, "private") == 0)
 	    acc = private_field;
 	  else if (strcmp (parent->name, "protected") == 0)
@@ -3206,8 +3218,8 @@ cplus_describe_child (struct varobj *parent, int index,
 
 	  while (index >= 0)
 	    {
-	      if (TYPE_VPTR_BASETYPE (type) == type
-		  && type_index == TYPE_VPTR_FIELDNO (type))
+	      if ((type == basetype && type_index == vptr_fieldno)
+		  || TYPE_FIELD_ARTIFICIAL (type, type_index))
 		; /* ignore vptr */
 	      else if (match_accessibility (type, type_index, acc))
 		    --index;

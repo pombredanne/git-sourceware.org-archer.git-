@@ -1,6 +1,6 @@
 /* Target-dependent code for OpenBSD/amd64.
 
-   Copyright (C) 2003, 2004, 2005, 2007, 2008, 2009
+   Copyright (C) 2003, 2004, 2005, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -380,7 +380,7 @@ amd64obsd_trapframe_cache (struct frame_info *this_frame, void **this_cache)
   if ((cs & I386_SEL_RPL) == I386_SEL_UPL)
     {
       /* Trap from user space; terminate backtrace.  */
-      trad_frame_set_id (cache, null_frame_id);
+      trad_frame_set_id (cache, outer_frame_id);
     }
   else
     {

@@ -1,4 +1,4 @@
-# Copyright (C) 2009 Free Software Foundation, Inc.
+# Copyright (C) 2009, 2010 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -56,3 +56,16 @@ gdb_py_test_multiple "input value-returning convenience function" \
   "end" ""
 
 gdb_test "print \$double (1)" "= 2" "call value-returning function"
+
+gdb_py_test_multiple "input int-returning function" \
+  "python" "" \
+  "class Yes(gdb.Function):" "" \
+  "    def __init__(self):" "" \
+  "        gdb.Function.__init__(self, 'yes')" "" \
+  "    def invoke(self):" "" \
+  "        return 1" "" \
+  "Yes ()" "" \
+  "end" ""
+
+gdb_test "print \$yes() && \$yes()" " = 1" "call yes with &&"
+gdb_test "print \$yes() || \$yes()" " = 1" "call yes with ||"

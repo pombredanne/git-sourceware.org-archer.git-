@@ -1,7 +1,7 @@
 /* Target-vector operations for controlling windows child processes, for GDB.
 
    Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
-   2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2005, 2006, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    Contributed by Cygnus Solutions, A Red Hat Company.
 
@@ -1289,8 +1289,8 @@ ctrl_c_handler (DWORD event_type)
 {
   const int attach_flag = current_inferior ()->attach_flag;
 
-  /* Only handle Ctrl-C event.  Ignore others.  */
-  if (event_type != CTRL_C_EVENT)
+  /* Only handle Ctrl-C and Ctrl-Break events.  Ignore others.  */
+  if (event_type != CTRL_C_EVENT && event_type != CTRL_BREAK_EVENT)
     return FALSE;
 
   /* If the inferior and the debugger share the same console, do nothing as
@@ -1585,7 +1585,8 @@ do_initial_windows_stuff (struct target_ops *ops, DWORD pid, int attaching)
   clear_proceed_status ();
   init_wait_for_inferior ();
 
-  inf = add_inferior (pid);
+  inf = current_inferior ();
+  inferior_appeared (inf, pid);
   inf->attach_flag = attaching;
 
   /* Make the new process the current inferior, so terminal handling

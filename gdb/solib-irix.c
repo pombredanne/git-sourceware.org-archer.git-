@@ -1,6 +1,6 @@
 /* Shared library support for IRIX.
    Copyright (C) 1993, 1994, 1995, 1996, 1998, 1999, 2000, 2001, 2002, 2004,
-   2007, 2008, 2009 Free Software Foundation, Inc.
+   2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file was created using portions of irix5-nat.c originally
    contributed to GDB by Ian Lance Taylor.
@@ -365,11 +365,17 @@ disable_break (void)
 static int
 enable_break (void)
 {
-  if (symfile_objfile != NULL)
+  if (symfile_objfile != NULL && has_stack_frames ())
     {
-      base_breakpoint
-	= deprecated_insert_raw_breakpoint (target_gdbarch,
-					    entry_point_address ());
+      struct frame_info *frame = get_current_frame ();
+      struct address_space *aspace = get_frame_address_space (frame);
+      CORE_ADDR entry_point;
+
+      if (!entry_point_address_query (&entry_point))
+	return 0;
+
+      base_breakpoint = deprecated_insert_raw_breakpoint (target_gdbarch,
+							  aspace, entry_point);
 
       if (base_breakpoint != NULL)
 	return 1;

@@ -1,5 +1,5 @@
 # Copyright (C) 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-# 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
+# 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
 # Free Software Foundation, Inc.
 
 # This file is part of GDB.
@@ -172,6 +172,8 @@ GDB_DATADIR_PATH = @GDB_DATADIR_PATH@
 # The argument to --with-pythondir.  If not given, this is
 # GDB_DATADIR_PATH/python.
 pythondir = @pythondir@
+
+GDB_DATADIR = @GDB_DATADIR@
 
 # Helper code from gnulib.
 LIBGNU = gnulib/libgnu.a
@@ -521,6 +523,7 @@ ALL_TARGET_OBS = \
 	m68kbsd-tdep.o m68klinux-tdep.o m68k-tdep.o \
 	m88k-tdep.o \
 	mep-tdep.o \
+	microblaze-tdep.o microblaze-linux-tdep.o \
 	mips-irix-tdep.o mips-linux-tdep.o \
 	mipsnbsd-tdep.o mips-tdep.o \
 	mn10300-linux-tdep.o mn10300-tdep.o \
@@ -663,7 +666,8 @@ SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c ada-tasks.c \
 	cp-name-parser.y \
 	dbxread.c demangle.c dictionary.c disasm.c doublest.c dummy-frame.c \
 	dwarf2expr.c dwarf2loc.c dwarf2read.c dwarf2-frame.c \
-	elfread.c environ.c eval.c event-loop.c event-top.c expprint.c \
+	elfread.c environ.c eval.c event-loop.c event-top.c \
+	exceptions.c expprint.c \
 	f-exp.y f-lang.c f-typeprint.c f-valprint.c findcmd.c findvar.c \
 	frame.c frame-base.c frame-unwind.c \
 	gdbarch.c arch-utils.c gdbtypes.c gnu-v2-abi.c gnu-v3-abi.c \
@@ -680,6 +684,7 @@ SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c ada-tasks.c \
 	objc-exp.y objc-lang.c \
 	objfiles.c osabi.c observer.c osdata.c \
 	p-exp.y p-lang.c p-typeprint.c p-valprint.c parse.c printcmd.c \
+	progspace.c \
 	prologue-value.c \
 	regcache.c reggroups.c remote.c remote-fileio.c reverse.c \
 	scm-exp.c scm-lang.c scm-valprint.c \
@@ -699,8 +704,9 @@ SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c ada-tasks.c \
 	wrapper.c \
 	xml-tdesc.c xml-support.c \
 	inferior.c gdb_usleep.c \
-	record.c \
-	jit.c
+	record.c gcore.c \
+	jit.c \
+	xml-syscall.c \
 
 LINTFILES = $(SFILES) $(YYFILES) $(CONFIG_SRCS) init.c
 
@@ -740,7 +746,7 @@ f-lang.h dwarf2loc.h value.h sparc-tdep.h defs.h target-descriptions.h \
 objfiles.h vec.h disasm.h mips-tdep.h ser-base.h \
 gdb_curses.h bfd-target.h memattr.h inferior.h ax.h dummy-frame.h \
 inflow.h fbsd-nat.h libunwind-frame.h completer.h inf-ttrace.h \
-solib-target.h shnbsd-tdep.h gdb_vfork.h alpha-tdep.h dwarf2expr.h \
+solib-target.h gdb_vfork.h alpha-tdep.h dwarf2expr.h \
 m2-lang.h stack.h charset.h addrmap.h command.h solist.h source.h \
 target.h prologue-value.h cp-abi.h tui/tui-hooks.h tui/tui.h \
 tui/tui-file.h tui/tui-command.h tui/tui-disasm.h tui/tui-wingeneral.h \
@@ -769,7 +775,8 @@ config/rs6000/nm-rs6000.h top.h bsd-kvm.h gdb-stabs.h reggroups.h \
 annotate.h sim-regno.h dictionary.h dfp.h main.h frame-unwind.h	\
 remote-fileio.h i386-linux-tdep.h vax-tdep.h objc-lang.h \
 sentinel-frame.h bcache.h symfile.h windows-tdep.h linux-tdep.h \
-gdb_usleep.h jit.h python/python.h python/python-internal.h
+gdb_usleep.h jit.h python/python.h python/python-internal.h \
+xml-syscall.h ada-operator.inc microblaze-tdep.h
 
 # Header files that already have srcdir in them, or which are in objdir.
 
@@ -849,10 +856,16 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 	trad-frame.o \
 	tramp-frame.o \
 	solib.o solib-null.o \
-	prologue-value.o memory-map.o xml-support.o \
+	prologue-value.o memory-map.o xml-support.o xml-syscall.o \
 	target-descriptions.o target-memory.o xml-tdesc.o xml-builtin.o \
-	inferior.o osdata.o gdb_usleep.o record.o \
-	jit.o
+	inferior.o osdata.o gdb_usleep.o record.o gcore.o \
+	jit.o progspace.o
+
+# Definitions for the syscall's XML files and dir
+XML_SYSCALLS_DIR = syscalls/
+XML_SYSCALLS_FILES = gdb-syscalls.dtd \
+		     ppc-linux.xml ppc64-linux.xml \
+		     i386-linux.xml amd64-linux.xml
 
 TSOBS = inflow.o
 
@@ -887,10 +900,40 @@ generated_files = config.h observer.h observer.inc ada-lex.c \
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 
-all: gdb$(EXEEXT) $(CONFIG_ALL) .gdbinit
+all: gdb$(EXEEXT) $(CONFIG_ALL) xml-syscall-copy
 	@$(MAKE) $(FLAGS_TO_PASS) DO=all "DODIRS=`echo $(SUBDIRS) | sed 's/testsuite//'`" subdir_do
 .PHONY: all-tui
 all-tui: $(TUI)$(EXEEXT)
+
+# This is needed for running GDB from the build directory
+.PHONY: xml-syscall-copy
+xml-syscall-copy:
+	if [ "`cd $(srcdir) && pwd`" != "`pwd`" ] ; then \
+	  mkdir -p ./$(XML_SYSCALLS_DIR) ; \
+	  list='$(XML_SYSCALLS_FILES)' ; \
+ 	  for file in $$list ; do \
+	    f=$(srcdir)/$(XML_SYSCALLS_DIR)/$$file ; \
+	    if test -f $$f ; then \
+	      $(INSTALL_DATA) $$f \
+	    	  ./$(XML_SYSCALLS_DIR) ; \
+	    fi ; \
+	  done ; \
+	fi ;
+
+# This target is responsible for properly installing the syscalls'
+# XML files in the system.
+.PHONY: xml-syscall-install
+xml-syscall-install:
+	$(SHELL) $(srcdir)/../mkinstalldirs \
+		$(DESTDIR)$(GDB_DATADIR)/$(XML_SYSCALLS_DIR) ; \
+	list='$(XML_SYSCALLS_FILES)' ; \
+	for file in $$list ; do \
+	  f=$(srcdir)/$(XML_SYSCALLS_DIR)/$$file ; \
+	  if test -f $$f ; then \
+	    $(INSTALL_DATA) $$f \
+	    	$(DESTDIR)$(GDB_DATADIR)/$(XML_SYSCALLS_DIR) ; \
+	  fi ; \
+	done ;
 
 installcheck:
 
@@ -948,8 +991,11 @@ gdb.z:gdb.1
 # source file and doesn't care about rebuilding or just wants to save the
 # time it takes for make to check that all is up to date.
 # install-only is intended to address that need.
-install: all install-only
-install-only: $(CONFIG_INSTALL)
+install: all install-only 
+
+# The "install-only" target also installs the syscalls' XML files in
+# the system.
+install-only: $(CONFIG_INSTALL) xml-syscall-install
 	transformed_name=`t='$(program_transform_name)'; \
 			  echo gdb | sed -e "$$t"` ; \
 		if test "x$$transformed_name" = x; then \
@@ -1420,6 +1466,7 @@ ALLDEPFILES = \
 	m68kbsd-nat.c m68kbsd-tdep.c \
 	m68klinux-nat.c m68klinux-tdep.c \
 	m88k-tdep.c m88kbsd-nat.c \
+	microblaze-tdep.c microblaze-linux-tdep.c \
 	mingw-hdep.c \
 	mips-linux-nat.c mips-linux-tdep.c \
 	mips-irix-tdep.c \

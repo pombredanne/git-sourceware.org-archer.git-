@@ -1,6 +1,6 @@
 /* Python interface to values.
 
-   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -242,7 +242,8 @@ valpy_string (PyObject *self, PyObject *args, PyObject *kw)
   const char *errors = NULL;
   const char *user_encoding = NULL;
   const char *la_encoding = NULL;
-  static char *keywords[] = { "encoding", "errors", "length" };
+  struct type *char_type;
+  static char *keywords[] = { "encoding", "errors", "length", NULL };
 
   if (!PyArg_ParseTupleAndKeywords (args, kw, "|ssi", keywords,
 				    &user_encoding, &errors, &length))
@@ -250,12 +251,13 @@ valpy_string (PyObject *self, PyObject *args, PyObject *kw)
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      LA_GET_STRING (value, &buffer, &length, &la_encoding);
+      LA_GET_STRING (value, &buffer, &length, &char_type, &la_encoding);
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
   encoding = (user_encoding && *user_encoding) ? user_encoding : la_encoding;
-  unicode = PyUnicode_Decode (buffer, length, encoding, errors);
+  unicode = PyUnicode_Decode (buffer, length * TYPE_LENGTH (char_type),
+			      encoding, errors);
   xfree (buffer);
 
   return unicode;
@@ -788,6 +790,13 @@ valpy_int (PyObject *self)
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
+#ifdef HAVE_LONG_LONG		/* Defined by Python.  */
+  /* If we have 'long long', and the value overflows a 'long', use a
+     Python Long; otherwise use a Python Int.  */
+  if (sizeof (l) > sizeof (long) && (l > PyInt_GetMax ()
+				     || l < (- (LONGEST) PyInt_GetMax ()) - 1))
+    return PyLong_FromLongLong (l);
+#endif
   return PyInt_FromLong (l);
 }
 
@@ -812,7 +821,11 @@ valpy_long (PyObject *self)
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
+#ifdef HAVE_LONG_LONG		/* Defined by Python.  */
+  return PyLong_FromLongLong (l);
+#else
   return PyLong_FromLong (l);
+#endif
 }
 
 /* Implements conversion to float.  */

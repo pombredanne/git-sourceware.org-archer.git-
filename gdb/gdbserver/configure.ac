@@ -1,6 +1,6 @@
 dnl Autoconf configure script for GDB server.
-dnl Copyright (C) 2000, 2002, 2003, 2004, 2005, 2006, 2007, 2008
-dnl Free Software Foundation, Inc.
+dnl Copyright (C) 2000, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009,
+dnl 2010 Free Software Foundation, Inc.
 dnl
 dnl This file is part of GDB.
 dnl
@@ -45,6 +45,15 @@ AC_CHECK_HEADERS(sgtty.h termio.h termios.h sys/reg.h string.h dnl
 AC_CHECK_FUNCS(pread pwrite pread64)
 AC_REPLACE_FUNCS(memmem)
 
+dnl dladdr is glibc-specific.  It is used by thread-db.c but only for
+dnl debugging messages.  It lives in -ldl which is handled below so we don't
+dnl use AC_CHECK_LIB (or AC_SEARCH_LIBS) here.  Instead we just temporarily
+dnl augment LIBS.
+old_LIBS="$LIBS"
+LIBS="$LIBS -ldl"
+AC_CHECK_FUNCS(dladdr)
+LIBS="$old_LIBS"
+
 have_errno=no
 AC_MSG_CHECKING(for errno)
 AC_TRY_LINK([
@@ -72,6 +81,37 @@ ACX_PKGVERSION([GDB])
 ACX_BUGURL([http://www.gnu.org/software/gdb/bugs/])
 AC_DEFINE_UNQUOTED([PKGVERSION], ["$PKGVERSION"], [Additional package description])
 AC_DEFINE_UNQUOTED([REPORT_BUGS_TO], ["$REPORT_BUGS_TO"], [Bug reporting address])
+
+# Check for various supplementary target information (beyond the
+# triplet) which might affect the choices in configure.srv.
+case "${target}" in
+changequote(,)dnl
+  i[34567]86-*-linux*)
+changequote([,])dnl
+    AC_CACHE_CHECK([if building for x86-64], [gdb_cv_i386_is_x86_64],
+      	           [save_CPPFLAGS="$CPPFLAGS"
+                    CPPFLAGS="$CPPFLAGS $CFLAGS"
+                    AC_EGREP_CPP([got it], [
+#if __x86_64__
+got it
+#endif
+                 ], [gdb_cv_i386_is_x86_64=yes],
+                    [gdb_cv_i386_is_x86_64=no])
+                    CPPFLAGS="$save_CPPFLAGS"])
+    ;;
+  m68k-*-*)
+    AC_CACHE_CHECK([if building for Coldfire], [gdb_cv_m68k_is_coldfire],
+      	           [save_CPPFLAGS="$CPPFLAGS"
+                    CPPFLAGS="$CPPFLAGS $CFLAGS"
+                    AC_EGREP_CPP([got it], [
+#ifdef __mcoldfire__
+got it
+#endif
+                 ], [gdb_cv_m68k_is_coldfire=yes],
+                    [gdb_cv_m68k_is_coldfire=no])
+                    CPPFLAGS="$save_CPPFLAGS"])
+    ;;
+esac
 
 . ${srcdir}/configure.srv
 
@@ -140,23 +180,13 @@ srv_libs=
 USE_THREAD_DB=
 
 if test "$srv_linux_thread_db" = "yes"; then
-  SRV_CHECK_THREAD_DB
-  if test "$srv_cv_thread_db" = no; then
-    AC_WARN([Could not find libthread_db.])
-    AC_WARN([Disabling thread support in gdbserver.])
-    srv_linux_thread_db=no
-  else
-    srv_libs="$srv_cv_thread_db"
-    SRV_CHECK_TLS_GET_ADDR
-  fi
+  srv_libs="-ldl"
   old_LDFLAGS="$LDFLAGS"
   LDFLAGS="$LDFLAGS -rdynamic"
   AC_TRY_LINK([], [], [RDYNAMIC=-rdynamic], [RDYNAMIC=])
   AC_SUBST(RDYNAMIC)
   LDFLAGS="$old_LDFLAGS"
-fi
 
-if test "$srv_linux_thread_db" = "yes"; then
   srv_thread_depfiles="thread-db.o proc-service.o"
   USE_THREAD_DB="-DUSE_THREAD_DB"
   AC_CACHE_CHECK([for TD_VERSION], gdbsrv_cv_have_td_version,
@@ -166,11 +196,14 @@ if test "$srv_linux_thread_db" = "yes"; then
   if test $gdbsrv_cv_have_td_version = yes; then
     AC_DEFINE(HAVE_TD_VERSION, 1, [Define if TD_VERSION is available.])
   fi
-
-  if test "$srv_cv_tls_get_addr" = yes; then
-    AC_DEFINE(HAVE_TD_THR_TLS_GET_ADDR, 1, [Define if td_thr_tls_get_addr is available.])
-  fi
 fi
+
+AC_ARG_WITH(libthread-db,
+AS_HELP_STRING([--with-libthread-db=PATH], [use given libthread_db directly]),
+[srv_libthread_db_path="${withval}"
+  AC_DEFINE(USE_LIBTHREAD_DB_DIRECTLY, 1, [Define if we should use libthread_db directly.])
+  srv_libs="$srv_libthread_db_path"
+])
 
 if test "$srv_xmlfiles" != ""; then
   srv_xmlbuiltin="xml-builtin.o"

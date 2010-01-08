@@ -1,6 +1,6 @@
 /* General python/gdb code
 
-   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -317,7 +317,11 @@ execute_gdb_command (PyObject *self, PyObject *args)
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      execute_command (arg, from_tty);
+      /* Copy the argument text in case the command modifies it.  */
+      char *copy = xstrdup (arg);
+      struct cleanup *cleanup = make_cleanup (xfree, copy);
+      execute_command (copy, from_tty);
+      do_cleanups (cleanup);
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
@@ -340,7 +344,7 @@ gdbpy_solib_address (PyObject *self, PyObject *args)
   if (!PyArg_ParseTuple (args, "K", &pc))
     return NULL;
 
-  soname = solib_name_from_address (pc);
+  soname = solib_name_from_address (current_program_space, pc);
   if (soname)
     str_obj = PyString_Decode (soname, strlen (soname), host_charset (), NULL);
   else
@@ -1033,7 +1037,9 @@ Return the selected thread object." },
 Return a tuple containing all inferiors." },
 
   { "parse_and_eval", gdbpy_parse_and_eval, METH_VARARGS,
-    "Parse a string as an expression, evaluate it, and return the result." },
+    "parse_and_eval (String) -> Value.\n\
+Parse String as an expression, evaluate it, and return the result as a Value."
+  },
 
   { "post_event", gdbpy_post_event, METH_VARARGS,
     "Post an event into gdb's event loop." },

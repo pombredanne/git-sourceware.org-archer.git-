@@ -166,14 +166,17 @@ bfd_mach_o_cpu_subtype;
 
 typedef enum bfd_mach_o_filetype
 {
-  BFD_MACH_O_MH_OBJECT = 1,
-  BFD_MACH_O_MH_EXECUTE = 2,
-  BFD_MACH_O_MH_FVMLIB = 3,
-  BFD_MACH_O_MH_CORE = 4,
-  BFD_MACH_O_MH_PRELOAD = 5,
-  BFD_MACH_O_MH_DYLIB = 6,
-  BFD_MACH_O_MH_DYLINKER = 7,
-  BFD_MACH_O_MH_BUNDLE = 8
+  BFD_MACH_O_MH_OBJECT      = 0x01,
+  BFD_MACH_O_MH_EXECUTE     = 0x02,
+  BFD_MACH_O_MH_FVMLIB      = 0x03,
+  BFD_MACH_O_MH_CORE        = 0x04,
+  BFD_MACH_O_MH_PRELOAD     = 0x05,
+  BFD_MACH_O_MH_DYLIB       = 0x06,
+  BFD_MACH_O_MH_DYLINKER    = 0x07,
+  BFD_MACH_O_MH_BUNDLE      = 0x08,
+  BFD_MACH_O_MH_DYLIB_STUB  = 0x09,
+  BFD_MACH_O_MH_DSYM        = 0x0a,
+  BFD_MACH_O_MH_KEXT_BUNDLE = 0x0b
 }
 bfd_mach_o_filetype;
 
@@ -748,7 +751,6 @@ bfd_mach_o_prebound_dylib_command;
 typedef struct bfd_mach_o_uuid_command
 {
   unsigned char uuid[16];
-  asection *section;
 }
 bfd_mach_o_uuid_command;
 
@@ -855,7 +857,7 @@ bfd_mach_o_backend_data;
   ((bfd_mach_o_backend_data*)(abfd)->xvec->backend_data)
 
 bfd_boolean bfd_mach_o_valid (bfd *);
-int bfd_mach_o_scan_read_dysymtab_symbol (bfd *, bfd_mach_o_dysymtab_command *, bfd_mach_o_symtab_command *, bfd_mach_o_asymbol *, unsigned long);
+int bfd_mach_o_read_dysymtab_symbol (bfd *, bfd_mach_o_dysymtab_command *, bfd_mach_o_symtab_command *, bfd_mach_o_asymbol *, unsigned long);
 int bfd_mach_o_scan_start_address (bfd *);
 int bfd_mach_o_scan (bfd *, bfd_mach_o_header *, bfd_mach_o_data_struct *);
 bfd_boolean bfd_mach_o_mkobject_init (bfd *);
@@ -873,6 +875,8 @@ bfd_boolean bfd_mach_o_bfd_copy_private_section_data (bfd *, asection *,
 bfd_boolean bfd_mach_o_bfd_copy_private_bfd_data (bfd *, bfd *);
 long bfd_mach_o_get_symtab_upper_bound (bfd *);
 long bfd_mach_o_canonicalize_symtab (bfd *, asymbol **);
+long bfd_mach_o_get_synthetic_symtab (bfd *, long, asymbol **, long, 
+                                      asymbol **, asymbol **ret);
 long bfd_mach_o_get_reloc_upper_bound (bfd *, asection *);
 long bfd_mach_o_canonicalize_reloc (bfd *, asection *, arelent **, asymbol **);
 long bfd_mach_o_get_dynamic_reloc_upper_bound (bfd *);

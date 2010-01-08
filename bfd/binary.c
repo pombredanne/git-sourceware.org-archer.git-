@@ -42,11 +42,6 @@
    a start symbol, an end symbol, and an absolute length symbol.  */
 #define BIN_SYMS 3
 
-/* Set by external programs - specifies the BFD architecture and
-   machine number to be uses when creating binary BFDs.  */
-enum bfd_architecture  bfd_external_binary_architecture = bfd_arch_unknown;
-unsigned long          bfd_external_machine = 0;
-
 /* Create a binary object.  Invoked via bfd_set_format.  */
 
 static bfd_boolean
@@ -91,14 +86,6 @@ binary_object_p (bfd *abfd)
   sec->filepos = 0;
 
   abfd->tdata.any = (void *) sec;
-
-  if (bfd_get_arch_info (abfd) != NULL)
-    {
-      if ((bfd_get_arch_info (abfd)->arch == bfd_arch_unknown)
-          && (bfd_external_binary_architecture != bfd_arch_unknown))
-        bfd_set_arch_info (abfd, bfd_lookup_arch
-			   (bfd_external_binary_architecture, bfd_external_machine));
-    }
 
   return abfd->xvec;
 }
@@ -320,6 +307,8 @@ binary_sizeof_headers (bfd *abfd ATTRIBUTE_UNUSED,
 #define binary_bfd_link_hash_table_create         _bfd_generic_link_hash_table_create
 #define binary_bfd_link_hash_table_free           _bfd_generic_link_hash_table_free
 #define binary_bfd_link_just_syms                 _bfd_generic_link_just_syms
+#define binary_bfd_copy_link_hash_symbol_type \
+  _bfd_generic_copy_link_hash_symbol_type
 #define binary_bfd_link_add_symbols               _bfd_generic_link_add_symbols
 #define binary_bfd_final_link                     _bfd_generic_final_link
 #define binary_bfd_link_split_section             _bfd_generic_link_split_section

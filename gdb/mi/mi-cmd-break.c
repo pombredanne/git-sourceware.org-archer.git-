@@ -1,5 +1,5 @@
 /* MI Command Set - breakpoint and watchpoint commands.
-   Copyright (C) 2000, 2001, 2002, 2007, 2008, 2009
+   Copyright (C) 2000, 2001, 2002, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
    Contributed by Cygnus Solutions (a Red Hat company).
 
@@ -298,7 +298,7 @@ mi_cmd_break_commands (char *command, char **argv, int argc)
   mi_command_line_array_ptr = 1;
   mi_command_line_array_cnt = argc;
 
-  break_command = read_command_lines_1 (mi_read_next_line, 0);
+  break_command = read_command_lines_1 (mi_read_next_line, 1);
   breakpoint_set_commands (b, break_command);
 }
 

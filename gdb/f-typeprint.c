@@ -1,7 +1,8 @@
 /* Support for printing Fortran types for GDB, the GNU debugger.
 
    Copyright (C) 1986, 1988, 1989, 1991, 1993, 1994, 1995, 1996, 1998, 2000,
-   2001, 2002, 2003, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2001, 2002, 2003, 2006, 2007, 2008, 2009, 2010
+   Free Software Foundation, Inc.
 
    Contributed by Motorola.  Adapted from the C version by Farooq Butt
    (fmbutt@engage.sps.mot.com).
@@ -60,15 +61,13 @@ f_print_type (struct type *type, char *varstring, struct ui_file *stream,
   f_type_print_base (type, stream, show, level);
   code = TYPE_CODE (type);
   if ((varstring != NULL && *varstring != '\0')
-      ||
   /* Need a space if going to print stars or brackets;
      but not if we will print just a type name.  */
-      ((show > 0 || TYPE_NAME (type) == 0)
-       &&
-       (code == TYPE_CODE_PTR || code == TYPE_CODE_FUNC
-	|| code == TYPE_CODE_METHOD
-	|| code == TYPE_CODE_ARRAY
-	|| code == TYPE_CODE_REF)))
+      || ((show > 0 || TYPE_NAME (type) == 0)
+          && (code == TYPE_CODE_PTR || code == TYPE_CODE_FUNC
+	      || code == TYPE_CODE_METHOD
+	      || code == TYPE_CODE_ARRAY
+	      || code == TYPE_CODE_REF)))
     fputs_filtered (" ", stream);
   f_type_print_varspec_prefix (type, stream, show, 0);
 

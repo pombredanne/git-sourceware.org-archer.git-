@@ -1,5 +1,5 @@
 /* Event loop machinery for GDB, the GNU debugger.
-   Copyright (C) 1999, 2000, 2001, 2002, 2005, 2006, 2007, 2008, 2009
+   Copyright (C) 1999, 2000, 2001, 2002, 2005, 2006, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
    Written by Elena Zannoni <ezannoni@cygnus.com> of Cygnus Solutions.
 
@@ -1212,9 +1212,9 @@ create_timer (int milliseconds, timer_handler_func * proc, gdb_client_data clien
     {
       /* If the seconds field is greater or if it is the same, but the
          microsecond field is greater. */
-      if ((timer_index->when.tv_sec > timer_ptr->when.tv_sec) ||
-	  ((timer_index->when.tv_sec == timer_ptr->when.tv_sec)
-	   && (timer_index->when.tv_usec > timer_ptr->when.tv_usec)))
+      if ((timer_index->when.tv_sec > timer_ptr->when.tv_sec)
+	  || ((timer_index->when.tv_sec == timer_ptr->when.tv_sec)
+	      && (timer_index->when.tv_usec > timer_ptr->when.tv_usec)))
 	break;
     }
 
@@ -1288,9 +1288,9 @@ handle_timer_event (event_data dummy)
 
   while (timer_ptr != NULL)
     {
-      if ((timer_ptr->when.tv_sec > time_now.tv_sec) ||
-	  ((timer_ptr->when.tv_sec == time_now.tv_sec) &&
-	   (timer_ptr->when.tv_usec > time_now.tv_usec)))
+      if ((timer_ptr->when.tv_sec > time_now.tv_sec)
+	  || ((timer_ptr->when.tv_sec == time_now.tv_sec)
+	      && (timer_ptr->when.tv_usec > time_now.tv_usec)))
 	break;
 
       /* Get rid of the timer from the beginning of the list. */

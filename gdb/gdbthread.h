@@ -1,6 +1,6 @@
 /* Multi-process/thread control defs for GDB, the GNU debugger.
    Copyright (C) 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1997, 1998, 1999,
-   2000, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2000, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
    Contributed by Lynx Real-Time Systems, Inc.  Los Gatos, CA.
    
 
@@ -245,6 +245,10 @@ struct thread_info *first_thread_of_process (int pid);
 
 /* Returns any thread of process PID.  */
 extern struct thread_info *any_thread_of_process (int pid);
+
+/* Returns any non-exited thread of process PID, giving preference for
+   already stopped threads.  */
+extern struct thread_info *any_live_thread_of_process (int pid);
 
 /* Change the ptid of thread OLD_PTID to NEW_PTID.  */
 void thread_change_ptid (ptid_t old_ptid, ptid_t new_ptid);

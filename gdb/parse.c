@@ -1,7 +1,7 @@
 /* Parse expressions for GDB.
 
    Copyright (C) 1986, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997,
-   1998, 1999, 2000, 2001, 2004, 2005, 2007, 2008, 2009
+   1998, 1999, 2000, 2001, 2004, 2005, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    Modified from expread.y by the Department of Computer Science at the
@@ -835,6 +835,11 @@ operator_length_standard (struct expression *expr, int endpos,
     case OP_F77_UNDETERMINED_ARGLIST:
       oplen = 3;
       args = 1 + longest_to_int (expr->elts[endpos - 2].longconst);
+      break;
+
+    case TYPE_INSTANCE:
+      oplen = 4 + longest_to_int (expr->elts[endpos - 2].longconst);
+      args = 1;
       break;
 
     case OP_OBJC_MSGCALL:	/* Objective C message (method) call */

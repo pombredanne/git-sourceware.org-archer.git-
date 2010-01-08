@@ -1,4 +1,4 @@
-# Copyright 1999, 2000, 2001, 2002, 2003, 2004, 2004, 2007, 2008, 2009
+# Copyright 1999, 2000, 2001, 2002, 2003, 2004, 2004, 2007, 2008, 2009, 2010
 # Free Software Foundation, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -125,11 +125,6 @@ mi_create_varobj_checked lsimple.integer lsimple.integer "int" \
 mi_gdb_test "-var-create int * int" \
 	"&\"Attempt to use a type name as an expression.\\\\n\".*\\^error,msg=\"mi_cmd_var_create: unable to create variable object\"" \
 	"create int"
-
-# The number 0 must be an invalid frame address and linteger a local variable.
-mi_gdb_test "-var-create invalidframe 0 linteger" \
-	"\\^error,msg=\"Failed to find the specified frame\"" \
-	"create variable with invalid FRAME-ADDR"
 
 
 #####             #####

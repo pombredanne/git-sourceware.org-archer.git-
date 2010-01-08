@@ -1,6 +1,6 @@
 /* UI_FILE - a generic STDIO like output stream.
 
-   Copyright (C) 1999, 2000, 2001, 2002, 2007, 2008, 2009
+   Copyright (C) 1999, 2000, 2001, 2002, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -23,6 +23,7 @@
 #include "defs.h"
 #include "ui-file.h"
 #include "gdb_string.h"
+#include "gdb_select.h"
 
 #include <errno.h>
 
@@ -471,6 +472,19 @@ stdio_file_read (struct ui_file *file, char *buf, long length_buf)
   if (stdio->magic != &stdio_file_magic)
     internal_error (__FILE__, __LINE__,
 		    _("stdio_file_read: bad magic number"));
+
+  /* For the benefit of Windows, call gdb_select before reading from
+     the file.  Wait until at least one byte of data is available.
+     Control-C can interrupt gdb_select, but not read.  */
+  {
+    int fd = fileno (stdio->file);
+    fd_set readfds;
+    FD_ZERO (&readfds);
+    FD_SET (fd, &readfds);
+    if (gdb_select (fd + 1, &readfds, NULL, NULL, NULL) == -1)
+      return -1;
+  }
+
   return read (fileno (stdio->file), buf, length_buf);
 }
 

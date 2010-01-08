@@ -889,16 +889,11 @@ cr16_elf_final_link_relocate (reloc_howto_type *howto,
   unsigned short r_type = howto->type;
   bfd_byte *hit_data = contents + offset;
   bfd_vma reloc_bits, check, Rvalue1;
-
   bfd *      dynobj;
   bfd_vma *  local_got_offsets;
-  asection * sgot;
 
   dynobj = elf_hash_table (info)->dynobj;
   local_got_offsets = elf_local_got_offsets (input_bfd);
-
-  sgot   = NULL;
-
 
   switch (r_type)
     {
@@ -1430,9 +1425,6 @@ elf32_cr16_relocate_section (bfd *output_bfd, struct bfd_link_info *info,
   Elf_Internal_Shdr *symtab_hdr;
   struct elf_link_hash_entry **sym_hashes;
   Elf_Internal_Rela *rel, *relend;
-
-  if (info->relocatable)
-    return TRUE;
 
   symtab_hdr = &elf_tdata (input_bfd)->symtab_hdr;
   sym_hashes = elf_sym_hashes (input_bfd);

@@ -1,7 +1,7 @@
 /* Header file for command-reading library command.c.
 
    Copyright (C) 1986, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1999, 2000,
-   2002, 2004, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2002, 2004, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -32,8 +32,8 @@ enum command_class
   /* Classes of commands */
   no_class = -1, class_run = 0, class_vars, class_stack,
   class_files, class_support, class_info, class_breakpoint, class_trace,
-  class_alias, class_obscure, class_user, class_maintenance,
-  class_pseudo, class_tui, class_xdb
+  class_alias, class_bookmark, class_obscure, class_maintenance,
+  class_pseudo, class_tui, class_user, class_xdb
 };
 
 /* FIXME: cagney/2002-03-17: Once cmd_type() has been removed, ``enum

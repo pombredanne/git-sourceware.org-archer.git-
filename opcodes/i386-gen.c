@@ -86,6 +86,8 @@ static initializer cpu_flag_init[] =
     "Cpu186|Cpu286|Cpu386|Cpu486|Cpu586|Cpu686|CpuSYSCALL|CpuRdtscp|Cpu387|Cpu687|CpuMMX|Cpu3dnow|Cpu3dnowA|CpuSSE|CpuSSE2|CpuLM" },
   { "CPU_AMDFAM10_FLAGS",
     "Cpu186|Cpu286|Cpu386|Cpu486|Cpu586|Cpu686|CpuSYSCALL|CpuRdtscp|Cpu387|Cpu687|CpuFISTTP|CpuMMX|Cpu3dnow|Cpu3dnowA|CpuSSE|CpuSSE2|CpuSSE3|CpuSSE4a|CpuABM|CpuLM" },
+  { "CPU_AMDFAM15_FLAGS",
+    "Cpu186|Cpu286|Cpu386|Cpu486|Cpu586|Cpu686|CpuSYSCALL|CpuRdtscp|Cpu387|Cpu687|CpuFISTTP|CpuMMX|Cpu3dnow|Cpu3dnowA|CpuSSE|CpuSSE2|CpuSSE3|CpuSSE4a|CpuABM|CpuLM|CpuFMA4|CpuXOP|CpuLWP" },
   { "CPU_8087_FLAGS",
     "Cpu8087" },
   { "CPU_287_FLAGS",
@@ -128,6 +130,10 @@ static initializer cpu_flag_init[] =
     "CpuMMX|CpuSSE|CpuSSE2|CpuSSE3|CpuSSSE3|CpuSSE4_1|CpuSSE4_2|CpuAVX|CpuFMA" },
   { "CPU_FMA4_FLAGS",
     "CpuMMX|CpuSSE|CpuSSE2|CpuSSE3|CpuSSSE3|CpuSSE4_1|CpuSSE4_2|CpuAVX|CpuFMA4" },
+  { "CPU_XOP_FLAGS",
+    "CpuMMX|CpuSSE|CpuSSE2|CpuSSE3|CpuSSSE3|CpuSSE4_1|CpuSSE4_2|CpuSSE4a|CpuABM|CpuAVX|CpuFMA4|CpuXOP" },
+  { "CPU_LWP_FLAGS",
+    "CpuLWP" },
   { "CPU_MOVBE_FLAGS",
     "CpuMovbe" },
   { "CPU_RDTSCP_FLAGS",
@@ -295,7 +301,9 @@ static bitfield cpu_flags[] =
   BITFIELD (CpuAES),
   BITFIELD (CpuPCLMUL),
   BITFIELD (CpuFMA),
-  BITFIELD (CpuFMA4),  
+  BITFIELD (CpuFMA4),
+  BITFIELD (CpuXOP),
+  BITFIELD (CpuLWP),
   BITFIELD (CpuLM),
   BITFIELD (CpuMovbe),
   BITFIELD (CpuEPT),
@@ -334,10 +342,10 @@ static bitfield opcode_modifiers[] =
   BITFIELD (No_ldSuf),
   BITFIELD (FWait),
   BITFIELD (IsString),
+  BITFIELD (IsLockable),
   BITFIELD (RegKludge),
   BITFIELD (FirstXmm0),
   BITFIELD (Implicit1stXmm0),
-  BITFIELD (ByteOkIntel),
   BITFIELD (ToDword),
   BITFIELD (ToQword),
   BITFIELD (AddrPrefixOp0),
@@ -347,15 +355,10 @@ static bitfield opcode_modifiers[] =
   BITFIELD (Rex64),
   BITFIELD (Ugh),
   BITFIELD (Vex),
-  BITFIELD (Vex256),
-  BITFIELD (VexNDS),
-  BITFIELD (VexNDD),
-  BITFIELD (VexW0),
-  BITFIELD (VexW1),
-  BITFIELD (Vex0F),
-  BITFIELD (Vex0F38),
-  BITFIELD (Vex0F3A),
-  BITFIELD (Vex3Sources),
+  BITFIELD (VexVVVV),
+  BITFIELD (VexW),
+  BITFIELD (VexOpcode),
+  BITFIELD (VexSources),
   BITFIELD (VexImmExt),
   BITFIELD (SSE2AVX),
   BITFIELD (NoAVX),
@@ -375,13 +378,13 @@ static bitfield operand_types[] =
   BITFIELD (RegMMX),
   BITFIELD (RegXMM),
   BITFIELD (RegYMM),
+  BITFIELD (Imm1),
   BITFIELD (Imm8),
   BITFIELD (Imm8S),
   BITFIELD (Imm16),
   BITFIELD (Imm32),
   BITFIELD (Imm32S),
   BITFIELD (Imm64),
-  BITFIELD (Imm1),
   BITFIELD (BaseIndex),
   BITFIELD (Disp8),
   BITFIELD (Disp16),
@@ -539,6 +542,29 @@ set_bitfield (const char *f, bitfield *array, int value,
 	array[i].value = value;
 	return;
       }
+
+  if (value)
+    {
+      const char *v = strchr (f, '=');
+
+      if (v)
+	{
+	  size_t n = v - f;
+	  char *end;
+
+	  for (i = 0; i < size; i++)
+	    if (strncasecmp (array[i].name, f, n) == 0)
+	      {
+		value = strtol (v + 1, &end, 0);
+		if (*end == '\0')
+		  {
+		    array[i].value = value;
+		    return;
+		  }
+		break;
+	      }
+	}
+    }
 
   if (lineno != -1)
     fail (_("%s: %d: Unknown bitfield: %s\n"), filename, lineno, f);

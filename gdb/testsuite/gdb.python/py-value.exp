@@ -1,4 +1,4 @@
-# Copyright (C) 2008, 2009 Free Software Foundation, Inc.
+# Copyright (C) 2008, 2009, 2010 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -361,14 +361,25 @@ proc test_subscript_regression {lang} {
  # Try to access a single dimension array with a subscript to the
  # result.  This should fail.
  gdb_test "python print pointer\[intv\]\[0\]" "RuntimeError: Cannot subscript requested type.*" \
-     "Attempt to access an integer with a subscript"   
+     "Attempt to access an integer with a subscript"
 
  # Lastly, test subscript access to an array with multiple
  # dimensions.  This should pass.
  gdb_py_test_silent_cmd "print {\"fu \",\"foo\",\"bar\"}" "Build array" 1
  gdb_py_test_silent_cmd "python marray = gdb.history(0)" "" 1
  gdb_test "python print marray\[1\]\[2\]" "o." "Test multiple subscript"
-}   
+}
+
+# A few tests of gdb.parse_and_eval.
+proc test_parse_and_eval {} {
+  gdb_test "python print gdb.parse_and_eval ('23')" "23" \
+    "parse_and_eval constant test"
+  gdb_test "python print gdb.parse_and_eval ('5 + 7')" "12" \
+    "parse_and_eval simple expression test"
+  gdb_test "python print type(gdb.parse_and_eval ('5 + 7'))" \
+    ".type 'gdb.Value'."\
+    "parse_and_eval type test"
+}
 
 # Start with a fresh gdb.
 
@@ -397,6 +408,7 @@ test_value_numeric_ops
 test_value_boolean
 test_value_compare
 test_objfiles
+test_parse_and_eval
 
 # The following tests require execution.
 
@@ -410,7 +422,6 @@ test_value_after_death
 test_cast_regression
 
 # The following test recompiles the binary to test either C or C++
-# values.
-
+# values. 
 test_subscript_regression "c++"
 test_subscript_regression "c"

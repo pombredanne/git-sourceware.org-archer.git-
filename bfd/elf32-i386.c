@@ -1669,7 +1669,6 @@ elf_i386_check_relocs (bfd *abfd,
 		     easily.  Oh well.  */
 		  void **vpp;
 		  asection *s;
-		  Elf_Internal_Sym *isym;
 
 		  isym = bfd_sym_from_r_symndx (&htab->sym_cache,
 						abfd, r_symndx);
@@ -2665,7 +2664,7 @@ elf_i386_fake_sections (bfd *abfd ATTRIBUTE_UNUSED,
 			Elf_Internal_Shdr *hdr,
 			asection *sec)
 {
-  register const char *name;
+  const char *name;
 
   name = bfd_get_section_name (abfd, sec);
 
@@ -3610,7 +3609,7 @@ elf_i386_relocate_section (bfd *output_bfd,
 	    {
 	      Elf_Internal_Rela outrel;
 	      bfd_byte *loc;
-	      int dr_type, indx;
+	      int dr_type;
 	      asection *sreloc;
 
 	      if (htab->elf.srelgot == NULL)
@@ -3939,7 +3938,6 @@ elf_i386_relocate_section (bfd *output_bfd,
 	      Elf_Internal_Rela outrel;
 	      asection *sreloc;
 	      bfd_byte *loc;
-	      int indx;
 
 	      outrel.r_offset = rel->r_offset
 				+ input_section->output_section->vma
@@ -4251,13 +4249,15 @@ elf_i386_finish_dynamic_symbol (bfd *output_bfd,
 	    }
 	  else
 	    {
+	      asection *plt;
+
 	      if (!h->pointer_equality_needed)
 		abort ();
 
 	      /* For non-shared object, we can't use .got.plt, which
 		 contains the real function addres if we need pointer
 		 equality.  We load the GOT entry with the PLT entry.  */
-	      asection *plt = htab->elf.splt ? htab->elf.splt : htab->elf.iplt;
+	      plt = htab->elf.splt ? htab->elf.splt : htab->elf.iplt;
 	      bfd_put_32 (output_bfd,
 			  (plt->output_section->vma
 			   + plt->output_offset + h->plt.offset),

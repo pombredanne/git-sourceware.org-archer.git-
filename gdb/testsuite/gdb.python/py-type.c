@@ -1,6 +1,6 @@
 /* This testcase is part of GDB, the GNU debugger.
 
-   Copyright 2009 Free Software Foundation, Inc.
+   Copyright 2009, 2010 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -22,11 +22,16 @@ struct s
 };
 
 #ifdef __cplusplus
-class C
+struct C
 {
- public:
   int c;
   int d;
+};
+
+struct D : C
+{
+  int e;
+  int f;
 };
 #endif
 
@@ -39,6 +44,9 @@ main ()
   C c;
   c.c = 1;
   c.d = 2;
+  D d;
+  d.e = 3;
+  d.f = 4;
 #endif
 
   st.a = 3;

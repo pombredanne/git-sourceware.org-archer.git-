@@ -172,6 +172,14 @@ struct elfNN_ia64_link_hash_table
   unsigned reltext : 1;		/* are there relocs against readonly sections? */
   unsigned self_dtpmod_done : 1;/* has self DTPMOD entry been finished? */
   bfd_vma self_dtpmod_offset;	/* .got offset to self DTPMOD entry */
+  /* There are maybe R_IA64_GPREL22 relocations, including those
+     optimized from R_IA64_LTOFF22X, against non-SHF_IA_64_SHORT
+     sections.  We need to record those sections so that we can choose
+     a proper GP to cover all R_IA64_GPREL22 relocations.  */
+  asection *max_short_sec;	/* maximum short output section */
+  bfd_vma max_short_offset;	/* maximum short offset */
+  asection *min_short_sec;	/* minimum short output section */
+  bfd_vma min_short_offset;	/* minimum short offset */
 
   htab_t loc_hash_table;
   void *loc_hash_memory;
@@ -752,6 +760,42 @@ elfNN_ia64_relax_brl (bfd_byte *contents, bfd_vma off)
 
 /* These functions do relaxation for IA-64 ELF.  */
 
+static void
+elfNN_ia64_update_short_info (asection *sec, bfd_vma offset,
+			      struct elfNN_ia64_link_hash_table *ia64_info)
+{
+  /* Skip ABS and SHF_IA_64_SHORT sections.  */
+  if (sec == bfd_abs_section_ptr
+      || (sec->flags & SEC_SMALL_DATA) != 0)
+    return;
+
+  if (!ia64_info->min_short_sec)
+    {
+      ia64_info->max_short_sec = sec;
+      ia64_info->max_short_offset = offset;
+      ia64_info->min_short_sec = sec;
+      ia64_info->min_short_offset = offset;
+    }
+  else if (sec == ia64_info->max_short_sec
+	   && offset > ia64_info->max_short_offset)
+    ia64_info->max_short_offset = offset;
+  else if (sec == ia64_info->min_short_sec
+	   && offset < ia64_info->min_short_offset)
+    ia64_info->min_short_offset = offset;
+  else if (sec->output_section->vma
+	   > ia64_info->max_short_sec->vma)
+    {
+      ia64_info->max_short_sec = sec;
+      ia64_info->max_short_offset = offset;
+    }
+  else if (sec->output_section->vma
+	   < ia64_info->min_short_sec->vma)
+    {
+      ia64_info->min_short_sec = sec;
+      ia64_info->min_short_offset = offset;
+    }
+}
+
 static bfd_boolean
 elfNN_ia64_relax_section (bfd *abfd, asection *sec,
 			  struct bfd_link_info *link_info,
@@ -854,6 +898,9 @@ elfNN_ia64_relax_section (bfd *abfd, asection *sec,
 	    }
 	  is_branch = TRUE;
 	  break;
+
+	case R_IA64_GPREL22:
+	  /* Update max_short_sec/min_short_sec.  */
 
 	case R_IA64_LTOFF22X:
 	case R_IA64_LDXMOV:
@@ -1171,7 +1218,11 @@ elfNN_ia64_relax_section (bfd *abfd, asection *sec,
 	      ||(bfd_signed_vma) (symaddr - gp) < -0x200000)
 	    continue;
 
-	  if (r_type == R_IA64_LTOFF22X)
+	  if (r_type == R_IA64_GPREL22)
+	    elfNN_ia64_update_short_info (tsec->output_section,
+					  tsec->output_offset + toff,
+					  ia64_info);
+	  else if (r_type == R_IA64_LTOFF22X)
 	    {
 	      irel->r_info = ELFNN_R_INFO (ELFNN_R_SYM (irel->r_info),
 					   R_IA64_GPREL22);
@@ -1181,6 +1232,10 @@ elfNN_ia64_relax_section (bfd *abfd, asection *sec,
 		  dyn_i->want_gotx = 0;
 		  changed_got |= !dyn_i->want_got;
 		}
+
+	      elfNN_ia64_update_short_info (tsec->output_section,
+					    tsec->output_offset + toff,
+					    ia64_info);
 	    }
 	  else
 	    {
@@ -1392,7 +1447,7 @@ static bfd_boolean
 elfNN_ia64_fake_sections (bfd *abfd, Elf_Internal_Shdr *hdr,
 			  asection *sec)
 {
-  register const char *name;
+  const char *name;
 
   name = bfd_get_section_name (abfd, sec);
 
@@ -2080,7 +2135,7 @@ sort_dyn_sym_info (struct elfNN_ia64_dyn_sym_info *info,
 		   unsigned int count)
 {
   bfd_vma curr, prev, got_offset;
-  unsigned int i, kept, dup, diff, dest, src, len;
+  unsigned int i, kept, dupes, diff, dest, src, len;
 
   qsort (info, count, sizeof (*info), addend_compare);
 
@@ -2145,35 +2200,35 @@ sort_dyn_sym_info (struct elfNN_ia64_dyn_sym_info *info,
 	  /* Find the next duplicate.  SRC will be kept.  */
 	  prev = info [src].addend;
 	  got_offset = info [src].got_offset;
-	  for (dup = src + 1; dup < count; dup++)
+	  for (dupes = src + 1; dupes < count; dupes ++)
 	    {
-	      curr = info [dup].addend;
+	      curr = info [dupes].addend;
 	      if (curr == prev)
 		{
 		  /* Make sure that got_offset is valid.  */
 		  if (got_offset == (bfd_vma) -1)
-		    got_offset = info [dup].got_offset;
+		    got_offset = info [dupes].got_offset;
 
 		  /* For duplicates, make sure that the kept one has
 		     a valid got_offset.  */
 		  if (got_offset != (bfd_vma) -1)
-		    info [dup - 1].got_offset = got_offset;
+		    info [dupes - 1].got_offset = got_offset;
 		  break;
 		}
-	      got_offset = info [dup].got_offset;
+	      got_offset = info [dupes].got_offset;
 	      prev = curr;
 	    }
 
 	  /* How much to move.  */
-	  len = dup - src;
-	  i = dup + 1;
+	  len = dupes - src;
+	  i = dupes + 1;
 
-	  if (len == 1 && dup < count)
+	  if (len == 1 && dupes < count)
 	    {
 	      /* If we only move 1 element, we combine it with the next
 		 one.  There must be at least a duplicate.  Find the
 		 next different one.  */
-	      for (diff = dup + 1, src++; diff < count; diff++, src++)
+	      for (diff = dupes + 1, src++; diff < count; diff++, src++)
 		{
 		  if (info [diff].addend != curr)
 		    break;
@@ -2194,18 +2249,18 @@ sort_dyn_sym_info (struct elfNN_ia64_dyn_sym_info *info,
 		     offset.  */
 		  prev = info [diff].addend;
 		  got_offset = info [diff].got_offset;
-		  for (dup = diff + 1; dup < count; dup++)
+		  for (dupes = diff + 1; dupes < count; dupes ++)
 		    {
-		      curr = info [dup].addend;
+		      curr = info [dupes].addend;
 		      if (curr == prev)
 			{
 			  /* For duplicates, make sure that GOT_OFFSET
 			     is valid.  */
 			  if (got_offset == (bfd_vma) -1)
-			    got_offset = info [dup].got_offset;
+			    got_offset = info [dupes].got_offset;
 			  break;
 			}
-		      got_offset = info [dup].got_offset;
+		      got_offset = info [dupes].got_offset;
 		      prev = curr;
 		      diff++;
 		    }
@@ -4256,6 +4311,20 @@ elfNN_ia64_choose_gp (bfd *abfd, struct bfd_link_info *info)
 	}
     }
 
+  if (ia64_info->min_short_sec)
+    {
+      if (min_short_vma 
+	  > (ia64_info->min_short_sec->vma
+	     + ia64_info->min_short_offset))
+	min_short_vma = (ia64_info->min_short_sec->vma
+			 + ia64_info->min_short_offset);
+      if (max_short_vma
+	  < (ia64_info->max_short_sec->vma
+	     + ia64_info->max_short_offset))
+	max_short_vma = (ia64_info->max_short_sec->vma
+			 + ia64_info->max_short_offset);
+    }
+
   /* See if the user wants to force a value.  */
   gp = elf_link_hash_lookup (elf_hash_table (info), "__gp", FALSE,
 			     FALSE, FALSE);
@@ -4273,17 +4342,30 @@ elfNN_ia64_choose_gp (bfd *abfd, struct bfd_link_info *info)
     {
       /* Pick a sensible value.  */
 
-      asection *got_sec = ia64_info->root.sgot;
+      if (ia64_info->min_short_sec)
+	{
+	  bfd_vma short_range = max_short_vma - min_short_vma;
 
-      /* Start with just the address of the .got.  */
-      if (got_sec)
-	gp_val = got_sec->output_section->vma;
-      else if (max_short_vma != 0)
-	gp_val = min_short_vma;
-      else if (max_vma - min_vma < 0x200000)
-	gp_val = min_vma;
+	  /* If min_short_sec is set, pick one in the middle bewteen
+	     min_short_vma and max_short_vma.  */
+	  if (short_range >= 0x400000)
+	    goto overflow;
+	  gp_val = min_short_vma + short_range / 2;
+	}
       else
-	gp_val = max_vma - 0x200000 + 8;
+	{
+	  asection *got_sec = ia64_info->root.sgot;
+
+	  /* Start with just the address of the .got.  */
+	  if (got_sec)
+	    gp_val = got_sec->output_section->vma;
+	  else if (max_short_vma != 0)
+	    gp_val = min_short_vma;
+	  else if (max_vma - min_vma < 0x200000)
+	    gp_val = min_vma;
+	  else
+	    gp_val = max_vma - 0x200000 + 8;
+	}
 
       /* If it is possible to address the entire image, but we
 	 don't with the choice above, adjust.  */
@@ -4310,6 +4392,7 @@ elfNN_ia64_choose_gp (bfd *abfd, struct bfd_link_info *info)
     {
       if (max_short_vma - min_short_vma >= 0x400000)
 	{
+overflow:
 	  (*_bfd_error_handler)
 	    (_("%s: short data segment overflowed (0x%lx >= 0x400000)"),
 	     bfd_get_filename (abfd),
@@ -5158,18 +5241,18 @@ elfNN_ia64_finish_dynamic_symbol (bfd *output_bfd,
       Elf_Internal_Rela outrel;
       bfd_byte *loc;
       asection *plt_sec;
-      bfd_vma plt_addr, pltoff_addr, gp_val, index;
+      bfd_vma plt_addr, pltoff_addr, gp_val, plt_index;
 
       gp_val = _bfd_get_gp_value (output_bfd);
 
       /* Initialize the minimal PLT entry.  */
 
-      index = (dyn_i->plt_offset - PLT_HEADER_SIZE) / PLT_MIN_ENTRY_SIZE;
+      plt_index = (dyn_i->plt_offset - PLT_HEADER_SIZE) / PLT_MIN_ENTRY_SIZE;
       plt_sec = ia64_info->root.splt;
       loc = plt_sec->contents + dyn_i->plt_offset;
 
       memcpy (loc, plt_min_entry, PLT_MIN_ENTRY_SIZE);
-      elfNN_ia64_install_value (loc, index, R_IA64_IMM22);
+      elfNN_ia64_install_value (loc, plt_index, R_IA64_IMM22);
       elfNN_ia64_install_value (loc+2, -dyn_i->plt_offset, R_IA64_PCREL21B);
 
       plt_addr = (plt_sec->output_section->vma
@@ -5214,7 +5297,7 @@ elfNN_ia64_finish_dynamic_symbol (bfd *output_bfd,
 	 PLT relocations.  */
 
       loc = ia64_info->rel_pltoff_sec->contents;
-      loc += ((ia64_info->rel_pltoff_sec->reloc_count + index)
+      loc += ((ia64_info->rel_pltoff_sec->reloc_count + plt_index)
 	      * sizeof (ElfNN_External_Rela));
       bfd_elfNN_swap_reloca_out (output_bfd, &outrel, loc);
     }
