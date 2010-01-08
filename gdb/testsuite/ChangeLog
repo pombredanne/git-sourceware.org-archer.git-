@@ -1,3 +1,20 @@
+2010-01-08  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.cp/gdb2495.exp: Skip if gdb,nosignals.
+
+2010-01-08  Joel Brobecker  <brobecker@adacore.com>
+
+	* lib/gdb.exp (gdb_start_cmd): Move comment outside of gdb_expect
+	call, to avoid interruption.
+
+2010-01-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.stabs/weird.def (args93): New.
+
+2010-01-07  Doug Evans  <dje@google.com>
+
+	* lib/gdb.exp (gdb_skip_xml_test): Add comment.
+
 2010-01-07  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.base/source.exp: Use correct line number.

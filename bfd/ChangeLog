@@ -1,3 +1,28 @@
+2010-01-08  Tristan Gingold  <gingold@adacore.com>
+
+	* archive.c: Remove bfd_special_undocumented_glue.
+
+2010-01-08  Alan Modra  <amodra@gmail.com>
+
+	PR ld/11133
+	* elf32-cr16.c (elf32_cr16_gc_mark_hook): Call _bfd_elf_gc_mark_hook.
+	* elf32-microblaze.c (microblaze_elf_gc_mark_hook): Likewise.
+	* elf64-ppc.c (ppc64_elf_gc_mark_hook): Likewise.
+
+2010-01-07  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/11138
+	* elflink.c (elf_link_check_versioned_symbol): Don't abort if
+	a symbol referenced by DSO is is defined in a non-shared object
+	and forced local.
+
+2010-01-07  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/11133
+	* elflink.c (_bfd_elf_gc_mark_hook): Check section XXX for
+	undefined __start_XXX/__stop_XXX in all input files and set
+	SEC_KEEP.
+
 2010-01-07  H.J. Lu  <hongjiu.lu@intel.com>
 
 	PR ld/11143

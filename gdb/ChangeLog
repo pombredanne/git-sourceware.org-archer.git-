@@ -1,3 +1,38 @@
+2010-01-08  Vladimir Prus  <vladimir@codesourcery.com>
+
+	Fix multiexec race.
+	* infrun.c (handle_inferior_event): Use get_thread_regcache
+	with events ptid, not get_current_regcache.
+
+2009-01-08  Joel Brobecker  <brobecker@adacore.com>
+
+	GDB crash with empty executable name (MinGW).
+	* source.c (openp): Add assert that parameter string is not NULL.
+	if parameter string is an empty string, then return with a failure
+	immediately.
+
+2009-01-08  Joel Brobecker  <brobecker@adacore.com>
+
+	Get rid of support for VAX Floats.
+	* ada-lang.h (ada_is_vax_floating_type, ada_vax_float_type_suffix)
+	(ada_vax_float_print_function): Delete.
+	* ada-lang.c (ada_is_vax_floating_type, ada_vax_float_type_suffix)
+	(ada_vax_float_print_function): Delete.
+	* ada-typeprint.c (print_vax_floating_point_type): Delete.
+	(ada_print_type): Remove support for VAX floats.
+	* ada-valprint.c (ada_val_print_1): Remove support for VAX floats.
+
+2010-01-08  jan kratochvil  <jan.kratochvil@redhat.com>
+
+	* stabsread.c (read_args): Handle zero arguments.
+
+2009-01-08  Joel Brobecker  <brobecker@adacore.com>
+
+	Cannot find in-tree libiconv.a after reconfigure.
+	* acinclude.m4 (AM_ICONV): If we find an in-tree libiconv.a
+	that we can use, then cache the path to this archive.
+	* configure: Regenerate.
+
 2010-01-07  Stan Shebs  <stan@codesourcery.com>
 
 	Make tracepoint operations go through target vector.
