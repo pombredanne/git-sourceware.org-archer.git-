@@ -764,7 +764,7 @@ follow_exec (ptid_t pid, char *execd_pathname)
 #ifdef SOLIB_CREATE_INFERIOR_HOOK
   SOLIB_CREATE_INFERIOR_HOOK (PIDGET (inferior_ptid));
 #else
-  solib_create_inferior_hook ();
+  solib_create_inferior_hook (0);
 #endif
 
   jit_inferior_created_hook ();
@@ -4065,6 +4065,11 @@ infrun: not switching back to stepped thread, it has vanished\n");
       keep_going (ecs);
       return;
     }
+
+  /* Re-fetch current thread's frame in case the code above caused
+     the frame cache to be re-initialized, making our FRAME variable
+     a dangling pointer.  */
+  frame = get_current_frame ();
 
   /* If stepping through a line, keep going if still within it.
 

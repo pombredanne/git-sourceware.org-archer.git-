@@ -1,3 +1,129 @@
+2010-01-09  Joel Brobecker  <brobecker@adacore.com>
+
+	Signal unwinder for mips-irix N32.
+	* mips-irix-tdep.c: #include mips-tdep.h, trad-frame.h, and
+	tramp-frame.h.
+	(SIGTRAMP_FRAME_SIZE, SIGCONTEXT_PC_OFF, SIGCONTEXT_REGS_OFF)
+	(SIGCONTEXT_FPREGS_OFF, SIGCONTEXT_FPCSR_OFF, SIGCONTEXT_HI_OFF)
+	(SIGCONTEXT_LO_OFF): New macros. 
+	(mips_irix_n32_tramp_frame_init): New function. 
+	(mips_irix_n32_tramp_frame): New static constant.
+	(mips_irix_init_abi): Prepend the mips_irix_n32_tramp_frame unwinder.
+
+2010-01-09  Joel Brobecker  <brobecker@adacore.com>
+
+	Breakpoint in shared library does not work on mips-irix.
+	* procfs.c: #include "observer.h".
+	(procfs_inferior_created): New function, moving here the code
+	which unsets the syssgi syscall-exit notifications.
+	(procfs_create_inferior): Remove the code which unsets the syssgi
+	syscall-exit notifications. It is too early to do this here.
+	(_initialize_procfs): Attach the procfs_inferior_created observer.
+
+2010-01-09  Joel Brobecker  <brobecker@adacore.com>
+
+	Wrong return convention for arrays (mips-irix).
+	* mips-tdep.c (mips_n32n64_return_value): Arrays whose size is
+	128 bits or smaller are returned the same way as structs
+	and unions of the the same size.
+
+2010-01-09  Joel Brobecker  <brobecker@adacore.com>
+
+	Cannot set the PC on mips-irix.
+	* irix5-nat.c (fill_gregset): Check regno against the raw PC
+	register number, no the cooked one.
+
+2010-01-09  Joel Brobecker  <brobecker@adacore.com>
+
+	Error while loading core file on mips-irix.
+	* solib-irix.c (irix_solib_create_inferior_hook): Do nothing
+	if debugging from a core file.
+
+2010-01-09  Joel Brobecker  <brobecker@adacore.com>
+
+	GDB hangs when attaching to process on mips-irix.
+	* solib-irix.c (irix_solib_create_inferior_hook): Do nothing if
+	attaching to a process.
+
+2010-01-09  Joel Brobecker  <brobecker@adacore.com>
+
+	Use the correct breakpoint instruction on mips-irix.
+	* mips-tdep.c (mips_breakpoint_from_pc): Add new static variable
+	containing the correct breakpoint instruction to use on mips-irix.
+	Use it when the osabi is GDB_OSABI_IRIX.
+
+2010-01-09  Joel Brobecker  <brobecker@adacore.com>
+
+	-Wunused warning in procfs.c (mips-irix only).
+	* procfs.c (gdb_praddset, gdb_prdelset): New macros.  Use them
+	throughout instead of using praddset and prdelset respectively.
+
+2010-01-09  Joel Brobecker  <brobecker@adacore.com>
+
+	GDB crash while stepping into function.
+	* infrun.c (handle_inferior_event): Refetch the current frame
+	after handling what.main_action, in case that pointer became
+	dangling.
+
+2010-01-09  Joel Brobecker  <brobecker@adacore.com>
+
+	Fix build failure of solaris-hosted cross debuggers.
+	* ada-valprint.c, parse.c: Include defs.h before including ctype.h.
+
+2010-01-09  Daniel Gutson  <dgutson@codesourcery.com>
+
+	Fix build failure on sparc-solaris.
+	* procfs.c: (procfs_do_thread_registers) Use elfcore_write_lwpstatus.
+
+2010-01-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Move some symfile code into subroutines.
+	* symfile.h (relative_addr_info_to_section_offsets)
+	(addr_info_make_relative): New prototypes.
+	* symfile.c (default_symfile_offsets): Move a part to ...
+	(relative_addr_info_to_section_offsets): ... this new function.
+	(default_symfile_offsets): Call it.
+	(syms_from_objfile <!mainline && addrs && addrs->other[0].name>): Move
+	this part to ...
+	(addr_info_make_relative): ... this new function.
+
+2010-01-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Add from_tty to solib_create_inferior_hook.
+	* infcmd.c (post_create_inferior): Move solib_add after
+	solib_create_inferior_hook.  Pass from_tty to
+	solib_create_inferior_hook.  Call solib_add and SOLIB_ADD with
+	0 from_tty and comment why.
+	* infrun.c (follow_exec): Pass from_tty solib_create_inferior_hook as 0.
+	* linux-nat.c (linux_child_follow_fork): Likewise.
+	* nto-procfs.c (procfs_post_attach, procfs_create_inferior): Likewise.
+	* solib-darwin.c (darwin_solib_create_inferior_hook): New parameter
+	from_tty.
+	* solib-frv.c (frv_solib_create_inferior_hook): Likewise.
+	* solib-irix.c (irix_solib_create_inferior_hook): Likewise.
+	* solib-null.c (null_solib_create_inferior_hook): Likewise.
+	* solib-osf.c (osf_solib_create_inferior_hook): Likewise.
+	* solib-pa64.c (pa64_solib_create_inferior_hook): Likewise.
+	* solib-som.c (som_solib_create_inferior_hook): Likewise.
+	* solib-spu.c (spu_solib_create_inferior_hook): New parameter from_tty.
+	Pass it to svr4_so_ops.solib_create_inferior_hook.
+	* solib-sunos.c (sunos_solib_create_inferior_hook): New parameter
+	from_tty.
+	* solib-svr4.c (enable_break): New parameter from_tty.  Pass it to
+	solib_add.
+	(svr4_solib_create_inferior_hook): New parameter from_tty.  Pass it to
+	enable_break.
+	* solib-target.c (solib_target_solib_create_inferior_hook): New
+	parameter from_tty.
+	* solib.c (solib_create_inferior_hook): New parameter from_tty.  Pass
+	it to ops->solib_create_inferior_hook.
+	(reload_shared_libraries): Pass from_tty to solib_create_inferior_hook.
+	Move solib_add after solib_create_inferior_hook, call it now with
+	from_tty as 0.  New comment there.
+	* solib.h (solib_create_inferior_hook): New parameter from_tty.
+	* solist.h (struct target_so_ops <solib_create_inferior_hook>):
+	Likewise.
+
 2010-01-08  Vladimir Prus  <vladimir@codesourcery.com>
 
 	Fix multiexec race.
@@ -22,7 +148,7 @@
 	(ada_print_type): Remove support for VAX floats.
 	* ada-valprint.c (ada_val_print_1): Remove support for VAX floats.
 
-2010-01-08  jan kratochvil  <jan.kratochvil@redhat.com>
+2010-01-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* stabsread.c (read_args): Handle zero arguments.
 
