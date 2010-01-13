@@ -1,3 +1,63 @@
+2010-01-13  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* lib/mi-support.exp (mi_check_thread_states): Handle
+	core number in thread listing.
+
+2010-01-12  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.base/maint.exp: Adjust the expected output for the
+	"maint print type" test. Use gdb_test_multiple instead of
+	gdb_sent/gdb_expect.
+
+2010-01-11  Doug Evans  <dje@google.com>
+
+	* lib/gdbserver-support.exp (gdbserver_download_current_prog): Rename
+	from gdbserver_download.  All callers updated.
+
+	* gdb.server/ext-run.exp: "info os processes" requires xml support.
+
+2010-01-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Implement binary numbers parsing.
+	* gdb.base/printcmds.exp (test_integer_literals_accepted)
+	(test_integer_literals_rejected): New binary tests.
+
+2010-01-09  Ralf Wildenhues  <Ralf.Wildenhues@gmx.de>
+
+	* gdb.cell/configure: Regenerate.
+
+2010-01-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/corefile.exp: Move the core finding block out and call it as
+	core_find, new variable $corefile, replace corefile by $corefile and
+	[file tail $corefile] for usage vs. test names resp.
+	* lib/gdb.exp (core_find): Move it as a new function here.  New
+	parameter binfile and deletefiles.  New variable $destcore.  Pre-delete
+	$destcore.  Return "" on error.
+
+2010-01-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Workaround PR binutils/10802.
+	* lib/gdb.exp (gdb_gnu_strip_debug): Preserve the file attributes
+	(twice).
+
+2010-01-08  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.cp/gdb2495.exp: Skip if gdb,nosignals.
+
+2010-01-08  Joel Brobecker  <brobecker@adacore.com>
+
+	* lib/gdb.exp (gdb_start_cmd): Move comment outside of gdb_expect
+	call, to avoid interruption.
+
+2010-01-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.stabs/weird.def (args93): New.
+
+2010-01-07  Doug Evans  <dje@google.com>
+
+	* lib/gdb.exp (gdb_skip_xml_test): Add comment.
+
 2010-01-07  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.base/source.exp: Use correct line number.

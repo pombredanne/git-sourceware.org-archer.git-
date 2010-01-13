@@ -65,8 +65,6 @@
 #define TRUNCATION_TOWARDS_ZERO ((-5 / 2) == -2)
 #endif
 
-static void extract_string (CORE_ADDR addr, char *buf);
-
 static void modify_general_field (struct type *, char *, LONGEST, int, int);
 
 static struct type *desc_base_type (struct type *);
@@ -156,6 +154,9 @@ static struct type *ada_lookup_struct_elt_type (struct type *, char *,
                                                 int, int, int *);
 
 static struct value *evaluate_subexp_type (struct expression *, int *);
+
+static struct type *ada_find_parallel_type_with_name (struct type *,
+                                                      const char *);
 
 static int is_dynamic_field (struct type *, int);
 
@@ -354,25 +355,6 @@ ada_print_array_index (struct value *index_value, struct ui_file *stream,
 {
   LA_VALUE_PRINT (index_value, stream, options);
   fprintf_filtered (stream, " => ");
-}
-
-/* Read the string located at ADDR from the inferior and store the
-   result into BUF.  */
-
-static void
-extract_string (CORE_ADDR addr, char *buf)
-{
-  int char_index = 0;
-
-  /* Loop, reading one byte at a time, until we reach the '\000'
-     end-of-string marker.  */
-  do
-    {
-      target_read_memory (addr + char_index * sizeof (char),
-                          buf + char_index * sizeof (char), sizeof (char));
-      char_index++;
-    }
-  while (buf[char_index - 1] != '\000');
 }
 
 /* Assuming VECT points to an array of *SIZE objects of size
@@ -1874,13 +1856,13 @@ decode_constrained_packed_array_type (struct type *type)
   memcpy (name, raw_name, tail - raw_name);
   name[tail - raw_name] = '\000';
 
-  sym = standard_lookup (name, get_selected_block (0), VAR_DOMAIN);
-  if (sym == NULL || SYMBOL_TYPE (sym) == NULL)
+  shadow_type = ada_find_parallel_type_with_name (type, name);
+
+  if (shadow_type == NULL)
     {
       lim_warning (_("could not find bounds information on packed array"));
       return NULL;
     }
-  shadow_type = SYMBOL_TYPE (sym);
   CHECK_TYPEDEF (shadow_type);
 
   if (TYPE_CODE (shadow_type) != TYPE_CODE_ARRAY)
@@ -6666,30 +6648,89 @@ ada_type_name (struct type *type)
     return TYPE_TAG_NAME (type);
 }
 
-/* Find a parallel type to TYPE whose name is formed by appending
+/* Search the list of "descriptive" types associated to TYPE for a type
+   whose name is NAME.  */
+
+static struct type *
+find_parallel_type_by_descriptive_type (struct type *type, const char *name)
+{
+  struct type *result;
+
+  /* If there no descriptive-type info, then there is no parallel type
+     to be found.  */
+  if (!HAVE_GNAT_AUX_INFO (type))
+    return NULL;
+
+  result = TYPE_DESCRIPTIVE_TYPE (type);
+  while (result != NULL)
+    {
+      char *result_name = ada_type_name (result);
+
+      if (result_name == NULL)
+        {
+          warning (_("unexpected null name on descriptive type"));
+          return NULL;
+        }
+
+      /* If the names match, stop.  */
+      if (strcmp (result_name, name) == 0)
+	break;
+
+      /* Otherwise, look at the next item on the list, if any.  */
+      if (HAVE_GNAT_AUX_INFO (result))
+	result = TYPE_DESCRIPTIVE_TYPE (result);
+      else
+	result = NULL;
+    }
+
+  /* If we didn't find a match, see whether this is a packed array.  With
+     older compilers, the descriptive type information is either absent or
+     irrelevant when it comes to packed arrays so the above lookup fails.
+     Fall back to using a parallel lookup by name in this case.  */
+  if (result == NULL && ada_is_packed_array_type (type))
+    return ada_find_any_type (name);
+
+  return result;
+}
+
+/* Find a parallel type to TYPE with the specified NAME, using the
+   descriptive type taken from the debugging information, if available,
+   and otherwise using the (slower) name-based method.  */
+
+static struct type *
+ada_find_parallel_type_with_name (struct type *type, const char *name)
+{
+  struct type *result = NULL;
+
+  if (HAVE_GNAT_AUX_INFO (type))
+    result = find_parallel_type_by_descriptive_type (type, name);
+  else
+    result = ada_find_any_type (name);
+
+  return result;
+}
+
+/* Same as above, but specify the name of the parallel type by appending
    SUFFIX to the name of TYPE.  */
 
 struct type *
 ada_find_parallel_type (struct type *type, const char *suffix)
 {
-  static char *name;
-  static size_t name_len = 0;
+  char *name, *typename = ada_type_name (type);
   int len;
-  char *typename = ada_type_name (type);
 
   if (typename == NULL)
     return NULL;
 
   len = strlen (typename);
 
-  GROW_VECT (name, name_len, len + strlen (suffix) + 1);
+  name = (char *) alloca (len + strlen (suffix) + 1);
 
   strcpy (name, typename);
   strcpy (name + len, suffix);
 
-  return ada_find_any_type (name);
+  return ada_find_parallel_type_with_name (type, name);
 }
-
 
 /* If TYPE is a variable-size record type, return the corresponding template
    type describing its fields.  Otherwise, return NULL.  */
@@ -9656,52 +9697,6 @@ ada_float_to_fixed (struct type *type, DOUBLEST x)
   return (LONGEST) (x / scaling_factor (type) + 0.5);
 }
 
-
-                                /* VAX floating formats */
-
-/* Non-zero iff TYPE represents one of the special VAX floating-point
-   types.  */
-
-int
-ada_is_vax_floating_type (struct type *type)
-{
-  int name_len =
-    (ada_type_name (type) == NULL) ? 0 : strlen (ada_type_name (type));
-  return
-    name_len > 6
-    && (TYPE_CODE (type) == TYPE_CODE_INT
-        || TYPE_CODE (type) == TYPE_CODE_RANGE)
-    && strncmp (ada_type_name (type) + name_len - 6, "___XF", 5) == 0;
-}
-
-/* The type of special VAX floating-point type this is, assuming
-   ada_is_vax_floating_point.  */
-
-int
-ada_vax_float_type_suffix (struct type *type)
-{
-  return ada_type_name (type)[strlen (ada_type_name (type)) - 1];
-}
-
-/* A value representing the special debugging function that outputs
-   VAX floating-point values of the type represented by TYPE.  Assumes
-   ada_is_vax_floating_type (TYPE).  */
-
-struct value *
-ada_vax_float_print_function (struct type *type)
-{
-  switch (ada_vax_float_type_suffix (type))
-    {
-    case 'F':
-      return get_var_value ("DEBUG_STRING_F", 0);
-    case 'D':
-      return get_var_value ("DEBUG_STRING_D", 0);
-    case 'G':
-      return get_var_value ("DEBUG_STRING_G", 0);
-    default:
-      error (_("invalid VAX floating-point type"));
-    }
-}
 
 
                                 /* Range types */

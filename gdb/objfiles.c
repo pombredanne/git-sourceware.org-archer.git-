@@ -693,9 +693,11 @@ free_all_objfiles (void)
 }
 
 /* Relocate OBJFILE to NEW_OFFSETS.  There should be OBJFILE->NUM_SECTIONS
-   entries in new_offsets.  */
-void
-objfile_relocate (struct objfile *objfile, struct section_offsets *new_offsets)
+   entries in new_offsets.  SEPARATE_DEBUG_OBJFILE is not touched here.
+   Return non-zero iff any change happened.  */
+
+static int
+objfile_relocate1 (struct objfile *objfile, struct section_offsets *new_offsets)
 {
   struct obj_section *s;
   struct section_offsets *delta =
@@ -713,7 +715,7 @@ objfile_relocate (struct objfile *objfile, struct section_offsets *new_offsets)
 	  something_changed = 1;
       }
     if (!something_changed)
-      return;
+      return 0;
   }
 
   /* OK, get all the symtabs.  */
@@ -850,8 +852,61 @@ objfile_relocate (struct objfile *objfile, struct section_offsets *new_offsets)
 				obj_section_addr (s));
     }
 
+  /* Data changed.  */
+  return 1;
+}
+
+/* Relocate OBJFILE to NEW_OFFSETS.  There should be OBJFILE->NUM_SECTIONS
+   entries in new_offsets.  Process also OBJFILE's SEPARATE_DEBUG_OBJFILEs.
+
+   The number and ordering of sections does differ between the two objfiles.
+   Only their names match.  Also the file offsets will differ (objfile being
+   possibly prelinked but separate_debug_objfile is probably not prelinked) but
+   the in-memory absolute address as specified by NEW_OFFSETS must match both
+   files.  */
+
+void
+objfile_relocate (struct objfile *objfile, struct section_offsets *new_offsets)
+{
+  struct objfile *debug_objfile;
+  int changed = 0;
+
+  changed |= objfile_relocate1 (objfile, new_offsets);
+
+  for (debug_objfile = objfile->separate_debug_objfile;
+       debug_objfile;
+       debug_objfile = objfile_separate_debug_iterate (objfile, debug_objfile))
+    {
+      struct section_addr_info *objfile_addrs;
+      struct section_offsets *new_debug_offsets;
+      int new_debug_num_sections;
+      struct cleanup *my_cleanups;
+
+      objfile_addrs = build_section_addr_info_from_objfile (objfile);
+      my_cleanups = make_cleanup (xfree, objfile_addrs);
+
+      /* Here OBJFILE_ADDRS contain the correct absolute addresses, the
+	 relative ones must be already created according to debug_objfile.  */
+
+      addr_info_make_relative (objfile_addrs, debug_objfile->obfd);
+
+      gdb_assert (debug_objfile->num_sections
+		  == bfd_count_sections (debug_objfile->obfd));
+      new_debug_offsets = xmalloc (SIZEOF_N_SECTION_OFFSETS
+						 (debug_objfile->num_sections));
+      make_cleanup (xfree, new_debug_offsets);
+      relative_addr_info_to_section_offsets (new_debug_offsets,
+					     debug_objfile->num_sections,
+					     objfile_addrs);
+
+      changed |= objfile_relocate1 (debug_objfile, new_debug_offsets);
+
+      do_cleanups (my_cleanups);
+    }
+
   /* Relocate breakpoints as necessary, after things are relocated. */
-  breakpoint_re_set ();
+  if (changed)
+    breakpoint_re_set ();
 }
 
 /* Return non-zero if OBJFILE has partial symbols.  */

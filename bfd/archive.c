@@ -1,6 +1,6 @@
 /* BFD back-end for archive files (libraries).
    Copyright 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
+   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
    Written by Cygnus Support.  Mostly Gumby Henkel-Wallace's fault.
 
@@ -1054,6 +1054,24 @@ bfd_slurp_armap (bfd *abfd)
       return FALSE;
 #endif
     }
+  else if (CONST_STRNEQ (nextname, "#1/20           "))
+    {
+      /* Mach-O has a special name for armap when the map is sorted by name.
+         However because this name has a space it is slightly more difficult
+         to check it.  */
+      struct ar_hdr hdr;
+      char extname[21];
+
+      if (bfd_bread (&hdr, sizeof (hdr), abfd) != sizeof (hdr))
+        return FALSE;
+      /* Read the extended name.  We know its length.  */
+      if (bfd_bread (extname, 20, abfd) != 20)
+        return FALSE;
+      if (bfd_seek (abfd, (file_ptr) -(sizeof (hdr) + 20), SEEK_CUR) != 0)
+        return FALSE;
+      if (CONST_STRNEQ (extname, "__.SYMDEF SORTED"))
+        return do_slurp_bsd_armap (abfd);
+    }
 
   bfd_has_map (abfd) = FALSE;
   return TRUE;
@@ -1294,23 +1312,7 @@ normalize (bfd *abfd, const char *file)
 static const char *
 normalize (bfd *abfd ATTRIBUTE_UNUSED, const char *file)
 {
-  const char *filename = strrchr (file, '/');
-
-#ifdef HAVE_DOS_BASED_FILE_SYSTEM
-  {
-    /* We could have foo/bar\\baz, or foo\\bar, or d:bar.  */
-    char *bslash = strrchr (file, '\\');
-    if (filename == NULL || (bslash != NULL && bslash > filename))
-      filename = bslash;
-    if (filename == NULL && file[0] != '\0' && file[1] == ':')
-      filename = file + 1;
-  }
-#endif
-  if (filename != NULL)
-    filename++;
-  else
-    filename = file;
-  return filename;
+  return lbasename (file);
 }
 #endif
 
@@ -1703,22 +1705,6 @@ bfd_ar_hdr_from_filesystem (bfd *abfd, const char *filename, bfd *member)
   return ared;
 }
 
-/* This is magic required by the "ar" program.  Since it's
-   undocumented, it's undocumented.  You may think that it would take
-   a strong stomach to write this, and it does, but it takes even a
-   stronger stomach to try to code around such a thing!  */
-
-struct ar_hdr *bfd_special_undocumented_glue (bfd *, const char *);
-
-struct ar_hdr *
-bfd_special_undocumented_glue (bfd *abfd, const char *filename)
-{
-  struct areltdata *ar_elt = bfd_ar_hdr_from_filesystem (abfd, filename, 0);
-  if (ar_elt == NULL)
-    return NULL;
-  return (struct ar_hdr *) ar_elt->arch_header;
-}
-
 /* Analogous to stat call.  */
 
 int
@@ -1818,24 +1804,8 @@ bfd_bsd_truncate_arname (bfd *abfd, const char *pathname, char *arhdr)
 {
   struct ar_hdr *hdr = (struct ar_hdr *) arhdr;
   size_t length;
-  const char *filename = strrchr (pathname, '/');
+  const char *filename = lbasename (pathname);
   size_t maxlen = ar_maxnamelen (abfd);
-
-#ifdef HAVE_DOS_BASED_FILE_SYSTEM
-  {
-    /* We could have foo/bar\\baz, or foo\\bar, or d:bar.  */
-    char *bslash = strrchr (pathname, '\\');
-    if (filename == NULL || (bslash != NULL && bslash > filename))
-      filename = bslash;
-    if (filename == NULL && pathname[0] != '\0' && pathname[1] == ':')
-      filename = pathname + 1;
-  }
-#endif
-
-  if (filename == NULL)
-    filename = pathname;
-  else
-    ++filename;
 
   length = strlen (filename);
 
@@ -1866,25 +1836,8 @@ bfd_gnu_truncate_arname (bfd *abfd, const char *pathname, char *arhdr)
 {
   struct ar_hdr *hdr = (struct ar_hdr *) arhdr;
   size_t length;
-  const char *filename = strrchr (pathname, '/');
+  const char *filename = lbasename (pathname);
   size_t maxlen = ar_maxnamelen (abfd);
-
-#ifdef HAVE_DOS_BASED_FILE_SYSTEM
-  {
-    /* We could have foo/bar\\baz, or foo\\bar, or d:bar.  */
-    char *bslash = strrchr (pathname, '\\');
-
-    if (filename == NULL || (bslash != NULL && bslash > filename))
-      filename = bslash;
-    if (filename == NULL && pathname[0] != '\0' && pathname[1] == ':')
-      filename = pathname + 1;
-  }
-#endif
-
-  if (filename == NULL)
-    filename = pathname;
-  else
-    ++filename;
 
   length = strlen (filename);
 
