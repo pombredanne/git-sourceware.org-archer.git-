@@ -1,6 +1,6 @@
 /* Definitions for targets which report shared library events.
 
-   Copyright (C) 2007, 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -306,7 +306,7 @@ solib_target_special_symbol_handling (void)
 }
 
 static void
-solib_target_solib_create_inferior_hook (void)
+solib_target_solib_create_inferior_hook (int from_tty)
 {
   /* Nothing needed.  */
 }

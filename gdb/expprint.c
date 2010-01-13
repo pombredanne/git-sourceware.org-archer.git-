@@ -1,7 +1,8 @@
 /* Print in infix form a struct expression.
 
    Copyright (C) 1986, 1988, 1989, 1991, 1992, 1993, 1994, 1995, 1996, 1997,
-   1998, 1999, 2000, 2003, 2007, 2008, 2009 Free Software Foundation, Inc.
+   1998, 1999, 2000, 2003, 2007, 2008, 2009, 2010
+   Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -413,8 +414,8 @@ print_subexp_standard (struct expression *exp, int *pos,
       (*pos) += 2;
       if ((int) prec > (int) PREC_PREFIX)
 	fputs_filtered ("(", stream);
-      if (TYPE_CODE (exp->elts[pc + 1].type) == TYPE_CODE_FUNC &&
-	  exp->elts[pc + 3].opcode == OP_LONG)
+      if (TYPE_CODE (exp->elts[pc + 1].type) == TYPE_CODE_FUNC
+	  && exp->elts[pc + 3].opcode == OP_LONG)
 	{
 	  struct value_print_options opts;
 

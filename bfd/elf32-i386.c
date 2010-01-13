@@ -704,8 +704,8 @@ elf_i386_link_hash_newfunc (struct bfd_hash_entry *entry,
      subclass.  */
   if (entry == NULL)
     {
-      entry = bfd_hash_allocate (table,
-				 sizeof (struct elf_i386_link_hash_entry));
+      entry = (struct bfd_hash_entry *)
+          bfd_hash_allocate (table, sizeof (struct elf_i386_link_hash_entry));
       if (entry == NULL)
 	return entry;
     }
@@ -802,7 +802,7 @@ elf_i386_link_hash_table_create (bfd *abfd)
   struct elf_i386_link_hash_table *ret;
   bfd_size_type amt = sizeof (struct elf_i386_link_hash_table);
 
-  ret = bfd_malloc (amt);
+  ret = (struct elf_i386_link_hash_table *) bfd_malloc (amt);
   if (ret == NULL)
     return NULL;
 
@@ -1511,7 +1511,8 @@ elf_i386_check_relocs (bfd *abfd,
 		    size = symtab_hdr->sh_info;
 		    size *= (sizeof (bfd_signed_vma)
 			     + sizeof (bfd_vma) + sizeof(char));
-		    local_got_refcounts = bfd_zalloc (abfd, size);
+		    local_got_refcounts = (bfd_signed_vma *)
+                        bfd_zalloc (abfd, size);
 		    if (local_got_refcounts == NULL)
 		      return FALSE;
 		    elf_local_got_refcounts (abfd) = local_got_refcounts;
@@ -1668,7 +1669,6 @@ elf_i386_check_relocs (bfd *abfd,
 		     easily.  Oh well.  */
 		  void **vpp;
 		  asection *s;
-		  Elf_Internal_Sym *isym;
 
 		  isym = bfd_sym_from_r_symndx (&htab->sym_cache,
 						abfd, r_symndx);
@@ -1687,7 +1687,8 @@ elf_i386_check_relocs (bfd *abfd,
 	      if (p == NULL || p->sec != sec)
 		{
 		  bfd_size_type amt = sizeof *p;
-		  p = bfd_alloc (htab->elf.dynobj, amt);
+		  p = (struct elf_dyn_relocs *) bfd_alloc (htab->elf.dynobj,
+                                                           amt);
 		  if (p == NULL)
 		    return FALSE;
 		  p->next = *head;
@@ -2559,7 +2560,7 @@ elf_i386_size_dynamic_sections (bfd *output_bfd ATTRIBUTE_UNUSED,
 	 section's contents are written out.  This should not happen,
 	 but this way if it does, we get a R_386_NONE reloc instead
 	 of garbage.  */
-      s->contents = bfd_zalloc (dynobj, s->size);
+      s->contents = (unsigned char *) bfd_zalloc (dynobj, s->size);
       if (s->contents == NULL)
 	return FALSE;
     }
@@ -2663,7 +2664,7 @@ elf_i386_fake_sections (bfd *abfd ATTRIBUTE_UNUSED,
 			Elf_Internal_Shdr *hdr,
 			asection *sec)
 {
-  register const char *name;
+  const char *name;
 
   name = bfd_get_section_name (abfd, sec);
 
@@ -3608,7 +3609,7 @@ elf_i386_relocate_section (bfd *output_bfd,
 	    {
 	      Elf_Internal_Rela outrel;
 	      bfd_byte *loc;
-	      int dr_type, indx;
+	      int dr_type;
 	      asection *sreloc;
 
 	      if (htab->elf.srelgot == NULL)
@@ -3937,7 +3938,6 @@ elf_i386_relocate_section (bfd *output_bfd,
 	      Elf_Internal_Rela outrel;
 	      asection *sreloc;
 	      bfd_byte *loc;
-	      int indx;
 
 	      outrel.r_offset = rel->r_offset
 				+ input_section->output_section->vma
@@ -4249,13 +4249,15 @@ elf_i386_finish_dynamic_symbol (bfd *output_bfd,
 	    }
 	  else
 	    {
+	      asection *plt;
+
 	      if (!h->pointer_equality_needed)
 		abort ();
 
 	      /* For non-shared object, we can't use .got.plt, which
 		 contains the real function addres if we need pointer
 		 equality.  We load the GOT entry with the PLT entry.  */
-	      asection *plt = htab->elf.splt ? htab->elf.splt : htab->elf.iplt;
+	      plt = htab->elf.splt ? htab->elf.splt : htab->elf.iplt;
 	      bfd_put_32 (output_bfd,
 			  (plt->output_section->vma
 			   + plt->output_offset + h->plt.offset),

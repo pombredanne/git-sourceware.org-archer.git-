@@ -1,6 +1,6 @@
 /* Handle PA64 shared libraries for GDB, the GNU Debugger.
 
-   Copyright (C) 2004, 2007, 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 2004, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -329,7 +329,7 @@ bfd_lookup_symbol (bfd *abfd, char *symname)
    with shared libraries mapped shareable.  */
 
 static void
-pa64_solib_create_inferior_hook (void)
+pa64_solib_create_inferior_hook (int from_tty)
 {
   struct minimal_symbol *msymbol;
   unsigned int dld_flags, status;

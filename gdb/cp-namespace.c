@@ -1,5 +1,6 @@
 /* Helper routines for C++ support in GDB.
-   Copyright (C) 2003, 2004, 2007, 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 2003, 2004, 2007, 2008, 2009, 2010
+   Free Software Foundation, Inc.
 
    Contributed by David Carlton and by Kealia, Inc.
 
@@ -714,7 +715,6 @@ check_one_possible_namespace_symbol (const char *name, int len,
   if (sym == NULL)
     {
       struct type *type;
-      name_copy = obsavestring (name, len, &objfile->objfile_obstack);
 
       type = init_type (TYPE_CODE_NAMESPACE, 0, 0, name_copy, objfile);
 
@@ -723,7 +723,9 @@ check_one_possible_namespace_symbol (const char *name, int len,
       sym = obstack_alloc (&objfile->objfile_obstack, sizeof (struct symbol));
       memset (sym, 0, sizeof (struct symbol));
       SYMBOL_LANGUAGE (sym) = language_cplus;
-      SYMBOL_SET_NAMES (sym, name_copy, len, objfile);
+      /* Note that init_type copied the name to the objfile's
+	 obstack.  */
+      SYMBOL_SET_NAMES (sym, TYPE_NAME (type), len, 0, objfile);
       SYMBOL_CLASS (sym) = LOC_TYPEDEF;
       SYMBOL_TYPE (sym) = type;
       SYMBOL_DOMAIN (sym) = VAR_DOMAIN;

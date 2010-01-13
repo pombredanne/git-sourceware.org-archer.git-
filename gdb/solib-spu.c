@@ -1,5 +1,5 @@
 /* Cell SPU GNU/Linux support -- shared library handling.
-   Copyright (C) 2009 Free Software Foundation, Inc.
+   Copyright (C) 2009, 2010 Free Software Foundation, Inc.
 
    Contributed by Ulrich Weigand <uweigand@de.ibm.com>.
 
@@ -7,7 +7,7 @@
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
+   the Free Software Foundation; either version 3 of the License, or
    (at your option) any later version.
 
    This program is distributed in the hope that it will be useful,
@@ -16,9 +16,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 59 Temple Place - Suite 330,
-   Boston, MA 02111-1307, USA.  */
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
 #include "gdbcore.h"
@@ -52,25 +50,19 @@
 static void
 spu_relocate_main_executable (int spufs_fd)
 {
-  struct objfile *objfile;
-  struct cleanup *old_chain;
   struct section_offsets *new_offsets;
   int i;
 
-  for (objfile = symfile_objfile;
-       objfile;
-       objfile = objfile->separate_debug_objfile)
-    {
-      new_offsets = xcalloc (objfile->num_sections,
-			     sizeof (struct section_offsets));
-      old_chain = make_cleanup (xfree, new_offsets);
+  if (symfile_objfile == NULL)
+    return;
 
-      for (i = 0; i < objfile->num_sections; i++)
-        new_offsets->offsets[i] = SPUADDR (spufs_fd, 0);
+  new_offsets = alloca (symfile_objfile->num_sections
+			* sizeof (struct section_offsets));
 
-      objfile_relocate (objfile, new_offsets);
-      do_cleanups (old_chain);
-    }
+  for (i = 0; i < symfile_objfile->num_sections; i++)
+    new_offsets->offsets[i] = SPUADDR (spufs_fd, 0);
+
+  objfile_relocate (symfile_objfile, new_offsets);
 }
 
 /* When running a stand-alone SPE executable, we may need to skip one more
@@ -373,7 +365,7 @@ spu_enable_break (struct objfile *objfile)
 
 /* Create inferior hook.  */
 static void
-spu_solib_create_inferior_hook (void)
+spu_solib_create_inferior_hook (int from_tty)
 {
   /* Remove all previously installed solib breakpoints.  Both the SVR4
      code and us will re-install all required breakpoints.  */
@@ -404,7 +396,7 @@ spu_solib_create_inferior_hook (void)
     }
 
   /* Call SVR4 hook -- this will re-insert the SVR4 solib breakpoints.  */
-  svr4_so_ops.solib_create_inferior_hook ();
+  svr4_so_ops.solib_create_inferior_hook (from_tty);
 
   /* If the inferior is statically linked against libspe, we need to install
      our own solib breakpoint right now.  Otherwise, it will be installed by

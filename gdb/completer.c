@@ -1,5 +1,6 @@
 /* Line completion stuff for GDB, the GNU debugger.
-   Copyright (C) 2000, 2001, 2007, 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 2000, 2001, 2007, 2008, 2009, 2010
+   Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -676,7 +677,7 @@ complete_line_internal (const char *text, char *line_buffer, int point,
 			   p--)
 			;
 		    }
-		  if (reason != handle_brkchars)
+		  if (reason != handle_brkchars && c->completer != NULL)
 		    list = (*c->completer) (c, p, word);
 		}
 	    }
@@ -747,7 +748,7 @@ complete_line_internal (const char *text, char *line_buffer, int point,
 		       p--)
 		    ;
 		}
-	      if (reason != handle_brkchars)
+	      if (reason != handle_brkchars && c->completer != NULL)
 		list = (*c->completer) (c, p, word);
 	    }
 	}

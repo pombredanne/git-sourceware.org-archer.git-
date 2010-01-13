@@ -1,7 +1,7 @@
 /* Floating point routines for GDB, the GNU debugger.
 
    Copyright (C) 1986, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1997, 1998, 1999, 2000, 2001, 2003, 2004, 2005, 2007, 2008, 2009
+   1997, 1998, 1999, 2000, 2001, 2003, 2004, 2005, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -778,8 +778,8 @@ floatformat_from_length (struct gdbarch *gdbarch, int len)
      both in processor and in memory.  
      The code below accepts the real bit size.  */ 
   else if ((gdbarch_long_double_format (gdbarch) != NULL)
-	   && (len * TARGET_CHAR_BIT ==
-               gdbarch_long_double_format (gdbarch)[0]->totalsize))
+	   && (len * TARGET_CHAR_BIT
+               == gdbarch_long_double_format (gdbarch)[0]->totalsize))
     format = gdbarch_long_double_format (gdbarch)
 	       [gdbarch_byte_order (gdbarch)];
   else

@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008, 2009 Free Software Foundation, Inc.
+   2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -259,9 +259,6 @@ void (*deprecated_interactive_hook) (void);
    that several registers have changed (see value_assign). */
 void (*deprecated_register_changed_hook) (int regno);
 
-/* Tell the GUI someone changed LEN bytes of memory at ADDR */
-void (*deprecated_memory_changed_hook) (CORE_ADDR addr, int len);
-
 /* Called when going to wait for the target.  Usually allows the GUI to run
    while waiting for target events.  */
 
@@ -458,10 +455,13 @@ execute_command (char *p, int from_tty)
 
     }
 
-  /* Tell the user if the language has changed (except first time).  */
+  /* Tell the user if the language has changed (except first time).
+     First make sure that a new frame has been selected, in case this
+     command or the hooks changed the program state.  */
+  deprecated_safe_get_selected_frame ();
   if (current_language != expected_language)
     {
-      if (language_mode == language_mode_auto)
+      if (language_mode == language_mode_auto && info_verbose)
 	{
 	  language_info (1);	/* Print what changed.  */
 	}
@@ -1119,7 +1119,7 @@ print_gdb_version (struct ui_file *stream)
 
   /* Second line is a copyright notice. */
 
-  fprintf_filtered (stream, "Copyright (C) 2009 Free Software Foundation, Inc.\n");
+  fprintf_filtered (stream, "Copyright (C) 2010 Free Software Foundation, Inc.\n");
 
   /* Following the copyright is a brief statement that the program is
      free software, that users are free to copy and change it on
@@ -1188,6 +1188,9 @@ kill_or_detach (struct inferior *inf, void *args)
   struct qt_args *qt = args;
   struct thread_info *thread;
 
+  if (inf->pid == 0)
+    return 0;
+
   thread = any_thread_of_process (inf->pid);
   if (thread != NULL)
     {
@@ -1214,6 +1217,9 @@ static int
 print_inferior_quit_action (struct inferior *inf, void *arg)
 {
   struct ui_file *stb = arg;
+
+  if (inf->pid == 0)
+    return 0;
 
   if (inf->attach_flag)
     fprintf_filtered (stb,
@@ -1319,12 +1325,38 @@ quit_force (char *args, int from_tty)
   exit (exit_code);
 }
 
+/* If OFF, the debugger will run in non-interactive mode, which means
+   that it will automatically select the default answer to all the
+   queries made to the user.  If ON, gdb will wait for the user to
+   answer all queries.  If AUTO, gdb will determine whether to run
+   in interactive mode or not depending on whether stdin is a terminal
+   or not.  */
+static enum auto_boolean interactive_mode = AUTO_BOOLEAN_AUTO;
+
+/* Implement the "show interactive-mode" option.  */
+
+static void
+show_interactive_mode (struct ui_file *file, int from_tty,
+                       struct cmd_list_element *c,
+                       const char *value)
+{
+  if (interactive_mode == AUTO_BOOLEAN_AUTO)
+    fprintf_filtered (file, "\
+Debugger's interactive mode is %s (currently %s).\n",
+                      value, input_from_terminal_p () ? "on" : "off");
+  else
+    fprintf_filtered (file, "Debugger's interactive mode is %s.\n", value);
+}
+
 /* Returns whether GDB is running on a terminal and input is
    currently coming from that terminal.  */
 
 int
 input_from_terminal_p (void)
 {
+  if (interactive_mode != AUTO_BOOLEAN_AUTO)
+    return interactive_mode == AUTO_BOOLEAN_TRUE;
+
   if (gdb_has_a_terminal () && instream == stdin)
     return 1;
 
@@ -1656,6 +1688,18 @@ Use \"on\" to enable the notification, and \"off\" to disable it."),
 			   show_exec_done_display_p,
 			   &setlist, &showlist);
 
+  add_setshow_auto_boolean_cmd ("interactive-mode", class_support,
+                                &interactive_mode, _("\
+Set whether GDB should run in interactive mode or not"), _("\
+Show whether GDB runs in interactive mode"), _("\
+If on, run in interactive mode and wait for the user to answer\n\
+all queries.  If off, run in non-interactive mode and automatically\n\
+assume the default answer to all queries.  If auto (the default),\n\
+determine which mode to use based on the standard input settings"),
+                        NULL,
+                        show_interactive_mode,
+                        &setlist, &showlist);
+
   add_setshow_filename_cmd ("data-directory", class_maintenance,
                            &gdb_datadir, _("Set GDB's data directory."),
                            _("Show GDB's data directory."),
@@ -1684,6 +1728,13 @@ gdb_init (char *argv0)
   initialize_targets ();	/* Setup target_terminal macros for utils.c */
   initialize_utils ();		/* Make errors and warnings possible */
   initialize_all_files ();
+  /* This creates the current_program_space.  Do this after all the
+     _initialize_foo routines have had a chance to install their
+     per-sspace data keys.  Also do this before
+     initialize_current_architecture is called, because it accesses
+     exec_bfd of the current program space.  */
+  initialize_progspace ();
+  initialize_inferiors ();
   initialize_current_architecture ();
   init_cli_cmds();
   init_main ();			/* But that omits this file!  Do it now */

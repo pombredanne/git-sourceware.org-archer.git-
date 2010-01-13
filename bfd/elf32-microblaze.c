@@ -1,6 +1,6 @@
 /* Xilinx MicroBlaze-specific support for 32-bit ELF
 
-   Copyright 2009 Free Software Foundation, Inc.
+   Copyright 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
 
@@ -1284,7 +1284,7 @@ microblaze_elf_relax_section (bfd *abfd,
   bfd_byte *free_contents = NULL;
   int rel_count;
   unsigned int shndx;
-  int i, index;
+  int i, sym_index;
   asection *o;
   struct elf_link_hash_entry *sym_hash;
   Elf_Internal_Sym *isymbuf, *isymend;
@@ -1319,8 +1319,7 @@ microblaze_elf_relax_section (bfd *abfd,
  			     	    0, NULL, NULL, NULL);
   BFD_ASSERT (isymbuf != NULL);
 
-  internal_relocs = _bfd_elf_link_read_relocs
-    (abfd, sec, NULL, NULL, link_info->keep_memory);
+  internal_relocs = _bfd_elf_link_read_relocs (abfd, sec, NULL, NULL, link_info->keep_memory);
   if (internal_relocs == NULL)
     goto error_return;
   if (! link_info->keep_memory)
@@ -1364,7 +1363,6 @@ microblaze_elf_relax_section (bfd *abfd,
       if (ELF32_R_SYM (irel->r_info) < symtab_hdr->sh_info)
 	{
 	  /* A local symbol.  */
-	  Elf_Internal_Sym *isym;
 	  asection *sym_sec;
 
 	  isym = isymbuf + ELF32_R_SYM (irel->r_info);
@@ -1464,7 +1462,6 @@ microblaze_elf_relax_section (bfd *abfd,
 	         range to be adjusted, and hence must be changed.  */
 	      if (ELF32_R_SYM (irel->r_info) < symtab_hdr->sh_info)
 	        {
-		  Elf_Internal_Sym *isym;
 		  isym = isymbuf + ELF32_R_SYM (irel->r_info);
 		  /* Only handle relocs against .text.  */
 		  if (isym->st_shndx == shndx
@@ -1507,7 +1504,7 @@ microblaze_elf_relax_section (bfd *abfd,
       /* Look through all other sections.  */
       for (o = abfd->sections; o != NULL; o = o->next)
         {
-          Elf_Internal_Rela *internal_relocs;
+          Elf_Internal_Rela *irelocs;
           Elf_Internal_Rela *irelscan, *irelscanend;
           bfd_byte *ocontents;
 
@@ -1519,13 +1516,13 @@ microblaze_elf_relax_section (bfd *abfd,
           /* We always cache the relocs.  Perhaps, if info->keep_memory is
              FALSE, we should free them, if we are permitted to.  */
 
-          internal_relocs = _bfd_elf_link_read_relocs (abfd, o, NULL, NULL, TRUE);
-          if (internal_relocs == NULL)
+          irelocs = _bfd_elf_link_read_relocs (abfd, o, NULL, NULL, TRUE);
+          if (irelocs == NULL)
             goto error_return;
 
           ocontents = NULL;
-          irelscanend = internal_relocs + o->reloc_count;
-          for (irelscan = internal_relocs; irelscan < irelscanend; irelscan++)
+          irelscanend = irelocs + o->reloc_count;
+          for (irelscan = irelocs; irelscan < irelscanend; irelscan++)
             {
               if (ELF32_R_TYPE (irelscan->r_info) == (int) R_MICROBLAZE_32)
                 {
@@ -1745,9 +1742,9 @@ microblaze_elf_relax_section (bfd *abfd,
       /* Now adjust the global symbols defined in this section.  */
       isym = isymbuf + symtab_hdr->sh_info;
       isymend = isymbuf + (symtab_hdr->sh_size / sizeof (Elf32_External_Sym));
-      for (index = 0; isym < isymend; isym++, index++)
+      for (sym_index = 0; isym < isymend; isym++, sym_index++)
         {
-          sym_hash = elf_sym_hashes (abfd)[index];
+          sym_hash = elf_sym_hashes (abfd)[sym_index];
           if (isym->st_shndx == shndx
               && (sym_hash->root.type == bfd_link_hash_defined
                   || sym_hash->root.type == bfd_link_hash_defweak)
@@ -1822,38 +1819,20 @@ microblaze_elf_relax_section (bfd *abfd,
 
 static asection *
 microblaze_elf_gc_mark_hook (asection *sec,
-			     struct bfd_link_info * info ATTRIBUTE_UNUSED,
+			     struct bfd_link_info * info,
      			     Elf_Internal_Rela * rel,
      			     struct elf_link_hash_entry * h,
      			     Elf_Internal_Sym * sym)
 {
   if (h != NULL)
-    {
-      switch (ELF32_R_TYPE (rel->r_info))
-	{
-	case R_MICROBLAZE_GNU_VTINHERIT:
-	case R_MICROBLAZE_GNU_VTENTRY:
-	  break;
+    switch (ELF32_R_TYPE (rel->r_info))
+      {
+      case R_MICROBLAZE_GNU_VTINHERIT:
+      case R_MICROBLAZE_GNU_VTENTRY:
+	return NULL;
+      }
 
-	default:
-	  switch (h->root.type)
-	    {
-	    case bfd_link_hash_defined:
-	    case bfd_link_hash_defweak:
-	      return h->root.u.def.section;
-
-	    case bfd_link_hash_common:
-	      return h->root.u.c.p->section;
-
-	    default:
-	      break;
-	    }
-	}
-    }
-  else
-    return bfd_section_from_elf_index (sec->owner, sym->st_shndx);
-
-  return NULL;
+  return _bfd_elf_gc_mark_hook (sec, info, rel, h, sym);
 }
 
 /* Update the got entry reference counts for the section being removed.  */

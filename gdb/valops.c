@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008, 2009 Free Software Foundation, Inc.
+   2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -232,6 +232,11 @@ value_cast_structs (struct type *type, struct value *v2)
   gdb_assert ((TYPE_CODE (t2) == TYPE_CODE_STRUCT
 	       || TYPE_CODE (t2) == TYPE_CODE_UNION)
 	      && !!"Precondition is that value is of STRUCT or UNION kind");
+
+  if (TYPE_NAME (t1) != NULL
+      && TYPE_NAME (t2) != NULL
+      && !strcmp (TYPE_NAME (t1), TYPE_NAME (t2)))
+    return NULL;
 
   /* Upcasting: look in the type of the source to see if it contains the
      type of the target as a superclass.  If so, we'll need to
@@ -892,6 +897,9 @@ value_assign (struct value *toval, struct value *fromval)
 
 	if (value_bitsize (toval))
 	  {
+	    struct value *parent = value_parent (toval);
+	    changed_addr = value_address (parent) + value_offset (toval);
+
 	    changed_len = (value_bitpos (toval)
 			   + value_bitsize (toval)
 			   + HOST_CHAR_BIT - 1)
@@ -903,17 +911,16 @@ value_assign (struct value *toval, struct value *fromval)
 	       registers.  */
 	    if (changed_len < TYPE_LENGTH (type)
 		&& TYPE_LENGTH (type) <= (int) sizeof (LONGEST)
-		&& ((LONGEST) value_address (toval) % TYPE_LENGTH (type)) == 0)
+		&& ((LONGEST) changed_addr % TYPE_LENGTH (type)) == 0)
 	      changed_len = TYPE_LENGTH (type);
 
 	    if (changed_len > (int) sizeof (LONGEST))
 	      error (_("Can't handle bitfields which don't fit in a %d bit word."),
 		     (int) sizeof (LONGEST) * HOST_CHAR_BIT);
 
-	    read_memory (value_address (toval), buffer, changed_len);
+	    read_memory (changed_addr, buffer, changed_len);
 	    modify_field (type, buffer, value_as_long (fromval),
 			  value_bitpos (toval), value_bitsize (toval));
-	    changed_addr = value_address (toval);
 	    dest_buffer = buffer;
 	  }
 	else
@@ -924,8 +931,8 @@ value_assign (struct value *toval, struct value *fromval)
 	  }
 
 	write_memory (changed_addr, dest_buffer, changed_len);
-	if (deprecated_memory_changed_hook)
-	  deprecated_memory_changed_hook (changed_addr, changed_len);
+	observer_notify_memory_changed (changed_addr, changed_len,
+					dest_buffer);
       }
       break;
 
@@ -956,6 +963,8 @@ value_assign (struct value *toval, struct value *fromval)
 	  {
 	    if (value_bitsize (toval))
 	      {
+		struct value *parent = value_parent (toval);
+		int offset = value_offset (parent) + value_offset (toval);
 		int changed_len;
 		gdb_byte buffer[sizeof (LONGEST)];
 
@@ -968,15 +977,13 @@ value_assign (struct value *toval, struct value *fromval)
 		  error (_("Can't handle bitfields which don't fit in a %d bit word."),
 			 (int) sizeof (LONGEST) * HOST_CHAR_BIT);
 
-		get_frame_register_bytes (frame, value_reg,
-					  value_offset (toval),
+		get_frame_register_bytes (frame, value_reg, offset,
 					  changed_len, buffer);
 
 		modify_field (type, buffer, value_as_long (fromval),
 			      value_bitpos (toval), value_bitsize (toval));
 
-		put_frame_register_bytes (frame, value_reg,
-					  value_offset (toval),
+		put_frame_register_bytes (frame, value_reg, offset,
 					  changed_len, buffer);
 	      }
 	    else
@@ -2615,8 +2622,8 @@ check_field (struct type *type, const char *name)
    the comment before value_struct_elt_for_reference.  */
 
 struct value *
-value_aggregate_elt (struct type *curtype,
-		     char *name, int want_address,
+value_aggregate_elt (struct type *curtype, char *name,
+		     struct type *expect_type, int want_address,
 		     enum noside noside)
 {
   switch (TYPE_CODE (curtype))
@@ -2624,7 +2631,7 @@ value_aggregate_elt (struct type *curtype,
     case TYPE_CODE_STRUCT:
     case TYPE_CODE_UNION:
       return value_struct_elt_for_reference (curtype, 0, curtype, 
-					     name, NULL,
+					     name, expect_type,
 					     want_address, noside);
     case TYPE_CODE_NAMESPACE:
       return value_namespace_elt (curtype, name, 
@@ -2633,6 +2640,57 @@ value_aggregate_elt (struct type *curtype,
       internal_error (__FILE__, __LINE__,
 		      _("non-aggregate type in value_aggregate_elt"));
     }
+}
+
+/* Compares the two method/function types T1 and T2 for "equality" 
+   with respect to the the methods' parameters.  If the types of the
+   two parameter lists are the same, returns 1; 0 otherwise.  This
+   comparison may ignore any artificial parameters in T1 if
+   SKIP_ARTIFICIAL is non-zero.  This function will ALWAYS skip
+   the first artificial parameter in T1, assumed to be a 'this' pointer.
+
+   The type T2 is expected to have come from make_params (in eval.c).  */
+
+static int
+compare_parameters (struct type *t1, struct type *t2, int skip_artificial)
+{
+  int start = 0;
+
+  if (TYPE_FIELD_ARTIFICIAL (t1, 0))
+    ++start;
+
+  /* If skipping artificial fields, find the first real field
+     in T1. */
+  if (skip_artificial)
+    {
+      while (start < TYPE_NFIELDS (t1)
+	     && TYPE_FIELD_ARTIFICIAL (t1, start))
+	++start;
+    }
+
+  /* Now compare parameters */
+
+  /* Special case: a method taking void.  T1 will contain no
+     non-artificial fields, and T2 will contain TYPE_CODE_VOID.  */
+  if ((TYPE_NFIELDS (t1) - start) == 0 && TYPE_NFIELDS (t2) == 1
+      && TYPE_CODE (TYPE_FIELD_TYPE (t2, 0)) == TYPE_CODE_VOID)
+    return 1;
+
+  if ((TYPE_NFIELDS (t1) - start) == TYPE_NFIELDS (t2))
+    {
+      int i;
+      for (i = 0; i < TYPE_NFIELDS (t2); ++i)
+	{
+	  if (rank_one_type (TYPE_FIELD_TYPE (t1, start + i),
+			      TYPE_FIELD_TYPE (t2, i))
+	      != 0)
+	    return 0;
+	}
+
+      return 1;
+    }
+
+  return 0;
 }
 
 /* C++: Given an aggregate type CURTYPE, and a member name NAME,
@@ -2712,23 +2770,48 @@ value_struct_elt_for_reference (struct type *domain, int offset,
 	}
       if (t_field_name && strcmp (t_field_name, name) == 0)
 	{
-	  int j = TYPE_FN_FIELDLIST_LENGTH (t, i);
+	  int j;
+	  int len = TYPE_FN_FIELDLIST_LENGTH (t, i);
 	  struct fn_field *f = TYPE_FN_FIELDLIST1 (t, i);
 
 	  check_stub_method_group (t, i);
 
-	  if (intype == 0 && j > 1)
-	    error (_("non-unique member `%s' requires type instantiation"), name);
 	  if (intype)
 	    {
-	      while (j--)
-		if (TYPE_FN_FIELD_TYPE (f, j) == intype)
-		  break;
-	      if (j < 0)
+	      for (j = 0; j < len; ++j)
+		{
+		  if (compare_parameters (TYPE_FN_FIELD_TYPE (f, j), intype, 0)
+		      || compare_parameters (TYPE_FN_FIELD_TYPE (f, j), intype, 1))
+		    break;
+		}
+
+	      if (j == len)
 		error (_("no member function matches that type instantiation"));
 	    }
 	  else
-	    j = 0;
+	    {
+	      int ii;
+
+	      j = -1;
+	      for (ii = 0; ii < TYPE_FN_FIELDLIST_LENGTH (t, i);
+		   ++ii)
+		{
+		  /* Skip artificial methods.  This is necessary if,
+		     for example, the user wants to "print
+		     subclass::subclass" with only one user-defined
+		     constructor.  There is no ambiguity in this
+		     case.  */
+		  if (TYPE_FN_FIELD_ARTIFICIAL (f, ii))
+		    continue;
+
+		  /* Desired method is ambiguous if more than one
+		     method is defined.  */
+		  if (j != -1)
+		    error (_("non-unique member `%s' requires type instantiation"), name);
+
+		  j = ii;
+		}
+	    }
 
 	  if (TYPE_FN_FIELD_STATIC_P (f, j))
 	    {

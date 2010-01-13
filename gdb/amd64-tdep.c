@@ -1,6 +1,6 @@
 /* Target-dependent code for AMD64.
 
-   Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
+   Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    Contributed by Jiri Smid, SuSE Labs.
@@ -1402,7 +1402,10 @@ amd64_init_frame_cache (struct amd64_frame_cache *cache)
   cache->pc = 0;
 
   /* Saved registers.  We initialize these to -1 since zero is a valid
-     offset (that's where %rbp is supposed to be stored).  */
+     offset (that's where %rbp is supposed to be stored).
+     The values start out as being offsets, and are later converted to
+     addresses (at which point -1 is interpreted as an address, still meaning
+     "invalid").  */
   for (i = 0; i < AMD64_NUM_SAVED_REGS; i++)
     cache->saved_regs[i] = -1;
   cache->saved_sp = 0;
@@ -1925,7 +1928,7 @@ amd64_epilogue_frame_cache (struct frame_info *this_frame, void **this_cache)
   struct gdbarch *gdbarch = get_frame_arch (this_frame);
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   struct amd64_frame_cache *cache;
-  gdb_byte buf[4];
+  gdb_byte buf[8];
 
   if (*this_cache)
     return *this_cache;

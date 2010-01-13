@@ -1,6 +1,6 @@
 /* YACC parser for Ada expressions, for GDB.
    Copyright (C) 1986, 1989, 1990, 1991, 1993, 1994, 1997, 2000, 2003, 2004,
-   2007, 2008, 2009 Free Software Foundation, Inc.
+   2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1021,8 +1021,8 @@ block_lookup (struct block *context, char *raw_name)
     name = ada_encode (raw_name);
 
   nsyms = ada_lookup_symbol_list (name, context, VAR_DOMAIN, &syms);
-  if (context == NULL &&
-      (nsyms == 0 || SYMBOL_CLASS (syms[0].sym) != LOC_BLOCK))
+  if (context == NULL
+      && (nsyms == 0 || SYMBOL_CLASS (syms[0].sym) != LOC_BLOCK))
     symtab = lookup_symtab (name);
   else
     symtab = NULL;

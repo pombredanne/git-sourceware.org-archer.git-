@@ -1,7 +1,7 @@
 /* Definitions for dealing with stack frames, for GDB, the GNU debugger.
 
    Copyright (C) 1986, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1996, 1997,
-   1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009
+   1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -142,8 +142,13 @@ struct frame_id
 
 /* Methods for constructing and comparing Frame IDs.  */
 
-/* For convenience.  All fields are zero.  */
+/* For convenience.  All fields are zero.  This means "there is no frame".  */
 extern const struct frame_id null_frame_id;
+
+/* This means "there is no frame ID, but there is a frame".  It should be
+   replaced by best-effort frame IDs for the outermost frame, somehow.
+   The implementation is only special_addr_p set.  */
+extern const struct frame_id outer_frame_id;
 
 /* Flag to control debugging.  */
 
@@ -170,7 +175,8 @@ extern struct frame_id frame_id_build_special (CORE_ADDR stack_addr,
 extern struct frame_id frame_id_build_wild (CORE_ADDR stack_addr);
 
 /* Returns non-zero when L is a valid frame (a valid frame has a
-   non-zero .base).  */
+   non-zero .base).  The outermost frame is valid even without an
+   ID.  */
 extern int frame_id_p (struct frame_id l);
 
 /* Returns non-zero when L is a valid frame representing an inlined
@@ -399,6 +405,15 @@ extern int frame_relative_level (struct frame_info *fi);
 /* Return the frame's type.  */
 
 extern enum frame_type get_frame_type (struct frame_info *);
+
+/* Return the frame's program space.  */
+extern struct program_space *get_frame_program_space (struct frame_info *);
+
+/* Unwind THIS frame's program space from the NEXT frame.  */
+extern struct program_space *frame_unwind_program_space (struct frame_info *);
+
+/* Return the frame's address space.  */
+extern struct address_space *get_frame_address_space (struct frame_info *);
 
 /* For frames where we can not unwind further, describe why.  */
 

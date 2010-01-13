@@ -1,6 +1,6 @@
 /* Machine independent support for SVR4 /proc (process file system) for GDB.
 
-   Copyright (C) 1999, 2000, 2001, 2002, 2003, 2006, 2007, 2008, 2009
+   Copyright (C) 1999, 2000, 2001, 2002, 2003, 2006, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    Written by Michael Snyder at Cygnus Solutions.
@@ -51,6 +51,7 @@
 #include "inflow.h"
 #include "auxv.h"
 #include "procfs.h"
+#include "observer.h"
 
 /*
  * PROCFS.C
@@ -270,6 +271,15 @@ typedef pr_siginfo64_t gdb_siginfo_t;
 typedef struct siginfo gdb_siginfo_t;
 #endif
 
+/* On mips-irix, praddset and prdelset are defined in such a way that
+   they return a value, which causes GCC to emit a -Wunused error
+   because the returned value is not used.  Prevent this warning
+   by casting the return value to void.  On sparc-solaris, this issue
+   does not exist because the definition of these macros already include
+   that cast to void.  */
+#define gdb_praddset(sp, flag) ((void) praddset (sp, flag))
+#define gdb_prdelset(sp, flag) ((void) prdelset (sp, flag))
+
 /* gdb_premptysysset */
 #ifdef premptysysset
 #define gdb_premptysysset premptysysset
@@ -281,14 +291,14 @@ typedef struct siginfo gdb_siginfo_t;
 #ifdef praddsysset
 #define gdb_praddsysset praddsysset
 #else
-#define gdb_praddsysset praddset
+#define gdb_praddsysset gdb_praddset
 #endif
 
 /* prdelsysset */
 #ifdef prdelsysset
 #define gdb_prdelsysset prdelsysset
 #else
-#define gdb_prdelsysset prdelset
+#define gdb_prdelsysset gdb_prdelset
 #endif
 
 /* prissyssetmember */
@@ -2219,7 +2229,7 @@ proc_trace_signal (procinfo *pi, int signo)
     {
       if (proc_get_traced_signals (pi, &temp))
 	{
-	  praddset (&temp, signo);
+	  gdb_praddset (&temp, signo);
 	  return proc_set_traced_signals (pi, &temp);
 	}
     }
@@ -2253,7 +2263,7 @@ proc_ignore_signal (procinfo *pi, int signo)
     {
       if (proc_get_traced_signals (pi, &temp))
 	{
-	  prdelset (&temp, signo);
+	  gdb_prdelset (&temp, signo);
 	  return proc_set_traced_signals (pi, &temp);
 	}
     }
@@ -3491,7 +3501,7 @@ procfs_debug_inferior (procinfo *pi)
 #else
   /* Register to trace hardware faults in the child. */
   prfillset (&traced_faults);		/* trace all faults... */
-  prdelset  (&traced_faults, FLTPAGE);	/* except page fault.  */
+  gdb_prdelset  (&traced_faults, FLTPAGE);	/* except page fault.  */
 #endif
   if (!proc_set_traced_faults  (pi, &traced_faults))
     return __LINE__;
@@ -3705,7 +3715,8 @@ do_attach (ptid_t ptid)
   if ((fail = procfs_debug_inferior (pi)) != 0)
     dead_procinfo (pi, "do_attach: failed in procfs_debug_inferior", NOKILL);
 
-  inf = add_inferior (pi->pid);
+  inf = current_inferior ();
+  inferior_appeared (inf, pi->pid);
   /* Let GDB know that the inferior was attached.  */
   inf->attach_flag = 1;
 
@@ -4641,9 +4652,9 @@ register_gdb_signals (procinfo *pi, gdb_sigset_t *signals)
     if (signal_stop_state  (target_signal_from_host (signo)) == 0 &&
 	signal_print_state (target_signal_from_host (signo)) == 0 &&
 	signal_pass_state  (target_signal_from_host (signo)) == 1)
-      prdelset (signals, signo);
+      gdb_prdelset (signals, signo);
     else
-      praddset (signals, signo);
+      gdb_praddset (signals, signo);
 
   return proc_set_traced_signals (pi, signals);
 }
@@ -5136,13 +5147,27 @@ procfs_create_inferior (struct target_ops *ops, char *exec_file,
 		       NULL, NULL, shell_file);
 
   procfs_init_inferior (ops, pid);
+}
 
+/* An observer for the "inferior_created" event.  */
+
+static void
+procfs_inferior_created (struct target_ops *ops, int from_tty)
+{
 #ifdef SYS_syssgi
   /* Make sure to cancel the syssgi() syscall-exit notifications.  
      They should normally have been removed by now, but they may still
      be activated if the inferior doesn't use shared libraries, or if
      we didn't locate __dbx_link, or if we never stopped in __dbx_link.
-     See procfs_init_inferior() for more details.  */
+     See procfs_init_inferior() for more details.
+
+     Since these notifications are only ever enabled when we spawned
+     the inferior ourselves, there is nothing to do when the inferior
+     was created by attaching to an already running process, or when
+     debugging a core file.  */
+  if (current_inferior ()->attach_flag || !target_can_run (&current_target))
+    return;
+
   proc_trace_syscalls_1 (find_procinfo_or_die (PIDGET (inferior_ptid), 0),
                          SYS_syssgi, PR_SYSEXIT, FLAG_RESET, 0);
 #endif
@@ -5665,7 +5690,7 @@ insert_dbx_link_bpt_in_file (int fd, CORE_ADDR ignored)
     {
       /* Insert the breakpoint.  */
       dbx_link_bpt_addr = sym_addr;
-      dbx_link_bpt = deprecated_insert_raw_breakpoint (target_gdbarch,
+      dbx_link_bpt = deprecated_insert_raw_breakpoint (target_gdbarch, NULL,
 						       sym_addr);
       if (dbx_link_bpt == NULL)
         {
@@ -5990,6 +6015,8 @@ proc_untrace_sysexit_cmd (char *args, int from_tty)
 void
 _initialize_procfs (void)
 {
+  observer_attach_inferior_created (procfs_inferior_created);
+
   add_info ("proc", info_proc_cmd, _("\
 Show /proc process information about any running process.\n\
 Specify process id, or use the program being debugged by default.\n\
@@ -6059,11 +6086,21 @@ procfs_do_thread_registers (bfd *obfd, ptid_t ptid,
   gdb_gregset_t gregs;
   gdb_fpregset_t fpregs;
   unsigned long merged_pid;
+  struct cleanup *old_chain;
 
   merged_pid = TIDGET (ptid) << 16 | PIDGET (ptid);
 
+  /* This part is the old method for fetching registers.
+     It should be replaced by the newer one using regsets
+     once it is implemented in this platform:
+     gdbarch_regset_from_core_section() and regset->collect_regset(). */
+
+  old_chain = save_inferior_ptid ();
+  inferior_ptid = ptid;
+  target_fetch_registers (regcache, -1);
+
   fill_gregset (regcache, &gregs, -1);
-#if defined (UNIXWARE)
+#if defined (NEW_PROC_API)
   note_data = (char *) elfcore_write_lwpstatus (obfd,
 						note_data,
 						note_size,
@@ -6084,6 +6121,9 @@ procfs_do_thread_registers (bfd *obfd, ptid_t ptid,
 					      note_size,
 					      &fpregs,
 					      sizeof (fpregs));
+
+  do_cleanups (old_chain);
+
   return note_data;
 }
 
@@ -6101,13 +6141,11 @@ procfs_corefile_thread_callback (procinfo *pi, procinfo *thread, void *data)
 
   if (pi != NULL)
     {
-      ptid_t saved_ptid = inferior_ptid;
-      inferior_ptid = MERGEPID (pi->pid, thread->tid);
-      args->note_data = procfs_do_thread_registers (args->obfd, inferior_ptid,
+      ptid_t ptid = MERGEPID (pi->pid, thread->tid);
+      args->note_data = procfs_do_thread_registers (args->obfd, ptid,
 						    args->note_data,
 						    args->note_size,
 						    args->stop_signal);
-      inferior_ptid = saved_ptid;
     }
   return 0;
 }
@@ -6126,6 +6164,7 @@ procfs_make_note_section (bfd *obfd, int *note_size)
   struct procfs_corefile_thread_data thread_args;
   gdb_byte *auxv;
   int auxv_len;
+  enum target_signal stop_signal;
 
   if (get_exec_file (0))
     {
@@ -6150,6 +6189,8 @@ procfs_make_note_section (bfd *obfd, int *note_size)
 					       fname,
 					       psargs);
 
+  stop_signal = find_stop_signal ();
+
 #ifdef UNIXWARE
   fill_gregset (get_current_regcache (), &gregs, -1);
   note_data = elfcore_write_pstatus (obfd, note_data, note_size,
@@ -6160,7 +6201,7 @@ procfs_make_note_section (bfd *obfd, int *note_size)
   thread_args.obfd = obfd;
   thread_args.note_data = note_data;
   thread_args.note_size = note_size;
-  thread_args.stop_signal = find_stop_signal ();
+  thread_args.stop_signal = stop_signal;
   proc_iterate_over_threads (pi, procfs_corefile_thread_callback, &thread_args);
 
   /* There should be always at least one thread.  */

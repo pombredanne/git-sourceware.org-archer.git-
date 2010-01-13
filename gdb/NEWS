@@ -1,7 +1,190 @@
 		What has changed in GDB?
 	     (Organized release by release)
 
-*** Changes since GDB 6.8
+*** Changes since GDB 7.0
+
+* New targets
+
+Xilinx MicroBlaze		microblaze-*-*
+Renesas RX			rx-*-elf
+
+* New Simulators
+
+Xilinx MicroBlaze		microblaze
+Renesas RX			rx
+
+* Multi-program debugging.
+
+  GDB now has support for multi-program (a.k.a. multi-executable or
+  multi-exec) debugging.  This allows for debugging multiple inferiors
+  simultaneously each running a different program under the same GDB
+  session.  See "Debugging Multiple Inferiors and Programs" in the
+  manual for more information.  This implied some user visible changes
+  in the multi-inferior support.  For example, "info inferiors" now
+  lists inferiors that are not running yet or that have exited
+  already.  See also "New commands" and "New options" below.
+
+* New tracing features
+
+  GDB's tracepoint facility now includes several new features:
+
+  ** Trace state variables
+
+  GDB tracepoints now include support for trace state variables, which
+  are variables managed by the target agent during a tracing
+  experiment.  They are useful for tracepoints that trigger each
+  other, so for instance one tracepoint can count hits in a variable,
+  and then a second tracepoint has a condition that is true when the
+  count reaches a particular value.  Trace state variables share the
+  $-syntax of GDB convenience variables, and can appear in both
+  tracepoint actions and condition expressions.  Use the "tvariable"
+  command to create, and "info tvariables" to view; see "Trace State
+  Variables" in the manual for more detail.
+
+  ** Fast tracepoints
+
+  GDB now includes an option for defining fast tracepoints, which
+  targets may implement more efficiently, such as by installing a jump
+  into the target agent rather than a trap instruction.  The resulting
+  speedup can be by two orders of magnitude or more, although the
+  tradeoff is that some program locations on some target architectures
+  might not allow fast tracepoint installation, for instance if the
+  instruction to be replaced is shorter than the jump.  To request a
+  fast tracepoint, use the "ftrace" command, with syntax identical to
+  the regular trace command.
+
+  ** Disconnected tracing
+
+  It is now possible to detach GDB from the target while it is running
+  a trace experiment, then reconnect later to see how the experiment
+  is going.  In addition, a new variable disconnected-tracing lets you
+  tell the target agent whether to continue running a trace if the
+  connection is lost unexpectedly.
+
+* Changed commands
+
+disassemble
+  The disassemble command, when invoked with two arguments, now requires
+  the arguments to be comma-separated.
+
+info variables
+  The info variables command now displays variable definitions.  Files
+  which only declare a variable are not shown.
+
+* New commands (for set/show, see "New options" below)
+
+record save [<FILENAME>]
+  Save a file (in core file format) containing the process record 
+  execution log for replay debugging at a later time.
+
+record restore <FILENAME>
+  Restore the process record execution log that was saved at an
+  earlier time, for replay debugging.
+
+add-inferior [-copies <N>] [-exec <FILENAME>]
+  Add a new inferior.
+
+clone-inferior [-copies <N>] [ID]
+  Make a new inferior ready to execute the same program another
+  inferior has loaded.
+
+remove-inferior ID
+  Remove an inferior.
+
+maint info program-spaces
+  List the program spaces loaded into GDB.
+
+set remote interrupt-sequence [Ctrl-C | BREAK | BREAK-g]
+show remote interrupt-sequence
+  Allow the user to select one of ^C, a BREAK signal or BREAK-g
+  as the sequence to the remote target in order to interrupt the execution.
+  Ctrl-C is a default.  Some system prefers BREAK which is high level of
+  serial line for some certain time.  Linux kernel prefers BREAK-g, a.k.a
+  Magic SysRq g.  It is BREAK signal and character 'g'.
+
+set remote interrupt-on-connect [on | off]
+show remote interrupt-on-connect
+  When interrupt-on-connect is ON, gdb sends interrupt-sequence to
+  remote target when gdb connects to it.  This is needed when you debug
+  Linux kernel.
+
+set remotebreak [on | off]
+show remotebreak
+Deprecated.  Use "set/show remote interrupt-sequence" instead.
+
+tvariable $NAME [ = EXP ]
+  Create or modify a trace state variable.
+
+info tvariables
+  List trace state variables and their values.
+
+delete tvariable $NAME ...
+  Delete one or more trace state variables.
+
+teval EXPR, ...
+  Evaluate the given expressions without collecting anything into the
+  trace buffer. (Valid in tracepoint actions only.)
+
+ftrace FN / FILE:LINE / *ADDR
+  Define a fast tracepoint at the given function, line, or address.
+
+* New options
+
+set follow-exec-mode new|same
+show follow-exec-mode
+  Control whether GDB reuses the same inferior across an exec call or
+  creates a new one.  This is useful to be able to restart the old
+  executable after the inferior having done an exec call.
+
+set default-collect EXPR, ...
+show default-collect
+   Define a list of expressions to be collected at each tracepoint.
+   This is a useful way to ensure essential items are not overlooked,
+   such as registers or a critical global variable.
+
+set disconnected-tracing
+show disconnected-tracing
+   If set to 1, the target is instructed to continue tracing if it
+   loses its connection to GDB.  If 0, the target is to stop tracing
+   upon disconnection.
+
+* New remote packets
+
+QTDV
+   Define a trace state variable.
+
+qTV
+   Get the current value of a trace state variable.
+
+QTDisconnected
+   Set desired tracing behavior upon disconnection.
+
+qTfP, qTsP
+   Get data about the tracepoints currently in use.
+
+* Bug fixes
+
+Process record now works correctly with hardware watchpoints.
+
+Multiple bug fixes have been made to the mips-irix port, making it
+much more reliable. In particular:
+  - Debugging threaded applications is now possible again.  Previously,
+    GDB would hang while starting the program, or while waiting for
+    the program to stop at a breakpoint.
+  - Attaching to a running process no longer hangs.
+  - An error occurring while loading a core file has been fixed.
+  - Changing the value of the PC register now works again.  This fixes
+    problems observed when using the "jump" command, or when calling
+    a function from GDB, or even when assigning a new value to $pc.
+  - With the "finish" and "return" commands, the return value for functions
+    returning a small array is now correctly printed.
+  - It is now possible to break on shared library code which gets executed
+    during a shared library init phase (code executed while executing
+    their .init section).  Previously, the breakpoint would have no effect.
+  - GDB is now able to backtrace through the signal handler for
+    non-threaded programs.
+
+*** Changes in GDB 7.0
 
 * GDB now has an interface for JIT compilation.  Applications that
 dynamically generate code can create symbol files in memory and register
@@ -232,7 +415,31 @@ Cell/B.E. debugging, you need to configure GDB to support both the
 powerpc-linux or powerpc64-linux and the spu-elf targets, using the
 --enable-targets configure option.
 
+* Non-stop mode debugging.
+
+  For some targets, GDB now supports an optional mode of operation in
+  which you can examine stopped threads while other threads continue
+  to execute freely.  This is referred to as non-stop mode, with the
+  old mode referred to as all-stop mode.  See the "Non-Stop Mode"
+  section in the user manual for more information.
+
+  To be able to support remote non-stop debugging, a remote stub needs
+  to implement the non-stop mode remote protocol extensions, as
+  described in the "Remote Non-Stop" section of the user manual.  The
+  GDB remote stub, gdbserver, has been adjusted to support these
+  extensions on linux targets.
+
 * New commands (for set/show, see "New options" below)
+
+catch syscall [NAME(S) | NUMBER(S)]
+  Catch system calls.  Arguments, which should be names of system
+  calls or their numbers, mean catch only those syscalls.  Without
+  arguments, every syscall will be caught.  When the inferior issues
+  any of the specified syscalls, GDB will stop and announce the system
+  call, both when it is called and when its call returns.  This
+  feature is currently available with a native GDB running on the
+  Linux Kernel, under the following architectures: x86, x86_64,
+  PowerPC and PowerPC64.
 
 find [/size-char] [/max-count] start-address, end-address|+search-space-size,
     val1 [, val2, ...]
@@ -308,6 +515,14 @@ set remote write-siginfo-object
 show remote write-siginfo-object
   Control use of remote protocol `qXfer:siginfo:write' (write-siginfo-object)
   packet.
+
+set remote reverse-continue
+show remote reverse-continue
+  Control use of remote protocol 'bc' (reverse-continue) packet.
+
+set remote reverse-step
+show remote reverse-step
+  Control use of remote protocol 'bs' (reverse-step) packet.
 
 set displaced-stepping
 show displaced-stepping
@@ -399,6 +614,14 @@ show stack-cache
   Use more aggressive caching for accesses to the stack.  This improves
   performance of remote debugging (particularly backtraces) without
   affecting correctness.
+
+set interactive-mode (on|off|auto)
+show interactive-mode
+  Control whether GDB runs in interactive mode (on) or not (off).
+  When in interactive mode, GDB waits for the user to answer all
+  queries.  Otherwise, GDB does not wait and assumes the default
+  answer.  When set to auto (the default), GDB determines which
+  mode to use based on the stdin settings.
 
 * Removed commands
 

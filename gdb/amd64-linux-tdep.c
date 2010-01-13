@@ -1,6 +1,6 @@
 /* Target-dependent code for GNU/Linux x86-64.
 
-   Copyright (C) 2001, 2003, 2004, 2005, 2006, 2007, 2008, 2009
+   Copyright (C) 2001, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
    Contributed by Jiri Smid, SuSE Labs.
 
@@ -35,6 +35,10 @@
 
 #include "amd64-tdep.h"
 #include "solib-svr4.h"
+#include "xml-syscall.h"
+
+/* The syscall's XML filename for i386.  */
+#define XML_SYSCALL_FILENAME_AMD64 "syscalls/amd64-linux.xml"
 
 #include "record.h"
 #include "linux-record.h"
@@ -174,6 +178,28 @@ amd64_linux_sigcontext_addr (struct frame_info *this_frame)
 }
 
 
+static LONGEST
+amd64_linux_get_syscall_number (struct gdbarch *gdbarch,
+                                ptid_t ptid)
+{
+  struct regcache *regcache = get_thread_regcache (ptid);
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+  /* The content of a register.  */
+  gdb_byte buf[8];
+  /* The result.  */
+  LONGEST ret;
+
+  /* Getting the system call number from the register.
+     When dealing with x86_64 architecture, this information
+     is stored at %rax register.  */
+  regcache_cooked_read (regcache, AMD64_LINUX_ORIG_RAX_REGNUM, buf);
+
+  ret = extract_signed_integer (buf, 8, byte_order);
+
+  return ret;
+}
+
+
 /* From <asm/sigcontext.h>.  */
 static int amd64_linux_sc_reg_offset[] =
 {
@@ -263,16 +289,48 @@ amd64_linux_write_pc (struct regcache *regcache, CORE_ADDR pc)
   regcache_cooked_write_unsigned (regcache, AMD64_LINUX_ORIG_RAX_REGNUM, -1);
 }
 
-/* Parse the arguments of current system call instruction and record
-   the values of the registers and memory that will be changed into
-   "record_arch_list".  This instruction is "syscall".
+/* Record all registers but IP register for process-record.  */
 
-   Return -1 if something wrong.  */
+static int
+amd64_all_but_ip_registers_record (struct regcache *regcache)
+{
+  if (record_arch_list_add_reg (regcache, AMD64_RAX_REGNUM))
+    return -1;
+  if (record_arch_list_add_reg (regcache, AMD64_RCX_REGNUM))
+    return -1;
+  if (record_arch_list_add_reg (regcache, AMD64_RDX_REGNUM))
+    return -1;
+  if (record_arch_list_add_reg (regcache, AMD64_RBX_REGNUM))
+    return -1;
+  if (record_arch_list_add_reg (regcache, AMD64_RSP_REGNUM))
+    return -1;
+  if (record_arch_list_add_reg (regcache, AMD64_RBP_REGNUM))
+    return -1;
+  if (record_arch_list_add_reg (regcache, AMD64_RSI_REGNUM))
+    return -1;
+  if (record_arch_list_add_reg (regcache, AMD64_RDI_REGNUM))
+    return -1;
+  if (record_arch_list_add_reg (regcache, AMD64_R8_REGNUM))
+    return -1;
+  if (record_arch_list_add_reg (regcache, AMD64_R9_REGNUM))
+    return -1;
+  if (record_arch_list_add_reg (regcache, AMD64_R10_REGNUM))
+    return -1;
+  if (record_arch_list_add_reg (regcache, AMD64_R11_REGNUM))
+    return -1;
+  if (record_arch_list_add_reg (regcache, AMD64_R12_REGNUM))
+    return -1;
+  if (record_arch_list_add_reg (regcache, AMD64_R13_REGNUM))
+    return -1;
+  if (record_arch_list_add_reg (regcache, AMD64_R14_REGNUM))
+    return -1;
+  if (record_arch_list_add_reg (regcache, AMD64_R15_REGNUM))
+    return -1;
+  if (record_arch_list_add_reg (regcache, AMD64_EFLAGS_REGNUM))
+    return -1;
 
-static struct linux_record_tdep amd64_linux_record_tdep;
-
-#define RECORD_ARCH_GET_FS	0x1003
-#define RECORD_ARCH_GET_GS	0x1004
+  return 0;
+}
 
 /* amd64_canonicalize_syscall maps from the native amd64 Linux set 
    of syscall ids into a canonical set of syscall ids used by 
@@ -1085,6 +1143,17 @@ amd64_canonicalize_syscall (enum amd64_syscall syscall)
   }
 }
 
+/* Parse the arguments of current system call instruction and record
+   the values of the registers and memory that will be changed into
+   "record_arch_list".  This instruction is "syscall".
+
+   Return -1 if something wrong.  */
+
+static struct linux_record_tdep amd64_linux_record_tdep;
+
+#define RECORD_ARCH_GET_FS	0x1003
+#define RECORD_ARCH_GET_GS	0x1004
+
 static int
 amd64_linux_syscall_record (struct regcache *regcache)
 {
@@ -1094,26 +1163,38 @@ amd64_linux_syscall_record (struct regcache *regcache)
 
   regcache_raw_read_unsigned (regcache, AMD64_RAX_REGNUM, &syscall_native);
 
-  syscall_gdb = amd64_canonicalize_syscall (syscall_native);
-
-  if (syscall_native == amd64_sys_arch_prctl) 
+  switch (syscall_native)
     {
-      ULONGEST arg3;
+    case amd64_sys_rt_sigreturn:
+      if (amd64_all_but_ip_registers_record (regcache))
+        return -1;
+      return 0;
+      break;
 
-      regcache_raw_read_unsigned (regcache, amd64_linux_record_tdep.arg3,
-				  &arg3);
-      if (arg3 == RECORD_ARCH_GET_FS || arg3 == RECORD_ARCH_GET_GS)
-      {
-	CORE_ADDR addr;
+    case amd64_sys_arch_prctl:
+      if (syscall_native == amd64_sys_arch_prctl)
+        {
+          ULONGEST arg3;
 
-	regcache_raw_read_unsigned (regcache, amd64_linux_record_tdep.arg2,
-				    &addr);
-	if (record_arch_list_add_mem (addr, 
-				      amd64_linux_record_tdep.size_ulong))
-	  return -1;
-      }
-      goto record_regs;
+          regcache_raw_read_unsigned (regcache, amd64_linux_record_tdep.arg3,
+                                      &arg3);
+          if (arg3 == RECORD_ARCH_GET_FS || arg3 == RECORD_ARCH_GET_GS)
+            {
+	      CORE_ADDR addr;
+
+	      regcache_raw_read_unsigned (regcache,
+                                          amd64_linux_record_tdep.arg2,
+                                          &addr);
+	      if (record_arch_list_add_mem (addr,
+                                            amd64_linux_record_tdep.size_ulong))
+                return -1;
+            }
+          goto record_regs;
+        }
+      break;
     }
+
+  syscall_gdb = amd64_canonicalize_syscall (syscall_native);
 
   if (syscall_gdb < 0)
     {
@@ -1137,6 +1218,44 @@ amd64_linux_syscall_record (struct regcache *regcache)
   if (record_arch_list_add_reg (regcache, AMD64_R11_REGNUM))
     return -1;
 
+  return 0;
+}
+
+#define AMD64_LINUX_redzone    128
+#define AMD64_LINUX_xstate     512
+#define AMD64_LINUX_frame_size 560
+
+int
+amd64_linux_record_signal (struct gdbarch *gdbarch,
+                           struct regcache *regcache,
+                           enum target_signal signal)
+{
+  ULONGEST rsp;
+
+  if (amd64_all_but_ip_registers_record (regcache))
+    return -1;
+
+  if (record_arch_list_add_reg (regcache, AMD64_RIP_REGNUM))
+    return -1;
+
+  /* Record the change in the stack.  */
+  regcache_raw_read_unsigned (regcache, AMD64_RSP_REGNUM, &rsp);
+  /* redzone
+     sp -= 128; */
+  rsp -= AMD64_LINUX_redzone;
+  /* This is for xstate.
+     sp -= sizeof (struct _fpstate);  */
+  rsp -= AMD64_LINUX_xstate;
+  /* This is for frame_size.
+     sp -= sizeof (struct rt_sigframe);  */
+  rsp -= AMD64_LINUX_frame_size;
+  if (record_arch_list_add_mem (rsp, AMD64_LINUX_redzone
+                                     + AMD64_LINUX_xstate
+                                     + AMD64_LINUX_frame_size))
+    return -1;
+
+  if (record_arch_list_add_end ())
+    return -1;
 
   return 0;
 }
@@ -1168,6 +1287,11 @@ amd64_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
   set_gdbarch_register_type (gdbarch, amd64_linux_register_type);
   set_gdbarch_register_reggroup_p (gdbarch, amd64_linux_register_reggroup_p);
 
+  /* Functions for 'catch syscall'.  */
+  set_xml_syscall_file_name (XML_SYSCALL_FILENAME_AMD64);
+  set_gdbarch_get_syscall_number (gdbarch,
+                                  amd64_linux_get_syscall_number);
+
   /* Enable TLS support.  */
   set_gdbarch_fetch_tls_load_module_address (gdbarch,
                                              svr4_fetch_objfile_link_map);
@@ -1187,6 +1311,7 @@ amd64_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
   set_gdbarch_get_siginfo_type (gdbarch, linux_get_siginfo_type);
 
   set_gdbarch_process_record (gdbarch, i386_process_record);
+  set_gdbarch_process_record_signal (gdbarch, amd64_linux_record_signal);
 
   /* Initialize the amd64_linux_record_tdep.  */
   /* These values are the size of the type that will be used in a system

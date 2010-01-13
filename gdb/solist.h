@@ -1,6 +1,6 @@
 /* Shared library declarations for GDB, the GNU Debugger.
    Copyright (C) 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1998, 1999, 2000,
-   2001, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2001, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -52,6 +52,9 @@ struct so_list
     /* shared object file name, expanded to something GDB can open */
     char so_name[SO_NAME_MAX_PATH_SIZE];
 
+    /* Program space this shared library belongs to.  */
+    struct program_space *pspace;
+
     /* The following fields of the structure are built from
        information gathered from the shared object file itself, and
        are set when we actually add it to our symbol tables.
@@ -87,7 +90,7 @@ struct target_so_ops
     void (*clear_solib) (void);
 
     /* Target dependent code to run after child process fork.  */
-    void (*solib_create_inferior_hook) (void);
+    void (*solib_create_inferior_hook) (int from_tty);
 
     /* Do additional symbol handling, lookup, etc. after symbols
        for a shared object have been loaded.  */
@@ -123,6 +126,14 @@ struct target_so_ops
        Falls back to using strcmp on so_original_name field when set
        to NULL.  */
     int (*same) (struct so_list *gdb, struct so_list *inferior);
+
+    /* Return whether a region of memory must be kept in a core file
+       for shared libraries loaded before "gcore" is used to be
+       handled correctly when the core file is loaded.  This only
+       applies when the section would otherwise not be kept in the
+       core file (in particular, for readonly sections).  */
+    int (*keep_data_in_core) (CORE_ADDR vaddr,
+			      unsigned long size);
   };
 
 /* Free the memory associated with a (so_list *).  */

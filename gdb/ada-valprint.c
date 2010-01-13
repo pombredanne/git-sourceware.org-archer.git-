@@ -1,7 +1,8 @@
 /* Support for printing Ada values for GDB, the GNU debugger.
 
    Copyright (C) 1986, 1988, 1989, 1991, 1992, 1993, 1994, 1997, 2001, 2002,
-   2003, 2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
+   Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -18,8 +19,8 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#include <ctype.h>
 #include "defs.h"
+#include <ctype.h>
 #include "gdb_string.h"
 #include "symtab.h"
 #include "gdbtypes.h"
@@ -686,7 +687,8 @@ ada_val_print_1 (struct type *type, const gdb_byte *valaddr0,
 
   type = ada_check_typedef (type);
 
-  if (ada_is_array_descriptor_type (type) || ada_is_packed_array_type (type))
+  if (ada_is_array_descriptor_type (type)
+      || ada_is_constrained_packed_array_type (type))
     {
       int retn;
       struct value *mark = value_mark ();
@@ -741,22 +743,6 @@ ada_val_print_1 (struct type *type, const gdb_byte *valaddr0,
 	  fprintf_filtered (stream, len < 4 ? "%.11g" : "%.17g",
 			    (double) ada_fixed_to_float (type, v));
 	  return 0;
-	}
-      else if (ada_is_vax_floating_type (type))
-	{
-	  struct value *val =
-	    value_from_contents_and_address (type, valaddr, address);
-	  struct value *func = ada_vax_float_print_function (type);
-	  if (func != 0)
-	    {
-	      struct gdbarch *gdbarch = get_type_arch (type);
-	      CORE_ADDR addr;
-	      addr = value_as_address (call_function_by_hand (func, 1, &val));
-	      val_print_string (builtin_type (gdbarch)->builtin_true_char,
-				addr, -1, stream, options);
-	      return 0;
-	    }
-	  /* No special printing function.  Do as best we can.  */
 	}
       else if (TYPE_CODE (type) == TYPE_CODE_RANGE)
 	{

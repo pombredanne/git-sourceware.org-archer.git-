@@ -1,3 +1,33 @@
+2009-12-18  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* common.h (NT_S390_HIGH_GPRS): Define.
+
+2009-12-17  Alan Modra  <amodra@bigpond.net.au>
+
+	* ppc.h (R_PPC_RELAX32, R_PPC_RELAX32PC, R_PPC_RELAX32_PLT,
+	R_PPC_RELAX32PC_PLT): Delete.
+	(R_PPC_RELAX, R_PPC_RELAX_PLT, R_PPC_RELAX_PLTREL24): Define.
+
+2009-11-28  Joseph Myers  <joseph@codesourcery.com>
+
+	* common.h (ELFOSABI_FENIXOS, EM_TI_C6000, EM_TI_C2000,
+	EM_TI_C5500, EM_CUDA): Define.
+	(EM_res140, EM_res141, EM_res142): Remove.
+
+2009-11-17  Paul Brook  <paul@codesourcery.com>
+	Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* arm.h (TAG_CPU_ARCH_V7E_M): Define.
+
+2009-09-29  DJ Delorie  <dj@redhat.com>
+
+	* rx.h: New file.
+
+2009-09-21  Alan Modra  <amodra@bigpond.net.au>
+
+	* ppc.h (DT_PPC_TLSOPT): Define.
+	* ppc64.h (DT_PPC64_TLSOPT): Define.
+
 2009-08-10  Daniel Gutson  <dgutson@codesourcery.com>
 
 	* arm.h: (SHT_ARM_DEBUGOVERLAY): New define.

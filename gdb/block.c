@@ -1,6 +1,6 @@
 /* Block-related functions for the GNU debugger, GDB.
 
-   Copyright (C) 2003, 2007, 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 2003, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -52,6 +52,10 @@ contained_in (const struct block *a, const struct block *b)
     {
       if (a == b)
 	return 1;
+      /* If A is a function block, then A cannot be contained in B,
+         except if A was inlined.  */
+      if (BLOCK_FUNCTION (a) != NULL && !block_inlined_p (a))
+        return 0;
       a = BLOCK_SUPERBLOCK (a);
     }
   while (a != NULL);

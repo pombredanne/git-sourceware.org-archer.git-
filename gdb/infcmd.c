@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008, 2009 Free Software Foundation, Inc.
+   2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -54,6 +54,8 @@
 #include "gdbthread.h"
 #include "valprint.h"
 #include "inline-frame.h"
+
+extern void disconnect_or_stop_tracing (int from_tty);
 
 /* Functions exported for general use, in inferior.h: */
 
@@ -395,22 +397,6 @@ post_create_inferior (struct target_ops *target, int from_tty)
   /* Now that we know the register layout, retrieve current PC.  */
   stop_pc = regcache_read_pc (get_current_regcache ());
 
-  /* If the solist is global across processes, there's no need to
-     refetch it here.  */
-  if (exec_bfd && !gdbarch_has_global_solist (target_gdbarch))
-    {
-      /* Sometimes the platform-specific hook loads initial shared
-	 libraries, and sometimes it doesn't.  Try to do so first, so
-	 that we can add them with the correct value for FROM_TTY.
-	 If we made all the inferior hook methods consistent,
-	 this call could be removed.  */
-#ifdef SOLIB_ADD
-      SOLIB_ADD (NULL, from_tty, target, auto_solib_add);
-#else
-      solib_add (NULL, from_tty, target, auto_solib_add);
-#endif
-    }
-
   if (exec_bfd)
     {
       /* Create the hooks to handle shared library load and unload
@@ -418,7 +404,25 @@ post_create_inferior (struct target_ops *target, int from_tty)
 #ifdef SOLIB_CREATE_INFERIOR_HOOK
       SOLIB_CREATE_INFERIOR_HOOK (PIDGET (inferior_ptid));
 #else
-      solib_create_inferior_hook ();
+      solib_create_inferior_hook (from_tty);
+#endif
+    }
+
+  /* If the solist is global across processes, there's no need to
+     refetch it here.  */
+  if (exec_bfd && !gdbarch_has_global_solist (target_gdbarch))
+    {
+      /* Sometimes the platform-specific hook loads initial shared
+	 libraries, and sometimes it doesn't.  If it doesn't FROM_TTY will be
+	 incorrectly 0 but such solib targets should be fixed anyway.  If we
+	 made all the inferior hook methods consistent, this call could be
+	 removed.  Call it only after the solib target has been initialized by
+	 solib_create_inferior_hook.  */
+
+#ifdef SOLIB_ADD
+      SOLIB_ADD (NULL, 0, target, auto_solib_add);
+#else
+      solib_add (NULL, 0, target, auto_solib_add);
 #endif
     }
 
@@ -1515,14 +1519,13 @@ finish_forward (struct symbol *function, struct frame_info *frame)
   old_chain = make_cleanup_delete_breakpoint (breakpoint);
 
   tp->proceed_to_finish = 1;    /* We want stop_registers, please...  */
-  proceed ((CORE_ADDR) -1, TARGET_SIGNAL_DEFAULT, 0);
-
   cargs = xmalloc (sizeof (*cargs));
 
   cargs->breakpoint = breakpoint;
   cargs->function = function;
   add_continuation (tp, finish_command_continuation, cargs,
                     finish_command_continuation_free_arg);
+  proceed ((CORE_ADDR) -1, TARGET_SIGNAL_DEFAULT, 0);
 
   discard_cleanups (old_chain);
   if (!target_can_async_p ())
@@ -2505,6 +2508,8 @@ detach_command (char *args, int from_tty)
 
   if (ptid_equal (inferior_ptid, null_ptid))
     error (_("The program is not being run."));
+
+  disconnect_or_stop_tracing (from_tty);
 
   target_detach (args, from_tty);
 

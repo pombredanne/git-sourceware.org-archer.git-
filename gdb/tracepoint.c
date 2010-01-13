@@ -1,7 +1,7 @@
 /* Tracing functionality for remote targets in custom GDB protocol
 
    Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006,
-   2007, 2008, 2009 Free Software Foundation, Inc.
+   2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -32,8 +32,6 @@
 #include "inferior.h"
 #include "breakpoint.h"
 #include "tracepoint.h"
-#include "remote.h"
-extern int remote_supports_cond_tracepoints (void);
 #include "linespec.h"
 #include "regcache.h"
 #include "completer.h"
@@ -44,6 +42,7 @@ extern int remote_supports_cond_tracepoints (void);
 #include "valprint.h"
 #include "gdbcore.h"
 #include "objfiles.h"
+#include "filenames.h"
 
 #include "ax.h"
 #include "ax-gdb.h"
@@ -59,6 +58,8 @@ extern int remote_supports_cond_tracepoints (void);
 #include <unistd.h>
 #endif
 
+extern void stop_tracing ();
+
 /* Maximum length of an agent aexpression.
    This accounts for the fact that packets are limited to 400 bytes
    (which includes everything -- including the checksum), and assumes
@@ -69,6 +70,10 @@ extern int remote_supports_cond_tracepoints (void);
    large.  (400 - 31)/2 == 184 */
 #define MAX_AGENT_EXPR_LEN	184
 
+/* A hook used to notify the UI of tracepoint operations.  */
+
+void (*deprecated_trace_find_hook) (char *arg, int from_tty);
+void (*deprecated_trace_start_stop_hook) (int start, int from_tty);
 
 extern void (*deprecated_readline_begin_hook) (char *, ...);
 extern char *(*deprecated_readline_hook) (char *);
@@ -107,6 +112,19 @@ extern void output_command (char *, int);
 
 /* ======= Important global variables: ======= */
 
+/* The list of all trace state variables.  We don't retain pointers to
+   any of these for any reason - API is by name or number only - so it
+   works to have a vector of objects.  */
+
+typedef struct trace_state_variable tsv_s;
+DEF_VEC_O(tsv_s);
+
+static VEC(tsv_s) *tvariables;
+
+/* The next integer to assign to a variable.  */
+
+static int next_tsv_number = 1;
+
 /* Number of last traceframe collected.  */
 static int traceframe_number;
 
@@ -121,6 +139,11 @@ static struct symtab_and_line traceframe_sal;
 
 /* Tracing command lists */
 static struct cmd_list_element *tfindlist;
+
+/* List of expressions to collect by default at each tracepoint hit.  */
+char *default_collect = "";
+
+static int disconnected_tracing;
 
 /* ======= Important command functions: ======= */
 static void trace_actions_command (char *, int);
@@ -144,67 +167,10 @@ static char *mem2hex (gdb_byte *, char *, int);
 static void add_register (struct collection_list *collection,
 			  unsigned int regno);
 static struct cleanup *make_cleanup_free_actions (struct breakpoint *t);
-static void free_actions_list (char **actions_list);
-static void free_actions_list_cleanup_wrapper (void *);
+
+extern void send_disconnected_tracing_value (int value);
 
 extern void _initialize_tracepoint (void);
-
-/* Utility: returns true if "target remote" */
-static int
-target_is_remote (void)
-{
-  if (current_target.to_shortname &&
-      (strcmp (current_target.to_shortname, "remote") == 0
-       || strcmp (current_target.to_shortname, "extended-remote") == 0))
-    return 1;
-  else
-    return 0;
-}
-
-/* Utility: generate error from an incoming stub packet.  */
-static void
-trace_error (char *buf)
-{
-  if (*buf++ != 'E')
-    return;			/* not an error msg */
-  switch (*buf)
-    {
-    case '1':			/* malformed packet error */
-      if (*++buf == '0')	/*   general case: */
-	error (_("tracepoint.c: error in outgoing packet."));
-      else
-	error (_("tracepoint.c: error in outgoing packet at field #%ld."),
-	       strtol (buf, NULL, 16));
-    case '2':
-      error (_("trace API error 0x%s."), ++buf);
-    default:
-      error (_("Target returns error code '%s'."), buf);
-    }
-}
-
-/* Utility: wait for reply from stub, while accepting "O" packets.  */
-static char *
-remote_get_noisy_reply (char **buf_p,
-			long *sizeof_buf)
-{
-  do				/* Loop on reply from remote stub.  */
-    {
-      char *buf;
-      QUIT;			/* allow user to bail out with ^C */
-      getpkt (buf_p, sizeof_buf, 0);
-      buf = *buf_p;
-      if (buf[0] == 0)
-	error (_("Target does not support this command."));
-      else if (buf[0] == 'E')
-	trace_error (buf);
-      else if (buf[0] == 'O' &&
-	       buf[1] != 'K')
-	remote_console_output (buf + 1);	/* 'O' message from stub */
-      else
-	return buf;		/* here's the actual reply */
-    }
-  while (1);
-}
 
 /* Set traceframe number to NUM.  */
 static void
@@ -270,6 +236,185 @@ set_traceframe_context (struct frame_info *trace_frame)
 			    traceframe_sal.symtab->filename);
 }
 
+/* Create a new trace state variable with the given name.  */
+
+struct trace_state_variable *
+create_trace_state_variable (const char *name)
+{
+  struct trace_state_variable tsv;
+
+  memset (&tsv, 0, sizeof (tsv));
+  tsv.name = name;
+  tsv.number = next_tsv_number++;
+  return VEC_safe_push (tsv_s, tvariables, &tsv);
+}
+
+/* Look for a trace state variable of the given name.  */
+
+struct trace_state_variable *
+find_trace_state_variable (const char *name)
+{
+  struct trace_state_variable *tsv;
+  int ix;
+
+  for (ix = 0; VEC_iterate (tsv_s, tvariables, ix, tsv); ++ix)
+    if (strcmp (name, tsv->name) == 0)
+      return tsv;
+
+  return NULL;
+}
+
+void
+delete_trace_state_variable (const char *name)
+{
+  struct trace_state_variable *tsv;
+  int ix;
+
+  for (ix = 0; VEC_iterate (tsv_s, tvariables, ix, tsv); ++ix)
+    if (strcmp (name, tsv->name) == 0)
+      {
+	VEC_unordered_remove (tsv_s, tvariables, ix);
+	return;
+      }
+
+  warning (_("No trace variable named \"$%s\", not deleting"), name);
+}
+
+/* The 'tvariable' command collects a name and optional expression to
+   evaluate into an initial value.  */
+
+void
+trace_variable_command (char *args, int from_tty)
+{
+  struct expression *expr;
+  struct cleanup *old_chain;
+  struct internalvar *intvar = NULL;
+  LONGEST initval = 0;
+  struct trace_state_variable *tsv;
+
+  if (!args || !*args)
+    error_no_arg (_("trace state variable name"));
+
+  /* All the possible valid arguments are expressions.  */
+  expr = parse_expression (args);
+  old_chain = make_cleanup (free_current_contents, &expr);
+
+  if (expr->nelts == 0)
+    error (_("No expression?"));
+
+  /* Only allow two syntaxes; "$name" and "$name=value".  */
+  if (expr->elts[0].opcode == OP_INTERNALVAR)
+    {
+      intvar = expr->elts[1].internalvar;
+    }
+  else if (expr->elts[0].opcode == BINOP_ASSIGN
+	   && expr->elts[1].opcode == OP_INTERNALVAR)
+    {
+      intvar = expr->elts[2].internalvar;
+      initval = value_as_long (evaluate_subexpression_type (expr, 4));
+    }
+  else
+    error (_("Syntax must be $NAME [ = EXPR ]"));
+
+  if (!intvar)
+    error (_("No name given"));
+
+  if (strlen (internalvar_name (intvar)) <= 0)
+    error (_("Must supply a non-empty variable name"));
+
+  /* If the variable already exists, just change its initial value.  */
+  tsv = find_trace_state_variable (internalvar_name (intvar));
+  if (tsv)
+    {
+      tsv->initial_value = initval;
+      printf_filtered (_("Trace state variable $%s now has initial value %s.\n"),
+		       tsv->name, plongest (tsv->initial_value));
+      return;
+    }
+
+  /* Create a new variable.  */
+  tsv = create_trace_state_variable (internalvar_name (intvar));
+  tsv->initial_value = initval;
+
+  printf_filtered (_("Trace state variable $%s created, with initial value %s.\n"),
+		   tsv->name, plongest (tsv->initial_value));
+
+  do_cleanups (old_chain);
+}
+
+void
+delete_trace_variable_command (char *args, int from_tty)
+{
+  int i, ix;
+  char **argv;
+  struct cleanup *back_to;
+  struct trace_state_variable *tsv;
+
+  if (args == NULL)
+    {
+      if (query (_("Delete all trace state variables? ")))
+	VEC_free (tsv_s, tvariables);
+      dont_repeat ();
+      return;
+    }
+
+  argv = gdb_buildargv (args);
+  back_to = make_cleanup_freeargv (argv);
+
+  for (i = 0; argv[i] != NULL; i++)
+    {
+      if (*argv[i] == '$')
+	delete_trace_state_variable (argv[i] + 1);
+      else
+	warning (_("Name \"%s\" not prefixed with '$', ignoring"), argv[i]);
+    }
+
+  do_cleanups (back_to);
+
+  dont_repeat ();
+}
+
+/* List all the trace state variables.  */
+
+static void
+tvariables_info (char *args, int from_tty)
+{
+  struct trace_state_variable *tsv;
+  int ix;
+  char *reply;
+  ULONGEST tval;
+
+  if (VEC_length (tsv_s, tvariables) == 0)
+    {
+      printf_filtered (_("No trace state variables.\n"));
+      return;
+    }
+
+  /* Try to acquire values from the target.  */
+  for (ix = 0; VEC_iterate (tsv_s, tvariables, ix, tsv); ++ix)
+    tsv->value_known = target_get_trace_state_variable_value (tsv->number,
+							      &(tsv->value));
+
+  printf_filtered (_("Name\t\t  Initial\tCurrent\n"));
+
+  for (ix = 0; VEC_iterate (tsv_s, tvariables, ix, tsv); ++ix)
+    {
+      printf_filtered ("$%s", tsv->name);
+      print_spaces_filtered (17 - strlen (tsv->name), gdb_stdout);
+      printf_filtered ("%s ", plongest (tsv->initial_value));
+      print_spaces_filtered (11 - strlen (plongest (tsv->initial_value)), gdb_stdout);
+      if (tsv->value_known)
+	printf_filtered ("  %s", plongest (tsv->value));
+      else if (trace_running_p || traceframe_number >= 0)
+	/* The value is/was defined, but we don't have it.  */
+	printf_filtered (_("  <unknown>"));
+      else
+	/* It is not meaningful to ask about the value.  */
+	printf_filtered (_("  <undefined>"));
+      printf_filtered ("\n");
+    }
+}
+
 /* ACTIONS functions: */
 
 /* Prototypes for action-parsing utility commands  */
@@ -298,6 +443,12 @@ while_stepping_pseudocommand (char *args, int from_tty)
 
 static void
 collect_pseudocommand (char *args, int from_tty)
+{
+  error (_("This command can only be used in a tracepoint actions list."));
+}
+
+static void
+teval_pseudocommand (char *args, int from_tty)
 {
   error (_("This command can only be used in a tracepoint actions list."));
 }
@@ -538,6 +689,34 @@ validate_actionline (char **line, struct breakpoint *t)
       while (p && *p++ == ',');
       return GENERIC;
     }
+  else if (cmd_cfunc_eq (c, teval_pseudocommand))
+    {
+      struct agent_expr *aexpr;
+
+      do
+	{			/* repeat over a comma-separated list */
+	  QUIT;			/* allow user to bail out with ^C */
+	  while (isspace ((int) *p))
+	    p++;
+
+	  /* Only expressions are allowed for this action.  */
+	  exp = parse_exp_1 (&p, block_for_pc (t->loc->address), 1);
+	  old_chain = make_cleanup (free_current_contents, &exp);
+
+	  /* We have something to evaluate, make sure that the expr to
+	     bytecode translator can handle it and that it's not too
+	     long.  */
+	  aexpr = gen_eval_for_expr (t->loc->address, exp);
+	  make_cleanup_free_agent_expr (aexpr);
+
+	  if (aexpr->len > MAX_AGENT_EXPR_LEN)
+	    error (_("expression too complicated, try simplifying"));
+
+	  do_cleanups (old_chain);
+	}
+      while (p && *p++ == ',');
+      return GENERIC;
+    }
   else if (cmd_cfunc_eq (c, while_stepping_pseudocommand))
     {
       char *steparg;		/* in case warning is necessary */
@@ -725,7 +904,8 @@ static void
 collect_symbol (struct collection_list *collect, 
 		struct symbol *sym,
 		struct gdbarch *gdbarch,
-		long frame_regno, long frame_offset)
+		long frame_regno, long frame_offset,
+		CORE_ADDR scope)
 {
   unsigned long len;
   unsigned int reg;
@@ -817,6 +997,50 @@ collect_symbol (struct collection_list *collect,
       printf_filtered ("%s has been optimized out of existence.\n",
 		       SYMBOL_PRINT_NAME (sym));
       break;
+
+    case LOC_COMPUTED:
+      {
+	struct agent_expr *aexpr;
+	struct cleanup *old_chain1 = NULL;
+	struct agent_reqs areqs;
+
+	aexpr = gen_trace_for_var (scope, sym);
+
+	old_chain1 = make_cleanup_free_agent_expr (aexpr);
+
+	ax_reqs (aexpr, &areqs);
+	if (areqs.flaw != agent_flaw_none)
+	  error (_("malformed expression"));
+	
+	if (areqs.min_height < 0)
+	  error (_("gdb: Internal error: expression has min height < 0"));
+	if (areqs.max_height > 20)
+	  error (_("expression too complicated, try simplifying"));
+
+	discard_cleanups (old_chain1);
+	add_aexpr (collect, aexpr);
+
+	/* take care of the registers */
+	if (areqs.reg_mask_len > 0)
+	  {
+	    int ndx1, ndx2;
+
+	    for (ndx1 = 0; ndx1 < areqs.reg_mask_len; ndx1++)
+	      {
+		QUIT;	/* allow user to bail out with ^C */
+		if (areqs.reg_mask[ndx1] != 0)
+		  {
+		    /* assume chars have 8 bits */
+		    for (ndx2 = 0; ndx2 < 8; ndx2++)
+		      if (areqs.reg_mask[ndx1] & (1 << ndx2))
+			/* it's used -- record it */
+			add_register (collect, 
+				      ndx1 * 8 + ndx2);
+		  }
+	      }
+	  }
+      }
+      break;
     }
 }
 
@@ -843,7 +1067,7 @@ add_local_symbols (struct collection_list *collect,
 	    {
 	      count++;
 	      collect_symbol (collect, sym, gdbarch,
-			      frame_regno, frame_offset);
+			      frame_regno, frame_offset, pc);
 	    }
 	}
       if (BLOCK_FUNCTION (block))
@@ -984,28 +1208,8 @@ stringify_collection_list (struct collection_list *list, char *string)
     return *str_list;
 }
 
-static void
-free_actions_list_cleanup_wrapper (void *al)
-{
-  free_actions_list (al);
-}
-
-static void
-free_actions_list (char **actions_list)
-{
-  int ndx;
-
-  if (actions_list == 0)
-    return;
-
-  for (ndx = 0; actions_list[ndx]; ndx++)
-    xfree (actions_list[ndx]);
-
-  xfree (actions_list);
-}
-
 /* Render all actions into gdb protocol.  */
-static void
+/*static*/ void
 encode_actions (struct breakpoint *t, char ***tdp_actions,
 		char ***stepping_actions)
 {
@@ -1020,7 +1224,8 @@ encode_actions (struct breakpoint *t, char ***tdp_actions,
   struct agent_expr *aexpr;
   int frame_reg;
   LONGEST frame_offset;
-
+  char *default_collect_line = NULL;
+  struct action_line *default_collect_action = NULL;
 
   clear_collection_list (&tracepoint_list);
   clear_collection_list (&stepping_list);
@@ -1032,7 +1237,32 @@ encode_actions (struct breakpoint *t, char ***tdp_actions,
   gdbarch_virtual_frame_pointer (t->gdbarch,
 				 t->loc->address, &frame_reg, &frame_offset);
 
-  for (action = t->actions; action; action = action->next)
+  action = t->actions;
+
+  /* If there are default expressions to collect, make up a collect
+     action and prepend to the action list to encode.  Note that since
+     validation is per-tracepoint (local var "xyz" might be valid for
+     one tracepoint and not another, etc), we make up the action on
+     the fly, and don't cache it.  */
+  if (*default_collect)
+    {
+      char *line;
+      enum actionline_type linetype;
+
+      default_collect_line = xmalloc (12 + strlen (default_collect));
+      sprintf (default_collect_line, "collect %s", default_collect);
+      line = default_collect_line;
+      linetype = validate_actionline (&line, t);
+      if (linetype != BADLINE)
+	{
+	  default_collect_action = xmalloc (sizeof (struct action_line));
+	  default_collect_action->next = t->actions;
+	  default_collect_action->action = line;
+	  action = default_collect_action;
+	}
+    }
+
+  for (; action; action = action->next)
     {
       QUIT;			/* allow user to bail out with ^C */
       action_exp = action->action;
@@ -1122,7 +1352,8 @@ encode_actions (struct breakpoint *t, char ***tdp_actions,
 				      exp->elts[2].symbol,
 				      t->gdbarch,
 				      frame_reg,
-				      frame_offset);
+				      frame_offset,
+				      t->loc->address);
 		      break;
 
 		    default:	/* full-fledged expression */
@@ -1169,6 +1400,46 @@ encode_actions (struct breakpoint *t, char ***tdp_actions,
 	    }
 	  while (action_exp && *action_exp++ == ',');
 	}			/* if */
+      else if (cmd_cfunc_eq (cmd, teval_pseudocommand))
+	{
+	  do
+	    {			/* repeat over a comma-separated list */
+	      QUIT;		/* allow user to bail out with ^C */
+	      while (isspace ((int) *action_exp))
+		action_exp++;
+
+		{
+		  unsigned long addr, len;
+		  struct cleanup *old_chain = NULL;
+		  struct cleanup *old_chain1 = NULL;
+		  struct agent_reqs areqs;
+
+		  exp = parse_exp_1 (&action_exp, 
+				     block_for_pc (t->loc->address), 1);
+		  old_chain = make_cleanup (free_current_contents, &exp);
+
+		  aexpr = gen_eval_for_expr (t->loc->address, exp);
+		  old_chain1 = make_cleanup_free_agent_expr (aexpr);
+
+		  ax_reqs (aexpr, &areqs);
+		  if (areqs.flaw != agent_flaw_none)
+		    error (_("malformed expression"));
+
+		  if (areqs.min_height < 0)
+		    error (_("gdb: Internal error: expression has min height < 0"));
+		  if (areqs.max_height > 20)
+		    error (_("expression too complicated, try simplifying"));
+
+		  discard_cleanups (old_chain1);
+		  /* Even though we're not officially collecting, add
+		     to the collect list anyway.  */
+		  add_aexpr (collect, aexpr);
+
+		  do_cleanups (old_chain);
+		}		/* do */
+	    }
+	  while (action_exp && *action_exp++ == ',');
+	}			/* if */
       else if (cmd_cfunc_eq (cmd, while_stepping_pseudocommand))
 	{
 	  collect = &stepping_list;
@@ -1188,6 +1459,9 @@ encode_actions (struct breakpoint *t, char ***tdp_actions,
 					    tdp_buff);
   *stepping_actions = stringify_collection_list (&stepping_list, 
 						 step_buff);
+
+  xfree (default_collect_line);
+  xfree (default_collect_action);
 }
 
 static void
@@ -1204,52 +1478,6 @@ add_aexpr (struct collection_list *collect, struct agent_expr *aexpr)
   collect->next_aexpr_elt++;
 }
 
-static char *target_buf;
-static long target_buf_size;
-
-/* Set "transparent" memory ranges
-
-   Allow trace mechanism to treat text-like sections
-   (and perhaps all read-only sections) transparently, 
-   i.e. don't reject memory requests from these address ranges
-   just because they haven't been collected.  */
-
-static void
-remote_set_transparent_ranges (void)
-{
-  asection *s;
-  bfd_size_type size;
-  bfd_vma lma;
-  int anysecs = 0;
-
-  if (!exec_bfd)
-    return;			/* No information to give.  */
-
-  strcpy (target_buf, "QTro");
-  for (s = exec_bfd->sections; s; s = s->next)
-    {
-      char tmp1[40], tmp2[40];
-
-      if ((s->flags & SEC_LOAD) == 0 ||
-      /* (s->flags & SEC_CODE)     == 0 || */
-	  (s->flags & SEC_READONLY) == 0)
-	continue;
-
-      anysecs = 1;
-      lma = s->lma;
-      size = bfd_get_section_size (s);
-      sprintf_vma (tmp1, lma);
-      sprintf_vma (tmp2, lma + size);
-      sprintf (target_buf + strlen (target_buf), 
-	       ":%s,%s", tmp1, tmp2);
-    }
-  if (anysecs)
-    {
-      putpkt (target_buf);
-      getpkt (&target_buf, &target_buf_size, 0);
-    }
-}
-
 /* tstart command:
 
    Tell target to clear any previous trace experiment.
@@ -1257,254 +1485,190 @@ remote_set_transparent_ranges (void)
    to the target.  If no errors, 
    Tell target to start a new trace experiment.  */
 
-void download_tracepoint (struct breakpoint *t);
-
 static void
 trace_start_command (char *args, int from_tty)
 {
+  char buf[2048];
   VEC(breakpoint_p) *tp_vec = NULL;
   int ix;
   struct breakpoint *t;
+  struct trace_state_variable *tsv;
+  int any_downloaded = 0;
 
   dont_repeat ();	/* Like "run", dangerous to repeat accidentally.  */
 
-  if (target_is_remote ())
+  target_trace_init ();
+  
+  tp_vec = all_tracepoints ();
+  for (ix = 0; VEC_iterate (breakpoint_p, tp_vec, ix, t); ix++)
     {
-      putpkt ("QTinit");
-      remote_get_noisy_reply (&target_buf, &target_buf_size);
-      if (strcmp (target_buf, "OK"))
-	error (_("Target does not support this command."));
-
-      tp_vec = all_tracepoints ();
-      for (ix = 0; VEC_iterate (breakpoint_p, tp_vec, ix, t); ix++)
-	{
-	  download_tracepoint (t);
-	}
-      VEC_free (breakpoint_p, tp_vec);
-
-      /* Tell target to treat text-like sections as transparent.  */
-      remote_set_transparent_ranges ();
-      /* Now insert traps and begin collecting data.  */
-      putpkt ("QTStart");
-      remote_get_noisy_reply (&target_buf, &target_buf_size);
-      if (strcmp (target_buf, "OK"))
-	error (_("Bogus reply from target: %s"), target_buf);
-      set_traceframe_num (-1);	/* All old traceframes invalidated.  */
-      set_tracepoint_num (-1);
-      set_traceframe_context (NULL);
-      trace_running_p = 1;
-      if (deprecated_trace_start_stop_hook)
-	deprecated_trace_start_stop_hook (1, from_tty);
-
+      t->number_on_target = 0;
+      target_download_tracepoint (t);
+      t->number_on_target = t->number;
+      any_downloaded = 1;
     }
-  else
-    error (_("Trace can only be run on remote targets."));
-}
-
-/* Send the definition of a single tracepoint to the target.  */
-
-void
-download_tracepoint (struct breakpoint *t)
-{
-  char tmp[40];
-  char buf[2048];
-  char **tdp_actions;
-  char **stepping_actions;
-  int ndx;
-  struct cleanup *old_chain = NULL;
-  struct agent_expr *aexpr;
-  struct cleanup *aexpr_chain = NULL;
-
-  sprintf_vma (tmp, (t->loc ? t->loc->address : 0));
-  sprintf (buf, "QTDP:%x:%s:%c:%lx:%x", t->number, 
-	   tmp, /* address */
-	   (t->enable_state == bp_enabled ? 'E' : 'D'),
-	   t->step_count, t->pass_count);
-  /* If the tracepoint has a conditional, make it into an agent
-     expression and append to the definition.  */
-  if (t->loc->cond)
+  VEC_free (breakpoint_p, tp_vec);
+  
+  /* No point in tracing without any tracepoints... */
+  if (!any_downloaded)
+    error ("No tracepoints downloaded, not starting trace");
+  
+  /* Init any trace state variables that start with nonzero values.  */
+  for (ix = 0; VEC_iterate (tsv_s, tvariables, ix, tsv); ++ix)
     {
-      /* Only test support at download time, we may not know target
-	 capabilities at definition time.  */
-      if (remote_supports_cond_tracepoints ())
-	{
-	  aexpr = gen_eval_for_expr (t->loc->address, t->loc->cond);
-	  aexpr_chain = make_cleanup_free_agent_expr (aexpr);
-	  sprintf (buf + strlen (buf), ":X%x,", aexpr->len);
-	  mem2hex (aexpr->buf, buf + strlen (buf), aexpr->len);
-	  do_cleanups (aexpr_chain);
-	}
-      else
-	warning (_("Target does not support conditional tracepoints, ignoring tp %d cond"), t->number);
+      if (tsv->initial_value != 0)
+	target_download_trace_state_variable (tsv);
     }
+  
+  /* Tell target to treat text-like sections as transparent.  */
+  target_trace_set_readonly_regions ();
 
-  if (t->actions)
-    strcat (buf, "-");
-  putpkt (buf);
-  remote_get_noisy_reply (&target_buf, &target_buf_size);
-  if (strcmp (target_buf, "OK"))
-    error (_("Target does not support tracepoints."));
+  /* Now insert traps and begin collecting data.  */
+  target_trace_start ();
 
-  if (!t->actions)
-    return;
-
-  encode_actions (t, &tdp_actions, &stepping_actions);
-  old_chain = make_cleanup (free_actions_list_cleanup_wrapper,
-			    tdp_actions);
-  (void) make_cleanup (free_actions_list_cleanup_wrapper, stepping_actions);
-
-  /* do_single_steps (t); */
-  if (tdp_actions)
-    {
-      for (ndx = 0; tdp_actions[ndx]; ndx++)
-	{
-	  QUIT;	/* allow user to bail out with ^C */
-	  sprintf (buf, "QTDP:-%x:%s:%s%c",
-		   t->number, tmp, /* address */
-		   tdp_actions[ndx],
-		   ((tdp_actions[ndx + 1] || stepping_actions)
-		    ? '-' : 0));
-	  putpkt (buf);
-	  remote_get_noisy_reply (&target_buf,
-				  &target_buf_size);
-	  if (strcmp (target_buf, "OK"))
-	    error (_("Error on target while setting tracepoints."));
-	}
-    }
-  if (stepping_actions)
-    {
-      for (ndx = 0; stepping_actions[ndx]; ndx++)
-	{
-	  QUIT;	/* allow user to bail out with ^C */
-	  sprintf (buf, "QTDP:-%x:%s:%s%s%s",
-		   t->number, tmp, /* address */
-		   ((ndx == 0) ? "S" : ""),
-		   stepping_actions[ndx],
-		   (stepping_actions[ndx + 1] ? "-" : ""));
-	  putpkt (buf);
-	  remote_get_noisy_reply (&target_buf,
-				  &target_buf_size);
-	  if (strcmp (target_buf, "OK"))
-	    error (_("Error on target while setting tracepoints."));
-	}
-    }
-  do_cleanups (old_chain);
+  /* Reset our local state.  */
+  set_traceframe_num (-1);
+  set_tracepoint_num (-1);
+  set_traceframe_context (NULL);
+  trace_running_p = 1;
 }
 
 /* tstop command */
 static void
 trace_stop_command (char *args, int from_tty)
 {
-  if (target_is_remote ())
-    {
-      putpkt ("QTStop");
-      remote_get_noisy_reply (&target_buf, &target_buf_size);
-      if (strcmp (target_buf, "OK"))
-	error (_("Bogus reply from target: %s"), target_buf);
-      trace_running_p = 0;
-      if (deprecated_trace_start_stop_hook)
-	deprecated_trace_start_stop_hook (0, from_tty);
-    }
-  else
-    error (_("Trace can only be run on remote targets."));
+  stop_tracing ();
+}
+
+void
+stop_tracing ()
+{
+  target_trace_stop ();
+  trace_running_p = 0;
 }
 
 unsigned long trace_running_p;
+
+int
+get_trace_status ()
+{
+  int status = target_get_trace_status (NULL);
+
+  /* exported for use by the GUI */
+  trace_running_p = (status > 0);
+
+  return status;
+}
 
 /* tstatus command */
 static void
 trace_status_command (char *args, int from_tty)
 {
-  if (target_is_remote ())
+  int status = get_trace_status ();
+  
+  if (status < 0)
+    printf_filtered (_("Trace can not be run on the target.\n"));
+  else if (trace_running_p)
     {
-      putpkt ("qTStatus");
-      remote_get_noisy_reply (&target_buf, &target_buf_size);
-
-      if (target_buf[0] != 'T' ||
-	  (target_buf[1] != '0' && target_buf[1] != '1'))
-	error (_("Bogus reply from target: %s"), target_buf);
-
-      /* exported for use by the GUI */
-      trace_running_p = (target_buf[1] == '1');
+      printf_filtered (_("Trace is running on the target.\n"));
+      if (disconnected_tracing)
+	printf_filtered (_("Trace will continue if GDB disconnects.\n"));
+      else
+	printf_filtered (_("Trace will stop if GDB disconnects.\n"));
     }
   else
-    error (_("Trace can only be run on remote targets."));
+    printf_filtered (_("Trace is not running on the target.\n"));
+
+  if (traceframe_number >= 0)
+    printf_filtered (_("Looking at trace frame %d, tracepoint %d.\n"),
+		     traceframe_number, tracepoint_number);
+  else
+    printf_filtered (_("Not looking at any trace frame.\n"));
+}
+
+void
+disconnect_or_stop_tracing (int from_tty)
+{
+  if (trace_running_p && from_tty)
+    {
+      int cont = query (_("Trace is running.  Continue tracing after detach? "));
+      /* Note that we send the query result without affecting the
+	 user's setting of disconnected_tracing, so that the answer is
+	 a one-time-only.  */
+      send_disconnected_tracing_value (cont);
+
+      /* Also ensure that we do the equivalent of a tstop command if
+	 tracing is not to continue after the detach.  */
+      if (!cont)
+	stop_tracing ();
+    }
 }
 
 /* Worker function for the various flavors of the tfind command.  */
 static void
-finish_tfind_command (char **msg,
-		      long *sizeof_msg,
+finish_tfind_command (enum trace_find_type type, int num,
+		      ULONGEST addr1, ULONGEST addr2,
 		      int from_tty)
 {
   int target_frameno = -1, target_tracept = -1;
   struct frame_id old_frame_id;
   char *reply;
+  struct breakpoint *tp;
 
   old_frame_id = get_frame_id (get_current_frame ());
 
-  putpkt (*msg);
-  reply = remote_get_noisy_reply (msg, sizeof_msg);
+  target_frameno = target_trace_find (type, num, addr1, addr2,
+				      &target_tracept);
+  
+  if (type == tfind_number
+      && num == -1
+      && target_frameno == -1)
+    {
+      /* We told the target to get out of tfind mode, and it did.  */
+    }
+  else if (target_frameno == -1)
+    {
+      /* A request for a non-existant trace frame has failed.
+	 Our response will be different, depending on FROM_TTY:
 
-  while (reply && *reply)
-    switch (*reply)
-      {
-      case 'F':
-	if ((target_frameno = (int) strtol (++reply, &reply, 16)) == -1)
-	  {
-	    /* A request for a non-existant trace frame has failed.
-	       Our response will be different, depending on FROM_TTY:
+	 If FROM_TTY is true, meaning that this command was 
+	 typed interactively by the user, then give an error
+	 and DO NOT change the state of traceframe_number etc.
 
-	       If FROM_TTY is true, meaning that this command was 
-	       typed interactively by the user, then give an error
-	       and DO NOT change the state of traceframe_number etc.
+	 However if FROM_TTY is false, meaning that we're either
+	 in a script, a loop, or a user-defined command, then 
+	 DON'T give an error, but DO change the state of
+	 traceframe_number etc. to invalid.
 
-	       However if FROM_TTY is false, meaning that we're either
-	       in a script, a loop, or a user-defined command, then 
-	       DON'T give an error, but DO change the state of
-	       traceframe_number etc. to invalid.
-
-	       The rationalle is that if you typed the command, you
-	       might just have committed a typo or something, and you'd
-	       like to NOT lose your current debugging state.  However
-	       if you're in a user-defined command or especially in a
-	       loop, then you need a way to detect that the command
-	       failed WITHOUT aborting.  This allows you to write
-	       scripts that search thru the trace buffer until the end,
-	       and then continue on to do something else.  */
-
-	    if (from_tty)
-	      error (_("Target failed to find requested trace frame."));
-	    else
-	      {
-		if (info_verbose)
-		  printf_filtered ("End of trace buffer.\n");
-		/* The following will not recurse, since it's
-		   special-cased.  */
-		trace_find_command ("-1", from_tty);
-		reply = NULL;	/* Break out of loop 
-				   (avoid recursive nonsense).  */
-	      }
-	  }
-	break;
-      case 'T':
-	if ((target_tracept = (int) strtol (++reply, &reply, 16)) == -1)
-	  error (_("Target failed to find requested trace frame."));
-	break;
-      case 'O':		/* "OK"? */
-	if (reply[1] == 'K' && reply[2] == '\0')
-	  reply += 2;
-	else
-	  error (_("Bogus reply from target: %s"), reply);
-	break;
-      default:
-	error (_("Bogus reply from target: %s"), reply);
-      }
+	 The rationalle is that if you typed the command, you
+	 might just have committed a typo or something, and you'd
+	 like to NOT lose your current debugging state.  However
+	 if you're in a user-defined command or especially in a
+	 loop, then you need a way to detect that the command
+	 failed WITHOUT aborting.  This allows you to write
+	 scripts that search thru the trace buffer until the end,
+	 and then continue on to do something else.  */
+  
+      if (from_tty)
+	error (_("Target failed to find requested trace frame."));
+      else
+	{
+	  if (info_verbose)
+	    printf_filtered ("End of trace buffer.\n");
+#if 0 /* dubious now? */
+	  /* The following will not recurse, since it's
+	     special-cased.  */
+	  trace_find_command ("-1", from_tty);
+#endif
+	}
+    }
+  
+  tp = get_tracepoint_by_number_on_target (target_tracept);
 
   reinit_frame_cache ();
   registers_changed ();
   set_traceframe_num (target_frameno);
-  set_tracepoint_num (target_tracept);
+  set_tracepoint_num (tp ? tp->number : target_tracept);
   if (target_frameno == -1)
     set_traceframe_context (NULL);
   else
@@ -1551,38 +1715,35 @@ trace_find_command (char *args, int from_tty)
 { /* this should only be called with a numeric argument */
   int frameno = -1;
 
-  if (target_is_remote ())
-    {
-      if (deprecated_trace_find_hook)
-	deprecated_trace_find_hook (args, from_tty);
-
-      if (args == 0 || *args == 0)
-	{ /* TFIND with no args means find NEXT trace frame.  */
-	  if (traceframe_number == -1)
-	    frameno = 0;	/* "next" is first one */
-	  else
-	    frameno = traceframe_number + 1;
-	}
-      else if (0 == strcmp (args, "-"))
-	{
-	  if (traceframe_number == -1)
-	    error (_("not debugging trace buffer"));
-	  else if (from_tty && traceframe_number == 0)
-	    error (_("already at start of trace buffer"));
-
-	  frameno = traceframe_number - 1;
-	}
-      else
-	frameno = parse_and_eval_long (args);
-
-      if (frameno < -1)
-	error (_("invalid input (%d is less than zero)"), frameno);
-
-      sprintf (target_buf, "QTFrame:%x", frameno);
-      finish_tfind_command (&target_buf, &target_buf_size, from_tty);
+  if (trace_running_p)
+    error ("May not look at trace frames while trace is running.");
+  
+  if (args == 0 || *args == 0)
+    { /* TFIND with no args means find NEXT trace frame.  */
+      if (traceframe_number == -1)
+	frameno = 0;	/* "next" is first one */
+        else
+	frameno = traceframe_number + 1;
     }
+  else if (0 == strcmp (args, "-"))
+    {
+      if (traceframe_number == -1)
+	error (_("not debugging trace buffer"));
+      else if (from_tty && traceframe_number == 0)
+	error (_("already at start of trace buffer"));
+      
+      frameno = traceframe_number - 1;
+      }
+  /* A hack to work around eval's need for fp to have been collected.  */
+  else if (0 == strcmp (args, "-1"))
+    frameno = -1;
   else
-    error (_("Trace can only be run on remote targets."));
+    frameno = parse_and_eval_long (args);
+
+  if (frameno < -1)
+    error (_("invalid input (%d is less than zero)"), frameno);
+
+  finish_tfind_command (tfind_number, frameno, 0, 0, from_tty);
 }
 
 /* tfind end */
@@ -1613,19 +1774,15 @@ trace_find_pc_command (char *args, int from_tty)
   CORE_ADDR pc;
   char tmp[40];
 
-  if (target_is_remote ())
-    {
-      if (args == 0 || *args == 0)
-	pc = regcache_read_pc (get_current_regcache ());
-      else
-	pc = parse_and_eval_address (args);
+  if (trace_running_p)
+    error ("May not look at trace frames while trace is running.");
 
-      sprintf_vma (tmp, pc);
-      sprintf (target_buf, "QTFrame:pc:%s", tmp);
-      finish_tfind_command (&target_buf, &target_buf_size, from_tty);
-    }
+  if (args == 0 || *args == 0)
+    pc = regcache_read_pc (get_current_regcache ());
   else
-    error (_("Trace can only be run on remote targets."));
+    pc = parse_and_eval_address (args);
+
+  finish_tfind_command (tfind_pc, 0, pc, 0, from_tty);
 }
 
 /* tfind tracepoint command */
@@ -1633,24 +1790,29 @@ static void
 trace_find_tracepoint_command (char *args, int from_tty)
 {
   int tdp;
+  struct breakpoint *tp;
 
-  if (target_is_remote ())
+  if (trace_running_p)
+    error ("May not look at trace frames while trace is running.");
+
+  if (args == 0 || *args == 0)
     {
-      if (args == 0 || *args == 0)
-	{
-	  if (tracepoint_number == -1)
-	    error (_("No current tracepoint -- please supply an argument."));
-	  else
-	    tdp = tracepoint_number;	/* default is current TDP */
-	}
+      if (tracepoint_number == -1)
+	error (_("No current tracepoint -- please supply an argument."));
       else
-	tdp = parse_and_eval_long (args);
-
-      sprintf (target_buf, "QTFrame:tdp:%x", tdp);
-      finish_tfind_command (&target_buf, &target_buf_size, from_tty);
+	tdp = tracepoint_number;	/* default is current TDP */
     }
   else
-    error (_("Trace can only be run on remote targets."));
+    tdp = parse_and_eval_long (args);
+
+  /* If we have the tracepoint on hand, use the number that the
+     target knows about (which may be different if we disconnected
+     and reconnected).  */
+  tp = get_tracepoint (tdp);
+  if (tp)
+    tdp = tp->number_on_target;
+
+  finish_tfind_command (tfind_tp, tdp, 0, 0, from_tty);
 }
 
 /* TFIND LINE command:
@@ -1670,91 +1832,78 @@ trace_find_line_command (char *args, int from_tty)
   struct cleanup *old_chain;
   char   startpc_str[40], endpc_str[40];
 
-  if (target_is_remote ())
+  if (trace_running_p)
+    error ("May not look at trace frames while trace is running.");
+
+  if (args == 0 || *args == 0)
     {
-      if (args == 0 || *args == 0)
-	{
-	  sal = find_pc_line (get_frame_pc (get_current_frame ()), 0);
-	  sals.nelts = 1;
-	  sals.sals = (struct symtab_and_line *)
-	    xmalloc (sizeof (struct symtab_and_line));
-	  sals.sals[0] = sal;
-	}
-      else
-	{
-	  sals = decode_line_spec (args, 1);
-	  sal = sals.sals[0];
-	}
-
-      old_chain = make_cleanup (xfree, sals.sals);
-      if (sal.symtab == 0)
-	{
-	  struct gdbarch *gdbarch = get_current_arch ();
-
-	  printf_filtered ("TFIND: No line number information available");
-	  if (sal.pc != 0)
-	    {
-	      /* This is useful for "info line *0x7f34".  If we can't
-	         tell the user about a source line, at least let them
-	         have the symbolic address.  */
-	      printf_filtered (" for address ");
-	      wrap_here ("  ");
-	      print_address (gdbarch, sal.pc, gdb_stdout);
-	      printf_filtered (";\n -- will attempt to find by PC. \n");
-	    }
-	  else
-	    {
-	      printf_filtered (".\n");
-	      return;		/* No line, no PC; what can we do?  */
-	    }
-	}
-      else if (sal.line > 0
-	       && find_line_pc_range (sal, &start_pc, &end_pc))
-	{
-	  struct gdbarch *gdbarch = get_objfile_arch (sal.symtab->objfile);
-
-	  if (start_pc == end_pc)
-	    {
-	      printf_filtered ("Line %d of \"%s\"",
-			       sal.line, sal.symtab->filename);
-	      wrap_here ("  ");
-	      printf_filtered (" is at address ");
-	      print_address (gdbarch, start_pc, gdb_stdout);
-	      wrap_here ("  ");
-	      printf_filtered (" but contains no code.\n");
-	      sal = find_pc_line (start_pc, 0);
-	      if (sal.line > 0 &&
-		  find_line_pc_range (sal, &start_pc, &end_pc) &&
-		  start_pc != end_pc)
-		printf_filtered ("Attempting to find line %d instead.\n",
-				 sal.line);
-	      else
-		error (_("Cannot find a good line."));
-	    }
-	}
-      else
-	/* Is there any case in which we get here, and have an address
-	   which the user would want to see?  If we have debugging
-	   symbols and no line numbers?  */
-	error (_("Line number %d is out of range for \"%s\"."),
-	       sal.line, sal.symtab->filename);
-
-      sprintf_vma (startpc_str, start_pc);
-      sprintf_vma (endpc_str, end_pc - 1);
-      /* Find within range of stated line.  */
-      if (args && *args)
-	sprintf (target_buf, "QTFrame:range:%s:%s", 
-		 startpc_str, endpc_str);
-      /* Find OUTSIDE OF range of CURRENT line.  */
-      else
-	sprintf (target_buf, "QTFrame:outside:%s:%s", 
-		 startpc_str, endpc_str);
-      finish_tfind_command (&target_buf, &target_buf_size,
-			    from_tty);
-      do_cleanups (old_chain);
+      sal = find_pc_line (get_frame_pc (get_current_frame ()), 0);
+      sals.nelts = 1;
+      sals.sals = (struct symtab_and_line *)
+	xmalloc (sizeof (struct symtab_and_line));
+      sals.sals[0] = sal;
     }
   else
-    error (_("Trace can only be run on remote targets."));
+      {
+      sals = decode_line_spec (args, 1);
+      sal = sals.sals[0];
+    }
+  
+  old_chain = make_cleanup (xfree, sals.sals);
+  if (sal.symtab == 0)
+    {
+      printf_filtered ("TFIND: No line number information available");
+      if (sal.pc != 0)
+	{
+	  /* This is useful for "info line *0x7f34".  If we can't
+	     tell the user about a source line, at least let them
+	     have the symbolic address.  */
+	  printf_filtered (" for address ");
+	  wrap_here ("  ");
+	  print_address (get_current_arch (), sal.pc, gdb_stdout);
+	  printf_filtered (";\n -- will attempt to find by PC. \n");
+  	}
+        else
+  	{
+	  printf_filtered (".\n");
+	  return;		/* No line, no PC; what can we do?  */
+  	}
+    }
+  else if (sal.line > 0
+	   && find_line_pc_range (sal, &start_pc, &end_pc))
+    {
+      if (start_pc == end_pc)
+  	{
+	  printf_filtered ("Line %d of \"%s\"",
+			   sal.line, sal.symtab->filename);
+	  wrap_here ("  ");
+	  printf_filtered (" is at address ");
+	  print_address (get_current_arch (), start_pc, gdb_stdout);
+	  wrap_here ("  ");
+	  printf_filtered (" but contains no code.\n");
+	  sal = find_pc_line (start_pc, 0);
+	  if (sal.line > 0
+	      && find_line_pc_range (sal, &start_pc, &end_pc)
+	      && start_pc != end_pc)
+	    printf_filtered ("Attempting to find line %d instead.\n",
+			     sal.line);
+  	  else
+	    error (_("Cannot find a good line."));
+  	}
+      }
+    else
+    /* Is there any case in which we get here, and have an address
+       which the user would want to see?  If we have debugging
+       symbols and no line numbers?  */
+    error (_("Line number %d is out of range for \"%s\"."),
+	   sal.line, sal.symtab->filename);
+
+  /* Find within range of stated line.  */
+  if (args && *args)
+    finish_tfind_command (tfind_range, 0, start_pc, end_pc - 1, from_tty);
+  else
+    finish_tfind_command (tfind_outside, 0, start_pc, end_pc - 1, from_tty);
+  do_cleanups (old_chain);
 }
 
 /* tfind range command */
@@ -1765,35 +1914,30 @@ trace_find_range_command (char *args, int from_tty)
   char start_str[40], stop_str[40];
   char *tmp;
 
-  if (target_is_remote ())
+  if (trace_running_p)
+    error ("May not look at trace frames while trace is running.");
+
+  if (args == 0 || *args == 0)
+    { /* XXX FIXME: what should default behavior be?  */
+      printf_filtered ("Usage: tfind range <startaddr>,<endaddr>\n");
+      return;
+    }
+
+  if (0 != (tmp = strchr (args, ',')))
     {
-      if (args == 0 || *args == 0)
-	{ /* XXX FIXME: what should default behavior be?  */
-	  printf_filtered ("Usage: tfind range <startaddr>,<endaddr>\n");
-	  return;
-	}
-
-      if (0 != (tmp = strchr (args, ',')))
-	{
-	  *tmp++ = '\0';	/* terminate start address */
-	  while (isspace ((int) *tmp))
-	    tmp++;
-	  start = parse_and_eval_address (args);
-	  stop = parse_and_eval_address (tmp);
-	}
-      else
-	{			/* no explicit end address? */
-	  start = parse_and_eval_address (args);
-	  stop = start + 1;	/* ??? */
-	}
-
-      sprintf_vma (start_str, start);
-      sprintf_vma (stop_str, stop);
-      sprintf (target_buf, "QTFrame:range:%s:%s", start_str, stop_str);
-      finish_tfind_command (&target_buf, &target_buf_size, from_tty);
+      *tmp++ = '\0';	/* terminate start address */
+      while (isspace ((int) *tmp))
+	tmp++;
+      start = parse_and_eval_address (args);
+      stop = parse_and_eval_address (tmp);
     }
   else
-    error (_("Trace can only be run on remote targets."));
+    {			/* no explicit end address? */
+      start = parse_and_eval_address (args);
+      stop = start + 1;	/* ??? */
+    }
+
+  finish_tfind_command (tfind_range, 0, start, stop, from_tty);
 }
 
 /* tfind outside command */
@@ -1804,35 +1948,30 @@ trace_find_outside_command (char *args, int from_tty)
   char start_str[40], stop_str[40];
   char *tmp;
 
-  if (target_is_remote ())
+  if (trace_running_p)
+    error ("May not look at trace frames while trace is running.");
+
+  if (args == 0 || *args == 0)
+    { /* XXX FIXME: what should default behavior be? */
+      printf_filtered ("Usage: tfind outside <startaddr>,<endaddr>\n");
+      return;
+    }
+
+  if (0 != (tmp = strchr (args, ',')))
     {
-      if (args == 0 || *args == 0)
-	{ /* XXX FIXME: what should default behavior be? */
-	  printf_filtered ("Usage: tfind outside <startaddr>,<endaddr>\n");
-	  return;
-	}
-
-      if (0 != (tmp = strchr (args, ',')))
-	{
-	  *tmp++ = '\0';	/* terminate start address */
-	  while (isspace ((int) *tmp))
-	    tmp++;
-	  start = parse_and_eval_address (args);
-	  stop = parse_and_eval_address (tmp);
-	}
-      else
-	{			/* no explicit end address? */
-	  start = parse_and_eval_address (args);
-	  stop = start + 1;	/* ??? */
-	}
-
-      sprintf_vma (start_str, start);
-      sprintf_vma (stop_str, stop);
-      sprintf (target_buf, "QTFrame:outside:%s:%s", start_str, stop_str);
-      finish_tfind_command (&target_buf, &target_buf_size, from_tty);
+      *tmp++ = '\0';	/* terminate start address */
+      while (isspace ((int) *tmp))
+	tmp++;
+      start = parse_and_eval_address (args);
+      stop = parse_and_eval_address (tmp);
     }
   else
-    error (_("Trace can only be run on remote targets."));
+    {			/* no explicit end address? */
+      start = parse_and_eval_address (args);
+      stop = start + 1;	/* ??? */
+    }
+
+  finish_tfind_command (tfind_outside, 0, start, stop, from_tty);
 }
 
 /* info scope command: list the locals for a scope.  */
@@ -2003,12 +2142,6 @@ trace_dump_command (char *args, int from_tty)
   int stepping_actions = 0;
   int stepping_frame = 0;
 
-  if (!target_is_remote ())
-    {
-      error (_("Trace can only be run on remote targets."));
-      return;
-    }
-
   if (tracepoint_number == -1)
     {
       warning (_("No current trace frame."));
@@ -2033,8 +2166,7 @@ trace_dump_command (char *args, int from_tty)
   regcache = get_current_regcache ();
   gdbarch = get_regcache_arch (regcache);
 
-  stepping_frame = (t->loc->address != (regcache_read_pc (regcache)
-				   - gdbarch_decr_pc_after_break (gdbarch)));
+  stepping_frame = (t->loc->address != (regcache_read_pc (regcache)));
 
   for (action = t->actions; action; action = action->next)
     {
@@ -2107,6 +2239,22 @@ trace_dump_command (char *args, int from_tty)
   discard_cleanups (old_cleanups);
 }
 
+/* Tell the target what to do with an ongoing tracing run if GDB
+   disconnects for some reason.  */
+
+void
+send_disconnected_tracing_value (int value)
+{
+  target_set_disconnected_tracing (value);
+}
+
+static void
+set_disconnected_tracing (char *args, int from_tty,
+			  struct cmd_list_element *c)
+{
+  send_disconnected_tracing_value (disconnected_tracing);
+}
+
 /* Convert the memory pointed to by mem into hex, placing result in buf.
  * Return a pointer to the last char put in buf (null)
  * "stolen" from sparc-stub.c
@@ -2137,7 +2285,6 @@ get_traceframe_number (void)
 {
   return traceframe_number;
 }
-
 
 /* module initialization */
 void
@@ -2184,6 +2331,23 @@ _initialize_tracepoint (void)
 
   add_com ("tdump", class_trace, trace_dump_command,
 	   _("Print everything collected at the current tracepoint."));
+
+  c = add_com ("tvariable", class_trace, trace_variable_command,_("\
+Define a trace state variable.\n\
+Argument is a $-prefixed name, optionally followed\n\
+by '=' and an expression that sets the initial value\n\
+at the start of tracing."));
+  set_cmd_completer (c, expression_completer);
+
+  add_cmd ("tvariable", class_trace, delete_trace_variable_command, _("\
+Delete one or more trace state variables.\n\
+Arguments are the names of the variables to delete.\n\
+If no arguments are supplied, delete all variables."), &deletelist);
+  /* FIXME add a trace variable completer */
+
+  add_info ("tvariables", tvariables_info, _("\
+Status of trace state variables and their values.\n\
+"));
 
   add_prefix_cmd ("tfind", class_trace, trace_find_command, _("\
 Select a trace frame;\n\
@@ -2267,12 +2431,35 @@ Also accepts the following special arguments:\n\
     $locals -- all variables local to the block/function scope.\n\
 Note: this command can only be used in a tracepoint \"actions\" list."));
 
+  add_com ("teval", class_trace, teval_pseudocommand, _("\
+Specify one or more expressions to be evaluated at a tracepoint.\n\
+Accepts a comma-separated list of (one or more) expressions.\n\
+The result of each evaluation will be discarded.\n\
+Note: this command can only be used in a tracepoint \"actions\" list."));
+
   add_com ("actions", class_trace, trace_actions_command, _("\
 Specify the actions to be taken at a tracepoint.\n\
 Tracepoint actions may include collecting of specified data, \n\
 single-stepping, or enabling/disabling other tracepoints, \n\
 depending on target's capabilities."));
 
-  target_buf_size = 2048;
-  target_buf = xmalloc (target_buf_size);
+  default_collect = xstrdup ("");
+  add_setshow_string_cmd ("default-collect", class_trace,
+			  &default_collect, _("\
+Set the list of expressions to collect by default"), _("\
+Show the list of expressions to collect by default"), NULL,
+			  NULL, NULL,
+			  &setlist, &showlist);
+
+  add_setshow_boolean_cmd ("disconnected-tracing", no_class,
+			   &disconnected_tracing, _("\
+Set whether tracing continues after GDB disconnects."), _("\
+Show whether tracing continues after GDB disconnects."), _("\
+Use this to continue a tracing run even if GDB disconnects\n\
+or detaches from the target.  You can reconnect later and look at\n\
+trace data collected in the meantime."),
+			   set_disconnected_tracing,
+			   NULL,
+			   &setlist,
+			   &showlist);
 }

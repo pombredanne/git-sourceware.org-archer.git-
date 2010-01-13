@@ -1,7 +1,8 @@
 /* Support routines for manipulating internal types for GDB.
 
    Copyright (C) 1992, 1993, 1994, 1995, 1996, 1998, 1999, 2000, 2001, 2002,
-   2003, 2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
+   Free Software Foundation, Inc.
 
    Contributed by Cygnus Support, using pieces from other GDB modules.
 
@@ -752,7 +753,7 @@ allocate_stub_method (struct type *type)
 
 struct type *
 create_range_type (struct type *result_type, struct type *index_type,
-		   int low_bound, int high_bound)
+		   LONGEST low_bound, LONGEST high_bound)
 {
   if (result_type == NULL)
     result_type = alloc_type_copy (index_type);
@@ -762,10 +763,8 @@ create_range_type (struct type *result_type, struct type *index_type,
     TYPE_TARGET_STUB (result_type) = 1;
   else
     TYPE_LENGTH (result_type) = TYPE_LENGTH (check_typedef (index_type));
-  TYPE_NFIELDS (result_type) = 3;
-  TYPE_FIELDS (result_type) = TYPE_ZALLOC (result_type,
-					   TYPE_NFIELDS (result_type)
-					   * sizeof (struct field));
+  TYPE_RANGE_DATA (result_type) = (struct range_bounds *)
+    TYPE_ZALLOC (result_type, sizeof (struct range_bounds));
   TYPE_LOW_BOUND (result_type) = low_bound;
   TYPE_HIGH_BOUND (result_type) = high_bound;
   TYPE_BYTE_STRIDE (result_type) = 0;
@@ -877,10 +876,10 @@ create_array_type (struct type *result_type,
   /* DWARF blocks may depend on runtime information like
      DW_OP_PUSH_OBJECT_ADDRESS not being available during the
      CREATE_ARRAY_TYPE time.  */
-  if (TYPE_RANGE_BOUND_IS_DWARF_BLOCK (range_type, 0)
-      || TYPE_RANGE_BOUND_IS_DWARF_BLOCK (range_type, 1)
-      || TYPE_RANGE_UPPER_BOUND_IS_UNDEFINED (range_type) 
-      || TYPE_RANGE_LOWER_BOUND_IS_UNDEFINED (range_type) 
+  if (TYPE_LOW_BOUND_IS_DWARF_BLOCK (range_type)
+      || TYPE_HIGH_BOUND_IS_DWARF_BLOCK (range_type)
+      || TYPE_LOW_BOUND_UNDEFINED (range_type) 
+      || TYPE_HIGH_BOUND_UNDEFINED (range_type) 
       || get_discrete_bounds (range_type, &low_bound, &high_bound) < 0)
     {
       low_bound = 0;
@@ -1338,7 +1337,8 @@ lookup_struct_elt_type (struct type *type, char *name, int noerr)
    If not found, return -1 and ignore BASETYPEP.
    Callers should be aware that in some cases (for example,
    the type or one of its baseclasses is a stub type and we are
-   debugging a .o file), this function will not be able to find the
+   debugging a .o file, or the compiler uses DWARF-2 and is not GCC),
+   this function will not be able to find the
    virtual function table pointer, and vptr_fieldno will remain -1 and
    vptr_basetype will remain NULL or incomplete.  */
 
@@ -1400,13 +1400,12 @@ stub_noname_complaint (void)
    cleared FULL_SPAN return value (the expected SIZEOF) for non-zero
    TYPE_BYTE_STRIDE values.  */
 
-static CORE_ADDR
+static LONGEST
 type_length_get (struct type *type, struct type *target_type, int full_span)
 {
   struct type *range_type;
-  int count;
-  CORE_ADDR byte_stride = 0;	/* `= 0' for a false GCC warning.  */
-  CORE_ADDR element_size;
+  LONGEST byte_stride = 0;	/* `= 0' for a false GCC warning.  */
+  LONGEST count, element_size, retval;
 
   if (TYPE_CODE (type) != TYPE_CODE_ARRAY
       && TYPE_CODE (type) != TYPE_CODE_STRING)
@@ -1419,15 +1418,15 @@ type_length_get (struct type *type, struct type *target_type, int full_span)
     return 0;
 
   range_type = TYPE_INDEX_TYPE (type);
-  if (TYPE_RANGE_LOWER_BOUND_IS_UNDEFINED (range_type)
-      || TYPE_RANGE_UPPER_BOUND_IS_UNDEFINED (range_type))
+  if (TYPE_LOW_BOUND_UNDEFINED (range_type)
+      || TYPE_HIGH_BOUND_UNDEFINED (range_type))
     return 0;
   count = TYPE_HIGH_BOUND (range_type) - TYPE_LOW_BOUND (range_type) + 1;
   /* It may happen for wrong DWARF annotations returning garbage data.  */
   if (count < 0)
-    warning (_("Range for type %s has invalid bounds %d..%d"),
-	     TYPE_NAME (type), TYPE_LOW_BOUND (range_type),
-	     TYPE_HIGH_BOUND (range_type));
+    warning (_("Range for type %s has invalid bounds %s..%s"),
+	     TYPE_NAME (type), plongest (TYPE_LOW_BOUND (range_type)),
+	     plongest (TYPE_HIGH_BOUND (range_type)));
   /* The code below does not handle count == 0 right.  */
   if (count <= 0)
     return 0;
@@ -1443,12 +1442,32 @@ type_length_get (struct type *type, struct type *target_type, int full_span)
 	  byte_stride = type_length_get (target_type, NULL, 1);
 	}
     }
+
+  /* For now, we conservatively take the array length to be 0 if its length
+     exceeds UINT_MAX.  The code below assumes that for x < 0,
+     (ULONGEST) x == -x + ULONGEST_MAX + 1, which is technically not guaranteed
+     by C, but is usually true (because it would be true if x were unsigned
+     with its high-order bit on). It uses the fact that high_bound-low_bound is
+     always representable in ULONGEST and that if high_bound-low_bound+1
+     overflows, it overflows to 0.  We must change these tests if we decide to
+     increase the representation of TYPE_LENGTH from unsigned int to ULONGEST.
+     */
+
   if (full_span)
-    return count * byte_stride;
+    {
+      retval = count * byte_stride;
+      if (count == 0 || retval / count != byte_stride || retval > UINT_MAX)
+	retval = 0;
+      return retval;
+    }
   if (target_type == NULL)
     target_type = check_typedef (TYPE_TARGET_TYPE (type));
   element_size = type_length_get (target_type, NULL, 1);
-  return (count - 1) * byte_stride + element_size;
+  retval = (count - 1) * byte_stride + element_size;
+  if (byte_stride == 0 || retval < element_size
+      || (retval - element_size) / byte_stride != count - 1)
+    retval = 0;
+  return retval;
 }
 
 /* Prepare TYPE after being read in by the backend.  Currently this function
@@ -1481,13 +1500,17 @@ finalize_type (struct type *type)
    symbols which contain a full definition for the type.
 
    This used to be coded as a macro, but I don't think it is called 
-   often enough to merit such treatment.  */
+   often enough to merit such treatment.
 
-/* Find the real type of TYPE.  This function returns the real type,
+   Find the real type of TYPE.  This function returns the real type,
    after removing all layers of typedefs and completing opaque or stub
    types.  Completion changes the TYPE argument, but stripping of
-   typedefs does not.  Still original passed TYPE will have TYPE_LENGTH
-   updated.  FIXME: Remove this dependency (only ada_to_fixed_type?).  */
+   typedefs does not.
+
+   If TYPE is a TYPE_CODE_TYPEDEF, its length is (also) set to the length of
+   the target type instead of zero.  However, in the case of TYPE_CODE_TYPEDEF
+   check_typedef can still return different type than the original TYPE
+   pointer.  */
 
 struct type *
 check_typedef (struct type *type)
@@ -2150,7 +2173,8 @@ rank_one_type (struct type *parm, struct type *arg)
       switch (TYPE_CODE (arg))
 	{
 	case TYPE_CODE_PTR:
-	  if (TYPE_CODE (TYPE_TARGET_TYPE (parm)) == TYPE_CODE_VOID)
+	  if (TYPE_CODE (TYPE_TARGET_TYPE (parm)) == TYPE_CODE_VOID
+	      && TYPE_CODE (TYPE_TARGET_TYPE (arg)) != TYPE_CODE_VOID)
 	    return VOID_PTR_CONVERSION_BADNESS;
 	  else
 	    return rank_one_type (TYPE_TARGET_TYPE (parm), 
@@ -2881,6 +2905,14 @@ recursive_dump_type (struct type *type, int spaces)
 	  recursive_dump_type (TYPE_FIELD_TYPE (type, idx), spaces + 4);
 	}
     }
+  if (TYPE_CODE (type) == TYPE_CODE_RANGE)
+    {
+      printfi_filtered (spaces, "low %s%s  high %s%s\n",
+			plongest (TYPE_LOW_BOUND (type)), 
+			TYPE_LOW_BOUND_UNDEFINED (type) ? " (undefined)" : "",
+			plongest (TYPE_HIGH_BOUND (type)),
+			TYPE_HIGH_BOUND_UNDEFINED (type) ? " (undefined)" : "");
+    }
   printfi_filtered (spaces, "vptr_basetype ");
   gdb_print_host_address (TYPE_VPTR_BASETYPE (type), gdb_stdout);
   puts_filtered ("\n");
@@ -3118,16 +3150,6 @@ copy_type_recursive_1 (struct objfile *objfile,
 				  xstrdup (TYPE_FIELD_STATIC_PHYSNAME (type,
 								       i)));
 	      break;
-	    case FIELD_LOC_KIND_DWARF_BLOCK:
-	      /* `struct dwarf2_locexpr_baton' is too bound to its objfile so
-		 it is expected to be made constant by CHECK_TYPEDEF.  */
-	      if (TYPE_NOT_ALLOCATED (new_type)
-		  || TYPE_NOT_ASSOCIATED (new_type))
-		SET_FIELD_DWARF_BLOCK (TYPE_FIELD (new_type, i), NULL);
-	      else
-		SET_FIELD_BITPOS (TYPE_FIELD (new_type, i),
-		   dwarf_locexpr_baton_eval (TYPE_FIELD_DWARF_BLOCK (type, i)));
-	      break;
 	    default:
 	      internal_error (__FILE__, __LINE__,
 			      _("Unexpected type field location kind: %d"),
@@ -3136,18 +3158,63 @@ copy_type_recursive_1 (struct objfile *objfile,
 	}
     }
 
-  /* Convert TYPE_RANGE_HIGH_BOUND_IS_COUNT into a regular bound.  */
-  if (TYPE_CODE (type) == TYPE_CODE_RANGE
-      && TYPE_RANGE_HIGH_BOUND_IS_COUNT (type))
-    {
-      TYPE_RANGE_HIGH_BOUND_IS_COUNT (new_type) = 0;
-      TYPE_HIGH_BOUND (new_type) = TYPE_LOW_BOUND (type)
-				   + TYPE_HIGH_BOUND (type) - 1;
-    }
-
   /* Both FIELD_LOC_KIND_DWARF_BLOCK and TYPE_RANGE_HIGH_BOUND_IS_COUNT were
      possibly converted.  */
   TYPE_DYNAMIC (new_type) = 0;
+
+  /* For range types, copy the bounds information. */
+  if (TYPE_CODE (type) == TYPE_CODE_RANGE)
+    {
+      TYPE_RANGE_DATA (new_type) = xmalloc (sizeof (struct range_bounds));
+      *TYPE_RANGE_DATA (new_type) = *TYPE_RANGE_DATA (type);
+
+      if (TYPE_LOW_BOUND_IS_DWARF_BLOCK (type))
+	{
+	  /* `struct dwarf2_locexpr_baton' is too bound to its objfile so
+	     it is expected to be made constant by CHECK_TYPEDEF.  */
+	  if (TYPE_NOT_ALLOCATED (type)
+	      || TYPE_NOT_ASSOCIATED (type))
+	    TYPE_RANGE_DATA (new_type)->low.u.dwarf_block = NULL;
+	  else
+	    TYPE_LOW_BOUND (new_type) = dwarf_locexpr_baton_eval
+				(TYPE_RANGE_DATA (new_type)->low.u.dwarf_block);
+	  TYPE_LOW_BOUND_IS_DWARF_BLOCK (new_type) = 0;
+	}
+
+      if (TYPE_HIGH_BOUND_IS_DWARF_BLOCK (type))
+	{
+	  /* `struct dwarf2_locexpr_baton' is too bound to its objfile so
+	     it is expected to be made constant by CHECK_TYPEDEF.  */
+	  if (TYPE_NOT_ALLOCATED (type)
+	      || TYPE_NOT_ASSOCIATED (type))
+	    TYPE_RANGE_DATA (new_type)->high.u.dwarf_block = NULL;
+	  else
+	    TYPE_HIGH_BOUND (new_type) = dwarf_locexpr_baton_eval
+			       (TYPE_RANGE_DATA (new_type)->high.u.dwarf_block);
+	  TYPE_HIGH_BOUND_IS_DWARF_BLOCK (new_type) = 0;
+	}
+
+      if (TYPE_BYTE_STRIDE_IS_DWARF_BLOCK (type))
+	{
+	  /* `struct dwarf2_locexpr_baton' is too bound to its objfile so
+	     it is expected to be made constant by CHECK_TYPEDEF.  */
+	  if (TYPE_NOT_ALLOCATED (type)
+	      || TYPE_NOT_ASSOCIATED (type))
+	    TYPE_RANGE_DATA (new_type)->byte_stride.u.dwarf_block = NULL;
+	  else
+	    TYPE_BYTE_STRIDE (new_type) = dwarf_locexpr_baton_eval
+			(TYPE_RANGE_DATA (new_type)->byte_stride.u.dwarf_block);
+	  TYPE_BYTE_STRIDE_IS_DWARF_BLOCK (new_type) = 0;
+	}
+
+      /* Convert TYPE_RANGE_HIGH_BOUND_IS_COUNT into a regular bound.  */
+      if (TYPE_RANGE_HIGH_BOUND_IS_COUNT (type))
+	{
+	  TYPE_HIGH_BOUND (new_type) = TYPE_LOW_BOUND (type)
+				       + TYPE_HIGH_BOUND (type) - 1;
+	  TYPE_RANGE_HIGH_BOUND_IS_COUNT (new_type) = 0;
+	}
+    }
 
   /* Copy pointers to other types.  */
   if (TYPE_TARGET_TYPE (type))

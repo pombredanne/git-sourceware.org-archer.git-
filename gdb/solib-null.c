@@ -1,6 +1,6 @@
 /* Definitions for targets without shared libraries for GDB, the GNU Debugger.
 
-   Copyright (C) 2004, 2007, 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 2004, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -32,7 +32,7 @@ null_special_symbol_handling (void)
 }
 
 static void
-null_solib_create_inferior_hook (void)
+null_solib_create_inferior_hook (int from_tty)
 {
 }
 
