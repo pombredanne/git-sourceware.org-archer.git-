@@ -1,3 +1,27 @@
+2010-01-13  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* lib/mi-support.exp (mi_check_thread_states): Handle
+	core number in thread listing.
+
+2010-01-12  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.base/maint.exp: Adjust the expected output for the
+	"maint print type" test. Use gdb_test_multiple instead of
+	gdb_sent/gdb_expect.
+
+2010-01-11  Doug Evans  <dje@google.com>
+
+	* lib/gdbserver-support.exp (gdbserver_download_current_prog): Rename
+	from gdbserver_download.  All callers updated.
+
+	* gdb.server/ext-run.exp: "info os processes" requires xml support.
+
+2010-01-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Implement binary numbers parsing.
+	* gdb.base/printcmds.exp (test_integer_literals_accepted)
+	(test_integer_literals_rejected): New binary tests.
+
 2010-01-09  Ralf Wildenhues  <Ralf.Wildenhues@gmx.de>
 
 	* gdb.cell/configure: Regenerate.

@@ -1,3 +1,151 @@
+2010-01-13  Doug Evans  <dje@google.com>
+
+	* mi/mi-main.c (list_available_thread_groups): Avoid "may be used
+	uninitialized" warning from gcc on local `tree'.
+
+2010-01-13  Vladimir Prus  <vladimir@codesourcery.com>
+
+	Implement core awareness.
+
+	* bcache.c (compare_ints): Remove
+	(print_percentage): Use compare_positive_ints.
+	* defs.h (compare_positive_ints): Declare.
+	* linux-nat.h (struct lin_lwp): New field core.
+	(linux_nat_core_of_thread_1): Declare.
+	* linux-nat.c (add_lwp): Init the 'core' field.
+	(linux_nat_wait_1): Record the core.
+	(linux_nat_core_of_thread_1, linux_nat_core_of_thread): New.
+	(linux_nat_add_target): Register the above.
+	* linux-thread-db.c (update_thread_core): New.
+	(thread_db_find_new_threads): Update core information for
+	every thread.
+	* remote.c (struct private_thread_info): New.
+	(free_private_thread_info, demand_private_info): New.
+	(PACKET_qXfer_threads, use_osdata_threads): New.
+	(struct thread_item, threads_parsing_context
+	(start_thread, end_thread, thread_attributes)
+	(thread_children, threads_children, threads_elements): New.
+	(remote_threads_info): Try qXfer:threads before anything
+	else.
+	(remote_protocol_packets): Register qXfer:threads.
+	(remote_open_1): Init use_osdata_threads.
+	(struct stop_reply): New field 'core'.
+	(remote_parse_stop_reply): Parse core number.
+	(process_stop_reply): Record core number.
+	(remote_xfer_partial): Handle qXfer:threads.
+	(remote_core_of_thread): New.
+	(init_remote_ops): Register remote_core_of_thread.
+	(_initialize_remote): Register qXfer:read.
+	* target.c (target_core_of_thread): New
+	* target.h (enum target_object): New value TARGET_OBJECT_THREADS.
+	(struct target_ops): New field to_core_of_threads.
+	(target_core_of_thread): Declare.
+	* gdbthread.h (struct thread_info): New field private_dtor.
+	* thread.c (print_thread_info): Report the core.
+	* ui-out.c (MAX_UI_OUT_LEVELS): Increase.
+	* utils.c (compare_positive_ints): New.
+	* features/threads.dtd: New.
+	* mi/mi-interp.c (mi_on_normal_stop): Report the core.
+	* mi/mi-main.c (struct collect_cores_data, collect_cores)
+	(do_nothing, free_vector_of_osdata_items)
+	(splay_tree_int_comparator, free_splay_tree): New.
+	(print_one_inferior_data): Implemented printing of selected
+	inferiors.  Collect and print cores.
+	(output_cores): New.
+	(mi_cmd_list_thread_groups): Support --recurse.  Permit specifying
+	thread groups together with --available.
+
+2010-01-12  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* configure: Regenerate (for _STRUCTURED_PROC).
+
+2010-01-12  Joel Brobecker  <brobecker@adacore.com>
+
+	Delete dead function.
+	* ada-lang.c (extract_string): Delete.  No longer used.
+
+2010-01-12  Joel Brobecker  <brobecker@adacore.com>
+
+	Fix -Wunused warning in dec-thread.c.
+	* dec-thread.c (dec_thread_count_gdb_threads)
+	(dec_thread_add_gdb_thread): Prevent -Wunused warning.
+
+2010-01-12  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-valprint.c (ada_print_floating): Remove trailing space.
+
+2010-01-12  Joel Brobecker  <brobecker@adacore.com>
+
+	Add support for DW_AT_GNAT_descriptive_type.
+	* gdbtypes.h (enum type_specific_kind): New enum.
+	(struct main_type) [type_specific_field]: New component.
+	[type_specific]: Add new component "gnat_stuff".
+	(struct gnat_aux_type): New type.
+	(INIT_CPLUS_SPECIFIC): Also set TYPE_SPECIFIC_FIELD (type).
+	(HAVE_CPLUS_STRUCT): Also check TYPE_SPECIFIC_FIELD (type).
+	(gnat_aux_default, allocate_gnat_aux_type): Add declaration.
+	(INIT_GNAT_SPECIFIC, ALLOCATE_GNAT_AUX_TYPE, HAVE_GNAT_AUX_INFO)
+	(TYPE_SPECIFIC_FIELD): New macros.
+	(TYPE_CPLUS_SPECIFIC): Return cplus_struct_default if the given
+	type does not hold any cplus-specific data.
+	(TYPE_RAW_CPLUS_SPECIFIC): New macro.
+	(TYPE_GNAT_SPECIFIC, TYPE_DESCRIPTIVE_TYPE): New macros.
+	(TYPE_IS_OPAQUE): Use HAVE_CPLUS_STRUCT to check if type has
+	cplus-specific data.
+	* gdbtypes.c (allocate_cplus_struct_type): Minor stylistic rewrite.
+	Set new component TYPE_SPECIFIC_FIELD (type).
+	(gnat_aux_default): New constant.
+	(allocate_gnat_aux_type): New function.
+	(init_type): Add initialization the type-specific stuff for
+	TYPE_CODE_FLT and TYPE_CODE_FUNC types.
+	(print_gnat_stuff): New function.
+	(recursive_dump_type): Use HAVE_CPLUS_STRUCT to check for cplus-
+	specific data.  Adjust code that prints the contents of the
+	type-specific union using the TYPE_SPECIFIC_FIELD value.
+	* dwarf2read.c (dwarf2_attach_fields_to_type): Do not allocate
+	the type cplus stuff for Ada types.
+	(dwarf2_add_member_fn, dwarf2_attach_fn_fields_to_type):
+	Error out if these routines are called with an Ada type.
+	(read_structure_type, read_array_type, read_subrange_type):
+	Add call to set_descriptive_type.
+	(set_die_type): Initialize the gnat-specific data if necessary.
+	(need_gnat_info, die_descriptive_type, set_descriptive_type):
+	New functions.
+	* ada-lang.c (decode_constrained_packed_array_type): Use
+	decode_constrained_packed_array_type instead of doing a standard
+	lookup to locate a parallel type.
+	(find_parallel_type_by_descriptive_type): New function.
+	(ada_find_parallel_type_with_name): New function.
+	(ada_find_parallel_type): Reimplement using
+	ada_find_parallel_type_with_name.
+	* ada-valprint.c (print_field_values): Use HAVE_CPLUS_STRUCT
+	to check if type has a cplus stuff.
+	* linespec.c (total_number_of_methods): Likewise.
+	* mdebugread.c (new_type): Likewise.
+
+2010-01-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* NEWS: Document the 0b binary number prefix parsing.
+
+2010-01-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* objfiles.c (objfile_relocate1): Change the return type to int.
+	Describe the new return value.  Return non-zero if data changed.
+	(objfile_relocate): New variable changed.  Set it.  Call
+	breakpoint_re_set depending on CHANGED.
+
+2010-01-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Implement binary numbers parsing.
+	* c-exp.y (parse_number): New case 'b' and 'B'.
+
+2010-01-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Tristan Gingold  <gingold@adacore.com>
+
+	* solib.c (info_sharedlibrary_command): Replace
+	objfile_has_partial_symbols and objfile_has_full_symbols calls by
+	objfile_has_symbols.
+
 2010-01-10  Joel Brobecker  <brobecker@adacore.com>
 
 	* NEWS: Document the improvements made to the mips-irix port.
