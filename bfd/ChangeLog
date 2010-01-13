@@ -1,3 +1,78 @@
+2010-01-13  Nick Clifton  <nickc@redhat.com>
+
+	* cpu-m32c.c (m32c_scan): New function.  Ensures that a scan for
+	"m32c" returns the m32c arch_info_struct and not the m16c
+	arch_info_struct.
+	(arch_info_struct): Use the new scan function.
+	(bfd_m32c_arch): Likewise.
+
+2010-01-13  Tristan Gingold  <gingold@adacore.com>
+
+	* config.bfd: Remove duplicated target vector for i386-*-darwin.
+	Appends new arch instead of overriding.
+	Use mach_o_x86_64_vec for x86_64-*-darwin.
+	* configure.in: Add mach_o_x86_64_vec.
+	* configure: Regenerate.
+	* targets.c: Declare mach_o_x86_64_vec, add it to _bfd_target_vector.
+	* Makefile.am (BFD64_BACKENDS): Add mach-o-x86-64.lo
+	(BFD64_BACKENDS_CFILES): Add mach-o-x86-64.c
+	* Makefile.in: Regenerate.
+	* mach-o-x86-64.c: New file.
+
+2010-01-13  Tristan Gingold  <gingold@adacore.com>
+
+	* reloc.c: Add MACH_O_X86_64 relocations.
+	* bfd-in2.h: Regenerate.
+	* libbfd.h: Regenerate.
+
+2010-01-13  Tristan Gingold  <gingold@adacore.com>
+
+	* archive.c (normalize): Use lbasename.
+	(bfd_bsd_truncate_arname): Ditto.
+	(bfd_gnu_truncate_arname): Ditto.
+
+2010-01-12  Tristan Gingold  <gingold@adacore.com>
+
+	* makefile.vms (CFLAGS): Turns warnings into informational messages.
+
+2010-01-11  Tristan Gingold  <gingold@adacore.com>
+
+	* mach-o.h: Add x86-64 relocation types.
+
+2010-01-11  Tristan Gingold  <gingold@adacore.com>
+
+	* mach-o.h (bfd_mach_o_backend_data): Add arch field.
+	(bfd_mach_o_set_arch_mach): New prototype.
+	* mach-o.c (bfd_mach_o_mkobject): Define with bfd_mach_o_gen_mkobject.
+	(bfd_mach_o_set_arch_mach): New function.
+	(bfd_mach_o_gen_mkobject): New function.
+	Set TARGET_ARCHITECTURE for the generic back-ends.
+	* mach-o-target.c (bfd_mach_o_set_arch_mach): Remove define.
+	Check that TARGET_ARCHITECTURE is defined.
+	Add TARGET_ARCHITECTURE in TARGET_NAME_BACKEND structure.
+	* mach-o-i386.c (TARGET_ARCHITECTURE): Define.
+
+2010-01-11  Tristan Gingold  <gingold@adacore.com>
+
+	* archive.c (bfd_slurp_armap): Also check for Mach-O sorted armap.
+
+2010-01-11  Nick Clifton  <nickc@redhat.com>
+
+	* elf32-v850.c (v850_elf_perform_relocation): Fix overflow
+	handling of R_V850_HI16_S relocation.
+
+2010-01-11  Alan Modra  <amodra@gmail.com>
+
+	PR 11103
+	* dwarf1.c (parse_die): Correct FORM_STRING data pointer increment.
+
+2010-01-11  Alan Modra  <amodra@gmail.com>
+
+	PR 6832
+	* dwarf2.c (struct comp_unit): Add sec_info_ptr.
+	(find_abstract_instance_name): Use it.
+	(parse_comp_unit): Set it.
+
 2010-01-09  Ralf Wildenhues  <Ralf.Wildenhues@gmx.de>
 
 	* Makefile.in: Regenerate.
