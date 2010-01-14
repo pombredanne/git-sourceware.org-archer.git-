@@ -1464,8 +1464,10 @@ type_length_get (struct type *type, struct type *target_type, int full_span)
     target_type = check_typedef (TYPE_TARGET_TYPE (type));
   element_size = type_length_get (target_type, NULL, 1);
   retval = (count - 1) * byte_stride + element_size;
-  if (byte_stride == 0 || retval < element_size
-      || (retval - element_size) / byte_stride != count - 1)
+  if (retval < element_size
+      || (byte_stride != 0
+          && (retval - element_size) / byte_stride != count - 1)
+      || retval > UINT_MAX)
     retval = 0;
   return retval;
 }
@@ -1634,8 +1636,7 @@ check_typedef (struct type *type)
       gdb_assert (TYPE_DYNAMIC (type) == 0);
     }
 
-  if (!currently_reading_symtab
-      && (TYPE_TARGET_STUB (type) || TYPE_DYNAMIC (type)))
+  if (TYPE_TARGET_STUB (type) || TYPE_DYNAMIC (type))
     {
       struct type *target_type = check_typedef (TYPE_TARGET_TYPE (type));
 
