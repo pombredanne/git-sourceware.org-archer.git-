@@ -3144,9 +3144,7 @@ delete_main_type (struct type *type, htab_t deleted_types)
     }
   xfree (TYPE_FIELDS (type));
 
-  /* Strangely, HAVE_CPLUS_STRUCT will return true when there isn't
-     one at all.  */
-  gdb_assert (!HAVE_CPLUS_STRUCT (type) || !TYPE_CPLUS_SPECIFIC (type));
+  gdb_assert (!HAVE_CPLUS_STRUCT (type));
 
   xfree (TYPE_MAIN_TYPE (type));
 }
