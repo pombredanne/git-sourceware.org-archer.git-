@@ -3389,10 +3389,7 @@ delete_main_type (struct type *type)
     }
   xfree (TYPE_FIELDS (type));
 
-  /* `struct cplus_struct_type' handling is unsupported by this function.  */
-  gdb_assert ((TYPE_CODE (type) != TYPE_CODE_STRUCT
-	       && TYPE_CODE (type) != TYPE_CODE_UNION)
-	      || !HAVE_CPLUS_STRUCT (type));
+  gdb_assert (!HAVE_CPLUS_STRUCT (type));
 
   xfree (TYPE_MAIN_TYPE (type));
 }
