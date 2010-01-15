@@ -917,6 +917,7 @@ Enables or disables auto-loading of Python code when an object is opened."),
   gdbpy_initialize_types ();
   gdbpy_initialize_parameters ();
   gdbpy_initialize_objfile ();
+  gdbpy_initialize_lazy_string ();
   gdbpy_initialize_thread ();
   gdbpy_initialize_inferior ();
   gdbpy_initialize_events ();

@@ -281,6 +281,7 @@ SUBDIR_PYTHON_OBS = \
 	py-hooks.o \
 	py-inferior.o \
 	py-infthread.o \
+	py-lazy-string.o \
 	py-objfile.o \
 	py-param.o \
 	py-prettyprint.o \
@@ -299,6 +300,7 @@ SUBDIR_PYTHON_SRCS = \
 	python/py-hooks.c \
 	python/py-inferior.c \
 	python/py-infthread.c \
+	python/py-lazy-string.c \
 	python/py-objfile.c \
 	python/py-param.c \
 	python/py-prettyprint.c \
@@ -2027,6 +2029,10 @@ py-inferior.o: $(srcdir)/python/py-inferior.c
 
 py-infthread.o: $(srcdir)/python/py-infthread.c
 	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-infthread.c
+	$(POSTCOMPILE)
+
+py-lazy-string.o: $(srcdir)/python/py-lazy-string.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-lazy-string.c
 	$(POSTCOMPILE)
 
 py-objfile.o: $(srcdir)/python/py-objfile.c

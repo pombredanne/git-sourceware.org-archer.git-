@@ -93,6 +93,8 @@ PyObject *gdbpy_lookup_symbol (PyObject *self, PyObject *args, PyObject *kw);
 PyObject *gdbpy_selected_frame (PyObject *self, PyObject *args);
 PyObject *gdbpy_block_for_pc (PyObject *self, PyObject *args);
 PyObject *gdbpy_lookup_type (PyObject *self, PyObject *args, PyObject *kw);
+PyObject *gdbpy_create_lazy_string_object (CORE_ADDR address, long length,
+					   const char *encoding, struct type *type);
 PyObject *gdbpy_inferiors (PyObject *unused, PyObject *unused2);
 PyObject *gdbpy_selected_thread (PyObject *self, PyObject *args);
 
@@ -128,6 +130,7 @@ void gdbpy_initialize_types (void);
 void gdbpy_initialize_blocks (void);
 void gdbpy_initialize_functions (void);
 void gdbpy_initialize_objfile (void);
+void gdbpy_initialize_lazy_string (void);
 void gdbpy_initialize_parameters (void);
 void gdbpy_initialize_thread (void);
 void gdbpy_initialize_inferior (void);
@@ -179,6 +182,10 @@ PyObject *python_string_to_target_python_string (PyObject *obj);
 char *python_string_to_host_string (PyObject *obj);
 PyObject *target_string_to_unicode (const gdb_byte *str, int length);
 int gdbpy_is_string (PyObject *obj);
+int gdbpy_is_lazy_string (PyObject *result);
+gdb_byte *gdbpy_extract_lazy_string (PyObject *string,
+				     struct type **str_type, 
+				     long *length, char **encoding);
 
 int gdbpy_is_value_object (PyObject *obj);
 

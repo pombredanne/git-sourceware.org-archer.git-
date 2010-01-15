@@ -1,3 +1,130 @@
+2010-01-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Eli Zaretskii  <eliz@gnu.org>
+
+	* NEWS: Document the PIE support.
+
+2010-01-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linux-tdep.c: Remove includes gdbcore.h, observer.h and elf-bfd.h.
+	(check_is_pie_binary, _initialize_linux_tdep): Remove.
+
+2010-01-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* solib-svr4.c (svr4_exec_displacement): New comment for entry_point.
+	Replace exec_entry_point call by bfd_get_start_address.
+
+2010-01-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Support Valgrind attachments broken by the PIE support.
+	* auxv.c: Include gdbcore.h.
+	(procfs_xfer_auxv): Make static.  Reduce its comment.  Drop its
+	parameters ops, object and annex.  Remove their assertions.
+	(ld_so_xfer_auxv, memory_xfer_auxv): New function.
+	* auxv.h (procfs_xfer_auxv): Remove comment.  Rename to ...
+	(memory_xfer_auxv): ... here.
+	* linux-nat.c (linux_xfer_partial): Rename procfs_xfer_auxv to
+	memory_xfer_auxv.
+	* procfs.c (procfs_xfer_partial): Likewise.
+	* solib-svr4.c (svr4_relocate_main_executable): New prototype.
+	(svr4_special_symbol_handling): Call svr4_relocate_main_executable.
+	(svr4_solib_create_inferior_hook): Conditionalize the
+	svr4_relocate_main_executable call.
+
+2010-01-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* solib-svr4.c (scan_dyntag): Remove variable dyn_addr.  New variable
+	target_section.  Find SECT in current_target_sections, gdb_assert it.
+	(elf_lookup_lib_symbol): Pass the binary file if given symfile_objfile.
+	New variable abfd.
+	* symtab.c (lookup_objfile_from_block): Return the binary file instead
+	of separate debug info file.
+
+2010-01-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Support PIEs with no symfile_objfile.
+	* exec.c (print_section_info <abfd == exec_bfd>): Relocate Entry point.
+	* solib-svr4.c (svr4_relocate_main_executable <exec_bfd>): New block.
+
+2010-01-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* solib-svr4.c (svr4_relocate_main_executable): Move the static exec
+	code part to ...
+	(svr4_static_exec_displacement): ... a new function.
+	(svr4_exec_displacement): New function.
+	(svr4_relocate_main_executable): Call svr4_exec_displacement.  Allocate
+	new_offsets using alloca now.  Remove variable old_chain and changed.
+	Call objfile_relocate unconditionally now.
+
+2010-01-14  Doug Evans  <dje@google.com>
+
+	* gdbtypes.c (arch_flags_type): Fix comment.
+	* gdbtypes.h (arch_composite_type): Fix comment.
+
+2009-01-14  Tristan Gingold  <gingold@adacore.com>
+
+	* machoread.c (macho_add_oso_symfile): Add symfile_flags parameter.
+	Call xstrdup for abfd->filename.  Pass symfile_flags and objfile flags
+	to symbol_file_add_from_bfd.  Add OSO as separate objfile.
+	(macho_oso_symfile): Add symfile_flags parameter.  Pass it to
+	macho_add_oso_symfile.
+	(macho_symfile_read): Pass symfile_flags to macho_oso_symfile.
+
+2010-01-14  Joel Brobecker  <brobecker@adacore.com>
+
+	Tru64: Dead threads are never deleted.
+	* dec-thread.c (dec_thread_ptid_is_alive): New function.
+	(dec_thread_count_gdb_threads): Fix counter increment.
+	(dec_thread_add_gdb_thread): Fix *listp increment.
+	(resync_thread_list): Fix bug in deletion of dead threads that
+	caused all threads to be deleted, instead of just the dead ones.
+
+2010-01-13  Phil Muldoon  <pmuldoon@redhat.com>
+
+	PR python/10705
+
+	* python/python-internal.h: Add lazy_string_object_type
+	definition.
+	(create_lazy_string_object, gdbpy_initialize_lazy_string)
+	(gdbpy_is_lazystring, gdbpy_extract_lazy_string): Define.
+	* python/py-value.c (valpy_lazy_string): New function.
+	(convert_value_from_python): Add lazy string conversion.
+	* python/py-prettyprint.c (pretty_print_one_value): Check if
+	return is also a lazy string.
+	(print_string_repr): Add lazy string printing branch.
+	(print_children): Likewise.
+	* python/py-lazy-string.c: New file. Implement lazy strings.
+	* python/python.c (_initialize_python): Call
+	gdbpy_initialize_lazy_string.
+	* varobj.c (value_get_print_value): Add lazy string printing
+	branch.  Account for encoding.
+	* c-lang.c (c_printstr): Account for new encoding argument.  If
+	encoding is NULL, find encoding suited for type, otherwise use
+	user encoding.
+	* language.h (language_defn): Add encoding argument.
+	(LA_PRINT_STRING): Likewise.
+	* language.c (unk_lang_printstr): Update to reflect new encoding
+	argument to language_defn.
+	* ada-lang.h (ada_printstr): Likewise.
+	* c-lang.h (c_printstr): Likewise.
+	* p-lang.h (pascal_printstr);
+	* f-lang.c (f_printstr): Likewise.
+	* m2-lang.c (m2_printstr): Likewise.
+	* objc-lang.c (objc_printstr): Likewise.
+	* p-lang.c (pascal_printstr): Likewise.
+	* scm-lang.c (scm_printstr): Likewise.
+	* c-valprint.c (c_val_print): Update LA_PRINT_STRING call for
+	encoding argument.
+	* ada-valprint.c (ada_printstr): Likewise.
+	* f-valprint.c (f_val_print): Likewise
+	* m2-valprint.c (m2_val_print): Likewise.
+	* p-valprint.c (pascal_val_print): Likewise.
+	* expprint.c (print_subexp_standard): Likewise.
+	* valprint.c (val_print_string): Likewise.
+	* Makefile.in (SUBDIR_PYTHON_OBS): Add py-lazy-string.
+	(SUBDIR_PYTHON_SRCS): Likewise.
+	(py-lazy-string.o): New rule.
+
+
 2010-01-13  Doug Evans  <dje@google.com>
 
 	* mi/mi-main.c (list_available_thread_groups): Avoid "may be used
