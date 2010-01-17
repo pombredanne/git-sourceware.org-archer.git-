@@ -669,13 +669,6 @@ x86/x86_64 Darwin		i[34567]86-*-darwin*
 
 x86_64 MinGW			x86_64-*-mingw*
 
-* New native configurations
-
-x86/x86_64 Darwin		i[34567]86-*-darwin*
-
-info os processes
-  Show operating system information about processes.
-
 * New targets
 
 Lattice Mico32                  lm32-*

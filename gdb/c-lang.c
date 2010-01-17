@@ -717,7 +717,7 @@ c_get_string (struct value *value, gdb_byte **buffer, int *length,
      If length returned from read_string was > 0, return the number of
      characters read by dividing the number of bytes by width.  */
   if (*length != 0)
-    *length = *length / width;
+     *length = *length / width;
 
   *char_type = element_type;
 
@@ -1039,9 +1039,6 @@ evaluate_subexp_c (struct type *expect_type, struct expression *exp,
     }
   return evaluate_subexp_standard (expect_type, exp, pos, noside);
 }
-
-
-/* Preprocessing and parsing C and C++ expressions.  */
 
 
 

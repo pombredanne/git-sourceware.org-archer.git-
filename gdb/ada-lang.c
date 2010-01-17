@@ -1644,7 +1644,7 @@ ada_type_of_array (struct value *arr, int bounds)
         return NULL;
       while (arity > 0)
         {
-	  struct type *range_type = alloc_type_copy (value_type (arr));
+          struct type *range_type = alloc_type_copy (value_type (arr));
           struct type *array_type = alloc_type_copy (value_type (arr));
           struct value *low = desc_one_bound (descriptor, arity, 0);
           struct value *high = desc_one_bound (descriptor, arity, 1);

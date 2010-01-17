@@ -36,7 +36,6 @@
 #include "gdb_string.h"
 #include "exceptions.h"
 #include "valprint.h"
-
 #include <errno.h>
 
 extern void _initialize_typeprint (void);

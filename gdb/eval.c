@@ -39,7 +39,6 @@
 #include "exceptions.h"
 #include "regcache.h"
 #include "user-regs.h"
-#include "python/python.h"
 #include "valprint.h"
 #include "gdb_obstack.h"
 #include "objfiles.h"

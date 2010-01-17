@@ -69,6 +69,7 @@ typedef struct cmdpy_object cmdpy_object;
 
 static PyTypeObject cmdpy_object_type;
 
+
 /* Constants used by this module.  */
 static PyObject *invoke_cst;
 static PyObject *complete_cst;

@@ -163,6 +163,13 @@ gdb_test "set radix" \
     "Input and output radices now set to decimal 10, hex a, octal 12\." \
     "Reset radices"
 
+gdb_test "set input-radix 0" \
+    "Nonsense input radix ``decimal 0''; input radix unchanged\\." \
+    "Reject input-radix 0"
+gdb_test "show input-radix" \
+    "Default input radix for entering numbers is 10\\." \
+    "Input radix unchanged after rejecting 0"
+
 gdb_test "set input-radix 1" \
     "Nonsense input radix ``decimal 1''; input radix unchanged\\." \
     "Reject input-radix 1"
