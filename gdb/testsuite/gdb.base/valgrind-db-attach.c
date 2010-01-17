@@ -1,6 +1,6 @@
 /* This testcase is part of GDB, the GNU debugger.
 
-   Copyright 2009, 2010 Free Software Foundation, Inc.
+   Copyright 2009 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -13,22 +13,18 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-*/
+#include <stdlib.h>
 
-#include <stdio.h>
-
-void
-f1 (int a)
+int main()
 {
-  printf ("a = %d\n", a);
-}
+  void *p;
 
-int
-main (int argc, char *argv[])
-{
-  f1 (1);
-
+  p = malloc (1);
+  if (p == NULL)
+    return 1;
+  free (p);
+  free (p);	/* double-free */
   return 0;
 }

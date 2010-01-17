@@ -1,3 +1,56 @@
+2010-01-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/pie-support.exp, gdb.base/pie-support.c: Remove.
+
+2010-01-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/valgrind-db-attach.exp, gdb.base/valgrind-db-attach.c: New.
+
+2010-01-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/break-interp-lib.c: Include unistd.h, assert.h and stdio.h.
+	(libfunc): New parameter action.  Implement also selectable "sleep".
+	* gdb.base/break-interp-main.c: Include assert.h.
+	(libfunc): New parameter action.
+	(main): New parameters argc and argv.  Assert argc.  Pass argv.
+	* gdb.base/break-interp.exp (test_core): Pass the "segv" argument.
+	(test_attach): New proc.
+	(test_ld): Pass new "segv" exec parameter.  Call also test_attach.
+	* lib/gdb.exp (core_find): New parameter arg.  Pass it to $binfile.
+
+2010-01-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/break-interp.exp (test_core): New proc.
+	(test_ld): Call it.
+
+2010-01-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/break-interp-main.c, gdb.base/break-interp-lib.c: New.
+	* gdb.base/break-interp.exp: Exit on skip_shlib_tests.  Change $srcfile.
+	New variables $binfile_lib and $srcfile_lib.  Call get_compiler_info
+	and gdb_compile_shlib.  Use new -Wl compiler options.
+	(dl bt, main bt): New tests.
+
+2010-01-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Support PIEs with no symfile_objfile.
+	* gdb.base/break-interp.exp: New argument at the test_ld calls.
+	(test_ld): New parameter trynosym.
+	(test_ld <$trynosym>): New block.
+
+2010-01-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/break-interp.exp: New file.
+
+2010-01-13  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.python/py-value.exp (test_lazy_strings): Add lazy string test.
+	* gdb.python/py-prettyprint.py (pp_ls): New printer.
+	* gdb.python/py-prettyprint.exp (run_lang_tests): Add lazy string
+	test.
+	* gdb.python/py-prettyprint.c: Define lazystring test structure.
+	* gdb.python/py-mi.exp: Add lazy string test.
+
 2010-01-13  Vladimir Prus  <vladimir@codesourcery.com>
 
 	* lib/mi-support.exp (mi_check_thread_states): Handle

@@ -50,6 +50,7 @@
 
 static struct link_map_offsets *svr4_fetch_link_map_offsets (void);
 static int svr4_have_link_map_offsets (void);
+static void svr4_relocate_main_executable (void);
 
 /* Link map info to include in an allocated so_list entry */
 
@@ -568,11 +569,12 @@ scan_dyntag (int dyntag, bfd *abfd, CORE_ADDR *ptr)
 {
   int arch_size, step, sect_size;
   long dyn_tag;
-  CORE_ADDR dyn_ptr, dyn_addr;
+  CORE_ADDR dyn_ptr;
   gdb_byte *bufend, *bufstart, *buf;
   Elf32_External_Dyn *x_dynp_32;
   Elf64_External_Dyn *x_dynp_64;
   struct bfd_section *sect;
+  struct target_section *target_section;
 
   if (abfd == NULL)
     return 0;
@@ -588,7 +590,13 @@ scan_dyntag (int dyntag, bfd *abfd, CORE_ADDR *ptr)
   sect = bfd_get_section_by_name (abfd, ".dynamic");
   if (sect == NULL)
     return 0;
-  dyn_addr = bfd_section_vma (abfd, sect);
+
+  for (target_section = current_target_sections->sections;
+       target_section < current_target_sections->sections_end;
+       target_section++)
+    if (sect == target_section->the_bfd_section)
+      break;
+  gdb_assert (target_section < current_target_sections->sections_end);
 
   /* Read in .dynamic from the BFD.  We will get the actual value
      from memory later.  */
@@ -630,7 +638,7 @@ scan_dyntag (int dyntag, bfd *abfd, CORE_ADDR *ptr)
 	     CORE_ADDR ptr_addr;
 
 	     ptr_type = builtin_type (target_gdbarch)->builtin_data_ptr;
-	     ptr_addr = dyn_addr + (buf - bufstart) + arch_size / 8;
+	     ptr_addr = target_section->addr + (buf - bufstart) + arch_size / 8;
 	     if (target_read_memory (ptr_addr, ptr_buf, arch_size / 8) == 0)
 	       dyn_ptr = extract_typed_address (ptr_buf, ptr_type);
 	     *ptr = dyn_ptr;
@@ -1533,113 +1541,133 @@ enable_break (struct svr4_info *info, int from_tty)
 static void
 svr4_special_symbol_handling (void)
 {
+  svr4_relocate_main_executable ();
 }
 
-/* Relocate the main executable.  This function should be called upon
-   stopping the inferior process at the entry point to the program. 
-   The entry point from BFD is compared to the PC and if they are
-   different, the main executable is relocated by the proper amount. 
-   
-   As written it will only attempt to relocate executables which
-   lack interpreter sections.  It seems likely that only dynamic
-   linker executables will get relocated, though it should work
-   properly for a position-independent static executable as well.  */
+/* Decide if the objfile needs to be relocated.  As indicated above,
+   we will only be here when execution is stopped at the beginning
+   of the program.  Relocation is necessary if the address at which
+   we are presently stopped differs from the start address stored in
+   the executable AND there's no interpreter section.  The condition
+   regarding the interpreter section is very important because if
+   there *is* an interpreter section, execution will begin there
+   instead.  When there is an interpreter section, the start address
+   is (presumably) used by the interpreter at some point to start
+   execution of the program.
 
-static void
-svr4_relocate_main_executable (void)
+   If there is an interpreter, it is normal for it to be set to an
+   arbitrary address at the outset.  The job of finding it is
+   handled in enable_break().
+
+   So, to summarize, relocations are necessary when there is no
+   interpreter section and the start address obtained from the
+   executable is different from the address at which GDB is
+   currently stopped.
+   
+   [ The astute reader will note that we also test to make sure that
+     the executable in question has the DYNAMIC flag set.  It is my
+     opinion that this test is unnecessary (undesirable even).  It
+     was added to avoid inadvertent relocation of an executable
+     whose e_type member in the ELF header is not ET_DYN.  There may
+     be a time in the future when it is desirable to do relocations
+     on other types of files as well in which case this condition
+     should either be removed or modified to accomodate the new file
+     type.  (E.g, an ET_EXEC executable which has been built to be
+     position-independent could safely be relocated by the OS if
+     desired.  It is true that this violates the ABI, but the ABI
+     has been known to be bent from time to time.)  - Kevin, Nov 2000. ]
+   */
+
+static CORE_ADDR
+svr4_static_exec_displacement (void)
 {
   asection *interp_sect;
   struct regcache *regcache
     = get_thread_arch_regcache (inferior_ptid, target_gdbarch);
   CORE_ADDR pc = regcache_read_pc (regcache);
 
-  /* Decide if the objfile needs to be relocated.  As indicated above,
-     we will only be here when execution is stopped at the beginning
-     of the program.  Relocation is necessary if the address at which
-     we are presently stopped differs from the start address stored in
-     the executable AND there's no interpreter section.  The condition
-     regarding the interpreter section is very important because if
-     there *is* an interpreter section, execution will begin there
-     instead.  When there is an interpreter section, the start address
-     is (presumably) used by the interpreter at some point to start
-     execution of the program.
-
-     If there is an interpreter, it is normal for it to be set to an
-     arbitrary address at the outset.  The job of finding it is
-     handled in enable_break().
-
-     So, to summarize, relocations are necessary when there is no
-     interpreter section and the start address obtained from the
-     executable is different from the address at which GDB is
-     currently stopped.
-     
-     [ The astute reader will note that we also test to make sure that
-       the executable in question has the DYNAMIC flag set.  It is my
-       opinion that this test is unnecessary (undesirable even).  It
-       was added to avoid inadvertent relocation of an executable
-       whose e_type member in the ELF header is not ET_DYN.  There may
-       be a time in the future when it is desirable to do relocations
-       on other types of files as well in which case this condition
-       should either be removed or modified to accomodate the new file
-       type.  (E.g, an ET_EXEC executable which has been built to be
-       position-independent could safely be relocated by the OS if
-       desired.  It is true that this violates the ABI, but the ABI
-       has been known to be bent from time to time.)  - Kevin, Nov 2000. ]
-     */
-
   interp_sect = bfd_get_section_by_name (exec_bfd, ".interp");
   if (interp_sect == NULL 
       && (bfd_get_file_flags (exec_bfd) & DYNAMIC) != 0
       && (exec_entry_point (exec_bfd, &exec_ops) != pc))
+    return pc - exec_entry_point (exec_bfd, &exec_ops);
+
+  return 0;
+}
+
+/* We relocate all of the sections by the same amount.  This
+   behavior is mandated by recent editions of the System V ABI. 
+   According to the System V Application Binary Interface,
+   Edition 4.1, page 5-5:
+
+     ...  Though the system chooses virtual addresses for
+     individual processes, it maintains the segments' relative
+     positions.  Because position-independent code uses relative
+     addressesing between segments, the difference between
+     virtual addresses in memory must match the difference
+     between virtual addresses in the file.  The difference
+     between the virtual address of any segment in memory and
+     the corresponding virtual address in the file is thus a
+     single constant value for any one executable or shared
+     object in a given process.  This difference is the base
+     address.  One use of the base address is to relocate the
+     memory image of the program during dynamic linking.
+
+   The same language also appears in Edition 4.0 of the System V
+   ABI and is left unspecified in some of the earlier editions.  */
+
+static CORE_ADDR
+svr4_exec_displacement (void)
+{
+  int found;
+  /* ENTRY_POINT is a possible function descriptor - before
+     a call to gdbarch_convert_from_func_ptr_addr.  */
+  CORE_ADDR entry_point;
+
+  if (exec_bfd == NULL)
+    return 0;
+
+  if (target_auxv_search (&current_target, AT_ENTRY, &entry_point) == 1)
+    return entry_point - bfd_get_start_address (exec_bfd);
+
+  return svr4_static_exec_displacement ();
+}
+
+/* Relocate the main executable.  This function should be called upon
+   stopping the inferior process at the entry point to the program. 
+   The entry point from BFD is compared to the AT_ENTRY of AUXV and if they are
+   different, the main executable is relocated by the proper amount.  */
+
+static void
+svr4_relocate_main_executable (void)
+{
+  CORE_ADDR displacement = svr4_exec_displacement ();
+
+  /* Even if DISPLACEMENT is 0 still try to relocate it as this is a new
+     difference of in-memory vs. in-file addresses and we could already
+     relocate the executable at this function to improper address before.  */
+
+  if (symfile_objfile)
     {
-      struct cleanup *old_chain;
       struct section_offsets *new_offsets;
-      int i, changed;
-      CORE_ADDR displacement;
-      
-      /* It is necessary to relocate the objfile.  The amount to
-	 relocate by is simply the address at which we are stopped
-	 minus the starting address from the executable.
+      int i;
 
-	 We relocate all of the sections by the same amount.  This
-	 behavior is mandated by recent editions of the System V ABI. 
-	 According to the System V Application Binary Interface,
-	 Edition 4.1, page 5-5:
-
-	   ...  Though the system chooses virtual addresses for
-	   individual processes, it maintains the segments' relative
-	   positions.  Because position-independent code uses relative
-	   addressesing between segments, the difference between
-	   virtual addresses in memory must match the difference
-	   between virtual addresses in the file.  The difference
-	   between the virtual address of any segment in memory and
-	   the corresponding virtual address in the file is thus a
-	   single constant value for any one executable or shared
-	   object in a given process.  This difference is the base
-	   address.  One use of the base address is to relocate the
-	   memory image of the program during dynamic linking.
-
-	 The same language also appears in Edition 4.0 of the System V
-	 ABI and is left unspecified in some of the earlier editions.  */
-
-      displacement = pc - exec_entry_point (exec_bfd, &exec_ops);
-      changed = 0;
-
-      new_offsets = xcalloc (symfile_objfile->num_sections,
-			     sizeof (struct section_offsets));
-      old_chain = make_cleanup (xfree, new_offsets);
+      new_offsets = alloca (symfile_objfile->num_sections
+			    * sizeof (*new_offsets));
 
       for (i = 0; i < symfile_objfile->num_sections; i++)
-	{
-	  if (displacement != ANOFFSET (symfile_objfile->section_offsets, i))
-	    changed = 1;
-	  new_offsets->offsets[i] = displacement;
-	}
+	new_offsets->offsets[i] = displacement;
 
-      if (changed)
-	objfile_relocate (symfile_objfile, new_offsets);
+      objfile_relocate (symfile_objfile, new_offsets);
+    }
+  else if (exec_bfd)
+    {
+      asection *asect;
 
-      do_cleanups (old_chain);
+      for (asect = exec_bfd->sections; asect != NULL; asect = asect->next)
+	exec_set_section_address (bfd_get_filename (exec_bfd), asect->index,
+				  (bfd_section_vma (exec_bfd, asect)
+				   + displacement));
     }
 }
 
@@ -1705,7 +1733,8 @@ svr4_solib_create_inferior_hook (int from_tty)
   info = get_svr4_info ();
 
   /* Relocate the main executable if necessary.  */
-  svr4_relocate_main_executable ();
+  if (current_inferior ()->attach_flag == 0)
+    svr4_relocate_main_executable ();
 
   if (!svr4_have_link_map_offsets ())
     return;
@@ -1934,8 +1963,19 @@ elf_lookup_lib_symbol (const struct objfile *objfile,
 		       const char *linkage_name,
 		       const domain_enum domain)
 {
-  if (objfile->obfd == NULL
-     || scan_dyntag (DT_SYMBOLIC, objfile->obfd, NULL) != 1)
+  bfd *abfd;
+
+  if (objfile == symfile_objfile)
+    abfd = exec_bfd;
+  else
+    {
+      /* OBJFILE should have been passed as the non-debug one.  */
+      gdb_assert (objfile->separate_debug_objfile_backlink == NULL);
+
+      abfd = objfile->obfd;
+    }
+
+  if (abfd == NULL || scan_dyntag (DT_SYMBOLIC, abfd, NULL) != 1)
     return NULL;
 
   return lookup_global_symbol_from_objfile
