@@ -1,3 +1,45 @@
+2010-01-19  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/8000:
+	* gdb.cp/namespace.exp: Use new enum.  Fix line numbers in
+	existing tests.
+	* gdb.cp/namespace.cc (AAA::SomeEnum): New enum.
+	(main): Use AAA::SomeEnum.
+
+2010-01-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.mi/mi-break.exp (set line_callme_head, set line_callme_body): New.
+	(test_ignore_count): Declare line_callme_body global.
+	(run to breakpoint with ignore count): Use line_callme_body.
+	* gdb.mi/mi-cli.exp (set line_main_head, set line_main_body)
+	(set line_main_hello, set line_main_return): Reindent.
+	(set line_callee4_head, set line_callee4_body, set line_callee4_next):
+	New.
+	(continue to callee4): Use line_callee4_body.
+	(check *stopped from CLI command): Use line_callee4_next.
+	* gdb.mi/mi2-cli.exp (set line_main_head, set line_main_body)
+	(set line_main_hello, set line_main_return): Reindent.
+	(set line_callee4_head, set line_callee4_body): New.
+	(continue to callee4): Use line_callee4_body.
+
+2010-01-18  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/9680:
+	* gdb.cp/casts.cc: Add new classes and variables.
+	* gdb.cp/casts.exp: Test new operators.
+
+2010-01-18  Tom Tromey  <tromey@redhat.com>
+	    Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.python/source2.py: New file.
+	* gdb.python/source1: New file.
+	* gdb.python/python.exp: Test "source" command.
+
+2010-01-15  Stan Shebs  <stan@codesourcery.com>
+
+	* gdb.trace/tfile.c: New file.
+	* gdb.trace/tfile.exp: New file.
+	
 2010-01-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* gdb.base/pie-support.exp, gdb.base/pie-support.c: Remove.

@@ -1,3 +1,33 @@
+2010-01-19  Daisuke Hatayama  <d.hatayama@jp.fujitsu.com>
+	    Alan Modra <amodra@gmail.com>
+
+        * elfcode.h (elf_swap_ehdr_out): Handle e_phnum > 0xffff.
+	(elf_object_p): Read e_phnum extension.
+	(elf_write_shdrs_and_ehdr): Write e_phnum extension.
+        * elfcore.h (elf_core_file_p): Read e_phnum extension.  Sanity check
+	that we can read last program header.
+
+2010-01-19  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* elf32-arm.c (elf32_arm_howto_table_1): Correct bitsize of
+	R_ARM_THM_CALL entry.
+	(elf32_arm_final_link_relocate): Correct calculation of
+	reloc_signed_max when doing a R_ARM_THM_CALL, R_ARM_THM_XPC22,
+	or R_ARM_THM_JUMP24 relocation.
+
+2010-01-18  Alan Modra  <amodra@gmail.com>
+
+	PR 11168
+	* coffcode.h (coff_compute_section_file_positions): Move Rs6000COFF_C
+	block past vars in COFF_IMAGE_WITH_PE block.  Report error on more
+	than 32k sections.
+
+2010-01-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix compilation warning on gcc-3.4.
+	* vms-tir.c (start_etir_record, sto_imm): Rename the prototype
+	parameter index to sec_index according to the function definition.
+
 2010-01-13  Chao-ying Fu  <fu@mips.com>
 
 	* elfxx-mips.c (JR_TO_B_P): New define to transform JR to B.
