@@ -27,6 +27,7 @@
 #include "observer.h"
 #include "value.h"
 #include "language.h"
+#include "exceptions.h"
 #include "event-loop.h"
 
 #include <ctype.h>
@@ -47,7 +48,6 @@ static int gdbpy_auto_load = 1;
 #include "charset.h"
 #include "top.h"
 #include "solib.h"
-#include "exceptions.h"
 #include "python-internal.h"
 #include "linespec.h"
 #include "symtab.h"
@@ -450,6 +450,22 @@ gdbpy_parse_and_eval (PyObject *self, PyObject *args)
   return value_to_value_object (result);
 }
 
+/* Read a file as Python code.  STREAM is the input file; FILE is the
+   name of the file.  */
+
+void
+source_python_script (FILE *stream, char *file)
+{
+  PyGILState_STATE state;
+
+  state = PyGILState_Ensure ();
+
+  PyRun_SimpleFile (stream, file);
+
+  fclose (stream);
+  PyGILState_Release (state);
+}
+
 
 
 /* Posting and handling events.  */
@@ -643,18 +659,6 @@ run_python_script (int argc, char **argv)
   exit (0);
 }
 
-void
-source_python_script (FILE *stream, char *file)
-{
-  struct cleanup *cleanup;
-
-  cleanup = ensure_python_env (get_current_arch (), current_language);
-  PyRun_SimpleFile (stream, file);
-
-  fclose (stream);
-  do_cleanups (cleanup);
-}
-
 
 
 /* The "current" objfile.  This is set when gdb detects that a new
@@ -802,10 +806,11 @@ eval_python_from_control_command (struct command_line *cmd)
 }
 
 void
-source_python_script (FILE *stream)
+source_python_script (FILE *stream, char *file)
 {
   fclose (stream);
-  error (_("Python scripting is not supported in this copy of GDB."));
+  throw_error (UNSUPPORTED_ERROR,
+	       _("Python scripting is not supported in this copy of GDB."));
 }
 
 #endif /* HAVE_PYTHON */

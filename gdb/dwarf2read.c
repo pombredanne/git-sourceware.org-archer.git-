@@ -2016,12 +2016,6 @@ process_psymtab_comp_unit (struct objfile *objfile,
     (objfile->static_psymbols.list + pst->statics_offset);
   sort_pst_symbols (pst);
 
-  /* If there is already a psymtab or symtab for a file of this
-     name, remove it. (If there is a symtab, more drastic things
-     also happen.) This happens in VxWorks.  */
-  if (! this_cu->from_debug_types)
-    free_named_symtabs (pst->filename);
-
   info_ptr = (beg_of_comp_unit + cu.header.length
 	      + cu.header.initial_length_size);
 
@@ -2392,7 +2386,8 @@ partial_die_parent_scope (struct partial_die_info *pdi,
       || parent->tag == DW_TAG_structure_type
       || parent->tag == DW_TAG_class_type
       || parent->tag == DW_TAG_interface_type
-      || parent->tag == DW_TAG_union_type)
+      || parent->tag == DW_TAG_union_type
+      || parent->tag == DW_TAG_enumeration_type)
     {
       if (grandparent_scope == NULL)
 	parent->scope = parent->name;
@@ -2400,7 +2395,7 @@ partial_die_parent_scope (struct partial_die_info *pdi,
 	parent->scope = typename_concat (&cu->comp_unit_obstack, grandparent_scope,
 					 parent->name, cu);
     }
-  else if (parent->tag == DW_TAG_enumeration_type)
+  else if (parent->tag == DW_TAG_enumerator)
     /* Enumerators should not get the name of the enumeration as a prefix.  */
     parent->scope = grandparent_scope;
   else
@@ -6786,7 +6781,7 @@ read_partial_die (struct partial_die_info *part_die,
 	    default:
 	      part_die->name
 		= dwarf2_canonicalize_name (DW_STRING (&attr), cu,
-					    &cu->comp_unit_obstack);
+					    &cu->objfile->objfile_obstack);
 	      break;
 	    }
 	  break;

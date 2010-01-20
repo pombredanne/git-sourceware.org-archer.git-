@@ -1867,6 +1867,18 @@ is_integral_type (struct type *t)
 	 || (TYPE_CODE (t) == TYPE_CODE_BOOL)));
 }
 
+/* A helper function which returns true if types A and B represent the
+   "same" class type.  This is true if the types have the same main
+   type, or the same name.  */
+
+int
+class_types_same_p (const struct type *a, const struct type *b)
+{
+  return (TYPE_MAIN_TYPE (a) == TYPE_MAIN_TYPE (b)
+	  || (TYPE_NAME (a) && TYPE_NAME (b)
+	      && !strcmp (TYPE_NAME (a), TYPE_NAME (b))));
+}
+
 /* Check whether BASE is an ancestor or base class or DCLASS 
    Return 1 if so, and 0 if not.
    Note: callers may want to check for identity of the types before
@@ -1881,18 +1893,103 @@ is_ancestor (struct type *base, struct type *dclass)
   CHECK_TYPEDEF (base);
   CHECK_TYPEDEF (dclass);
 
-  if (base == dclass)
-    return 1;
-  if (TYPE_NAME (base) && TYPE_NAME (dclass) 
-      && !strcmp (TYPE_NAME (base), TYPE_NAME (dclass)))
+  if (class_types_same_p (base, dclass))
     return 1;
 
   for (i = 0; i < TYPE_N_BASECLASSES (dclass); i++)
-    if (is_ancestor (base, TYPE_BASECLASS (dclass, i)))
-      return 1;
+    {
+      if (is_ancestor (base, TYPE_BASECLASS (dclass, i)))
+	return 1;
+    }
 
   return 0;
 }
+
+/* Like is_ancestor, but only returns true when BASE is a public
+   ancestor of DCLASS.  */
+
+int
+is_public_ancestor (struct type *base, struct type *dclass)
+{
+  int i;
+
+  CHECK_TYPEDEF (base);
+  CHECK_TYPEDEF (dclass);
+
+  if (class_types_same_p (base, dclass))
+    return 1;
+
+  for (i = 0; i < TYPE_N_BASECLASSES (dclass); ++i)
+    {
+      if (! BASETYPE_VIA_PUBLIC (dclass, i))
+	continue;
+      if (is_public_ancestor (base, TYPE_BASECLASS (dclass, i)))
+	return 1;
+    }
+
+  return 0;
+}
+
+/* A helper function for is_unique_ancestor.  */
+
+static int
+is_unique_ancestor_worker (struct type *base, struct type *dclass,
+			   int *offset,
+			   const bfd_byte *contents, CORE_ADDR address)
+{
+  int i, count = 0;
+
+  CHECK_TYPEDEF (base);
+  CHECK_TYPEDEF (dclass);
+
+  for (i = 0; i < TYPE_N_BASECLASSES (dclass) && count < 2; ++i)
+    {
+      struct type *iter = check_typedef (TYPE_BASECLASS (dclass, i));
+      int this_offset = baseclass_offset (dclass, i, contents, address);
+
+      if (this_offset == -1)
+	error (_("virtual baseclass botch"));
+
+      if (class_types_same_p (base, iter))
+	{
+	  /* If this is the first subclass, set *OFFSET and set count
+	     to 1.  Otherwise, if this is at the same offset as
+	     previous instances, do nothing.  Otherwise, increment
+	     count.  */
+	  if (*offset == -1)
+	    {
+	      *offset = this_offset;
+	      count = 1;
+	    }
+	  else if (this_offset == *offset)
+	    {
+	      /* Nothing.  */
+	    }
+	  else
+	    ++count;
+	}
+      else
+	count += is_unique_ancestor_worker (base, iter, offset,
+					    contents + this_offset,
+					    address + this_offset);
+    }
+
+  return count;
+}
+
+/* Like is_ancestor, but only returns true if BASE is a unique base
+   class of the type of VAL.  */
+
+int
+is_unique_ancestor (struct type *base, struct value *val)
+{
+  int offset = -1;
+
+  return is_unique_ancestor_worker (base, value_type (val), &offset,
+				    value_contents (val),
+				    value_address (val)) == 1;
+}
+
 
 
 
@@ -3097,6 +3194,8 @@ copy_type (const struct type *type)
   return new_type;
 }
 
+#if 0
+
 /* Allocate a hash table which is used when freeing a struct type.  */
 
 static htab_t
@@ -3104,6 +3203,8 @@ create_deleted_types_hash (void)
 {
   return htab_create (1, htab_hash_pointer, htab_eq_pointer, NULL);
 }
+
+#endif
 
 static void delete_type_recursive (struct type *type, htab_t deleted_types);
 
@@ -3256,6 +3357,8 @@ type_incref (struct type *type)
   ++*(found->refc);
 }
 
+#if 0
+
 /* A traverse callback for type_refc_table which removes any entry
    whose reference count pointer is REFC.  */
 
@@ -3272,6 +3375,8 @@ type_refc_remove (void **slot, void *refc)
 
   return 1;
 }
+
+#endif
 
 /* Decrement the reference count for TYPE.  If TYPE has no more
    references, delete it.  */

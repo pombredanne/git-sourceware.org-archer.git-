@@ -19,6 +19,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "exceptions.h"
 #include "arch-utils.h"
 #include "readline/readline.h"
 #include "readline/tilde.h"
@@ -186,9 +187,23 @@ struct cmd_list_element *showchecklist;
 
 /* Command tracing state.  */
 
-static int source_python = 0;
 int source_verbose = 0;
 int trace_commands = 0;
+
+/* 'script-extension' option support.  */
+
+static const char script_ext_off[] = "off";
+static const char script_ext_soft[] = "soft";
+static const char script_ext_strict[] = "strict";
+
+static const char *script_ext_enums[] = {
+  script_ext_off,
+  script_ext_soft,
+  script_ext_strict,
+  NULL
+};
+
+static const char *script_ext_mode = script_ext_soft;
 
 /* Utility used everywhere when at least one argument is needed and
    none is supplied. */
@@ -444,19 +459,25 @@ cd_command (char *dir, int from_tty)
     pwd_command ((char *) 0, 1);
 }
 
-void
-source_script (char *file, int from_tty)
+/* Show the current value of the 'script-extension' option.  */
+
+static void
+show_script_ext_mode (struct ui_file *file, int from_tty,
+		     struct cmd_list_element *c, const char *value)
 {
-  FILE *stream;
-  struct cleanup *old_cleanups;
+  fprintf_filtered (file, _("\
+Script filename extension recognition is \"%s\".\n"),
+		    value);
+}
+
+static int
+find_and_open_script (int from_tty, char **filep, FILE **streamp,
+		      struct cleanup **cleanupp)
+{
+  char *file = *filep;
   char *full_pathname = NULL;
   int fd;
-  int is_python;
-
-  if (file == NULL || *file == 0)
-    {
-      error (_("source command requires file name of file to source."));
-    }
+  struct cleanup *old_cleanups;
 
   file = tilde_expand (file);
   old_cleanups = make_cleanup (xfree, file);
@@ -480,18 +501,56 @@ source_script (char *file, int from_tty)
       else
 	{
 	  do_cleanups (old_cleanups);
-	  return;
+	  return 0;
 	}
     }
 
-  is_python = source_python;
-  if (strlen (file) > 3 && !strcmp (&file[strlen (file) - 3], ".py"))
-    is_python = 1;
+  *streamp = fdopen (fd, FOPEN_RT);
+  *filep = file;
+  *cleanupp = old_cleanups;
 
-  stream = fdopen (fd, FOPEN_RT);
+  return 1;
+}
 
-  if (is_python)
-    source_python_script (stream, file);
+void
+source_script (char *file, int from_tty)
+{
+  FILE *stream;
+  struct cleanup *old_cleanups;
+
+  if (file == NULL || *file == 0)
+    {
+      error (_("source command requires file name of file to source."));
+    }
+
+  if (!find_and_open_script (from_tty, &file, &stream, &old_cleanups))
+    return;
+
+  if (script_ext_mode != script_ext_off
+      && strlen (file) > 3 && !strcmp (&file[strlen (file) - 3], ".py"))
+    {
+      volatile struct gdb_exception e;
+
+      TRY_CATCH (e, RETURN_MASK_ERROR)
+	{
+	  source_python_script (stream, file);
+	}
+      if (e.reason < 0)
+	{
+	  /* Should we fallback to ye olde GDB script mode?  */
+	  if (script_ext_mode == script_ext_soft
+	      && e.reason == RETURN_ERROR && e.error == UNSUPPORTED_ERROR)
+	    {
+	      if (!find_and_open_script (from_tty, &file, &stream, &old_cleanups))
+		return;
+
+	      script_from_file (stream, file);
+	    }
+	  else
+	    /* Nope, just punt.  */
+	    throw_exception (e);
+	}
+    }
   else
     script_from_file (stream, file);
 
@@ -507,30 +566,15 @@ source_verbose_cleanup (void *old_value)
   xfree (old_value);
 }
 
-/* A helper for source_command.  Look for an argument in *ARGS.
-   Update *ARGS by stripping leading whitespace.  If an argument is
-   found, return it (a character).  Otherwise, return 0.  */
-static int
-find_argument (char **args)
-{
-  int result = 0;
-  while (isspace ((*args)[0]))
-    ++*args;
-  if ((*args)[0] == '-' && isalpha ((*args)[1]))
-    {
-      result = (*args)[1];
-      *args += 3;
-    }
-  return result;
-}
-
 static void
 source_command (char *args, int from_tty)
 {
   struct cleanup *old_cleanups;
+  char *file = args;
+  int *old_source_verbose = xmalloc (sizeof(int));
 
-  old_cleanups = make_cleanup_restore_integer (&source_verbose);
-  make_cleanup_restore_integer (&source_python);
+  *old_source_verbose = source_verbose;
+  old_cleanups = make_cleanup (source_verbose_cleanup, old_source_verbose);
 
   /* -v causes the source command to run in verbose mode.
      We still have to be able to handle filenames with spaces in a
@@ -538,28 +582,23 @@ source_command (char *args, int from_tty)
 
   if (args)
     {
-      while (1)
+      /* Make sure leading white space does not break the comparisons.  */
+      while (isspace(args[0]))
+	args++;
+
+      /* Is -v the first thing in the string?  */
+      if (args[0] == '-' && args[1] == 'v' && isspace (args[2]))
 	{
-	  int arg = find_argument (&args);
-	  if (!arg)
-	    break;
-	  switch (arg)
-	    {
-	    case 'v':
-	      source_verbose = 1;
-	      break;
-	    case 'p':
-	      source_python = 1;
-	      break;
-	    default:
-	      error (_("unrecognized option -%c"), arg);
-	    }
+	  source_verbose = 1;
+
+	  /* Trim -v and whitespace from the filename.  */
+	  file = &args[3];
+	  while (isspace (file[0]))
+	    file++;
 	}
     }
 
-  source_script (args, from_tty);
-
-  do_cleanups (old_cleanups);
+  source_script (file, from_tty);
 }
 
 
@@ -1341,12 +1380,23 @@ Read commands from a file named FILE.\n\
 Optional -v switch (before the filename) causes each command in\n\
 FILE to be echoed as it is executed.\n\
 Note that the file \"%s\" is read automatically in this way\n\
-when GDB is started.\n\
-Optional -p switch (before the filename) causes FILE to be evaluated\n\
-as Python code."), gdbinit);
+when GDB is started."), gdbinit);
   c = add_cmd ("source", class_support, source_command,
 	       source_help_text, &cmdlist);
   set_cmd_completer (c, filename_completer);
+
+  add_setshow_enum_cmd ("script-extension", class_support,
+			script_ext_enums, &script_ext_mode, _("\
+Set mode for script filename extension recognition."), _("\
+Show mode for script filename extension recognition."), _("\
+off  == no filename extension recognition (all sourced files are GDB scripts)\n\
+soft == evaluate script according to filename extension, fallback to GDB script"
+  "\n\
+strict == evaluate script according to filename extension, error if not supported"
+  ),
+			NULL,
+			show_script_ext_mode,
+			&setlist, &showlist);
 
   add_com ("quit", class_support, quit_command, _("Exit gdb."));
   c = add_com ("help", class_support, help_command,
