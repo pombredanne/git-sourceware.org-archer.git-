@@ -854,6 +854,8 @@ operator_length_standard (struct expression *expr, int endpos,
 
     case BINOP_VAL:
     case UNOP_CAST:
+    case UNOP_DYNAMIC_CAST:
+    case UNOP_REINTERPRET_CAST:
     case UNOP_MEMVAL:
       oplen = 3;
       args = 1;

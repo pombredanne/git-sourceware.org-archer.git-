@@ -56,6 +56,7 @@
 #include "source.h"
 #include "observer.h"
 #include "vec.h"
+#include "stack.h"
 
 /* Define whether or not the C operator '/' truncates towards zero for
    differently signed operands (truncation direction is undefined in C). 
@@ -6687,7 +6688,7 @@ find_parallel_type_by_descriptive_type (struct type *type, const char *name)
      older compilers, the descriptive type information is either absent or
      irrelevant when it comes to packed arrays so the above lookup fails.
      Fall back to using a parallel lookup by name in this case.  */
-  if (result == NULL && ada_is_packed_array_type (type))
+  if (result == NULL && ada_is_constrained_packed_array_type (type))
     return ada_find_any_type (name);
 
   return result;
@@ -6929,14 +6930,16 @@ ada_template_to_fixed_record_type_1 (struct type *type,
         }
       else
         {
-          TYPE_FIELD_TYPE (rtype, f) = TYPE_FIELD_TYPE (type, f);
+          struct type *field_type = TYPE_FIELD_TYPE (type, f);
+
+          TYPE_FIELD_TYPE (rtype, f) = field_type;
           TYPE_FIELD_NAME (rtype, f) = TYPE_FIELD_NAME (type, f);
           if (TYPE_FIELD_BITSIZE (type, f) > 0)
             bit_incr = fld_bit_len =
               TYPE_FIELD_BITSIZE (rtype, f) = TYPE_FIELD_BITSIZE (type, f);
           else
             bit_incr = fld_bit_len =
-              TYPE_LENGTH (TYPE_FIELD_TYPE (type, f)) * TARGET_CHAR_BIT;
+              TYPE_LENGTH (ada_check_typedef (field_type)) * TARGET_CHAR_BIT;
         }
       if (off + fld_bit_len > bit_len)
         bit_len = off + fld_bit_len;
@@ -7573,22 +7576,6 @@ ada_to_fixed_value (struct value *val)
                                     value_address (val),
                                     val);
 }
-
-/* A value representing VAL, but with a standard (static-sized) type
-   chosen to approximate the real type of VAL as well as possible, but
-   without consulting any runtime values.  For Ada dynamic-sized
-   types, therefore, the type of the result is likely to be inaccurate.  */
-
-static struct value *
-ada_to_static_fixed_value (struct value *val)
-{
-  struct type *type =
-    to_static_fixed_type (static_unwrap_type (value_type (val)));
-  if (type == value_type (val))
-    return val;
-  else
-    return coerce_unspec_val_to_type (val, type);
-}
 
 
 /* Attributes */
@@ -7725,6 +7712,16 @@ ada_is_string_type (struct type *type)
     return 0;
 }
 
+/* The compiler sometimes provides a parallel XVS type for a given
+   PAD type.  Normally, it is safe to follow the PAD type directly,
+   but older versions of the compiler have a bug that causes the offset
+   of its "F" field to be wrong.  Following that field in that case
+   would lead to incorrect results, but this can be worked around
+   by ignoring the PAD type and using the associated XVS type instead.
+
+   Set to True if the debugger should trust the contents of PAD types.
+   Otherwise, ignore the PAD type if there is a parallel XVS type.  */
+static int trust_pad_over_xvs = 1;
 
 /* True if TYPE is a struct type introduced by the compiler to force the
    alignment of a value.  Such types have a single field with a
@@ -7735,10 +7732,7 @@ ada_is_aligner_type (struct type *type)
 {
   type = ada_check_typedef (type);
 
-  /* If we can find a parallel XVS type, then the XVS type should
-     be used instead of this type.  And hence, this is not an aligner
-     type.  */
-  if (ada_find_parallel_type (type, "___XVS") != NULL)
+  if (!trust_pad_over_xvs && ada_find_parallel_type (type, "___XVS") != NULL)
     return 0;
 
   return (TYPE_CODE (type) == TYPE_CODE_STRUCT
@@ -7779,11 +7773,20 @@ ada_get_base_type (struct type *raw_type)
       || TYPE_NFIELDS (real_type_namer) != 1)
     return raw_type;
 
-  raw_real_type = ada_find_any_type (TYPE_FIELD_NAME (real_type_namer, 0));
-  if (raw_real_type == NULL)
-    return raw_type;
-  else
-    return raw_real_type;
+  if (TYPE_CODE (TYPE_FIELD_TYPE (real_type_namer, 0)) != TYPE_CODE_REF)
+    {
+      /* This is an older encoding form where the base type needs to be
+	 looked up by name.  We prefer the newer enconding because it is
+	 more efficient.  */
+      raw_real_type = ada_find_any_type (TYPE_FIELD_NAME (real_type_namer, 0));
+      if (raw_real_type == NULL)
+	return raw_type;
+      else
+	return raw_real_type;
+    }
+
+  /* The field in our XVS type is a reference to the base type.  */
+  return TYPE_TARGET_TYPE (TYPE_FIELD_TYPE (real_type_namer, 0));
 }
 
 /* The type of value designated by TYPE, with all aligners removed.  */
@@ -7916,8 +7919,11 @@ unwrap_value (struct value *val)
       struct type *raw_real_type =
         ada_check_typedef (ada_get_base_type (type));
 
-      if (type == raw_real_type)
-        return val;
+      /* If there is no parallel XVS or XVE type, then the value is
+	 already unwrapped.  Return it without further modification.  */
+      if ((type == raw_real_type)
+	  && ada_find_parallel_type (type, "___XVE") == NULL)
+	return val;
 
       return
         coerce_unspec_val_to_type
@@ -10145,21 +10151,6 @@ ada_executable_changed_observer (void)
   exception_info = NULL;
 }
 
-/* Return the name of the function at PC, NULL if could not find it.
-   This function only checks the debugging information, not the symbol
-   table.  */
-
-static char *
-function_name_from_pc (CORE_ADDR pc)
-{
-  char *func_name;
-
-  if (!find_pc_partial_function (pc, &func_name, NULL, NULL))
-    return NULL;
-
-  return func_name;
-}
-
 /* True iff FRAME is very likely to be that of a function that is
    part of the runtime system.  This is all very heuristic, but is
    intended to be used as advice as to what frames are uninteresting
@@ -10170,6 +10161,7 @@ is_known_support_routine (struct frame_info *frame)
 {
   struct symtab_and_line sal;
   char *func_name;
+  enum language func_lang;
   int i;
 
   /* If this code does not have any debugging information (no symtab),
@@ -10205,7 +10197,7 @@ is_known_support_routine (struct frame_info *frame)
 
   /* Check whether the function is a GNAT-generated entity.  */
 
-  func_name = function_name_from_pc (get_frame_address_in_block (frame));
+  find_frame_funname (frame, &func_name, &func_lang);
   if (func_name == NULL)
     return 1;
 
@@ -10270,8 +10262,10 @@ ada_unhandled_exception_name_addr_from_raise (void)
 
   while (fi != NULL)
     {
-      const char *func_name =
-        function_name_from_pc (get_frame_address_in_block (fi));
+      char *func_name;
+      enum language func_lang;
+
+      find_frame_funname (fi, &func_name, &func_lang);
       if (func_name != NULL
           && strcmp (func_name, exception_info->catch_exception_sym) == 0)
         break; /* We found the frame we were looking for...  */
@@ -11406,10 +11400,54 @@ const struct language_defn ada_language_defn = {
 /* Provide a prototype to silence -Wmissing-prototypes.  */
 extern initialize_file_ftype _initialize_ada_language;
 
+/* Command-list for the "set/show ada" prefix command.  */
+static struct cmd_list_element *set_ada_list;
+static struct cmd_list_element *show_ada_list;
+
+/* Implement the "set ada" prefix command.  */
+
+static void
+set_ada_command (char *arg, int from_tty)
+{
+  printf_unfiltered (_(\
+"\"set ada\" must be followed by the name of a setting.\n"));
+  help_list (set_ada_list, "set ada ", -1, gdb_stdout);
+}
+
+/* Implement the "show ada" prefix command.  */
+
+static void
+show_ada_command (char *args, int from_tty)
+{
+  cmd_show_list (show_ada_list, from_tty, "");
+}
+
 void
 _initialize_ada_language (void)
 {
   add_language (&ada_language_defn);
+
+  add_prefix_cmd ("ada", no_class, set_ada_command,
+                  _("Prefix command for changing Ada-specfic settings"),
+                  &set_ada_list, "set ada ", 0, &setlist);
+
+  add_prefix_cmd ("ada", no_class, show_ada_command,
+                  _("Generic command for showing Ada-specific settings."),
+                  &show_ada_list, "show ada ", 0, &showlist);
+
+  add_setshow_boolean_cmd ("trust-PAD-over-XVS", class_obscure,
+                           &trust_pad_over_xvs, _("\
+Enable or disable an optimization trusting PAD types over XVS types"), _("\
+Show whether an optimization trusting PAD types over XVS types is activated"),
+                           _("\
+This is related to the encoding used by the GNAT compiler.  The debugger\n\
+should normally trust the contents of PAD types, but certain older versions\n\
+of GNAT have a bug that sometimes causes the information in the PAD type\n\
+to be incorrect.  Turning this setting \"off\" allows the debugger to\n\
+work around this bug.  It is always safe to turn this option \"off\", but\n\
+this incurs a slight performance penalty, so it is recommended to NOT change\n\
+this option to \"off\" unless necessary."),
+                            NULL, NULL, &set_ada_list, &show_ada_list);
 
   varsize_limit = 65536;
 
