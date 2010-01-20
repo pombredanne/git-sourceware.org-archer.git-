@@ -3480,19 +3480,6 @@ java_value_of_variable (struct varobj *var, enum varobj_display_formats format)
   return cplus_value_of_variable (var, format);
 }
 
-/* Iterate all the existing VAROBJs and call the FUNC callback for them with an
-   arbitrary caller supplied DATA pointer.  */
-
-static void
-all_varobjs (void (*func) (struct varobj *var, void *data), void *data)
-{
-  struct vlist **vlp, *vl;
-
-  for (vlp = varobj_table; vlp < varobj_table + VAROBJ_TABLE_SIZE; vlp++)
-    for (vl = *vlp; vl != NULL; vl = vl->next)
-      (*func) (vl->var, data);
-}
-
 /* Iterate all the existing _root_ VAROBJs and call the FUNC callback for them
    with an arbitrary caller supplied DATA pointer.  */
 
@@ -3511,43 +3498,6 @@ all_root_varobjs (void (*func) (struct varobj *var, void *data), void *data)
     }
 }
 
-/* Helper for varobj_types_mark_used.  Call type_mark_used for any TYPEs
-   referenced from this VAR.  */
-
-static void
-varobj_types_mark_used_iter (struct varobj *var, void *unused)
-{
-  /* Even FLOATING or IS_INVALID VARs with non-NULL TYPE references will
-     free them in free_variable.  Still EXP may also reference TYPEs
-     but these belong to SYMBOLs which should be always associated with
-     an OBJFILE (and therefore not useful to be type_mark_used).  */
-
-  type_mark_used (var->type);
-  if (var->value)
-    type_mark_used (value_type (var->value));
-
-  /* Check VAROBJROOTs only once during the varobj_types_mark_used pass.  */
-
-  if (var->root->rootvar == var)
-    {
-      if (var->root->exp)
-	exp_types_mark_used (var->root->exp);
-    }
-}
-
-/* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
-
-static void
-varobj_types_mark_used (void)
-{
-  /* Check all the VAROBJs, even non-root ones.  Child VAROBJs can reference
-     types from other OBJFILEs through TYPE_IS_OPAQUE resolutions by
-     check_typedef.  Such types references will not be interconnected into the
-     same TYPE_GROUP.  */
-
-  all_varobjs (varobj_types_mark_used_iter, NULL);
-}
-
 extern void _initialize_varobj (void);
 void
 _initialize_varobj (void)
