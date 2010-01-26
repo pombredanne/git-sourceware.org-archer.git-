@@ -1,3 +1,46 @@
+2010-01-26  Tom Tromey  <tromey@redhat.com>
+
+	PR exp/7643:
+	* gdb.base/printcmds.exp (test_print_string_constants): Remove
+	setup_kfail.
+
+2010-01-14  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/nsrecurs.exp: New test.
+	* gdb.cp/nsrecurs.cc: New test program.
+	* gdb.cp/nsstress.exp: New test.
+	* gdb.cp/nsstress.cc: New test program.
+	* gdb.cp/nsdecl.exp: New test.
+	* gdb.cp/nsdecl.cc: New test program.
+
+2010-01-26  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/namespace-using.exp: Add test for printing of namespaces
+	imported into file scope.
+	Marked test as xfail.
+	* gdb.cp/namespace-using.cc (marker5): New function.
+	* gdb.cp/shadow.exp: New test.
+	* gdb.cp/shadow.cc: New test program.
+	* gdb.cp/nsimport.exp: New test.
+	* gdb.cp/nsimport.cc: New test program.
+
+2010-01-25  Tom Tromey  <tromey@redhat.com>
+
+	PR gdb/11049:
+	* gdb.base/printcmds.exp (test_print_typedef_arrays): Add test
+	with "set print null-stop on".
+
+2010-01-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.arch/i386-bp_permanent.exp (Disassemble function '$function'):
+	Adjust it for DISASSEMBLY_OMIT_FNAME.
+
+2010-01-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR symtab/11199:
+	* gdb.dwarf2/member-ptr-forwardref.exp,
+	gdb.dwarf2/member-ptr-forwardref.S: New.
+
 2010-01-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* gdb.threads/watchthreads-reorder.c (gdbstop_mutex): Remove.
