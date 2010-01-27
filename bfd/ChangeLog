@@ -1,3 +1,26 @@
+2010-01-27  Tristan Gingold  <gingold@adacore.com>
+
+	* vms.h: Remove trailing spaces.
+	(struct hdr_struct): Remove unused hdr_c_cpr field.
+	(enum file_format_enum): Add comments.
+	* vms.c (vms_bfd_print_private_bfd_data): New function that
+	replaces the macro.
+	Remove trailing spaces.
+	* vms-misc.c: Improve comments.
+	(_bfd_vms_get_object_record): Also handle files without pads.
+	* vms-hdr.c (_bfd_vms_write_dbg): Fix format string.
+	* vms-gsd.c (struct flagdescstruct): Make name field const.
+	(gsyflagdesc): Fix typo.
+
+2010-01-27  Alan Modra  <amodra@gmail.com>
+
+	PR ld/11217
+	* elf64-ppc.c (struct ppc_link_hash_table): Add toc_bfd, toc_first_sec.
+	(ppc64_elf_setup_section_lists): Init them.
+	(ppc64_elf_next_toc_section): Don't partition multi-toc between .got
+	and .toc on the same input file.
+	(ppc64_elf_relocate_section): Correct GOT entry offset.
+
 2010-01-26  Tristan Gingold  <gingold@adacore.com>
 
 	* targets.c (BFD_JUMP_TABLE_ARCHIVE): Add initializer for write_ar_hdr.
