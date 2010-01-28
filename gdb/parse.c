@@ -1408,8 +1408,9 @@ operator_check_standard (struct expression *exp, int pos,
 	const struct symbol *const symbol = elts[pos + 2].symbol;
 	const struct obj_section *const section = SYMBOL_OBJ_SECTION (symbol);
 
-	/* Check objfile where the variable itself is placed.  */
-	if (section && objfile_func && (*objfile_func) (section->objfile, data))
+	/* Check objfile where the variable itself is placed.
+	   SYMBOL_OBJ_SECTION (symbol) may be NULL.  */
+	if (objfile_func && (*objfile_func) (SYMBOL_SYMTAB (symbol)->objfile, data))
 	  return 1;
 
 	/* Check objfile where is placed the code touching the variable.  */
