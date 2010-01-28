@@ -153,7 +153,8 @@ struct pending_signals
   struct pending_signals *prev;
 };
 
-#define PTRACE_ARG3_TYPE long
+#define PTRACE_ARG3_TYPE void *
+#define PTRACE_ARG4_TYPE void *
 #define PTRACE_XFER_TYPE long
 
 #ifdef HAVE_LINUX_REGSETS
@@ -385,7 +386,7 @@ handle_extended_wait (struct lwp_info *event_child, int wstat)
 	    warning ("wait returned unexpected status 0x%x", status);
 	}
 
-      ptrace (PTRACE_SETOPTIONS, new_pid, 0, PTRACE_O_TRACECLONE);
+      ptrace (PTRACE_SETOPTIONS, new_pid, 0, (PTRACE_ARG4_TYPE) PTRACE_O_TRACECLONE);
 
       ptid = ptid_build (pid_of (event_child), new_pid, 0);
       new_lwp = (struct lwp_info *) add_lwp (ptid);
@@ -451,7 +452,8 @@ handle_extended_wait (struct lwp_info *event_child, int wstat)
 static CORE_ADDR
 get_stop_pc (void)
 {
-  CORE_ADDR stop_pc = (*the_low_target.get_pc) ();
+  struct regcache *regcache = get_thread_regcache (current_inferior, 1);
+  CORE_ADDR stop_pc = (*the_low_target.get_pc) (regcache);
 
   if (! get_thread_lwp (current_inferior)->stepping)
     stop_pc -= the_low_target.decr_pc_after_break;
@@ -884,6 +886,7 @@ check_removed_breakpoint (struct lwp_info *event_child)
 {
   CORE_ADDR stop_pc;
   struct thread_info *saved_inferior;
+  struct regcache *regcache;
 
   if (event_child->pending_is_breakpoint == 0)
     return 0;
@@ -894,7 +897,7 @@ check_removed_breakpoint (struct lwp_info *event_child)
 
   saved_inferior = current_inferior;
   current_inferior = get_lwp_thread (event_child);
-
+  regcache = get_thread_regcache (current_inferior, 1);
   stop_pc = get_stop_pc ();
 
   /* If the PC has changed since we stopped, then we shouldn't do
@@ -930,7 +933,7 @@ check_removed_breakpoint (struct lwp_info *event_child)
     {
       if (debug_threads)
 	fprintf (stderr, "Set pc to 0x%lx\n", (long) stop_pc);
-      (*the_low_target.set_pc) (stop_pc);
+      (*the_low_target.set_pc) (regcache, stop_pc);
     }
 
   /* We consumed the pending SIGTRAP.  */
@@ -1063,11 +1066,12 @@ retry:
       && the_low_target.get_pc != NULL)
     {
       struct thread_info *saved_inferior = current_inferior;
+      struct regcache *regcache = get_thread_regcache (current_inferior, 1);
       CORE_ADDR pc;
 
       current_inferior = (struct thread_info *)
 	find_inferior_id (&all_threads, child->head.id);
-      pc = (*the_low_target.get_pc) ();
+      pc = (*the_low_target.get_pc) (regcache);
       fprintf (stderr, "linux_wait_for_lwp: pc is 0x%lx\n", (long) pc);
       current_inferior = saved_inferior;
     }
@@ -1181,7 +1185,7 @@ linux_wait_for_event_1 (ptid_t ptid, int *wstat, int options)
       if (event_child->must_set_ptrace_flags)
 	{
 	  ptrace (PTRACE_SETOPTIONS, lwpid_of (event_child),
-		  0, PTRACE_O_TRACECLONE);
+		  0, (PTRACE_ARG4_TYPE) PTRACE_O_TRACECLONE);
 	  event_child->must_set_ptrace_flags = 0;
 	}
 
@@ -1832,7 +1836,8 @@ linux_resume_one_lwp (struct lwp_info *lwp,
 
   if (debug_threads && the_low_target.get_pc != NULL)
     {
-      CORE_ADDR pc = (*the_low_target.get_pc) ();
+      struct regcache *regcache = get_thread_regcache (current_inferior, 1);
+      CORE_ADDR pc = (*the_low_target.get_pc) (regcache);
       fprintf (stderr, "  resuming from pc 0x%lx\n", (long) pc);
     }
 
@@ -1862,7 +1867,10 @@ linux_resume_one_lwp (struct lwp_info *lwp,
   errno = 0;
   lwp->stopped = 0;
   lwp->stepping = step;
-  ptrace (step ? PTRACE_SINGLESTEP : PTRACE_CONT, lwpid_of (lwp), 0, signal);
+  ptrace (step ? PTRACE_SINGLESTEP : PTRACE_CONT, lwpid_of (lwp), 0,
+	  /* Coerce to a uintptr_t first to avoid potential gcc warning
+	     of coercing an 8 byte integer to a 4 byte pointer.  */
+	  (PTRACE_ARG4_TYPE) (uintptr_t) signal);
 
   current_inferior = saved_inferior;
   if (errno)
@@ -2121,7 +2129,7 @@ register_addr (int regnum)
 
 /* Fetch one register.  */
 static void
-fetch_register (int regno)
+fetch_register (struct regcache *regcache, int regno)
 {
   CORE_ADDR regaddr;
   int i, size;
@@ -2145,7 +2153,10 @@ fetch_register (int regno)
     {
       errno = 0;
       *(PTRACE_XFER_TYPE *) (buf + i) =
-	ptrace (PTRACE_PEEKUSER, pid, (PTRACE_ARG3_TYPE) regaddr, 0);
+	ptrace (PTRACE_PEEKUSER, pid,
+		/* Coerce to a uintptr_t first to avoid potential gcc warning
+		   of coercing an 8 byte integer to a 4 byte pointer.  */
+		(PTRACE_ARG3_TYPE) (uintptr_t) regaddr, 0);
       regaddr += sizeof (PTRACE_XFER_TYPE);
       if (errno != 0)
 	{
@@ -2160,29 +2171,29 @@ fetch_register (int regno)
     }
 
   if (the_low_target.supply_ptrace_register)
-    the_low_target.supply_ptrace_register (regno, buf);
+    the_low_target.supply_ptrace_register (regcache, regno, buf);
   else
-    supply_register (regno, buf);
+    supply_register (regcache, regno, buf);
 
 error_exit:;
 }
 
 /* Fetch all registers, or just one, from the child process.  */
 static void
-usr_fetch_inferior_registers (int regno)
+usr_fetch_inferior_registers (struct regcache *regcache, int regno)
 {
   if (regno == -1)
     for (regno = 0; regno < the_low_target.num_regs; regno++)
-      fetch_register (regno);
+      fetch_register (regcache, regno);
   else
-    fetch_register (regno);
+    fetch_register (regcache, regno);
 }
 
 /* Store our register values back into the inferior.
    If REGNO is -1, do this for all registers.
    Otherwise, REGNO specifies which register (so we can save time).  */
 static void
-usr_store_inferior_registers (int regno)
+usr_store_inferior_registers (struct regcache *regcache, int regno)
 {
   CORE_ADDR regaddr;
   int i, size;
@@ -2207,16 +2218,19 @@ usr_store_inferior_registers (int regno)
       memset (buf, 0, size);
 
       if (the_low_target.collect_ptrace_register)
-	the_low_target.collect_ptrace_register (regno, buf);
+	the_low_target.collect_ptrace_register (regcache, regno, buf);
       else
-	collect_register (regno, buf);
+	collect_register (regcache, regno, buf);
 
       pid = lwpid_of (get_thread_lwp (current_inferior));
       for (i = 0; i < size; i += sizeof (PTRACE_XFER_TYPE))
 	{
 	  errno = 0;
-	  ptrace (PTRACE_POKEUSER, pid, (PTRACE_ARG3_TYPE) regaddr,
-		  *(PTRACE_XFER_TYPE *) (buf + i));
+	  ptrace (PTRACE_POKEUSER, pid,
+		/* Coerce to a uintptr_t first to avoid potential gcc warning
+		   about coercing an 8 byte integer to a 4 byte pointer.  */
+		  (PTRACE_ARG3_TYPE) (uintptr_t) regaddr,
+		  (PTRACE_ARG4_TYPE) *(PTRACE_XFER_TYPE *) (buf + i));
 	  if (errno != 0)
 	    {
 	      /* At this point, ESRCH should mean the process is
@@ -2241,7 +2255,7 @@ usr_store_inferior_registers (int regno)
     }
   else
     for (regno = 0; regno < the_low_target.num_regs; regno++)
-      usr_store_inferior_registers (regno);
+      usr_store_inferior_registers (regcache, regno);
 }
 #endif /* HAVE_LINUX_USRREGS */
 
@@ -2250,7 +2264,7 @@ usr_store_inferior_registers (int regno)
 #ifdef HAVE_LINUX_REGSETS
 
 static int
-regsets_fetch_inferior_registers ()
+regsets_fetch_inferior_registers (struct regcache *regcache)
 {
   struct regset_info *regset;
   int saw_general_regs = 0;
@@ -2296,7 +2310,7 @@ regsets_fetch_inferior_registers ()
 	}
       else if (regset->type == GENERAL_REGS)
 	saw_general_regs = 1;
-      regset->store_function (buf);
+      regset->store_function (regcache, buf);
       regset ++;
       free (buf);
     }
@@ -2307,7 +2321,7 @@ regsets_fetch_inferior_registers ()
 }
 
 static int
-regsets_store_inferior_registers ()
+regsets_store_inferior_registers (struct regcache *regcache)
 {
   struct regset_info *regset;
   int saw_general_regs = 0;
@@ -2341,7 +2355,7 @@ regsets_store_inferior_registers ()
       if (res == 0)
 	{
 	  /* Then overlay our cached registers on that.  */
-	  regset->fill_function (buf);
+	  regset->fill_function (regcache, buf);
 
 	  /* Only now do we write the register set.  */
 #ifndef __sparc__
@@ -2391,26 +2405,26 @@ regsets_store_inferior_registers ()
 
 
 void
-linux_fetch_registers (int regno)
+linux_fetch_registers (struct regcache *regcache, int regno)
 {
 #ifdef HAVE_LINUX_REGSETS
-  if (regsets_fetch_inferior_registers () == 0)
+  if (regsets_fetch_inferior_registers (regcache) == 0)
     return;
 #endif
 #ifdef HAVE_LINUX_USRREGS
-  usr_fetch_inferior_registers (regno);
+  usr_fetch_inferior_registers (regcache, regno);
 #endif
 }
 
 void
-linux_store_registers (int regno)
+linux_store_registers (struct regcache *regcache, int regno)
 {
 #ifdef HAVE_LINUX_REGSETS
-  if (regsets_store_inferior_registers () == 0)
+  if (regsets_store_inferior_registers (regcache) == 0)
     return;
 #endif
 #ifdef HAVE_LINUX_USRREGS
-  usr_store_inferior_registers (regno);
+  usr_store_inferior_registers (regcache, regno);
 #endif
 }
 
@@ -2468,7 +2482,10 @@ linux_read_memory (CORE_ADDR memaddr, unsigned char *myaddr, int len)
   for (i = 0; i < count; i++, addr += sizeof (PTRACE_XFER_TYPE))
     {
       errno = 0;
-      buffer[i] = ptrace (PTRACE_PEEKTEXT, pid, (PTRACE_ARG3_TYPE) addr, 0);
+      /* Coerce the 3rd arg to a uintptr_t first to avoid potential gcc warning
+	 about coercing an 8 byte integer to a 4 byte pointer.  */
+      buffer[i] = ptrace (PTRACE_PEEKTEXT, pid,
+			  (PTRACE_ARG3_TYPE) (uintptr_t) addr, 0);
       if (errno)
 	return errno;
     }
@@ -2515,14 +2532,19 @@ linux_write_memory (CORE_ADDR memaddr, const unsigned char *myaddr, int len)
 
   /* Fill start and end extra bytes of buffer with existing memory data.  */
 
-  buffer[0] = ptrace (PTRACE_PEEKTEXT, pid, (PTRACE_ARG3_TYPE) addr, 0);
+  /* Coerce the 3rd arg to a uintptr_t first to avoid potential gcc warning
+     about coercing an 8 byte integer to a 4 byte pointer.  */
+  buffer[0] = ptrace (PTRACE_PEEKTEXT, pid,
+		      (PTRACE_ARG3_TYPE) (uintptr_t) addr, 0);
 
   if (count > 1)
     {
       buffer[count - 1]
 	= ptrace (PTRACE_PEEKTEXT, pid,
-		  (PTRACE_ARG3_TYPE) (addr + (count - 1)
-				      * sizeof (PTRACE_XFER_TYPE)),
+		  /* Coerce to a uintptr_t first to avoid potential gcc warning
+		     about coercing an 8 byte integer to a 4 byte pointer.  */
+		  (PTRACE_ARG3_TYPE) (uintptr_t) (addr + (count - 1)
+						  * sizeof (PTRACE_XFER_TYPE)),
 		  0);
     }
 
@@ -2535,7 +2557,11 @@ linux_write_memory (CORE_ADDR memaddr, const unsigned char *myaddr, int len)
   for (i = 0; i < count; i++, addr += sizeof (PTRACE_XFER_TYPE))
     {
       errno = 0;
-      ptrace (PTRACE_POKETEXT, pid, (PTRACE_ARG3_TYPE) addr, buffer[i]);
+      ptrace (PTRACE_POKETEXT, pid,
+	      /* Coerce to a uintptr_t first to avoid potential gcc warning
+		 about coercing an 8 byte integer to a 4 byte pointer.  */
+	      (PTRACE_ARG3_TYPE) (uintptr_t) addr,
+	      (PTRACE_ARG4_TYPE) buffer[i]);
       if (errno)
 	return errno;
     }
@@ -2602,7 +2628,8 @@ linux_test_for_tracefork (void)
   if (! WIFSTOPPED (status))
     error ("linux_test_for_tracefork: waitpid: unexpected status %d.", status);
 
-  ret = ptrace (PTRACE_SETOPTIONS, child_pid, 0, PTRACE_O_TRACEFORK);
+  ret = ptrace (PTRACE_SETOPTIONS, child_pid, 0,
+		(PTRACE_ARG4_TYPE) PTRACE_O_TRACEFORK);
   if (ret != 0)
     {
       ret = ptrace (PTRACE_KILL, child_pid, 0, 0);

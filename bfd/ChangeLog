@@ -1,3 +1,123 @@
+2010-01-27  Tristan Gingold  <gingold@adacore.com>
+
+	* vms.h: Remove trailing spaces.
+	(struct hdr_struct): Remove unused hdr_c_cpr field.
+	(enum file_format_enum): Add comments.
+	* vms.c (vms_bfd_print_private_bfd_data): New function that
+	replaces the macro.
+	Remove trailing spaces.
+	* vms-misc.c: Improve comments.
+	(_bfd_vms_get_object_record): Also handle files without pads.
+	* vms-hdr.c (_bfd_vms_write_dbg): Fix format string.
+	* vms-gsd.c (struct flagdescstruct): Make name field const.
+	(gsyflagdesc): Fix typo.
+
+2010-01-27  Alan Modra  <amodra@gmail.com>
+
+	PR ld/11217
+	* elf64-ppc.c (struct ppc_link_hash_table): Add toc_bfd, toc_first_sec.
+	(ppc64_elf_setup_section_lists): Init them.
+	(ppc64_elf_next_toc_section): Don't partition multi-toc between .got
+	and .toc on the same input file.
+	(ppc64_elf_relocate_section): Correct GOT entry offset.
+
+2010-01-26  Tristan Gingold  <gingold@adacore.com>
+
+	* targets.c (BFD_JUMP_TABLE_ARCHIVE): Add initializer for write_ar_hdr.
+	(bfd_target): Add _bfd_write_ar_hdr_fn field.
+	* archive.c (is_bsd44_extended_name): New macro.
+	(_bfd_generic_read_ar_hdr_mag): Use it.  Add extra_size.
+	(bfd_slurp_armap): Also check for "__.SYMDEF" as a BSD4.4 extended
+	name.
+	(_bfd_archive_bsd44_construct_extended_name_table): New function.
+	(_bfd_generic_write_ar_hdr): Ditto.
+	(_bfd_bsd44_write_ar_hdr): Ditto.
+	(_bfd_write_archive_contents): Call _bfd_write_ar_hdr.
+	(bsd_write_armap): Adjust firstreal computation.
+	* libbfd-in.h (struct areltdata): Add extra_size field.
+	(_bfd_generic_write_ar_hdr): Add prototype.
+	(_bfd_bsd44_write_ar_hdr): Ditto.
+	(_bfd_write_ar_hdr): Define.
+	(_bfd_noarchive_write_ar_hdr): Ditto.
+	(_bfd_archive_bsd_write_ar_hdr): Ditto.
+	(_bfd_archive_coff_write_ar_hdr): Ditto.
+	(_bfd_archive_bsd44_slurp_armap): Ditto.
+	(_bfd_archive_bsd44_slurp_extended_name_table): Ditto.
+	(_bfd_archive_bsd44_construct_extended_name_table): New prototype.
+	(_bfd_archive_bsd44_truncate_arname): Ditto.
+	(_bfd_archive_bsd44_write_armap): Ditto.
+	(_bfd_archive_bsd44_read_ar_hdr): Ditto.
+	(_bfd_archive_bsd44_write_ar_hdr): Ditto.
+	(_bfd_archive_bsd44_openr_next_archived_file): Ditto.
+	(_bfd_archive_bsd44_get_elt_at_index): Ditto.
+	(_bfd_archive_bsd44_generic_stat_arch_elt): Ditto.
+	(_bfd_archive_bsd44_update_armap_timestamp): Ditto.
+	* libbfd.h: Regenerate.
+	* oasys.c (oasys_write_ar_hdr): Define.
+	* libecoff.h (_bfd_ecoff_write_ar_hdr): Define.
+	* ieee.c (ieee_write_ar_hdr): Define.
+	* elf64-mips.c (bfd_elf64_archive_write_ar_hdr): Define.
+	* coff-rs6000.c (rs6000coff_vec): Adjust for write_ar_hdr field.
+	(bfd_pmac_xcoff_backend_data): Ditto.
+	* coff64-rs6000.c (rs6000coff64_vec): Ditto.
+	(bfd_xcoff_aix5_backend_data): Ditto.
+	* coff-alpha.c (alpha_ecoff_write_ar_hdr): Define.
+	* aout-target.h (MY_write_ar_hdr): Define it if not defined.
+	* aout-tic30.c (MY_write_ar_hdr): Ditto.
+	* mach-o-target.c (TARGET_NAME): Use _bfd_archive_bsd44 archive.
+	(bfd_mach_o_mkarchive, bfd_mach_o_read_ar_hdr)
+	(bfd_mach_o_slurp_armap, bfd_mach_o_slurp_extended_name_table)
+	(bfd_mach_o_construct_extended_name_table)
+	(bfd_mach_o_truncate_arname, bfd_mach_o_write_armap)
+	(bfd_mach_o_get_elt_at_index, bfd_mach_o_generic_stat_arch_elt)
+	(bfd_mach_o_update_armap_timestamp): Moved to mach-o.c
+	* mach-o.c (bfd_mach_o_mkarchive, bfd_mach_o_read_ar_hdr)
+	(bfd_mach_o_slurp_armap, bfd_mach_o_slurp_extended_name_table)
+	(bfd_mach_o_construct_extended_name_table)
+	(bfd_mach_o_truncate_arname, bfd_mach_o_write_armap)
+	(bfd_mach_o_get_elt_at_index, bfd_mach_o_generic_stat_arch_elt)
+	(bfd_mach_o_update_armap_timestamp): Moved from mach-o-target.c
+	* bfd-in2.h: Regenerate.
+
+2010-01-26  Alan Modra  <amodra@gmail.com>
+	    H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/11218
+	* elflink.c (elf_link_output_extsym): Do not ignore undefined
+	symbols with ref_regular set when gc_sections is active.
+
+2010-01-25  Alan Modra  <amodra@gmail.com>
+
+	PR ld/11217
+	* elf64-ppc.c (ppc64_elf_tls_optimize): Optimize tls sequences
+	with relocations against undefined weak symbols.
+	(ppc64_elf_relocate_section): Don't optimize calls to undefined
+	weak functions if the symbol is dynamic.
+	(ppc64_elf_relocate_section): Edit tprel tls sequences.
+	* elf32-ppc.c (ppc_elf_relocate_section): Likewise.
+	(_bfd_elf_ppc_at_tprel_transform): New function.
+	* bfd-in.h (_bfd_elf_ppc_at_tprel_transform): Declare.
+	* bfd-in2.h: Regenerate.
+
+2010-01-23  Richard Sandiford  <r.sandiford@uk.ibm.com>
+
+	* coff-rs6000.c (xcoff_howto_table): Change size to 0 and bitsize to 1.
+	(_bfd_xcoff_reloc_type_lookup): Handle BFD_RELOC_NONE.
+	* coff64-rs6000.c (xcoff64_howto_table): Change size to 0 and
+	bitsize to 1.
+	(xcoff64_reloc_type_lookup): Handle BFD_RELOC_NONE.
+
+2010-01-21  Nick Clifton  <nickc@redhat.com>
+
+	* elflink.c (elf_link_add_object_symbols): Look up name of
+	undefined symbol both before and after versioning has been
+	applied.  Do not bother with symbols that are weakly undefined.
+
+2010-01-21  Andreas Krebbel  <Andreas.Krebbel@de.ibm.com>
+
+	* elf32-s390.c (elf32_s390_merge_private_bfd_data): New function.
+	(bfd_elf32_bfd_merge_private_bfd_data): New macro definition.
+
 2010-01-19  Cary Coutant  <ccoutant@google.com>
 
 	* dwarf2.c (read_attribute_value): Add DW_FORM_ref_sig8.

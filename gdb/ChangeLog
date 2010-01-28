@@ -1,3 +1,114 @@
+2010-01-28  Joel Brobecker  <brobecker@adacore.com>
+
+	Another -Wunused-function error in procfs.c (sparc-solaris)
+	* procfs.c (insert_dbx_link_breakpoint): Delete declaration.  Move up.
+	Only define if SYS_syssgi is defined.
+	(remove_dbx_link_breakpoint): Delete declaration.  Move up.
+	(dbx_link_addr, insert_dbx_link_bpt_in_file)
+	(insert_dbx_link_bpt_in_region): Move up.  Only define if SYS_syssgi
+	is itself defined.
+
+2010-01-27  Christopher Faylor  <me+cygwin@cgf.cx>
+
+	* windows-nat.c (windows_initialization_done): New variable.
+	(get_windows_debug_event): Issue error when process dies before
+	completely initializing.
+	(do_initial_windows_stuff): Set flag to indicate when we are done with
+	the initial steps of attaching to the child.
+
+2010-01-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symtab.h (struct symbol <symtab>): New comment on NULL values.
+
+2010-01-27  Doug Evans  <dje@google.com>
+
+	* solib-svr4.c (solib_break_names): Add __dl_rtld_db_dlactivity.
+
+	* breakpoint.c (bpstat_stop_status): Delete useless code.
+
+2010-01-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* printcmd.c (display_uses_solib_p): Remove variable section.  Access
+	objfile via SYMBOL_SYMTAB.
+
+2010-01-26  Tom Tromey  <tromey@redhat.com>
+
+	PR exp/7643:
+	* eval.c (evaluate_subexp_for_address) <UNOP_IND>: Call
+	coerce_array on result.
+
+2010-01-26  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* cp-namespace.c (cp_lookup_symbol_namespace): Added
+	search_parent argument.
+	(cp_add_using): Initialize 'searched' field.
+	(reset_directive_searched): New function.
+	* cp-support.h: Add 'searched' field to using_direct struct.
+	(cp_lookup_symbol_imports): Ditto.
+	* cp-namespace.c (cp_lookup_symbol_imports): Ditto.
+	Perform recursive search.
+	Implement non parent search.
+	* valops.c (value_maybe_namespace_elt): Updated.
+
+2010-01-26  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	PR gdb/10929:
+	* dwarf2read.c (read_lexical_block_scope): Create blocks for
+	scopes which contain using directives even if they contain no
+	declarations.
+	* symtab.c (lookup_symbol_aux): Pass lowest level block to
+	la_lookup_symbol_nonlocal.
+	* cp-namespace.c (cp_lookup_symbol_nonlocal): call
+	cp_lookup_symbol_namespace.
+	(cp_lookup_symbol_namespace): Perform an import lookup at every
+	block level.
+	(cp_lookup_symbol_imports): New function.
+	(cp_lookup_symbol_in_namespace): New function.
+
+2010-01-25  Tom Tromey  <tromey@redhat.com>
+
+	PR gdb/11049:
+	* c-valprint.c (c_val_print): Fix test of extract_unsigned_integer
+	result.
+
+2010-01-25  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* configure.ac: Only use host_os part when disabling TUI on osf.
+	Use test to check variables, prefix strings with x.
+	* configure: Regenerate.
+
+	* solib-osf.c (osf_current_sos): Initialize tail.
+
+2010-01-25  gingold  <gingold@adacore.com>
+
+        * windows-nat.c (windows_continue): Use %x to print thread id.
+        (get_windows_debug_event): Ditto.
+
+2010-01-22  Tom Tromey  <tromey@redhat.com>
+
+	PR symtab/11199:
+	* dwarf2read.c (quirk_gcc_member_function_pointer): Change return
+	type and arguments.  Use smash_to_methodptr_type.
+	(read_structure_type): Call quirk_gcc_member_function_pointer
+	later.
+	* gdbtypes.h (smash_to_methodptr_type): Declare.
+	* gdbtypes.c (smash_to_methodptr_type): New function.
+	(lookup_methodptr_type): Use it.
+
+2010-01-21  Tom Tromey  <tromey@redhat.com>
+
+	PR symtab/11198:
+	* symtab.h (lookup_minimal_symbol_and_objfile): Declare.
+	* minsyms.c (lookup_minimal_symbol_and_objfile): New function.
+	* glibc-tdep.c (find_minsym_and_objfile): Remove.
+	(glibc_skip_solib_resolver): Use
+	lookup_minimal_symbol_and_objfile.
+
+2010-01-21  Kai Tietz  <kai.tietz@onevision.com>
+
+	* inflow.c (check_syscall): Guard by #if clause for GO32 and
+	WIN32 targets.
+
 2010-01-20  Tom Tromey  <tromey@redhat.com>
 
 	PR backtrace/10770:

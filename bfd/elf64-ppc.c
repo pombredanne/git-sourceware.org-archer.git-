@@ -3732,6 +3732,8 @@ struct ppc_link_hash_table
 
   /* Temp used when calculating TOC pointers.  */
   bfd_vma toc_curr;
+  bfd *toc_bfd;
+  asection *toc_first_sec;
 
   /* Highest input section id.  */
   int top_id;
@@ -7409,10 +7411,13 @@ ppc64_elf_tls_optimize (bfd *obfd ATTRIBUTE_UNUSED, struct bfd_link_info *info)
 
 		  if (h != NULL)
 		    {
-		      if (h->root.type != bfd_link_hash_defined
-			  && h->root.type != bfd_link_hash_defweak)
+		      if (h->root.type == bfd_link_hash_defined
+			  || h->root.type == bfd_link_hash_defweak)
+			value = h->root.u.def.value;
+		      else if (h->root.type == bfd_link_hash_undefweak)
+			value = 0;
+		      else
 			continue;
-		      value = h->root.u.def.value;
 		    }
 		  else
 		    /* Symbols referenced by TLS relocs must be of type
@@ -7425,11 +7430,17 @@ ppc64_elf_tls_optimize (bfd *obfd ATTRIBUTE_UNUSED, struct bfd_link_info *info)
 		      || !h->def_dynamic)
 		    {
 		      is_local = TRUE;
-		      value += sym_sec->output_offset;
-		      value += sym_sec->output_section->vma;
-		      value -= htab->elf.tls_sec->vma;
-		      ok_tprel = (value + TP_OFFSET + ((bfd_vma) 1 << 31)
-				  < (bfd_vma) 1 << 32);
+		      if (h != NULL
+			  && h->root.type == bfd_link_hash_undefweak)
+			ok_tprel = TRUE;
+		      else
+			{
+			  value += sym_sec->output_offset;
+			  value += sym_sec->output_section->vma;
+			  value -= htab->elf.tls_sec->vma;
+			  ok_tprel = (value + TP_OFFSET + ((bfd_vma) 1 << 31)
+				      < (bfd_vma) 1 << 32);
+			}
 		    }
 
 		  r_type = ELF64_R_TYPE (rel->r_info);
@@ -9603,6 +9614,8 @@ ppc64_elf_setup_section_lists (bfd *output_bfd,
     htab->stub_group[id].toc_off = TOC_BASE_OFF;
 
   elf_gp (output_bfd) = htab->toc_curr = ppc64_elf_toc (output_bfd);
+  htab->toc_bfd = NULL;
+  htab->toc_first_sec = NULL;
 
   /* We can't use output_bfd->section_count here to find the top output
      section index as some sections may have been removed, and
@@ -9637,11 +9650,21 @@ ppc64_elf_next_toc_section (struct bfd_link_info *info, asection *isec)
 
   if (!htab->no_multi_toc)
     {
-      bfd_vma addr = isec->output_offset + isec->output_section->vma;
-      bfd_vma off = addr - htab->toc_curr;
+      bfd_vma addr, off;
 
+      if (htab->toc_bfd != isec->owner)
+	{
+	  htab->toc_bfd = isec->owner;
+	  htab->toc_first_sec = isec;
+	}
+      addr = isec->output_offset + isec->output_section->vma;
+      off = addr - htab->toc_curr;
       if (off + isec->size > 0x10000)
-	htab->toc_curr = addr;
+	{
+	  addr = (htab->toc_first_sec->output_offset
+		  + htab->toc_first_sec->output_section->vma);
+	  htab->toc_curr = addr;
+	}
 
       elf_gp (isec->owner) = (htab->toc_curr
 			      - elf_gp (isec->output_section->owner)
@@ -11498,6 +11521,7 @@ ppc64_elf_relocate_section (bfd *output_bfd,
 	     checking whether the function is defined.  */
 	  else if (h != NULL
 		   && h->elf.root.type == bfd_link_hash_undefweak
+		   && h->elf.dynindx == -1
 		   && r_type == R_PPC64_REL24
 		   && relocation == 0
 		   && addend == 0)
@@ -11735,10 +11759,8 @@ ppc64_elf_relocate_section (bfd *output_bfd,
 	    if (off >= (bfd_vma) -2)
 	      abort ();
 
-	    relocation = got->output_offset + off;
-
-	    /* TOC base (r2) is TOC start plus 0x8000.  */
-	    addend = -TOC_BASE_OFF;
+	    relocation = got->output_section->vma + got->output_offset + off;
+	    addend = -(TOCstart + htab->stub_group[input_section->id].toc_off);
 	  }
 	  break;
 
@@ -11833,6 +11855,22 @@ ppc64_elf_relocate_section (bfd *output_bfd,
 	case R_PPC64_TPREL16_HIGHERA:
 	case R_PPC64_TPREL16_HIGHEST:
 	case R_PPC64_TPREL16_HIGHESTA:
+	  if (h != NULL
+	      && h->elf.root.type == bfd_link_hash_undefweak
+	      && h->elf.dynindx == -1)
+	    {
+	      /* Make this relocation against an undefined weak symbol
+		 resolve to zero.  This is really just a tweak, since
+		 code using weak externs ought to check that they are
+		 defined before using them.  */
+	      bfd_byte *p = contents + rel->r_offset - d_offset;
+
+	      insn = bfd_get_32 (output_bfd, p);
+	      insn = _bfd_elf_ppc_at_tprel_transform (insn, 13);
+	      if (insn != 0)
+		bfd_put_32 (output_bfd, insn, p);
+	      break;
+	    }
 	  addend -= htab->elf.tls_sec->vma + TP_OFFSET;
 	  if (info->shared)
 	    /* The TPREL16 relocs shouldn't really be used in shared

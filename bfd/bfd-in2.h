@@ -8,7 +8,7 @@
 /* Main header file for the bfd library -- portable access to object files.
 
    Copyright 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
+   1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    Contributed by Cygnus Support.
@@ -917,6 +917,9 @@ extern bfd_boolean elf32_arm_fix_exidx_coverage
 
 /* PowerPC @tls opcode transform/validate.  */
 extern unsigned int _bfd_elf_ppc_at_tls_transform
+  (unsigned int, unsigned int);
+/* PowerPC @tprel opcode transform/validate.  */
+extern unsigned int _bfd_elf_ppc_at_tprel_transform
   (unsigned int, unsigned int);
 
 /* TI COFF load page support.  */
@@ -5521,6 +5524,7 @@ typedef struct bfd_target
   NAME##_truncate_arname, \
   NAME##_write_armap, \
   NAME##_read_ar_hdr, \
+  NAME##_write_ar_hdr, \
   NAME##_openr_next_archived_file, \
   NAME##_get_elt_at_index, \
   NAME##_generic_stat_arch_elt, \
@@ -5534,6 +5538,7 @@ typedef struct bfd_target
   bfd_boolean (*write_armap)
     (bfd *, unsigned int, struct orl *, unsigned int, int);
   void *      (*_bfd_read_ar_hdr_fn) (bfd *);
+  bfd_boolean (*_bfd_write_ar_hdr_fn) (bfd *, bfd *);
   bfd *       (*openr_next_archived_file) (bfd *, bfd *);
 #define bfd_get_elt_at_index(b,i) BFD_SEND (b, _bfd_get_elt_at_index, (b,i))
   bfd *       (*_bfd_get_elt_at_index) (bfd *, symindex);
