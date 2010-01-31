@@ -1,3 +1,82 @@
+2010-01-29  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* infrun.c (prepare_to_proceed): Handle other signals which might
+	match a breakpoint.
+	(handle_inferior_event): Move the check for unusual breakpoint
+	signals earlier.
+
+2010-01-29  Paul Hilfinger  <hilfinger@adacore.com>
+
+	amd64 - function returning record with field straddling 2 registers.
+	* amd64-tdep.c (amd_classify_aggregate): Handle the case of
+	a record of length <= 16 in which a field straddles the two
+	eightbytes.
+
+2010-01-29  Joel Brobecker  <brobecker@adacore.com>
+
+	Implement return values on amd64-windows.
+	* amd64-windows-tdep.c: #include gdbcore.h and regcache.h.
+	(amd64_windows_return_value): New function.
+	(amd64_windows_init_abi): Call set_gdbarch_return_value with
+	amd64_windows_return_value.
+
+2010-01-29  Joel Brobecker  <brobecker@adacore.com>
+
+	amd64-windows: 32 bytes allocated on stack by caller for integer
+	parameter registers.
+	* i386-tdep.h (struct gdbarch_tdep): Add new field
+	integer_param_regs_saved_in_caller_frame.
+	* amd64-windows-tdep.c (amd64_windows_init_abi): Set
+	tdep->integer_param_regs_saved_in_caller_frame to 1.
+	* amd64-tdep.c (amd64_push_dummy_call): Allocate some memory on
+	stack if tdep->integer_param_regs_saved_in_caller_frame is set.
+
+2010-01-29  Joel Brobecker  <brobecker@adacore.com>
+
+	amd64-windows: memory args passed by pointer during function calls.
+	* i386-tdep.h (gdbarch_tdep): Add field memory_args_by_pointer.
+	* amd64-tdep.c (amd64_push_arguments): Add handling of architectures
+	where tdep->memory_args_by_pointer is non-zero.
+	* amd64-windows-tdep.c (amd64_windows_init_abi): Set
+	tdep->memory_args_by_pointer to 1.
+
+2010-01-29  Joel Brobecker  <brobecker@adacore.com>
+
+	amd64-windows: Integer parameters in function calls.
+	* i386-tdep.h (enum amd64_reg_class): New, moved here from
+	amd64-tdep.c.
+	(struct gdbarch_tdep): Add fields call_dummy_num_integer_regs,
+	call_dummy_integer_regs, and classify.
+	* amd64-tdep.h (amd64_classify): Add declaration.
+	* amd64-tdep.c (amd64_dummy_call_integer_regs): New static constant.
+	(amd64_reg_class): Delete, moved to i386-tdep.h.
+	(amd64_classify): Make non-static.  Move declaration to amd64-tdep.h.
+	Replace call to amd64_classify by call to tdep->classify.
+	(amd64_push_arguments): Get the list of registers to use for
+	passing integer parameters from the gdbarch tdep structure,
+	rather than using a hardcoded one.  Replace calls to amd64_classify
+	by calls to tdep->classify.
+	(amd64_push_dummy_call): Get the register number used for
+	the "hidden" argument from tdep->call_dummy_integer_regs.
+	(amd64_init_abi): Initialize tdep->call_dummy_num_integer_regs
+	and tdep->call_dummy_integer_regs.  Set tdep->classify.
+	* amd64-windows-tdep.c: Add include of gdbtypes.h.
+	(amd64_windows_dummy_call_integer_regs): New static global.
+	(amd64_windows_classify): New function.
+	(amd64_windows_init_abi): Initialize tdep->call_dummy_num_integer_regs
+	tdep->call_dummy_integer_regs and tdep->classify.
+
+2010-01-28  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* regcache.c (regcache_xmalloc): Add aspace argument.  Use it
+	for the new regcache.  All callers updated.
+	(regcache_cpy, regcache_cpy_no_passthrough): Do not set aspace here.
+	(get_thread_arch_regcache): Do not set aspace here.
+	* regcache.h (regcache_xmalloc): Update declaration.
+
+	* frame.c, infcall.c, ppc-linux-tdep.c: Calls to
+	regcache_xmalloc updated.
+
 2010-01-28  Joel Brobecker  <brobecker@adacore.com>
 
 	Another -Wunused-function error in procfs.c (sparc-solaris)
