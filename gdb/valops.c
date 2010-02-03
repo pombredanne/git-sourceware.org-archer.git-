@@ -250,10 +250,33 @@ value_cast_structs (struct type *type, struct value *v2)
 
   /* Downcasting: look in the type of the target to see if it contains the
      type of the source as a superclass.  If so, we'll need to
-     offset the pointer rather than just change its type.
-     FIXME: This fails silently with virtual inheritance.  */
+     offset the pointer rather than just change its type.  */
   if (TYPE_NAME (t2) != NULL)
     {
+      /* Try downcasting using the run-time type of the value.  */
+      int full, top, using_enc;
+      struct type *real_type;
+
+      real_type = value_rtti_type (v2, &full, &top, &using_enc);
+      if (real_type)
+	{
+	  v = value_full_object (v2, real_type, full, top, using_enc);
+	  v = value_at_lazy (real_type, value_address (v));
+
+	  /* We might be trying to cast to the outermost enclosing
+	     type, in which case search_struct_field won't work.  */
+	  if (TYPE_NAME (real_type) != NULL
+	      && !strcmp (TYPE_NAME (real_type), TYPE_NAME (t1)))
+	    return v;
+
+	  v = search_struct_field (type_name_no_tag (t2), v, 0, real_type, 1);
+	  if (v)
+	    return v;
+	}
+
+      /* Try downcasting using information from the destination type
+	 T2.  This wouldn't work properly for classes with virtual
+	 bases, but those were handled above.  */
       v = search_struct_field (type_name_no_tag (t2),
 			       value_zero (t1, not_lval), 0, t1, 1);
       if (v)
@@ -1785,9 +1808,10 @@ search_struct_field (char *name, struct value *arg1, int offset,
 		     struct type *type, int looking_for_baseclass)
 {
   int i;
-  int nbases = TYPE_N_BASECLASSES (type);
+  int nbases;
 
   CHECK_TYPEDEF (type);
+  nbases = TYPE_N_BASECLASSES (type);
 
   if (!looking_for_baseclass)
     for (i = TYPE_NFIELDS (type) - 1; i >= nbases; i--)
@@ -2761,6 +2785,9 @@ check_field (struct type *type, const char *name)
 {
   int i;
 
+  /* The type may be a stub.  */
+  CHECK_TYPEDEF (type);
+
   for (i = TYPE_NFIELDS (type) - 1; i >= TYPE_N_BASECLASSES (type); i--)
     {
       char *t_field_name = TYPE_FIELD_NAME (type, i);
@@ -3096,7 +3123,7 @@ value_maybe_namespace_elt (const struct type *curtype,
 
   sym = cp_lookup_symbol_namespace (namespace_name, name, NULL,
 				    get_selected_block (0), 
-				    VAR_DOMAIN);
+				    VAR_DOMAIN, 1);
 
   if (sym == NULL)
     return NULL;

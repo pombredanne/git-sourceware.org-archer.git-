@@ -698,10 +698,7 @@ lookup_methodptr_type (struct type *to_type)
   struct type *mtype;
 
   mtype = alloc_type_copy (to_type);
-  TYPE_TARGET_TYPE (mtype) = to_type;
-  TYPE_DOMAIN_TYPE (mtype) = TYPE_DOMAIN_TYPE (to_type);
-  TYPE_LENGTH (mtype) = cplus_method_ptr_size (to_type);
-  TYPE_CODE (mtype) = TYPE_CODE_METHODPTR;
+  smash_to_methodptr_type (mtype, to_type);
   return mtype;
 }
 
@@ -1006,6 +1003,22 @@ smash_to_memberptr_type (struct type *type, struct type *domain,
   TYPE_CODE (type) = TYPE_CODE_MEMBERPTR;
 }
 
+/* Smash TYPE to be a type of pointer to methods type TO_TYPE.
+
+   When "smashing" the type, we preserve the objfile that the old type
+   pointed to, since we aren't changing where the type is actually
+   allocated.  */
+
+void
+smash_to_methodptr_type (struct type *type, struct type *to_type)
+{
+  smash_type (type);
+  TYPE_TARGET_TYPE (type) = to_type;
+  TYPE_DOMAIN_TYPE (type) = TYPE_DOMAIN_TYPE (to_type);
+  TYPE_LENGTH (type) = cplus_method_ptr_size (to_type);
+  TYPE_CODE (type) = TYPE_CODE_METHODPTR;
+}
+
 /* Smash TYPE to be a type of method of DOMAIN with type TO_TYPE.
    METHOD just means `function that gets an extra "this" argument'.
 
@@ -1143,13 +1156,6 @@ lookup_union (char *name, struct block *block)
 
   if (TYPE_CODE (t) == TYPE_CODE_UNION)
     return t;
-
-  /* C++ unions may come out with TYPE_CODE_CLASS, but we look at
-   * a further "declared_type" field to discover it is really a union.
-   */
-  if (HAVE_CPLUS_STRUCT (t))
-    if (TYPE_DECLARED_TYPE (t) == DECLARED_TYPE_UNION)
-      return t;
 
   /* If we get here, it's not a union.  */
   error (_("This context has class, struct or enum %s, not a union."), 

@@ -1,3 +1,303 @@
+2010-02-02  Tom Tromey  <tromey@redhat.com>
+
+	* valops.c (value_cast_structs): Try downcasting using the RTTI
+	type.
+
+2010-02-02  Tom Tromey  <tromey@redhat.com>
+
+	* gnu-v2-abi.c: Don't include gnu-v2-abi.h.
+	(gnuv2_baseclass_offset): Now static.
+	* Makefile.in (HFILES_NO_SRCDIR): Remove gnu-v2-abi.h.
+	* gnu-v2-abi.h: Remove.
+
+2010-02-02  Tom Tromey  <tromey@redhat.com>
+
+	* m2-typeprint.c (m2_record_fields): Don't use
+	TYPE_DECLARED_TYPE.
+	* gdbtypes.h (TYPE_DECLARED_CLASS): New macro.
+	(struct main_type) <flag_declared_class>: New field.
+	(struct cplus_struct_type) <declared_type>: Remove.
+	<ntemplate_args>: Move earlier.
+	(DECLARED_TYPE_CLASS, DECLARED_TYPE_UNION, DECLARED_TYPE_STRUCT)
+	(DECLARED_TYPE_TEMPLATE): Remove.
+	(TYPE_DECLARED_TYPE): Remove.
+	* gdbtypes.c (lookup_union): Don't use TYPE_DECLARED_TYPE.
+	* dwarf2read.c (read_structure_type): Set TYPE_DECLARED_CLASS.
+	* c-typeprint.c (c_type_print_base): Use TYPE_DECLARED_CLASS, not
+	TYPE_DECLARED_TYPE.
+
+2010-02-02  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/11226, PR c++/9629, PR c++/9688, PR c++/8890:
+	* valops.c (search_struct_field): Compute nbases after calling
+	CHECK_TYPEDEF.
+	(check_field): Call CHECK_TYPEDEF.
+	* cp-valprint.c (cp_print_value): Pass correct address to
+	baseclass_offset.  Fix check for virtual base past the end of the
+	object.  Don't offset address passed to cp_print_value_fields or
+	apply_val_pretty_printer.
+	(cp_print_value_fields): Fix call to val_print.
+	(cp_print_value_fields_rtti): New function.
+	* c-valprint.c (c_val_print): Use cp_print_value_fields_rtti.
+	* p-valprint.c (pascal_object_print_value_fields): Fix call to
+	val_print.
+	* python/py-prettyprint.c (apply_val_pretty_printer): Add embedded
+	offset to address.
+	* language.h (struct language_defn) <la_val_print>: Document.
+	* c-lang.h (cp_print_value_fields_rtti): Declare.
+
+2010-02-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR libc/11214:
+	* linux-low.c (linux_tracefork_child) [!(__UCLIBC__ && HAS_NOMMU)]: New.
+	(linux_test_for_tracefork): Move `stack' into [__UCLIBC__ && HAS_NOMMU].
+	(linux_test_for_tracefork) [!(__UCLIBC__ && HAS_NOMMU)]: New.
+
+2010-02-01  Michael Matz  <matz@suse.de>
+	    Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* i386-tdep.c (i386_frame_cache): Assume valid anonymous
+	functions use a frame pointer.
+
+2010-02-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* solib-svr4.c (scan_dyntag): New variable dyn_addr.  Replace gdb_assert
+	by a conditional setting DYN_ADDR.  Use DYN_ADDR.
+	* config/djgpp/fnchange.lst: Add translations for
+	symbol-without-target_section.exp and symbol-without-target_section.c.
+
+2010-02-01  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdbarch.sh: Set LANG and LC_ALL to C, not c.
+	(remote_breakpoint_for_pc): Correct invalid_p check.
+	* gdbarch.c: Regenerated.
+
+2010-02-01  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* arm-tdep.c (arm_find_mapping_symbol): New function, from
+	arm_pc_is_thumb.
+	(arm_pc_is_thumb): Use arm_find_mapping_symbol.
+	(extend_buffer_earlier): New function.
+	(MAX_IT_BLOCK_PREFIX, IT_SCAN_THRESHOLD): New constants.
+	(arm_adjust_breakpoint_address): New function.
+	(arm_gdbarch_init): Register arm_adjust_breakpoint_address.
+
+2010-02-01  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* arm-linux-tdep.c (arm_linux_thumb2_be_breakpoint)
+	(arm_linux_thumb2_le_breakpoint): New constants.
+	(arm_linux_init_abi): Set thumb2_breakpoint and
+	thumb2_breakpoint_size.
+	* arm-tdep.c (thumb_insn_size, thumb_advance_itstate): New functions.
+	(thumb_get_next_pc): Add a comment.  Rename IT to ITSTATE.
+	Implement support for single stepping through IT blocks if
+	a 32-bit Thumb breakpoint instruction is available.
+	(arm_breakpoint_from_pc): If a 32-bit Thumb breakpoint instruction
+	is available, use it when needed.
+	(arm_remote_breakpoint_from_pc): New function.
+	(arm_gdbarch_init): Register arm_remote_breakpoint_from_pc.
+	* arm-tdep.h (struct gdbarch_tdep): Correct thumb_breakpoint
+	comment.  Add thumb2_breakpoint and thumb2_breakpoint_size.
+
+2010-02-01  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* arch-utils.c (default_remote_breakpoint_from_pc): New function.
+	* arch-utils.h (default_remote_breakpoint_from_pc): Declare.
+	* gdbarch.c, gdbarch.h: Regenerated.
+	* gdbarch.sh (remote_breakpoint_from_pc): New architecture method.
+	* remote.c (remote_insert_breakpoint, remote_insert_hw_breakpoint): Use
+	gdbarch_remote_breakpoint_from_pc.
+
+2010-01-29  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* infrun.c (prepare_to_proceed): Handle other signals which might
+	match a breakpoint.
+	(handle_inferior_event): Move the check for unusual breakpoint
+	signals earlier.
+
+2010-01-29  Paul Hilfinger  <hilfinger@adacore.com>
+
+	amd64 - function returning record with field straddling 2 registers.
+	* amd64-tdep.c (amd_classify_aggregate): Handle the case of
+	a record of length <= 16 in which a field straddles the two
+	eightbytes.
+
+2010-01-29  Joel Brobecker  <brobecker@adacore.com>
+
+	Implement return values on amd64-windows.
+	* amd64-windows-tdep.c: #include gdbcore.h and regcache.h.
+	(amd64_windows_return_value): New function.
+	(amd64_windows_init_abi): Call set_gdbarch_return_value with
+	amd64_windows_return_value.
+
+2010-01-29  Joel Brobecker  <brobecker@adacore.com>
+
+	amd64-windows: 32 bytes allocated on stack by caller for integer
+	parameter registers.
+	* i386-tdep.h (struct gdbarch_tdep): Add new field
+	integer_param_regs_saved_in_caller_frame.
+	* amd64-windows-tdep.c (amd64_windows_init_abi): Set
+	tdep->integer_param_regs_saved_in_caller_frame to 1.
+	* amd64-tdep.c (amd64_push_dummy_call): Allocate some memory on
+	stack if tdep->integer_param_regs_saved_in_caller_frame is set.
+
+2010-01-29  Joel Brobecker  <brobecker@adacore.com>
+
+	amd64-windows: memory args passed by pointer during function calls.
+	* i386-tdep.h (gdbarch_tdep): Add field memory_args_by_pointer.
+	* amd64-tdep.c (amd64_push_arguments): Add handling of architectures
+	where tdep->memory_args_by_pointer is non-zero.
+	* amd64-windows-tdep.c (amd64_windows_init_abi): Set
+	tdep->memory_args_by_pointer to 1.
+
+2010-01-29  Joel Brobecker  <brobecker@adacore.com>
+
+	amd64-windows: Integer parameters in function calls.
+	* i386-tdep.h (enum amd64_reg_class): New, moved here from
+	amd64-tdep.c.
+	(struct gdbarch_tdep): Add fields call_dummy_num_integer_regs,
+	call_dummy_integer_regs, and classify.
+	* amd64-tdep.h (amd64_classify): Add declaration.
+	* amd64-tdep.c (amd64_dummy_call_integer_regs): New static constant.
+	(amd64_reg_class): Delete, moved to i386-tdep.h.
+	(amd64_classify): Make non-static.  Move declaration to amd64-tdep.h.
+	Replace call to amd64_classify by call to tdep->classify.
+	(amd64_push_arguments): Get the list of registers to use for
+	passing integer parameters from the gdbarch tdep structure,
+	rather than using a hardcoded one.  Replace calls to amd64_classify
+	by calls to tdep->classify.
+	(amd64_push_dummy_call): Get the register number used for
+	the "hidden" argument from tdep->call_dummy_integer_regs.
+	(amd64_init_abi): Initialize tdep->call_dummy_num_integer_regs
+	and tdep->call_dummy_integer_regs.  Set tdep->classify.
+	* amd64-windows-tdep.c: Add include of gdbtypes.h.
+	(amd64_windows_dummy_call_integer_regs): New static global.
+	(amd64_windows_classify): New function.
+	(amd64_windows_init_abi): Initialize tdep->call_dummy_num_integer_regs
+	tdep->call_dummy_integer_regs and tdep->classify.
+
+2010-01-28  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* regcache.c (regcache_xmalloc): Add aspace argument.  Use it
+	for the new regcache.  All callers updated.
+	(regcache_cpy, regcache_cpy_no_passthrough): Do not set aspace here.
+	(get_thread_arch_regcache): Do not set aspace here.
+	* regcache.h (regcache_xmalloc): Update declaration.
+
+	* frame.c, infcall.c, ppc-linux-tdep.c: Calls to
+	regcache_xmalloc updated.
+
+2010-01-28  Joel Brobecker  <brobecker@adacore.com>
+
+	Another -Wunused-function error in procfs.c (sparc-solaris)
+	* procfs.c (insert_dbx_link_breakpoint): Delete declaration.  Move up.
+	Only define if SYS_syssgi is defined.
+	(remove_dbx_link_breakpoint): Delete declaration.  Move up.
+	(dbx_link_addr, insert_dbx_link_bpt_in_file)
+	(insert_dbx_link_bpt_in_region): Move up.  Only define if SYS_syssgi
+	is itself defined.
+
+2010-01-27  Christopher Faylor  <me+cygwin@cgf.cx>
+
+	* windows-nat.c (windows_initialization_done): New variable.
+	(get_windows_debug_event): Issue error when process dies before
+	completely initializing.
+	(do_initial_windows_stuff): Set flag to indicate when we are done with
+	the initial steps of attaching to the child.
+
+2010-01-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symtab.h (struct symbol <symtab>): New comment on NULL values.
+
+2010-01-27  Doug Evans  <dje@google.com>
+
+	* solib-svr4.c (solib_break_names): Add __dl_rtld_db_dlactivity.
+
+	* breakpoint.c (bpstat_stop_status): Delete useless code.
+
+2010-01-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* printcmd.c (display_uses_solib_p): Remove variable section.  Access
+	objfile via SYMBOL_SYMTAB.
+
+2010-01-26  Tom Tromey  <tromey@redhat.com>
+
+	PR exp/7643:
+	* eval.c (evaluate_subexp_for_address) <UNOP_IND>: Call
+	coerce_array on result.
+
+2010-01-26  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* cp-namespace.c (cp_lookup_symbol_namespace): Added
+	search_parent argument.
+	(cp_add_using): Initialize 'searched' field.
+	(reset_directive_searched): New function.
+	* cp-support.h: Add 'searched' field to using_direct struct.
+	(cp_lookup_symbol_imports): Ditto.
+	* cp-namespace.c (cp_lookup_symbol_imports): Ditto.
+	Perform recursive search.
+	Implement non parent search.
+	* valops.c (value_maybe_namespace_elt): Updated.
+
+2010-01-26  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	PR gdb/10929:
+	* dwarf2read.c (read_lexical_block_scope): Create blocks for
+	scopes which contain using directives even if they contain no
+	declarations.
+	* symtab.c (lookup_symbol_aux): Pass lowest level block to
+	la_lookup_symbol_nonlocal.
+	* cp-namespace.c (cp_lookup_symbol_nonlocal): call
+	cp_lookup_symbol_namespace.
+	(cp_lookup_symbol_namespace): Perform an import lookup at every
+	block level.
+	(cp_lookup_symbol_imports): New function.
+	(cp_lookup_symbol_in_namespace): New function.
+
+2010-01-25  Tom Tromey  <tromey@redhat.com>
+
+	PR gdb/11049:
+	* c-valprint.c (c_val_print): Fix test of extract_unsigned_integer
+	result.
+
+2010-01-25  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* configure.ac: Only use host_os part when disabling TUI on osf.
+	Use test to check variables, prefix strings with x.
+	* configure: Regenerate.
+
+	* solib-osf.c (osf_current_sos): Initialize tail.
+
+2010-01-25  gingold  <gingold@adacore.com>
+
+        * windows-nat.c (windows_continue): Use %x to print thread id.
+        (get_windows_debug_event): Ditto.
+
+2010-01-22  Tom Tromey  <tromey@redhat.com>
+
+	PR symtab/11199:
+	* dwarf2read.c (quirk_gcc_member_function_pointer): Change return
+	type and arguments.  Use smash_to_methodptr_type.
+	(read_structure_type): Call quirk_gcc_member_function_pointer
+	later.
+	* gdbtypes.h (smash_to_methodptr_type): Declare.
+	* gdbtypes.c (smash_to_methodptr_type): New function.
+	(lookup_methodptr_type): Use it.
+
+2010-01-21  Tom Tromey  <tromey@redhat.com>
+
+	PR symtab/11198:
+	* symtab.h (lookup_minimal_symbol_and_objfile): Declare.
+	* minsyms.c (lookup_minimal_symbol_and_objfile): New function.
+	* glibc-tdep.c (find_minsym_and_objfile): Remove.
+	(glibc_skip_solib_resolver): Use
+	lookup_minimal_symbol_and_objfile.
+
+2010-01-21  Kai Tietz  <kai.tietz@onevision.com>
+
+	* inflow.c (check_syscall): Guard by #if clause for GO32 and
+	WIN32 targets.
+
 2010-01-20  Tom Tromey  <tromey@redhat.com>
 
 	PR backtrace/10770:

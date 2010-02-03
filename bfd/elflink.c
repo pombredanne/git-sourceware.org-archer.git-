@@ -3999,6 +3999,20 @@ error_free_dyn:
 	  unsigned int vernum = 0;
 	  bfd_boolean skip;
 
+	  /* If this is a definition of a symbol which was previously
+	     referenced in a non-weak manner then make a note of the bfd
+	     that contained the reference.  This is used if we need to
+	     refer to the source of the reference later on.  */
+	  if (! bfd_is_und_section (sec))
+	    {
+	      h = elf_link_hash_lookup (elf_hash_table (info), name, FALSE, FALSE, FALSE);
+
+	      if (h != NULL
+		  && h->root.type == bfd_link_hash_undefined
+		  && h->root.u.undef.abfd)
+		undef_bfd = h->root.u.undef.abfd;
+	    }
+	  
 	  if (ever == NULL)
 	    {
 	      if (info->default_imported_symver)
@@ -4106,16 +4120,15 @@ error_free_dyn:
 	      name = newname;
 	    }
 
-	  /* If this is a definition of a previously undefined symbol
-	     make a note of the bfd that contained the reference in
-	     case we need to refer to it later on in error messages.  */
-	  if (! bfd_is_und_section (sec))
+	  /* If necessary, make a second attempt to locate the bfd
+	     containing an unresolved, non-weak reference to the
+	     current symbol.  */
+	  if (! bfd_is_und_section (sec) && undef_bfd == NULL)
 	    {
 	      h = elf_link_hash_lookup (elf_hash_table (info), name, FALSE, FALSE, FALSE);
 
 	      if (h != NULL
-		  && (h->root.type == bfd_link_hash_undefined
-		      || h->root.type == bfd_link_hash_undefweak)
+		  && h->root.type == bfd_link_hash_undefined
 		  && h->root.u.undef.abfd)
 		undef_bfd = h->root.u.undef.abfd;
 	    }
@@ -4455,12 +4468,14 @@ error_free_dyn:
 	      /* A symbol from a library loaded via DT_NEEDED of some
 		 other library is referenced by a regular object.
 		 Add a DT_NEEDED entry for it.  Issue an error if
-		 --no-add-needed is used.  */
-	      if ((elf_dyn_lib_class (abfd) & DYN_NO_NEEDED) != 0)
+		 --no-add-needed is used and the reference was not
+		 a weak one.  */
+	      if (undef_bfd != NULL
+		  && (elf_dyn_lib_class (abfd) & DYN_NO_NEEDED) != 0)
 		{
 		  (*_bfd_error_handler)
 		    (_("%B: undefined reference to symbol '%s'"),
-		     undef_bfd == NULL ? info->output_bfd : undef_bfd, name);
+		     undef_bfd, name);
 		  (*_bfd_error_handler)
 		    (_("note: '%s' is defined in DSO %B so try adding it to the linker command line"),
 		     abfd, name);
@@ -8564,7 +8579,9 @@ elf_link_output_extsym (struct elf_link_hash_entry *h, void *data)
     {
       /* If we have an undefined symbol reference here then it must have
 	 come from a shared library that is being linked in.  (Undefined
-	 references in regular files have already been handled).  */
+	 references in regular files have already been handled unless
+	 they are in unreferenced sections which are removed by garbage
+	 collection).  */
       bfd_boolean ignore_undef = FALSE;
 
       /* Some symbols may be special in that the fact that they're
@@ -8575,12 +8592,13 @@ elf_link_output_extsym (struct elf_link_hash_entry *h, void *data)
       /* If we are reporting errors for this situation then do so now.  */
       if (ignore_undef == FALSE
 	  && h->ref_dynamic
-	  && ! h->ref_regular
+	  && (!h->ref_regular || finfo->info->gc_sections)
 	  && ! elf_link_check_versioned_symbol (finfo->info, bed, h)
 	  && finfo->info->unresolved_syms_in_shared_libs != RM_IGNORE)
 	{
 	  if (! (finfo->info->callbacks->undefined_symbol
-		 (finfo->info, h->root.root.string, h->root.u.undef.abfd,
+		 (finfo->info, h->root.root.string,
+		  h->ref_regular ? NULL : h->root.u.undef.abfd,
 		  NULL, 0, finfo->info->unresolved_syms_in_shared_libs == RM_GENERATE_ERROR)))
 	    {
 	      eoinfo->failed = TRUE;
