@@ -1,3 +1,113 @@
+2010-02-02  Tom Tromey  <tromey@redhat.com>
+
+	* valops.c (value_cast_structs): Try downcasting using the RTTI
+	type.
+
+2010-02-02  Tom Tromey  <tromey@redhat.com>
+
+	* gnu-v2-abi.c: Don't include gnu-v2-abi.h.
+	(gnuv2_baseclass_offset): Now static.
+	* Makefile.in (HFILES_NO_SRCDIR): Remove gnu-v2-abi.h.
+	* gnu-v2-abi.h: Remove.
+
+2010-02-02  Tom Tromey  <tromey@redhat.com>
+
+	* m2-typeprint.c (m2_record_fields): Don't use
+	TYPE_DECLARED_TYPE.
+	* gdbtypes.h (TYPE_DECLARED_CLASS): New macro.
+	(struct main_type) <flag_declared_class>: New field.
+	(struct cplus_struct_type) <declared_type>: Remove.
+	<ntemplate_args>: Move earlier.
+	(DECLARED_TYPE_CLASS, DECLARED_TYPE_UNION, DECLARED_TYPE_STRUCT)
+	(DECLARED_TYPE_TEMPLATE): Remove.
+	(TYPE_DECLARED_TYPE): Remove.
+	* gdbtypes.c (lookup_union): Don't use TYPE_DECLARED_TYPE.
+	* dwarf2read.c (read_structure_type): Set TYPE_DECLARED_CLASS.
+	* c-typeprint.c (c_type_print_base): Use TYPE_DECLARED_CLASS, not
+	TYPE_DECLARED_TYPE.
+
+2010-02-02  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/11226, PR c++/9629, PR c++/9688, PR c++/8890:
+	* valops.c (search_struct_field): Compute nbases after calling
+	CHECK_TYPEDEF.
+	(check_field): Call CHECK_TYPEDEF.
+	* cp-valprint.c (cp_print_value): Pass correct address to
+	baseclass_offset.  Fix check for virtual base past the end of the
+	object.  Don't offset address passed to cp_print_value_fields or
+	apply_val_pretty_printer.
+	(cp_print_value_fields): Fix call to val_print.
+	(cp_print_value_fields_rtti): New function.
+	* c-valprint.c (c_val_print): Use cp_print_value_fields_rtti.
+	* p-valprint.c (pascal_object_print_value_fields): Fix call to
+	val_print.
+	* python/py-prettyprint.c (apply_val_pretty_printer): Add embedded
+	offset to address.
+	* language.h (struct language_defn) <la_val_print>: Document.
+	* c-lang.h (cp_print_value_fields_rtti): Declare.
+
+2010-02-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR libc/11214:
+	* linux-low.c (linux_tracefork_child) [!(__UCLIBC__ && HAS_NOMMU)]: New.
+	(linux_test_for_tracefork): Move `stack' into [__UCLIBC__ && HAS_NOMMU].
+	(linux_test_for_tracefork) [!(__UCLIBC__ && HAS_NOMMU)]: New.
+
+2010-02-01  Michael Matz  <matz@suse.de>
+	    Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* i386-tdep.c (i386_frame_cache): Assume valid anonymous
+	functions use a frame pointer.
+
+2010-02-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* solib-svr4.c (scan_dyntag): New variable dyn_addr.  Replace gdb_assert
+	by a conditional setting DYN_ADDR.  Use DYN_ADDR.
+	* config/djgpp/fnchange.lst: Add translations for
+	symbol-without-target_section.exp and symbol-without-target_section.c.
+
+2010-02-01  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdbarch.sh: Set LANG and LC_ALL to C, not c.
+	(remote_breakpoint_for_pc): Correct invalid_p check.
+	* gdbarch.c: Regenerated.
+
+2010-02-01  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* arm-tdep.c (arm_find_mapping_symbol): New function, from
+	arm_pc_is_thumb.
+	(arm_pc_is_thumb): Use arm_find_mapping_symbol.
+	(extend_buffer_earlier): New function.
+	(MAX_IT_BLOCK_PREFIX, IT_SCAN_THRESHOLD): New constants.
+	(arm_adjust_breakpoint_address): New function.
+	(arm_gdbarch_init): Register arm_adjust_breakpoint_address.
+
+2010-02-01  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* arm-linux-tdep.c (arm_linux_thumb2_be_breakpoint)
+	(arm_linux_thumb2_le_breakpoint): New constants.
+	(arm_linux_init_abi): Set thumb2_breakpoint and
+	thumb2_breakpoint_size.
+	* arm-tdep.c (thumb_insn_size, thumb_advance_itstate): New functions.
+	(thumb_get_next_pc): Add a comment.  Rename IT to ITSTATE.
+	Implement support for single stepping through IT blocks if
+	a 32-bit Thumb breakpoint instruction is available.
+	(arm_breakpoint_from_pc): If a 32-bit Thumb breakpoint instruction
+	is available, use it when needed.
+	(arm_remote_breakpoint_from_pc): New function.
+	(arm_gdbarch_init): Register arm_remote_breakpoint_from_pc.
+	* arm-tdep.h (struct gdbarch_tdep): Correct thumb_breakpoint
+	comment.  Add thumb2_breakpoint and thumb2_breakpoint_size.
+
+2010-02-01  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* arch-utils.c (default_remote_breakpoint_from_pc): New function.
+	* arch-utils.h (default_remote_breakpoint_from_pc): Declare.
+	* gdbarch.c, gdbarch.h: Regenerated.
+	* gdbarch.sh (remote_breakpoint_from_pc): New architecture method.
+	* remote.c (remote_insert_breakpoint, remote_insert_hw_breakpoint): Use
+	gdbarch_remote_breakpoint_from_pc.
+
 2010-01-29  Daniel Jacobowitz  <dan@codesourcery.com>
 
 	* infrun.c (prepare_to_proceed): Handle other signals which might
