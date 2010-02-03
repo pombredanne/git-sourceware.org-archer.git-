@@ -455,7 +455,8 @@ get_stop_pc (void)
   struct regcache *regcache = get_thread_regcache (current_inferior, 1);
   CORE_ADDR stop_pc = (*the_low_target.get_pc) (regcache);
 
-  if (! get_thread_lwp (current_inferior)->stepping)
+  if (! get_thread_lwp (current_inferior)->stepping
+      && WSTOPSIG (get_thread_lwp (current_inferior)->last_status) == SIGTRAP)
     stop_pc -= the_low_target.decr_pc_after_break;
 
   if (debug_threads)
@@ -1244,17 +1245,27 @@ linux_wait_for_event_1 (ptid_t ptid, int *wstat, int options)
 	  continue;
 	}
 
-      /* If this event was not handled above, and is not a SIGTRAP, report
-	 it.  */
-      if (!WIFSTOPPED (*wstat) || WSTOPSIG (*wstat) != SIGTRAP)
+      /* If this event was not handled above, and is not a SIGTRAP,
+	 report it.  SIGILL and SIGSEGV are also treated as traps in case
+	 a breakpoint is inserted at the current PC.  */
+      if (!WIFSTOPPED (*wstat)
+	  || (WSTOPSIG (*wstat) != SIGTRAP && WSTOPSIG (*wstat) != SIGILL
+	      && WSTOPSIG (*wstat) != SIGSEGV))
 	return lwpid_of (event_child);
 
       /* If this target does not support breakpoints, we simply report the
-	 SIGTRAP; it's of no concern to us.  */
+	 signal; it's of no concern to us.  */
       if (the_low_target.get_pc == NULL)
 	return lwpid_of (event_child);
 
       stop_pc = get_stop_pc ();
+
+      /* Only handle SIGILL or SIGSEGV if we've hit a recognized
+	 breakpoint.  */
+      if (WSTOPSIG (*wstat) != SIGTRAP
+	  && (event_child->stepping
+	      || ! (*the_low_target.breakpoint_at) (stop_pc)))
+	return lwpid_of (event_child);
 
       /* bp_reinsert will only be set if we were single-stepping.
 	 Notice that we will resume the process after hitting
@@ -2586,6 +2597,14 @@ linux_tracefork_child (void *arg)
 {
   ptrace (PTRACE_TRACEME, 0, 0, 0);
   kill (getpid (), SIGSTOP);
+
+#if !(defined(__UCLIBC__) && defined(HAS_NOMMU))
+
+  if (fork () == 0)
+    linux_tracefork_grandchild (NULL);
+
+#else /* defined(__UCLIBC__) && defined(HAS_NOMMU) */
+
 #ifdef __ia64__
   __clone2 (linux_tracefork_grandchild, arg, STACK_SIZE,
 	    CLONE_VM | SIGCHLD, NULL);
@@ -2593,6 +2612,9 @@ linux_tracefork_child (void *arg)
   clone (linux_tracefork_grandchild, arg + STACK_SIZE,
 	 CLONE_VM | SIGCHLD, NULL);
 #endif
+
+#endif /* defined(__UCLIBC__) && defined(HAS_NOMMU) */
+
   _exit (0);
 }
 
@@ -2605,18 +2627,31 @@ linux_test_for_tracefork (void)
 {
   int child_pid, ret, status;
   long second_pid;
+#if defined(__UCLIBC__) && defined(HAS_NOMMU)
   char *stack = xmalloc (STACK_SIZE * 4);
+#endif /* defined(__UCLIBC__) && defined(HAS_NOMMU) */
 
   linux_supports_tracefork_flag = 0;
+
+#if !(defined(__UCLIBC__) && defined(HAS_NOMMU))
+
+  child_pid = fork ();
+  if (child_pid == 0)
+    linux_tracefork_child (NULL);
+
+#else /* defined(__UCLIBC__) && defined(HAS_NOMMU) */
 
   /* Use CLONE_VM instead of fork, to support uClinux (no MMU).  */
 #ifdef __ia64__
   child_pid = __clone2 (linux_tracefork_child, stack, STACK_SIZE,
 			CLONE_VM | SIGCHLD, stack + STACK_SIZE * 2);
-#else
+#else /* !__ia64__ */
   child_pid = clone (linux_tracefork_child, stack + STACK_SIZE,
 		     CLONE_VM | SIGCHLD, stack + STACK_SIZE * 2);
-#endif
+#endif /* !__ia64__ */
+
+#endif /* defined(__UCLIBC__) && defined(HAS_NOMMU) */
+
   if (child_pid == -1)
     perror_with_name ("clone");
 
@@ -2685,7 +2720,9 @@ linux_test_for_tracefork (void)
     }
   while (WIFSTOPPED (status));
 
+#if defined(__UCLIBC__) && defined(HAS_NOMMU)
   free (stack);
+#endif /* defined(__UCLIBC__) && defined(HAS_NOMMU) */
 }
 
 

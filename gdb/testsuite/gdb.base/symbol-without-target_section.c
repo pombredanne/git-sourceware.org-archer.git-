@@ -1,8 +1,6 @@
-/* Abstraction of GNU v2 abi.
+/* This testcase is part of GDB, the GNU debugger.
 
-   Copyright (C) 2005, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
-
-   This file is part of GDB.
+   Copyright 2010 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,11 +15,4 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#ifndef GNU_V2_ABI_H
-#define GNU_V2_ABI_H
-
-extern int gnuv2_baseclass_offset (struct type *type, int index,
-				   const bfd_byte *valaddr,
-				   CORE_ADDR address);
-
-#endif
+int symbol_without_target_section;

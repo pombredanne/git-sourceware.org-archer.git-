@@ -1,3 +1,86 @@
+2010-02-02  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/virtbase.exp: Add regression tests.
+	* gdb.cp/virtbase.cc (RHA, RHB, RHC): New classes.
+	(main): Instantiate RHC.
+
+2010-02-02  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/member-ptr-forwardref.exp: Update expected result for
+	type-printing change.
+
+2010-02-02  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/11226, PR c++/9629, PR c++/9688, PR c++/8890:
+	* gdb.cp/virtbase.cc: New file.
+	* gdb.cp/virtbase.exp: New file.
+	* gdb.cp/userdef.exp: Allow 'struct' or 'class'.
+
+2010-02-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR libc/11214:
+	* gdb.threads/current-lwp-dead.c: Include features.h.
+	(HAS_NOMMU): New.
+	(fn, main): Move CLONE_VM into [__UCLIBC__ && HAS_NOMMU].
+
+2010-02-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/symbol-without-target_section.exp,
+	gdb.base/symbol-without-target_section.c: New.
+
+2010-02-01  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.base/bigcore.exp: Reset increased timeout.
+	* gdb.base/interrupt.exp: Match unexpected gdb prompt.
+
+2010-02-01  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.base/gcore.exp (capture_command_output): Use
+	gdb_test_multiple.
+
+2010-02-01  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.arch/thumb2-it.S (it_breakpoints): New function.
+	* gdb.arch/thumb2-it.exp (test_it_break): New function.
+	(Top level): Call it.
+
+2010-02-01  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.arch/thumb2-it.S, gdb.arch/thumb2-it.exp: New files.
+
+2010-01-29  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.base/call-strs.exp, gdb.base/default.exp,
+	gdb.base/ending-run.exp, gdb.base/finish.exp, gdb.base/funcargs.exp,
+	gdb.base/huge.exp, gdb.base/nodebug.exp, gdb.base/ptype.exp,
+	gdb.base/restore.exp, gdb.base/return.exp, gdb.base/setvar.exp,
+	gdb.base/watchpoints.exp, gdb.threads/gcore-thread.exp,
+	gdb.base/watchpoint-solib.exp: Save and restore timeout.
+	* gdb.base/ending-run.exp: Correct restore of timeout.
+	* gdb.base/page.exp: Remove unnecessary timeout setting.
+
+2010-01-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/rec_return: New testcase.
+
+2010-01-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/call_pn: New testcase.
+
+2010-01-28  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.mi/mi-nonstop.exp (mi_nonstop_resume): New function.
+	(Top level): Use it to resume.
+	* lib/mi-support.exp (mi_send_resuming_command_raw): Recognize
+	the Thumb mode displaced stepping error as unsupported.
+
+2010-01-28  Sami Wagiaalla  <swagiaal@redhat.com>
+
+    * gdb.cp/nsusing.exp: Added more tests.
+    * gdb.cp/nsrecurs.exp: Ditto.
+    * gdb.cp/nsusing.cc: Added test functions.
+    * gdb.cp/nsrecurs.cc: Ditto.
+
 2010-01-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* gdb.base/break-interp.exp: Use [file tail $filename] to omit any
