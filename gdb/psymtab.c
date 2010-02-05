@@ -1,6 +1,6 @@
 /* Partial symbol tables.
    
-   Copyright (C) 2009 Free Software Foundation, Inc.
+   Copyright (C) 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1339,7 +1339,6 @@ sort_pst_symbols (struct psymtab_state *state, struct partial_symtab *pst)
 struct partial_symtab *
 start_psymtab_common_full (struct psymtab_state *state,
 			   struct objfile *objfile,
-			   struct obstack *obstack,
 			   struct section_offsets *section_offsets,
 			   char *filename,
 			   CORE_ADDR textlow)
@@ -1348,7 +1347,7 @@ start_psymtab_common_full (struct psymtab_state *state,
 
   check_writeable (state);
 
-  psymtab = allocate_psymtab_full (state, filename, objfile, obstack);
+  psymtab = allocate_psymtab_full (state, filename, objfile);
   psymtab->section_offsets = section_offsets;
   psymtab->textlow = textlow;
   psymtab->texthigh = psymtab->textlow;		/* default */
@@ -1364,10 +1363,8 @@ start_psymtab_common (struct objfile *objfile,
 		      struct section_offsets *section_offsets, char *filename,
 		      CORE_ADDR textlow)
 {
-  return start_psymtab_common_full (objfile->psyms,
-				    objfile, &objfile->objfile_obstack,
-				    section_offsets, filename,
-				    textlow);
+  return start_psymtab_common_full (objfile->psyms, objfile,
+				    section_offsets, filename, textlow);
 }
 
 /* Helper function, initialises partial symbol structure and stashes 
@@ -1383,8 +1380,7 @@ add_psymbol_to_bcache (struct psymtab_state *state,
 		       long val,	/* Value as a long */
 		       CORE_ADDR coreaddr,	/* Value as a CORE_ADDR */
 		       enum language language, struct objfile *objfile,
-		       int *added,
-		       struct obstack *obstack)
+		       int *added)
 {
   char *buf = name;  
   /* psymbol is static so that there will be no uninitialized gaps in the
@@ -1413,7 +1409,7 @@ add_psymbol_to_bcache (struct psymtab_state *state,
   PSYMBOL_DOMAIN (&psymbol) = domain;
   PSYMBOL_CLASS (&psymbol) = class;
 
-  SYMBOL_SET_NAMES_FULL (&psymbol, buf, namelength, objfile, obstack);
+  SYMBOL_SET_NAMES_FULL (&psymbol, buf, namelength, objfile, state->obstack);
 
   /* Stash the partial symbol away in the cache */
   return bcache_full (&psymbol, sizeof (struct partial_symbol),
@@ -1483,7 +1479,6 @@ add_psymbol_to_list_full (struct psymtab_state *state,
 			  long val,	/* Value as a long */
 			  CORE_ADDR coreaddr,	/* Value as a CORE_ADDR */
 			  enum language language, struct objfile *objfile,
-			  struct obstack *obstack,
 			  int is_global)
 {
   const struct partial_symbol *psym;
@@ -1493,8 +1488,7 @@ add_psymbol_to_list_full (struct psymtab_state *state,
 
   /* Stash the partial symbol away in the cache */
   psym = add_psymbol_to_bcache (state, name, namelength, domain, class,
-				val, coreaddr, language, objfile, &added,
-				obstack);
+				val, coreaddr, language, objfile, &added);
 
   /* Do not duplicate global partial symbols.  */
   if (is_global && !added)
@@ -1518,14 +1512,12 @@ add_psymbol_to_list (char *name, int namelength, domain_enum domain,
   return add_psymbol_to_list_full (objfile->psyms,
 				   name, namelength, domain, class,
 				   val, coreaddr, language, objfile,
-				   &objfile->objfile_obstack,
 				   is_global);
 }
 
 struct partial_symtab *
 allocate_psymtab_full (struct psymtab_state *state,
-		       char *filename, struct objfile *objfile,
-		       struct obstack *obstack)
+		       char *filename, struct objfile *objfile)
 {
   struct partial_symtab *psymtab;
 
@@ -1538,10 +1530,11 @@ allocate_psymtab_full (struct psymtab_state *state,
     }
   else
     psymtab = (struct partial_symtab *)
-      obstack_alloc (obstack, sizeof (struct partial_symtab));
+      obstack_alloc (state->obstack, sizeof (struct partial_symtab));
 
   memset (psymtab, 0, sizeof (struct partial_symtab));
-  psymtab->filename = obsavestring (filename, strlen (filename), obstack);
+  psymtab->filename = obsavestring (filename, strlen (filename),
+				    state->obstack);
   psymtab->symtab = NULL;
 
   /* Prepend it to the psymtab list for the objfile it belongs to.
@@ -1558,8 +1551,7 @@ allocate_psymtab_full (struct psymtab_state *state,
 struct partial_symtab *
 allocate_psymtab (char *filename, struct objfile *objfile)
 {
-  return allocate_psymtab_full (objfile->psyms, filename, objfile,
-				&objfile->objfile_obstack);
+  return allocate_psymtab_full (objfile->psyms, filename, objfile);
 }
 
 void
@@ -1623,8 +1615,17 @@ allocate_psymtab_state (struct obstack *obstack)
 					      sizeof (struct psymtab_state));
   memset (state, 0, sizeof (struct psymtab_state));
   state->writeable = 1;
+  state->obstack = obstack;
   state->psymbol_cache = bcache_xmalloc ();
   return state;
+}
+
+void
+switch_psymtab_state_obstack (struct psymtab_state *state,
+			      struct obstack *new_obstack)
+{
+  check_writeable (state);
+  state->obstack = new_obstack;
 }
 
 /* A global readonly state.  */

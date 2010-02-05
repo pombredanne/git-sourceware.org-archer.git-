@@ -1,6 +1,6 @@
 /* Private partial symbol table definitions.
 
-   Copyright (C) 2009 Free Software Foundation, Inc.
+   Copyright (C) 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -208,6 +208,9 @@ struct psymtab_state
 {
   int writeable;
 
+  /* The obstack on which psymbols are allocated.  */
+  struct obstack *obstack;
+
   /* Vectors of all partial symbols read in from file.  The actual data
      is stored in the objfile_obstack. */
   struct psymbol_allocation_list global_psymbols;
@@ -238,15 +241,13 @@ void sort_pst_symbols (struct psymtab_state *state,
 		       struct partial_symtab *pst);
 
 /* Allocate a partial symbol table in STATE.  FILENAME and OBJFILE are
-   the file name and objfile associated with the new table.  OBSTACK
-   is used for allocating memory.  */
+   the file name and objfile associated with the new table.  */
 struct partial_symtab *allocate_psymtab_full (struct psymtab_state *state,
 					      char *filename,
-					      struct objfile *objfile,
-					      struct obstack *obstack);
+					      struct objfile *objfile);
 
 /* A legacy function that calls allocate_psymtab_full using the
-   objfile's obstack and psymtab_state.  */
+   objfile's psymtab_state.  */
 struct partial_symtab *allocate_psymtab (char *, struct objfile *);
 
 /* Discard a partial symbol table.  */
@@ -260,11 +261,10 @@ const struct partial_symbol *add_psymbol_to_list_full
      long val,	/* Value as a long */
      CORE_ADDR coreaddr,	/* Value as a CORE_ADDR */
      enum language language, struct objfile *objfile,
-     struct obstack *obstack,
      int is_global);
 
 /* A legacy function that calls add_psymbol_to_list_full using the
-   objfile's obstack and psymtab_state.  */
+   objfile's psymtab_state.  */
 const struct partial_symbol *add_psymbol_to_list
     (char *, int, domain_enum,
      enum address_class,
@@ -277,18 +277,16 @@ const struct partial_symbol *add_psymbol_to_list
 
    STATE is the psymtab state object holding all the necessary state.
    OBJFILE is the objfile associated with the symbol table.
-   OBSTACK is used to allocate memory.
    FILENAME is the name of the symbol-file we are reading from.  */
 struct partial_symtab *start_psymtab_common_full
     (struct psymtab_state *state,
      struct objfile *objfile,
-     struct obstack *obstack,
      struct section_offsets *section_offsets,
      char *filename,
      CORE_ADDR textlow);
 
 /* A legacy function that calls start_psymtab_common_full with the
-   objfile's psymtab_state and objstack.  */
+   objfile's psymtab_state.  */
 struct partial_symtab *start_psymtab_common
     (struct objfile *objfile,
      struct section_offsets *section_offsets, char *filename,
@@ -297,6 +295,12 @@ struct partial_symtab *start_psymtab_common
 /* Set n_global_syms and n_static_syms on PSYMTAB.  */
 void finalize_psymtab (struct psymtab_state *state,
 		       struct partial_symtab *psymtab);
+
+/* Change the obstack associated with a psymtab_state.  STATE is the
+   psymtab_state, which must be writeable.  OBSTACK is the new
+   obstack.  */
+void switch_psymtab_state_obstack (struct psymtab_state *state,
+				   struct obstack *new_obstack);
 
 /* A readonly psymtab_state.  This is temporarily put into an
    objfile's psyms slot when reading psymtabs in a background
