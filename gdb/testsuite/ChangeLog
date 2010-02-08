@@ -1,3 +1,48 @@
+2010-02-08  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/8017:
+	* gdb.cp/overload.exp: Add tests.
+	* gdb.cp/overload.cc (struct K): New.
+	(namespace N): New.
+	(main): Call new functions.
+	(K::staticoverload): Define.
+
+Mon Feb  8 13:18:22 2010  Chris Moller  <moller@mollerware.com>
+
+	PR gdb/10728
+	* gdb.cp/pr10728-x.h: New file.
+	* gdb.cp/pr10728-x.cc: New file.
+	* gdb.cp/pr10728-y.cc: New file.
+	* gdb.cp/pr10728.exp: New file.
+	* gdb.cp/Makefile.in (EXECUTABLES): Add pr10728
+
+Mon Feb  8 12:54:54 2010  Chris Moller  <moller@mollerware.com>
+
+	PR gdb/9067
+	* gdb.cp/pr9067.exp:  New
+	* gdb.cp/pr9067.cc:   New
+	* gdb.cp/Makefile.in (EXECUTABLES): Add pr9067
+
+2010-02-08  Joel Brobecker  <brobecker@adacore.com>
+
+	* lib/gdb.exp (gdb_test_timeout): New global variable.
+	Set it to timeout if not already set.
+	(gdb_init): Reset the value of timeout to gdb_test_timeout.
+
+2010-02-05  Doug Evans  <dje@google.com>
+
+	* lib/gdb.exp (INTERNAL_GDBFLAGS): Don't override value provided by
+	user.
+
+2010-02-05  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	PR c++/7935:
+	* gdb.cp/namespace-using.exp: Removed kfail; bug has been fixed.
+
+2010-02-04  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/virtbase.exp: Make test case names unique.
+
 2010-02-02  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.cp/virtbase.exp: Add regression tests.

@@ -1,3 +1,186 @@
+2010-02-08  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/8017:
+	* value.h: Update.
+	* valops.c (search_struct_field): Make 'name' const.
+	(search_struct_method): Likewise.
+	(find_method_list): Make 'method' const.
+	(value_struct_elt): Make 'name' and 'err' const.
+	(value_find_oload_method_list): Make 'method' const.
+	(find_overload_match): Make 'name' const.
+	* eval.c (evaluate_subexp_standard): New locals function,
+	function_name.
+	<OP_FUNCALL>: Handle OP_SCOPE specially.
+
+2010-02-08  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* infrun.c (handle_inferior_event): Do not look up regcache
+	for exited processes.
+
+Mon Feb  8 13:17:10 2010  Chris Moller  <moller@mollerware.com>
+
+	PR gdb/10728
+	* valarith.c (value_ptrdiff): Added a test for a zero type length,
+	warn if found, and assume length = 1. 
+
+2010-02-08  Chris Moller  <cmoller@redhat.com>
+
+	PR gdb/9067
+	* cp-valprint.c (cp_print_value_fields) Fix use of obstacks.
+	cp_print_static_field)  Fix use of obstacks.
+	
+2010-02-08  Pedro Alves  <pedro@codesourcery.com>
+
+	* linux-nat.c (linux_nat_resume): In non-stop, also only tag
+	resumed LWPs as resumed.
+	(linux_nat_wait_1): If there's no resumed LWP in the set of LWPs
+	we're waiting for, bail out with TARGET_WAITKIND_IGNORE, instead
+	of throwing an internal error.  If an LWP of a process we're not
+	waiting for reports a signal, don't force collecting a SIGSTOP,
+	and if it was breakpoint hit in non-stop mode, cancel it.  Don't
+	go through all LWPs cancelling breakpoints in non-stop mode.
+	(resume_stopped_resumed_lwps): New.
+	(linux_nat_wait): Use it.
+
+2010-02-07  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* features/Makefile (WHICH): Add i386/i386, i386/i386-linux,
+	i386/amd64 and i386/amd64-linux.
+	(i386/i386-expedite): New.
+	(i386/i386-linux-expedite): Likewise.
+	(i386/amd64-expedite):Likewise.
+	(i386/amd64-linux-expedite): Likewise.
+	($(outdir)/i386/i386-linux.dat): Likewise.
+	($(outdir)/i386/amd64.dat): Likewise.
+	($(outdir)/i386/amd64-linux.dat): Likewise.
+
+	* features/i386/32bit-core.xml: New.
+	* features/i386/32bit-linux.xml: Likewise.
+	* features/i386/32bit-sse.xml: Likewise.
+	* features/i386/64bit-core.xml: Likewise.
+	* features/i386/64bit-linux.xml: Likewise.
+	* features/i386/64bit-sse.xml: Likewise.
+	* features/i386/i386-linux.xml: Likewise.
+	* features/i386/i386.xml: Likewise.
+	* features/i386/amd64-linux.xml: Likewise.
+	* features/i386/amd64.xml: Likewise.
+	* features/i386/i386-linux.c: Likewise.
+	* features/i386/i386.c: Likewise.
+	* features/i386/amd64-linux.c: Likewise.
+	* features/i386/amd64.c: Likewise.
+
+2010-02-05  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	PR c++/7935:
+	* cp-support.h: Added char* alias element to using_direct data
+	struct.
+	(cp_add_using): Added char* alias argument.
+	(cp_add_using_directive): Ditto.
+	* cp-namespace.c: Updated with the above changes.
+	(cp_lookup_symbol_imports): Check for aliases.
+	* dwarf2read.c (read_import_statement): Figure out local alias
+	for the import and pass it on to cp_add_using.
+	(read_namespace): Pass alias argument to cp_add_using.
+
+2010-02-05  Hui Zhu  <teawater@gmail.com>
+
+	* defs.h (gdb_bfd_errmsg): New extern.
+	* exec.c (exec_file_attach): Change bfd_errmsg to
+	gdb_bfd_errmsg.
+	* utils.c (AMBIGUOUS_MESS1): New macro.
+	(AMBIGUOUS_MESS2): New macro.
+	(gdb_bfd_errmsg): New function.
+
+2010-02-04  Doug Evans  <dje@google.com>
+
+	* solib-svr4.c (enable_break): Add comment.
+
+2010-02-04  Anthony Green  <green@moxielogic.com>
+
+	* moxie-tdep.c (moxie_analyze_prologue): Fail protocol analysis
+	gracefully.
+
+2010-02-04  Tom Tromey  <tromey@redhat.com>
+
+	* valops.c (search_struct_field): Account for
+	value_embedded_offset.  Fix check for virtual base past the end of
+	the object.  Use value_copy when making a slice of the value.
+
+2010-02-04  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR tui/9622
+	* tui/tui-interp.c (tui_init): Call tui_initialize_readline
+	only if gdb_stdout is a tty.
+
+2010-02-04  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* target-descriptions.c: Include "osabi.h".
+	(maint_print_c_tdesc_cmd): Generate set_tdesc_osabi for valid
+	OSABI.
+
+2010-02-04  Tristan Gingold  <gingold@adacore.com>
+
+	* machoread.c (macho_add_oso): Renamed to macho_register_oso.
+	(macho_symtab_read): Adjust calls to macho_add_oso.
+	(macho_oso_symfile): Renamed to macho_symfile_read_all_oso.
+	(macho_symfile_read): Adjust call to macho_oso_symfile.
+	(macho_new_init): Move this function after declarations.
+	(macho_symfile_init): Ditto.
+	* darwin-nat-info.c (darwin_lib_gdb_ports): Remove.
+	* darwin-nat.c (darwin_lookup_task): Remove unused prototype.
+
+2010-02-04  Vladimir Prus  <vladimir@codesourcery.com>
+
+	Include MI command in remotelog.
+
+	* mi/mi-main.c (mi_execute_command): Call target_log_command.
+
+2010-02-03  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* remote.c (remote_state): Remove gdbarch.
+	(init_remote_state): Don't set gdbarch.
+	(remote_query_supported): Pass target_gdbarch instead of
+	rs->gdbarch to gdbarch_qsupported.
+
+2010-02-03  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* gdbarch.sh: Add qsupported.
+
+	* gdbarch.c: Regenerated.
+	* gdbarch.h: Likewise.
+
+	* remote.c (remote_state): Add gdbarch.
+	(init_remote_state): Set gdbarch.
+	(remote_query_supported): Support gdbarch_qsupported.
+
+2010-02-03  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* amd64fbsd-nat.c (amd64fbsd_supply_pcb): Also check for
+	__FreeBSD_kernel_version.
+
+2010-02-03  Tristan Gingold  <gingold@adacore.com>
+
+	* symfile.h (struct sym_fns): Add sym_relocate field.
+	(default_symfile_relocate): New prototype.
+	(symfile_relocate_debug_section): First argument is now an objfile.
+	* symfile.c (default_symfile_relocate): Rename from
+	symfile_relocate_debug_section, first argument is now an objfile.
+	(symfile_relocate_debug_section): New function.
+	* coffread.c (coff_sym_fns): Set sym_relocate field.
+	* somread.c (som_sym_fns): Ditto.
+	* mipsread.c (ecoff_sym_fns): Ditto.
+	* machoread.c (macho_sym_fns): Ditto.
+	* elfread.c (elf_sym_fns): Ditto.
+	* dwarf2read.c (dwarf2_read_section): Ditto.
+	* xcoffread.c (xcoff_sym_fns): Ditto.
+	* dbxread.c (aout_sym_fns): Ditto.
+	(dbx_psymtab_to_symtab): Adjust call to symfile_relocate_debug_section.
+	(elfstab_build_psymtabs): Ditto.
+
+2010-02-03  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* defs.h (MAX_REGISTER_SIZE): Increase to 32.
+
 2010-02-02  Tom Tromey  <tromey@redhat.com>
 
 	* valops.c (value_cast_structs): Try downcasting using the RTTI

@@ -1,3 +1,20 @@
+2010-02-08  Philipp Tomsich  <philipp.tomsich@theobroma-systems.com>
+
+	* ppc-dis.c (ppc_opts): Add titan entry.
+	* ppc-opc.c (TITAN, MULHW): Define.
+	(powerpc_opcodes): Support AppliedMicro Titan core (APM83xxx).
+
+2010-02-03  Quentin Neill  <quentin.neill@amd.com>
+
+	* i386-gen.c (cpu_flag_init): Rename CPU_AMDFAM15_FLAGS
+	to CPU_BDVER1_FLAGS
+	* i386-init.h: Regenerated.
+
+2010-02-03  Anthony Green  <green@moxielogic.com>
+
+	* moxie-opc.c (moxie_form1_opc_info): Move "nop" from 0x00 to
+	0x0f, and make 0x00 an illegal instruction.
+
 2010-01-29  Daniel Jacobowitz  <dan@codesourcery.com>
 
 	* opcodes/arm-dis.c (struct arm_private_data): New.

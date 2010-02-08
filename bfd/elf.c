@@ -232,7 +232,7 @@ bfd_elf_gnu_hash (const char *namearg)
 bfd_boolean
 bfd_elf_allocate_object (bfd *abfd,
 			 size_t object_size,
-			 enum elf_object_id object_id)
+			 enum elf_target_id object_id)
 {
   BFD_ASSERT (object_size >= sizeof (struct elf_obj_tdata));
   abfd->tdata.any = bfd_zalloc (abfd, object_size);
@@ -249,7 +249,7 @@ bfd_boolean
 bfd_elf_make_generic_object (bfd *abfd)
 {
   return bfd_elf_allocate_object (abfd, sizeof (struct elf_obj_tdata),
-				  GENERIC_ELF_TDATA);
+				  GENERIC_ELF_DATA);
 }
 
 bfd_boolean
@@ -4461,6 +4461,22 @@ assign_file_positions_for_load_sections (bfd *abfd,
 		  adjust = 0;
 		}
 	      p->p_memsz += adjust;
+
+	      if (p->p_paddr + p->p_memsz != sec->lma)
+		{
+		  /* This behavior is a compromise--ld has long
+		     silently changed the lma of sections when
+		     lma - vma is not equal for every section in a
+		     pheader--but only in the internal elf structures.
+		     Silently changing the lma is probably a bug, but
+		     changing it would have subtle and unknown
+		     consequences for existing scripts.
+
+		     Instead modify the bfd data structure to reflect
+		     what happened.  This at least fixes the values
+		     for the lma in the mapfile.  */
+		  sec->lma = p->p_paddr + p->p_memsz;
+		}
 
 	      if (this_hdr->sh_type != SHT_NOBITS)
 		{
