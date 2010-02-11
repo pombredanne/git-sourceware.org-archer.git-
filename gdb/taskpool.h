@@ -1,6 +1,6 @@
 /* Task pool implementation.
 
-   Copyright (C) 2009 Free Software Foundation, Inc.
+   Copyright (C) 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -17,16 +17,16 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#ifndef THREADPOOL_H
-#define THREADPOOL_H
+#ifndef TASKPOOL_H
+#define TASKPOOL_H
 
 struct task_pool;
 struct task;
 
-/* The GDB thread pool provides a simple way to hide work in the
+/* The GDB task pool provides a simple way to hide work in the
    background.
 
-   A thread pool manages a number of threads, with the maximum number
+   A task pool manages a number of threads, with the maximum number
    set at the time the pool is created.  It holds a queue of tasks,
    sorted by priority.  A worker thread simply loops, pulling the next
    task off the queue and running it.
@@ -86,4 +86,4 @@ void *get_task_answer (struct task *task);
    completed.  */
 void cancel_task (struct task *task);
 
-#endif /* THREADPOOL_H */
+#endif /* TASKPOOL_H */

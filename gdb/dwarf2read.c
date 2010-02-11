@@ -52,7 +52,7 @@
 #include "exceptions.h"
 #include "vec.h"
 #include "top.h"		/* readnow_symbol_files */
-#include "threadpool.h"
+#include "taskpool.h"
 
 #include <fcntl.h>
 #include "gdb_string.h"
