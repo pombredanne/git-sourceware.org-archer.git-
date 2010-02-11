@@ -1,3 +1,38 @@
+2010-02-11  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* mi/mi-cmd-stack.c (mi_cmd_stack_list_locals): Add extra
+	whitespace character after a dot in comment.
+	(mi_cmd_stack_list_arguments, mi_cmd_stack_list_variables):
+	Likewise.
+	(list_args_or_locals): For the 'all' (that is
+	-stack-list-variables) case, always output list of tuples.
+	Output 'arg' field if variable is argument.
+
+2010-02-10  Tom Tromey  <tromey@redhat.com>
+
+	* parser-defs.h (parser_debug): Declare.
+	* parse.c (_initialize_parse): Install "debug parser" set/show
+	command.
+	(parser_debug): New global.
+	(show_parserdebug): New function.
+	* c-exp.y (c_parse): Set yydebug.
+
+2010-02-10  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* target-descriptions.c (tdesc_type): Add TDESC_TYPE_I387_EXT,
+	TDESC_TYPE_I386_EFLAGS and TDESC_TYPE_I386_MXCSR.
+	(tdesc_predefined_types): Add i387_ext, i386_eflags and
+	i386_mxcsr.
+	(tdesc_find_type): New.
+	(tdesc_gdb_type): Use tdesc_find_type.  Handle TDESC_TYPE_I387_EXT,
+	TDESC_TYPE_I386_EFLAGS and TDESC_TYPE_I386_MXCSR.
+
+	* target-descriptions.h (tdesc_find_type): New.
+
+2010-02-10  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb-gdb.py: Comment fix.
+
 2010-02-09  Tristan Gingold  <gingold@adacore.com>
 
 	* machoread.c (macho_symfile_relocate): New function.
