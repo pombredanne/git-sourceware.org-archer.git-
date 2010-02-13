@@ -1,3 +1,28 @@
+2010-02-13  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdbint.texinfo (Testsuite): New section "Testsuite Configuration",
+	documenting the gdb_test_timeout variable.
+
+2010-02-12  Jakob Engblom  <jakob@virtutech.com>
+
+	* gdb.texinfo (MI commands): Added documentation of --reverse
+	option to a set of MI commands. Restructured documentation of MI
+	commands --exec-continue to reflect the complexity of reverse
+	execution.
+
+2010-02-12  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo (Using the Collected Data): Specify that the address
+	range of `tfind outsize' is exclusive, and that the address range
+	of `tfind range' is inclusive.
+	(Tracepoint Packets): Specify that the address range of
+	`QTFrame:range' is inclusive, and that the address range of
+	`QTFrame:outside' is exclusive
+
+2010-02-12  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* gdb.texinfo (GDB/MI Result Records): Clarify ^running.
+
 2010-02-10  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.texinfo (Debugging Output): Document set debug parser and

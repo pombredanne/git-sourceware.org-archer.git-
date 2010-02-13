@@ -2824,7 +2824,6 @@ tfile_open (char *filename, int from_tty)
   unpush_target (&tfile_ops);
 
   push_target (&tfile_ops);
-  discard_cleanups (old_chain);
 
   trace_filename = xstrdup (filename);
   trace_fd = scratch_chan;
@@ -2881,9 +2880,11 @@ tfile_open (char *filename, int from_tty)
 
   /* Add the file's tracepoints and variables into the current mix.  */
 
-  merge_uploaded_tracepoints (&uploaded_tps);
-
+  /* Get trace state variables first, they may be checked when parsing
+     uploaded commands.  */
   merge_uploaded_trace_state_variables (&uploaded_tsvs);
+
+  merge_uploaded_tracepoints (&uploaded_tps);
 
   /* Record the starting offset of the binary trace data.  */
   trace_frames_offset = bytes;
@@ -3609,12 +3610,12 @@ No argument means forward by one frame; '-' means backward by one frame."),
 		  &tfindlist, "tfind ", 1, &cmdlist);
 
   add_cmd ("outside", class_trace, trace_find_outside_command, _("\
-Select a trace frame whose PC is outside the given range.\n\
+Select a trace frame whose PC is outside the given range (exclusive).\n\
 Usage: tfind outside addr1, addr2"),
 	   &tfindlist);
 
   add_cmd ("range", class_trace, trace_find_range_command, _("\
-Select a trace frame whose PC is in the given range.\n\
+Select a trace frame whose PC is in the given range (inclusive).\n\
 Usage: tfind range addr1,addr2"),
 	   &tfindlist);
 

@@ -4812,8 +4812,6 @@ allocate_bp_location (struct breakpoint *bpt)
   switch (bpt->type)
     {
     case bp_breakpoint:
-    case bp_tracepoint:
-    case bp_fast_tracepoint:
     case bp_until:
     case bp_finish:
     case bp_longjmp:
@@ -4838,6 +4836,8 @@ allocate_bp_location (struct breakpoint *bpt)
       break;
     case bp_watchpoint:
     case bp_catchpoint:
+    case bp_tracepoint:
+    case bp_fast_tracepoint:
       loc->loc_type = bp_loc_other;
       break;
     default:
@@ -6722,17 +6722,16 @@ find_condition_and_thread (char *tok, CORE_ADDR pc,
     }
 }
 
-/* Set a breakpoint.  This function is shared between
-   CLI and MI functions for setting a breakpoint.
-   This function has two major modes of operations,
-   selected by the PARSE_CONDITION_AND_THREAD parameter.
-   If non-zero, the function will parse arg, extracting
-   breakpoint location, address and thread. Otherwise,
-   ARG is just the location of breakpoint, with condition
-   and thread specified by the COND_STRING and THREAD
-   parameters.  */
+/* Set a breakpoint.  This function is shared between CLI and MI
+   functions for setting a breakpoint.  This function has two major
+   modes of operations, selected by the PARSE_CONDITION_AND_THREAD
+   parameter.  If non-zero, the function will parse arg, extracting
+   breakpoint location, address and thread. Otherwise, ARG is just the
+   location of breakpoint, with condition and thread specified by the
+   COND_STRING and THREAD parameters.  Returns true if any breakpoint
+   was created; false otherwise.  */
 
-static void
+static int
 break_command_really (struct gdbarch *gdbarch,
 		      char *arg, char *cond_string, int thread,
 		      int parse_condition_and_thread,
@@ -6793,7 +6792,7 @@ break_command_really (struct gdbarch *gdbarch,
 	     selects no, then simply return the error code.  */
 	  if (pending_break_support == AUTO_BOOLEAN_AUTO
 	      && !nquery ("Make breakpoint pending on future shared library load? "))
-	    return;
+	    return 0;
 
 	  /* At this point, either the user was queried about setting
 	     a pending breakpoint and selected yes, or pending
@@ -6811,7 +6810,7 @@ break_command_really (struct gdbarch *gdbarch,
 	}
     default:
       if (!sals.nelts)
-	return;
+	return 0;
     }
 
   /* Create a chain of things that always need to be cleaned up. */
@@ -6923,6 +6922,8 @@ break_command_really (struct gdbarch *gdbarch,
 
   /* error call may happen here - have BKPT_CHAIN already discarded.  */
   update_global_location_list (1);
+
+  return 1;
 }
 
 /* Set a breakpoint. 
@@ -8574,7 +8575,8 @@ update_global_location_list (int should_insert)
 	  || b->enable_state == bp_startup_disabled
 	  || !loc->enabled
 	  || loc->shlib_disabled
-	  || !breakpoint_address_is_meaningful (b))
+	  || !breakpoint_address_is_meaningful (b)
+	  || tracepoint_type (b))
 	continue;
 
       /* Permanent breakpoint should always be inserted.  */
@@ -8690,6 +8692,16 @@ delete_breakpoint (struct breakpoint *bpt)
      references were extent.  A cheaper bandaid was chosen.  */
   if (bpt->type == bp_none)
     return;
+
+  /* At least avoid this stale reference until the reference counting of
+     breakpoints gets resolved.  */
+  if (bpt->related_breakpoint != NULL)
+    {
+      gdb_assert (bpt->related_breakpoint->related_breakpoint == bpt);
+      bpt->related_breakpoint->disposition = disp_del_at_next_stop;
+      bpt->related_breakpoint->related_breakpoint = NULL;
+      bpt->related_breakpoint = NULL;
+    }
 
   observer_notify_breakpoint_deleted (bpt->number);
 
@@ -9779,33 +9791,33 @@ set_tracepoint_count (int num)
 void
 trace_command (char *arg, int from_tty)
 {
-  break_command_really (get_current_arch (),
-			arg,
-			NULL, 0, 1 /* parse arg */,
-			0 /* tempflag */, 0 /* hardwareflag */,
-			1 /* traceflag */,
-			0 /* Ignore count */,
-			pending_break_support, 
-			NULL,
-			from_tty,
-			1 /* enabled */);
-  set_tracepoint_count (breakpoint_count);
+  if (break_command_really (get_current_arch (),
+			    arg,
+			    NULL, 0, 1 /* parse arg */,
+			    0 /* tempflag */, 0 /* hardwareflag */,
+			    1 /* traceflag */,
+			    0 /* Ignore count */,
+			    pending_break_support,
+			    NULL,
+			    from_tty,
+			    1 /* enabled */))
+    set_tracepoint_count (breakpoint_count);
 }
 
 void
 ftrace_command (char *arg, int from_tty)
 {
-  break_command_really (get_current_arch (),
-			arg, 
-			NULL, 0, 1 /* parse arg */,
-			0 /* tempflag */, 1 /* hardwareflag */,
-			1 /* traceflag */,
-			0 /* Ignore count */,
-			pending_break_support, 
-			NULL,
-			from_tty,
-			1 /* enabled */);
-  set_tracepoint_count (breakpoint_count);
+  if (break_command_really (get_current_arch (),
+			    arg,
+			    NULL, 0, 1 /* parse arg */,
+			    0 /* tempflag */, 1 /* hardwareflag */,
+			    1 /* traceflag */,
+			    0 /* Ignore count */,
+			    pending_break_support,
+			    NULL,
+			    from_tty,
+			    1 /* enabled */))
+    set_tracepoint_count (breakpoint_count);
 }
 
 /* Given information about a tracepoint as recorded on a target (which
@@ -9819,24 +9831,27 @@ create_tracepoint_from_upload (struct uploaded_tp *utp)
 {
   char buf[100];
   struct breakpoint *tp;
-  
+
   /* In the absence of a source location, fall back to raw address.  */
   sprintf (buf, "*%s", paddress (get_current_arch(), utp->addr));
 
-  break_command_really (get_current_arch (),
-			buf, 
-			NULL, 0, 1 /* parse arg */,
-			0 /* tempflag */,
-			(utp->type == bp_fast_tracepoint) /* hardwareflag */,
-			1 /* traceflag */,
-			0 /* Ignore count */,
-			pending_break_support, 
-			NULL,
-			0 /* from_tty */,
-			utp->enabled /* enabled */);
+  if (!break_command_really (get_current_arch (),
+			     buf,
+			     NULL, 0, 1 /* parse arg */,
+			     0 /* tempflag */,
+			     (utp->type == bp_fast_tracepoint) /* hardwareflag */,
+			     1 /* traceflag */,
+			     0 /* Ignore count */,
+			     pending_break_support,
+			     NULL,
+			     0 /* from_tty */,
+			     utp->enabled /* enabled */))
+    return NULL;
+
   set_tracepoint_count (breakpoint_count);
   
-    tp = get_tracepoint (tracepoint_count);
+  tp = get_tracepoint (tracepoint_count);
+  gdb_assert (tp != NULL);
 
   if (utp->pass > 0)
     {
