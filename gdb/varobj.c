@@ -3497,7 +3497,7 @@ all_root_varobjs (void (*func) (struct varobj *var, void *data), void *data)
       (*func) (var_root->rootvar, data);
     }
 }
-
+
 extern void _initialize_varobj (void);
 void
 _initialize_varobj (void)
