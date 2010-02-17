@@ -1,3 +1,77 @@
+2010-02-17  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* python/python-internal.h [!WITH_THREAD] (PyGILState_Release,
+	PyThreadState_Swap): Avoid "statement with no effect" warning.
+
+2010-02-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* solib-svr4.c (enable_break <target_auxv_search>): New variable
+	addr_bit.  Adjust LOAD_ADDR sign for cross-arch inferiors.
+
+2010-02-17  Tristan Gingold  <gingold@adacore.com>
+	    Petr Hluzín <petr.hluzin@gmail.com>
+
+	* avr-tdep.c (avr_scan_prologue): Convert an if statement to a
+	gdb_assert.  Fix info->size for SIG prologue.
+
+2010-02-16  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* infcmd.c (show_inferior_tty_command): Check for NULL.
+	Correct output message.
+
+2010-02-16  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* linespec.c (decode_line_1): Handle FILE:FUNCTION even if
+	FUNCTION contains parentheses.  Improve removal of a trailing
+	single quote.
+
+2010-02-16  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gcore.c (do_bfd_delete_cleanup): New function.
+	(gcore_command): Use it.  Discard the cleanup after success.
+	(gcore_copy_callback): Delete dead code.
+
+2010-02-16  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* symfile.c (addr_info_make_relative): Always use
+	find_lowest_section.
+
+2010-02-16  Sami Wagiaalla <swagiaal@redhat.com>
+
+	* NEWS: Added entry for namespace fixes.
+
+2010-02-15  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (guess_structure_name): Allocate name on the
+	objfile obstack.
+
+2010-02-15  Tom Tromey  <tromey@redhat.com>
+
+	* c-typeprint.c (c_type_print_base): Reverse order of test.
+
+2010-02-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* solib-svr4.c (LM_ADDR_CHECK): New variable minpagesize.  Optionally
+	initialize it from ELF BFD.  Extend the prelink condition by it.
+
+2010-02-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* defs.h (parse_pid_to_attach): New.
+	* utils.c (parse_pid_to_attach): New.
+	* darwin-nat.c (darwin_attach): Replace ARGS parsing by parse_pid.
+	* gnu-nat.c (gnu_attach): Likewise.
+	* nto-procfs.c (procfs_attach): Likewise.
+	* procfs.c (procfs_attach): Likewise.
+	* windows-nat.c (windows_attach): Likewise.
+	* inf-ptrace.c (inf_ptrace_attach): Likewise.  Remove variable dummy.
+	* inf-ttrace.c (inf_ttrace_attach): Likewise.
+	* remote.c (extended_remote_attach_1): Likewise.  New comment on getpid
+	check.
+
+2010-02-14  Masaki Muranaka  <monaka@monami-software.com>
+
+	* MAINTAINERS: Add myself for write after approval privileges.
+
 2010-02-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* solib-svr4.c: (LM_ADDR_CHECK): Move variable align to a more inner

@@ -1,3 +1,63 @@
+2010-02-16  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.xml/tdesc-arch.exp, gdb.xml/tdesc-regs.exp: Rewrite file
+	creation to support remote host testing.
+
+2010-02-16  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.base/valgrind-db-attach.exp: Use unsupported instead of xfail.
+	Recognize "command not found".
+
+2010-02-16  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.arch/thumb2-it.exp (test_it_break): Handle hardware
+	single-stepping.
+
+2010-02-16  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.python/py-value.exp (test_value_in_inferior): Skip arg0 test
+	if arguments are not supported.
+
+2010-02-16  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.cp/overload.exp: Allow foo::overload1arg's "this" pointer to
+	be const or non-const.
+
+2010-02-16  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.mi/mi-break.exp (test_breakpoint_commands): Use
+	mi_send_resuming_command to send -exec-continue.
+
+2010-02-16  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.base/list.exp (test_list_filename_and_function): Add test
+	with single quotes.
+	* gdb.cp/overload.cc (intToChar): Rewrite onto one line for easy
+	matching.
+	* gdb.cp/overload.exp: Add tests with filename, function, and quotes.
+	Add KFAIL'd tests for PR gdb/11289.
+
+2010-02-16  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.cp/cpcompletion.exp: Specify source file name explicitly.
+
+2010-02-16  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.base/comp-dir/subdir/dummy.txt: New file.
+	* gdb.base/completion.exp: Use comp-dir/subdir instead of creating
+	a temporary directory.
+
+2010-02-16  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.base/charset.exp: Use a single regular expression to match
+	show host-charset and show target-charset output.
+
+2010-02-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/attach.exp (attach to nonsense is prohibited): Make the
+	"Illegal process-id" expect string more exact.
+	(attach to digits-starting nonsense is prohibited): New.
+
 2010-02-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* gdb.base/prelink.exp (set verbose on): New.
