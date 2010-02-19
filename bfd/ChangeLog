@@ -1,3 +1,35 @@
+2010-02-18  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elf32-i386.c (elf_i386_add_symbol_hook): Don't set
+	has_ifunc_symbols if the symbol comes from a shared library.
+	* elf32-ppc.c (ppc_elf_add_symbol_hook): Likewise.
+	* elf32-sparc.c (elf32_sparc_add_symbol_hook): Likewise.
+	* elf64-ppc.c (ppc64_elf_add_symbol_hook): Likewise.
+	* elf64-sparc.c (elf64_sparc_add_symbol_hook): Likewise.
+	* elf64-x86-64.c (elf64_x86_64_add_symbol_hook): Likewise.
+
+2010-02-19  Alan Modra  <amodra@gmail.com>
+
+	* elf.c (_bfd_elf_fixup_group_sections): New function, split out from..
+	(_bfd_elf_copy_private_header_data): ..here.
+	* elflink.c (_bfd_elf_size_group_sections): New function.
+	(bfd_elf_size_dynamic_sections): Call it.
+	* elf-bfd.h (_bfd_elf_size_group_sections): Declare.
+	(_bfd_elf_fixup_group_sections): Declare.
+
+2010-02-18  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* elf32-arm.c (elf32_arm_merge_eabi_attributes): Add support for
+	merging Tag_DIV_use, Tag_MPextension_use, and
+	Tag_MPextension_use_legacy tags.
+
+2010-02-18  Alan Modra  <amodra@gmail.com>
+
+	* elf.c (bfd_elf_set_group_contents): Revert accidental 2009-01-15
+	commit.  Don't write zeros for removed group members.
+	(_bfd_elf_copy_private_header_data): Adjust size of group section
+	when group members are removed by objcopy.
+
 2010-02-15  Dave Korn  <dave.korn.cygwin@gmail.com>
 
 	PR binutils/11280

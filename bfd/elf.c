@@ -1,7 +1,7 @@
 /* ELF executable support for BFD.
 
    Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001,
-   2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
+   2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
@@ -2743,17 +2743,16 @@ bfd_elf_set_group_contents (bfd *abfd, asection *sec, void *failedptrarg)
   while (elt != NULL)
     {
       asection *s;
-      unsigned int idx;
 
       s = elt;
-      if (! elf_discarded_section (s))
+      if (!gas)
+	s = s->output_section;
+      if (s != NULL
+	  && !bfd_is_abs_section (s))
 	{
+	  unsigned int idx = elf_section_data (s)->this_idx;
+
 	  loc -= 4;
-	  if (!gas)
-	    s = s->output_section;
-	  idx = 0;
-	  if (s != NULL)
-	    idx = elf_section_data (s)->this_idx;
 	  H_PUT_32 (abfd, idx, loc);
 	}
       elt = elf_next_in_group (elt);
@@ -6138,13 +6137,74 @@ _bfd_elf_copy_private_section_data (bfd *ibfd,
 					     NULL);
 }
 
+/* Look at all the SHT_GROUP sections in IBFD, making any adjustments
+   necessary if we are removing either the SHT_GROUP section or any of
+   the group member sections.  DISCARDED is the value that a section's
+   output_section has if the section will be discarded, NULL when this
+   function is called from objcopy, bfd_abs_section_ptr when called
+   from the linker.  */
+
+bfd_boolean
+_bfd_elf_fixup_group_sections (bfd *ibfd, asection *discarded)
+{
+  asection *isec;
+
+  for (isec = ibfd->sections; isec != NULL; isec = isec->next)
+    if (elf_section_type (isec) == SHT_GROUP)
+      {
+	asection *first = elf_next_in_group (isec);
+	asection *s = first;
+	bfd_size_type removed = 0;
+
+	while (s != NULL)
+	  {
+	    /* If this member section is being output but the
+	       SHT_GROUP section is not, then clear the group info
+	       set up by _bfd_elf_copy_private_section_data.  */
+	    if (s->output_section != discarded
+		&& isec->output_section == discarded)
+	      {
+		elf_section_flags (s->output_section) &= ~SHF_GROUP;
+		elf_group_name (s->output_section) = NULL;
+	      }
+	    /* Conversely, if the member section is not being output
+	       but the SHT_GROUP section is, then adjust its size.  */
+	    else if (s->output_section == discarded
+		     && isec->output_section != discarded)
+	      removed += 4;
+	    s = elf_next_in_group (s);
+	    if (s == first)
+	      break;
+	  }
+	if (removed != 0)
+	  {
+	    if (discarded != NULL)
+	      {
+		/* If we've been called for ld -r, then we need to
+		   adjust the input section size.  This function may
+		   be called multiple times, so save the original
+		   size.  */
+		if (isec->rawsize == 0)
+		  isec->rawsize = isec->size;
+		isec->size = isec->rawsize - removed;
+	      }
+	    else
+	      {
+		/* Adjust the output section size when called from
+		   objcopy. */
+		isec->output_section->size -= removed;
+	      }
+	  }
+      }
+
+  return TRUE;
+}
+
 /* Copy private header information.  */
 
 bfd_boolean
 _bfd_elf_copy_private_header_data (bfd *ibfd, bfd *obfd)
 {
-  asection *isec;
-
   if (bfd_get_flavour (ibfd) != bfd_target_elf_flavour
       || bfd_get_flavour (obfd) != bfd_target_elf_flavour)
     return TRUE;
@@ -6160,28 +6220,7 @@ _bfd_elf_copy_private_header_data (bfd *ibfd, bfd *obfd)
 	return FALSE;
     }
 
-  /* _bfd_elf_copy_private_section_data copied over the SHF_GROUP flag
-     but this might be wrong if we deleted the group section.  */
-  for (isec = ibfd->sections; isec != NULL; isec = isec->next)
-    if (elf_section_type (isec) == SHT_GROUP
-	&& isec->output_section == NULL)
-      {
-	asection *first = elf_next_in_group (isec);
-	asection *s = first;
-	while (s != NULL)
-	  {
-	    if (s->output_section != NULL)
-	      {
-		elf_section_flags (s->output_section) &= ~SHF_GROUP;
-		elf_group_name (s->output_section) = NULL;
-	      }
-	    s = elf_next_in_group (s);
-	    if (s == first)
-	      break;
-	  }
-      }
-
-  return TRUE;
+  return _bfd_elf_fixup_group_sections (ibfd, NULL);
 }
 
 /* Copy private symbol information.  If this symbol is in a section

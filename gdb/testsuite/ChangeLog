@@ -1,3 +1,47 @@
+2010-02-19  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/8693, PR c++/9496:
+	* gdb.cp/namespace.exp: Remove some setup_kfail calls.  Added
+	regression tests.
+
+2010-02-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix compatibility with m68k as.
+	* gdb.dwarf2/member-ptr-forwardref.S: Use .data section.  Use .2byte.
+	Use only /* comments */.
+
+2010-02-18  Ulrich Weigand  <Ulrich.Weigand@de.ibm.com>
+
+	* configure.ac: Add gdb.multi/Makefile to AC_OUTPUT.
+	* configure: Regenerate.
+
+2010-02-18  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.python/py-type.exp: Check for Python support.
+
+2010-02-17  Pedro Alves  <pedro@codesourcery.com>
+
+	* lib/gdb.exp (build_id_debug_filename_get): Don't assume new
+	`regsub' syntax available.
+
+2010-02-17  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.base/shmain.c (main): Remove printf call.
+	* gdb.base/sizeof.c (main): Cast return of sizeof to int.
+	* gdb.base/unload.c (main): Make format of fprintf a string
+	literal.  Add missing endlines to prints to stderr.
+	* gdb.base/watchpoint-solib.c (open_shlib): Ditto.
+
+2010-02-17  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.java/jprint.java (jprint.props): New field.
+	* gdb.java/jprint.exp (set_lang_java): Add regression test.
+
+2010-02-17  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.base/charset.exp: Don't assume new `regsub' syntax
+	available.
+
 2010-02-16  Daniel Jacobowitz  <dan@codesourcery.com>
 
 	* gdb.xml/tdesc-arch.exp, gdb.xml/tdesc-regs.exp: Rewrite file
