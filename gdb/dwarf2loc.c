@@ -232,8 +232,8 @@ struct piece_closure
   /* The number of pieces used to describe this variable.  */
   int n_pieces;
 
-  /* The architecture, used only for DWARF_VALUE_STACK.  */
-  struct gdbarch *arch;
+  /* The target address size, used only for DWARF_VALUE_STACK.  */
+  int addr_size;
 
   /* The pieces themselves.  */
   struct dwarf_expr_piece *pieces;
@@ -244,12 +244,12 @@ struct piece_closure
 
 static struct piece_closure *
 allocate_piece_closure (int n_pieces, struct dwarf_expr_piece *pieces,
-			struct gdbarch *arch)
+			int addr_size)
 {
   struct piece_closure *c = XZALLOC (struct piece_closure);
 
   c->n_pieces = n_pieces;
-  c->arch = arch;
+  c->addr_size = addr_size;
   c->pieces = XCALLOC (n_pieces, struct dwarf_expr_piece);
 
   memcpy (c->pieces, pieces, n_pieces * sizeof (struct dwarf_expr_piece));
@@ -298,16 +298,13 @@ read_pieced_value (struct value *v)
 
 	case DWARF_VALUE_STACK:
 	  {
-	    gdb_byte bytes[sizeof (ULONGEST)];
-	    size_t n;
-	    int addr_size = gdbarch_addr_bit (c->arch) / 8;
-	    store_unsigned_integer (bytes, addr_size,
-				    gdbarch_byte_order (c->arch),
+	    struct gdbarch *gdbarch = get_type_arch (value_type (v));
+	    size_t n = p->size;
+	    if (n > c->addr_size)
+	      n = c->addr_size;
+	    store_unsigned_integer (contents + offset, n,
+				    gdbarch_byte_order (gdbarch),
 				    p->v.expr.value);
-	    n = p->size;
-	    if (n > addr_size)
-	      n = addr_size;
-	    memcpy (contents + offset, bytes, n);
 	  }
 	  break;
 
@@ -379,7 +376,7 @@ copy_pieced_value_closure (struct value *v)
 {
   struct piece_closure *c = (struct piece_closure *) value_computed_closure (v);
   
-  return allocate_piece_closure (c->n_pieces, c->pieces, c->arch);
+  return allocate_piece_closure (c->n_pieces, c->pieces, c->addr_size);
 }
 
 static void
@@ -441,7 +438,8 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
       struct piece_closure *c;
       struct frame_id frame_id = get_frame_id (frame);
 
-      c = allocate_piece_closure (ctx->num_pieces, ctx->pieces, ctx->gdbarch);
+      c = allocate_piece_closure (ctx->num_pieces, ctx->pieces,
+				  ctx->addr_size);
       retval = allocate_computed_value (SYMBOL_TYPE (var),
 					&pieced_value_funcs,
 					c);
@@ -476,19 +474,17 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
 
 	case DWARF_VALUE_STACK:
 	  {
-	    gdb_byte bytes[sizeof (ULONGEST)];
 	    ULONGEST value = (ULONGEST) dwarf_expr_fetch (ctx, 0);
 	    bfd_byte *contents;
 	    size_t n = ctx->addr_size;
 
-	    store_unsigned_integer (bytes, ctx->addr_size,
-				    gdbarch_byte_order (ctx->gdbarch),
-				    value);
 	    retval = allocate_value (SYMBOL_TYPE (var));
 	    contents = value_contents_raw (retval);
 	    if (n > TYPE_LENGTH (SYMBOL_TYPE (var)))
 	      n = TYPE_LENGTH (SYMBOL_TYPE (var));
-	    memcpy (contents, bytes, n);
+	    store_unsigned_integer (contents, n,
+				    gdbarch_byte_order (ctx->gdbarch),
+				    value);
 	  }
 	  break;
 

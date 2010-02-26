@@ -1,3 +1,35 @@
+2010-02-25  David S. Miller  <davem@davemloft.net>
+
+	* gdb.base/catch-syscall.exp: Allow to run on sparc*-*-linux and
+	fix logic for setting all_syscalls_numbers.
+
+2010-02-24  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* Makefile.in: Add py-block and py-symbol.
+	* gdb.python/py-symbol.exp: New File.
+	* gdb.python/py-symtab.exp: New File.
+	* gdb.python/py-block.exp: New File.
+	* gdb.python/py-symbol.c: New File.
+	* gdb.python/py-block.c: New File.
+
+2010-02-24  Phil Muldoon  <pmuldoon@redhat.com>
+
+	PR python/11314
+	* lib/gdb.exp (skip_python_tests): New function.
+	* gdb.python/py-cmd.exp: Use skip_python_tests.
+	* gdb.python/py-frame.exp: Likewise.
+	* gdb.python/py-function.exp: Likewise.
+	* gdb.python/py-prettyprint.exp: Likewise.
+	* gdb.python/py-template.exp: Likewise.
+	* gdb.python/py-type.exp: Likewise.
+	* gdb.python/py-value.exp: Likewise.
+
+2010-02-22  Pedro Alves  <pedro@codesourcery.com>
+
+	PR9605
+
+	* gdb.base/watch-read.c, gdb.base/watch-read.exp: New files.
+
 2010-02-19  Tom Tromey  <tromey@redhat.com>
 
 	PR c++/8693, PR c++/9496:

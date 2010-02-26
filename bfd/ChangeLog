@@ -1,3 +1,35 @@
+2010-02-25  Alan Modra  <amodra@gmail.com>
+
+	PR ld/11304
+	* elf.c (_bfd_elf_init_private_section_data): Rename need_group
+	to final_link and invert.  For final link allow some flags to
+	differ.  Don't specially allow flags to be all zero.
+
+2010-02-24  Alan Modra  <amodra@gmail.com>
+
+	PR binutils/10858
+	* elfxx-mips.c (mips_elf_create_dynamic_relocation): Ise
+	SYMBOL_REFERENCES_LOCAL to exclude entries from the dynamic symbol
+	table.
+
+2010-02-23  Andrew Zabolotny  <anpaza@mail.ru>
+
+	PR binutils/11297
+	* elf32-avr.c (elf_avr_howto_table): Add R_AVR_8.
+	(avr_reloc_map): Map BFD_RELOC_8 to R_AVR_8.
+
+2010-02-22  Alan Modra  <amodra@gmail.com>
+
+	* reloc.c (bfd_check_overflow): When forming addrmask, shift
+	fieldmask left by rightshift.
+	(_bfd_relocate_contents): Likewise.  Use rightshift addrmask in all
+	overflow checks.
+
+2010-02-20  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elf64-x86-64.c (elf64_x86_64_add_symbol_hook): Don't check
+	STT_GNU_IFUNC on large common symbol.
+
 2010-02-18  H.J. Lu  <hongjiu.lu@intel.com>
 
 	* elf32-i386.c (elf_i386_add_symbol_hook): Don't set
