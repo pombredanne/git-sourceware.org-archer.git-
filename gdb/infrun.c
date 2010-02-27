@@ -51,6 +51,7 @@
 #include "record.h"
 #include "inline-frame.h"
 #include "jit.h"
+#include "tracepoint.h"
 
 /* Prototypes for local functions */
 
@@ -1761,6 +1762,16 @@ proceed (CORE_ADDR addr, enum target_signal siggnal, int step)
 			"infrun: proceed (addr=%s, signal=%d, step=%d)\n",
 			paddress (gdbarch, addr), siggnal, step);
 
+  /* We're handling a live event, so make sure we're doing live
+     debugging.  If we're looking at traceframes while the target is
+     running, we're going to need to get back to that mode after
+     handling the event.  */
+  if (non_stop)
+    {
+      make_cleanup_restore_current_traceframe ();
+      set_traceframe_number (-1);
+    }
+
   if (non_stop)
     /* In non-stop, each thread is handled individually.  The context
        must already be set to the right thread here.  */
@@ -2664,7 +2675,6 @@ handle_inferior_event (struct execution_control_state *ecs)
 {
   struct frame_info *frame;
   struct gdbarch *gdbarch;
-  struct regcache *regcache;
   int sw_single_step_trap_p = 0;
   int stopped_by_watchpoint;
   int stepped_after_stopped_by_watchpoint = 0;
@@ -2735,18 +2745,21 @@ handle_inferior_event (struct execution_control_state *ecs)
      non-executable stack.  This happens for call dummy breakpoints
      for architectures like SPARC that place call dummies on the
      stack.  */
-  regcache = get_thread_regcache (ecs->ptid);
   if (ecs->ws.kind == TARGET_WAITKIND_STOPPED
       && (ecs->ws.value.sig == TARGET_SIGNAL_ILL
 	  || ecs->ws.value.sig == TARGET_SIGNAL_SEGV
-	  || ecs->ws.value.sig == TARGET_SIGNAL_EMT)
-      && breakpoint_inserted_here_p (get_regcache_aspace (regcache),
-				     regcache_read_pc (regcache)))
+	  || ecs->ws.value.sig == TARGET_SIGNAL_EMT))
     {
-      if (debug_infrun)
-	fprintf_unfiltered (gdb_stdlog,
-			    "infrun: Treating signal as SIGTRAP\n");
-      ecs->ws.value.sig = TARGET_SIGNAL_TRAP;
+      struct regcache *regcache = get_thread_regcache (ecs->ptid);
+
+      if (breakpoint_inserted_here_p (get_regcache_aspace (regcache),
+				      regcache_read_pc (regcache)))
+	{
+	  if (debug_infrun)
+	    fprintf_unfiltered (gdb_stdlog,
+				"infrun: Treating signal as SIGTRAP\n");
+	  ecs->ws.value.sig = TARGET_SIGNAL_TRAP;
+	}
     }
 
   /* Mark the non-executing threads accordingly.  In all-stop, all

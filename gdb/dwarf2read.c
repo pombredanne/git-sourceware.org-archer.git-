@@ -1418,7 +1418,7 @@ dwarf2_read_section (struct objfile *objfile, struct dwarf2_section_info *info)
      http://sourceware.org/ml/gdb-patches/2002-04/msg00136.html .
      We never compress sections in .o files, so we only need to
      try this when the section is not compressed.  */
-  retbuf = symfile_relocate_debug_section (abfd, sectp, buf);
+  retbuf = symfile_relocate_debug_section (objfile, sectp, buf);
   if (retbuf != NULL)
     {
       info->buffer = retbuf;
@@ -2771,7 +2771,7 @@ guess_structure_name (struct partial_die_info *struct_pdi,
 		  struct_pdi->name
 		    = obsavestring (actual_class_name,
 				    strlen (actual_class_name),
-				    &cu->comp_unit_obstack);
+				    &cu->objfile->objfile_obstack);
 		  xfree (actual_class_name);
 		}
 	      break;
@@ -3391,6 +3391,8 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
   struct dwarf2_cu *imported_cu;
   const char *imported_name;
   const char *imported_name_prefix;
+  char *import_alias;
+
   const char *import_prefix;
   char *canonical_name;
 
@@ -3442,7 +3444,8 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
       return;
     }
 
-  /* FIXME: dwarf2_name (die); for the local name after import.  */
+  /* Figure out the local name after import.  */
+  import_alias = dwarf2_name (die, cu);
 
   /* Figure out where the statement is being imported to.  */
   import_prefix = determine_prefix (die, cu);
@@ -3453,7 +3456,8 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
 
   if (strlen (imported_name_prefix) > 0)
     {
-      canonical_name = alloca (strlen (imported_name_prefix) + 2 + strlen (imported_name) + 1);
+      canonical_name = alloca (strlen (imported_name_prefix)
+                               + 2 + strlen (imported_name) + 1);
       strcpy (canonical_name, imported_name_prefix);
       strcat (canonical_name, "::");
       strcat (canonical_name, imported_name);
@@ -3464,7 +3468,10 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
       strcpy (canonical_name, imported_name);
     }
 
-  using_directives = cp_add_using (import_prefix,canonical_name, using_directives);
+  using_directives = cp_add_using (import_prefix,
+                                   canonical_name,
+                                   import_alias,
+                                   using_directives);
 }
 
 static void
@@ -5641,7 +5648,7 @@ read_namespace (struct die_info *die, struct dwarf2_cu *cu)
       if (is_anonymous)
 	{
 	  const char *previous_prefix = determine_prefix (die, cu);
-	  cp_add_using_directive (previous_prefix, TYPE_NAME (type));
+	  cp_add_using_directive (previous_prefix, TYPE_NAME (type), NULL);
 	}
     }
 

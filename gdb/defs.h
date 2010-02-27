@@ -419,6 +419,15 @@ char **gdb_buildargv (const char *);
 
 int compare_positive_ints (const void *ap, const void *bp);
 
+/* A wrapper for bfd_errmsg to produce a more helpful error message
+   in the case of bfd_error_file_ambiguously recognized.
+   MATCHING, if non-NULL, is the corresponding argument to
+   bfd_check_format_matches, and will be freed.  */
+
+extern const char *gdb_bfd_errmsg (bfd_error_type error_tag, char **matching);
+
+extern int parse_pid_to_attach (char *args);
+
 /* From demangle.c */
 
 extern void set_demangling_style (char *);
@@ -1023,7 +1032,7 @@ extern void *alloca ();
 /* Maximum size of a register.  Something small, but large enough for
    all known ISAs.  If it turns out to be too small, make it bigger.  */
 
-enum { MAX_REGISTER_SIZE = 16 };
+enum { MAX_REGISTER_SIZE = 32 };
 
 /* Static target-system-dependent parameters for GDB. */
 
