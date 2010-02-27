@@ -5376,7 +5376,7 @@ line of a function back to its return to its caller
 Like @code{nexti}, @code{reverse-nexti} executes a single instruction
 in reverse, except that called functions are ``un-executed'' atomically.
 That is, if the previously executed instruction was a return from
-another instruction, @code{reverse-nexti} will continue to execute
+another function, @code{reverse-nexti} will continue to execute
 in reverse until the call to that function (from the current stack
 frame) is reached.
 
@@ -9910,11 +9910,11 @@ snapshot with the same value of PC as the current snapshot.
 
 @item tfind outside @var{addr1}, @var{addr2}
 Find the next snapshot whose PC is outside the given range of
-addresses.
+addresses (exclusive).
 
 @item tfind range @var{addr1}, @var{addr2}
 Find the next snapshot whose PC is between @var{addr1} and
-@var{addr2}.  @c FIXME: Is the range inclusive or exclusive?
+@var{addr2} (inclusive).
 
 @item tfind line @r{[}@var{file}:@r{]}@var{n}
 Find the next snapshot associated with the source line @var{n}.  If
@@ -13835,8 +13835,8 @@ in stabs format.
 @kindex readnow
 @cindex reading symbols immediately
 @cindex symbols, reading immediately
-@item symbol-file @var{filename} @r{[} -readnow @r{]}
-@itemx file @var{filename} @r{[} -readnow @r{]}
+@item symbol-file @r{[} -readnow @r{]} @var{filename}
+@itemx file @r{[} -readnow @r{]} @var{filename}
 You can override the @value{GDBN} two-stage strategy for reading symbol
 tables by using the @samp{-readnow} option with any of the commands that
 load symbol table information, if you want to be sure @value{GDBN} has the
@@ -18858,6 +18858,15 @@ is off.
 @item show debug overload
 Displays the current state of displaying @value{GDBN} C@t{++} overload
 debugging info.
+@cindex expression parser, debugging info
+@cindex debug expression parser
+@item set debug parser
+Turns on or off the display of expression parser debugging output.
+Internally, this sets the @code{yydebug} variable in the expression
+parser.  @xref{Tracing, , Tracing Your Parser, bison, Bison}, for
+details.  The default is off.
+@item show debug parser
+Show the current state of expression parser debugging.
 @cindex packets, reporting on stdout
 @cindex serial connections, debugging
 @cindex debug remote protocol
@@ -22445,9 +22454,12 @@ values.
 
 @item "^running"
 @findex ^running
-@c Is this one correct?  Should it be an out-of-band notification?
-The asynchronous operation was successfully started.  The target is
-running.
+This result record is equivalent to @samp{^done}.  Historically, it
+was output instead of @samp{^done} if the command has resumed the
+target.  This behaviour is maintained for backward compatibility, but
+all frontends should treat @samp{^done} and @samp{^running}
+identically and rely on the @samp{*running} output record to determine
+which threads are resumed.
 
 @item "^connected"
 @findex ^connected
@@ -23700,20 +23712,29 @@ other cases.
 @subsubheading Synopsis
 
 @smallexample
- -exec-continue [--all|--thread-group N]
+ -exec-continue [--reverse] [--all|--thread-group N]
 @end smallexample
 
-Resumes the execution of the inferior program until a breakpoint is
-encountered, or until the inferior exits.  In all-stop mode
-(@pxref{All-Stop Mode}), may resume only one thread, or all threads,
-depending on the value of the @samp{scheduler-locking} variable.  In
-non-stop mode (@pxref{Non-Stop Mode}), if the @samp{--all} is not
-specified, only the thread specified with the @samp{--thread} option
-(or current thread, if no @samp{--thread} is provided) is resumed.  If
-@samp{--all} is specified, all threads will be resumed.  The
-@samp{--all} option is ignored in all-stop mode.  If the
-@samp{--thread-group} options is specified, then all threads in that
-thread group are resumed.
+Resumes the execution of the inferior program, which will continue
+to execute until it reaches a debugger stop event.  If the 
+@samp{--reverse} option is specified, execution resumes in reverse until 
+it reaches a stop event.  Stop events may include
+@itemize @bullet
+@item
+breakpoints or watchpoints
+@item
+signals or exceptions
+@item
+the end of the process (or its beginning under @samp{--reverse})
+@item
+the end or beginning of a replay log if one is being used.
+@end itemize
+In all-stop mode (@pxref{All-Stop
+Mode}), may resume only one thread, or all threads, depending on the
+value of the @samp{scheduler-locking} variable.  If @samp{--all} is
+specified, all threads will be resumed.  The @samp{--all} option is
+ignored in all-stop mode.  If the @samp{--thread-group} options is
+specified, then all threads in that thread group are resumed.
 
 @subsubheading @value{GDBN} Command
 
@@ -23739,11 +23760,14 @@ line="13"@}
 @subsubheading Synopsis
 
 @smallexample
- -exec-finish
+ -exec-finish [--reverse]
 @end smallexample
 
 Resumes the execution of the inferior program until the current
 function is exited.  Displays the results returned by the function.
+If the @samp{--reverse} option is specified, resumes the reverse
+execution of the inferior program until the point where current
+function was called.
 
 @subsubheading @value{GDBN} Command
 
@@ -23862,11 +23886,18 @@ The corresponding @value{GDBN} command is @samp{jump}.
 @subsubheading Synopsis
 
 @smallexample
- -exec-next
+ -exec-next [--reverse]
 @end smallexample
 
 Resumes execution of the inferior program, stopping when the beginning
 of the next source line is reached.
+
+If the @samp{--reverse} option is specified, resumes reverse execution
+of the inferior program, stopping at the beginning of the previous
+source line.  If you issue this command on the first line of a
+function, it will take you back to the caller of that function, to the
+source line where the function was called.
+
 
 @subsubheading @value{GDBN} Command
 
@@ -23889,13 +23920,19 @@ The corresponding @value{GDBN} command is @samp{next}.
 @subsubheading Synopsis
 
 @smallexample
- -exec-next-instruction
+ -exec-next-instruction [--reverse]
 @end smallexample
 
 Executes one machine instruction.  If the instruction is a function
 call, continues until the function returns.  If the program stops at an
 instruction in the middle of a source line, the address will be
 printed as well.
+
+If the @samp{--reverse} option is specified, resumes reverse execution
+of the inferior program, stopping at the previous instruction.  If the
+previously executed instruction was a return from another function,
+it will continue to execute in reverse until the call to that function
+(from the current stack frame) is reached.
 
 @subsubheading @value{GDBN} Command
 
@@ -24039,13 +24076,15 @@ signal-meaning="Interrupt"
 @subsubheading Synopsis
 
 @smallexample
- -exec-step
+ -exec-step [--reverse]
 @end smallexample
 
 Resumes execution of the inferior program, stopping when the beginning
 of the next source line is reached, if the next source line is not a
 function call.  If it is, stop at the first instruction of the called
-function.
+function.  If the @samp{--reverse} option is specified, resumes reverse
+execution of the inferior program, stopping at the beginning of the
+previously executed source line.
 
 @subsubheading @value{GDBN} Command
 
@@ -24083,14 +24122,16 @@ Regular stepping:
 @subsubheading Synopsis
 
 @smallexample
- -exec-step-instruction
+ -exec-step-instruction [--reverse]
 @end smallexample
 
-Resumes the inferior which executes one machine instruction.  The
-output, once @value{GDBN} has stopped, will vary depending on whether
-we have stopped in the middle of a source line or not.  In the former
-case, the address at which the program stopped will be printed as
-well.
+Resumes the inferior which executes one machine instruction.  If the
+@samp{--reverse} option is specified, resumes reverse execution of the
+inferior program, stopping at the previously executed instruction.
+The output, once @value{GDBN} has stopped, will vary depending on
+whether we have stopped in the middle of a source line or not.  In the
+former case, the address at which the program stopped will be printed
+as well.
 
 @subsubheading @value{GDBN} Command
 
@@ -30932,12 +30973,12 @@ is a hexadecimal number.
 @item QTFrame:range:@var{start}:@var{end}
 Like @samp{QTFrame:@var{n}}, but select the first tracepoint frame after the
 currently selected frame whose PC is between @var{start} (inclusive)
-and @var{end} (exclusive); @var{start} and @var{end} are hexadecimal
+and @var{end} (inclusive); @var{start} and @var{end} are hexadecimal
 numbers.
 
 @item QTFrame:outside:@var{start}:@var{end}
 Like @samp{QTFrame:range:@var{start}:@var{end}}, but select the first
-frame @emph{outside} the given range of addresses.
+frame @emph{outside} the given range of addresses (exclusive).
 
 @item QTStart
 Begin the tracepoint experiment.  Begin collecting data from tracepoint
@@ -33144,6 +33185,15 @@ Double precision IEEE floating point.
 @item arm_fpa_ext
 The 12-byte extended precision format used by ARM FPA registers.
 
+@item i387_ext
+The 10-byte extended precision format used by x87 registers.
+
+@item i386_eflags
+32bit @sc{eflags} register used by x86.
+
+@item i386_mxcsr
+32bit @sc{mxcsr} register used by x86.
+
 @end table
 
 @node Standard Target Features
@@ -33182,6 +33232,7 @@ registers using the capitalization used in the description.
 
 @menu
 * ARM Features::
+* i386 Features::
 * MIPS Features::
 * M68K Features::
 * PowerPC Features::
@@ -33216,6 +33267,45 @@ VFP double-precision registers as vectors and to synthesize the
 quad-precision registers from pairs of double-precision registers.
 If this feature is present, @samp{org.gnu.gdb.arm.vfp} must also
 be present and include 32 double-precision registers.
+
+@node i386 Features
+@subsection i386 Features
+@cindex target descriptions, i386 features
+
+The @samp{org.gnu.gdb.i386.core} feature is required for i386/amd64
+targets.  It should describe the following registers:
+
+@itemize @minus
+@item
+@samp{eax} through @samp{edi} plus @samp{eip} for i386
+@item
+@samp{rax} through @samp{r15} plus @samp{rip} for amd64
+@item
+@samp{eflags}, @samp{cs}, @samp{ss}, @samp{ds}, @samp{es},
+@samp{fs}, @samp{gs}
+@item 
+@samp{st0} through @samp{st7}
+@item 
+@samp{fctrl}, @samp{fstat}, @samp{ftag}, @samp{fiseg}, @samp{fioff},
+@samp{foseg}, @samp{fooff} and @samp{fop}
+@end itemize
+
+The register sets may be different, depending on the target.
+
+The @samp{org.gnu.gdb.i386.sse} feature is required.  It should
+describe registers:
+
+@itemize @minus
+@item
+@samp{xmm0} through @samp{xmm7} for i386
+@item
+@samp{xmm0} through @samp{xmm15} for amd64
+@item 
+@samp{mxcsr}
+@end itemize
+
+The @samp{org.gnu.gdb.i386.linux} feature is optional.  It should
+describe a single register, @samp{orig_eax}.
 
 @node MIPS Features
 @subsection MIPS Features

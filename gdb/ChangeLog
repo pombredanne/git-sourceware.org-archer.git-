@@ -1,3 +1,494 @@
+2010-02-26  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* arm-tdep.c (thumb_get_next_pc): Correct conditional branch opcode.
+
+2010-02-24  Pedro Alves  <pedro@codesourcery.com>
+	    Stan Shebs  <stan@codesourcery.com>
+
+	* tracepoint.h (set_traceframe_number)
+	(cleanup_restore_current_traceframe): Declare.
+	* tracepoint.c (set_traceframe_number): New.
+	(struct current_traceframe_cleanup): New.
+	(do_restore_current_traceframe_cleanup)
+	(restore_current_traceframe_cleanup_dtor)
+	(make_cleanup_restore_current_traceframe): New.
+	* infrun.c: Include tracepoint.h.
+	(fetch_inferior_event): Switch out and in of tfind mode.
+
+2010-02-23  Harald Koenig  <H.Koenig@science-computing.de>
+
+	* varobj.c (varobj_update): Avoid non-constants in initializers.
+
+2010-02-23  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2loc.c (read_pieced_value) <DWARF_VALUE_STACK>: Correctly
+	handle big-endian values.
+	(dwarf2_evaluate_loc_desc) <DWARF_VALUE_STACK>: Likewise.
+
+2010-02-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symfile.c (addr_info_make_relative): Extend comment.  Move SECT to
+	a more inner block.  Initialize ADDR by LOWER_OFFSET only if it was
+	found by bfd_get_section_by_name.
+	* symfile.h (struct section_addr_info) <sectindex>: New comment.
+
+2010-02-19  Joel Brobecker  <brobecker@adacore.com>
+
+	* version.in: Set version to 7.0.90.20100219-cvs.
+
+2010-02-19  Joel Brobecker  <brobecker@adacore.com>
+
+	GDB 7.0.90 released.
+
+2010-02-19  Joel Brobecker  <brobecker@adacore.com>
+
+	* README: Update GDB version number to 7.0.90.
+	* version.in: Likewise.
+
+2010-02-19  Joel Brobecker  <brobecker@adacore.com>
+
+	Workaround for PR/10966:
+	* linespec.c (add_matching_methods): Only match methods that are
+	in the VAR_DOMAIN and whose class is LOC_BLOCK.
+
+2010-02-19  Joel Brobecker  <brobecker@adacore.com>
+
+	* configure.ac: Disable -Werror by default.
+	* configure: Regenerate.
+
+2010-02-19  Joel Brobecker  <brobecker@adacore.com>
+
+	GDB 7.1 branch created (branch timestamp: 2010-02-18 20:00 UTC)
+	* version.in: Bump version to 7.0.90.20100218-cvs.
+
+2010-02-18  Harald Koenig  <H.Koenig@science-computing.de>
+
+	* mi/mi-main.c (mi_cmd_exec_jump): Drop unneeded `return'.
+	* symfile.c (symfile_map_offsets_to_segments): Fix assertion.
+
+2010-02-17  Tom Tromey  <tromey@redhat.com>
+
+	* NEWS: Add Python API Improvements section.
+
+2010-02-18  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* NEWS: Correct typo.
+
+2010-02-17  Tom Tromey  <tromey@redhat.com>
+
+	* objfiles.c (gdb_bfd_ref): Handle abfd==NULL.
+
+2010-02-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symfile.c (build_section_addr_info_from_objfile): Include sections
+	only if they are SEC_ALLOC or SEC_LOAD.
+
+2010-02-17  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR shlibs/11293
+	* solib-svr4.c (enable_break): Check size of CORE_ADDR instead
+	of ULONGEST for address size.
+
+2010-02-17  Tom Tromey  <tromey@redhat.com>
+
+	* NEWS: Add C++ improvements section.
+
+2010-02-17  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* python/python-internal.h [!WITH_THREAD] (PyGILState_Release,
+	PyThreadState_Swap): Avoid "statement with no effect" warning.
+
+2010-02-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* solib-svr4.c (enable_break <target_auxv_search>): New variable
+	addr_bit.  Adjust LOAD_ADDR sign for cross-arch inferiors.
+
+2010-02-17  Tristan Gingold  <gingold@adacore.com>
+	    Petr Hluzín <petr.hluzin@gmail.com>
+
+	* avr-tdep.c (avr_scan_prologue): Convert an if statement to a
+	gdb_assert.  Fix info->size for SIG prologue.
+
+2010-02-16  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* infcmd.c (show_inferior_tty_command): Check for NULL.
+	Correct output message.
+
+2010-02-16  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* linespec.c (decode_line_1): Handle FILE:FUNCTION even if
+	FUNCTION contains parentheses.  Improve removal of a trailing
+	single quote.
+
+2010-02-16  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gcore.c (do_bfd_delete_cleanup): New function.
+	(gcore_command): Use it.  Discard the cleanup after success.
+	(gcore_copy_callback): Delete dead code.
+
+2010-02-16  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* symfile.c (addr_info_make_relative): Always use
+	find_lowest_section.
+
+2010-02-16  Sami Wagiaalla <swagiaal@redhat.com>
+
+	* NEWS: Added entry for namespace fixes.
+
+2010-02-15  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (guess_structure_name): Allocate name on the
+	objfile obstack.
+
+2010-02-15  Tom Tromey  <tromey@redhat.com>
+
+	* c-typeprint.c (c_type_print_base): Reverse order of test.
+
+2010-02-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* solib-svr4.c (LM_ADDR_CHECK): New variable minpagesize.  Optionally
+	initialize it from ELF BFD.  Extend the prelink condition by it.
+
+2010-02-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* defs.h (parse_pid_to_attach): New.
+	* utils.c (parse_pid_to_attach): New.
+	* darwin-nat.c (darwin_attach): Replace ARGS parsing by parse_pid.
+	* gnu-nat.c (gnu_attach): Likewise.
+	* nto-procfs.c (procfs_attach): Likewise.
+	* procfs.c (procfs_attach): Likewise.
+	* windows-nat.c (windows_attach): Likewise.
+	* inf-ptrace.c (inf_ptrace_attach): Likewise.  Remove variable dummy.
+	* inf-ttrace.c (inf_ttrace_attach): Likewise.
+	* remote.c (extended_remote_attach_1): Likewise.  New comment on getpid
+	check.
+
+2010-02-14  Masaki Muranaka  <monaka@monami-software.com>
+
+	* MAINTAINERS: Add myself for write after approval privileges.
+
+2010-02-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* solib-svr4.c: (LM_ADDR_CHECK): Move variable align to a more inner
+	block.
+
+2010-02-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* solib-svr4.c: (LM_ADDR_CHECK): Print successful prelink adjustment
+	only if INFO_VERBOSE.
+
+2010-02-12  Tomas Holmberg <th@virtutech.com>
+
+	* mi/mi-main.c: Added the --reverse flag to the following MI
+	commands: exec-continue, exec-finish, exec-next, exec-step,
+	exec-next-instruction, exec-step-instruction. This is to
+	support reverse execution over the MI interface to gdb.
+
+2010-02-12  Pedro Alves  <pedro@codesourcery.com>
+
+	* tracepoint.c (_initialize_tracepoint): Specify that the address
+	range of `tfind outsize' is exclusive, and that the address range
+	of `tfind range' is inclusive, in the commands' help strings.
+
+2010-02-12  Joel Brobecker  <brobecker@adacore.com>
+
+	Spurious "dll not found" error messages on x64-windows.
+	* windows-nat.c: Add include of complaints.h.
+	(handle_unload_dll): Change dll-not-found error into a complaint.
+
+2010-02-12  Pedro Alves  <pedro@codesourcery.com>
+
+	* breakpoint.c (allocate_bp_location): Use bp_loc_other for
+	bp_tracepoint and bp_fast_tracepoint, not
+	bp_loc_software_breakpoint.
+	(update_global_location_list): Tracepoints are never duplicates of
+	anything.
+
+2010-02-12  Pedro Alves  <pedro@codesourcery.com>
+
+	* breakpoint.c (break_command_really): Change return type to int.
+	Return false if no breakpoint was created, true otherwise.
+	(trace_command): Don't set the tracepoint count if no tracepoint
+	was created.
+	(ftrace_command): Ditto.
+	(create_tracepoint_from_upload): Bail out if the tracepoint wasn't
+	created in the breakpoints table.
+
+2010-02-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* solib-svr4.c (LM_ADDR_CHECK): New comment on PPC-aware condition.
+
+2010-02-11  Pedro Alves  <pedro@codesourcery.com>
+
+	* ax-gdb.c (gen_exp_binop_rest) [BINOP_SUBSCRIPT]: Error out if
+	the offset value isn't of integral type.
+
+2010-02-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* breakpoint.c (delete_breakpoint) <bpt->related_breakpoint != NULL>:
+	New.
+
+2010-02-11  Pedro Alves  <pedro@codesourcery.com>
+
+	* ax-gdb.c (gen_exp_binop_rest) [BINOP_SUBSCRIPT]: Error out on
+	non-subscriptable types.
+	* valarith.c (binop_types_user_defined_p): New, abstracted out
+	from ...
+	(binop_user_defined_p): ... this.
+	* value.h (binop_types_user_defined_p): Declare.
+
+2010-02-11  Pedro Alves  <pedro@codesourcery.com>
+
+	* tracepoint.c (tfile_open): Remove spurious discard_cleanups.
+	Merge uploaded TSVs before merging uploaded tracepoints.
+
+2010-02-11  Pedro Alves  <pedro@codesourcery.com>
+
+	* ax-gdb.c (gen_deref): Don't allow dereferencing void pointers.
+
+2010-02-11  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* mi/mi-cmd-stack.c (mi_cmd_stack_list_locals): Add extra
+	whitespace character after a dot in comment.
+	(mi_cmd_stack_list_arguments, mi_cmd_stack_list_variables):
+	Likewise.
+	(list_args_or_locals): For the 'all' (that is
+	-stack-list-variables) case, always output list of tuples.
+	Output 'arg' field if variable is argument.
+
+2010-02-10  Tom Tromey  <tromey@redhat.com>
+
+	* parser-defs.h (parser_debug): Declare.
+	* parse.c (_initialize_parse): Install "debug parser" set/show
+	command.
+	(parser_debug): New global.
+	(show_parserdebug): New function.
+	* c-exp.y (c_parse): Set yydebug.
+
+2010-02-10  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* target-descriptions.c (tdesc_type): Add TDESC_TYPE_I387_EXT,
+	TDESC_TYPE_I386_EFLAGS and TDESC_TYPE_I386_MXCSR.
+	(tdesc_predefined_types): Add i387_ext, i386_eflags and
+	i386_mxcsr.
+	(tdesc_find_type): New.
+	(tdesc_gdb_type): Use tdesc_find_type.  Handle TDESC_TYPE_I387_EXT,
+	TDESC_TYPE_I386_EFLAGS and TDESC_TYPE_I386_MXCSR.
+
+	* target-descriptions.h (tdesc_find_type): New.
+
+2010-02-10  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb-gdb.py: Comment fix.
+
+2010-02-09  Tristan Gingold  <gingold@adacore.com>
+
+	* machoread.c (macho_symfile_relocate): New function.
+	(macho_sym_fns): Use macho_symfile_relocate instead of
+	default_symfile_relocate.
+	(macho_oso_data): New type.
+	(current_oso): New variable.
+	(macho_add_oso_symfile): Do not compute section_addr_info, but
+	instead set vma of sections.
+	Do not set SYMFILE_VERBOSE to call symbol_file_add_from_bfd.
+	Set and clear current_oso.
+
+2010-02-09  Joel Brobecker  <brobecker@adacore.com>
+
+	Wrong type description for tagged type parameter.
+	* ada-lang.c (ada_evaluate_subexp) [OP_VAR_VALUE]: When noside is
+	EVAL_AVOID_SIDE_EFFECTS, also handle the case when type is a
+	reference to a tagged type.
+
+2010-02-09  Tristan Gingold  <gingold@adacore.com>
+
+	* objfiles.c (objfile_separate_debug_iterate): Do not iterate on
+	brothers of the parent.
+
+2010-02-08  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/8017:
+	* value.h: Update.
+	* valops.c (search_struct_field): Make 'name' const.
+	(search_struct_method): Likewise.
+	(find_method_list): Make 'method' const.
+	(value_struct_elt): Make 'name' and 'err' const.
+	(value_find_oload_method_list): Make 'method' const.
+	(find_overload_match): Make 'name' const.
+	* eval.c (evaluate_subexp_standard): New locals function,
+	function_name.
+	<OP_FUNCALL>: Handle OP_SCOPE specially.
+
+2010-02-08  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* infrun.c (handle_inferior_event): Do not look up regcache
+	for exited processes.
+
+Mon Feb  8 13:17:10 2010  Chris Moller  <moller@mollerware.com>
+
+	PR gdb/10728
+	* valarith.c (value_ptrdiff): Added a test for a zero type length,
+	warn if found, and assume length = 1. 
+
+2010-02-08  Chris Moller  <cmoller@redhat.com>
+
+	PR gdb/9067
+	* cp-valprint.c (cp_print_value_fields) Fix use of obstacks.
+	cp_print_static_field)  Fix use of obstacks.
+	
+2010-02-08  Pedro Alves  <pedro@codesourcery.com>
+
+	* linux-nat.c (linux_nat_resume): In non-stop, also only tag
+	resumed LWPs as resumed.
+	(linux_nat_wait_1): If there's no resumed LWP in the set of LWPs
+	we're waiting for, bail out with TARGET_WAITKIND_IGNORE, instead
+	of throwing an internal error.  If an LWP of a process we're not
+	waiting for reports a signal, don't force collecting a SIGSTOP,
+	and if it was breakpoint hit in non-stop mode, cancel it.  Don't
+	go through all LWPs cancelling breakpoints in non-stop mode.
+	(resume_stopped_resumed_lwps): New.
+	(linux_nat_wait): Use it.
+
+2010-02-07  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* features/Makefile (WHICH): Add i386/i386, i386/i386-linux,
+	i386/amd64 and i386/amd64-linux.
+	(i386/i386-expedite): New.
+	(i386/i386-linux-expedite): Likewise.
+	(i386/amd64-expedite):Likewise.
+	(i386/amd64-linux-expedite): Likewise.
+	($(outdir)/i386/i386-linux.dat): Likewise.
+	($(outdir)/i386/amd64.dat): Likewise.
+	($(outdir)/i386/amd64-linux.dat): Likewise.
+
+	* features/i386/32bit-core.xml: New.
+	* features/i386/32bit-linux.xml: Likewise.
+	* features/i386/32bit-sse.xml: Likewise.
+	* features/i386/64bit-core.xml: Likewise.
+	* features/i386/64bit-linux.xml: Likewise.
+	* features/i386/64bit-sse.xml: Likewise.
+	* features/i386/i386-linux.xml: Likewise.
+	* features/i386/i386.xml: Likewise.
+	* features/i386/amd64-linux.xml: Likewise.
+	* features/i386/amd64.xml: Likewise.
+	* features/i386/i386-linux.c: Likewise.
+	* features/i386/i386.c: Likewise.
+	* features/i386/amd64-linux.c: Likewise.
+	* features/i386/amd64.c: Likewise.
+
+2010-02-05  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	PR c++/7935:
+	* cp-support.h: Added char* alias element to using_direct data
+	struct.
+	(cp_add_using): Added char* alias argument.
+	(cp_add_using_directive): Ditto.
+	* cp-namespace.c: Updated with the above changes.
+	(cp_lookup_symbol_imports): Check for aliases.
+	* dwarf2read.c (read_import_statement): Figure out local alias
+	for the import and pass it on to cp_add_using.
+	(read_namespace): Pass alias argument to cp_add_using.
+
+2010-02-05  Hui Zhu  <teawater@gmail.com>
+
+	* defs.h (gdb_bfd_errmsg): New extern.
+	* exec.c (exec_file_attach): Change bfd_errmsg to
+	gdb_bfd_errmsg.
+	* utils.c (AMBIGUOUS_MESS1): New macro.
+	(AMBIGUOUS_MESS2): New macro.
+	(gdb_bfd_errmsg): New function.
+
+2010-02-04  Doug Evans  <dje@google.com>
+
+	* solib-svr4.c (enable_break): Add comment.
+
+2010-02-04  Anthony Green  <green@moxielogic.com>
+
+	* moxie-tdep.c (moxie_analyze_prologue): Fail protocol analysis
+	gracefully.
+
+2010-02-04  Tom Tromey  <tromey@redhat.com>
+
+	* valops.c (search_struct_field): Account for
+	value_embedded_offset.  Fix check for virtual base past the end of
+	the object.  Use value_copy when making a slice of the value.
+
+2010-02-04  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR tui/9622
+	* tui/tui-interp.c (tui_init): Call tui_initialize_readline
+	only if gdb_stdout is a tty.
+
+2010-02-04  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* target-descriptions.c: Include "osabi.h".
+	(maint_print_c_tdesc_cmd): Generate set_tdesc_osabi for valid
+	OSABI.
+
+2010-02-04  Tristan Gingold  <gingold@adacore.com>
+
+	* machoread.c (macho_add_oso): Renamed to macho_register_oso.
+	(macho_symtab_read): Adjust calls to macho_add_oso.
+	(macho_oso_symfile): Renamed to macho_symfile_read_all_oso.
+	(macho_symfile_read): Adjust call to macho_oso_symfile.
+	(macho_new_init): Move this function after declarations.
+	(macho_symfile_init): Ditto.
+	* darwin-nat-info.c (darwin_lib_gdb_ports): Remove.
+	* darwin-nat.c (darwin_lookup_task): Remove unused prototype.
+
+2010-02-04  Vladimir Prus  <vladimir@codesourcery.com>
+
+	Include MI command in remotelog.
+
+	* mi/mi-main.c (mi_execute_command): Call target_log_command.
+
+2010-02-03  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* remote.c (remote_state): Remove gdbarch.
+	(init_remote_state): Don't set gdbarch.
+	(remote_query_supported): Pass target_gdbarch instead of
+	rs->gdbarch to gdbarch_qsupported.
+
+2010-02-03  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* gdbarch.sh: Add qsupported.
+
+	* gdbarch.c: Regenerated.
+	* gdbarch.h: Likewise.
+
+	* remote.c (remote_state): Add gdbarch.
+	(init_remote_state): Set gdbarch.
+	(remote_query_supported): Support gdbarch_qsupported.
+
+2010-02-03  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* amd64fbsd-nat.c (amd64fbsd_supply_pcb): Also check for
+	__FreeBSD_kernel_version.
+
+2010-02-03  Tristan Gingold  <gingold@adacore.com>
+
+	* symfile.h (struct sym_fns): Add sym_relocate field.
+	(default_symfile_relocate): New prototype.
+	(symfile_relocate_debug_section): First argument is now an objfile.
+	* symfile.c (default_symfile_relocate): Rename from
+	symfile_relocate_debug_section, first argument is now an objfile.
+	(symfile_relocate_debug_section): New function.
+	* coffread.c (coff_sym_fns): Set sym_relocate field.
+	* somread.c (som_sym_fns): Ditto.
+	* mipsread.c (ecoff_sym_fns): Ditto.
+	* machoread.c (macho_sym_fns): Ditto.
+	* elfread.c (elf_sym_fns): Ditto.
+	* dwarf2read.c (dwarf2_read_section): Ditto.
+	* xcoffread.c (xcoff_sym_fns): Ditto.
+	* dbxread.c (aout_sym_fns): Ditto.
+	(dbx_psymtab_to_symtab): Adjust call to symfile_relocate_debug_section.
+	(elfstab_build_psymtabs): Ditto.
+
+2010-02-03  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* defs.h (MAX_REGISTER_SIZE): Increase to 32.
+
 2010-02-02  Tom Tromey  <tromey@redhat.com>
 
 	* valops.c (value_cast_structs): Try downcasting using the RTTI
