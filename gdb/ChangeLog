@@ -1,3 +1,207 @@
+2010-03-01  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* target-descriptions.c (tdesc_type): Remove
+	TDESC_TYPE_I386_EFLAGS and TDESC_TYPE_I386_MXCSR.
+	(tdesc_predefined_types): Likewise.
+	(tdesc_gdb_type): Likewise.  Pass NULL to append_flags_type_flag
+	if flag name is empty.
+	(maint_print_c_tdesc_cmd): Handle TDESC_TYPE_FLAGS.
+
+	* features/i386/32bit-core.xml: Define i386_eflags.
+	* features/i386/64bit-core.xml: Likewise.
+
+	* features/i386/32bit-sse.xml: Define i386_mxcsr.
+	* features/i386/64bit-sse.xml: Likewise.
+
+	* features/i386/amd64-linux.c: Regenerated.
+	* features/i386/amd64.c: Likewise.
+	* features/i386/i386-linux.c: Likewise.
+	* features/i386/i386.c: Likewise.
+
+2010-03-01  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdbtypes.c (append_composite_type_field_raw): New.
+	(append_composite_type_field_aligned): Use the new function.
+	* gdbtypes.h (append_composite_type_field_raw): Declare.
+	* target-descriptions.c (struct tdesc_type_field): Add start and end.
+	(struct tdesc_type_flag): New type.
+	(struct tdesc_type): Add TDESC_TYPE_STRUCT and TDESC_TYPE_FLAGS to
+	kind.  Add size to u.u.  Add u.f for flags.
+	(tdesc_gdb_type): Handle TDESC_TYPE_STRUCT and TDESC_TYPE_FLAGS.
+	(tdesc_free_type): Likewise.
+	(tdesc_create_struct, tdesc_set_struct_size, tdesc_create_flags): New.
+	(tdesc_add_field): Handle TDESC_TYPE_STRUCT.
+	(tdesc_add_bitfield, tdesc_add_flag): New.
+	* target-descriptions.h (tdesc_create_struct, tdesc_set_struct_size)
+	(tdesc_create_flags, tdesc_add_bitfield, tdesc_add_flag): Declare.
+	* xml-tdesc.c (struct tdesc_parsing_data): Rename current_union to
+	current_type.  Add current_type_size and current_type_is_flags.
+	(tdesc_start_union): Clear the new fields.
+	(tdesc_start_struct, tdesc_start_flags): New.
+	(tdesc_start_field): Handle struct fields, including bitfields.
+	(field_attributes): Make type optional.  Add start and end.
+	(union_children): Rename to struct_union_children.
+	(union_attributes): Rename to struct_union_attributes.  Add optional
+	size.
+	(flags_attributes): New.
+	(feature_children): Add struct and flags.
+	* features/gdb-target.dtd: Add flags and struct to features.
+	Make field type optional.  Add field start and end.
+
+2010-03-01  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* amd64-linux-nat.c (AMD64_LINUX_USER64_CS): New.
+	(amd64_linux_read_description): Likewise.
+	(_initialize_amd64_linux_nat): Set to_read_description to
+	amd64_linux_read_description.
+
+	* amd64-linux-tdep.c: Include "features/i386/amd64-linux.c".
+	(amd64_linux_register_name): Removed.
+	(amd64_linux_register_type): Likewise.
+	(amd64_linux_core_read_description): New.
+	(amd64_linux_init_abi): Set target description to
+	tdesc_amd64_linux if needed.  Support orig_rax in target
+	description.  Don't call set_gdbarch_register_name nor
+	set_gdbarch_register_type.  Call
+	set_gdbarch_core_read_description.
+	(_initialize_amd64_linux_tdep): Call
+	initialize_tdesc_amd64_linux.
+
+	* amd64-linux-tdep.h (tdesc_amd64_linux): New.
+
+	* amd64-tdep.c:  Include "features/i386/amd64.c".
+	(amd64_register_names): Removed.
+	(amd64_register_name): Likewise.
+	(amd64_register_type): Likewise.
+	(amd64_init_abi):  Set num_core_regs and register_names.  Set
+	target description to tdesc_amd64 if needed.  Don't call 
+	set_gdbarch_register_name nor set_gdbarch_register_type.
+	(_initialize_amd64_tdep): New.
+
+	* i386-linux-nat.c (i386_linux_read_description): New.
+	(_initialize_i386_linux_nat): Set to_read_description to
+	i386_linux_read_description.
+
+	* i386-linux-tdep.c: Include "features/i386/i386-linux.c".
+	(i386_linux_register_name): Removed.
+	(i386_linux_core_read_description): New.
+	(i386_linux_read_description): Likewise.
+	(i386_linux_init_abi): Don't call set_gdbarch_register_name.
+	Set target description to tdesc_i386_linux if needed.  Support
+	orig_eax.  Set register_reggroup_p.  Call
+	set_gdbarch_core_read_description.
+	(_initialize_i386_linux_tdep): Call initialize_tdesc_i386_linux.
+
+	* i386-linux-tdep.h (tdesc_i386_linux): New.
+
+	* i386-nto-tdep.c (i386nto_regset_id): Replace I386_NUM_FREGS
+	with I387_NUM_REGS.
+
+	* i386-tdep.c: Include "features/i386/i386.c".
+	(i386_register_names): Make it const.
+	(i386_mmx_names): Likewise.
+	(i386_num_register_names): Removed.
+	(i386_register_name): Likewise.
+	(i386_eflags_type): Likewise.
+	(i386_mxcsr_type): Likewise.
+	(i386_sse_type): Likewise.
+	(i386_register_type): Likewise.
+	(i387_ext_type): Call tdesc_find_type instead of arch_float_type.
+	(i386_pseudo_register_name): New.
+	(i386_pseudo_register_type): Likewise.
+	(i386_mmx_type): Make it static.
+	(i386_gdbarch_init): Check arch.  Replace I386_NUM_FREGS with
+	I387_NUM_REGS.  Set num_core_regs and register_names.  Don't
+	call set_gdbarch_register_name nor set_gdbarch_register_type.
+	Set register_reggroup_p.  Set target description to tdesc_i386
+	if needed.  Call set_tdesc_pseudo_register_type,
+	set_tdesc_pseudo_register_name and tdesc_use_registers.
+	(_initialize_i386_tdep): Call initialize_tdesc_i386.
+	initialize_tdesc_x86_64.
+
+	* i386-tdep.h (gdbarch_tdep): Remove i386_eflags_type,
+	i386_mxcsr_type and i386_sse_type.  Add num_core_regs,
+	register_names, tdesc and register_reggroup_p.
+	(I386_NUM_FREGS): Removed.
+	(i386_eflags_type): Likewise.
+	(i386_mxcsr_type): Likewise.
+	(i386_mmx_type): Likewise.
+	(i386_sse_type): Likewise.
+	(i386_register_name): Likewise.
+	(i386_regnum): Add I386_MXCSR_REGNUM.
+	(I386_SSE_NUM_REGS): Defined with I386_MXCSR_REGNUM.
+
+	* i387-tdep.h (I387_NUM_REGS): New.
+
+	* regformats/i386/i386-linux.dat: Generated.
+	* regformats/i386/i386.dat: Likewise.
+	* regformats/i386/amd64-linux.dat: Likewise.
+	* regformats/i386/amd64.dat: Likewise.
+
+	* regformats/reg-i386-linux.dat: Removed.
+	* regformats/reg-i386.dat: Likewise.
+	* regformats/reg-x86-64-linux.dat: Likewise.
+	* regformats/reg-x86-64.dat: Likewise.
+
+2010-03-01  Corinna Vinschen  <vinschen@redhat.com>
+
+	* remote-fileio.c (remote_fileio_func_rename): Use Cygwin 1.7
+	cygwin_conv_path API rather than the deprecated
+	cygwin_conv_to_full_posix_path.
+	* windows-nat.c:
+	(GetModuleFileNameExA): Undefine for Cygwin.
+	(GetModuleFileNameExW): Define for Cygwin.
+	(get_module_name): Change size of pathbuf to PATH_MAX for Cygwin.
+	Call GetModuleFileNameExW and convert path to POSIX using
+	cygwin_conv_path.
+	(windows_make_so): Always define p.  Drop unused variable m.
+	Don't use Win32 functions to check file existance, rather use
+	access on Cygwin.  Fetch system directory using GetSystemDirectoryW.
+	Use canonicalize_file_name to get full path.
+	(get_image_name): Use wcstombs, rather than WideCharToMultiByte
+	to convert Unicode pathname to multibyte on Cygwin.  Otherwise,
+	use correct target buffer size in call to WideCharToMultiByte.
+	(handle_load_dll): Change size of dll_buf to PATH_MAX for Cygwin.
+	(windows_pid_to_exec_file): Change size of path to PATH_MAX for Cygwin.
+	(windows_create_inferior): Convert all paths and arguments to wchar_t
+	and use CreateProcessW on Cygwin.
+	(_initialize_windows_nat): Disable DOS-style path warning on Cygwin.
+	(bad_GetModuleFileNameExA): Undefine for Cygwin.
+	(bad_GetModuleFileNameExW): Define for Cygwin.
+	(_initialize_loadable): Load GetModuleFileNameExW into
+	dyn_GetModuleFileNameExW on Cygwin.  Don't load ANSI function on Cygwin.
+
+2010-02-28  Phil Muldoon  <pmuldoon@redhat.com>
+
+	PR python/11036
+	* python/py-frame.c (frapy_read_var): Add block argument and logic
+	to cope with user provided blocks.
+
+2010-02-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* infcall.c (call_function_by_hand): Remove gdb_assert on sp and old_sp.
+	New comment.
+
+2010-02-28  Corinna Vinschen  <vinschen@redhat.com>
+
+	* Makefile.in (SUBDIR_MI_OBS): Move mi-common.o from here...
+	(COMMON_OBS): ... to here since it's used unconditionally.
+	(SUBDIR_MI_SRCS): Move mi/mi-common.c from here...
+	(SFILES): To here.
+
+2010-02-26  David Daney  <ddaney@caviumnetworks.com>
+
+	* mips-linux-tdep.c: Update struct sigframe comments.
+	(SIGFRAME_CODE_OFFSET): Delete macro.
+	(mips_linux_o32_sigframe_init): Calculate sigcontext_base using
+	this_frame's sp.
+	(mips_linux_n32n64_sigframe_init): Same.
+
+2010-02-26  Kevin Buettner  <kevinb@redhat.com>
+
+	* remote-mips.c (mips_load): Don't use pseudo-register when
+	invalidating regcache.
+
 2010-02-26  Daniel Jacobowitz  <dan@codesourcery.com>
 
 	* arm-tdep.c (thumb_get_next_pc): Correct conditional branch opcode.
