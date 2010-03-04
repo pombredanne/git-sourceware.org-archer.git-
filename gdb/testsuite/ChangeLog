@@ -1,3 +1,37 @@
+2010-03-04  Keith Seitz  <keiths@redhat.com>
+
+	* gdb.cp/overload.exp: Test that the filename portion of a linespec
+	can be quoted.  Test that both the filename and function/line
+	portions can be quoted at the same time.
+
+2010-03-04  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.base/watch-non-mem.c, gdb.base/watch-non-mem.exp: New.
+
+2010-03-03  Doug Evans  <dje@google.com>
+
+	* lib/gdb.exp (gdb_compile_pthreads): Handle case where
+	libc contains libpthread.
+
+	* gdb.threads/linux-dp.c (shared_random): Call rand instead of rand_r.
+	* gdb.threads/linux-dp.exp: Compile with gdb_compile_pthreads instead
+	of gdb_compile.  Add another pattern to match android backtrace.
+
+2010-03-03  Tom Tromey  <tromey@redhat.com>
+
+	PR gdb/11345:
+	* gdb.base/printcmds.exp (test_printf): Add test.
+
+2010-03-02  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* gdb.arch/amd64-byte.exp: New.
+	* gdb.arch/amd64-dword.exp: Likewise.
+	* gdb.arch/amd64-pseudo.c: Likewise.
+	* gdb.arch/amd64-word.exp: Likewise.
+	* gdb.arch/i386-byte.exp: Likewise.
+	* gdb.arch/i386-pseudo.c: Likewise.
+	* gdb.arch/i386-word.exp: Likewise.
+
 2010-03-01  Daniel Jacobowitz  <dan@codesourcery.com>
 
 	* gdb.xml/extra-regs.xml: Add struct1, struct2, and flags

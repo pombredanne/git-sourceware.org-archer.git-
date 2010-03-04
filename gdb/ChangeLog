@@ -1,3 +1,146 @@
+2010-03-04  Keith Seitz  <keiths@redhat.com>
+
+	* linespec.c (decode_line_1): Update comments for is_quote_enclosed.
+	If the filename portion of the linespec was quoted, recheck the
+	remainder for additional quoting.
+	(locate_first_half): Skip over completer chars, too.
+
+2010-03-04  Tom Tromey  <tromey@redhat.com>
+
+	* printcmd.c (printf_command): Pass dummy argument to
+	printf_filtered.
+
+2010-03-04  Doug Evans  <dje@google.com>
+
+	* arm-tdep.c (arm_make_stub_cache): Delete unused locals reg,
+	unwound_fp.
+
+	* arm-tdep.c (arm_stub_unwind_sniffer): Add comment.
+
+2010-03-04  Pedro Alves  <pedro@codesourcery.com>
+
+	* breakpoint.c (update_watchpoint): Create a sentinel location if
+	the software watchpoint isn't watching any memory.
+	(breakpoint_address_bits): Skip dummy software watchpoint locations.
+
+2010-03-04  Pedro Alves  <pedro@codesourcery.com>
+
+	* utils.c (fputs_maybe_filtered): Check if there's already a top
+	level interpreter before dereferencing it.  If there isn't one,
+	don't paginate either.
+
+2010-03-04  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-tdep.c (arm_pc_is_thumb): Add heuristic that tries to get
+	the state right when single stepping.
+	(arm_get_next_pc_raw, thumb_get_next_pc_raw): New functions.
+	Get the next PC along with the instruction state.
+	(thumb_get_next_pc): Remove.
+	(arm_get_next_pc): Modified to use arm_get_next_pc_raw.
+
+2010-03-04  Hui Zhu  <teawater@gmail.com>
+
+	* i386-tdep.c (i386_process_record): Change "addr" to "tmpu64".
+
+2010-03-03  Pedro Alves  <pedro@codesourcery.com>
+
+	* utils.c (fputs_maybe_filtered): Always disable pagination if the
+	top level interpreter is MI.
+
+2010-03-03 Stan Shebs  <stan@codesourcery.com>
+
+	* remote.c (remote_download_tracepoint): Iterate over locations.
+	* tracepoint.c (validate_actionline): Ditto.
+	(encode_actions): Add location argument.
+	(trace_dump_command): Check all locations to see if stepping
+	frame.
+
+2010-03-03  H.J. Lu  <hongjiu.lu@intel.com>
+	    Eli Zaretskii  <eliz@gnu.org>
+
+	* NEWS: Add X86 general purpose registers section.
+
+2010-03-03  Tom Tromey  <tromey@redhat.com>
+
+	PR mi/11098:
+	* varobj.c (install_new_value): Handle case where new print_value
+	is NULL.
+
+2010-03-03  Dainis Jonitis  <jonitis@gmail.com>
+
+	PR gdb/11345:
+	* printcmd.c (printf_command): Print end of format string using
+	printf_filtered.
+
+2010-03-02  Tom Tromey  <tromey@redhat.com>
+
+	* mi/mi-cmd-break.c (mi_read_next_line): Add missing 'void'.
+	* defs.h (read_command_lines_1): Add missing 'void'.
+	* cli/cli-script.c (recurse_read_control_structure): Add missing
+	'void'.
+	(read_next_line): Likewise.
+	(read_command_lines_1): Likewise.
+
+2010-03-02  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* spu-tdep.c (spu_analyze_prologue): Track instruction to
+	store backchain as part of prologue.
+
+2010-03-02  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* progspace.c (update_address_spaces): Update inferior address spaces
+	also.
+
+2010-03-02  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (add_partial_subprogram): Add missing baseaddr to
+	lowpc,highpc args to addrmap_set_empty.
+
+2010-03-02  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* amd64-tdep.c (amd64_byte_names): New.
+	(amd64_word_names): Likewise.
+	(amd64_dword_names): Likewise.
+	(amd64_pseudo_register_name): Likewise.
+	(amd64_pseudo_register_read): Likewise.
+	(amd64_pseudo_register_write): Likewise.
+	(amd64_init_abi): Set num_byte_regs, num_word_regs, num_dword_regs
+	and num_mmx_regs.  Call set_gdbarch_pseudo_register_read,
+	set_gdbarch_pseudo_register_write and
+	set_tdesc_pseudo_register_name.  Don't call
+	set_gdbarch_num_pseudo_regs.  Don't set mm0_regnum.
+
+	* i386-tdep.c (i386_num_mmx_regs): Removed.
+	(i386_num_pseudo_regs): Likewise.
+	(i386_byte_names): New.
+	(i386_word_names): Likewise.
+	(i386_byte_regnum_p): Likewise.
+	(i386_word_regnum_p): Likewise.
+	(i386_mmx_regnum_p): Updated.
+	(i386_pseudo_register_name): Make it global.  Handle byte and
+	word pseudo-registers.
+	(i386_pseudo_register_read): Likewise.
+	(i386_pseudo_register_write): Likewise.
+	(i386_pseudo_register_type): Handle byte, word and dword
+	pseudo-registers
+	(i386_register_reggroup_p): Don't include pseudo
+	registers, except for MXX, in any register groups.  Don't
+	include pseudo byte, word, dword registers in general_reggroup.
+	(i386_gdbarch_init): Set num_byte_regs, num_word_regs,
+	num_dword_regs, al_regnum, ax_regnum and eax_regnum.  Put MMX
+	pseudo-registers after word pseudo-registers.  Call
+	set_gdbarch_num_pseudo_regs after calling gdbarch_init_osabi.
+
+	* i386-tdep.h (gdbarch_tdep): Add num_mmx_regs, num_byte_regs,
+	al_regnum, num_word_regs, ax_regnum, num_dword_regs and
+	eax_regnum.
+	(i386_byte_regnum_p): New.
+	(i386_word_regnum_p): Likewise.
+	(i386_dword_regnum_p): Likewise.
+	(i386_pseudo_register_name): Likewise.
+	(i386_pseudo_register_read): Likewise.
+	(i386_pseudo_register_write): Likewise.
+
 2010-03-01  H.J. Lu  <hongjiu.lu@intel.com>
 
 	* target-descriptions.c (tdesc_type): Remove
