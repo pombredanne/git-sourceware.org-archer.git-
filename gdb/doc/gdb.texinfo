@@ -1028,7 +1028,9 @@ Run in batch mode.  Exit with status @code{0} after processing all the
 command files specified with @samp{-x} (and all commands from
 initialization files, if not inhibited with @samp{-n}).  Exit with
 nonzero status if an error occurs in executing the @value{GDBN} commands
-in the command files.
+in the command files.  Batch mode also disables pagination;
+@pxref{Screen Size} and acts as if @kbd{set confirm off} were in
+effect (@pxref{Messages/Warnings}).
 
 Batch mode may be useful for running @value{GDBN} as a filter, for
 example to download and run a program on another computer; in order to
@@ -6661,7 +6663,8 @@ The usual way to examine data in your program is with the @code{print}
 command (abbreviated @code{p}), or its synonym @code{inspect}.  It
 evaluates and prints the value of an expression of the language your
 program is written in (@pxref{Languages, ,Using @value{GDBN} with
-Different Languages}).
+Different Languages}).  It may also print the expression using a
+Python-based pretty-printer (@pxref{Pretty Printing}).
 
 @table @code
 @item print @var{expr}
@@ -7159,8 +7162,10 @@ array.
 @item r
 @cindex raw printing
 Print using the @samp{raw} formatting.  By default, @value{GDBN} will
-use a type-specific pretty-printer.  The @samp{r} format bypasses any
-pretty-printer which might exist for the value's type.
+use a Python-based pretty-printer, if one is available (@pxref{Pretty
+Printing}).  This typically results in a higher-level display of the
+value's contents.  The @samp{r} format bypasses any Python
+pretty-printer which might exist.
 @end table
 
 For example, to print the program counter in hex (@pxref{Registers}), type
@@ -18491,7 +18496,9 @@ from wrapping its output.
 @itemx set pagination off
 @kindex set pagination
 Turn the output pagination on or off; the default is on.  Turning
-pagination off is the alternative to @code{set height 0}.
+pagination off is the alternative to @code{set height 0}.  Note that
+running @value{GDBN} with the @option{--batch} option (@pxref{Mode
+Options, -batch}) also automatically disables pagination.
 
 @item show pagination
 @kindex show pagination
@@ -18714,7 +18721,9 @@ commands, you can disable this ``feature'':
 @cindex confirmation
 @cindex stupid questions
 @item set confirm off
-Disables confirmation requests.
+Disables confirmation requests.  Note that running @value{GDBN} with
+the @option{--batch} option (@pxref{Mode Options, -batch}) also
+automatically disables confirmation requests.
 
 @item set confirm on
 Enables confirmation requests (the default).
@@ -19629,6 +19638,21 @@ call this function.
 Flush @value{GDBN}'s paginated standard output stream.  Flushing
 @code{sys.stdout} or @code{sys.stderr} will automatically call this
 function.
+@end defun
+
+@findex gdb.target_charset
+@defun target_charset
+Return the name of the current target character set (@pxref{Character
+Sets}).  This differs from @code{gdb.parameter('target-charset')} in
+that @samp{auto} is never returned.
+@end defun
+
+@findex gdb.target_wide_charset
+@defun target_wide_charset
+Return the name of the current target wide character set
+(@pxref{Character Sets}).  This differs from
+@code{gdb.parameter('target-wide-charset')} in that @samp{auto} is
+never returned.
 @end defun
 
 @node Exception Handling

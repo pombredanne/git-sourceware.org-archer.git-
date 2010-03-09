@@ -364,18 +364,13 @@ build_section_addr_info_from_objfile (const struct objfile *objfile)
   struct section_addr_info *sap;
   int i;
   struct bfd_section *sec;
-  int addr_bit = gdbarch_addr_bit (objfile->gdbarch);
-  CORE_ADDR mask = CORE_ADDR_MAX;
-
-  if (addr_bit < (sizeof (CORE_ADDR) * HOST_CHAR_BIT))
-    mask = ((CORE_ADDR) 1 << addr_bit) - 1;
 
   sap = alloc_section_addr_info (objfile->num_sections);
   for (i = 0, sec = objfile->obfd->sections; sec != NULL; sec = sec->next)
     if (bfd_get_section_flags (objfile->obfd, sec) & (SEC_ALLOC | SEC_LOAD))
       {
 	sap->other[i].addr = (bfd_get_section_vma (objfile->obfd, sec)
-			      + objfile->section_offsets->offsets[i]) & mask;
+			      + objfile->section_offsets->offsets[i]);
 	sap->other[i].name = xstrdup (bfd_get_section_name (objfile->obfd,
 							    sec));
 	sap->other[i].sectindex = sec->index;
@@ -597,7 +592,8 @@ addr_info_make_relative (struct section_addr_info *addrs, bfd *abfd)
 
   for (i = 0; i < addrs->num_sections && addrs->other[i].name; i++)
     {
-      asection *sect = bfd_get_section_by_name (abfd, addrs->other[i].name);
+      const char *sect_name = addrs->other[i].name;
+      asection *sect = bfd_get_section_by_name (abfd, sect_name);
 
       if (sect)
 	{
@@ -614,8 +610,22 @@ addr_info_make_relative (struct section_addr_info *addrs, bfd *abfd)
 	}
       else
 	{
-	  warning (_("section %s not found in %s"), addrs->other[i].name,
-		   bfd_get_filename (abfd));
+	  /* This section does not exist in ABFD, which is normally
+	     unexpected and we want to issue a warning.
+
+	     However, the ELF prelinker does create a couple of sections
+	     (".gnu.liblist" and ".gnu.conflict") which are marked in the main
+	     executable as loadable (they are loaded in memory from the
+	     DYNAMIC segment) and yet are not present in separate debug info
+	     files.  This is fine, and should not cause a warning.  Shared
+	     libraries contain just the section ".gnu.liblist" but it is not
+	     marked as loadable there.  */
+
+	  if (!(strcmp (sect_name, ".gnu.liblist") == 0
+		|| strcmp (sect_name, ".gnu.conflict") == 0))
+	    warning (_("section %s not found in %s"), sect_name,
+		     bfd_get_filename (abfd));
+
 	  addrs->other[i].addr = 0;
 
 	  /* SECTINDEX is invalid if ADDR is zero.  */

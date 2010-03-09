@@ -868,9 +868,16 @@ solib_svr4_r_map (struct svr4_info *info)
 {
   struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
   struct type *ptr_type = builtin_type (target_gdbarch)->builtin_data_ptr;
+  CORE_ADDR addr = 0;
+  volatile struct gdb_exception ex;
 
-  return read_memory_typed_address (info->debug_base + lmo->r_map_offset,
-				    ptr_type);
+  TRY_CATCH (ex, RETURN_MASK_ERROR)
+    {
+      addr = read_memory_typed_address (info->debug_base + lmo->r_map_offset,
+                                        ptr_type);
+    }
+  exception_print (gdb_stderr, ex);
+  return addr;
 }
 
 /* Find r_brk from the inferior's debug base.  */
@@ -2034,7 +2041,6 @@ struct target_so_ops svr4_so_ops;
 static struct symbol *
 elf_lookup_lib_symbol (const struct objfile *objfile,
 		       const char *name,
-		       const char *linkage_name,
 		       const domain_enum domain)
 {
   bfd *abfd;
@@ -2052,8 +2058,7 @@ elf_lookup_lib_symbol (const struct objfile *objfile,
   if (abfd == NULL || scan_dyntag (DT_SYMBOLIC, abfd, NULL) != 1)
     return NULL;
 
-  return lookup_global_symbol_from_objfile
-		(objfile, name, linkage_name, domain);
+  return lookup_global_symbol_from_objfile (objfile, name, domain);
 }
 
 extern initialize_file_ftype _initialize_svr4_solib; /* -Wmissing-prototypes */
