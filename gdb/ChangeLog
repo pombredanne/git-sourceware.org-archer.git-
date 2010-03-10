@@ -1,3 +1,248 @@
+2010-03-10  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (struct pubnames_header): Remove.
+	(_PUBNAMES_HEADER): Remove.
+	(_ACTUAL_PUBNAMES_HEADER_SIZE): Remove.
+	(struct aranges_header): Remove.
+	(_ARANGES_HEADER, _ACTUAL_ARANGES_HEADER_SIZE): Remove.
+	(struct dwarf2_per_objfile) <pubnames, aranges>: Remove.
+	(PUBNAMES_SECTION): Remove.
+	(ARANGES_SECTION): Remove.
+	(dwarf2_locate_sections): Don't handle pubnames or aranges.
+	(dwarf2_build_psymtabs): Remove dead code.
+	(dwarf2_build_psymtabs_easy): Remove.
+
+2010-03-10  Tom Tromey  <tromey@redhat.com>
+
+	* elfread.c (elf_symfile_read): Don't call
+	dwarf2_build_frame_info.
+	* dwarf2read.c (struct dwarf2_section_info) <readin>: New field.
+	(struct dwarf2_per_objfile) <objfile>: New field.
+	(dwarf2_has_info): Now idempotent.  Set objfile field.
+	(dwarf2_read_section): Check and set readin field.  Call
+	posix_madvise.
+	(dwarf2_build_psymtabs): Don't read all sections.
+	(read_type_comp_unit_head): Read types section.
+	(create_debug_types_hash_table): Likewise.
+	(init_cu_die_reader): Add asserts.
+	(process_type_comp_unit): Add assert.
+	(dwarf2_build_psymtabs_hard): Read info section.
+	(load_partial_comp_unit): Add assert.
+	(create_all_comp_units): Read info section.
+	(load_full_comp_unit): Likewise.
+	(dwarf2_ranges_read): Read ranges section.
+	(dwarf2_record_block_ranges): Add assert.
+	(dwarf2_read_abbrevs): Read abbrev section.
+	(read_indirect_string): Read str section.
+	(dwarf_decode_line_header): Read line section.
+	(read_signatured_type_at_offset): Read types section.
+	(dwarf_decode_macros): Read macinfo section.
+	(dwarf2_symbol_mark_computed): Read loc section.
+	* dwarf2-frame.c (dwarf2_frame_find_fde): Call
+	dwarf2_build_frame_info.
+	(dwarf2_build_frame_info): Unconditionally set
+	dwarf2_frame_objfile_data on the objfile.
+	* configure.ac: Check for posix_madvise.
+	* config.in, configure: Rebuild.
+
+2010-03-10  Tom Tromey  <tromey@redhat.com>
+
+	* xcoffread.c (xcoff_start_psymtab): Update.
+	(xcoff_end_psymtab): Update.
+	* psymtab.c (allocate_psymtab): Remove dead code.
+	* psympriv.h (struct partial_symtab) <read_symtab_private>: Now
+	void*.
+	* mdebugread.c (parse_partial_symbols): Update.
+	(new_psymtab): Likewise.
+	* dwarf2read.c (process_psymtab_comp_unit): Update.
+	(psymtab_to_symtab_1): Update.
+	* dbxread.c (start_psymtab): Update.
+	(end_psymtab): Likewise.
+
+2010-03-10  Tom Tromey  <tromey@redhat.com>
+
+	* xcoffread.c: Include psymtab.h.
+	(xcoff_sym_fns): Update.
+	* symtab.h (struct partial_symbol): Remove.
+	(PSYMBOL_DOMAIN, PSYMBOL_CLASS): Remove.
+	(struct partial_symtab): Remove.
+	(PSYMTAB_TO_SYMTAB): Remove.
+	(lookup_partial_symbol, lookup_partial_symtab, find_pc_psymtab)
+	(find_pc_sect_psymtab): Remove.
+	(find_pc_sect_symtab_via_partial): Declare.
+	(find_pc_psymtab, find_pc_sect_psymbol, psymtab_to_symtab)
+	(find_main_psymtab): Remove.
+	(find_main_filename): Declare.
+	(fixup_psymbol_section): Remove.
+	(fixup_section): Declare.
+	* symtab.c: Include psymtab.h.
+	(lookup_symtab): Use lookup_symtab method.
+	(lookup_partial_symtab): Remove.
+	(find_pc_sect_psymtab_closer): Remove.
+	(find_pc_sect_psymtab): Remove.
+	(find_pc_sect_symtab_via_partial): New function.
+	(find_pc_psymtab, find_pc_sect_psymbol, find_pc_psymbol): Remove.
+	(fixup_section): No longer static.
+	(fixup_psymbol_section): Remove.
+	(lookup_symbol_aux): Use lookup_symbol_aux_quick.
+	(lookup_global_symbol_from_objfile): Likewise.
+	(lookup_symbol_aux_psymtabs): Remove.
+	(lookup_symbol_aux_quick): New function.
+	(lookup_symbol_global): Use lookup_symbol_aux_quick.
+	(lookup_partial_symbol): Remove.
+	(basic_lookup_transparent_type_quick): New function.
+	(basic_lookup_transparent_type): Use it.
+	(find_main_psymtab): Remove.
+	(find_main_filename): New function.
+	(find_pc_sect_symtab): Use find_pc_sect_symtab method.
+	(find_line_symtab): Use expand_symtabs_with_filename method.
+	(output_partial_symbol_filename): New function.
+	(sources_info): Use map_partial_symbol_filenames.
+	(struct search_symbols_data): New type.
+	(search_symbols_file_matches): New function.
+	(search_symbols_name_matches): Likewise.
+	(search_symbols): Use expand_symtabs_matching method.
+	(struct add_name_data): Rename from add_macro_name_data.
+	(add_macro_name): Update.
+	(add_partial_symbol_name): New function.
+	(default_make_symbol_completion_list): Use
+	map_partial_symbol_names.
+	(struct add_partial_symbol_name): New type.
+	(maybe_add_partial_symtab_filename): New function.
+	(make_source_files_completion_list): Use
+	map_partial_symbol_filenames.
+	(expand_line_sal): Use expand_symtabs_with_filename method.
+	* symmisc.c: Include psymtab.h.
+	(print_objfile_statistics): Use print_stats method.
+	(dump_objfile): Use dump method.
+	(dump_psymtab, maintenance_print_psymbols)
+	(maintenance_info_psymtabs, maintenance_check_symtabs)
+	(extend_psymbol_list): Remove.
+	* symfile.h (struct quick_symbol_functions): New struct.
+	(struct sym_fns) <qf>: New field.
+	(sort_pst_symbols): Remove.
+	(increment_reading_symtab): Declare.
+	* symfile.c: Include psymtab.h.
+	(compare_psymbols, sort_pst_symbols): Remove.
+	(psymtab_to_symtab): Remove.
+	(increment_reading_symtab): New function.
+	(symbol_file_add_with_addrs_or_offsets): Use expand_all_symtabs
+	method.
+	(set_initial_language): Use find_main_filename.
+	(allocate_psymtab, discard_psymtab, cashier_psymtab): Remove.
+	(free_named_symtabs): Remove unused code.
+	(start_psymtab_common, add_psymbol_to_bcache)
+	(append_psymbol_to_list, add_psymbol_to_list, init_psymbol_list):
+	Remove.
+	* stack.c: Include psymtab.h, symfile.h.
+	(backtrace_command_1): Use find_pc_sect_symtab_via_partial.
+	* source.h (psymtab_to_fullname): Don't declare.
+	* source.c: Include psymtab.h.
+	(select_source_symtab): Use find_last_source_symtab method.
+	(forget_cached_source_info): Use forget_cached_source_info
+	method.
+	(find_and_open_source): No longer static.
+	(psymtab_to_fullname): Remove.
+	* somread.c: Include psymtab.h.
+	(som_sym_fns): Update.
+	* psympriv.h: New file.
+	* psymtab.h: New file.
+	* psymtab.c: New file.
+	* objfiles.h: (ALL_OBJFILE_PSYMTABS): Remove.
+	(ALL_PSYMTABS, ALL_PSPACE_PSYMTABS): Likewise.
+	* objfiles.c: Include psymtab.h.
+	(objfile_relocate1): Use relocate method.
+	(objfile_has_partial_symbols): Use has_symbols method.
+	* mipsread.c: Include psymtab.h.
+	(ecoff_sym_fns): Update.
+	* mi/mi-cmd-file.c: Include psymtab.h.
+	(print_partial_file_name): New function.
+	(mi_cmd_file_list_exec_source_files): Use
+	map_partial_symbol_filenames.
+	* mdebugread.c: Include psympriv.h.
+	* machoread.c: Include psympriv.h.
+	(macho_sym_fns): Update.
+	* m2-exp.y (yylex): Use lookup_symtab.
+	* elfread.c: Include psympriv.h.
+	(elf_sym_fns): Update.
+	* dwarf2read.c: Include psympriv.h.
+	* dbxread.c: Include psympriv.h.
+	(aout_sym_fns): Update.
+	* cp-support.c: Include psymtab.h.
+	(read_in_psymtabs): Remove.
+	(make_symbol_overload_list_qualified): Use
+	expand_symtabs_for_function method.
+	* coffread.c: Include psympriv.h.
+	(coff_sym_fns): Update.
+	* blockframe.c: Include psymtab.h.
+	(find_pc_partial_function): Use find_pc_sect_symtab method.
+	* ada-lang.h (ada_update_initial_language): Update.
+	* ada-lang.c: Include psymtab.h.
+	(ada_update_initial_language): Remove 'main_pst' argument.
+	(ada_lookup_partial_symbol): Remove.
+	(struct ada_psym_data): New type.
+	(ada_add_psyms): New function.
+	(ada_add_non_local_symbols): Use map_ada_symtabs method.
+	(struct add_partial_datum): New type.
+	(ada_add_partial_symbol_completions): New function.
+	(ada_make_symbol_completion_list): Use map_partial_symbol_names.
+	(ada_exception_support_info_sniffer): Update.
+	* Makefile.in (SFILES): Add psymtab.c.
+	(COMMON_OBS): Add psymtab.o.
+	(HFILES_NO_SRCDIR): Add psymtab.h, psympriv.h.
+
+2010-03-10  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* remote-fileio.c (cygwin_conv_path): Define macro for old cygwin API.
+
+2010-03-10  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	PR C++/11236:
+	* cp-namespace.c (cp_add_using): Deleted.
+	(cp_add_using_directive): Use obstack allocations.
+	Merged the function cp_add_using into this one.
+	Added 'struct obstack *' argument.
+	(cp_scan_for_anonymous_namespaces): Updated.
+	* cp-support.h: Updated.
+	* dwarf2read.c (read_import_statement): Updated.
+	(read_namespace): Updated.
+
+2010-03-10  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* windows-nat.c (cygwin_conv_path): Remove old macro.
+
+2010-03-10  Pedro Alves  <pedro@codesourcery.com>
+
+	* breakpoint.c (condition_command): Handle watchpoint conditions.
+	(is_hardware_watchpoint): Add comment.
+	(is_watchpoint): New.
+	(update_watchpoint): Don't reparse the watchpoint's condition
+	unless necessary.
+	(WP_IGNORE): New.
+	(watchpoint_check): Use it.
+	(bpstat_check_watchpoint): Handle it.
+	(bpstat_check_breakpoint_conditions): Evaluate watchpoint local
+	conditions in a frame where it makes sense.
+	(watch_command_1): Store the innermost block of the condition
+	expression.
+	(delete_breakpoint): Delete the watchpoint condition expression.
+	* breakpoint.h (struct bp_location) <cond>: Update comment.
+	(struct breakpoint): New field `cond_exp_valid_block'.
+
+2010-03-09  Joel Brobecker  <brobecker@adacore.com>
+
+	Adjust handling of Ada DIEs after dwarf2_physname patch.
+	* dwarf2read.c (dwarf2_compute_name): Add handling of Ada DIEs.
+
+2010-03-09  Christopher Faylor  <me+cygwin@cgf.cx>
+	    Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* windows-nat.c (cygwin_conv_path): Redefine to properly convert
+	from/to posix/win32.
+	(windows_make_so): Use non-Cygwin 1.7 specific function.
+	(windows_create_inferior): Make sure that cygallargs points to
+	original args in non Cygwin 1.7. case.
+
 2010-03-09  Michael Snyder  <msnyder@vmware.com>
 
 	* i386-tdep.c (i386_record_lea_modrm_addr): Use extract_signed_int
@@ -118,8 +363,8 @@
 
 	* python/python-internal.h: Include symtab.h.
 
-2010-03-09  Joel Brobecker <brobecker@adacore.com>
-	    Pierre Muller <muller@ics.u-strasbg.fr>
+2010-03-09  Joel Brobecker  <brobecker@adacore.com>
+	    Pierre Muller  <muller@ics.u-strasbg.fr>
 
 	* p-lang.c (is_pascal_string_type): Remove unneeded parentheses.
 	* p-valprint.c (pascal_val_print): Remove undeed block and fix

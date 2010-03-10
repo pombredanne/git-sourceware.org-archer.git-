@@ -50,6 +50,7 @@
 #include "addrmap.h"
 #include "typeprint.h"
 #include "jv-lang.h"
+#include "psympriv.h"
 
 #include <fcntl.h>
 #include "gdb_string.h"
@@ -81,38 +82,6 @@ typedef struct comp_unit_header
 _COMP_UNIT_HEADER;
 #define _ACTUAL_COMP_UNIT_HEADER_SIZE 11
 #endif
-
-/* .debug_pubnames header
-   Because of alignment constraints, this structure has padding and cannot
-   be mapped directly onto the beginning of the .debug_info section.  */
-typedef struct pubnames_header
-  {
-    unsigned int length;	/* length of the .debug_pubnames
-				   contribution  */
-    unsigned char version;	/* version number -- 2 for DWARF
-				   version 2 */
-    unsigned int info_offset;	/* offset into .debug_info section */
-    unsigned int info_size;	/* byte size of .debug_info section
-				   portion */
-  }
-_PUBNAMES_HEADER;
-#define _ACTUAL_PUBNAMES_HEADER_SIZE 13
-
-/* .debug_pubnames header
-   Because of alignment constraints, this structure has padding and cannot
-   be mapped directly onto the beginning of the .debug_info section.  */
-typedef struct aranges_header
-  {
-    unsigned int length;	/* byte len of the .debug_aranges
-				   contribution */
-    unsigned short version;	/* version number -- 2 for DWARF
-				   version 2 */
-    unsigned int info_offset;	/* offset into .debug_info section */
-    unsigned char addr_size;	/* byte size of an address */
-    unsigned char seg_size;	/* byte size of segment descriptor */
-  }
-_ARANGES_HEADER;
-#define _ACTUAL_ARANGES_HEADER_SIZE 12
 
 /* .debug_line statement program prologue
    Because of alignment constraints, this structure has padding and cannot
@@ -156,6 +125,8 @@ struct dwarf2_section_info
   gdb_byte *buffer;
   bfd_size_type size;
   int was_mmapped;
+  /* True if we have tried to read this section.  */
+  int readin;
 };
 
 struct dwarf2_per_objfile
@@ -163,8 +134,6 @@ struct dwarf2_per_objfile
   struct dwarf2_section_info info;
   struct dwarf2_section_info abbrev;
   struct dwarf2_section_info line;
-  struct dwarf2_section_info pubnames;
-  struct dwarf2_section_info aranges;
   struct dwarf2_section_info loc;
   struct dwarf2_section_info macinfo;
   struct dwarf2_section_info str;
@@ -172,6 +141,9 @@ struct dwarf2_per_objfile
   struct dwarf2_section_info types;
   struct dwarf2_section_info frame;
   struct dwarf2_section_info eh_frame;
+
+  /* Back link.  */
+  struct objfile *objfile;
 
   /* A list of all the compilation units.  This is used to locate
      the target compilation unit of a particular reference.  */
@@ -203,8 +175,6 @@ static struct dwarf2_per_objfile *dwarf2_per_objfile;
 #define INFO_SECTION     "debug_info"
 #define ABBREV_SECTION   "debug_abbrev"
 #define LINE_SECTION     "debug_line"
-#define PUBNAMES_SECTION "debug_pubnames"
-#define ARANGES_SECTION  "debug_aranges"
 #define LOC_SECTION      "debug_loc"
 #define MACINFO_SECTION  "debug_macinfo"
 #define STR_SECTION      "debug_str"
@@ -769,10 +739,6 @@ dwarf2_invalid_attrib_class_complaint (const char *arg1, const char *arg2)
 
 static void dwarf2_locate_sections (bfd *, asection *, void *);
 
-#if 0
-static void dwarf2_build_psymtabs_easy (struct objfile *);
-#endif
-
 static void dwarf2_create_include_psymtab (char *, struct partial_symtab *,
                                            struct objfile *);
 
@@ -1163,16 +1129,21 @@ static struct type *get_die_type (struct die_info *die, struct dwarf2_cu *cu);
 int
 dwarf2_has_info (struct objfile *objfile)
 {
-  struct dwarf2_per_objfile *data;
+  dwarf2_per_objfile = objfile_data (objfile, dwarf2_objfile_data_key);
+  if (!dwarf2_per_objfile)
+    {
+      /* Initialize per-objfile state.  */
+      struct dwarf2_per_objfile *data
+	= obstack_alloc (&objfile->objfile_obstack, sizeof (*data));
+      memset (data, 0, sizeof (*data));
+      set_objfile_data (objfile, dwarf2_objfile_data_key, data);
+      dwarf2_per_objfile = data;
 
-  /* Initialize per-objfile state.  */
-  data = obstack_alloc (&objfile->objfile_obstack, sizeof (*data));
-  memset (data, 0, sizeof (*data));
-  set_objfile_data (objfile, dwarf2_objfile_data_key, data);
-  dwarf2_per_objfile = data;
-
-  bfd_map_over_sections (objfile->obfd, dwarf2_locate_sections, NULL);
-  return (data->info.asection != NULL && data->abbrev.asection != NULL);
+      bfd_map_over_sections (objfile->obfd, dwarf2_locate_sections, NULL);
+      dwarf2_per_objfile->objfile = objfile;
+    }
+  return (dwarf2_per_objfile->info.asection != NULL
+	  && dwarf2_per_objfile->abbrev.asection != NULL);
 }
 
 /* When loading sections, we can either look for ".<name>", or for
@@ -1208,16 +1179,6 @@ dwarf2_locate_sections (bfd *abfd, asection *sectp, void *ignore_ptr)
     {
       dwarf2_per_objfile->line.asection = sectp;
       dwarf2_per_objfile->line.size = bfd_get_section_size (sectp);
-    }
-  else if (section_is_p (sectp->name, PUBNAMES_SECTION))
-    {
-      dwarf2_per_objfile->pubnames.asection = sectp;
-      dwarf2_per_objfile->pubnames.size = bfd_get_section_size (sectp);
-    }
-  else if (section_is_p (sectp->name, ARANGES_SECTION))
-    {
-      dwarf2_per_objfile->aranges.asection = sectp;
-      dwarf2_per_objfile->aranges.size = bfd_get_section_size (sectp);
     }
   else if (section_is_p (sectp->name, LOC_SECTION))
     {
@@ -1354,8 +1315,11 @@ dwarf2_read_section (struct objfile *objfile, struct dwarf2_section_info *info)
   gdb_byte *buf, *retbuf;
   unsigned char header[4];
 
+  if (info->readin)
+    return;
   info->buffer = NULL;
   info->was_mmapped = 0;
+  info->readin = 1;
 
   if (info->asection == NULL || info->size == 0)
     return;
@@ -1393,6 +1357,9 @@ dwarf2_read_section (struct objfile *objfile, struct dwarf2_section_info *info)
 	{
 	  info->was_mmapped = 1;
 	  info->buffer = retbuf + (sectp->filepos & (pagesize - 1)) ;
+#if HAVE_POSIX_MADVISE
+	  posix_madvise (retbuf, map_length, POSIX_MADV_WILLNEED);
+#endif
 	  return;
 	}
     }
@@ -1451,73 +1418,13 @@ dwarf2_get_section_info (struct objfile *objfile, const char *section_name,
 void
 dwarf2_build_psymtabs (struct objfile *objfile)
 {
-  dwarf2_read_section (objfile, &dwarf2_per_objfile->info);
-  dwarf2_read_section (objfile, &dwarf2_per_objfile->abbrev);
-  dwarf2_read_section (objfile, &dwarf2_per_objfile->line);
-  dwarf2_read_section (objfile, &dwarf2_per_objfile->str);
-  dwarf2_read_section (objfile, &dwarf2_per_objfile->macinfo);
-  dwarf2_read_section (objfile, &dwarf2_per_objfile->ranges);
-  dwarf2_read_section (objfile, &dwarf2_per_objfile->types);
-  dwarf2_read_section (objfile, &dwarf2_per_objfile->loc);
-  dwarf2_read_section (objfile, &dwarf2_per_objfile->eh_frame);
-  dwarf2_read_section (objfile, &dwarf2_per_objfile->frame);
-
   if (objfile->global_psymbols.size == 0 && objfile->static_psymbols.size == 0)
     {
       init_psymbol_list (objfile, 1024);
     }
 
-#if 0
-  if (dwarf_aranges_offset && dwarf_pubnames_offset)
-    {
-      /* Things are significantly easier if we have .debug_aranges and
-         .debug_pubnames sections */
-
-      dwarf2_build_psymtabs_easy (objfile);
-    }
-  else
-#endif
-    /* only test this case for now */
-    {
-      /* In this case we have to work a bit harder */
-      dwarf2_build_psymtabs_hard (objfile);
-    }
+  dwarf2_build_psymtabs_hard (objfile);
 }
-
-#if 0
-/* Build the partial symbol table from the information in the
-   .debug_pubnames and .debug_aranges sections.  */
-
-static void
-dwarf2_build_psymtabs_easy (struct objfile *objfile)
-{
-  bfd *abfd = objfile->obfd;
-  char *aranges_buffer, *pubnames_buffer;
-  char *aranges_ptr, *pubnames_ptr;
-  unsigned int entry_length, version, info_offset, info_size;
-
-  pubnames_buffer = dwarf2_read_section (objfile,
-					 dwarf_pubnames_section);
-  pubnames_ptr = pubnames_buffer;
-  while ((pubnames_ptr - pubnames_buffer) < dwarf2_per_objfile->pubnames.size)
-    {
-      unsigned int bytes_read;
-
-      entry_length = read_initial_length (abfd, pubnames_ptr, &bytes_read);
-      pubnames_ptr += bytes_read;
-      version = read_1_byte (abfd, pubnames_ptr);
-      pubnames_ptr += 1;
-      info_offset = read_4_bytes (abfd, pubnames_ptr);
-      pubnames_ptr += 4;
-      info_size = read_4_bytes (abfd, pubnames_ptr);
-      pubnames_ptr += 4;
-    }
-
-  aranges_buffer = dwarf2_read_section (objfile,
-					dwarf_aranges_section);
-
-}
-#endif
 
 /* Return TRUE if OFFSET is within CU_HEADER.  */
 
@@ -1605,6 +1512,7 @@ read_type_comp_unit_head (struct comp_unit_head *cu_header,
   unsigned int bytes_read;
   gdb_byte *initial_types_ptr = types_ptr;
 
+  dwarf2_read_section (dwarf2_per_objfile->objfile, &dwarf2_per_objfile->types);
   cu_header->offset = types_ptr - dwarf2_per_objfile->types.buffer;
 
   types_ptr = read_comp_unit_head (cu_header, types_ptr, abfd);
@@ -1701,8 +1609,11 @@ eq_type_signature (const void *item_lhs, const void *item_rhs)
 static int
 create_debug_types_hash_table (struct objfile *objfile)
 {
-  gdb_byte *info_ptr = dwarf2_per_objfile->types.buffer;
+  gdb_byte *info_ptr;
   htab_t types_htab;
+
+  dwarf2_read_section (objfile, &dwarf2_per_objfile->types);
+  info_ptr = dwarf2_per_objfile->types.buffer;
 
   if (info_ptr == NULL)
     {
@@ -1809,9 +1720,15 @@ init_cu_die_reader (struct die_reader_specs *reader,
   reader->abfd = cu->objfile->obfd;
   reader->cu = cu;
   if (cu->per_cu->from_debug_types)
-    reader->buffer = dwarf2_per_objfile->types.buffer;
+    {
+      gdb_assert (dwarf2_per_objfile->types.readin);
+      reader->buffer = dwarf2_per_objfile->types.buffer;
+    }
   else
-    reader->buffer = dwarf2_per_objfile->info.buffer;
+    {
+      gdb_assert (dwarf2_per_objfile->info.readin);
+      reader->buffer = dwarf2_per_objfile->info.buffer;
+    }
 }
 
 /* Find the base address of the compilation unit for range lists and
@@ -1950,7 +1867,7 @@ process_psymtab_comp_unit (struct objfile *objfile,
   if (attr != NULL)
     pst->dirname = DW_STRING (attr);
 
-  pst->read_symtab_private = (char *) this_cu;
+  pst->read_symtab_private = this_cu;
 
   baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
 
@@ -2043,6 +1960,7 @@ process_type_comp_unit (void **slot, void *info)
   this_cu = &entry->per_cu;
   this_cu->from_debug_types = 1;
 
+  gdb_assert (dwarf2_per_objfile->types.readin);
   process_psymtab_comp_unit (objfile, this_cu,
 			     dwarf2_per_objfile->types.buffer,
 			     dwarf2_per_objfile->types.buffer + entry->offset,
@@ -2070,12 +1988,11 @@ build_type_psymtabs (struct objfile *objfile)
 static void
 dwarf2_build_psymtabs_hard (struct objfile *objfile)
 {
-  /* Instead of reading this into a big buffer, we should probably use
-     mmap()  on architectures that support it. (FIXME) */
   bfd *abfd = objfile->obfd;
   gdb_byte *info_ptr;
   struct cleanup *back_to;
 
+  dwarf2_read_section (objfile, &dwarf2_per_objfile->info);
   info_ptr = dwarf2_per_objfile->info.buffer;
 
   /* Any cached compilation units will be linked by the per-objfile
@@ -2141,6 +2058,7 @@ load_partial_comp_unit (struct dwarf2_per_cu_data *this_cu,
 
   gdb_assert (! this_cu->from_debug_types);
 
+  gdb_assert (dwarf2_per_objfile->info.readin);
   info_ptr = dwarf2_per_objfile->info.buffer + this_cu->offset;
   beg_of_comp_unit = info_ptr;
 
@@ -2198,7 +2116,10 @@ create_all_comp_units (struct objfile *objfile)
   int n_allocated;
   int n_comp_units;
   struct dwarf2_per_cu_data **all_comp_units;
-  gdb_byte *info_ptr = dwarf2_per_objfile->info.buffer;
+  gdb_byte *info_ptr;
+
+  dwarf2_read_section (objfile, &dwarf2_per_objfile->info);
+  info_ptr = dwarf2_per_objfile->info.buffer;
 
   n_comp_units = 0;
   n_allocated = 10;
@@ -3054,7 +2975,7 @@ psymtab_to_symtab_1 (struct partial_symtab *pst)
         psymtab_to_symtab_1 (pst->dependencies[i]);
       }
 
-  per_cu = (struct dwarf2_per_cu_data *) pst->read_symtab_private;
+  per_cu = pst->read_symtab_private;
 
   if (per_cu == NULL)
     {
@@ -3100,6 +3021,7 @@ load_full_comp_unit (struct dwarf2_per_cu_data *per_cu, struct objfile *objfile)
   /* Set local variables from the partial symbol table info.  */
   offset = per_cu->offset;
 
+  dwarf2_read_section (objfile, &dwarf2_per_objfile->info);
   info_ptr = dwarf2_per_objfile->info.buffer + offset;
   beg_of_comp_unit = info_ptr;
 
@@ -3324,6 +3246,9 @@ die_needs_namespace (struct die_info *die, struct dwarf2_cu *cu)
    compute the physname for the object, which include a method's
    formal parameters (C++/Java) and return type (Java).
 
+   For Ada, return the DIE's linkage name rather than the fully qualified
+   name.  PHYSNAME is ignored..
+
    The result is allocated on the objfile_obstack and canonicalized.  */
 
 static const char *
@@ -3395,6 +3320,19 @@ dwarf2_compute_name (char *name, struct die_info *die, struct dwarf2_cu *cu,
 		name = cname;
 	    }
 	}
+    }
+  else if (cu->language == language_ada)
+    {
+      /* For Ada unit, we prefer the linkage name over the name, as
+	 the former contains the exported name, which the user expects
+	 to be able to reference.  Ideally, we want the user to be able
+	 to reference this entity using either natural or linkage name,
+	 but we haven't started looking at this enhancement yet.  */
+      struct attribute *attr;
+
+      attr = dwarf2_attr (die, DW_AT_MIPS_linkage_name, cu);
+      if (attr && DW_STRING (attr))
+	name = DW_STRING (attr);
     }
 
   return name;
@@ -3514,10 +3452,10 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
       strcpy (canonical_name, imported_name);
     }
 
-  using_directives = cp_add_using (import_prefix,
-                                   canonical_name,
-                                   import_alias,
-                                   using_directives);
+  cp_add_using_directive (import_prefix,
+                          canonical_name,
+                          import_alias,
+                          &cu->objfile->objfile_obstack);
 }
 
 static void
@@ -4061,6 +3999,7 @@ dwarf2_ranges_read (unsigned offset, CORE_ADDR *low_return,
   found_base = cu->base_known;
   base = cu->base_address;
 
+  dwarf2_read_section (objfile, &dwarf2_per_objfile->ranges);
   if (offset >= dwarf2_per_objfile->ranges.size)
     {
       complaint (&symfile_complaints,
@@ -4363,6 +4302,7 @@ dwarf2_record_block_ranges (struct die_info *die, struct block *block,
       CORE_ADDR base = cu->base_address;
       int base_known = cu->base_known;
 
+      gdb_assert (dwarf2_per_objfile->ranges.readin);
       if (offset >= dwarf2_per_objfile->ranges.size)
         {
           complaint (&symfile_complaints,
@@ -5635,7 +5575,8 @@ read_namespace (struct die_info *die, struct dwarf2_cu *cu)
       if (is_anonymous)
 	{
 	  const char *previous_prefix = determine_prefix (die, cu);
-	  cp_add_using_directive (previous_prefix, TYPE_NAME (type), NULL);
+	  cp_add_using_directive (previous_prefix, TYPE_NAME (type), NULL,
+	                          &objfile->objfile_obstack);
 	}
     }
 
@@ -6361,6 +6302,8 @@ dwarf2_read_abbrevs (bfd *abfd, struct dwarf2_cu *cu)
   memset (cu->dwarf2_abbrevs, 0,
           ABBREV_HASH_SIZE * sizeof (struct abbrev_info *));
 
+  dwarf2_read_section (dwarf2_per_objfile->objfile,
+		       &dwarf2_per_objfile->abbrev);
   abbrev_ptr = dwarf2_per_objfile->abbrev.buffer + cu_header->abbrev_offset;
   abbrev_number = read_unsigned_leb128 (abfd, abbrev_ptr, &bytes_read);
   abbrev_ptr += bytes_read;
@@ -7433,6 +7376,7 @@ read_indirect_string (bfd *abfd, gdb_byte *buf,
 {
   LONGEST str_offset = read_offset (abfd, buf, cu_header, bytes_read_ptr);
 
+  dwarf2_read_section (dwarf2_per_objfile->objfile, &dwarf2_per_objfile->str);
   if (dwarf2_per_objfile->str.buffer == NULL)
     {
       error (_("DW_FORM_strp used without .debug_str section [in module %s]"),
@@ -7759,6 +7703,7 @@ dwarf_decode_line_header (unsigned int offset, bfd *abfd,
   int i;
   char *cur_dir, *cur_file;
 
+  dwarf2_read_section (dwarf2_per_objfile->objfile, &dwarf2_per_objfile->line);
   if (dwarf2_per_objfile->line.buffer == NULL)
     {
       complaint (&symfile_complaints, _("missing .debug_line section"));
@@ -10527,6 +10472,8 @@ read_signatured_type_at_offset (struct objfile *objfile,
 {
   struct signatured_type *type_sig;
 
+  dwarf2_read_section (objfile, &dwarf2_per_objfile->types);
+
   /* We have the section offset, but we need the signature to do the
      hash table lookup.	 */
   type_sig = lookup_signatured_type_at_offset (objfile, offset);
@@ -11133,6 +11080,8 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
   enum dwarf_macinfo_record_type macinfo_type;
   int at_commandline;
 
+  dwarf2_read_section (dwarf2_per_objfile->objfile,
+		       &dwarf2_per_objfile->macinfo);
   if (dwarf2_per_objfile->macinfo.buffer == NULL)
     {
       complaint (&symfile_complaints, _("missing .debug_macinfo section"));
@@ -11457,6 +11406,9 @@ dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
 			     sizeof (struct dwarf2_loclist_baton));
       baton->per_cu = cu->per_cu;
       gdb_assert (baton->per_cu);
+
+      dwarf2_read_section (dwarf2_per_objfile->objfile,
+			   &dwarf2_per_objfile->loc);
 
       /* We don't know how long the location list is, but make sure we
 	 don't run off the edge of the section.  */
