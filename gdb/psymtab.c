@@ -1279,7 +1279,7 @@ struct partial_symtab *
 start_psymtab_common_full (struct psymtab_state *state,
 			   struct objfile *objfile,
 			   struct section_offsets *section_offsets,
-			   char *filename,
+			   const char *filename,
 			   CORE_ADDR textlow)
 {
   struct partial_symtab *psymtab;
@@ -1299,7 +1299,8 @@ start_psymtab_common_full (struct psymtab_state *state,
 
 struct partial_symtab *
 start_psymtab_common (struct objfile *objfile,
-		      struct section_offsets *section_offsets, char *filename,
+		      struct section_offsets *section_offsets,
+		      const char *filename,
 		      CORE_ADDR textlow)
 {
   return start_psymtab_common_full (objfile->psyms, objfile,
@@ -1314,7 +1315,7 @@ start_psymtab_common (struct objfile *objfile,
 
 static const struct partial_symbol *
 add_psymbol_to_bcache (struct psymtab_state *state,
-		       char *name, int namelength, int copy_name,
+		       const char *name, int namelength, int copy_name,
 		       domain_enum domain,
 		       enum address_class class,
 		       long val,	/* Value as a long */
@@ -1411,7 +1412,7 @@ append_psymbol_to_list (struct psymbol_allocation_list *list,
 
 const struct partial_symbol *
 add_psymbol_to_list_full (struct psymtab_state *state,
-			  char *name, int namelength, int copy_name,
+			  const char *name, int namelength, int copy_name,
 			  domain_enum domain,
 			  enum address_class class,
 			  long val,	/* Value as a long */
@@ -1441,7 +1442,7 @@ add_psymbol_to_list_full (struct psymtab_state *state,
 }
 
 const struct partial_symbol *
-add_psymbol_to_list (char *name, int namelength, int copy_name,
+add_psymbol_to_list (const char *name, int namelength, int copy_name,
 		     domain_enum domain,
 		     enum address_class class,
 		     int is_global,
@@ -1457,7 +1458,7 @@ add_psymbol_to_list (char *name, int namelength, int copy_name,
 
 struct partial_symtab *
 allocate_psymtab_full (struct psymtab_state *state,
-		       char *filename, struct objfile *objfile)
+		       const char *filename, struct objfile *objfile)
 {
   struct partial_symtab *psymtab;
 
@@ -1489,7 +1490,7 @@ allocate_psymtab_full (struct psymtab_state *state,
 }
 
 struct partial_symtab *
-allocate_psymtab (char *filename, struct objfile *objfile)
+allocate_psymtab (const char *filename, struct objfile *objfile)
 {
   return allocate_psymtab_full (objfile->psyms, filename, objfile);
 }

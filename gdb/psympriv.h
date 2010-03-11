@@ -242,12 +242,12 @@ void sort_pst_symbols (struct psymtab_state *state,
 /* Allocate a partial symbol table in STATE.  FILENAME and OBJFILE are
    the file name and objfile associated with the new table.  */
 struct partial_symtab *allocate_psymtab_full (struct psymtab_state *state,
-					      char *filename,
+					      const char *filename,
 					      struct objfile *objfile);
 
 /* A legacy function that calls allocate_psymtab_full using the
    objfile's psymtab_state.  */
-struct partial_symtab *allocate_psymtab (char *, struct objfile *);
+struct partial_symtab *allocate_psymtab (const char *, struct objfile *);
 
 /* Discard a partial symbol table.  */
 void discard_psymtab (struct psymtab_state *state, struct partial_symtab *);
@@ -255,7 +255,7 @@ void discard_psymtab (struct psymtab_state *state, struct partial_symtab *);
 /* Add any kind of symbol to a psymbol_allocation_list.  */
 const struct partial_symbol *add_psymbol_to_list_full
     (struct psymtab_state *state,
-     char *name, int namelength, int copy_name, domain_enum domain,
+     const char *name, int namelength, int copy_name, domain_enum domain,
      enum address_class class,
      long val,	/* Value as a long */
      CORE_ADDR coreaddr,	/* Value as a CORE_ADDR */
@@ -265,7 +265,7 @@ const struct partial_symbol *add_psymbol_to_list_full
 /* A legacy function that calls add_psymbol_to_list_full using the
    objfile's psymtab_state.  */
 const struct partial_symbol *add_psymbol_to_list
-    (char *, int, int, domain_enum,
+    (const char *, int, int, domain_enum,
      enum address_class,
      int,
      long, CORE_ADDR,
@@ -281,14 +281,14 @@ struct partial_symtab *start_psymtab_common_full
     (struct psymtab_state *state,
      struct objfile *objfile,
      struct section_offsets *section_offsets,
-     char *filename,
+     const char *filename,
      CORE_ADDR textlow);
 
 /* A legacy function that calls start_psymtab_common_full with the
    objfile's psymtab_state.  */
 struct partial_symtab *start_psymtab_common
     (struct objfile *objfile,
-     struct section_offsets *section_offsets, char *filename,
+     struct section_offsets *section_offsets, const char *filename,
      CORE_ADDR textlow);
 
 /* Set n_global_syms and n_static_syms on PSYMTAB.  */
