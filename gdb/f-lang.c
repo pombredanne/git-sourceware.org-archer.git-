@@ -1,7 +1,7 @@
 /* Fortran language support routines for GDB, the GNU debugger.
 
    Copyright (C) 1993, 1994, 1995, 1996, 1998, 1999, 2000, 2001, 2002, 2003,
-   2004, 2005, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2004, 2005, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    Contributed by Motorola.  Adapted from the C parser by Farooq Butt
    (fmbutt@engage.sps.mot.com).
@@ -143,7 +143,7 @@ f_printchar (int c, struct type *type, struct ui_file *stream)
 
 static void
 f_printstr (struct ui_file *stream, struct type *type, const gdb_byte *string,
-	    unsigned int length, int force_ellipses,
+	    unsigned int length, const char *encoding, int force_ellipses,
 	    const struct value_print_options *options)
 {
   unsigned int i;

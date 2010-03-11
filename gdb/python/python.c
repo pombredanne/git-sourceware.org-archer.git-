@@ -1,6 +1,6 @@
 /* General python/gdb code
 
-   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -27,6 +27,7 @@
 #include "observer.h"
 #include "value.h"
 #include "language.h"
+#include "exceptions.h"
 
 #include <ctype.h>
 
@@ -45,7 +46,6 @@ static int gdbpy_auto_load = 1;
 #include "cli/cli-decode.h"
 #include "charset.h"
 #include "top.h"
-#include "exceptions.h"
 #include "python-internal.h"
 #include "version.h"
 #include "target.h"
@@ -283,6 +283,24 @@ gdbpy_parameter (PyObject *self, PyObject *args)
   return parameter_to_python (cmd);
 }
 
+/* Wrapper for target_charset.  */
+
+static PyObject *
+gdbpy_target_charset (PyObject *self, PyObject *args)
+{
+  const char *cset = target_charset (python_gdbarch);
+  return PyUnicode_Decode (cset, strlen (cset), host_charset (), NULL);
+}
+
+/* Wrapper for target_wide_charset.  */
+
+static PyObject *
+gdbpy_target_wide_charset (PyObject *self, PyObject *args)
+{
+  const char *cset = target_wide_charset (python_gdbarch);
+  return PyUnicode_Decode (cset, strlen (cset), host_charset (), NULL);
+}
+
 /* A Python function which evaluates a string using the gdb CLI.  */
 
 static PyObject *
@@ -309,7 +327,11 @@ execute_gdb_command (PyObject *self, PyObject *args)
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      execute_command (arg, from_tty);
+      /* Copy the argument text in case the command modifies it.  */
+      char *copy = xstrdup (arg);
+      struct cleanup *cleanup = make_cleanup (xfree, copy);
+      execute_command (copy, from_tty);
+      do_cleanups (cleanup);
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
@@ -317,6 +339,42 @@ execute_gdb_command (PyObject *self, PyObject *args)
   bpstat_do_actions ();
 
   Py_RETURN_NONE;
+}
+
+/* Parse a string and evaluate it as an expression.  */
+static PyObject *
+gdbpy_parse_and_eval (PyObject *self, PyObject *args)
+{
+  char *expr_str;
+  struct value *result = NULL;
+  volatile struct gdb_exception except;
+
+  if (!PyArg_ParseTuple (args, "s", &expr_str))
+    return NULL;
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      result = parse_and_eval (expr_str);
+    }
+  GDB_PY_HANDLE_EXCEPTION (except);
+
+  return value_to_value_object (result);
+}
+
+/* Read a file as Python code.  STREAM is the input file; FILE is the
+   name of the file.  */
+
+void
+source_python_script (FILE *stream, char *file)
+{
+  PyGILState_STATE state;
+
+  state = PyGILState_Ensure ();
+
+  PyRun_SimpleFile (stream, file);
+
+  fclose (stream);
+  PyGILState_Release (state);
 }
 
 
@@ -501,6 +559,14 @@ eval_python_from_control_command (struct command_line *cmd)
   error (_("Python scripting is not supported in this copy of GDB."));
 }
 
+void
+source_python_script (FILE *stream, char *file)
+{
+  fclose (stream);
+  throw_error (UNSUPPORTED_ERROR,
+	       _("Python scripting is not supported in this copy of GDB."));
+}
+
 #endif /* HAVE_PYTHON */
 
 
@@ -596,9 +662,13 @@ Enables or disables auto-loading of Python code when an object is opened."),
   gdbpy_initialize_values ();
   gdbpy_initialize_frames ();
   gdbpy_initialize_commands ();
+  gdbpy_initialize_symbols ();
+  gdbpy_initialize_symtabs ();
+  gdbpy_initialize_blocks ();
   gdbpy_initialize_functions ();
   gdbpy_initialize_types ();
   gdbpy_initialize_objfile ();
+  gdbpy_initialize_lazy_string ();
 
   PyRun_SimpleString ("import gdb");
   PyRun_SimpleString ("gdb.pretty_printers = []");
@@ -675,6 +745,25 @@ Return a string explaining unwind stop reason." },
     METH_VARARGS | METH_KEYWORDS,
     "lookup_type (name [, block]) -> type\n\
 Return a Type corresponding to the given name." },
+  { "lookup_symbol", (PyCFunction) gdbpy_lookup_symbol,
+    METH_VARARGS | METH_KEYWORDS,
+    "lookup_symbol (name [, block] [, domain]) -> (symbol, is_field_of_this)\n\
+Return a tuple with the symbol corresponding to the given name (or None) and\n\
+a boolean indicating if name is a field of the current implied argument\n\
+`this' (when the current language is object-oriented)." },
+  { "block_for_pc", gdbpy_block_for_pc, METH_VARARGS,
+    "Return the block containing the given pc value, or None." },
+  { "parse_and_eval", gdbpy_parse_and_eval, METH_VARARGS,
+    "parse_and_eval (String) -> Value.\n\
+Parse String as an expression, evaluate it, and return the result as a Value."
+  },
+
+  { "target_charset", gdbpy_target_charset, METH_NOARGS,
+    "target_charset () -> string.\n\
+Return the name of the current target charset." },
+  { "target_wide_charset", gdbpy_target_wide_charset, METH_NOARGS,
+    "target_wide_charset () -> string.\n\
+Return the name of the current target wide charset." },
 
   { "write", gdbpy_write, METH_VARARGS,
     "Write a string using gdb's filtered stream." },

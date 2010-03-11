@@ -1,7 +1,7 @@
 /* Support for printing Modula 2 values for GDB, the GNU debugger.
 
    Copyright (C) 1986, 1988, 1989, 1991, 1992, 1996, 1998, 2000, 2005, 2006,
-                 2007, 2008, 2009 Free Software Foundation, Inc.
+                 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -360,8 +360,8 @@ m2_val_print (struct type *type, const gdb_byte *valaddr, int embedded_offset,
 		}
 
 	      LA_PRINT_STRING (stream, TYPE_TARGET_TYPE (type),
-			       valaddr + embedded_offset, len, 0,
-			       options);
+			       valaddr + embedded_offset, len, NULL,
+			       0, options);
 	      i = len;
 	    }
 	  else

@@ -380,6 +380,9 @@ MY_bfd_final_link (bfd *abfd, struct bfd_link_info *info)
 #ifndef MY_read_ar_hdr
 #define MY_read_ar_hdr		_bfd_generic_read_ar_hdr
 #endif
+#ifndef MY_write_ar_hdr
+#define MY_write_ar_hdr		_bfd_generic_write_ar_hdr
+#endif
 #ifndef	MY_truncate_arname
 #define	MY_truncate_arname		bfd_bsd_truncate_arname
 #endif
@@ -522,6 +525,10 @@ MY_bfd_final_link (bfd *abfd, struct bfd_link_info *info)
 #endif
 #ifndef MY_bfd_link_just_syms
 #define MY_bfd_link_just_syms _bfd_generic_link_just_syms
+#endif
+#ifndef MY_bfd_copy_link_hash_symbol_type
+#define MY_bfd_copy_link_hash_symbol_type \
+  _bfd_generic_copy_link_hash_symbol_type
 #endif
 #ifndef MY_bfd_link_split_section
 #define MY_bfd_link_split_section  _bfd_generic_link_split_section

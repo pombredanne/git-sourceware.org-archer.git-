@@ -1,6 +1,6 @@
 /* Low-level child interface to ttrace.
 
-   Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009
+   Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -453,6 +453,8 @@ inf_ttrace_follow_fork (struct target_ops *ops, int follow_child)
       inferior_ptid = ptid_build (fpid, flwpid, 0);
       inf = add_inferior (fpid);
       inf->attach_flag = parent_inf->attach_flag;
+      inf->pspace = parent_inf->pspace;
+      inf->aspace = parent_inf->aspace;
       copy_terminal_info (inf, parent_inf);
       detach_breakpoints (pid);
 
@@ -689,17 +691,10 @@ inf_ttrace_attach (struct target_ops *ops, char *args, int from_tty)
 {
   char *exec_file;
   pid_t pid;
-  char *dummy;
   ttevent_t tte;
   struct inferior *inf;
 
-  if (!args)
-    error_no_arg (_("process-id to attach"));
-
-  dummy = args;
-  pid = strtol (args, &dummy, 0);
-  if (pid == 0 && args == dummy)
-    error (_("Illegal process-id: %s."), args);
+  pid = parse_pid_to_attach (args);
 
   if (pid == getpid ())		/* Trying to masturbate?  */
     error (_("I refuse to debug myself!"));
@@ -725,7 +720,8 @@ inf_ttrace_attach (struct target_ops *ops, char *args, int from_tty)
   if (ttrace (TT_PROC_ATTACH, pid, 0, TT_KILL_ON_EXIT, TT_VERSION, 0) == -1)
     perror_with_name (("ttrace"));
 
-  inf = add_inferior (pid);
+  inf = current_inferior ();
+  inferior_appeared (inf, pid);
   inf->attach_flag = 1;
 
   /* Set the initial event mask.  */
@@ -1104,7 +1100,7 @@ inf_ttrace_wait (struct target_ops *ops,
 	  inf_ttrace_disable_page_protections (tts.tts_pid);
 	}
       ourstatus->kind = TARGET_WAITKIND_SYSCALL_ENTRY;
-      ourstatus->value.syscall_id = tts.tts_scno;
+      ourstatus->value.syscall_number = tts.tts_scno;
       break;
 
     case TTEVT_SYSCALL_RETURN:
@@ -1119,7 +1115,7 @@ inf_ttrace_wait (struct target_ops *ops,
 	  inf_ttrace_num_lwps_in_syscall--;
 	}
       ourstatus->kind = TARGET_WAITKIND_SYSCALL_RETURN;
-      ourstatus->value.syscall_id = tts.tts_scno;
+      ourstatus->value.syscall_number = tts.tts_scno;
       break;
 
     default:

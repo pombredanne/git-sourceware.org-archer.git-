@@ -1,6 +1,6 @@
 /* Target-dependent code for the i387.
 
-   Copyright (C) 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009
+   Copyright (C) 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -26,6 +26,9 @@ struct frame_info;
 struct regcache;
 struct type;
 struct ui_file;
+
+/* Number of i387 floating point registers.  */
+#define I387_NUM_REGS	16
 
 #define I387_ST0_REGNUM(tdep) ((tdep)->st0_regnum)
 #define I387_NUM_XMM_REGS(tdep) ((tdep)->num_xmm_regs)

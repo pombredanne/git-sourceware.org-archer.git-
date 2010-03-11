@@ -73,10 +73,9 @@ START_RELOC_NUMBERS (elf_ppc_reloc_type)
 
 #ifndef RELOC_MACROS_GEN_FUNC
 /* Fake relocations for branch stubs, only used internally by ld.  */
-  RELOC_NUMBER (R_PPC_RELAX32,		 48)
-  RELOC_NUMBER (R_PPC_RELAX32PC,	 49)
-  RELOC_NUMBER (R_PPC_RELAX32_PLT,	 50)
-  RELOC_NUMBER (R_PPC_RELAX32PC_PLT,	 51)
+  RELOC_NUMBER (R_PPC_RELAX,		 48)
+  RELOC_NUMBER (R_PPC_RELAX_PLT,	 49)
+  RELOC_NUMBER (R_PPC_RELAX_PLTREL24,	 50)
 #endif
 
   /* Relocs added to support TLS.  */
@@ -153,7 +152,10 @@ END_RELOC_NUMBERS (R_PPC_max)
   ((R) >= R_PPC_TLS && (R) <= R_PPC_GOT_DTPREL16_HA)
 
 /* Specify the value of _GLOBAL_OFFSET_TABLE_.  */
-#define DT_PPC_GOT		DT_LOPROC
+#define DT_PPC_GOT		(DT_LOPROC)
+
+/* Specify that tls descriptors should be optimized.  */
+#define DT_PPC_TLSOPT		(DT_LOPROC + 1)
 
 /* Processor specific flags for the ELF header e_flags field.  */
 

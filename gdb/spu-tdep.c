@@ -1,5 +1,5 @@
 /* SPU target-dependent code for GDB, the GNU debugger.
-   Copyright (C) 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 2006, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    Contributed by Ulrich Weigand <uweigand@de.ibm.com>.
    Based on a port by Sid Manning <sid@us.ibm.com>.
@@ -633,6 +633,7 @@ spu_analyze_prologue (struct gdbarch *gdbarch,
   int found_sp = 0;
   int found_fp = 0;
   int found_lr = 0;
+  int found_bc = 0;
   int reg_immed[SPU_NUM_GPRS];
   gdb_byte buf[16];
   CORE_ADDR prolog_pc = start_pc;
@@ -661,8 +662,9 @@ spu_analyze_prologue (struct gdbarch *gdbarch,
 	- The first instruction to set up the stack pointer.
 	- The first instruction to set up the frame pointer.
 	- The first instruction to save the link register.
+	- The first instruction to save the backchain.
 
-     We return the instruction after the latest of these three,
+     We return the instruction after the latest of these four,
      or the incoming PC if none is found.  The first instruction
      to set up the stack pointer also defines the frame size.
 
@@ -769,6 +771,14 @@ spu_analyze_prologue (struct gdbarch *gdbarch,
               && !found_lr)
 	    {
 	      found_lr = 1;
+	      prolog_pc = pc + 4;
+	    }
+
+	  if (ra == SPU_RAW_SP_REGNUM
+	      && (found_sp? immed == 0 : rt == SPU_RAW_SP_REGNUM)
+	      && !found_bc)
+	    {
+	      found_bc = 1;
 	      prolog_pc = pc + 4;
 	    }
 	}
@@ -1504,6 +1514,7 @@ static int
 spu_software_single_step (struct frame_info *frame)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
+  struct address_space *aspace = get_frame_address_space (frame);
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   CORE_ADDR pc, next_pc;
   unsigned int insn;
@@ -1524,7 +1535,8 @@ spu_software_single_step (struct frame_info *frame)
   else
     next_pc = (SPUADDR_ADDR (pc) + 4) & (SPU_LS_SIZE - 1);
 
-  insert_single_step_breakpoint (gdbarch, SPUADDR (SPUADDR_SPU (pc), next_pc));
+  insert_single_step_breakpoint (gdbarch,
+				 aspace, SPUADDR (SPUADDR_SPU (pc), next_pc));
 
   if (is_branch (insn, &offset, &reg))
     {
@@ -1540,7 +1552,7 @@ spu_software_single_step (struct frame_info *frame)
 
       target = target & (SPU_LS_SIZE - 1);
       if (target != next_pc)
-	insert_single_step_breakpoint (gdbarch,
+	insert_single_step_breakpoint (gdbarch, aspace,
 				       SPUADDR (SPUADDR_SPU (pc), target));
     }
 
@@ -1839,7 +1851,7 @@ spu_catch_start (struct objfile *objfile)
       struct symbol *sym;
       struct symtab_and_line sal;
 
-      sym = lookup_block_symbol (block, "main", NULL, VAR_DOMAIN);
+      sym = lookup_block_symbol (block, "main", VAR_DOMAIN);
       if (sym)
 	{
 	  fixup_symbol_section (sym, objfile);

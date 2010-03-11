@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
    1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008,
-   2009 Free Software Foundation, Inc.
+   2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -366,10 +366,11 @@ common_val_print (struct value *val, struct ui_file *stream, int recurse,
 		    stream, recurse, options, language);
 }
 
-/* Print the value VAL in C-ish syntax on stream STREAM according to
-   OPTIONS.
-   If the object printed is a string pointer, returns
-   the number of string bytes printed.  */
+/* Print on stream STREAM the value VAL according to OPTIONS.  The value
+   is printed using the current_language syntax.
+
+   If the object printed is a string pointer, return the number of string
+   bytes printed.  */
 
 int
 value_print (struct value *val, struct ui_file *stream,
@@ -1451,7 +1452,8 @@ val_print_string (struct type *elttype, CORE_ADDR addr, int len,
 	{
 	  fputs_filtered (" ", stream);
 	}
-      LA_PRINT_STRING (stream, elttype, buffer, bytes_read / width, force_ellipsis, options);
+      LA_PRINT_STRING (stream, elttype, buffer, bytes_read / width,
+		       NULL, force_ellipsis, options);
     }
 
   if (errcode != 0)

@@ -62,6 +62,7 @@
 #include "bfd.h"
 #include "libbfd.h"
 #include "coff/internal.h"
+#include "bfdver.h"
 
 /* NOTE: it's strange to be including an architecture specific header
    in what's supposed to be general (to PE/PEI) code.  However, that's
@@ -160,7 +161,7 @@ _bfd_XXi_swap_sym_in (bfd * abfd, void * ext1, void * in1)
 
 	  if (name == namebuf)
 	    {
-	      name = bfd_alloc (abfd, strlen (namebuf) + 1);
+	      name = (const char *) bfd_alloc (abfd, strlen (namebuf) + 1);
 	      if (name == NULL)
 		/* FIXME: Return error.  */
 		abort ();
@@ -666,7 +667,8 @@ _bfd_XXi_swap_aouthdr_out (bfd * abfd, void * in, void * out)
 
   H_PUT_16 (abfd, aouthdr_in->magic, aouthdr_out->standard.magic);
 
-#define LINKER_VERSION 256 /* That is, 2.56 */
+/* e.g. 219510000 is linker version 2.19  */
+#define LINKER_VERSION ((short) (BFD_VERSION / 1000000))
 
   /* This piece of magic sets the "linker version" field to
      LINKER_VERSION.  */
@@ -1263,7 +1265,7 @@ pe_print_idata (bfd * abfd, void * vfile)
 	      else
 		{
 		  ft_idx = first_thunk - (ft_section->vma - extra->ImageBase);
-		  ft_data = bfd_malloc (datasize);
+		  ft_data = (bfd_byte *) bfd_malloc (datasize);
 		  if (ft_data == NULL)
 		    continue;
 
@@ -1432,7 +1434,7 @@ pe_print_edata (bfd * abfd, void * vfile)
   fprintf (file, _("\nThere is an export table in %s at 0x%lx\n"),
 	   section->name, (unsigned long) addr);
 
-  data = bfd_malloc (datasize);
+  data = (bfd_byte *) bfd_malloc (datasize);
   if (data == NULL)
     return FALSE;
 
@@ -1736,7 +1738,7 @@ slurp_symtab (bfd *abfd, sym_cache *psc)
   if (storage < 0)
     return NULL;
   if (storage)
-    sy = bfd_malloc (storage);
+    sy = (asymbol **) bfd_malloc (storage);
 
   psc->symcount = bfd_canonicalize_symtab (abfd, sy);
   if (psc->symcount < 0)
@@ -1782,7 +1784,7 @@ _bfd_XX_print_ce_compressed_pdata (bfd * abfd, void * vfile)
   bfd_size_type i;
   bfd_size_type start, stop;
   int onaline = PDATA_ROW_SIZE;
-  struct sym_cache sym_cache = {0, 0} ;
+  struct sym_cache cache = {0, 0} ;
 
   if (section == NULL
       || coff_section_data (abfd, section) == NULL
@@ -1857,7 +1859,7 @@ _bfd_XX_print_ce_compressed_pdata (bfd * abfd, void * vfile)
 	    {
 	      int xx = (begin_addr - 8) - tsection->vma;
 
-	      tdata = bfd_malloc (8);
+	      tdata = (bfd_byte *) bfd_malloc (8);
 	      if (bfd_get_section_contents (abfd, tsection, tdata, (bfd_vma) xx, 8))
 		{
 		  bfd_vma eh, eh_data;
@@ -1868,7 +1870,7 @@ _bfd_XX_print_ce_compressed_pdata (bfd * abfd, void * vfile)
 		  fprintf (file, "%08x", (unsigned int) eh_data);
 		  if (eh != 0)
 		    {
-		      const char *s = my_symbol_for_address (abfd, eh, &sym_cache);
+		      const char *s = my_symbol_for_address (abfd, eh, &cache);
 
 		      if (s)
 			fprintf (file, " (%s) ", s);
@@ -1888,7 +1890,7 @@ _bfd_XX_print_ce_compressed_pdata (bfd * abfd, void * vfile)
 
   free (data);
 
-  cleanup_syms (& sym_cache);
+  cleanup_syms (& cache);
 
   return TRUE;
 #undef PDATA_ROW_SIZE

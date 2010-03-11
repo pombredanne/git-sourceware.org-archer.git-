@@ -1,6 +1,6 @@
 /* Handle set and show GDB commands.
 
-   Copyright (c) 2000, 2001, 2002, 2003, 2007, 2008, 2009
+   Copyright (c) 2000, 2001, 2002, 2003, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
@@ -21,6 +21,7 @@
 #include "value.h"
 #include <ctype.h>
 #include "gdb_string.h"
+#include "arch-utils.h"
 
 #include "ui-out.h"
 
@@ -152,7 +153,7 @@ do_setshow_command (char *arg, int from_tty, struct cmd_list_element *c)
 		       right before a newline.  */
 		    if (*p == 0)
 		      break;
-		    ch = parse_escape (&p);
+		    ch = parse_escape (get_current_arch (), &p);
 		    if (ch == 0)
 		      break;	/* C loses */
 		    else if (ch > 0)

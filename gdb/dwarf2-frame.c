@@ -1,6 +1,6 @@
 /* Frame unwinder for frames with DWARF Call Frame Information.
 
-   Copyright (C) 2003, 2004, 2005, 2007, 2008, 2009
+   Copyright (C) 2003, 2004, 2005, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    Contributed by Mark Kettenis.
@@ -358,7 +358,8 @@ register %s (#%d) at %s"),
 
 static CORE_ADDR
 execute_stack_op (gdb_byte *exp, ULONGEST len, int addr_size,
-		  struct frame_info *this_frame, CORE_ADDR initial)
+		  struct frame_info *this_frame, CORE_ADDR initial,
+		  int initial_in_stack_memory)
 {
   struct dwarf_expr_context *ctx;
   CORE_ADDR result;
@@ -376,12 +377,19 @@ execute_stack_op (gdb_byte *exp, ULONGEST len, int addr_size,
   ctx->get_frame_cfa = no_get_frame_cfa;
   ctx->get_tls_address = no_get_tls_address;
 
-  dwarf_expr_push (ctx, initial);
+  dwarf_expr_push (ctx, initial, initial_in_stack_memory);
   dwarf_expr_eval (ctx, exp, len);
   result = dwarf_expr_fetch (ctx, 0);
 
-  if (ctx->in_reg)
+  if (ctx->location == DWARF_VALUE_REGISTER)
     result = read_reg (this_frame, result);
+  else if (ctx->location != DWARF_VALUE_MEMORY)
+    {
+      /* This is actually invalid DWARF, but if we ever do run across
+	 it somehow, we might as well support it.  So, instead, report
+	 it as unimplemented.  */
+      error (_("Not implemented: computing unwound register using explicit value operator"));
+    }
 
   do_cleanups (old_chain);
 
@@ -969,7 +977,7 @@ dwarf2_frame_cache (struct frame_info *this_frame, void **this_cache)
     case CFA_EXP:
       cache->cfa =
 	execute_stack_op (fs->regs.cfa_exp, fs->regs.cfa_exp_len,
-			  cache->addr_size, this_frame, 0);
+			  cache->addr_size, this_frame, 0, 0);
       break;
 
     default:
@@ -1125,7 +1133,7 @@ dwarf2_frame_prev_register (struct frame_info *this_frame, void **this_cache,
     case DWARF2_FRAME_REG_SAVED_EXP:
       addr = execute_stack_op (cache->reg[regnum].loc.exp,
 			       cache->reg[regnum].exp_len,
-			       cache->addr_size, this_frame, cache->cfa);
+			       cache->addr_size, this_frame, cache->cfa, 1);
       return frame_unwind_got_memory (this_frame, regnum, addr);
 
     case DWARF2_FRAME_REG_SAVED_VAL_OFFSET:
@@ -1135,7 +1143,7 @@ dwarf2_frame_prev_register (struct frame_info *this_frame, void **this_cache,
     case DWARF2_FRAME_REG_SAVED_VAL_EXP:
       addr = execute_stack_op (cache->reg[regnum].loc.exp,
 			       cache->reg[regnum].exp_len,
-			       cache->addr_size, this_frame, cache->cfa);
+			       cache->addr_size, this_frame, cache->cfa, 1);
       return frame_unwind_got_constant (this_frame, regnum, addr);
 
     case DWARF2_FRAME_REG_UNSPECIFIED:
@@ -1517,6 +1525,14 @@ static struct dwarf2_cie *
 find_cie (struct dwarf2_cie_table *cie_table, ULONGEST cie_pointer)
 {
   struct dwarf2_cie **p_cie;
+
+  /* The C standard (ISO/IEC 9899:TC2) requires the BASE argument to
+     bsearch be non-NULL.  */
+  if (cie_table->entries == NULL)
+    {
+      gdb_assert (cie_table->num_entries == 0);
+      return NULL;
+    }
 
   p_cie = bsearch (&cie_pointer, cie_table->entries, cie_table->num_entries,
                    sizeof (cie_table->entries[0]), bsearch_cie_cmp);
@@ -2108,27 +2124,61 @@ dwarf2_build_frame_info (struct objfile *objfile)
     }
   else
     {
-      int i, j;
+      struct dwarf2_fde *fde_prev = NULL;
+      struct dwarf2_fde *first_non_zero_fde = NULL;
+      int i;
 
       /* Prepare FDE table for lookups.  */
       qsort (fde_table.entries, fde_table.num_entries,
              sizeof (fde_table.entries[0]), qsort_fde_cmp);
 
-      /* Since we'll be doing bsearch, squeeze out identical (except for
-         eh_frame_p) fde entries so bsearch result is predictable.  */
-      for (i = 0, j = 0; j < fde_table.num_entries; ++i)
-        {
-          const int k = j;
+      /* Check for leftovers from --gc-sections.  The GNU linker sets
+	 the relevant symbols to zero, but doesn't zero the FDE *end*
+	 ranges because there's no relocation there.  It's (offset,
+	 length), not (start, end).  On targets where address zero is
+	 just another valid address this can be a problem, since the
+	 FDEs appear to be non-empty in the output --- we could pick
+	 out the wrong FDE.  To work around this, when overlaps are
+	 detected, we prefer FDEs that do not start at zero.
 
-          obstack_grow (&objfile->objfile_obstack, &fde_table.entries[j],
-                        sizeof (fde_table.entries[0]));
-          while (++j < fde_table.num_entries
-                 && (fde_table.entries[k]->initial_location ==
-                     fde_table.entries[j]->initial_location))
-            /* Skip.  */;
-        }
+	 Start by finding the first FDE with non-zero start.  Below
+	 we'll discard all FDEs that start at zero and overlap this
+	 one.  */
+      for (i = 0; i < fde_table.num_entries; i++)
+	{
+	  struct dwarf2_fde *fde = fde_table.entries[i];
+
+	  if (fde->initial_location != 0)
+	    {
+	      first_non_zero_fde = fde;
+	      break;
+	    }
+	}
+
+      /* Since we'll be doing bsearch, squeeze out identical (except
+	 for eh_frame_p) fde entries so bsearch result is predictable.
+	 Also discard leftovers from --gc-sections.  */
+      fde_table2->num_entries = 0;
+      for (i = 0; i < fde_table.num_entries; i++)
+	{
+	  struct dwarf2_fde *fde = fde_table.entries[i];
+
+	  if (fde->initial_location == 0
+	      && first_non_zero_fde != NULL
+	      && (first_non_zero_fde->initial_location
+		  < fde->initial_location + fde->address_range))
+	    continue;
+
+	  if (fde_prev != NULL
+	      && fde_prev->initial_location == fde->initial_location)
+	    continue;
+
+	  obstack_grow (&objfile->objfile_obstack, &fde_table.entries[i],
+			sizeof (fde_table.entries[0]));
+	  ++fde_table2->num_entries;
+	  fde_prev = fde;
+	}
       fde_table2->entries = obstack_finish (&objfile->objfile_obstack);
-      fde_table2->num_entries = i;
 
       /* Discard the original fde_table.  */
       xfree (fde_table.entries);

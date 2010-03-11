@@ -1,6 +1,6 @@
 /* Frame unwinder for frames using the libunwind library.
 
-   Copyright (C) 2003, 2004, 2006, 2007, 2008, 2009
+   Copyright (C) 2003, 2004, 2006, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    Written by Jeff Johnston, contributed by Red Hat Inc.
@@ -278,8 +278,6 @@ libunwind_frame_this_id (struct frame_info *this_frame, void **this_cache,
 
   if (cache != NULL)
     (*this_id) = frame_id_build (cache->base, cache->func_addr);
-  else
-    (*this_id) = null_frame_id;
 }
 
 struct value *

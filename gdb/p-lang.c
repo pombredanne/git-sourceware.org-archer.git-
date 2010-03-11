@@ -1,6 +1,6 @@
 /* Pascal language support routines for GDB, the GNU debugger.
 
-   Copyright (C) 2000, 2002, 2003, 2004, 2005, 2007, 2008, 2009
+   Copyright (C) 2000, 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -101,7 +101,7 @@ is_pascal_string_type (struct type *type,int *length_pos,
 		       struct type **char_type,
 		       char **arrayname)
 {
-  if (TYPE_CODE (type) == TYPE_CODE_STRUCT)
+  if (type != NULL && TYPE_CODE (type) == TYPE_CODE_STRUCT)
     {
       /* Old Borland type pascal strings from Free Pascal Compiler.  */
       /* Two fields: length and st.  */
@@ -214,7 +214,7 @@ pascal_printchar (int c, struct type *type, struct ui_file *stream)
 void
 pascal_printstr (struct ui_file *stream, struct type *type,
 		 const gdb_byte *string, unsigned int length,
-		 int force_ellipses,
+		 const char *encoding, int force_ellipses,
 		 const struct value_print_options *options)
 {
   enum bfd_endian byte_order = gdbarch_byte_order (get_type_arch (type));

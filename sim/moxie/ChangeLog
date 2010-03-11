@@ -1,3 +1,42 @@
+2010-02-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* interp.c (sim_create_inferior): Fix crashes on zero PROG_BFD or ARGV.
+
+2010-02-03  Anthony Green  <green@moxielogic.com>
+
+	* interp.c (sim_resume): nop is 0x0f, and 0x00 is an illegal
+	instruction.
+
+2010-01-13  Anthony Green  <green@moxielogic.com>
+
+	* interp.c (sim_open): Add period to end of sentence in comment.
+
+2010-01-13  Anthony Green  <green@moxielogic.com>
+
+	* interp.c (sim_open): Initialize the SIM_DESC object properly
+	with sim_config() and sim_post_argv_init().
+
+2010-01-09  Ralf Wildenhues  <Ralf.Wildenhues@gmx.de>
+
+	* configure: Regenerate.
+
+2009-09-10  Anthony Green  <green@moxielogic.com>
+
+	* Makefile.in (install-dtb): New target.
+	(moxie-gdb.dtb): New target.
+	(SIM_CFLAGS): Define DTB macro on command line.
+	(SIM_OBJS): Use common infrastructire.
+	(dtbdir): Define install location for dtb file.
+
+	* sim-main.h: New file.
+	* moxie-gdb.dts: New file.
+	* configure.ac: Check for dtc.  Install dtb file.  Remove some old
+	cruft.
+	* configure: Regenerate.
+	* interp.c: Many changes to use common memory infrastructure.
+	(load_dtb): New function.
+	(sim_create_inferior): Call it.
+
 2009-08-22  Ralf Wildenhues  <Ralf.Wildenhues@gmx.de>
 
 	* config.in: Regenerate.

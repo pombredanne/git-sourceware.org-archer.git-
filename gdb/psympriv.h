@@ -29,7 +29,8 @@
    on a  partial symtab list and which points to the corresponding 
    normal symtab once the partial_symtab has been referenced.  */
 
-/* This structure is space critical.  See space comments at the top. */
+/* This structure is space critical.  See space comments at the top of
+   symtab.h. */
 
 struct partial_symbol
 {
@@ -59,8 +60,7 @@ struct partial_symbol
 
    Even after the source file has been read into a symtab, the
    partial_symtab remains around.  They are allocated on an obstack,
-   objfile_obstack.  FIXME, this is bad for dynamic linking or VxWorks-
-   style execution of a bunch of .o's.  */
+   objfile_obstack.  */
 
 struct partial_symtab
 {
@@ -140,10 +140,9 @@ struct partial_symtab
   /* Information that lets read_symtab() locate the part of the symbol table
      that this psymtab corresponds to.  This information is private to the
      format-dependent symbol reading routines.  For further detail examine
-     the various symbol reading modules.  Should really be (void *) but is
-     (char *) as with other such gdb variables.  (FIXME) */
+     the various symbol reading modules.  */
 
-  char *read_symtab_private;
+  void *read_symtab_private;
 
   /* Non-zero if the symtab corresponding to this psymtab has been readin */
 
@@ -256,7 +255,7 @@ void discard_psymtab (struct psymtab_state *state, struct partial_symtab *);
 /* Add any kind of symbol to a psymbol_allocation_list.  */
 const struct partial_symbol *add_psymbol_to_list_full
     (struct psymtab_state *state,
-     char *name, int namelength, domain_enum domain,
+     char *name, int namelength, int copy_name, domain_enum domain,
      enum address_class class,
      long val,	/* Value as a long */
      CORE_ADDR coreaddr,	/* Value as a CORE_ADDR */
@@ -266,7 +265,7 @@ const struct partial_symbol *add_psymbol_to_list_full
 /* A legacy function that calls add_psymbol_to_list_full using the
    objfile's psymtab_state.  */
 const struct partial_symbol *add_psymbol_to_list
-    (char *, int, domain_enum,
+    (char *, int, int, domain_enum,
      enum address_class,
      int,
      long, CORE_ADDR,

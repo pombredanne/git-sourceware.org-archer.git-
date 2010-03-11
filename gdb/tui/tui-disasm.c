@@ -1,7 +1,7 @@
 /* Disassembly display.
 
-   Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009
-   Free Software Foundation, Inc.
+   Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009,
+   2010 Free Software Foundation, Inc.
 
    Contributed by Hewlett-Packard Company.
 
@@ -36,6 +36,7 @@
 #include "tui/tui-stack.h"
 #include "tui/tui-file.h"
 #include "tui/tui-disasm.h"
+#include "progspace.h"
 
 #include "gdb_curses.h"
 
@@ -259,7 +260,8 @@ tui_set_disassem_content (struct gdbarch *gdbarch, CORE_ADDR pc)
 
       /* See whether there is a breakpoint installed.  */
       src->has_break = (!src->is_exec_point
-                       && breakpoint_here_p (pc) != no_breakpoint_here);
+			&& breakpoint_here_p (current_program_space->aspace, pc)
+			!= no_breakpoint_here);
 
       xfree (asm_lines[i].addr_string);
       xfree (asm_lines[i].insn);

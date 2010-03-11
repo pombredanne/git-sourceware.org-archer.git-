@@ -1,6 +1,6 @@
 /* Target-dependent code for GNU/Linux i386.
 
-   Copyright (C) 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009
+   Copyright (C) 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -37,31 +37,25 @@
 #include "symtab.h"
 #include "arch-utils.h"
 #include "regset.h"
+#include "xml-syscall.h"
+
+/* The syscall's XML filename for i386.  */
+#define XML_SYSCALL_FILENAME_I386 "syscalls/i386-linux.xml"
 
 #include "record.h"
 #include "linux-record.h"
 #include <stdint.h>
 
+#include "features/i386/i386-linux.c"
+
 /* Supported register note sections.  */
 static struct core_regset_section i386_linux_regset_sections[] =
 {
-  { ".reg", 144 },
-  { ".reg2", 108 },
-  { ".reg-xfp", 512 },
+  { ".reg", 144, "general-purpose" },
+  { ".reg2", 108, "floating-point" },
+  { ".reg-xfp", 512, "extended floating-point" },
   { NULL, 0 }
 };
-
-/* Return the name of register REG.  */
-
-static const char *
-i386_linux_register_name (struct gdbarch *gdbarch, int reg)
-{
-  /* Deal with the extra "orig_eax" pseudo register.  */
-  if (reg == I386_LINUX_ORIG_EAX_REGNUM)
-    return "orig_eax";
-
-  return i386_register_name (gdbarch, reg);
-}
 
 /* Return non-zero, when the register is in the corresponding register
    group.  Put the LINUX_ORIG_EAX register in the system group.  */
@@ -354,7 +348,32 @@ i386_linux_write_pc (struct regcache *regcache, CORE_ADDR pc)
   regcache_cooked_write_unsigned (regcache, I386_LINUX_ORIG_EAX_REGNUM, -1);
 }
 
-static struct linux_record_tdep i386_linux_record_tdep;
+/* Record all registers but IP register for process-record.  */
+
+static int
+i386_all_but_ip_registers_record (struct regcache *regcache)
+{
+  if (record_arch_list_add_reg (regcache, I386_EAX_REGNUM))
+    return -1;
+  if (record_arch_list_add_reg (regcache, I386_ECX_REGNUM))
+    return -1;
+  if (record_arch_list_add_reg (regcache, I386_EDX_REGNUM))
+    return -1;
+  if (record_arch_list_add_reg (regcache, I386_EBX_REGNUM))
+    return -1;
+  if (record_arch_list_add_reg (regcache, I386_ESP_REGNUM))
+    return -1;
+  if (record_arch_list_add_reg (regcache, I386_EBP_REGNUM))
+    return -1;
+  if (record_arch_list_add_reg (regcache, I386_ESI_REGNUM))
+    return -1;
+  if (record_arch_list_add_reg (regcache, I386_EDI_REGNUM))
+    return -1;
+  if (record_arch_list_add_reg (regcache, I386_EFLAGS_REGNUM))
+    return -1;
+
+  return 0;
+}
 
 /* i386_canonicalize_syscall maps from the native i386 Linux set
    of syscall ids into a canonical set of syscall ids used by
@@ -379,6 +398,8 @@ i386_canonicalize_syscall (int syscall)
 
    Return -1 if something wrong.  */
 
+static struct linux_record_tdep i386_linux_record_tdep;
+
 static int
 i386_linux_intx80_sysenter_record (struct regcache *regcache)
 {
@@ -398,6 +419,14 @@ i386_linux_intx80_sysenter_record (struct regcache *regcache)
       return -1;
     }
 
+  if (syscall_gdb == gdb_sys_sigreturn
+      || syscall_gdb == gdb_sys_rt_sigreturn)
+   {
+     if (i386_all_but_ip_registers_record (regcache))
+       return -1;
+     return 0;
+   }
+
   ret = record_linux_system_call (syscall_gdb, regcache,
 				  &i386_linux_record_tdep);
   if (ret)
@@ -409,7 +438,62 @@ i386_linux_intx80_sysenter_record (struct regcache *regcache)
 
   return 0;
 }
+
+#define I386_LINUX_xstate	270
+#define I386_LINUX_frame_size	732
+
+int
+i386_linux_record_signal (struct gdbarch *gdbarch,
+                          struct regcache *regcache,
+                          enum target_signal signal)
+{
+  ULONGEST esp;
+
+  if (i386_all_but_ip_registers_record (regcache))
+    return -1;
+
+  if (record_arch_list_add_reg (regcache, I386_EIP_REGNUM))
+    return -1;
+
+  /* Record the change in the stack.  */
+  regcache_raw_read_unsigned (regcache, I386_ESP_REGNUM, &esp);
+  /* This is for xstate.
+     sp -= sizeof (struct _fpstate);  */
+  esp -= I386_LINUX_xstate;
+  /* This is for frame_size.
+     sp -= sizeof (struct rt_sigframe);  */
+  esp -= I386_LINUX_frame_size;
+  if (record_arch_list_add_mem (esp,
+                                I386_LINUX_xstate + I386_LINUX_frame_size))
+    return -1;
+
+  if (record_arch_list_add_end ())
+    return -1;
+
+  return 0;
+}
 
+
+static LONGEST
+i386_linux_get_syscall_number (struct gdbarch *gdbarch,
+                               ptid_t ptid)
+{
+  struct regcache *regcache = get_thread_regcache (ptid);
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+  /* The content of a register.  */
+  gdb_byte buf[4];
+  /* The result.  */
+  LONGEST ret;
+
+  /* Getting the system call number from the register.
+     When dealing with x86 architecture, this information
+     is stored at %eax register.  */
+  regcache_cooked_read (regcache, I386_LINUX_ORIG_EAX_REGNUM, buf);
+
+  ret = extract_signed_integer (buf, 4, byte_order);
+
+  return ret;
+}
 
 /* The register sets used in GNU/Linux ELF core-dumps are identical to
    the register sets in `struct user' that are used for a.out
@@ -476,21 +560,57 @@ static int i386_linux_sc_reg_offset[] =
   0 * 4				/* %gs */
 };
 
+/* Get Linux/x86 target description from core dump.  */
+
+static const struct target_desc *
+i386_linux_core_read_description (struct gdbarch *gdbarch,
+				  struct target_ops *target,
+				  bfd *abfd)
+{
+  asection *section = bfd_get_section_by_name (abfd, ".reg2");
+
+  if (section == NULL)
+    return NULL;
+
+  /* Linux/i386.  */
+  return tdesc_i386_linux;
+}
+
 static void
 i386_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
 {
   struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
+  const struct target_desc *tdesc = info.target_desc;
+  struct tdesc_arch_data *tdesc_data = (void *) info.tdep_info;
+  const struct tdesc_feature *feature;
+  int valid_p;
+
+  gdb_assert (tdesc_data);
 
   /* GNU/Linux uses ELF.  */
   i386_elf_init_abi (info, gdbarch);
 
-  /* Since we have the extra "orig_eax" register on GNU/Linux, we have
-     to adjust a few things.  */
-
-  set_gdbarch_write_pc (gdbarch, i386_linux_write_pc);
+  /* Reserve a number for orig_eax.  */
   set_gdbarch_num_regs (gdbarch, I386_LINUX_NUM_REGS);
-  set_gdbarch_register_name (gdbarch, i386_linux_register_name);
-  set_gdbarch_register_reggroup_p (gdbarch, i386_linux_register_reggroup_p);
+
+  if (! tdesc_has_registers (tdesc))
+    tdesc = tdesc_i386_linux;
+  tdep->tdesc = tdesc;
+
+  feature = tdesc_find_feature (tdesc, "org.gnu.gdb.i386.linux");
+  if (feature == NULL)
+    return;
+
+  valid_p = tdesc_numbered_register (feature, tdesc_data,
+				     I386_LINUX_ORIG_EAX_REGNUM,
+				     "orig_eax");
+  if (!valid_p)
+    return;
+
+  /* Add the %orig_eax register used for syscall restarting.  */
+  set_gdbarch_write_pc (gdbarch, i386_linux_write_pc);
+
+  tdep->register_reggroup_p = i386_linux_register_reggroup_p;
 
   tdep->gregset_reg_offset = i386_linux_gregset_reg_offset;
   tdep->gregset_num_regs = ARRAY_SIZE (i386_linux_gregset_reg_offset);
@@ -504,6 +624,7 @@ i386_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
   tdep->sc_num_regs = ARRAY_SIZE (i386_linux_sc_reg_offset);
 
   set_gdbarch_process_record (gdbarch, i386_process_record);
+  set_gdbarch_process_record_signal (gdbarch, i386_linux_record_signal);
 
   /* Initialize the i386_linux_record_tdep.  */
   /* These values are the size of the type that will be used in a system
@@ -688,6 +809,9 @@ i386_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
   /* Install supported register note sections.  */
   set_gdbarch_core_regset_sections (gdbarch, i386_linux_regset_sections);
 
+  set_gdbarch_core_read_description (gdbarch,
+				     i386_linux_core_read_description);
+
   /* Displaced stepping.  */
   set_gdbarch_displaced_step_copy_insn (gdbarch,
                                         simple_displaced_step_copy_insn);
@@ -696,6 +820,11 @@ i386_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
                                            simple_displaced_step_free_closure);
   set_gdbarch_displaced_step_location (gdbarch,
                                        displaced_step_at_entry_point);
+
+  /* Functions for 'catch syscall'.  */
+  set_xml_syscall_file_name (XML_SYSCALL_FILENAME_I386);
+  set_gdbarch_get_syscall_number (gdbarch,
+                                  i386_linux_get_syscall_number);
 
   set_gdbarch_get_siginfo_type (gdbarch, linux_get_siginfo_type);
 }
@@ -708,4 +837,7 @@ _initialize_i386_linux_tdep (void)
 {
   gdbarch_register_osabi (bfd_arch_i386, 0, GDB_OSABI_LINUX,
 			  i386_linux_init_abi);
+
+  /* Initialize the Linux target description  */
+  initialize_tdesc_i386_linux ();
 }

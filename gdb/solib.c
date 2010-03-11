@@ -1,7 +1,7 @@
 /* Handle shared libraries for GDB, the GNU Debugger.
 
    Copyright (C) 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003, 2005, 2006, 2007, 2008, 2009
+   2000, 2001, 2002, 2003, 2005, 2006, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -86,9 +86,8 @@ set_solib_ops (struct gdbarch *gdbarch, struct target_so_ops *new_ops)
    configuration needs to call set_solib_ops.  */
 struct target_so_ops *current_target_so_ops;
 
-/* local data declarations */
-
-static struct so_list *so_list_head;	/* List of known shared objects */
+/* List of known shared objects */
+#define so_list_head current_program_space->so_list
 
 /* Local function prototypes */
 
@@ -151,6 +150,30 @@ solib_find (char *in_pathname, int *fd)
   int found_file = -1;
   char *temp_pathname = NULL;
   int gdb_sysroot_is_empty;
+  const char *solib_symbols_extension
+    = gdbarch_solib_symbols_extension (target_gdbarch);
+
+  /* If solib_symbols_extension is set, replace the file's
+     extension.  */
+  if (solib_symbols_extension)
+    {
+      char *p = in_pathname + strlen (in_pathname);
+      while (p > in_pathname && *p != '.')
+	p--;
+
+      if (*p == '.')
+	{
+	  char *new_pathname;
+
+	  new_pathname = alloca (p - in_pathname + 1
+				 + strlen (solib_symbols_extension) + 1);
+	  memcpy (new_pathname, in_pathname, p - in_pathname + 1);
+	  strcpy (new_pathname + (p - in_pathname) + 1,
+		  solib_symbols_extension);
+
+	  in_pathname = new_pathname;
+	}
+    }
 
   gdb_sysroot_is_empty = (gdb_sysroot == NULL || *gdb_sysroot == 0);
 
@@ -228,14 +251,16 @@ solib_find (char *in_pathname, int *fd)
 
   /* If not found, next search the inferior's $PATH environment variable. */
   if (found_file < 0 && gdb_sysroot_is_empty)
-    found_file = openp (get_in_environ (inferior_environ, "PATH"),
+    found_file = openp (get_in_environ (current_inferior ()->environment,
+					"PATH"),
 			OPF_TRY_CWD_FIRST, in_pathname, O_RDONLY | O_BINARY,
 			&temp_pathname);
 
   /* If not found, next search the inferior's $LD_LIBRARY_PATH 
      environment variable. */
   if (found_file < 0 && gdb_sysroot_is_empty)
-    found_file = openp (get_in_environ (inferior_environ, "LD_LIBRARY_PATH"),
+    found_file = openp (get_in_environ (current_inferior ()->environment,
+					"LD_LIBRARY_PATH"),
 			OPF_TRY_CWD_FIRST, in_pathname, O_RDONLY | O_BINARY,
 			&temp_pathname);
 
@@ -310,7 +335,7 @@ solib_bfd_open (char *pathname)
 
   /* Check bfd arch.  */
   b = gdbarch_bfd_arch_info (target_gdbarch);
-  if (b->compatible (b, bfd_get_arch_info (abfd)) != b)
+  if (!b->compatible (b, bfd_get_arch_info (abfd)))
     warning (_("`%s': Shared library architecture %s is not compatible "
                "with target architecture %s."), found_pathname,
              bfd_get_arch_info (abfd)->printable_name, b->printable_name);
@@ -651,6 +676,7 @@ update_solib_list (int from_tty, struct target_ops *target)
       for (i = inferior; i; i = i->next)
 	{
 	  i->from_tty = from_tty;
+	  i->pspace = current_program_space;
 
 	  /* Fill in the rest of the `struct so_list' node.  */
 	  catch_errors (solib_map_sections, i,
@@ -937,15 +963,32 @@ solib_contains_address_p (const struct so_list *const solib,
  */
 
 char *
-solib_name_from_address (CORE_ADDR address)
+solib_name_from_address (struct program_space *pspace, CORE_ADDR address)
 {
-  struct so_list *so = 0;	/* link map state variable */
+  struct so_list *so = NULL;
 
-  for (so = so_list_head; so; so = so->next)
+  for (so = pspace->so_list; so; so = so->next)
     if (solib_contains_address_p (so, address))
       return (so->so_name);
 
   return (0);
+}
+
+/* Return whether the data starting at VADDR, size SIZE, must be kept
+   in a core file for shared libraries loaded before "gcore" is used
+   to be handled correctly when the core file is loaded.  This only
+   applies when the section would otherwise not be kept in the core
+   file (in particular, for readonly sections).  */
+
+int
+solib_keep_data_in_core (CORE_ADDR vaddr, unsigned long size)
+{
+  struct target_so_ops *ops = solib_ops (target_gdbarch);
+
+  if (ops->keep_data_in_core)
+    return ops->keep_data_in_core (vaddr, size);
+  else
+    return 0;
 }
 
 /* Called by free_all_symtabs */
@@ -998,7 +1041,7 @@ clear_solib (void)
 
    SYNOPSIS
 
-   void solib_create_inferior_hook ()
+   void solib_create_inferior_hook (int from_tty)
 
    DESCRIPTION
 
@@ -1008,10 +1051,10 @@ clear_solib (void)
    SOLIB_CREATE_INFERIOR_HOOK.  */
 
 void
-solib_create_inferior_hook (void)
+solib_create_inferior_hook (int from_tty)
 {
   struct target_so_ops *ops = solib_ops (target_gdbarch);
-  ops->solib_create_inferior_hook();
+  ops->solib_create_inferior_hook (from_tty);
 }
 
 /* GLOBAL FUNCTION
@@ -1087,7 +1130,6 @@ reload_shared_libraries (char *ignored, int from_tty,
 			 struct cmd_list_element *e)
 {
   no_shared_libraries (NULL, from_tty);
-  solib_add (NULL, from_tty, NULL, auto_solib_add);
   /* Creating inferior hooks here has two purposes. First, if we reload 
      shared libraries then the address of solib breakpoint we've computed
      previously might be no longer valid.  For example, if we forgot to set
@@ -1102,9 +1144,19 @@ reload_shared_libraries (char *ignored, int from_tty,
 #ifdef SOLIB_CREATE_INFERIOR_HOOK
       SOLIB_CREATE_INFERIOR_HOOK (PIDGET (inferior_ptid));
 #else
-      solib_create_inferior_hook ();
+      solib_create_inferior_hook (from_tty);
 #endif
     }
+
+  /* Sometimes the platform-specific hook loads initial shared
+     libraries, and sometimes it doesn't.  If it doesn't FROM_TTY will be
+     incorrectly 0 but such solib targets should be fixed anyway.  If we
+     made all the inferior hook methods consistent, this call could be
+     removed.  Call it only after the solib target has been initialized by
+     solib_create_inferior_hook.  */
+
+  solib_add (NULL, 0, NULL, auto_solib_add);
+
   /* We have unloaded and then reloaded debug info for all shared libraries.
      However, frames may still reference them, for example a frame's 
      unwinder might still point of DWARF FDE structures that are now freed.
@@ -1127,13 +1179,12 @@ show_auto_solib_add (struct ui_file *file, int from_tty,
 struct symbol *
 solib_global_lookup (const struct objfile *objfile,
 		     const char *name,
-		     const char *linkage_name,
 		     const domain_enum domain)
 {
   struct target_so_ops *ops = solib_ops (target_gdbarch);
 
   if (ops->lookup_lib_global_symbol != NULL)
-    return ops->lookup_lib_global_symbol (objfile, name, linkage_name, domain);
+    return ops->lookup_lib_global_symbol (objfile, name, domain);
   return NULL;
 }
 

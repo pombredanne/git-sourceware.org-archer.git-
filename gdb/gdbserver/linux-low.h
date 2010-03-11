@@ -1,5 +1,5 @@
 /* Internal interfaces for the GNU/Linux specific target code for gdbserver.
-   Copyright (C) 2002, 2004, 2005, 2007, 2008, 2009
+   Copyright (C) 2002, 2004, 2005, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -24,8 +24,8 @@
 #include "gdb_proc_service.h"
 
 #ifdef HAVE_LINUX_REGSETS
-typedef void (*regset_fill_func) (void *);
-typedef void (*regset_store_func) (const void *);
+typedef void (*regset_fill_func) (struct regcache *, void *);
+typedef void (*regset_store_func) (struct regcache *, const void *);
 enum regset_type {
   GENERAL_REGS,
   FP_REGS,
@@ -47,18 +47,12 @@ struct siginfo;
 
 struct process_info_private
 {
-  /* True if this process has loaded thread_db, and it is active.  */
-  int thread_db_active;
-
-  /* Structure that identifies the child process for the
-     <proc_service.h> interface.  */
-  struct ps_prochandle proc_handle;
-
-  /* Connection to the libthread_db library.  */
-  td_thragent_t *thread_agent;
-
   /* Arch-specific additions.  */
   struct arch_process_info *arch_private;
+
+  /* libthread_db-specific additions.  Not NULL if this process has loaded
+     thread_db, and it is active.  */
+  struct thread_db *thread_db;
 };
 
 struct lwp_info;
@@ -76,8 +70,8 @@ struct linux_target_ops
      store the register, and 2 if failure to store the register
      is acceptable.  */
   int (*cannot_store_register) (int);
-  CORE_ADDR (*get_pc) (void);
-  void (*set_pc) (CORE_ADDR newpc);
+  CORE_ADDR (*get_pc) (struct regcache *regcache);
+  void (*set_pc) (struct regcache *regcache, CORE_ADDR newpc);
   const unsigned char *breakpoint;
   int breakpoint_len;
   CORE_ADDR (*breakpoint_reinsert_addr) (void);
@@ -94,8 +88,10 @@ struct linux_target_ops
 
   /* Hooks to reformat register data for PEEKUSR/POKEUSR (in particular
      for registers smaller than an xfer unit).  */
-  void (*collect_ptrace_register) (int regno, char *buf);
-  void (*supply_ptrace_register) (int regno, const char *buf);
+  void (*collect_ptrace_register) (struct regcache *regcache,
+				   int regno, char *buf);
+  void (*supply_ptrace_register) (struct regcache *regcache,
+				  int regno, const char *buf);
 
   /* Hook to convert from target format to ptrace format and back.
      Returns true if any conversion was done; false otherwise.
@@ -203,9 +199,11 @@ char *linux_child_pid_to_exec_file (int pid);
 int elf_64_file_p (const char *file);
 
 void linux_attach_lwp (unsigned long pid);
+struct lwp_info *find_lwp_pid (ptid_t ptid);
 
+/* From thread-db.c  */
 int thread_db_init (int use_events);
+void thread_db_free (struct process_info *, int detaching);
+int thread_db_handle_monitor_command (char *);
 int thread_db_get_tls_address (struct thread_info *thread, CORE_ADDR offset,
 			       CORE_ADDR load_module, CORE_ADDR *address);
-
-struct lwp_info *find_lwp_pid (ptid_t ptid);

@@ -1,4 +1,4 @@
-# Copyright 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009
+# Copyright 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010
 # Free Software Foundation, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -557,7 +557,7 @@ mi_gdb_test "-var-info-num-children e" \
 # Test: c_variable-7.55
 # Desc: children of e
 mi_gdb_test "-var-list-children e" \
-	"\\^done,numchild=\"0\"" \
+	"\\^done,numchild=\"0\",has_more=\"0\"" \
 	"get children of e"
 
 # Test: c_variable-7.60
@@ -599,7 +599,7 @@ mi_gdb_test "-var-info-num-children anone" \
 # Test: c_variable-7.75
 # Desc: children of anone
 mi_gdb_test "-var-list-children anone" \
-	"\\^done,numchild=\"0\"" \
+	"\\^done,numchild=\"0\",has_more=\"0\"" \
 	"get children of anone"
 
 

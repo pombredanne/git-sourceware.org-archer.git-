@@ -1,6 +1,6 @@
 /* Main code for remote server for GDB.
    Copyright (C) 1989, 1993, 1994, 1995, 1997, 1998, 1999, 2000, 2002, 2003,
-   2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2004, 2005, 2006, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -557,7 +557,7 @@ handle_search_memory_1 (CORE_ADDR start_addr, CORE_ADDR search_space_len,
       if (search_space_len >= pattern_len)
 	{
 	  unsigned keep_len = search_buf_size - chunk_size;
-	  CORE_ADDR read_addr = start_addr + keep_len;
+	  CORE_ADDR read_addr = start_addr + chunk_size + keep_len;
 	  int nr_to_read;
 
 	  /* Copy the trailing part of the previous iteration to the front
@@ -659,6 +659,134 @@ handle_search_memory (char *own_buf, int packet_len)
       write_enn (BUF);				\
       return;					\
     }
+
+/* Handle monitor commands not handled by target-specific handlers.  */
+
+static void
+handle_monitor_command (char *mon)
+{
+  if (strcmp (mon, "set debug 1") == 0)
+    {
+      debug_threads = 1;
+      monitor_output ("Debug output enabled.\n");
+    }
+  else if (strcmp (mon, "set debug 0") == 0)
+    {
+      debug_threads = 0;
+      monitor_output ("Debug output disabled.\n");
+    }
+  else if (strcmp (mon, "set debug-hw-points 1") == 0)
+    {
+      debug_hw_points = 1;
+      monitor_output ("H/W point debugging output enabled.\n");
+    }
+  else if (strcmp (mon, "set debug-hw-points 0") == 0)
+    {
+      debug_hw_points = 0;
+      monitor_output ("H/W point debugging output disabled.\n");
+    }
+  else if (strcmp (mon, "set remote-debug 1") == 0)
+    {
+      remote_debug = 1;
+      monitor_output ("Protocol debug output enabled.\n");
+    }
+  else if (strcmp (mon, "set remote-debug 0") == 0)
+    {
+      remote_debug = 0;
+      monitor_output ("Protocol debug output disabled.\n");
+    }
+  else if (strcmp (mon, "help") == 0)
+    monitor_show_help ();
+  else if (strcmp (mon, "exit") == 0)
+    exit_requested = 1;
+  else
+    {
+      monitor_output ("Unknown monitor command.\n\n");
+      monitor_show_help ();
+      write_enn (own_buf);
+    }
+}
+
+static void
+handle_threads_qxfer_proper (struct buffer *buffer)
+{
+  struct inferior_list_entry *thread;
+
+  buffer_grow_str (buffer, "<threads>\n");
+
+  for (thread = all_threads.head; thread; thread = thread->next)
+    {
+      ptid_t ptid = thread_to_gdb_id ((struct thread_info *)thread);
+      char ptid_s[100];
+      int core = -1;
+      char core_s[21];
+
+      write_ptid (ptid_s, ptid);
+
+      if (the_target->core_of_thread)
+	core = (*the_target->core_of_thread) (ptid);
+
+      if (core != -1)
+	{
+	  sprintf (core_s, "%d", core);
+	  buffer_xml_printf (buffer, "<thread id=\"%s\" core=\"%s\"/>\n",
+			     ptid_s, core_s);
+	}
+      else
+	{
+	  buffer_xml_printf (buffer, "<thread id=\"%s\"/>\n",
+			     ptid_s);
+	}
+    }
+
+  buffer_grow_str0 (buffer, "</threads>\n");
+}
+
+static int
+handle_threads_qxfer (const char *annex,
+		      unsigned char *readbuf,
+		      CORE_ADDR offset, int length)
+{
+  static char *result = 0;
+  static unsigned int result_length = 0;
+
+  if (annex && strcmp (annex, "") != 0)
+    return 0;
+
+  if (offset == 0)
+    {
+      struct buffer buffer;
+      /* When asked for data at offset 0, generate everything and store into
+	 'result'.  Successive reads will be served off 'result'.  */
+      if (result)
+	free (result);
+
+      buffer_init (&buffer);
+
+      handle_threads_qxfer_proper (&buffer);
+
+      result = buffer_finish (&buffer);
+      result_length = strlen (result);
+      buffer_free (&buffer);
+    }
+
+  if (offset >= result_length)
+    {
+      /* We're out of data.  */
+      free (result);
+      result = NULL;
+      result_length = 0;
+      return 0;
+    }
+
+  if (length > result_length - offset)
+    length = result_length - offset;
+
+  memcpy (readbuf, result + offset, length);
+
+  return length;
+
+}
 
 /* Handle all of the extended 'q' packets.  */
 void
@@ -1065,6 +1193,43 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
       return;
     }
 
+  if (strncmp ("qXfer:threads:read:", own_buf, 19) == 0)
+    {
+      unsigned char *data;
+      int n;
+      CORE_ADDR ofs;
+      unsigned int len;
+      char *annex;
+
+      require_running (own_buf);
+
+      /* Reject any annex; grab the offset and length.  */
+      if (decode_xfer_read (own_buf + 19, &annex, &ofs, &len) < 0
+	  || annex[0] != '\0')
+	{
+	  strcpy (own_buf, "E00");
+	  return;
+	}
+
+      /* Read one extra byte, as an indicator of whether there is
+	 more.  */
+      if (len > PBUFSIZ - 2)
+	len = PBUFSIZ - 2;
+      data = malloc (len + 1);
+      if (!data)
+	return;
+      n = handle_threads_qxfer (annex, data, ofs, len + 1);
+      if (n < 0)
+	write_enn (own_buf);
+      else if (n > len)
+	*new_packet_len_p = write_qxfer_response (own_buf, data, len, 1);
+      else
+	*new_packet_len_p = write_qxfer_response (own_buf, data, n, 0);
+
+      free (data);
+      return;
+    }
+
   /* Protocol features query.  */
   if (strncmp ("qSupported", own_buf, 10) == 0
       && (own_buf[10] == ':' || own_buf[10] == '\0'))
@@ -1120,6 +1285,8 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 
       if (target_supports_non_stop ())
 	strcat (own_buf, ";QNonStop+");
+
+      strcat (own_buf, ";qXfer:threads:read+");
 
       return;
     }
@@ -1211,46 +1378,10 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 
       write_ok (own_buf);
 
-      if (strcmp (mon, "set debug 1") == 0)
-	{
-	  debug_threads = 1;
-	  monitor_output ("Debug output enabled.\n");
-	}
-      else if (strcmp (mon, "set debug 0") == 0)
-	{
-	  debug_threads = 0;
-	  monitor_output ("Debug output disabled.\n");
-	}
-      else if (strcmp (mon, "set debug-hw-points 1") == 0)
-	{
-	  debug_hw_points = 1;
-	  monitor_output ("H/W point debugging output enabled.\n");
-	}
-      else if (strcmp (mon, "set debug-hw-points 0") == 0)
-	{
-	  debug_hw_points = 0;
-	  monitor_output ("H/W point debugging output disabled.\n");
-	}
-      else if (strcmp (mon, "set remote-debug 1") == 0)
-	{
-	  remote_debug = 1;
-	  monitor_output ("Protocol debug output enabled.\n");
-	}
-      else if (strcmp (mon, "set remote-debug 0") == 0)
-	{
-	  remote_debug = 0;
-	  monitor_output ("Protocol debug output disabled.\n");
-	}
-      else if (strcmp (mon, "help") == 0)
-	monitor_show_help ();
-      else if (strcmp (mon, "exit") == 0)
-	exit_requested = 1;
-      else
-	{
-	  monitor_output ("Unknown monitor command.\n\n");
-	  monitor_show_help ();
-	  write_enn (own_buf);
-	}
+      if (the_target->handle_monitor_command == NULL
+	  || (*the_target->handle_monitor_command) (mon) == 0)
+	/* Default processing.  */
+	handle_monitor_command (mon);
 
       free (mon);
       return;
@@ -1764,7 +1895,7 @@ static void
 gdbserver_version (void)
 {
   printf ("GNU gdbserver %s%s\n"
-	  "Copyright (C) 2009 Free Software Foundation, Inc.\n"
+	  "Copyright (C) 2010 Free Software Foundation, Inc.\n"
 	  "gdbserver is free software, covered by the GNU General Public License.\n"
 	  "This gdbserver was configured as \"%s\"\n",
 	  PKGVERSION, version, host_name);
@@ -2325,15 +2456,25 @@ process_serial_event (void)
 	}
       break;
     case 'g':
-      require_running (own_buf);
-      set_desired_inferior (1);
-      registers_to_string (own_buf);
+      {
+	struct regcache *regcache;
+
+	require_running (own_buf);
+	set_desired_inferior (1);
+	regcache = get_thread_regcache (current_inferior, 1);
+	registers_to_string (regcache, own_buf);
+      }
       break;
     case 'G':
-      require_running (own_buf);
-      set_desired_inferior (1);
-      registers_from_string (&own_buf[1]);
-      write_ok (own_buf);
+ 	{
+	  struct regcache *regcache;
+
+	  require_running (own_buf);
+	  set_desired_inferior (1);
+	  regcache = get_thread_regcache (current_inferior, 1);
+	  registers_from_string (regcache, &own_buf[1]);
+	  write_ok (own_buf);
+	}
       break;
     case 'm':
       require_running (own_buf);

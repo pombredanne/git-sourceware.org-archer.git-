@@ -1,6 +1,6 @@
 /* Low level interface to ptrace, for the remote server for GDB.
    Copyright (C) 1995, 1996, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005,
-   2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2006, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -19,9 +19,6 @@
 
 #include "server.h"
 #include "linux-low.h"
-#include "ansidecl.h" /* For ATTRIBUTE_PACKED, must be bug in external.h.  */
-#include "elf/common.h"
-#include "elf/external.h"
 
 #include <sys/wait.h>
 #include <stdio.h>
@@ -42,6 +39,13 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <sys/vfs.h>
+#ifndef ELFMAG0
+/* Don't include <linux/elf.h> here.  If it got included by gdb_proc_service.h
+   then ELFMAG0 will have been defined.  If it didn't get included by
+   gdb_proc_service.h then including it will likely introduce a duplicate
+   definition of elf_fpregset_t.  */
+#include <elf.h>
+#endif
 
 #ifndef SPUFS_MAGIC
 #define SPUFS_MAGIC 0x23c9b64e
@@ -89,6 +93,10 @@
 #define __WALL          0x40000000 /* Wait for any child.  */
 #endif
 
+#ifndef W_STOPCODE
+#define W_STOPCODE(sig) ((sig) << 8 | 0x7f)
+#endif
+
 #ifdef __UCLIBC__
 #if !(defined(__UCLIBC_HAS_MMU__) || defined(__ARCH_HAS_MMU__))
 #define HAS_NOMMU
@@ -134,9 +142,9 @@ static void stop_all_lwps (void);
 static int linux_wait_for_event (ptid_t ptid, int *wstat, int options);
 static int check_removed_breakpoint (struct lwp_info *event_child);
 static void *add_lwp (ptid_t ptid);
-static int my_waitpid (int pid, int *status, int flags);
 static int linux_stopped_by_watchpoint (void);
 static void mark_lwp_dead (struct lwp_info *lwp, int wstat);
+static int linux_core_of_thread (ptid_t ptid);
 
 struct pending_signals
 {
@@ -145,7 +153,8 @@ struct pending_signals
   struct pending_signals *prev;
 };
 
-#define PTRACE_ARG3_TYPE long
+#define PTRACE_ARG3_TYPE void *
+#define PTRACE_ARG4_TYPE void *
 #define PTRACE_XFER_TYPE long
 
 #ifdef HAVE_LINUX_REGSETS
@@ -192,7 +201,7 @@ linux_child_pid_to_exec_file (int pid)
 /* Return non-zero if HEADER is a 64-bit ELF file.  */
 
 static int
-elf_64_header_p (const Elf64_External_Ehdr *header)
+elf_64_header_p (const Elf64_Ehdr *header)
 {
   return (header->e_ident[EI_MAG0] == ELFMAG0
           && header->e_ident[EI_MAG1] == ELFMAG1
@@ -208,7 +217,7 @@ elf_64_header_p (const Elf64_External_Ehdr *header)
 int
 elf_64_file_p (const char *file)
 {
-  Elf64_External_Ehdr header;
+  Elf64_Ehdr header;
   int fd;
 
   fd = open (file, O_RDONLY);
@@ -261,9 +270,86 @@ linux_add_process (int pid, int attached)
 static void
 linux_remove_process (struct process_info *process)
 {
-  free (process->private->arch_private);
-  free (process->private);
+  struct process_info_private *priv = process->private;
+
+  free (priv->arch_private);
+  free (priv);
   remove_process (process);
+}
+
+/* Wrapper function for waitpid which handles EINTR, and emulates
+   __WALL for systems where that is not available.  */
+
+static int
+my_waitpid (int pid, int *status, int flags)
+{
+  int ret, out_errno;
+
+  if (debug_threads)
+    fprintf (stderr, "my_waitpid (%d, 0x%x)\n", pid, flags);
+
+  if (flags & __WALL)
+    {
+      sigset_t block_mask, org_mask, wake_mask;
+      int wnohang;
+
+      wnohang = (flags & WNOHANG) != 0;
+      flags &= ~(__WALL | __WCLONE);
+      flags |= WNOHANG;
+
+      /* Block all signals while here.  This avoids knowing about
+	 LinuxThread's signals.  */
+      sigfillset (&block_mask);
+      sigprocmask (SIG_BLOCK, &block_mask, &org_mask);
+
+      /* ... except during the sigsuspend below.  */
+      sigemptyset (&wake_mask);
+
+      while (1)
+	{
+	  /* Since all signals are blocked, there's no need to check
+	     for EINTR here.  */
+	  ret = waitpid (pid, status, flags);
+	  out_errno = errno;
+
+	  if (ret == -1 && out_errno != ECHILD)
+	    break;
+	  else if (ret > 0)
+	    break;
+
+	  if (flags & __WCLONE)
+	    {
+	      /* We've tried both flavors now.  If WNOHANG is set,
+		 there's nothing else to do, just bail out.  */
+	      if (wnohang)
+		break;
+
+	      if (debug_threads)
+		fprintf (stderr, "blocking\n");
+
+	      /* Block waiting for signals.  */
+	      sigsuspend (&wake_mask);
+	    }
+
+	  flags ^= __WCLONE;
+	}
+
+      sigprocmask (SIG_SETMASK, &org_mask, NULL);
+    }
+  else
+    {
+      do
+	ret = waitpid (pid, status, flags);
+      while (ret == -1 && errno == EINTR);
+      out_errno = errno;
+    }
+
+  if (debug_threads)
+    fprintf (stderr, "my_waitpid (%d, 0x%x): status(%x), %d\n",
+	     pid, flags, status ? *status : -1, ret);
+
+  errno = out_errno;
+  return ret;
 }
 
 /* Handle a GNU/Linux extended wait response.  If we see a clone
@@ -300,7 +386,7 @@ handle_extended_wait (struct lwp_info *event_child, int wstat)
 	    warning ("wait returned unexpected status 0x%x", status);
 	}
 
-      ptrace (PTRACE_SETOPTIONS, new_pid, 0, PTRACE_O_TRACECLONE);
+      ptrace (PTRACE_SETOPTIONS, new_pid, 0, (PTRACE_ARG4_TYPE) PTRACE_O_TRACECLONE);
 
       ptid = ptid_build (pid_of (event_child), new_pid, 0);
       new_lwp = (struct lwp_info *) add_lwp (ptid);
@@ -366,9 +452,11 @@ handle_extended_wait (struct lwp_info *event_child, int wstat)
 static CORE_ADDR
 get_stop_pc (void)
 {
-  CORE_ADDR stop_pc = (*the_low_target.get_pc) ();
+  struct regcache *regcache = get_thread_regcache (current_inferior, 1);
+  CORE_ADDR stop_pc = (*the_low_target.get_pc) (regcache);
 
-  if (! get_thread_lwp (current_inferior)->stepping)
+  if (! get_thread_lwp (current_inferior)->stepping
+      && WSTOPSIG (get_thread_lwp (current_inferior)->last_status) == SIGTRAP)
     stop_pc -= the_low_target.decr_pc_after_break;
 
   if (debug_threads)
@@ -417,7 +505,9 @@ linux_create_inferior (char *program, char **allargs)
     {
       ptrace (PTRACE_TRACEME, 0, 0, 0);
 
+#ifdef __SIGRTMIN /* Bionic doesn't use SIGRTMIN the way glibc does.  */
       signal (__SIGRTMIN + 1, SIG_DFL);
+#endif
 
       setpgid (0, 0);
 
@@ -656,6 +746,9 @@ linux_kill (int pid)
       lwpid = linux_wait_for_event (lwp->head.id, &wstat, __WALL);
     } while (lwpid > 0 && WIFSTOPPED (wstat));
 
+#ifdef USE_THREAD_DB
+  thread_db_free (process, 0);
+#endif
   delete_lwp (lwp);
   linux_remove_process (process);
   return 0;
@@ -741,6 +834,10 @@ linux_detach (int pid)
   if (process == NULL)
     return -1;
 
+#ifdef USE_THREAD_DB
+  thread_db_free (process, 1);
+#endif
+
   current_inferior =
     (struct thread_info *) find_inferior (&all_threads, any_thread_of, &pid);
 
@@ -790,6 +887,7 @@ check_removed_breakpoint (struct lwp_info *event_child)
 {
   CORE_ADDR stop_pc;
   struct thread_info *saved_inferior;
+  struct regcache *regcache;
 
   if (event_child->pending_is_breakpoint == 0)
     return 0;
@@ -800,7 +898,7 @@ check_removed_breakpoint (struct lwp_info *event_child)
 
   saved_inferior = current_inferior;
   current_inferior = get_lwp_thread (event_child);
-
+  regcache = get_thread_regcache (current_inferior, 1);
   stop_pc = get_stop_pc ();
 
   /* If the PC has changed since we stopped, then we shouldn't do
@@ -836,7 +934,7 @@ check_removed_breakpoint (struct lwp_info *event_child)
     {
       if (debug_threads)
 	fprintf (stderr, "Set pc to 0x%lx\n", (long) stop_pc);
-      (*the_low_target.set_pc) (stop_pc);
+      (*the_low_target.set_pc) (regcache, stop_pc);
     }
 
   /* We consumed the pending SIGTRAP.  */
@@ -969,11 +1067,13 @@ retry:
       && the_low_target.get_pc != NULL)
     {
       struct thread_info *saved_inferior = current_inferior;
+      struct regcache *regcache;
       CORE_ADDR pc;
 
       current_inferior = (struct thread_info *)
 	find_inferior_id (&all_threads, child->head.id);
-      pc = (*the_low_target.get_pc) ();
+      regcache = get_thread_regcache (current_inferior, 1);
+      pc = (*the_low_target.get_pc) (regcache);
       fprintf (stderr, "linux_wait_for_lwp: pc is 0x%lx\n", (long) pc);
       current_inferior = saved_inferior;
     }
@@ -1087,7 +1187,7 @@ linux_wait_for_event_1 (ptid_t ptid, int *wstat, int options)
       if (event_child->must_set_ptrace_flags)
 	{
 	  ptrace (PTRACE_SETOPTIONS, lwpid_of (event_child),
-		  0, PTRACE_O_TRACECLONE);
+		  0, (PTRACE_ARG4_TYPE) PTRACE_O_TRACECLONE);
 	  event_child->must_set_ptrace_flags = 0;
 	}
 
@@ -1121,8 +1221,8 @@ linux_wait_for_event_1 (ptid_t ptid, int *wstat, int options)
       if (WIFSTOPPED (*wstat)
 	  && !event_child->stepping
 	  && (
-#ifdef USE_THREAD_DB
-	      (current_process ()->private->thread_db_active
+#if defined (USE_THREAD_DB) && defined (__SIGRTMIN)
+	      (current_process ()->private->thread_db != NULL
 	       && (WSTOPSIG (*wstat) == __SIGRTMIN
 		   || WSTOPSIG (*wstat) == __SIGRTMIN + 1))
 	      ||
@@ -1146,17 +1246,27 @@ linux_wait_for_event_1 (ptid_t ptid, int *wstat, int options)
 	  continue;
 	}
 
-      /* If this event was not handled above, and is not a SIGTRAP, report
-	 it.  */
-      if (!WIFSTOPPED (*wstat) || WSTOPSIG (*wstat) != SIGTRAP)
+      /* If this event was not handled above, and is not a SIGTRAP,
+	 report it.  SIGILL and SIGSEGV are also treated as traps in case
+	 a breakpoint is inserted at the current PC.  */
+      if (!WIFSTOPPED (*wstat)
+	  || (WSTOPSIG (*wstat) != SIGTRAP && WSTOPSIG (*wstat) != SIGILL
+	      && WSTOPSIG (*wstat) != SIGSEGV))
 	return lwpid_of (event_child);
 
       /* If this target does not support breakpoints, we simply report the
-	 SIGTRAP; it's of no concern to us.  */
+	 signal; it's of no concern to us.  */
       if (the_low_target.get_pc == NULL)
 	return lwpid_of (event_child);
 
       stop_pc = get_stop_pc ();
+
+      /* Only handle SIGILL or SIGSEGV if we've hit a recognized
+	 breakpoint.  */
+      if (WSTOPSIG (*wstat) != SIGTRAP
+	  && (event_child->stepping
+	      || ! (*the_low_target.breakpoint_at) (stop_pc)))
+	return lwpid_of (event_child);
 
       /* bp_reinsert will only be set if we were single-stepping.
 	 Notice that we will resume the process after hitting
@@ -1371,6 +1481,9 @@ retry:
 	  int pid = pid_of (lwp);
 	  struct process_info *process = find_process_pid (pid);
 
+#ifdef USE_THREAD_DB
+	  thread_db_free (process, 0);
+#endif
 	  delete_lwp (lwp);
 	  linux_remove_process (process);
 
@@ -1492,25 +1605,29 @@ linux_wait (ptid_t ptid,
   return event_ptid;
 }
 
-/* Send a signal to an LWP.  For LinuxThreads, kill is enough; however, if
-   thread groups are in use, we need to use tkill.  */
+/* Send a signal to an LWP.  */
 
 static int
 kill_lwp (unsigned long lwpid, int signo)
 {
-  static int tkill_failed;
+  /* Use tkill, if possible, in case we are using nptl threads.  If tkill
+     fails, then we are not using nptl threads and we should be using kill.  */
 
-  errno = 0;
+#ifdef __NR_tkill
+  {
+    static int tkill_failed;
 
-#ifdef SYS_tkill
-  if (!tkill_failed)
-    {
-      int ret = syscall (SYS_tkill, lwpid, signo);
-      if (errno != ENOSYS)
-	return ret;
-      errno = 0;
-      tkill_failed = 1;
-    }
+    if (!tkill_failed)
+      {
+	int ret;
+
+	errno = 0;
+	ret = syscall (__NR_tkill, lwpid, signo);
+	if (errno != ENOSYS)
+	  return ret;
+	tkill_failed = 1;
+      }
+  }
 #endif
 
   return kill (lwpid, signo);
@@ -1731,7 +1848,8 @@ linux_resume_one_lwp (struct lwp_info *lwp,
 
   if (debug_threads && the_low_target.get_pc != NULL)
     {
-      CORE_ADDR pc = (*the_low_target.get_pc) ();
+      struct regcache *regcache = get_thread_regcache (current_inferior, 1);
+      CORE_ADDR pc = (*the_low_target.get_pc) (regcache);
       fprintf (stderr, "  resuming from pc 0x%lx\n", (long) pc);
     }
 
@@ -1761,7 +1879,10 @@ linux_resume_one_lwp (struct lwp_info *lwp,
   errno = 0;
   lwp->stopped = 0;
   lwp->stepping = step;
-  ptrace (step ? PTRACE_SINGLESTEP : PTRACE_CONT, lwpid_of (lwp), 0, signal);
+  ptrace (step ? PTRACE_SINGLESTEP : PTRACE_CONT, lwpid_of (lwp), 0,
+	  /* Coerce to a uintptr_t first to avoid potential gcc warning
+	     of coercing an 8 byte integer to a 4 byte pointer.  */
+	  (PTRACE_ARG4_TYPE) (uintptr_t) signal);
 
   current_inferior = saved_inferior;
   if (errno)
@@ -2020,7 +2141,7 @@ register_addr (int regnum)
 
 /* Fetch one register.  */
 static void
-fetch_register (int regno)
+fetch_register (struct regcache *regcache, int regno)
 {
   CORE_ADDR regaddr;
   int i, size;
@@ -2044,7 +2165,10 @@ fetch_register (int regno)
     {
       errno = 0;
       *(PTRACE_XFER_TYPE *) (buf + i) =
-	ptrace (PTRACE_PEEKUSER, pid, (PTRACE_ARG3_TYPE) regaddr, 0);
+	ptrace (PTRACE_PEEKUSER, pid,
+		/* Coerce to a uintptr_t first to avoid potential gcc warning
+		   of coercing an 8 byte integer to a 4 byte pointer.  */
+		(PTRACE_ARG3_TYPE) (uintptr_t) regaddr, 0);
       regaddr += sizeof (PTRACE_XFER_TYPE);
       if (errno != 0)
 	{
@@ -2059,29 +2183,29 @@ fetch_register (int regno)
     }
 
   if (the_low_target.supply_ptrace_register)
-    the_low_target.supply_ptrace_register (regno, buf);
+    the_low_target.supply_ptrace_register (regcache, regno, buf);
   else
-    supply_register (regno, buf);
+    supply_register (regcache, regno, buf);
 
 error_exit:;
 }
 
 /* Fetch all registers, or just one, from the child process.  */
 static void
-usr_fetch_inferior_registers (int regno)
+usr_fetch_inferior_registers (struct regcache *regcache, int regno)
 {
   if (regno == -1)
     for (regno = 0; regno < the_low_target.num_regs; regno++)
-      fetch_register (regno);
+      fetch_register (regcache, regno);
   else
-    fetch_register (regno);
+    fetch_register (regcache, regno);
 }
 
 /* Store our register values back into the inferior.
    If REGNO is -1, do this for all registers.
    Otherwise, REGNO specifies which register (so we can save time).  */
 static void
-usr_store_inferior_registers (int regno)
+usr_store_inferior_registers (struct regcache *regcache, int regno)
 {
   CORE_ADDR regaddr;
   int i, size;
@@ -2106,16 +2230,19 @@ usr_store_inferior_registers (int regno)
       memset (buf, 0, size);
 
       if (the_low_target.collect_ptrace_register)
-	the_low_target.collect_ptrace_register (regno, buf);
+	the_low_target.collect_ptrace_register (regcache, regno, buf);
       else
-	collect_register (regno, buf);
+	collect_register (regcache, regno, buf);
 
       pid = lwpid_of (get_thread_lwp (current_inferior));
       for (i = 0; i < size; i += sizeof (PTRACE_XFER_TYPE))
 	{
 	  errno = 0;
-	  ptrace (PTRACE_POKEUSER, pid, (PTRACE_ARG3_TYPE) regaddr,
-		  *(PTRACE_XFER_TYPE *) (buf + i));
+	  ptrace (PTRACE_POKEUSER, pid,
+		/* Coerce to a uintptr_t first to avoid potential gcc warning
+		   about coercing an 8 byte integer to a 4 byte pointer.  */
+		  (PTRACE_ARG3_TYPE) (uintptr_t) regaddr,
+		  (PTRACE_ARG4_TYPE) *(PTRACE_XFER_TYPE *) (buf + i));
 	  if (errno != 0)
 	    {
 	      /* At this point, ESRCH should mean the process is
@@ -2140,7 +2267,7 @@ usr_store_inferior_registers (int regno)
     }
   else
     for (regno = 0; regno < the_low_target.num_regs; regno++)
-      usr_store_inferior_registers (regno);
+      usr_store_inferior_registers (regcache, regno);
 }
 #endif /* HAVE_LINUX_USRREGS */
 
@@ -2149,7 +2276,7 @@ usr_store_inferior_registers (int regno)
 #ifdef HAVE_LINUX_REGSETS
 
 static int
-regsets_fetch_inferior_registers ()
+regsets_fetch_inferior_registers (struct regcache *regcache)
 {
   struct regset_info *regset;
   int saw_general_regs = 0;
@@ -2195,7 +2322,7 @@ regsets_fetch_inferior_registers ()
 	}
       else if (regset->type == GENERAL_REGS)
 	saw_general_regs = 1;
-      regset->store_function (buf);
+      regset->store_function (regcache, buf);
       regset ++;
       free (buf);
     }
@@ -2206,7 +2333,7 @@ regsets_fetch_inferior_registers ()
 }
 
 static int
-regsets_store_inferior_registers ()
+regsets_store_inferior_registers (struct regcache *regcache)
 {
   struct regset_info *regset;
   int saw_general_regs = 0;
@@ -2240,7 +2367,7 @@ regsets_store_inferior_registers ()
       if (res == 0)
 	{
 	  /* Then overlay our cached registers on that.  */
-	  regset->fill_function (buf);
+	  regset->fill_function (regcache, buf);
 
 	  /* Only now do we write the register set.  */
 #ifndef __sparc__
@@ -2290,26 +2417,26 @@ regsets_store_inferior_registers ()
 
 
 void
-linux_fetch_registers (int regno)
+linux_fetch_registers (struct regcache *regcache, int regno)
 {
 #ifdef HAVE_LINUX_REGSETS
-  if (regsets_fetch_inferior_registers () == 0)
+  if (regsets_fetch_inferior_registers (regcache) == 0)
     return;
 #endif
 #ifdef HAVE_LINUX_USRREGS
-  usr_fetch_inferior_registers (regno);
+  usr_fetch_inferior_registers (regcache, regno);
 #endif
 }
 
 void
-linux_store_registers (int regno)
+linux_store_registers (struct regcache *regcache, int regno)
 {
 #ifdef HAVE_LINUX_REGSETS
-  if (regsets_store_inferior_registers () == 0)
+  if (regsets_store_inferior_registers (regcache) == 0)
     return;
 #endif
 #ifdef HAVE_LINUX_USRREGS
-  usr_store_inferior_registers (regno);
+  usr_store_inferior_registers (regcache, regno);
 #endif
 }
 
@@ -2351,7 +2478,7 @@ linux_read_memory (CORE_ADDR memaddr, unsigned char *myaddr, int len)
 #ifdef HAVE_PREAD64
       if (pread64 (fd, myaddr, len, memaddr) != len)
 #else
-      if (lseek (fd, memaddr, SEEK_SET) == -1 || read (fd, memaddr, len) != len)
+      if (lseek (fd, memaddr, SEEK_SET) == -1 || read (fd, myaddr, len) != len)
 #endif
 	{
 	  close (fd);
@@ -2367,7 +2494,10 @@ linux_read_memory (CORE_ADDR memaddr, unsigned char *myaddr, int len)
   for (i = 0; i < count; i++, addr += sizeof (PTRACE_XFER_TYPE))
     {
       errno = 0;
-      buffer[i] = ptrace (PTRACE_PEEKTEXT, pid, (PTRACE_ARG3_TYPE) addr, 0);
+      /* Coerce the 3rd arg to a uintptr_t first to avoid potential gcc warning
+	 about coercing an 8 byte integer to a 4 byte pointer.  */
+      buffer[i] = ptrace (PTRACE_PEEKTEXT, pid,
+			  (PTRACE_ARG3_TYPE) (uintptr_t) addr, 0);
       if (errno)
 	return errno;
     }
@@ -2414,14 +2544,19 @@ linux_write_memory (CORE_ADDR memaddr, const unsigned char *myaddr, int len)
 
   /* Fill start and end extra bytes of buffer with existing memory data.  */
 
-  buffer[0] = ptrace (PTRACE_PEEKTEXT, pid, (PTRACE_ARG3_TYPE) addr, 0);
+  /* Coerce the 3rd arg to a uintptr_t first to avoid potential gcc warning
+     about coercing an 8 byte integer to a 4 byte pointer.  */
+  buffer[0] = ptrace (PTRACE_PEEKTEXT, pid,
+		      (PTRACE_ARG3_TYPE) (uintptr_t) addr, 0);
 
   if (count > 1)
     {
       buffer[count - 1]
 	= ptrace (PTRACE_PEEKTEXT, pid,
-		  (PTRACE_ARG3_TYPE) (addr + (count - 1)
-				      * sizeof (PTRACE_XFER_TYPE)),
+		  /* Coerce to a uintptr_t first to avoid potential gcc warning
+		     about coercing an 8 byte integer to a 4 byte pointer.  */
+		  (PTRACE_ARG3_TYPE) (uintptr_t) (addr + (count - 1)
+						  * sizeof (PTRACE_XFER_TYPE)),
 		  0);
     }
 
@@ -2434,7 +2569,11 @@ linux_write_memory (CORE_ADDR memaddr, const unsigned char *myaddr, int len)
   for (i = 0; i < count; i++, addr += sizeof (PTRACE_XFER_TYPE))
     {
       errno = 0;
-      ptrace (PTRACE_POKETEXT, pid, (PTRACE_ARG3_TYPE) addr, buffer[i]);
+      ptrace (PTRACE_POKETEXT, pid,
+	      /* Coerce to a uintptr_t first to avoid potential gcc warning
+		 about coercing an 8 byte integer to a 4 byte pointer.  */
+	      (PTRACE_ARG3_TYPE) (uintptr_t) addr,
+	      (PTRACE_ARG4_TYPE) buffer[i]);
       if (errno)
 	return errno;
     }
@@ -2442,6 +2581,7 @@ linux_write_memory (CORE_ADDR memaddr, const unsigned char *myaddr, int len)
   return 0;
 }
 
+/* Non-zero if the kernel supports PTRACE_O_TRACEFORK.  */
 static int linux_supports_tracefork_flag;
 
 /* Helper functions for linux_test_for_tracefork, called via clone ().  */
@@ -2459,6 +2599,14 @@ linux_tracefork_child (void *arg)
 {
   ptrace (PTRACE_TRACEME, 0, 0, 0);
   kill (getpid (), SIGSTOP);
+
+#if !(defined(__UCLIBC__) && defined(HAS_NOMMU))
+
+  if (fork () == 0)
+    linux_tracefork_grandchild (NULL);
+
+#else /* defined(__UCLIBC__) && defined(HAS_NOMMU) */
+
 #ifdef __ia64__
   __clone2 (linux_tracefork_grandchild, arg, STACK_SIZE,
 	    CLONE_VM | SIGCHLD, NULL);
@@ -2466,82 +2614,10 @@ linux_tracefork_child (void *arg)
   clone (linux_tracefork_grandchild, arg + STACK_SIZE,
 	 CLONE_VM | SIGCHLD, NULL);
 #endif
+
+#endif /* defined(__UCLIBC__) && defined(HAS_NOMMU) */
+
   _exit (0);
-}
-
-/* Wrapper function for waitpid which handles EINTR, and emulates
-   __WALL for systems where that is not available.  */
-
-static int
-my_waitpid (int pid, int *status, int flags)
-{
-  int ret, out_errno;
-
-  if (debug_threads)
-    fprintf (stderr, "my_waitpid (%d, 0x%x)\n", pid, flags);
-
-  if (flags & __WALL)
-    {
-      sigset_t block_mask, org_mask, wake_mask;
-      int wnohang;
-
-      wnohang = (flags & WNOHANG) != 0;
-      flags &= ~(__WALL | __WCLONE);
-      flags |= WNOHANG;
-
-      /* Block all signals while here.  This avoids knowing about
-	 LinuxThread's signals.  */
-      sigfillset (&block_mask);
-      sigprocmask (SIG_BLOCK, &block_mask, &org_mask);
-
-      /* ... except during the sigsuspend below.  */
-      sigemptyset (&wake_mask);
-
-      while (1)
-	{
-	  /* Since all signals are blocked, there's no need to check
-	     for EINTR here.  */
-	  ret = waitpid (pid, status, flags);
-	  out_errno = errno;
-
-	  if (ret == -1 && out_errno != ECHILD)
-	    break;
-	  else if (ret > 0)
-	    break;
-
-	  if (flags & __WCLONE)
-	    {
-	      /* We've tried both flavors now.  If WNOHANG is set,
-		 there's nothing else to do, just bail out.  */
-	      if (wnohang)
-		break;
-
-	      if (debug_threads)
-		fprintf (stderr, "blocking\n");
-
-	      /* Block waiting for signals.  */
-	      sigsuspend (&wake_mask);
-	    }
-
-	  flags ^= __WCLONE;
-	}
-
-      sigprocmask (SIG_SETMASK, &org_mask, NULL);
-    }
-  else
-    {
-      do
-	ret = waitpid (pid, status, flags);
-      while (ret == -1 && errno == EINTR);
-      out_errno = errno;
-    }
-
-  if (debug_threads)
-    fprintf (stderr, "my_waitpid (%d, 0x%x): status(%x), %d\n",
-	     pid, flags, status ? *status : -1, ret);
-
-  errno = out_errno;
-  return ret;
 }
 
 /* Determine if PTRACE_O_TRACEFORK can be used to follow fork events.  Make
@@ -2553,18 +2629,31 @@ linux_test_for_tracefork (void)
 {
   int child_pid, ret, status;
   long second_pid;
+#if defined(__UCLIBC__) && defined(HAS_NOMMU)
   char *stack = xmalloc (STACK_SIZE * 4);
+#endif /* defined(__UCLIBC__) && defined(HAS_NOMMU) */
 
   linux_supports_tracefork_flag = 0;
+
+#if !(defined(__UCLIBC__) && defined(HAS_NOMMU))
+
+  child_pid = fork ();
+  if (child_pid == 0)
+    linux_tracefork_child (NULL);
+
+#else /* defined(__UCLIBC__) && defined(HAS_NOMMU) */
 
   /* Use CLONE_VM instead of fork, to support uClinux (no MMU).  */
 #ifdef __ia64__
   child_pid = __clone2 (linux_tracefork_child, stack, STACK_SIZE,
 			CLONE_VM | SIGCHLD, stack + STACK_SIZE * 2);
-#else
+#else /* !__ia64__ */
   child_pid = clone (linux_tracefork_child, stack + STACK_SIZE,
 		     CLONE_VM | SIGCHLD, stack + STACK_SIZE * 2);
-#endif
+#endif /* !__ia64__ */
+
+#endif /* defined(__UCLIBC__) && defined(HAS_NOMMU) */
+
   if (child_pid == -1)
     perror_with_name ("clone");
 
@@ -2576,7 +2665,8 @@ linux_test_for_tracefork (void)
   if (! WIFSTOPPED (status))
     error ("linux_test_for_tracefork: waitpid: unexpected status %d.", status);
 
-  ret = ptrace (PTRACE_SETOPTIONS, child_pid, 0, PTRACE_O_TRACEFORK);
+  ret = ptrace (PTRACE_SETOPTIONS, child_pid, 0,
+		(PTRACE_ARG4_TYPE) PTRACE_O_TRACEFORK);
   if (ret != 0)
     {
       ret = ptrace (PTRACE_KILL, child_pid, 0, 0);
@@ -2632,7 +2722,9 @@ linux_test_for_tracefork (void)
     }
   while (WIFSTOPPED (status));
 
+#if defined(__UCLIBC__) && defined(HAS_NOMMU)
   free (stack);
+#endif /* defined(__UCLIBC__) && defined(HAS_NOMMU) */
 }
 
 
@@ -2642,11 +2734,13 @@ linux_look_up_symbols (void)
 #ifdef USE_THREAD_DB
   struct process_info *proc = current_process ();
 
-  if (proc->private->thread_db_active)
+  if (proc->private->thread_db != NULL)
     return;
 
-  proc->private->thread_db_active
-    = thread_db_init (!linux_supports_tracefork_flag);
+  /* If the kernel supports tracing forks then it also supports tracing
+     clones, and then we don't need to use the magic thread event breakpoint
+     to learn about threads.  */
+  thread_db_init (!linux_supports_tracefork_flag);
 #endif
 }
 
@@ -2784,6 +2878,175 @@ linux_read_offsets (CORE_ADDR *text_p, CORE_ADDR *data_p)
 #endif
 
 static int
+compare_ints (const void *xa, const void *xb)
+{
+  int a = *(const int *)xa;
+  int b = *(const int *)xb;
+
+  return a - b;
+}
+
+static int *
+unique (int *b, int *e)
+{
+  int *d = b;
+  while (++b != e)
+    if (*d != *b)
+      *++d = *b;
+  return ++d;
+}
+
+/* Given PID, iterates over all threads in that process.
+
+   Information about each thread, in a format suitable for qXfer:osdata:thread
+   is printed to BUFFER, if it's not NULL.  BUFFER is assumed to be already
+   initialized, and the caller is responsible for finishing and appending '\0'
+   to it.
+
+   The list of cores that threads are running on is assigned to *CORES, if it
+   is not NULL.  If no cores are found, *CORES will be set to NULL.  Caller
+   should free *CORES.  */
+
+static void
+list_threads (int pid, struct buffer *buffer, char **cores)
+{
+  int count = 0;
+  int allocated = 10;
+  int *core_numbers = xmalloc (sizeof (int) * allocated);
+  char pathname[128];
+  DIR *dir;
+  struct dirent *dp;
+  struct stat statbuf;
+
+  sprintf (pathname, "/proc/%d/task", pid);
+  if (stat (pathname, &statbuf) == 0 && S_ISDIR (statbuf.st_mode))
+    {
+      dir = opendir (pathname);
+      if (!dir)
+	{
+	  free (core_numbers);
+	  return;
+	}
+
+      while ((dp = readdir (dir)) != NULL)
+	{
+	  unsigned long lwp = strtoul (dp->d_name, NULL, 10);
+
+	  if (lwp != 0)
+	    {
+	      unsigned core = linux_core_of_thread (ptid_build (pid, lwp, 0));
+
+	      if (core != -1)
+		{
+		  char s[sizeof ("4294967295")];
+		  sprintf (s, "%u", core);
+
+		  if (count == allocated)
+		    {
+		      allocated *= 2;
+		      core_numbers = realloc (core_numbers,
+					      sizeof (int) * allocated);
+		    }
+		  core_numbers[count++] = core;
+		  if (buffer)
+		    buffer_xml_printf (buffer,
+				       "<item>"
+				       "<column name=\"pid\">%d</column>"
+				       "<column name=\"tid\">%s</column>"
+				       "<column name=\"core\">%s</column>"
+				       "</item>", pid, dp->d_name, s);
+		}
+	      else
+		{
+		  if (buffer)
+		    buffer_xml_printf (buffer,
+				       "<item>"
+				       "<column name=\"pid\">%d</column>"
+				       "<column name=\"tid\">%s</column>"
+				       "</item>", pid, dp->d_name);
+		}
+	    }
+	}
+    }
+
+  if (cores)
+    {
+      *cores = NULL;
+      if (count > 0)
+	{
+	  struct buffer buffer2;
+	  int *b;
+	  int *e;
+	  qsort (core_numbers, count, sizeof (int), compare_ints);
+
+	  /* Remove duplicates. */
+	  b = core_numbers;
+	  e = unique (b, core_numbers + count);
+
+	  buffer_init (&buffer2);
+
+	  for (b = core_numbers; b != e; ++b)
+	    {
+	      char number[sizeof ("4294967295")];
+	      sprintf (number, "%u", *b);
+	      buffer_xml_printf (&buffer2, "%s%s",
+				 (b == core_numbers) ? "" : ",", number);
+	    }
+	  buffer_grow_str0 (&buffer2, "");
+
+	  *cores = buffer_finish (&buffer2);
+	}
+    }
+  free (core_numbers);
+}
+
+static void
+show_process (int pid, const char *username, struct buffer *buffer)
+{
+  char pathname[128];
+  FILE *f;
+  char cmd[MAXPATHLEN + 1];
+
+  sprintf (pathname, "/proc/%d/cmdline", pid);
+
+  if ((f = fopen (pathname, "r")) != NULL)
+    {
+      size_t len = fread (cmd, 1, sizeof (cmd) - 1, f);
+      if (len > 0)
+	{
+	  char *cores = 0;
+	  int i;
+	  for (i = 0; i < len; i++)
+	    if (cmd[i] == '\0')
+	      cmd[i] = ' ';
+	  cmd[len] = '\0';
+
+	  buffer_xml_printf (buffer,
+			     "<item>"
+			     "<column name=\"pid\">%d</column>"
+			     "<column name=\"user\">%s</column>"
+			     "<column name=\"command\">%s</column>",
+			     pid,
+			     username,
+			     cmd);
+
+	  /* This only collects core numbers, and does not print threads.  */
+	  list_threads (pid, NULL, &cores);
+
+	  if (cores)
+	    {
+	      buffer_xml_printf (buffer,
+				 "<column name=\"cores\">%s</column>", cores);
+	      free (cores);
+	    }
+
+	  buffer_xml_printf (buffer, "</item>");
+	}
+      fclose (f);
+    }
+}
+
+static int
 linux_qxfer_osdata (const char *annex,
 		    unsigned char *readbuf, unsigned const char *writebuf,
 		    CORE_ADDR offset, int len)
@@ -2793,10 +3056,16 @@ linux_qxfer_osdata (const char *annex,
   static const char *buf;
   static long len_avail = -1;
   static struct buffer buffer;
+  int processes = 0;
+  int threads = 0;
 
   DIR *dirp;
 
-  if (strcmp (annex, "processes") != 0)
+  if (strcmp (annex, "processes") == 0)
+    processes = 1;
+  else if (strcmp (annex, "threads") == 0)
+    threads = 1;
+  else
     return 0;
 
   if (!readbuf || writebuf)
@@ -2809,7 +3078,10 @@ linux_qxfer_osdata (const char *annex,
       len_avail = 0;
       buf = NULL;
       buffer_init (&buffer);
-      buffer_grow_str (&buffer, "<osdata type=\"processes\">");
+      if (processes)
+	buffer_grow_str (&buffer, "<osdata type=\"processes\">");
+      else if (threads)
+	buffer_grow_str (&buffer, "<osdata type=\"threads\">");
 
       dirp = opendir ("/proc");
       if (dirp)
@@ -2828,37 +3100,16 @@ linux_qxfer_osdata (const char *annex,
 	     if (stat (procentry, &statbuf) == 0
 		 && S_ISDIR (statbuf.st_mode))
 	       {
-		 char pathname[128];
-		 FILE *f;
-		 char cmd[MAXPATHLEN + 1];
-		 struct passwd *entry;
+		 int pid = (int) strtoul (dp->d_name, NULL, 10);
 
-		 sprintf (pathname, "/proc/%s/cmdline", dp->d_name);
-		 entry = getpwuid (statbuf.st_uid);
-
-		 if ((f = fopen (pathname, "r")) != NULL)
+		 if (processes)
 		   {
-		     size_t len = fread (cmd, 1, sizeof (cmd) - 1, f);
-		     if (len > 0)
-		       {
-			 int i;
-			 for (i = 0; i < len; i++)
-			   if (cmd[i] == '\0')
-			     cmd[i] = ' ';
-			 cmd[len] = '\0';
-
-			 buffer_xml_printf (
-			   &buffer,
-			   "<item>"
-			   "<column name=\"pid\">%s</column>"
-			   "<column name=\"user\">%s</column>"
-			   "<column name=\"command\">%s</column>"
-			   "</item>",
-			   dp->d_name,
-			   entry ? entry->pw_name : "?",
-			   cmd);
-		       }
-		     fclose (f);
+		     struct passwd *entry = getpwuid (statbuf.st_uid);
+		     show_process (pid, entry ? entry->pw_name : "?", &buffer);
+		   }
+		 else if (threads)
+		   {
+		     list_threads (pid, &buffer, NULL);
 		   }
 	       }
 	   }
@@ -3134,6 +3385,55 @@ linux_qxfer_spu (const char *annex, unsigned char *readbuf,
   return ret;
 }
 
+static int
+linux_core_of_thread (ptid_t ptid)
+{
+  char filename[sizeof ("/proc//task//stat")
+		 + 2 * 20 /* decimal digits for 2 numbers, max 2^64 bit each */
+		 + 1];
+  FILE *f;
+  char *content = NULL;
+  char *p;
+  char *ts = 0;
+  int content_read = 0;
+  int i;
+  int core;
+
+  sprintf (filename, "/proc/%d/task/%ld/stat",
+	   ptid_get_pid (ptid), ptid_get_lwp (ptid));
+  f = fopen (filename, "r");
+  if (!f)
+    return -1;
+
+  for (;;)
+    {
+      int n;
+      content = realloc (content, content_read + 1024);
+      n = fread (content + content_read, 1, 1024, f);
+      content_read += n;
+      if (n < 1024)
+	{
+	  content[content_read] = '\0';
+	  break;
+	}
+    }
+
+  p = strchr (content, '(');
+  p = strchr (p, ')') + 2; /* skip ")" and a whitespace. */
+
+  p = strtok_r (p, " ", &ts);
+  for (i = 0; i != 36; ++i)
+    p = strtok_r (NULL, " ", &ts);
+
+  if (sscanf (p, "%d", &core) == 0)
+    core = -1;
+
+  free (content);
+  fclose (f);
+
+  return core;
+}
+
 static struct target_ops linux_target_ops = {
   linux_create_inferior,
   linux_attach,
@@ -3171,7 +3471,13 @@ static struct target_ops linux_target_ops = {
   linux_supports_non_stop,
   linux_async,
   linux_start_non_stop,
-  linux_supports_multi_process
+  linux_supports_multi_process,
+#ifdef USE_THREAD_DB
+  thread_db_handle_monitor_command,
+#else
+  NULL,
+#endif
+  linux_core_of_thread
 };
 
 static void
@@ -3179,7 +3485,9 @@ linux_init_signals ()
 {
   /* FIXME drow/2002-06-09: As above, we should check with LinuxThreads
      to find what the cancel signal actually is.  */
+#ifdef __SIGRTMIN /* Bionic doesn't use SIGRTMIN the way glibc does.  */
   signal (__SIGRTMIN+1, SIG_IGN);
+#endif
 }
 
 void

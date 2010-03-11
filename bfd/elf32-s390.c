@@ -693,13 +693,13 @@ struct elf_s390_obj_tdata
 #define is_s390_elf(bfd) \
   (bfd_get_flavour (bfd) == bfd_target_elf_flavour \
    && elf_tdata (bfd) != NULL \
-   && elf_object_id (bfd) == S390_ELF_TDATA)
+   && elf_object_id (bfd) == S390_ELF_DATA)
 
 static bfd_boolean
 elf_s390_mkobject (bfd *abfd)
 {
   return bfd_elf_allocate_object (abfd, sizeof (struct elf_s390_obj_tdata),
-				  S390_ELF_TDATA);
+				  S390_ELF_DATA);
 }
 
 static bfd_boolean
@@ -737,7 +737,8 @@ struct elf_s390_link_hash_table
 /* Get the s390 ELF linker hash table from a link_info structure.  */
 
 #define elf_s390_hash_table(p) \
-  ((struct elf_s390_link_hash_table *) ((p)->hash))
+  (elf_hash_table_id ((struct elf_link_hash_table *) ((p)->hash)) \
+  == S390_ELF_DATA ? ((struct elf_s390_link_hash_table *) ((p)->hash)) : NULL)
 
 /* Create an entry in an s390 ELF linker hash table.  */
 
@@ -786,7 +787,8 @@ elf_s390_link_hash_table_create (abfd)
     return NULL;
 
   if (!_bfd_elf_link_hash_table_init (&ret->elf, abfd, link_hash_newfunc,
-				      sizeof (struct elf_s390_link_hash_entry)))
+				      sizeof (struct elf_s390_link_hash_entry),
+				      S390_ELF_DATA))
     {
       free (ret);
       return NULL;
@@ -3483,6 +3485,13 @@ elf_s390_plt_sym_val (bfd_vma i, const asection *plt,
   return plt->vma + PLT_FIRST_ENTRY_SIZE + i * PLT_ENTRY_SIZE;
 }
 
+static bfd_boolean
+elf32_s390_merge_private_bfd_data (bfd *ibfd, bfd *obfd)
+{
+  elf_elfheader (obfd)->e_flags |= elf_elfheader (ibfd)->e_flags;
+  return TRUE;
+}
+
 
 #define TARGET_BIG_SYM	bfd_elf32_s390_vec
 #define TARGET_BIG_NAME	"elf32-s390"
@@ -3505,6 +3514,8 @@ elf_s390_plt_sym_val (bfd_vma i, const asection *plt,
 #define bfd_elf32_bfd_link_hash_table_create  elf_s390_link_hash_table_create
 #define bfd_elf32_bfd_reloc_type_lookup	      elf_s390_reloc_type_lookup
 #define bfd_elf32_bfd_reloc_name_lookup elf_s390_reloc_name_lookup
+
+#define bfd_elf32_bfd_merge_private_bfd_data  elf32_s390_merge_private_bfd_data
 
 #define elf_backend_adjust_dynamic_symbol     elf_s390_adjust_dynamic_symbol
 #define elf_backend_check_relocs	      elf_s390_check_relocs

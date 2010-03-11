@@ -1,6 +1,6 @@
 /* BFD support for handling relocation entries.
    Copyright 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
+   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
    Written by Cygnus Support.
 
@@ -504,7 +504,7 @@ bfd_check_overflow (enum complain_overflow how,
      overflow check.  */
   fieldmask = N_ONES (bitsize);
   signmask = ~fieldmask;
-  addrmask = N_ONES (addrsize) | fieldmask;
+  addrmask = N_ONES (addrsize) | (fieldmask << rightshift);
   a = (relocation & addrmask) >> rightshift;;
 
   switch (how)
@@ -1434,9 +1434,11 @@ _bfd_relocate_contents (reloc_howto_type *howto,
          See also bfd_check_overflow.  */
       fieldmask = N_ONES (howto->bitsize);
       signmask = ~fieldmask;
-      addrmask = N_ONES (bfd_arch_bits_per_address (input_bfd)) | fieldmask;
+      addrmask = (N_ONES (bfd_arch_bits_per_address (input_bfd))
+		  | (fieldmask << rightshift));
       a = (relocation & addrmask) >> rightshift;
       b = (x & howto->src_mask & addrmask) >> bitpos;
+      addrmask >>= rightshift;
 
       switch (howto->complain_on_overflow)
 	{
@@ -1454,7 +1456,7 @@ _bfd_relocate_contents (reloc_howto_type *howto,
 	     field.  Note that when bfd_vma is 32 bits, a 32-bit reloc
 	     can't overflow, which is exactly what we want.  */
 	  ss = a & signmask;
-	  if (ss != 0 && ss != ((addrmask >> rightshift) & signmask))
+	  if (ss != 0 && ss != (addrmask & signmask))
 	    flag = bfd_reloc_overflow;
 
 	  /* We only need this next bit of code if the sign bit of B
@@ -1870,6 +1872,10 @@ ENUMX
   BFD_RELOC_SPARC_GOTDATA_OP_LOX10
 ENUMX
   BFD_RELOC_SPARC_GOTDATA_OP
+ENUMX
+  BFD_RELOC_SPARC_JMP_IREL
+ENUMX
+  BFD_RELOC_SPARC_IRELATIVE
 ENUMDOC
   SPARC ELF relocations.  There is probably some overlap with other
   relocation types already defined.
@@ -2019,6 +2025,10 @@ ENUMX
   BFD_RELOC_SPU_PPU64
 ENUMX
   BFD_RELOC_SPU_ADD_PIC
+ENUMX
+  BFD_RELOC_SPU_PIC18
+ENUMX
+  BFD_RELOC_SPU_STUB
 ENUMDOC
   SPU Relocations.
 
@@ -4052,6 +4062,57 @@ ENUMDOC
   instructions
 
 ENUM
+  BFD_RELOC_RX_NEG8
+ENUMX
+  BFD_RELOC_RX_NEG16
+ENUMX
+  BFD_RELOC_RX_NEG24
+ENUMX
+  BFD_RELOC_RX_NEG32
+ENUMX
+  BFD_RELOC_RX_16_OP
+ENUMX
+  BFD_RELOC_RX_24_OP
+ENUMX
+  BFD_RELOC_RX_32_OP
+ENUMX
+  BFD_RELOC_RX_8U
+ENUMX
+  BFD_RELOC_RX_16U
+ENUMX
+  BFD_RELOC_RX_24U
+ENUMX
+  BFD_RELOC_RX_DIR3U_PCREL
+ENUMX
+  BFD_RELOC_RX_DIFF
+ENUMX
+  BFD_RELOC_RX_GPRELB
+ENUMX
+  BFD_RELOC_RX_GPRELW
+ENUMX
+  BFD_RELOC_RX_GPRELL
+ENUMX
+  BFD_RELOC_RX_SYM
+ENUMX
+  BFD_RELOC_RX_OP_SUBTRACT
+ENUMX
+  BFD_RELOC_RX_ABS8
+ENUMX
+  BFD_RELOC_RX_ABS16
+ENUMX
+  BFD_RELOC_RX_ABS32
+ENUMX
+  BFD_RELOC_RX_ABS16U
+ENUMX
+  BFD_RELOC_RX_ABS16UW
+ENUMX
+  BFD_RELOC_RX_ABS16UL
+ENUMX
+  BFD_RELOC_RX_RELAX
+ENUMDOC
+  Renesas RX Relocations.
+
+ENUM
   BFD_RELOC_390_12
 ENUMDOC
    Direct 12 bit.
@@ -5184,14 +5245,51 @@ ENUMDOC
  Lattice Mico32 relocations.
 
 ENUM
-   BFD_RELOC_MACH_O_SECTDIFF
+  BFD_RELOC_MACH_O_SECTDIFF
 ENUMDOC
-   Difference between two section addreses.  Must be followed by a
-   BFD_RELOC_MACH_O_PAIR.
+  Difference between two section addreses.  Must be followed by a
+  BFD_RELOC_MACH_O_PAIR.
 ENUM
-   BFD_RELOC_MACH_O_PAIR
+  BFD_RELOC_MACH_O_PAIR
 ENUMDOC
- Mach-O generic relocations.
+  Pair of relocation.  Contains the first symbol.
+
+ENUM
+  BFD_RELOC_MACH_O_X86_64_BRANCH32
+ENUMX
+  BFD_RELOC_MACH_O_X86_64_BRANCH8
+ENUMDOC
+  PCREL relocations.  They are marked as branch to create PLT entry if
+  required.
+ENUM
+  BFD_RELOC_MACH_O_X86_64_GOT
+ENUMDOC
+  Used when referencing a GOT entry.
+ENUM
+  BFD_RELOC_MACH_O_X86_64_GOT_LOAD
+ENUMDOC
+  Used when loading a GOT entry with movq.  It is specially marked so that
+  the linker could optimize the movq to a leaq if possible.
+ENUM
+  BFD_RELOC_MACH_O_X86_64_SUBTRACTOR32
+ENUMDOC
+  Symbol will be substracted.  Must be followed by a BFD_RELOC_64.
+ENUM
+  BFD_RELOC_MACH_O_X86_64_SUBTRACTOR64
+ENUMDOC
+  Symbol will be substracted.  Must be followed by a BFD_RELOC_64.
+ENUM
+  BFD_RELOC_MACH_O_X86_64_PCREL32_1
+ENUMDOC
+  Same as BFD_RELOC_32_PCREL but with an implicit -1 addend.
+ENUM
+  BFD_RELOC_MACH_O_X86_64_PCREL32_2
+ENUMDOC
+  Same as BFD_RELOC_32_PCREL but with an implicit -2 addend.
+ENUM
+  BFD_RELOC_MACH_O_X86_64_PCREL32_4
+ENUMDOC
+  Same as BFD_RELOC_32_PCREL but with an implicit -4 addend.
 
 ENUM
   BFD_RELOC_MICROBLAZE_32_LO
@@ -5475,7 +5573,7 @@ bfd_generic_get_relocated_section_contents (bfd *abfd,
   if (reloc_size == 0)
     return data;
 
-  reloc_vector = bfd_malloc (reloc_size);
+  reloc_vector = (arelent **) bfd_malloc (reloc_size);
   if (reloc_vector == NULL)
     return NULL;
 

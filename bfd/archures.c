@@ -1,6 +1,6 @@
 /* BFD library support routines for architectures.
    Copyright 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
+   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
    Hacked by John Gilmore and Steve Chamberlain of Cygnus Support.
 
@@ -230,6 +230,8 @@ DESCRIPTION
 .#define bfd_mach_ppc_7400	7400
 .#define bfd_mach_ppc_e500      500
 .#define bfd_mach_ppc_e500mc    5001
+.#define bfd_mach_ppc_e500mc64  5005
+.#define bfd_mach_ppc_titan     83
 .  bfd_arch_rs6000,    {* IBM RS/6000 *}
 .#define bfd_mach_rs6k		6000
 .#define bfd_mach_rs6k_rs1	6001
@@ -380,6 +382,8 @@ DESCRIPTION
 .#define bfd_mach_cris_v0_v10	255
 .#define bfd_mach_cris_v32	32
 .#define bfd_mach_cris_v10_v32	1032
+.  bfd_arch_rx,        {* Renesas RX.  *}
+.#define bfd_mach_rx            0x75
 .  bfd_arch_s390,      {* IBM s390 *}
 .#define bfd_mach_s390_31       31
 .#define bfd_mach_s390_64       64
@@ -513,6 +517,7 @@ extern const bfd_arch_info_type bfd_plugin_arch;
 extern const bfd_arch_info_type bfd_powerpc_archs[];
 #define bfd_powerpc_arch bfd_powerpc_archs[0]
 extern const bfd_arch_info_type bfd_rs6000_arch;
+extern const bfd_arch_info_type bfd_rx_arch;
 extern const bfd_arch_info_type bfd_s390_arch;
 extern const bfd_arch_info_type bfd_score_arch;
 extern const bfd_arch_info_type bfd_sh_arch;
@@ -586,6 +591,7 @@ static const bfd_arch_info_type * const bfd_archures_list[] =
     &bfd_pdp11_arch,
     &bfd_powerpc_arch,
     &bfd_rs6000_arch,
+    &bfd_rx_arch,
     &bfd_s390_arch,
     &bfd_score_arch,
     &bfd_sh_arch,
@@ -691,7 +697,7 @@ bfd_arch_list (void)
     }
 
   amt = (vec_length + 1) * sizeof (char **);
-  name_list = bfd_malloc (amt);
+  name_list = (const char **) bfd_malloc (amt);
   if (name_list == NULL)
     return NULL;
 

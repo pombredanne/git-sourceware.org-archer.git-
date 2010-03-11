@@ -1,6 +1,6 @@
 /* Support for printing Modula 2 types for GDB, the GNU debugger.
    Copyright (C) 1986, 1988, 1989, 1991, 1992, 1995, 2000, 2001, 2002, 2003,
-                 2004, 2005, 2006, 2007, 2008, 2009
+                 2004, 2005, 2006, 2007, 2008, 2009, 2010
                  Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -144,9 +144,6 @@ m2_print_type (struct type *type, char *varstring, struct ui_file *stream,
 
     case TYPE_CODE_RANGE:
       m2_range (type, stream, show, level);
-      break;
-
-    case TYPE_CODE_TEMPLATE:
       break;
 
     default:
@@ -547,9 +544,9 @@ m2_record_fields (struct type *type, struct ui_file *stream, int show,
   wrap_here ("    ");
   if (show < 0)
     {
-      if (TYPE_CODE (type) == DECLARED_TYPE_STRUCT)
+      if (TYPE_CODE (type) == TYPE_CODE_STRUCT)
 	fprintf_filtered (stream, "RECORD ... END ");
-      else if (TYPE_DECLARED_TYPE (type) == DECLARED_TYPE_UNION)
+      else if (TYPE_CODE (type) == TYPE_CODE_UNION)
 	fprintf_filtered (stream, "CASE ... END ");
     }
   else if (show > 0)

@@ -1,6 +1,6 @@
 /* Top level stuff for GDB, the GNU debugger.
 
-   Copyright (C) 1999, 2000, 2001, 2002, 2004, 2005, 2007, 2008, 2009
+   Copyright (C) 1999, 2000, 2001, 2002, 2004, 2005, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    Written by Elena Zannoni <ezannoni@cygnus.com> of Cygnus Solutions.
@@ -622,6 +622,7 @@ command_line_handler (char *rl)
 
   if (p > linebuffer && *(p - 1) == '\\')
     {
+      *p = '\0';
       p--;			/* Put on top of '\'.  */
 
       readline_input_state.linebuffer = xstrdup (linebuffer);

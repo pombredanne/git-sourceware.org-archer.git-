@@ -982,12 +982,12 @@ som_reloc_queue_insert (unsigned char *p,
    to the front of the queue.  */
 
 static void
-som_reloc_queue_fix (struct reloc_queue *queue, unsigned int index)
+som_reloc_queue_fix (struct reloc_queue *queue, unsigned int idx)
 {
-  if (index == 0)
+  if (idx == 0)
     return;
 
-  if (index == 1)
+  if (idx == 1)
     {
       unsigned char *tmp1 = queue[0].reloc;
       unsigned int tmp2 = queue[0].size;
@@ -999,7 +999,7 @@ som_reloc_queue_fix (struct reloc_queue *queue, unsigned int index)
       return;
     }
 
-  if (index == 2)
+  if (idx == 2)
     {
       unsigned char *tmp1 = queue[0].reloc;
       unsigned int tmp2 = queue[0].size;
@@ -1013,7 +1013,7 @@ som_reloc_queue_fix (struct reloc_queue *queue, unsigned int index)
       return;
     }
 
-  if (index == 3)
+  if (idx == 3)
     {
       unsigned char *tmp1 = queue[0].reloc;
       unsigned int tmp2 = queue[0].size;
@@ -4239,10 +4239,10 @@ bfd_section_from_som_symbol (bfd *abfd, struct symbol_dictionary_record *symbol)
 	  && symbol->symbol_type != ST_SEC_PROG
 	  && symbol->symbol_type != ST_MILLICODE))
     {
-      int index = symbol->symbol_info;
+      int idx = symbol->symbol_info;
 
       for (section = abfd->sections; section != NULL; section = section->next)
-	if (section->target_index == index && som_is_subspace (section))
+	if (section->target_index == idx && som_is_subspace (section))
 	  return section;
     }
   else
@@ -5177,7 +5177,7 @@ bfd_som_set_section_attributes (asection *section,
 bfd_boolean
 bfd_som_set_subsection_attributes (asection *section,
 				   asection *container,
-				   int access,
+				   int access_ctr,
 				   unsigned int sort_key,
 				   int quadrant,
 				   int comdat,
@@ -5194,7 +5194,7 @@ bfd_som_set_subsection_attributes (asection *section,
 	return FALSE;
     }
   som_section_data (section)->copy_data->sort_key = sort_key;
-  som_section_data (section)->copy_data->access_control_bits = access;
+  som_section_data (section)->copy_data->access_control_bits = access_ctr;
   som_section_data (section)->copy_data->quadrant = quadrant;
   som_section_data (section)->copy_data->container = container;
   som_section_data (section)->copy_data->is_comdat = comdat;
@@ -6324,6 +6324,7 @@ som_bfd_link_split_section (bfd *abfd ATTRIBUTE_UNUSED, asection *sec)
 
 #define	som_close_and_cleanup		        som_bfd_free_cached_info
 #define som_read_ar_hdr			        _bfd_generic_read_ar_hdr
+#define som_write_ar_hdr		        _bfd_generic_write_ar_hdr
 #define som_openr_next_archived_file	        bfd_generic_openr_next_archived_file
 #define som_get_elt_at_index		        _bfd_generic_get_elt_at_index
 #define som_generic_stat_arch_elt	        bfd_generic_stat_arch_elt
@@ -6343,6 +6344,8 @@ som_bfd_link_split_section (bfd *abfd ATTRIBUTE_UNUSED, asection *sec)
 #define som_bfd_link_hash_table_free            _bfd_generic_link_hash_table_free
 #define som_bfd_link_add_symbols                _bfd_generic_link_add_symbols
 #define som_bfd_link_just_syms                  _bfd_generic_link_just_syms
+#define som_bfd_copy_link_hash_symbol_type \
+  _bfd_generic_copy_link_hash_symbol_type
 #define som_bfd_final_link                      _bfd_generic_final_link
 #define som_bfd_gc_sections		        bfd_generic_gc_sections
 #define som_bfd_merge_sections		        bfd_generic_merge_sections

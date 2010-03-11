@@ -2,8 +2,8 @@
 
 /* Dynamic architecture support for GDB, the GNU debugger.
 
-   Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007
-   Free Software Foundation, Inc.
+   Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006,
+   2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -52,6 +52,7 @@ struct bp_target_info;
 struct target_desc;
 struct displaced_step_closure;
 struct core_regset_section;
+struct syscall;
 
 /* The architecture associated with the connection to the target.
  
@@ -406,6 +407,14 @@ typedef const gdb_byte * (gdbarch_breakpoint_from_pc_ftype) (struct gdbarch *gdb
 extern const gdb_byte * gdbarch_breakpoint_from_pc (struct gdbarch *gdbarch, CORE_ADDR *pcptr, int *lenptr);
 extern void set_gdbarch_breakpoint_from_pc (struct gdbarch *gdbarch, gdbarch_breakpoint_from_pc_ftype *breakpoint_from_pc);
 
+/* Return the adjusted address and kind to use for Z0/Z1 packets.
+   KIND is usually the memory length of the breakpoint, but may have a
+   different target-specific meaning. */
+
+typedef void (gdbarch_remote_breakpoint_from_pc_ftype) (struct gdbarch *gdbarch, CORE_ADDR *pcptr, int *kindptr);
+extern void gdbarch_remote_breakpoint_from_pc (struct gdbarch *gdbarch, CORE_ADDR *pcptr, int *kindptr);
+extern void set_gdbarch_remote_breakpoint_from_pc (struct gdbarch *gdbarch, gdbarch_remote_breakpoint_from_pc_ftype *remote_breakpoint_from_pc);
+
 extern int gdbarch_adjust_breakpoint_address_p (struct gdbarch *gdbarch);
 
 typedef CORE_ADDR (gdbarch_adjust_breakpoint_address_ftype) (struct gdbarch *gdbarch, CORE_ADDR bpaddr);
@@ -733,6 +742,20 @@ typedef struct displaced_step_closure * (gdbarch_displaced_step_copy_insn_ftype)
 extern struct displaced_step_closure * gdbarch_displaced_step_copy_insn (struct gdbarch *gdbarch, CORE_ADDR from, CORE_ADDR to, struct regcache *regs);
 extern void set_gdbarch_displaced_step_copy_insn (struct gdbarch *gdbarch, gdbarch_displaced_step_copy_insn_ftype *displaced_step_copy_insn);
 
+/* Return true if GDB should use hardware single-stepping to execute
+   the displaced instruction identified by CLOSURE.  If false,
+   GDB will simply restart execution at the displaced instruction
+   location, and it is up to the target to ensure GDB will receive
+   control again (e.g. by placing a software breakpoint instruction
+   into the displaced instruction buffer).
+  
+   The default implementation returns false on all targets that
+   provide a gdbarch_software_single_step routine, and true otherwise. */
+
+typedef int (gdbarch_displaced_step_hw_singlestep_ftype) (struct gdbarch *gdbarch, struct displaced_step_closure *closure);
+extern int gdbarch_displaced_step_hw_singlestep (struct gdbarch *gdbarch, struct displaced_step_closure *closure);
+extern void set_gdbarch_displaced_step_hw_singlestep (struct gdbarch *gdbarch, gdbarch_displaced_step_hw_singlestep_ftype *displaced_step_hw_singlestep);
+
 /* Fix up the state resulting from successfully single-stepping a
    displaced instruction, to give the result we would have gotten from
    stepping the instruction in its original location.
@@ -821,6 +844,15 @@ typedef int (gdbarch_process_record_ftype) (struct gdbarch *gdbarch, struct regc
 extern int gdbarch_process_record (struct gdbarch *gdbarch, struct regcache *regcache, CORE_ADDR addr);
 extern void set_gdbarch_process_record (struct gdbarch *gdbarch, gdbarch_process_record_ftype *process_record);
 
+/* Save process state after a signal.
+   Return -1 if something goes wrong, 0 otherwise. */
+
+extern int gdbarch_process_record_signal_p (struct gdbarch *gdbarch);
+
+typedef int (gdbarch_process_record_signal_ftype) (struct gdbarch *gdbarch, struct regcache *regcache, enum target_signal signal);
+extern int gdbarch_process_record_signal (struct gdbarch *gdbarch, struct regcache *regcache, enum target_signal signal);
+extern void set_gdbarch_process_record_signal (struct gdbarch *gdbarch, gdbarch_process_record_signal_ftype *process_record_signal);
+
 /* Signal translation: translate inferior's signal (host's) number into
    GDB's representation. */
 
@@ -853,6 +885,15 @@ typedef void (gdbarch_record_special_symbol_ftype) (struct gdbarch *gdbarch, str
 extern void gdbarch_record_special_symbol (struct gdbarch *gdbarch, struct objfile *objfile, asymbol *sym);
 extern void set_gdbarch_record_special_symbol (struct gdbarch *gdbarch, gdbarch_record_special_symbol_ftype *record_special_symbol);
 
+/* Function for the 'catch syscall' feature.
+   Get architecture-specific system calls information from registers. */
+
+extern int gdbarch_get_syscall_number_p (struct gdbarch *gdbarch);
+
+typedef LONGEST (gdbarch_get_syscall_number_ftype) (struct gdbarch *gdbarch, ptid_t ptid);
+extern LONGEST gdbarch_get_syscall_number (struct gdbarch *gdbarch, ptid_t ptid);
+extern void set_gdbarch_get_syscall_number (struct gdbarch *gdbarch, gdbarch_get_syscall_number_ftype *get_syscall_number);
+
 /* True if the list of shared libraries is one and only for all
    processes, as opposed to a list of shared libraries per inferior.
    This usually means that all processes, although may or may not share
@@ -869,6 +910,48 @@ extern void set_gdbarch_has_global_solist (struct gdbarch *gdbarch, int has_glob
 
 extern int gdbarch_has_global_breakpoints (struct gdbarch *gdbarch);
 extern void set_gdbarch_has_global_breakpoints (struct gdbarch *gdbarch, int has_global_breakpoints);
+
+/* True if inferiors share an address space (e.g., uClinux). */
+
+typedef int (gdbarch_has_shared_address_space_ftype) (struct gdbarch *gdbarch);
+extern int gdbarch_has_shared_address_space (struct gdbarch *gdbarch);
+extern void set_gdbarch_has_shared_address_space (struct gdbarch *gdbarch, gdbarch_has_shared_address_space_ftype *has_shared_address_space);
+
+/* True if a fast tracepoint can be set at an address. */
+
+typedef int (gdbarch_fast_tracepoint_valid_at_ftype) (struct gdbarch *gdbarch, CORE_ADDR addr, int *isize, char **msg);
+extern int gdbarch_fast_tracepoint_valid_at (struct gdbarch *gdbarch, CORE_ADDR addr, int *isize, char **msg);
+extern void set_gdbarch_fast_tracepoint_valid_at (struct gdbarch *gdbarch, gdbarch_fast_tracepoint_valid_at_ftype *fast_tracepoint_valid_at);
+
+/* Not NULL if a target has additonal field for qSupported. */
+
+extern const char * gdbarch_qsupported (struct gdbarch *gdbarch);
+extern void set_gdbarch_qsupported (struct gdbarch *gdbarch, const char * qsupported);
+
+/* Return the "auto" target charset. */
+
+typedef const char * (gdbarch_auto_charset_ftype) (void);
+extern const char * gdbarch_auto_charset (struct gdbarch *gdbarch);
+extern void set_gdbarch_auto_charset (struct gdbarch *gdbarch, gdbarch_auto_charset_ftype *auto_charset);
+
+/* Return the "auto" target wide charset. */
+
+typedef const char * (gdbarch_auto_wide_charset_ftype) (void);
+extern const char * gdbarch_auto_wide_charset (struct gdbarch *gdbarch);
+extern void set_gdbarch_auto_wide_charset (struct gdbarch *gdbarch, gdbarch_auto_wide_charset_ftype *auto_wide_charset);
+
+/* If non-empty, this is a file extension that will be opened in place
+   of the file extension reported by the shared library list.
+  
+   This is most useful for toolchains that use a post-linker tool,
+   where the names of the files run on the target differ in extension
+   compared to the names of the files GDB should load for debug info. */
+
+extern const char * gdbarch_solib_symbols_extension (struct gdbarch *gdbarch);
+extern void set_gdbarch_solib_symbols_extension (struct gdbarch *gdbarch, const char * solib_symbols_extension);
+
+/* Definition for an unknown syscall, used basically in error-cases.  */
+#define UNKNOWN_SYSCALL (-1)
 
 extern struct gdbarch_tdep *gdbarch_tdep (struct gdbarch *gdbarch);
 

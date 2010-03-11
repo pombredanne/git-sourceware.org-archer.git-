@@ -1,5 +1,5 @@
 /* Support for printing Pascal types for GDB, the GNU debugger.
-   Copyright (C) 2000, 2001, 2002, 2006, 2007, 2008, 2009
+   Copyright (C) 2000, 2001, 2002, 2006, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -267,10 +267,9 @@ pascal_type_print_varspec_prefix (struct type *type, struct ui_file *stream,
       fprintf_filtered (stream, "array ");
       if (TYPE_LENGTH (TYPE_TARGET_TYPE (type)) > 0
 	&& !TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED (type))
-	fprintf_filtered (stream, "[%d..%d] ",
-			  TYPE_ARRAY_LOWER_BOUND_VALUE (type),
-			  TYPE_ARRAY_UPPER_BOUND_VALUE (type)
-	  );
+	fprintf_filtered (stream, "[%s..%s] ",
+			  plongest (TYPE_ARRAY_LOWER_BOUND_VALUE (type)),
+			  plongest (TYPE_ARRAY_UPPER_BOUND_VALUE (type)));
       fprintf_filtered (stream, "of ");
       break;
 
@@ -290,7 +289,6 @@ pascal_type_print_varspec_prefix (struct type *type, struct ui_file *stream,
     case TYPE_CODE_BITSTRING:
     case TYPE_CODE_COMPLEX:
     case TYPE_CODE_TYPEDEF:
-    case TYPE_CODE_TEMPLATE:
       /* These types need no prefix.  They are listed here so that
          gcc -Wall will reveal any types that haven't been handled.  */
       break;
@@ -405,7 +403,6 @@ pascal_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
     case TYPE_CODE_BITSTRING:
     case TYPE_CODE_COMPLEX:
     case TYPE_CODE_TYPEDEF:
-    case TYPE_CODE_TEMPLATE:
       /* These types do not need a suffix.  They are listed so that
          gcc -Wall will report types that may not have been considered.  */
       break;

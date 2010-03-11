@@ -1,8 +1,8 @@
 /* Perform arithmetic and other operations on values, for GDB.
 
    Copyright (C) 1986, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009
-   Free Software Foundation, Inc.
+   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009,
+   2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -122,6 +122,13 @@ First argument of `-' is a pointer and second argument is neither\n\
 an integer nor a pointer of the same type."));
 
   sz = TYPE_LENGTH (check_typedef (TYPE_TARGET_TYPE (type1)));
+  if (sz == 0) 
+    {
+      warning (_("Type size unknown, assuming 1. "
+               "Try casting to a known type, or void *."));
+      sz = 1;
+    }
+
   return (value_as_long (arg1) - value_as_long (arg2)) / sz;
 }
 
@@ -256,22 +263,35 @@ value_bitstring_subscript (struct type *type,
    For now, we do not overload the `=' operator.  */
 
 int
-binop_user_defined_p (enum exp_opcode op, struct value *arg1, struct value *arg2)
+binop_types_user_defined_p (enum exp_opcode op,
+			    struct type *type1, struct type *type2)
 {
-  struct type *type1, *type2;
   if (op == BINOP_ASSIGN || op == BINOP_CONCAT)
     return 0;
 
-  type1 = check_typedef (value_type (arg1));
+  type1 = check_typedef (type1);
   if (TYPE_CODE (type1) == TYPE_CODE_REF)
     type1 = check_typedef (TYPE_TARGET_TYPE (type1));
 
-  type2 = check_typedef (value_type (arg2));
+  type2 = check_typedef (type1);
   if (TYPE_CODE (type2) == TYPE_CODE_REF)
     type2 = check_typedef (TYPE_TARGET_TYPE (type2));
 
   return (TYPE_CODE (type1) == TYPE_CODE_STRUCT
 	  || TYPE_CODE (type2) == TYPE_CODE_STRUCT);
+}
+
+/* Check to see if either argument is a structure, or a reference to
+   one.  This is called so we know whether to go ahead with the normal
+   binop or look for a user defined function instead.
+
+   For now, we do not overload the `=' operator.  */
+
+int
+binop_user_defined_p (enum exp_opcode op,
+		      struct value *arg1, struct value *arg2)
+{
+  return binop_types_user_defined_p (op, value_type (arg1), value_type (arg2));
 }
 
 /* Check to see if argument is a structure.  This is called so
@@ -1128,6 +1148,18 @@ value_binop (struct value *arg1, struct value *arg2, enum exp_opcode op)
 	      v = v1 < v2;
 	      break;
 
+	    case BINOP_GTR:
+	      v = v1 > v2;
+	      break;
+
+	    case BINOP_LEQ:
+	      v = v1 <= v2;
+	      break;
+
+	    case BINOP_GEQ:
+	      v = v1 >= v2;
+	      break;
+
 	    default:
 	      error (_("Invalid binary operation on numbers."));
 	    }
@@ -1237,8 +1269,24 @@ value_binop (struct value *arg1, struct value *arg2, enum exp_opcode op)
 	      v = v1 == v2;
 	      break;
 
+            case BINOP_NOTEQUAL:
+              v = v1 != v2;
+              break;
+
 	    case BINOP_LESS:
 	      v = v1 < v2;
+	      break;
+
+	    case BINOP_GTR:
+	      v = v1 > v2;
+	      break;
+
+	    case BINOP_LEQ:
+	      v = v1 <= v2;
+	      break;
+
+	    case BINOP_GEQ:
+	      v = v1 >= v2;
 	      break;
 
 	    default:
@@ -1395,6 +1443,24 @@ value_equal (struct value *arg1, struct value *arg2)
       error (_("Invalid type combination in equality test."));
       return 0;			/* For lint -- never reached */
     }
+}
+
+/* Compare values based on their raw contents.  Useful for arrays since
+   value_equal coerces them to pointers, thus comparing just the address
+   of the array instead of its contents.  */
+
+int
+value_equal_contents (struct value *arg1, struct value *arg2)
+{
+  struct type *type1, *type2;
+
+  type1 = check_typedef (value_type (arg1));
+  type2 = check_typedef (value_type (arg2));
+
+  return (TYPE_CODE (type1) == TYPE_CODE (type2)
+	  && TYPE_LENGTH (type1) == TYPE_LENGTH (type2)
+	  && memcmp (value_contents (arg1), value_contents (arg2),
+		     TYPE_LENGTH (type1)) == 0);
 }
 
 /* Simulate the C operator < by returning 1

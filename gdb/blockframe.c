@@ -2,8 +2,8 @@
    functions and pc values.
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009
-   Free Software Foundation, Inc.
+   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009,
+   2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -37,12 +37,7 @@
 #include "gdbcmd.h"
 #include "block.h"
 #include "inline-frame.h"
-
 #include "psymtab.h"
-
-/* Prototypes for exported functions. */
-
-void _initialize_blockframe (void);
 
 /* Return the innermost lexical block in execution
    in a specified stack frame.  The frame address is assumed valid.
@@ -220,8 +215,9 @@ find_pc_partial_function (CORE_ADDR pc, char **name, CORE_ADDR *address,
   msymbol = lookup_minimal_symbol_by_pc_section (mapped_pc, section);
   ALL_OBJFILES (objfile)
   {
-    symtab = objfile->sf->qf->find_pc_sect_symtab (objfile, msymbol,
-						   mapped_pc, section, 0);
+    if (objfile->sf)
+      symtab = objfile->sf->qf->find_pc_sect_symtab (objfile, msymbol,
+						     mapped_pc, section, 0);
     if (symtab)
       break;
   }
@@ -339,7 +335,6 @@ block_innermost_frame (struct block *block)
   struct frame_info *frame;
   CORE_ADDR start;
   CORE_ADDR end;
-  CORE_ADDR calling_pc;
 
   if (block == NULL)
     return NULL;

@@ -1,5 +1,5 @@
 /* MI Command Set - breakpoint and watchpoint commands.
-   Copyright (C) 2000, 2001, 2002, 2007, 2008, 2009
+   Copyright (C) 2000, 2001, 2002, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
    Contributed by Cygnus Solutions (a Red Hat company).
 
@@ -64,6 +64,7 @@ mi_cmd_file_list_exec_source_file (char *command, char **argv, int argc)
   ui_out_field_int (uiout, "macro-info", st.symtab->macro_table ? 1 : 0);
 }
 
+/* A callback for map_partial_symbol_filenames.  */
 static void
 print_partial_file_name (const char *filename, const char *fullname,
 			 void *ignore)

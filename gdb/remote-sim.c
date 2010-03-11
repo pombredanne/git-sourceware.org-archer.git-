@@ -1,7 +1,7 @@
 /* Generic remote debugging interface for simulators.
 
    Copyright (C) 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
-   2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2004, 2005, 2006, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support.
    Steve Chamberlain (sac@cygnus.com).
@@ -471,7 +471,7 @@ gdbsim_create_inferior (struct target_ops *target, char *exec_file, char *args,
   sim_create_inferior (gdbsim_desc, exec_bfd, argv, env);
 
   inferior_ptid = remote_sim_ptid;
-  add_inferior_silent (ptid_get_pid (inferior_ptid));
+  inferior_appeared (current_inferior (), ptid_get_pid (inferior_ptid));
   add_thread_silent (inferior_ptid);
 
   insert_breakpoints ();	/* Needed to get correct instruction in cache */

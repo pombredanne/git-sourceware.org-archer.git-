@@ -1,5 +1,6 @@
 /* YACC parser for Pascal expressions, for GDB.
-   Copyright (C) 2000, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 2000, 2006, 2007, 2008, 2009, 2010
+   Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1137,7 +1138,7 @@ yylex ()
       lexptr++;
       c = *lexptr++;
       if (c == '\\')
-	c = parse_escape (&lexptr);
+	c = parse_escape (parse_gdbarch, &lexptr);
       else if (c == '\'')
 	error ("Empty character constant.");
 
@@ -1302,7 +1303,7 @@ yylex ()
 	    break;
 	  case '\\':
 	    tokptr++;
-	    c = parse_escape (&tokptr);
+	    c = parse_escape (parse_gdbarch, &tokptr);
 	    if (c == -1)
 	      {
 		continue;

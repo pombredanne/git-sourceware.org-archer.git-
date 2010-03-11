@@ -1,7 +1,8 @@
 /* Internal type definitions for GDB.
 
    Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001,
-   2002, 2003, 2004, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2002, 2003, 2004, 2006, 2007, 2008, 2009, 2010
+   Free Software Foundation, Inc.
 
    Contributed by Cygnus Support, using pieces from other GDB modules.
 
@@ -130,8 +131,6 @@ enum type_code
     TYPE_CODE_COMPLEX,		/* Complex float */
 
     TYPE_CODE_TYPEDEF,
-    TYPE_CODE_TEMPLATE,		/* C++ template */
-    TYPE_CODE_TEMPLATE_ARG,	/* C++ template arg */
 
     TYPE_CODE_NAMESPACE,	/* C++ namespace.  */
 
@@ -278,6 +277,12 @@ enum type_instance_flag_value
 #define TYPE_OWNER(t) TYPE_MAIN_TYPE(t)->owner
 #define TYPE_OBJFILE(t) (TYPE_OBJFILE_OWNED(t)? TYPE_OWNER(t).objfile : NULL)
 
+/* True if this type was declared using the "class" keyword.  This is
+   only valid for C++ structure types, and only used for displaying
+   the type.  If false, the structure was declared as a "struct".  */
+
+#define TYPE_DECLARED_CLASS(t) (TYPE_MAIN_TYPE (t)->flag_declared_class)
+
 /* Constant type.  If this is set, the corresponding type has a
  * const modifier.
  */
@@ -339,6 +344,26 @@ enum field_loc_kind
     FIELD_LOC_KIND_DWARF_BLOCK	/* dwarf_block */
   };
 
+/* A discriminant to determine which field in the main_type.type_specific
+   union is being used, if any.
+
+   For types such as TYPE_CODE_FLT or TYPE_CODE_FUNC, the use of this
+   discriminant is really redundant, as we know from the type code
+   which field is going to be used.  As such, it would be possible to
+   reduce the size of this enum in order to save a bit or two for
+   other fields of struct main_type.  But, since we still have extra
+   room , and for the sake of clarity and consistency, we treat all fields
+   of the union the same way.  */
+
+enum type_specific_kind
+{
+  TYPE_SPECIFIC_NONE,
+  TYPE_SPECIFIC_CPLUS_STUFF,
+  TYPE_SPECIFIC_GNAT_STUFF,
+  TYPE_SPECIFIC_FLOATFORMAT,
+  TYPE_SPECIFIC_CALLING_CONVENTION
+};
+
 /* This structure is space-critical.
    Its layout has been tweaked to reduce the space used.  */
 
@@ -365,6 +390,13 @@ struct main_type
   unsigned int flag_nottext : 1;
   unsigned int flag_fixed_instance : 1;
   unsigned int flag_objfile_owned : 1;
+  /* True if this type was declared with "class" rather than
+     "struct".  */
+  unsigned int flag_declared_class : 1;
+
+  /* A discriminant telling us which field of the type_specific union
+     is being used for this type, if any.  */
+  ENUM_BITFIELD(type_specific_kind) type_specific_field : 3;
 
   /* Number of fields described for this type.  This field appears at
      this location because it packs nicely here.  */
@@ -447,61 +479,87 @@ struct main_type
      because we can allocate the space for a type before
      we know what to put in it.  */
 
-  struct field
+  union 
   {
-    union field_location
+    struct field
     {
-      /* Position of this field, counting in bits from start of
-	 containing structure.
-	 For gdbarch_bits_big_endian=1 targets, it is the bit offset to the MSB.
-	 For gdbarch_bits_big_endian=0 targets, it is the bit offset to the LSB.
-	 For a range bound or enum value, this is the value itself. */
+      union field_location
+      {
+	/* Position of this field, counting in bits from start of
+	   containing structure.
+	   For gdbarch_bits_big_endian=1 targets, it is the bit offset to the MSB.
+	   For gdbarch_bits_big_endian=0 targets, it is the bit offset to the LSB.
+	   For a range bound or enum value, this is the value itself. */
 
-      int bitpos;
+	int bitpos;
 
-      /* For a static field, if TYPE_FIELD_STATIC_HAS_ADDR then physaddr
-	 is the location (in the target) of the static field.
-	 Otherwise, physname is the mangled label of the static field. */
+	/* For a static field, if TYPE_FIELD_STATIC_HAS_ADDR then physaddr
+	   is the location (in the target) of the static field.
+	   Otherwise, physname is the mangled label of the static field. */
 
-      CORE_ADDR physaddr;
-      char *physname;
+	CORE_ADDR physaddr;
+	char *physname;
 
-      /* The field location can be computed by evaluating the following DWARF
-	 block.  This can be used in Fortran variable-length arrays, for
-	 instance.  */
+	/* The field location can be computed by evaluating the following DWARF
+	   block.  This can be used in Fortran variable-length arrays, for
+	   instance.  */
 
-      struct dwarf2_locexpr_baton *dwarf_block;
-    }
-    loc;
+	struct dwarf2_locexpr_baton *dwarf_block;
+      }
+      loc;
 
-    /* For a function or member type, this is 1 if the argument is marked
-       artificial.  Artificial arguments should not be shown to the
-       user.  For TYPE_CODE_RANGE it is set if the specific bound is not
-       defined.  */
-    unsigned int artificial : 1;
+      /* For a function or member type, this is 1 if the argument is marked
+	 artificial.  Artificial arguments should not be shown to the
+	 user.  For TYPE_CODE_RANGE it is set if the specific bound is not
+	 defined.  */
+      unsigned int artificial : 1;
 
-    /* Discriminant for union field_location.  */
-    ENUM_BITFIELD(field_loc_kind) loc_kind : 2;
+      /* Discriminant for union field_location.  */
+      ENUM_BITFIELD(field_loc_kind) loc_kind : 2;
 
-    /* Size of this field, in bits, or zero if not packed.
-       For an unpacked field, the field's type's length
-       says how many bytes the field occupies.  */
+      /* Size of this field, in bits, or zero if not packed.
+	 If non-zero in an array type, indicates the element size in
+	 bits (used only in Ada at the moment).
+	 For an unpacked field, the field's type's length
+	 says how many bytes the field occupies.  */
 
-    unsigned int bitsize : 29;
+      unsigned int bitsize : 29;
 
-    /* In a struct or union type, type of this field.
-       In a function or member type, type of this argument.
-       In an array type, the domain-type of the array.  */
+      /* In a struct or union type, type of this field.
+	 In a function or member type, type of this argument.
+	 In an array type, the domain-type of the array.  */
 
-    struct type *type;
+      struct type *type;
 
-    /* Name of field, value or argument.
-       NULL for range bounds, array domains, and member function
-       arguments.  */
+      /* Name of field, value or argument.
+	 NULL for range bounds, array domains, and member function
+	 arguments.  */
 
-    char *name;
+      char *name;
+    } *fields;
 
-  } *fields;
+    /* Union member used for range types. */
+
+    struct range_bounds
+    {
+      /* Low bound of range. */
+
+      LONGEST low;
+
+      /* High bound of range. */
+
+      LONGEST high;
+
+      /* Flags indicating whether the values of low and high are
+         valid.  When true, the respective range value is
+         undefined.  Currently used only for FORTRAN arrays.  */
+           
+      char low_undefined;
+      char high_undefined;
+
+    } *bounds;
+
+  } flds_bnds;
 
   /* For types with virtual functions (TYPE_CODE_STRUCT), VPTR_BASETYPE
      is the base class which defined the virtual function table pointer.  
@@ -526,6 +584,10 @@ struct main_type
        cplus_struct_type. */
 
     struct cplus_struct_type *cplus_stuff;
+
+    /* GNAT_STUFF is for types for which the GNAT Ada compiler
+       provides additional information.  */
+    struct gnat_aux_type *gnat_stuff;
 
     /* FLOATFORMAT is for TYPE_CODE_FLT.  It is a pointer to two
        floatformat objects that describe the floating-point value
@@ -621,19 +683,12 @@ struct cplus_struct_type
 
     short nfn_fields_total;
 
-    /* The "declared_type" field contains a code saying how the
-       user really declared this type, e.g., "class s", "union s",
-       "struct s".
-       The 3 above things come out from the C++ compiler looking like classes, 
-       but we keep track of the real declaration so we can give
-       the correct information on "ptype". (Note: TEMPLATE may not
-       belong in this list...)  */
-
-#define DECLARED_TYPE_CLASS 0
-#define DECLARED_TYPE_UNION 1
-#define DECLARED_TYPE_STRUCT 2
-#define DECLARED_TYPE_TEMPLATE 3
-    short declared_type;	/* One of the above codes */
+    /* One if this struct is a dynamic class, as defined by the
+       Itanium C++ ABI: if it requires a virtual table pointer,
+       because it or any of its base classes have one or more virtual
+       member functions or virtual base classes.  Minus one if not
+       dynamic.  Zero if not yet computed.  */
+    int is_dynamic : 2;
 
     /* For derived classes, the number of base classes is given by n_baseclasses
        and virtual_field_bits is a bit vector containing one bit per base class.
@@ -751,21 +806,6 @@ struct cplus_struct_type
       }
      *fn_fieldlists;
 
-    /* If this "struct type" describes a template, then it 
-     * has arguments. "template_args" points to an array of
-     * template arg descriptors, of length "ntemplate_args".
-     * The only real information in each of these template arg descriptors
-     * is a name. "type" will typically just point to a "struct type" with
-     * the placeholder TYPE_CODE_TEMPLATE_ARG type.
-     */
-    short ntemplate_args;
-    struct template_arg
-      {
-	char *name;
-	struct type *type;
-      }
-     *template_args;
-
     /* Pointer to information about enclosing scope, if this is a
      * local type.  If it is not a local type, this is NULL
      */
@@ -791,6 +831,15 @@ struct badness_vector
     int *rank;
   };
 
+/* GNAT Ada-specific information for various Ada types.  */
+struct gnat_aux_type
+  {
+    /* Parallel type used to encode information about dynamic types
+       used in Ada (such as variant records, variable-size array,
+       etc).  */
+    struct type* descriptive_type;
+  };
+
 /* The default value of TYPE_CPLUS_SPECIFIC(T) points to the
    this shared static structure. */
 
@@ -799,10 +848,27 @@ extern const struct cplus_struct_type cplus_struct_default;
 extern void allocate_cplus_struct_type (struct type *);
 
 #define INIT_CPLUS_SPECIFIC(type) \
-  (TYPE_CPLUS_SPECIFIC(type)=(struct cplus_struct_type*)&cplus_struct_default)
+  (TYPE_SPECIFIC_FIELD (type) = TYPE_SPECIFIC_CPLUS_STUFF, \
+   TYPE_RAW_CPLUS_SPECIFIC (type) = (struct cplus_struct_type*) &cplus_struct_default)
+
 #define ALLOCATE_CPLUS_STRUCT_TYPE(type) allocate_cplus_struct_type (type)
+
 #define HAVE_CPLUS_STRUCT(type) \
-  (TYPE_CPLUS_SPECIFIC(type) != &cplus_struct_default)
+  (TYPE_SPECIFIC_FIELD (type) == TYPE_SPECIFIC_CPLUS_STUFF \
+   && TYPE_RAW_CPLUS_SPECIFIC (type) !=  &cplus_struct_default)
+
+extern const struct gnat_aux_type gnat_aux_default;
+
+extern void allocate_gnat_aux_type (struct type *);
+
+#define INIT_GNAT_SPECIFIC(type) \
+  (TYPE_SPECIFIC_FIELD (type) = TYPE_SPECIFIC_GNAT_STUFF, \
+   TYPE_GNAT_SPECIFIC (type) = (struct gnat_aux_type *) &gnat_aux_default)
+#define ALLOCATE_GNAT_AUX_TYPE(type) allocate_gnat_aux_type (type)
+/* A macro that returns non-zero if the type-specific data should be
+   read as "gnat-stuff".  */
+#define HAVE_GNAT_AUX_INFO(type) \
+  (TYPE_SPECIFIC_FIELD (type) == TYPE_SPECIFIC_GNAT_STUFF)
 
 #define TYPE_INSTANCE_FLAGS(thistype) (thistype)->instance_flags
 #define TYPE_MAIN_TYPE(thistype) (thistype)->main_type
@@ -821,19 +887,23 @@ extern void allocate_cplus_struct_type (struct type *);
    type, you need to do TYPE_CODE (check_type (this_type)). */
 #define TYPE_CODE(thistype) TYPE_MAIN_TYPE(thistype)->code
 #define TYPE_NFIELDS(thistype) TYPE_MAIN_TYPE(thistype)->nfields
-#define TYPE_FIELDS(thistype) TYPE_MAIN_TYPE(thistype)->fields
-#define TYPE_TEMPLATE_ARGS(thistype) TYPE_CPLUS_SPECIFIC(thistype)->template_args
+#define TYPE_FIELDS(thistype) TYPE_MAIN_TYPE(thistype)->flds_bnds.fields
 
 #define TYPE_INDEX_TYPE(type) TYPE_FIELD_TYPE (type, 0)
-#define TYPE_LOW_BOUND(range_type) TYPE_FIELD_BITPOS (range_type, 0)
-#define TYPE_HIGH_BOUND(range_type) TYPE_FIELD_BITPOS (range_type, 1)
+#define TYPE_RANGE_DATA(thistype) TYPE_MAIN_TYPE(thistype)->flds_bnds.bounds
+#define TYPE_LOW_BOUND(range_type) TYPE_RANGE_DATA(range_type)->low
+#define TYPE_HIGH_BOUND(range_type) TYPE_RANGE_DATA(range_type)->high
+#define TYPE_LOW_BOUND_UNDEFINED(range_type) \
+   TYPE_RANGE_DATA(range_type)->low_undefined
+#define TYPE_HIGH_BOUND_UNDEFINED(range_type) \
+   TYPE_RANGE_DATA(range_type)->high_undefined
 
 /* Moto-specific stuff for FORTRAN arrays */
 
 #define TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED(arraytype) \
-   (TYPE_FIELD_ARTIFICIAL(TYPE_INDEX_TYPE((arraytype)),1))
+   TYPE_HIGH_BOUND_UNDEFINED(TYPE_INDEX_TYPE(arraytype))
 #define TYPE_ARRAY_LOWER_BOUND_IS_UNDEFINED(arraytype) \
-   (TYPE_FIELD_ARTIFICIAL(TYPE_INDEX_TYPE((arraytype)),0))
+   TYPE_LOW_BOUND_UNDEFINED(TYPE_INDEX_TYPE(arraytype))
 
 #define TYPE_ARRAY_UPPER_BOUND_VALUE(arraytype) \
    (TYPE_HIGH_BOUND(TYPE_INDEX_TYPE((arraytype))))
@@ -849,18 +919,30 @@ extern void allocate_cplus_struct_type (struct type *);
 #define TYPE_FN_FIELDS(thistype) TYPE_CPLUS_SPECIFIC(thistype)->fn_fields
 #define TYPE_NFN_FIELDS(thistype) TYPE_CPLUS_SPECIFIC(thistype)->nfn_fields
 #define TYPE_NFN_FIELDS_TOTAL(thistype) TYPE_CPLUS_SPECIFIC(thistype)->nfn_fields_total
-#define TYPE_NTEMPLATE_ARGS(thistype) TYPE_CPLUS_SPECIFIC(thistype)->ntemplate_args
-#define TYPE_DECLARED_TYPE(thistype) TYPE_CPLUS_SPECIFIC(thistype)->declared_type
+#define TYPE_SPECIFIC_FIELD(thistype) \
+  TYPE_MAIN_TYPE(thistype)->type_specific_field
 #define	TYPE_TYPE_SPECIFIC(thistype) TYPE_MAIN_TYPE(thistype)->type_specific
-#define TYPE_CPLUS_SPECIFIC(thistype) TYPE_MAIN_TYPE(thistype)->type_specific.cplus_stuff
+/* We need this tap-dance with the TYPE_RAW_SPECIFIC because of the case
+   where we're trying to print an Ada array using the C language.
+   In that case, there is no "cplus_stuff", but the C language assumes
+   that there is.  What we do, in that case, is pretend that there is
+   an implicit one which is the default cplus stuff.  */
+#define TYPE_CPLUS_SPECIFIC(thistype) \
+   (!HAVE_CPLUS_STRUCT(thistype) \
+    ? (struct cplus_struct_type*)&cplus_struct_default \
+    : TYPE_RAW_CPLUS_SPECIFIC(thistype))
+#define TYPE_RAW_CPLUS_SPECIFIC(thistype) TYPE_MAIN_TYPE(thistype)->type_specific.cplus_stuff
 #define TYPE_FLOATFORMAT(thistype) TYPE_MAIN_TYPE(thistype)->type_specific.floatformat
+#define TYPE_GNAT_SPECIFIC(thistype) TYPE_MAIN_TYPE(thistype)->type_specific.gnat_stuff
+#define TYPE_DESCRIPTIVE_TYPE(thistype) TYPE_GNAT_SPECIFIC(thistype)->descriptive_type
 #define TYPE_CALLING_CONVENTION(thistype) TYPE_MAIN_TYPE(thistype)->type_specific.calling_convention
-#define TYPE_BASECLASS(thistype,index) TYPE_MAIN_TYPE(thistype)->fields[index].type
+#define TYPE_BASECLASS(thistype,index) TYPE_FIELD_TYPE(thistype, index)
 #define TYPE_N_BASECLASSES(thistype) TYPE_CPLUS_SPECIFIC(thistype)->n_baseclasses
-#define TYPE_BASECLASS_NAME(thistype,index) TYPE_MAIN_TYPE(thistype)->fields[index].name
+#define TYPE_BASECLASS_NAME(thistype,index) TYPE_FIELD_NAME(thistype, index)
 #define TYPE_BASECLASS_BITPOS(thistype,index) TYPE_FIELD_BITPOS(thistype,index)
 #define BASETYPE_VIA_PUBLIC(thistype, index) \
   ((!TYPE_FIELD_PRIVATE(thistype, index)) && (!TYPE_FIELD_PROTECTED(thistype, index)))
+#define TYPE_CPLUS_DYNAMIC(thistype) TYPE_CPLUS_SPECIFIC (thistype)->is_dynamic
 
 #define BASETYPE_VIA_VIRTUAL(thistype, index) \
   (TYPE_CPLUS_SPECIFIC(thistype)->virtual_field_bits == NULL ? 0 \
@@ -888,7 +970,7 @@ extern void allocate_cplus_struct_type (struct type *);
 #define FIELD_ARTIFICIAL(thisfld) ((thisfld).artificial)
 #define FIELD_BITSIZE(thisfld) ((thisfld).bitsize)
 
-#define TYPE_FIELD(thistype, n) TYPE_MAIN_TYPE(thistype)->fields[n]
+#define TYPE_FIELD(thistype, n) TYPE_MAIN_TYPE(thistype)->flds_bnds.fields[n]
 #define TYPE_FIELD_TYPE(thistype, n) FIELD_TYPE(TYPE_FIELD(thistype, n))
 #define TYPE_FIELD_NAME(thistype, n) FIELD_NAME(TYPE_FIELD(thistype, n))
 #define TYPE_FIELD_LOC_KIND(thistype, n) FIELD_LOC_KIND (TYPE_FIELD (thistype, n))
@@ -899,7 +981,6 @@ extern void allocate_cplus_struct_type (struct type *);
 #define TYPE_FIELD_ARTIFICIAL(thistype, n) FIELD_ARTIFICIAL(TYPE_FIELD(thistype,n))
 #define TYPE_FIELD_BITSIZE(thistype, n) FIELD_BITSIZE(TYPE_FIELD(thistype,n))
 #define TYPE_FIELD_PACKED(thistype, n) (FIELD_BITSIZE(TYPE_FIELD(thistype,n))!=0)
-#define TYPE_TEMPLATE_ARG(thistype, n) TYPE_CPLUS_SPECIFIC(thistype)->template_args[n]
 
 #define TYPE_FIELD_PRIVATE_BITS(thistype) \
   TYPE_CPLUS_SPECIFIC(thistype)->private_field_bits
@@ -964,7 +1045,7 @@ extern void allocate_cplus_struct_type (struct type *);
 #define TYPE_IS_OPAQUE(thistype) (((TYPE_CODE (thistype) == TYPE_CODE_STRUCT) ||        \
                                    (TYPE_CODE (thistype) == TYPE_CODE_UNION))        && \
                                   (TYPE_NFIELDS (thistype) == 0)                     && \
-                                  (TYPE_CPLUS_SPECIFIC (thistype) && (TYPE_NFN_FIELDS (thistype) == 0)) && \
+                                  (HAVE_CPLUS_STRUCT (thistype) && (TYPE_NFN_FIELDS (thistype) == 0)) && \
                                   (TYPE_STUB (thistype) || !TYPE_STUB_SUPPORTED (thistype)))
 
 struct builtin_type
@@ -1156,7 +1237,7 @@ extern struct type *arch_complex_type (struct gdbarch *, char *,
 
 /* Helper functions to construct a struct or record type.  An
    initially empty type is created using arch_composite_type().
-   Fields are then added using append_struct_type_field().  A union
+   Fields are then added using append_composite_type_field*().  A union
    type has its size set to the largest field.  A struct type has each
    field packed against the previous.  */
 
@@ -1168,6 +1249,8 @@ extern void append_composite_type_field_aligned (struct type *t,
 						 char *name,
 						 struct type *field,
 						 int alignment);
+struct field *append_composite_type_field_raw (struct type *t, char *name,
+					       struct type *field);
 
 /* Helper functions to construct a bit flags type.  An initially empty
    type is created using arch_flag_type().  Flags are then added using
@@ -1205,6 +1288,8 @@ extern void smash_to_method_type (struct type *type, struct type *domain,
 extern void smash_to_memberptr_type (struct type *, struct type *,
 				     struct type *);
 
+extern void smash_to_methodptr_type (struct type *, struct type *);
+
 extern struct type *allocate_stub_method (struct type *);
 
 extern char *type_name_no_tag (const struct type *);
@@ -1219,8 +1304,8 @@ extern struct type *make_function_type (struct type *, struct type **);
 
 extern struct type *lookup_function_type (struct type *);
 
-extern struct type *create_range_type (struct type *, struct type *, int,
-				       int);
+extern struct type *create_range_type (struct type *, struct type *, LONGEST,
+				       LONGEST);
 
 extern struct type *create_array_type (struct type *, struct type *,
 				       struct type *);
@@ -1260,7 +1345,13 @@ extern int get_vptr_fieldno (struct type *, struct type **);
 
 extern int get_discrete_bounds (struct type *, LONGEST *, LONGEST *);
 
+extern int class_types_same_p (const struct type *, const struct type *);
+
 extern int is_ancestor (struct type *, struct type *);
+
+extern int is_public_ancestor (struct type *, struct type *);
+
+extern int is_unique_ancestor (struct type *, struct value *);
 
 /* Overload resolution */
 

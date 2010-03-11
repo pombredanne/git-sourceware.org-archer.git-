@@ -100,7 +100,8 @@
 #define TAG_CPU_ARCH_V7		10
 #define TAG_CPU_ARCH_V6_M	11
 #define TAG_CPU_ARCH_V6S_M	12
-#define MAX_TAG_CPU_ARCH	12
+#define TAG_CPU_ARCH_V7E_M	13
+#define MAX_TAG_CPU_ARCH	13
 /* Pseudo-architecture to allow objects to be compatible with the subset of
    armv4t and armv6-m.  This value should never be stored in object files.  */
 #define TAG_CPU_ARCH_V4T_PLUS_V6_M (MAX_TAG_CPU_ARCH + 1)
@@ -287,13 +288,18 @@ enum
   Tag_undefined37,
   Tag_ABI_FP_16bit_format,
   Tag_undefined39,
+  Tag_undefined40,
+  Tag_undefined41,
+  Tag_MPextension_use,
+  Tag_undefined_43,
+  Tag_DIV_use,
   Tag_nodefaults = 64,
   Tag_also_compatible_with,
   Tag_T2EE_use,
   Tag_conformance,
   Tag_Virtualization_use,
   Tag_undefined69,
-  Tag_MPextension_use
+  Tag_MPextension_use_legacy
 };
 
 #endif

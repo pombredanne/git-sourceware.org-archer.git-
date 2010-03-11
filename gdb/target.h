@@ -1,7 +1,7 @@
 /* Interface between GDB and target environments, including files and processes
 
    Copyright (C) 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
+   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    Contributed by Cygnus Support.  Written by John Gilmore.
@@ -31,6 +31,10 @@ struct target_ops;
 struct bp_target_info;
 struct regcache;
 struct target_section_table;
+struct trace_state_variable;
+struct trace_status;
+struct uploaded_tsv;
+struct uploaded_tp;
 
 /* This include file defines the interface between the main part
    of the debugger, and the part which is target-specific, or
@@ -110,6 +114,15 @@ enum target_waitkind
 
     TARGET_WAITKIND_EXECD,
 
+    /* The program had previously vforked, and now the child is done
+       with the shared memory region, because it exec'ed or exited.
+       Note that the event is reported to the vfork parent.  This is
+       only used if GDB did not stay attached to the vfork child,
+       otherwise, a TARGET_WAITKIND_EXECD or
+       TARGET_WAITKIND_EXIT|SIGNALLED event associated with the child
+       has the same effect.  */
+    TARGET_WAITKIND_VFORK_DONE,
+
     /* The program has entered or returned from a system call.  On
        HP-UX, this is used in the hardware watchpoint implementation.
        The syscall's unique integer ID number is in value.syscall_id */
@@ -142,14 +155,15 @@ struct target_waitstatus
   {
     enum target_waitkind kind;
 
-    /* Forked child pid, execd pathname, exit status or signal number.  */
+    /* Forked child pid, execd pathname, exit status, signal number or
+       syscall number.  */
     union
       {
 	int integer;
 	enum target_signal sig;
 	ptid_t related_pid;
 	char *execd_pathname;
-	int syscall_id;
+	int syscall_number;
       }
     value;
   };
@@ -160,6 +174,21 @@ struct target_waitstatus
    options is not requested, target_wait blocks waiting for an
    event.  */
 #define TARGET_WNOHANG 1
+
+/* The structure below stores information about a system call.
+   It is basically used in the "catch syscall" command, and in
+   every function that gives information about a system call.
+   
+   It's also good to mention that its fields represent everything
+   that we currently know about a syscall in GDB.  */
+struct syscall
+  {
+    /* The syscall number.  */
+    int number;
+
+    /* The syscall name.  */
+    const char *name;
+  };
 
 /* Return a pretty printed form of target_waitstatus.
    Space for the result is malloc'd, caller must free.  */
@@ -230,8 +259,22 @@ enum target_object
   /* Extra signal info.  Usually the contents of `siginfo_t' on unix
      platforms.  */
   TARGET_OBJECT_SIGNAL_INFO,
+  /* The list of threads that are being debugged.  */
+  TARGET_OBJECT_THREADS,
   /* Possible future objects: TARGET_OBJECT_FILE, ... */
 };
+
+/* Enumeration of the kinds of traceframe searches that a target may
+   be able to perform.  */
+
+enum trace_find_type
+  {
+    tfind_number,
+    tfind_pc,
+    tfind_tp,
+    tfind_range,
+    tfind_outside,
+  };
 
 /* Request that OPS transfer up to LEN 8-bit bytes of the target's
    OBJECT.  The OFFSET, for a seekable object, specifies the
@@ -406,6 +449,7 @@ struct target_ops
     int (*to_follow_fork) (struct target_ops *, int);
     void (*to_insert_exec_catchpoint) (int);
     int (*to_remove_exec_catchpoint) (int);
+    int (*to_set_syscall_catchpoint) (int, int, int, int, int *);
     int (*to_has_exited) (int, int, int *);
     void (*to_mourn_inferior) (struct target_ops *);
     int (*to_can_run) (void);
@@ -433,13 +477,18 @@ struct target_ops
     void (*to_async) (void (*) (enum inferior_event_type, void *), void *);
     int (*to_async_mask) (int);
     int (*to_supports_non_stop) (void);
+    /* find_memory_regions support method for gcore */
     int (*to_find_memory_regions) (int (*) (CORE_ADDR,
 					    unsigned long,
 					    int, int, int,
 					    void *),
 				   void *);
+    /* make_corefile_notes support method for gcore */
     char * (*to_make_corefile_notes) (bfd *, int *);
-
+    /* get_bookmark support method for bookmarks */
+    gdb_byte * (*to_get_bookmark) (char *, int);
+    /* goto_bookmark support method for bookmarks */
+    void (*to_goto_bookmark) (gdb_byte *, int);
     /* Return the thread-local address at OFFSET in the
        thread-local storage for the thread PTID and the shared library
        or executable file given by OBJFILE.  If that block of
@@ -559,6 +608,71 @@ struct target_ops
        The default implementation always returns target_gdbarch.  */
     struct gdbarch *(*to_thread_architecture) (struct target_ops *, ptid_t);
 
+    /* Determine current address space of thread PTID.
+
+       The default implementation always returns the inferior's
+       address space.  */
+    struct address_space *(*to_thread_address_space) (struct target_ops *,
+						      ptid_t);
+
+    /* Tracepoint-related operations.  */
+
+    /* Prepare the target for a tracing run.  */
+    void (*to_trace_init) (void);
+
+    /* Send full details of a tracepoint to the target.  */
+    void (*to_download_tracepoint) (struct breakpoint *t);
+
+    /* Send full details of a trace state variable to the target.  */
+    void (*to_download_trace_state_variable) (struct trace_state_variable *tsv);
+
+    /* Inform the target info of memory regions that are readonly
+       (such as text sections), and so it should return data from
+       those rather than look in the trace buffer.  */
+    void (*to_trace_set_readonly_regions) (void);
+
+    /* Start a trace run.  */
+    void (*to_trace_start) (void);
+
+    /* Get the current status of a tracing run.  */
+    int (*to_get_trace_status) (struct trace_status *ts);
+
+    /* Stop a trace run.  */
+    void (*to_trace_stop) (void);
+
+   /* Ask the target to find a trace frame of the given type TYPE,
+      using NUM, ADDR1, and ADDR2 as search parameters.  Returns the
+      number of the trace frame, and also the tracepoint number at
+      TPP.  */
+    int (*to_trace_find) (enum trace_find_type type, int num,
+			  ULONGEST addr1, ULONGEST addr2, int *tpp);
+
+    /* Get the value of the trace state variable number TSV, returning
+       1 if the value is known and writing the value itself into the
+       location pointed to by VAL, else returning 0.  */
+    int (*to_get_trace_state_variable_value) (int tsv, LONGEST *val);
+
+    int (*to_save_trace_data) (char *filename);
+
+    int (*to_upload_tracepoints) (struct uploaded_tp **utpp);
+
+    int (*to_upload_trace_state_variables) (struct uploaded_tsv **utsvp);
+
+    LONGEST (*to_get_raw_trace_data) (gdb_byte *buf,
+				      ULONGEST offset, LONGEST len);
+
+    /* Set the target's tracing behavior in response to unexpected
+       disconnection - set VAL to 1 to keep tracing, 0 to stop.  */
+    void (*to_set_disconnected_tracing) (int val);
+
+    /* Return the processor core that thread PTID was last seen on.
+       This information is updated only when:
+       - update_thread_list is called
+       - thread stops
+       If the core cannot be determined -- either for the specified thread, or
+       right now, or in this debug session, or for this target -- return -1.  */
+    int (*to_core_of_thread) (struct target_ops *, ptid_t ptid);
+
     int to_magic;
     /* Need sub-structure for target machine related rather than comm related?
      */
@@ -668,6 +782,10 @@ extern void target_store_registers (struct regcache *regcache, int regs);
 #define	target_prepare_to_store(regcache)	\
      (*current_target.to_prepare_to_store) (regcache)
 
+/* Determine current address space of thread PTID.  */
+
+struct address_space *target_thread_address_space (ptid_t);
+
 /* Returns true if this target can debug multiple processes
    simultaneously.  */
 
@@ -747,6 +865,8 @@ extern int inferior_has_forked (ptid_t pid, ptid_t *child_pid);
 extern int inferior_has_vforked (ptid_t pid, ptid_t *child_pid);
 
 extern int inferior_has_execd (ptid_t pid, char **execd_pathname);
+
+extern int inferior_has_called_syscall (ptid_t pid, int *syscall_number);
 
 /* Print a line about the current target.  */
 
@@ -899,6 +1019,27 @@ int target_follow_fork (int follow_child);
 
 #define target_remove_exec_catchpoint(pid) \
      (*current_target.to_remove_exec_catchpoint) (pid)
+
+/* Syscall catch.
+
+   NEEDED is nonzero if any syscall catch (of any kind) is requested.
+   If NEEDED is zero, it means the target can disable the mechanism to
+   catch system calls because there are no more catchpoints of this type.
+
+   ANY_COUNT is nonzero if a generic (filter-less) syscall catch is
+   being requested.  In this case, both TABLE_SIZE and TABLE should
+   be ignored.
+
+   TABLE_SIZE is the number of elements in TABLE.  It only matters if
+   ANY_COUNT is zero.
+
+   TABLE is an array of ints, indexed by syscall number.  An element in
+   this array is nonzero if that syscall should be caught.  This argument
+   only matters if ANY_COUNT is zero.  */
+
+#define target_set_syscall_catchpoint(pid, needed, any_count, table_size, table) \
+     (*current_target.to_set_syscall_catchpoint) (pid, needed, any_count, \
+						  table_size, table)
 
 /* Returns TRUE if PID has exited.  And, also sets EXIT_STATUS to the
    exit code of PID, if any.  */
@@ -1081,10 +1222,17 @@ extern char *normal_pid_to_str (ptid_t ptid);
 #define target_make_corefile_notes(BFD, SIZE_P) \
      (current_target.to_make_corefile_notes) (BFD, SIZE_P)
 
+/* Bookmark interfaces.  */
+#define target_get_bookmark(ARGS, FROM_TTY) \
+     (current_target.to_get_bookmark) (ARGS, FROM_TTY)
+
+#define target_goto_bookmark(ARG, FROM_TTY) \
+     (current_target.to_goto_bookmark) (ARG, FROM_TTY)
+
 /* Hardware watchpoint interfaces.  */
 
 /* Returns non-zero if we were stopped by a hardware watchpoint (memory read or
-   write).  */
+   write).  Only the INFERIOR_PTID task is being queried.  */
 
 #define target_stopped_by_watchpoint \
    (*current_target.to_stopped_by_watchpoint)
@@ -1116,9 +1264,10 @@ extern char *normal_pid_to_str (ptid_t ptid);
     (*current_target.to_region_ok_for_hw_watchpoint) (addr, len)
 
 
-/* Set/clear a hardware watchpoint starting at ADDR, for LEN bytes.  TYPE is 0
-   for write, 1 for read, and 2 for read/write accesses.  Returns 0 for
-   success, non-zero for failure.  */
+/* Set/clear a hardware watchpoint starting at ADDR, for LEN bytes.
+   TYPE is 0 for write, 1 for read, and 2 for read/write accesses.
+   Returns 0 for success, 1 if the watchpoint type is not supported,
+   -1 for failure.  */
 
 #define	target_insert_watchpoint(addr, len, type)	\
      (*current_target.to_insert_watchpoint) (addr, len, type)
@@ -1132,8 +1281,11 @@ extern char *normal_pid_to_str (ptid_t ptid);
 #define target_remove_hw_breakpoint(gdbarch, bp_tgt) \
      (*current_target.to_remove_hw_breakpoint) (gdbarch, bp_tgt)
 
-#define target_stopped_data_address(target, x) \
-    (*target.to_stopped_data_address) (target, x)
+/* Return non-zero if target knows the data address which triggered this
+   target_stopped_by_watchpoint, in such case place it to *ADDR_P.  Only the
+   INFERIOR_PTID task is being queried.  */
+#define target_stopped_data_address(target, addr_p) \
+    (*target.to_stopped_data_address) (target, addr_p)
 
 #define target_watchpoint_addr_within_range(target, addr, start, length) \
   (*target.to_watchpoint_addr_within_range) (target, addr, start, length)
@@ -1163,6 +1315,50 @@ extern int target_search_memory (CORE_ADDR start_addr,
                                  ULONGEST pattern_len,
                                  CORE_ADDR *found_addrp);
 
+/* Tracepoint-related operations.  */
+
+#define target_trace_init() \
+  (*current_target.to_trace_init) ()
+
+#define target_download_tracepoint(t) \
+  (*current_target.to_download_tracepoint) (t)
+
+#define target_download_trace_state_variable(tsv) \
+  (*current_target.to_download_trace_state_variable) (tsv)
+
+#define target_trace_start() \
+  (*current_target.to_trace_start) ()
+
+#define target_trace_set_readonly_regions() \
+  (*current_target.to_trace_set_readonly_regions) ()
+
+#define target_get_trace_status(ts) \
+  (*current_target.to_get_trace_status) (ts)
+
+#define target_trace_stop() \
+  (*current_target.to_trace_stop) ()
+
+#define target_trace_find(type,num,addr1,addr2,tpp) \
+  (*current_target.to_trace_find) ((type), (num), (addr1), (addr2), (tpp))
+
+#define target_get_trace_state_variable_value(tsv,val) \
+  (*current_target.to_get_trace_state_variable_value) ((tsv), (val))
+
+#define target_save_trace_data(filename) \
+  (*current_target.to_save_trace_data) (filename)
+
+#define target_upload_tracepoints(utpp) \
+  (*current_target.to_upload_tracepoints) (utpp)
+
+#define target_upload_trace_state_variables(utsvp) \
+  (*current_target.to_upload_trace_state_variables) (utsvp)
+
+#define target_get_raw_trace_data(buf,offset,len) \
+  (*current_target.to_get_raw_trace_data) ((buf), (offset), (len))
+
+#define target_set_disconnected_tracing(val) \
+  (*current_target.to_set_disconnected_tracing) (val)
+
 /* Command logging facility.  */
 
 #define target_log_command(p)						\
@@ -1170,6 +1366,9 @@ extern int target_search_memory (CORE_ADDR start_addr,
     if (current_target.to_log_command)					\
       (*current_target.to_log_command) (p);				\
   while (0)
+
+
+extern int target_core_of_thread (ptid_t ptid);
 
 /* Routines for maintenance of the target structures...
 

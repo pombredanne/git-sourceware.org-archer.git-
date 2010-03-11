@@ -1,7 +1,7 @@
 /* Dynamic architecture support for GDB, the GNU debugger.
 
    Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008, 2009 Free Software Foundation, Inc.
+   2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -67,6 +67,12 @@ simple_displaced_step_free_closure (struct gdbarch *gdbarch,
   xfree (closure);
 }
 
+int
+default_displaced_step_hw_singlestep (struct gdbarch *gdbarch,
+				      struct displaced_step_closure *closure)
+{
+  return !gdbarch_software_single_step_p (gdbarch);
+}
 
 CORE_ADDR
 displaced_step_at_entry_point (struct gdbarch *gdbarch)
@@ -749,6 +755,32 @@ get_current_arch (void)
     return get_frame_arch (get_selected_frame (NULL));
   else
     return target_gdbarch;
+}
+
+int
+default_has_shared_address_space (struct gdbarch *gdbarch)
+{
+  /* Simply say no.  In most unix-like targets each inferior/process
+     has its own address space.  */
+  return 0;
+}
+
+int
+default_fast_tracepoint_valid_at (struct gdbarch *gdbarch,
+				  CORE_ADDR addr, int *isize, char **msg)
+{
+  /* We don't know if maybe the target has some way to do fast
+     tracepoints that doesn't need gdbarch, so always say yes.  */
+  if (msg)
+    *msg = NULL;
+  return 1;
+}
+
+void
+default_remote_breakpoint_from_pc (struct gdbarch *gdbarch, CORE_ADDR *pcptr,
+				   int *kindptr)
+{
+  gdbarch_breakpoint_from_pc (gdbarch, pcptr, kindptr);
 }
 
 /* */

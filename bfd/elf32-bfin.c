@@ -1,5 +1,6 @@
 /* ADI Blackfin BFD support for 32-bit ELF.
-   Copyright 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   Copyright 2005, 2006, 2007, 2008, 2009, 2010
+   Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
 
@@ -1716,8 +1717,8 @@ bfin_gc_sweep_hook (bfd * abfd,
 extern const bfd_target bfd_elf32_bfinfdpic_vec;
 #define IS_FDPIC(bfd) ((bfd)->xvec == &bfd_elf32_bfinfdpic_vec)
 
-/* An extension of the elf hash table data structure, containing some
-   additional Blackfin-specific data.  */
+/* An extension of the elf hash table data structure,
+   containing some additional Blackfin-specific data.  */
 struct bfinfdpic_elf_link_hash_table
 {
   struct elf_link_hash_table elf;
@@ -1748,7 +1749,8 @@ struct bfinfdpic_elf_link_hash_table
 /* Get the Blackfin ELF linker hash table from a link_info structure.  */
 
 #define bfinfdpic_hash_table(info) \
-  ((struct bfinfdpic_elf_link_hash_table *) ((info)->hash))
+  (elf_hash_table_id ((struct elf_link_hash_table *) ((info)->hash)) \
+  == BFIN_ELF_DATA ? ((struct bfinfdpic_elf_link_hash_table *) ((info)->hash)) : NULL)
 
 #define bfinfdpic_got_section(info) \
   (bfinfdpic_hash_table (info)->sgot)
@@ -1814,7 +1816,8 @@ bfinfdpic_elf_link_hash_table_create (bfd *abfd)
 
   if (!_bfd_elf_link_hash_table_init (&ret->elf, abfd,
 				      _bfd_elf_link_hash_newfunc,
-				      sizeof (struct elf_link_hash_entry)))
+				      sizeof (struct elf_link_hash_entry),
+				      BFIN_ELF_DATA))
     {
       free (ret);
       return NULL;
@@ -1950,8 +1953,12 @@ bfinfdpic_relocs_info_find (struct htab *ht,
 			   const struct bfinfdpic_relocs_info *entry,
 			   enum insert_option insert)
 {
-  struct bfinfdpic_relocs_info **loc =
-    (struct bfinfdpic_relocs_info **) htab_find_slot (ht, entry, insert);
+  struct bfinfdpic_relocs_info **loc;
+
+  if (!ht)
+    return NULL;
+
+  loc = (struct bfinfdpic_relocs_info **) htab_find_slot (ht, entry, insert);
 
   if (! loc)
     return NULL;
@@ -3477,7 +3484,6 @@ _bfin_create_got_section (bfd *abfd, struct bfd_link_info *info)
     {
       /* Define the symbol _PROCEDURE_LINKAGE_TABLE_ at the start of the
 	 .plt section.  */
-      struct elf_link_hash_entry *h;
       struct bfd_link_hash_entry *bh = NULL;
 
       if (! (_bfd_generic_link_add_one_symbol
@@ -4162,19 +4168,17 @@ _bfinfdpic_size_got_plt (bfd *output_bfd,
     }
 
   if (elf_hash_table (info)->dynamic_sections_created)
+    bfinfdpic_pltrel_section (info)->size =
+      gpinfop->g.lzplt / LZPLT_NORMAL_SIZE * get_elf_backend_data (output_bfd)->s->sizeof_rel;
+  if (bfinfdpic_pltrel_section (info)->size == 0)
+    bfinfdpic_pltrel_section (info)->flags |= SEC_EXCLUDE;
+  else
     {
-      bfinfdpic_pltrel_section (info)->size =
-	gpinfop->g.lzplt / LZPLT_NORMAL_SIZE * get_elf_backend_data (output_bfd)->s->sizeof_rel;
-      if (bfinfdpic_pltrel_section (info)->size == 0)
-	bfinfdpic_pltrel_section (info)->flags |= SEC_EXCLUDE;
-      else
-	{
-	  bfinfdpic_pltrel_section (info)->contents =
-	    (bfd_byte *) bfd_zalloc (dynobj,
-				     bfinfdpic_pltrel_section (info)->size);
-	  if (bfinfdpic_pltrel_section (info)->contents == NULL)
-	    return FALSE;
-	}
+      bfinfdpic_pltrel_section (info)->contents =
+	(bfd_byte *) bfd_zalloc (dynobj,
+				 bfinfdpic_pltrel_section (info)->size);
+      if (bfinfdpic_pltrel_section (info)->contents == NULL)
+	return FALSE;
     }
 
   /* Add 4 bytes for every block of at most 65535 lazy PLT entries,
@@ -4211,18 +4215,15 @@ _bfinfdpic_size_got_plt (bfd *output_bfd,
   /* Allocate the PLT section contents only after
      _bfinfdpic_assign_plt_entries has a chance to add the size of the
      non-lazy PLT entries.  */
-  if (elf_hash_table (info)->dynamic_sections_created)
+  if (bfinfdpic_plt_section (info)->size == 0)
+    bfinfdpic_plt_section (info)->flags |= SEC_EXCLUDE;
+  else
     {
-      if (bfinfdpic_plt_section (info)->size == 0)
-	bfinfdpic_plt_section (info)->flags |= SEC_EXCLUDE;
-      else
-	{
-	  bfinfdpic_plt_section (info)->contents =
-	    (bfd_byte *) bfd_zalloc (dynobj,
-				     bfinfdpic_plt_section (info)->size);
-	  if (bfinfdpic_plt_section (info)->contents == NULL)
-	    return FALSE;
-	}
+      bfinfdpic_plt_section (info)->contents =
+	(bfd_byte *) bfd_zalloc (dynobj,
+				 bfinfdpic_plt_section (info)->size);
+      if (bfinfdpic_plt_section (info)->contents == NULL)
+	return FALSE;
     }
 
   return TRUE;
@@ -4298,12 +4299,11 @@ elf32_bfinfdpic_size_dynamic_sections (bfd *output_bfd,
 	  return FALSE;
     }
 
-
-  s = bfd_get_section_by_name (dynobj, ".rela.bss");
+  s = bfd_get_section_by_name (dynobj, ".dynbss");
   if (s && s->size == 0)
     s->flags |= SEC_EXCLUDE;
 
-  s = bfd_get_section_by_name (dynobj, ".rel.plt");
+  s = bfd_get_section_by_name (dynobj, ".rela.bss");
   if (s && s->size == 0)
     s->flags |= SEC_EXCLUDE;
 
@@ -5195,7 +5195,8 @@ bfin_link_hash_table_create (bfd * abfd)
 
   if (!_bfd_elf_link_hash_table_init (&ret->root, abfd,
 				      bfin_link_hash_newfunc,
-				      sizeof (struct elf_link_hash_entry)))
+				      sizeof (struct elf_link_hash_entry),
+				      BFIN_ELF_DATA))
     {
       free (ret);
       return NULL;

@@ -1,6 +1,6 @@
 /* Interface GDB to the GNU Hurd.
    Copyright (C) 1992, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2006, 2007,
-   2008, 2009 Free Software Foundation, Inc.
+   2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -2139,12 +2139,9 @@ gnu_attach (struct target_ops *ops, char *args, int from_tty)
   struct inf *inf = cur_inf ();
   struct inferior *inferior;
 
-  if (!args)
-    error_no_arg (_("process-id to attach"));
+  pid = parse_pid_to_attach (args);
 
-  pid = atoi (args);
-
-  if (pid == getpid ())		/* Trying to masturbate? */
+  if (pid == getpid ())		/* Trying to masturbate?  */
     error (_("I refuse to debug myself!"));
 
   if (from_tty)
@@ -2166,7 +2163,8 @@ gnu_attach (struct target_ops *ops, char *args, int from_tty)
 
   push_target (ops);
 
-  inferior = add_inferior (pid);
+  inferior = current_inferior ();
+  inferior_appeared (inferior, pid);
   inferior->attach_flag = 1;
 
   inf_update_procs (inf);

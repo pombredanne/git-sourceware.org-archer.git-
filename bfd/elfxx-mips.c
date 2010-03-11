@@ -1,6 +1,6 @@
 /* MIPS-specific support for ELF
    Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
-   2003, 2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    Most of the information added by Ian Lance Taylor, Cygnus Support,
    <ian@cygnus.com>.
@@ -177,7 +177,8 @@ struct mips_got_info
 
 /* Map an input bfd to a got in a multi-got link.  */
 
-struct mips_elf_bfd2got_hash {
+struct mips_elf_bfd2got_hash
+{
   bfd *bfd;
   struct mips_got_info *g;
 };
@@ -246,7 +247,7 @@ struct _mips_elf_section_data
 #define is_mips_elf(bfd)				\
   (bfd_get_flavour (bfd) == bfd_target_elf_flavour	\
    && elf_tdata (bfd) != NULL				\
-   && elf_object_id (bfd) == MIPS_ELF_TDATA)
+   && elf_object_id (bfd) == MIPS_ELF_DATA)
 
 /* The ABI says that every symbol used by dynamic relocations must have
    a global GOT entry.  Among other things, this provides the dynamic
@@ -484,8 +485,15 @@ struct mips_elf_link_hash_table
   asection *(*add_stub_section) (const char *, asection *, asection *);
 };
 
+/* Get the MIPS ELF linker hash table from a link_info structure.  */
+
+#define mips_elf_hash_table(p) \
+  (elf_hash_table_id ((struct elf_link_hash_table *) ((p)->hash)) \
+  == MIPS_ELF_DATA ? ((struct mips_elf_link_hash_table *) ((p)->hash)) : NULL)
+
 /* A structure used to communicate with htab_traverse callbacks.  */
-struct mips_htab_traverse_info {
+struct mips_htab_traverse_info
+{
   /* The usual link-wide information.  */
   struct bfd_link_info *info;
   bfd *output_bfd;
@@ -678,6 +686,11 @@ static bfd *reldyn_sorting_bfd;
    This should be safe for all architectures.  We enable this predicate for
    all CPUs.  */
 #define JALR_TO_BAL_P(abfd) 1
+
+/* True if ABFD is for CPUs that are faster if JR is converted to B.
+   This should be safe for all architectures.  We enable this predicate for
+   all CPUs.  */
+#define JR_TO_B_P(abfd) 1
 
 /* True if ABFD is a PIC object.  */
 #define PIC_OBJECT_P(abfd) \
@@ -1000,11 +1013,6 @@ static const bfd_vma mips_vxworks_shared_plt_entry[] =
    (&(table)->root,							\
     (bfd_boolean (*) (struct elf_link_hash_entry *, void *)) (func),	\
     (info)))
-
-/* Get the MIPS ELF linker hash table from a link_info structure.  */
-
-#define mips_elf_hash_table(p) \
-  ((struct mips_elf_link_hash_table *) ((p)->hash))
 
 /* Find the base offsets for thread-local storage in this object,
    for GD/LD and IE/LE respectively.  */
@@ -1543,6 +1551,9 @@ _bfd_mips_elf_init_stubs (struct bfd_link_info *info,
   struct mips_elf_link_hash_table *htab;
 
   htab = mips_elf_hash_table (info);
+  if (htab == NULL)
+    return FALSE;
+
   htab->add_stub_section = fn;
   htab->la25_stubs = htab_try_create (1, mips_elf_la25_stub_hash,
 				      mips_elf_la25_stub_eq, NULL);
@@ -1583,6 +1594,8 @@ mips_elf_add_la25_intro (struct mips_elf_la25_stub *stub,
   unsigned int align;
 
   htab = mips_elf_hash_table (info);
+  if (htab == NULL)
+    return FALSE;
 
   /* Create a unique name for the new section.  */
   name = bfd_malloc (11 + sizeof (".text.stub."));
@@ -1626,6 +1639,8 @@ mips_elf_add_la25_trampoline (struct mips_elf_la25_stub *stub,
   asection *s;
 
   htab = mips_elf_hash_table (info);
+  if (htab == NULL)
+    return FALSE;
 
   /* Create a trampoline section, if we haven't already.  */
   s = htab->strampoline;
@@ -1676,6 +1691,9 @@ mips_elf_add_la25_stub (struct bfd_link_info *info,
 
   /* See if we've already created an equivalent stub.  */
   htab = mips_elf_hash_table (info);
+  if (htab == NULL)
+    return FALSE;
+
   slot = htab_find_slot (htab->la25_stubs, &search, INSERT);
   if (slot == NULL)
     return FALSE;
@@ -1868,6 +1886,12 @@ static inline bfd_boolean
 mips16_call_reloc_p (int r_type)
 {
   return r_type == R_MIPS16_26 || r_type == R_MIPS16_CALL16;
+}
+
+static inline bfd_boolean
+jal_reloc_p (int r_type)
+{
+  return r_type == R_MIPS_26 || r_type == R_MIPS16_26;
 }
 
 void
@@ -2842,6 +2866,9 @@ mips_elf_initialize_tls_slots (bfd *abfd, bfd_vma got_offset,
   bfd_boolean need_relocs = FALSE;
 
   htab = mips_elf_hash_table (info);
+  if (htab == NULL)
+    return;
+
   sgot = htab->sgot;
 
   indx = 0;
@@ -3001,6 +3028,8 @@ mips_elf_gotplt_index (struct bfd_link_info *info,
   struct mips_elf_link_hash_table *htab;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
+
   BFD_ASSERT (h->plt.offset != (bfd_vma) -1);
 
   /* This function only works for VxWorks, because a non-VxWorks .got.plt
@@ -3037,6 +3066,8 @@ mips_elf_local_got_index (bfd *abfd, bfd *ibfd, struct bfd_link_info *info,
   struct mips_got_entry *entry;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
+
   entry = mips_elf_create_local_got_entry (abfd, info, ibfd, value,
 					   r_symndx, h, r_type);
   if (!entry)
@@ -3064,11 +3095,13 @@ mips_elf_global_got_index (bfd *abfd, bfd *ibfd, struct elf_link_hash_entry *h,
 			   int r_type, struct bfd_link_info *info)
 {
   struct mips_elf_link_hash_table *htab;
-  bfd_vma index;
+  bfd_vma got_index;
   struct mips_got_info *g, *gg;
   long global_got_dynindx = 0;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
+
   gg = g = htab->got_info;
   if (g->bfd2got && ibfd)
     {
@@ -3122,8 +3155,8 @@ mips_elf_global_got_index (bfd *abfd, bfd *ibfd, struct elf_link_hash_entry *h,
 		 + h->root.u.def.section->output_offset
 		 + h->root.u.def.section->output_section->vma);
 
-      index = mips_tls_got_index (abfd, hm->tls_got_offset, &hm->tls_type,
-				  r_type, info, hm, value);
+      got_index = mips_tls_got_index (abfd, hm->tls_got_offset, &hm->tls_type,
+				      r_type, info, hm, value);
     }
   else
     {
@@ -3132,12 +3165,12 @@ mips_elf_global_got_index (bfd *abfd, bfd *ibfd, struct elf_link_hash_entry *h,
 	 indices into the GOT.  That makes it easy to calculate the GOT
 	 offset.  */
       BFD_ASSERT (h->dynindx >= global_got_dynindx);
-      index = ((h->dynindx - global_got_dynindx + g->local_gotno)
-	       * MIPS_ELF_GOT_SIZE (abfd));
+      got_index = ((h->dynindx - global_got_dynindx + g->local_gotno)
+		   * MIPS_ELF_GOT_SIZE (abfd));
     }
-  BFD_ASSERT (index < htab->sgot->size);
+  BFD_ASSERT (got_index < htab->sgot->size);
 
-  return index;
+  return got_index;
 }
 
 /* Find a GOT page entry that points to within 32KB of VALUE.  These
@@ -3150,7 +3183,7 @@ static bfd_vma
 mips_elf_got_page (bfd *abfd, bfd *ibfd, struct bfd_link_info *info,
 		   bfd_vma value, bfd_vma *offsetp)
 {
-  bfd_vma page, index;
+  bfd_vma page, got_index;
   struct mips_got_entry *entry;
 
   page = (value + 0x8000) & ~(bfd_vma) 0xffff;
@@ -3160,12 +3193,12 @@ mips_elf_got_page (bfd *abfd, bfd *ibfd, struct bfd_link_info *info,
   if (!entry)
     return MINUS_ONE;
 
-  index = entry->gotidx;
+  got_index = entry->gotidx;
 
   if (offsetp)
     *offsetp = value - entry->d.address;
 
-  return index;
+  return got_index;
 }
 
 /* Find a local GOT entry for an R_MIPS*_GOT16 relocation against VALUE.
@@ -3201,18 +3234,20 @@ mips_elf_got16_entry (bfd *abfd, bfd *ibfd, struct bfd_link_info *info,
 
 static bfd_vma
 mips_elf_got_offset_from_index (struct bfd_link_info *info, bfd *output_bfd,
-				bfd *input_bfd, bfd_vma index)
+				bfd *input_bfd, bfd_vma got_index)
 {
   struct mips_elf_link_hash_table *htab;
   asection *sgot;
   bfd_vma gp;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
+
   sgot = htab->sgot;
   gp = _bfd_get_gp_value (output_bfd)
     + mips_elf_adjust_gp (output_bfd, htab->got_info, input_bfd);
 
-  return sgot->output_section->vma + sgot->output_offset + index - gp;
+  return sgot->output_section->vma + sgot->output_offset + got_index - gp;
 }
 
 /* Create and return a local GOT entry for VALUE, which was calculated
@@ -3232,6 +3267,7 @@ mips_elf_create_local_got_entry (bfd *abfd, struct bfd_link_info *info,
   struct mips_elf_link_hash_table *htab;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
 
   entry.abfd = NULL;
   entry.symndx = -1;
@@ -3309,7 +3345,7 @@ mips_elf_create_local_got_entry (bfd *abfd, struct bfd_link_info *info,
     {
       Elf_Internal_Rela outrel;
       asection *s;
-      bfd_byte *loc;
+      bfd_byte *rloc;
       bfd_vma got_address;
 
       s = mips_elf_rel_dyn_section (info, FALSE);
@@ -3317,11 +3353,11 @@ mips_elf_create_local_got_entry (bfd *abfd, struct bfd_link_info *info,
 		     + htab->sgot->output_offset
 		     + entry.gotidx);
 
-      loc = s->contents + (s->reloc_count++ * sizeof (Elf32_External_Rela));
+      rloc = s->contents + (s->reloc_count++ * sizeof (Elf32_External_Rela));
       outrel.r_offset = got_address;
       outrel.r_info = ELF32_R_INFO (STN_UNDEF, R_MIPS_32);
       outrel.r_addend = value;
-      bfd_elf32_swap_reloca_out (abfd, &outrel, loc);
+      bfd_elf32_swap_reloca_out (abfd, &outrel, rloc);
     }
 
   return *loc;
@@ -3367,6 +3403,8 @@ mips_elf_sort_hash_table (bfd *abfd, struct bfd_link_info *info)
     return TRUE;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
+
   g = htab->got_info;
   if (g == NULL)
     return TRUE;
@@ -3453,6 +3491,8 @@ mips_elf_record_global_got_symbol (struct elf_link_hash_entry *h,
   struct mips_got_info *g;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
+
   hmips = (struct mips_elf_link_hash_entry *) h;
 
   /* A global symbol in the GOT must also be in the dynamic symbol
@@ -3519,6 +3559,8 @@ mips_elf_record_local_got_symbol (bfd *abfd, long symndx, bfd_vma addend,
   struct mips_got_entry entry, **loc;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
+
   g = htab->got_info;
   BFD_ASSERT (g != NULL);
 
@@ -3601,6 +3643,8 @@ mips_elf_record_got_page_entry (struct bfd_link_info *info, bfd *abfd,
   void **loc;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
+
   g = htab->got_info;
   BFD_ASSERT (g != NULL);
 
@@ -3692,6 +3736,8 @@ mips_elf_allocate_dynamic_relocations (bfd *abfd, struct bfd_link_info *info,
   struct mips_elf_link_hash_table *htab;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
+
   s = mips_elf_rel_dyn_section (info, FALSE);
   BFD_ASSERT (s != NULL);
 
@@ -4231,6 +4277,8 @@ mips_elf_forbid_lazy_stubs (void **entryp, void *data)
   entry = (struct mips_got_entry *) *entryp;
   info = (struct bfd_link_info *) data;
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
+
   if (entry->abfd != NULL
       && entry->symndx == -1
       && entry->d.h->needs_lazy_stub)
@@ -4278,6 +4326,8 @@ mips_elf_multi_got (bfd *abfd, struct bfd_link_info *info,
 
   dynobj = elf_hash_table (info)->dynobj;
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
+
   g = htab->got_info;
   g->bfd2got = htab_try_create (1, mips_elf_bfd2got_entry_hash,
 				mips_elf_bfd2got_entry_eq, NULL);
@@ -4652,6 +4702,7 @@ mips_elf_create_got_section (bfd *abfd, struct bfd_link_info *info)
   struct mips_elf_link_hash_table *htab;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
 
   /* This function may be called more than once.  */
   if (htab->sgot)
@@ -4770,8 +4821,8 @@ mips_elf_relocation_needs_la25_stub (bfd *input_bfd, int r_type)
    RELOCATION; RELOCATION->R_ADDEND is ignored.
 
    The result of the relocation calculation is stored in VALUEP.
-   REQUIRE_JALXP indicates whether or not the opcode used with this
-   relocation must be JALX.
+   On exit, set *CROSS_MODE_JUMP_P to true if the relocation field
+   is a MIPS16 jump to non-MIPS16 code, or vice versa.
 
    This function returns bfd_reloc_continue if the caller need take no
    further action regarding this relocation, bfd_reloc_notsupported if
@@ -4786,7 +4837,8 @@ mips_elf_calculate_relocation (bfd *abfd, bfd *input_bfd,
 			       bfd_vma addend, reloc_howto_type *howto,
 			       Elf_Internal_Sym *local_syms,
 			       asection **local_sections, bfd_vma *valuep,
-			       const char **namep, bfd_boolean *require_jalxp,
+			       const char **namep,
+			       bfd_boolean *cross_mode_jump_p,
 			       bfd_boolean save_addend)
 {
   /* The eventual value we will return.  */
@@ -4832,6 +4884,7 @@ mips_elf_calculate_relocation (bfd *abfd, bfd *input_bfd,
 
   dynobj = elf_hash_table (info)->dynobj;
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
 
   /* Parse the relocation.  */
   r_symndx = ELF_R_SYM (input_bfd, relocation->r_info);
@@ -4973,15 +5026,17 @@ mips_elf_calculate_relocation (bfd *abfd, bfd *input_bfd,
 	     http://techpubs.sgi.com/library/manuals/4000/007-4658-001/pdf/007-4658-001.pdf  */
 	  symbol = 0;
 	}
+      else if ((*info->callbacks->undefined_symbol)
+	       (info, h->root.root.root.string, input_bfd,
+		input_section, relocation->r_offset,
+		(info->unresolved_syms_in_objects == RM_GENERATE_ERROR)
+		 || ELF_ST_VISIBILITY (h->root.other)))
+	{
+	  return bfd_reloc_undefined;
+	}
       else
 	{
-	  if (! ((*info->callbacks->undefined_symbol)
-		 (info, h->root.root.root.string, input_bfd,
-		  input_section, relocation->r_offset,
-		  (info->unresolved_syms_in_objects == RM_GENERATE_ERROR)
-		   || ELF_ST_VISIBILITY (h->root.other))))
-	    return bfd_reloc_undefined;
-	  symbol = 0;
+	  return bfd_reloc_notsupported;
 	}
 
       target_is_16_bit_code_p = ELF_ST_IS_MIPS16 (h->root.other);
@@ -5073,10 +5128,11 @@ mips_elf_calculate_relocation (bfd *abfd, bfd *input_bfd,
 	      + h->la25_stub->offset);
 
   /* Calls from 16-bit code to 32-bit code and vice versa require the
-     special jalx instruction.  */
-  *require_jalxp = (!info->relocatable
-                    && (((r_type == R_MIPS16_26) && !target_is_16_bit_code_p)
-                        || ((r_type == R_MIPS_26) && target_is_16_bit_code_p)));
+     mode change.  */
+  *cross_mode_jump_p = !info->relocatable
+		       && ((r_type == R_MIPS16_26 && !target_is_16_bit_code_p)
+			   || ((r_type == R_MIPS_26 || r_type == R_MIPS_JALR)
+			       && target_is_16_bit_code_p));
 
   local_p = mips_elf_local_relocation_p (input_bfd, relocation,
 					 local_sections, TRUE);
@@ -5530,9 +5586,9 @@ mips_elf_obtain_contents (reloc_howto_type *howto,
 /* It has been determined that the result of the RELOCATION is the
    VALUE.  Use HOWTO to place VALUE into the output file at the
    appropriate position.  The SECTION is the section to which the
-   relocation applies.  If REQUIRE_JALX is TRUE, then the opcode used
-   for the relocation must be either JAL or JALX, and it is
-   unconditionally converted to JALX.
+   relocation applies.  
+   CROSS_MODE_JUMP_P is true if the relocation field
+   is a MIPS16 jump to non-MIPS16 code, or vice versa.
 
    Returns FALSE if anything goes wrong.  */
 
@@ -5542,7 +5598,7 @@ mips_elf_perform_relocation (struct bfd_link_info *info,
 			     const Elf_Internal_Rela *relocation,
 			     bfd_vma value, bfd *input_bfd,
 			     asection *input_section, bfd_byte *contents,
-			     bfd_boolean require_jalx)
+			     bfd_boolean cross_mode_jump_p)
 {
   bfd_vma x;
   bfd_byte *location;
@@ -5563,7 +5619,7 @@ mips_elf_perform_relocation (struct bfd_link_info *info,
   x |= (value & howto->dst_mask);
 
   /* If required, turn JAL into JALX.  */
-  if (require_jalx)
+  if (cross_mode_jump_p && jal_reloc_p (r_type))
     {
       bfd_boolean ok;
       bfd_vma opcode = x >> 26;
@@ -5597,15 +5653,19 @@ mips_elf_perform_relocation (struct bfd_link_info *info,
       x = (x & ~(0x3f << 26)) | (jalx_opcode << 26);
     }
 
-  /* Try converting JAL and JALR to BAL, if the target is in range.  */
+  /* Try converting JAL to BAL and J(AL)R to B(AL), if the target is in
+     range.  */
   if (!info->relocatable
-      && !require_jalx
+      && !cross_mode_jump_p
       && ((JAL_TO_BAL_P (input_bfd)
 	   && r_type == R_MIPS_26
 	   && (x >> 26) == 0x3)		/* jal addr */
 	  || (JALR_TO_BAL_P (input_bfd)
 	      && r_type == R_MIPS_JALR
-	      && x == 0x0320f809)))	/* jalr t9 */
+	      && x == 0x0320f809)	/* jalr t9 */
+	  || (JR_TO_B_P (input_bfd)
+	      && r_type == R_MIPS_JALR
+	      && x == 0x03200008)))	/* jr t9 */
     {
       bfd_vma addr;
       bfd_vma dest;
@@ -5621,7 +5681,12 @@ mips_elf_perform_relocation (struct bfd_link_info *info,
 	dest = value;
       off = dest - addr;
       if (off <= 0x1ffff && off >= -0x20000)
-	x = 0x04110000 | (((bfd_vma) off >> 2) & 0xffff);   /* bal addr */
+	{
+	  if (x == 0x03200008)	/* jr t9 */
+	    x = 0x10000000 | (((bfd_vma) off >> 2) & 0xffff);   /* b addr */
+	  else
+	    x = 0x04110000 | (((bfd_vma) off >> 2) & 0xffff);   /* bal addr */
+	}
     }
 
   /* Put the value into the output.  */
@@ -5655,6 +5720,8 @@ mips_elf_create_dynamic_relocation (bfd *output_bfd,
   struct mips_elf_link_hash_table *htab;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
+
   r_type = ELF_R_TYPE (output_bfd, rel->r_info);
   dynobj = elf_hash_table (info)->dynobj;
   sreloc = mips_elf_rel_dyn_section (info, FALSE);
@@ -5688,9 +5755,7 @@ mips_elf_create_dynamic_relocation (bfd *output_bfd,
 
   /* We must now calculate the dynamic symbol table index to use
      in the relocation.  */
-  if (h != NULL
-      && (!h->root.def_regular
-	  || (info->shared && !info->symbolic && !h->root.forced_local)))
+  if (h != NULL && ! SYMBOL_REFERENCES_LOCAL (info, &h->root))
     {
       indx = h->root.dynindx;
       if (SGI_COMPAT (output_bfd))
@@ -6844,6 +6909,8 @@ _bfd_mips_elf_create_dynamic_sections (bfd *abfd, struct bfd_link_info *info)
   struct mips_elf_link_hash_table *htab;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
+
   flags = (SEC_ALLOC | SEC_LOAD | SEC_HAS_CONTENTS | SEC_IN_MEMORY
 	   | SEC_LINKER_CREATED | SEC_READONLY);
 
@@ -7180,6 +7247,8 @@ _bfd_mips_elf_check_relocs (bfd *abfd, struct bfd_link_info *info,
     return TRUE;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
+
   dynobj = elf_hash_table (info)->dynobj;
   symtab_hdr = &elf_tdata (abfd)->symtab_hdr;
   sym_hashes = elf_sym_hashes (abfd);
@@ -8053,6 +8122,8 @@ allocate_dynrelocs (struct elf_link_hash_entry *h, void *inf)
   struct mips_elf_link_hash_table *htab;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
+
   dynobj = elf_hash_table (info)->dynobj;
   hmips = (struct mips_elf_link_hash_entry *) h;
 
@@ -8129,6 +8200,8 @@ _bfd_mips_elf_adjust_dynamic_symbol (struct bfd_link_info *info,
   struct mips_elf_link_hash_table *htab;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
+
   dynobj = elf_hash_table (info)->dynobj;
   hmips = (struct mips_elf_link_hash_entry *) h;
 
@@ -8323,6 +8396,7 @@ _bfd_mips_elf_always_size_sections (bfd *output_bfd,
   struct mips_htab_traverse_info hti;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
 
   /* The .reginfo section has a fixed size.  */
   ri = bfd_get_section_by_name (output_bfd, ".reginfo");
@@ -8355,6 +8429,8 @@ mips_elf_lay_out_got (bfd *output_bfd, struct bfd_link_info *info)
   struct mips_elf_link_hash_table *htab;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
+
   s = htab->sgot;
   if (s == NULL)
     return TRUE;
@@ -8480,6 +8556,8 @@ mips_elf_estimate_stub_size (bfd *output_bfd, struct bfd_link_info *info)
   bfd_size_type dynsymcount;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
+
   if (htab->lazy_stub_count == 0)
     return;
 
@@ -8531,12 +8609,13 @@ mips_elf_lay_out_lazy_stubs (struct bfd_link_info *info)
   struct mips_elf_link_hash_table *htab;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
+
   if (htab->lazy_stub_count == 0)
     return;
 
   htab->sstubs->size = 0;
-  mips_elf_link_hash_traverse (mips_elf_hash_table (info),
-			       mips_elf_allocate_lazy_stub, htab);
+  mips_elf_link_hash_traverse (htab, mips_elf_allocate_lazy_stub, htab);
   htab->sstubs->size += htab->function_stub_size;
   BFD_ASSERT (htab->sstubs->size
 	      == htab->lazy_stub_count * htab->function_stub_size);
@@ -8554,6 +8633,7 @@ _bfd_mips_elf_size_dynamic_sections (bfd *output_bfd,
   struct mips_elf_link_hash_table *htab;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
   dynobj = elf_hash_table (info)->dynobj;
   BFD_ASSERT (dynobj != NULL);
 
@@ -8883,7 +8963,7 @@ _bfd_mips_elf_relocate_section (bfd *output_bfd, struct bfd_link_info *info,
       const char *name;
       bfd_vma value = 0;
       reloc_howto_type *howto;
-      bfd_boolean require_jalx;
+      bfd_boolean cross_mode_jump_p;
       /* TRUE if the relocation is a RELA relocation, rather than a
          REL relocation.  */
       bfd_boolean rela_relocation_p = TRUE;
@@ -8973,8 +9053,6 @@ _bfd_mips_elf_relocate_section (bfd *output_bfd, struct bfd_link_info *info,
 		  if (!mips_elf_add_lo16_rel_addend (input_bfd, rel, relend,
 						     contents, &addend))
 		    {
-		      const char *name;
-
 		      if (h)
 			name = h->root.root.string;
 		      else
@@ -9085,7 +9163,7 @@ _bfd_mips_elf_relocate_section (bfd *output_bfd, struct bfd_link_info *info,
 					     input_section, info, rel,
 					     addend, howto, local_syms,
 					     local_sections, &value,
-					     &name, &require_jalx,
+					     &name, &cross_mode_jump_p,
 					     use_saved_addend_p))
 	{
 	case bfd_reloc_continue:
@@ -9115,14 +9193,14 @@ _bfd_mips_elf_relocate_section (bfd *output_bfd, struct bfd_link_info *info,
 	      struct mips_elf_link_hash_table *htab;
 
 	      htab = mips_elf_hash_table (info);
+	      BFD_ASSERT (htab != NULL);
 	      BFD_ASSERT (name != NULL);
 	      if (!htab->small_data_overflow_reported
 		  && (howto->type == R_MIPS_GPREL16
 		      || howto->type == R_MIPS_LITERAL))
 		{
-		  const char *msg =
-		    _("small-data section exceeds 64KB;"
-		      " lower small-data size limit (see option -G)");
+		  msg = _("small-data section exceeds 64KB;"
+			  " lower small-data size limit (see option -G)");
 
 		  htab->small_data_overflow_reported = TRUE;
 		  (*info->callbacks->einfo) ("%P: %s\n", msg);
@@ -9198,7 +9276,7 @@ _bfd_mips_elf_relocate_section (bfd *output_bfd, struct bfd_link_info *info,
       /* Actually perform the relocation.  */
       if (! mips_elf_perform_relocation (info, howto, rel, value,
 					 input_bfd, input_section,
-					 contents, require_jalx))
+					 contents, cross_mode_jump_p))
 	return FALSE;
     }
 
@@ -9221,6 +9299,7 @@ mips_elf_create_la25_stub (void **slot, void *data)
   stub = (struct mips_elf_la25_stub *) *slot;
   hti = (struct mips_htab_traverse_info *) data;
   htab = mips_elf_hash_table (hti->info);
+  BFD_ASSERT (htab != NULL);
 
   /* Create the section contents, if we haven't already.  */
   s = stub->stub_section;
@@ -9335,6 +9414,7 @@ _bfd_mips_elf_finish_dynamic_symbol (bfd *output_bfd,
   struct mips_elf_link_hash_entry *hmips;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
   dynobj = elf_hash_table (info)->dynobj;
   hmips = (struct mips_elf_link_hash_entry *) h;
 
@@ -9674,6 +9754,7 @@ _bfd_mips_vxworks_finish_dynamic_symbol (bfd *output_bfd,
   struct mips_elf_link_hash_table *htab;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
   dynobj = elf_hash_table (info)->dynobj;
 
   if (h->plt.offset != (bfd_vma) -1)
@@ -9841,6 +9922,8 @@ mips_finish_exec_plt (bfd *output_bfd, struct bfd_link_info *info)
   struct mips_elf_link_hash_table *htab;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
+
   if (ABI_64_P (output_bfd))
     plt_entry = mips_n64_exec_plt0_entry;
   else if (ABI_N32_P (output_bfd))
@@ -9884,6 +9967,8 @@ mips_vxworks_finish_exec_plt (bfd *output_bfd, struct bfd_link_info *info)
   struct mips_elf_link_hash_table *htab;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
+
   plt_entry = mips_vxworks_exec_plt0_entry;
 
   /* Calculate the value of _GLOBAL_OFFSET_TABLE_.  */
@@ -9954,6 +10039,7 @@ mips_vxworks_finish_shared_plt (bfd *output_bfd, struct bfd_link_info *info)
   struct mips_elf_link_hash_table *htab;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
 
   /* We just need to copy the entry byte-by-byte.  */
   for (i = 0; i < ARRAY_SIZE (mips_vxworks_shared_plt0_entry); i++)
@@ -9974,6 +10060,8 @@ _bfd_mips_elf_finish_dynamic_sections (bfd *output_bfd,
   struct mips_elf_link_hash_table *htab;
 
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
+
   dynobj = elf_hash_table (info)->dynobj;
 
   sdyn = bfd_get_section_by_name (dynobj, ".dynamic");
@@ -10224,22 +10312,22 @@ _bfd_mips_elf_finish_dynamic_sections (bfd *output_bfd,
 
       for (g = gg->next; g->next != gg; g = g->next)
 	{
-	  bfd_vma index = g->next->local_gotno + g->next->global_gotno
+	  bfd_vma got_index = g->next->local_gotno + g->next->global_gotno
 	    + g->next->tls_gotno;
 
 	  MIPS_ELF_PUT_WORD (output_bfd, 0, sgot->contents
-			     + index++ * MIPS_ELF_GOT_SIZE (output_bfd));
+			     + got_index++ * MIPS_ELF_GOT_SIZE (output_bfd));
 	  MIPS_ELF_PUT_WORD (output_bfd, MIPS_ELF_GNU_GOT1_MASK (output_bfd),
 			     sgot->contents
-			     + index++ * MIPS_ELF_GOT_SIZE (output_bfd));
+			     + got_index++ * MIPS_ELF_GOT_SIZE (output_bfd));
 
 	  if (! info->shared)
 	    continue;
 
-	  while (index < g->assigned_gotno)
+	  while (got_index < g->assigned_gotno)
 	    {
 	      rel[0].r_offset = rel[1].r_offset = rel[2].r_offset
-		= index++ * MIPS_ELF_GOT_SIZE (output_bfd);
+		= got_index++ * MIPS_ELF_GOT_SIZE (output_bfd);
 	      if (!(mips_elf_create_dynamic_relocation
 		    (output_bfd, info, rel, NULL,
 		     bfd_abs_section_ptr,
@@ -11438,7 +11526,7 @@ bfd_boolean
 _bfd_mips_elf_mkobject (bfd *abfd)
 {
   return bfd_elf_allocate_object (abfd, sizeof (struct elf_obj_tdata),
-				  MIPS_ELF_TDATA);
+				  MIPS_ELF_DATA);
 }
 
 /* Create a MIPS ELF linker hash table.  */
@@ -11455,7 +11543,8 @@ _bfd_mips_elf_link_hash_table_create (bfd *abfd)
 
   if (!_bfd_elf_link_hash_table_init (&ret->root, abfd,
 				      mips_elf_link_hash_newfunc,
-				      sizeof (struct mips_elf_link_hash_entry)))
+				      sizeof (struct mips_elf_link_hash_entry),
+				      MIPS_ELF_DATA))
     {
       free (ret);
       return NULL;
@@ -11560,6 +11649,8 @@ _bfd_mips_elf_final_link (bfd *abfd, struct bfd_link_info *info)
   /* Sort the dynamic symbols so that those with GOT entries come after
      those without.  */
   htab = mips_elf_hash_table (info);
+  BFD_ASSERT (htab != NULL);
+
   if (!mips_elf_sort_hash_table (abfd, info))
     return FALSE;
 
@@ -12895,6 +12986,8 @@ _bfd_mips_post_process_headers (bfd *abfd, struct bfd_link_info *link_info)
   if (link_info)
     {
       htab = mips_elf_hash_table (link_info);
+      BFD_ASSERT (htab != NULL);
+
       if (htab->use_plts_and_copy_relocs && !htab->is_vxworks)
 	i_ehdrp->e_ident[EI_ABIVERSION] = 1;
     }

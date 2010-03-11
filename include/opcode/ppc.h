@@ -1,6 +1,6 @@
 /* ppc.h -- Header file for PowerPC opcode table
    Copyright 1994, 1995, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006,
-   2007, 2008, 2009 Free Software Foundation, Inc.
+   2007, 2008, 2009, 2010 Free Software Foundation, Inc.
    Written by Ian Lance Taylor, Cygnus Support
 
 This file is part of GDB, GAS, and the GNU binutils.
@@ -22,7 +22,9 @@ Software Foundation, 51 Franklin Street - Fifth Floor, Boston, MA 02110-1301, US
 #ifndef PPC_H
 #define PPC_H
 
-typedef unsigned long ppc_cpu_t;
+#include "bfd_stdint.h"
+
+typedef uint64_t ppc_cpu_t;
 
 /* The opcode table is an array of struct powerpc_opcode.  */
 
@@ -164,6 +166,15 @@ extern const int powerpc_num_opcodes;
 
 /* Opcode is supported by Vector-Scalar (VSX) Unit */
 #define PPC_OPCODE_VSX		 0x80000000
+
+/* Opcode is supported by A2.  */
+#define PPC_OPCODE_A2	 	 0x100000000ULL
+
+/* Opcode is supported by PowerPC 476 processor.  */
+#define PPC_OPCODE_476		 0x200000000ULL
+
+/* Opcode is supported by AppliedMicro Titan core */
+#define PPC_OPCODE_TITAN         0x400000000ULL
 
 /* A macro to extract the major opcode from an instruction.  */
 #define PPC_OP(i) (((i) >> 26) & 0x3f)

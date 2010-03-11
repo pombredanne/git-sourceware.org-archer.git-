@@ -45,8 +45,8 @@ Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston, MA 02110-1301, USA. 
 
 /* Section indices.  */
 
-#define SHN_BEFORE	SHN_LORESERVE		/* used with SHF_ORDERED */
-#define SHN_AFTER	(SHN_LORESERVE + 1)	/* used with SHF_ORDERED */
+#define SHN_BEFORE	SHN_LORESERVE		/* Used with SHF_ORDERED and...  */
+#define SHN_AFTER	(SHN_LORESERVE + 1)	/* SHF_LINK_ORDER section flags. */
 
 /* Section flags.  */
 
@@ -164,6 +164,8 @@ START_RELOC_NUMBERS (elf_sparc_reloc_type)
   
   EMPTY_RELOC  (R_SPARC_max_std)
 
+  RELOC_NUMBER (R_SPARC_JMP_IREL, 248)
+  RELOC_NUMBER (R_SPARC_IRELATIVE, 249)
   RELOC_NUMBER (R_SPARC_GNU_VTINHERIT, 250)
   RELOC_NUMBER (R_SPARC_GNU_VTENTRY, 251)
   RELOC_NUMBER (R_SPARC_REV32, 252)

@@ -1,6 +1,6 @@
 /* MI Command Set - MI parser.
 
-   Copyright (C) 2000, 2001, 2002, 2007, 2008, 2009
+   Copyright (C) 2000, 2001, 2002, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    Contributed by Cygnus Solutions (a Red Hat company).
@@ -23,9 +23,82 @@
 #include "defs.h"
 #include "mi-cmds.h"
 #include "mi-parse.h"
+#include "charset.h"
 
 #include <ctype.h>
 #include "gdb_string.h"
+
+/* Like parse_escape, but leave the results as a host char, not a
+   target char.  */
+
+static int
+mi_parse_escape (char **string_ptr)
+{
+  int c = *(*string_ptr)++;
+  switch (c)
+    {
+      case '\n':
+	return -2;
+      case 0:
+	(*string_ptr)--;
+	return 0;
+
+      case '0':
+      case '1':
+      case '2':
+      case '3':
+      case '4':
+      case '5':
+      case '6':
+      case '7':
+	{
+	  int i = host_hex_value (c);
+	  int count = 0;
+	  while (++count < 3)
+	    {
+	      c = (**string_ptr);
+	      if (isdigit (c) && c != '8' && c != '9')
+		{
+		  (*string_ptr)++;
+		  i *= 8;
+		  i += host_hex_value (c);
+		}
+	      else
+		{
+		  break;
+		}
+	    }
+	  return i;
+	}
+
+    case 'a':
+      c = '\a';
+      break;
+    case 'b':
+      c = '\b';
+      break;
+    case 'f':
+      c = '\f';
+      break;
+    case 'n':
+      c = '\n';
+      break;
+    case 'r':
+      c = '\r';
+      break;
+    case 't':
+      c = '\t';
+      break;
+    case 'v':
+      c = '\v';
+      break;
+
+    default:
+      break;
+    }
+
+  return c;
+}
 
 static void
 mi_parse_argv (char *args, struct mi_parse *parse)
@@ -60,7 +133,7 @@ mi_parse_argv (char *args, struct mi_parse *parse)
 		if (*chp == '\\')
 		  {
 		    chp++;
-		    if (parse_escape (&chp) <= 0)
+		    if (mi_parse_escape (&chp) <= 0)
 		      {
 			/* Do not allow split lines or "\000" */
 			freeargv (argv);
@@ -93,7 +166,7 @@ mi_parse_argv (char *args, struct mi_parse *parse)
 		if (*chp == '\\')
 		  {
 		    chp++;
-		    arg[len] = parse_escape (&chp);
+		    arg[len] = mi_parse_escape (&chp);
 		  }
 		else
 		  arg[len] = *chp++;
@@ -151,6 +224,8 @@ mi_parse (char *cmd)
   char *chp;
   struct mi_parse *parse = XMALLOC (struct mi_parse);
   memset (parse, 0, sizeof (*parse));
+  parse->all = 0;
+  parse->thread_group = -1;
   parse->thread = -1;
   parse->frame = -1;
 
@@ -210,19 +285,42 @@ mi_parse (char *cmd)
   for (;;)
     {
       char *start = chp;
+      size_t as = sizeof ("--all ") - 1;
+      size_t tgs = sizeof ("--thread-group ") - 1;
       size_t ts = sizeof ("--thread ") - 1;
       size_t fs = sizeof ("--frame ") - 1;
+      if (strncmp (chp, "--all ", as) == 0)
+	{
+	  parse->all = 1;
+	  chp += as;
+	}
+      /* See if --all is the last token in the input.  */
+      if (strcmp (chp, "--all") == 0)
+	{
+          parse->all = 1;
+          chp += strlen (chp);
+        }
+      if (strncmp (chp, "--thread-group ", tgs) == 0)
+	{
+	  if (parse->thread_group != -1)
+	    error (_("Duplicate '--thread-group' option"));
+	  chp += tgs;
+	  if (*chp != 'i')
+	    error (_("Invalid thread group id"));
+	  chp += 1;
+	  parse->thread_group = strtol (chp, &chp, 10);
+	}
       if (strncmp (chp, "--thread ", ts) == 0)
 	{
 	  if (parse->thread != -1)
-	    error ("Duplicate '--thread' option");
+	    error (_("Duplicate '--thread' option"));
 	  chp += ts;
 	  parse->thread = strtol (chp, &chp, 10);
 	}
       else if (strncmp (chp, "--frame ", fs) == 0)
 	{
 	  if (parse->frame != -1)
-	    error ("Duplicate '--frame' option");
+	    error (_("Duplicate '--frame' option"));
 	  chp += fs;
 	  parse->frame = strtol (chp, &chp, 10);
 	}
@@ -230,7 +328,7 @@ mi_parse (char *cmd)
 	break;
 
       if (*chp != '\0' && !isspace (*chp))
-	error ("Invalid value for the '%s' option",
+	error (_("Invalid value for the '%s' option"),
 	       start[2] == 't' ? "--thread" : "--frame");
       while (isspace (*chp))
 	chp++;

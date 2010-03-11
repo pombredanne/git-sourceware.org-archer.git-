@@ -1,7 +1,7 @@
 /* GNU/Linux on ARM target support.
 
    Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008,
-   2009 Free Software Foundation, Inc.
+   2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -73,6 +73,14 @@ static const char eabi_linux_arm_be_breakpoint[] = { 0xe7, 0xf0, 0x01, 0xf0 };
 static const char arm_linux_thumb_be_breakpoint[] = {0xde, 0x01};
 
 static const char arm_linux_thumb_le_breakpoint[] = {0x01, 0xde};
+
+/* Because the 16-bit Thumb breakpoint is affected by Thumb-2 IT blocks,
+   we must use a length-appropriate breakpoint for 32-bit Thumb
+   instructions.  See also thumb_get_next_pc.  */
+
+static const char arm_linux_thumb2_be_breakpoint[] = { 0xf7, 0xf0, 0xa0, 0x00 };
+
+static const char arm_linux_thumb2_le_breakpoint[] = { 0xf0, 0xf7, 0x00, 0xa0 };
 
 /* Description of the longjmp buffer.  */
 #define ARM_LINUX_JB_ELEMENT_SIZE	INT_REGISTER_SIZE
@@ -216,6 +224,11 @@ static const char arm_linux_thumb_le_breakpoint[] = {0x01, 0xde};
 #define ARM_SET_R7_RT_SIGRETURN		0xe3a070ad
 #define ARM_EABI_SYSCALL		0xef000000
 
+/* OABI syscall restart trampoline, used for EABI executables too
+   whenever OABI support has been enabled in the kernel.  */
+#define ARM_OABI_SYSCALL_RESTART_SYSCALL 0xef900000
+#define ARM_LDR_PC_SP_12		0xe49df00c
+
 static void
 arm_linux_sigtramp_cache (struct frame_info *this_frame,
 			  struct trad_frame_cache *this_cache,
@@ -325,6 +338,21 @@ arm_linux_rt_sigreturn_init (const struct tramp_frame *self,
 			      + ARM_SIGCONTEXT_R0);
 }
 
+static void
+arm_linux_restart_syscall_init (const struct tramp_frame *self,
+				struct frame_info *this_frame,
+				struct trad_frame_cache *this_cache,
+				CORE_ADDR func)
+{
+  CORE_ADDR sp = get_frame_register_unsigned (this_frame, ARM_SP_REGNUM);
+
+  trad_frame_set_reg_addr (this_cache, ARM_PC_REGNUM, sp);
+  trad_frame_set_reg_value (this_cache, ARM_SP_REGNUM, sp + 12);
+
+  /* Save a frame ID.  */
+  trad_frame_set_id (this_cache, frame_id_build (sp, func));
+}
+
 static struct tramp_frame arm_linux_sigreturn_tramp_frame = {
   SIGTRAMP_FRAME,
   4,
@@ -365,6 +393,17 @@ static struct tramp_frame arm_eabi_linux_rt_sigreturn_tramp_frame = {
     { TRAMP_SENTINEL_INSN }
   },
   arm_linux_rt_sigreturn_init
+};
+
+static struct tramp_frame arm_linux_restart_syscall_tramp_frame = {
+  NORMAL_FRAME,
+  4,
+  {
+    { ARM_OABI_SYSCALL_RESTART_SYSCALL, -1 },
+    { ARM_LDR_PC_SP_12, -1 },
+    { TRAMP_SENTINEL_INSN }
+  },
+  arm_linux_restart_syscall_init
 };
 
 /* Core file and register set support.  */
@@ -586,6 +625,7 @@ static int
 arm_linux_software_single_step (struct frame_info *frame)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
+  struct address_space *aspace = get_frame_address_space (frame);
   CORE_ADDR next_pc = arm_get_next_pc (frame, get_frame_pc (frame));
 
   /* The Linux kernel offers some user-mode helpers in a high page.  We can
@@ -596,7 +636,7 @@ arm_linux_software_single_step (struct frame_info *frame)
   if (next_pc > 0xffff0000)
     next_pc = get_frame_register_unsigned (frame, ARM_LR_REGNUM);
 
-  insert_single_step_breakpoint (gdbarch, next_pc);
+  insert_single_step_breakpoint (gdbarch, aspace, next_pc);
 
   return 1;
 }
@@ -819,6 +859,7 @@ arm_linux_init_abi (struct gdbarch_info info,
       else
 	tdep->arm_breakpoint = arm_linux_arm_be_breakpoint;
       tdep->thumb_breakpoint = arm_linux_thumb_be_breakpoint;
+      tdep->thumb2_breakpoint = arm_linux_thumb2_be_breakpoint;
     }
   else
     {
@@ -827,9 +868,11 @@ arm_linux_init_abi (struct gdbarch_info info,
       else
 	tdep->arm_breakpoint = arm_linux_arm_le_breakpoint;
       tdep->thumb_breakpoint = arm_linux_thumb_le_breakpoint;
+      tdep->thumb2_breakpoint = arm_linux_thumb2_le_breakpoint;
     }
   tdep->arm_breakpoint_size = sizeof (arm_linux_arm_le_breakpoint);
   tdep->thumb_breakpoint_size = sizeof (arm_linux_thumb_le_breakpoint);
+  tdep->thumb2_breakpoint_size = sizeof (arm_linux_thumb2_le_breakpoint);
 
   if (tdep->fp_model == ARM_FLOAT_AUTO)
     tdep->fp_model = ARM_FLOAT_FPA;
@@ -859,6 +902,8 @@ arm_linux_init_abi (struct gdbarch_info info,
 				&arm_eabi_linux_sigreturn_tramp_frame);
   tramp_frame_prepend_unwinder (gdbarch,
 				&arm_eabi_linux_rt_sigreturn_tramp_frame);
+  tramp_frame_prepend_unwinder (gdbarch,
+				&arm_linux_restart_syscall_tramp_frame);
 
   /* Core file support.  */
   set_gdbarch_regset_from_core_section (gdbarch,

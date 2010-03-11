@@ -1,6 +1,7 @@
 /* Handle SOM shared libraries.
 
-   Copyright (C) 2004, 2005, 2007, 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 2004, 2005, 2007, 2008, 2009, 2010
+   Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -182,7 +183,7 @@ struct {
    means running until the "_start" is called.  */
 
 static void
-som_solib_create_inferior_hook (void)
+som_solib_create_inferior_hook (int from_tty)
 {
   enum bfd_endian byte_order = gdbarch_byte_order (target_gdbarch);
   struct minimal_symbol *msymbol;
@@ -190,10 +191,6 @@ som_solib_create_inferior_hook (void)
   asection *shlib_info;
   char buf[4];
   CORE_ADDR anaddr;
-
-  /* First, remove all the solib event breakpoints.  Their addresses
-     may have changed since the last time we ran the program.  */
-  remove_solib_event_breakpoints ();
 
   if (symfile_objfile == NULL)
     return;

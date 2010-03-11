@@ -1,7 +1,7 @@
 /* Scheme/Guile language support routines for GDB, the GNU debugger.
 
    Copyright (C) 1995, 1996, 1998, 2000, 2001, 2002, 2003, 2004, 2005, 2007,
-   2008, 2009 Free Software Foundation, Inc.
+   2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -35,8 +35,6 @@
 #include "objfiles.h"
 
 extern void _initialize_scheme_language (void);
-static struct value *evaluate_subexp_scm (struct type *, struct expression *,
-				      int *, enum noside);
 static struct value *scm_lookup_name (struct gdbarch *, char *);
 static int in_eval_c (void);
 
@@ -48,7 +46,7 @@ scm_printchar (int c, struct type *type, struct ui_file *stream)
 
 static void
 scm_printstr (struct ui_file *stream, struct type *type, const gdb_byte *string,
-	      unsigned int length, int force_ellipses,
+	      unsigned int length, const char *encoding, int force_ellipses,
 	      const struct value_print_options *options)
 {
   fprintf_filtered (stream, "\"%s\"", string);

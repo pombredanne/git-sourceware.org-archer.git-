@@ -2,7 +2,7 @@
    Written by Fred Fish <fnf@cygnus.com>
    Rewritten by Jim Blandy <jimb@cygnus.com>
 
-   Copyright (C) 1999, 2000, 2002, 2003, 2007, 2008, 2009
+   Copyright (C) 1999, 2000, 2002, 2003, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -301,15 +301,6 @@ bcache_xfree (struct bcache *bcache)
 
 /* Printing statistics.  */
 
-static int
-compare_ints (const void *ap, const void *bp)
-{
-  /* Because we know we're comparing two ints which are positive,
-     there's no danger of overflow here.  */
-  return * (int *) ap - * (int *) bp;
-}
-
-
 static void
 print_percentage (int portion, int total)
 {
@@ -367,9 +358,9 @@ print_bcache_statistics (struct bcache *c, char *type)
 
     /* To compute the median, we need the set of chain lengths sorted.  */
     qsort (chain_length, c->num_buckets, sizeof (chain_length[0]),
-	   compare_ints);
+	   compare_positive_ints);
     qsort (entry_size, c->unique_count, sizeof (entry_size[0]),
-	   compare_ints);
+	   compare_positive_ints);
 
     if (c->num_buckets > 0)
       {

@@ -1,7 +1,7 @@
 /* Handle lists of commands, their decoding and documentation, for GDB.
 
    Copyright (c) 1986, 1989, 1990, 1991, 1998, 2000, 2001, 2002, 2004, 2007,
-   2008, 2009 Free Software Foundation, Inc.
+   2008, 2009, 2010 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1051,10 +1051,10 @@ help_cmd_list (struct cmd_list_element *list, enum command_class class,
 
   for (c = list; c; c = c->next)
     {      
-      if (c->abbrev_flag == 0 &&
-	  (class == all_commands
-	   || (class == all_classes && c->func == NULL)
-	   || (class == c->class && c->func != NULL)))
+      if (c->abbrev_flag == 0
+	  && (class == all_commands
+	      || (class == all_classes && c->func == NULL)
+	      || (class == c->class && c->func != NULL)))
 	{
 	  print_help_for_command (c, prefix, recurse, stream);
 	}
@@ -1108,11 +1108,11 @@ find_command_name_length (const char *text)
      used as a suffix for print, examine and display.
      Note that this is larger than the character set allowed when creating
      user-defined commands.  */
-  while (isalnum (*p) || *p == '-' || *p == '_' ||
+  while (isalnum (*p) || *p == '-' || *p == '_'
 	 /* Characters used by TUI specific commands.  */
-	 *p == '+' || *p == '<' || *p == '>' || *p == '$' ||
+	 || *p == '+' || *p == '<' || *p == '>' || *p == '$'
 	 /* Characters used for XDB compatibility.  */
-	 (xdb_commands && (*p == '!' || *p == '/' || *p == '?')))
+	 || (xdb_commands && (*p == '!' || *p == '/' || *p == '?')))
     p++;
 
   return p - text;

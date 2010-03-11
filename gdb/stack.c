@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008,
-   2009 Free Software Foundation, Inc.
+   2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -646,12 +646,12 @@ print_frame_info (struct frame_info *frame, int print_level,
       /* If disassemble-next-line is set to on and there is line debug
          messages, output assembly codes for next line.  */
       if (disassemble_next_line == AUTO_BOOLEAN_TRUE)
-	do_gdb_disassembly (get_frame_arch (frame), -1,
-			    get_frame_pc (frame), sal.end);
+	do_gdb_disassembly (get_frame_arch (frame), -1, sal.pc, sal.end);
     }
 
   if (print_what != LOCATION)
-    set_default_breakpoint (1, get_frame_pc (frame), sal.symtab, sal.line);
+    set_default_breakpoint (1, sal.pspace,
+			    get_frame_pc (frame), sal.symtab, sal.line);
 
   annotate_frame_end ();
 
@@ -828,7 +828,8 @@ print_frame (struct frame_info *frame, int print_level,
 #ifdef PC_SOLIB
       char *lib = PC_SOLIB (get_frame_pc (frame));
 #else
-      char *lib = solib_name_from_address (get_frame_pc (frame));
+      char *lib = solib_name_from_address (get_frame_program_space (frame),
+					   get_frame_pc (frame));
 #endif
       if (lib)
 	{
@@ -1322,7 +1323,6 @@ backtrace_command_1 (char *count_exp, int show_locals, int from_tty)
       for (fi = trailing; fi != NULL && i--; fi = get_prev_frame (fi))
 	{
 	  CORE_ADDR pc;
-	  struct objfile *objfile;
 	  QUIT;
 	  pc = get_frame_address_in_block (fi);
 	  find_pc_sect_symtab_via_partial (pc, find_pc_mapped_section (pc));
@@ -1488,8 +1488,16 @@ print_block_frame_locals (struct block *b, struct frame_info *frame,
   return values_printed;
 }
 
+
 /* Same, but print labels.  */
 
+#if 0
+/* Commented out, as the code using this function has also been
+   commented out.  FIXME:brobecker/2009-01-13: Find out why the code
+   was commented out in the first place.  The discussion introducing
+   this change (2007-12-04: Support lexical blocks and function bodies
+   that occupy non-contiguous address ranges) did not explain why
+   this change was made.  */
 static int
 print_block_frame_labels (struct gdbarch *gdbarch, struct block *b,
 			  int *have_default, struct ui_file *stream)
@@ -1527,6 +1535,7 @@ print_block_frame_labels (struct gdbarch *gdbarch, struct block *b,
 
   return values_printed;
 }
+#endif
 
 /* Print on STREAM all the local variables in frame FRAME, including
    all the blocks active in that frame at its current PC.

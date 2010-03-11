@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008, 2009 Free Software Foundation, Inc.
+   2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -431,22 +431,24 @@ extern struct value *value_complement (struct value *arg1);
 
 extern struct value *value_struct_elt (struct value **argp,
 				       struct value **args,
-				       char *name, int *static_memfuncp,
-				       char *err);
+				       const char *name, int *static_memfuncp,
+				       const char *err);
 
 extern struct value *value_aggregate_elt (struct type *curtype,
 					  char *name,
+					  struct type *expect_type,
 					  int want_address,
 					  enum noside noside);
 
 extern struct value *value_static_field (struct type *type, int fieldno);
 
-extern struct fn_field *value_find_oload_method_list (struct value **, char *,
+extern struct fn_field *value_find_oload_method_list (struct value **,
+						      const char *,
 						      int, int *,
 						      struct type **, int *);
 
 extern int find_overload_match (struct type **arg_types, int nargs,
-				char *name, int method, int lax,
+				const char *name, int method, int lax,
 				struct value **objp, struct symbol *fsym,
 				struct value **valp, struct symbol **symp,
 				int *staticp);
@@ -467,6 +469,11 @@ extern struct value *value_full_object (struct value *, struct type *, int,
 extern struct value *value_cast_pointers (struct type *, struct value *);
 
 extern struct value *value_cast (struct type *type, struct value *arg2);
+
+extern struct value *value_reinterpret_cast (struct type *type,
+					     struct value *arg);
+
+extern struct value *value_dynamic_cast (struct type *type, struct value *arg);
 
 extern struct value *value_zero (struct type *type, enum lval_type lv);
 
@@ -562,6 +569,8 @@ extern struct internalvar *lookup_internalvar (const char *name);
 
 extern int value_equal (struct value *arg1, struct value *arg2);
 
+extern int value_equal_contents (struct value *arg1, struct value *arg2);
+
 extern int value_less (struct value *arg1, struct value *arg2);
 
 extern int value_logical_not (struct value *arg1);
@@ -580,6 +589,10 @@ extern struct value *value_x_unop (struct value *arg1, enum exp_opcode op,
 
 extern struct value *value_fn_field (struct value **arg1p, struct fn_field *f,
 				     int j, struct type *type, int offset);
+
+extern int binop_types_user_defined_p (enum exp_opcode op,
+				       struct type *type1,
+				       struct type *type2);
 
 extern int binop_user_defined_p (enum exp_opcode op, struct value *arg1,
 				 struct value *arg2);

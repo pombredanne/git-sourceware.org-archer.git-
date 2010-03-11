@@ -1,7 +1,8 @@
 /* Multiple source language support for GDB.
 
    Copyright (C) 1991, 1992, 1993, 1994, 1995, 1996, 1998, 1999, 2000, 2001,
-   2002, 2003, 2004, 2005, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010
+   Free Software Foundation, Inc.
 
    Contributed by the Department of Computer Science at the State University
    of New York at Buffalo.
@@ -696,6 +697,7 @@ float_type (struct type *type)
   CHECK_TYPEDEF (type);
   return TYPE_CODE (type) == TYPE_CODE_FLT;
 }
+#endif
 
 /* Returns non-zero if the value is a pointer type */
 int
@@ -705,6 +707,7 @@ pointer_type (struct type *type)
     TYPE_CODE (type) == TYPE_CODE_REF;
 }
 
+#if 0
 /* Returns non-zero if the value is a structured type */
 int
 structured_type (struct type *type)
@@ -1045,7 +1048,7 @@ default_print_array_index (struct value *index_value, struct ui_file *stream,
 
 void
 default_get_string (struct value *value, gdb_byte **buffer, int *length,
-		    const char **charset)
+		    struct type **char_type, const char **charset)
 {
   error (_("Getting a string is unsupported in this language."));
 }
@@ -1080,7 +1083,7 @@ unk_lang_printchar (int c, struct type *type, struct ui_file *stream)
 static void
 unk_lang_printstr (struct ui_file *stream, struct type *type,
 		   const gdb_byte *string, unsigned int length,
-		   int force_ellipses,
+		   const char *encoding, int force_ellipses,
 		   const struct value_print_options *options)
 {
   error (_("internal error - unimplemented function unk_lang_printstr called."));

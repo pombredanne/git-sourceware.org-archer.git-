@@ -1,7 +1,7 @@
 /* Handle OSF/1, Digital UNIX, and Tru64 shared libraries
    for GDB, the GNU Debugger.
    Copyright (C) 1993, 1994, 1995, 1996, 1998, 1999, 2000, 2001, 2007, 2008,
-   2009 Free Software Foundation, Inc.
+   2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -306,7 +306,7 @@ osf_clear_solib (void)
    Also, what if child has exit()ed?  Must exit loop somehow.  */
 
 static void
-osf_solib_create_inferior_hook (void)
+osf_solib_create_inferior_hook (int from_tty)
 {
   struct inferior *inf;
   struct thread_info *tp;
@@ -536,7 +536,7 @@ close_map (struct read_map_ctxt *ctxt)
 static struct so_list *
 osf_current_sos (void)
 {
-  struct so_list *head = NULL, *tail, *newtail, so;
+  struct so_list *head = NULL, *tail = NULL, *newtail, so;
   struct read_map_ctxt ctxt;
   int skipped_main;
 

@@ -1,7 +1,8 @@
 /* Remote debugging interface for boot monitors, for GDB.
 
    Copyright (C) 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2000, 2001, 2002, 2006, 2007, 2008, 2009, 2010
+   Free Software Foundation, Inc.
 
    Contributed by Cygnus Support.  Written by Rob Savoye for Cygnus.
    Resurrected from the ashes by Stu Grossman.
@@ -705,6 +706,7 @@ monitor_open (char *args, struct monitor_ops *mon_ops, int from_tty)
 {
   char *name;
   char **p;
+  struct inferior *inf;
 
   if (mon_ops->magic != MONITOR_OPS_MAGIC)
     error (_("Magic number of monitor_ops struct wrong."));
@@ -822,7 +824,8 @@ monitor_open (char *args, struct monitor_ops *mon_ops, int from_tty)
 
   /* Make run command think we are busy...  */
   inferior_ptid = monitor_ptid;
-  add_inferior_silent (ptid_get_pid (inferior_ptid));
+  inf = current_inferior ();
+  inferior_appeared (inf, ptid_get_pid (inferior_ptid));
   add_thread_silent (inferior_ptid);
 
   /* Give monitor_wait something to read */

@@ -1,6 +1,6 @@
 /* MI Command Set for GDB, the GNU debugger.
 
-   Copyright (C) 2000, 2001, 2003, 2007, 2008, 2009
+   Copyright (C) 2000, 2001, 2003, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    Contributed by Cygnus Solutions (a Red Hat company).
@@ -33,6 +33,7 @@ static void build_table (struct mi_cmd *commands);
 
 struct mi_cmd mi_cmds[] =
 {
+  { "add-inferior", { NULL, 0 }, mi_cmd_add_inferior },
   { "break-after", { "ignore", 1 }, NULL },
   { "break-condition", { "cond", 1 }, NULL },
   { "break-commands", { NULL, 0 }, mi_cmd_break_commands },
@@ -52,6 +53,7 @@ struct mi_cmd mi_cmds[] =
   { "data-write-memory", { NULL, 0 }, mi_cmd_data_write_memory},
   { "data-write-register-values", { NULL, 0 }, mi_cmd_data_write_register_values},
   { "enable-timings", { NULL, 0 }, mi_cmd_enable_timings},
+  { "enable-pretty-printing", { NULL, 0 }, mi_cmd_enable_pretty_printing},
   { "environment-cd", { NULL, 0 }, mi_cmd_env_cd},
   { "environment-directory", { NULL, 0 }, mi_cmd_env_dir},
   { "environment-path", { NULL, 0 }, mi_cmd_env_path},
@@ -64,7 +66,7 @@ struct mi_cmd mi_cmds[] =
   { "exec-next", { NULL, 0 }, mi_cmd_exec_next},
   { "exec-next-instruction", { NULL, 0 }, mi_cmd_exec_next_instruction},
   { "exec-return", { NULL, 0 }, mi_cmd_exec_return},
-  { "exec-run", { "run", 1 }, NULL},
+  { "exec-run", { NULL, 0}, mi_cmd_exec_run},
   { "exec-step", { NULL, 0 }, mi_cmd_exec_step},
   { "exec-step-instruction", { NULL, 0 }, mi_cmd_exec_step_instruction},
   { "exec-until", { "until", 1 }, NULL},
@@ -83,11 +85,13 @@ struct mi_cmd mi_cmds[] =
   { "list-features", { NULL, 0 }, mi_cmd_list_features},
   { "list-target-features", { NULL, 0 }, mi_cmd_list_target_features},
   { "list-thread-groups", { NULL, 0 }, mi_cmd_list_thread_groups },  
+  { "remove-inferior", { NULL, 0 }, mi_cmd_remove_inferior },
   { "stack-info-depth", { NULL, 0 }, mi_cmd_stack_info_depth},
   { "stack-info-frame", { NULL, 0 }, mi_cmd_stack_info_frame},
   { "stack-list-arguments", { NULL, 0 }, mi_cmd_stack_list_args},
   { "stack-list-frames", { NULL, 0 }, mi_cmd_stack_list_frames},
   { "stack-list-locals", { NULL, 0 }, mi_cmd_stack_list_locals},
+  { "stack-list-variables", { NULL, 0 }, mi_cmd_stack_list_variables},
   { "stack-select-frame", { NULL, 0 }, mi_cmd_stack_select_frame},
   { "symbol-list-lines", { NULL, 0 }, mi_cmd_symbol_list_lines},
   { "target-attach", { "attach", 1 }, NULL },
@@ -112,6 +116,7 @@ struct mi_cmd mi_cmds[] =
   { "var-list-children", { NULL, 0 }, mi_cmd_var_list_children},
   { "var-set-format", { NULL, 0 }, mi_cmd_var_set_format},
   { "var-set-frozen", { NULL, 0 }, mi_cmd_var_set_frozen},
+  { "var-set-update-range", { NULL, 0 }, mi_cmd_var_set_update_range },
   { "var-set-visualizer", { NULL, 0 }, mi_cmd_var_set_visualizer},
   { "var-show-attributes", { NULL, 0 }, mi_cmd_var_show_attributes},
   { "var-show-format", { NULL, 0 }, mi_cmd_var_show_format},

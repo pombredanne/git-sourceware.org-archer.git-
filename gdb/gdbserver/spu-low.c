@@ -1,5 +1,5 @@
 /* Low level interface to SPUs, for the remote server for GDB.
-   Copyright (C) 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 2006, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    Contributed by Ulrich Weigand <uweigand@de.ibm.com>.
 
@@ -321,11 +321,20 @@ spu_attach (unsigned long  pid)
 static int
 spu_kill (int pid)
 {
+  int status, ret;
   struct process_info *process = find_process_pid (pid);
   if (process == NULL)
     return -1;
 
   ptrace (PTRACE_KILL, pid, 0, 0);
+
+  do {
+    ret = waitpid (pid, &status, 0);
+    if (WIFEXITED (status) || WIFSIGNALED (status))
+      break;
+  } while (ret != -1 || errno != ECHILD);
+
+  clear_inferiors ();
   remove_process (process);
   return 0;
 }
@@ -339,6 +348,8 @@ spu_detach (int pid)
     return -1;
 
   ptrace (PTRACE_DETACH, pid, 0, 0);
+
+  clear_inferiors ();
   remove_process (process);
   return 0;
 }
@@ -466,7 +477,7 @@ spu_wait (ptid_t ptid, struct target_waitstatus *ourstatus, int options)
 
 /* Fetch inferior registers.  */
 static void
-spu_fetch_registers (int regno)
+spu_fetch_registers (struct regcache *regcache, int regno)
 {
   int fd;
   CORE_ADDR addr;
@@ -477,14 +488,14 @@ spu_fetch_registers (int regno)
 
   /* The ID register holds the spufs file handle.  */
   if (regno == -1 || regno == SPU_ID_REGNUM)
-    supply_register (SPU_ID_REGNUM, (char *)&fd);
+    supply_register (regcache, SPU_ID_REGNUM, (char *)&fd);
 
   /* The NPC register is found at ADDR.  */
   if (regno == -1 || regno == SPU_PC_REGNUM)
     {
       char buf[4];
       if (fetch_ppc_memory (addr, buf, 4) == 0)
-	supply_register (SPU_PC_REGNUM, buf);
+	supply_register (regcache, SPU_PC_REGNUM, buf);
     }
 
   /* The GPRs are found in the "regs" spufs file.  */
@@ -497,13 +508,13 @@ spu_fetch_registers (int regno)
       sprintf (annex, "%d/regs", fd);
       if (spu_proc_xfer_spu (annex, buf, NULL, 0, sizeof buf) == sizeof buf)
 	for (i = 0; i < SPU_NUM_CORE_REGS; i++)
-	  supply_register (i, buf + i*16);
+	  supply_register (regcache, i, buf + i*16);
     }
 }
 
 /* Store inferior registers.  */
 static void
-spu_store_registers (int regno)
+spu_store_registers (struct regcache *regcache, int regno)
 {
   int fd;
   CORE_ADDR addr;
@@ -520,7 +531,7 @@ spu_store_registers (int regno)
   if (regno == -1 || regno == SPU_PC_REGNUM)
     {
       char buf[4];
-      collect_register (SPU_PC_REGNUM, buf);
+      collect_register (regcache, SPU_PC_REGNUM, buf);
       store_ppc_memory (addr, buf, 4);
     }
 
@@ -532,7 +543,7 @@ spu_store_registers (int regno)
       int i;
 
       for (i = 0; i < SPU_NUM_CORE_REGS; i++)
-	collect_register (i, buf + i*16);
+	collect_register (regcache, i, buf + i*16);
 
       sprintf (annex, "%d/regs", fd);
       spu_proc_xfer_spu (annex, NULL, buf, 0, sizeof buf);

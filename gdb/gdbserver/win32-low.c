@@ -1,5 +1,5 @@
 /* Low level interface to Windows debugging, for gdbserver.
-   Copyright (C) 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 2006, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    Contributed by Leo Zayas.  Based on "win32-nat.c" from GDB.
 
@@ -38,14 +38,17 @@
 #include <sys/cygwin.h>
 #endif
 
-#define LOG 0
+#define OUTMSG(X) do { printf X; fflush (stderr); } while (0)
 
-#define OUTMSG(X) do { printf X; fflush (stdout); } while (0)
-#if LOG
-#define OUTMSG2(X) do { printf X; fflush (stdout); } while (0)
-#else
-#define OUTMSG2(X) do ; while (0)
-#endif
+#define OUTMSG2(X) \
+  do						\
+    {						\
+      if (debug_threads)			\
+	{					\
+	  printf X;				\
+	  fflush (stderr);			\
+	}					\
+    } while (0)
 
 #ifndef _T
 #define _T(x) TEXT (x)
@@ -369,29 +372,29 @@ child_continue (DWORD continue_status, int thread_id)
 
 /* Fetch register(s) from the current thread context.  */
 static void
-child_fetch_inferior_registers (int r)
+child_fetch_inferior_registers (struct regcache *regcache, int r)
 {
   int regno;
   win32_thread_info *th = thread_rec (current_inferior_ptid (), TRUE);
   if (r == -1 || r > NUM_REGS)
-    child_fetch_inferior_registers (NUM_REGS);
+    child_fetch_inferior_registers (regcache, NUM_REGS);
   else
     for (regno = 0; regno < r; regno++)
-      (*the_low_target.fetch_inferior_register) (th, regno);
+      (*the_low_target.fetch_inferior_register) (regcache, th, regno);
 }
 
 /* Store a new register value into the current thread context.  We don't
    change the program's context until later, when we resume it.  */
 static void
-child_store_inferior_registers (int r)
+child_store_inferior_registers (struct regcache *regcache, int r)
 {
   int regno;
   win32_thread_info *th = thread_rec (current_inferior_ptid (), TRUE);
   if (r == -1 || r == 0 || r > NUM_REGS)
-    child_store_inferior_registers (NUM_REGS);
+    child_store_inferior_registers (regcache, NUM_REGS);
   else
     for (regno = 0; regno < r; regno++)
-      (*the_low_target.store_inferior_register) (th, regno);
+      (*the_low_target.store_inferior_register) (regcache, th, regno);
 }
 
 /* Map the Windows error number in ERROR to a locale-dependent error
@@ -905,6 +908,14 @@ win32_add_one_solib (const char *name, CORE_ADDR load_addr)
       }
 #endif
     }
+
+#ifndef _WIN32_WCE
+  if (strcasecmp (buf, "ntdll.dll") == 0)
+    {
+      GetSystemDirectoryA (buf, sizeof (buf));
+      strcat (buf, "\\ntdll.dll");
+    }
+#endif
 
 #ifdef __CYGWIN__
   cygwin_conv_to_posix_path (buf, buf2);
@@ -1427,10 +1438,6 @@ get_child_debug_event (struct target_waitstatus *ourstatus)
 
  gotevent:
 
-  ptid = debug_event_ptid (&current_event);
-  current_inferior =
-    (struct thread_info *) find_inferior_id (&all_threads, ptid);
-
   switch (current_event.dwDebugEventCode)
     {
     case CREATE_THREAD_DEBUG_EVENT:
@@ -1452,7 +1459,9 @@ get_child_debug_event (struct target_waitstatus *ourstatus)
 		(unsigned) current_event.dwThreadId));
       child_delete_thread (current_event.dwProcessId,
 			   current_event.dwThreadId);
-      break;
+
+      current_inferior = (struct thread_info *) all_threads.head;
+      return 1;
 
     case CREATE_PROCESS_DEBUG_EVENT:
       OUTMSG2 (("gdbserver: kernel event CREATE_PROCESS_DEBUG_EVENT "
@@ -1547,6 +1556,7 @@ get_child_debug_event (struct target_waitstatus *ourstatus)
       break;
     }
 
+  ptid = debug_event_ptid (&current_event);
   current_inferior =
     (struct thread_info *) find_inferior_id (&all_threads, ptid);
   return 1;
@@ -1559,6 +1569,7 @@ static ptid_t
 win32_wait (ptid_t ptid, struct target_waitstatus *ourstatus, int options)
 {
   struct process_info *process;
+  struct regcache *regcache;
 
   while (1)
     {
@@ -1578,9 +1589,10 @@ win32_wait (ptid_t ptid, struct target_waitstatus *ourstatus, int options)
 	case TARGET_WAITKIND_STOPPED:
 	case TARGET_WAITKIND_LOADED:
 	  OUTMSG2 (("Child Stopped with signal = %d \n",
-		    our_status.value.sig));
+		    ourstatus->value.sig));
 
-	  child_fetch_inferior_registers (-1);
+	  regcache = get_thread_regcache (current_inferior, 1);
+	  child_fetch_inferior_registers (regcache, -1);
 
 	  if (ourstatus->kind == TARGET_WAITKIND_LOADED
 	      && !server_waiting)
@@ -1612,17 +1624,17 @@ win32_wait (ptid_t ptid, struct target_waitstatus *ourstatus, int options)
 /* Fetch registers from the inferior process.
    If REGNO is -1, fetch all registers; otherwise, fetch at least REGNO.  */
 static void
-win32_fetch_inferior_registers (int regno)
+win32_fetch_inferior_registers (struct regcache *regcache, int regno)
 {
-  child_fetch_inferior_registers (regno);
+  child_fetch_inferior_registers (regcache, regno);
 }
 
 /* Store registers to the inferior process.
    If REGNO is -1, store all registers; otherwise, store at least REGNO.  */
 static void
-win32_store_inferior_registers (int regno)
+win32_store_inferior_registers (struct regcache *regcache, int regno)
 {
-  child_store_inferior_registers (regno);
+  child_store_inferior_registers (regcache, regno);
 }
 
 /* Read memory from the inferior process.  This should generally be

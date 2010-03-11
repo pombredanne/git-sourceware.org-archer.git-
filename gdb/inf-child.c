@@ -2,7 +2,7 @@
    Unix.
 
    Copyright (C) 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1998,
-   1999, 2000, 2001, 2002, 2004, 2005, 2007, 2008, 2009
+   1999, 2000, 2001, 2002, 2004, 2005, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -148,6 +148,15 @@ inf_child_remove_exec_catchpoint (int pid)
 }
 
 static int
+inf_child_set_syscall_catchpoint (int pid, int needed, int any_count,
+				  int table_size, int *table)
+{
+  /* This version of Unix doesn't support notification of syscall
+     events.  */
+  return 0;
+}
+
+static int
 inf_child_can_run (void)
 {
   return 1;
@@ -190,6 +199,7 @@ inf_child_target (void)
   t->to_follow_fork = inf_child_follow_fork;
   t->to_insert_exec_catchpoint = inf_child_insert_exec_catchpoint;
   t->to_remove_exec_catchpoint = inf_child_remove_exec_catchpoint;
+  t->to_set_syscall_catchpoint = inf_child_set_syscall_catchpoint;
   t->to_can_run = inf_child_can_run;
   t->to_pid_to_exec_file = inf_child_pid_to_exec_file;
   t->to_stratum = process_stratum;

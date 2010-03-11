@@ -1,6 +1,6 @@
 /* Low level interface for debugging AIX 4.3+ pthreads.
 
-   Copyright (C) 1999, 2000, 2002, 2007, 2008, 2009
+   Copyright (C) 1999, 2000, 2002, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
    Written by Nick Duffek <nsd@redhat.com>.
 
@@ -893,8 +893,8 @@ pd_enable (void)
   stub_name = NULL;
   status = pthdb_session_pthreaded (PD_USER, PTHDB_FLAG_REGS,
 				    &pd_callbacks, &stub_name);
-  if ((status != PTHDB_SUCCESS && 
-       status != PTHDB_NOT_PTHREADED) || !stub_name)
+  if ((status != PTHDB_SUCCESS
+       && status != PTHDB_NOT_PTHREADED) || !stub_name)
     return;
 
   /* Set a breakpoint on the returned stub function.  */

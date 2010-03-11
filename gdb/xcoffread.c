@@ -1,7 +1,7 @@
 /* Read AIX xcoff symbol tables and convert to internal format, for GDB.
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009
-   Free Software Foundation, Inc.
+   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009,
+   2010 Free Software Foundation, Inc.
    Derived from coffread.c, dbxread.c, and a lot of hacking.
    Contributed by IBM Corporation.
 
@@ -1955,8 +1955,8 @@ xcoff_start_psymtab (struct objfile *objfile, char *filename, int first_symnum)
 			/* We fill in textlow later.  */
 			0);
 
-  result->read_symtab_private = (char *)
-    obstack_alloc (&objfile->objfile_obstack, sizeof (struct symloc));
+  result->read_symtab_private = obstack_alloc (&objfile->objfile_obstack,
+					       sizeof (struct symloc));
   ((struct symloc *) result->read_symtab_private)->first_symnum = first_symnum;
   result->read_symtab = xcoff_psymtab_to_symtab;
 
@@ -2014,9 +2014,8 @@ xcoff_end_psymtab (struct partial_symtab *pst, char **include_list,
       allocate_psymtab (include_list[i], objfile);
 
       subpst->section_offsets = pst->section_offsets;
-      subpst->read_symtab_private =
-	(char *) obstack_alloc (&objfile->objfile_obstack,
-				sizeof (struct symloc));
+      subpst->read_symtab_private = obstack_alloc (&objfile->objfile_obstack,
+						   sizeof (struct symloc));
       ((struct symloc *) subpst->read_symtab_private)->first_symnum = 0;
       ((struct symloc *) subpst->read_symtab_private)->numsyms = 0;
       subpst->textlow = 0;
@@ -2041,11 +2040,6 @@ xcoff_end_psymtab (struct partial_symtab *pst, char **include_list,
     }
 
   sort_pst_symbols (objfile->psyms, pst);
-
-  /* If there is already a psymtab or symtab for a file of this name,
-     remove it.  (If there is a symtab, more drastic things also
-     happen.)  This happens in VxWorks.  */
-  free_named_symtabs (pst->filename);
 
   if (num_includes == 0
       && number_dependencies == 0
@@ -2596,7 +2590,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 		  namestring = gdbarch_static_transform_name
 				 (gdbarch, namestring);
 
-		add_psymbol_to_list (namestring, p - namestring,
+		add_psymbol_to_list (namestring, p - namestring, 1,
 				     VAR_DOMAIN, LOC_STATIC,
 				     0,
 				     0, symbol.n_value,
@@ -2607,7 +2601,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 		symbol.n_value += ANOFFSET (objfile->section_offsets, SECT_OFF_DATA (objfile));
 		/* The addresses in these entries are reported to be
 		   wrong.  See the code that reads 'G's for symtabs. */
-		add_psymbol_to_list (namestring, p - namestring,
+		add_psymbol_to_list (namestring, p - namestring, 1,
 				     VAR_DOMAIN, LOC_STATIC,
 				     1,
 				     0, symbol.n_value,
@@ -2625,7 +2619,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 		    || (p == namestring + 1
 			&& namestring[0] != ' '))
 		  {
-		    add_psymbol_to_list (namestring, p - namestring,
+		    add_psymbol_to_list (namestring, p - namestring, 1,
 					 STRUCT_DOMAIN, LOC_TYPEDEF,
 					 0,
 					 symbol.n_value, 0,
@@ -2633,7 +2627,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 		    if (p[2] == 't')
 		      {
 			/* Also a typedef with the same name.  */
-			add_psymbol_to_list (namestring, p - namestring,
+			add_psymbol_to_list (namestring, p - namestring, 1,
 					     VAR_DOMAIN, LOC_TYPEDEF,
 					     0,
 					     symbol.n_value, 0,
@@ -2646,7 +2640,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 	      case 't':
 		if (p != namestring)	/* a name is there, not just :T... */
 		  {
-		    add_psymbol_to_list (namestring, p - namestring,
+		    add_psymbol_to_list (namestring, p - namestring, 1,
 					 VAR_DOMAIN, LOC_TYPEDEF,
 					 0,
 					 symbol.n_value, 0,
@@ -2708,7 +2702,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 			  ;
 			/* Note that the value doesn't matter for
 			   enum constants in psymtabs, just in symtabs.  */
-			add_psymbol_to_list (p, q - p,
+			add_psymbol_to_list (p, q - p, 1,
 					     VAR_DOMAIN, LOC_CONST,
 					     0, 0,
 					     0, psymtab_language, objfile);
@@ -2726,7 +2720,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 
 	      case 'c':
 		/* Constant, e.g. from "const" in Pascal.  */
-		add_psymbol_to_list (namestring, p - namestring,
+		add_psymbol_to_list (namestring, p - namestring, 1,
 				     VAR_DOMAIN, LOC_CONST,
 				     0, symbol.n_value,
 				     0, psymtab_language, objfile);
@@ -2743,7 +2737,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 		    xfree (name);
 		  }
 		symbol.n_value += ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
-		add_psymbol_to_list (namestring, p - namestring,
+		add_psymbol_to_list (namestring, p - namestring, 1,
 				     VAR_DOMAIN, LOC_BLOCK,
 				     0,
 				     0, symbol.n_value,
@@ -2772,7 +2766,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 		  continue;
 
 		symbol.n_value += ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
-		add_psymbol_to_list (namestring, p - namestring,
+		add_psymbol_to_list (namestring, p - namestring, 1,
 				     VAR_DOMAIN, LOC_BLOCK,
 				     1,
 				     0, symbol.n_value,
@@ -2858,11 +2852,10 @@ xcoff_get_toc_offset (struct objfile *objfile)
 
    SECTION_OFFSETS contains offsets relative to which the symbols in the
    various sections are (depending where the sections were actually loaded).
-   MAINLINE is true if we are reading the main symbol
-   table (as opposed to a shared lib or dynamically loaded file).  */
+*/
 
 static void
-xcoff_initial_scan (struct objfile *objfile, int mainline)
+xcoff_initial_scan (struct objfile *objfile, int symfile_flags)
 {
   bfd *abfd;
   int val;
@@ -3024,6 +3017,7 @@ static struct sym_fns xcoff_sym_fns =
   default_symfile_segments,	/* sym_segments: Get segment information from
 				   a file.  */
   aix_process_linenos,          /* sym_read_linetable */
+  default_symfile_relocate,	/* sym_relocate: Relocate a debug section.  */
   &psym_functions,
   NULL				/* next: pointer to next struct sym_fns */
 };

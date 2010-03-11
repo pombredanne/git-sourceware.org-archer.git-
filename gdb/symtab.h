@@ -1,7 +1,7 @@
 /* Symbol table definitions for GDB.
 
    Copyright (C) 1986, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009
+   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -32,6 +32,7 @@ struct block;
 struct blockvector;
 struct axs_value;
 struct agent_expr;
+struct program_space;
 
 /* Some of the structures in this file are space critical.
    The space-critical structures are:
@@ -171,9 +172,6 @@ extern CORE_ADDR symbol_overlayed_address (CORE_ADDR, struct obj_section *);
 #define SYMBOL_SECTION(symbol)		(symbol)->ginfo.section
 #define SYMBOL_OBJ_SECTION(symbol)	(symbol)->ginfo.obj_section
 
-#define SYMBOL_CPLUS_DEMANGLED_NAME(symbol)	\
-  (symbol)->ginfo.language_specific.cplus_specific.demangled_name
-
 /* Initializes the language dependent portion of a symbol
    depending upon the language for the symbol. */
 #define SYMBOL_INIT_LANGUAGE_SPECIFIC(symbol,language) \
@@ -184,19 +182,20 @@ extern void symbol_init_language_specific (struct general_symbol_info *symbol,
 /* Set just the linkage name of a symbol; do not try to demangle
    it.  Used for constructs which do not have a mangled name,
    e.g. struct tags.  Unlike SYMBOL_SET_NAMES, linkage_name must
-   be terminated and already on the objfile's obstack.  */
+   be terminated and either already on the objfile's obstack or
+   permanently allocated.  */
 #define SYMBOL_SET_LINKAGE_NAME(symbol,linkage_name) \
   (symbol)->ginfo.name = (linkage_name)
 
 /* Set the linkage and natural names of a symbol, by demangling
    the linkage name.  */
-#define SYMBOL_SET_NAMES(symbol,linkage_name,len,objfile) \
-  symbol_set_names (&(symbol)->ginfo, linkage_name, len, objfile, \
+#define SYMBOL_SET_NAMES(symbol,linkage_name,len,copy_name,objfile)	\
+  symbol_set_names (&(symbol)->ginfo, linkage_name, len, copy_name, objfile, \
 		    &objfile->objfile_obstack)
-#define SYMBOL_SET_NAMES_FULL(symbol,linkage_name,len,objfile,obstack)	\
-  symbol_set_names (&(symbol)->ginfo, linkage_name, len, objfile, obstack)
+#define SYMBOL_SET_NAMES_FULL(symbol,linkage_name,len,copy_name,objfile,obstack) \
+  symbol_set_names (&(symbol)->ginfo, linkage_name, len, copy_name, objfile, obstack)
 extern void symbol_set_names (struct general_symbol_info *symbol,
-			      const char *linkage_name, int len,
+			      const char *linkage_name, int len, int copy_name,
 			      struct objfile *objfile,
 			      struct obstack *obstack);
 
@@ -556,7 +555,8 @@ struct symbol
   struct type *type;
 
   /* The symbol table containing this symbol.  This is the file
-     associated with LINE.  */
+     associated with LINE.  It can be NULL during symbols read-in but it is
+     never NULL during normal operation.  */
   struct symtab *symtab;
 
   /* Domain code.  */
@@ -797,6 +797,7 @@ struct symtab
 
 #define BLOCKVECTOR(symtab)	(symtab)->blockvector
 #define LINETABLE(symtab)	(symtab)->linetable
+#define SYMTAB_PSPACE(symtab)	(symtab)->objfile->pspace
 
 
 /* The virtual function table is now an array of structures which have the
@@ -860,7 +861,6 @@ extern struct symbol *lookup_symbol (const char *, const struct block *,
    that can't think of anything better to do.  */
 
 extern struct symbol *basic_lookup_symbol_nonlocal (const char *,
-						    const char *,
 						    const struct block *,
 						    const domain_enum);
 
@@ -871,7 +871,6 @@ extern struct symbol *basic_lookup_symbol_nonlocal (const char *,
    is one; do nothing if BLOCK is NULL or a global block.  */
 
 extern struct symbol *lookup_symbol_static (const char *name,
-					    const char *linkage_name,
 					    const struct block *block,
 					    const domain_enum domain);
 
@@ -879,7 +878,6 @@ extern struct symbol *lookup_symbol_static (const char *name,
    necessary).  */
 
 extern struct symbol *lookup_symbol_global (const char *name,
-					    const char *linkage_name,
 					    const struct block *block,
 					    const domain_enum domain);
 
@@ -888,14 +886,12 @@ extern struct symbol *lookup_symbol_global (const char *name,
    will fix up the symbol if necessary.  */
 
 extern struct symbol *lookup_symbol_aux_block (const char *name,
-					       const char *linkage_name,
 					       const struct block *block,
 					       const domain_enum domain);
 
 /* lookup a symbol by name, within a specified block */
 
 extern struct symbol *lookup_block_symbol (const struct block *, const char *,
-					   const char *,
 					   const domain_enum);
 
 /* lookup a [struct, union, enum] by name, within a specified block */
@@ -961,6 +957,11 @@ extern void prim_record_minimal_symbol (const char *, CORE_ADDR,
 					enum minimal_symbol_type,
 					struct objfile *);
 
+extern struct minimal_symbol *prim_record_minimal_symbol_full
+  (const char *, int, int, CORE_ADDR,
+   enum minimal_symbol_type,
+   int section, asection * bfd_section, struct objfile *);
+
 extern struct minimal_symbol *prim_record_minimal_symbol_and_info
   (const char *, CORE_ADDR,
    enum minimal_symbol_type,
@@ -992,6 +993,10 @@ extern struct minimal_symbol *lookup_minimal_symbol_by_pc_name
 
 extern struct minimal_symbol *lookup_minimal_symbol_by_pc (CORE_ADDR);
 
+extern struct minimal_symbol *
+    lookup_minimal_symbol_and_objfile (const char *,
+				       struct objfile **);
+
 extern struct minimal_symbol
   *lookup_minimal_symbol_by_pc_section (CORE_ADDR, struct obj_section *);
 
@@ -1012,6 +1017,9 @@ extern void msymbols_sort (struct objfile *objfile);
 
 struct symtab_and_line
 {
+  /* The program space of this sal.  */
+  struct program_space *pspace;
+
   struct symtab *symtab;
   struct obj_section *section;
   /* Line number.  Line numbers start at 1 and proceed through symtab->nlines.
@@ -1192,7 +1200,6 @@ extern /*const */ char *main_name (void);
 /* Check global symbols in objfile.  */
 struct symbol *lookup_global_symbol_from_objfile (const struct objfile *objfile,
 						  const char *name,
-						  const char *linkage_name,
 						  const domain_enum domain);
 
 extern struct symtabs_and_lines

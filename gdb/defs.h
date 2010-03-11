@@ -1,8 +1,8 @@
 /* *INDENT-OFF* */ /* ATTR_FORMAT confuses indent, avoid running it for now */
 /* Basic, host-specific, and target-specific definitions for GDB.
    Copyright (C) 1986, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009
-   Free Software Foundation, Inc.
+   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009,
+   2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -417,6 +417,17 @@ char *ldirname (const char *filename);
 
 char **gdb_buildargv (const char *);
 
+int compare_positive_ints (const void *ap, const void *bp);
+
+/* A wrapper for bfd_errmsg to produce a more helpful error message
+   in the case of bfd_error_file_ambiguously recognized.
+   MATCHING, if non-NULL, is the corresponding argument to
+   bfd_check_format_matches, and will be freed.  */
+
+extern const char *gdb_bfd_errmsg (bfd_error_type error_tag, char **matching);
+
+extern int parse_pid_to_attach (char *args);
+
 /* From demangle.c */
 
 extern void set_demangling_style (char *);
@@ -596,10 +607,11 @@ extern int info_verbose;
 
 extern void set_next_address (struct gdbarch *, CORE_ADDR);
 
-extern void print_address_symbolic (CORE_ADDR, struct ui_file *, int,
-				    char *);
+extern void print_address_symbolic (struct gdbarch *, CORE_ADDR,
+				    struct ui_file *, int, char *);
 
-extern int build_address_symbolic (CORE_ADDR addr,
+extern int build_address_symbolic (struct gdbarch *,
+				   CORE_ADDR addr,
 				   int do_demangle, 
 				   char **name, 
 				   int *offset, 
@@ -608,6 +620,7 @@ extern int build_address_symbolic (CORE_ADDR addr,
 				   int *unmapped);
 
 extern void print_address (struct gdbarch *, CORE_ADDR, struct ui_file *);
+extern const char *pc_prefix (CORE_ADDR);
 
 /* From source.c */
 
@@ -629,8 +642,6 @@ extern void directory_switch (char *, int);
 extern char *source_path;
 
 extern void init_source_path (void);
-
-extern void init_last_source_visited (void);
 
 /* From exec.c */
 
@@ -696,7 +707,7 @@ struct command_line
   };
 
 extern struct command_line *read_command_lines (char *, int, int);
-extern struct command_line *read_command_lines_1 (char * (*) (), int);
+extern struct command_line *read_command_lines_1 (char * (*) (void), int);
 
 extern void free_command_lines (struct command_line **);
 
@@ -888,7 +899,7 @@ extern char *xstrvprintf (const char *format, va_list ap)
 extern int xsnprintf (char *str, size_t size, const char *format, ...)
      ATTR_FORMAT (printf, 3, 4);
 
-extern int parse_escape (char **);
+extern int parse_escape (struct gdbarch *, char **);
 
 /* Message to be printed before the error message, when an error occurs.  */
 
@@ -958,13 +969,12 @@ enum gdb_osabi
   GDB_OSABI_INTERIX,
   GDB_OSABI_HPUX_ELF,
   GDB_OSABI_HPUX_SOM,
-
   GDB_OSABI_QNXNTO,
-
   GDB_OSABI_CYGWIN,
   GDB_OSABI_AIX,
   GDB_OSABI_DICOS,
   GDB_OSABI_DARWIN,
+  GDB_OSABI_SYMBIAN,
 
   GDB_OSABI_INVALID		/* keep this last */
 };
@@ -1021,7 +1031,7 @@ extern void *alloca ();
 /* Maximum size of a register.  Something small, but large enough for
    all known ISAs.  If it turns out to be too small, make it bigger.  */
 
-enum { MAX_REGISTER_SIZE = 16 };
+enum { MAX_REGISTER_SIZE = 32 };
 
 /* Static target-system-dependent parameters for GDB. */
 
@@ -1109,7 +1119,6 @@ extern void (*deprecated_readline_begin_hook) (char *, ...)
 extern char *(*deprecated_readline_hook) (char *);
 extern void (*deprecated_readline_end_hook) (void);
 extern void (*deprecated_register_changed_hook) (int regno);
-extern void (*deprecated_memory_changed_hook) (CORE_ADDR addr, int len);
 extern void (*deprecated_context_hook) (int);
 extern ptid_t (*deprecated_target_wait_hook) (ptid_t ptid,
 					      struct target_waitstatus *status,
@@ -1219,5 +1228,10 @@ extern ULONGEST align_down (ULONGEST v, int n);
    which use obstacks.  */
 void *hashtab_obstack_allocate (void *data, size_t size, size_t count);
 void dummy_obstack_deallocate (void *object, void *data);
+
+/* From progspace.c */
+
+extern void initialize_progspace (void);
+extern void initialize_inferiors (void);
 
 #endif /* #ifndef DEFS_H */

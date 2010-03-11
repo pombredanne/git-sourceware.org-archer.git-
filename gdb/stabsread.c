@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008, 2009 Free Software Foundation, Inc.
+   2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -673,18 +673,14 @@ define_symbol (CORE_ADDR valu, char *string, int desc, int type,
       switch (string[1])
 	{
 	case 't':
-	  SYMBOL_SET_LINKAGE_NAME
-	    (sym, obsavestring ("this", strlen ("this"),
-				&objfile->objfile_obstack));
+	  SYMBOL_SET_LINKAGE_NAME (sym, "this");
 	  break;
 
 	case 'v':		/* $vtbl_ptr_type */
 	  goto normal;
 
 	case 'e':
-	  SYMBOL_SET_LINKAGE_NAME
-	    (sym, obsavestring ("eh_throw", strlen ("eh_throw"),
-				&objfile->objfile_obstack));
+	  SYMBOL_SET_LINKAGE_NAME (sym, "eh_throw");
 	  break;
 
 	case '_':
@@ -717,11 +713,11 @@ define_symbol (CORE_ADDR valu, char *string, int desc, int type,
 	}
       if (new_name != NULL)
 	{
-	  SYMBOL_SET_NAMES (sym, new_name, strlen (new_name), objfile);
+	  SYMBOL_SET_NAMES (sym, new_name, strlen (new_name), 1, objfile);
 	  xfree (new_name);
 	}
       else
-	SYMBOL_SET_NAMES (sym, string, p - string, objfile);
+	SYMBOL_SET_NAMES (sym, string, p - string, 1, objfile);
     }
   p++;
 
@@ -4115,7 +4111,17 @@ read_args (char **pp, int end, struct objfile *objfile, int *nargsp,
     }
   (*pp)++;			/* get past `end' (the ':' character) */
 
-  if (TYPE_CODE (types[n - 1]) != TYPE_CODE_VOID)
+  if (n == 0)
+    {
+      /* We should read at least the THIS parameter here.  Some broken stabs
+	 output contained `(0,41),(0,42)=@s8;-16;,(0,43),(0,1);' where should
+	 have been present ";-16,(0,43)" reference instead.  This way the
+	 excessive ";" marker prematurely stops the parameters parsing.  */
+
+      complaint (&symfile_complaints, _("Invalid (empty) method arguments"));
+      *varargsp = 0;
+    }
+  else if (TYPE_CODE (types[n - 1]) != TYPE_CODE_VOID)
     *varargsp = 1;
   else
     {

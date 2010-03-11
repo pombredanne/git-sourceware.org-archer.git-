@@ -1,7 +1,7 @@
 /* Modula 2 language support routines for GDB, the GNU debugger.
 
    Copyright (C) 1992, 1993, 1994, 1995, 1996, 1998, 2000, 2002, 2003, 2004,
-   2005, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2005, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -104,7 +104,7 @@ m2_printchar (int c, struct type *type, struct ui_file *stream)
 
 static void
 m2_printstr (struct ui_file *stream, struct type *type, const gdb_byte *string,
-	     unsigned int length, int force_ellipses,
+	     unsigned int length, const char *encoding, int force_ellipses,
 	     const struct value_print_options *options)
 {
   unsigned int i;

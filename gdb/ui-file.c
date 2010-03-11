@@ -1,6 +1,6 @@
 /* UI_FILE - a generic STDIO like output stream.
 
-   Copyright (C) 1999, 2000, 2001, 2002, 2007, 2008, 2009
+   Copyright (C) 1999, 2000, 2001, 2002, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -22,7 +22,9 @@
 
 #include "defs.h"
 #include "ui-file.h"
+#include "gdb_obstack.h"
 #include "gdb_string.h"
+#include "gdb_select.h"
 
 #include <errno.h>
 
@@ -263,7 +265,7 @@ set_ui_file_data (struct ui_file *file, void *data,
 }
 
 /* ui_file utility function for converting a ``struct ui_file'' into
-   a memory buffer''. */
+   a memory buffer. */
 
 struct accumulated_ui_file
 {
@@ -296,6 +298,23 @@ ui_file_xstrdup (struct ui_file *file, long *length)
   if (length != NULL)
     *length = acc.length;
   return acc.buffer;
+}
+
+static void
+do_ui_file_obsavestring (void *context, const char *buffer, long length)
+{
+  struct obstack *obstack = (struct obstack *) context;
+  obstack_grow (obstack, buffer, length);
+}
+
+char *
+ui_file_obsavestring (struct ui_file *file, struct obstack *obstack,
+		      long *length)
+{
+  ui_file_put (file, do_ui_file_obsavestring, obstack);
+  *length = obstack_object_size (obstack);
+  obstack_1grow (obstack, '\0');
+  return obstack_finish (obstack);
 }
 
 /* A pure memory based ``struct ui_file'' that can be used an output
@@ -471,6 +490,19 @@ stdio_file_read (struct ui_file *file, char *buf, long length_buf)
   if (stdio->magic != &stdio_file_magic)
     internal_error (__FILE__, __LINE__,
 		    _("stdio_file_read: bad magic number"));
+
+  /* For the benefit of Windows, call gdb_select before reading from
+     the file.  Wait until at least one byte of data is available.
+     Control-C can interrupt gdb_select, but not read.  */
+  {
+    int fd = fileno (stdio->file);
+    fd_set readfds;
+    FD_ZERO (&readfds);
+    FD_SET (fd, &readfds);
+    if (gdb_select (fd + 1, &readfds, NULL, NULL, NULL) == -1)
+      return -1;
+  }
+
   return read (fileno (stdio->file), buf, length_buf);
 }
 

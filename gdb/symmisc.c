@@ -1,7 +1,7 @@
 /* Do various things to symbol tables (other than lookup), for GDB.
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2002, 2003, 2004, 2007, 2008, 2009
+   1996, 1997, 1998, 1999, 2000, 2002, 2003, 2004, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -39,7 +39,8 @@
 #include "gdb_string.h"
 #include "readline/readline.h"
 
-#include "psympriv.h"
+#include "psymtab.h"
+#include "psympriv.h"		/* FIXME */
 
 #ifndef DEV_TTY
 #define DEV_TTY "/dev/tty"
@@ -125,16 +126,19 @@ free_symtab (struct symtab *s)
 void
 print_symbol_bcache_statistics (void)
 {
+  struct program_space *pspace;
   struct objfile *objfile;
 
   immediate_quit++;
-  ALL_OBJFILES (objfile)
+  ALL_PSPACES (pspace)
+    ALL_PSPACE_OBJFILES (pspace, objfile)
   {
     printf_filtered (_("Byte cache statistics for '%s':\n"), objfile->name);
     if (objfile->psyms)
       print_bcache_statistics (objfile->psyms->psymbol_cache,
 			       "partial symbol cache");
     print_bcache_statistics (objfile->macro_cache, "preprocessor macro cache");
+    print_bcache_statistics (objfile->filename_cache, "file name cache");
   }
   immediate_quit--;
 }
@@ -142,12 +146,14 @@ print_symbol_bcache_statistics (void)
 void
 print_objfile_statistics (void)
 {
+  struct program_space *pspace;
   struct objfile *objfile;
   struct symtab *s;
   int i, linetables, blockvectors;
 
   immediate_quit++;
-  ALL_OBJFILES (objfile)
+  ALL_PSPACES (pspace)
+    ALL_PSPACE_OBJFILES (pspace, objfile)
   {
     printf_filtered (_("Statistics for '%s':\n"), objfile->name);
     if (OBJSTAT (objfile, n_stabs) > 0)
@@ -165,7 +171,8 @@ print_objfile_statistics (void)
     if (OBJSTAT (objfile, n_types) > 0)
       printf_filtered (_("  Number of \"types\" defined: %d\n"),
 		       OBJSTAT (objfile, n_types));
-    objfile->sf->qf->print_stats (objfile);
+    if (objfile->sf)
+      objfile->sf->qf->print_stats (objfile);
     i = linetables = blockvectors = 0;
     ALL_OBJFILE_SYMTABS (objfile, s)
       {
@@ -191,6 +198,8 @@ print_objfile_statistics (void)
 		       bcache_memory_used (objfile->psyms->psymbol_cache));
     printf_filtered (_("  Total memory used for macro cache: %d\n"),
 		     bcache_memory_used (objfile->macro_cache));
+    printf_filtered (_("  Total memory used for file name cache: %d\n"),
+		     bcache_memory_used (objfile->filename_cache));
   }
   immediate_quit--;
 }
@@ -208,7 +217,8 @@ dump_objfile (struct objfile *objfile)
   printf_filtered (", %d minsyms\n\n",
 		   objfile->minimal_symbol_count);
 
-  objfile->sf->qf->dump (objfile);
+  if (objfile->sf)
+    objfile->sf->qf->dump (objfile);
 
   if (objfile->symtabs)
     {
@@ -652,6 +662,7 @@ maintenance_print_msymbols (char *args, int from_tty)
   struct cleanup *cleanups;
   char *filename = DEV_TTY;
   char *symname = NULL;
+  struct program_space *pspace;
   struct objfile *objfile;
 
   struct stat sym_st, obj_st;
@@ -687,10 +698,11 @@ maintenance_print_msymbols (char *args, int from_tty)
   make_cleanup_ui_file_delete (outfile);
 
   immediate_quit++;
-  ALL_OBJFILES (objfile)
-    if (symname == NULL
-	|| (!stat (objfile->name, &obj_st) && sym_st.st_ino == obj_st.st_ino))
-      dump_msymbols (objfile, outfile);
+  ALL_PSPACES (pspace)
+    ALL_PSPACE_OBJFILES (pspace, objfile)
+      if (symname == NULL
+	  || (!stat (objfile->name, &obj_st) && sym_st.st_ino == obj_st.st_ino))
+	dump_msymbols (objfile, outfile);
   immediate_quit--;
   fprintf_filtered (outfile, "\n\n");
   do_cleanups (cleanups);
@@ -699,13 +711,15 @@ maintenance_print_msymbols (char *args, int from_tty)
 void
 maintenance_print_objfiles (char *ignore, int from_tty)
 {
+  struct program_space *pspace;
   struct objfile *objfile;
 
   dont_repeat ();
 
   immediate_quit++;
-  ALL_OBJFILES (objfile)
-    dump_objfile (objfile);
+  ALL_PSPACES (pspace)
+    ALL_PSPACE_OBJFILES (pspace, objfile)
+      dump_objfile (objfile);
   immediate_quit--;
 }
 
@@ -714,12 +728,14 @@ maintenance_print_objfiles (char *ignore, int from_tty)
 void
 maintenance_info_symtabs (char *regexp, int from_tty)
 {
+  struct program_space *pspace;
   struct objfile *objfile;
 
   if (regexp)
     re_comp (regexp);
 
-  ALL_OBJFILES (objfile)
+  ALL_PSPACES (pspace)
+    ALL_PSPACE_OBJFILES (pspace, objfile)
     {
       struct symtab *symtab;
       

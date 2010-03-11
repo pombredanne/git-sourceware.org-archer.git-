@@ -1,6 +1,6 @@
 /* VAX series support for 32-bit ELF
    Copyright 1993, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003,
-   2004, 2005, 2006, 2007, 2008, 2009  Free Software Foundation, Inc.
+   2004, 2005, 2006, 2007, 2008, 2009, 2010  Free Software Foundation, Inc.
    Contributed by Matt Thomas <matt@3am-software.com>.
 
    This file is part of BFD, the Binary File Descriptor library.
@@ -371,7 +371,7 @@ static const bfd_byte elf_vax_plt0_entry[PLT_ENTRY_SIZE] =
 static const bfd_byte elf_vax_plt_entry[PLT_ENTRY_SIZE] =
 {
   0xfc, 0x0f,		/* .word ^M<r11:r2> */
-  0x16,	0xef,		/* jsb L^(pc) */
+  0x16, 0xef,		/* jsb L^(pc) */
   0, 0, 0, 0,		/* replaced with offset to start of .plt  */
   0, 0, 0, 0,		/* index into .rela.plt */
 };
@@ -407,34 +407,23 @@ struct elf_vax_link_hash_entry
   bfd_vma got_addend;
 };
 
-/* VAX ELF linker hash table.  */
-
-struct elf_vax_link_hash_table
-{
-  struct elf_link_hash_table root;
-};
-
 /* Declare this now that the above structures are defined.  */
 
 static bfd_boolean elf_vax_discard_copies (struct elf_vax_link_hash_entry *,
-					   PTR);
+					   void *);
 
 /* Declare this now that the above structures are defined.  */
 
 static bfd_boolean elf_vax_instantiate_got_entries (struct elf_link_hash_entry *,
-						    PTR);
+						    void *);
 
 /* Traverse an VAX ELF linker hash table.  */
 
 #define elf_vax_link_hash_traverse(table, func, info)			\
   (elf_link_hash_traverse						\
-   (&(table)->root,							\
+   ((table),								\
     (bfd_boolean (*) (struct elf_link_hash_entry *, PTR)) (func),	\
     (info)))
-
-/* Get the VAX ELF linker hash table from a link_info structure.  */
-
-#define elf_vax_hash_table(p) ((struct elf_vax_link_hash_table *) (p)->hash)
 
 /* Create an entry in an VAX ELF linker hash table.  */
 
@@ -472,22 +461,23 @@ elf_vax_link_hash_newfunc (struct bfd_hash_entry *entry,
 static struct bfd_link_hash_table *
 elf_vax_link_hash_table_create (bfd *abfd)
 {
-  struct elf_vax_link_hash_table *ret;
-  bfd_size_type amt = sizeof (struct elf_vax_link_hash_table);
+  struct elf_link_hash_table *ret;
+  bfd_size_type amt = sizeof (struct elf_link_hash_table);
 
   ret = bfd_malloc (amt);
   if (ret == NULL)
     return NULL;
 
-  if (!_bfd_elf_link_hash_table_init (&ret->root, abfd,
+  if (!_bfd_elf_link_hash_table_init (ret, abfd,
 				      elf_vax_link_hash_newfunc,
-				      sizeof (struct elf_vax_link_hash_entry)))
+				      sizeof (struct elf_vax_link_hash_entry),
+				      GENERIC_ELF_DATA))
     {
       free (ret);
       return NULL;
     }
 
-  return &ret->root.root;
+  return &ret->root;
 }
 
 /* Keep vax-specific flags in the ELF header */
@@ -1132,7 +1122,7 @@ elf_vax_size_dynamic_sections (bfd *output_bfd, struct bfd_link_info *info)
      allocated space for them in the check_relocs routine, but we will not
      fill them in in the relocate_section routine.  */
   if (info->shared && info->symbolic)
-    elf_vax_link_hash_traverse (elf_vax_hash_table (info),
+    elf_vax_link_hash_traverse (elf_hash_table (info),
 				elf_vax_discard_copies,
 				NULL);
 
@@ -1583,7 +1573,7 @@ elf_vax_relocate_section (bfd *output_bfd,
 	  if (sgotplt == NULL)
 	    {
 	      sgotplt = bfd_get_section_by_name (dynobj, ".got.plt");
-	      BFD_ASSERT (splt != NULL);
+	      BFD_ASSERT (sgotplt != NULL);
 	    }
 
 	  plt_index = h->plt.offset / PLT_ENTRY_SIZE - 1;
@@ -1593,7 +1583,7 @@ elf_vax_relocate_section (bfd *output_bfd,
 	     The first two are reserved.  */
 	  got_offset = (plt_index + 3) * 4;
 
-	  /* We want the relocate to point into the .got.plt instead
+	  /* We want the relocation to point into the .got.plt instead
 	     of the plt itself.  */
 	  relocation = (sgotplt->output_section->vma
 			+ sgotplt->output_offset

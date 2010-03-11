@@ -1,6 +1,6 @@
 /* Target-dependent code for Moxie.
 
-   Copyright (C) 2009 Free Software Foundation, Inc.
+   Copyright (C) 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -174,23 +174,39 @@ moxie_analyze_prologue (CORE_ADDR start_addr, CORE_ADDR end_addr,
 	  cache->saved_regs[regnum] = cache->framesize;
 	  next_addr += 2;
 	}
-
-      /* Optional stack allocation for args and local vars <= 4
-	 byte.  */
-      else if (inst == 0x01f0)           /* ldi.l $r12, X */
-	{
-	  offset = read_memory_integer (next_addr + 2, 4, byte_order);
-	  inst2 = read_memory_unsigned_integer (next_addr + 6, 2, byte_order);
-
-	  if (inst2 == 0x051f)           /* add.l $sp, $r12 */
-	    {
-	      cache->framesize += offset;
-	    }
-
-	  return (next_addr + 8);
-	}
-      else  /* This is not a prologue instruction.  */
+      else
 	break;
+    }
+
+  inst = read_memory_unsigned_integer (next_addr, 2, byte_order);
+
+  /* Optional stack allocation for args and local vars <= 4
+     byte.  */
+  if (inst == 0x0170)           /* ldi.l $r5, X */
+    {
+      offset = read_memory_integer (next_addr + 2, 4, byte_order);
+      inst2 = read_memory_unsigned_integer (next_addr + 6, 2, byte_order);
+      
+      if (inst2 == 0x0517)           /* add.l $sp, $r5 */
+	{
+	  cache->framesize += offset;
+	}
+      
+      return (next_addr + 8);
+    }
+  else if ((inst & 0xff00) == 0x91)   /* dec $sp, X */
+    {
+      cache->framesize += (inst & 0x00ff);
+      next_addr += 2;
+
+      while (next_addr < end_addr)
+	{
+	  inst = read_memory_unsigned_integer (next_addr, 2, byte_order);
+	  if ((inst & 0xff00) != 0x91) /* no more dec $sp, X */
+	    break;
+	  cache->framesize += (inst & 0x00ff);
+	  next_addr += 2;
+	}
     }
 
   return next_addr;

@@ -1,7 +1,6 @@
 /* QNX Neutrino specific low level interface, for the remote server
    for GDB.
-   Copyright (C) 2009
-   Free Software Foundation, Inc.
+   Copyright (C) 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -602,7 +601,7 @@ nto_wait (ptid_t ptid,
    If REGNO is -1, fetch all registers, or REGNO register only otherwise.  */
 
 static void
-nto_fetch_registers (int regno)
+nto_fetch_registers (struct regcache *regcache, int regno)
 {
   int regsize;
   procfs_greg greg;
@@ -630,7 +629,7 @@ nto_fetch_registers (int regno)
 	    {
 	      const unsigned int registeroffset
 		= the_low_target.register_offset (regno);
-	      supply_register (regno, ((char *)&greg) + registeroffset);
+	      supply_register (regcache, regno, ((char *)&greg) + registeroffset);
 	    }
 	}
       else
@@ -639,7 +638,7 @@ nto_fetch_registers (int regno)
 	    = the_low_target.register_offset (regno);
 	  if (registeroffset == -1)
 	    return;
-	  supply_register (regno, ((char *)&greg) + registeroffset);
+	  supply_register (regcache, regno, ((char *)&greg) + registeroffset);
 	}
     }
   else
@@ -650,7 +649,7 @@ nto_fetch_registers (int regno)
    We always store all registers, regardless of REGNO.  */
 
 static void
-nto_store_registers (int regno)
+nto_store_registers (struct regcache *regcache, int regno)
 {
   procfs_greg greg;
   int err;
@@ -672,7 +671,7 @@ nto_store_registers (int regno)
     {
       const unsigned int regoffset
 	= the_low_target.register_offset (regno);
-      collect_register (regno, ((char *)&greg) + regoffset);
+      collect_register (regcache, regno, ((char *)&greg) + regoffset);
     }
   err = devctl (nto_inferior.ctl_fd, DCMD_PROC_SETGREG, &greg, sizeof (greg),
 		0);

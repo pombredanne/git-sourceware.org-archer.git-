@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008, 2009 Free Software Foundation, Inc.
+   2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -49,6 +49,7 @@
 #include "solib.h"
 #include "parser-defs.h"
 #include "charset.h"
+#include "arch-utils.h"
 
 #ifdef TUI
 #include "tui/tui.h"		/* For tui_active et.al.   */
@@ -135,16 +136,25 @@ struct display
   {
     /* Chain link to next auto-display item.  */
     struct display *next;
+
     /* The expression as the user typed it.  */
     char *exp_string;
+
     /* Expression to be evaluated and displayed.  */
     struct expression *exp;
+
     /* Item number of this auto-display item.  */
     int number;
+
     /* Display format specified.  */
     struct format_data format;
+
+    /* Program space associated with `block'.  */
+    struct program_space *pspace;
+
     /* Innermost block required by this expression when evaluated */
     struct block *block;
+
     /* Status of this display (enabled or disabled) */
     int enabled_p;
   };
@@ -553,7 +563,8 @@ set_next_address (struct gdbarch *gdbarch, CORE_ADDR addr)
    settings of the demangle and asm_demangle variables.  */
 
 void
-print_address_symbolic (CORE_ADDR addr, struct ui_file *stream,
+print_address_symbolic (struct gdbarch *gdbarch, CORE_ADDR addr,
+			struct ui_file *stream,
 			int do_demangle, char *leadin)
 {
   char *name = NULL;
@@ -566,7 +577,7 @@ print_address_symbolic (CORE_ADDR addr, struct ui_file *stream,
   struct cleanup *cleanup_chain = make_cleanup (free_current_contents, &name);
   make_cleanup (free_current_contents, &filename);
 
-  if (build_address_symbolic (addr, do_demangle, &name, &offset,
+  if (build_address_symbolic (gdbarch, addr, do_demangle, &name, &offset,
 			      &filename, &line, &unmapped))
     {
       do_cleanups (cleanup_chain);
@@ -606,7 +617,8 @@ print_address_symbolic (CORE_ADDR addr, struct ui_file *stream,
    success, when all the info in the OUT paramters is valid. Return 1
    otherwise. */
 int
-build_address_symbolic (CORE_ADDR addr,  /* IN */
+build_address_symbolic (struct gdbarch *gdbarch,
+			CORE_ADDR addr,  /* IN */
 			int do_demangle, /* IN */
 			char **name,     /* OUT */
 			int *offset,     /* OUT */
@@ -649,6 +661,13 @@ build_address_symbolic (CORE_ADDR addr,  /* IN */
 
   if (symbol)
     {
+      /* If this is a function (i.e. a code address), strip out any
+	 non-address bits.  For instance, display a pointer to the
+	 first instruction of a Thumb function as <function>; the
+	 second instruction will be <function+2>, even though the
+	 pointer is <function+3>.  This matches the ISA behavior.  */
+      addr = gdbarch_addr_bits_remove (gdbarch, addr);
+
       name_location = BLOCK_START (SYMBOL_BLOCK_VALUE (symbol));
       if (do_demangle || asm_demangle)
 	name_temp = SYMBOL_PRINT_NAME (symbol);
@@ -713,7 +732,27 @@ print_address (struct gdbarch *gdbarch,
 	       CORE_ADDR addr, struct ui_file *stream)
 {
   fputs_filtered (paddress (gdbarch, addr), stream);
-  print_address_symbolic (addr, stream, asm_demangle, " ");
+  print_address_symbolic (gdbarch, addr, stream, asm_demangle, " ");
+}
+
+/* Return a prefix for instruction address:
+   "=> " for current instruction, else "   ".  */
+
+const char *
+pc_prefix (CORE_ADDR addr)
+{
+  if (has_stack_frames ())
+    {
+      struct frame_info *frame;
+      CORE_ADDR pc;
+
+      frame = get_selected_frame (NULL);
+      pc = get_frame_pc (frame);
+
+      if (pc == addr)
+	return "=> ";
+    }
+  return "   ";
 }
 
 /* Print address ADDR symbolically on STREAM.  Parameter DEMANGLE
@@ -734,11 +773,11 @@ print_address_demangle (struct gdbarch *gdbarch, CORE_ADDR addr,
   else if (opts.addressprint)
     {
       fputs_filtered (paddress (gdbarch, addr), stream);
-      print_address_symbolic (addr, stream, do_demangle, " ");
+      print_address_symbolic (gdbarch, addr, stream, do_demangle, " ");
     }
   else
     {
-      print_address_symbolic (addr, stream, do_demangle, "");
+      print_address_symbolic (gdbarch, addr, stream, do_demangle, "");
     }
 }
 
@@ -808,6 +847,8 @@ do_examine (struct format_data fmt, struct gdbarch *gdbarch, CORE_ADDR addr)
   while (count > 0)
     {
       QUIT;
+      if (format == 'i')
+	fputs_filtered (pc_prefix (next_address), gdb_stdout);
       print_address (next_gdbarch, next_address, gdb_stdout);
       printf_filtered (":");
       for (i = maxelts;
@@ -1449,6 +1490,7 @@ display_command (char *exp, int from_tty)
       new->exp_string = xstrdup (exp);
       new->exp = expr;
       new->block = innermost_block;
+      new->pspace = current_program_space;
       new->next = display_chain;
       new->number = ++display_number;
       new->format = fmt;
@@ -1565,6 +1607,20 @@ do_one_display (struct display *d)
   if (d->enabled_p == 0)
     return;
 
+  /* The expression carries the architecture that was used at parse time.
+     This is a problem if the expression depends on architecture features
+     (e.g. register numbers), and the current architecture is now different.
+     For example, a display statement like "display/i $pc" is expected to
+     display the PC register of the current architecture, not the arch at
+     the time the display command was given.  Therefore, we re-parse the
+     expression if the current architecture has changed.  */
+  if (d->exp != NULL && d->exp->gdbarch != get_current_arch ())
+    {
+      xfree (d->exp);
+      d->exp = NULL;
+      d->block = NULL;
+    }
+
   if (d->exp == NULL)
     {
       volatile struct gdb_exception ex;
@@ -1585,7 +1641,12 @@ do_one_display (struct display *d)
     }
 
   if (d->block)
-    within_current_scope = contained_in (get_selected_block (0), d->block);
+    {
+      if (d->pspace == current_program_space)
+	within_current_scope = contained_in (get_selected_block (0), d->block);
+      else
+	within_current_scope = 0;
+    }
   else
     within_current_scope = 1;
   if (!within_current_scope)
@@ -1810,6 +1871,7 @@ display_uses_solib_p (const struct display *d,
   const union exp_element *const elts = exp->elts;
 
   if (d->block != NULL
+      && d->pspace == solib->pspace
       && solib_contains_address_p (solib, d->block->startaddr))
     return 1;
 
@@ -1826,14 +1888,14 @@ display_uses_solib_p (const struct display *d,
 	{
 	  const struct block *const block = elts[i + 1].block;
 	  const struct symbol *const symbol = elts[i + 2].symbol;
-	  const struct obj_section *const section =
-	    SYMBOL_OBJ_SECTION (symbol);
 
 	  if (block != NULL
-	      && solib_contains_address_p (solib, block->startaddr))
+	      && solib_contains_address_p (solib,
+					   block->startaddr))
 	    return 1;
 
-	  if (section && section->objfile == solib->objfile)
+	  /* SYMBOL_OBJ_SECTION (symbol) may be NULL.  */
+	  if (SYMBOL_SYMTAB (symbol)->objfile == solib->objfile)
 	    return 1;
 	}
       endpos -= oplen;
@@ -2310,7 +2372,7 @@ printf_command (char *arg, int from_tty)
 	      obstack_init (&output);
 	      inner_cleanup = make_cleanup_obstack_free (&output);
 
-	      convert_between_encodings (target_wide_charset (byte_order),
+	      convert_between_encodings (target_wide_charset (gdbarch),
 					 host_charset (),
 					 str, j, wcwidth,
 					 &output, translit_char);
@@ -2342,7 +2404,7 @@ printf_command (char *arg, int from_tty)
 	      obstack_init (&output);
 	      inner_cleanup = make_cleanup_obstack_free (&output);
 
-	      convert_between_encodings (target_wide_charset (byte_order),
+	      convert_between_encodings (target_wide_charset (gdbarch),
 					 host_charset (),
 					 bytes, TYPE_LENGTH (valtype),
 					 TYPE_LENGTH (valtype),
@@ -2580,8 +2642,13 @@ printf_command (char *arg, int from_tty)
 	/* Skip to the next substring.  */
 	current_substring += strlen (current_substring) + 1;
       }
-    /* Print the portion of the format string after the last argument.  */
-    puts_filtered (last_arg);
+    /* Print the portion of the format string after the last argument.
+       Note that this will not include any ordinary %-specs, but it
+       might include "%%".  That is why we use printf_filtered and not
+       puts_filtered here.  Also, we pass a dummy argument because
+       some platforms have modified GCC to include -Wformat-security
+       by default, which will warn here if there is no argument.  */
+    printf_filtered (last_arg, 0);
   }
   do_cleanups (old_cleanups);
 }

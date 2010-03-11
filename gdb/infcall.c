@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008, 2009 Free Software Foundation, Inc.
+   2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -441,6 +441,7 @@ call_function_by_hand (struct value *function, int nargs, struct value **args)
   struct gdbarch *gdbarch;
   struct breakpoint *terminate_bp = NULL;
   struct minimal_symbol *tm;
+  struct cleanup *terminate_bp_cleanup = NULL;
   ptid_t call_thread_ptid;
   struct gdb_exception e;
   const char *name;
@@ -517,10 +518,9 @@ call_function_by_hand (struct value *function, int nargs, struct value **args)
 	      /* Stack grows up.  */
 	      sp = gdbarch_frame_align (gdbarch, old_sp + 1);
 	  }
-	gdb_assert ((gdbarch_inner_than (gdbarch, 1, 2)
-		    && sp <= old_sp)
-		    || (gdbarch_inner_than (gdbarch, 2, 1)
-		       && sp >= old_sp));
+	/* SP may have underflown address zero here from OLD_SP.  Memory access
+	   functions will probably fail in such case but that is a target's
+	   problem.  */
       }
     else
       /* FIXME: cagney/2002-09-18: Hey, you loose!
@@ -730,6 +730,7 @@ call_function_by_hand (struct value *function, int nargs, struct value **args)
     struct breakpoint *bpt;
     struct symtab_and_line sal;
     init_sal (&sal);		/* initialize to zeroes */
+    sal.pspace = current_program_space;
     sal.pc = bp_addr;
     sal.section = find_pc_overlay (sal.pc);
     /* Sanity.  The exact same SP value is returned by
@@ -772,7 +773,7 @@ call_function_by_hand (struct value *function, int nargs, struct value **args)
 
   /* Register a clean-up for unwind_on_terminating_exception_breakpoint.  */
   if (terminate_bp)
-    make_cleanup_delete_breakpoint (terminate_bp);
+    terminate_bp_cleanup = make_cleanup_delete_breakpoint (terminate_bp);
 
   /* - SNIP - SNIP - SNIP - SNIP - SNIP - SNIP - SNIP - SNIP - SNIP -
      If you're looking to implement asynchronous dummy-frames, then
@@ -939,7 +940,7 @@ When the function is done executing, GDB will silently stop."),
 		 user.  */
 
 	      if (terminate_bp != NULL
-		  && (inferior_thread()->stop_bpstat->breakpoint_at->address
+		  && (inferior_thread ()->stop_bpstat->breakpoint_at->address
 		      == terminate_bp->loc->address))
 		{
 		  /* We must get back to the frame we were before the
@@ -987,11 +988,17 @@ When the function is done executing, GDB will silently stop."),
       internal_error (__FILE__, __LINE__, _("... should not be here"));
     }
 
+  /* If we get here and the std::terminate() breakpoint has been set,
+     it has to be cleaned manually.  */
+  if (terminate_bp)
+    do_cleanups (terminate_bp_cleanup);
+
   /* If we get here the called FUNCTION ran to completion,
      and the dummy frame has already been popped.  */
 
   {
-    struct regcache *retbuf = regcache_xmalloc (gdbarch);
+    struct address_space *aspace = get_regcache_aspace (stop_registers);
+    struct regcache *retbuf = regcache_xmalloc (gdbarch, aspace);
     struct cleanup *retbuf_cleanup = make_cleanup_regcache_xfree (retbuf);
     struct value *retval = NULL;
 

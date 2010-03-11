@@ -1,6 +1,6 @@
 /* Target-dependent code for the Toshiba MeP for GDB, the GNU debugger.
 
-   Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
+   Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    Contributed by Red Hat, Inc.
@@ -46,7 +46,7 @@
 #include "elf-bfd.h"
 #include "elf/mep.h"
 #include "prologue-value.h"
-#include "opcode/cgen-bitset.h"
+#include "cgen/bitset.h"
 #include "infcall.h"
 
 #include "gdb_assert.h"

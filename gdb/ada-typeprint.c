@@ -1,6 +1,6 @@
 /* Support for printing Ada types for GDB, the GNU debugger.
    Copyright (C) 1986, 1988, 1989, 1991, 1997, 1998, 1999, 2000, 2001, 2002,
-   2003, 2004, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2003, 2004, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -114,53 +114,32 @@ decoded_type_name (struct type *type)
     }
 }
 
-/* Print range type TYPE on STREAM.  */
+/* Print TYPE on STREAM, preferably as a range.  */
 
 static void
 print_range (struct type *type, struct ui_file *stream)
 {
-  struct type *target_type;
-  target_type = TYPE_TARGET_TYPE (type);
-  if (target_type == NULL)
-    target_type = type;
-
-  switch (TYPE_CODE (target_type))
+  switch (TYPE_CODE (type))
     {
     case TYPE_CODE_RANGE:
-    case TYPE_CODE_INT:
-    case TYPE_CODE_BOOL:
-    case TYPE_CODE_CHAR:
     case TYPE_CODE_ENUM:
+      {
+	struct type *target_type;
+	target_type = TYPE_TARGET_TYPE (type);
+	if (target_type == NULL)
+	  target_type = type;
+	ada_print_scalar (target_type, ada_discrete_type_low_bound (type),
+			  stream);
+	fprintf_filtered (stream, " .. ");
+	ada_print_scalar (target_type, ada_discrete_type_high_bound (type),
+			  stream);
+      }
       break;
     default:
-      target_type = NULL;
-      break;
-    }
-
-  if (TYPE_NFIELDS (type) < 2)
-    {
-      /* A range needs at least 2 bounds to be printed.  If there are less
-         than 2, just print the type name instead of the range itself.
-         This check handles cases such as characters, for example.
-
-         If the name is not defined, then we don't print anything.
-       */
       fprintf_filtered (stream, "%.*s",
 			ada_name_prefix_len (TYPE_NAME (type)),
 			TYPE_NAME (type));
-    }
-  else
-    {
-      /* We extract the range type bounds respectively from the first element
-         and the last element of the type->fields array */
-      const LONGEST lower_bound = (LONGEST) TYPE_LOW_BOUND (type);
-      const LONGEST upper_bound = (TYPE_CODE (type) == TYPE_CODE_RANGE
-	? (LONGEST) TYPE_HIGH_BOUND (type)
-	: (LONGEST) TYPE_FIELD_BITPOS (type, TYPE_NFIELDS (type) - 1));
-
-      ada_print_scalar (target_type, lower_bound, stream);
-      fprintf_filtered (stream, " .. ");
-      ada_print_scalar (target_type, upper_bound, stream);
+      break;
     }
 }
 
@@ -331,15 +310,6 @@ print_fixed_point_type (struct type *type, struct ui_file *stream)
     }
 }
 
-/* Print representation of special VAX floating-point type TYPE on STREAM.  */
-
-static void
-print_vax_floating_point_type (struct type *type, struct ui_file *stream)
-{
-  fprintf_filtered (stream, "<float format %c>",
-		    ada_vax_float_type_suffix (type));
-}
-
 /* Print simple (constrained) array type TYPE on STREAM.  LEVEL is the
    recursion (indentation) level, in case the element type itself has
    nested structure, and SHOW is the number of levels of internal
@@ -352,7 +322,7 @@ print_array_type (struct type *type, struct ui_file *stream, int show,
   int bitsize;
   int n_indices;
 
-  if (ada_is_packed_array_type (type))
+  if (ada_is_constrained_packed_array_type (type))
     type = ada_coerce_to_simple_array_type (type);
 
   bitsize = 0;
@@ -770,7 +740,7 @@ ada_print_type (struct type *type0, char *varstring, struct ui_file *stream,
 
   if (ada_is_aligner_type (type))
     ada_print_type (ada_aligned_type (type), "", stream, show, level);
-  else if (ada_is_packed_array_type (type))
+  else if (ada_is_constrained_packed_array_type (type))
     {
       if (TYPE_CODE (type) == TYPE_CODE_PTR)
         {
@@ -807,8 +777,6 @@ ada_print_type (struct type *type0, char *varstring, struct ui_file *stream,
       case TYPE_CODE_INT:
 	if (ada_is_fixed_point_type (type))
 	  print_fixed_point_type (type, stream);
-	else if (ada_is_vax_floating_type (type))
-	  print_vax_floating_point_type (type, stream);
 	else
 	  {
 	    char *name = ada_type_name (type);
@@ -825,8 +793,6 @@ ada_print_type (struct type *type0, char *varstring, struct ui_file *stream,
       case TYPE_CODE_RANGE:
 	if (ada_is_fixed_point_type (type))
 	  print_fixed_point_type (type, stream);
-	else if (ada_is_vax_floating_type (type))
-	  print_vax_floating_point_type (type, stream);
 	else if (ada_is_modular_type (type))
 	  fprintf_filtered (stream, "mod %s", 
 			    int_string (ada_modulus (type), 10, 0, 0, 1));

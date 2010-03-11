@@ -1,7 +1,7 @@
 /* Scheme/Guile language support routines for GDB, the GNU debugger.
 
-   Copyright (C) 1995, 1996, 1998, 1999, 2000, 2001, 2005, 2007, 2008, 2009
-   Free Software Foundation, Inc.
+   Copyright (C) 1995, 1996, 1998, 1999, 2000, 2001, 2005, 2007, 2008, 2009,
+   2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -62,9 +62,9 @@ scm_inferior_print (struct type *type, LONGEST value, struct ui_file *stream,
     {
       /* XXX: Should we cache these symbols?  */
       gdb_output_sym =
-	lookup_symbol_global ("gdb_output", NULL, NULL, VAR_DOMAIN);
+	lookup_symbol_global ("gdb_output", NULL, VAR_DOMAIN);
       gdb_output_len_sym =
-	lookup_symbol_global ("gdb_output_length", NULL, NULL, VAR_DOMAIN);
+	lookup_symbol_global ("gdb_output_length", NULL, VAR_DOMAIN);
 
       if ((gdb_output_sym == NULL) || (gdb_output_len_sym == NULL))
 	ret = -1;

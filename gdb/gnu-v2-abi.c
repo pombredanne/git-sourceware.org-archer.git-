@@ -1,6 +1,6 @@
 /* Abstraction of GNU v2 abi.
 
-   Copyright (C) 2001, 2002, 2003, 2005, 2007, 2008, 2009
+   Copyright (C) 2001, 2002, 2003, 2005, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    Contributed by Daniel Berlin <dberlin@redhat.com>
@@ -28,7 +28,6 @@
 #include "demangle.h"
 #include "cp-abi.h"
 #include "cp-support.h"
-#include "gnu-v2-abi.h"
 
 #include <ctype.h>
 
@@ -346,7 +345,7 @@ vb_match (struct type *type, int index, struct type *basetype)
 
    -1 is returned on error. */
 
-int
+static int
 gnuv2_baseclass_offset (struct type *type, int index,
 			const bfd_byte *valaddr, CORE_ADDR address)
 {

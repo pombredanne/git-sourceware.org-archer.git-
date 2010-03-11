@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
    1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008,
-   2009 Free Software Foundation, Inc.
+   2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -26,6 +26,9 @@
 #include "event-top.h"
 #include "exceptions.h"
 #include "gdbthread.h"
+#ifdef HAVE_SYS_RESOURCE_H
+#include <sys/resource.h>
+#endif /* HAVE_SYS_RESOURCE_H */
 
 #ifdef TUI
 #include "tui/tui.h"		/* For tui_get_command_dimension.   */
@@ -55,6 +58,7 @@
 #include "gdb_obstack.h"
 #include "gdbcore.h"
 #include "top.h"
+#include "main.h"
 
 #include "inferior.h"		/* for signed_pointer_to_address */
 
@@ -68,6 +72,7 @@
 #include <time.h>
 
 #include "gdb_usleep.h"
+#include "interps.h"
 
 #if !HAVE_DECL_MALLOC
 extern PTR malloc ();		/* ARI: PTR */
@@ -843,6 +848,44 @@ error_stream (struct ui_file *stream)
   error (("%s"), message);
 }
 
+/* Dump core trying to increase the core soft limit to hard limit first.  */
+
+static void
+dump_core (void)
+{
+#ifdef HAVE_SETRLIMIT
+  struct rlimit rlim = { RLIM_INFINITY, RLIM_INFINITY };
+
+  setrlimit (RLIMIT_CORE, &rlim);
+#endif /* HAVE_SETRLIMIT */
+
+  abort ();		/* NOTE: GDB has only three calls to abort().  */
+}
+
+/* Check whether GDB will be able to dump core using the dump_core function.  */
+
+static int
+can_dump_core (const char *reason)
+{
+#ifdef HAVE_GETRLIMIT
+  struct rlimit rlim;
+
+  /* Be quiet and assume we can dump if an error is returned.  */
+  if (getrlimit (RLIMIT_CORE, &rlim) != 0)
+    return 1;
+
+  if (rlim.rlim_max == 0)
+    {
+      fprintf_unfiltered (gdb_stderr,
+			  _("%s\nUnable to dump core, use `ulimit -c unlimited'"
+			    " before executing GDB next time.\n"), reason);
+      return 0;
+    }
+#endif /* HAVE_GETRLIMIT */
+
+  return 1;
+}
+
 /* Allow the user to configure the debugger behavior with respect to
    what to do when an internal problem is detected.  */
 
@@ -893,7 +936,7 @@ internal_vproblem (struct internal_problem *problem,
       case 1:
 	dejavu = 2;
 	fputs_unfiltered (msg, gdb_stderr);
-	abort ();	/* NOTE: GDB has only four calls to abort().  */
+	abort ();	/* NOTE: GDB has only three calls to abort().  */
       default:
 	dejavu = 3;
         /* Newer GLIBC versions put the warn_unused_result attribute
@@ -902,7 +945,7 @@ internal_vproblem (struct internal_problem *problem,
            does not fix this problem.  This is the solution suggested
            at http://gcc.gnu.org/bugzilla/show_bug.cgi?id=25509.  */
 	if (write (STDERR_FILENO, msg, sizeof (msg)) != sizeof (msg))
-          abort (); /* NOTE: GDB has only four calls to abort().  */
+          abort (); /* NOTE: GDB has only three calls to abort().  */
 	exit (1);
       }
   }
@@ -951,13 +994,18 @@ further debugging may prove unreliable.", file, line, problem->name, msg);
 
   if (problem->should_dump_core == internal_problem_ask)
     {
-      /* Default (yes/batch case) is to dump core.  This leaves a GDB
-         `dropping' so that it is easier to see that something went
-         wrong in GDB.  */
-      dump_core_p = query (_("%s\nCreate a core file of GDB? "), reason);
+      if (!can_dump_core (reason))
+	dump_core_p = 0;
+      else
+	{
+	  /* Default (yes/batch case) is to dump core.  This leaves a GDB
+	     `dropping' so that it is easier to see that something went
+	     wrong in GDB.  */
+	  dump_core_p = query (_("%s\nCreate a core file of GDB? "), reason);
+	}
     }
   else if (problem->should_dump_core == internal_problem_yes)
-    dump_core_p = 1;
+    dump_core_p = can_dump_core (reason);
   else if (problem->should_dump_core == internal_problem_no)
     dump_core_p = 0;
   else
@@ -966,7 +1014,7 @@ further debugging may prove unreliable.", file, line, problem->name, msg);
   if (quit_p)
     {
       if (dump_core_p)
-	abort ();		/* NOTE: GDB has only four calls to abort().  */
+	dump_core ();
       else
 	exit (1);
     }
@@ -976,7 +1024,7 @@ further debugging may prove unreliable.", file, line, problem->name, msg);
 	{
 #ifdef HAVE_WORKING_FORK
 	  if (fork () == 0)
-	    abort ();		/* NOTE: GDB has only four calls to abort().  */
+	    dump_core ();
 #endif
 	}
     }
@@ -1449,7 +1497,7 @@ defaulted_query (const char *ctlstr, const char defchar, va_list args)
      question we're asking, and then answer the default automatically.  This
      way, important error messages don't get lost when talking to GDB
      over a pipe.  */
-  if (! input_from_terminal_p ())
+  if (batch_flag || ! input_from_terminal_p ())
     {
       wrap_here ("");
       vfprintf_filtered (gdb_stdout, ctlstr, args);
@@ -1606,7 +1654,7 @@ query (const char *ctlstr, ...)
    function returns 1.  Otherwise, the function returns 0.  */
 
 static int
-host_char_to_target (int c, int *target_c)
+host_char_to_target (struct gdbarch *gdbarch, int c, int *target_c)
 {
   struct obstack host_data;
   char the_char = c;
@@ -1616,7 +1664,7 @@ host_char_to_target (int c, int *target_c)
   obstack_init (&host_data);
   cleanups = make_cleanup_obstack_free (&host_data);
 
-  convert_between_encodings (target_charset (), host_charset (),
+  convert_between_encodings (target_charset (gdbarch), host_charset (),
 			     &the_char, 1, 1, &host_data, translit_none);
 
   if (obstack_object_size (&host_data) == 1)
@@ -1645,7 +1693,7 @@ host_char_to_target (int c, int *target_c)
    after the zeros.  A value of 0 does not mean end of string.  */
 
 int
-parse_escape (char **string_ptr)
+parse_escape (struct gdbarch *gdbarch, char **string_ptr)
 {
   int target_char = -2;	/* initialize to avoid GCC warnings */
   int c = *(*string_ptr)++;
@@ -1711,11 +1759,11 @@ parse_escape (char **string_ptr)
       break;
     }
 
-  if (!host_char_to_target (c, &target_char))
+  if (!host_char_to_target (gdbarch, c, &target_char))
     error
       ("The escape sequence `\%c' is equivalent to plain `%c', which"
        " has no equivalent\n" "in the `%s' character set.", c, c,
-       target_charset ());
+       target_charset (gdbarch));
   return target_char;
 }
 
@@ -2163,8 +2211,11 @@ fputs_maybe_filtered (const char *linebuffer, struct ui_file *stream,
     return;
 
   /* Don't do any filtering if it is disabled.  */
-  if ((stream != gdb_stdout) || !pagination_enabled
-      || (lines_per_page == UINT_MAX && chars_per_line == UINT_MAX))
+  if (stream != gdb_stdout
+      || !pagination_enabled
+      || (lines_per_page == UINT_MAX && chars_per_line == UINT_MAX)
+      || top_level_interpreter () == NULL
+      || ui_out_is_mi_like_p (interp_ui_out (top_level_interpreter ())))
     {
       fputs_unfiltered (linebuffer, stream);
       return;
@@ -3552,6 +3603,74 @@ gdb_buildargv (const char *s)
   if (s != NULL && argv == NULL)
     nomem (0);
   return argv;
+}
+
+int
+compare_positive_ints (const void *ap, const void *bp)
+{
+  /* Because we know we're comparing two ints which are positive,
+     there's no danger of overflow here.  */
+  return * (int *) ap - * (int *) bp;
+}
+
+#define AMBIGUOUS_MESS1	".\nMatching formats:"
+#define AMBIGUOUS_MESS2	".\nUse \"set gnutarget format-name\" to specify the format."
+
+const char *
+gdb_bfd_errmsg (bfd_error_type error_tag, char **matching)
+{
+  char *ret, *retp;
+  int ret_len;
+  char **p;
+
+  /* Check if errmsg just need simple return.  */
+  if (error_tag != bfd_error_file_ambiguously_recognized || matching == NULL)
+    return bfd_errmsg (error_tag);
+
+  ret_len = strlen (bfd_errmsg (error_tag)) + strlen (AMBIGUOUS_MESS1)
+            + strlen (AMBIGUOUS_MESS2);
+  for (p = matching; *p; p++)
+    ret_len += strlen (*p) + 1;
+  ret = xmalloc (ret_len + 1);
+  retp = ret;
+  make_cleanup (xfree, ret);
+
+  strcpy (retp, bfd_errmsg (error_tag));
+  retp += strlen (retp);
+
+  strcpy (retp, AMBIGUOUS_MESS1);
+  retp += strlen (retp);
+
+  for (p = matching; *p; p++)
+    {
+      sprintf (retp, " %s", *p);
+      retp += strlen (retp);
+    }
+  xfree (matching);
+
+  strcpy (retp, AMBIGUOUS_MESS2);
+
+  return ret;
+}
+
+/* Return ARGS parsed as a valid pid, or throw an error.  */
+
+int
+parse_pid_to_attach (char *args)
+{
+  unsigned long pid;
+  char *dummy;
+
+  if (!args)
+    error_no_arg (_("process-id to attach"));
+
+  dummy = args;
+  pid = strtoul (args, &dummy, 0);
+  /* Some targets don't set errno on errors, grrr!  */
+  if ((pid == 0 && dummy == args) || dummy != &args[strlen (args)])
+    error (_("Illegal process-id: %s."), args);
+
+  return pid;
 }
 
 /* Provide a prototype to silence -Wmissing-prototypes.  */

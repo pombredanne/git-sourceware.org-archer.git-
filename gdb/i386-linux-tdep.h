@@ -1,6 +1,7 @@
 /* Target-dependent code for GNU/Linux x86.
 
-   Copyright (C) 2002, 2003, 2007, 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 2002, 2003, 2007, 2008, 2009, 2010
+   Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -33,5 +34,8 @@
 
 /* Total number of registers for GNU/Linux.  */
 #define I386_LINUX_NUM_REGS (I386_LINUX_ORIG_EAX_REGNUM + 1)
+
+/* Linux target description.  */
+extern struct target_desc *tdesc_i386_linux;
 
 #endif /* i386-linux-tdep.h */

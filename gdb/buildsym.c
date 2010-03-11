@@ -1,7 +1,7 @@
 /* Support routines for building symbol tables in GDB's internal format.
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009
-   Free Software Foundation, Inc.
+   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009,
+   2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -163,8 +163,8 @@ find_symbol_in_list (struct pending *list, char *name, int length)
       for (j = list->nsyms; --j >= 0;)
 	{
 	  pp = SYMBOL_LINKAGE_NAME (list->symbol[j]);
-	  if (*pp == *name && strncmp (pp, name, length) == 0 &&
-	      pp[length] == '\0')
+	  if (*pp == *name && strncmp (pp, name, length) == 0
+	      && pp[length] == '\0')
 	    {
 	      return (list->symbol[j]);
 	    }
@@ -583,8 +583,8 @@ start_subfile (char *name, char *dirname)
      source file. */
 
   subfile->language = deduce_language_from_filename (subfile->name);
-  if (subfile->language == language_unknown &&
-      subfile->next != NULL)
+  if (subfile->language == language_unknown
+      && subfile->next != NULL)
     {
       subfile->language = subfile->next->language;
     }
@@ -656,8 +656,8 @@ patch_subfile_names (struct subfile *subfile, char *name)
          symbols have been processed for a given source file. */
 
       subfile->language = deduce_language_from_filename (subfile->name);
-      if (subfile->language == language_unknown &&
-	  subfile->next != NULL)
+      if (subfile->language == language_unknown
+	  && subfile->next != NULL)
 	{
 	  subfile->language = subfile->next->language;
 	}

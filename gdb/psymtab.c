@@ -38,12 +38,11 @@
 #endif
 
 /* A fast way to get from a psymtab to its symtab (after the first time).  */
-#define	PSYMTAB_TO_SYMTAB(pst)  \
+#define PSYMTAB_TO_SYMTAB(pst)  \
     ((pst) -> symtab != NULL ? (pst) -> symtab : psymtab_to_symtab (pst))
 
 /* Lookup a partial symbol.  */
 static struct partial_symbol *lookup_partial_symbol (struct partial_symtab *,
-						     const char *,
 						     const char *, int,
 						     domain_enum);
 
@@ -416,7 +415,6 @@ fixup_psymbol_section (struct partial_symbol *psym, struct objfile *objfile)
 static struct symtab *
 lookup_symbol_aux_psymtabs (struct objfile *objfile,
 			    int block_index, const char *name,
-			    const char *linkage_name,
 			    const domain_enum domain)
 {
   struct partial_symtab *ps;
@@ -425,8 +423,7 @@ lookup_symbol_aux_psymtabs (struct objfile *objfile,
   require_partial_symbols (objfile);
   ALL_OBJFILE_PSYMTABS (objfile, ps)
   {
-    if (!ps->readin && lookup_partial_symbol (ps, name, linkage_name,
-					      psymtab_index, domain))
+    if (!ps->readin && lookup_partial_symbol (ps, name, psymtab_index, domain))
       return PSYMTAB_TO_SYMTAB (ps);
   }
 
@@ -434,14 +431,11 @@ lookup_symbol_aux_psymtabs (struct objfile *objfile,
 }
 
 /* Look, in partial_symtab PST, for symbol whose natural name is NAME.
-   If LINKAGE_NAME is non-NULL, check in addition that the symbol's
-   linkage name matches it.  Check the global symbols if GLOBAL, the
-   static symbols if not */
+   Check the global symbols if GLOBAL, the static symbols if not. */
 
-static struct partial_symbol *
+struct partial_symbol *
 lookup_partial_symbol (struct partial_symtab *pst, const char *name,
-		       const char *linkage_name, int global,
-		       domain_enum domain)
+		       int global, domain_enum domain)
 {
   struct partial_symbol *temp;
   struct partial_symbol **start, **psym;
@@ -493,9 +487,7 @@ lookup_partial_symbol (struct partial_symtab *pst, const char *name,
 	internal_error (__FILE__, __LINE__, _("failed internal consistency check"));
 
       while (top <= real_top
-	     && (linkage_name != NULL
-		 ? strcmp (SYMBOL_LINKAGE_NAME (*top), linkage_name) == 0
-		 : SYMBOL_MATCHES_SEARCH_NAME (*top,name)))
+	     && SYMBOL_MATCHES_SEARCH_NAME (*top, name))
 	{
 	  if (symbol_matches_domain (SYMBOL_LANGUAGE (*top),
 				     SYMBOL_DOMAIN (*top), domain))
@@ -512,15 +504,9 @@ lookup_partial_symbol (struct partial_symtab *pst, const char *name,
       for (psym = start; psym < start + length; psym++)
 	{
 	  if (symbol_matches_domain (SYMBOL_LANGUAGE (*psym),
-				     SYMBOL_DOMAIN (*psym), domain))
-	    {
-	      if (linkage_name != NULL
-		  ? strcmp (SYMBOL_LINKAGE_NAME (*psym), linkage_name) == 0
-		  : SYMBOL_MATCHES_SEARCH_NAME (*psym, name))
-		{
-		  return (*psym);
-		}
-	    }
+				     SYMBOL_DOMAIN (*psym), domain)
+	      && SYMBOL_MATCHES_SEARCH_NAME (*psym, name))
+	    return (*psym);
 	}
     }
 
@@ -543,7 +529,6 @@ psymtab_to_symtab (struct partial_symtab *pst)
   if (!pst->readin)
     {
       struct cleanup *back_to = increment_reading_symtab ();
-      currently_reading_symtab++;
       (*pst->read_symtab) (pst);
       do_cleanups (back_to);
     }
@@ -845,58 +830,12 @@ read_symtabs_for_function (struct objfile *objfile, const char *func_name)
     if (ps->readin)
       continue;
 
-    if ((lookup_partial_symbol (ps, func_name, NULL, 1, VAR_DOMAIN)
+    if ((lookup_partial_symbol (ps, func_name, 1, VAR_DOMAIN)
 	 != NULL)
-	|| (lookup_partial_symbol (ps, func_name, NULL, 0, VAR_DOMAIN)
+	|| (lookup_partial_symbol (ps, func_name, 0, VAR_DOMAIN)
 	    != NULL))
       psymtab_to_symtab (ps);
   }
-}
-
-void
-maintenance_print_psymbols (char *args, int from_tty)
-{
-  char **argv;
-  struct ui_file *outfile;
-  struct cleanup *cleanups;
-  char *symname = NULL;
-  char *filename = DEV_TTY;
-  struct objfile *objfile;
-  struct partial_symtab *ps;
-
-  dont_repeat ();
-
-  if (args == NULL)
-    {
-      error (_("print-psymbols takes an output file name and optional symbol file name"));
-    }
-  argv = gdb_buildargv (args);
-  cleanups = make_cleanup_freeargv (argv);
-
-  if (argv[0] != NULL)
-    {
-      filename = argv[0];
-      /* If a second arg is supplied, it is a source file name to match on */
-      if (argv[1] != NULL)
-	{
-	  symname = argv[1];
-	}
-    }
-
-  filename = tilde_expand (filename);
-  make_cleanup (xfree, filename);
-
-  outfile = gdb_fopen (filename, FOPEN_WT);
-  if (outfile == 0)
-    perror_with_name (filename);
-  make_cleanup_ui_file_delete (outfile);
-
-  immediate_quit++;
-  ALL_PSYMTABS (objfile, ps)
-    if (symname == NULL || strcmp (symname, ps->filename) == 0)
-    dump_psymtab (objfile, ps, outfile);
-  immediate_quit--;
-  do_cleanups (cleanups);
 }
 
 static void
@@ -983,7 +922,6 @@ map_symbol_filenames_psymtab (struct objfile *objfile,
     }
 }
 
-/* FIXME */
 int find_and_open_source (const char *filename,
 			  const char *dirname,
 			  char **fullname);
@@ -1024,15 +962,11 @@ find_symbol_file_from_partial (struct objfile *objfile, const char *name)
   require_partial_symbols (objfile);
   ALL_OBJFILE_PSYMTABS (objfile, pst)
     {
-      if (lookup_partial_symbol (pst, name, NULL, 1, VAR_DOMAIN))
+      if (lookup_partial_symbol (pst, name, 1, VAR_DOMAIN))
 	return pst->filename;
     }
   return NULL;
 }
-
-/* FIXME */
-extern int ada_wild_match (const char *patn0, int patn_len, const char *name0);
-extern int ada_is_name_suffix (const char *);
 
 /* Look, in partial_symtab PST, for symbol NAME in given namespace.
    Check the global symbols if GLOBAL, the static symbols if not.
@@ -1040,7 +974,9 @@ extern int ada_is_name_suffix (const char *);
 
 static struct partial_symbol *
 ada_lookup_partial_symbol (struct partial_symtab *pst, const char *name,
-                           int global, domain_enum namespace, int wild)
+                           int global, domain_enum namespace, int wild,
+			   int (*wild_match) (const char *, int, const char *),
+			   int (*is_name_suffix) (const char *))
 {
   struct partial_symbol **start;
   int name_len = strlen (name);
@@ -1064,7 +1000,7 @@ ada_lookup_partial_symbol (struct partial_symtab *pst, const char *name,
 
           if (symbol_matches_domain (SYMBOL_LANGUAGE (psym),
                                      SYMBOL_DOMAIN (psym), namespace)
-              && ada_wild_match (name, name_len, SYMBOL_LINKAGE_NAME (psym)))
+              && (*wild_match) (name, name_len, SYMBOL_LINKAGE_NAME (psym)))
             return psym;
         }
       return NULL;
@@ -1108,8 +1044,8 @@ ada_lookup_partial_symbol (struct partial_symtab *pst, const char *name,
                     break;
                 }
               else if (cmp == 0
-                       && ada_is_name_suffix (SYMBOL_LINKAGE_NAME (psym)
-					      + name_len))
+                       && (*is_name_suffix) (SYMBOL_LINKAGE_NAME (psym)
+					     + name_len))
                 return psym;
             }
           i += 1;
@@ -1161,8 +1097,8 @@ ada_lookup_partial_symbol (struct partial_symtab *pst, const char *name,
                     break;
                 }
               else if (cmp == 0
-                       && ada_is_name_suffix (SYMBOL_LINKAGE_NAME (psym)
-					      + name_len + 5))
+                       && (*is_name_suffix) (SYMBOL_LINKAGE_NAME (psym)
+					     + name_len + 5))
                 return psym;
             }
           i += 1;
@@ -1173,6 +1109,8 @@ ada_lookup_partial_symbol (struct partial_symtab *pst, const char *name,
 
 static void
 map_ada_symtabs (struct objfile *objfile,
+		 int (*wild_match) (const char *, int, const char *),
+		 int (*is_name_suffix) (const char *),
 		 void (*callback) (struct objfile *, struct symtab *, void *),
 		 const char *name, int global, domain_enum namespace, int wild,
 		 void *data)
@@ -1183,7 +1121,8 @@ map_ada_symtabs (struct objfile *objfile,
     {
       QUIT;
       if (ps->readin
-	  || ada_lookup_partial_symbol (ps, name, global, namespace, wild))
+	  || ada_lookup_partial_symbol (ps, name, global, namespace, wild,
+					wild_match, is_name_suffix))
 	{
 	  struct symtab *s = PSYMTAB_TO_SYMTAB (ps);
 	  if (s == NULL || !s->primary)
@@ -1375,26 +1314,23 @@ start_psymtab_common (struct objfile *objfile,
 
 static const struct partial_symbol *
 add_psymbol_to_bcache (struct psymtab_state *state,
-		       char *name, int namelength, domain_enum domain,
+		       char *name, int namelength, int copy_name,
+		       domain_enum domain,
 		       enum address_class class,
 		       long val,	/* Value as a long */
 		       CORE_ADDR coreaddr,	/* Value as a CORE_ADDR */
 		       enum language language, struct objfile *objfile,
 		       int *added)
 {
-  char *buf = name;  
   /* psymbol is static so that there will be no uninitialized gaps in the
      structure which might contain random data, causing cache misses in
      bcache. */
   static struct partial_symbol psymbol;
   
-  if (name[namelength] != '\0')
-    {
-      buf = alloca (namelength + 1);
-      /* Create local copy of the partial symbol */
-      memcpy (buf, name, namelength);
-      buf[namelength] = '\0';
-    }
+  /* However, we must ensure that the entire 'value' field has been
+     zeroed before assigning to it, because an assignment may not
+     write the entire field.  */
+  memset (&psymbol.ginfo.value, 0, sizeof (psymbol.ginfo.value));
   /* val and coreaddr are mutually exclusive, one of them *will* be zero */
   if (val != 0)
     {
@@ -1409,7 +1345,8 @@ add_psymbol_to_bcache (struct psymtab_state *state,
   PSYMBOL_DOMAIN (&psymbol) = domain;
   PSYMBOL_CLASS (&psymbol) = class;
 
-  SYMBOL_SET_NAMES_FULL (&psymbol, buf, namelength, objfile, state->obstack);
+  SYMBOL_SET_NAMES_FULL (&psymbol, name, namelength, copy_name,
+			 objfile, state->obstack);
 
   /* Stash the partial symbol away in the cache */
   return bcache_full (&psymbol, sizeof (struct partial_symbol),
@@ -1474,7 +1411,8 @@ append_psymbol_to_list (struct psymbol_allocation_list *list,
 
 const struct partial_symbol *
 add_psymbol_to_list_full (struct psymtab_state *state,
-			  char *name, int namelength, domain_enum domain,
+			  char *name, int namelength, int copy_name,
+			  domain_enum domain,
 			  enum address_class class,
 			  long val,	/* Value as a long */
 			  CORE_ADDR coreaddr,	/* Value as a CORE_ADDR */
@@ -1487,7 +1425,8 @@ add_psymbol_to_list_full (struct psymtab_state *state,
   check_writeable (state);
 
   /* Stash the partial symbol away in the cache */
-  psym = add_psymbol_to_bcache (state, name, namelength, domain, class,
+  psym = add_psymbol_to_bcache (state, name, namelength, copy_name,
+				domain, class,
 				val, coreaddr, language, objfile, &added);
 
   /* Do not duplicate global partial symbols.  */
@@ -1502,7 +1441,8 @@ add_psymbol_to_list_full (struct psymtab_state *state,
 }
 
 const struct partial_symbol *
-add_psymbol_to_list (char *name, int namelength, domain_enum domain,
+add_psymbol_to_list (char *name, int namelength, int copy_name,
+		     domain_enum domain,
 		     enum address_class class,
 		     int is_global,
 		     long val,	/* Value as a long */
@@ -1510,7 +1450,7 @@ add_psymbol_to_list (char *name, int namelength, domain_enum domain,
 		     enum language language, struct objfile *objfile)
 {
   return add_psymbol_to_list_full (objfile->psyms,
-				   name, namelength, domain, class,
+				   name, namelength, copy_name, domain, class,
 				   val, coreaddr, language, objfile,
 				   is_global);
 }
@@ -1633,16 +1573,64 @@ struct psymtab_state readonly_psymtab_state;
 
 
 
+void
+maintenance_print_psymbols (char *args, int from_tty)
+{
+  char **argv;
+  struct ui_file *outfile;
+  struct cleanup *cleanups;
+  char *symname = NULL;
+  char *filename = DEV_TTY;
+  struct objfile *objfile;
+  struct partial_symtab *ps;
+
+  dont_repeat ();
+
+  if (args == NULL)
+    {
+      error (_("print-psymbols takes an output file name and optional symbol file name"));
+    }
+  argv = gdb_buildargv (args);
+  cleanups = make_cleanup_freeargv (argv);
+
+  if (argv[0] != NULL)
+    {
+      filename = argv[0];
+      /* If a second arg is supplied, it is a source file name to match on */
+      if (argv[1] != NULL)
+	{
+	  symname = argv[1];
+	}
+    }
+
+  filename = tilde_expand (filename);
+  make_cleanup (xfree, filename);
+
+  outfile = gdb_fopen (filename, FOPEN_WT);
+  if (outfile == 0)
+    perror_with_name (filename);
+  make_cleanup_ui_file_delete (outfile);
+
+  immediate_quit++;
+  ALL_PSYMTABS (objfile, ps)
+    if (symname == NULL || strcmp (symname, ps->filename) == 0)
+    dump_psymtab (objfile, ps, outfile);
+  immediate_quit--;
+  do_cleanups (cleanups);
+}
+
 /* List all the partial symbol tables whose names match REGEXP (optional).  */
 void
 maintenance_info_psymtabs (char *regexp, int from_tty)
 {
+  struct program_space *pspace;
   struct objfile *objfile;
 
   if (regexp)
     re_comp (regexp);
 
-  ALL_OBJFILES (objfile)
+  ALL_PSPACES (pspace)
+    ALL_PSPACE_OBJFILES (pspace, objfile)
     {
       struct gdbarch *gdbarch = get_objfile_arch (objfile);
       struct partial_symtab *psymtab;
@@ -1759,7 +1747,7 @@ maintenance_check_symtabs (char *ignore, int from_tty)
     while (length--)
       {
 	sym = lookup_block_symbol (b, SYMBOL_LINKAGE_NAME (*psym),
-				   NULL, SYMBOL_DOMAIN (*psym));
+				   SYMBOL_DOMAIN (*psym));
 	if (!sym)
 	  {
 	    printf_filtered ("Static symbol `");
@@ -1776,7 +1764,7 @@ maintenance_check_symtabs (char *ignore, int from_tty)
     while (length--)
       {
 	sym = lookup_block_symbol (b, SYMBOL_LINKAGE_NAME (*psym),
-				   NULL, SYMBOL_DOMAIN (*psym));
+				   SYMBOL_DOMAIN (*psym));
 	if (!sym)
 	  {
 	    printf_filtered ("Global symbol `");
@@ -1826,7 +1814,8 @@ map_partial_symbol_names (void (*fun) (const char *, void *), void *data)
 
   ALL_OBJFILES (objfile)
   {
-    objfile->sf->qf->map_symbol_names (objfile, fun, data);
+    if (objfile->sf)
+      objfile->sf->qf->map_symbol_names (objfile, fun, data);
   }
 }
 
@@ -1839,6 +1828,7 @@ map_partial_symbol_filenames (void (*fun) (const char *, const char *,
 
   ALL_OBJFILES (objfile)
   {
-    objfile->sf->qf->map_symbol_filenames (objfile, fun, data);
+    if (objfile->sf)
+      objfile->sf->qf->map_symbol_filenames (objfile, fun, data);
   }
 }

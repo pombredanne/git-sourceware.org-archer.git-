@@ -234,6 +234,7 @@ _bfd_vms_write_hdr (bfd *abfd, int objtype)
       _bfd_vms_output_long (abfd, MAX_OUTREC_SIZE);
     }
 
+  /* Create module name from filename.  */
   if (bfd_get_filename (abfd) != 0)
     {
       /* Strip path and suffix information.  */
@@ -256,9 +257,9 @@ _bfd_vms_write_hdr (bfd *abfd, int objtype)
       if (fptr != NULL)
 	fout = fptr + 1;
 
-      /* Strip .obj suffix.  */
+      /* Strip suffix.  */
       fptr = strrchr (fout, '.');
-      if (fptr != 0 && strcasecmp (fptr, ".OBJ") == 0)
+      if (fptr != 0)
 	*fptr = 0;
 
       /* Convert to upper case and truncate at 31 characters.
@@ -1178,13 +1179,13 @@ build_module_list (bfd *abfd)
 	     of debug info in the DST section, as well as the count of
 	     program sections (i.e. address spans) it contains.  */
 	  int modbeg = bfd_getl32 (ptr + DBG_S_L_DMT_MODBEG);
-	  int size = bfd_getl32 (ptr + DBG_S_L_DST_SIZE);
+	  int msize = bfd_getl32 (ptr + DBG_S_L_DST_SIZE);
 	  int count = bfd_getl16 (ptr + DBG_S_W_DMT_PSECT_COUNT);
 	  ptr += DBG_S_C_DMT_HEADER_SIZE;
 
 #if VMS_DEBUG
 	  _bfd_vms_debug (3, "module: modbeg = %d, size = %d, count = %d\n",
-			  modbeg, size, count);
+			  modbeg, msize, count);
 #endif
 
 	  /* We create a 'module' structure for each program section since
@@ -1198,7 +1199,7 @@ build_module_list (bfd *abfd)
 	      int length = bfd_getl32 (ptr + DBG_S_L_DMT_PSECT_LENGTH);
 	      module = new_module (abfd);
 	      module->modbeg = modbeg;
-	      module->size = size;
+	      module->size = msize;
 	      module->low = start;
 	      module->high = start + length;
 	      module->next = list;
@@ -1396,7 +1397,7 @@ int
 _bfd_vms_write_dbg (bfd *abfd ATTRIBUTE_UNUSED, int objtype ATTRIBUTE_UNUSED)
 {
 #if VMS_DEBUG
-  _bfd_vms_debug (2, "vms_write_dbg (%p, objtype)\n", abfd, objtype);
+  _bfd_vms_debug (2, "vms_write_dbg (%p, %d)\n", abfd, objtype);
 #endif
 
   return 0;

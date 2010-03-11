@@ -1,3 +1,477 @@
+2010-03-06  Simo Melenius  <simo.melenius@iki.fi>
+
+	* linux-low.c (linux_wait_for_lwp): Fetch the regcache after
+	switching the current inferior, not before.
+
+2010-03-01  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* Makefile.in (clean): Replace reg-i386.c, reg-x86-64.c,
+	reg-i386-linux.c and reg-x86-64-linux.c with i386.c, amd64.c,
+	i386-linux.c and amd64-linux.c.
+	(reg-i386.o): Removed.
+	(reg-i386.c): Likewise.
+	(reg-i386-linux.o): Likewise.
+	(reg-i386-linux.c): Likewise.
+	(reg-x86-64.o): Likewise.
+	(reg-x86-64.c): Likewise.
+	(reg-x86-64-linux.o): Likewise.
+	(reg-x86-64-linux.c): Likewise.
+	(i386.o): New.
+	(i386.c): Likewise.
+	(i386-linux.o): Likewise.
+	(i386-linux.c): Likewise.
+	(amd64.o): Likewise.
+	(amd64.c): Likewise.
+	(amd64-linux.o): Likewise.
+	(amd64-linux.c): Likewise.
+
+	* configure.srv (srv_i386_regobj): New.
+	(srv_i386_linux_regobj): Likewise.
+	(srv_amd64_regobj): Likewise.
+	(srv_amd64_linux_regobj): Likewise.
+	(srv_i386_32bit_xmlfiles): Likewise.
+	(srv_i386_64bit_xmlfiles): Likewise.
+	(srv_i386_xmlfiles): Likewise.
+	(srv_amd64_xmlfiles): Likewise.
+	(srv_i386_linux_xmlfiles): Likewise.
+	(srv_amd64_linux_xmlfiles): Likewise.
+	(i[34567]86-*-cygwin*): Set srv_regobj to $srv_i386_regobj.  Set
+	srv_xmlfiles to $srv_i386_xmlfiles.
+	(i[34567]86-*-mingw32ce*): Likewise.
+	(i[34567]86-*-mingw*): Likewise.
+	(i[34567]86-*-nto*): Likewise.
+	(i[34567]86-*-linux*): Set srv_regobj to $srv_i386_linux_regobj
+	and $srv_amd64_linux_regobj.  Set srv_xmlfiles to
+	$srv_i386_linux_xmlfiles and $srv_amd64_linux_xmlfiles.
+	(x86_64-*-linux*): Likewise.
+
+	* linux-x86-low.c (init_registers_x86_64_linux): Removed.
+	(init_registers_amd64_linux): New.
+	(x86_arch_setup): Replace init_registers_x86_64_linux with
+	init_registers_amd64_linux.
+
+2010-02-23  Maxim Kuvyrkov  <maxim@codesourcery.com>
+
+	* configure.ac: Check for libdl.  If it is not available link against
+	static libthread_db.
+	* configure: Regenerate.
+
+2010-02-22  Pedro Alves  <pedro@codesourcery.com>
+
+	PR9605
+
+	* i386-low.c (i386_length_and_rw_bits): Throw a fatal error if
+	handing a read watchpoint.
+	(i386_low_insert_watchpoint): Read watchpoints aren't supported.
+
+2010-02-12  Doug Evans  <dje@google.com>
+
+	* linux-low.c (linux_supports_tracefork_flag): Document.
+	(linux_look_up_symbols): Add comment.
+
+2010-02-03  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* regcache.c (supply_register): Clear regcache if buf is NULL.
+
+2010-02-02  Nicolas Roche  <roche@sourceware.org>
+	    Joel Brobecker  <brobecker@adacore.com>
+
+	* inferiors.c (find_inferior): Add function documentation.
+	(unloaded_dll): Handle the case where the unloaded dll has not
+	been previously registered in the dll list.
+
+2010-02-01  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* linux-arm-low.c (thumb_breakpoint_len): Delete.
+	(thumb2_breakpoint): New.
+	(arm_breakpoint_at): Check for Thumb-2 breakpoints.
+
+2010-01-29  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* linux-low.c (get_stop_pc): Check for SIGTRAP.
+	(linux_wait_for_event_1): Handle SIGILL and SIGSEGV as possible
+	breakpoints.
+
+2010-01-21  Pedro Alves  <pedro@codesourcery.com>
+
+	* linux-ppc-low.c (ppc_arch_setup): Adjust to regcache changes.
+
+2010-01-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linux-s390-low.c (s390_collect_ptrace_register)
+	(s390_supply_ptrace_register): Adjust it for the new regcache parameter.
+
+2010-01-21  Doug Evans  <dje@google.com>
+
+	* linux-low.c (PTRACE_ARG3_TYPE): Change from long to void*.
+	(PTRACE_ARG4_TYPE): New macro.
+	(handle_extended_wait): Cast ptrace arg4 to PTRACE_ARG4_TYPE.
+	(linux_wait_for_event_1, linux_resume_one_lwp): Ditto.
+	(fetch_register): Cast to uintptr_t before casting to PTRACE_ARG3_TYPE.
+	(usr_store_inferior_registers): Ditto.
+	(linux_read_memory, linux_write_memory): Ditto.
+	(linux_test_for_tracefork): Ditto.
+
+	* linux-arm-low.c: Remove redundant include of gdb_proc_service.h.
+	Only include elf.h if gdb_proc_service.h didn't include linux/elf.h.
+
+2010-01-21  Pedro Alves  <pedro@codesourcery.com>
+
+	* proc-service.c (ps_lgetregs): Don't refetch registers from the
+	target.
+
+2010-01-21  Pedro Alves  <pedro@codesourcery.com>
+
+	* spu-low.c (spu_fetch_registers, spu_store_registers): Change
+	prototype to take a regcache.  Adjust.
+
+2010-01-20  Pedro Alves  <pedro@codesourcery.com>
+
+	* regcache.h (struct thread_info): Forward declare.
+	(struct regcache): New.
+	(new_register_cache): Adjust prototype.
+	(get_thread_regcache): Declare.
+	(free_register_cache): Adjust prototype.
+	(registers_to_string, registers_from_string): Ditto.
+	(supply_register, supply_register_by_name, collect_register)
+	(collect_register_as_string, collect_register_by_name): Ditto.
+	* regcache.c (struct inferior_regcache_data): Delete.
+	(get_regcache): Rename to ...
+	(get_thread_regcache): ... this.  Adjust.  Switch inferior before
+	fetching registers.
+	(regcache_invalidate_one): Adjust.
+	(regcache_invalidate): Fix prototype.
+	(new_register_cache): Return the new register cache.
+	(free_register_cache): Change prototype.
+	(realloc_register_cache): Adjust.
+	(registers_to_string): Change prototype to take a regcache.  Adjust.
+	(registers_from_string): Ditto.
+	(register_data): Ditto.
+	(supply_register): Ditto.
+	(supply_register_by_name): Ditto.
+	(collect_register): Ditto.
+	(collect_register_as_string): Ditto.
+	(collect_register_by_name): Ditto.
+	* server.c (process_serial_event): Adjust.
+	* linux-low.h (regset_fill_func, regset_store_func): Change
+	prototype.
+	(get_pc, set_pc, collect_ptrace_register, supply_ptrace_register):
+	Change prototype.
+	* linux-low.c (get_stop_pc): Adjust.
+	(check_removed_breakpoint): Adjust.
+	(linux_wait_for_event): Adjust.
+	(linux_resume_one_lwp): Adjust.
+	(fetch_register): Add regcache parameter.  Adjust.
+	(usr_store_inferior_registers): Ditto.
+	(regsets_fetch_inferior_registers): Ditto.
+	(regsets_store_inferior_registers): Ditto.
+	(linux_fetch_registers, linux_store_registers): Ditto.
+	* i387-fp.c (i387_cache_to_fsave): Change prototype to take a
+	regcache.  Adjust.
+	(i387_fsave_to_cache, i387_cache_to_fxsave, i387_fxsave_to_cache): Ditto.
+	* i387-fp.h (i387_cache_to_fsave, i387_fsave_to_cache): Change
+	prototype to take a regcache.
+	(i387_cache_to_fxsave, i387_fxsave_to_cache): Ditto.
+	* remote-utils.c (convert_ascii_to_int, outreg)
+	(prepare_resume_reply): Change prototype to take a regcache.
+	Adjust.
+	* target.h (struct target_ops) <fetch_registers, store_registers>:
+	Change prototype to take a regcache.
+	(fetch_inferior_registers, store_inferior_registers): Change
+	prototype to take a regcache.  Adjust.
+	* proc-service.c (ps_lgetregs): Adjust.
+	* linux-x86-low.c (x86_fill_gregset, x86_store_gregset)
+	(x86_fill_fpregset, x86_store_fpregset, x86_fill_fpxregset)
+	(x86_store_fpxregset, x86_get_pc, x86_set_pc): Change prototype to
+	take a regcache.  Adjust.
+	* linux-arm-low.c (arm_fill_gregset, arm_store_gregset)
+	(arm_fill_wmmxregset, arm_store_wmmxregset, arm_fill_vfpregset)
+	(arm_store_vfpregset, arm_get_pc, arm_set_pc):
+	(arm_breakpoint_at): Change prototype to take a regcache.  Adjust.
+	* linux-cris-low.c (cris_get_pc, cris_set_pc)
+	(cris_cannot_fetch_register):
+	(cris_breakpoint_at): Change prototype to take a regcache.
+	Adjust.
+	* linux-crisv32-low.c (cris_get_pc, cris_set_pc,
+	cris_reinsert_addr, cris_write_data_breakpoint): Change prototype
+	to take a regcache.  Adjust.
+	(cris_breakpoint_at, cris_insert_point, cris_remove_point):
+	Adjust.
+	* linux-m32r-low.c (m32r_get_pc, m32r_set_pc): Change prototype to
+	take a regcache.  Adjust.
+	* linux-m68k-low.c (m68k_fill_gregset, m68k_store_gregset)
+	(m68k_fill_fpregset, m68k_store_fpregset, m68k_get_pc,
+	(m68k_set_pc): Change prototype to take a regcache.  Adjust.
+	* linux-mips-low.c (mips_get_pc):
+	(mips_set_pc): Change prototype to take a regcache.  Adjust.
+	(mips_reinsert_addr): Adjust.
+	(mips_collect_register): Change prototype to take a regcache.
+	Adjust.
+	(mips_supply_register):
+	(mips_collect_register_32bit, mips_supply_register_32bit)
+	(mips_fill_gregset, mips_store_gregset, mips_fill_fpregset)
+	(mips_store_fpregset): Ditto.
+	* linux-ppc-low.c (ppc_supply_ptrace_register, ppc_supply_ptrace_register):
+	Ditto.
+	(parse_spufs_run): Adjust.
+	(ppc_get_pc, ppc_set_pc, ppc_fill_gregset, ppc_fill_vsxregset)
+	(ppc_store_vsxregset, ppc_fill_vrregset, ppc_store_vrregset)
+	(ppc_fill_evrregset, ppc_store_evrregset): Change prototype to
+	take a regcache.  Adjust.
+	* linux-s390-low.c (s390_collect_ptrace_register)
+	(s390_supply_ptrace_register, s390_fill_gregset, s390_get_pc)
+	(s390_set_pc): Change prototype to take a regcache.  Adjust.
+	(s390_arch_setup): Adjust.
+	* linux-sh-low.c (sh_get_pc, sh_breakpoint_at)
+	(sh_fill_gregset): Change prototype to take a regcache.  Adjust.
+	* linux-sparc-low.c (sparc_fill_gregset_to_stack)
+	(sparc_fill_gregset, sparc_store_gregset_from_stack)
+	(sparc_store_gregset, sparc_get_pc): Change prototype to take a
+	regcache.  Adjust.
+	(sparc_breakpoint_at): Adjust.
+	* linux-xtensa-low.c (xtensa_fill_gregset):
+	(xtensa_store_gregset):
+	(xtensa_fill_xtregset, xtensa_store_xtregset, xtensa_get_pc)
+	(xtensa_set_pc): Change prototype to take a regcache.  Adjust.
+	* nto-low.c (nto_fetch_registers, nto_store_registers): Change
+	prototype to take a regcache.  Adjust.
+	* win32-arm-low.c (arm_fetch_inferior_register)
+	(arm_store_inferior_register): Change prototype to take a
+	regcache.  Adjust.
+	* win32-i386-low.c (i386_fetch_inferior_register)
+	(i386_store_inferior_register): Change prototype to take a
+	regcache.  Adjust.
+	* win32-low.c (child_fetch_inferior_registers)
+	(child_store_inferior_registers): Change prototype to take a
+	regcache.  Adjust.
+	(win32_wait): Adjust.
+	(win32_fetch_inferior_registers): Change prototype to take a
+	regcache.  Adjust.
+	(win32_store_inferior_registers): Adjust.
+	* win32-low.h (struct win32_target_ops) <fetch_inferior_register,
+	store_inferior_register>: Change prototype to take a regcache.
+
+2010-01-20  Doug Evans  <dje@google.com>
+
+	* linux-low.c (linux_create_inferior): Wrap use of __SIGRTMIN in
+	#ifdef.
+	(linux_wait_for_event1, linux_init_signals): Ditto.
+	(W_STOPCODE): Provide definition if missing.
+
+2010-01-13  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* linux-low.c (linux_core_of_thread): New.
+	(compare_ints, show_process, list_threads): New.
+	(linux_qxfer_osdata): Report threads and cores.
+	(linux_target_op): Register linux_core_of_thread.
+	* remote-utils.c (prepare_resume_reply): Report the core.
+	(buffer_xml_printf): Support %d specifier.
+	* server.c (handle_threads_qxfer_proper, handle_threads_qxfer):
+	New.
+	(handle_query): Handle qXfer:threads.  Announce availability
+	thereof.
+	* target.h (struct target_ops): New field core_of_thread.
+
+2010-01-04  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* Makefile.in (clean): Remove new generated files.
+	(reg-s390.o, reg-s390.c): Remove rules.
+	(reg-s390x.o, reg-s390x.c): Likewise.
+	(s390-linux32.o, s390-linux32.c): Add rules.
+	(s390-linux64.o, s390-linux64.c): Likewise.
+	(s390x-linux64.o, s390x-linux64.c): Likewise.
+	* configure.srv (s390*-*-linux*): Update srv_regobj and srv_xmlfiles.
+	* linux-s390-low.c: Include <elf.h>.
+	(HWCAP_S390_HIGH_GPRS): Define if undefined.
+	(init_registers_s390): Remove prototype.
+	(init_registers_s390x): Likewise.
+	(init_registers_s390_linux32): Add prototype.
+	(init_registers_s390_linux64): Likewise.
+	(init_registers_s390x_linux64): Likewise.
+	(s390_num_regs_3264): New define.
+	(s390_regmap_3264): New global variable.
+	(s390_cannot_fetch_register): Remove obsolete check.
+	(s390_cannot_store_register): Likewise.
+	(s390_collect_ptrace_register): Handle upper/lower register halves.
+	(s390_supply_ptrace_register): Likewise.
+	(s390_fill_gregset): Update to register number changes.
+	(s390_get_hwcap): New routine.
+	(s390_arch_setup): Detect 32-bit process running on 64-bit system.
+	Install appropriate regmap and register set.
+
+2010-01-01  Joel Brobecker  <brobecker@adacore.com>
+
+	* server.c (gdbserver_version): Update copyright year to 2010.
+	* gdbreplay.c (gdbreplay_version): Likewise.
+
+2009-12-28  Doug Evans  <dje@google.com>
+
+	* linux-low.c: Delete inclusion of ansidecl.h, elf/common.h,
+	elf/external.h.  Include <elf.h> instead but only if necessary.
+
+2009-12-28  Pedro Alves  <pedro@codesourcery.com>
+
+	* linux-low.c (linux_remove_process): Remove `detaching'
+	parameter.  Don't release/detach from thread_db here.
+	(linux_kill): Release/detach from thread_db here, ...
+	(linux_detach): ... and here, before actually detaching.
+	(linux_wait_1): ... and here, when a process exits.
+	* thread-db.c (any_thread_of): New.
+	(thread_db_free): Switch the current inferior to a thread of the
+	passed in process.
+
+2009-12-21  Doug Evans  <dje@google.com>
+
+	* linux-x86-low.c: Delete outdated comment about Elf32_Phdr.
+
+	* linux-low.c (kill_lwp): Use __NR_tkill instead of SYS_tkill.
+	Move definition of tkill_failed to ifdef __NR_tkill to avoid gcc
+	warning ifndef __NR_tkill.  Move setting of errno there too.
+	Delete unnecessary resetting of errno after syscall.
+	Minor comment changes to match gdb/linux-nat.c:kill_lwp.
+
+	* configure.ac: Check for dladdr.
+	* config.in: Regenerate.
+	* configure: Regenerate.
+	* thread-db.c (dladdr_to_soname): Only define ifdef HAVE_DLADDR.
+	(try_thread_db_load): Update.
+
+	* linux-low.c (my_waitpid): Delete unnecessary prototype.
+
+2009-12-18  Doug Evans  <dje@google.com>
+
+	* event-loop.c: Include unistd.h if it exists.
+
+	* linux-low.c (my_waitpid): Move definition away from being in
+	between linux_tracefork_child/linux_test_for_tracefork.
+
+	* gdb_proc_service.h (psaddr_t): Fix type.
+	* thread-db.c (thread_db_info.td_thr_tls_get_addr_p): Fix
+	signature to match glibc.
+
+2009-12-16  Doug Evans  <dje@google.com>
+
+	* linux-low.c (linux_read_memory): Fix argument to read.
+
+2009-11-26  Pedro Alves  <pedro@codesourcery.com>
+
+	* win32-low.c (get_child_debug_event): On EXIT_THREAD_DEBUG_EVENT
+	events, don't leave current_inferior pointing at null.
+
+2009-11-26  Pedro Alves  <pedro@codesourcery.com>
+
+	* win32-low.c (LOG): Delete.
+	(OUTMSG): Output to stderr.
+	(OUTMSG2): Conditionalize on `debug_threads' variable, instead of
+	on compile time LOG macro.
+	(win32_wait): Fix debug output.
+
+2009-11-26  Pedro Alves  <pedro@codesourcery.com>
+
+	* win32-low.c (win32_add_one_solib): If the dll name is
+	"ntdll.dll", prepend the system directory to the dll path.
+
+2009-11-17  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* m68k-tdep.c (m68k_gdbarch_init): Reuse previous initialization.
+
+2009-11-17  Nathan Sidwell  <nathan@codesourcery.com>
+            Vladimir Prus  <vladimir@codesourcery.com>
+
+	* Makefile.in (reg-cf.o, reg-cf.c): New targets.
+	* configure.ac: Check for __mcoldfire__ and set
+	gdb_cv_m68k_is_coldfire.
+	* configure.srv: Use gdb_cv_m68k_is_coldfire to select between
+	reg-cf.o and reg-m68k.o.
+	* configure: Regenerated.
+
+2009-11-16  Pedro Alves  <pedro@codesourcery.com>
+
+	* linux-low.c (linux_remove_process): Add `detaching' parameter.
+	Pass it to thread_db_free.
+	(linux_kill, linux_detach, linux_wait_1): Adjust to pass the
+	proper `detaching' argument to linux_remove_process.
+	* linux-low.h (thread_db_free): Add `detaching' parameter.
+	* thread-db.c (thread_db_init): Pass false as `detaching' argument
+	to thread_db_free.
+	(thread_db_free): Add `detaching' parameter.  Only
+	call td_ta_clear_event if detaching from process.
+
+2009-11-12  Maxim Kuvyrkov  <maxim@codesourcery.com>
+
+	* thread-db.c (thread_db_free): Fix typo.
+
+2009-11-11  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	PR gdb/10838
+	* thread-db.c (thread_db_free): Call td_ta_clear_event.
+
+2009-11-03  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* configure.ac (i[34567]86-*): Check if we're targetting x86-64
+	with an i686 compiler.
+	* configure.srv (i[34567]86-*-linux*): Pull in x86-64 handling if
+	needed.
+	* configure: Rebuilt.
+
+2009-10-29  Sandra Loosemore  <sandra@codesourcery.com>
+
+	PR gdb/10783
+
+	* server.c (handle_search_memory_1): Correct read_addr initialization
+	in loop for searching subsequent chunks.
+
+2009-10-29  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* configure.ac: New --with-libthread-db option.
+	* thread-db.c: Allow direct dependence on libthread_db.
+	(thread_db_free): Adjust.
+	* config.in: Regenerate.
+	* configure: Likewise.
+	
+2009-10-28  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	PR gdb/10757
+	* thread-db.c (attach_thread): New function.
+	(maybe_attach_thread): Return success/failure.
+	(find_new_threads_callback): Adjust.
+	(thread_db_find_new_threads): Loop until no new threads.	
+	
+2009-10-13  Pedro Alves  <pedro@codesourcery.com>
+
+	* proc-service.c (ps_lgetregs): Formatting.
+
+2009-10-08  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* acinclude.m4: (SRV_CHECK_THREAD_DB, SRV_CHECK_TLS_GET_ADDR): Remove.
+	* configure.ac: Adjust.
+	* linux-low.h (struct process_info_private): Move members to struct
+	thread_db.
+	(thread_db_free, thread_db_handle_monitor_command): New prototype.
+	* linux-low.c (linux_remove_process): Adjust.
+	(linux_wait_for_event_1, linux_look_up_symbols): Likewise.
+	* server.c (handle_query): Move code ...
+	(handle_monitor_command): ... here. New function.
+	* target.h (struct target_ops): New member.
+	* thread-db.c (struct thread_db): New.
+	(libthread_db_search_path): New variable.
+	(thread_db_create_event, thread_db_enable_reporting)
+	(find_one_thread, maybe_attach_thread, find_new_threads_callback)
+	(thread_db_find_new_threads, (thread_db_get_tls_address): Adjust.
+	(try_thread_db_load_1, dladdr_to_soname): New functions.
+	(try_thread_db_load, thread_db_load_search): New functions.
+	(thread_db_init): Search for libthread_db.
+	(thread_db_free): New function.
+	(thread_db_handle_monitor_command): Likewise.
+	* config.in: Regenerate.
+	* configure: Regenerate.
+	
+2009-09-27  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* spu-low.c (spu_kill): Wait for inferior to terminate.
+	Call clear_inferiors.
+	(spu_detach): Call clear_inferiors.
+
 2009-08-22  Ralf Wildenhues  <Ralf.Wildenhues@gmx.de>
 
 	* aclocal.m4: Regenerate.

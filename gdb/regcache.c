@@ -1,7 +1,7 @@
 /* Cache and manage the values of registers for GDB, the GNU debugger.
 
    Copyright (C) 1986, 1987, 1989, 1991, 1994, 1995, 1996, 1998, 2000, 2001,
-   2002, 2004, 2007, 2008, 2009 Free Software Foundation, Inc.
+   2002, 2004, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -185,6 +185,11 @@ register_size (struct gdbarch *gdbarch, int regnum)
 struct regcache
 {
   struct regcache_descr *descr;
+
+  /* The address space of this register cache (for registers where it
+     makes sense, like PC or SP).  */
+  struct address_space *aspace;
+
   /* The register buffers.  A read-only register cache can hold the
      full [0 .. gdbarch_num_regs + gdbarch_num_pseudo_regs) while a read/write
      register cache can only hold [0 .. gdbarch_num_regs).  */
@@ -207,7 +212,7 @@ struct regcache
 };
 
 struct regcache *
-regcache_xmalloc (struct gdbarch *gdbarch)
+regcache_xmalloc (struct gdbarch *gdbarch, struct address_space *aspace)
 {
   struct regcache_descr *descr;
   struct regcache *regcache;
@@ -219,6 +224,7 @@ regcache_xmalloc (struct gdbarch *gdbarch)
     = XCALLOC (descr->sizeof_raw_registers, gdb_byte);
   regcache->register_valid_p
     = XCALLOC (descr->sizeof_raw_register_valid_p, gdb_byte);
+  regcache->aspace = aspace;
   regcache->readonly_p = 1;
   regcache->ptid = minus_one_ptid;
   return regcache;
@@ -252,6 +258,12 @@ struct gdbarch *
 get_regcache_arch (const struct regcache *regcache)
 {
   return regcache->descr->gdbarch;
+}
+
+struct address_space *
+get_regcache_aspace (const struct regcache *regcache)
+{
+  return regcache->aspace;
 }
 
 /* Return  a pointer to register REGNUM's buffer cache.  */
@@ -340,10 +352,12 @@ regcache_cpy (struct regcache *dst, struct regcache *src)
 {
   int i;
   gdb_byte *buf;
+
   gdb_assert (src != NULL && dst != NULL);
   gdb_assert (src->descr->gdbarch == dst->descr->gdbarch);
   gdb_assert (src != dst);
   gdb_assert (src->readonly_p || dst->readonly_p);
+
   if (!src->readonly_p)
     regcache_save (dst, do_cooked_read, src);
   else if (!dst->readonly_p)
@@ -362,6 +376,7 @@ regcache_cpy_no_passthrough (struct regcache *dst, struct regcache *src)
      move of data into the current regcache.  Doing this would be
      silly - it would mean that valid_p would be completely invalid.  */
   gdb_assert (dst->readonly_p);
+
   memcpy (dst->registers, src->registers, dst->descr->sizeof_raw_registers);
   memcpy (dst->register_valid_p, src->register_valid_p,
 	  dst->descr->sizeof_raw_register_valid_p);
@@ -371,7 +386,7 @@ struct regcache *
 regcache_dup (struct regcache *src)
 {
   struct regcache *newbuf;
-  newbuf = regcache_xmalloc (src->descr->gdbarch);
+  newbuf = regcache_xmalloc (src->descr->gdbarch, get_regcache_aspace (src));
   regcache_cpy (newbuf, src);
   return newbuf;
 }
@@ -380,7 +395,7 @@ struct regcache *
 regcache_dup_no_passthrough (struct regcache *src)
 {
   struct regcache *newbuf;
-  newbuf = regcache_xmalloc (src->descr->gdbarch);
+  newbuf = regcache_xmalloc (src->descr->gdbarch, get_regcache_aspace (src));
   regcache_cpy_no_passthrough (newbuf, src);
   return newbuf;
 }
@@ -435,9 +450,11 @@ get_thread_arch_regcache (ptid_t ptid, struct gdbarch *gdbarch)
 	&& get_regcache_arch (list->regcache) == gdbarch)
       return list->regcache;
 
-  new_regcache = regcache_xmalloc (gdbarch);
+  new_regcache = regcache_xmalloc (gdbarch,
+				   target_thread_address_space (ptid));
   new_regcache->readonly_p = 0;
   new_regcache->ptid = ptid;
+  gdb_assert (new_regcache->aspace != NULL);
 
   list = xmalloc (sizeof (struct regcache_list));
   list->regcache = new_regcache;

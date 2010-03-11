@@ -1,7 +1,7 @@
 /* Read coff symbol tables and convert to internal format, for GDB.
    Copyright (C) 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009
-   Free Software Foundation, Inc.
+   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009,
+   2010 Free Software Foundation, Inc.
    Contributed by David D. Johnson, Brown University (ddj@cs.brown.edu).
 
    This file is part of GDB.
@@ -45,7 +45,7 @@
 
 #include "coff-pe-read.h"
 
-#include "psympriv.h"
+#include "psymtab.h"
 
 extern void _initialize_coffread (void);
 
@@ -404,9 +404,6 @@ coff_end_symtab (struct objfile *objfile)
 
   symtab = end_symtab (current_source_end_addr, objfile, SECT_OFF_TEXT (objfile));
 
-  if (symtab != NULL)
-    free_named_symtabs (symtab->filename);
-
   /* Reinitialize for beginning of new file. */
   last_source_file = NULL;
 }
@@ -503,7 +500,7 @@ static bfd *symfile_bfd;
 /* Read a symbol file, after initialization by coff_symfile_init.  */
 
 static void
-coff_symfile_read (struct objfile *objfile, int mainline)
+coff_symfile_read (struct objfile *objfile, int symfile_flags)
 {
   struct coff_symfile_info *info;
   struct dbx_symfile_info *dbxinfo;
@@ -627,7 +624,6 @@ coff_symfile_read (struct objfile *objfile, int mainline)
       stabstrsize = bfd_section_size (abfd, info->stabstrsect);
 
       coffstab_build_psymtabs (objfile,
-			       mainline,
 			       info->textaddr, info->textsize,
 			       info->stabsects,
 			       info->stabstrsect->filepos, stabstrsize);
@@ -635,10 +631,25 @@ coff_symfile_read (struct objfile *objfile, int mainline)
   if (dwarf2_has_info (objfile))
     {
       /* DWARF2 sections.  */
-      dwarf2_build_psymtabs (objfile, mainline);
+      dwarf2_build_psymtabs (objfile);
     }
 
   dwarf2_build_frame_info (objfile);
+
+  /* Try to add separate debug file if no symbols table found.   */
+  if (!objfile_has_partial_symbols (objfile))
+    {
+      char *debugfile;
+
+      debugfile = find_separate_debug_file_by_debuglink (objfile);
+
+      if (debugfile)
+	{
+	  bfd *abfd = symfile_bfd_open (debugfile);
+	  symbol_file_add_separate (abfd, symfile_flags, objfile);
+	  xfree (debugfile);
+	}
+    }
 
   do_cleanups (back_to);
 }
@@ -1427,10 +1438,10 @@ patch_opaque_types (struct symtab *s)
          Remove syms from the chain when their types are stored,
          but search the whole chain, as there may be several syms
          from different files with the same name.  */
-      if (SYMBOL_CLASS (real_sym) == LOC_TYPEDEF &&
-	  SYMBOL_DOMAIN (real_sym) == VAR_DOMAIN &&
-	  TYPE_CODE (SYMBOL_TYPE (real_sym)) == TYPE_CODE_PTR &&
-	  TYPE_LENGTH (TYPE_TARGET_TYPE (SYMBOL_TYPE (real_sym))) != 0)
+      if (SYMBOL_CLASS (real_sym) == LOC_TYPEDEF
+	  && SYMBOL_DOMAIN (real_sym) == VAR_DOMAIN
+	  && TYPE_CODE (SYMBOL_TYPE (real_sym)) == TYPE_CODE_PTR
+	  && TYPE_LENGTH (TYPE_TARGET_TYPE (SYMBOL_TYPE (real_sym))) != 0)
 	{
 	  char *name = SYMBOL_LINKAGE_NAME (real_sym);
 	  int hash = hashname (name);
@@ -1439,8 +1450,8 @@ patch_opaque_types (struct symtab *s)
 	  prev = 0;
 	  for (sym = opaque_type_chain[hash]; sym;)
 	    {
-	      if (name[0] == SYMBOL_LINKAGE_NAME (sym)[0] &&
-		  strcmp (name + 1, SYMBOL_LINKAGE_NAME (sym) + 1) == 0)
+	      if (name[0] == SYMBOL_LINKAGE_NAME (sym)[0]
+		  && strcmp (name + 1, SYMBOL_LINKAGE_NAME (sym) + 1) == 0)
 		{
 		  if (prev)
 		    {
@@ -1496,7 +1507,7 @@ process_coff_symbol (struct coff_symbol *cs,
   name = cs->c_name;
   name = EXTERNAL_NAME (name, objfile->obfd);
   SYMBOL_LANGUAGE (sym) = current_subfile->language;
-  SYMBOL_SET_NAMES (sym, name, strlen (name), objfile);
+  SYMBOL_SET_NAMES (sym, name, strlen (name), 1, objfile);
 
   /* default assumptions */
   SYMBOL_VALUE (sym) = cs->c_value;
@@ -1625,10 +1636,10 @@ process_coff_symbol (struct coff_symbol *cs,
 	     simple forward reference (TYPE_CODE_UNDEF) is not an
 	     empty structured type, though; the forward references
 	     work themselves out via the magic of coff_lookup_type.  */
-	  if (TYPE_CODE (SYMBOL_TYPE (sym)) == TYPE_CODE_PTR &&
-	      TYPE_LENGTH (TYPE_TARGET_TYPE (SYMBOL_TYPE (sym))) == 0 &&
-	      TYPE_CODE (TYPE_TARGET_TYPE (SYMBOL_TYPE (sym))) !=
-	      TYPE_CODE_UNDEF)
+	  if (TYPE_CODE (SYMBOL_TYPE (sym)) == TYPE_CODE_PTR
+	      && TYPE_LENGTH (TYPE_TARGET_TYPE (SYMBOL_TYPE (sym))) == 0
+	      && TYPE_CODE (TYPE_TARGET_TYPE (SYMBOL_TYPE (sym)))
+	         != TYPE_CODE_UNDEF)
 	    {
 	      int i = hashname (SYMBOL_LINKAGE_NAME (sym));
 
@@ -2120,6 +2131,7 @@ static struct sym_fns coff_sym_fns =
   default_symfile_segments,	/* sym_segments: Get segment information from
 				   a file.  */
   NULL,                         /* sym_read_linetable  */
+  default_symfile_relocate,	/* sym_relocate: Relocate a debug section.  */
   &psym_functions,
   NULL				/* next: pointer to next struct sym_fns */
 };

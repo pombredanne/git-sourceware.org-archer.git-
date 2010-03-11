@@ -1,7 +1,8 @@
 /* Print in infix form a struct expression.
 
    Copyright (C) 1986, 1988, 1989, 1991, 1992, 1993, 1994, 1995, 1996, 1997,
-   1998, 1999, 2000, 2003, 2007, 2008, 2009 Free Software Foundation, Inc.
+   1998, 1999, 2000, 2003, 2007, 2008, 2009, 2010
+   Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -187,7 +188,7 @@ print_subexp_standard (struct expression *exp, int *pos,
 	   additional parameter to LA_PRINT_STRING.  -fnf */
 	get_user_print_options (&opts);
 	LA_PRINT_STRING (stream, builtin_type (exp->gdbarch)->builtin_char,
-			 &exp->elts[pc + 2].string, nargs, 0, &opts);
+			 &exp->elts[pc + 2].string, nargs, NULL, 0, &opts);
       }
       return;
 
@@ -206,7 +207,7 @@ print_subexp_standard (struct expression *exp, int *pos,
 	fputs_filtered ("@\"", stream);
 	get_user_print_options (&opts);
 	LA_PRINT_STRING (stream, builtin_type (exp->gdbarch)->builtin_char,
-			 &exp->elts[pc + 2].string, nargs, 0, &opts);
+			 &exp->elts[pc + 2].string, nargs, NULL, 0, &opts);
 	fputs_filtered ("\"", stream);
       }
       return;
@@ -292,7 +293,7 @@ print_subexp_standard (struct expression *exp, int *pos,
 	  struct value_print_options opts;
 	  get_user_print_options (&opts);
 	  LA_PRINT_STRING (stream, builtin_type (exp->gdbarch)->builtin_char,
-			   tempstr, nargs - 1, 0, &opts);
+			   tempstr, nargs - 1, NULL, 0, &opts);
 	  (*pos) = pc;
 	}
       else
@@ -409,12 +410,24 @@ print_subexp_standard (struct expression *exp, int *pos,
 	fputs_filtered (")", stream);
       return;
 
+    case UNOP_DYNAMIC_CAST:
+    case UNOP_REINTERPRET_CAST:
+      fputs_filtered (opcode == UNOP_DYNAMIC_CAST ? "dynamic_cast"
+		      : "reinterpret_cast", stream);
+      fputs_filtered ("<", stream);
+      (*pos) += 2;
+      type_print (exp->elts[pc + 1].type, "", stream, 0);
+      fputs_filtered ("> (", stream);
+      print_subexp (exp, pos, stream, PREC_PREFIX);
+      fputs_filtered (")", stream);
+      return;
+
     case UNOP_MEMVAL:
       (*pos) += 2;
       if ((int) prec > (int) PREC_PREFIX)
 	fputs_filtered ("(", stream);
-      if (TYPE_CODE (exp->elts[pc + 1].type) == TYPE_CODE_FUNC &&
-	  exp->elts[pc + 3].opcode == OP_LONG)
+      if (TYPE_CODE (exp->elts[pc + 1].type) == TYPE_CODE_FUNC
+	  && exp->elts[pc + 3].opcode == OP_LONG)
 	{
 	  struct value_print_options opts;
 
@@ -729,6 +742,10 @@ op_name_standard (enum exp_opcode opcode)
       return "OP_ARRAY";
     case UNOP_CAST:
       return "UNOP_CAST";
+    case UNOP_DYNAMIC_CAST:
+      return "UNOP_DYNAMIC_CAST";
+    case UNOP_REINTERPRET_CAST:
+      return "UNOP_REINTERPRET_CAST";
     case UNOP_MEMVAL:
       return "UNOP_MEMVAL";
     case UNOP_MEMVAL_TLS:
@@ -1035,6 +1052,8 @@ dump_subexp_body_standard (struct expression *exp,
       break;
     case UNOP_MEMVAL:
     case UNOP_CAST:
+    case UNOP_DYNAMIC_CAST:
+    case UNOP_REINTERPRET_CAST:
       fprintf_filtered (stream, "Type @");
       gdb_print_host_address (exp->elts[elt].type, stream);
       fprintf_filtered (stream, " (");

@@ -1,6 +1,6 @@
 /* Support for printing Pascal values for GDB, the GNU debugger.
 
-   Copyright (C) 2000, 2001, 2003, 2005, 2006, 2007, 2008, 2009
+   Copyright (C) 2000, 2001, 2003, 2005, 2006, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -104,7 +104,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
 		}
 
 	      LA_PRINT_STRING (stream, TYPE_TARGET_TYPE (type),
-			       valaddr + embedded_offset, len, 0,
+			       valaddr + embedded_offset, len, NULL, 0,
 			       options);
 	      i = len;
 	    }
@@ -151,105 +151,105 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
 	  break;
 	}
       elttype = check_typedef (TYPE_TARGET_TYPE (type));
+
+      addr = unpack_pointer (type, valaddr + embedded_offset);
+    print_unpacked_pointer:
+      elttype = check_typedef (TYPE_TARGET_TYPE (type));
+
+      if (TYPE_CODE (elttype) == TYPE_CODE_FUNC)
 	{
-	  addr = unpack_pointer (type, valaddr + embedded_offset);
-	print_unpacked_pointer:
-	  elttype = check_typedef (TYPE_TARGET_TYPE (type));
-
-	  if (TYPE_CODE (elttype) == TYPE_CODE_FUNC)
-	    {
-	      /* Try to print what function it points to.  */
-	      print_address_demangle (gdbarch, addr, stream, demangle);
-	      /* Return value is irrelevant except for string pointers.  */
-	      return (0);
-	    }
-
-	  if (options->addressprint && options->format != 's')
-	    {
-	      fputs_filtered (paddress (gdbarch, addr), stream);
-	    }
-
-	  /* For a pointer to char or unsigned char, also print the string
-	     pointed to, unless pointer is null.  */
-	  if (((TYPE_LENGTH (elttype) == 1
-	       && (TYPE_CODE (elttype) == TYPE_CODE_INT
-		  || TYPE_CODE (elttype) == TYPE_CODE_CHAR))
-	      || ((TYPE_LENGTH (elttype) == 2 || TYPE_LENGTH (elttype) == 4)
-		  && TYPE_CODE (elttype) == TYPE_CODE_CHAR))
-	      && (options->format == 0 || options->format == 's')
-	      && addr != 0)
-	    {
-	      /* no wide string yet */
-	      i = val_print_string (elttype, addr, -1, stream, options);
-	    }
-	  /* also for pointers to pascal strings */
-	  /* Note: this is Free Pascal specific:
-	     as GDB does not recognize stabs pascal strings
-	     Pascal strings are mapped to records
-	     with lowercase names PM  */
-          if (is_pascal_string_type (elttype, &length_pos, &length_size,
-                                     &string_pos, &char_type, NULL)
-	      && addr != 0)
-	    {
-	      ULONGEST string_length;
-              void *buffer;
-              buffer = xmalloc (length_size);
-              read_memory (addr + length_pos, buffer, length_size);
-	      string_length = extract_unsigned_integer (buffer, length_size,
-							byte_order);
-              xfree (buffer);
-              i = val_print_string (char_type ,addr + string_pos, string_length, stream, options);
-	    }
-	  else if (pascal_object_is_vtbl_member (type))
-	    {
-	      /* print vtbl's nicely */
-	      CORE_ADDR vt_address = unpack_pointer (type, valaddr + embedded_offset);
-
-	      struct minimal_symbol *msymbol =
-	      lookup_minimal_symbol_by_pc (vt_address);
-	      if ((msymbol != NULL)
-		  && (vt_address == SYMBOL_VALUE_ADDRESS (msymbol)))
-		{
-		  fputs_filtered (" <", stream);
-		  fputs_filtered (SYMBOL_PRINT_NAME (msymbol), stream);
-		  fputs_filtered (">", stream);
-		}
-	      if (vt_address && options->vtblprint)
-		{
-		  struct value *vt_val;
-		  struct symbol *wsym = (struct symbol *) NULL;
-		  struct type *wtype;
-		  struct block *block = (struct block *) NULL;
-		  int is_this_fld;
-
-		  if (msymbol != NULL)
-		    wsym = lookup_symbol (SYMBOL_LINKAGE_NAME (msymbol), block,
-					  VAR_DOMAIN, &is_this_fld);
-
-		  if (wsym)
-		    {
-		      wtype = SYMBOL_TYPE (wsym);
-		    }
-		  else
-		    {
-		      wtype = TYPE_TARGET_TYPE (type);
-		    }
-		  vt_val = value_at (wtype, vt_address);
-		  common_val_print (vt_val, stream, recurse + 1, options,
-				    current_language);
-		  if (options->pretty)
-		    {
-		      fprintf_filtered (stream, "\n");
-		      print_spaces_filtered (2 + 2 * recurse, stream);
-		    }
-		}
-	    }
-
-	  /* Return number of characters printed, including the terminating
-	     '\0' if we reached the end.  val_print_string takes care including
-	     the terminating '\0' if necessary.  */
-	  return i;
+	  /* Try to print what function it points to.  */
+	  print_address_demangle (gdbarch, addr, stream, demangle);
+	  /* Return value is irrelevant except for string pointers.  */
+	  return (0);
 	}
+
+      if (options->addressprint && options->format != 's')
+	{
+	  fputs_filtered (paddress (gdbarch, addr), stream);
+	}
+
+      /* For a pointer to char or unsigned char, also print the string
+	 pointed to, unless pointer is null.  */
+      if (((TYPE_LENGTH (elttype) == 1
+	   && (TYPE_CODE (elttype) == TYPE_CODE_INT
+	      || TYPE_CODE (elttype) == TYPE_CODE_CHAR))
+	  || ((TYPE_LENGTH (elttype) == 2 || TYPE_LENGTH (elttype) == 4)
+	      && TYPE_CODE (elttype) == TYPE_CODE_CHAR))
+	  && (options->format == 0 || options->format == 's')
+	  && addr != 0)
+	{
+	  /* no wide string yet */
+	  i = val_print_string (elttype, addr, -1, stream, options);
+	}
+      /* also for pointers to pascal strings */
+      /* Note: this is Free Pascal specific:
+	 as GDB does not recognize stabs pascal strings
+	 Pascal strings are mapped to records
+	 with lowercase names PM  */
+      if (is_pascal_string_type (elttype, &length_pos, &length_size,
+				 &string_pos, &char_type, NULL)
+	  && addr != 0)
+	{
+	  ULONGEST string_length;
+	  void *buffer;
+	  buffer = xmalloc (length_size);
+	  read_memory (addr + length_pos, buffer, length_size);
+	  string_length = extract_unsigned_integer (buffer, length_size,
+						    byte_order);
+	  xfree (buffer);
+	  i = val_print_string (char_type ,addr + string_pos, string_length, stream, options);
+	}
+      else if (pascal_object_is_vtbl_member (type))
+	{
+	  /* print vtbl's nicely */
+	  CORE_ADDR vt_address = unpack_pointer (type, valaddr + embedded_offset);
+
+	  struct minimal_symbol *msymbol =
+	  lookup_minimal_symbol_by_pc (vt_address);
+	  if ((msymbol != NULL)
+	      && (vt_address == SYMBOL_VALUE_ADDRESS (msymbol)))
+	    {
+	      fputs_filtered (" <", stream);
+	      fputs_filtered (SYMBOL_PRINT_NAME (msymbol), stream);
+	      fputs_filtered (">", stream);
+	    }
+	  if (vt_address && options->vtblprint)
+	    {
+	      struct value *vt_val;
+	      struct symbol *wsym = (struct symbol *) NULL;
+	      struct type *wtype;
+	      struct block *block = (struct block *) NULL;
+	      int is_this_fld;
+
+	      if (msymbol != NULL)
+		wsym = lookup_symbol (SYMBOL_LINKAGE_NAME (msymbol), block,
+				      VAR_DOMAIN, &is_this_fld);
+
+	      if (wsym)
+		{
+		  wtype = SYMBOL_TYPE (wsym);
+		}
+	      else
+		{
+		  wtype = TYPE_TARGET_TYPE (type);
+		}
+	      vt_val = value_at (wtype, vt_address);
+	      common_val_print (vt_val, stream, recurse + 1, options,
+				current_language);
+	      if (options->pretty)
+		{
+		  fprintf_filtered (stream, "\n");
+		  print_spaces_filtered (2 + 2 * recurse, stream);
+		}
+	    }
+	}
+
+      /* Return number of characters printed, including the terminating
+	 '\0' if we reached the end.  val_print_string takes care including
+	 the terminating '\0' if necessary.  */
+      return i;
+
       break;
 
     case TYPE_CODE_REF:
@@ -306,7 +306,9 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
                                      &string_pos, &char_type, NULL))
 	    {
 	      len = extract_unsigned_integer (valaddr + embedded_offset + length_pos, length_size, byte_order);
-	      LA_PRINT_STRING (stream, char_type, valaddr + embedded_offset + string_pos, len, 0, options);
+	      LA_PRINT_STRING (stream, char_type, 
+			       valaddr + embedded_offset + string_pos,
+			       len, NULL, 0, options);
 	    }
 	  else
 	    pascal_object_print_value_fields (type, valaddr + embedded_offset, address, stream,

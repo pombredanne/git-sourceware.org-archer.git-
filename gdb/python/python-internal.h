@@ -1,6 +1,6 @@
 /* Gdb/Python header for private use by Python module.
 
-   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -54,40 +54,64 @@ typedef int Py_ssize_t;
    PyGILState_STATE will be.  */
 #ifndef WITH_THREAD
 #define PyGILState_Ensure() ((PyGILState_STATE) 0)
-#define PyGILState_Release(ARG) (ARG)
+#define PyGILState_Release(ARG) ((void)(ARG))
 #define PyEval_InitThreads() 0
-#define PyThreadState_Swap(ARG) (ARG)
+#define PyThreadState_Swap(ARG) ((void)(ARG))
 #define PyEval_InitThreads() 0
 #define PyEval_ReleaseLock() 0
 #endif
 
+/* In order to be able to parse symtab_and_line_to_sal_object function 
+   a real symtab_and_line structure is needed.  */
+#include "symtab.h"
+
+struct block;
 struct value;
 struct language_defn;
 
 extern PyObject *gdb_module;
 extern PyTypeObject value_object_type;
+extern PyTypeObject block_object_type;
+extern PyTypeObject symbol_object_type;
 
 PyObject *gdbpy_history (PyObject *self, PyObject *args);
 PyObject *gdbpy_frame_stop_reason_string (PyObject *, PyObject *);
+PyObject *gdbpy_lookup_symbol (PyObject *self, PyObject *args, PyObject *kw);
 PyObject *gdbpy_selected_frame (PyObject *self, PyObject *args);
+PyObject *gdbpy_block_for_pc (PyObject *self, PyObject *args);
 PyObject *gdbpy_lookup_type (PyObject *self, PyObject *args, PyObject *kw);
+PyObject *gdbpy_create_lazy_string_object (CORE_ADDR address, long length,
+					   const char *encoding, struct type *type);
 
+PyObject *symtab_and_line_to_sal_object (struct symtab_and_line sal);
+PyObject *symtab_to_symtab_object (struct symtab *symtab);
+PyObject *symbol_to_symbol_object (struct symbol *sym);
+PyObject *block_to_block_object (struct block *block, struct objfile *objfile);
 PyObject *value_to_value_object (struct value *v);
 PyObject *type_to_type_object (struct type *);
 PyObject *objfile_to_objfile_object (struct objfile *);
 
 PyObject *objfpy_get_printers (PyObject *, void *);
 
+struct block *block_object_to_block (PyObject *obj);
+struct symbol *symbol_object_to_symbol (PyObject *obj);
 struct value *value_object_to_value (PyObject *self);
 struct value *convert_value_from_python (PyObject *obj);
 struct type *type_object_to_type (PyObject *obj);
+struct symtab *symtab_object_to_symtab (PyObject *obj);
+struct symtab_and_line *sal_object_to_symtab_and_line (PyObject *obj);
 
 void gdbpy_initialize_values (void);
 void gdbpy_initialize_frames (void);
+void gdbpy_initialize_symtabs (void);
 void gdbpy_initialize_commands (void);
+void gdbpy_initialize_symbols (void);
+void gdbpy_initialize_symtabs (void);
+void gdbpy_initialize_blocks (void);
 void gdbpy_initialize_types (void);
 void gdbpy_initialize_functions (void);
 void gdbpy_initialize_objfile (void);
+void gdbpy_initialize_lazy_string (void);
 
 struct cleanup *make_cleanup_py_decref (PyObject *py);
 
@@ -117,6 +141,10 @@ PyObject *python_string_to_target_python_string (PyObject *obj);
 char *python_string_to_host_string (PyObject *obj);
 PyObject *target_string_to_unicode (const gdb_byte *str, int length);
 int gdbpy_is_string (PyObject *obj);
+int gdbpy_is_lazy_string (PyObject *result);
+gdb_byte *gdbpy_extract_lazy_string (PyObject *string,
+				     struct type **str_type, 
+				     long *length, char **encoding);
 
 /* Note that these are declared here, and not in python.h with the
    other pretty-printer functions, because they refer to PyObject.  */

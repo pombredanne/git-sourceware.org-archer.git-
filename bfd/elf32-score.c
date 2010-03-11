@@ -1,5 +1,5 @@
 /* 32-bit ELF support for S+core.
-   Copyright 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   Copyright 2006, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
    Contributed by
    Brain.lin (brain.lin@sunplusct.com)
    Mei Ligang (ligang@sunnorth.com.cn)
@@ -37,13 +37,6 @@
 int score3 = 0;
 int score7 = 1;
 
-/* Score ELF linker hash table.  */
-struct score_elf_link_hash_table
-{
-  /* The main hash table.  */
-  struct elf_link_hash_table root;
-};
-
 /* The SCORE ELF linker needs additional information for each symbol in
    the global hash table.  */
 struct score_elf_link_hash_entry
@@ -68,13 +61,9 @@ struct score_elf_link_hash_entry
 /* Traverse a score ELF linker hash table.  */
 #define score_elf_link_hash_traverse(table, func, info) \
   (elf_link_hash_traverse \
-   (&(table)->root, \
+   ((table),							     \
     (bfd_boolean (*) (struct elf_link_hash_entry *, void *)) (func), \
     (info)))
-
-/* Get the SCORE elf linker hash table from a link_info structure.  */
-#define score_elf_hash_table(info) \
-  ((struct score_elf_link_hash_table *) ((info)->hash))
 
 /* This structure is used to hold .got entries while estimating got sizes.  */
 struct score_got_entry
@@ -1135,10 +1124,9 @@ score_elf_sort_hash_table (struct bfd_link_info *info,
        too large offsets.  */
     - (g->next ? g->assigned_gotno : 0);
   hsd.max_non_got_dynindx = max_local;
-  score_elf_link_hash_traverse (((struct score_elf_link_hash_table *)
-                                 elf_hash_table (info)),
-                                 score_elf_sort_hash_table_f,
-                                 &hsd);
+  score_elf_link_hash_traverse (elf_hash_table (info),
+				score_elf_sort_hash_table_f,
+				&hsd);
 
   /* There should have been enough room in the symbol table to
      accommodate both the GOT and non-GOT symbols.  */
@@ -1154,22 +1142,23 @@ score_elf_sort_hash_table (struct bfd_link_info *info,
 }
 
 /* Create an entry in an score ELF linker hash table.  */
+
 static struct bfd_hash_entry *
 score_elf_link_hash_newfunc (struct bfd_hash_entry *entry,
                              struct bfd_hash_table *table,
                              const char *string)
 {
-  struct score_elf_link_hash_entry *ret = (struct score_elf_link_hash_entry *)entry;
+  struct score_elf_link_hash_entry *ret = (struct score_elf_link_hash_entry *) entry;
 
   /* Allocate the structure if it has not already been allocated by a subclass.  */
   if (ret == NULL)
     ret = bfd_hash_allocate (table, sizeof (struct score_elf_link_hash_entry));
   if (ret == NULL)
-    return (struct bfd_hash_entry *)ret;
+    return (struct bfd_hash_entry *) ret;
 
   /* Call the allocation method of the superclass.  */
   ret = ((struct score_elf_link_hash_entry *)
-         _bfd_elf_link_hash_newfunc ((struct bfd_hash_entry *)ret, table, string));
+         _bfd_elf_link_hash_newfunc ((struct bfd_hash_entry *) ret, table, string));
 
   if (ret != NULL)
     {
@@ -1179,7 +1168,7 @@ score_elf_link_hash_newfunc (struct bfd_hash_entry *entry,
       ret->forced_local = FALSE;
     }
 
-  return (struct bfd_hash_entry *)ret;
+  return (struct bfd_hash_entry *) ret;
 }
 
 /* Returns the first relocation of type r_type found, beginning with
@@ -1755,7 +1744,7 @@ score_elf_local_got_index (bfd *abfd, bfd *ibfd, struct bfd_link_info *info,
 static bfd_vma
 score_elf_global_got_index (bfd *abfd, struct elf_link_hash_entry *h)
 {
-  bfd_vma index;
+  bfd_vma got_index;
   asection *sgot;
   struct score_got_info *g;
   long global_got_dynindx = 0;
@@ -1769,16 +1758,19 @@ score_elf_global_got_index (bfd *abfd, struct elf_link_hash_entry *h)
      indices into the GOT.  That makes it easy to calculate the GOT
      offset.  */
   BFD_ASSERT (h->dynindx >= global_got_dynindx);
-  index = ((h->dynindx - global_got_dynindx + g->local_gotno) * SCORE_ELF_GOT_SIZE (abfd));
-  BFD_ASSERT (index < sgot->size);
+  got_index = ((h->dynindx - global_got_dynindx + g->local_gotno) * SCORE_ELF_GOT_SIZE (abfd));
+  BFD_ASSERT (got_index < sgot->size);
 
-  return index;
+  return got_index;
 }
 
 /* Returns the offset for the entry at the INDEXth position in the GOT.  */
+
 static bfd_vma
-score_elf_got_offset_from_index (bfd *dynobj, bfd *output_bfd,
-                                 bfd *input_bfd ATTRIBUTE_UNUSED, bfd_vma index)
+score_elf_got_offset_from_index (bfd *dynobj,
+				 bfd *output_bfd,
+                                 bfd *input_bfd ATTRIBUTE_UNUSED,
+				 bfd_vma got_index)
 {
   asection *sgot;
   bfd_vma gp;
@@ -1787,7 +1779,7 @@ score_elf_got_offset_from_index (bfd *dynobj, bfd *output_bfd,
   g = score_elf_got_info (dynobj, &sgot);
   gp = _bfd_get_gp_value (output_bfd);
 
-  return sgot->output_section->vma + sgot->output_offset + index - gp;
+  return sgot->output_section->vma + sgot->output_offset + got_index - gp;
 }
 
 /* Follow indirect and warning hash entries so that each got entry
@@ -2080,7 +2072,7 @@ score_elf_final_link_relocate (reloc_howto_type *howto,
         {
           g = score_elf_global_got_index (elf_hash_table (info)->dynobj,
                                           (struct elf_link_hash_entry *) h);
-          if ((! elf_hash_table(info)->dynamic_sections_created
+          if ((! elf_hash_table (info)->dynamic_sections_created
                || (info->shared
                    && (info->symbolic || h->root.dynindx == -1)
                    && h->root.def_regular)))
@@ -4003,28 +3995,6 @@ elf32_score_reloc_name_lookup (bfd *abfd ATTRIBUTE_UNUSED,
   return NULL;
 }
 
-/* Create a score elf linker hash table.  */
-
-static struct bfd_link_hash_table *
-s3_elf32_score_link_hash_table_create (bfd *abfd)
-{
-  struct score_elf_link_hash_table *ret;
-  bfd_size_type amt = sizeof (struct score_elf_link_hash_table);
-
-  ret = bfd_malloc (amt);
-  if (ret == NULL)
-    return NULL;
-
-  if (!_bfd_elf_link_hash_table_init (&ret->root, abfd, score_elf_link_hash_newfunc,
-                                      sizeof (struct score_elf_link_hash_entry)))
-    {
-      free (ret);
-      return NULL;
-    }
-
-  return &ret->root.root;
-}
-
 static bfd_boolean
 s3_elf32_score_print_private_bfd_data (bfd *abfd, void * ptr)
 {
@@ -4391,13 +4361,29 @@ elf32_score_reloc_type_lookup (bfd *abfd ATTRIBUTE_UNUSED, bfd_reloc_code_real_t
     return s7_elf32_score_reloc_type_lookup (abfd, code);
 }
 
+/* Create a score elf linker hash table.
+   This is a copy of _bfd_elf_link_hash_table_create() except with a
+   different hash table entry creation function.  */
+
 static struct bfd_link_hash_table *
 elf32_score_link_hash_table_create (bfd *abfd)
 {
-  if (bfd_get_mach (abfd) == bfd_mach_score3)
-    return s3_elf32_score_link_hash_table_create (abfd);
-  else
-    return s7_elf32_score_link_hash_table_create (abfd);
+  struct elf_link_hash_table *ret;
+  bfd_size_type amt = sizeof (struct elf_link_hash_table);
+
+  ret = (struct elf_link_hash_table *) bfd_malloc (amt);
+  if (ret == NULL)
+    return NULL;
+
+  if (!_bfd_elf_link_hash_table_init (ret, abfd, score_elf_link_hash_newfunc,
+                                      sizeof (struct score_elf_link_hash_entry),
+				      GENERIC_ELF_DATA))
+    {
+      free (ret);
+      return NULL;
+    }
+
+  return &ret->root;
 }
 
 static bfd_boolean

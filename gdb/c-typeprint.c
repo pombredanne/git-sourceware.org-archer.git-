@@ -1,6 +1,6 @@
 /* Support for printing C and C++ types for GDB, the GNU debugger.
    Copyright (C) 1986, 1988, 1989, 1991, 1992, 1993, 1994, 1995, 1996, 1998,
-   1999, 2000, 2001, 2002, 2003, 2006, 2007, 2008, 2009
+   1999, 2000, 2001, 2002, 2003, 2006, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -32,6 +32,7 @@
 #include "c-lang.h"
 #include "typeprint.h"
 #include "cp-abi.h"
+#include "jv-lang.h"
 
 #include "gdb_string.h"
 #include <errno.h>
@@ -39,8 +40,6 @@
 static void cp_type_print_method_args (struct type *mtype, char *prefix,
 				       char *varstring, int staticp,
 				       struct ui_file *stream);
-
-static void c_type_print_args (struct type *, struct ui_file *);
 
 static void cp_type_print_derivation_info (struct ui_file *, struct type *);
 
@@ -70,17 +69,15 @@ c_print_type (struct type *type, char *varstring, struct ui_file *stream,
   c_type_print_base (type, stream, show, level);
   code = TYPE_CODE (type);
   if ((varstring != NULL && *varstring != '\0')
-      ||
   /* Need a space if going to print stars or brackets;
      but not if we will print just a type name.  */
-      ((show > 0 || TYPE_NAME (type) == 0)
-       &&
-       (code == TYPE_CODE_PTR || code == TYPE_CODE_FUNC
-	|| code == TYPE_CODE_METHOD
-	|| code == TYPE_CODE_ARRAY
-	|| code == TYPE_CODE_MEMBERPTR
-	|| code == TYPE_CODE_METHODPTR
-	|| code == TYPE_CODE_REF)))
+      || ((show > 0 || TYPE_NAME (type) == 0)
+	  && (code == TYPE_CODE_PTR || code == TYPE_CODE_FUNC
+	      || code == TYPE_CODE_METHOD
+	      || code == TYPE_CODE_ARRAY
+	      || code == TYPE_CODE_MEMBERPTR
+	      || code == TYPE_CODE_METHODPTR
+	      || code == TYPE_CODE_REF)))
     fputs_filtered (" ", stream);
   need_post_space = (varstring != NULL && strcmp (varstring, "") != 0);
   c_type_print_varspec_prefix (type, stream, show, 0, need_post_space);
@@ -199,6 +196,23 @@ cp_type_print_method_args (struct type *mtype, char *prefix, char *varstring,
     fprintf_filtered (stream, "void");
 
   fprintf_filtered (stream, ")");
+
+  /* For non-static methods, read qualifiers from the type of
+     THIS.  */
+  if (!staticp)
+    {
+      struct type *domain;
+
+      gdb_assert (nargs > 0);
+      gdb_assert (TYPE_CODE (args[0].type) == TYPE_CODE_PTR);
+      domain = TYPE_TARGET_TYPE (args[0].type);
+
+      if (TYPE_CONST (domain))
+	fprintf_filtered (stream, " const");
+
+      if (TYPE_VOLATILE (domain))
+	fprintf_filtered (stream, " volatile");
+    }
 }
 
 
@@ -294,7 +308,6 @@ c_type_print_varspec_prefix (struct type *type, struct ui_file *stream,
     case TYPE_CODE_STRING:
     case TYPE_CODE_BITSTRING:
     case TYPE_CODE_COMPLEX:
-    case TYPE_CODE_TEMPLATE:
     case TYPE_CODE_NAMESPACE:
     case TYPE_CODE_DECFLOAT:
       /* These types need no prefix.  They are listed here so that
@@ -355,10 +368,14 @@ c_type_print_modifier (struct type *type, struct ui_file *stream,
 
 /* Print out the arguments of TYPE, which should have TYPE_CODE_METHOD
    or TYPE_CODE_FUNC, to STREAM.  Artificial arguments, such as "this"
-   in non-static methods, are displayed.  */
+   in non-static methods, are displayed if SHOW_ARTIFICIAL is
+   non-zero. LANGUAGE is the language in which TYPE was defined.  This is
+   a necessary evil since this code is used by the C, C++, and Java
+   backends. */
 
-static void
-c_type_print_args (struct type *type, struct ui_file *stream)
+void
+c_type_print_args (struct type *type, struct ui_file *stream,
+		   int show_artificial, enum language language)
 {
   int i, len;
   struct field *args;
@@ -370,13 +387,19 @@ c_type_print_args (struct type *type, struct ui_file *stream)
 
   for (i = 0; i < TYPE_NFIELDS (type); i++)
     {
+      if (TYPE_FIELD_ARTIFICIAL (type, i) && !show_artificial)
+	continue;
+
       if (printed_any)
 	{
 	  fprintf_filtered (stream, ", ");
 	  wrap_here ("    ");
 	}
 
-      c_print_type (TYPE_FIELD_TYPE (type, i), "", stream, -1, 0);
+      if (language == language_java)
+	java_print_type (TYPE_FIELD_TYPE (type, i), "", stream, -1, 0);
+      else
+	c_print_type (TYPE_FIELD_TYPE (type, i), "", stream, -1, 0);
       printed_any = 1;
     }
 
@@ -593,7 +616,7 @@ c_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
       if (passed_a_ptr)
 	fprintf_filtered (stream, ")");
       if (!demangled_args)
-	c_type_print_args (type, stream);
+	c_type_print_args (type, stream, 1, language_c);
       c_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream, show,
 				   passed_a_ptr, 0);
       break;
@@ -618,7 +641,6 @@ c_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
     case TYPE_CODE_STRING:
     case TYPE_CODE_BITSTRING:
     case TYPE_CODE_COMPLEX:
-    case TYPE_CODE_TEMPLATE:
     case TYPE_CODE_NAMESPACE:
     case TYPE_CODE_DECFLOAT:
       /* These types do not need a suffix.  They are listed so that
@@ -704,35 +726,10 @@ c_type_print_base (struct type *type, struct ui_file *stream, int show,
 
     case TYPE_CODE_STRUCT:
       c_type_print_modifier (type, stream, 0, 1);
-      /* Note TYPE_CODE_STRUCT and TYPE_CODE_CLASS have the same value,
-       * so we use another means for distinguishing them.
-       */
-      if (HAVE_CPLUS_STRUCT (type))
-	{
-	  switch (TYPE_DECLARED_TYPE (type))
-	    {
-	    case DECLARED_TYPE_CLASS:
-	      fprintf_filtered (stream, "class ");
-	      break;
-	    case DECLARED_TYPE_UNION:
-	      fprintf_filtered (stream, "union ");
-	      break;
-	    case DECLARED_TYPE_STRUCT:
-	      fprintf_filtered (stream, "struct ");
-	      break;
-	    default:
-	      /* If there is a CPLUS_STRUCT, assume class if not
-	       * otherwise specified in the declared_type field.
-	       */
-	      fprintf_filtered (stream, "class ");
-	      break;
-	    }			/* switch */
-	}
+      if (TYPE_DECLARED_CLASS (type))
+	fprintf_filtered (stream, "class ");
       else
-	{
-	  /* If not CPLUS_STRUCT, then assume it's a C struct */
-	  fprintf_filtered (stream, "struct ");
-	}
+	fprintf_filtered (stream, "struct ");
       goto struct_union;
 
     case TYPE_CODE_UNION:
@@ -747,8 +744,8 @@ c_type_print_base (struct type *type, struct ui_file *stream, int show,
        * tag  for unnamed struct/union/enum's, which we don't
        * want to print.
        */
-      if (TYPE_TAG_NAME (type) != NULL &&
-	  strncmp (TYPE_TAG_NAME (type), "{unnamed", 8))
+      if (TYPE_TAG_NAME (type) != NULL
+	  && strncmp (TYPE_TAG_NAME (type), "{unnamed", 8))
 	{
 	  fputs_filtered (TYPE_TAG_NAME (type), stream);
 	  if (show > 0)
@@ -763,6 +760,9 @@ c_type_print_base (struct type *type, struct ui_file *stream, int show,
 	}
       else if (show > 0 || TYPE_TAG_NAME (type) == NULL)
 	{
+	  struct type *basetype;
+	  int vptr_fieldno;
+
 	  cp_type_print_derivation_info (stream, type);
 
 	  fprintf_filtered (stream, "{\n");
@@ -785,8 +785,7 @@ c_type_print_base (struct type *type, struct ui_file *stream, int show,
 	     masquerading as a class, if all members are public, there's
 	     no need for a "public:" label. */
 
-	  if ((TYPE_DECLARED_TYPE (type) == DECLARED_TYPE_CLASS) ||
-	      (TYPE_DECLARED_TYPE (type) == DECLARED_TYPE_TEMPLATE))
+	  if (TYPE_DECLARED_CLASS (type))
 	    {
 	      QUIT;
 	      len = TYPE_NFIELDS (type);
@@ -814,8 +813,7 @@ c_type_print_base (struct type *type, struct ui_file *stream, int show,
 		    }
 		}
 	    }
-	  else if ((TYPE_DECLARED_TYPE (type) == DECLARED_TYPE_STRUCT) ||
-		   (TYPE_DECLARED_TYPE (type) == DECLARED_TYPE_UNION))
+	  else
 	    {
 	      QUIT;
 	      len = TYPE_NFIELDS (type);
@@ -834,8 +832,8 @@ c_type_print_base (struct type *type, struct ui_file *stream, int show,
 		      QUIT;
 		      len = TYPE_FN_FIELDLIST_LENGTH (type, j);
 		      for (i = 0; i < len; i++)
-			if (TYPE_FN_FIELD_PRIVATE (TYPE_FN_FIELDLIST1 (type, j), i) ||
-			    TYPE_FN_FIELD_PROTECTED (TYPE_FN_FIELDLIST1 (type, j), i))
+			if (TYPE_FN_FIELD_PRIVATE (TYPE_FN_FIELDLIST1 (type, j), i)
+			    || TYPE_FN_FIELD_PROTECTED (TYPE_FN_FIELDLIST1 (type, j), i))
 			  {
 			    need_access_label = 1;
 			    break;
@@ -850,18 +848,19 @@ c_type_print_base (struct type *type, struct ui_file *stream, int show,
 	     do not print the field that it occupies.  */
 
 	  len = TYPE_NFIELDS (type);
+	  vptr_fieldno = get_vptr_fieldno (type, &basetype);
 	  for (i = TYPE_N_BASECLASSES (type); i < len; i++)
 	    {
 	      QUIT;
-	      /* Don't print out virtual function table.  */
-	      if (strncmp (TYPE_FIELD_NAME (type, i), "_vptr", 5) == 0
-		  && is_cplus_marker ((TYPE_FIELD_NAME (type, i))[5]))
+
+	      /* If we have a virtual table pointer, omit it.  Even if
+		 virtual table pointers are not specifically marked in
+		 the debug info, they should be artificial.  */
+	      if ((i == vptr_fieldno && type == basetype)
+		  || TYPE_FIELD_ARTIFICIAL (type, i))
 		continue;
 
-	      /* If this is a C++ class we can print the various C++ section
-	         labels. */
-
-	      if (HAVE_CPLUS_STRUCT (type) && need_access_label)
+	      if (need_access_label)
 		{
 		  if (TYPE_FIELD_PROTECTED (type, i))
 		    {
@@ -986,9 +985,9 @@ c_type_print_base (struct type *type, struct ui_file *stream, int show,
 					TYPE_FN_FIELD_PHYSNAME (f, j));
 		      break;
 		    }
-		  else if (!is_constructor &&	/* constructors don't have declared types */
-			   !is_full_physname_constructor &&	/*    " "  */
-			   !is_type_conversion_operator (type, i, j))
+		  else if (!is_constructor	/* constructors don't have declared types */
+			   && !is_full_physname_constructor	/*    " "  */
+			   && !is_type_conversion_operator (type, i, j))
 		    {
 		      type_print (TYPE_TARGET_TYPE (TYPE_FN_FIELD_TYPE (f, j)),
 				  "", stream, -1);
@@ -1070,8 +1069,8 @@ c_type_print_base (struct type *type, struct ui_file *stream, int show,
          "{unnamed struct}"/"{unnamed union}"/"{unnamed enum}"
          tag for unnamed struct/union/enum's, which we don't
          want to print. */
-      if (TYPE_TAG_NAME (type) != NULL &&
-	  strncmp (TYPE_TAG_NAME (type), "{unnamed", 8))
+      if (TYPE_TAG_NAME (type) != NULL
+	  && strncmp (TYPE_TAG_NAME (type), "{unnamed", 8))
 	{
 	  fputs_filtered (TYPE_TAG_NAME (type), stream);
 	  if (show > 0)
@@ -1124,25 +1123,6 @@ c_type_print_base (struct type *type, struct ui_file *stream, int show,
       /* This should not occur */
       fprintf_filtered (stream, _("<range type>"));
       break;
-
-    case TYPE_CODE_TEMPLATE:
-      /* Called on "ptype t" where "t" is a template.
-         Prints the template header (with args), e.g.:
-         template <class T1, class T2> class "
-         and then merges with the struct/union/class code to
-         print the rest of the definition. */
-      c_type_print_modifier (type, stream, 0, 1);
-      fprintf_filtered (stream, "template <");
-      for (i = 0; i < TYPE_NTEMPLATE_ARGS (type); i++)
-	{
-	  struct template_arg templ_arg;
-	  templ_arg = TYPE_TEMPLATE_ARG (type, i);
-	  fprintf_filtered (stream, "class %s", templ_arg.name);
-	  if (i < TYPE_NTEMPLATE_ARGS (type) - 1)
-	    fprintf_filtered (stream, ", ");
-	}
-      fprintf_filtered (stream, "> class ");
-      goto struct_union;
 
     case TYPE_CODE_NAMESPACE:
       fputs_filtered ("namespace ", stream);

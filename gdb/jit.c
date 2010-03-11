@@ -1,7 +1,6 @@
 /* Handle JIT code generation in the inferior for GDB, the GNU Debugger.
 
-   Copyright (C) 2009
-   Free Software Foundation, Inc.
+   Copyright (C) 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -253,7 +252,7 @@ JITed symbol file is not an object file, ignoring it.\n"));
         /* We assume that these virtual addresses are absolute, and do not
            treat them as offsets.  */
         sai->other[i].addr = bfd_get_section_vma (nbfd, sec);
-        sai->other[i].name = (char *) bfd_get_section_name (nbfd, sec);
+        sai->other[i].name = xstrdup (bfd_get_section_name (nbfd, sec));
         sai->other[i].sectindex = sec->index;
         ++i;
       }
@@ -398,7 +397,7 @@ jit_inferior_created_observer (struct target_ops *objfile, int from_tty)
    for example when it crashes.  */
 
 static void
-jit_inferior_exit_hook (int pid)
+jit_inferior_exit_hook (struct inferior *inf)
 {
   struct objfile *objf;
   struct objfile *temp;

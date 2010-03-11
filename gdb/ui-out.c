@@ -1,6 +1,6 @@
 /* Output generating routines for GDB.
 
-   Copyright (C) 1999, 2000, 2001, 2002, 2004, 2005, 2007, 2008, 2009
+   Copyright (C) 1999, 2000, 2001, 2002, 2004, 2005, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    Contributed by Cygnus Solutions.
@@ -44,7 +44,7 @@ struct ui_out_hdr
    is always available.  Stack/nested level 0 is reserved for the
    top-level result. */
 
-enum { MAX_UI_OUT_LEVELS = 6 };
+enum { MAX_UI_OUT_LEVELS = 8 };
 
 struct ui_out_level
   {

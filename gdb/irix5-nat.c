@@ -1,7 +1,7 @@
 /* Native support for the SGI Iris running IRIX version 5, for GDB.
 
    Copyright (C) 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1998,
-   1999, 2000, 2001, 2002, 2004, 2006, 2007, 2008, 2009
+   1999, 2000, 2001, 2002, 2004, 2006, 2007, 2008, 2009, 2010
    Free Software Foundation, Inc.
 
    Contributed by Alessandro Forin(af@cs.cmu.edu) at CMU
@@ -98,7 +98,7 @@ fill_gregset (const struct regcache *regcache, gregset_t *gregsetp, int regno)
 	*(regp + regi) = extract_signed_integer (buf, size, byte_order);
       }
 
-  if ((regno == -1) || (regno == gdbarch_pc_regnum (gdbarch)))
+  if ((regno == -1) || (regno == mips_regnum (gdbarch)->pc))
     {
       regi = mips_regnum (gdbarch)->pc;
       size = register_size (gdbarch, regi);

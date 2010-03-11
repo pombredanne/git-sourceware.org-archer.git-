@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2005, 2006, 2007, 2008,
-   2009 Free Software Foundation, Inc.
+   2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -40,6 +40,8 @@
 #include "regcache.h"
 #include "user-regs.h"
 #include "valprint.h"
+#include "gdb_obstack.h"
+#include "objfiles.h"
 #include "python/python.h"
 
 #include "gdb_assert.h"
@@ -651,6 +653,29 @@ ptrmath_type_p (struct type *type)
     }
 }
 
+/* Constructs a fake method with the given parameter types.
+   This function is used by the parser to construct an "expected"
+   type for method overload resolution.  */
+
+static struct type *
+make_params (int num_types, struct type **param_types)
+{
+  struct type *type = XZALLOC (struct type);
+  TYPE_MAIN_TYPE (type) = XZALLOC (struct main_type);
+  TYPE_LENGTH (type) = 1;
+  TYPE_CODE (type) = TYPE_CODE_METHOD;
+  TYPE_VPTR_FIELDNO (type) = -1;
+  TYPE_CHAIN (type) = type;
+  TYPE_NFIELDS (type) = num_types;
+  TYPE_FIELDS (type) = (struct field *)
+    TYPE_ZALLOC (type, sizeof (struct field) * num_types);
+
+  while (num_types-- > 0)
+    TYPE_FIELD_TYPE (type, num_types) = param_types[num_types];
+
+  return type;
+}
+
 struct value *
 evaluate_subexp_standard (struct type *expect_type,
 			  struct expression *exp, int *pos,
@@ -671,6 +696,8 @@ evaluate_subexp_standard (struct type *expect_type,
   long mem_offset;
   struct type **arg_types;
   int save_pos1;
+  struct symbol *function = NULL;
+  char *function_name = NULL;
 
   pc = (*pos)++;
   op = exp->elts[pc].opcode;
@@ -684,7 +711,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	goto nosideret;
       arg1 = value_aggregate_elt (exp->elts[pc + 1].type,
 				  &exp->elts[pc + 3].string,
-				  0, noside);
+				  expect_type, 0, noside);
       if (arg1 == NULL)
 	error (_("There is no field named %s"), &exp->elts[pc + 3].string);
       return arg1;
@@ -884,8 +911,8 @@ evaluate_subexp_standard (struct type *expect_type,
 	  LONGEST low_bound, high_bound;
 
 	  /* get targettype of elementtype */
-	  while (TYPE_CODE (check_type) == TYPE_CODE_RANGE ||
-		 TYPE_CODE (check_type) == TYPE_CODE_TYPEDEF)
+	  while (TYPE_CODE (check_type) == TYPE_CODE_RANGE
+		 || TYPE_CODE (check_type) == TYPE_CODE_TYPEDEF)
 	    check_type = TYPE_TARGET_TYPE (check_type);
 
 	  if (get_discrete_bounds (element_type, &low_bound, &high_bound) < 0)
@@ -919,14 +946,14 @@ evaluate_subexp_standard (struct type *expect_type,
 		range_low_type = TYPE_TARGET_TYPE (range_low_type);
 	      if (TYPE_CODE (range_high_type) == TYPE_CODE_RANGE)
 		range_high_type = TYPE_TARGET_TYPE (range_high_type);
-	      if ((TYPE_CODE (range_low_type) != TYPE_CODE (range_high_type)) ||
-		  (TYPE_CODE (range_low_type) == TYPE_CODE_ENUM &&
-		   (range_low_type != range_high_type)))
+	      if ((TYPE_CODE (range_low_type) != TYPE_CODE (range_high_type))
+		  || (TYPE_CODE (range_low_type) == TYPE_CODE_ENUM
+		      && (range_low_type != range_high_type)))
 		/* different element modes */
 		error (_("POWERSET tuple elements of different mode"));
-	      if ((TYPE_CODE (check_type) != TYPE_CODE (range_low_type)) ||
-		  (TYPE_CODE (check_type) == TYPE_CODE_ENUM &&
-		   range_low_type != check_type))
+	      if ((TYPE_CODE (check_type) != TYPE_CODE (range_low_type))
+		  || (TYPE_CODE (check_type) == TYPE_CODE_ENUM
+		      && range_low_type != check_type))
 		error (_("incompatible POWERSET tuple elements"));
 	      if (range_low > range_high)
 		{
@@ -1161,8 +1188,13 @@ evaluate_subexp_standard (struct type *expect_type,
 	if (addr)
 	  {
 	    struct symbol *sym = NULL;
-	    /* Is it a high_level symbol?  */
 
+	    /* The address might point to a function descriptor;
+	       resolve it to the actual code address instead.  */
+	    addr = gdbarch_convert_from_func_ptr_addr (exp->gdbarch, addr,
+						       &current_target);
+
+	    /* Is it a high_level symbol?  */
 	    sym = find_pc_function (addr);
 	    if (sym != NULL) 
 	      method = value_of_variable (sym, 0);
@@ -1216,11 +1248,20 @@ evaluate_subexp_standard (struct type *expect_type,
 	  {
 	    if (TYPE_CODE (value_type (method)) != TYPE_CODE_FUNC)
 	      error (_("method address has symbol information with non-function type; skipping"));
+
+	    /* Create a function pointer of the appropriate type, and replace
+	       its value with the value of msg_send or msg_send_stret.  We must
+	       use a pointer here, as msg_send and msg_send_stret are of pointer
+	       type, and the representation may be different on systems that use
+	       function descriptors.  */
 	    if (struct_return)
-	      set_value_address (method, value_as_address (msg_send_stret));
+	      called_method
+		= value_from_pointer (lookup_pointer_type (value_type (method)),
+				      value_as_address (msg_send_stret));
 	    else
-	      set_value_address (method, value_as_address (msg_send));
-	    called_method = method;
+	      called_method
+		= value_from_pointer (lookup_pointer_type (value_type (method)),
+				      value_as_address (msg_send));
 	  }
 	else
 	  {
@@ -1275,7 +1316,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	  {
 	    /* Function objc_msg_lookup returns a pointer.  */
 	    deprecated_set_value_type (argvec[0],
-				       lookup_function_type (lookup_pointer_type (value_type (argvec[0]))));
+				       lookup_pointer_type (lookup_function_type (value_type (argvec[0]))));
 	    argvec[0] = call_function_by_hand (argvec[0], nargs + 2, argvec + 1);
 	  }
 
@@ -1371,6 +1412,47 @@ evaluate_subexp_standard (struct type *expect_type,
 	  /* Now, say which argument to start evaluating from */
 	  tem = 2;
 	}
+      else if (op == OP_SCOPE
+	       && overload_resolution
+	       && (exp->language_defn->la_language == language_cplus))
+	{
+	  /* Unpack it locally so we can properly handle overload
+	     resolution.  */
+	  struct type *qual_type;
+	  char *name;
+	  int local_tem;
+
+	  pc2 = (*pos)++;
+	  local_tem = longest_to_int (exp->elts[pc2 + 2].longconst);
+	  (*pos) += 4 + BYTES_TO_EXP_ELEM (local_tem + 1);
+	  type = exp->elts[pc2 + 1].type;
+	  name = &exp->elts[pc2 + 3].string;
+
+	  function = NULL;
+	  function_name = NULL;
+	  if (TYPE_CODE (type) == TYPE_CODE_NAMESPACE)
+	    {
+	      function = cp_lookup_symbol_namespace (TYPE_TAG_NAME (type),
+						     name,
+						     get_selected_block (0),
+						     VAR_DOMAIN, 1);
+	      if (function == NULL)
+		error (_("No symbol \"%s\" in namespace \"%s\"."), 
+		       name, TYPE_TAG_NAME (type));
+
+	      tem = 1;
+	    }
+	  else
+	    {
+	      gdb_assert (TYPE_CODE (type) == TYPE_CODE_STRUCT
+			  || TYPE_CODE (type) == TYPE_CODE_UNION);
+	      function_name = name;
+
+	      arg2 = value_zero (type, lval_memory);
+	      ++nargs;
+	      tem = 2;
+	    }
+	}
       else
 	{
 	  /* Non-method function call */
@@ -1402,15 +1484,22 @@ evaluate_subexp_standard (struct type *expect_type,
       /* signal end of arglist */
       argvec[tem] = 0;
 
-      if (op == STRUCTOP_STRUCT || op == STRUCTOP_PTR)
+      if (op == STRUCTOP_STRUCT || op == STRUCTOP_PTR
+	  || (op == OP_SCOPE && function_name != NULL))
 	{
 	  int static_memfuncp;
-	  char tstr[256];
+	  char *tstr;
 
 	  /* Method invocation : stuff "this" as first parameter */
 	  argvec[1] = arg2;
-	  /* Name of method from expression */
-	  strcpy (tstr, &exp->elts[pc2 + 2].string);
+
+	  if (op != OP_SCOPE)
+	    {
+	      /* Name of method from expression */
+	      tstr = &exp->elts[pc2 + 2].string;
+	    }
+	  else
+	    tstr = function_name;
 
 	  if (overload_resolution && (exp->language_defn->la_language == language_cplus))
 	    {
@@ -1427,7 +1516,13 @@ evaluate_subexp_standard (struct type *expect_type,
 					  &arg2 /* the object */ , NULL,
 					  &valp, NULL, &static_memfuncp);
 
-
+	      if (op == OP_SCOPE && !static_memfuncp)
+		{
+		  /* For the time being, we don't handle this.  */
+		  error (_("Call to overloaded function %s requires "
+			   "`this' pointer"),
+			 function_name);
+		}
 	      argvec[1] = arg2;	/* the ``this'' pointer */
 	      argvec[0] = valp;	/* use the method found after overload resolution */
 	    }
@@ -1460,7 +1555,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	  argvec[1] = arg2;
 	  argvec[0] = arg1;
 	}
-      else if (op == OP_VAR_VALUE)
+      else if (op == OP_VAR_VALUE || (op == OP_SCOPE && function != NULL))
 	{
 	  /* Non-member function being called */
           /* fn: This can only be done for C++ functions.  A C-style function
@@ -1472,6 +1567,9 @@ evaluate_subexp_standard (struct type *expect_type,
 	      /* Language is C++, do some overload resolution before evaluation */
 	      struct symbol *symp;
 
+	      if (op == OP_VAR_VALUE)
+		function = exp->elts[save_pos1+2].symbol;
+
 	      /* Prepare list of argument types for overload resolution */
 	      arg_types = (struct type **) alloca (nargs * (sizeof (struct type *)));
 	      for (ix = 1; ix <= nargs; ix++)
@@ -1479,12 +1577,18 @@ evaluate_subexp_standard (struct type *expect_type,
 
 	      (void) find_overload_match (arg_types, nargs, NULL /* no need for name */ ,
 				 0 /* not method */ , 0 /* strict match */ ,
-		      NULL, exp->elts[save_pos1+2].symbol /* the function */ ,
+		      NULL, function /* the function */ ,
 					  NULL, &symp, NULL);
 
-	      /* Now fix the expression being evaluated */
-	      exp->elts[save_pos1+2].symbol = symp;
-	      argvec[0] = evaluate_subexp_with_coercion (exp, &save_pos1, noside);
+	      if (op == OP_VAR_VALUE)
+		{
+		  /* Now fix the expression being evaluated */
+		  exp->elts[save_pos1+2].symbol = symp;
+		  argvec[0] = evaluate_subexp_with_coercion (exp, &save_pos1,
+							     noside);
+		}
+	      else
+		argvec[0] = value_of_variable (symp, get_selected_block (0));
 	    }
 	  else
 	    {
@@ -1513,11 +1617,18 @@ evaluate_subexp_standard (struct type *expect_type,
 	     gdb isn't asked for it's opinion (ie. through "whatis"),
 	     it won't offer it. */
 
-	  struct type *ftype =
-	  TYPE_TARGET_TYPE (value_type (argvec[0]));
+	  struct type *ftype = value_type (argvec[0]);
 
-	  if (ftype)
-	    return allocate_value (TYPE_TARGET_TYPE (value_type (argvec[0])));
+	  if (TYPE_CODE (ftype) == TYPE_CODE_INTERNAL_FUNCTION)
+	    {
+	      /* We don't know anything about what the internal
+		 function might return, but we have to return
+		 something.  */
+	      return value_zero (builtin_type (exp->gdbarch)->builtin_int,
+				 not_lval);
+	    }
+	  else if (TYPE_TARGET_TYPE (ftype))
+	    return allocate_value (TYPE_TARGET_TYPE (ftype));
 	  else
 	    error (_("Expression of type other than \"Function returning ...\" used as function"));
 	}
@@ -1641,8 +1752,8 @@ evaluate_subexp_standard (struct type *expect_type,
 	struct value_print_options opts;
 
 	get_user_print_options (&opts);
-        if (opts.objectprint && TYPE_TARGET_TYPE(type) &&
-            (TYPE_CODE (TYPE_TARGET_TYPE (type)) == TYPE_CODE_CLASS))
+        if (opts.objectprint && TYPE_TARGET_TYPE(type)
+            && (TYPE_CODE (TYPE_TARGET_TYPE (type)) == TYPE_CODE_CLASS))
           {
             real_type = value_rtti_target_type (arg1, &full, &top, &using_enc);
             if (real_type)
@@ -1708,6 +1819,20 @@ evaluate_subexp_standard (struct type *expect_type,
 	default:
 	  error (_("non-pointer-to-member value used in pointer-to-member construct"));
 	}
+
+    case TYPE_INSTANCE:
+      nargs = longest_to_int (exp->elts[pc + 1].longconst);
+      arg_types = (struct type **) alloca (nargs * sizeof (struct type *));
+      for (ix = 0; ix < nargs; ++ix)
+	arg_types[ix] = exp->elts[pc + 1 + ix + 1].type;
+
+      expect_type = make_params (nargs, arg_types);
+      *(pos) += 3 + nargs;
+      arg1 = evaluate_subexp_standard (expect_type, exp, pos, noside);
+      xfree (TYPE_FIELDS (expect_type));
+      xfree (TYPE_MAIN_TYPE (expect_type));
+      xfree (expect_type);
+      return arg1;
 
     case BINOP_CONCAT:
       arg1 = evaluate_subexp_with_coercion (exp, pos, noside);
@@ -2353,6 +2478,22 @@ evaluate_subexp_standard (struct type *expect_type,
 	arg1 = value_cast (type, arg1);
       return arg1;
 
+    case UNOP_DYNAMIC_CAST:
+      (*pos) += 2;
+      type = exp->elts[pc + 1].type;
+      arg1 = evaluate_subexp (type, exp, pos, noside);
+      if (noside == EVAL_SKIP)
+	goto nosideret;
+      return value_dynamic_cast (type, arg1);
+
+    case UNOP_REINTERPRET_CAST:
+      (*pos) += 2;
+      type = exp->elts[pc + 1].type;
+      arg1 = evaluate_subexp (type, exp, pos, noside);
+      if (noside == EVAL_SKIP)
+	goto nosideret;
+      return value_reinterpret_cast (type, arg1);
+
     case UNOP_MEMVAL:
       (*pos) += 2;
       arg1 = evaluate_subexp (expect_type, exp, pos, noside);
@@ -2553,7 +2694,7 @@ evaluate_subexp_for_address (struct expression *exp, int *pos,
 	  goto default_case_after_eval;
 	}
 
-      return x;
+      return coerce_array (x);
 
     case UNOP_MEMVAL:
       (*pos) += 3;
@@ -2591,7 +2732,7 @@ evaluate_subexp_for_address (struct expression *exp, int *pos,
       (*pos) += 5 + BYTES_TO_EXP_ELEM (tem + 1);
       x = value_aggregate_elt (exp->elts[pc + 1].type,
 			       &exp->elts[pc + 3].string,
-			       1, noside);
+			       NULL, 1, noside);
       if (x == NULL)
 	error (_("There is no field named %s"), &exp->elts[pc + 3].string);
       return x;

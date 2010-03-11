@@ -3,7 +3,7 @@
 # Architecture commands for GDB, the GNU debugger.
 #
 # Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-# 2008, 2009 Free Software Foundation, Inc.
+# 2008, 2009, 2010 Free Software Foundation, Inc.
 #
 # This file is part of GDB.
 #
@@ -22,8 +22,8 @@
 
 # Make certain that the script is not running in an internationalized
 # environment.
-LANG=c ; export LANG
-LC_ALL=c ; export LC_ALL
+LANG=C ; export LANG
+LC_ALL=C ; export LC_ALL
 
 
 compare_new ()
@@ -486,6 +486,10 @@ m:CORE_ADDR:skip_prologue:CORE_ADDR ip:ip:0:0
 M:CORE_ADDR:skip_main_prologue:CORE_ADDR ip:ip
 f:int:inner_than:CORE_ADDR lhs, CORE_ADDR rhs:lhs, rhs:0:0
 m:const gdb_byte *:breakpoint_from_pc:CORE_ADDR *pcptr, int *lenptr:pcptr, lenptr::0:
+# Return the adjusted address and kind to use for Z0/Z1 packets.
+# KIND is usually the memory length of the breakpoint, but may have a
+# different target-specific meaning.
+m:void:remote_breakpoint_from_pc:CORE_ADDR *pcptr, int *kindptr:pcptr, kindptr:0:default_remote_breakpoint_from_pc::0
 M:CORE_ADDR:adjust_breakpoint_address:CORE_ADDR bpaddr:bpaddr
 m:int:memory_insert_breakpoint:struct bp_target_info *bp_tgt:bp_tgt:0:default_memory_insert_breakpoint::0
 m:int:memory_remove_breakpoint:struct bp_target_info *bp_tgt:bp_tgt:0:default_memory_remove_breakpoint::0
@@ -654,6 +658,17 @@ V:ULONGEST:max_insn_length:::0:0
 # here.
 M:struct displaced_step_closure *:displaced_step_copy_insn:CORE_ADDR from, CORE_ADDR to, struct regcache *regs:from, to, regs
 
+# Return true if GDB should use hardware single-stepping to execute
+# the displaced instruction identified by CLOSURE.  If false,
+# GDB will simply restart execution at the displaced instruction
+# location, and it is up to the target to ensure GDB will receive
+# control again (e.g. by placing a software breakpoint instruction
+# into the displaced instruction buffer).
+#
+# The default implementation returns false on all targets that
+# provide a gdbarch_software_single_step routine, and true otherwise.
+m:int:displaced_step_hw_singlestep:struct displaced_step_closure *closure:closure::default_displaced_step_hw_singlestep::0
+
 # Fix up the state resulting from successfully single-stepping a
 # displaced instruction, to give the result we would have gotten from
 # stepping the instruction in its original location.
@@ -709,6 +724,10 @@ v:int:sofun_address_maybe_missing:::0:0::0
 # Return -1 if something goes wrong, 0 otherwise.
 M:int:process_record:struct regcache *regcache, CORE_ADDR addr:regcache, addr
 
+# Save process state after a signal.
+# Return -1 if something goes wrong, 0 otherwise.
+M:int:process_record_signal:struct regcache *regcache, enum target_signal signal:regcache, signal
+
 # Signal translation: translate inferior's signal (host's) number into
 # GDB's representation.
 m:enum target_signal:target_signal_from_host:int signo:signo::default_target_signal_from_host::0
@@ -724,6 +743,11 @@ M:struct type *:get_siginfo_type:void:
 # Record architecture-specific information from the symbol table.
 M:void:record_special_symbol:struct objfile *objfile, asymbol *sym:objfile, sym
 
+# Function for the 'catch syscall' feature.
+
+# Get architecture-specific system calls information from registers.
+M:LONGEST:get_syscall_number:ptid_t ptid:ptid
+
 # True if the list of shared libraries is one and only for all
 # processes, as opposed to a list of shared libraries per inferior.
 # This usually means that all processes, although may or may not share
@@ -736,6 +760,28 @@ v:int:has_global_solist:::0:0::0
 # visible to all address spaces automatically.  For such cases,
 # this property should be set to true.
 v:int:has_global_breakpoints:::0:0::0
+
+# True if inferiors share an address space (e.g., uClinux).
+m:int:has_shared_address_space:void:::default_has_shared_address_space::0
+
+# True if a fast tracepoint can be set at an address.
+m:int:fast_tracepoint_valid_at:CORE_ADDR addr, int *isize, char **msg:addr, isize, msg::default_fast_tracepoint_valid_at::0
+
+# Not NULL if a target has additonal field for qSupported.
+v:const char *:qsupported:::0:0::0:gdbarch->qsupported
+
+# Return the "auto" target charset.
+f:const char *:auto_charset:void::default_auto_charset:default_auto_charset::0
+# Return the "auto" target wide charset.
+f:const char *:auto_wide_charset:void::default_auto_wide_charset:default_auto_wide_charset::0
+
+# If non-empty, this is a file extension that will be opened in place
+# of the file extension reported by the shared library list.
+#
+# This is most useful for toolchains that use a post-linker tool,
+# where the names of the files run on the target differ in extension
+# compared to the names of the files GDB should load for debug info.
+v:const char *:solib_symbols_extension:::::::pstring (gdbarch->solib_symbols_extension)
 EOF
 }
 
@@ -788,8 +834,8 @@ cat <<EOF
 
 /* Dynamic architecture support for GDB, the GNU debugger.
 
-   Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007
-   Free Software Foundation, Inc.
+   Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006,
+   2007, 2008, 2009 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -848,6 +894,7 @@ struct bp_target_info;
 struct target_desc;
 struct displaced_step_closure;
 struct core_regset_section;
+struct syscall;
 
 /* The architecture associated with the connection to the target.
  
@@ -925,6 +972,9 @@ done
 
 # close it off
 cat <<EOF
+
+/* Definition for an unknown syscall, used basically in error-cases.  */
+#define UNKNOWN_SYSCALL (-1)
 
 extern struct gdbarch_tdep *gdbarch_tdep (struct gdbarch *gdbarch);
 
@@ -1201,6 +1251,14 @@ pformat (const struct floatformat **format)
   else
     /* Just print out one of them - this is only for diagnostics.  */
     return format[0]->name;
+}
+
+static const char *
+pstring (const char *string)
+{
+  if (string == NULL)
+    return "(null)";
+  return string;
 }
 
 EOF

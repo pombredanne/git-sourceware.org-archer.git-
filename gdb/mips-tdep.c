@@ -1,8 +1,8 @@
 /* Target-dependent code for the MIPS architecture, for GDB, the GNU Debugger.
 
    Copyright (C) 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997,
-   1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
-   Free Software Foundation, Inc.
+   1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009,
+   2010 Free Software Foundation, Inc.
 
    Contributed by Alessandro Forin(af@cs.cmu.edu) at CMU
    and by Per Bothner(bothner@cs.wisc.edu) at U.Wisconsin.
@@ -1814,6 +1814,9 @@ mips_insn16_frame_this_id (struct frame_info *this_frame, void **this_cache,
 {
   struct mips_frame_cache *info = mips_insn16_frame_cache (this_frame,
 							   this_cache);
+  /* This marks the outermost frame.  */
+  if (info->base == 0)
+    return;
   (*this_id) = frame_id_build (info->base, get_frame_func (this_frame));
 }
 
@@ -2163,6 +2166,9 @@ mips_insn32_frame_this_id (struct frame_info *this_frame, void **this_cache,
 {
   struct mips_frame_cache *info = mips_insn32_frame_cache (this_frame,
 							   this_cache);
+  /* This marks the outermost frame.  */
+  if (info->base == 0)
+    return;
   (*this_id) = frame_id_build (info->base, get_frame_func (this_frame));
 }
 
@@ -2383,7 +2389,8 @@ mips_addr_bits_remove (struct gdbarch *gdbarch, CORE_ADDR addr)
    the sequence.  */
 
 static int
-deal_with_atomic_sequence (struct gdbarch *gdbarch, CORE_ADDR pc)
+deal_with_atomic_sequence (struct gdbarch *gdbarch,
+			   struct address_space *aspace, CORE_ADDR pc)
 {
   CORE_ADDR breaks[2] = {-1, -1};
   CORE_ADDR loc = pc;
@@ -2471,7 +2478,7 @@ deal_with_atomic_sequence (struct gdbarch *gdbarch, CORE_ADDR pc)
 
   /* Effectively inserts the breakpoints.  */
   for (index = 0; index <= last_breakpoint; index++)
-      insert_single_step_breakpoint (gdbarch, breaks[index]);
+    insert_single_step_breakpoint (gdbarch, aspace, breaks[index]);
 
   return 1;
 }
@@ -2485,15 +2492,16 @@ int
 mips_software_single_step (struct frame_info *frame)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
+  struct address_space *aspace = get_frame_address_space (frame);
   CORE_ADDR pc, next_pc;
 
   pc = get_frame_pc (frame);
-  if (deal_with_atomic_sequence (gdbarch, pc))
+  if (deal_with_atomic_sequence (gdbarch, aspace, pc))
     return 1;
 
   next_pc = mips_next_pc (frame, pc);
 
-  insert_single_step_breakpoint (gdbarch, next_pc);
+  insert_single_step_breakpoint (gdbarch, aspace, next_pc);
   return 1;
 }
 
@@ -3371,7 +3379,7 @@ mips_n32n64_return_value (struct gdbarch *gdbarch, struct type *func_type,
      (and $f2 if necessary).  This is a generalization of the Fortran COMPLEX
      case.
 
-     * Any other struct or union results of at most 128 bits are returned in
+     * Any other composite results of at most 128 bits are returned in
      $2 (first 64 bits) and $3 (remainder, if necessary).
 
      * Larger composite results are handled by converting the function to a
@@ -3382,8 +3390,7 @@ mips_n32n64_return_value (struct gdbarch *gdbarch, struct type *func_type,
      specific exception to return COMPLEX results in the floating point
      registers.]  */
 
-  if (TYPE_CODE (type) == TYPE_CODE_ARRAY
-      || TYPE_LENGTH (type) > 2 * MIPS64_REGSIZE)
+  if (TYPE_LENGTH (type) > 2 * MIPS64_REGSIZE)
     return RETURN_VALUE_STRUCT_CONVENTION;
   else if (TYPE_CODE (type) == TYPE_CODE_FLT
 	   && TYPE_LENGTH (type) == 16
@@ -3473,9 +3480,10 @@ mips_n32n64_return_value (struct gdbarch *gdbarch, struct type *func_type,
       return RETURN_VALUE_REGISTER_CONVENTION;
     }
   else if (TYPE_CODE (type) == TYPE_CODE_STRUCT
-	   || TYPE_CODE (type) == TYPE_CODE_UNION)
+	   || TYPE_CODE (type) == TYPE_CODE_UNION
+	   || TYPE_CODE (type) == TYPE_CODE_ARRAY)
     {
-      /* A structure or union.  Extract the left justified value,
+      /* A composite type.  Extract the left justified value,
          regardless of the byte order.  I.e. DO NOT USE
          mips_xfer_lower.  */
       int offset;
@@ -4677,7 +4685,7 @@ mips_single_step_through_delay (struct gdbarch *gdbarch,
   if (mips_pc_is_mips16 (pc))
     return 0;
 
-  if (!breakpoint_here_p (pc + 4))
+  if (!breakpoint_here_p (get_frame_address_space (frame), pc + 4))
     return 0;
 
   if (!safe_frame_unwind_memory (frame, pc, buf, sizeof buf))
@@ -5037,6 +5045,9 @@ mips_breakpoint_from_pc (struct gdbarch *gdbarch, CORE_ADDR *pcptr, int *lenptr)
 	  static gdb_byte big_breakpoint[] = { 0, 0x5, 0, 0xd };
 	  static gdb_byte pmon_big_breakpoint[] = { 0, 0, 0, 0xd };
 	  static gdb_byte idt_big_breakpoint[] = { 0, 0, 0x0a, 0xd };
+	  /* Likewise, IRIX appears to expect a different breakpoint,
+	     although this is not apparent until you try to use pthreads. */
+	  static gdb_byte irix_big_breakpoint[] = { 0, 0, 0, 0xd };
 
 	  *lenptr = sizeof (big_breakpoint);
 
@@ -5046,6 +5057,8 @@ mips_breakpoint_from_pc (struct gdbarch *gdbarch, CORE_ADDR *pcptr, int *lenptr)
 		   || strcmp (target_shortname, "pmon") == 0
 		   || strcmp (target_shortname, "lsi") == 0)
 	    return pmon_big_breakpoint;
+	  else if (gdbarch_osabi (gdbarch) == GDB_OSABI_IRIX)
+	    return irix_big_breakpoint;
 	  else
 	    return big_breakpoint;
 	}
