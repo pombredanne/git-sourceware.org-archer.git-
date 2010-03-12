@@ -1,3 +1,56 @@
+2010-03-12  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* amd64-tdep.c (amd64_word_names): Replace "sp" with "".
+	* i386-tdep.c (i386_word_names): Likewise.
+
+2010-03-12  Pedro Alves  <pedro@codesourcery.com>
+
+	* target.c (memory_xfer_partial): Don't use the stack cache if
+	inspecting trace frames.
+	* tracepoint.c (finish_tfind_command): Invalidate the target
+	dcache.
+
+2010-03-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* solib-svr4.c (LM_ADDR_CHECK) <info_verbose>: Use printf_unfiltered
+	for the PIC displacement, print also the displacement value.
+	(svr4_exec_displacement):  Print DISPLACEMENT if INFO_VERBOSE.
+
+2010-03-10  Kevin Buettner  <kevinb@redhat.com>
+
+	* remote-mips.c (close_ports, mips_initialize_cleanups)
+	(mips_exit_cleanups, mips_send_command, mips_open, pmon_open)
+	(ddb_open, lsi_open, mips_remove_breakpoint, mips_remove_watchpoint)
+	(mips_stopped_by_watchpoint, send_srec, pmon_checkset)
+	(pmon_make_fastrec, pmon_check_ack, mips_expect_download)
+	(pmon_check_entry_address, pmon_check_total, pmon_end_download)
+	(pmon_download, pmon_load_fast, _initialize_remote_mips): Add
+	comments describing each of these functions.
+	(mips_enter_debug, mips_exit_debug, common_open)
+	(mips_signal_from_protocol, pmon_makeb64, pmon_zeroset): Add
+	blank line after the comment describing the function.
+
+2010-03-10  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* solib-svr4.c (svr4_exec_displacement): Return now success, new
+	parameter displacementp.  Update comment.
+	(svr4_relocate_main_executable): Return if non-zero SECTION_OFFSETS
+	element exists.  Return if svr4_exec_displacement was not successful.
+	Update comment.
+
+2010-03-10  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* solib-svr4.c (read_program_header): Support type == -1 to read
+	all program headers.
+	(read_program_headers_from_bfd): New function.
+	(svr4_static_exec_displacement): Remove and move the comment ...
+	(svr4_exec_displacement): ... here.  Remove variable found.  New
+	variable displacement.  Check also DYNAMIC.  Verify DISPLACEMENT
+	alignment for ELF targets.  Compare target vs. exec_bfd PHDRs for ELF
+	targets using read_program_headers_from_bfd.  Remove the call of
+	svr4_static_exec_displacement.
+
 2010-03-10  Tom Tromey  <tromey@redhat.com>
 
 	* dwarf2read.c (struct pubnames_header): Remove.
