@@ -1,3 +1,138 @@
+2010-03-17  Tom Tromey  <tromey@redhat.com>
+
+	* linux-nat.c (linux_nat_detach): Check debug_linux_nat.
+
+2010-03-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* spu-tdep.c (spu_catch_start): Replace set_breakpoint call with the
+	create_breakpoint call, adjust the parameters.
+
+2010-03-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Chandru <chandru@in.ibm.com>
+
+	* dwarf2read.c (read_subrange_type): Set TYPE_HIGH_BOUND_UNDEFINED.
+	* valarith.c (value_subscripted_rvalue): Suppress error if
+	TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED.
+
+2010-03-16  Holger Hans Peter Freyther  <zecke@selfish.org>
+
+	* linux-record.c (record_linux_msghdr): Remove unintended semicolons.
+
+2010-03-16  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-tasks.c (task_command_1): Check that the task ptid is valid
+	before doing the associated thread switch.
+
+2010-03-16  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* MAINTAINERS: Update my email address.
+
+2010-03-16  Vladimir Prus  <vladimir@codesourcery.com>
+
+	Simplify MI breakpoint setting.
+
+	* breakpoint.c (break_command_really): Make nonstatic and
+	rename to...
+	(create_breakpoint): ...this. Rename prior function by this name
+	to...
+	(create_breakpoint_sal): ...this.
+	(create_breakpoints): Rename to...
+	(create_breakpoints_sal): ...this.
+	(set_breakpoint): Remove.
+	* breakpoint.h: Adjust to above changes.
+	* mi/mi-cmd-break.c (mi_cmd_break_insert): Simplify.
+
+2010-03-15 Stan Shebs  <stan@codesourcery.com>
+
+	* ax-gdb.c: Include cp-support.h.
+	(find_field): Remove.
+	(gen_primitive_field): New function.
+	(gen_struct_ref_recursive): New function.
+	(gen_struct_ref): Rewrite to call gen_struct_ref_recursive instead
+	of find_field.
+	(gen_static_field): New function.
+	(gen_struct_elt_for_reference): New.
+	(gen_namespace_elt): New.
+	(gen_maybe_namespace_elt): New.
+	(gen_aggregate_elt_ref): New.
+	(gen_expr): Add OP_SCOPE, display opcode name in error message.
+
+2010-03-15  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (die_needs_namespace): Also return 0 for
+	DW_TAG_subprogram.
+
+2010-03-15  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	PR c++/7936:
+	* cp-support.h: Added char *declaration element to using_direct
+	data struct.
+	(cp_add_using): Added char *declaration argument.
+	(cp_add_using_directive): Ditto.
+	(cp_lookup_symbol_imports): made extern.
+	* cp-namespace.c: Updated with the above changes.
+	* dwarf2read.c (read_import_statement): Ditto.
+	(read_namespace): Ditto.
+	(read_import_statement): Support import declarations.
+	* cp-namespace.c (cp_lookup_symbol_imports): Check for imported
+	declarations.
+	Added support for 'declaration_only' search.
+	(cp_lookup_symbol_namespace): Attempt to search for the name as
+	is before consideration of imports.
+	* symtab.c (lookup_symbol_aux_local): Added a 'declaration_only'
+	search at every block level search.
+	Now takes language argument.
+	(lookup_symbol_aux): Updated.
+
+2010-03-15  Tom Tromey  <tromey@redhat.com>
+
+	* c-exp.y (name_not_typename): Add 'operator' clause.
+
+2010-03-15  Ralf Corsepius  <ralf.corsepius@rtems.org>  (tiny change)
+
+	* configure.ac: Exit if ${gdb_target_obs}" is not set.
+	* configure: Regenerate.
+
+2010-03-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symfile.c (addr_info_make_relative): Ignore also missing ".dynbss"
+	and ".sdynbss".  Update the comment.
+
+2010-03-15  Jie Zhang  <jie@codesourcery.com>
+
+	* MAINTAINERS: Update my email address.
+
+2010-03-14  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdbtypes.h (TYPE_IS_OPAQUE): Correct HAVE_CPLUS_STRUCT check.
+
+2010-03-14  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* charset.c [USE_WIN32API]: Include <windows.h>.
+	 (_initialize_charset): Correct type of w32_host_default_charset.
+
+2010-03-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* infrun.c (ptid_match): Don't assert that PTID is not a pid ptid.
+
+2010-03-12  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/9708:
+	* dwarf2read.c (die_needs_namespace) <DW_TAG_variable>: A variable
+	in a lexical block does not need a namespace.
+	(new_symbol) <DW_TAG_variable>: Put extern variables on
+	list_in_scope in all cases.
+
+2010-03-12 Stan Shebs  <stan@codesourcery.com>
+
+	* ax-gdb.c (gen_expr): Add shift expressions.
+	(gen_expr_binop_rest): Ditto.
+
+2010-03-12  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* buildsym.c (finish_block): Reset using_directives pointer
+	after block initialization.
+
 2010-03-12  H.J. Lu  <hongjiu.lu@intel.com>
 
 	* amd64-tdep.c (amd64_word_names): Replace "sp" with "".

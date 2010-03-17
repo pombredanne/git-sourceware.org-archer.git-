@@ -1,3 +1,69 @@
+2010-03-15  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/shadow.exp: Removed kfail; test has been fix.
+	* gdb.cp/nsusing.exp: Ditto.
+
+2010-03-15  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/userdef.exp: Add tests for explicit calls to operator==.
+	* gdb.cp/userdef.cc (operator==): New function.
+	(main): New locals mem1, mem2.
+
+2010-03-15  Jie Zhang  <jie@codesourcery.com>
+
+	* lib/mi-support.exp (mi_gdb_target_load): Delete unused timeout var.
+	Declare and use new loadtimeout variable.
+
+2010-03-14  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.base/printcmds.exp: Use gdb_file_cmd instead of gdb_load.
+	Use gdb_load later.
+
+2010-03-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.base/solib-disc.c (main): Make format of fprintf a string
+	literal.  Add missing endlines to prints to stderr.
+
+2010-03-12  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/9708:
+	* gdb.cp/m-static.exp: Add regression test.
+	* gdb.cp/m-static.cc (method): New method.
+	(main): Call it.
+
+2010-03-12  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/gdb2384-base.h: Created 'namespace B'.
+	* gdb.cp/gdb2384-base.cc: Use 'namespace B'.
+
+2010-03-12  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* lib/gdb.exp (gdb_test_multiple): Handle -timeout.
+
+2010-03-12  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* lib/gdb.exp (skip_stl_tests): New.
+	(gdb_compile): Symbian needs -ldl.
+	(shlib_target_file): New.
+	(shlib_symbol_file): New.
+	(gdb_load_shlibs): Use shlib_target_file.
+	* lib/mi-support.exp (mi_load_shlibs): Use shlib_target_file.
+	* gdb.cp/exception.exp: Use skip_stl_tests.
+	* gdb.cp/bs15503.exp: Use skip_stl_tests.  Use untested.
+	* gdb.cp/try_catch.exp: Use skip_stl_tests.
+	* gdb.cp/mb-templates.exp: Ditto.
+	* gdb.base/commands.exp: Relax regexes.
+	* gdb.base/watchpoint-solib.exp: Don't skip on symbian.  Use
+	shlib_target_file and shlib_symbol_file.
+	* gdb.base/maint.exp: Allow lowercase t.  Allow .rodata in
+	sections.
+	* gdb.base/ending-run.exp: Accept E32Main for symbian.
+	* gdb.base/solib-disc.exp: Use
+	shlib_target_file and shlib_symbol_file.
+	* gdb.base/unload.exp: Don't skip on symbian.  Use
+	shlib_target_file and shlib_symbol_file.
+	* gdb.base/list.exp: Check use_gdb_stub instead of is_remote.
+
 2010-03-12  Pedro Alves  <pedro@codesourcery.com>
  
 	* gdb.trace/backtrace.exp: Adjust for x86 and x86_64.

@@ -1062,6 +1062,51 @@ retry:
       new_inferior = 0;
     }
 
+  /* Fetch the possibly triggered data watchpoint info and store it in
+     CHILD.
+
+     On some archs, like x86, that use debug registers to set
+     watchpoints, it's possible that the way to know which watched
+     address trapped, is to check the register that is used to select
+     which address to watch.  Problem is, between setting the
+     watchpoint and reading back which data address trapped, the user
+     may change the set of watchpoints, and, as a consequence, GDB
+     changes the debug registers in the inferior.  To avoid reading
+     back a stale stopped-data-address when that happens, we cache in
+     LP the fact that a watchpoint trapped, and the corresponding data
+     address, as soon as we see CHILD stop with a SIGTRAP.  If GDB
+     changes the debug registers meanwhile, we have the cached data we
+     can rely on.  */
+
+  if (WIFSTOPPED (*wstatp) && WSTOPSIG (*wstatp) == SIGTRAP)
+    {
+      if (the_low_target.stopped_by_watchpoint == NULL)
+	{
+	  child->stopped_by_watchpoint = 0;
+	}
+      else
+	{
+	  struct thread_info *saved_inferior;
+
+	  saved_inferior = current_inferior;
+	  current_inferior = get_lwp_thread (child);
+
+	  child->stopped_by_watchpoint
+	    = the_low_target.stopped_by_watchpoint ();
+
+	  if (child->stopped_by_watchpoint)
+	    {
+	      if (the_low_target.stopped_data_address != NULL)
+		child->stopped_data_address
+		  = the_low_target.stopped_data_address ();
+	      else
+		child->stopped_data_address = 0;
+	    }
+
+	  current_inferior = saved_inferior;
+	}
+    }
+
   if (debug_threads
       && WIFSTOPPED (*wstatp)
       && the_low_target.get_pc != NULL)
@@ -1724,7 +1769,7 @@ wait_for_sigstop (struct inferior_list_entry *entry)
 	 signal.  */
       if (WSTOPSIG (wstat) == SIGTRAP
 	  && lwp->stepping
-	  && !linux_stopped_by_watchpoint ())
+	  && !lwp->stopped_by_watchpoint)
 	{
 	  if (debug_threads)
 	    fprintf (stderr, "  single-step SIGTRAP ignored\n");
@@ -1878,6 +1923,7 @@ linux_resume_one_lwp (struct lwp_info *lwp,
 			   get_lwp_thread (lwp));
   errno = 0;
   lwp->stopped = 0;
+  lwp->stopped_by_watchpoint = 0;
   lwp->stepping = step;
   ptrace (step ? PTRACE_SINGLESTEP : PTRACE_CONT, lwpid_of (lwp), 0,
 	  /* Coerce to a uintptr_t first to avoid potential gcc warning
@@ -2171,23 +2217,13 @@ fetch_register (struct regcache *regcache, int regno)
 		(PTRACE_ARG3_TYPE) (uintptr_t) regaddr, 0);
       regaddr += sizeof (PTRACE_XFER_TYPE);
       if (errno != 0)
-	{
-	  /* Warning, not error, in case we are attached; sometimes the
-	     kernel doesn't let us at the registers.  */
-	  char *err = strerror (errno);
-	  char *msg = alloca (strlen (err) + 128);
-	  sprintf (msg, "reading register %d: %s", regno, err);
-	  error (msg);
-	  goto error_exit;
-	}
+	error ("reading register %d: %s", regno, strerror (errno));
     }
 
   if (the_low_target.supply_ptrace_register)
     the_low_target.supply_ptrace_register (regcache, regno, buf);
   else
     supply_register (regcache, regno, buf);
-
-error_exit:;
 }
 
 /* Fetch all registers, or just one, from the child process.  */
@@ -2253,14 +2289,7 @@ usr_store_inferior_registers (struct regcache *regcache, int regno)
 		return;
 
 	      if ((*the_low_target.cannot_store_register) (regno) == 0)
-		{
-		  char *err = strerror (errno);
-		  char *msg = alloca (strlen (err) + 128);
-		  sprintf (msg, "writing register %d: %s",
-			   regno, err);
-		  error (msg);
-		  return;
-		}
+		error ("writing register %d: %s", regno, strerror (errno));
 	    }
 	  regaddr += sizeof (PTRACE_XFER_TYPE);
 	}
@@ -2510,9 +2539,8 @@ linux_read_memory (CORE_ADDR memaddr, unsigned char *myaddr, int len)
   return 0;
 }
 
-/* Copy LEN bytes of data from debugger memory at MYADDR
-   to inferior's memory at MEMADDR.
-   On failure (cannot write the inferior)
+/* Copy LEN bytes of data from debugger memory at MYADDR to inferior's
+   memory at MEMADDR.  On failure (cannot write to the inferior)
    returns the value of errno.  */
 
 static int
@@ -2544,13 +2572,17 @@ linux_write_memory (CORE_ADDR memaddr, const unsigned char *myaddr, int len)
 
   /* Fill start and end extra bytes of buffer with existing memory data.  */
 
+  errno = 0;
   /* Coerce the 3rd arg to a uintptr_t first to avoid potential gcc warning
      about coercing an 8 byte integer to a 4 byte pointer.  */
   buffer[0] = ptrace (PTRACE_PEEKTEXT, pid,
 		      (PTRACE_ARG3_TYPE) (uintptr_t) addr, 0);
+  if (errno)
+    return errno;
 
   if (count > 1)
     {
+      errno = 0;
       buffer[count - 1]
 	= ptrace (PTRACE_PEEKTEXT, pid,
 		  /* Coerce to a uintptr_t first to avoid potential gcc warning
@@ -2558,9 +2590,11 @@ linux_write_memory (CORE_ADDR memaddr, const unsigned char *myaddr, int len)
 		  (PTRACE_ARG3_TYPE) (uintptr_t) (addr + (count - 1)
 						  * sizeof (PTRACE_XFER_TYPE)),
 		  0);
+      if (errno)
+	return errno;
     }
 
-  /* Copy data to be written over corresponding part of buffer */
+  /* Copy data to be written over corresponding part of buffer.  */
 
   memcpy ((char *) buffer + (memaddr & (sizeof (PTRACE_XFER_TYPE) - 1)), myaddr, len);
 
@@ -2817,19 +2851,17 @@ linux_remove_point (char type, CORE_ADDR addr, int len)
 static int
 linux_stopped_by_watchpoint (void)
 {
-  if (the_low_target.stopped_by_watchpoint != NULL)
-    return the_low_target.stopped_by_watchpoint ();
-  else
-    return 0;
+  struct lwp_info *lwp = get_thread_lwp (current_inferior);
+
+  return lwp->stopped_by_watchpoint;
 }
 
 static CORE_ADDR
 linux_stopped_data_address (void)
 {
-  if (the_low_target.stopped_data_address != NULL)
-    return the_low_target.stopped_data_address ();
-  else
-    return 0;
+  struct lwp_info *lwp = get_thread_lwp (current_inferior);
+
+  return lwp->stopped_data_address;
 }
 
 #if defined(__UCLIBC__) && defined(HAS_NOMMU)
