@@ -1,3 +1,99 @@
+2010-03-20  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* tui/tui-disasm.c (tui_get_begin_asm_address): Default to
+	get_current_arch.
+	* tui/tui-layout.c (extract_display_start_addr): Likewise.
+
+2010-03-19  Stan Shebs  <stan@codesourcery.com>
+
+	* ax-gdb.c (gen_fetch): Handle bool.
+	(gen_usual_unary): Ditto.
+	(gen_cast): Ditto.
+	(gen_equal): New function.
+	(gen_less): New function.
+	(gen_expr_binop_rest): Call them, also return integer type from
+	logical operations.
+	(gen_expr): Ditto.
+
+2010-03-19  Tom Tromey  <tromey@redhat.com>
+
+	* jv-lang.c (jv_dynamics_objfile_data_key)
+	(jv_type_objfile_data_key): New globals.
+	(class_symtab): Move earlier.
+	(jv_per_objfile_free): New function.
+	(get_dynamics_objfile): Call set_objfile_data.  Add 'gdbarch'
+	parameter.
+	Remove ancient #if 1.
+	(add_class_symbol): Remove redundant declaration.
+	(java_lookup_class): Use alloc_type, not alloc_type_arch.
+	(java_link_class_type): Mark as static.  Update.
+	(jv_clear_object_type): New function.
+	(set_java_object_type): Likewise.
+	(get_java_object_type): Use set_java_object_type.
+	(is_object_type): Likewise.
+	(_initialize_java_language): Register new objfile keys.
+	(get_java_class_symtab): Add 'gdbarch' parameter.
+	(add_class_symtab_symbol): Update.
+	(type_from_class): Update.
+
+2010-03-19  Stan Shebs  <stan@codesourcery.com>
+
+	* ax-general.c (ax_const_l): Fix a sizing bug. 
+
+2010-03-18  Joel Brobecker  <brobecker@adacore.com>
+
+	GDB 7.1 released.
+
+2010-03-18  Stan Shebs  <stan@codesourcery.com>
+	    Pedro Alves  <pedro@codesourcery.com>
+
+	* target.h (struct target_ops): New method
+	to_set_circular_trace_buffer.
+	(target_set_circular_trace_buffer): New macro.
+	* target.c (update_current_target): Add
+	to_set_circular_trace_buffer, fix to_set_disconnected_tracing
+	default behavior.
+	* remote.c (remote_set_circular_trace_buffer): New function.
+	(init_remote_ops): Add it to vector.
+	* tracepoint.h (struct trace_status): New field traceframes_created,
+	change buffer_size and buffer_free to int.
+	* tracepoint.c (circular_trace_buffer): New global.
+	(start_tracing): Send values of disconnected tracing and circular
+	trace buffer settings.
+	(set_circular_trace_buffer): New function.
+	(parse_trace_state): Handle total space and frames created.
+	(trace_status_command): Display total space and total frames
+	created.
+	(trace_save): Write out new status values.
+	(parse_trace_status): Set traceframe_count, traceframes_created,
+	buffer_free and buffer_size to -1 by default.
+	(_initialize_tracepoint): New setshow for circular-trace-buffer.
+	* NEWS: Mention the circular trace buffer option.
+
+2010-03-18  Tom Tromey  <tromey@redhat.com>
+
+	* infcmd.c (finish_command_continuation): Wrap print_return_value
+	in TRY_CATCH.
+
+2010-03-18  Joel Brobecker  <brobecker@adacore.com>
+
+	* dwarf2read.c (add_partial_subprogram): Make sure the subprogram
+	DIE has a name before creating the associated partial symbol.
+	(read_func_scope): Emit a complaint if the subprogram does not
+	have a name or when we can't extract the subprogram PC bounds.
+
+2010-03-18  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* mi/mi-main.c (mi_cmd_list_thread_groups): Use get_current_arch
+	instead of selected frame architecture.
+
+2010-03-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* infcmd.c (until_command): Use ERROR_NO_INFERIOR.  Ensure there's
+	a valid selected thread, and that it is not running.
+	(advance_command): Ditto.
+	(finish_command): Ditto.
+
 2010-03-17 Stan Shebs  <stan@codesourcery.com>
 
 	* ax-gdb.c (require_rvalue): Disallow non-scalars.

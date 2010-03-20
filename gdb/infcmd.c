@@ -1274,10 +1274,10 @@ until_command (char *arg, int from_tty)
 {
   int async_exec = 0;
 
-  if (!target_has_execution)
-    error (_("The program is not running."));
-
+  ERROR_NO_INFERIOR;
   ensure_not_tfind_mode ();
+  ensure_valid_thread ();
+  ensure_not_running ();
 
   /* Find out whether we must run in the background. */
   if (arg != NULL)
@@ -1307,10 +1307,10 @@ advance_command (char *arg, int from_tty)
 {
   int async_exec = 0;
 
-  if (!target_has_execution)
-    error (_("The program is not running."));
-
+  ERROR_NO_INFERIOR;
   ensure_not_tfind_mode ();
+  ensure_valid_thread ();
+  ensure_not_running ();
 
   if (arg == NULL)
     error_no_arg (_("a location"));
@@ -1439,7 +1439,19 @@ finish_command_continuation (void *arg)
 			_("finish_command: function has no target type"));
 
       if (TYPE_CODE (value_type) != TYPE_CODE_VOID)
-	print_return_value (SYMBOL_TYPE (a->function), value_type);
+	{
+	  volatile struct gdb_exception ex;
+
+	  TRY_CATCH (ex, RETURN_MASK_ALL)
+	    {
+	      /* print_return_value can throw an exception in some
+		 circumstances.  We need to catch this so that we still
+		 delete the breakpoint.  */
+	      print_return_value (SYMBOL_TYPE (a->function), value_type);
+	    }
+	  if (ex.reason < 0)
+	    exception_print (gdb_stdout, ex);
+	}
     }
 
   /* We suppress normal call of normal_stop observer and do it here so
@@ -1565,7 +1577,10 @@ finish_command (char *arg, int from_tty)
 
   int async_exec = 0;
 
+  ERROR_NO_INFERIOR;
   ensure_not_tfind_mode ();
+  ensure_valid_thread ();
+  ensure_not_running ();
 
   /* Find out whether we must run in the background.  */
   if (arg != NULL)
@@ -1590,8 +1605,6 @@ finish_command (char *arg, int from_tty)
 
   if (arg)
     error (_("The \"finish\" command does not take any arguments."));
-  if (!target_has_execution)
-    error (_("The program is not running."));
 
   frame = get_prev_frame (get_selected_frame (_("No selected frame.")));
   if (frame == 0)

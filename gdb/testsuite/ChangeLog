@@ -1,3 +1,34 @@
+2010-03-19  Stan Shebs  <stan@codesourcery.com>
+
+	* gdb.trace/ax.exp: New file.
+
+2010-03-19  Doug Evans  <dje@google.com>
+
+	* lib/gdb.exp (gdb_compile_test): Watch for "compiler not installed"
+	output from gcc.
+
+	* gdb.base/break-interp.exp (prelinkNO): Handle prelink binaries
+	named /usr/sbin/prelink<foo>.
+
+2010-03-18  Stan Shebs  <stan@codesourcery.com>
+
+	* gdb.trace/circ.exp: Test circular-trace-buffer.
+	* gdb.trace/tfile.exp: Update tstatus test.
+
+2010-03-18  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.dwarf2/dw2-anonymous-func.S: New file.
+	* gdb.dwarf2/dw2-anonymous-func.exp: New testcase.
+
+2010-03-18  Ulrich Weigand  <Ulrich.Weigand@de.ibm.com>
+
+	* gdb.mi/gdb680.exp: Revert 2009-06-17 change.
+
+2010-03-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.base/default.exp: Adjust the expected output of the finish
+	and until commands when the inferior is not being run.
+
 2010-03-15  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* gdb.cp/shadow.exp: Removed kfail; test has been fix.
