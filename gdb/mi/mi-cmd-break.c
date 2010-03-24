@@ -74,6 +74,7 @@ mi_cmd_break_insert (char *command, char **argv, int argc)
   char *condition = NULL;
   int pending = 0;
   int enabled = 1;
+  int tracepoint = 0;
   struct cleanup *back_to;
 
   struct gdb_exception e;
@@ -81,7 +82,8 @@ mi_cmd_break_insert (char *command, char **argv, int argc)
   enum opt
     {
       HARDWARE_OPT, TEMP_OPT, CONDITION_OPT,
-      IGNORE_COUNT_OPT, THREAD_OPT, PENDING_OPT, DISABLE_OPT
+      IGNORE_COUNT_OPT, THREAD_OPT, PENDING_OPT, DISABLE_OPT,
+      TRACEPOINT_OPT,
     };
   static struct mi_opt opts[] =
   {
@@ -92,6 +94,7 @@ mi_cmd_break_insert (char *command, char **argv, int argc)
     {"p", THREAD_OPT, 1},
     {"f", PENDING_OPT, 0},
     {"d", DISABLE_OPT, 0},
+    {"a", TRACEPOINT_OPT, 0},
     { 0, 0, 0 }
   };
 
@@ -126,6 +129,10 @@ mi_cmd_break_insert (char *command, char **argv, int argc)
 	  break;
 	case DISABLE_OPT:
 	  enabled = 0;
+	  break;
+	case TRACEPOINT_OPT:
+	  tracepoint = 1;
+	  break;
 	}
     }
 
@@ -148,7 +155,7 @@ mi_cmd_break_insert (char *command, char **argv, int argc)
   mi_can_breakpoint_notify = 1;
   create_breakpoint (get_current_arch (), address, condition, thread,
 		     0 /* condition and thread are valid.  */,
-		     temp_p, hardware, 0 /* traceflag */,
+		     temp_p, hardware, tracepoint,
 		     ignore_count,
 		     pending ? AUTO_BOOLEAN_TRUE : AUTO_BOOLEAN_FALSE,
 		     NULL, 0, enabled);
@@ -162,6 +169,31 @@ enum wp_type
   READ_WP,
   ACCESS_WP
 };
+
+void
+mi_cmd_break_passcount (char *command, char **argv, int argc)
+{
+  int n;
+  int p;
+  struct breakpoint *t;
+
+  if (argc != 2)
+    error (_("Usage: tracepoint-number passcount"));
+
+  n = atoi (argv[0]);
+  p = atoi (argv[1]);
+  t = get_tracepoint (n);
+
+  if (t)
+    {
+      t->pass_count = p;
+      observer_notify_tracepoint_modified (n);
+    }
+  else
+    {
+      error (_("Cound not find tracepoint %d"), n);
+    }
+}
 
 /* Insert a watchpoint. The type of watchpoint is specified by the
    first argument: 
@@ -271,7 +303,12 @@ mi_cmd_break_commands (char *command, char **argv, int argc)
   mi_command_line_array_ptr = 1;
   mi_command_line_array_cnt = argc;
 
-  break_command = read_command_lines_1 (mi_read_next_line, 1);
+  if (breakpoint_is_tracepoint (b))
+    break_command = read_command_lines_1 (mi_read_next_line, 1,
+					  check_tracepoint_command, b);
+  else
+    break_command = read_command_lines_1 (mi_read_next_line, 1, 0, 0);
+
   breakpoint_set_commands (b, break_command);
 }
 

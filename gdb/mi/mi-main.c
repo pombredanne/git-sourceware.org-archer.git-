@@ -51,6 +51,7 @@
 #include "inferior.h"
 #include "osdata.h"
 #include "splay-tree.h"
+#include "tracepoint.h"
 
 #include <ctype.h>
 #include <sys/time.h>
@@ -2077,3 +2078,179 @@ print_diff (struct mi_timestamp *start, struct mi_timestamp *end)
        timeval_diff (start->utime, end->utime) / 1000000.0, 
        timeval_diff (start->stime, end->stime) / 1000000.0);
   }
+
+void
+mi_cmd_trace_define_variable (char *command, char **argv, int argc)
+{
+  struct expression *expr;
+  struct cleanup *back_to;
+  LONGEST initval = 0;
+  struct trace_state_variable *tsv;
+  char *name = 0;
+
+  if (argc != 1 && argc != 2)
+    error (_("Usage: -trace-define-variable VARIABLE [VALUE]"));
+
+  expr = parse_expression (argv[0]);
+  back_to = make_cleanup (xfree, expr);
+
+  if (expr->nelts == 3 && expr->elts[0].opcode == OP_INTERNALVAR)
+    {
+      struct internalvar *intvar = expr->elts[1].internalvar;
+      if (intvar)
+	name = internalvar_name (intvar);
+    }
+
+  if (!name || *name == '\0')
+    error (_("Invalid name of trace variable"));
+
+  tsv = find_trace_state_variable (name);
+  if (!tsv)
+    tsv = create_trace_state_variable (name);
+
+  if (argc == 2)
+    initval = value_as_long (parse_and_eval (argv[1]));
+
+  tsv->initial_value = initval;
+
+  do_cleanups (back_to);
+}
+
+void
+mi_cmd_trace_list_variables (char *command, char **argv, int argc)
+{
+  if (argc != 0)
+    error (_("-trace-list-variables: no arguments are allowed"));
+
+  tvariables_info_1 ();
+}
+
+void
+mi_cmd_trace_find (char *command, char **argv, int argc)
+{
+  char *mode;
+
+  if (argc == 0)
+    error (_("trace selection mode is required"));
+
+  mode = argv[0];
+
+  if (strcmp (mode, "none") == 0)
+    {
+      tfind_1 (tfind_number, -1, 0, 0, 0);
+      return;
+    }
+
+  if (current_trace_status ()->running)
+    error (_("May not look at trace frames while trace is running."));
+
+  if (strcmp (mode, "frame-number") == 0)
+    {
+      if (argc != 2)
+	error (_("frame number is required"));
+      tfind_1 (tfind_number, atoi (argv[1]), 0, 0, 0);
+    }
+  else if (strcmp (mode, "tracepoint-number") == 0)
+    {
+      if (argc != 2)
+	error (_("tracepoint number is required"));
+      tfind_1 (tfind_tp, atoi (argv[1]), 0, 0, 0);
+    }
+  else if (strcmp (mode, "pc") == 0)
+    {
+      if (argc != 2)
+	error (_("PC is required"));
+      tfind_1 (tfind_pc, 0, parse_and_eval_address (argv[1]), 0, 0);
+    }
+  else if (strcmp (mode, "pc-inside-range") == 0)
+    {
+      if (argc != 3)
+	error (_("Start and end PC are required"));
+      tfind_1 (tfind_range, 0, parse_and_eval_address (argv[1]),
+	       parse_and_eval_address (argv[2]), 0);
+    }
+  else if (strcmp (mode, "pc-outside-range") == 0)
+    {
+      if (argc != 3)
+	error (_("Start and end PC are required"));
+      tfind_1 (tfind_outside, 0, parse_and_eval_address (argv[1]),
+	       parse_and_eval_address (argv[2]), 0);
+    }
+  else if (strcmp (mode, "line") == 0)
+    {
+      struct symtabs_and_lines sals;
+      struct symtab_and_line sal;
+      static CORE_ADDR start_pc, end_pc;
+      struct cleanup *back_to;
+
+      if (argc != 2)
+	error (_("Line is required"));
+
+      sals = decode_line_spec (argv[1], 1);
+      back_to = make_cleanup (xfree, sals.sals);
+
+      sal = sals.sals[0];
+
+      if (sal.symtab == 0)
+	error (_("Could not find the specified line"));
+
+      if (sal.line > 0 && find_line_pc_range (sal, &start_pc, &end_pc))
+	tfind_1 (tfind_range, 0, start_pc, end_pc - 1, 0);
+      else
+	error (_("Could not find the specified line"));
+
+      do_cleanups (back_to);
+    }
+  else
+    error (_("Invalid mode '%s'"), mode);
+
+  if (has_stack_frames () || get_traceframe_number () >= 0)
+    {
+      print_stack_frame (get_selected_frame (NULL), 1, SRC_AND_LOC);
+    }
+}
+
+void
+mi_cmd_trace_save (char *command, char **argv, int argc)
+{
+  int target_saves = 0;
+  char *filename;
+
+  if (argc != 1 && argc != 2)
+    error (_("Usage: -trace-save [-r] filename"));
+
+  if (argc == 2)
+    {
+      filename = argv[1];
+      if (strcmp (argv[0], "-r") == 0)
+	target_saves = 1;
+      else
+	error (_("Invalid option: %s"), argv[0]);
+    }
+  else
+    {
+      filename = argv[0];
+    }
+
+  trace_save (filename, target_saves);
+}
+
+
+void
+mi_cmd_trace_start (char *command, char **argv, int argc)
+{
+  start_tracing ();
+}
+
+void
+mi_cmd_trace_status (char *command, char **argv, int argc)
+{
+  trace_status_mi (0);
+}
+
+void
+mi_cmd_trace_stop (char *command, char **argv, int argc)
+{
+  stop_tracing ();
+  trace_status_mi (1);
+}

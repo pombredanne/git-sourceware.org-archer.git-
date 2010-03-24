@@ -20,12 +20,8 @@
 #if !defined (TRACEPOINT_H)
 #define TRACEPOINT_H 1
 
-/* The data structure for an action: */
-struct action_line
-  {
-    struct action_line *next;
-    char *action;
-  };
+#include "breakpoint.h"
+#include "target.h"
 
 enum actionline_type
   {
@@ -93,6 +89,8 @@ struct trace_status
 
   enum trace_stop_reason stop_reason;
 
+  /* If stop_reason == tracepoint_passcount, the on-target number
+     of the tracepoint which caused the stop.  */
   int stopping_tracepoint;
 
   /* Number of traceframes currently in the buffer.  */
@@ -160,6 +158,7 @@ extern void end_actions_pseudocommand (char *args, int from_tty);
 extern void while_stepping_pseudocommand (char *args, int from_tty);
 
 extern struct trace_state_variable *find_trace_state_variable (const char *name);
+extern struct trace_state_variable *create_trace_state_variable (const char *name);
 
 extern void parse_trace_status (char *line, struct trace_status *ts);
 
@@ -173,5 +172,18 @@ extern void merge_uploaded_tracepoints (struct uploaded_tp **utpp);
 extern void merge_uploaded_trace_state_variables (struct uploaded_tsv **utsvp);
 
 extern void disconnect_or_stop_tracing (int from_tty);
+
+extern void start_tracing (void);
+extern void stop_tracing (void);
+
+extern void trace_status_mi (int on_stop);
+
+extern void tvariables_info_1 (void);
+
+extern void tfind_1 (enum trace_find_type type, int num,
+		     ULONGEST addr1, ULONGEST addr2,
+		     int from_tty);
+
+extern void trace_save (const char *filename, int target_does_save);
 
 #endif	/* TRACEPOINT_H */

@@ -1,3 +1,23 @@
+2010-03-24  Mike Frysinger  <vapier@gentoo.org>
+
+	* bfin-dis.c (decode_regs_hi): Change REG_LH2 typo to REG_MH2.
+
+2010-03-23  Joseph Myers  <joseph@codesourcery.com>
+
+	* dis-buf.c (buffer_read_memory): Give error for reading just
+	before the start of memory.
+
+2010-03-22  Sebastian Pop  <sebastian.pop@amd.com>
+	    Quentin Neill <quentin.neill@amd.com>
+
+	* i386-dis.c (OP_LWP_I): Removed.
+	(reg_table): Do not use OP_LWP_I, use Iq.
+	(OP_LWPCB_E): Remove use of names16.
+	(OP_LWP_E): Same.
+	* i386-opc.tbl: Removed 16bit LWP insns.  32bit LWP insns
+	should not set the Vex.length bit.
+	* i386-tbl.h: Regenerated.
+
 2010-02-25  Edmar Wienskoski  <edmar@freescale.com>
 
 	* ppc-dis.c (ppc_opts): Add PPC_OPCODE_E500MC for "e500mc64".

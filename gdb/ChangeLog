@@ -1,3 +1,145 @@
+2010-03-24  Pedro Alves  <pedro@codesourcery.com>
+
+	* remote.c (crc32): Constify `buf' parameter.
+	(remote_verify_memory): New, abstracted out from...
+	(compare_sections_command): ... this.  Remove hardcoded target
+	checks.
+	(init_remote_ops): Install remote_verify_memory.
+	* target.c (target_verify_memory): New.
+	* target.h (struct target_ops) <to_verify_memory>: New field.
+	(target_verify_memory): Declare.
+
+2010-03-24  Vladimir Prus  <vladimir@codesourcery.com>
+
+	Implement -trace-save.
+
+	* mi-cmds.h (mi_cmds_trace_save): Declare.
+	* mi-cmds.c (mi_cmds): Register -trace-save.
+	* mi/mi-main.c (mi_cmd_trace_save): New.
+	* remote.c (remote_save_trace_data): Take const parameter.
+	* target.h (struct target_ops::to_save_trace_data): Take
+	const parameter.
+	* target.c (update_current_target): Adjust to the above.
+	* tracepoint.c (trave_save): New, extracted from
+	(trace_save_command): ...this.
+	(tfile_trace_find): Remove message that is unnecessary now
+	that 'tfind' reports found frame.
+	* tracepoint.h (trace_save): Declare.
+
+2010-03-24  Vladimir Prus  <vladimir@codesourcery.com>
+
+	Implement -trace-find.
+
+	* mi/mi-cmds.c (mi_cmds): Register -trace-find.
+	* mi/mi-cmds.h (mi_cmd_trace_find): Declare.
+	* mi/mi-main.c (mi_cmd_trace_find): New.
+	* target.h (struct target_ops): Document to_trace_find.
+	* tracepoint.h (tfind_1): Declare.
+	* tracepoint.c (finish_tfind_command): Rename to...
+	(tfind_1): ...this.
+	* remote.c (remote_trace_find): Return -1 if target say
+	there's no frame.  Improve error diagnostics.
+
+2010-03-24  Vladimir Prus  <vladimir@codesourcery.com>
+
+	-trace-define-variable and -trace-list-variables.
+
+	* tracepoint.c (create_trace_state_variable): Make
+	private copy of name, as opposed to assuming the
+	pointer lives forever.
+	(tvariables_info_1): New.
+	(tvariables_info): Use the above.
+	* tracepoint.h (create_trace_state_variable, tvariables_info_1):
+	Declare.
+	* mi/mi-cmds.c (mi_cmds): Register -trace-define-variable
+	and -trace-list-variables.
+	* mi/mi-cmds.h (mi_cmd_trace_define_variable)
+	(mi_cmd_trace_list_variables): New.
+	* mi/mi-main.c (mi_cmd_trace_define_variable)
+	(mi_cmd_trace_list_variables): New.
+
+2010-03-24  Vladimir Prus  <vladimir@codesourcery.com>
+
+	Implement -break-passcount.
+
+	* mi/mi-cmd-break.c (mi_cmd_break_passcount): New.
+	* mi/mi-cmds.c (mi_cmds): Register -break-passcount.
+	* mi/mi-cmds.h (mi_cmd_break_passcount): Declare.
+
+2010-03-24  Vladimir Prus  <vladimir@codesourcery.com>
+
+	-trace-start/-trace-end/-trace-status.
+
+	* mi/mi-cmds.c (mi_cmds): Register -trace-start, -trace-status
+	and -trace-stop.
+	* mi/mi-cmds.h (mi_cmd_trace_start, mi_cmd_trace_status)
+	(mi_cmd_trace_stop): Declare.
+	* mi/mi-main.c (mi_cmd_trace_start, mi_cmd_trace_status)
+	(mi_cmd_trace_stop): New.
+	* tracepoint.c (start_tracing): New, extracted from...
+	(trace_start_command): ...this.
+	(trace_status_mi): New.
+	* tracepoint.h (struct trace_status): Document
+	stopping_tracepoint.
+	(start_tracing, stop_tracing, trace_status_mi): Declare.
+
+2010-03-24  Vladimir Prus  <vladimir@codesourcery.com>
+
+	Implement creating tracepoints with -break-insert.
+
+	* mi/mi-cmd-break.c (mi_cmd_break_insert): Handle -a
+	to mean that tracepoint should be created.
+
+2010-03-24  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* breakpoint.c (check_no_tracepoint_commands): Use
+	current spelling of 'teval'.
+
+2010-03-24  Vladimir Prus  <vladimir@codesourcery.com>
+
+	Unify actions and commands
+
+	* defs.h (read_command_lines, read_command_lines_1): New
+	parameters validator and closure.
+	* tracepoint.h (struct action_line): Remove.
+	* breakpoint.h (struct breakpoint): Remove the 'actions'
+	field.
+	* defs.h (enum command_control_type): New value
+	while_stepping_control.
+	(struct command_line): Add comments.
+	* breakpoint.c (breakoint_is_tracepoint): New.
+	(breakpoint_set_commands): For tracepoints,
+	verify the commands are permissible.
+	(check_tracepoint_commands): New.
+	(commands_command): Require that each new line is validated using
+	check_tracepoint_command, if we set commands for a tracepoint.
+	(create_tracepoint_from_upload): Likewise.
+	(print_one_breakpoint_location): Remove the code to print
+	actions specifically.
+	(tracepoint_save_command): Relay to print_command_lines.
+	* cli/cli-script.c (process_next_line): New parameters validator
+	and closure. Handle 'while-stepping'. Call validator if not null.
+	(read_command_lines, read_command_lines1): Likewise.
+	(recurse_read_control_structure): New parameters validator and
+	closure. Handle while_stepping_control.
+	(print_command_lines): Handle while-stepping.
+	(get_command_line, define_command, document_command): Adjust.
+	* remote.c (remote_download_tracepoint): Adjust.
+	* tracepoint.c (make_cleanup_free_actions, read_actions)
+	(free_actions, do_free_actions_cleanup): Remove.
+	(trace_actions_command): Use read_command_lines.
+	(validate_actionline): Use error in one place.
+	(encode_actions_1): New, extracted from...
+	(encode_actions): ...this. Also use cleanups for exception
+	safety.
+	(trace_dump_command): Adjust.
+	* mi/mi-cmd-break (mi_cmd_break_commands): Validate commands if
+	it's tracepoint.
+
+2010-03-23  Mike Frysinger  <vapier@gentoo.org>
+
+	* Makefile.in (OPCODES_CFLAGS): Add -I$(OPCODES_SRC)/..
+
 2010-03-22  Stan Shebs  <stan@codesourcery.com>
 
 	* value.c (value_static_field): Be lazy about the field's value.
