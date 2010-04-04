@@ -1,3 +1,62 @@
+2010-04-02  Mike Frysinger  <vapier@gentoo.org>
+
+	* hw-ports.h: Fix spelling typos.
+
+2010-03-30  Mike Frysinger  <vapier@gentoo.org>
+
+	* configure.ac: Check for socklen_t.
+	* configure, config.in: Regenerated.
+	* dv-sockser.c (connected_p): Change addrlen type to socklen_t.
+
+2010-03-30  Mike Frysinger  <vapier@gentoo.org>
+
+	* sim-utils.c (sim_io_eprintf_cpu): Use %s with printf string.
+	* sim-hw.c (hw_option_handler): Likewise.
+
+2010-03-30  Mike Frysinger  <vapier@gentoo.org>
+
+	* sim-watch.c (watchpoint_type_to_str): Add const to return.
+	(interrupt_nr_to_str): Likewise.
+	(default_interrupt_names): Add const to pointer type.
+	(sim_watchpoint_install): Add const to prefix.
+	* sim-watch.h (struct _sim_watchpoints): Add const to interrupt_names.
+
+2010-03-30  Mike Frysinger  <vapier@gentoo.org>
+
+	* sim-core.c (sim_core_read_buffer): Change raddr to address_word.
+	(sim_core_write_buffer): Likewise.
+
+2010-03-30  Mike Frysinger  <vapier@gentoo.org>
+
+	* sim-trace.c (trace_option_handler): Move cpu_nr decl behind
+	the SIM_HAVE_ADDR_RANGE define.
+
+2010-03-30  Mike Frysinger  <vapier@gentoo.org>
+
+	* sim-core.h (device_error): Add const to message, and add printf
+	format attribute.
+
+2010-03-30  Mike Frysinger  <vapier@gentoo.org>
+
+	* sim-profile.c (profile_print_addr_ranges): Wrap with the
+	SIM_HAVE_ADDR_RANGE define.
+
+2010-03-30  Mike Frysinger  <vapier@gentoo.org>
+
+	* dv-glue.c (hw_glue_ports): Swap static and const.
+
+2010-03-30  Mike Frysinger  <vapier@gentoo.org>
+
+	* nrun.c (usage): Use void in definition.
+	* sim-options.c (dup_arg_p): Convert old-style function definition.
+	(sim_parse_args): Likewise.
+	(sim_print_help): Likewise.
+	* sim-trace.c (set_trace_option_mask): Likewise.
+	(set_trace_option): Likewise.
+	* sim-utils.c (sim_analyze_program): Likewise.
+	(sim_elapsed_time_get): Likewise.
+	(sim_elapsed_time_since): Likewise.
+
 2010-03-22  Mike Frysinger  <vapier@gentoo.org>
 
 	* sim/common/sim-options.c (enum): Remove SIM_HAVE_BIENDIAN ifdef.

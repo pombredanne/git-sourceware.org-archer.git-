@@ -3085,6 +3085,12 @@ load_full_comp_unit (struct dwarf2_per_cu_data *per_cu, struct objfile *objfile)
   else
     set_cu_language (language_minimal, cu);
 
+  /* Similarly, if we do not read the producer, we can not apply
+     producer-specific interpretation.  */
+  attr = dwarf2_attr (cu->dies, DW_AT_producer, cu);
+  if (attr)
+    cu->producer = DW_STRING (attr);
+
   /* Link this CU into read_in_chain.  */
   per_cu->cu->read_in_chain = dwarf2_per_objfile->read_in_chain;
   dwarf2_per_objfile->read_in_chain = per_cu;
@@ -3939,6 +3945,31 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
     }
 
   inherit_abstract_dies (die, cu);
+
+  /* If we have a DW_AT_specification, we might need to import using
+     directives from the context of the specification DIE.  See the
+     comment in determine_prefix.  */
+  if (cu->language == language_cplus
+      && dwarf2_attr (die, DW_AT_specification, cu))
+    {
+      struct dwarf2_cu *spec_cu = cu;
+      struct die_info *spec_die = die_specification (die, &spec_cu);
+
+      while (spec_die)
+	{
+	  child_die = spec_die->child;
+	  while (child_die && child_die->tag)
+	    {
+	      if (child_die->tag == DW_TAG_imported_module)
+		process_die (child_die, spec_cu);
+	      child_die = sibling_die (child_die);
+	    }
+
+	  /* In some cases, GCC generates specification DIEs that
+	     themselves contain DW_AT_specification attributes.  */
+	  spec_die = die_specification (spec_die, &spec_cu);
+	}
+    }
 
   new = pop_context ();
   /* Make a block for the local symbols within.  */
@@ -5084,6 +5115,11 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
   TYPE_STUB_SUPPORTED (type) = 1;
   if (die_is_declaration (die, cu))
     TYPE_STUB (type) = 1;
+  else if (attr == NULL && die->child == NULL
+	   && producer_is_realview (cu->producer))
+    /* RealView does not output the required DW_AT_declaration
+       on incomplete types.  */
+    TYPE_STUB (type) = 1;
 
   set_descriptive_type (type, die, cu);
 
@@ -5601,9 +5637,7 @@ read_namespace_type (struct die_info *die, struct dwarf2_cu *cu)
   TYPE_NAME (type) = (char *) name;
   TYPE_TAG_NAME (type) = TYPE_NAME (type);
 
-  set_die_type (die, type, cu);
-
-  return type;
+  return set_die_type (die, type, cu);
 }
 
 /* Read a C++ namespace.  */
@@ -5882,6 +5916,12 @@ read_subroutine_type (struct die_info *die, struct dwarf2_cu *cu)
       || cu->language == language_java
       || cu->language == language_pascal)
     TYPE_PROTOTYPED (ftype) = 1;
+  else if (producer_is_realview (cu->producer))
+    /* RealView does not emit DW_AT_prototyped.  We can not
+       distinguish prototyped and unprototyped functions; default to
+       prototyped, since that is more common in modern code (and
+       RealView warns about unprototyped functions).  */
+    TYPE_PROTOTYPED (ftype) = 1;
 
   /* Store the calling convention in the type if it's available in
      the subroutine die.  Otherwise set the calling convention to
@@ -5896,13 +5936,14 @@ read_subroutine_type (struct die_info *die, struct dwarf2_cu *cu)
   
   if (die->child != NULL)
     {
+      struct type *void_type = objfile_type (cu->objfile)->builtin_void;
       struct die_info *child_die;
-      int nparams = 0;
-      int iparams = 0;
+      int nparams, iparams;
 
       /* Count the number of parameters.
          FIXME: GDB currently ignores vararg functions, but knows about
          vararg member functions.  */
+      nparams = 0;
       child_die = die->child;
       while (child_die && child_die->tag)
 	{
@@ -5918,6 +5959,12 @@ read_subroutine_type (struct die_info *die, struct dwarf2_cu *cu)
       TYPE_FIELDS (ftype) = (struct field *)
 	TYPE_ZALLOC (ftype, nparams * sizeof (struct field));
 
+      /* TYPE_FIELD_TYPE must never be NULL.  Pre-fill the array to ensure it
+	 even if we error out during the parameters reading below.  */
+      for (iparams = 0; iparams < nparams; iparams++)
+	TYPE_FIELD_TYPE (ftype, iparams) = void_type;
+
+      iparams = 0;
       child_die = die->child;
       while (child_die && child_die->tag)
 	{
@@ -5932,7 +5979,18 @@ read_subroutine_type (struct die_info *die, struct dwarf2_cu *cu)
 	      if (attr)
 		TYPE_FIELD_ARTIFICIAL (ftype, iparams) = DW_UNSND (attr);
 	      else
-		TYPE_FIELD_ARTIFICIAL (ftype, iparams) = 0;
+		{
+		  TYPE_FIELD_ARTIFICIAL (ftype, iparams) = 0;
+
+		  /* GCC/43521: In java, the formal parameter
+		     "this" is sometimes not marked with DW_AT_artificial.  */
+		  if (cu->language == language_java)
+		    {
+		      const char *name = dwarf2_name (child_die, cu);
+		      if (name && !strcmp (name, "this"))
+			TYPE_FIELD_ARTIFICIAL (ftype, iparams) = 1;
+		    }
+		}
 	      TYPE_FIELD_TYPE (ftype, iparams) = die_type (child_die, cu);
 	      iparams++;
 	    }
@@ -9159,16 +9217,61 @@ dwarf2_name (struct die_info *die, struct dwarf2_cu *cu)
       /* These tags always have simple identifiers already; no need
 	 to canonicalize them.  */
       return DW_STRING (attr);
-    default:
-      if (!DW_STRING_IS_CANONICAL (attr))
+
+    case DW_TAG_subprogram:
+      /* Java constructors will all be named "<init>", so return
+	 the class name when we see this special case.  */
+      if (cu->language == language_java
+	  && DW_STRING (attr) != NULL
+	  && strcmp (DW_STRING (attr), "<init>") == 0)
 	{
-	  DW_STRING (attr)
-	    = dwarf2_canonicalize_name (DW_STRING (attr), cu,
-					&cu->objfile->objfile_obstack);
-	  DW_STRING_IS_CANONICAL (attr) = 1;
+	  struct dwarf2_cu *spec_cu = cu;
+	  struct die_info *spec_die;
+
+	  /* GCJ will output '<init>' for Java constructor names.
+	     For this special case, return the name of the parent class.  */
+
+	  /* GCJ may output suprogram DIEs with AT_specification set.
+	     If so, use the name of the specified DIE.  */
+	  spec_die = die_specification (die, &spec_cu);
+	  if (spec_die != NULL)
+	    return dwarf2_name (spec_die, spec_cu);
+
+	  do
+	    {
+	      die = die->parent;
+	      if (die->tag == DW_TAG_class_type)
+		return dwarf2_name (die, cu);
+	    }
+	  while (die->tag != DW_TAG_compile_unit);
 	}
-      return DW_STRING (attr);
+      break;
+
+    case DW_TAG_class_type:
+    case DW_TAG_interface_type:
+    case DW_TAG_structure_type:
+    case DW_TAG_union_type:
+      /* Some GCC versions emit spurious DW_AT_name attributes for unnamed
+	 structures or unions.  These were of the form "._%d" in GCC 4.1,
+	 or simply "<anonymous struct>" or "<anonymous union>" in GCC 4.3
+	 and GCC 4.4.  We work around this problem by ignoring these.  */
+      if (strncmp (DW_STRING (attr), "._", 2) == 0
+	  || strncmp (DW_STRING (attr), "<anonymous", 10) == 0)
+	return NULL;
+      break;
+
+    default:
+      break;
     }
+
+  if (!DW_STRING_IS_CANONICAL (attr))
+    {
+      DW_STRING (attr)
+	= dwarf2_canonicalize_name (DW_STRING (attr), cu,
+				    &cu->objfile->objfile_obstack);
+      DW_STRING_IS_CANONICAL (attr) = 1;
+    }
+  return DW_STRING (attr);
 }
 
 /* Return the die that this die in an extension of, or NULL if there

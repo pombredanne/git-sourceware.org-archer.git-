@@ -7,7 +7,8 @@
    (This include file is not for users of the library.)
 
    Copyright 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
+   1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009,
+   2010
    Free Software Foundation, Inc.
 
    Written by Cygnus Support.
@@ -141,6 +142,8 @@ bfd_boolean _bfd_add_bfd_to_archive_cache
   (bfd *, file_ptr, bfd *);
 bfd_boolean _bfd_generic_mkarchive
   (bfd *abfd);
+char *_bfd_append_relative_path
+  (bfd *arch, char *elt_name);
 const bfd_target *bfd_generic_archive_p
   (bfd *abfd);
 bfd_boolean bfd_slurp_armap
@@ -354,6 +357,30 @@ extern bfd_boolean _bfd_archive_bsd44_construct_extended_name_table
   bfd_generic_stat_arch_elt
 #define _bfd_archive_bsd44_update_armap_timestamp \
   _bfd_archive_bsd_update_armap_timestamp
+
+/* Routines to use for BFD_JUMP_TABLE_ARCHIVE to get VMS style
+   archives.  Use BFD_JUMP_TABLE_ARCHIVE (_bfd_vms_lib).  Some of them
+   are irrelevant and never called, so defined as NULL.  */
+
+extern bfd_boolean _bfd_vms_lib_write_archive_contents (bfd *arch);
+#define _bfd_vms_lib_slurp_armap NULL
+#define _bfd_vms_lib_slurp_extended_name_table NULL
+#define _bfd_vms_lib_construct_extended_name_table NULL
+#define _bfd_vms_lib_truncate_arname NULL
+#define _bfd_vms_lib_write_armap NULL
+#define _bfd_vms_lib_read_ar_hdr NULL
+#define _bfd_vms_lib_write_ar_hdr NULL
+extern bfd *_bfd_vms_lib_openr_next_archived_file (bfd *, bfd *);
+extern bfd *_bfd_vms_lib_get_elt_at_index (bfd *, symindex);
+extern int _bfd_vms_lib_generic_stat_arch_elt (bfd *, struct stat *);
+#define _bfd_vms_lib_update_armap_timestamp bfd_true
+
+/* Extra routines for VMS style archives.  */
+
+extern symindex _bfd_vms_lib_find_symbol (bfd *, const char *);
+extern bfd *_bfd_vms_lib_get_imagelib_file (bfd *);
+extern const bfd_target *_bfd_vms_lib_alpha_archive_p (bfd *abfd);
+extern bfd_boolean _bfd_vms_lib_mkarchive (bfd *abfd);
 
 /* Routines to use for BFD_JUMP_TABLE_SYMBOLS where there is no symbol
    support.  Use BFD_JUMP_TABLE_SYMBOLS (_bfd_nosymbols).  */
@@ -1607,6 +1634,32 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_TIC54X_23",
   "BFD_RELOC_TIC54X_16_OF_23",
   "BFD_RELOC_TIC54X_MS7_OF_23",
+  "BFD_RELOC_C6000_PCR_S21",
+  "BFD_RELOC_C6000_PCR_S12",
+  "BFD_RELOC_C6000_PCR_S10",
+  "BFD_RELOC_C6000_PCR_S7",
+  "BFD_RELOC_C6000_ABS_S16",
+  "BFD_RELOC_C6000_ABS_L16",
+  "BFD_RELOC_C6000_ABS_H16",
+  "BFD_RELOC_C6000_SBR_U15_B",
+  "BFD_RELOC_C6000_SBR_U15_H",
+  "BFD_RELOC_C6000_SBR_U15_W",
+  "BFD_RELOC_C6000_SBR_S16",
+  "BFD_RELOC_C6000_SBR_L16_B",
+  "BFD_RELOC_C6000_SBR_L16_H",
+  "BFD_RELOC_C6000_SBR_L16_W",
+  "BFD_RELOC_C6000_SBR_H16_B",
+  "BFD_RELOC_C6000_SBR_H16_H",
+  "BFD_RELOC_C6000_SBR_H16_W",
+  "BFD_RELOC_C6000_SBR_GOT_U15_W",
+  "BFD_RELOC_C6000_SBR_GOT_L16_W",
+  "BFD_RELOC_C6000_SBR_GOT_H16_W",
+  "BFD_RELOC_C6000_DSBT_INDEX",
+  "BFD_RELOC_C6000_PREL31",
+  "BFD_RELOC_C6000_COPY",
+  "BFD_RELOC_C6000_ALIGN",
+  "BFD_RELOC_C6000_FPHEAD",
+  "BFD_RELOC_C6000_NOCMP",
   "BFD_RELOC_FR30_48",
   "BFD_RELOC_FR30_20",
   "BFD_RELOC_FR30_6_IN_4",

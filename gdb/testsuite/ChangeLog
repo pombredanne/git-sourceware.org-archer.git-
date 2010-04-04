@@ -1,3 +1,176 @@
+2010-04-02  Hui Zhu  <teawater@gmail.com>
+            Michael Snyder <msnyder@vmware.com>
+
+	* gdb.reverse/i386-sse-reverse.exp: New file.
+	* gdb.reverse/i386-sse-reverse.c: New file.
+
+2010-04-02  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.trace/tfind.exp: Adjust expected disassembly output.
+
+2010-04-01  Stan Shebs  <stan@codesourcery.com>
+
+	* gdb.trace/actions.exp: Tweak expected output.
+	* gdb.trace/while-stepping.exp: Tweak expected output.
+
+2010-04-01  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* gdb.arch/amd64-byte.exp: Check "ah", "bh", "ch", "dh".
+
+2010-04-01  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.base/commands.exp: Adjust.
+	* gdb.cp/extern-c.exp: Adjust.
+
+2010-04-01  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.trace/collection.c (local_test_func): Define a local struct,
+	and instanciate it.
+
+2010-04-01  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.trace/collection.exp (gdb_collect_args_test)
+	(gdb_collect_argarray_test): XFAIL the tests that assume the
+	argarray argument's elements are collected.
+
+2010-03-31  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-bad-parameter-type.exp,
+	gdb.dwarf2/dw2-bad-parameter-type.S: New.
+
+2010-03-31  Stan Shebs  <stan@codesourcery.com>
+
+	* gdb.trace/save-trace.exp: Test save/restore of default-collect
+	and tracepoint conditionals.
+	(gdb_verify_tracepoints): Delete unused return.
+
+2010-03-26  Keith Seitz  <keiths@redhat.com>
+
+	* gdb.java/jmisc.exp (ptype jmisc): Allow the constructor to
+	appear in the output before main.
+	Remove KFAIL for gdb/2215 aka bz 9320.
+
+2010-03-30  Doug Evans  <dje@google.com>
+
+	* gdb.arch/amd64-word.exp: Rename hex to hexr, the former is defined
+	by dejagnu.
+	* gdb.arch/amd64-dword.exp: Ditto.
+
+	* gdb.base/annota1.exp (break handle_USR1): Make fail and pass text
+	match.
+	(break printf): Ditto.
+
+2010-03-29  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/nsusing.exp: Marked imported declaration test as xfail with
+	gcc < 4.4.
+	* gdb.cp/shadow.exp: Ditto.
+
+2010-03-29  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.trace/collection.exp (run_trace_experiment): Make sure
+	"tstart" is silent.
+
+2010-03-29  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.trace/collection.exp (executable): New.
+	(binfile): Use it.
+	(fpreg, spreg, pcreg): New.
+	(test_register): Use gdb_test_multiple.  Pass /x to print.
+	(prepare_for_trace_test): New.
+	(run_trace_experiment): Use "continue", not gdb_run_cmd.
+	(gdb_collect_args_test, gdb_collect_argstruct_test)
+	(gdb_collect_argarray_test, gdb_collect_locals_test): Use
+	prepare_for_trace_test.
+	(gdb_collect_registers_test): Use prepare_for_trace_test.  Use
+	fpreg, spreg and pcreg.
+	(gdb_collect_expression_test, gdb_collect_globals_test): Use
+	prepare_for_trace_test.
+	(gdb_trace_collection_test): Use fpreg, spreg and pcreg.  Don't
+	try to detect tracing support here.  Don't set breakpoints at
+	`begin' or `end' here.
+	<global scope>: Use clean_restart.  Run to main before checking
+	for tracing support.  Check for for tracing support here.
+
+2010-03-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/break-interp.exp (test_core, test_attach, test_ld): Add
+	" as $displacement" to "seen displacement message".
+
+2010-03-28  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.trace/while-dyn.exp (executable): New variable.
+	(binfile): Use it.
+	(test_while_stepping): New function.  Move most tests here.  Call
+	it once for each of the while-stepping, stepping and ws aliases.
+
+2010-03-26  Ulrich Weigand  <Ulrich.Weigand@de.ibm.com>
+
+	* gdb.cp/inherit.exp (test_ptype_si): XFAIL test for GCC versions
+	that do not provide the tagless_struct type name at all.
+	(test_print_anon_union): Do not check value of uninitialized
+	union member.  Do not use cp_test_ptype_class, so we can accept
+	"long" as well as "long int".
+
+2010-03-26  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.trace/tfile.c (tohex, bin2hex): New.
+	(write_error_trace_file): Hexify error description.
+
+2010-03-25  Stan Shebs  <stan@codesourcery.com>
+
+	* gdb.trace/tfile.c: Generate an additional trace file, improve
+	portability.
+	* gdb.trace/tfile.exp: Test trace file with an error stop, delete
+	files in a better way.
+
+2010-03-25  Keith Seitz  <keiths@redhat.com>
+
+	* gdb.java/jprint.exp: XFAIL printing of static class members
+	because of GCC debuginfo problem.
+
+2010-03-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/dup-sect.exp, gdb.base/dup-sect.S: New.
+
+2010-03-24  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.base/completion.exp: Allow long instead of long int.
+	* gdb.base/ending-run.exp: Match _rt_entry.* for RealView.
+	* gdb.base/gdbvars.c (main): Remove unused usestubs code.  Reference
+	variable p.
+	* gdb.base/maint.exp: Allow ER_RO and ER_RW instead of .text and .data.
+	* gdb.base/pointers.exp: Allow long instead of long int.
+	* gdb.base/printcmds.exp: XFAIL for RealView on ARM EABI.
+	* gdb.base/step-line.exp: Allow a directory before the source file name.
+
+2010-03-24  Tom Tromey  <tromey@redhat.com>
+
+	PR breakpoints/9352:
+	* gdb.base/default.exp: Update.
+	* gdb.base/commands.exp: Update.
+	* gdb.cp/extern-c.exp: Test setting commands on multiple
+	breakpoints at once.
+
+2010-03-24  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.base/call-signal-resume.exp, gdb.base/unwindonsignal.exp: Skip
+	if gdb,nosignals.
+	* gdb.base/watchpoints.c: Do not include unnecessary headers.
+	* lib/gdb.exp (gdb_test_multiple): Relax pattern for "the program
+	exited".
+
+2010-03-24  Stan Shebs  <stan@codesourcery.com>
+
+	* gdb.trace/tfile.exp: Expect "trace frame", with a space.
+
+2010-03-24  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.base/callfuncs.exp (do_function_calls): Add XFAILs for RealView.
+	* gdb.base/ptype.exp (ptype_maybe_prototyped): Add overprototyped
+	argument.  Handle "short" and "long".
+	(Top level): Pass overprototyped output for old_fptr and xptr.
+
 2010-03-23  Pedro Alves  <pedro@codesourcery.com>
 
 	* gdb.threads/pthreads.c (thread1, thread2, main): Fix printf

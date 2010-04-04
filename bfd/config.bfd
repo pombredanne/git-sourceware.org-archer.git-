@@ -177,6 +177,7 @@ case "${targ}" in
     ;;
   alpha*-*-*vms*)
     targ_defvec=vms_alpha_vec
+    targ_selvecs=vms_lib_txt_vec
     want64=true
     ;;
   alpha*-*-*)
@@ -1464,6 +1465,11 @@ case "${targ}" in
     targ_underscore=yes
     ;;
 #endif
+
+  tic6x-*-elf)
+    targ_defvec=bfd_elf32_tic6x_le_vec
+    targ_selvecs=bfd_elf32_tic6x_be_vec
+    ;;
 
   tic80*-*-*)
     targ_defvec=tic80coff_vec

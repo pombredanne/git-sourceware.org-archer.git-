@@ -1,3 +1,420 @@
+2010-04-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (read_namespace_type): Use common "return set_die_type"
+	code form.
+
+2010-04-02  Hui Zhu  <teawater@gmail.com>
+
+	* i386-tdep.c (OT_DQUAD): New enum.
+	(i386_process_record): Add code for MMX, 3DNow!, SSE, SSE2,
+	SSE3, SSSE3 and SSE4.
+
+2010-04-02  Hui Zhu  <teawater@gmail.com>
+
+	* i386-tdep.c (i386_record_lea_modrm_addr): Remove useless
+	"*addr = 0".
+
+2010-04-02  Pedro Alves  <pedro@codesourcery.com>
+
+	* tracepoint.c (trace_dump_actions): New, factored out from
+	trace_dump_command, and adjusted to recurse into while-stepping's
+	action list.
+	(trace_dump_command): Use it.
+
+2010-04-02  Pedro Alves  <pedro@codesourcery.com>
+
+	* breakpoint.h (struct counted_command_line): Moved definition to
+	breakpoint.c, and forward declare.
+	(breakpoint_commands): Declare.
+	* breakpoint.c (struct counted_command_line): Moved here.
+	(breakpoint_commands): New.
+	* tracepoint.c (encode_actions): Use breakpoint_commands.
+	* remote.c (remote_download_tracepoint): Ditto.
+
+2010-04-01  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* remote.c (remote_parse_stop_reply): Use hex_string instead
+	of phex_nz for error.
+
+2010-04-01  Stan Shebs  <stan@codesourcery.com>
+	    Nathan Sidwell  <nathan@codesourcery.com>
+
+	* tracepoint.h (enum actionline_type): Remove.
+	(validate_actionline): Change return to void.
+	* tracepoint.c (report_agent_reqs_errors): New function.
+	(validate_actionline): Call it, change return to void, report errors
+	more consistently.
+	(collect_symbol): Call report_agent_reqs_errors.
+	(encode_actions_1): Ditto.
+	(encode_actions): Don't expect a result from validate_actionline.
+
+2010-04-01  Stan Shebs  <stan@codesourcery.com>
+
+	* tracepoint.c (trace_start_command): Confirm if trace is running.
+	(trace_stop_command): Error if trace not running.
+
+2010-04-01  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* amd64-tdep.c (amd64_byte_names): Add "ah", "bh", "ch", "dh".
+	(AMD64_NUM_LOWER_BYTE_REGS): New.
+	(amd64_pseudo_register_read): Handle "ah", "bh", "ch", "dh".
+	(amd64_pseudo_register_write): Likewise.
+	(amd64_init_abi): Set num_byte_regs to 20.
+
+2010-04-01  Pedro Alves  <pedro@codesourcery.com>
+
+	* breakpoint.c (multi_start, multi_end, last_was_multi): Delete.
+	(prev_breakpoint_count): New.
+	(set_breakpoint_count): Adjust.
+	(rbreak_start_breakpoint_count): New.
+	(start_rbreak_breakpoints): Adjust.
+	(end_rbreak_breakpoints): Adjust.
+	(struct commands_info) <arg>: New field.
+	(do_map_commands_command): Tweak output to include breakpoint spec
+	range.
+	(commands_command_1): Adjust.  Avoid setting an xfree cleanup if
+	ARG was empty on entry.  Set INFO's arg.
+	(create_breakpoint): Adjust.
+
+	* NEWS: Clarify `commands' changes.
+
+2010-04-01  Pedro Alves  <pedro@codesourcery.com>
+
+	* tracepoint.c: Include stack.h.
+	(struct add_local_symbols_data): New.
+	(do_collect_symbol): New.
+	(add_local_symbols): Rewrite using iterate_over_block_arg_vars and
+	iterate_over_block_local_vars.
+	* stack.c (print_block_frame_locals): Rewrite as ...
+	(iterate_over_block_locals): ... this.  Take a callback function
+	pointer and generic data pointer, and call that instead of
+	print_variable_and_value.
+	(struct print_variable_and_value_data): New.
+	(do_print_variable_and_value): New.
+	(iterate_over_block_local_vars): New, abstracted out from
+	print_frame_local_vars.
+	(print_frame_local_vars): Rewrite using
+	iterate_over_block_local_vars.
+	(iterate_over_block_arg_vars): New, abstracted out from
+	print_frame_arg_vars.
+	(print_frame_arg_vars): Rewrite using iterate_over_block_arg_vars.
+	* stack.h (iterate_over_block_arg_local_vars_cb): New typedef.
+	(iterate_over_block_arg_vars, iterate_over_block_local_vars): Declare.
+
+2010-03-31  Richard Earnshaw  <rearnsha@arm.com>
+
+	* arm-tdep.c (thumb_get_next_pc_raw): Correctly detect TBH
+	instructions.  Use the PC+4 if the base of the TBB or TBH is the 
+	PC register.
+
+2010-03-31  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix crash on reading wrong function declaration DWARF.
+	* dwarf2read.c (read_subroutine_type): New variable void_type.
+	Pre-fill all TYPE_FIELD_TYPEs.  Move nparams and iparams initialization
+	more close to their use.
+
+2010-03-31  Stan Shebs  <stan@codesourcery.com>
+
+	* breakpoint.c (tracepoint_save_command): Include variables,
+ 	conditionals, tracepoint types, and default-collect.
+	* tracepoint.c (save_trace_state_variables): New function.
+	* tracepoint.h (save_trace_state_variables): Declare it.
+
+2010-03-31  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* src/gdb/remote.c (end_thread): ARI fix: Use xstrdup instead of
+	strdup.
+
+2010-03-30  Keith Seitz  <keiths@redhat.com>
+
+	* c-typeprint.c (c_type_print_args): Don't print "void"
+	for java, regardless of whether it is TYPE_PROTOTYPED.
+	Use the passed-in language instead of current_language.
+	(c_type_print_varspec_suffix): Use current_language instead
+	of assuming language_c.
+	* jv-typeprint.c (java_type_print_base): (bz 9320) Strip off
+	any return type specifier from the physname.
+
+2010-03-30  Pedro Alves  <pedro@codesourcery.com>
+
+	* tui/tui-interp.c (tui_is_toplevel): New.
+	(tui_init): Set it.
+	(tui_allowed_p): New.
+	* tui/tui.c (tui_enable): Check if the TUI is allowed before
+	enabling it.
+	* tui/tui.h (tui_allowed_p): Declare.
+
+2010-03-30  Ozkan Sezer  <sezeroz@gmail.com>
+
+	* serial.h: Include winsock2.h before windows.h.
+
+2010-03-30  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* NEWS: Mention xmlRegisters= in qSupported packet.
+
+	* i386-tdep.c: Include "remote.h".
+	(_initialize_i386_tdep): Call register_remote_support_xml.
+
+	* remote.c (remote_support_xml): New.
+	(register_remote_support_xml): Likewise.
+	(remote_query_supported_append): Likewise.
+	(remote_query_supported): Support remote_support_xml.
+
+	* remote.h (register_remote_support_xml): New.
+
+2010-03-29  Stan Shebs  <stan@codesourcery.com>
+
+	* tracepoint.c (trace_find_line_command): Remove dead code.
+
+	* tracepoint.h (struct uploaded_string): New struct.
+	(struct uploaded_tp): New fields for source strings.
+	* breakpoint.c (this_utp, next_cmd): New globals.
+	(read_uploaded_action): New function.
+	(create_tracepoint_from_upload): Fill in more parts
+	of a tracepoint.
+	* tracepoint.c (encode_source_string): New function.
+	(trace_save): Write out source strings, fix error checks.
+	(parse_tracepoint_definition): Add source string parsing.
+	* remote.c (PACKET_TracepointSource): New packet type.
+	(remote_download_command_source): New function.
+	(remote_download_tracepoint): Download source pieces also.
+	(_initialize_remote): Add packet config command.
+
+	* tracepoint.c (collect_symbol): Send LOC_UNRESOLVED symbols to
+	expression handler.
+
+	* tracepoint.c (start_tracing): Check tracepoints before sending
+	commands to target, don't start if all tracepoints disabled.
+
+2010-03-28  Pedro Alves  <pedro@codesourcery.com>
+
+	* cli/cli-script.c (process_next_line): Handle 'stepping'.
+
+2010-03-26  Stan Shebs  <stan@codesourcery.com>
+
+	* tracepoint.c (disconnect_or_stop_tracing): Get out of tfind mode.
+
+2010-03-26  Tom Tromey  <tromey@redhat.com>
+
+	* breakpoint.c (commands_command_1): Duplicate 'arg'.
+
+2010-03-26  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* breakpoint.c (expand_line_sal_maybe): Always call skip_prologue_sal.
+	(skip_prologue_sal): Remove local definition.
+	(resolve_sal_pc): Remove now unnecessary code.
+	* linespec.c (minsym_found): Call skip_prologue_sal.
+	* symtab.c (find_function_start_pc): Remove.
+	(find_function_start_sal): Extract prologue skipping into ...
+	(skip_prologue_sal): ... this new function.  Handle code both
+	with and without debug info.  Respect SAL's explicit_pc and
+	explicit_line flags.  Inline old find_function_start_pc.
+	* symtab.h (find_function_start_pc): Remove.
+	(skip_prologue_sal): Add prototype.
+
+2010-03-26  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* dwarf2read.c (read_func_scope): Also scan specification DIEs
+	for DW_TAG_imported_module children.
+
+2010-03-26  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* dwarf2read.c (dwarf2_name): Work around GCC bugzilla debug/41828 by
+	ignoring spurious DW_AT_name attributes for unnamed structs or unions.
+	* completer.c (add_struct_fields): Fix inverted logic.
+
+2010-03-26  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* breakpoint.c (bpstat_clear_actions): Reset bs->commands_left.
+
+2010-03-26  Pedro Alves  <pedro@codesourcery.com>
+
+	* tracepoint.c (current_trace_status): Don't make sure error_desc
+	is non-NULL here.
+	(parse_trace_status): Release a previous error_desc string, and
+	set it to NULL by default.  If stop reason is tracepoint_error,
+	make sure error_desc is not left NULL.
+
+2010-03-26  Pedro Alves  <pedro@codesourcery.com>
+
+	* tracepoint.c (trace_save): Remove X from tracepoint error
+	description.
+
+2010-03-26  Pedro Alves  <pedro@codesourcery.com>
+
+	* tracepoint.c (parse_trace_status): Don't allow plain strings in
+	the terror description.  Don't expect an X prefix.
+
+2010-03-25  Stan Shebs  <stan@codesourcery.com>
+
+	* tracepoint.h (trace_stop_reason): Add tracepoint_error.
+	(struct trace_status): New field error_desc.
+	* tracepoint.c (stop_reason_names): Add terror.
+	(current_trace_status): Ensure non-NULL error description.
+	(trace_status_command): Add error report.
+	(trace_status_mi): Ditto.
+	(trace_save): Add special case for error description.
+	(parse_trace_status): Add case for errors.
+
+2010-03-25  Keith Seitz  <keiths@redhat.com>
+
+	* dwarf2read.c (read_subroutine_type): If the compilation unit
+	language is Java, mark any formal parameter named "this" as
+	artificial (GCC/43521).
+	(dwarf2_name): Add special handling for Java constructors.
+
+2010-03-25  Tom Tromey  <tromey@redhat.com>
+
+	PR gdb/11327, PR gdb/11328, PR breakpoints/11368:
+	* infrun.c (handle_inferior_event): Change initialization of
+	stop_stack_dummy.
+	(handle_inferior_event): Change assignment to stop_stack_dummy.
+	(normal_stop): Update use of stop_stack_dummy.
+	(struct inferior_status) <stop_stack_dummy>: Change type.
+	* inferior.h (stop_stack_dummy): Update.
+	* infcmd.c (stop_stack_dummy): Change type.
+	* infcall.c (cleanup_delete_std_terminate_breakpoint): New
+	function.
+	(call_function_by_hand): Call set_std_terminate_breakpoint.
+	Rewrite std::terminate handling.
+	* breakpoint.h (enum bptype) <bp_std_terminate,
+	bp_std_terminate_master>: New.
+	(enum stop_stack_kind): New.
+	(struct bpstat_what) <call_dummy>: Change type.
+	(set_std_terminate_breakpoint, delete_std_terminate_breakpoint):
+	Declare.
+	* breakpoint.c (create_std_terminate_master_breakpoint): New
+	function.
+	(update_breakpoints_after_exec): Handle bp_std_terminate_master.
+	Call create_std_terminate_master_breakpoint.
+	(print_it_typical): Handle new breakpoint kinds.
+	(bpstat_stop_status): Handle bp_std_terminate_master.
+	(bpstat_what): Correctly set call_dummy field.  Handle
+	bp_std_terminate_master and bp_std_terminate.
+	(print_one_breakpoint_location): Update.
+	(allocate_bp_location): Update.
+	(set_std_terminate_breakpoint): New function.
+	(delete_std_terminate_breakpoint): Likewise.
+	(create_thread_event_breakpoint): Update.
+	(delete_command): Update.
+	(breakpoint_re_set_one): Update.
+	(breakpoint_re_set): Call create_std_terminate_master_breakpoint.
+
+2010-03-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symfile.c (build_section_addr_info_from_bfd): New.
+	(build_section_addr_info_from_objfile): Base it on
+	build_section_addr_info_from_bfd.
+	(addrs_section_compar, addrs_section_sort): New.
+	(addr_info_make_relative): New variables my_cleanup, abfd_addrs,
+	addrs_sorted, abfd_addrs_sorted and addrs_to_abfd_addrs.  Build
+	addrs_to_abfd_addrs.  Use it for recalculating ADDRS.
+
+2010-03-24  Michael Snyder  <msnyder@localhost.localdomain>
+
+	* elfread.c (find_separate_debug_file_by_buildid): 
+	Remove unused local variable.
+
+2010-03-24  Tom Tromey  <tromey@redhat.com>
+
+	PR breakpoints/9352:
+	* NEWS: Mention changes to `commands' and `rbreak'.
+	* symtab.c (do_end_rbreak_breakpoints): New function.
+	(rbreak_command): Call start_rbreak_breakpoints; arrange to call
+	end_rbreak_breakpoints.
+	* breakpoint.c (breakpoint_count, tracepoint_count): Now static.
+	(set_breakpoint_count): Likewise.  Clear last_was_multi.
+	(multi_start, multi_end, last_was_multi): New globals.
+	(start_rbreak_breakpoints, end_rbreak_breakpoints): New
+	functions.
+	(struct commands_info): New
+	(do_map_commands_command): New function.
+	(commands_command_1): New function.
+	(commands_command): Use it.
+	(commands_from_control_command): Likewise.
+	(do_delete_breakpoint): New function.
+	(delete_command): Use it.
+	(map_breakpoint_numbers): Add 'data' argument.  Pass to callback.
+	(do_map_disable_breakpoint): New function.
+	(disable_command): Use it.
+	(do_map_enable_breakpoint): New function.
+	(enable_command): Use it.
+	(enable_once_breakpoint): Add argument.
+	(enable_once_command): Update.
+	(enable_delete_breakpoint): Add argument.
+	(enable_delete_command): Update.
+	(break_command_really): Set last_was_multi when needed.
+	(check_tracepoint_command): Fix formatting.
+	(validate_commands_for_breakpoint): New function.
+	(breakpoint_set_commands): Use it.
+	(tracepoint_save_command): Update.
+	* breakpoint.h (start_rbreak_breakpoints, end_rbreak_breakpoints):
+	Declare.
+
+2010-03-24  Tom Tromey  <tromey@redhat.com>
+
+	* breakpoint.h (struct counted_command_line): New struct.
+	(struct breakpoint) <commands>: Change type.
+	(struct bpstats) <commands>: Change type.
+	<commands_left>: New field.
+	* breakpoint.c (alloc_counted_command_line): New function.
+	(incref_counted_command_line): Likewise.
+	(decref_counted_command_line): Likewise.
+	(do_cleanup_counted_command_line): Likewise.
+	(make_cleanup_decref_counted_command_line): Likewise.
+	(breakpoint_set_commands): Use decref_counted_command_line and
+	alloc_counted_command_line.
+	(commands_command): Don't error if breakpoint commands are
+	executing.
+	(commands_from_control_command): Likewise.
+	(bpstat_free): Update.
+	(bpstat_copy): Likewise.
+	(bpstat_clear_actions): Likewise.
+	(bpstat_do_actions_1): Likewise.
+	(bpstat_stop_status): Likewise.
+	(print_one_breakpoint_location): Likewise.
+	(delete_breakpoint): Likewise.
+	(bpstat_alloc): Initialize new field.
+	(tracepoint_save_command): Update.
+	* tracepoint.c (encode_actions): Update.
+	(trace_dump_command): Update.
+
+2010-03-24  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* dwarf2-frame.c (dwarf2_frame_find_quirks): Use producer_is_realview.
+	* dwarf2read.c (load_full_comp_unit): Read DW_AT_producer.
+	(read_structure_type): For RealView, set TYPE_STUB on structures with
+	no byte size and no children.
+	(read_subroutine_type): Mark functions as prototyped by default.
+	* symtab.c (producer_is_realview): New function.
+	* symtab.h (expand_line_sal): Fix declaration formatting.
+	(producer_is_realview): Declare.
+
+2010-03-24  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* arm-tdep.c (skip_prologue_function): New function.
+	(submask, bit, bits, sbits, BranchDest): Move higher in the file.
+	(thumb_analyze_prologue): Document return value.  Recognize more
+	Thumb instructions, skippable calls, and some Thumb-2 instructions.
+	Add debug output.
+	(arm_skip_prologue): Remove call dummy check.  Check the prologue
+	for non-GNU compilers.
+	(arm_instruction_changes_pc): New function.
+	(arm_analyze_prologue): New function, broken out from
+	arm_scan_prologue.  Recognize more ARM instructions and skippable
+	calls.  Update comments.  Handle NULL cache.  Return the address
+	of the first unrecognized instruction.  Do not skip past other
+	instructions which change control flow.  Add debug output.
+	(arm_scan_prologue): Use arm_analyze_prologue.
+	(ARM_PC_32): Delete.
+	(shifted_reg_val): Simplify ARM_PC_32 check.
+
+2010-03-24  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* tracepoint.c (tvariables_info_1): Actually compute
+	the number of rows in the result.
+
 2010-03-24  Pedro Alves  <pedro@codesourcery.com>
 
 	* remote.c (crc32): Constify `buf' parameter.
@@ -781,23 +1198,23 @@
 	(gnu_v3_print_method_ptr): Use the physname for virtual methods
 	without a demangled name.
 	Print out type information for non-virtual methods.
-        * linespec.c (decode_line_1): Force ANY string using "::" (or
+	* linespec.c (decode_line_1): Force ANY string using "::" (or
 	"." for java) to use decode_compound, and clean up any stray quoting.
-        If we found a file symtab, re-evaluate whether the remainder is_quoted.
-        (decode_compound): Stop consuming at an open parenthesis.
-        Keep template parameters.
-        Keep any overload information.
-        Keep keywords like "const".
-        Remove paren_pointer.
-        Move is_quoted check from set_flags to here.
-        Remove #if 0 code from 2000. Ten years is long enough.
-        (find_method): Before comparing symbol names, canonicalize the string
-        from the user.
-        If a specific overload is requested, find it. Otherwise throw an error.
+	If we found a file symtab, re-evaluate whether the remainder is_quoted.
+	(decode_compound): Stop consuming at an open parenthesis.
+	Keep template parameters.
+	Keep any overload information.
+	Keep keywords like "const".
+	Remove paren_pointer.
+	Move is_quoted check from set_flags to here.
+	Remove #if 0 code from 2000. Ten years is long enough.
+	(find_method): Before comparing symbol names, canonicalize the string
+	from the user.
+	If a specific overload is requested, find it. Otherwise throw an error.
 	(find_method_overload_end): New function.
 	(set_flags): Remove.
-        (decode_compound): Assume that parentheses are matched.
-        It's a lot easier.
+	(decode_compound): Assume that parentheses are matched.
+	It's a lot easier.
 	* symtab.c (symbol_find_demangled_name): Add DMGL_VERBOSE flag
 	to cplus_demangle.
 	* linespec.c (decode_line_1): Keep important keywords like
@@ -962,7 +1379,7 @@
 2010-03-07  Joel Brobecker  <brobecker@adacore.com>
 
 	* remote.c (remote_get_ada_task_ptid): New function.
-        (init_remote_ops): Set remote_ops.to_get_ada_task_ptid.
+	(init_remote_ops): Set remote_ops.to_get_ada_task_ptid.
 
 2010-03-06  Christopher Faylor  <me+cygwin@cgf.cx>
 
@@ -1055,7 +1472,7 @@
 	address as UnsignedLongLong, not LongLong.
 
 2010-03-05  Kevin Buettner  <kevinb@redhat.com>
-            Pedro Alves  <pedro@codesourcery.com>
+	    Pedro Alves  <pedro@codesourcery.com>
 
 	* remote-mips.c (gdbthread.h): Include.
 	(remote_mips_ptid): Declare.
@@ -1445,7 +1862,7 @@
 	GDB's gdbarch_addr_bit as size of values on the DWARF stack.
 
 2010-02-26  Phil Muldoon  <pmuldoon@redhat.com>
-            Tom Tromey  <tromey@redhat.com>
+	    Tom Tromey  <tromey@redhat.com>
 
 	* python/py-type.c (typy_lookup_typename): Add in block argument.
 	If provided restrict lookup to specified blocks.
@@ -2420,8 +2837,8 @@ Mon Feb  8 13:17:10 2010  Chris Moller  <moller@mollerware.com>
 
 2010-01-25  gingold  <gingold@adacore.com>
 
-        * windows-nat.c (windows_continue): Use %x to print thread id.
-        (get_windows_debug_event): Ditto.
+	* windows-nat.c (windows_continue): Use %x to print thread id.
+	(get_windows_debug_event): Ditto.
 
 2010-01-22  Tom Tromey  <tromey@redhat.com>
 
@@ -3452,7 +3869,7 @@ Mon Feb  8 13:17:10 2010  Chris Moller  <moller@mollerware.com>
 
 2010-01-04  Ulrich Weigand  <uweigand@de.ibm.com>
 
-        * features/Makefile (WHICH): Add s390-linux32, s390-linux64,
+	* features/Makefile (WHICH): Add s390-linux32, s390-linux64,
 	and s390x-linux64.
 	(s390-linux32-expedite): Define.
 	(s390-linux64-expedite): Define.

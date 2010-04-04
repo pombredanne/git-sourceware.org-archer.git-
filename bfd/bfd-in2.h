@@ -301,7 +301,7 @@ typedef struct bfd_section *sec_ptr;
   (((sec)->rawsize ? (sec)->rawsize : (sec)->size) \
    / bfd_octets_per_byte (bfd))
 
-/* Return TRUE if section has been discarded.  */
+/* Return TRUE if input section SEC has been discarded.  */
 #define elf_discarded_section(sec)				\
   (!bfd_is_abs_section (sec)					\
    && bfd_is_abs_section ((sec)->output_section)		\
@@ -1971,6 +1971,7 @@ enum bfd_architecture
 #define bfd_mach_tic3x         30
 #define bfd_mach_tic4x         40
   bfd_arch_tic54x,    /* Texas Instruments TMS320C54X */
+  bfd_arch_tic6x,     /* Texas Instruments TMS320C6X */
   bfd_arch_tic80,     /* TI TMS320c80 (MVP) */
   bfd_arch_v850,      /* NEC V850 */
 #define bfd_mach_v850          1
@@ -2243,10 +2244,7 @@ struct reloc_howto_struct
       when doing overflow checking.  */
   unsigned int bitsize;
 
-  /*  Notes that the relocation is relative to the location in the
-      data section of the addend.  The relocation function will
-      subtract from the relocation value the address of the location
-      being relocated.  */
+  /*  The relocation is relative to the field being relocated.  */
   bfd_boolean pc_relative;
 
   /*  The bit position of the reloc value in the destination.
@@ -3638,6 +3636,34 @@ the opcode.  */
 significant 7 bits of a 23-bit extended address are placed into
 the opcode.  */
   BFD_RELOC_TIC54X_MS7_OF_23,
+
+/* TMS320C6000 relocations.  */
+  BFD_RELOC_C6000_PCR_S21,
+  BFD_RELOC_C6000_PCR_S12,
+  BFD_RELOC_C6000_PCR_S10,
+  BFD_RELOC_C6000_PCR_S7,
+  BFD_RELOC_C6000_ABS_S16,
+  BFD_RELOC_C6000_ABS_L16,
+  BFD_RELOC_C6000_ABS_H16,
+  BFD_RELOC_C6000_SBR_U15_B,
+  BFD_RELOC_C6000_SBR_U15_H,
+  BFD_RELOC_C6000_SBR_U15_W,
+  BFD_RELOC_C6000_SBR_S16,
+  BFD_RELOC_C6000_SBR_L16_B,
+  BFD_RELOC_C6000_SBR_L16_H,
+  BFD_RELOC_C6000_SBR_L16_W,
+  BFD_RELOC_C6000_SBR_H16_B,
+  BFD_RELOC_C6000_SBR_H16_H,
+  BFD_RELOC_C6000_SBR_H16_W,
+  BFD_RELOC_C6000_SBR_GOT_U15_W,
+  BFD_RELOC_C6000_SBR_GOT_L16_W,
+  BFD_RELOC_C6000_SBR_GOT_H16_W,
+  BFD_RELOC_C6000_DSBT_INDEX,
+  BFD_RELOC_C6000_PREL31,
+  BFD_RELOC_C6000_COPY,
+  BFD_RELOC_C6000_ALIGN,
+  BFD_RELOC_C6000_FPHEAD,
+  BFD_RELOC_C6000_NOCMP,
 
 /* This is a 48 bit reloc for the FR30 that stores 32 bits.  */
   BFD_RELOC_FR30_48,
@@ -5093,6 +5119,10 @@ struct bfd
 
   /* Set if this is a thin archive.  */
   unsigned int is_thin_archive : 1;
+
+  /* Set if only required symbols should be added in the link hash table for
+     this object.  Used by VMS linkers.  */
+  unsigned int selective_search : 1;
 };
 
 typedef enum bfd_error

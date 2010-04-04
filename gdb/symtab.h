@@ -1132,11 +1132,10 @@ extern char *find_main_filename (void);
 
 extern struct symtab *find_line_symtab (struct symtab *, int, int *, int *);
 
-extern CORE_ADDR find_function_start_pc (struct gdbarch *,
-					 CORE_ADDR, struct obj_section *);
-
 extern struct symtab_and_line find_function_start_sal (struct symbol *sym,
 						       int);
+
+extern void skip_prologue_sal (struct symtab_and_line *);
 
 /* symfile.c */
 
@@ -1198,8 +1197,11 @@ struct symbol *lookup_global_symbol_from_objfile (const struct objfile *objfile,
 						  const char *name,
 						  const domain_enum domain);
 
-extern struct symtabs_and_lines
-expand_line_sal (struct symtab_and_line sal);
+extern struct symtabs_and_lines expand_line_sal (struct symtab_and_line sal);
+
+/* Return 1 if the supplied producer string matches the ARM RealView
+   compiler (armcc).  */
+int producer_is_realview (const char *producer);
 
 void fixup_section (struct general_symbol_info *ginfo,
 		    CORE_ADDR addr, struct objfile *objfile);

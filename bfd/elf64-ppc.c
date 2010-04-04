@@ -11569,6 +11569,18 @@ ppc64_elf_relocate_section (bfd *output_bfd,
 	  }
 	  break;
 
+	case R_PPC64_GOT_TPREL16_HI:
+	case R_PPC64_GOT_TPREL16_HA:
+	  if (tls_mask != 0
+	      && (tls_mask & TLS_TPREL) == 0)
+	    {
+	      rel->r_offset -= d_offset;
+	      bfd_put_32 (output_bfd, NOP, contents + rel->r_offset);
+	      r_type = R_PPC64_NONE;
+	      rel->r_info = ELF64_R_INFO (r_symndx, r_type);
+	    }
+	  break;
+
 	case R_PPC64_GOT_TPREL16_DS:
 	case R_PPC64_GOT_TPREL16_LO_DS:
 	  if (tls_mask != 0
@@ -11914,23 +11926,13 @@ ppc64_elf_relocate_section (bfd *output_bfd,
 	     linkage stubs needs to be followed by a nop, as the nop
 	     will be replaced with an instruction to restore the TOC
 	     base pointer.  */
-	  stub_entry = NULL;
 	  fdh = h;
 	  if (h != NULL
 	      && h->oh != NULL
 	      && h->oh->is_func_descriptor)
 	    fdh = ppc_follow_link (h->oh);
-	  if (((fdh != NULL
-		&& fdh->elf.plt.plist != NULL)
-	       || (sec != NULL
-		   && sec->output_section != NULL
-		   && sec->id <= htab->top_id
-		   && (htab->stub_group[sec->id].toc_off
-		       != htab->stub_group[input_section->id].toc_off))
-	       || (h == NULL
-		   && ELF_ST_TYPE (sym->st_info) == STT_GNU_IFUNC))
-	      && (stub_entry = ppc_get_stub_entry (input_section, sec, fdh,
-						   rel, htab)) != NULL
+	  stub_entry = ppc_get_stub_entry (input_section, sec, fdh, rel, htab);
+	  if (stub_entry != NULL
 	      && (stub_entry->stub_type == ppc_stub_plt_call
 		  || stub_entry->stub_type == ppc_stub_plt_branch_r2off
 		  || stub_entry->stub_type == ppc_stub_long_branch_r2off))
@@ -12015,7 +12017,9 @@ ppc64_elf_relocate_section (bfd *output_bfd,
 		unresolved_reloc = FALSE;
 	    }
 
-	  if (stub_entry == NULL
+	  if ((stub_entry == NULL
+	       || stub_entry->stub_type == ppc_stub_long_branch
+	       || stub_entry->stub_type == ppc_stub_plt_branch)
 	      && get_opd_info (sec) != NULL)
 	    {
 	      /* The branch destination is the value of the opd entry. */
@@ -12036,13 +12040,15 @@ ppc64_elf_relocate_section (bfd *output_bfd,
 		  + input_section->output_offset
 		  + input_section->output_section->vma);
 
-	  if (stub_entry == NULL
-	      && (relocation + addend - from + max_br_offset
-		  >= 2 * max_br_offset)
-	      && r_type != R_PPC64_ADDR14_BRTAKEN
-	      && r_type != R_PPC64_ADDR14_BRNTAKEN)
-	    stub_entry = ppc_get_stub_entry (input_section, sec, fdh, rel,
-					     htab);
+	  if (stub_entry != NULL
+	      && (stub_entry->stub_type == ppc_stub_long_branch
+		  || stub_entry->stub_type == ppc_stub_plt_branch)
+	      && (r_type == R_PPC64_ADDR14_BRTAKEN
+		  || r_type == R_PPC64_ADDR14_BRNTAKEN
+		  || (relocation + addend - from + max_br_offset
+		      < 2 * max_br_offset)))
+	    /* Don't use the stub if this branch is in range.  */
+	    stub_entry = NULL;
 
 	  if (stub_entry != NULL)
 	    {

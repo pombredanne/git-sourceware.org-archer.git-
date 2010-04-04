@@ -83,6 +83,10 @@ enum bptype
        of scope (with hardware support for watchpoints)).  */
     bp_call_dummy,
 
+    /* A breakpoint set on std::terminate, that is used to catch
+       otherwise uncaught exceptions thrown during an inferior call.  */
+    bp_std_terminate,
+
     /* Some dynamic linkers (HP, maybe Solaris) can arrange for special
        code in the inferior to run when significant events occur in the
        dynamic linker (for example a library is loaded or unloaded).
@@ -117,6 +121,9 @@ enum bptype
        type will be created and enabled.  */
 
     bp_longjmp_master,
+
+    /* Master copies of std::terminate breakpoints.  */
+    bp_std_terminate_master,
 
     bp_catchpoint,
 
@@ -376,6 +383,11 @@ DEF_VEC_I(int);
 typedef struct bp_location *bp_location_p;
 DEF_VEC_P(bp_location_p);
 
+/* A reference-counted struct command_line.  This lets multiple
+   breakpoints share a single command list.  This is an implementation
+   detail to the breakpoints module.  */
+struct counted_command_line;
+
 /* Note that the ->silent field is not currently used by any commands
    (though the code is in there if it was to be, and set_raw_breakpoint
    does set it to 0).  I implemented it because I thought it would be
@@ -414,7 +426,7 @@ struct breakpoint
        be continued automatically before really stopping.  */
     int ignore_count;
     /* Chain of command lines to execute when this breakpoint is hit.  */
-    struct command_line *commands;
+    struct counted_command_line *commands;
     /* Stack depth (address of frame).  If nonzero, break only if fp
        equals this.  */
     struct frame_id frame_id;
@@ -598,6 +610,20 @@ enum bpstat_what_main_action
     BPSTAT_WHAT_LAST
   };
 
+/* An enum indicating the kind of "stack dummy" stop.  This is a bit
+   of a misnomer because only one kind of truly a stack dummy.  */
+enum stop_stack_kind
+  {
+    /* We didn't stop at a stack dummy breakpoint.  */
+    STOP_NONE = 0,
+
+    /* Stopped at a stack dummy.  */
+    STOP_STACK_DUMMY,
+
+    /* Stopped at std::terminate.  */
+    STOP_STD_TERMINATE
+  };
+
 struct bpstat_what
   {
     enum bpstat_what_main_action main_action;
@@ -606,7 +632,7 @@ struct bpstat_what
        of BPSTAT_WHAT_STOP_SILENT or BPSTAT_WHAT_STOP_NOISY (the concept of
        continuing from a call dummy without popping the frame is not a
        useful one).  */
-    int call_dummy;
+    enum stop_stack_kind call_dummy;
   };
 
 /* The possible return values for print_bpstat, print_it_normal,
@@ -698,8 +724,11 @@ struct bpstats
     bpstat next;
     /* Breakpoint that we are at.  */
     const struct bp_location *breakpoint_at;
-    /* Commands left to be done.  */
-    struct command_line *commands;
+    /* The associated command list.  */
+    struct counted_command_line *commands;
+    /* Commands left to be done.  This points somewhere in
+       base_command.  */
+    struct command_line *commands_left;
     /* Old value associated with a watchpoint.  */
     struct value *old_val;
 
@@ -779,6 +808,10 @@ extern void delete_breakpoint (struct breakpoint *);
 
 extern void breakpoint_auto_delete (bpstat);
 
+/* Return the chain of command lines to execute when this breakpoint
+   is hit.  */
+extern struct command_line *breakpoint_commands (struct breakpoint *b);
+
 extern void break_command (char *, int);
 
 extern void hbreak_command_wrapper (char *, int);
@@ -850,6 +883,9 @@ extern void delete_longjmp_breakpoint (int thread);
 
 extern void enable_overlay_breakpoints (void);
 extern void disable_overlay_breakpoints (void);
+
+extern void set_std_terminate_breakpoint (void);
+extern void delete_std_terminate_breakpoint (void);
 
 /* These functions respectively disable or reenable all currently
    enabled watchpoints.  When disabled, the watchpoints are marked
@@ -1010,5 +1046,10 @@ extern int breakpoint_is_tracepoint (const struct breakpoint *b);
 /* Function that can be passed to read_command_line to validate
    that each command is suitable for tracepoint command list.  */
 extern void check_tracepoint_command (char *line, void *closure);
+
+/* Call at the start and end of an "rbreak" command to register
+   breakpoint numbers for a later "commands" command.  */
+extern void start_rbreak_breakpoints (void);
+extern void end_rbreak_breakpoints (void);
 
 #endif /* !defined (BREAKPOINT_H) */

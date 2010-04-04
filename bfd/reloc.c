@@ -305,10 +305,7 @@ CODE_FRAGMENT
 .      when doing overflow checking.  *}
 .  unsigned int bitsize;
 .
-.  {*  Notes that the relocation is relative to the location in the
-.      data section of the addend.  The relocation function will
-.      subtract from the relocation value the address of the location
-.      being relocated.  *}
+.  {*  The relocation is relative to the field being relocated.  *}
 .  bfd_boolean pc_relative;
 .
 .  {*  The bit position of the reloc value in the destination.
@@ -3761,6 +3758,61 @@ ENUMDOC
   This is a reloc for the tms320c54x, where the most
   significant 7 bits of a 23-bit extended address are placed into
   the opcode.
+
+ENUM
+  BFD_RELOC_C6000_PCR_S21
+ENUMX
+  BFD_RELOC_C6000_PCR_S12
+ENUMX
+  BFD_RELOC_C6000_PCR_S10
+ENUMX
+  BFD_RELOC_C6000_PCR_S7
+ENUMX
+  BFD_RELOC_C6000_ABS_S16
+ENUMX
+  BFD_RELOC_C6000_ABS_L16
+ENUMX
+  BFD_RELOC_C6000_ABS_H16
+ENUMX
+  BFD_RELOC_C6000_SBR_U15_B
+ENUMX
+  BFD_RELOC_C6000_SBR_U15_H
+ENUMX
+  BFD_RELOC_C6000_SBR_U15_W
+ENUMX
+  BFD_RELOC_C6000_SBR_S16
+ENUMX
+  BFD_RELOC_C6000_SBR_L16_B
+ENUMX
+  BFD_RELOC_C6000_SBR_L16_H
+ENUMX
+  BFD_RELOC_C6000_SBR_L16_W
+ENUMX
+  BFD_RELOC_C6000_SBR_H16_B
+ENUMX
+  BFD_RELOC_C6000_SBR_H16_H
+ENUMX
+  BFD_RELOC_C6000_SBR_H16_W
+ENUMX
+  BFD_RELOC_C6000_SBR_GOT_U15_W
+ENUMX
+  BFD_RELOC_C6000_SBR_GOT_L16_W
+ENUMX
+  BFD_RELOC_C6000_SBR_GOT_H16_W
+ENUMX
+  BFD_RELOC_C6000_DSBT_INDEX
+ENUMX
+  BFD_RELOC_C6000_PREL31
+ENUMX
+  BFD_RELOC_C6000_COPY
+ENUMX
+  BFD_RELOC_C6000_ALIGN
+ENUMX
+  BFD_RELOC_C6000_FPHEAD
+ENUMX
+  BFD_RELOC_C6000_NOCMP
+ENUMDOC
+  TMS320C6000 relocations.
 
 ENUM
   BFD_RELOC_FR30_48

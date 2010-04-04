@@ -23,14 +23,6 @@
 #include "breakpoint.h"
 #include "target.h"
 
-enum actionline_type
-  {
-    BADLINE = -1,
-    GENERIC = 0,
-    END = 1,
-    STEPPING = 2
-  };
-
 /* A trace state variable is a value managed by a target being
    traced. A trace state variable (or tsv for short) can be accessed
    and assigned to by tracepoint actions and conditionals, but is not
@@ -73,7 +65,8 @@ enum trace_stop_reason
     tstop_command,
     trace_buffer_full,
     trace_disconnected,
-    tracepoint_passcount
+    tracepoint_passcount,
+    tracepoint_error
   };
 
 struct trace_status
@@ -89,9 +82,14 @@ struct trace_status
 
   enum trace_stop_reason stop_reason;
 
-  /* If stop_reason == tracepoint_passcount, the on-target number
-     of the tracepoint which caused the stop.  */
+  /* If stop_reason is tracepoint_passcount or tracepoint_error, this
+     is the (on-target) number of the tracepoint which caused the
+     stop.  */
   int stopping_tracepoint;
+
+  /* If stop_reason is tracepoint_error, this is a human-readable
+     string that describes the error that happened on the target.  */
+  char *error_desc;
 
   /* Number of traceframes currently in the buffer.  */
 
@@ -116,7 +114,14 @@ extern char *default_collect;
 
 /* Struct to collect random info about tracepoints on the target.  */
 
-struct uploaded_tp {
+struct uploaded_string
+{
+  char *str;
+  struct uploaded_string *next;
+};
+
+struct uploaded_tp
+{
   int number;
   enum bptype type;
   ULONGEST addr;
@@ -129,12 +134,23 @@ struct uploaded_tp {
   char *actions[100];
   int num_step_actions;
   char *step_actions[100];
+
+  /* The original string defining the location of the tracepoint.  */
+  char *at_string;
+
+  /* The original string defining the tracepoint's condition.  */
+  char *cond_string;
+
+  /* List of original strings defining the tracepoint's actions.  */
+  struct uploaded_string *cmd_strings;
+
   struct uploaded_tp *next;
 };
 
 /* Struct recording info about trace state variables on the target.  */
 
-struct uploaded_tsv {
+struct uploaded_tsv
+{
   const char *name;
   int number;
   LONGEST initial_value;
@@ -152,13 +168,17 @@ void set_traceframe_number (int);
 struct cleanup *make_cleanup_restore_current_traceframe (void);
 
 void free_actions (struct breakpoint *);
-enum actionline_type validate_actionline (char **, struct breakpoint *);
+extern void validate_actionline (char **, struct breakpoint *);
 
 extern void end_actions_pseudocommand (char *args, int from_tty);
 extern void while_stepping_pseudocommand (char *args, int from_tty);
 
 extern struct trace_state_variable *find_trace_state_variable (const char *name);
 extern struct trace_state_variable *create_trace_state_variable (const char *name);
+
+extern int encode_source_string (int num, ULONGEST addr,
+				 char *srctype, char *src,
+				 char *buf, int buf_size);
 
 extern void parse_trace_status (char *line, struct trace_status *ts);
 
@@ -179,6 +199,7 @@ extern void stop_tracing (void);
 extern void trace_status_mi (int on_stop);
 
 extern void tvariables_info_1 (void);
+extern void save_trace_state_variables (struct ui_file *fp);
 
 extern void tfind_1 (enum trace_find_type type, int num,
 		     ULONGEST addr1, ULONGEST addr2,

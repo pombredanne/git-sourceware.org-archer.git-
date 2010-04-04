@@ -1154,6 +1154,7 @@ enum {
   PACKET_FastTracepoints,
   PACKET_bc,
   PACKET_bs,
+  PACKET_TracepointSource,
   PACKET_MAX
 };
 
@@ -2449,7 +2450,7 @@ end_thread (struct gdb_xml_parser *parser,
   struct threads_parsing_context *data = user_data;
 
   if (body_text && *body_text)
-    VEC_last (thread_item_t, data->items)->extra = strdup (body_text);
+    VEC_last (thread_item_t, data->items)->extra = xstrdup (body_text);
 }
 
 const struct gdb_xml_attribute thread_attributes[] = {
@@ -3462,7 +3463,56 @@ static struct protocol_feature remote_protocol_features[] = {
     PACKET_bc },
   { "ReverseStep", PACKET_DISABLE, remote_supported_packet,
     PACKET_bs },
+  { "TracepointSource", PACKET_DISABLE, remote_supported_packet,
+    PACKET_TracepointSource },
 };
+
+static char *remote_support_xml;
+
+/* Register string appended to "xmlRegisters=" in qSupported query.  */
+
+void
+register_remote_support_xml (const char *xml ATTRIBUTE_UNUSED)
+{
+#if defined(HAVE_LIBEXPAT)
+  if (remote_support_xml == NULL)
+    remote_support_xml = concat ("xmlRegisters=", xml, NULL);
+  else
+    {
+      char *copy = xstrdup (remote_support_xml + 13);
+      char *p = strtok (copy, ",");
+
+      do
+	{
+	  if (strcmp (p, xml) == 0)
+	    {
+	      /* already there */
+	      xfree (copy);
+	      return;
+	    }
+	}
+      while ((p = strtok (NULL, ",")) != NULL);
+      xfree (copy);
+
+      p = concat (remote_support_xml, ",", xml, NULL);
+      xfree (remote_support_xml);
+      remote_support_xml = p;
+    }
+#endif
+}
+
+static char *
+remote_query_supported_append (char *msg, const char *append)
+{
+  if (msg)
+    {
+      char *p = concat (msg, ";", append, NULL);
+      xfree (msg);
+      return p;
+    }
+  else
+    return xstrdup (append);
+}
 
 static void
 remote_query_supported (void)
@@ -3482,24 +3532,27 @@ remote_query_supported (void)
   rs->buf[0] = 0;
   if (remote_protocol_packets[PACKET_qSupported].support != PACKET_DISABLE)
     {
+      char *q = NULL;
       const char *qsupported = gdbarch_qsupported (target_gdbarch);
+
+      if (rs->extended)
+	q = remote_query_supported_append (q, "multiprocess+");
+      
       if (qsupported)
+	q = remote_query_supported_append (q, qsupported);
+
+      if (remote_support_xml)
+	q = remote_query_supported_append (q, remote_support_xml);
+
+      if (q)
 	{
-	  char *q;
-	  if (rs->extended)
-	    q = concat ("qSupported:multiprocess+;", qsupported, NULL);
-	  else
-	    q = concat ("qSupported:", qsupported, NULL);
-	  putpkt (q);
+	  char *p = concat ("qSupported:", q, NULL);
 	  xfree (q);
+	  putpkt (p);
+	  xfree (p);
 	}
       else
-	{
-	  if (rs->extended)
-	    putpkt ("qSupported:multiprocess+");
-	  else
-	    putpkt ("qSupported");
-	}
+	putpkt ("qSupported");
 
       getpkt (&rs->buf, &rs->buf_size, 0);
 
@@ -4831,7 +4884,7 @@ Packet: '%s'\n"),
 	      if (reg == NULL)
 		error (_("Remote sent bad register number %s: %s\n\
 Packet: '%s'\n"),
-		       phex_nz (pnum, 0), p, buf);
+		       hex_string (pnum), p, buf);
 
 	      cached_reg.num = reg->regnum;
 
@@ -9267,12 +9320,52 @@ free_actions_list (char **actions_list)
   xfree (actions_list);
 }
 
+/* Recursive routine to walk through command list including loops, and
+   download packets for each command.  */
+
+static void
+remote_download_command_source (int num, ULONGEST addr,
+				struct command_line *cmds)
+{
+  struct remote_state *rs = get_remote_state ();
+  struct command_line *cmd;
+
+  for (cmd = cmds; cmd; cmd = cmd->next)
+    {
+      QUIT;	/* allow user to bail out with ^C */
+      strcpy (rs->buf, "QTDPsrc:");
+      encode_source_string (num, addr, "cmd", cmd->line,
+			    rs->buf + strlen (rs->buf),
+			    rs->buf_size - strlen (rs->buf));
+      putpkt (rs->buf);
+      remote_get_noisy_reply (&target_buf, &target_buf_size);
+      if (strcmp (target_buf, "OK"))
+	warning (_("Target does not support source download."));
+
+      if (cmd->control_type == while_control
+	  || cmd->control_type == while_stepping_control)
+	{
+	  remote_download_command_source (num, addr, *cmd->body_list);
+
+	  QUIT;	/* allow user to bail out with ^C */
+	  strcpy (rs->buf, "QTDPsrc:");
+	  encode_source_string (num, addr, "cmd", "end",
+				rs->buf + strlen (rs->buf),
+				rs->buf_size - strlen (rs->buf));
+	  putpkt (rs->buf);
+	  remote_get_noisy_reply (&target_buf, &target_buf_size);
+	  if (strcmp (target_buf, "OK"))
+	    warning (_("Target does not support source download."));
+	}
+    }
+}
+
 static void
 remote_download_tracepoint (struct breakpoint *t)
 {
   struct bp_location *loc;
   CORE_ADDR tpaddr;
-  char tmp[40];
+  char addrbuf[40];
   char buf[2048];
   char **tdp_actions;
   char **stepping_actions;
@@ -9293,9 +9386,9 @@ remote_download_tracepoint (struct breakpoint *t)
       (void) make_cleanup (free_actions_list_cleanup_wrapper, stepping_actions);
 
       tpaddr = loc->address;
-      sprintf_vma (tmp, (loc ? tpaddr : 0));
+      sprintf_vma (addrbuf, tpaddr);
       sprintf (buf, "QTDP:%x:%s:%c:%lx:%x", t->number, 
-	       tmp, /* address */
+	       addrbuf, /* address */
 	       (t->enable_state == bp_enabled ? 'E' : 'D'),
 	       t->step_count, t->pass_count);
       /* Fast tracepoints are mostly handled by the target, but we can
@@ -9352,9 +9445,6 @@ remote_download_tracepoint (struct breakpoint *t)
       if (strcmp (target_buf, "OK"))
 	error (_("Target does not support tracepoints."));
 
-  if (!t->commands && !*default_collect)
-	continue;
-
       /* do_single_steps (t); */
       if (tdp_actions)
 	{
@@ -9362,7 +9452,7 @@ remote_download_tracepoint (struct breakpoint *t)
 	    {
 	      QUIT;	/* allow user to bail out with ^C */
 	      sprintf (buf, "QTDP:-%x:%s:%s%c",
-		       t->number, tmp, /* address */
+		       t->number, addrbuf, /* address */
 		       tdp_actions[ndx],
 		       ((tdp_actions[ndx + 1] || stepping_actions)
 			? '-' : 0));
@@ -9379,7 +9469,7 @@ remote_download_tracepoint (struct breakpoint *t)
 	    {
 	      QUIT;	/* allow user to bail out with ^C */
 	      sprintf (buf, "QTDP:-%x:%s:%s%s%s",
-		       t->number, tmp, /* address */
+		       t->number, addrbuf, /* address */
 		       ((ndx == 0) ? "S" : ""),
 		       stepping_actions[ndx],
 		       (stepping_actions[ndx + 1] ? "-" : ""));
@@ -9390,6 +9480,36 @@ remote_download_tracepoint (struct breakpoint *t)
 		error (_("Error on target while setting tracepoints."));
 	    }
 	}
+
+      if (remote_protocol_packets[PACKET_TracepointSource].support == PACKET_ENABLE)
+	{
+	  if (t->addr_string)
+	    {
+	      strcpy (buf, "QTDPsrc:");
+	      encode_source_string (t->number, loc->address,
+				    "at", t->addr_string, buf + strlen (buf),
+				    2048 - strlen (buf));
+
+	      putpkt (buf);
+	      remote_get_noisy_reply (&target_buf, &target_buf_size);
+	      if (strcmp (target_buf, "OK"))
+		warning (_("Target does not support source download."));
+	    }
+	  if (t->cond_string)
+	    {
+	      strcpy (buf, "QTDPsrc:");
+	      encode_source_string (t->number, loc->address,
+				    "cond", t->cond_string, buf + strlen (buf),
+				    2048 - strlen (buf));
+	      putpkt (buf);
+	      remote_get_noisy_reply (&target_buf, &target_buf_size);
+	      if (strcmp (target_buf, "OK"))
+		warning (_("Target does not support source download."));
+	    }
+	  remote_download_command_source (t->number, loc->address,
+					  breakpoint_commands (t));
+	}
+
       do_cleanups (old_chain);
     }
 }
@@ -10230,6 +10350,9 @@ Show the maximum size of the address (in bits) in a memory packet."), NULL,
 			 "ConditionalTracepoints", "conditional-tracepoints", 0);
   add_packet_config_cmd (&remote_protocol_packets[PACKET_FastTracepoints],
 			 "FastTracepoints", "fast-tracepoints", 0);
+
+  add_packet_config_cmd (&remote_protocol_packets[PACKET_TracepointSource],
+			 "TracepointSource", "TracepointSource", 0);
 
   /* Keep the old ``set remote Z-packet ...'' working.  Each individual
      Z sub-packet has its own set and show commands, but users may

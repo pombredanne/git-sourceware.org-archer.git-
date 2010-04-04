@@ -1,3 +1,131 @@
+2010-04-01  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* elf32-ppc.c (apuinfo_set): New static var.
+	(ppc_elf_begin_write_processing): Set it here, always create an
+	APUinfo section if there were any in the inputs.
+	(ppc_elf_write_section): Check apuinfo_set.
+	(ppc_elf_final_write_processing): Likewise.
+
+2010-04-01  Tristan Gingold  <gingold@adacore.com>
+
+	* vms.h: Include time.h. Add prototypes for vms_get_module_name,
+	vms_time_to_time_t and vms_rawtime_to_time_t.
+	* vms.c (vms_alpha_vec): Add archives support.
+	* vms-misc.c: Include safe-ctype.h
+	(vms_get_module_name): New function.
+	(vms_time_to_time_t, vms_rawtime_to_time_t): Ditto.
+	* vms-hdr.c (_bfd_vms_write_hdr): Put module name creation to the
+	vms_get_module_name function.  Use this function.
+	* targets.c: Declare vms_lib_txt_vec.  Add it to _bfd_target_vector.
+	* libbfd-in.h: Add prototype for _bfd_append_relative_path.
+	Add prototypes for vms-lib.c
+	* libbfd.h: Regenerate.
+	* configure.in (TDEFINES): Add an entry for vms_lib_txt_vec.  Add
+	vms-lib.lo to vms_alpha_vec.
+	* config.bfd (targ_cpu): Add targ_selvecs for alpha*-*-*vms*.
+	* configure: Regenerate.
+	* bfd.c: Add selective_search field.
+	* bfd-in2.h: Regenerate.
+	* archive.c (append_relative_path): Rename to
+	_bfd_append_relative_path and make it public.
+	(_bfd_get_elt_at_filepos): Adjust for above renaming.
+	* Makefile.am (BFD32_BACKENDS): Add vms-lib.lo
+	(BFD32_BACKENDS_CFILES): Add vms-lib.c
+	* Makefile.in: Regenerate.
+
+2010-04-01  Jakub Jelinek  <jakub@redhat.com>
+
+	* dwarf2.c (read_attribute_value): Handle CU version 4
+	for DW_FORM_ref_addr, handle DW_FORM_sec_offset, DW_FORM_exprloc
+	and DW_FORM_flag_present.  For unknown form value return NULL.
+	(scan_unit_for_symbols): For DW_AT_location handle DW_FORM_exprloc
+	like DW_FORM_block.
+	(parse_comp_unit): Allow CU version 4.
+
+2010-04-01  Hans-Peter Nilsson  <hp@axis.com>
+
+	* elf32-cris.c (cris_elf_relocate_section): Correct first argument
+	to _bfd_elf_get_dynamic_reloc_section.
+	(elf_cris_discard_excess_dso_dynamics): Ditto.
+
+2010-03-31  Kai Tietz  <kai.tietz@onevision.com>
+
+	* coff-i386.c (in_reloc_p): Check also for R_SECREL32.
+	* coff-x86_64.c (in_reloc_p): Check also for R_AMD64_SECREL.
+
+2010-03-31  Alan Modra  <amodra@gmail.com>
+
+	* elf64-ppc.c (ppc64_elf_relocate_section): Nop out optimized
+	TPREL16_HI and TPREL16_HA insns.
+
+2010-03-31  Hans-Peter Nilsson  <hp@axis.com>
+
+	PR ld/11458
+	* elf32-cris.c (elf_cris_copy_indirect_symbol): Remove invalid
+	assert of empty pcrel_relocs_copied on the direct symbol.  Instead
+	of moving the list from the indirect symbol to the direct symbol,
+	merge into any existing list.
+	(cris_elf_check_relocs): Store the original section in the
+	pcrel_relocs_copied list, not the relocation section.
+	(elf_cris_discard_excess_dso_dynamics): Adjust accordingly to find
+	the relocation section, for reducing its size.  Change the
+	BFD_ASSERT into a check for the section being read-only, and only
+	emit warnings and TEXTREL marker when there's an entry for a
+	read-only section.
+
+2010-03-29  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* elf32-arm.c (using_thumb_only): Handle v6-M.
+
+2010-03-26  Alan Modra  <amodra@gmail.com>
+
+	* elf32-ppc.c (ppc_elf_howto_raw <R_PPC_EMB_RELSDA>): Not pc-relative.
+	* bfd-in.h (elf_discarded_section): Clarify comment.
+	* reloc.c (struct reloc_howto_struct <pc_relative>): Likewise.
+	* bfd-in2.h: Regenerate.
+
+2010-03-26  Matt Rice  <ratmice@gmail.com>
+
+	* archive.c (_bfd_compute_and_write_armap): Allow symbols flagged
+	as unique in the armap.
+
+2010-03-26  Alan Modra  <amodra@gmail.com>
+
+	PR ld/11375
+	* elf64-ppc.c (ppc64_elf_relocate_section): Always look up a
+	possible stub on branches.
+
+2010-03-25  Joseph Myers  <joseph@codesourcery.com>
+
+	* Makefile.am (ALL_MACHINES): Add cpu-tic6x.lo.
+	(ALL_MACHINES_CFILES): Add cpu-tic6x.c.
+	(BFD32_BACKENDS): Add elf32-tic6x.lo.
+	(BFD32_BACKENDS_CFILES): Add elf32-tic6x.c.
+	* Makefile.in: Regenerate.
+	* archures.c (bfd_arch_tic6x, bfd_tic6x_arch): New.
+	(bfd_archures_list): Update.
+	* config.bfd (tic6x-*-elf): New.
+	* configure.in (bfd_elf32_tic6x_be_vec, bfd_elf32_tic6x_le_vec):
+	New.
+	* configure: Regenerate.
+	* cpu-tic6x.c, elf32-tic6x.c: New.
+	* reloc.c (BFD_RELOC_C6000_PCR_S21, BFD_RELOC_C6000_PCR_S12,
+	BFD_RELOC_C6000_PCR_S10, BFD_RELOC_C6000_PCR_S7,
+	BFD_RELOC_C6000_ABS_S16, BFD_RELOC_C6000_ABS_L16,
+	BFD_RELOC_C6000_ABS_H16, BFD_RELOC_C6000_SBR_U15_B,
+	BFD_RELOC_C6000_SBR_U15_H, BFD_RELOC_C6000_SBR_U15_W,
+	BFD_RELOC_C6000_SBR_S16, BFD_RELOC_C6000_SBR_L16_B,
+	BFD_RELOC_C6000_SBR_L16_H, BFD_RELOC_C6000_SBR_L16_W,
+	BFD_RELOC_C6000_SBR_H16_B, BFD_RELOC_C6000_SBR_H16_H,
+	BFD_RELOC_C6000_SBR_H16_W, BFD_RELOC_C6000_SBR_GOT_U15_W,
+	BFD_RELOC_C6000_SBR_GOT_L16_W, BFD_RELOC_C6000_SBR_GOT_H16_W,
+	BFD_RELOC_C6000_DSBT_INDEX, BFD_RELOC_C6000_PREL31,
+	BFD_RELOC_C6000_COPY, BFD_RELOC_C6000_ALIGN,
+	BFD_RELOC_C6000_FPHEAD, BFD_RELOC_C6000_NOCMP): New.
+	* targets.c (bfd_elf32_tic6x_be_vec, bfd_elf32_tic6x_le_vec): New.
+	(_bfd_target_vector): Update.
+	* bfd-in2.h, libbfd.h: Regenerate.
+
 2010-03-24  H.J. Lu  <hongjiu.lu@intel.com>
 
 	* aout-target.h: Update copyright year.
@@ -75,6 +203,7 @@
 
 2010-03-17  Alan Modra  <amodra@gmail.com>
 
+	PR binutils/11382
 	* plugin.c (bfd_plugin_object_p): Pass iostream to fileno using
 	proper type.
 
@@ -331,7 +460,7 @@
 	elfcore_write_s390_prefix): New.
 	(elfcore_grok_note): Handle NT_S390_TIMER, NT_S390_TODCMP,
 	NT_S390_TODPREG, NT_S390_CTRS and NT_S390_PREFIX.
-	(elfcore_write_register_note): Handle .reg-s390-timer, 
+	(elfcore_write_register_note): Handle .reg-s390-timer,
 	.reg-s390-todcmp, .reg-s390-todpreg, .reg-s390-ctrs,
 	.reg-s390-prefix section.
 
@@ -727,10 +856,10 @@
 2010-01-19  Daisuke Hatayama  <d.hatayama@jp.fujitsu.com>
 	    Alan Modra <amodra@gmail.com>
 
-        * elfcode.h (elf_swap_ehdr_out): Handle e_phnum > 0xffff.
+	* elfcode.h (elf_swap_ehdr_out): Handle e_phnum > 0xffff.
 	(elf_object_p): Read e_phnum extension.
 	(elf_write_shdrs_and_ehdr): Write e_phnum extension.
-        * elfcore.h (elf_core_file_p): Read e_phnum extension.  Sanity check
+	* elfcore.h (elf_core_file_p): Read e_phnum extension.  Sanity check
 	that we can read last program header.
 
 2010-01-19  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>

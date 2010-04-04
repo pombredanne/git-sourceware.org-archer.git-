@@ -3,6 +3,9 @@
 
 *** Changes since GDB 7.1
 
+* GDB now sends xmlRegisters= in qSupported packet to indicate that
+  it understands register description.
+
 * The --batch flag now disables pagination and queries.
 
 * X86 general purpose registers
@@ -12,6 +15,13 @@
   $ah or $ax to refer, respectively, to the byte register AH and
   16-bit word register AX that are actually portions of the 32-bit
   register EAX or 64-bit register RAX.
+
+* The `commands' command now accepts a range of breakpoints to modify.
+  A plain `commands' following a command that creates multiple
+  breakpoints affects all the breakpoints set by that command.  This
+  applies to breakpoints set by `rbreak', and also applies when a
+  single `break' command creates multiple breakpoints (e.g.,
+  breakpoints on overloaded c++ functions).
 
 * Python scripting
 
