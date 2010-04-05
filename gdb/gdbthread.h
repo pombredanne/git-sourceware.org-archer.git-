@@ -163,7 +163,8 @@ struct thread_info
 
   enum step_over_calls_kind step_over_calls;
 
-  /* Nonzero if stopped due to a step command.  */
+  /* Nonzero if stopped due to a step command.  In such case print the source
+     line but do not print its location.  */
   int stop_step;
 
   /* If stepping, nonzero means step count is > 1 so don't print frame

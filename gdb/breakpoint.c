@@ -204,6 +204,9 @@ static void update_global_location_list (int);
 
 static void update_global_location_list_nothrow (int);
 
+static int bpstat_remove_bp_location_callback (struct thread_info *th,
+					       void *data);
+
 static int is_hardware_watchpoint (struct breakpoint *bpt);
 
 static int is_watchpoint (struct breakpoint *bpt);
@@ -3460,7 +3463,7 @@ print_bp_stop_message (bpstat bs)
 enum print_stop_action
 bpstat_print (bpstat bs)
 {
-  int val;
+  enum print_stop_action retval = PRINT_UNKNOWN;
 
   /* Maybe another breakpoint in the chain caused us to stop.
      (Currently all watchpoints go on the bpstat whether hit or not.
@@ -3468,11 +3471,11 @@ bpstat_print (bpstat bs)
      with respect to bpstat_explains_signal).  */
   for (; bs; bs = bs->next)
     {
+      enum print_stop_action val;
+      
       val = print_bp_stop_message (bs);
-      if (val == PRINT_SRC_ONLY 
-	  || val == PRINT_SRC_AND_LOC 
-	  || val == PRINT_NOTHING)
-	return val;
+      if (val != PRINT_UNKNOWN && val < retval)
+	retval = val;
     }
 
   /* We reached the end of the chain, or we got a null BS to start
@@ -4207,250 +4210,6 @@ bpstat_stop_status (struct address_space *aspace,
   return root_bs->next;
 }
 
-/* Tell what to do about this bpstat.  */
-struct bpstat_what
-bpstat_what (bpstat bs)
-{
-  /* Classify each bpstat as one of the following.  */
-  enum class
-    {
-      /* This bpstat element has no effect on the main_action.  */
-      no_effect = 0,
-
-      /* There was a watchpoint, stop but don't print.  */
-      wp_silent,
-
-      /* There was a watchpoint, stop and print.  */
-      wp_noisy,
-
-      /* There was a breakpoint but we're not stopping.  */
-      bp_nostop,
-
-      /* There was a breakpoint, stop but don't print.  */
-      bp_silent,
-
-      /* There was a breakpoint, stop and print.  */
-      bp_noisy,
-
-      /* We hit the longjmp breakpoint.  */
-      long_jump,
-
-      /* We hit the longjmp_resume breakpoint.  */
-      long_resume,
-
-      /* We hit the step_resume breakpoint.  */
-      step_resume,
-
-      /* We hit the shared library event breakpoint.  */
-      shlib_event,
-
-      /* We hit the jit event breakpoint.  */
-      jit_event,
-
-      /* This is just used to count how many enums there are.  */
-      class_last
-    };
-
-  /* Here is the table which drives this routine.  So that we can
-     format it pretty, we define some abbreviations for the
-     enum bpstat_what codes.  */
-#define kc BPSTAT_WHAT_KEEP_CHECKING
-#define ss BPSTAT_WHAT_STOP_SILENT
-#define sn BPSTAT_WHAT_STOP_NOISY
-#define sgl BPSTAT_WHAT_SINGLE
-#define slr BPSTAT_WHAT_SET_LONGJMP_RESUME
-#define clr BPSTAT_WHAT_CLEAR_LONGJMP_RESUME
-#define sr BPSTAT_WHAT_STEP_RESUME
-#define shl BPSTAT_WHAT_CHECK_SHLIBS
-#define jit BPSTAT_WHAT_CHECK_JIT
-
-/* "Can't happen."  Might want to print an error message.
-   abort() is not out of the question, but chances are GDB is just
-   a bit confused, not unusable.  */
-#define err BPSTAT_WHAT_STOP_NOISY
-
-  /* Given an old action and a class, come up with a new action.  */
-  /* One interesting property of this table is that wp_silent is the same
-     as bp_silent and wp_noisy is the same as bp_noisy.  That is because
-     after stopping, the check for whether to step over a breakpoint
-     (BPSTAT_WHAT_SINGLE type stuff) is handled in proceed() without
-     reference to how we stopped.  We retain separate wp_silent and
-     bp_silent codes in case we want to change that someday. 
-
-     Another possibly interesting property of this table is that
-     there's a partial ordering, priority-like, of the actions.  Once
-     you've decided that some action is appropriate, you'll never go
-     back and decide something of a lower priority is better.  The
-     ordering is:
-
-     kc   < jit clr sgl shl slr sn sr ss
-     sgl  < jit shl slr sn sr ss
-     slr  < jit err shl sn sr ss
-     clr  < jit err shl sn sr ss
-     ss   < jit shl sn sr
-     sn   < jit shl sr
-     jit  < shl sr
-     shl  < sr
-     sr   <
-
-     What I think this means is that we don't need a damned table
-     here.  If you just put the rows and columns in the right order,
-     it'd look awfully regular.  We could simply walk the bpstat list
-     and choose the highest priority action we find, with a little
-     logic to handle the 'err' cases.  */
-
-  /* step_resume entries: a step resume breakpoint overrides another
-     breakpoint of signal handling (see comment in wait_for_inferior
-     at where we set the step_resume breakpoint).  */
-
-  static const enum bpstat_what_main_action
-    table[(int) class_last][(int) BPSTAT_WHAT_LAST] =
-  {
-  /*                              old action */
-  /*               kc   ss   sn   sgl  slr  clr  sr  shl  jit */
-/* no_effect */   {kc,  ss,  sn,  sgl, slr, clr, sr, shl, jit},
-/* wp_silent */   {ss,  ss,  sn,  ss,  ss,  ss,  sr, shl, jit},
-/* wp_noisy */    {sn,  sn,  sn,  sn,  sn,  sn,  sr, shl, jit},
-/* bp_nostop */   {sgl, ss,  sn,  sgl, slr, slr, sr, shl, jit},
-/* bp_silent */   {ss,  ss,  sn,  ss,  ss,  ss,  sr, shl, jit},
-/* bp_noisy */    {sn,  sn,  sn,  sn,  sn,  sn,  sr, shl, jit},
-/* long_jump */   {slr, ss,  sn,  slr, slr, err, sr, shl, jit},
-/* long_resume */ {clr, ss,  sn,  err, err, err, sr, shl, jit},
-/* step_resume */ {sr,  sr,  sr,  sr,  sr,  sr,  sr, sr,  sr },
-/* shlib */       {shl, shl, shl, shl, shl, shl, sr, shl, shl},
-/* jit_event */   {jit, jit, jit, jit, jit, jit, sr, jit, jit}
-  };
-
-#undef kc
-#undef ss
-#undef sn
-#undef sgl
-#undef slr
-#undef clr
-#undef err
-#undef sr
-#undef ts
-#undef shl
-#undef jit
-  enum bpstat_what_main_action current_action = BPSTAT_WHAT_KEEP_CHECKING;
-  struct bpstat_what retval;
-
-  retval.call_dummy = STOP_NONE;
-  for (; bs != NULL; bs = bs->next)
-    {
-      enum class bs_class = no_effect;
-      if (bs->breakpoint_at == NULL)
-	/* I suspect this can happen if it was a momentary breakpoint
-	   which has since been deleted.  */
-	continue;
-      if (bs->breakpoint_at->owner == NULL)
-	bs_class = bp_nostop;
-      else
-      switch (bs->breakpoint_at->owner->type)
-	{
-	case bp_none:
-	  continue;
-
-	case bp_breakpoint:
-	case bp_hardware_breakpoint:
-	case bp_until:
-	case bp_finish:
-	  if (bs->stop)
-	    {
-	      if (bs->print)
-		bs_class = bp_noisy;
-	      else
-		bs_class = bp_silent;
-	    }
-	  else
-	    bs_class = bp_nostop;
-	  break;
-	case bp_watchpoint:
-	case bp_hardware_watchpoint:
-	case bp_read_watchpoint:
-	case bp_access_watchpoint:
-	  if (bs->stop)
-	    {
-	      if (bs->print)
-		bs_class = wp_noisy;
-	      else
-		bs_class = wp_silent;
-	    }
-	  else
-	    /* There was a watchpoint, but we're not stopping. 
-	       This requires no further action.  */
-	    bs_class = no_effect;
-	  break;
-	case bp_longjmp:
-	  bs_class = long_jump;
-	  break;
-	case bp_longjmp_resume:
-	  bs_class = long_resume;
-	  break;
-	case bp_step_resume:
-	  if (bs->stop)
-	    {
-	      bs_class = step_resume;
-	    }
-	  else
-	    /* It is for the wrong frame.  */
-	    bs_class = bp_nostop;
-	  break;
-	case bp_watchpoint_scope:
-	  bs_class = bp_nostop;
-	  break;
-	case bp_shlib_event:
-	  bs_class = shlib_event;
-	  break;
-	case bp_jit_event:
-	  bs_class = jit_event;
-	  break;
-	case bp_thread_event:
-	case bp_overlay_event:
-	case bp_longjmp_master:
-	case bp_std_terminate_master:
-	  bs_class = bp_nostop;
-	  break;
-	case bp_catchpoint:
-	  if (bs->stop)
-	    {
-	      if (bs->print)
-		bs_class = bp_noisy;
-	      else
-		bs_class = bp_silent;
-	    }
-	  else
-	    /* There was a catchpoint, but we're not stopping.  
-	       This requires no further action.  */
-	    bs_class = no_effect;
-	  break;
-	case bp_call_dummy:
-	  /* Make sure the action is stop (silent or noisy),
-	     so infrun.c pops the dummy frame.  */
-	  bs_class = bp_silent;
-	  retval.call_dummy = STOP_STACK_DUMMY;
-	  break;
-	case bp_std_terminate:
-	  /* Make sure the action is stop (silent or noisy),
-	     so infrun.c pops the dummy frame.  */
-	  bs_class = bp_silent;
-	  retval.call_dummy = STOP_STD_TERMINATE;
-	  break;
-	case bp_tracepoint:
-	case bp_fast_tracepoint:
-	  /* Tracepoint hits should not be reported back to GDB, and
-	     if one got through somehow, it should have been filtered
-	     out already.  */
-	  internal_error (__FILE__, __LINE__,
-			  _("bpstat_what: tracepoint encountered"));
-	  break;
-	}
-      current_action = table[(int) bs_class][(int) current_action];
-    }
-  retval.main_action = current_action;
-  return retval;
-}
-
 /* Nonzero if we should step constantly (e.g. watchpoints on machines
    without hardware support).  This isn't related to a specific bpstat,
    just to things like whether watchpoints are set.  */
@@ -5368,6 +5127,18 @@ allocate_bp_location (struct breakpoint *bpt)
 
 static void free_bp_location (struct bp_location *loc)
 {
+  /* Be sure no bpstat's are pointing at it after it's been freed.  */
+  /* FIXME, how can we find all bpstat's?
+     We just check stop_bpstat for now.  Note that we cannot just
+     remove bpstats pointing at bpt from the stop_bpstat list
+     entirely, as breakpoint commands are associated with the bpstat;
+     if we remove it here, then the later call to
+         bpstat_do_actions (&stop_bpstat);
+     in event-top.c won't do anything, and temporary breakpoints
+     with commands won't work.  */
+
+  iterate_over_threads (bpstat_remove_bp_location_callback, loc);
+
   if (loc->cond)
     xfree (loc->cond);
 
@@ -9141,11 +8912,11 @@ update_global_location_list_nothrow (int inserting)
 
 /* Clear BPT from a BPS.  */
 static void
-bpstat_remove_breakpoint (bpstat bps, struct breakpoint *bpt)
+bpstat_remove_bp_location (bpstat bps, struct bp_location *loc)
 {
   bpstat bs;
   for (bs = bps; bs; bs = bs->next)
-    if (bs->breakpoint_at && bs->breakpoint_at->owner == bpt)
+    if (bs->breakpoint_at == loc)
       {
 	bs->breakpoint_at = NULL;
 	bs->old_val = NULL;
@@ -9155,10 +8926,11 @@ bpstat_remove_breakpoint (bpstat bps, struct breakpoint *bpt)
 
 /* Callback for iterate_over_threads.  */
 static int
-bpstat_remove_breakpoint_callback (struct thread_info *th, void *data)
+bpstat_remove_bp_location_callback (struct thread_info *th, void *data)
 {
-  struct breakpoint *bpt = data;
-  bpstat_remove_breakpoint (th->stop_bpstat, bpt);
+  struct bp_location *loc = data;
+
+  bpstat_remove_bp_location (th->stop_bpstat, loc);
   return 0;
 }
 
@@ -9221,18 +8993,6 @@ delete_breakpoint (struct breakpoint *bpt)
   xfree (bpt->source_file);
   xfree (bpt->exec_pathname);
   clean_up_filters (&bpt->syscalls_to_be_caught);
-
-  /* Be sure no bpstat's are pointing at it after it's been freed.  */
-  /* FIXME, how can we find all bpstat's?
-     We just check stop_bpstat for now.  Note that we cannot just
-     remove bpstats pointing at bpt from the stop_bpstat list
-     entirely, as breakpoint commands are associated with the bpstat;
-     if we remove it here, then the later call to
-         bpstat_do_actions (&stop_bpstat);
-     in event-top.c won't do anything, and temporary breakpoints
-     with commands won't work.  */
-
-  iterate_over_threads (bpstat_remove_breakpoint_callback, bpt);
 
   /* Now that breakpoint is removed from breakpoint
      list, update the global location list.  This
@@ -10819,6 +10579,65 @@ clear_syscall_counts (struct inferior *inf)
   inf->total_syscalls_count = 0;
   inf->any_syscall_count = 0;
   VEC_free (int, inf->syscalls_counts);
+}
+
+const char *
+breakpoint_type_name (enum bptype bptype)
+{
+  switch (bptype)
+    {
+    case bp_none:
+      return "bp_none";
+    case bp_breakpoint:
+      return "bp_breakpoint";
+    case bp_hardware_breakpoint:
+      return "bp_hardware_breakpoint";
+    case bp_until:
+      return "bp_until";
+    case bp_finish:
+      return "bp_finish";
+    case bp_watchpoint:
+      return "bp_watchpoint";
+    case bp_hardware_watchpoint:
+      return "bp_hardware_watchpoint";
+    case bp_read_watchpoint:
+      return "bp_read_watchpoint";
+    case bp_access_watchpoint:
+      return "bp_access_watchpoint";
+    case bp_longjmp:
+      return "bp_longjmp";
+    case bp_longjmp_resume:
+      return "bp_longjmp_resume";
+    case bp_step_resume:
+      return "bp_step_resume";
+    case bp_watchpoint_scope:
+      return "bp_watchpoint_scope";
+    case bp_call_dummy:
+      return "bp_call_dummy";
+    case bp_std_terminate:
+      return "bp_std_terminate";
+    case bp_shlib_event:
+      return "bp_shlib_event";
+    case bp_thread_event:
+      return "bp_thread_event";
+    case bp_overlay_event:
+      return "bp_overlay_event";
+    case bp_longjmp_master:
+      return "bp_longjmp_master";
+    case bp_std_terminate_master:
+      return "bp_std_terminate_master";
+    case bp_catchpoint:
+      return "bp_catchpoint";
+    case bp_tracepoint:
+      return "bp_tracepoint";
+    case bp_fast_tracepoint:
+      return "bp_fast_tracepoint";
+    case bp_jit_event:
+      return "bp_jit_event";
+    }
+  internal_error (__FILE__, __LINE__, _("Invalid breakpoint type %d"),
+		  (int) bptype);
+  return NULL;
 }
 
 void

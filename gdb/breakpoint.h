@@ -558,58 +558,6 @@ extern bpstat bpstat_copy (bpstat);
 extern bpstat bpstat_stop_status (struct address_space *aspace,
 				  CORE_ADDR pc, ptid_t ptid);
 
-/* This bpstat_what stuff tells wait_for_inferior what to do with a
-   breakpoint (a challenging task).  */
-
-enum bpstat_what_main_action
-  {
-    /* Perform various other tests; that is, this bpstat does not
-       say to perform any action (e.g. failed watchpoint and nothing
-       else).  */
-    BPSTAT_WHAT_KEEP_CHECKING,
-
-    /* Rather than distinguish between noisy and silent stops here, it
-       might be cleaner to have bpstat_print make that decision (also
-       taking into account stop_print_frame and source_only).  But the
-       implications are a bit scary (interaction with auto-displays, etc.),
-       so I won't try it.  */
-
-    /* Stop silently.  */
-    BPSTAT_WHAT_STOP_SILENT,
-
-    /* Stop and print.  */
-    BPSTAT_WHAT_STOP_NOISY,
-
-    /* Remove breakpoints, single step once, then put them back in and
-       go back to what we were doing.  It's possible that this should be
-       removed from the main_action and put into a separate field, to more
-       cleanly handle BPSTAT_WHAT_CLEAR_LONGJMP_RESUME_SINGLE.  */
-    BPSTAT_WHAT_SINGLE,
-
-    /* Set longjmp_resume breakpoint, remove all other breakpoints,
-       and continue.  The "remove all other breakpoints" part is required
-       if we are also stepping over another breakpoint as well as doing
-       the longjmp handling.  */
-    BPSTAT_WHAT_SET_LONGJMP_RESUME,
-
-    /* Clear longjmp_resume breakpoint, then handle as
-       BPSTAT_WHAT_KEEP_CHECKING.  */
-    BPSTAT_WHAT_CLEAR_LONGJMP_RESUME,
-
-    /* Clear step resume breakpoint, and keep checking.  */
-    BPSTAT_WHAT_STEP_RESUME,
-
-    /* Check the dynamic linker's data structures for new libraries, then
-       keep checking.  */
-    BPSTAT_WHAT_CHECK_SHLIBS,
-
-    /* Check for new JITed code.  */
-    BPSTAT_WHAT_CHECK_JIT,
-
-    /* This is just used to keep track of how many enums there are.  */
-    BPSTAT_WHAT_LAST
-  };
-
 /* An enum indicating the kind of "stack dummy" stop.  This is a bit
    of a misnomer because only one kind of truly a stack dummy.  */
 enum stop_stack_kind
@@ -624,19 +572,10 @@ enum stop_stack_kind
     STOP_STD_TERMINATE
   };
 
-struct bpstat_what
-  {
-    enum bpstat_what_main_action main_action;
-
-    /* Did we hit a call dummy breakpoint?  This only goes with a main_action
-       of BPSTAT_WHAT_STOP_SILENT or BPSTAT_WHAT_STOP_NOISY (the concept of
-       continuing from a call dummy without popping the frame is not a
-       useful one).  */
-    enum stop_stack_kind call_dummy;
-  };
-
 /* The possible return values for print_bpstat, print_it_normal,
-   print_it_done, print_it_noop. */
+   print_it_done, print_it_noop.  Keep them in decreasing order of contained
+   info.  Currently each next item must be a subset of the previous one.  */
+
 enum print_stop_action
   {
     PRINT_UNKNOWN = -1,
@@ -1051,5 +990,7 @@ extern void check_tracepoint_command (char *line, void *closure);
    breakpoint numbers for a later "commands" command.  */
 extern void start_rbreak_breakpoints (void);
 extern void end_rbreak_breakpoints (void);
+
+extern const char *breakpoint_type_name (enum bptype bptype);
 
 #endif /* !defined (BREAKPOINT_H) */

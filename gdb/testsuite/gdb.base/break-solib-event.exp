@@ -1,0 +1,71 @@
+# Copyright 2010 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+if {[skip_shlib_tests]} {
+    return 0
+}
+
+set testfile "break-solib-event"
+set libfile "unloadshr"
+set libfile2 "unloadshr2"
+set libname "${testfile}-{libfile}.sl"
+set libname2 "${testfile}-{libfile2}.sl"
+set libsrcfile ${libfile}.c
+set libsrcfile2 ${libfile2}.c
+set srcfile $srcdir/$subdir/unload.c
+set executable $testfile
+set binfile $objdir/$subdir/$executable
+set shlibdir ${objdir}/${subdir}
+set libsrc  $srcdir/$subdir/$libfile.c
+set libsrc2  $srcdir/$subdir/$libfile2.c
+set lib_sl  $objdir/$subdir/$libname
+set lib_sl2  $objdir/$subdir/$libname2
+set lib_dlopen [shlib_target_file ${libname}]
+set lib_dlopen2 [shlib_target_file ${libname2}]
+set lib_syms [shlib_symbol_file ${libname}]
+set lib_syms2 [shlib_symbol_file ${libname2}]
+
+if [get_compiler_info ${binfile}] {
+    return -1
+}
+
+set lib_opts debug
+set exec_opts [list debug shlib_load additional_flags=-DSHLIB_NAME\=\"${lib_dlopen}\" additional_flags=-DSHLIB_NAME2\=\"${lib_dlopen2}\"]
+
+if { [gdb_compile_shlib $libsrc $lib_sl $lib_opts] != ""
+     || [gdb_compile_shlib $libsrc2 $lib_sl2 $lib_opts] != ""
+     || [gdb_compile $srcfile $binfile executable $exec_opts] != ""} {
+    untested "Couldn't compile $libsrc or $libsrc2 or $srcfile."
+    return -1
+}
+
+clean_restart $executable
+gdb_load_shlibs $lib_sl $lib_sl2
+
+gdb_test "set stop-on-solib-events 1"
+
+set event_msg "Stopped due to shared library event"
+
+gdb_run_cmd
+gdb_test "" "${event_msg}.*" "stop at event"
+
+gdb_breakpoint {*$pc}
+set test {commands $bpnum}
+gdb_test_multiple $test $test { -re "\r\n>$" { pass $test } }
+set test {echo event-hit\n}
+gdb_test_multiple $test $test { -re "\r\n>$" { pass $test } }
+gdb_test "end"
+
+gdb_test "continue" "${event_msg}.*event-hit.*"
