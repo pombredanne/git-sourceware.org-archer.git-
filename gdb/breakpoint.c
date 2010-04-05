@@ -206,9 +206,6 @@ static void update_global_location_list (int);
 
 static void update_global_location_list_nothrow (int);
 
-static int bpstat_remove_bp_location_callback (struct thread_info *th,
-					       void *data);
-
 static int is_hardware_watchpoint (const struct breakpoint *bpt);
 
 static int is_watchpoint (const struct breakpoint *bpt);
@@ -5121,18 +5118,6 @@ allocate_bp_location (struct breakpoint *bpt)
 
 static void free_bp_location (struct bp_location *loc)
 {
-  /* Be sure no bpstat's are pointing at it after it's been freed.  */
-  /* FIXME, how can we find all bpstat's?
-     We just check stop_bpstat for now.  Note that we cannot just
-     remove bpstats pointing at bpt from the stop_bpstat list
-     entirely, as breakpoint commands are associated with the bpstat;
-     if we remove it here, then the later call to
-         bpstat_do_actions (&stop_bpstat);
-     in event-top.c won't do anything, and temporary breakpoints
-     with commands won't work.  */
-
-  iterate_over_threads (bpstat_remove_bp_location_callback, loc);
-
   if (loc->cond)
     xfree (loc->cond);
 
@@ -8906,11 +8891,11 @@ update_global_location_list_nothrow (int inserting)
 
 /* Clear BPT from a BPS.  */
 static void
-bpstat_remove_bp_location (bpstat bps, struct bp_location *loc)
+bpstat_remove_breakpoint (bpstat bps, struct breakpoint *bpt)
 {
   bpstat bs;
   for (bs = bps; bs; bs = bs->next)
-    if (bs->breakpoint_at == loc)
+    if (bs->breakpoint_at && bs->breakpoint_at->owner == bpt)
       {
 	bs->breakpoint_at = NULL;
 	bs->old_val = NULL;
@@ -8920,11 +8905,10 @@ bpstat_remove_bp_location (bpstat bps, struct bp_location *loc)
 
 /* Callback for iterate_over_threads.  */
 static int
-bpstat_remove_bp_location_callback (struct thread_info *th, void *data)
+bpstat_remove_breakpoint_callback (struct thread_info *th, void *data)
 {
-  struct bp_location *loc = data;
-
-  bpstat_remove_bp_location (th->stop_bpstat, loc);
+  struct breakpoint *bpt = data;
+  bpstat_remove_breakpoint (th->stop_bpstat, bpt);
   return 0;
 }
 
@@ -8987,6 +8971,18 @@ delete_breakpoint (struct breakpoint *bpt)
   xfree (bpt->source_file);
   xfree (bpt->exec_pathname);
   clean_up_filters (&bpt->syscalls_to_be_caught);
+
+  /* Be sure no bpstat's are pointing at it after it's been freed.  */
+  /* FIXME, how can we find all bpstat's?
+     We just check stop_bpstat for now.  Note that we cannot just
+     remove bpstats pointing at bpt from the stop_bpstat list
+     entirely, as breakpoint commands are associated with the bpstat;
+     if we remove it here, then the later call to
+         bpstat_do_actions (&stop_bpstat);
+     in event-top.c won't do anything, and temporary breakpoints
+     with commands won't work.  */
+
+  iterate_over_threads (bpstat_remove_breakpoint_callback, bpt);
 
   /* Now that breakpoint is removed from breakpoint
      list, update the global location list.  This
