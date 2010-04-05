@@ -651,17 +651,6 @@ struct bpstat_what bpstat_what (bpstat);
 /* Find the bpstat associated with a breakpoint.  NULL otherwise. */
 bpstat bpstat_find_breakpoint (bpstat, struct breakpoint *);
 
-/* Find a step_resume breakpoint associated with this bpstat.
-   (If there are multiple step_resume bp's on the list, this function
-   will arbitrarily pick one.)
-
-   It is an error to use this function if BPSTAT doesn't contain a
-   step_resume breakpoint.
-
-   See wait_for_inferior's use of this function.
- */
-extern struct breakpoint *bpstat_find_step_resume_breakpoint (bpstat);
-
 /* Nonzero if a signal that we got in wait() was due to circumstances
    explained by the BS.  */
 /* Currently that is true if we have hit a breakpoint, or if there is
@@ -1041,7 +1030,7 @@ extern struct breakpoint *get_tracepoint_by_number (char **arg, int multi_p,
    is newly allocated; the caller should free when done with it.  */
 extern VEC(breakpoint_p) *all_tracepoints (void);
 
-extern int breakpoint_is_tracepoint (const struct breakpoint *b);
+extern int is_tracepoint (const struct breakpoint *b);
 
 /* Function that can be passed to read_command_line to validate
    that each command is suitable for tracepoint command list.  */
