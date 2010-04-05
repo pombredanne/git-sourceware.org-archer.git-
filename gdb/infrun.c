@@ -3974,16 +3974,6 @@ process_event_stop_test:
 	pf_yes,
       }
     print_frame_max = pf_default;
-    enum stepping_over
-      {
-	/* so_default is so_no.  */
-        so_default,
-	/* ecs->event_thread->stepping_over_breakpoint value 0.  */
-	so_no,
-	/* ecs->event_thread->stepping_over_breakpoint value 1.  */
-	so_yes,
-      }
-    stepping_over_max = so_default;
     enum stop_step
       {
 	/* ss_default is ss_print_yes.  */
@@ -3996,8 +3986,7 @@ process_event_stop_test:
     stop_step_max = ss_default;
     enum perform
       {
-	/* pe_default is pe_check_more.  */
-        pe_default,
+        pe_undef,
 	/* Break from this block and check other possibilities why to stop.  */
 	pe_check_more,
 	/* Call stop_stepping (ecs).  */
@@ -4010,14 +3999,14 @@ process_event_stop_test:
 	   the user.  */
 	pe_going,
       }
-    perform_max = pe_default;
+    perform_max = pe_check_more;
+    int perform_shlib = 0;
 
     for (bs = ecs->event_thread->stop_bpstat; bs != NULL; bs = bs->next)
       {
 	enum print_frame print_frame = pf_default;
-	enum stepping_over stepping_over = so_default;
 	enum stop_step stop_step = ss_default;
-	enum perform perform = pe_default;
+	enum perform perform = pe_undef;
 	enum bptype bptype;
 
 	if (bs->breakpoint_at == NULL)
@@ -4028,7 +4017,7 @@ process_event_stop_test:
 	  }
 	else if (bs->breakpoint_at->owner == NULL)
 	  {
-	    stepping_over = so_yes;
+	    ecs->event_thread->stepping_over_breakpoint = 1;
 	    bptype = bp_none;
 	  }
 	else
@@ -4054,7 +4043,7 @@ process_event_stop_test:
 	      }
 	    else
 	      {
-		stepping_over = so_yes;
+		ecs->event_thread->stepping_over_breakpoint = 1;
 		perform = pe_check_more;
 	      }
 	    break;
@@ -4093,7 +4082,7 @@ process_event_stop_test:
 		  insert_longjmp_resume_breakpoint (gdbarch, jmp_buf_pc);
 		}
 
-	      stepping_over = so_yes;
+	      ecs->event_thread->stepping_over_breakpoint = 1;
 	      perform = pe_going;
 	    }
 	    break;
@@ -4114,7 +4103,7 @@ process_event_stop_test:
 		       to doing that.  pe_going must override pe_check_more so
 		       that we do not stop again on that breakpoint.  */
 		    ecs->event_thread->step_after_step_resume_breakpoint = 0;
-		    stepping_over = so_yes;
+		    ecs->event_thread->stepping_over_breakpoint = 1;
 		    perform = pe_going;
 		  }
 		else if (stop_pc == ecs->stop_func_start
@@ -4124,14 +4113,14 @@ process_event_stop_test:
 		       just hit the step-resume breakpoint at the start
 		       address of the function.  Go back to single-stepping,
 		       which should take us back to the function call.  */
-		    stepping_over = so_yes;
+		    ecs->event_thread->stepping_over_breakpoint = 1;
 		    perform = pe_going;
 		  }
 	      }
 	    else
 	      {
 		/* It is for the wrong frame.  */
-		stepping_over = so_yes;
+		ecs->event_thread->stepping_over_breakpoint = 1;
 		perform = pe_check_more;
 	      }
 	    break;
@@ -4140,42 +4129,28 @@ process_event_stop_test:
 	  case bp_overlay_event:
 	  case bp_longjmp_master:
 	  case bp_std_terminate_master:
-	    stepping_over = so_yes;
+	    ecs->event_thread->stepping_over_breakpoint = 1;
 	    perform = pe_check_more;
 	    break;
 	  case bp_shlib_event:
-	    {
-	      /* Check for any newly added shared libraries if we're
-		 supposed to be adding them automatically.  Switch
-		 terminal for any messages produced by
-		 breakpoint_re_set.  */
-	      target_terminal_ours_for_output ();
-	      /* NOTE: cagney/2003-11-25: Make certain that the target
-		 stack's section table is kept up-to-date.  Architectures,
-		 (e.g., PPC64), use the section table to perform
-		 operations such as address => section name and hence
-		 require the table to contain all sections (including
-		 those found in shared libraries).  */
-#ifdef SOLIB_ADD
-	      SOLIB_ADD (NULL, 0, &current_target, auto_solib_add);
-#else
-	      solib_add (NULL, 0, &current_target, auto_solib_add);
-#endif
-	      target_terminal_inferior ();
+	    /* solib_add may call breakpoint_re_set which would clear many
+	       BREAKPOINT_AT entries still going to be processed.
+	       breakpoint_re_set does not keep the same bp_location's even if
+	       they actually do not change.  */
+	    perform_shlib = 1;
 
-	      /* If requested, stop when the dynamic linker notifies
-		 gdb of events.  This allows the user to get control
-		 and place breakpoints in initializer routines for
-		 dynamically loaded objects (among other things).  */
-	      if (stop_on_solib_events || stop_stack_dummy)
-		perform = pe_stop;
-	      else
-		{
-		  /* We want to step over this breakpoint, then keep going.  */
-		  stepping_over = so_yes;
-		  perform = pe_check_more;
-		}
-	    }
+	    /* If requested, stop when the dynamic linker notifies
+	       gdb of events.  This allows the user to get control
+	       and place breakpoints in initializer routines for
+	       dynamically loaded objects (among other things).  */
+	    if (stop_on_solib_events || stop_stack_dummy)
+	      perform = pe_stop;
+	    else
+	      {
+		/* We want to step over this breakpoint, then keep going.  */
+		ecs->event_thread->stepping_over_breakpoint = 1;
+		perform = pe_check_more;
+	      }
 	    break;
 	  case bp_jit_event:
 	    /* Switch terminal for any messages produced by breakpoint_re_set.  */
@@ -4186,7 +4161,7 @@ process_event_stop_test:
 	    target_terminal_inferior ();
 
 	    /* We want to step over this breakpoint, then keep going.  */
-	    stepping_over = so_yes;
+	    ecs->event_thread->stepping_over_breakpoint = 1;
 	    perform = pe_check_more;
 	    break;
 	  case bp_call_dummy:
@@ -4213,6 +4188,9 @@ process_event_stop_test:
 	    break;
 	  }
 
+	/* PERFORM must be always decided.  */
+	gdb_assert (perform != pe_undef);
+
 	if (debug_infrun)
 	  {
 	    const char *bptype_s = breakpoint_type_name (bptype);
@@ -4221,30 +4199,23 @@ process_event_stop_test:
 	      fprintf_unfiltered (gdb_stdlog, "infrun: %s: print_frame %s\n",
 				  bptype_s, print_frame == pf_no ? "pf_no"
 								 : "pf_yes");
-	    if (stepping_over != so_default)
-	      fprintf_unfiltered (gdb_stdlog,
-				  "infrun: %s -> stepping_over %s\n", bptype_s,
-				  stepping_over == so_no ? "so_no" : "so_yes");
 	    if (stop_step != ss_default)
 	      fprintf_unfiltered (gdb_stdlog, "infrun: %s: stop_step %s\n",
 				  bptype_s, stop_step_max == ss_print_no
 					    ? "ss_print_no (stop_step 1)"
 					    : "ss_print_yes (stop_step 0)");
-	    if (perform != pe_default)
-	      fprintf_unfiltered (gdb_stdlog, "infrun: %s: perform %s\n",
-				  bptype_s,
-				  perform == pe_going
-				    ? "pe_going"
-				    : perform == pe_check_more
-				      ? "pe_check_more"
-				      : perform == pe_stop
-					? "pe_stop" : "pe_stop_end_range");
+	    fprintf_unfiltered (gdb_stdlog, "infrun: %s: perform %s\n",
+				bptype_s,
+				perform == pe_going
+				  ? "pe_going"
+				  : perform == pe_check_more
+				    ? "pe_check_more"
+				    : perform == pe_stop
+				      ? "pe_stop" : "pe_stop_end_range");
 	  }
 	
 	if (print_frame_max < print_frame)
 	  print_frame_max = print_frame;
-	if (stepping_over_max < stepping_over)
-	  stepping_over_max = stepping_over;
 	if (stop_step_max < stop_step)
 	  stop_step_max = stop_step;
 	if (perform_max < perform)
@@ -4253,38 +4224,49 @@ process_event_stop_test:
     if (debug_infrun)
       fprintf_unfiltered (gdb_stdlog,
 			  _("infrun: summary: print_frame %s\n"
-			    "infrun: summary: stepping_over %s\n"
 			    "infrun: summary: stop_step %s\n"
 			    "infrun: summary: perform %s\n"),
 			  print_frame_max == pf_default
 			    ? "pf_default (pf_yes)"
 			    : print_frame_max == pf_no ? "pf_no" : "pf_yes",
-			  stepping_over_max == so_default
-			    ? "so_default (so_no)"
-			    : stepping_over_max == so_no ? "so_no" : "so_yes",
 			  stop_step_max == ss_default
 			    ? "ss_default (ss_print_yes (stop_step 0))"
 			    : stop_step_max == ss_print_no
 			      ? "ss_print_no (stop_step 1)"
 			      : "ss_print_yes (stop_step 0)",
-			  perform_max == pe_default
-			  ? "pe_default (pe_check_more)"
-			  : perform_max == pe_check_more
+			  perform_max == pe_check_more
 			    ? "pe_check_more"
 			    : perform_max == pe_stop
 			      ? "pe_stop" : perform_max == pe_stop_end_range
 					    ? "pe_stop_end_range" : "pe_going");
     if (print_frame_max == pf_default)
       print_frame_max = pf_yes;
-    if (stepping_over_max == so_default)
-      stepping_over_max = so_no;
     if (stop_step_max == ss_default)
       stop_step_max = ss_print_yes;
-    if (perform_max == pe_default)
-      perform_max = pe_check_more;
+    gdb_assert (perform_max != pe_undef);
+
+    if (perform_shlib)
+      {
+	/* Check for any newly added shared libraries if we're
+	   supposed to be adding them automatically.  Switch
+	   terminal for any messages produced by
+	   breakpoint_re_set.  */
+	target_terminal_ours_for_output ();
+	/* NOTE: cagney/2003-11-25: Make certain that the target
+	   stack's section table is kept up-to-date.  Architectures,
+	   (e.g., PPC64), use the section table to perform
+	   operations such as address => section name and hence
+	   require the table to contain all sections (including
+	   those found in shared libraries).  */
+#ifdef SOLIB_ADD
+	SOLIB_ADD (NULL, 0, &current_target, auto_solib_add);
+#else
+	solib_add (NULL, 0, &current_target, auto_solib_add);
+#endif
+	target_terminal_inferior ();
+      }
 
     stop_print_frame = print_frame_max == pf_yes;
-    ecs->event_thread->stepping_over_breakpoint = stepping_over_max == so_yes;
     ecs->event_thread->stop_step = stop_step_max == ss_print_no;
     switch (perform_max)
     {
