@@ -4141,12 +4141,8 @@ bpstat_stop_status (struct address_space *aspace,
      not have changed, but the intermediate memory locations we are
      watching may have.  Don't bother if we're stopping; this will get
      done later.  */
-  for (bs = root_bs->next; bs != NULL; bs = bs->next)
-    if (bs->stop)
-      break;
-
   need_remove_insert = 0;
-  if (bs == NULL)
+  if (! bpstat_causes_stop (root_bs->next))
     for (bs = root_bs->next; bs != NULL; bs = bs->next)
       if (!bs->stop
 	  && bs->breakpoint_at->owner
@@ -10352,18 +10348,16 @@ ftrace_command (char *arg, int from_tty)
    list that was acquired during tracepoint uploading.  */
 
 static struct uploaded_tp *this_utp;
-static struct uploaded_string *next_cmd;
+static int next_cmd;
 
 static char *
 read_uploaded_action (void)
 {
   char *rslt;
 
-  if (!next_cmd)
-    return NULL;
+  VEC_iterate (char_ptr, this_utp->cmd_strings, next_cmd, rslt);
 
-  rslt = next_cmd->str;
-  next_cmd = next_cmd->next;
+  next_cmd++;
 
   return rslt;
 }
@@ -10429,18 +10423,19 @@ create_tracepoint_from_upload (struct uploaded_tp *utp)
      special-purpose "reader" function and call the usual command line
      reader, then pass the result to the breakpoint command-setting
      function.  */
-  if (utp->cmd_strings)
+  if (!VEC_empty (char_ptr, utp->cmd_strings))
     {
       struct command_line *cmd_list;
 
       this_utp = utp;
-      next_cmd = utp->cmd_strings;
+      next_cmd = 0;
 
       cmd_list = read_command_lines_1 (read_uploaded_action, 1, NULL, NULL);
 
       breakpoint_set_commands (tp, cmd_list);
     }
-  else if (utp->numactions > 0 || utp->num_step_actions > 0)
+  else if (!VEC_empty (char_ptr, utp->actions)
+	   || !VEC_empty (char_ptr, utp->step_actions))
     warning (_("Uploaded tracepoint %d actions have no source form, ignoring them"),
 	     utp->number);
 
