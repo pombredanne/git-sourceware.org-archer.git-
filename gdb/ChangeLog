@@ -1,3 +1,405 @@
+2010-04-09  Stan Shebs  <stan@codesourcery.com>
+
+	* tracepoint.c (trace_dump_command): Include default-collect
+	expressions.
+
+2010-04-09  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* symtab.c (find_function_start_sal): Never return SAL pointing
+	before function start address, even if line info is missing.
+
+2010-04-09  Pedro  Alves  <pedro@codesourcery.com>
+
+	* NEWS: Mention tracepoints support.
+
+2010-04-09  Pedro Alves  <pedro@codesourcery.com>
+
+	* tracepoint.c (trace_status_mi): Report disconnected tracing and
+	circular trace buffer statuses.
+
+2010-04-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* config/djgpp/fnchange.lst: Fix typo in translations for
+	symbol-without-target_section.exp and symbol-without-target_section.c.
+
+2010-04-09  Pedro Alves  <pedro@codesourcery.com>
+
+	* breakpoint.c (condition_command): Pass condition expression to
+	set_breakpoint_condition stripped from breakpoint number.
+
+2010-04-09  Phil Muldoon  <pmuldoon@redhat.com>
+	    Thiago Jung Bauermann  <bauerman@br.ibm.com>
+	    Tom Tromey  <tromey@redhat.com>
+
+	* breakpoint.c (condition_command): Simplify.  Move condition
+	setting code to ...
+	(set_breakpoint_condition): ... here.  New function.
+	* breakpoint.h  (set_breakpoint_condition): Declare.
+	* Makefile.in (SUBDIR_PYTHON_OBS): Add py-breakpoint.
+	(SUBDIR_PYTHON_SRCS): Likewise.
+	(py-breakpoint.o): New rule.
+	* python/py-breakpoint.c: New file.
+	* python/python-internal.h (gdbpy_breakpoints)
+	(gdbpy_initialize_breakpoints): Declare.
+	(GDB_PY_SET_HANDLE_EXCEPTION) Define.
+
+2010-04-09  Pedro Alves  <pedro@codesourcery.com>
+
+	* regformats/regdat.sh: Include server.h.  Don't include
+	regcache.h.
+
+2010-04-08  Stan Shebs  <stan@codesourcery.com>
+	    Pedro Alves  <pedro@codesourcery.com>
+
+	* tracepoint.h (struct trace_status): New fields disconnected_tracing
+	and circular_buffer.
+	(disconnect_tracing): Rename from disconnect_or_stop_tracing.
+	* tracepoint.c (trace_status_command): Display target's status for
+	disconnected tracing and circular buffer.
+	(disconnect_tracing): Rename from disconnect_or_stop_tracing, add
+	query for non-disconnected-tracing case, remove the stop_tracing
+	call.
+	(tfile_open): Clear disconnected and circular buffer status.
+	(trace_save): Save disconnected and circular buffer status.
+	(parse_trace_status): Parse disconnected and circular buffer status,
+	also recognize disconnected as a stop reason.
+	* remote.c (remote_set_disconnected_tracing): Only set
+	QTDisconnected if the remote end supports disconnected tracing.
+	Warn otherwise, if trying to enable disconnected tracing.
+	* infcmd.c (detach_command): Update disconnect_tracing call.
+	* cli/cli-cmds.c (quit_command): Ditto.
+
+2010-04-08  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* i387-tdep.c (i387_collect_xsave): Replace abort with
+	internal_error.
+
+2010-04-08  Stan Shebs  <stan@codesourcery.com>
+
+	* breakpoint.c (default_collect_info): New function.
+	(breakpoints_info): Call it.
+	(maintenance_info_breakpoints): Ditto.
+	(tracepoints_info): Ditto.
+
+2010-04-08  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* i387-tdep.c (i387_collect_xsave): Re-indent.
+
+2010-04-08  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* i386-linux-nat.c (have_ptrace_getfpxregs): Initialize to -1
+	if HAVE_PTRACE_GETFPXREGS is defined.
+	(i386_linux_read_description): Set have_ptrace_getfpxregs and
+	have_ptrace_getregset to 0 if ptrace PTRACE_GETFPXREGS failed.
+
+	* i386-linux-tdep.c: Include "features/i386/i386-mmx-linux.c"
+	(i386_linux_core_read_description): Return tdesc_i386_mmx_linux
+	if .reg-xfp section doesn't exist.
+	(_initialize_i386_linux_tdep): Call initialize_tdesc_i386_mmx_linux.
+
+	* i386-linux-tdep.h (tdesc_i386_mmx_linux): New.
+
+	* i386-tdep.c: Include "features/i386/i386-mmx.c".
+	(i386_go32_init_abi): Set tdesc to tdesc_i386_mmx.
+	(i386_validate_tdesc_p): Make org.gnu.gdb.i386.sse optional.  Set
+	xcr0 to I386_XSTATE_X87_MASK if SSE isn't available.
+	(i386_gdbarch_init): Update comments.
+	(_initialize_i386_tdep): Call initialize_tdesc_i386_mmx.
+
+	* common/i386-xstate.h (I386_XSTATE_X87_MASK): New.
+
+	* config/djgpp/fnchange.lst: Add i386 MMX XML files.
+
+	* features/Makefile (i386/i386-mmx-expedite): New.
+	(i386/i386-mmx-linux-expedite): Likewise.
+	($(outdir)/i386/i386-mmx.dat): Likewise.
+	($(outdir)/i386/i386-mmx-linux.dat): Likewise.
+
+	* features/i386/i386-mmx-linux.c: New.
+	* features/i386/i386-mmx-linux.xml: Likewise.
+	* features/i386/i386-mmx.c: Likewise.
+	* features/i386/i386-mmx.xml: Likewise.
+	* regformats/i386/i386-mmx-linux.dat: Likewise.
+	* regformats/i386/i386-mmx.dat: Likewise.
+
+	* features/Makefile (WHICH): Add i386/i386-mmx and
+	i386/i386-mmx-linux.
+
+2010-04-08  Doug Evans  <dje@google.com>
+
+	* source.c (openp): Skip $cdir in PATH.
+
+2010-04-08  Phil Muldoon  <pmuldoon@redhat.com>
+
+	PR python/11417
+	* python/py-lazy-string.c (stpy_convert_to_value): Check for
+	a NULL address.
+	(gdbpy_create_lazy_string_object): Allow strings with a NULL
+	address and a zero length.
+
+2010-04-08  Hui Zhu  <teawater@gmail.com>
+
+	* i386-tdep.c (i386_process_record): Add support for insn
+	rdtsc.
+
+2010-04-07  Doug Evans  <dje@google.com>
+
+	* python/python.c (source_python_script): Use ensure_python_env
+	to prepare environment for script.
+
+2010-04-07  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* amd64-linux-nat.c: Include "regset.h", "elf/common.h",
+	<sys/uio.h> and "i386-xstate.h".
+	(PTRACE_GETREGSET): New.
+	(PTRACE_SETREGSET): Likewise.
+	(have_ptrace_getregset): Likewise.
+	(amd64_linux_gregset64_reg_offset): Include 16 upper YMM
+	registers.
+	(amd64_linux_gregset32_reg_offset): Include 8 upper YMM
+	registers.
+	(amd64_linux_fetch_inferior_registers): Support PTRACE_GETFPREGS.
+	(amd64_linux_store_inferior_registers): Likewise.
+	(amd64_linux_read_description): Check and enable AVX target
+	descriptions.
+
+	* amd64-linux-tdep.c: Include "regset.h", "i386-linux-tdep.h"
+	and "features/i386/amd64-avx-linux.c".
+	(amd64_linux_regset_sections): New.
+	(amd64_linux_core_read_description): Check and enable AVX
+	target description.
+	(amd64_linux_init_abi): Set xsave_xcr0_offset.  Call
+	set_gdbarch_core_regset_sections.
+	(_initialize_amd64_linux_tdep): Call
+	initialize_tdesc_amd64_avx_linux.
+
+	* amd64-linux-tdep.h (AMD64_LINUX_ORIG_RAX_REGNUM): Replace
+	AMD64_MXCSR_REGNUM with AMD64_YMM15H_REGNUM.
+	(tdesc_amd64_avx_linux): New.
+	(amd64_linux_update_xstateregset): Likewise.
+
+	* amd64-tdep.c: Include "features/i386/amd64-avx.c".
+	(amd64_ymm_names): New.
+	(amd64_ymmh_names): Likewise.
+	(amd64_register_name): Likewise.
+	(amd64_supply_xstateregset): Likewise.
+	(amd64_collect_xstateregset): Likewise.
+	(amd64_supply_xsave): Likewise.
+	(amd64_collect_xsave): Likewise.
+	(AMD64_NUM_REGS): Removed.
+	(amd64_dwarf_reg_to_regnum): Return %ymmN register number for
+	%xmmN if AVX is available.
+	(amd64_pseudo_register_name): Support pseudo YMM registers.
+	(amd64_regset_from_core_section): Support .reg-xstate section.
+	(amd64_init_abi): Set ymmh_register_names, num_ymm_regs
+	and ymm0h_regnum.  Call set_gdbarch_register_name.
+	(amd64_init_abi): Call initialize_tdesc_amd64_avx.
+
+	* amd64-tdep.h (amd64_regnum): Add AMD64_YMM0H_REGNUM and
+	AMD64_YMM15H_REGNUM.
+	(AMD64_NUM_REGS): New.
+	(amd64_supply_xsave): Likewise.
+	(amd64_collect_xsave): Likewise.
+	(amd64_register_name): Removed.
+	(amd64_register_type): Likewise.
+
+2010-04-07  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* i387-tdep.c: Include "i386-xstate.h".
+	(XSAVE_XSTATE_BV_ADDR): New.
+	(xsave_avxh_offset): Likewise.
+	(XSAVE_AVXH_ADDR): Likewise.
+	(i387_supply_xsave): Likewise.
+	(i387_collect_xsave): Likewise.
+
+	* i387-tdep.h (I387_NUM_YMM_REGS): New.
+	(I387_YMM0H_REGNUM): Likewise.
+	(I387_YMMENDH_REGNUM): Likewise.
+	(i387_supply_xsave): Likewise.
+	(i387_collect_xsave): Likewise.
+
+2010-04-07  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* i386-linux-nat.c: Include "regset.h", "elf/common.h",
+	<sys/uio.h> and "i386-xstate.h".
+	(PTRACE_GETREGSET): New.
+	(PTRACE_SETREGSET): Likewise.
+	(fetch_xstateregs): Likewise.
+	(store_xstateregs): Likewise.
+	(GETXSTATEREGS_SUPPLIES): Likewise.
+	(regmap): Include 8 upper YMM registers.
+	(i386_linux_fetch_inferior_registers): Support XSAVE extended
+	state.
+	(i386_linux_store_inferior_registers): Likewise.
+	(i386_linux_read_description): Check and enable AVX target
+	descriptions.
+
+	* i386-linux-tdep.c: Include "regset.h", "i387-tdep.h",
+	"i386-xstate.h" and "features/i386/i386-avx-linux.c".
+	(i386_linux_regset_sections): Add ".reg-xstate".
+	(i386_linux_gregset_reg_offset): Include 8 upper YMM registers.
+	(i386_linux_core_read_xcr0): New.
+	(i386_linux_core_read_description): Check and enable AVX target
+	description.
+	(i386_linux_init_abi): Set xsave_xcr0_offset.
+	(_initialize_i386_linux_tdep): Call
+	initialize_tdesc_i386_avx_linux.
+
+	* i386-linux-tdep.h (I386_LINUX_ORIG_EAX_REGNUM): Replace
+	I386_SSE_NUM_REGS with I386_AVX_NUM_REGS.
+	(i386_linux_core_read_xcr0): New.
+	(tdesc_i386_avx_linux): Likewise.
+	(I386_LINUX_XSAVE_XCR0_OFFSET): Likewise.
+
+	* i386-tdep.c: Include "i386-xstate.h" and
+	"features/i386/i386-avx.c".
+	(i386_ymm_names): New.
+	(i386_ymmh_names): Likewise.
+	(i386_ymmh_regnum_p): Likewise.
+	(i386_ymm_regnum_p): Likewise.
+	(i386_xmm_regnum_p): Likewise.
+	(i386_register_name): Likewise.
+	(i386_ymm_type): Likewise.
+	(i386_supply_xstateregset): Likewise.
+	(i386_collect_xstateregset): Likewise.
+	(i386_sse_regnum_p): Removed.
+	(i386_pseudo_register_name): Support pseudo YMM registers.
+	(i386_pseudo_register_type): Likewise.
+	(i386_pseudo_register_read): Likewise.
+	(i386_pseudo_register_write): Likewise.
+	(i386_dbx_reg_to_regnum): Return %ymmN register number for
+	%xmmN if AVX is available.
+	(i386_regset_from_core_section): Support .reg-xstate section.
+	(i386_register_reggroup_p): Supper upper YMM and YMM registers.
+	(i386_process_record): Replace i386_sse_regnum_p with
+	i386_xmm_regnum_p.
+	(i386_validate_tdesc_p): Support org.gnu.gdb.i386.avx feature.
+	Set ymmh_register_names, num_ymm_regs, ymm0h_regnum and xcr0.
+	(i386_gdbarch_init): Set xstateregset.  Set xsave_xcr0_offset. 
+	Call set_gdbarch_register_name.  Replace I386_SSE_NUM_REGS with
+	I386_AVX_NUM_REGS.  Set ymmh_register_names, ymm0h_regnum and
+	num_ymm_regs.  Add num_ymm_regs to set_gdbarch_num_pseudo_regs.
+	Set ymm0_regnum.
+	(_initialize_i386_tdep): Call initialize_tdesc_i386_avx.
+
+	* i386-tdep.h (gdbarch_tdep): Add xstateregset, ymm0_regnum,
+	xcr0, xsave_xcr0_offset, ymm0h_regnum, ymmh_register_names and
+	i386_ymm_type.
+	(i386_regnum): Add I386_YMM0H_REGNUM, and I386_YMM7H_REGNUM.
+	(I386_AVX_NUM_REGS): New.
+	(i386_xmm_regnum_p): Likewise.
+	(i386_ymm_regnum_p): Likewise.
+	(i386_ymmh_regnum_p): Likewise.
+
+	* common/i386-xstate.h: New.
+
+2010-04-07  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* config/djgpp/fnchange.lst: Add x86 AVX XML files.
+
+	* features/Makefile (WHICH): Add i386/i386-avx,
+	i386/i386-avx-linux, i386/x86-64-avx and i386/x86-64-avx-linux.
+	(i386/i386-avx-expedite): New.
+	(i386/i386-avx-linux-expedite): Likewise.
+	(i386/x86-64-avx-expedite):Likewise.
+	(i386/x86-64-avx-linux-expedite): Likewise.
+	($(outdir)/i386/i386-avx.dat): New dependency.
+	($(outdir)/i386/i386-avx-linux.dat): Likewise.
+	($(outdir)/i386/x86-avx-64.dat): Likewise.
+	($(outdir)/i386/x86-64-avx-linux.dat): Likewise.
+
+	* features/i386/32bit-avx.xml: New.
+	* features/i386/64bit-avx.xml: Likewise.
+	* features/i386/i386-avx-linux.c: Likewise.
+	* features/i386/i386-avx-linux.xml: Likewise.
+	* features/i386/i386-avx.c: Likewise.
+	* features/i386/i386-avx.xml: Likewise.
+	* features/i386/x86-64-avx-linux.c: Likewise.
+	* features/i386/x86-64-avx-linux.xml: Likewise.
+	* features/i386/x86-64-avx.c: Likewise.
+	* features/i386/x86-64-avx.xml: Likewise.
+	* regformats/i386/i386-avx-linux.dat: Likewise.
+	* regformats/i386/i386-avx.dat: Likewise.
+	* regformats/i386/x86-64-avx-linux.dat: Likewise.
+	* regformats/i386/x86-64-avx.dat: Likewise.
+
+2010-04-07  Doug Evans  <dje@google.com>
+
+	* top.c (source_file_name): Make const char *.
+	* top.h (source_file_name): Update.
+	* cli/cli-script.c (source_cleanup_lines_args): Make old_file
+	const char *.
+	(script_from_file): Change `file' arg to const char *.
+	* cli/cli-script.h (script_from_file): Update.
+
+2010-04-06  Doug Evans  <dje@google.com>
+
+	* cli/cli-cmds.c (source_command): Run cleanups.
+
+2010-04-06  Stan Shebs  <stan@codesourcery.com>
+
+	* defs.h (char_ptr): Move typedef here from...
+	* ada-lang.c (char_ptr): Remove.
+	* charset.c (char_ptr): Remove.
+	* tracepoint.h (struct uploaded_string): Remove.
+	(struct uploaded_tp): Use vectors for string arrays.
+	* tracepoint.c (trace_save): Use vectors of actions.
+	(parse_tracepoint_definition): Ditto.
+	(get_uploaded_tp): Clear vectors.
+	* breakpoint.c (create_tracepoint_from_upload): Use vectors.
+	(next_cmd): Change to an int.
+	(read_next_cmd): Use vector of command strings.
+
+2010-04-06  Doug Evans  <dje@google.com>
+
+	* top.h (source_script, cd_command): Delete.
+	* main.c: #include "cli/cli-cmds.h"
+
+2010-04-06  Kevin Buettner  <kevinb@redhat.com>
+
+	* m32c-tdep.c (make_types): When calling `arch_type', pass size of
+	type in bytes, not bits.
+
+2010-04-06  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* stabsread.c (define_symbol): Add support for char
+	and string constants.
+
+2010-04-06  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	Remove remaining "%ll" uses.
+	* go32-nat.c (go32_pte_for_address): Replace "0x%llx" using
+	hex_string call.
+	* rs6000-nat.c (rs6000_ptrace64): Idem.
+	* solib-pa64.c (pa64_current_sos): Idem.
+	* solib-spu.c (spu_current_sos): Idem.
+	* linux-nat.c (linux_nat_find_memory_regions): Replace "%lld" using
+	plongest call.
+	* nto-procfs.c (procfs_meminfo): Replace "0x%016llx" using
+	phex (VAR, 8) call.
+	* sh64-tdep.c (sh64_show_media_regs): Idem.
+
+2010-04-05  Stan Shebs  <stan@codesourcery.com>
+
+	* tracepoint.c: Include gdbcore.h.
+	(tfile_xfer_partial): Return partial results, also try reading
+	from executable.
+	(tfile_has_all_memory): New function.
+	(init_tfile_ops): Use it.
+
+2010-04-05  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	PR gdb/10736:
+	* xml-syscall.c (my_gdb_datadir): New variable to keep track of
+	the changes in data-directory.
+	(init_sysinfo): Reload the syscall XML file if the data-directory
+	has changed.
+
+2010-04-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* breakpoint.c (bpstat_stop_status): Use bpstat_causes_stop.
+
 2010-04-04  Stan Shebs  <stan@codesourcery.com>
 	    Nathan Sidwell  <nathan@codesourcery.com>
 

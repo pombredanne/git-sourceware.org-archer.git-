@@ -3,6 +3,11 @@
 
 *** Changes since GDB 7.1
 
+* New features in the GDB remote stub, GDBserver
+
+  - GDBserver now support tracepoints.  The feature is currently
+    supported by the i386-linux and amd64-linux builds.
+
 * GDB now sends xmlRegisters= in qSupported packet to indicate that
   it understands register description.
 
@@ -25,8 +30,8 @@
 
 * Python scripting
 
-** The GDB Python API now has access to symbols, symbol tables, and
-   frame's code blocks.
+** The GDB Python API now has access to breakpoints, symbols, symbol
+   tables, and frame's code blocks.
 
 ** New methods gdb.target_charset and gdb.target_wide_charset.
 

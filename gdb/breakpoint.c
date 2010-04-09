@@ -709,6 +709,61 @@ get_breakpoint (int num)
 }
 
 
+
+void
+set_breakpoint_condition (struct breakpoint *b, char *exp,
+			  int from_tty)
+{
+  struct bp_location *loc = b->loc;
+
+  for (; loc; loc = loc->next)
+    {
+      xfree (loc->cond);
+      loc->cond = NULL;
+    }
+  xfree (b->cond_string);
+  b->cond_string = NULL;
+  xfree (b->cond_exp);
+  b->cond_exp = NULL;
+
+  if (*exp == 0)
+    {
+      if (from_tty)
+	printf_filtered (_("Breakpoint %d now unconditional.\n"), b->number);
+    }
+  else
+    {
+      char *arg = exp;
+      /* I don't know if it matters whether this is the string the user
+	 typed in or the decompiled expression.  */
+      b->cond_string = xstrdup (arg);
+      b->condition_not_parsed = 0;
+
+      if (is_watchpoint (b))
+	{
+	  innermost_block = NULL;
+	  arg = exp;
+	  b->cond_exp = parse_exp_1 (&arg, 0, 0);
+	  if (*arg)
+	    error (_("Junk at end of expression"));
+	  b->cond_exp_valid_block = innermost_block;
+	}
+      else
+	{
+	  for (loc = b->loc; loc; loc = loc->next)
+	    {
+	      arg = exp;
+	      loc->cond =
+		parse_exp_1 (&arg, block_for_pc (loc->address), 0);
+	      if (*arg)
+		error (_("Junk at end of expression"));
+	    }
+	}
+    }
+  breakpoints_changed ();
+  observer_notify_breakpoint_modified (b->number);
+}
+
 /* condition N EXP -- set break condition of breakpoint N to EXP.  */
 
 static void
@@ -729,53 +784,7 @@ condition_command (char *arg, int from_tty)
   ALL_BREAKPOINTS (b)
     if (b->number == bnum)
       {
-	struct bp_location *loc = b->loc;
-	for (; loc; loc = loc->next)
-	  {
-	    xfree (loc->cond);
-	    loc->cond = NULL;
-	  }
-	xfree (b->cond_string);
-	b->cond_string = NULL;
-	xfree (b->cond_exp);
-	b->cond_exp = NULL;
-
-	if (*p == 0)
-	  {
-	    if (from_tty)
-	      printf_filtered (_("Breakpoint %d now unconditional.\n"), bnum);
-	  }
-	else
-	  {
-	    arg = p;
-	    /* I don't know if it matters whether this is the string the user
-	       typed in or the decompiled expression.  */
-	    b->cond_string = xstrdup (arg);
-	    b->condition_not_parsed = 0;
-
-	    if (is_watchpoint (b))
-	      {
-		innermost_block = NULL;
-		arg = p;
-		b->cond_exp = parse_exp_1 (&arg, 0, 0);
-		if (*arg)
-		  error (_("Junk at end of expression"));
-		b->cond_exp_valid_block = innermost_block;
-	      }
-	    else
-	      {
-		for (loc = b->loc; loc; loc = loc->next)
-		  {
-		    arg = p;
-		    loc->cond =
-		      parse_exp_1 (&arg, block_for_pc (loc->address), 0);
-		    if (*arg)
-		      error (_("Junk at end of expression"));
-		  }
-	      }
-	  }
-	breakpoints_changed ();
-	observer_notify_breakpoint_modified (b->number);
+	set_breakpoint_condition (b, p, from_tty);
 	return;
       }
 
@@ -4141,12 +4150,8 @@ bpstat_stop_status (struct address_space *aspace,
      not have changed, but the intermediate memory locations we are
      watching may have.  Don't bother if we're stopping; this will get
      done later.  */
-  for (bs = root_bs->next; bs != NULL; bs = bs->next)
-    if (bs->stop)
-      break;
-
   need_remove_insert = 0;
-  if (bs == NULL)
+  if (! bpstat_causes_stop (root_bs->next))
     for (bs = root_bs->next; bs != NULL; bs = bs->next)
       if (!bs->stop
 	  && bs->breakpoint_at->owner
@@ -4812,6 +4817,25 @@ breakpoint_1 (int bnum, int allflag, int (*filter) (const struct breakpoint *))
   return nr_printable_breakpoints;
 }
 
+/* Display the value of default-collect in a way that is generally
+   compatible with the breakpoint list.  */
+
+static void
+default_collect_info (void)
+{
+  /* If it has no value (which is frequently the case), say nothing; a
+     message like "No default-collect." gets in user's face when it's
+     not wanted.  */
+  if (!*default_collect)
+    return;
+
+  /* The following phrase lines up nicely with per-tracepoint collect
+     actions.  */
+  ui_out_text (uiout, "default collect ");
+  ui_out_field_string (uiout, "default-collect", default_collect);
+  ui_out_text (uiout, " \n");
+}
+  
 static void
 breakpoints_info (char *bnum_exp, int from_tty)
 {
@@ -4821,6 +4845,8 @@ breakpoints_info (char *bnum_exp, int from_tty)
     bnum = parse_and_eval_long (bnum_exp);
 
   breakpoint_1 (bnum, 0, NULL);
+
+  default_collect_info ();
 }
 
 static void
@@ -4851,6 +4877,8 @@ maintenance_info_breakpoints (char *bnum_exp, int from_tty)
     bnum = parse_and_eval_long (bnum_exp);
 
   breakpoint_1 (bnum, 1, NULL);
+
+  default_collect_info ();
 }
 
 static int
@@ -10108,18 +10136,16 @@ ftrace_command (char *arg, int from_tty)
    list that was acquired during tracepoint uploading.  */
 
 static struct uploaded_tp *this_utp;
-static struct uploaded_string *next_cmd;
+static int next_cmd;
 
 static char *
 read_uploaded_action (void)
 {
   char *rslt;
 
-  if (!next_cmd)
-    return NULL;
+  VEC_iterate (char_ptr, this_utp->cmd_strings, next_cmd, rslt);
 
-  rslt = next_cmd->str;
-  next_cmd = next_cmd->next;
+  next_cmd++;
 
   return rslt;
 }
@@ -10185,18 +10211,19 @@ create_tracepoint_from_upload (struct uploaded_tp *utp)
      special-purpose "reader" function and call the usual command line
      reader, then pass the result to the breakpoint command-setting
      function.  */
-  if (utp->cmd_strings)
+  if (!VEC_empty (char_ptr, utp->cmd_strings))
     {
       struct command_line *cmd_list;
 
       this_utp = utp;
-      next_cmd = utp->cmd_strings;
+      next_cmd = 0;
 
       cmd_list = read_command_lines_1 (read_uploaded_action, 1, NULL, NULL);
 
       breakpoint_set_commands (tp, cmd_list);
     }
-  else if (utp->numactions > 0 || utp->num_step_actions > 0)
+  else if (!VEC_empty (char_ptr, utp->actions)
+	   || !VEC_empty (char_ptr, utp->step_actions))
     warning (_("Uploaded tracepoint %d actions have no source form, ignoring them"),
 	     utp->number);
 
@@ -10223,6 +10250,8 @@ tracepoints_info (char *tpnum_exp, int from_tty)
       else
 	ui_out_message (uiout, 0, "No tracepoint number %d.\n", tpnum);
     }
+
+  default_collect_info ();
 }
 
 /* The 'enable trace' command enables tracepoints.  

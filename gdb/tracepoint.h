@@ -106,6 +106,16 @@ struct trace_status
   /* Unused bytes left in the target's trace buffer.  */
 
   int buffer_free;
+
+  /* 1 if the target will continue tracing after disconnection, else
+     0.  If the target does not report a value, assume 0.  */
+
+  int disconnected_tracing;
+
+  /* 1 if the target is using a circular trace buffer, else 0.  If the
+     target does not report a value, assume 0.  */
+
+  int circular_buffer;
 };
 
 struct trace_status *current_trace_status (void);
@@ -114,11 +124,7 @@ extern char *default_collect;
 
 /* Struct to collect random info about tracepoints on the target.  */
 
-struct uploaded_string
-{
-  char *str;
-  struct uploaded_string *next;
-};
+DEF_VEC_P (char_ptr);
 
 struct uploaded_tp
 {
@@ -129,11 +135,13 @@ struct uploaded_tp
   int step;
   int pass;
   int orig_size;
+
+  /* String that is the encoded form of the tracepoint's condition.  */
   char *cond;
-  int numactions;
-  char *actions[100];
-  int num_step_actions;
-  char *step_actions[100];
+
+  /* Vectors of strings that are the encoded forms of a tracepoint's actions.  */
+  VEC(char_ptr) *actions;
+  VEC(char_ptr) *step_actions;
 
   /* The original string defining the location of the tracepoint.  */
   char *at_string;
@@ -142,7 +150,7 @@ struct uploaded_tp
   char *cond_string;
 
   /* List of original strings defining the tracepoint's actions.  */
-  struct uploaded_string *cmd_strings;
+  VEC(char_ptr) *cmd_strings;
 
   struct uploaded_tp *next;
 };
@@ -191,7 +199,7 @@ extern struct breakpoint *create_tracepoint_from_upload (struct uploaded_tp *utp
 extern void merge_uploaded_tracepoints (struct uploaded_tp **utpp);
 extern void merge_uploaded_trace_state_variables (struct uploaded_tsv **utsvp);
 
-extern void disconnect_or_stop_tracing (int from_tty);
+extern void disconnect_tracing (int from_tty);
 
 extern void start_tracing (void);
 extern void stop_tracing (void);
