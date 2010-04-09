@@ -74,9 +74,17 @@ gdb_test_multiple $test $test {
 gdb_breakpoint "*$event"
 
 set test {commands $bpnum}
-gdb_test_multiple $test $test { -re "\r\n>$" { pass $test } }
+gdb_test_multiple $test $test {
+    -re "\r\n>$" {
+	pass $test
+    }
+}
 set test {echo event-hit\n}
-gdb_test_multiple $test $test { -re "\r\n>$" { pass $test } }
+gdb_test_multiple $test $test {
+    -re "\r\n>$" {
+	pass $test
+    }
+}
 gdb_test "end"
 
 gdb_test "continue" "${event_msg}.*event-hit.*"
