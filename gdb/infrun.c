@@ -4116,6 +4116,8 @@ process_event_stop_test:
 		    ecs->event_thread->stepping_over_breakpoint = 1;
 		    perform = pe_going;
 		  }
+		else
+		  perform = pe_check_more;
 	      }
 	    else
 	      {
@@ -4186,10 +4188,18 @@ process_event_stop_test:
 	    internal_error (__FILE__, __LINE__,
 			    _("handle_inferior_event: tracepoint encountered"));
 	    break;
+	  default:
+	    internal_error (__FILE__, __LINE__,
+			    _("handle_inferior_event: Unhandled bptype %s"),
+			    breakpoint_type_name (bptype));
+	    break;
 	  }
 
 	/* PERFORM must be always decided.  */
-	gdb_assert (perform != pe_undef);
+	if (perform == pe_undef)
+	  internal_error (__FILE__, __LINE__,
+			  _("handle_inferior_event: Unset perform, bptype %s"),
+			  breakpoint_type_name (bptype));
 
 	if (debug_infrun)
 	  {
