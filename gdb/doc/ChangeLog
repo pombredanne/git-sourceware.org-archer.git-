@@ -1,3 +1,36 @@
+2010-04-09  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo (gdb/mi Tracepoint Commands) <-trace-status>:
+	Describe the `circular' and `disconnected' fields.
+
+2010-04-09  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* gdb.texinfo (maint print registers): Mention unavailable and
+	invisible registers.
+
+2010-04-09  Phil Muldoon  <pmuldoon@redhat.com>
+	    Thiago Jung Bauermann  <bauerman@br.ibm.com>
+	    Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Breakpoints In Python): New Node.
+
+2010-04-08  Stan Shebs  <stan@codesourcery.com>
+
+	* gdb.texinfo (Tracepoint Packets): Describe disconn and circular
+	trace status fields.
+
+2010-04-08  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* gdb.texinfo (i386 Features): Make org.gnu.gdb.i386.avx
+	optional.  Make org.gnu.gdb.i386.avx requires
+	org.gnu.gdb.i386.avx.
+
+2010-04-08  Doug Evans  <dje@google.com>
+
+	* gdb.texinfo (Command Files): Document that gdb skips $cdir in
+	search path, and document that gdb only scans the search path if
+	the script's path doesn't specify a directory.
+
 2010-04-05  Doug Evans  <dje@google.com>
 
 	* gdb.texinfo (maint show python auto-load): Fix typo.

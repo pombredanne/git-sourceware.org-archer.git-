@@ -1,3 +1,31 @@
+2010-04-09  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.python/py-breakpoint.exp: New File.
+	* gdb.python/py-breakpoint.C: Ditto.
+
+2010-04-08  Stan Shebs  <stan@codesourcery.com>
+
+	* gdb.trace/actions.exp: Clear default-collect.
+	* gdb.trace/save-trace.exp: Clear default-collect.
+
+2010-04-08  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.python/py-value: Add null string variable.
+	  (test_lazy_string): Test zero length, NULL address lazy
+	  strings.
+
+2010-04-07  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* gdb.arch/i386-avx.c: New.
+	* gdb.arch/i386-avx.exp: Likewise.
+
+	* gdb.arch/i386-cpuid.h: Updated from gcc 4.4.
+
+2010-04-06  Doug Evans  <dje@google.com>
+
+	* gdb.base/source-test.gdb: New file.
+	* gdb.base/source.exp: Test source -v.
+
 2010-04-06  Ulrich Weigand  <Ulrich.Weigand@de.ibm.com>
 
 	* gdb.cp/inherit.exp (test_print_anon_union): Fix re_class pattern.
