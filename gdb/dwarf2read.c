@@ -1114,6 +1114,9 @@ static int attr_form_is_section_offset (struct attribute *);
 
 static int attr_form_is_constant (struct attribute *);
 
+static struct dwarf2_loclist_baton *dwarf2_attr_to_loclist_baton
+  (struct attribute *attr, struct dwarf2_cu *cu);
+
 static void dwarf2_symbol_mark_computed (struct attribute *attr,
 					 struct symbol *sym,
 					 struct dwarf2_cu *cu);
@@ -5919,7 +5922,8 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
 		}
 	    }
 
-	  TYPE_HIGH_BOUND_IS_DWARF_BLOCK (range_type) = 1;
+	  TYPE_RANGE_DATA (range_type)->high.kind
+	    = RANGE_BOUND_KIND_DWARF_BLOCK;
 	  TYPE_RANGE_DATA (range_type)->high.u.dwarf_block = length_baton;
 	  TYPE_DYNAMIC (range_type) = 1;
 	}
@@ -5938,7 +5942,8 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
       attr = dwarf2_attr (die, DW_AT_byte_size, cu);
       if (attr && attr_form_is_block (attr))
 	{
-	  TYPE_HIGH_BOUND_IS_DWARF_BLOCK (range_type) = 1;
+	  TYPE_RANGE_DATA (range_type)->high.kind
+	    = RANGE_BOUND_KIND_DWARF_BLOCK;
 	  TYPE_RANGE_DATA (range_type)->high.u.dwarf_block =
 					dwarf2_attr_to_locexpr_baton (attr, cu);
 	  TYPE_DYNAMIC (range_type) = 1;
@@ -6178,9 +6183,28 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
   attr = dwarf2_attr (die, DW_AT_lower_bound, cu);
   if (attr && attr_form_is_block (attr))
     {
-      TYPE_LOW_BOUND_IS_DWARF_BLOCK (range_type) = 1;
+      TYPE_RANGE_DATA (range_type)->low.kind = RANGE_BOUND_KIND_DWARF_BLOCK;
       TYPE_RANGE_DATA (range_type)->low.u.dwarf_block =
 					dwarf2_attr_to_locexpr_baton (attr, cu);
+      TYPE_DYNAMIC (range_type) = 1;
+      /* For setting a default if DW_AT_UPPER_BOUND would be missing.  */
+      low = 0;
+    }
+  else if (attr && is_ref_attr (attr))
+    {
+      struct die_info *target_die;
+      struct dwarf2_cu *target_cu = cu;
+      struct attribute *target_loc_attr;
+
+      target_die = follow_die_ref_or_sig (die, attr, &target_cu);
+      gdb_assert (target_cu->objfile == cu->objfile);
+      target_loc_attr = dwarf2_attr (target_die, DW_AT_location, target_cu);
+
+      TYPE_RANGE_DATA (range_type)->low.kind = RANGE_BOUND_KIND_DWARF_LOCLIST;
+      TYPE_RANGE_DATA (range_type)->low.u.dwarf_loclist.loclist
+        = dwarf2_attr_to_loclist_baton (target_loc_attr, target_cu);
+      TYPE_RANGE_DATA (range_type)->low.u.dwarf_loclist.type
+        = die_type (target_die, target_cu);
       TYPE_DYNAMIC (range_type) = 1;
       /* For setting a default if DW_AT_UPPER_BOUND would be missing.  */
       low = 0;
@@ -6211,7 +6235,8 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
     }
 
   attr = dwarf2_attr (die, DW_AT_upper_bound, cu);
-  if (!attr || (!attr_form_is_block (attr) && !attr_form_is_constant (attr)))
+  if (!attr || (!attr_form_is_block (attr) && !attr_form_is_constant (attr)
+		&& !is_ref_attr (attr)))
     {
       attr = dwarf2_attr (die, DW_AT_count, cu);
       /* It does not hurt but it is needlessly ineffective in check_typedef.  */
@@ -6225,9 +6250,26 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
 
   if (attr && attr_form_is_block (attr))
     {
-      TYPE_HIGH_BOUND_IS_DWARF_BLOCK (range_type) = 1;
+      TYPE_RANGE_DATA (range_type)->high.kind = RANGE_BOUND_KIND_DWARF_BLOCK;
       TYPE_RANGE_DATA (range_type)->high.u.dwarf_block =
 					dwarf2_attr_to_locexpr_baton (attr, cu);
+      TYPE_DYNAMIC (range_type) = 1;
+    }
+  else if (attr && is_ref_attr (attr))
+    {
+      struct die_info *target_die;
+      struct dwarf2_cu *target_cu = cu;
+      struct attribute *target_loc_attr;
+
+      target_die = follow_die_ref_or_sig (die, attr, &target_cu);
+      gdb_assert (target_cu->objfile == cu->objfile);
+      target_loc_attr = dwarf2_attr (target_die, DW_AT_location, target_cu);
+
+      TYPE_RANGE_DATA (range_type)->high.kind = RANGE_BOUND_KIND_DWARF_LOCLIST;
+      TYPE_RANGE_DATA (range_type)->high.u.dwarf_loclist.loclist
+        = dwarf2_attr_to_loclist_baton (target_loc_attr, target_cu);
+      TYPE_RANGE_DATA (range_type)->high.u.dwarf_loclist.type
+        = die_type (target_die, target_cu);
       TYPE_DYNAMIC (range_type) = 1;
     }
   else
@@ -6252,9 +6294,28 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
   attr = dwarf2_attr (die, DW_AT_byte_stride, cu);
   if (attr && attr_form_is_block (attr))
     {
-      TYPE_BYTE_STRIDE_IS_DWARF_BLOCK (range_type) = 1;
+      TYPE_RANGE_DATA (range_type)->byte_stride.kind
+        = RANGE_BOUND_KIND_DWARF_BLOCK;
       TYPE_RANGE_DATA (range_type)->byte_stride.u.dwarf_block =
 					dwarf2_attr_to_locexpr_baton (attr, cu);
+      TYPE_DYNAMIC (range_type) = 1;
+    }
+  else if (attr && is_ref_attr (attr))
+    {
+      struct die_info *target_die;
+      struct dwarf2_cu *target_cu = cu;
+      struct attribute *target_loc_attr;
+
+      target_die = follow_die_ref_or_sig (die, attr, &target_cu);
+      gdb_assert (target_cu->objfile == cu->objfile);
+      target_loc_attr = dwarf2_attr (target_die, DW_AT_location, target_cu);
+
+      TYPE_RANGE_DATA (range_type)->byte_stride.kind
+        = RANGE_BOUND_KIND_DWARF_LOCLIST;
+      TYPE_RANGE_DATA (range_type)->byte_stride.u.dwarf_loclist.loclist
+        = dwarf2_attr_to_loclist_baton (target_loc_attr, target_cu);
+      TYPE_RANGE_DATA (range_type)->byte_stride.u.dwarf_loclist.type
+        = die_type (target_die, target_cu);
       TYPE_DYNAMIC (range_type) = 1;
     }
   else if (attr && attr_form_is_constant (attr))
@@ -11627,36 +11688,48 @@ dwarf2_attr_to_locexpr_baton (struct attribute *attr, struct dwarf2_cu *cu)
   return baton;
 }
 
+static struct dwarf2_loclist_baton *
+dwarf2_attr_to_loclist_baton (struct attribute *attr, struct dwarf2_cu *cu)
+{
+  struct dwarf2_loclist_baton *baton;
+
+  if (!(attr_form_is_section_offset (attr)
+	/* ".debug_loc" may not exist at all, or the offset may be outside
+	   the section.  If so, fall through to the complaint in the
+	   other branch.  */
+	&& DW_UNSND (attr) < dwarf2_per_objfile->loc.size))
+    return NULL;
+
+  baton = obstack_alloc (&cu->objfile->objfile_obstack,
+			 sizeof (struct dwarf2_loclist_baton));
+  baton->per_cu = cu->per_cu;
+  gdb_assert (baton->per_cu);
+
+  /* We don't know how long the location list is, but make sure we
+     don't run off the edge of the section.  */
+  baton->size = dwarf2_per_objfile->loc.size - DW_UNSND (attr);
+  baton->data = dwarf2_per_objfile->loc.buffer + DW_UNSND (attr);
+  baton->base_address = cu->base_address;
+  if (cu->base_known == 0)
+    complaint (&symfile_complaints,
+	       _("Location list used without specifying the CU base address."));
+
+  return baton;
+}
+
 /* SYM may get its SYMBOL_CLASS overriden on invalid ATTR content.  */
 
 static void
 dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
 			     struct dwarf2_cu *cu)
 {
-  if (attr_form_is_section_offset (attr)
-      /* ".debug_loc" may not exist at all, or the offset may be outside
-	 the section.  If so, fall through to the complaint in the
-	 other branch.  */
-      && DW_UNSND (attr) < dwarf2_per_objfile->loc.size)
+  struct dwarf2_loclist_baton *loclist_baton;
+
+  loclist_baton = dwarf2_attr_to_loclist_baton (attr, cu);
+  if (loclist_baton)
     {
-      struct dwarf2_loclist_baton *baton;
-
-      baton = obstack_alloc (&cu->objfile->objfile_obstack,
-			     sizeof (struct dwarf2_loclist_baton));
-      baton->per_cu = cu->per_cu;
-      gdb_assert (baton->per_cu);
-
-      /* We don't know how long the location list is, but make sure we
-	 don't run off the edge of the section.  */
-      baton->size = dwarf2_per_objfile->loc.size - DW_UNSND (attr);
-      baton->data = dwarf2_per_objfile->loc.buffer + DW_UNSND (attr);
-      baton->base_address = cu->base_address;
-      if (cu->base_known == 0)
-	complaint (&symfile_complaints,
-		   _("Location list used without specifying the CU base address."));
-
       SYMBOL_COMPUTED_OPS (sym) = &dwarf2_loclist_funcs;
-      SYMBOL_LOCATION_BATON (sym) = baton;
+      SYMBOL_LOCATION_BATON (sym) = loclist_baton;
     }
   else if (attr_form_is_block (attr))
     {

@@ -558,7 +558,8 @@ c_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
 	fprintf_filtered (stream, ")");
 
       fprintf_filtered (stream, "[");
-      if (TYPE_ARRAY_UPPER_BOUND_IS_DWARF_BLOCK (type))
+      if (TYPE_RANGE_DATA (TYPE_INDEX_TYPE (type))->high.kind
+	  != RANGE_BOUND_KIND_CONSTANT)
 	{
 	  /* No _() - printed sources should not be locale dependent.  */
 	  fprintf_filtered (stream, "variable");

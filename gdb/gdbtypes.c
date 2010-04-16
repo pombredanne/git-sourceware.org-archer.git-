@@ -873,8 +873,8 @@ create_array_type (struct type *result_type,
   /* DWARF blocks may depend on runtime information like
      DW_OP_PUSH_OBJECT_ADDRESS not being available during the
      CREATE_ARRAY_TYPE time.  */
-  if (TYPE_LOW_BOUND_IS_DWARF_BLOCK (range_type)
-      || TYPE_HIGH_BOUND_IS_DWARF_BLOCK (range_type)
+  if (TYPE_RANGE_DATA (range_type)->low.kind != RANGE_BOUND_KIND_CONSTANT
+      || TYPE_RANGE_DATA (range_type)->high.kind != RANGE_BOUND_KIND_CONSTANT
       || TYPE_LOW_BOUND_UNDEFINED (range_type) 
       || TYPE_HIGH_BOUND_UNDEFINED (range_type) 
       || get_discrete_bounds (range_type, &low_bound, &high_bound) < 0)
@@ -3262,6 +3262,9 @@ copy_type_recursive_1 (struct objfile *objfile,
     {
       int i, nfields;
 
+      /* TYPE_CODE_RANGE uses TYPE_RANGE_DATA of the union with TYPE_FIELDS.  */
+      gdb_assert (TYPE_CODE (type) != TYPE_CODE_RANGE);
+
       nfields = TYPE_NFIELDS (type);
       TYPE_NFIELDS (new_type) = nfields;
       TYPE_FIELDS (new_type) = XCALLOC (nfields, struct field);
@@ -3310,43 +3313,116 @@ copy_type_recursive_1 (struct objfile *objfile,
       TYPE_RANGE_DATA (new_type) = xmalloc (sizeof (struct range_bounds));
       *TYPE_RANGE_DATA (new_type) = *TYPE_RANGE_DATA (type);
 
-      if (TYPE_LOW_BOUND_IS_DWARF_BLOCK (type))
+      switch (TYPE_RANGE_DATA (new_type)->low.kind)
 	{
+	case RANGE_BOUND_KIND_CONSTANT:
+	  break;
+	case RANGE_BOUND_KIND_DWARF_BLOCK:
 	  /* `struct dwarf2_locexpr_baton' is too bound to its objfile so
 	     it is expected to be made constant by CHECK_TYPEDEF.  */
 	  if (TYPE_NOT_ALLOCATED (type)
 	      || TYPE_NOT_ASSOCIATED (type))
 	    TYPE_RANGE_DATA (new_type)->low.u.dwarf_block = NULL;
 	  else
-	    TYPE_LOW_BOUND (new_type) = dwarf_locexpr_baton_eval
+	    {
+	      TYPE_LOW_BOUND (new_type) = dwarf_locexpr_baton_eval
 				(TYPE_RANGE_DATA (new_type)->low.u.dwarf_block);
-	  TYPE_LOW_BOUND_IS_DWARF_BLOCK (new_type) = 0;
+	      TYPE_RANGE_DATA (new_type)->low.kind = RANGE_BOUND_KIND_CONSTANT;
+	    }
+	  break;
+	case RANGE_BOUND_KIND_DWARF_LOCLIST:
+	  /* `struct dwarf2_loclist_baton' is too bound to its objfile so
+	     it is expected to be made constant by CHECK_TYPEDEF.  */
+	  if (TYPE_NOT_ALLOCATED (type)
+	      || TYPE_NOT_ASSOCIATED (type))
+	    {
+	      TYPE_RANGE_DATA (new_type)->low.u.dwarf_loclist.loclist = NULL;
+	      TYPE_RANGE_DATA (new_type)->low.u.dwarf_loclist.type = NULL;
+	    }
+	  else
+	    {
+	      TYPE_LOW_BOUND (new_type) = dwarf_loclist_baton_eval
+		       (TYPE_RANGE_DATA (new_type)->low.u.dwarf_loclist.loclist,
+			  TYPE_RANGE_DATA (new_type)->low.u.dwarf_loclist.type);
+	      TYPE_RANGE_DATA (new_type)->low.kind = RANGE_BOUND_KIND_CONSTANT;
+	    }
+	  break;
 	}
 
-      if (TYPE_HIGH_BOUND_IS_DWARF_BLOCK (type))
+      switch (TYPE_RANGE_DATA (new_type)->high.kind)
 	{
+	case RANGE_BOUND_KIND_CONSTANT:
+	  break;
+	case RANGE_BOUND_KIND_DWARF_BLOCK:
 	  /* `struct dwarf2_locexpr_baton' is too bound to its objfile so
 	     it is expected to be made constant by CHECK_TYPEDEF.  */
 	  if (TYPE_NOT_ALLOCATED (type)
 	      || TYPE_NOT_ASSOCIATED (type))
 	    TYPE_RANGE_DATA (new_type)->high.u.dwarf_block = NULL;
 	  else
-	    TYPE_HIGH_BOUND (new_type) = dwarf_locexpr_baton_eval
+	    {
+	      TYPE_HIGH_BOUND (new_type) = dwarf_locexpr_baton_eval
 			       (TYPE_RANGE_DATA (new_type)->high.u.dwarf_block);
-	  TYPE_HIGH_BOUND_IS_DWARF_BLOCK (new_type) = 0;
+	      TYPE_RANGE_DATA (new_type)->high.kind = RANGE_BOUND_KIND_CONSTANT;
+	    }
+	  break;
+	case RANGE_BOUND_KIND_DWARF_LOCLIST:
+	  /* `struct dwarf2_loclist_baton' is too bound to its objfile so
+	     it is expected to be made constant by CHECK_TYPEDEF.  */
+	  if (TYPE_NOT_ALLOCATED (type)
+	      || TYPE_NOT_ASSOCIATED (type))
+	    {
+	      TYPE_RANGE_DATA (new_type)->high.u.dwarf_loclist.loclist = NULL;
+	      TYPE_RANGE_DATA (new_type)->high.u.dwarf_loclist.type = NULL;
+	    }
+	  else
+	    {
+	      TYPE_HIGH_BOUND (new_type) = dwarf_loclist_baton_eval
+		      (TYPE_RANGE_DATA (new_type)->high.u.dwarf_loclist.loclist,
+			 TYPE_RANGE_DATA (new_type)->high.u.dwarf_loclist.type);
+	      TYPE_RANGE_DATA (new_type)->high.kind = RANGE_BOUND_KIND_CONSTANT;
+	    }
+	  break;
 	}
 
-      if (TYPE_BYTE_STRIDE_IS_DWARF_BLOCK (type))
+      switch (TYPE_RANGE_DATA (new_type)->byte_stride.kind)
 	{
+	case RANGE_BOUND_KIND_CONSTANT:
+	  break;
+	case RANGE_BOUND_KIND_DWARF_BLOCK:
 	  /* `struct dwarf2_locexpr_baton' is too bound to its objfile so
 	     it is expected to be made constant by CHECK_TYPEDEF.  */
 	  if (TYPE_NOT_ALLOCATED (type)
 	      || TYPE_NOT_ASSOCIATED (type))
 	    TYPE_RANGE_DATA (new_type)->byte_stride.u.dwarf_block = NULL;
 	  else
-	    TYPE_BYTE_STRIDE (new_type) = dwarf_locexpr_baton_eval
+	    {
+	      TYPE_BYTE_STRIDE (new_type) = dwarf_locexpr_baton_eval
 			(TYPE_RANGE_DATA (new_type)->byte_stride.u.dwarf_block);
-	  TYPE_BYTE_STRIDE_IS_DWARF_BLOCK (new_type) = 0;
+	      TYPE_RANGE_DATA (new_type)->byte_stride.kind
+	        = RANGE_BOUND_KIND_CONSTANT;
+	    }
+	  break;
+	case RANGE_BOUND_KIND_DWARF_LOCLIST:
+	  /* `struct dwarf2_loclist_baton' is too bound to its objfile so
+	     it is expected to be made constant by CHECK_TYPEDEF.  */
+	  if (TYPE_NOT_ALLOCATED (type)
+	      || TYPE_NOT_ASSOCIATED (type))
+	    {
+	      TYPE_RANGE_DATA (new_type)->byte_stride.u.dwarf_loclist.loclist
+		= NULL;
+	      TYPE_RANGE_DATA (new_type)->byte_stride.u.dwarf_loclist.type
+		= NULL;
+	    }
+	  else
+	    {
+	      TYPE_BYTE_STRIDE (new_type) = dwarf_loclist_baton_eval
+	       (TYPE_RANGE_DATA (new_type)->byte_stride.u.dwarf_loclist.loclist,
+		  TYPE_RANGE_DATA (new_type)->byte_stride.u.dwarf_loclist.type);
+	      TYPE_RANGE_DATA (new_type)->byte_stride.kind
+		= RANGE_BOUND_KIND_CONSTANT;
+	    }
+	  break;
 	}
 
       /* Convert TYPE_RANGE_HIGH_BOUND_IS_COUNT into a regular bound.  */

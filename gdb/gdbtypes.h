@@ -609,11 +609,23 @@ struct main_type
 	{
 	  union
 	    {
-	      struct dwarf2_locexpr_baton *dwarf_block;
 	      LONGEST constant;
+	      struct dwarf2_locexpr_baton *dwarf_block;
+	      struct
+		{
+		  struct dwarf2_loclist_baton *loclist;
+		  struct type *type;
+		}
+	      dwarf_loclist;
 	    }
 	  u;
-	  unsigned is_dwarf_block : 1;
+	  enum range_bound_kind
+	    {
+	      RANGE_BOUND_KIND_CONSTANT,
+	      RANGE_BOUND_KIND_DWARF_BLOCK,
+	      RANGE_BOUND_KIND_DWARF_LOCLIST
+	    }
+	  kind;
 	}
       /* Low bound of range. */
       low,
