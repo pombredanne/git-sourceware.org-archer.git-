@@ -3308,7 +3308,7 @@ copy_type_recursive_1 (struct objfile *objfile,
   TYPE_DYNAMIC (new_type) = 0;
 
   /* For range types, copy the bounds information. */
-  if (TYPE_CODE (type) == TYPE_CODE_RANGE)
+  if (TYPE_CODE (new_type) == TYPE_CODE_RANGE)
     {
       TYPE_RANGE_DATA (new_type) = xmalloc (sizeof (struct range_bounds));
       *TYPE_RANGE_DATA (new_type) = *TYPE_RANGE_DATA (type);
@@ -3319,9 +3319,10 @@ copy_type_recursive_1 (struct objfile *objfile,
 	  break;
 	case RANGE_BOUND_KIND_DWARF_BLOCK:
 	  /* `struct dwarf2_locexpr_baton' is too bound to its objfile so
-	     it is expected to be made constant by CHECK_TYPEDEF.  */
-	  if (TYPE_NOT_ALLOCATED (type)
-	      || TYPE_NOT_ASSOCIATED (type))
+	     it is expected to be made constant by CHECK_TYPEDEF.
+	     TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
+	     */
+	  if (TYPE_NOT_ALLOCATED (new_type) || TYPE_NOT_ASSOCIATED (new_type))
 	    TYPE_RANGE_DATA (new_type)->low.u.dwarf_block = NULL;
 	  else
 	    {
@@ -3332,9 +3333,10 @@ copy_type_recursive_1 (struct objfile *objfile,
 	  break;
 	case RANGE_BOUND_KIND_DWARF_LOCLIST:
 	  /* `struct dwarf2_loclist_baton' is too bound to its objfile so
-	     it is expected to be made constant by CHECK_TYPEDEF.  */
-	  if (TYPE_NOT_ALLOCATED (type)
-	      || TYPE_NOT_ASSOCIATED (type))
+	     it is expected to be made constant by CHECK_TYPEDEF.
+	     TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
+	     */
+	  if (TYPE_NOT_ALLOCATED (new_type) || TYPE_NOT_ASSOCIATED (new_type))
 	    {
 	      TYPE_RANGE_DATA (new_type)->low.u.dwarf_loclist.loclist = NULL;
 	      TYPE_RANGE_DATA (new_type)->low.u.dwarf_loclist.type = NULL;
@@ -3355,9 +3357,10 @@ copy_type_recursive_1 (struct objfile *objfile,
 	  break;
 	case RANGE_BOUND_KIND_DWARF_BLOCK:
 	  /* `struct dwarf2_locexpr_baton' is too bound to its objfile so
-	     it is expected to be made constant by CHECK_TYPEDEF.  */
-	  if (TYPE_NOT_ALLOCATED (type)
-	      || TYPE_NOT_ASSOCIATED (type))
+	     it is expected to be made constant by CHECK_TYPEDEF.
+	     TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
+	     */
+	  if (TYPE_NOT_ALLOCATED (new_type) || TYPE_NOT_ASSOCIATED (new_type))
 	    TYPE_RANGE_DATA (new_type)->high.u.dwarf_block = NULL;
 	  else
 	    {
@@ -3368,9 +3371,10 @@ copy_type_recursive_1 (struct objfile *objfile,
 	  break;
 	case RANGE_BOUND_KIND_DWARF_LOCLIST:
 	  /* `struct dwarf2_loclist_baton' is too bound to its objfile so
-	     it is expected to be made constant by CHECK_TYPEDEF.  */
-	  if (TYPE_NOT_ALLOCATED (type)
-	      || TYPE_NOT_ASSOCIATED (type))
+	     it is expected to be made constant by CHECK_TYPEDEF.
+	     TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
+	     */
+	  if (TYPE_NOT_ALLOCATED (new_type) || TYPE_NOT_ASSOCIATED (new_type))
 	    {
 	      TYPE_RANGE_DATA (new_type)->high.u.dwarf_loclist.loclist = NULL;
 	      TYPE_RANGE_DATA (new_type)->high.u.dwarf_loclist.type = NULL;
@@ -3391,9 +3395,10 @@ copy_type_recursive_1 (struct objfile *objfile,
 	  break;
 	case RANGE_BOUND_KIND_DWARF_BLOCK:
 	  /* `struct dwarf2_locexpr_baton' is too bound to its objfile so
-	     it is expected to be made constant by CHECK_TYPEDEF.  */
-	  if (TYPE_NOT_ALLOCATED (type)
-	      || TYPE_NOT_ASSOCIATED (type))
+	     it is expected to be made constant by CHECK_TYPEDEF.
+	     TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
+	     */
+	  if (TYPE_NOT_ALLOCATED (new_type) || TYPE_NOT_ASSOCIATED (new_type))
 	    TYPE_RANGE_DATA (new_type)->byte_stride.u.dwarf_block = NULL;
 	  else
 	    {
@@ -3405,9 +3410,10 @@ copy_type_recursive_1 (struct objfile *objfile,
 	  break;
 	case RANGE_BOUND_KIND_DWARF_LOCLIST:
 	  /* `struct dwarf2_loclist_baton' is too bound to its objfile so
-	     it is expected to be made constant by CHECK_TYPEDEF.  */
-	  if (TYPE_NOT_ALLOCATED (type)
-	      || TYPE_NOT_ASSOCIATED (type))
+	     it is expected to be made constant by CHECK_TYPEDEF.
+	     TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
+	     */
+	  if (TYPE_NOT_ALLOCATED (new_type) || TYPE_NOT_ASSOCIATED (new_type))
 	    {
 	      TYPE_RANGE_DATA (new_type)->byte_stride.u.dwarf_loclist.loclist
 		= NULL;
@@ -3426,10 +3432,10 @@ copy_type_recursive_1 (struct objfile *objfile,
 	}
 
       /* Convert TYPE_RANGE_HIGH_BOUND_IS_COUNT into a regular bound.  */
-      if (TYPE_RANGE_HIGH_BOUND_IS_COUNT (type))
+      if (TYPE_RANGE_HIGH_BOUND_IS_COUNT (new_type))
 	{
-	  TYPE_HIGH_BOUND (new_type) = TYPE_LOW_BOUND (type)
-				       + TYPE_HIGH_BOUND (type) - 1;
+	  TYPE_HIGH_BOUND (new_type) = TYPE_LOW_BOUND (new_type)
+				       + TYPE_HIGH_BOUND (new_type) - 1;
 	  TYPE_RANGE_HIGH_BOUND_IS_COUNT (new_type) = 0;
 	}
     }
