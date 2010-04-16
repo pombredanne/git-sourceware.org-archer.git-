@@ -1006,12 +1006,6 @@ extern void allocate_gnat_aux_type (struct type *);
    TYPE_RANGE_DATA(range_type)->low_undefined
 #define TYPE_HIGH_BOUND_UNDEFINED(range_type) \
    TYPE_RANGE_DATA(range_type)->high_undefined
-#define TYPE_LOW_BOUND_IS_DWARF_BLOCK(range_type) \
-   TYPE_RANGE_DATA(range_type)->low.is_dwarf_block
-#define TYPE_HIGH_BOUND_IS_DWARF_BLOCK(range_type) \
-   TYPE_RANGE_DATA(range_type)->high.is_dwarf_block
-#define TYPE_BYTE_STRIDE_IS_DWARF_BLOCK(range_type) \
-   TYPE_RANGE_DATA(range_type)->byte_stride.is_dwarf_block
 
 /* Moto-specific stuff for FORTRAN arrays */
 
@@ -1019,11 +1013,6 @@ extern void allocate_gnat_aux_type (struct type *);
    TYPE_HIGH_BOUND_UNDEFINED(TYPE_INDEX_TYPE(arraytype))
 #define TYPE_ARRAY_LOWER_BOUND_IS_UNDEFINED(arraytype) \
    TYPE_LOW_BOUND_UNDEFINED(TYPE_INDEX_TYPE(arraytype))
-
-#define TYPE_ARRAY_UPPER_BOUND_IS_DWARF_BLOCK(arraytype) \
-   TYPE_HIGH_BOUND_IS_DWARF_BLOCK(TYPE_INDEX_TYPE(arraytype))
-#define TYPE_ARRAY_LOWER_BOUND_IS_DWARF_BLOCK(arraytype) \
-   TYPE_LOW_BOUND_IS_DWARF_BLOCK(TYPE_INDEX_TYPE(arraytype))
 
 #define TYPE_ARRAY_UPPER_BOUND_VALUE(arraytype) \
    (TYPE_HIGH_BOUND(TYPE_INDEX_TYPE((arraytype))))

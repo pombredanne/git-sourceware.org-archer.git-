@@ -3322,32 +3322,40 @@ copy_type_recursive_1 (struct objfile *objfile,
 	     it is expected to be made constant by CHECK_TYPEDEF.
 	     TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
 	     */
-	  if (TYPE_NOT_ALLOCATED (new_type) || TYPE_NOT_ASSOCIATED (new_type))
-	    TYPE_RANGE_DATA (new_type)->low.u.dwarf_block = NULL;
-	  else
+	  if (TYPE_NOT_ALLOCATED (new_type) || TYPE_NOT_ASSOCIATED (new_type)
+	      || ! has_stack_frames ())
 	    {
-	      TYPE_LOW_BOUND (new_type) = dwarf_locexpr_baton_eval
-				(TYPE_RANGE_DATA (new_type)->low.u.dwarf_block);
-	      TYPE_RANGE_DATA (new_type)->low.kind = RANGE_BOUND_KIND_CONSTANT;
+	      /* We should set 1 for Fortran but how to find the language?  */
+	      TYPE_LOW_BOUND (new_type) = 0;
+	      TYPE_LOW_BOUND_UNDEFINED (new_type) = 1;
 	    }
+	  else
+	    TYPE_LOW_BOUND (new_type) = dwarf_locexpr_baton_eval
+				(TYPE_RANGE_DATA (new_type)->low.u.dwarf_block);
+	  TYPE_RANGE_DATA (new_type)->low.kind = RANGE_BOUND_KIND_CONSTANT;
 	  break;
 	case RANGE_BOUND_KIND_DWARF_LOCLIST:
-	  /* `struct dwarf2_loclist_baton' is too bound to its objfile so
-	     it is expected to be made constant by CHECK_TYPEDEF.
-	     TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
-	     */
-	  if (TYPE_NOT_ALLOCATED (new_type) || TYPE_NOT_ASSOCIATED (new_type))
-	    {
-	      TYPE_RANGE_DATA (new_type)->low.u.dwarf_loclist.loclist = NULL;
-	      TYPE_RANGE_DATA (new_type)->low.u.dwarf_loclist.type = NULL;
-	    }
-	  else
-	    {
-	      TYPE_LOW_BOUND (new_type) = dwarf_loclist_baton_eval
-		       (TYPE_RANGE_DATA (new_type)->low.u.dwarf_loclist.loclist,
-			  TYPE_RANGE_DATA (new_type)->low.u.dwarf_loclist.type);
-	      TYPE_RANGE_DATA (new_type)->low.kind = RANGE_BOUND_KIND_CONSTANT;
-	    }
+	  {
+	    CORE_ADDR addr;
+
+	    /* `struct dwarf2_loclist_baton' is too bound to its objfile so
+	       it is expected to be made constant by CHECK_TYPEDEF.
+	       TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
+	       */
+	    if (! TYPE_NOT_ALLOCATED (new_type)
+	        && ! TYPE_NOT_ASSOCIATED (new_type) && has_stack_frames ()
+	        && dwarf_loclist_baton_eval
+		  (TYPE_RANGE_DATA (new_type)->low.u.dwarf_loclist.loclist,
+		   TYPE_RANGE_DATA (new_type)->low.u.dwarf_loclist.type, &addr))
+	      TYPE_LOW_BOUND (new_type) = addr;
+	    else
+	      {
+		/* We should set 1 for Fortran but how to find the language?  */
+		TYPE_LOW_BOUND (new_type) = 0;
+		TYPE_LOW_BOUND_UNDEFINED (new_type) = 1;
+	      }
+	    TYPE_RANGE_DATA (new_type)->low.kind = RANGE_BOUND_KIND_CONSTANT;
+	  }
 	  break;
 	}
 
@@ -3360,32 +3368,39 @@ copy_type_recursive_1 (struct objfile *objfile,
 	     it is expected to be made constant by CHECK_TYPEDEF.
 	     TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
 	     */
-	  if (TYPE_NOT_ALLOCATED (new_type) || TYPE_NOT_ASSOCIATED (new_type))
-	    TYPE_RANGE_DATA (new_type)->high.u.dwarf_block = NULL;
-	  else
+	  if (TYPE_NOT_ALLOCATED (new_type) || TYPE_NOT_ASSOCIATED (new_type)
+	      || ! has_stack_frames ())
 	    {
-	      TYPE_HIGH_BOUND (new_type) = dwarf_locexpr_baton_eval
-			       (TYPE_RANGE_DATA (new_type)->high.u.dwarf_block);
-	      TYPE_RANGE_DATA (new_type)->high.kind = RANGE_BOUND_KIND_CONSTANT;
+	      TYPE_HIGH_BOUND (new_type) = TYPE_LOW_BOUND (new_type) - 1;
+	      TYPE_HIGH_BOUND_UNDEFINED (new_type) = 1;
 	    }
+	  else
+	    TYPE_HIGH_BOUND (new_type) = dwarf_locexpr_baton_eval
+			       (TYPE_RANGE_DATA (new_type)->high.u.dwarf_block);
+	  TYPE_RANGE_DATA (new_type)->high.kind = RANGE_BOUND_KIND_CONSTANT;
 	  break;
 	case RANGE_BOUND_KIND_DWARF_LOCLIST:
-	  /* `struct dwarf2_loclist_baton' is too bound to its objfile so
-	     it is expected to be made constant by CHECK_TYPEDEF.
-	     TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
-	     */
-	  if (TYPE_NOT_ALLOCATED (new_type) || TYPE_NOT_ASSOCIATED (new_type))
-	    {
-	      TYPE_RANGE_DATA (new_type)->high.u.dwarf_loclist.loclist = NULL;
-	      TYPE_RANGE_DATA (new_type)->high.u.dwarf_loclist.type = NULL;
-	    }
-	  else
-	    {
-	      TYPE_HIGH_BOUND (new_type) = dwarf_loclist_baton_eval
+	  {
+	    CORE_ADDR addr;
+
+	    /* `struct dwarf2_loclist_baton' is too bound to its objfile so
+	       it is expected to be made constant by CHECK_TYPEDEF.
+	       TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
+	       */
+	    if (! TYPE_NOT_ALLOCATED (new_type)
+	        && ! TYPE_NOT_ASSOCIATED (new_type) && has_stack_frames ()
+	        && dwarf_loclist_baton_eval
 		      (TYPE_RANGE_DATA (new_type)->high.u.dwarf_loclist.loclist,
-			 TYPE_RANGE_DATA (new_type)->high.u.dwarf_loclist.type);
-	      TYPE_RANGE_DATA (new_type)->high.kind = RANGE_BOUND_KIND_CONSTANT;
-	    }
+		       TYPE_RANGE_DATA (new_type)->high.u.dwarf_loclist.type,
+		       &addr))
+	      TYPE_HIGH_BOUND (new_type) = addr;
+	    else
+	      {
+		TYPE_HIGH_BOUND (new_type) = TYPE_LOW_BOUND (new_type) - 1;
+		TYPE_HIGH_BOUND_UNDEFINED (new_type) = 1;
+	      }
+	    TYPE_RANGE_DATA (new_type)->high.kind = RANGE_BOUND_KIND_CONSTANT;
+	  }
 	  break;
 	}
 
@@ -3398,36 +3413,33 @@ copy_type_recursive_1 (struct objfile *objfile,
 	     it is expected to be made constant by CHECK_TYPEDEF.
 	     TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
 	     */
-	  if (TYPE_NOT_ALLOCATED (new_type) || TYPE_NOT_ASSOCIATED (new_type))
-	    TYPE_RANGE_DATA (new_type)->byte_stride.u.dwarf_block = NULL;
+	  if (TYPE_NOT_ALLOCATED (new_type) || TYPE_NOT_ASSOCIATED (new_type)
+	      || ! has_stack_frames ())
+	    TYPE_BYTE_STRIDE (new_type) = 0;
 	  else
-	    {
-	      TYPE_BYTE_STRIDE (new_type) = dwarf_locexpr_baton_eval
+	    TYPE_BYTE_STRIDE (new_type) = dwarf_locexpr_baton_eval
 			(TYPE_RANGE_DATA (new_type)->byte_stride.u.dwarf_block);
-	      TYPE_RANGE_DATA (new_type)->byte_stride.kind
-	        = RANGE_BOUND_KIND_CONSTANT;
-	    }
+	  TYPE_RANGE_DATA (new_type)->byte_stride.kind
+	    = RANGE_BOUND_KIND_CONSTANT;
 	  break;
 	case RANGE_BOUND_KIND_DWARF_LOCLIST:
-	  /* `struct dwarf2_loclist_baton' is too bound to its objfile so
-	     it is expected to be made constant by CHECK_TYPEDEF.
-	     TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
-	     */
-	  if (TYPE_NOT_ALLOCATED (new_type) || TYPE_NOT_ASSOCIATED (new_type))
-	    {
-	      TYPE_RANGE_DATA (new_type)->byte_stride.u.dwarf_loclist.loclist
-		= NULL;
-	      TYPE_RANGE_DATA (new_type)->byte_stride.u.dwarf_loclist.type
-		= NULL;
-	    }
-	  else
-	    {
-	      TYPE_BYTE_STRIDE (new_type) = dwarf_loclist_baton_eval
+	  {
+	    CORE_ADDR addr = 0;
+
+	    /* `struct dwarf2_loclist_baton' is too bound to its objfile so
+	       it is expected to be made constant by CHECK_TYPEDEF.
+	       TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
+	       */
+	    if (! TYPE_NOT_ALLOCATED (new_type)
+		&& ! TYPE_NOT_ASSOCIATED (new_type) && has_stack_frames ())
+	      dwarf_loclist_baton_eval
 	       (TYPE_RANGE_DATA (new_type)->byte_stride.u.dwarf_loclist.loclist,
-		  TYPE_RANGE_DATA (new_type)->byte_stride.u.dwarf_loclist.type);
-	      TYPE_RANGE_DATA (new_type)->byte_stride.kind
-		= RANGE_BOUND_KIND_CONSTANT;
-	    }
+		TYPE_RANGE_DATA (new_type)->byte_stride.u.dwarf_loclist.type,
+		&addr);
+	    TYPE_BYTE_STRIDE (new_type) = addr;
+	    TYPE_RANGE_DATA (new_type)->byte_stride.kind
+	      = RANGE_BOUND_KIND_CONSTANT;
+	  }
 	  break;
 	}
 

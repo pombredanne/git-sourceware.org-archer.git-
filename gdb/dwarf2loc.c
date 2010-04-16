@@ -371,31 +371,29 @@ dwarf_locexpr_baton_eval (struct dwarf2_locexpr_baton *dlbaton)
 }
 
 /* Evaluate DWARF location list at DLLBATON expecting it produces exactly one
-   CORE_ADDR result on the DWARF stack stack.  */
+   CORE_ADDR result stored to *ADDRP on the DWARF stack stack.  If the result
+   could not be found return zero and keep *ADDRP unchanged.  */
 
-CORE_ADDR
+int
 dwarf_loclist_baton_eval (struct dwarf2_loclist_baton *dllbaton,
-			  struct type *type)
+			  struct type *type, CORE_ADDR *addrp)
 {
   struct frame_info *frame = get_selected_frame (NULL);
-  CORE_ADDR frame_pc = get_frame_address_in_block (frame);
   gdb_byte *data;
   size_t size;
   struct value *val;
 
-  data = find_location_expression (dllbaton, &size, frame_pc);
-  if (data)
-    val = dwarf2_evaluate_loc_desc (type, frame, data, size,
-				    dllbaton->per_cu);
-  if (data == NULL || value_optimized_out (val))
-    {
-      struct gdbarch *frame_gdbarch = get_frame_arch (frame);
+  data = find_location_expression (dllbaton, &size,
+				   get_frame_address_in_block (frame));
+  if (data == NULL)
+    return 0;
 
-      error (_("<optimized out> at %s is unsupported for DW_FORM_(loclist)"),
-	     paddress (frame_gdbarch, frame_pc));
-    }
+  val = dwarf2_evaluate_loc_desc (type, frame, data, size, dllbaton->per_cu);
+  if (value_optimized_out (val))
+    return 0;
 
-  return value_as_address (val);
+  *addrp = value_as_address (val);
+  return 1;
 }
 
 struct piece_closure

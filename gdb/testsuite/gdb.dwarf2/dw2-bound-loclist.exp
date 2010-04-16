@@ -34,10 +34,15 @@ if { [prepare_for_testing ${testfile}.exp ${testfile} [list ${testfile}.S main.c
     return -1
 }
 
+# Verify it behaves at least as an unbound array without inferior.
+
+gdb_test "p a_string" { = 0x[0-9a-f]+ "seennotseen"}
+gdb_test "ptype a_string" {type = char \[\]}
+
 # Not runto_main as dw2-bound-loclist.S handles only the first byte of main.
 if ![runto "*main"] {
     return -1
 }
 
-gdb_test "p a_string" " = \"seen\""
-gdb_test "ptype a_string" "type = char \\\[4\\\]"
+gdb_test "p a_string" { = "seen"}
+gdb_test "ptype a_string" {type = char \[4\]}
