@@ -365,6 +365,7 @@ trace_variable_command (char *args, int from_tty)
       tsv->initial_value = initval;
       printf_filtered (_("Trace state variable $%s now has initial value %s.\n"),
 		       tsv->name, plongest (tsv->initial_value));
+      do_cleanups (old_chain);
       return;
     }
 
@@ -559,16 +560,16 @@ trace_actions_command (char *args, int from_tty)
    internal errors.  */
 
 static void
-report_agent_reqs_errors (struct agent_expr *aexpr, struct agent_reqs *areqs)
+report_agent_reqs_errors (struct agent_expr *aexpr)
 {
   /* All of the "flaws" are serious bytecode generation issues that
      should never occur.  */
-  if (areqs->flaw != agent_flaw_none)
+  if (aexpr->flaw != agent_flaw_none)
     internal_error (__FILE__, __LINE__, _("expression is malformed"));
 
   /* If analysis shows a stack underflow, GDB must have done something
      badly wrong in its bytecode generation.  */
-  if (areqs->min_height < 0)
+  if (aexpr->min_height < 0)
     internal_error (__FILE__, __LINE__,
 		    _("expression has min height < 0"));
 
@@ -578,7 +579,7 @@ report_agent_reqs_errors (struct agent_expr *aexpr, struct agent_reqs *areqs)
      depth roughly corresponds to parenthesization, so a limit of 20
      amounts to 20 levels of expression nesting, which is actually
      a pretty big hairy expression.  */
-  if (areqs->max_height > 20)
+  if (aexpr->max_height > 20)
     error (_("Expression is too complicated."));
 }
 
@@ -592,7 +593,6 @@ validate_actionline (char **line, struct breakpoint *t)
   char *p, *tmp_p;
   struct bp_location *loc;
   struct agent_expr *aexpr;
-  struct agent_reqs areqs;
 
   /* if EOF is typed, *line is NULL */
   if (*line == NULL)
@@ -662,10 +662,9 @@ validate_actionline (char **line, struct breakpoint *t)
 	      if (aexpr->len > MAX_AGENT_EXPR_LEN)
 		error (_("Expression is too complicated."));
 
-	      ax_reqs (aexpr, &areqs);
-	      (void) make_cleanup (xfree, areqs.reg_mask);
+	      ax_reqs (aexpr);
 
-	      report_agent_reqs_errors (aexpr, &areqs);
+	      report_agent_reqs_errors (aexpr);
 
 	      do_cleanups (old_chain);
 	    }
@@ -698,10 +697,8 @@ validate_actionline (char **line, struct breakpoint *t)
 	      if (aexpr->len > MAX_AGENT_EXPR_LEN)
 		error (_("Expression is too complicated."));
 
-	      ax_reqs (aexpr, &areqs);
-	      (void) make_cleanup (xfree, areqs.reg_mask);
-
-	      report_agent_reqs_errors (aexpr, &areqs);
+	      ax_reqs (aexpr);
+	      report_agent_reqs_errors (aexpr);
 
 	      do_cleanups (old_chain);
 	    }
@@ -973,7 +970,6 @@ collect_symbol (struct collection_list *collect,
     {
       struct agent_expr *aexpr;
       struct cleanup *old_chain1 = NULL;
-      struct agent_reqs areqs;
 
       aexpr = gen_trace_for_var (scope, gdbarch, sym);
 
@@ -989,26 +985,26 @@ collect_symbol (struct collection_list *collect,
 
       old_chain1 = make_cleanup_free_agent_expr (aexpr);
 
-      ax_reqs (aexpr, &areqs);
+      ax_reqs (aexpr);
 
-      report_agent_reqs_errors (aexpr, &areqs);
+      report_agent_reqs_errors (aexpr);
 
       discard_cleanups (old_chain1);
       add_aexpr (collect, aexpr);
 
       /* take care of the registers */
-      if (areqs.reg_mask_len > 0)
+      if (aexpr->reg_mask_len > 0)
 	{
 	  int ndx1, ndx2;
 
-	  for (ndx1 = 0; ndx1 < areqs.reg_mask_len; ndx1++)
+	  for (ndx1 = 0; ndx1 < aexpr->reg_mask_len; ndx1++)
 	    {
 	      QUIT;	/* allow user to bail out with ^C */
-	      if (areqs.reg_mask[ndx1] != 0)
+	      if (aexpr->reg_mask[ndx1] != 0)
 		{
 		  /* assume chars have 8 bits */
 		  for (ndx2 = 0; ndx2 < 8; ndx2++)
-		    if (areqs.reg_mask[ndx1] & (1 << ndx2))
+		    if (aexpr->reg_mask[ndx1] & (1 << ndx2))
 		      /* it's used -- record it */
 		      add_register (collect, ndx1 * 8 + ndx2);
 		}
@@ -1286,7 +1282,6 @@ encode_actions_1 (struct command_line *action,
 		  unsigned long addr, len;
 		  struct cleanup *old_chain = NULL;
 		  struct cleanup *old_chain1 = NULL;
-		  struct agent_reqs areqs;
 
 		  exp = parse_exp_1 (&action_exp, 
 				     block_for_pc (tloc->address), 1);
@@ -1332,27 +1327,27 @@ encode_actions_1 (struct command_line *action,
 
 		      old_chain1 = make_cleanup_free_agent_expr (aexpr);
 
-		      ax_reqs (aexpr, &areqs);
+		      ax_reqs (aexpr);
 
-		      report_agent_reqs_errors (aexpr, &areqs);
+		      report_agent_reqs_errors (aexpr);
 
 		      discard_cleanups (old_chain1);
 		      add_aexpr (collect, aexpr);
 
 		      /* take care of the registers */
-		      if (areqs.reg_mask_len > 0)
+		      if (aexpr->reg_mask_len > 0)
 			{
 			  int ndx1;
 			  int ndx2;
 
-			  for (ndx1 = 0; ndx1 < areqs.reg_mask_len; ndx1++)
+			  for (ndx1 = 0; ndx1 < aexpr->reg_mask_len; ndx1++)
 			    {
 			      QUIT;	/* allow user to bail out with ^C */
-			      if (areqs.reg_mask[ndx1] != 0)
+			      if (aexpr->reg_mask[ndx1] != 0)
 				{
 				  /* assume chars have 8 bits */
 				  for (ndx2 = 0; ndx2 < 8; ndx2++)
-				    if (areqs.reg_mask[ndx1] & (1 << ndx2))
+				    if (aexpr->reg_mask[ndx1] & (1 << ndx2))
 				      /* it's used -- record it */
 				      add_register (collect, 
 						    ndx1 * 8 + ndx2);
@@ -1378,7 +1373,6 @@ encode_actions_1 (struct command_line *action,
 		  unsigned long addr, len;
 		  struct cleanup *old_chain = NULL;
 		  struct cleanup *old_chain1 = NULL;
-		  struct agent_reqs areqs;
 
 		  exp = parse_exp_1 (&action_exp, 
 				     block_for_pc (tloc->address), 1);
@@ -1387,9 +1381,8 @@ encode_actions_1 (struct command_line *action,
 		  aexpr = gen_eval_for_expr (tloc->address, exp);
 		  old_chain1 = make_cleanup_free_agent_expr (aexpr);
 
-		  ax_reqs (aexpr, &areqs);
-
-		  report_agent_reqs_errors (aexpr, &areqs);
+		  ax_reqs (aexpr);
+		  report_agent_reqs_errors (aexpr);
 
 		  discard_cleanups (old_chain1);
 		  /* Even though we're not officially collecting, add
@@ -1798,6 +1791,8 @@ trace_status_mi (int on_stop)
 
   if (ts->traceframe_count != -1)
     ui_out_field_int (uiout, "frames", ts->traceframe_count);
+  if (ts->traceframes_created != -1)
+    ui_out_field_int (uiout, "frames-created", ts->traceframes_created);
   if (ts->buffer_size != -1)
     ui_out_field_int (uiout, "buffer-size", ts->buffer_size);
   if (ts->buffer_free != -1)
@@ -1854,11 +1849,19 @@ tfind_1 (enum trace_find_type type, int num,
 	 int from_tty)
 {
   int target_frameno = -1, target_tracept = -1;
-  struct frame_id old_frame_id;
+  struct frame_id old_frame_id = null_frame_id;
   char *reply;
   struct breakpoint *tp;
 
-  old_frame_id = get_frame_id (get_current_frame ());
+  /* Only try to get the current stack frame if we have a chance of
+     succeeding.  In particular, if we're trying to get a first trace
+     frame while all threads are running, it's not going to succeed,
+     so leave it with a default value and let the frame comparison
+     below (correctly) decide to print out the source location of the
+     trace frame.  */
+  if (!(type == tfind_number && num == -1)
+      && (has_stack_frames () || traceframe_number >= 0))
+    old_frame_id = get_frame_id (get_current_frame ());
 
   target_frameno = target_trace_find (type, num, addr1, addr2,
 				      &target_tracept);
@@ -1871,7 +1874,7 @@ tfind_1 (enum trace_find_type type, int num,
     }
   else if (target_frameno == -1)
     {
-      /* A request for a non-existant trace frame has failed.
+      /* A request for a non-existent trace frame has failed.
 	 Our response will be different, depending on FROM_TTY:
 
 	 If FROM_TTY is true, meaning that this command was 
@@ -1938,8 +1941,10 @@ tfind_1 (enum trace_find_type type, int num,
     {
       if (ui_out_is_mi_like_p (uiout))
 	ui_out_field_string (uiout, "found", "0");
-      else
-	printf_unfiltered (_("No trace frame found"));
+      else if (type == tfind_number && num == -1)
+	printf_unfiltered (_("No longer looking at any trace frame\n"));
+      else /* this case may never occur, check */
+	printf_unfiltered (_("No trace frame found\n"));
     }
 
   /* If we're in nonstop mode and getting out of looking at trace
@@ -1950,7 +1955,7 @@ tfind_1 (enum trace_find_type type, int num,
     {
       enum print_what print_what;
 
-      /* NOTE: in immitation of the step command, try to determine
+      /* NOTE: in imitation of the step command, try to determine
          whether we have made a transition from one function to
          another.  If so, we'll print the "stack frame" (ie. the new
          function and it's arguments) -- otherwise we'll just show the
@@ -2359,7 +2364,9 @@ scope_info (char *args, int from_tty)
 	      printf_filtered ("optimized out.\n");
 	      continue;
 	    case LOC_COMPUTED:
-	      SYMBOL_COMPUTED_OPS (sym)->describe_location (sym, gdb_stdout);
+	      SYMBOL_COMPUTED_OPS (sym)->describe_location (sym,
+							    BLOCK_START (block),
+							    gdb_stdout);
 	      break;
 	    }
 	  if (SYMBOL_TYPE (sym))
@@ -2601,7 +2608,7 @@ trace_save (const char *filename, int target_does_save)
   pathname = tilde_expand (filename);
   cleanup = make_cleanup (xfree, pathname);
 
-  fp = fopen (pathname, "w");
+  fp = fopen (pathname, "wb");
   if (!fp)
     error (_("Unable to open file '%s' for saving trace data (%s)"),
 	   filename, safe_strerror (errno));
@@ -3890,7 +3897,14 @@ tfile_xfer_partial (struct target_ops *ops, enum target_object object,
 	      if (amt > len)
 		amt = len;
 
-	      read (trace_fd, readbuf, amt);
+	      gotten = read (trace_fd, readbuf, amt);
+	      if (gotten < 0)
+		perror_with_name (trace_filename);
+	      /* While it's acceptable to return less than was
+		 originally asked for, it's not acceptable to return
+		 less than what this block claims to contain.  */
+	      else if (gotten < amt)
+		error (_("Premature end of file while reading trace file"));
 	      return amt;
   	    }
 	  lseek (trace_fd, mlen, SEEK_CUR);

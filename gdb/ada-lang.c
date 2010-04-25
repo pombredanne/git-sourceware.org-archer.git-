@@ -226,8 +226,6 @@ static int find_struct_field (char *, struct type *, int,
 static struct value *ada_to_fixed_value_create (struct type *, CORE_ADDR,
                                                 struct value *);
 
-static struct value *ada_to_fixed_value (struct value *);
-
 static int ada_resolve_function (struct ada_symbol_info *, int,
                                  struct value **, int, const char *,
                                  struct type *);
@@ -3865,6 +3863,25 @@ ada_convert_actual (struct value *actual, struct type *formal_type0,
   return actual;
 }
 
+/* Convert VALUE (which must be an address) to a CORE_ADDR that is a pointer of
+   type TYPE.  This is usually an inefficient no-op except on some targets
+   (such as AVR) where the representation of a pointer and an address
+   differs.  */
+
+static CORE_ADDR
+value_pointer (struct value *value, struct type *type)
+{
+  struct gdbarch *gdbarch = get_type_arch (type);
+  unsigned len = TYPE_LENGTH (type);
+  gdb_byte *buf = alloca (len);
+  CORE_ADDR addr;
+
+  addr = value_address (value);
+  gdbarch_address_to_pointer (gdbarch, type, buf, addr);
+  addr = extract_unsigned_integer (buf, len, gdbarch_byte_order (gdbarch));
+  return addr;
+}
+
 
 /* Push a descriptor of type TYPE for array value ARR on the stack at
    *SP, updating *SP to reflect the new descriptor.  Return either
@@ -3900,13 +3917,15 @@ make_array_descriptor (struct type *type, struct value *arr,
 
   modify_general_field (value_type (descriptor),
 			value_contents_writeable (descriptor),
-                        value_address (ensure_lval (arr, gdbarch, sp)),
+                        value_pointer (ensure_lval (arr, gdbarch, sp),
+                                       TYPE_FIELD_TYPE (desc_type, 0)),
                         fat_pntr_data_bitpos (desc_type),
                         fat_pntr_data_bitsize (desc_type));
 
   modify_general_field (value_type (descriptor),
 			value_contents_writeable (descriptor),
-                        value_address (bounds),
+                        value_pointer (bounds,
+                                       TYPE_FIELD_TYPE (desc_type, 1)),
                         fat_pntr_bounds_bitpos (desc_type),
                         fat_pntr_bounds_bitsize (desc_type));
 
@@ -7449,7 +7468,7 @@ ada_to_fixed_value_create (struct type *type0, CORE_ADDR address,
    that correctly describes it.  Does not necessarily create a new
    value.  */
 
-static struct value *
+struct value *
 ada_to_fixed_value (struct value *val)
 {
   return ada_to_fixed_value_create (value_type (val),
@@ -10348,6 +10367,34 @@ print_mention_exception (enum exception_catchpoint_kind ex,
     }
 }
 
+/* Implement the PRINT_RECREATE method in the breakpoint_ops structure
+   for all exception catchpoint kinds.  */
+
+static void
+print_recreate_exception (enum exception_catchpoint_kind ex,
+			  struct breakpoint *b, struct ui_file *fp)
+{
+  switch (ex)
+    {
+      case ex_catch_exception:
+	fprintf_filtered (fp, "catch exception");
+	if (b->exp_string != NULL)
+	  fprintf_filtered (fp, " %s", b->exp_string);
+	break;
+
+      case ex_catch_exception_unhandled:
+	fprintf_filtered (fp, "catch exception unhandled");
+	break;
+
+      case ex_catch_assert:
+	fprintf_filtered (fp, "catch assert");
+	break;
+
+      default:
+	internal_error (__FILE__, __LINE__, _("unexpected catchpoint type"));
+    }
+}
+
 /* Virtual table for "catch exception" breakpoints.  */
 
 static enum print_stop_action
@@ -10368,6 +10415,12 @@ print_mention_catch_exception (struct breakpoint *b)
   print_mention_exception (ex_catch_exception, b);
 }
 
+static void
+print_recreate_catch_exception (struct breakpoint *b, struct ui_file *fp)
+{
+  print_recreate_exception (ex_catch_exception, b, fp);
+}
+
 static struct breakpoint_ops catch_exception_breakpoint_ops =
 {
   NULL, /* insert */
@@ -10375,7 +10428,8 @@ static struct breakpoint_ops catch_exception_breakpoint_ops =
   NULL, /* breakpoint_hit */
   print_it_catch_exception,
   print_one_catch_exception,
-  print_mention_catch_exception
+  print_mention_catch_exception,
+  print_recreate_catch_exception
 };
 
 /* Virtual table for "catch exception unhandled" breakpoints.  */
@@ -10399,13 +10453,21 @@ print_mention_catch_exception_unhandled (struct breakpoint *b)
   print_mention_exception (ex_catch_exception_unhandled, b);
 }
 
+static void
+print_recreate_catch_exception_unhandled (struct breakpoint *b,
+					  struct ui_file *fp)
+{
+  print_recreate_exception (ex_catch_exception_unhandled, b, fp);
+}
+
 static struct breakpoint_ops catch_exception_unhandled_breakpoint_ops = {
   NULL, /* insert */
   NULL, /* remove */
   NULL, /* breakpoint_hit */
   print_it_catch_exception_unhandled,
   print_one_catch_exception_unhandled,
-  print_mention_catch_exception_unhandled
+  print_mention_catch_exception_unhandled,
+  print_recreate_catch_exception_unhandled
 };
 
 /* Virtual table for "catch assert" breakpoints.  */
@@ -10428,13 +10490,20 @@ print_mention_catch_assert (struct breakpoint *b)
   print_mention_exception (ex_catch_assert, b);
 }
 
+static void
+print_recreate_catch_assert (struct breakpoint *b, struct ui_file *fp)
+{
+  print_recreate_exception (ex_catch_assert, b, fp);
+}
+
 static struct breakpoint_ops catch_assert_breakpoint_ops = {
   NULL, /* insert */
   NULL, /* remove */
   NULL, /* breakpoint_hit */
   print_it_catch_assert,
   print_one_catch_assert,
-  print_mention_catch_assert
+  print_mention_catch_assert,
+  print_recreate_catch_assert
 };
 
 /* Return non-zero if B is an Ada exception catchpoint.  */
@@ -10816,6 +10885,36 @@ ada_operator_length (struct expression *exp, int pc, int *oplenp, int *argsp)
       *argsp = longest_to_int (exp->elts[pc - 2].longconst) + 1;
       break;
     }
+}
+
+/* Implementation of the exp_descriptor method operator_check.  */
+
+static int
+ada_operator_check (struct expression *exp, int pos,
+		    int (*objfile_func) (struct objfile *objfile, void *data),
+		    void *data)
+{
+  const union exp_element *const elts = exp->elts;
+  struct type *type = NULL;
+
+  switch (elts[pos].opcode)
+    {
+      case UNOP_IN_RANGE:
+      case UNOP_QUAL:
+	type = elts[pos + 1].type;
+	break;
+
+      default:
+	return operator_check_standard (exp, pos, objfile_func, data);
+    }
+
+  /* Invoke callbacks for TYPE and OBJFILE if they were set as non-NULL.  */
+
+  if (type && TYPE_OBJFILE (type)
+      && (*objfile_func) (TYPE_OBJFILE (type), data))
+    return 1;
+
+  return 0;
 }
 
 static char *
@@ -11206,6 +11305,7 @@ parse (void)
 static const struct exp_descriptor ada_exp_descriptor = {
   ada_print_subexp,
   ada_operator_length,
+  ada_operator_check,
   ada_op_name,
   ada_dump_subexp_body,
   ada_evaluate_subexp
@@ -11228,7 +11328,7 @@ const struct language_defn ada_language_defn = {
   ada_printstr,                 /* Function to print string constant */
   emit_char,                    /* Function to print single char (not used) */
   ada_print_type,               /* Print a type using appropriate syntax */
-  default_print_typedef,	/* Print a typedef using appropriate syntax */
+  ada_print_typedef,            /* Print a typedef using appropriate syntax */
   ada_val_print,                /* Print a value using appropriate syntax */
   ada_value_print,              /* Print a top-level value */
   NULL,                         /* Language specific skip_trampoline */

@@ -1150,7 +1150,7 @@ lookup_symbol_aux_local (const char *name, const struct block *block,
 
 /* Look up OBJFILE to BLOCK.  */
 
-static struct objfile *
+struct objfile *
 lookup_objfile_from_block (const struct block *block)
 {
   struct objfile *obj;
@@ -3248,8 +3248,31 @@ rbreak_command (char *regexp, int from_tty)
   struct cleanup *old_chain;
   char *string = NULL;
   int len = 0;
+  char **files = NULL;
+  int nfiles = 0;
 
-  search_symbols (regexp, FUNCTIONS_DOMAIN, 0, (char **) NULL, &ss);
+  if (regexp)
+    {
+      char *colon = strchr (regexp, ':');
+      if (colon && *(colon + 1) != ':')
+	{
+	  int colon_index;
+	  char * file_name;
+
+	  colon_index = colon - regexp;
+	  file_name = alloca (colon_index + 1);
+	  memcpy (file_name, regexp, colon_index);
+	  file_name[colon_index--] = 0;
+	  while (isspace (file_name[colon_index]))
+	    file_name[colon_index--] = 0; 
+	  files = &file_name;
+	  nfiles = 1;
+	  regexp = colon + 1;
+	  while (isspace (*regexp))  regexp++; 
+	}
+    }
+
+  search_symbols (regexp, FUNCTIONS_DOMAIN, nfiles, files, &ss);
   old_chain = make_cleanup_free_search_symbols (ss);
   make_cleanup (free_current_contents, &string);
 

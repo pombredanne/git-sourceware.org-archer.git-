@@ -56,9 +56,21 @@
 /* Supported register note sections.  */
 static struct core_regset_section i386_linux_regset_sections[] =
 {
-  { ".reg", 144, "general-purpose" },
+  { ".reg", 68, "general-purpose" },
   { ".reg2", 108, "floating-point" },
+  { NULL, 0 }
+};
+
+static struct core_regset_section i386_linux_sse_regset_sections[] =
+{
+  { ".reg", 68, "general-purpose" },
   { ".reg-xfp", 512, "extended floating-point" },
+  { NULL, 0 }
+};
+
+static struct core_regset_section i386_linux_avx_regset_sections[] =
+{
+  { ".reg", 68, "general-purpose" },
   { ".reg-xstate", I386_XSTATE_MAX_SIZE, "XSAVE extended state" },
   { NULL, 0 }
 };
@@ -517,7 +529,7 @@ i386_linux_get_syscall_number (struct gdbarch *gdbarch,
    format and GDB's register cache layout.  */
 
 /* From <sys/reg.h>.  */
-static int i386_linux_gregset_reg_offset[] =
+int i386_linux_gregset_reg_offset[] =
 {
   6 * 4,			/* %eax */
   1 * 4,			/* %ecx */
@@ -599,7 +611,7 @@ i386_linux_core_read_xcr0 (struct gdbarch *gdbarch,
 	}
     }
   else
-    xcr0 = I386_XSTATE_SSE_MASK;
+    xcr0 = 0;
 
   return xcr0;
 }
@@ -611,22 +623,24 @@ i386_linux_core_read_description (struct gdbarch *gdbarch,
 				  struct target_ops *target,
 				  bfd *abfd)
 {
-  asection *section = bfd_get_section_by_name (abfd, ".reg2");
-  uint64_t xcr0;
-
-  if (section == NULL)
-    return NULL;
-
-  section = bfd_get_section_by_name (abfd, ".reg-xfp");
-  if (section == NULL)
-    return tdesc_i386_mmx_linux;
-
   /* Linux/i386.  */
-  xcr0 = i386_linux_core_read_xcr0 (gdbarch, target, abfd);
-  if ((xcr0 & I386_XSTATE_AVX_MASK) == I386_XSTATE_AVX_MASK)
-    return tdesc_i386_avx_linux;
-  else
+  uint64_t xcr0 = i386_linux_core_read_xcr0 (gdbarch, target, abfd);
+  switch ((xcr0 & I386_XSTATE_AVX_MASK))
+    {
+    case I386_XSTATE_AVX_MASK:
+      return tdesc_i386_avx_linux;
+    case I386_XSTATE_SSE_MASK:
+      return tdesc_i386_linux;
+    case I386_XSTATE_X87_MASK:
+      return tdesc_i386_mmx_linux;
+    default:
+      break;
+    }
+
+  if (bfd_get_section_by_name (abfd, ".reg-xfp") != NULL)
     return tdesc_i386_linux;
+  else
+    return tdesc_i386_mmx_linux;
 }
 
 static void
@@ -862,7 +876,12 @@ i386_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
                                              svr4_fetch_objfile_link_map);
 
   /* Install supported register note sections.  */
-  set_gdbarch_core_regset_sections (gdbarch, i386_linux_regset_sections);
+  if (tdesc_find_feature (tdesc, "org.gnu.gdb.i386.avx"))
+    set_gdbarch_core_regset_sections (gdbarch, i386_linux_avx_regset_sections);
+  else if (tdesc_find_feature (tdesc, "org.gnu.gdb.i386.sse"))
+    set_gdbarch_core_regset_sections (gdbarch, i386_linux_sse_regset_sections);
+  else
+    set_gdbarch_core_regset_sections (gdbarch, i386_linux_regset_sections);
 
   set_gdbarch_core_read_description (gdbarch,
 				     i386_linux_core_read_description);

@@ -13810,6 +13810,7 @@ fi
 # If we are configured native, pick a core file support file.
 COREFILE=
 COREFLAG=
+CORE_HEADER=
 TRAD_HEADER=
 if test "${target}" = "${host}"; then
   case "${host}" in
@@ -14033,6 +14034,9 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
   vax-*-*)
 	COREFILE=trad-core.lo
 	TRAD_HEADER='"hosts/vaxbsd.h"'
+	;;
+  x86_64-*-linux*)
+	CORE_HEADER='"hosts/x86-64linux.h"'
 	;;
   x86_64-*-netbsd* | x86_64-*-openbsd*)
 	COREFILE=netbsd-core.lo
@@ -14701,6 +14705,13 @@ $as_echo "$bfd_cv_have_sys_procfs_type_win32_pstatus_t" >&6; }
 fi
 
 
+if test -n "$CORE_HEADER"; then
+
+cat >>confdefs.h <<_ACEOF
+#define CORE_HEADER $CORE_HEADER
+_ACEOF
+
+fi
 if test -n "$TRAD_HEADER"; then
 
 cat >>confdefs.h <<_ACEOF
@@ -15272,9 +15283,8 @@ do
     vax1knetbsd_vec)		tb="$tb vax1knetbsd.lo aout32.lo" ;;
     vaxbsd_vec)			tb="$tb vaxbsd.lo aout32.lo" ;;
     versados_vec)		tb="$tb versados.lo" ;;
-    vms_alpha_vec)		tb="$tb vms.lo vms-hdr.lo vms-gsd.lo vms-tir.lo vms-misc.lo vms-lib.lo"; target_size=64 ;;
+    vms_alpha_vec)		tb="$tb vms-alpha.lo vms-misc.lo vms-lib.lo"; target_size=64 ;;
     vms_lib_txt_vec)		tb="$tb vms-lib.lo vms-misc.lo" ;;
-    vms_vax_vec)		tb="$tb vms.lo vms-hdr.lo vms-gsd.lo vms-tir.lo vms-misc.lo" ;;
     w65_vec)			tb="$tb coff-w65.lo reloc16.lo" ;;
     we32kcoff_vec)		tb="$tb coff-we32k.lo" ;;
     z80coff_vec)		tb="$tb coff-z80.lo reloc16.lo" ;;

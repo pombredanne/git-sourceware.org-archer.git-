@@ -46,10 +46,13 @@ static const char *xmltarget_i386_linux_no_xml = "@<target>\
 <architecture>i386</architecture>\
 <osabi>GNU/Linux</osabi>\
 </target>";
+
+#ifdef __x86_64__
 static const char *xmltarget_amd64_linux_no_xml = "@<target>\
 <architecture>i386:x86-64</architecture>\
 <osabi>GNU/Linux</osabi>\
 </target>";
+#endif
 
 #include <sys/reg.h>
 #include <sys/procfs.h>
@@ -834,12 +837,17 @@ x86_linux_update_xmltarget (void)
   struct regset_info *regset;
   static unsigned long long xcr0;
   static int have_ptrace_getregset = -1;
-#ifdef HAVE_PTRACE_GETFPXREGS
+#if !defined(__x86_64__) && defined(HAVE_PTRACE_GETFPXREGS)
   static int have_ptrace_getfpxregs = -1;
 #endif
 
   if (!current_inferior)
     return;
+
+  /* Before changing the register cache internal layout or the target
+     regsets, flush the contents of the current valid caches back to
+     the threads.  */
+  regcache_invalidate ();
 
   pid = pid_of (get_thread_lwp (current_inferior));
 #ifdef __x86_64__
