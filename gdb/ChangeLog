@@ -1,3 +1,72 @@
+2010-04-27  Joel Brobecker  <brobecker@adacore.com>
+
+	* solib-svr4.c (solib_svr4_r_map): Expand function description.
+
+2010-04-27  Joel Brobecker  <brobecker@adacore.com>
+
+	* symfile.c (init_filename_language_table): Register .dg files
+	with language_ada.
+
+2010-04-27  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdbtypes.h (struct main_type): Expand comment about target_type
+	field.
+
+2010-04-27  Pedro Alves  <pedro@codesourcery.com>
+	    Tristan Gingold  <gingold@adacore.com>
+
+	* symfile.c (reread_symbols): Also search for file in libraries.
+	Update comment.
+
+2010-04-27  Joel Brobecker  <brobecker@adacore.com>
+
+	* configure.tgt: Treat x86-lynxos targets as x86 bareboard targets
+	in terms of configuration.
+
+2010-04-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* objfiles.c: Include solist.h.
+	(free_all_objfiles): New variable so.  Check stale solist objfiles.
+	* symfile.c (symbol_file_clear): Swap the order of free_all_objfiles
+	and no_shared_libraries.
+
+2010-04-27  Joel Brobecker  <brobecker@adacore.com>
+
+	ARI warning fix.
+	* python/py-auto-load.c (source_section_scripts): Remove trailing
+	new-line in i18n string.
+
+2010-04-26  Doug Evans  <dje@google.com>
+
+	* serial.c (serial_write): Handle serial_debug_p akin to serial_read.
+
+2010-04-26  Tom Tromey  <tromey@redhat.com>
+
+	* cli/cli-decode.c (complete_on_cmdlist): Make two passes over the
+	command list.
+
+2010-04-26  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	Removal of config/i386/nm-i386sol2.h native configuration file.
+	* config/i386/nm-i386sol2.h: Remove file.
+	* config/i386/i386sol2.mh: Remove NAT_FILE definition.
+	* config/i386/sol2-64.mh: Idem.
+	* config/djgpp/fnchange.lst: Remove reference to that file.
+	* Makefile.in (HFILES_NO_SRCDIR): Idem.
+
+2010-04-26  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	PR breakpoints/11531.
+	* config/i386/nm-i386sol2.h (CANNOT_STEP_HW_WATCHPOINTS): Remove
+	macro definition and related comment.
+	* infrun.c (CANNOT_STEP_HW_WATCHPOINTS): Remove macro.
+	(resume): Remove code and comment related to this macro.
+
+2010-04-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* cp-namespace.c (cp_lookup_symbol_in_namespace): Fix alloca size.
+	Fix whitespace.
+
 2010-04-24  Pedro Alves  <pedro@codesourcery.com>
 
 	* defs.h: Adjust comment.
