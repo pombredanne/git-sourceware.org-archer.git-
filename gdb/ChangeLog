@@ -1,3 +1,75 @@
+2010-04-29  Doug Evans  <dje@google.com>
+
+	* ser-base.h (reschedule): Delete prototype.
+	* ser-base.c (reschedule): Make static.
+
+2010-04-29  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-linux-tdep.c (ARM_LINUX_JB_PC): Remove.
+	(ARM_LINUX_JB_PC_FPA): Add, offset of PC in longjmp buffer for FPA.
+	(ARM_LINUX_JB_PC_EABI): Add, offset of PC in longjmp buffer for 
+	EABI.
+	(arm_linux_init_abi): Set up JB_PC field dependent on FP model in 
+	use.
+
+2010-04-29  Pedro Alves  <pedro@codesourcery.com>
+
+	PR gdb/11557
+
+	* regcache.c (registers_changed): Rename to ...
+	(registers_changed_ptid): ... this, and only delete register cache
+	entries matching the ptid filter argument.
+	(registers_changed): Reimplement on top of registers_changed_ptid.
+	* regcache.h (registers_changed_ptid): Declare.
+	* target.c (target_resume): Flush register caches.
+
+2010-04-29  Phil Muldoon  <pmuldoon@redhat.com>
+            Tom Tromey  <tromey@redhat.com>
+            Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+        * Makefile.in (SUBDIR_PYTHON_OBS): Add py-parameter.
+        (SUBDIR_PYTHON_SRCS): Likewise.
+        (py-parameter.o): New rule.
+        * python/py-parameter.c: New file.
+        * python/python-internal.h (gdbpy_initialize_parameter)
+        (gdbpy_parameter, gdbpy_parameter_value)
+        (gdbpy_parse_command_name): Declare.
+        * python/py-cmd.c (parse_command_name): Rename to
+        gdbpy_parse_command_name.
+        (gdbpy_parse_command_name): Accept a starting list parameter and
+        use over cmdlist.
+        (cmdpy_init): Use gdbpy_parse_command_name.
+        * python/python.c (parameter_to_python): Rename to
+        gdbpy_parameter_to_python.  Accept enum var_types and value.
+        (gdbpy_parameter): Use gdbpy_parameter_value.
+        (_initialize_python): Call gdbpy_initialize_parameters.
+
+2010-04-29  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* MAINTAINERS: Add myself for write after approval privileges.
+
+2010-04-29  Mihail Zenkov  <mihail.zenkov@gmail.com>
+
+	D language support.
+	* Makefile.in (SFILES): Add d-lang.c d-valprint.c.
+	(COMMON_OBS): Add d-lang.o d-valprint.o.
+	(HFILES_NO_SRCDIR): Add d-lang.h.
+	* NEWS: Mention D language support.
+	* c-lang.c (c_emit_char, exp_descriptor_c): Make public.
+	* c-lang.h (c_emit_char, exp_descriptor_c): Add declaration.
+	* d-lang.c: New file.
+	* d-lang.h: New file.
+	* d-valprint.c: New file.
+	* defs.h (enum language): Add language_d.
+	* dwarf2read.c (set_cu_language): Add DW_LANG_D.
+	* language.c (binop_result_type, integral_type, character_type)
+	(string_type, boolean_type, structured_type): Add language_d.
+	* symfile.c (init_filename_language_table): Add language_d.
+	* symtab.c: Include d-lang.h.
+	(symbol_init_language_specific, symbol_find_demangled_name)
+	(symbol_natural_name, lookup_symbol_in_language)
+	(symbol_demangled_name, symbol_matches_domain): Add language_d.
+
 2010-04-27  Joel Brobecker  <brobecker@adacore.com>
 
 	* solib-svr4.c (solib_svr4_r_map): Expand function description.
@@ -3520,7 +3592,7 @@
 	addr_bit.  Adjust LOAD_ADDR sign for cross-arch inferiors.
 
 2010-02-17  Tristan Gingold  <gingold@adacore.com>
-	    Petr Hluzín <petr.hluzin@gmail.com>
+	    Petr Hluzin  <petr.hluzin@gmail.com>
 
 	* avr-tdep.c (avr_scan_prologue): Convert an if statement to a
 	gdb_assert.  Fix info->size for SIG prologue.
