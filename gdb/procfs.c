@@ -445,6 +445,19 @@ static void free_syscalls (procinfo *pi);
 static int find_syscall (procinfo *pi, char *name);
 #endif /* DYNAMIC_SYSCALLS */
 
+/* A function type used as a callback back iterate_over_mappings.  */
+typedef int (iterate_over_mappings_cb_ftype)
+  (CORE_ADDR vaddr, unsigned long size, int read, int write, int execute,
+   void *data);
+
+static int iterate_over_mappings
+  (procinfo *pi,
+   iterate_over_mappings_cb_ftype *child_func,
+   void *data,
+   int (*func) (struct prmap *map,
+                iterate_over_mappings_cb_ftype *child_func,
+                void *data));
+
 /* The head of the procinfo list: */
 static procinfo * procinfo_list;
 
@@ -2889,10 +2902,11 @@ proc_parent_pid (procinfo *pi)
   return pi->prstatus.pr_ppid;
 }
 
-
 /* Convert a target address (a.k.a. CORE_ADDR) into a host address
    (a.k.a void pointer)!  */
 
+#if (defined (PCWATCH) || defined (PIOCSWATCH)) \
+    && !(defined (PIOCOPENLWP) || defined (UNIXWARE))
 static void *
 procfs_address_to_host_pointer (CORE_ADDR addr)
 {
@@ -2904,6 +2918,7 @@ procfs_address_to_host_pointer (CORE_ADDR addr)
 			      (gdb_byte *) &ptr, addr);
   return ptr;
 }
+#endif
 
 /*
  * Function: proc_set_watchpoint
@@ -4043,13 +4058,60 @@ insert_dbx_link_bpt_in_file (int fd, CORE_ADDR ignored)
   return 0;
 }
 
+/* Calls the supplied callback function once for each mapped address
+   space in the process.  The callback function  receives an open
+   file descriptor for the file corresponding to that mapped
+   address space (if there is one), and the base address of the
+   mapped space.  Quit when the callback function returns a
+   nonzero value, or at teh end of the mappings.
+
+   Returns: the first non-zero return value of the callback function,
+   or zero.  */
+
+static int
+solib_mappings_callback (struct prmap *map, int (*func) (int, CORE_ADDR),
+			 void *data)
+{
+  procinfo *pi = data;
+  int fd;
+
+#ifdef NEW_PROC_API
+  char name[MAX_PROC_NAME_SIZE + sizeof (map->pr_mapname)];
+
+  if (map->pr_vaddr == 0 && map->pr_size == 0)
+    return -1;		/* sanity */
+
+  if (map->pr_mapname[0] == 0)
+    {
+      fd = -1;	/* no map file */
+    }
+  else
+    {
+      sprintf (name, "/proc/%d/object/%s", pi->pid, map->pr_mapname);
+      /* Note: caller's responsibility to close this fd!  */
+      fd = open_with_retry (name, O_RDONLY);
+      /* Note: we don't test the above call for failure;
+	 we just pass the FD on as given.  Sometimes there is
+	 no file, so the open may return failure, but that's
+	 not a problem.  */
+    }
+#else
+  fd = ioctl (pi->ctl_fd, PIOCOPENM, &map->pr_vaddr);
+  /* Note: we don't test the above call for failure;
+     we just pass the FD on as given.  Sometimes there is
+     no file, so the ioctl may return failure, but that's
+     not a problem.  */
+#endif
+  return (*func) (fd, (CORE_ADDR) map->pr_vaddr);
+}
+
 /* If the given memory region MAP contains a symbol named __dbx_link,
    insert a breakpoint at this location and return nonzero.  Return
    zero otherwise.  */
 
 static int
 insert_dbx_link_bpt_in_region (struct prmap *map,
-                               int (*child_func) (),
+                               iterate_over_mappings_cb_ftype *child_func,
                                void *data)
 {
   procinfo *pi = (procinfo *) data;
@@ -5570,9 +5632,11 @@ procfs_use_watchpoints (struct target_ops *t)
  */
 
 static int
-iterate_over_mappings (procinfo *pi, int (*child_func) (), void *data,
+iterate_over_mappings (procinfo *pi,
+		       iterate_over_mappings_cb_ftype *child_func,
+		       void *data,
 		       int (*func) (struct prmap *map,
-				    int (*child_func) (),
+				    iterate_over_mappings_cb_ftype *child_func,
 				    void *data))
 {
   char pathname[MAX_PROC_NAME_SIZE];
@@ -5621,57 +5685,6 @@ iterate_over_mappings (procinfo *pi, int (*child_func) (), void *data,
       return funcstat;
 
   return 0;
-}
-
-/*
- * Function: solib_mappings_callback
- *
- * Calls the supplied callback function once for each mapped address
- * space in the process.  The callback function  receives an open
- * file descriptor for the file corresponding to that mapped
- * address space (if there is one), and the base address of the
- * mapped space.  Quit when the callback function returns a
- * nonzero value, or at teh end of the mappings.
- *
- * Returns: the first non-zero return value of the callback function,
- * or zero.
- */
-
-int solib_mappings_callback (struct prmap *map,
-			     int (*func) (int, CORE_ADDR),
-			     void *data)
-{
-  procinfo *pi = data;
-  int fd;
-
-#ifdef NEW_PROC_API
-  char name[MAX_PROC_NAME_SIZE + sizeof (map->pr_mapname)];
-
-  if (map->pr_vaddr == 0 && map->pr_size == 0)
-    return -1;		/* sanity */
-
-  if (map->pr_mapname[0] == 0)
-    {
-      fd = -1;	/* no map file */
-    }
-  else
-    {
-      sprintf (name, "/proc/%d/object/%s", pi->pid, map->pr_mapname);
-      /* Note: caller's responsibility to close this fd!  */
-      fd = open_with_retry (name, O_RDONLY);
-      /* Note: we don't test the above call for failure;
-	 we just pass the FD on as given.  Sometimes there is
-	 no file, so the open may return failure, but that's
-	 not a problem.  */
-    }
-#else
-  fd = ioctl (pi->ctl_fd, PIOCOPENM, &map->pr_vaddr);
-  /* Note: we don't test the above call for failure;
-     we just pass the FD on as given.  Sometimes there is
-     no file, so the ioctl may return failure, but that's
-     not a problem.  */
-#endif
-  return (*func) (fd, (CORE_ADDR) map->pr_vaddr);
 }
 
 /*
@@ -5771,7 +5784,9 @@ mappingflags (long flags)
  */
 
 static int
-info_mappings_callback (struct prmap *map, int (*ignore) (), void *unused)
+info_mappings_callback (struct prmap *map,
+			iterate_over_mappings_cb_ftype *ignore,
+			void *unused)
 {
   unsigned int pr_off;
 
@@ -6049,28 +6064,6 @@ procfs_first_available (void)
   return pid_to_ptid (procinfo_list ? procinfo_list->pid : -1);
 }
 
-static int
-find_signalled_thread (struct thread_info *info, void *data)
-{
-  if (info->stop_signal != TARGET_SIGNAL_0
-      && ptid_get_pid (info->ptid) == ptid_get_pid (inferior_ptid))
-    return 1;
-
-  return 0;
-}
-
-static enum target_signal
-find_stop_signal (void)
-{
-  struct thread_info *info =
-    iterate_over_threads (find_signalled_thread, NULL);
-
-  if (info)
-    return info->stop_signal;
-  else
-    return TARGET_SIGNAL_0;
-}
-
 /* ===================  GCORE .NOTE "MODULE" =================== */
 #if defined (UNIXWARE) || defined (PIOCOPENLWP) || defined (PCAGENT)
 /* gcore only implemented on solaris and unixware (so far) */
@@ -6146,6 +6139,28 @@ procfs_corefile_thread_callback (procinfo *pi, procinfo *thread, void *data)
 						    args->stop_signal);
     }
   return 0;
+}
+
+static int
+find_signalled_thread (struct thread_info *info, void *data)
+{
+  if (info->stop_signal != TARGET_SIGNAL_0
+      && ptid_get_pid (info->ptid) == ptid_get_pid (inferior_ptid))
+    return 1;
+
+  return 0;
+}
+
+static enum target_signal
+find_stop_signal (void)
+{
+  struct thread_info *info =
+    iterate_over_threads (find_signalled_thread, NULL);
+
+  if (info)
+    return info->stop_signal;
+  else
+    return TARGET_SIGNAL_0;
 }
 
 static char *

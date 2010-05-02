@@ -263,10 +263,14 @@ cmdpy_completer (struct cmd_list_element *command, char *text, char *word)
    *BASE_LIST is set to the final prefix command's list of
    *sub-commands.
    
+   START_LIST is the list in which the search starts.
+
    This function returns the xmalloc()d name of the new command.  On
    error sets the Python error and returns NULL.  */
-static char *
-parse_command_name (char *text, struct cmd_list_element ***base_list)
+char *
+gdbpy_parse_command_name (char *text,
+			  struct cmd_list_element ***base_list,
+			  struct cmd_list_element **start_list)
 {
   struct cmd_list_element *elt;
   int len = strlen (text);
@@ -279,7 +283,7 @@ parse_command_name (char *text, struct cmd_list_element ***base_list)
     ;
   if (i < 0)
     {
-      PyErr_SetString (PyExc_RuntimeError, _("no command name found"));
+      PyErr_SetString (PyExc_RuntimeError, _("No command name found."));
       return NULL;
     }
   lastchar = i;
@@ -299,7 +303,7 @@ parse_command_name (char *text, struct cmd_list_element ***base_list)
     ;
   if (i < 0)
     {
-      *base_list = &cmdlist;
+      *base_list = start_list;
       return result;
     }
 
@@ -308,10 +312,10 @@ parse_command_name (char *text, struct cmd_list_element ***base_list)
   prefix_text[i + 1] = '\0';
 
   text = prefix_text;
-  elt = lookup_cmd_1 (&text, cmdlist, NULL, 1);
+  elt = lookup_cmd_1 (&text, *start_list, NULL, 1);
   if (!elt || elt == (struct cmd_list_element *) -1)
     {
-      PyErr_Format (PyExc_RuntimeError, _("could not find command prefix %s"),
+      PyErr_Format (PyExc_RuntimeError, _("Could not find command prefix %s."),
 		    prefix_text);
       xfree (prefix_text);
       xfree (result);
@@ -325,7 +329,7 @@ parse_command_name (char *text, struct cmd_list_element ***base_list)
       return result;
     }
 
-  PyErr_Format (PyExc_RuntimeError, _("'%s' is not a prefix command"),
+  PyErr_Format (PyExc_RuntimeError, _("'%s' is not a prefix command."),
 		prefix_text);
   xfree (prefix_text);
   xfree (result);
@@ -374,7 +378,7 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kw)
       /* Note: this is apparently not documented in Python.  We return
 	 0 for success, -1 for failure.  */
       PyErr_Format (PyExc_RuntimeError,
-		    _("command object already initialized"));
+		    _("Command object already initialized."));
       return -1;
     }
 
@@ -389,17 +393,17 @@ cmdpy_init (PyObject *self, PyObject *args, PyObject *kw)
       && cmdtype != class_trace && cmdtype != class_obscure
       && cmdtype != class_maintenance)
     {
-      PyErr_Format (PyExc_RuntimeError, _("invalid command class argument"));
+      PyErr_Format (PyExc_RuntimeError, _("Invalid command class argument."));
       return -1;
     }
 
   if (completetype < -1 || completetype >= (int) N_COMPLETERS)
     {
-      PyErr_Format (PyExc_RuntimeError, _("invalid completion type argument"));
+      PyErr_Format (PyExc_RuntimeError, _("Invalid completion type argument."));
       return -1;
     }
 
-  cmd_name = parse_command_name (name, &cmd_list);
+  cmd_name = gdbpy_parse_command_name (name, &cmd_list, &cmdlist);
   if (! cmd_name)
     return -1;
 

@@ -9215,6 +9215,8 @@ insert_cantunwind_after(asection *text_sec, asection *exidx_sec)
      2. Duplicate entries are merged together (EXIDX_CANTUNWIND, or unwind
         codes which have been inlined into the index).
 
+   If MERGE_EXIDX_ENTRIES is false, duplicate entries are not merged.
+
    The edits are applied when the tables are written
    (in elf32_arm_write_section).
 */
@@ -9222,7 +9224,8 @@ insert_cantunwind_after(asection *text_sec, asection *exidx_sec)
 bfd_boolean
 elf32_arm_fix_exidx_coverage (asection **text_section_order,
 			      unsigned int num_text_sections,
-			      struct bfd_link_info *info)
+			      struct bfd_link_info *info,
+			      bfd_boolean merge_exidx_entries)
 {
   bfd *inp;
   unsigned int last_second_word = 0, i;
@@ -9334,7 +9337,8 @@ elf32_arm_fix_exidx_coverage (asection **text_section_order,
 	  /* Inlined unwinding data.  Merge if equal to previous.  */
 	  else if ((second_word & 0x80000000) != 0)
 	    {
-	      if (last_second_word == second_word && last_unwind_type == 1)
+	      if (merge_exidx_entries
+		   && last_second_word == second_word && last_unwind_type == 1)
 		elide = 1;
 	      unwind_type = 1;
 	      last_second_word = second_word;
@@ -10003,27 +10007,26 @@ elf32_arm_merge_eabi_attributes (bfd *ibfd, bfd *obfd)
 	case Tag_ABI_FP_exceptions:
 	case Tag_ABI_FP_user_exceptions:
 	case Tag_ABI_FP_number_model:
-	case Tag_VFP_HP_extension:
+	case Tag_FP_HP_extension:
 	case Tag_CPU_unaligned_access:
 	case Tag_T2EE_use:
-	case Tag_Virtualization_use:
 	case Tag_MPextension_use:
 	  /* Use the largest value specified.  */
 	  if (in_attr[i].i > out_attr[i].i)
 	    out_attr[i].i = in_attr[i].i;
 	  break;
 
-	case Tag_ABI_align8_preserved:
+	case Tag_ABI_align_preserved:
 	case Tag_ABI_PCS_RO_data:
 	  /* Use the smallest value specified.  */
 	  if (in_attr[i].i < out_attr[i].i)
 	    out_attr[i].i = in_attr[i].i;
 	  break;
 
-	case Tag_ABI_align8_needed:
+	case Tag_ABI_align_needed:
 	  if ((in_attr[i].i > 0 || out_attr[i].i > 0)
-	      && (in_attr[Tag_ABI_align8_preserved].i == 0
-		  || out_attr[Tag_ABI_align8_preserved].i == 0))
+	      && (in_attr[Tag_ABI_align_preserved].i == 0
+		  || out_attr[Tag_ABI_align_preserved].i == 0))
 	    {
 	      /* This error message should be enabled once all non-conformant
 		 binaries in the toolchain have had the attributes set
@@ -10044,6 +10047,27 @@ elf32_arm_merge_eabi_attributes (bfd *ibfd, bfd *obfd)
 	    out_attr[i].i = in_attr[i].i;
 	  break;
 
+	case Tag_Virtualization_use:
+	  /* The virtualization tag effectively stores two bits of
+	     information: the intended use of TrustZone (in bit 0), and the
+	     intended use of Virtualization (in bit 1).  */
+	  if (out_attr[i].i == 0)
+	    out_attr[i].i = in_attr[i].i;
+	  else if (in_attr[i].i != 0
+		   && in_attr[i].i != out_attr[i].i)
+	    {
+	      if (in_attr[i].i <= 3 && out_attr[i].i <= 3)
+		out_attr[i].i = 3;
+	      else
+		{
+		  _bfd_error_handler
+		    (_("error: %B: unable to merge virtualization attributes "
+		       "with %B"),
+		     obfd, ibfd);
+		  result = FALSE;
+		}
+	    }
+	  break;
 
 	case Tag_CPU_arch_profile:
 	  if (out_attr[i].i != in_attr[i].i)
@@ -10071,7 +10095,7 @@ elf32_arm_merge_eabi_attributes (bfd *ibfd, bfd *obfd)
 		}
 	    }
 	  break;
-	case Tag_VFP_arch:
+	case Tag_FP_arch:
 	    {
 	      static const struct
 	      {

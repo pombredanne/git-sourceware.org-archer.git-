@@ -148,7 +148,7 @@ struct general_symbol_info
 
   short section;
 
-  /* The section associated with this symbol. */
+  /* The section associated with this symbol.  It can be NULL.  */
 
   struct obj_section *obj_section;
 };
@@ -516,8 +516,9 @@ struct symbol_computed_ops
   int (*read_needs_frame) (struct symbol * symbol);
 
   /* Write to STREAM a natural-language description of the location of
-     SYMBOL.  */
-  int (*describe_location) (struct symbol * symbol, struct ui_file * stream);
+     SYMBOL, in the context of ADDR.  */
+  void (*describe_location) (struct symbol * symbol, CORE_ADDR addr,
+			     struct ui_file * stream);
 
   /* Tracepoint support.  Append bytecodes to the tracepoint agent
      expression AX that push the address of the object SYMBOL.  Set
@@ -1205,5 +1206,7 @@ int producer_is_realview (const char *producer);
 
 void fixup_section (struct general_symbol_info *ginfo,
 		    CORE_ADDR addr, struct objfile *objfile);
+
+struct objfile *lookup_objfile_from_block (const struct block *block);
 
 #endif /* !defined(SYMTAB_H) */

@@ -63,7 +63,7 @@ enum {
    the need to make redundant calls into the event-loop - the next
    scheduled task is only changed when needed. */
 
-void
+static void
 reschedule (struct serial *scb)
 {
   if (serial_is_async_p (scb))
@@ -363,6 +363,13 @@ generic_readchar (struct serial *scb, int timeout,
 	  s = read (scb->error_fd, &buf, to_read);
 	  if (s == -1)
 	    break;
+	  if (s == 0)
+	    {
+	      /* EOF */
+	      close (scb->error_fd);
+	      scb->error_fd = -1;
+	      break;
+	    }
 
 	  /* In theory, embedded newlines are not a problem.
 	     But for MI, we want each output line to have just

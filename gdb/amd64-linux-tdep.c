@@ -62,7 +62,7 @@ static struct core_regset_section amd64_linux_regset_sections[] =
    format and GDB's register cache layout.  */
 
 /* From <sys/reg.h>.  */
-static int amd64_linux_gregset_reg_offset[] =
+int amd64_linux_gregset_reg_offset[] =
 {
   10 * 8,			/* %rax */
   5 * 8,			/* %rbx */
@@ -87,7 +87,14 @@ static int amd64_linux_gregset_reg_offset[] =
   23 * 8,			/* %ds */
   24 * 8,			/* %es */
   25 * 8,			/* %fs */
-  26 * 8			/* %gs */
+  26 * 8,			/* %gs */
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  15 * 8			/* "orig_rax" */
 };
 
 
@@ -1262,18 +1269,15 @@ amd64_linux_core_read_description (struct gdbarch *gdbarch,
 				  struct target_ops *target,
 				  bfd *abfd)
 {
-  asection *section = bfd_get_section_by_name (abfd, ".reg2");
-  uint64_t xcr0;
-
-  if (section == NULL)
-    return NULL;
-
   /* Linux/x86-64.  */
-  xcr0 = i386_linux_core_read_xcr0 (gdbarch, target, abfd);
-  if ((xcr0 & I386_XSTATE_AVX_MASK) == I386_XSTATE_AVX_MASK)
-    return tdesc_amd64_avx_linux;
-  else
-    return tdesc_amd64_linux;
+  uint64_t xcr0 = i386_linux_core_read_xcr0 (gdbarch, target, abfd);
+  switch ((xcr0 & I386_XSTATE_AVX_MASK))
+    {
+    case I386_XSTATE_AVX_MASK:
+      return tdesc_amd64_avx_linux;
+    default:
+      return tdesc_amd64_linux;
+    }
 }
 
 static void

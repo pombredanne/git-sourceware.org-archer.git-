@@ -1,3 +1,71 @@
+2010-04-26  Pedro Alves  <pedro@codesourcery.com>
+
+	* filenames.h (PATH_SEPARATOR): Delete.
+
+2010-04-23  Pedro Alves  <pedro@codesourcery.com>
+
+	* filenames.h (IS_DIR_SEPARATOR_1): Rename from IS_DIR_SEPARATOR,
+	always define it independently of host, add `dos_based' parameter,
+	and handle it.
+	(PATH_SEPARATOR): Define.
+	(HAS_DRIVE_SPEC_1): Rename from HAS_DRIVE_SPEC, always define it
+	independently of host, add `dos_based' parameter, and handle it.
+	(IS_ABSOLUTE_PATH_1): Rename from IS_ABSOLUTE_PATH, always define
+	it independently of host, add `dos_based' parameter, and handle
+	it.
+	(IS_DOS_DIR_SEPARATOR, IS_DOS_ABSOLUTE_PATH)
+	(IS_UNIX_DIR_SEPARATOR, IS_UNIX_ABSOLUTE_PATH)
+	(HAS_DOS_DRIVE_SPEC): New.
+	(HAS_DRIVE_SPEC): Reimplement on top of HAS_DRIVE_SPEC_1.
+	(IS_DIR_SEPARATOR): Reimplement on top of IS_DIR_SEPARATOR_1.
+	(IS_ABSOLUTE_PATH): Reimplement on top of IS_ABSOLUTE_PATH_1.
+	* libiberty.h (dos_lbasename, unix_lbasename): Declare.
+
+2009-05-31  Ian Lance Taylor  <iant@google.com>
+
+	* ansidecl.h: Add extern "C" when compiling with C++.  Treat C++
+	the way we treat an ISO C compiler.  Don't define inline as a
+	macro when compiling with C++.
+	* dyn-string.h: Add header guard DYN_STRING_H.  Add extern "C"
+	when compiling with C++.
+	* fibheap.h: Add extern "C" when compiling with C++.
+
+2010-04-23  Pedro Alves  <pedro@codesourcery.com>
+
+	* filenames.h (IS_DIR_SEPARATOR_1): Rename from IS_DIR_SEPARATOR,
+	always define it independently of host, add `dos_based' parameter,
+	and handle it.
+	(HAS_DRIVE_SPEC_1): Rename from HAS_DRIVE_SPEC, always define it
+	independently of host, add `dos_based' parameter, and handle it.
+	(IS_ABSOLUTE_PATH_1): Rename from IS_ABSOLUTE_PATH, always define
+	it independently of host, add `dos_based' parameter, and handle
+	it.
+	(IS_DOS_DIR_SEPARATOR, IS_DOS_ABSOLUTE_PATH)
+	(IS_UNIX_DIR_SEPARATOR, IS_UNIX_ABSOLUTE_PATH)
+	(HAS_DOS_DRIVE_SPEC): New.
+	(HAS_DRIVE_SPEC): Reimplement on top of HAS_DRIVE_SPEC_1.
+	(IS_DIR_SEPARATOR): Reimplement on top of IS_DIR_SEPARATOR_1.
+	(IS_ABSOLUTE_PATH): Reimplement on top of IS_ABSOLUTE_PATH_1.
+	* libiberty.h (dos_lbasename, unix_lbasename): Declare.
+
+2010-04-20  Nick Clifton  <nickc@redhat.com>
+
+	* sha1.h: Update copyright notice to use GPLv3.
+
+2010-04-15  Nick Clifton  <nickc@redhat.com>
+
+	* bout.h: Update copyright notice to use GPLv3.
+	* hp-symtab.h: Likewise.
+	* oasys.h: Likewise.
+	* progress.h: Likewise.
+	* sha1.h: Likewise.
+	* xtensa-isa-internal.h: Likewise.
+	* xtensa-isa.h: Likewise.
+
+2010-04-14  Doug Evans  <dje@google.com>
+
+	* filenames.h (HAS_DRIVE_SPEC, STRIP_DRIVE_SPEC): New macros.
+
 2010-04-05  Jakub Jelinek  <jakub@redhat.com>
 
 	* dwarf2.h (DWARF2_Internal_LineInfo): Add li_max_ops_per_insn
@@ -294,7 +362,7 @@
 	* xtensa-isa.h (xtensa_state_is_shared_or): New prototype.
 
 2008-11-19  Bob Wilson  <bob.wilson@acm.org>
-	
+
 	* xtensa-config.h (XCHAL_HAVE_MUL16, XCHAL_HAVE_MUL32, XCHAL_HAVE_DIV32)
 	(XCHAL_HAVE_MINMAX, XCHAL_HAVE_SEXT, XCHAL_HAVE_THREADPTR)
 	(XCHAL_HAVE_RELEASE_SYNC, XCHAL_HAVE_S32C1I): Change to 1.
@@ -304,7 +372,7 @@
 	(XCHAL_ICACHE_LINEWIDTH, XCHAL_DCACHE_LINEWIDTH): Change to 5.
 	(XCHAL_DCACHE_IS_WRITEBACK): Change to 1.
 	(XCHAL_DEBUGLEVEL): Change to 6.
-	
+
 2008-11-14  Tristan Gingold  <gingold@adacore.com>
 
 	* fopen-vms.h (FOPEN_RB): Use a single string to match the
@@ -435,7 +503,7 @@
 
 	* xtensa-config.h (XCHAL_HAVE_THREADPTR): Redefine to zero.
 	(XCHAL_NUM_AREGS, XCHAL_MAX_INSTRUCTION_SIZE): New.
-	
+
 2008-01-26  David Daney  <ddaney@avtrex.com>
 
 	* demangle.h (demangle_component_type):  Add
@@ -464,10 +532,10 @@
 	* ternary.h: Remove.
 
 2007-07-18  Bob Wilson  <bob.wilson@acm.org>
-	
+
 	* xtensa-config.h (XCHAL_HAVE_THREADPTR): New.
 	(XCHAL_HAVE_RELEASE_SYNC, XCHAL_HAVE_S32C1I): New.
-	
+
 2007-07-17  Nick Clifton  <nickc@redhat.com>
 
 	* COPYING3: New file.  Contains version 3 of the GNU General

@@ -1,3 +1,97 @@
+2010-04-29  Phil Muldoon  <pmuldoon@redhat.com>
+            Tom Tromey  <tromey@redhat.com>
+            Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+       * gdb.texinfo (Parameters In Python): New Node.
+
+2010-04-29  Mihail Zenkov  <mihail.zenkov@gmail.com>
+
+	* gdb.texinfo: (Summary) Add mention about D language support.
+	(Filenames): Add D suffixes.
+	(D): New node.
+
+2010-04-26  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* gdbint.texinfo (CANNOT_STEP_HW_WATCHPOINTS): Remove explanation
+	of macro deleted from GDB code.
+
+2010-04-24  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo (Commands to specify files): Describe what how GDB
+	looks up DOS-based filesystem paths on the system root.  Document
+	the new `set/show target-file-system-kind' commands.
+
+2010-04-23  Doug Evans  <dje@google.com>
+
+	* gdb.texinfo (Python): Move Auto-loading section here ...
+	(Python API): from here.
+	(Auto-loading): Add docs for .debug_gdb_scripts auto-loaded scripts.
+	(Maintenance Commands): Add docs for "maint print section-scripts".
+
+2010-04-20  Chris Moller  <cmoller@redhat.com>
+
+	* gdb.texinfo (Setting Breakpoints): Added description of
+	filename-qualified rbreak.
+	* refcard.tex (Breakpoints and Watchpoints): Added brief
+	description of filename-qualified rbreak.
+
+2010-04-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.texinfo (Data): New @menu reference to Pretty Printing.
+	(Python API): Change the reference to Pretty Printing API.
+	(Pretty Printing): Move the user part under the Data node.  Reformat
+	the sample output to 72 columns.  Create a new reference to Pretty
+	Printing API.  Rename the API part ...
+	(Pretty Printing API): To a new node name.
+	(Selecting Pretty-Printers, Progspaces In Python, Objfiles In Python)
+	(GDB/MI Variable Objects): Change references to Pretty Printing API.
+
+2010-04-21  Stan Shebs  <stan@codesourcery.com>
+
+	* gdb.texinfo (Tracepoint Actions): Mention synonymy of actions
+ 	and commands.
+	(Listing Tracepoints): Update to reflect current behavior.
+	
+2010-04-22  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* gdb.texinfo (Examining memory): Update for change in string
+	display with explicit size.
+
+2010-04-19  Pedro Alves  <pedro@codesourcery.com>
+
+	PR breakpoints/8554.
+
+	* gdb.texinfo (Save Breakpoints): New node.
+	(save-tracepoints): Rename to ...
+	(save tracepoints): ... this.  Mention that `save-tracepoints' is
+	a deprecated alias to `save tracepoints'.
+
+2010-04-16  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* gdb.texinfo ($_tlb): Document new automatic convinience variable.
+	(info w32 thread-information-block): Document new command.
+	(qGetTIBAddress): Document new gdbserver query.
+	(maint set/show show-all-tib): Document new command.
+
+2010-04-15  Doug Evans  <dje@google.com>
+
+	* gdb.texinfo (Python API): Add progspaces section.
+	(Selecting Pretty-Printers): Progspace pretty-printers are
+	searched too.
+	(Progspaces In Python): New section.
+
+	* gdb.texinfo (Command Files): Add docs for new "source -s" option.
+
+2010-04-14  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.texinfo (Pretty Printing): Document behaviour when to_string
+	returns None.
+
+2010-04-09  Stan Shebs  <stan@codesourcery.com>
+
+	* gdb.texinfo (gdb/mi Tracepoint Commands) <-trace-status>:
+	Describe the `frames-created' field, tweak grammar.
+
 2010-04-09  Pedro Alves  <pedro@codesourcery.com>
 
 	* gdb.texinfo (gdb/mi Tracepoint Commands) <-trace-status>:

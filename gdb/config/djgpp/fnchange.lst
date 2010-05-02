@@ -136,7 +136,6 @@
 @V@/gdb/config/i386/nm-linux64.h @V@/gdb/config/i386/nm-lx64.h
 @V@/gdb/config/i386/nm-i386sco4.h @V@/gdb/config/i386/nm-sco4.h
 @V@/gdb/config/i386/nm-i386sco5.h @V@/gdb/config/i386/nm-sco5.h
-@V@/gdb/config/i386/nm-i386sol2.h @V@/gdb/config/i386/nm-sol2.h
 @V@/gdb/config/i386/nm-i386v4.h @V@/gdb/config/i386/nm-v4.h
 @V@/gdb/config/i386/nm-i386v42mp.h @V@/gdb/config/i386/nm-v42mp.h
 @V@/gdb/config/i386/tm-i386sol2.h @V@/gdb/config/i386/tm-sol2.h
@@ -398,6 +397,7 @@
 @V@/gdb/testsuite/gdb.base/siginfo-obj.c @V@/gdb/testsuite/gdb.base/si-obj.c
 @V@/gdb/testsuite/gdb.base/siginfo-addr.exp @V@/gdb/testsuite/gdb.base/si-addr.exp
 @V@/gdb/testsuite/gdb.base/siginfo-obj.exp @V@/gdb/testsuite/gdb.base/si-obj.exp
+@V@/gdb/testsuite/gdb.base/solib-corrupted.exp @V@/gdb/testsuite/gdb.base/so-crptd.exp
 @V@/gdb/testsuite/gdb.base/solib-disc.c @V@/gdb/testsuite/gdb.base/so-disc.c
 @V@/gdb/testsuite/gdb.base/solib-display-lib.c @V@/gdb/testsuite/gdb.base/so-displib.c
 @V@/gdb/testsuite/gdb.base/solib-display-main.c @V@/gdb/testsuite/gdb.base/so-dispmain.c

@@ -61,6 +61,9 @@ regcache_invalidate_one (struct inferior_list_entry *entry)
 
   regcache = (struct regcache *) inferior_regcache_data (thread);
 
+  if (regcache == NULL)
+    return;
+
   if (regcache->registers_valid)
     {
       struct thread_info *saved_inferior = current_inferior;
@@ -138,6 +141,8 @@ realloc_register_cache (struct inferior_list_entry *thread_p)
   struct regcache *regcache
     = (struct regcache *) inferior_regcache_data (thread);
 
+  if (regcache != NULL)
+    regcache_invalidate_one (thread_p);
   free_register_cache (regcache);
   set_inferior_regcache_data (thread, new_register_cache ());
 }
@@ -146,6 +151,10 @@ void
 set_register_cache (struct reg *regs, int n)
 {
   int offset, i;
+
+  /* Before changing the register cache internal layout, flush the
+     contents of valid caches back to the threads.  */
+  regcache_invalidate ();
 
   reg_defs = regs;
   num_registers = n;

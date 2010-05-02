@@ -120,11 +120,11 @@ static const OPTION standard_options[] =
 {
   { {"verbose", no_argument, NULL, OPTION_VERBOSE},
       'v', NULL, "Verbose output",
-      standard_option_handler },
+      standard_option_handler, NULL },
 
   { {"endian", required_argument, NULL, OPTION_ENDIAN},
       'E', "big|little", "Set endianness",
-      standard_option_handler },
+      standard_option_handler, NULL },
 
 #ifdef SIM_HAVE_ENVIRONMENT
   /* This option isn't supported unless all choices are supported in keeping
@@ -205,9 +205,9 @@ static const OPTION standard_options[] =
   { {"sysroot", required_argument, NULL, OPTION_SYSROOT},
       '\0', "SYSROOT",
     "Root for system calls with absolute file-names and cwd at start",
-      standard_option_handler },
+      standard_option_handler, NULL },
 
-  { {NULL, no_argument, NULL, 0}, '\0', NULL, NULL, NULL }
+  { {NULL, no_argument, NULL, 0}, '\0', NULL, NULL, NULL, NULL }
 };
 
 static SIM_RC
@@ -265,7 +265,7 @@ standard_option_handler (SIM_DESC sd, sim_cpu *cpu, int opt,
       if (WITH_ENVIRONMENT != ALL_ENVIRONMENT
 	  && WITH_ENVIRONMENT != STATE_ENVIRONMENT (sd))
 	{
-	  char *type;
+	  const char *type;
 	  switch (WITH_ENVIRONMENT)
 	    {
 	    case USER_ENVIRONMENT: type = "user"; break;
@@ -489,15 +489,15 @@ standard_install (SIM_DESC sd)
 #define ARG_HASH(a) ((256 * (unsigned char) a[0] + (unsigned char) a[1]) % ARG_HASH_SIZE)
 
 static int
-dup_arg_p (char *arg)
+dup_arg_p (const char *arg)
 {
   int hash;
-  static char **arg_table = NULL;
+  static const char **arg_table = NULL;
 
   if (arg == NULL)
     {
       if (arg_table == NULL)
-	arg_table = (char **) xmalloc (ARG_HASH_SIZE * sizeof (char *));
+	arg_table = (const char **) xmalloc (ARG_HASH_SIZE * sizeof (char *));
       memset (arg_table, 0, ARG_HASH_SIZE * sizeof (char *));
       return 0;
     }
