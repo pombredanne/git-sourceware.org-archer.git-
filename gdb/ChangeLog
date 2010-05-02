@@ -1,3 +1,31 @@
+2010-05-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* cli/cli-dump.h (parse_and_eval_with_error): Remove the declaration.
+
+2010-05-01  Pedro Alves  <pedro@codesourcery.com>
+
+	* infrun.c (prepare_for_detach): In non-stop, context switch to
+	the thread that got the event before handling the event.
+
+2010-04-30  Tom Tromey  <tromey@redhat.com>
+
+	* symtab.c (symbol_set_names): Fix typo.
+
+2010-04-30  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* python/py-param.c (parm_constants): Avoid ARI warning
+	by adding ARI comment.
+	(parmpy_init): Likewise.
+
+2010-04-30  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* windows-tdep.c (windows_get_tlb_type): Remember last GDBARCH
+	and created type for re-use.
+
+2010-04-30  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* NEWS: Mention gdbserver support for x86_64 Windows 64-bit.
+
 2010-04-29  Doug Evans  <dje@google.com>
 
 	* ser-base.h (reschedule): Delete prototype.
