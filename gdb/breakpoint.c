@@ -3434,7 +3434,7 @@ print_bp_stop_message (bpstat bs)
 enum print_stop_action
 bpstat_print (bpstat bs)
 {
-  int val;
+  enum print_stop_action retval = PRINT_UNKNOWN;
 
   /* Maybe another breakpoint in the chain caused us to stop.
      (Currently all watchpoints go on the bpstat whether hit or not.
@@ -3442,16 +3442,14 @@ bpstat_print (bpstat bs)
      with respect to bpstat_explains_signal).  */
   for (; bs; bs = bs->next)
     {
+      enum print_stop_action val;
+      
       val = print_bp_stop_message (bs);
-      if (val == PRINT_SRC_ONLY 
-	  || val == PRINT_SRC_AND_LOC 
-	  || val == PRINT_NOTHING)
-	return val;
+      if (val < retval)
+	retval = val;
     }
 
-  /* We reached the end of the chain, or we got a null BS to start
-     with and nothing was printed. */
-  return PRINT_UNKNOWN;
+  return retval;
 }
 
 /* Evaluate the expression EXP and return 1 if value is zero.
