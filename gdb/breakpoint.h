@@ -575,16 +575,16 @@ enum stop_stack_kind
     STOP_STD_TERMINATE
   };
 
-/* The possible return values for print_bpstat, print_it_normal,
-   print_it_done, print_it_noop.  Keep them in decreasing order of contained
-   info.  Currently each next item must be a subset of the previous one.  */
+/* The possible return values for print_bpstat, print_it_normal, print_it_done,
+   print_it_noop.  bpstat_print depends on ther ordering where each item is an
+   information subset of the previous one.  */
 
 enum print_stop_action
   {
-    PRINT_UNKNOWN = -1,
     PRINT_SRC_AND_LOC,
     PRINT_SRC_ONLY,
-    PRINT_NOTHING
+    PRINT_NOTHING,
+    PRINT_UNKNOWN
   };
 
 /* Tell what to do about this bpstat.  */

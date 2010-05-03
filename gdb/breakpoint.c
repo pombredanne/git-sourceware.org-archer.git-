@@ -3445,13 +3445,11 @@ bpstat_print (bpstat bs)
       enum print_stop_action val;
       
       val = print_bp_stop_message (bs);
-      if (val != PRINT_UNKNOWN && val < retval)
+      if (val < retval)
 	retval = val;
     }
 
-  /* We reached the end of the chain, or we got a null BS to start
-     with and nothing was printed. */
-  return PRINT_UNKNOWN;
+  return retval;
 }
 
 /* Evaluate the expression EXP and return 1 if value is zero.
