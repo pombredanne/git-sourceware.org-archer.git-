@@ -3950,6 +3950,7 @@ process_event_stop_test:
   /* Breakpoints get deleted/created here which calls reinit_frame_cache thus
      invalidating current_frame.  Call explicitly get_current_frame.  */
   frame = NULL;
+  gdbarch = NULL;
 
   /* Handle cases caused by hitting a breakpoint.  */
   {
@@ -4056,14 +4057,16 @@ process_event_stop_test:
 	    break;
 	  case bp_longjmp:
 	    {
+	      struct frame_info *frame = get_current_frame ();
+	      struct gdbarch *gdbarch = get_frame_arch (frame);
+
 	      /* If we hit the breakpoint at longjmp while stepping, we
 		 install a momentary breakpoint at the target of the
 		 jmp_buf.  */
 
 	      CORE_ADDR jmp_buf_pc;
 	      if (gdbarch_get_longjmp_target_p (gdbarch)
-		  && gdbarch_get_longjmp_target (gdbarch, get_current_frame (),
-						 &jmp_buf_pc))
+		  && gdbarch_get_longjmp_target (gdbarch, frame, &jmp_buf_pc))
 		{
 		  /* We're going to replace the current step-resume breakpoint
 		     with a longjmp-resume breakpoint.  */
@@ -4149,7 +4152,12 @@ process_event_stop_test:
 	    /* Switch terminal for any messages produced by breakpoint_re_set.  */
 	    target_terminal_ours_for_output ();
 
-	    jit_event_handler (gdbarch);
+	    {
+	      struct frame_info *frame = get_current_frame ();
+	      struct gdbarch *gdbarch = get_frame_arch (frame);
+
+	      jit_event_handler (gdbarch);
+	    }
 
 	    target_terminal_inferior ();
 
@@ -4419,6 +4427,7 @@ infrun: not switching back to stepped thread, it has vanished\n");
      the frame cache to be re-initialized, making our FRAME variable
      a dangling pointer.  */
   frame = get_current_frame ();
+  gdbarch = get_frame_arch (frame);
 
   /* If stepping through a line, keep going if still within it.
 
