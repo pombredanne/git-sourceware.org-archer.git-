@@ -11058,7 +11058,8 @@ get_valid_dis386 (const struct dis386 *dp, disassemble_info *info)
       switch ((*codep & 0x1f))
 	{
 	default:
-	  BadOp ();
+	  dp = &bad_opcode;
+	  return dp;
 	case 0x8:
 	  vex_table_index = XOP_08;
 	  break;
@@ -11077,7 +11078,10 @@ get_valid_dis386 (const struct dis386 *dp, disassemble_info *info)
       vex.register_specifier = (~(*codep >> 3)) & 0xf;
       if (address_mode != mode_64bit
 	  && vex.register_specifier > 0x7)
-	BadOp ();
+	{
+	  dp = &bad_opcode;
+	  return dp;
+	}
 
       vex.length = (*codep & 0x4) ? 256 : 128;
       switch ((*codep & 0x3))
@@ -11115,7 +11119,8 @@ get_valid_dis386 (const struct dis386 *dp, disassemble_info *info)
       switch ((*codep & 0x1f))
 	{
 	default:
-	  BadOp ();
+	  dp = &bad_opcode;
+	  return dp;
 	case 0x1:
 	  vex_table_index = VEX_0F;
 	  break;
@@ -11134,7 +11139,10 @@ get_valid_dis386 (const struct dis386 *dp, disassemble_info *info)
       vex.register_specifier = (~(*codep >> 3)) & 0xf;
       if (address_mode != mode_64bit
 	  && vex.register_specifier > 0x7)
-	BadOp ();
+	{
+	  dp = &bad_opcode;
+	  return dp;
+	}
 
       vex.length = (*codep & 0x4) ? 256 : 128;
       switch ((*codep & 0x3))
@@ -11176,7 +11184,10 @@ get_valid_dis386 (const struct dis386 *dp, disassemble_info *info)
       vex.register_specifier = (~(*codep >> 3)) & 0xf;
       if (address_mode != mode_64bit
 	  && vex.register_specifier > 0x7)
-	BadOp ();
+	{
+	  dp = &bad_opcode;
+	  return dp;
+	}
 
       vex.w = 0;
 
@@ -11242,7 +11253,6 @@ print_insn (bfd_vma pc, disassemble_info *info)
   int sizeflag;
   const char *p;
   struct dis_private priv;
-  unsigned char op;
   int prefix_length;
   int default_prefixes;
 
@@ -11446,8 +11456,6 @@ print_insn (bfd_vma pc, disassemble_info *info)
       (*info->fprintf_func) (info->stream, "fwait");
       return 1;
     }
-
-  op = 0;
 
   if (*codep == 0x0f)
     {
@@ -13532,7 +13540,6 @@ static void
 OP_sI (int bytemode, int sizeflag)
 {
   bfd_signed_vma op;
-  bfd_signed_vma mask = -1;
 
   switch (bytemode)
     {
@@ -13541,7 +13548,6 @@ OP_sI (int bytemode, int sizeflag)
       op = *codep++;
       if ((op & 0x80) != 0)
 	op -= 0x100;
-      mask = 0xffffffff;
       break;
     case v_mode:
       USED_REX (REX_W);
@@ -13552,11 +13558,9 @@ OP_sI (int bytemode, int sizeflag)
 	  if (sizeflag & DFLAG)
 	    {
 	      op = get32s ();
-	      mask = 0xffffffff;
 	    }
 	  else
 	    {
-	      mask = 0xffffffff;
 	      op = get16 ();
 	      if ((op & 0x8000) != 0)
 		op -= 0x10000;
@@ -13566,7 +13570,6 @@ OP_sI (int bytemode, int sizeflag)
       break;
     case w_mode:
       op = get16 ();
-      mask = 0xffffffff;
       if ((op & 0x8000) != 0)
 	op -= 0x10000;
       break;

@@ -1228,12 +1228,11 @@ symbol_file_clear (int from_tty)
 	  : !query (_("Discard symbol table? "))))
     error (_("Not confirmed."));
 
-  free_all_objfiles ();
-
-  /* solib descriptors may have handles to objfiles.  Since their
-     storage has just been released, we'd better wipe the solib
-     descriptors as well.  */
+  /* solib descriptors may have handles to objfiles.  Wipe them before their
+     objfiles get stale by free_all_objfiles.  */
   no_shared_libraries (NULL, from_tty);
+
+  free_all_objfiles ();
 
   gdb_assert (symfile_objfile == NULL);
   if (from_tty)
@@ -2291,14 +2290,13 @@ reread_symbols (void)
       if (objfile->separate_debug_objfile_backlink)
 	continue;
 
-#ifdef DEPRECATED_IBM6000_TARGET
-      /* If this object is from a shared library, then you should
-	 stat on the library name, not member name. */
-
+      /* If this object is from an archive (what you usually create with
+	 `ar', often called a `static library' on most systems, though
+	 a `shared library' on AIX is also an archive), then you should
+	 stat on the archive name, not member name.  */
       if (objfile->obfd->my_archive)
 	res = stat (objfile->obfd->my_archive->filename, &new_statbuf);
       else
-#endif
 	res = stat (objfile->name, &new_statbuf);
       if (res != 0)
 	{
@@ -2618,6 +2616,7 @@ init_filename_language_table (void)
       filename_language_table =
 	xmalloc (fl_table_size * sizeof (*filename_language_table));
       add_filename_language (".c", language_c);
+      add_filename_language (".d", language_d);
       add_filename_language (".C", language_cplus);
       add_filename_language (".cc", language_cplus);
       add_filename_language (".cp", language_cplus);
@@ -2639,6 +2638,7 @@ init_filename_language_table (void)
       add_filename_language (".ads", language_ada);
       add_filename_language (".a", language_ada);
       add_filename_language (".ada", language_ada);
+      add_filename_language (".dg", language_ada);
     }
 }
 

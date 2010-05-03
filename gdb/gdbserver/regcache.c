@@ -61,6 +61,9 @@ regcache_invalidate_one (struct inferior_list_entry *entry)
 
   regcache = (struct regcache *) inferior_regcache_data (thread);
 
+  if (regcache == NULL)
+    return;
+
   if (regcache->registers_valid)
     {
       struct thread_info *saved_inferior = current_inferior;
@@ -80,6 +83,29 @@ regcache_invalidate (void)
 }
 
 struct regcache *
+init_register_cache (struct regcache *regcache, unsigned char *regbuf)
+{
+  if (regbuf == NULL)
+    {
+      /* Make sure to zero-initialize the register cache when it is
+	 created, in case there are registers the target never
+	 fetches.  This way they'll read as zero instead of
+	 garbage.  */
+      regcache->registers = xcalloc (1, register_bytes);
+      regcache->registers_owned = 1;
+    }
+  else
+    {
+      regcache->registers = regbuf;
+      regcache->registers_owned = 0;
+    }
+
+  regcache->registers_valid = 0;
+
+  return regcache;
+}
+
+struct regcache *
 new_register_cache (void)
 {
   struct regcache *regcache;
@@ -88,16 +114,7 @@ new_register_cache (void)
     return NULL; /* The architecture hasn't been initialized yet.  */
 
   regcache = xmalloc (sizeof (*regcache));
-
-  /* Make sure to zero-initialize the register cache when it is
-     created, in case there are registers the target never
-     fetches.  This way they'll read as zero instead of
-     garbage.  */
-  regcache->registers = xcalloc (1, register_bytes);
-
-  regcache->registers_valid = 0;
-
-  return regcache;
+  return init_register_cache (regcache, NULL);
 }
 
 void
@@ -110,6 +127,13 @@ free_register_cache (struct regcache *regcache)
     }
 }
 
+void
+regcache_cpy (struct regcache *dst, struct regcache *src)
+{
+  memcpy (dst->registers, src->registers, register_bytes);
+  dst->registers_valid = src->registers_valid;
+}
+
 static void
 realloc_register_cache (struct inferior_list_entry *thread_p)
 {
@@ -117,6 +141,8 @@ realloc_register_cache (struct inferior_list_entry *thread_p)
   struct regcache *regcache
     = (struct regcache *) inferior_regcache_data (thread);
 
+  if (regcache != NULL)
+    regcache_invalidate_one (thread_p);
   free_register_cache (regcache);
   set_inferior_regcache_data (thread, new_register_cache ());
 }
@@ -125,6 +151,10 @@ void
 set_register_cache (struct reg *regs, int n)
 {
   int offset, i;
+
+  /* Before changing the register cache internal layout, flush the
+     contents of valid caches back to the threads.  */
+  regcache_invalidate ();
 
   reg_defs = regs;
   num_registers = n;
@@ -144,6 +174,12 @@ set_register_cache (struct reg *regs, int n)
 
   /* Re-allocate all pre-existing register caches.  */
   for_each_inferior (&all_threads, realloc_register_cache);
+}
+
+int
+register_cache_size (void)
+{
+  return register_bytes;
 }
 
 void
@@ -222,6 +258,15 @@ supply_register (struct regcache *regcache, int n, const void *buf)
 }
 
 void
+supply_regblock (struct regcache *regcache, const void *buf)
+{
+  if (buf)
+    memcpy (regcache->registers, buf, register_bytes);
+  else
+    memset (regcache->registers, 0, register_bytes);
+}
+
+void
 supply_register_by_name (struct regcache *regcache,
 			 const char *name, const void *buf)
 {
@@ -246,4 +291,30 @@ collect_register_by_name (struct regcache *regcache,
 			  const char *name, void *buf)
 {
   collect_register (regcache, find_regno (name), buf);
+}
+
+/* Special handling for register PC.  */
+
+CORE_ADDR
+regcache_read_pc (struct regcache *regcache)
+{
+  CORE_ADDR pc_val;
+
+  if (the_target->read_pc)
+    pc_val = the_target->read_pc (regcache);
+  else
+    internal_error (__FILE__, __LINE__,
+		    "regcache_read_pc: Unable to find PC");
+
+  return pc_val;
+}
+
+void
+regcache_write_pc (struct regcache *regcache, CORE_ADDR pc)
+{
+  if (the_target->write_pc)
+    the_target->write_pc (regcache, pc);
+  else
+    internal_error (__FILE__, __LINE__,
+		    "regcache_write_pc: Unable to update PC");
 }

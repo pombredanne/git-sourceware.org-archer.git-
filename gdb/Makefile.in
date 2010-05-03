@@ -267,13 +267,17 @@ SUBDIR_TUI_CFLAGS= \
 #
 SUBDIR_PYTHON_OBS = \
 	python.o \
+	py-auto-load.o \
 	py-block.o \
+	py-breakpoint.o \
 	py-cmd.o \
 	py-frame.o \
 	py-function.o \
 	py-lazy-string.o \
 	py-objfile.o \
+	py-param.o \
 	py-prettyprint.o \
+	py-progspace.o \
 	py-symbol.o \
 	py-symtab.o \
 	py-type.o \
@@ -281,13 +285,17 @@ SUBDIR_PYTHON_OBS = \
 	py-value.o
 SUBDIR_PYTHON_SRCS = \
 	python/python.c \
+	python/py-auto-load.c \
 	python/py-block.c \
+	python/py-breakpoint.c \
 	python/py-cmd.c \
 	python/py-frame.c \
 	python/py-function.c \
 	python/py-lazy-string.c \
 	python/py-objfile.c \
+	python/py-param.c \
 	python/py-prettyprint.c \
+	python/py-progspace.c \
 	python/py-symbol.c \
 	python/py-symtab.c \
 	python/py-type.c \
@@ -652,13 +660,14 @@ SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c ada-tasks.c \
 	charset.c cli-out.c coffread.c coff-pe-read.c \
 	complaints.c completer.c corefile.c \
 	cp-abi.c cp-support.c cp-namespace.c cp-valprint.c \
+	d-lang.c d-valprint.c \
 	cp-name-parser.y \
 	dbxread.c demangle.c dictionary.c disasm.c doublest.c dummy-frame.c \
 	dwarf2expr.c dwarf2loc.c dwarf2read.c dwarf2-frame.c \
 	elfread.c environ.c eval.c event-loop.c event-top.c \
 	exceptions.c expprint.c \
-	f-exp.y f-lang.c f-typeprint.c f-valprint.c findcmd.c findvar.c \
-	frame.c frame-base.c frame-unwind.c \
+	f-exp.y f-lang.c f-typeprint.c f-valprint.c filesystem.c \
+	findcmd.c findvar.c frame.c frame-base.c frame-unwind.c \
 	gdbarch.c arch-utils.c gdbtypes.c gnu-v2-abi.c gnu-v3-abi.c \
 	inf-loop.c \
 	infcall.c \
@@ -719,7 +728,7 @@ cli-out.h gdb_expat.h breakpoint.h infcall.h obsd-tdep.h \
 exec.h m32r-tdep.h osabi.h gdbcore.h solib-som.h \
 i386bsd-nat.h xml-support.h xml-tdesc.h alphabsd-tdep.h gdb_obstack.h \
 ia64-tdep.h ada-lang.h varobj.h frv-tdep.h nto-tdep.h serial.h \
-c-lang.h frame.h event-loop.h block.h cli/cli-setshow.h	\
+c-lang.h d-lang.h frame.h event-loop.h block.h cli/cli-setshow.h	\
 cli/cli-decode.h cli/cli-cmds.h cli/cli-dump.h \
 cli/cli-script.h macrotab.h symtab.h version.h gnulib/wchar.in.h \
 gnulib/string.in.h gnulib/str-two-way.h gnulib/extra/link-warning.h \
@@ -759,7 +768,7 @@ language.h nbsd-tdep.h wrapper.h solib-svr4.h \
 macroexp.h ui-file.h regcache.h gdb_string.h tracepoint.h i386-tdep.h \
 inf-child.h p-lang.h event-top.h gdbtypes.h scm-tags.h user-regs.h \
 regformats/regdef.h config/alpha/nm-osf3.h  config/i386/nm-i386gnu.h \
-config/i386/nm-fbsd.h config/i386/nm-i386sol2.h config/i386/nm-linux.h \
+config/i386/nm-fbsd.h config/i386/nm-linux.h \
 config/nm-nto.h config/sparc/nm-sol2.h config/nm-linux.h \
 config/rs6000/nm-rs6000.h top.h bsd-kvm.h gdb-stabs.h reggroups.h \
 annotate.h sim-regno.h dictionary.h dfp.h main.h frame-unwind.h	\
@@ -808,6 +817,7 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 	infcmd.o infrun.o \
 	expprint.o environ.o stack.o thread.o \
 	exceptions.o \
+	filesystem.o \
 	inf-child.o \
 	interps.o \
 	main.o \
@@ -824,7 +834,7 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 	dbxread.o coffread.o coff-pe-read.o \
 	dwarf2read.o mipsread.o stabsread.o corefile.o \
 	dwarf2expr.o dwarf2loc.o dwarf2-frame.o \
-	ada-lang.o c-lang.o f-lang.o objc-lang.o \
+	ada-lang.o c-lang.o d-lang.o f-lang.o objc-lang.o \
 	ada-tasks.o \
 	ui-out.o cli-out.o \
 	varobj.o vec.o wrapper.o \
@@ -834,7 +844,8 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 	sentinel-frame.o \
 	complaints.o typeprint.o \
 	ada-typeprint.o c-typeprint.o f-typeprint.o m2-typeprint.o \
-	ada-valprint.o c-valprint.o cp-valprint.o f-valprint.o m2-valprint.o \
+	ada-valprint.o c-valprint.o cp-valprint.o d-valprint.o f-valprint.o \
+	m2-valprint.o \
 	serial.o mdebugread.o top.o utils.o \
 	ui-file.o \
 	user-regs.o \
@@ -1982,8 +1993,16 @@ python.o: $(srcdir)/python/python.c
 	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python.c
 	$(POSTCOMPILE)
 
+py-auto-load.o: $(srcdir)/python/py-auto-load.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-auto-load.c
+	$(POSTCOMPILE)
+
 py-block.o: $(srcdir)/python/py-block.c
 	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-block.c
+	$(POSTCOMPILE)
+
+py-breakpoint.o: $(srcdir)/python/py-breakpoint.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-breakpoint.c
 	$(POSTCOMPILE)
 
 py-cmd.o: $(srcdir)/python/py-cmd.c
@@ -2006,8 +2025,16 @@ py-objfile.o: $(srcdir)/python/py-objfile.c
 	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-objfile.c
 	$(POSTCOMPILE)
 
+py-param.o: $(srcdir)/python/py-param.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-param.c
+	$(POSTCOMPILE)
+
 py-prettyprint.o: $(srcdir)/python/py-prettyprint.c
 	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-prettyprint.c
+	$(POSTCOMPILE)
+
+py-progspace.o: $(srcdir)/python/py-progspace.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-progspace.c
 	$(POSTCOMPILE)
 
 py-symbol.o: $(srcdir)/python/py-symbol.c

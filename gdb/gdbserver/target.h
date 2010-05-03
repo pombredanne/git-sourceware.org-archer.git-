@@ -138,6 +138,10 @@ struct target_ops
 
   int (*detach) (int pid);
 
+  /* The inferior process has died.  Do what is right.  */
+
+  void (*mourn) (struct process_info *proc);
+
   /* Wait for inferior PID to exit.  */
   void (*join) (int pid);
 
@@ -286,6 +290,40 @@ struct target_ops
 
   /* Returns the core given a thread, or -1 if not known.  */
   int (*core_of_thread) (ptid_t);
+
+  /* Target specific qSupported support.  */
+  void (*process_qsupported) (const char *);
+
+  /* Return 1 if the target supports tracepoints, 0 (or leave the
+     callback NULL) otherwise.  */
+  int (*supports_tracepoints) (void);
+
+  /* Read PC from REGCACHE.  */
+  CORE_ADDR (*read_pc) (struct regcache *regcache);
+
+  /* Write PC to REGCACHE.  */
+  void (*write_pc) (struct regcache *regcache, CORE_ADDR pc);
+
+  /* Return true if THREAD is known to be stopped now.  */
+  int (*thread_stopped) (struct thread_info *thread);
+
+  /* Read Thread Information Block address.  */
+  int (*get_tib_address) (ptid_t ptid, CORE_ADDR *address);
+
+  /* Pause all threads.  If FREEZE, arrange for any resume attempt be
+     be ignored until an unpause_all call unfreezes threads again.
+     There can be nested calls to pause_all, so a freeze counter
+     should be maintained.  */
+  void (*pause_all) (int freeze);
+
+  /* Unpause all threads.  Threads that hadn't been resumed by the
+     client should be left stopped.  Basically a pause/unpause call
+     pair should not end up resuming threads that were stopped before
+     the pause call.  */
+  void (*unpause_all) (int unfreeze);
+
+  /* Cancel all pending breakpoints hits in all threads.  */
+  void (*cancel_breakpoints) (void);
 };
 
 extern struct target_ops *the_target;
@@ -303,6 +341,9 @@ void set_target_ops (struct target_ops *);
 
 #define detach_inferior(pid) \
   (*the_target->detach) (pid)
+
+#define mourn_inferior(PROC) \
+  (*the_target->mourn) (PROC)
 
 #define mythread_alive(pid) \
   (*the_target->thread_alive) (pid)
@@ -326,6 +367,41 @@ void set_target_ops (struct target_ops *);
   (the_target->supports_multi_process ? \
    (*the_target->supports_multi_process) () : 0)
 
+#define target_process_qsupported(query)		\
+  do							\
+    {							\
+      if (the_target->process_qsupported)		\
+	the_target->process_qsupported (query);		\
+    } while (0)
+
+#define target_supports_tracepoints()			\
+  (the_target->supports_tracepoints			\
+   ? (*the_target->supports_tracepoints) () : 0)
+
+#define thread_stopped(thread) \
+  (*the_target->thread_stopped) (thread)
+
+#define pause_all(freeze)			\
+  do						\
+    {						\
+      if (the_target->pause_all)		\
+	(*the_target->pause_all) (freeze);	\
+    } while (0)
+
+#define unpause_all(unfreeze)			\
+  do						\
+    {						\
+      if (the_target->unpause_all)		\
+	(*the_target->unpause_all) (unfreeze);	\
+    } while (0)
+
+#define cancel_breakpoints()			\
+  do						\
+    {						\
+      if (the_target->cancel_breakpoints)     	\
+	(*the_target->cancel_breakpoints) ();  	\
+    } while (0)
+
 /* Start non-stop mode, returns 0 on success, -1 on failure.   */
 
 int start_non_stop (int nonstop);
@@ -341,5 +417,7 @@ int write_inferior_memory (CORE_ADDR memaddr, const unsigned char *myaddr,
 void set_desired_inferior (int id);
 
 const char *target_pid_to_str (ptid_t);
+
+const char *target_waitstatus_to_string (const struct target_waitstatus *);
 
 #endif /* TARGET_H */

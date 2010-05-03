@@ -793,6 +793,75 @@ define_symbol (CORE_ADDR valu, char *string, int desc, int type,
 	    SYMBOL_CLASS (sym) = LOC_CONST;
 	  }
 	  break;
+
+	case 'c':
+	  {
+	    SYMBOL_TYPE (sym) = objfile_type (objfile)->builtin_char;
+	    SYMBOL_VALUE (sym) = atoi (p);
+	    SYMBOL_CLASS (sym) = LOC_CONST;
+	  }
+	  break;
+
+	case 's':
+	  {
+	    struct type *range_type;
+	    int ind = 0;
+	    char quote = *p++;
+	    char *startp = p;
+	    gdb_byte *string_local = (gdb_byte *) alloca (strlen (p));
+	    gdb_byte *string_value;
+
+	    if (quote != '\'' && quote != '"')
+	      {
+		SYMBOL_CLASS (sym) = LOC_CONST;
+		SYMBOL_TYPE (sym) = error_type (&p, objfile);
+		SYMBOL_DOMAIN (sym) = VAR_DOMAIN;
+		add_symbol_to_list (sym, &file_symbols);
+		return sym;
+	      }
+
+	    /* Find matching quote, rejecting escaped quotes.  */
+	    while (*p && *p != quote)
+	      {
+		if (*p == '\\' && p[1] == quote)
+		  {
+		    string_local[ind] = (gdb_byte) quote;
+		    ind++;
+		    p += 2;
+		  }
+		else if (*p) 
+		  {
+		    string_local[ind] = (gdb_byte) (*p);
+		    ind++;
+		    p++;
+		  }
+	      }
+	    if (*p != quote)
+	      {
+		SYMBOL_CLASS (sym) = LOC_CONST;
+		SYMBOL_TYPE (sym) = error_type (&p, objfile);
+		SYMBOL_DOMAIN (sym) = VAR_DOMAIN;
+		add_symbol_to_list (sym, &file_symbols);
+		return sym;
+	      }
+
+	    /* NULL terminate the string.  */
+	    string_local[ind] = 0;
+	    range_type = create_range_type (NULL,
+					    objfile_type (objfile)->builtin_int,
+					    0, ind);
+	    SYMBOL_TYPE (sym) = create_array_type (NULL,
+				  objfile_type (objfile)->builtin_char,
+				  range_type);
+	    string_value = obstack_alloc (&objfile->objfile_obstack, ind + 1);
+	    memcpy (string_value, string_local, ind + 1);
+	    p++;
+
+	    SYMBOL_VALUE_BYTES (sym) = string_value;
+	    SYMBOL_CLASS (sym) = LOC_CONST_BYTES;
+	  }
+	  break;
+
 	case 'e':
 	  /* SYMBOL:c=eTYPE,INTVALUE for a constant symbol whose value
 	     can be represented as integral.
@@ -3324,6 +3393,42 @@ complain_about_struct_wipeout (struct type *type)
 	     _("struct/union type gets multiply defined: %s%s"), kind, name);
 }
 
+/* Set the length for all variants of a same main_type, which are
+   connected in the closed chain.
+   
+   This is something that needs to be done when a type is defined *after*
+   some cross references to this type have already been read.  Consider
+   for instance the following scenario where we have the following two
+   stabs entries:
+
+        .stabs  "t:p(0,21)=*(0,22)=k(0,23)=xsdummy:",160,0,28,-24
+        .stabs  "dummy:T(0,23)=s16x:(0,1),0,3[...]"
+
+   A stubbed version of type dummy is created while processing the first
+   stabs entry.  The length of that type is initially set to zero, since
+   it is unknown at this point.  Also, a "constant" variation of type
+   "dummy" is created as well (this is the "(0,22)=k(0,23)" section of
+   the stabs line).
+
+   The second stabs entry allows us to replace the stubbed definition
+   with the real definition.  However, we still need to adjust the length
+   of the "constant" variation of that type, as its length was left
+   untouched during the main type replacement...  */
+
+static void
+set_length_in_type_chain (struct type *type)
+{
+  struct type *ntype = TYPE_CHAIN (type);
+
+  while (ntype != type)
+    {
+      if (TYPE_LENGTH(ntype) == 0)
+	TYPE_LENGTH (ntype) = TYPE_LENGTH (type);
+      else
+        complain_about_struct_wipeout (ntype);
+      ntype = TYPE_CHAIN (ntype);
+    }
+}
 
 /* Read the description of a structure (or union type) and return an object
    describing the type.
@@ -3382,6 +3487,7 @@ read_struct_type (char **pp, struct type *type, enum type_code type_code,
     TYPE_LENGTH (type) = read_huge_number (pp, 0, &nbits, 0);
     if (nbits != 0)
       return error_type (pp, objfile);
+    set_length_in_type_chain (type);
   }
 
   /* Now read the baseclasses, if any, read the regular C struct or C++
@@ -3546,6 +3652,7 @@ read_enum_type (char **pp, struct type *type,
   /* Now fill in the fields of the type-structure.  */
 
   TYPE_LENGTH (type) = gdbarch_int_bit (gdbarch) / HOST_CHAR_BIT;
+  set_length_in_type_chain (type);
   TYPE_CODE (type) = TYPE_CODE_ENUM;
   TYPE_STUB (type) = 0;
   if (unsigned_enum)

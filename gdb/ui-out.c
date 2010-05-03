@@ -100,7 +100,7 @@ struct ui_out
     int flags;
     /* specific implementation of ui-out */
     struct ui_out_impl *impl;
-    struct ui_out_data *data;
+    void *data;
 
     /* Sub structure tracking the ui-out depth.  */
     int level;
@@ -177,12 +177,12 @@ static void default_field_fmt (struct ui_out *uiout, int fldno,
 			       int width, enum ui_align align,
 			       const char *fldname,
 			       const char *format,
-			       va_list args) ATTR_FORMAT (printf, 6, 0);
+			       va_list args) ATTRIBUTE_PRINTF (6, 0);
 static void default_spaces (struct ui_out *uiout, int numspaces);
 static void default_text (struct ui_out *uiout, const char *string);
 static void default_message (struct ui_out *uiout, int verbosity,
 			     const char *format,
-			     va_list args) ATTR_FORMAT (printf, 3, 0);
+			     va_list args) ATTRIBUTE_PRINTF (3, 0);
 static void default_wrap_hint (struct ui_out *uiout, char *identstring);
 static void default_flush (struct ui_out *uiout);
 
@@ -242,18 +242,15 @@ static void uo_field_int (struct ui_out *uiout, int fldno, int width,
 			  enum ui_align align, const char *fldname, int value);
 static void uo_field_skip (struct ui_out *uiout, int fldno, int width,
 			   enum ui_align align, const char *fldname);
-static void uo_field_string (struct ui_out *uiout, int fldno, int width,
-			     enum ui_align align, const char *fldname,
-			     const char *string);
 static void uo_field_fmt (struct ui_out *uiout, int fldno, int width,
 			  enum ui_align align, const char *fldname,
 			  const char *format, va_list args)
-     ATTR_FORMAT (printf, 6, 0);
+     ATTRIBUTE_PRINTF (6, 0);
 static void uo_spaces (struct ui_out *uiout, int numspaces);
 static void uo_text (struct ui_out *uiout, const char *string);
 static void uo_message (struct ui_out *uiout, int verbosity,
 			const char *format, va_list args)
-     ATTR_FORMAT (printf, 3, 0);
+     ATTRIBUTE_PRINTF (3, 0);
 static void uo_wrap_hint (struct ui_out *uiout, char *identstring);
 static void uo_flush (struct ui_out *uiout);
 static int uo_redirect (struct ui_out *uiout, struct ui_file *outstream);
@@ -1137,7 +1134,7 @@ ui_out_get_field_separator (struct ui_out *uiout)
 
 /* Access to ui-out members data */
 
-struct ui_out_data *
+void *
 ui_out_data (struct ui_out *uiout)
 {
   return uiout->data;
@@ -1146,8 +1143,7 @@ ui_out_data (struct ui_out *uiout)
 /* initalize private members at startup */
 
 struct ui_out *
-ui_out_new (struct ui_out_impl *impl,
-	    struct ui_out_data *data,
+ui_out_new (struct ui_out_impl *impl, void *data,
 	    int flags)
 {
   struct ui_out *uiout = XMALLOC (struct ui_out);

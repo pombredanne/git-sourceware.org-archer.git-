@@ -214,6 +214,9 @@ You can use @value{GDBN} to debug programs written in C and C@t{++}.
 For more information, see @ref{Supported Languages,,Supported Languages}.
 For more information, see @ref{C,,C and C++}.
 
+Support for D is partial.  For information on D, see
+@ref{D,,D}.
+
 @cindex Modula-2
 Support for Modula-2 is partial.  For information on Modula-2, see
 @ref{Modula-2,,Modula-2}.
@@ -3247,6 +3250,7 @@ all breakpoints in that range are operated on.
 * Disabling::                   Disabling breakpoints
 * Conditions::                  Break conditions
 * Break Commands::              Breakpoint command lists
+* Save Breakpoints::            How to save breakpoints in a file
 * Error in Breakpoints::        ``Cannot insert breakpoints''
 * Breakpoint-related Warnings:: ``Breakpoint address adjusted...''
 @end menu
@@ -3354,7 +3358,7 @@ See also @ref{Conditions, ,Break Conditions}.
 
 @kindex rbreak
 @cindex regular expression
-@cindex breakpoints in functions matching a regexp
+@cindex breakpoints at functions matching a regexp
 @cindex set breakpoints in many functions
 @item rbreak @var{regex}
 Set breakpoints on all functions matching the regular expression
@@ -3383,6 +3387,19 @@ The @code{rbreak} command can be used to set breakpoints in
 @smallexample
 (@value{GDBP}) rbreak .
 @end smallexample
+
+@item rbreak @var{file}:@var{regex}
+If @code{rbreak} is called with a filename qualification, it limits
+the search for functions matching the given regular expression to the
+specified @var{file}.  This can be used, for example, to set breakpoints on
+every function in a given file:
+
+@smallexample
+(@value{GDBP}) rbreak file.c:.
+@end smallexample
+
+The colon separating the filename qualifier from the regex may
+optionally be surrounded by spaces.
 
 @kindex info breakpoints
 @cindex @code{$_} and @code{info breakpoints}
@@ -4400,6 +4417,31 @@ set x = y + 4
 cont
 end
 @end smallexample
+
+@node Save Breakpoints
+@subsection How to save breakpoints to a file
+
+To save breakpoint definitions to a file use the @w{@code{save
+breakpoints}} command.
+
+@table @code
+@kindex save breakpoints
+@cindex save breakpoints to a file for future sessions
+@item save breakpoints [@var{filename}]
+This command saves all current breakpoint definitions together with
+their commands and ignore counts, into a file @file{@var{filename}}
+suitable for use in a later debugging session.  This includes all
+types of breakpoints (breakpoints, watchpoints, catchpoints,
+tracepoints).  To read the saved breakpoint definitions, use the
+@code{source} command (@pxref{Command Files}).  Note that watchpoints
+with expressions involving local variables may fail to be recreated
+because it may not be possible to access the context where the
+watchpoint is valid anymore.  Because the saved breakpoint definitions
+are simply a sequence of @value{GDBN} commands that recreate the
+breakpoints, you can edit the file in your favorite editing program,
+and remove the breakpoint definitions you're not interested in, or
+that can no longer be recreated.
+@end table
 
 @c  @ifclear BARETARGET
 @node Error in Breakpoints
@@ -6705,6 +6747,7 @@ Table}.
 * Memory::                      Examining memory
 * Auto Display::                Automatic display
 * Print Settings::              Print settings
+* Pretty Printing::             Python pretty printing
 * Value History::               Value history
 * Convenience Vars::            Convenience variables
 * Registers::                   Registers
@@ -7236,8 +7279,16 @@ Giant words (eight bytes).
 @end table
 
 Each time you specify a unit size with @code{x}, that size becomes the
-default unit the next time you use @code{x}.  (For the @samp{s} and
-@samp{i} formats, the unit size is ignored and is normally not written.)
+default unit the next time you use @code{x}.  For the @samp{i} format,
+the unit size is ignored and is normally not written.  For the @samp{s} format,
+the unit size defaults to @samp{b}, unless it is explicitly given.
+Use @kbd{x /hs} to display 16-bit char strings and @kbd{x /ws} to display
+32-bit strings.  The next use of @kbd{x /s} will again display 8-bit strings.
+Note that the results depend on the programming language of the
+current compilation unit.  If the language is C, the @samp{s}
+modifier will use the UTF-16 encoding while @samp{w} will use
+UTF-32.  The encoding is set by the programming language and cannot
+be altered.
 
 @item @var{addr}, starting display address
 @var{addr} is the address where you want @value{GDBN} to begin displaying
@@ -7875,6 +7926,42 @@ Do not pretty print C@t{++} virtual function tables.
 Show whether C@t{++} virtual function tables are pretty printed, or not.
 @end table
 
+@node Pretty Printing
+@section Pretty Printing
+
+@value{GDBN} provides a mechanism to allow pretty-printing of values using
+Python code.  It greatly simplifies the display of complex objects.  This
+mechanism works for both MI and the CLI.
+
+For example, here is how a C@t{++} @code{std::string} looks without a
+pretty-printer:
+
+@smallexample
+(@value{GDBP}) print s
+$1 = @{
+  static npos = 4294967295, 
+  _M_dataplus = @{
+    <std::allocator<char>> = @{
+      <__gnu_cxx::new_allocator<char>> = @{
+        <No data fields>@}, <No data fields>
+      @},
+    members of std::basic_string<char, std::char_traits<char>,
+      std::allocator<char> >::_Alloc_hider:
+    _M_p = 0x804a014 "abcd"
+  @}
+@}
+@end smallexample
+
+With a pretty-printer for @code{std::string} only the contents are printed:
+
+@smallexample
+(@value{GDBP}) print s
+$2 = "abcd"
+@end smallexample
+
+For implementing pretty printers for new types you should read the Python API
+details (@pxref{Pretty Printing API}).
+
 @node Value History
 @section Value History
 
@@ -8054,6 +8141,15 @@ The variable @code{$_siginfo} contains extra signal information
 (@pxref{extra signal information}).  Note that @code{$_siginfo}
 could be empty, if the application has not yet received any signals.
 For example, it will be empty before you execute the @code{run} command.
+
+@item $_tlb
+@vindex $_tlb@r{, convenience variable}
+The variable @code{$_tlb} is automatically set when debugging
+applications running on MS-Windows in native mode or connected to
+gdbserver that supports the @code{qGetTIBAddr} request. 
+@xref{General Query Packets}.
+This variable contains the address of the thread information block.
+
 @end table
 
 On HP-UX systems, if you refer to a function or variable name that
@@ -9604,6 +9700,10 @@ terminate the actions list with a line containing just @code{end}.  So
 far, the only defined actions are @code{collect}, @code{teval}, and
 @code{while-stepping}.
 
+@code{actions} is actually equivalent to @code{commands} (@pxref{Break
+Commands, ,Breakpoint Command Lists}), except that only the defined
+actions are allowed; any other @value{GDBN} command is rejected.
+
 @cindex remove actions from a tracepoint
 To remove all actions from a tracepoint, type @samp{actions @var{num}}
 and follow it immediately with @samp{end}.
@@ -9632,7 +9732,7 @@ Enter actions for tracepoint 1, one per line:
 > collect bar,baz
 > collect $regs
 > while-stepping 12
-  > collect $fp, $sp
+  > collect $pc, arr[i]
   > end
 end
 @end smallexample
@@ -9657,7 +9757,7 @@ collect all local variables.
 
 You can give several consecutive @code{collect} commands, each one
 with a single argument, or one @code{collect} command with several
-arguments separated by commas: the effect is the same.
+arguments separated by commas; the effect is the same.
 
 The command @code{info scope} (@pxref{Symbols, info scope}) is
 particularly useful for figuring out what data to collect.
@@ -9728,24 +9828,18 @@ tracing:
 @itemize @bullet
 @item
 its passcount as given by the @code{passcount @var{n}} command
-@item
-its step count as given by the @code{while-stepping @var{n}} command
-@item
-its action list as given by the @code{actions} command.  The actions
-are prefixed with an @samp{A} so as to distinguish them from commands.
 @end itemize
 
 @smallexample
 (@value{GDBP}) @b{info trace}
 Num     Type           Disp Enb Address    What
 1       tracepoint     keep y   0x0804ab57 in foo() at main.cxx:7
+        while-stepping 20
+          collect globfoo, $regs
+        end
+        collect globfoo2
+        end
         pass count 1200 
-        step count 20 
-      A while-stepping 20
-      A collect globfoo, $regs
-      A end
-      A collect globfoo2
-      A end
 (@value{GDBP})
 @end smallexample
 
@@ -9971,7 +10065,7 @@ the buffer will fail.
 @menu
 * tfind::                       How to select a trace snapshot
 * tdump::                       How to display all data for a snapshot
-* save-tracepoints::            How to save tracepoints for a future run
+* save tracepoints::            How to save tracepoints for a future run
 @end menu
 
 @node tfind
@@ -10166,8 +10260,9 @@ list, and may fail if a while-stepping frame does not include all the
 same data that is collected at the tracepoint hit.
 @c This is getting pretty arcane, example would be good.
 
-@node save-tracepoints
-@subsection @code{save-tracepoints @var{filename}}
+@node save tracepoints
+@subsection @code{save tracepoints @var{filename}}
+@kindex save tracepoints
 @kindex save-tracepoints
 @cindex save tracepoints for future sessions
 
@@ -10175,7 +10270,8 @@ This command saves all current tracepoint definitions together with
 their actions and passcounts, into a file @file{@var{filename}}
 suitable for use in a later debugging session.  To read the saved
 tracepoint definitions, use the @code{source} command (@pxref{Command
-Files}).
+Files}).  The @w{@code{save-tracepoints}} command is a deprecated
+alias for @w{@code{save tracepoints}}
 
 @node Tracepoint Variables
 @section Convenience Variables for Tracepoints
@@ -10731,6 +10827,9 @@ C source file
 @itemx .c++
 C@t{++} source file
 
+@item .d
+D source file
+
 @item .m
 Objective-C source file
 
@@ -11008,7 +11107,7 @@ being set automatically by @value{GDBN}.
 @node Supported Languages
 @section Supported Languages
 
-@value{GDBN} supports C, C@t{++}, Objective-C, Fortran, Java, Pascal,
+@value{GDBN} supports C, C@t{++}, D, Objective-C, Fortran, Java, Pascal,
 assembly, Modula-2, and Ada.
 @c This is false ...
 Some @value{GDBN} features may be used in expressions regardless of the
@@ -11027,6 +11126,7 @@ language reference or tutorial.
 
 @menu
 * C::                           C and C@t{++}
+* D::                           D
 * Objective-C::                 Objective-C
 * Fortran::                     Fortran
 * Pascal::                      Pascal
@@ -11563,6 +11663,14 @@ underflow, overflow and divide by zero exceptions.
 In the PowerPC architecture, @value{GDBN} provides a set of pseudo-registers
 to inspect @code{_Decimal128} values stored in floating point registers.
 See @ref{PowerPC,,PowerPC} for more details.
+
+@node D
+@subsection D
+
+@cindex D
+@value{GDBN} can be used to debug programs written in D and compiled with
+GDC, LDC or DMD compilers. Currently @value{GDBN} supports only one D
+specific feature --- dynamic arrays.
 
 @node Objective-C
 @subsection Objective-C
@@ -14311,6 +14419,59 @@ The part of @var{path} following the initial @file{remote:}
 that happens to be named @file{remote:}, you need to use some equivalent
 variant of the name like @file{./remote:}.}
 
+For targets with an MS-DOS based filesystem, such as MS-Windows and
+SymbianOS, @value{GDBN} tries prefixing a few variants of the target
+absolute file name with @var{path}.  But first, on Unix hosts,
+@value{GDBN} converts all backslash directory separators into forward
+slashes, because the backslash is not a directory separator on Unix:
+
+@smallexample
+  c:\foo\bar.dll @result{} c:/foo/bar.dll
+@end smallexample
+
+Then, @value{GDBN} attempts prefixing the target file name with
+@var{path}, and looks for the resulting file name in the host file
+system:
+
+@smallexample
+  c:/foo/bar.dll @result{} /path/to/sysroot/c:/foo/bar.dll
+@end smallexample
+
+If that does not find the shared library, @value{GDBN} tries removing
+the @samp{:} character from the drive spec, both for convenience, and,
+for the case of the host file system not supporting file names with
+colons:
+
+@smallexample
+  c:/foo/bar.dll @result{} /path/to/sysroot/c/foo/bar.dll
+@end smallexample
+
+This makes it possible to have a system root that mirrors a target
+with more than one drive.  E.g., you may want to setup your local
+copies of the target system shared libraries like so (note @samp{c} vs
+@samp{z}):
+
+@smallexample
+ @file{/path/to/sysroot/c/sys/bin/foo.dll}
+ @file{/path/to/sysroot/c/sys/bin/bar.dll}
+ @file{/path/to/sysroot/z/sys/bin/bar.dll}
+@end smallexample
+
+@noindent
+and point the system root at @file{/path/to/sysroot}, so that
+@value{GDBN} can find the correct copies of both
+@file{c:\sys\bin\foo.dll}, and @file{z:\sys\bin\bar.dll}.
+
+If that still does not find the shared library, @value{GDBN} tries
+removing the whole drive spec from the target file name:
+
+@smallexample
+  c:/foo/bar.dll @result{} /path/to/sysroot/foo/bar.dll
+@end smallexample
+
+This last lookup makes it possible to not care about the drive name,
+if you don't want or need to.
+
 The @code{set solib-absolute-prefix} command is an alias for @code{set
 sysroot}.
 
@@ -14342,6 +14503,55 @@ of shared library symbols.
 @kindex show solib-search-path
 @item show solib-search-path
 Display the current shared library search path.
+
+@cindex DOS file-name semantics of file names.
+@kindex set target-file-system-kind (unix|dos-based|auto)
+@kindex show target-file-system-kind
+@item set target-file-system-kind @var{kind}
+Set assumed file system kind for target reported file names.
+
+Shared library file names as reported by the target system may not
+make sense as is on the system @value{GDBN} is running on.  For
+example, when remote debugging a target that has MS-DOS based file
+system semantics, from a Unix host, the target may be reporting to
+@value{GDBN} a list of loaded shared libraries with file names such as
+@file{c:\Windows\kernel32.dll}.  On Unix hosts, there's no concept of
+drive letters, so the @samp{c:\} prefix is not normally understood as
+indicating an absolute file name, and neither is the backslash
+normally considered a directory separator character.  In that case,
+the native file system would interpret this whole absolute file name
+as a relative file name with no directory components.  This would make
+it impossible to point @value{GDBN} at a copy of the remote target's
+shared libraries on the host using @code{set sysroot}, and impractical
+with @code{set solib-search-path}.  Setting
+@code{target-file-system-kind} to @code{dos-based} tells @value{GDBN}
+to interpret such file names similarly to how the target would, and to
+map them to file names valid on @value{GDBN}'s native file system
+semantics.  The value of @var{kind} can be @code{"auto"}, in addition
+to one of the supported file system kinds.  In that case, @value{GDBN}
+tries to determine the appropriate file system variant based on the
+current target's operating system (@pxref{ABI, ,Configuring the
+Current ABI}).  The supported file system settings are:
+
+@table @code
+@item unix
+Instruct @value{GDBN} to assume the target file system is of Unix
+kind.  Only file names starting the forward slash (@samp{/}) character
+are considered absolute, and the directory separator character is also
+the forward slash.
+
+@item dos-based
+Instruct @value{GDBN} to assume the target file system is DOS based.
+File names starting with either a forward slash, or a drive letter
+followed by a colon (e.g., @samp{c:}), are considered absolute, and
+both the slash (@samp{/}) and the backslash (@samp{\\}) characters are
+considered directory separators.
+
+@item auto
+Instruct @value{GDBN} to use the file system kind associated with the
+target operating system (@pxref{ABI, ,Configuring the Current ABI}).
+This is the default.
+@end table
 @end table
 
 
@@ -15755,6 +15965,10 @@ are:
 @tab @code{qGetTLSAddr}
 @tab Displaying @code{__thread} variables
 
+@item @code{get-thread-information-block-address}
+@tab @code{qGetTIBAddr}
+@tab Display MS-Windows Thread Information Block.
+
 @item @code{search-memory}
 @tab @code{qSearch:memory}
 @tab @code{find}
@@ -16533,6 +16747,11 @@ It takes an optional argument that is evaluated to
 a long value to give the information about this given selector.
 Without argument, this command displays information
 about the six segment registers.
+
+@item info w32 thread-information-block
+This command displays thread specific information stored in the
+Thread Information Block (readable on the X86 CPU family using @code{$fs}
+selector for 32-bit programs and @code{$gs} for 64-bit programs).
 
 @kindex info dll
 @item info dll
@@ -19373,7 +19592,7 @@ using the @code{script-extension} setting.
 @table @code
 @kindex source
 @cindex execute commands from a file
-@item source [@code{-v}] @var{filename}
+@item source [-s] [-v] @var{filename}
 Execute the command file @var{filename}.
 @end table
 
@@ -19383,8 +19602,27 @@ unless the order of execution is changed by one of the
 printed as they are executed.  An error in any command terminates
 execution of the command file and control is returned to the console.
 
-@value{GDBN} searches for @var{filename} in the current directory and then
-on the search path (specified with the @samp{directory} command).
+@value{GDBN} first searches for @var{filename} in the current directory.
+If the file is not found there, and @var{filename} does not specify a
+directory, then @value{GDBN} also looks for the file on the source search path
+(specified with the @samp{directory} command);
+except that @file{$cdir} is not searched because the compilation directory
+is not relevant to scripts.
+
+If @code{-s} is specified, then @value{GDBN} searches for @var{filename}
+on the search path even if @var{filename} specifies a directory.
+The search is done by appending @var{filename} to each element of the
+search path.  So, for example, if @var{filename} is @file{mylib/myscript}
+and the search path contains @file{/home/user} then @value{GDBN} will
+look for the script @file{/home/user/mylib/myscript}.
+The search is also done if @var{filename} is an absolute path.
+For example, if @var{filename} is @file{/tmp/myscript} and
+the search path contains @file{/home/user} then @value{GDBN} will
+look for the script @file{/home/user/tmp/myscript}.
+For DOS-like systems, if @var{filename} contains a drive specification,
+it is stripped before concatenation.  For example, if @var{filename} is
+@file{d:myscript} and the search path contains @file{c:/tmp} then @value{GDBN}
+will look for the script @file{c:/tmp/myscript}.
 
 If @code{-v}, for verbose mode, is given then @value{GDBN} displays
 each command as it is executed.  The option must be given before
@@ -19620,6 +19858,7 @@ Python programming language}.  This feature is available only if
 @menu
 * Python Commands::             Accessing Python from @value{GDBN}.
 * Python API::                  Accessing @value{GDBN} from Python.
+* Auto-loading::                Automatically loading Python code.
 @end menu
 
 @node Python Commands
@@ -19697,19 +19936,21 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 @menu
 * Basic Python::                Basic Python Functions.
 * Exception Handling::
-* Auto-loading::                Automatically loading Python code.
 * Values From Inferior::
-* Types In Python::		Python representation of types.
-* Pretty Printing::		Pretty-printing values.
+* Types In Python::             Python representation of types.
+* Pretty Printing API::         Pretty-printing values.
 * Selecting Pretty-Printers::   How GDB chooses a pretty-printer.
 * Commands In Python::          Implementing new commands in Python.
+* Parameters In Python::        Adding new @value{GDBN} parameters.
 * Functions In Python::         Writing new convenience functions.
+* Progspaces In Python::        Program spaces.
 * Objfiles In Python::          Object files.
 * Frames In Python::            Accessing inferior stack frames from Python.
 * Blocks In Python::            Accessing frame blocks from Python.
 * Symbols In Python::           Python representation of symbols.
 * Symbol Tables In Python::     Python representation of symbol tables.
 * Lazy Strings In Python::      Python representation of lazy strings.
+* Breakpoints In Python::       Manipulating breakpoints using Python.
 @end menu
 
 @node Basic Python
@@ -19733,6 +19974,12 @@ If no exceptions occur, this function returns @code{None}.
 @var{from_tty} specifies whether @value{GDBN} ought to consider this
 command as having originated from the user invoking it interactively.
 It must be a boolean value.  If omitted, it defaults to @code{False}.
+@end defun
+
+@findex gdb.breakpoints
+@defun breakpoints
+Return a sequence holding all of @value{GDBN}'s breakpoints.
+@xref{Breakpoints In Python}, for more information.
 @end defun
 
 @findex gdb.parameter
@@ -19834,53 +20081,6 @@ exception handler will see @code{RuntimeError} or
 message as its value, and the Python call stack backtrace at the
 Python statement closest to where the @value{GDBN} error occured as the
 traceback.
-
-@node Auto-loading
-@subsubsection Auto-loading
-@cindex auto-loading, Python
-
-When a new object file is read (for example, due to the @code{file}
-command, or because the inferior has loaded a shared library),
-@value{GDBN} will look for a file named @file{@var{objfile}-gdb.py},
-where @var{objfile} is the object file's real name, formed by ensuring
-that the file name is absolute, following all symlinks, and resolving
-@code{.} and @code{..}  components.  If this file exists and is
-readable, @value{GDBN} will evaluate it as a Python script.
-
-If this file does not exist, and if the parameter
-@code{debug-file-directory} is set (@pxref{Separate Debug Files}),
-then @value{GDBN} will use for its each separated directory component
-@code{component} the file named @file{@code{component}/@var{real-name}}, where
-@var{real-name} is the object file's real name, as described above.
-
-Finally, if this file does not exist, then @value{GDBN} will look for
-a file named @file{@var{data-directory}/python/auto-load/@var{real-name}}, where
-@var{data-directory} is @value{GDBN}'s data directory (available via
-@code{show data-directory}, @pxref{Data Files}), and @var{real-name}
-is the object file's real name, as described above.
-
-When reading an auto-loaded file, @value{GDBN} sets the ``current
-objfile''.  This is available via the @code{gdb.current_objfile}
-function (@pxref{Objfiles In Python}).  This can be useful for
-registering objfile-specific pretty-printers.
-
-The auto-loading feature is useful for supplying application-specific
-debugging commands and scripts.  You can enable or disable this
-feature, and view its current state.
-
-@table @code
-@kindex maint set python auto-load
-@item maint set python auto-load [yes|no]
-Enable or disable the Python auto-loading feature.
-
-@kindex show python auto-load
-@item show python auto-load
-Show whether Python auto-loading is enabled or disabled.
-@end table
-
-@value{GDBN} does not track which files it has already auto-loaded.
-So, your @samp{-gdb.py} file should take care to ensure that it may be
-evaluated multiple times without error.
 
 @node Values From Inferior
 @subsubsection Values From Inferior
@@ -20319,37 +20519,10 @@ A function internal to @value{GDBN}.  This is the type used to represent
 convenience functions.
 @end table
 
-@node Pretty Printing
-@subsubsection Pretty Printing
+@node Pretty Printing API
+@subsubsection Pretty Printing API
 
-@value{GDBN} provides a mechanism to allow pretty-printing of values
-using Python code.  The pretty-printer API allows application-specific
-code to greatly simplify the display of complex objects.  This
-mechanism works for both MI and the CLI.
-
-For example, here is how a C@t{++} @code{std::string} looks without a
-pretty-printer:
-
-@smallexample
-(@value{GDBP}) print s
-$1 = @{
-  static npos = 4294967295, 
-  _M_dataplus = @{
-    <std::allocator<char>> = @{
-      <__gnu_cxx::new_allocator<char>> = @{<No data fields>@}, <No data fields>@}, 
-    members of std::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Alloc_hider: 
-    _M_p = 0x804a014 "abcd"
-  @}
-@}
-@end smallexample
-
-After a pretty-printer for @code{std::string} has been installed, only
-the contents are printed:
-
-@smallexample
-(@value{GDBP}) print s
-$2 = "abcd"
-@end smallexample
+An example output is provided (@pxref{Pretty Printing}).
 
 A pretty-printer is just an object that holds a value and implements a
 specific interface, defined here.
@@ -20424,6 +20597,9 @@ the resulting value.  Again, this may result in a call to another
 pretty-printer.  Python scalars (integers, floats, and booleans) and
 strings are convertible to @code{gdb.Value}; other types are not.
 
+Finally, if this method returns @code{None} then no further operations
+are peformed in this method and nothing is printed.
+
 If the result is not one of these types, an exception is raised.
 @end defop
 
@@ -20432,18 +20608,23 @@ If the result is not one of these types, an exception is raised.
 
 The Python list @code{gdb.pretty_printers} contains an array of
 functions that have been registered via addition as a pretty-printer.
+Each @code{gdb.Progspace} contains a @code{pretty_printers} attribute.
 Each @code{gdb.Objfile} also contains a @code{pretty_printers}
 attribute.
 
 A function on one of these lists is passed a single @code{gdb.Value}
 argument and should return a pretty-printer object conforming to the
-interface definition above (@pxref{Pretty Printing}).  If a function
+interface definition above (@pxref{Pretty Printing API}).  If a function
 cannot create a pretty-printer for the value, it should return
 @code{None}.
 
 @value{GDBN} first checks the @code{pretty_printers} attribute of each
-@code{gdb.Objfile} and iteratively calls each function in the list for
-that @code{gdb.Objfile} until it receives a pretty-printer object.
+@code{gdb.Objfile} in the current program space and iteratively calls
+each function in the list for that @code{gdb.Objfile} until it receives
+a pretty-printer object.
+If no pretty-printer is found in the objfile lists, @value{GDBN} then
+searches the pretty-printer list of the current program space,
+calling each function until an object is returned.
 After these lists have been exhausted, it tries the global
 @code{gdb.pretty-printers} list, again calling each function until an
 object is returned.
@@ -20514,7 +20695,7 @@ printers with a specific objfile, @value{GDBN} will find the correct
 printers for the specific version of the library used by each
 inferior.
 
-To continue the @code{std::string} example (@pxref{Pretty Printing}),
+To continue the @code{std::string} example (@pxref{Pretty Printing API}),
 this code might appear in @code{gdb.libstdcxx.v6}:
 
 @smallexample
@@ -20782,6 +20963,152 @@ registration of the command with @value{GDBN}.  Depending on how the
 Python code is read into @value{GDBN}, you may need to import the
 @code{gdb} module explicitly.
 
+@node Parameters In Python
+@subsubsection Parameters In Python
+
+@cindex parameters in python
+@cindex python parameters
+@tindex gdb.Parameter
+@tindex Parameter
+You can implement new @value{GDBN} parameters using Python.  A new
+parameter is implemented as an instance of the @code{gdb.Parameter}
+class.
+
+Parameters are exposed to the user via the @code{set} and
+@code{show} commands.  @xref{Help}.
+
+There are many parameters that already exist and can be set in
+@value{GDBN}.  Two examples are: @code{set follow fork} and
+@code{set charset}.  Setting these parameters influences certain
+behavior in @value{GDBN}.  Similarly, you can define parameters that
+can be used to influence behavior in custom Python scripts and commands.
+
+@defmethod Parameter __init__ name @var{command-class} @var{parameter-class} @r{[}@var{enum-sequence}@r{]}
+The object initializer for @code{Parameter} registers the new
+parameter with @value{GDBN}.  This initializer is normally invoked
+from the subclass' own @code{__init__} method.
+
+@var{name} is the name of the new parameter.  If @var{name} consists
+of multiple words, then the initial words are looked for as prefix
+parameters.  An example of this can be illustrated with the
+@code{set print} set of parameters.  If @var{name} is
+@code{print foo}, then @code{print} will be searched as the prefix
+parameter.  In this case the parameter can subsequently be accessed in
+@value{GDBN} as @code{set print foo}.
+
+If @var{name} consists of multiple words, and no prefix parameter group
+can be found, an exception is raised.
+
+@var{command-class} should be one of the @samp{COMMAND_} constants
+(@pxref{Commands In Python}).  This argument tells @value{GDBN} how to
+categorize the new parameter in the help system.
+
+@var{parameter-class} should be one of the @samp{PARAM_} constants
+defined below.  This argument tells @value{GDBN} the type of the new
+parameter; this information is used for input validation and
+completion.
+
+If @var{parameter-class} is @code{PARAM_ENUM}, then
+@var{enum-sequence} must be a sequence of strings.  These strings
+represent the possible values for the parameter.
+
+If @var{parameter-class} is not @code{PARAM_ENUM}, then the presence
+of a fourth argument will cause an exception to be thrown.
+
+The help text for the new parameter is taken from the Python
+documentation string for the parameter's class, if there is one.  If
+there is no documentation string, a default value is used.
+@end defmethod
+
+@defivar Parameter set_doc
+If this attribute exists, and is a string, then its value is used as
+the help text for this parameter's @code{set} command.  The value is
+examined when @code{Parameter.__init__} is invoked; subsequent changes
+have no effect.
+@end defivar
+
+@defivar Parameter show_doc
+If this attribute exists, and is a string, then its value is used as
+the help text for this parameter's @code{show} command.  The value is
+examined when @code{Parameter.__init__} is invoked; subsequent changes
+have no effect.
+@end defivar
+
+@defivar Parameter value
+The @code{value} attribute holds the underlying value of the
+parameter.  It can be read and assigned to just as any other
+attribute.  @value{GDBN} does validation when assignments are made.
+@end defivar
+
+
+When a new parameter is defined, its type must be specified.  The
+available types are represented by constants defined in the @code{gdb}
+module:
+
+@table @code
+@findex PARAM_BOOLEAN
+@findex gdb.PARAM_BOOLEAN
+@item PARAM_BOOLEAN
+The value is a plain boolean.  The Python boolean values, @code{True}
+and @code{False} are the only valid values.
+
+@findex PARAM_AUTO_BOOLEAN
+@findex gdb.PARAM_AUTO_BOOLEAN
+@item PARAM_AUTO_BOOLEAN
+The value has three possible states: true, false, and @samp{auto}.  In
+Python, true and false are represented using boolean constants, and
+@samp{auto} is represented using @code{None}.
+
+@findex PARAM_UINTEGER
+@findex gdb.PARAM_UINTEGER
+@item PARAM_UINTEGER
+The value is an unsigned integer.  The value of 0 should be
+interpreted to mean ``unlimited''.
+
+@findex PARAM_INTEGER
+@findex gdb.PARAM_INTEGER
+@item PARAM_INTEGER
+The value is a signed integer.  The value of 0 should be interpreted
+to mean ``unlimited''.
+
+@findex PARAM_STRING
+@findex gdb.PARAM_STRING
+@item PARAM_STRING
+The value is a string.  When the user modifies the string, any escape
+sequences, such as @samp{\t}, @samp{\f}, and octal escapes, are
+translated into corresponding characters and encoded into the current
+host charset.
+
+@findex PARAM_STRING_NOESCAPE
+@findex gdb.PARAM_STRING_NOESCAPE
+@item PARAM_STRING_NOESCAPE
+The value is a string.  When the user modifies the string, escapes are
+passed through untranslated.
+
+@findex PARAM_OPTIONAL_FILENAME
+@findex gdb.PARAM_OPTIONAL_FILENAME
+@item PARAM_OPTIONAL_FILENAME
+The value is a either a filename (a string), or @code{None}.
+
+@findex PARAM_FILENAME
+@findex gdb.PARAM_FILENAME
+@item PARAM_FILENAME
+The value is a filename.  This is just like
+@code{PARAM_STRING_NOESCAPE}, but uses file names for completion.
+
+@findex PARAM_ZINTEGER
+@findex gdb.PARAM_ZINTEGER
+@item PARAM_ZINTEGER
+The value is an integer.  This is like @code{PARAM_INTEGER}, except 0
+is interpreted as itself.
+
+@findex PARAM_ENUM
+@findex gdb.PARAM_ENUM
+@item PARAM_ENUM
+The value is a string, which must be one of a collection string
+constants provided when the parameter is created.
+@end table
+
 @node Functions In Python
 @subsubsection Writing new convenience functions
 
@@ -20841,6 +21168,49 @@ registration of the function with @value{GDBN}.  Depending on how the
 Python code is read into @value{GDBN}, you may need to import the
 @code{gdb} module explicitly.
 
+@node Progspaces In Python
+@subsubsection Program Spaces In Python
+
+@cindex progspaces in python
+@tindex gdb.Progspace
+@tindex Progspace
+A program space, or @dfn{progspace}, represents a symbolic view
+of an address space.
+It consists of all of the objfiles of the program.
+@xref{Objfiles In Python}.
+@xref{Inferiors and Programs, program spaces}, for more details
+about program spaces.
+
+The following progspace-related functions are available in the
+@code{gdb} module:
+
+@findex gdb.current_progspace
+@defun current_progspace
+This function returns the program space of the currently selected inferior.
+@xref{Inferiors and Programs}.
+@end defun
+
+@findex gdb.progspaces
+@defun progspaces
+Return a sequence of all the progspaces currently known to @value{GDBN}.
+@end defun
+
+Each progspace is represented by an instance of the @code{gdb.Progspace}
+class.
+
+@defivar Progspace filename
+The file name of the progspace as a string.
+@end defivar
+
+@defivar Progspace pretty_printers
+The @code{pretty_printers} attribute is a list of functions.  It is
+used to look up pretty-printers.  A @code{Value} is passed to each
+function in order; if the function returns @code{None}, then the
+search continues.  Otherwise, the return value should be an object
+which is used to format the value.  @xref{Pretty Printing API}, for more
+information.
+@end defivar
+
 @node Objfiles In Python
 @subsubsection Objfiles In Python
 
@@ -20882,7 +21252,7 @@ The @code{pretty_printers} attribute is a list of functions.  It is
 used to look up pretty-printers.  A @code{Value} is passed to each
 function in order; if the function returns @code{None}, then the
 search continues.  Otherwise, the return value should be an object
-which is used to format the value.  @xref{Pretty Printing}, for more
+which is used to format the value.  @xref{Pretty Printing API}, for more
 information.
 @end defivar
 
@@ -21275,6 +21645,163 @@ Return the symbol table's source absolute file name.
 @end defmethod
 @end table
 
+@node Breakpoints In Python
+@subsubsection Manipulating breakpoints using Python
+
+@cindex breakpoints in python
+@tindex gdb.Breakpoint
+
+Python code can manipulate breakpoints via the @code{gdb.Breakpoint}
+class.
+
+@defmethod Breakpoint __init__ spec @r{[}type@r{]} @r{[}wp_class@r{]}
+Create a new breakpoint.  @var{spec} is a string naming the
+location of the breakpoint, or an expression that defines a
+watchpoint.  The contents can be any location recognized by the
+@code{break} command, or in the case of a watchpoint, by the @code{watch}
+command.  The optional @var{type} denotes the breakpoint to create
+from the types defined later in this chapter.  This argument can be
+either: @code{BP_BREAKPOINT} or @code{BP_WATCHPOINT}.  @var{type}
+defaults to @code{BP_BREAKPOINT}.  The optional @var{wp_class}
+argument defines the class of watchpoint to create, if @var{type} is
+defined as @code{BP_WATCHPOINT}.  If a watchpoint class is not
+provided, it is assumed to be a @var{WP_WRITE} class.
+@end defmethod
+
+The available watchpoint types represented by constants are defined in the
+@code{gdb} module:
+
+@table @code
+@findex WP_READ
+@findex gdb.WP_READ
+@item WP_READ
+Read only watchpoint.
+
+@findex WP_WRITE
+@findex gdb.WP_WRITE
+@item WP_WRITE
+Write only watchpoint.
+
+@findex WP_ACCESS
+@findex gdb.WP_ACCESS
+@item WP_ACCESS
+Read/Write watchpoint.
+@end table
+
+@defmethod Breakpoint is_valid
+Return @code{True} if this @code{Breakpoint} object is valid,
+@code{False} otherwise.  A @code{Breakpoint} object can become invalid
+if the user deletes the breakpoint.  In this case, the object still
+exists, but the underlying breakpoint does not.  In the cases of
+watchpoint scope, the watchpoint remains valid even if execution of the
+inferior leaves the scope of that watchpoint.
+@end defmethod
+
+@defivar Breakpoint enabled
+This attribute is @code{True} if the breakpoint is enabled, and
+@code{False} otherwise.  This attribute is writable.
+@end defivar
+
+@defivar Breakpoint silent
+This attribute is @code{True} if the breakpoint is silent, and
+@code{False} otherwise.  This attribute is writable.
+
+Note that a breakpoint can also be silent if it has commands and the
+first command is @code{silent}.  This is not reported by the
+@code{silent} attribute.
+@end defivar
+
+@defivar Breakpoint thread
+If the breakpoint is thread-specific, this attribute holds the thread
+id.  If the breakpoint is not thread-specific, this attribute is
+@code{None}.  This attribute is writable.
+@end defivar
+
+@defivar Breakpoint task
+If the breakpoint is Ada task-specific, this attribute holds the Ada task
+id.  If the breakpoint is not task-specific (or the underlying
+language is not Ada), this attribute is @code{None}.  This attribute
+is writable.
+@end defivar
+
+@defivar Breakpoint ignore_count
+This attribute holds the ignore count for the breakpoint, an integer.
+This attribute is writable.
+@end defivar
+
+@defivar Breakpoint number
+This attribute holds the breakpoint's number --- the identifier used by
+the user to manipulate the breakpoint.  This attribute is not writable.
+@end defivar
+
+@defivar Breakpoint type
+This attribute holds the breakpoint's type --- the identifier used to
+determine the actual breakpoint type or use-case.  This attribute is not
+writable.
+@end defivar
+
+The available types are represented by constants defined in the @code{gdb}
+module:
+
+@table @code
+@findex BP_BREAKPOINT
+@findex gdb.BP_BREAKPOINT
+@item BP_BREAKPOINT
+Normal code breakpoint.
+
+@findex BP_WATCHPOINT
+@findex gdb.BP_WATCHPOINT
+@item BP_WATCHPOINT
+Watchpoint breakpoint.
+
+@findex BP_HARDWARE_WATCHPOINT
+@findex gdb.BP_HARDWARE_WATCHPOINT
+@item BP_HARDWARE_WATCHPOINT
+Hardware assisted watchpoint.
+
+@findex BP_READ_WATCHPOINT
+@findex gdb.BP_READ_WATCHPOINT
+@item BP_READ_WATCHPOINT
+Hardware assisted read watchpoint.
+
+@findex BP_ACCESS_WATCHPOINT
+@findex gdb.BP_ACCESS_WATCHPOINT
+@item BP_ACCESS_WATCHPOINT
+Hardware assisted access watchpoint.
+@end table
+
+@defivar Breakpoint hit_count
+This attribute holds the hit count for the breakpoint, an integer.
+This attribute is writable, but currently it can only be set to zero.
+@end defivar
+
+@defivar Breakpoint location
+This attribute holds the location of the breakpoint, as specified by
+the user.  It is a string.  If the breakpoint does not have a location
+(that is, it is a watchpoint) the attribute's value is @code{None}.  This
+attribute is not writable.
+@end defivar
+
+@defivar Breakpoint expression
+This attribute holds a breakpoint expression, as specified by
+the user.  It is a string.  If the breakpoint does not have an
+expression (the breakpoint is not a watchpoint) the attribute's value
+is @code{None}.  This attribute is not writable.
+@end defivar
+
+@defivar Breakpoint condition
+This attribute holds the condition of the breakpoint, as specified by
+the user.  It is a string.  If there is no condition, this attribute's
+value is @code{None}.  This attribute is writable.
+@end defivar
+
+@defivar Breakpoint commands
+This attribute holds the commands attached to the breakpoint.  If
+there are commands, this attribute's value is a string holding all the
+commands, separated by newlines.  If there are no commands, this
+attribute is @code{None}.  This attribute is not writable.
+@end defivar
+
 @node Lazy Strings In Python
 @subsubsection Python representation of lazy strings.
 
@@ -21329,6 +21856,162 @@ resolve this to the lazy string's character type, use the type's
 @code{target} method.  @xref{Types In Python}.  This attribute is not
 writable.
 @end defivar
+
+@node Auto-loading
+@subsection Auto-loading
+@cindex auto-loading, Python
+
+When a new object file is read (for example, due to the @code{file}
+command, or because the inferior has loaded a shared library),
+@value{GDBN} will look for Python support scripts in several ways:
+@file{@var{objfile}-gdb.py} and @code{.debug_gdb_scripts} section.
+
+@menu
+* objfile-gdb.py file::         The @file{@var{objfile}-gdb.py} file
+* .debug_gdb_scripts section::  The @code{.debug_gdb_scripts} section
+* Which flavor to choose?::
+@end menu
+
+The auto-loading feature is useful for supplying application-specific
+debugging commands and scripts.
+
+Auto-loading can be enabled or disabled.
+
+@table @code
+@kindex maint set python auto-load
+@item maint set python auto-load [yes|no]
+Enable or disable the Python auto-loading feature.
+
+@kindex maint show python auto-load
+@item maint show python auto-load
+Show whether Python auto-loading is enabled or disabled.
+@end table
+
+When reading an auto-loaded file, @value{GDBN} sets the
+@dfn{current objfile}.  This is available via the @code{gdb.current_objfile}
+function (@pxref{Objfiles In Python}).  This can be useful for
+registering objfile-specific pretty-printers.
+
+@node objfile-gdb.py file
+@subsubsection The @file{@var{objfile}-gdb.py} file
+@cindex @file{@var{objfile}-gdb.py}
+
+When a new object file is read, @value{GDBN} looks for
+a file named @file{@var{objfile}-gdb.py},
+where @var{objfile} is the object file's real name, formed by ensuring
+that the file name is absolute, following all symlinks, and resolving
+@code{.} and @code{..} components.  If this file exists and is
+readable, @value{GDBN} will evaluate it as a Python script.
+
+If this file does not exist, and if the parameter
+@code{debug-file-directory} is set (@pxref{Separate Debug Files}),
+then @value{GDBN} will look for @var{real-name} in all of the
+directories mentioned in the value of @code{debug-file-directory}.
+
+Finally, if this file does not exist, then @value{GDBN} will look for
+a file named @file{@var{data-directory}/python/auto-load/@var{real-name}}, where
+@var{data-directory} is @value{GDBN}'s data directory (available via
+@code{show data-directory}, @pxref{Data Files}), and @var{real-name}
+is the object file's real name, as described above.
+
+@value{GDBN} does not track which files it has already auto-loaded this way.
+@value{GDBN} will load the associated script every time the corresponding
+@var{objfile} is opened.
+So your @file{-gdb.py} file should be careful to avoid errors if it
+is evaluated more than once.
+
+@node .debug_gdb_scripts section
+@subsubsection The @code{.debug_gdb_scripts} section
+@cindex @code{.debug_gdb_scripts} section
+
+For systems using file formats like ELF and COFF,
+when @value{GDBN} loads a new object file
+it will look for a special section named @samp{.debug_gdb_scripts}.
+If this section exists, its contents is a list of names of scripts to load.
+
+@value{GDBN} will look for each specified script file first in the
+current directory and then along the source search path
+(@pxref{Source Path, ,Specifying Source Directories}),
+except that @file{$cdir} is not searched, since the compilation
+directory is not relevant to scripts.
+
+Entries can be placed in section @code{.debug_gdb_scripts} with,
+for example, this GCC macro:
+
+@example
+/* Note: The "MS" section flags are to remote duplicates.  */
+#define DEFINE_GDB_SCRIPT(script_name) \
+  asm("\
+.pushsection \".debug_gdb_scripts\", \"MS\",@@progbits,1\n\
+.byte 1\n\
+.asciz \"" script_name "\"\n\
+.popsection \n\
+");
+@end example
+
+@noindent
+Then one can reference the macro in a header or source file like this:
+
+@example
+DEFINE_GDB_SCRIPT ("my-app-scripts.py")
+@end example
+
+The script name may include directories if desired.
+
+If the macro is put in a header, any application or library
+using this header will get a reference to the specified script.
+
+@node Which flavor to choose?
+@subsubsection Which flavor to choose?
+
+Given the multiple ways of auto-loading Python scripts, it might not always
+be clear which one to choose.  This section provides some guidance.
+
+Benefits of the @file{-gdb.py} way:
+
+@itemize @bullet
+@item
+Can be used with file formats that don't support multiple sections.
+
+@item
+Ease of finding scripts for public libraries.
+
+Scripts specified in the @code{.debug_gdb_scripts} section are searched for
+in the source search path.
+For publicly installed libraries, e.g., @file{libstdc++}, there typically
+isn't a source directory in which to find the script.
+
+@item
+Doesn't require source code additions.
+@end itemize
+
+Benefits of the @code{.debug_gdb_scripts} way:
+
+@itemize @bullet
+@item
+Works with static linking.
+
+Scripts for libraries done the @file{-gdb.py} way require an objfile to
+trigger their loading.  When an application is statically linked the only
+objfile available is the executable, and it is cumbersome to attach all the
+scripts from all the input libraries to the executable's @file{-gdb.py} script.
+
+@item
+Works with classes that are entirely inlined.
+
+Some classes can be entirely inlined, and thus there may not be an associated
+shared library to attach a @file{-gdb.py} script to.
+
+@item
+Scripts needn't be copied out of the source tree.
+
+In some circumstances, apps can be built out of large collections of internal
+libraries, and the build infrastructure necessary to install the
+@file{-gdb.py} scripts in a place where @value{GDBN} can find them is
+cumbersome.  It may be easier to specify the scripts in the
+@code{.debug_gdb_scripts} section as relative paths, and add a path to the
+top of the source tree to the source search path.
+@end itemize
 
 @node Interpreters
 @chapter Command Interpreters
@@ -24982,7 +25665,7 @@ then this attribute will not be present.
 @item displayhint
 A dynamic varobj can supply a display hint to the front end.  The
 value comes directly from the Python pretty-printer object's
-@code{display_hint} method.  @xref{Pretty Printing}.
+@code{display_hint} method.  @xref{Pretty Printing API}.
 @end table
 
 Typical output will look like this:
@@ -25154,7 +25837,7 @@ The result may have its own attributes:
 @item displayhint
 A dynamic varobj can supply a display hint to the front end.  The
 value comes directly from the Python pretty-printer object's
-@code{display_hint} method.  @xref{Pretty Printing}.
+@code{display_hint} method.  @xref{Pretty Printing API}.
 
 @item has_more
 This is an integer attribute which is nonzero if there are children
@@ -25518,7 +26201,7 @@ single argument.  @value{GDBN} will call this object with the value of
 the varobj @var{name} as an argument (this is done so that the same
 Python pretty-printing code can be used for both the CLI and MI).
 When called, this object must return an object which conforms to the
-pretty-printing interface (@pxref{Pretty Printing}).
+pretty-printing interface (@pxref{Pretty Printing API}).
 
 The pre-defined function @code{gdb.default_visualizer} may be used to
 select a visualizer by following the built-in process
@@ -26219,7 +26902,7 @@ The corresponding @value{GDBN} command is @samp{tstart}.
  -trace-status
 @end smallexample
 
-Obtains the status of a tracing experiement.  The result may include
+Obtains the status of a tracing experiment.  The result may include
 the following fields:
 
 @table @samp
@@ -26253,13 +26936,27 @@ present iff the @samp{stop-reason} field has the value of
 @samp{passcount}.
 
 @item frames
-This field is an integer number of currently collected frames.  This
-field is optional.
+@itemx frames-created
+The @samp{frames} field is a count of the total number of trace frames
+in the trace buffer, while @samp{frames-created} is the total created
+during the run, including ones that were discarded, such as when a
+circular trace buffer filled up.  Both fields are optional.
 
 @item buffer-size
 @itemx buffer-free
 These fields tell the current size of the tracing buffer and the
-remaining space.  These field is optional.
+remaining space.  These fields are optional.
+
+@item circular
+The value of the circular trace buffer flag.  @code{1} means that the
+trace buffer is circular and old trace frames will be discarded if
+necessary to make room, @code{0} means that the trace buffer is linear
+and may fill up.
+
+@item disconnected
+The value of the disconnected tracing flag.  @code{1} means that
+tracing will continue after @value{GDBN} disconnects, @code{0} means
+that the trace run will stop.
 
 @end table
 
@@ -29078,8 +29775,9 @@ Print @value{GDBN}'s internal register data structures.
 
 The command @code{maint print raw-registers} includes the contents of
 the raw register cache; the command @code{maint print cooked-registers}
-includes the (cooked) value of all registers; and the command
-@code{maint print register-groups} includes the groups that each
+includes the (cooked) value of all registers, including registers which
+aren't available on the target nor visible to user; and the
+command @code{maint print register-groups} includes the groups that each
 register is a member of.  @xref{Registers,, Registers, gdbint,
 @value{GDBN} Internals}.
 
@@ -29116,6 +29814,16 @@ This command forces @value{GDBN} to flush its internal register cache.
 Print a dump of all known object files.  For each object file, this
 command prints its name, address in memory, and all of its psymtabs
 and symtabs.
+
+@kindex maint print section-scripts
+@cindex info for known .debug_gdb_scripts-loaded scripts
+@item maint print section-scripts [@var{regexp}]
+Print a dump of scripts specified in the @code{.debug_gdb_section} section.
+If @var{regexp} is specified, only print scripts loaded by object files
+matching @var{regexp}.
+For each script, this command prints its name as specified in the objfile,
+and the full path if known.
+@xref{.debug_gdb_scripts section}.
 
 @kindex maint print statistics
 @cindex bcache statistics
@@ -29198,6 +29906,14 @@ registers.  Use @code{ON} to enable, @code{OFF} to disable.  If
 enabled, the debug registers values are shown when @value{GDBN} inserts or
 removes a hardware breakpoint or watchpoint, and when the inferior
 triggers a hardware-assisted breakpoint or watchpoint.
+
+@kindex maint set show-all-tib
+@kindex maint show show-all-tib
+@item maint set show-all-tib
+@itemx maint show show-all-tib
+Control whether to show all non zero areas within a 1k block starting
+at thread local base, when using the @samp{info w32 thread-information-block}
+command.
 
 @kindex maint space
 @cindex memory used by commands
@@ -30412,6 +31128,27 @@ An error occurred.  @var{nn} are hex digits.
 An empty reply indicates that @samp{qGetTLSAddr} is not supported by the stub.
 @end table
 
+@item qGetTIBAddr:@var{thread-id}
+@cindex get thread information block address
+@cindex @samp{qGetTIBAddr} packet
+Fetch address of the Windows OS specific Thread Information Block.
+
+@var{thread-id} is the thread ID associated with the thread.
+
+Reply:
+@table @samp
+@item @var{XX}@dots{}
+Hex encoded (big endian) bytes representing the linear address of the
+thread information block.
+
+@item E @var{nn}
+An error occured.  This means that either the thread was not found, or the
+address could not be retrieved.
+
+@item
+An empty reply indicates that @samp{qGetTIBAddr} is not supported by the stub.
+@end table
+
 @item qL @var{startflag} @var{threadcount} @var{nextthread}
 Obtain thread information from RTOS.  Where: @var{startflag} (one hex
 digit) is one to indicate the first query and zero to indicate a
@@ -31504,10 +32241,11 @@ The trace stopped for some other reason.
 
 @end table
 
-Additional optional fields supply statistical information.  Although
-not required, they are extremely useful for users monitoring the
-progress of a trace run.  If a trace has stopped, and these numbers
-are reported, they must reflect the state of the just-stopped trace.
+Additional optional fields supply statistical and other information.
+Although not required, they are extremely useful for users monitoring
+the progress of a trace run.  If a trace has stopped, and these
+numbers are reported, they must reflect the state of the just-stopped
+trace.
 
 @table @samp
 
@@ -31523,6 +32261,17 @@ The total size of the trace buffer, in bytes.
 
 @item tfree:@var{n}
 The number of bytes still unused in the buffer.
+
+@item circular:@var{n}
+The value of the circular trace buffer flag.  @code{1} means that the
+trace buffer is circular and old trace frames will be discarded if
+necessary to make room, @code{0} means that the trace buffer is linear
+and may fill up.
+
+@item disconn:@var{n}
+The value of the disconnected tracing flag.  @code{1} means that
+tracing will continue after @value{GDBN} disconnects, @code{0} means
+that the trace run will stop.
 
 @end table
 
@@ -33846,7 +34595,7 @@ targets.  It should describe the following registers:
 
 The register sets may be different, depending on the target.
 
-The @samp{org.gnu.gdb.i386.sse} feature is required.  It should
+The @samp{org.gnu.gdb.i386.sse} feature is optional.  It should
 describe registers:
 
 @itemize @minus
@@ -33858,7 +34607,8 @@ describe registers:
 @samp{mxcsr}
 @end itemize
 
-The @samp{org.gnu.gdb.i386.avx} feature is optional.  It should
+The @samp{org.gnu.gdb.i386.avx} feature is optional and requires the
+@samp{org.gnu.gdb.i386.sse} feature.  It should
 describe the upper 128 bits of @sc{ymm} registers:
 
 @itemize @minus

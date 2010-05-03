@@ -23,8 +23,8 @@
 #include "ui-out.h"
 #include "cli/cli-script.h"
 #include "gdbcmd.h"
+#include "progspace.h"
 #include "objfiles.h"
-#include "observer.h"
 #include "value.h"
 #include "language.h"
 #include "exceptions.h"
@@ -34,10 +34,6 @@
 /* True if we should print the stack when catching a Python error,
    false otherwise.  */
 static int gdbpy_should_print_stack = 1;
-
-/* This is true if we should auto-load python code when an objfile is
-   opened, false otherwise.  */
-static int gdbpy_auto_load = 1;
 
 #ifdef HAVE_PYTHON
 
@@ -196,11 +192,10 @@ python_command (char *arg, int from_tty)
 /* Transform a gdb parameters's value into a Python value.  May return
    NULL (and set a Python exception) on error.  Helper function for
    get_parameter.  */
-
-static PyObject *
-parameter_to_python (struct cmd_list_element *cmd)
+PyObject *
+gdbpy_parameter_value (enum var_types type, void *var)
 {
-  switch (cmd->var_type)
+  switch (type)
     {
     case var_string:
     case var_string_noescape:
@@ -208,7 +203,7 @@ parameter_to_python (struct cmd_list_element *cmd)
     case var_filename:
     case var_enum:
       {
-	char *str = * (char **) cmd->var;
+	char *str = * (char **) var;
 	if (! str)
 	  str = "";
 	return PyString_Decode (str, strlen (str), host_charset (), NULL);
@@ -216,7 +211,7 @@ parameter_to_python (struct cmd_list_element *cmd)
 
     case var_boolean:
       {
-	if (* (int *) cmd->var)
+	if (* (int *) var)
 	  Py_RETURN_TRUE;
 	else
 	  Py_RETURN_FALSE;
@@ -224,7 +219,7 @@ parameter_to_python (struct cmd_list_element *cmd)
 
     case var_auto_boolean:
       {
-	enum auto_boolean ab = * (enum auto_boolean *) cmd->var;
+	enum auto_boolean ab = * (enum auto_boolean *) var;
 	if (ab == AUTO_BOOLEAN_TRUE)
 	  Py_RETURN_TRUE;
 	else if (ab == AUTO_BOOLEAN_FALSE)
@@ -234,28 +229,29 @@ parameter_to_python (struct cmd_list_element *cmd)
       }
 
     case var_integer:
-      if ((* (int *) cmd->var) == INT_MAX)
+      if ((* (int *) var) == INT_MAX)
 	Py_RETURN_NONE;
       /* Fall through.  */
     case var_zinteger:
-      return PyLong_FromLong (* (int *) cmd->var);
+      return PyLong_FromLong (* (int *) var);
 
     case var_uinteger:
       {
-	unsigned int val = * (unsigned int *) cmd->var;
+	unsigned int val = * (unsigned int *) var;
 	if (val == UINT_MAX)
 	  Py_RETURN_NONE;
 	return PyLong_FromUnsignedLong (val);
       }
     }
 
-  return PyErr_Format (PyExc_RuntimeError, "programmer error: unhandled type");
+  return PyErr_Format (PyExc_RuntimeError, 
+		       _("Programmer error: unhandled type."));
 }
 
 /* A Python function which returns a gdb parameter's value as a Python
    value.  */
 
-static PyObject *
+PyObject *
 gdbpy_parameter (PyObject *self, PyObject *args)
 {
   struct cmd_list_element *alias, *prefix, *cmd;
@@ -276,11 +272,12 @@ gdbpy_parameter (PyObject *self, PyObject *args)
   GDB_PY_HANDLE_EXCEPTION (except);
   if (!found)
     return PyErr_Format (PyExc_RuntimeError,
-			 "could not find parameter `%s'", arg);
+			 _("Could not find parameter `%s'."), arg);
 
   if (! cmd->var)
-    return PyErr_Format (PyExc_RuntimeError, "`%s' is not a parameter", arg);
-  return parameter_to_python (cmd);
+    return PyErr_Format (PyExc_RuntimeError, 
+			 _("`%s' is not a parameter."), arg);
+  return gdbpy_parameter_value (cmd->var_type, cmd->var);
 }
 
 /* Wrapper for target_charset.  */
@@ -362,19 +359,19 @@ gdbpy_parse_and_eval (PyObject *self, PyObject *args)
 }
 
 /* Read a file as Python code.  STREAM is the input file; FILE is the
-   name of the file.  */
+   name of the file.
+   STREAM is not closed, that is the caller's responsibility.  */
 
 void
-source_python_script (FILE *stream, char *file)
+source_python_script (FILE *stream, const char *file)
 {
-  PyGILState_STATE state;
+  struct cleanup *cleanup;
 
-  state = PyGILState_Ensure ();
+  cleanup = ensure_python_env (get_current_arch (), current_language);
 
   PyRun_SimpleFile (stream, file);
 
-  fclose (stream);
-  PyGILState_Release (state);
+  do_cleanups (cleanup);
 }
 
 
@@ -415,86 +412,75 @@ gdbpy_print_stack (void)
 
 
 
+/* Return the current Progspace.
+   There always is one.  */
+
+static PyObject *
+gdbpy_get_current_progspace (PyObject *unused1, PyObject *unused2)
+{
+  PyObject *result;
+
+  result = pspace_to_pspace_object (current_program_space);
+  if (result)
+    Py_INCREF (result);
+  return result;
+}
+
+/* Return a sequence holding all the Progspaces.  */
+
+static PyObject *
+gdbpy_progspaces (PyObject *unused1, PyObject *unused2)
+{
+  struct program_space *ps;
+  PyObject *list;
+
+  list = PyList_New (0);
+  if (!list)
+    return NULL;
+
+  ALL_PSPACES (ps)
+  {
+    PyObject *item = pspace_to_pspace_object (ps);
+    if (!item || PyList_Append (list, item) == -1)
+      {
+	Py_DECREF (list);
+	return NULL;
+      }
+  }
+
+  return list;
+}
+
+
+
 /* The "current" objfile.  This is set when gdb detects that a new
-   objfile has been loaded.  It is only set for the duration of a call
-   to gdbpy_new_objfile; it is NULL at other times.  */
+   objfile has been loaded.  It is only set for the duration of a call to
+   source_python_script_for_objfile; it is NULL at other times.  */
 static struct objfile *gdbpy_current_objfile;
 
-/* The file name we attempt to read.  */
-#define GDBPY_AUTO_FILENAME "-gdb.py"
+/* Set the current objfile to OBJFILE and then read STREAM,FILE as
+   Python code.  */
 
-/* This is a new_objfile observer callback which loads python code
-   based on the path to the objfile.  */
-static void
-gdbpy_new_objfile (struct objfile *objfile)
+void
+source_python_script_for_objfile (struct objfile *objfile,
+				  FILE *stream, const char *file)
 {
-  char *realname;
-  char *filename, *debugfile;
-  int len;
-  FILE *input;
   struct cleanup *cleanups;
 
-  if (!gdbpy_auto_load || !objfile || !objfile->name)
-    return;
-
   cleanups = ensure_python_env (get_objfile_arch (objfile), current_language);
-
   gdbpy_current_objfile = objfile;
 
-  realname = gdb_realpath (objfile->name);
-  len = strlen (realname);
-  filename = xmalloc (len + sizeof (GDBPY_AUTO_FILENAME));
-  memcpy (filename, realname, len);
-  strcpy (filename + len, GDBPY_AUTO_FILENAME);
-
-  input = fopen (filename, "r");
-  debugfile = filename;
-
-  make_cleanup (xfree, filename);
-  make_cleanup (xfree, realname);
-
-  if (!input && debug_file_directory)
-    {
-      /* Also try the same file in the separate debug info directory.  */
-      debugfile = xmalloc (strlen (filename)
-			   + strlen (debug_file_directory) + 1);
-      strcpy (debugfile, debug_file_directory);
-      /* FILENAME is absolute, so we don't need a "/" here.  */
-      strcat (debugfile, filename);
-
-      make_cleanup (xfree, debugfile);
-      input = fopen (debugfile, "r");
-    }
-
-  if (!input && gdb_datadir)
-    {
-      /* Also try the same file in a subdirectory of gdb's data
-	 directory.  */
-      debugfile = xmalloc (strlen (gdb_datadir) + strlen (filename)
-			   + strlen ("/auto-load") + 1);
-      strcpy (debugfile, gdb_datadir);
-      strcat (debugfile, "/auto-load");
-      /* FILENAME is absolute, so we don't need a "/" here.  */
-      strcat (debugfile, filename);
-
-      make_cleanup (xfree, debugfile);
-      input = fopen (debugfile, "r");
-    }
-
-  if (input)
-    {
-      /* We don't want to throw an exception here -- but the user
-	 would like to know that something went wrong.  */
-      if (PyRun_SimpleFile (input, debugfile))
-	gdbpy_print_stack ();
-      fclose (input);
-    }
+  /* We don't want to throw an exception here -- but the user
+     would like to know that something went wrong.  */
+  if (PyRun_SimpleFile (stream, file))
+    gdbpy_print_stack ();
 
   do_cleanups (cleanups);
   gdbpy_current_objfile = NULL;
 }
 
 /* Return the current Objfile, or None if there isn't one.  */
+
 static PyObject *
 gdbpy_get_current_objfile (PyObject *unused1, PyObject *unused2)
 {
@@ -510,6 +496,7 @@ gdbpy_get_current_objfile (PyObject *unused1, PyObject *unused2)
 }
 
 /* Return a sequence holding all the Objfiles.  */
+
 static PyObject *
 gdbpy_objfiles (PyObject *unused1, PyObject *unused2)
 {
@@ -560,9 +547,8 @@ eval_python_from_control_command (struct command_line *cmd)
 }
 
 void
-source_python_script (FILE *stream, char *file)
+source_python_script (FILE *stream, const char *file)
 {
-  fclose (stream);
   throw_error (UNSUPPORTED_ERROR,
 	       _("Python scripting is not supported in this copy of GDB."));
 }
@@ -573,8 +559,8 @@ source_python_script (FILE *stream, char *file)
 
 /* Lists for 'maint set python' commands.  */
 
-static struct cmd_list_element *set_python_list;
-static struct cmd_list_element *show_python_list;
+struct cmd_list_element *set_python_list;
+struct cmd_list_element *show_python_list;
 
 /* Function for use by 'maint set python' prefix command.  */
 
@@ -639,15 +625,6 @@ Enables or disables printing of Python stack traces."),
 			   &set_python_list,
 			   &show_python_list);
 
-  add_setshow_boolean_cmd ("auto-load", class_maintenance,
-			   &gdbpy_auto_load, _("\
-Enable or disable auto-loading of Python code when an object is opened."), _("\
-Show whether Python code will be auto-loaded when an object is opened."), _("\
-Enables or disables auto-loading of Python code when an object is opened."),
-			   NULL, NULL,
-			   &set_python_list,
-			   &show_python_list);
-
 #ifdef HAVE_PYTHON
   Py_Initialize ();
   PyEval_InitThreads ();
@@ -659,6 +636,7 @@ Enables or disables auto-loading of Python code when an object is opened."),
   PyModule_AddStringConstant (gdb_module, "HOST_CONFIG", (char*) host_name);
   PyModule_AddStringConstant (gdb_module, "TARGET_CONFIG", (char*) target_name);
 
+  gdbpy_initialize_auto_load ();
   gdbpy_initialize_values ();
   gdbpy_initialize_frames ();
   gdbpy_initialize_commands ();
@@ -666,14 +644,15 @@ Enables or disables auto-loading of Python code when an object is opened."),
   gdbpy_initialize_symtabs ();
   gdbpy_initialize_blocks ();
   gdbpy_initialize_functions ();
+  gdbpy_initialize_parameters ();
   gdbpy_initialize_types ();
+  gdbpy_initialize_pspace ();
   gdbpy_initialize_objfile ();
+  gdbpy_initialize_breakpoints ();
   gdbpy_initialize_lazy_string ();
 
   PyRun_SimpleString ("import gdb");
   PyRun_SimpleString ("gdb.pretty_printers = []");
-
-  observer_attach_new_objfile (gdbpy_new_objfile);
 
   gdbpy_to_string_cst = PyString_FromString ("to_string");
   gdbpy_children_cst = PyString_FromString ("children");
@@ -726,8 +705,16 @@ static PyMethodDef GdbMethods[] =
   { "parameter", gdbpy_parameter, METH_VARARGS,
     "Return a gdb parameter's value" },
 
+  { "breakpoints", gdbpy_breakpoints, METH_NOARGS,
+    "Return a tuple of all breakpoint objects" },
+
   { "default_visualizer", gdbpy_default_visualizer, METH_VARARGS,
     "Find the default visualizer for a Value." },
+
+  { "current_progspace", gdbpy_get_current_progspace, METH_NOARGS,
+    "Return the current Progspace." },
+  { "progspaces", gdbpy_progspaces, METH_NOARGS,
+    "Return a sequence of all progspaces." },
 
   { "current_objfile", gdbpy_get_current_objfile, METH_NOARGS,
     "Return the current Objfile being loaded, or None." },

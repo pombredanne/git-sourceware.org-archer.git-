@@ -39,6 +39,7 @@
 #include "source.h"
 #include "filenames.h"		/* for FILENAME_CMP */
 #include "objc-lang.h"
+#include "d-lang.h"
 #include "ada-lang.h"
 #include "p-lang.h"
 #include "addrmap.h"
@@ -346,6 +347,7 @@ symbol_init_language_specific (struct general_symbol_info *gsymbol,
 {
   gsymbol->language = language;
   if (gsymbol->language == language_cplus
+      || gsymbol->language == language_d
       || gsymbol->language == language_java
       || gsymbol->language == language_objc)
     {
@@ -446,6 +448,16 @@ symbol_find_demangled_name (struct general_symbol_info *gsymbol,
       if (demangled != NULL)
 	{
 	  gsymbol->language = language_java;
+	  return demangled;
+	}
+    }
+  if (gsymbol->language == language_d
+      || gsymbol->language == language_auto)
+    {
+      demangled = d_demangle(mangled, 0);
+      if (demangled != NULL)
+	{
+	  gsymbol->language = language_d;
 	  return demangled;
 	}
     }
@@ -578,7 +590,7 @@ symbol_set_names (struct general_symbol_info *gsymbol,
 	 
 	 It turns out that it is actually important to still save such
 	 an entry in the hash table, because storing this name gives
-	 us better backache hit rates for partial symbols.  */
+	 us better bcache hit rates for partial symbols.  */
       if (!copy_name && lookup_name == linkage_name)
 	{
 	  *slot = obstack_alloc (&objfile->objfile_obstack,
@@ -626,6 +638,7 @@ symbol_natural_name (const struct general_symbol_info *gsymbol)
   switch (gsymbol->language)
     {
     case language_cplus:
+    case language_d:
     case language_java:
     case language_objc:
       if (gsymbol->language_specific.cplus_specific.demangled_name != NULL)
@@ -651,6 +664,7 @@ symbol_demangled_name (const struct general_symbol_info *gsymbol)
   switch (gsymbol->language)
     {
     case language_cplus:
+    case language_d:
     case language_java:
     case language_objc:
       if (gsymbol->language_specific.cplus_specific.demangled_name != NULL)
@@ -940,7 +954,7 @@ lookup_symbol_in_language (const char *name, const struct block *block,
 
   modified_name = name;
 
-  /* If we are using C++ or Java, demangle the name before doing a lookup, so
+  /* If we are using C++, D, or Java, demangle the name before doing a lookup, so
      we can always binary search. */
   if (lang == language_cplus)
     {
@@ -966,6 +980,15 @@ lookup_symbol_in_language (const char *name, const struct block *block,
     {
       demangled_name = cplus_demangle (name,
 		      		       DMGL_ANSI | DMGL_PARAMS | DMGL_JAVA);
+      if (demangled_name)
+	{
+	  modified_name = demangled_name;
+	  make_cleanup (xfree, demangled_name);
+	}
+    }
+  else if (lang == language_d)
+    {
+      demangled_name = d_demangle (name, 0);
       if (demangled_name)
 	{
 	  modified_name = demangled_name;
@@ -1150,7 +1173,7 @@ lookup_symbol_aux_local (const char *name, const struct block *block,
 
 /* Look up OBJFILE to BLOCK.  */
 
-static struct objfile *
+struct objfile *
 lookup_objfile_from_block (const struct block *block)
 {
   struct objfile *obj;
@@ -1412,6 +1435,7 @@ symbol_matches_domain (enum language symbol_language,
      A Java class declaration also defines a typedef for the class.
      Similarly, any Ada type declaration implicitly defines a typedef.  */
   if (symbol_language == language_cplus
+      || symbol_language == language_d
       || symbol_language == language_java
       || symbol_language == language_ada)
     {
@@ -2294,6 +2318,18 @@ find_function_start_sal (struct symbol *sym, int funfirstline)
   fixup_symbol_section (sym, NULL);
   sal = find_pc_sect_line (BLOCK_START (SYMBOL_BLOCK_VALUE (sym)),
 			   SYMBOL_OBJ_SECTION (sym), 0);
+
+  /* We always should have a line for the function start address.
+     If we don't, something is odd.  Create a plain SAL refering
+     just the PC and hope that skip_prologue_sal (if requested)
+     can find a line number for after the prologue.  */
+  if (sal.pc < BLOCK_START (SYMBOL_BLOCK_VALUE (sym)))
+    {
+      init_sal (&sal);
+      sal.pspace = current_program_space;
+      sal.pc = BLOCK_START (SYMBOL_BLOCK_VALUE (sym));
+      sal.section = SYMBOL_OBJ_SECTION (sym);
+    }
 
   if (funfirstline)
     skip_prologue_sal (&sal);
@@ -3236,8 +3272,31 @@ rbreak_command (char *regexp, int from_tty)
   struct cleanup *old_chain;
   char *string = NULL;
   int len = 0;
+  char **files = NULL;
+  int nfiles = 0;
 
-  search_symbols (regexp, FUNCTIONS_DOMAIN, 0, (char **) NULL, &ss);
+  if (regexp)
+    {
+      char *colon = strchr (regexp, ':');
+      if (colon && *(colon + 1) != ':')
+	{
+	  int colon_index;
+	  char * file_name;
+
+	  colon_index = colon - regexp;
+	  file_name = alloca (colon_index + 1);
+	  memcpy (file_name, regexp, colon_index);
+	  file_name[colon_index--] = 0;
+	  while (isspace (file_name[colon_index]))
+	    file_name[colon_index--] = 0; 
+	  files = &file_name;
+	  nfiles = 1;
+	  regexp = colon + 1;
+	  while (isspace (*regexp))  regexp++; 
+	}
+    }
+
+  search_symbols (regexp, FUNCTIONS_DOMAIN, nfiles, files, &ss);
   old_chain = make_cleanup_free_search_symbols (ss);
   make_cleanup (free_current_contents, &string);
 

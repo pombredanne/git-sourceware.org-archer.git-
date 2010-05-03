@@ -55,6 +55,10 @@ struct breakpoint *set_breakpoint_at (CORE_ADDR where,
 
 int delete_gdb_breakpoint_at (CORE_ADDR addr);
 
+/* Delete a breakpoint.  */
+
+int delete_breakpoint (struct breakpoint *bkpt);
+
 /* Set a reinsert breakpoint at STOP_AT.  */
 
 void set_reinsert_breakpoint (CORE_ADDR stop_at);
@@ -98,6 +102,10 @@ void set_breakpoint_data (const unsigned char *bp_data, int bp_len);
 /* Delete all breakpoints.  */
 
 void delete_all_breakpoints (void);
+
+/* Clear the "inserted" flag in all breakpoints of PROC.  */
+
+void mark_breakpoints_out (struct process_info *proc);
 
 /* Delete all breakpoints, but do not try to un-insert them from the
    inferior.  */

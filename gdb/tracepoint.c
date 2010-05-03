@@ -45,6 +45,7 @@
 #include "filenames.h"
 #include "gdbthread.h"
 #include "stack.h"
+#include "gdbcore.h"
 
 #include "ax.h"
 #include "ax-gdb.h"
@@ -364,6 +365,7 @@ trace_variable_command (char *args, int from_tty)
       tsv->initial_value = initval;
       printf_filtered (_("Trace state variable $%s now has initial value %s.\n"),
 		       tsv->name, plongest (tsv->initial_value));
+      do_cleanups (old_chain);
       return;
     }
 
@@ -558,16 +560,16 @@ trace_actions_command (char *args, int from_tty)
    internal errors.  */
 
 static void
-report_agent_reqs_errors (struct agent_expr *aexpr, struct agent_reqs *areqs)
+report_agent_reqs_errors (struct agent_expr *aexpr)
 {
   /* All of the "flaws" are serious bytecode generation issues that
      should never occur.  */
-  if (areqs->flaw != agent_flaw_none)
+  if (aexpr->flaw != agent_flaw_none)
     internal_error (__FILE__, __LINE__, _("expression is malformed"));
 
   /* If analysis shows a stack underflow, GDB must have done something
      badly wrong in its bytecode generation.  */
-  if (areqs->min_height < 0)
+  if (aexpr->min_height < 0)
     internal_error (__FILE__, __LINE__,
 		    _("expression has min height < 0"));
 
@@ -577,7 +579,7 @@ report_agent_reqs_errors (struct agent_expr *aexpr, struct agent_reqs *areqs)
      depth roughly corresponds to parenthesization, so a limit of 20
      amounts to 20 levels of expression nesting, which is actually
      a pretty big hairy expression.  */
-  if (areqs->max_height > 20)
+  if (aexpr->max_height > 20)
     error (_("Expression is too complicated."));
 }
 
@@ -591,7 +593,6 @@ validate_actionline (char **line, struct breakpoint *t)
   char *p, *tmp_p;
   struct bp_location *loc;
   struct agent_expr *aexpr;
-  struct agent_reqs areqs;
 
   /* if EOF is typed, *line is NULL */
   if (*line == NULL)
@@ -661,10 +662,9 @@ validate_actionline (char **line, struct breakpoint *t)
 	      if (aexpr->len > MAX_AGENT_EXPR_LEN)
 		error (_("Expression is too complicated."));
 
-	      ax_reqs (aexpr, &areqs);
-	      (void) make_cleanup (xfree, areqs.reg_mask);
+	      ax_reqs (aexpr);
 
-	      report_agent_reqs_errors (aexpr, &areqs);
+	      report_agent_reqs_errors (aexpr);
 
 	      do_cleanups (old_chain);
 	    }
@@ -697,10 +697,8 @@ validate_actionline (char **line, struct breakpoint *t)
 	      if (aexpr->len > MAX_AGENT_EXPR_LEN)
 		error (_("Expression is too complicated."));
 
-	      ax_reqs (aexpr, &areqs);
-	      (void) make_cleanup (xfree, areqs.reg_mask);
-
-	      report_agent_reqs_errors (aexpr, &areqs);
+	      ax_reqs (aexpr);
+	      report_agent_reqs_errors (aexpr);
 
 	      do_cleanups (old_chain);
 	    }
@@ -972,7 +970,6 @@ collect_symbol (struct collection_list *collect,
     {
       struct agent_expr *aexpr;
       struct cleanup *old_chain1 = NULL;
-      struct agent_reqs areqs;
 
       aexpr = gen_trace_for_var (scope, gdbarch, sym);
 
@@ -988,26 +985,26 @@ collect_symbol (struct collection_list *collect,
 
       old_chain1 = make_cleanup_free_agent_expr (aexpr);
 
-      ax_reqs (aexpr, &areqs);
+      ax_reqs (aexpr);
 
-      report_agent_reqs_errors (aexpr, &areqs);
+      report_agent_reqs_errors (aexpr);
 
       discard_cleanups (old_chain1);
       add_aexpr (collect, aexpr);
 
       /* take care of the registers */
-      if (areqs.reg_mask_len > 0)
+      if (aexpr->reg_mask_len > 0)
 	{
 	  int ndx1, ndx2;
 
-	  for (ndx1 = 0; ndx1 < areqs.reg_mask_len; ndx1++)
+	  for (ndx1 = 0; ndx1 < aexpr->reg_mask_len; ndx1++)
 	    {
 	      QUIT;	/* allow user to bail out with ^C */
-	      if (areqs.reg_mask[ndx1] != 0)
+	      if (aexpr->reg_mask[ndx1] != 0)
 		{
 		  /* assume chars have 8 bits */
 		  for (ndx2 = 0; ndx2 < 8; ndx2++)
-		    if (areqs.reg_mask[ndx1] & (1 << ndx2))
+		    if (aexpr->reg_mask[ndx1] & (1 << ndx2))
 		      /* it's used -- record it */
 		      add_register (collect, ndx1 * 8 + ndx2);
 		}
@@ -1285,7 +1282,6 @@ encode_actions_1 (struct command_line *action,
 		  unsigned long addr, len;
 		  struct cleanup *old_chain = NULL;
 		  struct cleanup *old_chain1 = NULL;
-		  struct agent_reqs areqs;
 
 		  exp = parse_exp_1 (&action_exp, 
 				     block_for_pc (tloc->address), 1);
@@ -1331,27 +1327,27 @@ encode_actions_1 (struct command_line *action,
 
 		      old_chain1 = make_cleanup_free_agent_expr (aexpr);
 
-		      ax_reqs (aexpr, &areqs);
+		      ax_reqs (aexpr);
 
-		      report_agent_reqs_errors (aexpr, &areqs);
+		      report_agent_reqs_errors (aexpr);
 
 		      discard_cleanups (old_chain1);
 		      add_aexpr (collect, aexpr);
 
 		      /* take care of the registers */
-		      if (areqs.reg_mask_len > 0)
+		      if (aexpr->reg_mask_len > 0)
 			{
 			  int ndx1;
 			  int ndx2;
 
-			  for (ndx1 = 0; ndx1 < areqs.reg_mask_len; ndx1++)
+			  for (ndx1 = 0; ndx1 < aexpr->reg_mask_len; ndx1++)
 			    {
 			      QUIT;	/* allow user to bail out with ^C */
-			      if (areqs.reg_mask[ndx1] != 0)
+			      if (aexpr->reg_mask[ndx1] != 0)
 				{
 				  /* assume chars have 8 bits */
 				  for (ndx2 = 0; ndx2 < 8; ndx2++)
-				    if (areqs.reg_mask[ndx1] & (1 << ndx2))
+				    if (aexpr->reg_mask[ndx1] & (1 << ndx2))
 				      /* it's used -- record it */
 				      add_register (collect, 
 						    ndx1 * 8 + ndx2);
@@ -1377,7 +1373,6 @@ encode_actions_1 (struct command_line *action,
 		  unsigned long addr, len;
 		  struct cleanup *old_chain = NULL;
 		  struct cleanup *old_chain1 = NULL;
-		  struct agent_reqs areqs;
 
 		  exp = parse_exp_1 (&action_exp, 
 				     block_for_pc (tloc->address), 1);
@@ -1386,9 +1381,8 @@ encode_actions_1 (struct command_line *action,
 		  aexpr = gen_eval_for_expr (tloc->address, exp);
 		  old_chain1 = make_cleanup_free_agent_expr (aexpr);
 
-		  ax_reqs (aexpr, &areqs);
-
-		  report_agent_reqs_errors (aexpr, &areqs);
+		  ax_reqs (aexpr);
+		  report_agent_reqs_errors (aexpr);
 
 		  discard_cleanups (old_chain1);
 		  /* Even though we're not officially collecting, add
@@ -1625,10 +1619,6 @@ trace_status_command (char *args, int from_tty)
   else if (ts->running)
     {
       printf_filtered (_("Trace is running on the target.\n"));
-      if (disconnected_tracing)
-	printf_filtered (_("Trace will continue if GDB disconnects.\n"));
-      else
-	printf_filtered (_("Trace will stop if GDB disconnects.\n"));
     }
   else
     {
@@ -1697,6 +1687,14 @@ trace_status_command (char *args, int from_tty)
 	printf_filtered (_("Trace buffer has %d bytes free.\n"),
 			 ts->buffer_free);
     }
+
+  if (ts->disconnected_tracing)
+    printf_filtered (_("Trace will continue if GDB disconnects.\n"));
+  else
+    printf_filtered (_("Trace will stop if GDB disconnects.\n"));
+
+  if (ts->circular_buffer)
+    printf_filtered (_("Trace buffer is circular.\n"));
 
   /* Now report on what we're doing with tfind.  */
   if (traceframe_number >= 0)
@@ -1791,18 +1789,24 @@ trace_status_mi (int on_stop)
 	}
     }
 
-
-  if ((int) ts->traceframe_count != -1)
+  if (ts->traceframe_count != -1)
     ui_out_field_int (uiout, "frames", ts->traceframe_count);
-  if ((int) ts->buffer_size != -1)
-    ui_out_field_int (uiout, "buffer-size",  (int) ts->buffer_size);
-  if ((int) ts->buffer_free != -1)
-    ui_out_field_int (uiout, "buffer-free",  (int) ts->buffer_free);
+  if (ts->traceframes_created != -1)
+    ui_out_field_int (uiout, "frames-created", ts->traceframes_created);
+  if (ts->buffer_size != -1)
+    ui_out_field_int (uiout, "buffer-size", ts->buffer_size);
+  if (ts->buffer_free != -1)
+    ui_out_field_int (uiout, "buffer-free", ts->buffer_free);
+
+  ui_out_field_int (uiout, "disconnected",  ts->disconnected_tracing);
+  ui_out_field_int (uiout, "circular",  ts->circular_buffer);
 }
 
-
+/* This function handles the details of what to do about an ongoing
+   tracing run if the user has asked to detach or otherwise disconnect
+   from the target.  */
 void
-disconnect_or_stop_tracing (int from_tty)
+disconnect_tracing (int from_tty)
 {
   /* It can happen that the target that was tracing went away on its
      own, and we didn't notice.  Get a status update, and if the
@@ -1811,18 +1815,23 @@ disconnect_or_stop_tracing (int from_tty)
   if (target_get_trace_status (current_trace_status ()) < 0)
     current_trace_status ()->running = 0;
 
+  /* If running interactively, give the user the option to cancel and
+     then decide what to do differently with the run.  Scripts are
+     just going to disconnect and let the target deal with it,
+     according to how it's been instructed previously via
+     disconnected-tracing.  */
   if (current_trace_status ()->running && from_tty)
     {
-      int cont = query (_("Trace is running.  Continue tracing after detach? "));
-      /* Note that we send the query result without affecting the
-	 user's setting of disconnected_tracing, so that the answer is
-	 a one-time-only.  */
-      send_disconnected_tracing_value (cont);
-
-      /* Also ensure that we do the equivalent of a tstop command if
-	 tracing is not to continue after the detach.  */
-      if (!cont)
-	stop_tracing ();
+      if (current_trace_status ()->disconnected_tracing)
+	{
+	  if (!query (_("Trace is running and will continue after detach; detach anyway? ")))
+	    error (_("Not confirmed."));
+	}
+      else
+	{
+	  if (!query (_("Trace is running but will stop on detach; detach anyway? ")))
+	    error (_("Not confirmed."));
+	}
     }
 
   /* Also we want to be out of tfind mode, otherwise things can get
@@ -1840,11 +1849,19 @@ tfind_1 (enum trace_find_type type, int num,
 	 int from_tty)
 {
   int target_frameno = -1, target_tracept = -1;
-  struct frame_id old_frame_id;
+  struct frame_id old_frame_id = null_frame_id;
   char *reply;
   struct breakpoint *tp;
 
-  old_frame_id = get_frame_id (get_current_frame ());
+  /* Only try to get the current stack frame if we have a chance of
+     succeeding.  In particular, if we're trying to get a first trace
+     frame while all threads are running, it's not going to succeed,
+     so leave it with a default value and let the frame comparison
+     below (correctly) decide to print out the source location of the
+     trace frame.  */
+  if (!(type == tfind_number && num == -1)
+      && (has_stack_frames () || traceframe_number >= 0))
+    old_frame_id = get_frame_id (get_current_frame ());
 
   target_frameno = target_trace_find (type, num, addr1, addr2,
 				      &target_tracept);
@@ -1857,7 +1874,7 @@ tfind_1 (enum trace_find_type type, int num,
     }
   else if (target_frameno == -1)
     {
-      /* A request for a non-existant trace frame has failed.
+      /* A request for a non-existent trace frame has failed.
 	 Our response will be different, depending on FROM_TTY:
 
 	 If FROM_TTY is true, meaning that this command was 
@@ -1924,8 +1941,10 @@ tfind_1 (enum trace_find_type type, int num,
     {
       if (ui_out_is_mi_like_p (uiout))
 	ui_out_field_string (uiout, "found", "0");
-      else
-	printf_unfiltered (_("No trace frame found"));
+      else if (type == tfind_number && num == -1)
+	printf_unfiltered (_("No longer looking at any trace frame\n"));
+      else /* this case may never occur, check */
+	printf_unfiltered (_("No trace frame found\n"));
     }
 
   /* If we're in nonstop mode and getting out of looking at trace
@@ -1936,7 +1955,7 @@ tfind_1 (enum trace_find_type type, int num,
     {
       enum print_what print_what;
 
-      /* NOTE: in immitation of the step command, try to determine
+      /* NOTE: in imitation of the step command, try to determine
          whether we have made a transition from one function to
          another.  If so, we'll print the "stack frame" (ie. the new
          function and it's arguments) -- otherwise we'll just show the
@@ -2345,7 +2364,9 @@ scope_info (char *args, int from_tty)
 	      printf_filtered ("optimized out.\n");
 	      continue;
 	    case LOC_COMPUTED:
-	      SYMBOL_COMPUTED_OPS (sym)->describe_location (sym, gdb_stdout);
+	      SYMBOL_COMPUTED_OPS (sym)->describe_location (sym,
+							    BLOCK_START (block),
+							    gdb_stdout);
 	      break;
 	    }
 	  if (SYMBOL_TYPE (sym))
@@ -2467,6 +2488,9 @@ trace_dump_command (char *args, int from_tty)
   struct breakpoint *t;
   int stepping_frame = 0;
   struct bp_location *loc;
+  char *line, *default_collect_line = NULL;
+  struct command_line *actions, *default_collect_action = NULL;
+  struct cleanup *old_chain = NULL;
 
   if (tracepoint_number == -1)
     {
@@ -2498,7 +2522,29 @@ trace_dump_command (char *args, int from_tty)
     if (loc->address == regcache_read_pc (regcache))
       stepping_frame = 0;
 
-  trace_dump_actions (breakpoint_commands (t), 0, stepping_frame, from_tty);
+  actions = breakpoint_commands (t);
+
+  /* If there is a default-collect list, make up a collect command,
+     prepend to the tracepoint's commands, and pass the whole mess to
+     the trace dump scanner.  We need to validate because
+     default-collect might have been junked since the trace run.  */
+  if (*default_collect)
+    {
+      default_collect_line = xstrprintf ("collect %s", default_collect);
+      old_chain = make_cleanup (xfree, default_collect_line);
+      line = default_collect_line;
+      validate_actionline (&line, t);
+      default_collect_action = xmalloc (sizeof (struct command_line));
+      make_cleanup (xfree, default_collect_action);
+      default_collect_action->next = actions;
+      default_collect_action->line = line;
+      actions = default_collect_action;
+    }
+
+  trace_dump_actions (actions, 0, stepping_frame, from_tty);
+
+  if (*default_collect)
+    do_cleanups (old_chain);
 }
 
 /* Encode a piece of a tracepoint's source-level definition in a form
@@ -2537,7 +2583,7 @@ trace_save (const char *filename, int target_does_save)
   struct uploaded_tp *uploaded_tps = NULL, *utp;
   struct uploaded_tsv *uploaded_tsvs = NULL, *utsv;
   int a;
-  struct uploaded_string *cmd;
+  char *act;
   LONGEST gotten = 0;
   ULONGEST offset = 0;
 #define MAX_TRACE_UPLOAD 2000
@@ -2562,7 +2608,7 @@ trace_save (const char *filename, int target_does_save)
   pathname = tilde_expand (filename);
   cleanup = make_cleanup (xfree, pathname);
 
-  fp = fopen (pathname, "w");
+  fp = fopen (pathname, "wb");
   if (!fp)
     error (_("Unable to open file '%s' for saving trace data (%s)"),
 	   filename, safe_strerror (errno));
@@ -2598,6 +2644,10 @@ trace_save (const char *filename, int target_does_save)
     fprintf (fp, ";tfree:%x", ts->buffer_free);
   if (ts->buffer_size >= 0)
     fprintf (fp, ";tsize:%x", ts->buffer_size);
+  if (ts->disconnected_tracing)
+    fprintf (fp, ";disconn:%x", ts->disconnected_tracing);
+  if (ts->circular_buffer)
+    fprintf (fp, ";circular:%x", ts->circular_buffer);
   fprintf (fp, "\n");
 
   /* Note that we want to upload tracepoints and save those, rather
@@ -2645,14 +2695,12 @@ trace_save (const char *filename, int target_does_save)
 	fprintf (fp, ":X%x,%s", (unsigned int) strlen (utp->cond) / 2,
 		 utp->cond);
       fprintf (fp, "\n");
-      for (a = 0; a < utp->numactions; ++a)
+      for (a = 0; VEC_iterate (char_ptr, utp->actions, a, act); ++a)
 	fprintf (fp, "tp A%x:%s:%s\n",
-		 utp->number, phex_nz (utp->addr, sizeof (utp->addr)),
-		 utp->actions[a]);
-      for (a = 0; a < utp->num_step_actions; ++a)
+		 utp->number, phex_nz (utp->addr, sizeof (utp->addr)), act);
+      for (a = 0; VEC_iterate (char_ptr, utp->actions, a, act); ++a)
 	fprintf (fp, "tp S%x:%s:%s\n",
-		 utp->number, phex_nz (utp->addr, sizeof (utp->addr)),
-		 utp->step_actions[a]);
+		 utp->number, phex_nz (utp->addr, sizeof (utp->addr)), act);
       if (utp->at_string)
 	{
 	  encode_source_string (utp->number, utp->addr,
@@ -2665,9 +2713,9 @@ trace_save (const char *filename, int target_does_save)
 				"cond", utp->cond_string, buf, MAX_TRACE_UPLOAD);
 	  fprintf (fp, "tp Z%s\n", buf);
 	}
-      for (cmd = utp->cmd_strings; cmd; cmd = cmd->next)
+      for (a = 0; VEC_iterate (char_ptr, utp->cmd_strings, a, act); ++a)
 	{
-	  encode_source_string (utp->number, utp->addr, "cmd", cmd->str,
+	  encode_source_string (utp->number, utp->addr, "cmd", act,
 				buf, MAX_TRACE_UPLOAD);
 	  fprintf (fp, "tp Z%s\n", buf);
 	}
@@ -2869,6 +2917,9 @@ get_uploaded_tp (int num, ULONGEST addr, struct uploaded_tp **utpp)
   memset (utp, 0, sizeof (struct uploaded_tp));
   utp->number = num;
   utp->addr = addr;
+  utp->actions = NULL;
+  utp->step_actions = NULL;
+  utp->cmd_strings = NULL;
   utp->next = *utpp;
   *utpp = utp;
   return utp;
@@ -3165,6 +3216,8 @@ tfile_open (char *filename, int from_tty)
   ts->stop_reason = trace_stop_reason_unknown;
   ts->traceframe_count = -1;
   ts->buffer_free = 0;
+  ts->disconnected_tracing = 0;
+  ts->circular_buffer = 0;
 
   /* Read through a section of newline-terminated lines that
      define things like tracepoints.  */
@@ -3280,6 +3333,8 @@ parse_trace_status (char *line, struct trace_status *ts)
   ts->traceframes_created = -1;
   ts->buffer_free = -1;
   ts->buffer_size = -1;
+  ts->disconnected_tracing = 0;
+  ts->circular_buffer = 0;
 
   while (*p++)
     {
@@ -3307,6 +3362,11 @@ Status line: '%s'\n"), p, line);
 	{
 	  p = unpack_varlen_hex (++p1, &val);
 	  ts->stop_reason = tstop_command;
+	}
+      else if (strncmp (p, stop_reason_names[trace_disconnected], p1 - p) == 0)
+	{
+	  p = unpack_varlen_hex (++p1, &val);
+	  ts->stop_reason = trace_disconnected;
 	}
       else if (strncmp (p, stop_reason_names[tracepoint_error], p1 - p) == 0)
 	{
@@ -3345,6 +3405,16 @@ Status line: '%s'\n"), p, line);
 	{
 	  p = unpack_varlen_hex (++p1, &val);
 	  ts->buffer_size = val;
+	}
+      else if (strncmp (p, "disconn", p1 - p) == 0)
+	{
+	  p = unpack_varlen_hex (++p1, &val);
+	  ts->disconnected_tracing = val;
+	}
+      else if (strncmp (p, "circular", p1 - p) == 0)
+	{
+	  p = unpack_varlen_hex (++p1, &val);
+	  ts->circular_buffer = val;
 	}
       else
 	{
@@ -3423,12 +3493,12 @@ parse_tracepoint_definition (char *line, struct uploaded_tp **utpp)
   else if (piece == 'A')
     {
       utp = get_uploaded_tp (num, addr, utpp);
-      utp->actions[utp->numactions++] = xstrdup (p);
+      VEC_safe_push (char_ptr, utp->actions, xstrdup (p));
     }
   else if (piece == 'S')
     {
       utp = get_uploaded_tp (num, addr, utpp);
-      utp->step_actions[utp->num_step_actions++] = xstrdup (p);
+      VEC_safe_push (char_ptr, utp->step_actions, xstrdup (p));
     }
   else if (piece == 'Z')
     {
@@ -3452,21 +3522,7 @@ parse_tracepoint_definition (char *line, struct uploaded_tp **utpp)
       else if (strncmp (srctype, "cond:", strlen ("cond:")) == 0)
 	utp->cond_string = xstrdup (buf);
       else if (strncmp (srctype, "cmd:", strlen ("cmd:")) == 0)
-	{
-	  /* FIXME consider using a vector? */
-	  struct uploaded_string *last, *newlast;
-	  newlast = (struct uploaded_string *) xmalloc (sizeof (struct uploaded_string));
-	  newlast->str = xstrdup (buf);
-	  newlast->next = NULL;
-	  if (utp->cmd_strings)
-	    {
-	      for (last = utp->cmd_strings; last->next; last = last->next)
-		;
-	      last->next = newlast;
-	    }
-	  else
-	    utp->cmd_strings = newlast;
-	}
+	VEC_safe_push (char_ptr, utp->cmd_strings, xstrdup (buf));
     }
   else
     {
@@ -3793,7 +3849,7 @@ tfile_xfer_partial (struct target_ops *ops, enum target_object object,
 {
   char block_type;
   int pos, gotten;
-  ULONGEST maddr;
+  ULONGEST maddr, amt;
   unsigned short mlen;
 
   /* We're only doing regular memory for now.  */
@@ -3831,16 +3887,26 @@ tfile_xfer_partial (struct target_ops *ops, enum target_object object,
 	    perror_with_name (trace_filename);
 	  else if (gotten < 2)
 	    error (_("Premature end of file while reading trace file"));
-	  if (maddr <= offset && (offset + len) <= (maddr + mlen))
-	    {
-	      gotten = read (trace_fd, readbuf, mlen);
+	  /* If the block includes the first part of the desired
+	     range, return as much it has; GDB will re-request the
+	     remainder, which might be in a different block of this
+	     trace frame.  */
+	  if (maddr <= offset && offset < (maddr + mlen))
+  	    {
+	      amt = (maddr + mlen) - offset;
+	      if (amt > len)
+		amt = len;
+
+	      gotten = read (trace_fd, readbuf, amt);
 	      if (gotten < 0)
 		perror_with_name (trace_filename);
-	      else if (gotten < mlen)
-		error (_("Premature end of file qwhile reading trace file"));
-
-	      return mlen;
-	    }
+	      /* While it's acceptable to return less than was
+		 originally asked for, it's not acceptable to return
+		 less than what this block claims to contain.  */
+	      else if (gotten < amt)
+		error (_("Premature end of file while reading trace file"));
+	      return amt;
+  	    }
 	  lseek (trace_fd, mlen, SEEK_CUR);
 	  pos += (8 + 2 + mlen);
 	  break;
@@ -3854,6 +3920,38 @@ tfile_xfer_partial (struct target_ops *ops, enum target_object object,
 	  break;
 	}
     }
+
+  /* It's unduly pedantic to refuse to look at the executable for
+     read-only pieces; so do the equivalent of readonly regions aka
+     QTro packet.  */
+  /* FIXME account for relocation at some point */
+  if (exec_bfd)
+    {
+      asection *s;
+      bfd_size_type size;
+      bfd_vma lma;
+
+      for (s = exec_bfd->sections; s; s = s->next)
+	{
+	  if ((s->flags & SEC_LOAD) == 0 ||
+	      (s->flags & SEC_READONLY) == 0)
+	    continue;
+
+	  lma = s->lma;
+	  size = bfd_get_section_size (s);
+	  if (lma <= offset && offset < (lma + size))
+	    {
+	      amt = (lma + size) - offset;
+	      if (amt > len)
+		amt = len;
+
+	      amt = bfd_get_section_contents (exec_bfd, s,
+					      readbuf, offset - lma, amt);
+	      return amt;
+	    }
+	}
+    }
+
   /* Indicate failure to find the requested memory block.  */
   return -1;
 }
@@ -3923,6 +4021,12 @@ tfile_get_trace_state_variable_value (int tsvnum, LONGEST *val)
 }
 
 static int
+tfile_has_all_memory (struct target_ops *ops)
+{
+  return 1;
+}
+
+static int
 tfile_has_memory (struct target_ops *ops)
 {
   return 1;
@@ -3958,6 +4062,7 @@ init_tfile_ops (void)
   /* core_stratum might seem more logical, but GDB doesn't like having
      more than one core_stratum vector.  */
   tfile_ops.to_stratum = process_stratum;
+  tfile_ops.to_has_all_memory = tfile_has_all_memory;
   tfile_ops.to_has_memory = tfile_has_memory;
   tfile_ops.to_has_stack = tfile_has_stack;
   tfile_ops.to_has_registers = tfile_has_registers;

@@ -362,6 +362,9 @@ struct breakpoint_ops
   /* Display information about this breakpoint after setting it (roughly
      speaking; this is called from "mention").  */
   void (*print_mention) (struct breakpoint *);
+
+  /* Print to FP the CLI command that recreates this breakpoint.  */
+  void (*print_recreate) (struct breakpoint *, struct ui_file *fp);
 };
 
 enum watchpoint_triggered
@@ -1004,6 +1007,10 @@ extern int breakpoints_always_inserted_mode (void);
    Retires previously deleted breakpoint locations that
    in our opinion won't ever trigger.  */
 extern void breakpoint_retire_moribund (void);
+
+/* Set break condition of breakpoint B to EXP.  */
+extern void set_breakpoint_condition (struct breakpoint *b, char *exp,
+				      int from_tty);
 
 /* Checks if we are catching syscalls or not.
    Returns 0 if not, greater than 0 if we are.  */

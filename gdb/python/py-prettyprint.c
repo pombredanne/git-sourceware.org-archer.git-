@@ -29,12 +29,12 @@
 #ifdef HAVE_PYTHON
 #include "python-internal.h"
 
-
 /* Helper function for find_pretty_printer which iterates over a list,
    calls each function and inspects output.  This will return a
    printer object if one recognizes VALUE.  If no printer is found, it
    will return None.  On error, it will set the Python error and
    return NULL.  */
+
 static PyObject *
 search_pp_list (PyObject *list, PyObject *value)
 {
@@ -60,18 +60,19 @@ search_pp_list (PyObject *list, PyObject *value)
   Py_RETURN_NONE;
 }
 
-/* Find the pretty-printing constructor function for VALUE.  If no
-   pretty-printer exists, return None.  If one exists, return a new
-   reference.  On error, set the Python error and return NULL.  */
-static PyObject *
-find_pretty_printer (PyObject *value)
-{
-  PyObject *pp_list = NULL;
-  PyObject *function = NULL;
-  struct objfile *obj;
-  volatile struct gdb_exception except;
+/* Subroutine of find_pretty_printer to simplify it.
+   Look for a pretty-printer to print VALUE in all objfiles.
+   The result is NULL if there's an error and the search should be terminated.
+   The result is Py_None, suitably inc-ref'd, if no pretty-printer was found.
+   Otherwise the result is the pretty-printer function, suitably inc-ref'd.  */
 
-  /* Look at the pretty-printer dictionary for each objfile.  */
+static PyObject *
+find_pretty_printer_from_objfiles (PyObject *value)
+{
+  PyObject *pp_list;
+  PyObject *function;
+  struct objfile *obj;
+
   ALL_OBJFILES (obj)
   {
     PyObject *objf = objfile_to_objfile_object (obj);
@@ -84,50 +85,104 @@ find_pretty_printer (PyObject *value)
 
     pp_list = objfpy_get_printers (objf, NULL);
     function = search_pp_list (pp_list, value);
+    Py_XDECREF (pp_list);
 
-    /* If there is an error in any objfile list, abort the search and
-       exit.  */
+    /* If there is an error in any objfile list, abort the search and exit.  */
     if (! function)
-      {
-	Py_XDECREF (pp_list);
-	return NULL;
-      }
+      return NULL;
 
     if (function != Py_None)
-      goto done;
+      return function;
     
     Py_DECREF (function);
-    Py_XDECREF (pp_list);
   }
 
-  pp_list = NULL;
-  /* Fetch the global pretty printer dictionary.  */
-  if (! PyObject_HasAttrString (gdb_module, "pretty_printers"))
-    {
-      function = Py_None;
-      Py_INCREF (function);
-      goto done;
-    }
-  pp_list = PyObject_GetAttrString (gdb_module, "pretty_printers");
-  if (! pp_list)
-    goto done;
-  if (! PyList_Check (pp_list))
-    goto done;
+  Py_RETURN_NONE;
+}
 
+/* Subroutine of find_pretty_printer to simplify it.
+   Look for a pretty-printer to print VALUE in the current program space.
+   The result is NULL if there's an error and the search should be terminated.
+   The result is Py_None, suitably inc-ref'd, if no pretty-printer was found.
+   Otherwise the result is the pretty-printer function, suitably inc-ref'd.  */
+
+static PyObject *
+find_pretty_printer_from_progspace (PyObject *value)
+{
+  PyObject *pp_list;
+  PyObject *function;
+  PyObject *obj = pspace_to_pspace_object (current_program_space);
+
+  if (!obj)
+    return NULL;
+  pp_list = pspy_get_printers (obj, NULL);
   function = search_pp_list (pp_list, value);
-
- done:
   Py_XDECREF (pp_list);
-  
   return function;
 }
 
+/* Subroutine of find_pretty_printer to simplify it.
+   Look for a pretty-printer to print VALUE in the gdb module.
+   The result is NULL if there's an error and the search should be terminated.
+   The result is Py_None, suitably inc-ref'd, if no pretty-printer was found.
+   Otherwise the result is the pretty-printer function, suitably inc-ref'd.  */
+
+static PyObject *
+find_pretty_printer_from_gdb (PyObject *value)
+{
+  PyObject *pp_list;
+  PyObject *function;
+
+  /* Fetch the global pretty printer dictionary.  */
+  if (! PyObject_HasAttrString (gdb_module, "pretty_printers"))
+    Py_RETURN_NONE;
+  pp_list = PyObject_GetAttrString (gdb_module, "pretty_printers");
+  if (pp_list == NULL || ! PyList_Check (pp_list))
+    {
+      Py_XDECREF (pp_list);
+      Py_RETURN_NONE;
+    }
+
+  function = search_pp_list (pp_list, value);
+  Py_XDECREF (pp_list);
+  return function;
+}
+
+/* Find the pretty-printing constructor function for VALUE.  If no
+   pretty-printer exists, return None.  If one exists, return a new
+   reference.  On error, set the Python error and return NULL.  */
+
+static PyObject *
+find_pretty_printer (PyObject *value)
+{
+  PyObject *function;
+
+  /* Look at the pretty-printer dictionary for each objfile
+     in the current program-space.  */
+  function = find_pretty_printer_from_objfiles (value);
+  if (function == NULL || function != Py_None)
+    return function;
+  Py_DECREF (function);
+
+  /* Look at the pretty-printer dictionary for the current program-space.  */
+  function = find_pretty_printer_from_progspace (value);
+  if (function == NULL || function != Py_None)
+    return function;
+  Py_DECREF (function);
+
+  /* Look at the pretty-printer dictionary in the gdb module.  */
+  function = find_pretty_printer_from_gdb (value);
+  return function;
+}
 
 /* Pretty-print a single value, via the printer object PRINTER.
    If the function returns a string, a PyObject containing the string
-   is returned.  Otherwise, if the function returns a value,
-   *OUT_VALUE is set to the value, and NULL is returned.  On error,
-   *OUT_VALUE is set to NULL, and NULL is returned.  */
+   is returned.  If the function returns Py_NONE that means the pretty
+   printer returned the Python None as a value.  Otherwise, if the
+   function returns a value,  *OUT_VALUE is set to the value, and NULL
+   is returned.  On error, *OUT_VALUE is set to NULL, and NULL is
+   returned.  */
+
 static PyObject *
 pretty_print_one_value (PyObject *printer, struct value **out_value)
 {
@@ -140,7 +195,8 @@ pretty_print_one_value (PyObject *printer, struct value **out_value)
       result = PyObject_CallMethodObjArgs (printer, gdbpy_to_string_cst, NULL);
       if (result)
 	{
-	  if (! gdbpy_is_string (result) && ! gdbpy_is_lazy_string (result))
+	  if (! gdbpy_is_string (result) && ! gdbpy_is_lazy_string (result)  
+	      && result != Py_None)
 	    {
 	      *out_value = convert_value_from_python (result);
 	      if (PyErr_Occurred ())
@@ -179,8 +235,11 @@ gdbpy_get_display_hint (PyObject *printer)
 }
 
 /* Helper for apply_val_pretty_printer which calls to_string and
-   formats the result.  */
-static void
+   formats the result.  If the value returnd is Py_None, nothing is
+   printed and the function returns a 1; in all other cases data is
+   printed as given by the pretty printer and the function returns 0.
+*/
+static int
 print_string_repr (PyObject *printer, const char *hint,
 		   struct ui_file *stream, int recurse,
 		   const struct value_print_options *options,
@@ -189,52 +248,58 @@ print_string_repr (PyObject *printer, const char *hint,
 {
   struct value *replacement = NULL;
   PyObject *py_str = NULL;
+  int is_py_none = 0;
 
   py_str = pretty_print_one_value (printer, &replacement);
   if (py_str)
     {
-      gdb_byte *output = NULL;
-      long length;
-      struct type *type;
-      char *encoding = NULL;
-      PyObject *string = NULL;
-      int is_lazy;
-      
-      is_lazy = gdbpy_is_lazy_string (py_str);
-      if (is_lazy)
-	output = gdbpy_extract_lazy_string (py_str, &type, &length, &encoding);
+      if (py_str == Py_None)
+	is_py_none = 1;
       else
 	{
-	  string = python_string_to_target_python_string (py_str);
-	  if (string)
+	  gdb_byte *output = NULL;
+	  long length;
+	  struct type *type;
+	  char *encoding = NULL;
+	  PyObject *string = NULL;
+	  int is_lazy;
+
+	  is_lazy = gdbpy_is_lazy_string (py_str);
+	  if (is_lazy)
+	    output = gdbpy_extract_lazy_string (py_str, &type, &length, &encoding);
+	  else
 	    {
-	      output = PyString_AsString (string);
-	      length = PyString_Size (string);
-	      type = builtin_type (gdbarch)->builtin_char;
+	      string = python_string_to_target_python_string (py_str);
+	      if (string)
+		{
+		  output = PyString_AsString (string);
+		  length = PyString_Size (string);
+		  type = builtin_type (gdbarch)->builtin_char;
+		}
+	      else
+		gdbpy_print_stack ();
+	      
+	    }
+	
+	  if (output)
+	    {
+	      if (is_lazy || (hint && !strcmp (hint, "string")))
+		LA_PRINT_STRING (stream, type, output, length, encoding,
+				 0, options);
+	      else
+		fputs_filtered (output, stream);
 	    }
 	  else
 	    gdbpy_print_stack ();
 	  
-	}
-      
-      if (output)
-	{
-	  if (is_lazy || (hint && !strcmp (hint, "string")))
-	    LA_PRINT_STRING (stream, type, output, length, encoding,
-			     0, options);
+	  if (string)
+	    Py_DECREF (string);
 	  else
-	    fputs_filtered (output, stream);
+	    xfree (output);
+      
+	  xfree (encoding);
+	  Py_DECREF (py_str);
 	}
-      else
-	gdbpy_print_stack ();
-      
-      if (string)
-	Py_DECREF (string);
-      else
-	xfree (output);
-      
-      xfree (encoding);
-      Py_DECREF (py_str);
     }
   else if (replacement)
     {
@@ -245,6 +310,8 @@ print_string_repr (PyObject *printer, const char *hint,
     }
   else
     gdbpy_print_stack ();
+
+  return is_py_none;
 }
 
 static void
@@ -323,12 +390,14 @@ push_dummy_python_frame ()
 }
 
 /* Helper for apply_val_pretty_printer that formats children of the
-   printer, if any exist.  */
+   printer, if any exist.  If is_py_none is true, then nothing has
+   been printed by to_string, and format output accordingly. */
 static void
 print_children (PyObject *printer, const char *hint,
 		struct ui_file *stream, int recurse,
 		const struct value_print_options *options,
-		const struct language_defn *language)
+		const struct language_defn *language,
+		int is_py_none)
 {
   int is_map, is_array, done_flag, pretty;
   unsigned int i;
@@ -408,7 +477,13 @@ print_children (PyObject *printer, const char *hint,
 	 2. Arrays.  Always print a ",".
 	 3. Other.  Always print a ",".  */
       if (i == 0)
-	fputs_filtered (" = {", stream);
+	{
+         if (is_py_none)
+           fputs_filtered ("{", stream);
+         else
+           fputs_filtered (" = {", stream);
+       }
+
       else if (! is_map || i % 2 == 0)
 	fputs_filtered (pretty ? "," : ", ", stream);
 
@@ -532,7 +607,7 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
   char *hint = NULL;
   struct cleanup *cleanups;
   int result = 0;
-
+  int is_py_none = 0;
   cleanups = ensure_python_env (gdbarch, language);
 
   /* Instantiate the printer.  */
@@ -557,9 +632,11 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
   make_cleanup (free_current_contents, &hint);
 
   /* Print the section */
-  print_string_repr (printer, hint, stream, recurse, options, language,
-		     gdbarch);
-  print_children (printer, hint, stream, recurse, options, language);
+  is_py_none = print_string_repr (printer, hint, stream, recurse,
+				  options, language, gdbarch);
+  print_children (printer, hint, stream, recurse, options, language,
+		  is_py_none);
+
   result = 1;
 
 
@@ -638,7 +715,8 @@ gdbpy_default_visualizer (PyObject *self, PyObject *args)
   value = value_object_to_value (val_obj);
   if (! value)
     {
-      PyErr_SetString (PyExc_TypeError, "argument must be a gdb.Value");
+      PyErr_SetString (PyExc_TypeError, 
+		       _("Argument must be a gdb.Value."));
       return NULL;
     }
 

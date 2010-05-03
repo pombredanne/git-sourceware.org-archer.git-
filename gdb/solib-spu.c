@@ -161,7 +161,8 @@ spu_current_sos (void)
 
       /* Encode FD and object ID in path name.  Choose the name so as not
 	 to conflict with any (normal) SVR4 library path name.  */
-      xsnprintf (new->so_name, sizeof new->so_name, "@0x%llx <%d>", addr, fd);
+      xsnprintf (new->so_name, sizeof new->so_name, "@%s <%d>",
+		 hex_string (addr), fd);
       strcpy (new->so_original_name, new->so_name);
 
       *link_ptr = new;
@@ -427,7 +428,7 @@ spu_solib_loaded (struct so_list *so)
 {
   if (strstr (so->so_original_name, "/libspe") != NULL)
     {
-      solib_read_symbols (so, so->from_tty ? SYMFILE_VERBOSE : 0);
+      solib_read_symbols (so, 0);
       spu_enable_break (so->objfile);
     }
 }

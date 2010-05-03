@@ -92,7 +92,7 @@ void (*deprecated_error_begin_hook) (void);
 /* Prototypes for local functions */
 
 static void vfprintf_maybe_filtered (struct ui_file *, const char *,
-				     va_list, int) ATTR_FORMAT (printf, 2, 0);
+				     va_list, int) ATTRIBUTE_PRINTF (2, 0);
 
 static void fputs_maybe_filtered (const char *, struct ui_file *, int);
 
@@ -806,13 +806,13 @@ warning (const char *string, ...)
    The first argument STRING is the error message, used as a fprintf string,
    and the remaining args are passed as arguments to it.  */
 
-NORETURN void
+void
 verror (const char *string, va_list args)
 {
   throw_verror (GENERIC_ERROR, string, args);
 }
 
-NORETURN void
+void
 error (const char *string, ...)
 {
   va_list args;
@@ -825,13 +825,13 @@ error (const char *string, ...)
    The first argument STRING is the error message, used as a fprintf string,
    and the remaining args are passed as arguments to it.  */
 
-NORETURN void
+void
 vfatal (const char *string, va_list args)
 {
   throw_vfatal (string, args);
 }
 
-NORETURN void
+void
 fatal (const char *string, ...)
 {
   va_list args;
@@ -840,7 +840,7 @@ fatal (const char *string, ...)
   va_end (args);
 }
 
-NORETURN void
+void
 error_stream (struct ui_file *stream)
 {
   char *message = ui_file_xstrdup (stream, NULL);
@@ -916,7 +916,7 @@ struct internal_problem
    has been reported, and assuming GDB didn't quit, the caller can
    either allow execution to resume or throw an error.  */
 
-static void ATTR_FORMAT (printf, 4, 0)
+static void ATTRIBUTE_PRINTF (4, 0)
 internal_vproblem (struct internal_problem *problem,
 		   const char *file, int line, const char *fmt, va_list ap)
 {
@@ -1036,14 +1036,14 @@ static struct internal_problem internal_error_problem = {
   "internal-error", internal_problem_ask, internal_problem_ask
 };
 
-NORETURN void
+void
 internal_verror (const char *file, int line, const char *fmt, va_list ap)
 {
   internal_vproblem (&internal_error_problem, file, line, fmt, ap);
   deprecated_throw_reason (RETURN_ERROR);
 }
 
-NORETURN void
+void
 internal_error (const char *file, int line, const char *string, ...)
 {
   va_list ap;
@@ -1174,7 +1174,7 @@ Show whether GDB will create a core file of GDB when %s is detected"),
    as the file name for which the error was encountered.
    Then return to command level.  */
 
-NORETURN void
+void
 perror_with_name (const char *string)
 {
   char *err;
@@ -1240,7 +1240,7 @@ quit (void)
 /* Called when a memory allocation fails, with the number of bytes of
    memory requested in SIZE. */
 
-NORETURN void
+void
 nomem (long size)
 {
   if (size > 0)
@@ -1452,7 +1452,7 @@ gdb_print_host_address (const void *addr, struct ui_file *stream)
    ARGS are the arguments passed along with the CTLSTR argument to
    printf.  */
 
-static int ATTR_FORMAT (printf, 1, 0)
+static int ATTRIBUTE_PRINTF (1, 0)
 defaulted_query (const char *ctlstr, const char defchar, va_list args)
 {
   int answer;

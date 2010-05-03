@@ -70,7 +70,8 @@ static void gdb_os_vprintf_filtered (host_callback *, const char *, va_list);
 
 static void gdb_os_evprintf_filtered (host_callback *, const char *, va_list);
 
-static void gdb_os_error (host_callback *, const char *, ...) ATTR_NORETURN;
+static void gdb_os_error (host_callback *, const char *, ...)
+     ATTRIBUTE_NORETURN;
 
 static void gdbsim_kill (struct target_ops *);
 
@@ -793,7 +794,7 @@ gdbsim_xfer_inferior_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len,
 static void
 gdbsim_files_info (struct target_ops *target)
 {
-  char *file = "nothing";
+  const char *file = "nothing";
 
   if (exec_bfd)
     file = bfd_get_filename (exec_bfd);
