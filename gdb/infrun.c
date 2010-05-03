@@ -3947,6 +3947,10 @@ process_event_stop_test:
       return;
     }
 
+  /* Breakpoints get deleted/created here which calls reinit_frame_cache thus
+     invalidating current_frame.  Call explicitly get_current_frame.  */
+  frame = NULL;
+
   /* Handle cases caused by hitting a breakpoint.  */
   {
     bpstat bs;
@@ -4058,7 +4062,8 @@ process_event_stop_test:
 
 	      CORE_ADDR jmp_buf_pc;
 	      if (gdbarch_get_longjmp_target_p (gdbarch)
-		  && gdbarch_get_longjmp_target (gdbarch, frame, &jmp_buf_pc))
+		  && gdbarch_get_longjmp_target (gdbarch, get_current_frame (),
+						 &jmp_buf_pc))
 		{
 		  /* We're going to replace the current step-resume breakpoint
 		     with a longjmp-resume breakpoint.  */
