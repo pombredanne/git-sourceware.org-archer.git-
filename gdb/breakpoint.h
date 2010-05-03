@@ -587,9 +587,6 @@ enum print_stop_action
     PRINT_UNKNOWN
   };
 
-/* Tell what to do about this bpstat.  */
-struct bpstat_what bpstat_what (bpstat);
-
 /* Find the bpstat associated with a breakpoint.  NULL otherwise. */
 bpstat bpstat_find_breakpoint (bpstat, struct breakpoint *);
 
