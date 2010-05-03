@@ -9223,7 +9223,7 @@ update_global_location_list_nothrow (int inserting)
     update_global_location_list (inserting);
 }
 
-/* Clear BPT from a BPS.  */
+/* Clear LOC from a BPS.  */
 static void
 bpstat_remove_bp_location (bpstat bps, struct bp_location *loc)
 {
