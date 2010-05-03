@@ -3947,8 +3947,9 @@ process_event_stop_test:
       return;
     }
 
-  /* Breakpoints get deleted/created here which calls reinit_frame_cache thus
-     invalidating current_frame.  Call explicitly get_current_frame.  */
+  /* Breakpoints may get deleted and created in the block below.  It calls
+     reinit_frame_cache thus invalidating current_frame.  In this block one
+     needs to explicitly get_current_frame.  */
   frame = NULL;
   gdbarch = NULL;
 
@@ -3991,10 +3992,16 @@ process_event_stop_test:
 	pe_going,
       }
     perform_max = pe_check_more;
+    /* solib_add may call breakpoint_re_set which would clear many
+       BREAKPOINT_AT entries still going to be processed.  breakpoint_re_set
+       does not keep the same bp_location's even if they actually do not
+       change.  */
     int perform_shlib = 0;
 
     for (bs = ecs->event_thread->stop_bpstat; bs != NULL; bs = bs->next)
       {
+	/* Decisions for this specific BS, they get mapped to their *_max
+	   variants at the end of this BS processing.  */
 	enum print_frame print_frame = pf_default;
 	enum stop_step stop_step = ss_default;
 	enum perform perform = pe_undef;
@@ -4129,10 +4136,6 @@ process_event_stop_test:
 	    perform = pe_check_more;
 	    break;
 	  case bp_shlib_event:
-	    /* solib_add may call breakpoint_re_set which would clear many
-	       BREAKPOINT_AT entries still going to be processed.
-	       breakpoint_re_set does not keep the same bp_location's even if
-	       they actually do not change.  */
 	    perform_shlib = 1;
 
 	    /* If requested, stop when the dynamic linker notifies
