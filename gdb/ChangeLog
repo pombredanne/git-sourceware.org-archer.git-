@@ -1,3 +1,61 @@
+2010-05-05  Hui Zhu  <teawater@gmail.com>
+
+	* gdbarch.h (gdbarch_has_dos_based_file_system): Update comment.
+
+2010-05-04  Mark Kettenis  <kettenis@gnu.org>
+
+	* remote.c (register_remote_support_xml)
+	(remote_query_supported_append, remote_query_supported): Add cast
+	to NULL used as sentinel.
+	* tracepoint.c (tvariables_info_1): Likewise.
+	* utils.c (add_internal_problem_command): Likewise.
+
+2010-05-04  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* dwarf2loc.c (read_pieced_value, write_pieced_value,
+	dwarf2_evaluate_loc_desc): Handle not being able to access DWARF
+	registers gracefully.
+
+2010-05-04  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* exec.c (print_section_info): Display entry point without arch 
+	specific parts.
+
+2010-05-04  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	PR exp/11349.
+	* printcmd.c (x_command): Only dereference once implicitly for
+	TYPE_CODE_REF.
+
+2010-05-03  Doug Evans  <dje@google.com>
+
+	* event-loop.c (gdb_timer): Delete unused global.
+	(create_timer): Update.
+
+2010-05-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* cp-namespace.c (cp_lookup_symbol_imports): Support ALIAS for the
+	CURRENT->DECLARATION case.
+	* cp-support.h (struct using_direct): Provide extended comment.
+
+2010-05-03  Mark Kettenis  <kettenis@gnu.org>
+
+	* hppaobsd-tdep.c (HPPAOBSD_SIZEOF_GREGS): Renamed from
+	HPPABSD_SIZEOF_GREGS.
+	(HPPAOBSD_SIZEOF_FPREGS): New define.
+	(hppaobsd_supply_gregset): Renamed from hppabsd_supply_gregset.
+	(hppaobsd_supply_fpregset): New function.
+	(hppaobsd_gregset): Renamed from hppabsd_gregset.
+	(hppaobsd_fpregset): New variable.
+	(hppaobsd_regset_from_core_section): Handle floating-point registers.
+	(_initialize_hppabsd_tdep): Remove spurious blank line.
+
+2010-05-03  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	PR pascal/11349.
+	* p-valprint.c (pascal_value_print): Always dereference a value with
+	type code TYPE_CODE_REF.
+	
 2010-05-03  Pedro Alves  <pedro@codesourcery.com>
 
 	* remote.c (remote_notice_signals): New.
