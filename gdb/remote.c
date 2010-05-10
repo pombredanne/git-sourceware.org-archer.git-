@@ -2482,6 +2482,21 @@ const struct gdb_xml_element threads_elements[] = {
   { NULL, NULL, NULL, GDB_XML_EF_NONE, NULL, NULL }
 };
 
+/* Discard the contents of the constructed thread info context.  */
+
+static void
+clear_threads_parsing_context (void *p)
+{
+  struct threads_parsing_context *context = p;
+  int i;
+  struct thread_item *item;
+
+  for (i = 0; VEC_iterate (thread_item_t, context->items, i, item); ++i)
+    xfree (item->extra);
+
+  VEC_free (thread_item_t, context->items);
+}
+
 #endif
 
 /*
@@ -2512,14 +2527,19 @@ remote_threads_info (struct target_ops *ops)
 	{
 	  struct gdb_xml_parser *parser;
 	  struct threads_parsing_context context;
-	  struct cleanup *back_to = make_cleanup (null_cleanup, NULL);
+	  struct cleanup *clear_parsing_context;
 
 	  context.items = 0;
+	  /* Note: this parser cleanup is already guarded by BACK_TO
+	     above.  */
 	  parser = gdb_xml_create_parser_and_cleanup (_("threads"),
 						      threads_elements,
 						      &context);
 
 	  gdb_xml_use_dtd (parser, "threads.dtd");
+
+	  clear_parsing_context
+	    = make_cleanup (clear_threads_parsing_context, &context);
 
 	  if (gdb_xml_parse (parser, xml) == 0)
 	    {
@@ -2542,13 +2562,12 @@ remote_threads_info (struct target_ops *ops)
 		      info = demand_private_info (item->ptid);
 		      info->core = item->core;
 		      info->extra = item->extra;
-		      item->extra = 0;
+		      item->extra = NULL;
 		    }
-		  xfree (item->extra);
 		}
 	    }
 
-	  VEC_free (thread_item_t, context.items);
+	  do_cleanups (clear_parsing_context);
 	}
 
       do_cleanups (back_to);
@@ -3482,7 +3501,7 @@ static char *remote_support_xml;
 /* Register string appended to "xmlRegisters=" in qSupported query.  */
 
 void
-register_remote_support_xml (const char *xml ATTRIBUTE_UNUSED)
+register_remote_support_xml (const char *xml)
 {
 #if defined(HAVE_LIBEXPAT)
   if (remote_support_xml == NULL)
@@ -3504,9 +3523,9 @@ register_remote_support_xml (const char *xml ATTRIBUTE_UNUSED)
       while ((p = strtok (NULL, ",")) != NULL);
       xfree (copy);
 
-      p = concat (remote_support_xml, ",", xml, (char *) NULL);
-      xfree (remote_support_xml);
-      remote_support_xml = p;
+      remote_support_xml = reconcat (remote_support_xml,
+				     remote_support_xml, ",", xml,
+				     (char *) NULL);
     }
 #endif
 }
@@ -3515,11 +3534,7 @@ static char *
 remote_query_supported_append (char *msg, const char *append)
 {
   if (msg)
-    {
-      char *p = concat (msg, ";", append, (char *) NULL);
-      xfree (msg);
-      return p;
-    }
+    return reconcat (msg, msg, ";", append, (char *) NULL);
   else
     return xstrdup (append);
 }
@@ -3543,26 +3558,23 @@ remote_query_supported (void)
   if (remote_protocol_packets[PACKET_qSupported].support != PACKET_DISABLE)
     {
       char *q = NULL;
-      const char *qsupported = gdbarch_qsupported (target_gdbarch);
+      struct cleanup *old_chain = make_cleanup (free_current_contents, &q);
 
       if (rs->extended)
 	q = remote_query_supported_append (q, "multiprocess+");
-      
-      if (qsupported)
-	q = remote_query_supported_append (q, qsupported);
 
       if (remote_support_xml)
 	q = remote_query_supported_append (q, remote_support_xml);
 
       if (q)
 	{
-	  char *p = concat ("qSupported:", q, (char *) NULL);
-	  xfree (q);
-	  putpkt (p);
-	  xfree (p);
+	  q = reconcat (q, "qSupported:", q, (char *) NULL);
+	  putpkt (q);
 	}
       else
 	putpkt ("qSupported");
+
+      do_cleanups (old_chain);
 
       getpkt (&rs->buf, &rs->buf_size, 0);
 
@@ -5079,7 +5091,6 @@ process_stop_reply (struct stop_reply *stop_reply,
 		    struct target_waitstatus *status)
 {
   ptid_t ptid;
-  struct thread_info *info;
 
   *status = stop_reply->ws;
   ptid = stop_reply->ptid;
@@ -9637,8 +9648,7 @@ remote_trace_start (void)
 static int
 remote_get_trace_status (struct trace_status *ts)
 {
-  char *p, *p1, *p_temp;
-  ULONGEST val;
+  char *p;
   /* FIXME we need to get register block size some other way */
   extern int trace_regblock_size;
   trace_regblock_size = get_remote_arch_state ()->sizeof_g_packet;

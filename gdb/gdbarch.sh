@@ -767,9 +767,6 @@ m:int:has_shared_address_space:void:::default_has_shared_address_space::0
 # True if a fast tracepoint can be set at an address.
 m:int:fast_tracepoint_valid_at:CORE_ADDR addr, int *isize, char **msg:addr, isize, msg::default_fast_tracepoint_valid_at::0
 
-# Not NULL if a target has additonal field for qSupported.
-v:const char *:qsupported:::0:0::0:gdbarch->qsupported
-
 # Return the "auto" target charset.
 f:const char *:auto_charset:void::default_auto_charset:default_auto_charset::0
 # Return the "auto" target wide charset.
@@ -1866,7 +1863,6 @@ gdbarch_printable_names (void)
 {
   /* Accumulate a list of names based on the registed list of
      architectures. */
-  enum bfd_architecture a;
   int nr_arches = 0;
   const char **arches = NULL;
   struct gdbarch_registration *rego;
@@ -2101,8 +2097,6 @@ extern void _initialize_gdbarch (void);
 void
 _initialize_gdbarch (void)
 {
-  struct cmd_list_element *c;
-
   add_setshow_zinteger_cmd ("arch", class_maintenance, &gdbarch_debug, _("\\
 Set architecture debugging."), _("\\
 Show architecture debugging."), _("\\
