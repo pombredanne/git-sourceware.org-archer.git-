@@ -66,7 +66,8 @@ proc memory_v_pages_get {} {
 
 set pages_found [memory_v_pages_get]
 
-set mb_reserve 10
+# s390x with glibc-debuginfo.s390x installed used approx. 16MB.
+set mb_reserve 40
 verbose -log "pages_found = $pages_found, mb_reserve = $mb_reserve"
 set kb_found [expr $pages_found * $pagesize / 1024]
 set kb_permit [expr $kb_found + 1 * 1024 + $mb_reserve * 1024]
