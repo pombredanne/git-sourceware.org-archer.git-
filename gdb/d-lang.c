@@ -243,8 +243,8 @@ static const struct language_defn d_language_defn =
   array_row_major,
   macro_expansion_c,
   &exp_descriptor_c,
-  c_parse,
-  c_error,
+  c_old_parse,
+  c_old_error,
   null_post_parser,
   c_printchar,			/* Print a character constant.  */
   c_printstr,			/* Function to print string constant.  */

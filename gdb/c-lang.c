@@ -1145,6 +1145,44 @@ const struct exp_descriptor exp_descriptor_c =
   evaluate_subexp_c
 };
 
+const struct language_defn c_old_language_defn =
+{
+  "c",				/* Language name */
+  language_c,
+  range_check_off,
+  type_check_off,
+  case_sensitive_on,
+  array_row_major,
+  macro_expansion_c,
+  &exp_descriptor_c,
+  c_old_parse,
+  c_old_error,
+  null_post_parser,
+  c_printchar,			/* Print a character constant */
+  c_printstr,			/* Function to print string constant */
+  c_emit_char,			/* Print a single char */
+  c_print_type,			/* Print a type using appropriate syntax */
+  c_print_typedef,		/* Print a typedef using appropriate syntax */
+  c_val_print,			/* Print a value using appropriate syntax */
+  c_value_print,		/* Print a top-level value */
+  NULL,				/* Language specific skip_trampoline */
+  NULL,				/* name_of_this */
+  basic_lookup_symbol_nonlocal,	/* lookup_symbol_nonlocal */
+  basic_lookup_transparent_type,/* lookup_transparent_type */
+  NULL,				/* Language specific symbol demangler */
+  NULL,				/* Language specific class_name_from_physname */
+  c_op_print_tab,		/* expression operators for printing */
+  1,				/* c-style arrays */
+  0,				/* String lower bound */
+  default_word_break_characters,
+  default_make_symbol_completion_list,
+  c_language_arch_info,
+  default_print_array_index,
+  default_pass_by_reference,
+  c_get_string,
+  LANG_MAGIC
+};
+
 const struct language_defn c_language_defn =
 {
   "c",				/* Language name */
@@ -1312,8 +1350,8 @@ const struct language_defn asm_language_defn =
   array_row_major,
   macro_expansion_c,
   &exp_descriptor_c,
-  c_parse,
-  c_error,
+  c_old_parse,
+  c_old_error,
   null_post_parser,
   c_printchar,			/* Print a character constant */
   c_printstr,			/* Function to print string constant */
@@ -1355,8 +1393,8 @@ const struct language_defn minimal_language_defn =
   array_row_major,
   macro_expansion_c,
   &exp_descriptor_c,
-  c_parse,
-  c_error,
+  c_old_parse,
+  c_old_error,
   null_post_parser,
   c_printchar,			/* Print a character constant */
   c_printstr,			/* Function to print string constant */
@@ -1387,6 +1425,7 @@ void
 _initialize_c_language (void)
 {
   add_language (&c_language_defn);
+  add_language (&c_old_language_defn);
   add_language (&cplus_language_defn);
   add_language (&asm_language_defn);
   add_language (&minimal_language_defn);

@@ -56,6 +56,13 @@ enum c_string_type
 
 /* Defined in c-exp.y.  */
 
+extern int c_old_parse (void);
+
+extern void c_old_error (char *);
+
+extern int c_parse_escape (char **, struct obstack *);
+
+/* Defined in cparser.c.  */
 extern int c_parse (void);
 
 extern void c_error (char *);

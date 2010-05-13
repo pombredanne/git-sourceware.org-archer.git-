@@ -67,7 +67,7 @@
 #define	yymaxdepth c_maxdepth
 #define	yyparse	c_parse_internal
 #define	yylex	c_lex
-#define	yyerror	c_error
+#define	yyerror	c_old_error
 #define	yylval	c_lval
 #define	yychar	c_char
 #define	yydebug	c_debug
@@ -1286,7 +1286,7 @@ operator_stoken (const char *op)
   strcpy (st.ptr, operator_string);
   strcat (st.ptr, op);
 
-  /* The toplevel (c_parse) will free the memory allocated here.  */
+  /* The toplevel (c_old_parse) will free the memory allocated here.  */
   make_cleanup (free, st.ptr);
   return st;
 };
@@ -2570,7 +2570,7 @@ yylex (void)
 }
 
 int
-c_parse (void)
+c_old_parse (void)
 {
   int result;
   struct cleanup *back_to = make_cleanup (free_current_contents,
