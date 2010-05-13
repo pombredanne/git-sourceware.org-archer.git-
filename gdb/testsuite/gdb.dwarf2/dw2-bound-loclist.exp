@@ -46,3 +46,6 @@ if ![runto "*main"] {
 
 gdb_test "p a_string" { = "seen"}
 gdb_test "ptype a_string" {type = char \[4\]}
+
+gdb_test "p b_string" { = (0x[0-9a-f]+ )?"seennotseen"}
+gdb_test "ptype b_string" {type = char \[\]}

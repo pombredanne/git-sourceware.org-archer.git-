@@ -383,6 +383,9 @@ dwarf_loclist_baton_eval (struct dwarf2_loclist_baton *dllbaton,
   size_t size;
   struct value *val;
 
+  if (!dllbaton)
+    return 0;
+
   data = find_location_expression (dllbaton, &size,
 				   get_frame_address_in_block (frame));
   if (data == NULL)

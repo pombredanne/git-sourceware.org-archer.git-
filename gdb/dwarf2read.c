@@ -11693,6 +11693,11 @@ dwarf2_attr_to_loclist_baton (struct attribute *attr, struct dwarf2_cu *cu)
 {
   struct dwarf2_loclist_baton *baton;
 
+  /* DW_AT_location of the referenced DIE may be missing if the referenced
+     variable has been optimized out.  */
+  if (!attr)
+    return NULL;
+
   if (!(attr_form_is_section_offset (attr)
 	/* ".debug_loc" may not exist at all, or the offset may be outside
 	   the section.  If so, fall through to the complaint in the
