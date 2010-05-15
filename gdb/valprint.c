@@ -35,6 +35,7 @@
 #include "exceptions.h"
 #include "dfp.h"
 #include "python/python.h"
+#include "dwarf2loc.h"
 
 #include <errno.h>
 
@@ -1109,6 +1110,7 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
 {
   unsigned int things_printed = 0;
   unsigned len;
+  struct type *saved_type = type;
   struct type *elttype, *index_type;
   unsigned eltlen;
   /* Position of the array element we are examining to see
@@ -1117,9 +1119,33 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
   /* Number of repetitions we have detected so far.  */
   unsigned int reps;
   long low_bound_index = 0;
+  struct cleanup *back_to;
+  CORE_ADDR saved_address = address;
+  
+  back_to = make_cleanup (null_cleanup, 0);
+  type = object_address_get_data (type, &address);
+  if (!type)
+    {
+      fputs_filtered (object_address_data_not_valid (type), stream);
+      do_cleanups (back_to);
+      return;
+    }
+  if (address != saved_address)
+    {
+      size_t length = TYPE_LENGTH (type);
 
-  elttype = TYPE_TARGET_TYPE (type);
-  eltlen = TYPE_LENGTH (check_typedef (elttype));
+      valaddr = xmalloc (length);
+      make_cleanup (xfree, (gdb_byte *) valaddr);
+      read_memory (address, (gdb_byte *) valaddr, length);
+    }
+
+  /* Skip typedefs but do not resolve TYPE_DYNAMIC.  */
+  elttype = saved_type;
+  while (TYPE_CODE (elttype) == TYPE_CODE_TYPEDEF)
+    elttype = TYPE_TARGET_TYPE (elttype);
+  elttype = TYPE_TARGET_TYPE (elttype);
+
+  eltlen = TYPE_ARRAY_BYTE_STRIDE_VALUE (type);
   index_type = TYPE_INDEX_TYPE (type);
 
   /* Compute the number of elements in the array.  On most arrays,
@@ -1127,9 +1153,6 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
      is simply the size of the array divided by the size of the elements.
      But for arrays of elements whose size is zero, we need to look at
      the bounds.  */
-  if (eltlen != 0)
-    len = TYPE_LENGTH (type) / eltlen;
-  else
     {
       long low, hi;
       if (get_array_bounds (type, &low, &hi))
@@ -1202,6 +1225,8 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
     {
       fprintf_filtered (stream, "...");
     }
+
+  do_cleanups (back_to);
 }
 
 /* Read LEN bytes of target memory at address MEMADDR, placing the

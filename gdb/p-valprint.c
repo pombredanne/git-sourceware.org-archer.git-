@@ -38,6 +38,7 @@
 #include "p-lang.h"
 #include "cp-abi.h"
 #include "cp-support.h"
+#include "dwarf2loc.h"
 
 
 
@@ -66,8 +67,27 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
   struct type *char_type;
   LONGEST val;
   CORE_ADDR addr;
+  struct cleanup *back_to;
+  struct type *saved_type = type;
+  CORE_ADDR saved_address = address;
+  
+  back_to = make_cleanup (null_cleanup, 0);
+  type = object_address_get_data (type, &address);
+  if (type == NULL)
+    {
+      fputs_filtered (object_address_data_not_valid (saved_type), stream);
+      gdb_flush (stream);
+      do_cleanups (back_to);
+      return 0;
+    }
+  if (address != saved_address)
+    {
+      size_t length = TYPE_LENGTH (type);
 
-  CHECK_TYPEDEF (type);
+      valaddr = xmalloc (length);
+      make_cleanup (xfree, (gdb_byte *) valaddr);
+      read_memory (address, (gdb_byte *) valaddr, length);
+    }
   switch (TYPE_CODE (type))
     {
     case TYPE_CODE_ARRAY:
@@ -122,8 +142,9 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
 		{
 		  i = 0;
 		}
-	      val_print_array_elements (type, valaddr + embedded_offset, address, stream,
-					recurse, options, i);
+	      val_print_array_elements (saved_type, valaddr + embedded_offset,
+					saved_address, stream, recurse, options,
+					i);
 	      fprintf_filtered (stream, "}");
 	    }
 	  break;
@@ -161,6 +182,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
 	      /* Try to print what function it points to.  */
 	      print_address_demangle (gdbarch, addr, stream, demangle);
 	      /* Return value is irrelevant except for string pointers.  */
+	      do_cleanups (back_to);
 	      return (0);
 	    }
 
@@ -248,6 +270,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
 	  /* Return number of characters printed, including the terminating
 	     '\0' if we reached the end.  val_print_string takes care including
 	     the terminating '\0' if necessary.  */
+	  do_cleanups (back_to);
 	  return i;
 	}
       break;
@@ -535,6 +558,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
       error (_("Invalid pascal type code %d in symbol table."), TYPE_CODE (type));
     }
   gdb_flush (stream);
+  do_cleanups (back_to);
   return (0);
 }
 
