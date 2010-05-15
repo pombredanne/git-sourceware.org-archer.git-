@@ -870,15 +870,14 @@ object_address_data_not_valid (struct type *type)
   return NULL;
 }
 
-/* Return non-NULL check_typedef result on TYPE if the variable is valid.  If
-   it is valid the function may store the data address (DW_AT_DATA_LOCATION) of
-   TYPE at *ADDRESS_RETURN.  You must set *ADDRESS_RETURN from
-   value_raw_address (VAL) before calling this function.  If no
-   DW_AT_DATA_LOCATION is present for TYPE the address at *ADDRESS_RETURN is
-   left unchanged.  ADDRESS_RETURN must not be NULL, use
+/* Return non-zero if the variable is valid.  If it is valid the function
+   may store the data address (DW_AT_DATA_LOCATION) of TYPE at *ADDRESS_RETURN.
+   You must set *ADDRESS_RETURN from value_raw_address (VAL) before calling this
+   function.  If no DW_AT_DATA_LOCATION is present for TYPE the address at
+   *ADDRESS_RETURN is left unchanged.  ADDRESS_RETURN must not be NULL, use
    object_address_data_not_valid () for just the data validity check.  */
 
-struct type *
+int
 object_address_get_data (struct type *type, CORE_ADDR *address_return)
 {
   gdb_assert (address_return != NULL);
@@ -893,7 +892,7 @@ object_address_get_data (struct type *type, CORE_ADDR *address_return)
     {
       /* Do not try to evaluate DW_AT_data_location as it may even crash
 	 (it would just return the value zero in the gfortran case).  */
-      return NULL;
+      return 0;
     }
 
   if (TYPE_DATA_LOCATION_IS_ADDR (type))
@@ -902,7 +901,7 @@ object_address_get_data (struct type *type, CORE_ADDR *address_return)
     *address_return
       = dwarf_locexpr_baton_eval (TYPE_DATA_LOCATION_DWARF_BLOCK (type));
 
-  return type;
+  return 1;
 }
 
 /* Helper function for value_at, value_at_lazy, and value_at_lazy_stack.  */

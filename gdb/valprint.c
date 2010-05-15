@@ -35,7 +35,6 @@
 #include "exceptions.h"
 #include "dfp.h"
 #include "python/python.h"
-#include "dwarf2loc.h"
 
 #include <errno.h>
 
@@ -1110,7 +1109,6 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
 {
   unsigned int things_printed = 0;
   unsigned len;
-  struct type *saved_type = type;
   struct type *elttype, *index_type;
   unsigned eltlen;
   /* Position of the array element we are examining to see
@@ -1119,27 +1117,9 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
   /* Number of repetitions we have detected so far.  */
   unsigned int reps;
   long low_bound_index = 0;
-  struct cleanup *back_to;
-  CORE_ADDR saved_address = address;
-  
-  back_to = make_cleanup (null_cleanup, 0);
-  type = object_address_get_data (type, &address);
-  if (!type)
-    {
-      fputs_filtered (object_address_data_not_valid (type), stream);
-      do_cleanups (back_to);
-      return;
-    }
-  if (address != saved_address)
-    valaddr = NULL;
 
-  /* Skip typedefs but do not resolve TYPE_DYNAMIC.  */
-  elttype = saved_type;
-  while (TYPE_CODE (elttype) == TYPE_CODE_TYPEDEF)
-    elttype = TYPE_TARGET_TYPE (elttype);
-  elttype = TYPE_TARGET_TYPE (elttype);
-
-  eltlen = TYPE_ARRAY_BYTE_STRIDE_VALUE (type);
+  elttype = TYPE_TARGET_TYPE (type);
+  eltlen = TYPE_LENGTH (check_typedef (elttype));
   index_type = TYPE_INDEX_TYPE (type);
 
   /* Compute the number of elements in the array.  On most arrays,
@@ -1147,6 +1127,9 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
      is simply the size of the array divided by the size of the elements.
      But for arrays of elements whose size is zero, we need to look at
      the bounds.  */
+  if (eltlen != 0)
+    len = TYPE_LENGTH (type) / eltlen;
+  else
     {
       long low, hi;
       if (get_array_bounds (type, &low, &hi))
@@ -1188,29 +1171,17 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
 
       rep1 = i + 1;
       reps = 1;
-      while (valaddr && (rep1 < len) &&
+      while ((rep1 < len) &&
 	     !memcmp (valaddr + i * eltlen, valaddr + rep1 * eltlen, eltlen))
 	{
 	  ++reps;
 	  ++rep1;
 	}
 
-      if (valaddr)
-	val_print (elttype, valaddr + i * eltlen, 0, address + i * eltlen,
-		   stream, recurse + 1, options, current_language);
-      else
-	{
-	  char *mem = xmalloc (eltlen);
-	  struct cleanup *back_to = make_cleanup (xfree, mem);
-
-	  read_memory (address + i * eltlen, mem, eltlen);
-	  val_print (elttype, mem, 0, address + i * eltlen, stream, recurse + 1,
-		     options, current_language);
-	  do_cleanups (back_to);
-	}
-
       if (reps > options->repeat_count_threshold)
 	{
+	  val_print (elttype, valaddr + i * eltlen, 0, address + i * eltlen,
+		     stream, recurse + 1, options, current_language);
 	  annotate_elt_rep (reps);
 	  fprintf_filtered (stream, " <repeats %u times>", reps);
 	  annotate_elt_rep_end ();
@@ -1220,6 +1191,8 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
 	}
       else
 	{
+	  val_print (elttype, valaddr + i * eltlen, 0, address + i * eltlen,
+		     stream, recurse + 1, options, current_language);
 	  annotate_elt ();
 	  things_printed++;
 	}
@@ -1229,8 +1202,6 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
     {
       fprintf_filtered (stream, "...");
     }
-
-  do_cleanups (back_to);
 }
 
 /* Read LEN bytes of target memory at address MEMADDR, placing the
