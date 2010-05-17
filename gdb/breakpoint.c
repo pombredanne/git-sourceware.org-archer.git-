@@ -4151,6 +4151,8 @@ bpstat_stop_status (struct address_space *aspace,
   return root_bs->next;
 }
 
+/* Return BPTYPE text representation for the purpose of debug messages.  */
+
 static const char *
 breakpoint_type_name (enum bptype bptype)
 {

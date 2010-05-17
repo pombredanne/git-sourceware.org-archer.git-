@@ -4982,6 +4982,11 @@ insert_longjmp_resume_breakpoint (struct gdbarch *gdbarch, CORE_ADDR pc)
      longjmp_resume_breakpoint when one is already active.  */
   gdb_assert (inferior_thread ()->step_resume_breakpoint == NULL);
 
+  if (debug_infrun)
+    fprintf_unfiltered (gdb_stdlog,
+			"infrun: inserting longjmp-resume breakpoint at %s\n",
+			paddress (gdbarch, pc));
+
   inferior_thread ()->step_resume_breakpoint =
     set_momentary_breakpoint_at_pc (gdbarch, pc, bp_longjmp_resume);
 }
