@@ -1420,18 +1420,6 @@ set_schedlock_func (char *args, int from_tty, struct cmd_list_element *c)
     }
 }
 
-/* reset_schedlock -- public */
- 
-void
-reset_schedlock ()
-{
-  if (scheduler_mode == schedlock_on)
-    {
-      warning ("Resetting scheduler-lock mode to 'off'");
-      scheduler_mode = schedlock_off;
-    }
-}
-
 /* True if execution commands resume all threads of all processes by
    default; otherwise, resume only threads of the current inferior
    process.  */
