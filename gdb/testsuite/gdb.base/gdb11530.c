@@ -1,7 +1,8 @@
-/* Main function for CLI gdb.  
-   Copyright (C) 2002, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
+/* This testcase is part of GDB, the GNU debugger.
 
-   This file is part of GDB.
+   Copyright 2010 Free Software Foundation, Inc.
+
+   Contributed by Pierre Muller.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -14,22 +15,21 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#include "defs.h"
-#include "main.h"
-#include "gdb_string.h"
-#include "interps.h"
+   Test for problem related to unnamed unions.  */
+
+struct a
+  {
+    union
+      {
+        int i;
+      };
+  } a;
 
 int
-main (int argc, char **argv)
+main (void)
 {
-  struct captured_main_args args;
-
-  memset (&args, 0, sizeof args);
-  args.argc = argc;
-  args.argv = argv;
-  args.use_windows = 0;
-  args.interpreter_p = INTERP_CONSOLE;
-  return gdb_main (&args);
+  return sizeof (a.i);
 }
+

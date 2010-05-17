@@ -1,3 +1,228 @@
+2010-05-16  Michael Snyder  <msnyder@vmware.com>
+
+	* scm-exp.c: White space.
+	* scm-lang.c: White space.
+	* scm-valprint.c: White space.
+	* sentinel-frame.c: White space.
+	* ser-base.c: White space.
+	* ser-go32.c: White space.
+	* serial.c: White space.
+	* ser-mingw.c: White space.
+	* ser-pipe.c: White space.
+	* ser-tcp.c: White space.
+	* ser-unix.c: White space.
+	* solib.c: White space.
+	* solib-darwin.c: White space.
+	* solib-frv.c: White space.
+	* solib-irix.c: White space.
+	* solib-osf.c: White space.
+	* solib-pa64.c: White space.
+	* solib-som.c: White space.
+	* solib-spu.c: White space.
+	* solib-svr4.c: White space.
+	* solib-target.c: White space.
+	* source.c: White space.
+	* stabsread.c: White space.
+	* stack.c: White space.
+	* std-regs.c: White space.
+	* symfile.c: White space.
+	* symmisc.c: White space.
+	* symtab.c: White space.
+
+2010-05-16  Michael Snyder  <msnyder@vmware.com>
+
+	* source.c (_initialize_source): Add "rev" as an abbreviation
+	for the "reverse-search" command.
+
+2010-05-16  Michael Snyder  <msnyder@vmware.com>
+
+	* record.c: White space.
+	* regcache.c: White space.
+	* reggroups.c: White space.
+	* remote-fileio.c: White space.
+	* remote-m32r-sdi.c: White space.
+	* remote-mips.c: White space.
+	* remote-sim.c: White space.
+	* remote.c: White space.
+	(process_g_packet): Remove orphan braces.
+
+2010-05-15  Michael Snyder  <msnyder@vmware.com>
+
+	* parse.c: White space.
+	* p-lang.c: White space.
+	* posix-hdep.c: White space.
+	* printcmd.c: White space.
+	* progspace.c: White space.
+	* prologue-value.c: White space.
+	* psymtab.c: White space.
+	* p-typeprint.c: White space.
+	* p-valprint.c: White space.
+
+	* objc-lang.c: White space.
+	* objfiles.c: White space.
+	* observer.c: White space.
+	* osabi.c: White space.
+	* osdata.c: White space.
+
+	* m2-lang.c: White space.
+	* m2-valprint.c: White space.
+	* macrocmd.c: White space.
+	* macroexp.c: White space.
+	* macroscope.c: White space.
+	* macrotab.c: White space.
+	* main.c: White space.
+	* maint.c: White space.
+	* mdebugread.c: White space.
+	* memattr.c: White space.
+	* minsyms.c: White space.
+	* monitor.c: White space.
+
+2010-05-14  Michael Snyder  <msnyder@vmware.com>
+
+	* jv-lang.c: White space.
+	* jv-typeprint.c: White space.
+	* jv-valprint.c: White space.
+	* language.c: White space.
+	* libunwind-frame.c: White space.
+	* linespec.c: White space.
+	* linux-nat.c: White space.
+	* linux-record.c: White space.
+	* linux-thread-db.c: White space.
+
+	* infcall.c: White space.
+	* inf-child.c: White space.
+	* infcmd.c: White space.
+	* inferior.c: White space.
+	* inf-loop.c: White space.
+	* inflow.c: White space.
+	* inline-frame.c: White space.
+	* interps.c: White space.
+
+	* gcore.c: White space.
+	* gdb.c: White space.
+	* gdbtypes.c: White space.
+	* gnu-nat.c: White space.
+	* gnu-v2-abi.c: White space.
+	* gnu-v3-abi.c: White space.
+
+	* findcmd.c: White space.
+	* findvar.c: White space.
+	* fork-child.c: White space.
+	* frame-base.c: White space.
+	* frame.c: White space.
+	* frame-unwind.c: White space.
+	* f-valprint.c: White space.
+
+	* elfread.c: White space.
+	* environ.c: White space.
+	* eval.c: White space.
+	* event-loop.c: White space.
+	* event-top.c: White space.
+	* exceptions.c: White space.
+	* exec.c: White space.
+	* expprint.c: White space.
+
+	* dbxread.c: White space.
+	* dcache.c: White space.
+	* disasm.c: White space.
+	* doublest.c: White space.
+	* dsrec.c: White space.
+	* dummy-frame.c: White space.
+	* dwarf2expr.c: White space.
+	* dwarf2-frame.c: White space.
+	* dwarf2loc.c: White space.
+	* dwarf2read.c: White space.
+
+2010-05-14  Phil Muldoon  <pmuldoon@redhat.com>
+
+ 	PR python/11482
+
+	* python/py-value.c (valpy_hash): New function.
+	(value_object_type): Register valpy_hash.
+
+2010-05-14  Hui Zhu  <teawater@gmail.com>
+            Michael Snyder  <msnyder@vmware.com>
+
+	* linux-fork.c (gdbthread.h): New include.
+	(fork_info): Add parent_ptid.
+	(inferior_call_waitpid_cleanup, inferior_call_waitpid): New
+	functions.
+	(delete_checkpoint_command): Call inferior_call_waitpid.
+	(checkpoint_command): Set parent_ptid.
+
+2010-05-13  Michael Snyder  <msnyder@vmware.com>
+
+	* dictionary.c: Re-indent to GNU coding standard.
+
+	* charset.c: White space.
+	* c-lang.c: White space.
+	* cli-out.c: White space.
+	* coffread.c: White space.
+	* complaints.c: White space.
+	* completer.c: White space.
+	* corefile.c: White space.
+	* corelow.c: White space.
+	* cp-abi.c: White space.
+	* cp-namespace.c: White space.
+	* cp-support.c: White space.
+	* cp-valprint.c: White space.
+	* c-typeprint.c: White space.
+	* c-valprint.c: White space.
+	* blockframe.c: White space.
+	* breakpoint.c: White space.
+	* buildsym.c: White space.
+	* blockframe.c: White space.
+	* bcache.c: White space.
+	* gdbarch.sh: White space, add blank lines.
+	* arch-utils.c: Ditto.
+	* gdbarch.c: Regenerate.
+	* frame.c: White space, add blank lines.
+	* stack.c: White space, add blank lines.
+	(initialize_stack): Remove long-dead code.
+
+2010-05-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* dwarf2loc.c (dwarf2_evaluate_loc_desc): Change the parameter to type.
+	(locexpr_read_variable, loclist_read_variable): Update the callers.
+
+2010-05-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* dwarf2read.c (die_type, die_descriptive_type): Remove variable type.
+	Remove check of NULL returned by tag_type_to_type.
+	(die_containing_type): Remove variable type.  Remove type_die variable
+	initialization.  Remove check of NULL returned by tag_type_to_type.
+
+2010-05-11  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	PR exp/11530.
+	* gdbtypes.c (lookup_struct_elt_type): Also lookup
+	names of unnamed structures or unions.
+
+2010-05-11  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* procfs.c (proc_watchpoint_address): New function.
+	(procfs_stopped_by_watchpoint): Remove useless check after 
+	find_procinfo_or_die call.
+	(procfs_stopped_data_address): New function.
+	(procfs_use_watchpoints): Register new watchpoint related function.
+
+2010-05-11  Tom Tromey  <tromey@redhat.com>
+
+	* eval.c (evaluate_subexp_standard): Revert inadvertent change.
+
+2010-05-10  Michael Snyder  <msnyder@vmware.com>
+
+	* utils.c: White space cleanup.
+
+2010-05-10  Tom Tromey  <tromey@redhat.com>
+
+	* eval.c (ptrmath_type_p): Add 'lang' argument.
+	(evaluate_subexp_standard): Update.
+	(evaluate_subexp_with_coercion): Update.
+	* language.h (CAST_IS_CONVERSION): Add 'LANG' argument.
+
 2010-05-10  Michael Snyder  <msnyder@vmware.com>
 
 	* utils.c (do_fclose_cleanup) Restore local variable.

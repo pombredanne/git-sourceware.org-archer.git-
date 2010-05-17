@@ -192,6 +192,7 @@ dwarf_expr_frame_base_1 (struct symbol *framefunc, CORE_ADDR pc,
   else
     {
       struct dwarf2_locexpr_baton *symbaton;
+
       symbaton = SYMBOL_LOCATION_BATON (framefunc);
       if (symbaton != NULL)
 	{
@@ -214,6 +215,7 @@ static CORE_ADDR
 dwarf_expr_frame_cfa (void *baton)
 {
   struct dwarf_expr_baton *debaton = (struct dwarf_expr_baton *) baton;
+
   return dwarf2_frame_cfa (debaton->frame);
 }
 
@@ -270,6 +272,7 @@ read_pieced_value (struct value *v)
   for (i = 0; i < c->n_pieces; i++)
     {
       struct dwarf_expr_piece *p = &c->pieces[i];
+
       switch (p->location)
 	{
 	case DWARF_VALUE_REGISTER:
@@ -308,6 +311,7 @@ read_pieced_value (struct value *v)
 	  {
 	    struct gdbarch *gdbarch = get_type_arch (value_type (v));
 	    size_t n = p->size;
+
 	    if (n > c->addr_size)
 	      n = c->addr_size;
 	    store_unsigned_integer (contents + offset, n,
@@ -319,6 +323,7 @@ read_pieced_value (struct value *v)
 	case DWARF_VALUE_LITERAL:
 	  {
 	    size_t n = p->size;
+
 	    if (n > p->v.literal.length)
 	      n = p->v.literal.length;
 	    memcpy (contents + offset, p->v.literal.data, n);
@@ -351,6 +356,7 @@ write_pieced_value (struct value *to, struct value *from)
   for (i = 0; i < c->n_pieces; i++)
     {
       struct dwarf_expr_piece *p = &c->pieces[i];
+
       switch (p->location)
 	{
 	case DWARF_VALUE_REGISTER:
@@ -413,10 +419,11 @@ static struct lval_funcs pieced_value_funcs = {
 };
 
 /* Evaluate a location description, starting at DATA and with length
-   SIZE, to find the current location of variable VAR in the context
+   SIZE, to find the current location of variable of TYPE in the context
    of FRAME.  */
+
 static struct value *
-dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
+dwarf2_evaluate_loc_desc (struct type *type, struct frame_info *frame,
 			  gdb_byte *data, unsigned short size,
 			  struct dwarf2_per_cu_data *per_cu)
 {
@@ -427,7 +434,7 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
 
   if (size == 0)
     {
-      retval = allocate_value (SYMBOL_TYPE (var));
+      retval = allocate_value (type);
       VALUE_LVAL (retval) = not_lval;
       set_value_optimized_out (retval, 1);
       return retval;
@@ -456,9 +463,7 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
 
       c = allocate_piece_closure (ctx->num_pieces, ctx->pieces,
 				  ctx->addr_size);
-      retval = allocate_computed_value (SYMBOL_TYPE (var),
-					&pieced_value_funcs,
-					c);
+      retval = allocate_computed_value (type, &pieced_value_funcs, c);
       VALUE_FRAME_ID (retval) = frame_id;
     }
   else
@@ -470,16 +475,12 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
 	    struct gdbarch *arch = get_frame_arch (frame);
 	    CORE_ADDR dwarf_regnum = dwarf_expr_fetch (ctx, 0);
 	    int gdb_regnum = gdbarch_dwarf2_reg_to_regnum (arch, dwarf_regnum);
+
 	    if (gdb_regnum != -1)
-	      {
-		retval = value_from_register (SYMBOL_TYPE (var),
-					      gdb_regnum, frame);
-	      }
+	      retval = value_from_register (type, gdb_regnum, frame);
 	    else
-	      {
-		error (_("Unable to access DWARF register number %s"),
-		       paddress (arch, dwarf_regnum));
-	      }
+	      error (_("Unable to access DWARF register number %s"),
+		     paddress (arch, dwarf_regnum));
 	  }
 	  break;
 
@@ -488,7 +489,7 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
 	    CORE_ADDR address = dwarf_expr_fetch (ctx, 0);
 	    int in_stack_memory = dwarf_expr_fetch_in_stack_memory (ctx, 0);
 
-	    retval = allocate_value (SYMBOL_TYPE (var));
+	    retval = allocate_value (type);
 	    VALUE_LVAL (retval) = lval_memory;
 	    set_value_lazy (retval, 1);
 	    if (in_stack_memory)
@@ -503,10 +504,10 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
 	    bfd_byte *contents;
 	    size_t n = ctx->addr_size;
 
-	    retval = allocate_value (SYMBOL_TYPE (var));
+	    retval = allocate_value (type);
 	    contents = value_contents_raw (retval);
-	    if (n > TYPE_LENGTH (SYMBOL_TYPE (var)))
-	      n = TYPE_LENGTH (SYMBOL_TYPE (var));
+	    if (n > TYPE_LENGTH (type))
+	      n = TYPE_LENGTH (type);
 	    store_unsigned_integer (contents, n,
 				    gdbarch_byte_order (ctx->gdbarch),
 				    value);
@@ -518,10 +519,10 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
 	    bfd_byte *contents;
 	    size_t n = ctx->len;
 
-	    retval = allocate_value (SYMBOL_TYPE (var));
+	    retval = allocate_value (type);
 	    contents = value_contents_raw (retval);
-	    if (n > TYPE_LENGTH (SYMBOL_TYPE (var)))
-	      n = TYPE_LENGTH (SYMBOL_TYPE (var));
+	    if (n > TYPE_LENGTH (type))
+	      n = TYPE_LENGTH (type);
 	    memcpy (contents, ctx->data, n);
 	  }
 	  break;
@@ -550,6 +551,7 @@ static CORE_ADDR
 needs_frame_read_reg (void *baton, int regnum)
 {
   struct needs_frame_baton *nf_baton = baton;
+
   nf_baton->needs_frame = 1;
   return 1;
 }
@@ -580,6 +582,7 @@ static CORE_ADDR
 needs_frame_frame_cfa (void *baton)
 {
   struct needs_frame_baton *nf_baton = baton;
+
   nf_baton->needs_frame = 1;
   return 1;
 }
@@ -589,6 +592,7 @@ static CORE_ADDR
 needs_frame_tls_address (void *baton, CORE_ADDR offset)
 {
   struct needs_frame_baton *nf_baton = baton;
+
   nf_baton->needs_frame = 1;
   return 1;
 }
@@ -677,6 +681,7 @@ dwarf2_tracepoint_var_loc (struct symbol *symbol,
   else if (data[0] == DW_OP_regx)
     {
       ULONGEST reg;
+
       data = read_uleb128 (data + 1, end, &reg);
       loc->kind = axs_lvalue_register;
       loc->reg = gdbarch_dwarf2_reg_to_regnum (gdbarch, reg);
@@ -908,8 +913,9 @@ locexpr_read_variable (struct symbol *symbol, struct frame_info *frame)
 {
   struct dwarf2_locexpr_baton *dlbaton = SYMBOL_LOCATION_BATON (symbol);
   struct value *val;
-  val = dwarf2_evaluate_loc_desc (symbol, frame, dlbaton->data, dlbaton->size,
-				  dlbaton->per_cu);
+
+  val = dwarf2_evaluate_loc_desc (SYMBOL_TYPE (symbol), frame, dlbaton->data,
+				  dlbaton->size, dlbaton->per_cu);
 
   return val;
 }
@@ -919,6 +925,7 @@ static int
 locexpr_read_needs_frame (struct symbol *symbol)
 {
   struct dwarf2_locexpr_baton *dlbaton = SYMBOL_LOCATION_BATON (symbol);
+
   return dwarf2_loc_desc_needs_frame (dlbaton->data, dlbaton->size,
 				      dlbaton->per_cu);
 }
@@ -1043,6 +1050,7 @@ locexpr_describe_location_piece (struct symbol *symbol, struct ui_file *stream,
 					      data + 1,
 					      data + size - 1,
 					      addr_size);
+
       fprintf_filtered (stream, 
 			_("a thread-local variable at offset %s "
 			  "in the thread-local storage for `%s'"),
@@ -1166,7 +1174,7 @@ loclist_read_variable (struct symbol *symbol, struct frame_info *frame)
       set_value_optimized_out (val, 1);
     }
   else
-    val = dwarf2_evaluate_loc_desc (symbol, frame, data, size,
+    val = dwarf2_evaluate_loc_desc (SYMBOL_TYPE (symbol), frame, data, size,
 				    dlbaton->per_cu);
 
   return val;
