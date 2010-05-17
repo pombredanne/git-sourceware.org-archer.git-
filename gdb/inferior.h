@@ -232,9 +232,14 @@ extern char *construct_inferior_arguments (int, char **);
 
 /* From infrun.c */
 
+extern int stop_on_solib_events;
+
 extern void start_remote (int from_tty);
 
 extern void normal_stop (void);
+
+extern void bpstat_what_debug (struct bpstat_what what, const char *event,
+			       int print_defaults);
 
 extern int signal_stop_state (int);
 

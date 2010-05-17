@@ -560,7 +560,55 @@ extern bpstat bpstat_copy (bpstat);
 
 extern bpstat bpstat_stop_status (struct address_space *aspace,
 				  CORE_ADDR pc, ptid_t ptid);
-
+
+/* This bpstat_what stuff tells wait_for_inferior what to do with a
+   breakpoint (a challenging task).  */
+
+struct bpstat_what
+  {
+    enum print_frame
+      {
+	/* pf_default is pf_yes.  */
+	pf_default,
+	/* stop_print_frame value 0.  */
+	pf_no,
+	/* stop_print_frame value 1.  */
+	pf_yes,
+      }
+    print_frame;
+    enum stop_step
+      {
+	/* ss_default is ss_print_yes.  */
+	ss_default,
+	/* ecs->event_thread->stop_step value 1.  */
+	ss_print_no,
+	/* ecs->event_thread->stop_step value 0.  */
+	ss_print_yes,
+      }
+    stop_step;
+    enum perform
+      {
+	pe_undef,
+	/* Break from this block and check other possibilities why to stop.  */
+	pe_check_more,
+	pe_default = pe_check_more,
+	/* Call stop_stepping (ecs).  */
+	pe_stop,
+	/* Like pe_stop but also print_stop_reason (END_STEPPING_RANGE, 0).  */
+	pe_stop_end_range,
+	/* Call keep_going (ecs) and return without breaking from this block
+	   and checking other possibilities why to stop.  Some operations need
+	   to finish before an already stepped on breakpoint is displayed to
+	   the user.  */
+	pe_going,
+      }
+    perform;
+    unsigned stepping_over_breakpoint : 1;
+    unsigned bp_longjmp : 1;
+    unsigned bp_longjmp_resume : 1;
+    unsigned bp_step_resume_on_stop : 1;
+  };
+
 /* An enum indicating the kind of "stack dummy" stop.  This is a bit
    of a misnomer because only one kind of truly a stack dummy.  */
 enum stop_stack_kind
@@ -587,6 +635,9 @@ enum print_stop_action
     PRINT_UNKNOWN
   };
 
+/* Tell what to do about this list of bpstats.  */
+struct bpstat_what bpstat_what (bpstat);
+
 /* Find the bpstat associated with a breakpoint.  NULL otherwise. */
 bpstat bpstat_find_breakpoint (bpstat, struct breakpoint *);
 
@@ -983,7 +1034,5 @@ extern void check_tracepoint_command (char *line, void *closure);
    breakpoint numbers for a later "commands" command.  */
 extern void start_rbreak_breakpoints (void);
 extern void end_rbreak_breakpoints (void);
-
-extern const char *breakpoint_type_name (enum bptype bptype);
 
 #endif /* !defined (BREAKPOINT_H) */

@@ -215,7 +215,7 @@ static struct symbol *step_start_function;
 
 /* Nonzero if we want to give control to the user when we're notified
    of shared library events by the dynamic linker.  */
-static int stop_on_solib_events;
+int stop_on_solib_events;
 static void
 show_stop_on_solib_events (struct ui_file *file, int from_tty,
 			   struct cmd_list_element *c, const char *value)
@@ -2859,6 +2859,45 @@ handle_syscall_event (struct execution_control_state *ecs)
   return 1;
 }
 
+/* Print debug information about WHAT on DEBUG_INFRUN.  EVENT contains string
+   describing what WHAT is for.  PRINT_DEFAULTS will force printing event the
+   WHAT fields which contain an unchanged default value.  */
+
+void
+bpstat_what_debug (struct bpstat_what what, const char *event,
+		   int print_defaults)
+{
+  if (! debug_infrun)
+    return;
+
+  if (print_defaults || what.print_frame != pf_default)
+    fprintf_unfiltered (gdb_stdlog, _("infrun: %s: print_frame %s\n"), event,
+			what.print_frame == pf_default
+			  ? "pf_default (pf_yes)"
+			  : what.print_frame == pf_no ? "pf_no" : "pf_yes");
+
+  if (print_defaults || what.stop_step != ss_default)
+    fprintf_unfiltered (gdb_stdlog, _("infrun: %s: stop_step %s\n"), event,
+			what.stop_step == ss_default
+			  ? "ss_default (ss_print_yes (stop_step 0))"
+			  : what.stop_step == ss_print_no
+			    ? "ss_print_no (stop_step 1)"
+			    : "ss_print_yes (stop_step 0)");
+
+  gdb_assert (what.perform != pe_undef);
+  fprintf_unfiltered (gdb_stdlog, _("infrun: %s: perform %s\n"), event,
+		      what.perform == pe_check_more
+			? "pe_check_more"
+			: what.perform == pe_stop
+			  ? "pe_stop" : what.perform == pe_stop_end_range
+					? "pe_stop_end_range" : "pe_going");
+
+  if (print_defaults || what.stepping_over_breakpoint)
+    fprintf_unfiltered (gdb_stdlog,
+			_("infrun: %s: stepping_over_breakpoint %s\n"), event,
+			what.stepping_over_breakpoint ? "yes" : "no");
+}
+
 /* Given an execution control state that has been freshly filled in
    by an event from the inferior, figure out what it means and take
    appropriate action.  */
@@ -3972,334 +4011,81 @@ process_event_stop_test:
   frame = NULL;
   gdbarch = NULL;
 
-  /* Handle cases caused by hitting a breakpoint.  */
   {
-    bpstat bs;
-    enum print_frame
-      {
-	/* pf_default is pf_yes.  */
-	pf_default,
-	/* stop_print_frame value 0.  */
-	pf_no,
-	/* stop_print_frame value 1.  */
-	pf_yes,
-      }
-    print_frame_max = pf_default;
-    enum stop_step
-      {
-	/* ss_default is ss_print_yes.  */
-        ss_default,
-	/* ecs->event_thread->stop_step value 1.  */
-	ss_print_no,
-	/* ecs->event_thread->stop_step value 0.  */
-	ss_print_yes,
-      }
-    stop_step_max = ss_default;
-    enum perform
-      {
-        pe_undef,
-	/* Break from this block and check other possibilities why to stop.  */
-	pe_check_more,
-	/* Call stop_stepping (ecs).  */
-	pe_stop,
-	/* Like pe_stop but also print_stop_reason (END_STEPPING_RANGE, 0).  */
-	pe_stop_end_range,
-	/* Call keep_going (ecs) and return without breaking from this block
-	   and checking other possibilities why to stop.  Some operations need
-	   to finish before an already stepped on breakpoint is displayed to
-	   the user.  */
-	pe_going,
-      }
-    perform_max = pe_check_more;
-    /* solib_add may call breakpoint_re_set which would clear many
-       BREAKPOINT_AT entries still going to be processed.  breakpoint_re_set
-       does not keep the same bp_location's even if they actually do not
-       change.  */
-    int perform_shlib = 0;
+    struct bpstat_what what;
 
-    for (bs = ecs->event_thread->stop_bpstat; bs != NULL; bs = bs->next)
-      {
-	/* Decisions for this specific BS, they get mapped to their *_max
-	   variants at the end of this BS processing.  */
-	enum print_frame print_frame = pf_default;
-	enum stop_step stop_step = ss_default;
-	enum perform perform = pe_undef;
-	enum bptype bptype;
+    what = bpstat_what (ecs->event_thread->stop_bpstat);
 
-	if (bs->breakpoint_at == NULL)
+    if (what.bp_longjmp)
+      {
+	struct frame_info *frame = get_current_frame ();
+	struct gdbarch *gdbarch = get_frame_arch (frame);
+
+	/* If we hit the breakpoint at longjmp while stepping, we
+	   install a momentary breakpoint at the target of the
+	   jmp_buf.  */
+
+	CORE_ADDR jmp_buf_pc;
+	if (gdbarch_get_longjmp_target_p (gdbarch)
+	    && gdbarch_get_longjmp_target (gdbarch, frame, &jmp_buf_pc))
 	  {
-	    /* I suspect this can happen if it was a momentary breakpoint
-	       which has since been deleted.  */
-	    bptype = bp_none;
+	    /* We're going to replace the current step-resume breakpoint
+	       with a longjmp-resume breakpoint.  */
+	    delete_step_resume_breakpoint (ecs->event_thread);
+
+	    /* Insert a breakpoint at resume address.  */
+	    insert_longjmp_resume_breakpoint (gdbarch, jmp_buf_pc);
 	  }
-	else if (bs->breakpoint_at->owner == NULL)
+      }
+
+    if (what.bp_longjmp_resume)
+      {
+	gdb_assert (ecs->event_thread->step_resume_breakpoint != NULL);
+	delete_step_resume_breakpoint (ecs->event_thread);
+      }
+
+    if (what.bp_step_resume_on_stop)
+      {
+	delete_step_resume_breakpoint (ecs->event_thread);
+	if (ecs->event_thread->step_after_step_resume_breakpoint)
 	  {
-	    ecs->event_thread->stepping_over_breakpoint = 1;
-	    bptype = bp_none;
+	    /* Back when the step-resume breakpoint was inserted, we
+	       were trying to single-step off a breakpoint.  Go back
+	       to doing that.  pe_going must override pe_check_more so
+	       that we do not stop again on that breakpoint.  */
+	    ecs->event_thread->step_after_step_resume_breakpoint = 0;
+	    what.stepping_over_breakpoint = 1;
+	    gdb_assert (pe_check_more < pe_going);
+	    if (what.perform < pe_going)
+	      what.perform = pe_going;
+	  }
+	else if (stop_pc == ecs->stop_func_start
+		 && execution_direction == EXEC_REVERSE)
+	  {
+	    /* We are stepping over a function call in reverse, and
+	       just hit the step-resume breakpoint at the start
+	       address of the function.  Go back to single-stepping,
+	       which should take us back to the function call.  */
+	    what.stepping_over_breakpoint = 1;
+	    gdb_assert (pe_check_more < pe_going);
+	    if (what.perform < pe_going)
+	      what.perform = pe_going;
 	  }
 	else
-	  bptype = bs->breakpoint_at->owner->type;
-
-        if (debug_infrun)
-	  fprintf_unfiltered (gdb_stdlog, "infrun: %s\n",
-			      breakpoint_type_name (bptype));
-
-	switch (bptype)
 	  {
-	  case bp_none:
-	    perform = pe_check_more;
-	    break;
-	  case bp_breakpoint:
-	  case bp_hardware_breakpoint:
-	  case bp_until:
-	  case bp_finish:
-	    if (bs->stop)
-	      {
-		print_frame = bs->print ? pf_yes : pf_no;
-		perform = pe_stop;
-	      }
-	    else
-	      {
-		ecs->event_thread->stepping_over_breakpoint = 1;
-		perform = pe_check_more;
-	      }
-	    break;
-	  case bp_watchpoint:
-	  case bp_hardware_watchpoint:
-	  case bp_read_watchpoint:
-	  case bp_access_watchpoint:
-	  case bp_catchpoint:
-	    if (bs->stop)
-	      {
-		print_frame = bs->print ? pf_yes : pf_no;
-		perform = pe_stop;
-	      }
-	    else
-	      {
-		/* There was a watchpoint or catchpoint, but we're not
-		   stopping.  This requires no further action.  */
-		perform = pe_check_more;
-	      }
-	    break;
-	  case bp_longjmp:
-	    {
-	      struct frame_info *frame = get_current_frame ();
-	      struct gdbarch *gdbarch = get_frame_arch (frame);
-
-	      /* If we hit the breakpoint at longjmp while stepping, we
-		 install a momentary breakpoint at the target of the
-		 jmp_buf.  */
-
-	      CORE_ADDR jmp_buf_pc;
-	      if (gdbarch_get_longjmp_target_p (gdbarch)
-		  && gdbarch_get_longjmp_target (gdbarch, frame, &jmp_buf_pc))
-		{
-		  /* We're going to replace the current step-resume breakpoint
-		     with a longjmp-resume breakpoint.  */
-		  delete_step_resume_breakpoint (ecs->event_thread);
-
-		  /* Insert a breakpoint at resume address.  */
-		  insert_longjmp_resume_breakpoint (gdbarch, jmp_buf_pc);
-		}
-
-	      ecs->event_thread->stepping_over_breakpoint = 1;
-	      perform = pe_going;
-	    }
-	    break;
-	  case bp_longjmp_resume:
-	    gdb_assert (ecs->event_thread->step_resume_breakpoint != NULL);
-	    delete_step_resume_breakpoint (ecs->event_thread);
-	    stop_step = ss_print_no;
-	    perform = pe_stop_end_range;
-	    break;
-	  case bp_step_resume:
-	    if (bs->stop)
-	      {
-		delete_step_resume_breakpoint (ecs->event_thread);
-		if (ecs->event_thread->step_after_step_resume_breakpoint)
-		  {
-		    /* Back when the step-resume breakpoint was inserted, we
-		       were trying to single-step off a breakpoint.  Go back
-		       to doing that.  pe_going must override pe_check_more so
-		       that we do not stop again on that breakpoint.  */
-		    ecs->event_thread->step_after_step_resume_breakpoint = 0;
-		    ecs->event_thread->stepping_over_breakpoint = 1;
-		    perform = pe_going;
-		  }
-		else if (stop_pc == ecs->stop_func_start
-			 && execution_direction == EXEC_REVERSE)
-		  {
-		    /* We are stepping over a function call in reverse, and
-		       just hit the step-resume breakpoint at the start
-		       address of the function.  Go back to single-stepping,
-		       which should take us back to the function call.  */
-		    ecs->event_thread->stepping_over_breakpoint = 1;
-		    perform = pe_going;
-		  }
-		else
-		  perform = pe_check_more;
-	      }
-	    else
-	      {
-		/* It is for the wrong frame.  */
-		ecs->event_thread->stepping_over_breakpoint = 1;
-		perform = pe_check_more;
-	      }
-	    break;
-	  case bp_watchpoint_scope:
-	  case bp_thread_event:
-	  case bp_overlay_event:
-	  case bp_longjmp_master:
-	  case bp_std_terminate_master:
-	    ecs->event_thread->stepping_over_breakpoint = 1;
-	    perform = pe_check_more;
-	    break;
-	  case bp_shlib_event:
-	    perform_shlib = 1;
-
-	    /* If requested, stop when the dynamic linker notifies
-	       gdb of events.  This allows the user to get control
-	       and place breakpoints in initializer routines for
-	       dynamically loaded objects (among other things).  */
-	    if (stop_on_solib_events || stop_stack_dummy)
-	      perform = pe_stop;
-	    else
-	      {
-		/* We want to step over this breakpoint, then keep going.  */
-		ecs->event_thread->stepping_over_breakpoint = 1;
-		perform = pe_check_more;
-	      }
-	    break;
-	  case bp_jit_event:
-	    /* Switch terminal for any messages produced by breakpoint_re_set.  */
-	    target_terminal_ours_for_output ();
-
-	    {
-	      struct frame_info *frame = get_current_frame ();
-	      struct gdbarch *gdbarch = get_frame_arch (frame);
-
-	      jit_event_handler (gdbarch);
-	    }
-
-	    target_terminal_inferior ();
-
-	    /* We want to step over this breakpoint, then keep going.  */
-	    ecs->event_thread->stepping_over_breakpoint = 1;
-	    perform = pe_check_more;
-	    break;
-	  case bp_call_dummy:
-	    /* Make sure the action is stop (silent or noisy),
-	       so infrun.c pops the dummy frame.  */
-	    stop_stack_dummy = STOP_STACK_DUMMY;
-	    print_frame = pf_no;
-	    perform = pe_stop;
-	    break;
-	  case bp_std_terminate:
-	    /* Make sure the action is stop (silent or noisy),
-	       so infrun.c pops the dummy frame.  */
-	    stop_stack_dummy = STOP_STD_TERMINATE;
-	    print_frame = pf_no;
-	    perform = pe_stop;
-	    break;
-	  case bp_tracepoint:
-	  case bp_fast_tracepoint:
-	    /* Tracepoint hits should not be reported back to GDB, and
-	       if one got through somehow, it should have been filtered
-	       out already.  */
-	    internal_error (__FILE__, __LINE__,
-			    _("handle_inferior_event: tracepoint encountered"));
-	    break;
-	  default:
-	    internal_error (__FILE__, __LINE__,
-			    _("handle_inferior_event: Unhandled bptype %s"),
-			    breakpoint_type_name (bptype));
-	    break;
+	    if (what.perform < pe_check_more)
+	      what.perform = pe_check_more;
 	  }
-
-	/* PERFORM must be always decided.  */
-	if (perform == pe_undef)
-	  internal_error (__FILE__, __LINE__,
-			  _("handle_inferior_event: Unset perform, bptype %s"),
-			  breakpoint_type_name (bptype));
-
-	if (debug_infrun)
-	  {
-	    const char *bptype_s = breakpoint_type_name (bptype);
-
-	    if (print_frame != pf_default)
-	      fprintf_unfiltered (gdb_stdlog, "infrun: %s: print_frame %s\n",
-				  bptype_s, print_frame == pf_no ? "pf_no"
-								 : "pf_yes");
-	    if (stop_step != ss_default)
-	      fprintf_unfiltered (gdb_stdlog, "infrun: %s: stop_step %s\n",
-				  bptype_s, stop_step_max == ss_print_no
-					    ? "ss_print_no (stop_step 1)"
-					    : "ss_print_yes (stop_step 0)");
-	    fprintf_unfiltered (gdb_stdlog, "infrun: %s: perform %s\n",
-				bptype_s,
-				perform == pe_going
-				  ? "pe_going"
-				  : perform == pe_check_more
-				    ? "pe_check_more"
-				    : perform == pe_stop
-				      ? "pe_stop" : "pe_stop_end_range");
-	  }
-	
-	if (print_frame_max < print_frame)
-	  print_frame_max = print_frame;
-	if (stop_step_max < stop_step)
-	  stop_step_max = stop_step;
-	if (perform_max < perform)
-	  perform_max = perform;
-      }
-    if (debug_infrun)
-      fprintf_unfiltered (gdb_stdlog,
-			  _("infrun: summary: print_frame %s\n"
-			    "infrun: summary: stop_step %s\n"
-			    "infrun: summary: perform %s\n"),
-			  print_frame_max == pf_default
-			    ? "pf_default (pf_yes)"
-			    : print_frame_max == pf_no ? "pf_no" : "pf_yes",
-			  stop_step_max == ss_default
-			    ? "ss_default (ss_print_yes (stop_step 0))"
-			    : stop_step_max == ss_print_no
-			      ? "ss_print_no (stop_step 1)"
-			      : "ss_print_yes (stop_step 0)",
-			  perform_max == pe_check_more
-			    ? "pe_check_more"
-			    : perform_max == pe_stop
-			      ? "pe_stop" : perform_max == pe_stop_end_range
-					    ? "pe_stop_end_range" : "pe_going");
-    if (print_frame_max == pf_default)
-      print_frame_max = pf_yes;
-    if (stop_step_max == ss_default)
-      stop_step_max = ss_print_yes;
-    gdb_assert (perform_max != pe_undef);
-
-    if (perform_shlib)
-      {
-	/* Check for any newly added shared libraries if we're
-	   supposed to be adding them automatically.  Switch
-	   terminal for any messages produced by
-	   breakpoint_re_set.  */
-	target_terminal_ours_for_output ();
-	/* NOTE: cagney/2003-11-25: Make certain that the target
-	   stack's section table is kept up-to-date.  Architectures,
-	   (e.g., PPC64), use the section table to perform
-	   operations such as address => section name and hence
-	   require the table to contain all sections (including
-	   those found in shared libraries).  */
-#ifdef SOLIB_ADD
-	SOLIB_ADD (NULL, 0, &current_target, auto_solib_add);
-#else
-	solib_add (NULL, 0, &current_target, auto_solib_add);
-#endif
-	target_terminal_inferior ();
       }
 
-    stop_print_frame = print_frame_max == pf_yes;
-    ecs->event_thread->stop_step = stop_step_max == ss_print_no;
-    switch (perform_max)
+    stop_print_frame = what.print_frame == pf_yes;
+
+    ecs->event_thread->stop_step = what.stop_step == ss_print_no;
+
+    if (what.stepping_over_breakpoint)
+      ecs->event_thread->stepping_over_breakpoint = 1;
+
+    switch (what.perform)
     {
       case pe_check_more:
 	/* Still need to check other stuff, at least the case
@@ -5207,11 +4993,6 @@ insert_longjmp_resume_breakpoint (struct gdbarch *gdbarch, CORE_ADDR pc)
      breakpoint per thread, so we should never be setting a new
      longjmp_resume_breakpoint when one is already active.  */
   gdb_assert (inferior_thread ()->step_resume_breakpoint == NULL);
-
-  if (debug_infrun)
-    fprintf_unfiltered (gdb_stdlog,
-			"infrun: inserting longjmp-resume breakpoint at %s\n",
-			paddress (gdbarch, pc));
 
   inferior_thread ()->step_resume_breakpoint =
     set_momentary_breakpoint_at_pc (gdbarch, pc, bp_longjmp_resume);

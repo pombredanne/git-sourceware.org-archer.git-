@@ -4150,7 +4150,310 @@ bpstat_stop_status (struct address_space *aspace,
 
   return root_bs->next;
 }
-
+
+static const char *
+breakpoint_type_name (enum bptype bptype)
+{
+  switch (bptype)
+    {
+    case bp_none:
+      return "bp_none";
+    case bp_breakpoint:
+      return "bp_breakpoint";
+    case bp_hardware_breakpoint:
+      return "bp_hardware_breakpoint";
+    case bp_until:
+      return "bp_until";
+    case bp_finish:
+      return "bp_finish";
+    case bp_watchpoint:
+      return "bp_watchpoint";
+    case bp_hardware_watchpoint:
+      return "bp_hardware_watchpoint";
+    case bp_read_watchpoint:
+      return "bp_read_watchpoint";
+    case bp_access_watchpoint:
+      return "bp_access_watchpoint";
+    case bp_longjmp:
+      return "bp_longjmp";
+    case bp_longjmp_resume:
+      return "bp_longjmp_resume";
+    case bp_step_resume:
+      return "bp_step_resume";
+    case bp_watchpoint_scope:
+      return "bp_watchpoint_scope";
+    case bp_call_dummy:
+      return "bp_call_dummy";
+    case bp_std_terminate:
+      return "bp_std_terminate";
+    case bp_shlib_event:
+      return "bp_shlib_event";
+    case bp_thread_event:
+      return "bp_thread_event";
+    case bp_overlay_event:
+      return "bp_overlay_event";
+    case bp_longjmp_master:
+      return "bp_longjmp_master";
+    case bp_std_terminate_master:
+      return "bp_std_terminate_master";
+    case bp_catchpoint:
+      return "bp_catchpoint";
+    case bp_tracepoint:
+      return "bp_tracepoint";
+    case bp_fast_tracepoint:
+      return "bp_fast_tracepoint";
+    case bp_jit_event:
+      return "bp_jit_event";
+    }
+  internal_error (__FILE__, __LINE__, _("Invalid breakpoint type %d"),
+		  (int) bptype);
+  return NULL;
+}
+
+/* Return the more significant events from both A and B.  */
+
+struct bpstat_what
+bpstat_what_merge (struct bpstat_what a, struct bpstat_what b)
+{
+  struct bpstat_what retval;
+
+  retval.print_frame = max (a.print_frame, b.print_frame);
+  retval.stop_step = max (a.stop_step, b.stop_step);
+  retval.perform = max (a.perform, b.perform);
+  retval.stepping_over_breakpoint = max (a.stepping_over_breakpoint,
+					 b.stepping_over_breakpoint);
+  retval.bp_longjmp = max (a.bp_longjmp, b.bp_longjmp);
+  retval.bp_longjmp_resume = max (a.bp_longjmp_resume, b.bp_longjmp_resume);
+  retval.bp_step_resume_on_stop = max (a.bp_step_resume_on_stop,
+				       b.bp_step_resume_on_stop);
+
+  return retval;
+}
+
+/* Prepare WHAT final decision for infrun.  */
+
+static void
+bpstat_what_finalize (struct bpstat_what *what)
+{
+  if (what->print_frame == pf_default)
+    what->print_frame = pf_yes;
+  if (what->stop_step == ss_default)
+    what->stop_step = ss_print_yes;
+  gdb_assert (what->perform != pe_undef);
+}
+
+/* Tell what to do about this bpstat.  */
+struct bpstat_what
+bpstat_what (bpstat bs)
+{
+  struct bpstat_what retval;
+  /* solib_add may call breakpoint_re_set which would clear many
+     BREAKPOINT_AT entries still going to be processed.  breakpoint_re_set
+     does not keep the same bp_location's even if they actually do not
+     change.  */
+  int perform_shlib = 0;
+
+  memset (&retval, 0, sizeof (retval));
+  retval.print_frame = pf_default;
+  retval.stop_step = ss_default;
+  retval.perform = pe_default;
+
+  for (; bs != NULL; bs = bs->next)
+    {
+      /* Decisions for this specific BS, they get mapped to their *_max
+	 variants at the end of this BS processing.  */
+      struct bpstat_what this;
+      enum bptype bptype;
+
+      memset (&this, 0, sizeof (this));
+      this.print_frame = pf_default;
+      this.stop_step = ss_default;
+      this.perform = pe_undef;
+
+      if (bs->breakpoint_at == NULL)
+	{
+	  /* I suspect this can happen if it was a momentary breakpoint
+	     which has since been deleted.  */
+	  bptype = bp_none;
+	}
+      else if (bs->breakpoint_at->owner == NULL)
+	{
+	  this.stepping_over_breakpoint = 1;
+	  bptype = bp_none;
+	}
+      else
+	bptype = bs->breakpoint_at->owner->type;
+
+      switch (bptype)
+	{
+	case bp_none:
+	  this.perform = pe_check_more;
+	  break;
+	case bp_breakpoint:
+	case bp_hardware_breakpoint:
+	case bp_until:
+	case bp_finish:
+	  if (bs->stop)
+	    {
+	      this.print_frame = bs->print ? pf_yes : pf_no;
+	      this.perform = pe_stop;
+	    }
+	  else
+	    {
+	      this.stepping_over_breakpoint = 1;
+	      this.perform = pe_check_more;
+	    }
+	  break;
+	case bp_watchpoint:
+	case bp_hardware_watchpoint:
+	case bp_read_watchpoint:
+	case bp_access_watchpoint:
+	case bp_catchpoint:
+	  if (bs->stop)
+	    {
+	      this.print_frame = bs->print ? pf_yes : pf_no;
+	      this.perform = pe_stop;
+	    }
+	  else
+	    {
+	      /* There was a watchpoint or catchpoint, but we're not
+		 stopping.  This requires no further action.  */
+	      this.perform = pe_check_more;
+	    }
+	  break;
+	case bp_longjmp:
+	  this.bp_longjmp = 1;
+	  this.stepping_over_breakpoint = 1;
+	  this.perform = pe_going;
+	  break;
+	case bp_longjmp_resume:
+	  this.bp_longjmp_resume = 1;
+	  this.stop_step = ss_print_no;
+	  this.perform = pe_stop_end_range;
+	  break;
+	case bp_step_resume:
+	  if (bs->stop)
+	    {
+	      this.bp_step_resume_on_stop = 1;
+	      gdb_assert (pe_check_more < pe_going);
+	      this.perform = pe_check_more;
+	    }
+	  else
+	    {
+	      /* It is for the wrong frame.  */
+	      this.stepping_over_breakpoint = 1;
+	      this.perform = pe_check_more;
+	    }
+	  break;
+	case bp_watchpoint_scope:
+	case bp_thread_event:
+	case bp_overlay_event:
+	case bp_longjmp_master:
+	case bp_std_terminate_master:
+	  this.stepping_over_breakpoint = 1;
+	  this.perform = pe_check_more;
+	  break;
+	case bp_shlib_event:
+	  perform_shlib = 1;
+
+	  /* If requested, stop when the dynamic linker notifies
+	     gdb of events.  This allows the user to get control
+	     and place breakpoints in initializer routines for
+	     dynamically loaded objects (among other things).  */
+	  if (stop_on_solib_events || stop_stack_dummy)
+	    this.perform = pe_stop;
+	  else
+	    {
+	      /* We want to step over this breakpoint, then keep going.  */
+	      this.stepping_over_breakpoint = 1;
+	      this.perform = pe_check_more;
+	    }
+	  break;
+	case bp_jit_event:
+	  /* Switch terminal for any messages produced by breakpoint_re_set.  */
+	  target_terminal_ours_for_output ();
+
+	  {
+	    struct frame_info *frame = get_current_frame ();
+	    struct gdbarch *gdbarch = get_frame_arch (frame);
+
+	    jit_event_handler (gdbarch);
+	  }
+
+	  target_terminal_inferior ();
+
+	  /* We want to step over this breakpoint, then keep going.  */
+	  this.stepping_over_breakpoint = 1;
+	  this.perform = pe_check_more;
+	  break;
+	case bp_call_dummy:
+	  /* Make sure the action is stop (silent or noisy),
+	     so infrun.c pops the dummy frame.  */
+	  stop_stack_dummy = STOP_STACK_DUMMY;
+	  this.print_frame = pf_no;
+	  this.perform = pe_stop;
+	  break;
+	case bp_std_terminate:
+	  /* Make sure the action is stop (silent or noisy),
+	     so infrun.c pops the dummy frame.  */
+	  stop_stack_dummy = STOP_STD_TERMINATE;
+	  this.print_frame = pf_no;
+	  this.perform = pe_stop;
+	  break;
+	case bp_tracepoint:
+	case bp_fast_tracepoint:
+	  /* Tracepoint hits should not be reported back to GDB, and
+	     if one got through somehow, it should have been filtered
+	     out already.  */
+	  internal_error (__FILE__, __LINE__,
+			  _("bpstat_what: tracepoint encountered"));
+	  break;
+	default:
+	  internal_error (__FILE__, __LINE__,
+			  _("bpstat_what: Unhandled bptype %s"),
+			  breakpoint_type_name (bptype));
+	  break;
+	}
+
+      /* THIS.PERFORM must be always decided.  */
+      if (this.perform == pe_undef)
+	internal_error (__FILE__, __LINE__,
+			_("bpstat_what: Unset perform, bptype %s"),
+			breakpoint_type_name (bptype));
+
+      bpstat_what_debug (this, breakpoint_type_name (bptype), 0);
+
+      retval = bpstat_what_merge (retval, this);
+    }
+
+  if (perform_shlib)
+    {
+      /* Check for any newly added shared libraries if we're
+	 supposed to be adding them automatically.  Switch
+	 terminal for any messages produced by
+	 breakpoint_re_set.  */
+      target_terminal_ours_for_output ();
+      /* NOTE: cagney/2003-11-25: Make certain that the target
+	 stack's section table is kept up-to-date.  Architectures,
+	 (e.g., PPC64), use the section table to perform
+	 operations such as address => section name and hence
+	 require the table to contain all sections (including
+	 those found in shared libraries).  */
+#ifdef SOLIB_ADD
+      SOLIB_ADD (NULL, 0, &current_target, auto_solib_add);
+#else
+      solib_add (NULL, 0, &current_target, auto_solib_add);
+#endif
+      target_terminal_inferior ();
+    }
+
+  bpstat_what_debug (retval, _("summary"), 1);
+
+  bpstat_what_finalize (&retval);
+
+  return retval;
+}
+
 /* Nonzero if we should step constantly (e.g. watchpoints on machines
    without hardware support).  This isn't related to a specific bpstat,
    just to things like whether watchpoints are set.  */
@@ -10766,65 +11069,6 @@ save_command (char *arg, int from_tty)
   printf_unfiltered (_("\
 \"save\" must be followed by the name of a save subcommand.\n"));
   help_list (save_cmdlist, "save ", -1, gdb_stdout);
-}
-
-const char *
-breakpoint_type_name (enum bptype bptype)
-{
-  switch (bptype)
-    {
-    case bp_none:
-      return "bp_none";
-    case bp_breakpoint:
-      return "bp_breakpoint";
-    case bp_hardware_breakpoint:
-      return "bp_hardware_breakpoint";
-    case bp_until:
-      return "bp_until";
-    case bp_finish:
-      return "bp_finish";
-    case bp_watchpoint:
-      return "bp_watchpoint";
-    case bp_hardware_watchpoint:
-      return "bp_hardware_watchpoint";
-    case bp_read_watchpoint:
-      return "bp_read_watchpoint";
-    case bp_access_watchpoint:
-      return "bp_access_watchpoint";
-    case bp_longjmp:
-      return "bp_longjmp";
-    case bp_longjmp_resume:
-      return "bp_longjmp_resume";
-    case bp_step_resume:
-      return "bp_step_resume";
-    case bp_watchpoint_scope:
-      return "bp_watchpoint_scope";
-    case bp_call_dummy:
-      return "bp_call_dummy";
-    case bp_std_terminate:
-      return "bp_std_terminate";
-    case bp_shlib_event:
-      return "bp_shlib_event";
-    case bp_thread_event:
-      return "bp_thread_event";
-    case bp_overlay_event:
-      return "bp_overlay_event";
-    case bp_longjmp_master:
-      return "bp_longjmp_master";
-    case bp_std_terminate_master:
-      return "bp_std_terminate_master";
-    case bp_catchpoint:
-      return "bp_catchpoint";
-    case bp_tracepoint:
-      return "bp_tracepoint";
-    case bp_fast_tracepoint:
-      return "bp_fast_tracepoint";
-    case bp_jit_event:
-      return "bp_jit_event";
-    }
-  internal_error (__FILE__, __LINE__, _("Invalid breakpoint type %d"),
-		  (int) bptype);
-  return NULL;
 }
 
 void
