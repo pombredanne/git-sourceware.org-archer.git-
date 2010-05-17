@@ -1,4 +1,63 @@
+2010-05-17  Andreas Schwab  <schwab@redhat.com>
+
+	PR gdb/11092
+	* c-lang.c (c_printstr): Compute real length of NUL terminated
+	string at first.
+
+2010-05-17  Joel Brobecker  <brobecker@adacore.com>
+
+	* parse.c (parse_exp_in_context): When block is not NULL, use
+	its associated language to parse the expression instead of
+	the current_language.
+
+2010-05-17  Joel Brobecker  <brobecker@adacore.com>
+
+	* jv-lang.c (java_lookup_class): Remove commented out code.
+	(type_from_class): Likewise.
+	(java_op_print_tab): Remove commented-out elements.
+
+2010-05-17  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (to_fixed_range_type): The the raw index type as
+	argument instead of the raw type name.  Remove orig_type parameter.
+	Update calls throughout.
+	(ada_fixup_array_indexes_type): New function.
+	(ada_array_bound_from_type): Add call to ada_fixup_array_indexes_type.
+	* ada-lang.h (ada_fixup_array_indexes_type): Add declaration.
+	* ada-typeprint.c (print_range_type): Renames print_range_type_named.
+	Remove name parameter.
+	(print_array_type): Add call to ada_fixup_array_indexes_type.
+	Update calls to print_range_type.
+	(ada_print_type): Update calls to print_range_type.
+
+2010-05-17  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* dwarf2read.c (read_set_type): Set type length if
+	DW_AT_byte_size attribute is present.
+
+2010-05-17  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* p-valprint.c (pascal_val_print): Handle set type if range limits
+	are undefined but size is known.
+
+2010-05-17  Pedro Alves  <pedro@codesourcery.com>
+
+	* procfs.c: Reformat.
+
 2010-05-16  Michael Snyder  <msnyder@vmware.com>
+
+	* target.c: White space.
+	* target-descriptions.c: White space.
+	* target-memory.c: White space.
+	* thread.c: White space.
+	* top.c: White space.
+	* tracepoint.c: White space.
+	* trad-frame.c: White space.
+	* tramp-frame.c: White space.
+	* ui-file.c: White space.
+	* ui-out.c: White space.
+	* user-regs.c: White space.
+	* utils.c: White space.
 
 	* scm-exp.c: White space.
 	* scm-lang.c: White space.
