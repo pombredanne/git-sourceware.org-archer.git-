@@ -1,3 +1,51 @@
+2010-05-17  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/cond_lang: New testcase.
+
+2010-05-17  Joel Brobecker  <brobecker@adacore.com>
+
+	* lib/gdb.exp (banned_variables): New variable/constant.
+	(gdb_init): Add write trace on variables listed in banned_variables.
+	(gdb_finish): Remove write traces on variables listed in
+	banned_variables.
+
+2010-05-17  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.base/gdb11530.exp: Delete setting of prms_id and bug_id.
+	* gdb.cp/koenig.exp: Likewise.
+
+2010-05-14  Phil Muldoon  <pmuldoon@redhat.com>
+
+ 	PR python/11482
+
+	* gdb.python/py-value.exp (test_value_hash): New function.
+
+2010-05-11  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	PR exp/11530.
+	* gdb.base/gdb11530.c: New file.
+	* gdb.base/gdb11530.exp: New file.
+
+2010-05-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-modula2-self-type.exp: New.
+	* gdb.dwarf2/dw2-modula2-self-type.S: New.
+
+2010-05-07  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/koenig.exp: New test.
+	* gdb.cp/koenig.cc: New test program.
+
+2010-05-05  Joel Brobecker  <brobecker@adacore.com>
+
+	Remove the use of prms_id and bug_id throughout the testsuite.
+
+2010-05-04  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	PR exp/11349.
+	* testsuite/gdb.cp/ref-types.exp: Add test to examine
+	use a reference local variable.
+
 2010-05-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* gdb.base/break-interp.exp: Remove $exec.debug safety removal.

@@ -1,3 +1,78 @@
+2010-05-17  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-alpha.c: Include esgps.h and eidc.h.
+	(_bfd_vms_slurp_egsd): Ignore SPSC and IDC sub-records.
+	(evax_bfd_print_egsd_flags): New function, extracted from ...
+	(evax_bfd_print_egsd): ..., calls evax_bfd_print_egsd_flags.  Handles
+	EGSD__C_SPSC and EGSD__C_IDC.
+
+2010-05-14  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-alpha.c (alpha_vms_object_p): Accept header size of 0.
+	(_bfd_vms_get_object_record): Handle align byte only in the
+	foreign case.
+
+2010-05-14  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-lib.c (_bfd_vms_lib_ia64_archive_p): New function.
+	* libbfd-in.h (_bfd_vms_lib_ia64_archive_p): Add prototype.
+	* libbfd.h: Regenerate.
+	* configure.in (havevecs): Define HAVE_all_vecs when
+	--enable-targets=all is set.  Use AC_SUBST on it.
+	(tdefaults): Do not add havevecs.
+	(bfd_elf64_ia64_vms_vec): Add vms-lib.lo and vms-misc.lo
+	* configure: Regenerate.
+	* Makefile.am (HAVEVECS): New variable.
+	(INCLUDES): Add HAVEVECS.
+	* Makefile.in: Regenerate.
+	* elfxx-ia64.c (INCLUDE_IA64_VMS): New macro, defined if vms
+	target is selected.  Add #ifdef/#endif around vms specific code.
+	(bfd_elfNN_archive_p, bfd_elfNN_archive_slurp_armap,
+	bfd_elfNN_archive_slurp_extended_name_table,
+	bfd_elfNN_archive_construct_extended_name_table,
+	bfd_elfNN_archive_truncate_arname,
+	bfd_elfNN_archive_write_armap,
+	bfd_elfNN_archive_read_ar_hdr,
+	bfd_elfNN_archive_write_ar_hdr,
+	bfd_elfNN_archive_openr_next_archived_file,
+	bfd_elfNN_archive_get_elt_at_index,
+	bfd_elfNN_archive_generic_stat_arch_elt,
+	bfd_elfNN_archive_update_armap_timestamp): Define to use vms archives.
+
+2010-05-11  Jie Zhang  <jie@codesourcery.com>
+
+	* elf32-arm.c (elf32_arm_merge_eabi_attributes): Merge
+	Tag_ABI_HardFP_use correctly.
+
+2010-05-11  Alan Modra  <amodra@gmail.com>
+
+	* coffcode.h (coff_write_object_contents): Enclose all occurrences
+	of hasdebug and is_reloc_section in #ifdef COFF_IMAGE_WITH_PE.
+
+2010-05-07  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* elf32-arm.c (struct a8_erratum_reloc): Add hash member.  Move
+	sym_name to improve packing.
+	(cortex_a8_erratum_scan): Check for PLT entries.
+	(elf32_arm_size_stubs): Save the target symbol for a8 relocs.
+
+2010-05-07  Tristan Gingold  <gingold@adacore.com>
+
+	* Makefile.in: Regenerate with automake 1.11.1.
+	* aclocal.m4: Ditto.
+
+2010-05-05  Nick Clifton  <nickc@redhat.com>
+
+	* po/es.po: Updated Spanish translation.
+
+2010-05-03  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-lib.c (vms_lib_bopen): Fix the size threshold to read
+	selective_search flag.
+	Add comments.
+	* vms-alpha.c (alpha_vms_bfd_final_link): Create the DMT section
+	before output_has_begun is set.
+
 2010-05-03  Tristan Gingold  <gingold@adacore.com>
 
 	* vms-alpha.c: Add comments.
@@ -11,6 +86,7 @@
 	Write the dmt section.
 	(evax_bfd_print_image): Also print the dst size in hexa.  Fix typo.
 	(alpha_vms_read_sections_content): Do not set image_autoextend.
+	(alpha_vms_bfd_final_link): Generate the dst.
 
 2010-05-03  Tristan Gingold  <gingold@adacore.com>
 

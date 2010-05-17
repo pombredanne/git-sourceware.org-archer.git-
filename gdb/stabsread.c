@@ -352,7 +352,6 @@ patch_block_stabs (struct pending *symbols, struct pending_stabs *stabs,
 
   if (stabs)
     {
-
       /* for all the stab entries, find their corresponding symbols and 
          patch their types! */
 
@@ -435,6 +434,7 @@ static int
 read_type_number (char **pp, int *typenums)
 {
   int nbits;
+
   if (**pp == '(')
     {
       (*pp)++;
@@ -508,9 +508,11 @@ ref_add (int refnum, struct symbol *sym, char *stabs, CORE_ADDR value)
     {
       int new_slots = ref_count - ref_chunk * MAX_CHUNK_REFS;
       int new_chunks = new_slots / MAX_CHUNK_REFS + 1;
+
       ref_map = (struct ref_map *)
 	xrealloc (ref_map, REF_MAP_SIZE (ref_chunk + new_chunks));
-      memset (ref_map + ref_chunk * MAX_CHUNK_REFS, 0, new_chunks * REF_CHUNK_SIZE);
+      memset (ref_map + ref_chunk * MAX_CHUNK_REFS, 0, 
+	      new_chunks * REF_CHUNK_SIZE);
       ref_chunk += new_chunks;
     }
   ref_map[refnum].stabs = stabs;
@@ -706,6 +708,7 @@ define_symbol (CORE_ADDR valu, char *string, int desc, int type,
       if (SYMBOL_LANGUAGE (sym) == language_cplus)
 	{
 	  char *name = alloca (p - string + 1);
+
 	  memcpy (name, string, p - string);
 	  name[p - string] = '\0';
 	  new_name = cp_canonicalize_string (name);
@@ -807,7 +810,6 @@ define_symbol (CORE_ADDR valu, char *string, int desc, int type,
 	    struct type *range_type;
 	    int ind = 0;
 	    char quote = *p++;
-	    char *startp = p;
 	    gdb_byte *string_local = (gdb_byte *) alloca (strlen (p));
 	    gdb_byte *string_value;
 
@@ -1122,6 +1124,7 @@ define_symbol (CORE_ADDR valu, char *string, int desc, int type,
 	      && gdbarch_stabs_argument_has_addr (gdbarch, SYMBOL_TYPE (sym)))
 	    {
 	      struct symbol *prev_sym;
+
 	      prev_sym = local_symbols->symbol[local_symbols->nsyms - 1];
 	      if ((SYMBOL_CLASS (prev_sym) == LOC_REF_ARG
 		   || SYMBOL_CLASS (prev_sym) == LOC_ARG)
@@ -1155,11 +1158,13 @@ define_symbol (CORE_ADDR valu, char *string, int desc, int type,
 	     != SYMBOL_LINKAGE_NAME (sym))
 	{
 	  struct minimal_symbol *msym;
+
 	  msym = lookup_minimal_symbol (SYMBOL_LINKAGE_NAME (sym), NULL, objfile);
 	  if (msym != NULL)
 	    {
 	      char *new_name = gdbarch_static_transform_name
 		(gdbarch, SYMBOL_LINKAGE_NAME (sym));
+
 	      SYMBOL_SET_LINKAGE_NAME (sym, new_name);
 	      SYMBOL_VALUE_ADDRESS (sym) = SYMBOL_VALUE_ADDRESS (msym);
 	    }
@@ -1206,6 +1211,7 @@ define_symbol (CORE_ADDR valu, char *string, int desc, int type,
 	    && TYPE_N_BASECLASSES (SYMBOL_TYPE (sym)))
 	  {
 	    int j;
+
 	    for (j = TYPE_N_BASECLASSES (SYMBOL_TYPE (sym)) - 1; j >= 0; j--)
 	      if (TYPE_BASECLASS_NAME (SYMBOL_TYPE (sym), j) == 0)
 		TYPE_BASECLASS_NAME (SYMBOL_TYPE (sym), j) =
@@ -1280,9 +1286,9 @@ define_symbol (CORE_ADDR valu, char *string, int desc, int type,
           SYMBOL_VALUE (struct_sym) = valu;
           SYMBOL_DOMAIN (struct_sym) = STRUCT_DOMAIN;
           if (TYPE_NAME (SYMBOL_TYPE (sym)) == 0)
-            TYPE_NAME (SYMBOL_TYPE (sym))
-              = obconcat (&objfile->objfile_obstack, "", "",
-                          SYMBOL_LINKAGE_NAME (sym));
+            TYPE_NAME (SYMBOL_TYPE (sym)) = obconcat (&objfile->objfile_obstack,
+						      SYMBOL_LINKAGE_NAME (sym),
+						      (char *) NULL);
           add_symbol_to_list (struct_sym, &file_symbols);
         }
       
@@ -1307,24 +1313,25 @@ define_symbol (CORE_ADDR valu, char *string, int desc, int type,
       SYMBOL_VALUE (sym) = valu;
       SYMBOL_DOMAIN (sym) = STRUCT_DOMAIN;
       if (TYPE_TAG_NAME (SYMBOL_TYPE (sym)) == 0)
-	TYPE_TAG_NAME (SYMBOL_TYPE (sym))
-	  = obconcat (&objfile->objfile_obstack, "", "",
-		      SYMBOL_LINKAGE_NAME (sym));
+	TYPE_TAG_NAME (SYMBOL_TYPE (sym)) = obconcat (&objfile->objfile_obstack,
+						      SYMBOL_LINKAGE_NAME (sym),
+						      (char *) NULL);
       add_symbol_to_list (sym, &file_symbols);
 
       if (synonym)
 	{
 	  /* Clone the sym and then modify it. */
 	  struct symbol *typedef_sym = (struct symbol *)
-	  obstack_alloc (&objfile->objfile_obstack, sizeof (struct symbol));
+	    obstack_alloc (&objfile->objfile_obstack, sizeof (struct symbol));
+
 	  *typedef_sym = *sym;
 	  SYMBOL_CLASS (typedef_sym) = LOC_TYPEDEF;
 	  SYMBOL_VALUE (typedef_sym) = valu;
 	  SYMBOL_DOMAIN (typedef_sym) = VAR_DOMAIN;
 	  if (TYPE_NAME (SYMBOL_TYPE (sym)) == 0)
-	    TYPE_NAME (SYMBOL_TYPE (sym))
-	      = obconcat (&objfile->objfile_obstack, "", "",
-			  SYMBOL_LINKAGE_NAME (sym));
+	    TYPE_NAME (SYMBOL_TYPE (sym)) = obconcat (&objfile->objfile_obstack,
+						      SYMBOL_LINKAGE_NAME (sym),
+						      (char *) NULL);
 	  add_symbol_to_list (typedef_sym, &file_symbols);
 	}
       break;
@@ -1340,11 +1347,14 @@ define_symbol (CORE_ADDR valu, char *string, int desc, int type,
 	     != SYMBOL_LINKAGE_NAME (sym))
 	{
 	  struct minimal_symbol *msym;
-	  msym = lookup_minimal_symbol (SYMBOL_LINKAGE_NAME (sym), NULL, objfile);
+
+	  msym = lookup_minimal_symbol (SYMBOL_LINKAGE_NAME (sym), 
+					NULL, objfile);
 	  if (msym != NULL)
 	    {
 	      char *new_name = gdbarch_static_transform_name
 		(gdbarch, SYMBOL_LINKAGE_NAME (sym));
+
 	      SYMBOL_SET_LINKAGE_NAME (sym, new_name);
 	      SYMBOL_VALUE_ADDRESS (sym) = SYMBOL_VALUE_ADDRESS (msym);
 	    }
@@ -1581,6 +1591,7 @@ again:
 	  if (q1 && p > q1 && p[1] == ':')
 	    {
 	      int nesting_level = 0;
+
 	      for (q2 = q1; *q2; q2++)
 		{
 		  if (*q2 == '<')
@@ -1598,6 +1609,7 @@ again:
 	  if (current_subfile->language == language_cplus)
 	    {
 	      char *new_name, *name = alloca (p - *pp + 1);
+
 	      memcpy (name, *pp, p - *pp);
 	      name[p - *pp] = '\0';
 	      new_name = cp_canonicalize_string (name);
@@ -1685,6 +1697,7 @@ again:
       TYPE_CODE (type) = TYPE_CODE_TYPEDEF;
       {
 	struct type *xtype = read_type (pp, objfile);
+
 	if (type == xtype)
 	  {
 	    /* It's being defined as itself.  That means it is "void".  */
@@ -1857,6 +1870,7 @@ again:
 	/* type attribute */
 	{
 	  char *attr = *pp;
+
 	  /* Skip to the semicolon.  */
 	  while (**pp != ';' && **pp != '\0')
 	    ++(*pp);
@@ -2610,8 +2624,8 @@ read_member_functions (struct field_info *fip, char **pp, struct type *type,
 	      make_cleanup (xfree, destr_fnlist);
 	      memset (destr_fnlist, 0, sizeof (struct next_fnfieldlist));
 	      destr_fnlist->fn_fieldlist.name
-		= obconcat (&objfile->objfile_obstack, "", "~",
-			    new_fnlist->fn_fieldlist.name);
+		= obconcat (&objfile->objfile_obstack, "~",
+			    new_fnlist->fn_fieldlist.name, (char *) NULL);
 
 	      destr_fnlist->fn_fieldlist.fn_fields = (struct fn_field *)
 		obstack_alloc (&objfile->objfile_obstack,
@@ -2668,6 +2682,7 @@ read_member_functions (struct field_info *fip, char **pp, struct type *type,
 	    {
 	      char dem_opname[256];
 	      int ret;
+
 	      ret = cplus_demangle_opname (new_fnlist->fn_fieldlist.name,
 					      dem_opname, DMGL_ANSI);
 	      if (!ret)
@@ -2745,11 +2760,11 @@ read_cpp_abbrev (struct field_info *fip, char **pp, struct type *type,
 	case 'f':		/* $vf -- a virtual function table pointer */
 	  name = type_name_no_tag (context);
 	  if (name == NULL)
-	  {
-		  name = "";
-	  }
-	  fip->list->field.name =
-	    obconcat (&objfile->objfile_obstack, vptr_name, name, "");
+	    {
+	      name = "";
+	    }
+	  fip->list->field.name = obconcat (&objfile->objfile_obstack,
+					    vptr_name, name, (char *) NULL);
 	  break;
 
 	case 'b':		/* $vb -- a virtual bsomethingorother */
@@ -2761,15 +2776,15 @@ read_cpp_abbrev (struct field_info *fip, char **pp, struct type *type,
 			 symnum);
 	      name = "FOO";
 	    }
-	  fip->list->field.name =
-	    obconcat (&objfile->objfile_obstack, vb_name, name, "");
+	  fip->list->field.name = obconcat (&objfile->objfile_obstack, vb_name,
+					    name, (char *) NULL);
 	  break;
 
 	default:
 	  invalid_cpp_abbrev_complaint (*pp);
-	  fip->list->field.name =
-	    obconcat (&objfile->objfile_obstack,
-		      "INVALID_CPLUSPLUS_ABBREV", "", "");
+	  fip->list->field.name = obconcat (&objfile->objfile_obstack,
+					    "INVALID_CPLUSPLUS_ABBREV",
+					    (char *) NULL);
 	  break;
 	}
 
@@ -2790,6 +2805,7 @@ read_cpp_abbrev (struct field_info *fip, char **pp, struct type *type,
 
       {
 	int nbits;
+
 	FIELD_BITPOS (fip->list->field) = read_huge_number (pp, ';', &nbits,
                                                             0);
 	if (nbits != 0)
@@ -2866,6 +2882,7 @@ read_one_struct_field (struct field_info *fip, char **pp, char *p,
 
   {
     int nbits;
+
     FIELD_BITPOS (fip->list->field) = read_huge_number (pp, ',', &nbits, 0);
     if (nbits != 0)
       {
@@ -3069,6 +3086,7 @@ read_baseclasses (struct field_info *fip, char **pp, struct type *type,
   ALLOCATE_CPLUS_STRUCT_TYPE (type);
   {
     int nbits;
+
     TYPE_N_BASECLASSES (type) = read_huge_number (pp, ',', &nbits, 0);
     if (nbits != 0)
       return 0;
@@ -3229,6 +3247,7 @@ read_tilde_fields (struct field_info *fip, char **pp, struct type *type,
 		   --i)
 		{
 		  char *name = TYPE_FIELD_NAME (t, i);
+
 		  if (!strncmp (name, vptr_name, sizeof (vptr_name) - 2)
 		      && is_cplus_marker (name[sizeof (vptr_name) - 2]))
 		    {
@@ -3484,6 +3503,7 @@ read_struct_type (char **pp, struct type *type, enum type_code type_code,
 
   {
     int nbits;
+
     TYPE_LENGTH (type) = read_huge_number (pp, 0, &nbits, 0);
     if (nbits != 0)
       return error_type (pp, objfile);
@@ -3674,9 +3694,11 @@ read_enum_type (char **pp, struct type *type,
     {
       int last = syms == osyms ? o_nsyms : 0;
       int j = syms->nsyms;
+
       for (; --j >= last; --n)
 	{
 	  struct symbol *xsym = syms->symbol[j];
+
 	  SYMBOL_TYPE (xsym) = type;
 	  TYPE_FIELD_NAME (type, n) = SYMBOL_LINKAGE_NAME (xsym);
 	  TYPE_FIELD_BITPOS (type, n) = SYMBOL_VALUE (xsym);
@@ -3861,6 +3883,7 @@ read_huge_number (char **pp, int end, int *bits, int twos_complement_bits)
 
       size_t len;
       char *p1 = p;
+
       while ((c = *p1) >= '0' && c < '8')
 	p1++;
 
@@ -3894,6 +3917,7 @@ read_huge_number (char **pp, int end, int *bits, int twos_complement_bits)
 	      if (n == 0)
 		{
 		  long sn = c - '0' - ((2 * (c - '0')) | (2 << sign_bit));
+
 		  n = -sn;
 		}
               else
@@ -4096,6 +4120,7 @@ read_range_type (char **pp, int typenums[2], int type_size,
 	{
 	  struct type *complex_type = 
 	    init_type (TYPE_CODE_COMPLEX, 2 * n2, 0, NULL, objfile);
+
 	  TYPE_TARGET_TYPE (complex_type) = float_type;
 	  return complex_type;
 	}
@@ -4108,6 +4133,7 @@ read_range_type (char **pp, int typenums[2], int type_size,
   else if (n2 == 0 && n3 == -1)
     {
       int bits = type_size;
+
       if (bits <= 0)
 	{
 	  /* We don't know its size.  It is unsigned int or unsigned
@@ -4344,9 +4370,11 @@ static void
 fix_common_block (struct symbol *sym, int valu)
 {
   struct pending *next = (struct pending *) SYMBOL_TYPE (sym);
+
   for (; next; next = next->next)
     {
       int j;
+
       for (j = next->nsyms - 1; j >= 0; j--)
 	SYMBOL_VALUE_ADDRESS (next->symbol[j]) += valu;
     }
@@ -4749,6 +4777,7 @@ static char *
 find_name_end (char *name)
 {
   char *s = name;
+
   if (s[0] == '-' || *s == '+')
     {
       /* Must be an ObjC method symbol.  */

@@ -194,6 +194,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
 	{
 	  ULONGEST string_length;
 	  void *buffer;
+
 	  buffer = xmalloc (length_size);
 	  read_memory (addr + length_pos, buffer, length_size);
 	  string_length = extract_unsigned_integer (buffer, length_size,
@@ -205,9 +206,9 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
 	{
 	  /* print vtbl's nicely */
 	  CORE_ADDR vt_address = unpack_pointer (type, valaddr + embedded_offset);
-
 	  struct minimal_symbol *msymbol =
-	  lookup_minimal_symbol_by_pc (vt_address);
+	    lookup_minimal_symbol_by_pc (vt_address);
+
 	  if ((msymbol != NULL)
 	      && (vt_address == SYMBOL_VALUE_ADDRESS (msymbol)))
 	    {
@@ -259,6 +260,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
 	{
 	  CORE_ADDR addr
 	    = extract_typed_address (valaddr + embedded_offset, type);
+
 	  fprintf_filtered (stream, "@");
           fputs_filtered (paddress (gdbarch, addr), stream);
 	  if (options->deref_ref)
@@ -270,9 +272,10 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
 	  if (TYPE_CODE (elttype) != TYPE_CODE_UNDEF)
 	    {
 	      struct value *deref_val =
-	      value_at
-	      (TYPE_TARGET_TYPE (type),
-	       unpack_pointer (type, valaddr + embedded_offset));
+		value_at
+		(TYPE_TARGET_TYPE (type),
+		 unpack_pointer (type, valaddr + embedded_offset));
+
 	      common_val_print (deref_val, stream, recurse + 1, options,
 				current_language);
 	    }
@@ -372,6 +375,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
       if (options->format || options->output_format)
 	{
 	  struct value_print_options opts = *options;
+
 	  opts.format = (options->format ? options->format
 			 : options->output_format);
 	  print_scalar_formatted (valaddr + embedded_offset, type,
@@ -406,6 +410,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
       if (options->format || options->output_format)
 	{
 	  struct value_print_options opts = *options;
+
 	  opts.format = (options->format ? options->format
 			 : options->output_format);
 	  print_scalar_formatted (valaddr + embedded_offset, type,
@@ -421,6 +426,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
       if (options->format || options->output_format)
 	{
 	  struct value_print_options opts = *options;
+
 	  opts.format = (options->format ? options->format
 			 : options->output_format);
 	  print_scalar_formatted (valaddr + embedded_offset, type,
@@ -474,6 +480,14 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
 	    fputs_filtered ("[", stream);
 
 	  i = get_discrete_bounds (range, &low_bound, &high_bound);
+	  if (low_bound == 0 && high_bound == -1 && TYPE_LENGTH (type) > 0)
+	    {
+	      /* If we know the size of the set type, we can figure out the
+	      maximum value.  */
+	      i = 0;
+	      high_bound = TYPE_LENGTH (type) * TARGET_CHAR_BIT - 1;
+	      TYPE_HIGH_BOUND (range) = high_bound;
+	    }
 	maybe_bad_bstring:
 	  if (i < 0)
 	    {
@@ -484,6 +498,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
 	  for (i = low_bound; i <= high_bound; i++)
 	    {
 	      int element = value_bit_index (type, valaddr + embedded_offset, i);
+
 	      if (element < 0)
 		{
 		  i = element;
@@ -501,6 +516,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
 		  if (i + 1 <= high_bound && value_bit_index (type, valaddr + embedded_offset, ++i))
 		    {
 		      int j = i;
+
 		      fputs_filtered ("..", stream);
 		      while (i + 1 <= high_bound
 			     && value_bit_index (type, valaddr + embedded_offset, ++i))
@@ -544,6 +560,9 @@ pascal_value_print (struct value *val, struct ui_file *stream,
 		    const struct value_print_options *options)
 {
   struct type *type = value_type (val);
+  struct value_print_options opts = *options;
+
+  opts.deref_ref = 1;
 
   /* If it is a pointer, indicate what it points to.
 
@@ -570,7 +589,7 @@ pascal_value_print (struct value *val, struct ui_file *stream,
 	  fprintf_filtered (stream, ") ");
 	}
     }
-  return common_val_print (val, stream, 0, options, current_language);
+  return common_val_print (val, stream, 0, &opts, current_language);
 }
 
 
@@ -757,6 +776,7 @@ pascal_object_print_value_fields (struct type *type, const gdb_byte *valaddr,
 	      else
 		{
 		  struct value_print_options opts = *options;
+
 		  v = value_from_longest (TYPE_FIELD_TYPE (type, i),
 				   unpack_field_as_long (type, valaddr, i));
 
@@ -775,6 +795,7 @@ pascal_object_print_value_fields (struct type *type, const gdb_byte *valaddr,
 		{
 		  /* struct value *v = value_static_field (type, i); v4.17 specific */
 		  struct value *v;
+
 		  v = value_from_longest (TYPE_FIELD_TYPE (type, i),
 				   unpack_field_as_long (type, valaddr, i));
 
@@ -787,6 +808,7 @@ pascal_object_print_value_fields (struct type *type, const gdb_byte *valaddr,
 	      else
 		{
 		  struct value_print_options opts = *options;
+
 		  opts.deref_ref = 0;
 		  /* val_print (TYPE_FIELD_TYPE (type, i),
 		     valaddr + TYPE_FIELD_BITPOS (type, i) / 8,
@@ -830,7 +852,7 @@ pascal_object_print_value (struct type *type, const gdb_byte *valaddr,
 			   struct type **dont_print_vb)
 {
   struct type **last_dont_print
-  = (struct type **) obstack_next_free (&dont_print_vb_obstack);
+    = (struct type **) obstack_next_free (&dont_print_vb_obstack);
   struct obstack tmp_obstack = dont_print_vb_obstack;
   int i, n_baseclasses = TYPE_N_BASECLASSES (type);
 
@@ -853,10 +875,10 @@ pascal_object_print_value (struct type *type, const gdb_byte *valaddr,
       if (BASETYPE_VIA_VIRTUAL (type, i))
 	{
 	  struct type **first_dont_print
-	  = (struct type **) obstack_base (&dont_print_vb_obstack);
+	    = (struct type **) obstack_base (&dont_print_vb_obstack);
 
 	  int j = (struct type **) obstack_next_free (&dont_print_vb_obstack)
-	  - first_dont_print;
+	    - first_dont_print;
 
 	  while (--j >= 0)
 	    if (baseclass == first_dont_print[j])
@@ -887,6 +909,7 @@ pascal_object_print_value (struct type *type, const gdb_byte *valaddr,
 	{
 	  /* FIXME (alloc): not safe is baseclass is really really big. */
 	  gdb_byte *buf = alloca (TYPE_LENGTH (baseclass));
+
 	  base_valaddr = buf;
 	  if (target_read_memory (address + boffset, buf,
 				  TYPE_LENGTH (baseclass)) != 0)

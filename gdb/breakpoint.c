@@ -255,6 +255,7 @@ bpdisp_text (enum bpdisp disp)
   /* NOTE: the following values are a part of MI protocol and represent
      values of 'disp' field returned when inferior stops at a breakpoint.  */
   static char *bpdisps[] = {"del", "dstp", "dis", "keep"};
+
   return bpdisps[(int) disp];
 }
 
@@ -481,6 +482,7 @@ alloc_counted_command_line (struct command_line *commands)
 {
   struct counted_command_line *result
     = xmalloc (sizeof (struct counted_command_line));
+
   result->refc = 1;
   result->commands = commands;
   return result;
@@ -741,6 +743,7 @@ set_breakpoint_condition (struct breakpoint *b, char *exp,
   else
     {
       char *arg = exp;
+
       /* I don't know if it matters whether this is the string the user
 	 typed in or the decompiled expression.  */
       b->cond_string = xstrdup (arg);
@@ -806,6 +809,7 @@ static void
 check_no_tracepoint_commands (struct command_line *commands)
 {
   struct command_line *c;
+
   for (c = commands; c; c = c->next)
     {
       int i;
@@ -853,7 +857,6 @@ validate_commands_for_breakpoint (struct breakpoint *b,
       struct command_line *while_stepping = 0;
       for (c = commands; c; c = c->next)
 	{
-	  char *l = c->line;
 	  if (c->control_type == while_stepping_control)
 	    {
 	      if (b->type == bp_fast_tracepoint)
@@ -873,7 +876,6 @@ validate_commands_for_breakpoint (struct breakpoint *b,
 	  c2 = while_stepping->body_list[0];
 	  for (; c2; c2 = c2->next)
 	    {
-	      char *l = c2->line;
 	      if (c2->control_type == while_stepping_control)
 		error (_("The 'while-stepping' command cannot be nested"));
 	    }
@@ -904,6 +906,7 @@ void
 check_tracepoint_command (char *line, void *closure)
 {
   struct breakpoint *b = closure;
+
   validate_actionline (&line, b);
 }
 
@@ -1168,7 +1171,6 @@ static void
 insert_catchpoint (struct ui_out *uo, void *args)
 {
   struct breakpoint *b = (struct breakpoint *) args;
-  int val = -1;
 
   gdb_assert (b->type == bp_catchpoint);
   gdb_assert (b->ops != NULL && b->ops->insert != NULL);
@@ -1345,9 +1347,7 @@ update_watchpoint (struct breakpoint *b, int reparse)
 {
   int within_current_scope;
   struct frame_id saved_frame_id;
-  struct bp_location *loc;
   int frame_saved;
-  bpstat bs;
 
   /* If this is a local watchpoint, we only want to check if the
      watchpoint frame is in scope if the current thread is the thread
@@ -1648,7 +1648,6 @@ insert_bp_location (struct bp_location *bpt,
 	    {
 	      if (automatic_hardware_breakpoints)
 		{
-		  int changed = 0;
 		  enum bp_loc_type new_type;
 		  
 		  if (mr->attrib.mode != MEM_RW)
@@ -1659,6 +1658,7 @@ insert_bp_location (struct bp_location *bpt,
 		  if (new_type != bpt->loc_type)
 		    {
 		      static int said = 0;
+
 		      bpt->loc_type = new_type;
 		      if (!said)
 			{
@@ -1939,9 +1939,6 @@ insert_breakpoint_locations (void)
 
   ALL_BP_LOCATIONS (b, bp_tmp)
     {
-      struct thread_info *tp;
-      CORE_ADDR last_addr;
-
       if (!should_be_inserted (b) || b->inserted)
 	continue;
 
@@ -2396,7 +2393,6 @@ static int
 remove_breakpoint_1 (struct bp_location *b, insertion_state_t is)
 {
   int val;
-  struct cleanup *old_chain;
 
   if (b->owner->enable_state == bp_permanent)
     /* Permanent breakpoints cannot be inserted or removed.  */
@@ -2483,9 +2479,6 @@ remove_breakpoint_1 (struct bp_location *b, insertion_state_t is)
     }
   else if (b->loc_type == bp_loc_hardware_watchpoint)
     {
-      struct value *v;
-      struct value *n;
-
       b->inserted = (is == mark_inserted);
       val = target_remove_watchpoint (b->address, b->length, 
 				      b->watchpoint_type);
@@ -2758,7 +2751,6 @@ int
 software_breakpoint_inserted_here_p (struct address_space *aspace, CORE_ADDR pc)
 {
   struct bp_location *bpt, **bptp_tmp;
-  int any_breakpoint_here = 0;
 
   ALL_BP_LOCATIONS (bpt, bptp_tmp)
     {
@@ -3464,6 +3456,7 @@ breakpoint_cond_eval (void *exp)
 {
   struct value *mark = value_mark ();
   int i = !value_true (evaluate_expression ((struct expression *) exp));
+
   value_free_to_mark (mark);
   return i;
 }
@@ -3526,7 +3519,6 @@ watchpoints_triggered (struct target_waitstatus *ws)
     if (is_hardware_watchpoint (b))
       {
 	struct bp_location *loc;
-	struct value *v;
 
 	b->watchpoint_triggered = watch_triggered_no;
 	for (loc = b->loc; loc; loc = loc->next)
@@ -3759,8 +3751,6 @@ bpstat_check_watchpoint (bpstat bs)
 
   if (is_watchpoint (b))
     {
-      CORE_ADDR addr;
-      struct value *v;
       int must_check_value = 0;
       
       if (b->type == bp_watchpoint)
@@ -4035,7 +4025,7 @@ bpstat_stop_status (struct address_space *aspace,
 		    CORE_ADDR bp_addr, ptid_t ptid)
 {
   struct breakpoint *b = NULL;
-  struct bp_location *bl, **blp_tmp;
+  struct bp_location *bl;
   struct bp_location *loc;
   /* Root of the chain of bpstat's */
   struct bpstats root_bs[1];
@@ -4415,6 +4405,7 @@ int
 bpstat_should_step (void)
 {
   struct breakpoint *b;
+
   ALL_BREAKPOINTS (b)
     if (breakpoint_enabled (b) && b->type == bp_watchpoint && b->loc != NULL)
       return 1;
@@ -4496,7 +4487,6 @@ print_one_breakpoint_location (struct breakpoint *b,
 			       int allflag)
 {
   struct command_line *l;
-  struct symbol *sym;
   struct ep_type_description
     {
       enum bptype type;
@@ -4889,11 +4879,13 @@ do_captured_breakpoint_query (struct ui_out *uiout, void *data)
   struct captured_breakpoint_query_args *args = data;
   struct breakpoint *b;
   struct bp_location *dummy_loc = NULL;
+
   ALL_BREAKPOINTS (b)
     {
       if (args->bnum == b->number)
 	{
 	  int print_address_bits = breakpoint_address_bits (b);
+
 	  print_one_breakpoint (b, &dummy_loc, print_address_bits, 0);
 	  return GDB_RC_OK;
 	}
@@ -4905,6 +4897,7 @@ enum gdb_rc
 gdb_breakpoint_query (struct ui_out *uiout, int bnum, char **error_message)
 {
   struct captured_breakpoint_query_args args;
+
   args.bnum = bnum;
   /* For the moment we don't trust print_one_breakpoint() to not throw
      an error. */
@@ -5121,6 +5114,7 @@ breakpoint_has_pc (struct breakpoint *b,
 		   CORE_ADDR pc, struct obj_section *section)
 {
   struct bp_location *bl = b->loc;
+
   for (; bl; bl = bl->next)
     {
       if (bl->pspace == pspace
@@ -5328,7 +5322,7 @@ adjust_breakpoint_address (struct gdbarch *gdbarch,
 static struct bp_location *
 allocate_bp_location (struct breakpoint *bpt)
 {
-  struct bp_location *loc, *loc_p;
+  struct bp_location *loc;
 
   loc = xmalloc (sizeof (struct bp_location));
   memset (loc, 0, sizeof (*loc));
@@ -5543,6 +5537,7 @@ void
 make_breakpoint_permanent (struct breakpoint *b)
 {
   struct bp_location *bl;
+
   b->enable_state = bp_permanent;
 
   /* By definition, permanent breakpoints are already present in the code. 
@@ -5572,6 +5567,7 @@ set_longjmp_breakpoint (int thread)
 	&& b->type == bp_longjmp_master)
       {
 	struct breakpoint *clone = clone_momentary_breakpoint (b);
+
 	clone->type = bp_longjmp;
 	clone->thread = thread;
       }
@@ -5775,6 +5771,7 @@ disable_breakpoints_in_unloaded_shlib (struct so_list *solib)
   ALL_BP_LOCATIONS (loc, locp_tmp)
   {
     struct breakpoint *b = loc->owner;
+
     if ((loc->loc_type == bp_loc_hardware_breakpoint
 	 || loc->loc_type == bp_loc_software_breakpoint)
 	&& solib->pspace == loc->pspace
@@ -5999,11 +5996,13 @@ insert_catch_syscall (struct breakpoint *b)
   else
     {
       int i, iter;
+
       for (i = 0;
            VEC_iterate (int, b->syscalls_to_be_caught, i, iter);
            i++)
 	{
           int elem;
+
 	  if (iter >= VEC_length (int, inf->syscalls_counts))
 	    {
               int old_size = VEC_length (int, inf->syscalls_counts);
@@ -6041,6 +6040,7 @@ remove_catch_syscall (struct breakpoint *b)
   else
     {
       int i, iter;
+
       for (i = 0;
            VEC_iterate (int, b->syscalls_to_be_caught, i, iter);
            i++)
@@ -6079,6 +6079,7 @@ breakpoint_hit_catch_syscall (struct breakpoint *b)
   if (b->syscalls_to_be_caught)
     {
       int i, iter;
+
       for (i = 0;
            VEC_iterate (int, b->syscalls_to_be_caught, i, iter);
            i++)
@@ -6160,6 +6161,7 @@ print_one_catch_syscall (struct breakpoint *b,
     {
       int i, iter;
       char *text = xstrprintf ("%s", "");
+
       for (i = 0;
            VEC_iterate (int, b->syscalls_to_be_caught, i, iter);
            i++)
@@ -7106,6 +7108,7 @@ create_breakpoints_sal (struct gdbarch *gdbarch,
 			int enabled)
 {
   int i;
+
   for (i = 0; i < sals.nelts; ++i)
     {
       struct symtabs_and_lines expanded = 
@@ -7129,6 +7132,7 @@ parse_breakpoint_sals (char **address,
 		       int *not_found_ptr)
 {
   char *addr_start = *address;
+
   *addr_string = NULL;
   /* If no arg given, or if first arg is 'if ', use the default
      breakpoint. */
@@ -7138,6 +7142,7 @@ parse_breakpoint_sals (char **address,
       if (default_breakpoint_valid)
 	{
 	  struct symtab_and_line sal;
+
 	  init_sal (&sal);		/* initialize to zeroes */
 	  sals->sals = (struct symtab_and_line *)
 	    xmalloc (sizeof (struct symtab_and_line));
@@ -7188,11 +7193,13 @@ parse_breakpoint_sals (char **address,
   if (addr_start != (*address))
     {
       int i;
+
       for (i = 0; i < sals->nelts; i++)
 	{
 	  /* Add the string if not present. */
 	  if ((*addr_string)[i] == NULL)
-	    (*addr_string)[i] = savestring (addr_start, (*address) - addr_start);
+	    (*addr_string)[i] = savestring (addr_start, 
+					    (*address) - addr_start);
 	}
     }
 }
@@ -7206,6 +7213,7 @@ breakpoint_sals_to_pc (struct symtabs_and_lines *sals,
 		       char *address)
 {    
   int i;
+
   for (i = 0; i < sals->nelts; i++)
     resolve_sal_pc (&sals->sals[i]);
 }
@@ -7269,6 +7277,7 @@ find_condition_and_thread (char *tok, CORE_ADDR pc,
       int toklen;
       char *cond_start = NULL;
       char *cond_end = NULL;
+
       while (*tok == ' ' || *tok == '\t')
 	tok++;
       
@@ -7343,7 +7352,6 @@ create_breakpoint (struct gdbarch *gdbarch,
   struct symtabs_and_lines sals;
   struct symtab_and_line pending_sal;
   char *copy_arg;
-  char *err_msg;
   char *addr_start = arg;
   char **addr_string;
   struct cleanup *old_chain;
@@ -7484,7 +7492,6 @@ create_breakpoint (struct gdbarch *gdbarch,
     }
   else
     {
-      struct symtab_and_line sal = {0};
       struct breakpoint *b;
 
       make_cleanup (xfree, copy_arg);
@@ -7552,7 +7559,6 @@ break_command_1 (char *arg, int flag, int from_tty)
 		     from_tty,
 		     1 /* enabled */);
 }
-
 
 
 /* Helper function for break_command_1 and disassemble_command.  */
@@ -7715,7 +7721,6 @@ stopat_command (char *arg, int from_tty)
 static void
 watch_command_1 (char *arg, int accessflag, int from_tty)
 {
-  struct gdbarch *gdbarch = get_current_arch ();
   struct breakpoint *b, *scope_breakpoint = NULL;
   struct expression *exp;
   struct block *exp_valid_block = NULL, *cond_exp_valid_block = NULL;
@@ -8218,7 +8223,8 @@ typedef enum
 catch_fork_kind;
 
 static void
-catch_fork_command_1 (char *arg, int from_tty, struct cmd_list_element *command)
+catch_fork_command_1 (char *arg, int from_tty, 
+		      struct cmd_list_element *command)
 {
   struct gdbarch *gdbarch = get_current_arch ();
   char *cond_string = NULL;
@@ -8264,7 +8270,8 @@ catch_fork_command_1 (char *arg, int from_tty, struct cmd_list_element *command)
 }
 
 static void
-catch_exec_command_1 (char *arg, int from_tty, struct cmd_list_element *command)
+catch_exec_command_1 (char *arg, int from_tty, 
+		      struct cmd_list_element *command)
 {
   struct gdbarch *gdbarch = get_current_arch ();
   int tempflag;
@@ -8324,9 +8331,11 @@ print_exception_catchpoint (struct breakpoint *b)
 }
 
 static void
-print_one_exception_catchpoint (struct breakpoint *b, struct bp_location **last_loc)
+print_one_exception_catchpoint (struct breakpoint *b, 
+				struct bp_location **last_loc)
 {
   struct value_print_options opts;
+
   get_user_print_options (&opts);
   if (opts.addressprint)
     {
@@ -8416,7 +8425,6 @@ catch_exception_command_1 (enum exception_event_kind ex_event, char *arg,
 			   int tempflag, int from_tty)
 {
   char *cond_string = NULL;
-  struct symtab_and_line *sal = NULL;
 
   if (!arg)
     arg = "";
@@ -8443,6 +8451,7 @@ static void
 catch_catch_command (char *arg, int from_tty, struct cmd_list_element *command)
 {
   int tempflag = get_cmd_context (command) == CATCH_TEMPORARY;
+
   catch_exception_command_1 (EX_EVENT_CATCH, arg, tempflag, from_tty);
 }
 
@@ -8452,6 +8461,7 @@ static void
 catch_throw_command (char *arg, int from_tty, struct cmd_list_element *command)
 {
   int tempflag = get_cmd_context (command) == CATCH_TEMPORARY;
+
   catch_exception_command_1 (EX_EVENT_THROW, arg, tempflag, from_tty);
 }
 
@@ -8516,7 +8526,6 @@ catch_ada_exception_command (char *arg, int from_tty,
   struct gdbarch *gdbarch = get_current_arch ();
   int tempflag;
   struct symtab_and_line sal;
-  enum bptype type;
   char *addr_string = NULL;
   char *exp_string = NULL;
   char *cond_string = NULL;
@@ -8594,7 +8603,8 @@ catch_syscall_split_args (char *arg)
 /* Implement the "catch syscall" command.  */
 
 static void
-catch_syscall_command_1 (char *arg, int from_tty, struct cmd_list_element *command)
+catch_syscall_command_1 (char *arg, int from_tty, 
+			 struct cmd_list_element *command)
 {
   int tempflag;
   VEC(int) *filter;
@@ -9219,6 +9229,7 @@ static void
 update_global_location_list_nothrow (int inserting)
 {
   struct gdb_exception e;
+
   TRY_CATCH (e, RETURN_MASK_ERROR)
     update_global_location_list (inserting);
 }
@@ -9228,6 +9239,7 @@ static void
 bpstat_remove_bp_location (bpstat bps, struct bp_location *loc)
 {
   bpstat bs;
+
   for (bs = bps; bs; bs = bs->next)
     if (bs->breakpoint_at == loc)
       {
@@ -9254,7 +9266,6 @@ void
 delete_breakpoint (struct breakpoint *bpt)
 {
   struct breakpoint *b;
-  struct bp_location *loc, *next;
 
   gdb_assert (bpt != NULL);
 
@@ -9418,7 +9429,8 @@ ambiguous_names_p (struct bp_location *loc)
 {
   struct bp_location *l;
   htab_t htab = htab_create_alloc (13, htab_hash_string,
-				   (int (*) (const void *, const void *)) streq,
+				   (int (*) (const void *, 
+					     const void *)) streq,
 				   NULL, xcalloc, xfree);
 
   for (l = loc; l != NULL; l = l->next)
@@ -9558,14 +9570,11 @@ breakpoint_re_set_one (void *bint)
 {
   /* get past catch_errs */
   struct breakpoint *b = (struct breakpoint *) bint;
-  struct value *mark;
-  int i;
   int not_found = 0;
   int *not_found_ptr = &not_found;
   struct symtabs_and_lines sals = {0};
   struct symtabs_and_lines expanded = {0};
   char *s;
-  enum enable_state save_enable;
   struct gdb_exception e;
   struct cleanup *cleanups = make_cleanup (null_cleanup, NULL);
 
@@ -9990,6 +9999,7 @@ static void
 disable_command (char *args, int from_tty)
 {
   struct breakpoint *bpt;
+
   if (args == 0)
     ALL_BREAKPOINTS (bpt)
       switch (bpt->type)
@@ -10025,8 +10035,7 @@ disable_command (char *args, int from_tty)
 static void
 do_enable_breakpoint (struct breakpoint *bpt, enum bpdisp disposition)
 {
-  int target_resources_ok, other_type_used;
-  struct value *mark;
+  int target_resources_ok;
 
   if (bpt->type == bp_hardware_breakpoint)
     {
@@ -10090,6 +10099,7 @@ static void
 enable_command (char *args, int from_tty)
 {
   struct breakpoint *bpt;
+
   if (args == 0)
     ALL_BREAKPOINTS (bpt)
       switch (bpt->type)
@@ -10191,6 +10201,7 @@ struct symtabs_and_lines
 decode_line_spec_1 (char *string, int funfirstline)
 {
   struct symtabs_and_lines sals;
+
   if (string == 0)
     error (_("Empty line specification."));
   if (default_breakpoint_valid)
@@ -10311,7 +10322,8 @@ remove_single_step_breakpoints (void)
 /* Check whether a software single-step breakpoint is inserted at PC.  */
 
 static int
-single_step_breakpoint_inserted_here_p (struct address_space *aspace, CORE_ADDR pc)
+single_step_breakpoint_inserted_here_p (struct address_space *aspace, 
+					CORE_ADDR pc)
 {
   int i;
 
@@ -10379,6 +10391,7 @@ catch_syscall_completer (struct cmd_list_element *cmd,
                          char *text, char *word)
 {
   const char **list = get_syscall_names ();
+
   return (list == NULL) ? NULL : complete_on_enum (list, text, word);
 }
 

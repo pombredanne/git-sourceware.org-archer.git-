@@ -287,6 +287,7 @@ print_frame_args (struct symbol *func, struct frame_info *frame,
 	  if (*SYMBOL_LINKAGE_NAME (sym))
 	    {
 	      struct symbol *nsym;
+
 	      nsym = lookup_symbol (SYMBOL_LINKAGE_NAME (sym),
 				    b, VAR_DOMAIN, NULL);
 	      gdb_assert (nsym != NULL);
@@ -484,6 +485,7 @@ static void
 gdb_disassembly_stub (void *args)
 {
   struct gdb_disassembly_stub_args *p = args;
+
   gdb_disassembly (p->gdbarch, uiout, 0,
                    DISASSEMBLY_RAW_INSN, p->how_many,
                    p->low, p->high);
@@ -623,6 +625,7 @@ print_frame_info (struct frame_info *frame, int print_level,
 	  else
 	    {
 	      struct value_print_options opts;
+
 	      get_user_print_options (&opts);
 	      /* We used to do this earlier, but that is clearly
 		 wrong. This function is used by many different
@@ -720,6 +723,7 @@ find_frame_funname (struct frame_info *frame, char **funname,
 		 with DMGL_PARAMS turned on, and here we don't want to
 		 display parameters.  So remove the parameters.  */
 	      char *func_only = cp_remove_params (*funname);
+
 	      if (func_only)
 		{
 		  *funname = func_only;
@@ -791,6 +795,7 @@ print_frame (struct frame_info *frame, int print_level,
     {
       struct print_args_args args;
       struct cleanup *args_list_chain;
+
       args.frame = frame;
       args.func = find_pc_function (get_frame_address_in_block (frame));
       args.stream = gdb_stdout;
@@ -813,6 +818,7 @@ print_frame (struct frame_info *frame, int print_level,
       if (ui_out_is_mi_like_p (uiout))
 	{
 	  const char *fullname = symtab_to_fullname (sal.symtab);
+
 	  if (fullname != NULL)
 	    ui_out_field_string (uiout, "fullname", fullname);
 	}
@@ -865,9 +871,6 @@ parse_frame_specification_1 (const char *frame_exp, const char *message,
     numargs = 0;
   else
     {
-      char *addr_string;
-      struct cleanup *tmp_cleanup;
-
       numargs = 0;
       while (1)
 	{
@@ -921,6 +924,7 @@ parse_frame_specification_1 (const char *frame_exp, const char *message,
     {
       struct frame_info *fid;
       int level = value_as_long (args[0]);
+
       fid = find_relative_frame (get_current_frame (), &level);
       if (level == 0)
 	/* find_relative_frame was successful */
@@ -930,6 +934,7 @@ parse_frame_specification_1 (const char *frame_exp, const char *message,
   /* Convert each value into a corresponding address.  */
   {
     int i;
+
     for (i = 0; i < numargs; i++)
       addrs[i] = value_as_address (args[i]);
   }
@@ -994,7 +999,7 @@ frame_info (char *addr_exp, int from_tty)
   struct symbol *func;
   struct symtab *s;
   struct frame_info *calling_frame_info;
-  int i, count, numregs;
+  int numregs;
   char *funname = 0;
   enum language funlang = language_unknown;
   const char *pc_regname;
@@ -1036,6 +1041,7 @@ frame_info (char *addr_exp, int from_tty)
 	     with DMGL_PARAMS turned on, and here we don't want to
 	     display parameters.  So remove the parameters.  */
 	  char *func_only = cp_remove_params (funname);
+
 	  if (func_only)
 	    {
 	      funname = func_only;
@@ -1197,6 +1203,7 @@ frame_info (char *addr_exp, int from_tty)
 	    int sp_size = register_size (gdbarch, gdbarch_sp_regnum (gdbarch));
 	    gdb_byte value[MAX_REGISTER_SIZE];
 	    CORE_ADDR sp;
+
 	    frame_register_unwind (fi, gdbarch_sp_regnum (gdbarch),
 				   &optimized, &lval, &addr,
 				   &realnum, value);
@@ -1314,8 +1321,6 @@ backtrace_command_1 (char *count_exp, int show_locals, int from_tty)
 
   if (info_verbose)
     {
-      struct partial_symtab *ps;
-
       /* Read in symbols for all of the frames.  Need to do this in a
          separate pass so that "Reading in symbols for xxx" messages
          don't screw up the appearance of the backtrace.  Also if
@@ -1325,6 +1330,7 @@ backtrace_command_1 (char *count_exp, int show_locals, int from_tty)
       for (fi = trailing; fi != NULL && i--; fi = get_prev_frame (fi))
 	{
 	  CORE_ADDR pc;
+
 	  QUIT;
 	  pc = get_frame_address_in_block (fi);
 	  find_pc_sect_symtab_via_partial (pc, find_pc_mapped_section (pc));
@@ -1377,6 +1383,7 @@ static int
 backtrace_command_stub (void *data)
 {
   struct backtrace_command_args *args = data;
+
   backtrace_command_1 (args->count_exp, args->show_locals, args->from_tty);
   return 0;
 }
@@ -1448,6 +1455,7 @@ static void
 backtrace_full_command (char *arg, int from_tty)
 {
   struct backtrace_command_args btargs;
+
   btargs.count_exp = arg;
   btargs.show_locals = 1;
   btargs.from_tty = from_tty;
@@ -1516,6 +1524,7 @@ print_block_frame_labels (struct gdbarch *gdbarch, struct block *b,
 	{
 	  struct symtab_and_line sal;
 	  struct value_print_options opts;
+
 	  sal = find_pc_line (SYMBOL_VALUE_ADDRESS (sym), 0);
 	  values_printed = 1;
 	  fputs_filtered (SYMBOL_PRINT_NAME (sym), stream);
@@ -1693,8 +1702,6 @@ locals_info (char *args, int from_tty)
 static void
 catch_info (char *ignore, int from_tty)
 {
-  struct symtab_and_line *sal;
-
   /* Assume g++ compiled code; old GDB 4.16 behaviour.  */
   print_frame_label_vars (get_selected_frame (_("No frame selected.")),
                           0, gdb_stdout);
@@ -1819,6 +1826,7 @@ find_relative_frame (struct frame_info *frame, int *level_offset_ptr)
   while (*level_offset_ptr > 0)
     {
       struct frame_info *prev = get_prev_frame (frame);
+
       if (!prev)
 	break;
       (*level_offset_ptr)--;
@@ -1829,6 +1837,7 @@ find_relative_frame (struct frame_info *frame, int *level_offset_ptr)
   while (*level_offset_ptr < 0)
     {
       struct frame_info *next = get_next_frame (frame);
+
       if (!next)
 	break;
       (*level_offset_ptr)++;
@@ -1909,6 +1918,7 @@ down_silently_base (char *count_exp)
 {
   struct frame_info *frame;
   int count = -1;
+
   if (count_exp)
     count = -parse_and_eval_long (count_exp);
 
@@ -2015,6 +2025,7 @@ If you continue, the return value that you specified will be ignored.\n";
   if (from_tty)
     {
       int confirmed;
+
       if (thisfun == NULL)
 	confirmed = query (_("%sMake selected stack frame return now? "),
 			   query_prefix);
@@ -2147,10 +2158,6 @@ void _initialize_stack (void);
 void
 _initialize_stack (void)
 {
-#if 0
-  backtrace_limit = 30;
-#endif
-
   add_com ("return", class_stack, return_command, _("\
 Make selected stack frame return to its caller.\n\
 Control remains in the debugger, but when you continue\n\
@@ -2255,12 +2262,4 @@ source line."),
 			        show_disassemble_next_line,
 			        &setlist, &showlist);
   disassemble_next_line = AUTO_BOOLEAN_FALSE;
-
-#if 0
-  add_cmd ("backtrace-limit", class_stack, set_backtrace_limit_command, _(\
-"Specify maximum number of frames for \"backtrace\" to print by default."),
-	   &setlist);
-  add_info ("backtrace-limit", backtrace_limit_info, _("\
-The maximum number of frames for \"backtrace\" to print by default."));
-#endif
 }
