@@ -270,8 +270,6 @@ this platform."));
 #endif /* !HAVE_PERSONALITY */
 }
 
-static int linux_parent_pid;
-
 struct simple_pid_list
 {
   int pid;
@@ -370,6 +368,7 @@ static void
 add_to_pid_list (struct simple_pid_list **listp, int pid, int status)
 {
   struct simple_pid_list *new_pid = xmalloc (sizeof (struct simple_pid_list));
+
   new_pid->pid = pid;
   new_pid->status = status;
   new_pid->next = *listp;
@@ -385,6 +384,7 @@ pull_pid_from_list (struct simple_pid_list **listp, int pid, int *status)
     if ((*p)->pid == pid)
       {
 	struct simple_pid_list *next = (*p)->next;
+
 	*status = (*p)->status;
 	xfree (*p);
 	*p = next;
@@ -405,8 +405,6 @@ linux_record_stopped_pid (int pid, int status)
 static void
 linux_tracefork_child (void)
 {
-  int ret;
-
   ptrace (PTRACE_TRACEME, 0, 0, 0);
   kill (getpid (), SIGSTOP);
   fork ();
@@ -867,7 +865,6 @@ holding the child stopped.  Try \"set detach-on-fork\" or \
     }
   else
     {
-      struct thread_info *tp;
       struct inferior *parent_inf, *child_inf;
       struct lwp_info *lp;
       struct program_space *parent_pspace;
@@ -1651,6 +1648,7 @@ get_pending_status (struct lwp_info *lp, int *status)
   else if (non_stop && !is_executing (lp->ptid))
     {
       struct thread_info *tp = find_thread_ptid (lp->ptid);
+
       signo = tp->stop_signal;
     }
   else if (!non_stop)
@@ -1663,6 +1661,7 @@ get_pending_status (struct lwp_info *lp, int *status)
       if (GET_LWP (lp->ptid) == GET_LWP (last_ptid))
 	{
 	  struct thread_info *tp = find_thread_ptid (lp->ptid);
+
 	  signo = tp->stop_signal;
 	}
     }
@@ -1752,7 +1751,6 @@ linux_nat_detach (struct target_ops *ops, char *args, int from_tty)
 {
   int pid;
   int status;
-  enum target_signal sig;
   struct lwp_info *main_lwp;
 
   pid = GET_PID (inferior_ptid);
@@ -2215,8 +2213,6 @@ linux_handle_extended_wait (struct lwp_info *lp, int status,
 	ourstatus->kind = TARGET_WAITKIND_VFORKED;
       else
 	{
-	  struct cleanup *old_chain;
-
 	  ourstatus->kind = TARGET_WAITKIND_IGNORE;
 	  new_lp = add_lwp (BUILD_LWP (new_pid, GET_PID (lp->ptid)));
 	  new_lp->cloned = 1;
@@ -2475,7 +2471,6 @@ static int
 linux_nat_has_pending_sigint (int pid)
 {
   sigset_t pending, blocked, ignored;
-  int i;
 
   linux_proc_pending_signals (pid, &pending, &blocked, &ignored);
 
@@ -3811,6 +3806,7 @@ linux_nat_kill (struct target_ops *ops)
   else
     {
       ptid_t ptid = pid_to_ptid (ptid_get_pid (inferior_ptid));
+
       /* Stop all threads before killing them, since ptrace requires
 	 that the thread is stopped to sucessfully PTRACE_KILL.  */
       iterate_over_lwps (ptid, stop_callback, NULL);
@@ -4059,7 +4055,6 @@ linux_nat_find_memory_regions (int (*func) (CORE_ADDR,
   long long addr, endaddr, size, offset, inode;
   char permissions[8], device[8], filename[MAXPATHLEN];
   int read, write, exec;
-  int ret;
   struct cleanup *cleanup;
 
   /* Compose the filename for the /proc memory map, and open it.  */
@@ -4350,6 +4345,7 @@ static char *
 linux_spu_make_corefile_notes (bfd *obfd, char *note_data, int *note_size)
 {
   struct linux_spu_corefile_data args;
+
   args.obfd = obfd;
   args.note_data = note_data;
   args.note_size = note_size;
@@ -4367,13 +4363,11 @@ static char *
 linux_nat_make_corefile_notes (bfd *obfd, int *note_size)
 {
   struct linux_nat_corefile_thread_data thread_args;
-  struct cleanup *old_chain;
   /* The variable size must be >= sizeof (prpsinfo_t.pr_fname).  */
   char fname[16] = { '\0' };
   /* The variable size must be >= sizeof (prpsinfo_t.pr_psargs).  */
   char psargs[80] = { '\0' };
   char *note_data = NULL;
-  ptid_t current_ptid = inferior_ptid;
   ptid_t filter = pid_to_ptid (ptid_get_pid (inferior_ptid));
   gdb_byte *auxv;
   int auxv_len;
@@ -4443,7 +4437,6 @@ linux_nat_info_proc_cmd (char *args, int from_tty)
   int cwd_f = 1;
   int exe_f = 1;
   int mappings_f = 0;
-  int environ_f = 0;
   int status_f = 0;
   int stat_f = 0;
   int all = 0;
@@ -4509,6 +4502,7 @@ linux_nat_info_proc_cmd (char *args, int from_tty)
       if ((procfile = fopen (fname1, "r")) != NULL)
 	{
 	  struct cleanup *cleanup = make_cleanup_fclose (procfile);
+
           if (fgets (buffer, sizeof (buffer), procfile))
             printf_filtered ("cmdline = '%s'\n", buffer);
           else
@@ -4604,6 +4598,7 @@ linux_nat_info_proc_cmd (char *args, int from_tty)
       if ((procfile = fopen (fname1, "r")) != NULL)
 	{
 	  struct cleanup *cleanup = make_cleanup_fclose (procfile);
+
 	  while (fgets (buffer, sizeof (buffer), procfile) != NULL)
 	    puts_filtered (buffer);
 	  do_cleanups (cleanup);
@@ -4898,7 +4893,6 @@ linux_proc_pending_signals (int pid, sigset_t *pending, sigset_t *blocked, sigse
 {
   FILE *procfile;
   char buffer[MAXPATHLEN], fname[MAXPATHLEN];
-  int signum;
   struct cleanup *cleanup;
 
   sigemptyset (pending);
@@ -4935,8 +4929,8 @@ linux_proc_pending_signals (int pid, sigset_t *pending, sigset_t *blocked, sigse
 
 static LONGEST
 linux_nat_xfer_osdata (struct target_ops *ops, enum target_object object,
-                    const char *annex, gdb_byte *readbuf,
-                    const gdb_byte *writebuf, ULONGEST offset, LONGEST len)
+		       const char *annex, gdb_byte *readbuf,
+		       const gdb_byte *writebuf, ULONGEST offset, LONGEST len)
 {
   /* We make the process list snapshot when the object starts to be
      read.  */
@@ -4956,7 +4950,7 @@ linux_nat_xfer_osdata (struct target_ops *ops, enum target_object object,
   if (offset == 0)
     {
       if (len_avail != -1 && len_avail != 0)
-       obstack_free (&obstack, NULL);
+	obstack_free (&obstack, NULL);
       len_avail = 0;
       buf = NULL;
       obstack_init (&obstack);
@@ -4964,60 +4958,63 @@ linux_nat_xfer_osdata (struct target_ops *ops, enum target_object object,
 
       dirp = opendir ("/proc");
       if (dirp)
-       {
-         struct dirent *dp;
-         while ((dp = readdir (dirp)) != NULL)
-           {
-             struct stat statbuf;
-             char procentry[sizeof ("/proc/4294967295")];
+	{
+	  struct dirent *dp;
 
-             if (!isdigit (dp->d_name[0])
-                 || NAMELEN (dp) > sizeof ("4294967295") - 1)
-               continue;
+	  while ((dp = readdir (dirp)) != NULL)
+	    {
+	      struct stat statbuf;
+	      char procentry[sizeof ("/proc/4294967295")];
 
-             sprintf (procentry, "/proc/%s", dp->d_name);
-             if (stat (procentry, &statbuf) == 0
-                 && S_ISDIR (statbuf.st_mode))
-               {
-                 char *pathname;
-                 FILE *f;
-                 char cmd[MAXPATHLEN + 1];
-                 struct passwd *entry;
+	      if (!isdigit (dp->d_name[0])
+		  || NAMELEN (dp) > sizeof ("4294967295") - 1)
+		continue;
 
-                 pathname = xstrprintf ("/proc/%s/cmdline", dp->d_name);
-                 entry = getpwuid (statbuf.st_uid);
+	      sprintf (procentry, "/proc/%s", dp->d_name);
+	      if (stat (procentry, &statbuf) == 0
+		  && S_ISDIR (statbuf.st_mode))
+		{
+		  char *pathname;
+		  FILE *f;
+		  char cmd[MAXPATHLEN + 1];
+		  struct passwd *entry;
 
-                 if ((f = fopen (pathname, "r")) != NULL)
-                   {
-                     size_t len = fread (cmd, 1, sizeof (cmd) - 1, f);
-                     if (len > 0)
-                       {
-                         int i;
-                         for (i = 0; i < len; i++)
-                           if (cmd[i] == '\0')
-                             cmd[i] = ' ';
-                         cmd[len] = '\0';
+		  pathname = xstrprintf ("/proc/%s/cmdline", dp->d_name);
+		  entry = getpwuid (statbuf.st_uid);
 
-                         obstack_xml_printf (
-			   &obstack,
-			   "<item>"
-			   "<column name=\"pid\">%s</column>"
-			   "<column name=\"user\">%s</column>"
-			   "<column name=\"command\">%s</column>"
-			   "</item>",
-			   dp->d_name,
-			   entry ? entry->pw_name : "?",
-			   cmd);
-                       }
-                     fclose (f);
-                   }
+		  if ((f = fopen (pathname, "r")) != NULL)
+		    {
+		      size_t len = fread (cmd, 1, sizeof (cmd) - 1, f);
 
-                 xfree (pathname);
-               }
-           }
+		      if (len > 0)
+			{
+			  int i;
 
-         closedir (dirp);
-       }
+			  for (i = 0; i < len; i++)
+			    if (cmd[i] == '\0')
+			      cmd[i] = ' ';
+			  cmd[len] = '\0';
+
+			  obstack_xml_printf (
+			    &obstack,
+			    "<item>"
+			    "<column name=\"pid\">%s</column>"
+			    "<column name=\"user\">%s</column>"
+			    "<column name=\"command\">%s</column>"
+			    "</item>",
+			    dp->d_name,
+			    entry ? entry->pw_name : "?",
+			    cmd);
+			}
+		      fclose (f);
+		    }
+
+		  xfree (pathname);
+		}
+	    }
+
+	  closedir (dirp);
+	}
 
       obstack_grow_str0 (&obstack, "</osdata>\n");
       buf = obstack_finish (&obstack);
@@ -5363,7 +5360,6 @@ linux_nat_stop_lwp (struct lwp_info *lwp, void *data)
 {
   if (!lwp->stopped)
     {
-      int pid, status;
       ptid_t ptid = lwp->ptid;
 
       if (debug_linux_nat)
@@ -5493,6 +5489,7 @@ linux_nat_core_of_thread_1 (ptid_t ptid)
   for (;;)
     {
       int n;
+
       content = xrealloc (content, content_read + 1024);
       n = fread (content + content_read, 1, 1024, f);
       content_read += n;
@@ -5528,6 +5525,7 @@ int
 linux_nat_core_of_thread (struct target_ops *ops, ptid_t ptid)
 {
   struct lwp_info *info = find_lwp_pid (ptid);
+
   if (info)
     return info->core;
   return -1;
@@ -5624,8 +5622,6 @@ extern initialize_file_ftype _initialize_linux_nat;
 void
 _initialize_linux_nat (void)
 {
-  sigset_t mask;
-
   add_info ("proc", linux_nat_info_proc_cmd, _("\
 Show /proc process information about any running process.\n\
 Specify any process id, or use the program being debugged by default.\n\

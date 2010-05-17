@@ -1,3 +1,828 @@
+2010-05-16  Michael Snyder  <msnyder@vmware.com>
+
+	* scm-exp.c: White space.
+	* scm-lang.c: White space.
+	* scm-valprint.c: White space.
+	* sentinel-frame.c: White space.
+	* ser-base.c: White space.
+	* ser-go32.c: White space.
+	* serial.c: White space.
+	* ser-mingw.c: White space.
+	* ser-pipe.c: White space.
+	* ser-tcp.c: White space.
+	* ser-unix.c: White space.
+	* solib.c: White space.
+	* solib-darwin.c: White space.
+	* solib-frv.c: White space.
+	* solib-irix.c: White space.
+	* solib-osf.c: White space.
+	* solib-pa64.c: White space.
+	* solib-som.c: White space.
+	* solib-spu.c: White space.
+	* solib-svr4.c: White space.
+	* solib-target.c: White space.
+	* source.c: White space.
+	* stabsread.c: White space.
+	* stack.c: White space.
+	* std-regs.c: White space.
+	* symfile.c: White space.
+	* symmisc.c: White space.
+	* symtab.c: White space.
+
+2010-05-16  Michael Snyder  <msnyder@vmware.com>
+
+	* source.c (_initialize_source): Add "rev" as an abbreviation
+	for the "reverse-search" command.
+
+2010-05-16  Michael Snyder  <msnyder@vmware.com>
+
+	* record.c: White space.
+	* regcache.c: White space.
+	* reggroups.c: White space.
+	* remote-fileio.c: White space.
+	* remote-m32r-sdi.c: White space.
+	* remote-mips.c: White space.
+	* remote-sim.c: White space.
+	* remote.c: White space.
+	(process_g_packet): Remove orphan braces.
+
+2010-05-15  Michael Snyder  <msnyder@vmware.com>
+
+	* parse.c: White space.
+	* p-lang.c: White space.
+	* posix-hdep.c: White space.
+	* printcmd.c: White space.
+	* progspace.c: White space.
+	* prologue-value.c: White space.
+	* psymtab.c: White space.
+	* p-typeprint.c: White space.
+	* p-valprint.c: White space.
+
+	* objc-lang.c: White space.
+	* objfiles.c: White space.
+	* observer.c: White space.
+	* osabi.c: White space.
+	* osdata.c: White space.
+
+	* m2-lang.c: White space.
+	* m2-valprint.c: White space.
+	* macrocmd.c: White space.
+	* macroexp.c: White space.
+	* macroscope.c: White space.
+	* macrotab.c: White space.
+	* main.c: White space.
+	* maint.c: White space.
+	* mdebugread.c: White space.
+	* memattr.c: White space.
+	* minsyms.c: White space.
+	* monitor.c: White space.
+
+2010-05-14  Michael Snyder  <msnyder@vmware.com>
+
+	* jv-lang.c: White space.
+	* jv-typeprint.c: White space.
+	* jv-valprint.c: White space.
+	* language.c: White space.
+	* libunwind-frame.c: White space.
+	* linespec.c: White space.
+	* linux-nat.c: White space.
+	* linux-record.c: White space.
+	* linux-thread-db.c: White space.
+
+	* infcall.c: White space.
+	* inf-child.c: White space.
+	* infcmd.c: White space.
+	* inferior.c: White space.
+	* inf-loop.c: White space.
+	* inflow.c: White space.
+	* inline-frame.c: White space.
+	* interps.c: White space.
+
+	* gcore.c: White space.
+	* gdb.c: White space.
+	* gdbtypes.c: White space.
+	* gnu-nat.c: White space.
+	* gnu-v2-abi.c: White space.
+	* gnu-v3-abi.c: White space.
+
+	* findcmd.c: White space.
+	* findvar.c: White space.
+	* fork-child.c: White space.
+	* frame-base.c: White space.
+	* frame.c: White space.
+	* frame-unwind.c: White space.
+	* f-valprint.c: White space.
+
+	* elfread.c: White space.
+	* environ.c: White space.
+	* eval.c: White space.
+	* event-loop.c: White space.
+	* event-top.c: White space.
+	* exceptions.c: White space.
+	* exec.c: White space.
+	* expprint.c: White space.
+
+	* dbxread.c: White space.
+	* dcache.c: White space.
+	* disasm.c: White space.
+	* doublest.c: White space.
+	* dsrec.c: White space.
+	* dummy-frame.c: White space.
+	* dwarf2expr.c: White space.
+	* dwarf2-frame.c: White space.
+	* dwarf2loc.c: White space.
+	* dwarf2read.c: White space.
+
+2010-05-14  Phil Muldoon  <pmuldoon@redhat.com>
+
+ 	PR python/11482
+
+	* python/py-value.c (valpy_hash): New function.
+	(value_object_type): Register valpy_hash.
+
+2010-05-14  Hui Zhu  <teawater@gmail.com>
+            Michael Snyder  <msnyder@vmware.com>
+
+	* linux-fork.c (gdbthread.h): New include.
+	(fork_info): Add parent_ptid.
+	(inferior_call_waitpid_cleanup, inferior_call_waitpid): New
+	functions.
+	(delete_checkpoint_command): Call inferior_call_waitpid.
+	(checkpoint_command): Set parent_ptid.
+
+2010-05-13  Michael Snyder  <msnyder@vmware.com>
+
+	* dictionary.c: Re-indent to GNU coding standard.
+
+	* charset.c: White space.
+	* c-lang.c: White space.
+	* cli-out.c: White space.
+	* coffread.c: White space.
+	* complaints.c: White space.
+	* completer.c: White space.
+	* corefile.c: White space.
+	* corelow.c: White space.
+	* cp-abi.c: White space.
+	* cp-namespace.c: White space.
+	* cp-support.c: White space.
+	* cp-valprint.c: White space.
+	* c-typeprint.c: White space.
+	* c-valprint.c: White space.
+	* blockframe.c: White space.
+	* breakpoint.c: White space.
+	* buildsym.c: White space.
+	* blockframe.c: White space.
+	* bcache.c: White space.
+	* gdbarch.sh: White space, add blank lines.
+	* arch-utils.c: Ditto.
+	* gdbarch.c: Regenerate.
+	* frame.c: White space, add blank lines.
+	* stack.c: White space, add blank lines.
+	(initialize_stack): Remove long-dead code.
+
+2010-05-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* dwarf2loc.c (dwarf2_evaluate_loc_desc): Change the parameter to type.
+	(locexpr_read_variable, loclist_read_variable): Update the callers.
+
+2010-05-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* dwarf2read.c (die_type, die_descriptive_type): Remove variable type.
+	Remove check of NULL returned by tag_type_to_type.
+	(die_containing_type): Remove variable type.  Remove type_die variable
+	initialization.  Remove check of NULL returned by tag_type_to_type.
+
+2010-05-11  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	PR exp/11530.
+	* gdbtypes.c (lookup_struct_elt_type): Also lookup
+	names of unnamed structures or unions.
+
+2010-05-11  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* procfs.c (proc_watchpoint_address): New function.
+	(procfs_stopped_by_watchpoint): Remove useless check after 
+	find_procinfo_or_die call.
+	(procfs_stopped_data_address): New function.
+	(procfs_use_watchpoints): Register new watchpoint related function.
+
+2010-05-11  Tom Tromey  <tromey@redhat.com>
+
+	* eval.c (evaluate_subexp_standard): Revert inadvertent change.
+
+2010-05-10  Michael Snyder  <msnyder@vmware.com>
+
+	* utils.c: White space cleanup.
+
+2010-05-10  Tom Tromey  <tromey@redhat.com>
+
+	* eval.c (ptrmath_type_p): Add 'lang' argument.
+	(evaluate_subexp_standard): Update.
+	(evaluate_subexp_with_coercion): Update.
+	* language.h (CAST_IS_CONVERSION): Add 'LANG' argument.
+
+2010-05-10  Michael Snyder  <msnyder@vmware.com>
+
+	* utils.c (do_fclose_cleanup) Restore local variable.
+
+2010-05-09  Doug Evans  <dje@google.com>
+
+	* record.c (init_record_core_ops): Rename record_core to record-core.
+
+2010-05-08  Joel Brobecker  <brobecker@adacore.com>
+
+	Implement task switching on pa-hpux.
+	* inf-ttrace.c (inf_ttrace_get_ada_task_ptid): New function.
+	(inf_ttrace_target): Set t->to_get_ada_task_ptid.
+
+2010-05-08  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* valops.c (find_overload_match): Add missing i18n markup.
+
+2010-05-08  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* p-exp.y (exp : SIZEOF '(' exp ')'): New rule.
+
+2010-05-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (typename_concat): Use (char *) NULL terminated stdarg
+	list for the obconcat call.
+	* mdebugread.c (parse_symbol): Likewise.
+	* stabsread.c (define_symbol, read_member_functions, read_cpp_abbrev):
+	Likewise.
+	* symfile.c (obconcat): Replace the s1, s2 and s3 parameters by `...'.
+	New variable ap.  Remove variables len and val.
+	* symfile.h (obconcat): Likewise for the prototype.
+
+2010-05-07  Michael Snyder  <msnyder@vmware.com>
+
+	* python/python.c (execute_gdb_command): Remove unused variables.
+	* python/py-block.c (gdbpy_block_for_pc): Remove unused variable.
+	* python/py-breakpoint.c (gdbpy_breakpoint_created): 
+	Remove unused variable.
+	* python/py-cmd.c (cmdpy_function): Remove unused variable.
+	(cmdpy_completer): Remove unused variable.
+	* python/py-frame.c (frapy_find_sal): Remove unused variable.
+	* python/py-function.c (fnpy_call): Remove unused variable.
+	* python/py-objfile.c (objfile_to_objfile_object):
+	Remove unused variable.
+	* python/py-param.c (parmpy_init): Remove unused variable.
+	* python/py-prettyprint.c (apply_varobj_pretty_printer): 
+	Remove unused variable.
+	(gdbpy_default_visualizer): Remove unused variable.
+	* python/py-progspace.c (pspace_to_pspace_object):
+	Remove unused variable.
+	* python/py-symtab.c (symtab_and_line_to_sal_object): 
+	Remove unused variable.
+	* python/py-type.c (typy_template_argument): 
+	Remove unused variable.
+	* python/py-value.c (valpy_string): Remove unused variable.
+	(convert_value_from_python): Remove unused variables.
+
+2010-05-07  Michael Snyder  <msnyder@vmware.com>
+
+	* valops.c (value_cast_pointers): Restore unused variable 'type1',
+	and use it to compute variable 't1'.
+
+2010-05-07  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (assign_aggregate): Remove unused variable.
+
+2010-05-07  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	PR C++/7943:
+	* valops.c (find_overload_match): Handle fsym == NULL case.
+	Add int no_adl argument.
+	(find_oload_champ_namespace_loop): Call make_symbol_overload_list_adl
+	when appropriate.
+	Add int no_adl argument.
+	(find_oload_champ_namespace): 	Add int no_adl argument.
+	* parse.c (operator_length_standard): Return length for OP_ADL_FUNC
+	expression.
+	* expprint.c (op_name_standard): Added string for OP_ADL_FUNC case.
+	* eval.c (evaluate_subexp_standard): Added OP_ADL_FUNC case.
+	Evaluate arguments and use them to perform ADL lookup.
+	Pass no_adl argument to find_overload_match.
+	Disable adl lookup when evaluating a fully qualified OP_FUNCALL.
+	* cp-support.h: Added prototype for
+	make_symbol_overload_list_namespace.
+	* cp-support.c (make_symbol_overload_list_namespace): New function.
+	(make_symbol_overload_list_adl_namespace): New function.
+	(make_symbol_overload_list_adl): New function.
+	(make_symbol_overload_list_using): Moved code to add function to
+	overload set to make_symbol_overload_list_namespace.
+	* c-exp.y: create UNKNOWN_CPP_NAME token.
+	Add parse rule for ADL functions.
+	(classify_name): Recognize an UNKNOWN_CPP_NAME.
+
+2010-05-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* fbsd-nat.c (fbsd_make_corefile_notes): Add cast to NULL used as
+	sentinel.
+
+2010-05-07  Joel Brobecker  <brobecker@adacore.com>
+
+	Implement task switching on solaris targets.
+	* sol-thread.c (thread_db_find_thread_from_tid)
+	(sol_get_ada_task_ptid): New functions.
+	(init_sol_thread_ops): Set sol_thread_ops.to_get_ada_task_ptid.
+
+2010-05-07  Pedro Alves  <pedro@codesourcery.com>
+
+	* remote.c (remote_query_supported_append): Use reconcat.
+	(remote_query_supported): Install a cleanup.  Use reconcat.
+
+2010-05-07  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdbarch.sh (qsupported): Delete.
+	* gdbarch.h, gdbarch.c: Regenerate.
+	* remote.c (remote_query_supported): Remove use of
+	gdbarch_qsupported.
+
+2010-05-06  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	* xml-syscall.c (syscall_start_syscalls_info): Remove unused
+	function.
+
+2010-05-06  Michael Snyder  <msnyder@vmware.com>
+
+	* xml-support.c (xinclude_start_include): Delete unused variable.
+	(xml_process_xincludes): Delete unused variable.
+	* xml-syscall.c (syscall_parse_xml): Delete unused variable.
+	* target-descriptions.c (tdesc_gdb_type): Delete unused variable.
+	(tdesc_find_arch_register): Delete unused variable.
+	(tdesc_use_registers): Delete unused variable.
+	* xml-tdesc.c (tdesc_start_target): Delete unused variable.
+	* inferior.c (print_inferior): Delete unused variable.
+	* record.c (record_open_1): Delete unused variable.
+	(record_restore): Delete unused variable.
+	(cmd_record_save): Delete unused variable.
+	* gcore.c (derive_heap_segment): Delete unused variable.
+	(objfile_find_memory_regions): Use unused variable.
+	* jit.c (jit_inferior_init): Delete unused variable.
+	* progspace.c (clone_program_space): Delete unused variable.
+	(pspace_empty_p): Delete unused variable.
+	
+	* frame-unwind.c (frame_unwind_find_by_frame): 
+	Delete unused variable.
+	* gnu-v2-abi.c (gnuv2_value_rtti_type): Delete unused variable.
+	* cp-support.c (mangled_name_to_comp): Delete unused variable.
+	(method_name_from_physname): Delete unused variable.
+	(cp_func_name): Delete unused variable.
+	(cp_validate_operator): Delete unused variable.
+	* cp-namespace.c (cp_scan_for_anonymous_namespaces): 
+	Delete unused variable.
+	* trad-frame.c (trad_frame_get_prev_register): 
+	Delete unused variable.
+	* tramp-frame.c (tramp_frame_cache): Delete unused variable.
+
+	* serial.c (serial_for_fd): Delete unused variable.
+	* mdebugread.c (psymtab_to_symtab_1): Delete unused variable.
+	* top.c (execute_command): Delete unused variable.
+	(init_main): Delete unused variable.
+	* utils.c (do_fclose_cleanup): Delete unused variable.
+	(do_all_inferior_continuations): Delete unused variable.
+	(initialize_utils): Delete unused variable.
+	(internal_problem_mode): Delete unused global.
+	* frame.c (get_prev_frame): Delete unused global.
+	(get_frame_locals_address): Delete unused global.
+	(get_frame_args_address): Delete unused global.
+
+	* p-typeprint.c (pascal_type_print_base): Delete unused variable.
+	(pascal_type_print_varspec_prefix): Delete unused variable.
+	* f-typeprint.c (f_type_print_base): Delete unused variable.
+	(f_type_print_varspec_suffix): Delete unused variable.
+	* m2-typeprint.c (m2_print_type): Delete unused variable.
+	(m2_long_set): Delete unused variable.
+	* ada-valprint.c (ada_val_print_1): Delete unused variable.
+	* d-valprint.c (dynamic_array_type): Delete unused variable.
+	* f-valprint.c (f77_get_dynamic_length_of_aggregate): 
+	Delete unused variable.
+	(f77_create_arrayprint_offset_tbl): Delete unused variable.
+	* m2-valprint.c (m2_val_print): Delete unused variable.
+
+	* ui-out.c (ui_out_field_int): Delete unused variable.
+	(ui_out_field_fmt_int): Delete unused variable.
+	* varobj.c (varobj_list_children): Delete unused variable.
+	(varobj_set_value): Delete unused variable.
+	(install_new_value_visualizer): Delete unused variable.
+	(varobj_set_visualizer): Delete unused variable.
+	(varobj_update): Delete unused variable.
+	(varobj_editable_p): Delete unused variable.
+	(c_value_of_root): Delete unused variable.
+	(cplus_describe_child): Delete unused variable.
+
+	* ada-lang.c (add_defn_to_vec): Delete unused variable.
+	(decode_constrained_packed_array_type): Delete unused variable.
+	(add_defn_to_vec): Delete unused variable.
+	(symbol_completion_match): Delete unused variable.
+	(value_tag_from_contents_and_address): Delete unused variable.
+	(ada_evaluate_subexp): Delete unused variable.
+	* c-lang.c (classify_type): Delete unused variable.
+	* f-lang.c (f_printstr): Delete unused variable.
+	* objc-lang.c (objc_printstr): Delete unused variable.
+	* ada-tasks.c (get_known_tasks_addr): Delete unused variable.
+	* jv-lang.c (type_from_class): ifdef unused variable.
+	(java_class_name_from_physname): Delete unused variable.
+	* m2-lang.c (m2_printstr): Delete unused variable.
+
+	* objfiles.c (objfile_relocate): Delete unused variable.
+	* maint.c (_initialize_maint_cmds): Delete unused variable.
+	* demangle.c (_initialize_demangler): Delete unused variable.
+	* corefile.c (reopen_exec_file): Delete unused variable.
+	* dwarf2expr.c (dwarf2_read_address): Delete unused variable.
+	* dwarf2-frame.c (decode_frame_entry): Delete unused variable.
+
+	* osabi.c (_initialize_gdb_osabi): Delete unused variable.
+	* memattr.c (mem_delete): Delete unused variable.
+	(invalidate_target_mem_regions): Delete unused variable.
+	* mem-break.c (default_memory_insert_breakpoint):
+	Delete unused variable.
+	* target.c (target_get_osdata): Delete unused variable.
+	* parse.c (length_of_subexp): Delete unused variable.
+	(prefixify_subexp): Delete unused variable.
+	(exp_iterate): Delete unused variable.
+	* reverse.c (delete_bookmark_command): Delete unused variable.
+
+	* macrocmd.c (_initialize_macrocmd): Delete unused variable.
+	* macroexp.c (gather_arguments): Delete unused variable.
+	(substitute_args): Delete unused variable.
+	* completer.c (gdb_completer_loc_break_characters): Unused, delete.
+	* gdbarch.sh (gdbarch_printable_names): Delete unused variable.
+	(_initialize_gdbarch): Delete unused variable.
+	* gdbarch.c, gdbarch.h: Regenerate.
+	* arch-utils.c (initialize_current_architecture): 
+	Delete unused variable.
+	(_initialize_gdbarch_utils): Delete unused variable.
+	* gdbtypes.c (make_cv_type): Delete unused variable.
+	(make_type_with_address_space): Delete unused variable.
+
+	* linespec.c (decode_compound): Delete unused variable.
+	* dictionary.c (iterator_next_hashed): Delete unused variable.
+	* infcall.c (call_function_by_hand): Delete unused variable.
+	* infcmd.c (step_1): Delete unused variable.
+	(registers_info): Delete unused variable.
+	(attach_command): Delete unused variable.
+	* infrun.c (follow_exec): Delete unused variable.
+	(handle_step_into_function_backwards): Delete unused variable.
+	(_initialize_infrun): Delete unused variable.
+	* stack.c (parse_frame_specification_1): Delete unused variable.
+	(frame_info): Delete unused variable.
+	(backtrace_command_1): Delete unused variable.
+	(catch_info): Delete unused variable.
+
+	* eval.c (evaluate_subexp_standard): Delete unused variable.
+	* valops.c (value_cast_pointers): Delete unused variable.
+	(value_dynamic_cast): Delete unused variable.
+	(value_array): Delete unused variable.
+	(find_overload_match): Delete unused variable.
+	* valarith.c (value_subscript): Delete unused variable.
+	(value_binop): Delete unused variable.
+	* valprint.c (_initialize_valprint): Delete unused variable.
+	* printcmd.c (print_command_1): Delete unused variable.
+	(address_info): Delete unused variable.
+	(printf_command): Delete unused variable.
+
+	* auxv.c (target_auxv_search): Delete unused variable.
+	* blockframe.c (get_frame_block): Delete unused variable.
+	* regcache.c (regcache_cpy): Delete unused variable.
+	(regcache_cpy_no_passthrough): Delete unused variable.
+	* charset.c (wchar_iterate): Delete unused variable.
+	(find_charset_names): Delete unused variable.
+	(_initialize_charset): Delete unused variable.
+	* disasm.c (do_mixed_source_and_assembly): 
+	Delete unused variable.
+	* source.c (set_default_source_symtab_and_line): 
+	Delete unused variable.
+	(set_substitute_path_command): Delete unused variable.
+	* value.c (preserve_values): Delete unused variable.
+	(value_from_double): Delete unused variable.
+
+2010-05-05  Michael Snyder  <msnyder@vmware.com>
+
+	* psymtab.c (lookup_partial_symbol): Delete unused variable.
+	(find_last_source_symtab_from_partial): Delete unused variable.
+	* symfile.c (place_section): Delete unused variable.
+	(default_symfile_offsets): Delete unused variable.
+	(get_debug_link_info): Delete unused variable.
+	(find_separate_debug_file_by_debuglink): Delete unused variable.
+	(add_symbol_file_command): Delete unused variable.
+	(symfile_find_segment_sections): Delete unused variable.
+	* symmisc.c (free_symtab): Delete unused variable.
+	(dump_symtab_1): Delete unused variable.
+	* symtab.c (lookup_symbil_aux_quick): Delete unused variable.
+	(find_pc_sect_symtab): Delete unused variable.
+	(skip_prologue_using_lineinfo): Delete unused variable.
+	(sources_info): Delete unused variable.
+	(completion_list_add_name): Delete unused variable.
+	(expand_line_sal): Delete unused variable.
+
+	* breakpoint.c (validate_commands_for_breakpoint): 
+	Delete unused variables.
+	(insert_catchpoint): Delete unused variable.
+	(update_watchpoint): Delete unused variable.
+	(insert_bp_location): Delete unused variable.
+	(insert_breakpoint_locations): Delete unused variable.
+	(remove_breakpoint_1): Delete unused variable.
+	(software_breakpoint_inserted_here_p): Delete unused variable.
+	(watchpoints_triggered): Delete unused variable.
+	(bpstat_check_watchpoint): Delete unused variable.
+	(bpstat_stop_status): Delete unused variable.
+	(print_one_breakpoint_location): Delete unused variable.
+	(allocate_bp_location): Delete unused variable.
+	(create_breakpoint): Delete unused variable.
+	(watch_command_1): Delete unused variable.
+	(catch_exception_command_1): Delete unused variable.
+	(catch_ada_exception_command): Delete unused variable.
+	(delete_breakpoint): Delete unused variable.
+	(breakpoint_re_set_one): Delete unused variable.
+	(do_enable_breakpoint): Delete unused variable.
+
+2010-05-06  Pedro Alves  <pedro@codesourcery.com>
+
+	* amd64-tdep.c: Include disasm.h.
+	(amd64_insn_length_fprintf, amd64_insn_length_init_dis)
+	(amd64_insn_length): Moved to disasm.c and renamed.
+	(fixup_riprel): Adjust.
+	* disasm.c (do_ui_file_delete): New.
+	(gdb_insn_length): New.
+	(gdb_buffered_insn_length_fprintf)
+	(gdb_buffered_insn_length_init_dis)
+	(gdb_buffered_insn_length): New, moved from amd64-tdep.c, and
+	renamed.
+	* disasm.h (gdb_insn_length): Declare.
+	(gdb_buffered_insn_length): Declare.
+
+2010-05-06  Pedro Alves  <pedro@codesourcery.com>
+
+	* remote.c (clear_threads_parsing_context): New.
+	(remote_threads_info): Delete unused null_cleanup.  Install a
+	cleanup to clear the threads_parsing_context in case parsing
+	throws.
+
+2010-05-05  Michael Snyder  <msnyder@vmware.com>
+
+	* c-exp.y (parse_string_or_char): Delete unused variable.
+	(c_lex): Delete unused variable.
+	* cp-name-parser.y (cpname_lex): Delete unused variable.
+	* ada-exp.y (find_primitive_type): Delete unused variable.
+	(write_var_or_type): Delete unused variable.
+	* jv-exp.y (java_parse): Delete unused variable.
+	(push_expression_name): Delete unused variable.
+	* p-exp.y (pascal_lex): Delete unused variable.
+
+2010-05-05  Pedro Alves  <pedro@codesourcery.com>
+
+	* remote.c (remote_threads_info): Really revert previous previous
+	change.
+
+2010-05-05  Michael Snyder  <msnyder@vmware.com>
+
+	* elfread.c (elf_symtab_read): Delete unused variable.
+	(find_separate_debug_file_by_buildid): Delete unused variables.
+	(elf_symfile_read): Delete unused variable.
+
+	* coffread.c (coff_symfile_read): Delete unused variables.
+
+	* coff-pe-read.c (add_pe_exported_sym): Delete unused variable.
+	(read_pe_exported_syms): Delete unused variable.
+
+	* stabsread.c (define_symbol): Delete unused variable.
+
+	* dwarf2read.c (read_type_comp_unit_head): Delete unused variable.
+	(process_psymtab_comp_unit): Delete unused variable.
+	(dwarf2_build_psymtabs_hard): Delete unused variable.
+	(load_partial_comp_unit): Delete unused variable.
+	(create_all_comp_units): Delete unused variable.
+	(scan_partial_symbols): Delete unused variable.
+	(add_partial_symbol): Delete unused variable.
+	(add_partial_namespace): Delete unused variable.
+	(add_partial_enumeration): Delete unused variable.
+	(load_full_comp_unit): Delete unused variable.
+	(process_full_comp_unit): Delete unused variable.
+	(read_file_scope): Delete unused variable.
+	(read_type_unit_scope): Delete unused variable.
+	(process_structure_scope): Delete unused variable.
+	(process_enumeration_scope): Delete unused variable.
+	(read_tag_ptr_to_member_type): Delete unused variable.
+	(read_typedef): Delete unused variable.
+	(read_partial_die): Delete unused variable.
+	(decode_locdesc): Delete unused variable.
+	(zeroed_partial_die): Delete unused global variable.
+
+	* tui/tui-interp.c (_initialize_tui_interp): 
+	Delete unused variable.
+	* tui/tui-regs.c tui_display_registers_from): 
+	Delete unused variable.
+	(tui_check_register_values): Delete unused variable.
+	(tui_register_format): Delete unused variable.
+	* tui/tui-win.c (_initialize_tui_win): Delete unused variable.
+	* tui/tui-windata.c (tui_display_data_from_line): 
+	Delete unused variables.
+	(tui_vertical_data_scroll): Delete unused variables.
+
+2010-05-05  Michael Snyder  <msnyder@vmware.com>
+
+	* remote.c (remote_threads_info): Revert questionable part of
+	the previous change.
+
+2010-05-05  Michael Snyder  <msnyder@vmware.com>
+
+	* mi/mi-out.c (mi_table_begin): Delete unused variable.
+	* mi/mi-cmd-var.c (print_varobj): Delete unused variable.
+	(mi_cmd_var_list_children): Delete unused variable.
+	(varobj_update_one): Delete unused variable.
+	* mi/mi-cmd-break.c (mi_cmd_break_insert): Delete unused variables.
+	* mi/mi-cmd-stack.c (mi_cmd_stack_list_locals): 
+	Delete unused variable.
+	(mi_cmd_stack_list_variables): Delete unused variable.
+	(list_args_or_locals): Delete unused variable.
+	* mi/mi-cmd-file.c (mi_cmd_file_list_exec_source_file): 
+	Delete unused variables.
+	(mi_cmd_file_list_exec_source_files): Delete unused variable.
+	* mi/mi-cmd-target.c (mi_cmd_target_file_delete): 
+	Delete unused variable.
+	* mi/mi-interp.c (mi_interpreter_exec): Delete unused variable.
+	(mi_cmd_interpreter_exec): Delete unused variable.
+	(mi_on_normal_stop): Delete unused variable.
+	* mi/mi-main.c (run_one_inferior): Delete unused variable.
+	(print_one_inferior): Delete unused variables.
+	(mi_execute_command): Delete unused variable.
+	(mi_cmd_execute): Delete unused variable.
+	(timestamp): Delete unused variable.
+
+	* cli/cli-dump.c (dump_memory_to_file): Delete unused variable.
+	(restore_binary_file): Delete unused variable.
+	* cli/cli-decode.c (deprecated_cmd_warning): Delete unused variables.
+	* cli/cli-script.c (define_command): Delete unused variables.
+	(recurse_read_control_structure): Delete unused variable.
+	(script_from_file): Delete unused variable.
+	* cli/cli-cmds.c (complete_command): Delete unused variable.
+	(disassemble_command): Delete unused variable.
+
+	* ax-gdb.c (gen_struct_elt_for_reference): Delete unused variables.
+	* tracepoint.c (delete_trace_variable_command): 
+	Delete unused variables.
+	(encode_actions_1): Delete unused variables.
+	(start_tracing): Delete unused variable.
+	(trace_status_mi): Delete unused variable.
+	(tfind_1): Delete unused variable.
+	(trace_find_pc_command): Delete unused variable.
+	(trace_find_line_command): Delete unused variables.
+	(trace_find_range_command): Delete unused variables.
+	(trace_find_outside_command): Delete unused variables.
+	(parse_tracepoint_definition): Delete unused variables.
+	(tfile_fetch_registers): Delete unused variable.
+
+	* dcache.c (dcache_init): Delete unused variable.
+	(dcache_info): Delete unused variable.
+
+	* remote.c (remote_threads_info): Delete unused variable.
+	(process_stop_reply) :Delete unused variable.
+	(remote_get_trace_status): Delete unused variables.
+
+	* linux-thread-db.c (add_thread_db_info): Delete unused variable.
+	(thread_from_lwp): Delete unused variable.
+	(enable_thread_event_reporting): Delete unused variable.
+	(check_for_thread_db): Delete unused variables.
+	(thread_db_find_new_threads_2): Delete unused variable.
+	
+	* linux-fork.c (info_checkpoints_command): Delete unused variables.
+	(checkpoint_command): Delete unused variable.
+	(linux_fork_context): Delete unused variables.
+
+	* linux-nat.c (linux_parent_pid): Delete unused global variable.
+	(linux_tracefork_child): Delete unused variable.
+	(linux_child_follow_fork): Delete unused variable.
+	(linux_nat_detach): Delete unused variable.
+	(linux_handle_extended_wait): Delete unused variable.
+	(linux_nat_has_pending_sigint): Delete unused variable.
+	(linux_nat_find_memory_regions): Delete unused variable.
+	(linux_nat_make_corefile_notes): Delete unused variables.
+	(linux_nat_info_proc_cmd): Delete unused variable.
+	(linux_proc_pending_signals): Delete unused variable.
+	(linux_nat_stop_lwp): Delete unused variables.
+	(_initialize_linux_nat): Delete unused variable.
+
+	* ser-pipe.c (pipe_ops): Delete unused global variable.
+
+	* linux-record.c (record_linux_system_call): 
+	Delete unused variables.
+
+	* corelow.c (core_xfer_partial): Delete unused variables.
+
+	* solib-svr4.c (find_program_interpreter): Delete unused variable.
+	(svr4_solib_create_inferior_hook): Add ifdef around 
+	conditionally-used variable declarations.
+
+	* solib.c (solib_find): Delete unused variable.
+	(free_so_symbols): Delete unused variable.
+	(info_sharedlibrary_command): Delete unused variable.
+	(reload_shared_libraries_1): Delete unused variable.
+	(_initialize_solib): Delete unused variable.
+
+	* i386-tdep.c (i386_supply_xstateregset) Delete unused variable.
+	(i386_collect_xstateregset): Delete unused variable.
+	* i387-tdep.c (i387_print_float_info): Delete unused variable.
+
+	* features/i386/i386-mmx.c (initialize_tdesc_i386_mmx):
+	Delete unused variable 'type'.
+
+2010-05-05  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdbtypes.h (MAX_OF_TYPE, MIN_OF_TYPE): Delete macros.  *
+	ada-lang.c: Remove comment mentioning these macros.
+	* m2-exp.y: Delete commented out code.
+
+2010-05-05  Joel Brobecker  <brobecker@adacore.com>
+
+	* sparc-tdep.c (sparc_structure_or_union_p): Return non-zero
+	for array types.
+	* sparc64-tdep.c (sparc64_structure_or_union_p): Likewise.
+
+2010-05-04  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	ARI fix: Remove ATTRIBUTE_UNUSED throughout.
+	* arm-linux-tdep.c (arm_linux_cleanup_svc): Remove 
+	ATTRIBUTE_UNUSED.
+	(cleanup_kernel_helper_return): Likewise.
+	* arm-tdep.c (copy_unmodified): Likewise.
+	(copy_preload): Likewise.
+	(copy_copro_load_store): Likewise.
+	(cleanup_branch): Likewise.
+	(copy_b_bl_blx): Likewise.
+	(copy_bx_blx_reg): Likewise.
+	(copy_alu_imm): Likewise.
+	(copy_alu_reg): Likewise.
+	(copy_alu_shifted_reg): Likewise.
+	(cleanup_load): Likewise.
+	(cleanup_store): Likewise.
+	(cleanup_block_load_pc): Likewise.
+	(cleanup_svc): Likewise.
+	(copy_undef): Likewise.
+	(copy_unpred): Likewise.
+	* remote.c (register_remote_support_xml): Likewise.
+
+2010-05-05  Hui Zhu  <teawater@gmail.com>
+
+	* gdbarch.h (gdbarch_has_dos_based_file_system): Update comment.
+
+2010-05-04  Mark Kettenis  <kettenis@gnu.org>
+
+	* remote.c (register_remote_support_xml)
+	(remote_query_supported_append, remote_query_supported): Add cast
+	to NULL used as sentinel.
+	* tracepoint.c (tvariables_info_1): Likewise.
+	* utils.c (add_internal_problem_command): Likewise.
+
+2010-05-04  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* dwarf2loc.c (read_pieced_value, write_pieced_value,
+	dwarf2_evaluate_loc_desc): Handle not being able to access DWARF
+	registers gracefully.
+
+2010-05-04  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* exec.c (print_section_info): Display entry point without arch 
+	specific parts.
+
+2010-05-04  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	PR exp/11349.
+	* printcmd.c (x_command): Only dereference once implicitly for
+	TYPE_CODE_REF.
+
+2010-05-03  Doug Evans  <dje@google.com>
+
+	* event-loop.c (gdb_timer): Delete unused global.
+	(create_timer): Update.
+
+2010-05-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* cp-namespace.c (cp_lookup_symbol_imports): Support ALIAS for the
+	CURRENT->DECLARATION case.
+	* cp-support.h (struct using_direct): Provide extended comment.
+
+2010-05-03  Mark Kettenis  <kettenis@gnu.org>
+
+	* hppaobsd-tdep.c (HPPAOBSD_SIZEOF_GREGS): Renamed from
+	HPPABSD_SIZEOF_GREGS.
+	(HPPAOBSD_SIZEOF_FPREGS): New define.
+	(hppaobsd_supply_gregset): Renamed from hppabsd_supply_gregset.
+	(hppaobsd_supply_fpregset): New function.
+	(hppaobsd_gregset): Renamed from hppabsd_gregset.
+	(hppaobsd_fpregset): New variable.
+	(hppaobsd_regset_from_core_section): Handle floating-point registers.
+	(_initialize_hppabsd_tdep): Remove spurious blank line.
+
+2010-05-03  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	PR pascal/11349.
+	* p-valprint.c (pascal_value_print): Always dereference a value with
+	type code TYPE_CODE_REF.
+	
 2010-05-03  Pedro Alves  <pedro@codesourcery.com>
 
 	* remote.c (remote_notice_signals): New.

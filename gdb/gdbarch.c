@@ -260,7 +260,6 @@ struct gdbarch
   int has_global_breakpoints;
   gdbarch_has_shared_address_space_ftype *has_shared_address_space;
   gdbarch_fast_tracepoint_valid_at_ftype *fast_tracepoint_valid_at;
-  const char * qsupported;
   gdbarch_auto_charset_ftype *auto_charset;
   gdbarch_auto_wide_charset_ftype *auto_wide_charset;
   const char * solib_symbols_extension;
@@ -408,7 +407,6 @@ struct gdbarch startup_gdbarch =
   0,  /* has_global_breakpoints */
   default_has_shared_address_space,  /* has_shared_address_space */
   default_fast_tracepoint_valid_at,  /* fast_tracepoint_valid_at */
-  0,  /* qsupported */
   default_auto_charset,  /* auto_charset */
   default_auto_wide_charset,  /* auto_wide_charset */
   0,  /* solib_symbols_extension */
@@ -513,6 +511,7 @@ void *
 gdbarch_obstack_zalloc (struct gdbarch *arch, long size)
 {
   void *data = obstack_alloc (arch->obstack, size);
+
   memset (data, 0, size);
   return data;
 }
@@ -528,6 +527,7 @@ void
 gdbarch_free (struct gdbarch *arch)
 {
   struct obstack *obstack;
+
   gdb_assert (arch != NULL);
   gdb_assert (!arch->initialized_p);
   obstack = arch->obstack;
@@ -545,6 +545,7 @@ verify_gdbarch (struct gdbarch *gdbarch)
   struct cleanup *cleanups;
   long length;
   char *buf;
+
   log = mem_fileopen ();
   cleanups = make_cleanup_ui_file_delete (log);
   /* fundamental */
@@ -681,7 +682,6 @@ verify_gdbarch (struct gdbarch *gdbarch)
   /* Skip verify of has_global_breakpoints, invalid_p == 0 */
   /* Skip verify of has_shared_address_space, invalid_p == 0 */
   /* Skip verify of fast_tracepoint_valid_at, invalid_p == 0 */
-  /* Skip verify of qsupported, invalid_p == 0 */
   /* Skip verify of auto_charset, invalid_p == 0 */
   /* Skip verify of auto_wide_charset, invalid_p == 0 */
   /* Skip verify of has_dos_based_file_system, invalid_p == 0 */
@@ -701,6 +701,7 @@ void
 gdbarch_dump (struct gdbarch *gdbarch, struct ui_file *file)
 {
   const char *gdb_nm_file = "<not-defined>";
+
 #if defined (GDB_NM_FILE)
   gdb_nm_file = GDB_NM_FILE;
 #endif
@@ -1067,9 +1068,6 @@ gdbarch_dump (struct gdbarch *gdbarch, struct ui_file *file)
   fprintf_unfiltered (file,
                       "gdbarch_dump: push_dummy_code = <%s>\n",
                       host_address_to_string (gdbarch->push_dummy_code));
-  fprintf_unfiltered (file,
-                      "gdbarch_dump: qsupported = %s\n",
-                      gdbarch->qsupported);
   fprintf_unfiltered (file,
                       "gdbarch_dump: gdbarch_read_pc_p() = %d\n",
                       gdbarch_read_pc_p (gdbarch));
@@ -3616,23 +3614,6 @@ set_gdbarch_fast_tracepoint_valid_at (struct gdbarch *gdbarch,
 }
 
 const char *
-gdbarch_qsupported (struct gdbarch *gdbarch)
-{
-  gdb_assert (gdbarch != NULL);
-  /* Skip verify of qsupported, invalid_p == 0 */
-  if (gdbarch_debug >= 2)
-    fprintf_unfiltered (gdb_stdlog, "gdbarch_qsupported called\n");
-  return gdbarch->qsupported;
-}
-
-void
-set_gdbarch_qsupported (struct gdbarch *gdbarch,
-                        const char * qsupported)
-{
-  gdbarch->qsupported = qsupported;
-}
-
-const char *
 gdbarch_auto_charset (struct gdbarch *gdbarch)
 {
   gdb_assert (gdbarch != NULL);
@@ -3733,7 +3714,8 @@ gdbarch_data_register (gdbarch_data_pre_init_ftype *pre_init,
 		       gdbarch_data_post_init_ftype *post_init)
 {
   struct gdbarch_data_registration **curr;
-  /* Append the new registraration.  */
+
+  /* Append the new registration.  */
   for (curr = &gdbarch_data_registry.registrations;
        (*curr) != NULL;
        curr = &(*curr)->next);
@@ -3849,10 +3831,10 @@ gdbarch_printable_names (void)
 {
   /* Accumulate a list of names based on the registed list of
      architectures. */
-  enum bfd_architecture a;
   int nr_arches = 0;
   const char **arches = NULL;
   struct gdbarch_registration *rego;
+
   for (rego = gdbarch_registry;
        rego != NULL;
        rego = rego->next)
@@ -3881,6 +3863,7 @@ gdbarch_register (enum bfd_architecture bfd_architecture,
 {
   struct gdbarch_registration **curr;
   const struct bfd_arch_info *bfd_arch_info;
+
   /* Check that BFD recognizes this architecture */
   bfd_arch_info = bfd_lookup_arch (bfd_architecture, 0);
   if (bfd_arch_info == NULL)
@@ -4084,8 +4067,6 @@ extern void _initialize_gdbarch (void);
 void
 _initialize_gdbarch (void)
 {
-  struct cmd_list_element *c;
-
   add_setshow_zinteger_cmd ("arch", class_maintenance, &gdbarch_debug, _("\
 Set architecture debugging."), _("\
 Show architecture debugging."), _("\

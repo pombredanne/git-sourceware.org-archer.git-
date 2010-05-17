@@ -577,6 +577,7 @@ _bfd_vms_lib_archive_p (bfd *abfd, enum vms_lib_kind kind)
           off = bfd_getl16 (sbm->next);
           if (off != 0)
             {
+              /* Read the 'next' array.  */
               sbmdesc->next = (unsigned short *)bfd_alloc
                 (abfd, sbm_len * sizeof (unsigned short));
               buf1 = data + off;
@@ -585,6 +586,7 @@ _bfd_vms_lib_archive_p (bfd *abfd, enum vms_lib_kind kind)
             }
           else
             {
+              /* There is no next array if there is only one submap.  */
               BFD_ASSERT (tdata->nbr_dcxsbm == 1);
               sbmdesc->next = NULL;
             }
@@ -615,6 +617,14 @@ const bfd_target *
 _bfd_vms_lib_alpha_archive_p (bfd *abfd)
 {
   return _bfd_vms_lib_archive_p (abfd, vms_lib_alpha);
+}
+
+/* Standard function for ia64 libraries.  */
+
+const bfd_target *
+_bfd_vms_lib_ia64_archive_p (bfd *abfd)
+{
+  return _bfd_vms_lib_archive_p (abfd, vms_lib_ia64);
 }
 
 /* Standard function for text libraries.  */
@@ -1200,7 +1210,7 @@ vms_lib_bopen (bfd *el, file_ptr filepos)
   /* Check id.  */
   if (mhd->id != MHD__C_MHDID)
     return FALSE;
-  if (len >= sizeof (struct vms_mhd))
+  if (len >= MHD__C_MHDLEN + 1)
     el->selective_search = (mhd->objstat & MHD__M_SELSRC) ? 1 : 0;
   el->mtime = vms_rawtime_to_time_t (mhd->datim);
   el->mtime_set = TRUE;

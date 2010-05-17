@@ -205,6 +205,7 @@ obsavestring (const char *ptr, int size, struct obstack *obstackp)
     const char *p1 = ptr;
     char *p2 = p;
     const char *end = ptr + size;
+
     while (p1 != end)
       *p2++ = *p1++;
   }
@@ -212,19 +213,29 @@ obsavestring (const char *ptr, int size, struct obstack *obstackp)
   return p;
 }
 
-/* Concatenate strings S1, S2 and S3; return the new string.  Space is found
-   in the obstack pointed to by OBSTACKP.  */
+/* Concatenate NULL terminated variable argument list of `const char *' strings;
+   return the new string.  Space is found in the OBSTACKP.  Argument list must
+   be terminated by a sentinel expression `(char *) NULL'.  */
 
 char *
-obconcat (struct obstack *obstackp, const char *s1, const char *s2,
-	  const char *s3)
+obconcat (struct obstack *obstackp, ...)
 {
-  int len = strlen (s1) + strlen (s2) + strlen (s3) + 1;
-  char *val = (char *) obstack_alloc (obstackp, len);
-  strcpy (val, s1);
-  strcat (val, s2);
-  strcat (val, s3);
-  return val;
+  va_list ap;
+
+  va_start (ap, obstackp);
+  for (;;)
+    {
+      const char *s = va_arg (ap, const char *);
+
+      if (s == NULL)
+	break;
+
+      obstack_grow_str (obstackp, s);
+    }
+  va_end (ap);
+  obstack_1grow (obstackp, 0);
+
+  return obstack_finish (obstackp);
 }
 
 /* True if we are reading a symbol table. */
@@ -473,7 +484,6 @@ place_section (bfd *abfd, asection *sect, void *obj)
     for (cur_sec = abfd->sections; cur_sec != NULL; cur_sec = cur_sec->next)
       {
 	int indx = cur_sec->index;
-	CORE_ADDR cur_offset;
 
 	/* We don't need to compare against ourself.  */
 	if (cur_sec == sect)
@@ -739,7 +749,6 @@ default_symfile_offsets (struct objfile *objfile,
       struct place_section_arg arg;
       bfd *abfd = objfile->obfd;
       asection *cur_sec;
-      CORE_ADDR lowest = 0;
 
       for (cur_sec = abfd->sections; cur_sec != NULL; cur_sec = cur_sec->next)
 	/* We do not expect this to happen; just skip this step if the
@@ -1002,7 +1011,6 @@ syms_from_objfile (struct objfile *objfile,
 void
 new_symfile_objfile (struct objfile *objfile, int add_flags)
 {
-
   /* If this is the main symbol file we have to clean up all users of the
      old main symbol file. Otherwise it is sufficient to fixup all the
      breakpoints that may have been redefined by this symbol file.  */
@@ -1247,7 +1255,6 @@ get_debug_link_info (struct objfile *objfile, unsigned long *crc32_out)
   unsigned long crc32;
   char *contents;
   int crc_offset;
-  unsigned char *p;
 
   sect = bfd_get_section_by_name (objfile->obfd, ".gnu_debuglink");
 
@@ -1347,12 +1354,10 @@ The directory where separate debug symbols are searched for is \"%s\".\n"),
 char *
 find_separate_debug_file_by_debuglink (struct objfile *objfile)
 {
-  asection *sect;
-  char *basename, *name_copy, *debugdir;
+  char *basename, *debugdir;
   char *dir = NULL;
   char *debugfile = NULL;
   char *canon_name = NULL;
-  bfd_size_type debuglink_size;
   unsigned long crc32;
   int i;
 
@@ -1603,6 +1608,7 @@ symfile_bfd_open (char *name)
   if (desc < 0)
     {
       char *exename = alloca (strlen (name) + 5);
+
       strcat (strcpy (exename, name), ".exe");
       desc = openp (getenv ("PATH"), OPF_TRY_CWD_FIRST, exename,
 		    O_RDONLY | O_BINARY, &absolute_name);
@@ -2113,7 +2119,6 @@ add_symbol_file_command (char *args, int from_tty)
   char *filename = NULL;
   int flags = OBJF_USERLOADED;
   char *arg;
-  int expecting_option = 0;
   int section_index = 0;
   int argcnt = 0;
   int sec_num = 0;
@@ -3630,7 +3635,6 @@ symfile_find_segment_sections (struct objfile *objfile)
 
   for (i = 0, sect = abfd->sections; sect != NULL; i++, sect = sect->next)
     {
-      CORE_ADDR vma;
       int which = data->segment_info[i];
 
       if (which == 1)

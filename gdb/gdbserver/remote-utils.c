@@ -80,7 +80,19 @@ typedef int socklen_t;
 # define INVALID_DESCRIPTOR -1
 #endif
 
+/* Extra value for readchar_callback.  */
+enum {
+  /* The callback is currently not scheduled.  */
+  NOT_SCHEDULED = -1
+};
+
+/* Status of the readchar callback.
+   Either NOT_SCHEDULED or the callback id.  */
+static int readchar_callback = NOT_SCHEDULED;
+
 static int readchar (void);
+static void reset_readchar (void);
+static void reschedule (void);
 
 /* A cache entry for a successfully looked-up symbol.  */
 struct sym_cache
@@ -341,6 +353,8 @@ remote_close (void)
   close (remote_desc);
 #endif
   remote_desc = INVALID_DESCRIPTOR;
+
+  reset_readchar ();
 }
 
 /* Convert hex digit A to a number.  */
@@ -926,33 +940,83 @@ initialize_async_io (void)
   unblock_async_io ();
 }
 
+/* Internal buffer used by readchar.
+   These are global to readchar because reschedule_remote needs to be
+   able to tell whether the buffer is empty.  */
+
+static unsigned char readchar_buf[BUFSIZ];
+static int readchar_bufcnt = 0;
+static unsigned char *readchar_bufp;
+
 /* Returns next char from remote GDB.  -1 if error.  */
 
 static int
 readchar (void)
 {
-  static unsigned char buf[BUFSIZ];
-  static int bufcnt = 0;
-  static unsigned char *bufp;
+  int ch;
 
-  if (bufcnt-- > 0)
-    return *bufp++;
-
-  bufcnt = read (remote_desc, buf, sizeof (buf));
-
-  if (bufcnt <= 0)
+  if (readchar_bufcnt == 0)
     {
-      if (bufcnt == 0)
-	fprintf (stderr, "readchar: Got EOF\n");
-      else
-	perror ("readchar");
+      readchar_bufcnt = read (remote_desc, readchar_buf, sizeof (readchar_buf));
 
-      return -1;
+      if (readchar_bufcnt <= 0)
+	{
+	  if (readchar_bufcnt == 0)
+	    fprintf (stderr, "readchar: Got EOF\n");
+	  else
+	    perror ("readchar");
+
+	  return -1;
+	}
+
+      readchar_bufp = readchar_buf;
     }
 
-  bufp = buf;
-  bufcnt--;
-  return *bufp++;
+  readchar_bufcnt--;
+  ch = *readchar_bufp++;
+  reschedule ();
+  return ch;
+}
+
+/* Reset the readchar state machine.  */
+
+static void
+reset_readchar (void)
+{
+  readchar_bufcnt = 0;
+  if (readchar_callback != NOT_SCHEDULED)
+    {
+      delete_callback_event (readchar_callback);
+      readchar_callback = NOT_SCHEDULED;
+    }
+}
+
+/* Process remaining data in readchar_buf.  */
+
+static int
+process_remaining (void *context)
+{
+  int res;
+
+  /* This is a one-shot event.  */
+  readchar_callback = NOT_SCHEDULED;
+
+  if (readchar_bufcnt > 0)
+    res = handle_serial_event (0, NULL);
+  else
+    res = 0;
+
+  return res;
+}
+
+/* If there is still data in the buffer, queue another event to process it,
+   we can't sleep in select yet.  */
+
+static void
+reschedule (void)
+{
+  if (readchar_bufcnt > 0 && readchar_callback == NOT_SCHEDULED)
+    readchar_callback = append_callback_event (process_remaining, NULL);
 }
 
 /* Read a packet from the remote machine, with error checking,
@@ -1411,11 +1475,12 @@ clear_symbol_cache (struct sym_cache **symcache_p)
   *symcache_p = NULL;
 }
 
-/* Ask GDB for the address of NAME, and return it in ADDRP if found.
+/* Get the address of NAME, and return it in ADDRP if found.  if
+   MAY_ASK_GDB is false, assume symbol cache misses are failures.
    Returns 1 if the symbol is found, 0 if it is not, -1 on error.  */
 
 int
-look_up_one_symbol (const char *name, CORE_ADDR *addrp)
+look_up_one_symbol (const char *name, CORE_ADDR *addrp, int may_ask_gdb)
 {
   char own_buf[266], *p, *q;
   int len;
@@ -1432,12 +1497,9 @@ look_up_one_symbol (const char *name, CORE_ADDR *addrp)
 	return 1;
       }
 
-  /* If we've passed the call to thread_db_look_up_symbols, then
-     anything not in the cache must not exist; we're not interested
-     in any libraries loaded after that point, only in symbols in
-     libpthread.so.  It might not be an appropriate time to look
-     up a symbol, e.g. while we're trying to fetch registers.  */
-  if (proc->all_symbols_looked_up)
+  /* It might not be an appropriate time to look up a symbol,
+     e.g. while we're trying to fetch registers.  */
+  if (!may_ask_gdb)
     return 0;
 
   /* Send the request.  */

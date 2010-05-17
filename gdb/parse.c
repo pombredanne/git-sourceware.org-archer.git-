@@ -168,6 +168,7 @@ end_arglist (void)
 {
   int val = arglist_len;
   struct funcall *call = funcall_chain;
+
   funcall_chain = call->next;
   arglist_len = call->arglist_len;
   xfree (call);
@@ -214,10 +215,9 @@ void
 write_exp_elt_opcode (enum exp_opcode expelt)
 {
   union exp_element tmp;
+
   memset (&tmp, 0, sizeof (union exp_element));
-
   tmp.opcode = expelt;
-
   write_exp_elt (tmp);
 }
 
@@ -225,10 +225,9 @@ void
 write_exp_elt_sym (struct symbol *expelt)
 {
   union exp_element tmp;
+
   memset (&tmp, 0, sizeof (union exp_element));
-
   tmp.symbol = expelt;
-
   write_exp_elt (tmp);
 }
 
@@ -236,6 +235,7 @@ void
 write_exp_elt_block (struct block *b)
 {
   union exp_element tmp;
+
   memset (&tmp, 0, sizeof (union exp_element));
   tmp.block = b;
   write_exp_elt (tmp);
@@ -245,6 +245,7 @@ void
 write_exp_elt_objfile (struct objfile *objfile)
 {
   union exp_element tmp;
+
   memset (&tmp, 0, sizeof (union exp_element));
   tmp.objfile = objfile;
   write_exp_elt (tmp);
@@ -254,10 +255,9 @@ void
 write_exp_elt_longcst (LONGEST expelt)
 {
   union exp_element tmp;
+
   memset (&tmp, 0, sizeof (union exp_element));
-
   tmp.longconst = expelt;
-
   write_exp_elt (tmp);
 }
 
@@ -265,10 +265,9 @@ void
 write_exp_elt_dblcst (DOUBLEST expelt)
 {
   union exp_element tmp;
+
   memset (&tmp, 0, sizeof (union exp_element));
-
   tmp.doubleconst = expelt;
-
   write_exp_elt (tmp);
 }
 
@@ -288,10 +287,9 @@ void
 write_exp_elt_type (struct type *expelt)
 {
   union exp_element tmp;
+
   memset (&tmp, 0, sizeof (union exp_element));
-
   tmp.type = expelt;
-
   write_exp_elt (tmp);
 }
 
@@ -299,10 +297,9 @@ void
 write_exp_elt_intern (struct internalvar *expelt)
 {
   union exp_element tmp;
+
   memset (&tmp, 0, sizeof (union exp_element));
-
   tmp.internalvar = expelt;
-
   write_exp_elt (tmp);
 }
 
@@ -776,7 +773,7 @@ prefixify_expression (struct expression *expr)
 int
 length_of_subexp (struct expression *expr, int endpos)
 {
-  int oplen, args, i;
+  int oplen, args;
 
   operator_length (expr, endpos, &oplen, &args);
 
@@ -890,6 +887,13 @@ operator_length_standard (struct expression *expr, int endpos,
       args = 1;
       break;
 
+    case OP_ADL_FUNC:
+      oplen = longest_to_int (expr->elts[endpos - 2].longconst);
+      oplen = 4 + BYTES_TO_EXP_ELEM (oplen + 1);
+      oplen++;
+      oplen++;
+      break;
+
     case OP_LABELED:
     case STRUCTOP_STRUCT:
     case STRUCTOP_PTR:
@@ -984,7 +988,6 @@ prefixify_subexp (struct expression *inexpr,
   int args;
   int i;
   int *arglens;
-  enum exp_opcode opcode;
   int result = -1;
 
   operator_length (inexpr, inend, &oplen, &args);
@@ -1017,6 +1020,7 @@ prefixify_subexp (struct expression *inexpr,
   for (i = 0; i < args; i++)
     {
       int r;
+
       oplen = arglens[i];
       inend += oplen;
       r = prefixify_subexp (inexpr, outexpr, inend, outbeg);
@@ -1160,6 +1164,7 @@ struct expression *
 parse_expression (char *string)
 {
   struct expression *exp;
+
   exp = parse_exp_1 (&string, 0, 0);
   if (*string)
     error (_("Junk after end of expression."));
@@ -1363,6 +1368,7 @@ void
 parser_fprintf (FILE *x, const char *y, ...)
 { 
   va_list args;
+
   va_start (args, y);
   if (x == stderr)
     vfprintf_unfiltered (gdb_stderr, y, args); 
@@ -1472,7 +1478,6 @@ exp_iterate (struct expression *exp,
 	     void *data)
 {
   int endpos;
-  const union exp_element *const elts = exp->elts;
 
   for (endpos = exp->nelts; endpos > 0; )
     {

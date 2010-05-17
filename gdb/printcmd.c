@@ -296,6 +296,7 @@ print_formatted (struct value *val, int size,
 	case 's':
 	  {
 	    struct type *elttype = value_type (val);
+
 	    next_address = (value_address (val)
 			    + val_print_string (elttype,
 						value_address (val), -1,
@@ -463,6 +464,7 @@ print_scalar_formatted (const void *valaddr, struct type *type,
     case 'a':
       {
 	CORE_ADDR addr = unpack_pointer (type, valaddr);
+
 	print_address (gdbarch, addr, stream);
       }
       break;
@@ -470,8 +472,8 @@ print_scalar_formatted (const void *valaddr, struct type *type,
     case 'c':
       {
 	struct value_print_options opts = *options;
-	opts.format = 0;
 
+	opts.format = 0;
 	if (TYPE_UNSIGNED (type))
 	  type = builtin_type (gdbarch)->builtin_true_unsigned_char;
  	else
@@ -769,6 +771,7 @@ print_address_demangle (struct gdbarch *gdbarch, CORE_ADDR addr,
 			struct ui_file *stream, int do_demangle)
 {
   struct value_print_options opts;
+
   get_user_print_options (&opts);
   if (addr == 0)
     {
@@ -840,6 +843,7 @@ do_examine (struct format_data fmt, struct gdbarch *gdbarch, CORE_ADDR addr)
   if (format == 's')
     {
       struct type *char_type = NULL;
+
       /* Search for "char16_t"  or "char32_t" types or fall back to 8-bit char
 	 if type is not found.  */
       if (size == 'h')
@@ -959,7 +963,6 @@ print_command_1 (char *exp, int inspect, int voidprint)
 
   if (exp && *exp)
     {
-      struct type *type;
       expr = parse_expression (exp);
       old_chain = make_cleanup (free_current_contents, &expr);
       cleanup = 1;
@@ -1076,6 +1079,7 @@ set_command (char *exp, int from_tty)
   struct expression *expr = parse_expression (exp);
   struct cleanup *old_chain =
     make_cleanup (free_current_contents, &expr);
+
   evaluate_expression (expr);
   do_cleanups (old_chain);
 }
@@ -1175,7 +1179,6 @@ sym_info (char *arg, int from_tty)
 static void
 address_info (char *exp, int from_tty)
 {
-  struct block *block;
   struct gdbarch *gdbarch;
   int regno;
   struct symbol *sym;
@@ -1420,7 +1423,7 @@ x_command (char *exp, int from_tty)
       old_chain = make_cleanup (free_current_contents, &expr);
       val = evaluate_expression (expr);
       if (TYPE_CODE (value_type (val)) == TYPE_CODE_REF)
-	val = value_ind (val);
+	val = coerce_ref (val);
       /* In rvalue contexts, such as this, functions are coerced into
          pointers to functions.  This makes "x/i main" work.  */
       if (/* last_format == 'i'  && */ 
@@ -1655,6 +1658,7 @@ do_one_display (struct display *d)
   if (d->exp == NULL)
     {
       volatile struct gdb_exception ex;
+
       TRY_CATCH (ex, RETURN_MASK_ALL)
 	{
 	  innermost_block = NULL;
@@ -2255,6 +2259,7 @@ printf_command (char *arg, int from_tty)
 	      /* Windows' printf does support long long, but not the usual way.
 		 Convert %lld to %I64d.  */
 	      int length_before_ll = f - last_arg - 1 - lcount;
+
 	      strncpy (current_substring, last_arg, length_before_ll);
 	      strcpy (current_substring + length_before_ll, "I64");
 	      current_substring[length_before_ll + 3] =
@@ -2266,6 +2271,7 @@ printf_command (char *arg, int from_tty)
 	    {
 	      /* Convert %ls or %lc to %s.  */
 	      int length_before_ls = f - last_arg - 2;
+
 	      strncpy (current_substring, last_arg, length_before_ls);
 	      strcpy (current_substring + length_before_ls, "s");
 	      current_substring += length_before_ls + 2;
@@ -2286,6 +2292,7 @@ printf_command (char *arg, int from_tty)
     while (*s != '\0')
       {
 	char *s1;
+
 	if (nargs == allocated_args)
 	  val_args = (struct value **) xrealloc ((char *) val_args,
 						 (allocated_args *= 2)
@@ -2313,12 +2320,14 @@ printf_command (char *arg, int from_tty)
 	      gdb_byte *str;
 	      CORE_ADDR tem;
 	      int j;
+
 	      tem = value_as_address (val_args[i]);
 
 	      /* This is a %s argument.  Find the length of the string.  */
 	      for (j = 0;; j++)
 		{
 		  gdb_byte c;
+
 		  QUIT;
 		  read_memory (tem + j, &c, 1);
 		  if (c == 0)
@@ -2383,7 +2392,6 @@ printf_command (char *arg, int from_tty)
 	    {
 	      struct gdbarch *gdbarch
 		= get_type_arch (value_type (val_args[i]));
-	      enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
 	      struct type *wctype = lookup_typename (current_language, gdbarch,
 						     "wchar_t", NULL, 0);
 	      struct type *valtype;
@@ -2452,6 +2460,7 @@ printf_command (char *arg, int from_tty)
 #if defined (CC_HAS_LONG_LONG) && defined (PRINTF_HAS_LONG_LONG)
 	    {
 	      long long val = value_as_long (val_args[i]);
+
 	      printf_filtered (current_substring, val);
 	      break;
 	    }
@@ -2461,12 +2470,14 @@ printf_command (char *arg, int from_tty)
 	  case int_arg:
 	    {
 	      int val = value_as_long (val_args[i]);
+
 	      printf_filtered (current_substring, val);
 	      break;
 	    }
 	  case long_arg:
 	    {
 	      long val = value_as_long (val_args[i]);
+
 	      printf_filtered (current_substring, val);
 	      break;
 	    }
@@ -2475,6 +2486,7 @@ printf_command (char *arg, int from_tty)
 	case decfloat_arg:
 	    {
 	      const gdb_byte *param_ptr = value_contents (val_args[i]);
+
 #if defined (PRINTF_HAS_DECFLOAT)
 	      /* If we have native support for Decimal floating
 		 printing, handle it here.  */
@@ -2595,6 +2607,7 @@ printf_command (char *arg, int from_tty)
 	      while (*p)
 		{
 		  int is_percent = (*p == '%');
+
 		  *fmt_p++ = *p++;
 		  if (is_percent)
 		    {

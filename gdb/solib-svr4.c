@@ -581,7 +581,6 @@ find_program_interpreter (void)
      interp_sect = bfd_get_section_by_name (exec_bfd, ".interp");
      if (interp_sect != NULL)
       {
-	CORE_ADDR sect_addr = bfd_section_vma (exec_bfd, interp_sect);
 	int sect_size = bfd_section_size (exec_bfd, interp_sect);
 
 	buf = xmalloc (sect_size);
@@ -724,6 +723,7 @@ scan_dyntag_auxv (int dyntag, CORE_ADDR *ptr)
     if (arch_size == 32)
       {
 	Elf32_External_Dyn *dynp = (Elf32_External_Dyn *) buf;
+
 	dyn_tag = extract_unsigned_integer ((gdb_byte *) dynp->d_tag,
 					    4, byte_order);
 	dyn_ptr = extract_unsigned_integer ((gdb_byte *) dynp->d_un.d_ptr,
@@ -732,6 +732,7 @@ scan_dyntag_auxv (int dyntag, CORE_ADDR *ptr)
     else
       {
 	Elf64_External_Dyn *dynp = (Elf64_External_Dyn *) buf;
+
 	dyn_tag = extract_unsigned_integer ((gdb_byte *) dynp->d_tag,
 					    8, byte_order);
 	dyn_ptr = extract_unsigned_integer ((gdb_byte *) dynp->d_un.d_ptr,
@@ -794,6 +795,7 @@ elf_locate_base (void)
       struct type *ptr_type = builtin_type (target_gdbarch)->builtin_data_ptr;
       gdb_byte *pbuf;
       int pbuf_size = TYPE_LENGTH (ptr_type);
+
       pbuf = alloca (pbuf_size);
       /* DT_MIPS_RLD_MAP contains a pointer to the address
 	 of the dynamic link structure.  */
@@ -1520,6 +1522,7 @@ enable_break (struct svr4_info *info, int from_tty)
 	{
 	  struct regcache *regcache
 	    = get_thread_arch_regcache (inferior_ptid, target_gdbarch);
+
 	  load_addr = (regcache_read_pc (regcache)
 		       - exec_entry_point (tmp_bfd, tmp_bfd_target));
 	}
@@ -1910,8 +1913,10 @@ svr4_relocate_main_executable (void)
 static void
 svr4_solib_create_inferior_hook (int from_tty)
 {
+#if defined(_SCO_DS)
   struct inferior *inf;
   struct thread_info *tp;
+#endif /* defined(_SCO_DS) */
   struct svr4_info *info;
 
   info = get_svr4_info ();
@@ -2064,6 +2069,7 @@ static int
 svr4_have_link_map_offsets (void)
 {
   struct solib_svr4_ops *ops = gdbarch_data (target_gdbarch, solib_svr4_data);
+
   return (ops->fetch_link_map_offsets != NULL);
 }
 
