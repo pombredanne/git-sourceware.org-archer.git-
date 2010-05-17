@@ -259,7 +259,7 @@ valpy_lazy_string (PyObject *self, PyObject *args, PyObject *kw)
 static PyObject *
 valpy_string (PyObject *self, PyObject *args, PyObject *kw)
 {
-  int length = -1, ret = 0;
+  int length = -1;
   gdb_byte *buffer;
   struct value *value = ((value_object *) self)->value;
   volatile struct gdb_exception except;
@@ -430,6 +430,14 @@ valpy_get_is_optimized_out (PyObject *self, void *closure)
     Py_RETURN_TRUE;
 
   Py_RETURN_FALSE;
+}
+
+/* Calculate and return the address of the PyObject as the value of
+   the builtin __hash__ call.  */
+static long 
+valpy_hash (PyObject *self)
+{
+  return (long) (intptr_t) self;
 }
 
 enum valpy_opcode
@@ -923,7 +931,6 @@ struct value *
 convert_value_from_python (PyObject *obj)
 {
   struct value *value = NULL; /* -Wall */
-  PyObject *target_str, *unicode_str;
   struct cleanup *old;
   volatile struct gdb_exception except;
   int cmp;
@@ -1098,7 +1105,7 @@ PyTypeObject value_object_type = {
   &value_object_as_number,	  /*tp_as_number*/
   0,				  /*tp_as_sequence*/
   &value_object_as_mapping,	  /*tp_as_mapping*/
-  0,				  /*tp_hash */
+  valpy_hash,		          /*tp_hash*/
   0,				  /*tp_call*/
   valpy_str,			  /*tp_str*/
   0,				  /*tp_getattro*/

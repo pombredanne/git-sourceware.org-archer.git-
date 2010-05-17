@@ -360,7 +360,6 @@ execute_command (char *p, int from_tty)
 #ifdef HAVE_SBRK
   long space_at_cmd_start = 0;
 #endif
-  extern int display_time;
   extern int display_space;
 
   if (target_can_async_p ())
@@ -371,6 +370,7 @@ execute_command (char *p, int from_tty)
 	{
 #ifdef HAVE_SBRK
 	  char *lim = (char *) sbrk (0);
+
 	  space_at_cmd_start = lim - lim_at_start;
 #endif
 	}
@@ -516,6 +516,7 @@ command_loop (void)
 	{
 #ifdef HAVE_SBRK
 	  char *lim = (char *) sbrk (0);
+
 	  space_at_cmd_start = lim - lim_at_start;
 #endif
 	}
@@ -539,6 +540,7 @@ command_loop (void)
 	{
 #ifdef HAVE_SBRK
 	  char *lim = (char *) sbrk (0);
+
 	  long space_now = lim - lim_at_start;
 	  long space_diff = space_now - space_at_cmd_start;
 
@@ -786,6 +788,7 @@ static void
 gdb_rl_operate_and_get_next_completion (void)
 {
   int delta = where_history () - operate_saved_history;
+
   /* The `key' argument to rl_get_previous_history is ignored.  */
   rl_get_previous_history (delta, 0);
   operate_saved_history = -1;
@@ -1516,8 +1519,6 @@ Notification of completion for asynchronous execution commands is %s.\n"),
 static void
 init_main (void)
 {
-  struct cmd_list_element *c;
-
   /* initialize the prompt stack to a simple "(gdb) " prompt or to
      whatever the DEFAULT_PROMPT is.  */
   the_prompts.top = 0;

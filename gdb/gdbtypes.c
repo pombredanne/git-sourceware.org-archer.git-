@@ -443,6 +443,7 @@ extern int
 address_space_name_to_int (struct gdbarch *gdbarch, char *space_identifier)
 {
   int type_flags;
+
   /* Check for known address space delimiters.  */
   if (!strcmp (space_identifier, "code"))
     return TYPE_INSTANCE_FLAG_CODE_SPACE;
@@ -540,7 +541,6 @@ make_qualified_type (struct type *type, int new_flags,
 struct type *
 make_type_with_address_space (struct type *type, int space_flag)
 {
-  struct type *ntype;
   int new_flags = ((TYPE_INSTANCE_FLAGS (type)
 		    & ~(TYPE_INSTANCE_FLAG_CODE_SPACE
 			| TYPE_INSTANCE_FLAG_DATA_SPACE
@@ -567,11 +567,10 @@ make_cv_type (int cnst, int voltl,
 	      struct type **typeptr)
 {
   struct type *ntype;	/* New type */
-  struct type *tmp_type = type;	/* tmp type */
-  struct objfile *objfile;
 
   int new_flags = (TYPE_INSTANCE_FLAGS (type)
-		   & ~(TYPE_INSTANCE_FLAG_CONST | TYPE_INSTANCE_FLAG_VOLATILE));
+		   & ~(TYPE_INSTANCE_FLAG_CONST 
+		       | TYPE_INSTANCE_FLAG_VOLATILE));
 
   if (cnst)
     new_flags |= TYPE_INSTANCE_FLAG_CONST;
@@ -854,6 +853,7 @@ lookup_array_range_type (struct type *element_type,
   struct type *index_type = builtin_type (gdbarch)->builtin_int;
   struct type *range_type
     = create_range_type (NULL, index_type, low_bound, high_bound);
+
   return create_array_type (NULL, element_type, range_type);
 }
 
@@ -886,6 +886,7 @@ lookup_string_range_type (struct type *string_char_type,
 			  int low_bound, int high_bound)
 {
   struct type *result_type;
+
   result_type = lookup_array_range_type (string_char_type,
 					 low_bound, high_bound);
   TYPE_CODE (result_type) = TYPE_CODE_STRING;
@@ -905,6 +906,7 @@ create_set_type (struct type *result_type, struct type *domain_type)
   if (!TYPE_STUB (domain_type))
     {
       LONGEST low_bound, high_bound, bit_length;
+
       if (get_discrete_bounds (domain_type, &low_bound, &high_bound) < 0)
 	low_bound = high_bound = 0;
       bit_length = high_bound - low_bound + 1;
@@ -948,6 +950,7 @@ struct type *
 init_vector_type (struct type *elt_type, int n)
 {
   struct type *array_type;
+
   array_type = lookup_array_range_type (elt_type, 0, n - 1);
   make_vector_type (array_type);
   return array_type;
@@ -1169,6 +1172,7 @@ lookup_template_type (char *name, struct type *type,
   struct symbol *sym;
   char *nam = (char *) 
     alloca (strlen (name) + strlen (TYPE_NAME (type)) + 4);
+
   strcpy (nam, name);
   strcat (nam, "<");
   strcat (nam, TYPE_NAME (type));
@@ -1245,6 +1249,14 @@ lookup_struct_elt_type (struct type *type, char *name, int noerr)
       if (t_field_name && (strcmp_iw (t_field_name, name) == 0))
 	{
 	  return TYPE_FIELD_TYPE (type, i);
+	}
+     else if (!t_field_name || *t_field_name == '\0')
+	{
+	  struct type *subtype 
+	    = lookup_struct_elt_type (TYPE_FIELD_TYPE (type, i), name, 1);
+
+	  if (subtype != NULL)
+	    return subtype;
 	}
     }
 
@@ -1414,6 +1426,7 @@ check_typedef (struct type *type)
     {
       char *name = type_name_no_tag (type);
       struct type *newtype;
+
       if (name == NULL)
 	{
 	  stub_noname_complaint ();
@@ -1449,6 +1462,7 @@ check_typedef (struct type *type)
          as appropriate?  (this code was written before TYPE_NAME and
          TYPE_TAG_NAME were separate).  */
       struct symbol *sym;
+
       if (name == NULL)
 	{
 	  stub_noname_complaint ();
@@ -1492,26 +1506,27 @@ check_typedef (struct type *type)
 
 	  if (high_bound < low_bound)
 	    len = 0;
-	  else {
-	    /* For now, we conservatively take the array length to be 0
-	       if its length exceeds UINT_MAX.  The code below assumes
-	       that for x < 0, (ULONGEST) x == -x + ULONGEST_MAX + 1,
-	       which is technically not guaranteed by C, but is usually true
-	       (because it would be true if x were unsigned with its
-	       high-order bit on). It uses the fact that
-	       high_bound-low_bound is always representable in
-	       ULONGEST and that if high_bound-low_bound+1 overflows,
-	       it overflows to 0.  We must change these tests if we 
-	       decide to increase the representation of TYPE_LENGTH
-	       from unsigned int to ULONGEST. */
-	    ULONGEST ulow = low_bound, uhigh = high_bound;
-	    ULONGEST tlen = TYPE_LENGTH (target_type);
+	  else
+	    {
+	      /* For now, we conservatively take the array length to be 0
+		 if its length exceeds UINT_MAX.  The code below assumes
+		 that for x < 0, (ULONGEST) x == -x + ULONGEST_MAX + 1,
+		 which is technically not guaranteed by C, but is usually true
+		 (because it would be true if x were unsigned with its
+		 high-order bit on). It uses the fact that
+		 high_bound-low_bound is always representable in
+		 ULONGEST and that if high_bound-low_bound+1 overflows,
+		 it overflows to 0.  We must change these tests if we 
+		 decide to increase the representation of TYPE_LENGTH
+		 from unsigned int to ULONGEST. */
+	      ULONGEST ulow = low_bound, uhigh = high_bound;
+	      ULONGEST tlen = TYPE_LENGTH (target_type);
 
-	    len = tlen * (uhigh - ulow + 1);
-	    if (tlen == 0 || (len / tlen - 1 + ulow) != uhigh 
-		|| len > UINT_MAX)
-	      len = 0;
-	  }
+	      len = tlen * (uhigh - ulow + 1);
+	      if (tlen == 0 || (len / tlen - 1 + ulow) != uhigh 
+		  || len > UINT_MAX)
+		len = 0;
+	    }
 	  TYPE_LENGTH (type) = len;
 	  TYPE_TARGET_STUB (type) = 0;
 	}
@@ -2975,6 +2990,7 @@ static hashval_t
 type_pair_hash (const void *item)
 {
   const struct type_pair *pair = item;
+
   return htab_hash_pointer (pair->old);
 }
 
@@ -2982,6 +2998,7 @@ static int
 type_pair_eq (const void *item_lhs, const void *item_rhs)
 {
   const struct type_pair *lhs = item_lhs, *rhs = item_rhs;
+
   return lhs->old == rhs->old;
 }
 
@@ -3246,6 +3263,7 @@ arch_complex_type (struct gdbarch *gdbarch,
 		   char *name, struct type *target_type)
 {
   struct type *t;
+
   t = arch_type (gdbarch, TYPE_CODE_COMPLEX,
 		 2 * TYPE_LENGTH (target_type), name);
   TYPE_TARGET_TYPE (t) = target_type;
@@ -3295,6 +3313,7 @@ struct type *
 arch_composite_type (struct gdbarch *gdbarch, char *name, enum type_code code)
 {
   struct type *t;
+
   gdb_assert (code == TYPE_CODE_STRUCT || code == TYPE_CODE_UNION);
   t = arch_type (gdbarch, code, 0, NULL);
   TYPE_TAG_NAME (t) = name;
@@ -3310,6 +3329,7 @@ append_composite_type_field_raw (struct type *t, char *name,
 				 struct type *field)
 {
   struct field *f;
+
   TYPE_NFIELDS (t) = TYPE_NFIELDS (t) + 1;
   TYPE_FIELDS (t) = xrealloc (TYPE_FIELDS (t),
 			      sizeof (struct field) * TYPE_NFIELDS (t));
@@ -3327,6 +3347,7 @@ append_composite_type_field_aligned (struct type *t, char *name,
 				     struct type *field, int alignment)
 {
   struct field *f = append_composite_type_field_raw (t, name, field);
+
   if (TYPE_CODE (t) == TYPE_CODE_UNION)
     {
       if (TYPE_LENGTH (t) < TYPE_LENGTH (field))
@@ -3344,6 +3365,7 @@ append_composite_type_field_aligned (struct type *t, char *name,
 	  if (alignment)
 	    {
 	      int left = FIELD_BITPOS (f[0]) % (alignment * TARGET_CHAR_BIT);
+
 	      if (left)
 		{
 		  FIELD_BITPOS (f[0]) += left;

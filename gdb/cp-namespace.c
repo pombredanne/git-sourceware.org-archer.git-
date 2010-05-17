@@ -81,7 +81,6 @@ cp_scan_for_anonymous_namespaces (const struct symbol *symbol)
       const char *name = SYMBOL_DEMANGLED_NAME (symbol);
       unsigned int previous_component;
       unsigned int next_component;
-      const char *len;
 
       /* Start with a quick-and-dirty check for mention of "(anonymous
 	 namespace)".  */
@@ -265,6 +264,7 @@ cp_lookup_symbol_in_namespace (const char *namespace,
     {
       char *concatenated_name = alloca (strlen (namespace) + 2 +
                                         strlen (name) + 1);
+
       strcpy (concatenated_name, namespace);
       strcat (concatenated_name, "::");
       strcat (concatenated_name, name);
@@ -355,12 +355,14 @@ cp_lookup_symbol_imports (const char *scope,
 	searched_cleanup = make_cleanup (reset_directive_searched, current);
 
 	/* If there is an import of a single declaration, compare the imported
-	   declaration with the sought out name.  If there is a match pass
-	   current->import_src as NAMESPACE to direct the search towards the
-	   imported namespace.  */
-	if (current->declaration && strcmp (name, current->declaration) == 0)
+	   declaration (after optional renaming by its alias) with the sought
+	   out name.  If there is a match pass current->import_src as NAMESPACE
+	   to direct the search towards the imported namespace.  */
+	if (current->declaration
+	    && strcmp (name, current->alias ? current->alias
+					    : current->declaration) == 0)
 	  sym = cp_lookup_symbol_in_namespace (current->import_src,
-	                                       name,
+	                                       current->declaration,
 	                                       block,
 	                                       domain);
 
@@ -576,6 +578,7 @@ cp_lookup_nested_type (struct type *parent_type,
 	                                                    nested_name,
 	                                                    block,
 	                                                    VAR_DOMAIN);
+
 	if (sym == NULL || SYMBOL_CLASS (sym) != LOC_TYPEDEF)
 	  return NULL;
 	else
@@ -643,6 +646,7 @@ cp_lookup_transparent_type_loop (const char *name, const char *scope,
     {
       struct type *retval
 	= cp_lookup_transparent_type_loop (name, scope, scope_length + 2);
+
       if (retval != NULL)
 	return retval;
     }
@@ -875,6 +879,7 @@ static void
 maintenance_cplus_namespace (char *args, int from_tty)
 {
   struct objfile *objfile;
+
   printf_unfiltered (_("Possible namespaces:\n"));
   ALL_OBJFILES (objfile)
     {
