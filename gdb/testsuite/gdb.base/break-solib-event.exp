@@ -20,8 +20,8 @@ if {[skip_shlib_tests]} {
 set testfile "break-solib-event"
 set libfile "unloadshr"
 set libfile2 "unloadshr2"
-set libname "${testfile}-{libfile}.sl"
-set libname2 "${testfile}-{libfile2}.sl"
+set libname "${testfile}-${libfile}.sl"
+set libname2 "${testfile}-${libfile2}.sl"
 set libsrcfile ${libfile}.c
 set libsrcfile2 ${libfile2}.c
 set srcfile $srcdir/$subdir/unload.c
