@@ -2884,6 +2884,19 @@ bpstat_what_debug (struct bpstat_what what, const char *event,
     fprintf_unfiltered (gdb_stdlog,
 			_("infrun: %s: stepping_over_breakpoint %s\n"), event,
 			what.stepping_over_breakpoint ? "yes" : "no");
+
+  if (print_defaults || what.bp_longjmp)
+    fprintf_unfiltered (gdb_stdlog, _("infrun: %s: bp_longjmp %s\n"), event,
+			what.bp_longjmp ? "yes" : "no");
+
+  if (print_defaults || what.bp_longjmp_resume)
+    fprintf_unfiltered (gdb_stdlog, _("infrun: %s: bp_longjmp_resume %s\n"),
+			event, what.bp_longjmp_resume ? "yes" : "no");
+
+  if (print_defaults || what.bp_step_resume_on_stop)
+    fprintf_unfiltered (gdb_stdlog,
+			_("infrun: %s: bp_step_resume_on_stop %s\n"), event,
+			what.bp_step_resume_on_stop ? "yes" : "no");
 }
 
 /* Given an execution control state that has been freshly filled in
@@ -4065,6 +4078,10 @@ process_event_stop_test:
 	      what.perform = pe_check_more;
 	  }
       }
+
+    bpstat_what_debug (what, _("summary"), 1);
+
+    bpstat_what_finalize (&what);
 
     stop_print_frame = what.print_frame == pf_yes;
 

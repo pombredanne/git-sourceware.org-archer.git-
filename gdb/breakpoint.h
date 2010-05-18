@@ -637,7 +637,9 @@ enum print_stop_action
 
 /* Tell what to do about this list of bpstats.  */
 struct bpstat_what bpstat_what (bpstat);
-
+
+void bpstat_what_finalize (struct bpstat_what *what);
+
 /* Find the bpstat associated with a breakpoint.  NULL otherwise. */
 bpstat bpstat_find_breakpoint (bpstat, struct breakpoint *);
 

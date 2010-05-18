@@ -4234,7 +4234,7 @@ bpstat_what_merge (struct bpstat_what a, struct bpstat_what b)
 
 /* Prepare WHAT final decision for infrun.  */
 
-static void
+void
 bpstat_what_finalize (struct bpstat_what *what)
 {
   if (what->print_frame == pf_default)
@@ -4448,10 +4448,6 @@ bpstat_what (bpstat bs)
 #endif
       target_terminal_inferior ();
     }
-
-  bpstat_what_debug (retval, _("summary"), 1);
-
-  bpstat_what_finalize (&retval);
 
   return retval;
 }
