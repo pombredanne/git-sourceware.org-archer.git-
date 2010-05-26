@@ -1,3 +1,284 @@
+2010-05-26  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2loc.h (struct dwarf2_locexpr_baton) <data>: Now const.
+	(struct dwarf2_loclist_baton) <data>: Likewise.
+	* dwarf2loc.c (find_location_expression): Constify return type.
+	(dwarf2_evaluate_loc_desc): Make 'data' argument const.
+	(dwarf2_loc_desc_needs_frame): Likewise.
+	(loclist_read_variable): Constify.
+	(loclist_describe_location): Likewise.
+	(loclist_tracepoint_var_ref): Likewise.
+
+2010-05-25  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2loc.c (dwarf_expr_frame_base): Constify.
+	(dwarf_expr_frame_base_1): Likewise.
+	(read_pieced_value): Update.
+	(needs_frame_frame_base): Constify.
+	(dwarf2_tracepoint_var_loc): Likewise.
+	(dwarf2_tracepoint_var_access): Likewise.
+	(locexpr_describe_location_piece): Likewise.
+	(locexpr_describe_location_1): Likewise.
+	* dwarf2expr.h (struct dwarf_expr_context) <get_frame_base>:
+	Constify.
+	(data): Now const.
+	(struct dwarf_expr_piece) <v.literal.data>: Likewise.
+	(dwarf_expr_eval, read_uleb128, read_sleb128)
+	(dwarf2_read_address): Update.
+	* dwarf2expr.c (dwarf_expr_eval): Constify.
+	(read_uleb128): Likewise.
+	(read_sleb128): Likewise.
+	(dwarf2_read_address): Likewise.
+	(require_composition): Likewise.
+	(execute_stack_op): Likewise.
+	* dwarf2-frame.h (struct dwarf2_frame_state_reg) <loc.exp>: Now a
+	"const gdb_byte *".
+	* dwarf2-frame.c (struct dwarf2_frame_state_reg_info) <cfa_exp>:
+	Now const.
+	(no_get_frame_base): Constify.
+	(execute_stack_op): Likewise.
+	(execute_cfa_program): Likewise.
+	(read_encoded_value): Likewise.
+
+2010-05-25  Doug Evans  <dje@google.com>
+
+	* ser-pipe.c (pipe_open): Ignore SIGINTs in child.
+
+	* event-loop.h (GDB_READABLE, GDB_WRITABLE, GDB_EXCEPTION): Move to ...
+	* event-loop.c: ... here.
+	* tui/tui-io.c (tui_readline_output): Rename parameter `code' to
+	`error' for clarity.
+	(tui_getc): Pass correct value for `error' parameter to
+	tui_readline_output.
+
+	Add python gdb.GdbError and gdb.string_to_argv.
+	* NEWS: Document them.
+	* python/py-cmd.c (cmdpy_function): Don't print a traceback if
+	the exception is gdb.GdbError.  Print a second traceback if there's
+	an error computing the error message.
+	(gdbpy_string_to_argv): New function.
+	* python/py-utils.c (gdbpy_obj_to_string): New function.
+	(gdbpy_exception_to_string): New function.
+	* python/python-internal.h (gdbpy_string_to_argv): Declare.
+	(gdbpy_obj_to_string, gdbpy_exception_to_string): Declare.
+	(gdbpy_gdberror_exc): Declare.
+	* python/python.c (gdbpy_gdberror_exc): New global.
+	(_initialize_python): Initialize gdbpy_gdberror_exc and create
+	gdb.GdbError.
+	(GdbMethods): Add string_to_argv.
+
+2010-05-21  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* windows-nat.c (display_selector): Call GetLastError to give better
+	failure explanation.
+
+2010-05-24  Pedro Alves  <pedro@codesourcery.com>
+
+	* config.in: Regenerate.
+
+2010-05-23  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* target.c (push_target): Return only void.  Remove the return value
+	comment.
+	* target.h (push_target): Return only void.
+
+2010-05-23  Pedro Alves  <pedro@codesourcery.com>
+
+	Update gnulib from latest git.
+	(250b80067c1e1d8faa0c42fb572f721975b929c5)
+
+	* gnulib/memcmp.c: Removed.
+	* gnulib/memchr.valgrind: New.
+	* gnulib/stddef.in.h: New.
+	* gnulib/Makefile.am: Updated.
+	* gnulib/memchr.c: Updated.
+	* gnulib/memmem.c: Updated.
+	* gnulib/stdint.in.h: Updated.
+	* gnulib/str-two-way.h: Updated.
+	* gnulib/string.in.h: Updated.
+	* gnulib/wchar.in.h: Updated.
+
+	* gnulib/extra/link-warning.h: Removed.
+	* gnulib/extra/c++defs.h: New.
+	* gnulib/extra/warn-on-use.h: New.
+	* gnulib/extra/arg-nonnull.h: Updated.
+
+	* gnulib/m4/extensions.m4: Updated.
+	* gnulib/m4/gnulib-cache.m4: Updated.
+	* gnulib/m4/gnulib-common.m4: Updated.
+	* gnulib/m4/gnulib-comp.m4: Updated.
+	* gnulib/m4/gnulib-tool.m4: Updated.
+	* gnulib/m4/include_next.m4: Updated.
+	* gnulib/m4/longlong.m4: Updated.
+	* gnulib/m4/memchr.m4: Updated.
+	* gnulib/m4/memmem.m4: Updated.
+	* gnulib/m4/stdint.m4: Updated.
+	* gnulib/m4/string_h.m4: Updated.
+	* gnulib/m4/memcmp.m4: Removed.
+	* gnulib/m4/onceonly_2_57.m4: Removed.
+	* gnulib/m4/00gnulib.m4: New.
+	* gnulib/m4/mmap-anon.m4: New.
+	* gnulib/m4/multiarch.m4: New.
+	* gnulib/m4/onceonly.m4: New.
+	* gnulib/m4/stddef_h.m4: New.
+	* gnulib/m4/warn-on-use.m4: New.
+	* gnulib/m4/wchar.m4: Removed.
+	* gnulib/m4/wchar_h.m4: New.
+	* gnulib/m4/wchar_t.m4: New.
+	* gnulib/m4/wint_t.m4: New.
+
+	* aclocal.m4: Regenerate.
+	* config.in: Likewise.
+	* configure: Likewise.
+	* gnulib/Makefile.in: Likewise.
+
+2010-05-21  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2loc.c (extract_bits_primitive): New function.
+	(extract_bits): Likewise.
+	(insert_bits): Likewise.
+	(copy_bitwise): Likewise.
+	(read_pieced_value): Do all operations in bits.
+	(write_pieced_value): Likewise.
+	* dwarf2expr.h (struct dwarf_expr_piece) <offset>: New field.
+	* dwarf2expr.c (add_piece): New arguments bit_piece, offset.
+	Always use xrealloc to resize piece array.
+	(execute_stack_op) <DW_OP_reg0>: Handle DW_OP_bit_piece.
+	<DW_OP_piece>: Update.
+	<DW_OP_bit_piece>: New case.
+
+2010-05-21  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2loc.c (read_pieced_value): Exit loop when result is full.
+	<DWARF_VALUE_OPTIMIZED_OUT>: New case.
+	* dwarf2expr.h (enum dwarf_value_location)
+	<DWARF_VALUE_OPTIMIZED_OUT>: New constant.
+	* dwarf2expr.c (dwarf_expr_stack_empty_p): New function.
+	(add_piece): Handle empty piece.
+	(execute_stack_op) <DW_OP_piece>: Handle
+	DWARF_VALUE_OPTIMIZED_OUT.
+
+2010-05-21  Tom Tromey  <tromey@redhat.com>
+
+	* eval.c (evaluate_subexp_standard) <BINOP_SUBSCRIPT>: Call
+	evaluate_subexp, not evaluate_subexp_with_coercion.
+
+2010-05-21  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* dwarf2read.c (new_symbol): Handle DW_AT_variable_parameter
+	attribute.
+
+2010-05-21  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2loc.c (read_pieced_value): Work properly when 'v' has an
+	offset.
+	(write_pieced_value): Likewise.
+
+2010-05-21  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* dwarf2read.c (process_die): Also allow DW_TAG_const_type
+	and DW_TAG_volatile_type.
+	(new_symbol): Likewise.
+
+2010-05-20  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* p-valprint.c (pascal_val_print): Call get_array_bounds
+	to obtain the number of elements in an array.
+
+2010-05-19  Doug Evans  <dje@google.com>
+
+	* python.c (gdbpy_print_stack): Ensure output ends with a newline.
+
+	* python.c (source_python_script): Add comment.
+	(source_python_script_for_objfile): Remove unnecessary call to
+	gdbpy_print_stack.
+
+2010-05-18  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	Code cleanup.
+	* parse.c (exp_iterate): Use operator_length wrapper function.
+
+2010-05-18  Michael Snyder  <msnyder@vmware.com>
+
+	* ada-lang.c: White space.
+	* ada-typeprint.c: White space.
+	* ada-valprint.c: White space.
+	* addrmap.c: White space.
+	* auxv.c: White space.
+	* ax-gdb.c: White space.
+
+2010-05-18  Hui Zhu  <teawater@gmail.com>
+
+	* linux-fork.c (inferior_call_waitpid_cleanup): Add check
+	for oldfp.
+	(inferior_call_waitpid): Move make_cleanup out of check.
+	Check the return of waitpid.
+	(delete_checkpoint_command): Add pptid to save fi->parent_ptid.
+
+2010-05-17  Michael Snyder  <msnyder@vmware.com>
+
+	* tui/tui.c: White space.
+	* tui/tui-data.c: White space.
+	* tui/tui-disasm.c: White space.
+	* tui/tui-file.c: White space.
+	* tui/tui-interp.c: White space.
+	* tui/tui-main.c: White space.
+	* tui/tui-out.c: White space.
+	* tui/tui-regs.c: White space.
+	* tui/tui-source.c: White space.
+	* tui/tui-stack.c: White space.
+	* tui/tui-win.c: White space.
+	* tui/tui-winsource.c: White space.
+
+	* procfs.c: White space.
+
+	* python/py-auto-load.c: White space.
+	* python/py-block.c: White space.
+	* python/py-breakpoint.c: White space.
+	* python/py-cmd.c: White space.
+	* python/py-function.c: White space.
+	* python/py-lazy-string.c: White space.
+	* python/py-objfile.c: White space.
+	* python/py-param.c: White space.
+	* python/py-prettyprint.c: White space.
+	* python/py-progspace.c: White space.
+	* python/py-symtab.c: White space.
+	* python/python.c: White space.
+	* python/py-type.c: White space.
+	* python/py-utils.c: White space.
+	* python/py-value.c: White space.
+
+	* mi/mi-cmd-break.c: White space.
+	* mi/mi-cmd-env.c: White space.
+	* mi/mi-cmds.c: White space.
+	* mi/mi-cmd-stack.c: White space.
+	* mi/mi-cmd-var.c: White space.
+	* mi/mi-console.c: White space.
+	* mi/mi-getopt.c: White space.
+	* mi/mi-interp.c: White space.
+	* mi/mi-main.c: White space.
+	* mi/mi-out.c: White space.
+	* mi/mi-parse.c: White space.
+
+	* cli/cli-cmds.c: White space.
+	* cli/cli-decode.c: White space.
+	* cli/cli-dump.c: White space.
+	* cli/cli-interp.c: White space.
+	* cli/cli-logging.c: White space.
+	* cli/cli-script.c: White space.
+	* cli/cli-setshow.c: White space.
+
+	* valarith.c: White space.
+	* valops.c: White space.
+	* valprint.c: White space.
+	* value.c: White space.
+	* varobj.c: White space.
+	* xcoffread.c: White space.
+	* xml-support.c: White space.
+	* xml-tdesc.c: White space.
+
 2010-05-17  Andreas Schwab  <schwab@redhat.com>
 
 	PR gdb/11092

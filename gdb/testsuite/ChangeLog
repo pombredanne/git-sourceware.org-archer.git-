@@ -1,3 +1,123 @@
+2010-05-25  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/macscp.exp: Add missing space after setup_kfail.
+
+2010-05-25  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.arch/i386-prologue.exp (skip_breakpoint): Fix setup_kfail
+	argument order.
+	* gdb.base/macscp.exp: Fix setup_kfail argument order.
+	* gdb.base/long_long.exp (gdb_test_xxx): Fix setup_kfail argument
+	order.
+	* gdb.base/sigbpt.exp (stepi_out): Fix setup_kfail argument
+	order.
+	* gdb.base/call-sc.exp (setup_kfails): Remove.
+	(setup_compiler_kfails): Remove.
+	* gdb.base/callfuncs.exp (do_function_calls): Fix setup_kfail
+	argument order.
+	* gdb.base/siginfo.exp: Fix setup_kfail argument order.
+	* gdb.base/sigstep.exp (advance): Fix setup_kfail argument order.
+	(advancei): Fix setup_kfail argument order.
+	* gdb.base/radix.exp: Fix setup_kfail argument order.
+	* gdb.base/solib-weak.exp (do_test): Fix setup_kfail argument
+	order.
+	* gdb.base/structs.exp (setup_kfails): Remove.
+	(setup_compiler_kfails): Fix setup_kfail argument order.
+	* gdb.base/sigaltstack.exp (finish_test): Fix setup_kfail argument
+	order.
+	* gdb.java/jmain.exp: Fix setup_kfail argument order.
+	* gdb.pascal/types.exp (test_string_literal_types_accepted): Fix
+	setup_kfail argument order.
+	* gdb.cp/overload.exp: Fix setup_kfail argument order.
+
+2010-05-25  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/pieces.exp (pieces_test_f3): Mention PR 11636.
+
+2010-05-25  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.base/call-ar-st.exp: Replace send_gdb with gdb_test.
+	* gdb.base/callfuncs.exp: Replace send_gdb with gdb_test.
+	* gdb.base/call-rt-st.exp: Replace send_gdb with gdb_test.
+	* gdb.base/call-signal-resume.exp: Replace send_gdb with gdb_test.
+	* gdb.base/call-strs.exp: Replace send_gdb with gdb_test.
+	* gdb.base/catch-syscall.exp: Replace send_gdb with gdb_test.
+	* gdb.base/charset.exp: Replace send_gdb with gdb_test.
+	* gdb.base/checkpoint.exp: Replace send_gdb with gdb_test.
+	* gdb.base/commands.exp: Replace send_gdb with gdb_test.
+	* gdb.base/condbreak.exp: Replace send_gdb with gdb_test.
+	* gdb.base/cond-exprs.exp: Replace send_gdb with gdb_test.
+	* gdb.base/consecutive.exp: Replace send_gdb with gdb_test.
+	* gdb.base/constvars.exp: Replace send_gdb with gdb_test.
+	* gdb.base/corefile.exp: Replace send_gdb with gdb_test.
+	* gdb.base/default.exp: Replace send_gdb with gdb_test.
+	* gdb.base/define.exp: Replace send_gdb with gdb_test.
+	* gdb.base/display.exp: Replace send_gdb with gdb_test.
+	* gdb.base/dump.exp: Replace send_gdb with gdb_test.
+	* gdb.base/ending-run.exp: Replace send_gdb with gdb_test.
+	* gdb.base/eval-skip.exp: Replace send_gdb with gdb_test.
+	* gdb.base/exprs.exp: Replace send_gdb with gdb_test.
+	* gdb.base/fileio.exp: Replace send_gdb with gdb_test.
+	* gdb.base/finish.exp: Replace send_gdb with gdb_test.
+	* gdb.base/foll-fork.exp: Replace send_gdb with gdb_test.
+	* gdb.base/funcargs.exp: Replace send_gdb with gdb_test.
+	* gdb.base/gcore-buffer-overflow.exp: Replace send_gdb with gdb_test.
+	* gdb.base/gcore.exp: Replace send_gdb with gdb_test.
+	* gdb.base/gdb1090.exp: Replace send_gdb with gdb_test.
+	* gdb.base/gdbvars.exp: Replace send_gdb with gdb_test.
+	* gdb.base/help.exp: Replace send_gdb with gdb_test.
+	* gdb.base/info-proc.exp: Replace send_gdb with gdb_test.
+	* gdb.base/jump.exp: Replace send_gdb with gdb_test.
+	* gdb.base/long_long.exp: Replace send_gdb with gdb_test.
+	* gdb.base/maint.exp: Replace send_gdb with gdb_test.
+	* gdb.base/miscexprs.exp: Replace send_gdb with gdb_test.
+	* gdb.base/nodebug.exp: Replace send_gdb with gdb_test.
+	* gdb.base/pointers.exp: Replace send_gdb with gdb_test.
+	* gdb.base/ptype.exp: Replace send_gdb with gdb_test.
+
+2010-05-25  Doug Evans  <dje@google.com>
+
+	* gdb.python/py-cmd.exp: Add tests for gdb.GdbError and
+	gdb.string_to_argv.
+
+2010-05-21  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/pieces.exp (pieces_test_f3): New proc.
+	Call it.
+	* gdb.dwarf2/pieces.S: Update.
+	* gdb.dwarf2/pieces.c (struct B): Remove initial field.
+
+2010-05-21  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/pieces.exp (pieces_test_f6): New proc.
+	Call it.
+	* gdb.dwarf2/pieces.c (struct C): New.
+	(f6): New function.
+	* gdb.dwarf2/pieces.S: Replace.
+
+2010-05-21  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/pieces.exp (pieces_test_f2): New proc.
+	Call it.
+
+2010-05-21  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2.pieces.exp: New file.
+	* gdb.dwarf2.pieces.S: New file.
+	* gdb.dwarf2.pieces.c: New file.
+
+2010-05-20  Pedro Alves  <pedro@codesourcery.com>
+            Joel Brobecker  <brobecker@adacore.com>
+
+	* lib/gdb.exp (gdb_test_no_output): New function.
+	* lib/gdb.ada/arrayidx.exp: Use gdb_test_no_output instead of gdb_test
+	when testing commands that should produce no output.
+
+2010-05-17  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/watch_arg/watch.adb: Rewrite testcase to avoid the
+	parameter that we want to watch being a constant.
+
 2010-05-17  Joel Brobecker  <brobecker@adacore.com>
 
 	* gdb.ada/cond_lang: New testcase.

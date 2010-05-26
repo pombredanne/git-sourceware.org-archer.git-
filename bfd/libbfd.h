@@ -845,6 +845,7 @@ struct bfd_iovec
   void *(*bmmap) (struct bfd *abfd, void *addr, bfd_size_type len,
                   int prot, int flags, file_ptr offset);
 };
+extern const struct bfd_iovec _bfd_memory_iovec;
 /* Extracted from bfdwin.c.  */
 struct _bfd_window_internal {
   struct _bfd_window_internal *next;
@@ -1511,6 +1512,13 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_SH_TLS_DTPMOD32",
   "BFD_RELOC_SH_TLS_DTPOFF32",
   "BFD_RELOC_SH_TLS_TPOFF32",
+  "BFD_RELOC_SH_GOT20",
+  "BFD_RELOC_SH_GOTOFF20",
+  "BFD_RELOC_SH_GOTFUNCDESC",
+  "BFD_RELOC_SH_GOTFUNCDESC20",
+  "BFD_RELOC_SH_GOTOFFFUNCDESC",
+  "BFD_RELOC_SH_GOTOFFFUNCDESC20",
+  "BFD_RELOC_SH_FUNCDESC",
   "BFD_RELOC_ARC_B22_PCREL",
   "BFD_RELOC_ARC_B26",
   "BFD_RELOC_BFIN_16_IMM",

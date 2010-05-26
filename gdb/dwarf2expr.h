@@ -38,7 +38,10 @@ enum dwarf_value_location
   DWARF_VALUE_STACK,
 
   /* The piece is a literal.  */
-  DWARF_VALUE_LITERAL
+  DWARF_VALUE_LITERAL,
+
+  /* The piece was optimized out.  */
+  DWARF_VALUE_OPTIMIZED_OUT
 };
 
 /* The dwarf expression stack.  */
@@ -85,7 +88,7 @@ struct dwarf_expr_context
   /* Return the location expression for the frame base attribute, in
      START and LENGTH.  The result must be live until the current
      expression evaluation is complete.  */
-  void (*get_frame_base) (void *baton, gdb_byte **start, size_t *length);
+  void (*get_frame_base) (void *baton, const gdb_byte **start, size_t *length);
 
   /* Return the CFA for the frame.  */
   CORE_ADDR (*get_frame_cfa) (void *baton);
@@ -118,7 +121,7 @@ struct dwarf_expr_context
   /* For VALUE_LITERAL, a the current literal value's length and
      data.  */
   ULONGEST len;
-  gdb_byte *data;
+  const gdb_byte *data;
 
   /* Initialization status of variable: Non-zero if variable has been
      initialized; zero otherwise.  */
@@ -152,7 +155,7 @@ struct dwarf_expr_context
 };
 
 
-/* A piece of an object, as recorded by DW_OP_piece.  */
+/* A piece of an object, as recorded by DW_OP_piece or DW_OP_bit_piece.  */
 struct dwarf_expr_piece
 {
   enum dwarf_value_location location;
@@ -172,14 +175,16 @@ struct dwarf_expr_piece
     {
       /* A pointer to the data making up this piece, for literal
 	 pieces.  */
-      gdb_byte *data;
+      const gdb_byte *data;
       /* The length of the available data.  */
       ULONGEST length;
     } literal;
   } v;
 
-  /* The length of the piece, in bytes.  */
+  /* The length of the piece, in bits.  */
   ULONGEST size;
+  /* The piece offset, in bits.  */
+  ULONGEST offset;
 };
 
 struct dwarf_expr_context *new_dwarf_expr_context (void);
@@ -190,15 +195,17 @@ struct cleanup *
 void dwarf_expr_push (struct dwarf_expr_context *ctx, CORE_ADDR value,
 		      int in_stack_memory);
 void dwarf_expr_pop (struct dwarf_expr_context *ctx);
-void dwarf_expr_eval (struct dwarf_expr_context *ctx, unsigned char *addr,
+void dwarf_expr_eval (struct dwarf_expr_context *ctx, const gdb_byte *addr,
 		      size_t len);
 CORE_ADDR dwarf_expr_fetch (struct dwarf_expr_context *ctx, int n);
 int dwarf_expr_fetch_in_stack_memory (struct dwarf_expr_context *ctx, int n);
 
 
-gdb_byte *read_uleb128 (gdb_byte *buf, gdb_byte *buf_end, ULONGEST * r);
-gdb_byte *read_sleb128 (gdb_byte *buf, gdb_byte *buf_end, LONGEST * r);
-CORE_ADDR dwarf2_read_address (struct gdbarch *gdbarch, gdb_byte *buf,
-			       gdb_byte *buf_end, int addr_size);
+const gdb_byte *read_uleb128 (const gdb_byte *buf, const gdb_byte *buf_end,
+			      ULONGEST * r);
+const gdb_byte *read_sleb128 (const gdb_byte *buf, const gdb_byte *buf_end,
+			      LONGEST * r);
+CORE_ADDR dwarf2_read_address (struct gdbarch *gdbarch, const gdb_byte *buf,
+			       const gdb_byte *buf_end, int addr_size);
 
 #endif /* dwarf2expr.h */

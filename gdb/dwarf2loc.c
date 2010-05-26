@@ -44,7 +44,7 @@
 
 static void
 dwarf_expr_frame_base_1 (struct symbol *framefunc, CORE_ADDR pc,
-			 gdb_byte **start, size_t *length);
+			 const gdb_byte **start, size_t *length);
 
 /* A helper function for dealing with location lists.  Given a
    symbol baton (BATON) and a pc value (PC), find the appropriate
@@ -54,12 +54,12 @@ dwarf_expr_frame_base_1 (struct symbol *framefunc, CORE_ADDR pc,
    For now, only return the first matching location expression; there
    can be more than one in the list.  */
 
-static gdb_byte *
+static const gdb_byte *
 find_location_expression (struct dwarf2_loclist_baton *baton,
 			  size_t *locexpr_length, CORE_ADDR pc)
 {
   CORE_ADDR low, high;
-  gdb_byte *loc_ptr, *buf_end;
+  const gdb_byte *loc_ptr, *buf_end;
   int length;
   struct objfile *objfile = dwarf2_per_cu_objfile (baton->per_cu);
   struct gdbarch *gdbarch = get_objfile_arch (objfile);
@@ -153,7 +153,7 @@ dwarf_expr_read_mem (void *baton, gdb_byte *buf, CORE_ADDR addr, size_t len)
    describing the frame base.  Return a pointer to it in START and
    its length in LENGTH.  */
 static void
-dwarf_expr_frame_base (void *baton, gdb_byte **start, size_t * length)
+dwarf_expr_frame_base (void *baton, const gdb_byte **start, size_t * length)
 {
   /* FIXME: cagney/2003-03-26: This code should be using
      get_frame_base_address(), and then implement a dwarf2 specific
@@ -178,7 +178,7 @@ dwarf_expr_frame_base (void *baton, gdb_byte **start, size_t * length)
 
 static void
 dwarf_expr_frame_base_1 (struct symbol *framefunc, CORE_ADDR pc,
-			 gdb_byte **start, size_t *length)
+			 const gdb_byte **start, size_t *length)
 {
   if (SYMBOL_LOCATION_BATON (framefunc) == NULL)
     *start = NULL;
@@ -259,20 +259,245 @@ allocate_piece_closure (int n_pieces, struct dwarf_expr_piece *pieces,
   return c;
 }
 
+/* The lowest-level function to extract bits from a byte buffer.
+   SOURCE is the buffer.  It is updated if we read to the end of a
+   byte.
+   SOURCE_OFFSET_BITS is the offset of the first bit to read.  It is
+   updated to reflect the number of bits actually read.
+   NBITS is the number of bits we want to read.  It is updated to
+   reflect the number of bits actually read.  This function may read
+   fewer bits.
+   BITS_BIG_ENDIAN is taken directly from gdbarch.
+   This function returns the extracted bits.  */
+
+static unsigned int
+extract_bits_primitive (const gdb_byte **source,
+			unsigned int *source_offset_bits,
+			int *nbits, int bits_big_endian)
+{
+  unsigned int avail, mask, datum;
+
+  gdb_assert (*source_offset_bits < 8);
+
+  avail = 8 - *source_offset_bits;
+  if (avail > *nbits)
+    avail = *nbits;
+
+  mask = (1 << avail) - 1;
+  datum = **source;
+  if (bits_big_endian)
+    datum >>= 8 - (*source_offset_bits + *nbits);
+  else
+    datum >>= *source_offset_bits;
+  datum &= mask;
+
+  *nbits -= avail;
+  *source_offset_bits += avail;
+  if (*source_offset_bits >= 8)
+    {
+      *source_offset_bits -= 8;
+      ++*source;
+    }
+
+  return datum;
+}
+
+/* Extract some bits from a source buffer and move forward in the
+   buffer.
+   
+   SOURCE is the source buffer.  It is updated as bytes are read.
+   SOURCE_OFFSET_BITS is the offset into SOURCE.  It is updated as
+   bits are read.
+   NBITS is the number of bits to read.
+   BITS_BIG_ENDIAN is taken directly from gdbarch.
+   
+   This function returns the bits that were read.  */
+
+static unsigned int
+extract_bits (const gdb_byte **source, unsigned int *source_offset_bits,
+	      int nbits, int bits_big_endian)
+{
+  unsigned int datum;
+
+  gdb_assert (nbits > 0 && nbits <= 8);
+
+  datum = extract_bits_primitive (source, source_offset_bits, &nbits,
+				  bits_big_endian);
+  if (nbits > 0)
+    {
+      unsigned int more;
+
+      more = extract_bits_primitive (source, source_offset_bits, &nbits,
+				     bits_big_endian);
+      if (bits_big_endian)
+	datum <<= nbits;
+      else
+	more <<= nbits;
+      datum |= more;
+    }
+
+  return datum;
+}
+
+/* Write some bits into a buffer and move forward in the buffer.
+   
+   DATUM is the bits to write.  The low-order bits of DATUM are used.
+   DEST is the destination buffer.  It is updated as bytes are
+   written.
+   DEST_OFFSET_BITS is the bit offset in DEST at which writing is
+   done.
+   NBITS is the number of valid bits in DATUM.
+   BITS_BIG_ENDIAN is taken directly from gdbarch.  */
+
+static void
+insert_bits (unsigned int datum,
+	     gdb_byte *dest, unsigned int dest_offset_bits,
+	     int nbits, int bits_big_endian)
+{
+  unsigned int mask;
+
+  gdb_assert (dest_offset_bits >= 0 && dest_offset_bits + nbits <= 8);
+
+  mask = (1 << nbits) - 1;
+  if (bits_big_endian)
+    {
+      datum <<= 8 - (dest_offset_bits + nbits);
+      mask <<= 8 - (dest_offset_bits + nbits);
+    }
+  else
+    {
+      datum <<= dest_offset_bits;
+      mask <<= dest_offset_bits;
+    }
+
+  gdb_assert ((datum & ~mask) == 0);
+
+  *dest = (*dest & ~mask) | datum;
+}
+
+/* Copy bits from a source to a destination.
+   
+   DEST is where the bits should be written.
+   DEST_OFFSET_BITS is the bit offset into DEST.
+   SOURCE is the source of bits.
+   SOURCE_OFFSET_BITS is the bit offset into SOURCE.
+   BIT_COUNT is the number of bits to copy.
+   BITS_BIG_ENDIAN is taken directly from gdbarch.  */
+
+static void
+copy_bitwise (gdb_byte *dest, unsigned int dest_offset_bits,
+	      const gdb_byte *source, unsigned int source_offset_bits,
+	      unsigned int bit_count,
+	      int bits_big_endian)
+{
+  unsigned int dest_avail;
+  int datum;
+
+  /* Reduce everything to byte-size pieces.  */
+  dest += dest_offset_bits / 8;
+  dest_offset_bits %= 8;
+  source += source_offset_bits / 8;
+  source_offset_bits %= 8;
+
+  dest_avail = 8 - dest_offset_bits % 8;
+
+  /* See if we can fill the first destination byte.  */
+  if (dest_avail < bit_count)
+    {
+      datum = extract_bits (&source, &source_offset_bits, dest_avail,
+			    bits_big_endian);
+      insert_bits (datum, dest, dest_offset_bits, dest_avail, bits_big_endian);
+      ++dest;
+      dest_offset_bits = 0;
+      bit_count -= dest_avail;
+    }
+
+  /* Now, either DEST_OFFSET_BITS is byte-aligned, or we have fewer
+     than 8 bits remaining.  */
+  gdb_assert (dest_offset_bits % 8 == 0 || bit_count < 8);
+  for (; bit_count >= 8; bit_count -= 8)
+    {
+      datum = extract_bits (&source, &source_offset_bits, 8, bits_big_endian);
+      *dest++ = (gdb_byte) datum;
+    }
+
+  /* Finally, we may have a few leftover bits.  */
+  gdb_assert (bit_count <= 8 - dest_offset_bits % 8);
+  if (bit_count > 0)
+    {
+      datum = extract_bits (&source, &source_offset_bits, bit_count,
+			    bits_big_endian);
+      insert_bits (datum, dest, dest_offset_bits, bit_count, bits_big_endian);
+    }
+}
+
 static void
 read_pieced_value (struct value *v)
 {
   int i;
   long offset = 0;
+  ULONGEST bits_to_skip;
   gdb_byte *contents;
   struct piece_closure *c = (struct piece_closure *) value_computed_closure (v);
   struct frame_info *frame = frame_find_by_id (VALUE_FRAME_ID (v));
+  size_t type_len;
+  size_t buffer_size = 0;
+  char *buffer = NULL;
+  struct cleanup *cleanup;
+  int bits_big_endian
+    = gdbarch_bits_big_endian (get_type_arch (value_type (v)));
+
+  if (value_type (v) != value_enclosing_type (v))
+    internal_error (__FILE__, __LINE__,
+		    _("Should not be able to create a lazy value with "
+		      "an enclosing type"));
+
+  cleanup = make_cleanup (free_current_contents, &buffer);
 
   contents = value_contents_raw (v);
-  for (i = 0; i < c->n_pieces; i++)
+  bits_to_skip = 8 * value_offset (v);
+  type_len = 8 * TYPE_LENGTH (value_type (v));
+
+  for (i = 0; i < c->n_pieces && offset < type_len; i++)
     {
       struct dwarf_expr_piece *p = &c->pieces[i];
+      size_t this_size, this_size_bits;
+      long dest_offset_bits, source_offset_bits, source_offset;
+      const gdb_byte *intermediate_buffer;
 
+      /* Compute size, source, and destination offsets for copying, in
+	 bits.  */
+      this_size_bits = p->size;
+      if (bits_to_skip > 0 && bits_to_skip >= this_size_bits)
+	{
+	  bits_to_skip -= this_size_bits;
+	  continue;
+	}
+      if (this_size_bits > type_len - offset)
+	this_size_bits = type_len - offset;
+      if (bits_to_skip > 0)
+	{
+	  dest_offset_bits = 0;
+	  source_offset_bits = bits_to_skip;
+	  this_size_bits -= bits_to_skip;
+	  bits_to_skip = 0;
+	}
+      else
+	{
+	  dest_offset_bits = offset;
+	  source_offset_bits = 0;
+	}
+
+      this_size = (this_size_bits + source_offset_bits % 8 + 7) / 8;
+      source_offset = source_offset_bits / 8;
+      if (buffer_size < this_size)
+	{
+	  buffer_size = this_size;
+	  buffer = xrealloc (buffer, buffer_size);
+	}
+      intermediate_buffer = buffer;
+
+      /* Copy from the source to DEST_BUFFER.  */
       switch (p->location)
 	{
 	case DWARF_VALUE_REGISTER:
@@ -280,17 +505,22 @@ read_pieced_value (struct value *v)
 	    struct gdbarch *arch = get_frame_arch (frame);
 	    int gdb_regnum = gdbarch_dwarf2_reg_to_regnum (arch,
 							   p->v.expr.value);
-	    int reg_offset = 0;
+	    int reg_offset = source_offset;
 
 	    if (gdbarch_byte_order (arch) == BFD_ENDIAN_BIG
-		&& p->size < register_size (arch, gdb_regnum))
-	      /* Big-endian, and we want less than full size.  */
-	      reg_offset = register_size (arch, gdb_regnum) - p->size;
+		&& this_size < register_size (arch, gdb_regnum))
+	      {
+		/* Big-endian, and we want less than full size.  */
+		reg_offset = register_size (arch, gdb_regnum) - this_size;
+		/* We want the lower-order THIS_SIZE_BITS of the bytes
+		   we extract from the register.  */
+		source_offset_bits += 8 * this_size - this_size_bits;
+	      }
 
 	    if (gdb_regnum != -1)
 	      {
 		get_frame_register_bytes (frame, gdb_regnum, reg_offset, 
-					  p->size, contents + offset);
+					  this_size, buffer);
 	      }
 	    else
 	      {
@@ -302,39 +532,76 @@ read_pieced_value (struct value *v)
 
 	case DWARF_VALUE_MEMORY:
 	  if (p->v.expr.in_stack_memory)
-	    read_stack (p->v.expr.value, contents + offset, p->size);
+	    read_stack (p->v.expr.value + source_offset, buffer, this_size);
 	  else
-	    read_memory (p->v.expr.value, contents + offset, p->size);
+	    read_memory (p->v.expr.value + source_offset, buffer, this_size);
 	  break;
 
 	case DWARF_VALUE_STACK:
 	  {
 	    struct gdbarch *gdbarch = get_type_arch (value_type (v));
-	    size_t n = p->size;
+	    size_t n = this_size;
 
-	    if (n > c->addr_size)
-	      n = c->addr_size;
-	    store_unsigned_integer (contents + offset, n,
-				    gdbarch_byte_order (gdbarch),
-				    p->v.expr.value);
+	    if (n > c->addr_size - source_offset)
+	      n = (c->addr_size >= source_offset
+		   ? c->addr_size - source_offset
+		   : 0);
+	    if (n == 0)
+	      {
+		/* Nothing.  */
+	      }
+	    else if (source_offset == 0)
+	      store_unsigned_integer (buffer, n,
+				      gdbarch_byte_order (gdbarch),
+				      p->v.expr.value);
+	    else
+	      {
+		gdb_byte bytes[sizeof (ULONGEST)];
+
+		store_unsigned_integer (bytes, n + source_offset,
+					gdbarch_byte_order (gdbarch),
+					p->v.expr.value);
+		memcpy (buffer, bytes + source_offset, n);
+	      }
 	  }
 	  break;
 
 	case DWARF_VALUE_LITERAL:
 	  {
-	    size_t n = p->size;
+	    size_t n = this_size;
 
-	    if (n > p->v.literal.length)
-	      n = p->v.literal.length;
-	    memcpy (contents + offset, p->v.literal.data, n);
+	    if (n > p->v.literal.length - source_offset)
+	      n = (p->v.literal.length >= source_offset
+		   ? p->v.literal.length - source_offset
+		   : 0);
+	    if (n != 0)
+	      intermediate_buffer = p->v.literal.data + source_offset;
 	  }
+	  break;
+
+	case DWARF_VALUE_OPTIMIZED_OUT:
+	  /* We just leave the bits empty for now.  This is not ideal
+	     but gdb currently does not have a nice way to represent
+	     optimized-out pieces.  */
+	  warning (_("bits %ld-%ld in computed object were optimized out; "
+		     "replacing with zeroes"),
+		   offset,
+		   offset + (long) this_size_bits);
 	  break;
 
 	default:
 	  internal_error (__FILE__, __LINE__, _("invalid location type"));
 	}
-      offset += p->size;
+
+      if (p->location != DWARF_VALUE_OPTIMIZED_OUT)
+	copy_bitwise (contents, dest_offset_bits,
+		      intermediate_buffer, source_offset_bits % 8,
+		      this_size_bits, bits_big_endian);
+
+      offset += this_size_bits;
     }
+
+  do_cleanups (cleanup);
 }
 
 static void
@@ -342,9 +609,16 @@ write_pieced_value (struct value *to, struct value *from)
 {
   int i;
   long offset = 0;
-  gdb_byte *contents;
+  ULONGEST bits_to_skip;
+  const gdb_byte *contents;
   struct piece_closure *c = (struct piece_closure *) value_computed_closure (to);
   struct frame_info *frame = frame_find_by_id (VALUE_FRAME_ID (to));
+  size_t type_len;
+  size_t buffer_size = 0;
+  char *buffer = NULL;
+  struct cleanup *cleanup;
+  int bits_big_endian
+    = gdbarch_bits_big_endian (get_type_arch (value_type (to)));
 
   if (frame == NULL)
     {
@@ -352,10 +626,58 @@ write_pieced_value (struct value *to, struct value *from)
       return;
     }
 
-  contents = value_contents_raw (from);
-  for (i = 0; i < c->n_pieces; i++)
+  cleanup = make_cleanup (free_current_contents, &buffer);
+
+  contents = value_contents (from);
+  bits_to_skip = 8 * value_offset (to);
+  type_len = 8 * TYPE_LENGTH (value_type (to));
+  for (i = 0; i < c->n_pieces && offset < type_len; i++)
     {
       struct dwarf_expr_piece *p = &c->pieces[i];
+      size_t this_size_bits, this_size;
+      long dest_offset_bits, source_offset_bits, dest_offset, source_offset;
+      int need_bitwise;
+      const gdb_byte *source_buffer;
+
+      this_size_bits = p->size;
+      if (bits_to_skip > 0 && bits_to_skip >= this_size_bits)
+	{
+	  bits_to_skip -= this_size_bits;
+	  continue;
+	}
+      if (this_size_bits > type_len - offset)
+	this_size_bits = type_len - offset;
+      if (bits_to_skip > 0)
+	{
+	  dest_offset_bits = bits_to_skip;
+	  source_offset_bits = 0;
+	  this_size_bits -= bits_to_skip;
+	  bits_to_skip = 0;
+	}
+      else
+	{
+	  dest_offset_bits = 0;
+	  source_offset_bits = offset;
+	}
+
+      this_size = (this_size_bits + source_offset_bits % 8 + 7) / 8;
+      source_offset = source_offset_bits / 8;
+      dest_offset = dest_offset_bits / 8;
+      if (dest_offset_bits % 8 == 0 && source_offset_bits % 8 == 0)
+	{
+	  source_buffer = contents + source_offset;
+	  need_bitwise = 0;
+	}
+      else
+	{
+	  if (buffer_size < this_size)
+	    {
+	      buffer_size = this_size;
+	      buffer = xrealloc (buffer, buffer_size);
+	    }
+	  source_buffer = buffer;
+	  need_bitwise = 1;
+	}
 
       switch (p->location)
 	{
@@ -363,17 +685,27 @@ write_pieced_value (struct value *to, struct value *from)
 	  {
 	    struct gdbarch *arch = get_frame_arch (frame);
 	    int gdb_regnum = gdbarch_dwarf2_reg_to_regnum (arch, p->v.expr.value);
-	    int reg_offset = 0;
+	    int reg_offset = dest_offset;
 
 	    if (gdbarch_byte_order (arch) == BFD_ENDIAN_BIG
-		&& p->size < register_size (arch, gdb_regnum))
+		&& this_size <= register_size (arch, gdb_regnum))
 	      /* Big-endian, and we want less than full size.  */
-	      reg_offset = register_size (arch, gdb_regnum) - p->size;
+	      reg_offset = register_size (arch, gdb_regnum) - this_size;
 
 	    if (gdb_regnum != -1)
 	      {
+		if (need_bitwise)
+		  {
+		    get_frame_register_bytes (frame, gdb_regnum, reg_offset,
+					      this_size, buffer);
+		    copy_bitwise (buffer, dest_offset_bits,
+				  contents, source_offset_bits,
+				  this_size_bits,
+				  bits_big_endian);
+		  }
+
 		put_frame_register_bytes (frame, gdb_regnum, reg_offset, 
-					  p->size, contents + offset);
+					  this_size, source_buffer);
 	      }
 	    else
 	      {
@@ -383,14 +715,31 @@ write_pieced_value (struct value *to, struct value *from)
 	  }
 	  break;
 	case DWARF_VALUE_MEMORY:
-	  write_memory (p->v.expr.value, contents + offset, p->size);
+	  if (need_bitwise)
+	    {
+	      /* Only the first and last bytes can possibly have any
+		 bits reused.  */
+	      read_memory (p->v.expr.value + dest_offset, buffer, 1);
+	      read_memory (p->v.expr.value + dest_offset + this_size - 1,
+			   buffer + this_size - 1, 1);
+	      copy_bitwise (buffer, dest_offset_bits,
+			    contents, source_offset_bits,
+			    this_size_bits,
+			    bits_big_endian);
+	    }
+
+	  write_memory (p->v.expr.value + dest_offset,
+			source_buffer, this_size);
 	  break;
 	default:
 	  set_value_optimized_out (to, 1);
-	  return;
+	  goto done;
 	}
-      offset += p->size;
+      offset += this_size_bits;
     }
+
+ done:
+  do_cleanups (cleanup);
 }
 
 static void *
@@ -424,7 +773,7 @@ static struct lval_funcs pieced_value_funcs = {
 
 static struct value *
 dwarf2_evaluate_loc_desc (struct type *type, struct frame_info *frame,
-			  gdb_byte *data, unsigned short size,
+			  const gdb_byte *data, unsigned short size,
 			  struct dwarf2_per_cu_data *per_cu)
 {
   struct value *retval;
@@ -527,6 +876,9 @@ dwarf2_evaluate_loc_desc (struct type *type, struct frame_info *frame,
 	  }
 	  break;
 
+	  /* DWARF_VALUE_OPTIMIZED_OUT can't occur in this context --
+	     it can only be encountered when making a piece.  */
+	case DWARF_VALUE_OPTIMIZED_OUT:
 	default:
 	  internal_error (__FILE__, __LINE__, _("invalid location type"));
 	}
@@ -565,7 +917,7 @@ needs_frame_read_mem (void *baton, gdb_byte *buf, CORE_ADDR addr, size_t len)
 
 /* Frame-relative accesses do require a frame.  */
 static void
-needs_frame_frame_base (void *baton, gdb_byte **start, size_t * length)
+needs_frame_frame_base (void *baton, const gdb_byte **start, size_t * length)
 {
   static gdb_byte lit0 = DW_OP_lit0;
   struct needs_frame_baton *nf_baton = baton;
@@ -601,7 +953,7 @@ needs_frame_tls_address (void *baton, CORE_ADDR offset)
    requires a frame to evaluate.  */
 
 static int
-dwarf2_loc_desc_needs_frame (gdb_byte *data, unsigned short size,
+dwarf2_loc_desc_needs_frame (const gdb_byte *data, unsigned short size,
 			     struct dwarf2_per_cu_data *per_cu)
 {
   struct needs_frame_baton baton;
@@ -665,12 +1017,12 @@ struct axs_var_loc
   LONGEST offset;
 };
 
-static gdb_byte *
+static const gdb_byte *
 dwarf2_tracepoint_var_loc (struct symbol *symbol,
 			   struct agent_expr *ax,
 			   struct axs_var_loc *loc,
 			   struct gdbarch *gdbarch,
-			   gdb_byte *data, gdb_byte *end)
+			   const gdb_byte *data, const gdb_byte *end)
 {
   if (data[0] >= DW_OP_reg0 && data[0] <= DW_OP_reg31)
     {
@@ -692,7 +1044,7 @@ dwarf2_tracepoint_var_loc (struct symbol *symbol,
       struct symbol *framefunc;
       int frame_reg = 0;
       LONGEST frame_offset;
-      gdb_byte *base_data;
+      const gdb_byte *base_data;
       size_t base_size;
       LONGEST base_offset = 0;
 
@@ -711,8 +1063,8 @@ dwarf2_tracepoint_var_loc (struct symbol *symbol,
 
       if (base_data[0] >= DW_OP_breg0 && base_data[0] <= DW_OP_breg31)
 	{
-	  gdb_byte *buf_end;
-	  
+	  const gdb_byte *buf_end;
+
 	  frame_reg = base_data[0] - DW_OP_breg0;
 	  buf_end = read_sleb128 (base_data + 1,
 				  base_data + base_size, &base_offset);
@@ -791,9 +1143,9 @@ dwarf2_tracepoint_var_access (struct agent_expr *ax,
 static void
 dwarf2_tracepoint_var_ref (struct symbol *symbol, struct gdbarch *gdbarch,
 			   struct agent_expr *ax, struct axs_value *value,
-			   gdb_byte *data, int size)
+			   const gdb_byte *data, int size)
 {
-  gdb_byte *end = data + size;
+  const gdb_byte *end = data + size;
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   /* In practice, a variable is not going to be spread across
      dozens of registers or memory locations.  If someone comes up
@@ -933,10 +1285,11 @@ locexpr_read_needs_frame (struct symbol *symbol)
 /* Describe a single piece of a location, returning an updated
    position in the bytecode sequence.  */
 
-static gdb_byte *
+static const gdb_byte *
 locexpr_describe_location_piece (struct symbol *symbol, struct ui_file *stream,
 				 CORE_ADDR addr, struct objfile *objfile,
-				 gdb_byte *data, int size, unsigned int addr_size)
+				 const gdb_byte *data, int size,
+				 unsigned int addr_size)
 {
   struct gdbarch *gdbarch = get_objfile_arch (objfile);
   int regno;
@@ -963,7 +1316,7 @@ locexpr_describe_location_piece (struct symbol *symbol, struct ui_file *stream,
       struct symbol *framefunc;
       int frame_reg = 0;
       LONGEST frame_offset;
-      gdb_byte *base_data;
+      const gdb_byte *base_data;
       size_t base_size;
       LONGEST base_offset = 0;
 
@@ -983,7 +1336,7 @@ locexpr_describe_location_piece (struct symbol *symbol, struct ui_file *stream,
 
       if (base_data[0] >= DW_OP_breg0 && base_data[0] <= DW_OP_breg31)
 	{
-	  gdb_byte *buf_end;
+	  const gdb_byte *buf_end;
 	  
 	  frame_reg = base_data[0] - DW_OP_breg0;
 	  buf_end = read_sleb128 (base_data + 1,
@@ -1070,10 +1423,11 @@ locexpr_describe_location_piece (struct symbol *symbol, struct ui_file *stream,
 
 static void
 locexpr_describe_location_1 (struct symbol *symbol, CORE_ADDR addr,
-			     struct ui_file *stream, gdb_byte *data, int size,
+			     struct ui_file *stream,
+			     const gdb_byte *data, int size,
 			     struct objfile *objfile, unsigned int addr_size)
 {
-  gdb_byte *end = data + size;
+  const gdb_byte *end = data + size;
   int piece_done = 0, first_piece = 1, bad = 0;
 
   /* A multi-piece description consists of multiple sequences of bytes
@@ -1161,7 +1515,7 @@ loclist_read_variable (struct symbol *symbol, struct frame_info *frame)
 {
   struct dwarf2_loclist_baton *dlbaton = SYMBOL_LOCATION_BATON (symbol);
   struct value *val;
-  gdb_byte *data;
+  const gdb_byte *data;
   size_t size;
 
   data = find_location_expression (dlbaton, &size,
@@ -1203,7 +1557,7 @@ loclist_describe_location (struct symbol *symbol, CORE_ADDR addr,
 {
   struct dwarf2_loclist_baton *dlbaton = SYMBOL_LOCATION_BATON (symbol);
   CORE_ADDR low, high;
-  gdb_byte *loc_ptr, *buf_end;
+  const gdb_byte *loc_ptr, *buf_end;
   int length, first = 1;
   struct objfile *objfile = dwarf2_per_cu_objfile (dlbaton->per_cu);
   struct gdbarch *gdbarch = get_objfile_arch (objfile);
@@ -1285,7 +1639,7 @@ loclist_tracepoint_var_ref (struct symbol *symbol, struct gdbarch *gdbarch,
 			    struct agent_expr *ax, struct axs_value *value)
 {
   struct dwarf2_loclist_baton *dlbaton = SYMBOL_LOCATION_BATON (symbol);
-  gdb_byte *data;
+  const gdb_byte *data;
   size_t size;
 
   data = find_location_expression (dlbaton, &size, ax->scope);
