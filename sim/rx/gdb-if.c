@@ -829,10 +829,12 @@ sim_do_command (SIM_DESC sd, char *cmd)
     {
       if (strcmp (args, "on") == 0)
 	verbose = 1;
+      else if (strcmp (args, "noisy") == 0)
+	verbose = 2;
       else if (strcmp (args, "off") == 0)
 	verbose = 0;
       else
-	printf ("The 'sim verbose' command expects 'on' or 'off'"
+	printf ("The 'sim verbose' command expects 'on', 'noisy', or 'off'"
 		" as an argument.\n");
     }
   else

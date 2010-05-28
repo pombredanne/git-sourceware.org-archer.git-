@@ -1,3 +1,128 @@
+2010-05-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/tui-layout.exp: New.
+
+2010-05-28  Michael Snyder  <msnyder@msnyder-server.eng.vmware.com>
+
+	* gdb.reverse/break-precsave.exp: 
+	Replace uses of send_gdb / gdb_expect.
+	* gdb.reverse/break-reverse.exp: 
+	Replace uses of send_gdb / gdb_expect.
+	* gdb.reverse/consecutive-precsave.exp: 
+	Replace uses of send_gdb / gdb_expect.
+	* gdb.reverse/consecutive-reverse.exp: 
+	Replace uses of send_gdb / gdb_expect.
+	* gdb.reverse/finish-precsave.exp: 
+	Replace uses of send_gdb / gdb_expect.
+	* gdb.reverse/finish-reverse.exp: 
+	Replace uses of send_gdb / gdb_expect.
+	* gdb.reverse/i386-precsave.exp: 
+	Replace uses of send_gdb / gdb_expect.
+	* gdb.reverse/i386-reverse.exp: 
+	Replace uses of send_gdb / gdb_expect.
+	* gdb.reverse/i386-sse-reverse.exp: 
+	Replace uses of send_gdb / gdb_expect.
+	* gdb.reverse/i387-env-reverse.exp: 
+	Replace uses of send_gdb / gdb_expect.
+	* gdb.reverse/i387-stack-reverse.exp: 
+	Replace uses of send_gdb / gdb_expect.
+	* gdb.reverse/machinestate-precsave.exp: 
+	Replace uses of send_gdb / gdb_expect.
+	* gdb.reverse/machinestate.exp: 
+	Replace uses of send_gdb / gdb_expect.
+	* gdb.reverse/sigall-precsave.exp: 
+	Replace uses of send_gdb / gdb_expect.
+	* gdb.reverse/sigall-reverse.exp: 
+	Replace uses of send_gdb / gdb_expect.
+	* gdb.reverse/solib-precsave.exp: 
+	Replace uses of send_gdb / gdb_expect.
+	* gdb.reverse/solib-reverse.exp: 
+	Replace uses of send_gdb / gdb_expect.
+	* gdb.reverse/step-precsave.exp: 
+	Replace uses of send_gdb / gdb_expect.
+	* gdb.reverse/step-reverse.exp: 
+	Replace uses of send_gdb / gdb_expect.
+	* gdb.reverse/until-precsave.exp: 
+	Replace uses of send_gdb / gdb_expect.
+	* gdb.reverse/until-reverse.exp: 
+	Replace uses of send_gdb / gdb_expect.
+	* gdb.reverse/watch-precsave.exp: 
+	Replace uses of send_gdb / gdb_expect.
+	* gdb.reverse/watch-reverse.exp: 
+	Replace uses of send_gdb / gdb_expect.
+
+2010-05-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/sepdebug.exp (info silent break bp_location1): Fix racy
+	excessive newline.
+
+2010-05-27  Michael Snyder  <msnyder@msnyder-server.eng.vmware.com>
+
+	* gdb.base/break.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/relational.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/relocate.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/restore.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/return.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/return2.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/sepdebug.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/setshow.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/setvar.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/shlib-call.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/shreloc.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/sigall.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/sigbpt.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/signull.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/so-impl-ld.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/varargs.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/volatile.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/watch_thread_num.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/watchpoint.exp: Replace uses of send_gdb / gdb_expect.
+
+2010-05-26  Michael Snyder  <msnyder@msnyder-server.eng.vmware.com>
+
+	* gdb.java/jmisc.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.java/jprint.exp: Replace uses of send_gdb / gdb_expect.
+
+	* gdb.gdb/complaints.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.gdb/selftest.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.gdb/xfullpath.exp: Replace uses of send_gdb / gdb_expect.
+
+	* gdb.reverse/consecutive-reverse.exp: 
+	Replace uses of send_gdb / gdb_expect.
+	* gdb.reverse/consecutive-precsave.exp: 
+	Replace uses of send_gdb / gdb_expect.
+
+	* gdb.mi/mi-basics.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.mi/mi-nonstop-exit.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.mi/mi-nonstop.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.mi/mi-ns-stale-regcache.exp: 
+	Replace uses of send_gdb / gdb_expect.
+	* gdb.mi/mi-nsintrall.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.mi/mi-nsmoribund.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.mi/mi-nsthrexec.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.mi/mi-return.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.mi/mi-var-display.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.mi/mi2-basics.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.mi/mi2-console.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.mi/mi2-return.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.mi/mi2-var-display.exp: Replace uses of send_gdb / gdb_expect.
+
+2010-05-26  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.ada/formatted_ref.exp: Replace uses of send_gdb / gdb_expect.
+
+	* gdb.asm/asm-source.exp: Replace uses of send_gdb / gdb_expect.
+
+	* gdb.base/a2-run.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/all-bin.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/annota1.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/annota3.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/assign.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/attach.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/bitfields.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/bitfields2.exp: Replace uses of send_gdb / gdb_expect.
+	* gdb.base/bitops.exp: Replace uses of send_gdb / gdb_expect.
+
 2010-05-25  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.base/macscp.exp: Add missing space after setup_kfail.
@@ -36,6 +161,15 @@
 
 2010-05-25  Michael Snyder  <msnyder@vmware.com>
 
+	* gdb.base/a2-run.exp: Replace send_gdb with gdb_test.
+	* gdb.base/all-bin.exp: Replace send_gdb with gdb_test.
+	* gdb.base/annota1.exp: Replace send_gdb with gdb_test.
+	* gdb.base/annota3.exp: Replace send_gdb with gdb_test.
+	* gdb.base/assign.exp: Replace send_gdb with gdb_test.
+	* gdb.base/attach.exp: Replace send_gdb with gdb_test.
+	* gdb.base/bitfields.exp: Replace send_gdb with gdb_test.
+	* gdb.base/bitfields2.exp: Replace send_gdb with gdb_test.
+	* gdb.base/bitops.exp: Replace send_gdb with gdb_test.
 	* gdb.base/call-ar-st.exp: Replace send_gdb with gdb_test.
 	* gdb.base/callfuncs.exp: Replace send_gdb with gdb_test.
 	* gdb.base/call-rt-st.exp: Replace send_gdb with gdb_test.
@@ -74,6 +208,7 @@
 	* gdb.base/nodebug.exp: Replace send_gdb with gdb_test.
 	* gdb.base/pointers.exp: Replace send_gdb with gdb_test.
 	* gdb.base/ptype.exp: Replace send_gdb with gdb_test.
+	* gdb.base/whatis.exp: Replace send_gdb with gdb_test.
 
 2010-05-25  Doug Evans  <dje@google.com>
 
