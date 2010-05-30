@@ -2332,7 +2332,25 @@ value_from_decfloat (struct type *type, const gdb_byte *dec)
 struct value *
 coerce_ref (struct value *arg)
 {
-  struct type *value_type_arg_tmp = check_typedef (value_type (arg));
+  struct type *value_type_arg_tmp;
+
+  if (TYPE_DYNAMIC (value_type (arg)))
+    {
+      struct cleanup *cleanups = make_cleanup (null_cleanup, NULL);
+      CORE_ADDR address;
+
+      value_type_arg_tmp = value_type (arg);
+      address = value_raw_address (arg);
+      value_type_arg_tmp = object_address_get_data (value_type_arg_tmp,
+						    &address);
+      if (! value_type_arg_tmp)
+	error (_("Attempt to coerce non-valid value."));
+      arg = value_at_lazy (value_type_arg_tmp, address);
+      do_cleanups (cleanups);
+    }
+  else
+    value_type_arg_tmp = check_typedef (value_type (arg));
+
   if (TYPE_CODE (value_type_arg_tmp) == TYPE_CODE_REF)
     arg = value_at_lazy (TYPE_TARGET_TYPE (value_type_arg_tmp),
 			 unpack_pointer (value_type (arg),		

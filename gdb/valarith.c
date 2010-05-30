@@ -308,6 +308,10 @@ int
 binop_user_defined_p (enum exp_opcode op,
 		      struct value *arg1, struct value *arg2)
 {
+  /* FIXME: We should support user defined ops for dynamic types.  */
+  if (TYPE_DYNAMIC (value_type (arg1)) || TYPE_DYNAMIC (value_type (arg2)))
+    return 0;
+
   return binop_types_user_defined_p (op, value_type (arg1), value_type (arg2));
 }
 
