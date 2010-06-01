@@ -2836,16 +2836,13 @@ dwarf2_initialize_objfile (struct objfile *objfile)
       return 2;
     }
 
-  /* We read symbols for the primary objfile right away.  This seems
-     to be the least confusing thing for the user.  If we read the
-     main objfile in the background, the first thing the user sees is
-     "reading symbols ... done", followed by an inexplicable
-     pause.  */
+  /* We want to read the data largest-first, to try to hide as much of
+     the work as possible.  However, we often want the main objfile,
+     so we make it more important than any other.  */
   if ((objfile->flags & OBJF_MAIN) != 0)
-    {
-      dwarf2_build_psymtabs (dwarf2_per_objfile->objfile);
-      return 0;
-    }
+    prio = (unsigned long) -1;
+  else
+    prio = dwarf2_per_objfile->info.size;
 
   obstack_init (&dwarf2_per_objfile->self_obstack);
   dwarf2_per_objfile->obstack = &dwarf2_per_objfile->self_obstack;
@@ -2864,10 +2861,6 @@ dwarf2_initialize_objfile (struct objfile *objfile)
   /* Ensure that nothing else can create psymtabs while the background
      thread is running.  */
   objfile->psyms = &readonly_psymtab_state;
-
-  /* We want to read the data largest-first, to try to hide as much of
-     the work as possible.  */
-  prio = dwarf2_per_objfile->info.size;
 
   ++dwarf2_per_objfile->refc;
   dwarf2_per_objfile->reader = create_task (dwarf2_task_pool,

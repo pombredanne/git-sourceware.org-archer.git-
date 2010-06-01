@@ -1119,7 +1119,7 @@ symbol_file_add_main_1 (char *args, int from_tty, int flags)
      what is frameless.  */
   reinit_frame_cache ();
 
-  set_initial_language ();
+  lazily_set_initial_language ();
 }
 
 void
@@ -1420,37 +1420,6 @@ symbol_file_command (char *args, int from_tty)
 
       do_cleanups (cleanups);
     }
-}
-
-/* Set the initial language.
-
-   FIXME: A better solution would be to record the language in the
-   psymtab when reading partial symbols, and then use it (if known) to
-   set the language.  This would be a win for formats that encode the
-   language in an easily discoverable place, such as DWARF.  For
-   stabs, we can jump through hoops looking for specially named
-   symbols or try to intuit the language from the specific type of
-   stabs we find, but we can't do that until later when we read in
-   full symbols.  */
-
-void
-set_initial_language (void)
-{
-  char *filename;
-  enum language lang = language_unknown;
-
-  filename = find_main_filename ();
-  if (filename != NULL)
-    lang = deduce_language_from_filename (filename);
-
-  if (lang == language_unknown)
-    {
-      /* Make C the default language */
-      lang = language_c;
-    }
-
-  set_language (lang);
-  expected_language = current_language; /* Don't warn the user.  */
 }
 
 /* If NAME is a remote name open the file using remote protocol, otherwise

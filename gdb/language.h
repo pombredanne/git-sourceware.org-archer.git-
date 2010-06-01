@@ -341,7 +341,9 @@ struct language_defn
    the language of symbol files (e.g. detecting when ".c" files are
    C++), it should be a separate setting from the current_language.  */
 
-extern const struct language_defn *current_language;
+
+extern const struct language_defn *get_current_language (void);
+#define current_language get_current_language ()
 
 /* Pointer to the language_defn expected by the user, e.g. the language
    of main(), or the language we last mentioned in a message, or C.  */
@@ -488,7 +490,7 @@ extern enum language get_frame_language (void);	/* In stack.c */
 extern CORE_ADDR skip_language_trampoline (struct frame_info *, CORE_ADDR pc);
 
 /* Return demangled language symbol, or NULL.  */
-extern char *language_demangle (const struct language_defn *current_language, 
+extern char *language_demangle (const struct language_defn *lang, 
 				const char *mangled, int options);
 
 /* Return class name from physname, or NULL.  */
@@ -521,5 +523,7 @@ void default_get_string (struct value *value, gdb_byte **buffer, int *length,
 
 void c_get_string (struct value *value, gdb_byte **buffer, int *length,
 		   struct type **char_type, const char **charset);
+
+void lazily_set_initial_language (void);
 
 #endif /* defined (LANGUAGE_H) */

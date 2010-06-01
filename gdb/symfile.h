@@ -444,8 +444,6 @@ extern int auto_solib_limit;
 
 /* From symfile.c */
 
-extern void set_initial_language (void);
-
 extern void find_lowest_section (bfd *, asection *, void *);
 
 extern bfd *symfile_bfd_open (char *);

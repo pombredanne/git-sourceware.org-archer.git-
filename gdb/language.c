@@ -89,7 +89,8 @@ enum case_sensitivity case_sensitivity = case_sensitive_on;
 
 /* The current language and language_mode (see language.h) */
 
-const struct language_defn *current_language = &unknown_language_defn;
+static const struct language_defn *real_current_language
+     = &unknown_language_defn;
 enum language_mode language_mode = language_mode_auto;
 
 /* The language that the user expects to be typing in (the language
@@ -165,7 +166,7 @@ set_language_command (char *ignore, int from_tty, struct cmd_list_element *c)
 	      if (flang != language_unknown)
 		set_language (flang);
 	      else
-		set_initial_language ();
+		lazily_set_initial_language ();
 	      expected_language = current_language;
 	      return;
 	    }
@@ -173,7 +174,7 @@ set_language_command (char *ignore, int from_tty, struct cmd_list_element *c)
 	    {
 	      /* Enter manual mode.  Set the specified language.  */
 	      language_mode = language_mode_manual;
-	      current_language = languages[i];
+	      real_current_language = languages[i];
 	      set_type_range_case ();
 	      expected_language = current_language;
 	      return;
@@ -434,7 +435,7 @@ set_language (enum language lang)
     {
       if (languages[i]->la_language == lang)
 	{
-	  current_language = languages[i];
+	  real_current_language = languages[i];
 	  set_type_range_case ();
 	  break;
 	}
@@ -442,6 +443,53 @@ set_language (enum language lang)
 
   return prev_language;
 }
+
+static int initial_language_set = 1;
+
+/* Set the initial language.
+
+   FIXME: A better solution would be to record the language in the
+   psymtab when reading partial symbols, and then use it (if known) to
+   set the language.  This would be a win for formats that encode the
+   language in an easily discoverable place, such as DWARF.  For
+   stabs, we can jump through hoops looking for specially named
+   symbols or try to intuit the language from the specific type of
+   stabs we find, but we can't do that until later when we read in
+   full symbols.  */
+
+void
+lazily_set_initial_language (void)
+{
+  initial_language_set = 0;
+}
+
+const struct language_defn *
+get_current_language (void)
+{
+  if (!initial_language_set)
+    {
+      char *filename;
+      enum language lang = language_unknown;
+
+      initial_language_set = 1;
+
+      filename = find_main_filename ();
+      if (filename != NULL)
+	lang = deduce_language_from_filename (filename);
+
+      if (lang == language_unknown)
+	{
+	  /* Make C the default language */
+	  lang = language_c;
+	}
+
+      set_language (lang);
+      expected_language = real_current_language; /* Don't warn the user.  */
+    }
+
+  return real_current_language;
+}
+
 
 
 /* Print out the current language settings: language, range and
@@ -990,21 +1038,21 @@ skip_language_trampoline (struct frame_info *frame, CORE_ADDR pc)
    FIXME: Sometimes the demangler is invoked when we don't know the
    language, so we can't use this everywhere.  */
 char *
-language_demangle (const struct language_defn *current_language, 
-				const char *mangled, int options)
+language_demangle (const struct language_defn *lang, 
+		   const char *mangled, int options)
 {
-  if (current_language != NULL && current_language->la_demangle)
-    return current_language->la_demangle (mangled, options);
+  if (lang != NULL && lang->la_demangle)
+    return lang->la_demangle (mangled, options);
   return NULL;
 }
 
 /* Return class name from physname or NULL.  */
 char *
-language_class_name_from_physname (const struct language_defn *current_language,
+language_class_name_from_physname (const struct language_defn *lang,
 				   const char *physname)
 {
-  if (current_language != NULL && current_language->la_class_name_from_physname)
-    return current_language->la_class_name_from_physname (physname);
+  if (lang != NULL && lang->la_class_name_from_physname)
+    return lang->la_class_name_from_physname (physname);
   return NULL;
 }
 
