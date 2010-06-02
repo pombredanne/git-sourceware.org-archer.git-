@@ -920,6 +920,9 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 	 we access breakpoint shadows.  */
       validate_breakpoints ();
 
+      if (target_supports_tracepoints ())
+	tracepoint_look_up_symbols ();
+
       if (target_running () && the_target->look_up_symbols != NULL)
 	(*the_target->look_up_symbols) ();
 
@@ -1338,6 +1341,7 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
       && (own_buf[10] == ':' || own_buf[10] == '\0'))
     {
       char *p = &own_buf[10];
+      int gdb_supports_qRelocInsn = 0;
 
       /* Start processing qSupported packet.  */
       target_process_qsupported (NULL);
@@ -1346,20 +1350,45 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 	 feature will follow a ':', and latter features will follow
 	 ';'.  */
       if (*p == ':')
-	for (p = strtok (p + 1, ";");
-	     p != NULL;
-	     p = strtok (NULL, ";"))
-	  {
-	    if (strcmp (p, "multiprocess+") == 0)
-	      {
-		/* GDB supports and wants multi-process support if
-		   possible.  */
-		if (target_supports_multi_process ())
-		  multi_process = 1;
-	      }
-	    else
-	      target_process_qsupported (p);
-	  }
+	{
+	  char **qsupported = NULL;
+	  int count = 0;
+	  int i;
+
+	  /* Two passes, to avoid nested strtok calls in
+	     target_process_qsupported.  */
+	  for (p = strtok (p + 1, ";");
+	       p != NULL;
+	       p = strtok (NULL, ";"))
+	    {
+	      count++;
+	      qsupported = xrealloc (qsupported, count * sizeof (char *));
+	      qsupported[count - 1] = xstrdup (p);
+	    }
+
+	  for (i = 0; i < count; i++)
+	    {
+	      p = qsupported[i];
+	      if (strcmp (p, "multiprocess+") == 0)
+		{
+		  /* GDB supports and wants multi-process support if
+		     possible.  */
+		  if (target_supports_multi_process ())
+		    multi_process = 1;
+		}
+	      else if (strcmp (p, "qRelocInsn+") == 0)
+		{
+		  /* GDB supports relocate instruction requests.  */
+		  gdb_supports_qRelocInsn = 1;
+		}
+	      else
+		target_process_qsupported (p);
+
+	      free (p);
+	    }
+
+	  free (qsupported);
+	}
 
       sprintf (own_buf, "PacketSize=%x;QPassSignals+", PBUFSIZ - 1);
 
@@ -1402,6 +1431,8 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 	  strcat (own_buf, ";TraceStateVariables+");
 	  strcat (own_buf, ";TracepointSource+");
 	  strcat (own_buf, ";DisconnectedTracing+");
+	  if (gdb_supports_qRelocInsn && target_supports_fast_tracepoints ())
+	    strcat (own_buf, ";FastTracepoints+");
 	}
 
       return;
@@ -2102,6 +2133,7 @@ handle_status (char *own_buf)
   else
     {
       pause_all (0);
+      stabilize_threads ();
       gdb_wants_all_threads_stopped ();
 
       if (all_threads.head)
@@ -2801,7 +2833,7 @@ process_serial_event (void)
       break;
     case 'M':
       require_running (own_buf);
-      decode_M_packet (&own_buf[1], &mem_addr, &len, mem_buf);
+      decode_M_packet (&own_buf[1], &mem_addr, &len, &mem_buf);
       if (write_memory (mem_addr, mem_buf, len) == 0)
 	write_ok (own_buf);
       else
@@ -2810,7 +2842,7 @@ process_serial_event (void)
     case 'X':
       require_running (own_buf);
       if (decode_X_packet (&own_buf[1], packet_len - 1,
-			   &mem_addr, &len, mem_buf) < 0
+			   &mem_addr, &len, &mem_buf) < 0
 	  || write_memory (mem_addr, mem_buf, len) != 0)
 	write_enn (own_buf);
       else
