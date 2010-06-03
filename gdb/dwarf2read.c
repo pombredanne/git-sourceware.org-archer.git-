@@ -2809,6 +2809,7 @@ int
 dwarf2_initialize_objfile (struct objfile *objfile)
 {
   unsigned long prio;
+  char *message;
 
   /* If we're about to read full symbols, don't bother with the
      indices.  In this case we also don't care if some other debug
@@ -2862,8 +2863,11 @@ dwarf2_initialize_objfile (struct objfile *objfile)
      thread is running.  */
   objfile->psyms = &readonly_psymtab_state;
 
+  message = xstrprintf ("Scanning debug info from %s...", objfile->name);
+
   ++dwarf2_per_objfile->refc;
   dwarf2_per_objfile->reader = create_task (dwarf2_task_pool,
+					    message,
 					    prio,
 					    dw2_read_psymtabs_task,
 					    dwarf2_per_objfile);

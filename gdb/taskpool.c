@@ -1,6 +1,6 @@
 /* Task pool implementation.
 
-   Copyright (C) 2009 Free Software Foundation, Inc.
+   Copyright (C) 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -20,6 +20,7 @@
 #include "defs.h"
 #include "exceptions.h"
 #include "vec.h"
+#include "taskpool.h"
 
 #include <pthread.h>
 #include <time.h>
@@ -55,6 +56,9 @@ struct task_pool
 /* A single task in a task pool.  */
 struct task
 {
+  /* The task's message.  */
+  char *message;
+
   /* The task's priority.  */
   unsigned long priority;
 
@@ -81,16 +85,61 @@ struct task
   pthread_mutex_t lock;
 };
 
-/* Run TASK and set its result fields accordingly.  Returns true if
-   the task should now be destroyed, false otherwise.  */
+/* Acquire the task lock.  If MAIN_THREAD is false, just lock.  If
+   MAIN_THREAD is true, print the task message if the task is taking
+   "too long".  Return 1 if the message was printed, 0 otherwise.  */
 static int
-run_task (struct task *task)
+acquire_task_lock (struct task *task, int main_thread)
 {
-  int result;
-  pthread_mutex_lock (&task->lock);
+  if (!main_thread)
+    {
+      pthread_mutex_lock (&task->lock);
+      return 0;
+    }
+  else
+    {
+      struct timespec ts;
+      struct timeval tv;
+
+      /* If the task returns in less than 1 second, just go on.  */
+      gettimeofday (&tv, NULL);
+      ts.tv_sec = tv.tv_sec + 1;
+      ts.tv_nsec = tv.tv_usec * 1000;
+      if (! pthread_mutex_timedlock (&task->lock, &ts))
+	return 0;
+
+      /* Print the message.  */
+      puts_unfiltered (task->message);
+      gdb_flush (gdb_stdout);
+      pthread_mutex_lock (&task->lock);
+
+      return 1;
+    }
+}
+
+/* Run TASK and set its result fields accordingly.  Returns true if
+   the task should now be destroyed, false otherwise.  If MAIN_THREAD
+   is true, possibly print the message to the user.  */
+static int
+run_task (struct task *task, int main_thread)
+{
+  int result, message_printed;
+
+  message_printed = acquire_task_lock (task, main_thread);
   if (!task->completed)
     {
       volatile struct gdb_exception except;
+
+      /* If we are running the task in the main thread, print the
+	 message unconditionally.  */
+      if (main_thread)
+	{
+	  gdb_assert (!message_printed);
+
+	  puts_unfiltered (task->message);
+	  gdb_flush (gdb_stdout);
+	  message_printed = 1;
+	}
 
       TRY_CATCH (except, RETURN_MASK_ALL)
 	{
@@ -108,6 +157,13 @@ run_task (struct task *task)
     }
   else
     result = 1;
+
+  if (message_printed)
+    {
+      puts_unfiltered ("done\n");
+      gdb_flush (gdb_stdout);
+    }
+
   pthread_mutex_unlock (&task->lock);
   return result;
 }
@@ -117,6 +173,7 @@ static void
 free_task (struct task *task)
 {
   pthread_mutex_destroy (&task->lock);
+  xfree (task->message);
   xfree (task);
 }
 
@@ -164,7 +221,7 @@ worker_thread (void *p)
 	  break;
 	}
 
-      if (run_task (job))
+      if (run_task (job, 0))
 	free_task (job);
     }
 
@@ -186,13 +243,15 @@ compare_priorities (const void *a, const void *b)
 
 /* Add a task to the task pool POOL, and return it.  */
 struct task *
-create_task (struct task_pool *pool, unsigned long priority,
+create_task (struct task_pool *pool, char *message,
+	     unsigned long priority,
 	     void *(*function) (void *), void *user_data)
 {
   struct task *result;
 
   result = xmalloc (sizeof (struct task));
 
+  result->message = message;
   result->priority = priority;
   result->function = function;
   result->user_data = user_data;
@@ -250,7 +309,7 @@ get_task_answer (struct task *task)
   int i, destroy;
   void *result;
 
-  destroy = run_task (task);
+  destroy = run_task (task, 1);
 
   if (task->completed < 0)
     {

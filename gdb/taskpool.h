@@ -48,6 +48,12 @@ struct task_pool *create_task_pool (int max_workers);
    data.  When run it can either throw an exception, or return a
    result.
 
+   A task has an associated message for the user.  This must be
+   translated by the caller.  It should end with "...".  It is only
+   printed if the task pool determines that the user is waiting for
+   the task to complete.  When the task completes, "done" is printed
+   after the message.  The message should be xmalloc()d.
+
    A task has a priority, also provided by the user.  Priorities must
    be comparable within a given pool but are not otherwise meaningful
    to the pool code.
@@ -61,6 +67,7 @@ struct task_pool *create_task_pool (int max_workers);
    A task is not destroyed until either cancel_task or get_task_answer
    has been called on it.  */
 struct task *create_task (struct task_pool *pool,
+			  char *message,
 			  unsigned long priority,
 			  void *(*function) (void *),
 			  void *user_data);
