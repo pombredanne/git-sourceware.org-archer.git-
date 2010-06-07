@@ -12,7 +12,7 @@ DOCFILES = aoutx.texi  archive.texi archures.texi \
 	bfdver.texi
 
 PROTOS = archive.p archures.p bfd.p \
-	 core.p format.p \
+	cache.p core.p format.p \
 	bfdio.p bfdwin.p \
 	libbfd.p opncls.p reloc.p \
 	section.p syms.p targets.p  \
@@ -36,7 +36,8 @@ SRCDOC = $(srcdir)/../aoutx.h  $(srcdir)/../archive.c \
 	$(srcdir)/../mmo.c
 
 SRCPROT = $(srcdir)/../archive.c $(srcdir)/../archures.c \
-	$(srcdir)/../bfd.c $(srcdir)/../coffcode.h $(srcdir)/../corefile.c \
+	$(srcdir)/../bfd.c $(srcdir)/../cache.c \
+	$(srcdir)/../coffcode.h $(srcdir)/../corefile.c \
 	$(srcdir)/../format.c $(srcdir)/../libbfd.c \
 	$(srcdir)/../bfdio.c $(srcdir)/../bfdwin.c \
 	$(srcdir)/../opncls.c $(srcdir)/../reloc.c \
@@ -245,6 +246,7 @@ BFD_H_DEP = \
 	$(srcdir)/../bfd.c		\
 	$(srcdir)/../archive.c		\
 	$(srcdir)/../corefile.c		\
+	$(srcdir)/../cache.c		\
 	$(srcdir)/../targets.c		\
 	$(srcdir)/../format.c		\
 	$(srcdir)/../linker.c		\

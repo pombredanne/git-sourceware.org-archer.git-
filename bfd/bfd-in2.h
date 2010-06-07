@@ -1,8 +1,8 @@
 /* DO NOT EDIT!  -*- buffer-read-only: t -*-  This file is automatically 
    generated from "bfd-in.h", "init.c", "opncls.c", "libbfd.c", 
    "bfdio.c", "bfdwin.c", "section.c", "archures.c", "reloc.c", 
-   "syms.c", "bfd.c", "archive.c", "corefile.c", "targets.c", "format.c", 
-   "linker.c", "simple.c" and "compress.c".
+   "syms.c", "bfd.c", "archive.c", "corefile.c", "cache.c", "targets.c", 
+   "format.c", "linker.c", "simple.c" and "compress.c".
    Run "make headers" in your build bfd/ to regenerate.  */
 
 /* Main header file for the bfd library -- portable access to object files.
@@ -2574,6 +2574,8 @@ relocation types already defined.  */
   BFD_RELOC_SPU_PPU32,
   BFD_RELOC_SPU_PPU64,
   BFD_RELOC_SPU_ADD_PIC,
+  BFD_RELOC_SPU_PIC18,
+  BFD_RELOC_SPU_STUB,
 
 /* Alpha ECOFF and ELF relocations.  Some of these treat the symbol or
 "addend" in some special way.
@@ -5314,6 +5316,25 @@ bfd_boolean core_file_matches_executable_p
 
 bfd_boolean generic_core_file_matches_executable_p
    (bfd *core_bfd, bfd *exec_bfd);
+
+/* Extracted from cache.c.  */
+bfd_boolean bfd_cache_close_all (void);
+
+struct bfd_thread_info
+{
+  /* Return the ID of the current thread.  Should never return NULL.  */
+  void *(*self) (void);
+  /* Create a mutex and return it.  */
+  void *(*create_mutex) (void);
+  /* Lock a mutex.  */
+  void (*lock_mutex) (void *);
+  /* Unlock a mutex.  */
+  void (*unlock_mutex) (void *);
+};
+
+void bfd_init_threads (const struct bfd_thread_info *info);
+
+void bfd_thread_exit (void);
 
 /* Extracted from targets.c.  */
 #define BFD_SEND(bfd, message, arglist) \

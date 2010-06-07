@@ -21,6 +21,7 @@
 #include "exceptions.h"
 #include "vec.h"
 #include "taskpool.h"
+#include "bfd.h"
 
 #ifdef HAVE_PTHREAD_H
 #include <pthread.h>
@@ -159,6 +160,13 @@ gdb_n_processors (void)
 #endif
 }
 
+/* Return the current thread's ID.  Should never return NULL.  */
+static inline void *
+gdb_self (void)
+{
+  return (void *) /* FIXME */ pthread_self ();
+}
+
 #else /* HAVE_PTHREAD_CREATE */
 
 /* Threadless implementation.  */
@@ -223,7 +231,51 @@ gdb_n_processors (void)
   return 0;
 }
 
+static inline void *
+gdb_self (void)
+{
+  return "hi bob";
+}
+
 #endif /* HAVE_PTHREAD_CREATE */
+
+
+
+/* Thread functions for BFD.  */
+
+static void *
+gdb_bfd_self (void)
+{
+  return gdb_self ();
+}
+
+static void *
+gdb_bfd_create_mutex (void)
+{
+  gdb_mutex *m = XNEW (gdb_mutex);
+  gdb_mutex_init (m);
+  return m;
+}
+
+static void
+gdb_bfd_lock_mutex (void *m)
+{
+  gdb_mutex_lock (m);
+}
+
+static void
+gdb_bfd_unlock_mutex (void *m)
+{
+  gdb_mutex_unlock (m);
+}
+
+static struct bfd_thread_info gdb_bfd_thread_info =
+{
+  gdb_bfd_self,
+  gdb_bfd_create_mutex,
+  gdb_bfd_lock_mutex,
+  gdb_bfd_unlock_mutex
+};
 
 
 
@@ -417,6 +469,8 @@ worker_thread (void *p)
 
   clear_exception_cache ();
 
+  bfd_thread_exit ();
+
   /* The result is ignored.  */
   return NULL;
 }
@@ -547,6 +601,9 @@ create_task_pool (int max_workers)
 	max_workers *= 2;
     }
   result->max_workers = max_workers;
+
+  if (max_workers != 0)
+    bfd_init_threads (&gdb_bfd_thread_info);
 
   return result;
 }
