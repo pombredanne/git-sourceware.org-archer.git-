@@ -416,6 +416,8 @@ AC_CHECK_LIB(m, main)
 AC_CHECK_FUNC(wctype, [],
   [AC_CHECK_LIB(w, wctype)])
 
+AC_SEARCH_LIBS(pthread_create, pthread)
+
 # Some systems (e.g. Solaris) have `gethostbyname' in libnsl.
 AC_SEARCH_LIBS(gethostbyname, nsl)
 
@@ -721,7 +723,7 @@ AC_CHECK_HEADERS([nlist.h machine/reg.h poll.h sys/poll.h proc_service.h \
 		  sys/resource.h sys/procfs.h sys/ptrace.h ptrace.h \
 		  sys/reg.h sys/debugreg.h sys/select.h sys/syscall.h \
 		  sys/types.h sys/wait.h wait.h termios.h termio.h \
-		  sgtty.h unistd.h elf_hp.h ctype.h time.h locale.h])
+		  sgtty.h unistd.h elf_hp.h ctype.h time.h locale.h pthread.h])
 AC_CHECK_HEADERS(link.h, [], [],
 [#if HAVE_SYS_TYPES_H
 # include <sys/types.h>
@@ -802,7 +804,7 @@ AC_CHECK_FUNCS([canonicalize_file_name realpath getrusage getuid \
 		getgid pipe poll pread64 sbrk setpgid setpgrp setsid \
 		sigaction sigprocmask sigsetmask socketpair syscall \
 		ttrace wborder setlocale iconvlist libiconvlist btowc \
-		setrlimit getrlimit posix_madvise])
+		setrlimit getrlimit posix_madvise pthread_create])
 AM_LANGINFO_CODESET
 
 # Check the return and argument types of ptrace.  No canned test for

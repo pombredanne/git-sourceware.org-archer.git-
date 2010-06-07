@@ -22,10 +22,210 @@
 #include "vec.h"
 #include "taskpool.h"
 
+#ifdef HAVE_PTHREAD_H
 #include <pthread.h>
+#endif
 #include <time.h>
 #include <sys/time.h>
 #include <signal.h>
+
+/* To port the threading code to a new host, you must define types and
+   functions for the taskpool implementation to use.  You can use the
+   pthreads code as a guide.
+  
+   We use pthread_create as a sentinel for all the pthread
+   functionality.  */
+#ifdef HAVE_PTHREAD_CREATE
+
+/* The type of a mutex.  */
+typedef pthread_mutex_t gdb_mutex;
+
+/* The type of a condition variable.  */
+typedef pthread_cond_t gdb_condition;
+
+/* Initialize a mutex.  */
+static inline void
+gdb_mutex_init (gdb_mutex *m)
+{
+  pthread_mutex_init (m, NULL);
+}
+
+/* Destroy a mutex.  */
+static inline void
+gdb_mutex_destroy (gdb_mutex *m)
+{
+  pthread_mutex_destroy (m);
+}
+
+/* Acquire a mutex.  */
+static inline void
+gdb_mutex_lock (gdb_mutex *m)
+{
+  pthread_mutex_lock (m);
+}
+
+/* Try for N_SECONDS seconds to acquire the lock M.  If the lock is
+   acquired, return 0.  Otherwise, return nonzero.  */
+static inline int
+gdb_mutex_timed_lock (gdb_mutex *m, unsigned int n_seconds)
+{
+  struct timespec ts;
+  struct timeval tv;
+
+  gettimeofday (&tv, NULL);
+  ts.tv_sec = tv.tv_sec + n_seconds;
+  ts.tv_nsec = tv.tv_usec * 1000;
+
+  return pthread_mutex_timedlock (m, &ts);
+}
+
+/* Release a mutex.  */
+static inline void
+gdb_mutex_unlock (gdb_mutex *m)
+{
+  pthread_mutex_unlock (m);
+}
+
+/* Initialize the condition variable C.  */
+static inline void
+gdb_cond_init (gdb_condition *c)
+{
+  pthread_cond_init (c, NULL);
+}
+
+/* Wait on the condition variable C.  The mutex M is associated with
+   C; it will already have been acquired by the caller.  Wait for up
+   to N_SECONDS seconds; return 0 on success, nonzero if the condition
+   was never triggered.  */
+static inline int
+gdb_cond_timed_wait (gdb_condition *c, gdb_mutex *m, unsigned int n_seconds)
+{
+  struct timespec ts;
+  struct timeval tv;
+
+  gettimeofday (&tv, NULL);
+  ts.tv_sec = tv.tv_sec + n_seconds;
+  ts.tv_nsec = tv.tv_usec * 1000;
+
+  return pthread_cond_timedwait (c, m, &ts);
+}
+
+/* Signal the condition variable.  */
+static inline void
+gdb_cond_signal (gdb_condition *c)
+{
+  pthread_cond_signal (c);
+}
+
+/* Start a new thread.  A new thread should be run in the background
+   -- it should not prevent gdb from exiting.  Also, care must be
+   taken to arrange for signals to be delivered to gdb's main thread.
+   FUNC is called in the new thread, with DATUM as its argument.  */
+static inline void
+gdb_create_new_thread (void *(func) (void *), void *datum)
+{
+  pthread_attr_t attr;
+  pthread_t tem;
+  sigset_t block, old;
+
+  /* Temporarily block every signal.  This is used to prevent the
+     worker threads from accepting any signal that must be
+     delivered to the main thread.  */
+  sigfillset (&block);
+  pthread_sigmask (SIG_BLOCK, &block, &old);
+
+  pthread_attr_init (&attr);
+  pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_DETACHED);
+
+  pthread_create (&tem, &attr, func, datum);
+
+  pthread_attr_destroy (&attr);
+  pthread_sigmask (SIG_SETMASK, &old, NULL);
+}
+
+/* Return the number of processors on this system, or -1 if this is
+   unknown.  If this function returns 0, gdb assumes that no threads
+   are available at all.  */
+static inline int
+gdb_n_processors (void)
+{
+#ifdef _SC_NPROCESSORS_ONLN
+  int n = (int) sysconf (_SC_NPROCESSORS_ONLN);
+  if (n == 0)
+    n = -1;
+  return n;
+#else
+  return -1;
+#endif
+}
+
+#else /* HAVE_PTHREAD_CREATE */
+
+/* Threadless implementation.  */
+
+typedef int gdb_mutex;
+typedef int gdb_condition;
+
+static inline void
+gdb_mutex_init (gdb_mutex *m)
+{
+  *m = 0;
+}
+
+static inline void
+gdb_mutex_destroy (gdb_mutex *m)
+{
+}
+
+static inline void
+gdb_mutex_lock (gdb_mutex *m)
+{
+}
+
+static inline int
+gdb_mutex_timed_lock (gdb_mutex *m, unsigned int n_seconds)
+{
+  return 0;
+}
+
+static inline void
+gdb_mutex_unlock (gdb_mutex *m)
+{
+}
+
+static inline void
+gdb_cond_init (gdb_condition *c)
+{
+  *c = 0;
+}
+
+static inline int
+gdb_cond_timed_wait (gdb_condition *c, gdb_mutex *m, unsigned int n_seconds)
+{
+  return 1;
+}
+
+static inline void
+gdb_cond_signal (gdb_condition *c)
+{
+}
+
+static inline void
+gdb_create_new_thread (void *(func) (void *), void *datum)
+{
+  internal_error (__FILE__, __LINE__,
+		  _("should not be possible to start a new thread"));
+}
+
+static inline int
+gdb_n_processors (void)
+{
+  return 0;
+}
+
+#endif /* HAVE_PTHREAD_CREATE */
+
+
 
 typedef struct task *task_p;
 
@@ -39,11 +239,11 @@ struct task_pool
 
   /* The queue lock.  This must be held when modifying any element of
      the task pool.  */
-  pthread_mutex_t lock;
+  gdb_mutex lock;
 
   /* The queue condition.  This is signaled when a new task is pushed
      on the queue.  */
-  pthread_cond_t condition;
+  gdb_condition condition;
 
   /* The number of worker threads present active.  */
   int worker_count;
@@ -82,7 +282,7 @@ struct task
 
   /* The task lock.  This must be acquired before modifying any field
      of this task.  */
-  pthread_mutex_t lock;
+  gdb_mutex lock;
 };
 
 /* Acquire the task lock.  If MAIN_THREAD is false, just lock.  If
@@ -93,25 +293,19 @@ acquire_task_lock (struct task *task, int main_thread)
 {
   if (!main_thread)
     {
-      pthread_mutex_lock (&task->lock);
+      gdb_mutex_lock (&task->lock);
       return 0;
     }
   else
     {
-      struct timespec ts;
-      struct timeval tv;
-
       /* If the task returns in less than 1 second, just go on.  */
-      gettimeofday (&tv, NULL);
-      ts.tv_sec = tv.tv_sec + 1;
-      ts.tv_nsec = tv.tv_usec * 1000;
-      if (! pthread_mutex_timedlock (&task->lock, &ts))
+      if (! gdb_mutex_timed_lock (&task->lock, 1))
 	return 0;
 
       /* Print the message.  */
       puts_unfiltered (task->message);
       gdb_flush (gdb_stdout);
-      pthread_mutex_lock (&task->lock);
+      gdb_mutex_lock (&task->lock);
 
       return 1;
     }
@@ -164,7 +358,7 @@ run_task (struct task *task, int main_thread)
       gdb_flush (gdb_stdout);
     }
 
-  pthread_mutex_unlock (&task->lock);
+  gdb_mutex_unlock (&task->lock);
   return result;
 }
 
@@ -172,7 +366,7 @@ run_task (struct task *task, int main_thread)
 static void
 free_task (struct task *task)
 {
-  pthread_mutex_destroy (&task->lock);
+  gdb_mutex_destroy (&task->lock);
   xfree (task->message);
   xfree (task);
 }
@@ -185,23 +379,19 @@ worker_thread (void *p)
   struct task_pool *pool = p;
   while (1)
     {
-      struct timespec ts;
-      struct timeval tv;
       int r;
       struct task *job;
 
-      pthread_mutex_lock (&pool->lock);
-
-      /* Wait up to 15 seconds for a new job.  */
-      gettimeofday (&tv, NULL);
-      ts.tv_sec = tv.tv_sec + 15;
-      ts.tv_nsec = tv.tv_usec * 1000;
+      gdb_mutex_lock (&pool->lock);
 
       r = 0;
       while (VEC_empty (task_p, pool->queue) && r == 0)
 	{
 	  ++pool->waiters;
-	  r = pthread_cond_timedwait (&pool->condition, &pool->lock, &ts);
+	  /* Wait up to 15 seconds for a new job.  If we have a
+	     spurious wakeup we will wait the whole time again; this
+	     doesn't seem very important.  */
+	  r = gdb_cond_timed_wait (&pool->condition, &pool->lock, 15);
 	  --pool->waiters;
 	}
 
@@ -213,7 +403,7 @@ worker_thread (void *p)
       else
 	job = VEC_pop (task_p, pool->queue);
 
-      pthread_mutex_unlock (&pool->lock);
+      gdb_mutex_unlock (&pool->lock);
 
       if (!job)
 	{
@@ -257,46 +447,41 @@ create_task (struct task_pool *pool, char *message,
   result->user_data = user_data;
   result->completed = 0;
   result->result = NULL;
-  pthread_mutex_init (&result->lock, NULL);
+  gdb_mutex_init (&result->lock);
 
   /* Acquire the pool lock while operating on the pool.  */
-  pthread_mutex_lock (&pool->lock);
+  gdb_mutex_lock (&pool->lock);
 
-  /* Push the task and then sort by priority.  */
-  VEC_safe_push (task_p, pool->queue, result);
-  qsort (VEC_address (task_p, pool->queue),
-	 VEC_length (task_p, pool->queue),
-	 sizeof (task_p),
-	 compare_priorities);
-
-  /* If a thread is already waiting for a job, or if we are already
-     running the maximum number of worker threads, then we just notify
-     a waiting thread.  Otherwise, we start a new thread.  */
-  if (pool->waiters == 0 && pool->worker_count < pool->max_workers)
+  if (pool->max_workers == 0)
     {
-      pthread_attr_t attr;
-      pthread_t tem;
-      sigset_t block, old;
-
-      /* Temporarily block every signal.  This is used to prevent the
-	 worker threads from accepting any signal that must be
-	 delivered to the main thread.  */
-      sigfillset (&block);
-      pthread_sigmask (SIG_BLOCK, &block, &old);
-
-      pthread_attr_init (&attr);
-      pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_DETACHED);
-
-      pthread_create (&tem, &attr, worker_thread, pool);
-      ++pool->worker_count;
-
-      pthread_attr_destroy (&attr);
-      pthread_sigmask (SIG_SETMASK, &old, NULL);
+      /* No threads, so run the task right away.  We pretend that this
+	 is not the main thread, because we don't want the message to
+	 be printed.  */
+      run_task (result, 0);
     }
   else
-    pthread_cond_signal (&pool->condition);
+    {	
+      /* Push the task and then sort by priority.  */
+      VEC_safe_push (task_p, pool->queue, result);
+      qsort (VEC_address (task_p, pool->queue),
+	     VEC_length (task_p, pool->queue),
+	     sizeof (task_p),
+	     compare_priorities);
 
-  pthread_mutex_unlock (&pool->lock);
+      /* If a thread is already waiting for a job, or if we are
+	 already running the maximum number of worker threads, then we
+	 just notify a waiting thread.  Otherwise, we start a new
+	 thread.  */
+      if (pool->waiters == 0 && pool->worker_count < pool->max_workers)
+	{
+	  gdb_create_new_thread (worker_thread, pool);
+	  ++pool->worker_count;
+	}
+      else
+	gdb_cond_signal (&pool->condition);
+    }
+
+  gdb_mutex_unlock (&pool->lock);
 
   return result;
 }
@@ -332,11 +517,11 @@ cancel_task (struct task *task)
 {
   int destroy;
 
-  pthread_mutex_lock (&task->lock);
+  gdb_mutex_lock (&task->lock);
   destroy = task->completed;
   if (!task->completed)
     task->completed = 1;
-  pthread_mutex_unlock (&task->lock);
+  gdb_mutex_unlock (&task->lock);
   if (destroy)
     free_task (task);
 }
@@ -350,17 +535,15 @@ create_task_pool (int max_workers)
   result = xmalloc (sizeof (struct task_pool));
   memset (result, 0, sizeof (struct task_pool));
 
-  pthread_mutex_init (&result->lock, NULL);
-  pthread_cond_init (&result->condition, NULL);
+  gdb_mutex_init (&result->lock);
+  gdb_cond_init (&result->condition);
 
   if (max_workers == -1)
     {
-#ifdef _SC_NPROCESSORS_ONLN
-      max_workers = (int) sysconf (_SC_NPROCESSORS_ONLN);
-#endif
-      if (max_workers <= 0)
+      max_workers = gdb_n_processors ();
+      if (max_workers < 0)
 	max_workers = 5;
-      else
+      else if (max_workers > 0)
 	max_workers *= 2;
     }
   result->max_workers = max_workers;

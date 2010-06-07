@@ -339,6 +339,12 @@
 /* Define if <sys/procfs.h> has pstatus_t. */
 #undef HAVE_PSTATUS_T
 
+/* Define to 1 if you have the `pthread_create' function. */
+#undef HAVE_PTHREAD_CREATE
+
+/* Define to 1 if you have the <pthread.h> header file. */
+#undef HAVE_PTHREAD_H
+
 /* Define if sys/ptrace.h defines the PTRACE_GETFPXREGS request. */
 #undef HAVE_PTRACE_GETFPXREGS
 
