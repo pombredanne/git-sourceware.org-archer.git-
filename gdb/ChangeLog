@@ -1,3 +1,159 @@
+2010-06-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix duplicate types for single DIE.
+	* dwarf2read.c (read_structure_type): Move set_descriptive_type after
+	set_die_type.
+	(read_array_type): Remove type initialization.  Recheck get_die_type
+	after initial die_type.  Move set_die_type before set_descriptive_type.
+	(read_set_type): New variable domain_type.  Recheck get_die_type after
+	initial die_type.  Move attr initialization later.
+	(read_tag_pointer_type, read_tag_reference_type): New variable
+	target_type.  Recheck get_die_type after initial die_type.
+	(read_tag_ptr_to_member_type): Recheck get_die_type after initial
+	die_type and die_containing_type.
+	(read_tag_const_type, read_tag_volatile_type, read_subroutine_type):
+	Recheck get_die_type after initial die_type.
+	(read_subrange_type): Recheck get_die_type after initial die_type.
+	Move set_die_type before set_descriptive_type.
+	(set_die_type): Extend the function comment.  Call complaint if DIE has
+	some type already set.
+
+2010-06-05  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* mi/mi-main.c (mi_cmd_list_thread_groups): Adjust
+	for current naming of thread groups (iN, not N).
+
+2010-06-04  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	* ada-lang.c (ada_operator_length): Constify `struct expression'.
+	* parse.c (operator_length): Likewise.
+	(operator_length_standard): Likewise.
+	* parser-defs.h (operator_length): Likewise.
+	(operator_length_standard): Likewise.
+	(struct exp_descriptor <operator_length>): Likewise.
+
+2010-06-04  Doug Evans  <dje@google.com>
+
+	Add support for enabling/disabling individual pretty-printers.
+	* python/py-prettyprint.c (search_pp_list): Skip disabled printers.
+	* python/python-internal.h (gdbpy_enabled_cst): Declare.
+	* python/python.c (gdbpy_enabled_cst): Define.
+	(_initialize_python): Initialize gdbpy_enabled_cst.
+	* NEWS: Add entry.
+
+2010-06-04  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* breakpoint.c (update_global_location_list): Fix comment typo.
+
+2010-06-04  Hui Zhu  <teawater@gmail.com>
+
+	* dwarf2loc.c (disassemble_dwarf_expression): Change ul to l.
+
+2010-06-03  Doug Evans  <dje@google.com>
+
+	* configure.ac: Don't fail if python is unusable when
+	configured with --with-python=auto.
+	* configure: Regenerate.
+
+2010-06-03  Sami Wagiaalla  <swagiaal@redhat.com>
+
+    	* dwarf2read.c (new_symbol): Remove redundant naming of symbol.
+
+2010-06-03  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* valprint.h (get_array_bounds): Change low and high parameter types
+	to LONGEST *.
+	* valprint.c (get_array_bounds): Use get_discrete_bounds call to 
+	compute bounds.
+	(val_print_array_elements): Adapt to change above.
+	* ada-valprint.c (print_optional_low_bound): Adapt to change above.
+	* p-valprint.c (pascal_val_print): Likewise.
+
+2010-06-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symfile.c (init_filename_language_table): New extensions .for, .FOR,
+	.ftn, .FTN, .fpp, .FPP, .f90, .F90, .f95, .F95, .f03, .F03, .f08 and
+	.F08.
+
+2010-06-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Support DW_TAG_module as separate namespaces.
+	* dwarf2read.c (typename_concat): New parameter physname.
+	(read_module_type): New function and declaration.
+	(scan_partial_symbols): Scan also DW_TAG_module children.
+	(partial_die_parent_scope): Accept scope even from DW_TAG_module. Pass
+	to typename_concat backward compatible physname value 0.
+	(partial_die_full_name, read_namespace_type): Pass to typename_concat
+	backward compatible physname value 0.
+	(add_partial_module, read_module): Remove FIXME comment.
+	(process_die) <DW_TAG_module>: Set PROCESSING_HAS_NAMESPACE_INFO.
+	(die_needs_namespace) <DW_TAG_variable>: Allow returning true even for
+	DIEs under DW_TAG_module.
+	(dwarf2_compute_name): Move the ada block for DW_AT_linkage_name and
+	DW_AT_MIPS_linkage_name first, extend it for language_fortran
+	&& physname and return there instead of just setting NAME.  Extend
+	the main block for language_fortran.  Pass physname parameter to the
+	typename_concat call.
+	(read_import_statement, read_func_scope, get_scope_pc_bounds)
+	(load_partial_dies, determine_prefix): Support also DW_TAG_module.
+	(new_symbol): Fill in cplus_specific.demangled_name if it is still
+	missing from SYMBOL_SET_NAMES in the language_fortran case.
+	(new_symbol) <DW_TAG_variable>: Force LOC_UNRESOLVED for gfortran module
+	variables.
+	(read_type_die) <DW_TAG_module>: New.
+	(MAX_SEP_LEN): Increase to 7.
+	(typename_concat): New parameter physname.  New variable lead.  Support
+	also language_fortran.
+	* f-exp.y (yylex): Consider : also as a symbol name character class.
+	* f-lang.c: Include cp-support.h.
+	(f_word_break_characters, f_make_symbol_completion_list): New functions.
+	(f_language_defn): Use cp_lookup_symbol_nonlocal,
+	f_word_break_characters and f_make_symbol_completion_list.
+	* f-typeprint.c (f_type_print_base) <TYPE_CODE_MODULE>: New.
+	* gdbtypes.h (enum type_code) <TYPE_CODE_MODULE>: New.
+	* symtab.c (symbol_init_language_specific): Support language_fortran.
+	(symbol_find_demangled_name): New comment on language_fortran.
+	(symbol_natural_name, symbol_demangled_name): Use demangled_name even
+	for language_fortran.
+	(lookup_symbol_aux_local): Check imports also for language_fortran.
+	(default_make_symbol_completion_list): Rename to ...
+	(default_make_symbol_completion_list_break_on): ... this name.  New
+	parameter break_on, use it.
+	(default_make_symbol_completion_list): New stub.
+	* symtab.h (default_make_symbol_completion_list_break_on): New
+	prototype.
+
+2010-06-02  Joel Brobecker  <brobecker@adacore.com>
+
+	* remote.c (remote_get_noisy_reply): Remove trailing "\n" in call
+	to error.
+
+2010-06-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (typename_concat): Add const to the variable sep.
+
+2010-06-02  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2loc.h (dwarf2_per_cu_data): Declare.
+	* dwarf2read.c (dwarf_stack_op_name): No longer static.  Return
+	type is const.  Add 'def' argument.  Add missing operators, remove
+	unhandled ones.
+	(decode_locdesc): Update.
+	(dwarf2_always_disassemble): New global.
+	(show_dwarf2_always_disassemble): New function.
+	(_initialize_dwarf2_read): Add always-disassemble.
+	(dwarf2_per_cu_offset_size): New function.
+	* dwarf2loc.c (dwarf2_always_disassemble): Declare.
+	(piece_end_p): New function.
+	(locexpr_describe_location_piece): Replace 'size' argument with
+	'end'.  Use piece_end_p.  Rewrite recognition of TLS.  Recognize
+	some constants.  Remove errors.
+	(disassemble_dwarf_expression): New function.
+	(locexpr_describe_location_1): Use disassemble_dwarf_expression.
+	Add 'offset_size' argument.
+	(loclist_describe_location): Change output formatting.
+	* dwarf2expr.h (dwarf_stack_op_name): Declare.
+
 2010-06-02  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* cp-support.c (make_symbol_overload_list_adl_namespace): Handle

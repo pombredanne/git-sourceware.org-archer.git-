@@ -905,10 +905,9 @@ static struct type *read_type_die (struct die_info *, struct dwarf2_cu *);
 
 static char *determine_prefix (struct die_info *die, struct dwarf2_cu *);
 
-static char *typename_concat (struct obstack *,
-                              const char *prefix, 
-                              const char *suffix,
-			      struct dwarf2_cu *);
+static char *typename_concat (struct obstack *obs, const char *prefix, 
+			      const char *suffix, int physname,
+			      struct dwarf2_cu *cu);
 
 static void read_file_scope (struct die_info *, struct dwarf2_cu *);
 
@@ -954,6 +953,9 @@ static void read_namespace (struct die_info *die, struct dwarf2_cu *);
 static void read_module (struct die_info *die, struct dwarf2_cu *cu);
 
 static void read_import_statement (struct die_info *die, struct dwarf2_cu *);
+
+static struct type *read_module_type (struct die_info *die,
+				      struct dwarf2_cu *cu);
 
 static const char *namespace_name (struct die_info *die,
 				   int *is_anonymous, struct dwarf2_cu *);
@@ -1001,8 +1003,6 @@ static char *dwarf_tag_name (unsigned int);
 static char *dwarf_attr_name (unsigned int);
 
 static char *dwarf_form_name (unsigned int);
-
-static char *dwarf_stack_op_name (unsigned int);
 
 static char *dwarf_bool_name (unsigned int);
 
@@ -2200,12 +2200,12 @@ scan_partial_symbols (struct partial_die_info *first_die, CORE_ADDR *lowpc,
     {
       fixup_partial_die (pdi, cu);
 
-      /* Anonymous namespaces have no name but have interesting
+      /* Anonymous namespaces or modules have no name but have interesting
 	 children, so we need to look at them.  Ditto for anonymous
 	 enums.  */
 
       if (pdi->name != NULL || pdi->tag == DW_TAG_namespace
-	  || pdi->tag == DW_TAG_enumeration_type)
+	  || pdi->tag == DW_TAG_module || pdi->tag == DW_TAG_enumeration_type)
 	{
 	  switch (pdi->tag)
 	    {
@@ -2318,6 +2318,7 @@ partial_die_parent_scope (struct partial_die_info *pdi,
     }
 
   if (parent->tag == DW_TAG_namespace
+      || parent->tag == DW_TAG_module
       || parent->tag == DW_TAG_structure_type
       || parent->tag == DW_TAG_class_type
       || parent->tag == DW_TAG_interface_type
@@ -2328,7 +2329,7 @@ partial_die_parent_scope (struct partial_die_info *pdi,
 	parent->scope = parent->name;
       else
 	parent->scope = typename_concat (&cu->comp_unit_obstack, grandparent_scope,
-					 parent->name, cu);
+					 parent->name, 0, cu);
     }
   else if (parent->tag == DW_TAG_enumerator)
     /* Enumerators should not get the name of the enumeration as a prefix.  */
@@ -2360,7 +2361,7 @@ partial_die_full_name (struct partial_die_info *pdi,
   if (parent_scope == NULL)
     return NULL;
   else
-    return typename_concat (NULL, parent_scope, pdi->name, cu);
+    return typename_concat (NULL, parent_scope, pdi->name, 0, cu);
 }
 
 static void
@@ -2546,9 +2547,7 @@ static void
 add_partial_module (struct partial_die_info *pdi, CORE_ADDR *lowpc,
 		    CORE_ADDR *highpc, int need_pc, struct dwarf2_cu *cu)
 {
-  /* Now scan partial symbols in that module.
-
-     FIXME: Support the separate Fortran module namespaces.  */
+  /* Now scan partial symbols in that module.  */
 
   if (pdi->has_children)
     scan_partial_symbols (pdi->die_child, lowpc, highpc, need_pc, cu);
@@ -3210,6 +3209,7 @@ process_die (struct die_info *die, struct dwarf2_cu *cu)
       read_namespace (die, cu);
       break;
     case DW_TAG_module:
+      processing_has_namespace_info = 1;
       read_module (die, cu);
       break;
     case DW_TAG_imported_declaration:
@@ -3265,7 +3265,8 @@ die_needs_namespace (struct die_info *die, struct dwarf2_cu *cu)
 	}
 
       attr = dwarf2_attr (die, DW_AT_external, cu);
-      if (attr == NULL && die->parent->tag != DW_TAG_namespace)
+      if (attr == NULL && die->parent->tag != DW_TAG_namespace
+	  && die->parent->tag != DW_TAG_module)
 	return 0;
       /* A variable in a lexical block of some kind does not need a
 	 namespace, even though in C++ such variables may be external
@@ -3298,9 +3299,29 @@ dwarf2_compute_name (char *name, struct die_info *die, struct dwarf2_cu *cu,
   if (name == NULL)
     name = dwarf2_name (die, cu);
 
+  /* For Fortran GDB prefers DW_AT_*linkage_name if present but otherwise
+     compute it by typename_concat inside GDB.  */
+  if (cu->language == language_ada
+      || (cu->language == language_fortran && physname))
+    {
+      /* For Ada unit, we prefer the linkage name over the name, as
+	 the former contains the exported name, which the user expects
+	 to be able to reference.  Ideally, we want the user to be able
+	 to reference this entity using either natural or linkage name,
+	 but we haven't started looking at this enhancement yet.  */
+      struct attribute *attr;
+
+      attr = dwarf2_attr (die, DW_AT_linkage_name, cu);
+      if (attr == NULL)
+	attr = dwarf2_attr (die, DW_AT_MIPS_linkage_name, cu);
+      if (attr && DW_STRING (attr))
+	return DW_STRING (attr);
+    }
+
   /* These are the only languages we know how to qualify names in.  */
   if (name != NULL
-      && (cu->language == language_cplus || cu->language == language_java))
+      && (cu->language == language_cplus || cu->language == language_java
+	  || cu->language == language_fortran))
     {
       if (die_needs_namespace (die, cu))
 	{
@@ -3312,7 +3333,8 @@ dwarf2_compute_name (char *name, struct die_info *die, struct dwarf2_cu *cu,
 	  buf = mem_fileopen ();
 	  if (*prefix != '\0')
 	    {
-	      char *prefixed_name = typename_concat (NULL, prefix, name, cu);
+	      char *prefixed_name = typename_concat (NULL, prefix, name,
+						     physname, cu);
 
 	      fputs_unfiltered (prefixed_name, buf);
 	      xfree (prefixed_name);
@@ -3362,21 +3384,6 @@ dwarf2_compute_name (char *name, struct die_info *die, struct dwarf2_cu *cu,
 		name = cname;
 	    }
 	}
-    }
-  else if (cu->language == language_ada)
-    {
-      /* For Ada unit, we prefer the linkage name over the name, as
-	 the former contains the exported name, which the user expects
-	 to be able to reference.  Ideally, we want the user to be able
-	 to reference this entity using either natural or linkage name,
-	 but we haven't started looking at this enhancement yet.  */
-      struct attribute *attr;
-
-      attr = dwarf2_attr (die, DW_AT_linkage_name, cu);
-      if (attr == NULL)
-	attr = dwarf2_attr (die, DW_AT_MIPS_linkage_name, cu);
-      if (attr && DW_STRING (attr))
-	name = DW_STRING (attr);
     }
 
   return name;
@@ -3484,7 +3491,8 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
      to the name of the imported die.  */
   imported_name_prefix = determine_prefix (imported_die, imported_cu);
 
-  if (imported_die->tag != DW_TAG_namespace)
+  if (imported_die->tag != DW_TAG_namespace
+      && imported_die->tag != DW_TAG_module)
     {
       imported_declaration = imported_name;
       canonical_name = imported_name_prefix;
@@ -3981,7 +3989,7 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
                         lowpc, highpc, objfile);
 
   /* For C++, set the block's scope.  */
-  if (cu->language == language_cplus)
+  if (cu->language == language_cplus || cu->language == language_fortran)
     cp_set_block_scope (new->name, block, &objfile->objfile_obstack,
 			determine_prefix (die, cu),
 			processing_has_namespace_info);
@@ -4316,6 +4324,7 @@ get_scope_pc_bounds (struct die_info *die,
             dwarf2_get_subprogram_pc_bounds (child, &best_low, &best_high, cu);
 	    break;
 	  case DW_TAG_namespace:
+	  case DW_TAG_module:
 	    /* FIXME: carlton/2004-01-16: Should we do this for
 	       DW_TAG_class_type/DW_TAG_structure_type, too?  I think
 	       that current GCC's always emit the DIEs corresponding
@@ -5129,12 +5138,13 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
        on incomplete types.  */
     TYPE_STUB (type) = 1;
 
-  set_descriptive_type (type, die, cu);
-
   /* We need to add the type field to the die immediately so we don't
      infinitely recurse when dealing with pointers to the structure
      type within the structure itself. */
   set_die_type (die, type, cu);
+
+  /* set_die_type should be already done.  */
+  set_descriptive_type (type, die, cu);
 
   if (die->child != NULL && ! die_is_declaration (die, cu))
     {
@@ -5424,7 +5434,7 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
 {
   struct objfile *objfile = cu->objfile;
   struct die_info *child_die;
-  struct type *type = NULL;
+  struct type *type;
   struct type *element_type, *range_type, *index_type;
   struct type **range_types = NULL;
   struct attribute *attr;
@@ -5433,6 +5443,11 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
   char *name;
 
   element_type = die_type (die, cu);
+
+  /* The die_type call above may have already set the type for this DIE.  */
+  type = get_die_type (die, cu);
+  if (type)
+    return type;
 
   /* Irix 6.2 native cc creates array types without children for
      arrays with unspecified length.  */
@@ -5502,12 +5517,15 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
   if (name)
     TYPE_NAME (type) = name;
   
+  /* Install the type in the die. */
+  set_die_type (die, type, cu);
+
+  /* set_die_type should be already done.  */
   set_descriptive_type (type, die, cu);
 
   do_cleanups (back_to);
 
-  /* Install the type in the die. */
-  return set_die_type (die, type, cu);
+  return type;
 }
 
 static enum dwarf_array_dim_ordering
@@ -5550,11 +5568,22 @@ read_array_order (struct die_info *die, struct dwarf2_cu *cu)
 static struct type *
 read_set_type (struct die_info *die, struct dwarf2_cu *cu)
 {
-  struct type *set_type = create_set_type (NULL, die_type (die, cu));
-  struct attribute *attr = dwarf2_attr (die, DW_AT_byte_size, cu);
+  struct type *domain_type, *set_type;
+  struct attribute *attr;
 
+  domain_type = die_type (die, cu);
+
+  /* The die_type call above may have already set the type for this DIE.  */
+  set_type = get_die_type (die, cu);
+  if (set_type)
+    return set_type;
+
+  set_type = create_set_type (NULL, domain_type);
+
+  attr = dwarf2_attr (die, DW_AT_byte_size, cu);
   if (attr)
     TYPE_LENGTH (set_type) = DW_UNSND (attr);
+
   return set_die_type (die, set_type, cu);
 }
 
@@ -5642,7 +5671,7 @@ read_namespace_type (struct die_info *die, struct dwarf2_cu *cu)
   previous_prefix = determine_prefix (die, cu);
   if (previous_prefix[0] != '\0')
     name = typename_concat (&objfile->objfile_obstack,
-			    previous_prefix, name, cu);
+			    previous_prefix, name, 0, cu);
 
   /* Create the type.  */
   type = init_type (TYPE_CODE_NAMESPACE, 0, 0, NULL,
@@ -5695,14 +5724,35 @@ read_namespace (struct die_info *die, struct dwarf2_cu *cu)
     }
 }
 
+/* Read a Fortran module as type.  This DIE can be only a declaration used for
+   imported module.  Still we need that type as local Fortran "use ... only"
+   declaration imports depend on the created type in determine_prefix.  */
+
+static struct type *
+read_module_type (struct die_info *die, struct dwarf2_cu *cu)
+{
+  struct objfile *objfile = cu->objfile;
+  char *module_name;
+  struct type *type;
+
+  module_name = dwarf2_name (die, cu);
+  if (!module_name)
+    complaint (&symfile_complaints, _("DW_TAG_module has no name, offset 0x%x"),
+               die->offset);
+  type = init_type (TYPE_CODE_MODULE, 0, 0, module_name, objfile);
+
+  /* determine_prefix uses TYPE_TAG_NAME.  */
+  TYPE_TAG_NAME (type) = TYPE_NAME (type);
+
+  return set_die_type (die, type, cu);
+}
+
 /* Read a Fortran module.  */
 
 static void
 read_module (struct die_info *die, struct dwarf2_cu *cu)
 {
   struct die_info *child_die = die->child;
-
-  /* FIXME: Support the separate Fortran module namespaces.  */
 
   while (child_die && child_die->tag)
     {
@@ -5753,8 +5803,16 @@ read_tag_pointer_type (struct die_info *die, struct dwarf2_cu *cu)
   struct attribute *attr_byte_size;
   struct attribute *attr_address_class;
   int byte_size, addr_class;
+  struct type *target_type;
 
-  type = lookup_pointer_type (die_type (die, cu));
+  target_type = die_type (die, cu);
+
+  /* The die_type call above may have already set the type for this DIE.  */
+  type = get_die_type (die, cu);
+  if (type)
+    return type;
+
+  type = lookup_pointer_type (target_type);
 
   attr_byte_size = dwarf2_attr (die, DW_AT_byte_size, cu);
   if (attr_byte_size)
@@ -5810,6 +5868,11 @@ read_tag_ptr_to_member_type (struct die_info *die, struct dwarf2_cu *cu)
   to_type = die_type (die, cu);
   domain = die_containing_type (die, cu);
 
+  /* The calls above may have already set the type for this DIE.  */
+  type = get_die_type (die, cu);
+  if (type)
+    return type;
+
   if (TYPE_CODE (check_typedef (to_type)) == TYPE_CODE_METHOD)
     type = lookup_methodptr_type (to_type);
   else
@@ -5825,10 +5888,17 @@ static struct type *
 read_tag_reference_type (struct die_info *die, struct dwarf2_cu *cu)
 {
   struct comp_unit_head *cu_header = &cu->header;
-  struct type *type;
+  struct type *type, *target_type;
   struct attribute *attr;
 
-  type = lookup_reference_type (die_type (die, cu));
+  target_type = die_type (die, cu);
+
+  /* The die_type call above may have already set the type for this DIE.  */
+  type = get_die_type (die, cu);
+  if (type)
+    return type;
+
+  type = lookup_reference_type (target_type);
   attr = dwarf2_attr (die, DW_AT_byte_size, cu);
   if (attr)
     {
@@ -5847,6 +5917,12 @@ read_tag_const_type (struct die_info *die, struct dwarf2_cu *cu)
   struct type *base_type, *cv_type;
 
   base_type = die_type (die, cu);
+
+  /* The die_type call above may have already set the type for this DIE.  */
+  cv_type = get_die_type (die, cu);
+  if (cv_type)
+    return cv_type;
+
   cv_type = make_cv_type (1, TYPE_VOLATILE (base_type), base_type, 0);
   return set_die_type (die, cv_type, cu);
 }
@@ -5857,6 +5933,12 @@ read_tag_volatile_type (struct die_info *die, struct dwarf2_cu *cu)
   struct type *base_type, *cv_type;
 
   base_type = die_type (die, cu);
+
+  /* The die_type call above may have already set the type for this DIE.  */
+  cv_type = get_die_type (die, cu);
+  if (cv_type)
+    return cv_type;
+
   cv_type = make_cv_type (TYPE_CONST (base_type), 1, base_type, 0);
   return set_die_type (die, cv_type, cu);
 }
@@ -5921,6 +6003,12 @@ read_subroutine_type (struct die_info *die, struct dwarf2_cu *cu)
   struct attribute *attr;
 
   type = die_type (die, cu);
+
+  /* The die_type call above may have already set the type for this DIE.  */
+  ftype = get_die_type (die, cu);
+  if (ftype)
+    return ftype;
+
   ftype = lookup_function_type (type);
 
   /* All functions in C++, Pascal and Java have prototypes.  */
@@ -6134,6 +6222,11 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
 
   base_type = die_type (die, cu);
 
+  /* The die_type call above may have already set the type for this DIE.  */
+  range_type = get_die_type (die, cu);
+  if (range_type)
+    return range_type;
+
   if (cu->language == language_fortran)
     { 
       /* FORTRAN implies a lower bound of 1, if not given.  */
@@ -6240,9 +6333,12 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
   if (attr)
     TYPE_LENGTH (range_type) = DW_UNSND (attr);
 
+  set_die_type (die, range_type, cu);
+
+  /* set_die_type should be already done.  */
   set_descriptive_type (range_type, die, cu);
 
-  return set_die_type (die, range_type, cu);
+  return range_type;
 }
   
 static struct type *
@@ -6693,6 +6789,7 @@ load_partial_dies (bfd *abfd, gdb_byte *buffer, gdb_byte *info_ptr,
 	  && abbrev->tag != DW_TAG_lexical_block
 	  && abbrev->tag != DW_TAG_variable
 	  && abbrev->tag != DW_TAG_namespace
+	  && abbrev->tag != DW_TAG_module
 	  && abbrev->tag != DW_TAG_member)
 	{
 	  /* Otherwise we skip to the next sibling, if any.  */
@@ -6824,6 +6921,7 @@ load_partial_dies (bfd *abfd, gdb_byte *buffer, gdb_byte *info_ptr,
       if (last_die->has_children
 	  && (load_all
 	      || last_die->tag == DW_TAG_namespace
+	      || last_die->tag == DW_TAG_module
 	      || last_die->tag == DW_TAG_enumeration_type
 	      || (cu->language != language_c
 		  && (last_die->tag == DW_TAG_class_type
@@ -8545,6 +8643,13 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
       linkagename = dwarf2_physname (name, die, cu);
       SYMBOL_SET_NAMES (sym, linkagename, strlen (linkagename), 0, objfile);
 
+      /* Fortran does not have mangling standard and the mangling does differ
+	 between gfortran, iFort etc.  */
+      if (cu->language == language_fortran
+          && sym->ginfo.language_specific.cplus_specific.demangled_name == NULL)
+	sym->ginfo.language_specific.cplus_specific.demangled_name
+	  = (char *) dwarf2_full_name (name, die, cu);
+
       /* Default assumptions.
          Use the passed type or decode it from the die.  */
       SYMBOL_DOMAIN (sym) = VAR_DOMAIN;
@@ -8648,6 +8753,20 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
 		{
 		  struct pending **list_to_add;
 
+		  /* Workaround gfortran PR debug/40040 - it uses
+		     DW_AT_location for variables in -fPIC libraries which may
+		     get overriden by other libraries/executable and get
+		     a different address.  Resolve it by the minimal symbol
+		     which may come from inferior's executable using copy
+		     relocation.  Make this workaround only for gfortran as for
+		     other compilers GDB cannot guess the minimal symbol
+		     Fortran mangling kind.  */
+		  if (cu->language == language_fortran && die->parent
+		      && die->parent->tag == DW_TAG_module
+		      && cu->producer
+		      && strncmp (cu->producer, "GNU Fortran ", 12) == 0)
+		    SYMBOL_CLASS (sym) = LOC_UNRESOLVED;
+
 		  /* A variable with DW_AT_external is never static,
 		     but it may be block-scoped.  */
 		  list_to_add = (cu->list_in_scope == &file_symbols
@@ -8731,28 +8850,6 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
 	  SYMBOL_CLASS (sym) = LOC_TYPEDEF;
 	  SYMBOL_DOMAIN (sym) = STRUCT_DOMAIN;
 
-	  /* Make sure that the symbol includes appropriate enclosing
-	     classes/namespaces in its name.  These are calculated in
-	     read_structure_type, and the correct name is saved in
-	     the type.  */
-
-	  if (cu->language == language_cplus
-	      || cu->language == language_java)
-	    {
-	      struct type *type = SYMBOL_TYPE (sym);
-	      
-	      if (TYPE_TAG_NAME (type) != NULL)
-		{
-		  /* FIXME: carlton/2003-11-10: Should this use
-		     SYMBOL_SET_NAMES instead?  (The same problem also
-		     arises further down in this function.)  */
-		  /* The type's name is already allocated along with
-		     this objfile, so we don't need to duplicate it
-		     for the symbol.  */
-		  SYMBOL_LINKAGE_NAME (sym) = TYPE_TAG_NAME (type);
-		}
-	    }
-
 	  {
 	    /* NOTE: carlton/2003-11-10: C++ and Java class symbols shouldn't
 	       really ever be static objects: otherwise, if you try
@@ -8787,8 +8884,6 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
 	  }
 	  break;
 	case DW_TAG_typedef:
-	  SYMBOL_LINKAGE_NAME (sym)
-	    = (char *) dwarf2_full_name (name, die, cu);
 	  SYMBOL_CLASS (sym) = LOC_TYPEDEF;
 	  SYMBOL_DOMAIN (sym) = VAR_DOMAIN;
 	  add_symbol_to_list (sym, cu->list_in_scope);
@@ -8802,8 +8897,6 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
 	  add_symbol_to_list (sym, cu->list_in_scope);
 	  break;
 	case DW_TAG_enumerator:
-	  SYMBOL_LINKAGE_NAME (sym)
-	    = (char *) dwarf2_full_name (name, die, cu);
 	  attr = dwarf2_attr (die, DW_AT_const_value, cu);
 	  if (attr)
 	    {
@@ -9129,6 +9222,9 @@ read_type_die (struct die_info *die, struct dwarf2_cu *cu)
     case DW_TAG_namespace:
       this_type = read_namespace_type (die, cu);
       break;
+    case DW_TAG_module:
+      this_type = read_module_type (die, cu);
+      break;
     default:
       complaint (&symfile_complaints, _("unexpected tag in read_type_die: '%s'"),
 		 dwarf_tag_name (die->tag));
@@ -9160,8 +9256,8 @@ determine_prefix (struct die_info *die, struct dwarf2_cu *cu)
   struct dwarf2_cu *spec_cu;
   struct type *parent_type;
 
-  if (cu->language != language_cplus
-      && cu->language != language_java)
+  if (cu->language != language_cplus && cu->language != language_java
+      && cu->language != language_fortran)
     return "";
 
   /* We have to be careful in the presence of DW_AT_specification.
@@ -9213,6 +9309,7 @@ determine_prefix (struct die_info *die, struct dwarf2_cu *cu)
       case DW_TAG_interface_type:
       case DW_TAG_structure_type:
       case DW_TAG_union_type:
+      case DW_TAG_module:
 	parent_type = read_type_die (parent, cu);
 	if (TYPE_TAG_NAME (parent_type) != NULL)
 	  return TYPE_TAG_NAME (parent_type);
@@ -9232,18 +9329,27 @@ determine_prefix (struct die_info *die, struct dwarf2_cu *cu)
    perform an obconcat, otherwise allocate storage for the result.  The CU argument
    is used to determine the language and hence, the appropriate separator.  */
 
-#define MAX_SEP_LEN 2  /* sizeof ("::")  */
+#define MAX_SEP_LEN 7  /* strlen ("__") + strlen ("_MOD_")  */
 
 static char *
-typename_concat (struct obstack *obs, const char *prefix, const char *suffix, 
-		 struct dwarf2_cu *cu)
+typename_concat (struct obstack *obs, const char *prefix, const char *suffix,
+                 int physname, struct dwarf2_cu *cu)
 {
-  char *sep;
+  const char *lead = "";
+  const char *sep;
 
   if (suffix == NULL || suffix[0] == '\0' || prefix == NULL || prefix[0] == '\0')
     sep = "";
   else if (cu->language == language_java)
     sep = ".";
+  else if (cu->language == language_fortran && physname)
+    {
+      /* This is gfortran specific mangling.  Normally DW_AT_linkage_name or
+	 DW_AT_MIPS_linkage_name is preferred and used instead.  */
+
+      lead = "__";
+      sep = "_MOD_";
+    }
   else
     sep = "::";
 
@@ -9256,7 +9362,8 @@ typename_concat (struct obstack *obs, const char *prefix, const char *suffix,
     {
       char *retval = xmalloc (strlen (prefix) + MAX_SEP_LEN + strlen (suffix) + 1);
 
-      strcpy (retval, prefix);
+      strcpy (retval, lead);
+      strcat (retval, prefix);
       strcat (retval, sep);
       strcat (retval, suffix);
       return retval;
@@ -9264,7 +9371,7 @@ typename_concat (struct obstack *obs, const char *prefix, const char *suffix,
   else
     {
       /* We have an obstack.  */
-      return obconcat (obs, prefix, sep, suffix, (char *) NULL);
+      return obconcat (obs, lead, prefix, sep, suffix, (char *) NULL);
     }
 }
 
@@ -9890,8 +9997,8 @@ dwarf_form_name (unsigned form)
 
 /* Convert a DWARF stack opcode into its string name.  */
 
-static char *
-dwarf_stack_op_name (unsigned op)
+const char *
+dwarf_stack_op_name (unsigned op, int def)
 {
   switch (op)
     {
@@ -10194,32 +10301,24 @@ dwarf_stack_op_name (unsigned op)
       return "DW_OP_call4";
     case DW_OP_call_ref:
       return "DW_OP_call_ref";
-    /* GNU extensions.  */
     case DW_OP_form_tls_address:
       return "DW_OP_form_tls_address";
     case DW_OP_call_frame_cfa:
       return "DW_OP_call_frame_cfa";
     case DW_OP_bit_piece:
       return "DW_OP_bit_piece";
+    /* DWARF 4 extensions.  */
+    case DW_OP_implicit_value:
+      return "DW_OP_implicit_value";
+    case DW_OP_stack_value:
+      return "DW_OP_stack_value";
+    /* GNU extensions.  */
     case DW_OP_GNU_push_tls_address:
       return "DW_OP_GNU_push_tls_address";
     case DW_OP_GNU_uninit:
       return "DW_OP_GNU_uninit";
-    /* HP extensions. */ 
-    case DW_OP_HP_is_value:
-      return "DW_OP_HP_is_value";
-    case DW_OP_HP_fltconst4:
-      return "DW_OP_HP_fltconst4";
-    case DW_OP_HP_fltconst8:
-      return "DW_OP_HP_fltconst8";
-    case DW_OP_HP_mod_range:
-      return "DW_OP_HP_mod_range";
-    case DW_OP_HP_unmod_range:
-      return "DW_OP_HP_unmod_range";
-    case DW_OP_HP_tls:
-      return "DW_OP_HP_tls";
     default:
-      return "OP_<unknown>";
+      return def ? "OP_<unknown>" : NULL;
     }
 }
 
@@ -11060,7 +11159,7 @@ decode_locdesc (struct dwarf_block *blk, struct dwarf2_cu *cu)
 
 	default:
 	  complaint (&symfile_complaints, _("unsupported stack op: '%s'"),
-		     dwarf_stack_op_name (op));
+		     dwarf_stack_op_name (op, 1));
 	  return (stack[stacki]);
 	}
     }
@@ -11787,6 +11886,28 @@ dwarf2_per_cu_addr_size (struct dwarf2_per_cu_data *per_cu)
     }
 }
 
+/* Return the offset size given in the compilation unit header for CU.  */
+
+int
+dwarf2_per_cu_offset_size (struct dwarf2_per_cu_data *per_cu)
+{
+  if (per_cu->cu)
+    return per_cu->cu->header.offset_size;
+  else
+    {
+      /* If the CU is not currently read in, we re-read its header.  */
+      struct objfile *objfile = per_cu->psymtab->objfile;
+      struct dwarf2_per_objfile *per_objfile
+	= objfile_data (objfile, dwarf2_objfile_data_key);
+      gdb_byte *info_ptr = per_objfile->info.buffer + per_cu->offset;
+      struct comp_unit_head cu_header;
+
+      memset (&cu_header, 0, sizeof cu_header);
+      read_comp_unit_head (&cu_header, info_ptr, objfile->obfd);
+      return cu_header.offset_size;
+    }
+}
+
 /* Locate the .debug_info compilation unit from CU's objfile which contains
    the DIE at OFFSET.  Raises an error on failure.  */
 
@@ -12039,7 +12160,22 @@ offset_and_type_eq (const void *item_lhs, const void *item_rhs)
 }
 
 /* Set the type associated with DIE to TYPE.  Save it in CU's hash
-   table if necessary.  For convenience, return TYPE.  */
+   table if necessary.  For convenience, return TYPE.
+
+   The DIEs reading must have careful ordering to:
+    * Not cause infite loops trying to read in DIEs as a prerequisite for
+      reading current DIE.
+    * Not trying to dereference contents of still incompletely read in types
+      while reading in other DIEs.
+    * Enable referencing still incompletely read in types just by a pointer to
+      the type without accessing its fields.
+
+   Therefore caller should follow these rules:
+     * Try to fetch any prerequisite types we may need to build this DIE type
+       before building the type and calling set_die_type.
+     * After building typer call set_die_type for current DIE as soon as
+       possible before fetching more types to complete the current type.
+     * Make the type as complete as possible before fetching more types.  */
 
 static struct type *
 set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
@@ -12077,6 +12213,10 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
   ofs.type = type;
   slot = (struct dwarf2_offset_and_type **)
     htab_find_slot_with_hash (cu->type_hash, &ofs, ofs.offset, INSERT);
+  if (*slot)
+    complaint (&symfile_complaints,
+	       _("A problem internal to GDB: DIE 0x%x has type already set"),
+	       die->offset);
   *slot = obstack_alloc (&cu->objfile->objfile_obstack, sizeof (**slot));
   **slot = ofs;
   return type;
@@ -12241,6 +12381,17 @@ dwarf2_per_objfile_free (struct objfile *objfile, void *d)
   munmap_section_buffer (&data->eh_frame);
 }
 
+int dwarf2_always_disassemble;
+
+static void
+show_dwarf2_always_disassemble (struct ui_file *file, int from_tty,
+				struct cmd_list_element *c, const char *value)
+{
+  fprintf_filtered (file, _("\
+Whether to always disassemble DWARF expressions is %s.\n"),
+		    value);
+}
+
 void _initialize_dwarf2_read (void);
 
 void
@@ -12272,6 +12423,18 @@ caching, which can slow down startup."),
 			    show_dwarf2_max_cache_age,
 			    &set_dwarf2_cmdlist,
 			    &show_dwarf2_cmdlist);
+
+  add_setshow_boolean_cmd ("always-disassemble", class_obscure,
+			   &dwarf2_always_disassemble, _("\
+Set whether `info address' always disassembles DWARF expressions."), _("\
+Show whether `info address' always disassembles DWARF expressions."), _("\
+When enabled, DWARF expressions are always printed in an assembly-like\n\
+syntax.  When disabled, expressions will be printed in a more\n\
+conversational style, when possible."),
+			   NULL,
+			   show_dwarf2_always_disassemble,
+			   &set_dwarf2_cmdlist,
+			   &show_dwarf2_cmdlist);
 
   add_setshow_zinteger_cmd ("dwarf2-die", no_class, &dwarf2_die_debug, _("\
 Set debugging of the dwarf2 DIE reader."), _("\
