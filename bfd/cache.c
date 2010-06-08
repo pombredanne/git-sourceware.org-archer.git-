@@ -166,6 +166,7 @@ static bfd_boolean
 bfd_cache_delete (bfd *abfd)
 {
   bfd_boolean ret;
+  struct thread_map_entry *iter;
 
   if (fclose ((FILE *) abfd->iostream) == 0)
     ret = TRUE;
@@ -176,6 +177,10 @@ bfd_cache_delete (bfd *abfd)
     }
 
   snip (abfd);
+
+  for (iter = thread_map; iter; iter = iter->next)
+    if (iter->abfd == abfd)
+      iter->abfd = NULL;
 
   abfd->iostream = NULL;
   --open_files;
