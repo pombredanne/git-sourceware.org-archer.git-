@@ -112,7 +112,7 @@ mi_interpreter_init (int top_level)
 static int
 mi_interpreter_resume (void *data)
 {
-  struct mi_interp *mi = data;
+  struct mi_interp *mi = (struct mi_interp *) data;
 
   /* As per hack note in mi_interpreter_init, swap in the output channels... */
   gdb_setup_readline ();
@@ -169,7 +169,7 @@ mi_interpreter_suspend (void *data)
 static struct gdb_exception
 mi_interpreter_exec (void *data, const char *command)
 {
-  char *tmp = alloca (strlen (command) + 1);
+  char *tmp = (char *) alloca (strlen (command) + 1);
 
   strcpy (tmp, command);
   mi_execute_command_wrapper (tmp);
@@ -295,7 +295,7 @@ mi_command_loop (int mi_version)
 static void
 mi_new_thread (struct thread_info *t)
 {
-  struct mi_interp *mi = top_level_interpreter_data ();
+  struct mi_interp *mi = (struct mi_interp *) top_level_interpreter_data ();
   struct inferior *inf = find_inferior_pid (ptid_get_pid (t->ptid));
 
   gdb_assert (inf);
@@ -317,7 +317,7 @@ mi_thread_exit (struct thread_info *t, int silent)
 
   inf = find_inferior_pid (ptid_get_pid (t->ptid));
 
-  mi = top_level_interpreter_data ();
+  mi = (struct mi_interp *) top_level_interpreter_data ();
   target_terminal_ours ();
   fprintf_unfiltered (mi->event_channel, 
 		      "thread-exited,id=\"%d\",group-id=\"i%d\"",
@@ -328,7 +328,7 @@ mi_thread_exit (struct thread_info *t, int silent)
 static void
 mi_inferior_added (struct inferior *inf)
 {
-  struct mi_interp *mi = top_level_interpreter_data ();
+  struct mi_interp *mi = (struct mi_interp *) top_level_interpreter_data ();
 
   target_terminal_ours ();
   fprintf_unfiltered (mi->event_channel,
@@ -340,7 +340,7 @@ mi_inferior_added (struct inferior *inf)
 static void
 mi_inferior_appeared (struct inferior *inf)
 {
-  struct mi_interp *mi = top_level_interpreter_data ();
+  struct mi_interp *mi = (struct mi_interp *) top_level_interpreter_data ();
 
   target_terminal_ours ();
   fprintf_unfiltered (mi->event_channel,
@@ -352,7 +352,7 @@ mi_inferior_appeared (struct inferior *inf)
 static void
 mi_inferior_exit (struct inferior *inf)
 {
-  struct mi_interp *mi = top_level_interpreter_data ();
+  struct mi_interp *mi = (struct mi_interp *) top_level_interpreter_data ();
 
   target_terminal_ours ();
   fprintf_unfiltered (mi->event_channel, "thread-group-exited,id=\"i%d\"",
@@ -363,7 +363,7 @@ mi_inferior_exit (struct inferior *inf)
 static void
 mi_inferior_removed (struct inferior *inf)
 {
-  struct mi_interp *mi = top_level_interpreter_data ();
+  struct mi_interp *mi = (struct mi_interp *) top_level_interpreter_data ();
 
   target_terminal_ours ();
   fprintf_unfiltered (mi->event_channel,
@@ -444,7 +444,7 @@ mi_about_to_proceed (void)
 static int
 mi_output_running_pid (struct thread_info *info, void *arg)
 {
-  ptid_t *ptid = arg;
+  ptid_t *ptid = (ptid_t *) arg;
 
   if (ptid_get_pid (*ptid) == ptid_get_pid (info->ptid))
     fprintf_unfiltered (raw_stdout,
@@ -459,7 +459,7 @@ mi_inferior_count (struct inferior *inf, void *arg)
 {
   if (inf->pid != 0)
     {
-      int *count_p = arg;
+      int *count_p = (int *) arg;
       (*count_p)++;
     }
 
@@ -535,7 +535,7 @@ mi_on_resume (ptid_t ptid)
 static void
 mi_solib_loaded (struct so_list *solib)
 {
-  struct mi_interp *mi = top_level_interpreter_data ();
+  struct mi_interp *mi = (struct mi_interp *) top_level_interpreter_data ();
 
   target_terminal_ours ();
   if (gdbarch_has_global_solist (target_gdbarch))
@@ -559,7 +559,7 @@ mi_solib_loaded (struct so_list *solib)
 static void
 mi_solib_unloaded (struct so_list *solib)
 {
-  struct mi_interp *mi = top_level_interpreter_data ();
+  struct mi_interp *mi = (struct mi_interp *) top_level_interpreter_data ();
 
   target_terminal_ours ();
   if (gdbarch_has_global_solist (target_gdbarch))
@@ -585,7 +585,7 @@ report_initial_inferior (struct inferior *inf, void *closure)
      mi_inferior_added assumes that inferior is fully initialized
      and top_level_interpreter_data is set, we cannot call
      it here.  */
-  struct mi_interp *mi = closure;
+  struct mi_interp *mi = (struct mi_interp *) closure;
 
   target_terminal_ours ();
   fprintf_unfiltered (mi->event_channel,

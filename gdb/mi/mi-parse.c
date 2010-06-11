@@ -107,7 +107,7 @@ mi_parse_argv (char *args, struct mi_parse *parse)
 {
   char *chp = args;
   int argc = 0;
-  char **argv = xmalloc ((argc + 1) * sizeof (char *));
+  char **argv = (char **) xmalloc ((argc + 1) * sizeof (char *));
 
   argv[argc] = NULL;
   while (1)
@@ -162,7 +162,7 @@ mi_parse_argv (char *args, struct mi_parse *parse)
 		return;
 	      }
 	    /* create the buffer. */
-	    arg = xmalloc ((len + 1) * sizeof (char));
+	    arg = (char *) xmalloc ((len + 1) * sizeof (char));
 	    /* And copy the characters in. */
 	    chp = start;
 	    len = 0;
@@ -193,14 +193,14 @@ mi_parse_argv (char *args, struct mi_parse *parse)
 		chp++;
 	      }
 	    len = chp - start;
-	    arg = xmalloc ((len + 1) * sizeof (char));
+	    arg = (char *) xmalloc ((len + 1) * sizeof (char));
 	    strncpy (arg, start, len);
 	    arg[len] = '\0';
 	    break;
 	  }
 	}
       /* Append arg to argv. */
-      argv = xrealloc (argv, (argc + 2) * sizeof (char *));
+      argv = (char **) xrealloc (argv, (argc + 2) * sizeof (char *));
       argv[argc++] = arg;
       argv[argc] = NULL;
     }
@@ -243,7 +243,7 @@ mi_parse (char *cmd)
   /* Find/skip any token and then extract it. */
   for (chp = cmd; *chp >= '0' && *chp <= '9'; chp++)
     ;
-  parse->token = xmalloc ((chp - cmd + 1) * sizeof (char *));
+  parse->token = (char *) xmalloc ((chp - cmd + 1) * sizeof (char *));
   memcpy (parse->token, cmd, (chp - cmd));
   parse->token[chp - cmd] = '\0';
 
@@ -263,7 +263,7 @@ mi_parse (char *cmd)
 
     for (; *chp && !isspace (*chp); chp++)
       ;
-    parse->command = xmalloc ((chp - tmp + 1) * sizeof (char *));
+    parse->command = (char *) xmalloc ((chp - tmp + 1) * sizeof (char *));
     memcpy (parse->command, tmp, chp - tmp);
     parse->command[chp - tmp] = '\0';
   }

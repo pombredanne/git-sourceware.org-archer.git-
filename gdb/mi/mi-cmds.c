@@ -199,7 +199,7 @@ build_table (struct mi_cmd *commands)
   struct mi_cmd *command;
   int sizeof_table = sizeof (struct mi_cmd **) * MI_TABLE_SIZE;
 
-  mi_table = xmalloc (sizeof_table);
+  mi_table = (struct mi_cmd **) xmalloc (sizeof_table);
   memset (mi_table, 0, sizeof_table);
   for (command = commands; command->name != 0; command++)
     {
