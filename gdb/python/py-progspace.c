@@ -133,7 +133,7 @@ static void
 py_free_pspace (struct program_space *pspace, void *datum)
 {
   struct cleanup *cleanup;
-  pspace_object *object = datum;
+  pspace_object *object = (pspace_object *) datum;
   /* FIXME: What's the right way to get a program space's arch?
      There may be multiple.  */
   struct gdbarch *arch = get_objfile_arch (pspace->symfile_object_file);
@@ -154,7 +154,7 @@ pspace_to_pspace_object (struct program_space *pspace)
 {
   pspace_object *object;
 
-  object = program_space_data (pspace, pspy_pspace_data_key);
+  object = (pspace_object *) program_space_data (pspace, pspy_pspace_data_key);
   if (!object)
     {
       object = PyObject_New (pspace_object, &pspace_object_type);

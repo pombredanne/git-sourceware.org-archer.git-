@@ -389,7 +389,7 @@ compute_enum_values (parmpy_object *self, PyObject *enum_values)
       return 0;
     }
 
-  self->enumeration = xmalloc ((size + 1) * sizeof (char *));
+  self->enumeration = (const char **) xmalloc ((size + 1) * sizeof (char *));
   memset (self->enumeration, 0, (size + 1) * sizeof (char *));
 
   for (i = 0; i < size; ++i)

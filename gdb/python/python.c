@@ -94,7 +94,7 @@ struct cleanup *
 ensure_python_env (struct gdbarch *gdbarch,
                    const struct language_defn *language)
 {
-  struct python_env *env = xmalloc (sizeof *env);
+  struct python_env *env = (struct python_env *) xmalloc (sizeof *env);
 
   env->state = PyGILState_Ensure ();
   env->gdbarch = python_gdbarch;
@@ -123,7 +123,7 @@ compute_python_string (struct command_line *l)
   for (iter = l; iter; iter = iter->next)
     size += strlen (iter->line) + 1;
 
-  script = xmalloc (size + 1);
+  script = (char *) xmalloc (size + 1);
   here = 0;
   for (iter = l; iter; iter = iter->next)
     {

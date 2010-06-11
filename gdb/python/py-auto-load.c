@@ -95,7 +95,8 @@ auto_load_pspace_data_cleanup (struct program_space *pspace, void *arg)
 {
   struct auto_load_pspace_info *info;
 
-  info = program_space_data (pspace, auto_load_pspace_data);
+  info = (struct auto_load_pspace_info *)
+    program_space_data (pspace, auto_load_pspace_data);
   if (info != NULL)
     {
       if (info->loaded_scripts)
@@ -112,7 +113,7 @@ get_auto_load_pspace_data (struct program_space *pspace)
 {
   struct auto_load_pspace_info *info;
 
-  info = program_space_data (pspace, auto_load_pspace_data);
+  info = (struct auto_load_pspace_info *) program_space_data (pspace, auto_load_pspace_data);
   if (info == NULL)
     {
       info = XZALLOC (struct auto_load_pspace_info);
@@ -127,7 +128,8 @@ get_auto_load_pspace_data (struct program_space *pspace)
 static hashval_t
 hash_loaded_script_entry (const void *data)
 {
-  const struct loaded_script_entry *e = data;
+  const struct loaded_script_entry *e
+    = (const struct loaded_script_entry *) data;
 
   return htab_hash_string (e->name);
 }
@@ -137,8 +139,8 @@ hash_loaded_script_entry (const void *data)
 static int
 eq_loaded_script_entry (const void *a, const void *b)
 {
-  const struct loaded_script_entry *ea = a;
-  const struct loaded_script_entry *eb = b;
+  const struct loaded_script_entry *ea = (const struct loaded_script_entry *) a;
+  const struct loaded_script_entry *eb = (const struct loaded_script_entry *) b;
 
   return strcmp (ea->name, eb->name) == 0;
 }
@@ -203,7 +205,7 @@ source_section_scripts (struct objfile *objfile, const char *source_name,
 	++p;
       if (p == end)
 	{
-	  char *buf = alloca (p - file + 1);
+	  char *buf = (char *) alloca (p - file + 1);
 
 	  memcpy (buf, file, p - file);
 	  buf[p - file] = '\0';
@@ -240,9 +242,10 @@ source_section_scripts (struct objfile *objfile, const char *source_name,
 	{
 	  char *p;
 
-	  *slot = xmalloc (sizeof (**slot)
-			   + strlen (file) + 1
-			   + (opened ? (strlen (full_path) + 1) : 0));
+	  *slot = (struct loaded_script_entry *)
+	    xmalloc (sizeof (**slot)
+		     + strlen (file) + 1
+		     + (opened ? (strlen (full_path) + 1) : 0));
 	  p = ((char*) *slot) + sizeof (**slot);
 	  strcpy (p, file);
 	  (*slot)->name = p;
@@ -291,7 +294,7 @@ auto_load_section_scripts (struct objfile *objfile, const char *section_name)
     return;
 
   size = bfd_get_section_size (scripts_sect);
-  p = xmalloc (size);
+  p = (char *) xmalloc (size);
   
   cleanups = make_cleanup (xfree, p);
 
@@ -312,7 +315,7 @@ clear_section_scripts (void)
   struct program_space *pspace = current_program_space;
   struct auto_load_pspace_info *info;
 
-  info = program_space_data (pspace, auto_load_pspace_data);
+  info = (struct auto_load_pspace_info *) program_space_data (pspace, auto_load_pspace_data);
   if (info != NULL && info->loaded_scripts != NULL)
     {
       htab_delete (info->loaded_scripts);
@@ -333,7 +336,7 @@ auto_load_objfile_script (struct objfile *objfile, const char *suffix)
 
   realname = gdb_realpath (objfile->name);
   len = strlen (realname);
-  filename = xmalloc (len + strlen (suffix) + 1);
+  filename = (char *) xmalloc (len + strlen (suffix) + 1);
   memcpy (filename, realname, len);
   strcpy (filename + len, suffix);
 
@@ -346,8 +349,8 @@ auto_load_objfile_script (struct objfile *objfile, const char *suffix)
   if (!input && debug_file_directory)
     {
       /* Also try the same file in the separate debug info directory.  */
-      debugfile = xmalloc (strlen (filename)
-			   + strlen (debug_file_directory) + 1);
+      debugfile = (char *) xmalloc (strlen (filename)
+				    + strlen (debug_file_directory) + 1);
       strcpy (debugfile, debug_file_directory);
       /* FILENAME is absolute, so we don't need a "/" here.  */
       strcat (debugfile, filename);
@@ -360,8 +363,8 @@ auto_load_objfile_script (struct objfile *objfile, const char *suffix)
     {
       /* Also try the same file in a subdirectory of gdb's data
 	 directory.  */
-      debugfile = xmalloc (strlen (gdb_datadir) + strlen (filename)
-			   + strlen ("/auto-load") + 1);
+      debugfile = (char *) xmalloc (strlen (gdb_datadir) + strlen (filename)
+				    + strlen ("/auto-load") + 1);
       strcpy (debugfile, gdb_datadir);
       strcat (debugfile, "/auto-load");
       /* FILENAME is absolute, so we don't need a "/" here.  */
@@ -419,7 +422,7 @@ load_auto_scripts_for_objfile (struct objfile *objfile)
 static int
 maybe_print_section_script (void **slot, void *info)
 {
-  struct loaded_script_entry *entry = *slot;
+  struct loaded_script_entry *entry = (struct loaded_script_entry *) *slot;
 
   if (re_exec (entry->name))
     {
