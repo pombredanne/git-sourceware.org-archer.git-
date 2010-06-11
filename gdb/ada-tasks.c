@@ -613,7 +613,7 @@ read_known_tasks_array (void)
     gdbarch_ptr_bit (target_gdbarch) / TARGET_CHAR_BIT;
   const CORE_ADDR known_tasks_addr = get_known_tasks_addr ();
   const int known_tasks_size = target_ptr_byte * MAX_NUMBER_OF_KNOWN_TASKS;
-  gdb_byte *known_tasks = alloca (known_tasks_size);
+  gdb_byte *known_tasks = (gdb_byte *) alloca (known_tasks_size);
   int i;
 
   /* Step 1: Clear the current list, if necessary.  */

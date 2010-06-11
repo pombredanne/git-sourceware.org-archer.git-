@@ -78,7 +78,7 @@ decoded_type_name (struct type *type)
       if (name_buffer == NULL || name_buffer_len <= strlen (raw_name))
 	{
 	  name_buffer_len = 16 + 2 * strlen (raw_name);
-	  name_buffer = xrealloc (name_buffer, name_buffer_len);
+	  name_buffer = (char *) xrealloc (name_buffer, name_buffer_len);
 	}
       strcpy (name_buffer, raw_name);
 
@@ -202,6 +202,8 @@ print_dynamic_range_bound (struct type *type, const char *name, int name_len,
   LONGEST B;
   int OK;
 
+  /* FIXME the GROW_VECT call here seems to cause implicit casts to void
+     not sure why its the only such call to GROW_VECT that appears to. */
   GROW_VECT (name_buf, name_buf_len, name_len + strlen (suffix) + 1);
   strncpy (name_buf, name, name_len);
   strcpy (name_buf + name_len, suffix);

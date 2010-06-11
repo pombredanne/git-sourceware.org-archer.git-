@@ -985,7 +985,7 @@ write_object_renaming (struct block *orig_left_context,
 	  if (end == NULL)
 	    end = renaming_expr + strlen (renaming_expr);
 	  field_name.length = end - renaming_expr;
-	  field_name.ptr = malloc (end - renaming_expr + 1);
+	  field_name.ptr = (char *) malloc (end - renaming_expr + 1);
 	  strncpy (field_name.ptr, renaming_expr, end - renaming_expr);
 	  field_name.ptr[end - renaming_expr] = '\000';
 	  renaming_expr = end;
@@ -1157,7 +1157,7 @@ write_selectors (char *sels)
 static void
 write_ambiguous_var (struct block *block, char *name, int len)
 {
-  struct symbol *sym =
+  struct symbol *sym = (struct symbol *)
     obstack_alloc (&temp_parse_space, sizeof (struct symbol));
   memset (sym, 0, sizeof (struct symbol));
   SYMBOL_DOMAIN (sym) = UNDEF_DOMAIN;
@@ -1178,7 +1178,7 @@ static int
 ada_nget_field_index (const struct type *type, const char *field_name0,
                       int field_name_len, int maybe_missing)
 {
-  char *field_name = alloca ((field_name_len + 1) * sizeof (char));
+  char *field_name = (char *) alloca ((field_name_len + 1) * sizeof (char));
 
   strncpy (field_name, field_name0, field_name_len);
   field_name[field_name_len] = '\0';
@@ -1313,8 +1313,9 @@ write_var_or_type (struct block *block, struct stoken name0)
 	    case ADA_SUBPROGRAM_RENAMING:
 	      {
 		char *new_name
-		  = obstack_alloc (&temp_parse_space,
-				   renaming_len + name_len - tail_index + 1);
+		  = (char *)
+		  obstack_alloc (&temp_parse_space,
+				 renaming_len + name_len - tail_index + 1);
 		strncpy (new_name, renaming, renaming_len);
 		strcpy (new_name + renaming_len, encoded_name + tail_index);
 		encoded_name = new_name;
