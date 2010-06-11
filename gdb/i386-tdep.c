@@ -1545,7 +1545,7 @@ i386_frame_cache (struct frame_info *this_frame, void **this_cache)
   int i;
 
   if (*this_cache)
-    return *this_cache;
+    return (struct i386_frame_cache *) *this_cache;
 
   cache = i386_alloc_frame_cache ();
   *this_cache = cache;
@@ -1745,7 +1745,7 @@ i386_epilogue_frame_cache (struct frame_info *this_frame, void **this_cache)
   gdb_byte buf[4];
 
   if (*this_cache)
-    return *this_cache;
+    return (struct i386_frame_cache *) *this_cache;
 
   cache = i386_alloc_frame_cache ();
   *this_cache = cache;
@@ -1801,7 +1801,7 @@ i386_sigtramp_frame_cache (struct frame_info *this_frame, void **this_cache)
   gdb_byte buf[4];
 
   if (*this_cache)
-    return *this_cache;
+    return (struct i386_frame_cache *) *this_cache;
 
   cache = i386_alloc_frame_cache ();
 
@@ -2730,7 +2730,7 @@ i386_supply_gregset (const struct regset *regset, struct regcache *regcache,
 		     int regnum, const void *gregs, size_t len)
 {
   const struct gdbarch_tdep *tdep = gdbarch_tdep (regset->arch);
-  const gdb_byte *regs = gregs;
+  const gdb_byte *regs = (const gdb_byte *) gregs;
   int i;
 
   gdb_assert (len == tdep->sizeof_gregset);
@@ -2754,7 +2754,7 @@ i386_collect_gregset (const struct regset *regset,
 		      int regnum, void *gregs, size_t len)
 {
   const struct gdbarch_tdep *tdep = gdbarch_tdep (regset->arch);
-  gdb_byte *regs = gregs;
+  gdb_byte *regs = (gdb_byte *) gregs;
   int i;
 
   gdb_assert (len == tdep->sizeof_gregset);
@@ -6992,7 +6992,7 @@ i386_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   set_gdbarch_relocate_instruction (gdbarch, i386_relocate_instruction);
 
   /* Hook in ABI-specific overrides, if they have been registered.  */
-  info.tdep_info = (void *) tdesc_data;
+  info.tdep_info = (struct gdbarch_tdep_info *) tdesc_data;
   gdbarch_init_osabi (info, gdbarch);
 
   if (!i386_validate_tdesc_p (tdep, tdesc_data))
@@ -7017,7 +7017,10 @@ i386_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   tdesc_use_registers (gdbarch, tdesc, tdesc_data);
 
   /* Override gdbarch_register_reggroup_p set in tdesc_use_registers.  */
-  set_gdbarch_register_reggroup_p (gdbarch, tdep->register_reggroup_p);
+  set_gdbarch_register_reggroup_p (gdbarch,
+				   (int (*)(struct gdbarch *,
+					    int, struct reggroup *))
+				   tdep->register_reggroup_p);
 
   /* Make %al the first pseudo-register.  */
   tdep->al_regnum = gdbarch_num_regs (gdbarch);
