@@ -277,7 +277,7 @@ complete_command (char *arg, int from_tty)
       point--;
     }
 
-  arg_prefix = alloca (point - arg + 1);
+  arg_prefix = (char *) alloca (point - arg + 1);
   memcpy (arg_prefix, arg, point - arg);
   arg_prefix[point - arg] = 0;
 
@@ -612,7 +612,7 @@ source_command (char *args, int from_tty)
 {
   struct cleanup *old_cleanups;
   char *file = args;
-  int *old_source_verbose = xmalloc (sizeof(int));
+  int *old_source_verbose = (int *) xmalloc (sizeof(int));
   int search_path = 0;
 
   *old_source_verbose = source_verbose;
@@ -1196,7 +1196,7 @@ make_command (char *arg, int from_tty)
     p = "make";
   else
     {
-      p = xmalloc (sizeof ("make ") + strlen (arg));
+      p = (char *) xmalloc (sizeof ("make ") + strlen (arg));
       strcpy (p, "make ");
       strcpy (p + sizeof ("make ") - 1, arg);
     }
@@ -1240,7 +1240,7 @@ apropos_command (char *searchstr, int from_tty)
   char *pattern_fastmap;
   char errorbuffer[512];
 
-  pattern_fastmap = xcalloc (256, sizeof (char));
+  pattern_fastmap = (char *) xcalloc (256, sizeof (char));
   if (searchstr == NULL)
       error (_("REGEXP string is empty"));
 

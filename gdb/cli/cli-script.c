@@ -261,7 +261,7 @@ print_command_lines (struct ui_out *uiout, struct command_line *cmd,
 static void
 clear_hook_in_cleanup (void *data)
 {
-  struct cmd_list_element *c = data;
+  struct cmd_list_element *c = (struct cmd_list_element *) data;
 
   c->hook_in = 0; /* Allow hook to work again once it is complete */
 }
@@ -295,7 +295,7 @@ execute_cmd_post_hook (struct cmd_list_element *c)
 static void
 do_restore_user_call_depth (void * call_depth)
 {	
-  int *depth = call_depth;
+  int *depth = (int *) call_depth;
 
   (*depth)--;
   if ((*depth) == 0)
@@ -434,7 +434,7 @@ execute_control_command (struct command_line *cmd)
 
     case while_control:
       {
-	char *buffer = alloca (strlen (cmd->line) + 7);
+	char *buffer = (char *) alloca (strlen (cmd->line) + 7);
 
 	sprintf (buffer, "while %s", cmd->line);
 	print_command_trace (buffer);
@@ -502,7 +502,7 @@ execute_control_command (struct command_line *cmd)
 
     case if_control:
       {
-	char *buffer = alloca (strlen (cmd->line) + 4);
+	char *buffer = (char *) alloca (strlen (cmd->line) + 4);
 
 	sprintf (buffer, "if %s", cmd->line);
 	print_command_trace (buffer);
@@ -1307,7 +1307,7 @@ free_command_lines (struct command_line **lptr)
 static void
 do_free_command_lines_cleanup (void *arg)
 {
-  free_command_lines (arg);
+  free_command_lines ((struct command_line **) arg);
 }
 
 struct cleanup *
@@ -1587,7 +1587,8 @@ struct wrapped_read_command_file_args
 static void
 wrapped_read_command_file (struct ui_out *uiout, void *data)
 {
-  struct wrapped_read_command_file_args *args = data;
+  struct wrapped_read_command_file_args *args
+    = (struct wrapped_read_command_file_args *) data;
 
   read_command_file (args->stream);
 }
