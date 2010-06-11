@@ -74,7 +74,7 @@ tui_file_new (void)
 static void
 tui_file_delete (struct ui_file *file)
 {
-  struct tui_stream *tmpstream = ui_file_data (file);
+  struct tui_stream *tmpstream = (struct tui_stream *) ui_file_data (file);
 
   if (tmpstream->ts_magic != &tui_file_magic)
     internal_error (__FILE__, __LINE__,
@@ -91,7 +91,7 @@ struct ui_file *
 tui_fileopen (FILE *stream)
 {
   struct ui_file *file = tui_file_new ();
-  struct tui_stream *tmpstream = ui_file_data (file);
+  struct tui_stream *tmpstream = (struct tui_stream *) ui_file_data (file);
 
   tmpstream->ts_streamtype = afile;
   tmpstream->ts_filestream = stream;
@@ -104,13 +104,13 @@ struct ui_file *
 tui_sfileopen (int n)
 {
   struct ui_file *file = tui_file_new ();
-  struct tui_stream *tmpstream = ui_file_data (file);
+  struct tui_stream *tmpstream = (struct tui_stream *) ui_file_data (file);
 
   tmpstream->ts_streamtype = astring;
   tmpstream->ts_filestream = NULL;
   if (n > 0)
     {
-      tmpstream->ts_strbuf = xmalloc ((n + 1) * sizeof (char));
+      tmpstream->ts_strbuf = (char *) xmalloc ((n + 1) * sizeof (char));
       tmpstream->ts_strbuf[0] = '\0';
     }
   else
@@ -124,7 +124,7 @@ tui_sfileopen (int n)
 static int
 tui_file_isatty (struct ui_file *file)
 {
-  struct tui_stream *stream = ui_file_data (file);
+  struct tui_stream *stream = (struct tui_stream *) ui_file_data (file);
 
   if (stream->ts_magic != &tui_file_magic)
     internal_error (__FILE__, __LINE__,
@@ -138,7 +138,7 @@ tui_file_isatty (struct ui_file *file)
 static void
 tui_file_rewind (struct ui_file *file)
 {
-  struct tui_stream *stream = ui_file_data (file);
+  struct tui_stream *stream = (struct tui_stream *) ui_file_data (file);
 
   if (stream->ts_magic != &tui_file_magic)
     internal_error (__FILE__, __LINE__,
@@ -151,7 +151,7 @@ tui_file_put (struct ui_file *file,
 	      ui_file_put_method_ftype *write,
 	      void *dest)
 {
-  struct tui_stream *stream = ui_file_data (file);
+  struct tui_stream *stream = (struct tui_stream *) ui_file_data (file);
 
   if (stream->ts_magic != &tui_file_magic)
     internal_error (__FILE__, __LINE__,
@@ -172,7 +172,7 @@ tui_file_put (struct ui_file *file,
 void
 tui_file_fputs (const char *linebuffer, struct ui_file *file)
 {
-  struct tui_stream *stream = ui_file_data (file);
+  struct tui_stream *stream = (struct tui_stream *) ui_file_data (file);
 
   if (stream->ts_streamtype == astring)
     {
@@ -188,7 +188,7 @@ tui_file_fputs (const char *linebuffer, struct ui_file *file)
 char *
 tui_file_get_strbuf (struct ui_file *file)
 {
-  struct tui_stream *stream = ui_file_data (file);
+  struct tui_stream *stream = (struct tui_stream *) ui_file_data (file);
 
   if (stream->ts_magic != &tui_file_magic)
     internal_error (__FILE__, __LINE__,
@@ -202,7 +202,7 @@ tui_file_get_strbuf (struct ui_file *file)
 void
 tui_file_adjust_strbuf (int n, struct ui_file *file)
 {
-  struct tui_stream *stream = ui_file_data (file);
+  struct tui_stream *stream = (struct tui_stream *) ui_file_data (file);
   int non_null_chars;
 
   if (stream->ts_magic != &tui_file_magic)
@@ -220,18 +220,18 @@ tui_file_adjust_strbuf (int n, struct ui_file *file)
       if (n > (stream->ts_buflen - non_null_chars - 1))
 	{
 	  stream->ts_buflen = n + non_null_chars + 1;
-	  stream->ts_strbuf = xrealloc (stream->ts_strbuf, stream->ts_buflen);
+	  stream->ts_strbuf = (char *) xrealloc (stream->ts_strbuf, stream->ts_buflen);
 	}
     }
   else
     /* No buffer yet, so allocate one of the desired size.  */
-    stream->ts_strbuf = xmalloc ((n + 1) * sizeof (char));
+    stream->ts_strbuf = (char *) xmalloc ((n + 1) * sizeof (char));
 }
 
 static void
 tui_file_flush (struct ui_file *file)
 {
-  struct tui_stream *stream = ui_file_data (file);
+  struct tui_stream *stream = (struct tui_stream *) ui_file_data (file);
 
   if (stream->ts_magic != &tui_file_magic)
     internal_error (__FILE__, __LINE__,

@@ -243,7 +243,7 @@ tui_rl_command_key (int count, int key)
         {
           /* Must save the command because it can be modified by
              execute_command.  */
-          char *cmd = alloca (strlen (tui_commands[i].cmd) + 1);
+          char *cmd = (char *) alloca (strlen (tui_commands[i].cmd) + 1);
 
           strcpy (cmd, tui_commands[i].cmd);
           execute_command (cmd, TRUE);
