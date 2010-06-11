@@ -97,7 +97,7 @@ record_linux_sockaddr (struct regcache *regcache,
   if (!addr)
     return 0;
 
-  a = alloca (tdep->size_int);
+  a = (gdb_byte *) alloca (tdep->size_int);
 
   if (record_arch_list_add_mem ((CORE_ADDR) len, tdep->size_int))
     return -1;
@@ -139,7 +139,7 @@ record_linux_msghdr (struct regcache *regcache,
   if (record_arch_list_add_mem ((CORE_ADDR) addr, tdep->size_msghdr))
     return -1;
 
-  a = alloca (tdep->size_msghdr);
+  a = (gdb_byte *) alloca (tdep->size_msghdr);
   if (target_read_memory ((CORE_ADDR) addr, a, tdep->size_msghdr))
     {
       if (record_debug)
@@ -170,7 +170,7 @@ record_linux_msghdr (struct regcache *regcache,
       ULONGEST i;
       ULONGEST len = extract_unsigned_integer (a, tdep->size_size_t,
                                                byte_order);
-      gdb_byte *iov = alloca (tdep->size_iovec);
+      gdb_byte *iov = (gdb_byte *) alloca (tdep->size_iovec);
 
       for (i = 0; i < len; i++)
         {
@@ -793,7 +793,7 @@ record_linux_system_call (enum gdb_syscall syscall,
       if (tmpulongest)
         {
           ULONGEST optvalp;
-          gdb_byte *optlenp = alloca (tdep->size_int);
+          gdb_byte *optlenp = (gdb_byte *) alloca (tdep->size_int);
 
           if (target_read_memory ((CORE_ADDR) tmpulongest, optlenp,
                                   tdep->size_int))
@@ -835,7 +835,7 @@ record_linux_system_call (enum gdb_syscall syscall,
                                         &tmpulongest);
             if (tmpulongest)
               {
-                gdb_byte *a = alloca (tdep->size_ulong * 2);
+                gdb_byte *a = (gdb_byte *) alloca (tdep->size_ulong * 2);
                 ULONGEST len;
 
                 tmpulongest += tdep->size_ulong;
@@ -863,7 +863,7 @@ record_linux_system_call (enum gdb_syscall syscall,
 
         case RECORD_SYS_SOCKETPAIR:
           {
-            gdb_byte *a = alloca (tdep->size_ulong);
+            gdb_byte *a = (gdb_byte *) alloca (tdep->size_ulong);
 
             regcache_raw_read_unsigned (regcache, tdep->arg2,
                                         &tmpulongest);
@@ -897,7 +897,7 @@ record_linux_system_call (enum gdb_syscall syscall,
                                       &tmpulongest);
           if (tmpulongest)
             {
-              gdb_byte *a = alloca (tdep->size_ulong * 2);
+              gdb_byte *a = (gdb_byte *) alloca (tdep->size_ulong * 2);
               ULONGEST len;
 
               tmpulongest += tdep->size_ulong * 4;
@@ -924,7 +924,7 @@ record_linux_system_call (enum gdb_syscall syscall,
                                       &tmpulongest);
           if (tmpulongest)
             {
-              gdb_byte *a = alloca (tdep->size_ulong * 2);
+              gdb_byte *a = (gdb_byte *) alloca (tdep->size_ulong * 2);
 
               tmpulongest += tdep->size_ulong;
               if (target_read_memory ((CORE_ADDR) tmpulongest, a,
@@ -956,8 +956,8 @@ record_linux_system_call (enum gdb_syscall syscall,
           break;
         case RECORD_SYS_GETSOCKOPT:
           {
-            gdb_byte *a = alloca (tdep->size_ulong * 2);
-            gdb_byte *av = alloca (tdep->size_int);
+            gdb_byte *a = (gdb_byte *) alloca (tdep->size_ulong * 2);
+            gdb_byte *av = (gdb_byte *) alloca (tdep->size_int);
 
             regcache_raw_read_unsigned (regcache, tdep->arg2,
                                         &tmpulongest);
@@ -1017,7 +1017,7 @@ record_linux_system_call (enum gdb_syscall syscall,
           break;
         case RECORD_SYS_RECVMSG:
           {
-            gdb_byte *a = alloca (tdep->size_ulong);
+            gdb_byte *a = (gdb_byte *) alloca (tdep->size_ulong);
 
             regcache_raw_read_unsigned (regcache, tdep->arg2,
                                         &tmpulongest);
@@ -1370,7 +1370,7 @@ record_linux_system_call (enum gdb_syscall syscall,
         regcache_raw_read_unsigned (regcache, tdep->arg2, &vec);
         if (vec)
           {
-            gdb_byte *iov = alloca (tdep->size_iovec);
+            gdb_byte *iov = (gdb_byte *) alloca (tdep->size_iovec);
 
             regcache_raw_read_unsigned (regcache, tdep->arg3, &vlen);
             for (tmpulongest = 0; tmpulongest < vlen; tmpulongest++)
@@ -1859,7 +1859,7 @@ record_linux_system_call (enum gdb_syscall syscall,
           gdb_byte *iocbp;
 
           regcache_raw_read_unsigned (regcache, tdep->arg2, &nr);
-          iocbp = alloca (nr * tdep->size_pointer);
+          iocbp = (gdb_byte *) alloca (nr * tdep->size_pointer);
           if (target_read_memory ((CORE_ADDR) tmpulongest, iocbp,
                                   nr * tdep->size_pointer))
             {

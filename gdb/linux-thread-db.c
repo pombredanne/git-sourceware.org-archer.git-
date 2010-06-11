@@ -174,7 +174,7 @@ add_thread_db_info (void *handle)
 {
   struct thread_db_info *info;
 
-  info = xcalloc (1, sizeof (*info));
+  info = (struct thread_db_info *) xcalloc (1, sizeof (*info));
   info->pid = ptid_get_pid (inferior_ptid);
   info->handle = handle;
   info->need_stale_parent_threads_check = 1;
@@ -364,7 +364,7 @@ thread_get_info_callback (const td_thrhandle_t *thp, void *argp)
   struct thread_get_info_inout *inout;
   struct thread_db_info *info;
 
-  inout = argp;
+  inout = (struct thread_get_info_inout *) argp;
   info = inout->thread_db_info;
 
   err = info->td_thr_get_info_p (thp, &ti);
@@ -636,7 +636,9 @@ try_thread_db_load_1 (struct thread_db_info *info)
   /* Initialize pointers to the dynamic library functions we will use.
      Essential functions first.  */
 
-  info->td_init_p = verbose_dlsym (info->handle, "td_init");
+  info->td_init_p = (td_err_e (*)(void))
+    verbose_dlsym (info->handle, "td_init");
+
   if (info->td_init_p == NULL)
     return 0;
 
@@ -647,7 +649,8 @@ try_thread_db_load_1 (struct thread_db_info *info)
       return 0;
     }
 
-  info->td_ta_new_p = verbose_dlsym (info->handle, "td_ta_new");
+  info->td_ta_new_p = (td_err_e (*)(struct ps_prochandle *, td_thragent_t **))
+		       verbose_dlsym (info->handle, "td_ta_new");
   if (info->td_ta_new_p == NULL)
     return 0;
 
@@ -678,33 +681,63 @@ try_thread_db_load_1 (struct thread_db_info *info)
       return 0;
     }
 
-  info->td_ta_map_id2thr_p = verbose_dlsym (info->handle, "td_ta_map_id2thr");
+  info->td_ta_map_id2thr_p
+    = (td_err_e (*)(const td_thragent_t *, thread_t, td_thrhandle_t *))
+    verbose_dlsym (info->handle, "td_ta_map_id2thr");
+
   if (info->td_ta_map_id2thr_p == NULL)
     return 0;
 
-  info->td_ta_map_lwp2thr_p = verbose_dlsym (info->handle, "td_ta_map_lwp2thr");
+  info->td_ta_map_lwp2thr_p
+    = (td_err_e (*)(const td_thragent_t *, lwpid_t,  td_thrhandle_t *))
+    verbose_dlsym (info->handle, "td_ta_map_lwp2thr");
+
   if (info->td_ta_map_lwp2thr_p == NULL)
     return 0;
 
-  info->td_ta_thr_iter_p = verbose_dlsym (info->handle, "td_ta_thr_iter");
+  info->td_ta_thr_iter_p
+    = (td_err_e (*)(const td_thragent_t *,
+		    int (*)(const td_thrhandle_t *, void *),
+		    void *, td_thr_state_e, int, sigset_t *, unsigned int))
+    verbose_dlsym (info->handle, "td_ta_thr_iter");
   if (info->td_ta_thr_iter_p == NULL)
     return 0;
 
-  info->td_thr_validate_p = verbose_dlsym (info->handle, "td_thr_validate");
+  info->td_thr_validate_p = (td_err_e (*)(const td_thrhandle_t *))
+    verbose_dlsym (info->handle, "td_thr_validate");
   if (info->td_thr_validate_p == NULL)
     return 0;
 
-  info->td_thr_get_info_p = verbose_dlsym (info->handle, "td_thr_get_info");
+  info->td_thr_get_info_p
+    = (td_err_e (*)(const td_thrhandle_t *, td_thrinfo_t *))
+    verbose_dlsym (info->handle, "td_thr_get_info");
   if (info->td_thr_get_info_p == NULL)
     return 0;
 
   /* These are not essential.  */
-  info->td_ta_event_addr_p = dlsym (info->handle, "td_ta_event_addr");
-  info->td_ta_set_event_p = dlsym (info->handle, "td_ta_set_event");
-  info->td_ta_clear_event_p = dlsym (info->handle, "td_ta_clear_event");
-  info->td_ta_event_getmsg_p = dlsym (info->handle, "td_ta_event_getmsg");
-  info->td_thr_event_enable_p = dlsym (info->handle, "td_thr_event_enable");
-  info->td_thr_tls_get_addr_p = dlsym (info->handle, "td_thr_tls_get_addr");
+  info->td_ta_event_addr_p
+    = (td_err_e (*)(const td_thragent_t *, td_event_e, td_notify_t *))
+    dlsym (info->handle, "td_ta_event_addr");
+
+  info->td_ta_set_event_p
+    = (td_err_e (*)(const td_thragent_t *, td_thr_events_t *))
+    dlsym (info->handle, "td_ta_set_event");
+
+  info->td_ta_clear_event_p
+    = (td_err_e (*)(const td_thragent_t *, td_thr_events_t *))
+    dlsym (info->handle, "td_ta_clear_event");
+
+  info->td_ta_event_getmsg_p
+    = (td_err_e (*)(const td_thragent_t *, td_event_msg_t *))
+    dlsym (info->handle, "td_ta_event_getmsg");
+
+  info->td_thr_event_enable_p
+    = (td_err_e (*)(const td_thrhandle_t *, int))
+    dlsym (info->handle, "td_thr_event_enable");
+
+  info->td_thr_tls_get_addr_p
+    = (td_err_e (*)(const td_thrhandle_t *, void *, size_t,  void **))
+    dlsym (info->handle, "td_thr_tls_get_addr");
 
   printf_unfiltered (_("[Thread debugging using libthread_db enabled]\n"));
 
@@ -802,7 +835,7 @@ thread_db_load_search (void)
 
           if (len + 1 + strlen (LIBTHREAD_DB_SO) + 1 > sizeof (path))
             {
-              char *cp = xmalloc (len + 1);
+              char *cp = (char *) xmalloc (len + 1);
 
               memcpy (cp, search_path, len);
               cp[len] = '\0';
@@ -1031,7 +1064,8 @@ attach_thread (ptid_t ptid, const td_thrhandle_t *th_p,
     return 0;
 
   /* Construct the thread's private data.  */
-  private = xmalloc (sizeof (struct private_thread_info));
+  private = (struct private_thread_info *)
+    xmalloc (sizeof (struct private_thread_info));
   memset (private, 0, sizeof (struct private_thread_info));
 
   /* A thread ID of zero may mean the thread library has not initialized
@@ -1296,7 +1330,7 @@ find_new_threads_callback (const td_thrhandle_t *th_p, void *data)
   td_err_e err;
   ptid_t ptid;
   struct thread_info *tp;
-  struct callback_data *cb_data = data;
+  struct callback_data *cb_data = (struct callback_data *) data;
   struct thread_db_info *info = cb_data->info;
 
   err = info->td_thr_get_info_p (th_p, &ti);

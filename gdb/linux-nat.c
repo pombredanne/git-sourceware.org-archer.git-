@@ -367,7 +367,8 @@ static struct lwp_info *find_lwp_pid (ptid_t ptid);
 static void
 add_to_pid_list (struct simple_pid_list **listp, int pid, int status)
 {
-  struct simple_pid_list *new_pid = xmalloc (sizeof (struct simple_pid_list));
+  struct simple_pid_list *new_pid
+    = (struct simple_pid_list *) xmalloc (sizeof (struct simple_pid_list));
 
   new_pid->pid = pid;
   new_pid->status = status;
@@ -1779,7 +1780,7 @@ linux_nat_detach (struct target_ops *ops, char *args, int from_tty)
     {
       /* Put the signal number in ARGS so that inf_ptrace_detach will
 	 pass it along with PTRACE_DETACH.  */
-      args = alloca (8);
+      args = (char *) alloca (8);
       sprintf (args, "%d", (int) WSTOPSIG (status));
       if (debug_linux_nat)
 	fprintf_unfiltered (gdb_stdlog,
@@ -2777,7 +2778,7 @@ running_callback (struct lwp_info *lp, void *data)
 static int
 count_events_callback (struct lwp_info *lp, void *data)
 {
-  int *count = data;
+  int *count = (int *) data;
 
   gdb_assert (count != NULL);
 
@@ -2805,7 +2806,7 @@ select_singlestep_lwp_callback (struct lwp_info *lp, void *data)
 static int
 select_event_lwp_callback (struct lwp_info *lp, void *data)
 {
-  int *selector = data;
+  int *selector = (int *) data;
 
   gdb_assert (selector != NULL);
 
@@ -2854,7 +2855,7 @@ cancel_breakpoint (struct lwp_info *lp)
 static int
 cancel_breakpoints_callback (struct lwp_info *lp, void *data)
 {
-  struct lwp_info *event_lp = data;
+  struct lwp_info *event_lp = (struct lwp_info *) data;
 
   /* Leave the LWP that has been elected to receive a SIGTRAP alone.  */
   if (lp == event_lp)
@@ -3642,7 +3643,7 @@ retry:
 static int
 resume_stopped_resumed_lwps (struct lwp_info *lp, void *data)
 {
-  ptid_t *wait_ptid_p = data;
+  ptid_t *wait_ptid_p = (ptid_t *) data;
 
   if (lp->stopped
       && lp->resumed
@@ -4005,8 +4006,8 @@ linux_child_pid_to_exec_file (int pid)
 {
   char *name1, *name2;
 
-  name1 = xmalloc (MAXPATHLEN);
-  name2 = xmalloc (MAXPATHLEN);
+  name1 = (char *) xmalloc (MAXPATHLEN);
+  name2 = (char *) xmalloc (MAXPATHLEN);
   make_cleanup (xfree, name1);
   make_cleanup (xfree, name2);
   memset (name2, 0, MAXPATHLEN);
@@ -4185,7 +4186,7 @@ linux_nat_do_thread_registers (bfd *obfd, ptid_t ptid,
 						   sect_list->sect_name,
 						   sect_list->size);
 	gdb_assert (regset && regset->collect_regset);
-	gdb_regset = xmalloc (sect_list->size);
+	gdb_regset = (char *) xmalloc (sect_list->size);
 	regset->collect_regset (regset, regcache, -1,
 				gdb_regset, sect_list->size);
 	note_data = (char *) elfcore_write_register_note (obfd,
@@ -4236,7 +4237,8 @@ struct linux_nat_corefile_thread_data
 static int
 linux_nat_corefile_thread_callback (struct lwp_info *ti, void *data)
 {
-  struct linux_nat_corefile_thread_data *args = data;
+  struct linux_nat_corefile_thread_data *args
+    = (struct linux_nat_corefile_thread_data *) data;
 
   args->note_data = linux_nat_do_thread_registers (args->obfd,
 						   ti->ptid,
@@ -4302,7 +4304,9 @@ struct linux_spu_corefile_data
 static void
 linux_spu_corefile_callback (void *data, int fd)
 {
-  struct linux_spu_corefile_data *args = data;
+  struct linux_spu_corefile_data *args
+    = (struct linux_spu_corefile_data *) data;
+
   int i;
 
   static const char *spu_files[] =
@@ -4389,7 +4393,7 @@ linux_nat_make_corefile_notes (bfd *obfd, int *note_size)
 
 	  /* linux_elfcore_write_prpsinfo () handles zero unterminated
 	     strings fine.  */
-	  string_end = memchr (psargs, 0, sizeof (psargs));
+	  string_end = (char *) memchr (psargs, 0, sizeof (psargs));
 	  if (string_end != NULL)
 	    {
 	      *string_end++ = ' ';
@@ -5023,7 +5027,7 @@ linux_nat_xfer_osdata (struct target_ops *ops, enum target_object object,
 	}
 
       obstack_grow_str0 (&obstack, "</osdata>\n");
-      buf = obstack_finish (&obstack);
+      buf = (const char *) obstack_finish (&obstack);
       len_avail = strlen (buf);
     }
 
@@ -5496,7 +5500,7 @@ linux_nat_core_of_thread_1 (ptid_t ptid)
     {
       int n;
 
-      content = xrealloc (content, content_read + 1024);
+      content = (char *) xrealloc (content, content_read + 1024);
       n = fread (content + content_read, 1, 1024, f);
       content_read += n;
       if (n < 1024)
