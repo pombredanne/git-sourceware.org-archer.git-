@@ -639,7 +639,7 @@ remote_fileio_func_open (char *buf)
   mode = remote_fileio_mode_to_host (num, 1);
 
   /* Request pathname using 'm' packet */
-  pathname = alloca (length);
+  pathname = (char *) alloca (length);
   retlength = remote_read_bytes (ptrval, (gdb_byte *) pathname, length);
   if (retlength != length)
     {
@@ -984,7 +984,7 @@ remote_fileio_func_rename (char *buf)
     }
   
   /* Request oldpath using 'm' packet */
-  oldpath = alloca (old_len);
+  oldpath = (char *) alloca (old_len);
   retlength = remote_read_bytes (old_ptr, (gdb_byte *) oldpath, old_len);
   if (retlength != old_len)
     {
@@ -993,7 +993,7 @@ remote_fileio_func_rename (char *buf)
     }
   
   /* Request newpath using 'm' packet */
-  newpath = alloca (new_len);
+  newpath = (char *) alloca (new_len);
   retlength = remote_read_bytes (new_ptr, (gdb_byte *) newpath, new_len);
   if (retlength != new_len)
     {
@@ -1072,7 +1072,7 @@ remote_fileio_func_unlink (char *buf)
       return;
     }
   /* Request pathname using 'm' packet */
-  pathname = alloca (length);
+  pathname = (char *) alloca (length);
   retlength = remote_read_bytes (ptrval, (gdb_byte *) pathname, length);
   if (retlength != length)
     {
@@ -1123,7 +1123,7 @@ remote_fileio_func_stat (char *buf)
   statptr = (CORE_ADDR) lnum;
   
   /* Request pathname using 'm' packet */
-  pathname = alloca (namelength);
+  pathname = (char *) alloca (namelength);
   retlength = remote_read_bytes (nameptr, (gdb_byte *) pathname, namelength);
   if (retlength != namelength)
     {
@@ -1331,7 +1331,7 @@ remote_fileio_func_system (char *buf)
   if (length)
     {
       /* Request commandline using 'm' packet */
-      cmdline = alloca (length);
+      cmdline = (char *) alloca (length);
       retlength = remote_read_bytes (ptrval, (gdb_byte *) cmdline, length);
       if (retlength != length)
 	{
@@ -1386,7 +1386,7 @@ static struct {
 static int
 do_remote_fileio_request (struct ui_out *uiout, void *buf_arg)
 {
-  char *buf = buf_arg;
+  char *buf = (char *) buf_arg;
   char *c;
   int idx;
 
