@@ -745,7 +745,7 @@ varobj_delete (struct varobj *var, char ***dellist, int only_children)
   /* We may have been asked to return a list of what has been deleted */
   if (dellist != NULL)
     {
-      *dellist = xmalloc ((delcount + 1) * sizeof (char *));
+      *dellist = (char **) xmalloc ((delcount + 1) * sizeof (char *));
 
       cp = *dellist;
       mycount = delcount;
@@ -1976,7 +1976,7 @@ install_variable (struct varobj *var)
     error (_("Duplicate variable object name"));
 
   /* Add varobj to hash table */
-  newvl = xmalloc (sizeof (struct vlist));
+  newvl = (struct vlist *) xmalloc (sizeof (struct vlist));
   newvl->next = *(varobj_table + index);
   newvl->var = var;
   *(varobj_table + index) = newvl;
@@ -2203,7 +2203,7 @@ free_variable (struct varobj *var)
 static void
 do_free_variable_cleanup (void *var)
 {
-  free_variable (var);
+  free_variable ((struct varobj *) var);
 }
 
 static struct cleanup *
@@ -2536,7 +2536,7 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
 			char *s = PyString_AsString (py_str);
 
 			len = PyString_Size (py_str);
-			thevalue = xmemdup (s, len + 1, len + 1);
+			thevalue = (gdb_byte *) xmemdup (s, len + 1, len + 1);
 			type = builtin_type (gdbarch)->builtin_char;
 			Py_DECREF (py_str);
 		      }
@@ -3533,7 +3533,7 @@ _initialize_varobj (void)
 {
   int sizeof_table = sizeof (struct vlist *) * VAROBJ_TABLE_SIZE;
 
-  varobj_table = xmalloc (sizeof_table);
+  varobj_table = (struct vlist **) xmalloc (sizeof_table);
   memset (varobj_table, 0, sizeof_table);
 
   add_setshow_zinteger_cmd ("debugvarobj", class_maintenance,

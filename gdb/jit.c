@@ -121,7 +121,8 @@ static struct bfd *
 bfd_open_from_target_memory (CORE_ADDR addr, size_t size, char *target)
 {
   const char *filename = xstrdup ("<in-memory>");
-  struct target_buffer *buffer = xmalloc (sizeof (struct target_buffer));
+  struct target_buffer *buffer
+    = (struct target_buffer *) xmalloc (sizeof (struct target_buffer));
 
   buffer->base = addr;
   buffer->size = size;
@@ -150,7 +151,7 @@ jit_read_descriptor (struct gdbarch *gdbarch,
   ptr_type = builtin_type (gdbarch)->builtin_data_ptr;
   ptr_size = TYPE_LENGTH (ptr_type);
   desc_size = 8 + 2 * ptr_size;  /* Two 32-bit ints and two pointers.  */
-  desc_buf = alloca (desc_size);
+  desc_buf = (gdb_byte *) alloca (desc_size);
 
   /* Read the descriptor.  */
   err = target_read_memory (jit_descriptor_addr, desc_buf, desc_size);
@@ -183,7 +184,7 @@ jit_read_code_entry (struct gdbarch *gdbarch,
   ptr_type = builtin_type (gdbarch)->builtin_data_ptr;
   ptr_size = TYPE_LENGTH (ptr_type);
   entry_size = 3 * ptr_size + 8;  /* Three pointers and one 64-bit int.  */
-  entry_buf = alloca (entry_size);
+  entry_buf = (gdb_byte *) alloca (entry_size);
 
   /* Read the entry.  */
   err = target_read_memory (code_addr, entry_buf, entry_size);
@@ -269,7 +270,7 @@ JITed symbol file is not an object file, ignoring it.\n"));
   do_cleanups (my_cleanups);
 
   /* Remember a mapping from entry_addr to objfile.  */
-  entry_addr_ptr = xmalloc (sizeof (CORE_ADDR));
+  entry_addr_ptr = (CORE_ADDR *) xmalloc (sizeof (CORE_ADDR));
   *entry_addr_ptr = entry_addr;
   set_objfile_data (objfile, jit_objfile_data, entry_addr_ptr);
 

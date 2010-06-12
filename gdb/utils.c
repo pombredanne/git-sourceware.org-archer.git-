@@ -237,7 +237,7 @@ make_cleanup_freeargv (char **arg)
 static void
 do_bfd_close_cleanup (void *arg)
 {
-  bfd_close (arg);
+  bfd_close ((struct bfd *) arg);
 }
 
 struct cleanup *
@@ -249,7 +249,7 @@ make_cleanup_bfd_close (bfd *abfd)
 static void
 do_close_cleanup (void *arg)
 {
-  int *fd = arg;
+  int *fd = (int *) arg;
 
   close (*fd);
 }
@@ -257,7 +257,7 @@ do_close_cleanup (void *arg)
 struct cleanup *
 make_cleanup_close (int fd)
 {
-  int *saved_fd = xmalloc (sizeof (fd));
+  int *saved_fd = (int *) xmalloc (sizeof (fd));
 
   *saved_fd = fd;
   return make_cleanup_dtor (do_close_cleanup, saved_fd, xfree);
@@ -268,7 +268,7 @@ make_cleanup_close (int fd)
 static void
 do_fclose_cleanup (void *arg)
 {
-  FILE *file = arg;
+  FILE *file = (FILE *) arg;
 
   fclose (file);
 }
@@ -286,7 +286,7 @@ make_cleanup_fclose (FILE *file)
 static void
 do_obstack_free (void *arg)
 {
-  struct obstack *ob = arg;
+  struct obstack *ob = (struct obstack *) arg;
 
   obstack_free (ob, NULL);
 }
@@ -302,7 +302,7 @@ make_cleanup_obstack_free (struct obstack *obstack)
 static void
 do_ui_file_delete (void *arg)
 {
-  ui_file_delete (arg);
+  ui_file_delete ((struct ui_file *) arg);
 }
 
 struct cleanup *
@@ -314,7 +314,7 @@ make_cleanup_ui_file_delete (struct ui_file *arg)
 static void
 do_free_section_addr_info (void *arg)
 {
-  free_section_addr_info (arg);
+  free_section_addr_info ((struct section_addr_info *) arg);
 }
 
 struct cleanup *
@@ -332,7 +332,7 @@ struct restore_integer_closure
 static void
 restore_integer (void *p)
 {
-  struct restore_integer_closure *closure = p;
+  struct restore_integer_closure *closure = (struct restore_integer_closure *)p;
 
   *(closure->variable) = closure->value;
 }
@@ -342,7 +342,7 @@ restore_integer (void *p)
 struct cleanup *
 make_cleanup_restore_integer (int *variable)
 {
-  struct restore_integer_closure *c =
+  struct restore_integer_closure *c = (struct restore_integer_closure *)
     xmalloc (sizeof (struct restore_integer_closure));
 
   c->variable = variable;
@@ -489,7 +489,7 @@ restore_my_cleanups (struct cleanup **pmy_chain, struct cleanup *chain)
 void
 free_current_contents (void *ptr)
 {
-  void **location = ptr;
+  void **location = (void **) ptr;
 
   if (location == NULL)
     internal_error (__FILE__, __LINE__,
@@ -594,7 +594,7 @@ discard_all_inferior_continuations (struct inferior *inf)
 static void
 restore_thread_cleanup (void *arg)
 {
-  ptid_t *ptid_p = arg;
+  ptid_t *ptid_p = (ptid_t *) arg;
 
   switch_to_thread (*ptid_p);
 }
@@ -1125,8 +1125,8 @@ add_internal_problem_command (struct internal_problem *problem)
   char *set_doc;
   char *show_doc;
 
-  set_cmd_list = xmalloc (sizeof (*set_cmd_list));
-  show_cmd_list = xmalloc (sizeof (*set_cmd_list));
+  set_cmd_list = (struct cmd_list_element **) xmalloc (sizeof (*set_cmd_list));
+  show_cmd_list = (struct cmd_list_element **) xmalloc (sizeof (*set_cmd_list));
   *set_cmd_list = NULL;
   *show_cmd_list = NULL;
 
@@ -2191,7 +2191,7 @@ puts_filtered_tabular (char *string, int width, int right)
   if (right)
     spaces += width - stringlen;
 
-  spacebuf = alloca (spaces + 1);
+  spacebuf = (char *) alloca (spaces + 1);
   spacebuf[spaces] = '\0';
   while (spaces--)
     spacebuf[spaces] = ' ';
@@ -3344,7 +3344,7 @@ gdb_realpath (const char *filename)
     if (path_max > 0)
       {
 	/* PATH_MAX is bounded.  */
-	char *buf = alloca (path_max);
+	char *buf = (char *) alloca (path_max);
 	char *rp = realpath (filename, buf);
 
 	return xstrdup (rp ? rp : filename);
@@ -3372,7 +3372,7 @@ xfullpath (const char *filename)
   if (base_name == filename)
     return xstrdup (filename);
 
-  dir_name = alloca ((size_t) (base_name - filename + 2));
+  dir_name = (char *) alloca ((size_t) (base_name - filename + 2));
   /* Allocate enough space to store the dir_name + plus one extra
      character sometimes needed under Windows (see below), and
      then the closing \000 character */
@@ -3627,7 +3627,7 @@ ldirname (const char *filename)
   if (base == filename)
     return NULL;
 
-  dirname = xmalloc (base - filename + 2);
+  dirname = (char *) xmalloc (base - filename + 2);
   memcpy (dirname, filename, base - filename);
 
   /* On DOS based file systems, convert "d:foo" to "d:.", so that we
@@ -3681,7 +3681,7 @@ gdb_bfd_errmsg (bfd_error_type error_tag, char **matching)
             + strlen (AMBIGUOUS_MESS2);
   for (p = matching; *p; p++)
     ret_len += strlen (*p) + 1;
-  ret = xmalloc (ret_len + 1);
+  ret = (char *) xmalloc (ret_len + 1);
   retp = ret;
   make_cleanup (xfree, ret);
 

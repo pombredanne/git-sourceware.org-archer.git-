@@ -302,7 +302,7 @@ add_matching_methods (int method_counter, struct type *t,
 	  tmp_name = gdb_mangle_name (t,
 				      method_counter,
 				      field_counter);
-	  phys_name = alloca (strlen (tmp_name) + 1);
+	  phys_name = (char *) alloca (strlen (tmp_name) + 1);
 	  strcpy (phys_name, tmp_name);
 	  xfree (tmp_name);
 	}
@@ -404,12 +404,13 @@ build_canonical_line_spec (struct symtab_and_line *sal, char *symname,
   filename = s->filename;
   if (symname != NULL)
     {
-      canonical_name = xmalloc (strlen (filename) + strlen (symname) + 2);
+      canonical_name
+	= (char *) xmalloc (strlen (filename) + strlen (symname) + 2);
       sprintf (canonical_name, "%s:%s", filename, symname);
     }
   else
     {
-      canonical_name = xmalloc (strlen (filename) + 30);
+      canonical_name = (char *) xmalloc (strlen (filename) + 30);
       sprintf (canonical_name, "%s:%d", filename, sal->line);
     }
   canonical_arr[0] = canonical_name;
@@ -1539,8 +1540,9 @@ find_method (int funfirstline, char ***canonical, char *saved_arg,
   struct symtabs_and_lines values;
   struct symbol *sym = NULL;
   int i1;	/*  Counter for the symbol array.  */
-  struct symbol **sym_arr =  alloca (total_number_of_methods (t)
-				     * sizeof (struct symbol *));
+  struct symbol **sym_arr
+    =  (struct symbol **) alloca (total_number_of_methods (t)
+				  * sizeof (struct symbol *));
 
   /* Find all methods with a matching name, and put them in
      sym_arr.  */
