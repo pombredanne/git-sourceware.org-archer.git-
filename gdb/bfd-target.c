@@ -47,7 +47,7 @@ target_bfd_xfer_partial (struct target_ops *ops,
     {
     case TARGET_OBJECT_MEMORY:
       {
-	struct target_bfd_data *data = ops->to_data;
+	struct target_bfd_data *data = (struct target_bfd_data *) ops->to_data;
 	return section_table_xfer_memory_partial (readbuf, writebuf,
 						  offset, len,
 						  data->table.sections,
@@ -62,14 +62,14 @@ target_bfd_xfer_partial (struct target_ops *ops,
 static struct target_section_table *
 target_bfd_get_section_table (struct target_ops *ops)
 {
-  struct target_bfd_data *data = ops->to_data;
+  struct target_bfd_data *data = (struct target_bfd_data *) ops->to_data;
   return &data->table;
 }
 
 static void
 target_bfd_xclose (struct target_ops *t, int quitting)
 {
-  struct target_bfd_data *data = t->to_data;
+  struct target_bfd_data *data = (struct target_bfd_data *) t->to_data;
 
   bfd_close (data->bfd);
   xfree (data->table.sections);

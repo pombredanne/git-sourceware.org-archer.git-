@@ -223,7 +223,7 @@ struct addrmap_mutable
 static splay_tree_key
 allocate_key (struct addrmap_mutable *map, CORE_ADDR addr)
 {
-  CORE_ADDR *key = obstack_alloc (map->obstack, sizeof (*key));
+  CORE_ADDR *key = (CORE_ADDR *) obstack_alloc (map->obstack, sizeof (*key));
 
   *key = addr;
   return (splay_tree_key) key;
@@ -414,10 +414,11 @@ addrmap_mutable_create_fixed (struct addrmap *this, struct obstack *obstack)
      maps have, but mutable maps do not.)  */
   num_transitions++;
 
-  fixed = obstack_alloc (obstack,
-                         (sizeof (*fixed)
-                          + (num_transitions
-                             * sizeof (fixed->transitions[0]))));
+  fixed = (struct addrmap_fixed *)
+    obstack_alloc (obstack,
+		   (sizeof (*fixed)
+		    + (num_transitions
+		       * sizeof (fixed->transitions[0]))));
   fixed->addrmap.funcs = &addrmap_fixed_funcs;
   fixed->num_transitions = 1;
   fixed->transitions[0].addr = 0;
@@ -456,7 +457,7 @@ static const struct addrmap_funcs addrmap_mutable_funcs =
 static void *
 splay_obstack_alloc (int size, void *closure)
 {
-  struct addrmap_mutable *map = closure;
+  struct addrmap_mutable *map = (struct addrmap_mutable *) closure;
   splay_tree_node n;
 
   /* We should only be asked to allocate nodes and larger things.
@@ -478,8 +479,8 @@ splay_obstack_alloc (int size, void *closure)
 static void
 splay_obstack_free (void *obj, void *closure)
 {
-  struct addrmap_mutable *map = closure;
-  splay_tree_node n = obj;
+  struct addrmap_mutable *map = (struct addrmap_mutable *) closure;
+  splay_tree_node n = (splay_tree_node) obj;
 
   /* We've asserted in the allocation function that we only allocate
      nodes or larger things, so it should be safe to put whatever
@@ -509,7 +510,8 @@ splay_compare_CORE_ADDR_ptr (splay_tree_key ak, splay_tree_key bk)
 struct addrmap *
 addrmap_create_mutable (struct obstack *obstack)
 {
-  struct addrmap_mutable *map = obstack_alloc (obstack, sizeof (*map));
+  struct addrmap_mutable *map
+    = (struct addrmap_mutable *) obstack_alloc (obstack, sizeof (*map));
 
   map->addrmap.funcs = &addrmap_mutable_funcs;
   map->obstack = obstack;

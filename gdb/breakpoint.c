@@ -478,7 +478,8 @@ static struct counted_command_line *
 alloc_counted_command_line (struct command_line *commands)
 {
   struct counted_command_line *result
-    = xmalloc (sizeof (struct counted_command_line));
+    = (struct counted_command_line *)
+    xmalloc (sizeof (struct counted_command_line));
 
   result->refc = 1;
   result->commands = commands;
@@ -517,7 +518,7 @@ decref_counted_command_line (struct counted_command_line **cmdp)
 static void
 do_cleanup_counted_command_line (void *arg)
 {
-  decref_counted_command_line (arg);
+  decref_counted_command_line ((struct counted_command_line **) arg);
 }
 
 /* Create a cleanup that calls decref_counted_command_line on the
@@ -902,7 +903,7 @@ breakpoint_set_commands (struct breakpoint *b, struct command_line *commands)
 void
 check_tracepoint_command (char *line, void *closure)
 {
-  struct breakpoint *b = closure;
+  struct breakpoint *b = (struct breakpoint *) closure;
 
   validate_actionline (&line, b);
 }
@@ -933,7 +934,7 @@ struct commands_info
 static void
 do_map_commands_command (struct breakpoint *b, void *data)
 {
-  struct commands_info *info = data;
+  struct commands_info *info = (struct commands_info *) data;
 
   if (info->cmd == NULL)
     {
@@ -4873,7 +4874,8 @@ struct captured_breakpoint_query_args
 static int
 do_captured_breakpoint_query (struct ui_out *uiout, void *data)
 {
-  struct captured_breakpoint_query_args *args = data;
+  struct captured_breakpoint_query_args *args
+    = (struct captured_breakpoint_query_args *) data;
   struct breakpoint *b;
   struct bp_location *dummy_loc = NULL;
 
@@ -5321,7 +5323,7 @@ allocate_bp_location (struct breakpoint *bpt)
 {
   struct bp_location *loc;
 
-  loc = xmalloc (sizeof (struct bp_location));
+  loc = (struct bp_location *) xmalloc (sizeof (struct bp_location));
   memset (loc, 0, sizeof (*loc));
 
   loc->owner = bpt;
@@ -6821,7 +6823,7 @@ bp_loc_is_permanent (struct bp_location *loc)
   if (brk == NULL)
     return 0;
 
-  target_mem = alloca (len);
+  target_mem = (gdb_byte *) alloca (len);
 
   /* Enable the automatic memory restoration from breakpoints while
      we read the memory.  Otherwise we could say about our temporary
@@ -6979,7 +6981,8 @@ expand_line_sal_maybe (struct symtab_and_line sal)
   if (sal.explicit_pc || sal.line == 0 || sal.symtab == NULL)
     {
       expanded.nelts = 1;
-      expanded.sals = xmalloc (sizeof (struct symtab_and_line));
+      expanded.sals
+	= (struct symtab_and_line *) xmalloc (sizeof (struct symtab_and_line));
       expanded.sals[0] = sal;
       return expanded;
     }
@@ -7001,7 +7004,8 @@ expand_line_sal_maybe (struct symtab_and_line sal)
          past the function prologue if necessary.  */
       xfree (expanded.sals);
       expanded.nelts = 1;
-      expanded.sals = xmalloc (sizeof (struct symtab_and_line));
+      expanded.sals
+	= (struct symtab_and_line *) xmalloc (sizeof (struct symtab_and_line));
       sal.pc = original_pc;
       expanded.sals[0] = sal;
       skip_prologue_sal (&expanded.sals[0]);
@@ -7047,7 +7051,8 @@ expand_line_sal_maybe (struct symtab_and_line sal)
       Fix that by returnign the original sal. */
       xfree (expanded.sals);
       expanded.nelts = 1;
-      expanded.sals = xmalloc (sizeof (struct symtab_and_line));
+      expanded.sals
+	= (struct symtab_and_line *) xmalloc (sizeof (struct symtab_and_line));
       sal.pc = original_pc;
       expanded.sals[0] = sal;
       return expanded;      
@@ -7174,7 +7179,7 @@ parse_breakpoint_sals (char **address,
     }
   /* For any SAL that didn't have a canonical string, fill one in. */
   if (sals->nelts > 0 && *addr_string == NULL)
-    *addr_string = xcalloc (sals->nelts, sizeof (char **));
+    *addr_string = (char **) xcalloc (sals->nelts, sizeof (char **));
   if (addr_start != (*address))
     {
       int i;
@@ -7238,7 +7243,8 @@ check_fast_tracepoint_sals (struct gdbarch *gdbarch,
 static void
 do_captured_parse_breakpoint (struct ui_out *ui, void *data)
 {
-  struct captured_parse_breakpoint_args *args = data;
+  struct captured_parse_breakpoint_args *args
+    = (struct captured_parse_breakpoint_args *) data;
   
   parse_breakpoint_sals (args->arg_p, args->sals_p, args->addr_string_p, 
 		         args->not_found_ptr);
@@ -8066,7 +8072,8 @@ struct until_break_command_continuation_args
 static void
 until_break_command_continuation (void *arg)
 {
-  struct until_break_command_continuation_args *a = arg;
+  struct until_break_command_continuation_args *a
+    = (struct until_break_command_continuation_args *) arg;
 
   delete_breakpoint (a->breakpoint);
   if (a->breakpoint2)
@@ -8144,7 +8151,8 @@ until_break_command (char *arg, int from_tty, int anywhere)
   if (target_can_async_p () && is_running (inferior_ptid))
     {
       struct until_break_command_continuation_args *args;
-      args = xmalloc (sizeof (*args));
+      args = (struct until_break_command_continuation_args *)
+	xmalloc (sizeof (*args));
 
       args->breakpoint = breakpoint;
       args->breakpoint2 = breakpoint2;
@@ -8831,8 +8839,8 @@ breakpoint_auto_delete (bpstat bs)
 static int
 bp_location_compare (const void *ap, const void *bp)
 {
-  struct bp_location *a = *(void **) ap;
-  struct bp_location *b = *(void **) bp;
+  struct bp_location *a = *(struct bp_location **) ap;
+  struct bp_location *b = *(struct bp_location **) bp;
   int a_perm = a->owner->enable_state == bp_permanent;
   int b_perm = b->owner->enable_state == bp_permanent;
 
@@ -8937,7 +8945,8 @@ update_global_location_list (int should_insert)
     for (loc = b->loc; loc; loc = loc->next)
       bp_location_count++;
 
-  bp_location = xmalloc (sizeof (*bp_location) * bp_location_count);
+  bp_location = (struct bp_location **) xmalloc (sizeof (*bp_location)
+						 * bp_location_count);
   locp = bp_location;
   ALL_BREAKPOINTS (b)
     for (loc = b->loc; loc; loc = loc->next)
@@ -9238,7 +9247,7 @@ bpstat_remove_breakpoint (bpstat bps, struct breakpoint *bpt)
 static int
 bpstat_remove_breakpoint_callback (struct thread_info *th, void *data)
 {
-  struct breakpoint *bpt = data;
+  struct breakpoint *bpt = (struct breakpoint *) data;
 
   bpstat_remove_breakpoint (th->stop_bpstat, bpt);
   return 0;
@@ -9336,7 +9345,7 @@ delete_breakpoint (struct breakpoint *bpt)
 static void
 do_delete_breakpoint_cleanup (void *b)
 {
-  delete_breakpoint (b);
+  delete_breakpoint ((struct breakpoint *) b);
 }
 
 struct cleanup *
@@ -10246,7 +10255,7 @@ deprecated_insert_raw_breakpoint (struct gdbarch *gdbarch,
 int
 deprecated_remove_raw_breakpoint (struct gdbarch *gdbarch, void *bp)
 {
-  struct bp_target_info *bp_tgt = bp;
+  struct bp_target_info *bp_tgt = (struct bp_target_info *) bp;
   int ret;
 
   ret = target_remove_breakpoint (gdbarch, bp_tgt);
@@ -10326,7 +10335,8 @@ single_step_breakpoint_inserted_here_p (struct address_space *aspace,
 
   for (i = 0; i < 2; i++)
     {
-      struct bp_target_info *bp_tgt = single_step_breakpoints[i];
+      struct bp_target_info *bp_tgt
+	= (struct bp_target_info *) single_step_breakpoints[i];
       if (bp_tgt
 	  && breakpoint_address_match (bp_tgt->placed_address_space,
 				       bp_tgt->placed_address,
