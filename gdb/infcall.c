@@ -710,7 +710,8 @@ call_function_by_hand (struct value *function, int nargs, struct value **args)
       struct value **new_args;
 
       /* Add the new argument to the front of the argument list.  */
-      new_args = xmalloc (sizeof (struct value *) * (nargs + 1));
+      new_args = (struct value **) xmalloc (sizeof (struct value *)
+					    * (nargs + 1));
       new_args[0] = value_from_pointer (lookup_pointer_type (values_type),
 					struct_addr);
       memcpy (&new_args[1], &args[0], sizeof (struct value *) * nargs);

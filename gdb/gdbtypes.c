@@ -132,9 +132,11 @@ alloc_type (struct objfile *objfile)
   gdb_assert (objfile != NULL);
 
   /* Alloc the structure and start off with all fields zeroed.  */
-  type = OBSTACK_ZALLOC (&objfile->objfile_obstack, struct type);
-  TYPE_MAIN_TYPE (type) = OBSTACK_ZALLOC (&objfile->objfile_obstack,
-					  struct main_type);
+  type = (struct type *) OBSTACK_ZALLOC (&objfile->objfile_obstack,
+					 struct type);
+  TYPE_MAIN_TYPE (type)
+    = (struct main_type *) OBSTACK_ZALLOC (&objfile->objfile_obstack,
+					   struct main_type);
   OBJSTAT (objfile, n_types++);
 
   TYPE_OBJFILE_OWNED (type) = 1;
@@ -217,8 +219,9 @@ alloc_type_instance (struct type *oldtype)
   if (! TYPE_OBJFILE_OWNED (oldtype))
     type = XZALLOC (struct type);
   else
-    type = OBSTACK_ZALLOC (&TYPE_OBJFILE (oldtype)->objfile_obstack,
-			   struct type);
+    type = (struct type *)
+      OBSTACK_ZALLOC (&TYPE_OBJFILE (oldtype)->objfile_obstack,
+		      struct type);
 
   TYPE_MAIN_TYPE (type) = TYPE_MAIN_TYPE (oldtype);
 
@@ -901,7 +904,8 @@ create_set_type (struct type *result_type, struct type *domain_type)
 
   TYPE_CODE (result_type) = TYPE_CODE_SET;
   TYPE_NFIELDS (result_type) = 1;
-  TYPE_FIELDS (result_type) = TYPE_ZALLOC (result_type, sizeof (struct field));
+  TYPE_FIELDS (result_type)
+    = (struct field *) TYPE_ZALLOC (result_type, sizeof (struct field));
 
   if (!TYPE_STUB (domain_type))
     {
@@ -1071,7 +1075,7 @@ struct type *
 lookup_unsigned_typename (const struct language_defn *language,
 			  struct gdbarch *gdbarch, char *name)
 {
-  char *uns = alloca (strlen (name) + 10);
+  char *uns = (char *) alloca (strlen (name) + 10);
 
   strcpy (uns, "unsigned ");
   strcpy (uns + 9, name);
@@ -1083,7 +1087,7 @@ lookup_signed_typename (const struct language_defn *language,
 			struct gdbarch *gdbarch, char *name)
 {
   struct type *t;
-  char *uns = alloca (strlen (name) + 8);
+  char *uns = (char *) alloca (strlen (name) + 8);
 
   strcpy (uns, "signed ");
   strcpy (uns + 7, name);
@@ -2045,9 +2049,9 @@ rank_function (struct type **parms, int nparms,
   struct badness_vector *bv;
   int min_len = nparms < nargs ? nparms : nargs;
 
-  bv = xmalloc (sizeof (struct badness_vector));
+  bv = (struct badness_vector *) xmalloc (sizeof (struct badness_vector));
   bv->length = nargs + 1;	/* add 1 for the length-match rank */
-  bv->rank = xmalloc ((nargs + 1) * sizeof (int));
+  bv->rank = (int *) xmalloc ((nargs + 1) * sizeof (int));
 
   /* First compare the lengths of the supplied lists.
      If there is a mismatch, set it to a high value.  */
@@ -2989,7 +2993,7 @@ struct type_pair
 static hashval_t
 type_pair_hash (const void *item)
 {
-  const struct type_pair *pair = item;
+  const struct type_pair *pair = (const struct type_pair *) item;
 
   return htab_hash_pointer (pair->old);
 }
@@ -2997,7 +3001,8 @@ type_pair_hash (const void *item)
 static int
 type_pair_eq (const void *item_lhs, const void *item_rhs)
 {
-  const struct type_pair *lhs = item_lhs, *rhs = item_rhs;
+  const struct type_pair *lhs = (const struct type_pair *) item_lhs;
+  const struct type_pair *rhs = (const struct type_pair *) item_rhs;
 
   return lhs->old == rhs->old;
 }
@@ -3045,7 +3050,8 @@ copy_type_recursive (struct objfile *objfile,
 
   /* We must add the new type to the hash table immediately, in case
      we encounter this type again during a recursive call below.  */
-  stored = obstack_alloc (&objfile->objfile_obstack, sizeof (struct type_pair));
+  stored = (struct type_pair *) obstack_alloc (&objfile->objfile_obstack,
+					       sizeof (struct type_pair));
   stored->old = type;
   stored->new = new_type;
   *slot = stored;
@@ -3109,7 +3115,8 @@ copy_type_recursive (struct objfile *objfile,
   /* For range types, copy the bounds information. */
   if (TYPE_CODE (type) == TYPE_CODE_RANGE)
     {
-      TYPE_RANGE_DATA (new_type) = xmalloc (sizeof (struct range_bounds));
+      TYPE_RANGE_DATA (new_type)
+	= (struct range_bounds *) xmalloc (sizeof (struct range_bounds));
       *TYPE_RANGE_DATA (new_type) = *TYPE_RANGE_DATA (type);
     }
 
@@ -3281,7 +3288,8 @@ arch_flags_type (struct gdbarch *gdbarch, char *name, int length)
   type = arch_type (gdbarch, TYPE_CODE_FLAGS, length, name);
   TYPE_UNSIGNED (type) = 1;
   TYPE_NFIELDS (type) = nfields;
-  TYPE_FIELDS (type) = TYPE_ZALLOC (type, nfields * sizeof (struct field));
+  TYPE_FIELDS (type)
+    = (struct field *) TYPE_ZALLOC (type, nfields * sizeof (struct field));
 
   return type;
 }
@@ -3331,8 +3339,9 @@ append_composite_type_field_raw (struct type *t, char *name,
   struct field *f;
 
   TYPE_NFIELDS (t) = TYPE_NFIELDS (t) + 1;
-  TYPE_FIELDS (t) = xrealloc (TYPE_FIELDS (t),
-			      sizeof (struct field) * TYPE_NFIELDS (t));
+  TYPE_FIELDS (t) = (struct field *) xrealloc (TYPE_FIELDS (t),
+					       sizeof (struct field)
+					       * TYPE_NFIELDS (t));
   f = &(TYPE_FIELDS (t)[TYPE_NFIELDS (t) - 1]);
   memset (f, 0, sizeof f[0]);
   FIELD_TYPE (f[0]) = field;
@@ -3390,7 +3399,7 @@ static struct gdbarch_data *gdbtypes_data;
 const struct builtin_type *
 builtin_type (struct gdbarch *gdbarch)
 {
-  return gdbarch_data (gdbarch, gdbtypes_data);
+  return (struct builtin_type *) gdbarch_data (gdbarch, gdbtypes_data);
 }
 
 static void *
@@ -3528,13 +3537,14 @@ objfile_type (struct objfile *objfile)
 {
   struct gdbarch *gdbarch;
   struct objfile_type *objfile_type
-    = objfile_data (objfile, objfile_type_data);
+    = (struct objfile_type *) objfile_data (objfile, objfile_type_data);
 
   if (objfile_type)
     return objfile_type;
 
-  objfile_type = OBSTACK_CALLOC (&objfile->objfile_obstack,
-				 1, struct objfile_type);
+  objfile_type
+    = (struct objfile_type *) OBSTACK_CALLOC (&objfile->objfile_obstack,
+					      1, struct objfile_type);
 
   /* Use the objfile architecture to determine basic type properties.  */
   gdbarch = get_objfile_arch (objfile);

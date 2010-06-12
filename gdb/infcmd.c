@@ -928,7 +928,7 @@ struct step_1_continuation_args
 static void
 step_1_continuation (void *args)
 {
-  struct step_1_continuation_args *a = args;
+  struct step_1_continuation_args *a = (struct step_1_continuation_args *) args;
 
   if (target_has_execution)
     {
@@ -1037,7 +1037,7 @@ which has no line number information.\n"), name);
 	{
 	  struct step_1_continuation_args *args;
 
-	  args = xmalloc (sizeof (*args));
+	  args = (struct step_1_continuation_args *) xmalloc (sizeof (*args));
 	  args->skip_subroutines = skip_subroutines;
 	  args->single_inst = single_inst;
 	  args->count = count;
@@ -1420,7 +1420,8 @@ struct finish_command_continuation_args
 static void
 finish_command_continuation (void *arg)
 {
-  struct finish_command_continuation_args *a = arg;
+  struct finish_command_continuation_args *a
+    = (struct finish_command_continuation_args *) arg;
   struct thread_info *tp = NULL;
   bpstat bs = NULL;
 
@@ -1557,7 +1558,7 @@ finish_forward (struct symbol *function, struct frame_info *frame)
   old_chain = make_cleanup_delete_breakpoint (breakpoint);
 
   tp->proceed_to_finish = 1;    /* We want stop_registers, please...  */
-  cargs = xmalloc (sizeof (*cargs));
+  cargs = (struct finish_command_continuation_args *) xmalloc (sizeof (*cargs));
 
   cargs->breakpoint = breakpoint;
   cargs->function = function;
@@ -2351,7 +2352,8 @@ struct attach_command_continuation_args
 static void
 attach_command_continuation (void *args)
 {
-  struct attach_command_continuation_args *a = args;
+  struct attach_command_continuation_args *a
+    = (struct attach_command_continuation_args *) args;
 
   attach_command_post_wait (a->args, a->from_tty, a->async_exec);
 }
@@ -2359,7 +2361,8 @@ attach_command_continuation (void *args)
 static void
 attach_command_continuation_free_args (void *args)
 {
-  struct attach_command_continuation_args *a = args;
+  struct attach_command_continuation_args *a
+    = (struct attach_command_continuation_args *) args;
 
   xfree (a->args);
   xfree (a);
@@ -2455,7 +2458,7 @@ attach_command (char *args, int from_tty)
 	  /* sync_execution mode.  Wait for stop.  */
 	  struct attach_command_continuation_args *a;
 
-	  a = xmalloc (sizeof (*a));
+	  a = (struct attach_command_continuation_args *) xmalloc (sizeof (*a));
 	  a->args = xstrdup (args);
 	  a->from_tty = from_tty;
 	  a->async_exec = async_exec;
@@ -2518,7 +2521,7 @@ notice_new_inferior (ptid_t ptid, int leave_running, int from_tty)
 	{
 	  struct attach_command_continuation_args *a;
 
-	  a = xmalloc (sizeof (*a));
+	  a = (struct attach_command_continuation_args *) xmalloc (sizeof (*a));
 	  a->args = xstrdup ("");
 	  a->from_tty = from_tty;
 	  a->async_exec = async_exec;

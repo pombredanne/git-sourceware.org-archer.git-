@@ -67,7 +67,7 @@ set_current_inferior (struct inferior *inf)
 static void
 restore_inferior (void *arg)
 {
-  struct inferior *saved_inferior = arg;
+  struct inferior *saved_inferior = (struct inferior *) arg;
 
   set_current_inferior (saved_inferior);
 }
@@ -120,7 +120,7 @@ add_inferior_silent (int pid)
 {
   struct inferior *inf;
 
-  inf = xmalloc (sizeof (*inf));
+  inf = (struct inferior *) xmalloc (sizeof (*inf));
   memset (inf, 0, sizeof (*inf));
   inf->pid = pid;
 
@@ -163,7 +163,8 @@ struct delete_thread_of_inferior_arg
 static int
 delete_thread_of_inferior (struct thread_info *tp, void *data)
 {
-  struct delete_thread_of_inferior_arg *arg = data;
+  struct delete_thread_of_inferior_arg *arg
+    = (struct delete_thread_of_inferior_arg *) data;
 
   if (ptid_get_pid (tp->ptid) == arg->pid)
     {

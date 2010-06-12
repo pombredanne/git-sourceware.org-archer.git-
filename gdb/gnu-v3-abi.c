@@ -122,7 +122,7 @@ build_gdb_vtable_type (struct gdbarch *arch)
      the alignment that type requires, and then use that here.  */
 
   /* Build the field list.  */
-  field_list = xmalloc (sizeof (struct field [4]));
+  field_list = (struct field *) xmalloc (sizeof (struct field [4]));
   memset (field_list, 0, sizeof (struct field [4]));
   field = &field_list[0];
   offset = 0;
@@ -172,7 +172,8 @@ build_gdb_vtable_type (struct gdbarch *arch)
 static struct type *
 vtable_ptrdiff_type (struct gdbarch *gdbarch)
 {
-  struct type *vtable_type = gdbarch_data (gdbarch, vtable_type_gdbarch_data);
+  struct type *vtable_type
+    = (struct type *) gdbarch_data (gdbarch, vtable_type_gdbarch_data);
 
   /* The "offset_to_top" field has the appropriate (ptrdiff_t) type.  */
   return TYPE_FIELD_TYPE (vtable_type, vtable_field_offset_to_top);
@@ -184,7 +185,8 @@ vtable_ptrdiff_type (struct gdbarch *gdbarch)
 static int
 vtable_address_point_offset (struct gdbarch *gdbarch)
 {
-  struct type *vtable_type = gdbarch_data (gdbarch, vtable_type_gdbarch_data);
+  struct type *vtable_type
+    = (struct type *) gdbarch_data (gdbarch, vtable_type_gdbarch_data);
 
   return (TYPE_FIELD_BITPOS (vtable_type, vtable_field_virtual_functions)
           / TARGET_CHAR_BIT);
@@ -237,8 +239,8 @@ static struct value *
 gnuv3_get_vtable (struct gdbarch *gdbarch,
 		  struct type *container_type, CORE_ADDR container_addr)
 {
-  struct type *vtable_type = gdbarch_data (gdbarch,
-					   vtable_type_gdbarch_data);
+  struct type *vtable_type
+    = (struct type *) gdbarch_data (gdbarch, vtable_type_gdbarch_data);
   struct type *vtable_pointer_type;
   struct value *vtable_pointer;
   CORE_ADDR vtable_address;

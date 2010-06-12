@@ -706,9 +706,9 @@ follow_exec (ptid_t pid, char *execd_pathname)
 
   if (gdb_sysroot && *gdb_sysroot)
     {
-      char *name = alloca (strlen (gdb_sysroot)
-			    + strlen (execd_pathname)
-			    + 1);
+      char *name = (char *) alloca (strlen (gdb_sysroot)
+				    + strlen (execd_pathname)
+				    + 1);
 
       strcpy (name, gdb_sysroot);
       strcat (name, execd_pathname);
@@ -955,7 +955,7 @@ add_displaced_stepping_state (int pid)
     if (state->pid == pid)
       return state;
 
-  state = xcalloc (1, sizeof (*state));
+  state = (struct displaced_step_inferior_state *) xcalloc (1, sizeof (*state));
   state->pid = pid;
   state->next = displaced_step_inferior_states;
   displaced_step_inferior_states = state;
@@ -1065,7 +1065,8 @@ displaced_step_clear (struct displaced_step_inferior_state *displaced)
 static void
 displaced_step_clear_cleanup (void *arg)
 {
-  struct displaced_step_inferior_state *state = arg;
+  struct displaced_step_inferior_state *state
+    = (struct displaced_step_inferior_state *) arg;
 
   displaced_step_clear (state);
 }
@@ -1128,7 +1129,7 @@ displaced_step_prepare (ptid_t ptid)
 			    "displaced: defering step of %s\n",
 			    target_pid_to_str (ptid));
 
-      new_req = xmalloc (sizeof (*new_req));
+      new_req = (struct displaced_step_request *) xmalloc (sizeof (*new_req));
       new_req->ptid = ptid;
       new_req->next = NULL;
 
@@ -1164,7 +1165,7 @@ displaced_step_prepare (ptid_t ptid)
   len = gdbarch_max_insn_length (gdbarch);
 
   /* Save the original contents of the copy area.  */
-  displaced->step_saved_copy = xmalloc (len);
+  displaced->step_saved_copy = (gdb_byte *) xmalloc (len);
   ignore_cleanups = make_cleanup (free_current_contents,
 				  &displaced->step_saved_copy);
   read_memory (copy, displaced->step_saved_copy, len);
@@ -6015,7 +6016,7 @@ restore_inferior_thread_state (struct inferior_thread_state *inf_state)
 static void
 do_restore_inferior_thread_state_cleanup (void *state)
 {
-  restore_inferior_thread_state (state);
+  restore_inferior_thread_state ((struct inferior_thread_state *) state);
 }
 
 struct cleanup *
@@ -6165,7 +6166,7 @@ restore_inferior_status (struct inferior_status *inf_status)
 static void
 do_restore_inferior_status_cleanup (void *sts)
 {
-  restore_inferior_status (sts);
+  restore_inferior_status ((struct inferior_status *) sts);
 }
 
 struct cleanup *
@@ -6352,7 +6353,7 @@ ptid_match (ptid_t ptid, ptid_t filter)
 static void
 restore_inferior_ptid (void *arg)
 {
-  ptid_t *saved_ptid_ptr = arg;
+  ptid_t *saved_ptid_ptr = (ptid_t *) arg;
 
   inferior_ptid = *saved_ptid_ptr;
   xfree (arg);
@@ -6367,7 +6368,7 @@ save_inferior_ptid (void)
 {
   ptid_t *saved_ptid_ptr;
 
-  saved_ptid_ptr = xmalloc (sizeof (ptid_t));
+  saved_ptid_ptr = (ptid_t *) xmalloc (sizeof (ptid_t));
   *saved_ptid_ptr = inferior_ptid;
   return make_cleanup (restore_inferior_ptid, saved_ptid_ptr);
 }

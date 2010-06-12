@@ -685,7 +685,7 @@ get_frame_func (struct frame_info *this_frame)
 static int
 do_frame_register_read (void *src, int regnum, gdb_byte *buf)
 {
-  return frame_register_read (src, regnum, buf);
+  return frame_register_read ((struct frame_info *) src, regnum, buf);
 }
 
 struct regcache *
@@ -1144,7 +1144,7 @@ frame_obstack_zalloc (unsigned long size)
 static int
 unwind_to_current_frame (struct ui_out *ui_out, void *args)
 {
-  struct frame_info *frame = get_prev_frame (args);
+  struct frame_info *frame = get_prev_frame ((struct frame_info *) args);
 
   /* A sentinel frame can fail to unwind, e.g., because its PC value
      lands in somewhere like start.  */
@@ -2160,7 +2160,7 @@ frame_stop_reason_string (enum unwind_stop_reason reason)
 static void
 frame_cleanup_after_sniffer (void *arg)
 {
-  struct frame_info *frame = arg;
+  struct frame_info *frame = (struct frame_info *) arg;
 
   /* The sniffer should not allocate a prologue cache if it did not
      match this frame.  */
