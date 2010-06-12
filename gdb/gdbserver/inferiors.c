@@ -166,7 +166,8 @@ remove_inferior (struct inferior_list *list,
 void
 add_thread (ptid_t thread_id, void *target_data)
 {
-  struct thread_info *new_thread = xmalloc (sizeof (*new_thread));
+  struct thread_info *new_thread
+    = (struct thread_info *) xmalloc (sizeof (*new_thread));
 
   memset (new_thread, 0, sizeof (*new_thread));
 
@@ -232,7 +233,7 @@ static void
 free_one_thread (struct inferior_list_entry *inf)
 {
   struct thread_info *thread = get_thread (inf);
-  free_register_cache (inferior_regcache_data (thread));
+  free_register_cache ((struct regcache *) inferior_regcache_data (thread));
   free (thread);
 }
 
@@ -319,8 +320,8 @@ free_one_dll (struct inferior_list_entry *inf)
 static int
 match_dll (struct inferior_list_entry *inf, void *arg)
 {
-  struct dll_info *iter = (void *) inf;
-  struct dll_info *key = arg;
+  struct dll_info *iter = (struct dll_info *) inf;
+  struct dll_info *key = (struct dll_info *) arg;
 
   if (key->base_addr != ~(CORE_ADDR) 0
       && iter->base_addr == key->base_addr)
@@ -338,7 +339,7 @@ match_dll (struct inferior_list_entry *inf, void *arg)
 void
 loaded_dll (const char *name, CORE_ADDR base_addr)
 {
-  struct dll_info *new_dll = xmalloc (sizeof (*new_dll));
+  struct dll_info *new_dll = (struct dll_info *) xmalloc (sizeof (*new_dll));
   memset (new_dll, 0, sizeof (*new_dll));
 
   new_dll->entry.id = minus_one_ptid;
@@ -362,7 +363,7 @@ unloaded_dll (const char *name, CORE_ADDR base_addr)
   key_dll.name = (char *) name;
   key_dll.base_addr = base_addr;
 
-  dll = (void *) find_inferior (&all_dlls, match_dll, &key_dll);
+  dll = (struct dll_info *) find_inferior (&all_dlls, match_dll, &key_dll);
 
   if (dll == NULL)
     /* For some inferiors we might get unloaded_dll events without having
@@ -407,7 +408,8 @@ add_pid_to_list (struct inferior_list *list, unsigned long pid)
 {
   struct inferior_list_entry *new_entry;
 
-  new_entry = xmalloc (sizeof (struct inferior_list_entry));
+  new_entry = (struct inferior_list_entry *)
+    xmalloc (sizeof (struct inferior_list_entry));
   new_entry->id = pid_to_ptid (pid);
   add_inferior_to_list (list, new_entry);
 }
@@ -433,7 +435,7 @@ add_process (int pid, int attached)
 {
   struct process_info *process;
 
-  process = xcalloc (1, sizeof (*process));
+  process = (struct process_info *) xcalloc (1, sizeof (*process));
 
   process->head.id = pid_to_ptid (pid);
   process->attached = attached;

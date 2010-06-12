@@ -114,7 +114,7 @@ require_data (char *p, int p_len, char **data, int *data_len)
 {
   int input_index, output_index, escaped;
 
-  *data = xmalloc (p_len);
+  *data = (char *) xmalloc (p_len);
 
   output_index = 0;
   escaped = 0;
@@ -293,7 +293,7 @@ handle_open (char *own_buf)
     }
 
   /* Record the new file descriptor.  */
-  new_fd = xmalloc (sizeof (struct fd_list));
+  new_fd = (struct fd_list *) xmalloc (sizeof (struct fd_list));
   new_fd->fd = fd;
   new_fd->next = open_fds;
   open_fds = new_fd;
@@ -321,7 +321,7 @@ handle_pread (char *own_buf, int *new_packet_len)
       return;
     }
 
-  data = xmalloc (len);
+  data = (char *) xmalloc (len);
 #ifdef HAVE_PREAD
   ret = pread (fd, data, len, offset);
 #else

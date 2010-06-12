@@ -133,7 +133,7 @@ set_raw_breakpoint_at (CORE_ADDR where)
       return bp;
     }
 
-  bp = xcalloc (1, sizeof (*bp));
+  bp = (struct raw_breakpoint *) xcalloc (1, sizeof (*bp));
   bp->pc = where;
   bp->refcount = 1;
 
@@ -322,7 +322,7 @@ set_fast_tracepoint_jump (CORE_ADDR where,
   /* We don't, so create a new object.  Double the length, because the
      flexible array member holds both the jump insn, and the
      shadow.  */
-  jp = xcalloc (1, sizeof (*jp) + (length * 2));
+  jp = (struct fast_tracepoint_jump *) xcalloc (1, sizeof (*jp) + (length * 2));
   jp->pc = where;
   jp->length = length;
   memcpy (fast_tracepoint_jump_insn (jp), insn, length);
@@ -482,7 +482,7 @@ set_breakpoint_at (CORE_ADDR where, int (*handler) (CORE_ADDR))
       return NULL;
     }
 
-  bp = xcalloc (1, sizeof (struct breakpoint));
+  bp = (struct breakpoint *) xcalloc (1, sizeof (struct breakpoint));
   bp->type = other_breakpoint;
 
   bp->raw = raw;
@@ -882,7 +882,7 @@ validate_inserted_breakpoint (struct raw_breakpoint *bp)
 
   gdb_assert (bp->inserted);
 
-  buf = alloca (breakpoint_len);
+  buf = (unsigned char *) alloca (breakpoint_len);
   err = (*the_target->read_memory) (bp->pc, buf, breakpoint_len);
   if (err || memcmp (buf, breakpoint_data, breakpoint_len) != 0)
     {

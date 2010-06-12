@@ -219,8 +219,8 @@ linux_child_pid_to_exec_file (int pid)
 {
   char *name1, *name2;
 
-  name1 = xmalloc (MAXPATHLEN);
-  name2 = xmalloc (MAXPATHLEN);
+  name1 = (char *) xmalloc (MAXPATHLEN);
+  name2 = (char *) xmalloc (MAXPATHLEN);
   memset (name2, 0, MAXPATHLEN);
 
   sprintf (name1, "/proc/%d/exe", pid);
@@ -294,7 +294,8 @@ linux_add_process (int pid, int attached)
     new_inferior = 1;
 
   proc = add_process (pid, attached);
-  proc->private = xcalloc (1, sizeof (*proc->private));
+  proc->private = (struct process_info_private *)
+    xcalloc (1, sizeof (*proc->private));
 
   if (the_low_target.new_process != NULL)
     proc->private->arch_private = the_low_target.new_process ();
@@ -585,7 +586,7 @@ linux_create_inferior (char *program, char **allargs)
   linux_add_process (pid, 0);
 
   ptid = ptid_build (pid, pid, 0);
-  new_lwp = add_lwp (ptid);
+  new_lwp = (struct lwp_info *) add_lwp (ptid);
   add_thread (ptid, new_lwp);
   new_lwp->must_set_ptrace_flags = 1;
 
@@ -705,7 +706,7 @@ struct counter
 static int
 second_thread_of_pid_p (struct inferior_list_entry *entry, void *args)
 {
-  struct counter *counter = args;
+  struct counter *counter = (struct counter *) args;
 
   if (ptid_get_pid (entry->id) == counter->pid)
     {
@@ -879,7 +880,7 @@ static int
 delete_lwp_callback (struct inferior_list_entry *entry, void *proc)
 {
   struct lwp_info *lwp = (struct lwp_info *) entry;
-  struct process_info *process = proc;
+  struct process_info *process = (struct process_info *) proc;
 
   if (pid_of (lwp) == pid_of (process))
     delete_lwp (lwp);
@@ -1337,7 +1338,7 @@ Deferring signal %d for LWP %ld.\n", WSTOPSIG (*wstat), lwpid_of (lwp));
       fprintf (stderr, "   (no more currently queued signals)\n");
     }
 
-  p_sig = xmalloc (sizeof (*p_sig));
+  p_sig = (struct pending_signals *) xmalloc (sizeof (*p_sig));
   p_sig->prev = lwp->pending_signals_to_report;
   p_sig->signal = WSTOPSIG (*wstat);
   memset (&p_sig->info, 0, sizeof (siginfo_t));
@@ -1660,7 +1661,7 @@ count_events_callback (struct inferior_list_entry *entry, void *data)
 {
   struct lwp_info *lp = (struct lwp_info *) entry;
   struct thread_info *thread = get_lwp_thread (lp);
-  int *count = data;
+  int *count = (int *) data;
 
   gdb_assert (count != NULL);
 
@@ -1701,7 +1702,7 @@ select_event_lwp_callback (struct inferior_list_entry *entry, void *data)
 {
   struct lwp_info *lp = (struct lwp_info *) entry;
   struct thread_info *thread = get_lwp_thread (lp);
-  int *selector = data;
+  int *selector = (int *) data;
 
   gdb_assert (selector != NULL);
 
@@ -1723,7 +1724,7 @@ cancel_breakpoints_callback (struct inferior_list_entry *entry, void *data)
 {
   struct lwp_info *lp = (struct lwp_info *) entry;
   struct thread_info *thread = get_lwp_thread (lp);
-  struct lwp_info *event_lp = data;
+  struct lwp_info *event_lp = (struct lwp_info *) data;
 
   /* Leave the LWP that has been elected to receive a SIGTRAP alone.  */
   if (lp == event_lp)
@@ -2817,7 +2818,7 @@ linux_resume_one_lwp (struct lwp_info *lwp,
 	  || fast_tp_collecting))
     {
       struct pending_signals *p_sig;
-      p_sig = xmalloc (sizeof (*p_sig));
+      p_sig = (struct pending_signals *) xmalloc (sizeof (*p_sig));
       p_sig->prev = lwp->pending_signals;
       p_sig->signal = signal;
       if (info == NULL)
@@ -3006,7 +3007,7 @@ linux_set_resume_request (struct inferior_list_entry *entry, void *arg)
 
   thread = (struct thread_info *) entry;
   lwp = get_thread_lwp (thread);
-  r = arg;
+  r = (struct thread_resume_array *) arg;
 
   for (ndx = 0; ndx < r->n; ndx++)
     {
@@ -3406,7 +3407,7 @@ linux_resume_one_thread (struct inferior_list_entry *entry, void *arg)
       if (lwp->resume->sig != 0)
 	{
 	  struct pending_signals *p_sig;
-	  p_sig = xmalloc (sizeof (*p_sig));
+	  p_sig = (struct pending_signals *) xmalloc (sizeof (*p_sig));
 	  p_sig->prev = lwp->pending_signals;
 	  p_sig->signal = lwp->resume->sig;
 	  memset (&p_sig->info, 0, sizeof (siginfo_t));
@@ -3676,7 +3677,7 @@ fetch_register (struct regcache *regcache, int regno)
   pid = lwpid_of (get_thread_lwp (current_inferior));
   size = ((register_size (regno) + sizeof (PTRACE_XFER_TYPE) - 1)
 	  & - sizeof (PTRACE_XFER_TYPE));
-  buf = alloca (size);
+  buf = (char *) alloca (size);
   for (i = 0; i < size; i += sizeof (PTRACE_XFER_TYPE))
     {
       errno = 0;
@@ -3732,7 +3733,7 @@ usr_store_inferior_registers (struct regcache *regcache, int regno)
       errno = 0;
       size = (register_size (regno) + sizeof (PTRACE_XFER_TYPE) - 1)
 	     & - sizeof (PTRACE_XFER_TYPE);
-      buf = alloca (size);
+      buf = (char *) alloca (size);
       memset (buf, 0, size);
 
       if (the_low_target.collect_ptrace_register)
@@ -4447,7 +4448,7 @@ list_threads (int pid, struct buffer *buffer, char **cores)
 {
   int count = 0;
   int allocated = 10;
-  int *core_numbers = xmalloc (sizeof (int) * allocated);
+  int *core_numbers = (int *) xmalloc (sizeof (int) * allocated);
   char pathname[128];
   DIR *dir;
   struct dirent *dp;
@@ -4479,8 +4480,8 @@ list_threads (int pid, struct buffer *buffer, char **cores)
 		  if (count == allocated)
 		    {
 		      allocated *= 2;
-		      core_numbers = realloc (core_numbers,
-					      sizeof (int) * allocated);
+		      core_numbers = (int *) realloc (core_numbers,
+						      sizeof (int) * allocated);
 		    }
 		  core_numbers[count++] = core;
 		  if (buffer)
@@ -4947,7 +4948,7 @@ linux_core_of_thread (ptid_t ptid)
   for (;;)
     {
       int n;
-      content = realloc (content, content_read + 1024);
+      content = (char *) realloc (content, content_read + 1024);
       n = fread (content + content_read, 1, 1024, f);
       content_read += n;
       if (n < 1024)
@@ -5135,7 +5136,7 @@ initialize_low (void)
 #ifdef HAVE_LINUX_REGSETS
   for (num_regsets = 0; target_regsets[num_regsets].size >= 0; num_regsets++)
     ;
-  disabled_regsets = xmalloc (num_regsets);
+  disabled_regsets = (char *) xmalloc (num_regsets);
 #endif
 
   sigchld_action.sa_handler = sigchld_handler;

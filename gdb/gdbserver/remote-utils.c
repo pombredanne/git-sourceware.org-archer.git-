@@ -710,7 +710,7 @@ putpkt_binary_1 (char *buf, int cnt, int is_notif)
   char *p;
   int cc;
 
-  buf2 = xmalloc (PBUFSIZ);
+  buf2 = (char *) xmalloc (PBUFSIZ);
 
   /* Copy the packet into buffer BUF2, encapsulating it
      and giving it a checksum.  */
@@ -1373,7 +1373,7 @@ decode_M_packet (char *from, CORE_ADDR *mem_addr_ptr, unsigned int *len_ptr,
     }
 
   if (*to_p == NULL)
-    *to_p = xmalloc (*len_ptr);
+    *to_p = (unsigned char *) xmalloc (*len_ptr);
 
   convert_ascii_to_int (&from[i++], *to_p, *len_ptr);
 }
@@ -1399,7 +1399,7 @@ decode_X_packet (char *from, int packet_len, CORE_ADDR *mem_addr_ptr,
     }
 
   if (*to_p == NULL)
-    *to_p = xmalloc (*len_ptr);
+    *to_p = (unsigned char *) xmalloc (*len_ptr);
 
   if (remote_unescape_input ((const gdb_byte *) &from[i], packet_len - i,
 			     *to_p, *len_ptr) != *len_ptr)
@@ -1531,7 +1531,7 @@ look_up_one_symbol (const char *name, CORE_ADDR *addrp, int may_ask_gdb)
       unsigned int mem_len;
 
       decode_m_packet (&own_buf[1], &mem_addr, &mem_len);
-      mem_buf = xmalloc (mem_len);
+      mem_buf = (unsigned char *) xmalloc (mem_len);
       if (read_inferior_memory (mem_addr, mem_buf, mem_len) == 0)
 	convert_int_to_ascii (mem_buf, own_buf, mem_len);
       else
@@ -1562,7 +1562,7 @@ look_up_one_symbol (const char *name, CORE_ADDR *addrp, int may_ask_gdb)
   decode_address (addrp, p, q - p);
 
   /* Save the symbol in our cache.  */
-  sym = xmalloc (sizeof (*sym));
+  sym = (struct sym_cache *) xmalloc (sizeof (*sym));
   sym->name = xstrdup (name);
   sym->addr = *addrp;
   sym->next = proc->symbol_cache;
@@ -1615,7 +1615,7 @@ relocate_instruction (CORE_ADDR *to, CORE_ADDR oldloc)
       if (own_buf[0] == 'm')
 	{
 	  decode_m_packet (&own_buf[1], &mem_addr, &mem_len);
-	  mem_buf = xmalloc (mem_len);
+	  mem_buf = (unsigned char *) xmalloc (mem_len);
 	  if (read_inferior_memory (mem_addr, mem_buf, mem_len) == 0)
 	    convert_int_to_ascii (mem_buf, own_buf, mem_len);
 	  else
@@ -1669,7 +1669,7 @@ relocate_instruction (CORE_ADDR *to, CORE_ADDR oldloc)
 void
 monitor_output (const char *msg)
 {
-  char *buf = xmalloc (strlen (msg) * 2 + 2);
+  char *buf = (char *) xmalloc (strlen (msg) * 2 + 2);
 
   buf[0] = 'O';
   hexify (buf + 1, msg, 0);
@@ -1707,7 +1707,7 @@ xml_escape_text (const char *text)
       }
 
   /* Expand the result.  */
-  result = xmalloc (i + special + 1);
+  result = (char *) xmalloc (i + special + 1);
   for (i = 0, special = 0; text[i] != '\0'; i++)
     switch (text[i])
       {
@@ -1756,7 +1756,7 @@ buffer_grow (struct buffer *buffer, const char *data, size_t size)
 
   while (buffer->used_size + size > new_buffer_size)
     new_buffer_size *= 2;
-  new_buffer = realloc (buffer->buffer, new_buffer_size);
+  new_buffer = (char *) realloc (buffer->buffer, new_buffer_size);
   if (!new_buffer)
     abort ();
   memcpy (new_buffer + buffer->used_size, data, size);

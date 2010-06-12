@@ -96,7 +96,7 @@ init_register_cache (struct regcache *regcache, unsigned char *regbuf)
 	 created, in case there are registers the target never
 	 fetches.  This way they'll read as zero instead of
 	 garbage.  */
-      regcache->registers = xcalloc (1, register_bytes);
+      regcache->registers = (unsigned char *) xcalloc (1, register_bytes);
       regcache->registers_owned = 1;
     }
   else
@@ -125,7 +125,7 @@ new_register_cache (void)
   if (register_bytes == 0)
     return NULL; /* The architecture hasn't been initialized yet.  */
 
-  regcache = xmalloc (sizeof (*regcache));
+  regcache = (struct regcache *) xmalloc (sizeof (*regcache));
   return init_register_cache (regcache, NULL);
 }
 

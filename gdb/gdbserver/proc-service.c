@@ -79,7 +79,7 @@ ps_err_e
 ps_pdread (gdb_ps_prochandle_t ph, psaddr_t addr,
 	   gdb_ps_read_buf_t buf, gdb_ps_size_t size)
 {
-  read_inferior_memory ((unsigned long) addr, buf, size);
+  read_inferior_memory ((unsigned long) addr, (unsigned char *) buf, size);
   return PS_OK;
 }
 
@@ -89,7 +89,8 @@ ps_err_e
 ps_pdwrite (gdb_ps_prochandle_t ph, psaddr_t addr,
 	    gdb_ps_write_buf_t buf, gdb_ps_size_t size)
 {
-  return write_inferior_memory ((unsigned long) addr, buf, size);
+  return write_inferior_memory ((unsigned long) addr,
+				(const unsigned char *) buf, size);
 }
 
 /* Get the general registers of LWP LWPID within the target process PH

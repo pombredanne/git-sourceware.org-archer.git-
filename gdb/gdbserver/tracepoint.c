@@ -1596,7 +1596,7 @@ add_tracepoint (int num, CORE_ADDR addr)
 {
   struct tracepoint *tpoint;
 
-  tpoint = xmalloc (sizeof (struct tracepoint));
+  tpoint = (struct tracepoint *) xmalloc (sizeof (struct tracepoint));
   tpoint->number = num;
   tpoint->address = addr;
   tpoint->numactions = 0;
@@ -1668,7 +1668,7 @@ save_string (const char *str, size_t len)
 {
   char *s;
 
-  s = xmalloc (len + 1);
+  s = (char *) xmalloc (len + 1);
   memcpy (s, str, len);
   s[len] = '\0';
 
@@ -1703,7 +1703,8 @@ add_tracepoint_action (struct tracepoint *tpoint, char *packet)
 	    ULONGEST basereg;
 	    int is_neg;
 
-	    maction = xmalloc (sizeof *maction);
+	    maction
+	      = (struct collect_memory_action *) xmalloc (sizeof *maction);
 	    maction->base.type = *act;
 	    action = &maction->base;
 
@@ -1728,7 +1729,8 @@ add_tracepoint_action (struct tracepoint *tpoint, char *packet)
 	  {
 	    struct collect_registers_action *raction;
 
-	    raction = xmalloc (sizeof *raction);
+	    raction
+	      = (struct collect_registers_action *) xmalloc (sizeof *raction);
 	    raction->base.type = *act;
 	    action = &raction->base;
 
@@ -1747,7 +1749,7 @@ add_tracepoint_action (struct tracepoint *tpoint, char *packet)
 	  {
 	    struct eval_expr_action *xaction;
 
-	    xaction = xmalloc (sizeof (*xaction));
+	    xaction = (struct eval_expr_action *) xmalloc (sizeof (*xaction));
 	    xaction->base.type = *act;
 	    action = &xaction->base;
 
@@ -1770,13 +1772,14 @@ add_tracepoint_action (struct tracepoint *tpoint, char *packet)
 	  tpoint->num_step_actions++;
 
 	  tpoint->step_actions
-	    = xrealloc (tpoint->step_actions,
-			(sizeof (*tpoint->step_actions)
-			 * tpoint->num_step_actions));
+	    = (struct tracepoint_action **)
+	    xrealloc (tpoint->step_actions,
+		      (sizeof (*tpoint->step_actions)
+		       * tpoint->num_step_actions));
 	  tpoint->step_actions_str
-	    = xrealloc (tpoint->step_actions_str,
-			(sizeof (*tpoint->step_actions_str)
-			 * tpoint->num_step_actions));
+	    = (char **) xrealloc (tpoint->step_actions_str,
+				  (sizeof (*tpoint->step_actions_str)
+				   * tpoint->num_step_actions));
 	  tpoint->step_actions[tpoint->num_step_actions - 1] = action;
 	  tpoint->step_actions_str[tpoint->num_step_actions - 1]
 	    = save_string (act_start, act - act_start);
@@ -1785,11 +1788,13 @@ add_tracepoint_action (struct tracepoint *tpoint, char *packet)
 	{
 	  tpoint->numactions++;
 	  tpoint->actions
-	    = xrealloc (tpoint->actions,
-			sizeof (*tpoint->actions) * tpoint->numactions);
+	    = (struct tracepoint_action **)
+	    xrealloc (tpoint->actions,
+		      sizeof (*tpoint->actions) * tpoint->numactions);
 	  tpoint->actions_str
-	    = xrealloc (tpoint->actions_str,
-			sizeof (*tpoint->actions_str) * tpoint->numactions);
+	    = (char **) xrealloc (tpoint->actions_str,
+				  sizeof (*tpoint->actions_str)
+				  * tpoint->numactions);
 	  tpoint->actions[tpoint->numactions - 1] = action;
 	  tpoint->actions_str[tpoint->numactions - 1]
 	    = save_string (act_start, act - act_start);
@@ -1833,7 +1838,8 @@ create_trace_state_variable (int num, int gdb)
     return tsv;
 
   /* Create a new variable.  */
-  tsv = xmalloc (sizeof (struct trace_state_variable));
+  tsv = (struct trace_state_variable *)
+    xmalloc (sizeof (struct trace_state_variable));
   tsv->number = num;
   tsv->initial_value = 0;
   tsv->value = 0;
@@ -1935,7 +1941,8 @@ add_traceframe (struct tracepoint *tpoint)
 {
   struct traceframe *tframe;
 
-  tframe = trace_buffer_alloc (sizeof (struct traceframe));
+  tframe = (struct traceframe *)
+    trace_buffer_alloc (sizeof (struct traceframe));
 
   if (tframe == NULL)
     return NULL;
@@ -1956,7 +1963,7 @@ add_traceframe_block (struct traceframe *tframe, int amt)
   if (!tframe)
     return NULL;
 
-  block = trace_buffer_alloc (amt);
+  block = (unsigned char *) trace_buffer_alloc (amt);
 
   if (!block)
     return NULL;
@@ -2164,10 +2171,11 @@ clear_installed_tracepoints (void)
       switch (tpoint->type)
 	{
 	case trap_tracepoint:
-	  delete_breakpoint (tpoint->handle);
+	  delete_breakpoint ((struct breakpoint *) tpoint->handle);
 	  break;
 	case fast_tracepoint:
-	  delete_fast_tracepoint_jump (tpoint->handle);
+	  delete_fast_tracepoint_jump ((struct fast_tracepoint_jump *)
+				       tpoint->handle);
 	  break;
 	}
 
@@ -2307,7 +2315,7 @@ cmd_qtdpsrc (char *own_buf)
 
   saved = packet;
   packet = strchr (packet, ':');
-  srctype = xmalloc (packet - saved + 1);
+  srctype = (char *) xmalloc (packet - saved + 1);
   memcpy (srctype, saved, packet - saved);
   srctype[packet - saved] = '\0';
   ++packet;
@@ -2315,11 +2323,11 @@ cmd_qtdpsrc (char *own_buf)
   ++packet; /* skip a colon */
   packet = unpack_varlen_hex (packet, &slen);
   ++packet; /* skip a colon */
-  src = xmalloc (slen + 1);
+  src = (char *) xmalloc (slen + 1);
   nbytes = unhexify (src, packet, strlen (packet) / 2);
   src[nbytes] = '\0';
 
-  newlast = xmalloc (sizeof (struct source_string));
+  newlast = (struct source_string *) xmalloc (sizeof (struct source_string));
   newlast->type = srctype;
   newlast->str = src;
   newlast->next = NULL;
@@ -2357,7 +2365,7 @@ cmd_qtdv (char *own_buf)
   ++packet; /* skip a colon */
 
   nbytes = strlen (packet) / 2;
-  varname = xmalloc (nbytes + 1);
+  varname = (char *) xmalloc (nbytes + 1);
   nbytes = unhexify (varname, packet, nbytes);
   varname[nbytes] = '\0';
 
@@ -2442,7 +2450,8 @@ cmd_qtro (char *own_buf)
       packet = unpack_varlen_hex (packet, &start);
       ++packet;  /* skip a comma */
       packet = unpack_varlen_hex (packet, &end);
-      roreg = xmalloc (sizeof (struct readonly_region));
+      roreg
+	= (struct readonly_region *) xmalloc (sizeof (struct readonly_region));
       roreg->start = start;
       roreg->end = end;
       roreg->next = readonly_regions;
@@ -2980,7 +2989,8 @@ cmd_qtstatus (char *packet)
 
       result_name = stop_reason_rsp + strlen ("terror:");
       hexstr_len = strlen (result_name) * 2;
-      p = stop_reason_rsp = alloca (strlen ("terror:") + hexstr_len + 1);
+      p = stop_reason_rsp
+	= (char *) alloca (strlen ("terror:") + hexstr_len + 1);
       strcpy (p, "terror:");
       p += strlen (p);
       convert_int_to_ascii ((gdb_byte *) result_name, p, strlen (result_name));
@@ -3058,7 +3068,7 @@ response_source (char *packet,
   int len;
 
   len = strlen (src->str);
-  buf = alloca (len * 2 + 1);
+  buf = (char *) alloca (len * 2 + 1);
   convert_int_to_ascii ((gdb_byte *) src->str, buf, len);
 
   sprintf (packet, "Z%x:%s:%s:%x:%x:%s",
@@ -3147,7 +3157,7 @@ response_tsv (char *packet, struct trace_state_variable *tsv)
   if (tsv->name)
     {
       namelen = strlen (tsv->name);
-      buf = alloca (namelen * 2 + 1);
+      buf = (char *) alloca (namelen * 2 + 1);
       convert_int_to_ascii ((gdb_byte *) tsv->name, buf, namelen);
     }
 
@@ -3399,7 +3409,7 @@ add_while_stepping_state (struct thread_info *tinfo,
 {
   struct wstep_state *wstep;
 
-  wstep = xmalloc (sizeof (*wstep));
+  wstep = (struct wstep_state *) xmalloc (sizeof (*wstep));
   wstep->next = tinfo->while_stepping;
 
   wstep->tp_number = tp_number;
@@ -3936,9 +3946,9 @@ parse_agent_expr (char **actparm)
   ++act;  /* skip the X */
   act = unpack_varlen_hex (act, &xlen);
   ++act;  /* skip a comma */
-  aexpr = xmalloc (sizeof (struct agent_expr));
+  aexpr = (struct agent_expr *) xmalloc (sizeof (struct agent_expr));
   aexpr->length = xlen;
-  aexpr->bytes = xmalloc (xlen);
+  aexpr->bytes = (unsigned char *) xmalloc (xlen);
   convert_ascii_to_int (act, aexpr->bytes, xlen);
   *actparm = act + (xlen * 2);
   return aexpr;
@@ -3953,7 +3963,7 @@ unparse_agent_expr (struct agent_expr *aexpr)
 {
   char *rslt;
 
-  rslt = xmalloc (2 * aexpr->length + 1);
+  rslt = (char *) xmalloc (2 * aexpr->length + 1);
   convert_int_to_ascii (aexpr->bytes, rslt, aexpr->length);
   return rslt;
 }
@@ -4906,7 +4916,7 @@ gdb_collect (struct tracepoint *tpoint, unsigned char *regs)
 
   /* Wrap the regblock in a register cache (in the stack, we don't
      want to malloc here).  */
-  ctx.regspace = alloca (register_cache_size ());
+  ctx.regspace = (unsigned char *) alloca (register_cache_size ());
   if (ctx.regspace == NULL)
     {
       trace_debug ("Trace buffer block allocation failed, skipping");
@@ -5484,7 +5494,7 @@ initialize_tracepoint (void)
 {
   /* There currently no way to change the buffer size.  */
   const int sizeOfBuffer = 5 * 1024 * 1024;
-  unsigned char *buf = xmalloc (sizeOfBuffer);
+  unsigned char *buf = (unsigned char *) xmalloc (sizeOfBuffer);
   init_trace_buffer (buf, sizeOfBuffer);
 
   /* Wire trace state variable 1 to be the timestamp.  This will be
@@ -5502,10 +5512,10 @@ initialize_tracepoint (void)
     if (pagesize == -1)
       fatal ("sysconf");
 
-    gdb_tp_heap_buffer = xmalloc (5 * 1024 * 1024);
+    gdb_tp_heap_buffer = (char *) xmalloc (5 * 1024 * 1024);
 
     /* Allocate scratch buffer aligned on a page boundary.  */
-    gdb_jump_pad_buffer = memalign (pagesize, pagesize * 20);
+    gdb_jump_pad_buffer = (char *) memalign (pagesize, pagesize * 20);
     gdb_jump_pad_buffer_end = gdb_jump_pad_buffer + pagesize * 20;
 
     /* Make it writable and executable.  */
