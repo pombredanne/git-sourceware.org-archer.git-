@@ -81,7 +81,8 @@ read_pe_section_index (const char *section_name)
 static void
 get_section_vmas (bfd *abfd, asection *sectp, void *context)
 {
-  struct read_pe_section_data *sections = context;
+  struct read_pe_section_data *sections
+    = (struct read_pe_section_data *) context;
   int sectix = read_pe_section_index (sectp->name);
 
   if (sectix != PE_SECTION_INDEX_INVALID)
@@ -113,7 +114,7 @@ add_pe_exported_sym (char *sym_name,
      of the dll name, e.g. KERNEL32!AddAtomA. This matches the style
      used by windbg from the "Microsoft Debugging Tools for Windows". */
 
-  qualified_name = xmalloc (dll_name_len + strlen (sym_name) + 2);
+  qualified_name = (char *) xmalloc (dll_name_len + strlen (sym_name) + 2);
 
   strncpy (qualified_name, dll_name, dll_name_len);
   qualified_name[dll_name_len] = '!';
@@ -171,7 +172,7 @@ pe_get32 (bfd *abfd, int where)
 static unsigned int
 pe_as32 (void *ptr)
 {
-  unsigned char *b = ptr;
+  unsigned char *b = (unsigned char *) ptr;
 
   return b[0] + (b[1] << 8) + (b[2] << 16) + (b[3] << 24);
 }

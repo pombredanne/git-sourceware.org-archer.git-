@@ -696,8 +696,8 @@ make_symbol_overload_list (const char *func_name,
 
   sym_return_val_size = 100;
   sym_return_val_index = 0;
-  sym_return_val = xmalloc ((sym_return_val_size + 1) *
-			    sizeof (struct symbol *));
+  sym_return_val = (struct symbol **) xmalloc ((sym_return_val_size + 1)
+					       * sizeof (struct symbol *));
   sym_return_val[0] = NULL;
 
   old_cleanups = make_cleanup (xfree, sym_return_val);
@@ -720,7 +720,7 @@ make_symbol_overload_list_namespace (const char *func_name,
   else
     {
       char *concatenated_name
-	= alloca (strlen (namespace) + 2 + strlen (func_name) + 1);
+	= (char *) alloca (strlen (namespace) + 2 + strlen (func_name) + 1);
 
       strcpy (concatenated_name, namespace);
       strcat (concatenated_name, "::");
@@ -759,7 +759,7 @@ make_symbol_overload_list_adl_namespace (struct type *type,
 
   if (prefix_len != 0)
     {
-      namespace = alloca (prefix_len + 1);
+      namespace = (char *) alloca (prefix_len + 1);
       strncpy (namespace, type_name, prefix_len);
       namespace[prefix_len] = '\0';
 
@@ -964,7 +964,7 @@ first_component_command (char *arg, int from_tty)
     return;
 
   len = cp_find_first_component (arg);
-  prefix = alloca (len + 1);
+  prefix = (char *) alloca (len + 1);
 
   memcpy (prefix, arg, len);
   prefix[len] = '\0';

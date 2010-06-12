@@ -159,7 +159,7 @@ filename_completer (struct cmd_list_element *ignore, char *text, char *word)
       else if (word > text)
 	{
 	  /* Return some portion of p.  */
-	  q = xmalloc (strlen (p) + 5);
+	  q = (char *) xmalloc (strlen (p) + 5);
 	  strcpy (q, p + (word - text));
 	  return_val[return_val_used++] = q;
 	  xfree (p);
@@ -167,7 +167,7 @@ filename_completer (struct cmd_list_element *ignore, char *text, char *word)
       else
 	{
 	  /* Return some of TEXT plus p.  */
-	  q = xmalloc (strlen (p) + (text - word) + 5);
+	  q = (char *) xmalloc (strlen (p) + (text - word) + 5);
 	  strncpy (q, word, text - word);
 	  q[text - word] = '\0';
 	  strcat (q, p);
@@ -295,7 +295,8 @@ location_completer (struct cmd_list_element *ignore, char *text, char *word)
      fn_list[] onto the end of list[].  */
   if (n_syms && n_files)
     {
-      list = xrealloc (list, (n_syms + n_files + 1) * sizeof (char *));
+      list = (char **) xrealloc (list,
+				 (n_syms + n_files + 1) * sizeof (char *));
       memcpy (list + n_syms, fn_list, (n_files + 1) * sizeof (char *));
       xfree (fn_list);
     }

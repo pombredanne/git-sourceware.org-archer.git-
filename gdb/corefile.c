@@ -355,7 +355,7 @@ read_memory_string (CORE_ADDR memaddr, char *buffer, int max_len)
 CORE_ADDR
 read_memory_typed_address (CORE_ADDR addr, struct type *type)
 {
-  gdb_byte *buf = alloca (TYPE_LENGTH (type));
+  gdb_byte *buf = (gdb_byte *) alloca (TYPE_LENGTH (type));
 
   read_memory (addr, buf, TYPE_LENGTH (type));
   return extract_typed_address (buf, type);
@@ -378,7 +378,7 @@ write_memory_unsigned_integer (CORE_ADDR addr, int len,
 			       enum bfd_endian byte_order,
 			       ULONGEST value)
 {
-  gdb_byte *buf = alloca (len);
+  gdb_byte *buf = (gdb_byte *) alloca (len);
 
   store_unsigned_integer (buf, len, byte_order, value);
   write_memory (addr, buf, len);
@@ -390,7 +390,7 @@ write_memory_signed_integer (CORE_ADDR addr, int len,
 			     enum bfd_endian byte_order,
 			     LONGEST value)
 {
-  gdb_byte *buf = alloca (len);
+  gdb_byte *buf = (gdb_byte *) alloca (len);
 
   store_signed_integer (buf, len, byte_order, value);
   write_memory (addr, buf, len);

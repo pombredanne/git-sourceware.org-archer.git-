@@ -101,8 +101,8 @@ cp_scan_for_anonymous_namespaces (const struct symbol *symbol)
 	      int dest_len = (previous_component == 0 ? 0 : previous_component - 2);
 	      int src_len = next_component;
 
-	      char *dest = alloca (dest_len + 1);
-	      char *src = alloca (src_len + 1);
+	      char *dest = (char *) alloca (dest_len + 1);
+	      char *src = (char *) alloca (src_len + 1);
 
 	      memcpy (dest, name, dest_len);
 	      memcpy (src, name, src_len);
@@ -161,7 +161,7 @@ cp_add_using_directive (const char *dest,
 	return;
     }
 
-  new = OBSTACK_ZALLOC (obstack, struct using_direct);
+  new = (struct using_direct *) OBSTACK_ZALLOC (obstack, struct using_direct);
 
   new->import_src = obsavestring (src, strlen (src), obstack);
   new->import_dest = obsavestring (dest, strlen (dest), obstack);
@@ -262,8 +262,8 @@ cp_lookup_symbol_in_namespace (const char *namespace,
     }
   else
     {
-      char *concatenated_name = alloca (strlen (namespace) + 2 +
-                                        strlen (name) + 1);
+      char *concatenated_name = (char *) alloca (strlen (namespace) + 2 +
+						 strlen (name) + 1);
 
       strcpy (concatenated_name, namespace);
       strcat (concatenated_name, "::");
@@ -279,7 +279,7 @@ cp_lookup_symbol_in_namespace (const char *namespace,
 static void
 reset_directive_searched (void *data)
 {
-  struct using_direct *direct = data;
+  struct using_direct *direct = (struct using_direct *) data;
   direct->searched = 0;
 }
 
@@ -489,7 +489,7 @@ lookup_namespace_scope (const char *name,
   /* Okay, we didn't find a match in our children, so look for the
      name in the current namespace.  */
 
-  namespace = alloca (scope_len + 1);
+  namespace = (char *) alloca (scope_len + 1);
   strncpy (namespace, scope, scope_len);
   namespace[scope_len] = '\0';
   return cp_lookup_symbol_in_namespace (namespace, name, block, domain);
@@ -651,7 +651,7 @@ cp_lookup_transparent_type_loop (const char *name, const char *scope,
 	return retval;
     }
 
-  full_name = alloca (scope_length + 2 + strlen (name) + 1);
+  full_name = (char *) alloca (scope_length + 2 + strlen (name) + 1);
   strncpy (full_name, scope, scope_length);
   strncpy (full_name + scope_length, "::", 2);
   strcpy (full_name + scope_length + 2, name);
@@ -690,9 +690,10 @@ initialize_namespace_symtab (struct objfile *objfile)
   namespace_symtab->free_code = free_nothing;
   namespace_symtab->dirname = NULL;
 
-  bv = obstack_alloc (&objfile->objfile_obstack,
-		      sizeof (struct blockvector)
-		      + FIRST_LOCAL_BLOCK * sizeof (struct block *));
+  bv = (struct blockvector *)
+    obstack_alloc (&objfile->objfile_obstack,
+		   sizeof (struct blockvector)
+		   + FIRST_LOCAL_BLOCK * sizeof (struct block *));
   BLOCKVECTOR_NBLOCKS (bv) = FIRST_LOCAL_BLOCK + 1;
   BLOCKVECTOR (namespace_symtab) = bv;
   
@@ -818,7 +819,7 @@ check_one_possible_namespace_symbol (const char *name, int len,
 				     struct objfile *objfile)
 {
   struct block *block = get_possible_namespace_block (objfile);
-  char *name_copy = alloca (len + 1);
+  char *name_copy = (char *) alloca (len + 1);
   struct symbol *sym;
 
   memcpy (name_copy, name, len);
@@ -833,7 +834,8 @@ check_one_possible_namespace_symbol (const char *name, int len,
 
       TYPE_TAG_NAME (type) = TYPE_NAME (type);
 
-      sym = obstack_alloc (&objfile->objfile_obstack, sizeof (struct symbol));
+      sym = (struct symbol *) obstack_alloc (&objfile->objfile_obstack,
+					     sizeof (struct symbol));
       memset (sym, 0, sizeof (struct symbol));
       SYMBOL_LANGUAGE (sym) = language_cplus;
       /* Note that init_type copied the name to the objfile's

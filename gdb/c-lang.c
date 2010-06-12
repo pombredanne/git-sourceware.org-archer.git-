@@ -269,7 +269,7 @@ c_emit_char (int c, struct type *type,
 
   classify_type (type, get_type_arch (type), &encoding);
 
-  buf = alloca (TYPE_LENGTH (type));
+  buf = (gdb_byte *) alloca (TYPE_LENGTH (type));
   pack_long (buf, type, c);
 
   iter = make_wchar_iterator (buf, TYPE_LENGTH (type), encoding,
@@ -692,7 +692,7 @@ c_get_string (struct value *value, gdb_byte **buffer, int *length,
       /* I is now either a user-defined length, the number of non-null
  	 characters, or FETCHLIMIT.  */
       *length = i * width;
-      *buffer = xmalloc (*length);
+      *buffer = (gdb_byte *) xmalloc (*length);
       memcpy (*buffer, contents, *length);
       err = 0;
     }
@@ -786,7 +786,7 @@ emit_numeric_character (struct type *type, unsigned long value,
 {
   gdb_byte *buffer;
 
-  buffer = alloca (TYPE_LENGTH (type));
+  buffer = (gdb_byte *) alloca (TYPE_LENGTH (type));
   pack_long (buffer, type, value);
   obstack_grow (output, buffer, TYPE_LENGTH (type));
 }

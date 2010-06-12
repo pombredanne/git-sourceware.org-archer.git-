@@ -466,7 +466,7 @@ cp_print_value (struct type *type, struct type *real_type,
 		  || (boffset + offset) >= TYPE_LENGTH (real_type)))
 	    {
 	      /* FIXME (alloca): unsafe if baseclass is really really large. */
-	      gdb_byte *buf = alloca (TYPE_LENGTH (baseclass));
+	      gdb_byte *buf = (gdb_byte *) alloca (TYPE_LENGTH (baseclass));
 
 	      base_valaddr = buf;
 	      if (target_read_memory (address + boffset, buf,
