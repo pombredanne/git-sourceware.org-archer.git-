@@ -658,7 +658,7 @@ string_exp:
 
 			  vec->type = $1.type;
 			  vec->length = $1.length;
-			  vec->ptr = malloc ($1.length + 1);
+			  vec->ptr = (char *) malloc ($1.length + 1);
 			  memcpy (vec->ptr, $1.ptr, $1.length + 1);
 			}
 
@@ -668,10 +668,11 @@ string_exp:
 			     for convenience.  */
 			  char *p;
 			  ++$$.len;
-			  $$.tokens = realloc ($$.tokens,
-					       $$.len * sizeof (struct typed_stoken));
+			  $$.tokens = (struct typed_stoken *)
+			    realloc ($$.tokens,
+				     $$.len * sizeof (struct typed_stoken));
 
-			  p = malloc ($2.length + 1);
+			  p = (char *) malloc ($2.length + 1);
 			  memcpy (p, $2.ptr, $2.length + 1);
 
 			  $$.tokens[$$.len - 1].type = $2.type;
@@ -1282,7 +1283,7 @@ operator_stoken (const char *op)
   static const char *operator_string = "operator";
   struct stoken st = { NULL, 0 };
   st.length = strlen (operator_string) + strlen (op);
-  st.ptr = malloc (st.length + 1);
+  st.ptr = (char *) malloc (st.length + 1);
   strcpy (st.ptr, operator_string);
   strcat (st.ptr, op);
 
@@ -1364,7 +1365,7 @@ parse_number (char *p, int len, int parsed_float, YYSTYPE *putithere)
 	  return DECFLOAT;
 	}
 
-      s = malloc (len);
+      s = (char *) malloc (len);
       saved_char = p[len];
       p[len] = 0;	/* null-terminate the token */
       num = sscanf (p, "%" DOUBLEST_SCAN_FORMAT "%s",
@@ -1938,7 +1939,8 @@ scan_macro_expansion (char *expansion)
 
   /* Copy to the obstack, and then free the intermediate
      expansion.  */
-  copy = obstack_copy0 (&expansion_obstack, expansion, strlen (expansion));
+  copy = (char *) obstack_copy0 (&expansion_obstack,
+				 expansion, strlen (expansion));
   xfree (expansion);
 
   /* Save the old lexptr value, so we can return to it when we're done
@@ -2563,7 +2565,7 @@ yylex (void)
     }
 
   yylval = current.value;
-  yylval.sval.ptr = obstack_copy0 (&expansion_obstack,
+  yylval.sval.ptr = (char *) obstack_copy0 (&expansion_obstack,
 				   yylval.sval.ptr,
 				   yylval.sval.length);
   return current.token;

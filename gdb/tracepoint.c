@@ -758,7 +758,8 @@ static int memrange_cmp (const void *, const void *);
 static int
 memrange_cmp (const void *va, const void *vb)
 {
-  const struct memrange *a = va, *b = vb;
+  const struct memrange *a = (struct memrange *) va;
+  const struct memrange *b = (struct memrange *) vb;
 
   if (a->type < b->type)
     return -1;
@@ -846,8 +847,8 @@ add_memrange (struct collection_list *memranges,
   if (memranges->next_memrange >= memranges->listsize)
     {
       memranges->listsize *= 2;
-      memranges->list = xrealloc (memranges->list,
-				  memranges->listsize);
+      memranges->list
+	= (struct memrange *) xrealloc (memranges->list, memranges->listsize);
     }
 
   if (type != memrange_absolute)		/* Better collect the base register!  */
@@ -1033,7 +1034,7 @@ do_collect_symbol (const char *print_name,
 		   struct symbol *sym,
 		   void *cb_data)
 {
-  struct add_local_symbols_data *p = cb_data;
+  struct add_local_symbols_data *p = (struct add_local_symbols_data *) cb_data;
 
   collect_symbol (p->collect, sym, p->gdbarch, p->frame_regno,
 		  p->frame_offset, p->pc);
@@ -1448,7 +1449,8 @@ encode_actions (struct breakpoint *t, struct bp_location *tloc,
       line = default_collect_line;
       validate_actionline (&line, t);
 
-      default_collect_action = xmalloc (sizeof (struct command_line));
+      default_collect_action = (struct command_line *)
+	xmalloc (sizeof (struct command_line));
       make_cleanup (xfree, default_collect_action);
       default_collect_action->next = actions;
       default_collect_action->line = line;
@@ -1473,7 +1475,7 @@ add_aexpr (struct collection_list *collect, struct agent_expr *aexpr)
 {
   if (collect->next_aexpr_elt >= collect->aexpr_listsize)
     {
-      collect->aexpr_list =
+      collect->aexpr_list = (struct agent_expr **)
 	xrealloc (collect->aexpr_list,
 		  2 * collect->aexpr_listsize * sizeof (struct agent_expr *));
       collect->aexpr_listsize *= 2;
@@ -2378,7 +2380,7 @@ scope_info (char *args, int from_tty)
 static void
 replace_comma (void *data)
 {
-  char *comma = data;
+  char *comma = (char *) data;
   *comma = ',';
 }
 
@@ -2525,7 +2527,8 @@ trace_dump_command (char *args, int from_tty)
       old_chain = make_cleanup (xfree, default_collect_line);
       line = default_collect_line;
       validate_actionline (&line, t);
-      default_collect_action = xmalloc (sizeof (struct command_line));
+      default_collect_action = (struct command_line *)
+	xmalloc (sizeof (struct command_line));
       make_cleanup (xfree, default_collect_action);
       default_collect_action->next = actions;
       default_collect_action->line = line;
@@ -2869,7 +2872,8 @@ struct current_traceframe_cleanup
 static void
 do_restore_current_traceframe_cleanup (void *arg)
 {
-  struct current_traceframe_cleanup *old = arg;
+  struct current_traceframe_cleanup *old
+    = (struct current_traceframe_cleanup *) arg;
 
   set_traceframe_number (old->traceframe_number);
 }
@@ -2877,7 +2881,8 @@ do_restore_current_traceframe_cleanup (void *arg)
 static void
 restore_current_traceframe_cleanup_dtor (void *arg)
 {
-  struct current_traceframe_cleanup *old = arg;
+  struct current_traceframe_cleanup *old
+    = (struct current_traceframe_cleanup *) arg;
 
   xfree (old);
 }
@@ -2887,7 +2892,8 @@ make_cleanup_restore_current_traceframe (void)
 {
   struct current_traceframe_cleanup *old;
 
-  old = xmalloc (sizeof (struct current_traceframe_cleanup));
+  old = (struct current_traceframe_cleanup *)
+    xmalloc (sizeof (struct current_traceframe_cleanup));
   old->traceframe_number = traceframe_number;
 
   return make_cleanup_dtor (do_restore_current_traceframe_cleanup, old,
@@ -3365,7 +3371,7 @@ Status line: '%s'\n"), p, line);
 	    {
 	      int end;
 
-	      ts->error_desc = xmalloc ((p2 - p1) / 2 + 1);
+	      ts->error_desc = (char *) xmalloc ((p2 - p1) / 2 + 1);
 	      end = hex2bin (p1, ts->error_desc, (p2 - p1) / 2);
 	      ts->error_desc[end] = '\0';
 	    }
@@ -3502,7 +3508,7 @@ parse_tracepoint_definition (char *line, struct uploaded_tp **utpp)
       p = unpack_varlen_hex (p, &xlen);
       p++;  /* skip a colon */
 
-      buf = alloca (strlen (line));
+      buf = (char *) alloca (strlen (line));
 
       end = hex2bin (p, (gdb_byte *) buf, strlen (p) / 2);
       buf[end] = '\0';
@@ -3533,7 +3539,7 @@ parse_tsv_definition (char *line, struct uploaded_tsv **utsvp)
   int end;
   struct uploaded_tsv *utsv = NULL;
 
-  buf = alloca (strlen (line));
+  buf = (char *) alloca (strlen (line));
 
   p = line;
   p = unpack_varlen_hex (p, &num);
@@ -3726,7 +3732,7 @@ tfile_fetch_registers (struct target_ops *ops,
   if (!trace_regblock_size)
     return;
 
-  regs = alloca (trace_regblock_size);
+  regs = (char *) alloca (trace_regblock_size);
 
   lseek (trace_fd, cur_offset, SEEK_SET);
   pos = 0;
@@ -4071,27 +4077,27 @@ _initialize_tracepoint (void)
   if (tracepoint_list.list == NULL)
     {
       tracepoint_list.listsize = 128;
-      tracepoint_list.list = xmalloc
+      tracepoint_list.list = (struct memrange *) xmalloc
 	(tracepoint_list.listsize * sizeof (struct memrange));
     }
   if (tracepoint_list.aexpr_list == NULL)
     {
       tracepoint_list.aexpr_listsize = 128;
-      tracepoint_list.aexpr_list = xmalloc
+      tracepoint_list.aexpr_list = (struct agent_expr **) xmalloc
 	(tracepoint_list.aexpr_listsize * sizeof (struct agent_expr *));
     }
 
   if (stepping_list.list == NULL)
     {
       stepping_list.listsize = 128;
-      stepping_list.list = xmalloc
+      stepping_list.list = (struct memrange *) xmalloc
 	(stepping_list.listsize * sizeof (struct memrange));
     }
 
   if (stepping_list.aexpr_list == NULL)
     {
       stepping_list.aexpr_listsize = 128;
-      stepping_list.aexpr_list = xmalloc
+      stepping_list.aexpr_list = (struct agent_expr **) xmalloc
 	(stepping_list.aexpr_listsize * sizeof (struct agent_expr *));
     }
 

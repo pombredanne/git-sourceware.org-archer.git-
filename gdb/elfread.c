@@ -68,13 +68,14 @@ elf_symfile_segments (bfd *abfd)
   if (phdrs_size == -1)
     return NULL;
 
-  phdrs = alloca (phdrs_size);
+  phdrs = (Elf_Internal_Phdr *) alloca (phdrs_size);
   num_phdrs = bfd_get_elf_phdrs (abfd, phdrs);
   if (num_phdrs == -1)
     return NULL;
 
   num_segments = 0;
-  segments = alloca (sizeof (Elf_Internal_Phdr *) * num_phdrs);
+  segments = (Elf_Internal_Phdr **) alloca (sizeof (Elf_Internal_Phdr *)
+					    * num_phdrs);
   for (i = 0; i < num_phdrs; i++)
     if (phdrs[i].p_type == PT_LOAD)
       segments[num_segments++] = &phdrs[i];
@@ -587,7 +588,8 @@ build_id_bfd_get (bfd *abfd)
       || elf_tdata (abfd)->build_id == NULL)
     return NULL;
 
-  retval = xmalloc (sizeof *retval - 1 + elf_tdata (abfd)->build_id_size);
+  retval = (struct build_id *) xmalloc (sizeof *retval - 1
+					+ elf_tdata (abfd)->build_id_size);
   retval->size = elf_tdata (abfd)->build_id_size;
   memcpy (retval->data, elf_tdata (abfd)->build_id, retval->size);
 
@@ -631,8 +633,9 @@ build_id_to_debug_filename (struct build_id *build_id)
   char *link, *debugdir, *retval = NULL;
 
   /* DEBUG_FILE_DIRECTORY/.build-id/ab/cdef */
-  link = alloca (strlen (debug_file_directory) + (sizeof "/.build-id/" - 1) + 1
-		 + 2 * build_id->size + (sizeof ".debug" - 1) + 1);
+  link = (char *) alloca (strlen (debug_file_directory)
+			  + (sizeof "/.build-id/" - 1) + 1
+			  + 2 * build_id->size + (sizeof ".debug" - 1) + 1);
 
   /* Keep backward compatibility so that DEBUG_FILE_DIRECTORY being "" will
      cause "/.build-id/..." lookups.  */
@@ -810,7 +813,8 @@ elf_symfile_read (struct objfile *objfile, int symfile_flags)
       long i;
 
       make_cleanup (xfree, synthsyms);
-      synth_symbol_table = xmalloc (sizeof (asymbol *) * synthcount);
+      synth_symbol_table = (asymbol **) xmalloc (sizeof (asymbol *)
+						 * synthcount);
       for (i = 0; i < synthcount; i++)
 	synth_symbol_table[i] = synthsyms + i;
       make_cleanup (xfree, synth_symbol_table);

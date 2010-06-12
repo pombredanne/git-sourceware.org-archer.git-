@@ -1700,8 +1700,8 @@ yylex ()
 		      struct symbol *cur_sym;
 		      /* As big as the whole rest of the expression,
 			 which is at least big enough.  */
-		      char *ncopy = alloca (strlen (tmp) +
-					    strlen (namestart) + 3);
+		      char *ncopy = (char *) alloca (strlen (tmp) +
+						     strlen (namestart) + 3);
 		      char *tmp1;
 
 		      tmp1 = ncopy;

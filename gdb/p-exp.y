@@ -308,7 +308,8 @@ exp	:	exp '['
 			  if (arrayfieldindex) 
 			    {
 			      struct stoken stringsval;
-			      stringsval.ptr = alloca (strlen (arrayname) + 1);
+			      stringsval.ptr
+				= (char *) alloca (strlen (arrayname) + 1);
 			      stringsval.length = strlen (arrayname);
 			      strcpy (stringsval.ptr, arrayname);
 			      current_type = TYPE_FIELD_TYPE (current_type,
@@ -1599,7 +1600,8 @@ yylex ()
 		      struct symbol *cur_sym;
 		      /* As big as the whole rest of the expression, which is
 			 at least big enough.  */
-		      char *ncopy = alloca (strlen (tmp)+strlen (namestart)+3);
+		      char *ncopy
+			= (char *) alloca (strlen (tmp)+strlen (namestart)+3);
 		      char *tmp1;
 
 		      tmp1 = ncopy;

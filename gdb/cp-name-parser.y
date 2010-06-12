@@ -75,7 +75,7 @@ d_grab (void)
     {
       if (demangle_info->next == NULL)
 	{
-	  more = malloc (sizeof (struct demangle_info));
+	  more = (struct demangle_info *)malloc (sizeof (struct demangle_info));
 	  more->prev = demangle_info;
 	  more->next = NULL;
 	  demangle_info->next = more;
@@ -1940,7 +1940,8 @@ allocate_info (void)
 {
   if (demangle_info == NULL)
     {
-      demangle_info = malloc (sizeof (struct demangle_info));
+      demangle_info = (struct demangle_info *)
+	malloc (sizeof (struct demangle_info));
       demangle_info->prev = NULL;
       demangle_info->next = NULL;
     }
