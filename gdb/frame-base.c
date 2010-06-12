@@ -72,7 +72,8 @@ static void *
 frame_base_init (struct obstack *obstack)
 {
   struct frame_base_table *table
-    = OBSTACK_ZALLOC (obstack, struct frame_base_table);
+    = (struct frame_base_table *) OBSTACK_ZALLOC (obstack,
+						  struct frame_base_table);
 
   table->tail = &table->head;
   table->default_base = &default_frame_base;
@@ -83,7 +84,8 @@ void
 frame_base_append_sniffer (struct gdbarch *gdbarch,
 			   frame_base_sniffer_ftype *sniffer)
 {
-  struct frame_base_table *table = gdbarch_data (gdbarch, frame_base_data);
+  struct frame_base_table *table
+    = (struct frame_base_table *) gdbarch_data (gdbarch, frame_base_data);
 
   (*table->tail) = GDBARCH_OBSTACK_ZALLOC (gdbarch, struct frame_base_table_entry);
   (*table->tail)->sniffer = sniffer;
@@ -94,7 +96,8 @@ void
 frame_base_set_default (struct gdbarch *gdbarch,
 			const struct frame_base *default_base)
 {
-  struct frame_base_table *table = gdbarch_data (gdbarch, frame_base_data);
+  struct frame_base_table *table
+    = (struct frame_base_table *) gdbarch_data (gdbarch, frame_base_data);
 
   table->default_base = default_base;
 }
@@ -103,7 +106,8 @@ const struct frame_base *
 frame_base_find_by_frame (struct frame_info *this_frame)
 {
   struct gdbarch *gdbarch = get_frame_arch (this_frame);
-  struct frame_base_table *table = gdbarch_data (gdbarch, frame_base_data);
+  struct frame_base_table *table
+    = (struct frame_base_table *) gdbarch_data (gdbarch, frame_base_data);
   struct frame_base_table_entry *entry;
 
   for (entry = table->head; entry != NULL; entry = entry->next)

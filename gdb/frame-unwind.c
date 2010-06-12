@@ -48,13 +48,16 @@ static void *
 frame_unwind_init (struct obstack *obstack)
 {
   struct frame_unwind_table *table
-    = OBSTACK_ZALLOC (obstack, struct frame_unwind_table);
+    = (struct frame_unwind_table *) OBSTACK_ZALLOC (obstack,
+						    struct frame_unwind_table);
 
   /* Start the table out with a few default sniffers.  OSABI code
      can't override this.  */
-  table->list = OBSTACK_ZALLOC (obstack, struct frame_unwind_table_entry);
+  table->list = (struct frame_unwind_table_entry *)
+    OBSTACK_ZALLOC (obstack, struct frame_unwind_table_entry);
   table->list->unwinder = dummy_frame_unwind;
-  table->list->next = OBSTACK_ZALLOC (obstack, struct frame_unwind_table_entry);
+  table->list->next = (struct frame_unwind_table_entry *)
+    OBSTACK_ZALLOC (obstack, struct frame_unwind_table_entry);
   table->list->next->unwinder = inline_frame_unwind;
   /* The insertion point for OSABI sniffers.  */
   table->osabi_head = &table->list->next->next;
@@ -65,7 +68,8 @@ void
 frame_unwind_prepend_unwinder (struct gdbarch *gdbarch,
 				const struct frame_unwind *unwinder)
 {
-  struct frame_unwind_table *table = gdbarch_data (gdbarch, frame_unwind_data);
+  struct frame_unwind_table *table = (struct frame_unwind_table *)
+    gdbarch_data (gdbarch, frame_unwind_data);
   struct frame_unwind_table_entry *entry;
 
   /* Insert the new entry at the start of the list.  */
@@ -79,7 +83,8 @@ void
 frame_unwind_append_unwinder (struct gdbarch *gdbarch,
 			      const struct frame_unwind *unwinder)
 {
-  struct frame_unwind_table *table = gdbarch_data (gdbarch, frame_unwind_data);
+  struct frame_unwind_table *table = (struct frame_unwind_table *)
+    gdbarch_data (gdbarch, frame_unwind_data);
   struct frame_unwind_table_entry **ip;
 
   /* Find the end of the list and insert the new entry there.  */
@@ -92,7 +97,8 @@ const struct frame_unwind *
 frame_unwind_find_by_frame (struct frame_info *this_frame, void **this_cache)
 {
   struct gdbarch *gdbarch = get_frame_arch (this_frame);
-  struct frame_unwind_table *table = gdbarch_data (gdbarch, frame_unwind_data);
+  struct frame_unwind_table *table = (struct frame_unwind_table *)
+    gdbarch_data (gdbarch, frame_unwind_data);
   struct frame_unwind_table_entry *entry;
 
   for (entry = table->list; entry != NULL; entry = entry->next)

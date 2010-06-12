@@ -327,7 +327,7 @@ ada_inferior_data_cleanup (struct inferior *inf, void *arg)
 {
   struct ada_inferior_data *data;
 
-  data = inferior_data (inf, ada_inferior_data);
+  data = (struct ada_inferior_data *) inferior_data (inf, ada_inferior_data);
   if (data != NULL)
     xfree (data);
 }
@@ -345,7 +345,7 @@ get_ada_inferior_data (struct inferior *inf)
 {
   struct ada_inferior_data *data;
 
-  data = inferior_data (inf, ada_inferior_data);
+  data = (struct ada_inferior_data *) inferior_data (inf, ada_inferior_data);
   if (data == NULL)
     {
       data = XZALLOC (struct ada_inferior_data);
@@ -4014,7 +4014,7 @@ value_pointer (struct value *value, struct type *type)
 {
   struct gdbarch *gdbarch = get_type_arch (type);
   unsigned len = TYPE_LENGTH (type);
-  gdb_byte *buf = alloca (len);
+  gdb_byte *buf = (gdb_byte *) alloca (len);
   CORE_ADDR addr;
 
   addr = value_address (value);
@@ -4246,7 +4246,7 @@ static struct ada_symbol_info *
 defns_collected (struct obstack *obstackp, int finish)
 {
   if (finish)
-    return obstack_finish (obstackp);
+    return (struct ada_symbol_info *) obstack_finish (obstackp);
   else
     return (struct ada_symbol_info *) obstack_base (obstackp);
 }
@@ -4649,7 +4649,7 @@ struct ada_psym_data
 static void
 ada_add_psyms (struct objfile *objfile, struct symtab *s, void *user_data)
 {
-  struct ada_psym_data *data = user_data;
+  struct ada_psym_data *data = (struct ada_psym_data *) user_data;
   const int block_kind = data->global ? GLOBAL_BLOCK : STATIC_BLOCK;
 
   ada_add_block_symbols (data->obstackp,
@@ -5278,19 +5278,19 @@ symbol_completion_add (VEC(char_ptr) **sv,
 
   if (word == orig_text)
     {
-      completion = xmalloc (strlen (match) + 5);
+      completion = (char *) xmalloc (strlen (match) + 5);
       strcpy (completion, match);
     }
   else if (word > orig_text)
     {
       /* Return some portion of sym_name.  */
-      completion = xmalloc (strlen (match) + 5);
+      completion = (char *) xmalloc (strlen (match) + 5);
       strcpy (completion, match + (word - orig_text));
     }
   else
     {
       /* Return some of ORIG_TEXT plus sym_name.  */
-      completion = xmalloc (strlen (match) + (orig_text - word) + 5);
+      completion = (char *) xmalloc (strlen (match) + (orig_text - word) + 5);
       strncpy (completion, word, orig_text - word);
       completion[orig_text - word] = '\0';
       strcat (completion, match);
@@ -5316,7 +5316,7 @@ struct add_partial_datum
 static void
 ada_add_partial_symbol_completions (const char *name, void *user_data)
 {
-  struct add_partial_datum *data = user_data;
+  struct add_partial_datum *data = (struct add_partial_datum *) user_data;
 
   symbol_completion_add (data->completions, name,
 			 data->text, data->text_len, data->text0, data->word,
@@ -5450,7 +5450,7 @@ ada_make_symbol_completion_list (char *text0, char *word)
   {
     const size_t completions_size = 
       VEC_length (char_ptr, completions) * sizeof (char *);
-    char **result = malloc (completions_size);
+    char **result = (char **) malloc (completions_size);
     
     memcpy (result, VEC_address (char_ptr, completions), completions_size);
 
@@ -7482,7 +7482,8 @@ ada_to_fixed_type_1 (struct type *type, const gdb_byte *valaddr,
         else if (ada_type_name (fixed_record_type) != NULL)
           {
             char *name = ada_type_name (fixed_record_type);
-            char *xvz_name = alloca (strlen (name) + 7 /* "___XVZ\0" */);
+            char *xvz_name
+	      = (char *) alloca (strlen (name) + 7 /* "___XVZ\0" */);
             int xvz_found = 0;
             LONGEST size;
 
@@ -8301,7 +8302,7 @@ assign_aggregate (struct value *container,
 
   num_specs = num_component_specs (exp, *pos - 3);
   max_indices = 4 * num_specs + 4;
-  indices = alloca (max_indices * sizeof (indices[0]));
+  indices = (LONGEST *) alloca (max_indices * sizeof (indices[0]));
   indices[0] = indices[1] = low_index - 1;
   indices[2] = indices[3] = high_index + 1;
   num_indices = 4;
@@ -10771,7 +10772,7 @@ ada_get_next_arg (char **argsp)
 
   /* Make a copy of the current argument and return it.  */
 
-  result = xmalloc (end - args + 1);
+  result = (char *) xmalloc (end - args + 1);
   strncpy (result, args, end - args);
   result[end - args] = '\0';
   

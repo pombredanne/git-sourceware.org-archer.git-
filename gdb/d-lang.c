@@ -192,7 +192,7 @@ d_demangle (const char *symbol, int options)
 
   /* Doesn't display the return type, but wouldn't be too hard to do.  */
 
-  out_str = xstrdup (obstack_finish (&tempbuf));
+  out_str = xstrdup ((const char *) obstack_finish (&tempbuf));
   obstack_free (&tempbuf, NULL);
   return out_str;
 }

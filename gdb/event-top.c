@@ -727,7 +727,7 @@ command_line_handler (char *rl)
     {
       if (linelength > linesize)
 	{
-	  line = xrealloc (line, linelength);
+	  line = (char *) xrealloc (line, linelength);
 	  linesize = linelength;
 	}
       strcpy (line, linebuffer);
@@ -909,7 +909,8 @@ handle_sigint (int sig)
      that point, though, the command that we want to interrupt needs to
      finish first, which is unacceptable.  If immediate quit is not set,
      we process SIGINT the next time through the loop, which is fine. */
-  gdb_call_async_signal_handler (sigint_token, immediate_quit);
+  gdb_call_async_signal_handler ((struct async_signal_handler *) sigint_token,
+				 immediate_quit);
 }
 
 /* Quit GDB if SIGTERM is received.

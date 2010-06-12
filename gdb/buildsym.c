@@ -974,7 +974,7 @@ end_symtab (CORE_ADDR end_addr, struct objfile *objfile, int section)
       for (pb = pending_blocks; pb != NULL; pb = pb->next)
 	count++;
 
-      barray = xmalloc (sizeof (*barray) * count);
+      barray = (struct block **) xmalloc (sizeof (*barray) * count);
       back_to = make_cleanup (xfree, barray);
 
       bp = barray;

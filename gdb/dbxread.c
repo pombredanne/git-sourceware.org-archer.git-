@@ -946,7 +946,7 @@ free_bincl_list (struct objfile *objfile)
 static void
 do_free_bincl_list_cleanup (void *objfile)
 {
-  free_bincl_list (objfile);
+  free_bincl_list ((struct objfile *) objfile);
 }
 
 static struct cleanup *
@@ -1136,7 +1136,7 @@ find_stab_function_addr (char *namestring, char *filename,
   if (p == NULL)
     p = namestring;
   n = p - namestring;
-  p = alloca (n + 2);
+  p = (char *) alloca (n + 2);
   strncpy (p, namestring, n);
   p[n] = 0;
 
@@ -1691,7 +1691,7 @@ pos %d"),
 	  sym_name = NULL;	/* pacify "gcc -Werror" */
  	  if (psymtab_language == language_cplus)
  	    {
- 	      char *new_name, *name = xmalloc (p - namestring + 1);
+	      char *new_name, *name = (char *) xmalloc (p - namestring + 1);
  	      memcpy (name, namestring, p - namestring);
 
  	      name[p - namestring] = '\0';
@@ -1870,7 +1870,7 @@ pos %d"),
 	      if (! pst)
 		{
 		  int name_len = p - namestring;
-		  char *name = xmalloc (name_len + 1);
+		  char *name = (char *) xmalloc (name_len + 1);
 
 		  memcpy (name, namestring, name_len);
 		  name[name_len] = '\0';
@@ -1940,7 +1940,7 @@ pos %d"),
 	      if (! pst)
 		{
 		  int name_len = p - namestring;
-		  char *name = xmalloc (name_len + 1);
+		  char *name = (char *) xmalloc (name_len + 1);
 
 		  memcpy (name, namestring, name_len);
 		  name[name_len] = '\0';
@@ -2268,7 +2268,7 @@ end_psymtab (struct partial_symtab *pst, char **include_list, int num_includes,
       if (p == NULL)
 	p = last_function_name;
       n = p - last_function_name;
-      p = alloca (n + 2);
+      p = (char *) alloca (n + 2);
       strncpy (p, last_function_name, n);
       p[n] = 0;
 
