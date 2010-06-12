@@ -157,7 +157,9 @@ struct symbol_file_add_from_memory_args
 static int
 symbol_file_add_from_memory_wrapper (struct ui_out *uiout, void *data)
 {
-  struct symbol_file_add_from_memory_args *args = data;
+  struct symbol_file_add_from_memory_args *args;
+
+  args = (struct symbol_file_add_from_memory_args *) data;
 
   symbol_file_add_from_memory (args->bfd, args->sysinfo_ehdr, args->name,
 			       args->from_tty);

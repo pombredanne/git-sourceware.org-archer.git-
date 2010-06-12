@@ -334,7 +334,9 @@ svr4_pspace_data_cleanup (struct program_space *pspace, void *arg)
 {
   struct svr4_info *info;
 
-  info = program_space_data (pspace, solib_svr4_pspace_data);
+  info = (struct svr4_info *)
+    program_space_data (pspace, solib_svr4_pspace_data);
+
   xfree (info);
 }
 
@@ -346,7 +348,8 @@ get_svr4_info (void)
 {
   struct svr4_info *info;
 
-  info = program_space_data (current_program_space, solib_svr4_pspace_data);
+  info = (struct svr4_info *) program_space_data (current_program_space,
+						  solib_svr4_pspace_data);
   if (info != NULL)
     return info;
 
@@ -550,7 +553,7 @@ read_program_header (int type, int *p_sect_size, int *p_arch_size)
     }
 
   /* Read in requested program header.  */
-  buf = xmalloc (sect_size);
+  buf = (gdb_byte *) xmalloc (sect_size);
   if (target_read_memory (sect_addr, buf, sect_size))
     {
       xfree (buf);
@@ -583,7 +586,7 @@ find_program_interpreter (void)
       {
 	int sect_size = bfd_section_size (exec_bfd, interp_sect);
 
-	buf = xmalloc (sect_size);
+	buf = (gdb_byte *) xmalloc (sect_size);
 	bfd_get_section_contents (exec_bfd, interp_sect, buf, 0, sect_size);
       }
    }
@@ -646,7 +649,7 @@ scan_dyntag (int dyntag, bfd *abfd, CORE_ADDR *ptr)
   /* Read in .dynamic from the BFD.  We will get the actual value
      from memory later.  */
   sect_size = bfd_section_size (abfd, sect);
-  buf = bufstart = alloca (sect_size);
+  buf = bufstart = (gdb_byte *) alloca (sect_size);
   if (!bfd_get_section_contents (abfd, sect,
 				 buf, 0, sect_size))
     return 0;
@@ -796,7 +799,7 @@ elf_locate_base (void)
       gdb_byte *pbuf;
       int pbuf_size = TYPE_LENGTH (ptr_type);
 
-      pbuf = alloca (pbuf_size);
+      pbuf = (gdb_byte *) alloca (pbuf_size);
       /* DT_MIPS_RLD_MAP contains a pointer to the address
 	 of the dynamic link structure.  */
       if (target_read_memory (dyn_ptr, pbuf, pbuf_size))
@@ -961,11 +964,11 @@ svr4_keep_data_in_core (CORE_ADDR vaddr, unsigned long size)
   lmo = svr4_fetch_link_map_offsets ();
   new = XZALLOC (struct so_list);
   old_chain = make_cleanup (xfree, new);
-  new->lm_info = xmalloc (sizeof (struct lm_info));
+  new->lm_info = (struct lm_info *) xmalloc (sizeof (struct lm_info));
   make_cleanup (xfree, new->lm_info);
   new->lm_info->l_addr = (CORE_ADDR)-1;
   new->lm_info->lm_addr = ldsomap;
-  new->lm_info->lm = xzalloc (lmo->link_map_size);
+  new->lm_info->lm = (gdb_byte *) xzalloc (lmo->link_map_size);
   make_cleanup (xfree, new->lm_info->lm);
   read_memory (ldsomap, new->lm_info->lm, lmo->link_map_size);
   lm_name = LM_NAME (new);
@@ -1006,7 +1009,7 @@ open_symbol_file_object (void *from_ttyp)
   struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
   struct type *ptr_type = builtin_type (target_gdbarch)->builtin_data_ptr;
   int l_name_size = TYPE_LENGTH (ptr_type);
-  gdb_byte *l_name_buf = xmalloc (l_name_size);
+  gdb_byte *l_name_buf = (gdb_byte *) xmalloc (l_name_size);
   struct cleanup *cleanups = make_cleanup (xfree, l_name_buf);
   struct svr4_info *info = get_svr4_info ();
 
@@ -1068,7 +1071,7 @@ svr4_default_sos (void)
     {
       struct so_list *new = XZALLOC (struct so_list);
 
-      new->lm_info = xmalloc (sizeof (struct lm_info));
+      new->lm_info = (struct lm_info *) xmalloc (sizeof (struct lm_info));
 
       /* Nothing will ever check the cached copy of the link
 	 map if we set l_addr.  */
@@ -1139,12 +1142,12 @@ svr4_current_sos (void)
       struct cleanup *old_chain = make_cleanup (xfree, new);
       CORE_ADDR next_lm;
 
-      new->lm_info = xmalloc (sizeof (struct lm_info));
+      new->lm_info = (struct lm_info *) xmalloc (sizeof (struct lm_info));
       make_cleanup (xfree, new->lm_info);
 
       new->lm_info->l_addr = (CORE_ADDR)-1;
       new->lm_info->lm_addr = lm;
-      new->lm_info->lm = xzalloc (lmo->link_map_size);
+      new->lm_info->lm = (gdb_byte *) xzalloc (lmo->link_map_size);
       make_cleanup (xfree, new->lm_info->lm);
 
       read_memory (lm, new->lm_info->lm, lmo->link_map_size);
@@ -1671,7 +1674,7 @@ read_program_headers_from_bfd (bfd *abfd, int *phdrs_size)
   if (*phdrs_size == 0)
     return NULL;
 
-  buf = xmalloc (*phdrs_size);
+  buf = (gdb_byte *) xmalloc (*phdrs_size);
   if (bfd_seek (abfd, ehdr->e_phoff, SEEK_SET) != 0
       || bfd_bread (buf, *phdrs_size, abfd) != *phdrs_size)
     {
@@ -1839,8 +1842,8 @@ svr4_relocate_main_executable (void)
       struct section_offsets *new_offsets;
       int i;
 
-      new_offsets = alloca (symfile_objfile->num_sections
-			    * sizeof (*new_offsets));
+      new_offsets = (struct section_offsets *)
+	alloca (symfile_objfile->num_sections * sizeof (*new_offsets));
 
       for (i = 0; i < symfile_objfile->num_sections; i++)
 	new_offsets->offsets[i] = displacement;
@@ -2032,7 +2035,8 @@ solib_svr4_init (struct obstack *obstack)
 {
   struct solib_svr4_ops *ops;
 
-  ops = OBSTACK_ZALLOC (obstack, struct solib_svr4_ops);
+  ops = (struct solib_svr4_ops *)
+    OBSTACK_ZALLOC (obstack, struct solib_svr4_ops);
   ops->fetch_link_map_offsets = NULL;
   return ops;
 }
@@ -2044,7 +2048,8 @@ void
 set_solib_svr4_fetch_link_map_offsets (struct gdbarch *gdbarch,
                                        struct link_map_offsets *(*flmo) (void))
 {
-  struct solib_svr4_ops *ops = gdbarch_data (gdbarch, solib_svr4_data);
+  struct solib_svr4_ops *ops = (struct solib_svr4_ops *)
+    gdbarch_data (gdbarch, solib_svr4_data);
 
   ops->fetch_link_map_offsets = flmo;
 
@@ -2057,7 +2062,8 @@ set_solib_svr4_fetch_link_map_offsets (struct gdbarch *gdbarch,
 static struct link_map_offsets *
 svr4_fetch_link_map_offsets (void)
 {
-  struct solib_svr4_ops *ops = gdbarch_data (target_gdbarch, solib_svr4_data);
+  struct solib_svr4_ops *ops = (struct solib_svr4_ops *)
+    gdbarch_data (target_gdbarch, solib_svr4_data);
 
   gdb_assert (ops->fetch_link_map_offsets);
   return ops->fetch_link_map_offsets ();
@@ -2068,7 +2074,8 @@ svr4_fetch_link_map_offsets (void)
 static int
 svr4_have_link_map_offsets (void)
 {
-  struct solib_svr4_ops *ops = gdbarch_data (target_gdbarch, solib_svr4_data);
+  struct solib_svr4_ops *ops
+    = (struct solib_svr4_ops *) gdbarch_data (target_gdbarch, solib_svr4_data);
 
   return (ops->fetch_link_map_offsets != NULL);
 }

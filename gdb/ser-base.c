@@ -132,7 +132,7 @@ reschedule (struct serial *scb)
 static void
 fd_event (int error, void *context)
 {
-  struct serial *scb = context;
+  struct serial *scb = (struct serial *) context;
   if (error != 0)
     {
       scb->bufcnt = SERIAL_ERROR;
@@ -170,7 +170,7 @@ fd_event (int error, void *context)
 static void
 push_event (void *context)
 {
-  struct serial *scb = context;
+  struct serial *scb = (struct serial *) context;
 
   scb->async_state = NOTHING_SCHEDULED; /* Timers are one-off */
   scb->async_handler (scb, scb->async_context);

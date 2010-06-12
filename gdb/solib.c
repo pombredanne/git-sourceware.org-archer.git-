@@ -59,7 +59,9 @@ solib_init (struct obstack *obstack)
 {
   struct target_so_ops **ops;
 
-  ops = OBSTACK_ZALLOC (obstack, struct target_so_ops *);
+  ops = (struct target_so_ops **)
+    OBSTACK_ZALLOC (obstack, struct target_so_ops *);
+
   *ops = current_target_so_ops;
   return ops;
 }
@@ -67,7 +69,9 @@ solib_init (struct obstack *obstack)
 static struct target_so_ops *
 solib_ops (struct gdbarch *gdbarch)
 {
-  struct target_so_ops **ops = gdbarch_data (gdbarch, solib_data);
+  struct target_so_ops **ops;
+
+  ops = (struct target_so_ops **) gdbarch_data (gdbarch, solib_data);
 
   return *ops;
 }
@@ -77,7 +81,8 @@ solib_ops (struct gdbarch *gdbarch)
 void
 set_solib_ops (struct gdbarch *gdbarch, struct target_so_ops *new_ops)
 {
-  struct target_so_ops **ops = gdbarch_data (gdbarch, solib_data);
+  struct target_so_ops **ops
+    = (struct target_so_ops **) gdbarch_data (gdbarch, solib_data);
 
   *ops = new_ops;
 }
@@ -179,8 +184,9 @@ solib_find (char *in_pathname, int *fd)
 	{
 	  char *new_pathname;
 
-	  new_pathname = alloca (p - in_pathname + 1
-				 + strlen (solib_symbols_extension) + 1);
+	  new_pathname = (char *) alloca (p - in_pathname + 1
+					  + strlen (solib_symbols_extension)
+					  + 1);
 	  memcpy (new_pathname, in_pathname, p - in_pathname + 1);
 	  strcpy (new_pathname + (p - in_pathname) + 1,
 		  solib_symbols_extension);
@@ -213,7 +219,7 @@ solib_find (char *in_pathname, int *fd)
       char *p;
 
       /* Avoid clobbering our input.  */
-      p = alloca (strlen (in_pathname) + 1);
+      p = (char *) alloca (strlen (in_pathname) + 1);
       strcpy (p, in_pathname);
       in_pathname = p;
 
