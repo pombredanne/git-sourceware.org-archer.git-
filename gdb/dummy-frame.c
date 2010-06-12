@@ -238,7 +238,8 @@ dummy_frame_prev_register (struct frame_info *this_frame,
 			   void **this_prologue_cache,
 			   int regnum)
 {
-  struct dummy_frame_cache *cache = (*this_prologue_cache);
+  struct dummy_frame_cache *cache
+    = (struct dummy_frame_cache *) (*this_prologue_cache);
   struct gdbarch *gdbarch = get_frame_arch (this_frame);
   struct value *reg_val;
 
@@ -268,7 +269,8 @@ dummy_frame_this_id (struct frame_info *this_frame,
 		     struct frame_id *this_id)
 {
   /* The dummy-frame sniffer always fills in the cache.  */
-  struct dummy_frame_cache *cache = (*this_prologue_cache);
+  struct dummy_frame_cache *cache
+    = (struct dummy_frame_cache *) (*this_prologue_cache);
 
   gdb_assert (cache != NULL);
   (*this_id) = cache->this_id;

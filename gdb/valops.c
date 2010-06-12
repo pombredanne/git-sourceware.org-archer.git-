@@ -2059,7 +2059,7 @@ search_struct_method (const char *name, struct value **arg1p,
 
 	  if (offset < 0 || offset >= TYPE_LENGTH (type))
 	    {
-	      gdb_byte *tmp = alloca (TYPE_LENGTH (baseclass));
+	      gdb_byte *tmp = (gdb_byte *) alloca (TYPE_LENGTH (baseclass));
 
 	      if (target_read_memory (value_address (*arg1p) + offset,
 				      tmp, TYPE_LENGTH (baseclass)) != 0)
@@ -2636,7 +2636,7 @@ find_oload_champ_namespace_loop (struct type **arg_types, int nargs,
 
   old_cleanups = make_cleanup (xfree, *oload_syms);
   old_cleanups = make_cleanup (xfree, *oload_champ_bv);
-  new_namespace = alloca (namespace_len + 1);
+  new_namespace = (char *) alloca (namespace_len + 1);
   strncpy (new_namespace, qualified_name, namespace_len);
   new_namespace[namespace_len] = '\0';
   new_oload_syms = make_symbol_overload_list (func_name,

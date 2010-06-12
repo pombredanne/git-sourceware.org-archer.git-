@@ -116,7 +116,7 @@ blockvector_for_pc_sect (CORE_ADDR pc, struct obj_section *section,
      that.  */
   if (BLOCKVECTOR_MAP (bl))
     {
-      b = addrmap_find (BLOCKVECTOR_MAP (bl), pc);
+      b = (struct block *) addrmap_find (BLOCKVECTOR_MAP (bl), pc);
       if (b)
         {
           if (pblock)
@@ -262,7 +262,8 @@ block_initialize_namespace (struct block *block, struct obstack *obstack)
   if (BLOCK_NAMESPACE (block) == NULL)
     {
       BLOCK_NAMESPACE (block)
-	= obstack_alloc (obstack, sizeof (struct block_namespace_info));
+	= (struct block_namespace_info *)
+	obstack_alloc (obstack, sizeof (struct block_namespace_info));
       BLOCK_NAMESPACE (block)->scope = NULL;
       BLOCK_NAMESPACE (block)->using = NULL;
     }
@@ -310,7 +311,8 @@ block_global_block (const struct block *block)
 struct block *
 allocate_block (struct obstack *obstack)
 {
-  struct block *bl = obstack_alloc (obstack, sizeof (struct block));
+  struct block *bl
+    = (struct block *) obstack_alloc (obstack, sizeof (struct block));
 
   BLOCK_START (bl) = 0;
   BLOCK_END (bl) = 0;

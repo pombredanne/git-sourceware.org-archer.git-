@@ -374,7 +374,7 @@ print_scalar_formatted (const void *valaddr, struct type *type,
       struct value_print_options opts = *options;
       opts.format = 0;
       opts.deref_ref = 0;
-      val_print (type, valaddr, 0, 0, stream, 0, &opts,
+      val_print (type, (const gdb_byte *) valaddr, 0, 0, stream, 0, &opts,
 		 current_language);
       return;
     }
@@ -386,20 +386,22 @@ print_scalar_formatted (const void *valaddr, struct type *type,
       switch (options->format)
 	{
 	case 'o':
-	  print_octal_chars (stream, valaddr, len, byte_order);
+	  print_octal_chars (stream, (const gdb_byte *) valaddr,
+			     len, byte_order);
 	  return;
 	case 'u':
 	case 'd':
-	  print_decimal_chars (stream, valaddr, len, byte_order);
+	  print_decimal_chars (stream, (const gdb_byte *) valaddr,
+			       len, byte_order);
 	  return;
 	case 't':
-	  print_binary_chars (stream, valaddr, len, byte_order);
+	  print_binary_chars (stream, (const gdb_byte *) valaddr, len, byte_order);
 	  return;
 	case 'x':
-	  print_hex_chars (stream, valaddr, len, byte_order);
+	  print_hex_chars (stream, (const gdb_byte *) valaddr, len, byte_order);
 	  return;
 	case 'c':
-	  print_char_chars (stream, type, valaddr, len, byte_order);
+	  print_char_chars (stream, type, (const gdb_byte *) valaddr, len, byte_order);
 	  return;
 	default:
 	  break;
@@ -407,7 +409,7 @@ print_scalar_formatted (const void *valaddr, struct type *type,
     }
 
   if (options->format != 'f')
-    val_long = unpack_long (type, valaddr);
+    val_long = unpack_long (type, (const gdb_byte *) valaddr);
 
   /* If the value is a pointer, and pointers and addresses are not the
      same, then at this point, the value's length (in target bytes) is
@@ -463,7 +465,7 @@ print_scalar_formatted (const void *valaddr, struct type *type,
 
     case 'a':
       {
-	CORE_ADDR addr = unpack_pointer (type, valaddr);
+	CORE_ADDR addr = unpack_pointer (type, (const gdb_byte *) valaddr);
 
 	print_address (gdbarch, addr, stream);
       }
@@ -485,7 +487,7 @@ print_scalar_formatted (const void *valaddr, struct type *type,
 
     case 'f':
       type = float_type_from_length (type);
-      print_floating (valaddr, type, stream);
+      print_floating ((const gdb_byte *) valaddr, type, stream);
       break;
 
     case 0:
@@ -1969,7 +1971,8 @@ printf_command (char *arg, int from_tty)
   int allocated_args = 20;
   struct cleanup *old_cleanups;
 
-  val_args = xmalloc (allocated_args * sizeof (struct value *));
+  val_args = (struct value **) xmalloc (allocated_args
+					* sizeof (struct value *));
   old_cleanups = make_cleanup (free_current_contents, &val_args);
 
   if (s == 0)
@@ -2053,7 +2056,7 @@ printf_command (char *arg, int from_tty)
     s++;
 
   /* Need extra space for the '\0's.  Doubling the size is sufficient.  */
-  substrings = alloca (strlen (string) * 2);
+  substrings = (char *) alloca (strlen (string) * 2);
   current_substring = substrings;
 
   {
@@ -2354,7 +2357,7 @@ printf_command (char *arg, int from_tty)
 	      struct type *wctype = lookup_typename (current_language, gdbarch,
 						     "wchar_t", NULL, 0);
 	      int wcwidth = TYPE_LENGTH (wctype);
-	      gdb_byte *buf = alloca (wcwidth);
+	      gdb_byte *buf = (gdb_byte *) alloca (wcwidth);
 	      struct obstack output;
 	      struct cleanup *inner_cleanup;
 
@@ -2599,7 +2602,7 @@ printf_command (char *arg, int from_tty)
 	      long val = value_as_long (val_args[i]);
 #endif
 
-	      fmt = alloca (strlen (current_substring) + 5);
+	      fmt = (char *) alloca (strlen (current_substring) + 5);
 
 	      /* Copy up to the leading %.  */
 	      p = current_substring;

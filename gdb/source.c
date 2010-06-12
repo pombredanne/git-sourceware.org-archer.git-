@@ -706,7 +706,7 @@ openp (const char *path, int opts, const char *string,
 
       if (is_regular_file (string))
 	{
-	  filename = alloca (strlen (string) + 1);
+	  filename = (char *) alloca (strlen (string) + 1);
 	  strcpy (filename, string);
 	  fd = open (filename, mode);
 	  if (fd >= 0)
@@ -737,7 +737,7 @@ openp (const char *path, int opts, const char *string,
     string += 2;
 
   alloclen = strlen (path) + strlen (string) + 2;
-  filename = alloca (alloclen);
+  filename = (char *) alloca (alloclen);
   fd = -1;
   for (p = path; p; p = p1 ? p1 + 1 : 0)
     {
@@ -759,7 +759,7 @@ openp (const char *path, int opts, const char *string,
 	  if (newlen > alloclen)
 	    {
 	      alloclen = newlen;
-	      filename = alloca (alloclen);
+	      filename = (char *) alloca (alloclen);
 	    }
 	  strcpy (filename, current_directory);
 	}
@@ -872,7 +872,7 @@ substitute_path_rule_matches (const struct substitute_path_rule *rule,
      comparison routine, so we need to extract the first FROM_LEN
      characters from PATH first and use that to do the comparison.  */
 
-  path_start = alloca (from_len + 1);
+  path_start = (char *) alloca (from_len + 1);
   strncpy (path_start, path, from_len);
   path_start[from_len] = '\0';
 
@@ -1329,7 +1329,7 @@ print_source_lines_base (struct symtab *s, int line, int stopline, int noerror)
 
       if (!noerror)
 	{
-	  char *name = alloca (strlen (s->filename) + 100);
+	  char *name = (char *) alloca (strlen (s->filename) + 100);
 	  sprintf (name, "%d\t%s", line, s->filename);
 	  print_sys_errmsg (name, errno);
 	}
@@ -1563,7 +1563,7 @@ forward_search_command (char *regex, int from_tty)
       int cursize, newsize;
 
       cursize = 256;
-      buf = xmalloc (cursize);
+      buf = (char *) xmalloc (cursize);
       p = buf;
 
       c = getc (stream);
@@ -1575,7 +1575,7 @@ forward_search_command (char *regex, int from_tty)
 	  if (p - buf == cursize)
 	    {
 	      newsize = cursize + cursize / 2;
-	      buf = xrealloc (buf, newsize);
+	      buf = (char *) xrealloc (buf, newsize);
 	      p = buf + cursize;
 	      cursize = newsize;
 	    }
@@ -1733,7 +1733,8 @@ add_substitute_path_rule (char *from, char *to)
   struct substitute_path_rule *rule;
   struct substitute_path_rule *new_rule;
 
-  new_rule = xmalloc (sizeof (struct substitute_path_rule));
+  new_rule = (struct substitute_path_rule *)
+    xmalloc (sizeof (struct substitute_path_rule));
   new_rule->from = xstrdup (from);
   new_rule->to = xstrdup (to);
   new_rule->next = NULL;
