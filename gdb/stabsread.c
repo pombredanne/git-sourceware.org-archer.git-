@@ -707,7 +707,7 @@ define_symbol (CORE_ADDR valu, char *string, int desc, int type,
       SYMBOL_LANGUAGE (sym) = current_subfile->language;
       if (SYMBOL_LANGUAGE (sym) == language_cplus)
 	{
-	  char *name = alloca (p - string + 1);
+	  char *name = (char *) alloca (p - string + 1);
 
 	  memcpy (name, string, p - string);
 	  name[p - string] = '\0';
@@ -773,8 +773,8 @@ define_symbol (CORE_ADDR valu, char *string, int desc, int type,
 
 	    dbl_type = objfile_type (objfile)->builtin_double;
 	    dbl_valu =
-	      obstack_alloc (&objfile->objfile_obstack,
-			     TYPE_LENGTH (dbl_type));
+	      (gdb_byte *) obstack_alloc (&objfile->objfile_obstack,
+					  TYPE_LENGTH (dbl_type));
 	    store_typed_floating (dbl_valu, dbl_type, d);
 
 	    SYMBOL_TYPE (sym) = dbl_type;
@@ -855,7 +855,8 @@ define_symbol (CORE_ADDR valu, char *string, int desc, int type,
 	    SYMBOL_TYPE (sym) = create_array_type (NULL,
 				  objfile_type (objfile)->builtin_char,
 				  range_type);
-	    string_value = obstack_alloc (&objfile->objfile_obstack, ind + 1);
+	    string_value
+	      = (gdb_byte *) obstack_alloc (&objfile->objfile_obstack, ind + 1);
 	    memcpy (string_value, string_local, ind + 1);
 	    p++;
 
@@ -1608,7 +1609,7 @@ again:
 	  type_name = NULL;
 	  if (current_subfile->language == language_cplus)
 	    {
-	      char *new_name, *name = alloca (p - *pp + 1);
+	      char *new_name, *name = (char *) alloca (p - *pp + 1);
 
 	      memcpy (name, *pp, p - *pp);
 	      name[p - *pp] = '\0';
@@ -1794,7 +1795,7 @@ again:
         while (**pp && **pp != '#')
           {
             struct type *arg_type = read_type (pp, objfile);
-            struct type_list *new = alloca (sizeof (*new));
+            struct type_list *new = (struct type_list *) alloca (sizeof (*new));
             new->type = arg_type;
             new->next = arg_types;
             arg_types = new;
@@ -2041,7 +2042,8 @@ static const struct objfile_data *rs6000_builtin_type_data;
 static struct type *
 rs6000_builtin_type (int typenum, struct objfile *objfile)
 {
-  struct type **negative_types = objfile_data (objfile, rs6000_builtin_type_data);
+  struct type **negative_types
+    = (struct type **) objfile_data (objfile, rs6000_builtin_type_data);
 
   /* We recognize types numbered from -NUMBER_RECOGNIZED to -1.  */
 #define NUMBER_RECOGNIZED 34
@@ -2056,8 +2058,10 @@ rs6000_builtin_type (int typenum, struct objfile *objfile)
   if (!negative_types)
     {
       /* This includes an empty slot for type number -0.  */
-      negative_types = OBSTACK_CALLOC (&objfile->objfile_obstack,
-				       NUMBER_RECOGNIZED + 1, struct type *);
+      negative_types
+	= (struct type **) OBSTACK_CALLOC (&objfile->objfile_obstack,
+					   NUMBER_RECOGNIZED + 1,
+					   struct type *);
       set_objfile_data (objfile, rs6000_builtin_type_data, negative_types);
     }
 

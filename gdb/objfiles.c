@@ -81,7 +81,8 @@ objfiles_pspace_data_cleanup (struct program_space *pspace, void *arg)
 {
   struct objfile_pspace_info *info;
 
-  info = program_space_data (pspace, objfiles_pspace_data);
+  info = (struct objfile_pspace_info *)
+    program_space_data (pspace, objfiles_pspace_data);
   if (info != NULL)
     {
       xfree (info->sections);
@@ -97,7 +98,8 @@ get_objfile_pspace_data (struct program_space *pspace)
 {
   struct objfile_pspace_info *info;
 
-  info = program_space_data (pspace, objfiles_pspace_data);
+  info = (struct objfile_pspace_info *)
+    program_space_data (pspace, objfiles_pspace_data);
   if (info == NULL)
     {
       info = XZALLOC (struct objfile_pspace_info);
@@ -170,7 +172,8 @@ build_objfile_section_table (struct objfile *objfile)
   objfile->sections_end = 0;
   bfd_map_over_sections (objfile->obfd,
 			 add_to_objfile_sections, (void *) objfile);
-  objfile->sections = obstack_finish (&objfile->objfile_obstack);
+  objfile->sections
+    = (struct obj_section *) obstack_finish (&objfile->objfile_obstack);
   objfile->sections_end = objfile->sections + (size_t) objfile->sections_end;
   return (0);
 }
@@ -674,7 +677,7 @@ free_objfile (struct objfile *objfile)
 static void
 do_free_objfile_cleanup (void *obj)
 {
-  free_objfile (obj);
+  free_objfile ((struct objfile *) obj);
 }
 
 struct cleanup *
@@ -873,7 +876,7 @@ objfile_relocate (struct objfile *objfile, struct section_offsets *new_offsets)
 
       gdb_assert (debug_objfile->num_sections
 		  == bfd_count_sections (debug_objfile->obfd));
-      new_debug_offsets = 
+      new_debug_offsets = (struct section_offsets *)
 	xmalloc (SIZEOF_N_SECTION_OFFSETS (debug_objfile->num_sections));
       make_cleanup (xfree, new_debug_offsets);
       relative_addr_info_to_section_offsets (new_debug_offsets,
@@ -1258,7 +1261,7 @@ update_section_map (struct program_space *pspace,
       return;
     }
 
-  map = xmalloc (alloc_size * sizeof (*map));
+  map = (struct obj_section **) xmalloc (alloc_size * sizeof (*map));
 
   i = 0;
   ALL_PSPACE_OBJFILES (pspace, objfile)
@@ -1272,7 +1275,7 @@ update_section_map (struct program_space *pspace,
 
   if (map_size < alloc_size)
     /* Some sections were eliminated.  Trim excess space.  */
-    map = xrealloc (map, map_size * sizeof (*map));
+    map = (struct obj_section **) xrealloc (map, map_size * sizeof (*map));
   else
     gdb_assert (alloc_size == map_size);
 
@@ -1503,7 +1506,7 @@ gdb_bfd_ref (struct bfd *abfd)
   if (abfd == NULL)
     return NULL;
 
-  p_refcount = bfd_usrdata (abfd);
+  p_refcount = (int *) bfd_usrdata (abfd);
 
   if (p_refcount != NULL)
     {
@@ -1511,7 +1514,7 @@ gdb_bfd_ref (struct bfd *abfd)
       return abfd;
     }
 
-  p_refcount = xmalloc (sizeof (*p_refcount));
+  p_refcount = (int *) xmalloc (sizeof (*p_refcount));
   *p_refcount = 1;
   bfd_usrdata (abfd) = p_refcount;
 
@@ -1528,7 +1531,7 @@ gdb_bfd_unref (struct bfd *abfd)
   if (abfd == NULL)
     return;
 
-  p_refcount = bfd_usrdata (abfd);
+  p_refcount = (int *) bfd_usrdata (abfd);
 
   /* Valid range for p_refcount: a pointer to int counter, which has a
      value of 1 (single owner) or 2 (shared).  */

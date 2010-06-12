@@ -197,8 +197,9 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
 	  void *buffer;
 
 	  buffer = xmalloc (length_size);
-	  read_memory (addr + length_pos, buffer, length_size);
-	  string_length = extract_unsigned_integer (buffer, length_size,
+	  read_memory (addr + length_pos, (gdb_byte *) buffer, length_size);
+	  string_length = extract_unsigned_integer ((const gdb_byte *) buffer,
+						    length_size,
 						    byte_order);
 	  xfree (buffer);
 	  i = val_print_string (char_type ,addr + string_pos, string_length, stream, options);
@@ -909,7 +910,7 @@ pascal_object_print_value (struct type *type, const gdb_byte *valaddr,
       if (boffset != -1 && (boffset < 0 || boffset >= TYPE_LENGTH (type)))
 	{
 	  /* FIXME (alloc): not safe is baseclass is really really big. */
-	  gdb_byte *buf = alloca (TYPE_LENGTH (baseclass));
+	  gdb_byte *buf = (gdb_byte *) alloca (TYPE_LENGTH (baseclass));
 
 	  base_valaddr = buf;
 	  if (target_read_memory (address + boffset, buf,

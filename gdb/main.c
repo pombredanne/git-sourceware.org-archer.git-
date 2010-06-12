@@ -252,7 +252,7 @@ captured_command_loop (void *data)
 static int
 captured_main (void *data)
 {
-  struct captured_main_args *context = data;
+  struct captured_main_args *context = (struct captured_main_args *) data;
   int argc = context->argc;
   char **argv = context->argv;
   static int quiet = 0;
@@ -539,8 +539,9 @@ captured_main (void *data)
 	    if (ncmd >= cmdsize)
 	      {
 		cmdsize *= 2;
-		cmdarg = xrealloc ((char *) cmdarg,
-				   cmdsize * sizeof (*cmdarg));
+		cmdarg = (struct cmdarg *)
+		  xrealloc ((char *) cmdarg,
+			    cmdsize * sizeof (*cmdarg));
 	      }
 	    break;
 	  case 'X':
@@ -549,8 +550,9 @@ captured_main (void *data)
 	    if (ncmd >= cmdsize)
 	      {
 		cmdsize *= 2;
-		cmdarg = xrealloc ((char *) cmdarg,
-				   cmdsize * sizeof (*cmdarg));
+		cmdarg = (struct cmdarg *)
+		  xrealloc ((char *) cmdarg,
+			    cmdsize * sizeof (*cmdarg));
 	      }
 	    break;
 	  case 'B':

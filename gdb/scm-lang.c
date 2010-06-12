@@ -296,7 +296,7 @@ static struct gdbarch_data *scm_type_data;
 const struct builtin_scm_type *
 builtin_scm_type (struct gdbarch *gdbarch)
 {
-  return gdbarch_data (gdbarch, scm_type_data);
+  return (const struct builtin_scm_type *) gdbarch_data (gdbarch, scm_type_data);
 }
 
 void

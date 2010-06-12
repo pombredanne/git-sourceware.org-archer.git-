@@ -59,13 +59,14 @@ memory_map_start_memory (struct gdb_xml_parser *parser,
 			 const struct gdb_xml_element *element,
 			 void *user_data, VEC(gdb_xml_value_s) *attributes)
 {
-  struct memory_map_parsing_data *data = user_data;
+  struct memory_map_parsing_data *data
+    = (struct memory_map_parsing_data *) user_data;
   struct mem_region *r = VEC_safe_push (mem_region_s, *data->memory_map, NULL);
   ULONGEST *start_p, *length_p, *type_p;
 
-  start_p = VEC_index (gdb_xml_value_s, attributes, 0)->value;
-  length_p = VEC_index (gdb_xml_value_s, attributes, 1)->value;
-  type_p = VEC_index (gdb_xml_value_s, attributes, 2)->value;
+  start_p = (ULONGEST *) VEC_index (gdb_xml_value_s, attributes, 0)->value;
+  length_p = (ULONGEST *) VEC_index (gdb_xml_value_s, attributes, 1)->value;
+  type_p = (ULONGEST *) VEC_index (gdb_xml_value_s, attributes, 2)->value;
 
   mem_region_init (r);
   r->lo = *start_p;
@@ -82,7 +83,8 @@ memory_map_end_memory (struct gdb_xml_parser *parser,
 		       const struct gdb_xml_element *element,
 		       void *user_data, const char *body_text)
 {
-  struct memory_map_parsing_data *data = user_data;
+  struct memory_map_parsing_data *data
+    = (struct memory_map_parsing_data *) user_data;
   struct mem_region *r = VEC_last (mem_region_s, *data->memory_map);
 
   if (r->attrib.mode == MEM_FLASH && r->attrib.blocksize == -1)
@@ -97,10 +99,11 @@ memory_map_start_property (struct gdb_xml_parser *parser,
 			   const struct gdb_xml_element *element,
 			   void *user_data, VEC(gdb_xml_value_s) *attributes)
 {
-  struct memory_map_parsing_data *data = user_data;
+  struct memory_map_parsing_data *data
+    = (struct memory_map_parsing_data *) user_data;
   char *name;
 
-  name = VEC_index (gdb_xml_value_s, attributes, 0)->value;
+  name = (char *) VEC_index (gdb_xml_value_s, attributes, 0)->value;
   snprintf (data->property_name, sizeof (data->property_name), "%s", name);
 }
 
@@ -111,7 +114,8 @@ memory_map_end_property (struct gdb_xml_parser *parser,
 			 const struct gdb_xml_element *element,
 			 void *user_data, const char *body_text)
 {
-  struct memory_map_parsing_data *data = user_data;
+  struct memory_map_parsing_data *data
+    = (struct memory_map_parsing_data *) user_data;
   char *name = data->property_name;
 
   if (strcmp (name, "blocksize") == 0)
@@ -129,7 +133,7 @@ memory_map_end_property (struct gdb_xml_parser *parser,
 static void
 clear_result (void *p)
 {
-  VEC(mem_region_s) **result = p;
+  VEC(mem_region_s) **result = (VEC(mem_region_s) **) p;
   VEC_free (mem_region_s, *result);
   *result = NULL;
 }

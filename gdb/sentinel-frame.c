@@ -49,7 +49,8 @@ sentinel_frame_prev_register (struct frame_info *this_frame,
 			      int regnum)
 {
   struct gdbarch *gdbarch = get_frame_arch (this_frame);
-  struct frame_unwind_cache *cache = *this_prologue_cache;
+  struct frame_unwind_cache *cache
+    = (struct frame_unwind_cache *) *this_prologue_cache;
   struct value *value;
 
   /* Return the actual value.  */
@@ -81,7 +82,8 @@ static struct gdbarch *
 sentinel_frame_prev_arch (struct frame_info *this_frame,
 			  void **this_prologue_cache)
 {
-  struct frame_unwind_cache *cache = *this_prologue_cache;
+  struct frame_unwind_cache *cache
+    = (struct frame_unwind_cache *) *this_prologue_cache;
 
   return get_regcache_arch (cache->regcache);
 }

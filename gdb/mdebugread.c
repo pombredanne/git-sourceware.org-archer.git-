@@ -356,7 +356,7 @@ mdebug_build_psymtabs (struct objfile *objfile,
       info->fdr = (FDR *) obstack_alloc (&objfile->objfile_obstack,
 					 (info->symbolic_header.ifdMax
 					  * sizeof (FDR)));
-      fdr_src = info->external_fdr;
+      fdr_src = (char *) info->external_fdr;
       fdr_end = (fdr_src
 		 + info->symbolic_header.ifdMax * swap->external_fdr_size);
       fdr_ptr = info->fdr;
@@ -1343,7 +1343,8 @@ static struct type *
 basic_type (int bt, struct objfile *objfile)
 {
   struct gdbarch *gdbarch = get_objfile_arch (objfile);
-  struct type **map_bt = objfile_data (objfile, basic_type_data);
+  struct type **map_bt = (struct type **) objfile_data (objfile,
+							basic_type_data);
   struct type *tp;
 
   if (bt >= btMax)
@@ -1351,8 +1352,8 @@ basic_type (int bt, struct objfile *objfile)
 
   if (!map_bt)
     {
-      map_bt = OBSTACK_CALLOC (&objfile->objfile_obstack,
-			       btMax, struct type *);
+      map_bt = (struct type **) OBSTACK_CALLOC (&objfile->objfile_obstack,
+						btMax, struct type *);
       set_objfile_data (objfile, basic_type_data, map_bt);
     }
 
@@ -2837,10 +2838,11 @@ parse_partial_symbols (struct objfile *objfile)
 		    /* Concatinate stabstring2 with stabstring1 */
 		    if (stabstring
 		     && stabstring != debug_info->ss + fh->issBase + sh.iss)
-		      stabstring = xrealloc (stabstring, len + len2 + 1);
+		      stabstring = (char *) xrealloc (stabstring,
+						      len + len2 + 1);
 		    else
 		      {
-			stabstring = xmalloc (len + len2 + 1);
+			stabstring = (char *) xmalloc (len + len2 + 1);
 			strcpy (stabstring, stabstring1);
 		      }
 		    strcpy (stabstring + len, stabstring2);
@@ -3240,7 +3242,7 @@ parse_partial_symbols (struct objfile *objfile)
 			if (! pst)
 			  {
 			    int name_len = p - namestring;
-			    char *name = xmalloc (name_len + 1);
+			    char *name = (char *) xmalloc (name_len + 1);
 
 			    memcpy (name, namestring, name_len);
 			    name[name_len] = '\0';
@@ -3262,7 +3264,7 @@ parse_partial_symbols (struct objfile *objfile)
 			if (! pst)
 			  {
 			    int name_len = p - namestring;
-			    char *name = xmalloc (name_len + 1);
+			    char *name = (char *) xmalloc (name_len + 1);
 
 			    memcpy (name, namestring, name_len);
 			    name[name_len] = '\0';
@@ -4774,7 +4776,7 @@ new_block (enum block_type type)
   /* FIXME: carlton/2003-09-11: This should use allocate_block to
      allocate the block.  Which, in turn, suggests that the block
      should be allocated on an obstack.  */
-  struct block *retval = xzalloc (sizeof (struct block));
+  struct block *retval = (struct block *) xzalloc (sizeof (struct block));
 
   if (type == FUNCTION_BLOCK)
     BLOCK_DICT (retval) = dict_create_linear_expandable ();

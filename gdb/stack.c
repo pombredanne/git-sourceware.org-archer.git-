@@ -95,7 +95,7 @@ struct print_stack_frame_args
 static int
 print_stack_frame_stub (void *args)
 {
-  struct print_stack_frame_args *p = args;
+  struct print_stack_frame_args *p = (struct print_stack_frame_args *) args;
   int center = (p->print_what == SRC_LINE || p->print_what == SRC_AND_LOC);
 
   print_frame_info (p->frame, p->print_level, p->print_what, p->print_args);
@@ -420,7 +420,7 @@ print_frame_args (struct symbol *func, struct frame_info *frame,
 static int
 print_args_stub (void *args)
 {
-  struct print_args_args *p = args;
+  struct print_args_args *p = (struct print_args_args *) args;
   struct gdbarch *gdbarch = get_frame_arch (p->frame);
   int numargs;
 
@@ -484,7 +484,8 @@ struct gdb_disassembly_stub_args
 static void
 gdb_disassembly_stub (void *args)
 {
-  struct gdb_disassembly_stub_args *p = args;
+  struct gdb_disassembly_stub_args *p
+    = (struct gdb_disassembly_stub_args *) args;
 
   gdb_disassembly (p->gdbarch, uiout, 0,
                    DISASSEMBLY_RAW_INSN, p->how_many,
@@ -1382,7 +1383,7 @@ struct backtrace_command_args
 static int
 backtrace_command_stub (void *data)
 {
-  struct backtrace_command_args *args = data;
+  struct backtrace_command_args *args = (struct backtrace_command_args *) data;
 
   backtrace_command_1 (args->count_exp, args->show_locals, args->from_tty);
   return 0;
@@ -1423,7 +1424,7 @@ backtrace_command (char *arg, int from_tty)
 	{
 	  if (arglen > 0)
 	    {
-	      arg = xmalloc (arglen + 1);
+	      arg = (char *) xmalloc (arglen + 1);
 	      memset (arg, 0, arglen + 1);
 	      for (i = 0; i < (argc + 1); i++)
 		{
@@ -1582,7 +1583,8 @@ do_print_variable_and_value (const char *print_name,
 			     struct symbol *sym,
 			     void *cb_data)
 {
-  struct print_variable_and_value_data *p = cb_data;
+  struct print_variable_and_value_data *p
+    = (struct print_variable_and_value_data *) cb_data;
 
   print_variable_and_value (print_name, sym,
 			    p->frame, p->stream, p->num_tabs);

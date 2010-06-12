@@ -307,7 +307,7 @@ void
 do_restore_instream_cleanup (void *stream)
 {
   /* Restore the previous input stream.  */
-  instream = stream;
+  instream = (FILE *) stream;
 }
 
 /* Read commands from STREAM.  */
@@ -729,7 +729,8 @@ struct gdb_readline_wrapper_cleanup
 static void
 gdb_readline_wrapper_cleanup (void *arg)
 {
-  struct gdb_readline_wrapper_cleanup *cleanup = arg;
+  struct gdb_readline_wrapper_cleanup *cleanup
+    = (struct gdb_readline_wrapper_cleanup *) arg;
 
   rl_already_prompted = cleanup->already_prompted_orig;
 
@@ -751,7 +752,7 @@ gdb_readline_wrapper (char *prompt)
   struct gdb_readline_wrapper_cleanup *cleanup;
   char *retval;
 
-  cleanup = xmalloc (sizeof (*cleanup));
+  cleanup = (struct gdb_readline_wrapper_cleanup *) xmalloc (sizeof (*cleanup));
   cleanup->handler_orig = input_handler;
   input_handler = gdb_readline_wrapper_line;
 
@@ -863,7 +864,7 @@ command_line_input (char *prompt_arg, int repeat, char *annotation_suffix)
 
   if (annotation_level > 1 && instream == stdin)
     {
-      local_prompt = alloca ((prompt_arg == NULL ? 0 : strlen (prompt_arg))
+      local_prompt = (char *) alloca ((prompt_arg == NULL ? 0 : strlen (prompt_arg))
 			     + strlen (annotation_suffix) + 40);
       if (prompt_arg == NULL)
 	local_prompt[0] = '\0';
@@ -1039,7 +1040,7 @@ command_line_input (char *prompt_arg, int repeat, char *annotation_suffix)
     {
       if (linelength > linesize)
 	{
-	  line = xrealloc (line, linelength);
+	  line = (char *) xrealloc (line, linelength);
 	  linesize = linelength;
 	}
       strcpy (line, linebuffer);
@@ -1127,7 +1128,7 @@ struct qt_args
 static int
 kill_or_detach (struct inferior *inf, void *args)
 {
-  struct qt_args *qt = args;
+  struct qt_args *qt = (struct qt_args *) args;
   struct thread_info *thread;
 
   if (inf->pid == 0)
@@ -1158,7 +1159,7 @@ kill_or_detach (struct inferior *inf, void *args)
 static int
 print_inferior_quit_action (struct inferior *inf, void *arg)
 {
-  struct ui_file *stb = arg;
+  struct ui_file *stb = (struct ui_file *) arg;
 
   if (inf->pid == 0)
     return 0;

@@ -651,7 +651,7 @@ struct record_message_args {
 static int
 record_message_wrapper (void *args)
 {
-  struct record_message_args *record_args = args;
+  struct record_message_args *record_args = (struct record_message_args *) args;
 
   return record_message (record_args->regcache, record_args->signal);
 }
@@ -721,7 +721,7 @@ record_exec_insn (struct regcache *regcache, struct gdbarch *gdbarch,
 	/* Nothing to do if the entry is flagged not_accessible.  */
         if (!entry->u.mem.mem_entry_not_accessible)
           {
-            gdb_byte *mem = alloca (entry->u.mem.len);
+            gdb_byte *mem = (gdb_byte *) alloca (entry->u.mem.len);
 
             if (record_debug > 1)
               fprintf_unfiltered (gdb_stdlog,
@@ -816,7 +816,7 @@ record_core_open_1 (char *name, int from_tty)
 
   /* Get record_core_regbuf.  */
   target_fetch_registers (regcache, -1);
-  record_core_regbuf = xmalloc (MAX_REGISTER_SIZE * regnum);
+  record_core_regbuf = (gdb_byte *) xmalloc (MAX_REGISTER_SIZE * regnum);
   for (i = 0; i < regnum; i ++)
     regcache_raw_collect (regcache, i,
 			  record_core_regbuf + MAX_REGISTER_SIZE * i);
@@ -2318,7 +2318,7 @@ cmd_record_restore (char *args, int from_tty)
 static void
 record_save_cleanups (void *data)
 {
-  bfd *obfd = data;
+  bfd *obfd = (bfd *) data;
   char *pathname = xstrdup (bfd_get_filename (obfd));
 
   bfd_close (obfd);

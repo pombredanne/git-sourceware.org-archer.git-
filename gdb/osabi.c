@@ -412,7 +412,7 @@ check_note (bfd *abfd, asection *sect, const char *note,
 void
 generic_elf_osabi_sniff_abi_tag_sections (bfd *abfd, asection *sect, void *obj)
 {
-  enum gdb_osabi *osabi = obj;
+  enum gdb_osabi *osabi = (enum gdb_osabi *) obj;
   const char *name;
   unsigned int sectsize;
   char *note;
@@ -424,7 +424,7 @@ generic_elf_osabi_sniff_abi_tag_sections (bfd *abfd, asection *sect, void *obj)
   if (sectsize > MAX_NOTESZ)
     sectsize = MAX_NOTESZ;
 
-  note = alloca (sectsize);
+  note = (char *) alloca (sectsize);
   bfd_get_section_contents (abfd, sect, note, 0, sectsize);
 
   /* .note.ABI-tag notes, used by GNU/Linux and FreeBSD.  */

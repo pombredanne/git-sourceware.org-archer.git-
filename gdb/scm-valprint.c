@@ -302,7 +302,7 @@ taloop:
 	  {
 	    int len = SCM_LENGTH (svalue);
 
-	    char *str = alloca (len);
+	    char *str = (char *) alloca (len);
 	    read_memory (SCM_CDR (svalue), (gdb_byte *) str, len + 1);
 	    /* Should handle weird characters FIXME */
 	    str[len] = '\0';

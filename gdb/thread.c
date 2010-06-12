@@ -152,7 +152,7 @@ new_thread (ptid_t ptid)
 {
   struct thread_info *tp;
 
-  tp = xcalloc (1, sizeof (*tp));
+  tp = (struct thread_info *) xcalloc (1, sizeof (*tp));
 
   tp->ptid = ptid;
   tp->num = ++highest_thread_num;
@@ -726,7 +726,7 @@ finish_thread_state (ptid_t ptid)
 void
 finish_thread_state_cleanup (void *arg)
 {
-  ptid_t *ptid_p = arg;
+  ptid_t *ptid_p = (ptid_t *) arg;
 
   gdb_assert (arg);
 
@@ -975,7 +975,7 @@ static void
 do_restore_current_thread_cleanup (void *arg)
 {
   struct thread_info *tp;
-  struct current_thread_cleanup *old = arg;
+  struct current_thread_cleanup *old = (struct current_thread_cleanup *) arg;
 
   tp = find_thread_ptid (old->inferior_ptid);
 
@@ -1007,7 +1007,7 @@ do_restore_current_thread_cleanup (void *arg)
 static void
 restore_current_thread_cleanup_dtor (void *arg)
 {
-  struct current_thread_cleanup *old = arg;
+  struct current_thread_cleanup *old = (struct current_thread_cleanup *) arg;
   struct thread_info *tp;
 
   tp = find_thread_ptid (old->inferior_ptid);
@@ -1023,7 +1023,8 @@ make_cleanup_restore_current_thread (void)
   struct frame_info *frame;
   struct current_thread_cleanup *old;
 
-  old = xmalloc (sizeof (struct current_thread_cleanup));
+  old = (struct current_thread_cleanup *)
+    xmalloc (sizeof (struct current_thread_cleanup));
   old->inferior_ptid = inferior_ptid;
   old->inf_id = current_inferior ()->num;
 
@@ -1212,7 +1213,7 @@ do_captured_thread_select (struct ui_out *uiout, void *tidstr)
   int num;
   struct thread_info *tp;
 
-  num = value_as_long (parse_and_eval (tidstr));
+  num = value_as_long (parse_and_eval ((char *) tidstr));
 
   tp = find_thread_id (num);
 

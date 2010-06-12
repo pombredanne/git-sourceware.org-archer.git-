@@ -736,7 +736,7 @@ copy_name (struct stoken token)
   if (namecopy_size < token.length + 1)
     {
       namecopy_size = token.length + 1;
-      namecopy = xrealloc (namecopy, token.length + 1);
+      namecopy = (char *) xrealloc (namecopy, token.length + 1);
     }
       
   memcpy (namecopy, token.ptr, token.length);
@@ -1530,7 +1530,7 @@ exp_iterate (struct expression *exp,
 static int
 exp_uses_objfile_iter (struct objfile *exp_objfile, void *objfile_voidp)
 {
-  struct objfile *objfile = objfile_voidp;
+  struct objfile *objfile = (struct objfile *) objfile_voidp;
 
   if (exp_objfile->separate_debug_objfile_backlink)
     exp_objfile = exp_objfile->separate_debug_objfile_backlink;
