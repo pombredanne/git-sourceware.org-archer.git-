@@ -227,7 +227,8 @@ find_pc_sect_psymtab (struct objfile *objfile, CORE_ADDR pc,
 
   if (objfile->psymtabs_addrmap != NULL)
     {
-      pst = addrmap_find (objfile->psymtabs_addrmap, pc);
+      pst = (struct partial_symtab *)
+	addrmap_find (objfile->psymtabs_addrmap, pc);
       if (pst != NULL)
 	{
 	  /* FIXME: addrmaps currently do not handle overlayed sections,
@@ -1221,8 +1222,8 @@ const struct quick_symbol_functions psym_functions =
 static int
 compare_psymbols (const void *s1p, const void *s2p)
 {
-  struct partial_symbol *const *s1 = s1p;
-  struct partial_symbol *const *s2 = s2p;
+  struct partial_symbol *const *s1 = (struct partial_symbol *const *) s1p;
+  struct partial_symbol *const *s2 = (struct partial_symbol *const *) s2p;
 
   return strcmp_iw_ordered (SYMBOL_SEARCH_NAME (*s1),
 			    SYMBOL_SEARCH_NAME (*s2));
@@ -1302,8 +1303,9 @@ add_psymbol_to_bcache (char *name, int namelength, int copy_name,
   SYMBOL_SET_NAMES (&psymbol, name, namelength, copy_name, objfile);
 
   /* Stash the partial symbol away in the cache */
-  return bcache_full (&psymbol, sizeof (struct partial_symbol),
-		      objfile->psymbol_cache, added);
+  return (const struct partial_symbol *)
+    bcache_full (&psymbol, sizeof (struct partial_symbol),
+		 objfile->psymbol_cache, added);
 }
 
 /* Helper function, adds partial symbol to the given partial symbol

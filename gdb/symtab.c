@@ -376,7 +376,8 @@ struct demangled_name_entry
 static hashval_t
 hash_demangled_name_entry (const void *data)
 {
-  const struct demangled_name_entry *e = data;
+  const struct demangled_name_entry *e
+    = (const struct demangled_name_entry *) data;
 
   return htab_hash_string (e->mangled);
 }
@@ -385,8 +386,10 @@ hash_demangled_name_entry (const void *data)
 static int
 eq_demangled_name_entry (const void *a, const void *b)
 {
-  const struct demangled_name_entry *da = a;
-  const struct demangled_name_entry *db = b;
+  const struct demangled_name_entry *da
+    = (const struct demangled_name_entry *) a;
+  const struct demangled_name_entry *db
+    = (const struct demangled_name_entry *) b;
 
   return strcmp (da->mangled, db->mangled) == 0;
 }
@@ -533,7 +536,8 @@ symbol_set_names (struct general_symbol_info *gsymbol,
 	gsymbol->name = (char *) linkage_name;
       else
 	{
-	  gsymbol->name = obstack_alloc (&objfile->objfile_obstack, len + 1);
+	  gsymbol->name = (char *) obstack_alloc (&objfile->objfile_obstack,
+						  len + 1);
 	  memcpy (gsymbol->name, linkage_name, len);
 	  gsymbol->name[len] = '\0';
 	}
@@ -553,7 +557,7 @@ symbol_set_names (struct general_symbol_info *gsymbol,
       char *alloc_name;
 
       lookup_len = len + JAVA_PREFIX_LEN;
-      alloc_name = alloca (lookup_len + 1);
+      alloc_name = (char *) alloca (lookup_len + 1);
       memcpy (alloc_name, JAVA_PREFIX, JAVA_PREFIX_LEN);
       memcpy (alloc_name + JAVA_PREFIX_LEN, linkage_name, len);
       alloc_name[lookup_len] = '\0';
@@ -566,7 +570,7 @@ symbol_set_names (struct general_symbol_info *gsymbol,
       char *alloc_name;
 
       lookup_len = len;
-      alloc_name = alloca (lookup_len + 1);
+      alloc_name = (char *) alloca (lookup_len + 1);
       memcpy (alloc_name, linkage_name, len);
       alloc_name[lookup_len] = '\0';
 
@@ -603,10 +607,10 @@ symbol_set_names (struct general_symbol_info *gsymbol,
 	 us better bcache hit rates for partial symbols.  */
       if (!copy_name && lookup_name == linkage_name)
 	{
-	  *slot = obstack_alloc (&objfile->objfile_obstack,
-				 offsetof (struct demangled_name_entry,
-					   demangled)
-				 + demangled_len + 1);
+	  *slot = (const struct demangled_name_entry *)
+	    obstack_alloc (&objfile->objfile_obstack,
+			   offsetof (struct demangled_name_entry, demangled)
+			   + demangled_len + 1);
 	  (*slot)->mangled = (char *) lookup_name;
 	}
       else
@@ -614,10 +618,10 @@ symbol_set_names (struct general_symbol_info *gsymbol,
 	  /* If we must copy the mangled name, put it directly after
 	     the demangled name so we can have a single
 	     allocation.  */
-	  *slot = obstack_alloc (&objfile->objfile_obstack,
-				 offsetof (struct demangled_name_entry,
-					   demangled)
-				 + lookup_len + demangled_len + 2);
+	  *slot = (struct demangled_name_entry *)
+	    obstack_alloc (&objfile->objfile_obstack,
+			   offsetof (struct demangled_name_entry, demangled)
+			   + lookup_len + demangled_len + 2);
 	  (*slot)->mangled = &((*slot)->demangled[demangled_len + 1]);
 	  strcpy ((*slot)->mangled, lookup_name);
 	}
@@ -2718,7 +2722,7 @@ static void
 output_partial_symbol_filename (const char *fullname, const char *filename,
 				void *data)
 {
-  output_source_filename (fullname ? fullname : filename, data);
+  output_source_filename (fullname ? fullname : filename, (int *) data);
 }
 
 static void
@@ -2786,7 +2790,7 @@ free_search_symbols (struct symbol_search *symbols)
 static void
 do_free_search_symbols_cleanup (void *symbols)
 {
-  free_search_symbols (symbols);
+  free_search_symbols ((struct symbol_search *) symbols);
 }
 
 struct cleanup *
@@ -2855,7 +2859,7 @@ struct search_symbols_data
 static int
 search_symbols_file_matches (const char *filename, void *user_data)
 {
-  struct search_symbols_data *data = user_data;
+  struct search_symbols_data *data = (struct search_symbols_data *) user_data;
 
   return file_matches (filename, data->files, data->nfiles);
 }
@@ -2864,7 +2868,7 @@ search_symbols_file_matches (const char *filename, void *user_data)
 static int
 search_symbols_name_matches (const char *symname, void *user_data)
 {
-  struct search_symbols_data *data = user_data;
+  struct search_symbols_data *data = (struct search_symbols_data *) user_data;
 
   return data->regexp == NULL || re_exec (symname);
 }
@@ -3303,7 +3307,7 @@ rbreak_command (char *regexp, int from_tty)
 	  char * file_name;
 
 	  colon_index = colon - regexp;
-	  file_name = alloca (colon_index + 1);
+	  file_name = (char *) alloca (colon_index + 1);
 	  memcpy (file_name, regexp, colon_index);
 	  file_name[colon_index--] = 0;
 	  while (isspace (file_name[colon_index]))
@@ -3331,7 +3335,7 @@ rbreak_command (char *regexp, int from_tty)
 
 	  if (newlen > len)
 	    {
-	      string = xrealloc (string, newlen);
+	      string = (char *) xrealloc (string, newlen);
 	      len = newlen;
 	    }
 	  strcpy (string, p->symtab->filename);
@@ -3351,7 +3355,7 @@ rbreak_command (char *regexp, int from_tty)
 
 	  if (newlen > len)
 	    {
-	      string = xrealloc (string, newlen);
+	      string = (char *) xrealloc (string, newlen);
 	      len = newlen;
 	    }
 	  strcpy (string, "'");
@@ -3403,19 +3407,19 @@ completion_list_add_name (char *symname, char *sym_text, int sym_text_len,
 
     if (word == sym_text)
       {
-	new = xmalloc (strlen (symname) + 5);
+	new = (char *) xmalloc (strlen (symname) + 5);
 	strcpy (new, symname);
       }
     else if (word > sym_text)
       {
 	/* Return some portion of symname.  */
-	new = xmalloc (strlen (symname) + 5);
+	new = (char *) xmalloc (strlen (symname) + 5);
 	strcpy (new, symname + (word - sym_text));
       }
     else
       {
 	/* Return some of SYM_TEXT plus symname.  */
-	new = xmalloc (strlen (symname) + (sym_text - word) + 5);
+	new = (char *) xmalloc (strlen (symname) + (sym_text - word) + 5);
 	strncpy (new, word, sym_text - word);
 	new[sym_text - word] = '\0';
 	strcat (new, symname);
@@ -3460,7 +3464,7 @@ completion_list_objc_symbol (struct minimal_symbol *msymbol, char *sym_text,
 	tmplen = 1024;
       else
 	tmplen *= 2;
-      tmp = xrealloc (tmp, tmplen);
+      tmp = (char *) xrealloc (tmp, tmplen);
     }
   selector = strchr (method, ' ');
   if (selector != NULL)
@@ -3929,19 +3933,19 @@ add_filename_to_list (const char *fname, char *text, char *word,
   if (word == text)
     {
       /* Return exactly fname.  */
-      new = xmalloc (fnlen + 5);
+      new = (char *) xmalloc (fnlen + 5);
       strcpy (new, fname);
     }
   else if (word > text)
     {
       /* Return some portion of fname.  */
-      new = xmalloc (fnlen + 5);
+      new = (char *) xmalloc (fnlen + 5);
       strcpy (new, fname + (word - text));
     }
   else
     {
       /* Return some of TEXT plus fname.  */
-      new = xmalloc (fnlen + (text - word) + 5);
+      new = (char *) xmalloc (fnlen + (text - word) + 5);
       strncpy (new, word, text - word);
       new[text - word] = '\0';
       strcat (new, fname);
@@ -3985,7 +3989,8 @@ static void
 maybe_add_partial_symtab_filename (const char *fullname, const char *filename,
 				   void *user_data)
 {
-  struct add_partial_filename_data *data = user_data;
+  struct add_partial_filename_data *data
+    = (struct add_partial_filename_data *) user_data;
 
   if (not_interesting_fname (filename))
     return;
@@ -4383,9 +4388,8 @@ append_expanded_sal (struct symtabs_and_lines *sal,
 		     struct symtab *symtab,
 		     int lineno, CORE_ADDR pc)
 {
-  sal->sals = xrealloc (sal->sals,
-			sizeof (sal->sals[0])
-			* (sal->nelts + 1));
+  sal->sals = (struct symtab_and_line *)
+    xrealloc (sal->sals, sizeof (sal->sals[0]) * (sal->nelts + 1));
   init_sal (sal->sals + sal->nelts);
   sal->sals[sal->nelts].pspace = pspace;
   sal->sals[sal->nelts].symtab = symtab;
@@ -4480,7 +4484,8 @@ expand_line_sal (struct symtab_and_line sal)
   /* Only expand sals that represent file.c:line.  */
   if (sal.symtab == NULL || sal.line == 0 || sal.pc != 0)
     {
-      ret.sals = xmalloc (sizeof (struct symtab_and_line));
+      ret.sals
+	= (struct symtab_and_line *) xmalloc (sizeof (struct symtab_and_line));
       ret.sals[0] = sal;
       ret.nelts = 1;
       return ret;
@@ -4543,8 +4548,8 @@ expand_line_sal (struct symtab_and_line sal)
      that are in the same block.  If yes, the other PCs are filtered out.  */
 
   old_chain = save_current_program_space ();
-  filter = alloca (ret.nelts * sizeof (int));
-  blocks = alloca (ret.nelts * sizeof (struct block *));
+  filter = (int *) alloca (ret.nelts * sizeof (int));
+  blocks = (struct block **) alloca (ret.nelts * sizeof (struct block *));
   for (i = 0; i < ret.nelts; ++i)
     {
       set_current_program_space (ret.sals[i].pspace);
@@ -4566,7 +4571,7 @@ expand_line_sal (struct symtab_and_line sal)
 	  }
 
   {
-    struct symtab_and_line *final =
+    struct symtab_and_line *final = (struct symtab_and_line *)
       xmalloc (sizeof (struct symtab_and_line) * (ret.nelts-deleted));
 
     for (i = 0, j = 0; i < ret.nelts; ++i)

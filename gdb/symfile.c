@@ -235,7 +235,7 @@ obconcat (struct obstack *obstackp, ...)
   va_end (ap);
   obstack_1grow (obstackp, 0);
 
-  return obstack_finish (obstackp);
+  return (char *) obstack_finish (obstackp);
 }
 
 /* True if we are reading a symbol table. */
@@ -460,7 +460,7 @@ struct place_section_arg
 static void
 place_section (bfd *abfd, asection *sect, void *obj)
 {
-  struct place_section_arg *arg = obj;
+  struct place_section_arg *arg = (struct place_section_arg *) obj;
   CORE_ADDR *offsets = arg->offsets->offsets, start_addr;
   int done;
   ULONGEST align = ((ULONGEST) 1) << bfd_get_section_alignment (abfd, sect);
@@ -577,7 +577,8 @@ addrs_section_sort (struct section_addr_info *addrs)
   int i;
 
   /* `+ 1' for the NULL terminator.  */
-  array = xmalloc (sizeof (*array) * (addrs->num_sections + 1));
+  array = (struct other_sections **)
+    xmalloc (sizeof (*array) * (addrs->num_sections + 1));
   for (i = 0; i < addrs->num_sections && addrs->other[i].name; i++)
     array[i] = &addrs->other[i];
   array[i] = NULL;
@@ -635,8 +636,8 @@ addr_info_make_relative (struct section_addr_info *addrs, bfd *abfd)
 
   /* Now create ADDRS_TO_ABFD_ADDRS from ADDRS_SORTED and ABFD_ADDRS_SORTED.  */
 
-  addrs_to_abfd_addrs = xzalloc (sizeof (*addrs_to_abfd_addrs)
-				 * addrs->num_sections);
+  addrs_to_abfd_addrs = (struct other_sections **)
+    xzalloc (sizeof (*addrs_to_abfd_addrs) * addrs->num_sections);
   make_cleanup (xfree, addrs_to_abfd_addrs);
 
   while (*addrs_sorted)
@@ -1263,7 +1264,7 @@ get_debug_link_info (struct objfile *objfile, unsigned long *crc32_out)
 
   debuglink_size = bfd_section_size (objfile->obfd, sect);
 
-  contents = xmalloc (debuglink_size);
+  contents = (char *) xmalloc (debuglink_size);
   bfd_get_section_contents (objfile->obfd, sect, contents,
 			    (file_ptr)0, (bfd_size_type)debuglink_size);
 
@@ -1388,12 +1389,12 @@ find_separate_debug_file_by_debuglink (struct objfile *objfile)
   if (canon_name && strlen (canon_name) > i)
     i = strlen (canon_name);
 
-  debugfile = xmalloc (strlen (debug_file_directory) + 1
-		       + i
-		       + strlen (DEBUG_SUBDIRECTORY)
-		       + strlen ("/")
-		       + strlen (basename)
-		       + 1);
+  debugfile = (char *) xmalloc (strlen (debug_file_directory) + 1
+				+ i
+				+ strlen (DEBUG_SUBDIRECTORY)
+				+ strlen ("/")
+				+ strlen (basename)
+				+ 1);
 
   /* First try in the same directory as the original file.  */
   strcpy (debugfile, dir);
@@ -1730,7 +1731,7 @@ load_command (char *arg, int from_tty)
       if (count)
 	{
 	  /* We need to quote this string so buildargv can pull it apart.  */
-	  char *temp = xmalloc (strlen (arg) + count + 1 );
+	  char *temp = (char *) xmalloc (strlen (arg) + count + 1 );
 	  char *ptemp = temp;
 	  char *prev;
 
@@ -1773,7 +1774,7 @@ static int validate_download = 0;
 static void
 add_section_size_callback (bfd *abfd, asection *asec, void *data)
 {
-  bfd_size_type *sum = data;
+  bfd_size_type *sum = (bfd_size_type *) data;
 
   *sum += bfd_get_section_size (asec);
 }
@@ -1810,7 +1811,8 @@ struct load_progress_section_data {
 static void
 load_progress (ULONGEST bytes, void *untyped_arg)
 {
-  struct load_progress_section_data *args = untyped_arg;
+  struct load_progress_section_data *args
+    = (struct load_progress_section_data *) untyped_arg;
   struct load_progress_data *totals;
 
   if (args == NULL)
@@ -1839,7 +1841,7 @@ load_progress (ULONGEST bytes, void *untyped_arg)
 	 might add a verify_memory() method to the target vector and
 	 then use that.  remote.c could implement that method using
 	 the ``qCRC'' packet.  */
-      gdb_byte *check = xmalloc (bytes);
+      gdb_byte *check = (gdb_byte *) xmalloc (bytes);
       struct cleanup *verify_cleanups = make_cleanup (xfree, check);
 
       if (target_read_memory (args->lma, check, bytes) != 0)
@@ -1875,7 +1877,7 @@ static void
 load_section_callback (bfd *abfd, asection *asec, void *data)
 {
   struct memory_write_request *new_request;
-  struct load_section_data *args = data;
+  struct load_section_data *args = (struct load_section_data *) data;
   struct load_progress_section_data *section_data;
   bfd_size_type size = bfd_get_section_size (asec);
   gdb_byte *buffer;
@@ -1890,10 +1892,11 @@ load_section_callback (bfd *abfd, asection *asec, void *data)
   new_request = VEC_safe_push (memory_write_request_s,
 			       args->requests, NULL);
   memset (new_request, 0, sizeof (struct memory_write_request));
-  section_data = xcalloc (1, sizeof (struct load_progress_section_data));
+  section_data = (struct load_progress_section_data *)
+    xcalloc (1, sizeof (struct load_progress_section_data));
   new_request->begin = bfd_section_lma (abfd, asec) + args->load_offset;
   new_request->end = new_request->begin + size; /* FIXME Should size be in instead?  */
-  new_request->data = xmalloc (size);
+  new_request->data = (gdb_byte *) xmalloc (size);
   new_request->baton = section_data;
 
   buffer = new_request->data;
@@ -1913,7 +1916,7 @@ load_section_callback (bfd *abfd, asection *asec, void *data)
 static void
 clear_memory_write_data (void *arg)
 {
-  VEC(memory_write_request_s) **vec_p = arg;
+  VEC(memory_write_request_s) **vec_p = (VEC(memory_write_request_s **)) arg;
   VEC(memory_write_request_s) *vec = *vec_p;
   int i;
   struct memory_write_request *mr;
@@ -2521,7 +2524,7 @@ add_filename_language (char *ext, enum language lang)
   if (fl_table_next >= fl_table_size)
     {
       fl_table_size += 10;
-      filename_language_table =
+      filename_language_table = (filename_language *)
 	xrealloc (filename_language_table,
 		  fl_table_size * sizeof (*filename_language_table));
     }
@@ -2618,7 +2621,7 @@ init_filename_language_table (void)
     {
       fl_table_size = 20;
       fl_table_next = 0;
-      filename_language_table =
+      filename_language_table = (filename_language *)
 	xmalloc (fl_table_size * sizeof (*filename_language_table));
       add_filename_language (".c", language_c);
       add_filename_language (".d", language_d);
@@ -3308,7 +3311,7 @@ read_target_long_array (CORE_ADDR memaddr, unsigned int *myaddr,
 			int len, int size, enum bfd_endian byte_order)
 {
   /* FIXME (alloca): Not safe if array is very large. */
-  gdb_byte *buf = alloca (len * size);
+  gdb_byte *buf = (gdb_byte *) alloca (len * size);
   int i;
 
   read_memory (memaddr, buf, len * size);
@@ -3352,7 +3355,7 @@ simple_read_overlay_table (void)
   cache_novlys = read_memory_integer (SYMBOL_VALUE_ADDRESS (novlys_msym),
 				      4, byte_order);
   cache_ovly_table
-    = (void *) xmalloc (cache_novlys * sizeof (*cache_ovly_table));
+    = (unsigned int (*)[4]) xmalloc (cache_novlys * sizeof (*cache_ovly_table));
   cache_ovly_table_base = SYMBOL_VALUE_ADDRESS (ovly_table_msym);
   read_target_long_array (cache_ovly_table_base,
                           (unsigned int *) cache_ovly_table,
