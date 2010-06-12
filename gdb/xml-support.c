@@ -85,7 +85,7 @@ struct gdb_xml_parser
 static void
 gdb_xml_body_text (void *data, const XML_Char *text, int length)
 {
-  struct gdb_xml_parser *parser = data;
+  struct gdb_xml_parser *parser = (struct gdb_xml_parser *) data;
   struct scope_level *scope = VEC_last (scope_level_s, parser->scopes);
 
   if (parser->error.reason < 0)
@@ -142,7 +142,7 @@ gdb_xml_error (struct gdb_xml_parser *parser, const char *format, ...)
 static void
 gdb_xml_values_cleanup (void *data)
 {
-  VEC(gdb_xml_value_s) **values = data;
+  VEC(gdb_xml_value_s) **values = (VEC(gdb_xml_value_s) **) data;
   struct gdb_xml_value *value;
   int ix;
 
@@ -159,7 +159,7 @@ static void
 gdb_xml_start_element (void *data, const XML_Char *name,
 		       const XML_Char **attrs)
 {
-  struct gdb_xml_parser *parser = data;
+  struct gdb_xml_parser *parser = (struct gdb_xml_parser *) data;
   struct scope_level *scope;
   struct scope_level new_scope;
   const struct gdb_xml_element *element;
@@ -298,7 +298,7 @@ static void
 gdb_xml_start_element_wrapper (void *data, const XML_Char *name,
 			       const XML_Char **attrs)
 {
-  struct gdb_xml_parser *parser = data;
+  struct gdb_xml_parser *parser = (struct gdb_xml_parser *) data;
   volatile struct gdb_exception ex;
 
   if (parser->error.reason < 0)
@@ -323,7 +323,7 @@ gdb_xml_start_element_wrapper (void *data, const XML_Char *name,
 static void
 gdb_xml_end_element (void *data, const XML_Char *name)
 {
-  struct gdb_xml_parser *parser = data;
+  struct gdb_xml_parser *parser = (struct gdb_xml_parser *) data;
   struct scope_level *scope = VEC_last (scope_level_s, parser->scopes);
   const struct gdb_xml_element *element;
   unsigned int seen;
@@ -351,7 +351,7 @@ gdb_xml_end_element (void *data, const XML_Char *name)
 
 	  length = obstack_object_size (scope->body);
 	  obstack_1grow (scope->body, '\0');
-	  body = obstack_finish (scope->body);
+	  body = (char *) obstack_finish (scope->body);
 
 	  /* Strip leading and trailing whitespace.  */
 	  while (length > 0 && ISSPACE (body[length-1]))
@@ -381,7 +381,7 @@ gdb_xml_end_element (void *data, const XML_Char *name)
 static void
 gdb_xml_end_element_wrapper (void *data, const XML_Char *name)
 {
-  struct gdb_xml_parser *parser = data;
+  struct gdb_xml_parser *parser = (struct gdb_xml_parser *) data;
   volatile struct gdb_exception ex;
 
   if (parser->error.reason < 0)
@@ -405,7 +405,7 @@ gdb_xml_end_element_wrapper (void *data, const XML_Char *name)
 static void
 gdb_xml_cleanup (void *arg)
 {
-  struct gdb_xml_parser *parser = arg;
+  struct gdb_xml_parser *parser = (struct gdb_xml_parser *) arg;
   struct scope_level *scope;
   int ix;
 
@@ -474,7 +474,8 @@ gdb_xml_fetch_external_entity (XML_Parser expat_parser,
 			       const XML_Char *systemId,
 			       const XML_Char *publicId)
 {
-  struct gdb_xml_parser *parser = XML_GetUserData (expat_parser);
+  struct gdb_xml_parser *parser
+    = (struct gdb_xml_parser *) XML_GetUserData (expat_parser);
   XML_Parser entity_parser;
   const char *text;
   enum XML_Status status;
@@ -652,10 +653,12 @@ gdb_xml_parse_attr_enum (struct gdb_xml_parser *parser,
 			 const struct gdb_xml_attribute *attribute,
 			 const char *value)
 {
-  const struct gdb_xml_enum *enums = attribute->handler_data;
+  const struct gdb_xml_enum *enums;
   void *ret;
 
-  for (enums = attribute->handler_data; enums->name != NULL; enums++)
+  for (enums = (const struct gdb_xml_enum *) attribute->handler_data;
+       enums->name != NULL;
+       enums++)
     if (strcasecmp (enums->name, value) == 0)
       break;
 
@@ -717,8 +720,9 @@ xinclude_start_include (struct gdb_xml_parser *parser,
 			const struct gdb_xml_element *element,
 			void *user_data, VEC(gdb_xml_value_s) *attributes)
 {
-  struct xinclude_parsing_data *data = user_data;
-  char *href = VEC_index (gdb_xml_value_s, attributes, 0)->value;
+  struct xinclude_parsing_data *data
+    = (struct xinclude_parsing_data *) user_data;
+  char *href = (char *) VEC_index (gdb_xml_value_s, attributes, 0)->value;
   struct cleanup *back_to;
   char *text, *output;
 
@@ -752,7 +756,7 @@ xinclude_end_include (struct gdb_xml_parser *parser,
 		      const struct gdb_xml_element *element,
 		      void *user_data, const char *body_text)
 {
-  struct xinclude_parsing_data *data = user_data;
+  struct xinclude_parsing_data *data = (struct xinclude_parsing_data *) user_data;
 
   data->skip_depth--;
 }
@@ -760,8 +764,9 @@ xinclude_end_include (struct gdb_xml_parser *parser,
 static void XMLCALL
 xml_xinclude_default (void *data_, const XML_Char *s, int len)
 {
-  struct gdb_xml_parser *parser = data_;
-  struct xinclude_parsing_data *data = parser->user_data;
+  struct gdb_xml_parser *parser = (struct gdb_xml_parser *) data_;
+  struct xinclude_parsing_data *data
+    = (struct xinclude_parsing_data *) parser->user_data;
 
   /* If we are inside of e.g. xi:include or the DTD, don't save this
      string.  */
@@ -778,8 +783,9 @@ xml_xinclude_start_doctype (void *data_, const XML_Char *doctypeName,
 			    const XML_Char *sysid, const XML_Char *pubid,
 			    int has_internal_subset)
 {
-  struct gdb_xml_parser *parser = data_;
-  struct xinclude_parsing_data *data = parser->user_data;
+  struct gdb_xml_parser *parser = (struct gdb_xml_parser *) data_;
+  struct xinclude_parsing_data *data
+    = (struct xinclude_parsing_data *) parser->user_data;
 
   /* Don't print out the doctype, or the contents of the DTD internal
      subset, if any.  */
@@ -789,8 +795,9 @@ xml_xinclude_start_doctype (void *data_, const XML_Char *doctypeName,
 static void XMLCALL
 xml_xinclude_end_doctype (void *data_)
 {
-  struct gdb_xml_parser *parser = data_;
-  struct xinclude_parsing_data *data = parser->user_data;
+  struct gdb_xml_parser *parser = (struct gdb_xml_parser *) data_;
+  struct xinclude_parsing_data *data
+    = (struct xinclude_parsing_data *) parser->user_data;
 
   data->skip_depth--;
 }
@@ -807,7 +814,7 @@ xml_xinclude_xml_decl (void *data_, const XML_Char *version,
 static void
 xml_xinclude_cleanup (void *data_)
 {
-  struct xinclude_parsing_data *data = data_;
+  struct xinclude_parsing_data *data = (struct xinclude_parsing_data *) data_;
 
   obstack_free (&data->obstack, NULL);
   xfree (data);
@@ -867,7 +874,7 @@ xml_process_xincludes (const char *name, const char *text,
   if (gdb_xml_parse (parser, text) == 0)
     {
       obstack_1grow (&data->obstack, '\0');
-      result = xstrdup (obstack_finish (&data->obstack));
+      result = xstrdup ((const char *) obstack_finish (&data->obstack));
 
       if (depth == 0)
 	gdb_xml_debug (parser, _("XInclude processing succeeded."));
@@ -963,7 +970,7 @@ xml_escape_text (const char *text)
       }
 
   /* Expand the result.  */
-  result = xmalloc (i + special + 1);
+  result = (char *) xmalloc (i + special + 1);
   for (i = 0, special = 0; text[i] != '\0'; i++)
     switch (text[i])
       {
@@ -1039,7 +1046,7 @@ obstack_xml_printf (struct obstack *obstack, const char *format, ...)
 char *
 xml_fetch_content_from_file (const char *filename, void *baton)
 {
-  const char *dirname = baton;
+  const char *dirname = (const char *) baton;
   FILE *file;
   struct cleanup *back_to;
   char *text;
@@ -1065,7 +1072,7 @@ xml_fetch_content_from_file (const char *filename, void *baton)
   /* Read in the whole file, one chunk at a time.  */
   len = 4096;
   offset = 0;
-  text = xmalloc (len);
+  text = (char *) xmalloc (len);
   make_cleanup (free_current_contents, &text);
   while (1)
     {
@@ -1087,7 +1094,7 @@ xml_fetch_content_from_file (const char *filename, void *baton)
 	break;
 
       len = len * 2;
-      text = xrealloc (text, len);
+      text = (char *) xrealloc (text, len);
     }
 
   fclose (file);
