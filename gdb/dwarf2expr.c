@@ -42,11 +42,13 @@ new_dwarf_expr_context (void)
 {
   struct dwarf_expr_context *retval;
 
-  retval = xcalloc (1, sizeof (struct dwarf_expr_context));
+  retval = (struct dwarf_expr_context *)
+    xcalloc (1, sizeof (struct dwarf_expr_context));
   retval->stack_len = 0;
   retval->stack_allocated = 10;
-  retval->stack = xmalloc (retval->stack_allocated
-			   * sizeof (struct dwarf_stack_value));
+  retval->stack = (struct dwarf_stack_value *)
+    xmalloc (retval->stack_allocated
+	     * sizeof (struct dwarf_stack_value));
   retval->num_pieces = 0;
   retval->pieces = 0;
   retval->max_recursion_depth = 0x100;
@@ -68,7 +70,7 @@ free_dwarf_expr_context (struct dwarf_expr_context *ctx)
 static void
 free_dwarf_expr_context_cleanup (void *arg)
 {
-  free_dwarf_expr_context (arg);
+  free_dwarf_expr_context ((struct dwarf_expr_context *) arg);
 }
 
 /* Return a cleanup that calls free_dwarf_expr_context.  */
@@ -89,8 +91,9 @@ dwarf_expr_grow_stack (struct dwarf_expr_context *ctx, size_t need)
     {
       size_t newlen = ctx->stack_len + need + 10;
 
-      ctx->stack = xrealloc (ctx->stack,
-			     newlen * sizeof (struct dwarf_stack_value));
+      ctx->stack = (struct dwarf_stack_value *)
+	xrealloc (ctx->stack,
+		  newlen * sizeof (struct dwarf_stack_value));
       ctx->stack_allocated = newlen;
     }
 }
@@ -159,9 +162,10 @@ add_piece (struct dwarf_expr_context *ctx, ULONGEST size, ULONGEST offset)
 
   ctx->num_pieces++;
 
-  ctx->pieces = xrealloc (ctx->pieces,
-			  (ctx->num_pieces
-			   * sizeof (struct dwarf_expr_piece)));
+  ctx->pieces = (struct dwarf_expr_piece *)
+    xrealloc (ctx->pieces,
+	      (ctx->num_pieces
+	       * sizeof (struct dwarf_expr_piece)));
 
   p = &ctx->pieces[ctx->num_pieces - 1];
   p->location = ctx->location;
@@ -677,7 +681,7 @@ execute_stack_op (struct dwarf_expr_context *ctx,
 	    {
 	    case DW_OP_deref:
 	      {
-		gdb_byte *buf = alloca (ctx->addr_size);
+		gdb_byte *buf = (gdb_byte *) alloca (ctx->addr_size);
 
 		(ctx->read_mem) (ctx->baton, buf, result, ctx->addr_size);
 		result = dwarf2_read_address (ctx->gdbarch,
@@ -689,7 +693,7 @@ execute_stack_op (struct dwarf_expr_context *ctx,
 	    case DW_OP_deref_size:
 	      {
 		int addr_size = *op_ptr++;
-		gdb_byte *buf = alloca (addr_size);
+		gdb_byte *buf = (gdb_byte *) alloca (addr_size);
 
 		(ctx->read_mem) (ctx->baton, buf, result, addr_size);
 		result = dwarf2_read_address (ctx->gdbarch,
