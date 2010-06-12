@@ -31,8 +31,10 @@
 static int
 compare_block_starting_address (const void *a, const void *b)
 {
-  const struct memory_write_request *a_req = a;
-  const struct memory_write_request *b_req = b;
+  const struct memory_write_request *a_req
+    = (const struct memory_write_request *) a;
+  const struct memory_write_request *b_req
+    = (const struct memory_write_request *) b;
 
   if (a_req->begin < b_req->begin)
     return -1;
@@ -291,7 +293,7 @@ compute_garbled_blocks (VEC(memory_write_request_s) *erased_blocks,
 static void
 cleanup_request_data (void *p)
 {
-  VEC(memory_write_request_s) **v = p;
+  VEC(memory_write_request_s) **v = (VEC(memory_write_request_s) **) p;
   struct memory_write_request *r;
   int i;
 
@@ -302,7 +304,7 @@ cleanup_request_data (void *p)
 static void
 cleanup_write_requests_vector (void *p)
 {
-  VEC(memory_write_request_s) **v = p;
+  VEC(memory_write_request_s) **v = (VEC(memory_write_request_s) **) p;
 
   VEC_free (memory_write_request_s, *v);
 }
@@ -369,7 +371,7 @@ target_write_memory_blocks (VEC(memory_write_request_s) *requests,
 	  for (i = 0; VEC_iterate (memory_write_request_s, garbled, i, r); ++i)
 	    {
 	      gdb_assert (r->data == NULL);
-	      r->data = xmalloc (r->end - r->begin);
+	      r->data = (gdb_byte *) xmalloc (r->end - r->begin);
 	      err = target_read_memory (r->begin, r->data, r->end - r->begin);
 	      if (err != 0)
 		goto out;

@@ -1119,7 +1119,7 @@ target_read_string (CORE_ADDR memaddr, char **string, int len, int *errnop)
 
   /* Small for testing.  */
   buffer_allocated = 4;
-  buffer = xmalloc (buffer_allocated);
+  buffer = (char *) xmalloc (buffer_allocated);
   bufptr = buffer;
 
   origlen = len;
@@ -1148,7 +1148,7 @@ target_read_string (CORE_ADDR memaddr, char **string, int len, int *errnop)
 
 	  bytes = bufptr - buffer;
 	  buffer_allocated *= 2;
-	  buffer = xrealloc (buffer, buffer_allocated);
+	  buffer = (char *) xrealloc (buffer, buffer_allocated);
 	  bufptr = buffer + bytes;
 	}
 
@@ -1237,7 +1237,8 @@ memory_xfer_partial (struct target_ops *ops, enum target_object object,
 	  const char *section_name = section->the_bfd_section->name;
 
 	  memaddr = overlay_mapped_address (memaddr, section);
-	  return section_table_xfer_memory_partial (readbuf, writebuf,
+	  return section_table_xfer_memory_partial ((gdb_byte *) readbuf,
+						    (const gdb_byte *) writebuf,
 						    memaddr, len,
 						    table->sections,
 						    table->sections_end,
@@ -1257,7 +1258,8 @@ memory_xfer_partial (struct target_ops *ops, enum target_object object,
 	      & SEC_READONLY))
 	{
 	  table = target_get_section_table (ops);
-	  return section_table_xfer_memory_partial (readbuf, writebuf,
+	  return section_table_xfer_memory_partial ((gdb_byte *) readbuf,
+						    (const gdb_byte *) writebuf,
 						    memaddr, len,
 						    table->sections,
 						    table->sections_end,
@@ -1309,21 +1311,21 @@ memory_xfer_partial (struct target_ops *ops, enum target_object object,
 	  || (stack_cache_enabled_p && object == TARGET_OBJECT_STACK_MEMORY)))
     {
       if (readbuf != NULL)
-	res = dcache_xfer_memory (ops, target_dcache, memaddr, readbuf,
-				  reg_len, 0);
+	res = dcache_xfer_memory (ops, target_dcache, memaddr,
+				  (gdb_byte *) readbuf, reg_len, 0);
       else
 	/* FIXME drow/2006-08-09: If we're going to preserve const
 	   correctness dcache_xfer_memory should take readbuf and
 	   writebuf.  */
 	res = dcache_xfer_memory (ops, target_dcache, memaddr,
-				  (void *) writebuf,
+				  (gdb_byte *) writebuf,
 				  reg_len, 1);
       if (res <= 0)
 	return -1;
       else
 	{
 	  if (readbuf && !show_memory_breakpoints)
-	    breakpoint_restore_shadows (readbuf, memaddr, reg_len);
+	    breakpoint_restore_shadows ((gdb_byte *) readbuf, memaddr, reg_len);
 	  return res;
 	}
     }
@@ -1341,7 +1343,9 @@ memory_xfer_partial (struct target_ops *ops, enum target_object object,
   do
     {
       res = ops->to_xfer_partial (ops, TARGET_OBJECT_MEMORY, NULL,
-				  readbuf, writebuf, memaddr, reg_len);
+				  (gdb_byte *) readbuf,
+				  (const gdb_byte *) writebuf,
+				  memaddr, reg_len);
       if (res > 0)
 	break;
 
@@ -1355,7 +1359,7 @@ memory_xfer_partial (struct target_ops *ops, enum target_object object,
   while (ops != NULL);
 
   if (readbuf && !show_memory_breakpoints)
-    breakpoint_restore_shadows (readbuf, memaddr, reg_len);
+    breakpoint_restore_shadows ((gdb_byte *) readbuf, memaddr, reg_len);
 
   /* Make sure the cache gets updated no matter what - if we are writing
      to the stack.  Even if this write is not tagged as such, we still need
@@ -1368,7 +1372,7 @@ memory_xfer_partial (struct target_ops *ops, enum target_object object,
       && stack_cache_enabled_p
       && object != TARGET_OBJECT_STACK_MEMORY)
     {
-      dcache_update (target_dcache, memaddr, (void *) writebuf, res);
+      dcache_update (target_dcache, memaddr, (gdb_byte *) writebuf, res);
     }
 
   /* If we still haven't got anything, return the last error.  We
@@ -1419,8 +1423,9 @@ target_xfer_partial (struct target_ops *ops,
       if (raw_object == TARGET_OBJECT_RAW_MEMORY)
 	raw_object = TARGET_OBJECT_MEMORY;
 
-      retval = ops->to_xfer_partial (ops, raw_object, annex, readbuf,
-				     writebuf, offset, len);
+      retval = ops->to_xfer_partial (ops, raw_object, annex,
+				     (gdb_byte *) readbuf,
+				     (const gdb_byte *) writebuf, offset, len);
     }
 
   if (targetdebug)
@@ -1438,9 +1443,9 @@ target_xfer_partial (struct target_ops *ops,
 			  plongest (len), plongest (retval));
 
       if (readbuf)
-	myaddr = readbuf;
+	myaddr = (const unsigned char *) readbuf;
       if (writebuf)
-	myaddr = writebuf;
+	myaddr = (const unsigned char *) writebuf;
       if (retval > 0 && myaddr != NULL)
 	{
 	  int i;
@@ -1639,8 +1644,8 @@ default_xfer_partial (struct target_ops *ops, enum target_object object,
 	  struct cleanup *cleanup = make_cleanup (xfree, buffer);
 
 	  memcpy (buffer, writebuf, len);
-	  xfered = ops->deprecated_xfer_memory (offset, buffer, len,
-						1/*write*/, NULL, ops);
+	  xfered = ops->deprecated_xfer_memory (offset, (gdb_byte *) buffer,
+						len, 1/*write*/, NULL, ops);
 	  do_cleanups (cleanup);
 	}
       if (readbuf != NULL)
@@ -1865,7 +1870,7 @@ target_read_alloc_1 (struct target_ops *ops, enum target_object object,
   /* Start by reading up to 4K at a time.  The target will throttle
      this number down if necessary.  */
   buf_alloc = 4096;
-  buf = xmalloc (buf_alloc);
+  buf = (gdb_byte *)xmalloc (buf_alloc);
   buf_pos = 0;
   while (1)
     {
@@ -1893,7 +1898,7 @@ target_read_alloc_1 (struct target_ops *ops, enum target_object object,
       if (buf_alloc < buf_pos * 2)
 	{
 	  buf_alloc *= 2;
-	  buf = xrealloc (buf, buf_alloc);
+	  buf = (gdb_byte *) xrealloc (buf, buf_alloc);
 	}
 
       QUIT;
@@ -2306,7 +2311,7 @@ simple_search_memory (struct target_ops *ops,
   if (search_space_len < search_buf_size)
     search_buf_size = search_space_len;
 
-  search_buf = malloc (search_buf_size);
+  search_buf = (gdb_byte *) malloc (search_buf_size);
   if (search_buf == NULL)
     error (_("Unable to allocate memory to perform the search."));
   old_cleanups = make_cleanup (free_current_contents, &search_buf);
@@ -2333,8 +2338,8 @@ simple_search_memory (struct target_ops *ops,
       gdb_byte *found_ptr;
       unsigned nr_search_bytes = min (search_space_len, search_buf_size);
 
-      found_ptr = memmem (search_buf, nr_search_bytes,
-			  pattern, pattern_len);
+      found_ptr = (gdb_byte *) memmem (search_buf, nr_search_bytes,
+				       pattern, pattern_len);
 
       if (found_ptr != NULL)
 	{

@@ -308,7 +308,8 @@ target_find_description (void)
 	{
 	  struct tdesc_arch_data *data;
 
-	  data = gdbarch_data (target_gdbarch, tdesc_data);
+	  data = (struct tdesc_arch_data *) gdbarch_data (target_gdbarch,
+							  tdesc_data);
 	  if (tdesc_has_registers (current_target_desc)
 	      && data->arch_regs == NULL)
 	    warning (_("Target-supplied registers are not supported "
@@ -515,7 +516,7 @@ tdesc_find_type (struct gdbarch *gdbarch, const char *id)
   struct tdesc_arch_data *data;
   int i, num_regs;
 
-  data = gdbarch_data (gdbarch, tdesc_data);
+  data = (struct tdesc_arch_data *) gdbarch_data (gdbarch, tdesc_data);
   num_regs = VEC_length (tdesc_arch_reg, data->arch_regs);
   for (i = 0; i < num_regs; i++)
     {
@@ -735,7 +736,8 @@ tdesc_data_init (struct obstack *obstack)
 {
   struct tdesc_arch_data *data;
 
-  data = OBSTACK_ZALLOC (obstack, struct tdesc_arch_data);
+  data = (struct tdesc_arch_data *) OBSTACK_ZALLOC (obstack,
+						    struct tdesc_arch_data);
   return data;
 }
 
@@ -755,7 +757,7 @@ tdesc_data_alloc (void)
 void
 tdesc_data_cleanup (void *data_untyped)
 {
-  struct tdesc_arch_data *data = data_untyped;
+  struct tdesc_arch_data *data = (struct tdesc_arch_data *) data_untyped;
 
   VEC_free (tdesc_arch_reg, data->arch_regs);
   xfree (data);
@@ -853,7 +855,7 @@ tdesc_find_arch_register (struct gdbarch *gdbarch, int regno)
 {
   struct tdesc_arch_data *data;
 
-  data = gdbarch_data (gdbarch, tdesc_data);
+  data = (struct tdesc_arch_data *) gdbarch_data (gdbarch, tdesc_data);
   if (regno < VEC_length (tdesc_arch_reg, data->arch_regs))
     return VEC_index (tdesc_arch_reg, data->arch_regs, regno);
   else
@@ -883,7 +885,8 @@ tdesc_register_name (struct gdbarch *gdbarch, int regno)
 
   if (regno >= num_regs && regno < num_regs + num_pseudo_regs)
     {
-      struct tdesc_arch_data *data = gdbarch_data (gdbarch, tdesc_data);
+      struct tdesc_arch_data *data
+	= (struct tdesc_arch_data *) gdbarch_data (gdbarch, tdesc_data);
 
       gdb_assert (data->pseudo_register_name != NULL);
       return data->pseudo_register_name (gdbarch, regno);
@@ -902,7 +905,8 @@ tdesc_register_type (struct gdbarch *gdbarch, int regno)
 
   if (reg == NULL && regno >= num_regs && regno < num_regs + num_pseudo_regs)
     {
-      struct tdesc_arch_data *data = gdbarch_data (gdbarch, tdesc_data);
+      struct tdesc_arch_data *data
+	= (struct tdesc_arch_data *) gdbarch_data (gdbarch, tdesc_data);
 
       gdb_assert (data->pseudo_register_type != NULL);
       return data->pseudo_register_type (gdbarch, regno);
@@ -1040,7 +1044,8 @@ tdesc_register_reggroup_p (struct gdbarch *gdbarch, int regno,
 
   if (regno >= num_regs && regno < num_regs + num_pseudo_regs)
     {
-      struct tdesc_arch_data *data = gdbarch_data (gdbarch, tdesc_data);
+      struct tdesc_arch_data *data
+	= (struct tdesc_arch_data *) gdbarch_data (gdbarch, tdesc_data);
 
       if (data->pseudo_register_reggroup_p != NULL)
 	return data->pseudo_register_reggroup_p (gdbarch, regno, reggroup);
@@ -1061,7 +1066,8 @@ void
 set_tdesc_pseudo_register_name (struct gdbarch *gdbarch,
 				gdbarch_register_name_ftype *pseudo_name)
 {
-  struct tdesc_arch_data *data = gdbarch_data (gdbarch, tdesc_data);
+  struct tdesc_arch_data *data
+    = (struct tdesc_arch_data *) gdbarch_data (gdbarch, tdesc_data);
 
   data->pseudo_register_name = pseudo_name;
 }
@@ -1070,7 +1076,8 @@ void
 set_tdesc_pseudo_register_type (struct gdbarch *gdbarch,
 				gdbarch_register_type_ftype *pseudo_type)
 {
-  struct tdesc_arch_data *data = gdbarch_data (gdbarch, tdesc_data);
+  struct tdesc_arch_data *data
+    = (struct tdesc_arch_data *) gdbarch_data (gdbarch, tdesc_data);
 
   data->pseudo_register_type = pseudo_type;
 }
@@ -1080,7 +1087,8 @@ set_tdesc_pseudo_register_reggroup_p
   (struct gdbarch *gdbarch,
    gdbarch_register_reggroup_p_ftype *pseudo_reggroup_p)
 {
-  struct tdesc_arch_data *data = gdbarch_data (gdbarch, tdesc_data);
+  struct tdesc_arch_data *data
+    = (struct tdesc_arch_data *) gdbarch_data (gdbarch, tdesc_data);
 
   data->pseudo_register_reggroup_p = pseudo_reggroup_p;
 }
@@ -1106,7 +1114,7 @@ tdesc_use_registers (struct gdbarch *gdbarch,
      included.  */
   gdb_assert (tdesc_has_registers (target_desc));
 
-  data = gdbarch_data (gdbarch, tdesc_data);
+  data = (struct tdesc_arch_data *) gdbarch_data (gdbarch, tdesc_data);
   data->arch_regs = early_data->arch_regs;
   xfree (early_data);
 
@@ -1394,7 +1402,7 @@ allocate_target_description (void)
 static void
 free_target_description (void *arg)
 {
-  struct target_desc *target_desc = arg;
+  struct target_desc *target_desc = (struct target_desc *) arg;
   struct tdesc_feature *feature;
   struct property *prop;
   int ix;
@@ -1564,7 +1572,7 @@ maint_print_c_tdesc_cmd (char *args, int from_tty)
     error (_("The current target description did not come from an XML file."));
 
   filename = lbasename (target_description_filename);
-  function = alloca (strlen (filename) + 1);
+  function = (char *) alloca (strlen (filename) + 1);
   for (inp = filename, outp = function; *inp != '\0'; inp++)
     if (*inp == '.')
       break;
