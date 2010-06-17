@@ -1,6 +1,29 @@
+2010-06-16  Vincent Rivière  <vincent.riviere@freesbee.fr>
+
+	PR gas/11673
+	* m68k-opc.c (m68k_opcodes): Remove move.l for isab and later.
+
+2010-06-16  Vincent Rivière  <vincent.riviere@freesbee.fr>
+
+	PR binutils/11676
+	* m68k-dis.c (print_insn_arg): Prefix float constants with #0e.
+
+2010-06-14  Sebastian Andrzej Siewior  <bigeasy@linutronix.de>
+
+	* ppc-dis.c (ppc_opts):  Remove PPC_OPCODE_E500MC from e500 and
+	e500x2.  Add PPC_OPCODE_E500 to e500 and e500x2
+	* ppc-opc.c (powerpc_opcodes): Deprecate all opcodes on EFS which
+	touch floating point regs and are enabled by COM, PPC or PPCCOM.
+	Treat sync as msync on e500.  Treat eieio as mbar 1 on e500.
+	Treat lwsync as msync on e500.
+
+2010-06-07  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (thumb-opcodes): Add disassembly for movs.
+
 2010-05-28  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
 
-	* arm-dis.c (print_insn_neon):  Ensure disassembly of Neon 
+	* arm-dis.c (print_insn_neon):  Ensure disassembly of Neon
 	constants is the same on 32-bit and 64-bit hosts.
 
 2010-05-27  Jason Duerstock  <jason.duerstock+binutils@gmail.com>

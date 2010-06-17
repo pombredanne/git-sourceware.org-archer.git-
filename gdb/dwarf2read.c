@@ -337,7 +337,8 @@ struct dwarf2_per_cu_data
      Otherwise it's from .debug_info.  */
   unsigned int from_debug_types : 1;
 
-  /* Set iff currently read in.  */
+  /* Set to non-NULL iff this CU is currently loaded.  When it gets freed out
+     of the CU cache it gets reset to NULL again.  */
   struct dwarf2_cu *cu;
 
   /* If full symbols for this CU have been read in, then this field
@@ -4878,19 +4879,46 @@ dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
     fnp->is_artificial = 1;
 
   /* Get index in virtual function table if it is a virtual member
-     function.  For GCC, this is an offset in the appropriate
-     virtual table, as specified by DW_AT_containing_type.  For
-     everyone else, it is an expression to be evaluated relative
+     function.  For older versions of GCC, this is an offset in the
+     appropriate virtual table, as specified by DW_AT_containing_type.
+     For everyone else, it is an expression to be evaluated relative
      to the object address.  */
 
   attr = dwarf2_attr (die, DW_AT_vtable_elem_location, cu);
-  if (attr && fnp->fcontext)
+  if (attr)
     {
-      /* Support the .debug_loc offsets */
-      if (attr_form_is_block (attr))
+      if (attr_form_is_block (attr) && DW_BLOCK (attr)->size > 0)
         {
-          fnp->voffset = decode_locdesc (DW_BLOCK (attr), cu) + 2;
-        }
+	  if (DW_BLOCK (attr)->data[0] == DW_OP_constu)
+	    {
+	      /* Old-style GCC.  */
+	      fnp->voffset = decode_locdesc (DW_BLOCK (attr), cu) + 2;
+	    }
+	  else if (DW_BLOCK (attr)->data[0] == DW_OP_deref
+		   || (DW_BLOCK (attr)->size > 1
+		       && DW_BLOCK (attr)->data[0] == DW_OP_deref_size
+		       && DW_BLOCK (attr)->data[1] == cu->header.addr_size))
+	    {
+	      struct dwarf_block blk;
+	      int offset;
+
+	      offset = (DW_BLOCK (attr)->data[0] == DW_OP_deref
+			? 1 : 2);
+	      blk.size = DW_BLOCK (attr)->size - offset;
+	      blk.data = DW_BLOCK (attr)->data + offset;
+	      fnp->voffset = decode_locdesc (DW_BLOCK (attr), cu);
+	      if ((fnp->voffset % cu->header.addr_size) != 0)
+		dwarf2_complex_location_expr_complaint ();
+	      else
+		fnp->voffset /= cu->header.addr_size;
+	      fnp->voffset += 2;
+	    }
+	  else
+	    dwarf2_complex_location_expr_complaint ();
+
+	  if (!fnp->fcontext)
+	    fnp->fcontext = TYPE_TARGET_TYPE (TYPE_FIELD_TYPE (this_type, 0));
+	}
       else if (attr_form_is_section_offset (attr))
         {
 	  dwarf2_complex_location_expr_complaint ();
@@ -4900,28 +4928,6 @@ dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
 	  dwarf2_invalid_attrib_class_complaint ("DW_AT_vtable_elem_location",
 						 fieldname);
         }
-    }
-  else if (attr)
-    {
-      /* We only support trivial expressions here.  This hack will work
-	 for v3 classes, which always start with the vtable pointer.  */
-      if (attr_form_is_block (attr) && DW_BLOCK (attr)->size > 0
-	  && DW_BLOCK (attr)->data[0] == DW_OP_deref)
-	{
-	  struct dwarf_block blk;
-
-	  blk.size = DW_BLOCK (attr)->size - 1;
-	  blk.data = DW_BLOCK (attr)->data + 1;
-	  fnp->voffset = decode_locdesc (&blk, cu);
-	  if ((fnp->voffset % cu->header.addr_size) != 0)
-	    dwarf2_complex_location_expr_complaint ();
-	  else
-	    fnp->voffset /= cu->header.addr_size;
-	  fnp->voffset += 2;
-	  fnp->fcontext = TYPE_TARGET_TYPE (TYPE_FIELD_TYPE (this_type, 0));
-	}
-      else
-	dwarf2_complex_location_expr_complaint ();
     }
   else
     {
@@ -10735,22 +10741,17 @@ follow_die_ref_or_sig (struct die_info *src_die, struct attribute *attr,
   return die;
 }
 
-/* Follow reference attribute ATTR of SRC_DIE.
-   On entry *REF_CU is the CU of SRC_DIE.
+/* Follow reference OFFSET.
+   On entry *REF_CU is the CU of source DIE referencing OFFSET.
    On exit *REF_CU is the CU of the result.  */
 
 static struct die_info *
-follow_die_ref (struct die_info *src_die, struct attribute *attr,
-		struct dwarf2_cu **ref_cu)
+follow_die_offset (unsigned int offset, struct dwarf2_cu **ref_cu)
 {
-  struct die_info *die;
-  unsigned int offset;
   struct die_info temp_die;
   struct dwarf2_cu *target_cu, *cu = *ref_cu;
 
   gdb_assert (cu->per_cu != NULL);
-
-  offset = dwarf2_get_ref_die_offset (attr);
 
   if (cu->per_cu->from_debug_types)
     {
@@ -10758,7 +10759,7 @@ follow_die_ref (struct die_info *src_die, struct attribute *attr,
 	 If they need to, they have to reference a signatured type via
 	 DW_FORM_sig8.  */
       if (! offset_in_cu_p (&cu->header, offset))
-	goto not_found;
+	return NULL;
       target_cu = cu;
     }
   else if (! offset_in_cu_p (&cu->header, offset))
@@ -10778,15 +10779,67 @@ follow_die_ref (struct die_info *src_die, struct attribute *attr,
 
   *ref_cu = target_cu;
   temp_die.offset = offset;
-  die = htab_find_with_hash (target_cu->die_hash, &temp_die, offset);
-  if (die)
-    return die;
+  return htab_find_with_hash (target_cu->die_hash, &temp_die, offset);
+}
 
- not_found:
+/* Follow reference attribute ATTR of SRC_DIE.
+   On entry *REF_CU is the CU of SRC_DIE.
+   On exit *REF_CU is the CU of the result.  */
 
-  error (_("Dwarf Error: Cannot find DIE at 0x%x referenced from DIE "
-	 "at 0x%x [in module %s]"),
-	 offset, src_die->offset, cu->objfile->name);
+static struct die_info *
+follow_die_ref (struct die_info *src_die, struct attribute *attr,
+		struct dwarf2_cu **ref_cu)
+{
+  unsigned int offset = dwarf2_get_ref_die_offset (attr);
+  struct dwarf2_cu *cu = *ref_cu;
+  struct die_info *die;
+
+  die = follow_die_offset (offset, ref_cu);
+  if (!die)
+    error (_("Dwarf Error: Cannot find DIE at 0x%x referenced from DIE "
+	   "at 0x%x [in module %s]"),
+	   offset, src_die->offset, cu->objfile->name);
+
+  return die;
+}
+
+/* Return DWARF block and its CU referenced by OFFSET at PER_CU.  Returned
+   value is intended for DW_OP_call*.  */
+
+struct dwarf2_locexpr_baton
+dwarf2_fetch_die_location_block (unsigned int offset,
+				 struct dwarf2_per_cu_data *per_cu)
+{
+  struct dwarf2_cu *cu = per_cu->cu;
+  struct die_info *die;
+  struct attribute *attr;
+  struct dwarf2_locexpr_baton retval;
+
+  die = follow_die_offset (offset, &cu);
+  if (!die)
+    error (_("Dwarf Error: Cannot find DIE at 0x%x referenced in module %s"),
+	   offset, per_cu->cu->objfile->name);
+
+  attr = dwarf2_attr (die, DW_AT_location, cu);
+  if (!attr)
+    {
+      /* DWARF: "If there is no such attribute, then there is no effect.".  */
+
+      retval.data = NULL;
+      retval.size = 0;
+    }
+  else
+    {
+      if (!attr_form_is_block (attr))
+	error (_("Dwarf Error: DIE at 0x%x referenced in module %s "
+		 "is neither DW_FORM_block* nor DW_FORM_exprloc"),
+	       offset, per_cu->cu->objfile->name);
+
+      retval.data = DW_BLOCK (attr)->data;
+      retval.size = DW_BLOCK (attr)->size;
+    }
+  retval.per_cu = cu->per_cu;
+  return retval;
 }
 
 /* Follow the signature attribute ATTR in SRC_DIE.

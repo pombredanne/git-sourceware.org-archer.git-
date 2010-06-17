@@ -1,3 +1,202 @@
+2010-06-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	* gdb.base/watch-notconst.c: New file.
+	* gdb.base/watch-notconst.S: New file.
+	* gdb.base/watch-notconst2.c: New file.
+	* gdb.base/watch-notconst2.S: New file.
+	* gdb.base/watch-notconst.exp: New file.
+	* gdb.base/watchpoint.c (global_ptr_ptr): New variable.
+	(func4): Add operations on `global_ptr_ptr'.
+	* gdb.base/watchpoint.exp (test_constant_watchpoint): New
+	routine to test watchpoints created with a constant expression.
+	(test_inaccessible_watchpoint): Include tests for watchpoints
+	created with a constant expression.
+
+2010-06-14  Kevin Buettner  <kevinb@redhat.com>
+
+	* gdb.disasm/t01_mov.exp, gdb.disasm/t02_mova.exp,
+	gdb.disasm/t03_add.exp, gdb.disasm/t04_sub.exp,
+	gdb.disasm/t05_cmp.exp, gdb.disasm/t06_ari2.exp,
+	gdb.disasm/t07_ari3.exp, gdb.disasm/t08_or.exp,
+	gdb.disasm/t09_xor.exp, gdb.disasm/t10_and.exp,
+	gdb.disasm/t11_logs.exp, gdb.disasm/t12_bit.exp,
+	gdb.disasm/t13_otr.exp: Examine instruction at label `start' instead
+	of `_start'.
+
+2010-06-11  Ulrich Weigand  <Ulrich.Weigand@de.ibm.com>
+
+	* gdb.mi/mi-nonstop.exp: Do not call perror if non-stop mode is
+	not supported on the target.
+	* gdb.mi/mi-nonstop-exit.exp: Likewise.
+	* gdb.mi/mi-ns-stale-regcache.exp: Likewise.
+	* gdb.mi/mi-nsintrall.exp: Likewise.
+	* gdb.mi/mi-nsmoribund.exp: Likewise.
+	* gdb.mi/mi-nsthrexec.exp: Likewise.
+
+2010-06-11  Stan Shebs  <stan@codesourcery.com>
+
+	* gdb.base/permissions.exp: New file.
+
+2010-06-11  Ulrich Weigand  <Ulrich.Weigand@de.ibm.com>
+
+	* gdb.base/valgrind-db-attach.exp: Fail gracefully if valgrind
+	does not support ELF executable class.
+
+2010-06-11  Ulrich Weigand  <Ulrich.Weigand@de.ibm.com>
+
+	* gdb.trace/packetlen.exp: Respect gdb_target_supports_trace.
+
+2010-06-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* lib/gdb.exp (gdb_run_cmd): Return on $gdb_prompt.
+	(runto): Catch "The target does not support running in non-stop mode.".
+
+2010-06-11  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.base/setshow.exp (set language asm): Don't use
+	gdb_test_no_output, fails on some targets.
+
+2010-06-11  Ulrich Weigand  <Ulrich.Weigand@de.ibm.com>
+
+	* gdb.cp/cpexprs.exp: Skip test on spu*-*-*.
+	* gdb.cp/pr9167.exp: Likewise.
+
+2010-06-11  Ulrich Weigand  <Ulrich.Weigand@de.ibm.com>
+
+	* gdb.python/py-breakpoint.exp: Handle software watchpoints as well.
+
+2010-06-11  Ulrich Weigand  <Ulrich.Weigand@de.ibm.com>
+
+	* gdb.base/solib-corrupted.exp: Respect skip_shlib_tests.
+
+2010-06-11  Ulrich Weigand  <Ulrich.Weigand@de.ibm.com>
+
+	* gdb.base/charset.c (main): Make sure malloc gets linked in.
+
+2010-06-11  Tom Tromey  <tromey@redhat.com>
+
+	PR gdb/9977, PR exp/11636::
+	* gdb.dwarf2/pieces.exp (pieces_test_f3): Remove kfail.
+	(pieces_test_f6): Update expected output.
+
+2010-06-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/moribund-step.exp: New.
+
+2010-06-08  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.ada/assign_1.exp: Use ".*" instead of "" as wildcard regexp.
+	* gdb.ada/boolean_expr.exp: 
+	* gdb.ada/frame_args.exp: Ditto.
+	* gdb.ada/lang_switch.exp: Ditto.
+	* gdb.ada/ptype_arith_binop.exp: Ditto.
+	* gdb.ada/ref_param.exp: Ditto.
+	* gdb.ada/type_coercion.exp:Ditto.
+
+	* gdb.asm/asm-source.exp: Ditto.
+
+	* gdb.base/attach.exp: Ditto.
+	* gdb.base/bitfields2.exp: Ditto.
+	* gdb.base/call-signal-resume.exp: Ditto.
+	* gdb.base/callfuncs.exp: Ditto.
+	* gdb.base/commands.exp: Ditto.
+	* gdb.base/dbx.exp: Ditto.
+	* gdb.base/default.exp: Ditto.
+	* gdb.base/dump.exp: Ditto.
+	* gdb.base/exprs.exp: Ditto.
+	* gdb.base/freebpcmd.exp: Ditto.
+	* gdb.base/interrupt.exp: Ditto.
+	* gdb.base/list.exp: Ditto.
+	* gdb.base/long_long.exp: Ditto.
+	* gdb.base/maint.exp: Ditto.
+	* gdb.base/ptype.exp: Ditto.
+	* gdb.base/return.exp: Ditto.
+	* gdb.base/setshow.exp: Ditto.
+	* gdb.base/sigbpt.exp: Ditto.
+	* gdb.base/sigrepeat.exp: Ditto.
+
+	* gdb.cp/classes.exp: Ditto.
+
+	* gdb.dwarf2/dw2-restore.exp: Ditto.
+
+	* gdb.gdb/selftest.exp: Ditto.
+
+	* gdb.multi/base.exp: Ditto.
+	* gdb.multi/bkpt-multi-exec.exp: Ditto.
+
+	* gdb.python/py-block.exp: Ditto.
+	* gdb.python/py-prettyprint.exp: Ditto.
+	* gdb.python/py-template.exp: Ditto.
+
+	* gdb.server/ext-attach.exp: Ditto.
+	* gdb.server/ext-run.exp: Ditto.
+	* gdb.server/server-mon.exp: Ditto.
+
+	* gdb.threads/fork-thread-pending.exp: Ditto.
+	* gdb.threads/hand-call-in-threads.exp: Ditto.
+	* gdb.threads/interrupted-hand-call.exp: Ditto.
+	* gdb.threads/linux-dp.exp: Ditto.
+	* gdb.threads/manythreads.exp: Ditto.
+	* gdb.threads/print-threads.exp: Ditto.
+	* gdb.threads/pthreads.exp: Ditto.
+	* gdb.threads/schedlock.exp: Ditto.
+	* gdb.threads/thread-unwindonsignal.exp: Ditto.
+	* gdb.threads/threadapply.exp: Ditto.
+
+2010-06-08  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.ada/exec_changed.exp: 
+	Use ".*" instead of "" as wildcard regexp.
+
+	* gdb.base/async.exp: Use ".*" instead of "" as wildcard regexp.
+	* gdb.base/call-ar-st.exp: Ditto.
+	* gdb.base/checkpoint.exp: Ditto.
+	* gdb.base/default.exp: Ditto.
+	* gdb.base/dump.exp: Ditto.
+	* gdb.base/ending-run.exp: Ditto.
+	* gdb.base/fileio.exp: Ditto.
+	* gdb.base/miscexprs.exp: Ditto.
+	* gdb.base/pointers.exp: Ditto.
+	* gdb.base/readline.exp: Ditto.
+	* gdb.base/reread.exp: Ditto.
+	* gdb.base/restore.exp: Ditto.
+	* gdb.base/shlib-call.exp: Ditto.
+	* gdb.base/valgrind-db-attach.exp: Ditto.
+	* gdb.base/volatile.exp: Ditto.
+	* gdb.base/watchpoints.exp: Ditto.
+
+	* gdb.cp/classes.exp: Use ".*" instead of "" as wildcard regexp.
+
+	* gdb.python/py-frame.exp: Use ".*" instead of "" as wildcard regexp.
+	* gdb.python/py-value.exp: Ditto.
+
+	* gdb.trace/backtrace.exp: Use ".*" instead of "" as wildcard regexp.
+	* gdb.trace/circ.exp: Ditto.
+	* gdb.trace/collection.exp: Ditto.
+	* gdb.trace/packetlen.exp: Ditto.
+	* gdb.trace/passc-dyn.exp: Ditto.
+	* gdb.trace/report.exp: Ditto.
+	* gdb.trace/tfile.exp: Ditto.
+	* gdb.trace/tfind.exp: Ditto.
+	* gdb.trace/while-dyn.exp: Ditto.
+
+2010-06-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.python/python.exp (pythonX.Y/lib-dynload/*.so): New.
+
+2010-06-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Test PR 10640.
+	* gdb.dwarf2/dw2-op-call.exp, gdb.dwarf2/dw2-op-call.S: New.
+
+2010-06-07  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/koenig.exp: Test for ADL operators.
+	* gdb.cp/koenig.cc: Added ADL operators.
+	* gdb.cp/operator.exp: New test.
+	* gdb.cp/operator.cc: New test.
+
 2010-06-04  Michael Snyder  <msnyder@vmware.com>
 
 	* gdb.base/attach.exp: Replace gdb_test_multiple with gdb_test.

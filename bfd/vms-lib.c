@@ -703,6 +703,12 @@ _bfd_vms_lib_alpha_mkarchive (bfd *abfd)
   return _bfd_vms_lib_mkarchive (abfd, vms_lib_alpha);
 }
 
+bfd_boolean
+_bfd_vms_lib_ia64_mkarchive (bfd *abfd)
+{
+  return _bfd_vms_lib_mkarchive (abfd, vms_lib_ia64);
+}
+
 /* Find NAME in the symbol index.  Return the index.  */
 
 symindex
@@ -2105,6 +2111,7 @@ _bfd_vms_lib_write_archive_contents (bfd *arch)
           /* Write the first block (which contains an mhd).  */
           if (bfd_bwrite (blk, VMS_BLOCK_SIZE, arch) != VMS_BLOCK_SIZE)
             goto input_err;
+          off += VMS_BLOCK_SIZE;
 
           if (amt == VMS_BLOCK_SIZE - sz)
             {

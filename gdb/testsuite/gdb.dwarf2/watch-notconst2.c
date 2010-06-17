@@ -1,10 +1,6 @@
-/* Native support for GNU/Linux x86.
+/* This testcase is part of GDB, the GNU debugger.
 
-   Copyright 1986, 1987, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003, 2005, 2007, 2008, 2009, 2010
-   Free Software Foundation, Inc.
-
-   This file is part of GDB.
+   Copyright 2010 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -19,14 +15,21 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#ifndef NM_LINUX_H
-#define NM_LINUX_H
+/* The original program corresponding to watch-notconst2.S.
 
-#include "config/nm-linux.h"
+   This program is not compiled; the .S version is used instead.
 
-#ifdef HAVE_PTRACE_GETFPXREGS
-/* Include register set support for the SSE registers.  */
-#define FILL_FPXREGSET
-#endif
+   The purpose of this test is to see if GDB can still watch the
+   variable `x' even when we compile the program using -O2
+   optimization.  */
 
-#endif /* nm-linux.h */
+extern int g (int j);
+
+int
+f (int i)
+{
+  int x = 5;
+  g (2);
+  x = i;
+  return g (x);
+}

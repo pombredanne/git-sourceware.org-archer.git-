@@ -936,7 +936,7 @@ struct sec_flags_struct
 
 /* These flags are deccrtl/vaxcrtl (openVMS 6.2 Alpha) compatible.  */
 
-static struct sec_flags_struct evax_section_flags[] =
+static const struct sec_flags_struct evax_section_flags[] =
   {
     { EVAX_ABS_NAME,
       (EGPS__V_SHR),
@@ -995,12 +995,11 @@ static struct sec_flags_struct evax_section_flags[] =
       (SEC_IN_MEMORY | SEC_DATA | SEC_HAS_CONTENTS | SEC_ALLOC | SEC_LOAD) }
   };
 
-/* Retrieve bfd section flags by name and size.  */
+/* Retrieve BFD section flags by name and size.  */
 
 static flagword
-vms_secflag_by_name (bfd *abfd ATTRIBUTE_UNUSED,
-		     struct sec_flags_struct *section_flags,
-		     char *name,
+vms_secflag_by_name (const struct sec_flags_struct *section_flags,
+		     const char *name,
 		     int hassize)
 {
   int i = 0;
@@ -1021,12 +1020,12 @@ vms_secflag_by_name (bfd *abfd ATTRIBUTE_UNUSED,
   return section_flags[i].flags_always;
 }
 
-/* Retrieve vms section flags by name and size.  */
+/* Retrieve VMS section flags by name and size.  */
 
 static flagword
-vms_esecflag_by_name (struct sec_flags_struct *section_flags,
-		      char *name,
-		      int hassize)
+vms_esecflag_by_name (const struct sec_flags_struct *section_flags,
+		      const char *name,
+                      int hassize)
 {
   int i = 0;
 
@@ -1144,7 +1143,7 @@ _bfd_vms_slurp_egsd (bfd *abfd)
             vms_section_data (section)->flags = old_flags;
             vms_section_data (section)->no_flags = 0;
 	    section->size = bfd_getl32 (egps->alloc);
-	    new_flags = vms_secflag_by_name (abfd, evax_section_flags, name,
+	    new_flags = vms_secflag_by_name (evax_section_flags, name,
 					     section->size > 0);
             if (!(old_flags & EGPS__V_NOMOD))
               {
@@ -1155,12 +1154,18 @@ _bfd_vms_slurp_egsd (bfd *abfd)
 	    if (!bfd_set_section_flags (abfd, section, new_flags))
 	      return FALSE;
 	    section->alignment_power = egps->align;
-	    align_addr = (1 << section->alignment_power);
-	    if ((base_addr % align_addr) != 0)
-	      base_addr += (align_addr - (base_addr % align_addr));
-	    section->vma = (bfd_vma)base_addr;
-	    base_addr += section->size;
-	    section->filepos = (unsigned int)-1;
+            if ((old_flags & EGPS__V_REL) != 0)
+              {
+                /* Give a non-overlapping vma to non absolute sections.  */
+                align_addr = (1 << section->alignment_power);
+                if ((base_addr % align_addr) != 0)
+                  base_addr += (align_addr - (base_addr % align_addr));
+                section->vma = (bfd_vma)base_addr;
+                base_addr += section->size;
+              }
+            else
+              section->vma = 0;
+	    section->filepos = 0;
 
             /* Append it to the section array.  */
             if (PRIV (section_count) >= PRIV (section_max))
@@ -3268,7 +3273,7 @@ _bfd_vms_write_egsd (bfd *abfd)
   unsigned int symnum;
   int last_index = -1;
   char dummy_name[10];
-  char *sname;
+  const char *sname;
   flagword new_flags, old_flags;
   int abs_section_index = 0;
   struct vms_rec_wr *recwr = &PRIV (recwr);
@@ -3319,7 +3324,7 @@ _bfd_vms_write_egsd (bfd *abfd)
 
       /* Don't know if this is necessary for the linker but for now it keeps
 	 vms_slurp_gsd happy.  */
-      sname = (char *)section->name;
+      sname = section->name;
       if (*sname == '.')
 	{
           /* Remove leading dot.  */
@@ -6088,6 +6093,10 @@ evax_bfd_print_etir (FILE *file, const char *name,
             evax_bfd_print_hex (file, "   ", buf + 4, len);
             sec_len += len;
           }
+          break;
+        case ETIR__C_STO_GBL_LW:
+          fprintf (file, _("STO_GBL_LW (store global longword) %.*s\n"),
+                   buf[0], buf + 1);
           break;
         case ETIR__C_STO_LP_PSB:
           fprintf (file, _("STO_OFF (store LP with procedure signature)\n"));

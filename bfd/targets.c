@@ -1204,9 +1204,7 @@ static const bfd_target * const _bfd_target_vector[] =
 	&shlcoff_vec,
 	&shlpe_vec,
 	&shlpei_vec,
-#if defined (HOST_HPPAHPUX) || defined (HOST_HPPABSD) || defined (HOST_HPPAOSF)
 	&som_vec,
-#endif
 	&sparccoff_vec,
 	&sparcle_aout_vec,
 	&sparclinux_vec,
@@ -1588,11 +1586,6 @@ bfd_target_list (void)
 {
   int vec_length = 0;
   bfd_size_type amt;
-#if defined (HOST_HPPAHPUX) && ! defined (__STDC__)
-  /* The native compiler on the HP9000/700 has a bug which causes it
-     to loop endlessly when compiling this file.  This avoids it.  */
-  volatile
-#endif
   const bfd_target * const *target;
   const  char **name_list, **name_ptr;
 
