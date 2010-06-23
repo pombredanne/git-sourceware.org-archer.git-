@@ -1,3 +1,119 @@
+2010-06-23  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* infrun.c (handle_inferior_event): Handle presence of single-step
+	breakpoints for TARGET_WAITKIND_FORKED and TARGET_WAITKIND_VFORKED.
+	Cancel single-step breakpoints for TARGET_WAITKIND_EXITED,
+	TARGET_WAITKIND_SIGNALED, and TARGET_WAITKIND_EXECD.
+	* breakpoint.c (detach_single_step_breakpoints): New function.
+	(detach_breakpoints): Call it.
+	(cancel_single_step_breakpoints): New function.
+	* breakpoint.h (cancel_single_step_breakpoints): Add prototype.
+
+	* spu-tdep.c (spu_memory_remove_breakpoint): New function.
+	(spu_gdbarch_init): Install it.
+
+2010-06-23  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* configure.ac: Always set RDYNAMIC at least as `-rdynamic'.
+	* configure: Regenerate.
+
+2010-06-22  Hui Zhu  <teawater@gmail.com>
+
+	* i386-tdep.c (i386_record_lea_modrm): Change warning to query.
+	(i386_process_record): Ditto.
+	* record.c (record_memory_query): New variable.
+	(_initialize_record): New command "set record memory-query".
+	* record.h (record_memory_query): New extern.
+
+2010-06-21  Doug Evans  <dje@google.com>
+
+	* i386-tdep.h (i386_displaced_step_copy_insn): Declare.
+	* i386-tdep.c (i386_displaced_step_copy_insn): New function.
+	(i386_syscall_p): Change type of lengthp to int.
+	(i386_displaced_step_fixup): Handle kernels that run one past a
+	syscall insn.
+	* i386-linux-tdep.c (i386_linux_init_abi): Use
+	i386_displaced_step_copy_insn instead of
+	simple_displaced_step_copy_insn.
+
+2010-06-21  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (read_base_type): Handle DW_ATE_UTF.
+	(dwarf_type_encoding_name): Likewise.
+
+2010-06-21  Tom Tromey  <tromey@redhat.com>
+
+	* p-valprint.c (pascal_val_print): Use TYPE_ERROR_NAME.
+	* p-typeprint.c (pascal_type_print_base): Use TYPE_ERROR_NAME.
+	* m2-valprint.c (m2_val_print): Use TYPE_ERROR_NAME.
+	* gdbtypes.h (TYPE_ERROR_NAME): New macro.
+	* f-valprint.c (f_val_print): Use TYPE_ERROR_NAME.
+	* f-typeprint.c (f_type_print_base): Use TYPE_ERROR_NAME.
+	* dwarf2read.c (tag_type_to_type): Create a new error type on
+	failure.
+	* c-valprint.c (c_val_print): Use TYPE_ERROR_NAME.
+	* c-typeprint.c (c_type_print_base): Use TYPE_ERROR_NAME.
+
+2010-06-21  Michael Snyder  <msnyder@vmware.com>
+
+	* breakpoint.c (_initialize_breakpoint): Use add_prefix_cmd, 
+	not add_abbrev_prefix_cmd, for "enable breakpoints".
+
+2010-06-21  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* dwarf2loc.c (find_location_expression): Add relocation offset
+	to base-address-selection entry base addresses.  Read addresses
+	(and offsets) as signed/unsigned integers, depending on the
+	BFD's sign_extend_vma flag.  Do not call dwarf2_read_address.
+	(loclist_describe_location): Likewise.
+	(disassemble_dwarf_expression): Read DW_OP_addr operand as
+	unsigned integer.  Do not call dwarf2_read_address.
+	(locexpr_describe_location): Likewise for DW_OP_GNU_push_tls_address.
+
+2010-06-19  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* spu-tdep.c (spu_frame_unwind_cache): Use LSLR register
+	value instead of hard-coded SPU_LS_SIZE.
+	(spu_software_single_step): Likewise.
+	* spu-tdep.h (SPU_LS_SIZE): Remove.
+
+2010-06-19  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* spu-multiarch.c (spu_xfer_partial): Wrap around local store
+	limit on local store memory accesses.
+	* spu-linux-nat.c (spu_xfer_partial): Likewise.
+	* spu-tdep.c (spu_lslr): Remove.
+	(spu_pointer_to_address): Do not truncate addresses.
+	(spu_integer_to_address): Likewise.
+	(spu_overlay_new_objfile): Use SPU_OVERLAY_LMA.
+	* spu-tdep.h: Add comments.
+	(SPUADDR_SPU): Respect SPU_OVERLAY_LMA bit.
+	(SPU_OVERLAY_LMA): Define.
+
+2010-06-18  Stan Shebs  <stan@codesourcery.com>
+
+	* osdata.c (get_osdata): Warn separately if target does not report
+	type list.
+	(info_osdata_command): Allow empty type, report error if target
+	does not return available types of OS data.
+	* linux-nat.c (linux_nat_xfer_osdata): Report list of OS data
+	types if no annex supplied.
+
+	* thread.c (thread_id_make_value): Make a value representing the
+	current thread.
+	(_initialize_thread): Create $_thread.
+
+2010-06-17  Joel Brobecker  <brobecker@adacore.com>
+
+	* dwarf2read.c (psymtabs_addrmap_cleanup): Add empty line after
+	last local variable declaration.  No real code change.
+
+2010-06-17  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (psymtabs_addrmap_cleanup): New function.
+	(dwarf2_build_psymtabs_hard): Use it.  Create addrmap on a
+	temporary obstack.
+
 2010-06-16  Sergio Durigan Junior  <sergiodj@redhat.com>
 	    Jan Kratochvil  <jan.kratochvil@redhat.com>
 

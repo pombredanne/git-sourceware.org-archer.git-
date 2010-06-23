@@ -1995,6 +1995,16 @@ build_type_psymtabs (struct objfile *objfile)
 			  process_type_comp_unit, objfile);
 }
 
+/* A cleanup function that clears objfile's psymtabs_addrmap field.  */
+
+static void
+psymtabs_addrmap_cleanup (void *o)
+{
+  struct objfile *objfile = o;
+
+  objfile->psymtabs_addrmap = NULL;
+}
+
 /* Build the partial symbol table by doing a quick pass through the
    .debug_info and .debug_abbrev sections.  */
 
@@ -2002,7 +2012,8 @@ static void
 dwarf2_build_psymtabs_hard (struct objfile *objfile)
 {
   gdb_byte *info_ptr;
-  struct cleanup *back_to;
+  struct cleanup *back_to, *addrmap_cleanup;
+  struct obstack temp_obstack;
 
   dwarf2_read_section (objfile, &dwarf2_per_objfile->info);
   info_ptr = dwarf2_per_objfile->info.buffer;
@@ -2015,8 +2026,12 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile)
 
   create_all_comp_units (objfile);
 
-  objfile->psymtabs_addrmap =
-    addrmap_create_mutable (&objfile->objfile_obstack);
+  /* Create a temporary address map on a temporary obstack.  We later
+     copy this to the final obstack.  */
+  obstack_init (&temp_obstack);
+  make_cleanup_obstack_free (&temp_obstack);
+  objfile->psymtabs_addrmap = addrmap_create_mutable (&temp_obstack);
+  addrmap_cleanup = make_cleanup (psymtabs_addrmap_cleanup, objfile);
 
   /* Since the objects we're extracting from .debug_info vary in
      length, only the individual functions to extract them (like
@@ -2048,6 +2063,7 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile)
 
   objfile->psymtabs_addrmap = addrmap_create_fixed (objfile->psymtabs_addrmap,
 						    &objfile->objfile_obstack);
+  discard_cleanups (addrmap_cleanup);
 
   do_cleanups (back_to);
 }
@@ -6196,6 +6212,11 @@ read_base_type (struct die_info *die, struct dwarf2_cu *cu)
 	  code = TYPE_CODE_CHAR;
 	type_flags |= TYPE_FLAG_UNSIGNED;
 	break;
+      case DW_ATE_UTF:
+	/* We just treat this as an integer and then recognize the
+	   type by name elsewhere.  */
+	break;
+
       default:
 	complaint (&symfile_complaints, _("unsupported DW_AT_encoding: '%s'"),
 		   dwarf_type_encoding_name (encoding));
@@ -9157,9 +9178,18 @@ tag_type_to_type (struct die_info *die, struct dwarf2_cu *cu)
   this_type = read_type_die (die, cu);
   if (!this_type)
     {
-      dump_die_for_error (die);
-      error (_("Dwarf Error: Cannot find type of die [in module %s]"), 
-	     cu->objfile->name);
+      char *message, *saved;
+
+      /* read_type_die already issued a complaint.  */
+      message = xstrprintf (_("<unknown type in %s, CU 0x%x, DIE 0x%x>"),
+			    cu->objfile->name,
+			    cu->header.offset,
+			    die->offset);
+      saved = obstack_copy0 (&cu->objfile->objfile_obstack,
+			     message, strlen (message));
+      xfree (message);
+
+      this_type = init_type (TYPE_CODE_ERROR, 0, 0, saved, cu->objfile);
     }
   return this_type;
 }
@@ -10377,6 +10407,9 @@ dwarf_type_encoding_name (unsigned enc)
       return "DW_ATE_unsigned_fixed";
     case DW_ATE_decimal_float:
       return "DW_ATE_decimal_float";
+    /* DWARF 4.  */
+    case DW_ATE_UTF:
+      return "DW_ATE_UTF";
     /* HP extensions.  */
     case DW_ATE_HP_float80:
       return "DW_ATE_HP_float80";
