@@ -1061,6 +1061,7 @@ c_parse (void)
   expout_size = expr->size;
   expout_ptr = expr->ptr;
   xfree (expr);
+  VEC_free (cp_token, parser.token_fifo);
   return 0;
 }
 
