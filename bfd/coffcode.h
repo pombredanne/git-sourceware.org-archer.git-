@@ -2094,22 +2094,6 @@ coff_set_arch_mach_hook (bfd *abfd, void * filehdr)
       machine = bfd_mach_m68020;
       break;
 #endif
-#ifdef MAXQ20MAGIC
-    case MAXQ20MAGIC:
-      arch = bfd_arch_maxq;
-      switch (internal_f->f_flags & F_MACHMASK)
-	{
-	case F_MAXQ10:
-	  machine = bfd_mach_maxq10;
-	  break;
-	case F_MAXQ20:
-	  machine = bfd_mach_maxq20;
-	  break;
-	default:
-	  return FALSE;
-	}
-      break;
-#endif
 #ifdef MC88MAGIC
     case MC88MAGIC:
     case MC88DMAGIC:
@@ -3018,17 +3002,6 @@ coff_set_flags (bfd * abfd,
       return TRUE;
 #endif
 
-#ifdef MAXQ20MAGIC
-    case bfd_arch_maxq:
-      * magicp = MAXQ20MAGIC;
-      switch (bfd_get_mach (abfd))
-	{
-	case bfd_mach_maxq10: * flagsp = F_MAXQ10; return TRUE;
-	case bfd_mach_maxq20: * flagsp = F_MAXQ20; return TRUE;
-	default:	      return FALSE;
-	}
-#endif
-
     default:			/* Unknown architecture.  */
       /* Fall through to "return FALSE" below, to avoid
 	 "statement never reached" errors on the one below.  */
@@ -3090,11 +3063,11 @@ static bfd_boolean
 coff_compute_section_file_positions (bfd * abfd)
 {
   asection *current;
-  asection *previous = NULL;
   file_ptr sofar = bfd_coff_filhsz (abfd);
   bfd_boolean align_adjust;
   int target_index;
 #ifdef ALIGN_SECTIONS_IN_FILE
+  asection *previous = NULL;
   file_ptr old_sofar;
 #endif
 
@@ -3408,7 +3381,9 @@ coff_compute_section_file_positions (bfd * abfd)
 	bfd_set_section_vma (abfd, current, 0);
 #endif
 
+#ifdef ALIGN_SECTIONS_IN_FILE
       previous = current;
+#endif
     }
 
   /* It is now safe to write to the output file.  If we needed an
@@ -4107,11 +4082,6 @@ coff_write_object_contents (bfd * abfd)
 #ifdef OR32
 #define __A_MAGIC_SET__
     internal_a.magic = NMAGIC; /* Assume separate i/d.  */
-#endif
-
-#ifdef MAXQ20MAGIC
-#define __A_MAGIC_SET__
-      internal_a.magic = MAXQ20MAGIC;
 #endif
 
 #ifndef __A_MAGIC_SET__
@@ -5179,6 +5149,7 @@ coff_slurp_reloc_table (bfd * abfd, sec_ptr asect, asymbol ** symbols)
 
       /* Calculate any reloc addend by looking at the symbol.  */
       CALC_ADDEND (abfd, ptr, dst, cache_ptr);
+      (void) ptr;
 
       cache_ptr->address -= asect->vma;
       /* !! cache_ptr->section = NULL;*/

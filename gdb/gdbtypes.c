@@ -42,6 +42,10 @@
 
 
 /* Floatformat pairs.  */
+const struct floatformat *floatformats_ieee_half[BFD_ENDIAN_UNKNOWN] = {
+  &floatformat_ieee_half_big,
+  &floatformat_ieee_half_little
+};
 const struct floatformat *floatformats_ieee_single[BFD_ENDIAN_UNKNOWN] = {
   &floatformat_ieee_single_big,
   &floatformat_ieee_single_little
@@ -1733,7 +1737,8 @@ check_stub_method_group (struct type *type, int method_id)
     }
 }
 
-const struct cplus_struct_type cplus_struct_default;
+/* Ensure it is in .rodata (if available) by workarounding GCC PR 44690.  */
+const struct cplus_struct_type cplus_struct_default = { };
 
 void
 allocate_cplus_struct_type (struct type *type)
@@ -2511,9 +2516,7 @@ field_is_static (struct field *f)
      to the address of the enclosing struct.  It would be nice to
      have a dedicated flag that would be set for static fields when
      the type is being created.  But in practice, checking the field
-     loc_kind should give us an accurate answer (at least as long as
-     we assume that DWARF block locations are not going to be used
-     for static fields).  FIXME?  */
+     loc_kind should give us an accurate answer.  */
   return (FIELD_LOC_KIND (*f) == FIELD_LOC_KIND_PHYSNAME
 	  || FIELD_LOC_KIND (*f) == FIELD_LOC_KIND_PHYSADDR);
 }

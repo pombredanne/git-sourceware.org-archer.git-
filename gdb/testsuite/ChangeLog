@@ -1,3 +1,227 @@
+2010-07-07  Doug Evans  <dje@google.com>
+
+	* lib/gdb.exp (gdb_test_list_exact): New function.
+	* gdb.base/default.exp (show convenience): Call it, add tests for
+	$_sdata = void, $_thread = 0.
+
+2010-07-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Joel Brobecker  <brobecker@adacore.com>
+
+	Fix re-run of PIE executable, PR shlibs/11776.
+	* gdb.base/break-interp.exp (test_ld): Turn off "disable-randomization".
+	Remove $displacement_main to match the solib-svr4.c change.  New "kill"
+	and re-"run" of the inferior.
+
+2010-07-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Joel Brobecker  <brobecker@adacore.com>
+
+	Cope with missing /usr/sbin/prelink.
+	* lib/prelink-support.exp (prelink_no):
+	<result == 1 && $output is "no such file or directory">: New.
+	(prelink_yes): Likewise.  Return on failed prelink_no.
+
+2010-07-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.base/attach-pie-misread.exp: Load prelink-support.exp.  Replace
+	build_executable by build_executable_own_libs.  Replace "prelink -R"
+	execution by a call of prelink_yes.  Comment why "prelink -r" needs no
+	change.
+	* gdb.base/break-interp.exp: Load prelink-support.exp.  Rename calls of
+	copy to file_copy.  Move setting opts --dynamic-linker and -rpath,
+	mkdir $dir and ldd its parsing and copying to lib/prelink-support.exp.
+	Replace build_executable by build_executable_own_libs's function
+	build_executable_own_libs.
+	(prelinkNO): Create new stub to call prelink_no.
+	(prelinkYES): Create new stub to call prelink_yes.
+	(test_attach): Rename calls of copy to file_copy.
+	(section_get, prelinkNO_run, prelinkNO, prelinkYES, symlink_resolve)
+	(copy): Move to ...
+	* lib/prelink-support.exp: ... a new file.  Rename prelinkNO to
+	prelink_no, prelinkYES to prelink_yes, copy to file_copy.
+	* gdb.base/prelink.exp: Disable testcase also for is_remote and
+	skip_shlib_tests.  Load prelink-support.exp.  Replace gdb_compile with
+	special flags by gdb_compile_shlib.  Replace second gdb_compile by
+	build_executable_own_libs.  Replace "prelink -R" execution by a call of
+	prelink_yes.  Replace "prelink -u" and second "prelink -R" execution by
+	a second call of prelink_yes.  Replace restart commands by
+	clean_restart.
+	(prelink): Rename to ...
+	(seen displacement message): ... this test.  Extend its expectation
+	strictness.
+
+2010-07-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/attach-pie-misread.exp, gdb.base/attach-pie-misread.c: New.
+	* gdb.base/break-interp.exp (reach, test_core, test_ld): Require each
+	displacement message exactly once.
+
+2010-07-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.base/break-interp.exp (test_attach): Keep $interp changed.  Move
+	its restore after the <$relink_args != ""> loop.  new comment.
+
+2010-07-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.base/break-interp.exp: Run $binpie with new value "ATTACH", new
+	code for it.  New variable relink_args.
+	(prelinkYES): Call prelinkNO.
+	(test_attach): Accept new parameter relink_args.  Re-prelink the binary
+	in such case.  Move the core code to ...
+	(test_attach_gdb): ... a new function.  Send GDB command "file".
+	Extend expected "Attaching to " string.
+
+2010-07-02  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/bitops.exp: Remove extraneous "pass".
+
+2010-07-02  Ken Werner  <ken.werner@de.ibm.com>
+
+	* gdb.arch/altivec-abi.exp: Fix expect pattern of character vectors.
+
+2010-07-01  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.base/help.exp: Adjust expected output.
+
+2010-07-01  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.base/help.exp: Adjust expected output.
+
+2010-06-30  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.cp/namespace.exp (print C::OtherFileClass::cOtherFileClassVar)
+	(print ::C::OtherFileClass::cOtherFileClassVar): Remove KFAIL for
+	c++/11702.
+
+2010-06-29  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Doug Evans  <dje@google.com>
+
+	* gdb.base/break-interp.exp (prelinkYES): XFAIL on `Not enough room to
+	add .dynamic entry'.
+
+2010-06-29  Doug Evans  <dje@google.com>
+
+	Test PR c++/11702.
+	* gdb.cp/m-static.exp: Add testcase.
+	* gdb.cp/m-static.h (gnu_obj_4): Add initialized static const member.
+
+2010-06-28  Phil Muldoon  <pmuldoon@redhat.com>
+            Tom Tromey  <tromey@redhat.com>
+            Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.python/py-inferior.c: New File.
+	* gdb.python/py-infthread.c: New File.
+	* gdb.python/py-inferior.exp: New File.
+	* gdb.python/py-infthread.exp: New File.
+
+2010-06-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.cp/namespace.exp (ptype OtherFileClass typedefs)
+	(ptype ::C::OtherFileClass typedefs): New.
+	* gdb.cp/namespace1.cc (C::OtherFileClass::cOtherFileClassType2)
+	(C::OtherFileClass::cOtherFileClassVar2): New.
+	(C::OtherFileClass::cOtherFileClassVar_use): Use also
+	cOtherFileClassVar2.
+	(C::cOtherFileType2, C::cOtherFileVar2): New.
+	(C::cOtherFileVar_use): use also cOtherFileVar2.
+	* gdb.cp/userdef.exp (ptype &*c): Permit arbitrary trailing text.
+
+2010-06-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.cp/namespace.exp (whatis C::cOtherFileType)
+	(whatis ::C::cOtherFileType, whatis C::cOtherFileVar)
+	(whatis ::C::cOtherFileVar, print C::cOtherFileVar)
+	(print ::C::cOtherFileVar)
+	(whatis C::OtherFileClass::cOtherFileClassType)
+	(whatis ::C::OtherFileClass::cOtherFileClassType)
+	(print C::OtherFileClass::cOtherFileClassVar)
+	(print ::cOtherFileClassVar)
+	(print ::C::OtherFileClass::cOtherFileClassVar): New tests.
+	(ptype OtherFileClass, ptype ::C::OtherFileClass): Permit arbitrary
+	trailing content.
+	* gdb.cp/namespace1.cc (C::OtherFileClass::cOtherFileClassType)
+	(C::OtherFileClass::cOtherFileClassVar)
+	(C::OtherFileClass::cOtherFileClassVar_use, C::cOtherFileType)
+	(C::cOtherFileVar, C::cOtherFileVar_use): New.
+
+2010-06-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Test PR c++/11703 and PR gdb/1448.
+	* gdb.cp/namespace.exp (ptype ::C::NestedClass): Remove KFAIL for
+	gdb/1448.
+
+2010-06-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.cp/virtbase.cc (class RTTI_base, class RTTI_data)
+	(main) <rtti_data>: New.
+	* gdb.cp/virtbase.exp (print rtti_data): New.
+
+2010-06-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Joel Brobecker  <brobecker@adacore.com>
+
+	* lib/gdb.exp (gdb_test_multiple): Error on trailing newlines.
+
+2010-06-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.cp/static-print-quit.exp, gdb.cp/static-print-quit.cc: New.
+
+2010-06-28  Doug Evans  <dje@google.com>
+
+	* gdb.base/break-interp.exp (reach): Relax expected output a bit.
+
+2010-06-27  Doug Evans  <dje@google.com>
+
+	* gdb.cp/m-static.exp: Update expected test output.
+
+2010-06-25  Paul Hilfinger  <hilfinger@adacore.com>
+
+        * gdb.gdb/selftest.exp: Adjust expected message for
+        capturing start-up runtime.
+
+2010-06-25  Tom Tromey  <tromey@redhat.com>
+
+	PR python/10808:
+	* gdb.python/python.exp: Add new tests.
+
+2010-06-25  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/operator.cc: Created an import loop.
+	* gdb.cp/operator.exp: Added testcase for import loop.
+
+2010-06-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Test PR python/11407.
+	* gdb.dwarf2/dw2-ref-missing-frame-func.c: New file.
+	* gdb.dwarf2/dw2-ref-missing-frame.S: Use cu_text_start and cu_text_end.
+	Split main into func_nofb and func_loopfb dropping NO_FRAME_BASE.
+	* gdb.dwarf2/dw2-ref-missing-frame.exp: Remove variables sources,
+	executable_nofb and executable_fb.  New variables srcsfile, objsfile,
+	srcfuncfile, objfuncfile, srcmainfile, objmainfile, executable and
+	binfile.  Call gdb_compile with clean_restart twice.
+	(func_nofb print, func_nofb backtrace, func_loopfb print)
+	(func_loopfb backtrace): New.
+
+2010-06-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-ref-missing-frame-main.c: New.
+	* gdb.dwarf2/dw2-ref-missing-frame.S: Replace compiler generated output
+	by a hand made one.
+	* gdb.dwarf2/dw2-ref-missing-frame.exp: Remove invalid comment.  Remove
+	i?86 requirement.  Remove variables srcfile and binfile.  New variable
+	sources, executable_nofb and executable_fb.  Call prepare_for_testing.
+
+2010-06-25  Ulrich Weigand  <Ulrich.Weigand@de.ibm.com>
+
+	* gdb.cell/dwarfaddr.exp: New file.
+	* gdb.cell/dwarfaddr.S: New file.
+
+2010-06-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Test PR 9436.
+	* gdb.base/nostdlib.exp, gdb.base/nostdlib.c: New.
+
 2010-06-24  Hui Zhu  <teawater@gmail.com>
 
 	* gdb.base/eval.exp: New file.

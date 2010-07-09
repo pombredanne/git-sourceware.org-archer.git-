@@ -4280,15 +4280,15 @@ procfs_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int dowrite,
       if (dowrite)
 	{
 #ifdef NEW_PROC_API
-	  PROCFS_NOTE ("write memory: ");
+	  PROCFS_NOTE ("write memory:\n");
 #else
-	  PROCFS_NOTE ("write memory: \n");
+	  PROCFS_NOTE ("write memory:\n");
 #endif
 	  nbytes = write (pi->as_fd, myaddr, len);
 	}
       else
 	{
-	  PROCFS_NOTE ("read  memory: \n");
+	  PROCFS_NOTE ("read  memory:\n");
 	  nbytes = read (pi->as_fd, myaddr, len);
 	}
       if (nbytes < 0)
@@ -5161,7 +5161,8 @@ procfs_stopped_data_address (struct target_ops *targ, CORE_ADDR *addr)
 }
 
 static int
-procfs_insert_watchpoint (CORE_ADDR addr, int len, int type)
+procfs_insert_watchpoint (CORE_ADDR addr, int len, int type,
+			  struct expression *cond)
 {
   if (!target_have_steppable_watchpoint
       && !gdbarch_have_nonsteppable_watchpoint (target_gdbarch))
@@ -5182,7 +5183,8 @@ procfs_insert_watchpoint (CORE_ADDR addr, int len, int type)
 }
 
 static int
-procfs_remove_watchpoint (CORE_ADDR addr, int len, int type)
+procfs_remove_watchpoint (CORE_ADDR addr, int len, int type,
+			  struct expression *cond)
 {
   return procfs_set_watchpoint (inferior_ptid, addr, 0, 0, 0);
 }

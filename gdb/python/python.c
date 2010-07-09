@@ -309,27 +309,66 @@ gdbpy_target_wide_charset (PyObject *self, PyObject *args)
   return PyUnicode_Decode (cset, strlen (cset), host_charset (), NULL);
 }
 
+struct restore_ui_file_closure
+{
+  struct ui_file **variable;
+  struct ui_file *value;
+};
+
+static void
+restore_ui_file (void *p)
+{
+  struct restore_ui_file_closure *closure = p;
+
+  *(closure->variable) = closure->value;
+}
+
+/* Remember the current value of *VARIABLE and make it restored when
+   the cleanup is run.  */
+struct cleanup *
+make_cleanup_restore_ui_file (struct ui_file **variable)
+{
+  struct restore_ui_file_closure *c = XNEW (struct restore_ui_file_closure);
+
+  c->variable = variable;
+  c->value = *variable;
+
+  return make_cleanup_dtor (restore_ui_file, (void *) c, xfree);
+}
+
 /* A Python function which evaluates a string using the gdb CLI.  */
 
 static PyObject *
-execute_gdb_command (PyObject *self, PyObject *args)
+execute_gdb_command (PyObject *self, PyObject *args, PyObject *kw)
 {
   char *arg;
-  PyObject *from_tty_obj = NULL;
-  int from_tty;
-  int cmp;
+  PyObject *from_tty_obj = NULL, *to_string_obj = NULL;
+  int from_tty, to_string;
   volatile struct gdb_exception except;
+  static char *keywords[] = {"command", "from_tty", "to_string", NULL };
+  char *result = NULL;
 
-  if (! PyArg_ParseTuple (args, "s|O!", &arg, &PyBool_Type, &from_tty_obj))
+  if (! PyArg_ParseTupleAndKeywords (args, kw, "s|O!O!", keywords, &arg,
+				     &PyBool_Type, &from_tty_obj,
+				     &PyBool_Type, &to_string_obj))
     return NULL;
 
   from_tty = 0;
   if (from_tty_obj)
     {
-      cmp = PyObject_IsTrue (from_tty_obj);
+      int cmp = PyObject_IsTrue (from_tty_obj);
       if (cmp < 0)
-	  return NULL;
+	return NULL;
       from_tty = cmp;
+    }
+
+  to_string = 0;
+  if (to_string_obj)
+    {
+      int cmp = PyObject_IsTrue (to_string_obj);
+      if (cmp < 0)
+	return NULL;
+      to_string = cmp;
     }
 
   TRY_CATCH (except, RETURN_MASK_ALL)
@@ -337,8 +376,27 @@ execute_gdb_command (PyObject *self, PyObject *args)
       /* Copy the argument text in case the command modifies it.  */
       char *copy = xstrdup (arg);
       struct cleanup *cleanup = make_cleanup (xfree, copy);
+      struct ui_file *str_file = NULL;
+
+      if (to_string)
+	{
+	  str_file = mem_fileopen ();
+
+	  make_cleanup_restore_ui_file (&gdb_stdout);
+	  make_cleanup_restore_ui_file (&gdb_stderr);
+	  make_cleanup_ui_file_delete (str_file);
+
+	  gdb_stdout = str_file;
+	  gdb_stderr = str_file;
+	}
 
       execute_command (copy, from_tty);
+
+      if (str_file)
+	result = ui_file_xstrdup (str_file, NULL);
+      else
+	result = NULL;
+
       do_cleanups (cleanup);
     }
   GDB_PY_HANDLE_EXCEPTION (except);
@@ -346,6 +404,12 @@ execute_gdb_command (PyObject *self, PyObject *args)
   /* Do any commands attached to breakpoint we stopped at.  */
   bpstat_do_actions ();
 
+  if (result)
+    {
+      PyObject *r = PyString_FromString (result);
+      xfree (result);
+      return r;
+    }
   Py_RETURN_NONE;
 }
 
@@ -668,6 +732,13 @@ Enables or disables printing of Python stack traces."),
   PyModule_AddStringConstant (gdb_module, "VERSION", (char*) version);
   PyModule_AddStringConstant (gdb_module, "HOST_CONFIG", (char*) host_name);
   PyModule_AddStringConstant (gdb_module, "TARGET_CONFIG", (char*) target_name);
+  {
+    char *gdb_pythondir;
+
+    gdb_pythondir = concat (gdb_datadir, SLASH_STRING, "python", NULL);
+    PyModule_AddStringConstant (gdb_module, "PYTHONDIR", gdb_pythondir);
+    xfree (gdb_pythondir);
+  }
 
   gdbpy_gdberror_exc = PyErr_NewException ("gdb.GdbError", NULL, NULL);
   PyModule_AddObject (gdb_module, "GdbError", gdbpy_gdberror_exc);
@@ -686,6 +757,8 @@ Enables or disables printing of Python stack traces."),
   gdbpy_initialize_objfile ();
   gdbpy_initialize_breakpoints ();
   gdbpy_initialize_lazy_string ();
+  gdbpy_initialize_thread ();
+  gdbpy_initialize_inferior ();
 
   PyRun_SimpleString ("import gdb");
   PyRun_SimpleString ("gdb.pretty_printers = []");
@@ -720,6 +793,20 @@ class GdbOutputFile:\n\
 \n\
 sys.stderr = GdbOutputFile()\n\
 sys.stdout = GdbOutputFile()\n\
+\n\
+# GDB's python scripts are stored inside gdb.PYTHONDIR.  So insert\n\
+# that directory name at the start of sys.path to allow the Python\n\
+# interpreter to find them.\n\
+sys.path.insert(0, gdb.PYTHONDIR)\n\
+\n\
+# The gdb module is implemented in C rather than in Python.  As a result,\n\
+# the associated __init.py__ script is not not executed by default when\n\
+# the gdb module gets imported.  Execute that script manually if it exists.\n\
+gdb.__path__ = [gdb.PYTHONDIR + '/gdb']\n\
+from os.path import exists\n\
+ipy = gdb.PYTHONDIR + '/gdb/__init__.py'\n\
+if exists (ipy):\n\
+  execfile (ipy)\n\
 ");
 
   /* Release the GIL while gdb runs.  */
@@ -737,7 +824,7 @@ static PyMethodDef GdbMethods[] =
 {
   { "history", gdbpy_history, METH_VARARGS,
     "Get a value from history" },
-  { "execute", execute_gdb_command, METH_VARARGS,
+  { "execute", (PyCFunction) execute_gdb_command, METH_VARARGS | METH_KEYWORDS,
     "Execute a gdb command" },
   { "parameter", gdbpy_parameter, METH_VARARGS,
     "Return a gdb parameter's value" },
@@ -799,7 +886,12 @@ Arguments are separate by spaces and may be quoted."
     "Write a string using gdb's filtered stream." },
   { "flush", gdbpy_flush, METH_NOARGS,
     "Flush gdb's filtered stdout stream." },
-
+  { "selected_thread", gdbpy_selected_thread, METH_NOARGS,
+    "selected_thread () -> gdb.InferiorThread.\n\
+Return the selected thread object." },
+  { "inferiors", gdbpy_inferiors, METH_NOARGS,
+    "inferiors () -> (gdb.Inferior, ...).\n\
+Return a tuple containing all inferiors." },
   {NULL, NULL, 0, NULL}
 };
 

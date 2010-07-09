@@ -1,3 +1,52 @@
+2010-07-01  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo (Create and Delete Tracepoints): Add more index
+	entries for fast tracepoints and static tracepoints.
+
+2010-07-01  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo (General Query Packets) <qfThreadInfo,
+	qsThreadInfo>: Spell out `l' as ell.
+
+2010-07-01  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo (Convenience Variables): Document $_sdata.
+	(Commands to Set Tracepoints): Describe static tracepoints.  Add
+	`Listing Static Tracepoint Markers' menu entry.  Document
+	"strace".
+	(Tracepoint Action Lists): Document collecting $_sdata.
+	(Listing Static Tracepoint Markers): New subsection.
+	(Tracepoints support in gdbserver): Mention static tracepoints.
+	(remote packets, enabling and disabling): Mention
+	read-sdata-object.
+	(General Query Packets) <qSupported>: Document qXfer:sdata:read
+	and StaticTracepoint.
+	Mention qTfSTM, qTsSTM and qTSTMat as tracepoint packets.
+	Document qXfer:sdata:read.
+	(Tracepoint packets): Document qTfSTM, qTsSTM and qTSTMat.
+
+2010-06-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.texinfo (Threads In Python): Fix unmatched @end table.
+
+2010-06-28  Phil Muldoon  <pmuldoon@redhat.com>
+	    Tom Tromey  <tromey@redhat.com>
+	    Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.texinfo (Inferiors In Python): New node.
+	* gdb.texinfo (Threads In Python): New node.
+
+2010-06-28  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.texinfo (Python): Document what the python directory is
+	and what its location is.
+	(Basic Python): Document the gdb.PYTHONDIR constant.
+
+2010-06-25  Tom Tromey  <tromey@redhat.com>
+
+	PR python/10808:
+	* gdb.texinfo (Basic Python): Document new gdb.execute argument.
+
 2010-06-24  Hui Zhu  <teawater@gmail.com>
 
 	* gdb.texinfo: (Commands for Controlled Output): Add

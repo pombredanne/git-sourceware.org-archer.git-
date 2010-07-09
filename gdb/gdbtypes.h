@@ -342,8 +342,7 @@ enum field_loc_kind
   {
     FIELD_LOC_KIND_BITPOS,	/* bitpos */
     FIELD_LOC_KIND_PHYSADDR,	/* physaddr */
-    FIELD_LOC_KIND_PHYSNAME,	/* physname */
-    FIELD_LOC_KIND_DWARF_BLOCK	/* dwarf_block */
+    FIELD_LOC_KIND_PHYSNAME	/* physname */
   };
 
 /* A discriminant to determine which field in the main_type.type_specific
@@ -504,12 +503,6 @@ struct main_type
 
 	CORE_ADDR physaddr;
 	char *physname;
-
-	/* The field location can be computed by evaluating the following DWARF
-	   block.  This can be used in Fortran variable-length arrays, for
-	   instance.  */
-
-	struct dwarf2_locexpr_baton *dwarf_block;
       }
       loc;
 
@@ -820,6 +813,19 @@ struct cplus_struct_type
 	int line;
       }
      *localtype_ptr;
+
+    /* typedefs defined inside this class.  TYPEDEF_FIELD points to an array of
+       TYPEDEF_FIELD_COUNT elements.  */
+    struct typedef_field
+      {
+	/* Unqualified name to be prefixed by owning class qualified name.  */
+	const char *name;
+
+	/* Type this typedef named NAME represents.  */
+	struct type *type;
+      }
+    *typedef_field;
+    unsigned typedef_field_count;
   };
 
 /* Struct used in computing virtual base list */
@@ -959,7 +965,6 @@ extern void allocate_gnat_aux_type (struct type *);
 #define FIELD_BITPOS(thisfld) ((thisfld).loc.bitpos)
 #define FIELD_STATIC_PHYSNAME(thisfld) ((thisfld).loc.physname)
 #define FIELD_STATIC_PHYSADDR(thisfld) ((thisfld).loc.physaddr)
-#define FIELD_DWARF_BLOCK(thisfld) ((thisfld).loc.dwarf_block)
 #define SET_FIELD_BITPOS(thisfld, bitpos)			\
   (FIELD_LOC_KIND (thisfld) = FIELD_LOC_KIND_BITPOS,		\
    FIELD_BITPOS (thisfld) = (bitpos))
@@ -969,9 +974,6 @@ extern void allocate_gnat_aux_type (struct type *);
 #define SET_FIELD_PHYSADDR(thisfld, addr)			\
   (FIELD_LOC_KIND (thisfld) = FIELD_LOC_KIND_PHYSADDR,		\
    FIELD_STATIC_PHYSADDR (thisfld) = (addr))
-#define SET_FIELD_DWARF_BLOCK(thisfld, addr)			\
-  (FIELD_LOC_KIND (thisfld) = FIELD_LOC_KIND_DWARF_BLOCK,	\
-   FIELD_DWARF_BLOCK (thisfld) = (addr))
 #define FIELD_ARTIFICIAL(thisfld) ((thisfld).artificial)
 #define FIELD_BITSIZE(thisfld) ((thisfld).bitsize)
 
@@ -982,7 +984,6 @@ extern void allocate_gnat_aux_type (struct type *);
 #define TYPE_FIELD_BITPOS(thistype, n) FIELD_BITPOS (TYPE_FIELD (thistype, n))
 #define TYPE_FIELD_STATIC_PHYSNAME(thistype, n) FIELD_STATIC_PHYSNAME (TYPE_FIELD (thistype, n))
 #define TYPE_FIELD_STATIC_PHYSADDR(thistype, n) FIELD_STATIC_PHYSADDR (TYPE_FIELD (thistype, n))
-#define TYPE_FIELD_DWARF_BLOCK(thistype, n) FIELD_DWARF_BLOCK (TYPE_FIELD (thistype, n))
 #define TYPE_FIELD_ARTIFICIAL(thistype, n) FIELD_ARTIFICIAL(TYPE_FIELD(thistype,n))
 #define TYPE_FIELD_BITSIZE(thistype, n) FIELD_BITSIZE(TYPE_FIELD(thistype,n))
 #define TYPE_FIELD_PACKED(thistype, n) (FIELD_BITSIZE(TYPE_FIELD(thistype,n))!=0)
@@ -1046,6 +1047,17 @@ extern void allocate_gnat_aux_type (struct type *);
 #define TYPE_LOCALTYPE_PTR(thistype) (TYPE_CPLUS_SPECIFIC(thistype)->localtype_ptr)
 #define TYPE_LOCALTYPE_FILE(thistype) (TYPE_CPLUS_SPECIFIC(thistype)->localtype_ptr->file)
 #define TYPE_LOCALTYPE_LINE(thistype) (TYPE_CPLUS_SPECIFIC(thistype)->localtype_ptr->line)
+
+#define TYPE_TYPEDEF_FIELD_ARRAY(thistype) \
+  TYPE_CPLUS_SPECIFIC (thistype)->typedef_field
+#define TYPE_TYPEDEF_FIELD(thistype, n) \
+  TYPE_CPLUS_SPECIFIC (thistype)->typedef_field[n]
+#define TYPE_TYPEDEF_FIELD_NAME(thistype, n) \
+  TYPE_TYPEDEF_FIELD (thistype, n).name
+#define TYPE_TYPEDEF_FIELD_TYPE(thistype, n) \
+  TYPE_TYPEDEF_FIELD (thistype, n).type
+#define TYPE_TYPEDEF_FIELD_COUNT(thistype) \
+  TYPE_CPLUS_SPECIFIC (thistype)->typedef_field_count
 
 #define TYPE_IS_OPAQUE(thistype) (((TYPE_CODE (thistype) == TYPE_CODE_STRUCT) ||        \
                                    (TYPE_CODE (thistype) == TYPE_CODE_UNION))        && \
@@ -1179,6 +1191,7 @@ extern const struct objfile_type *objfile_type (struct objfile *objfile);
 
  
 /* Explicit floating-point formats.  See "floatformat.h".  */
+extern const struct floatformat *floatformats_ieee_half[BFD_ENDIAN_UNKNOWN];
 extern const struct floatformat *floatformats_ieee_single[BFD_ENDIAN_UNKNOWN];
 extern const struct floatformat *floatformats_ieee_double[BFD_ENDIAN_UNKNOWN];
 extern const struct floatformat *floatformats_ieee_double_littlebyte_bigword[BFD_ENDIAN_UNKNOWN];

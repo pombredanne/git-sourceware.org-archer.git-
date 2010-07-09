@@ -1,3 +1,145 @@
+2010-07-08 Tejas Belagod <tejas.belagod@arm.com>
+
+	* arm-dis.c (print_insn_arm): Add cases for printing more
+	symbolic operands.
+	(print_insn_thumb32): Likewise.
+
+2010-07-06  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* mips-dis.c (print_insn_mips): Correct branch instruction type
+	determination.
+
+2010-07-06  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* mips-dis.c (print_mips16_insn_arg): Remove branch instruction
+	type and delay slot determination.
+	(print_insn_mips16): Extend branch instruction type and delay
+	slot determination to cover all instructions.
+	* mips16-opc.c (BR): Remove macro.
+	(UBR, CBR): New macros.
+	(mips16_opcodes): Update branch annotation for "b", "beqz",
+	"bnez", "bteqz" and "btnez".  Add branch annotation for "jalrc"
+	and "jrc".
+
+2010-07-05  H.J. Lu  <hongjiu.lu@intel.com>
+
+	AVX Programming Reference (June, 2010)
+	* i386-dis.c (mod_table): Replace rdrnd with rdrand.
+	* i386-opc.tbl: Likewise.
+	* i386-tbl.h: Regenerated.
+
+2010-07-05  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* i386-opc.h (CpuFSGSBase): Fix a typo in comments.
+
+2010-07-03  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* ppc-dis.c (powerpc_init_dialect): Cast PPC_OPCODE_xxx to
+	ppc_cpu_t before inverting.
+	(ppc_parse_cpu): Likewise.
+	(print_insn_powerpc): Likewise.
+
+2010-07-03  Alan Modra  <amodra@gmail.com>
+
+	* ppc-dis.c (ppc_opts, powerpc_init_dialect): Remove old opcode flags.
+	* ppc-opc.c (PPC32, POWER32, COM32, CLASSIC): Delete.
+	(PPC64, MFDEC2): Update.
+	(NON32, NO371): Define.
+	(powerpc_opcode): Update to not use old opcode flags, and avoid
+	-m601 duplicates.
+
+2010-07-03  DJ Delorie  <dj@delorie.com>
+
+	* m32c-ibld.c: Regenerate.
+
+2010-07-03  Alan Modra  <amodra@gmail.com>
+
+	* ppc-opc.c (PWR2COM): Define.
+	(PPCPWR2): Add PPC_OPCODE_COMMON.
+	(powerpc_opcodes): Add "subc", "subco", "subco.", "fcir", "fcir.",
+	"fcirz", "fcirz." to -mcom opcodes.  Remove "mfsri", "dclst",
+	"rac" from -mcom.
+
+2010-07-01  H.J. Lu  <hongjiu.lu@intel.com>
+
+	AVX Programming Reference (June, 2010)
+	* i386-dis.c (PREFIX_0FAE_REG_0): New.
+	(PREFIX_0FAE_REG_1): Likewise.
+	(PREFIX_0FAE_REG_2): Likewise.
+	(PREFIX_0FAE_REG_3): Likewise.
+	(PREFIX_VEX_3813): Likewise.
+	(PREFIX_VEX_3A1D): Likewise.
+	(prefix_table): Add PREFIX_0FAE_REG_0, PREFIX_0FAE_REG_1,
+	PREFIX_0FAE_REG_2, PREFIX_0FAE_REG_3, PREFIX_VEX_3813 and
+	PREFIX_VEX_3A1D.
+	(vex_table): Add PREFIX_VEX_3813 and PREFIX_VEX_3A1D.
+	(mod_table): Add PREFIX_0FAE_REG_0, PREFIX_0FAE_REG_1,
+	PREFIX_0FAE_REG_2, PREFIX_0FAE_REG_3 xsaveopt and rdrnd.
+
+	* i386-gen.c (cpu_flag_init): Add CPU_XSAVEOPT_FLAGS,
+	CPU_FSGSBASE_FLAGS, CPU_RDRND_FLAGS and CPU_F16C_FLAGS.
+	(cpu_flags): Add CpuXsaveopt, CpuFSGSBase, CpuRdRnd and CpuF16C.
+
+	* i386-opc.h (CpuXsaveopt): New.
+	(CpuFSGSBase): Likewise.
+	(CpuRdRnd): Likewise.
+	(CpuF16C): Likewise.
+	(i386_cpu_flags): Add cpuxsaveopt, cpufsgsbase, cpurdrnd and
+	cpuf16c.
+
+	* i386-opc.tbl: Add xsaveopt, rdfsbase, rdgsbase, rdrnd,
+	wrfsbase, wrgsbase, vcvtph2ps and vcvtps2ph.
+	* i386-init.h: Regenerated.
+	* i386-tbl.h: Likewise.
+
+2010-07-01  Sebastian Andrzej Siewior  <bigeasy@linutronix.de>
+
+	* ppc-opc.c (powerpc_opcodes): Revert deprecation of mfocrf, mtcrf
+	and mtocrf on EFS.
+
+2010-06-29  Alan Modra  <amodra@gmail.com>
+
+	* maxq-dis.c: Delete file.
+	* Makefile.am: Remove references to maxq.
+	* configure.in: Likewise.
+	* disassemble.c: Likewise.
+	* Makefile.in: Regenerate.
+	* configure: Regenerate.
+	* po/POTFILES.in: Regenerate.
+
+2010-06-29  Alan Modra  <amodra@gmail.com>
+
+	* mep-dis.c: Regenerate.
+
+2010-06-28  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-disc.c (parse_insn_neon):  Fix Neon alignment syntax.
+
+2010-06-27  Alan Modra  <amodra@gmail.com>
+
+	* arc-dis.c (arc_sprintf): Delete set but unused variables.
+	(decodeInstr): Likewise.
+	* dlx-dis.c (print_insn_dlx): Likewise.
+	* h8300-dis.c (bfd_h8_disassemble_init): Likewise.
+	* maxq-dis.c (check_move, print_insn): Likewise.
+	* mep-dis.c (mep_examine_ivc2_insns): Likewise.
+	* msp430-dis.c (msp430_branchinstr): Likewise.
+	* bfin-dis.c (_print_insn_bfin): Avoid set but unused warning.
+	* cgen-asm.in (parse_insn_normal, _cgen_assemble_insn): Likewise.
+	* sparc-dis.c (print_insn_sparc): Likewise.
+	* fr30-asm.c: Regenerate.
+	* frv-asm.c: Regenerate.
+	* ip2k-asm.c: Regenerate.
+	* iq2000-asm.c: Regenerate.
+	* lm32-asm.c: Regenerate.
+	* m32c-asm.c: Regenerate.
+	* m32r-asm.c: Regenerate.
+	* mep-asm.c: Regenerate.
+	* mt-asm.c: Regenerate.
+	* openrisc-asm.c: Regenerate.
+	* xc16x-asm.c: Regenerate.
+	* xstormy16-asm.c: Regenerate.
+
 2010-06-16  Vincent Rivière  <vincent.riviere@freesbee.fr>
 
 	PR gas/11673

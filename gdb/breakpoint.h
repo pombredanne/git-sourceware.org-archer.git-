@@ -129,6 +129,7 @@ enum bptype
 
     bp_tracepoint,
     bp_fast_tracepoint,
+    bp_static_tracepoint,
 
     /* Event for JIT compiled code generation or deletion.  */
     bp_jit_event,
@@ -536,6 +537,18 @@ struct breakpoint
 
     /* The number of the tracepoint on the target.  */
     int number_on_target;
+
+    /* The static tracepoint marker id, if known.  */
+    char *static_trace_marker_id;
+
+    /* LTTng/UST allow more than one marker with the same ID string,
+       although it unadvised because it confuses tools.  When setting
+       static tracepoints by marker ID, this will record the index in
+       the array of markers we found for the given marker ID for which
+       this static tracepoint corresponds.  When resetting
+       breakpoints, we will use this index to try to find the same
+       marker again.  */
+    int static_trace_marker_id_idx;
   };
 
 typedef struct breakpoint *breakpoint_p;
@@ -563,7 +576,20 @@ extern bpstat bpstat_stop_status (struct address_space *aspace,
 				  CORE_ADDR pc, ptid_t ptid);
 
 /* This bpstat_what stuff tells wait_for_inferior what to do with a
-   breakpoint (a challenging task).  */
+   breakpoint (a challenging task).
+
+   The enum values order defines priority-like order of the actions.
+   Once you've decided that some action is appropriate, you'll never
+   go back and decide something of a lower priority is better.  Each
+   of these actions is mutually exclusive with the others.  That
+   means, that if you find yourself adding a new action class here and
+   wanting to tell GDB that you have two simultaneous actions to
+   handle, something is wrong, and you probably don't actually need a
+   new action type.
+
+   Note that a step resume breakpoint overrides another breakpoint of
+   signal handling (see comment in wait_for_inferior at where we set
+   the step_resume breakpoint).  */
 
 enum bpstat_what_main_action
   {
@@ -571,18 +597,6 @@ enum bpstat_what_main_action
        say to perform any action (e.g. failed watchpoint and nothing
        else).  */
     BPSTAT_WHAT_KEEP_CHECKING,
-
-    /* Rather than distinguish between noisy and silent stops here, it
-       might be cleaner to have bpstat_print make that decision (also
-       taking into account stop_print_frame and source_only).  But the
-       implications are a bit scary (interaction with auto-displays, etc.),
-       so I won't try it.  */
-
-    /* Stop silently.  */
-    BPSTAT_WHAT_STOP_SILENT,
-
-    /* Stop and print.  */
-    BPSTAT_WHAT_STOP_NOISY,
 
     /* Remove breakpoints, single step once, then put them back in and
        go back to what we were doing.  It's possible that this should be
@@ -600,18 +614,20 @@ enum bpstat_what_main_action
        BPSTAT_WHAT_KEEP_CHECKING.  */
     BPSTAT_WHAT_CLEAR_LONGJMP_RESUME,
 
+    /* Rather than distinguish between noisy and silent stops here, it
+       might be cleaner to have bpstat_print make that decision (also
+       taking into account stop_print_frame and source_only).  But the
+       implications are a bit scary (interaction with auto-displays, etc.),
+       so I won't try it.  */
+
+    /* Stop silently.  */
+    BPSTAT_WHAT_STOP_SILENT,
+
+    /* Stop and print.  */
+    BPSTAT_WHAT_STOP_NOISY,
+
     /* Clear step resume breakpoint, and keep checking.  */
     BPSTAT_WHAT_STEP_RESUME,
-
-    /* Check the dynamic linker's data structures for new libraries, then
-       keep checking.  */
-    BPSTAT_WHAT_CHECK_SHLIBS,
-
-    /* Check for new JITed code.  */
-    BPSTAT_WHAT_CHECK_JIT,
-
-    /* This is just used to keep track of how many enums there are.  */
-    BPSTAT_WHAT_LAST
   };
 
 /* An enum indicating the kind of "stack dummy" stop.  This is a bit
@@ -818,7 +834,7 @@ extern void tbreak_command (char *, int);
 extern int create_breakpoint (struct gdbarch *gdbarch, char *arg,
 			      char *cond_string, int thread,
 			      int parse_condition_and_thread,
-			      int tempflag, int hardwareflag, int traceflag,
+			      int tempflag, enum bptype wanted_type,
 			      int ignore_count,
 			      enum auto_boolean pending_break_support,
 			      struct breakpoint_ops *ops,
@@ -1040,6 +1056,11 @@ extern struct breakpoint *get_tracepoint_by_number (char **arg, int multi_p,
 extern VEC(breakpoint_p) *all_tracepoints (void);
 
 extern int is_tracepoint (const struct breakpoint *b);
+
+/* Return a vector of all static tracepoints defined at ADDR.  The
+   vector is newly allocated; the caller should free when done with
+   it.  */
+extern VEC(breakpoint_p) *static_tracepoints_here (CORE_ADDR addr);
 
 /* Function that can be passed to read_command_line to validate
    that each command is suitable for tracepoint command list.  */
