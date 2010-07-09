@@ -364,18 +364,13 @@ build_section_addr_info_from_objfile (const struct objfile *objfile)
   struct section_addr_info *sap;
   int i;
   struct bfd_section *sec;
-  int addr_bit = gdbarch_addr_bit (objfile->gdbarch);
-  CORE_ADDR mask = CORE_ADDR_MAX;
-
-  if (addr_bit < (sizeof (CORE_ADDR) * HOST_CHAR_BIT))
-    mask = ((CORE_ADDR) 1 << addr_bit) - 1;
 
   sap = alloc_section_addr_info (objfile->num_sections);
   for (i = 0, sec = objfile->obfd->sections; sec != NULL; sec = sec->next)
     if (bfd_get_section_flags (objfile->obfd, sec) & (SEC_ALLOC | SEC_LOAD))
       {
 	sap->other[i].addr = (bfd_get_section_vma (objfile->obfd, sec)
-			      + objfile->section_offsets->offsets[i]) & mask;
+			      + objfile->section_offsets->offsets[i]);
 	sap->other[i].name = xstrdup (bfd_get_section_name (objfile->obfd,
 							    sec));
 	sap->other[i].sectindex = sec->index;
@@ -571,6 +566,7 @@ addr_info_make_relative (struct section_addr_info *addrs, bfd *abfd)
   asection *lower_sect;
   CORE_ADDR lower_offset;
   int i;
+  asection *sect;
 
   /* Find lowest loadable section to be used as starting point for
      continguous sections.  */
@@ -595,10 +591,23 @@ addr_info_make_relative (struct section_addr_info *addrs, bfd *abfd)
      (the loadable section directly below it in memory).
      this_offset = lower_offset = lower_addr - lower_orig_addr */
 
+  sect = NULL;
   for (i = 0; i < addrs->num_sections && addrs->other[i].name; i++)
     {
-      asection *sect = bfd_get_section_by_name (abfd, addrs->other[i].name);
+      const char *sect_name = addrs->other[i].name;
 
+      /* Prefer the next section of that we have found last.  The separate
+	 debug info files have either the same section layout or just a few
+	 sections are missing there.  On the other hand the section name is not
+	 unique and we could find an inappropraite section by its name.  */
+
+      if (sect)
+	sect = sect->next;
+      if (sect && strcmp (sect_name, bfd_get_section_name (abfd, sect)) != 0)
+	sect = NULL;
+
+      if (sect == NULL)
+	sect = bfd_get_section_by_name (abfd, sect_name);
       if (sect)
 	{
 	  /* This is the index used by BFD. */
@@ -1924,6 +1933,16 @@ generic_load (char *args, int from_tty)
   /* We were doing this in remote-mips.c, I suspect it is right
      for other targets too.  */
   regcache_write_pc (get_current_regcache (), entry);
+
+  /* Reset breakpoints, now that we have changed the load image.  For
+     instance, breakpoints may have been set (or reset, by
+     post_create_inferior) while connected to the target but before we
+     loaded the program.  In that case, the prologue analyzer could
+     have read instructions from the target to find the right
+     breakpoint locations.  Loading has changed the contents of that
+     memory.  */
+
+  breakpoint_re_set ();
 
   /* FIXME: are we supposed to call symbol_file_add or not?  According
      to a comment from remote-mips.c (where a call to symbol_file_add

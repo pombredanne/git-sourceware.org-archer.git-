@@ -1,6 +1,6 @@
 /* This testcase is part of GDB, the GNU debugger.
 
-   Copyright 2008, 2009, 2010 Free Software Foundation, Inc.
+   Copyright 2010 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -13,23 +13,10 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
-   */
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-namespace B{
-  int x;
-}
+	.section	sect1, "a"
+var1:	.byte	1
 
-class base
-{
- public:
-  base (int _x);
-  int x;
-  virtual int meth ();
-};
-
-class derived : public base
-{
- public:
-  derived (int _x);
-};
+	.section	sect2, "a"
+var2:	.byte	2
