@@ -993,6 +993,10 @@ cp_lex_one_token (cp_parser *parser)
       result.type = TTYPE_MINUS;
       break;
 
+    case '%':
+      result.type = TTYPE_MOD;
+      break;
+
     case '!':
       result.type = TTYPE_NOT;
       break;
