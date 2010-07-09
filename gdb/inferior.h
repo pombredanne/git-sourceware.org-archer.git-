@@ -105,6 +105,16 @@ extern int ptid_equal (ptid_t p1, ptid_t p2);
 /* Return true if PTID represents a process id.  */
 extern int ptid_is_pid (ptid_t ptid);
 
+/* Returns true if PTID matches filter FILTER.  FILTER can be the wild
+   card MINUS_ONE_PTID (all ptid match it); can be a ptid representing
+   a process (ptid_is_pid returns true), in which case, all lwps and
+   threads of that given process match, lwps and threads of other
+   processes do not; or, it can represent a specific thread, in which
+   case, only that thread will match true.  PTID must represent a
+   specific LWP or THREAD, it can never be a wild card.  */
+
+extern int ptid_match (ptid_t ptid, ptid_t filter);
+
 /* Save value of inferior_ptid so that it may be restored by
    a later call to do_cleanups().  Returns the struct cleanup
    pointer needed for later doing the cleanup.  */
@@ -175,6 +185,8 @@ extern void address_to_signed_pointer (struct gdbarch *gdbarch,
 
 extern void wait_for_inferior (int treat_exec_as_sigtrap);
 
+extern void prepare_for_detach (void);
+
 extern void fetch_inferior_event (void *);
 
 extern void init_wait_for_inferior (void);
@@ -219,6 +231,10 @@ extern void startup_inferior (int);
 extern char *construct_inferior_arguments (int, char **);
 
 /* From infrun.c */
+
+extern int debug_infrun;
+
+extern int stop_on_solib_events;
 
 extern void start_remote (int from_tty);
 
@@ -285,7 +301,7 @@ extern CORE_ADDR stop_pc;
 
 /* Nonzero if stopped due to completion of a stack dummy routine.  */
 
-extern int stop_stack_dummy;
+extern enum stop_stack_kind stop_stack_dummy;
 
 /* Nonzero if program stopped due to a random (unexpected) signal in
    inferior process.  */
@@ -468,6 +484,9 @@ struct inferior
      either by exiting or execing.  */
   int waiting_for_vfork_done;
 
+  /* True if we're in the process of detaching from this inferior.  */
+  int detaching;
+
   /* What is left to do for an execution command after any thread of
      this inferior stops.  For continuations associated with a
      specific thread, see `struct thread_info'.  */
@@ -522,6 +541,8 @@ extern struct inferior *add_inferior_silent (int pid);
 
 /* Delete an existing inferior list entry, due to inferior exit.  */
 extern void delete_inferior (int pid);
+
+extern void delete_inferior_1 (struct inferior *todel, int silent);
 
 /* Same as delete_inferior, but don't print new inferior notifications
    to the CLI.  */
@@ -608,5 +629,9 @@ extern struct inferior *inferior_list;
 extern void prune_inferiors (void);
 
 extern int number_of_inferiors (void);
+
+extern struct inferior *add_inferior_with_spaces (void);
+
+extern void update_observer_mode (void);
 
 #endif /* !defined (INFERIOR_H) */

@@ -290,6 +290,9 @@ proc gdb_run_cmd {args} {
 	    exp_continue
 	}
 	-notransfer -re "Starting program: \[^\r\n\]*" {}
+	-notransfer -re "$gdb_prompt $" {
+	    # There is no more input expected.
+	}
     }
 }
 
@@ -415,6 +418,10 @@ proc runto { function args } {
 	}
 	-re "Breakpoint \[0-9\]*, \[0-9xa-f\]* in .*$gdb_prompt $" { 
 	    return 1
+	}
+	-re "The target does not support running in non-stop mode.\r\n$gdb_prompt $" {
+	    unsupported "Non-stop mode not supported"
+	    return 0
 	}
 	-re "$gdb_prompt $" { 
 	    fail "running to $function in runto"
@@ -573,6 +580,10 @@ proc gdb_test_multiple { command message user_code } {
 	set message $command
     }
 
+    if [string match "*\[\r\n\]" $command] {
+	error "Invalid trailing newline in \"$message\" test"
+    }
+
     # TCL/EXPECT WART ALERT
     # Expect does something very strange when it receives a single braced
     # argument.  It splits it along word separators and performs substitutions.
@@ -601,12 +612,23 @@ proc gdb_test_multiple { command message user_code } {
     set processed_code ""
     set patterns ""
     set expecting_action 0
+    set expecting_arg 0
     foreach item $user_code subst_item $subst_code {
 	if { $item == "-n" || $item == "-notransfer" || $item == "-nocase" } {
 	    lappend processed_code $item
 	    continue
 	}
-	if {$item == "-indices" || $item == "-re" || $item == "-ex"} {
+	if { $item == "-indices" || $item == "-re" || $item == "-ex" } {
+	    lappend processed_code $item
+	    continue
+	}
+	if { $item == "-timeout" } {
+	    set expecting_arg 1
+	    lappend processed_code $item
+	    continue
+	}
+	if { $expecting_arg } {
+	    set expecting_arg 0
 	    lappend processed_code $item
 	    continue
 	}
@@ -736,7 +758,7 @@ proc gdb_test_multiple { command message user_code } {
 	    fail "$errmsg"
 	    set result -1
 	}
-	 -re "EXIT code \[0-9\r\n\]+Program exited normally.*$gdb_prompt $" {
+	 -re "Program exited normally.*$gdb_prompt $" {
 	    if ![string match "" $message] then {
 		set errmsg "$message (the program exited)"
 	    } else {
@@ -866,6 +888,34 @@ proc gdb_test { args } {
 	}
      }]
 }
+
+# gdb_test_no_output COMMAND MESSAGE
+# Send a command to GDB and verify that this command generated no output.
+#
+# See gdb_test_multiple for a description of the COMMAND and MESSAGE
+# parameters.  If MESSAGE is ommitted, then COMMAND will be used as
+# the message.  (If MESSAGE is the empty string, then sometimes we do not
+# call pass or fail at all; I don't understand this at all.)
+
+proc gdb_test_no_output { args } {
+    global gdb_prompt
+    set command [lindex $args 0]
+    if [llength $args]>1 then {
+	set message [lindex $args 1]
+    } else {
+	set message $command
+    }
+
+    set command_regex [string_to_regexp $command]
+    gdb_test_multiple $command $message {
+        -re "^$command_regex\r\n$gdb_prompt $" {
+	    if ![string match "" $message] then {
+		pass "$message"
+            }
+        }
+    }
+}
+
 
 # Test that a command gives an error.  For pass or fail, return
 # a 1 to indicate that more tests can proceed.  However a timeout
@@ -1256,6 +1306,8 @@ proc gdb_compile_test {src output} {
 	unsupported "compilation [file tail $src]"
     } elseif { [regexp {.*: command not found[\r|\n]*$} $output] } {
 	unsupported "compilation [file tail $src]"
+    } elseif { [regexp {.*: [^\r\n]*compiler not installed[^\r\n]*[\r|\n]*$} $output] } {
+	unsupported "compilation [file tail $src]"
     } else {
 	verbose -log "compilation failed: $output" 2
 	fail "compilation [file tail $src]"
@@ -1281,6 +1333,18 @@ proc skip_cplus_tests {} {
     return 0
 }
 
+# Return a 1 for configurations for which don't have both C++ and the STL.
+
+proc skip_stl_tests {} {
+    # Symbian supports the C++ language, but the STL is missing
+    # (both headers and libraries).
+    if { [istarget "arm*-*-symbianelf*"] } {
+	return 1
+    }
+
+    return [skip_cplus_tests]
+}
+
 # Return a 1 if I don't even want to try to test FORTRAN.
 
 proc skip_fortran_tests {} {
@@ -1296,6 +1360,21 @@ proc skip_ada_tests {} {
 # Return a 1 if I don't even want to try to test java.
 
 proc skip_java_tests {} {
+    return 0
+}
+
+# Return a 1 for configurations that do not support Python scripting.
+
+proc skip_python_tests {} {
+    global gdb_prompt
+    gdb_test_multiple "python print 'test'" "verify python support" {
+	-re "not supported.*$gdb_prompt $"	{
+	    unsupported "Python support is disabled."
+	    return 1
+	}
+	-re "$gdb_prompt $"	{}
+    }
+
     return 0
 }
 
@@ -1793,11 +1872,14 @@ proc gdb_compile {source dest type options} {
 	if { ([istarget "*-*-mingw*"]
 	      || [istarget *-*-cygwin*]
 	      || [istarget *-*-pe*]
-	      || [istarget arm*-*-symbianelf*]
 	      || [istarget hppa*-*-hpux*])} {
 	    # Do not need anything.
 	} elseif { [istarget *-*-openbsd*] } {
 	    lappend new_options "additional_flags=-Wl,-rpath,${outdir}"
+	} elseif { [istarget arm*-*-symbianelf*] } {
+	    if { $shlib_load } {
+		lappend new_options "libs=-ldl"
+	    }
 	} else {
 	    if { $shlib_load } {
 		lappend new_options "libs=-ldl"
@@ -1914,7 +1996,7 @@ proc gdb_compile {source dest type options} {
 proc gdb_compile_pthreads {source dest type options} {
     set built_binfile 0
     set why_msg "unrecognized error"
-    foreach lib {-lpthreads -lpthread -lthread} {
+    foreach lib {-lpthreads -lpthread -lthread ""} {
         # This kind of wipes out whatever libs the caller may have
         # set.  Or maybe theirs will override ours.  How infelicitous.
         set options_with_lib [concat $options [list libs=$lib quiet]]
@@ -2318,6 +2400,22 @@ proc gdb_load_cmd { args } {
     return -1
 }
 
+# Return the filename to download to the target and load on the target
+# for this shared library.  Normally just LIBNAME, unless shared libraries
+# for this target have separate link and load images.
+
+proc shlib_target_file { libname } {
+    return $libname
+}
+
+# Return the filename GDB will load symbols from when debugging this
+# shared library.  Normally just LIBNAME, unless shared libraries for
+# this target have separate link and load images.
+
+proc shlib_symbol_file { libname } {
+    return $libname
+}
+
 # gdb_download
 #
 # Copy a file to the remote target and return its target filename.
@@ -2341,7 +2439,7 @@ proc gdb_load_shlibs { args } {
     }
 
     foreach file $args {
-	gdb_download $file
+	gdb_download [shlib_target_file $file]
     }
 
     # Even if the target supplies full paths for shared libraries,
@@ -2421,6 +2519,20 @@ if ![info exists gdb_test_timeout] {
     set gdb_test_timeout $timeout
 }
 
+# A list of global variables that GDB testcases should not use.
+# We try to prevent their use by monitoring write accesses and raising
+# an error when that happens.
+set banned_variables { bug_id prms_id }
+
+# gdb_init is called by runtest at start, but also by several
+# tests directly; gdb_finish is only called from within runtest after
+# each test source execution.
+# Placing several traces by repetitive calls to gdb_init leads
+# to problems, as only one trace is removed in gdb_finish.
+# To overcome this possible problem, we add a variable that records
+# if the banned variables are traced.
+set banned_variables_traced 0
+
 proc gdb_init { args } {
     # Reset the timeout value to the default.  This way, any testcase
     # that changes the timeout value without resetting it cannot affect
@@ -2428,6 +2540,17 @@ proc gdb_init { args } {
     global gdb_test_timeout
     global timeout
     set timeout $gdb_test_timeout
+
+    # Block writes to all banned variables...
+    global banned_variables
+    global banned_variables_traced
+    if (!$banned_variables_traced) {
+    	foreach banned_var $banned_variables {
+            global "$banned_var"
+            trace add variable "$banned_var" write error
+	}
+	set banned_variables_traced 1
+    }
 
     return [eval default_gdb_init $args];
 }
@@ -2441,6 +2564,18 @@ proc gdb_finish { } {
     if { [llength $cleanfiles] > 0 } {
 	eval remote_file target delete $cleanfiles
 	set cleanfiles {}
+    }
+
+    # Unblock write access to the banned variables.  Dejagnu typically
+    # resets some of them between testcases.
+    global banned_variables
+    global banned_variables_traced
+    if ($banned_variables_traced) {
+    	foreach banned_var $banned_variables {
+            global "$banned_var"
+            trace remove variable "$banned_var" write error
+	}
+	set banned_variables_traced 0
     }
 }
 
@@ -2774,8 +2909,8 @@ proc gdb_skip_xml_test { } {
 # Note: the procedure gdb_gnu_strip_debug will produce an executable called
 # ${binfile}.dbglnk, which is just like the executable ($binfile) but without
 # the debuginfo. Instead $binfile has a .gnu_debuglink section which contains
-# the name of a debuginfo only file. This file will be stored in the 
-# gdb.base/.debug subdirectory.
+# the name of a debuginfo only file. This file will be stored in the same
+# subdirectory.
 
 # Functions for separate debug info testing
 
@@ -2784,26 +2919,8 @@ proc gdb_skip_xml_test { } {
 
 # at the end of the process we have:
 # foo.stripped --> foo w/o debug info
-# .debug/foo.debug --> foo's debug info
+# foo.debug --> foo's debug info
 # foo --> like foo, but with a new .gnu_debuglink section pointing to foo.debug.
-
-# Return the name of the file in which we should stor EXEC's separated
-# debug info. EXEC contains the full path.
-proc separate_debug_filename { exec } {
-
-    # In a .debug subdirectory off the same directory where the testcase
-    # executable is going to be. Something like:
-    # <your-path>/gdb/testsuite/gdb.base/.debug/blah.debug.
-    # This is the default location where gdb expects to findi
-    # the debug info file.
-
-    set exec_dir [file dirname $exec]
-    set exec_file [file tail $exec]
-    set debug_dir [file join $exec_dir ".debug"]
-    set debug_file [file join $debug_dir "${exec_file}.debug"]
-
-    return $debug_file
-}
 
 # Return the build-id hex string (usually 160 bits as 40 hex characters)
 # converted to the form: .build-id/ab/cdef1234...89.debug
@@ -2837,19 +2954,18 @@ proc build_id_debug_filename_get { exec } {
 # Create stripped files for DEST, replacing it.  If ARGS is passed, it is a
 # list of optional flags.  The only currently supported flag is no-main,
 # which removes the symbol entry for main from the separate debug file.
+#
+# Function returns zero on success.  Function will return non-zero failure code
+# on some targets not supporting separate debug info (such as i386-msdos).
 
 proc gdb_gnu_strip_debug { dest args } {
 
-    set debug_file [separate_debug_filename $dest]
+    # Use the first separate debug info file location searched by GDB so the
+    # run cannot be broken by some stale file searched with higher precedence.
+    set debug_file "${dest}.debug"
+
     set strip_to_file_program [transform strip]
     set objcopy_program [transform objcopy]
-
-    # Make sure the directory that will hold the separated debug
-    # info actually exists.
-    set debug_dir [file dirname $debug_file]
-    if {! [file isdirectory $debug_dir]} {
-	file mkdir $debug_dir
-    }
 
     set debug_link [file tail $debug_file]
     set stripped_file "${dest}.stripped"

@@ -2676,7 +2676,7 @@ elf64_x86_64_relocate_section (bfd *output_bfd, struct bfd_link_info *info,
 	}
       else
 	{
-	  bfd_boolean warned;
+	  bfd_boolean warned ATTRIBUTE_UNUSED;
 
 	  RELOC_FOR_GLOBAL_SYMBOL (info, input_bfd, input_section, rel,
 				   r_symndx, symtab_hdr, sym_hashes,
@@ -2685,15 +2685,8 @@ elf64_x86_64_relocate_section (bfd *output_bfd, struct bfd_link_info *info,
 	}
 
       if (sec != NULL && elf_discarded_section (sec))
-	{
-	  /* For relocs against symbols from removed linkonce sections,
-	     or sections discarded by a linker script, we just want the
-	     section contents zeroed.  Avoid any special processing.  */
-	  _bfd_clear_contents (howto, input_bfd, contents + rel->r_offset);
-	  rel->r_info = 0;
-	  rel->r_addend = 0;
-	  continue;
-	}
+	RELOC_AGAINST_DISCARDED_SECTION (info, input_bfd, input_section,
+					 rel, relend, howto, contents);
 
       if (info->relocatable)
 	continue;
@@ -3319,13 +3312,11 @@ elf64_x86_64_relocate_section (bfd *output_bfd, struct bfd_link_info *info,
 		     leaq x@tlsdesc(%rip), %rax
 
 		     Change it to:
-		     movl $x@tpoff, %rax
-		   */
+		     movl $x@tpoff, %rax.  */
 
-		  unsigned int val, type, type2;
+		  unsigned int val, type;
 
 		  type = bfd_get_8 (input_bfd, contents + roff - 3);
-		  type2 = bfd_get_8 (input_bfd, contents + roff - 2);
 		  val = bfd_get_8 (input_bfd, contents + roff - 1);
 		  bfd_put_8 (output_bfd, 0x48 | ((type >> 2) & 1),
 			     contents + roff - 3);
@@ -3554,14 +3545,7 @@ elf64_x86_64_relocate_section (bfd *output_bfd, struct bfd_link_info *info,
 		     leaq x@tlsdesc(%rip), %rax
 
 		     Change it to:
-		     movq x@gottpoff(%rip), %rax # before xchg %ax,%ax
-		   */
-
-		  unsigned int val, type, type2;
-
-		  type = bfd_get_8 (input_bfd, contents + roff - 3);
-		  type2 = bfd_get_8 (input_bfd, contents + roff - 2);
-		  val = bfd_get_8 (input_bfd, contents + roff - 1);
+		     movq x@gottpoff(%rip), %rax # before xchg %ax,%ax.  */
 
 		  /* Now modify the instruction as appropriate. To
 		     turn a leaq into a movq in the form we use it, it
@@ -3586,12 +3570,8 @@ elf64_x86_64_relocate_section (bfd *output_bfd, struct bfd_link_info *info,
 		     call *(%rax)
 
 		     Change it to:
-		     xchg %ax,%ax.  */
+		     xchg %ax, %ax.  */
 
-		  unsigned int val, type;
-
-		  type = bfd_get_8 (input_bfd, contents + roff);
-		  val = bfd_get_8 (input_bfd, contents + roff + 1);
 		  bfd_put_8 (output_bfd, 0x66, contents + roff);
 		  bfd_put_8 (output_bfd, 0x90, contents + roff + 1);
 		  continue;
@@ -4254,10 +4234,11 @@ elf64_x86_64_add_symbol_hook (bfd *abfd,
 	}
       *secp = lcomm;
       *valp = sym->st_size;
-      break;
+      return TRUE;
     }
 
-  if (ELF_ST_TYPE (sym->st_info) == STT_GNU_IFUNC)
+  if ((abfd->flags & DYNAMIC) == 0
+      && ELF_ST_TYPE (sym->st_info) == STT_GNU_IFUNC)
     elf_tdata (info->output_bfd)->has_ifunc_symbols = TRUE;
 
   return TRUE;
@@ -4506,6 +4487,29 @@ static const struct bfd_elf_special_section
 
 #undef  elf64_bed
 #define elf64_bed elf64_x86_64_fbsd_bed
+
+#include "elf64-target.h"
+
+/* Solaris 2 support.  */
+
+#undef  TARGET_LITTLE_SYM
+#define TARGET_LITTLE_SYM		    bfd_elf64_x86_64_sol2_vec
+#undef  TARGET_LITTLE_NAME
+#define TARGET_LITTLE_NAME		    "elf64-x86-64-sol2"
+
+/* Restore default: we cannot use ELFOSABI_SOLARIS, otherwise ELFOSABI_NONE
+   objects won't be recognized.  */
+#undef ELF_OSABI
+
+#undef  elf64_bed
+#define elf64_bed			    elf64_x86_64_sol2_bed
+
+/* The Solaris 2 ABI requires a plt symbol on all platforms.
+
+   Cf. Linker and Libraries Guide, Ch. 2, Link-Editor, Generating the Output
+   File, p.63.  */
+#undef elf_backend_want_plt_sym
+#define elf_backend_want_plt_sym	    1
 
 #include "elf64-target.h"
 

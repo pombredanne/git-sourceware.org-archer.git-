@@ -235,6 +235,11 @@ struct arm_prologue_cache
   struct trad_frame_saved_reg *saved_regs;
 };
 
+static CORE_ADDR arm_analyze_prologue (struct gdbarch *gdbarch,
+				       CORE_ADDR prologue_start,
+				       CORE_ADDR prologue_end,
+				       struct arm_prologue_cache *cache);
+
 /* Architecture version for displaced stepping.  This effects the behaviour of
    certain instructions, and really should not be hard-wired.  */
 
@@ -334,6 +339,9 @@ arm_find_mapping_symbol (CORE_ADDR memaddr, CORE_ADDR *start)
   return 0;
 }
 
+static CORE_ADDR arm_get_next_pc_raw (struct frame_info *frame, 
+				      CORE_ADDR pc, int insert_bkpt);
+
 /* Determine if the program counter specified in MEMADDR is in a Thumb
    function.  This function should be called for addresses unrelated to
    any executing frame; otherwise, prefer arm_frame_is_thumb.  */
@@ -375,9 +383,29 @@ arm_pc_is_thumb (CORE_ADDR memaddr)
      target, then trust the current value of $cpsr.  This lets
      "display/i $pc" always show the correct mode (though if there is
      a symbol table we will not reach here, so it still may not be
-     displayed in the mode it will be executed).  */
+     displayed in the mode it will be executed).  
+   
+     As a further heuristic if we detect that we are doing a single-step we
+     see what state executing the current instruction ends up with us being
+     in.  */
   if (target_has_registers)
-    return arm_frame_is_thumb (get_current_frame ());
+    {
+      struct frame_info *current_frame = get_current_frame ();
+      CORE_ADDR current_pc = get_frame_pc (current_frame);
+      int is_thumb = arm_frame_is_thumb (current_frame);
+      CORE_ADDR next_pc;
+      if (memaddr == current_pc)
+	return is_thumb;
+      else
+	{
+	  struct gdbarch *gdbarch = get_frame_arch (current_frame);
+	  next_pc = arm_get_next_pc_raw (current_frame, current_pc, FALSE);
+	  if (memaddr == gdbarch_addr_bits_remove (gdbarch, next_pc))
+	    return IS_THUMB_ADDR (next_pc);
+	  else
+	    return is_thumb;
+	}
+    }
 
   /* Otherwise we're out of luck; we assume ARM.  */
   return 0;
@@ -401,15 +429,59 @@ arm_smash_text_address (struct gdbarch *gdbarch, CORE_ADDR val)
   return val & ~1;
 }
 
+/* Return 1 if PC is the start of a compiler helper function which
+   can be safely ignored during prologue skipping.  */
+static int
+skip_prologue_function (CORE_ADDR pc)
+{
+  struct minimal_symbol *msym;
+  const char *name;
+
+  msym = lookup_minimal_symbol_by_pc (pc);
+  if (msym == NULL || SYMBOL_VALUE_ADDRESS (msym) != pc)
+    return 0;
+
+  name = SYMBOL_LINKAGE_NAME (msym);
+  if (name == NULL)
+    return 0;
+
+  /* The GNU linker's Thumb call stub to foo is named
+     __foo_from_thumb.  */
+  if (strstr (name, "_from_thumb") != NULL)
+    name += 2;
+
+  /* On soft-float targets, __truncdfsf2 is called to convert promoted
+     arguments to their argument types in non-prototyped
+     functions.  */
+  if (strncmp (name, "__truncdfsf2", strlen ("__truncdfsf2")) == 0)
+    return 1;
+  if (strncmp (name, "__aeabi_d2f", strlen ("__aeabi_d2f")) == 0)
+    return 1;
+
+  return 0;
+}
+
+/* Support routines for instruction parsing.  */
+#define submask(x) ((1L << ((x) + 1)) - 1)
+#define bit(obj,st) (((obj) >> (st)) & 1)
+#define bits(obj,st,fn) (((obj) >> (st)) & submask ((fn) - (st)))
+#define sbits(obj,st,fn) \
+  ((long) (bits(obj,st,fn) | ((long) bit(obj,fn) * ~ submask (fn - st))))
+#define BranchDest(addr,instr) \
+  ((CORE_ADDR) (((long) (addr)) + 8 + (sbits (instr, 0, 23) << 2)))
+
 /* Analyze a Thumb prologue, looking for a recognizable stack frame
    and frame pointer.  Scan until we encounter a store that could
-   clobber the stack frame unexpectedly, or an unknown instruction.  */
+   clobber the stack frame unexpectedly, or an unknown instruction.
+   Return the last address which is definitely safe to skip for an
+   initial breakpoint.  */
 
 static CORE_ADDR
 thumb_analyze_prologue (struct gdbarch *gdbarch,
 			CORE_ADDR start, CORE_ADDR limit,
 			struct arm_prologue_cache *cache)
 {
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   enum bfd_endian byte_order_for_code = gdbarch_byte_order_for_code (gdbarch);
   int i;
   pv_t regs[16];
@@ -460,9 +532,29 @@ thumb_analyze_prologue (struct gdbarch *gdbarch,
 	    regs[ARM_SP_REGNUM] = pv_add_constant (regs[ARM_SP_REGNUM],
 						   offset);
 	}
-      else if ((insn & 0xff00) == 0xaf00)	/* add r7, sp, #imm */
-	regs[THUMB_FP_REGNUM] = pv_add_constant (regs[ARM_SP_REGNUM],
-						 (insn & 0xff) << 2);
+      else if ((insn & 0xf800) == 0xa800)	/* add Rd, sp, #imm */
+	regs[bits (insn, 8, 10)] = pv_add_constant (regs[ARM_SP_REGNUM],
+						    (insn & 0xff) << 2);
+      else if ((insn & 0xfe00) == 0x1c00	/* add Rd, Rn, #imm */
+	       && pv_is_register (regs[bits (insn, 3, 5)], ARM_SP_REGNUM))
+	regs[bits (insn, 0, 2)] = pv_add_constant (regs[bits (insn, 3, 5)],
+						   bits (insn, 6, 8));
+      else if ((insn & 0xf800) == 0x3000	/* add Rd, #imm */
+	       && pv_is_register (regs[bits (insn, 8, 10)], ARM_SP_REGNUM))
+	regs[bits (insn, 8, 10)] = pv_add_constant (regs[bits (insn, 8, 10)],
+						    bits (insn, 0, 7));
+      else if ((insn & 0xfe00) == 0x1800	/* add Rd, Rn, Rm */
+	       && pv_is_register (regs[bits (insn, 6, 8)], ARM_SP_REGNUM)
+	       && pv_is_constant (regs[bits (insn, 3, 5)]))
+	regs[bits (insn, 0, 2)] = pv_add (regs[bits (insn, 3, 5)],
+					  regs[bits (insn, 6, 8)]);
+      else if ((insn & 0xff00) == 0x4400	/* add Rd, Rm */
+	       && pv_is_constant (regs[bits (insn, 3, 6)]))
+	{
+	  int rd = (bit (insn, 7) << 3) + bits (insn, 0, 2);
+	  int rm = bits (insn, 3, 6);
+	  regs[rd] = pv_add (regs[rd], regs[rm]);
+	}
       else if ((insn & 0xff00) == 0x4600)	/* mov hi, lo or mov lo, hi */
 	{
 	  int dst_reg = (insn & 0x7) + ((insn & 0x80) >> 4);
@@ -485,6 +577,131 @@ thumb_analyze_prologue (struct gdbarch *gdbarch,
 
 	  pv_area_store (stack, addr, 4, regs[regno]);
 	}
+      else if ((insn & 0xf800) == 0x6000)	/* str rd, [rn, #off] */
+	{
+	  int rd = bits (insn, 0, 2);
+	  int rn = bits (insn, 3, 5);
+	  pv_t addr;
+
+	  offset = bits (insn, 6, 10) << 2;
+	  addr = pv_add_constant (regs[rn], offset);
+
+	  if (pv_area_store_would_trash (stack, addr))
+	    break;
+
+	  pv_area_store (stack, addr, 4, regs[rd]);
+	}
+      else if (((insn & 0xf800) == 0x7000	/* strb Rd, [Rn, #off] */
+		|| (insn & 0xf800) == 0x8000)	/* strh Rd, [Rn, #off] */
+	       && pv_is_register (regs[bits (insn, 3, 5)], ARM_SP_REGNUM))
+	/* Ignore stores of argument registers to the stack.  */
+	;
+      else if ((insn & 0xf800) == 0xc800	/* ldmia Rn!, { registers } */
+	       && pv_is_register (regs[bits (insn, 8, 10)], ARM_SP_REGNUM))
+	/* Ignore block loads from the stack, potentially copying
+	   parameters from memory.  */
+	;
+      else if ((insn & 0xf800) == 0x9800	/* ldr Rd, [Rn, #immed] */
+	       || ((insn & 0xf800) == 0x6800	/* ldr Rd, [sp, #immed] */
+		   && pv_is_register (regs[bits (insn, 3, 5)], ARM_SP_REGNUM)))
+	/* Similarly ignore single loads from the stack.  */
+	;
+      else if ((insn & 0xffc0) == 0x0000	/* lsls Rd, Rm, #0 */
+	       || (insn & 0xffc0) == 0x1c00)	/* add Rd, Rn, #0 */
+	/* Skip register copies, i.e. saves to another register
+	   instead of the stack.  */
+	;
+      else if ((insn & 0xf800) == 0x2000)	/* movs Rd, #imm */
+	/* Recognize constant loads; even with small stacks these are necessary
+	   on Thumb.  */
+	regs[bits (insn, 8, 10)] = pv_constant (bits (insn, 0, 7));
+      else if ((insn & 0xf800) == 0x4800)	/* ldr Rd, [pc, #imm] */
+	{
+	  /* Constant pool loads, for the same reason.  */
+	  unsigned int constant;
+	  CORE_ADDR loc;
+
+	  loc = start + 4 + bits (insn, 0, 7) * 4;
+	  constant = read_memory_unsigned_integer (loc, 4, byte_order);
+	  regs[bits (insn, 8, 10)] = pv_constant (constant);
+	}
+      else if ((insn & 0xe000) == 0xe000 && cache == NULL)
+	{
+	  /* Only recognize 32-bit instructions for prologue skipping.  */
+	  unsigned short inst2;
+
+	  inst2 = read_memory_unsigned_integer (start + 2, 2,
+						byte_order_for_code);
+
+	  if ((insn & 0xf800) == 0xf000 && (inst2 & 0xe800) == 0xe800)
+	    {
+	      /* BL, BLX.  Allow some special function calls when
+		 skipping the prologue; GCC generates these before
+		 storing arguments to the stack.  */
+	      CORE_ADDR nextpc;
+	      int j1, j2, imm1, imm2;
+
+	      imm1 = sbits (insn, 0, 10);
+	      imm2 = bits (inst2, 0, 10);
+	      j1 = bit (inst2, 13);
+	      j2 = bit (inst2, 11);
+
+	      offset = ((imm1 << 12) + (imm2 << 1));
+	      offset ^= ((!j2) << 22) | ((!j1) << 23);
+
+	      nextpc = start + 4 + offset;
+	      /* For BLX make sure to clear the low bits.  */
+	      if (bit (inst2, 12) == 0)
+		nextpc = nextpc & 0xfffffffc;
+
+	      if (!skip_prologue_function (nextpc))
+		break;
+	    }
+	  else if ((insn & 0xfe50) == 0xe800	/* stm{db,ia} Rn[!], { registers } */
+		   && pv_is_register (regs[bits (insn, 0, 3)], ARM_SP_REGNUM))
+	    ;
+	  else if ((insn & 0xfe50) == 0xe840	/* strd Rt, Rt2, [Rn, #imm] */
+		   && pv_is_register (regs[bits (insn, 0, 3)], ARM_SP_REGNUM))
+	    ;
+	  else if ((insn & 0xffd0) == 0xe890	/* ldmia Rn[!], { registers } */
+	      && (inst2 & 0x8000) == 0x0000
+	      && pv_is_register (regs[bits (insn, 0, 3)], ARM_SP_REGNUM))
+	    ;
+	  else if ((insn & 0xfbf0) == 0xf100	/* add.w Rd, Rn, #imm */
+		   && (inst2 & 0x8000) == 0x0000)
+	    /* Since we only recognize this for prologue skipping, do not bother
+	       to compute the constant.  */
+	    regs[bits (inst2, 8, 11)] = regs[bits (insn, 0, 3)];
+	  else if ((insn & 0xfbf0) == 0xf1a0	/* sub.w Rd, Rn, #imm12 */
+		   && (inst2 & 0x8000) == 0x0000)
+	    /* Since we only recognize this for prologue skipping, do not bother
+	       to compute the constant.  */
+	    regs[bits (inst2, 8, 11)] = regs[bits (insn, 0, 3)];
+	  else if ((insn & 0xfbf0) == 0xf2a0	/* sub.w Rd, Rn, #imm8 */
+		   && (inst2 & 0x8000) == 0x0000)
+	    /* Since we only recognize this for prologue skipping, do not bother
+	       to compute the constant.  */
+	    regs[bits (inst2, 8, 11)] = regs[bits (insn, 0, 3)];
+	  else if ((insn & 0xff50) == 0xf850	/* ldr.w Rd, [Rn, #imm]{!} */
+		   && pv_is_register (regs[bits (insn, 0, 3)], ARM_SP_REGNUM))
+	    ;
+	  else if ((insn & 0xff50) == 0xe950	/* ldrd Rt, Rt2, [Rn, #imm]{!} */
+		   && pv_is_register (regs[bits (insn, 0, 3)], ARM_SP_REGNUM))
+	    ;
+	  else if ((insn & 0xff50) == 0xf800	/* strb.w or strh.w */
+		   && pv_is_register (regs[bits (insn, 0, 3)], ARM_SP_REGNUM))
+	    ;
+	  else
+	    {
+	      /* We don't know what this instruction is.  We're finished
+		 scanning.  NOTE: Recognizing more safe-to-ignore
+		 instructions here will improve support for optimized
+		 code.  */
+	      break;
+	    }
+
+	  start += 2;
+	}
       else
 	{
 	  /* We don't know what this instruction is.  We're finished
@@ -496,6 +713,10 @@ thumb_analyze_prologue (struct gdbarch *gdbarch,
 
       start += 2;
     }
+
+  if (arm_debug)
+    fprintf_unfiltered (gdb_stdlog, "Prologue scan stopped at %s\n",
+			paddress (gdbarch, start));
 
   if (cache == NULL)
     {
@@ -560,10 +781,6 @@ arm_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR pc)
   CORE_ADDR func_addr, limit_pc;
   struct symtab_and_line sal;
 
-  /* If we're in a dummy frame, don't even try to skip the prologue.  */
-  if (deprecated_pc_in_call_dummy (gdbarch, pc))
-    return pc;
-
   /* See if we can determine the end of the prologue via the symbol table.
      If so, then return either PC, or the PC after the prologue, whichever
      is greater.  */
@@ -571,8 +788,45 @@ arm_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR pc)
     {
       CORE_ADDR post_prologue_pc
 	= skip_prologue_using_sal (gdbarch, func_addr);
+      struct symtab *s = find_pc_symtab (func_addr);
+
+      /* GCC always emits a line note before the prologue and another
+	 one after, even if the two are at the same address or on the
+	 same line.  Take advantage of this so that we do not need to
+	 know every instruction that might appear in the prologue.  We
+	 will have producer information for most binaries; if it is
+	 missing (e.g. for -gstabs), assuming the GNU tools.  */
+      if (post_prologue_pc
+	  && (s == NULL
+	      || s->producer == NULL
+	      || strncmp (s->producer, "GNU ", sizeof ("GNU ") - 1) == 0))
+	return post_prologue_pc;
+
       if (post_prologue_pc != 0)
-	return max (pc, post_prologue_pc);
+	{
+	  CORE_ADDR analyzed_limit;
+
+	  /* For non-GCC compilers, make sure the entire line is an
+	     acceptable prologue; GDB will round this function's
+	     return value up to the end of the following line so we
+	     can not skip just part of a line (and we do not want to).
+
+	     RealView does not treat the prologue specially, but does
+	     associate prologue code with the opening brace; so this
+	     lets us skip the first line if we think it is the opening
+	     brace.  */
+	  if (arm_pc_is_thumb (func_addr))
+	    analyzed_limit = thumb_analyze_prologue (gdbarch, func_addr,
+						     post_prologue_pc, NULL);
+	  else
+	    analyzed_limit = arm_analyze_prologue (gdbarch, func_addr,
+						   post_prologue_pc, NULL);
+
+	  if (analyzed_limit != post_prologue_pc)
+	    return func_addr;
+
+	  return post_prologue_pc;
+	}
     }
 
   /* Can't determine prologue from the symbol table, need to examine
@@ -701,167 +955,124 @@ thumb_scan_prologue (struct gdbarch *gdbarch, CORE_ADDR prev_pc,
   thumb_analyze_prologue (gdbarch, prologue_start, prologue_end, cache);
 }
 
-/* This function decodes an ARM function prologue to determine:
-   1) the size of the stack frame
-   2) which registers are saved on it
-   3) the offsets of saved regs
-   4) the offset from the stack pointer to the frame pointer
-   This information is stored in the "extra" fields of the frame_info.
+/* Return 1 if THIS_INSTR might change control flow, 0 otherwise.  */
 
-   There are two basic forms for the ARM prologue.  The fixed argument
-   function call will look like:
-
-   mov    ip, sp
-   stmfd  sp!, {fp, ip, lr, pc}
-   sub    fp, ip, #4
-   [sub sp, sp, #4]
-
-   Which would create this stack frame (offsets relative to FP):
-   IP ->   4    (caller's stack)
-   FP ->   0    PC (points to address of stmfd instruction + 8 in callee)
-   -4   LR (return address in caller)
-   -8   IP (copy of caller's SP)
-   -12  FP (caller's FP)
-   SP -> -28    Local variables
-
-   The frame size would thus be 32 bytes, and the frame offset would be
-   28 bytes.  The stmfd call can also save any of the vN registers it
-   plans to use, which increases the frame size accordingly.
-
-   Note: The stored PC is 8 off of the STMFD instruction that stored it
-   because the ARM Store instructions always store PC + 8 when you read
-   the PC register.
-
-   A variable argument function call will look like:
-
-   mov    ip, sp
-   stmfd  sp!, {a1, a2, a3, a4}
-   stmfd  sp!, {fp, ip, lr, pc}
-   sub    fp, ip, #20
-
-   Which would create this stack frame (offsets relative to FP):
-   IP ->  20    (caller's stack)
-   16  A4
-   12  A3
-   8  A2
-   4  A1
-   FP ->   0    PC (points to address of stmfd instruction + 8 in callee)
-   -4   LR (return address in caller)
-   -8   IP (copy of caller's SP)
-   -12  FP (caller's FP)
-   SP -> -28    Local variables
-
-   The frame size would thus be 48 bytes, and the frame offset would be
-   28 bytes.
-
-   There is another potential complication, which is that the optimizer
-   will try to separate the store of fp in the "stmfd" instruction from
-   the "sub fp, ip, #NN" instruction.  Almost anything can be there, so
-   we just key on the stmfd, and then scan for the "sub fp, ip, #NN"...
-
-   Also, note, the original version of the ARM toolchain claimed that there
-   should be an
-
-   instruction at the end of the prologue.  I have never seen GCC produce
-   this, and the ARM docs don't mention it.  We still test for it below in
-   case it happens...
-
- */
-
-static void
-arm_scan_prologue (struct frame_info *this_frame,
-		   struct arm_prologue_cache *cache)
+static int
+arm_instruction_changes_pc (uint32_t this_instr)
 {
-  struct gdbarch *gdbarch = get_frame_arch (this_frame);
+  if (bits (this_instr, 28, 31) == INST_NV)
+    /* Unconditional instructions.  */
+    switch (bits (this_instr, 24, 27))
+      {
+      case 0xa:
+      case 0xb:
+	/* Branch with Link and change to Thumb.  */
+	return 1;
+      case 0xc:
+      case 0xd:
+      case 0xe:
+	/* Coprocessor register transfer.  */
+        if (bits (this_instr, 12, 15) == 15)
+	  error (_("Invalid update to pc in instruction"));
+	return 0;
+      default:
+	return 0;
+      }
+  else
+    switch (bits (this_instr, 25, 27))
+      {
+      case 0x0:
+	if (bits (this_instr, 23, 24) == 2 && bit (this_instr, 20) == 0)
+	  {
+	    /* Multiplies and extra load/stores.  */
+	    if (bit (this_instr, 4) == 1 && bit (this_instr, 7) == 1)
+	      /* Neither multiplies nor extension load/stores are allowed
+		 to modify PC.  */
+	      return 0;
+
+	    /* Otherwise, miscellaneous instructions.  */
+
+	    /* BX <reg>, BXJ <reg>, BLX <reg> */
+	    if (bits (this_instr, 4, 27) == 0x12fff1
+		|| bits (this_instr, 4, 27) == 0x12fff2
+		|| bits (this_instr, 4, 27) == 0x12fff3)
+	      return 1;
+
+	    /* Other miscellaneous instructions are unpredictable if they
+	       modify PC.  */
+	    return 0;
+	  }
+	/* Data processing instruction.  Fall through.  */
+
+      case 0x1:
+	if (bits (this_instr, 12, 15) == 15)
+	  return 1;
+	else
+	  return 0;
+
+      case 0x2:
+      case 0x3:
+	/* Media instructions and architecturally undefined instructions.  */
+	if (bits (this_instr, 25, 27) == 3 && bit (this_instr, 4) == 1)
+	  return 0;
+
+	/* Stores.  */
+	if (bit (this_instr, 20) == 0)
+	  return 0;
+
+	/* Loads.  */
+	if (bits (this_instr, 12, 15) == ARM_PC_REGNUM)
+	  return 1;
+	else
+	  return 0;
+
+      case 0x4:
+	/* Load/store multiple.  */
+	if (bit (this_instr, 20) == 1 && bit (this_instr, 15) == 1)
+	  return 1;
+	else
+	  return 0;
+
+      case 0x5:
+	/* Branch and branch with link.  */
+	return 1;
+
+      case 0x6:
+      case 0x7:
+	/* Coprocessor transfers or SWIs can not affect PC.  */
+	return 0;
+
+      default:
+	internal_error (__FILE__, __LINE__, "bad value in switch");
+      }
+}
+
+/* Analyze an ARM mode prologue starting at PROLOGUE_START and
+   continuing no further than PROLOGUE_END.  If CACHE is non-NULL,
+   fill it in.  Return the first address not recognized as a prologue
+   instruction.
+
+   We recognize all the instructions typically found in ARM prologues,
+   plus harmless instructions which can be skipped (either for analysis
+   purposes, or a more restrictive set that can be skipped when finding
+   the end of the prologue).  */
+
+static CORE_ADDR
+arm_analyze_prologue (struct gdbarch *gdbarch,
+		      CORE_ADDR prologue_start, CORE_ADDR prologue_end,
+		      struct arm_prologue_cache *cache)
+{
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   enum bfd_endian byte_order_for_code = gdbarch_byte_order_for_code (gdbarch);
   int regno;
-  CORE_ADDR prologue_start, prologue_end, current_pc;
-  CORE_ADDR prev_pc = get_frame_pc (this_frame);
-  CORE_ADDR block_addr = get_frame_address_in_block (this_frame);
+  CORE_ADDR offset, current_pc;
   pv_t regs[ARM_FPS_REGNUM];
   struct pv_area *stack;
   struct cleanup *back_to;
-  CORE_ADDR offset;
+  int framereg, framesize;
+  CORE_ADDR unrecognized_pc = 0;
 
-  /* Assume there is no frame until proven otherwise.  */
-  cache->framereg = ARM_SP_REGNUM;
-  cache->framesize = 0;
-
-  /* Check for Thumb prologue.  */
-  if (arm_frame_is_thumb (this_frame))
-    {
-      thumb_scan_prologue (gdbarch, prev_pc, block_addr, cache);
-      return;
-    }
-
-  /* Find the function prologue.  If we can't find the function in
-     the symbol table, peek in the stack frame to find the PC.  */
-  if (find_pc_partial_function (block_addr, NULL, &prologue_start,
-				&prologue_end))
-    {
-      /* One way to find the end of the prologue (which works well
-         for unoptimized code) is to do the following:
-
-	    struct symtab_and_line sal = find_pc_line (prologue_start, 0);
-
-	    if (sal.line == 0)
-	      prologue_end = prev_pc;
-	    else if (sal.end < prologue_end)
-	      prologue_end = sal.end;
-
-	 This mechanism is very accurate so long as the optimizer
-	 doesn't move any instructions from the function body into the
-	 prologue.  If this happens, sal.end will be the last
-	 instruction in the first hunk of prologue code just before
-	 the first instruction that the scheduler has moved from
-	 the body to the prologue.
-
-	 In order to make sure that we scan all of the prologue
-	 instructions, we use a slightly less accurate mechanism which
-	 may scan more than necessary.  To help compensate for this
-	 lack of accuracy, the prologue scanning loop below contains
-	 several clauses which'll cause the loop to terminate early if
-	 an implausible prologue instruction is encountered.  
-	 
-	 The expression
-	 
-	      prologue_start + 64
-	    
-	 is a suitable endpoint since it accounts for the largest
-	 possible prologue plus up to five instructions inserted by
-	 the scheduler.  */
-         
-      if (prologue_end > prologue_start + 64)
-	{
-	  prologue_end = prologue_start + 64;	/* See above.  */
-	}
-    }
-  else
-    {
-      /* We have no symbol information.  Our only option is to assume this
-	 function has a standard stack frame and the normal frame register.
-	 Then, we can find the value of our frame pointer on entrance to
-	 the callee (or at the present moment if this is the innermost frame).
-	 The value stored there should be the address of the stmfd + 8.  */
-      CORE_ADDR frame_loc;
-      LONGEST return_value;
-
-      frame_loc = get_frame_register_unsigned (this_frame, ARM_FP_REGNUM);
-      if (!safe_read_memory_integer (frame_loc, 4, byte_order, &return_value))
-        return;
-      else
-        {
-          prologue_start = gdbarch_addr_bits_remove 
-			     (gdbarch, return_value) - 8;
-          prologue_end = prologue_start + 64;	/* See above.  */
-        }
-    }
-
-  if (prev_pc < prologue_end)
-    prologue_end = prev_pc;
-
-  /* Now search the prologue looking for instructions that set up the
+  /* Search the prologue looking for instructions that set up the
      frame pointer, adjust the stack pointer, and save registers.
 
      Be careful, however, and if it doesn't look like a prologue,
@@ -869,18 +1080,7 @@ arm_scan_prologue (struct frame_info *this_frame,
      begins with stmfd sp!, then we will tell ourselves there is
      a frame, which will confuse stack traceback, as well as "finish" 
      and other operations that rely on a knowledge of the stack
-     traceback.
-
-     In the APCS, the prologue should start with  "mov ip, sp" so
-     if we don't see this as the first insn, we will stop.  
-
-     [Note: This doesn't seem to be true any longer, so it's now an
-     optional part of the prologue.  - Kevin Buettner, 2001-11-20]
-
-     [Note further: The "mov ip,sp" only seems to be missing in
-     frameless functions at optimization level "-O2" or above,
-     in which case it is often (but not always) replaced by
-     "str lr, [sp, #-4]!".  - Michael Snyder, 2002-04-23]  */
+     traceback.  */
 
   for (regno = 0; regno < ARM_FPS_REGNUM; regno++)
     regs[regno] = pv_register (regno, 0);
@@ -899,28 +1099,33 @@ arm_scan_prologue (struct frame_info *this_frame,
 	  regs[ARM_IP_REGNUM] = regs[ARM_SP_REGNUM];
 	  continue;
 	}
-      else if ((insn & 0xfffff000) == 0xe28dc000) /* add ip, sp #n */
+      else if ((insn & 0xfff00000) == 0xe2800000	/* add Rd, Rn, #n */
+	       && pv_is_register (regs[bits (insn, 16, 19)], ARM_SP_REGNUM))
 	{
 	  unsigned imm = insn & 0xff;                   /* immediate value */
 	  unsigned rot = (insn & 0xf00) >> 7;           /* rotate amount */
+	  int rd = bits (insn, 12, 15);
 	  imm = (imm >> rot) | (imm << (32 - rot));
-	  regs[ARM_IP_REGNUM] = pv_add_constant (regs[ARM_SP_REGNUM], imm);
+	  regs[rd] = pv_add_constant (regs[bits (insn, 16, 19)], imm);
 	  continue;
 	}
-      else if ((insn & 0xfffff000) == 0xe24dc000) /* sub ip, sp #n */
+      else if ((insn & 0xfff00000) == 0xe2400000	/* sub Rd, Rn, #n */
+	       && pv_is_register (regs[bits (insn, 16, 19)], ARM_SP_REGNUM))
 	{
 	  unsigned imm = insn & 0xff;                   /* immediate value */
 	  unsigned rot = (insn & 0xf00) >> 7;           /* rotate amount */
+	  int rd = bits (insn, 12, 15);
 	  imm = (imm >> rot) | (imm << (32 - rot));
-	  regs[ARM_IP_REGNUM] = pv_add_constant (regs[ARM_SP_REGNUM], -imm);
+	  regs[rd] = pv_add_constant (regs[bits (insn, 16, 19)], -imm);
 	  continue;
 	}
-      else if (insn == 0xe52de004)	/* str lr, [sp, #-4]! */
+      else if ((insn & 0xffff0fff) == 0xe52d0004)	/* str Rd, [sp, #-4]! */
 	{
 	  if (pv_area_store_would_trash (stack, regs[ARM_SP_REGNUM]))
 	    break;
 	  regs[ARM_SP_REGNUM] = pv_add_constant (regs[ARM_SP_REGNUM], -4);
-	  pv_area_store (stack, regs[ARM_SP_REGNUM], 4, regs[ARM_LR_REGNUM]);
+	  pv_area_store (stack, regs[ARM_SP_REGNUM], 4,
+			 regs[bits (insn, 12, 15)]);
 	  continue;
 	}
       else if ((insn & 0xffff0000) == 0xe92d0000)
@@ -941,18 +1146,24 @@ arm_scan_prologue (struct frame_info *this_frame,
 		pv_area_store (stack, regs[ARM_SP_REGNUM], 4, regs[regno]);
 	      }
 	}
-      else if ((insn & 0xffffc000) == 0xe54b0000	/* strb rx,[r11,#-n] */
-	       || (insn & 0xffffc0f0) == 0xe14b00b0	/* strh rx,[r11,#-n] */
+      else if ((insn & 0xffff0000) == 0xe54b0000	/* strb rx,[r11,#-n] */
+	       || (insn & 0xffff00f0) == 0xe14b00b0	/* strh rx,[r11,#-n] */
 	       || (insn & 0xffffc000) == 0xe50b0000)	/* str  rx,[r11,#-n] */
 	{
 	  /* No need to add this to saved_regs -- it's just an arg reg.  */
 	  continue;
 	}
-      else if ((insn & 0xffffc000) == 0xe5cd0000	/* strb rx,[sp,#n] */
-	       || (insn & 0xffffc0f0) == 0xe1cd00b0	/* strh rx,[sp,#n] */
+      else if ((insn & 0xffff0000) == 0xe5cd0000	/* strb rx,[sp,#n] */
+	       || (insn & 0xffff00f0) == 0xe1cd00b0	/* strh rx,[sp,#n] */
 	       || (insn & 0xffffc000) == 0xe58d0000)	/* str  rx,[sp,#n] */
 	{
 	  /* No need to add this to saved_regs -- it's just an arg reg.  */
+	  continue;
+	}
+      else if ((insn & 0xfff00000) == 0xe8800000	/* stm Rn, { registers } */
+	       && pv_is_register (regs[bits (insn, 16, 19)], ARM_SP_REGNUM))
+	{
+	  /* No need to add this to saved_regs -- it's just arg regs.  */
 	  continue;
 	}
       else if ((insn & 0xfffff000) == 0xe24cb000)	/* sub fp, ip #n */
@@ -1012,42 +1223,188 @@ arm_scan_prologue (struct frame_info *this_frame,
 			     regs[fp_start_reg++]);
 	    }
 	}
+      else if ((insn & 0xff000000) == 0xeb000000 && cache == NULL) /* bl */
+	{
+	  /* Allow some special function calls when skipping the
+	     prologue; GCC generates these before storing arguments to
+	     the stack.  */
+	  CORE_ADDR dest = BranchDest (current_pc, insn);
+
+	  if (skip_prologue_function (dest))
+	    continue;
+	  else
+	    break;
+	}
       else if ((insn & 0xf0000000) != 0xe0000000)
 	break;			/* Condition not true, exit early */
-      else if ((insn & 0xfe200000) == 0xe8200000)	/* ldm? */
-	break;			/* Don't scan past a block load */
-      else
-	/* The optimizer might shove anything into the prologue,
-	   so we just skip what we don't recognize.  */
+      else if (arm_instruction_changes_pc (insn))
+	/* Don't scan past anything that might change control flow.  */
+	break;
+      else if ((insn & 0xfe500000) == 0xe8100000)	/* ldm */
+	{
+	  /* Ignore block loads from the stack, potentially copying
+	     parameters from memory.  */
+	  if (pv_is_register (regs[bits (insn, 16, 19)], ARM_SP_REGNUM))
+	    continue;
+	  else
+	    break;
+	}
+      else if ((insn & 0xfc500000) == 0xe4100000)
+	{
+	  /* Similarly ignore single loads from the stack.  */
+	  if (pv_is_register (regs[bits (insn, 16, 19)], ARM_SP_REGNUM))
+	    continue;
+	  else
+	    break;
+	}
+      else if ((insn & 0xffff0ff0) == 0xe1a00000)
+	/* MOV Rd, Rm.  Skip register copies, i.e. saves to another
+	   register instead of the stack.  */
 	continue;
+      else
+	{
+	  /* The optimizer might shove anything into the prologue,
+	     so we just skip what we don't recognize.  */
+	  unrecognized_pc = current_pc;
+	  continue;
+	}
     }
+
+  if (unrecognized_pc == 0)
+    unrecognized_pc = current_pc;
 
   /* The frame size is just the distance from the frame register
      to the original stack pointer.  */
   if (pv_is_register (regs[ARM_FP_REGNUM], ARM_SP_REGNUM))
     {
       /* Frame pointer is fp.  */
-      cache->framereg = ARM_FP_REGNUM;
-      cache->framesize = -regs[ARM_FP_REGNUM].k;
+      framereg = ARM_FP_REGNUM;
+      framesize = -regs[ARM_FP_REGNUM].k;
     }
   else if (pv_is_register (regs[ARM_SP_REGNUM], ARM_SP_REGNUM))
     {
       /* Try the stack pointer... this is a bit desperate.  */
-      cache->framereg = ARM_SP_REGNUM;
-      cache->framesize = -regs[ARM_SP_REGNUM].k;
+      framereg = ARM_SP_REGNUM;
+      framesize = -regs[ARM_SP_REGNUM].k;
     }
   else
     {
       /* We're just out of luck.  We don't know where the frame is.  */
-      cache->framereg = -1;
-      cache->framesize = 0;
+      framereg = -1;
+      framesize = 0;
     }
 
-  for (regno = 0; regno < ARM_FPS_REGNUM; regno++)
-    if (pv_area_find_reg (stack, gdbarch, regno, &offset))
-      cache->saved_regs[regno].addr = offset;
+  if (cache)
+    {
+      cache->framereg = framereg;
+      cache->framesize = framesize;
+
+      for (regno = 0; regno < ARM_FPS_REGNUM; regno++)
+	if (pv_area_find_reg (stack, gdbarch, regno, &offset))
+	  cache->saved_regs[regno].addr = offset;
+    }
+
+  if (arm_debug)
+    fprintf_unfiltered (gdb_stdlog, "Prologue scan stopped at %s\n",
+			paddress (gdbarch, unrecognized_pc));
 
   do_cleanups (back_to);
+  return unrecognized_pc;
+}
+
+static void
+arm_scan_prologue (struct frame_info *this_frame,
+		   struct arm_prologue_cache *cache)
+{
+  struct gdbarch *gdbarch = get_frame_arch (this_frame);
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+  int regno;
+  CORE_ADDR prologue_start, prologue_end, current_pc;
+  CORE_ADDR prev_pc = get_frame_pc (this_frame);
+  CORE_ADDR block_addr = get_frame_address_in_block (this_frame);
+  pv_t regs[ARM_FPS_REGNUM];
+  struct pv_area *stack;
+  struct cleanup *back_to;
+  CORE_ADDR offset;
+
+  /* Assume there is no frame until proven otherwise.  */
+  cache->framereg = ARM_SP_REGNUM;
+  cache->framesize = 0;
+
+  /* Check for Thumb prologue.  */
+  if (arm_frame_is_thumb (this_frame))
+    {
+      thumb_scan_prologue (gdbarch, prev_pc, block_addr, cache);
+      return;
+    }
+
+  /* Find the function prologue.  If we can't find the function in
+     the symbol table, peek in the stack frame to find the PC.  */
+  if (find_pc_partial_function (block_addr, NULL, &prologue_start,
+				&prologue_end))
+    {
+      /* One way to find the end of the prologue (which works well
+         for unoptimized code) is to do the following:
+
+	    struct symtab_and_line sal = find_pc_line (prologue_start, 0);
+
+	    if (sal.line == 0)
+	      prologue_end = prev_pc;
+	    else if (sal.end < prologue_end)
+	      prologue_end = sal.end;
+
+	 This mechanism is very accurate so long as the optimizer
+	 doesn't move any instructions from the function body into the
+	 prologue.  If this happens, sal.end will be the last
+	 instruction in the first hunk of prologue code just before
+	 the first instruction that the scheduler has moved from
+	 the body to the prologue.
+
+	 In order to make sure that we scan all of the prologue
+	 instructions, we use a slightly less accurate mechanism which
+	 may scan more than necessary.  To help compensate for this
+	 lack of accuracy, the prologue scanning loop below contains
+	 several clauses which'll cause the loop to terminate early if
+	 an implausible prologue instruction is encountered.
+
+	 The expression
+
+	      prologue_start + 64
+
+	 is a suitable endpoint since it accounts for the largest
+	 possible prologue plus up to five instructions inserted by
+	 the scheduler.  */
+
+      if (prologue_end > prologue_start + 64)
+	{
+	  prologue_end = prologue_start + 64;	/* See above.  */
+	}
+    }
+  else
+    {
+      /* We have no symbol information.  Our only option is to assume this
+	 function has a standard stack frame and the normal frame register.
+	 Then, we can find the value of our frame pointer on entrance to
+	 the callee (or at the present moment if this is the innermost frame).
+	 The value stored there should be the address of the stmfd + 8.  */
+      CORE_ADDR frame_loc;
+      LONGEST return_value;
+
+      frame_loc = get_frame_register_unsigned (this_frame, ARM_FP_REGNUM);
+      if (!safe_read_memory_integer (frame_loc, 4, byte_order, &return_value))
+        return;
+      else
+        {
+          prologue_start = gdbarch_addr_bits_remove
+			     (gdbarch, return_value) - 8;
+          prologue_end = prologue_start + 64;	/* See above.  */
+        }
+    }
+
+  if (prev_pc < prologue_end)
+    prologue_end = prev_pc;
+
+  arm_analyze_prologue (gdbarch, prologue_start, prologue_end, cache);
 }
 
 static struct arm_prologue_cache *
@@ -1175,9 +1532,7 @@ struct frame_unwind arm_prologue_unwind = {
 static struct arm_prologue_cache *
 arm_make_stub_cache (struct frame_info *this_frame)
 {
-  int reg;
   struct arm_prologue_cache *cache;
-  CORE_ADDR unwound_fp;
 
   cache = FRAME_OBSTACK_ZALLOC (struct arm_prologue_cache);
   cache->saved_regs = trad_frame_alloc_saved_regs (this_frame);
@@ -1213,6 +1568,8 @@ arm_stub_unwind_sniffer (const struct frame_unwind *self,
 
   addr_in_block = get_frame_address_in_block (this_frame);
   if (in_plt_section (addr_in_block, NULL)
+      /* We also use the stub winder if the target memory is unreadable
+	 to avoid having the prologue unwinder trying to read it.  */
       || target_read_memory (get_frame_pc (this_frame), dummy, 4) != 0)
     return 1;
 
@@ -1340,7 +1697,7 @@ struct stack_item
 };
 
 static struct stack_item *
-push_stack_item (struct stack_item *prev, void *contents, int len)
+push_stack_item (struct stack_item *prev, const void *contents, int len)
 {
   struct stack_item *si;
   si = xmalloc (sizeof (struct stack_item));
@@ -1681,7 +2038,7 @@ arm_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
       struct type *arg_type;
       struct type *target_type;
       enum type_code typecode;
-      bfd_byte *val;
+      const bfd_byte *val;
       int align;
       enum arm_vfp_cprc_base_type vfp_base_type;
       int vfp_base_count;
@@ -1691,7 +2048,7 @@ arm_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
       len = TYPE_LENGTH (arg_type);
       target_type = TYPE_TARGET_TYPE (arg_type);
       typecode = TYPE_CODE (arg_type);
-      val = value_contents_writeable (args[argnum]);
+      val = value_contents (args[argnum]);
 
       align = arm_type_align (arg_type);
       /* Round alignment up to a whole number of words.  */
@@ -1792,9 +2149,10 @@ arm_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 	  CORE_ADDR regval = extract_unsigned_integer (val, len, byte_order);
 	  if (arm_pc_is_thumb (regval))
 	    {
-	      val = alloca (len);
-	      store_unsigned_integer (val, len, byte_order,
+	      bfd_byte *copy = alloca (len);
+	      store_unsigned_integer (copy, len, byte_order,
 				      MAKE_THUMB_ADDR (regval));
+	      val = copy;
 	    }
 	}
 
@@ -2208,16 +2566,6 @@ condition_true (unsigned long cond, unsigned long status_reg)
   return 1;
 }
 
-/* Support routines for single stepping.  Calculate the next PC value.  */
-#define submask(x) ((1L << ((x) + 1)) - 1)
-#define bit(obj,st) (((obj) >> (st)) & 1)
-#define bits(obj,st,fn) (((obj) >> (st)) & submask ((fn) - (st)))
-#define sbits(obj,st,fn) \
-  ((long) (bits(obj,st,fn) | ((long) bit(obj,fn) * ~ submask (fn - st))))
-#define BranchDest(addr,instr) \
-  ((CORE_ADDR) (((long) (addr)) + 8 + (sbits (instr, 0, 23) << 2)))
-#define ARM_PC_32 1
-
 static unsigned long
 shifted_reg_val (struct frame_info *frame, unsigned long inst, int carry,
 		 unsigned long pc_val, unsigned long status_reg)
@@ -2236,8 +2584,7 @@ shifted_reg_val (struct frame_info *frame, unsigned long inst, int carry,
     shift = bits (inst, 7, 11);
 
   res = (rm == 15
-	 ? ((pc_val | (ARM_PC_32 ? 0 : status_reg))
-	    + (bit (inst, 4) ? 12 : 8))
+	 ? (pc_val + (bit (inst, 4) ? 12 : 8))
 	 : get_frame_register_unsigned (frame, rm));
 
   switch (shifttype)
@@ -2313,7 +2660,7 @@ thumb_advance_itstate (unsigned int itstate)
    another breakpoint by our caller.  */
 
 static CORE_ADDR
-thumb_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
+thumb_get_next_pc_raw (struct frame_info *frame, CORE_ADDR pc, int insert_bkpt)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
   struct address_space *aspace = get_frame_address_space (frame);
@@ -2324,6 +2671,9 @@ thumb_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
   CORE_ADDR nextpc = pc + 2;		/* default is next instruction */
   unsigned long offset;
   ULONGEST status, itstate;
+
+  nextpc = MAKE_THUMB_ADDR (nextpc);
+  pc_val = MAKE_THUMB_ADDR (pc_val);
 
   inst1 = read_memory_unsigned_integer (pc, 2, byte_order_for_code);
 
@@ -2363,7 +2713,7 @@ thumb_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
 	      itstate = thumb_advance_itstate (itstate);
 	    }
 
-	  return pc;
+	  return MAKE_THUMB_ADDR (pc);
 	}
       else if (itstate != 0)
 	{
@@ -2381,7 +2731,7 @@ thumb_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
 		  itstate = thumb_advance_itstate (itstate);
 		}
 
-	      return pc;
+	      return MAKE_THUMB_ADDR (pc);
 	    }
 	  else if ((itstate & 0x0f) == 0x08)
 	    {
@@ -2406,7 +2756,8 @@ thumb_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
 
 	      /* Set a breakpoint on the following instruction.  */
 	      gdb_assert ((itstate & 0x0f) != 0);
-	      insert_single_step_breakpoint (gdbarch, aspace, pc);
+	      if (insert_bkpt)
+	        insert_single_step_breakpoint (gdbarch, aspace, pc);
 	      cond_negated = (itstate >> 4) & 1;
 
 	      /* Skip all following instructions with the same
@@ -2422,7 +2773,7 @@ thumb_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
 		}
 	      while (itstate != 0 && ((itstate >> 4) & 1) == cond_negated);
 
-	      return pc;
+	      return MAKE_THUMB_ADDR (pc);
 	    }
 	}
     }
@@ -2436,9 +2787,9 @@ thumb_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
 	  /* Advance to the next instruction.  All the 32-bit
 	     instructions share a common prefix.  */
 	  if ((inst1 & 0xe000) == 0xe000 && (inst1 & 0x1800) != 0)
-	    return pc + 4;
+	    return MAKE_THUMB_ADDR (pc + 4);
 	  else
-	    return pc + 2;
+	    return MAKE_THUMB_ADDR (pc + 2);
 	}
 
       /* Otherwise, handle the instruction normally.  */
@@ -2453,9 +2804,6 @@ thumb_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
       offset = bitcount (bits (inst1, 0, 7)) * INT_REGISTER_SIZE;
       sp = get_frame_register_unsigned (frame, ARM_SP_REGNUM);
       nextpc = read_memory_unsigned_integer (sp + offset, 4, byte_order);
-      nextpc = gdbarch_addr_bits_remove (gdbarch, nextpc);
-      if (nextpc == pc)
-	error (_("Infinite loop detected"));
     }
   else if ((inst1 & 0xf000) == 0xd000)	/* conditional branch */
     {
@@ -2474,6 +2822,7 @@ thumb_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
 
       /* Default to the next instruction.  */
       nextpc = pc + 4;
+      nextpc = MAKE_THUMB_ADDR (nextpc);
 
       if ((inst1 & 0xf800) == 0xf000 && (inst2 & 0x8000) == 0x8000)
 	{
@@ -2503,7 +2852,7 @@ thumb_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
 	      nextpc = get_frame_register_unsigned (frame, ARM_LR_REGNUM);
 	      nextpc -= inst2 & 0x00ff;
 	    }
-	  else if ((inst2 & 0xd000) == 0xc000 && (inst1 & 0x0380) != 0x0380)
+	  else if ((inst2 & 0xd000) == 0x8000 && (inst1 & 0x0380) != 0x0380)
 	    {
 	      /* Conditional branch.  */
 	      if (condition_true (bits (inst1, 6, 9), status))
@@ -2566,6 +2915,7 @@ thumb_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
 	{
 	  /* MOV PC or MOVS PC.  */
 	  nextpc = get_frame_register_unsigned (frame, bits (inst2, 0, 3));
+	  nextpc = MAKE_THUMB_ADDR (nextpc);
 	}
       else if ((inst1 & 0xff70) == 0xf850 && (inst2 & 0xf000) == 0xf000)
 	{
@@ -2610,19 +2960,29 @@ thumb_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
       else if ((inst1 & 0xfff0) == 0xe8d0 && (inst2 & 0xfff0) == 0xf000)
 	{
 	  /* TBB.  */
-	  CORE_ADDR table, offset, length;
+	  CORE_ADDR tbl_reg, table, offset, length;
 
-	  table = get_frame_register_unsigned (frame, bits (inst1, 0, 3));
+	  tbl_reg = bits (inst1, 0, 3);
+	  if (tbl_reg == 0x0f)
+	    table = pc + 4;  /* Regcache copy of PC isn't right yet.  */
+	  else
+	    table = get_frame_register_unsigned (frame, tbl_reg);
+
 	  offset = get_frame_register_unsigned (frame, bits (inst2, 0, 3));
 	  length = 2 * get_frame_memory_unsigned (frame, table + offset, 1);
 	  nextpc = pc_val + length;
 	}
-      else if ((inst1 & 0xfff0) == 0xe8d0 && (inst2 & 0xfff0) == 0xf000)
+      else if ((inst1 & 0xfff0) == 0xe8d0 && (inst2 & 0xfff0) == 0xf010)
 	{
 	  /* TBH.  */
-	  CORE_ADDR table, offset, length;
+	  CORE_ADDR tbl_reg, table, offset, length;
 
-	  table = get_frame_register_unsigned (frame, bits (inst1, 0, 3));
+	  tbl_reg = bits (inst1, 0, 3);
+	  if (tbl_reg == 0x0f)
+	    table = pc + 4;  /* Regcache copy of PC isn't right yet.  */
+	  else
+	    table = get_frame_register_unsigned (frame, tbl_reg);
+
 	  offset = 2 * get_frame_register_unsigned (frame, bits (inst2, 0, 3));
 	  length = 2 * get_frame_memory_unsigned (frame, table + offset, 2);
 	  nextpc = pc_val + length;
@@ -2634,10 +2994,6 @@ thumb_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
 	nextpc = pc_val;
       else
 	nextpc = get_frame_register_unsigned (frame, bits (inst1, 3, 6));
-
-      nextpc = gdbarch_addr_bits_remove (gdbarch, nextpc);
-      if (nextpc == pc)
-	error (_("Infinite loop detected"));
     }
   else if ((inst1 & 0xf500) == 0xb100)
     {
@@ -2650,12 +3006,20 @@ thumb_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
       else if (!bit (inst1, 11) && reg == 0)
 	nextpc = pc_val + imm;
     }
-
   return nextpc;
 }
 
-CORE_ADDR
-arm_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
+/* Get the raw next address.  PC is the current program counter, in 
+   FRAME.  INSERT_BKPT should be TRUE if we want a breakpoint set on 
+   the alternative next instruction if there are two options.
+
+   The value returned has the execution state of the next instruction 
+   encoded in it.  Use IS_THUMB_ADDR () to see whether the instruction is
+   in Thumb-State, and gdbarch_addr_bits_remove () to get the plain memory
+   address.
+*/
+static CORE_ADDR
+arm_get_next_pc_raw (struct frame_info *frame, CORE_ADDR pc, int insert_bkpt)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
@@ -2666,7 +3030,7 @@ arm_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
   CORE_ADDR nextpc;
 
   if (arm_frame_is_thumb (frame))
-    return thumb_get_next_pc (frame, pc);
+    return thumb_get_next_pc_raw (frame, pc, insert_bkpt);
 
   pc_val = (unsigned long) pc;
   this_instr = read_memory_unsigned_integer (pc, 4, byte_order_for_code);
@@ -2683,10 +3047,7 @@ arm_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
 	  /* Branch with Link and change to Thumb.  */
 	  nextpc = BranchDest (pc, this_instr);
 	  nextpc |= bit (this_instr, 24) << 1;
-
-	  nextpc = gdbarch_addr_bits_remove (gdbarch, nextpc);
-	  if (nextpc == pc)
-	    error (_("Infinite loop detected"));
+	  nextpc = MAKE_THUMB_ADDR (nextpc);
 	  break;
 	}
       case 0xc:
@@ -2722,14 +3083,8 @@ arm_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
 		|| bits (this_instr, 4, 27) == 0x12fff3)
 	      {
 		rn = bits (this_instr, 0, 3);
-		result = (rn == 15) ? pc_val + 8
+		nextpc = (rn == 15) ? pc_val + 8
 				    : get_frame_register_unsigned (frame, rn);
-		nextpc = (CORE_ADDR) gdbarch_addr_bits_remove
-				       (gdbarch, result);
-
-		if (nextpc == pc)
-		  error (_("Infinite loop detected"));
-
 		return nextpc;
 	      }
 
@@ -2807,11 +3162,14 @@ arm_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
 		result = ~operand2;
 		break;
 	      }
-	    nextpc = (CORE_ADDR) gdbarch_addr_bits_remove
-				   (gdbarch, result);
 
-	    if (nextpc == pc)
-	      error (_("Infinite loop detected"));
+            /* In 26-bit APCS the bottom two bits of the result are 
+	       ignored, and we always end up in ARM state.  */
+	    if (!arm_apcs_32)
+	      nextpc = arm_addr_bits_remove (gdbarch, result);
+	    else
+	      nextpc = result;
+
 	    break;
 	  }
 
@@ -2851,11 +3209,6 @@ arm_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
 		    }
 		  nextpc = (CORE_ADDR) read_memory_integer ((CORE_ADDR) base,
 							    4, byte_order);
-
-		  nextpc = gdbarch_addr_bits_remove (gdbarch, nextpc);
-
-		  if (nextpc == pc)
-		    error (_("Infinite loop detected"));
 		}
 	    }
 	  break;
@@ -2890,10 +3243,6 @@ arm_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
 								  + offset),
 						       4, byte_order);
 		  }
-		  nextpc = gdbarch_addr_bits_remove
-			     (gdbarch, nextpc);
-		  if (nextpc == pc)
-		    error (_("Infinite loop detected"));
 		}
 	    }
 	  break;
@@ -2902,10 +3251,6 @@ arm_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
 	case 0xa:		/* branch */
 	  {
 	    nextpc = BranchDest (pc, this_instr);
-
-	    nextpc = gdbarch_addr_bits_remove (gdbarch, nextpc);
-	    if (nextpc == pc)
-	      error (_("Infinite loop detected"));
 	    break;
 	  }
 
@@ -2921,6 +3266,18 @@ arm_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
 	}
     }
 
+  return nextpc;
+}
+
+CORE_ADDR
+arm_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
+{
+  struct gdbarch *gdbarch = get_frame_arch (frame);
+  CORE_ADDR nextpc = 
+    gdbarch_addr_bits_remove (gdbarch, 
+			      arm_get_next_pc_raw (frame, pc, TRUE));
+  if (nextpc == pc)
+    error (_("Infinite loop detected"));
   return nextpc;
 }
 
@@ -3346,7 +3703,7 @@ insn_references_pc (uint32_t insn, uint32_t bitmask)
    matter what address they are executed at: in those cases, use this.  */
 
 static int
-copy_unmodified (struct gdbarch *gdbarch ATTRIBUTE_UNUSED, uint32_t insn,
+copy_unmodified (struct gdbarch *gdbarch, uint32_t insn,
 		 const char *iname, struct displaced_step_closure *dsc)
 {
   if (debug_displaced)
@@ -3362,7 +3719,7 @@ copy_unmodified (struct gdbarch *gdbarch ATTRIBUTE_UNUSED, uint32_t insn,
 /* Preload instructions with immediate offset.  */
 
 static void
-cleanup_preload (struct gdbarch *gdbarch ATTRIBUTE_UNUSED,
+cleanup_preload (struct gdbarch *gdbarch,
 		 struct regcache *regs, struct displaced_step_closure *dsc)
 {
   displaced_write_reg (regs, dsc, 0, dsc->tmp[0], CANNOT_WRITE_PC);
@@ -3447,7 +3804,7 @@ copy_preload_reg (struct gdbarch *gdbarch, uint32_t insn, struct regcache *regs,
 /* Copy/cleanup coprocessor load and store instructions.  */
 
 static void
-cleanup_copro_load_store (struct gdbarch *gdbarch ATTRIBUTE_UNUSED,
+cleanup_copro_load_store (struct gdbarch *gdbarch,
 			  struct regcache *regs,
 			  struct displaced_step_closure *dsc)
 {
@@ -3501,7 +3858,7 @@ copy_copro_load_store (struct gdbarch *gdbarch, uint32_t insn,
    PC).  */
 
 static void
-cleanup_branch (struct gdbarch *gdbarch ATTRIBUTE_UNUSED, struct regcache *regs,
+cleanup_branch (struct gdbarch *gdbarch, struct regcache *regs,
 		struct displaced_step_closure *dsc)
 {
   ULONGEST from = dsc->insn_addr;
@@ -3525,7 +3882,7 @@ cleanup_branch (struct gdbarch *gdbarch ATTRIBUTE_UNUSED, struct regcache *regs,
 /* Copy B/BL/BLX instructions with immediate destinations.  */
 
 static int
-copy_b_bl_blx (struct gdbarch *gdbarch ATTRIBUTE_UNUSED, uint32_t insn,
+copy_b_bl_blx (struct gdbarch *gdbarch, uint32_t insn,
 	       struct regcache *regs, struct displaced_step_closure *dsc)
 {
   unsigned int cond = bits (insn, 28, 31);
@@ -3572,7 +3929,7 @@ copy_b_bl_blx (struct gdbarch *gdbarch ATTRIBUTE_UNUSED, uint32_t insn,
 /* Copy BX/BLX with register-specified destinations.  */
 
 static int
-copy_bx_blx_reg (struct gdbarch *gdbarch ATTRIBUTE_UNUSED, uint32_t insn,
+copy_bx_blx_reg (struct gdbarch *gdbarch, uint32_t insn,
 		 struct regcache *regs, struct displaced_step_closure *dsc)
 {
   unsigned int cond = bits (insn, 28, 31);
@@ -3610,7 +3967,7 @@ copy_bx_blx_reg (struct gdbarch *gdbarch ATTRIBUTE_UNUSED, uint32_t insn,
 /* Copy/cleanup arithmetic/logic instruction with immediate RHS. */
 
 static void
-cleanup_alu_imm (struct gdbarch *gdbarch ATTRIBUTE_UNUSED,
+cleanup_alu_imm (struct gdbarch *gdbarch,
 		 struct regcache *regs, struct displaced_step_closure *dsc)
 {
   ULONGEST rd_val = displaced_read_reg (regs, dsc->insn_addr, 0);
@@ -3671,7 +4028,7 @@ copy_alu_imm (struct gdbarch *gdbarch, uint32_t insn, struct regcache *regs,
 /* Copy/cleanup arithmetic/logic insns with register RHS.  */
 
 static void
-cleanup_alu_reg (struct gdbarch *gdbarch ATTRIBUTE_UNUSED,
+cleanup_alu_reg (struct gdbarch *gdbarch,
 		 struct regcache *regs, struct displaced_step_closure *dsc)
 {
   ULONGEST rd_val;
@@ -3740,7 +4097,7 @@ copy_alu_reg (struct gdbarch *gdbarch, uint32_t insn, struct regcache *regs,
 /* Cleanup/copy arithmetic/logic insns with shifted register RHS.  */
 
 static void
-cleanup_alu_shifted_reg (struct gdbarch *gdbarch ATTRIBUTE_UNUSED,
+cleanup_alu_shifted_reg (struct gdbarch *gdbarch,
 			 struct regcache *regs,
 			 struct displaced_step_closure *dsc)
 {
@@ -3814,7 +4171,7 @@ copy_alu_shifted_reg (struct gdbarch *gdbarch, uint32_t insn,
 /* Clean up load instructions.  */
 
 static void
-cleanup_load (struct gdbarch *gdbarch ATTRIBUTE_UNUSED, struct regcache *regs,
+cleanup_load (struct gdbarch *gdbarch, struct regcache *regs,
 	      struct displaced_step_closure *dsc)
 {
   ULONGEST rt_val, rt_val2 = 0, rn_val;
@@ -3844,7 +4201,7 @@ cleanup_load (struct gdbarch *gdbarch ATTRIBUTE_UNUSED, struct regcache *regs,
 /* Clean up store instructions.  */
 
 static void
-cleanup_store (struct gdbarch *gdbarch ATTRIBUTE_UNUSED, struct regcache *regs,
+cleanup_store (struct gdbarch *gdbarch, struct regcache *regs,
 	       struct displaced_step_closure *dsc)
 {
   CORE_ADDR from = dsc->insn_addr;
@@ -4177,7 +4534,7 @@ cleanup_block_store_pc (struct gdbarch *gdbarch, struct regcache *regs,
    must undo that here.  */
 
 static void
-cleanup_block_load_pc (struct gdbarch *gdbarch ATTRIBUTE_UNUSED,
+cleanup_block_load_pc (struct gdbarch *gdbarch,
 		       struct regcache *regs,
 		       struct displaced_step_closure *dsc)
 {
@@ -4373,7 +4730,7 @@ copy_block_xfer (struct gdbarch *gdbarch, uint32_t insn, struct regcache *regs,
    for Linux, where some SVC instructions must be treated specially.  */
 
 static void
-cleanup_svc (struct gdbarch *gdbarch ATTRIBUTE_UNUSED, struct regcache *regs,
+cleanup_svc (struct gdbarch *gdbarch, struct regcache *regs,
 	     struct displaced_step_closure *dsc)
 {
   CORE_ADDR from = dsc->insn_addr;
@@ -4417,7 +4774,7 @@ copy_svc (struct gdbarch *gdbarch, uint32_t insn, CORE_ADDR to,
 /* Copy undefined instructions.  */
 
 static int
-copy_undef (struct gdbarch *gdbarch ATTRIBUTE_UNUSED, uint32_t insn,
+copy_undef (struct gdbarch *gdbarch, uint32_t insn,
 	    struct displaced_step_closure *dsc)
 {
   if (debug_displaced)
@@ -4432,7 +4789,7 @@ copy_undef (struct gdbarch *gdbarch ATTRIBUTE_UNUSED, uint32_t insn,
 /* Copy unpredictable instructions.  */
 
 static int
-copy_unpred (struct gdbarch *gdbarch ATTRIBUTE_UNUSED, uint32_t insn,
+copy_unpred (struct gdbarch *gdbarch, uint32_t insn,
 	     struct displaced_step_closure *dsc)
 {
   if (debug_displaced)

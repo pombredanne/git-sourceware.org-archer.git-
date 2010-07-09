@@ -168,6 +168,7 @@ end_arglist (void)
 {
   int val = arglist_len;
   struct funcall *call = funcall_chain;
+
   funcall_chain = call->next;
   arglist_len = call->arglist_len;
   xfree (call);
@@ -214,10 +215,9 @@ void
 write_exp_elt_opcode (enum exp_opcode expelt)
 {
   union exp_element tmp;
+
   memset (&tmp, 0, sizeof (union exp_element));
-
   tmp.opcode = expelt;
-
   write_exp_elt (tmp);
 }
 
@@ -225,10 +225,9 @@ void
 write_exp_elt_sym (struct symbol *expelt)
 {
   union exp_element tmp;
+
   memset (&tmp, 0, sizeof (union exp_element));
-
   tmp.symbol = expelt;
-
   write_exp_elt (tmp);
 }
 
@@ -236,6 +235,7 @@ void
 write_exp_elt_block (struct block *b)
 {
   union exp_element tmp;
+
   memset (&tmp, 0, sizeof (union exp_element));
   tmp.block = b;
   write_exp_elt (tmp);
@@ -245,6 +245,7 @@ void
 write_exp_elt_objfile (struct objfile *objfile)
 {
   union exp_element tmp;
+
   memset (&tmp, 0, sizeof (union exp_element));
   tmp.objfile = objfile;
   write_exp_elt (tmp);
@@ -254,10 +255,9 @@ void
 write_exp_elt_longcst (LONGEST expelt)
 {
   union exp_element tmp;
+
   memset (&tmp, 0, sizeof (union exp_element));
-
   tmp.longconst = expelt;
-
   write_exp_elt (tmp);
 }
 
@@ -265,10 +265,9 @@ void
 write_exp_elt_dblcst (DOUBLEST expelt)
 {
   union exp_element tmp;
+
   memset (&tmp, 0, sizeof (union exp_element));
-
   tmp.doubleconst = expelt;
-
   write_exp_elt (tmp);
 }
 
@@ -288,10 +287,9 @@ void
 write_exp_elt_type (struct type *expelt)
 {
   union exp_element tmp;
+
   memset (&tmp, 0, sizeof (union exp_element));
-
   tmp.type = expelt;
-
   write_exp_elt (tmp);
 }
 
@@ -299,10 +297,9 @@ void
 write_exp_elt_intern (struct internalvar *expelt)
 {
   union exp_element tmp;
+
   memset (&tmp, 0, sizeof (union exp_element));
-
   tmp.internalvar = expelt;
-
   write_exp_elt (tmp);
 }
 
@@ -776,7 +773,7 @@ prefixify_expression (struct expression *expr)
 int
 length_of_subexp (struct expression *expr, int endpos)
 {
-  int oplen, args, i;
+  int oplen, args;
 
   operator_length (expr, endpos, &oplen, &args);
 
@@ -794,7 +791,8 @@ length_of_subexp (struct expression *expr, int endpos)
    operator takes.  */
 
 void
-operator_length (struct expression *expr, int endpos, int *oplenp, int *argsp)
+operator_length (const struct expression *expr, int endpos, int *oplenp,
+		 int *argsp)
 {
   expr->language_defn->la_exp_desc->operator_length (expr, endpos,
 						     oplenp, argsp);
@@ -803,7 +801,7 @@ operator_length (struct expression *expr, int endpos, int *oplenp, int *argsp)
 /* Default value for operator_length in exp_descriptor vectors.  */
 
 void
-operator_length_standard (struct expression *expr, int endpos,
+operator_length_standard (const struct expression *expr, int endpos,
 			  int *oplenp, int *argsp)
 {
   int oplen = 1;
@@ -888,6 +886,13 @@ operator_length_standard (struct expression *expr, int endpos,
     case UNOP_TRUNC:
       oplen = 1;
       args = 1;
+      break;
+
+    case OP_ADL_FUNC:
+      oplen = longest_to_int (expr->elts[endpos - 2].longconst);
+      oplen = 4 + BYTES_TO_EXP_ELEM (oplen + 1);
+      oplen++;
+      oplen++;
       break;
 
     case OP_LABELED:
@@ -984,7 +989,6 @@ prefixify_subexp (struct expression *inexpr,
   int args;
   int i;
   int *arglens;
-  enum exp_opcode opcode;
   int result = -1;
 
   operator_length (inexpr, inend, &oplen, &args);
@@ -1017,6 +1021,7 @@ prefixify_subexp (struct expression *inexpr,
   for (i = 0; i < args; i++)
     {
       int r;
+
       oplen = arglens[i];
       inend += oplen;
       r = prefixify_subexp (inexpr, outexpr, inend, outbeg);
@@ -1064,6 +1069,7 @@ parse_exp_in_context (char **stringptr, struct block *block, int comma,
 {
   volatile struct gdb_exception except;
   struct cleanup *old_chain;
+  const struct language_defn *lang = NULL;
   int subexp;
 
   lexptr = *stringptr;
@@ -1101,17 +1107,43 @@ parse_exp_in_context (char **stringptr, struct block *block, int comma,
 	expression_context_pc = BLOCK_START (expression_context_block);
     }
 
+  if (language_mode == language_mode_auto && block != NULL)
+    {
+      /* Find the language associated to the given context block.
+         Default to the current language if it can not be determined.
+
+         Note that using the language corresponding to the current frame
+         can sometimes give unexpected results.  For instance, this
+         routine is often called several times during the inferior
+         startup phase to re-parse breakpoint expressions after
+         a new shared library has been loaded.  The language associated
+         to the current frame at this moment is not relevant for
+         the breakpoint. Using it would therefore be silly, so it seems
+         better to rely on the current language rather than relying on
+         the current frame language to parse the expression. That's why
+         we do the following language detection only if the context block
+         has been specifically provided.  */
+      struct symbol *func = block_linkage_function (block);
+
+      if (func != NULL)
+        lang = language_def (SYMBOL_LANGUAGE (func));
+      if (lang == NULL || lang->la_language == language_unknown)
+        lang = current_language;
+    }
+  else
+    lang = current_language;
+
   expout_size = 10;
   expout_ptr = 0;
   expout = (struct expression *)
     xmalloc (sizeof (struct expression) + EXP_ELEM_TO_BYTES (expout_size));
-  expout->language_defn = current_language;
+  expout->language_defn = lang;
   expout->gdbarch = get_current_arch ();
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      if (current_language->la_parser ())
-	current_language->la_error (NULL);
+      if (lang->la_parser ())
+        lang->la_error (NULL);
     }
   if (except.reason < 0)
     {
@@ -1144,7 +1176,7 @@ parse_exp_in_context (char **stringptr, struct block *block, int comma,
   if (out_subexp)
     *out_subexp = subexp;
 
-  current_language->la_post_parser (&expout, void_context_p);
+  lang->la_post_parser (&expout, void_context_p);
 
   if (expressiondebug)
     dump_prefix_expression (expout, gdb_stdlog);
@@ -1160,6 +1192,7 @@ struct expression *
 parse_expression (char *string)
 {
   struct expression *exp;
+
   exp = parse_exp_1 (&string, 0, 0);
   if (*string)
     error (_("Junk after end of expression."));
@@ -1363,6 +1396,7 @@ void
 parser_fprintf (FILE *x, const char *y, ...)
 { 
   va_list args;
+
   va_start (args, y);
   if (x == stderr)
     vfprintf_unfiltered (gdb_stderr, y, args); 
@@ -1403,10 +1437,27 @@ operator_check_standard (struct expression *exp, int pos,
     case OP_SCOPE:
     case OP_TYPE:
     case UNOP_CAST:
+    case UNOP_DYNAMIC_CAST:
+    case UNOP_REINTERPRET_CAST:
     case UNOP_MAX:
     case UNOP_MEMVAL:
     case UNOP_MIN:
       type = elts[pos + 1].type;
+      break;
+
+    case TYPE_INSTANCE:
+      {
+	LONGEST arg, nargs = elts[pos + 1].longconst;
+
+	for (arg = 0; arg < nargs; arg++)
+	  {
+	    struct type *type = elts[pos + 2 + arg].type;
+	    struct objfile *objfile = TYPE_OBJFILE (type);
+
+	    if (objfile && objfile_func && (*objfile_func) (objfile, data))
+	      return 1;
+	  }
+      }
       break;
 
     case UNOP_MEMVAL_TLS:
@@ -1418,15 +1469,15 @@ operator_check_standard (struct expression *exp, int pos,
       {
 	const struct block *const block = elts[pos + 1].block;
 	const struct symbol *const symbol = elts[pos + 2].symbol;
-	const struct obj_section *const section = SYMBOL_OBJ_SECTION (symbol);
 
 	/* Check objfile where the variable itself is placed.
 	   SYMBOL_OBJ_SECTION (symbol) may be NULL.  */
-	if (objfile_func && (*objfile_func) (SYMBOL_SYMTAB (symbol)->objfile, data))
+	if (objfile_func
+	    && (*objfile_func) (SYMBOL_SYMTAB (symbol)->objfile, data))
 	  return 1;
 
 	/* Check objfile where is placed the code touching the variable.  */
-	objfile = block_objfile (block);
+	objfile = lookup_objfile_from_block (block);
 
 	type = SYMBOL_TYPE (symbol);
       }
@@ -1460,19 +1511,19 @@ exp_iterate (struct expression *exp,
 	     void *data)
 {
   int endpos;
-  const union exp_element *const elts = exp->elts;
 
   for (endpos = exp->nelts; endpos > 0; )
     {
       int pos, args, oplen = 0;
 
-      exp->language_defn->la_exp_desc->operator_length (exp, endpos,
-							&oplen, &args);
+      operator_length (exp, endpos, &oplen, &args);
       gdb_assert (oplen > 0);
 
       pos = endpos - oplen;
-      if (exp->language_defn->la_exp_desc->operator_check (exp, pos, type_func,
-							   objfile_func, data))
+      if (exp->language_defn->la_exp_desc->operator_check (exp, pos,
+							   type_func,
+							   objfile_func,
+							   data))
 	return 1;
 
       endpos = pos;
@@ -1488,16 +1539,22 @@ exp_uses_objfile_iter (struct objfile *exp_objfile, void *objfile_voidp)
 {
   struct objfile *objfile = objfile_voidp;
 
+  if (exp_objfile->separate_debug_objfile_backlink)
+    exp_objfile = exp_objfile->separate_debug_objfile_backlink;
+
   return exp_objfile == objfile;
 }
 
 /* Return 1 if EXP uses OBJFILE (and will become dangling when OBJFILE
-   is unloaded), otherwise return 0.  */
+   is unloaded), otherwise return 0.  OBJFILE must not be a separate debug info
+   file.  */
 
 int
 exp_uses_objfile (struct expression *exp, struct objfile *objfile)
 {
-  return exp_iterate (exp, NULL, exp_uses_objfile_iter, objfile);
+  gdb_assert (objfile->separate_debug_objfile_backlink == NULL);
+
+  return exp_iterate (exp, exp_uses_objfile_iter, objfile);
 }
 
 /* Helper for exp_types_mark_used.  */
@@ -1511,7 +1568,7 @@ exp_types_mark_used_iter (struct type *type, void *unused)
   return 0;
 }
 
-/* Call type_mark_used for any TYPE contained in EXP.  */
+/* Call type_mark_used for any type contained in EXP.  */
 
 void
 exp_types_mark_used (struct expression *exp)

@@ -25,7 +25,7 @@ extern int f_parse (void);
 
 extern void f_error (char *);	/* Defined in f-exp.y */
 
-extern void f_print_type (struct type *, char *, struct ui_file *, int,
+extern void f_print_type (struct type *, const char *, struct ui_file *, int,
 			  int);
 
 extern const char *f_object_address_data_valid_print_to_stream
@@ -34,6 +34,7 @@ extern void f_object_address_data_valid_or_error (struct type *type);
 
 extern int f_val_print (struct type *, const gdb_byte *, int, CORE_ADDR,
 			struct ui_file *, int,
+			const struct value *,
 			const struct value_print_options *);
 
 /* Language-specific data structures */
@@ -117,6 +118,7 @@ struct builtin_f_type
   struct type *builtin_logical;
   struct type *builtin_logical_s1;
   struct type *builtin_logical_s2;
+  struct type *builtin_logical_s8;
   struct type *builtin_real;
   struct type *builtin_real_s8;
   struct type *builtin_real_s16;

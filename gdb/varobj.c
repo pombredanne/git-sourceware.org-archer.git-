@@ -514,6 +514,7 @@ find_frame_addr_in_frame_chain (CORE_ADDR frame_addr)
 	 comparing it against our argument.  */
       CORE_ADDR frame_base = get_frame_base_address (frame);
       int addr_bit = gdbarch_addr_bit (get_frame_arch (frame));
+
       if (addr_bit < (sizeof (CORE_ADDR) * HOST_CHAR_BIT))
 	frame_base &= ((CORE_ADDR) 1 << addr_bit) - 1;
 
@@ -624,6 +625,7 @@ varobj_create (char *objname,
 	  /* Error getting the value.  Try to at least get the
 	     right type.  */
 	  struct value *type_only_value = evaluate_type (var->root->exp);
+
 	  var->type = value_type (type_only_value);
 	}
       else 
@@ -926,6 +928,7 @@ install_dynamic_child (struct varobj *var,
     {
       /* There's no child yet.  */
       struct varobj *child = varobj_add_child (var, name, value);
+
       if (new)
 	{
 	  VEC_safe_push (varobj_p, *new, child);
@@ -935,6 +938,7 @@ install_dynamic_child (struct varobj *var,
   else 
     {
       varobj_p existing = VEC_index (varobj_p, var->children, index);
+
       if (install_new_value (existing, value, 0))
 	{
 	  if (changed)
@@ -1070,6 +1074,7 @@ update_dynamic_varobj_children (struct varobj *var,
   if (i < VEC_length (varobj_p, var->children))
     {
       int j;
+
       *cchanged = 1;
       for (j = i; j < VEC_length (varobj_p, var->children); ++j)
 	varobj_delete (VEC_index (varobj_p, var->children, j), NULL, 0);
@@ -1118,7 +1123,6 @@ varobj_get_num_children (struct varobj *var)
 VEC (varobj_p)*
 varobj_list_children (struct varobj *var, int *from, int *to)
 {
-  struct varobj *child;
   char *name;
   int i, children_changed;
 
@@ -1174,6 +1178,7 @@ varobj_add_child (struct varobj *var, const char *name, struct value *value)
   varobj_p v = create_child_with_value (var, 
 					VEC_length (varobj_p, var->children), 
 					name, value);
+
   VEC_safe_push (varobj_p, var->children, v);
   return v;
 }
@@ -1265,8 +1270,6 @@ int
 varobj_set_value (struct varobj *var, char *expression)
 {
   struct value *val;
-  int offset = 0;
-  int error = 0;
 
   /* The argument "expression" contains the variable's new value.
      We need to first construct a legal expression for this -- ugh! */
@@ -1275,7 +1278,6 @@ varobj_set_value (struct varobj *var, char *expression)
   struct value *value;
   int saved_input_radix = input_radix;
   char *s = expression;
-  int i;
 
   gdb_assert (varobj_editable_p (var));
 
@@ -1415,7 +1417,6 @@ install_new_value_visualizer (struct varobj *var)
   if (var->constructor != Py_None && var->value)
     {
       struct cleanup *cleanup;
-      PyObject *pretty_printer = NULL;
 
       cleanup = varobj_ensure_python_env (var);
 
@@ -1493,6 +1494,7 @@ install_new_value (struct varobj *var, struct value *value, int initial)
     {
       struct varobj *parent = var->parent;
       int frozen = var->frozen;
+
       for (; !frozen && parent; parent = parent->parent)
 	frozen |= parent->frozen;
 
@@ -1595,7 +1597,10 @@ install_new_value (struct varobj *var, struct value *value, int initial)
     {
       xfree (print_value);
       print_value = value_get_print_value (var->value, var->format, var);
-      if (!var->print_value || strcmp (var->print_value, print_value) != 0)
+      if ((var->print_value == NULL && print_value != NULL)
+	  || (var->print_value != NULL && print_value == NULL)
+	  || (var->print_value != NULL && print_value != NULL
+	      && strcmp (var->print_value, print_value) != 0))
 	changed = 1;
     }
   if (var->print_value)
@@ -1632,8 +1637,8 @@ void
 varobj_set_visualizer (struct varobj *var, const char *visualizer)
 {
 #if HAVE_PYTHON
-  PyObject *mainmod, *globals, *pretty_printer, *constructor;
-  struct cleanup *back_to, *value;
+  PyObject *mainmod, *globals, *constructor;
+  struct cleanup *back_to;
 
   back_to = varobj_ensure_python_env (var);
 
@@ -1683,14 +1688,9 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
   int changed = 0;
   int type_changed = 0;
   int i;
-  int vleft;
-  struct varobj *v;
-  struct varobj **cv;
-  struct varobj **templist = NULL;
   struct value *new;
   VEC (varobj_update_result) *stack = NULL;
   VEC (varobj_update_result) *result = NULL;
-  struct frame_info *fi;
 
   /* Frozen means frozen -- we don't check for any change in
      this varobj, including its going out of scope, or
@@ -1702,7 +1702,9 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
 
   if (!(*varp)->root->is_valid)
     {
-      varobj_update_result r = {*varp};
+      varobj_update_result r = {0};
+
+      r.varobj = *varp;
       r.status = VAROBJ_INVALID;
       VEC_safe_push (varobj_update_result, result, &r);
       return result;
@@ -1710,7 +1712,9 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
 
   if ((*varp)->root->rootvar == *varp)
     {
-      varobj_update_result r = {*varp};
+      varobj_update_result r = {0};
+
+      r.varobj = *varp;
       r.status = VAROBJ_IN_SCOPE;
 
       /* Update the root variable. value_of_root can return NULL
@@ -1740,7 +1744,9 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
     }
   else
     {
-      varobj_update_result r = {*varp};
+      varobj_update_result r = {0};
+
+      r.varobj = *varp;
       VEC_safe_push (varobj_update_result, stack, &r);
     }
 
@@ -1817,7 +1823,9 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
 	      for (i = VEC_length (varobj_p, changed) - 1; i >= 0; --i)
 		{
 		  varobj_p tmp = VEC_index (varobj_p, changed, i);
-		  varobj_update_result r = {tmp};
+		  varobj_update_result r = {0};
+
+		  r.varobj = tmp;
 		  r.changed = 1;
 		  r.value_installed = 1;
 		  VEC_safe_push (varobj_update_result, stack, &r);
@@ -1825,9 +1833,12 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
 	      for (i = VEC_length (varobj_p, unchanged) - 1; i >= 0; --i)
 	      	{
 		  varobj_p tmp = VEC_index (varobj_p, unchanged, i);
+
 	      	  if (!tmp->frozen)
 	      	    {
-	      	      varobj_update_result r = {tmp};
+	      	      varobj_update_result r = {0};
+
+		      r.varobj = tmp;
 	      	      r.value_installed = 1;
 	      	      VEC_safe_push (varobj_update_result, stack, &r);
 	      	    }
@@ -1851,10 +1862,13 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
       for (i = VEC_length (varobj_p, v->children)-1; i >= 0; --i)
 	{
 	  varobj_p c = VEC_index (varobj_p, v->children, i);
+
 	  /* Child may be NULL if explicitly deleted by -var-delete.  */
 	  if (c != NULL && !c->frozen)
 	    {
-	      varobj_update_result r = {c};
+	      varobj_update_result r = {0};
+
+	      r.varobj = c;
 	      VEC_safe_push (varobj_update_result, stack, &r);
 	    }
 	}
@@ -1902,6 +1916,7 @@ delete_variable_1 (struct cpstack **resultp, int *delcountp,
   for (i = 0; i < VEC_length (varobj_p, var->children); ++i)
     {   
       varobj_p child = VEC_index (varobj_p, var->children, i);
+
       if (!child)
 	continue;
       if (!remove_from_parent_p)
@@ -2142,6 +2157,7 @@ static struct varobj *
 new_root_variable (void)
 {
   struct varobj *var = new_variable ();
+
   var->root = (struct varobj_root *) xmalloc (sizeof (struct varobj_root));;
   var->root->lang = NULL;
   var->root->exp = NULL;
@@ -2207,8 +2223,8 @@ static struct type *
 get_type (struct varobj *var)
 {
   struct type *type;
-  type = var->type;
 
+  type = var->type;
   if (type != NULL)
     type = check_typedef (type);
 
@@ -2403,6 +2419,7 @@ value_of_root (struct varobj **var_handle, int *type_changed)
 	     correct in other frames, so update the expression.  */
 
          struct expression *tmp_exp = var->root->exp;
+
          var->root->exp = tmp_var->root->exp;
          tmp_var->root->exp = tmp_exp;
 
@@ -2515,9 +2532,11 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
 		  {
 		    PyObject *py_str
 		      = python_string_to_target_python_string (output);
+
 		    if (py_str)
 		      {
 			char *s = PyString_AsString (py_str);
+
 			len = PyString_Size (py_str);
 			thevalue = xmemdup (s, len + 1, len + 1);
 			type = builtin_type (gdbarch)->builtin_char;
@@ -2564,7 +2583,6 @@ int
 varobj_editable_p (struct varobj *var)
 {
   struct type *type;
-  struct value *value;
 
   if (!(var->root->is_valid && var->value && VALUE_LVAL (var->value)))
     return 0;
@@ -2675,7 +2693,8 @@ adjust_value_for_child_access (struct value **value,
 	{
 	  if (value && *value)
 	    {
-	      int success = gdb_value_ind (*value, value);	  
+	      int success = gdb_value_ind (*value, value);
+
 	      if (!success)
 		*value = NULL;
 	    }
@@ -2758,8 +2777,8 @@ value_struct_element_index (struct value *value, int type_index)
 {
   struct value *result = NULL;
   volatile struct gdb_exception e;
-
   struct type *type = value_type (value);
+
   type = check_typedef (type);
 
   gdb_assert (TYPE_CODE (type) == TYPE_CODE_STRUCT
@@ -2826,6 +2845,7 @@ c_describe_child (struct varobj *parent, int index,
       if (cvalue && value)
 	{
 	  int real_index = index + TYPE_LOW_BOUND (TYPE_INDEX_TYPE (type));
+
 	  gdb_value_subscript (value, real_index, cvalue);
 	}
 
@@ -2859,6 +2879,7 @@ c_describe_child (struct varobj *parent, int index,
       if (cfull_expression)
 	{
 	  char *join = was_ptr ? "->" : ".";
+
 	  *cfull_expression = xstrprintf ("(%s)%s%s", parent_expression, join,
 					  TYPE_FIELD_NAME (type, index));
 	}
@@ -2872,6 +2893,7 @@ c_describe_child (struct varobj *parent, int index,
       if (cvalue && value)
 	{
 	  int success = gdb_value_ind (value, cvalue);
+
 	  if (!success)
 	    *cvalue = NULL;
 	}
@@ -2901,6 +2923,7 @@ static char *
 c_name_of_child (struct varobj *parent, int index)
 {
   char *name;
+
   c_describe_child (parent, index, &name, NULL, NULL, NULL);
   return name;
 }
@@ -2927,6 +2950,7 @@ check_scope (struct varobj *var)
   if (fi)
     {
       CORE_ADDR pc = get_frame_pc (fi);
+
       if (pc <  BLOCK_START (var->root->valid_block) ||
 	  pc >= BLOCK_END (var->root->valid_block))
 	scope = 0;
@@ -2941,7 +2965,6 @@ c_value_of_root (struct varobj **var_handle)
 {
   struct value *new_val = NULL;
   struct varobj *var = *var_handle;
-  struct frame_info *fi;
   int within_scope = 0;
   struct cleanup *back_to;
 								 
@@ -2990,8 +3013,8 @@ static struct value *
 c_value_of_child (struct varobj *parent, int index)
 {
   struct value *value = NULL;
-  c_describe_child (parent, index, NULL, &value, NULL, NULL);
 
+  c_describe_child (parent, index, NULL, &value, NULL, NULL);
   return value;
 }
 
@@ -2999,6 +3022,7 @@ static struct type *
 c_type_of_child (struct varobj *parent, int index)
 {
   struct type *type = NULL;
+
   c_describe_child (parent, index, NULL, NULL, &type, NULL);
   return type;
 }
@@ -3030,6 +3054,7 @@ c_value_of_variable (struct varobj *var, enum varobj_display_formats format)
     case TYPE_CODE_ARRAY:
       {
 	char *number;
+
 	number = xstrprintf ("[%d]", var->num_children);
 	return (number);
       }
@@ -3187,7 +3212,6 @@ cplus_describe_child (struct varobj *parent, int index,
 		      char **cname, struct value **cvalue, struct type **ctype,
 		      char **cfull_expression)
 {
-  char *name = NULL;
   struct value *value;
   struct type *type;
   int was_ptr;
@@ -3223,6 +3247,7 @@ cplus_describe_child (struct varobj *parent, int index,
       || TYPE_CODE (type) == TYPE_CODE_UNION)
     {
       char *join = was_ptr ? "->" : ".";
+
       if (CPLUS_FAKE_CHILD (parent))
 	{
 	  /* The fields of the class type are ordered as they
@@ -3284,6 +3309,7 @@ cplus_describe_child (struct varobj *parent, int index,
 	  if (cfull_expression)
 	    {
 	      char *ptr = was_ptr ? "*" : "";
+
 	      /* Cast the parent to the base' type. Note that in gdb,
 		 expression like 
 		         (Base1)d
@@ -3302,6 +3328,7 @@ cplus_describe_child (struct varobj *parent, int index,
 	{
 	  char *access = NULL;
 	  int children[3];
+
 	  cplus_class_num_children (type, children);
 
 	  /* Everything beyond the baseclasses can
@@ -3357,6 +3384,7 @@ static char *
 cplus_name_of_child (struct varobj *parent, int index)
 {
   char *name = NULL;
+
   cplus_describe_child (parent, index, &name, NULL, NULL, NULL);
   return name;
 }
@@ -3379,6 +3407,7 @@ static struct value *
 cplus_value_of_child (struct varobj *parent, int index)
 {
   struct value *value = NULL;
+
   cplus_describe_child (parent, index, NULL, &value, NULL, NULL);
   return value;
 }
@@ -3387,12 +3416,14 @@ static struct type *
 cplus_type_of_child (struct varobj *parent, int index)
 {
   struct type *type = NULL;
+
   cplus_describe_child (parent, index, NULL, NULL, &type, NULL);
   return type;
 }
 
 static char *
-cplus_value_of_variable (struct varobj *var, enum varobj_display_formats format)
+cplus_value_of_variable (struct varobj *var, 
+			 enum varobj_display_formats format)
 {
 
   /* If we have one of our special types, don't print out

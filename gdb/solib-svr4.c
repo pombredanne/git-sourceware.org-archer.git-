@@ -243,12 +243,10 @@ LM_ADDR_CHECK (struct so_list *so, bfd *abfd)
 	      l_addr = l_dynaddr - dynaddr;
 
 	      if (info_verbose)
-		{
-		  warning (_(".dynamic section for \"%s\" "
-			     "is not at the expected address"), so->so_name);
-		  warning (_("difference appears to be caused by prelink, "
-			     "adjusting expectations"));
-		}
+		printf_unfiltered (_("Using PIC (Position Independent Code) "
+				     "prelink displacement %s for \"%s\".\n"),
+				   paddress (target_gdbarch, l_addr),
+				   so->so_name);
 	    }
 	  else
 	    warning (_(".dynamic section for \"%s\" "
@@ -274,6 +272,16 @@ LM_NEXT (struct so_list *so)
 }
 
 static CORE_ADDR
+LM_PREV (struct so_list *so)
+{
+  struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
+  struct type *ptr_type = builtin_type (target_gdbarch)->builtin_data_ptr;
+
+  return extract_typed_address (so->lm_info->lm + lmo->l_prev_offset,
+				ptr_type);
+}
+
+static CORE_ADDR
 LM_NAME (struct so_list *so)
 {
   struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
@@ -286,16 +294,12 @@ LM_NAME (struct so_list *so)
 static int
 IGNORE_FIRST_LINK_MAP_ENTRY (struct so_list *so)
 {
-  struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
-  struct type *ptr_type = builtin_type (target_gdbarch)->builtin_data_ptr;
-
   /* Assume that everything is a library if the dynamic loader was loaded
      late by a static executable.  */
   if (exec_bfd && bfd_get_section_by_name (exec_bfd, ".dynamic") == NULL)
     return 0;
 
-  return extract_typed_address (so->lm_info->lm + lmo->l_prev_offset,
-				ptr_type) == 0;
+  return LM_PREV (so) == 0;
 }
 
 /* Per pspace SVR4 specific data.  */
@@ -451,6 +455,9 @@ bfd_lookup_symbol (bfd *abfd, char *symname)
 /* Read program header TYPE from inferior memory.  The header is found
    by scanning the OS auxillary vector.
 
+   If TYPE == -1, return the program headers instead of the contents of
+   one program header.
+
    Return a pointer to allocated memory holding the program header contents,
    or NULL on failure.  If sucessful, and unless P_SECT_SIZE is NULL, the
    size of those contents is returned to P_SECT_SIZE.  Likewise, the target
@@ -483,8 +490,13 @@ read_program_header (int type, int *p_sect_size, int *p_arch_size)
   else
     return 0;
 
-  /* Find .dynamic section via the PT_DYNAMIC PHDR.  */
-  if (arch_size == 32)
+  /* Find the requested segment.  */
+  if (type == -1)
+    {
+      sect_addr = at_phdr;
+      sect_size = at_phent * at_phnum;
+    }
+  else if (arch_size == 32)
     {
       Elf32_External_Phdr phdr;
       int i;
@@ -569,7 +581,6 @@ find_program_interpreter (void)
      interp_sect = bfd_get_section_by_name (exec_bfd, ".interp");
      if (interp_sect != NULL)
       {
-	CORE_ADDR sect_addr = bfd_section_vma (exec_bfd, interp_sect);
 	int sect_size = bfd_section_size (exec_bfd, interp_sect);
 
 	buf = xmalloc (sect_size);
@@ -712,6 +723,7 @@ scan_dyntag_auxv (int dyntag, CORE_ADDR *ptr)
     if (arch_size == 32)
       {
 	Elf32_External_Dyn *dynp = (Elf32_External_Dyn *) buf;
+
 	dyn_tag = extract_unsigned_integer ((gdb_byte *) dynp->d_tag,
 					    4, byte_order);
 	dyn_ptr = extract_unsigned_integer ((gdb_byte *) dynp->d_un.d_ptr,
@@ -720,6 +732,7 @@ scan_dyntag_auxv (int dyntag, CORE_ADDR *ptr)
     else
       {
 	Elf64_External_Dyn *dynp = (Elf64_External_Dyn *) buf;
+
 	dyn_tag = extract_unsigned_integer ((gdb_byte *) dynp->d_tag,
 					    8, byte_order);
 	dyn_ptr = extract_unsigned_integer ((gdb_byte *) dynp->d_un.d_ptr,
@@ -782,6 +795,7 @@ elf_locate_base (void)
       struct type *ptr_type = builtin_type (target_gdbarch)->builtin_data_ptr;
       gdb_byte *pbuf;
       int pbuf_size = TYPE_LENGTH (ptr_type);
+
       pbuf = alloca (pbuf_size);
       /* DT_MIPS_RLD_MAP contains a pointer to the address
 	 of the dynamic link structure.  */
@@ -857,7 +871,8 @@ locate_base (struct svr4_info *info)
 }
 
 /* Find the first element in the inferior's dynamic link map, and
-   return its address in the inferior.
+   return its address in the inferior.  Return zero if the address
+   could not be determined.
 
    FIXME: Perhaps we should validate the info somehow, perhaps by
    checking r_version for a known version number, or r_state for
@@ -868,9 +883,16 @@ solib_svr4_r_map (struct svr4_info *info)
 {
   struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
   struct type *ptr_type = builtin_type (target_gdbarch)->builtin_data_ptr;
+  CORE_ADDR addr = 0;
+  volatile struct gdb_exception ex;
 
-  return read_memory_typed_address (info->debug_base + lmo->r_map_offset,
-				    ptr_type);
+  TRY_CATCH (ex, RETURN_MASK_ERROR)
+    {
+      addr = read_memory_typed_address (info->debug_base + lmo->r_map_offset,
+                                        ptr_type);
+    }
+  exception_print (gdb_stderr, ex);
+  return addr;
 }
 
 /* Find r_brk from the inferior's debug base.  */
@@ -1088,7 +1110,7 @@ svr4_default_sos (void)
 static struct so_list *
 svr4_current_sos (void)
 {
-  CORE_ADDR lm;
+  CORE_ADDR lm, prev_lm;
   struct so_list *head = 0;
   struct so_list **link_ptr = &head;
   CORE_ADDR ldsomap = 0;
@@ -1107,6 +1129,7 @@ svr4_current_sos (void)
 
   /* Walk the inferior's link map list, and build our list of
      `struct so_list' nodes.  */
+  prev_lm = 0;
   lm = solib_svr4_r_map (info);
 
   while (lm)
@@ -1114,6 +1137,7 @@ svr4_current_sos (void)
       struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
       struct so_list *new = XZALLOC (struct so_list);
       struct cleanup *old_chain = make_cleanup (xfree, new);
+      CORE_ADDR next_lm;
 
       new->lm_info = xmalloc (sizeof (struct lm_info));
       make_cleanup (xfree, new->lm_info);
@@ -1125,14 +1149,21 @@ svr4_current_sos (void)
 
       read_memory (lm, new->lm_info->lm, lmo->link_map_size);
 
-      lm = LM_NEXT (new);
+      next_lm = LM_NEXT (new);
+
+      if (LM_PREV (new) != prev_lm)
+	{
+	  warning (_("Corrupted shared library list"));
+	  free_so (new);
+	  next_lm = 0;
+	}
 
       /* For SVR4 versions, the first entry in the link map is for the
          inferior executable, so we must ignore it.  For some versions of
          SVR4, it has no name.  For others (Solaris 2.3 for example), it
          does have a name, so we can no longer use a missing name to
          decide when to ignore it. */
-      if (IGNORE_FIRST_LINK_MAP_ENTRY (new) && ldsomap == 0)
+      else if (IGNORE_FIRST_LINK_MAP_ENTRY (new) && ldsomap == 0)
 	{
 	  info->main_lm_addr = new->lm_info->lm_addr;
 	  free_so (new);
@@ -1169,12 +1200,18 @@ svr4_current_sos (void)
 	    }
 	}
 
+      prev_lm = lm;
+      lm = next_lm;
+
       /* On Solaris, the dynamic linker is not in the normal list of
 	 shared objects, so make sure we pick it up too.  Having
 	 symbol information for the dynamic linker is quite crucial
 	 for skipping dynamic linker resolver code.  */
       if (lm == 0 && ldsomap == 0)
-	lm = ldsomap = solib_svr4_r_ldsomap (info);
+	{
+	  lm = ldsomap = solib_svr4_r_ldsomap (info);
+	  prev_lm = 0;
+	}
 
       discard_cleanups (old_chain);
     }
@@ -1314,10 +1351,6 @@ enable_break (struct svr4_info *info, int from_tty)
   asection *interp_sect;
   gdb_byte *interp_name;
   CORE_ADDR sym_addr;
-
-  /* First, remove all the solib event breakpoints.  Their addresses
-     may have changed since the last time we ran the program.  */
-  remove_solib_event_breakpoints ();
 
   info->interp_text_sect_low = info->interp_text_sect_high = 0;
   info->interp_plt_sect_low = info->interp_plt_sect_high = 0;
@@ -1489,6 +1522,7 @@ enable_break (struct svr4_info *info, int from_tty)
 	{
 	  struct regcache *regcache
 	    = get_thread_arch_regcache (inferior_ptid, target_gdbarch);
+
 	  load_addr = (regcache_read_pc (regcache)
 		       - exec_entry_point (tmp_bfd, tmp_bfd_target));
 	}
@@ -1619,61 +1653,38 @@ enable_break (struct svr4_info *info, int from_tty)
 static void
 svr4_special_symbol_handling (void)
 {
-  svr4_relocate_main_executable ();
 }
 
-/* Decide if the objfile needs to be relocated.  As indicated above,
-   we will only be here when execution is stopped at the beginning
-   of the program.  Relocation is necessary if the address at which
-   we are presently stopped differs from the start address stored in
-   the executable AND there's no interpreter section.  The condition
-   regarding the interpreter section is very important because if
-   there *is* an interpreter section, execution will begin there
-   instead.  When there is an interpreter section, the start address
-   is (presumably) used by the interpreter at some point to start
-   execution of the program.
+/* Read the ELF program headers from ABFD.  Return the contents and
+   set *PHDRS_SIZE to the size of the program headers.  */
 
-   If there is an interpreter, it is normal for it to be set to an
-   arbitrary address at the outset.  The job of finding it is
-   handled in enable_break().
-
-   So, to summarize, relocations are necessary when there is no
-   interpreter section and the start address obtained from the
-   executable is different from the address at which GDB is
-   currently stopped.
-   
-   [ The astute reader will note that we also test to make sure that
-     the executable in question has the DYNAMIC flag set.  It is my
-     opinion that this test is unnecessary (undesirable even).  It
-     was added to avoid inadvertent relocation of an executable
-     whose e_type member in the ELF header is not ET_DYN.  There may
-     be a time in the future when it is desirable to do relocations
-     on other types of files as well in which case this condition
-     should either be removed or modified to accomodate the new file
-     type.  (E.g, an ET_EXEC executable which has been built to be
-     position-independent could safely be relocated by the OS if
-     desired.  It is true that this violates the ABI, but the ABI
-     has been known to be bent from time to time.)  - Kevin, Nov 2000. ]
-   */
-
-static CORE_ADDR
-svr4_static_exec_displacement (void)
+static gdb_byte *
+read_program_headers_from_bfd (bfd *abfd, int *phdrs_size)
 {
-  asection *interp_sect;
-  struct regcache *regcache
-    = get_thread_arch_regcache (inferior_ptid, target_gdbarch);
-  CORE_ADDR pc = regcache_read_pc (regcache);
+  Elf_Internal_Ehdr *ehdr;
+  gdb_byte *buf;
 
-  interp_sect = bfd_get_section_by_name (exec_bfd, ".interp");
-  if (interp_sect == NULL 
-      && (bfd_get_file_flags (exec_bfd) & DYNAMIC) != 0
-      && (exec_entry_point (exec_bfd, &exec_ops) != pc))
-    return pc - exec_entry_point (exec_bfd, &exec_ops);
+  ehdr = elf_elfheader (abfd);
 
-  return 0;
+  *phdrs_size = ehdr->e_phnum * ehdr->e_phentsize;
+  if (*phdrs_size == 0)
+    return NULL;
+
+  buf = xmalloc (*phdrs_size);
+  if (bfd_seek (abfd, ehdr->e_phoff, SEEK_SET) != 0
+      || bfd_bread (buf, *phdrs_size, abfd) != *phdrs_size)
+    {
+      xfree (buf);
+      return NULL;
+    }
+
+  return buf;
 }
 
-/* We relocate all of the sections by the same amount.  This
+/* Return 1 and fill *DISPLACEMENTP with detected PIE offset of inferior
+   exec_bfd.  Otherwise return 0.
+
+   We relocate all of the sections by the same amount.  This
    behavior is mandated by recent editions of the System V ABI. 
    According to the System V Application Binary Interface,
    Edition 4.1, page 5-5:
@@ -1692,23 +1703,280 @@ svr4_static_exec_displacement (void)
      memory image of the program during dynamic linking.
 
    The same language also appears in Edition 4.0 of the System V
-   ABI and is left unspecified in some of the earlier editions.  */
+   ABI and is left unspecified in some of the earlier editions.
 
-static CORE_ADDR
-svr4_exec_displacement (void)
+   Decide if the objfile needs to be relocated.  As indicated above, we will
+   only be here when execution is stopped.  But during attachment PC can be at
+   arbitrary address therefore regcache_read_pc can be misleading (contrary to
+   the auxv AT_ENTRY value).  Moreover for executable with interpreter section
+   regcache_read_pc would point to the interpreter and not the main executable.
+
+   So, to summarize, relocations are necessary when the start address obtained
+   from the executable is different from the address in auxv AT_ENTRY entry.
+   
+   [ The astute reader will note that we also test to make sure that
+     the executable in question has the DYNAMIC flag set.  It is my
+     opinion that this test is unnecessary (undesirable even).  It
+     was added to avoid inadvertent relocation of an executable
+     whose e_type member in the ELF header is not ET_DYN.  There may
+     be a time in the future when it is desirable to do relocations
+     on other types of files as well in which case this condition
+     should either be removed or modified to accomodate the new file
+     type.  - Kevin, Nov 2000. ]  */
+
+static int
+svr4_exec_displacement (CORE_ADDR *displacementp)
 {
-  int found;
   /* ENTRY_POINT is a possible function descriptor - before
      a call to gdbarch_convert_from_func_ptr_addr.  */
-  CORE_ADDR entry_point;
+  CORE_ADDR entry_point, displacement;
 
   if (exec_bfd == NULL)
     return 0;
 
-  if (target_auxv_search (&current_target, AT_ENTRY, &entry_point) == 1)
-    return entry_point - bfd_get_start_address (exec_bfd);
+  /* Therefore for ELF it is ET_EXEC and not ET_DYN.  Both shared libraries
+     being executed themselves and PIE (Position Independent Executable)
+     executables are ET_DYN.  */
 
-  return svr4_static_exec_displacement ();
+  if ((bfd_get_file_flags (exec_bfd) & DYNAMIC) == 0)
+    return 0;
+
+  if (target_auxv_search (&current_target, AT_ENTRY, &entry_point) <= 0)
+    return 0;
+
+  displacement = entry_point - bfd_get_start_address (exec_bfd);
+
+  /* Verify the DISPLACEMENT candidate complies with the required page
+     alignment.  It is cheaper than the program headers comparison below.  */
+
+  if (bfd_get_flavour (exec_bfd) == bfd_target_elf_flavour)
+    {
+      const struct elf_backend_data *elf = get_elf_backend_data (exec_bfd);
+
+      /* p_align of PT_LOAD segments does not specify any alignment but
+	 only congruency of addresses:
+	   p_offset % p_align == p_vaddr % p_align
+	 Kernel is free to load the executable with lower alignment.  */
+
+      if ((displacement & (elf->minpagesize - 1)) != 0)
+	return 0;
+    }
+
+  /* Verify that the auxilliary vector describes the same file as exec_bfd, by
+     comparing their program headers.  If the program headers in the auxilliary
+     vector do not match the program headers in the executable, then we are
+     looking at a different file than the one used by the kernel - for
+     instance, "gdb program" connected to "gdbserver :PORT ld.so program".  */
+
+  if (bfd_get_flavour (exec_bfd) == bfd_target_elf_flavour)
+    {
+      /* Be optimistic and clear OK only if GDB was able to verify the headers
+	 really do not match.  */
+      int phdrs_size, phdrs2_size, ok = 1;
+      gdb_byte *buf, *buf2;
+      int arch_size;
+
+      buf = read_program_header (-1, &phdrs_size, &arch_size);
+      buf2 = read_program_headers_from_bfd (exec_bfd, &phdrs2_size);
+      if (buf != NULL && buf2 != NULL)
+	{
+	  enum bfd_endian byte_order = gdbarch_byte_order (target_gdbarch);
+
+	  /* We are dealing with three different addresses.  EXEC_BFD
+	     represents current address in on-disk file.  target memory content
+	     may be different from EXEC_BFD as the file may have been prelinked
+	     to a different address after the executable has been loaded.
+	     Moreover the address of placement in target memory can be
+	     different from what the program headers in target memory say - this
+	     is the goal of PIE.
+
+	     Detected DISPLACEMENT covers both the offsets of PIE placement and
+	     possible new prelink performed after start of the program.  Here
+	     relocate BUF and BUF2 just by the EXEC_BFD vs. target memory
+	     content offset for the verification purpose.  */
+
+	  if (phdrs_size != phdrs2_size
+	      || bfd_get_arch_size (exec_bfd) != arch_size)
+	    ok = 0;
+	  else if (arch_size == 32 && phdrs_size >= sizeof (Elf32_External_Phdr)
+	           && phdrs_size % sizeof (Elf32_External_Phdr) == 0)
+	    {
+	      Elf_Internal_Ehdr *ehdr2 = elf_tdata (exec_bfd)->elf_header;
+	      Elf_Internal_Phdr *phdr2 = elf_tdata (exec_bfd)->phdr;
+	      CORE_ADDR displacement = 0;
+	      int i;
+
+	      /* DISPLACEMENT could be found more easily by the difference of
+		 ehdr2->e_entry.  But we haven't read the ehdr yet, and we
+		 already have enough information to compute that displacement
+		 with what we've read.  */
+
+	      for (i = 0; i < ehdr2->e_phnum; i++)
+		if (phdr2[i].p_type == PT_LOAD)
+		  {
+		    Elf32_External_Phdr *phdrp;
+		    gdb_byte *buf_vaddr_p, *buf_paddr_p;
+		    CORE_ADDR vaddr, paddr;
+		    CORE_ADDR displacement_vaddr = 0;
+		    CORE_ADDR displacement_paddr = 0;
+
+		    phdrp = &((Elf32_External_Phdr *) buf)[i];
+		    buf_vaddr_p = (gdb_byte *) &phdrp->p_vaddr;
+		    buf_paddr_p = (gdb_byte *) &phdrp->p_paddr;
+
+		    vaddr = extract_unsigned_integer (buf_vaddr_p, 4,
+						      byte_order);
+		    displacement_vaddr = vaddr - phdr2[i].p_vaddr;
+
+		    paddr = extract_unsigned_integer (buf_paddr_p, 4,
+						      byte_order);
+		    displacement_paddr = paddr - phdr2[i].p_paddr;
+
+		    if (displacement_vaddr == displacement_paddr)
+		      displacement = displacement_vaddr;
+
+		    break;
+		  }
+
+	      /* Now compare BUF and BUF2 with optional DISPLACEMENT.  */
+
+	      for (i = 0; i < phdrs_size / sizeof (Elf32_External_Phdr); i++)
+		{
+		  Elf32_External_Phdr *phdrp;
+		  Elf32_External_Phdr *phdr2p;
+		  gdb_byte *buf_vaddr_p, *buf_paddr_p;
+		  CORE_ADDR vaddr, paddr;
+
+		  phdrp = &((Elf32_External_Phdr *) buf)[i];
+		  buf_vaddr_p = (gdb_byte *) &phdrp->p_vaddr;
+		  buf_paddr_p = (gdb_byte *) &phdrp->p_paddr;
+		  phdr2p = &((Elf32_External_Phdr *) buf2)[i];
+
+		  /* PT_GNU_STACK is an exception by being never relocated by
+		     prelink as its addresses are always zero.  */
+
+		  if (memcmp (phdrp, phdr2p, sizeof (*phdrp)) == 0)
+		    continue;
+
+		  /* Check also other adjustment combinations - PR 11786.  */
+
+		  vaddr = extract_unsigned_integer (buf_vaddr_p, 4, byte_order);
+		  vaddr -= displacement;
+		  store_unsigned_integer (buf_vaddr_p, 4, byte_order, vaddr);
+
+		  paddr = extract_unsigned_integer (buf_paddr_p, 4, byte_order);
+		  paddr -= displacement;
+		  store_unsigned_integer (buf_paddr_p, 4, byte_order, paddr);
+
+		  if (memcmp (phdrp, phdr2p, sizeof (*phdrp)) == 0)
+		    continue;
+
+		  ok = 0;
+		  break;
+		}
+	    }
+	  else if (arch_size == 64 && phdrs_size >= sizeof (Elf64_External_Phdr)
+	           && phdrs_size % sizeof (Elf64_External_Phdr) == 0)
+	    {
+	      Elf_Internal_Ehdr *ehdr2 = elf_tdata (exec_bfd)->elf_header;
+	      Elf_Internal_Phdr *phdr2 = elf_tdata (exec_bfd)->phdr;
+	      CORE_ADDR displacement = 0;
+	      int i;
+
+	      /* DISPLACEMENT could be found more easily by the difference of
+		 ehdr2->e_entry.  But we haven't read the ehdr yet, and we
+		 already have enough information to compute that displacement
+		 with what we've read.  */
+
+	      for (i = 0; i < ehdr2->e_phnum; i++)
+		if (phdr2[i].p_type == PT_LOAD)
+		  {
+		    Elf64_External_Phdr *phdrp;
+		    gdb_byte *buf_vaddr_p, *buf_paddr_p;
+		    CORE_ADDR vaddr, paddr;
+		    CORE_ADDR displacement_vaddr = 0;
+		    CORE_ADDR displacement_paddr = 0;
+
+		    phdrp = &((Elf64_External_Phdr *) buf)[i];
+		    buf_vaddr_p = (gdb_byte *) &phdrp->p_vaddr;
+		    buf_paddr_p = (gdb_byte *) &phdrp->p_paddr;
+
+		    vaddr = extract_unsigned_integer (buf_vaddr_p, 8,
+						      byte_order);
+		    displacement_vaddr = vaddr - phdr2[i].p_vaddr;
+
+		    paddr = extract_unsigned_integer (buf_paddr_p, 8,
+						      byte_order);
+		    displacement_paddr = paddr - phdr2[i].p_paddr;
+
+		    if (displacement_vaddr == displacement_paddr)
+		      displacement = displacement_vaddr;
+
+		    break;
+		  }
+
+	      /* Now compare BUF and BUF2 with optional DISPLACEMENT.  */
+
+	      for (i = 0; i < phdrs_size / sizeof (Elf64_External_Phdr); i++)
+		{
+		  Elf64_External_Phdr *phdrp;
+		  Elf64_External_Phdr *phdr2p;
+		  gdb_byte *buf_vaddr_p, *buf_paddr_p;
+		  CORE_ADDR vaddr, paddr;
+
+		  phdrp = &((Elf64_External_Phdr *) buf)[i];
+		  buf_vaddr_p = (gdb_byte *) &phdrp->p_vaddr;
+		  buf_paddr_p = (gdb_byte *) &phdrp->p_paddr;
+		  phdr2p = &((Elf64_External_Phdr *) buf2)[i];
+
+		  /* PT_GNU_STACK is an exception by being never relocated by
+		     prelink as its addresses are always zero.  */
+
+		  if (memcmp (phdrp, phdr2p, sizeof (*phdrp)) == 0)
+		    continue;
+
+		  /* Check also other adjustment combinations - PR 11786.  */
+
+		  vaddr = extract_unsigned_integer (buf_vaddr_p, 8, byte_order);
+		  vaddr -= displacement;
+		  store_unsigned_integer (buf_vaddr_p, 8, byte_order, vaddr);
+
+		  paddr = extract_unsigned_integer (buf_paddr_p, 8, byte_order);
+		  paddr -= displacement;
+		  store_unsigned_integer (buf_paddr_p, 8, byte_order, paddr);
+
+		  if (memcmp (phdrp, phdr2p, sizeof (*phdrp)) == 0)
+		    continue;
+
+		  ok = 0;
+		  break;
+		}
+	    }
+	  else
+	    ok = 0;
+	}
+
+      xfree (buf);
+      xfree (buf2);
+
+      if (!ok)
+	return 0;
+    }
+
+  if (info_verbose)
+    {
+      /* It can be printed repeatedly as there is no easy way to check
+	 the executable symbols/file has been already relocated to
+	 displacement.  */
+
+      printf_unfiltered (_("Using PIE (Position Independent Executable) "
+			   "displacement %s for \"%s\".\n"),
+			 paddress (target_gdbarch, displacement),
+			 bfd_get_filename (exec_bfd));
+    }
+
+  *displacementp = displacement;
+  return 1;
 }
 
 /* Relocate the main executable.  This function should be called upon
@@ -1719,11 +1987,40 @@ svr4_exec_displacement (void)
 static void
 svr4_relocate_main_executable (void)
 {
-  CORE_ADDR displacement = svr4_exec_displacement ();
+  CORE_ADDR displacement;
 
-  /* Even if DISPLACEMENT is 0 still try to relocate it as this is a new
-     difference of in-memory vs. in-file addresses and we could already
-     relocate the executable at this function to improper address before.  */
+  /* If we are re-running this executable, SYMFILE_OBJFILE->SECTION_OFFSETS
+     probably contains the offsets computed using the PIE displacement
+     from the previous run, which of course are irrelevant for this run.
+     So we need to determine the new PIE displacement and recompute the
+     section offsets accordingly, even if SYMFILE_OBJFILE->SECTION_OFFSETS
+     already contains pre-computed offsets.
+
+     If we cannot compute the PIE displacement, either:
+
+       - The executable is not PIE.
+
+       - SYMFILE_OBJFILE does not match the executable started in the target.
+	 This can happen for main executable symbols loaded at the host while
+	 `ld.so --ld-args main-executable' is loaded in the target.
+
+     Then we leave the section offsets untouched and use them as is for
+     this run.  Either:
+
+       - These section offsets were properly reset earlier, and thus
+	 already contain the correct values.  This can happen for instance
+	 when reconnecting via the remote protocol to a target that supports
+	 the `qOffsets' packet.
+
+       - The section offsets were not reset earlier, and the best we can
+	 hope is that the old offsets are still applicable to the new run.
+   */
+
+  if (! svr4_exec_displacement (&displacement))
+    return;
+
+  /* Even DISPLACEMENT 0 is a valid new difference of in-memory vs. in-file
+     addresses.  */
 
   if (symfile_objfile)
     {
@@ -1804,15 +2101,16 @@ svr4_relocate_main_executable (void)
 static void
 svr4_solib_create_inferior_hook (int from_tty)
 {
+#if defined(_SCO_DS)
   struct inferior *inf;
   struct thread_info *tp;
+#endif /* defined(_SCO_DS) */
   struct svr4_info *info;
 
   info = get_svr4_info ();
 
   /* Relocate the main executable if necessary.  */
-  if (current_inferior ()->attach_flag == 0)
-    svr4_relocate_main_executable ();
+  svr4_relocate_main_executable ();
 
   if (!svr4_have_link_map_offsets ())
     return;
@@ -1958,6 +2256,7 @@ static int
 svr4_have_link_map_offsets (void)
 {
   struct solib_svr4_ops *ops = gdbarch_data (target_gdbarch, solib_svr4_data);
+
   return (ops->fetch_link_map_offsets != NULL);
 }
 
@@ -2038,7 +2337,6 @@ struct target_so_ops svr4_so_ops;
 static struct symbol *
 elf_lookup_lib_symbol (const struct objfile *objfile,
 		       const char *name,
-		       const char *linkage_name,
 		       const domain_enum domain)
 {
   bfd *abfd;
@@ -2056,8 +2354,7 @@ elf_lookup_lib_symbol (const struct objfile *objfile,
   if (abfd == NULL || scan_dyntag (DT_SYMBOLIC, abfd, NULL) != 1)
     return NULL;
 
-  return lookup_global_symbol_from_objfile
-		(objfile, name, linkage_name, domain);
+  return lookup_global_symbol_from_objfile (objfile, name, domain);
 }
 
 extern initialize_file_ftype _initialize_svr4_solib; /* -Wmissing-prototypes */

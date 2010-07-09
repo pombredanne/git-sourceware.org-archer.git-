@@ -114,7 +114,6 @@ static void CRC32_Fixup (int, int);
 static void FXSAVE_Fixup (int, int);
 static void OP_LWPCB_E (int, int);
 static void OP_LWP_E (int, int);
-static void OP_LWP_I (int, int);
 static void OP_Vex_2src_1 (int, int);
 static void OP_Vex_2src_2 (int, int);
 
@@ -742,6 +741,10 @@ enum
   PREFIX_0F7D,
   PREFIX_0F7E,
   PREFIX_0F7F,
+  PREFIX_0FAE_REG_0,
+  PREFIX_0FAE_REG_1,
+  PREFIX_0FAE_REG_2,
+  PREFIX_0FAE_REG_3,
   PREFIX_0FB8,
   PREFIX_0FBD,
   PREFIX_0FC2,
@@ -937,6 +940,7 @@ enum
   PREFIX_VEX_380D,
   PREFIX_VEX_380E,
   PREFIX_VEX_380F,
+  PREFIX_VEX_3813,
   PREFIX_VEX_3817,
   PREFIX_VEX_3818,
   PREFIX_VEX_3819,
@@ -1027,6 +1031,7 @@ enum
   PREFIX_VEX_3A17,
   PREFIX_VEX_3A18,
   PREFIX_VEX_3A19,
+  PREFIX_VEX_3A1D,
   PREFIX_VEX_3A20,
   PREFIX_VEX_3A21,
   PREFIX_VEX_3A22,
@@ -2306,6 +2311,13 @@ modrm;
 static unsigned char need_modrm;
 static struct
   {
+    int scale;
+    int index;
+    int base;
+  }
+sib;
+static struct
+  {
     int register_specifier;
     int length;
     int prefix;
@@ -2744,8 +2756,8 @@ static const struct dis386 reg_table[][8] = {
   },
   /* REG_XOP_LWP */
   {
-    { "lwpins", { { OP_LWP_E, 0 }, Ed, { OP_LWP_I, 0 } } },
-    { "lwpval",	{ { OP_LWP_E, 0 }, Ed, { OP_LWP_I, 0 } } },
+    { "lwpins", { { OP_LWP_E, 0 }, Ed, Iq } },
+    { "lwpval",	{ { OP_LWP_E, 0 }, Ed, Iq } },
   },
 };
 
@@ -3025,6 +3037,30 @@ static const struct dis386 prefix_table[][4] = {
     { "movq",	{ EMS, MX } },
     { "movdqu",	{ EXxS, XM } },
     { "movdqa",	{ EXxS, XM } },
+  },
+
+  /* PREFIX_0FAE_REG_0 */
+  {
+    { Bad_Opcode },
+    { "rdfsbase", { Ev } },
+  },
+
+  /* PREFIX_0FAE_REG_1 */
+  {
+    { Bad_Opcode },
+    { "rdgsbase", { Ev } },
+  },
+
+  /* PREFIX_0FAE_REG_2 */
+  {
+    { Bad_Opcode },
+    { "wrfsbase", { Ev } },
+  },
+
+  /* PREFIX_0FAE_REG_3 */
+  {
+    { Bad_Opcode },
+    { "wrgsbase", { Ev } },
   },
 
   /* PREFIX_0FB8 */
@@ -4413,6 +4449,13 @@ static const struct dis386 prefix_table[][4] = {
     { VEX_W_TABLE (VEX_W_380F_P_2) },
   },
 
+  /* PREFIX_VEX_3813 */
+  {
+    { Bad_Opcode },
+    { Bad_Opcode },
+    { "vcvtph2ps", { XM, EXxmmq } },
+  },
+
   /* PREFIX_VEX_3817 */
   {
     { Bad_Opcode },
@@ -5042,6 +5085,13 @@ static const struct dis386 prefix_table[][4] = {
     { Bad_Opcode },
     { Bad_Opcode },
     { VEX_LEN_TABLE (VEX_LEN_3A19_P_2) },
+  },
+
+  /* PREFIX_VEX_3A1D */
+  {
+    { Bad_Opcode },
+    { Bad_Opcode },
+    { "vcvtps2ph", { EXxmmq, XM, Ib } },
   },
 
   /* PREFIX_VEX_3A20 */
@@ -7527,7 +7577,7 @@ static const struct dis386 vex_table[][256] = {
     { Bad_Opcode },
     { Bad_Opcode },
     { Bad_Opcode },
-    { Bad_Opcode },
+    { PREFIX_TABLE (PREFIX_VEX_3813) },
     { Bad_Opcode },
     { Bad_Opcode },
     { Bad_Opcode },
@@ -7829,7 +7879,7 @@ static const struct dis386 vex_table[][256] = {
     { Bad_Opcode },
     { Bad_Opcode },
     { Bad_Opcode },
-    { Bad_Opcode },
+    { PREFIX_TABLE (PREFIX_VEX_3A1D) },
     { Bad_Opcode },
     { Bad_Opcode },
     /* 20 */
@@ -10349,18 +10399,22 @@ static const struct dis386 mod_table[][2] = {
   {
     /* MOD_0FAE_REG_0 */
     { "fxsave",		{ FXSAVE } },
+    { PREFIX_TABLE (PREFIX_0FAE_REG_0) },
   },
   {
     /* MOD_0FAE_REG_1 */
     { "fxrstor",	{ FXSAVE } },
+    { PREFIX_TABLE (PREFIX_0FAE_REG_1) },
   },
   {
     /* MOD_0FAE_REG_2 */
     { "ldmxcsr",	{ Md } },
+    { PREFIX_TABLE (PREFIX_0FAE_REG_2) },
   },
   {
     /* MOD_0FAE_REG_3 */
     { "stmxcsr",	{ Md } },
+    { PREFIX_TABLE (PREFIX_0FAE_REG_3) },
   },
   {
     /* MOD_0FAE_REG_4 */
@@ -10373,7 +10427,7 @@ static const struct dis386 mod_table[][2] = {
   },
   {
     /* MOD_0FAE_REG_6 */
-    { Bad_Opcode },
+    { "xsaveopt",	{ FXSAVE } },
     { RM_TABLE (RM_0FAE_REG_6) },
   },
   {
@@ -10396,6 +10450,7 @@ static const struct dis386 mod_table[][2] = {
   {
     /* MOD_0FC7_REG_6 */
     { PREFIX_TABLE (PREFIX_0FC7_REG_6) },
+    { "rdrand",		{ Ev } },
   },
   {
     /* MOD_0FC7_REG_7 */
@@ -11059,7 +11114,8 @@ get_valid_dis386 (const struct dis386 *dp, disassemble_info *info)
       switch ((*codep & 0x1f))
 	{
 	default:
-	  BadOp ();
+	  dp = &bad_opcode;
+	  return dp;
 	case 0x8:
 	  vex_table_index = XOP_08;
 	  break;
@@ -11078,7 +11134,10 @@ get_valid_dis386 (const struct dis386 *dp, disassemble_info *info)
       vex.register_specifier = (~(*codep >> 3)) & 0xf;
       if (address_mode != mode_64bit
 	  && vex.register_specifier > 0x7)
-	BadOp ();
+	{
+	  dp = &bad_opcode;
+	  return dp;
+	}
 
       vex.length = (*codep & 0x4) ? 256 : 128;
       switch ((*codep & 0x3))
@@ -11116,7 +11175,8 @@ get_valid_dis386 (const struct dis386 *dp, disassemble_info *info)
       switch ((*codep & 0x1f))
 	{
 	default:
-	  BadOp ();
+	  dp = &bad_opcode;
+	  return dp;
 	case 0x1:
 	  vex_table_index = VEX_0F;
 	  break;
@@ -11135,7 +11195,10 @@ get_valid_dis386 (const struct dis386 *dp, disassemble_info *info)
       vex.register_specifier = (~(*codep >> 3)) & 0xf;
       if (address_mode != mode_64bit
 	  && vex.register_specifier > 0x7)
-	BadOp ();
+	{
+	  dp = &bad_opcode;
+	  return dp;
+	}
 
       vex.length = (*codep & 0x4) ? 256 : 128;
       switch ((*codep & 0x3))
@@ -11177,7 +11240,10 @@ get_valid_dis386 (const struct dis386 *dp, disassemble_info *info)
       vex.register_specifier = (~(*codep >> 3)) & 0xf;
       if (address_mode != mode_64bit
 	  && vex.register_specifier > 0x7)
-	BadOp ();
+	{
+	  dp = &bad_opcode;
+	  return dp;
+	}
 
       vex.w = 0;
 
@@ -11233,6 +11299,22 @@ get_valid_dis386 (const struct dis386 *dp, disassemble_info *info)
     return get_valid_dis386 (dp, info);
 }
 
+static void
+get_sib (disassemble_info *info)
+{
+  /* If modrm.mod == 3, operand must be register.  */
+  if (need_modrm
+      && address_mode != mode_16bit
+      && modrm.mod != 3
+      && modrm.rm == 4)
+    {
+      FETCH_DATA (info, codep + 2);
+      sib.index = (codep [1] >> 3) & 7;
+      sib.scale = (codep [1] >> 6) & 3;
+      sib.base = codep [1] & 7;
+    }
+}
+
 static int
 print_insn (bfd_vma pc, disassemble_info *info)
 {
@@ -11243,7 +11325,6 @@ print_insn (bfd_vma pc, disassemble_info *info)
   int sizeflag;
   const char *p;
   struct dis_private priv;
-  unsigned char op;
   int prefix_length;
   int default_prefixes;
 
@@ -11448,8 +11529,6 @@ print_insn (bfd_vma pc, disassemble_info *info)
       return 1;
     }
 
-  op = 0;
-
   if (*codep == 0x0f)
     {
       unsigned char threebyte;
@@ -11521,6 +11600,7 @@ print_insn (bfd_vma pc, disassemble_info *info)
 
   if (dp->name == NULL && dp->op[0].bytemode == FLOATCODE)
     {
+      get_sib (info);
       dofloat (sizeflag);
     }
   else
@@ -11528,6 +11608,7 @@ print_insn (bfd_vma pc, disassemble_info *info)
       dp = get_valid_dis386 (dp, info);
       if (dp != NULL && putop (dp->name, sizeflag) == 0)
         {
+	  get_sib (info);
 	  for (i = 0; i < MAX_OPERANDS; ++i)
 	    {
 	      obufp = op_out[i];
@@ -12928,10 +13009,9 @@ OP_E_memory (int bytemode, int sizeflag)
       if (base == 4)
 	{
 	  havesib = 1;
-	  FETCH_DATA (the_info, codep + 1);
-	  vindex = (*codep >> 3) & 7;
-	  scale = (*codep >> 6) & 3;
-	  base = *codep & 7;
+	  vindex = sib.index;
+	  scale = sib.scale;
+	  base = sib.base;
 	  USED_REX (REX_X);
 	  if (rex & REX_X)
 	    vindex += 8;
@@ -13533,7 +13613,6 @@ static void
 OP_sI (int bytemode, int sizeflag)
 {
   bfd_signed_vma op;
-  bfd_signed_vma mask = -1;
 
   switch (bytemode)
     {
@@ -13542,7 +13621,6 @@ OP_sI (int bytemode, int sizeflag)
       op = *codep++;
       if ((op & 0x80) != 0)
 	op -= 0x100;
-      mask = 0xffffffff;
       break;
     case v_mode:
       USED_REX (REX_W);
@@ -13553,11 +13631,9 @@ OP_sI (int bytemode, int sizeflag)
 	  if (sizeflag & DFLAG)
 	    {
 	      op = get32s ();
-	      mask = 0xffffffff;
 	    }
 	  else
 	    {
-	      mask = 0xffffffff;
 	      op = get16 ();
 	      if ((op & 0x8000) != 0)
 		op -= 0x10000;
@@ -13567,7 +13643,6 @@ OP_sI (int bytemode, int sizeflag)
       break;
     case w_mode:
       op = get16 ();
-      mask = 0xffffffff;
       if ((op & 0x8000) != 0)
 	op -= 0x10000;
       break;
@@ -14977,10 +15052,8 @@ OP_LWPCB_E (int bytemode ATTRIBUTE_UNUSED, int sizeflag ATTRIBUTE_UNUSED)
 
   if (vex.w)
     names = names64;
-  else if (vex.length == 256)
-    names = names32;
   else
-    names = names16;
+    names = names32;
 
   reg = modrm.rm;
   USED_REX (REX_B);
@@ -14997,20 +15070,9 @@ OP_LWP_E (int bytemode ATTRIBUTE_UNUSED, int sizeflag ATTRIBUTE_UNUSED)
 
   if (vex.w)
     names = names64;
-  else if (vex.length == 256)
-    names = names32;
   else
-    names = names16;
+    names = names32;
 
   oappend (names[vex.register_specifier]);
-}
-
-static void
-OP_LWP_I (int bytemode ATTRIBUTE_UNUSED, int sizeflag)
-{
-  if (vex.w || vex.length == 256)
-    OP_I (q_mode, sizeflag);
-  else
-    OP_I (w_mode, sizeflag);
 }
 

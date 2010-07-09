@@ -533,6 +533,7 @@ extern void *objfile_data (struct objfile *objfile,
 
 extern struct bfd *gdb_bfd_ref (struct bfd *abfd);
 extern void gdb_bfd_unref (struct bfd *abfd);
+extern int gdb_bfd_close_or_warn (struct bfd *abfd);
 
 
 /* Traverse all object files in the current program space.
@@ -564,11 +565,6 @@ extern void gdb_bfd_unref (struct bfd *abfd);
 #define	ALL_OBJFILE_SYMTABS(objfile, s) \
     for ((s) = (objfile) -> symtabs; (s) != NULL; (s) = (s) -> next)
 
-/* Traverse all psymtabs in one objfile.  */
-
-#define	ALL_OBJFILE_PSYMTABS(objfile, p) \
-    for ((p) = (objfile) -> psymtabs; (p) != NULL; (p) = (p) -> next)
-
 /* Traverse all minimal symbols in one objfile.  */
 
 #define	ALL_OBJFILE_MSYMBOLS(objfile, m) \
@@ -598,17 +594,6 @@ extern void gdb_bfd_unref (struct bfd *abfd);
   ALL_PSPACE_OBJFILES (ss, objfile)			\
     ALL_OBJFILE_SYMTABS (objfile, s)			\
       if ((s)->primary)
-
-/* Traverse all psymtabs in all objfiles in the current symbol
-   space.  */
-
-#define	ALL_PSYMTABS(objfile, p) \
-  ALL_OBJFILES (objfile)	 \
-    ALL_OBJFILE_PSYMTABS (objfile, p)
-
-#define ALL_PSPACE_PSYMTABS(ss, objfile, p)		\
-  ALL_PSPACE_OBJFILES (ss, objfile)			\
-    ALL_OBJFILE_PSYMTABS (objfile, p)
 
 /* Traverse all minimal symbols in all objfiles in the current symbol
    space.  */

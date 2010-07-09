@@ -313,7 +313,6 @@ jit_inferior_init (struct gdbarch *gdbarch)
   struct jit_descriptor descriptor;
   struct jit_code_entry cur_entry;
   CORE_ADDR cur_entry_addr;
-  struct cleanup *old_cleanups;
 
   /* When we register code, GDB resets its breakpoints in case symbols have
      changed.  That in turn calls this handler, which makes us look for new
@@ -397,7 +396,7 @@ jit_inferior_created_observer (struct target_ops *objfile, int from_tty)
    for example when it crashes.  */
 
 static void
-jit_inferior_exit_hook (int pid)
+jit_inferior_exit_hook (struct inferior *inf)
 {
   struct objfile *objf;
   struct objfile *temp;

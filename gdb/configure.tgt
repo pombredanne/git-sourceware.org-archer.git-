@@ -15,7 +15,6 @@ case $targ in
  d10v-*-* | \
  hppa*-*-hiux* | \
  i[34567]86-ncr-* | \
- i[34567]86-*-lynxos* | \
  m68*-cisco*-* | \
  m68*-tandem-* | \
  m68*-*-os68k* | \
@@ -90,6 +89,10 @@ arm*-*-openbsd*)
 	# Target: OpenBSD/arm
 	gdb_target_obs="arm-tdep.o armbsd-tdep.o armobsd-tdep.o obsd-tdep.o \
 			corelow.o solib.o solib-svr4.o"
+	;;
+arm*-*-symbianelf*)
+	# Target: SymbianOS/arm
+	gdb_target_obs="arm-tdep.o solib-target.o arm-symbian-tdep.o"
 	;;
 arm*-*-* | thumb*-*-* | strongarm*-*-* | xscale-*-*)
 	# Target: ARM embedded system
@@ -586,6 +589,7 @@ x86_64-*-mingw*)
 	gdb_target_obs="amd64-tdep.o amd64-windows-tdep.o \
                         i386-tdep.o i386-cygwin-tdep.o i387-tdep.o \
                         solib-target.o windows-tdep.o"
+	build_gdbserver=yes
         ;;
 x86_64-*-netbsd* | x86_64-*-knetbsd*-gnu)
 	# Target: NetBSD/amd64
@@ -626,4 +630,6 @@ m68*-*-openbsd* | m88*-*-openbsd* | vax-*-openbsd*) ;;
 *-*-mingw* | *-*-cygwin*)
 		gdb_osabi=GDB_OSABI_CYGWIN ;;
 *-*-dicos*)	gdb_osabi=GDB_OSABI_DICOS ;;
+*-*-symbianelf*)
+		gdb_osabi=GDB_OSABI_SYMBIAN ;;
 esac

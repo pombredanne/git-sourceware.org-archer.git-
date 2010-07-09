@@ -322,6 +322,7 @@ unsigned_pointer_to_address (struct gdbarch *gdbarch,
 			     struct type *type, const gdb_byte *buf)
 {
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+
   return extract_unsigned_integer (buf, TYPE_LENGTH (type), byte_order);
 }
 
@@ -330,6 +331,7 @@ signed_pointer_to_address (struct gdbarch *gdbarch,
 			   struct type *type, const gdb_byte *buf)
 {
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+
   return extract_signed_integer (buf, TYPE_LENGTH (type), byte_order);
 }
 
@@ -340,6 +342,7 @@ unsigned_address_to_pointer (struct gdbarch *gdbarch, struct type *type,
 			     gdb_byte *buf, CORE_ADDR addr)
 {
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+
   store_unsigned_integer (buf, TYPE_LENGTH (type), byte_order, addr);
 }
 
@@ -348,6 +351,7 @@ address_to_signed_pointer (struct gdbarch *gdbarch, struct type *type,
 			   gdb_byte *buf, CORE_ADDR addr)
 {
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+
   store_signed_integer (buf, TYPE_LENGTH (type), byte_order, addr);
 }
 
@@ -435,6 +439,7 @@ read_var_value (struct symbol *var, struct frame_info *frame)
 	    CORE_ADDR addr
 	      = symbol_overlayed_address (SYMBOL_VALUE_ADDRESS (var),
 					  SYMBOL_OBJ_SECTION (var));
+
 	    store_typed_address (value_contents_raw (v), type, addr);
 	  }
 	else
@@ -471,6 +476,7 @@ read_var_value (struct symbol *var, struct frame_info *frame)
       {
 	struct value *ref;
 	CORE_ADDR argref;
+
 	argref = get_frame_args_address (frame);
 	if (!argref)
 	  return 0;

@@ -1013,6 +1013,11 @@ _bfd_elf_merge_symbol (bfd *abfd,
       break;
     }
 
+  /* Differentiate strong and weak symbols.  */
+  newweak = bind == STB_WEAK;
+  oldweak = (h->root.type == bfd_link_hash_defweak
+	     || h->root.type == bfd_link_hash_undefweak);
+
   /* In cases involving weak versioned symbols, we may wind up trying
      to merge a symbol with itself.  Catch that here, to avoid the
      confusion that results if we try to override a symbol with
@@ -1020,6 +1025,7 @@ _bfd_elf_merge_symbol (bfd *abfd,
      _GLOBAL_OFFSET_TABLE_, which are regular symbols defined in a
      dynamic object, which we do want to handle here.  */
   if (abfd == oldbfd
+      && (newweak || oldweak)
       && ((abfd->flags & DYNAMIC) == 0
 	  || !h->def_regular))
     return TRUE;
@@ -1240,11 +1246,6 @@ _bfd_elf_merge_symbol (bfd *abfd,
       h->type = 0;
       return TRUE;
     }
-
-  /* Differentiate strong and weak symbols.  */
-  newweak = bind == STB_WEAK;
-  oldweak = (h->root.type == bfd_link_hash_defweak
-	     || h->root.type == bfd_link_hash_undefweak);
 
   if (bind == STB_GNU_UNIQUE)
     h->unique_global = 1;
@@ -1715,7 +1716,7 @@ _bfd_elf_add_default_symbol (bfd *abfd,
 	{
 	  if (! dynamic)
 	    {
-	      if (info->shared
+	      if (! info->executable
 		  || hi->ref_dynamic)
 		*dynsym = TRUE;
 	    }
@@ -1784,7 +1785,7 @@ nondefault:
 	    {
 	      if (! dynamic)
 		{
-		  if (info->shared
+		  if (! info->executable
 		      || hi->ref_dynamic)
 		    *dynsym = TRUE;
 		}
@@ -5481,6 +5482,20 @@ compute_bucket_count (struct bfd_link_info *info,
   return best_size;
 }
 
+/* Size any SHT_GROUP section for ld -r.  */
+
+bfd_boolean
+_bfd_elf_size_group_sections (struct bfd_link_info *info)
+{
+  bfd *ibfd;
+
+  for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link_next)
+    if (bfd_get_flavour (ibfd) == bfd_target_elf_flavour
+	&& !_bfd_elf_fixup_group_sections (ibfd, bfd_abs_section_ptr))
+      return FALSE;
+  return TRUE;
+}
+
 /* Set up the sizes and contents of the ELF dynamic sections.  This is
    called by the ELF linker emulation before_allocation routine.  We
    must set the sizes of the sections before the linker sets the
@@ -5554,6 +5569,10 @@ bfd_elf_size_dynamic_sections (bfd *output_bfd,
     = elf_hash_table (info)->init_got_offset;
   elf_hash_table (info)->init_plt_refcount
     = elf_hash_table (info)->init_plt_offset;
+
+  if (info->relocatable
+      && !_bfd_elf_size_group_sections (info))
+    return FALSE;
 
   /* The backend may have to create some sections regardless of whether
      we're dynamic or not.  */
@@ -5928,6 +5947,10 @@ bfd_elf_size_dynamic_sections (bfd *output_bfd,
 	    {
 	      struct bfd_elf_version_deps *n;
 
+	      /* Don't emit base version twice.  */
+	      if (t->vernum == 0)
+		continue;
+
 	      size += sizeof (Elf_External_Verdef);
 	      size += sizeof (Elf_External_Verdaux);
 	      ++cdefs;
@@ -6027,6 +6050,10 @@ bfd_elf_size_dynamic_sections (bfd *output_bfd,
 	      unsigned int cdeps;
 	      struct bfd_elf_version_deps *n;
 
+	      /* Don't emit the base version twice.  */
+	      if (t->vernum == 0)
+		continue;
+
 	      cdeps = 0;
 	      for (n = t->deps; n != NULL; n = n->next)
 		++cdeps;
@@ -6058,7 +6085,13 @@ bfd_elf_size_dynamic_sections (bfd *output_bfd,
 	      def.vd_hash = bfd_elf_hash (t->name);
 	      def.vd_aux = sizeof (Elf_External_Verdef);
 	      def.vd_next = 0;
-	      if (t->next != NULL)
+
+	      /* If a basever node is next, it *must* be the last node in
+		 the chain, otherwise Verdef construction breaks.  */
+	      if (t->next != NULL && t->next->vernum == 0)
+		BFD_ASSERT (t->next->next == NULL);
+
+	      if (t->next != NULL && t->next->vernum != 0)
 		def.vd_next = (sizeof (Elf_External_Verdef)
 			       + (cdeps + 1) * sizeof (Elf_External_Verdaux));
 
@@ -6159,7 +6192,7 @@ bfd_elf_size_dynamic_sections (bfd *output_bfd,
 	    unsigned int crefs;
 	    bfd_byte *p;
 
-	    /* Build the version definition section.  */
+	    /* Build the version dependency section.  */
 	    size = 0;
 	    crefs = 0;
 	    for (t = elf_tdata (output_bfd)->verref;

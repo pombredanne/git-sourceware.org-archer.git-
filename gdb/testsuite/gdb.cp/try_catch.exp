@@ -22,13 +22,11 @@ if $tracelevel then {
         strace $tracelevel
         }
 
-if { [skip_cplus_tests] } { continue }
+if { [skip_stl_tests] } { continue }
 
 #
 # test running programs
 #
-set prms_id 0
-set bug_id 0
 
 set testfile "try_catch"
 set srcfile ${testfile}.cc
