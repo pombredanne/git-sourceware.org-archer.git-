@@ -90,8 +90,12 @@ extern int cp_is_anonymous (const char *namespace);
 
 extern void cp_add_using_directive (const char *dest,
                                     const char *src,
-                                    const char *alias,
-                                    struct obstack *obstack);
+                                    const char *alias);
+
+extern struct using_direct *cp_add_using (const char *dest,
+                                          const char *src,
+                                          const char *alias,
+					  struct using_direct *next);
 
 extern void cp_initialize_namespace (void);
 

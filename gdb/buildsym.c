@@ -387,7 +387,6 @@ finish_block (struct symbol *symbol, struct pending **listhead,
     }
 
   block_set_using (block, using_directives, &objfile->objfile_obstack);
-  using_directives = NULL;
 
   record_pending_block (objfile, block, opblock);
 

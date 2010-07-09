@@ -23,8 +23,6 @@ base::base (int _x)
 {
 }
 
-using namespace B;
-
 int
 base::meth ()
 {

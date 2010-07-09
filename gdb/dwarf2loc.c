@@ -470,14 +470,16 @@ read_pieced_value (struct value *v)
 
 	case DWARF_VALUE_STACK:
 	  {
+	    gdb_byte bytes[sizeof (ULONGEST)];
 	    size_t n;
 	    int addr_size = gdbarch_addr_bit (c->arch) / 8;
+	    store_unsigned_integer (bytes, addr_size,
+				    gdbarch_byte_order (c->arch),
+				    p->v.expr.value);
 	    n = p->size;
 	    if (n > addr_size)
 	      n = addr_size;
-	    store_unsigned_integer (contents + offset, n,
-				    gdbarch_byte_order (c->arch),
-				    p->v.expr.value);
+	    memcpy (contents + offset, bytes, n);
 	  }
 	  break;
 
@@ -634,17 +636,19 @@ dwarf2_evaluate_loc_desc (struct type *type, struct frame_info *frame,
 
 	case DWARF_VALUE_STACK:
 	  {
+	    gdb_byte bytes[sizeof (ULONGEST)];
 	    ULONGEST value = (ULONGEST) dwarf_expr_fetch (ctx, 0);
 	    bfd_byte *contents;
 	    size_t n = ctx->addr_size;
 
+	    store_unsigned_integer (bytes, ctx->addr_size,
+				    gdbarch_byte_order (ctx->gdbarch),
+				    value);
 	    retval = allocate_value (type);
 	    contents = value_contents_raw (retval);
 	    if (n > TYPE_LENGTH (type))
 	      n = TYPE_LENGTH (type);
-	    store_unsigned_integer (contents, n,
-				    gdbarch_byte_order (ctx->gdbarch),
-				    value);
+	    memcpy (contents, bytes, n);
 	  }
 	  break;
 

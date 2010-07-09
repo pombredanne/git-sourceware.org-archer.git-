@@ -328,7 +328,7 @@ gdb_test "restart 9" "Not found.*" "no more checkpoint 9"
 gdb_test "restart 10" "Not found.*" "no more checkpoint 10"
 
 #
-# Now let's try setting a large number of checkpoints (>600)
+# Now let's try setting a large number of checkpoints (>1000)
 #
 
 gdb_exit
@@ -351,10 +351,6 @@ gdb_expect {
     -re ".*$gdb_prompt $" { pass "set checkpoint breakpoint" }
     timeout { fail "(timeout) set checkpoint breakpoint" }
 }
-
-set prev_timeout $timeout
-set timeout [expr $timeout + 120]
-verbose "Timeout now $timeout sec."
 
 gdb_breakpoint $break2_loc
 gdb_test "continue" "breakpoint 2.*" "break2 with many checkpoints"
@@ -379,12 +375,8 @@ gdb_test_multiple "info checkpoints" $msg {
 # OK, kill 'em all...
 #
 
-gdb_test "kill" "" "kill all one with many checkpoints" \
+gdb_test "kill" "" "kill all one" \
     "Kill the program being debugged.*y or n. $" "y"
-
-# Restore old timeout
-set timeout $prev_timeout
-verbose "Timeout now $timeout sec."
 
 #
 # Finished: cleanup

@@ -1595,10 +1595,7 @@ install_new_value (struct varobj *var, struct value *value, int initial)
     {
       xfree (print_value);
       print_value = value_get_print_value (var->value, var->format, var);
-      if ((var->print_value == NULL && print_value != NULL)
-	  || (var->print_value != NULL && print_value == NULL)
-	  || (var->print_value != NULL && print_value != NULL
-	      && strcmp (var->print_value, print_value) != 0))
+      if (!var->print_value || strcmp (var->print_value, print_value) != 0)
 	changed = 1;
     }
   if (var->print_value)
@@ -1705,8 +1702,7 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
 
   if (!(*varp)->root->is_valid)
     {
-      varobj_update_result r = {0};
-      r.varobj = *varp;
+      varobj_update_result r = {*varp};
       r.status = VAROBJ_INVALID;
       VEC_safe_push (varobj_update_result, result, &r);
       return result;
@@ -1714,8 +1710,7 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
 
   if ((*varp)->root->rootvar == *varp)
     {
-      varobj_update_result r = {0};
-      r.varobj = *varp;
+      varobj_update_result r = {*varp};
       r.status = VAROBJ_IN_SCOPE;
 
       /* Update the root variable. value_of_root can return NULL
@@ -1745,8 +1740,7 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
     }
   else
     {
-      varobj_update_result r = {0};
-      r.varobj = *varp;
+      varobj_update_result r = {*varp};
       VEC_safe_push (varobj_update_result, stack, &r);
     }
 
@@ -1823,8 +1817,7 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
 	      for (i = VEC_length (varobj_p, changed) - 1; i >= 0; --i)
 		{
 		  varobj_p tmp = VEC_index (varobj_p, changed, i);
-		  varobj_update_result r = {0};
-		  r.varobj = tmp;
+		  varobj_update_result r = {tmp};
 		  r.changed = 1;
 		  r.value_installed = 1;
 		  VEC_safe_push (varobj_update_result, stack, &r);
@@ -1834,8 +1827,7 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
 		  varobj_p tmp = VEC_index (varobj_p, unchanged, i);
 	      	  if (!tmp->frozen)
 	      	    {
-	      	      varobj_update_result r = {0};
-		      r.varobj = tmp;
+	      	      varobj_update_result r = {tmp};
 	      	      r.value_installed = 1;
 	      	      VEC_safe_push (varobj_update_result, stack, &r);
 	      	    }
@@ -1862,8 +1854,7 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
 	  /* Child may be NULL if explicitly deleted by -var-delete.  */
 	  if (c != NULL && !c->frozen)
 	    {
-	      varobj_update_result r = {0};
-	      r.varobj = c;
+	      varobj_update_result r = {c};
 	      VEC_safe_push (varobj_update_result, stack, &r);
 	    }
 	}

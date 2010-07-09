@@ -1810,11 +1810,10 @@ linux_nat_detach (struct target_ops *ops, char *args, int from_tty)
 	 pass it along with PTRACE_DETACH.  */
       args = alloca (8);
       sprintf (args, "%d", (int) WSTOPSIG (status));
-      if (debug_linux_nat)
-	fprintf_unfiltered (gdb_stdlog,
-			    "LND: Sending signal %s to %s\n",
-			    args,
-			    target_pid_to_str (main_lwp->ptid));
+      fprintf_unfiltered (gdb_stdlog,
+			  "LND: Sending signal %s to %s\n",
+			  args,
+ 			  target_pid_to_str (main_lwp->ptid));
     }
 
   delete_lwp (main_lwp->ptid);

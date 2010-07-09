@@ -1,32 +1,3 @@
-2010-04-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
-
-	* gdb.base/dup-sect.exp, gdb.base/dup-sect.S: New.
-
-2010-04-08  Sami Wagiaalla  <swagiaal@redhat.com>
-
-	* gdb.cp/gdb2384-base.h: Created 'namespace B'.
-	* gdb.cp/gdb2384-base.cc: Use 'namespace B'.
-
-2010-03-18  Ulrich Weigand  <Ulrich.Weigand@de.ibm.com>
-
-	* gdb.mi/gdb680.exp: Revert 2009-06-17 change.
-
-2010-03-10  Doug Evans  <dje@google.com>
-
-	* gdb.base/checkpoint.exp: Fix comment.
-	Lengthen timeout while doing >600 checkpoints test.
-	Rename duplicate "kill all one" test to keep test names unique.
-
-2010-03-03  Tom Tromey  <tromey@redhat.com>
-
-	PR gdb/11345:
-	* gdb.base/printcmds.exp (test_printf): Add test.
-
-2010-02-18  Ulrich Weigand  <Ulrich.Weigand@de.ibm.com>
-
-	* configure.ac: Add gdb.multi/Makefile to AC_OUTPUT.
-	* configure: Regenerate.
-
 2010-02-18  Daniel Jacobowitz  <dan@codesourcery.com>
 
 	* gdb.python/py-type.exp: Check for Python support.

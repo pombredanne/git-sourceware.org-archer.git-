@@ -1,7 +1,7 @@
 		What has changed in GDB?
 	     (Organized release by release)
 
-*** Changes in GDB 7.1
+*** Changes since GDB 7.0
 
 * C++ Improvements
 

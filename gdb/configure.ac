@@ -161,9 +161,6 @@ do
 
     . ${srcdir}/configure.tgt
 
-    AS_IF([test -z "${gdb_target_obs}"],
-      [AC_MSG_ERROR([configuration ${targ} is unsupported.])])
-
     # Target-specific object files
     for i in ${gdb_target_obs}; do
         case " $TARGET_OBS " in
@@ -1529,6 +1526,11 @@ AC_ARG_ENABLE(werror,
      no | n)  ERROR_ON_WARNING="no" ;;
      *) AC_MSG_ERROR(bad value ${enableval} for --enable-werror) ;;
    esac])
+
+# Enable -Werror by default when using gcc
+if test "${GCC}" = yes -a -z "${ERROR_ON_WARNING}" ; then
+    ERROR_ON_WARNING=yes
+fi
 
 WERROR_CFLAGS=""
 if test "${ERROR_ON_WARNING}" = yes ; then

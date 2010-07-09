@@ -117,8 +117,7 @@ cp_scan_for_anonymous_namespaces (const struct symbol *symbol)
 		 anonymous namespace.  So add symbols in it to the
 		 namespace given by the previous component if there is
 		 one, or to the global namespace if there isn't.  */
-	      cp_add_using_directive (dest, src, NULL,
-	                              &SYMBOL_SYMTAB (symbol)->objfile->objfile_obstack);
+	      cp_add_using_directive (dest, src, NULL);
 	    }
 	  /* The "+ 2" is for the "::".  */
 	  previous_component = next_component + 2;
@@ -129,18 +128,11 @@ cp_scan_for_anonymous_namespaces (const struct symbol *symbol)
     }
 }
 
-
-/* Add a using directive to using_directives.  If the using directive in
-   question has already been added, don't add it twice.
-   Create a new struct using_direct which imports the namespace SRC into the
-   scope DEST.  ALIAS is the name of the imported namespace in the current
-   scope.  If ALIAS is NULL then the namespace is known by its original name.
-   The arguments are copied into newly allocated memory so they can be 
-   temporaries.  */
+/* Add a using directive to using_list. If the using directive in question
+   has already been added, don't add it twice.  */
 
 void
-cp_add_using_directive (const char *dest, const char *src, const char *alias,
-                        struct obstack *obstack)
+cp_add_using_directive (const char *dest, const char *src, const char *alias)
 {
   struct using_direct *current;
   struct using_direct *new;
@@ -150,23 +142,12 @@ cp_add_using_directive (const char *dest, const char *src, const char *alias,
   for (current = using_directives; current != NULL; current = current->next)
     {
       if (strcmp (current->import_src, src) == 0
-          && strcmp (current->import_dest, dest) == 0
-          && ((alias == NULL && current->alias == NULL)
-              || (alias != NULL && current->alias != NULL
-        	  && strcmp (alias, current->alias) == 0)))
+          && strcmp (current->import_dest, dest) == 0)
 	return;
     }
 
-  new = OBSTACK_ZALLOC (obstack, struct using_direct);
+  using_directives = cp_add_using (dest, src, alias, using_directives);
 
-  new->import_src = obsavestring (src, strlen (src), obstack);
-  new->import_dest = obsavestring (dest, strlen (dest), obstack);
-
-  if (alias != NULL)
-    new->alias = obsavestring (alias, strlen (alias), obstack);
-
-  new->next = using_directives;
-  using_directives = new;
 }
 
 /* Record the namespace that the function defined by SYMBOL was
@@ -215,6 +196,36 @@ cp_is_anonymous (const char *namespace)
 {
   return (strstr (namespace, "(anonymous namespace)")
 	  != NULL);
+}
+
+/* Create a new struct using direct which imports the namespace SRC into the
+   scope DEST.  ALIAS is the name of the imported namespace in the current
+   scope.  If ALIAS is NULL then the namespace is known by its original name.
+   Set its next member in the linked list to NEXT; allocate all memory
+   using xmalloc.  It copies the strings, so NAME can be a temporary
+   string.  */
+
+struct using_direct *
+cp_add_using (const char *dest,
+              const char *src,
+              const char *alias,
+	      struct using_direct *next)
+{
+  struct using_direct *retval;
+
+  retval = xmalloc (sizeof (struct using_direct));
+  retval->import_src = savestring (src, strlen(src));
+  retval->import_dest = savestring (dest, strlen(dest));
+
+  if (alias != NULL)
+    retval->alias = savestring (alias, strlen (alias));
+  else
+    retval->alias = NULL;
+
+  retval->next = next;
+  retval->searched = 0;
+
+  return retval;
 }
 
 /* The C++-specific version of name lookup for static and global
