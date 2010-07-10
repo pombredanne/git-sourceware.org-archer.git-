@@ -346,9 +346,6 @@ dwarf_expr_prep_ctx (struct frame_info *frame, const gdb_byte *data,
   struct dwarf_expr_baton baton;
   struct objfile *objfile = dwarf2_per_cu_objfile (per_cu);
 
-  if (!frame)
-    frame = get_selected_frame (NULL);
-
   baton.frame = frame;
   baton.per_cu = per_cu;
   baton.object_address = object_address;
@@ -386,8 +383,8 @@ dwarf_locexpr_baton_eval (struct dwarf2_locexpr_baton *dlbaton)
   CORE_ADDR retval;
   struct cleanup *back_to = make_cleanup (null_cleanup, 0);
 
-  ctx = dwarf_expr_prep_ctx (NULL, dlbaton->data, dlbaton->size,
-			     dlbaton->per_cu);
+  ctx = dwarf_expr_prep_ctx (get_selected_frame (NULL), dlbaton->data,
+			     dlbaton->size, dlbaton->per_cu);
   if (ctx->num_pieces > 0)
     error (_("DW_OP_*piece is unsupported for DW_FORM_block"));
 
