@@ -50,7 +50,7 @@ dwarf_expr_frame_base_1 (struct symbol *framefunc, CORE_ADDR pc,
 
 static struct value *dwarf2_evaluate_loc_desc (struct type *type,
 					       struct frame_info *frame,
-					       gdb_byte *data,
+					       const gdb_byte *data,
 					       unsigned short size,
 					     struct dwarf2_per_cu_data *per_cu);
 
@@ -339,11 +339,12 @@ object_address_set (CORE_ADDR address)
    pushed on the cleanup chain.  */
 
 static struct dwarf_expr_context *
-dwarf_expr_prep_ctx (struct frame_info *frame, gdb_byte *data,
-		     unsigned short size, struct dwarf2_per_cu_data *per_cu)
+dwarf_expr_prep_ctx (struct frame_info *frame, const gdb_byte *data,
+		     size_t size, struct dwarf2_per_cu_data *per_cu)
 {
   struct dwarf_expr_context *ctx;
   struct dwarf_expr_baton baton;
+  struct objfile *objfile = dwarf2_per_cu_objfile (per_cu);
 
   if (!frame)
     frame = get_selected_frame (NULL);
@@ -355,7 +356,7 @@ dwarf_expr_prep_ctx (struct frame_info *frame, gdb_byte *data,
   ctx = new_dwarf_expr_context ();
   make_cleanup_free_dwarf_expr_context (ctx);
 
-  ctx->gdbarch = get_objfile_arch (baton.objfile);
+  ctx->gdbarch = get_objfile_arch (objfile);
   ctx->addr_size = dwarf2_per_cu_addr_size (per_cu);
   ctx->offset = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
   ctx->baton = &baton;
@@ -417,7 +418,7 @@ dwarf_loclist_baton_eval (struct dwarf2_loclist_baton *dllbaton,
 			  struct type *type, CORE_ADDR *addrp)
 {
   struct frame_info *frame = get_selected_frame (NULL);
-  gdb_byte *data;
+  const gdb_byte *data;
   size_t size;
   struct value *val;
 
@@ -1063,7 +1064,6 @@ dwarf2_evaluate_loc_desc (struct type *type, struct frame_info *frame,
   struct value *retval;
   struct dwarf_expr_context *ctx;
   struct cleanup *old_chain = make_cleanup (null_cleanup, 0);
-  struct objfile *objfile = dwarf2_per_cu_objfile (per_cu);
 
   if (size == 0)
     {
@@ -2777,11 +2777,11 @@ missing_read_needs_frame (struct symbol *symbol)
   return 0;
 }
 
-static int
-missing_describe_location (struct symbol *symbol, struct ui_file *stream)
+static void
+missing_describe_location (struct symbol *symbol, CORE_ADDR addr,
+			   struct ui_file *stream)
 {
   fprintf_filtered (stream, _("a variable we are unable to resolve"));
-  return 1;
 }
 
 static void

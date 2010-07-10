@@ -194,11 +194,6 @@ extern void operator_length_standard (const struct expression *, int, int *,
 				      int *);
 
 extern int operator_check_standard (struct expression *exp, int pos,
-				    int (*objfile_func)
-				      (struct objfile *objfile, void *data),
-				    void *data);
-
-extern int operator_check_standard (struct expression *exp, int pos,
 				    int (*type_func) (struct type *type,
 						      void *data),
 				    int (*objfile_func)
@@ -282,19 +277,6 @@ struct exp_descriptor
     /* Returns number of exp_elements needed to represent an operator and
        the number of subexpressions it takes.  */
     void (*operator_length) (const struct expression*, int, int*, int *);
-
-    /* Call TYPE_FUNC and OBJFILE_FUNC for any TYPE and OBJFILE found being
-       referenced by the single operator of EXP at position POS.  Operator
-       parameters are located at positive (POS + number) offsets in EXP.
-       The functions should never be called with NULL TYPE or NULL OBJFILE.
-       Functions should get passed an arbitrary caller supplied DATA pointer.
-       If any of the functions returns non-zero value then (any other) non-zero
-       value should be immediately returned to the caller.  Otherwise zero
-       should be returned.  */
-    int (*operator_check) (struct expression *exp, int pos,
-			   int (*objfile_func) (struct objfile *objfile,
-						void *data),
-			   void *data);
 
     /* Call TYPE_FUNC and OBJFILE_FUNC for any TYPE and OBJFILE found being
        referenced by the single operator of EXP at position POS.  Operator

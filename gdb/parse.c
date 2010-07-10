@@ -1554,7 +1554,7 @@ exp_uses_objfile (struct expression *exp, struct objfile *objfile)
 {
   gdb_assert (objfile->separate_debug_objfile_backlink == NULL);
 
-  return exp_iterate (exp, exp_uses_objfile_iter, objfile);
+  return exp_iterate (exp, NULL, exp_uses_objfile_iter, objfile);
 }
 
 /* Helper for exp_types_mark_used.  */

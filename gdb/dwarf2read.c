@@ -6122,7 +6122,7 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
 	  else if (blk->size > 1 && blk->data[0] == DW_OP_regx)
 	    {
 	      ULONGEST ulongest;
-	      gdb_byte *end;
+	      const gdb_byte *end;
 
 	      end = read_uleb128 (&blk->data[1], &blk->data[blk->size],
 				  &ulongest);
@@ -6133,34 +6133,33 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
 	  if (length_baton == NULL)
 	    {
 	      struct attribute *size_attr;
+	      gdb_byte *data;
 
 	      length_baton = obstack_alloc (&cu->comp_unit_obstack,
 					    sizeof (*length_baton));
 	      length_baton->per_cu = cu->per_cu;
 	      length_baton->size = DW_BLOCK (attr)->size + 2;
-	      length_baton->data = obstack_alloc (&cu->comp_unit_obstack,
-						  length_baton->size);
-	      memcpy (length_baton->data, DW_BLOCK (attr)->data,
-		      DW_BLOCK (attr)->size);
+	      data = obstack_alloc (&cu->comp_unit_obstack,
+				    length_baton->size);
+	      length_baton->data = data;
+	      memcpy (data, DW_BLOCK (attr)->data, DW_BLOCK (attr)->size);
 
 	      /* DW_AT_BYTE_SIZE existing together with DW_AT_STRING_LENGTH
 		 specifies the size of an integer to fetch.  */
 	      size_attr = dwarf2_attr (die, DW_AT_byte_size, cu);
 	      if (size_attr)
 		{
-		  length_baton->data[DW_BLOCK (attr)->size] = DW_OP_deref_size;
-		  length_baton->data[DW_BLOCK (attr)->size + 1] =
-							   DW_UNSND (size_attr);
-		  if (length_baton->data[DW_BLOCK (attr)->size + 1]
-		      != DW_UNSND (size_attr))
+		  data[DW_BLOCK (attr)->size] = DW_OP_deref_size;
+		  data[DW_BLOCK (attr)->size + 1] = DW_UNSND (size_attr);
+		  if (data[DW_BLOCK (attr)->size + 1] != DW_UNSND (size_attr))
 		    complaint (&symfile_complaints,
 			       _("DW_AT_string_length's DW_AT_byte_size "
 				 "integer exceeds the byte size storage"));
 		}
 	      else
 		{
-		  length_baton->data[DW_BLOCK (attr)->size] = DW_OP_deref;
-		  length_baton->data[DW_BLOCK (attr)->size + 1] = DW_OP_nop;
+		  data[DW_BLOCK (attr)->size] = DW_OP_deref;
+		  data[DW_BLOCK (attr)->size + 1] = DW_OP_nop;
 		}
 	    }
 
@@ -6564,15 +6563,6 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
 	  TYPE_HIGH_BOUND (range_type) = low - 1;
 	}
     }
-  else
-    {
-      attr = dwarf2_attr (die, DW_AT_count, cu);
-      if (attr)
-	{
-	  int count = dwarf2_get_attr_constant_value (attr, 1);
-	  high = low + count - 1;
-	}
-    }
 
   /* Dwarf-2 specifications explicitly allows to create subrange types
      without specifying a base type.
@@ -6648,12 +6638,6 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
 	complaint (&symfile_complaints,
 		   _("Found DW_AT_byte_stride with unsupported value 0"));
     }
-
-  /* Mark arrays with dynamic length at least as an array of unspecified
-     length.  GDB could check the boundary but before it gets implemented at
-     least allow accessing the array elements.  */
-  if (attr && attr->form == DW_FORM_block1)
-    TYPE_HIGH_BOUND_UNDEFINED (range_type) = 1;
 
   name = dwarf2_name (die, cu);
   if (name)
