@@ -6456,8 +6456,13 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
   negative_mask = 
     (LONGEST) -1 << (TYPE_LENGTH (base_type) * TARGET_CHAR_BIT - 1);
 
+  /* Exclude language_ada from any TYPE_DYNAMIC constructs below.  GDB Ada
+     supports implements the dynamic bounds in a non-DWARF way and the
+     existing DWARF dynamic bounds are invalid, leading to memory access
+     errors.  */
+
   attr = dwarf2_attr (die, DW_AT_lower_bound, cu);
-  if (attr && attr_form_is_block (attr))
+  if (attr && attr_form_is_block (attr) && cu->language != language_ada)
     {
       TYPE_RANGE_DATA (range_type)->low.kind = RANGE_BOUND_KIND_DWARF_BLOCK;
       TYPE_RANGE_DATA (range_type)->low.u.dwarf_block =
@@ -6466,7 +6471,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
       /* For setting a default if DW_AT_UPPER_BOUND would be missing.  */
       low = 0;
     }
-  else if (attr && is_ref_attr (attr))
+  else if (attr && is_ref_attr (attr) && cu->language != language_ada)
     {
       struct die_info *target_die;
       struct dwarf2_cu *target_cu = cu;
@@ -6524,14 +6529,14 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
       /* Pass it now as the regular DW_AT_upper_bound.  */
     }
 
-  if (attr && attr_form_is_block (attr))
+  if (attr && attr_form_is_block (attr) && cu->language != language_ada)
     {
       TYPE_RANGE_DATA (range_type)->high.kind = RANGE_BOUND_KIND_DWARF_BLOCK;
       TYPE_RANGE_DATA (range_type)->high.u.dwarf_block =
 					dwarf2_attr_to_locexpr_baton (attr, cu);
       TYPE_DYNAMIC (range_type) = 1;
     }
-  else if (attr && is_ref_attr (attr))
+  else if (attr && is_ref_attr (attr) && cu->language != language_ada)
     {
       struct die_info *target_die;
       struct dwarf2_cu *target_cu = cu;
@@ -6605,7 +6610,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
 
   /* DW_AT_bit_stride is currently unsupported as we count in bytes.  */
   attr = dwarf2_attr (die, DW_AT_byte_stride, cu);
-  if (attr && attr_form_is_block (attr))
+  if (attr && attr_form_is_block (attr) && cu->language != language_ada)
     {
       TYPE_RANGE_DATA (range_type)->byte_stride.kind
         = RANGE_BOUND_KIND_DWARF_BLOCK;
@@ -6613,7 +6618,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
 					dwarf2_attr_to_locexpr_baton (attr, cu);
       TYPE_DYNAMIC (range_type) = 1;
     }
-  else if (attr && is_ref_attr (attr))
+  else if (attr && is_ref_attr (attr) && cu->language != language_ada)
     {
       struct die_info *target_die;
       struct dwarf2_cu *target_cu = cu;
