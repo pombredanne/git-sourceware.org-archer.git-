@@ -6442,6 +6442,8 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
   LONGEST negative_mask;
 
   base_type = die_type (die, cu);
+  /* Preserve BASE_TYPE's original type, just set its LENGTH.  */
+  check_typedef (base_type);
 
   /* The die_type call above may have already set the type for this DIE.  */
   range_type = get_die_type (die, cu);
@@ -6548,20 +6550,18 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
     }
   else
     {
-      if (attr && attr_form_is_constant (attr))
-	{
-	  LONGEST high;
+      LONGEST high;
 
-	  high = dwarf2_get_attr_constant_value (attr, 0);
-	  if (!TYPE_UNSIGNED (base_type) && (high & negative_mask))
-	    high |= negative_mask;
-	  TYPE_HIGH_BOUND (range_type) = high;
-	}
+      if (attr && attr_form_is_constant (attr))
+	high = dwarf2_get_attr_constant_value (attr, 0);
       else
 	{
 	  TYPE_HIGH_BOUND_UNDEFINED (range_type) = 1;
-	  TYPE_HIGH_BOUND (range_type) = low - 1;
+	  high = low - 1;
 	}
+      if (!TYPE_UNSIGNED (base_type) && (high & negative_mask))
+	high |= negative_mask;
+      TYPE_HIGH_BOUND (range_type) = high;
     }
 
   /* Dwarf-2 specifications explicitly allows to create subrange types
