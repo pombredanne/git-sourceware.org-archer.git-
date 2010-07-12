@@ -131,12 +131,12 @@ enum type_code
     TYPE_CODE_COMPLEX,		/* Complex float */
 
     TYPE_CODE_TYPEDEF,
-    TYPE_CODE_TEMPLATE,		/* C++ template */
-    TYPE_CODE_TEMPLATE_ARG,	/* C++ template arg */
 
     TYPE_CODE_NAMESPACE,	/* C++ namespace.  */
 
     TYPE_CODE_DECFLOAT,		/* Decimal floating point.  */
+
+    TYPE_CODE_MODULE,		/* Fortran module.  */
 
     /* Internal function type.  */
     TYPE_CODE_INTERNAL_FUNCTION
@@ -342,8 +342,7 @@ enum field_loc_kind
   {
     FIELD_LOC_KIND_BITPOS,	/* bitpos */
     FIELD_LOC_KIND_PHYSADDR,	/* physaddr */
-    FIELD_LOC_KIND_PHYSNAME,	/* physname */
-    FIELD_LOC_KIND_DWARF_BLOCK	/* dwarf_block */
+    FIELD_LOC_KIND_PHYSNAME	/* physname */
   };
 
 /* A discriminant to determine which field in the main_type.type_specific
@@ -461,6 +460,9 @@ struct main_type
      For a function or method type, describes the type of the return value.
      For a range type, describes the type of the full range.
      For a complex type, describes the type of each coordinate.
+     For a special record or union type encoding a dynamic-sized type
+     in GNAT, a memoized pointer to a corresponding static version of
+     the type.
      Unused otherwise.  */
 
   struct type *target_type;
@@ -501,12 +503,6 @@ struct main_type
 
 	CORE_ADDR physaddr;
 	char *physname;
-
-	/* The field location can be computed by evaluating the following DWARF
-	   block.  This can be used in Fortran variable-length arrays, for
-	   instance.  */
-
-	struct dwarf2_locexpr_baton *dwarf_block;
       }
       loc;
 
@@ -685,10 +681,12 @@ struct cplus_struct_type
 
     short nfn_fields_total;
 
-    /* Number of template arguments, placed here for better struct
-       packing.  */
-
-    short ntemplate_args;
+    /* One if this struct is a dynamic class, as defined by the
+       Itanium C++ ABI: if it requires a virtual table pointer,
+       because it or any of its base classes have one or more virtual
+       member functions or virtual base classes.  Minus one if not
+       dynamic.  Zero if not yet computed.  */
+    int is_dynamic : 2;
 
     /* For derived classes, the number of base classes is given by n_baseclasses
        and virtual_field_bits is a bit vector containing one bit per base class.
@@ -806,20 +804,6 @@ struct cplus_struct_type
       }
      *fn_fieldlists;
 
-    /* If this "struct type" describes a template, then it 
-     * has arguments. "template_args" points to an array of
-     * template arg descriptors, of length "ntemplate_args".
-     * The only real information in each of these template arg descriptors
-     * is a name. "type" will typically just point to a "struct type" with
-     * the placeholder TYPE_CODE_TEMPLATE_ARG type.
-     */
-    struct template_arg
-      {
-	char *name;
-	struct type *type;
-      }
-     *template_args;
-
     /* Pointer to information about enclosing scope, if this is a
      * local type.  If it is not a local type, this is NULL
      */
@@ -830,12 +814,18 @@ struct cplus_struct_type
       }
      *localtype_ptr;
 
-    /* One if this struct is a dynamic class, as defined by the
-       Itanium C++ ABI: if it requires a virtual table pointer,
-       because it or any of its base classes have one or more virtual
-       member functions or virtual base classes.  Minus one if not
-       dynamic.  Zero if not yet computed.  */
-    int is_dynamic : 2;
+    /* typedefs defined inside this class.  TYPEDEF_FIELD points to an array of
+       TYPEDEF_FIELD_COUNT elements.  */
+    struct typedef_field
+      {
+	/* Unqualified name to be prefixed by owning class qualified name.  */
+	const char *name;
+
+	/* Type this typedef named NAME represents.  */
+	struct type *type;
+      }
+    *typedef_field;
+    unsigned typedef_field_count;
   };
 
 /* Struct used in computing virtual base list */
@@ -909,7 +899,6 @@ extern void allocate_gnat_aux_type (struct type *);
 #define TYPE_CODE(thistype) TYPE_MAIN_TYPE(thistype)->code
 #define TYPE_NFIELDS(thistype) TYPE_MAIN_TYPE(thistype)->nfields
 #define TYPE_FIELDS(thistype) TYPE_MAIN_TYPE(thistype)->flds_bnds.fields
-#define TYPE_TEMPLATE_ARGS(thistype) TYPE_CPLUS_SPECIFIC(thistype)->template_args
 
 #define TYPE_INDEX_TYPE(type) TYPE_FIELD_TYPE (type, 0)
 #define TYPE_RANGE_DATA(thistype) TYPE_MAIN_TYPE(thistype)->flds_bnds.bounds
@@ -941,7 +930,6 @@ extern void allocate_gnat_aux_type (struct type *);
 #define TYPE_FN_FIELDS(thistype) TYPE_CPLUS_SPECIFIC(thistype)->fn_fields
 #define TYPE_NFN_FIELDS(thistype) TYPE_CPLUS_SPECIFIC(thistype)->nfn_fields
 #define TYPE_NFN_FIELDS_TOTAL(thistype) TYPE_CPLUS_SPECIFIC(thistype)->nfn_fields_total
-#define TYPE_NTEMPLATE_ARGS(thistype) TYPE_CPLUS_SPECIFIC(thistype)->ntemplate_args
 #define TYPE_SPECIFIC_FIELD(thistype) \
   TYPE_MAIN_TYPE(thistype)->type_specific_field
 #define	TYPE_TYPE_SPECIFIC(thistype) TYPE_MAIN_TYPE(thistype)->type_specific
@@ -977,7 +965,6 @@ extern void allocate_gnat_aux_type (struct type *);
 #define FIELD_BITPOS(thisfld) ((thisfld).loc.bitpos)
 #define FIELD_STATIC_PHYSNAME(thisfld) ((thisfld).loc.physname)
 #define FIELD_STATIC_PHYSADDR(thisfld) ((thisfld).loc.physaddr)
-#define FIELD_DWARF_BLOCK(thisfld) ((thisfld).loc.dwarf_block)
 #define SET_FIELD_BITPOS(thisfld, bitpos)			\
   (FIELD_LOC_KIND (thisfld) = FIELD_LOC_KIND_BITPOS,		\
    FIELD_BITPOS (thisfld) = (bitpos))
@@ -987,9 +974,6 @@ extern void allocate_gnat_aux_type (struct type *);
 #define SET_FIELD_PHYSADDR(thisfld, addr)			\
   (FIELD_LOC_KIND (thisfld) = FIELD_LOC_KIND_PHYSADDR,		\
    FIELD_STATIC_PHYSADDR (thisfld) = (addr))
-#define SET_FIELD_DWARF_BLOCK(thisfld, addr)			\
-  (FIELD_LOC_KIND (thisfld) = FIELD_LOC_KIND_DWARF_BLOCK,	\
-   FIELD_DWARF_BLOCK (thisfld) = (addr))
 #define FIELD_ARTIFICIAL(thisfld) ((thisfld).artificial)
 #define FIELD_BITSIZE(thisfld) ((thisfld).bitsize)
 
@@ -1000,11 +984,9 @@ extern void allocate_gnat_aux_type (struct type *);
 #define TYPE_FIELD_BITPOS(thistype, n) FIELD_BITPOS (TYPE_FIELD (thistype, n))
 #define TYPE_FIELD_STATIC_PHYSNAME(thistype, n) FIELD_STATIC_PHYSNAME (TYPE_FIELD (thistype, n))
 #define TYPE_FIELD_STATIC_PHYSADDR(thistype, n) FIELD_STATIC_PHYSADDR (TYPE_FIELD (thistype, n))
-#define TYPE_FIELD_DWARF_BLOCK(thistype, n) FIELD_DWARF_BLOCK (TYPE_FIELD (thistype, n))
 #define TYPE_FIELD_ARTIFICIAL(thistype, n) FIELD_ARTIFICIAL(TYPE_FIELD(thistype,n))
 #define TYPE_FIELD_BITSIZE(thistype, n) FIELD_BITSIZE(TYPE_FIELD(thistype,n))
 #define TYPE_FIELD_PACKED(thistype, n) (FIELD_BITSIZE(TYPE_FIELD(thistype,n))!=0)
-#define TYPE_TEMPLATE_ARG(thistype, n) TYPE_CPLUS_SPECIFIC(thistype)->template_args[n]
 
 #define TYPE_FIELD_PRIVATE_BITS(thistype) \
   TYPE_CPLUS_SPECIFIC(thistype)->private_field_bits
@@ -1066,11 +1048,28 @@ extern void allocate_gnat_aux_type (struct type *);
 #define TYPE_LOCALTYPE_FILE(thistype) (TYPE_CPLUS_SPECIFIC(thistype)->localtype_ptr->file)
 #define TYPE_LOCALTYPE_LINE(thistype) (TYPE_CPLUS_SPECIFIC(thistype)->localtype_ptr->line)
 
+#define TYPE_TYPEDEF_FIELD_ARRAY(thistype) \
+  TYPE_CPLUS_SPECIFIC (thistype)->typedef_field
+#define TYPE_TYPEDEF_FIELD(thistype, n) \
+  TYPE_CPLUS_SPECIFIC (thistype)->typedef_field[n]
+#define TYPE_TYPEDEF_FIELD_NAME(thistype, n) \
+  TYPE_TYPEDEF_FIELD (thistype, n).name
+#define TYPE_TYPEDEF_FIELD_TYPE(thistype, n) \
+  TYPE_TYPEDEF_FIELD (thistype, n).type
+#define TYPE_TYPEDEF_FIELD_COUNT(thistype) \
+  TYPE_CPLUS_SPECIFIC (thistype)->typedef_field_count
+
 #define TYPE_IS_OPAQUE(thistype) (((TYPE_CODE (thistype) == TYPE_CODE_STRUCT) ||        \
                                    (TYPE_CODE (thistype) == TYPE_CODE_UNION))        && \
                                   (TYPE_NFIELDS (thistype) == 0)                     && \
-                                  (HAVE_CPLUS_STRUCT (thistype) && (TYPE_NFN_FIELDS (thistype) == 0)) && \
+                                  (!HAVE_CPLUS_STRUCT (thistype)			\
+				   || TYPE_NFN_FIELDS (thistype) == 0) &&		\
                                   (TYPE_STUB (thistype) || !TYPE_STUB_SUPPORTED (thistype)))
+
+/* A helper macro that returns the name of an error type.  If the type
+   has a name, it is used; otherwise, a default is used.  */
+#define TYPE_ERROR_NAME(type) \
+  (TYPE_NAME (type) ? TYPE_NAME (type) : _("<error type>"))
 
 struct builtin_type
 {
@@ -1122,6 +1121,9 @@ struct builtin_type
   struct type *builtin_int128;
   struct type *builtin_uint128;
 
+  /* Wide character types.  */
+  struct type *builtin_char16;
+  struct type *builtin_char32;
 
   /* Pointer types.  */
 
@@ -1189,6 +1191,7 @@ extern const struct objfile_type *objfile_type (struct objfile *objfile);
 
  
 /* Explicit floating-point formats.  See "floatformat.h".  */
+extern const struct floatformat *floatformats_ieee_half[BFD_ENDIAN_UNKNOWN];
 extern const struct floatformat *floatformats_ieee_single[BFD_ENDIAN_UNKNOWN];
 extern const struct floatformat *floatformats_ieee_double[BFD_ENDIAN_UNKNOWN];
 extern const struct floatformat *floatformats_ieee_double_littlebyte_bigword[BFD_ENDIAN_UNKNOWN];
@@ -1201,16 +1204,6 @@ extern const struct floatformat *floatformats_vax_f[BFD_ENDIAN_UNKNOWN];
 extern const struct floatformat *floatformats_vax_d[BFD_ENDIAN_UNKNOWN];
 extern const struct floatformat *floatformats_ibm_long_double[BFD_ENDIAN_UNKNOWN];
 
-
-/* Maximum and minimum values of built-in types */
-
-#define	MAX_OF_TYPE(t)	\
-   (TYPE_UNSIGNED(t) ? UMAX_OF_SIZE(TYPE_LENGTH(t)) \
-    : MAX_OF_SIZE(TYPE_LENGTH(t)))
-
-#define MIN_OF_TYPE(t)	\
-   (TYPE_UNSIGNED(t) ? UMIN_OF_SIZE(TYPE_LENGTH(t)) \
-    : MIN_OF_SIZE(TYPE_LENGTH(t)))
 
 /* Allocate space for storing data associated with a particular type.
    We ensure that the space is allocated using the same mechanism that
@@ -1273,6 +1266,8 @@ extern void append_composite_type_field_aligned (struct type *t,
 						 char *name,
 						 struct type *field,
 						 int alignment);
+struct field *append_composite_type_field_raw (struct type *t, char *name,
+					       struct type *field);
 
 /* Helper functions to construct a bit flags type.  An initially empty
    type is created using arch_flag_type().  Flags are then added using

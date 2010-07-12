@@ -211,6 +211,7 @@ static PyObject *
 valpy_get_type (PyObject *self, void *closure)
 {
   value_object *obj = (value_object *) self;
+
   if (!obj->type)
     {
       obj->type = type_to_type_object (value_type (obj->value));
@@ -263,7 +264,7 @@ valpy_lazy_string (PyObject *self, PyObject *args, PyObject *kw)
 static PyObject *
 valpy_string (PyObject *self, PyObject *args, PyObject *kw)
 {
-  int length = -1, ret = 0;
+  int length = -1;
   gdb_byte *buffer;
   struct value *value = ((value_object *) self)->value;
   volatile struct gdb_exception except;
@@ -308,7 +309,8 @@ valpy_cast (PyObject *self, PyObject *args)
   type = type_object_to_type (type_obj);
   if (! type)
     {
-      PyErr_SetString (PyExc_RuntimeError, "argument must be a Type");
+      PyErr_SetString (PyExc_RuntimeError, 
+		       _("Argument must be a type."));
       return NULL;
     }
 
@@ -326,7 +328,7 @@ valpy_length (PyObject *self)
 {
   /* We don't support getting the number of elements in a struct / class.  */
   PyErr_SetString (PyExc_NotImplementedError,
-		   "Invalid operation on gdb.Value.");
+		   _("Invalid operation on gdb.Value."));
   return -1;
 }
 
@@ -359,16 +361,18 @@ valpy_getitem (PyObject *self, PyObject *key)
 	     value code throw an exception if the index has an invalid
 	     type.  */
 	  struct value *idx = convert_value_from_python (key);
+
 	  if (idx != NULL)
 	    {
 	      /* Check the value's type is something that can be accessed via
 		 a subscript.  */
 	      struct type *type;
+
 	      tmp = coerce_ref (tmp);
 	      type = check_typedef (value_type (tmp));
 	      if (TYPE_CODE (type) != TYPE_CODE_ARRAY
 		  && TYPE_CODE (type) != TYPE_CODE_PTR)
-		  error( _("Cannot subscript requested type"));
+		  error( _("Cannot subscript requested type."));
 	      else
 		res_val = value_subscript (tmp, value_as_long (idx));
 	    }
@@ -433,6 +437,14 @@ valpy_get_is_optimized_out (PyObject *self, void *closure)
     Py_RETURN_TRUE;
 
   Py_RETURN_FALSE;
+}
+
+/* Calculate and return the address of the PyObject as the value of
+   the builtin __hash__ call.  */
+static long 
+valpy_hash (PyObject *self)
+{
+  return (long) (intptr_t) self;
 }
 
 enum valpy_opcode
@@ -627,6 +639,7 @@ static PyObject *
 valpy_absolute (PyObject *self)
 {
   struct value *value = ((value_object *) self)->value;
+
   if (value_less (value, value_zero (value_type (value), not_lval)))
     return valpy_negative (self);
   else
@@ -732,7 +745,7 @@ valpy_richcompare (PyObject *self, PyObject *other, int op)
       default:
 	/* Can't happen.  */
 	PyErr_SetString (PyExc_NotImplementedError,
-			 "Invalid operation on gdb.Value.");
+			 _("Invalid operation on gdb.Value."));
 	return NULL;
     }
 
@@ -769,7 +782,7 @@ valpy_richcompare (PyObject *self, PyObject *other, int op)
 	default:
 	  /* Can't happen.  */
 	  PyErr_SetString (PyExc_NotImplementedError,
-			   "Invalid operation on gdb.Value.");
+			   _("Invalid operation on gdb.Value."));
 	  result = -1;
 	  break;
       }
@@ -810,7 +823,8 @@ valpy_int (PyObject *self)
   CHECK_TYPEDEF (type);
   if (!is_intlike (type, 0))
     {
-      PyErr_SetString (PyExc_RuntimeError, "cannot convert value to int");
+      PyErr_SetString (PyExc_RuntimeError, 
+		       _("Cannot convert value to int."));
       return NULL;
     }
 
@@ -841,7 +855,8 @@ valpy_long (PyObject *self)
 
   if (!is_intlike (type, 1))
     {
-      PyErr_SetString (PyExc_RuntimeError, "cannot convert value to long");
+      PyErr_SetString (PyExc_RuntimeError, 
+		       _("Cannot convert value to long."));
       return NULL;
     }
 
@@ -870,7 +885,8 @@ valpy_float (PyObject *self)
   CHECK_TYPEDEF (type);
   if (TYPE_CODE (type) != TYPE_CODE_FLT)
     {
-      PyErr_SetString (PyExc_RuntimeError, "cannot convert value to float");
+      PyErr_SetString (PyExc_RuntimeError, 
+		       _("Cannot convert value to float."));
       return NULL;
     }
 
@@ -909,6 +925,7 @@ struct value *
 value_object_to_value (PyObject *self)
 {
   value_object *real;
+
   if (! PyObject_TypeCheck (self, &value_object_type))
     return NULL;
   real = (value_object *) self;
@@ -923,7 +940,6 @@ struct value *
 convert_value_from_python (PyObject *obj)
 {
   struct value *value = NULL; /* -Wall */
-  PyObject *target_str, *unicode_str;
   struct cleanup *old;
   volatile struct gdb_exception except;
   int cmp;
@@ -1004,11 +1020,12 @@ convert_value_from_python (PyObject *obj)
 	{
 	  PyObject *result;
 	  PyObject *function = PyString_FromString ("value");
+
 	  result = PyObject_CallMethodObjArgs (obj, function,  NULL);
 	  value = value_copy (((value_object *) result)->value);
 	}
       else
-	PyErr_Format (PyExc_TypeError, _("Could not convert Python object: %s"),
+	PyErr_Format (PyExc_TypeError, _("Could not convert Python object: %s."),
 		      PyString_AsString (PyObject_Str (obj)));
     }
   if (except.reason < 0)
@@ -1133,7 +1150,7 @@ PyTypeObject value_object_type = {
   &value_object_as_number,	  /*tp_as_number*/
   0,				  /*tp_as_sequence*/
   &value_object_as_mapping,	  /*tp_as_mapping*/
-  0,				  /*tp_hash */
+  valpy_hash,		          /*tp_hash*/
   0,				  /*tp_call*/
   valpy_str,			  /*tp_str*/
   0,				  /*tp_getattro*/

@@ -20,6 +20,8 @@
 #ifndef GDB_PYTHON_INTERNAL_H
 #define GDB_PYTHON_INTERNAL_H
 
+#include <stdio.h>
+
 /* Python 2.4 doesn't include stdint.h soon enough to get {u,}intptr_t
    needed by pyport.h.  */
 #include <stdint.h>
@@ -28,8 +30,11 @@
    if it sees _GNU_SOURCE (which config.h will define).
    pyconfig.h defines _POSIX_C_SOURCE to a different value than
    /usr/include/features.h does causing compilation to fail.
-   To work around this, undef _POSIX_C_SOURCE before we include Python.h.  */
+   To work around this, undef _POSIX_C_SOURCE before we include Python.h.
+
+   Same problem with _XOPEN_SOURCE.  */
 #undef _POSIX_C_SOURCE
+#undef _XOPEN_SOURCE
 
 #if HAVE_LIBPYTHON2_4
 #include "python2.4/Python.h"
@@ -45,6 +50,9 @@ typedef int Py_ssize_t;
 #elif HAVE_LIBPYTHON2_6
 #include "python2.6/Python.h"
 #include "python2.6/frameobject.h"
+#elif HAVE_LIBPYTHON2_7
+#include "python2.7/Python.h"
+#include "python2.7/frameobject.h"
 #else
 #error "Unable to find usable Python.h"
 #endif
@@ -61,13 +69,17 @@ typedef int Py_ssize_t;
 #define PyEval_ReleaseLock() 0
 #endif
 
+/* In order to be able to parse symtab_and_line_to_sal_object function 
+   a real symtab_and_line structure is needed.  */
+#include "symtab.h"
+
+/* Also needed to parse enum var_types. */
 #include "command.h"
 
 struct block;
-struct symbol;
-struct symtab_and_line;
 struct value;
 struct language_defn;
+struct program_space;
 
 extern PyObject *gdb_module;
 extern PyTypeObject block_object_type;
@@ -86,6 +98,9 @@ typedef struct
   PyObject *inf_obj;
 } thread_object;
 
+extern struct cmd_list_element *set_python_list;
+extern struct cmd_list_element *show_python_list;
+
 PyObject *gdbpy_history (PyObject *self, PyObject *args);
 PyObject *gdbpy_breakpoints (PyObject *, PyObject *);
 PyObject *gdbpy_frame_stop_reason_string (PyObject *, PyObject *);
@@ -97,28 +112,46 @@ PyObject *gdbpy_create_lazy_string_object (CORE_ADDR address, long length,
 					   const char *encoding, struct type *type);
 PyObject *gdbpy_inferiors (PyObject *unused, PyObject *unused2);
 PyObject *gdbpy_selected_thread (PyObject *self, PyObject *args);
+PyObject *gdbpy_string_to_argv (PyObject *self, PyObject *args);
+PyObject *gdbpy_get_hook_function (const char *);
+PyObject *gdbpy_parameter (PyObject *self, PyObject *args);
+PyObject *gdbpy_parameter_value (enum var_types type, void *var);
+char *gdbpy_parse_command_name (char *text,
+				struct cmd_list_element ***base_list,
+				struct cmd_list_element **start_list);
 
 PyObject *symtab_and_line_to_sal_object (struct symtab_and_line sal);
 PyObject *symtab_to_symtab_object (struct symtab *symtab);
 PyObject *symbol_to_symbol_object (struct symbol *sym);
-PyObject *block_to_block_object (struct block *block);
+PyObject *block_to_block_object (struct block *block, struct objfile *objfile);
 PyObject *value_to_value_object (struct value *v);
 PyObject *type_to_type_object (struct type *);
-PyObject *objfile_to_objfile_object (struct objfile *);
+PyObject *frame_info_to_frame_object (struct frame_info *frame);
 PyObject *frame_info_to_frame_object (struct frame_info *frame);
 thread_object *create_thread_object (struct thread_info *tp);
 thread_object *find_thread_object (ptid_t ptid);
 PyObject *find_inferior_object (int pid);
 
+PyObject *pspace_to_pspace_object (struct program_space *);
+PyObject *pspy_get_printers (PyObject *, void *);
+
+PyObject *objfile_to_objfile_object (struct objfile *);
 PyObject *objfpy_get_printers (PyObject *, void *);
+
+thread_object *create_thread_object (struct thread_info *tp);
+thread_object *find_thread_object (ptid_t ptid);
+PyObject *find_inferior_object (int pid);
 
 struct block *block_object_to_block (PyObject *obj);
 struct symbol *symbol_object_to_symbol (PyObject *obj);
 struct value *value_object_to_value (PyObject *self);
 struct value *convert_value_from_python (PyObject *obj);
 struct type *type_object_to_type (PyObject *obj);
+struct symtab *symtab_object_to_symtab (PyObject *obj);
+struct symtab_and_line *sal_object_to_symtab_and_line (PyObject *obj);
 
 PyObject *gdbpy_get_hook_function (const char *);
+void gdbpy_initialize_auto_load (void);
 
 void gdbpy_initialize_values (void);
 void gdbpy_initialize_breakpoints (void);
@@ -126,10 +159,14 @@ void gdbpy_initialize_frames (void);
 void gdbpy_initialize_symtabs (void);
 void gdbpy_initialize_commands (void);
 void gdbpy_initialize_symbols (void);
+void gdbpy_initialize_symtabs (void);
+void gdbpy_initialize_blocks (void);
 void gdbpy_initialize_types (void);
 void gdbpy_initialize_blocks (void);
 void gdbpy_initialize_functions (void);
+void gdbpy_initialize_pspace (void);
 void gdbpy_initialize_objfile (void);
+void gdbpy_initialize_breakpoints (void);
 void gdbpy_initialize_lazy_string (void);
 void gdbpy_initialize_parameters (void);
 void gdbpy_initialize_thread (void);
@@ -175,6 +212,9 @@ PyObject *gdbpy_parameter_value (enum var_types, void *);
 
 void gdbpy_print_stack (void);
 
+void source_python_script_for_objfile (struct objfile *objfile,
+				       FILE *stream, const char *file);
+
 PyObject *python_string_to_unicode (PyObject *obj);
 char *unicode_to_target_string (PyObject *unicode_str);
 char *python_string_to_target_string (PyObject *obj);
@@ -182,6 +222,9 @@ PyObject *python_string_to_target_python_string (PyObject *obj);
 char *python_string_to_host_string (PyObject *obj);
 PyObject *target_string_to_unicode (const gdb_byte *str, int length);
 int gdbpy_is_string (PyObject *obj);
+char *gdbpy_obj_to_string (PyObject *obj);
+char *gdbpy_exception_to_string (PyObject *ptype, PyObject *pvalue);
+
 int gdbpy_is_lazy_string (PyObject *result);
 gdb_byte *gdbpy_extract_lazy_string (PyObject *string,
 				     struct type **str_type, 
@@ -202,6 +245,9 @@ extern PyObject *gdbpy_children_cst;
 extern PyObject *gdbpy_to_string_cst;
 extern PyObject *gdbpy_display_hint_cst;
 extern PyObject *gdbpy_doc_cst;
+extern PyObject *gdbpy_enabled_cst;
+
+extern PyObject *gdbpy_gdberror_exc;
 
 int get_addr_from_python (PyObject *obj, CORE_ADDR *addr);
 

@@ -186,7 +186,6 @@ remove_program_space (struct program_space *pspace)
 struct program_space *
 clone_program_space (struct program_space *dest, struct program_space *src)
 {
-  struct program_space *new_pspace;
   struct cleanup *old_chain;
 
   old_chain = save_current_program_space ();
@@ -228,6 +227,7 @@ static void
 restore_program_space (void *arg)
 {
   struct program_space *saved_pspace = arg;
+
   set_current_program_space (saved_pspace);
 }
 
@@ -240,6 +240,7 @@ save_current_program_space (void)
 {
   struct cleanup *old_chain = make_cleanup (restore_program_space,
 					    current_program_space);
+
   return old_chain;
 }
 
@@ -248,8 +249,6 @@ save_current_program_space (void)
 static int
 pspace_empty_p (struct program_space *pspace)
 {
-  struct inferior *inf;
-
   if (find_inferior_for_program_space (pspace) != NULL)
       return 0;
 
@@ -430,24 +429,31 @@ void
 update_address_spaces (void)
 {
   int shared_aspace = gdbarch_has_shared_address_space (target_gdbarch);
-  struct address_space *aspace = NULL;
   struct program_space *pspace;
+  struct inferior *inf;
 
   init_address_spaces ();
 
-  ALL_PSPACES (pspace)
+  if (shared_aspace)
     {
-      free_address_space (pspace->aspace);
+      struct address_space *aspace = new_address_space ();
 
-      if (shared_aspace)
-	{
-	  if (aspace == NULL)
-	    aspace = new_address_space ();
-	  pspace->aspace = aspace;
-	}
-      else
-	pspace->aspace = new_address_space ();
+      free_address_space (current_program_space->aspace);
+      ALL_PSPACES (pspace)
+	pspace->aspace = aspace;
     }
+  else
+    ALL_PSPACES (pspace)
+      {
+	free_address_space (pspace->aspace);
+	pspace->aspace = new_address_space ();
+      }
+
+  for (inf = inferior_list; inf; inf = inf->next)
+    if (gdbarch_has_global_solist (target_gdbarch))
+      inf->aspace = maybe_new_address_space ();
+    else
+      inf->aspace = inf->pspace->aspace;
 }
 
 /* Save the current program space so that it may be restored by a later

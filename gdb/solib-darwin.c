@@ -158,6 +158,7 @@ lookup_symbol_from_bfd (bfd *abfd, char *symname)
   for (i = 0; i < number_of_symbols; i++)
     {
       asymbol *sym = symbol_table[i];
+
       if (strcmp (sym->name, symname) == 0
 	  && (sym->section->flags & (SEC_CODE | SEC_DATA)) != 0)
 	{
@@ -309,10 +310,6 @@ darwin_solib_create_inferior_hook (int from_tty)
   bfd *dyld_bfd = NULL;
   struct inferior *inf = current_inferior ();
 
-  /* First, remove all the solib event breakpoints.  Their addresses
-     may have changed since the last time we ran the program.  */
-  remove_solib_event_breakpoints ();
-
   /* Find the program interpreter.  */
   interp_name = find_program_interpreter ();
   if (!interp_name)
@@ -324,6 +321,7 @@ darwin_solib_create_inferior_hook (int from_tty)
   if (dyld_bfd)
     {
       bfd *sub;
+
       sub = bfd_mach_o_fat_extract (dyld_bfd, bfd_object,
 				    gdbarch_bfd_arch_info (target_gdbarch));
       if (sub)
@@ -408,7 +406,6 @@ darwin_relocate_section_addresses (struct so_list *so,
 static struct symbol *
 darwin_lookup_lib_symbol (const struct objfile *objfile,
 			  const char *name,
-			  const char *linkage_name,
 			  const domain_enum domain)
 {
   return NULL;

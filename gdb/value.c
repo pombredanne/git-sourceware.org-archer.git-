@@ -315,6 +315,7 @@ struct value *
 allocate_value (struct type *type)
 {
   struct value *val = allocate_value_lazy (type);
+
   allocate_value_contents (val);
   val->lazy = 0;
   return val;
@@ -331,6 +332,7 @@ allocate_repeat_value (struct type *type, int count)
      done with it.  */
   struct type *array_type
     = lookup_array_range_type (type, low_bound, count + low_bound - 1);
+
   return allocate_value (array_type);
 }
 
@@ -340,6 +342,7 @@ allocate_computed_value (struct type *type,
                          void *closure)
 {
   struct value *v = allocate_value (type);
+
   VALUE_LVAL (v) = lval_computed;
   v->location.computed.funcs = funcs;
   v->location.computed.closure = closure;
@@ -357,7 +360,7 @@ value_next (struct value *value)
 }
 
 struct type *
-value_type (struct value *value)
+value_type (const struct value *value)
 {
   return value->type;
 }
@@ -370,7 +373,7 @@ deprecated_set_value_type (struct value *value, struct type *type)
 }
 
 int
-value_offset (struct value *value)
+value_offset (const struct value *value)
 {
   return value->offset;
 }
@@ -381,7 +384,7 @@ set_value_offset (struct value *value, int offset)
 }
 
 int
-value_bitpos (struct value *value)
+value_bitpos (const struct value *value)
 {
   return value->bitpos;
 }
@@ -392,7 +395,7 @@ set_value_bitpos (struct value *value, int bit)
 }
 
 int
-value_bitsize (struct value *value)
+value_bitsize (const struct value *value)
 {
   return value->bitsize;
 }
@@ -428,12 +431,27 @@ value_enclosing_type (struct value *value)
   return value->enclosing_type;
 }
 
+static void
+require_not_optimized_out (struct value *value)
+{
+  if (value->optimized_out)
+    error (_("value has been optimized out"));
+}
+
 const gdb_byte *
-value_contents_all (struct value *value)
+value_contents_for_printing (struct value *value)
 {
   if (value->lazy)
     value_fetch_lazy (value);
   return value->contents;
+}
+
+const gdb_byte *
+value_contents_all (struct value *value)
+{
+  const gdb_byte *result = value_contents_for_printing (value);
+  require_not_optimized_out (value);
+  return result;
 }
 
 int
@@ -463,7 +481,9 @@ set_value_stack (struct value *value, int val)
 const gdb_byte *
 value_contents (struct value *value)
 {
-  return value_contents_writeable (value);
+  const gdb_byte *result = value_contents_writeable (value);
+  require_not_optimized_out (value);
+  return result;
 }
 
 gdb_byte *
@@ -507,6 +527,29 @@ set_value_optimized_out (struct value *value, int val)
 }
 
 int
+value_entirely_optimized_out (const struct value *value)
+{
+  if (!value->optimized_out)
+    return 0;
+  if (value->lval != lval_computed
+      || !value->location.computed.funcs->check_validity)
+    return 1;
+  return !value->location.computed.funcs->check_any_valid (value);
+}
+
+int
+value_bits_valid (const struct value *value, int offset, int length)
+{
+  if (value == NULL || !value->optimized_out)
+    return 1;
+  if (value->lval != lval_computed
+      || !value->location.computed.funcs->check_validity)
+    return 0;
+  return value->location.computed.funcs->check_validity (value, offset,
+							 length);
+}
+
+int
 value_embedded_offset (struct value *value)
 {
   return value->embedded_offset;
@@ -539,9 +582,9 @@ value_computed_funcs (struct value *v)
 }
 
 void *
-value_computed_closure (struct value *v)
+value_computed_closure (const struct value *v)
 {
-  gdb_assert (VALUE_LVAL (v) == lval_computed);
+  gdb_assert (v->lval == lval_computed);
 
   return v->location.computed.closure;
 }
@@ -699,6 +742,20 @@ free_all_values (void)
   all_values = 0;
 }
 
+/* Frees all the elements in a chain of values.  */
+
+void
+free_value_chain (struct value *v)
+{
+  struct value *next;
+
+  for (; v; v = next)
+    {
+      next = value_next (v);
+      value_free (v);
+    }
+}
+
 /* Remove VAL from the chain all_values
    so it will not be freed automatically.  */
 
@@ -791,15 +848,16 @@ value_copy (struct value *arg)
 }
 
 void
-set_value_component_location (struct value *component, struct value *whole)
+set_value_component_location (struct value *component,
+			      const struct value *whole)
 {
-  if (VALUE_LVAL (whole) == lval_internalvar)
+  if (whole->lval == lval_internalvar)
     VALUE_LVAL (component) = lval_internalvar_component;
   else
-    VALUE_LVAL (component) = VALUE_LVAL (whole);
+    VALUE_LVAL (component) = whole->lval;
 
   component->location = whole->location;
-  if (VALUE_LVAL (whole) == lval_computed)
+  if (whole->lval == lval_computed)
     {
       struct lval_funcs *funcs = whole->location.computed.funcs;
 
@@ -840,7 +898,8 @@ record_latest_value (struct value *val)
   if (i == 0)
     {
       struct value_history_chunk *new
-      = (struct value_history_chunk *)
+	= (struct value_history_chunk *)
+
       xmalloc (sizeof (struct value_history_chunk));
       memset (new->values, 0, sizeof new->values);
       new->next = value_history_chain;
@@ -917,6 +976,7 @@ show_values (char *num_exp, int from_tty)
   for (i = num; i < num + 10 && i <= value_history_count; i++)
     {
       struct value_print_options opts;
+
       val = access_value_history (i);
       printf_filtered (("$%d = "), i);
       get_user_print_options (&opts);
@@ -1077,6 +1137,7 @@ struct internalvar *
 create_internalvar (const char *name)
 {
   struct internalvar *var;
+
   var = (struct internalvar *) xmalloc (sizeof (struct internalvar));
   var->name = concat (name, (char *)NULL);
   var->kind = INTERNALVAR_VOID;
@@ -1094,6 +1155,7 @@ struct internalvar *
 create_internalvar_type_lazy (char *name, internalvar_make_value fun)
 {
   struct internalvar *var = create_internalvar (name);
+
   var->kind = INTERNALVAR_MAKE_VALUE;
   var->u.make_value = fun;
   return var;
@@ -1377,6 +1439,7 @@ create_internal_function (const char *name,
 			  internal_function_fn handler, void *cookie)
 {
   struct internal_function *ifn = XNEW (struct internal_function);
+
   ifn->name = xstrdup (name);
   ifn->handler = handler;
   ifn->cookie = cookie;
@@ -1514,7 +1577,6 @@ preserve_values (struct objfile *objfile)
   htab_t copied_types;
   struct value_history_chunk *cur;
   struct internalvar *var;
-  struct value *val;
   int i;
 
   /* Create the hash table.  We allocate on the objfile's obstack, since
@@ -1835,7 +1897,7 @@ unpack_pointer (struct type *type, const gdb_byte *valaddr)
 }
 
 
-/* Get the value of the FIELDN'th field (which must be static) of
+/* Get the value of the FIELDNO'th field (which must be static) of
    TYPE.  Return NULL if the field doesn't exist or has been
    optimized out. */
 
@@ -1844,26 +1906,31 @@ value_static_field (struct type *type, int fieldno)
 {
   struct value *retval;
 
-  if (TYPE_FIELD_LOC_KIND (type, fieldno) == FIELD_LOC_KIND_PHYSADDR)
+  switch (TYPE_FIELD_LOC_KIND (type, fieldno))
     {
-      retval = value_at (TYPE_FIELD_TYPE (type, fieldno),
-			 TYPE_FIELD_STATIC_PHYSADDR (type, fieldno));
-    }
-  else
+    case FIELD_LOC_KIND_PHYSADDR:
+      retval = value_at_lazy (TYPE_FIELD_TYPE (type, fieldno),
+			      TYPE_FIELD_STATIC_PHYSADDR (type, fieldno));
+      break;
+    case FIELD_LOC_KIND_PHYSNAME:
     {
       char *phys_name = TYPE_FIELD_STATIC_PHYSNAME (type, fieldno);
+      /*TYPE_FIELD_NAME (type, fieldno);*/
       struct symbol *sym = lookup_symbol (phys_name, 0, VAR_DOMAIN, 0);
+
       if (sym == NULL)
 	{
-	  /* With some compilers, e.g. HP aCC, static data members are reported
-	     as non-debuggable symbols */
-	  struct minimal_symbol *msym = lookup_minimal_symbol (phys_name, NULL, NULL);
+	  /* With some compilers, e.g. HP aCC, static data members are
+	     reported as non-debuggable symbols */
+	  struct minimal_symbol *msym = lookup_minimal_symbol (phys_name,
+							       NULL, NULL);
+
 	  if (!msym)
 	    return NULL;
 	  else
 	    {
-	      retval = value_at (TYPE_FIELD_TYPE (type, fieldno),
-				 SYMBOL_VALUE_ADDRESS (msym));
+	      retval = value_at_lazy (TYPE_FIELD_TYPE (type, fieldno),
+				      SYMBOL_VALUE_ADDRESS (msym));
 	    }
 	}
       else
@@ -1878,7 +1945,12 @@ value_static_field (struct type *type, int fieldno)
       if (retval && VALUE_LVAL (retval) == lval_memory)
 	SET_FIELD_PHYSADDR (TYPE_FIELD (type, fieldno),
 			    value_address (retval));
+      break;
     }
+    default:
+      gdb_assert (0);
+    }
+
   return retval;
 }
 
@@ -2234,11 +2306,12 @@ pack_long (gdb_byte *buf, struct type *type, LONGEST num)
 void
 pack_unsigned_long (gdb_byte *buf, struct type *type, ULONGEST num)
 {
-  enum bfd_endian byte_order = gdbarch_byte_order (get_type_arch (type));
   int len;
+  enum bfd_endian byte_order;
 
   type = check_typedef (type);
   len = TYPE_LENGTH (type);
+  byte_order = gdbarch_byte_order (get_type_arch (type));
 
   switch (TYPE_CODE (type))
     {
@@ -2273,7 +2346,6 @@ value_from_longest (struct type *type, LONGEST num)
   struct value *val = allocate_value (type);
 
   pack_long (value_contents_raw (val), type, num);
-
   return val;
 }
 
@@ -2286,6 +2358,7 @@ value_from_ulongest (struct type *type, ULONGEST num)
   struct value *val = allocate_value (type);
 
   pack_unsigned_long (value_contents_raw (val), type, num);
+  pack_unsigned_long (value_contents_raw (val), type, num);
 
   return val;
 }
@@ -2297,6 +2370,7 @@ struct value *
 value_from_pointer (struct type *type, CORE_ADDR addr)
 {
   struct value *val = allocate_value (type);
+
   store_typed_address (value_contents_raw (val), check_typedef (type), addr);
   return val;
 }
@@ -2312,6 +2386,7 @@ value_from_contents_and_address (struct type *type,
 				 CORE_ADDR address)
 {
   struct value *v = allocate_value (type);
+
   if (valaddr == NULL)
     set_value_lazy (v, 1);
   else
@@ -2327,7 +2402,6 @@ value_from_double (struct type *type, DOUBLEST num)
   struct value *val = allocate_value (type);
   struct type *base_type = check_typedef (type);
   enum type_code code = TYPE_CODE (base_type);
-  int len = TYPE_LENGTH (base_type);
 
   if (code == TYPE_CODE_FLT)
     {
@@ -2345,7 +2419,6 @@ value_from_decfloat (struct type *type, const gdb_byte *dec)
   struct value *val = allocate_value (type);
 
   memcpy (value_contents_raw (val), dec, TYPE_LENGTH (type));
-
   return val;
 }
 
@@ -2353,6 +2426,7 @@ struct value *
 coerce_ref (struct value *arg)
 {
   struct type *value_type_arg_tmp = check_typedef (value_type (arg));
+
   if (TYPE_CODE (value_type_arg_tmp) == TYPE_CODE_REF)
     arg = value_at_lazy (TYPE_TARGET_TYPE (value_type_arg_tmp),
 			 unpack_pointer (value_type (arg),		

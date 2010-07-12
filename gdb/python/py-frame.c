@@ -26,6 +26,8 @@
 #include "stack.h"
 #include "value.h"
 #include "python-internal.h"
+#include "symfile.h"
+#include "objfiles.h"
 
 typedef struct {
   PyObject_HEAD
@@ -49,7 +51,7 @@ typedef struct {
     do {						\
       frame = frame_object_to_frame_info (frame_obj);	\
       if (frame == NULL)				\
-	error ("Frame is invalid.");			\
+	error (_("Frame is invalid."));			\
     } while (0)
 
 static PyTypeObject frame_object_type;
@@ -211,17 +213,26 @@ frapy_block (PyObject *self, PyObject *args)
   struct frame_info *frame;
   struct block *block = NULL;
   volatile struct gdb_exception except;
+  struct symtab_and_line sal;
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
       FRAPY_REQUIRE_VALID ((frame_object *) self, frame);
 
+      find_frame_sal (frame, &sal);
       block = block_for_pc (get_frame_address_in_block (frame));
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
+  if (!sal.symtab || !sal.symtab->objfile)
+    {
+      PyErr_SetString (PyExc_RuntimeError,
+		       _("Cannot locate object file for block."));
+      return NULL;
+    }
+
   if (block)
-    return block_to_block_object (block);
+    return block_to_block_object (block, sal.symtab->objfile);
 
   Py_RETURN_NONE;
 }
@@ -262,7 +273,8 @@ frame_info_to_frame_object (struct frame_info *frame)
   frame_obj = PyObject_New (frame_object, &frame_object_type);
   if (frame_obj == NULL)
     {
-      PyErr_SetString (PyExc_MemoryError, "Could not allocate frame object.");
+      PyErr_SetString (PyExc_MemoryError, 
+		       _("Could not allocate frame object."));
       return NULL;
     }
 
@@ -368,20 +380,22 @@ frapy_find_sal (PyObject *self, PyObject *args)
   return sal_obj;
 }
 
-/* Implementation of gdb.Frame.read_var (self, variable) -> gdb.Value.
-   Returns the value of the given variable in this frame.  The argument must be
-   a string.  Returns None if GDB can't find the specified variable.  */
-
+/* Implementation of gdb.Frame.read_var_value (self, variable,
+   [block]) -> gdb.Value.  If the optional block argument is provided
+   start the search from that block, otherwise search from the frame's
+   current block (determined by examining the resume address of the
+   frame).  The variable argument must be a string or an instance of a
+   gdb.Symbol.  The block argument must be an instance of gdb.Block.  */
 static PyObject *
 frapy_read_var (PyObject *self, PyObject *args)
 {
   struct frame_info *frame;
-  PyObject *sym_obj;
+  PyObject *sym_obj, *block_obj = NULL;
   struct symbol *var = NULL;	/* gcc-4.3.2 false warning.  */
   struct value *val = NULL;
   volatile struct gdb_exception except;
 
-  if (!PyArg_ParseTuple (args, "O", &sym_obj))
+  if (!PyArg_ParseTuple (args, "O|O", &sym_obj, &block_obj))
     return NULL;
 
   if (PyObject_TypeCheck (sym_obj, &symbol_object_type))
@@ -398,11 +412,23 @@ frapy_read_var (PyObject *self, PyObject *args)
 	return NULL;
       cleanup = make_cleanup (xfree, var_name);
 
+      if (block_obj)
+	{
+	  block = block_object_to_block (block_obj);
+	  if (!block)
+	    {
+	      PyErr_SetString (PyExc_RuntimeError,
+			       _("Second argument must be block."));
+	      return NULL;
+	    }
+	}
+
       TRY_CATCH (except, RETURN_MASK_ALL)
 	{
 	  FRAPY_REQUIRE_VALID ((frame_object *) self, frame);
 
-	  block = block_for_pc (get_frame_address_in_block (frame));
+	  if (!block)
+	    block = block_for_pc (get_frame_address_in_block (frame));
 	  var = lookup_symbol (var_name, block, VAR_DOMAIN, NULL);
 	}
       GDB_PY_HANDLE_EXCEPTION (except);
@@ -410,7 +436,7 @@ frapy_read_var (PyObject *self, PyObject *args)
       if (!var)
 	{
 	  PyErr_Format (PyExc_ValueError,
-			_("variable '%s' not found"), var_name);
+			_("Variable '%s' not found."), var_name);
 	  do_cleanups (cleanup);
 
 	  return NULL;
@@ -421,7 +447,7 @@ frapy_read_var (PyObject *self, PyObject *args)
   else
     {
       PyErr_SetString (PyExc_TypeError,
-		       _("argument must be a symbol or string"));
+		       _("Argument must be a symbol or string."));
       return NULL;
     }
 
@@ -433,10 +459,15 @@ frapy_read_var (PyObject *self, PyObject *args)
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
-  if (val)
-    return value_to_value_object (val);
+  if (!val)
+    {
+      PyErr_Format (PyExc_ValueError,
+		    _("Variable cannot be found for symbol '%s'."),
+		    SYMBOL_NATURAL_NAME (var));
+      return NULL;
+    }
 
-  Py_RETURN_NONE;
+  return value_to_value_object (val);
 }
 
 /* Select this frame.  */
@@ -451,6 +482,7 @@ frapy_select (PyObject *self, PyObject *args)
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
       FRAPY_REQUIRE_VALID (frame, fi);
+
       select_frame (fi);
     }
   GDB_PY_HANDLE_EXCEPTION (except);
@@ -492,7 +524,8 @@ gdbpy_frame_stop_reason_string (PyObject *self, PyObject *args)
 
   if (reason < 0 || reason > UNWIND_NO_SAVED_PC)
     {
-      PyErr_SetString (PyExc_ValueError, "Invalid frame stop reason.");
+      PyErr_SetString (PyExc_ValueError, 
+		       _("Invalid frame stop reason."));
       return NULL;
     }
 

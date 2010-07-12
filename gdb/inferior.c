@@ -68,6 +68,7 @@ static void
 restore_inferior (void *arg)
 {
   struct inferior *saved_inferior = arg;
+
   set_current_inferior (saved_inferior);
 }
 
@@ -80,6 +81,7 @@ save_current_inferior (void)
 {
   struct cleanup *old_chain = make_cleanup (restore_inferior,
 					    current_inferior_);
+
   return old_chain;
 }
 
@@ -132,6 +134,8 @@ add_inferior_silent (int pid)
   init_environ (inf->environment);
 
   inferior_alloc_data (inf);
+
+  observer_notify_inferior_added (inf);
 
   if (pid != 0)
     inferior_appeared (inf, pid);
@@ -194,7 +198,7 @@ delete_threads_of_inferior (int pid)
 /* If SILENT then be quiet -- don't announce a inferior death, or the
    exit of its threads.  */
 
-static void
+void
 delete_inferior_1 (struct inferior *todel, int silent)
 {
   struct inferior *inf, *infprev;
@@ -218,6 +222,8 @@ delete_inferior_1 (struct inferior *todel, int silent)
     infprev->next = inf->next;
   else
     inferior_list = inf->next;
+
+  observer_notify_inferior_removed (inf);
 
   free_inferior (inf);
 }
@@ -265,7 +271,7 @@ exit_inferior_1 (struct inferior *inftoex, int silent)
 
   /* Notify the observers before removing the inferior from the list,
      so that the observers have a chance to look it up.  */
-  observer_notify_inferior_exit (inf->pid);
+  observer_notify_inferior_exit (inf);
 
   inf->pid = 0;
   if (inf->vfork_parent != NULL)
@@ -279,6 +285,7 @@ void
 exit_inferior (int pid)
 {
   struct inferior *inf = find_inferior_pid (pid);
+
   exit_inferior_1 (inf, 0);
 
   if (print_inferior_events)
@@ -289,6 +296,7 @@ void
 exit_inferior_silent (int pid)
 {
   struct inferior *inf = find_inferior_pid (pid);
+
   exit_inferior_1 (inf, 1);
 }
 
@@ -304,6 +312,7 @@ void
 detach_inferior (int pid)
 {
   struct inferior *inf = find_inferior_pid (pid);
+
   exit_inferior_1 (inf, 1);
 
   if (print_inferior_events)
@@ -315,7 +324,7 @@ inferior_appeared (struct inferior *inf, int pid)
 {
   inf->pid = pid;
 
-  observer_notify_inferior_appeared (pid);
+  observer_notify_inferior_appeared (inf);
 }
 
 void
@@ -523,8 +532,6 @@ print_inferior (struct ui_out *uiout, int requested_inferior)
   /* Compute number of inferiors we will print.  */
   for (inf = inferior_list; inf; inf = inf->next)
     {
-      struct cleanup *chain2;
-
       if (requested_inferior != -1 && inf->num != requested_inferior)
 	continue;
 
@@ -738,6 +745,24 @@ remove_inferior_command (char *args, int from_tty)
   delete_inferior_1 (inf, 1);
 }
 
+struct inferior *
+add_inferior_with_spaces (void)
+{
+  struct address_space *aspace;
+  struct program_space *pspace;
+  struct inferior *inf;
+
+  /* If all inferiors share an address space on this system, this
+     doesn't really return a new address space; otherwise, it
+     really does.  */
+  aspace = maybe_new_address_space ();
+  pspace = add_program_space (aspace);
+  inf = add_inferior (0);
+  inf->pspace = pspace;
+  inf->aspace = pspace->aspace;
+
+  return inf;
+}
 
 /* add-inferior [-copies N] [-exec FILENAME]  */
 
@@ -782,18 +807,7 @@ add_inferior_command (char *args, int from_tty)
 
   for (i = 0; i < copies; ++i)
     {
-      struct address_space *aspace;
-      struct program_space *pspace;
-      struct inferior *inf;
-
-      /* If all inferiors share an address space on this system, this
-	 doesn't really return a new address space; otherwise, it
-	 really does.  */
-      aspace = maybe_new_address_space ();
-      pspace = add_program_space (aspace);
-      inf = add_inferior (0);
-      inf->pspace = pspace;
-      inf->aspace = pspace->aspace;
+      struct inferior *inf = add_inferior_with_spaces ();
 
       printf_filtered (_("Added inferior %d\n"), inf->num);
 
@@ -801,7 +815,7 @@ add_inferior_command (char *args, int from_tty)
 	{
 	  /* Switch over temporarily, while reading executable and
 	     symbols.q  */
-	  set_current_program_space (pspace);
+	  set_current_program_space (inf->pspace);
 	  set_current_inferior (inf);
 	  switch_to_thread (null_ptid);
 

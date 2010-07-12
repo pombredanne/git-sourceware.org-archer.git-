@@ -40,6 +40,7 @@
 #include "interps.h"
 #include "mi/mi-cmds.h"
 #include "target.h"
+#include "arch-utils.h"
 
 /* We share this one with symtab.c, but it is not exported widely. */
 
@@ -49,8 +50,6 @@ extern char *operator_chars (char *, char **);
 
 static void initialize_defaults (struct symtab **default_symtab,
 				 int *default_line);
-
-static void set_flags (char *arg, int *is_quoted, char **paren_pointer);
 
 static struct symtabs_and_lines decode_indirect (char **argptr);
 
@@ -79,9 +78,8 @@ static struct symtabs_and_lines find_method (int funfirstline,
 					     struct symbol *sym_class,
 					     int *not_found_ptr);
 
-static NORETURN void cplusplus_error (const char *name,
-				      const char *fmt, ...)
-     ATTR_NORETURN ATTR_FORMAT (printf, 2, 3);
+static void cplusplus_error (const char *name, const char *fmt, ...)
+     ATTRIBUTE_NORETURN ATTRIBUTE_PRINTF (2, 3);
 
 static int total_number_of_methods (struct type *type);
 
@@ -147,16 +145,18 @@ symtabs_and_lines minsym_found (int funfirstline,
    single quoted demangled C++ symbols as part of the completion
    error.  */
 
-static NORETURN void
+static void
 cplusplus_error (const char *name, const char *fmt, ...)
 {
   struct ui_file *tmp_stream;
   char *message;
+
   tmp_stream = mem_fileopen ();
   make_cleanup_ui_file_delete (tmp_stream);
 
   {
     va_list args;
+
     va_start (args, fmt);
     vfprintf_unfiltered (tmp_stream, fmt, args);
     va_end (args);
@@ -631,6 +631,37 @@ See set/show multiple-symbol."));
   discard_cleanups (old_chain);
   return return_values;
 }
+
+/* A helper function for decode_line_1 and friends which skips P
+   past any method overload information at the beginning of P, e.g.,
+   "(const struct foo *)".
+
+   This function assumes that P has already been validated to contain
+   overload information, and it will assert if *P != '('.  */
+static char *
+find_method_overload_end (char *p)
+{
+  int depth = 0;
+
+  gdb_assert (*p == '(');
+
+  while (*p)
+    {
+      if (*p == '(')
+	++depth;
+      else if (*p == ')')
+	{
+	  if (--depth == 0)
+	    {
+	      ++p;
+	      break;
+	    }
+	}
+      ++p;
+    }
+
+  return p;
+}
 
 /* The parser of linespec itself. */
 
@@ -691,18 +722,17 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
   struct symtab *file_symtab = NULL;
 
   char *copy;
-  /* This is NULL if there are no parens in *ARGPTR, or a pointer to
-     the closing parenthesis if there are parens.  */
-  char *paren_pointer;
   /* This says whether or not something in *ARGPTR is quoted with
      completer_quotes (i.e. with single quotes).  */
   int is_quoted;
-  /* Is part of *ARGPTR is enclosed in double quotes?  */
+  /* Is *ARGPTR is enclosed in double quotes?  */
   int is_quote_enclosed;
   int is_objc_method = 0;
   char *saved_arg = *argptr;
   /* If IS_QUOTED, the end of the quoted bit.  */
   char *end_quote = NULL;
+  /* The "first half" of the linespec.  */
+  char *first_half;
 
   if (not_found_ptr)
     *not_found_ptr = 0;
@@ -716,12 +746,9 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
   if (**argptr == '*')
     return decode_indirect (argptr);
 
-  /* Set various flags.  'paren_pointer' is important for overload
-     checking, where we allow things like:
-        (gdb) break c::f(int)
-  */
-
-  set_flags (*argptr, &is_quoted, &paren_pointer);
+  is_quoted = (*argptr
+	       && strchr (get_gdb_completer_quote_characters (),
+			  **argptr) != NULL);
   if (is_quoted)
     end_quote = skip_quoted (*argptr);
 
@@ -734,28 +761,23 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
      will point to "". If this is a C++ name, like "A::B::foo", p will
      point to "::B::foo". Argptr is not changed by this call.  */
 
-  p = locate_first_half (argptr, &is_quote_enclosed);
+  first_half = p = locate_first_half (argptr, &is_quote_enclosed);
 
   /* Check if this is an Objective-C method (anything that starts with
      a '+' or '-' and a '[').  */
   if (is_objc_method_format (p))
-    {
-      is_objc_method = 1;
-      paren_pointer  = NULL; /* Just a category name.  Ignore it.  */
-    }
+    is_objc_method = 1;
 
   /* Check if the symbol could be an Objective-C selector.  */
 
   {
     struct symtabs_and_lines values;
+
     values = decode_objc (argptr, funfirstline, NULL,
 			  canonical, saved_arg);
     if (values.sals != NULL)
       return values;
   }
-
-  if (is_quoted)
-    *argptr = *argptr + 1;
 
   /* Does it look like there actually were two parts?  */
 
@@ -770,66 +792,47 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
 	
       if (p[0] == '.' || p[1] == ':')
 	{
-	  if (paren_pointer == NULL)
-	    return decode_compound (argptr, funfirstline, canonical,
+	  struct symtabs_and_lines values;
+
+	  if (is_quote_enclosed)
+	    ++saved_arg;
+	  values = decode_compound (argptr, funfirstline, canonical,
 				    saved_arg, p, not_found_ptr);
-	  /* Otherwise, fall through to decode_variable below.  */
+	  if (is_quoted && **argptr == '\'')
+	    *argptr = *argptr + 1;
+	  return values;
 	}
-      else
+
+      /* No, the first part is a filename; set file_symtab to be that file's
+	 symtab.  Also, move argptr past the filename.  */
+
+      file_symtab = symtab_from_filename (argptr, p, is_quote_enclosed,
+					  not_found_ptr);
+
+      /* Check for single quotes on the non-filename part.  */
+      if (!is_quoted)
 	{
-	  /* No, the first part is a filename; set file_symtab to be that file's
-	     symtab.  Also, move argptr past the filename.  */
-
-	  file_symtab = symtab_from_filename (argptr, p, is_quote_enclosed,
-					      not_found_ptr);
-
-	  /* Check for single quotes on the non-filename part.  */
-	  if (!is_quoted)
-	    {
-	      is_quoted = (**argptr
-			   && strchr (get_gdb_completer_quote_characters (),
-				      **argptr) != NULL);
-	      if (is_quoted)
-		end_quote = skip_quoted (*argptr);
-	    }
+	  is_quoted = (**argptr
+		       && strchr (get_gdb_completer_quote_characters (),
+				  **argptr) != NULL);
+	  if (is_quoted)
+	    end_quote = skip_quoted (*argptr);
 	}
     }
-#if 0
-  /* No one really seems to know why this was added. It certainly
-     breaks the command line, though, whenever the passed
-     name is of the form ClassName::Method. This bit of code
-     singles out the class name, and if funfirstline is set (for
-     example, you are setting a breakpoint at this function),
-     you get an error. This did not occur with earlier
-     verions, so I am ifdef'ing this out. 3/29/99 */
-  else
-    {
-      /* Check if what we have till now is a symbol name */
-
-      /* We may be looking at a template instantiation such
-         as "foo<int>".  Check here whether we know about it,
-         instead of falling through to the code below which
-         handles ordinary function names, because that code
-         doesn't like seeing '<' and '>' in a name -- the
-         skip_quoted call doesn't go past them.  So see if we
-         can figure it out right now. */
-
-      copy = (char *) alloca (p - *argptr + 1);
-      memcpy (copy, *argptr, p - *argptr);
-      copy[p - *argptr] = '\000';
-      sym = lookup_symbol (copy, 0, VAR_DOMAIN, 0);
-      if (sym)
-	{
-	  *argptr = (*p == '\'') ? p + 1 : p;
-	  return symbol_found (funfirstline, canonical, copy, sym, NULL);
-	}
-      /* Otherwise fall out from here and go to file/line spec
-         processing, etc. */
-    }
-#endif
 
   /* file_symtab is specified file's symtab, or 0 if no file specified.
      arg no longer contains the file name.  */
+
+  /* If the filename was quoted, we must re-check the quotation.  */
+
+  if (end_quote == first_half && *end_quote!= '\0')
+    {
+      is_quoted = (**argptr
+		   && strchr (get_gdb_completer_quote_characters (),
+			      **argptr) != NULL);
+      if (is_quoted)
+	end_quote = skip_quoted (*argptr);
+    }
 
   /* Check whether arg is all digits (and sign).  */
 
@@ -861,10 +864,6 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
       /* allow word separators in method names for Obj-C */
       p = skip_quoted_chars (*argptr, NULL, "");
     }
-  else if (paren_pointer != NULL)
-    {
-      p = paren_pointer + 1;
-    }
   else
     {
       p = skip_quoted (*argptr);
@@ -873,6 +872,14 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
   /* Keep any template parameters */
   if (*p == '<')
     p = find_template_name_end (p);
+
+  /* Keep method overload information.  */
+  if (*p == '(')
+    p = find_method_overload_end (p);
+
+  /* Make sure we keep important kewords like "const" */
+  if (strncmp (p, " const", 6) == 0)
+    p += 6;
 
   copy = (char *) alloca (p - *argptr + 1);
   memcpy (copy, *argptr, p - *argptr);
@@ -921,10 +928,9 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
    function is passed ARGPTR as an argument, it modifies what ARGPTR
    points to; typically, it advances *ARGPTR past whatever substring
    it has just looked at.  (If it doesn't modify *ARGPTR, then the
-   function gets passed *ARGPTR instead, which is then called ARG: see
-   set_flags, for example.)  Also, functions that return a struct
-   symtabs_and_lines may modify CANONICAL, as in the description of
-   decode_line_1.
+   function gets passed *ARGPTR instead, which is then called ARG.)
+   Also, functions that return a struct symtabs_and_lines may modify
+   CANONICAL, as in the description of decode_line_1.
 
    If a function returns a struct symtabs_and_lines, then that struct
    will immediately make its way up the call chain to be returned by
@@ -949,44 +955,6 @@ initialize_defaults (struct symtab **default_symtab, int *default_line)
       *default_symtab = cursal.symtab;
       *default_line = cursal.line;
     }
-}
-
-static void
-set_flags (char *arg, int *is_quoted, char **paren_pointer)
-{
-  char *ii;
-  int has_if = 0;
-
-  /* 'has_if' is for the syntax:
-        (gdb) break foo if (a==b)
-  */
-  if ((ii = strstr (arg, " if ")) != NULL ||
-      (ii = strstr (arg, "\tif ")) != NULL ||
-      (ii = strstr (arg, " if\t")) != NULL ||
-      (ii = strstr (arg, "\tif\t")) != NULL ||
-      (ii = strstr (arg, " if(")) != NULL ||
-      (ii = strstr (arg, "\tif( ")) != NULL)
-    has_if = 1;
-  /* Temporarily zap out "if (condition)" to not confuse the
-     parenthesis-checking code below.  This is undone below. Do not
-     change ii!!  */
-  if (has_if)
-    {
-      *ii = '\0';
-    }
-
-  *is_quoted = (*arg
-		&& strchr (get_gdb_completer_quote_characters (),
-			   *arg) != NULL);
-
-  *paren_pointer = strchr (arg, '(');
-  if (*paren_pointer != NULL)
-    *paren_pointer = strrchr (*paren_pointer, ')');
-
-  /* Now that we're safely past the paren_pointer check, put back " if
-     (condition)" so outer layers can see it.  */
-  if (has_if)
-    *ii = ' ';
 }
 
 
@@ -1059,12 +1027,20 @@ locate_first_half (char **argptr, int *is_quote_enclosed)
       p++;
     }
   else
-    *is_quote_enclosed = 0;
+    {
+      *is_quote_enclosed = 0;
+      if (strchr (get_gdb_completer_quote_characters (), *p))
+	{
+	  ++(*argptr);
+	  ++p;
+	}
+    }
   for (; *p; p++)
     {
       if (p[0] == '<')
 	{
 	  char *temp_end = find_template_name_end (p);
+
 	  if (!temp_end)
 	    error (_("malformed template specification in command"));
 	  p = temp_end;
@@ -1088,8 +1064,9 @@ locate_first_half (char **argptr, int *is_quote_enclosed)
       if (p[0] == '.' && strchr (p, ':') == NULL)
 	{
 	  /* Java qualified method.  Find the *last* '.', since the
-	     others are package qualifiers.  */
-	  for (p1 = p; *p1; p1++)
+	     others are package qualifiers.  Stop at any open parenthesis
+	     which might provide overload information.  */
+	  for (p1 = p; *p1 && *p1 != '('; p1++)
 	    {
 	      if (*p1 == '.')
 		p = p1;
@@ -1104,6 +1081,7 @@ locate_first_half (char **argptr, int *is_quote_enclosed)
   if (*is_quote_enclosed)
     {
       char *closing_quote = strchr (p - 1, '"');
+
       if (closing_quote && closing_quote[1] == '\0')
 	*closing_quote = '\0';
     }
@@ -1239,8 +1217,8 @@ decode_compound (char **argptr, int funfirstline, char ***canonical,
   struct symbol *sym;
   char *copy;
   struct symbol *sym_class;
-  struct symbol **sym_arr;
   struct type *t;
+  char *saved_java_argptr = NULL;
 
   /* First check for "global" namespace specification, of the form
      "::foo".  If found, skip over the colons and jump to normal
@@ -1289,7 +1267,8 @@ decode_compound (char **argptr, int funfirstline, char ***canonical,
       /* PASS2: p2->"::fun", p->":fun" */
 
       /* Move pointer ahead to next double-colon.  */
-      while (*p && (p[0] != ' ') && (p[0] != '\t') && (p[0] != '\''))
+      while (*p && (p[0] != ' ') && (p[0] != '\t') && (p[0] != '\'')
+	     && (*p != '('))
 	{
 	  if (current_language->la_language == language_cplus)
 	    p += cp_validate_operator (p);
@@ -1367,8 +1346,11 @@ decode_compound (char **argptr, int funfirstline, char ***canonical,
       else
 	{
 	  /* At this point argptr->"fun".  */
+	  char *a;
+
 	  p = *argptr;
-	  while (*p && *p != ' ' && *p != '\t' && *p != ',' && *p != ':')
+	  while (*p && *p != ' ' && *p != '\t' && *p != ',' && *p != ':'
+		 && *p != '(')
 	    p++;
 	  /* At this point p->"".  String ended.  */
 	  /* Nope, C++ operators could have spaces in them
@@ -1379,6 +1361,43 @@ decode_compound (char **argptr, int funfirstline, char ***canonical,
 	    {
 	      /* The above loop has already swallowed "operator".  */
 	      p += cp_validate_operator (p - 8) - 8;
+	    }
+
+	  /* Keep any template parameters */
+	  if (*p == '<')
+	    p = find_template_name_end (p);
+
+	  /* Keep method overload information.  */
+	  a = strchr (p, '(');
+	  if (a != NULL)
+	    p = find_method_overload_end (a);
+
+	  /* Make sure we keep important kewords like "const" */
+	  if (strncmp (p, " const", 6) == 0)
+	    p += 6;
+
+	  /* Java may append typenames,  so assume that if there is
+	     anything else left in *argptr, it must be a typename.  */
+	  if (*p && current_language->la_language == language_java)
+	    {
+	      struct type *type;
+
+	      p2 = p;
+	      while (*p2)
+		++p2;
+	      copy = (char *) alloca (p2 - p + 1);
+	      memcpy (copy, p, p2 - p);
+	      copy[p2 - p] = '\0';
+	      type = lookup_typename (current_language, get_current_arch (),
+				      copy, NULL, 1);
+	      if (type != NULL)
+		{
+		  /* Save the location of this just in case this
+		     method/type combination isn't actually defined.
+		     It will be checked later.  */
+		  saved_java_argptr = p;
+		  p = p2;
+		}
 	    }
 	}
 
@@ -1408,9 +1427,26 @@ decode_compound (char **argptr, int funfirstline, char ***canonical,
 	 here, we return. If not, and we are at the and of the string,
 	 we'll lookup the whole string in the symbol tables.  */
 
-      return find_method (funfirstline, canonical, saved_arg,
-			  copy, t, sym_class, not_found_ptr);
-
+      values = find_method (funfirstline, canonical, saved_arg,
+			    copy, t, sym_class, not_found_ptr);
+      if (saved_java_argptr != NULL && values.nelts == 1)
+	{
+	  /* The user specified a specific return type for a java method.
+	     Double-check that it really is the one the user specified.
+	     [This is a necessary evil because strcmp_iw_ordered stops
+	     comparisons too prematurely.]  */
+	  sym = find_pc_sect_function (values.sals[0].pc,
+				       values.sals[0].section);
+	  /* We just found a SAL, we had better be able to go backwards!  */
+	  gdb_assert (sym != NULL);
+	  if (strcmp_iw (SYMBOL_LINKAGE_NAME (sym), saved_arg) != 0)
+	    {
+	      xfree (values.sals);
+	      error (_("the class `%s' does not have any method instance named %s\n"),
+		     SYMBOL_PRINT_NAME (sym_class), copy);
+	    }
+	}
+      return values;
     } /* End if symbol found */
 
 
@@ -1482,9 +1518,11 @@ lookup_prefix_sym (char **argptr, char *p)
 	 using VAR_DOMAIN (where typedefs live) and double-check that we
 	 found a struct/class type.  */
       struct symbol *s = lookup_symbol (copy, 0, VAR_DOMAIN, 0);
+
       if (s != NULL)
 	{
 	  struct type *t = SYMBOL_TYPE (s);
+
 	  CHECK_TYPEDEF (t);
 	  if (TYPE_CODE (t) == TYPE_CODE_STRUCT)
 	    return s;
@@ -1534,8 +1572,41 @@ find_method (int funfirstline, char ***canonical, char *saved_arg,
     }
   if (i1 > 0)
     {
-      /* There is more than one field with that name
-	 (overloaded).  Ask the user which one to use.  */
+      /* If we were given a specific overload instance, use that
+	 (or error if no matches were found).  Otherwise ask the user
+	 which one to use.  */
+      if (strchr (saved_arg, '(') != NULL)
+	{
+	  int i;
+
+	  for (i = 0; i < i1; ++i)
+	    {
+	      char *name = saved_arg;
+	      char *canon = cp_canonicalize_string (name);
+
+	      if (canon != NULL)
+		name = canon;
+
+	      if (strcmp_iw (name, SYMBOL_LINKAGE_NAME (sym_arr[i])) == 0)
+		{
+		  values.sals = (struct symtab_and_line *)
+		    xmalloc (sizeof (struct symtab_and_line));
+		  values.nelts = 1;
+		  values.sals[0] = find_function_start_sal (sym_arr[i],
+							    funfirstline);
+		  if (canon)
+		    xfree (canon);
+		  return values;
+		}
+
+	      if (canon)
+		xfree (canon);
+	    }
+
+	  error (_("the class `%s' does not have any method instance named %s\n"),
+		 SYMBOL_PRINT_NAME (sym_class), copy);
+	}
+
       return decode_line_2 (sym_arr, i1, funfirstline, canonical);
     }
   else
@@ -1577,7 +1648,8 @@ symtab_from_filename (char **argptr, char *p, int is_quote_enclosed,
   copy = (char *) alloca (p - *argptr + 1);
   memcpy (copy, *argptr, p - *argptr);
   /* It may have the ending quote right after the file name.  */
-  if (is_quote_enclosed && copy[p - *argptr - 1] == '"')
+  if ((is_quote_enclosed && copy[p - *argptr - 1] == '"')
+      || copy[p - *argptr - 1] == '\'')
     copy[p - *argptr - 1] = 0;
   else
     copy[p - *argptr] = 0;
@@ -1718,6 +1790,7 @@ decode_dollar (char *copy, int funfirstline, struct symtab *default_symtab,
     {
       /* We have a value history reference.  */
       struct value *val_history;
+
       sscanf ((copy[1] == '$') ? copy + 2 : copy + 1, "%d", &index);
       val_history = access_value_history ((copy[1] == '$') ? -index : index);
       if (TYPE_CODE (value_type (val_history)) != TYPE_CODE_INT)
@@ -1778,7 +1851,6 @@ decode_variable (char *copy, int funfirstline, char ***canonical,
 		 struct symtab *file_symtab, int *not_found_ptr)
 {
   struct symbol *sym;
-
   struct minimal_symbol *msymbol;
 
   sym = lookup_symbol (copy,
@@ -1840,7 +1912,8 @@ symbol_found (int funfirstline, char ***canonical, char *copy,
 	{
 	  struct blockvector *bv = BLOCKVECTOR (SYMBOL_SYMTAB (sym));
 	  struct block *b = BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK);
-	  if (lookup_block_symbol (b, copy, NULL, VAR_DOMAIN) != NULL)
+
+	  if (lookup_block_symbol (b, copy, VAR_DOMAIN) != NULL)
 	    build_canonical_line_spec (values.sals, copy, canonical);
 	}
       return values;
@@ -1896,26 +1969,7 @@ minsym_found (int funfirstline, struct minimal_symbol *msymbol)
     values.sals[0] = find_pc_sect_line (pc, NULL, 0);
 
   if (funfirstline)
-    {
-      struct symtab_and_line sal;
-
-      values.sals[0].pc = find_function_start_pc (gdbarch,
-						  values.sals[0].pc,
-						  values.sals[0].section);
-
-      sal = find_pc_sect_line (values.sals[0].pc, values.sals[0].section, 0);
-
-      /* Check if SKIP_PROLOGUE left us in mid-line, and the next
-	 line is still part of the same function.  If there is no
-	 line information here, sal.pc will be the passed in PC.  */
-      if (sal.pc != values.sals[0].pc
-	  && (lookup_minimal_symbol_by_pc_section (values.sals[0].pc,
-						   values.sals[0].section)
-	      == lookup_minimal_symbol_by_pc_section (sal.end,
-						      values.sals[0].section)))
-	/* Recalculate the line number (might not be N+1).  */
-	values.sals[0] = find_pc_sect_line (sal.end, values.sals[0].section, 0);
-    }
+    skip_prologue_sal (&values.sals[0]);
 
   values.nelts = 1;
   return values;

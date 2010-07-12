@@ -1,4 +1,4 @@
-# Copyright (C) 2009 Free Software Foundation, Inc.
+# Copyright (C) 2009, 2010 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,27 +20,28 @@ if $tracelevel then {
     strace $tracelevel
 }
 
-# Start with a fresh gdb.
+# Run a command in GDB, and report a failure if a Python exception is thrown.
+# If report_pass is true, report a pass if no exception is thrown.
+proc gdb_py_test_silent_cmd {cmd name report_pass} {
+    global gdb_prompt
 
-gdb_exit
-gdb_start
-gdb_reinitialize_dir $srcdir/$subdir
-
-if ![python_supported] then {
-  unsupported "python support is disabled"
-  return -1
+  gdb_test_multiple $cmd $name {
+      -re "Traceback.*$gdb_prompt $"  { fail $name }
+      -re "$gdb_prompt $"	      { if $report_pass { pass $name } }
+  }
 }
 
 set testfile "py-inferior"
 set srcfile ${testfile}.c
-set binfile ${objdir}/${subdir}/${testfile}
-
-if { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
-    untested "Couldn't compile ${srcfile}"
+if { [prepare_for_testing ${testfile}.exp ${testfile} ${srcfile}] } {
     return -1
 }
 
-gdb_load ${binfile}
+# Start with a fresh gdb.
+clean_restart ${testfile}
+
+# Skip all tests if Python scripting is not enabled.
+if { [skip_python_tests] } { continue }
 
 # The following tests require execution.
 
@@ -81,9 +82,8 @@ set hex_number {0x[0-9a-fA-F][0-9a-fA-F]*}
 set dec_number {[0-9]+}
 set history_prefix {[$][0-9]* = }
 set newline {[\r\n]+}
-set pattern_not_found "${newline}.]"
-set one_pattern_found "${newline}.${dec_number}L]"
-set two_patterns_found "${newline}.${dec_number}L, ${dec_number}L]"
+set pattern_not_found "${newline}.None"
+set one_pattern_found "${newline}.${dec_number}"
 
 # Test string pattern.
 
@@ -93,7 +93,7 @@ gdb_test "py start_addr = search_buf.address" "" ""
 gdb_test "py length = search_buf.type.sizeof" "" ""
 
 gdb_test "py print gdb.inferiors()\[0\].search_memory (start_addr, length, 'aaa')" \
-  "${two_patterns_found}" "find string pattern"
+  "${one_pattern_found}" "find string pattern"
 
 # Test not finding pattern because search range too small, with
 # potential find at the edge of the range.
@@ -103,25 +103,11 @@ gdb_test "py print gdb.inferiors()\[0\].search_memory (start_addr, 10+3, 'aaaa')
 
 # Increase the search range by 1 and we should find the pattern.
 
-gdb_test "py print gdb.inferiors()\[0\].search_memory (start_addr, 10+3+1, \['a', 'a', 'a', 'a'\])" \
+gdb_test "py print gdb.inferiors()\[0\].search_memory (start_addr, 10+3+1, 'aaa')" \
   "${one_pattern_found}" "pattern found at end of range"
 
-# Test max-count with size, with different parameter position
-
-gdb_test "py print gdb.inferiors()\[0\].search_memory (start_addr, length, \[0x61, 0x61\], 1, 1)" \
-  "${one_pattern_found}" "size = 1, max_count = 1"
-
-gdb_test "py print gdb.inferiors()\[0\].search_memory (start_addr, length, \[0x61, 0x61\], 1, 2)" \
-  "${two_patterns_found}" "size = 1, max_count = 2, normal ordering"
-
-gdb_test "py print gdb.inferiors()\[0\].search_memory (start_addr, length, \[0x61, 0x61\], size = 1, max_count = 2)" \
-  "${two_patterns_found}" "size = 1, max_count = 2, normal ordering, with keywords"
-
-gdb_test "py print gdb.inferiors()\[0\].search_memory (start_addr, length, \[0x61, 0x61\], max_count = 2, size = 1)" \
-  "${two_patterns_found}" "size = 1, max_count = 2, inverted ordering"
-
-gdb_test "py print gdb.inferiors()\[0\].search_memory (start_addr, length, \['a', 'a'\], max_count = 2)" \
-  "${two_patterns_found}" "max_count = 2, with keyword"
+# Import struct to pack the following patterns.
+gdb_test "py from struct import *" "" ""
 
 # Test 16-bit pattern.
 
@@ -129,10 +115,7 @@ gdb_test "set int16_search_buf\[10\] = 0x1234" "" ""
 gdb_test "py search_buf = gdb.selected_frame ().read_var ('int16_search_buf')" "" ""
 gdb_test "py start_addr = search_buf.address" "" ""
 gdb_test "py length = search_buf.type.sizeof" "" ""
-gdb_test "py pattern = gdb.parse_and_eval ('(int16_t) 0x1234')" "" ""
-
-gdb_test "py print gdb.inferiors()\[0\].search_memory (start_addr, length, 0x1234, 2)" \
-  "${one_pattern_found}" "find 16-bit pattern, with python pattern"
+gdb_test "py pattern = pack('H',0x1234)" "" \
 
 gdb_test "py print gdb.inferiors()\[0\].search_memory (start_addr, length, pattern)" \
   "${one_pattern_found}" "find 16-bit pattern, with value pattern"
@@ -143,12 +126,10 @@ gdb_test "set int32_search_buf\[10\] = 0x12345678" "" ""
 gdb_test "py search_buf = gdb.selected_frame ().read_var ('int32_search_buf')" "" ""
 gdb_test "py start_addr = search_buf.address" "" ""
 gdb_test "py length = search_buf.type.sizeof" "" ""
-gdb_test "py pattern = gdb.parse_and_eval ('(int32_t) 0x12345678')" "" ""
+gdb_test "py pattern = pack('I',0x12345678)" "" \
 
-gdb_test "py print gdb.inferiors()\[0\].search_memory (start_addr, length, 0x12345678, 4)" \
-  "${one_pattern_found}" "find 32-bit pattern, with python pattern"
 gdb_test "py print gdb.inferiors()\[0\].search_memory (start_addr, length, pattern)" \
-  "${one_pattern_found}" "find 32-bit pattern, with value pattern"
+  "${one_pattern_found}" "find 32-bit pattern, with python pattern"
 
 # Test 64-bit pattern.
 
@@ -156,10 +137,8 @@ gdb_test "set int64_search_buf\[10\] = 0xfedcba9876543210LL" "" ""
 gdb_test "py search_buf = gdb.selected_frame ().read_var ('int64_search_buf')" "" ""
 gdb_test "py start_addr = search_buf.address" "" ""
 gdb_test "py length = search_buf.type.sizeof" "" ""
-gdb_test "py pattern = gdb.parse_and_eval ('(int64_t) 0xfedcba9876543210LL')" "" ""
+gdb_test "py pattern = pack('Q', 0xfedcba9876543210)" "" ""
 
-gdb_test "py print gdb.inferiors()\[0\].search_memory (start_addr, length, 0xfedcba9876543210, 8)" \
-  "${one_pattern_found}" "find 64-bit pattern, with python pattern"
 gdb_test "py print gdb.inferiors()\[0\].search_memory (start_addr, length, pattern)" \
   "${one_pattern_found}" "find 64-bit pattern, with value pattern"
 
@@ -170,11 +149,15 @@ gdb_test "set *(int16_t*) &search_buf\[11\] = 0x6363" "" ""
 gdb_test "set *(int32_t*) &search_buf\[13\] = 0x64646464" "" ""
 gdb_test "py search_buf = gdb.selected_frame ().read_var ('search_buf')" "" ""
 gdb_test "py start_addr = search_buf\[0\].address" "" ""
-gdb_test "py pattern1 = gdb.parse_and_eval ('(int8_t) 0x62')" "" ""
-gdb_test "py pattern2 = gdb.parse_and_eval ('(int16_t) 0x6363')" "" ""
-gdb_test "py pattern3 = gdb.parse_and_eval ('(int32_t) 0x64646464')" "" ""
+gdb_test "py pattern1 = pack('B', 0x62)" "" ""
+gdb_test "py pattern2 = pack('H', 0x6363)" "" ""
+gdb_test "py pattern3 = pack('I', 0x64646464)" "" ""
 
-gdb_test "py print gdb.inferiors()\[0\].search_memory (start_addr, 100, \[pattern1, pattern2, pattern3\])" \
+gdb_test "py print gdb.inferiors()\[0\].search_memory (start_addr, 100, pattern1)" \
+    "${one_pattern_found}" "find mixed-sized pattern"
+gdb_test "py print gdb.inferiors()\[0\].search_memory (start_addr, 100, pattern2)" \
+    "${one_pattern_found}" "find mixed-sized pattern"
+gdb_test "py print gdb.inferiors()\[0\].search_memory (start_addr, 100, pattern3)" \
     "${one_pattern_found}" "find mixed-sized pattern"
 
 # Test search spanning a large range, in the particular case of native
@@ -187,15 +170,22 @@ gdb_test "set *(int32_t*) &search_buf\[0*${CHUNK_SIZE}+100\] = 0x12345678" "" ""
 gdb_test "set *(int32_t*) &search_buf\[1*${CHUNK_SIZE}+100\] = 0x12345678" "" ""
 gdb_test "py start_addr = gdb.selected_frame ().read_var ('search_buf')" "" ""
 gdb_test "py length = gdb.selected_frame ().read_var ('search_buf_size')" "" ""
-
-gdb_test "py print gdb.inferiors()\[0\].search_memory (start_addr, length, 0x12345678, 4)" \
-  "${two_patterns_found}" "search spanning large range"
+gdb_test "py pattern = pack('I', 0x12345678)" "" ""
+gdb_test "py first = gdb.inferiors()\[0\].search_memory (start_addr,length, pattern)" "" ""
+gdb_test "py print first" "${one_pattern_found}" "search spanning large range 1st result"
+gdb_test "py start_addr = first + 1"
+gdb_test "py second = gdb.inferiors()\[0\].search_memory (start_addr, length, pattern)" "" ""
+gdb_test "py print second" "${one_pattern_found}" "search spanning large range 2nd result"
+gdb_test "py start_addr = second + 1"
+gdb_test "py third = gdb.inferiors()\[0\].search_memory (start_addr, length, pattern)" "" ""
+gdb_test "py print third" "${pattern_not_found}" "search spanning large range 3rd result"
 
 # For native targets, test a pattern straddling a chunk boundary.
 
 if [isnative] {
     gdb_test "set *(int32_t*) &search_buf\[${CHUNK_SIZE}-1\] = 0xfdb97531" "" ""
-
-    gdb_test "py print gdb.inferiors()\[0\].search_memory (start_addr, length, 0xfdb97531, 4)" \
+    gdb_test "py pattern = pack('I', 0xfdb97531)" "" ""
+    gdb_test "py start_addr = gdb.selected_frame ().read_var ('search_buf')" "" ""
+    gdb_test "py print gdb.inferiors()\[0\].search_memory (start_addr, length, pattern)" \
       "${one_pattern_found}" "find pattern straddling chunk boundary"
 }

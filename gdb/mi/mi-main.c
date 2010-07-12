@@ -51,6 +51,7 @@
 #include "inferior.h"
 #include "osdata.h"
 #include "splay-tree.h"
+#include "tracepoint.h"
 
 #include <ctype.h>
 #include <sys/time.h>
@@ -78,6 +79,11 @@ static struct mi_timestamp *current_command_ts;
 static int do_timings = 0;
 
 char *current_token;
+/* Few commands would like to know if options like --thread-group
+   were explicitly specified.  This variable keeps the current
+   parsed command including all option, and make it possible.  */
+static struct mi_parse *current_context;
+
 int running_result_record_printed = 1;
 
 /* Flag indicating that the target has proceeded since the last
@@ -193,55 +199,81 @@ mi_cmd_exec_jump (char *args, char **argv, int argc)
   mi_execute_async_cli_command ("jump", argv, argc);
 }
  
+static void
+proceed_thread (struct thread_info *thread, int pid)
+{
+  if (!is_stopped (thread->ptid))
+    return;
+
+  if (pid != 0 && PIDGET (thread->ptid) != pid)
+    return;
+
+  switch_to_thread (thread->ptid);
+  clear_proceed_status ();
+  proceed ((CORE_ADDR) -1, TARGET_SIGNAL_DEFAULT, 0);
+}
+
+
 static int
 proceed_thread_callback (struct thread_info *thread, void *arg)
 {
   int pid = *(int *)arg;
 
-  if (!is_stopped (thread->ptid))
-    return 0;
-
-  if (PIDGET (thread->ptid) != pid)
-    return 0;
-
-  switch_to_thread (thread->ptid);
-  clear_proceed_status ();
-  proceed ((CORE_ADDR) -1, TARGET_SIGNAL_DEFAULT, 0);
+  proceed_thread (thread, pid);
   return 0;
 }
 
 static void
 exec_continue (char **argv, int argc)
 {
-  if (argc == 0)
-    continue_1 (0);
-  else if (argc == 1 && strcmp (argv[0], "--all") == 0)
-    continue_1 (1);
-  else if (argc == 2 && strcmp (argv[0], "--thread-group") == 0)
+  if (non_stop)
     {
-      struct cleanup *old_chain;
-      int pid;
-      if (argv[1] == NULL || argv[1] == '\0')
-	error ("Thread group id not specified");
-      pid = atoi (argv[1]);
-      if (!in_inferior_list (pid))
-	error ("Invalid thread group id '%s'", argv[1]);
+      /* In non-stop mode, 'resume' always resumes a single thread.  Therefore,
+	 to resume all threads of the current inferior, or all threads in all
+	 inferiors, we need to iterate over threads.
 
-      old_chain = make_cleanup_restore_current_thread ();
-      iterate_over_threads (proceed_thread_callback, &pid);
-      do_cleanups (old_chain);            
+	 See comment on infcmd.c:proceed_thread_callback for rationale.  */
+      if (current_context->all || current_context->thread_group != -1)
+	{
+	  int pid = 0;
+	  struct cleanup *back_to = make_cleanup_restore_current_thread ();
+
+	  if (!current_context->all)
+	    {
+	      struct inferior *inf = find_inferior_id (current_context->thread_group);
+	      pid = inf->pid;
+	    }
+	  iterate_over_threads (proceed_thread_callback, &pid);
+	  do_cleanups (back_to);
+	}
+      else
+	{
+	  continue_1 (0);
+	}
     }
   else
-    error ("Usage: -exec-continue [--reverse] [--all|--thread-group id]");
+    {
+      struct cleanup *back_to = make_cleanup_restore_integer (&sched_multi);
+
+      if (current_context->all)
+	{
+	  sched_multi = 1;
+	  continue_1 (0);
+	}
+      else
+	{
+	  /* In all-stop mode, -exec-continue traditionally resumed either
+	     all threads, or one thread, depending on the 'scheduler-locking'
+	     variable.  Let's continue to do the same.  */
+	  continue_1 (1);
+	}
+      do_cleanups (back_to);
+    }
 }
 
-/* continue in reverse direction:
-   XXX: code duplicated from reverse.c */
-
 static void
-exec_direction_default (void *notused)
+exec_direction_forward (void *notused)
 {
-  /* Return execution direction to default state.  */
   execution_direction = EXEC_FORWARD;
 }
 
@@ -260,7 +292,7 @@ exec_reverse_continue (char **argv, int argc)
   if (!target_can_execute_reverse)
     error (_("Target %s does not support this command."), target_shortname);
 
-  old_chain = make_cleanup (exec_direction_default, NULL);
+  old_chain = make_cleanup (exec_direction_forward, NULL);
   execution_direction = EXEC_REVERSE;
   exec_continue (argv, argc);
   do_cleanups (old_chain);
@@ -269,7 +301,7 @@ exec_reverse_continue (char **argv, int argc)
 void
 mi_cmd_exec_continue (char *command, char **argv, int argc)
 {
-  if (argc > 0 && strcmp(argv[0], "--reverse") == 0)
+  if (argc > 0 && strcmp (argv[0], "--reverse") == 0)
     exec_reverse_continue (argv + 1, argc - 1);
   else
     exec_continue (argv, argc);
@@ -298,42 +330,84 @@ interrupt_thread_callback (struct thread_info *thread, void *arg)
 void
 mi_cmd_exec_interrupt (char *command, char **argv, int argc)
 {
-  if (argc == 0)
+  /* In all-stop mode, everything stops, so we don't need to try
+     anything specific.  */
+  if (!non_stop)
     {
-      if (!is_running (inferior_ptid))
-	error ("Current thread is not running.");
-
       interrupt_target_1 (0);
+      return;
     }
-  else if (argc == 1 && strcmp (argv[0], "--all") == 0)
+
+  if (current_context->all)
     {
-      if (!any_running ())
-	error ("Inferior not running.");
-      
+      /* This will interrupt all threads in all inferiors.  */
       interrupt_target_1 (1);
     }
-  else if (argc == 2 && strcmp (argv[0], "--thread-group") == 0)
+  else if (current_context->thread_group != -1)
     {
-      struct cleanup *old_chain;
-      int pid;
-      if (argv[1] == NULL || argv[1] == '\0')
-	error ("Thread group id not specified");
-      pid = atoi (argv[1]);
-      if (!in_inferior_list (pid))
-	error ("Invalid thread group id '%s'", argv[1]);
+      struct inferior *inf = find_inferior_id (current_context->thread_group);
 
-      old_chain = make_cleanup_restore_current_thread ();
-      iterate_over_threads (interrupt_thread_callback, &pid);
-      do_cleanups (old_chain);
+      iterate_over_threads (interrupt_thread_callback, &inf->pid);
     }
   else
-    error ("Usage: -exec-interrupt [--all|--thread-group id]");
+    {
+      /* Interrupt just the current thread -- either explicitly
+	 specified via --thread or whatever was current before
+	 MI command was sent.  */
+      interrupt_target_1 (0);
+    }
 }
+
+static int
+run_one_inferior (struct inferior *inf, void *arg)
+{
+  if (inf->pid != 0)
+    {
+      if (inf->pid != ptid_get_pid (inferior_ptid))
+	{
+	  struct thread_info *tp;
+
+	  tp = any_thread_of_process (inf->pid);
+	  if (!tp)
+	    error (_("Inferior has no threads."));
+
+	  switch_to_thread (tp->ptid);
+	}
+    }
+  else
+    {
+      set_current_inferior (inf);
+      switch_to_thread (null_ptid);
+      set_current_program_space (inf->pspace);
+    }
+  mi_execute_cli_command ("run", target_can_async_p (),
+			  target_can_async_p () ? "&" : NULL);
+  return 0;
+}
+
+void
+mi_cmd_exec_run (char *command, char **argv, int argc)
+{
+  if (current_context->all)
+    {
+      struct cleanup *back_to = save_current_space_and_thread ();
+
+      iterate_over_inferiors (run_one_inferior, NULL);
+      do_cleanups (back_to);
+    }
+  else
+    {
+      mi_execute_cli_command ("run", target_can_async_p (),
+			      target_can_async_p () ? "&" : NULL);
+    }
+}
+
 
 static int
 find_thread_of_process (struct thread_info *ti, void *p)
 {
   int pid = *(int *)p;
+
   if (PIDGET (ti->ptid) == pid && !is_exited (ti->ptid))
     return 1;
 
@@ -351,6 +425,7 @@ mi_cmd_target_detach (char *command, char **argv, int argc)
       struct thread_info *tp;
       char *end = argv[0];
       int pid = strtol (argv[0], &end, 10);
+
       if (*end != '\0')
 	error (_("Cannot parse thread group id '%s'"), argv[0]);
 
@@ -431,6 +506,7 @@ collect_cores (struct thread_info *ti, void *xdata)
   if (ptid_get_pid (ti->ptid) == data->pid)
     {
       int core = target_core_of_thread (ti->ptid);
+
       if (core != -1)
 	VEC_safe_push (int, data->cores, core);
     }
@@ -442,6 +518,7 @@ static int *
 unique (int *b, int *e)
 {
   int *d = b;
+
   while (++b != e)
     if (*d != *b)
       *++d = *b;
@@ -468,18 +545,26 @@ print_one_inferior (struct inferior *inferior, void *xdata)
       struct cleanup *back_to
 	= make_cleanup_ui_out_tuple_begin_end (uiout, NULL);
 
-      ui_out_field_fmt (uiout, "id", "%d", inferior->pid);
+      ui_out_field_fmt (uiout, "id", "i%d", inferior->num);
       ui_out_field_string (uiout, "type", "process");
-      ui_out_field_int (uiout, "pid", inferior->pid);
+      if (inferior->pid != 0)
+	ui_out_field_int (uiout, "pid", inferior->pid);
 
-      data.pid = inferior->pid;
+      if (inferior->pspace->ebfd)
+	{
+	  ui_out_field_string (uiout, "executable",
+			       bfd_get_filename (inferior->pspace->ebfd));
+	}
+
       data.cores = 0;
-      iterate_over_threads (collect_cores, &data);
+      if (inferior->pid != 0)
+	{
+	  data.pid = inferior->pid;
+	  iterate_over_threads (collect_cores, &data);
+	}
 
       if (!VEC_empty (int, data.cores))
 	{
-	  int elt;
-	  int i;
 	  int *b, *e;
 	  struct cleanup *back_to_2 =
 	    make_cleanup_ui_out_list_begin_end (uiout, "cores");
@@ -530,6 +615,7 @@ static void
 free_vector_of_ints (void *xvector)
 {
   VEC (int) **vector = xvector;
+
   VEC_free (int, *vector);
 }
 
@@ -542,6 +628,7 @@ static void
 free_vector_of_osdata_items (splay_tree_value xvalue)
 {
   VEC (osdata_item_s) *value = (VEC (osdata_item_s) *) xvalue;
+
   /* We don't free the items itself, it will be done separately.  */
   VEC_free (osdata_item_s, value);
 }
@@ -551,6 +638,7 @@ splay_tree_int_comparator (splay_tree_key xa, splay_tree_key xb)
 {
   int a = xa;
   int b = xb;
+
   return a - b;
 }
 
@@ -567,6 +655,7 @@ list_available_thread_groups (VEC (int) *ids, int recurse)
   struct osdata *data;
   struct osdata_item *item;
   int ix_items;
+
   /* This keeps a map from integer (pid) to VEC (struct osdata_item *)*
      The vector contains information about all threads for the given pid.
      This is assigned an initial value to avoid "may be used uninitialized"
@@ -580,8 +669,8 @@ list_available_thread_groups (VEC (int) *ids, int recurse)
   if (recurse)
     {
       struct osdata *threads = get_osdata ("threads");
-      make_cleanup_osdata_free (threads);
 
+      make_cleanup_osdata_free (threads);
       tree = splay_tree_new (splay_tree_int_comparator,
 			     do_nothing,
 			     free_vector_of_osdata_items);
@@ -664,9 +753,9 @@ list_available_thread_groups (VEC (int) *ids, int recurse)
 		{
 		  struct cleanup *back_to_2 =
 		    make_cleanup_ui_out_tuple_begin_end (uiout, NULL);
-
 		  const char *tid = get_osdata_column (child, "tid");
 		  const char *tcore = get_osdata_column (child, "core");
+
 		  ui_out_field_string (uiout, "id", tid);
 		  if (tcore)
 		    ui_out_field_string (uiout, "core", tcore);
@@ -706,6 +795,7 @@ mi_cmd_list_thread_groups (char *command, char **argv, int argc)
     {
       int opt = mi_getopt ("-list-thread-groups", argc, argv, opts,
 			   &optind, &optarg);
+
       if (opt < 0)
 	break;
       switch ((enum opt) opt)
@@ -727,9 +817,15 @@ mi_cmd_list_thread_groups (char *command, char **argv, int argc)
   for (; optind < argc; ++optind)
     {
       char *end;
-      int inf = strtoul (argv[optind], &end, 0);
+      int inf;
+
+      if (*(argv[optind]) != 'i')
+	error ("invalid syntax of group id '%s'", argv[optind]);
+
+      inf = strtoul (argv[optind] + 1, &end, 0);
+
       if (*end != '\0')
-	error ("invalid group id '%s'", argv[optind]);
+	error ("invalid syntax of group id '%s'", argv[optind]);
       VEC_safe_push (int, ids, inf);
     }
   if (VEC_length (int, ids) > 1)
@@ -746,14 +842,18 @@ mi_cmd_list_thread_groups (char *command, char **argv, int argc)
   else if (VEC_length (int, ids) == 1)
     {
       /* Local thread groups, single id. */
-      int pid = *VEC_address (int, ids);
-      if (!in_inferior_list (pid))
-	error ("Invalid thread group id '%d'", pid);
-      print_thread_info (uiout, -1, pid);
+      int id = *VEC_address (int, ids);
+      struct inferior *inf = find_inferior_id (id);
+
+      if (!inf)
+	error ("Non-existent thread group id '%d'", id);
+      
+      print_thread_info (uiout, -1, inf->pid);
     }
   else
     {
       struct print_one_inferior_data data;
+
       data.recurse = recurse;
       data.inferiors = ids;
 
@@ -772,7 +872,6 @@ mi_cmd_list_thread_groups (char *command, char **argv, int argc)
 void
 mi_cmd_data_list_register_names (char *command, char **argv, int argc)
 {
-  struct frame_info *frame;
   struct gdbarch *gdbarch;
   int regnum, numregs;
   int i;
@@ -784,8 +883,7 @@ mi_cmd_data_list_register_names (char *command, char **argv, int argc)
      In this case, some entries of gdbarch_register_name will change depending
      upon the particular processor being debugged.  */
 
-  frame = get_selected_frame (NULL);
-  gdbarch = get_frame_arch (frame);
+  gdbarch = get_current_arch ();
   numregs = gdbarch_num_regs (gdbarch) + gdbarch_num_pseudo_regs (gdbarch);
 
   cleanup = make_cleanup_ui_out_list_begin_end (uiout, "register-names");
@@ -1019,6 +1117,7 @@ get_register (struct frame_info *frame, int regnum, int format)
 	{
 	  int idx = gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG ?
 		    j : register_size (gdbarch, regnum) - 1 - j;
+
 	  sprintf (ptr, "%02x", (unsigned char) buffer[idx]);
 	  ptr += 2;
 	}
@@ -1028,10 +1127,11 @@ get_register (struct frame_info *frame, int regnum, int format)
   else
     {
       struct value_print_options opts;
+
       get_formatted_print_options (&opts, format);
       opts.deref_ref = 1;
       val_print (register_type (gdbarch, regnum), buffer, 0, 0,
-		 stb->stream, 0, &opts, current_language);
+		 stb->stream, 0, NULL, &opts, current_language);
       ui_out_field_stream (uiout, "value", stb);
       ui_out_stream_delete (stb);
     }
@@ -1122,9 +1222,7 @@ mi_cmd_data_evaluate_expression (char *command, char **argv, int argc)
   /* Print the result of the expression evaluation.  */
   get_user_print_options (&opts);
   opts.deref_ref = 0;
-  val_print (value_type (val), value_contents (val),
-	     value_embedded_offset (val), value_address (val),
-	     stb->stream, 0, &opts, current_language);
+  common_val_print (val, stb->stream, 0, &opts, current_language);
 
   ui_out_field_stream (uiout, "value", stb);
   ui_out_stream_delete (stb);
@@ -1184,6 +1282,7 @@ mi_cmd_data_read_memory (char *command, char **argv, int argc)
     {
       int opt = mi_getopt ("mi_cmd_data_read_memory", argc, argv, opts,
 			   &optind, &optarg);
+
       if (opt < 0)
 	break;
       switch ((enum opt) opt)
@@ -1276,6 +1375,7 @@ mi_cmd_data_read_memory (char *command, char **argv, int argc)
     struct cleanup *cleanup_list_memory;
     int row;
     int row_byte;
+
     cleanup_list_memory = make_cleanup_ui_out_list_begin_end (uiout, "memory");
     for (row = 0, row_byte = 0;
 	 row < nr_rows;
@@ -1312,6 +1412,7 @@ mi_cmd_data_read_memory (char *command, char **argv, int argc)
 	if (aschar)
 	  {
 	    int byte;
+
 	    ui_file_rewind (stream->stream);
 	    for (byte = row_byte; byte < row_byte + word_size * nr_cols; byte++)
 	      {
@@ -1382,6 +1483,7 @@ mi_cmd_data_write_memory (char *command, char **argv, int argc)
     {
       int opt = mi_getopt ("mi_cmd_data_write_memory", argc, argv, opts,
 			   &optind, &optarg);
+
       if (opt < 0)
 	break;
       switch ((enum opt) opt)
@@ -1450,8 +1552,8 @@ mi_cmd_list_features (char *command, char **argv, int argc)
   if (argc == 0)
     {
       struct cleanup *cleanup = NULL;
-      cleanup = make_cleanup_ui_out_list_begin_end (uiout, "features");      
 
+      cleanup = make_cleanup_ui_out_list_begin_end (uiout, "features");      
       ui_out_field_string (uiout, NULL, "frozen-varobjs");
       ui_out_field_string (uiout, NULL, "pending-breakpoints");
       ui_out_field_string (uiout, NULL, "thread-info");
@@ -1473,8 +1575,8 @@ mi_cmd_list_target_features (char *command, char **argv, int argc)
   if (argc == 0)
     {
       struct cleanup *cleanup = NULL;
-      cleanup = make_cleanup_ui_out_list_begin_end (uiout, "features");      
 
+      cleanup = make_cleanup_ui_out_list_begin_end (uiout, "features");      
       if (target_can_async_p ())
 	ui_out_field_string (uiout, NULL, "async");
       
@@ -1484,6 +1586,40 @@ mi_cmd_list_target_features (char *command, char **argv, int argc)
 
   error ("-list-target-features should be passed no arguments");
 }
+
+void
+mi_cmd_add_inferior (char *command, char **argv, int argc)
+{
+  struct inferior *inf;
+
+  if (argc != 0)
+    error (_("-add-inferior should be passed no arguments"));
+
+  inf = add_inferior_with_spaces ();
+
+  ui_out_field_fmt (uiout, "inferior", "i%d", inf->num);
+}
+
+void
+mi_cmd_remove_inferior (char *command, char **argv, int argc)
+{
+  int id;
+  struct inferior *inf;
+
+  if (argc != 1)
+    error ("-remove-inferior should be passed a single argument");
+
+  if (sscanf (argv[1], "i%d", &id) != 1)
+    error ("the thread group id is syntactically invalid");
+
+  inf = find_inferior_id (id);
+  if (!inf)
+    error ("the specified thread group does not exist");
+
+  delete_inferior_1 (inf, 1 /* silent */);
+}
+
+
 
 /* Execute a command within a safe environment.
    Return <0 for error; >=0 for ok.
@@ -1546,6 +1682,7 @@ captured_mi_execute_command (struct ui_out *uiout, void *data)
     case CLI_COMMAND:
       {
 	char *argv[2];
+
 	/* A CLI command was read from the input stream.  */
 	/* This "feature" will be removed as soon as we have a
 	   complete set of mi commands.  */
@@ -1589,7 +1726,6 @@ void
 mi_execute_command (char *cmd, int from_tty)
 {
   struct mi_parse *command;
-  struct ui_out *saved_uiout = uiout;
 
   /* This is to handle EOF (^D). We just quit gdb.  */
   /* FIXME: we should call some API function here.  */
@@ -1653,12 +1789,14 @@ mi_execute_command (char *cmd, int from_tty)
 	  else if (!ptid_equal (inferior_ptid, null_ptid))
 	    {
 	      struct thread_info *ti = inferior_thread ();
+
 	      report_change = (ti->num != command->thread);
 	    }
 
 	  if (report_change)
 	    {     
 	      struct thread_info *ti = inferior_thread ();
+
 	      target_terminal_ours ();
 	      fprintf_unfiltered (mi->event_channel, 
 				  "thread-selected,id=\"%d\"",
@@ -1680,18 +1818,46 @@ static void
 mi_cmd_execute (struct mi_parse *parse)
 {
   struct cleanup *cleanup;
-  int i;
 
   prepare_execute_command ();
 
   cleanup = make_cleanup (null_cleanup, NULL);
 
+  if (parse->all && parse->thread_group != -1)
+    error (_("Cannot specify --thread-group together with --all"));
+
+  if (parse->all && parse->thread != -1)
+    error (_("Cannot specify --thread together with --all"));
+
+  if (parse->thread_group != -1 && parse->thread != -1)
+    error (_("Cannot specify --thread together with --thread-group"));
+
   if (parse->frame != -1 && parse->thread == -1)
     error (_("Cannot specify --frame without --thread"));
+
+  if (parse->thread_group != -1)
+    {
+      struct inferior *inf = find_inferior_id (parse->thread_group);
+      struct thread_info *tp = 0;
+
+      if (!inf)
+	error (_("Invalid thread group for the --thread-group option"));
+
+      set_current_inferior (inf);
+      /* This behaviour means that if --thread-group option identifies
+	 an inferior with multiple threads, then a random one will be picked.
+	 This is not a problem -- frontend should always provide --thread if
+	 it wishes to operate on a specific thread.  */
+      if (inf->pid != 0)
+	tp = any_thread_of_process (inf->pid);
+      switch_to_thread (tp ? tp->ptid : null_ptid);
+      set_current_program_space (inf->pspace);
+    }
 
   if (parse->thread != -1)
     {
       struct thread_info *tp = find_thread_id (parse->thread);
+
       if (!tp)
 	error (_("Invalid thread id: %d"), parse->thread);
 
@@ -1705,6 +1871,7 @@ mi_cmd_execute (struct mi_parse *parse)
     {
       struct frame_info *fid;
       int frame = parse->frame;
+
       fid = find_relative_frame (get_current_frame (), &frame);
       if (frame == 0)
 	/* find_relative_frame was successful */
@@ -1712,6 +1879,8 @@ mi_cmd_execute (struct mi_parse *parse)
       else
 	error (_("Invalid frame id: %d"), frame);
     }
+
+  current_context = parse;
 
   if (parse->cmd->argv_func != NULL)
     parse->cmd->argv_func (parse->command, parse->argv, parse->argc);
@@ -1751,6 +1920,7 @@ mi_execute_cli_command (const char *cmd, int args_p, const char *args)
     {
       struct cleanup *old_cleanups;
       char *run;
+
       if (args_p)
 	run = xstrprintf ("%s %s", cmd, args);
       else
@@ -1840,6 +2010,7 @@ mi_load_progress (const char *section_name,
   if (new_section)
     {
       struct cleanup *cleanup_tuple;
+
       xfree (previous_sect_name);
       previous_sect_name = xstrdup (section_name);
 
@@ -1860,6 +2031,7 @@ mi_load_progress (const char *section_name,
       delta.tv_usec >= update_threshold.tv_usec)
     {
       struct cleanup *cleanup_tuple;
+
       last_update.tv_sec = time_now.tv_sec;
       last_update.tv_usec = time_now.tv_usec;
       if (current_token)
@@ -1884,7 +2056,6 @@ mi_load_progress (const char *section_name,
 static void 
 timestamp (struct mi_timestamp *tv)
   {
-    long usec;
     gettimeofday (&tv->wallclock, NULL);
 #ifdef HAVE_GETRUSAGE
     getrusage (RUSAGE_SELF, &rusage);
@@ -1893,11 +2064,14 @@ timestamp (struct mi_timestamp *tv)
     tv->stime.tv_sec = rusage.ru_stime.tv_sec;
     tv->stime.tv_usec = rusage.ru_stime.tv_usec;
 #else
-    usec = get_run_time ();
-    tv->utime.tv_sec = usec/1000000L;
-    tv->utime.tv_usec = usec - 1000000L*tv->utime.tv_sec;
-    tv->stime.tv_sec = 0;
-    tv->stime.tv_usec = 0;
+    {
+      long usec = get_run_time ();
+
+      tv->utime.tv_sec = usec/1000000L;
+      tv->utime.tv_usec = usec - 1000000L*tv->utime.tv_sec;
+      tv->stime.tv_sec = 0;
+      tv->stime.tv_usec = 0;
+    }
 #endif
   }
 
@@ -1905,6 +2079,7 @@ static void
 print_diff_now (struct mi_timestamp *start)
   {
     struct mi_timestamp now;
+
     timestamp (&now);
     print_diff (start, &now);
   }
@@ -1935,3 +2110,180 @@ print_diff (struct mi_timestamp *start, struct mi_timestamp *end)
        timeval_diff (start->utime, end->utime) / 1000000.0, 
        timeval_diff (start->stime, end->stime) / 1000000.0);
   }
+
+void
+mi_cmd_trace_define_variable (char *command, char **argv, int argc)
+{
+  struct expression *expr;
+  struct cleanup *back_to;
+  LONGEST initval = 0;
+  struct trace_state_variable *tsv;
+  char *name = 0;
+
+  if (argc != 1 && argc != 2)
+    error (_("Usage: -trace-define-variable VARIABLE [VALUE]"));
+
+  expr = parse_expression (argv[0]);
+  back_to = make_cleanup (xfree, expr);
+
+  if (expr->nelts == 3 && expr->elts[0].opcode == OP_INTERNALVAR)
+    {
+      struct internalvar *intvar = expr->elts[1].internalvar;
+
+      if (intvar)
+	name = internalvar_name (intvar);
+    }
+
+  if (!name || *name == '\0')
+    error (_("Invalid name of trace variable"));
+
+  tsv = find_trace_state_variable (name);
+  if (!tsv)
+    tsv = create_trace_state_variable (name);
+
+  if (argc == 2)
+    initval = value_as_long (parse_and_eval (argv[1]));
+
+  tsv->initial_value = initval;
+
+  do_cleanups (back_to);
+}
+
+void
+mi_cmd_trace_list_variables (char *command, char **argv, int argc)
+{
+  if (argc != 0)
+    error (_("-trace-list-variables: no arguments are allowed"));
+
+  tvariables_info_1 ();
+}
+
+void
+mi_cmd_trace_find (char *command, char **argv, int argc)
+{
+  char *mode;
+
+  if (argc == 0)
+    error (_("trace selection mode is required"));
+
+  mode = argv[0];
+
+  if (strcmp (mode, "none") == 0)
+    {
+      tfind_1 (tfind_number, -1, 0, 0, 0);
+      return;
+    }
+
+  if (current_trace_status ()->running)
+    error (_("May not look at trace frames while trace is running."));
+
+  if (strcmp (mode, "frame-number") == 0)
+    {
+      if (argc != 2)
+	error (_("frame number is required"));
+      tfind_1 (tfind_number, atoi (argv[1]), 0, 0, 0);
+    }
+  else if (strcmp (mode, "tracepoint-number") == 0)
+    {
+      if (argc != 2)
+	error (_("tracepoint number is required"));
+      tfind_1 (tfind_tp, atoi (argv[1]), 0, 0, 0);
+    }
+  else if (strcmp (mode, "pc") == 0)
+    {
+      if (argc != 2)
+	error (_("PC is required"));
+      tfind_1 (tfind_pc, 0, parse_and_eval_address (argv[1]), 0, 0);
+    }
+  else if (strcmp (mode, "pc-inside-range") == 0)
+    {
+      if (argc != 3)
+	error (_("Start and end PC are required"));
+      tfind_1 (tfind_range, 0, parse_and_eval_address (argv[1]),
+	       parse_and_eval_address (argv[2]), 0);
+    }
+  else if (strcmp (mode, "pc-outside-range") == 0)
+    {
+      if (argc != 3)
+	error (_("Start and end PC are required"));
+      tfind_1 (tfind_outside, 0, parse_and_eval_address (argv[1]),
+	       parse_and_eval_address (argv[2]), 0);
+    }
+  else if (strcmp (mode, "line") == 0)
+    {
+      struct symtabs_and_lines sals;
+      struct symtab_and_line sal;
+      static CORE_ADDR start_pc, end_pc;
+      struct cleanup *back_to;
+
+      if (argc != 2)
+	error (_("Line is required"));
+
+      sals = decode_line_spec (argv[1], 1);
+      back_to = make_cleanup (xfree, sals.sals);
+
+      sal = sals.sals[0];
+
+      if (sal.symtab == 0)
+	error (_("Could not find the specified line"));
+
+      if (sal.line > 0 && find_line_pc_range (sal, &start_pc, &end_pc))
+	tfind_1 (tfind_range, 0, start_pc, end_pc - 1, 0);
+      else
+	error (_("Could not find the specified line"));
+
+      do_cleanups (back_to);
+    }
+  else
+    error (_("Invalid mode '%s'"), mode);
+
+  if (has_stack_frames () || get_traceframe_number () >= 0)
+    {
+      print_stack_frame (get_selected_frame (NULL), 1, SRC_AND_LOC);
+    }
+}
+
+void
+mi_cmd_trace_save (char *command, char **argv, int argc)
+{
+  int target_saves = 0;
+  char *filename;
+
+  if (argc != 1 && argc != 2)
+    error (_("Usage: -trace-save [-r] filename"));
+
+  if (argc == 2)
+    {
+      filename = argv[1];
+      if (strcmp (argv[0], "-r") == 0)
+	target_saves = 1;
+      else
+	error (_("Invalid option: %s"), argv[0]);
+    }
+  else
+    {
+      filename = argv[0];
+    }
+
+  trace_save (filename, target_saves);
+}
+
+
+void
+mi_cmd_trace_start (char *command, char **argv, int argc)
+{
+  start_tracing ();
+}
+
+void
+mi_cmd_trace_status (char *command, char **argv, int argc)
+{
+  trace_status_mi (0);
+}
+
+void
+mi_cmd_trace_stop (char *command, char **argv, int argc)
+{
+  stop_tracing ();
+  trace_status_mi (1);
+}

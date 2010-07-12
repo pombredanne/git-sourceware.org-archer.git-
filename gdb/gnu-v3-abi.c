@@ -26,6 +26,7 @@
 #include "demangle.h"
 #include "objfiles.h"
 #include "valprint.h"
+#include "c-lang.h"
 
 #include "gdb_assert.h"
 #include "gdb_string.h"
@@ -456,10 +457,8 @@ gnuv3_find_method_in (struct type *domain, CORE_ADDR voffset,
 		      LONGEST adjustment)
 {
   int i;
-  const char *physname;
 
   /* Search this class first.  */
-  physname = NULL;
   if (adjustment == 0)
     {
       int len;
@@ -587,14 +586,24 @@ gnuv3_print_method_ptr (const gdb_byte *contents,
 	{
 	  char *demangled_name = cplus_demangle (physname,
 						 DMGL_ANSI | DMGL_PARAMS);
-	  if (demangled_name != NULL)
+
+	  fprintf_filtered (stream, "&virtual ");
+	  if (demangled_name == NULL)
+	    fputs_filtered (physname, stream);
+	  else
 	    {
-	      fprintf_filtered (stream, "&virtual ");
 	      fputs_filtered (demangled_name, stream);
 	      xfree (demangled_name);
-	      return;
 	    }
+	  return;
 	}
+    }
+  else if (ptr_value != 0)
+    {
+      /* Found a non-virtual function: print out the type.  */
+      fputs_filtered ("(", stream);
+      c_print_type (type, "", stream, -1, 0);
+      fputs_filtered (") ", stream);
     }
 
   /* We didn't find it; print the raw data.  */
@@ -620,6 +629,7 @@ gnuv3_method_ptr_size (struct type *type)
 {
   struct type *domain_type = check_typedef (TYPE_DOMAIN_TYPE (type));
   struct gdbarch *gdbarch = get_type_arch (domain_type);
+
   return 2 * TYPE_LENGTH (builtin_type (gdbarch)->builtin_data_ptr);
 }
 
@@ -702,6 +712,7 @@ gnuv3_method_ptr_to_value (struct value **this_p, struct value *method_ptr)
   if (vbit)
     {
       LONGEST voffset;
+
       voffset = ptr_value / TYPE_LENGTH (vtable_ptrdiff_type (gdbarch));
       return gnuv3_get_virtual_fn (gdbarch, value_ind (*this_p),
 				   method_type, voffset);

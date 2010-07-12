@@ -121,6 +121,7 @@ static PROCESS_GROUP_TYPE
 gdb_getpgrp (void)
 {
   int process_group = -1;
+
 #ifdef HAVE_TERMIOS
   process_group = tcgetpgrp (0);
 #endif
@@ -500,9 +501,8 @@ get_inflow_inferior_data (struct inferior *inf)
    list.  */
 
 static void
-inflow_inferior_exit (int pid)
+inflow_inferior_exit (struct inferior *inf)
 {
-  struct inferior *inf = find_inferior_pid (pid);
   struct terminal_info *info;
 
   info = inferior_data (inf, inflow_inferior_data);

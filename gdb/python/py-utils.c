@@ -30,6 +30,7 @@ static void
 py_decref (void *p)
 {
   PyObject *py = p;
+
   /* Note that we need the extra braces in this 'if' to avoid a
      warning from gcc.  */
   if (py)
@@ -130,7 +131,8 @@ unicode_to_encoded_python_string (PyObject *unicode_str, const char *charset)
 char *
 unicode_to_target_string (PyObject *unicode_str)
 {
-  return unicode_to_encoded_string (unicode_str, target_charset ());
+  return unicode_to_encoded_string (unicode_str,
+				    target_charset (python_gdbarch));
 }
 
 /* Returns a PyObject with the contents of the given unicode string
@@ -140,7 +142,8 @@ unicode_to_target_string (PyObject *unicode_str)
 PyObject *
 unicode_to_target_python_string (PyObject *unicode_str)
 {
-  return unicode_to_encoded_python_string (unicode_str, target_charset ());
+  return unicode_to_encoded_python_string (unicode_str,
+					   target_charset (python_gdbarch));
 }
 
 /* Converts a python string (8-bit or unicode) to a target string in
@@ -209,7 +212,7 @@ target_string_to_unicode (const gdb_byte *str, int length)
   if (length == -1)
     length = strlen (str);
 
-  return PyUnicode_Decode (str, length, target_charset (), NULL);
+  return PyUnicode_Decode (str, length, target_charset (python_gdbarch), NULL);
 }
 
 /* Return true if OBJ is a Python string or unicode object, false
@@ -221,10 +224,61 @@ gdbpy_is_string (PyObject *obj)
   return PyString_Check (obj) || PyUnicode_Check (obj);
 }
 
+/* Return the string representation of OBJ, i.e., str (obj).
+   Space for the result is malloc'd, the caller must free.
+   If the result is NULL a python error occurred, the caller must clear it.  */
+
+char *
+gdbpy_obj_to_string (PyObject *obj)
+{
+  PyObject *str_obj = PyObject_Str (obj);
+
+  if (str_obj != NULL)
+    {
+      char *msg = xstrdup (PyString_AsString (str_obj));
+
+      Py_DECREF (str_obj);
+      return msg;
+    }
+
+  return NULL;
+}
+
+/* Return the string representation of the exception represented by
+   TYPE, VALUE which is assumed to have been obtained with PyErr_Fetch,
+   i.e., the error indicator is currently clear.
+   Space for the result is malloc'd, the caller must free.
+   If the result is NULL a python error occurred, the caller must clear it.  */
+
+char *
+gdbpy_exception_to_string (PyObject *ptype, PyObject *pvalue)
+{
+  PyObject *str_obj = PyObject_Str (pvalue);
+  char *str;
+
+  /* There are a few cases to consider.
+     For example:
+     pvalue is a string when PyErr_SetString is used.
+     pvalue is not a string when raise "foo" is used, instead it is None
+     and ptype is "foo".
+     So the algorithm we use is to print `str (pvalue)' if it's not
+     None, otherwise we print `str (ptype)'.
+     Using str (aka PyObject_Str) will fetch the error message from
+     gdb.GdbError ("message").  */
+
+  if (pvalue && pvalue != Py_None)
+    str = gdbpy_obj_to_string (pvalue);
+  else
+    str = gdbpy_obj_to_string (ptype);
+
+  return str;
+}
+
 /* Converts OBJ to a CORE_ADDR value.
 
    Returns 1 on success or 0 on failure, with a Python exception set.  This
-   function can also throw GDB exceptions.  */
+   function can also throw GDB exceptions.
+*/
 
 int
 get_addr_from_python (PyObject *obj, CORE_ADDR *addr)
@@ -253,13 +307,15 @@ get_addr_from_python (PyObject *obj, CORE_ADDR *addr)
 	if (PyErr_Occurred () != NULL)
 	  return 0;
 
-	PyErr_SetString (PyExc_ValueError, "negative address");
+	PyErr_SetString (PyExc_ValueError,
+			 _("Supplied address is negative."));
 	return 0;
       }
     }
   else
     {
-      PyErr_SetString (PyExc_TypeError, "invalid type for address");
+      PyErr_SetString (PyExc_TypeError,
+		       _("Invalid type for address."));
       return 0;
     }
 

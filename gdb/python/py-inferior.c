@@ -39,8 +39,8 @@ typedef struct
   /* The inferior we represent.  */
   struct inferior *inferior;
 
-  /* thread_object instances under this inferior.  This list owns a reference
-     to each object it contains. */
+  /* thread_object instances under this inferior.  This list owns a
+     reference to each object it contains.  */
   struct threadlist_entry *threads;
 
   /* Number of threads in the list.  */
@@ -48,6 +48,8 @@ typedef struct
 } inferior_object;
 
 static PyTypeObject inferior_object_type;
+
+static const struct inferior_data *infpy_inf_data_key;
 
 typedef struct {
   PyObject_HEAD
@@ -66,154 +68,78 @@ static PyTypeObject membuf_object_type;
     if (!Inferior->inferior)					\
       {								\
 	PyErr_SetString (PyExc_RuntimeError,			\
-			 "inferior no longer exists");	        \
+			 _("Inferior no longer exists."));	\
 	return NULL;						\
       }								\
   } while (0)
 
-struct inflist_entry {
-  inferior_object *inf_obj;
-  struct inflist_entry *next;
-};
-
-
-
-/* Inferior objects list.  */
-
-/* List containing inferior_objects.  This list owns a reference to each
-   object it contains.  */
-static struct inflist_entry *gdbpy_inferior_list;
-
-static int ninferiors;
-
-
-/* An observer callback function that is called when an inferior has
-   been created.  Creates a corresponding Python object for the inferior
-   and adds it to the list.  */
-static void
-add_inferior_object (int pid)
+/* Return a borrowed reference to the Python object of type Inferior
+   representing INFERIOR.  If the object has already been created,
+   return it,  otherwise, create it.  Return NULL on failure.  */
+PyObject *
+inferior_to_inferior_object (struct inferior *inferior)
 {
-  struct inferior *inf = find_inferior_pid (pid);
   inferior_object *inf_obj;
-  struct inflist_entry *entry;
-  struct cleanup *cleanup;
 
-  if (!inf)
-    {
-      warning (_("Can't create Python Inferior object."));
-      return;
-    }
-
-  /* While creating new inferior no inferior thread is available.  Therefore
-     get_current_arch has no valid current frame (and it would crash).  */
-
-  cleanup = ensure_python_env (target_gdbarch, current_language);
-
-  inf_obj = PyObject_New (inferior_object, &inferior_object_type);
+  inf_obj = inferior_data (inferior, infpy_inf_data_key);
   if (!inf_obj)
     {
-      warning (_("Can't create Python Inferior object."));
-      gdbpy_print_stack ();
+      struct cleanup *cleanup;
+      cleanup = ensure_python_env (python_gdbarch, python_language);
+
+      inf_obj = PyObject_New (inferior_object, &inferior_object_type);
+      if (!inf_obj)
+	{
+	  do_cleanups (cleanup);
+	  return NULL;
+	}
+
+      inf_obj->inferior = inferior;
+      inf_obj->threads = NULL;
+      inf_obj->nthreads = 0;
+
+      set_inferior_data (inferior, infpy_inf_data_key, inf_obj);
+
       do_cleanups (cleanup);
-      return;
     }
 
-  inf_obj->inferior = inf;
-  inf_obj->threads = NULL;
-  inf_obj->nthreads = 0;
-
-  entry = xmalloc (sizeof (struct inflist_entry));
-  entry->inf_obj = inf_obj;
-  entry->next = gdbpy_inferior_list;
-
-  gdbpy_inferior_list = entry;
-
-  ninferiors++;
-
-  do_cleanups (cleanup);
+  return (PyObject *) inf_obj;
 }
 
-/* An observer callback function that is called when an inferior has
-   been deleted.  Removes the corresponding Python object from the
-   inferior list, and removes the list's reference to the object.  */
-static void
-delete_inferior_object (int pid)
-{
-  struct cleanup *cleanup;
-  struct inflist_entry **inf_entry, *inf_tmp;
-  struct threadlist_entry *th_entry, *th_tmp;
-
-  /* Find inferior_object for the given PID.  */
-  for (inf_entry = &gdbpy_inferior_list; *inf_entry != NULL;
-       inf_entry = &(*inf_entry)->next)
-    if ((*inf_entry)->inf_obj->inferior->pid == pid)
-      break;
-
-  if (!*inf_entry)
-    return;
-
-  cleanup = ensure_python_env (get_current_arch (), current_language);
-
-  inf_tmp = *inf_entry;
-  inf_tmp->inf_obj->inferior = NULL;
-
-  /* Deallocate threads list.  */
-  for (th_entry = inf_tmp->inf_obj->threads; th_entry != NULL;)
-    {
-      Py_DECREF (th_entry->thread_obj);
-
-      th_tmp = th_entry;
-      th_entry = th_entry->next;
-      xfree (th_tmp);
-    }
-
-  inf_tmp->inf_obj->nthreads = 0;
-
-  *inf_entry = (*inf_entry)->next;
-  Py_DECREF (inf_tmp->inf_obj);
-  xfree (inf_tmp);
-
-  ninferiors--;
-
-  do_cleanups (cleanup);
-}
-
-/* Finds the Python Inferior object for the given pid.  Returns a borrowed
-   reference.  */
+/* Finds the Python Inferior object for the given PID.  Returns a
+   borrowed reference, or NULL if PID does not match any inferior
+   obect.
+  */
 PyObject *
 find_inferior_object (int pid)
 {
   struct inflist_entry *p;
+  struct inferior *inf = find_inferior_pid (pid);
 
-  for (p = gdbpy_inferior_list; p != NULL; p = p->next)
-    if (p->inf_obj->inferior->pid == pid)
-      return (PyObject *) p->inf_obj;
+  if (inf)
+    return inferior_to_inferior_object (inf);
 
   return NULL;
 }
 
-/* Finds the Python InferiorThread object for the given ptid.  Returns a
-   borrowed reference.  */
 thread_object *
 find_thread_object (ptid_t ptid)
 {
   int pid;
-  struct inflist_entry *p;
-  struct threadlist_entry *q;
+  struct threadlist_entry *thread;
+  PyObject *inf_obj;
 
   pid = PIDGET (ptid);
-  for (p = gdbpy_inferior_list; p != NULL; p = p->next)
-    if (p->inf_obj->inferior->pid == pid)
-      for (q = p->inf_obj->threads; q != NULL; q = q->next)
-	if (ptid_equal (q->thread_obj->thread->ptid, ptid))
-	  return q->thread_obj;
+  inf_obj = find_inferior_object (pid);
+
+  if (inf_obj)
+    for (thread = ((inferior_object *)inf_obj)->threads; thread;
+	 thread = thread->next)
+      if (ptid_equal (thread->thread_obj->thread->ptid, ptid))
+	return thread->thread_obj;
 
   return NULL;
 }
-
-
-
-/* Inferior object.  */
 
 static void
 add_thread_object (struct thread_info *tp)
@@ -223,15 +149,11 @@ add_thread_object (struct thread_info *tp)
   inferior_object *inf_obj;
   struct threadlist_entry *entry;
 
-  /* Note that the arch does not matter here, because we can't run
-     arbitrary Python code.  Calling get_current_arch here will
-     crash.  */
-  cleanup = ensure_python_env (target_gdbarch, current_language);
+  cleanup = ensure_python_env (python_gdbarch, python_language);
 
   thread_obj = create_thread_object (tp);
   if (!thread_obj)
     {
-      warning (_("Can't create Python InferiorThread object."));
       gdbpy_print_stack ();
       do_cleanups (cleanup);
       return;
@@ -262,14 +184,15 @@ delete_thread_object (struct thread_info *tp, int ignore)
     return;
 
   /* Find thread entry in its inferior's thread_list.  */
-  for (entry = &inf_obj->threads; *entry != NULL; entry = &(*entry)->next)
+  for (entry = &inf_obj->threads; *entry != NULL; entry =
+	 &(*entry)->next)
     if ((*entry)->thread_obj->thread == tp)
       break;
 
   if (!*entry)
     return;
 
-  cleanup = ensure_python_env (get_current_arch (), current_language);
+  cleanup = ensure_python_env (python_gdbarch, python_language);
 
   tmp = *entry;
   tmp->thread_obj->thread = NULL;
@@ -279,7 +202,6 @@ delete_thread_object (struct thread_info *tp, int ignore)
 
   Py_DECREF (tmp->thread_obj);
   xfree (tmp);
-
 
   do_cleanups (cleanup);
 }
@@ -294,13 +216,10 @@ infpy_threads (PyObject *self, PyObject *args)
 
   INFPY_REQUIRE_VALID (inf_obj);
 
-
   tuple = PyTuple_New (inf_obj->nthreads);
   if (!tuple)
     return NULL;
 
-  /* The list is in reverse order of thread age (i.e., newest comes first),
-     is this a problem?  */
   for (i = 0, entry = inf_obj->threads; i < inf_obj->nthreads;
        i++, entry = entry->next)
     {
@@ -335,51 +254,48 @@ static PyObject *
 infpy_get_was_attached (PyObject *self, void *closure)
 {
   inferior_object *inf = (inferior_object *) self;
+
   INFPY_REQUIRE_VALID (inf);
   if (inf->inferior->attach_flag)
     Py_RETURN_TRUE;
   Py_RETURN_FALSE;
 }
 
-
+static int
+build_inferior_list (struct inferior *inf, void *arg)
+{
+  PyObject *list = arg;
+  PyObject *inferior = inferior_to_inferior_object (inf);
+
+  PyList_Append (list, inferior);
+  return 0;
+}
 
 /* Implementation of gdb.inferiors () -> (gdb.Inferior, ...).
-   Returns a list of all inferiors.  */
-
+   Returns a tuple of all inferiors.  */
 PyObject *
 gdbpy_inferiors (PyObject *unused, PyObject *unused2)
 {
-  int i;
-  struct inflist_entry *entry;
-  PyObject *tuple;
+  int i = 0;
+  PyObject *list, *inferior;
+  struct inferior *inf;
 
-  tuple = PyTuple_New (ninferiors);
-  if (!tuple)
+  list = PyList_New (0);
+  if (!list)
     return NULL;
 
-  /* The list is in reverse order of inferior age (i.e., newest comes first),
-     is this a problem?  */
-  for (i = 0, entry = gdbpy_inferior_list;
-       i < ninferiors;
-       i++, entry = entry->next)
-    {
-      Py_INCREF (entry->inf_obj);
-      PyTuple_SET_ITEM (tuple, i, (PyObject *) entry->inf_obj);
-    }
+  iterate_over_inferiors (build_inferior_list, list);
 
-  return tuple;
+  return PyList_AsTuple (list);
 }
-
-
 
 /* Membuf and memory manipulation.  */
 
 /* Implementation of gdb.read_memory (address, length).
-   Returns a Python buffer object with LENGTH bytes of the inferior's memory
-   at ADDRESS. Both arguments are integers.  */
-
+   Returns a Python buffer object with LENGTH bytes of the inferior's
+   memory at ADDRESS.  Both arguments are integers.  */
 static PyObject *
-infpy_read_memory (PyObject *self, PyObject *args)
+infpy_read_memory (PyObject *self, PyObject *args, PyObject *kw)
 {
   int error = 0;
   CORE_ADDR addr, length;
@@ -388,8 +304,10 @@ infpy_read_memory (PyObject *self, PyObject *args)
   PyObject *addr_obj, *length_obj;
   struct cleanup *cleanups;
   volatile struct gdb_exception except;
+  static char *keywords[] = { "address", "length", NULL };
 
-  if (! PyArg_ParseTuple (args, "OO", &addr_obj, &length_obj))
+  if (! PyArg_ParseTupleAndKeywords (args, kw, "OO", keywords,
+				     &addr_obj, &length_obj))
     return NULL;
 
   cleanups = make_cleanup (null_cleanup, NULL);
@@ -408,7 +326,11 @@ infpy_read_memory (PyObject *self, PyObject *args)
 
       read_memory (addr, buffer, length);
     }
-  GDB_PY_HANDLE_EXCEPTION (except);
+  if (except.reason < 0)
+    {
+      do_cleanups (cleanups);
+      GDB_PY_HANDLE_EXCEPTION (except);
+    }
 
   if (error)
     {
@@ -420,7 +342,7 @@ infpy_read_memory (PyObject *self, PyObject *args)
   if (membuf_obj == NULL)
     {
       PyErr_SetString (PyExc_MemoryError,
-		       "Could not allocate memory buffer object.");
+		       _("Could not allocate memory buffer object."));
       do_cleanups (cleanups);
       return NULL;
     }
@@ -436,22 +358,24 @@ infpy_read_memory (PyObject *self, PyObject *args)
 }
 
 /* Implementation of gdb.write_memory (address, buffer [, length]).
-   Writes the contents of BUFFER (a Python object supporting the read buffer
-   protocol) at ADDRESS in the inferior's memory.  Write LENGTH bytes from
-   BUFFER, or its entire contents if the argument is not provided.  The
-   function returns nothing.  */
-
+   Writes the contents of BUFFER (a Python object supporting the read
+   buffer protocol) at ADDRESS in the inferior's memory.  Write LENGTH
+   bytes from BUFFER, or its entire contents if the argument is not
+   provided.  The function returns nothing.  */
 static PyObject *
-infpy_write_memory (PyObject *self, PyObject *args)
+infpy_write_memory (PyObject *self, PyObject *args, PyObject *kw)
 {
   int buf_len, error = 0;
   const char *buffer;
   CORE_ADDR addr, length;
   PyObject *addr_obj, *length_obj = NULL;
   volatile struct gdb_exception except;
+  static char *keywords[] = { "address", "buffer", "length", NULL };
 
-  if (! PyArg_ParseTuple (args, "Os#|O", &addr_obj, &buffer, &buf_len,
-			  &length_obj))
+
+  if (! PyArg_ParseTupleAndKeywords (args, kw, "Os#|O", keywords,
+				     &addr_obj, &buffer, &buf_len,
+				     &length_obj))
     return NULL;
 
   TRY_CATCH (except, RETURN_MASK_ALL)
@@ -461,7 +385,7 @@ infpy_write_memory (PyObject *self, PyObject *args)
 	  error = 1;
 	  break;
 	}
-      
+
       if (!length_obj)
 	length = buf_len;
       else if (!get_addr_from_python (length_obj, &length))
@@ -469,7 +393,6 @@ infpy_write_memory (PyObject *self, PyObject *args)
 	  error = 1;
 	  break;
 	}
-
       write_memory (addr, buffer, length);
     }
   GDB_PY_HANDLE_EXCEPTION (except);
@@ -481,7 +404,6 @@ infpy_write_memory (PyObject *self, PyObject *args)
 }
 
 /* Destructor of Membuf objects.  */
-
 static void
 mbpy_dealloc (PyObject *self)
 {
@@ -490,13 +412,13 @@ mbpy_dealloc (PyObject *self)
 }
 
 /* Return a description of the Membuf object.  */
-
 static PyObject *
 mbpy_str (PyObject *self)
 {
   membuf_object *membuf_obj = (membuf_object *) self;
 
-  return PyString_FromFormat ("memory buffer for address %s, %s bytes long",
+  return PyString_FromFormat (_("Memory buffer for address %s, \
+which is %s bytes long."),
 			      paddress (python_gdbarch, membuf_obj->addr),
 			      pulongest (membuf_obj->length));
 }
@@ -509,7 +431,7 @@ get_read_buffer (PyObject *self, Py_ssize_t segment, void **ptrptr)
   if (segment)
     {
       PyErr_SetString (PyExc_SystemError,
-		       "The memory buffer supports only one segment.");
+		       _("The memory buffer supports only one segment."));
       return -1;
     }
 
@@ -545,235 +467,112 @@ get_char_buffer (PyObject *self, Py_ssize_t segment, char **ptrptr)
   return ret;
 }
 
-/* Adds GDB value V to the pattern buffer in *PATTERN_BUF.  If SIZE is not zero,
-   it specifies the number of bytes from V to copy to *PATTERN_BUF.  The
-   function increases the size of *PATTERN_BUF as necessary, adjusting
-   *PATTERN_BUF_END and *PATTERN_BUF_SIZE in the process.  */
-
-static void
-add_value_pattern (struct value *v, int size, char **pattern_buf,
-		   char **pattern_buf_end, ULONGEST *pattern_buf_size)
-{
-  int val_bytes;
-
-  if (size)
-    {
-      LONGEST x = value_as_long (v);
-
-      if (size == 1)
-	*(*pattern_buf_end)++ = x;
-      else
-	{
-	  put_bits (x, *pattern_buf_end, size * 8,
-		    gdbarch_byte_order (python_gdbarch) == BFD_ENDIAN_BIG);
-	  *pattern_buf_end += size;
-	}
-    }
-  else
-   {
-     val_bytes = TYPE_LENGTH (value_type (v));
-
-     increase_pattern_buffer (pattern_buf, pattern_buf_end,
-			      pattern_buf_size, val_bytes);
-
-     memcpy (*pattern_buf_end, value_contents_raw (v), val_bytes);
-     *pattern_buf_end += val_bytes;
-   }
-}
-
-/* This function does the actual work of constructing the pattern buffer from
-   OBJ.  If OBJ is an object which implements the read buffer protocol (such
-   as a string, a byte array or gdb.Membuf), then its contents are directly
-   copied to *PATTERN_BUF.  If it is a list, then this function is recursively
-   called for each of its elements.  If OBJ is an object which can be converted
-   to a GDB value, then the contents of the value are copied to PATTERN_BUF.
-   If SIZE is different than zero, then it limits the number of bytes which
-   are copied to the buffer in case OBJ is converted to a GDB value.  That
-   means that SIZE influences only Python scalars and gdb.Value objects.
-   The function increases the size of *PATTERN_BUF as necessary, adjusting
-   *PATTERN_BUF_END and *PATTERN_BUF_SIZE in the process.
-
-   Returns 1 on success or 0 on failure, with a Python exception set.  This
-   function can also throw GDB exceptions.  */
-
-static int
-add_pattern_element (PyObject *obj, int size, char **pattern_buf,
-		     char **pattern_buf_end, ULONGEST *pattern_buf_size)
-{
-  if (PyObject_CheckReadBuffer (obj))
-    {
-      /* Handle string, Unicode string, byte array, gdb.Membuf and any other
-         object implementing the buffer protocol.  The SIZE parameter is
-	 ignored in this case.  */
-
-      Py_ssize_t val_bytes;
-      const void *buffer;
-
-      if (PyObject_AsReadBuffer (obj, &buffer, &val_bytes) == -1)
-	return 0;
-
-      increase_pattern_buffer (pattern_buf, pattern_buf_end,
-			       pattern_buf_size, val_bytes);
-
-      memcpy (*pattern_buf_end, buffer, val_bytes);
-      *pattern_buf_end += val_bytes;
-    }
-  else if (gdbpy_is_value_object (obj))
-    add_value_pattern (value_object_to_value (obj), size, pattern_buf,
-		       pattern_buf_end, pattern_buf_size);
-  else if (PySequence_Check (obj))
-    {
-      /* Handle lists and tuples.  */
-
-      Py_ssize_t i, num_objs;
-
-      num_objs = PySequence_Size (obj);
-      for (i = 0; i < num_objs; i++)
-	if (!add_pattern_element (PySequence_GetItem (obj, i), size,
-				  pattern_buf, pattern_buf_end,
-				  pattern_buf_size))
-	  return 0;
-    }
-  else
-    {
-      /* See if we can convert from a Python object to a GDB value.  */
-
-      struct value *v = convert_value_from_python (obj);
-
-      if (v)
-	add_value_pattern (v, size, pattern_buf, pattern_buf_end,
-			   pattern_buf_size);
-      else
-	return 0;
-    }
-
-  return 1;
-}
-
-/* Constructs the search pattern from OBJ, putting it in *PATTERN_BUFP, and its
-   size in *PATTERN_LENP.  See the function add_pattern_element to learn how
-   the search pattern is obtained from OBJ.
-
-   Returns 1 on success or 0 on failure, with a Python exception set.  This
-   function can also throw GDB exceptions.  */
-
-static int
-get_search_pattern (PyObject *obj, int size, char **pattern_bufp,
-		    ULONGEST *pattern_lenp)
-{
-  /* Buffer to hold the search pattern.  */
-  char *pattern_buf;
-  /* Current size of search pattern buffer.
-     We realloc space as needed.  */
-  ULONGEST pattern_buf_size;
-  /* Pointer to one past the last in-use part of pattern_buf.  */
-  char *pattern_buf_end;
-  struct cleanup *old_cleanups;
-
-  allocate_pattern_buffer (&pattern_buf, &pattern_buf_end, &pattern_buf_size);
-  old_cleanups = make_cleanup (free_current_contents, &pattern_buf);
-
-  if (!add_pattern_element (obj, size, &pattern_buf, &pattern_buf_end,
-			    &pattern_buf_size))
-    {
-      do_cleanups (old_cleanups);
-
-      return 0;
-    }
-
-  *pattern_bufp = pattern_buf;
-  *pattern_lenp = pattern_buf_end - pattern_buf;
-
-  discard_cleanups (old_cleanups);
-
-  return 1;
-}
-
 /* Implementation of
-   gdb.search_memory (address, length, pattern [, size] [, max_count]).
-   The third argument may be either a pattern, or a list or tupple of patterns
-   to be searched.  Size is the size in bytes of each search query value, either
-   1, 2, 4 or 8.  Returns a list of the addresses where matches were found.  */
-
+   gdb.search_memory (address, length, pattern).  ADDRESS is the
+   address to start the search.  LENGTH specifies the scope of the
+   search from ADDRESS.  PATTERN is the pattern to search for (and
+   must be a Python object supporting the buffer protocol).
+   Returns a Python Long object holding the address where the pattern
+   was located, or if the pattern was not found, returns None.  */
 static PyObject *
 infpy_search_memory (PyObject *self, PyObject *args, PyObject *kw)
 {
-  int size = 0;
-  unsigned int found_count = 0;
-  long max_count = 0;
   CORE_ADDR start_addr, length;
-  char *pattern_buf;
-  static char *keywords[] = { "address", "length", "pattern", "size",
-			      "max_count", NULL };
-  ULONGEST pattern_len, search_space_len;
-  PyObject *pattern, *list = NULL, *start_addr_obj, *length_obj;
+  static char *keywords[] = { "address", "length", "pattern", NULL };
+  PyObject *pattern, *start_addr_obj, *length_obj;
   volatile struct gdb_exception except;
+  Py_ssize_t pattern_size;
+  const void *buffer;
+  CORE_ADDR found_addr;
+  int found = 0;
 
-  if (! PyArg_ParseTupleAndKeywords (args, kw, "OOO|il", keywords,
-				     &start_addr_obj, &length_obj, &pattern,
-				     &size, &max_count))
+  if (! PyArg_ParseTupleAndKeywords (args, kw, "OOO", keywords,
+				     &start_addr_obj, &length_obj,
+				     &pattern))
     return NULL;
 
-  if (!max_count)
-    max_count = LONG_MAX;
-
-  if (size != 0 && size != 1 && size != 2 && size != 4 && size != 8)
+  if (get_addr_from_python (start_addr_obj, &start_addr)
+      && get_addr_from_python (length_obj, &length))
     {
-      PyErr_SetString (PyExc_ValueError, "invalid pattern size");
+      if (!length)
+	{
+	  PyErr_SetString (PyExc_ValueError,
+			   _("Search range is empty."));
+	  return NULL;
+	}
+      /* Watch for overflows.  */
+      else if (length > CORE_ADDR_MAX
+	       || (start_addr + length - 1) < start_addr)
+	{
+	  PyErr_SetString (PyExc_ValueError,
+			   _("The search range is too large."));
+
+	  return NULL;
+	}
+    }
+  else
+    {
+      PyErr_SetString (PyExc_RuntimeError,
+		       _("Cannot get search address/range from Python."));
+
       return NULL;
     }
 
+  if (!PyObject_CheckReadBuffer (pattern))
+    {
+      PyErr_SetString (PyExc_RuntimeError,
+		       _("The pattern is not a Python buffer."));
+
+      return NULL;
+    }
+
+  if (PyObject_AsReadBuffer (pattern, &buffer, &pattern_size) == -1)
+    return NULL;
+
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      if (get_addr_from_python (start_addr_obj, &start_addr)
-	  && get_addr_from_python (length_obj, &length))
-	{
-	  if (!length)
-	    {
-	      PyErr_SetString (PyExc_ValueError, "empty search range");
-	      break;
-	    }
-	  /* Watch for overflows.  */
-	  else if (length > CORE_ADDR_MAX
-		   || (start_addr + length - 1) < start_addr)
-	    {
-	      PyErr_SetString (PyExc_ValueError, "search range too large");
-	      break;
-	    }
-
-	  search_space_len = length;
-
-	  if (get_search_pattern (pattern, size, &pattern_buf, &pattern_len))
-	    {
-	      /* Any cleanups get automatically executed on an exception.  */
-	      struct cleanup *cleanups = make_cleanup (xfree, pattern_buf);
-
-	      list = PyList_New (0);
-
-	      while (search_space_len >= pattern_len && found_count < max_count)
-		{
-		  CORE_ADDR found_addr;
-		  int found;
-
-		  found = search_memory (&start_addr, &search_space_len,
-					 pattern_buf, pattern_len, &found_addr);
-		  if (found <= 0)
-		    break;
-
-		  PyList_Append (list, PyLong_FromUnsignedLong (found_addr));
-		  ++found_count;
-		}
-
-	      do_cleanups (cleanups);
-	    }
-	}
+      found = target_search_memory (start_addr, length,
+				    buffer, pattern_size,
+				    &found_addr);
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
-  return list;
+  if (found)
+    return PyLong_FromLong (found_addr);
+  else
+    Py_RETURN_NONE;
 }
 
-
+
+/* Clear the INFERIOR pointer in an Inferior object and clear the
+   thread list.  */
+static void
+py_free_inferior (struct inferior *inf, void *datum)
+{
+
+  struct cleanup *cleanup;
+  inferior_object *inf_obj = datum;
+  struct threadlist_entry *th_entry, *th_tmp;
+
+  cleanup = ensure_python_env (python_gdbarch, python_language);
+
+  inf_obj->inferior = NULL;
+
+  /* Deallocate threads list.  */
+  for (th_entry = inf_obj->threads; th_entry != NULL;)
+    {
+      Py_DECREF (th_entry->thread_obj);
+
+      th_tmp = th_entry;
+      th_entry = th_entry->next;
+      xfree (th_tmp);
+    }
+
+  inf_obj->nthreads = 0;
+
+  Py_DECREF ((PyObject *) inf_obj);
+  do_cleanups (cleanup);
+}
 
 void
 gdbpy_initialize_inferior (void)
@@ -785,11 +584,9 @@ gdbpy_initialize_inferior (void)
   PyModule_AddObject (gdb_module, "Inferior",
 		      (PyObject *) &inferior_object_type);
 
-  gdbpy_inferior_list = NULL;
-  ninferiors = 0;
+  infpy_inf_data_key =
+    register_inferior_data_with_cleanup (py_free_inferior);
 
-  observer_attach_inferior_appeared (add_inferior_object);
-  observer_attach_inferior_exit (delete_inferior_object);
   observer_attach_new_thread (add_thread_object);
   observer_attach_thread_exit (delete_thread_object);
 
@@ -797,10 +594,9 @@ gdbpy_initialize_inferior (void)
     return;
 
   Py_INCREF (&membuf_object_type);
-  PyModule_AddObject (gdb_module, "Membuf", (PyObject *) &membuf_object_type);
+  PyModule_AddObject (gdb_module, "Membuf", (PyObject *)
+		      &membuf_object_type);
 }
-
-
 
 static PyGetSetDef inferior_object_getset[] =
 {
@@ -809,7 +605,6 @@ static PyGetSetDef inferior_object_getset[] =
     NULL },
   { "was_attached", infpy_get_was_attached, NULL,
     "True if the inferior was created using 'attach'.", NULL },
-
   { NULL }
 };
 
@@ -817,17 +612,18 @@ static PyMethodDef inferior_object_methods[] =
 {
   { "threads", infpy_threads, METH_NOARGS,
     "Return all the threads of this inferior." },
-
-  { "read_memory", infpy_read_memory, METH_VARARGS,
+  { "read_memory", (PyCFunction) infpy_read_memory,
+    METH_VARARGS | METH_KEYWORDS,
     "read_memory (address, length) -> buffer\n\
 Return a buffer object for reading from the inferior's memory." },
-  { "write_memory", infpy_write_memory, METH_VARARGS,
+  { "write_memory", (PyCFunction) infpy_write_memory,
+    METH_VARARGS | METH_KEYWORDS,
     "write_memory (address, buffer [, length])\n\
 Write the given buffer object to the inferior's memory." },
-  { "search_memory", (PyCFunction) infpy_search_memory, METH_VARARGS | METH_KEYWORDS,
-    "search_memory (address, length, pattern [, size] [, max_count]) -> list\n\
-Return a list with the addresses where matches were found." },
-
+  { "search_memory", (PyCFunction) infpy_search_memory,
+    METH_VARARGS | METH_KEYWORDS,
+    "search_memory (address, length, pattern) -> long\n\
+Return a long with the address of a match, or None." },
   { NULL }
 };
 
@@ -872,8 +668,6 @@ static PyTypeObject inferior_object_type =
   0,				  /* tp_init */
   0				  /* tp_alloc */
 };
-
-
 
 /* Python doesn't provide a decent way to get compatibility here.  */
 #if HAVE_LIBPYTHON2_4

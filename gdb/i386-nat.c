@@ -268,7 +268,8 @@ i386_length_and_rw_bits (int len, enum target_hw_bp_type type)
 	rw = DR_RW_WRITE;
 	break;
       case hw_read:
-	/* The i386 doesn't support data-read watchpoints.  */
+	internal_error (__FILE__, __LINE__,
+			_("The i386 doesn't support data-read watchpoints.\n"));
       case hw_access:
 	rw = DR_RW_READ;
 	break;
@@ -483,9 +484,13 @@ Invalid value %d of operation in i386_handle_nonaligned_watchpoint.\n"),
    of the type TYPE.  Return 0 on success, -1 on failure.  */
 
 static int
-i386_insert_watchpoint (CORE_ADDR addr, int len, int type)
+i386_insert_watchpoint (CORE_ADDR addr, int len, int type,
+			struct expression *cond)
 {
   int retval;
+
+  if (type == hw_read)
+    return 1; /* unsupported */
 
   if (((len != 1 && len !=2 && len !=4) && !(TARGET_HAS_DR_LEN_8 && len == 8))
       || addr % len != 0)
@@ -507,7 +512,8 @@ i386_insert_watchpoint (CORE_ADDR addr, int len, int type)
    address ADDR, whose length is LEN bytes, and for accesses of the
    type TYPE.  Return 0 on success, -1 on failure.  */
 static int
-i386_remove_watchpoint (CORE_ADDR addr, int len, int type)
+i386_remove_watchpoint (CORE_ADDR addr, int len, int type,
+			struct expression *cond)
 {
   int retval;
 

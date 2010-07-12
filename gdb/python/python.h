@@ -22,18 +22,23 @@
 
 #include "value.h"
 
+extern int gdbpy_global_auto_load;
+
 void eval_python_from_control_command (struct command_line *);
 
-void source_python_script (FILE *stream, char *file);
+void source_python_script (FILE *stream, const char *file);
 
 void run_python_script (int argc, char **argv);
 
 int apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
 			      int embedded_offset, CORE_ADDR address,
 			      struct ui_file *stream, int recurse,
+			      const struct value *val,
 			      const struct value_print_options *options,
 			      const struct language_defn *language);
 
 void preserve_python_values (struct objfile *objfile, htab_t copied_types);
+
+void load_auto_scripts_for_objfile (struct objfile *objfile);
 
 #endif /* GDB_PYTHON_H */

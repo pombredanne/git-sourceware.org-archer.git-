@@ -101,6 +101,7 @@ static void
 field_dealloc (PyObject *obj)
 {
   field_object *f = (field_object *) obj;
+
   Py_XDECREF (f->dict);
   f->ob_type->tp_free (obj);
 }
@@ -109,6 +110,7 @@ static PyObject *
 field_new (void)
 {
   field_object *result = PyObject_New (field_object, &field_object_type);
+
   if (result)
     {
       result->dict = PyDict_New ();
@@ -128,6 +130,7 @@ static PyObject *
 typy_get_code (PyObject *self, void *closure)
 {
   struct type *type = ((type_object *) self)->type;
+
   return PyInt_FromLong (TYPE_CODE (type));
 }
 
@@ -222,6 +225,7 @@ typy_fields (PyObject *self, PyObject *args)
   for (i = 0; i < TYPE_NFIELDS (type); ++i)
     {
       PyObject *dict = convert_field (type, i);
+
       if (!dict)
 	{
 	  Py_DECREF (result);
@@ -243,6 +247,7 @@ static PyObject *
 typy_get_tag (PyObject *self, void *closure)
 {
   struct type *type = ((type_object *) self)->type;
+
   if (!TYPE_TAG_NAME (type))
     Py_RETURN_NONE;
   return PyString_FromString (TYPE_TAG_NAME (type));
@@ -290,7 +295,7 @@ typy_range (PyObject *self, PyObject *args)
       && TYPE_CODE (type) != TYPE_CODE_RANGE)
     {
       PyErr_SetString (PyExc_RuntimeError,
-		       "This type does not have a range.");
+		       _("This type does not have a range."));
       return NULL;
     }
 
@@ -362,7 +367,8 @@ typy_target (PyObject *self, PyObject *args)
 
   if (!TYPE_TARGET_TYPE (type))
     {
-      PyErr_SetString (PyExc_RuntimeError, "type does not have a target");
+      PyErr_SetString (PyExc_RuntimeError, 
+		       _("Type does not have a target."));
       return NULL;
     }
 
@@ -438,6 +444,7 @@ typy_lookup_typename (char *type_name, struct block *block)
 {
   struct type *type = NULL;
   volatile struct gdb_exception except;
+
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
       if (!strncmp (type_name, "struct ", 7))
@@ -505,7 +512,7 @@ typy_lookup_type (struct demangle_component *demangled,
 static PyObject *
 typy_template_argument (PyObject *self, PyObject *args)
 {
-  int i, argno, n_pointers;
+  int i, argno;
   struct type *type = ((type_object *) self)->type;
   struct demangle_component *demangled;
   const char *err;
@@ -522,7 +529,7 @@ typy_template_argument (PyObject *self, PyObject *args)
       if (! block)
 	{
 	  PyErr_SetString (PyExc_RuntimeError,
-			   "second argument must be block");
+			   _("Second argument must be block."));
 	  return NULL;
 	}
     }
@@ -533,7 +540,7 @@ typy_template_argument (PyObject *self, PyObject *args)
 
   if (TYPE_NAME (type) == NULL)
     {
-      PyErr_SetString (PyExc_RuntimeError, "null type name");
+      PyErr_SetString (PyExc_RuntimeError, _("Null type name."));
       return NULL;
     }
 
@@ -552,7 +559,7 @@ typy_template_argument (PyObject *self, PyObject *args)
 
   if (demangled->type != DEMANGLE_COMPONENT_TEMPLATE)
     {
-      PyErr_SetString (PyExc_RuntimeError, "type is not a template");
+      PyErr_SetString (PyExc_RuntimeError, _("Type is not a template."));
       return NULL;
     }
 
@@ -564,7 +571,7 @@ typy_template_argument (PyObject *self, PyObject *args)
 
   if (! demangled)
     {
-      PyErr_Format (PyExc_RuntimeError, "no argument %d in template",
+      PyErr_Format (PyExc_RuntimeError, _("No argument %d in template."),
 		    argno);
       return NULL;
     }
@@ -681,6 +688,7 @@ typy_dealloc (PyObject *obj)
     {
       /* Must reset head of list.  */
       struct objfile *objfile = TYPE_OBJFILE (type->type);
+
       if (objfile)
 	set_objfile_data (objfile, typy_objfile_data_key, type->next);
     }
@@ -733,7 +741,7 @@ gdbpy_lookup_type (PyObject *self, PyObject *args, PyObject *kw)
       if (! block)
 	{
 	  PyErr_SetString (PyExc_RuntimeError,
-			   "'block' argument must be a Block");
+			   _("'block' argument must be a Block."));
 	  return NULL;
 	}
     }
@@ -812,7 +820,7 @@ Return a type formed by stripping this type of all typedefs."},
     "target () -> Type\n\
 Return the target type of this type." },
   { "template_argument", typy_template_argument, METH_VARARGS,
-    "template_argument (arg) -> Type\n\
+    "template_argument (arg, [block]) -> Type\n\
 Return the type of a template argument." },
   { "unqualified", typy_unqualified, METH_NOARGS,
     "unqualified () -> Type\n\

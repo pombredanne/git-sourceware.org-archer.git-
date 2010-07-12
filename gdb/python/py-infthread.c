@@ -1,6 +1,6 @@
 /* Python interface to inferior threads.
 
-   Copyright (C) 2009 Free Software Foundation, Inc.
+   Copyright (C) 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -31,18 +31,18 @@ static PyTypeObject thread_object_type;
     if (!Thread->thread)					\
       {								\
 	PyErr_SetString (PyExc_RuntimeError,			\
-			 "thread no longer exists");	        \
+			 _("Thread no longer exists."));	\
 	return NULL;						\
       }								\
   } while (0)
 
-
+
 
 thread_object *
 create_thread_object (struct thread_info *tp)
 {
   thread_object *thread_obj;
-  
+
   thread_obj = PyObject_New (thread_object, &thread_object_type);
   if (!thread_obj)
     return NULL;
@@ -54,7 +54,7 @@ create_thread_object (struct thread_info *tp)
   return thread_obj;
 }
 
-
+
 
 static void
 thpy_dealloc (PyObject *self)
@@ -73,97 +73,31 @@ thpy_get_num (PyObject *self, void *closure)
   return PyLong_FromLong (thread_obj->thread->num);
 }
 
-
-
-/* Implementation of Inferior.frames () -> (gdb.Frame, ...).
-   Returns a tuple of all frame objects.  */
-PyObject *
-thpy_frames (PyObject *self, PyObject *args)
+/* Getter for InferiorThread.ptid  -> (pid, lwp, tid).
+   Returns a tuple with the thread's ptid components.  */
+static PyObject *
+thpy_get_ptid (PyObject *self, void *closure)
 {
-  int result = 0;
-  struct frame_info *frame;
-  PyObject *frame_obj;
-  PyObject *list, *tuple;
+  int pid;
+  long tid, lwp;
   thread_object *thread_obj = (thread_object *) self;
-  struct cleanup *cleanup;
-  volatile struct gdb_exception except;
+  PyObject *ret;
 
   THPY_REQUIRE_VALID (thread_obj);
 
-  list = PyList_New (0);
-  if (list == NULL)
-    {
-      PyErr_SetString (PyExc_MemoryError, "Could not allocate frames list.");
-      return NULL;
-    }
+  ret = PyTuple_New (3);
+  if (!ret)
+    return NULL;
 
-  cleanup = make_cleanup_restore_current_thread ();
+  pid = ptid_get_pid (thread_obj->thread->ptid);
+  lwp = ptid_get_lwp (thread_obj->thread->ptid);
+  tid = ptid_get_tid (thread_obj->thread->ptid);
 
-  TRY_CATCH (except, RETURN_MASK_ALL)
-    {
-      switch_to_thread (thread_obj->thread->ptid);
+  PyTuple_SET_ITEM (ret, 0, PyInt_FromLong (pid));
+  PyTuple_SET_ITEM (ret, 1, PyInt_FromLong (lwp));
+  PyTuple_SET_ITEM (ret, 2, PyInt_FromLong (tid));
 
-      for (frame = get_current_frame (); frame; frame = get_prev_frame (frame))
-	{
-	  frame_obj = frame_info_to_frame_object (frame);
-	  if (frame_obj == NULL)
-	    {
-	      Py_DECREF (list);
-	      list = NULL;
-	      break;
-	    }
-
-	  PyList_Append (list, frame_obj);
-	}
-    }
-  if (except.reason < 0)
-    {
-      Py_DECREF (list);
-      return PyErr_Format (except.reason == RETURN_QUIT
-			   ? PyExc_KeyboardInterrupt : PyExc_RuntimeError,
-			   "%s", except.message);
-    }
-
-  do_cleanups (cleanup);
-
-  if (list)
-    {
-      tuple = PyList_AsTuple (list);
-      Py_DECREF (list);
-    }
-  else
-    tuple = NULL;
-
-  return tuple;
-}
-
-/* Implementation of InferiorThread.newest_frame () -> gdb.Frame.
-   Returns the newest frame object.  */
-PyObject *
-thpy_newest_frame (PyObject *self, PyObject *args)
-{
-  struct frame_info *frame;
-  PyObject *frame_obj = NULL;   /* Initialize to appease gcc warning.  */
-  thread_object *thread_obj = (thread_object *) self;
-  struct cleanup *cleanup;
-  volatile struct gdb_exception except;
-
-  THPY_REQUIRE_VALID (thread_obj);
-
-  cleanup = make_cleanup_restore_current_thread ();
-
-  TRY_CATCH (except, RETURN_MASK_ALL)
-    {
-      switch_to_thread (thread_obj->thread->ptid);
-
-      frame = get_current_frame ();
-      frame_obj = frame_info_to_frame_object (frame);
-    }
-  GDB_PY_HANDLE_EXCEPTION (except);
-
-  do_cleanups (cleanup);
-
-  return frame_obj;
+  return ret;
 }
 
 /* Implementation of InferiorThread.switch ().
@@ -186,7 +120,52 @@ thpy_switch (PyObject *self, PyObject *args)
   Py_RETURN_NONE;
 }
 
-
+/* Implementation of InferiorThread.is_stopped () -> Boolean.
+   Return whether the thread is stopped.  */
+static PyObject *
+thpy_is_stopped (PyObject *self, PyObject *args)
+{
+  thread_object *thread_obj = (thread_object *) self;
+
+  THPY_REQUIRE_VALID (thread_obj);
+
+  if (is_stopped (thread_obj->thread->ptid))
+    Py_RETURN_TRUE;
+
+  Py_RETURN_FALSE;
+}
+
+/* Implementation of InferiorThread.is_running () -> Boolean.
+   Return whether the thread is running.  */
+static PyObject *
+thpy_is_running (PyObject *self, PyObject *args)
+{
+  thread_object *thread_obj = (thread_object *) self;
+
+  THPY_REQUIRE_VALID (thread_obj);
+
+  if (is_running (thread_obj->thread->ptid))
+    Py_RETURN_TRUE;
+
+  Py_RETURN_FALSE;
+}
+
+/* Implementation of InferiorThread.is_exited () -> Boolean.
+   Return whether the thread is exited.  */
+static PyObject *
+thpy_is_exited (PyObject *self, PyObject *args)
+{
+  thread_object *thread_obj = (thread_object *) self;
+
+  THPY_REQUIRE_VALID (thread_obj);
+
+  if (is_exited (thread_obj->thread->ptid))
+    Py_RETURN_TRUE;
+
+  Py_RETURN_FALSE;
+}
+
+
 
 /* Implementation of gdb.selected_thread () -> gdb.InferiorThread.
    Returns the selected thread object.  */
@@ -194,7 +173,7 @@ PyObject *
 gdbpy_selected_thread (PyObject *self, PyObject *args)
 {
   PyObject *thread_obj;
-  
+
   thread_obj = (PyObject *) find_thread_object (inferior_ptid);
   if (thread_obj)
     {
@@ -205,7 +184,7 @@ gdbpy_selected_thread (PyObject *self, PyObject *args)
   Py_RETURN_NONE;
 }
 
-
+
 
 void
 gdbpy_initialize_thread (void)
@@ -218,26 +197,31 @@ gdbpy_initialize_thread (void)
 		      (PyObject *) &thread_object_type);
 }
 
-
+
 
 static PyGetSetDef thread_object_getset[] =
 {
   { "num", thpy_get_num, NULL, "ID of the thread, as assigned by GDB.", NULL },
+  { "ptid", thpy_get_ptid, NULL, "ID of the thread, as assigned by the OS.",
+    NULL },
 
   { NULL }
 };
 
 static PyMethodDef thread_object_methods[] =
 {
-  { "frames", thpy_frames, METH_NOARGS,
-    "frames () -> (gdb.Frame, ...)\n\
-Return a tuple containing all frames in the thread." },
-  { "newest_frame", thpy_newest_frame, METH_NOARGS,
-    "newest_frame () -> gdb.Frame\n\
-Return the newest frame in the thread." },
   { "switch", thpy_switch, METH_NOARGS,
     "switch ()\n\
 Makes this the GDB selected thread." },
+  { "is_stopped", thpy_is_stopped, METH_NOARGS,
+    "is_stopped () -> Boolean\n\
+Return whether the thread is stopped." },
+  { "is_running", thpy_is_running, METH_NOARGS,
+    "is_running () -> Boolean\n\
+Return whether the thread is running." },
+  { "is_exited", thpy_is_exited, METH_NOARGS,
+    "is_exited () -> Boolean\n\
+Return whether the thread is exited." },
 
   { NULL }
 };

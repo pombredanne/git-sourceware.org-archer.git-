@@ -39,17 +39,10 @@
 
 #include "interps.h"
 #include "main.h"
-
 #include "python/python.h"
 #include "source.h"
-
-/* If nonzero, display time usage both at startup and for each command.  */
-
-int display_time;
-
-/* If nonzero, display space usage both at startup and for each command.  */
-
-int display_space;
+#include "cli/cli-cmds.h"
+#include "python/python.h"
 
 /* The selected interpreter.  This will be used as a set command
    variable, so it should always be malloc'ed - since
@@ -68,6 +61,10 @@ char *gdb_sysroot = 0;
 /* GDB datadir, used to store data files.  */
 char *gdb_datadir = 0;
 
+/* If gdb was configured with --with-python=/path,
+   the possibly relocated path to python's lib directory.  */
+char *python_libdir = 0;
+
 struct ui_file *gdb_stdout;
 struct ui_file *gdb_stderr;
 struct ui_file *gdb_stdlog;
@@ -76,6 +73,9 @@ struct ui_file *gdb_stdin;
 struct ui_file *gdb_stdtargin;
 struct ui_file *gdb_stdtarg;
 struct ui_file *gdb_stdtargerr;
+
+/* True if --batch or --batch-silent was seen.  */
+int batch_flag = 0;
 
 /* Support for the --batch-silent option.  */
 int batch_silent = 0;
@@ -140,6 +140,7 @@ relocate_directory (const char *progname, const char *initial, int flag)
   if (*dir)
     {
       char *canon_sysroot = lrealpath (dir);
+
       if (canon_sysroot)
 	{
 	  xfree (dir);
@@ -248,7 +249,6 @@ captured_main (void *data)
   int argc = context->argc;
   char **argv = context->argv;
   static int quiet = 0;
-  static int batch = 0;
   static int set_args = 0;
 
   /* Pointers to various arguments from command line.  */
@@ -292,8 +292,9 @@ captured_main (void *data)
   char *local_gdbinit;
 
   int i;
+  int save_auto_load;
 
-  long time_at_startup = get_run_time ();
+  struct cleanup *pre_stat_chain = make_command_stats_cleanup (0);
 
 #if defined (HAVE_SETLOCALE) && defined (HAVE_LC_MESSAGES)
   setlocale (LC_MESSAGES, "");
@@ -349,6 +350,14 @@ captured_main (void *data)
   gdb_datadir = relocate_directory (argv[0], GDB_DATADIR,
 				    GDB_DATADIR_RELOCATABLE);
 
+#ifdef WITH_PYTHON_PATH
+  /* For later use in helping Python find itself.  */
+  python_libdir = relocate_directory (argv[0],
+				      concat (WITH_PYTHON_PATH,
+					      SLASH_STRING, "lib", NULL),
+				      PYTHON_PATH_RELOCATABLE);
+#endif
+
 #ifdef RELOC_SRCDIR
   add_substitute_path_rule (RELOC_SRCDIR,
 			    make_relative_prefix (argv[0], BINDIR,
@@ -389,7 +398,7 @@ captured_main (void *data)
       {"nx", no_argument, &inhibit_gdbinit, 1},
       {"n", no_argument, &inhibit_gdbinit, 1},
       {"batch-silent", no_argument, 0, 'B'},
-      {"batch", no_argument, &batch, 1},
+      {"batch", no_argument, &batch_flag, 1},
       {"epoch", no_argument, &epoch_interface, 1},
 
     /* This is a synonym for "--annotate=1".  --annotate is now preferred,
@@ -478,8 +487,8 @@ captured_main (void *data)
 	    break;
 	  case OPT_STATISTICS:
 	    /* Enable the display of both time and space usage.  */
-	    display_time = 1;
-	    display_space = 1;
+	    set_display_time (1);
+	    set_display_space (1);
 	    break;
 	  case OPT_TUI:
 	    /* --tui is equivalent to -i=tui.  */
@@ -547,7 +556,7 @@ captured_main (void *data)
 	      }
 	    break;
 	  case 'B':
-	    batch = batch_silent = 1;
+	    batch_flag = batch_silent = 1;
 	    gdb_stdout = ui_file_new();
 	    break;
 #ifdef GDBTK
@@ -641,7 +650,7 @@ extern int gdbtk_test (char *);
 	use_windows = 0;
       }
 
-    if (batch)
+    if (batch_flag)
       quiet = 1;
   }
 
@@ -772,6 +781,7 @@ Excess command line arguments ignored. (%s%s)\n"),
   {
     /* Find it.  */
     struct interp *interp = interp_lookup (interpreter_p);
+
     if (interp == NULL)
       error (_("Interpreter `%s' unrecognized"), interpreter_p);
     /* Install it.  */
@@ -830,6 +840,11 @@ Excess command line arguments ignored. (%s%s)\n"),
     catch_command_errors (directory_switch, dirarg[i], 0, RETURN_MASK_ALL);
   xfree (dirarg);
 
+  /* Skip auto-loading section-specified scripts until we've sourced
+     local_gdbinit (which is often used to augment the source search path).  */
+  save_auto_load = gdbpy_global_auto_load;
+  gdbpy_global_auto_load = 0;
+
   if (execarg != NULL
       && symarg != NULL
       && strcmp (execarg, symarg) == 0)
@@ -837,15 +852,15 @@ Excess command line arguments ignored. (%s%s)\n"),
       /* The exec file and the symbol-file are the same.  If we can't
          open it, better only print one error message.
          catch_command_errors returns non-zero on success! */
-      if (catch_command_errors (exec_file_attach, execarg, !batch, RETURN_MASK_ALL))
-	catch_command_errors (symbol_file_add_main, symarg, !batch, RETURN_MASK_ALL);
+      if (catch_command_errors (exec_file_attach, execarg, !batch_flag, RETURN_MASK_ALL))
+	catch_command_errors (symbol_file_add_main, symarg, !batch_flag, RETURN_MASK_ALL);
     }
   else
     {
       if (execarg != NULL)
-	catch_command_errors (exec_file_attach, execarg, !batch, RETURN_MASK_ALL);
+	catch_command_errors (exec_file_attach, execarg, !batch_flag, RETURN_MASK_ALL);
       if (symarg != NULL)
-	catch_command_errors (symbol_file_add_main, symarg, !batch, RETURN_MASK_ALL);
+	catch_command_errors (symbol_file_add_main, symarg, !batch_flag, RETURN_MASK_ALL);
     }
 
   if (corearg && pidarg)
@@ -854,10 +869,10 @@ Can't attach to process and specify a core file at the same time."));
 
   if (corearg != NULL)
     catch_command_errors (core_file_command, corearg,
-			  !batch, RETURN_MASK_ALL);
+			  !batch_flag, RETURN_MASK_ALL);
   else if (pidarg != NULL)
     catch_command_errors (attach_command, pidarg,
-			  !batch, RETURN_MASK_ALL);
+			  !batch_flag, RETURN_MASK_ALL);
   else if (pid_or_core_arg)
     {
       /* The user specified 'gdb program pid' or gdb program core'.
@@ -867,13 +882,13 @@ Can't attach to process and specify a core file at the same time."));
       if (isdigit (pid_or_core_arg[0]))
 	{
 	  if (catch_command_errors (attach_command, pid_or_core_arg,
-				    !batch, RETURN_MASK_ALL) == 0)
+				    !batch_flag, RETURN_MASK_ALL) == 0)
 	    catch_command_errors (core_file_command, pid_or_core_arg,
-				  !batch, RETURN_MASK_ALL);
+				  !batch_flag, RETURN_MASK_ALL);
 	}
       else /* Can't be a pid, better be a corefile.  */
 	catch_command_errors (core_file_command, pid_or_core_arg,
-			      !batch, RETURN_MASK_ALL);
+			      !batch_flag, RETURN_MASK_ALL);
     }
 
   if (ttyarg != NULL)
@@ -889,14 +904,22 @@ Can't attach to process and specify a core file at the same time."));
   if (local_gdbinit && !inhibit_gdbinit)
     catch_command_errors (source_script, local_gdbinit, 0, RETURN_MASK_ALL);
 
+  /* Now that all .gdbinit's have been read and all -d options have been
+     processed, we can read any scripts mentioned in SYMARG.
+     We wait until now because it is common to add to the source search
+     path in local_gdbinit.  */
+  gdbpy_global_auto_load = save_auto_load;
+  if (symfile_objfile != NULL)
+    load_auto_scripts_for_objfile (symfile_objfile);
+
   for (i = 0; i < ncmd; i++)
     {
       if (cmdarg[i].type == CMDARG_FILE)
         catch_command_errors (source_script, cmdarg[i].string,
-			      !batch, RETURN_MASK_ALL);
+			      !batch_flag, RETURN_MASK_ALL);
       else  /* cmdarg[i].type == CMDARG_COMMAND */
         catch_command_errors (execute_command, cmdarg[i].string,
-			      !batch, RETURN_MASK_ALL);
+			      !batch_flag, RETURN_MASK_ALL);
     }
   xfree (cmdarg);
 
@@ -904,32 +927,14 @@ Can't attach to process and specify a core file at the same time."));
   if (!python_script)
     init_history ();
 
-  if (batch)
+  if (batch_flag)
     {
       /* We have hit the end of the batch file.  */
       quit_force (NULL, 0);
     }
 
   /* Show time and/or space usage.  */
-
-  if (display_time)
-    {
-      long init_time = get_run_time () - time_at_startup;
-
-      printf_unfiltered (_("Startup time: %ld.%06ld\n"),
-			 init_time / 1000000, init_time % 1000000);
-    }
-
-  if (display_space)
-    {
-#ifdef HAVE_SBRK
-      extern char **environ;
-      char *lim = (char *) sbrk (0);
-
-      printf_unfiltered (_("Startup size: data size %ld\n"),
-			 (long) (lim - (char *) &environ));
-#endif
-    }
+  do_cleanups (pre_stat_chain);
 
 #if HAVE_PYTHON
   if (python_script)

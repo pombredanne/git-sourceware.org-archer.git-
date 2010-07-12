@@ -46,6 +46,8 @@
 #include "ui-out.h"
 #include "readline/readline.h"
 
+#include "psymtab.h"
+
 
 #define OPEN_MODE (O_RDONLY | O_BINARY)
 #define FDOPEN_MODE FOPEN_RB
@@ -174,8 +176,6 @@ get_current_source_symtab_and_line (void)
 void
 set_default_source_symtab_and_line (void)
 {
-  struct symtab_and_line cursal;
-
   if (!have_full_symbols () && !have_partial_symbols ())
     error (_("No symbol table is loaded.  Use the \"file\" command."));
 
@@ -229,8 +229,6 @@ select_source_symtab (struct symtab *s)
 {
   struct symtabs_and_lines sals;
   struct symtab_and_line sal;
-  struct partial_symtab *ps;
-  struct partial_symtab *cs_pst = 0;
   struct objfile *ofp;
 
   if (s)
@@ -269,6 +267,7 @@ select_source_symtab (struct symtab *s)
 	{
 	  const char *name = s->filename;
 	  int len = strlen (name);
+
 	  if (!(len > 2 && (strcmp (&name[len - 2], ".h") == 0
 	      || strcmp (name, "<<C++-namespaces>>") == 0)))
 	    {
@@ -281,33 +280,13 @@ select_source_symtab (struct symtab *s)
   if (current_source_symtab)
     return;
 
-  /* How about the partial symbol tables?  */
-
   ALL_OBJFILES (ofp)
-    {
-      for (ps = ofp->psymtabs; ps != NULL; ps = ps->next)
-	{
-	  const char *name = ps->filename;
-	  int len = strlen (name);
-	  if (!(len > 2 && (strcmp (&name[len - 2], ".h") == 0
-	      || strcmp (name, "<<C++-namespaces>>") == 0)))
-	    cs_pst = ps;
-	}
-    }
-  if (cs_pst)
-    {
-      if (cs_pst->readin)
-	{
-	  internal_error (__FILE__, __LINE__,
-			  _("select_source_symtab: "
-			  "readin pst found and no symtabs."));
-	}
-      else
-	{
-	  current_source_pspace = current_program_space;
-	  current_source_symtab = PSYMTAB_TO_SYMTAB (cs_pst);
-	}
-    }
+  {
+    if (ofp->sf)
+      s = ofp->sf->qf->find_last_source_symtab (ofp);
+    if (s)
+      current_source_symtab = s;
+  }
   if (current_source_symtab)
     return;
 
@@ -332,7 +311,6 @@ forget_cached_source_info (void)
   struct program_space *pspace;
   struct symtab *s;
   struct objfile *objfile;
-  struct partial_symtab *pst;
 
   ALL_PSPACES (pspace)
     ALL_PSPACE_OBJFILES (pspace, objfile)
@@ -351,14 +329,8 @@ forget_cached_source_info (void)
 	    }
 	}
 
-      ALL_OBJFILE_PSYMTABS (objfile, pst)
-      {
-	if (pst->fullname != NULL)
-	  {
-	    xfree (pst->fullname);
-	    pst->fullname = NULL;
-	  }
-      }
+      if (objfile->sf)
+	objfile->sf->qf->forget_cached_source_info (objfile);
     }
 
   last_source_visited = NULL;
@@ -548,6 +520,7 @@ add_path (char *dirname, char **which_path, int parse_separators)
 	  if (stat (name, &st) < 0)
 	    {
 	      int save_errno = errno;
+
 	      fprintf_unfiltered (gdb_stderr, "Warning: ");
 	      print_sys_errmsg (name, save_errno);
 	    }
@@ -751,6 +724,10 @@ openp (const char *path, int opts, const char *string,
 	    goto done;
     }
 
+  /* For dos paths, d:/foo -> /foo, and d:foo -> foo.  */
+  if (HAS_DRIVE_SPEC (string))
+    string = STRIP_DRIVE_SPEC (string);
+
   /* /foo => foo, to avoid multiple slashes that Emacs doesn't like. */
   while (IS_DIR_SEPARATOR(string[0]))
     string++;
@@ -791,6 +768,16 @@ openp (const char *path, int opts, const char *string,
 	  /* Normal file name in path -- just use it.  */
 	  strncpy (filename, p, len);
 	  filename[len] = 0;
+
+	  /* Don't search $cdir.  It's also a magic path like $cwd, but we
+	     don't have enough information to expand it.  The user *could*
+	     have an actual directory named '$cdir' but handling that would
+	     be confusing, it would mean different things in different
+	     contexts.  If the user really has '$cdir' one can use './$cdir'.
+	     We can get $cdir when loading scripts.  When loading source files
+	     $cdir must have already been expanded to the correct value.  */
+	  if (strcmp (filename, "$cdir") == 0)
+	    continue;
 	}
 
       /* Remove trailing slashes */
@@ -828,6 +815,7 @@ done:
 			    IS_DIR_SEPARATOR (current_directory[strlen (current_directory) - 1])
 			    ? "" : SLASH_STRING,
 			    filename, (char *)NULL);
+
 	  *filename_opened = xfullpath (f);
 	  xfree (f);
 	}
@@ -964,7 +952,7 @@ rewrite_source_path (const char *path)
      An invalid file descriptor is returned. ( the return value is negative ) 
      FULLNAME is set to NULL.  */
 
-static int
+int
 find_and_open_source (const char *filename,
 		      const char *dirname,
 		      char **fullname)
@@ -1090,34 +1078,6 @@ symtab_to_fullname (struct symtab *s)
     {
       close (r);
       return s->fullname;
-    }
-
-  return NULL;
-}
-
-/* Finds the fullname that a partial_symtab represents.
-
-   If this functions finds the fullname, it will save it in ps->fullname
-   and it will also return the value.
-
-   If this function fails to find the file that this partial_symtab represents,
-   NULL will be returned and ps->fullname will be set to NULL.  */
-char *
-psymtab_to_fullname (struct partial_symtab *ps)
-{
-  int r;
-
-  if (!ps)
-    return NULL;
-
-  /* Don't check ps->fullname here, the file could have been
-     deleted/moved/..., look for it again */
-  r = find_and_open_source (ps->filename, ps->dirname, &ps->fullname);
-
-  if (r >= 0)
-    {
-      close (r);
-      return ps->fullname;
     }
 
   return NULL;
@@ -1333,6 +1293,7 @@ print_source_lines_base (struct symtab *s, int line, int stopline, int noerror)
 {
   int c;
   int desc;
+  int noprint = 0;
   FILE *stream;
   int nlines = stopline - line;
   struct cleanup *cleanup;
@@ -1359,11 +1320,12 @@ print_source_lines_base (struct symtab *s, int line, int stopline, int noerror)
     }
   else
     {
-      desc = -1;
+      desc = last_source_error;
       noerror = 1;
+      noprint = 1;
     }
 
-  if (desc < 0)
+  if (desc < 0 || noprint)
     {
       last_source_error = desc;
 
@@ -1915,7 +1877,6 @@ unset_substitute_path_command (char *args, int from_tty)
 static void
 set_substitute_path_command (char *args, int from_tty)
 {
-  char *from_path, *to_path;
   char **argv;
   struct substitute_path_rule *rule;
   
@@ -1954,6 +1915,7 @@ void
 _initialize_source (void)
 {
   struct cmd_list_element *c;
+
   current_source_symtab = 0;
   init_source_path ();
 
@@ -2015,6 +1977,7 @@ The matching line number is also stored as the value of \"$_\"."));
   add_com ("reverse-search", class_files, reverse_search_command, _("\
 Search backward for regular expression (see regex(3)) from last line listed.\n\
 The matching line number is also stored as the value of \"$_\"."));
+  add_com_alias ("rev", "reverse-search", class_files, 1);
 
   if (xdb_commands)
     {

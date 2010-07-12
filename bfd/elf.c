@@ -45,6 +45,10 @@ SECTION
 #include "libiberty.h"
 #include "safe-ctype.h"
 
+#ifdef CORE_HEADER
+#include CORE_HEADER
+#endif
+
 static int elf_sort_sections (const void *, const void *);
 static bfd_boolean assign_file_positions_except_relocs (bfd *, struct bfd_link_info *);
 static bfd_boolean prep_headers (bfd *);
@@ -872,6 +876,8 @@ _bfd_elf_make_section_from_shdr (bfd *abfd,
       return FALSE;
   if ((hdr->sh_flags & SHF_TLS) != 0)
     flags |= SEC_THREAD_LOCAL;
+  if ((hdr->sh_flags & SHF_EXCLUDE) != 0)
+    flags |= SEC_EXCLUDE;
 
   if ((flags & SEC_ALLOC) == 0)
     {
@@ -974,7 +980,7 @@ _bfd_elf_make_section_from_shdr (bfd *abfd,
       for (i = 0; i < elf_elfheader (abfd)->e_phnum; i++, phdr++)
 	{
 	  if (phdr->p_type == PT_LOAD
-	      && ELF_IS_SECTION_IN_SEGMENT (hdr, phdr))
+	      && ELF_SECTION_IN_SEGMENT (hdr, phdr))
 	    {
 	      if ((flags & SEC_LOAD) == 0)
 		newsect->lma = (phdr->p_paddr
@@ -1062,7 +1068,6 @@ _bfd_elf_copy_private_bfd_data (bfd *ibfd, bfd *obfd)
 
   /* Copy object attributes.  */
   _bfd_elf_copy_obj_attributes (ibfd, obfd);
-
   return TRUE;
 }
 
@@ -2624,6 +2629,8 @@ elf_fake_sections (bfd *abfd, asection *asect, void *failedptrarg)
 	    }
 	}
     }
+  if ((asect->flags & (SEC_GROUP | SEC_EXCLUDE)) == SEC_EXCLUDE)
+    this_hdr->sh_flags |= SHF_EXCLUDE;
 
   /* Check for processor-specific section types.  */
   sh_type = this_hdr->sh_type;
@@ -4450,32 +4457,17 @@ assign_file_positions_for_load_sections (bfd *abfd,
 		      && ((this_hdr->sh_flags & SHF_TLS) == 0
 			  || p->p_type == PT_TLS))))
 	    {
-	      bfd_signed_vma adjust = sec->vma - (p->p_vaddr + p->p_memsz);
+	      bfd_vma adjust = sec->lma - (p->p_paddr + p->p_memsz);
 
-	      if (adjust < 0)
+	      if (sec->lma < p->p_paddr + p->p_memsz)
 		{
 		  (*_bfd_error_handler)
-		    (_("%B: section %A vma 0x%lx overlaps previous sections"),
-		     abfd, sec, (unsigned long) sec->vma);
+		    (_("%B: section %A lma 0x%lx overlaps previous sections"),
+		     abfd, sec, (unsigned long) sec->lma);
 		  adjust = 0;
-		}
-	      p->p_memsz += adjust;
-
-	      if (p->p_paddr + p->p_memsz != sec->lma)
-		{
-		  /* This behavior is a compromise--ld has long
-		     silently changed the lma of sections when
-		     lma - vma is not equal for every section in a
-		     pheader--but only in the internal elf structures.
-		     Silently changing the lma is probably a bug, but
-		     changing it would have subtle and unknown
-		     consequences for existing scripts.
-
-		     Instead modify the bfd data structure to reflect
-		     what happened.  This at least fixes the values
-		     for the lma in the mapfile.  */
 		  sec->lma = p->p_paddr + p->p_memsz;
 		}
+	      p->p_memsz += adjust;
 
 	      if (this_hdr->sh_type != SHT_NOBITS)
 		{
@@ -4564,24 +4556,38 @@ assign_file_positions_for_load_sections (bfd *abfd,
       /* Check that all sections are in a PT_LOAD segment.
 	 Don't check funky gdb generated core files.  */
       if (p->p_type == PT_LOAD && bfd_get_format (abfd) != bfd_core)
-	for (i = 0, secpp = m->sections; i < m->count; i++, secpp++)
-	  {
-	    Elf_Internal_Shdr *this_hdr;
-	    asection *sec;
+	{
+	  bfd_boolean check_vma = TRUE;
 
-	    sec = *secpp;
-	    this_hdr = &(elf_section_data(sec)->this_hdr);
-	    if (this_hdr->sh_size != 0
-		&& !ELF_IS_SECTION_IN_SEGMENT_FILE (this_hdr, p))
+	  for (i = 1; i < m->count; i++)
+	    if (m->sections[i]->vma == m->sections[i - 1]->vma
+		&& ELF_SECTION_SIZE (&(elf_section_data (m->sections[i])
+				       ->this_hdr), p) != 0
+		&& ELF_SECTION_SIZE (&(elf_section_data (m->sections[i - 1])
+				       ->this_hdr), p) != 0)
 	      {
-		(*_bfd_error_handler)
-		  (_("%B: section `%A' can't be allocated in segment %d"),
-		   abfd, sec, j);
-		print_segment_map (m);
-		bfd_set_error (bfd_error_bad_value);
-		return FALSE;
+		/* Looks like we have overlays packed into the segment.  */
+		check_vma = FALSE;
+		break;
 	      }
-	  }
+
+	  for (i = 0; i < m->count; i++)
+	    {
+	      Elf_Internal_Shdr *this_hdr;
+	      asection *sec;
+
+	      sec = m->sections[i];
+	      this_hdr = &(elf_section_data(sec)->this_hdr);
+	      if (this_hdr->sh_size != 0
+		  && !ELF_SECTION_IN_SEGMENT_1 (this_hdr, p, check_vma))
+		{
+		  (*_bfd_error_handler)
+		    (_("%B: section `%A' can't be allocated in segment %d"),
+		     abfd, sec, j);
+		  print_segment_map (m);
+		}
+	    }
+	}
     }
 
   elf_tdata (abfd)->next_file_pos = off;
@@ -4872,8 +4878,7 @@ assign_file_positions_except_relocs (bfd *abfd,
 static bfd_boolean
 prep_headers (bfd *abfd)
 {
-  Elf_Internal_Ehdr *i_ehdrp;	/* Elf file header, internal form */
-  Elf_Internal_Phdr *i_phdrp = 0; /* Program header table, internal form */
+  Elf_Internal_Ehdr *i_ehdrp;	/* Elf file header, internal form.  */
   struct elf_strtab_hash *shstrtab;
   const struct elf_backend_data *bed = get_elf_backend_data (abfd);
 
@@ -4941,7 +4946,6 @@ prep_headers (bfd *abfd)
   else
     {
       i_ehdrp->e_phentsize = 0;
-      i_phdrp = 0;
       i_ehdrp->e_phoff = 0;
     }
 
@@ -4989,7 +4993,6 @@ bfd_boolean
 _bfd_elf_write_object_contents (bfd *abfd)
 {
   const struct elf_backend_data *bed = get_elf_backend_data (abfd);
-  Elf_Internal_Ehdr *i_ehdrp;
   Elf_Internal_Shdr **i_shdrp;
   bfd_boolean failed;
   unsigned int count, num_sec;
@@ -4999,7 +5002,6 @@ _bfd_elf_write_object_contents (bfd *abfd)
     return FALSE;
 
   i_shdrp = elf_elfsections (abfd);
-  i_ehdrp = elf_elfheader (abfd);
 
   failed = FALSE;
   bfd_map_over_sections (abfd, bed->s->write_relocs, &failed);
@@ -5855,7 +5857,8 @@ copy_elf_program_header (bfd *ibfd, bfd *obfd)
 	   section = section->next)
 	{
 	  this_hdr = &(elf_section_data(section)->this_hdr);
-	  if (ELF_IS_SECTION_IN_SEGMENT_FILE (this_hdr, segment))
+	  if (this_hdr->sh_size != 0
+	      && ELF_SECTION_IN_SEGMENT (this_hdr, segment))
 	    {
 	      if (!first_section)
 		first_section = lowest_section = section;
@@ -5934,7 +5937,8 @@ copy_elf_program_header (bfd *ibfd, bfd *obfd)
 	       section = section->next)
 	    {
 	      this_hdr = &(elf_section_data(section)->this_hdr);
-	      if (ELF_IS_SECTION_IN_SEGMENT_FILE (this_hdr, segment))
+	      if (this_hdr->sh_size != 0
+		  && ELF_SECTION_IN_SEGMENT (this_hdr, segment))
 		{
 		  map->sections[isec++] = section->output_section;
 		  if (isec == section_count)
@@ -6011,7 +6015,8 @@ copy_private_bfd_data (bfd *ibfd, bfd *obfd)
 
 	      /* Check if this section is covered by the segment.  */
 	      this_hdr = &(elf_section_data(section)->this_hdr);
-	      if (ELF_IS_SECTION_IN_SEGMENT_FILE (this_hdr, segment))
+	      if (this_hdr->sh_size != 0
+		  && ELF_SECTION_IN_SEGMENT (this_hdr, segment))
 		{
 		  /* FIXME: Check if its output section is changed or
 		     removed.  What else do we need to check?  */
@@ -6056,18 +6061,21 @@ _bfd_elf_init_private_section_data (bfd *ibfd,
 
 {
   Elf_Internal_Shdr *ihdr, *ohdr;
-  bfd_boolean need_group = link_info == NULL || link_info->relocatable;
+  bfd_boolean final_link = link_info != NULL && !link_info->relocatable;
 
   if (ibfd->xvec->flavour != bfd_target_elf_flavour
       || obfd->xvec->flavour != bfd_target_elf_flavour)
     return TRUE;
 
-  /* Don't copy the output ELF section type from input if the
-     output BFD section flags have been set to something different.
-     elf_fake_sections will set ELF section type based on BFD
-     section flags.  */
+  /* For objcopy and relocatable link, don't copy the output ELF
+     section type from input if the output BFD section flags have been
+     set to something different.  For a final link allow some flags
+     that the linker clears to differ.  */
   if (elf_section_type (osec) == SHT_NULL
-      && (osec->flags == isec->flags || !osec->flags))
+      && (osec->flags == isec->flags
+	  || (final_link
+	      && ((osec->flags ^ isec->flags)
+		  & ~ (SEC_LINK_ONCE | SEC_LINK_DUPLICATES)) == 0)))
     elf_section_type (osec) = elf_section_type (isec);
 
   /* FIXME: Is this correct for all OS/PROC specific flags?  */
@@ -6078,7 +6086,7 @@ _bfd_elf_init_private_section_data (bfd *ibfd,
      SHT_GROUP section will have its elf_next_in_group pointing back
      to the input group members.  Ignore linker created group section.
      See elfNN_ia64_object_p in elfxx-ia64.c.  */
-  if (need_group)
+  if (!final_link)
     {
       if (elf_sec_group (isec) == NULL
 	  || (elf_sec_group (isec)->flags & SEC_LINKER_CREATED) == 0)
@@ -6137,13 +6145,74 @@ _bfd_elf_copy_private_section_data (bfd *ibfd,
 					     NULL);
 }
 
+/* Look at all the SHT_GROUP sections in IBFD, making any adjustments
+   necessary if we are removing either the SHT_GROUP section or any of
+   the group member sections.  DISCARDED is the value that a section's
+   output_section has if the section will be discarded, NULL when this
+   function is called from objcopy, bfd_abs_section_ptr when called
+   from the linker.  */
+
+bfd_boolean
+_bfd_elf_fixup_group_sections (bfd *ibfd, asection *discarded)
+{
+  asection *isec;
+
+  for (isec = ibfd->sections; isec != NULL; isec = isec->next)
+    if (elf_section_type (isec) == SHT_GROUP)
+      {
+	asection *first = elf_next_in_group (isec);
+	asection *s = first;
+	bfd_size_type removed = 0;
+
+	while (s != NULL)
+	  {
+	    /* If this member section is being output but the
+	       SHT_GROUP section is not, then clear the group info
+	       set up by _bfd_elf_copy_private_section_data.  */
+	    if (s->output_section != discarded
+		&& isec->output_section == discarded)
+	      {
+		elf_section_flags (s->output_section) &= ~SHF_GROUP;
+		elf_group_name (s->output_section) = NULL;
+	      }
+	    /* Conversely, if the member section is not being output
+	       but the SHT_GROUP section is, then adjust its size.  */
+	    else if (s->output_section == discarded
+		     && isec->output_section != discarded)
+	      removed += 4;
+	    s = elf_next_in_group (s);
+	    if (s == first)
+	      break;
+	  }
+	if (removed != 0)
+	  {
+	    if (discarded != NULL)
+	      {
+		/* If we've been called for ld -r, then we need to
+		   adjust the input section size.  This function may
+		   be called multiple times, so save the original
+		   size.  */
+		if (isec->rawsize == 0)
+		  isec->rawsize = isec->size;
+		isec->size = isec->rawsize - removed;
+	      }
+	    else
+	      {
+		/* Adjust the output section size when called from
+		   objcopy. */
+		isec->output_section->size -= removed;
+	      }
+	  }
+      }
+
+  return TRUE;
+}
+
 /* Copy private header information.  */
 
 bfd_boolean
 _bfd_elf_copy_private_header_data (bfd *ibfd, bfd *obfd)
 {
-  asection *isec;
-
   if (bfd_get_flavour (ibfd) != bfd_target_elf_flavour
       || bfd_get_flavour (obfd) != bfd_target_elf_flavour)
     return TRUE;
@@ -6159,34 +6228,7 @@ _bfd_elf_copy_private_header_data (bfd *ibfd, bfd *obfd)
 	return FALSE;
     }
 
-  for (isec = ibfd->sections; isec != NULL; isec = isec->next)
-    if (elf_section_type (isec) == SHT_GROUP)
-      {
-	asection *first = elf_next_in_group (isec);
-	asection *s = first;
-	while (s != NULL)
-	  {
-	    /* If this member section is being output but the
-	       SHT_GROUP section is not, then clear the group info
-	       set up by _bfd_elf_copy_private_section_data.  */
-	    if (s->output_section != NULL
-		&& isec->output_section == NULL)
-	      {
-		elf_section_flags (s->output_section) &= ~SHF_GROUP;
-		elf_group_name (s->output_section) = NULL;
-	      }
-	    /* Conversely, if the member section is not being output
-	       but the SHT_GROUP section is, then adjust its size.  */
-	    else if (s->output_section == NULL
-		     && isec->output_section != NULL)
-	      isec->output_section->size -= 4;
-	    s = elf_next_in_group (s);
-	    if (s == first)
-	      break;
-	  }
-      }
-
-  return TRUE;
+  return _bfd_elf_fixup_group_sections (ibfd, NULL);
 }
 
 /* Copy private symbol information.  If this symbol is in a section

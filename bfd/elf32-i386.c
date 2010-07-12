@@ -2946,7 +2946,7 @@ elf_i386_relocate_section (bfd *output_bfd,
 	}
       else
 	{
-	  bfd_boolean warned;
+	  bfd_boolean warned ATTRIBUTE_UNUSED;
 
 	  RELOC_FOR_GLOBAL_SYMBOL (info, input_bfd, input_section, rel,
 				   r_symndx, symtab_hdr, sym_hashes,
@@ -2955,15 +2955,8 @@ elf_i386_relocate_section (bfd *output_bfd,
 	}
 
       if (sec != NULL && elf_discarded_section (sec))
-	{
-	  /* For relocs against symbols from removed linkonce sections,
-	     or sections discarded by a linker script, we just want the
-	     section contents zeroed.  Avoid any special processing.  */
-	  _bfd_clear_contents (howto, input_bfd, contents + rel->r_offset);
-	  rel->r_info = 0;
-	  rel->r_addend = 0;
-	  continue;
-	}
+	RELOC_AGAINST_DISCARDED_SECTION (info, input_bfd, input_section,
+					 rel, relend, howto, contents);
 
       if (info->relocatable)
 	continue;
@@ -4620,7 +4613,7 @@ elf_i386_hash_symbol (struct elf_link_hash_entry *h)
    file.  */
 
 static bfd_boolean
-elf_i386_add_symbol_hook (bfd * abfd ATTRIBUTE_UNUSED,
+elf_i386_add_symbol_hook (bfd * abfd,
 			  struct bfd_link_info * info ATTRIBUTE_UNUSED,
 			  Elf_Internal_Sym * sym,
 			  const char ** namep ATTRIBUTE_UNUSED,
@@ -4628,7 +4621,8 @@ elf_i386_add_symbol_hook (bfd * abfd ATTRIBUTE_UNUSED,
 			  asection ** secp ATTRIBUTE_UNUSED,
 			  bfd_vma * valp ATTRIBUTE_UNUSED)
 {
-  if (ELF_ST_TYPE (sym->st_info) == STT_GNU_IFUNC)
+  if ((abfd->flags & DYNAMIC) == 0
+      && ELF_ST_TYPE (sym->st_info) == STT_GNU_IFUNC)
     elf_tdata (info->output_bfd)->has_ifunc_symbols = TRUE;
 
   return TRUE;
@@ -4715,6 +4709,29 @@ elf_i386_fbsd_post_process_headers (bfd *abfd, struct bfd_link_info *info)
 #define	elf32_bed				elf32_i386_fbsd_bed
 
 #undef elf_backend_add_symbol_hook
+
+#include "elf32-target.h"
+
+/* Solaris 2.  */
+
+#undef	TARGET_LITTLE_SYM
+#define	TARGET_LITTLE_SYM		bfd_elf32_i386_sol2_vec
+#undef	TARGET_LITTLE_NAME
+#define	TARGET_LITTLE_NAME		"elf32-i386-sol2"
+
+/* Restore default: we cannot use ELFOSABI_SOLARIS, otherwise ELFOSABI_NONE
+   objects won't be recognized.  */
+#undef ELF_OSABI
+
+#undef	elf32_bed
+#define	elf32_bed			elf32_i386_sol2_bed
+
+/* The Solaris 2 ABI requires a plt symbol on all platforms.
+
+   Cf. Linker and Libraries Guide, Ch. 2, Link-Editor, Generating the Output
+   File, p.63.  */
+#undef elf_backend_want_plt_sym
+#define elf_backend_want_plt_sym	1
 
 #include "elf32-target.h"
 
