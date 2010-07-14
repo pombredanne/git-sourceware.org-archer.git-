@@ -103,6 +103,8 @@ struct symloc
 #define FILE_STRING_OFFSET(p) (SYMLOC(p)->file_string_offset)
 
 
+static struct objfile *current_objfile;
+
 /* Remember what we deduced to be the source language of this psymtab. */
 
 static enum language psymtab_language = language_unknown;
