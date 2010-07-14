@@ -871,8 +871,9 @@ static struct symbol *
 lookup_possible_namespace_symbol (const char *name)
 {
   struct objfile *objfile;
+  objfile_iterator_type iter;
 
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (iter, objfile)
     {
       struct symbol *sym;
 
@@ -892,9 +893,10 @@ static void
 maintenance_cplus_namespace (char *args, int from_tty)
 {
   struct objfile *objfile;
+  objfile_iterator_type iter;
 
   printf_unfiltered (_("Possible namespaces:\n"));
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (iter, objfile)
     {
       struct dict_iterator iter;
       struct symbol *sym;

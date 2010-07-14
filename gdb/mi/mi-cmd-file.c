@@ -82,6 +82,7 @@ mi_cmd_file_list_exec_source_files (char *command, char **argv, int argc)
 {
   struct symtab *s;
   struct objfile *objfile;
+  objfile_iterator_type iter;
 
   if (!mi_valid_noargs ("mi_cmd_file_list_exec_source_files", argc, argv))
     error (_("mi_cmd_file_list_exec_source_files: Usage: No args"));
@@ -90,7 +91,7 @@ mi_cmd_file_list_exec_source_files (char *command, char **argv, int argc)
   ui_out_begin (uiout, ui_out_type_list, "files");
 
   /* Look at all of the symtabs */
-  ALL_SYMTABS (objfile, s)
+  ALL_SYMTABS (iter, objfile, s)
   {
     ui_out_begin (uiout, ui_out_type_tuple, NULL);
 

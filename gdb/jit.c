@@ -291,8 +291,9 @@ jit_find_objf_with_entry_addr (CORE_ADDR entry_addr)
 {
   struct objfile *objf;
   CORE_ADDR *objf_entry_addr;
+  objfile_iterator_type iter;
 
-  ALL_OBJFILES (objf)
+  ALL_OBJFILES (iter, objf)
     {
       objf_entry_addr = (CORE_ADDR *) objfile_data (objf, jit_objfile_data);
       if (objf_entry_addr != NULL && *objf_entry_addr == entry_addr)
@@ -399,13 +400,13 @@ static void
 jit_inferior_exit_hook (struct inferior *inf)
 {
   struct objfile *objf;
-  struct objfile *temp;
+  objfile_iterator_type iter, temp;
 
   /* We need to reset the descriptor addr so that next time we load up the
      inferior we look for it again.  */
   jit_descriptor_addr = 0;
 
-  ALL_OBJFILES_SAFE (objf, temp)
+  ALL_OBJFILES_SAFE (iter, objf, temp)
     if (objfile_data (objf, jit_objfile_data) != NULL)
       jit_unregister_code (objf);
 }

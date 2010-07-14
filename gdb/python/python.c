@@ -585,13 +585,14 @@ static PyObject *
 gdbpy_objfiles (PyObject *unused1, PyObject *unused2)
 {
   struct objfile *objf;
+  objfile_iterator_type iter;
   PyObject *list;
 
   list = PyList_New (0);
   if (!list)
     return NULL;
 
-  ALL_OBJFILES (objf)
+  ALL_OBJFILES (iter, objf)
   {
     PyObject *item = objfile_to_objfile_object (objf);
 

@@ -372,6 +372,7 @@ maintenance_info_sections (char *arg, int from_tty)
 	{
 	  struct objfile *ofile;
 	  struct obj_section *osect;
+	  objfile_iterator_type iter;
 
 	  /* Only this function cares about the 'ALLOBJ' argument; 
 	     if 'ALLOBJ' is the only argument, discard it rather than
@@ -380,7 +381,7 @@ maintenance_info_sections (char *arg, int from_tty)
 	  if (strcmp (arg, "ALLOBJ") == 0)
 	    arg = NULL;
 
-	  ALL_OBJFILES (ofile)
+	  ALL_OBJFILES (iter, ofile)
 	    {
 	      printf_filtered (_("  Object file: %s\n"), 
 			       bfd_get_filename (ofile->obfd));
@@ -456,6 +457,7 @@ maintenance_translate_address (char *arg, int from_tty)
   char *p;
   struct minimal_symbol *sym;
   struct objfile *objfile;
+  objfile_iterator_type iter;
 
   if (arg == NULL || *arg == 0)
     error (_("requires argument (address or section + address)"));
@@ -473,7 +475,7 @@ maintenance_translate_address (char *arg, int from_tty)
       while (isspace (*p))
 	p++;			/* Skip whitespace */
 
-      ALL_OBJSECTIONS (objfile, sect)
+      ALL_OBJSECTIONS (iter, objfile, sect)
       {
 	if (strcmp (sect->the_bfd_section->name, arg) == 0)
 	  break;

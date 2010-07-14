@@ -2278,6 +2278,7 @@ reread_symbols (void)
   int reread_one = 0;
   struct stat new_statbuf;
   int res;
+  objfile_iterator_type iter;
 
   /* With the addition of shared libraries, this should be modified,
      the load time should be saved in the partial symbol tables, since
@@ -2285,7 +2286,7 @@ reread_symbols (void)
      This routine should then walk down each partial symbol table
      and see if the symbol table that it originates from has been changed */
 
-  for (objfile = object_files; objfile; objfile = objfile->next)
+  ALL_OBJFILES (iter, objfile)
     {
       /* solib-sunos.c creates one objfile with obfd.  */
       if (objfile->obfd == NULL)
@@ -2832,8 +2833,9 @@ overlay_invalidate_all (void)
 {
   struct objfile *objfile;
   struct obj_section *sect;
+  objfile_iterator_type iter;
 
-  ALL_OBJSECTIONS (objfile, sect)
+  ALL_OBJSECTIONS (iter, objfile, sect)
     if (section_is_overlay (sect))
       sect->ovly_mapped = -1;
 }
@@ -3010,9 +3012,10 @@ find_pc_overlay (CORE_ADDR pc)
 {
   struct objfile *objfile;
   struct obj_section *osect, *best_match = NULL;
+  objfile_iterator_type iter;
 
   if (overlay_debugging)
-    ALL_OBJSECTIONS (objfile, osect)
+    ALL_OBJSECTIONS (iter, objfile, osect)
       if (section_is_overlay (osect))
       {
 	if (pc_in_mapped_range (pc, osect))
@@ -3037,9 +3040,10 @@ find_pc_mapped_section (CORE_ADDR pc)
 {
   struct objfile *objfile;
   struct obj_section *osect;
+  objfile_iterator_type iter;
 
   if (overlay_debugging)
-    ALL_OBJSECTIONS (objfile, osect)
+    ALL_OBJSECTIONS (iter, objfile, osect)
       if (pc_in_mapped_range (pc, osect) && section_is_mapped (osect))
 	return osect;
 
@@ -3055,9 +3059,10 @@ list_overlays_command (char *args, int from_tty)
   int nmapped = 0;
   struct objfile *objfile;
   struct obj_section *osect;
+  objfile_iterator_type iter;
 
   if (overlay_debugging)
-    ALL_OBJSECTIONS (objfile, osect)
+    ALL_OBJSECTIONS (iter, objfile, osect)
       if (section_is_mapped (osect))
       {
 	struct gdbarch *gdbarch = get_objfile_arch (objfile);
@@ -3094,6 +3099,7 @@ map_overlay_command (char *args, int from_tty)
 {
   struct objfile *objfile, *objfile2;
   struct obj_section *sec, *sec2;
+  objfile_iterator_type iter, iter2;
 
   if (!overlay_debugging)
     error (_("\
@@ -3104,7 +3110,7 @@ the 'overlay manual' command."));
     error (_("Argument required: name of an overlay section"));
 
   /* First, find a section matching the user supplied argument */
-  ALL_OBJSECTIONS (objfile, sec)
+  ALL_OBJSECTIONS (iter, objfile, sec)
     if (!strcmp (bfd_section_name (objfile->obfd, sec->the_bfd_section), args))
     {
       /* Now, check to see if the section is an overlay. */
@@ -3116,7 +3122,7 @@ the 'overlay manual' command."));
 
       /* Next, make a pass and unmap any sections that are
          overlapped by this new section: */
-      ALL_OBJSECTIONS (objfile2, sec2)
+      ALL_OBJSECTIONS (iter2, objfile2, sec2)
 	if (sec2->ovly_mapped && sec != sec2 && sections_overlap (sec, sec2))
 	{
 	  if (info_verbose)
@@ -3139,6 +3145,7 @@ unmap_overlay_command (char *args, int from_tty)
 {
   struct objfile *objfile;
   struct obj_section *sec;
+  objfile_iterator_type iter;
 
   if (!overlay_debugging)
     error (_("\
@@ -3149,7 +3156,7 @@ the 'overlay manual' command."));
     error (_("Argument required: name of an overlay section"));
 
   /* First, find a section matching the user supplied argument */
-  ALL_OBJSECTIONS (objfile, sec)
+  ALL_OBJSECTIONS (iter, objfile, sec)
     if (!strcmp (bfd_section_name (objfile->obfd, sec->the_bfd_section), args))
     {
       if (!sec->ovly_mapped)
@@ -3457,6 +3464,7 @@ void
 simple_overlay_update (struct obj_section *osect)
 {
   struct objfile *objfile;
+  objfile_iterator_type iter;
 
   /* Were we given an osect to look up?  NULL means do all of them. */
   if (osect)
@@ -3478,7 +3486,7 @@ simple_overlay_update (struct obj_section *osect)
     return;
 
   /* Now may as well update all sections, even if only one was requested. */
-  ALL_OBJSECTIONS (objfile, osect)
+  ALL_OBJSECTIONS (iter, objfile, osect)
     if (section_is_overlay (osect))
     {
       int i, size;

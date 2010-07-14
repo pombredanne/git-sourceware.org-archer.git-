@@ -459,6 +459,7 @@ find_unwind_entry (CORE_ADDR pc)
   int first, middle, last;
   struct objfile *objfile;
   struct hppa_objfile_private *priv;
+  objfile_iterator_type iter;
 
   if (hppa_debug)
     fprintf_unfiltered (gdb_stdlog, "{ find_unwind_entry %s -> ",
@@ -472,7 +473,7 @@ find_unwind_entry (CORE_ADDR pc)
       return NULL;
     }
 
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (iter, objfile)
   {
     struct hppa_unwind_info *ui;
     ui = NULL;
@@ -2469,8 +2470,9 @@ hppa_lookup_stub_minimal_symbol (const char *name,
 {
   struct objfile *objfile;
   struct minimal_symbol *msym;
+  objfile_iterator_type iter;
 
-  ALL_MSYMBOLS (objfile, msym)
+  ALL_MSYMBOLS (iter, objfile, msym)
     {
       if (strcmp (SYMBOL_LINKAGE_NAME (msym), name) == 0)
         {

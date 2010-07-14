@@ -22,11 +22,11 @@
 #define PROGSPACE_H
 
 #include "target.h"
-#include "vec.h"
 
 struct target_ops;
 struct bfd;
 struct objfile;
+struct objfile_list;
 struct inferior;
 struct exec;
 struct address_space;
@@ -173,9 +173,8 @@ struct program_space
        (e.g. the argument to the "symbol-file" or "file" command).  */
     struct objfile *symfile_object_file;
 
-    /* All known objfiles are kept in a linked list.  This points to
-       the head of this list. */
-    struct objfile *objfiles;
+    /* All known objfiles.  */
+    struct objfile_list *objfiles;
 
     /* The set of target sections matching the sections mapped into
        this program space.  Managed by both exec_ops and solib.c.  */

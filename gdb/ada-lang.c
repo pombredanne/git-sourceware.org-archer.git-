@@ -4262,6 +4262,7 @@ ada_lookup_simple_minsym (const char *name)
   struct objfile *objfile;
   struct minimal_symbol *msymbol;
   int wild_match;
+  objfile_iterator_type iter;
 
   if (strncmp (name, "standard__", sizeof ("standard__") - 1) == 0)
     {
@@ -4271,7 +4272,7 @@ ada_lookup_simple_minsym (const char *name)
   else
     wild_match = (strstr (name, "__") == NULL);
 
-  ALL_MSYMBOLS (objfile, msymbol)
+  ALL_MSYMBOLS (iter, objfile, msymbol)
   {
     if (ada_match_name (SYMBOL_LINKAGE_NAME (msymbol), name, wild_match)
         && MSYMBOL_TYPE (msymbol) != mst_solib_trampoline)
@@ -4668,6 +4669,7 @@ ada_add_non_local_symbols (struct obstack *obstackp, const char *name,
 {
   struct objfile *objfile;
   struct ada_psym_data data;
+  objfile_iterator_type iter;
 
   data.obstackp = obstackp;
   data.name = name;
@@ -4675,7 +4677,7 @@ ada_add_non_local_symbols (struct obstack *obstackp, const char *name,
   data.global = global;
   data.wild_match = is_wild_match;
 
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (iter, objfile)
   {
     if (objfile->sf)
       objfile->sf->qf->map_ada_symtabs (objfile, wild_match, is_name_suffix,
@@ -5342,6 +5344,7 @@ ada_make_symbol_completion_list (char *text0, char *word)
   struct block *b, *surrounding_static_block = 0;
   int i;
   struct dict_iterator iter;
+  objfile_iterator_type oiter;
 
   if (text0[0] == '<')
     {
@@ -5386,7 +5389,7 @@ ada_make_symbol_completion_list (char *text0, char *word)
      anything that isn't a text symbol (everything else will be
      handled by the psymtab code above).  */
 
-  ALL_MSYMBOLS (objfile, msymbol)
+  ALL_MSYMBOLS (oiter, objfile, msymbol)
   {
     QUIT;
     symbol_completion_add (&completions, SYMBOL_LINKAGE_NAME (msymbol),
@@ -5412,7 +5415,7 @@ ada_make_symbol_completion_list (char *text0, char *word)
   /* Go through the symtabs and check the externs and statics for
      symbols which match.  */
 
-  ALL_SYMTABS (objfile, s)
+  ALL_SYMTABS (oiter, objfile, s)
   {
     QUIT;
     b = BLOCKVECTOR_BLOCK (BLOCKVECTOR (s), GLOBAL_BLOCK);
@@ -5424,7 +5427,7 @@ ada_make_symbol_completion_list (char *text0, char *word)
     }
   }
 
-  ALL_SYMTABS (objfile, s)
+  ALL_SYMTABS (oiter, objfile, s)
   {
     QUIT;
     b = BLOCKVECTOR_BLOCK (BLOCKVECTOR (s), STATIC_BLOCK);

@@ -910,11 +910,12 @@ make_symbol_overload_list_qualified (const char *func_name)
   const struct block *b, *surrounding_static_block = 0;
   struct dict_iterator iter;
   const struct dictionary *dict;
+  objfile_iterator_type oiter;
 
   /* Look through the partial symtabs for all symbols which begin
      by matching FUNC_NAME.  Make sure we read that symbol table in. */
 
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (oiter, objfile)
   {
     if (objfile->sf)
       objfile->sf->qf->expand_symtabs_for_function (objfile, func_name);
@@ -931,14 +932,14 @@ make_symbol_overload_list_qualified (const char *func_name)
   /* Go through the symtabs and check the externs and statics for
      symbols which match.  */
 
-  ALL_PRIMARY_SYMTABS (objfile, s)
+  ALL_PRIMARY_SYMTABS (oiter, objfile, s)
   {
     QUIT;
     b = BLOCKVECTOR_BLOCK (BLOCKVECTOR (s), GLOBAL_BLOCK);
     make_symbol_overload_list_block (func_name, b);
   }
 
-  ALL_PRIMARY_SYMTABS (objfile, s)
+  ALL_PRIMARY_SYMTABS (oiter, objfile, s)
   {
     QUIT;
     b = BLOCKVECTOR_BLOCK (BLOCKVECTOR (s), STATIC_BLOCK);

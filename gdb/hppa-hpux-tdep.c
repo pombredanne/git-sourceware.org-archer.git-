@@ -371,6 +371,7 @@ hppa_hpux_skip_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
 
       else if (msym != NULL && MSYMBOL_TYPE (msym) == mst_solib_trampoline)
 	{
+	  objfile_iterator_type iter;
 	  struct objfile *objfile;
 	  struct minimal_symbol *msymbol;
 	  int function_found = 0;
@@ -380,7 +381,7 @@ hppa_hpux_skip_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
 	     is an actual trampoline, in which case there would be another
 	     symbol with the same name corresponding to the real function */
 
-	  ALL_MSYMBOLS (objfile, msymbol)
+	  ALL_MSYMBOLS (iter, objfile, msymbol)
 	  {
 	    if (MSYMBOL_TYPE (msymbol) == mst_text
 		&& strcmp (SYMBOL_LINKAGE_NAME (msymbol),
@@ -1022,11 +1023,12 @@ hppa_hpux_find_import_stub_for_addr (CORE_ADDR funcaddr)
   struct objfile *objfile;
   struct minimal_symbol *funsym, *stubsym;
   CORE_ADDR stubaddr;
+  objfile_iterator_type iter;
 
   funsym = lookup_minimal_symbol_by_pc (funcaddr);
   stubaddr = 0;
 
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (iter, objfile)
     {
       stubsym = lookup_minimal_symbol_solib_trampoline
 	(SYMBOL_LINKAGE_NAME (funsym), objfile);

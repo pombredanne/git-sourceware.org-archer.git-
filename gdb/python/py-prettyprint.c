@@ -77,8 +77,9 @@ find_pretty_printer_from_objfiles (PyObject *value)
   PyObject *pp_list;
   PyObject *function;
   struct objfile *obj;
+  objfile_iterator_type iter;
 
-  ALL_OBJFILES (obj)
+  ALL_OBJFILES (iter, obj)
   {
     PyObject *objf = objfile_to_objfile_object (obj);
     if (!objf)

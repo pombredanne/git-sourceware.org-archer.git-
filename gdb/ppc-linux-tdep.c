@@ -1235,9 +1235,10 @@ static void
 ppc_linux_spe_context_inferior_created (struct target_ops *t, int from_tty)
 {
   struct objfile *objfile;
+  objfile_iterator_type iter;
 
   ppc_linux_spe_context_lookup (NULL);
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (iter, objfile)
     ppc_linux_spe_context_lookup (objfile);
 }
 

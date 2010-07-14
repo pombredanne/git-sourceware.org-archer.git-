@@ -699,6 +699,7 @@ selectors_info (char *regexp, int from_tty)
   char                   asel[256];
   struct symbol        **sym_arr;
   int                    plusminus = 0;
+  objfile_iterator_type iter;
 
   if (regexp == NULL)
     strcpy(myregexp, ".*]");	/* Null input, match all objc methods.  */
@@ -730,7 +731,7 @@ selectors_info (char *regexp, int from_tty)
     }
 
   /* First time thru is JUST to get max length and count.  */
-  ALL_MSYMBOLS (objfile, msymbol)
+  ALL_MSYMBOLS (iter, objfile, msymbol)
     {
       QUIT;
       name = SYMBOL_NATURAL_NAME (msymbol);
@@ -761,7 +762,7 @@ selectors_info (char *regexp, int from_tty)
 
       sym_arr = alloca (matches * sizeof (struct symbol *));
       matches = 0;
-      ALL_MSYMBOLS (objfile, msymbol)
+      ALL_MSYMBOLS (iter, objfile, msymbol)
 	{
 	  QUIT;
 	  name = SYMBOL_NATURAL_NAME (msymbol);
@@ -849,6 +850,7 @@ classes_info (char *regexp, int from_tty)
   char                   myregexp[2048];
   char                   aclass[256];
   struct symbol        **sym_arr;
+  objfile_iterator_type iter;
 
   if (regexp == NULL)
     strcpy(myregexp, ".* ");	/* Null input: match all objc classes.  */
@@ -870,7 +872,7 @@ classes_info (char *regexp, int from_tty)
     }
 
   /* First time thru is JUST to get max length and count.  */
-  ALL_MSYMBOLS (objfile, msymbol)
+  ALL_MSYMBOLS (iter, objfile, msymbol)
     {
       QUIT;
       name = SYMBOL_NATURAL_NAME (msymbol);
@@ -894,7 +896,7 @@ classes_info (char *regexp, int from_tty)
 		       regexp ? regexp : "*");
       sym_arr = alloca (matches * sizeof (struct symbol *));
       matches = 0;
-      ALL_MSYMBOLS (objfile, msymbol)
+      ALL_MSYMBOLS (iter, objfile, msymbol)
 	{
 	  QUIT;
 	  name = SYMBOL_NATURAL_NAME (msymbol);
@@ -1154,6 +1156,8 @@ find_methods (struct symtab *symtab, char type,
   unsigned int csym = 0;
   unsigned int cdebug = 0;
 
+  objfile_iterator_type iter;
+
   static char *tmp = NULL;
   static unsigned int tmplen = 0;
 
@@ -1163,7 +1167,7 @@ find_methods (struct symtab *symtab, char type,
   if (symtab)
     block = BLOCKVECTOR_BLOCK (BLOCKVECTOR (symtab), STATIC_BLOCK);
 
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (iter, objfile)
     {
       unsigned int *objc_csym;
 

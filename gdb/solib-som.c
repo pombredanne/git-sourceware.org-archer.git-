@@ -368,6 +368,7 @@ som_solib_desire_dynamic_linker_symbols (void)
   struct objfile *objfile;
   struct unwind_table_entry *u;
   struct minimal_symbol *dld_msymbol;
+  objfile_iterator_type iter;
 
   /* Do we already know the value of these symbols?  If so, then
      we've no work to do.
@@ -378,7 +379,7 @@ som_solib_desire_dynamic_linker_symbols (void)
   if (dld_cache.is_valid)
     return;
 
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (iter, objfile)
   {
     dld_msymbol = lookup_minimal_symbol ("shl_load", NULL, objfile);
     if (dld_msymbol != NULL)

@@ -59,6 +59,7 @@
 
 static void objfile_alloc_data (struct objfile *objfile);
 static void objfile_free_data (struct objfile *objfile);
+static struct objfile_list *unlink_objfile (struct objfile *objfile);
 
 /* Externally visible variables that are owned by this module.
    See declarations in objfile.h for more info. */
@@ -196,8 +197,10 @@ struct objfile *
 allocate_objfile (bfd *abfd, int flags)
 {
   struct objfile *objfile;
+  struct objfile_list *olist, **iter;
 
   objfile = (struct objfile *) xzalloc (sizeof (struct objfile));
+  objfile->refc = 1;
   objfile->psymbol_cache = bcache_xmalloc ();
   objfile->macro_cache = bcache_xmalloc ();
   objfile->filename_cache = bcache_xmalloc ();
@@ -254,18 +257,13 @@ allocate_objfile (bfd *abfd, int flags)
 
   /* Add this file onto the tail of the linked list of other such files. */
 
-  objfile->next = NULL;
-  if (object_files == NULL)
-    object_files = objfile;
-  else
-    {
-      struct objfile *last_one;
+  olist = XNEW (struct objfile_list);
+  olist->next = NULL;
+  olist->objfile = objfile;
 
-      for (last_one = object_files;
-	   last_one->next;
-	   last_one = last_one->next);
-      last_one->next = objfile;
-    }
+  for (iter = &object_files; *iter != NULL; iter = &(*iter)->next)
+    ;
+  *iter = olist;
 
   /* Save passed in flag bits. */
   objfile->flags |= flags;
@@ -422,19 +420,23 @@ objfile_separate_debug_iterate (const struct objfile *parent,
 /* Put one object file before a specified on in the global list.
    This can be used to make sure an object file is destroyed before
    another when using ALL_OBJFILES_SAFE to free all objfiles. */
-void
+static void
 put_objfile_before (struct objfile *objfile, struct objfile *before_this)
 {
-  struct objfile **objp;
+  struct objfile_list *iter, *prev, *objfile_wrapper;
 
-  unlink_objfile (objfile);
+  objfile_wrapper = unlink_objfile (objfile);
   
-  for (objp = &object_files; *objp != NULL; objp = &((*objp)->next))
+  prev = NULL;
+  for (iter = object_files; iter != NULL; prev = iter, iter = iter->next)
     {
-      if (*objp == before_this)
+      if (iter->objfile == before_this)
 	{
-	  objfile->next = *objp;
-	  *objp = objfile;
+	  if (prev)
+	    prev->next = objfile_wrapper;
+	  else
+	    object_files = objfile_wrapper;
+	  objfile_wrapper->next = iter;
 	  return;
 	}
     }
@@ -443,51 +445,28 @@ put_objfile_before (struct objfile *objfile, struct objfile *before_this)
 		  _("put_objfile_before: before objfile not in list"));
 }
 
-/* Put OBJFILE at the front of the list.  */
-
-void
-objfile_to_front (struct objfile *objfile)
-{
-  struct objfile **objp;
-  for (objp = &object_files; *objp != NULL; objp = &((*objp)->next))
-    {
-      if (*objp == objfile)
-	{
-	  /* Unhook it from where it is.  */
-	  *objp = objfile->next;
-	  /* Put it in the front.  */
-	  objfile->next = object_files;
-	  object_files = objfile;
-	  break;
-	}
-    }
-}
-
 /* Unlink OBJFILE from the list of known objfiles, if it is found in the
    list.
-
-   It is not a bug, or error, to call this function if OBJFILE is not known
-   to be in the current list.  This is done in the case of mapped objfiles,
-   for example, just to ensure that the mapped objfile doesn't appear twice
-   in the list.  Since the list is threaded, linking in a mapped objfile
-   twice would create a circular list.
 
    If OBJFILE turns out to be in the list, we zap it's NEXT pointer after
    unlinking it, just to ensure that we have completely severed any linkages
    between the OBJFILE and the list. */
 
-void
+static struct objfile_list *
 unlink_objfile (struct objfile *objfile)
 {
-  struct objfile **objpp;
+  struct objfile_list *iter, *prev;
 
-  for (objpp = &object_files; *objpp != NULL; objpp = &((*objpp)->next))
+  prev = NULL;
+  for (iter = object_files; iter != NULL; prev = iter, iter = iter->next)
     {
-      if (*objpp == objfile)
+      if (iter->objfile == objfile)
 	{
-	  *objpp = (*objpp)->next;
-	  objfile->next = NULL;
-	  return;
+	  if (prev)
+	    prev->next = iter->next;
+	  else
+	    object_files = iter->next;
+	  return iter;
 	}
     }
 
@@ -547,12 +526,9 @@ free_objfile_separate_debug (struct objfile *objfile)
    is using the mapped symbol info, we need to be more careful about when
    we free objects in the reusable area. */
 
-void
-free_objfile (struct objfile *objfile)
+static void
+do_free_objfile (struct objfile *objfile)
 {
-  /* Free all separate debug objfiles.  */
-  free_objfile_separate_debug (objfile);
-
   if (objfile->separate_debug_objfile_backlink)
     {
       /* We freed the separate debug file, make sure the base objfile
@@ -604,10 +580,6 @@ free_objfile (struct objfile *objfile)
   objfile_free_data (objfile);
 
   gdb_bfd_unref (objfile->obfd);
-
-  /* Remove it from the chain of all objfiles. */
-
-  unlink_objfile (objfile);
 
   if (objfile == symfile_objfile)
     symfile_objfile = NULL;
@@ -670,6 +642,22 @@ free_objfile (struct objfile *objfile)
   xfree (objfile);
 }
 
+void
+free_objfile (struct objfile *objfile)
+{
+  struct objfile_list *wrapper;
+
+  /* Free all separate debug objfiles.  */
+  free_objfile_separate_debug (objfile);
+
+  /* Remove it from the chain of all objfiles. */
+  wrapper = unlink_objfile (objfile);
+  xfree (wrapper);
+
+  if (--objfile->refc == 0)
+    do_free_objfile (objfile);
+}
+
 static void
 do_free_objfile_cleanup (void *obj)
 {
@@ -687,14 +675,15 @@ make_cleanup_free_objfile (struct objfile *obj)
 void
 free_all_objfiles (void)
 {
-  struct objfile *objfile, *temp;
+  struct objfile *objfile;
   struct so_list *so;
+  objfile_iterator_type iter, temp;
 
   /* Any objfile referencewould become stale.  */
   for (so = master_so_list (); so; so = so->next)
     gdb_assert (so->objfile == NULL);
 
-  ALL_OBJFILES_SAFE (objfile, temp)
+  ALL_OBJFILES_SAFE (iter, objfile, temp)
   {
     free_objfile (objfile);
   }
@@ -928,8 +917,9 @@ int
 have_partial_symbols (void)
 {
   struct objfile *ofp;
+  objfile_iterator_type iter;
 
-  ALL_OBJFILES (ofp)
+  ALL_OBJFILES (iter, ofp)
   {
     if (objfile_has_partial_symbols (ofp))
       return 1;
@@ -945,8 +935,9 @@ int
 have_full_symbols (void)
 {
   struct objfile *ofp;
+  objfile_iterator_type iter;
 
-  ALL_OBJFILES (ofp)
+  ALL_OBJFILES (iter, ofp)
   {
     if (objfile_has_full_symbols (ofp))
       return 1;
@@ -963,9 +954,9 @@ void
 objfile_purge_solibs (void)
 {
   struct objfile *objf;
-  struct objfile *temp;
+  objfile_iterator_type iter, temp;
 
-  ALL_OBJFILES_SAFE (objf, temp)
+  ALL_OBJFILES_SAFE (iter, objf, temp)
   {
     /* We assume that the solib package has been purged already, or will
        be soon.
@@ -984,8 +975,9 @@ int
 have_minimal_symbols (void)
 {
   struct objfile *ofp;
+  objfile_iterator_type iter;
 
-  ALL_OBJFILES (ofp)
+  ALL_OBJFILES (iter, ofp)
   {
     if (ofp->minimal_symbol_count > 0)
       {
@@ -1056,9 +1048,10 @@ qsort_cmp (const void *a, const void *b)
 	{
 	  /* Sort on sequence number of the objfile in the chain.  */
 
-	  const struct objfile *objfile;
+	  struct objfile *objfile;
+	  objfile_iterator_type iter;
 
-	  ALL_OBJFILES (objfile)
+	  ALL_OBJFILES (iter, objfile)
 	    if (objfile == objfile1)
 	      return -1;
 	    else if (objfile == objfile2)
@@ -1237,6 +1230,7 @@ update_section_map (struct program_space *pspace,
   int alloc_size, map_size, i;
   struct obj_section *s, **map;
   struct objfile *objfile;
+  objfile_iterator_type iter;
 
   gdb_assert (get_objfile_pspace_data (pspace)->objfiles_changed_p != 0);
 
@@ -1244,7 +1238,7 @@ update_section_map (struct program_space *pspace,
   xfree (map);
 
   alloc_size = 0;
-  ALL_PSPACE_OBJFILES (pspace, objfile)
+  ALL_PSPACE_OBJFILES (pspace, iter, objfile)
     ALL_OBJFILE_OSECTIONS (objfile, s)
       if (insert_section_p (objfile->obfd, s->the_bfd_section))
 	alloc_size += 1;
@@ -1260,7 +1254,7 @@ update_section_map (struct program_space *pspace,
   map = xmalloc (alloc_size * sizeof (*map));
 
   i = 0;
-  ALL_PSPACE_OBJFILES (pspace, objfile)
+  ALL_PSPACE_OBJFILES (pspace, iter, objfile)
     ALL_OBJFILE_OSECTIONS (objfile, s)
       if (insert_section_p (objfile->obfd, s->the_bfd_section))
 	map[i++] = s;

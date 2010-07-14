@@ -146,11 +146,12 @@ msymbol_objfile (struct minimal_symbol *sym)
 {
   struct objfile *objf;
   struct minimal_symbol *tsym;
+  objfile_iterator_type iter;
 
   unsigned int hash
     = msymbol_hash (SYMBOL_LINKAGE_NAME (sym)) % MINIMAL_SYMBOL_HASH_SIZE;
 
-  for (objf = object_files; objf; objf = objf->next)
+  ALL_OBJFILES (iter, objf)
     for (tsym = objf->msymbol_hash[hash]; tsym; tsym = tsym->hash_next)
       if (tsym == sym)
 	return objf;
@@ -189,6 +190,7 @@ lookup_minimal_symbol (const char *name, const char *sfile,
   struct minimal_symbol *found_symbol = NULL;
   struct minimal_symbol *found_file_symbol = NULL;
   struct minimal_symbol *trampoline_symbol = NULL;
+  objfile_iterator_type iter;
 
   unsigned int hash = msymbol_hash (name) % MINIMAL_SYMBOL_HASH_SIZE;
   unsigned int dem_hash = msymbol_hash_iw (name) % MINIMAL_SYMBOL_HASH_SIZE;
@@ -217,10 +219,11 @@ lookup_minimal_symbol (const char *name, const char *sfile,
 	}
     }
 
-  for (objfile = object_files;
-       objfile != NULL && found_symbol == NULL;
-       objfile = objfile->next)
+  ALL_OBJFILES (iter, objfile)
     {
+      if (found_symbol)
+	break;
+
       if (objf == NULL || objf == objfile
 	  || objf == objfile->separate_debug_objfile_backlink)
 	{
@@ -322,13 +325,15 @@ lookup_minimal_symbol_text (const char *name, struct objfile *objf)
   struct minimal_symbol *msymbol;
   struct minimal_symbol *found_symbol = NULL;
   struct minimal_symbol *found_file_symbol = NULL;
+  objfile_iterator_type iter;
 
   unsigned int hash = msymbol_hash (name) % MINIMAL_SYMBOL_HASH_SIZE;
 
-  for (objfile = object_files;
-       objfile != NULL && found_symbol == NULL;
-       objfile = objfile->next)
+  ALL_OBJFILES (iter, objfile)
     {
+      if (found_symbol)
+	break;
+
       if (objf == NULL || objf == objfile
 	  || objf == objfile->separate_debug_objfile_backlink)
 	{
@@ -375,12 +380,11 @@ lookup_minimal_symbol_by_pc_name (CORE_ADDR pc, const char *name,
 {
   struct objfile *objfile;
   struct minimal_symbol *msymbol;
+  objfile_iterator_type iter;
 
   unsigned int hash = msymbol_hash (name) % MINIMAL_SYMBOL_HASH_SIZE;
 
-  for (objfile = object_files;
-       objfile != NULL;
-       objfile = objfile->next)
+  ALL_OBJFILES (iter, objfile)
     {
       if (objf == NULL || objf == objfile
 	  || objf == objfile->separate_debug_objfile_backlink)
@@ -414,13 +418,15 @@ lookup_minimal_symbol_solib_trampoline (const char *name,
   struct objfile *objfile;
   struct minimal_symbol *msymbol;
   struct minimal_symbol *found_symbol = NULL;
+  objfile_iterator_type iter;
 
   unsigned int hash = msymbol_hash (name) % MINIMAL_SYMBOL_HASH_SIZE;
 
-  for (objfile = object_files;
-       objfile != NULL && found_symbol == NULL;
-       objfile = objfile->next)
+  ALL_OBJFILES (iter, objfile)
     {
+      if (found_symbol)
+	break;
+
       if (objf == NULL || objf == objfile
 	  || objf == objfile->separate_debug_objfile_backlink)
 	{
@@ -710,9 +716,10 @@ lookup_minimal_symbol_and_objfile (const char *name,
 				   struct objfile **objfile_p)
 {
   struct objfile *objfile;
+  objfile_iterator_type iter;
   unsigned int hash = msymbol_hash (name) % MINIMAL_SYMBOL_HASH_SIZE;
 
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (iter, objfile)
     {
       struct minimal_symbol *msym;
 
@@ -1230,10 +1237,11 @@ find_solib_trampoline_target (struct frame_info *frame, CORE_ADDR pc)
   struct objfile *objfile;
   struct minimal_symbol *msymbol;
   struct minimal_symbol *tsymbol = lookup_solib_trampoline_symbol_by_pc (pc);
+  objfile_iterator_type iter;
 
   if (tsymbol != NULL)
     {
-      ALL_MSYMBOLS (objfile, msymbol)
+      ALL_MSYMBOLS (iter, objfile, msymbol)
       {
 	if (MSYMBOL_TYPE (msymbol) == mst_text
 	    && strcmp (SYMBOL_LINKAGE_NAME (msymbol),

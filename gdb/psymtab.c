@@ -1498,6 +1498,7 @@ maintenance_print_psymbols (char *args, int from_tty)
   char *filename = DEV_TTY;
   struct objfile *objfile;
   struct partial_symtab *ps;
+  objfile_iterator_type iter;
 
   dont_repeat ();
 
@@ -1527,7 +1528,7 @@ maintenance_print_psymbols (char *args, int from_tty)
   make_cleanup_ui_file_delete (outfile);
 
   immediate_quit++;
-  ALL_PSYMTABS (objfile, ps)
+  ALL_PSYMTABS (iter, objfile, ps)
     if (symname == NULL || strcmp (symname, ps->filename) == 0)
     dump_psymtab (objfile, ps, outfile);
   immediate_quit--;
@@ -1540,12 +1541,13 @@ maintenance_info_psymtabs (char *regexp, int from_tty)
 {
   struct program_space *pspace;
   struct objfile *objfile;
+  objfile_iterator_type iter;
 
   if (regexp)
     re_comp (regexp);
 
   ALL_PSPACES (pspace)
-    ALL_PSPACE_OBJFILES (pspace, objfile)
+    ALL_PSPACE_OBJFILES (pspace, iter, objfile)
     {
       struct gdbarch *gdbarch = get_objfile_arch (objfile);
       struct partial_symtab *psymtab;
@@ -1648,8 +1650,9 @@ maintenance_check_symtabs (char *ignore, int from_tty)
   struct objfile *objfile;
   struct block *b;
   int length;
+  objfile_iterator_type iter;
 
-  ALL_PSYMTABS (objfile, ps)
+  ALL_PSYMTABS (iter, objfile, ps)
   {
     struct gdbarch *gdbarch = get_objfile_arch (objfile);
 
@@ -1727,8 +1730,9 @@ void
 map_partial_symbol_names (void (*fun) (const char *, void *), void *data)
 {
   struct objfile *objfile;
+  objfile_iterator_type iter;
 
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (iter, objfile)
   {
     if (objfile->sf)
       objfile->sf->qf->map_symbol_names (objfile, fun, data);
@@ -1741,8 +1745,9 @@ map_partial_symbol_filenames (void (*fun) (const char *, const char *,
 			      void *data)
 {
   struct objfile *objfile;
+  objfile_iterator_type iter;
 
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (iter, objfile)
   {
     if (objfile->sf)
       objfile->sf->qf->map_symbol_filenames (objfile, fun, data);

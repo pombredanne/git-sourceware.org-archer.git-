@@ -230,6 +230,7 @@ select_source_symtab (struct symtab *s)
   struct symtabs_and_lines sals;
   struct symtab_and_line sal;
   struct objfile *ofp;
+  objfile_iterator_type iter;
 
   if (s)
     {
@@ -261,7 +262,7 @@ select_source_symtab (struct symtab *s)
 
   current_source_line = 1;
 
-  ALL_OBJFILES (ofp)
+  ALL_OBJFILES (iter, ofp)
     {
       for (s = ofp->symtabs; s; s = s->next)
 	{
@@ -280,7 +281,7 @@ select_source_symtab (struct symtab *s)
   if (current_source_symtab)
     return;
 
-  ALL_OBJFILES (ofp)
+  ALL_OBJFILES (iter, ofp)
   {
     if (ofp->sf)
       s = ofp->sf->qf->find_last_source_symtab (ofp);
@@ -311,9 +312,10 @@ forget_cached_source_info (void)
   struct program_space *pspace;
   struct symtab *s;
   struct objfile *objfile;
+  objfile_iterator_type iter;
 
   ALL_PSPACES (pspace)
-    ALL_PSPACE_OBJFILES (pspace, objfile)
+    ALL_PSPACE_OBJFILES (pspace, iter, objfile)
     {
       for (s = objfile->symtabs; s != NULL; s = s->next)
 	{

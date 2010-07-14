@@ -103,8 +103,9 @@ append_ocl_sos (struct so_list **link_ptr)
 {
   CORE_ADDR *ocl_program_addr_base;
   struct objfile *objfile;
+  objfile_iterator_type iter;
 
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (iter, objfile)
     {
       ocl_program_addr_base = objfile_data (objfile, ocl_program_data_key);
       if (ocl_program_addr_base != NULL)

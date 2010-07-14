@@ -195,6 +195,7 @@ find_pc_partial_function (CORE_ADDR pc, char **name, CORE_ADDR *address,
   struct objfile *objfile;
   int i;
   CORE_ADDR mapped_pc;
+  objfile_iterator_type iter;
 
   /* To ensure that the symbol returned belongs to the correct setion
      (and that the last [random] symbol from the previous section
@@ -213,7 +214,7 @@ find_pc_partial_function (CORE_ADDR pc, char **name, CORE_ADDR *address,
     goto return_cached_value;
 
   msymbol = lookup_minimal_symbol_by_pc_section (mapped_pc, section);
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (iter, objfile)
   {
     if (objfile->sf)
       symtab = objfile->sf->qf->find_pc_sect_symtab (objfile, msymbol,

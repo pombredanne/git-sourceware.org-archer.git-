@@ -124,10 +124,11 @@ print_symbol_bcache_statistics (void)
 {
   struct program_space *pspace;
   struct objfile *objfile;
+  objfile_iterator_type iter;
 
   immediate_quit++;
   ALL_PSPACES (pspace)
-    ALL_PSPACE_OBJFILES (pspace, objfile)
+    ALL_PSPACE_OBJFILES (pspace, iter, objfile)
   {
     printf_filtered (_("Byte cache statistics for '%s':\n"), objfile->name);
     print_bcache_statistics (objfile->psymbol_cache, "partial symbol cache");
@@ -144,10 +145,11 @@ print_objfile_statistics (void)
   struct objfile *objfile;
   struct symtab *s;
   int i, linetables, blockvectors;
+  objfile_iterator_type iter;
 
   immediate_quit++;
   ALL_PSPACES (pspace)
-    ALL_PSPACE_OBJFILES (pspace, objfile)
+    ALL_PSPACE_OBJFILES (pspace, iter, objfile)
   {
     printf_filtered (_("Statistics for '%s':\n"), objfile->name);
     if (OBJSTAT (objfile, n_stabs) > 0)
@@ -441,6 +443,7 @@ maintenance_print_symbols (char *args, int from_tty)
   char *filename = DEV_TTY;
   struct objfile *objfile;
   struct symtab *s;
+  objfile_iterator_type iter;
 
   dont_repeat ();
 
@@ -471,7 +474,7 @@ Arguments missing: an output file name and an optional symbol file name"));
   make_cleanup_ui_file_delete (outfile);
 
   immediate_quit++;
-  ALL_SYMTABS (objfile, s)
+  ALL_SYMTABS (iter, objfile, s)
     if (symname == NULL || strcmp (symname, s->filename) == 0)
     dump_symtab (objfile, s, outfile);
   immediate_quit--;
@@ -659,6 +662,7 @@ maintenance_print_msymbols (char *args, int from_tty)
   char *symname = NULL;
   struct program_space *pspace;
   struct objfile *objfile;
+  objfile_iterator_type iter;
 
   struct stat sym_st, obj_st;
 
@@ -694,7 +698,7 @@ maintenance_print_msymbols (char *args, int from_tty)
 
   immediate_quit++;
   ALL_PSPACES (pspace)
-    ALL_PSPACE_OBJFILES (pspace, objfile)
+    ALL_PSPACE_OBJFILES (pspace, iter, objfile)
       if (symname == NULL
 	  || (!stat (objfile->name, &obj_st) && sym_st.st_ino == obj_st.st_ino))
 	dump_msymbols (objfile, outfile);
@@ -708,12 +712,13 @@ maintenance_print_objfiles (char *ignore, int from_tty)
 {
   struct program_space *pspace;
   struct objfile *objfile;
+  objfile_iterator_type iter;
 
   dont_repeat ();
 
   immediate_quit++;
   ALL_PSPACES (pspace)
-    ALL_PSPACE_OBJFILES (pspace, objfile)
+    ALL_PSPACE_OBJFILES (pspace, iter, objfile)
       dump_objfile (objfile);
   immediate_quit--;
 }
@@ -725,12 +730,13 @@ maintenance_info_symtabs (char *regexp, int from_tty)
 {
   struct program_space *pspace;
   struct objfile *objfile;
+  objfile_iterator_type iter;
 
   if (regexp)
     re_comp (regexp);
 
   ALL_PSPACES (pspace)
-    ALL_PSPACE_OBJFILES (pspace, objfile)
+    ALL_PSPACE_OBJFILES (pspace, iter, objfile)
     {
       struct symtab *symtab;
       

@@ -634,9 +634,10 @@ solib_read_symbols (struct so_list *so, int flags)
       TRY_CATCH (e, RETURN_MASK_ERROR)
 	{
 	  struct section_addr_info *sap;
+	  objfile_iterator_type iter;
 
 	  /* Have we already loaded this shared object?  */
-	  ALL_OBJFILES (so->objfile)
+	  ALL_OBJFILES (iter, so->objfile)
 	    {
 	      if (strcmp (so->objfile->name, so->so_name) == 0)
 		break;

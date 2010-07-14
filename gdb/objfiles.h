@@ -170,28 +170,14 @@ extern void print_symbol_bcache_statistics (void);
 
 struct objfile
   {
-
-    /* All struct objfile's are chained together by their next pointers.
-       The global variable "object_files" points to the first link in this
-       chain.
-
-       FIXME:  There is a problem here if the objfile is reusable, and if
-       multiple users are to be supported.  The problem is that the objfile
-       list is linked through a member of the objfile struct itself, which
-       is only valid for one gdb process.  The list implementation needs to
-       be changed to something like:
-
-       struct list {struct list *next; struct objfile *objfile};
-
-       where the list structure is completely maintained separately within
-       each gdb process. */
-
-    struct objfile *next;
-
     /* The object file's name, tilde-expanded and absolute.
        Malloc'd; free it if you free this struct.  */
 
     char *name;
+
+    /* The reference count.  */
+
+    unsigned int refc;
 
     /* Some flag bits for this objfile. */
 
@@ -450,13 +436,7 @@ extern void terminate_minimal_symbol_table (struct objfile *objfile);
 extern struct objfile *objfile_separate_debug_iterate (const struct objfile *,
                                                        const struct objfile *);
 
-extern void put_objfile_before (struct objfile *, struct objfile *);
-
-extern void objfile_to_front (struct objfile *);
-
 extern void add_separate_debug_objfile (struct objfile *, struct objfile *);
-
-extern void unlink_objfile (struct objfile *);
 
 extern void free_objfile (struct objfile *);
 
@@ -521,29 +501,33 @@ extern void gdb_bfd_unref (struct bfd *abfd);
 extern int gdb_bfd_close_or_warn (struct bfd *abfd);
 
 
+struct objfile_list
+{
+  struct objfile_list *next;
+  struct objfile *objfile;
+};
+
+typedef struct objfile_list *objfile_iterator_type;
+
+/* Traverse all object files in program space SS.  */
+
+#define ALL_PSPACE_OBJFILES(ss, iter, obj)			\
+  for (iter = ss->objfiles, obj = iter ? iter->objfile : NULL;	\
+       iter != NULL;						\
+       iter = iter->next, obj = iter ? iter->objfile : NULL)
+
+#define ALL_OBJFILES(iter, obj)			\
+  ALL_PSPACE_OBJFILES (current_program_space, iter, obj)
+
 /* Traverse all object files in the current program space.
    ALL_OBJFILES_SAFE works even if you delete the objfile during the
    traversal.  */
 
-/* Traverse all object files in program space SS.  */
-
-#define ALL_PSPACE_OBJFILES(ss, obj)					\
-  for ((obj) = ss->objfiles; (obj) != NULL; (obj) = (obj)->next)	\
-
-#define ALL_PSPACE_OBJFILES_SAFE(ss, obj, nxt)		\
-  for ((obj) = ss->objfiles;			\
-       (obj) != NULL? ((nxt)=(obj)->next,1) :0;	\
-       (obj) = (nxt))
-
-#define ALL_OBJFILES(obj)			    \
-  for ((obj) = current_program_space->objfiles; \
-       (obj) != NULL;				    \
-       (obj) = (obj)->next)
-
-#define ALL_OBJFILES_SAFE(obj,nxt)			\
-  for ((obj) = current_program_space->objfiles;	\
-       (obj) != NULL? ((nxt)=(obj)->next,1) :0;	\
-       (obj) = (nxt))
+#define ALL_OBJFILES_SAFE(iter,obj,nxt)			\
+  for ((iter = current_program_space->objfiles,		\
+	obj = iter ? iter->objfile : NULL);		\
+       iter != NULL ? (nxt = iter->next, 1) : 0;	\
+       iter = nxt, obj = iter ? iter->objfile : NULL)
 
 /* Traverse all symtabs in one objfile.  */
 
@@ -558,40 +542,40 @@ extern int gdb_bfd_close_or_warn (struct bfd *abfd);
 /* Traverse all symtabs in all objfiles in the current symbol
    space.  */
 
-#define	ALL_SYMTABS(objfile, s) \
-  ALL_OBJFILES (objfile)	 \
+#define	ALL_SYMTABS(iter, objfile, s)		\
+  ALL_OBJFILES (iter, objfile)			\
     ALL_OBJFILE_SYMTABS (objfile, s)
 
-#define ALL_PSPACE_SYMTABS(ss, objfile, s)		\
-  ALL_PSPACE_OBJFILES (ss, objfile)			\
+#define ALL_PSPACE_SYMTABS(ss, iter, objfile, s)		\
+  ALL_PSPACE_OBJFILES (ss, iter, objfile)			\
     ALL_OBJFILE_SYMTABS (objfile, s)
 
 /* Traverse all symtabs in all objfiles in the current program space,
    skipping included files (which share a blockvector with their
    primary symtab).  */
 
-#define ALL_PRIMARY_SYMTABS(objfile, s) \
-  ALL_OBJFILES (objfile)		\
+#define ALL_PRIMARY_SYMTABS(iter, objfile, s)	\
+  ALL_OBJFILES (iter, objfile)			\
     ALL_OBJFILE_SYMTABS (objfile, s)	\
       if ((s)->primary)
 
-#define ALL_PSPACE_PRIMARY_SYMTABS(pspace, objfile, s)	\
-  ALL_PSPACE_OBJFILES (ss, objfile)			\
+#define ALL_PSPACE_PRIMARY_SYMTABS(pspace, iter, objfile, s)	\
+  ALL_PSPACE_OBJFILES (ss, iter, objfile)			\
     ALL_OBJFILE_SYMTABS (objfile, s)			\
       if ((s)->primary)
 
 /* Traverse all minimal symbols in all objfiles in the current symbol
    space.  */
 
-#define	ALL_MSYMBOLS(objfile, m) \
-  ALL_OBJFILES (objfile)	 \
+#define	ALL_MSYMBOLS(iter, objfile, m)		\
+  ALL_OBJFILES (iter, objfile)			\
     ALL_OBJFILE_MSYMBOLS (objfile, m)
 
 #define ALL_OBJFILE_OSECTIONS(objfile, osect)	\
   for (osect = objfile->sections; osect < objfile->sections_end; osect++)
 
-#define ALL_OBJSECTIONS(objfile, osect)		\
-  ALL_OBJFILES (objfile)			\
+#define ALL_OBJSECTIONS(iter, objfile, osect)	\
+  ALL_OBJFILES (iter, objfile)			\
     ALL_OBJFILE_OSECTIONS (objfile, osect)
 
 #define SECT_OFF_DATA(objfile) \

@@ -2102,8 +2102,9 @@ static void
 create_overlay_event_breakpoint (char *func_name)
 {
   struct objfile *objfile;
+  objfile_iterator_type iter;
 
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (iter, objfile)
     {
       struct breakpoint *b;
       struct minimal_symbol *m;
@@ -2137,11 +2138,12 @@ create_longjmp_master_breakpoint (char *func_name)
   struct program_space *pspace;
   struct objfile *objfile;
   struct cleanup *old_chain;
+  objfile_iterator_type iter;
 
   old_chain = save_current_program_space ();
 
   ALL_PSPACES (pspace)
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (iter, objfile)
     {
       struct breakpoint *b;
       struct minimal_symbol *m;
@@ -2174,11 +2176,12 @@ create_std_terminate_master_breakpoint (const char *func_name)
   struct program_space *pspace;
   struct objfile *objfile;
   struct cleanup *old_chain;
+  objfile_iterator_type iter;
 
   old_chain = save_current_program_space ();
 
   ALL_PSPACES (pspace)
-    ALL_OBJFILES (objfile)
+    ALL_OBJFILES (iter, objfile)
     {
       struct breakpoint *b;
       struct minimal_symbol *m;

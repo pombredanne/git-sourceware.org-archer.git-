@@ -1,6 +1,6 @@
 /* Private partial symbol table definitions.
 
-   Copyright (C) 2009 Free Software Foundation, Inc.
+   Copyright (C) 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -158,8 +158,8 @@ extern void sort_pst_symbols (struct partial_symtab *);
 
 /* Traverse all psymtabs in all objfiles.  */
 
-#define	ALL_PSYMTABS(objfile, p) \
-  ALL_OBJFILES (objfile)	 \
+#define	ALL_PSYMTABS(iter, objfile, p)		\
+  ALL_OBJFILES (iter, objfile)			\
     ALL_OBJFILE_PSYMTABS (objfile, p)
 
 #endif /* PSYMPRIV_H */

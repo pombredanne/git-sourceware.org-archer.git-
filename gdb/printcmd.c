@@ -1093,12 +1093,13 @@ sym_info (char *arg, int from_tty)
   CORE_ADDR addr, sect_addr;
   int matches = 0;
   unsigned int offset;
+  objfile_iterator_type iter;
 
   if (!arg)
     error_no_arg (_("address"));
 
   addr = parse_and_eval_address (arg);
-  ALL_OBJSECTIONS (objfile, osect)
+  ALL_OBJSECTIONS (iter, objfile, osect)
   {
     /* Only process each object file once, even if there's a separate
        debug file.  */

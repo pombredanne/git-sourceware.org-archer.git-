@@ -1593,8 +1593,9 @@ static struct dwarf2_fde *
 dwarf2_frame_find_fde (CORE_ADDR *pc, CORE_ADDR *out_offset)
 {
   struct objfile *objfile;
+  objfile_iterator_type iter;
 
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (iter, objfile)
     {
       struct dwarf2_fde_table *fde_table;
       struct dwarf2_fde **p_fde;

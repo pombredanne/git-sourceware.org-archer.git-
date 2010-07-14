@@ -851,6 +851,7 @@ thread_db_load (void)
 {
   struct objfile *obj;
   struct thread_db_info *info;
+  objfile_iterator_type iter;
 
   info = get_thread_db_info (GET_PID (inferior_ptid));
 
@@ -873,7 +874,7 @@ thread_db_load (void)
      ones worked.  If the executable is dynamically linked against
      libpthread, try loading libthread_db from the same directory.  */
 
-  ALL_OBJFILES (obj)
+  ALL_OBJFILES (iter, obj)
     if (libpthread_name_p (obj->name))
       {
 	char path[PATH_MAX], *cp;

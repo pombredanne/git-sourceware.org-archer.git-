@@ -163,6 +163,7 @@ lookup_symtab (const char *name)
   struct objfile *objfile;
   char *real_path = NULL;
   char *full_path = NULL;
+  objfile_iterator_type iter;
 
   /* Here we are interested in canonicalizing an absolute path, not
      absolutizing a relative path.  */
@@ -178,7 +179,7 @@ got_symtab:
 
   /* First, search for an exact match */
 
-  ALL_SYMTABS (objfile, s)
+  ALL_SYMTABS (iter, objfile, s)
   {
     if (FILENAME_CMP (name, s->filename) == 0)
       {
@@ -218,7 +219,7 @@ got_symtab:
   /* Now, search for a matching tail (only if name doesn't have any dirs) */
 
   if (lbasename (name) == name)
-    ALL_SYMTABS (objfile, s)
+    ALL_SYMTABS (iter, objfile, s)
     {
       if (FILENAME_CMP (lbasename (s->filename), name) == 0)
 	return s;
@@ -228,7 +229,7 @@ got_symtab:
      psymtabs.  */
 
   found = 0;
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (iter, objfile)
   {
     if (objfile->sf
 	&& objfile->sf->qf->lookup_symtab (objfile, name, full_path, real_path,
@@ -733,6 +734,7 @@ matching_obj_sections (struct obj_section *obj_first,
   asection *first = obj_first? obj_first->the_bfd_section : NULL;
   asection *second = obj_second? obj_second->the_bfd_section : NULL;
   struct objfile *obj;
+  objfile_iterator_type iter;
 
   /* If they're the same section, then they match.  */
   if (first == second)
@@ -772,7 +774,7 @@ matching_obj_sections (struct obj_section *obj_first,
 
   /* Otherwise check that they are in corresponding objfiles.  */
 
-  ALL_OBJFILES (obj)
+  ALL_OBJFILES (iter, obj)
     if (obj->obfd == first->owner)
       break;
   gdb_assert (obj != NULL);
@@ -792,6 +794,7 @@ find_pc_sect_symtab_via_partial (CORE_ADDR pc, struct obj_section *section)
 {
   struct objfile *objfile;
   struct minimal_symbol *msymbol;
+  objfile_iterator_type iter;
 
   /* If we know that this is not a text address, return failure.  This is
      necessary because we loop based on texthigh and textlow, which do
@@ -805,7 +808,7 @@ find_pc_sect_symtab_via_partial (CORE_ADDR pc, struct obj_section *section)
 	  || MSYMBOL_TYPE (msymbol) == mst_file_bss))
     return NULL;
 
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (iter, objfile)
   {
     struct symtab *result = NULL;
 
@@ -1136,12 +1139,13 @@ lookup_static_symbol_aux (const char *name, const domain_enum domain)
 {
   struct objfile *objfile;
   struct symbol *sym;
+  objfile_iterator_type iter;
 
   sym = lookup_symbol_aux_symtabs (STATIC_BLOCK, name, domain);
   if (sym != NULL)
     return sym;
 
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (iter, objfile)
   {
     sym = lookup_symbol_aux_quick (objfile, STATIC_BLOCK, name, domain);
     if (sym != NULL)
@@ -1203,13 +1207,14 @@ lookup_objfile_from_block (const struct block *block)
 {
   struct objfile *obj;
   struct symtab *s;
+  objfile_iterator_type iter;
 
   if (block == NULL)
     return NULL;
 
   block = block_global_block (block);
   /* Go through SYMTABS.  */
-  ALL_SYMTABS (obj, s)
+  ALL_SYMTABS (iter, obj, s)
     if (block == BLOCKVECTOR_BLOCK (BLOCKVECTOR (s), GLOBAL_BLOCK))
       {
 	if (obj->separate_debug_objfile_backlink)
@@ -1294,8 +1299,9 @@ lookup_symbol_aux_symtabs (int block_index, const char *name,
   struct blockvector *bv;
   const struct block *block;
   struct symtab *s;
+  objfile_iterator_type iter;
 
-  ALL_PRIMARY_SYMTABS (objfile, s)
+  ALL_PRIMARY_SYMTABS (iter, objfile, s)
   {
     bv = BLOCKVECTOR (s);
     block = BLOCKVECTOR_BLOCK (bv, block_index);
@@ -1428,6 +1434,7 @@ lookup_symbol_global (const char *name,
 {
   struct symbol *sym = NULL;
   struct objfile *objfile = NULL;
+  objfile_iterator_type iter;
 
   /* Call library-specific lookup procedure.  */
   objfile = lookup_objfile_from_block (block);
@@ -1440,7 +1447,7 @@ lookup_symbol_global (const char *name,
   if (sym != NULL)
     return sym;
 
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (iter, objfile)
   {
     sym = lookup_symbol_aux_quick (objfile, GLOBAL_BLOCK, name, domain);
     if (sym)
@@ -1541,13 +1548,14 @@ basic_lookup_transparent_type (const char *name)
   struct objfile *objfile;
   struct block *block;
   struct type *t;
+  objfile_iterator_type iter;
 
   /* Now search all the global symbols.  Do the symtab's first, then
      check the psymtab's. If a psymtab indicates the existence
      of the desired name as a global, then do psymtab-to-symtab
      conversion on the fly and return the found symbol.  */
 
-  ALL_PRIMARY_SYMTABS (objfile, s)
+  ALL_PRIMARY_SYMTABS (iter, objfile, s)
   {
     bv = BLOCKVECTOR (s);
     block = BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK);
@@ -1558,7 +1566,7 @@ basic_lookup_transparent_type (const char *name)
       }
   }
 
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (iter, objfile)
   {
     t = basic_lookup_transparent_type_quick (objfile, GLOBAL_BLOCK, name);
     if (t)
@@ -1573,7 +1581,7 @@ basic_lookup_transparent_type (const char *name)
      conversion on the fly and return the found symbol.
    */
 
-  ALL_PRIMARY_SYMTABS (objfile, s)
+  ALL_PRIMARY_SYMTABS (iter, objfile, s)
   {
     bv = BLOCKVECTOR (s);
     block = BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK);
@@ -1584,7 +1592,7 @@ basic_lookup_transparent_type (const char *name)
       }
   }
 
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (iter, objfile)
   {
     t = basic_lookup_transparent_type_quick (objfile, STATIC_BLOCK, name);
     if (t)
@@ -1604,8 +1612,9 @@ find_main_filename (void)
 {
   struct objfile *objfile;
   char *result, *name = main_name ();
+  objfile_iterator_type iter;
 
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (iter, objfile)
   {
     if (!objfile->sf)
       continue;
@@ -1689,6 +1698,7 @@ find_pc_sect_symtab (CORE_ADDR pc, struct obj_section *section)
   struct program_space *pspace;
   CORE_ADDR distance = 0;
   struct minimal_symbol *msymbol;
+  objfile_iterator_type iter;
 
   pspace = current_program_space;
 
@@ -1721,7 +1731,7 @@ find_pc_sect_symtab (CORE_ADDR pc, struct obj_section *section)
      It also happens for objfiles that have their functions reordered.
      For these, the symtab we are looking for is not necessarily read in.  */
 
-  ALL_PRIMARY_SYMTABS (objfile, s)
+  ALL_PRIMARY_SYMTABS (iter, objfile, s)
   {
     bv = BLOCKVECTOR (s);
     b = BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK);
@@ -1771,7 +1781,7 @@ find_pc_sect_symtab (CORE_ADDR pc, struct obj_section *section)
   if (best_s != NULL)
     return (best_s);
 
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (iter, objfile)
   {
     struct symtab *result;
 
@@ -2106,13 +2116,14 @@ find_line_symtab (struct symtab *symtab, int line,
 
       struct objfile *objfile;
       struct symtab *s;
+      objfile_iterator_type iter;
 
       if (best_index >= 0)
 	best = best_linetable->item[best_index].line;
       else
 	best = 0;
 
-      ALL_OBJFILES (objfile)
+      ALL_OBJFILES (iter, objfile)
       {
 	if (objfile->sf)
 	  objfile->sf->qf->expand_symtabs_with_filename (objfile,
@@ -2122,7 +2133,7 @@ find_line_symtab (struct symtab *symtab, int line,
       /* Get symbol full file name if possible.  */
       symtab_to_fullname (symtab);
 
-      ALL_SYMTABS (objfile, s)
+      ALL_SYMTABS (iter, objfile, s)
       {
 	struct linetable *l;
 	int ind;
@@ -2737,6 +2748,7 @@ sources_info (char *ignore, int from_tty)
   struct symtab *s;
   struct objfile *objfile;
   int first;
+  objfile_iterator_type iter;
 
   if (!have_full_symbols () && !have_partial_symbols ())
     {
@@ -2746,7 +2758,7 @@ sources_info (char *ignore, int from_tty)
   printf_filtered ("Source files for which symbols have been read in:\n\n");
 
   first = 1;
-  ALL_SYMTABS (objfile, s)
+  ALL_SYMTABS (iter, objfile, s)
   {
     const char *fullname = symtab_to_fullname (s);
 
@@ -2924,6 +2936,7 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
   struct symbol_search *tail;
   struct cleanup *old_chain = NULL;
   struct search_symbols_data datum;
+  objfile_iterator_type oiter;
 
   if (kind < VARIABLES_DOMAIN)
     error (_("must search on specific domain"));
@@ -2982,7 +2995,7 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
   datum.nfiles = nfiles;
   datum.files = files;
   datum.regexp = regexp;
-  ALL_OBJFILES (objfile)
+  ALL_OBJFILES (oiter, objfile)
   {
     if (objfile->sf)
       objfile->sf->qf->expand_symtabs_matching (objfile,
@@ -3007,7 +3020,7 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
 
   if (nfiles == 0 && (kind == VARIABLES_DOMAIN || kind == FUNCTIONS_DOMAIN))
     {
-      ALL_MSYMBOLS (objfile, msymbol)
+      ALL_MSYMBOLS (oiter, objfile, msymbol)
       {
         QUIT;
 
@@ -3039,7 +3052,7 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
       }
     }
 
-  ALL_PRIMARY_SYMTABS (objfile, s)
+  ALL_PRIMARY_SYMTABS (oiter, objfile, s)
   {
     bv = BLOCKVECTOR (s);
       for (i = GLOBAL_BLOCK; i <= STATIC_BLOCK; i++)
@@ -3107,7 +3120,7 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
 
   if (found_misc || kind != FUNCTIONS_DOMAIN)
     {
-      ALL_MSYMBOLS (objfile, msymbol)
+      ALL_MSYMBOLS (oiter, objfile, msymbol)
       {
         QUIT;
 
@@ -3624,6 +3637,7 @@ default_make_symbol_completion_list_break_on (char *text, char *word,
   /* Length of sym_text.  */
   int sym_text_len;
   struct add_name_data datum;
+  objfile_iterator_type oiter;
 
   /* Now look for the symbol we are supposed to complete on.  */
   {
@@ -3699,7 +3713,7 @@ default_make_symbol_completion_list_break_on (char *text, char *word,
      anything that isn't a text symbol (everything else will be
      handled by the psymtab code above).  */
 
-  ALL_MSYMBOLS (objfile, msymbol)
+  ALL_MSYMBOLS (oiter, objfile, msymbol)
   {
     QUIT;
     COMPLETION_LIST_ADD_SYMBOL (msymbol, sym_text, sym_text_len, text, word);
@@ -3749,7 +3763,7 @@ default_make_symbol_completion_list_break_on (char *text, char *word,
   /* Go through the symtabs and check the externs and statics for
      symbols which match.  */
 
-  ALL_PRIMARY_SYMTABS (objfile, s)
+  ALL_PRIMARY_SYMTABS (oiter, objfile, s)
   {
     QUIT;
     b = BLOCKVECTOR_BLOCK (BLOCKVECTOR (s), GLOBAL_BLOCK);
@@ -3759,7 +3773,7 @@ default_make_symbol_completion_list_break_on (char *text, char *word,
       }
   }
 
-  ALL_PRIMARY_SYMTABS (objfile, s)
+  ALL_PRIMARY_SYMTABS (oiter, objfile, s)
   {
     QUIT;
     b = BLOCKVECTOR_BLOCK (BLOCKVECTOR (s), STATIC_BLOCK);
@@ -4051,13 +4065,14 @@ make_source_files_completion_list (char *text, char *word)
   char **list = (char **) xmalloc (list_alloced * sizeof (char *));
   const char *base_name;
   struct add_partial_filename_data datum;
+  objfile_iterator_type iter;
 
   list[0] = NULL;
 
   if (!have_full_symbols () && !have_partial_symbols ())
     return list;
 
-  ALL_SYMTABS (objfile, s)
+  ALL_SYMTABS (iter, objfile, s)
     {
       if (not_interesting_fname (s->filename))
 	continue;
@@ -4429,11 +4444,13 @@ append_exact_match_to_sals (char *filename, char *fullname, int lineno,
   struct symtab *symtab;
   int exact = 0;
   int j;
+  objfile_iterator_type iter;
+
   *best_item = 0;
   *best_symtab = 0;
 
   ALL_PSPACES (pspace)
-    ALL_PSPACE_SYMTABS (pspace, objfile, symtab)
+    ALL_PSPACE_SYMTABS (pspace, iter, objfile, symtab)
     {
       if (FILENAME_CMP (filename, symtab->filename) == 0)
 	{
@@ -4507,6 +4524,7 @@ expand_line_sal (struct symtab_and_line sal)
       struct symtab *best_symtab = 0;
       int exact = 0;
       char *match_filename;
+      objfile_iterator_type iter;
 
       lineno = sal.line;
       match_filename = sal.symtab->filename;
@@ -4526,7 +4544,7 @@ expand_line_sal (struct symtab_and_line sal)
       ALL_PSPACES (pspace)
       {
 	set_current_program_space (pspace);
-	ALL_PSPACE_OBJFILES (pspace, objfile)
+	ALL_PSPACE_OBJFILES (pspace, iter, objfile)
 	{
 	  if (objfile->sf)
 	    objfile->sf->qf->expand_symtabs_with_filename (objfile,

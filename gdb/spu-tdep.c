@@ -1793,8 +1793,9 @@ spu_overlay_update (struct obj_section *osect)
   else
     {
       struct objfile *objfile;
+      objfile_iterator_type iter;
 
-      ALL_OBJSECTIONS (objfile, osect)
+      ALL_OBJSECTIONS (iter, objfile, osect)
 	if (section_is_overlay (osect))
 	  spu_overlay_update_osect (osect);
     }
@@ -1906,11 +1907,12 @@ spu_objfile_from_frame (struct frame_info *frame)
   struct gdbarch *gdbarch = get_frame_arch (frame);
   struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
   struct objfile *obj;
+  objfile_iterator_type iter;
 
   if (gdbarch_bfd_arch_info (gdbarch)->arch != bfd_arch_spu)
     return NULL;
 
-  ALL_OBJFILES (obj)
+  ALL_OBJFILES (iter, obj)
     {
       if (obj->sections != obj->sections_end
 	  && SPUADDR_SPU (obj_section_addr (obj->sections)) == tdep->id)
