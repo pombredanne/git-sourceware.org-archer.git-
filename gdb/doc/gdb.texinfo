@@ -6330,6 +6330,13 @@ in the file @var{filename}.  You only need the file name with a
 function name to avoid ambiguity when there are identically named
 functions in different source files.
 
+@item @var{label}
+Specifies the line at which the label named @var{label} appears.
+@value{GDBN} searches for the label in the function corresponding to
+the currently selected stack frame.  If there is no current selected
+stack frame (for instance, if the inferior is not running), then
+@value{GDBN} will not search for a label.
+
 @item *@var{address}
 Specifies the program address @var{address}.  For line-oriented
 commands, such as @code{list} and @code{edit}, this specifies a source
@@ -14282,6 +14289,7 @@ program.  To debug a core dump of a previous run, you must also tell
 @menu
 * Files::                       Commands to specify files
 * Separate Debug Files::        Debugging information in separate files
+* Index Files::                 Index files speed up GDB
 * Symbol Errors::               Errors reading symbol files
 * Data Files::                  GDB data files
 @end menu
@@ -15171,6 +15179,46 @@ gnu_debuglink_crc32 (unsigned long crc,
 This computation does not apply to the ``build ID'' method.
 
 
+@node Index Files
+@section Index Files Speed Up @value{GDBN}
+@cindex index files
+@cindex @samp{.gdb_index} section
+
+When @value{GDBN} finds a symbol file, it scans the symbols in the
+file in order to construct an internal symbol table.  This lets most
+@value{GDBN} operations work quickly---at the cost of a delay early
+on.  For large programs, this delay can be quite lengthy, so
+@value{GDBN} provides a way to build an index, which speeds up
+startup.
+
+The index is stored as a section in the symbol file.  @value{GDBN} can
+write the index to a file, then you can put it into the symbol file
+using @command{objcopy}.
+
+To create an index file, use the @code{save gdb-index} command:
+
+@table @code
+@item save gdb-index @var{directory}
+@kindex save gdb-index
+Create an index file for each symbol file currently known by
+@value{GDBN}.  Each file is named after its corresponding symbol file,
+with @samp{.gdb-index} appended, and is written into the given
+@var{directory}.
+@end table
+
+Once you have created an index file you can merge it into your symbol
+file, here named @file{symfile}, using @command{objcopy}:
+
+@smallexample
+$ objcopy --add-section .gdb_index=symfile.gdb-index \
+    --set-section-flags .gdb_index=readonly symfile symfile
+@end smallexample
+
+There are currently some limitation on indices.  They only work when
+for DWARF debugging information, not stabs.  And, they do not
+currently work for programs using Ada.
+
+
 @node Symbol Errors
 @section Errors Reading Symbol Files
 
@@ -15343,33 +15391,20 @@ and @code{show architecture}.
 @cindex active targets
 @cindex multiple targets
 
-There are three classes of targets: processes, core files, and
-executable files.  @value{GDBN} can work concurrently on up to three
-active targets, one in each class.  This allows you to (for example)
-start a process and inspect its activity without abandoning your work on
-a core file.
+There are multiple classes of targets such as: processes, executable files or
+recording sessions.  Core files belong to the process class, making core file
+and process mutually exclusive.  Otherwise, @value{GDBN} can work concurrently
+on multiple active targets, one in each class.  This allows you to (for
+example) start a process and inspect its activity, while still having access to
+the executable file after the process finishes.  Or if you start process
+recording (@pxref{Reverse Execution}) and @code{reverse-step} there, you are
+presented a virtual layer of the recording target, while the process target
+remains stopped at the chronologically last point of the process execution.
 
-For example, if you execute @samp{gdb a.out}, then the executable file
-@code{a.out} is the only active target.  If you designate a core file as
-well---presumably from a prior run that crashed and coredumped---then
-@value{GDBN} has two active targets and uses them in tandem, looking
-first in the corefile target, then in the executable file, to satisfy
-requests for memory addresses.  (Typically, these two classes of target
-are complementary, since core files contain only a program's
-read-write memory---variables and so on---plus machine status, while
-executable files contain only the program text and initialized data.)
-
-When you type @code{run}, your executable file becomes an active process
-target as well.  When a process target is active, all @value{GDBN}
-commands requesting memory addresses refer to that target; addresses in
-an active core file or executable file target are obscured while the
-process target is active.
-
-Use the @code{core-file} and @code{exec-file} commands to select a new
-core file or executable target (@pxref{Files, ,Commands to Specify
-Files}).  To specify as a target a process that is already running, use
-the @code{attach} command (@pxref{Attach, ,Debugging an Already-running
-Process}).
+Use the @code{core-file} and @code{exec-file} commands to select a new core
+file or executable target (@pxref{Files, ,Commands to Specify Files}).  To
+specify as a target a process that is already running, use the @code{attach}
+command (@pxref{Attach, ,Debugging an Already-running Process}).
 
 @node Target Commands
 @section Commands for Managing Targets
@@ -26386,7 +26421,7 @@ be available.
 
 Return a list of the children of the specified variable object and
 create variable objects for them, if they do not already exist.  With
-a single argument or if @var{print-values} has a value for of 0 or
+a single argument or if @var{print-values} has a value of 0 or
 @code{--no-values}, print only the names of the variables; if
 @var{print-values} is 1 or @code{--all-values}, also print their
 values; and if it is 2 or @code{--simple-values} print the name and

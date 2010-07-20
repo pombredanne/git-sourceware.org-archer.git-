@@ -430,7 +430,7 @@ static int tracepoint_count;
 
 static struct cmd_list_element *breakpoint_set_cmdlist;
 static struct cmd_list_element *breakpoint_show_cmdlist;
-static struct cmd_list_element *save_cmdlist;
+struct cmd_list_element *save_cmdlist;
 
 /* Return whether a breakpoint is an active enabled breakpoint.  */
 static int
@@ -10724,6 +10724,16 @@ insert_single_step_breakpoint (struct gdbarch *gdbarch,
   if (*bpt_p == NULL)
     error (_("Could not insert single-step breakpoint at %s"),
 	     paddress (gdbarch, next_pc));
+}
+
+/* Check if the breakpoints used for software single stepping
+   were inserted or not.  */
+
+int
+single_step_breakpoints_inserted (void)
+{
+  return (single_step_breakpoints[0] != NULL
+          || single_step_breakpoints[1] != NULL);
 }
 
 /* Remove and delete any breakpoints used for software single step.  */

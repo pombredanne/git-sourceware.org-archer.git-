@@ -1037,6 +1037,30 @@ pop_all_targets (int quitting)
   pop_all_targets_above (dummy_stratum, quitting);
 }
 
+/* Return 1 if T is now pushed in the target stack.  Return 0 otherwise.  */
+
+int
+target_is_pushed (struct target_ops *t)
+{
+  struct target_ops **cur;
+
+  /* Check magic number.  If wrong, it probably means someone changed
+     the struct definition, but not all the places that initialize one.  */
+  if (t->to_magic != OPS_MAGIC)
+    {
+      fprintf_unfiltered (gdb_stderr,
+			  "Magic number of %s target struct wrong\n",
+			  t->to_shortname);
+      internal_error (__FILE__, __LINE__, _("failed internal consistency check"));
+    }
+
+  for (cur = &target_stack; (*cur) != NULL; cur = &(*cur)->beneath)
+    if (*cur == t)
+      return 1;
+
+  return 0;
+}
+
 /* Using the objfile specified in OBJFILE, find the address for the
    current thread's thread-local storage with offset OFFSET.  */
 CORE_ADDR
@@ -2770,31 +2794,6 @@ find_run_target (void)
   return (count == 1 ? runable : NULL);
 }
 
-/* Find a single core_stratum target in the list of targets and return it.
-   If for some reason there is more than one, return NULL.  */
-
-struct target_ops *
-find_core_target (void)
-{
-  struct target_ops **t;
-  struct target_ops *runable = NULL;
-  int count;
-
-  count = 0;
-
-  for (t = target_structs; t < target_structs + target_struct_size;
-       ++t)
-    {
-      if ((*t)->to_stratum == core_stratum)
-	{
-	  runable = *t;
-	  ++count;
-	}
-    }
-
-  return (count == 1 ? runable : NULL);
-}
-
 /*
  * Find the next target down the stack from the specified target.
  */
@@ -3270,8 +3269,8 @@ debug_to_insert_breakpoint (struct gdbarch *gdbarch,
   retval = debug_target.to_insert_breakpoint (gdbarch, bp_tgt);
 
   fprintf_unfiltered (gdb_stdlog,
-		      "target_insert_breakpoint (0x%lx, xxx) = %ld\n",
-		      (unsigned long) bp_tgt->placed_address,
+		      "target_insert_breakpoint (%s, xxx) = %ld\n",
+		      core_addr_to_string (bp_tgt->placed_address),
 		      (unsigned long) retval);
   return retval;
 }
@@ -3285,8 +3284,8 @@ debug_to_remove_breakpoint (struct gdbarch *gdbarch,
   retval = debug_target.to_remove_breakpoint (gdbarch, bp_tgt);
 
   fprintf_unfiltered (gdb_stdlog,
-		      "target_remove_breakpoint (0x%lx, xxx) = %ld\n",
-		      (unsigned long) bp_tgt->placed_address,
+		      "target_remove_breakpoint (%s, xxx) = %ld\n",
+		      core_addr_to_string (bp_tgt->placed_address),
 		      (unsigned long) retval);
   return retval;
 }
@@ -3315,10 +3314,9 @@ debug_to_region_ok_for_hw_watchpoint (CORE_ADDR addr, int len)
   retval = debug_target.to_region_ok_for_hw_watchpoint (addr, len);
 
   fprintf_unfiltered (gdb_stdlog,
-		      "target_region_ok_for_hw_watchpoint (%ld, %ld) = 0x%lx\n",
-		      (unsigned long) addr,
-		      (unsigned long) len,
-		      (unsigned long) retval);
+		      "target_region_ok_for_hw_watchpoint (%s, %ld) = %s\n",
+		      core_addr_to_string (addr), (unsigned long) len,
+		      core_addr_to_string (retval));
   return retval;
 }
 
@@ -3331,9 +3329,9 @@ debug_to_can_accel_watchpoint_condition (CORE_ADDR addr, int len, int rw,
   retval = debug_target.to_can_accel_watchpoint_condition (addr, len, rw, cond);
 
   fprintf_unfiltered (gdb_stdlog,
-		      "target_can_accel_watchpoint_condition (0x%lx, %d, %d, 0x%lx) = %ld\n",
-		      (unsigned long) addr, len, rw, (unsigned long) cond,
-		      (unsigned long) retval);
+		      "target_can_accel_watchpoint_condition (%s, %d, %d, %s) = %ld\n",
+		      core_addr_to_string (addr), len, rw,
+		      host_address_to_string (cond), (unsigned long) retval);
   return retval;
 }
 
@@ -3358,8 +3356,8 @@ debug_to_stopped_data_address (struct target_ops *target, CORE_ADDR *addr)
   retval = debug_target.to_stopped_data_address (target, addr);
 
   fprintf_unfiltered (gdb_stdlog,
-		      "target_stopped_data_address ([0x%lx]) = %ld\n",
-		      (unsigned long)*addr,
+		      "target_stopped_data_address ([%s]) = %ld\n",
+		      core_addr_to_string (*addr),
 		      (unsigned long)retval);
   return retval;
 }
@@ -3375,9 +3373,9 @@ debug_to_watchpoint_addr_within_range (struct target_ops *target,
 							 start, length);
 
   fprintf_filtered (gdb_stdlog,
-		    "target_watchpoint_addr_within_range (0x%lx, 0x%lx, %d) = %d\n",
-		    (unsigned long) addr, (unsigned long) start, length,
-		    retval);
+		    "target_watchpoint_addr_within_range (%s, %s, %d) = %d\n",
+		    core_addr_to_string (addr), core_addr_to_string (start),
+		    length, retval);
   return retval;
 }
 
@@ -3390,8 +3388,8 @@ debug_to_insert_hw_breakpoint (struct gdbarch *gdbarch,
   retval = debug_target.to_insert_hw_breakpoint (gdbarch, bp_tgt);
 
   fprintf_unfiltered (gdb_stdlog,
-		      "target_insert_hw_breakpoint (0x%lx, xxx) = %ld\n",
-		      (unsigned long) bp_tgt->placed_address,
+		      "target_insert_hw_breakpoint (%s, xxx) = %ld\n",
+		      core_addr_to_string (bp_tgt->placed_address),
 		      (unsigned long) retval);
   return retval;
 }
@@ -3405,8 +3403,8 @@ debug_to_remove_hw_breakpoint (struct gdbarch *gdbarch,
   retval = debug_target.to_remove_hw_breakpoint (gdbarch, bp_tgt);
 
   fprintf_unfiltered (gdb_stdlog,
-		      "target_remove_hw_breakpoint (0x%lx, xxx) = %ld\n",
-		      (unsigned long) bp_tgt->placed_address,
+		      "target_remove_hw_breakpoint (%s, xxx) = %ld\n",
+		      core_addr_to_string (bp_tgt->placed_address),
 		      (unsigned long) retval);
   return retval;
 }
@@ -3420,9 +3418,9 @@ debug_to_insert_watchpoint (CORE_ADDR addr, int len, int type,
   retval = debug_target.to_insert_watchpoint (addr, len, type, cond);
 
   fprintf_unfiltered (gdb_stdlog,
-		      "target_insert_watchpoint (0x%lx, %d, %d, 0x%ld) = %ld\n",
-		      (unsigned long) addr, len, type, (unsigned long) cond,
-		      (unsigned long) retval);
+		      "target_insert_watchpoint (%s, %d, %d, %s) = %ld\n",
+		      core_addr_to_string (addr), len, type,
+		      host_address_to_string (cond), (unsigned long) retval);
   return retval;
 }
 
@@ -3435,9 +3433,9 @@ debug_to_remove_watchpoint (CORE_ADDR addr, int len, int type,
   retval = debug_target.to_remove_watchpoint (addr, len, type, cond);
 
   fprintf_unfiltered (gdb_stdlog,
-		      "target_remove_watchpoint (0x%lx, %d, %d, 0x%ld) = %ld\n",
-		      (unsigned long) addr, len, type, (unsigned long) cond,
-		      (unsigned long) retval);
+		      "target_remove_watchpoint (%s, %d, %d, %s) = %ld\n",
+		      core_addr_to_string (addr), len, type,
+		      host_address_to_string (cond), (unsigned long) retval);
   return retval;
 }
 

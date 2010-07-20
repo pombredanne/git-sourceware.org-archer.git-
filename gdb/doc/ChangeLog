@@ -1,3 +1,26 @@
+2010-07-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.texinfo (Active Targets): Fix wrong comma placement.
+
+2010-07-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Eli Zaretskii  <eliz@gnu.org>
+
+	Make core files the process_stratum.
+	* gdb.texinfo (Active Targets): Remove core_stratum.  Include
+	record_stratum example.
+
+2010-07-13  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Index Files): New node.
+
+2010-07-13  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (GDB/MI Variable Objects): Remove extra 'for'.
+
+2010-07-13  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Specify Location): Document labels.
+
 2010-07-01  Pedro Alves  <pedro@codesourcery.com>
 
 	* gdb.texinfo (Create and Delete Tracepoints): Add more index
