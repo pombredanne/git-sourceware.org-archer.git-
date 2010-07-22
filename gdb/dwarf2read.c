@@ -4896,7 +4896,7 @@ dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
   /* The name is already allocated along with this objfile, so we don't
      need to duplicate it for the type.  */
   fnp->physname = physname ? physname : "";
-  fnp->type = alloc_type (objfile, NULL);
+  fnp->type = alloc_type (objfile);
   this_type = read_type_die (die, cu);
   if (this_type && TYPE_CODE (this_type) == TYPE_CODE_FUNC)
     {
@@ -5109,7 +5109,7 @@ quirk_gcc_member_function_pointer (struct type *type, struct objfile *objfile)
     return;
 
   domain_type = TYPE_TARGET_TYPE (TYPE_FIELD_TYPE (pfn_type, 0));
-  new_type = alloc_type (objfile, NULL);
+  new_type = alloc_type (objfile);
   smash_to_method_type (new_type, domain_type, TYPE_TARGET_TYPE (pfn_type),
 			TYPE_FIELDS (pfn_type), TYPE_NFIELDS (pfn_type),
 			TYPE_VARARGS (pfn_type));
@@ -5160,7 +5160,7 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
 
   back_to = make_cleanup (null_cleanup, 0);
 
-  type = alloc_type (objfile, NULL);
+  type = alloc_type (objfile);
   INIT_CPLUS_SPECIFIC (type);
 
   name = dwarf2_name (die, cu);
@@ -5427,7 +5427,7 @@ read_enumeration_type (struct die_info *die, struct dwarf2_cu *cu)
       return set_die_type (die, type, cu);
     }
 
-  type = alloc_type (objfile, NULL);
+  type = alloc_type (objfile);
 
   TYPE_CODE (type) = TYPE_CODE_ENUM;
   name = dwarf2_full_name (NULL, die, cu);

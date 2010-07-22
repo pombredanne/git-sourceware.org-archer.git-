@@ -171,14 +171,6 @@ struct value
      taken off this list.  */
   struct value *next;
 
-  /* The reference count.  A value that is still on the `all_values'
-     list will have a reference count of 0.  A call to `release_value'
-     will increment the reference count (and remove the value from the
-     list, the first time).  A call to `value_free' will decrement the
-     reference count, and will free the value when there are no more
-     references.  */
-  int refcount;
-
   /* Register number if the value is from a register.  */
   short regnum;
 
@@ -277,9 +269,7 @@ allocate_value_lazy (struct type *type)
   val->next = all_values;
   all_values = val;
   val->type = type;
-  type_incref (type);
   val->enclosing_type = type;
-  type_incref (type);
   VALUE_LVAL (val) = not_lval;
   val->location.address = 0;
   VALUE_FRAME_ID (val) = null_frame_id;
@@ -367,8 +357,6 @@ value_type (const struct value *value)
 void
 deprecated_set_value_type (struct value *value, struct type *type)
 {
-  type_incref (type);
-  type_decref (value->type);
   value->type = type;
 }
 
@@ -687,13 +675,6 @@ value_free (struct value *val)
       if (val->parent != NULL)
 	value_free (val->parent);
 
-#if 0
-      /* We need type GC instead.  This can fail when an objfile is
-	 reclaimed and then a value is later freed.  */
-      type_decref (val->type);
-      type_decref (val->enclosing_type);
-#endif
-
       if (VALUE_LVAL (val) == lval_computed)
 	{
 	  struct lval_funcs *funcs = val->location.computed.funcs;
@@ -812,9 +793,6 @@ value_copy (struct value *arg)
     val = allocate_value_lazy (encl_type);
   else
     val = allocate_value (encl_type);
-
-  type_incref (arg->type);
-  type_decref (val->type);
   val->type = arg->type;
   VALUE_LVAL (val) = VALUE_LVAL (arg);
   val->location = arg->location;
@@ -1521,22 +1499,12 @@ preserve_one_value (struct value *value, struct objfile *objfile,
 		    htab_t copied_types)
 {
   if (TYPE_OBJFILE (value->type) == objfile)
-    {
-      /* No need to decref the old type here, since we know it has no
-	 reference count.  */
-      value->type = copy_type_recursive (objfile, value->type, copied_types);
-      type_incref (value->type);
-    }
+    value->type = copy_type_recursive (objfile, value->type, copied_types);
 
   if (TYPE_OBJFILE (value->enclosing_type) == objfile)
-    {
-      /* No need to decref the old type here, since we know it has no
-	 reference count.  */
-      value->enclosing_type = copy_type_recursive (objfile,
-						   value->enclosing_type,
-						   copied_types);
-      type_incref (value->enclosing_type);
-    }
+    value->enclosing_type = copy_type_recursive (objfile,
+						 value->enclosing_type,
+						 copied_types);
 }
 
 /* Likewise for internal variable VAR.  */
@@ -1967,8 +1935,6 @@ value_change_enclosing_type (struct value *val, struct type *new_encl_type)
     val->contents =
       (gdb_byte *) xrealloc (val->contents, TYPE_LENGTH (new_encl_type));
 
-  type_incref (new_encl_type);
-  type_decref (val->enclosing_type);
   val->enclosing_type = new_encl_type;
   return val;
 }
@@ -2041,8 +2007,6 @@ value_primitive_field (struct value *arg1, int offset,
 	  memcpy (value_contents_all_raw (v), value_contents_all_raw (arg1),
 		  TYPE_LENGTH (value_enclosing_type (arg1)));
 	}
-      type_incref (type);
-      type_decref (v->type);
       v->type = type;
       v->offset = value_offset (arg1);
       v->embedded_offset = (offset + value_embedded_offset (arg1)

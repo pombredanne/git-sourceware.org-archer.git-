@@ -206,11 +206,6 @@ pretty_print_one_value (PyObject *printer, struct value **out_value)
 	      *out_value = convert_value_from_python (result);
  	      if (PyErr_Occurred ())
  		*out_value = NULL;
-	      else
-		/* We must increment the value's refcount, because we
-		   are about to decref RESULT, and this may result in
-		   the value being destroyed.  */
-		value_incref (*out_value);
  	      Py_DECREF (result);
  	      result = NULL;
 	    }

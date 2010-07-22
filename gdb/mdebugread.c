@@ -4806,7 +4806,7 @@ new_type (char *name)
 {
   struct type *t;
 
-  t = alloc_type (current_objfile, NULL);
+  t = alloc_type (current_objfile);
   TYPE_NAME (t) = name;
   INIT_CPLUS_SPECIFIC (t);
   return t;

@@ -122,23 +122,6 @@ static void print_bit_vector (B_TYPE *, int);
 static void print_arg_types (struct field *, int, int);
 static void dump_fn_fieldlists (struct type *, int);
 static void print_cplus_stuff (struct type *, int);
-static void type_init_refc (struct type *new_type, struct type *parent_type);
-
-/* A reference count structure for the type reference count map.  Each
-   type in a hierarchy of types is mapped to the same reference
-   count.  */
-struct type_refc_entry
-{
-  /* One type in the hierarchy.  Each type in the hierarchy gets its
-     own slot.  */
-  struct type *type;
-
-  /* A pointer to the shared reference count.  */
-  int *refc;
-};
-
-/* The hash table holding all reference counts.  */
-static htab_t type_refc_table;
 
 
 /* Allocate a new OBJFILE-associated type structure and fill it
@@ -146,7 +129,7 @@ static htab_t type_refc_table;
    on the objfile's objfile_obstack.  */
 
 struct type *
-alloc_type (struct objfile *objfile, struct type *parent)
+alloc_type (struct objfile *objfile)
 {
   struct type *type;
 
@@ -166,9 +149,6 @@ alloc_type (struct objfile *objfile, struct type *parent)
   TYPE_CODE (type) = TYPE_CODE_UNDEF;
   TYPE_VPTR_FIELDNO (type) = -1;
   TYPE_CHAIN (type) = type;	/* Chain back to itself.  */
-
-  if (objfile == NULL)
-    type_init_refc (type, parent);
 
   return type;
 }
@@ -198,8 +178,6 @@ alloc_type_arch (struct gdbarch *gdbarch)
   TYPE_VPTR_FIELDNO (type) = -1;
   TYPE_CHAIN (type) = type;	/* Chain back to itself.  */
 
-  type_init_refc (type, NULL);
-
   return type;
 }
 
@@ -211,7 +189,7 @@ struct type *
 alloc_type_copy (const struct type *type)
 {
   if (TYPE_OBJFILE_OWNED (type))
-    return alloc_type (TYPE_OWNER (type).objfile, (struct type *) type);
+    return alloc_type (TYPE_OWNER (type).objfile);
   else
     return alloc_type_arch (TYPE_OWNER (type).gdbarch);
 }
@@ -249,9 +227,6 @@ alloc_type_instance (struct type *oldtype)
   TYPE_MAIN_TYPE (type) = TYPE_MAIN_TYPE (oldtype);
 
   TYPE_CHAIN (type) = type;	/* Chain back to itself for now.  */
-
-  if (TYPE_OBJFILE (oldtype) == NULL)
-    type_init_refc (type, oldtype);
 
   return type;
 }
@@ -1807,7 +1782,7 @@ init_type (enum type_code code, int length, int flags,
 {
   struct type *type;
 
-  type = alloc_type (objfile, NULL);
+  type = alloc_type (objfile);
   TYPE_CODE (type) = code;
   TYPE_LENGTH (type) = length;
 
@@ -1860,10 +1835,6 @@ init_type (enum type_code code, int length, int flags,
         TYPE_SPECIFIC_FIELD (type) = TYPE_SPECIFIC_CALLING_CONVENTION;
         break;
     }
-
-  if (!objfile)
-    type_incref (type);
-
   return type;
 }
 
@@ -3047,17 +3018,15 @@ create_copied_types_hash (struct objfile *objfile)
 			       dummy_obstack_deallocate);
 }
 
-/* A helper for copy_type_recursive.  This does all the work.
-   REPRESENTATIVE is a pointer to a type.  This is used to register
-   newly-created types in the type_refc_table.  Initially it pointer
-   to a NULL pointer, but it is filled in the first time a type is
-   copied.  */
+/* Recursively copy (deep copy) TYPE, if it is associated with
+   OBJFILE.  Return a new type allocated using malloc, a saved type if
+   we have already visited TYPE (using COPIED_TYPES), or TYPE if it is
+   not associated with OBJFILE.  */
 
-static struct type *
-copy_type_recursive_1 (struct objfile *objfile, 
-		       struct type *type,
-		       htab_t copied_types,
-		       struct type **representative)
+struct type *
+copy_type_recursive (struct objfile *objfile, 
+		     struct type *type,
+		     htab_t copied_types)
 {
   struct type_pair *stored, pair;
   void **slot;
@@ -3112,8 +3081,8 @@ copy_type_recursive_1 (struct objfile *objfile,
 	  TYPE_FIELD_BITSIZE (new_type, i) = TYPE_FIELD_BITSIZE (type, i);
 	  if (TYPE_FIELD_TYPE (type, i))
 	    TYPE_FIELD_TYPE (new_type, i)
-	      = copy_type_recursive_1 (objfile, TYPE_FIELD_TYPE (type, i),
-				       copied_types, representative);
+	      = copy_type_recursive (objfile, TYPE_FIELD_TYPE (type, i),
+				     copied_types);
 	  if (TYPE_FIELD_NAME (type, i))
 	    TYPE_FIELD_NAME (new_type, i) = 
 	      xstrdup (TYPE_FIELD_NAME (type, i));
@@ -3150,16 +3119,14 @@ copy_type_recursive_1 (struct objfile *objfile,
   /* Copy pointers to other types.  */
   if (TYPE_TARGET_TYPE (type))
     TYPE_TARGET_TYPE (new_type) = 
-      copy_type_recursive_1 (objfile, 
-			     TYPE_TARGET_TYPE (type),
-			     copied_types,
-			     representative);
+      copy_type_recursive (objfile, 
+			   TYPE_TARGET_TYPE (type),
+			   copied_types);
   if (TYPE_VPTR_BASETYPE (type))
     TYPE_VPTR_BASETYPE (new_type) = 
-      copy_type_recursive_1 (objfile,
-			     TYPE_VPTR_BASETYPE (type),
-			     copied_types,
-			     representative);
+      copy_type_recursive (objfile,
+			   TYPE_VPTR_BASETYPE (type),
+			   copied_types);
   /* Maybe copy the type_specific bits.
 
      NOTE drow/2005-12-09: We do not copy the C++-specific bits like
@@ -3174,21 +3141,6 @@ copy_type_recursive_1 (struct objfile *objfile,
     INIT_CPLUS_SPECIFIC (new_type);
 
   return new_type;
-}
-
-/* Recursively copy (deep copy) TYPE, if it is associated with
-   OBJFILE.  Return a new type allocated using malloc, a saved type if
-   we have already visited TYPE (using COPIED_TYPES), or TYPE if it is
-   not associated with OBJFILE.  */
-
-struct type *
-copy_type_recursive (struct objfile *objfile, 
-		     struct type *type,
-		     htab_t copied_types)
-{
-  struct type *representative = NULL;
-
-  return copy_type_recursive_1 (objfile, type, copied_types, &representative);
 }
 
 /* Make a copy of the given TYPE, except that the pointer & reference
@@ -3213,225 +3165,6 @@ copy_type (const struct type *type)
   return new_type;
 }
 
-#if 0
-
-/* Allocate a hash table which is used when freeing a struct type.  */
-
-static htab_t
-create_deleted_types_hash (void)
-{
-  return htab_create (1, htab_hash_pointer, htab_eq_pointer, NULL);
-}
-
-#endif
-
-static void delete_type_recursive (struct type *type, htab_t deleted_types);
-
-/* A helper for delete_type_recursive which deletes a main_type and
-   the things to which it refers.  TYPE is a type whose main_type we
-   wish to destroy.  DELETED_TYPES is a hash holding already-seen
-   pointers; see delete_type_recursive.  */
-
-static void
-delete_main_type (struct type *type, htab_t deleted_types)
-{
-  int i;
-  void **slot;
-
-  if (!type)
-    return;
-
-  /* Multiple types might share a single main_type.  So, we must
-     check to make sure this is not happening.  */
-  slot = htab_find_slot (deleted_types, TYPE_MAIN_TYPE (type), INSERT);
-  if (*slot != NULL)
-    return;
-  *slot = TYPE_MAIN_TYPE (type);
-
-  xfree (TYPE_NAME (type));
-  xfree (TYPE_TAG_NAME (type));
-
-  delete_type_recursive (TYPE_TARGET_TYPE (type), deleted_types);
-  delete_type_recursive (TYPE_VPTR_BASETYPE (type), deleted_types);
-
-  for (i = 0; i < TYPE_NFIELDS (type); ++i)
-    {
-      delete_type_recursive (TYPE_FIELD_TYPE (type, i), deleted_types);
-      xfree (TYPE_FIELD_NAME (type, i));
-
-      if (TYPE_FIELD_LOC_KIND (type, i) == FIELD_LOC_KIND_PHYSNAME)
-	xfree (TYPE_FIELD_STATIC_PHYSNAME (type, i));
-    }
-  xfree (TYPE_FIELDS (type));
-
-  gdb_assert (!HAVE_CPLUS_STRUCT (type));
-
-  xfree (TYPE_MAIN_TYPE (type));
-}
-
-/* Recursively delete TYPE and things it references.  TYPE must have
-   been allocated using xmalloc -- not using an objfile.
-   DELETED_TYPES is a hash table, allocated using
-   create_deleted_types_hash, which is used for checking whether a
-   type has already been deleted.  */
-
-static void
-delete_type_recursive (struct type *type, htab_t deleted_types)
-{
-  void **slot;
-
-  if (!type)
-    return;
-
-  slot = htab_find_slot (deleted_types, type, INSERT);
-  if (*slot != NULL)
-    return;
-  gdb_assert (!TYPE_OBJFILE (type));
-  *slot = type;
-
-  delete_main_type (type, deleted_types);
-  delete_type_recursive (TYPE_POINTER_TYPE (type), deleted_types);
-  delete_type_recursive (TYPE_REFERENCE_TYPE (type), deleted_types);
-
-  /* It is somewhat inefficient to free the chain recursively.
-     However, the list is typically short, and this avoid duplicating
-     the deletion checking code.  */
-  delete_type_recursive (TYPE_CHAIN (type), deleted_types);
-
-  xfree (type);
-}
-
-/* Hash function for type_refc_table.  */
-
-static hashval_t
-type_refc_hash (const void *p)
-{
-  const struct type_refc_entry *entry = p;
-  return htab_hash_pointer (entry->type);
-}
-
-/* Equality function for type_refc_table.  */
-
-static int
-type_refc_equal (const void *a, const void *b)
-{
-  const struct type_refc_entry *left = a;
-  const struct type_refc_entry *right = b;
-  return left->type == right->type;
-}
-
-/* Insert the new type NEW_TYPE into the table.  Does nothing if
-   NEW_TYPE has an objfile.  If PARENT_TYPE is not NULL, then NEW_TYPE
-   will be inserted into the same hierarchy as PARENT_TYPE.  In this
-   case, PARENT_TYPE must already exist in the reference count map.
-   If PARENT_TYPE is NULL, a new reference count is allocated and set
-   to one.  */
-
-static void
-type_init_refc (struct type *new_type, struct type *parent_type)
-{
-  int *refc;
-  void **slot;
-  struct type_refc_entry *new_entry;
-
-  if (TYPE_OBJFILE (new_type))
-    return;
-
-  if (parent_type)
-    {
-      struct type_refc_entry entry, *found;
-      entry.type = parent_type;
-      found = htab_find (type_refc_table, &entry);
-      gdb_assert (found);
-      refc = found->refc;
-    }
-  else
-    {
-      refc = xmalloc (sizeof (int));
-      *refc = 0;
-    }
-
-  new_entry = XNEW (struct type_refc_entry);
-  new_entry->type = new_type;
-  new_entry->refc = refc;
-
-  slot = htab_find_slot (type_refc_table, new_entry, INSERT);
-  gdb_assert (!*slot);
-  *slot = new_entry;
-}
-
-/* Increment the reference count for TYPE.  */
-
-void
-type_incref (struct type *type)
-{
-  struct type_refc_entry entry, *found;
-
-  if (TYPE_OBJFILE (type))
-    return;
-
-  entry.type = type;
-  found = htab_find (type_refc_table, &entry);
-  gdb_assert (found);
-  ++*(found->refc);
-}
-
-#if 0
-
-/* A traverse callback for type_refc_table which removes any entry
-   whose reference count pointer is REFC.  */
-
-static int
-type_refc_remove (void **slot, void *refc)
-{
-  struct type_refc_entry *entry = *slot;
-
-  if (entry->refc == refc)
-    {
-      xfree (entry);
-      htab_clear_slot (type_refc_table, slot);
-    }
-
-  return 1;
-}
-
-#endif
-
-/* Decrement the reference count for TYPE.  If TYPE has no more
-   references, delete it.  */
-
-void
-type_decref (struct type *type)
-{
-  struct type_refc_entry entry, *found;
-
-  if (TYPE_OBJFILE (type))
-    return;
-
-  entry.type = type;
-  found = htab_find (type_refc_table, &entry);
-#if 0 /* We'll be replacing this with type GC soon.  */
-  gdb_assert (found);
-  --*(found->refc);
-  if (*(found->refc) == 0)
-    {
-      htab_t deleted;
-      void *refc = found->refc;
-      struct type *representative = found->type;
-
-      /* Clear all table entries referring to this count.  */
-      htab_traverse (type_refc_table, type_refc_remove, refc);
-
-      /* Delete the reference count itself.  */
-      xfree (refc);
-      
-      /* Delete the entire type hierarchy.  */
-      deleted = create_deleted_types_hash ();
-      delete_type_recursive (representative, deleted);
-      htab_delete (deleted);
-    }
-#endif
-}
 
 /* Helper functions to initialize architecture-specific types.  */
 
@@ -3946,9 +3679,6 @@ _initialize_gdbtypes (void)
 {
   gdbtypes_data = gdbarch_data_register_post_init (gdbtypes_post_init);
   objfile_type_data = register_objfile_data ();
-
-  type_refc_table = htab_create_alloc (20, type_refc_hash, type_refc_equal,
-				       NULL, xcalloc, xfree);
 
   add_setshow_zinteger_cmd ("overload", no_class, &overload_debug, _("\
 Set debugging of C++ overloading."), _("\

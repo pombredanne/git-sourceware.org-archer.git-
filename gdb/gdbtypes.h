@@ -1229,7 +1229,7 @@ extern const struct floatformat *floatformats_ibm_long_double[BFD_ENDIAN_UNKNOWN
    Use alloc_type_arch to allocate a type owned by an architecture.
    Use alloc_type_copy to allocate a type with the same owner as a
    pre-existing template type, no matter whether objfile or gdbarch.  */
-extern struct type *alloc_type (struct objfile *, struct type *);
+extern struct type *alloc_type (struct objfile *);
 extern struct type *alloc_type_arch (struct gdbarch *);
 extern struct type *alloc_type_copy (const struct type *);
 
@@ -1437,9 +1437,5 @@ extern struct type *copy_type_recursive (struct objfile *objfile,
 					 htab_t copied_types);
 
 extern struct type *copy_type (const struct type *type);
-
-extern void type_incref (struct type *type);
-
-extern void type_decref (struct type *type);
 
 #endif /* GDBTYPES_H */

@@ -288,7 +288,7 @@ type_from_class (struct gdbarch *gdbarch, struct value *clas)
   if (type != NULL)
     return type;
 
-  type = alloc_type (objfile, NULL);
+  type = alloc_type (objfile);
   TYPE_CODE (type) = TYPE_CODE_STRUCT;
   INIT_CPLUS_SPECIFIC (type);
 
