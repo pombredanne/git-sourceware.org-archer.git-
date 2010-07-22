@@ -37,7 +37,6 @@
 #include "block.h"
 #include "dfp.h"
 #include "objfiles.h"
-#include "cli/cli-decode.h"
 #include "valprint.h"
 #include "cli/cli-decode.h"
 
@@ -2321,7 +2320,6 @@ value_from_ulongest (struct type *type, ULONGEST num)
 {
   struct value *val = allocate_value (type);
 
-  pack_unsigned_long (value_contents_raw (val), type, num);
   pack_unsigned_long (value_contents_raw (val), type, num);
 
   return val;

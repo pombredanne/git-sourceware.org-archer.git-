@@ -1381,8 +1381,6 @@ int search_memory (CORE_ADDR *start_addr, ULONGEST *search_space_len,
 		   const char *pattern_buf, ULONGEST pattern_len,
 		   CORE_ADDR *found_addr);
 
-void put_bits (bfd_uint64_t data, char *buf, int bits, bfd_boolean big_p);
-
 /* Tracepoint-related operations.  */
 
 #define target_trace_init() \

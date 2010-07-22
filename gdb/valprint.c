@@ -1187,7 +1187,6 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
 
   for (; i < len && things_printed < options->print_max; i++)
     {
-      size_t elt_offset = i * eltlen;
       if (i != 0)
 	{
 	  if (options->prettyprint_arrays)
@@ -1207,7 +1206,7 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
       rep1 = i + 1;
       reps = 1;
       while ((rep1 < len) &&
-	     !memcmp (valaddr + elt_offset, valaddr + rep1 * eltlen, eltlen))
+	     !memcmp (valaddr + i * eltlen, valaddr + rep1 * eltlen, eltlen))
 	{
 	  ++reps;
 	  ++rep1;

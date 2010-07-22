@@ -27,7 +27,7 @@
 
 /* Copied from bfd_put_bits.  */
 
-void
+static void
 put_bits (bfd_uint64_t data, char *buf, int bits, bfd_boolean big_p)
 {
   int i;

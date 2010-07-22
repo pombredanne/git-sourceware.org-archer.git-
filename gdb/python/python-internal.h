@@ -209,7 +209,6 @@ PyObject *gdbpy_parameter_value (enum var_types, void *);
 	}								\
     } while (0)
 
-
 void gdbpy_print_stack (void);
 
 void source_python_script_for_objfile (struct objfile *objfile,
