@@ -59,6 +59,8 @@
   OP(CLOSE_PAREN,	")")			\
   OP(EQ_EQ,		"==")			\
   OP(NOT_EQ,		"!=")			\
+  OP(GREATER,		">")			\
+  OP(LESS,		"<")			\
   OP(GREATER_EQ,	">=")			\
   OP(LESS_EQ,		"<=")			\
   OP(PLUS_EQ,		"+=")			\
@@ -148,6 +150,14 @@ typedef struct
 enum cp_precedence
 {
   PREC_NOT_OPERATOR,
+  PREC_LOGICAL_OR_EXPRESSION,
+  PREC_LOGICAL_AND_EXPRESSION,
+  PREC_INCLUSIVE_OR_EXPRESSION,
+  PREC_EXCLUSIVE_OR_EXPRESSION,
+  PREC_AND_EXPRESSION,
+  PREC_EQUALITY_EXPRESSION,
+  PREC_RELATIONAL_EXPRESSION,
+  PREC_SHIFT_EXPRESSION,
   PREC_ADDITIVE_EXPRESSION,
   PREC_MULTIPLICATIVE_EXPRESSION,
   NUM_PREC_VALUES
@@ -161,7 +171,17 @@ enum expr_code
   DIV_EXPR,
   MOD_EXPR,
   PLUS_EXPR,
-  MINUS_EXPR
+  MINUS_EXPR,
+  RSHIFT_EXPR,
+  LSHIFT_EXPR,
+  AND_AND_EXPR,
+  OR_OR_EXPR,
+  EQ_EQ_EXPR,
+  NOT_EQ_EXPR,
+  GREATER_EXPR,
+  LESS_EXPR,
+  GREATER_EQ_EXPR,
+  LESS_EQ_EXPR,
 };
 
 /* An expression "chain" which wraps the parser globals
@@ -217,7 +237,22 @@ static const struct binary_operations_node binary_ops[] = {
   { TTYPE_MOD, MOD_EXPR, PREC_MULTIPLICATIVE_EXPRESSION },
 
   { TTYPE_PLUS, PLUS_EXPR, PREC_ADDITIVE_EXPRESSION },
-  { TTYPE_MINUS, MINUS_EXPR, PREC_ADDITIVE_EXPRESSION }
+  { TTYPE_MINUS, MINUS_EXPR, PREC_ADDITIVE_EXPRESSION },
+
+  { TTYPE_RSHIFT, RSHIFT_EXPR, PREC_SHIFT_EXPRESSION },
+  { TTYPE_LSHIFT, LSHIFT_EXPR, PREC_SHIFT_EXPRESSION },
+
+  { TTYPE_AND_AND, AND_AND_EXPR, PREC_LOGICAL_AND_EXPRESSION },
+
+  { TTYPE_OR_OR, OR_OR_EXPR, PREC_LOGICAL_OR_EXPRESSION },
+
+  { TTYPE_EQ_EQ, EQ_EQ_EXPR, PREC_EQUALITY_EXPRESSION },
+  { TTYPE_NOT_EQ, NOT_EQ_EXPR, PREC_EQUALITY_EXPRESSION },
+
+  { TTYPE_GREATER, GREATER_EXPR, PREC_RELATIONAL_EXPRESSION },
+  { TTYPE_LESS, LESS_EXPR, PREC_RELATIONAL_EXPRESSION },
+  { TTYPE_GREATER_EQ, GREATER_EQ_EXPR, PREC_RELATIONAL_EXPRESSION },
+  { TTYPE_LESS_EQ, LESS_EQ_EXPR, PREC_RELATIONAL_EXPRESSION },
 };
 
 /* The actual map that will be built.  */
@@ -773,6 +808,46 @@ build_binary_op (cp_expression *lhs, cp_expression *rhs, enum expr_code code)
       operator = BINOP_SUB;
       break;
 
+    case RSHIFT_EXPR:
+      operator = BINOP_RSH;
+      break;
+
+    case LSHIFT_EXPR:
+      operator = BINOP_LSH;
+      break;
+
+    case AND_AND_EXPR:
+      operator = BINOP_LOGICAL_AND;
+      break;
+
+    case OR_OR_EXPR:
+      operator = BINOP_LOGICAL_OR;
+      break;
+
+    case EQ_EQ_EXPR:
+      operator = BINOP_EQUAL;
+      break;
+
+    case NOT_EQ_EXPR:
+      operator = BINOP_NOTEQUAL;
+      break;
+
+    case GREATER_EXPR:
+      operator = BINOP_GTR;
+      break;
+
+    case LESS_EXPR:
+      operator = BINOP_LESS;
+      break;
+
+    case GREATER_EQ_EXPR:
+      operator = BINOP_GEQ;
+      break;
+
+    case LESS_EQ_EXPR:
+      operator = BINOP_LEQ;
+      break;
+
     default:
       error (_("unhandled operator in build_binary_op"));
     }
@@ -957,6 +1032,16 @@ cp_lex_number (cp_parser *parser)
   return result;
 }
 
+#define IF_NEXT_IS(CHAR, THEN_TYPE, ELSE_TYPE)	\
+  do {						\
+      result.type = ELSE_TYPE;			\
+      if (*parser->buffer.cur == CHAR)		\
+	{					\
+	  parser->buffer.cur++;			\
+	  result.type = THEN_TYPE;		\
+	}					\
+  } while (0)
+
 static cp_token
 cp_lex_one_token (cp_parser *parser)
 {
@@ -994,11 +1079,11 @@ cp_lex_one_token (cp_parser *parser)
       break;
 
     case '%':
-      result.type = TTYPE_MOD;
+      IF_NEXT_IS ('=', TTYPE_MOD_EQ, TTYPE_MOD);
       break;
 
     case '!':
-      result.type = TTYPE_NOT;
+      IF_NEXT_IS ('=', TTYPE_NOT_EQ, TTYPE_NOT);
       break;
 
     case '~':
@@ -1006,7 +1091,47 @@ cp_lex_one_token (cp_parser *parser)
       break;
 
     case '&':
-      result.type = TTYPE_AND;
+      IF_NEXT_IS ('&', TTYPE_AND_AND, TTYPE_AND);
+      break;
+
+    case '|':
+      IF_NEXT_IS ('|', TTYPE_OR_OR, TTYPE_OR);
+      break;
+
+    case '=':
+      IF_NEXT_IS ('=', TTYPE_EQ_EQ, TTYPE_EQ);
+      break;
+
+    case '>':
+      /* TODO: deal with templates.  */
+      if (*parser->buffer.cur == '=')
+	{
+	  result.type = TTYPE_GREATER_EQ;
+	  parser->buffer.cur++;
+	}
+      else if (*parser->buffer.cur == '>')
+	{
+	  parser->buffer.cur++;
+	  IF_NEXT_IS ('=', TTYPE_RSHIFT_EQ, TTYPE_RSHIFT);
+	}
+      else
+	result.type = TTYPE_GREATER;
+      break;
+
+    case '<':
+      /* TODO: deal with templates.  */
+      if (*parser->buffer.cur == '=')
+	{
+	  result.type = TTYPE_LESS_EQ;
+	  parser->buffer.cur++;
+	}
+      else if (*parser->buffer.cur == '<')
+	{
+	  parser->buffer.cur++;
+	  IF_NEXT_IS ('=', TTYPE_LSHIFT_EQ, TTYPE_LSHIFT);
+	}
+      else
+	result.type = TTYPE_LESS;
       break;
 
     case 0:
