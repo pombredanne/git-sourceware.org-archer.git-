@@ -61,6 +61,7 @@ static int thread_alive (struct thread_info *);
 static void info_threads_command (char *, int);
 static void thread_apply_command (char *, int);
 static void restore_current_thread (ptid_t);
+static void prune_threads (void);
 
 /* Frontend view of the thread state.  Possible extensions: stepping,
    finishing, until(ling),...  */
@@ -517,7 +518,7 @@ thread_alive (struct thread_info *tp)
   return 1;
 }
 
-void
+static void
 prune_threads (void)
 {
   struct thread_info *tp, *next;

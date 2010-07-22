@@ -257,9 +257,6 @@ extern struct thread_info *any_live_thread_of_process (int pid);
 /* Change the ptid of thread OLD_PTID to NEW_PTID.  */
 void thread_change_ptid (ptid_t old_ptid, ptid_t new_ptid);
 
-/* Prune dead threads from the list of threads.  */
-extern void prune_threads (void);
-
 /* Iterator function to call a user-provided callback function
    once for each known thread.  */
 typedef int (*thread_callback_func) (struct thread_info *, void *);
