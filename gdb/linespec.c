@@ -313,10 +313,7 @@ add_matching_methods (int method_counter, struct type *t,
 				   NULL, VAR_DOMAIN,
 				   language,
 				   (int *) NULL);
-      /* See PR10966.  Remove check on symbol domain and class when
-	 we stop using (bad) linkage names on constructors.  */
-      if (sym_arr[i1] && (SYMBOL_DOMAIN (sym_arr[i1]) == VAR_DOMAIN
-			  && SYMBOL_CLASS (sym_arr[i1]) == LOC_BLOCK))
+      if (sym_arr[i1])
 	i1++;
       else
 	{
