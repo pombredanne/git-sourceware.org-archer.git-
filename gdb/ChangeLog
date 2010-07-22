@@ -1,3 +1,40 @@
+2010-07-22  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (create_debug_types_hash_table): Set objfile on
+	type signature's per-CU data.
+
+2010-07-22  Pedro Alves  <pedro@codesourcery.com>
+
+	* NEWS: Mention target reported shared libraries support by
+	default.
+
+2010-07-21  Pedro Alves  <pedro@codesourcery.com>
+
+	PR symtab/11827
+
+	Revert:
+	2010-05-21  Pierre Muller  <muller@ics.u-strasbg.fr>
+	* dwarf2read.c (process_die): Also allow DW_TAG_const_type
+	and DW_TAG_volatile_type.
+	(new_symbol): Likewise.
+
+2010-07-21  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* eval.c (evaluate_subexp_standard): Disabled evaluation of C++
+	function symbols before overload resolution.
+
+2010-07-21  Pedro Alves  <pedro@codesourcery.com>
+
+	* breakpoint.c (bptype_string): New, abstracted out from
+	print_one_breakpoint_location.
+	(print_one_breakpoint_location): Adjust.
+	(breakpoint_1): Adjust the type column width dynamically.
+
+2010-07-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symfile.c (find_separate_debug_file_by_debuglink): Remove
+	a gdb_assert call, new comment.
+
 2010-07-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* linux-nat.c (linux_handle_extended_wait): Handle case when
