@@ -1,3 +1,77 @@
+2010-07-29  Pedro Alves  <pedro@codesourcery.com>
+
+	* lib/gdb.exp (gdb_init): Set LC_ALL and LANG to C in the
+	environment.
+
+2010-07-28  Tom Tromey  <tromey@redhat.com>
+
+	PR python/11060:
+	* gdb.python/py-type.c (Temargs): New template.
+	(temvar): New variable.
+	* gdb.python/py-type.exp (test_template): New proc.
+
+2010-07-28  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.cp/member-ptr.exp, gdb.cp/printmethod.exp,
+	gdb.dwarf2/member-ptr-forwardref.exp: Adjust.
+
+2010-07-28  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/9946:
+	* gdb.cp/temargs.exp: New file.
+	* gdb.cp/temargs.cc: New file.
+
+2010-07-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/help.exp (help disassemble): Update the content.
+
+2010-07-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.threads/ia64-sigill.exp: New file.
+	* gdb.threads/ia64-sigill.c: New file.
+
+2010-07-27  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.opt/inline-cmds.c (ATTR): New define.
+	(func1): Use it.
+	(func2): Likewise.
+	(func3): Likewise.
+	(outer_inline1): Likewise.
+	(outer_inline2): Likewise.
+	* gdb.opt/inline-bt.c (ATTR): New define.
+	(func1): Use it.
+	(func2): Likewise.
+	* gdb.opt/inline-locals.c (ATTR): New define.
+	(func1): Use it.
+	(func2): Likewise.
+
+2010-07-27  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.stabs/gdb11479.c (hack): New function.
+	(test): Use it.
+	(test2): Use it.
+	* gdb.python/py-inferior.c (int8_search_buf, int16_search_buf)
+	(int32_search_buf, int64_search_buf): No longer static.
+	(x): Remove.
+	* gdb.base/relocate.c (hack): New function.
+
+2010-07-27  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.python/py-value.exp (test_inferior_function_call): New function.
+	* gdb.python/py-value.c (func1): New function.
+	(func2): Likewise.
+
+2010-07-26  Corinna Vinschen  <vinschen@redhat.com>
+
+	* gdb.asm/xstormy16.inc (gdbasm_startup): Fix beginning of stack so
+	as not to clash with .data section.
+
+2010-07-26  Jerome Guitton  <guitton@adacore.com>
+
+	* gdb.base/code_elim.exp: New file.
+	* gdb.base/code_elim1.c: New file.
+	* gdb.base/code_elim2.c: New file.
+
 2010-07-21  Pedro Alves  <pedro@codesourcery.com>
 
 	PR symtab/11827

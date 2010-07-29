@@ -1,6 +1,6 @@
 /* This testcase is part of GDB, the GNU debugger.
 
-   Copyright 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010
+   Copyright 2010
    Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
@@ -16,27 +16,22 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-static int static_foo = 1;
-static int static_bar = 2;
+int my_global_symbol = 42;
 
-int global_foo = 3;
-int global_bar = 4;
+static int my_static_symbol;
 
 int
-function_foo ()
+main ()
 {
-  return 5;
+  int v_in_main;
+
+  return v_in_main;
 }
 
 int
-function_bar ()
+my_global_func ()
 {
-  return 6;
-}
+  int v_in_global_func;
 
-/* Make sure the statics are not optimized away.  */
-int *
-hack (int arg)
-{
-  return arg ? &static_foo : &static_bar;
+  return v_in_global_func;
 }

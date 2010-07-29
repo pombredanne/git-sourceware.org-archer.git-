@@ -6667,7 +6667,8 @@ readchar (int timeout)
       error (_("Remote connection closed"));
       /* no return */
     case SERIAL_ERROR:
-      perror_with_name (_("Remote communication error"));
+      pop_target ();
+      perror_with_name (_("Remote communication error.  Target disconnected."));
       /* no return */
     case SERIAL_TIMEOUT:
       break;
@@ -9746,7 +9747,7 @@ remote_download_tracepoint (struct breakpoint *t)
 	      if (target_static_tracepoint_marker_at (tpaddr, &marker))
 		strcat (buf, ":S");
 	      else
-		error ("Static tracepoint not valid during download");
+		error (_("Static tracepoint not valid during download"));
 	    }
 	  else
 	    /* Fast tracepoints are functionally identical to regular
