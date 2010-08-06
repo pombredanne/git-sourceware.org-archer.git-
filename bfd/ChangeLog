@@ -1,3 +1,84 @@
+2010-08-06  Alan Modra  <amodra@gmail.com>
+
+	* elf64-ppc.c (ha_reloc_match): Allow matches to other than r2.
+	(ppc64_elf_relocate_section): Nop out high part insn of large toc
+	code sequence when the high part of offset is zero.
+
+2010-08-04  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-alpha.c (alpha_vms_build_fixups): Write the EICP.
+	(alpha_vms_bfd_final_link): Explicitly forbid relocatable links.
+	Clear the SEC_RELOC flag.
+
+2010-08-04  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-alpha.c (alpha_vms_create_eisd_for_section): Make writable
+	sections with relocs.
+	(alpha_vms_add_fixup_lp): Set SEC_RELOC flag.
+	(alpha_vms_add_fixup_ca): Ditto.
+	(alpha_vms_add_fixup_qr): Ditto.
+	Add comments.
+
+2010-08-04  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-alpha.c (alpha_vms_create_eisd_for_section): Do not make
+	CODE sections writable.
+
+2010-08-04  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-alpha.c (alpha_vms_add_lw_fixup): Renamed to ...
+	(alpha_vms_add_fixup_lr): ... this for consistency.
+	(alpha_vms_add_qw_fixup): Removed.
+	Fix some comments.
+	(vms_get_symbol_info): Adjust type for unknown sections.
+
+2010-08-04  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-alpha.c (_bfd_vms_slurp_egsd): Use the canonical absolute
+	section for any absolute section.  Remove some debugging code.
+
+2010-08-03  DJ Delorie  <dj@redhat.com>
+
+	* elf32-m32c.c (ELF_MAXPAGESIZE): Change page size to 256 bytes.
+
+2010-08-03  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-misc.c (vms_convert_to_var): Make it static.
+	(_bfd_vms_convert_to_var_unix_filename): Make it public.
+
+2010-08-03  Tristan Gingold  <gingold@adacore.com>
+
+	* makefile.vms (OBJS): Update list.
+
+2010-08-03  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-alpha.c (_bfd_vms_slurp_egsd): Do not set SEC_HAS_CONTENTS
+	nor SEC_RELOC for empty sections.
+
+2010-08-03  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-alpha.c (evax_section_flags): Fix flags for absolute
+	section.  Remove useless parenthesis.
+
+2010-08-03  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-lib.c (vms_lib_bread_raw): Change type of BUF argument.
+	(vms_lib_bread, vms_lib_bopen): Adjust.
+
+2010-08-02  Alan Modra  <amodra@gmail.com>
+
+	PR 11866
+	* elf.c (assign_file_positions_for_load_sections): Use p_vaddr to
+	calculate off_adjust rather than first section vma.
+
+2010-07-30  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elflink.c (compute_bucket_count): Add ATTRIBUTE_UNUSED to info.
+
+2010-07-30  Anthony Green  <green@moxielogic.com>
+
+	* config.bfd (targ_cpu): Add moxie-*-rtems support.
+
 2010-07-29  Alan Modra  <amodra@gmail.com>
 
 	* elf64-ppc.c (ppc64_elf_edit_toc): Always adjust local syms in

@@ -2481,12 +2481,16 @@ using the @w{@code{kill inferior}} command:
 @kindex detach inferior @var{infno}
 @item detach inferior @var{infno}
 Detach from the inferior identified by @value{GDBN} inferior number
-@var{infno}, and remove it from the inferior list.
+@var{infno}.  Note that the inferior's entry still stays on the list
+of inferiors shown by @code{info inferiors}, but its Description will
+show @samp{<null>}.
 
 @kindex kill inferior @var{infno}
 @item kill inferior @var{infno}
 Kill the inferior identified by @value{GDBN} inferior number
-@var{infno}, and remove it from the inferior list.
+@var{infno}.  Note that the inferior's entry still stays on the list
+of inferiors shown by @code{info inferiors}, but its Description will
+show @samp{<null>}.
 @end table
 
 After the successful completion of a command such as @code{detach},
@@ -2860,6 +2864,14 @@ only on some platforms.
 @kindex show libthread-db-search-path 
 @item show libthread-db-search-path 
 Display current libthread_db search path.
+
+@kindex set debug libthread-db
+@kindex show debug libthread-db
+@cindex debugging @code{libthread_db}
+@item set debug libthread-db
+@itemx show debug libthread-db
+Turns on or off display of @code{libthread_db}-related events.
+Use @code{1} to enable, @code{0} to disable.
 @end table
 
 @node Forks
@@ -15239,6 +15251,15 @@ $ objcopy --add-section .gdb_index=symfile.gdb-index \
 There are currently some limitation on indices.  They only work when
 for DWARF debugging information, not stabs.  And, they do not
 currently work for programs using Ada.
+
+@pindex gdb-add-index
+@value{GDBN} comes with a program, @command{gdb-add-index}, which can
+be used to add the index to a symbol file.  It takes the symbol file
+as its only argument:
+
+@smallexample
+$ gdb-add-index symfile
+@end smallexample
 
 
 @node Symbol Errors
