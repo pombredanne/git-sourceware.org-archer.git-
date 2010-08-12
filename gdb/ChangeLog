@@ -1,3 +1,186 @@
+2010-08-11  Tom Tromey  <tromey@redhat.com>
+            Phil Muldoon  <pmuldoon@redhat.com>
+
+	* python/python.c (gdbpy_run_events): New function.
+	(gdbpy_post_event): Likewise.
+	(gdbpy_initialize_events): Likewise.
+	(_initialize_python): Call gdbpy_initialize_events.
+
+2010-08-11  Ken Werner  <ken.werner@de.ibm.com>
+
+	* gdb/valarith.c (vector_binop): New function.
+	(scalar_binop): Likewise.
+	(value_binop): Call scalar_binop or vector_binop depending on the types.
+	* gdb/eval.c (ptrmath_type_p): Return 0 in case of TYPE_VECTOR.
+	(evaluate_subexp_with_coercion): Add vector check to not convert vectors
+	to pointers.
+	* gdb/value.c (coerce_array): Add vector check to not coerce vectors.
+
+2010-08-11  Brad Roberts  <braddr@puremagic.com>
+
+	* d-lang.c (extract_identifiers): Handle multiple digits.
+
+2010-08-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* dummy-frame.c (dummy_frame_unwinder): Remove its static qualifier.
+	Rename to dummy_frame_unwind.
+	(dummy_frame_unwind): Remove.
+	* dummy-frame.h (dummy_frame_unwind): Reference directly the struct.
+	* frame-unwind.c (frame_unwind_init): Use address of
+	dummy_frame_unwind and inline_frame_unwind.
+	* frame.c (create_sentinel_frame): Use address of
+	sentinel_frame_unwind.
+	* inline-frame.c (inline_frame_unwinder): Rename to
+	inline_frame_unwind.
+	(inline_frame_unwind): Remove.
+	* inline-frame.h (inline_frame_unwind): Reference directly the struct.
+	* sentinel-frame.c (sentinel_frame_unwinder): Rename to
+	sentinel_frame_unwind.
+	(sentinel_frame_unwind): Remove.
+	* sentinel-frame.h (sentinel_frame_unwind): Reference directly the
+	struct.
+
+2010-08-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* frame-unwind.c (frame_unwind_find_by_frame): Remove the return type
+	and returned value.  New comment from frame-unwind.h.
+	* frame-unwind.h (frame_unwind_find_by_frame): Remove the return type.
+	Extend the comment.
+	* frame.c (get_frame_id, frame_unwind_register_value)
+	(create_new_frame, get_prev_frame_1, frame_unwinder_is)
+	(get_frame_type, frame_unwind_arch): Do not use the return value of
+	frame_unwind_find_by_frame.
+
+2010-08-11  Phil Muldoon  <pmuldoon@redhat.com>
+            Thiago Jung Bauermann  <bauerman@br.ibm.com>
+	    Tom Tromey  <tromey@redhat.com>
+
+	* python/python.c (gdbpy_solib_address):  New function.
+	(gdbpy_decode_line): Likewise.
+
+2010-08-10  Tom Tromey  <tromey@redhat.com>
+
+	Revert gdb-add-index addition:
+	* Makefile.in (install-only): Don't install gdb-add-index.
+	* gdb-add-index.sh: Remove.
+
+2010-08-09  Kevin Buettner  <kevinb@redhat.com>
+
+	* remote-sim.c (gdbsim_xfer_inferior_memory): Replace
+	`target_has_execution' check with `to_has_memory' check.
+	(gdbsim_has_all_memory, gdbsim_has_memory): New functions.
+	(init_gdbsym_ops): Initialize relevant fields of `gdbsim_ops'
+	with `gdbsim_has_all_memory' and `gdbsim_has_memory'.
+
+2010-08-09  Kevin Buettner  <kevinb@redhat.com>
+
+	* remote-sim.c (program_loaded, gdbsim_desc, remote_sim_ptid)
+	(resume_siggnal, resume_step): Move these static globals...
+	(struct sim_inferior_data): ...into this new struct.
+	(sim_inferior_data_key, next_pid, sim_argv, gdbsim_is_open):
+	New static globals.
+	(gdb_callback, callbacks_initialized): Move these globals to
+	a point earlier in the file.
+	(check_for_duplicate_sim_descriptor, get_sim_inferior_data)
+	(get_sim_inferior_data_by_ptid, sim_inferior_data_cleanup)
+	(gdbsim_close_inferior, gdbsim_resume_inferior)
+	(gdbsim_stop_inferior): New functions.
+	(SIM_INSTANCE_NOT_NEEDED, SIM_INSTANCE_NEEDED, INITIAL_PID):
+	New constants.
+	(gdbsim_fetch_register, gdbsim_store_register, gdbsim_load)
+	(gdbsim_create_inferior, gdbsim_open, gdbsim_close, gdbsim_resume)
+	(gdbsim_stop, gdbsim_cntrl_c, gdbsim_wait)
+	(gdbsim_xfer_inferior_memory, gdbsim_files_info)
+	(gdbsim_mourn_inferior, simulator_command, gdbsim_thread_alive,
+	(gdbsim_pid_to_str): Invoke `get_sim_inferior_data' to set
+	new local variable `sim_data' in each of these functions.  Use
+	`sim_data' to reference former globals `program_loaded',
+	`gdbsim_desc', `remote_sim_ptid', `resume_siggnal', and
+	`resume_step'.
+	(gdbsim_open): Remove local variable `argv'.  Put results of call
+	to `gdb_buildargv' in `sim_argv' rather than in `argv'.  Don't
+	make a cleanup for it.  Free it though when a sim instance cannot
+	be obtained.
+	(gdbsim_close): Free sim_argv and null it out as appropriate.
+	Close sim instances in all inferiors.
+	(gdbsim_cntrl_c): Stop all inferiors.
+	(gdbsim_wait): 
+	(_initialize_remote_sim): Initialize `sim_inferior_data_key'.
+
+2010-08-09  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* dwarf2read.c (new_symbol): Add symbol to variable list at end of
+	function after symbol construction is complete.
+	Do the same for template symbol addition to template_symbols list.
+
+2010-08-09  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* symtab.c (symbol_get_demangled_name): Remove assertion and
+	return NULL when language_specific.cplus_specific is not initialized.
+	* stabsread.c (define_symbol): Set the name before calling
+	cp_scan_for_anonymous_namespaces.
+
+2010-08-09  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* symtab.h: Renamed SYMBOL_INIT_LANGUAGE_SPECIFIC to
+	SYMBOL_SET_LANGUAGE.
+	(symbol_init_language_specific): Renamed to symbol_set_language.
+	* symtab.c (symbol_init_language_specific): Removed redundant check
+	for language_cplus.
+	Renamed to symbol_set_language.
+	* stabsread.c (define_symbol): Updated.
+	(read_enum_type): Updated
+	* psymtab.c (add_psymbol_to_bcache): Updated.
+	* minsyms.c (install_minimal_symbols): Updated.
+	* coffread.c (process_coff_symbol): SYMBOL_SET_LANGUAGE instead of
+	SYMBOL_LANGUAGE to set the language.
+	* minsyms.c (prim_record_minimal_symbol_full): Ditto.
+	* mdebugread.c (new_symbol): Ditto.
+	* cp-namespace.c (check_one_possible_namespace_symbol): Ditto.
+	* dwarf2read.c (new_symbol_full): Ditto.
+	* jv-lang.c (add_class_symbol): Ditto.
+
+2010-08-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* defs.h (make_cleanup_restore_uinteger, make_cleanup_restore_ui_file)
+	(make_cleanup_restore_page_info)
+	(set_batch_flag_and_make_cleanup_restore_page_info): New declarations.
+	* gdbcmd.h (execute_command_to_string): New declaration.
+	* python/python.c (struct restore_ui_file_closure, restore_ui_file)
+	(make_cleanup_restore_ui_file): Move to utils.c
+	(execute_gdb_command) <to_string>: Move ...
+	* top.c (execute_command_to_string): ... here.  Call
+	set_batch_flag_and_make_cleanup_restore_page_info.
+	* utils.c (make_cleanup_restore_integer): New source file blank line.
+	(make_cleanup_restore_uinteger): New.
+	(struct restore_ui_file_closure, do_restore_ui_file)
+	(make_cleanup_restore_ui_file): Move here from python/python.c.
+	(init_page_info) <batch_flag>
+	(do_restore_page_info_cleanup, make_cleanup_restore_page_info)
+	(set_batch_flag_and_make_cleanup_restore_page_info): New.
+
+2010-08-06  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* thread.c (add_thread_silent): Use null_ptid instead of
+	minus_one_ptid while getting rid of stale inferior_ptid.
+
+2010-08-06  Corinna Vinschen  <vinschen@redhat.com>
+
+	* dwarf2-frame.c (struct dwarf2_cie): Add ptr_size member.
+	Throughout, call read_encoded_value with ptr_size rather than addr_size.
+	(decode_frame_entry_1): Remove redundant setting of
+	addr_size.  Call gdbarch_dwarf2_addr_size rather than gdbarch_ptr_bit
+	to determine addr_size in Dwarf versions < 4.  Set ptr_size dependent
+	on examined frame section.  Add comment to explain why.
+	* gdbarch.sh (dwarf2_addr_size): Define as variable.  Add lengthy
+	comment to explain usage.
+	* gdbarch.c: Regenerate.
+	* gdbarch.h: Regenerate.
+
+	* xstormy16-tdep.c (xstormy16_gdbarch_init): Set dwarf2_addr_size to 4.
+
 2010-08-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	Code cleanup.

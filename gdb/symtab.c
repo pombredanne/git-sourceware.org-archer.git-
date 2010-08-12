@@ -382,8 +382,10 @@ symbol_get_demangled_name (const struct general_symbol_info *gsymbol)
 {
   if (gsymbol->language == language_cplus)
     {
-      gdb_assert (gsymbol->language_specific.cplus_specific != NULL);
-      return gsymbol->language_specific.cplus_specific->demangled_name;
+      if (gsymbol->language_specific.cplus_specific != NULL)
+	return gsymbol->language_specific.cplus_specific->demangled_name;
+      else
+	return NULL;
     }
   else
     return gsymbol->language_specific.mangled_lang.demangled_name;
@@ -393,13 +395,11 @@ symbol_get_demangled_name (const struct general_symbol_info *gsymbol)
 /* Initialize the language dependent portion of a symbol
    depending upon the language for the symbol. */
 void
-symbol_init_language_specific (struct general_symbol_info *gsymbol,
-			       enum language language)
+symbol_set_language (struct general_symbol_info *gsymbol,
+                     enum language language)
 {
-
   gsymbol->language = language;
-  if (gsymbol->language == language_cplus
-      || gsymbol->language == language_d
+  if (gsymbol->language == language_d
       || gsymbol->language == language_java
       || gsymbol->language == language_objc
       || gsymbol->language == language_fortran)

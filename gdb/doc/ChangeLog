@@ -1,3 +1,29 @@
+2010-08-11  Tom Tromey  <tromey@redhat.com>
+            Phil Muldoon <pmuldoon@redhat.com>
+
+	* gdb.texinfo (Basic Python): Describe post_event API.
+
+2010-08-11  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.texinfo (Basic Python): Describe solib_address and
+          decode_line Python APIs
+
+2010-08-10  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Pretty Printing API): Document
+	gdb.default_visualizer.
+
+2010-08-10  Tom Tromey  <tromey@redhat.com>
+
+	Revert gdb-add-index addition:
+	* gdb.texinfo (Index Files): Don't document gdb-add-index.
+
+2010-08-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Eli Zaretskii <eliz@gnu.org>
+
+	* gdb.texinfo (Mode Options) <-batch>
+	(Basic Python) <gdb.execute>: Describe setting width and height.
+
 2010-07-31  Paul Pluzhnikov  <ppluzhnikov@google.com>
 
 	* gdb.texinfo (Threads): Document 'debug libthread-db'.

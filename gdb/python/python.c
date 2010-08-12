@@ -28,6 +28,7 @@
 #include "value.h"
 #include "language.h"
 #include "exceptions.h"
+#include "event-loop.h"
 
 #include <ctype.h>
 
@@ -42,7 +43,10 @@ static int gdbpy_should_print_stack = 1;
 #include "cli/cli-decode.h"
 #include "charset.h"
 #include "top.h"
+#include "solib.h"
 #include "python-internal.h"
+#include "linespec.h"
+#include "source.h"
 #include "version.h"
 #include "target.h"
 #include "gdbthread.h"
@@ -309,33 +313,6 @@ gdbpy_target_wide_charset (PyObject *self, PyObject *args)
   return PyUnicode_Decode (cset, strlen (cset), host_charset (), NULL);
 }
 
-struct restore_ui_file_closure
-{
-  struct ui_file **variable;
-  struct ui_file *value;
-};
-
-static void
-restore_ui_file (void *p)
-{
-  struct restore_ui_file_closure *closure = p;
-
-  *(closure->variable) = closure->value;
-}
-
-/* Remember the current value of *VARIABLE and make it restored when
-   the cleanup is run.  */
-struct cleanup *
-make_cleanup_restore_ui_file (struct ui_file **variable)
-{
-  struct restore_ui_file_closure *c = XNEW (struct restore_ui_file_closure);
-
-  c->variable = variable;
-  c->value = *variable;
-
-  return make_cleanup_dtor (restore_ui_file, (void *) c, xfree);
-}
-
 /* A Python function which evaluates a string using the gdb CLI.  */
 
 static PyObject *
@@ -376,26 +353,14 @@ execute_gdb_command (PyObject *self, PyObject *args, PyObject *kw)
       /* Copy the argument text in case the command modifies it.  */
       char *copy = xstrdup (arg);
       struct cleanup *cleanup = make_cleanup (xfree, copy);
-      struct ui_file *str_file = NULL;
 
       if (to_string)
-	{
-	  str_file = mem_fileopen ();
-
-	  make_cleanup_restore_ui_file (&gdb_stdout);
-	  make_cleanup_restore_ui_file (&gdb_stderr);
-	  make_cleanup_ui_file_delete (str_file);
-
-	  gdb_stdout = str_file;
-	  gdb_stderr = str_file;
-	}
-
-      execute_command (copy, from_tty);
-
-      if (str_file)
-	result = ui_file_xstrdup (str_file, NULL);
+	result = execute_command_to_string (copy, from_tty);
       else
-	result = NULL;
+	{
+	  result = NULL;
+	  execute_command (copy, from_tty);
+	}
 
       do_cleanups (cleanup);
     }
@@ -411,6 +376,137 @@ execute_gdb_command (PyObject *self, PyObject *args, PyObject *kw)
       return r;
     }
   Py_RETURN_NONE;
+}
+
+/* Implementation of gdb.solib_name (Long) -> String.
+   Returns the name of the shared library holding a given address, or None.  */
+
+static PyObject *
+gdbpy_solib_name (PyObject *self, PyObject *args)
+{
+  char *soname;
+  PyObject *str_obj;
+#ifdef PY_LONG_LONG
+  unsigned PY_LONG_LONG pc;
+  const char *format = "K";
+#else
+  unsigned long pc;
+  const char *format = "k";
+#endif
+
+  if (!PyArg_ParseTuple (args, format, &pc))
+    return NULL;
+
+  soname = solib_name_from_address (current_program_space, pc);
+  if (soname)
+    str_obj = PyString_Decode (soname, strlen (soname), host_charset (), NULL);
+  else
+    {
+      str_obj = Py_None;
+      Py_INCREF (Py_None);
+    }
+
+  return str_obj;
+}
+
+/* A Python function which is a wrapper for decode_line_1.  */
+
+static PyObject *
+gdbpy_decode_line (PyObject *self, PyObject *args)
+{
+  struct symtabs_and_lines sals = { NULL, 0 }; /* Initialize to appease gcc.  */
+  struct symtab_and_line sal;
+  char *arg = NULL;
+  char *copy = NULL;
+  struct cleanup *cleanups;
+  PyObject *result = NULL;
+  PyObject *return_result = NULL;
+  PyObject *unparsed = NULL;
+  volatile struct gdb_exception except;
+
+  if (! PyArg_ParseTuple (args, "|s", &arg))
+    return NULL;
+
+  cleanups = ensure_python_env (get_current_arch (), current_language);
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      if (arg)
+	{
+	  arg = xstrdup (arg);
+	  make_cleanup (xfree, arg);
+	  copy = arg;
+	  sals = decode_line_1 (&copy, 0, 0, 0, 0, 0);
+	  make_cleanup (xfree, sals.sals);
+	}
+      else
+	{
+	  set_default_source_symtab_and_line ();
+	  sal = get_current_source_symtab_and_line ();
+	  sals.sals = &sal;
+	  sals.nelts = 1;
+	}
+    }
+  if (except.reason < 0)
+    {
+      do_cleanups (cleanups);
+      /* We know this will always throw.  */
+      GDB_PY_HANDLE_EXCEPTION (except);
+    }
+
+  if (sals.nelts)
+    {
+      int i;
+
+      result = PyTuple_New (sals.nelts);
+      if (! result)
+	goto error;
+      for (i = 0; i < sals.nelts; ++i)
+	{
+	  PyObject *obj;
+	  char *str;
+
+	  obj = symtab_and_line_to_sal_object (sals.sals[i]);
+	  if (! obj)
+	    {
+	      Py_DECREF (result);
+	      goto error;
+	    }
+
+	  PyTuple_SetItem (result, i, obj);
+	}
+    }
+  else
+    {
+      result = Py_None;
+      Py_INCREF (Py_None);
+    }
+
+  return_result = PyTuple_New (2);
+  if (! return_result)
+    {
+      Py_DECREF (result);
+      goto error;
+    }
+
+  if (copy && strlen (copy) > 0)
+    unparsed = PyString_FromString (copy);
+  else
+    {
+      unparsed = Py_None;
+      Py_INCREF (Py_None);
+    }
+
+  PyTuple_SetItem (return_result, 0, unparsed);
+  PyTuple_SetItem (return_result, 1, result);
+
+  do_cleanups (cleanups);
+
+  return return_result;
+
+ error:
+  do_cleanups (cleanups);
+  return NULL;
 }
 
 /* Parse a string and evaluate it as an expression.  */
@@ -452,6 +548,114 @@ source_python_script (FILE *stream, const char *file)
 }
 
 
+
+/* Posting and handling events.  */
+
+/* A single event.  */
+struct gdbpy_event
+{
+  /* The Python event.  This is just a callable object.  */
+  PyObject *event;
+  /* The next event.  */
+  struct gdbpy_event *next;
+};
+
+/* All pending events.  */
+static struct gdbpy_event *gdbpy_event_list;
+/* The final link of the event list.  */
+static struct gdbpy_event **gdbpy_event_list_end;
+
+/* We use a file handler, and not an async handler, so that we can
+   wake up the main thread even when it is blocked in poll().  */
+static int gdbpy_event_fds[2];
+
+/* The file handler callback.  This reads from the internal pipe, and
+   then processes the Python event queue.  This will always be run in
+   the main gdb thread.  */
+static void
+gdbpy_run_events (int err, gdb_client_data ignore)
+{
+  struct cleanup *cleanup;
+  char buffer[100];
+  int r;
+
+  cleanup = ensure_python_env (get_current_arch (), current_language);
+
+  /* Just read whatever is available on the fd.  It is relatively
+     harmless if there are any bytes left over.  */
+  r = read (gdbpy_event_fds[0], buffer, sizeof (buffer));
+
+  while (gdbpy_event_list)
+    {
+      /* Dispatching the event might push a new element onto the event
+	 loop, so we update here "atomically enough".  */
+      struct gdbpy_event *item = gdbpy_event_list;
+      gdbpy_event_list = gdbpy_event_list->next;
+      if (gdbpy_event_list == NULL)
+	gdbpy_event_list_end = &gdbpy_event_list;
+
+      /* Ignore errors.  */
+      if (PyObject_CallObject (item->event, NULL) == NULL)
+	PyErr_Clear ();
+
+      Py_DECREF (item->event);
+      xfree (item);
+    }
+
+  do_cleanups (cleanup);
+}
+
+/* Submit an event to the gdb thread.  */
+static PyObject *
+gdbpy_post_event (PyObject *self, PyObject *args)
+{
+  struct gdbpy_event *event;
+  PyObject *func;
+  int wakeup;
+
+  if (!PyArg_ParseTuple (args, "O", &func))
+    return NULL;
+
+  if (!PyCallable_Check (func))
+    {
+      PyErr_SetString (PyExc_RuntimeError, 
+		       _("Posted event is not callable"));
+      return NULL;
+    }
+
+  Py_INCREF (func);
+
+  /* From here until the end of the function, we have the GIL, so we
+     can operate on our global data structures without worrying.  */
+  wakeup = gdbpy_event_list == NULL;
+
+  event = XNEW (struct gdbpy_event);
+  event->event = func;
+  event->next = NULL;
+  *gdbpy_event_list_end = event;
+  gdbpy_event_list_end = &event->next;
+
+  /* Wake up gdb when needed.  */
+  if (wakeup)
+    {
+      char c = 'q';		/* Anything. */
+      if (write (gdbpy_event_fds[1], &c, 1) != 1)
+        return PyErr_SetFromErrno (PyExc_IOError);
+    }
+
+  Py_RETURN_NONE;
+}
+
+/* Initialize the Python event handler.  */
+static void
+gdbpy_initialize_events (void)
+{
+  if (!pipe (gdbpy_event_fds))
+    {
+      gdbpy_event_list_end = &gdbpy_event_list;
+      add_file_handler (gdbpy_event_fds[0], gdbpy_run_events, NULL);
+    }
+}
 
 /* Printing.  */
 
@@ -759,6 +963,7 @@ Enables or disables printing of Python stack traces."),
   gdbpy_initialize_lazy_string ();
   gdbpy_initialize_thread ();
   gdbpy_initialize_inferior ();
+  gdbpy_initialize_events ();
 
   PyRun_SimpleString ("import gdb");
   PyRun_SimpleString ("gdb.pretty_printers = []");
@@ -864,10 +1069,23 @@ a boolean indicating if name is a field of the current implied argument\n\
 `this' (when the current language is object-oriented)." },
   { "block_for_pc", gdbpy_block_for_pc, METH_VARARGS,
     "Return the block containing the given pc value, or None." },
+  { "solib_name", gdbpy_solib_name, METH_VARARGS,
+    "solib_name (Long) -> String.\n\
+Return the name of the shared library holding a given address, or None." },
+  { "decode_line", gdbpy_decode_line, METH_VARARGS,
+    "decode_line (String) -> Tuple.  Decode a string argument the way\n\
+that 'break' or 'edit' does.  Return a tuple containing two elements.\n\
+The first element contains any unparsed portion of the String parameter\n\
+(or None if the string was fully parsed).  The second element contains\n\
+a tuple that contains all the locations that match, represented as\n\
+gdb.Symtab_and_line objects (or None)."},
   { "parse_and_eval", gdbpy_parse_and_eval, METH_VARARGS,
     "parse_and_eval (String) -> Value.\n\
 Parse String as an expression, evaluate it, and return the result as a Value."
   },
+
+  { "post_event", gdbpy_post_event, METH_VARARGS,
+    "Post an event into gdb's event loop." },
 
   { "target_charset", gdbpy_target_charset, METH_NOARGS,
     "target_charset () -> string.\n\

@@ -1031,9 +1031,9 @@ Run in batch mode.  Exit with status @code{0} after processing all the
 command files specified with @samp{-x} (and all commands from
 initialization files, if not inhibited with @samp{-n}).  Exit with
 nonzero status if an error occurs in executing the @value{GDBN} commands
-in the command files.  Batch mode also disables pagination;
-@pxref{Screen Size} and acts as if @kbd{set confirm off} were in
-effect (@pxref{Messages/Warnings}).
+in the command files.  Batch mode also disables pagination, sets unlimited
+terminal width and height @pxref{Screen Size}, and acts as if @kbd{set confirm
+off} were in effect (@pxref{Messages/Warnings}).
 
 Batch mode may be useful for running @value{GDBN} as a filter, for
 example to download and run a program on another computer; in order to
@@ -15252,16 +15252,6 @@ There are currently some limitation on indices.  They only work when
 for DWARF debugging information, not stabs.  And, they do not
 currently work for programs using Ada.
 
-@pindex gdb-add-index
-@value{GDBN} comes with a program, @command{gdb-add-index}, which can
-be used to add the index to a symbol file.  It takes the symbol file
-as its only argument:
-
-@smallexample
-$ gdb-add-index symfile
-@end smallexample
-
-
 @node Symbol Errors
 @section Errors Reading Symbol Files
 
@@ -20484,7 +20474,9 @@ By default, any output produced by @var{command} is sent to
 @value{GDBN}'s standard output.  If the @var{to_string} parameter is
 @code{True}, then output will be collected by @code{gdb.execute} and
 returned as a string.  The default is @code{False}, in which case the
-return value is @code{None}.
+return value is @code{None}.  If @var{to_string} is @code{True}, the
+@value{GDBN} virtual terminal will be temporarily set to unlimited width
+and height, and its pagination will be disabled; @pxref{Screen Size}.
 @end defun
 
 @findex gdb.breakpoints
@@ -20533,6 +20525,45 @@ compute values, for example, it is the only way to get the value of a
 convenience variable (@pxref{Convenience Vars}) as a @code{gdb.Value}.
 @end defun
 
+@findex gdb.post_event
+@defun post_event event
+Put @var{event}, a callable object taking no arguments, into
+@value{GDBN}'s internal event queue.  This callable will be invoked at
+some later point, during @value{GDBN}'s event processing.  Events
+posted using @code{post_event} will be run in the order in which they
+were posted; however, there is no way to know when they will be
+processed relative to other events inside @value{GDBN}.
+
+@value{GDBN} is not thread-safe.  If your Python program uses multiple
+threads, you must be careful to only call @value{GDBN}-specific
+functions in the main @value{GDBN} thread.  @code{post_event} ensures
+this.  For example:
+
+@smallexample
+(@value{GDBP}) python
+>import threading
+>
+>class Writer():
+> def __init__(self, message):
+>        self.message = message;
+> def __call__(self):
+>        gdb.write(self.message)
+>
+>class MyThread1 (threading.Thread):
+> def run (self):
+>        gdb.post_event(Writer("Hello "))
+>
+>class MyThread2 (threading.Thread):
+> def run (self):
+>        gdb.post_event(Writer("World\n"))
+>
+>MyThread1().start()
+>MyThread2().start()
+>end
+(@value{GDBP}) Hello World
+@end smallexample
+@end defun
+
 @findex gdb.write
 @defun write string
 Print a string to @value{GDBN}'s paginated standard output stream.
@@ -20560,6 +20591,26 @@ Return the name of the current target wide character set
 (@pxref{Character Sets}).  This differs from
 @code{gdb.parameter('target-wide-charset')} in that @samp{auto} is
 never returned.
+@end defun
+
+@findex gdb.solib_name
+@defun solib_name address
+Return the name of the shared library holding the given @var{address}
+as a string, or @code{None}.
+@end defun
+
+@findex gdb.decode_line 
+@defun decode_line @r{[}expression@r{]}
+Return locations of the line specified by @var{expression}, or of the
+current line if no argument was given.  This function returns a Python
+tuple containing two elements.  The first element contains a string
+holding any unparsed section of @var{expression} (or @code{None} if
+the expression has been fully parsed).  The second element contains
+either @code{None} or another tuple that contains all the locations
+that match the expression represented as @code{gdb.Symtab_and_line}
+objects (@pxref{Symbol Tables In Python}).  If @var{expression} is
+provided, it is decoded the way that @value{GDBN}'s inbuilt
+@code{break} or @code{edit} commands do (@pxref{Specify Location}).
 @end defun
 
 @node Exception Handling
@@ -21153,6 +21204,16 @@ are peformed in this method and nothing is printed.
 
 If the result is not one of these types, an exception is raised.
 @end defop
+
+@value{GDBN} provides a function which can be used to look up the
+default pretty-printer for a @code{gdb.Value}:
+
+@findex gdb.default_visualizer
+@defun default_visualizer value
+This function takes a @code{gdb.Value} object as an argument.  If a
+pretty-printer for this value exists, then it is returned.  If no such
+printer exists, then this returns @code{None}.
+@end defun
 
 @node Selecting Pretty-Printers
 @subsubsection Selecting Pretty-Printers
