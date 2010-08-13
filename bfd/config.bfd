@@ -418,7 +418,7 @@ case "${targ}" in
     targ_selvecs=bfd_elf32_frv_vec
     ;;
 
-  moxie-*-elf | moxie-*-uclinux)
+  moxie-*-elf | moxie-*-rtems | moxie-*-uclinux)
     targ_defvec=bfd_elf32_moxie_vec
     ;;
 
@@ -1468,13 +1468,7 @@ case "${targ}" in
     targ_underscore=yes
     ;;
 
-  v850-*-*)
-    targ_defvec=bfd_elf32_v850_vec
-    ;;
-  v850e-*-*)
-    targ_defvec=bfd_elf32_v850_vec
-    ;;
-  v850ea-*-*)
+  v850*-*-*)
     targ_defvec=bfd_elf32_v850_vec
     ;;
 

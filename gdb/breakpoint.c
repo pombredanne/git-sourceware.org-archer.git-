@@ -262,7 +262,7 @@ bpdisp_text (enum bpdisp disp)
 {
   /* NOTE: the following values are a part of MI protocol and represent
      values of 'disp' field returned when inferior stops at a breakpoint.  */
-  static char *bpdisps[] = {"del", "dstp", "dis", "keep"};
+  static const char * const bpdisps[] = {"del", "dstp", "dis", "keep"};
 
   return bpdisps[(int) disp];
 }
@@ -430,7 +430,7 @@ static int tracepoint_count;
 
 static struct cmd_list_element *breakpoint_set_cmdlist;
 static struct cmd_list_element *breakpoint_show_cmdlist;
-static struct cmd_list_element *save_cmdlist;
+struct cmd_list_element *save_cmdlist;
 
 /* Return whether a breakpoint is an active enabled breakpoint.  */
 static int
@@ -4433,16 +4433,9 @@ static void print_breakpoint_location (struct breakpoint *b,
   do_cleanups (old_chain);
 }
 
-/* Print B to gdb_stdout. */
-static void
-print_one_breakpoint_location (struct breakpoint *b,
-			       struct bp_location *loc,
-			       int loc_number,
-			       struct bp_location **last_loc,
-			       int print_address_bits,
-			       int allflag)
+static const char *
+bptype_string (enum bptype type)
 {
-  struct command_line *l;
   struct ep_type_description
     {
       enum bptype type;
@@ -4476,7 +4469,27 @@ print_one_breakpoint_location (struct breakpoint *b,
     {bp_static_tracepoint, "static tracepoint"},
     {bp_jit_event, "jit events"},
   };
-  
+
+  if (((int) type >= (sizeof (bptypes) / sizeof (bptypes[0])))
+      || ((int) type != bptypes[(int) type].type))
+    internal_error (__FILE__, __LINE__,
+		    _("bptypes table does not describe type #%d."),
+		    (int) type);
+
+  return bptypes[(int) type].description;
+}
+
+/* Print B to gdb_stdout.  */
+
+static void
+print_one_breakpoint_location (struct breakpoint *b,
+			       struct bp_location *loc,
+			       int loc_number,
+			       struct bp_location **last_loc,
+			       int print_address_bits,
+			       int allflag)
+{
+  struct command_line *l;
   static char bpenables[] = "nynny";
   char wrap_indent[80];
   struct ui_stream *stb = ui_out_stream_new (uiout);
@@ -4521,15 +4534,8 @@ print_one_breakpoint_location (struct breakpoint *b,
   annotate_field (1);
   if (part_of_multiple)
     ui_out_field_skip (uiout, "type");
-  else 
-    {
-      if (((int) b->type >= (sizeof (bptypes) / sizeof (bptypes[0])))
-	  || ((int) b->type != bptypes[(int) b->type].type))
-	internal_error (__FILE__, __LINE__,
-			_("bptypes table does not describe type #%d."),
-			(int) b->type);
-      ui_out_field_string (uiout, "type", bptypes[(int) b->type].description);
-    }
+  else
+    ui_out_field_string (uiout, "type", bptype_string (b->type));
 
   /* 3 */
   annotate_field (2);
@@ -4907,7 +4913,8 @@ breakpoint_1 (int bnum, int allflag, int (*filter) (const struct breakpoint *))
   struct cleanup *bkpttbl_chain;
   struct value_print_options opts;
   int print_address_bits = 0;
-  
+  int print_type_col_width = 14;
+
   get_user_print_options (&opts);
 
   /* Compute the number of rows in the table, as well as the
@@ -4923,9 +4930,15 @@ breakpoint_1 (int bnum, int allflag, int (*filter) (const struct breakpoint *))
 	
 	if (allflag || user_settable_breakpoint (b))
 	  {
-	    int addr_bit = breakpoint_address_bits (b);
+	    int addr_bit, type_len;
+
+	    addr_bit = breakpoint_address_bits (b);
 	    if (addr_bit > print_address_bits)
 	      print_address_bits = addr_bit;
+
+	    type_len = strlen (bptype_string (b->type));
+	    if (type_len > print_type_col_width)
+	      print_type_col_width = type_len;
 
 	    nr_printable_breakpoints++;
 	  }
@@ -4947,7 +4960,8 @@ breakpoint_1 (int bnum, int allflag, int (*filter) (const struct breakpoint *))
   ui_out_table_header (uiout, 7, ui_left, "number", "Num");		/* 1 */
   if (nr_printable_breakpoints > 0)
     annotate_field (1);
-  ui_out_table_header (uiout, 14, ui_left, "type", "Type");		/* 2 */
+  ui_out_table_header (uiout, print_type_col_width, ui_left,
+		       "type", "Type");		/* 2 */
   if (nr_printable_breakpoints > 0)
     annotate_field (2);
   ui_out_table_header (uiout, 4, ui_left, "disp", "Disp");		/* 3 */
@@ -10010,7 +10024,6 @@ breakpoint_re_set_one (void *bint)
 	  return 0;
 	}
 
-      set_language (b->language);
       input_radix = b->input_radix;
       s = b->addr_string;
 
@@ -10019,6 +10032,7 @@ breakpoint_re_set_one (void *bint)
 
       marker_spec = b->type == bp_static_tracepoint && is_marker_spec (s);
 
+      set_language (b->language);
       TRY_CATCH (e, RETURN_MASK_ERROR)
 	{
 	  if (marker_spec)
@@ -10724,6 +10738,16 @@ insert_single_step_breakpoint (struct gdbarch *gdbarch,
   if (*bpt_p == NULL)
     error (_("Could not insert single-step breakpoint at %s"),
 	     paddress (gdbarch, next_pc));
+}
+
+/* Check if the breakpoints used for software single stepping
+   were inserted or not.  */
+
+int
+single_step_breakpoints_inserted (void)
+{
+  return (single_step_breakpoints[0] != NULL
+          || single_step_breakpoints[1] != NULL);
 }
 
 /* Remove and delete any breakpoints used for software single step.  */

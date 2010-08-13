@@ -292,8 +292,11 @@ gdb_proc_service_h = $(srcdir)/gdb_proc_service.h
 regdat_sh = $(srcdir)/../regformats/regdat.sh
 regdef_h = $(srcdir)/../regformats/regdef.h
 regcache_h = $(srcdir)/regcache.h
+signals_def = $(srcdir)/../../include/gdb/signals.def
+signals_h = $(srcdir)/../../include/gdb/signals.h $(signals_def)
 server_h = $(srcdir)/server.h $(regcache_h) config.h $(srcdir)/target.h \
-		$(srcdir)/mem-break.h $(srcdir)/../common/gdb_signals.h
+		$(srcdir)/mem-break.h $(srcdir)/../common/gdb_signals.h \
+		$(signals_h)
 
 linux_low_h = $(srcdir)/linux-low.h
 
@@ -340,7 +343,7 @@ tracepoint.o: tracepoint.c $(server_h)
 utils.o: utils.c $(server_h)
 gdbreplay.o: gdbreplay.c config.h
 
-signals.o: ../common/signals.c $(server_h)
+signals.o: ../common/signals.c $(server_h) $(signals_def)
 	$(CC) -c $(CPPFLAGS) $(INTERNAL_CFLAGS) $< -DGDBSERVER
 
 memmem.o: ../gnulib/memmem.c

@@ -1,3 +1,886 @@
+2010-08-11  Tom Tromey  <tromey@redhat.com>
+            Phil Muldoon  <pmuldoon@redhat.com>
+
+	* python/python.c (gdbpy_run_events): New function.
+	(gdbpy_post_event): Likewise.
+	(gdbpy_initialize_events): Likewise.
+	(_initialize_python): Call gdbpy_initialize_events.
+
+2010-08-11  Ken Werner  <ken.werner@de.ibm.com>
+
+	* gdb/valarith.c (vector_binop): New function.
+	(scalar_binop): Likewise.
+	(value_binop): Call scalar_binop or vector_binop depending on the types.
+	* gdb/eval.c (ptrmath_type_p): Return 0 in case of TYPE_VECTOR.
+	(evaluate_subexp_with_coercion): Add vector check to not convert vectors
+	to pointers.
+	* gdb/value.c (coerce_array): Add vector check to not coerce vectors.
+
+2010-08-11  Brad Roberts  <braddr@puremagic.com>
+
+	* d-lang.c (extract_identifiers): Handle multiple digits.
+
+2010-08-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* dummy-frame.c (dummy_frame_unwinder): Remove its static qualifier.
+	Rename to dummy_frame_unwind.
+	(dummy_frame_unwind): Remove.
+	* dummy-frame.h (dummy_frame_unwind): Reference directly the struct.
+	* frame-unwind.c (frame_unwind_init): Use address of
+	dummy_frame_unwind and inline_frame_unwind.
+	* frame.c (create_sentinel_frame): Use address of
+	sentinel_frame_unwind.
+	* inline-frame.c (inline_frame_unwinder): Rename to
+	inline_frame_unwind.
+	(inline_frame_unwind): Remove.
+	* inline-frame.h (inline_frame_unwind): Reference directly the struct.
+	* sentinel-frame.c (sentinel_frame_unwinder): Rename to
+	sentinel_frame_unwind.
+	(sentinel_frame_unwind): Remove.
+	* sentinel-frame.h (sentinel_frame_unwind): Reference directly the
+	struct.
+
+2010-08-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* frame-unwind.c (frame_unwind_find_by_frame): Remove the return type
+	and returned value.  New comment from frame-unwind.h.
+	* frame-unwind.h (frame_unwind_find_by_frame): Remove the return type.
+	Extend the comment.
+	* frame.c (get_frame_id, frame_unwind_register_value)
+	(create_new_frame, get_prev_frame_1, frame_unwinder_is)
+	(get_frame_type, frame_unwind_arch): Do not use the return value of
+	frame_unwind_find_by_frame.
+
+2010-08-11  Phil Muldoon  <pmuldoon@redhat.com>
+            Thiago Jung Bauermann  <bauerman@br.ibm.com>
+	    Tom Tromey  <tromey@redhat.com>
+
+	* python/python.c (gdbpy_solib_address):  New function.
+	(gdbpy_decode_line): Likewise.
+
+2010-08-10  Tom Tromey  <tromey@redhat.com>
+
+	Revert gdb-add-index addition:
+	* Makefile.in (install-only): Don't install gdb-add-index.
+	* gdb-add-index.sh: Remove.
+
+2010-08-09  Kevin Buettner  <kevinb@redhat.com>
+
+	* remote-sim.c (gdbsim_xfer_inferior_memory): Replace
+	`target_has_execution' check with `to_has_memory' check.
+	(gdbsim_has_all_memory, gdbsim_has_memory): New functions.
+	(init_gdbsym_ops): Initialize relevant fields of `gdbsim_ops'
+	with `gdbsim_has_all_memory' and `gdbsim_has_memory'.
+
+2010-08-09  Kevin Buettner  <kevinb@redhat.com>
+
+	* remote-sim.c (program_loaded, gdbsim_desc, remote_sim_ptid)
+	(resume_siggnal, resume_step): Move these static globals...
+	(struct sim_inferior_data): ...into this new struct.
+	(sim_inferior_data_key, next_pid, sim_argv, gdbsim_is_open):
+	New static globals.
+	(gdb_callback, callbacks_initialized): Move these globals to
+	a point earlier in the file.
+	(check_for_duplicate_sim_descriptor, get_sim_inferior_data)
+	(get_sim_inferior_data_by_ptid, sim_inferior_data_cleanup)
+	(gdbsim_close_inferior, gdbsim_resume_inferior)
+	(gdbsim_stop_inferior): New functions.
+	(SIM_INSTANCE_NOT_NEEDED, SIM_INSTANCE_NEEDED, INITIAL_PID):
+	New constants.
+	(gdbsim_fetch_register, gdbsim_store_register, gdbsim_load)
+	(gdbsim_create_inferior, gdbsim_open, gdbsim_close, gdbsim_resume)
+	(gdbsim_stop, gdbsim_cntrl_c, gdbsim_wait)
+	(gdbsim_xfer_inferior_memory, gdbsim_files_info)
+	(gdbsim_mourn_inferior, simulator_command, gdbsim_thread_alive,
+	(gdbsim_pid_to_str): Invoke `get_sim_inferior_data' to set
+	new local variable `sim_data' in each of these functions.  Use
+	`sim_data' to reference former globals `program_loaded',
+	`gdbsim_desc', `remote_sim_ptid', `resume_siggnal', and
+	`resume_step'.
+	(gdbsim_open): Remove local variable `argv'.  Put results of call
+	to `gdb_buildargv' in `sim_argv' rather than in `argv'.  Don't
+	make a cleanup for it.  Free it though when a sim instance cannot
+	be obtained.
+	(gdbsim_close): Free sim_argv and null it out as appropriate.
+	Close sim instances in all inferiors.
+	(gdbsim_cntrl_c): Stop all inferiors.
+	(gdbsim_wait): 
+	(_initialize_remote_sim): Initialize `sim_inferior_data_key'.
+
+2010-08-09  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* dwarf2read.c (new_symbol): Add symbol to variable list at end of
+	function after symbol construction is complete.
+	Do the same for template symbol addition to template_symbols list.
+
+2010-08-09  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* symtab.c (symbol_get_demangled_name): Remove assertion and
+	return NULL when language_specific.cplus_specific is not initialized.
+	* stabsread.c (define_symbol): Set the name before calling
+	cp_scan_for_anonymous_namespaces.
+
+2010-08-09  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* symtab.h: Renamed SYMBOL_INIT_LANGUAGE_SPECIFIC to
+	SYMBOL_SET_LANGUAGE.
+	(symbol_init_language_specific): Renamed to symbol_set_language.
+	* symtab.c (symbol_init_language_specific): Removed redundant check
+	for language_cplus.
+	Renamed to symbol_set_language.
+	* stabsread.c (define_symbol): Updated.
+	(read_enum_type): Updated
+	* psymtab.c (add_psymbol_to_bcache): Updated.
+	* minsyms.c (install_minimal_symbols): Updated.
+	* coffread.c (process_coff_symbol): SYMBOL_SET_LANGUAGE instead of
+	SYMBOL_LANGUAGE to set the language.
+	* minsyms.c (prim_record_minimal_symbol_full): Ditto.
+	* mdebugread.c (new_symbol): Ditto.
+	* cp-namespace.c (check_one_possible_namespace_symbol): Ditto.
+	* dwarf2read.c (new_symbol_full): Ditto.
+	* jv-lang.c (add_class_symbol): Ditto.
+
+2010-08-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* defs.h (make_cleanup_restore_uinteger, make_cleanup_restore_ui_file)
+	(make_cleanup_restore_page_info)
+	(set_batch_flag_and_make_cleanup_restore_page_info): New declarations.
+	* gdbcmd.h (execute_command_to_string): New declaration.
+	* python/python.c (struct restore_ui_file_closure, restore_ui_file)
+	(make_cleanup_restore_ui_file): Move to utils.c
+	(execute_gdb_command) <to_string>: Move ...
+	* top.c (execute_command_to_string): ... here.  Call
+	set_batch_flag_and_make_cleanup_restore_page_info.
+	* utils.c (make_cleanup_restore_integer): New source file blank line.
+	(make_cleanup_restore_uinteger): New.
+	(struct restore_ui_file_closure, do_restore_ui_file)
+	(make_cleanup_restore_ui_file): Move here from python/python.c.
+	(init_page_info) <batch_flag>
+	(do_restore_page_info_cleanup, make_cleanup_restore_page_info)
+	(set_batch_flag_and_make_cleanup_restore_page_info): New.
+
+2010-08-06  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* thread.c (add_thread_silent): Use null_ptid instead of
+	minus_one_ptid while getting rid of stale inferior_ptid.
+
+2010-08-06  Corinna Vinschen  <vinschen@redhat.com>
+
+	* dwarf2-frame.c (struct dwarf2_cie): Add ptr_size member.
+	Throughout, call read_encoded_value with ptr_size rather than addr_size.
+	(decode_frame_entry_1): Remove redundant setting of
+	addr_size.  Call gdbarch_dwarf2_addr_size rather than gdbarch_ptr_bit
+	to determine addr_size in Dwarf versions < 4.  Set ptr_size dependent
+	on examined frame section.  Add comment to explain why.
+	* gdbarch.sh (dwarf2_addr_size): Define as variable.  Add lengthy
+	comment to explain usage.
+	* gdbarch.c: Regenerate.
+	* gdbarch.h: Regenerate.
+
+	* xstormy16-tdep.c (xstormy16_gdbarch_init): Set dwarf2_addr_size to 4.
+
+2010-08-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* varobj.c (varobj_create): Move variables fi, old_fi and block to
+	a more inner block.
+
+2010-08-05  Pedro Alves  <pedro@codesourcery.com>
+
+	* configure.tgt (alpha*-*-linux*, am33_2.0*-*-linux*, frv-*-*)
+	(hppa*-*-linux*, ia64-*-linux*, m32r*-*-linux*, m68*-*-linux*)
+	(microblaze*-linux-*, mips*-*-linux*, sh*-*-linux*)
+	(sparc-*-linux*, sparc64-*-linux*, xtensa*-*-linux*): Add
+	linux-tdep.o to gdb_target_obs.
+
+2010-08-05  Marc Khouzam  <marc.khouzam@ericsson.com>
+ 
+	* mi/mi-main.c (mi_cmd_remove_inferior): Properly access first 
+	argument.
+	
+2010-08-05  Hui Zhu  <teawater@gmail.com>
+
+	* mips-linux-tdep.c(regset.h): New include.
+	(mips_supply_gregset_wrapper, mips_fill_gregset_wrapper,
+	mips_supply_fpregset_wrapper, mips_fill_fpregset_wrapper,
+	mips64_supply_gregset_wrapper, mips64_fill_gregset_wrapper,
+	mips64_supply_fpregset_wrapper, mips64_fill_fpregset_wrapper,
+	mips_linux_regset_from_core_section): New functions.
+	(fetch_core_registers, regset_core_fns): Deleted.
+	(mips_linux_init_abi): Add mips_linux_regset_from_core_section.
+	Deleted regset_core_fns.
+	* mips-tdep.c(mips_gdbarch_init): Initialize tdep->gregset,
+	tdep->gregset64, tdep->fpregset and tdep->fpregset64.
+	* mips-tdep.h(gdbarch_tdep): Add gregset, gregset64, fpregset
+	and fpregset64.
+
+2010-08-04  Pedro Alves  <pedro@codesourcery.com>
+
+	* s390-tdep.c: Include linux-tdep.h.
+	(s390_gdbarch_init): Call linux_init_abi.
+
+2010-08-04  Pedro Alves  <pedro@codesourcery.com>
+
+	* corelow.c (core_pid_to_str): Default to using normal_pid_to_str
+	instead of printing "Thread" here.
+	* linux-tdep.c: Include inferior.h.
+	(linux_core_pid_to_str): New.
+	(linux_init_abi): New.
+	* linux-tdep.h (linux_init_abi): Declare.
+	* alpha-linux-tdep.c: Include linux-tdep.h.
+	(alpha_linux_init_abi): Call linux_init_abi.
+	* amd64-linux-tdep.c (amd64_linux_init_abi): Call linux_init_abi.
+	* arm-linux-tdep.c (arm_linux_init_abi): Call linux_init_abi.
+	* frv-linux-tdep.c: Include linux-tdep.h
+	(frv_linux_init_abi): Call linux_init_abi.
+	* hppa-linux-tdep.c: Include linux-tdep.h
+	(hppa_linux_init_abi): Call linux_init_abi.
+	* i386-linux-tdep.c (i386_linux_init_abi): Call linux_init_abi.
+	* ia64-linux-tdep.c: Include linux-tdep.h.
+	(ia64_linux_init_abi): Call linux_init_abi.
+	* m32r-linux-tdep.c: Include linux-tdep.h.
+	(m32r_linux_init_abi): Call linux_init_abi.
+	* m68klinux-tdep.c: Include linux-tdep.h.
+	(m68k_linux_init_abi): Call linux_init_abi.
+	* microblaze-linux-tdep.c: Include linux-tdep.h.
+	(microblaze_linux_init_abi): Call linux_init_abi.
+	* mips-linux-tdep.c: Include linux-tdep.h.
+	(mips_linux_init_abi): Call linux_init_abi.
+	* mn10300-linux-tdep.c: Include linux-tdep.h.
+	(am33_linux_init_osabi): Call linux_init_abi.  Rename the
+	'gdbinfo' parameter to 'info'.
+	* ppc-linux-tdep.c: Include linux-tdep.h.
+	(ppc_linux_init_abi): Call linux_init_abi.
+	* sh-linux-tdep.c: Include linux-tdep.h.
+	(sh_linux_init_abi): Call linux_init_abi.
+	* sparc-linux-tdep.c: Include linux-tdep.h.
+	(sparc32_linux_init_abi): Call linux_init_abi.
+	* sparc64-linux-tdep.c: Include linux-tdep.h.
+	(sparc64_linux_init_abi): Call linux_init_abi.
+	* xtensa-linux-tdep.c: Include linux-tdep.h.
+	(xtensa_linux_init_abi): Call linux_init_abi.
+	* i386-cygwin-tdep.c (i386_windows_core_pid_to_str): New.
+	(i386_cygwin_init_abi): Install it as gdbarch_core_pid_to_str
+	callback.
+
+2010-08-03  Doug Evans  <dje@google.com>
+
+	* breakpoint.c (bpdisp_text): Constify bpdisps.
+	* solib-svr4.c (solib_break_names): Constify.
+	(bkpt_names, main_name_list): Constify.
+	(match_main): Constify soname arg.
+	(bfd_lookup_symbol): Remove unnecessary forward decl.
+	Constify symname arg.
+	(enable_break): Constify bkpt_namep.
+	* symtab.c (search_symbols): Constify types, types2, types3, types4.
+	(symtab_symbol_info): Constify classnames.
+
+2010-08-03  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* NEWS: Document Python value inferior function calls.
+
+2010-08-02  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (dwarf_attr_name): Add DW_AT_GNU_odr_signature.
+
+2010-07-31  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* linux-thread-db.c (libthread_db_debug): New variable.
+	(thread_db_find_new_threads_silently): Control verbosity with it.
+	(try_thread_db_load_1, try_thread_db_load): Likewise.
+	(find_new_threads_once): Likewise.
+	(_initialize_thread_db): Set/show it.
+
+2010-07-31  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* common/signals.c (signals): Move the content to signals.def.
+	Include it.  Remove the INDENT comments.
+
+2010-07-30  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in (install-only): Install gdb-add-index.
+	* gdb-add-index.sh: New file.
+
+2010-07-31  Renquan Cheng  <crq@gcc.gnu.org>
+
+	* MAINTAINERS: Add myself for write after approval privileges.
+
+2010-07-30  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symfile.c (addr_section_name): New function.
+	(addrs_section_compar): Use it.
+	(addr_info_make_relative): Use it.  Move variable sect_name into a more
+	inner block.  Make ".dynbss" and ".sdynbss" checks more strict.
+
+2010-07-30  Tom Tromey  <tromey@redhat.com>
+
+	* configure: Rebuild.
+	* configure.ac: Add missing case for Python 2.7.
+
+2010-07-29  DJ Delorie  <dj@redhat.com>
+
+	* rx-tdep.c (rx_analyze_prologue): Don't require branches to have
+	conditions.
+
+2010-07-29  Pedro Alves  <pedro@codesourcery.com>
+
+	* PROBLEMS: Remove mention of all problems.
+
+2010-07-28  Pedro Alves  <pedro@codesourcery.com>
+
+	PR build/11848
+	* configure.ac: Check for wresize.
+	* configure, config.in: Regenerate.
+	* tui/tui-win.c (make_visible_with_new_height): Wrap wresize call
+	with HAVE_WRESIZE.
+
+2010-07-28  Tom Tromey  <tromey@redhat.com>
+
+	PR python/11060:
+	* python/py-type.c (typy_legacy_template_argument): New function,
+	extracted from typy_template_argument.
+	(typy_template_argument): Use TYPE_TEMPLATE_ARGUMENT.  Return a
+	value when needed.
+
+2010-07-28  Oleg Nesterov  <oleg@redhat.com>
+
+	* remote.c (readchar): Call pop_target in case of SERIAL_ERROR.
+
+2010-07-27  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (dwarf2_const_value_data): Never sign extend.
+
+2010-07-28  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* dwarf2read.c (read_subroutine_type): Improve THIS detection,
+	handling DW_AT_object_pointer, and workaround GCC PR 43053.
+
+2010-07-28  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in (HFILES_NO_SRCDIR): Remove link-warning.h.
+
+2010-07-28  Joel Brobecker  <brobecker@adacore.com>
+
+	* remote.c (remote_download_tracepoint): Add missing gettext markup.
+	* tracepoint.c (parse_static_tracepoint_marker_definition): Likewise.
+
+2010-07-28  Joel Brobecker  <brobecker@adacore.com>
+
+	* breakpoint.c (breakpoint_re_set_one): Move call to set_language
+	down, just before the block that parse the breakpoint addr_string.
+
+2010-07-28  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/9946:
+	* symfile.c (reread_symbols): Clear template_symbols.
+	* symtab.h (struct symbol) <is_cplus_template_function>: New
+	field.
+	(SYMBOL_IS_CPLUS_TEMPLATE_FUNCTION): New macro.
+	(struct template_symbol): New.
+	* symtab.c (lookup_symbol_aux_local): Use
+	cp_lookup_symbol_imports_or_template.
+	* objfiles.h (struct objfile) <template_symbols>: New field.
+	* objfiles.c (relocate_one_symbol): New function.
+	(objfile_relocate1): Use it.  Relocate isolated symbols.
+	* gdbtypes.h (struct cplus_struct_type) <n_template_arguments,
+	template_arguments>: New fields.
+	(TYPE_N_TEMPLATE_ARGUMENTS): New macro.
+	(TYPE_TEMPLATE_ARGUMENTS): Likewise.
+	(TYPE_TEMPLATE_ARGUMENT): Likewise.
+	(lookup_typename): Update.
+	* gdbtypes.c (lookup_typename): Constify "block" argument.
+	* dwarf2read.c: Include vec.h.
+	(symbolp): New typedef.
+	(read_func_scope): Read template arguments.  Allocate a
+	template_symbol when needed.
+	(read_structure_type): Read template arguments.
+	(new_symbol_full): New function, from new_symbol.  Handle
+	DW_TAG_template_type_param and DW_TAG_template_value_param.
+	(new_symbol): Rewrite as wrapper.
+	* cp-support.h (cp_lookup_symbol_imports_or_template): Declare.
+	* cp-namespace.c: Include language.h.
+	(search_symbol_list): New function.
+	(cp_lookup_symbol_imports_or_template): Likewise.
+
+2010-07-28  Balazs Kezes  <rlblaster@gmail.com>
+
+	* tui/tui-win.c (make_visible_with_new_height): Resize and move
+	the command window to the new size and position.
+
+2010-07-28  Balazs Kezes  <rlblaster@gmail.com>
+
+	* tui/tui-win.c (tui_resize_all): Update the locator's origin's
+	coordinates.
+
+2010-07-28  Balazs Kezes  <rlblaster@gmail.com>
+
+	* tui/tui-io.c (tui_handle_resize_during_io): Call tui_resize_all
+	after a detecting a resize.
+	* tui/tui-win.c (tui_resize_all): Remove tui_set_win_resized_to
+	call.
+
+2010-07-28  Pedro Alves  <pedro@codesourcery.com>
+
+	* configure.ac: Check for resize_term.
+	* configure, config.in: Regenerate.
+
+2010-07-27  Joel Brobecker  <brobecker@adacore.com>
+
+	* MAINTAINERS (Write After Approval): Reorder a couple of entries.
+
+2010-07-27  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* dwarf2read.c (read_string): Rename to ...
+	(read_direct_string): ... this.
+	(skip_one_die, read_attribute_value, dwarf_decode_line_header)
+	(dwarf_decode_lines, dwarf_decode_macros): Adjust.
+
+2010-07-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linux-nat.c (linux_nat_lp_status_is_event): New function.
+	(count_events_callback, select_event_lwp_callback)
+	(cancel_breakpoints_callback, linux_nat_wait_1): Use it.
+
+2010-07-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* ia64-linux-nat.c (ia64_linux_status_is_event): New function.
+	(_initialize_ia64_linux_nat): Install it.
+	* linux-nat.c (sigtrap_is_event, linux_nat_status_is_event)
+	(linux_nat_set_status_is_event): New.
+	(stop_wait_callback, count_events_callback, select_event_lwp_callback)
+	cancel_breakpoints_callback, linux_nat_filter_event)
+	(linux_nat_wait_1): Use linux_nat_status_is_event.
+	* linux-nat.h (linux_nat_set_status_is_event): New prototype.
+
+2010-07-27  Tom Tromey  <tromey@redhat.com>
+
+	* NEWS: Mention labels, .gdb_index.
+
+2010-07-28  CHENG Renquan  <rqcheng@smu.edu.sg>
+
+	* cli/cli-cmds.c (disassemble_command): Add support of disassemble
+	"start,+length" form of arguments.
+	* NEWS: Add "Changed commands" (disassemble) section for "Changes
+	since GDB 7.1"; and merge two separated paragraphs of disassemble
+	description in "Changes in GDB 7.0".
+
+2010-07-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* top.c (input_from_terminal_p): Return 0 on BATCH_FLAG.
+	* utils.c (defaulted_query): Do not explicitly check for BATCH_FLAG.
+	(fputs_maybe_filtered): Do not do filtering also on
+	! INPUT_FROM_TERMINAL_P.
+
+2010-07-27  Joel Brobecker  <brobecker@adacore.com>
+
+	* dwarf2read.c (dw2_find_pc_sect_symtab): Remove trailing newline
+	in warning message.
+
+2010-07-27  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* python/py-value.c (valpy_call): New Function.
+
+2010-07-27  Ken Werner  <ken.werner@de.ibm.com>
+
+	* dwarf2read.c (dwarf2_read_index): Initialize the types_list and 
+	types_list_elements variables.
+
+2010-07-26  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2loc.c (locexpr_describe_location_piece): Also recognize
+	TLS with DW_OP_const4u or DW_OP_const8u.
+
+2010-07-26  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* ppc-linux-nat.c (store_vsx_register): Use PTRACE_GETVSXREGS to get
+	VSX registers contents.
+
+2010-07-26  Jerome Guitton  <guitton@adacore.com>
+
+	* dwarf2read.c (add_partial_symbol): Do not add a global variable if
+	its adress is null. Add comment to explain why.
+	(new_symbol): Ditto.
+
+2010-07-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linux-nat.c (linux_nat_do_thread_registers): Convert STOP_SIGNAL to
+	the host signal first.
+
+2010-07-23  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (struct dwarf2_per_objfile) <n_type_comp_units,
+	type_comp_units>: New fields.
+	(dw2_get_cu): New function.
+	(create_cus_from_index): Remove unused argument.
+	(create_signatured_type_hash_from_index): New function.
+	(create_addrmap_from_index): Update.
+	(dwarf2_read_index): Handle version 2.
+	(dw2_find_last_source_symtab, dw2_forget_cached_source_info)
+	(dw2_lookup_symtab, dw2_do_expand_symtabs_matching)
+	(dw2_print_stats, dw2_expand_all_symtabs)
+	(dw2_expand_symtabs_with_filename, dw2_find_symbol_file)
+	(dw2_expand_symtabs_matching, dw2_map_symbol_filenames): Update.
+	(dwarf2_initialize_objfile): Call create_debug_types_hash_table.
+	(allocate_signatured_type_hash_table): New function.
+	(add_signatured_type_cu_to_list): Likewise.
+	(create_debug_types_hash_table): Use them.  Set type_comp_units.
+	(read_signatured_type): Ensure section data is available.
+	(add_address_entry): Don't record empty ranges.
+	(struct signatured_type_index_data): New.
+	(write_one_signatured_type): New function.
+	(write_psymtabs_to_index): Write type CUs.
+	(save_gdb_index_command): Update comment.
+	(process_type_comp_unit): Move inititalization of
+	from_debug_types...
+	(create_debug_types_hash_table): ... here.
+
+2010-07-23  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb_gcore.sh (tmpfile): Remove the variable, its initialization,
+	cleanup and generating of gdb script to it.
+	(gdb): Use redirection from /dev/null.  Use --nx.  Turn off pagination
+	and terminal size.  Convert $tmpfile to a series of -ex-es.
+
+2010-07-23  Keith Seitz  <keiths@redhat.com>
+
+	* symtab.c (basic_lookup_transparent_type): Call pre-expand
+	hook for STATIC_BLOCK types, too.
+
+2010-07-23  Keith Seitz  <keiths@redhat.com>
+
+	* dwarf2read.c: Remove unused typedef dwarf2_cu_per_cu_data_ptr
+	and vector definition.
+
+2010-07-23  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linux-nat.c (cancel_breakpoint): Remove unused forward declaration.
+
+2010-07-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c: Include completer.h.
+	(save_gdb_index_command): Use matching usage command name.
+	(_initialize_dwarf2_read): New variable c, initialize it by add_cmd.
+	Set filename_completer for it.
+
+2010-07-22  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (create_debug_types_hash_table): Set objfile on
+	type signature's per-CU data.
+
+2010-07-22  Pedro Alves  <pedro@codesourcery.com>
+
+	* NEWS: Mention target reported shared libraries support by
+	default.
+
+2010-07-21  Pedro Alves  <pedro@codesourcery.com>
+
+	PR symtab/11827
+
+	Revert:
+	2010-05-21  Pierre Muller  <muller@ics.u-strasbg.fr>
+	* dwarf2read.c (process_die): Also allow DW_TAG_const_type
+	and DW_TAG_volatile_type.
+	(new_symbol): Likewise.
+
+2010-07-21  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* eval.c (evaluate_subexp_standard): Disabled evaluation of C++
+	function symbols before overload resolution.
+
+2010-07-21  Pedro Alves  <pedro@codesourcery.com>
+
+	* breakpoint.c (bptype_string): New, abstracted out from
+	print_one_breakpoint_location.
+	(print_one_breakpoint_location): Adjust.
+	(breakpoint_1): Adjust the type column width dynamically.
+
+2010-07-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symfile.c (find_separate_debug_file_by_debuglink): Remove
+	a gdb_assert call, new comment.
+
+2010-07-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linux-nat.c (linux_handle_extended_wait): Handle case when
+	event == PTRACE_EVENT_CLONE && stopping && WSTOPSIG (status) != SIGSTOP.
+
+2010-07-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* linux-nat.c (linux_nat_wait_1): Reset STATUS after calling
+	linux_nat_wait_1.  Use always LP->STATUS afterwards.
+
+2010-07-20  Hui Zhu  <teawater@gmail.com>
+
+	* inf-ptrace.c (inf_ptrace_create_inferior): Initialize back_to.
+	(inf_ptrace_attach): Ditto.
+
+2010-07-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Make core files the process_stratum.
+	* corefile.c (core_target): New variable.
+	(core_file_command): Remove variable t, use core_target.
+	* corelow.c (core_ops): Make it static.
+	(init_core_ops): Change to process_stratum.  Initialize CORE_TARGET.
+	* defs.h (make_cleanup_unpush_target): New prototype.
+	* gdbarch.h: Regenerate.
+	* gdbarch.sh (core_pid_to_str): Remove core_stratum from its comment.
+	* gdbcore.h (core_target): New declaration.
+	* inf-ptrace.c (inf_ptrace_create_inferior, inf_ptrace_attach): New
+	variables ops_already_pushed and back_to.  Use push_target,
+	make_cleanup_unpush_target and discard_cleanups calls.
+	* record.c (record_open): Replace core_stratum by a core_bfd check.
+	* target.c (target_is_pushed): New function.
+	(find_core_target): Remove.
+	* target.h (enum strata) <core_stratum>: Remove.
+	(target_is_pushed): New declaration.
+	(find_core_target): Remove declaration.
+	* tracepoint.c (init_tfile_ops) <to_stratum>: Remove comment.
+	* utils.c (do_unpush_target, make_cleanup_unpush_target): New functions.
+
+2010-07-19  Hui Zhu  <teawater@gmail.com>
+
+	* breakpoint.c (single_step_breakpoints_inserted): New
+	function.
+	* breakpoint.h (single_step_breakpoints_inserted): Extern.
+	* infrun.c (maybe_software_singlestep): Add check code.
+	* record.c (record_resume): Add code for software single step.
+	(record_wait): Ditto.
+
+2010-07-18  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linux-nat.c (linux_handle_extended_wait): Move variable new_lp into
+	a more inner block.  Remove its unused declaration initializer.
+
+2010-07-16  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* NEWS: Mention support for the new ptrace interface and hardware
+	accelerated watchpoint conditions on powerpc-linux.
+
+2010-07-16  Ozkan Sezer  <sezeroz@gmail.com>
+
+	* target.c (debug_to_insert_breakpoint): Instead of casting to unsigned
+	long and %ld, use core_addr_to_string() and %s to print CORE_ADDR vars
+	and host_address_to_string() and %s for pointers.
+	(debug_to_remove_breakpoint): Likewise.
+	(debug_to_region_ok_for_hw_watchpoint): Likewise.
+	(debug_to_can_accel_watchpoint_condition): Likewise.
+	(debug_to_stopped_data_address): Likewise.
+	(debug_to_watchpoint_addr_within_range): Likewise.
+	(debug_to_insert_hw_breakpoint): Likewise.
+	(debug_to_remove_hw_breakpoint): Likewise.
+	(debug_to_insert_watchpoint): Likewise.
+	(debug_to_remove_watchpoint): Likewise.
+
+2010-07-16  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* symtab.h (symbol_set_demangled_name): Now takes an optional objfile*
+	argument.
+	(cplus_specific): New struct.
+	* symtab.c (symbol_set_demangled_name): Updated.
+	Use cplus_specific for cplus symbols.
+	(symbol_get_demangled_name): Retrive the name from the cplus_specific
+	struct for cplus symbols.
+	(symbol_init_language_specific): Set cplus_specific for cplus symbols.
+	(symbol_set_names): Pass objfile to symbol_set_demangled_name.
+	* symtab.c (symbol_init_cplus_specific): New function.
+
+2010-07-16  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* symtab.h (symbol_set_demangled_name): New function.
+	(symbol_get_demangled_name): New function.
+	* symtab.c (symbol_set_demangled_name): New function.
+	(symbol_get_demangled_name): New function.
+	(symbol_init_language_specific): Use demangled_name setter and getter.
+	(symbol_set_names): Ditto.
+	(symbol_natural_name): Ditto.
+	(symbol_demangled_name): Ditto.
+	* dwarf2read.c (new_symbol): Ditto.
+
+2010-07-16  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* symtab.h: Renamed cplus_specific to mangled_lang.
+	* symtab.c (symbol_init_language_specific): Updated.
+	(symbol_set_names): Updated.
+	(symbol_natural_name): Updated.
+	(symbol_demangled_name): Updated.
+	* ada-lang.c (ada_decode_symbol): Updated.
+	* dwarf2read.c (new_symbol): Updated.
+
+2010-07-14  Ken Werner  <ken.werner@de.ibm.com>
+
+	* valops.c (value_assign): Do not call to value_coerce_to_target.
+	(value_must_coerce_to_target): Return 0 in case of TYPE_VECTOR.
+
+2010-07-14  Ken Werner  <ken.werner@de.ibm.com>
+
+	* MAINTAINERS: Add myself for write after approval privileges.
+
+2010-07-13  Emmanuel Thomé  <Emmanuel.Thome@gmail.com>
+
+	* c-valprint.c (c_val_print): Add embedded_offset to address in
+	call to val_print_array_elements.
+
+2010-07-13  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (dwarf2_read_index): Correctly set 'total_size'.
+
+2010-07-13  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (dwarf2_per_cu_text_offset): Fix reference to
+	objfile.
+
+2010-07-13  Tom Tromey  <tromey@redhat.com>
+
+	* symfile.c (set_initial_language): Update.
+	(deduce_language_from_filename): Argument type now const.
+	* symtab.h (find_main_filename): Update.
+	(deduce_language_from_filename): Update.
+	* symtab.c (find_main_filename): Make result const.
+	* dwarf2read.c (dw2_find_symbol_file): Change return type.
+	* psymtab.c (find_symbol_file_from_partial): Change return type.
+	* symfile.h (struct quick_symbol_functions) <find_symbol_file>:
+	Make result const.
+
+2010-07-13  Tom Tromey  <tromey@redhat.com>
+
+	* breakpoint.c (save_cmdlist): No longer static.
+	* gdbcmd.h (save_cmdlist): Declare.
+	* symfile.c (symbol_file_add_with_addrs_or_offsets): Set
+	OBJF_READNOW on objfile if readnow_symbol_files.
+	* elfread.c (elf_symfile_read): Use dwarf2_initialize_objfile.
+	(elf_sym_fns_gdb_index): New global.
+	* dwarf2read.c: Include exceptions.h.
+	(offset_type): New.
+	(struct mapped_index): New.
+	(dwarf2_per_cu_data_ptr): New typedef.
+	(struct dwarf2_per_objfile) <using_index, index_table, gdb_index>:
+	New fields.
+	(GDB_INDEX_SECTION): New define.
+	(struct dwarf2_per_cu_quick_data): New.
+	(struct dwarf2_per_cu_data) <objfile>: New field.
+	<psymtab>: Removed.
+	<v>: New field.
+	(byte_swap): New function.
+	(MAYBE_SWAP): New macro.
+	(INDEX_SUFFIX): New macro.
+	(dw2_do_instantiate_symtab): New function.
+	(dw2_instantiate_symtab): Likewise.
+	(create_cus_from_index): Likewise.
+	(create_addrmap_from_index): Likewise.
+	(mapped_index_string_hash): Likewise.
+	(find_slot_in_mapped_hash): Likewise.
+	(dwarf2_read_index): Likewise.
+	(dw2_setup): Likewise.
+	(dw2_require_line_header): Likewise.
+	(dw2_require_full_path): Likewise.
+	(dw2_find_last_source_symtab): Likewise.
+	(dw2_forget_cached_source_info): Likewise.
+	(dw2_lookup_symtab): Likewise.
+	(dw2_lookup_symbol): Likewise.
+	(dw2_do_expand_symtabs_matching): Likewise.
+	(dw2_pre_expand_symtabs_matching): Likewise.
+	(dw2_print_stats): Likewise.
+	(dw2_dump): Likewise.
+	(dw2_relocate): Likewise.
+	(dw2_expand_symtabs_for_function): Likewise.
+	(dw2_expand_all_symtabs): Likewise.
+	(dw2_expand_symtabs_with_filename): Likewise.
+	(dw2_find_symbol_file): Likewise.
+	(dw2_map_ada_symtabs): Likewise.
+	(dw2_expand_symtabs_matching): Likewise.
+	(dw2_find_pc_sect_symtab): Likewise.
+	(dw2_map_symbol_names): Likewise.
+	(dw2_map_symbol_filenames): Likewise.
+	(dw2_has_symbols): Likewise.
+	(dwarf2_gdb_index_functions): New global.
+	(dwarf2_initialize_objfile): New function.
+	(process_psymtab_comp_unit): Update.
+	(add_partial_subprogram): Likewise.
+	(dwarf2_psymtab_to_symtab): Likewise.
+	(psymtab_to_symtab_1): Use dw2_do_instantiate_symtab.
+	(process_full_comp_unit): Update.
+	(find_file_and_directory): New function.
+	(read_file_scope): Use find_file_and_directory.
+	(dwarf2_per_cu_objfile): Update.
+	(dwarf2_per_cu_addr_size): Update.
+	(dwarf2_per_cu_offset_size): Update.
+	(dwarf2_free_objfile): Free the index, if needed.
+	(dwarf2_per_objfile_free): Unmap the index, if needed.
+	(struct strtab_entry): New.
+	(hash_strtab_entry): New function.
+	(eq_strtab_entry): Likewise.
+	(create_strtab): Likewise.
+	(add_string): Likewise.
+	(struct symtab_index_entry): New.
+	(struct mapped_symtab): New.
+	(hash_symtab_entry): New function.
+	(eq_symtab_entry): Likewise.
+	(delete_symtab_entry): Likewise.
+	(create_index_table): Likewise.
+	(create_mapped_symtab): Likewise.
+	(cleanup_mapped_symtab): Likewise.
+	(find_slot): Likewise.
+	(hash_expand): Likewise.
+	(add_index_entry): Likewise.
+	(add_indices_to_cpool): Likewise.
+	(write_hash_table): Likewise.
+	(add_address_entry): Likewise.
+	(write_psymbols): Likewise.
+	(write_obstack): Likewise.
+	(unlink_if_set): Likewise.
+	(write_psymtabs_to_index): Likewise.
+	(save_gdb_index_command): Likewise.
+	(_initialize_dwarf2_read): Install "save gdb-index"
+	command.
+	(create_all_comp_units): Initialize 'objfile' field of CU.
+	(dwarf2_locate_sections): Check for .gdb_index.
+	* psymtab.h (dwarf2_gdb_index_functions): Declare.
+	* symfile.h (dwarf2_initialize_objfile): Declare.
+
+2010-07-13  Tom Tromey  <tromey@redhat.com>
+
+	* symtab.c (lookup_symbol_aux_symtabs): Call pre-expand hook.
+	(basic_lookup_transparent_type): Likewise.
+	* symfile.h (struct quick_symbol_functions)
+	<pre_expand_symtabs_matching>: New field.
+	* psymtab.c (pre_expand_symtabs_matching_psymtabs): New function.
+	(psym_functions): Update.
+
+2010-07-13  Tom Tromey  <tromey@redhat.com>
+
+	PR breakpoints/8357:
+	* symtab.h (domain_enum_tag) <LABEL_DOMAIN>: Update comment.
+	* linespec.c (decode_line_1): Update comment.  Call decode_label.
+	(decode_label): New function.
+	(symbol_found): Handle LOC_LABEL.
+	* dwarf2read.c (new_symbol) <DW_TAG_label>: Set symbol's type and
+	domain.  Call add_symbol_to_list.
+
+2010-07-13  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2loc.h (dwarf2_per_cu_text_offset): Declare.
+	* dwarf2loc.c (find_location_expression): Use
+	dwarf2_per_cu_text_offset.
+	(dwarf2_evaluate_loc_desc): Likewise.
+	(dwarf2_loc_desc_needs_frame): Likewise.
+	(compile_dwarf_to_ax): Likewise.
+	(loclist_describe_location): Likewise.
+	* dwarf2read.c (dwarf2_per_cu_text_offset): New function.
+	(dwarf2_per_cu_objfile): Update comment.
+
+2010-07-12  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (read_subrange_type): Call read_subrange_type.
+	* p-lang.c (pascal_printstr): Likewise.
+
+2010-07-09  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-prettyprint.c (gdbpy_get_display_hint): Don't use
+	'hint' if it is NULL.
+
 2010-07-09  Hui Zhu  <teawater@gmail.com>
 
 	* source.c (print_source_lines_base): Add check for noprint.

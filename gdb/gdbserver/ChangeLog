@@ -1,3 +1,42 @@
+2010-08-11  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* linux-low.c (linux_wait_1): Correctly return the ptid of the child
+	after its termination.
+
+2010-08-09  Pedro Alves  <pedro@codesourcery.com>
+
+	* linux-low.c (gdb_wants_lwp_stopped): Delete.
+	(gdb_wants_all_stopped): Delete.
+	(linux_wait_1): Don't call them.
+	* server.c (handle_v_cont): Tag all threads as want-stopped.
+	(gdb_wants_thread_stopped): Fix comments.  Tag the thread that
+	stopped as "client-wants-stopped".
+
+2010-07-31  Pedro Alves  <pedro@codesourcery.com>
+
+	* Makefile.in (signals_h): New.
+	(server_h): Depend on it.
+	(server.o): Don't depend on $(signals_def).
+	(signals.o): Depend on $(signals_def).
+
+2010-07-31  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* Makefile.in (signals_def): New.
+	(server_h): Append include/gdb/signals.h and signals_def.
+	(server.o): Append signals_def.
+
+2010-07-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* server.c (handle_target_event): Use target_signal_to_host for
+	resume_info.sig initialization.
+	* target.h (struct thread_resume) <sig>: New comment.
+
+2010-07-20  Ozkan Sezer  <sezeroz@gmail.com>
+
+	* server.c (handle_query): strcpy() the returned string from paddress()
+	instead of sprintf().
+	* utils.c (paddress): Return phex_nz().
+
 2010-07-07  Joel Brobecker  <brobecker@adacore.com>
 
 	* server.c (handle_v_cont): Call mourn_inferior if process

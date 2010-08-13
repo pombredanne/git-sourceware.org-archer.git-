@@ -667,7 +667,7 @@ dnl no -   Don't include python support.
 dnl yes -  Include python support, error if it's missing.
 dnl        If we find python in $PATH, use it to fetch configure options,
 dnl        otherwise assume the compiler can find it with no help from us.
-dnl        Python 2.6, 2.5, and then 2.4 are tried in turn.
+dnl        Python 2.7, 2.6, 2.5, and then 2.4 are tried in turn.
 dnl auto - Same as "yes", but if python is missing from the system,
 dnl        fall back to "no".
 dnl /path/to/python/exec-prefix -
@@ -676,7 +676,7 @@ dnl        If /path/to/python/exec-prefix/bin/python exists, use it to find
 dnl        the compilation parameters.  Otherwise use
 dnl        -I/path/to/python/exec-prefix/include,
 dnl        -L/path/to/python/exec-prefix/lib.
-dnl        Python 2.6, 2.5, and then 2.4 are tried in turn.
+dnl        Python 2.7, 2.6, 2.5, and then 2.4 are tried in turn.
 dnl        NOTE: This case is historical.  It is what was done for 7.0/7.1
 dnl        but is deprecated.
 dnl /path/to/python/executable -
@@ -824,6 +824,10 @@ else
       ;;
     esac
   elif test "${have_python_config}" != failed; then
+    if test "${have_libpython}" = no; then
+      AC_TRY_LIBPYTHON(python2.7, have_libpython,
+                       ${python_includes}, "${python_libs} -lpython2.7")
+    fi
     if test "${have_libpython}" = no; then
       AC_TRY_LIBPYTHON(python2.6, have_libpython,
                        ${python_includes}, "${python_libs} -lpython2.6")
@@ -1001,9 +1005,9 @@ AC_FUNC_ALLOCA
 AC_FUNC_MMAP
 AC_FUNC_VFORK
 AC_CHECK_FUNCS([canonicalize_file_name realpath getrusage getuid \
-		getgid pipe poll pread64 sbrk setpgid setpgrp setsid \
+		getgid pipe poll pread64 resize_term sbrk setpgid setpgrp setsid \
 		sigaction sigprocmask sigsetmask socketpair syscall \
-		ttrace wborder setlocale iconvlist libiconvlist btowc \
+		ttrace wborder wresize setlocale iconvlist libiconvlist btowc \
 		setrlimit getrlimit posix_madvise])
 AM_LANGINFO_CODESET
 

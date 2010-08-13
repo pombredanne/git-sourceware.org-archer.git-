@@ -547,6 +547,23 @@ relative_addr_info_to_section_offsets (struct section_offsets *section_offsets,
     }
 }
 
+/* Transform section name S for a name comparison.  prelink can split section
+   `.bss' into two sections `.dynbss' and `.bss' (in this order).  Similarly
+   prelink can split `.sbss' into `.sdynbss' and `.sbss'.  Use virtual address
+   of the new `.dynbss' (`.sdynbss') section as the adjacent new `.bss'
+   (`.sbss') section has invalid (increased) virtual address.  */
+
+static const char *
+addr_section_name (const char *s)
+{
+  if (strcmp (s, ".dynbss") == 0)
+    return ".bss";
+  if (strcmp (s, ".sdynbss") == 0)
+    return ".sbss";
+
+  return s;
+}
+
 /* qsort comparator for addrs_section_sort.  Sort entries in ascending order by
    their (name, sectindex) pair.  sectindex makes the sort by name stable.  */
 
@@ -557,7 +574,7 @@ addrs_section_compar (const void *ap, const void *bp)
   const struct other_sections *b = *((struct other_sections **) bp);
   int retval, a_idx, b_idx;
 
-  retval = strcmp (a->name, b->name);
+  retval = strcmp (addr_section_name (a->name), addr_section_name (b->name));
   if (retval)
     return retval;
 
@@ -641,14 +658,16 @@ addr_info_make_relative (struct section_addr_info *addrs, bfd *abfd)
 
   while (*addrs_sorted)
     {
-      const char *sect_name = (*addrs_sorted)->name;
+      const char *sect_name = addr_section_name ((*addrs_sorted)->name);
 
       while (*abfd_addrs_sorted
-	     && strcmp ((*abfd_addrs_sorted)->name, sect_name) < 0)
+	     && strcmp (addr_section_name ((*abfd_addrs_sorted)->name),
+			sect_name) < 0)
 	abfd_addrs_sorted++;
 
       if (*abfd_addrs_sorted
-	  && strcmp ((*abfd_addrs_sorted)->name, sect_name) == 0)
+	  && strcmp (addr_section_name ((*abfd_addrs_sorted)->name),
+		     sect_name) == 0)
 	{
 	  int index_in_addrs;
 
@@ -676,7 +695,6 @@ addr_info_make_relative (struct section_addr_info *addrs, bfd *abfd)
 
   for (i = 0; i < addrs->num_sections && addrs->other[i].name; i++)
     {
-      const char *sect_name = addrs->other[i].name;
       struct other_sections *sect = addrs_to_abfd_addrs[i];
 
       if (sect)
@@ -694,6 +712,9 @@ addr_info_make_relative (struct section_addr_info *addrs, bfd *abfd)
 	}
       else
 	{
+	  /* addr_section_name transformation is not used for SECT_NAME.  */
+	  const char *sect_name = addrs->other[i].name;
+
 	  /* This section does not exist in ABFD, which is normally
 	     unexpected and we want to issue a warning.
 
@@ -704,12 +725,20 @@ addr_info_make_relative (struct section_addr_info *addrs, bfd *abfd)
 	     a warning.  Shared libraries contain just the section
 	     ".gnu.liblist" but it is not marked as loadable there.  There is
 	     no other way to identify them than by their name as the sections
-	     created by prelink have no special flags.  */
+	     created by prelink have no special flags.
+
+	     For the sections `.bss' and `.sbss' see addr_section_name.  */
 
 	  if (!(strcmp (sect_name, ".gnu.liblist") == 0
 		|| strcmp (sect_name, ".gnu.conflict") == 0
-		|| strcmp (sect_name, ".dynbss") == 0
-		|| strcmp (sect_name, ".sdynbss") == 0))
+		|| (strcmp (sect_name, ".bss") == 0
+		    && i > 0
+		    && strcmp (addrs->other[i - 1].name, ".dynbss") == 0
+		    && addrs_to_abfd_addrs[i - 1] != NULL)
+		|| (strcmp (sect_name, ".sbss") == 0
+		    && i > 0
+		    && strcmp (addrs->other[i - 1].name, ".sdynbss") == 0
+		    && addrs_to_abfd_addrs[i - 1] != NULL)))
 	    warning (_("section %s not found in %s"), sect_name,
 		     bfd_get_filename (abfd));
 
@@ -1059,6 +1088,9 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
   const char *name = bfd_get_filename (abfd);
   const int from_tty = add_flags & SYMFILE_VERBOSE;
 
+  if (readnow_symbol_files)
+    flags |= OBJF_READNOW;
+
   my_cleanups = make_cleanup_bfd_close (abfd);
 
   /* Give user a chance to burp if we'd be
@@ -1095,7 +1127,7 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
      the gdb startup command line or on a per symbol file basis.  Expand
      all partial symbol tables for this objfile if so. */
 
-  if ((flags & OBJF_READNOW) || readnow_symbol_files)
+  if ((flags & OBJF_READNOW))
     {
       if (from_tty || info_verbose)
 	{
@@ -1371,15 +1403,13 @@ find_separate_debug_file_by_debuglink (struct objfile *objfile)
   dir = xstrdup (objfile->name);
 
   /* Strip off the final filename part, leaving the directory name,
-     followed by a slash.  Objfile names should always be absolute and
-     tilde-expanded, so there should always be a slash in there
-     somewhere.  */
+     followed by a slash.  The directory can be relative or absolute.  */
   for (i = strlen(dir) - 1; i >= 0; i--)
     {
       if (IS_DIR_SEPARATOR (dir[i]))
 	break;
     }
-  gdb_assert (i >= 0 && IS_DIR_SEPARATOR (dir[i]));
+  /* If I is -1 then no directory is present there and DIR will be "".  */
   dir[i+1] = '\0';
 
   /* Set I to max (strlen (canon_name), strlen (dir)). */
@@ -1535,7 +1565,7 @@ symbol_file_command (char *args, int from_tty)
 void
 set_initial_language (void)
 {
-  char *filename;
+  const char *filename;
   enum language lang = language_unknown;
 
   filename = find_main_filename ();
@@ -2419,6 +2449,7 @@ reread_symbols (void)
 	  objfile->psymtabs_addrmap = NULL;
 	  objfile->free_psymtabs = NULL;
 	  objfile->cp_namespace_symtab = NULL;
+	  objfile->template_symbols = NULL;
 	  objfile->msymbols = NULL;
 	  objfile->deprecated_sym_private = NULL;
 	  objfile->minimal_symbol_count = 0;
@@ -2662,7 +2693,7 @@ init_filename_language_table (void)
 }
 
 enum language
-deduce_language_from_filename (char *filename)
+deduce_language_from_filename (const char *filename)
 {
   int i;
   char *cp;

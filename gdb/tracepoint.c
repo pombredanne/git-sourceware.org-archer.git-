@@ -4098,8 +4098,6 @@ init_tfile_ops (void)
   tfile_ops.to_get_trace_status = tfile_get_trace_status;
   tfile_ops.to_trace_find = tfile_trace_find;
   tfile_ops.to_get_trace_state_variable_value = tfile_get_trace_state_variable_value;
-  /* core_stratum might seem more logical, but GDB doesn't like having
-     more than one core_stratum vector.  */
   tfile_ops.to_stratum = process_stratum;
   tfile_ops.to_has_all_memory = tfile_has_all_memory;
   tfile_ops.to_has_memory = tfile_has_memory;
@@ -4130,7 +4128,7 @@ parse_static_tracepoint_marker_definition (char *line, char **pp,
 
   endp = strchr (p, ':');
   if (endp == NULL)
-    error ("bad marker definition: %s", line);
+    error (_("bad marker definition: %s"), line);
 
   marker->str_id = xmalloc (endp - p + 1);
   end = hex2bin (p, (gdb_byte *) marker->str_id, (endp - p + 1) / 2);

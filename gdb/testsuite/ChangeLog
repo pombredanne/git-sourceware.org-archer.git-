@@ -1,3 +1,228 @@
+2010-08-11  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.python/python.exp (gdb_py_test_multiple): Add gdb.post_event
+	tests.
+
+2010-08-11  Ken Werner  <ken.werner@de.ibm.com>
+
+	* gdb.base/Makefile.in (EXECUTABLES): Add gnu_vector.
+	* gdb.base/gnu_vector.c: New File.
+	* gdb.base/gnu_vector.exp: Likewise.
+
+2010-08-11  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.python/python.c: New File.
+	* gdb.python/python-sl.c: New File.
+	* gdb.python/python.exp: Test solib_address and decode_line
+	* functions.
+
+2010-08-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.python/python.exp (show height, set height 10)
+	(verify pagination beforehand, verify pagination beforehand: q)
+	(gdb.execute does not page, verify pagination afterwards)
+	(verify pagination afterwards: q): New.
+
+2010-08-02  Doug Evans  <dje@google.com>
+
+	* gdb.cp/namespace.exp: When "print ::cOtherFileClassVar" fails
+	because of an older gcc, change test2
+	"print ::C::OtherFileClass::cOtherFileClassVar" from unresolved
+	to unsupported.
+
+2010-07-30  Kazu Hirata  <kazu@codesourcery.com>
+
+	* gdb.base/break-always.exp: Do not expect full paths to file
+	names.
+	* gdb.base/commands.exp: Likewise.
+
+2010-07-30  Doug Evans  <dje@google.com>
+
+	* gdb.cp/temargs.exp: For new tests that require newer gccs,
+	xfail them when run with older gccs.
+
+	* lib/gdb.exp (build_executable): Forward "c++" option to
+	get_compiler_info.
+
+	* gdb.python/py-type.exp (test_template): Mark as xfail tests
+	"python print ttype.template_argument(1)" and
+	"python print isinstance(ttype.template_argument(1), gdb.Value)"
+	if using gcc 4.4 or earlier.
+
+	* gdb.base/valgrind-db-attach.exp: Use unique test name for
+	attach-to-debugger handling.
+
+2010-07-30  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/prelink-lib.c (copyreloc): New initialized variable.
+	* gdb.base/prelink.c (copyreloc, bssvar, bssvarp): New variables.
+	(main): Use copyreloc.
+	* gdb.base/prelink.exp (split debug of executable)
+	(.dynbss vs. .bss address shift): New tests.
+
+2010-07-29  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.threads/pthreads.exp (check_backtraces): Consume $gdb_prompt
+	in gdb_test_multiple.
+
+2010-07-29  Pedro Alves  <pedro@codesourcery.com>
+
+	* lib/gdb.exp (gdb_init): Set LC_ALL and LANG to C in the
+	environment.
+
+2010-07-28  Tom Tromey  <tromey@redhat.com>
+
+	PR python/11060:
+	* gdb.python/py-type.c (Temargs): New template.
+	(temvar): New variable.
+	* gdb.python/py-type.exp (test_template): New proc.
+
+2010-07-28  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.cp/member-ptr.exp, gdb.cp/printmethod.exp,
+	gdb.dwarf2/member-ptr-forwardref.exp: Adjust.
+
+2010-07-28  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/9946:
+	* gdb.cp/temargs.exp: New file.
+	* gdb.cp/temargs.cc: New file.
+
+2010-07-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/help.exp (help disassemble): Update the content.
+
+2010-07-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.threads/ia64-sigill.exp: New file.
+	* gdb.threads/ia64-sigill.c: New file.
+
+2010-07-27  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.opt/inline-cmds.c (ATTR): New define.
+	(func1): Use it.
+	(func2): Likewise.
+	(func3): Likewise.
+	(outer_inline1): Likewise.
+	(outer_inline2): Likewise.
+	* gdb.opt/inline-bt.c (ATTR): New define.
+	(func1): Use it.
+	(func2): Likewise.
+	* gdb.opt/inline-locals.c (ATTR): New define.
+	(func1): Use it.
+	(func2): Likewise.
+
+2010-07-27  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.stabs/gdb11479.c (hack): New function.
+	(test): Use it.
+	(test2): Use it.
+	* gdb.python/py-inferior.c (int8_search_buf, int16_search_buf)
+	(int32_search_buf, int64_search_buf): No longer static.
+	(x): Remove.
+	* gdb.base/relocate.c (hack): New function.
+
+2010-07-27  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.python/py-value.exp (test_inferior_function_call): New function.
+	* gdb.python/py-value.c (func1): New function.
+	(func2): Likewise.
+
+2010-07-26  Corinna Vinschen  <vinschen@redhat.com>
+
+	* gdb.asm/xstormy16.inc (gdbasm_startup): Fix beginning of stack so
+	as not to clash with .data section.
+
+2010-07-26  Jerome Guitton  <guitton@adacore.com>
+
+	* gdb.base/code_elim.exp: New file.
+	* gdb.base/code_elim1.c: New file.
+	* gdb.base/code_elim2.c: New file.
+
+2010-07-21  Pedro Alves  <pedro@codesourcery.com>
+
+	PR symtab/11827
+
+	* gdb.base/printcmds.c (enum some_volatile_enum): New enum.
+	(some_volatile_enum): New variable.
+	* gdb.base/printcmds.exp (test_print_enums): New.
+	<top level>: Call it.
+
+2010-07-21  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/fpointer.cc: New test.
+	* gdb.cp/fpointer.exp: New test.
+
+2010-07-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/solib-nodir.exp: New file.
+	* lib/gdb.exp (runto): New case for a GDB internal error.
+
+2010-07-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Ulrich Weigand  <uweigand@de.ibm.com>
+	    Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/charset-malloc.c: New file.
+	* gdb.base/charset.c (malloc_stub): New prototype.
+	(main): Call it instead of malloc itself.
+	* gdb.base/charset.exp: Use only prepare_for_testing.
+	(binfile): Remove the variable.
+
+2010-07-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Make core files the process_stratum.
+	* gdb.base/corefile.exp (run: load core again)
+	(run: sanity check we see the core file, run: with core)
+	(run: core file is cleared, attach: load core again)
+	(attach: sanity check we see the core file, attach: with core)
+	(attach: core file is cleared): New tests.
+	* gdb.base/coremaker.c (main): New parameters.  Implement "sleep" argv.
+
+2010-07-14  Ken Werner  <ken.werner@de.ibm.com>
+
+	* gdb.arch/altivec-abi.exp: New tests.
+
+2010-07-13  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.python/py-prettyprint.c (struct arraystruct): New struct.
+	(main): Use it.
+	* gdb.python/py-prettyprint.exp (run_lang_tests): Add test.
+
+2010-07-13  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/label.exp: New file.
+	* gdb.base/label.c: New file.
+
+2010-07-12  Ulrich Weigand  <uweigand@de.ibm.com>
+	    H.J. Lu  <hongjiu.lu@intel.com>
+
+	* lib/gdb.exp (is_ilp32_target): New.
+	(is_lp64_target): Likewise.
+
+	* gdb.arch/amd64-byte.exp: Use is_lp64_target to check 64bit
+	target.
+	* gdb.arch/amd64-disp-step.exp: Likewise.
+	* gdb.arch/amd64-dword.exp: Likewise.
+	* gdb.arch/amd64-i386-address.exp: Likewise.
+	* gdb.arch/amd64-word.exp: Likewise.
+	
+	* gdb.arch/i386-avx.exp: Use is_ilp32_target to check for 32bit
+	target.
+	* gdb.arch/i386-bp_permanent.exp: Likewise.
+	* gdb.arch/i386-byte.exp: Likewise.
+	* gdb.arch/i386-disp-step.exp: Likewise.
+	* gdb.arch/i386-gnu-cfi.exp: Likewise.
+	* gdb.arch/i386-prologue.exp: Likewise.
+	* gdb.arch/i386-size-overlap.exp: Likewise.
+	* gdb.arch/i386-size.exp: Likewise.
+	* gdb.arch/i386-sse.exp: Likewise.
+	* gdb.arch/i386-unwind.exp: Likewise.
+	* gdb.arch/i386-word.exp: Likewise.
+
+	* gdb.arch/ppc64-atomic-inst.exp: Use is_lp64_target to execute
+	test only when building 64-bit executables.  Do not hard-code
+	-m64 option.
+
 2010-07-07  Doug Evans  <dje@google.com>
 
 	* lib/gdb.exp (gdb_test_list_exact): New function.

@@ -1,3 +1,238 @@
+2010-08-09  Richard Henderson  <rth@redhat.com>
+
+	PR ld/11891
+	* elf64-alpha.c (elf64_alpha_relax_tls_get_addr): Disallow relaxing
+	to tlshi/lo until pos0 and pos1 are adjacent.  Use the destination
+	register from the tldgd insn.
+
+2010-08-09  Catherine Moore  <clm@codesourcery.com>
+
+	* elfxx-mips.c (mips_elf_perform_relocation): Improve
+	interlinking error message.
+
+2010-08-06  Alan Modra  <amodra@gmail.com>
+
+	* elf64-ppc.c (ha_reloc_match): Allow matches to other than r2.
+	(ppc64_elf_relocate_section): Nop out high part insn of large toc
+	code sequence when the high part of offset is zero.
+
+2010-08-04  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-alpha.c (alpha_vms_build_fixups): Write the EICP.
+	(alpha_vms_bfd_final_link): Explicitly forbid relocatable links.
+	Clear the SEC_RELOC flag.
+
+2010-08-04  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-alpha.c (alpha_vms_create_eisd_for_section): Make writable
+	sections with relocs.
+	(alpha_vms_add_fixup_lp): Set SEC_RELOC flag.
+	(alpha_vms_add_fixup_ca): Ditto.
+	(alpha_vms_add_fixup_qr): Ditto.
+	Add comments.
+
+2010-08-04  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-alpha.c (alpha_vms_create_eisd_for_section): Do not make
+	CODE sections writable.
+
+2010-08-04  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-alpha.c (alpha_vms_add_lw_fixup): Renamed to ...
+	(alpha_vms_add_fixup_lr): ... this for consistency.
+	(alpha_vms_add_qw_fixup): Removed.
+	Fix some comments.
+	(vms_get_symbol_info): Adjust type for unknown sections.
+
+2010-08-04  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-alpha.c (_bfd_vms_slurp_egsd): Use the canonical absolute
+	section for any absolute section.  Remove some debugging code.
+
+2010-08-03  DJ Delorie  <dj@redhat.com>
+
+	* elf32-m32c.c (ELF_MAXPAGESIZE): Change page size to 256 bytes.
+
+2010-08-03  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-misc.c (vms_convert_to_var): Make it static.
+	(_bfd_vms_convert_to_var_unix_filename): Make it public.
+
+2010-08-03  Tristan Gingold  <gingold@adacore.com>
+
+	* makefile.vms (OBJS): Update list.
+
+2010-08-03  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-alpha.c (_bfd_vms_slurp_egsd): Do not set SEC_HAS_CONTENTS
+	nor SEC_RELOC for empty sections.
+
+2010-08-03  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-alpha.c (evax_section_flags): Fix flags for absolute
+	section.  Remove useless parenthesis.
+
+2010-08-03  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-lib.c (vms_lib_bread_raw): Change type of BUF argument.
+	(vms_lib_bread, vms_lib_bopen): Adjust.
+
+2010-08-02  Alan Modra  <amodra@gmail.com>
+
+	PR 11866
+	* elf.c (assign_file_positions_for_load_sections): Use p_vaddr to
+	calculate off_adjust rather than first section vma.
+
+2010-07-30  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elflink.c (compute_bucket_count): Add ATTRIBUTE_UNUSED to info.
+
+2010-07-30  Anthony Green  <green@moxielogic.com>
+
+	* config.bfd (targ_cpu): Add moxie-*-rtems support.
+
+2010-07-29  Alan Modra  <amodra@gmail.com>
+
+	* elf64-ppc.c (ppc64_elf_edit_toc): Always adjust local syms in
+	.toc section, even when none are used in relocs.
+
+2010-07-27  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* elfxx-mips.h: Include "elf/mips.h".
+	(gprel16_reloc_p): New static inline function.
+	* elfxx-mips.c (_bfd_mips_elf_check_relocs)
+	[R_MIPS16_GOT16, R_MIPS_GOT16, R_MIPS_GOT_HI16, R_MIPS_GOT_LO16]:
+	Use got16_reloc_p.
+	(_bfd_mips_elf_relocate_section)[bfd_reloc_overflow]: Use
+	gprel16_reloc_p.
+	* elf32-mips.c (mips_info_to_howto_rel): Likewise.
+	* elfn32-mips.c (mips_info_to_howto_rel): Likewise.
+
+2010-07-27  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* elf64-mips.c (mips_elf64_howto_table_rela)
+	[R_MIPS_TLS_DTPMOD64]: Clear partial_inplace.
+	[R_MIPS_TLS_DTPREL64, R_MIPS_TLS_GD, R_MIPS_TLS_LDM]: Likewise.
+	[R_MIPS_TLS_DTPREL_HI16, R_MIPS_TLS_DTPREL_LO16]: Likewise.
+	[R_MIPS_TLS_GOTTPREL, R_MIPS_TLS_TPREL64]: Likewise.
+	[R_MIPS_TLS_TPREL_HI16, R_MIPS_TLS_TPREL_LO16]: Likewise.
+	* elfn32-mips.c (elf_mips_howto_table_rela)
+	[R_MIPS_TLS_DTPMOD32]: Likewise.
+	[R_MIPS_TLS_DTPREL32, R_MIPS_TLS_GD, R_MIPS_TLS_LDM]: Likewise.
+	[R_MIPS_TLS_DTPREL_HI16, R_MIPS_TLS_DTPREL_LO16]: Likewise.
+	[R_MIPS_TLS_GOTTPREL, R_MIPS_TLS_TPREL32]: Likewise.
+	[R_MIPS_TLS_TPREL_HI16, R_MIPS_TLS_TPREL_LO16]: Likewise.
+
+2010-07-23  Naveen.H.S  <naveen.S@kpitcummins.com>
+	    Ina Pandit  <ina.pandit@kpitcummins.com>
+
+	* archures.c (DESCRIPTION): Define bfd_mach_v850e2 and
+	bfd_mach_v850e2v3.
+	* reloc.c (bfd_architecture): Define bfd_mach_v850e2 and
+	bfd_mach_v850e2v3.
+	(BFD_RELOC_V850_16_PCREL, BFD_RELOC_V850_17_PCREL,
+	BFD_RELOC_V850_22_PCREL, BFD_RELOC_V850_23,
+	BFD_RELOC_V850_32_PCREL, BFD_RELOC_V850_32_ABS,
+	BFD_RELOC_V850_16_SPLIT_OFFSET, BFD_RELOC_V850_16_S1,
+	BFD_RELOC_V850_LO16_SPLIT_OFFSET, BFD_RELOC_V850_SDA_15_16_OFFSET,
+	BFD_RELOC_V850_ZDA_16_16_OFFSET, BFD_RELOC_V850_CALLT_15_16_OFFSET,
+	BFD_RELOC_V850_32_GOTPCREL, BFD_RELOC_V850_16_GOT,
+	BFD_RELOC_V850_32_GOT, BFD_RELOC_V850_22_PLT_PCREL,
+	BFD_RELOC_V850_32_PLT_PCREL, BFD_RELOC_V850_COPY,
+	BFD_RELOC_V850_GLOB_DAT, BFD_RELOC_V850_JMP_SLOT,
+	BFD_RELOC_V850_RELATIVE, BFD_RELOC_V850_16_GOTOFF,
+	BFD_RELOC_V850_32_GOTOFF, BFD_RELOC_V850_CODE,
+	BFD_RELOC_V850_DATA): New relocations for V850 target.
+	* config.bfd: Match all v850 targets.
+	* cpu-v850.c (arch_info_struct): Define V850e2 and V850e2v3.
+	* elf32-v850.c (v850_elf_check_relocs): Check the newly added
+	relocations.
+	(v850_elf_perform_relocation ): Update the newly added
+	relocations.
+	(v850_elf_howto_t): Update the specifications of added
+	relocations.
+	(v850_elf_reloc_map): Update the relocation mappings.
+	(v850_elf_final_link_relocate): Maps added relocation into the
+	appropriate howto structure.
+	(v850_elf_object_p): Add support for V850E2 and V850E2V3.
+	(v850_elf_final_write_processing): Likewise.
+	(v850_elf_merge_private_bfd_data): Likewise.
+	(v850_elf_print_private_bfd_data): Likewise.
+	* libbfd.h: Regenerate.
+	* bfd-in2.h: Regenerate.
+
+2010-07-23  Alan Modra  <amodra@gmail.com>
+
+	* archive.c (_bfd_archive_bsd44_construct_extended_name_table):
+	Correct format specifier.
+
+2010-07-22  Alan Modra  <amodra@gmail.com>
+
+	* ecoff.c: Don't include aout/ranlib.h.
+	(_bfd_ecoff_slurp_armap): Use correct struct for ardata->symdefs.
+	(_bfd_ecoff_write_armap): Output ar_date and ar_size using
+	_bfd_ar_spacepad.
+
+2010-07-22  Alan Modra  <amodra@gmail.com>
+
+	* aoutx.h (some_aout_object_p): Don't set EXEC_P for files with
+	relocs.
+
+2010-07-20  Alan Modra  <amodra@gmail.com>
+
+	* elf.c (assign_file_positions_for_load_sections): Check that
+	zero size sections are allocated in segments too.
+	(assign_file_positions_for_non_load_sections): Warn if zero
+	size alloc sections are found here.
+	(copy_elf_program_header): Don't drop zero size sections from
+	segment map.
+	(copy_private_bfd_data): Check for changes in zero size sections.
+
+2010-07-17  Alan Modra  <amodra@gmail.com>
+
+	* elf.c (_bfd_elf_map_sections_to_segments): Force new segment
+	for sections with overlapping LMAs.
+	(assign_file_positions_for_load_sections): Catch overlap for
+	sections that wrap around the address space.  Replace a
+	warning that duplicates ld's --check-sections error with a
+	warning that lma has been adjusted for overlapping sections.
+
+2010-07-14  Cary Coutant  <ccoutant@google.com>
+
+	PR ld/11817
+	* dwarf2.c (read_section): Revert patch for compressed debug sections.
+	(find_line): Likewise.
+	(read_and_uncompress_section): Remove.
+
+2010-07-13  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/11812
+	* elf32-i386.c (elf_i386_size_dynamic_sections): Don't
+	 allocate .got.plt section if there are no GOT nor PLT
+	 entries.
+	 * elf64-x86-64.c (elf64_x86_64_size_dynamic_sections): Likewise.
+
+2010-07-13  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/11791
+	* elf-ifunc.c (_bfd_elf_allocate_ifunc_dyn_relocs): Support
+	garbage collection against STT_GNU_IFUNC symbols.
+
+	* elf32-i386.c (elf_i386_get_local_sym_hash): Don't set
+	elf.plt.offset/elf.got.offset to -1.
+	(elf_i386_tls_transition): Skip TLS transition for functions.
+	(elf_i386_gc_sweep_hook): Support STT_GNU_IFUNC symbols.
+
+	* elf64-x86-64.c (elf64_x86_64_get_local_sym_hash): Don't set
+	elf.plt.offset/elf.got.offset to -1.
+	(elf64_x86_64_tls_transition): Skip TLS transition for functions.
+	(elf64_x86_64_gc_sweep_hook): Support STT_GNU_IFUNC symbols.
+
+2010-07-12  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elf32-i386.c (elf_i386_check_relocs): Re-indent.
+	(elf_i386_relocate_section): Likewise.
+
 2010-07-06  H.J. Lu  <hongjiu.lu@intel.com>
 
 	* dwarf2.c (add_line_info): Initialize prev_line.

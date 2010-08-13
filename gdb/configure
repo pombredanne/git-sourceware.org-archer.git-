@@ -10773,6 +10773,43 @@ $as_echo "${found_usable_python}" >&6; }
   elif test "${have_python_config}" != failed; then
     if test "${have_libpython}" = no; then
 
+  version=python2.7
+
+  new_CPPFLAGS=${python_includes}
+  new_LIBS="${python_libs} -lpython2.7"
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for ${version}" >&5
+$as_echo_n "checking for ${version}... " >&6; }
+  save_CPPFLAGS=$CPPFLAGS
+  save_LIBS=$LIBS
+  CPPFLAGS="$CPPFLAGS $new_CPPFLAGS"
+  LIBS="$LIBS $new_LIBS"
+  found_usable_python=no
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include "${version}/Python.h"
+int
+main ()
+{
+Py_Initialize ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  have_libpython=${version}
+                  found_usable_python=yes
+else
+  CPPFLAGS=$save_CPPFLAGS
+                  LIBS=$save_LIBS
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: ${found_usable_python}" >&5
+$as_echo "${found_usable_python}" >&6; }
+
+    fi
+    if test "${have_libpython}" = no; then
+
   version=python2.6
 
   new_CPPFLAGS=${python_includes}
@@ -12585,9 +12622,9 @@ $as_echo "#define HAVE_WORKING_FORK 1" >>confdefs.h
 fi
 
 for ac_func in canonicalize_file_name realpath getrusage getuid \
-		getgid pipe poll pread64 sbrk setpgid setpgrp setsid \
+		getgid pipe poll pread64 resize_term sbrk setpgid setpgrp setsid \
 		sigaction sigprocmask sigsetmask socketpair syscall \
-		ttrace wborder setlocale iconvlist libiconvlist btowc \
+		ttrace wborder wresize setlocale iconvlist libiconvlist btowc \
 		setrlimit getrlimit posix_madvise
 do :
   as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`

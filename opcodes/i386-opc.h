@@ -44,9 +44,11 @@ enum
   Cpu586,
   /* i686 or better required */
   Cpu686,
-  /* CLFLUSH Instuction support required */
+  /* CLFLUSH Instruction support required */
   CpuClflush,
-  /* SYSCALL Instuctions support required */
+  /* NOP Instruction support required */
+  CpuNop,
+  /* SYSCALL Instructions support required */
   CpuSYSCALL,
   /* Floating point support required */
   Cpu8087,
@@ -92,9 +94,9 @@ enum
   CpuAVX,
   /* Intel L1OM support required */
   CpuL1OM,
-  /* Xsave/xrstor New Instuctions support required */
+  /* Xsave/xrstor New Instructions support required */
   CpuXsave,
-  /* Xsaveopt New Instuctions support required */
+  /* Xsaveopt New Instructions support required */
   CpuXsaveopt,
   /* AES support required */
   CpuAES,
@@ -108,11 +110,11 @@ enum
   CpuXOP,
   /* LWP support required */
   CpuLWP,
-  /* MOVBE Instuction support required */
+  /* MOVBE Instruction support required */
   CpuMovbe,
   /* EPT Instructions required */
   CpuEPT,
-  /* RDTSCP Instuction support required */
+  /* RDTSCP Instruction support required */
   CpuRdtscp,
   /* FSGSBASE Instructions required */
   CpuFSGSBase,
@@ -152,6 +154,7 @@ typedef union i386_cpu_flags
       unsigned int cpui586:1;
       unsigned int cpui686:1;
       unsigned int cpuclflush:1;
+      unsigned int cpunop:1;
       unsigned int cpusyscall:1;
       unsigned int cpu8087:1;
       unsigned int cpu287:1;
