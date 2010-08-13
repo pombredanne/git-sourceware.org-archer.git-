@@ -308,6 +308,7 @@ SUBDIR_PYTHON_SRCS = \
 	python/py-objfile.c \
 	python/py-param.c \
 	python/py-prettyprint.c \
+	python/py-progspace.c \
 	python/py-symbol.c \
 	python/py-symtab.c \
 	python/py-type.c \
