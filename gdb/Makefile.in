@@ -301,7 +301,6 @@ SUBDIR_PYTHON_SRCS = \
 	python/py-cmd.c \
 	python/py-frame.c \
 	python/py-function.c \
-	python/py-hooks.c \
 	python/py-inferior.c \
 	python/py-infthread.c \
 	python/py-lazy-string.c \
@@ -2033,10 +2032,6 @@ py-frame.o: $(srcdir)/python/py-frame.c
 
 py-function.o: $(srcdir)/python/py-function.c
 	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-function.c
-	$(POSTCOMPILE)
-
-py-hooks.o: $(srcdir)/python/py-hooks.c
-	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-hooks.c
 	$(POSTCOMPILE)
 
 py-inferior.o: $(srcdir)/python/py-inferior.c
