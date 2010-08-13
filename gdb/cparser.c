@@ -167,11 +167,15 @@ enum cp_precedence
 /* [Can we re-use gdb's own expression operators?] */
 enum expr_code
 {
+  EQ_EXPR,
   MULT_EXPR,
   DIV_EXPR,
   MOD_EXPR,
   PLUS_EXPR,
   MINUS_EXPR,
+  AND_EXPR,
+  OR_EXPR,
+  XOR_EXPR,
   RSHIFT_EXPR,
   LSHIFT_EXPR,
   AND_AND_EXPR,
@@ -238,6 +242,12 @@ static const struct binary_operations_node binary_ops[] = {
 
   { TTYPE_PLUS, PLUS_EXPR, PREC_ADDITIVE_EXPRESSION },
   { TTYPE_MINUS, MINUS_EXPR, PREC_ADDITIVE_EXPRESSION },
+
+  { TTYPE_AND, AND_EXPR, PREC_AND_EXPRESSION },
+
+  { TTYPE_OR, OR_EXPR, PREC_INCLUSIVE_OR_EXPRESSION },
+
+  { TTYPE_XOR, XOR_EXPR, PREC_EXCLUSIVE_OR_EXPRESSION },
 
   { TTYPE_RSHIFT, RSHIFT_EXPR, PREC_SHIFT_EXPRESSION },
   { TTYPE_LSHIFT, LSHIFT_EXPR, PREC_SHIFT_EXPRESSION },
@@ -808,6 +818,18 @@ build_binary_op (cp_expression *lhs, cp_expression *rhs, enum expr_code code)
       operator = BINOP_SUB;
       break;
 
+    case AND_EXPR:
+      operator = BINOP_BITWISE_AND;
+      break;
+
+    case OR_EXPR:
+      operator = BINOP_BITWISE_IOR;
+      break;
+
+    case XOR_EXPR:
+      operator = BINOP_BITWISE_XOR;
+      break;
+
     case RSHIFT_EXPR:
       operator = BINOP_RSH;
       break;
@@ -1075,7 +1097,7 @@ cp_lex_one_token (cp_parser *parser)
       break;
 
     case '-':
-      result.type = TTYPE_MINUS;
+      IF_NEXT_IS ('=', TTYPE_MINUS_EQ, TTYPE_MINUS);
       break;
 
     case '%':
@@ -1103,7 +1125,6 @@ cp_lex_one_token (cp_parser *parser)
       break;
 
     case '>':
-      /* TODO: deal with templates.  */
       if (*parser->buffer.cur == '=')
 	{
 	  result.type = TTYPE_GREATER_EQ;
@@ -1119,7 +1140,6 @@ cp_lex_one_token (cp_parser *parser)
       break;
 
     case '<':
-      /* TODO: deal with templates.  */
       if (*parser->buffer.cur == '=')
 	{
 	  result.type = TTYPE_LESS_EQ;
@@ -1152,6 +1172,7 @@ static void
 cp_lex (cp_parser *parser)
 {
   cp_token token;
+
   do
     {
       token = cp_lex_one_token (parser);
@@ -1179,11 +1200,14 @@ c_parse (void)
   char *start = lexptr;
   cp_expression *expr;
   cp_parser parser;
+
   parser.buffer.buffer = start;
   parser.buffer.cur = parser.buffer.buffer;
   parser.token_fifo = 0;
+
   cp_lex (&parser);
   _cp_dump_token_stream (&parser);
+
   lexptr += parser.buffer.cur - start;
   expr = cp_parse_expression (&parser);
   expout = expr->exp;
