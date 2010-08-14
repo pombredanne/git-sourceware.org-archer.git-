@@ -39,6 +39,8 @@
 #define TOKEN_TABLE				\
   OP(EQ,		"=")			\
   OP(NOT,		"!")			\
+  OP(GREATER,		">")			\
+  OP(LESS,		"<")			\
   OP(PLUS,		"+")			\
   OP(MINUS,		"-")			\
   OP(MULT,		"*")			\
@@ -59,13 +61,11 @@
   OP(CLOSE_PAREN,	")")			\
   OP(EQ_EQ,		"==")			\
   OP(NOT_EQ,		"!=")			\
-  OP(GREATER,		">")			\
-  OP(LESS,		"<")			\
   OP(GREATER_EQ,	">=")			\
   OP(LESS_EQ,		"<=")			\
   OP(PLUS_EQ,		"+=")			\
   OP(MINUS_EQ,		"-=")			\
-  OP(MULTI_EQ,		"*=")			\
+  OP(MULT_EQ,		"*=")			\
   OP(DIV_EQ,		"/=")			\
   OP(MOD_EQ,		"%=")			\
   OP(AND_EQ,		"&=")			\
@@ -114,14 +114,20 @@ static const char *token_table_strings[(int) N_TOKEN_TYPES] =
 #undef TK
 
 typedef unsigned char token_value;
-typedef struct
+typedef struct cp_token
 {
   token_type type;
   token_value *value;		/* Must be free'd (necesary?) */
 } cp_token;
 
+typedef struct cp_token_list
+{
+  cp_token *token;
+  struct cp_token_list *next;
+} cp_token_list;
+
 /* A token signifying the end of input.  */
-static cp_token EOF_token = {TTYPE_EOF, 0};
+static cp_token *EOF_token;
 
 /* A buffer for lexing the input.  */
 typedef struct
@@ -133,17 +139,20 @@ typedef struct
   const char *cur;
 } cp_buffer;
 
-/* A vector used to hold the token stream.  */
-DEF_VEC_O (cp_token);
-
-/* A parser instance  */
 typedef struct
 {
   /* Buffer used for lexing  */
   cp_buffer buffer;
 
   /* The token stream  */
-  VEC (cp_token) *token_fifo;
+  cp_token_list *tokens;
+  cp_token_list *head;
+} cp_lexer;
+
+/* A parser instance  */
+typedef struct
+{
+  cp_lexer *lexer;
 } cp_parser;
 
 /* Operator precedence levels  */
@@ -301,46 +310,60 @@ static cp_expression *cp_parse_expression (cp_parser *);
 
 
 
-static inline void
-cp_push_token (cp_parser *parser, const cp_token token)
+static cp_token *
+new_token (void)
 {
-  VEC_safe_push (cp_token, parser->token_fifo, &token);
+  return (cp_token *) xcalloc (1, sizeof (cp_token));
 }
 
-static inline cp_token
-cp_peek_token (const cp_parser *parser)
+static void
+cp_lexer_push_token (cp_lexer *lexer, cp_token *token)
 {
-  if (VEC_empty (cp_token, parser->token_fifo))
-    return EOF_token;
-  return *VEC_index (cp_token, parser->token_fifo, 0);
-}
+  cp_token_list *l;
+  cp_token_list *new = (cp_token_list *) xmalloc (sizeof (cp_token_list));
+  new->token = token;
+  new->next = NULL;
 
-#if 0
-static inline cp_token
-cp_peek_token_2 (const cp_parser *parser)
-{
-  if (VEC_length (cp_token, parser->token_fifo) < 2)
-    return EOF_token;
-  return *VEC_index (cp_token, parser->token_fifo, 1);
-}
-#endif
-
-static inline void
-cp_consume_token (const cp_parser *parser)
-{
-  if (!VEC_empty (cp_token, parser->token_fifo))
+  if (lexer->tokens == NULL)
     {
-      cp_token token = cp_peek_token (parser);
-      if (token.value)
-	xfree (token.value);
-      VEC_ordered_remove (cp_token, parser->token_fifo, 0);
+      lexer->tokens = new;
+      lexer->head = new;
+    }
+  else
+    {
+      for (l = lexer->tokens; l->next != NULL; l = l->next)
+        ;
+      l->next = new;
     }
 }
 
-static inline int
-cp_is_eof_token (cp_token token)
+static cp_token *
+cp_lexer_peek_token (const cp_lexer *lexer)
 {
-  return token.type == TTYPE_EOF;
+  if (lexer->tokens == NULL)
+    return EOF_token;
+  return lexer->tokens->token;
+}
+
+static cp_token *
+cp_lexer_consume_token (cp_lexer *lexer)
+{
+  cp_token_list *next = lexer->tokens->next;
+  gdb_assert (lexer->tokens != NULL);
+  lexer->tokens = next;
+  return next->token;
+}
+
+static int
+cp_lexer_next_token_is (cp_lexer *lexer, token_type type)
+{
+  return (cp_lexer_peek_token (lexer)->type == type);
+}
+
+static int
+cp_is_eof_token (cp_token *token)
+{
+  return (token->type == TTYPE_EOF);
 }
 
 
@@ -697,15 +720,15 @@ parse_number (const cp_parser *parser, token_value *value, cp_typed_number *resu
 static cp_expression *
 cp_parse_primary_expression (cp_parser *parser)
 {
-  cp_token token = cp_peek_token (parser);
-  switch (token.type)
+  cp_token *token = cp_lexer_peek_token (parser->lexer);
+  switch (token->type)
     {
     case TTYPE_NUMBER:
       {
 	int r;
 	cp_typed_number number;
-	parse_number (parser, token.value, &number);
-	cp_consume_token (parser);
+	parse_number (parser, token->value, &number);
+	cp_lexer_consume_token (parser->lexer);
 
 	switch (number.kind)
 	  {
@@ -748,9 +771,9 @@ cp_parse_primary_expression (cp_parser *parser)
 static cp_expression *
 cp_parse_postfix_expression (cp_parser *parser)
 {
-  cp_token token = cp_peek_token (parser);
+  cp_token *token = cp_lexer_peek_token (parser->lexer);
 
-  switch (token.type)
+  switch (token->type)
     {
     default:
       return cp_parse_primary_expression (parser);
@@ -763,7 +786,7 @@ cp_parse_postfix_expression (cp_parser *parser)
 static cp_expression *
 cp_parse_unary_expression (cp_parser *parser)
 {
-  cp_token token = cp_peek_token (parser);
+  cp_token *token = cp_lexer_peek_token (parser->lexer);
 
   /* check for keyword */
   /* check for scope operator */
@@ -776,7 +799,7 @@ static cp_expression *
 cp_cast_expression (cp_parser *parser)
 {
   /* determine if parser is looking at a cast of some sort */
-  if (cp_peek_token (parser).type == TTYPE_OPEN_PAREN)
+  if (cp_lexer_next_token_is (parser->lexer, TTYPE_OPEN_PAREN))
     {
       /* we could be looking at a cast... */
       return NULL;
@@ -891,7 +914,7 @@ cp_parse_binary_expression (cp_parser *parser, enum cp_precedence prec)
 {
   cp_expression_stack stack;
   cp_expression_stack_entry *sp = &stack[0];
-  cp_token token;
+  cp_token *token;
   enum cp_precedence new_prec, lookahead_prec;
   cp_expression *lhs, *rhs;
   enum expr_code operator;
@@ -899,8 +922,8 @@ cp_parse_binary_expression (cp_parser *parser, enum cp_precedence prec)
   lhs = cp_cast_expression (parser);
   for (;;)
     {
-      token = cp_peek_token (parser);
-      new_prec = binary_ops_token[token.type].prec;
+      token = cp_lexer_peek_token (parser->lexer);
+      new_prec = binary_ops_token[token->type].prec;
 
       if (new_prec <= prec)
 	{
@@ -912,13 +935,13 @@ cp_parse_binary_expression (cp_parser *parser, enum cp_precedence prec)
 
     get_rhs:
 
-      operator = binary_ops_token[token.type].code;
-      cp_consume_token (parser);
+      operator = binary_ops_token[token->type].code;
+      cp_lexer_consume_token (parser->lexer);
 
       rhs = cp_parse_simple_cast_expression (parser);
 
-      token = cp_peek_token (parser);
-      lookahead_prec = binary_ops_token[token.type].prec;
+      token = cp_lexer_peek_token (parser->lexer);
+      lookahead_prec = binary_ops_token[token->type].prec;
       if (lookahead_prec > new_prec)
 	{
 	  /* new token has higher precedence than old... */
@@ -951,43 +974,43 @@ cp_parse_binary_expression (cp_parser *parser, enum cp_precedence prec)
 static cp_expression *
 cp_parse_expression (cp_parser *parser)
 {
-  cp_token token = cp_peek_token (parser);
+  cp_token *token = cp_lexer_peek_token (parser->lexer);
 
-  switch (token.type)
+  switch (token->type)
     {
       /* Unary operators  */
     case TTYPE_MULT:
-      cp_consume_token (parser);
+      cp_lexer_consume_token (parser->lexer);
       cp_parse_expression (parser);
       write_exp_elt_opcode (UNOP_IND);
       break;
 
     case TTYPE_AND:
-      cp_consume_token (parser);
+      cp_lexer_consume_token (parser->lexer);
       cp_parse_expression (parser);
       write_exp_elt_opcode (UNOP_ADDR);
       break;
 
     case TTYPE_MINUS:
-      cp_consume_token (parser);
+      cp_lexer_consume_token (parser->lexer);
       cp_parse_expression (parser);
       write_exp_elt_opcode (UNOP_NEG);
       break;
 
     case TTYPE_PLUS:
-      cp_consume_token (parser);
+      cp_lexer_consume_token (parser->lexer);
       cp_parse_expression (parser);
       write_exp_elt_opcode (UNOP_PLUS);
       break;
 
     case TTYPE_NOT:
-      cp_consume_token (parser);
+      cp_lexer_consume_token (parser->lexer);
       cp_parse_expression (parser);
       write_exp_elt_opcode (UNOP_LOGICAL_NOT);
       break;
 
     case TTYPE_COMPL:
-      cp_consume_token (parser);
+      cp_lexer_consume_token (parser->lexer);
       cp_parse_expression (parser);
       write_exp_elt_opcode (UNOP_COMPLEMENT);
       break;
@@ -1002,16 +1025,16 @@ cp_parse_expression (cp_parser *parser)
 
   return NULL;
 }
+
 
 
-static cp_token
-cp_lex_number (cp_parser *parser)
+static void
+cp_lex_number (cp_lexer *lexer, cp_token *result)
 {
-  const char *start = --parser->buffer.cur;
+  const char *start = --lexer->buffer.cur;
   const char *p = start;
   int hex = input_radix > 10;
   int got_dot = 0, got_e = 0;
-  cp_token result;
 
   if (*p == '0' && (p[1] == 'x' || p[1] == 'X'))
     {
@@ -1048,31 +1071,29 @@ cp_lex_number (cp_parser *parser)
 	break;
     }
 
-  result.type = TTYPE_NUMBER;
-  result.value = savestring (start, p - start);
-  parser->buffer.cur += p - start;
-  return result;
+  result->type = TTYPE_NUMBER;
+  result->value = savestring (start, p - start);
+  lexer->buffer.cur += p - start;
 }
 
 #define IF_NEXT_IS(CHAR, THEN_TYPE, ELSE_TYPE)	\
   do {						\
-      result.type = ELSE_TYPE;			\
-      if (*parser->buffer.cur == CHAR)		\
+      result->type = ELSE_TYPE;			\
+      if (*lexer->buffer.cur == CHAR)		\
 	{					\
-	  parser->buffer.cur++;			\
-	  result.type = THEN_TYPE;		\
+	  lexer->buffer.cur++;			\
+	  result->type = THEN_TYPE;		\
 	}					\
   } while (0)
 
-static cp_token
-cp_lex_one_token (cp_parser *parser)
+static cp_token *
+cp_lex_one_token (cp_lexer *lexer)
 {
   char c;
-  cp_token result;
-  result.value = 0;
+  cp_token *result = new_token ();
 
  retry:
-  c = *parser->buffer.cur++;
+  c = *lexer->buffer.cur++;
 
   switch (c)
     {
@@ -1081,19 +1102,19 @@ cp_lex_one_token (cp_parser *parser)
 
     case '0': case '1': case '2': case '3': case '4':
     case '5': case '6': case '7': case '8': case '9':
-      result = cp_lex_number (parser);
+      cp_lex_number (lexer, result);
       break;
 
     case '*':
-      result.type = TTYPE_MULT;
+      result->type = TTYPE_MULT;
       break;
 
     case '/':
-      result.type = TTYPE_DIV;
+      result->type = TTYPE_DIV;
       break;
 
     case '+':
-      result.type = TTYPE_PLUS;
+      result->type = TTYPE_PLUS;
       break;
 
     case '-':
@@ -1109,7 +1130,7 @@ cp_lex_one_token (cp_parser *parser)
       break;
 
     case '~':
-      result.type = TTYPE_COMPL;
+      result->type = TTYPE_COMPL;
       break;
 
     case '&':
@@ -1125,37 +1146,38 @@ cp_lex_one_token (cp_parser *parser)
       break;
 
     case '>':
-      if (*parser->buffer.cur == '=')
+      if (*lexer->buffer.cur == '=')
 	{
-	  result.type = TTYPE_GREATER_EQ;
-	  parser->buffer.cur++;
+	  result->type = TTYPE_GREATER_EQ;
+	  lexer->buffer.cur++;
 	}
-      else if (*parser->buffer.cur == '>')
+      else if (*lexer->buffer.cur == '>')
 	{
-	  parser->buffer.cur++;
+	  lexer->buffer.cur++;
 	  IF_NEXT_IS ('=', TTYPE_RSHIFT_EQ, TTYPE_RSHIFT);
 	}
       else
-	result.type = TTYPE_GREATER;
+	result->type = TTYPE_GREATER;
       break;
 
     case '<':
-      if (*parser->buffer.cur == '=')
+      if (*lexer->buffer.cur == '=')
 	{
-	  result.type = TTYPE_LESS_EQ;
-	  parser->buffer.cur++;
+	  result->type = TTYPE_LESS_EQ;
+	  lexer->buffer.cur++;
 	}
-      else if (*parser->buffer.cur == '<')
+      else if (*lexer->buffer.cur == '<')
 	{
-	  parser->buffer.cur++;
+	  lexer->buffer.cur++;
 	  IF_NEXT_IS ('=', TTYPE_LSHIFT_EQ, TTYPE_LSHIFT);
 	}
       else
-	result.type = TTYPE_LESS;
+	result->type = TTYPE_LESS;
       break;
 
     case 0:
-      --parser->buffer.cur;
+      --lexer->buffer.cur;
+      xfree (result);
       result = EOF_token;
       break;
 
@@ -1169,52 +1191,92 @@ cp_lex_one_token (cp_parser *parser)
 }
 
 static void
-cp_lex (cp_parser *parser)
+cp_lex (cp_lexer *lexer)
 {
-  cp_token token;
-
+  cp_token *token;
   do
     {
-      token = cp_lex_one_token (parser);
-      cp_push_token (parser, token);
+      token = cp_lex_one_token (lexer);
+      cp_lexer_push_token (lexer, token);
     }
   while (!cp_is_eof_token (token));
 }
 
 #if 1
 static void
-_cp_dump_token_stream (const cp_parser *parser)
+_cp_dump_token_stream (const cp_lexer *lexer)
 {
-  int i;
-  cp_token *elt;
-  printf ("token stream:\n");
-  for (i = 0; VEC_iterate (cp_token, parser->token_fifo, i, elt); ++i)
-    printf ("\t[%d] token = %s, value = \"%s\"\n", i,
-	    token_table_strings[(int) elt->type], elt->value);
+  if (lexer->tokens == NULL)
+    printf ("\t<empty>\n");
+  else
+    {
+      int i;
+      cp_token_list *l;
+      for (i = 0, l = lexer->tokens; l != NULL; l = l->next)
+        {
+          cp_token *elt = l->token;
+          printf ("\t[%d] token = %s, value = \"%s\"\n", i++,
+                  token_table_strings[(int) elt->type], elt->value);
+        }
+    }
 }
 #endif
+
+static void
+free_cp_parser (cp_parser *parser)
+{
+  cp_token_list *l = parser->lexer->head;
+
+  while (l != NULL)
+    {
+      cp_token_list *p = l;
+      l = l->next;
+      if (p->token != EOF_token)
+        {
+          if (p->token->value != NULL)
+            xfree (p->token->value);
+          xfree (p->token);
+        }
+      xfree (p);
+    }
+
+  /* free saved_tokens, if any (shouldn't be) */
+  xfree (parser->lexer);
+  xfree (parser);
+}
+
+static cp_parser *
+new_parser (char *start)
+{
+  cp_parser *parser = xcalloc (1, sizeof (cp_parser));
+  parser->lexer = (cp_lexer *) xcalloc (1, sizeof (cp_lexer));
+  parser->lexer->buffer.buffer = start;
+  parser->lexer->buffer.cur = parser->lexer->buffer.buffer;
+  return parser;
+}
 
 int
 c_parse (void)
 {
   char *start = lexptr;
   cp_expression *expr;
-  cp_parser parser;
+  cp_parser *parser = new_parser (lexptr);
 
-  parser.buffer.buffer = start;
-  parser.buffer.cur = parser.buffer.buffer;
-  parser.token_fifo = 0;
+  /* Lex and parse input  */
+  cp_lex (parser->lexer);
+  _cp_dump_token_stream (parser->lexer);
+  lexptr += parser->lexer->buffer.cur - start;
 
-  cp_lex (&parser);
-  _cp_dump_token_stream (&parser);
-
-  lexptr += parser.buffer.cur - start;
-  expr = cp_parse_expression (&parser);
+  /* Parse input and reset global variables  */
+  expr = cp_parse_expression (parser);
   expout = expr->exp;
   expout_size = expr->size;
   expout_ptr = expr->ptr;
+
+  /* Free parser and expression memory  */
+  free_cp_parser (parser);
   xfree (expr);
-  VEC_free (cp_token, parser.token_fifo);
+
   return 0;
 }
 
@@ -1229,6 +1291,9 @@ void
 _initialize_cparser (void)
 {
   int i;
+
+  EOF_token = new_token ();
+  EOF_token->type = TTYPE_EOF;
 
   for (i = 0; i < sizeof (binary_ops) / sizeof (binary_ops[0]); ++i)
     binary_ops_token[binary_ops[i].token_type] = binary_ops[i];
