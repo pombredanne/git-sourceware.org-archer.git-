@@ -91,7 +91,8 @@
   TK(NUMBER,		LITERAL)		\
   TK(CHAR,		LITERAL)		\
   TK(OTHER,		LITERAL)		\
-  TK(STRING,		LITERAL)
+  TK(STRING,		LITERAL)		\
+  TK(KEYWORD,           NONE)
 
 #define OP(e,s) TTYPE_ ## e,
 #define TK(e,s) TTYPE_ ## e,
@@ -176,6 +177,7 @@ enum cp_precedence
 /* [Can we re-use gdb's own expression operators?] */
 enum expr_code
 {
+  ERROR_CODE,
   EQ_EXPR,
   MULT_EXPR,
   DIV_EXPR,
@@ -195,6 +197,14 @@ enum expr_code
   LESS_EXPR,
   GREATER_EQ_EXPR,
   LESS_EQ_EXPR,
+  INDIRECT_REF,
+  ADDR_EXPR,
+  PREINCREMENT_EXPR,
+  PREDECREMENT_EXPR,
+  UNARY_PLUS_EXPR,
+  NEGATE_EXPR,
+  TRUTH_NOT_EXPR,
+  BIT_NOT_EXPR
 };
 
 /* An expression "chain" which wraps the parser globals
@@ -307,6 +317,8 @@ typedef struct
 
    In both cases, expout will be reset.  */
 static cp_expression *cp_parse_expression (cp_parser *);
+
+static cp_expression *cp_cast_expression (cp_parser *);
 
 
 
@@ -783,14 +795,109 @@ cp_parse_postfix_expression (cp_parser *parser)
   return NULL;
 }
 
+static enum expr_code
+cp_unary_operator (cp_token *token)
+{
+  switch (token->type)
+    {
+    case TTYPE_MULT:
+      return INDIRECT_REF;
+
+    case TTYPE_AND:
+      return ADDR_EXPR;
+
+    case TTYPE_PLUS:
+      return UNARY_PLUS_EXPR;
+
+    case TTYPE_MINUS:
+      return NEGATE_EXPR;
+
+    case TTYPE_NOT:
+      return TRUTH_NOT_EXPR;
+
+    case TTYPE_COMPL:
+      return BIT_NOT_EXPR;
+
+    default:
+      return ERROR_CODE;
+    }
+}
+
 static cp_expression *
 cp_parse_unary_expression (cp_parser *parser)
 {
-  cp_token *token = cp_lexer_peek_token (parser->lexer);
+  cp_token *token;
+  enum expr_code unary_operator;
 
-  /* check for keyword */
-  /* check for scope operator */
-  /* look for unary operator */
+  token  = cp_lexer_peek_token (parser->lexer);
+  if (token->type == TTYPE_KEYWORD)
+    {
+      ;
+    }
+
+  if (cp_lexer_next_token_is (parser->lexer, TTYPE_SCOPE))
+    {
+      ;
+    }
+
+  unary_operator = cp_unary_operator (token);
+  if (unary_operator == ERROR_CODE)
+    {
+      if (token->type == TTYPE_PLUS_PLUS)
+	unary_operator = PREINCREMENT_EXPR;
+      else if (token->type == TTYPE_MINUS_MINUS)
+	unary_operator = PREDECREMENT_EXPR;
+      /* GNU extension TTYPE_AND_AND? */
+    }
+
+  if (unary_operator != ERROR_CODE)
+    {
+      cp_expression *cast_expr;
+      enum exp_opcode operator;
+
+      token = cp_lexer_consume_token (parser->lexer);
+      cast_expr = cp_cast_expression (parser);
+      switch (unary_operator)
+	{
+	case INDIRECT_REF:
+	  operator = UNOP_IND;
+	  break;
+
+	case ADDR_EXPR:
+	  operator = UNOP_ADDR;
+	  break;
+
+	case BIT_NOT_EXPR:
+	  operator = UNOP_COMPLEMENT;
+	  break;
+
+	case PREINCREMENT_EXPR:
+	  operator = UNOP_PREINCREMENT;
+	  break;
+
+	case PREDECREMENT_EXPR:
+	  operator = UNOP_PREDECREMENT;
+	  break;
+
+	case UNARY_PLUS_EXPR:
+	  operator = UNOP_PLUS;
+	  break;
+
+	case NEGATE_EXPR:
+	  operator = UNOP_NEG;
+	  break;
+
+	case TRUTH_NOT_EXPR:
+	  operator = UNOP_LOGICAL_NOT;
+	  break;
+
+	default:
+	  internal_error (__FILE__, __LINE__, _("unreachable statement!"));
+	}
+
+      write_exp_elt_opcode (operator);
+      return cp_expression_chain (cast_expr);
+    }
 
   return cp_parse_postfix_expression (parser);
 }
@@ -974,56 +1081,7 @@ cp_parse_binary_expression (cp_parser *parser, enum cp_precedence prec)
 static cp_expression *
 cp_parse_expression (cp_parser *parser)
 {
-  cp_token *token = cp_lexer_peek_token (parser->lexer);
-
-  switch (token->type)
-    {
-      /* Unary operators  */
-    case TTYPE_MULT:
-      cp_lexer_consume_token (parser->lexer);
-      cp_parse_expression (parser);
-      write_exp_elt_opcode (UNOP_IND);
-      break;
-
-    case TTYPE_AND:
-      cp_lexer_consume_token (parser->lexer);
-      cp_parse_expression (parser);
-      write_exp_elt_opcode (UNOP_ADDR);
-      break;
-
-    case TTYPE_MINUS:
-      cp_lexer_consume_token (parser->lexer);
-      cp_parse_expression (parser);
-      write_exp_elt_opcode (UNOP_NEG);
-      break;
-
-    case TTYPE_PLUS:
-      cp_lexer_consume_token (parser->lexer);
-      cp_parse_expression (parser);
-      write_exp_elt_opcode (UNOP_PLUS);
-      break;
-
-    case TTYPE_NOT:
-      cp_lexer_consume_token (parser->lexer);
-      cp_parse_expression (parser);
-      write_exp_elt_opcode (UNOP_LOGICAL_NOT);
-      break;
-
-    case TTYPE_COMPL:
-      cp_lexer_consume_token (parser->lexer);
-      cp_parse_expression (parser);
-      write_exp_elt_opcode (UNOP_COMPLEMENT);
-      break;
-
-    case TTYPE_EOF:
-      /* Need better error handling?  */
-      error (_("unexpected end-of-line while parsing input"));
-
-    default:
-      return cp_parse_binary_expression (parser, PREC_NOT_OPERATOR);
-    }
-
-  return NULL;
+  return cp_parse_binary_expression (parser, PREC_NOT_OPERATOR);
 }
 
 
