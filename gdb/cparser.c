@@ -1139,9 +1139,26 @@ cp_lex_number (cp_lexer *lexer, cp_token *result)
       result->type = ELSE_TYPE;			\
       if (*lexer->buffer.cur == CHAR)		\
 	{					\
-	  lexer->buffer.cur++;			\
+	  ++lexer->buffer.cur;			\
 	  result->type = THEN_TYPE;		\
 	}					\
+  } while (0)
+
+#define IF_NEXT_IS_ELSE_IF(CHAR_THEN, THEN_TYPE,	\
+			   CHAR_ELSE_IF, ELSE_IF_TYPE,	\
+			   ELSE_TYPE)			\
+  do {							\
+      result->type = ELSE_TYPE;				\
+      if (*lexer->buffer.cur == CHAR_THEN)		\
+	{						\
+	  ++lexer->buffer.cur;				\
+	  result->type = THEN_TYPE;			\
+	}						\
+      else if (*lexer->buffer.cur == CHAR_ELSE_IF)	\
+	{						\
+	  ++lexer->buffer.cur;				\
+	  result->type = ELSE_IF_TYPE;			\
+	}						\
   } while (0)
 
 static cp_token *
@@ -1164,19 +1181,37 @@ cp_lex_one_token (cp_lexer *lexer)
       break;
 
     case '*':
-      result->type = TTYPE_MULT;
+      IF_NEXT_IS ('=', TTYPE_MULT_EQ, TTYPE_MULT);
       break;
 
     case '/':
-      result->type = TTYPE_DIV;
+      IF_NEXT_IS ('=', TTYPE_DIV_EQ, TTYPE_DIV);
       break;
 
     case '+':
-      result->type = TTYPE_PLUS;
+      IF_NEXT_IS_ELSE_IF ('+', TTYPE_PLUS_PLUS,
+			  '=', TTYPE_PLUS_EQ,
+			  TTYPE_PLUS);
       break;
 
     case '-':
-      IF_NEXT_IS ('=', TTYPE_MINUS_EQ, TTYPE_MINUS);
+      if (*lexer->buffer.cur == '-')
+	{
+	  ++lexer->buffer.cur;
+	  result->type = TTYPE_MINUS_MINUS;
+	}
+      else if (*lexer->buffer.cur == '>')
+	{
+	  ++lexer->buffer.cur;
+	  IF_NEXT_IS ('*', TTYPE_DEREF_STAR, TTYPE_DEREF);
+	}
+      else if (*lexer->buffer.cur == '=')
+	{
+	  ++lexer->buffer.cur;
+	  result->type = TTYPE_MINUS_EQ;
+	}
+      else
+	result->type = TTYPE_MINUS;
       break;
 
     case '%':
@@ -1192,11 +1227,15 @@ cp_lex_one_token (cp_lexer *lexer)
       break;
 
     case '&':
-      IF_NEXT_IS ('&', TTYPE_AND_AND, TTYPE_AND);
+      IF_NEXT_IS_ELSE_IF ('&', TTYPE_AND_AND,
+			  '=', TTYPE_AND_EQ,
+			  TTYPE_AND);
       break;
 
     case '|':
-      IF_NEXT_IS ('|', TTYPE_OR_OR, TTYPE_OR);
+      IF_NEXT_IS_ELSE_IF ('|', TTYPE_OR_OR,
+			  '=', TTYPE_OR_EQ,
+			  TTYPE_OR);
       break;
 
     case '=':
@@ -1206,12 +1245,12 @@ cp_lex_one_token (cp_lexer *lexer)
     case '>':
       if (*lexer->buffer.cur == '=')
 	{
+	  ++lexer->buffer.cur;
 	  result->type = TTYPE_GREATER_EQ;
-	  lexer->buffer.cur++;
 	}
       else if (*lexer->buffer.cur == '>')
 	{
-	  lexer->buffer.cur++;
+	  ++lexer->buffer.cur;
 	  IF_NEXT_IS ('=', TTYPE_RSHIFT_EQ, TTYPE_RSHIFT);
 	}
       else
@@ -1221,16 +1260,60 @@ cp_lex_one_token (cp_lexer *lexer)
     case '<':
       if (*lexer->buffer.cur == '=')
 	{
+	  ++lexer->buffer.cur;
 	  result->type = TTYPE_LESS_EQ;
-	  lexer->buffer.cur++;
 	}
       else if (*lexer->buffer.cur == '<')
 	{
-	  lexer->buffer.cur++;
+	  ++lexer->buffer.cur;
 	  IF_NEXT_IS ('=', TTYPE_LSHIFT_EQ, TTYPE_LSHIFT);
 	}
       else
 	result->type = TTYPE_LESS;
+      break;
+
+    case '?':
+      result->type = TTYPE_QUERY;
+      break;
+
+    case ':':
+      IF_NEXT_IS (':', TTYPE_SCOPE, TTYPE_COLON);
+      break;
+
+    case ',':
+      result->type = TTYPE_COMMA;
+      break;
+
+    case '(':
+      result->type = TTYPE_OPEN_PAREN;
+      break;
+
+    case ')':
+      result->type = TTYPE_CLOSE_PAREN;
+      break;
+
+    case '[':
+      result->type = TTYPE_OPEN_SQUARE;
+      break;
+
+    case ']':
+      result->type = TTYPE_CLOSE_SQUARE;
+      break;
+
+    case '{':
+      result->type = TTYPE_OPEN_BRACE;
+      break;
+
+    case '}':
+      result->type = TTYPE_CLOSE_BRACE;
+      break;
+
+    case '.':
+      IF_NEXT_IS ('*', TTYPE_DOT_STAR, TTYPE_DOT);
+      break;
+
+    case '@':
+      result->type = TTYPE_ATSIGN;
       break;
 
     case 0:
