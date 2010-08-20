@@ -747,6 +747,7 @@ release_value (struct value *val)
   if (all_values == val)
     {
       all_values = val->next;
+      val->next = NULL;
       return;
     }
 
@@ -755,6 +756,7 @@ release_value (struct value *val)
       if (v->next == val)
 	{
 	  v->next = val->next;
+	  val->next = NULL;
 	  break;
 	}
     }
@@ -1915,7 +1917,7 @@ value_static_field (struct type *type, int fieldno)
       break;
     }
     default:
-      gdb_assert (0);
+      gdb_assert_not_reached ("unexpected field location kind");
     }
 
   return retval;

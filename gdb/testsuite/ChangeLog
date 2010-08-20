@@ -1,3 +1,112 @@
+2010-08-19  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.arch/vsx-regs.exp: Remove wrong comment about testing AltiVec
+	registers.  Update data sets with the new v2_double element in the
+	VSX register union.  Add vector_register3_vr data set for the AltiVec
+	registers.  Use gdb_test_no_output instead of send_gdb.
+
+2010-08-19  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.python/py-shared.exp: New file, factored out from
+	python.exp.
+	* gdb.python/py-shared.c: New file.
+	* gdb.python/py-shared-sl.c: New file.
+	* gdb.python/python-1.c: New file.
+	* gdb.python/python-sl.c: Delete.
+	* gdb.python/python.c: Mention python-1.c.
+	* gdb.python/python.exp: Move shared library tests to
+	py-shared.exp.
+	* gdb.python/Makefile.in (EXECUTABLES): Add py-shared and python.
+	(MISCELLANEOUS): New.
+	(clean mostlyclean): Also remove $MISCELLANEOUS.
+
+2010-08-19  Doug Evans  <dje@google.com>
+
+	PR exp/11926
+	* gdb.base/printcmds.exp (test_float_accepted): New function.
+	Move existing float tests there.  Add tests for floats with suffixes.
+	(test_float_rejected): New function.
+	* gdb.java/jv-print.exp (test_float_accepted): New function.
+	(test_float_rejected): New function.
+	* gdb.objc/print.exp: New file.
+	* gdb.pascal/print.exp: New file.
+	* lib/objc.exp: New file.
+
+2010-08-19  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* gdb.base/default.exp (info set): Avoid full buffer error and force
+	reading up to final gdb prompt.
+	(show): Likewise.
+
+2010-08-18  Tom Tromey  <tromey@redhat.com>
+
+	PR symtab/11919:
+	* gdb.base/completion.exp: Add test.
+
+2010-08-18  Doug Evans  <dje@google.com>
+
+	* gdb.base/call-ar-st.exp (set_lang_c): Delete, unused.
+	* gdb.base/callfuncs.exp (set_lang_c): Delete, set c language directly.
+	* gdb.base/printcmds.exp (set_lang_c): Delete, set c language directly.
+	Simplify, early exit if runto_main fails.
+	* gdb.fortran/exprs.exp: load_lib fortran.exp.
+	(set_lang_fortran): Moved to lib/fortran.exp.
+	* gdb.fortran/types.exp: load_lib fortran.exp.
+	(set_lang_fortran): Moved to lib/fortran.exp.
+	* gdb.java/jmisc.exp (set_lang_java): Moved to lib/java.exp.
+	* gdb.java/jprint.exp (set_lang_java): Ditto.
+	* gdb.java/jv-exp.exp: load_lib java.exp.
+	If set_lang_java fails, issue a warning instead of failure to be
+	consistent with other set_lang_foo uses.
+	(set_lang_java): Moved to lib/java.exp.
+	* gdb.java/jv-print.exp (set_lang_java): Moved to lib/java.exp.
+	If set_lang_java fails, issue a warning instead of failure to be
+	consistent with other set_lang_foo uses.
+	* gdb.pascal/types.exp: load_lib pascal.exp.
+	(set_lang_pascal): Moved to lib/pascal.exp.
+	* lib/fortran.exp: New file.
+	* lib/java.exp (set_lang_java): New function.
+	* lib/pascal.exp (set_lang_pascal): New function.
+
+2010-08-18  Yao Qi  <yao@codesourcery.com
+
+	* gdb.dwarf2/dw2-ref-missing-frame-func.c: Add .p2align 4 for labels
+	func_nofb_start and func_loopfb_start, so that address of functions
+	is equal to these labels on Thumb.
+
+2010-08-18  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.gdb/selftest.exp (do_steps_and_nexts): Update test case
+	to reflect latest c source file.
+
+2010-08-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.cp/infcall-dlopen.exp: New file.
+	* gdb.cp/infcall-dlopen.cc: New file.
+	* gdb.cp/infcall-dlopen-lib.cc: New file.
+
+2010-08-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Pedro Alves  <pedro@codesourcery.com>
+
+	PR breakpoints/11371
+
+	* gdb.base/watch-cond-infcall.exp: New file.
+	* gdb.base/watch-cond-infcall.c: New file.
+
+2010-08-16  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/help.exp: Update.
+	* gdb.base/watchpoint.exp (test_watchpoint_and_breakpoint): Delete
+	watchpoint.
+	(test_watch_location): New proc.
+	(test_watchpoint_in_big_blob): Delete watchpoint.
+	* gdb.base/watchpoint.c (func5): New function.
+	(main): Call it.
+
+2010-08-16  Doug Evans  <dje@google.com>
+
+	* gdb.python/python.exp: Fix syntax in "post event insertion" test.
+
 2010-08-11  Phil Muldoon  <pmuldoon@redhat.com>
 
 	* gdb.python/python.exp (gdb_py_test_multiple): Add gdb.post_event

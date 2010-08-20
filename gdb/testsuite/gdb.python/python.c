@@ -15,7 +15,7 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-/* Shared library function */
+/* In python-1.c.  */
 extern void func1 (void);
 extern int func2 (void);
 
