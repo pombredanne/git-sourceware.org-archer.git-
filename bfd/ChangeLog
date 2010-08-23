@@ -1,3 +1,27 @@
+2010-08-22  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/11933
+	* elflink.c (elf_link_add_object_symbols): Don't check relocation
+	if input ELF object ID doesn't match output.
+
+2010-08-21  Ralf Wildenhues  <Ralf.Wildenhues@gmx.de>
+
+	* configure: Regenerate.
+
+2010-08-20  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* merge.c (sec_merge_emit): Revert the last checkin.
+
+2010-08-20  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* elf32-sh.c (sh_elf_relocate_section): Handle non-ELF output
+	BFD.
+
+2010-08-20  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* elf32-m68k.c (bfd_elf_m68k_set_target_options): Don't set GOT
+	options unless an m68k hash table has been found.
+
 2010-08-20  Nick Clifton  <nickc@redhat.com>
 
 	* merge.c (sec_merge_emit): Do not zero pad sections that do not

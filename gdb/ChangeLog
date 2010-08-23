@@ -1,3 +1,55 @@
+2010-08-20  Pedro Alves  <pedro@codesourcery.com>
+
+	* python/python.c: Include "serial.h".
+	(gdbpy_event_fds): Change type to `struct serial *' a array from
+	int array.
+	(gdbpy_run_events): Change parameters.  Use serial_readchar in
+	place of read.
+	(gdbpy_post_event): Use serial_write in place of write.
+	(gdbpy_initialize_events): Use serial_pipe instead of pipe, and
+	serial_async in place of add_file_handler.
+
+2010-08-20  Pedro Alves  <pedro@codesourcery.com>
+
+	* serial.h (gdb_pipe, serial_pipe): Declare.
+	* serial.c (serial_interface_lookup): Take a const char pointer.
+	(serial_fdopen): Rename to ...
+	(serial_fdopen_ops): ... this.  Add an OPS parameter and use it.
+	Call the OPS' fdopen function if there is one.
+	(serial_fdopen): Rewrite as wrapper to serial_fdopen_ops.
+	(serial_pipe): New.
+	(struct serial_ops) <fdopen>: New field.
+
+	* ser-mingw.c (free_pipe_state):
+	(free_pipe_state): Close output on non-pex pipes.
+	(pipe_windows_fdopen): New.
+	(gdb_pipe): New.
+	(_initialize_ser_windows): Register pipe_windows_fdopen.
+	* ser-go32.c (gdb_pipe): New.
+	* ser-pipe.c (pipe_close): Close file descriptor even if there's
+	no state pointer.
+	(pipe_ops): Delete.
+	(gdb_pipe): New.
+
+2010-08-20  Keith Seitz  <keiths@redhat.com>
+
+	PR symtab/11465:
+ 	* dwarf2read.c (struct delayed_method_info): New struct.
+	(struct dwarf2_cu): Add vector method_list.
+	(scan_partial_symbols): Count methods for union, class, structure,
+	and interface types.
+	(add_to_method_list): New function.
+	(free_delayed_list): New function.
+	(compute_delayed_physnames): New function.
+	(process_full_comp_unit): Make a cleanup for the CU's delayed
+	physname list, compute the delayed physnames, and free the
+	the list.
+	(dwarf2_add_member_fn): For C++ and Java, delay the computation
+	of the physname until after the CU is read.
+
+	* dwarf2read.c (read_structure_type): Check if the current
+	DIE's type was already completed after dwarf2_full_name
+	was called.
 2010-08-19  Stan Shebs  <stan@codesourcery.com>
 
 	* NEWS: Mention some additional changes.
