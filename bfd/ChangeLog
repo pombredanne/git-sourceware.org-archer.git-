@@ -1,3 +1,125 @@
+2010-09-01  Pedro Alves  <pedro@codesourcery.com>
+
+	* netbsd-core.c (netbsd_core_core_file_pid): Renamed to ...
+	(netbsd_core_file_pid): ... this.
+
+2010-09-01  Tristan Gingold  <gingold@adacore.com>
+
+	* coffcode.h (coff_slurp_line_table): Add a cast.
+	(coff_slurp_reloc_table): Ditto.
+
+2010-08-30  Gunther Nikl  <gnikl@users.sourceforge.net>
+
+	* cisco-core.c (cisco_core_file_pid): Define.
+
+2010-08-30  Alan Modra  <amodra@gmail.com>
+
+	PR binutils/11953
+	* elf.c (copy_elf_program_header): Calculate map->header_size
+	from lowest_section, not first_section.  Validate program
+	header p_paddr against section lma.  Find lowest_section in
+	second loop over headers.
+
+2010-08-28  Alan Modra  <amodra@gmail.com>
+
+	* elflink.c (_bfd_elf_dynamic_symbol_p): Rename param.  Make
+	common syms local.
+	(_bfd_elf_symbol_refs_local_p): Expand comment.
+	(elf_link_output_extsym): Fix style nit.
+
+2010-08-26  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* elf32-arm.c (elf32_arm_final_link): Process stub sections
+	exactly once.
+
+2010-08-25  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/11939
+	* elflink.c (elf_link_add_object_symbols): Don't set
+	unique_global for non-ELF hash link table.
+
+2010-08-25  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/11944
+	* elf-bfd.h (elf_backend_data): Add target_id.
+	(bfd_elf_make_generic_object): Renamed to ...
+	(bfd_elf_make_object): This.
+
+	* elf.c (bfd_elf_make_generic_object): Removed.
+	(bfd_elf_make_object): New.
+	(bfd_elf_mkcorefile): Really treat it as an object file.
+
+	* elf-m10300.c (ELF_TARGET_ID): New.
+	* elf32-arm.c (ELF_TARGET_ID): Likewise.
+	* elf32-bfin.c (ELF_TARGET_ID): Likewise.
+	* elf32-cris.c (ELF_TARGET_ID): Likewise.
+	* elf32-frv.c (ELF_TARGET_ID): Likewise.
+	* elf32-i386.c (ELF_TARGET_ID): Likewise.
+	* elf32-lm32.c (ELF_TARGET_ID): Likewise.
+	* elf32-m32r.c (ELF_TARGET_ID): Likewise.
+	* elf32-m68hc11.c (ELF_TARGET_ID): Likewise.
+	* elf32-m68hc12.c (ELF_TARGET_ID): Likewise.
+	* elf32-m68k.c (ELF_TARGET_ID): Likewise.
+	* elf32-microblaze.c (ELF_TARGET_ID): Likewise.
+	* elf32-ppc.c (ELF_TARGET_ID): Likewise.
+	* elf32-s390.c (ELF_TARGET_ID): Likewise.
+	* elf32-sh.c (ELF_TARGET_ID): Likewise.
+	* elf32-sparc.c (ELF_TARGET_ID): Likewise.
+	* elf32-spu.c (ELF_TARGET_ID): Likewise.
+	* elf32-tic6x.c (ELF_TARGET_ID): Likewise.
+	* elf32-xtensa.c (ELF_TARGET_ID): Likewise.
+	* elf64-alpha.c (ELF_TARGET_ID): Likewise.
+	* elf64-hppa.c (ELF_TARGET_ID): Likewise.
+	* elf64-ppc.c (ELF_TARGET_ID): Likewise.
+	* elf64-s390.c (ELF_TARGET_ID): Likewise.
+	* elf64-x86-64.c (ELF_TARGET_ID): Likewise.
+	* elfxx-ia64.c (ELF_TARGET_ID): Likewise.
+
+	* elf32-hppa.c (elf32_hppa_mkobject): Removed.
+	(bfd_elf32_mkobject): Likewise.
+	(ELF_TARGET_ID): New.
+
+	* elf32-mips.c (ELF_TARGET_ID): New.
+	(bfd_elf32_mkobject): Removed.
+
+	* elf64-mips.c (ELF_TARGET_ID): New.
+	(bfd_elf64_mkobject): Removed.
+
+	* elfn32-mips.c (ELF_TARGET_ID): New.
+	(bfd_elf32_mkobject): Removed.
+
+	* elfxx-mips.c (_bfd_mips_elf_mkobject): Removed.
+	* elfxx-mips.h (_bfd_mips_elf_mkobject): Likewise.
+
+	* elfxx-target.h (bfd_elfNN_mkobject): Default to
+	bfd_elf_make_object.
+	(ELF_TARGET_ID): New.  Default to GENERIC_ELF_DATA.
+	(elfNN_bed): Initialize target_id.
+
+2010-08-25  Julian Brown  <julian@codesourcery.com>
+
+	* elf32-arm.c (arm_stub_required_alignment): New.
+	(arm_build_one_stub): Use above to partition stubs.
+	(make_branch_to_a8_stub): Use arm_stub_a8_veneer_lwm not
+	arm_stub_a8_veneer_b_cond.
+
+2010-08-25  Alan Modra  <amodra@gmail.com>
+
+	* aout-arm.c (MY(bfd_reloc_type_lookup)): Use bfd_arch_bits_per_address.
+	* aout-ns32k.c (MY(bfd_reloc_type_lookup)): Likewise.
+	* aoutx.h (NAME(aout,reloc_type_lookup)): Likewise.
+	* coff-arm.c (coff_arm_reloc_type_lookup): Likewise.
+	* elf-hppa.h (elf_hppa_reloc_final_type): Likewise.
+	* reloc.c (bfd_default_reloc_type_lookup): Likewise.
+	* riscix.c (riscix_reloc_type_lookup): Likewise.
+
+2010-08-25  Alan Modra  <amodra@gmail.com>
+
+	* elf.c (_bfd_elf_map_sections_to_segments): Don't load program
+	headers if any loaded section wraps the address space.  Simplify
+	~(m-1) to -m.  Use lma rather than vma when determining whether
+	note sections are adjacent.
+
 2010-08-22  H.J. Lu  <hongjiu.lu@intel.com>
 
 	PR ld/11933
@@ -91,7 +213,7 @@
 	elf_tdata's core_lwpid instead of to core_pid.
 	* elfn32-mips.c (elf32_mips_grok_prstatus): Write the LWPID to
 	elf_tdata's core_lwpid instead of to core_pid.
-	
+
 	* plugin.c (bfd_plugin_core_file_pid): New function.
 	* aout-target.h (MY_core_file_pid): Define.
 	* aout-tic30.c (MY_core_file_pid, MY_core_file_p): New defines.

@@ -98,6 +98,12 @@
 #define W_STOPCODE(sig) ((sig) << 8 | 0x7f)
 #endif
 
+/* This is the kernel's hard limit.  Not to be confused with
+   SIGRTMIN.  */
+#ifndef __SIGRTMIN
+#define __SIGRTMIN 32
+#endif
+
 #ifdef __UCLIBC__
 #if !(defined(__UCLIBC_HAS_MMU__) || defined(__ARCH_HAS_MMU__))
 #define HAS_NOMMU
@@ -566,7 +572,7 @@ linux_create_inferior (char *program, char **allargs)
     {
       ptrace (PTRACE_TRACEME, 0, 0, 0);
 
-#ifdef __SIGRTMIN /* Bionic doesn't use SIGRTMIN the way glibc does.  */
+#ifndef __ANDROID__ /* Bionic doesn't use SIGRTMIN the way glibc does.  */
       signal (__SIGRTMIN + 1, SIG_DFL);
 #endif
 
@@ -1337,6 +1343,30 @@ Deferring signal %d for LWP %ld.\n", WSTOPSIG (*wstat), lwpid_of (lwp));
       fprintf (stderr, "   (no more currently queued signals)\n");
     }
 
+  /* Don't enqueue non-RT signals if they are already in the deferred
+     queue.  (SIGSTOP being the easiest signal to see ending up here
+     twice)  */
+  if (WSTOPSIG (*wstat) < __SIGRTMIN)
+    {
+      struct pending_signals *sig;
+
+      for (sig = lwp->pending_signals_to_report;
+	   sig != NULL;
+	   sig = sig->prev)
+	{
+	  if (sig->signal == WSTOPSIG (*wstat))
+	    {
+	      if (debug_threads)
+		fprintf (stderr,
+			 "Not requeuing already queued non-RT signal %d"
+			 " for LWP %ld\n",
+			 sig->signal,
+			 lwpid_of (lwp));
+	      return;
+	    }
+	}
+    }
+
   p_sig = xmalloc (sizeof (*p_sig));
   p_sig->prev = lwp->pending_signals_to_report;
   p_sig->signal = WSTOPSIG (*wstat);
@@ -1884,8 +1914,9 @@ linux_stabilize_threads (void)
 					 stuck_in_jump_pad_callback, NULL);
   if (lwp_stuck != NULL)
     {
-      fprintf (stderr, "can't stabilize, LWP %ld is stuck in jump pad\n",
-	       lwpid_of (lwp_stuck));
+      if (debug_threads)
+	fprintf (stderr, "can't stabilize, LWP %ld is stuck in jump pad\n",
+		 lwpid_of (lwp_stuck));
       return;
     }
 
@@ -1931,12 +1962,12 @@ linux_stabilize_threads (void)
 
   current_inferior = save_inferior;
 
-  lwp_stuck
-    = (struct lwp_info *) find_inferior (&all_lwps,
-					 stuck_in_jump_pad_callback, NULL);
-  if (lwp_stuck != NULL)
+  if (debug_threads)
     {
-      if (debug_threads)
+      lwp_stuck
+	= (struct lwp_info *) find_inferior (&all_lwps,
+					 stuck_in_jump_pad_callback, NULL);
+      if (lwp_stuck != NULL)
 	fprintf (stderr, "couldn't stabilize, LWP %ld got stuck in jump pad\n",
 		 lwpid_of (lwp_stuck));
     }
@@ -2200,9 +2231,10 @@ Check if we're already there.\n",
 	      if (debug_threads)
 		fprintf (stderr, "dequeued one signal.\n");
 	    }
-	  else if (debug_threads)
+	  else
 	    {
-	      fprintf (stderr, "no deferred signals.\n");
+	      if (debug_threads)
+		fprintf (stderr, "no deferred signals.\n");
 
 	      if (stabilizing_threads)
 		{
@@ -2228,7 +2260,7 @@ Check if we're already there.\n",
   if (WIFSTOPPED (w)
       && current_inferior->last_resume_kind != resume_step
       && (
-#if defined (USE_THREAD_DB) && defined (__SIGRTMIN)
+#if defined (USE_THREAD_DB) && !defined (__ANDROID__)
 	  (current_process ()->private->thread_db != NULL
 	   && (WSTOPSIG (w) == __SIGRTMIN
 	       || WSTOPSIG (w) == __SIGRTMIN + 1))
@@ -2391,9 +2423,6 @@ Check if we're already there.\n",
 	     ourstatus->kind,
 	     ourstatus->value.sig);
 
-  if (!stabilizing_threads)
-    current_inferior->last_status = *ourstatus;
-
   return ptid_of (event_child);
 }
 
@@ -2476,6 +2505,12 @@ kill_lwp (unsigned long lwpid, int signo)
 #endif
 
   return kill (lwpid, signo);
+}
+
+void
+linux_stop_lwp (struct lwp_info *lwp)
+{
+  send_sigstop (lwp);
 }
 
 static void
@@ -3327,7 +3362,14 @@ linux_resume_one_thread (struct inferior_list_entry *entry, void *arg)
 	     the thread already has a pending status to report, we
 	     will still report it the next time we wait - see
 	     status_pending_p_callback.  */
-	  send_sigstop (lwp);
+
+	  /* If we already have a pending signal to report, then
+	     there's no need to queue a SIGSTOP, as this means we're
+	     midway through moving the LWP out of the jumppad, and we
+	     will report the pending signal as soon as that is
+	     finished.  */
+	  if (lwp->pending_signals_to_report == NULL)
+	    send_sigstop (lwp);
 	}
 
       /* For stop requests, we're done.  */
@@ -3495,7 +3537,9 @@ proceed_one_lwp (struct inferior_list_entry *entry, void *except)
       return 0;
     }
 
-  if (thread->last_resume_kind == resume_stop)
+  if (thread->last_resume_kind == resume_stop
+      && lwp->pending_signals_to_report == NULL
+      && lwp->collecting_fast_tracepoint == 0)
     {
       /* We haven't reported this LWP as stopped yet (otherwise, the
 	 last_status.kind check above would catch it, and we wouldn't
@@ -4266,7 +4310,7 @@ linux_read_auxv (CORE_ADDR offset, unsigned char *myaddr, unsigned int len)
   int fd, n;
   int pid = lwpid_of (get_thread_lwp (current_inferior));
 
-  snprintf (filename, sizeof filename, "/proc/%d/auxv", pid);
+  xsnprintf (filename, sizeof filename, "/proc/%d/auxv", pid);
 
   fd = open (filename, O_RDONLY);
   if (fd < 0)
@@ -4709,8 +4753,16 @@ sigchld_handler (int signo)
   int old_errno = errno;
 
   if (debug_threads)
-    /* fprintf is not async-signal-safe, so call write directly.  */
-    write (2, "sigchld_handler\n", sizeof ("sigchld_handler\n") - 1);
+    {
+      do
+	{
+	  /* fprintf is not async-signal-safe, so call write
+	     directly.  */
+	  if (write (2, "sigchld_handler\n",
+		     sizeof ("sigchld_handler\n") - 1) < 0)
+	    break; /* just ignore */
+	} while (0);
+    }
 
   if (target_is_async_p ())
     async_file_mark (); /* trigger a linux_wait */
@@ -4994,6 +5046,25 @@ linux_unpause_all (int unfreeze)
 }
 
 static int
+linux_prepare_to_access_memory (void)
+{
+  /* Neither ptrace nor /proc/PID/mem allow accessing memory through a
+     running LWP.  */
+  if (non_stop)
+    linux_pause_all (1);
+  return 0;
+}
+
+static void
+linux_done_accessing_memory (void)
+{
+  /* Neither ptrace nor /proc/PID/mem allow accessing memory through a
+     running LWP.  */
+  if (non_stop)
+    linux_unpause_all (1);
+}
+
+static int
 linux_install_fast_tracepoint_jump_pad (CORE_ADDR tpoint, CORE_ADDR tpaddr,
 					CORE_ADDR collector,
 					CORE_ADDR lockaddr,
@@ -5031,6 +5102,8 @@ static struct target_ops linux_target_ops = {
   linux_wait,
   linux_fetch_registers,
   linux_store_registers,
+  linux_prepare_to_access_memory,
+  linux_done_accessing_memory,
   linux_read_memory,
   linux_write_memory,
   linux_look_up_symbols,
@@ -5083,7 +5156,7 @@ linux_init_signals ()
 {
   /* FIXME drow/2002-06-09: As above, we should check with LinuxThreads
      to find what the cancel signal actually is.  */
-#ifdef __SIGRTMIN /* Bionic doesn't use SIGRTMIN the way glibc does.  */
+#ifndef __ANDROID__ /* Bionic doesn't use SIGRTMIN the way glibc does.  */
   signal (__SIGRTMIN+1, SIG_IGN);
 #endif
 }

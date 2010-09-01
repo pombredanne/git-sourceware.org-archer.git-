@@ -244,7 +244,7 @@ get_cell (void)
 /* Stdarg wrapper around vsnprintf.
    SIZE is the size of the buffer pointed to by STR.  */
 
-static int
+int
 xsnprintf (char *str, size_t size, const char *format, ...)
 {
   va_list args;
@@ -369,4 +369,16 @@ char *
 paddress (CORE_ADDR addr)
 {
   return phex_nz (addr, sizeof (CORE_ADDR));
+}
+
+/* Convert a file descriptor into a printable string.  */
+
+char *
+pfildes (gdb_fildes_t fd)
+{
+#if USE_WIN32API
+  return phex_nz (fd, sizeof (gdb_fildes_t));
+#else
+  return plongest (fd);
+#endif
 }

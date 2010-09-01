@@ -20759,6 +20759,16 @@ this value, thus it is not available for fetching from the inferior.
 The type of this @code{gdb.Value}.  The value of this attribute is a
 @code{gdb.Type} object.
 @end defivar
+
+@defivar Value dynamic_type
+The dynamic type of this @code{gdb.Value}.  This uses C@t{++} run-time
+type information to determine the dynamic type of the value.  If this
+value is of class type, it will return the class in which the value is
+embedded, if any.  If this value is of pointer or reference to a class
+type, it will compute the dynamic type of the referenced object, and
+return a pointer or reference to that type, respectively.  In all
+other cases, it will return the value's static type.
+@end defivar
 @end table
 
 The following methods are provided:
@@ -20790,6 +20800,16 @@ bar = foo.dereference ()
 
 The result @code{bar} will be a @code{gdb.Value} object holding the
 value pointed to by @code{foo}.
+@end defmethod
+
+@defmethod Value dynamic_cast type
+Like @code{Value.cast}, but works as if the C@t{++} @code{dynamic_cast}
+operator were used.  Consult a C@t{++} reference for details.
+@end defmethod
+
+@defmethod Value reinterpret_cast type
+Like @code{Value.cast}, but works as if the C@t{++} @code{reinterpret_cast}
+operator were used.  Consult a C@t{++} reference for details.
 @end defmethod
 
 @defmethod Value string @r{[}encoding@r{]} @r{[}errors@r{]} @r{[}length@r{]}
@@ -20936,6 +20956,15 @@ this will be zero; in this case the field's size is given by its type.
 The type of the field.  This is usually an instance of @code{Type},
 but it can be @code{None} in some situations.
 @end table
+@end defmethod
+
+@defmethod Type array @var{n1} @r{[}@var{n2}@r{]}
+Return a new @code{gdb.Type} object which represents an array of this
+type.  If one argument is given, it is the inclusive upper bound of
+the array; in this case the lower bound is zero.  If two arguments are
+given, the first argument is the lower bound of the array, and the
+second argument is the upper bound of the array.  An array's length
+must not be negative, but the bounds can be.
 @end defmethod
 
 @defmethod Type const
@@ -35628,9 +35657,15 @@ registers using the capitalization used in the description.
 @subsection ARM Features
 @cindex target descriptions, ARM features
 
-The @samp{org.gnu.gdb.arm.core} feature is required for ARM targets.
+The @samp{org.gnu.gdb.arm.core} feature is required for non-M-profile
+ARM targets.
 It should contain registers @samp{r0} through @samp{r13}, @samp{sp},
 @samp{lr}, @samp{pc}, and @samp{cpsr}.
+
+For M-profile targets (e.g. Cortex-M3), the @samp{org.gnu.gdb.arm.core}
+feature is replaced by @samp{org.gnu.gdb.arm.m-profile}.  It should contain
+registers @samp{r0} through @samp{r13}, @samp{sp}, @samp{lr}, @samp{pc},
+and @samp{xpsr}.
 
 The @samp{org.gnu.gdb.arm.fpa} feature is optional.  If present, it
 should contain registers @samp{f0} through @samp{f7} and @samp{fps}.
@@ -35698,7 +35733,6 @@ describe the upper 128 bits of @sc{ymm} registers:
 @samp{ymm0h} through @samp{ymm7h} for i386
 @item
 @samp{ymm0h} through @samp{ymm15h} for amd64
-@item 
 @end itemize
 
 The @samp{org.gnu.gdb.i386.linux} feature is optional.  It should

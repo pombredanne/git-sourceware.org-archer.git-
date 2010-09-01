@@ -376,7 +376,7 @@ add_to_pid_list (struct simple_pid_list **listp, int pid, int status)
 }
 
 static int
-pull_pid_from_list (struct simple_pid_list **listp, int pid, int *status)
+pull_pid_from_list (struct simple_pid_list **listp, int pid, int *statusp)
 {
   struct simple_pid_list **p;
 
@@ -385,7 +385,7 @@ pull_pid_from_list (struct simple_pid_list **listp, int pid, int *status)
       {
 	struct simple_pid_list *next = (*p)->next;
 
-	*status = (*p)->status;
+	*statusp = (*p)->status;
 	xfree (*p);
 	*p = next;
 	return 1;
@@ -414,13 +414,13 @@ linux_tracefork_child (void)
 /* Wrapper function for waitpid which handles EINTR.  */
 
 static int
-my_waitpid (int pid, int *status, int flags)
+my_waitpid (int pid, int *statusp, int flags)
 {
   int ret;
 
   do
     {
-      ret = waitpid (pid, status, flags);
+      ret = waitpid (pid, statusp, flags);
     }
   while (ret == -1 && errno == EINTR);
 
@@ -4104,9 +4104,7 @@ read_mapping (FILE *mapfile,
    regions in the inferior for a corefile.  */
 
 static int
-linux_nat_find_memory_regions (int (*func) (CORE_ADDR,
-					    unsigned long,
-					    int, int, int, void *), void *obfd)
+linux_nat_find_memory_regions (find_memory_region_ftype func, void *obfd)
 {
   int pid = PIDGET (inferior_ptid);
   char mapsfilename[MAXPATHLEN];

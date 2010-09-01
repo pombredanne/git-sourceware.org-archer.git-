@@ -38,6 +38,10 @@
 #include <string.h>
 #endif
 
+#ifdef HAVE_ALLOCA_H
+#include <alloca.h>
+#endif
+
 #if !HAVE_DECL_STRERROR
 #ifndef strerror
 extern char *strerror (int);	/* X3.159-1989  4.11.6.2 */
@@ -334,13 +338,20 @@ extern int disable_packet_qfThreadInfo;
 extern int multi_process;
 extern int non_stop;
 
+#if USE_WIN32API
+#include <winsock2.h>
+typedef SOCKET gdb_fildes_t;
+#else
+typedef int gdb_fildes_t;
+#endif
+
 /* Functions from event-loop.c.  */
 typedef void *gdb_client_data;
 typedef int (handler_func) (int, gdb_client_data);
 typedef int (callback_handler_func) (gdb_client_data);
 
-extern void delete_file_handler (int fd);
-extern void add_file_handler (int fd, handler_func *proc,
+extern void delete_file_handler (gdb_fildes_t fd);
+extern void add_file_handler (gdb_fildes_t fd, handler_func *proc,
 			      gdb_client_data client_data);
 extern int append_callback_event (callback_handler_func *proc,
 				   gdb_client_data client_data);
@@ -462,6 +473,8 @@ void *xmalloc (size_t) ATTR_MALLOC;
 void *xrealloc (void *, size_t);
 void *xcalloc (size_t, size_t) ATTR_MALLOC;
 char *xstrdup (const char *) ATTR_MALLOC;
+int xsnprintf (char *str, size_t size, const char *format, ...)
+  ATTR_FORMAT (printf, 3, 4);;
 void freeargv (char **argv);
 void perror_with_name (const char *string);
 void error (const char *string,...) ATTR_NORETURN ATTR_FORMAT (printf, 1, 2);
@@ -473,6 +486,7 @@ char *paddress (CORE_ADDR addr);
 char *pulongest (ULONGEST u);
 char *plongest (LONGEST l);
 char *phex_nz (ULONGEST l, int sizeof_l);
+char *pfildes (gdb_fildes_t fd);
 
 #define gdb_assert(expr)                                                      \
   ((void) ((expr) ? 0 :                                                       \

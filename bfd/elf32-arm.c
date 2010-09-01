@@ -3475,6 +3475,36 @@ static bfd_reloc_status_type elf32_arm_final_link_relocate
    Elf_Internal_Rela *, bfd_vma, struct bfd_link_info *, asection *,
    const char *, int, struct elf_link_hash_entry *, bfd_boolean *, char **);
 
+static unsigned int
+arm_stub_required_alignment (enum elf32_arm_stub_type stub_type)
+{
+  switch (stub_type)
+    {
+    case arm_stub_a8_veneer_b_cond:
+    case arm_stub_a8_veneer_b:
+    case arm_stub_a8_veneer_bl:
+      return 2;
+
+    case arm_stub_long_branch_any_any:
+    case arm_stub_long_branch_v4t_arm_thumb:
+    case arm_stub_long_branch_thumb_only:
+    case arm_stub_long_branch_v4t_thumb_thumb:
+    case arm_stub_long_branch_v4t_thumb_arm:
+    case arm_stub_short_branch_v4t_thumb_arm:
+    case arm_stub_long_branch_any_arm_pic:
+    case arm_stub_long_branch_any_thumb_pic:
+    case arm_stub_long_branch_v4t_thumb_thumb_pic:
+    case arm_stub_long_branch_v4t_arm_thumb_pic:
+    case arm_stub_long_branch_v4t_thumb_arm_pic:
+    case arm_stub_long_branch_thumb_only_pic:
+    case arm_stub_a8_veneer_blx:
+      return 4;
+    
+    default:
+      abort ();  /* Should be unreachable.  */
+    }
+}
+
 static bfd_boolean
 arm_build_one_stub (struct bfd_hash_entry *gen_entry,
 		    void * in_arg)
@@ -3506,9 +3536,8 @@ arm_build_one_stub (struct bfd_hash_entry *gen_entry,
   stub_sec = stub_entry->stub_sec;
 
   if ((globals->fix_cortex_a8 < 0)
-      != (stub_entry->stub_type >= arm_stub_a8_veneer_lwm))
-    /* We have to do the a8 fixes last, as they are less aligned than
-       the other veneers.  */
+      != (arm_stub_required_alignment (stub_entry->stub_type) == 2))
+    /* We have to do less-strictly-aligned fixes last.  */
     return TRUE;
 
   /* Make a note of the offset within the stubs for this entry.  */
@@ -9414,16 +9443,19 @@ elf32_arm_final_link (bfd *abfd, struct bfd_link_info *info)
   /* Process stub sections (eg BE8 encoding, ...).  */
   struct elf32_arm_link_hash_table *htab = elf32_arm_hash_table (info);
   int i;
-  for(i=0; i<htab->top_id; i++) {
-    sec = htab->stub_group[i].stub_sec;
-    if (sec) {
-      osec = sec->output_section;
-      elf32_arm_write_section (abfd, info, sec, sec->contents);
-      if (! bfd_set_section_contents (abfd, osec, sec->contents,
-				      sec->output_offset, sec->size))
-	return FALSE;
+  for (i=0; i<htab->top_id; i++)
+    {
+      sec = htab->stub_group[i].stub_sec;
+      /* Only process it once, in its link_sec slot.  */
+      if (sec && i == htab->stub_group[i].link_sec->id)
+	{
+	  osec = sec->output_section;
+	  elf32_arm_write_section (abfd, info, sec, sec->contents);
+	  if (! bfd_set_section_contents (abfd, osec, sec->contents,
+					  sec->output_offset, sec->size))
+	    return FALSE;
+	}
     }
-  }
 
   /* Write out any glue sections now that we have created all the
      stubs.  */
@@ -13356,7 +13388,7 @@ make_branch_to_a8_stub (struct bfd_hash_entry *gen_entry,
   data = (struct a8_branch_to_stub_data *) in_arg;
 
   if (stub_entry->target_section != data->writing_section
-      || stub_entry->stub_type < arm_stub_a8_veneer_b_cond)
+      || stub_entry->stub_type < arm_stub_a8_veneer_lwm)
     return TRUE;
 
   contents = data->contents;
@@ -13871,6 +13903,7 @@ const struct elf_size_info elf32_arm_size_info =
 };
 
 #define ELF_ARCH			bfd_arch_arm
+#define ELF_TARGET_ID			ARM_ELF_DATA
 #define ELF_MACHINE_CODE		EM_ARM
 #ifdef __QNXTARGET__
 #define ELF_MAXPAGESIZE			0x1000

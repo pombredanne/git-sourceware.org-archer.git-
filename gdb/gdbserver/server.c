@@ -158,6 +158,8 @@ queue_stop_reply (ptid_t ptid, struct target_waitstatus *status)
 void
 push_event (ptid_t ptid, struct target_waitstatus *status)
 {
+  gdb_assert (status->kind != TARGET_WAITKIND_IGNORE);
+
   queue_stop_reply (ptid, status);
 
   /* If this is the first stop reply in the queue, then inform GDB
@@ -292,15 +294,27 @@ start_inferior (char **argv)
  	  mywait (pid_to_ptid (signal_pid), &last_status, 0, 0);
 	  if (last_status.kind != TARGET_WAITKIND_STOPPED)
 	    return signal_pid;
+
+	  current_inferior->last_resume_kind = resume_stop;
+	  current_inferior->last_status = last_status;
 	}
       while (last_status.value.sig != TARGET_SIGNAL_TRAP);
 
+      current_inferior->last_resume_kind = resume_stop;
+      current_inferior->last_status = last_status;
       return signal_pid;
     }
 
   /* Wait till we are at 1st instruction in program, return new pid
      (assuming success).  */
   last_ptid = mywait (pid_to_ptid (signal_pid), &last_status, 0, 0);
+
+  if (last_status.kind != TARGET_WAITKIND_EXITED
+      && last_status.kind != TARGET_WAITKIND_SIGNALLED)
+    {
+      current_inferior->last_resume_kind = resume_stop;
+      current_inferior->last_status = last_status;
+    }
 
   return signal_pid;
 }
@@ -332,6 +346,9 @@ attach_inferior (int pid)
       if (last_status.kind == TARGET_WAITKIND_STOPPED
 	  && last_status.value.sig == TARGET_SIGNAL_STOP)
 	last_status.value.sig = TARGET_SIGNAL_TRAP;
+
+      current_inferior->last_resume_kind = resume_stop;
+      current_inferior->last_status = last_status;
     }
 
   return 0;
@@ -522,8 +539,10 @@ monitor_show_help (void)
 /* Read trace frame or inferior memory.  */
 
 static int
-read_memory (CORE_ADDR memaddr, unsigned char *myaddr, int len)
+gdb_read_memory (CORE_ADDR memaddr, unsigned char *myaddr, int len)
 {
+  int ret;
+
   if (current_traceframe >= 0)
     {
       ULONGEST nbytes;
@@ -541,19 +560,36 @@ read_memory (CORE_ADDR memaddr, unsigned char *myaddr, int len)
       /* (assume no half-trace half-real blocks for now) */
     }
 
-  return read_inferior_memory (memaddr, myaddr, len);
+  ret = prepare_to_access_memory ();
+  if (ret == 0)
+    {
+      ret = read_inferior_memory (memaddr, myaddr, len);
+      done_accessing_memory ();
+    }
+
+  return ret;
 }
 
 /* Write trace frame or inferior memory.  Actually, writing to trace
    frames is forbidden.  */
 
 static int
-write_memory (CORE_ADDR memaddr, const unsigned char *myaddr, int len)
+gdb_write_memory (CORE_ADDR memaddr, const unsigned char *myaddr, int len)
 {
   if (current_traceframe >= 0)
     return EIO;
   else
-    return write_inferior_memory (memaddr, myaddr, len);
+    {
+      int ret;
+
+      ret = prepare_to_access_memory ();
+      if (ret == 0)
+	{
+	  ret = write_inferior_memory (memaddr, myaddr, len);
+	  done_accessing_memory ();
+	}
+      return ret;
+    }
 }
 
 /* Subroutine of handle_search_memory to simplify it.  */
@@ -567,7 +603,7 @@ handle_search_memory_1 (CORE_ADDR start_addr, CORE_ADDR search_space_len,
 {
   /* Prime the search buffer.  */
 
-  if (read_memory (start_addr, search_buf, search_buf_size) != 0)
+  if (gdb_read_memory (start_addr, search_buf, search_buf_size) != 0)
     {
       warning ("Unable to access target memory at 0x%lx, halting search.",
 	       (long) start_addr);
@@ -618,8 +654,8 @@ handle_search_memory_1 (CORE_ADDR start_addr, CORE_ADDR search_space_len,
 			? search_space_len - keep_len
 			: chunk_size);
 
-	  if (read_memory (read_addr, search_buf + keep_len,
-				    nr_to_read) != 0)
+	  if (gdb_read_memory (read_addr, search_buf + keep_len,
+			       nr_to_read) != 0)
 	    {
 	      warning ("Unable to access target memory at 0x%lx, halting search.",
 		       (long) read_addr);
@@ -1780,6 +1816,10 @@ handle_v_cont (char *own_buf)
     {
       last_ptid = mywait (minus_one_ptid, &last_status, 0, 1);
 
+      if (last_status.kind != TARGET_WAITKIND_EXITED
+          && last_status.kind != TARGET_WAITKIND_SIGNALLED)
+	current_inferior->last_status = last_status;
+
       /* From the client's perspective, all-stop mode always stops all
 	 threads implicitly (and the target backend has already done
 	 so by now).  Tag all threads as "want-stopped", so we don't
@@ -2089,6 +2129,14 @@ myresume (char *own_buf, int step, int sig)
   else
     {
       last_ptid = mywait (minus_one_ptid, &last_status, 0, 1);
+
+      if (last_status.kind != TARGET_WAITKIND_EXITED
+          && last_status.kind != TARGET_WAITKIND_SIGNALLED)
+	{
+	  current_inferior->last_resume_kind = resume_stop;
+	  current_inferior->last_status = last_status;
+	}
+
       prepare_resume_reply (own_buf, last_ptid, &last_status);
       disable_async_io ();
 
@@ -2127,6 +2175,8 @@ queue_stop_reply_callback (struct inferior_list_entry *entry, void *arg)
 	    fprintf (stderr, "Reporting thread %s as already stopped with %s\n",
 		     target_pid_to_str (entry->id),
 		     target_waitstatus_to_string (&thread->last_status));
+
+	  gdb_assert (thread->last_status.kind != TARGET_WAITKIND_IGNORE);
 
 	  /* Pass the last stop reply back to GDB, but don't notify
 	     yet.  */
@@ -2893,7 +2943,7 @@ process_serial_event (void)
     case 'm':
       require_running (own_buf);
       decode_m_packet (&own_buf[1], &mem_addr, &len);
-      if (read_memory (mem_addr, mem_buf, len) == 0)
+      if (gdb_read_memory (mem_addr, mem_buf, len) == 0)
 	convert_int_to_ascii (mem_buf, own_buf, len);
       else
 	write_enn (own_buf);
@@ -2901,7 +2951,7 @@ process_serial_event (void)
     case 'M':
       require_running (own_buf);
       decode_M_packet (&own_buf[1], &mem_addr, &len, &mem_buf);
-      if (write_memory (mem_addr, mem_buf, len) == 0)
+      if (gdb_write_memory (mem_addr, mem_buf, len) == 0)
 	write_ok (own_buf);
       else
 	write_enn (own_buf);
@@ -2910,7 +2960,7 @@ process_serial_event (void)
       require_running (own_buf);
       if (decode_X_packet (&own_buf[1], packet_len - 1,
 			   &mem_addr, &len, &mem_buf) < 0
-	  || write_memory (mem_addr, mem_buf, len) != 0)
+	  || gdb_write_memory (mem_addr, mem_buf, len) != 0)
 	write_enn (own_buf);
       else
 	write_ok (own_buf);
@@ -3135,10 +3185,13 @@ handle_target_event (int err, gdb_client_data client_data)
 	  mourn_inferior (process);
 	}
       else
-	/* We're reporting this thread as stopped.  Update it's
-	   "want-stopped" state to what the client wants, until it gets
-	   a new resume action.  */
-	gdb_wants_thread_stopped (&current_inferior->entry);
+	{
+	  /* We're reporting this thread as stopped.  Update its
+	     "want-stopped" state to what the client wants, until it
+	     gets a new resume action.  */
+	  current_inferior->last_resume_kind = resume_stop;
+	  current_inferior->last_status = last_status;
+	}
 
       if (forward_event)
 	{
