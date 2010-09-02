@@ -25,6 +25,7 @@
 #include "gdb_string.h"
 #include "gdbtypes.h"
 #include "language.h"
+#include "objfiles.h"
 #include "parser-defs.h"
 #include "vec.h"
 
@@ -33,8 +34,6 @@
 /* Lexer token table:
    OP(name, string description): operator tokens
    TK(name, string description): parser tokens
-
-   Hmm... Still need reserved keywords...
 */
 #define TOKEN_TABLE				\
   OP(EQ,		"=")			\
@@ -114,10 +113,52 @@ static const char *token_table_strings[(int) N_TOKEN_TYPES] =
 #undef OP
 #undef TK
 
+typedef enum cp_keyword
+ {
+   KEYWORD_UNSIGNED,
+   KEYWORD_TEMPLATE,
+   KEYWORD_VOLATILE,
+   KEYWORD_STRUCT,
+   KEYWORD_SIGNED,
+   KEYWORD_SIZEOF,
+   KEYWORD_DOUBLE,
+   KEYWORD_FALSE,
+   KEYWORD_CLASS,
+   KEYWORD_UNION,
+   KEYWORD_SHORT,
+   KEYWORD_CONST,
+   KEYWORD_ENUM,
+   KEYWORD_LONG,
+   KEYWORD_TRUE,
+   KEYWORD_INT,
+   KEYWORD_NEW,
+   KEYWORD_DELETE,
+   KEYWORD_OPERATOR, /* ?? */
+
+   KEYWORD_AND,
+   KEYWORD_AND_EQ,
+   KEYWORD_BITAND,
+   KEYWORD_BITOR,
+   KEYWORD_COMPL,
+   KEYWORD_NOT,
+   KEYWORD_NOT_EQ,
+   KEYWORD_OR,
+   KEYWORD_OR_EQ,
+   KEYWORD_XOR,
+   KEYWORD_XOR_EQ,
+
+   KEYWORD_CONST_CAST,
+   KEYWORD_DYNAMIC_CAST,
+   KEYWORD_STATIC_CAST,
+   KEYWORD_REINTERPRET_CAST,
+   KEYWORD_MAX /* a marker */
+ } cp_keyword;
+
 typedef unsigned char token_value;
 typedef struct cp_token
 {
   token_type type;
+  cp_keyword keyword;
   token_value *value;		/* Must be free'd (necesary?) */
 } cp_token;
 
@@ -148,12 +189,34 @@ typedef struct
   /* The token stream  */
   cp_token_list *tokens;
   cp_token_list *head;
+
+  /* Parsing language  */
+  unsigned char language;
 } cp_lexer;
+
+/* An expression "chain" which wraps the parser globals
+   expout, expout_size, and expout_ptr.  */
+typedef struct cp_expression
+{
+  /* The actual expression  */
+  struct expression *exp;
+
+  /* The allocated number of elements in the expression.  */
+  int size;
+
+  /* A pointer to the next free slot in the expression.  */
+  int ptr;
+} cp_expression;
 
 /* A parser instance  */
 typedef struct
 {
+  /* The lexer  */
   cp_lexer *lexer;
+
+  cp_expression *scope;
+  cp_expression *qualifying_scope;
+  cp_expression *object_scope;
 } cp_parser;
 
 /* Operator precedence levels  */
@@ -207,19 +270,8 @@ enum expr_code
   BIT_NOT_EXPR
 };
 
-/* An expression "chain" which wraps the parser globals
-   expout, expout_size, and expout_ptr.  */
-typedef struct _cp_expression
-{
-  /* The actual expression  */
-  struct expression *exp;
-
-  /* The allocated number of elements in the expression.  */
-  int size;
-
-  /* A pointer to the next free slot in the expression.  */
-  int ptr;
-} cp_expression;
+/* An expression representing the global namespace.  */
+static cp_expression *global_namespace;
 
 /* A stack is used to deal with operator precedence.  This
    structure describes a stack entry for this.  */
@@ -233,6 +285,9 @@ typedef struct cp_expression_stack_entry
 
   /* The precedence level of this sub-expression.  */
   enum cp_precedence prec;
+
+  /* A cleanup for the expression being suspended.  */
+  struct cleanup *cleanup;
 } cp_expression_stack_entry;
 
 /* Type definition for the operator precedence stack.  */
@@ -312,6 +367,57 @@ typedef struct
   };
 } cp_typed_number;
 
+struct reserved_keywords
+{
+  const char *name;
+  cp_keyword keyword;
+  unsigned char valid_languages;
+};
+
+#define CP_LANGUAGE_C 0x1
+#define CP_LANGUAGE_CPLUS 0x2
+#define CP_LANGUAGE_ALL_C (CP_LANGUAGE_C | CP_LANGUAGE_CPLUS)
+
+static const struct reserved_keywords reserved_keywords[] =
+{
+  {"unsigned", KEYWORD_UNSIGNED, CP_LANGUAGE_ALL_C},
+  {"template", KEYWORD_TEMPLATE, CP_LANGUAGE_CPLUS},
+  {"volatile", KEYWORD_VOLATILE, CP_LANGUAGE_ALL_C},
+  {"struct", KEYWORD_STRUCT, CP_LANGUAGE_ALL_C},
+  {"signed", KEYWORD_SIGNED, CP_LANGUAGE_ALL_C},
+  {"sizeof", KEYWORD_SIZEOF, CP_LANGUAGE_ALL_C},
+  {"double", KEYWORD_DOUBLE, CP_LANGUAGE_ALL_C},
+  {"false", KEYWORD_FALSE, CP_LANGUAGE_CPLUS},
+  {"class", KEYWORD_CLASS, CP_LANGUAGE_CPLUS},
+  {"union", KEYWORD_UNION, CP_LANGUAGE_ALL_C},
+  {"short", KEYWORD_SHORT, CP_LANGUAGE_ALL_C},
+  {"const", KEYWORD_CONST, CP_LANGUAGE_ALL_C},
+  {"enum", KEYWORD_ENUM, CP_LANGUAGE_ALL_C},
+  {"long", KEYWORD_LONG, CP_LANGUAGE_ALL_C},
+  {"true", KEYWORD_TRUE, CP_LANGUAGE_CPLUS},
+  {"int", KEYWORD_INT, CP_LANGUAGE_ALL_C},
+  {"new", KEYWORD_NEW, CP_LANGUAGE_CPLUS},
+  {"delete", KEYWORD_DELETE, CP_LANGUAGE_CPLUS},
+  {"operator", KEYWORD_OPERATOR, CP_LANGUAGE_CPLUS},
+
+  {"and", KEYWORD_AND, CP_LANGUAGE_CPLUS},
+  {"and_eq", KEYWORD_AND_EQ, CP_LANGUAGE_CPLUS},
+  {"bitand", KEYWORD_BITAND, CP_LANGUAGE_CPLUS},
+  {"bitor", KEYWORD_BITOR, CP_LANGUAGE_CPLUS},
+  {"compl", KEYWORD_COMPL, CP_LANGUAGE_CPLUS},
+  {"not", KEYWORD_NOT, CP_LANGUAGE_CPLUS},
+  {"not_eq", KEYWORD_NOT_EQ, CP_LANGUAGE_CPLUS},
+  {"or", KEYWORD_OR, CP_LANGUAGE_CPLUS},
+  {"or_eq", KEYWORD_OR_EQ, CP_LANGUAGE_CPLUS},
+  {"xor", KEYWORD_XOR, CP_LANGUAGE_CPLUS},
+  {"xor_eq", KEYWORD_XOR_EQ, CP_LANGUAGE_CPLUS},
+
+  {"const_cast", KEYWORD_CONST_CAST, CP_LANGUAGE_CPLUS},
+  {"dynamic_cast", KEYWORD_DYNAMIC_CAST, CP_LANGUAGE_CPLUS},
+  {"static_cast", KEYWORD_STATIC_CAST, CP_LANGUAGE_CPLUS},
+  {"reinterpret_cast", KEYWORD_REINTERPRET_CAST, CP_LANGUAGE_CPLUS}
+};
+
 /* Returns the current expression chain (from expout).  If the argument
    is non-NULL, then the current chain is appended to it.
 
@@ -322,11 +428,15 @@ static cp_expression *cp_cast_expression (cp_parser *);
 
 
 
+/* Allocate a new CP_TOKEN.  */
+
 static cp_token *
 new_token (void)
 {
   return (cp_token *) xcalloc (1, sizeof (cp_token));
 }
+
+/* Push TOKEN onto LEXER's token stream.  */
 
 static void
 cp_lexer_push_token (cp_lexer *lexer, cp_token *token)
@@ -349,6 +459,9 @@ cp_lexer_push_token (cp_lexer *lexer, cp_token *token)
     }
 }
 
+/* Returns the next token in the token stream.  It is not removed from
+   the stream until cp_lexer_consume_token is called.  */
+
 static cp_token *
 cp_lexer_peek_token (const cp_lexer *lexer)
 {
@@ -357,14 +470,17 @@ cp_lexer_peek_token (const cp_lexer *lexer)
   return lexer->tokens->token;
 }
 
+/* Advance the token stream past the current token.  */
+
 static cp_token *
 cp_lexer_consume_token (cp_lexer *lexer)
 {
-  cp_token_list *next = lexer->tokens->next;
-  gdb_assert (lexer->tokens != NULL);
-  lexer->tokens = next;
-  return next->token;
+  cp_token_list *head = lexer->tokens;
+  lexer->tokens = head->next;
+  return head->token;
 }
+
+/* Returns true if the next token in LEXER has the given TYPE.  */
 
 static int
 cp_lexer_next_token_is (cp_lexer *lexer, token_type type)
@@ -372,13 +488,17 @@ cp_lexer_next_token_is (cp_lexer *lexer, token_type type)
   return (cp_lexer_peek_token (lexer)->type == type);
 }
 
+/* Returns true if the next token is the EOF marker token.  */
+
 static int
 cp_is_eof_token (cp_token *token)
 {
-  return (token->type == TTYPE_EOF);
+  return (token == EOF_token);
 }
 
 
+
+/* Append the SRC expression chain to DEST.  */
 
 static void
 cp_expression_append_chain (cp_expression *dest, cp_expression *src)
@@ -402,49 +522,63 @@ cp_expression_append_chain (cp_expression *dest, cp_expression *src)
 }
 
 /* Frees all memory allocated in the given chain.  */
+
 static void
-free_expression_chain (cp_expression *chain)
+free_expression_chain (void *chain)
 {
-  xfree (chain->exp);
-  xfree (chain);
+  cp_expression *expr = (cp_expression *) chain;
+  xfree (expr->exp);
+  xfree (expr);
 }
+
+/* Returns an expression chain containing the current contents of EXPOUT.
+   If CHAIN is non-NULL, the EXPOUT is copied into it instead.  */
 
 static cp_expression *
 cp_expression_chain (cp_expression *chain)
 {
   if (chain == NULL)
     {
-      /* new chain */
+      /* Create a new chain for the expression in EXPOUT.  */
       chain = (cp_expression *) xmalloc (sizeof (cp_expression));
       chain->size = expout_size;
       chain->ptr = expout_ptr;
       chain->exp = expout;
       chain->exp->nelts = expout_ptr;
+
+      /* Reset globals for next expression  */
+      expout_size = 10;
+      expout_ptr = 0;
+      expout = (struct expression *)
+	xmalloc (sizeof (struct expression) + EXP_ELEM_TO_BYTES (expout_size));
+      expout->language_defn = current_language;
+      expout->gdbarch = get_current_arch ();
     }
   else
     {
-      /* append chain */
+      /* Append the expression in EXPOUT to CHAIN.   */
       cp_expression tmp;
       tmp.size = expout_size;
       tmp.ptr = expout_ptr;
       tmp.exp = expout;
       tmp.exp->nelts = expout_ptr;
       cp_expression_append_chain (chain, &tmp);
-    }
 
-  /* Reset globals for next expression  */
-  expout_size = 10;
-  expout_ptr = 0;
-  expout = (struct expression *)
-    xmalloc (sizeof (struct expression) + EXP_ELEM_TO_BYTES (expout_size));
-  expout->language_defn = current_language;
-  expout->gdbarch = get_current_arch ();
+      /* Reset globals for next expression.  When appending a chain to
+	 another chain, the contents of expout are copied into the
+	 destination chain, so there is no need to allocate new memory
+	 for expout.  Simply reset the pointer to zero.  */
+      expout_ptr = 0;
+    }
 
   return chain;
 }
 
+/* A helper function to parse numbers from token values.  */
+
 static void
-parse_number (const cp_parser *parser, token_value *value, cp_typed_number *result)
+parse_number (const cp_parser *parser, token_value *value,
+	      cp_typed_number *result)
 {
   /* FIXME: Shouldn't these be unsigned?  We don't deal with negative values
      here, and we do kind of silly things like cast to unsigned.  */
@@ -729,6 +863,123 @@ parse_number (const cp_parser *parser, token_value *value, cp_typed_number *resu
    error (_("Invalid number \"%s\"."), value);
 }
 
+/* Print out an appropriate error message for an expected missing
+   token of type TYPE.  */
+
+static void
+cp_required_token_error (cp_parser *parser, token_type type)
+{
+  /* keiths-FIXME: This is not really sufficiently user-friendly.  */
+  error (_("syntax error: expected %s"), token_table_strings[(int) type]);
+}
+
+/* If the next token in PARSER is not of type TYPE, throw an error.
+   Otherwise, consume the token and return the next token.  */
+
+static cp_token *
+cp_require_token (cp_parser *parser, token_type type)
+{
+  if (cp_lexer_next_token_is (parser->lexer, type))
+    return cp_lexer_consume_token (parser->lexer);
+
+  cp_required_token_error (parser, type);
+  return NULL;
+}
+
+static cp_expression *
+cp_parse_identifier (cp_parser *parser)
+{
+  cp_token *token = cp_require_token (parser, TTYPE_NAME);
+  if (token != NULL)
+    {
+      /* FIXME: Can we use parser->scope? */
+      struct symbol *sym = lookup_symbol (token->value,
+					  expression_context_block, VAR_DOMAIN,
+					  NULL);
+      if (sym != NULL)
+	{
+	  write_exp_elt_opcode (OP_VAR_VALUE);
+	  write_exp_elt_block (expression_context_block);
+	  write_exp_elt_sym (sym);
+	  write_exp_elt_opcode (OP_VAR_VALUE);
+	  return cp_expression_chain (NULL);
+	}
+      else
+	{
+	  struct minimal_symbol *msym;
+	  msym = lookup_minimal_symbol (token->value, NULL, NULL);
+	  if (msym != NULL)
+	    {
+	      write_exp_msymbol (msym);
+	      return cp_expression_chain (NULL);
+	    }
+	  else if (!have_full_symbols () && !have_partial_symbols ())
+	    error (_("No symbol table is loaded.  Use the \"file\" command."));
+	  else
+	    error (_("No symbol \"%s\" in current context."), token->value);
+	}
+    }
+
+  return NULL;
+}
+
+static cp_expression *
+cp_parse_global_scope_opt (cp_parser *parser, int current_scope_valid_p)
+{
+  cp_token *token = cp_lexer_peek_token (parser->lexer);
+  if (token->type == TTYPE_SCOPE)
+    {
+      cp_lexer_consume_token (parser->lexer);
+      parser->scope = global_namespace;
+      parser->qualifying_scope = global_namespace;
+      parser->object_scope = NULL;
+
+      return parser->scope;
+    }
+  else if (!current_scope_valid_p)
+    {
+      parser->scope = NULL;
+      parser->qualifying_scope = NULL;
+      parser->object_scope = NULL;
+    }
+
+  return NULL;
+}
+
+static cp_expression *
+cp_parse_unqualified_id (cp_parser *parser, int optional_p)
+{
+  cp_token *token = cp_lexer_peek_token (parser->lexer);
+
+  switch (token->type)
+    {
+    case TTYPE_NAME:
+      return cp_parse_identifier (parser);
+
+    default:
+      if (optional_p)
+	return NULL;
+      error (_("expected unqualified-id"));
+    }
+}
+
+static cp_expression *
+cp_parse_id_expression (cp_parser *parser, int optional_p)
+{
+  int global_scope_p
+    = (cp_parse_global_scope_opt (parser, /*current_scope_valid_p=*/ 0)
+       != NULL);
+
+  if (global_scope_p)
+    {
+      cp_token *token = cp_lexer_peek_token (parser->lexer);
+      if (token->type == TTYPE_NAME)
+	return cp_parse_identifier (parser);
+    }
+
+  return cp_parse_unqualified_id (parser, optional_p);
+}
+
 static cp_expression *
 cp_parse_primary_expression (cp_parser *parser)
 {
@@ -767,10 +1018,13 @@ cp_parse_primary_expression (cp_parser *parser)
 	  }
 
 	/* expout now contains the number's expression chain. So
-	   we need to save this and reset expout. */
+	   we need to save this and reset expout.  */
 	return cp_expression_chain (NULL);
       }
       break;
+
+    case TTYPE_NAME:
+      return cp_parse_id_expression (parser, /*optional_p=*/ 0);
 
     default:
       error (_("expected primary expression"));
@@ -781,17 +1035,57 @@ cp_parse_primary_expression (cp_parser *parser)
 }
 
 static cp_expression *
+cp_parse_postfix_open_square_expression (cp_parser *parser, cp_expression *expr)
+{
+  cp_lexer_consume_token (parser->lexer);
+  cp_expression_append_chain (expr, cp_parse_expression (parser));
+  cp_require_token (parser, TTYPE_CLOSE_SQUARE);
+  write_exp_elt_opcode (BINOP_SUBSCRIPT);
+  return cp_expression_chain (expr);
+}
+
+static cp_expression *
 cp_parse_postfix_expression (cp_parser *parser)
 {
+  cp_expression *expr;
   cp_token *token = cp_lexer_peek_token (parser->lexer);
 
   switch (token->type)
     {
     default:
-      return cp_parse_primary_expression (parser);
+      expr = cp_parse_primary_expression (parser);
       break;
     }
 
+  while (1)
+    {
+      token = cp_lexer_peek_token (parser->lexer);
+
+      switch (token->type)
+	{
+	case TTYPE_OPEN_SQUARE:
+	  expr = cp_parse_postfix_open_square_expression (parser, expr);
+	  break;
+
+	case TTYPE_OPEN_PAREN:
+	  break;
+
+	case TTYPE_DOT:
+	case TTYPE_DEREF:
+	  break;
+
+	case TTYPE_PLUS_PLUS:
+	  break;
+
+	case TTYPE_MINUS_MINUS:
+	  break;
+
+	default:
+	  return expr;
+	}
+    }
+
+  error (_("should not get here"));
   return NULL;
 }
 
@@ -1010,15 +1304,13 @@ build_binary_op (cp_expression *lhs, cp_expression *rhs, enum expr_code code)
   write_exp_elt_opcode (operator);
   lhs = cp_expression_chain (lhs);
 
-  /* We no longer need RHS, so free its memory.  */
-  free_expression_chain (rhs);
-
   return lhs;
 }
 
 static cp_expression *
 cp_parse_binary_expression (cp_parser *parser, enum cp_precedence prec)
 {
+  struct cleanup *back_to, *cleanup;
   cp_expression_stack stack;
   cp_expression_stack_entry *sp = &stack[0];
   cp_token *token;
@@ -1027,6 +1319,8 @@ cp_parse_binary_expression (cp_parser *parser, enum cp_precedence prec)
   enum expr_code operator;
 
   lhs = cp_cast_expression (parser);
+  back_to = make_cleanup (free_expression_chain, lhs);
+
   for (;;)
     {
       token = cp_lexer_peek_token (parser->lexer);
@@ -1046,6 +1340,7 @@ cp_parse_binary_expression (cp_parser *parser, enum cp_precedence prec)
       cp_lexer_consume_token (parser->lexer);
 
       rhs = cp_parse_simple_cast_expression (parser);
+      cleanup = make_cleanup (free_expression_chain, rhs);
 
       token = cp_lexer_peek_token (parser->lexer);
       lookahead_prec = binary_ops_token[token->type].prec;
@@ -1055,6 +1350,7 @@ cp_parse_binary_expression (cp_parser *parser, enum cp_precedence prec)
 	  sp->prec = prec;
 	  sp->operator = operator;
 	  sp->lhs = lhs;
+	  sp->cleanup = cleanup;
 	  sp++;
 	  lhs = rhs;
 	  prec = new_prec;
@@ -1070,11 +1366,14 @@ cp_parse_binary_expression (cp_parser *parser, enum cp_precedence prec)
 	  operator = sp->operator;
 	  rhs = lhs;
 	  lhs = sp->lhs;
+	  cleanup = sp->cleanup;
 	}
 
       lhs = build_binary_op (lhs, rhs, operator);
+      do_cleanups (cleanup);
     }
 
+  discard_cleanups (back_to);
   return lhs;
 }
 
@@ -1316,6 +1615,57 @@ cp_lex_one_token (cp_lexer *lexer)
       result->type = TTYPE_ATSIGN;
       break;
 
+    case 'L':
+    case 'u':
+    case 'U':
+    case 'R':
+      /* Fall through  */
+
+    case '_':
+    case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':
+    case 'g': case 'h': case 'i': case 'j': case 'k': case 'l':
+    case 'm': case 'n': case 'o': case 'p': case 'q': case 'r':
+    case 's': case 't':           case 'v': case 'w': case 'x':
+    case 'y': case 'z':
+    case 'A': case 'B': case 'C': case 'D': case 'E': case 'F':
+    case 'G': case 'H': case 'I': case 'J': case 'K':
+    case 'M': case 'N': case 'O': case 'P': case 'Q':
+    case 'S': case 'T':           case 'V': case 'W': case 'X':
+    case 'Y': case 'Z':
+      {
+	int i, len;
+	char *copy;
+	struct stoken stoken;
+
+	result->type = TTYPE_NAME;
+	result->keyword = KEYWORD_MAX;
+
+	/* Find the end of the word.  */
+	len = 0;
+	for (c = lexer->buffer.cur[len];
+	     (c == '_' || c == '$' || (c >= '0' && c <= '9')
+	      || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')); )
+	  c = lexer->buffer.cur[++len];
+
+	stoken.length = len + 1;
+	stoken.ptr = (char *) (lexer->buffer.cur - 1);
+	copy = copy_name (stoken);
+	for (i = 0;
+	     i < sizeof (reserved_keywords) / sizeof (reserved_keywords[0]);
+	     ++i)
+	  {
+	    if (lexer->language & reserved_keywords[i].valid_languages
+		&& strcmp (reserved_keywords[i].name, copy) == 0)
+	      {
+		result->type = TTYPE_KEYWORD;
+		result->keyword = reserved_keywords[i].keyword;
+	      }
+	  }
+	lexer->buffer.cur += len;
+	result->value = savestring (stoken.ptr, stoken.length);
+      }
+    break;
+
     case 0:
       --lexer->buffer.cur;
       xfree (result);
@@ -1325,6 +1675,7 @@ cp_lex_one_token (cp_lexer *lexer)
     default:
       /* we should only get here if we did not implement something
 	 above.  */
+      xfree (result);
       error (_("unknown lexer token"));
   }
 
@@ -1364,8 +1715,9 @@ _cp_dump_token_stream (const cp_lexer *lexer)
 #endif
 
 static void
-free_cp_parser (cp_parser *parser)
+free_cp_parser (void *parser_ptr)
 {
+  cp_parser *parser = (cp_parser *) parser_ptr;
   cp_token_list *l = parser->lexer->head;
 
   while (l != NULL)
@@ -1393,6 +1745,18 @@ new_parser (char *start)
   parser->lexer = (cp_lexer *) xcalloc (1, sizeof (cp_lexer));
   parser->lexer->buffer.buffer = start;
   parser->lexer->buffer.cur = parser->lexer->buffer.buffer;
+
+  switch (parse_language->la_language)
+    {
+    case language_cplus:
+      parser->lexer->language = CP_LANGUAGE_CPLUS;
+      break;
+
+    default:
+      parser->lexer->language = CP_LANGUAGE_C;
+      break;
+    }
+
   return parser;
 }
 
@@ -1401,7 +1765,10 @@ c_parse (void)
 {
   char *start = lexptr;
   cp_expression *expr;
+  struct cleanup *back_to;
   cp_parser *parser = new_parser (lexptr);
+
+  back_to = make_cleanup (free_cp_parser, parser);
 
   /* Lex and parse input  */
   cp_lex (parser->lexer);
@@ -1410,12 +1777,13 @@ c_parse (void)
 
   /* Parse input and reset global variables  */
   expr = cp_parse_expression (parser);
+  xfree (expout);
   expout = expr->exp;
   expout_size = expr->size;
   expout_ptr = expr->ptr;
 
   /* Free parser and expression memory  */
-  free_cp_parser (parser);
+  do_cleanups (back_to);
   xfree (expr);
 
   return 0;
@@ -1435,6 +1803,7 @@ _initialize_cparser (void)
 
   EOF_token = new_token ();
   EOF_token->type = TTYPE_EOF;
+  global_namespace = xcalloc (1, sizeof (cp_expression));
 
   for (i = 0; i < sizeof (binary_ops) / sizeof (binary_ops[0]); ++i)
     binary_ops_token[binary_ops[i].token_type] = binary_ops[i];
