@@ -1085,7 +1085,7 @@ cp_parse_postfix_expression (cp_parser *parser)
 	}
     }
 
-  error (_("should not get here"));
+  gdb_assert_not_reached ("unreachable statement parsing postfix expression");
   return NULL;
 }
 
@@ -1186,7 +1186,7 @@ cp_parse_unary_expression (cp_parser *parser)
 	  break;
 
 	default:
-	  internal_error (__FILE__, __LINE__, _("unreachable statement!"));
+	  gdb_assert_not_reached ("unexpected unary operator");
 	}
 
       write_exp_elt_opcode (operator);
@@ -1295,7 +1295,7 @@ build_binary_op (cp_expression *lhs, cp_expression *rhs, enum expr_code code)
       break;
 
     default:
-      error (_("unhandled operator in build_binary_op"));
+      gdb_assert_not_reached ("unexpected binary operator");
     }
 
   /* All operators L -> R (not true for all operators?)
