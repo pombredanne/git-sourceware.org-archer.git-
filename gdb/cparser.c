@@ -1026,6 +1026,27 @@ cp_parse_primary_expression (cp_parser *parser)
     case TTYPE_NAME:
       return cp_parse_id_expression (parser, /*optional_p=*/ 0);
 
+    case TTYPE_OPEN_PAREN:
+      {
+	cp_expression *expr;
+	struct cleanup *c;
+
+	/* Consume the `('.  */
+	cp_lexer_consume_token (parser->lexer);
+
+	/* Parse the parenthesized expression.  */
+	expr = cp_parse_expression (parser);
+	c = make_cleanup (free_expression_chain, (void *) expr);
+
+	/* Consume the `)'.  */
+	cp_require_token (parser, TTYPE_CLOSE_PAREN);
+
+	discard_cleanups (c);
+
+	return expr;
+      }
+      break;
+
     default:
       error (_("expected primary expression"));
     }
@@ -1200,12 +1221,13 @@ static cp_expression *
 cp_cast_expression (cp_parser *parser)
 {
   /* determine if parser is looking at a cast of some sort */
+#if 0
   if (cp_lexer_next_token_is (parser->lexer, TTYPE_OPEN_PAREN))
     {
       /* we could be looking at a cast... */
       return NULL;
     }
-
+#endif
   return cp_parse_unary_expression (parser);
 }
 
