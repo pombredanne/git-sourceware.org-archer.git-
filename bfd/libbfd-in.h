@@ -270,6 +270,8 @@ extern int _bfd_nocore_core_file_failing_signal
   (bfd *);
 extern bfd_boolean _bfd_nocore_core_file_matches_executable_p
   (bfd *, bfd *);
+extern int _bfd_nocore_core_file_pid
+  (bfd *);
 
 /* Routines to use for BFD_JUMP_TABLE_ARCHIVE when there is no archive
    file support.  Use BFD_JUMP_TABLE_ARCHIVE (_bfd_noarchive).  */
@@ -375,7 +377,9 @@ extern int _bfd_vms_lib_generic_stat_arch_elt (bfd *, struct stat *);
 extern symindex _bfd_vms_lib_find_symbol (bfd *, const char *);
 extern bfd *_bfd_vms_lib_get_imagelib_file (bfd *);
 extern const bfd_target *_bfd_vms_lib_alpha_archive_p (bfd *abfd);
-extern bfd_boolean _bfd_vms_lib_mkarchive (bfd *abfd);
+extern const bfd_target *_bfd_vms_lib_ia64_archive_p (bfd *abfd);
+extern bfd_boolean _bfd_vms_lib_alpha_mkarchive (bfd *abfd);
+extern bfd_boolean _bfd_vms_lib_ia64_mkarchive (bfd *abfd);
 
 /* Routines to use for BFD_JUMP_TABLE_SYMBOLS where there is no symbol
    support.  Use BFD_JUMP_TABLE_SYMBOLS (_bfd_nosymbols).  */

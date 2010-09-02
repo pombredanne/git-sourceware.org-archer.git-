@@ -168,6 +168,7 @@ end_arglist (void)
 {
   int val = arglist_len;
   struct funcall *call = funcall_chain;
+
   funcall_chain = call->next;
   arglist_len = call->arglist_len;
   xfree (call);
@@ -214,10 +215,9 @@ void
 write_exp_elt_opcode (enum exp_opcode expelt)
 {
   union exp_element tmp;
+
   memset (&tmp, 0, sizeof (union exp_element));
-
   tmp.opcode = expelt;
-
   write_exp_elt (tmp);
 }
 
@@ -225,10 +225,9 @@ void
 write_exp_elt_sym (struct symbol *expelt)
 {
   union exp_element tmp;
+
   memset (&tmp, 0, sizeof (union exp_element));
-
   tmp.symbol = expelt;
-
   write_exp_elt (tmp);
 }
 
@@ -236,6 +235,7 @@ void
 write_exp_elt_block (struct block *b)
 {
   union exp_element tmp;
+
   memset (&tmp, 0, sizeof (union exp_element));
   tmp.block = b;
   write_exp_elt (tmp);
@@ -245,6 +245,7 @@ void
 write_exp_elt_objfile (struct objfile *objfile)
 {
   union exp_element tmp;
+
   memset (&tmp, 0, sizeof (union exp_element));
   tmp.objfile = objfile;
   write_exp_elt (tmp);
@@ -254,10 +255,9 @@ void
 write_exp_elt_longcst (LONGEST expelt)
 {
   union exp_element tmp;
+
   memset (&tmp, 0, sizeof (union exp_element));
-
   tmp.longconst = expelt;
-
   write_exp_elt (tmp);
 }
 
@@ -265,10 +265,9 @@ void
 write_exp_elt_dblcst (DOUBLEST expelt)
 {
   union exp_element tmp;
+
   memset (&tmp, 0, sizeof (union exp_element));
-
   tmp.doubleconst = expelt;
-
   write_exp_elt (tmp);
 }
 
@@ -288,10 +287,9 @@ void
 write_exp_elt_type (struct type *expelt)
 {
   union exp_element tmp;
+
   memset (&tmp, 0, sizeof (union exp_element));
-
   tmp.type = expelt;
-
   write_exp_elt (tmp);
 }
 
@@ -299,10 +297,9 @@ void
 write_exp_elt_intern (struct internalvar *expelt)
 {
   union exp_element tmp;
+
   memset (&tmp, 0, sizeof (union exp_element));
-
   tmp.internalvar = expelt;
-
   write_exp_elt (tmp);
 }
 
@@ -794,7 +791,8 @@ length_of_subexp (struct expression *expr, int endpos)
    operator takes.  */
 
 void
-operator_length (struct expression *expr, int endpos, int *oplenp, int *argsp)
+operator_length (const struct expression *expr, int endpos, int *oplenp,
+		 int *argsp)
 {
   expr->language_defn->la_exp_desc->operator_length (expr, endpos,
 						     oplenp, argsp);
@@ -803,7 +801,7 @@ operator_length (struct expression *expr, int endpos, int *oplenp, int *argsp)
 /* Default value for operator_length in exp_descriptor vectors.  */
 
 void
-operator_length_standard (struct expression *expr, int endpos,
+operator_length_standard (const struct expression *expr, int endpos,
 			  int *oplenp, int *argsp)
 {
   int oplen = 1;
@@ -1023,6 +1021,7 @@ prefixify_subexp (struct expression *inexpr,
   for (i = 0; i < args; i++)
     {
       int r;
+
       oplen = arglens[i];
       inend += oplen;
       r = prefixify_subexp (inexpr, outexpr, inend, outbeg);
@@ -1039,8 +1038,6 @@ prefixify_subexp (struct expression *inexpr,
   return result;
 }
 
-/* This page contains the two entry points to this file.  */
-
 /* Read an expression from the string *STRINGPTR points to,
    parse it, and return a pointer to a  struct expression  that we malloc.
    Use block BLOCK as the lexical context for variable names;
@@ -1070,6 +1067,7 @@ parse_exp_in_context (char **stringptr, struct block *block, int comma,
 {
   volatile struct gdb_exception except;
   struct cleanup *old_chain;
+  const struct language_defn *lang = NULL;
   int subexp;
 
   lexptr = *stringptr;
@@ -1107,17 +1105,43 @@ parse_exp_in_context (char **stringptr, struct block *block, int comma,
 	expression_context_pc = BLOCK_START (expression_context_block);
     }
 
+  if (language_mode == language_mode_auto && block != NULL)
+    {
+      /* Find the language associated to the given context block.
+         Default to the current language if it can not be determined.
+
+         Note that using the language corresponding to the current frame
+         can sometimes give unexpected results.  For instance, this
+         routine is often called several times during the inferior
+         startup phase to re-parse breakpoint expressions after
+         a new shared library has been loaded.  The language associated
+         to the current frame at this moment is not relevant for
+         the breakpoint. Using it would therefore be silly, so it seems
+         better to rely on the current language rather than relying on
+         the current frame language to parse the expression. That's why
+         we do the following language detection only if the context block
+         has been specifically provided.  */
+      struct symbol *func = block_linkage_function (block);
+
+      if (func != NULL)
+        lang = language_def (SYMBOL_LANGUAGE (func));
+      if (lang == NULL || lang->la_language == language_unknown)
+        lang = current_language;
+    }
+  else
+    lang = current_language;
+
   expout_size = 10;
   expout_ptr = 0;
   expout = (struct expression *)
     xmalloc (sizeof (struct expression) + EXP_ELEM_TO_BYTES (expout_size));
-  expout->language_defn = current_language;
+  expout->language_defn = lang;
   expout->gdbarch = get_current_arch ();
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      if (current_language->la_parser ())
-	current_language->la_error (NULL);
+      if (lang->la_parser ())
+        lang->la_error (NULL);
     }
   if (except.reason < 0)
     {
@@ -1150,7 +1174,7 @@ parse_exp_in_context (char **stringptr, struct block *block, int comma,
   if (out_subexp)
     *out_subexp = subexp;
 
-  current_language->la_post_parser (&expout, void_context_p);
+  lang->la_post_parser (&expout, void_context_p);
 
   if (expressiondebug)
     dump_prefix_expression (expout, gdb_stdlog);
@@ -1166,6 +1190,7 @@ struct expression *
 parse_expression (char *string)
 {
   struct expression *exp;
+
   exp = parse_exp_1 (&string, 0, 0);
   if (*string)
     error (_("Junk after end of expression."));
@@ -1175,8 +1200,10 @@ parse_expression (char *string)
 /* Parse STRING as an expression.  If parsing ends in the middle of a
    field reference, return the type of the left-hand-side of the
    reference; furthermore, if the parsing ends in the field name,
-   return the field name in *NAME.  In all other cases, return NULL.
-   Returned non-NULL *NAME must be freed by the caller.  */
+   return the field name in *NAME.  If the parsing ends in the middle
+   of a field reference, but the reference is somehow invalid, throw
+   an exception.  In all other cases, return NULL.  Returned non-NULL
+   *NAME must be freed by the caller.  */
 
 struct type *
 parse_field_expression (char *string, char **name)
@@ -1186,7 +1213,7 @@ parse_field_expression (char *string, char **name)
   int subexp;
   volatile struct gdb_exception except;
 
-  TRY_CATCH (except, RETURN_MASK_ALL)
+  TRY_CATCH (except, RETURN_MASK_ERROR)
     {
       in_parse_field = 1;
       exp = parse_exp_in_context (&string, 0, 0, 0, &subexp);
@@ -1206,10 +1233,12 @@ parse_field_expression (char *string, char **name)
       xfree (exp);
       return NULL;
     }
+
+  /* This might throw an exception.  If so, we want to let it
+     propagate.  */
+  val = evaluate_subexpression_type (exp, subexp);
   /* (*NAME) is a part of the EXP memory block freed below.  */
   *name = xstrdup (*name);
-
-  val = evaluate_subexpression_type (exp, subexp);
   xfree (exp);
 
   return value_type (val);
@@ -1220,6 +1249,73 @@ parse_field_expression (char *string, char **name)
 void
 null_post_parser (struct expression **exp, int void_context_p)
 {
+}
+
+/* Parse floating point value P of length LEN.
+   Return 0 (false) if invalid, 1 (true) if valid.
+   The successfully parsed number is stored in D.
+   *SUFFIX points to the suffix of the number in P.
+
+   NOTE: This accepts the floating point syntax that sscanf accepts.  */
+
+int
+parse_float (const char *p, int len, DOUBLEST *d, const char **suffix)
+{
+  char *copy;
+  char *s;
+  int n, num;
+
+  copy = xmalloc (len + 1);
+  memcpy (copy, p, len);
+  copy[len] = 0;
+
+  num = sscanf (copy, "%" DOUBLEST_SCAN_FORMAT "%n", d, &n);
+  xfree (copy);
+
+  /* The sscanf man page suggests not making any assumptions on the effect
+     of %n on the result, so we don't.
+     That is why we simply test num == 0.  */
+  if (num == 0)
+    return 0;
+
+  *suffix = p + n;
+  return 1;
+}
+
+/* Parse floating point value P of length LEN, using the C syntax for floats.
+   Return 0 (false) if invalid, 1 (true) if valid.
+   The successfully parsed number is stored in *D.
+   Its type is taken from builtin_type (gdbarch) and is stored in *T.  */
+
+int
+parse_c_float (struct gdbarch *gdbarch, const char *p, int len,
+	       DOUBLEST *d, struct type **t)
+{
+  const char *suffix;
+  int suffix_len;
+  const struct builtin_type *builtin_types = builtin_type (gdbarch);
+
+  if (! parse_float (p, len, d, &suffix))
+    return 0;
+
+  suffix_len = p + len - suffix;
+
+  if (suffix_len == 0)
+    *t = builtin_types->builtin_double;
+  else if (suffix_len == 1)
+    {
+      /* Handle suffixes: 'f' for float, 'l' for long double.  */
+      if (tolower (*suffix) == 'f')
+	*t = builtin_types->builtin_float;
+      else if (tolower (*suffix) == 'l')
+	*t = builtin_types->builtin_long_double;
+      else
+	return 0;
+    }
+  else
+    return 0;
+
+  return 1;
 }
 
 /* Stuff for maintaining a stack of types.  Currently just used by C, but
@@ -1369,6 +1465,7 @@ void
 parser_fprintf (FILE *x, const char *y, ...)
 { 
   va_list args;
+
   va_start (args, y);
   if (x == stderr)
     vfprintf_unfiltered (gdb_stderr, y, args); 
@@ -1483,8 +1580,7 @@ exp_iterate (struct expression *exp,
     {
       int pos, args, oplen = 0;
 
-      exp->language_defn->la_exp_desc->operator_length (exp, endpos,
-							&oplen, &args);
+      operator_length (exp, endpos, &oplen, &args);
       gdb_assert (oplen > 0);
 
       pos = endpos - oplen;

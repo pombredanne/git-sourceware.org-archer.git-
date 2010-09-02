@@ -913,7 +913,7 @@ extern bfd_boolean elf32_arm_build_stubs
 
 /* ARM unwind section editing support.  */
 extern bfd_boolean elf32_arm_fix_exidx_coverage
-  (struct bfd_section **, unsigned int, struct bfd_link_info *, bfd_boolean);
+(struct bfd_section **, unsigned int, struct bfd_link_info *, bfd_boolean);
 
 /* PowerPC @tls opcode transform/validate.  */
 extern unsigned int _bfd_elf_ppc_at_tls_transform
@@ -1977,6 +1977,8 @@ enum bfd_architecture
 #define bfd_mach_v850          1
 #define bfd_mach_v850e         'E'
 #define bfd_mach_v850e1        '1'
+#define bfd_mach_v850e2        0x4532
+#define bfd_mach_v850e2v3      0x45325633
   bfd_arch_arc,       /* ARC Cores */
 #define bfd_mach_arc_5         5
 #define bfd_mach_arc_6         6
@@ -2083,9 +2085,6 @@ enum bfd_architecture
 #define bfd_mach_xc16xs         3
   bfd_arch_xtensa,    /* Tensilica's Xtensa cores.  */
 #define bfd_mach_xtensa        1
-   bfd_arch_maxq,     /* Dallas MAXQ 10/20 */
-#define bfd_mach_maxq10    10
-#define bfd_mach_maxq20    20
   bfd_arch_z80,
 #define bfd_mach_z80strict      1 /* No undocumented opcodes.  */
 #define bfd_mach_z80            3 /* With ixl, ixh, iyl, and iyh.  */
@@ -3276,6 +3275,13 @@ pc-relative or some form of GOT-indirect relocation.  */
   BFD_RELOC_SH_TLS_DTPMOD32,
   BFD_RELOC_SH_TLS_DTPOFF32,
   BFD_RELOC_SH_TLS_TPOFF32,
+  BFD_RELOC_SH_GOT20,
+  BFD_RELOC_SH_GOTOFF20,
+  BFD_RELOC_SH_GOTFUNCDESC,
+  BFD_RELOC_SH_GOTFUNCDESC20,
+  BFD_RELOC_SH_GOTOFFFUNCDESC,
+  BFD_RELOC_SH_GOTOFFFUNCDESC20,
+  BFD_RELOC_SH_FUNCDESC,
 
 /* ARC Cores relocs.
 ARC 22 bit pc-relative branch.  The lowest two bits must be zero and are
@@ -3600,6 +3606,72 @@ bits placed non-contiguously in the instruction.  */
 /* This is a variation of BFD_RELOC_LO16 that can be used in v850e ld.bu
 instructions.  */
   BFD_RELOC_V850_LO16_SPLIT_OFFSET,
+
+/* This is a 16-bit reloc.  */
+  BFD_RELOC_V850_16_PCREL,
+
+/* This is a 17-bit reloc.  */
+  BFD_RELOC_V850_17_PCREL,
+
+/* This is a 23-bit reloc.  */
+  BFD_RELOC_V850_23,
+
+/* This is a 32-bit reloc.  */
+  BFD_RELOC_V850_32_PCREL,
+
+/* This is a 32-bit reloc.  */
+  BFD_RELOC_V850_32_ABS,
+
+/* This is a 16-bit reloc.  */
+  BFD_RELOC_V850_16_SPLIT_OFFSET,
+
+/* This is a 16-bit reloc.  */
+  BFD_RELOC_V850_16_S1,
+
+/* Low 16 bits. 16 bit shifted by 1.  */
+  BFD_RELOC_V850_LO16_S1,
+
+/* This is a 16 bit offset from the call table base pointer.  */
+  BFD_RELOC_V850_CALLT_15_16_OFFSET,
+
+/* DSO relocations.  */
+  BFD_RELOC_V850_32_GOTPCREL,
+
+/* DSO relocations.  */
+  BFD_RELOC_V850_16_GOT,
+
+/* DSO relocations.  */
+  BFD_RELOC_V850_32_GOT,
+
+/* DSO relocations.  */
+  BFD_RELOC_V850_22_PLT_PCREL,
+
+/* DSO relocations.  */
+  BFD_RELOC_V850_32_PLT_PCREL,
+
+/* DSO relocations.  */
+  BFD_RELOC_V850_COPY,
+
+/* DSO relocations.  */
+  BFD_RELOC_V850_GLOB_DAT,
+
+/* DSO relocations.  */
+  BFD_RELOC_V850_JMP_SLOT,
+
+/* DSO relocations.  */
+  BFD_RELOC_V850_RELATIVE,
+
+/* DSO relocations.  */
+  BFD_RELOC_V850_16_GOTOFF,
+
+/* DSO relocations.  */
+  BFD_RELOC_V850_32_GOTOFF,
+
+/* start code.  */
+  BFD_RELOC_V850_CODE,
+
+/* start data in text.  */
+  BFD_RELOC_V850_DATA,
 
 /* This is a 32bit pcrel reloc for the mn10300, offset by two bytes in the
 instruction.  */
@@ -5340,6 +5412,8 @@ const char *bfd_core_file_failing_command (bfd *abfd);
 
 int bfd_core_file_failing_signal (bfd *abfd);
 
+int bfd_core_file_pid (bfd *abfd);
+
 bfd_boolean core_file_matches_executable_p
    (bfd *core_bfd, bfd *exec_bfd);
 
@@ -5536,11 +5610,13 @@ typedef struct bfd_target
 #define BFD_JUMP_TABLE_CORE(NAME) \
   NAME##_core_file_failing_command, \
   NAME##_core_file_failing_signal, \
-  NAME##_core_file_matches_executable_p
+  NAME##_core_file_matches_executable_p, \
+  NAME##_core_file_pid
 
   char *      (*_core_file_failing_command) (bfd *);
   int         (*_core_file_failing_signal) (bfd *);
   bfd_boolean (*_core_file_matches_executable_p) (bfd *, bfd *);
+  int         (*_core_file_pid) (bfd *);
 
   /* Archive entry points.  */
 #define BFD_JUMP_TABLE_ARCHIVE(NAME) \

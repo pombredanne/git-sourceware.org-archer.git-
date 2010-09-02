@@ -555,8 +555,9 @@ static const unsigned int mips_isa_table[] =
 /* DSP ASE */ 
 #define INSN_DSP                  0x00001000
 #define INSN_DSP64                0x00002000
-/* MIPS 16 ASE */
-#define INSN_MIPS16               0x00004000
+
+/* 0x00004000 is unused.  */
+
 /* MIPS-3D ASE */
 #define INSN_MIPS3D               0x00008000
 
@@ -1088,8 +1089,10 @@ extern int bfd_mips_num_opcodes;
 #define MIPS16_INSN_READ_PC		    0x00002000
 /* Reads the general purpose register in MIPS16OP_*_REGR32.  */
 #define MIPS16_INSN_READ_GPR_X		    0x00004000
-/* Is a branch insn. */
-#define MIPS16_INSN_BRANCH                  0x00010000
+/* Is an unconditional branch insn. */
+#define MIPS16_INSN_UNCOND_BRANCH	    0x00008000
+/* Is a conditional branch insn. */
+#define MIPS16_INSN_COND_BRANCH		    0x00010000
 
 /* The following flags have the same value for the mips16 opcode
    table:

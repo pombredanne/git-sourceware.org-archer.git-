@@ -43,14 +43,6 @@
 #include "cli/cli-cmds.h"
 #include "python/python.h"
 
-/* If nonzero, display time usage both at startup and for each command.  */
-
-int display_time;
-
-/* If nonzero, display space usage both at startup and for each command.  */
-
-int display_space;
-
 /* The selected interpreter.  This will be used as a set command
    variable, so it should always be malloc'ed - since
    do_setshow_command will free it. */
@@ -67,6 +59,10 @@ char *gdb_sysroot = 0;
 
 /* GDB datadir, used to store data files.  */
 char *gdb_datadir = 0;
+
+/* If gdb was configured with --with-python=/path,
+   the possibly relocated path to python's lib directory.  */
+char *python_libdir = 0;
 
 struct ui_file *gdb_stdout;
 struct ui_file *gdb_stderr;
@@ -143,6 +139,7 @@ relocate_directory (const char *progname, const char *initial, int flag)
   if (*dir)
     {
       char *canon_sysroot = lrealpath (dir);
+
       if (canon_sysroot)
 	{
 	  xfree (dir);
@@ -294,7 +291,7 @@ captured_main (void *data)
   int i;
   int save_auto_load;
 
-  long time_at_startup = get_run_time ();
+  struct cleanup *pre_stat_chain = make_command_stats_cleanup (0);
 
 #if defined (HAVE_SETLOCALE) && defined (HAVE_LC_MESSAGES)
   setlocale (LC_MESSAGES, "");
@@ -349,6 +346,14 @@ captured_main (void *data)
 
   gdb_datadir = relocate_directory (argv[0], GDB_DATADIR,
 				    GDB_DATADIR_RELOCATABLE);
+
+#ifdef WITH_PYTHON_PATH
+  /* For later use in helping Python find itself.  */
+  python_libdir = relocate_directory (argv[0],
+				      concat (WITH_PYTHON_PATH,
+					      SLASH_STRING, "lib", NULL),
+				      PYTHON_PATH_RELOCATABLE);
+#endif
 
 #ifdef RELOC_SRCDIR
   add_substitute_path_rule (RELOC_SRCDIR,
@@ -472,8 +477,8 @@ captured_main (void *data)
 	    break;
 	  case OPT_STATISTICS:
 	    /* Enable the display of both time and space usage.  */
-	    display_time = 1;
-	    display_space = 1;
+	    set_display_time (1);
+	    set_display_space (1);
 	    break;
 	  case OPT_TUI:
 	    /* --tui is equivalent to -i=tui.  */
@@ -742,6 +747,7 @@ Excess command line arguments ignored. (%s%s)\n"),
   {
     /* Find it.  */
     struct interp *interp = interp_lookup (interpreter_p);
+
     if (interp == NULL)
       error (_("Interpreter `%s' unrecognized"), interpreter_p);
     /* Install it.  */
@@ -893,25 +899,7 @@ Can't attach to process and specify a core file at the same time."));
     }
 
   /* Show time and/or space usage.  */
-
-  if (display_time)
-    {
-      long init_time = get_run_time () - time_at_startup;
-
-      printf_unfiltered (_("Startup time: %ld.%06ld\n"),
-			 init_time / 1000000, init_time % 1000000);
-    }
-
-  if (display_space)
-    {
-#ifdef HAVE_SBRK
-      extern char **environ;
-      char *lim = (char *) sbrk (0);
-
-      printf_unfiltered (_("Startup size: data size %ld\n"),
-			 (long) (lim - (char *) &environ));
-#endif
-    }
+  do_cleanups (pre_stat_chain);
 
   /* NOTE: cagney/1999-11-07: There is probably no reason for not
      moving this loop and the code found in captured_command_loop()

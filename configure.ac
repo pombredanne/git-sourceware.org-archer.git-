@@ -548,6 +548,7 @@ case "${target}" in
     noconfigdirs="$noconfigdirs target-newlib target-libiberty target-libgloss ${libgcj} target-libmudflap"
     ;;
   *-*-rtems*)
+    skipdirs="${skipdirs} target-libiberty"
     noconfigdirs="$noconfigdirs target-libgloss ${libgcj}"
     ;;
     # The tpf target doesn't support gdb yet.
@@ -966,14 +967,8 @@ case "${target}" in
   v810-*-*)
     noconfigdirs="$noconfigdirs bfd binutils gas gcc gdb ld target-libstdc++-v3 opcodes target-libgloss ${libgcj}"
     ;;
-  v850-*-*)
-    noconfigdirs="$noconfigdirs target-libgloss ${libgcj}"
-    ;;
-  v850e-*-*)
-    noconfigdirs="$noconfigdirs target-libgloss ${libgcj}"
-    ;;
-  v850ea-*-*)
-    noconfigdirs="$noconfigdirs target-libgloss ${libgcj}"
+  v850*-*-*)
+    noconfigdirs="$noconfigdirs ${libgcj}"
     ;;
   vax-*-vms)
     noconfigdirs="$noconfigdirs bfd binutils gdb ld target-newlib opcodes target-libgloss ${libgcj}"
@@ -1374,13 +1369,13 @@ if test -d ${srcdir}/gcc && test "x$have_gmp" = xno; then
   #if GCC_GMP_VERSION < GCC_GMP_VERSION_NUM(4,2,0)
   choke me
   #endif
-  ], AC_TRY_COMPILE([#include <gmp.h>],[
+  ], [AC_TRY_COMPILE([#include <gmp.h>],[
   #define GCC_GMP_VERSION_NUM(a,b,c) (((a) << 16L) | ((b) << 8) | (c))
   #define GCC_GMP_VERSION GCC_GMP_VERSION_NUM(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL)
   #if GCC_GMP_VERSION < GCC_GMP_VERSION_NUM(4,3,2)
   choke me
   #endif
-  ], [AC_MSG_RESULT([yes])], [AC_MSG_RESULT([buggy but acceptable])]),
+  ], [AC_MSG_RESULT([yes])], [AC_MSG_RESULT([buggy but acceptable])])],
    [AC_MSG_RESULT([no]); have_gmp=no])
 
   # If we have GMP, check the MPFR version.
@@ -1392,12 +1387,12 @@ if test -d ${srcdir}/gcc && test "x$have_gmp" = xno; then
     #if MPFR_VERSION < MPFR_VERSION_NUM(2,3,1)
     choke me
     #endif
-    ], AC_TRY_COMPILE([#include <gmp.h>
+    ], [AC_TRY_COMPILE([#include <gmp.h>
     #include <mpfr.h>],[
     #if MPFR_VERSION < MPFR_VERSION_NUM(2,4,2)
     choke me
     #endif
-    ], [AC_MSG_RESULT([yes])], [AC_MSG_RESULT([buggy but acceptable])]),
+    ], [AC_MSG_RESULT([yes])], [AC_MSG_RESULT([buggy but acceptable])])],
      [AC_MSG_RESULT([no]); have_gmp=no])
   fi
 
@@ -1409,11 +1404,11 @@ if test -d ${srcdir}/gcc && test "x$have_gmp" = xno; then
     #if MPC_VERSION < MPC_VERSION_NUM(0,8,0)
     choke me
     #endif
-    ], AC_TRY_COMPILE([#include <mpc.h>],[
+    ], [AC_TRY_COMPILE([#include <mpc.h>],[
     #if MPC_VERSION < MPC_VERSION_NUM(0,8,1)
     choke me
     #endif
-    ], [AC_MSG_RESULT([yes])], [AC_MSG_RESULT([buggy but acceptable])]),
+    ], [AC_MSG_RESULT([yes])], [AC_MSG_RESULT([buggy but acceptable])])],
      [AC_MSG_RESULT([no]); have_gmp=no])
   fi
 
@@ -1530,8 +1525,6 @@ AC_ARG_WITH(boot-ldflags,
 AC_SUBST(poststage1_ldflags)
 
 # Check for PPL
-ppl_major_version=0
-ppl_minor_version=10
 ppllibs=" -lppl_c -lppl -lgmpxx"
 pplinc=
 
@@ -1572,9 +1565,9 @@ ENABLE_PPL_CHECK=yes)
 if test "x$with_ppl" != "xno" -a "${ENABLE_PPL_CHECK}" = "yes"; then
   saved_CFLAGS="$CFLAGS"
   CFLAGS="$CFLAGS $pplinc $gmpinc"
-  AC_MSG_CHECKING([for version $ppl_major_version.$ppl_minor_version of PPL])
+  AC_MSG_CHECKING([for version 0.10 (or later revision) of PPL])
   AC_TRY_COMPILE([#include "ppl_c.h"],[
-  #if PPL_VERSION_MAJOR != $ppl_major_version || PPL_VERSION_MINOR != $ppl_minor_version
+  #if PPL_VERSION_MAJOR != 0 || PPL_VERSION_MINOR < 10
   choke me
   #endif
   ], [AC_MSG_RESULT([yes])], [AC_MSG_RESULT([no]); ppllibs= ; pplinc= ; with_ppl=no ])
@@ -1637,7 +1630,12 @@ if test "x$with_cloog" != "xno" -a "${ENABLE_CLOOG_CHECK}" = "yes"; then
   #if CLOOG_VERSION_MAJOR != 0 || CLOOG_VERSION_MINOR != 15 || CLOOG_VERSION_REVISION < 5
   choke me
   #endif
-  ], [AC_MSG_RESULT([yes])], [AC_MSG_RESULT([no]); clooglibs= ; clooginc= ])
+  ], [AC_TRY_COMPILE([#include "cloog/cloog.h"],[
+  #if CLOOG_VERSION_MAJOR != 0 || CLOOG_VERSION_MINOR != 15 || CLOOG_VERSION_REVISION < 9
+  choke me
+  #endif
+  ], [AC_MSG_RESULT([yes])], [AC_MSG_RESULT([buggy but acceptable])])],
+  [AC_MSG_RESULT([no]); clooglibs= ; clooginc= ])
   CFLAGS="$saved_CFLAGS"
 fi
 
@@ -1651,17 +1649,8 @@ AC_ARG_ENABLE(lto,
 enable_lto=$enableval,
 enable_lto=yes; default_enable_lto=yes)
 
-ACX_ELF_TARGET_IFELSE([],
-if test x"$default_enable_lto" = x"yes" ; then
-  enable_lto=no
-else
-  if test x"$enable_lto" = x"yes"; then
-    AC_MSG_ERROR([LTO support requires an ELF target.])
-  fi
-fi
-default_enable_lto=no)
 
-if test x"$enable_lto" = x"yes" ; then
+ACX_ELF_TARGET_IFELSE([if test x"$enable_lto" = x"yes" ; then
   # Make sure that libelf.h and gelf.h are available.
   AC_ARG_WITH(libelf, [  --with-libelf=PATH       Specify prefix directory for the installed libelf package
                           Equivalent to --with-libelf-include=PATH/include
@@ -1750,7 +1739,6 @@ if test x"$enable_lto" = x"yes" ; then
       elf_nextscn (0, 0);
       elf_strptr (0, 0, 0);
       elf_getident (0, 0);
-      elf_getshdrstrndx (0, 0);
       elf_begin (0, 0, 0);
       elf_ndxscn (0);
       elf_end (0);
@@ -1758,6 +1746,27 @@ if test x"$enable_lto" = x"yes" ; then
       [AC_MSG_RESULT([yes]);],
       [AC_MSG_RESULT([no]); enable_lto=no; libelflibs= ; libelfinc= ]
     )
+
+    # Check for elf_getshdrstrndx or elf_getshstrndx.  The latter's flavor
+    # is determined in gcc/configure.ac.
+    if test x"$enable_lto" = x"yes" ; then
+      AC_MSG_CHECKING([for elf_getshdrstrndx])
+      AC_TRY_LINK(
+        [#include <libelf.h>],[
+	elf_getshdrstrndx (0, 0);
+        ],
+        [AC_MSG_RESULT([yes]);],
+        [AC_MSG_RESULT([no]);
+	 AC_MSG_CHECKING([for elf_getshstrndx])
+         AC_TRY_LINK(
+           [#include <libelf.h>],[
+	   elf_getshstrndx (0, 0);
+           ],
+           [AC_MSG_RESULT([yes]);],
+           [AC_MSG_RESULT([no]); enable_lto=no; libelflibs= ; libelfinc= ]
+         )]
+      )
+    fi
 
     # If we couldn't enable LTO and the user forced it, emit an error.
     if test x"$enable_lto" = x"no" \
@@ -1777,7 +1786,25 @@ to specify its location.])
   # Flags needed for libelf.
   AC_SUBST(libelflibs)
   AC_SUBST(libelfinc)
-fi
+fi],[if test x"$default_enable_lto" = x"yes" ; then
+    # On non-ELF platforms, LTO must be explicitly enabled.
+    enable_lto=no
+  else
+  # Apart from ELF platforms, only Windows supports LTO so far.  It
+  # would also be nice to check the binutils support, but we don't
+  # have gcc_GAS_CHECK_FEATURE available here.  For now, we'll just
+  # warn during gcc/ subconfigure; unless you're bootstrapping with
+  # -flto it won't be needed until after installation anyway.
+    case $target in
+      *-cygwin*|*-mingw*) ;;
+      *-apple-darwin*) ;;
+      *) if test x"$enable_lto" = x"yes"; then
+	AC_MSG_ERROR([LTO support is not enabled for this target.])
+        fi
+      ;;
+    esac
+  fi
+  default_enable_lto=no])
 
 
 # By default, C is the only stage 1 language.
@@ -2714,7 +2741,7 @@ else
        mv conftest.o conftest.o.g0 &&
        ${CC} -c -g conftest.c &&
        mv conftest.o conftest.o.g &&
-       ${srcdir}/contrib/compare-debug conftest.o.g0 conftest.o.g; then
+       ${srcdir}/contrib/compare-debug conftest.o.g0 conftest.o.g > /dev/null 2>&1; then
       :
     else
       BUILD_CONFIG=

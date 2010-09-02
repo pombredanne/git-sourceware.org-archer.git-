@@ -51,7 +51,9 @@ struct mi_cmd mi_cmds[] =
   { "data-list-register-names", { NULL, 0 }, mi_cmd_data_list_register_names},
   { "data-list-register-values", { NULL, 0 }, mi_cmd_data_list_register_values},
   { "data-read-memory", { NULL, 0 }, mi_cmd_data_read_memory},
+  { "data-read-memory-bytes", { NULL, 0 }, mi_cmd_data_read_memory_bytes},
   { "data-write-memory", { NULL, 0 }, mi_cmd_data_write_memory},
+  { "data-write-memory-bytes", {NULL, 0}, mi_cmd_data_write_memory_bytes},
   { "data-write-register-values", { NULL, 0 }, mi_cmd_data_write_register_values},
   { "enable-timings", { NULL, 0 }, mi_cmd_enable_timings},
   { "enable-pretty-printing", { NULL, 0 }, mi_cmd_enable_pretty_printing},
@@ -164,6 +166,7 @@ lookup_table (const char *command)
 {
   const char *chp;
   unsigned int index = 0;
+
   /* compute our hash */
   for (chp = command; *chp; chp++)
     {
@@ -203,6 +206,7 @@ build_table (struct mi_cmd *commands)
   for (command = commands; command->name != 0; command++)
     {
       struct mi_cmd **entry = lookup_table (command->name);
+
       if (*entry)
 	internal_error (__FILE__, __LINE__,
 			_("command `%s' appears to be duplicated"),

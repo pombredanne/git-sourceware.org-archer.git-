@@ -130,13 +130,18 @@ gdb_test "python print blist\[len(blist)-1\].commands" "print \"Command for brea
 # Start with a fresh gdb.
 clean_restart ${testfile}
 
+# Disable hardware watchpoints if necessary.
+if [target_info exists gdb,no_hardware_watchpoints] {
+    gdb_test_no_output "set can-use-hw-watchpoints 0" ""
+}
+
 if ![runto_main] then {
     fail "Cannot run to main."
     return 0
 }
 
 gdb_py_test_silent_cmd  "python wp1 = gdb.Breakpoint (\"result\", type=gdb.BP_WATCHPOINT, wp_class=gdb.WP_WRITE )" "Set watchpoint" 0
-gdb_test "continue" ".*watchpoint.*result.*Old value = 0.*New value = 25.*main.*" "Test watchpoint write"
+gdb_test "continue" ".*\[Ww\]atchpoint.*result.*Old value = 0.*New value = 25.*main.*" "Test watchpoint write"
 
 
 

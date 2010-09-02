@@ -712,6 +712,7 @@ tui_resize_all (void)
 	  else
 	    new_height = first_win->generic.height + split_diff;
 
+	  locator->origin.y = new_height + 1;
 	  make_invisible_and_set_new_height (first_win, new_height);
 	  TUI_CMD_WIN->generic.origin.y = locator->origin.y + 1;
 	  TUI_CMD_WIN->generic.width += width_diff;
@@ -799,7 +800,6 @@ tui_resize_all (void)
 	      tui_win_list[win_type] = (struct tui_win_info *) NULL;
 	    }
 	}
-      tui_set_win_resized_to (TRUE);
       /* Turn keypad back on, unless focus is in the command
 	 window.  */
       if (win_with_focus != TUI_CMD_WIN)
@@ -827,6 +827,7 @@ tui_initialize_win (void)
 #ifdef SIGWINCH
 #ifdef HAVE_SIGACTION
   struct sigaction old_winch;
+
   memset (&old_winch, 0, sizeof (old_winch));
   old_winch.sa_handler = &tui_sigwinch_handler;
   sigaction (SIGWINCH, &old_winch, NULL);
@@ -1241,6 +1242,7 @@ tui_adjust_win_heights (struct tui_win_info *primary_win_info,
 		      if ((TUI_CMD_WIN->generic.height + diff) < 1)
 			{
 			  int i;
+
 			  for (i = TUI_CMD_WIN->generic.height + diff;
 			       (i < 1); i++)
 			    if (primary_win_info == first_win)
@@ -1401,6 +1403,14 @@ make_visible_with_new_height (struct tui_win_info *win_info)
     case CMD_WIN:
       win_info->detail.command_info.cur_line = 0;
       win_info->detail.command_info.curch = 0;
+#ifdef HAVE_WRESIZE
+      wresize (TUI_CMD_WIN->generic.handle,
+	       TUI_CMD_WIN->generic.height,
+	       TUI_CMD_WIN->generic.width);
+#endif
+      mvwin (TUI_CMD_WIN->generic.handle,
+	     TUI_CMD_WIN->generic.origin.y,
+	     TUI_CMD_WIN->generic.origin.x);
       wmove (win_info->generic.handle,
 	     win_info->detail.command_info.cur_line,
 	     win_info->detail.command_info.curch);

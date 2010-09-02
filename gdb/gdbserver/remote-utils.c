@@ -74,6 +74,8 @@
 typedef int socklen_t;
 #endif
 
+#ifndef IN_PROCESS_AGENT
+
 #if USE_WIN32API
 # define INVALID_DESCRIPTOR INVALID_SOCKET
 #else
@@ -105,8 +107,8 @@ struct sym_cache
 int remote_debug = 0;
 struct ui_file *gdb_stdlog;
 
-static int remote_desc = INVALID_DESCRIPTOR;
-static int listen_desc = INVALID_DESCRIPTOR;
+static gdb_fildes_t remote_desc = INVALID_DESCRIPTOR;
+static gdb_fildes_t listen_desc = INVALID_DESCRIPTOR;
 
 /* FIXME headerize? */
 extern int using_threads;
@@ -305,7 +307,7 @@ remote_open (char *name)
 #endif
 
       listen_desc = socket (PF_INET, SOCK_STREAM, IPPROTO_TCP);
-      if (listen_desc < 0)
+      if (listen_desc == -1)
 	perror_with_name ("Can't open socket");
 
       /* Allow rapid reuse of this port. */
@@ -371,6 +373,8 @@ fromhex (int a)
   return 0;
 }
 
+#endif
+
 static const char hexchars[] = "0123456789abcdef";
 
 static int
@@ -393,6 +397,8 @@ ishex (int ch, int *val)
     }
   return 0;
 }
+
+#ifndef IN_PROCESS_AGENT
 
 int
 unhexify (char *bin, const char *hex, int count)
@@ -446,6 +452,8 @@ decode_address_to_semicolon (CORE_ADDR *addrp, const char *start)
   return end;
 }
 
+#endif
+
 /* Convert number NIB to a hex digit.  */
 
 static int
@@ -456,6 +464,8 @@ tohex (int nib)
   else
     return 'a' + nib - 10;
 }
+
+#ifndef IN_PROCESS_AGENT
 
 int
 hexify (char *hex, const char *bin, int count)
@@ -600,6 +610,8 @@ try_rle (char *buf, int remaining, unsigned char *csum, char **p)
   return n + 1;
 }
 
+#endif
+
 char *
 unpack_varlen_hex (char *buff,	/* packet to parse */
 		   ULONGEST *result)
@@ -616,6 +628,8 @@ unpack_varlen_hex (char *buff,	/* packet to parse */
   *result = retval;
   return buff;
 }
+
+#ifndef IN_PROCESS_AGENT
 
 /* Write a PTID to BUF.  Returns BUF+CHARACTERS_WRITTEN.  */
 
@@ -1077,7 +1091,8 @@ getpkt (char *buf)
 
       fprintf (stderr, "Bad checksum, sentsum=0x%x, csum=0x%x, buf=%s\n",
 	       (c1 << 4) + c2, csum, buf);
-      write (remote_desc, "-", 1);
+      if (write (remote_desc, "-", 1) != 1)
+	return -1;
     }
 
   if (!noack_mode)
@@ -1088,7 +1103,8 @@ getpkt (char *buf)
 	  fflush (stderr);
 	}
 
-      write (remote_desc, "+", 1);
+      if (write (remote_desc, "+", 1) != 1)
+	return -1;
 
       if (remote_debug)
 	{
@@ -1126,8 +1142,10 @@ write_enn (char *buf)
   buf[3] = '\0';
 }
 
+#endif
+
 void
-convert_int_to_ascii (unsigned char *from, char *to, int n)
+convert_int_to_ascii (const unsigned char *from, char *to, int n)
 {
   int nib;
   int ch;
@@ -1142,9 +1160,10 @@ convert_int_to_ascii (unsigned char *from, char *to, int n)
   *to++ = 0;
 }
 
+#ifndef IN_PROCESS_AGENT
 
 void
-convert_ascii_to_int (char *from, unsigned char *to, int n)
+convert_ascii_to_int (const char *from, unsigned char *to, int n)
 {
   int nib1, nib2;
   while (n--)
@@ -1354,7 +1373,7 @@ decode_m_packet (char *from, CORE_ADDR *mem_addr_ptr, unsigned int *len_ptr)
 
 void
 decode_M_packet (char *from, CORE_ADDR *mem_addr_ptr, unsigned int *len_ptr,
-		 unsigned char *to)
+		 unsigned char **to_p)
 {
   int i = 0;
   char ch;
@@ -1372,12 +1391,15 @@ decode_M_packet (char *from, CORE_ADDR *mem_addr_ptr, unsigned int *len_ptr,
       *len_ptr |= fromhex (ch) & 0x0f;
     }
 
-  convert_ascii_to_int (&from[i++], to, *len_ptr);
+  if (*to_p == NULL)
+    *to_p = xmalloc (*len_ptr);
+
+  convert_ascii_to_int (&from[i++], *to_p, *len_ptr);
 }
 
 int
 decode_X_packet (char *from, int packet_len, CORE_ADDR *mem_addr_ptr,
-		 unsigned int *len_ptr, unsigned char *to)
+		 unsigned int *len_ptr, unsigned char **to_p)
 {
   int i = 0;
   char ch;
@@ -1395,8 +1417,11 @@ decode_X_packet (char *from, int packet_len, CORE_ADDR *mem_addr_ptr,
       *len_ptr |= fromhex (ch) & 0x0f;
     }
 
+  if (*to_p == NULL)
+    *to_p = xmalloc (*len_ptr);
+
   if (remote_unescape_input ((const gdb_byte *) &from[i], packet_len - i,
-			     to, *len_ptr) != *len_ptr)
+			     *to_p, *len_ptr) != *len_ptr)
     return -1;
 
   return 0;
@@ -1563,6 +1588,101 @@ look_up_one_symbol (const char *name, CORE_ADDR *addrp, int may_ask_gdb)
   proc->symbol_cache = sym;
 
   return 1;
+}
+
+/* Relocate an instruction to execute at a different address.  OLDLOC
+   is the address in the inferior memory where the instruction to
+   relocate is currently at.  On input, TO points to the destination
+   where we want the instruction to be copied (and possibly adjusted)
+   to.  On output, it points to one past the end of the resulting
+   instruction(s).  The effect of executing the instruction at TO
+   shall be the same as if executing it at FROM.  For example, call
+   instructions that implicitly push the return address on the stack
+   should be adjusted to return to the instruction after OLDLOC;
+   relative branches, and other PC-relative instructions need the
+   offset adjusted; etc.  Returns 0 on success, -1 on failure.  */
+
+int
+relocate_instruction (CORE_ADDR *to, CORE_ADDR oldloc)
+{
+  char own_buf[266];
+  int len;
+  ULONGEST written = 0;
+
+  /* Send the request.  */
+  strcpy (own_buf, "qRelocInsn:");
+  sprintf (own_buf, "qRelocInsn:%s;%s", paddress (oldloc),
+	   paddress (*to));
+  if (putpkt (own_buf) < 0)
+    return -1;
+
+  /* FIXME:  Eventually add buffer overflow checking (to getpkt?)  */
+  len = getpkt (own_buf);
+  if (len < 0)
+    return -1;
+
+  /* We ought to handle pretty much any packet at this point while we
+     wait for the qRelocInsn "response".  That requires re-entering
+     the main loop.  For now, this is an adequate approximation; allow
+     GDB to access memory.  */
+  while (own_buf[0] == 'm' || own_buf[0] == 'M' || own_buf[0] == 'X')
+    {
+      CORE_ADDR mem_addr;
+      unsigned char *mem_buf = NULL;
+      unsigned int mem_len;
+
+      if (own_buf[0] == 'm')
+	{
+	  decode_m_packet (&own_buf[1], &mem_addr, &mem_len);
+	  mem_buf = xmalloc (mem_len);
+	  if (read_inferior_memory (mem_addr, mem_buf, mem_len) == 0)
+	    convert_int_to_ascii (mem_buf, own_buf, mem_len);
+	  else
+	    write_enn (own_buf);
+	}
+      else if (own_buf[0] == 'X')
+	{
+	  if (decode_X_packet (&own_buf[1], len - 1, &mem_addr,
+			       &mem_len, &mem_buf) < 0
+	      || write_inferior_memory (mem_addr, mem_buf, mem_len) != 0)
+	    write_enn (own_buf);
+	  else
+	    write_ok (own_buf);
+	}
+      else
+	{
+	  decode_M_packet (&own_buf[1], &mem_addr, &mem_len, &mem_buf);
+	  if (write_inferior_memory (mem_addr, mem_buf, mem_len) == 0)
+	    write_ok (own_buf);
+	  else
+	    write_enn (own_buf);
+	}
+      free (mem_buf);
+      if (putpkt (own_buf) < 0)
+	return -1;
+      len = getpkt (own_buf);
+      if (len < 0)
+	return -1;
+    }
+
+  if (own_buf[0] == 'E')
+    {
+      warning ("An error occurred while relocating an instruction: %s\n",
+	       own_buf);
+      return -1;
+    }
+
+  if (strncmp (own_buf, "qRelocInsn:", strlen ("qRelocInsn:")) != 0)
+    {
+      warning ("Malformed response to qRelocInsn, ignoring: %s\n",
+	       own_buf);
+      return -1;
+    }
+
+  unpack_varlen_hex (own_buf + strlen ("qRelocInsn:"), &written);
+
+  *to += written;
+  return 0;
 }
 
 void
@@ -1740,3 +1860,5 @@ buffer_xml_printf (struct buffer *buffer, const char *format, ...)
   buffer_grow_str (buffer, prev);
   va_end (ap);
 }
+
+#endif

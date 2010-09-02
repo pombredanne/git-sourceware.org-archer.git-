@@ -63,6 +63,7 @@ pipe_open (struct serial *scb, const char *name)
   int pdes[2];
   int err_pdes[2];
   int pid;
+
   if (socketpair (AF_UNIX, SOCK_STREAM, 0, pdes) < 0)
     return -1;
   if (socketpair (AF_UNIX, SOCK_STREAM, 0, err_pdes) < 0)
@@ -98,6 +99,15 @@ pipe_open (struct serial *scb, const char *name)
   /* Child. */
   if (pid == 0)
     {
+      /* We don't want ^c to kill the connection.  */
+#ifdef HAVE_SETSID
+      pid_t sid = setsid ();
+      if (sid == -1)
+	signal (SIGINT, SIG_IGN);
+#else
+      signal (SIGINT, SIG_IGN);
+#endif
+
       /* re-wire pdes[1] to stdin/stdout */
       close (pdes[0]);
       if (pdes[1] != STDOUT_FILENO)
@@ -146,27 +156,48 @@ static void
 pipe_close (struct serial *scb)
 {
   struct pipe_state *state = scb->state;
+
+  close (scb->fd);
+  scb->fd = -1;
+
   if (state != NULL)
     {
-      int pid = state->pid;
-      close (scb->fd);
-      scb->fd = -1;
+      kill (state->pid, SIGTERM);
+      /* Might be useful to check that the child does die,
+	 and while we're waiting for it to die print any remaining
+	 stderr output.  */
+
       if (scb->error_fd != -1)
 	close (scb->error_fd);
       scb->error_fd = -1;
       xfree (state);
       scb->state = NULL;
-      kill (pid, SIGTERM);
-      /* Might be useful to check that the child does die,
-	 and while we're waiting for it to die print any remaining
-	 stderr output.  */
     }
+}
+
+int
+gdb_pipe (int pdes[2])
+{
+#if !HAVE_SOCKETPAIR
+  errno = ENOSYS;
+  return -1;
+#else
+
+  if (socketpair (AF_UNIX, SOCK_STREAM, 0, pdes) < 0)
+    return -1;
+
+  /* If we don't do this, GDB simply exits when the remote side
+     dies.  */
+  signal (SIGPIPE, SIG_IGN);
+  return 0;
+#endif
 }
 
 void
 _initialize_ser_pipe (void)
 {
   struct serial_ops *ops = XMALLOC (struct serial_ops);
+
   memset (ops, 0, sizeof (struct serial_ops));
   ops->name = "pipe";
   ops->next = 0;

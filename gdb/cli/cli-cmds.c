@@ -247,6 +247,7 @@ compare_strings (const void *arg1, const void *arg2)
 {
   const char **s1 = (const char **) arg1;
   const char **s2 = (const char **) arg2;
+
   return strcmp (*s1, *s2);
 }
 
@@ -296,6 +297,7 @@ complete_command (char *arg, int from_tty)
       while (item < size)
 	{
 	  int next_item;
+
 	  printf_unfiltered ("%s%s\n", arg_prefix, completions[item]);
 	  next_item = item + 1;
 	  while (next_item < size
@@ -427,6 +429,7 @@ cd_command (char *dir, int from_tty)
 	      /* Search backwards for the directory just before the "/.."
 	         and obliterate it and the "/..".  */
 	      char *q = p;
+
 	      while (q != current_directory && !IS_DIR_SEPARATOR (q[-1]))
 		--q;
 
@@ -780,7 +783,6 @@ edit_command (char *arg, int from_tty)
     }
   else
     {
-
       /* Now should only be one argument -- decode it in SAL.  */
 
       arg1 = arg;
@@ -811,6 +813,7 @@ edit_command (char *arg, int from_tty)
       if (*arg == '*')
         {
 	  struct gdbarch *gdbarch;
+
           if (sal.symtab == 0)
 	    /* FIXME-32x64--assumes sal.pc fits in long.  */
 	    error (_("No source file for address %s."),
@@ -976,6 +979,7 @@ list_command (char *arg, int from_tty)
   if (*arg == '*')
     {
       struct gdbarch *gdbarch;
+
       if (sal.symtab == 0)
 	/* FIXME-32x64--assumes sal.pc fits in long.  */
 	error (_("No source file for address %s."),
@@ -1104,8 +1108,9 @@ disassemble_current_function (int flags)
        - dump the assembly code for the function of the current pc
      disassemble [/mr] addr
        - dump the assembly code for the function at ADDR
-     disassemble [/mr] low high
-       - dump the assembly code in the range [LOW,HIGH)
+     disassemble [/mr] low,high
+     disassemble [/mr] low,+length
+       - dump the assembly code in the range [LOW,HIGH), or [LOW,LOW+length)
 
    A /m modifier will include source code with the assembly.
    A /r modifier will include raw instructions in hex with the assembly.  */
@@ -1176,8 +1181,18 @@ disassemble_command (char *arg, int from_tty)
   else
     {
       /* Two arguments.  */
+      int incl_flag = 0;
       low = pc;
+      while (isspace (*arg))
+	arg++;
+      if (arg[0] == '+')
+	{
+	  ++arg;
+	  incl_flag = 1;
+	}
       high = parse_and_eval_address (arg);
+      if (incl_flag)
+	high += low;
     }
 
   print_disassembly (gdbarch, name, low, high, flags);
@@ -1209,6 +1224,7 @@ show_user (char *args, int from_tty)
   if (args)
     {
       char *comname = args;
+
       c = lookup_cmd (&comname, cmdlist, "", 0, 1);
       if (c->class != class_user)
 	error (_("Not a user command."));
@@ -1234,6 +1250,7 @@ apropos_command (char *searchstr, int from_tty)
   regex_t pattern;
   char *pattern_fastmap;
   char errorbuffer[512];
+
   pattern_fastmap = xcalloc (256, sizeof (char));
   if (searchstr == NULL)
       error (_("REGEXP string is empty"));
@@ -1609,7 +1626,8 @@ Default is the function surrounding the pc of the selected frame.\n\
 With a /m modifier, source lines are included (if available).\n\
 With a /r modifier, raw instructions in hex are included.\n\
 With a single argument, the function surrounding that address is dumped.\n\
-Two arguments (separated by a comma) are taken as a range of memory to dump."));
+Two arguments (separated by a comma) are taken as a range of memory to dump,\n\
+  in the form of \"start,end\", or \"start,+length\"."));
   set_cmd_completer (c, location_completer);
   if (xdb_commands)
     add_com_alias ("va", "disassemble", class_xdb, 0);

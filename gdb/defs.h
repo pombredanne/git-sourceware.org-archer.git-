@@ -157,6 +157,10 @@ extern char *gdb_sysroot;
 /* GDB datadir, used to store data files.  */
 extern char *gdb_datadir;
 
+/* If non-NULL, the possibly relocated path to python's "lib" directory
+   specified with --with-python.  */
+extern char *python_libdir;
+
 /* Search path for separate debug files.  */
 extern char *debug_file_directory;
 
@@ -303,6 +307,10 @@ extern int subset_compare (char *, char *);
 
 extern char *safe_strerror (int);
 
+extern void set_display_time (int);
+
+extern void set_display_space (int);
+
 #define	ALL_CLEANUPS	((struct cleanup *)0)
 
 extern void do_cleanups (struct cleanup *);
@@ -343,6 +351,13 @@ struct obstack;
 extern struct cleanup *make_cleanup_obstack_free (struct obstack *obstack);
 
 extern struct cleanup *make_cleanup_restore_integer (int *variable);
+extern struct cleanup *make_cleanup_restore_uinteger (unsigned int *variable);
+
+struct target_ops;
+extern struct cleanup *make_cleanup_unpush_target (struct target_ops *ops);
+
+extern struct cleanup *
+  make_cleanup_restore_ui_file (struct ui_file **variable);
 
 extern struct cleanup *make_final_cleanup (make_cleanup_ftype *, void *);
 
@@ -365,6 +380,8 @@ extern void free_current_contents (void *);
 
 extern void null_cleanup (void *);
 
+extern struct cleanup *make_command_stats_cleanup (int);
+
 extern int myread (int, char *, int);
 
 extern int query (const char *, ...) ATTRIBUTE_PRINTF (1, 2);
@@ -372,6 +389,10 @@ extern int nquery (const char *, ...) ATTRIBUTE_PRINTF (1, 2);
 extern int yquery (const char *, ...) ATTRIBUTE_PRINTF (1, 2);
 
 extern void init_page_info (void);
+
+extern struct cleanup *make_cleanup_restore_page_info (void);
+extern struct cleanup *
+  set_batch_flag_and_make_cleanup_restore_page_info (void);
 
 extern char *gdb_realpath (const char *);
 extern char *xfullpath (const char *);
@@ -613,12 +634,13 @@ extern void init_source_path (void);
 
 /* From exec.c */
 
+typedef int (*find_memory_region_ftype) (CORE_ADDR addr, unsigned long size,
+					 int read, int write, int exec,
+					 void *data);
+
 /* Take over the 'find_mapped_memory' vector from exec.c. */
-extern void exec_set_find_memory_regions (int (*) (int (*) (CORE_ADDR, 
-							    unsigned long, 
-							    int, int, int, 
-							    void *),
-						   void *));
+extern void exec_set_find_memory_regions
+  (int (*func) (find_memory_region_ftype func, void *data));
 
 /* Possible lvalue types.  Like enum language, this should be in
    value.h, but needs to be here for the same reason. */

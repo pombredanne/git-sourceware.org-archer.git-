@@ -26,7 +26,7 @@ if $tracelevel {
 # Test i386 prologue analyzer.
 
 
-if ![istarget "i?86-*-*"] then {
+if {(![istarget "x86_64-*-*"] && ![istarget "i?86-*-*"]) || ![is_ilp32_target] } then {
     verbose "Skipping i386 prologue tests."
     return
 }
@@ -202,7 +202,7 @@ gdb_test "backtrace 10" \
 	"#0\[ \t\]*$hex in gdb1718.*\r\n#1\[ \t\]*$hex in main.*" \
 	"backtrace in gdb1718"
 
-setup_kfail *-*-* gdb/1718
+setup_kfail gdb/1718 *-*-*
 gdb_test "info frame" \
 	".*Saved registers:.*esi at.*ebx at.*eip at.*" \
 	"saved registers in gdb1718"

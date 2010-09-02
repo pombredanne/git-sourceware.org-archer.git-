@@ -677,6 +677,7 @@ static int
 dos_flush_input (struct serial *scb)
 {
   struct dos_ttystate *port = &ports[scb->fd];
+
   disable ();
   port->first = port->count = 0;
   if (port->fifo)
@@ -858,6 +859,13 @@ static struct serial_ops dos_ops =
   (void (*)(struct serial *, int))NULL	/* change into async mode */
 };
 
+int
+gdb_pipe (int pdes[2])
+{
+  /* No support for pipes.  */
+  errno = ENOSYS;
+  return -1;
+}
 
 static void
 dos_info (char *arg, int from_tty)

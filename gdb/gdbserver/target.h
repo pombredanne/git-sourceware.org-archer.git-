@@ -22,6 +22,8 @@
 #ifndef TARGET_H
 #define TARGET_H
 
+struct emit_ops;
+
 /* Ways to "resume" a thread.  */
 
 enum resume_kind
@@ -51,7 +53,8 @@ struct thread_resume
   /* If non-zero, send this signal when we resume, or to stop the
      thread.  If stopping a thread, and this is 0, the target should
      stop the thread however it best decides to (e.g., SIGSTOP on
-     linux; SuspendThread on win32).  */
+     linux; SuspendThread on win32).  This is a host signal value (not
+     enum target_signal).  */
   int sig;
 };
 
@@ -177,6 +180,23 @@ struct target_ops
      If REGNO is -1, store all registers; otherwise, store at least REGNO.  */
 
   void (*store_registers) (struct regcache *regcache, int regno);
+
+  /* Prepare to read or write memory from the inferior process.
+     Targets use this to do what is necessary to get the state of the
+     inferior such that it is possible to access memory.
+
+     This should generally only be called from client facing routines,
+     such as gdb_read_memory/gdb_write_memory, or the insert_point
+     callbacks.
+
+     Like `read_memory' and `write_memory' below, returns 0 on success
+     and errno on failure.  */
+
+  int (*prepare_to_access_memory) (void);
+
+  /* Undo the effects of prepare_to_access_memory.  */
+
+  void (*done_accessing_memory) (void);
 
   /* Read memory from the inferior process.  This should generally be
      called through read_inferior_memory, which handles breakpoint shadowing.
@@ -324,6 +344,35 @@ struct target_ops
 
   /* Cancel all pending breakpoints hits in all threads.  */
   void (*cancel_breakpoints) (void);
+
+  /* Stabilize all threads.  That is, force them out of jump pads.  */
+  void (*stabilize_threads) (void);
+
+  /* Install a fast tracepoint jump pad.  TPOINT is the address of the
+     tracepoint internal object as used by the IPA agent.  TPADDR is
+     the address of tracepoint.  COLLECTOR is address of the function
+     the jump pad redirects to.  LOCKADDR is the address of the jump
+     pad lock object.  ORIG_SIZE is the size in bytes of the
+     instruction at TPADDR.  JUMP_ENTRY points to the address of the
+     jump pad entry, and on return holds the address past the end of
+     the created jump pad. JJUMP_PAD_INSN is a buffer containing a
+     copy of the instruction at TPADDR.  ADJUST_INSN_ADDR and
+     ADJUST_INSN_ADDR_END are output parameters that return the
+     address range where the instruction at TPADDR was relocated
+     to.  */
+  int (*install_fast_tracepoint_jump_pad) (CORE_ADDR tpoint, CORE_ADDR tpaddr,
+					   CORE_ADDR collector,
+					   CORE_ADDR lockaddr,
+					   ULONGEST orig_size,
+					   CORE_ADDR *jump_entry,
+					   unsigned char *jjump_pad_insn,
+					   ULONGEST *jjump_pad_insn_size,
+					   CORE_ADDR *adjusted_insn_addr,
+					   CORE_ADDR *adjusted_insn_addr_end);
+
+  /* Return the bytecode operations vector for the current inferior.
+     Returns NULL if bytecode compilation is not supported.  */
+  struct emit_ops *(*emit_ops) (void);
 };
 
 extern struct target_ops *the_target;
@@ -378,6 +427,9 @@ void set_target_ops (struct target_ops *);
   (the_target->supports_tracepoints			\
    ? (*the_target->supports_tracepoints) () : 0)
 
+#define target_supports_fast_tracepoints()		\
+  (the_target->install_fast_tracepoint_jump_pad != NULL)
+
 #define thread_stopped(thread) \
   (*the_target->thread_stopped) (thread)
 
@@ -402,12 +454,49 @@ void set_target_ops (struct target_ops *);
 	(*the_target->cancel_breakpoints) ();  	\
     } while (0)
 
+#define stabilize_threads()			\
+  do						\
+    {						\
+      if (the_target->stabilize_threads)     	\
+	(*the_target->stabilize_threads) ();  	\
+    } while (0)
+
+#define install_fast_tracepoint_jump_pad(tpoint, tpaddr,		\
+					 collector, lockaddr,		\
+					 orig_size,			\
+					 jump_entry, jjump_pad_insn,	\
+					 jjump_pad_insn_size,		\
+					 adjusted_insn_addr,		\
+					 adjusted_insn_addr_end)	\
+  (*the_target->install_fast_tracepoint_jump_pad) (tpoint, tpaddr,	\
+						   collector,lockaddr,	\
+						   orig_size, jump_entry, \
+						   jjump_pad_insn,	\
+						   jjump_pad_insn_size, \
+						   adjusted_insn_addr,	\
+						   adjusted_insn_addr_end)
+
+#define target_emit_ops() \
+  (the_target->emit_ops ? (*the_target->emit_ops) () : NULL)
+
 /* Start non-stop mode, returns 0 on success, -1 on failure.   */
 
 int start_non_stop (int nonstop);
 
 ptid_t mywait (ptid_t ptid, struct target_waitstatus *ourstatus, int options,
 	       int connected_wait);
+
+#define prepare_to_access_memory()		\
+  (the_target->prepare_to_access_memory		\
+   ? (*the_target->prepare_to_access_memory) () \
+   : 0)
+
+#define done_accessing_memory()				\
+  do							\
+    {							\
+      if (the_target->done_accessing_memory)     	\
+	(*the_target->done_accessing_memory) ();  	\
+    } while (0)
 
 int read_inferior_memory (CORE_ADDR memaddr, unsigned char *myaddr, int len);
 

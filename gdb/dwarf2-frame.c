@@ -77,6 +77,9 @@ struct dwarf2_cie
   /* Target address size in bytes.  */
   int addr_size;
 
+  /* Target pointer size in bytes. */
+  int ptr_size;
+
   /* True if a 'z' augmentation existed.  */
   unsigned char saw_z_augmentation;
 
@@ -150,13 +153,14 @@ struct comp_unit
   bfd_vma tbase;
 };
 
-static struct dwarf2_fde *dwarf2_frame_find_fde (CORE_ADDR *pc);
+static struct dwarf2_fde *dwarf2_frame_find_fde (CORE_ADDR *pc,
+						 CORE_ADDR *out_offset);
 
 static int dwarf2_frame_adjust_regnum (struct gdbarch *gdbarch, int regnum,
 				       int eh_frame_p);
 
 static CORE_ADDR read_encoded_value (struct comp_unit *unit, gdb_byte encoding,
-				     int ptr_len, gdb_byte *buf,
+				     int ptr_len, const gdb_byte *buf,
 				     unsigned int *bytes_read_ptr,
 				     CORE_ADDR func_base);
 
@@ -179,7 +183,7 @@ struct dwarf2_frame_state
       CFA_REG_OFFSET,
       CFA_EXP
     } cfa_how;
-    gdb_byte *cfa_exp;
+    const gdb_byte *cfa_exp;
 
     /* Used to implement DW_CFA_remember_state.  */
     struct dwarf2_frame_state_reg_info *prev;
@@ -306,7 +310,7 @@ read_mem (void *baton, gdb_byte *buf, CORE_ADDR addr, size_t len)
 }
 
 static void
-no_get_frame_base (void *baton, gdb_byte **start, size_t *length)
+no_get_frame_base (void *baton, const gdb_byte **start, size_t *length)
 {
   internal_error (__FILE__, __LINE__,
 		  _("Support for DW_OP_fbreg is unimplemented"));
@@ -326,6 +330,15 @@ no_get_tls_address (void *baton, CORE_ADDR offset)
 {
   internal_error (__FILE__, __LINE__,
 		  _("Support for DW_OP_GNU_push_tls_address is unimplemented"));
+}
+
+/* Helper function for execute_stack_op.  */
+
+static void
+no_dwarf_call (struct dwarf_expr_context *ctx, size_t die_offset)
+{
+  internal_error (__FILE__, __LINE__,
+		  _("Support for DW_OP_call* is invalid in CFI"));
 }
 
 /* Execute the required actions for both the DW_CFA_restore and
@@ -359,9 +372,9 @@ register %s (#%d) at %s"),
 }
 
 static CORE_ADDR
-execute_stack_op (gdb_byte *exp, ULONGEST len, int addr_size,
-		  struct frame_info *this_frame, CORE_ADDR initial,
-		  int initial_in_stack_memory)
+execute_stack_op (const gdb_byte *exp, ULONGEST len, int addr_size,
+		  CORE_ADDR offset, struct frame_info *this_frame,
+		  CORE_ADDR initial, int initial_in_stack_memory)
 {
   struct dwarf_expr_context *ctx;
   CORE_ADDR result;
@@ -372,20 +385,23 @@ execute_stack_op (gdb_byte *exp, ULONGEST len, int addr_size,
 
   ctx->gdbarch = get_frame_arch (this_frame);
   ctx->addr_size = addr_size;
+  ctx->offset = offset;
   ctx->baton = this_frame;
   ctx->read_reg = read_reg;
   ctx->read_mem = read_mem;
   ctx->get_frame_base = no_get_frame_base;
   ctx->get_frame_cfa = no_get_frame_cfa;
   ctx->get_tls_address = no_get_tls_address;
+  ctx->dwarf_call = no_dwarf_call;
 
   dwarf_expr_push (ctx, initial, initial_in_stack_memory);
   dwarf_expr_eval (ctx, exp, len);
-  result = dwarf_expr_fetch (ctx, 0);
 
-  if (ctx->location == DWARF_VALUE_REGISTER)
-    result = read_reg (this_frame, result);
-  else if (ctx->location != DWARF_VALUE_MEMORY)
+  if (ctx->location == DWARF_VALUE_MEMORY)
+    result = dwarf_expr_fetch_address (ctx, 0);
+  else if (ctx->location == DWARF_VALUE_REGISTER)
+    result = read_reg (this_frame, dwarf_expr_fetch (ctx, 0));
+  else
     {
       /* This is actually invalid DWARF, but if we ever do run across
 	 it somehow, we might as well support it.  So, instead, report
@@ -400,8 +416,8 @@ execute_stack_op (gdb_byte *exp, ULONGEST len, int addr_size,
 
 
 static void
-execute_cfa_program (struct dwarf2_fde *fde, gdb_byte *insn_ptr,
-		     gdb_byte *insn_end, struct frame_info *this_frame,
+execute_cfa_program (struct dwarf2_fde *fde, const gdb_byte *insn_ptr,
+		     const gdb_byte *insn_end, struct frame_info *this_frame,
 		     struct dwarf2_frame_state *fs)
 {
   int eh_frame_p = fde->eh_frame_p;
@@ -439,7 +455,7 @@ execute_cfa_program (struct dwarf2_fde *fde, gdb_byte *insn_ptr,
 	    {
 	    case DW_CFA_set_loc:
 	      fs->pc = read_encoded_value (fde->cie->unit, fde->cie->encoding,
-					   fde->cie->addr_size, insn_ptr,
+					   fde->cie->ptr_size, insn_ptr,
 					   &bytes_read, fde->initial_location);
 	      /* Apply the objfile offset for relocatable objects.  */
 	      fs->pc += ANOFFSET (fde->cie->unit->objfile->section_offsets,
@@ -647,6 +663,7 @@ bad CFI data; mismatched DW_CFA_restore_state at %s"),
 		 unwinder.  */
 	      {
 		int size = register_size (gdbarch, 0);
+
 		dwarf2_frame_state_alloc_regs (&fs->regs, 32);
 		for (reg = 8; reg < 16; reg++)
 		  {
@@ -889,6 +906,9 @@ struct dwarf2_frame_cache
 
   /* Target address size in bytes.  */
   int addr_size;
+
+  /* The .text offset.  */
+  CORE_ADDR text_offset;
 };
 
 static struct dwarf2_frame_cache *
@@ -932,7 +952,7 @@ dwarf2_frame_cache (struct frame_info *this_frame, void **this_cache)
   fs->pc = get_frame_address_in_block (this_frame);
 
   /* Find the correct FDE.  */
-  fde = dwarf2_frame_find_fde (&fs->pc);
+  fde = dwarf2_frame_find_fde (&fs->pc, &cache->text_offset);
   gdb_assert (fde != NULL);
 
   /* Extract any interesting information from the CIE.  */
@@ -969,7 +989,8 @@ dwarf2_frame_cache (struct frame_info *this_frame, void **this_cache)
     case CFA_EXP:
       cache->cfa =
 	execute_stack_op (fs->regs.cfa_exp, fs->regs.cfa_exp_len,
-			  cache->addr_size, this_frame, 0, 0);
+			  cache->addr_size, cache->text_offset,
+			  this_frame, 0, 0);
       break;
 
     default:
@@ -1125,7 +1146,8 @@ dwarf2_frame_prev_register (struct frame_info *this_frame, void **this_cache,
     case DWARF2_FRAME_REG_SAVED_EXP:
       addr = execute_stack_op (cache->reg[regnum].loc.exp,
 			       cache->reg[regnum].exp_len,
-			       cache->addr_size, this_frame, cache->cfa, 1);
+			       cache->addr_size, cache->text_offset,
+			       this_frame, cache->cfa, 1);
       return frame_unwind_got_memory (this_frame, regnum, addr);
 
     case DWARF2_FRAME_REG_SAVED_VAL_OFFSET:
@@ -1135,7 +1157,8 @@ dwarf2_frame_prev_register (struct frame_info *this_frame, void **this_cache,
     case DWARF2_FRAME_REG_SAVED_VAL_EXP:
       addr = execute_stack_op (cache->reg[regnum].loc.exp,
 			       cache->reg[regnum].exp_len,
-			       cache->addr_size, this_frame, cache->cfa, 1);
+			       cache->addr_size, cache->text_offset,
+			       this_frame, cache->cfa, 1);
       return frame_unwind_got_constant (this_frame, regnum, addr);
 
     case DWARF2_FRAME_REG_UNSPECIFIED:
@@ -1185,7 +1208,8 @@ dwarf2_frame_sniffer (const struct frame_unwind *self,
      extend one byte before its start address or we could potentially
      select the FDE of the previous function.  */
   CORE_ADDR block_addr = get_frame_address_in_block (this_frame);
-  struct dwarf2_fde *fde = dwarf2_frame_find_fde (&block_addr);
+  struct dwarf2_fde *fde = dwarf2_frame_find_fde (&block_addr, NULL);
+
   if (!fde)
     return 0;
 
@@ -1256,7 +1280,8 @@ const struct frame_base *
 dwarf2_frame_base_sniffer (struct frame_info *this_frame)
 {
   CORE_ADDR block_addr = get_frame_address_in_block (this_frame);
-  if (dwarf2_frame_find_fde (&block_addr))
+
+  if (dwarf2_frame_find_fde (&block_addr, NULL))
     return &dwarf2_frame_base;
 
   return NULL;
@@ -1408,7 +1433,8 @@ encoding_for_size (unsigned int size)
 
 static CORE_ADDR
 read_encoded_value (struct comp_unit *unit, gdb_byte encoding,
-		    int ptr_len, gdb_byte *buf, unsigned int *bytes_read_ptr,
+		    int ptr_len, const gdb_byte *buf,
+		    unsigned int *bytes_read_ptr,
 		    CORE_ADDR func_base)
 {
   ptrdiff_t offset;
@@ -1465,7 +1491,8 @@ read_encoded_value (struct comp_unit *unit, gdb_byte encoding,
     case DW_EH_PE_uleb128:
       {
 	ULONGEST value;
-	gdb_byte *end_buf = buf + (sizeof (value) + 1) * 8 / 7;
+	const gdb_byte *end_buf = buf + (sizeof (value) + 1) * 8 / 7;
+
 	*bytes_read_ptr += read_uleb128 (buf, end_buf, &value) - buf;
 	return base + value;
       }
@@ -1481,7 +1508,8 @@ read_encoded_value (struct comp_unit *unit, gdb_byte encoding,
     case DW_EH_PE_sleb128:
       {
 	LONGEST value;
-	gdb_byte *end_buf = buf + (sizeof (value) + 1) * 8 / 7;
+	const gdb_byte *end_buf = buf + (sizeof (value) + 1) * 8 / 7;
+
 	*bytes_read_ptr += read_sleb128 (buf, end_buf, &value) - buf;
 	return base + value;
       }
@@ -1553,6 +1581,7 @@ bsearch_fde_cmp (const void *key, const void *element)
 {
   CORE_ADDR seek_pc = *(CORE_ADDR *) key;
   struct dwarf2_fde *fde = *(struct dwarf2_fde **) element;
+
   if (seek_pc < fde->initial_location)
     return -1;
   if (seek_pc < fde->initial_location + fde->address_range)
@@ -1564,7 +1593,7 @@ bsearch_fde_cmp (const void *key, const void *element)
    inital location associated with it into *PC.  */
 
 static struct dwarf2_fde *
-dwarf2_frame_find_fde (CORE_ADDR *pc)
+dwarf2_frame_find_fde (CORE_ADDR *pc, CORE_ADDR *out_offset)
 {
   struct objfile *objfile;
 
@@ -1599,6 +1628,8 @@ dwarf2_frame_find_fde (CORE_ADDR *pc)
       if (p_fde != NULL)
         {
           *pc = (*p_fde)->initial_location + offset;
+	  if (out_offset)
+	    *out_offset = offset;
           return *p_fde;
         }
     }
@@ -1704,13 +1735,6 @@ decode_frame_entry_1 (struct comp_unit *unit, gdb_byte *start, int eh_frame_p,
          depends on the target address size.  */
       cie->encoding = DW_EH_PE_absptr;
 
-      /* The target address size.  For .eh_frame FDEs this is considered
-	 equal to the size of a target pointer.  For .dwarf_frame FDEs, 
-	 this is supposed to be the target address size from the associated
-	 CU header.  FIXME: We do not have a good way to determine the 
-	 latter.  Always use the target pointer size for now.  */
-      cie->addr_size = gdbarch_ptr_bit (gdbarch) / TARGET_CHAR_BIT;
-
       /* We'll determine the final value later, but we need to
 	 initialize it conservatively.  */
       cie->signal_frame = 0;
@@ -1751,9 +1775,17 @@ decode_frame_entry_1 (struct comp_unit *unit, gdb_byte *start, int eh_frame_p,
 	}
       else
 	{
-	  cie->addr_size = gdbarch_ptr_bit (gdbarch) / TARGET_CHAR_BIT;
+	  cie->addr_size = gdbarch_dwarf2_addr_size (gdbarch);
 	  cie->segment_size = 0;
 	}
+      /* Address values in .eh_frame sections are defined to have the
+	 target's pointer size.  Watchout: This breaks frame info for
+	 targets with pointer size < address size, unless a .debug_frame
+	 section exists as well. */
+      if (eh_frame_p)
+	cie->ptr_size = gdbarch_ptr_bit (gdbarch) / TARGET_CHAR_BIT;
+      else
+	cie->ptr_size = cie->addr_size;
 
       cie->code_alignment_factor =
 	read_unsigned_leb128 (unit->abfd, buf, &bytes_read);
@@ -1813,7 +1845,7 @@ decode_frame_entry_1 (struct comp_unit *unit, gdb_byte *start, int eh_frame_p,
 	    {
 	      /* Skip.  Avoid indirection since we throw away the result.  */
 	      gdb_byte encoding = (*buf++) & ~DW_EH_PE_indirect;
-	      read_encoded_value (unit, encoding, cie->addr_size,
+	      read_encoded_value (unit, encoding, cie->ptr_size,
 				  buf, &bytes_read, 0);
 	      buf += bytes_read;
 	      augmentation++;
@@ -1879,13 +1911,13 @@ decode_frame_entry_1 (struct comp_unit *unit, gdb_byte *start, int eh_frame_p,
       gdb_assert (fde->cie != NULL);
 
       fde->initial_location =
-	read_encoded_value (unit, fde->cie->encoding, fde->cie->addr_size,
+	read_encoded_value (unit, fde->cie->encoding, fde->cie->ptr_size,
 			    buf, &bytes_read, 0);
       buf += bytes_read;
 
       fde->address_range =
 	read_encoded_value (unit, fde->cie->encoding & 0x0f,
-			    fde->cie->addr_size, buf, &bytes_read, 0);
+			    fde->cie->ptr_size, buf, &bytes_read, 0);
       buf += bytes_read;
 
       /* A 'z' augmentation in the CIE implies the presence of an

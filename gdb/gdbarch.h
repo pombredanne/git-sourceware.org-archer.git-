@@ -118,11 +118,17 @@ extern void set_gdbarch_long_bit (struct gdbarch *gdbarch, int long_bit);
 extern int gdbarch_long_long_bit (struct gdbarch *gdbarch);
 extern void set_gdbarch_long_long_bit (struct gdbarch *gdbarch, int long_long_bit);
 
-/* The ABI default bit-size and format for "float", "double", and "long
-   double".  These bit/format pairs should eventually be combined into
-   a single object.  For the moment, just initialize them as a pair.
+/* The ABI default bit-size and format for "half", "float", "double", and
+   "long double".  These bit/format pairs should eventually be combined
+   into a single object.  For the moment, just initialize them as a pair.
    Each format describes both the big and little endian layouts (if
    useful). */
+
+extern int gdbarch_half_bit (struct gdbarch *gdbarch);
+extern void set_gdbarch_half_bit (struct gdbarch *gdbarch, int half_bit);
+
+extern const struct floatformat ** gdbarch_half_format (struct gdbarch *gdbarch);
+extern void set_gdbarch_half_format (struct gdbarch *gdbarch, const struct floatformat ** half_format);
 
 extern int gdbarch_float_bit (struct gdbarch *gdbarch);
 extern void set_gdbarch_float_bit (struct gdbarch *gdbarch, int float_bit);
@@ -148,8 +154,8 @@ extern void set_gdbarch_long_double_format (struct gdbarch *gdbarch, const struc
    / addr_bit will be set from it.
   
    If gdbarch_ptr_bit and gdbarch_addr_bit are different, you'll probably
-   also need to set gdbarch_pointer_to_address and gdbarch_address_to_pointer
-   as well.
+   also need to set gdbarch_dwarf2_addr_size, gdbarch_pointer_to_address and
+   gdbarch_address_to_pointer as well.
   
    ptr_bit is the size of a pointer on the target */
 
@@ -160,6 +166,23 @@ extern void set_gdbarch_ptr_bit (struct gdbarch *gdbarch, int ptr_bit);
 
 extern int gdbarch_addr_bit (struct gdbarch *gdbarch);
 extern void set_gdbarch_addr_bit (struct gdbarch *gdbarch, int addr_bit);
+
+/* dwarf2_addr_size is the target address size as used in the Dwarf debug
+   info.  For .debug_frame FDEs, this is supposed to be the target address
+   size from the associated CU header, and which is equivalent to the
+   DWARF2_ADDR_SIZE as defined by the target specific GCC back-end.
+   Unfortunately there is no good way to determine this value.  Therefore
+   dwarf2_addr_size simply defaults to the target pointer size.
+  
+   dwarf2_addr_size is not used for .eh_frame FDEs, which are generally
+   defined using the target's pointer size so far.
+  
+   Note that dwarf2_addr_size only needs to be redefined by a target if the
+   GCC back-end defines a DWARF2_ADDR_SIZE other than the target pointer size,
+   and if Dwarf versions < 4 need to be supported. */
+
+extern int gdbarch_dwarf2_addr_size (struct gdbarch *gdbarch);
+extern void set_gdbarch_dwarf2_addr_size (struct gdbarch *gdbarch, int dwarf2_addr_size);
 
 /* One if `char' acts like `signed char', zero if `unsigned char'. */
 
@@ -643,15 +666,6 @@ typedef const struct regset * (gdbarch_regset_from_core_section_ftype) (struct g
 extern const struct regset * gdbarch_regset_from_core_section (struct gdbarch *gdbarch, const char *sect_name, size_t sect_size);
 extern void set_gdbarch_regset_from_core_section (struct gdbarch *gdbarch, gdbarch_regset_from_core_section_ftype *regset_from_core_section);
 
-/* When creating core dumps, some systems encode the PID in addition
-   to the LWP id in core file register section names.  In those cases, the
-   "XXX" in ".reg/XXX" is encoded as [LWPID << 16 | PID].  This setting
-   is set to true for such architectures; false if "XXX" represents an LWP
-   or thread id with no special encoding. */
-
-extern int gdbarch_core_reg_section_encodes_pid (struct gdbarch *gdbarch);
-extern void set_gdbarch_core_reg_section_encodes_pid (struct gdbarch *gdbarch, int core_reg_section_encodes_pid);
-
 /* Supported register notes in a core file. */
 
 extern struct core_regset_section * gdbarch_core_regset_sections (struct gdbarch *gdbarch);
@@ -666,8 +680,7 @@ typedef LONGEST (gdbarch_core_xfer_shared_libraries_ftype) (struct gdbarch *gdba
 extern LONGEST gdbarch_core_xfer_shared_libraries (struct gdbarch *gdbarch, gdb_byte *readbuf, ULONGEST offset, LONGEST len);
 extern void set_gdbarch_core_xfer_shared_libraries (struct gdbarch *gdbarch, gdbarch_core_xfer_shared_libraries_ftype *core_xfer_shared_libraries);
 
-/* How the core_stratum layer converts a PTID from a core file to a
-   string. */
+/* How the core target converts a PTID from a core file to a string. */
 
 extern int gdbarch_core_pid_to_str_p (struct gdbarch *gdbarch);
 
@@ -805,6 +818,24 @@ extern void set_gdbarch_displaced_step_free_closure (struct gdbarch *gdbarch, gd
 typedef CORE_ADDR (gdbarch_displaced_step_location_ftype) (struct gdbarch *gdbarch);
 extern CORE_ADDR gdbarch_displaced_step_location (struct gdbarch *gdbarch);
 extern void set_gdbarch_displaced_step_location (struct gdbarch *gdbarch, gdbarch_displaced_step_location_ftype *displaced_step_location);
+
+/* Relocate an instruction to execute at a different address.  OLDLOC
+   is the address in the inferior memory where the instruction to
+   relocate is currently at.  On input, TO points to the destination
+   where we want the instruction to be copied (and possibly adjusted)
+   to.  On output, it points to one past the end of the resulting
+   instruction(s).  The effect of executing the instruction at TO shall
+   be the same as if executing it at FROM.  For example, call
+   instructions that implicitly push the return address on the stack
+   should be adjusted to return to the instruction after OLDLOC;
+   relative branches, and other PC-relative instructions need the
+   offset adjusted; etc. */
+
+extern int gdbarch_relocate_instruction_p (struct gdbarch *gdbarch);
+
+typedef void (gdbarch_relocate_instruction_ftype) (struct gdbarch *gdbarch, CORE_ADDR *to, CORE_ADDR from);
+extern void gdbarch_relocate_instruction (struct gdbarch *gdbarch, CORE_ADDR *to, CORE_ADDR from);
+extern void set_gdbarch_relocate_instruction (struct gdbarch *gdbarch, gdbarch_relocate_instruction_ftype *relocate_instruction);
 
 /* Refresh overlay mapped state for section OSECT. */
 

@@ -1,6 +1,6 @@
 /* SPU specific support for 32-bit ELF
 
-   Copyright 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   Copyright 2006, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
 
@@ -4827,14 +4827,12 @@ spu_elf_relocate_section (bfd *output_bfd,
       bfd_vma addend;
       bfd_reloc_status_type r;
       bfd_boolean unresolved_reloc;
-      bfd_boolean warned;
       enum _stub_type stub_type;
 
       r_symndx = ELF32_R_SYM (rel->r_info);
       r_type = ELF32_R_TYPE (rel->r_info);
       howto = elf_howto_table + r_type;
       unresolved_reloc = FALSE;
-      warned = FALSE;
       h = NULL;
       sym = NULL;
       sec = NULL;
@@ -4890,7 +4888,6 @@ spu_elf_relocate_section (bfd *output_bfd,
 						      input_section,
 						      rel->r_offset, err))
 		return FALSE;
-	      warned = TRUE;
 	    }
 	  sym_name = h->root.root.string;
 	}
@@ -5448,6 +5445,7 @@ spu_elf_size_sections (bfd * output_bfd, struct bfd_link_info *info)
 #define TARGET_BIG_SYM		bfd_elf32_spu_vec
 #define TARGET_BIG_NAME		"elf32-spu"
 #define ELF_ARCH		bfd_arch_spu
+#define ELF_TARGET_ID		SPU_ELF_DATA
 #define ELF_MACHINE_CODE	EM_SPU
 /* This matches the alignment need for DMA.  */
 #define ELF_MAXPAGESIZE		0x80
