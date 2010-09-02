@@ -188,9 +188,10 @@ extern int dump_subexp (struct expression *, struct ui_file *, int);
 extern int dump_subexp_body_standard (struct expression *, 
 				      struct ui_file *, int);
 
-extern void operator_length (struct expression *, int, int *, int *);
+extern void operator_length (const struct expression *, int, int *, int *);
 
-extern void operator_length_standard (struct expression *, int, int *, int *);
+extern void operator_length_standard (const struct expression *, int, int *,
+				      int *);
 
 extern int operator_check_standard (struct expression *exp, int pos,
 				    int (*objfile_func)
@@ -202,6 +203,12 @@ extern char *op_name_standard (enum exp_opcode);
 extern struct type *follow_types (struct type *);
 
 extern void null_post_parser (struct expression **, int);
+
+extern int parse_float (const char *p, int len, DOUBLEST *d,
+			const char **suffix);
+
+extern int parse_c_float (struct gdbarch *gdbarch, const char *p, int len,
+			  DOUBLEST *d, struct type **t);
 
 /* During parsing of a C expression, the pointer to the next character
    is in this variable.  */
@@ -273,7 +280,7 @@ struct exp_descriptor
 
     /* Returns number of exp_elements needed to represent an operator and
        the number of subexpressions it takes.  */
-    void (*operator_length) (struct expression*, int, int*, int *);
+    void (*operator_length) (const struct expression*, int, int*, int *);
 
     /* Call TYPE_FUNC and OBJFILE_FUNC for any TYPE and OBJFILE found being
        referenced by the single operator of EXP at position POS.  Operator

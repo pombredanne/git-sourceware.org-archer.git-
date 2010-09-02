@@ -46,8 +46,8 @@ void pascal_type_print_varspec_prefix (struct type *, struct ui_file *, int, int
 /* LEVEL is the depth to indent lines by.  */
 
 void
-pascal_print_type (struct type *type, char *varstring, struct ui_file *stream,
-		   int show, int level)
+pascal_print_type (struct type *type, const char *varstring,
+		   struct ui_file *stream, int show, int level)
 {
   enum type_code code;
   int demangled_args;
@@ -301,6 +301,7 @@ static void
 pascal_print_func_args (struct type *type, struct ui_file *stream)
 {
   int i, len = TYPE_NFIELDS (type);
+
   if (len)
     {
       fprintf_filtered (stream, "(");
@@ -439,8 +440,8 @@ pascal_type_print_base (struct type *type, struct ui_file *stream, int show,
       s_none, s_public, s_private, s_protected
     }
   section_type;
-  QUIT;
 
+  QUIT;
   wrap_here ("    ");
   if (type == NULL)
     {
@@ -757,13 +758,14 @@ pascal_type_print_base (struct type *type, struct ui_file *stream, int show,
       break;
 
     case TYPE_CODE_ERROR:
-      fprintf_filtered (stream, "<unknown type>");
+      fprintf_filtered (stream, "%s", TYPE_ERROR_NAME (type));
       break;
 
       /* this probably does not work for enums */
     case TYPE_CODE_RANGE:
       {
 	struct type *target = TYPE_TARGET_TYPE (type);
+
 	print_type_scalar (target, TYPE_LOW_BOUND (type), stream);
 	fputs_filtered ("..", stream);
 	print_type_scalar (target, TYPE_HIGH_BOUND (type), stream);

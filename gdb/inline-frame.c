@@ -75,6 +75,7 @@ find_inline_frame_state (ptid_t ptid)
 	{
 	  struct regcache *regcache = get_thread_regcache (ptid);
 	  CORE_ADDR current_pc = regcache_read_pc (regcache);
+
 	  if (current_pc != state->saved_pc)
 	    {
 	      /* PC has changed - this context is invalid.  Use the
@@ -124,6 +125,7 @@ clear_inline_frame_state (ptid_t ptid)
     {
       VEC (inline_state_s) *new_states = NULL;
       int pid = ptid_get_pid (ptid);
+
       for (ix = 0; VEC_iterate (inline_state_s, inline_states, ix, state); ix++)
 	if (pid != ptid_get_pid (state->ptid))
 	  VEC_safe_push (inline_state_s, new_states, state);
@@ -254,15 +256,13 @@ inline_frame_sniffer (const struct frame_unwind *self,
   return 1;
 }
 
-const struct frame_unwind inline_frame_unwinder = {
+const struct frame_unwind inline_frame_unwind = {
   INLINE_FRAME,
   inline_frame_this_id,
   inline_frame_prev_register,
   NULL,
   inline_frame_sniffer
 };
-
-const struct frame_unwind *const inline_frame_unwind = &inline_frame_unwinder;
 
 /* Return non-zero if BLOCK, an inlined function block containing PC,
    has a group of contiguous instructions starting at PC (but not

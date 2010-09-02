@@ -129,6 +129,7 @@ enum bptype
 
     bp_tracepoint,
     bp_fast_tracepoint,
+    bp_static_tracepoint,
 
     /* Event for JIT compiled code generation or deletion.  */
     bp_jit_event,
@@ -239,12 +240,18 @@ struct bp_location
      the same parent breakpoint.  */
   struct bp_location *next;
 
+  /* The reference count.  */
+  int refc;
+
   /* Type of this breakpoint location.  */
   enum bp_loc_type loc_type;
 
   /* Each breakpoint location must belong to exactly one higher-level
-     breakpoint.  This and the DUPLICATE flag are more straightforward
-     than reference counting.  */
+     breakpoint.  This pointer is NULL iff this bp_location is no
+     longer attached to a breakpoint.  For example, when a breakpoint
+     is deleted, its locations may still be found in the
+     moribund_locations list, or if we had stopped for it, in
+     bpstats.  */
   struct breakpoint *owner;
 
   /* Conditional.  Break only if this expression's value is nonzero.
@@ -448,8 +455,11 @@ struct breakpoint
     /* String form of the breakpoint condition (malloc'd), or NULL if there
        is no condition.  */
     char *cond_string;
-    /* String form of exp (malloc'd), or NULL if none.  */
+    /* String form of exp to use for displaying to the user (malloc'd), or
+       NULL if none.  */
     char *exp_string;
+    /* String form to use for reparsing of EXP (malloc'd) or NULL.  */
+    char *exp_string_reparse;
 
     /* The expression we are watching, or NULL if not a watchpoint.  */
     struct expression *exp;
@@ -535,6 +545,18 @@ struct breakpoint
 
     /* The number of the tracepoint on the target.  */
     int number_on_target;
+
+    /* The static tracepoint marker id, if known.  */
+    char *static_trace_marker_id;
+
+    /* LTTng/UST allow more than one marker with the same ID string,
+       although it unadvised because it confuses tools.  When setting
+       static tracepoints by marker ID, this will record the index in
+       the array of markers we found for the given marker ID for which
+       this static tracepoint corresponds.  When resetting
+       breakpoints, we will use this index to try to find the same
+       marker again.  */
+    int static_trace_marker_id_idx;
   };
 
 typedef struct breakpoint *breakpoint_p;
@@ -545,10 +567,6 @@ DEF_VEC_P(breakpoint_p);
    stopped at a breakpoint, and what we should do about it.  */
 
 typedef struct bpstats *bpstat;
-
-/* Frees any storage that is part of a bpstat.
-   Does not walk the 'next' chain.  */
-extern void bpstat_free (bpstat);
 
 /* Clears a chain of bpstat, freeing storage
    of each.  */
@@ -562,7 +580,20 @@ extern bpstat bpstat_stop_status (struct address_space *aspace,
 				  CORE_ADDR pc, ptid_t ptid);
 
 /* This bpstat_what stuff tells wait_for_inferior what to do with a
-   breakpoint (a challenging task).  */
+   breakpoint (a challenging task).
+
+   The enum values order defines priority-like order of the actions.
+   Once you've decided that some action is appropriate, you'll never
+   go back and decide something of a lower priority is better.  Each
+   of these actions is mutually exclusive with the others.  That
+   means, that if you find yourself adding a new action class here and
+   wanting to tell GDB that you have two simultaneous actions to
+   handle, something is wrong, and you probably don't actually need a
+   new action type.
+
+   Note that a step resume breakpoint overrides another breakpoint of
+   signal handling (see comment in wait_for_inferior at where we set
+   the step_resume breakpoint).  */
 
 enum bpstat_what_main_action
   {
@@ -570,18 +601,6 @@ enum bpstat_what_main_action
        say to perform any action (e.g. failed watchpoint and nothing
        else).  */
     BPSTAT_WHAT_KEEP_CHECKING,
-
-    /* Rather than distinguish between noisy and silent stops here, it
-       might be cleaner to have bpstat_print make that decision (also
-       taking into account stop_print_frame and source_only).  But the
-       implications are a bit scary (interaction with auto-displays, etc.),
-       so I won't try it.  */
-
-    /* Stop silently.  */
-    BPSTAT_WHAT_STOP_SILENT,
-
-    /* Stop and print.  */
-    BPSTAT_WHAT_STOP_NOISY,
 
     /* Remove breakpoints, single step once, then put them back in and
        go back to what we were doing.  It's possible that this should be
@@ -599,18 +618,20 @@ enum bpstat_what_main_action
        BPSTAT_WHAT_KEEP_CHECKING.  */
     BPSTAT_WHAT_CLEAR_LONGJMP_RESUME,
 
+    /* Rather than distinguish between noisy and silent stops here, it
+       might be cleaner to have bpstat_print make that decision (also
+       taking into account stop_print_frame and source_only).  But the
+       implications are a bit scary (interaction with auto-displays, etc.),
+       so I won't try it.  */
+
+    /* Stop silently.  */
+    BPSTAT_WHAT_STOP_SILENT,
+
+    /* Stop and print.  */
+    BPSTAT_WHAT_STOP_NOISY,
+
     /* Clear step resume breakpoint, and keep checking.  */
     BPSTAT_WHAT_STEP_RESUME,
-
-    /* Check the dynamic linker's data structures for new libraries, then
-       keep checking.  */
-    BPSTAT_WHAT_CHECK_SHLIBS,
-
-    /* Check for new JITed code.  */
-    BPSTAT_WHAT_CHECK_JIT,
-
-    /* This is just used to keep track of how many enums there are.  */
-    BPSTAT_WHAT_LAST
   };
 
 /* An enum indicating the kind of "stack dummy" stop.  This is a bit
@@ -711,16 +732,41 @@ enum bp_print_how
 
 struct bpstats
   {
-    /* Linked list because there can be two breakpoints at the same
-       place, and a bpstat reflects the fact that both have been hit.  */
+    /* Linked list because there can be more than one breakpoint at
+       the same place, and a bpstat reflects the fact that all have
+       been hit.  */
     bpstat next;
-    /* Breakpoint that we are at.  */
-    const struct bp_location *breakpoint_at;
+
+    /* Location that caused the stop.  Locations are refcounted, so
+       this will never be NULL.  Note that this location may end up
+       detached from a breakpoint, but that does not necessary mean
+       that the struct breakpoint is gone.  E.g., consider a
+       watchpoint with a condition that involves an inferior function
+       call.  Watchpoint locations are recreated often (on resumes,
+       hence on infcalls too).  Between creating the bpstat and after
+       evaluating the watchpoint condition, this location may hence
+       end up detached from its original owner watchpoint, even though
+       the watchpoint is still listed.  If it's condition evaluates as
+       true, we still want this location to cause a stop, and we will
+       still need to know which watchpoint it was originally attached.
+       What this means is that we should not (in most cases) follow
+       the `bpstat->bp_location->owner' link, but instead use the
+       `breakpoint_at' field below.  */
+    struct bp_location *bp_location_at;
+
+    /* Breakpoint that caused the stop.  This is nullified if the
+       breakpoint ends up being deleted.  See comments on
+       `bp_location_at' above for why do we need this field instead of
+       following the location's owner.  */
+    struct breakpoint *breakpoint_at;
+
     /* The associated command list.  */
     struct counted_command_line *commands;
+
     /* Commands left to be done.  This points somewhere in
        base_command.  */
     struct command_line *commands_left;
+
     /* Old value associated with a watchpoint.  */
     struct value *old_val;
 
@@ -817,7 +863,7 @@ extern void tbreak_command (char *, int);
 extern int create_breakpoint (struct gdbarch *gdbarch, char *arg,
 			      char *cond_string, int thread,
 			      int parse_condition_and_thread,
-			      int tempflag, int hardwareflag, int traceflag,
+			      int tempflag, enum bptype wanted_type,
 			      int ignore_count,
 			      enum auto_boolean pending_break_support,
 			      struct breakpoint_ops *ops,
@@ -983,7 +1029,9 @@ extern int remove_hw_watchpoints (void);
    twice before remove is called.  */
 extern void insert_single_step_breakpoint (struct gdbarch *,
 					   struct address_space *, CORE_ADDR);
+extern int single_step_breakpoints_inserted (void);
 extern void remove_single_step_breakpoints (void);
+extern void cancel_single_step_breakpoints (void);
 
 /* Manage manual breakpoints, separate from the normal chain of
    breakpoints.  These functions are used in murky target-specific
@@ -1038,6 +1086,11 @@ extern struct breakpoint *get_tracepoint_by_number (char **arg, int multi_p,
 extern VEC(breakpoint_p) *all_tracepoints (void);
 
 extern int is_tracepoint (const struct breakpoint *b);
+
+/* Return a vector of all static tracepoints defined at ADDR.  The
+   vector is newly allocated; the caller should free when done with
+   it.  */
+extern VEC(breakpoint_p) *static_tracepoints_here (CORE_ADDR addr);
 
 /* Function that can be passed to read_command_line to validate
    that each command is suitable for tracepoint command list.  */

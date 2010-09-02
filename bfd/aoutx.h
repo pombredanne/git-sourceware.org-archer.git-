@@ -269,7 +269,7 @@ NAME (aout, reloc_type_lookup) (bfd *abfd, bfd_reloc_code_real_type code)
   int ext = obj_reloc_entry_size (abfd) == RELOC_EXT_SIZE;
 
   if (code == BFD_RELOC_CTOR)
-    switch (bfd_get_arch_info (abfd)->bits_per_address)
+    switch (bfd_arch_bits_per_address (abfd))
       {
       case 32:
 	code = BFD_RELOC_32;
@@ -629,7 +629,9 @@ NAME (aout, some_aout_object_p) (bfd *abfd,
   if (execp->a_entry != 0
       || (execp->a_entry >= obj_textsec (abfd)->vma
 	  && execp->a_entry < (obj_textsec (abfd)->vma
-			       + obj_textsec (abfd)->size)))
+			       + obj_textsec (abfd)->size)
+	  && execp->a_trsize == 0
+	  && execp->a_drsize == 0))
     abfd->flags |= EXEC_P;
 #ifdef STAT_FOR_EXEC
   else

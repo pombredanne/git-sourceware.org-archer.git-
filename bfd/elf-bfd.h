@@ -689,6 +689,10 @@ struct elf_backend_data
   /* The architecture for this backend.  */
   enum bfd_architecture arch;
 
+  /* An identifier used to distinguish different target specific
+     extensions to elf_obj_tdata and elf_link_hash_table structures.  */
+  enum elf_target_id target_id;
+
   /* The ELF machine code (EM_xxxx) for this backend.  */
   int elf_machine_code;
 
@@ -1245,10 +1249,11 @@ struct elf_backend_data
   /* The section type to use for an attributes section.  */
   unsigned int obj_attrs_section_type;
 
-  /* This function determines the order in which any attributes are written.
-     It must be defined for input in the range 4..NUM_KNOWN_OBJ_ATTRIBUTES-1
-     (this range is used in order to make unity easy).  The returned value is
-     the actual tag number to place in the input position.  */
+  /* This function determines the order in which any attributes are
+     written.  It must be defined for input in the range
+     LEAST_KNOWN_OBJ_ATTRIBUTE..NUM_KNOWN_OBJ_ATTRIBUTES-1 (this range
+     is used in order to make unity easy).  The returned value is the
+     actual tag number to place in the input position.  */
   int (*obj_attrs_order) (int);
 
   /* This is TRUE if the linker should act like collect and gather
@@ -1411,6 +1416,12 @@ struct bfd_elf_section_data
 
 #define get_elf_backend_data(abfd) \
    xvec_get_elf_backend_data ((abfd)->xvec)
+
+/* The least object attributes (within an attributes subsection) known
+   for any target.  Some code assumes that the value 0 is not used and
+   the field for that attribute can instead be used as a marker to
+   indicate that attributes have been initialized.  */
+#define LEAST_KNOWN_OBJ_ATTRIBUTE 2
 
 /* The maximum number of known object attributes for any target.  */
 #define NUM_KNOWN_OBJ_ATTRIBUTES 71
@@ -1732,7 +1743,7 @@ extern bfd_reloc_status_type bfd_elf_generic_reloc
   (bfd *, arelent *, asymbol *, void *, asection *, bfd *, char **);
 extern bfd_boolean bfd_elf_allocate_object
   (bfd *, size_t, enum elf_target_id);
-extern bfd_boolean bfd_elf_make_generic_object
+extern bfd_boolean bfd_elf_make_object
   (bfd *);
 extern bfd_boolean bfd_elf_mkcorefile
   (bfd *);
@@ -1982,6 +1993,8 @@ extern int bfd_elf32_core_file_failing_signal
   (bfd *);
 extern bfd_boolean bfd_elf32_core_file_matches_executable_p
   (bfd *, bfd *);
+extern int bfd_elf32_core_file_pid
+  (bfd *);
 
 extern bfd_boolean bfd_elf32_swap_symbol_in
   (bfd *, const void *, const void *, Elf_Internal_Sym *);
@@ -2026,6 +2039,8 @@ extern int bfd_elf64_core_file_failing_signal
   (bfd *);
 extern bfd_boolean bfd_elf64_core_file_matches_executable_p
   (bfd *, bfd *);
+extern int bfd_elf64_core_file_pid
+  (bfd *);
 
 extern bfd_boolean bfd_elf64_swap_symbol_in
   (bfd *, const void *, const void *, Elf_Internal_Sym *);
@@ -2325,6 +2340,8 @@ extern asection _bfd_elf_large_com_section;
 	    return FALSE;						\
 	  warned = TRUE;						\
 	}								\
+      (void) unresolved_reloc;						\
+      (void) warned;							\
     }									\
   while (0)
 

@@ -249,7 +249,7 @@ struct objfile
     /* A byte cache where we can stash arbitrary "chunks" of bytes that
        will not change. */
 
-    struct bcache *psymbol_cache;	/* Byte cache for partial syms */
+    struct psymbol_bcache *psymbol_cache; /* Byte cache for partial syms */
     struct bcache *macro_cache;          /* Byte cache for macros */
     struct bcache *filename_cache;	 /* Byte cache for file names.  */
 
@@ -391,6 +391,12 @@ struct objfile
     /* FIXME/carlton-2003-06-27: Delete this in a few years once
        "possible namespace symbols" go away.  */
     struct symtab *cp_namespace_symtab;
+
+    /* A linked list of symbols created when reading template types or
+       function templates.  These symbols are not stored in any symbol
+       table, so we have to keep them here to relocate them
+       properly.  */
+    struct symbol *template_symbols;
   };
 
 /* Defines for the objfile flag word. */

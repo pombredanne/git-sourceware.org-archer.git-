@@ -368,6 +368,7 @@ static void
 add_to_pid_list (struct simple_pid_list **listp, int pid, int status)
 {
   struct simple_pid_list *new_pid = xmalloc (sizeof (struct simple_pid_list));
+
   new_pid->pid = pid;
   new_pid->status = status;
   new_pid->next = *listp;
@@ -375,7 +376,7 @@ add_to_pid_list (struct simple_pid_list **listp, int pid, int status)
 }
 
 static int
-pull_pid_from_list (struct simple_pid_list **listp, int pid, int *status)
+pull_pid_from_list (struct simple_pid_list **listp, int pid, int *statusp)
 {
   struct simple_pid_list **p;
 
@@ -383,7 +384,8 @@ pull_pid_from_list (struct simple_pid_list **listp, int pid, int *status)
     if ((*p)->pid == pid)
       {
 	struct simple_pid_list *next = (*p)->next;
-	*status = (*p)->status;
+
+	*statusp = (*p)->status;
 	xfree (*p);
 	*p = next;
 	return 1;
@@ -412,13 +414,13 @@ linux_tracefork_child (void)
 /* Wrapper function for waitpid which handles EINTR.  */
 
 static int
-my_waitpid (int pid, int *status, int flags)
+my_waitpid (int pid, int *statusp, int flags)
 {
   int ret;
 
   do
     {
-      ret = waitpid (pid, status, flags);
+      ret = waitpid (pid, statusp, flags);
     }
   while (ret == -1 && errno == EINTR);
 
@@ -677,7 +679,7 @@ linux_child_follow_fork (struct target_ops *ops, int follow_child)
 	 in the foreground, the user will not be able to ctrl-c to get
 	 back the terminal, effectively hanging the debug session.  */
       fprintf_filtered (gdb_stderr, _("\
-Can not resume the parent process over vfork in the foreground while \n\
+Can not resume the parent process over vfork in the foreground while\n\
 holding the child stopped.  Try \"set detach-on-fork\" or \
 \"set schedule-multiple\".\n"));
       return 1;
@@ -1071,7 +1073,6 @@ restore_child_signals_mask (sigset_t *prev_mask)
 static int stop_wait_callback (struct lwp_info *lp, void *data);
 static int linux_thread_alive (ptid_t ptid);
 static char *linux_child_pid_to_exec_file (int pid);
-static int cancel_breakpoint (struct lwp_info *lp);
 
 
 /* Convert wait status STATUS to a string.  Used for printing debug
@@ -1093,7 +1094,7 @@ status_to_str (int status)
     }
   else if (WIFSIGNALED (status))
     snprintf (buf, sizeof (buf), "%s (terminated)",
-	      strsignal (WSTOPSIG (status)));
+	      strsignal (WTERMSIG (status)));
   else
     snprintf (buf, sizeof (buf), "%d (exited)", WEXITSTATUS (status));
 
@@ -1646,6 +1647,7 @@ get_pending_status (struct lwp_info *lp, int *status)
   else if (non_stop && !is_executing (lp->ptid))
     {
       struct thread_info *tp = find_thread_ptid (lp->ptid);
+
       signo = tp->stop_signal;
     }
   else if (!non_stop)
@@ -1658,6 +1660,7 @@ get_pending_status (struct lwp_info *lp, int *status)
       if (GET_LWP (lp->ptid) == GET_LWP (last_ptid))
 	{
 	  struct thread_info *tp = find_thread_ptid (lp->ptid);
+
 	  signo = tp->stop_signal;
 	}
     }
@@ -2145,7 +2148,6 @@ linux_handle_extended_wait (struct lwp_info *lp, int status,
 {
   int pid = GET_LWP (lp->ptid);
   struct target_waitstatus *ourstatus = &lp->waitstatus;
-  struct lwp_info *new_lp = NULL;
   int event = status >> 16;
 
   if (event == PTRACE_EVENT_FORK || event == PTRACE_EVENT_VFORK
@@ -2209,7 +2211,10 @@ linux_handle_extended_wait (struct lwp_info *lp, int status,
 	ourstatus->kind = TARGET_WAITKIND_VFORKED;
       else
 	{
+	  struct lwp_info *new_lp;
+
 	  ourstatus->kind = TARGET_WAITKIND_IGNORE;
+
 	  new_lp = add_lwp (BUILD_LWP (new_pid, GET_PID (lp->ptid)));
 	  new_lp->cloned = 1;
 	  new_lp->stopped = 1;
@@ -2272,6 +2277,23 @@ linux_handle_extended_wait (struct lwp_info *lp, int status,
 
 	      linux_ops->to_resume (linux_ops, pid_to_ptid (new_pid),
 				    0, signo);
+	    }
+	  else
+	    {
+	      if (status != 0)
+		{
+		  /* We created NEW_LP so it cannot yet contain STATUS.  */
+		  gdb_assert (new_lp->status == 0);
+
+		  /* Save the wait status to report later.  */
+		  if (debug_linux_nat)
+		    fprintf_unfiltered (gdb_stdlog,
+					"LHEW: waitpid of new LWP %ld, "
+					"saving status %s\n",
+					(long) GET_LWP (new_lp->ptid),
+					status_to_str (status));
+		  new_lp->status = status;
+		}
 	    }
 
 	  if (debug_linux_nat)
@@ -2583,6 +2605,43 @@ linux_nat_stopped_data_address (struct target_ops *ops, CORE_ADDR *addr_p)
   return lp->stopped_data_address_p;
 }
 
+/* Commonly any breakpoint / watchpoint generate only SIGTRAP.  */
+
+static int
+sigtrap_is_event (int status)
+{
+  return WIFSTOPPED (status) && WSTOPSIG (status) == SIGTRAP;
+}
+
+/* SIGTRAP-like events recognizer.  */
+
+static int (*linux_nat_status_is_event) (int status) = sigtrap_is_event;
+
+/* Check for SIGTRAP-like events in LP.  */
+
+static int
+linux_nat_lp_status_is_event (struct lwp_info *lp)
+{
+  /* We check for lp->waitstatus in addition to lp->status, because we can
+     have pending process exits recorded in lp->status
+     and W_EXITCODE(0,0) == 0.  We should probably have an additional
+     lp->status_p flag.  */
+
+  return (lp->waitstatus.kind == TARGET_WAITKIND_IGNORE
+	  && linux_nat_status_is_event (lp->status));
+}
+
+/* Set alternative SIGTRAP-like events recognizer.  If
+   breakpoint_inserted_here_p there then gdbarch_decr_pc_after_break will be
+   applied.  */
+
+void
+linux_nat_set_status_is_event (struct target_ops *t,
+			       int (*status_is_event) (int status))
+{
+  linux_nat_status_is_event = status_is_event;
+}
+
 /* Wait until LP is stopped.  */
 
 static int
@@ -2623,7 +2682,7 @@ stop_wait_callback (struct lwp_info *lp, void *data)
 
       if (WSTOPSIG (status) != SIGSTOP)
 	{
-	  if (WSTOPSIG (status) == SIGTRAP)
+	  if (linux_nat_status_is_event (status))
 	    {
 	      /* If a LWP other than the LWP that we're reporting an
 	         event for has hit a GDB breakpoint (as opposed to
@@ -2778,8 +2837,7 @@ count_events_callback (struct lwp_info *lp, void *data)
   gdb_assert (count != NULL);
 
   /* Count only resumed LWPs that have a SIGTRAP event pending.  */
-  if (lp->status != 0 && lp->resumed
-      && WIFSTOPPED (lp->status) && WSTOPSIG (lp->status) == SIGTRAP)
+  if (lp->resumed && linux_nat_lp_status_is_event (lp))
     (*count)++;
 
   return 0;
@@ -2806,8 +2864,7 @@ select_event_lwp_callback (struct lwp_info *lp, void *data)
   gdb_assert (selector != NULL);
 
   /* Select only resumed LWPs that have a SIGTRAP event pending. */
-  if (lp->status != 0 && lp->resumed
-      && WIFSTOPPED (lp->status) && WSTOPSIG (lp->status) == SIGTRAP)
+  if (lp->resumed && linux_nat_lp_status_is_event (lp))
     if ((*selector)-- == 0)
       return 1;
 
@@ -2867,9 +2924,7 @@ cancel_breakpoints_callback (struct lwp_info *lp, void *data)
      delete or disable the breakpoint, but the LWP will have already
      tripped on it.  */
 
-  if (lp->waitstatus.kind == TARGET_WAITKIND_IGNORE
-      && lp->status != 0
-      && WIFSTOPPED (lp->status) && WSTOPSIG (lp->status) == SIGTRAP
+  if (linux_nat_lp_status_is_event (lp)
       && cancel_breakpoint (lp))
     /* Throw away the SIGTRAP.  */
     lp->status = 0;
@@ -3042,7 +3097,7 @@ linux_nat_filter_event (int lwpid, int status, int options)
 	return NULL;
     }
 
-  if (WIFSTOPPED (status) && WSTOPSIG (status) == SIGTRAP)
+  if (linux_nat_status_is_event (status))
     {
       /* Save the trap's siginfo in case we need it later.  */
       save_siginfo (lp);
@@ -3361,6 +3416,9 @@ retry:
 
 	  lp = linux_nat_filter_event (lwpid, status, options);
 
+	  /* STATUS is now no longer valid, use LP->STATUS instead.  */
+	  status = 0;
+
 	  if (lp
 	      && ptid_is_pid (ptid)
 	      && ptid_get_pid (lp->ptid) != ptid_get_pid (ptid))
@@ -3369,7 +3427,7 @@ retry:
 
 	      if (debug_linux_nat)
 		fprintf (stderr, "LWP %ld got an event %06x, leaving pending.\n",
-			 ptid_get_lwp (lp->ptid), status);
+			 ptid_get_lwp (lp->ptid), lp->status);
 
 	      if (WIFSTOPPED (lp->status))
 		{
@@ -3385,8 +3443,7 @@ retry:
 			 always cancels breakpoint hits in all
 			 threads.  */
 		      if (non_stop
-			  && lp->waitstatus.kind == TARGET_WAITKIND_IGNORE
-			  && WSTOPSIG (lp->status) == SIGTRAP
+			  && linux_nat_lp_status_is_event (lp)
 			  && cancel_breakpoint (lp))
 			{
 			  /* Throw away the SIGTRAP.  */
@@ -3406,7 +3463,7 @@ retry:
 		      lp->signalled = 0;
 		    }
 		}
-	      else if (WIFEXITED (status) || WIFSIGNALED (status))
+	      else if (WIFEXITED (lp->status) || WIFSIGNALED (lp->status))
 		{
 		  if (debug_linux_nat)
 		    fprintf (stderr, "Process %ld exited while stopping LWPs\n",
@@ -3602,7 +3659,7 @@ retry:
   else
     lp->resumed = 0;
 
-  if (WIFSTOPPED (status) && WSTOPSIG (status) == SIGTRAP)
+  if (linux_nat_status_is_event (status))
     {
       if (debug_linux_nat)
 	fprintf_unfiltered (gdb_stdlog,
@@ -3622,7 +3679,13 @@ retry:
     fprintf_unfiltered (gdb_stdlog, "LLW: exit\n");
 
   restore_child_signals_mask (&prev_mask);
-  lp->core = linux_nat_core_of_thread_1 (lp->ptid);
+
+  if (ourstatus->kind == TARGET_WAITKIND_EXITED
+      || ourstatus->kind == TARGET_WAITKIND_SIGNALLED)
+    lp->core = -1;
+  else
+    lp->core = linux_nat_core_of_thread_1 (lp->ptid);
+
   return lp->ptid;
 }
 
@@ -3802,6 +3865,7 @@ linux_nat_kill (struct target_ops *ops)
   else
     {
       ptid_t ptid = pid_to_ptid (ptid_get_pid (inferior_ptid));
+
       /* Stop all threads before killing them, since ptrace requires
 	 that the thread is stopped to sucessfully PTRACE_KILL.  */
       iterate_over_lwps (ptid, stop_callback, NULL);
@@ -4040,9 +4104,7 @@ read_mapping (FILE *mapfile,
    regions in the inferior for a corefile.  */
 
 static int
-linux_nat_find_memory_regions (int (*func) (CORE_ADDR,
-					    unsigned long,
-					    int, int, int, void *), void *obfd)
+linux_nat_find_memory_regions (find_memory_region_ftype func, void *obfd)
 {
   int pid = PIDGET (inferior_ptid);
   char mapsfilename[MAXPATHLEN];
@@ -4123,8 +4185,6 @@ linux_nat_do_thread_registers (bfd *obfd, ptid_t ptid,
 			       char *note_data, int *note_size,
 			       enum target_signal stop_signal)
 {
-  gdb_gregset_t gregs;
-  gdb_fpregset_t fpregs;
   unsigned long lwp = ptid_get_lwp (ptid);
   struct gdbarch *gdbarch = target_gdbarch;
   struct regcache *regcache = get_thread_arch_regcache (ptid, gdbarch);
@@ -4142,21 +4202,6 @@ linux_nat_do_thread_registers (bfd *obfd, ptid_t ptid,
   core_regset_p = gdbarch_regset_from_core_section_p (gdbarch);
   sect_list = gdbarch_core_regset_sections (gdbarch);
 
-  if (core_regset_p
-      && (regset = gdbarch_regset_from_core_section (gdbarch, ".reg",
-						     sizeof (gregs))) != NULL
-      && regset->collect_regset != NULL)
-    regset->collect_regset (regset, regcache, -1,
-			    &gregs, sizeof (gregs));
-  else
-    fill_gregset (regcache, &gregs, -1);
-
-  note_data = (char *) elfcore_write_prstatus (obfd,
-					       note_data,
-					       note_size,
-					       lwp,
-					       stop_signal, &gregs);
-
   /* The loop below uses the new struct core_regset_section, which stores
      the supported section names and sizes for the core file.  Note that
      note PRSTATUS needs to be treated specially.  But the other notes are
@@ -4164,12 +4209,6 @@ linux_nat_do_thread_registers (bfd *obfd, ptid_t ptid,
   if (core_regset_p && sect_list != NULL)
     while (sect_list->sect_name != NULL)
       {
-	/* .reg was already handled above.  */
-	if (strcmp (sect_list->sect_name, ".reg") == 0)
-	  {
-	    sect_list++;
-	    continue;
-	  }
 	regset = gdbarch_regset_from_core_section (gdbarch,
 						   sect_list->sect_name,
 						   sect_list->size);
@@ -4177,12 +4216,17 @@ linux_nat_do_thread_registers (bfd *obfd, ptid_t ptid,
 	gdb_regset = xmalloc (sect_list->size);
 	regset->collect_regset (regset, regcache, -1,
 				gdb_regset, sect_list->size);
-	note_data = (char *) elfcore_write_register_note (obfd,
-							  note_data,
-							  note_size,
-							  sect_list->sect_name,
-							  gdb_regset,
-							  sect_list->size);
+
+	if (strcmp (sect_list->sect_name, ".reg") == 0)
+	  note_data = (char *) elfcore_write_prstatus
+				(obfd, note_data, note_size,
+				 lwp, target_signal_to_host (stop_signal),
+				 gdb_regset);
+	else
+	  note_data = (char *) elfcore_write_register_note
+				(obfd, note_data, note_size,
+				 sect_list->sect_name, gdb_regset,
+				 sect_list->size);
 	xfree (gdb_regset);
 	sect_list++;
       }
@@ -4192,6 +4236,22 @@ linux_nat_do_thread_registers (bfd *obfd, ptid_t ptid,
      the new support, the code below should be deleted.  */
   else
     {
+      gdb_gregset_t gregs;
+      gdb_fpregset_t fpregs;
+
+      if (core_regset_p
+	  && (regset = gdbarch_regset_from_core_section (gdbarch, ".reg",
+							 sizeof (gregs))) != NULL
+	  && regset->collect_regset != NULL)
+	regset->collect_regset (regset, regcache, -1,
+				&gregs, sizeof (gregs));
+      else
+	fill_gregset (regcache, &gregs, -1);
+
+      note_data = (char *) elfcore_write_prstatus
+	(obfd, note_data, note_size, lwp, target_signal_to_host (stop_signal),
+	 &gregs);
+
       if (core_regset_p
           && (regset = gdbarch_regset_from_core_section (gdbarch, ".reg2",
 							 sizeof (fpregs))) != NULL
@@ -4340,6 +4400,7 @@ static char *
 linux_spu_make_corefile_notes (bfd *obfd, char *note_data, int *note_size)
 {
   struct linux_spu_corefile_data args;
+
   args.obfd = obfd;
   args.note_data = note_data;
   args.note_size = note_size;
@@ -4496,6 +4557,7 @@ linux_nat_info_proc_cmd (char *args, int from_tty)
       if ((procfile = fopen (fname1, "r")) != NULL)
 	{
 	  struct cleanup *cleanup = make_cleanup_fclose (procfile);
+
           if (fgets (buffer, sizeof (buffer), procfile))
             printf_filtered ("cmdline = '%s'\n", buffer);
           else
@@ -4591,6 +4653,7 @@ linux_nat_info_proc_cmd (char *args, int from_tty)
       if ((procfile = fopen (fname1, "r")) != NULL)
 	{
 	  struct cleanup *cleanup = make_cleanup_fclose (procfile);
+
 	  while (fgets (buffer, sizeof (buffer), procfile) != NULL)
 	    puts_filtered (buffer);
 	  do_cleanups (cleanup);
@@ -4921,8 +4984,8 @@ linux_proc_pending_signals (int pid, sigset_t *pending, sigset_t *blocked, sigse
 
 static LONGEST
 linux_nat_xfer_osdata (struct target_ops *ops, enum target_object object,
-                    const char *annex, gdb_byte *readbuf,
-                    const gdb_byte *writebuf, ULONGEST offset, LONGEST len)
+		       const char *annex, gdb_byte *readbuf,
+		       const gdb_byte *writebuf, ULONGEST offset, LONGEST len)
 {
   /* We make the process list snapshot when the object starts to be
      read.  */
@@ -4934,6 +4997,45 @@ linux_nat_xfer_osdata (struct target_ops *ops, enum target_object object,
 
   gdb_assert (object == TARGET_OBJECT_OSDATA);
 
+  if (!annex)
+    {
+      if (offset == 0)
+	{
+	  if (len_avail != -1 && len_avail != 0)
+	    obstack_free (&obstack, NULL);
+	  len_avail = 0;
+	  buf = NULL;
+	  obstack_init (&obstack);
+	  obstack_grow_str (&obstack, "<osdata type=\"types\">\n");
+
+	  obstack_xml_printf (
+			      &obstack,
+			      "<item>"
+			      "<column name=\"Type\">processes</column>"
+			      "<column name=\"Description\">Listing of all processes</column>"
+			      "</item>");
+
+	  obstack_grow_str0 (&obstack, "</osdata>\n");
+	  buf = obstack_finish (&obstack);
+	  len_avail = strlen (buf);
+	}
+
+      if (offset >= len_avail)
+	{
+	  /* Done.  Get rid of the obstack.  */
+	  obstack_free (&obstack, NULL);
+	  buf = NULL;
+	  len_avail = 0;
+	  return 0;
+	}
+
+      if (len > len_avail - offset)
+	len = len_avail - offset;
+      memcpy (readbuf, buf + offset, len);
+
+      return len;
+    }
+
   if (strcmp (annex, "processes") != 0)
     return 0;
 
@@ -4942,7 +5044,7 @@ linux_nat_xfer_osdata (struct target_ops *ops, enum target_object object,
   if (offset == 0)
     {
       if (len_avail != -1 && len_avail != 0)
-       obstack_free (&obstack, NULL);
+	obstack_free (&obstack, NULL);
       len_avail = 0;
       buf = NULL;
       obstack_init (&obstack);
@@ -4950,60 +5052,63 @@ linux_nat_xfer_osdata (struct target_ops *ops, enum target_object object,
 
       dirp = opendir ("/proc");
       if (dirp)
-       {
-         struct dirent *dp;
-         while ((dp = readdir (dirp)) != NULL)
-           {
-             struct stat statbuf;
-             char procentry[sizeof ("/proc/4294967295")];
+	{
+	  struct dirent *dp;
 
-             if (!isdigit (dp->d_name[0])
-                 || NAMELEN (dp) > sizeof ("4294967295") - 1)
-               continue;
+	  while ((dp = readdir (dirp)) != NULL)
+	    {
+	      struct stat statbuf;
+	      char procentry[sizeof ("/proc/4294967295")];
 
-             sprintf (procentry, "/proc/%s", dp->d_name);
-             if (stat (procentry, &statbuf) == 0
-                 && S_ISDIR (statbuf.st_mode))
-               {
-                 char *pathname;
-                 FILE *f;
-                 char cmd[MAXPATHLEN + 1];
-                 struct passwd *entry;
+	      if (!isdigit (dp->d_name[0])
+		  || NAMELEN (dp) > sizeof ("4294967295") - 1)
+		continue;
 
-                 pathname = xstrprintf ("/proc/%s/cmdline", dp->d_name);
-                 entry = getpwuid (statbuf.st_uid);
+	      sprintf (procentry, "/proc/%s", dp->d_name);
+	      if (stat (procentry, &statbuf) == 0
+		  && S_ISDIR (statbuf.st_mode))
+		{
+		  char *pathname;
+		  FILE *f;
+		  char cmd[MAXPATHLEN + 1];
+		  struct passwd *entry;
 
-                 if ((f = fopen (pathname, "r")) != NULL)
-                   {
-                     size_t len = fread (cmd, 1, sizeof (cmd) - 1, f);
-                     if (len > 0)
-                       {
-                         int i;
-                         for (i = 0; i < len; i++)
-                           if (cmd[i] == '\0')
-                             cmd[i] = ' ';
-                         cmd[len] = '\0';
+		  pathname = xstrprintf ("/proc/%s/cmdline", dp->d_name);
+		  entry = getpwuid (statbuf.st_uid);
 
-                         obstack_xml_printf (
-			   &obstack,
-			   "<item>"
-			   "<column name=\"pid\">%s</column>"
-			   "<column name=\"user\">%s</column>"
-			   "<column name=\"command\">%s</column>"
-			   "</item>",
-			   dp->d_name,
-			   entry ? entry->pw_name : "?",
-			   cmd);
-                       }
-                     fclose (f);
-                   }
+		  if ((f = fopen (pathname, "r")) != NULL)
+		    {
+		      size_t len = fread (cmd, 1, sizeof (cmd) - 1, f);
 
-                 xfree (pathname);
-               }
-           }
+		      if (len > 0)
+			{
+			  int i;
 
-         closedir (dirp);
-       }
+			  for (i = 0; i < len; i++)
+			    if (cmd[i] == '\0')
+			      cmd[i] = ' ';
+			  cmd[len] = '\0';
+
+			  obstack_xml_printf (
+			    &obstack,
+			    "<item>"
+			    "<column name=\"pid\">%s</column>"
+			    "<column name=\"user\">%s</column>"
+			    "<column name=\"command\">%s</column>"
+			    "</item>",
+			    dp->d_name,
+			    entry ? entry->pw_name : "?",
+			    cmd);
+			}
+		      fclose (f);
+		    }
+
+		  xfree (pathname);
+		}
+	    }
+
+	  closedir (dirp);
+	}
 
       obstack_grow_str0 (&obstack, "</osdata>\n");
       buf = obstack_finish (&obstack);
@@ -5478,6 +5583,7 @@ linux_nat_core_of_thread_1 (ptid_t ptid)
   for (;;)
     {
       int n;
+
       content = xrealloc (content, content_read + 1024);
       n = fread (content + content_read, 1, 1024, f);
       content_read += n;
@@ -5491,15 +5597,21 @@ linux_nat_core_of_thread_1 (ptid_t ptid)
   make_cleanup (xfree, content);
 
   p = strchr (content, '(');
-  p = strchr (p, ')') + 2; /* skip ")" and a whitespace. */
+
+  /* Skip ")".  */
+  if (p != NULL)
+    p = strchr (p, ')');
+  if (p != NULL)
+    p++;
 
   /* If the first field after program name has index 0, then core number is
      the field with index 36.  There's no constant for that anywhere.  */
-  p = strtok_r (p, " ", &ts);
-  for (i = 0; i != 36; ++i)
+  if (p != NULL)
+    p = strtok_r (p, " ", &ts);
+  for (i = 0; p != NULL && i != 36; ++i)
     p = strtok_r (NULL, " ", &ts);
 
-  if (sscanf (p, "%d", &core) == 0)
+  if (p == NULL || sscanf (p, "%d", &core) == 0)
     core = -1;
 
   do_cleanups (back_to);
@@ -5513,6 +5625,7 @@ int
 linux_nat_core_of_thread (struct target_ops *ops, ptid_t ptid)
 {
   struct lwp_info *info = find_lwp_pid (ptid);
+
   if (info)
     return info->core;
   return -1;

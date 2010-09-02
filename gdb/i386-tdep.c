@@ -518,7 +518,7 @@ i386_call_p (const gdb_byte *insn)
    length in bytes.  Otherwise, return zero.  */
 
 static int
-i386_syscall_p (const gdb_byte *insn, ULONGEST *lengthp)
+i386_syscall_p (const gdb_byte *insn, int *lengthp)
 {
   if (insn[0] == 0xcd)
     {
@@ -527,6 +527,43 @@ i386_syscall_p (const gdb_byte *insn, ULONGEST *lengthp)
     }
 
   return 0;
+}
+
+/* Some kernels may run one past a syscall insn, so we have to cope.
+   Otherwise this is just simple_displaced_step_copy_insn.  */
+
+struct displaced_step_closure *
+i386_displaced_step_copy_insn (struct gdbarch *gdbarch,
+			       CORE_ADDR from, CORE_ADDR to,
+			       struct regcache *regs)
+{
+  size_t len = gdbarch_max_insn_length (gdbarch);
+  gdb_byte *buf = xmalloc (len);
+
+  read_memory (from, buf, len);
+
+  /* GDB may get control back after the insn after the syscall.
+     Presumably this is a kernel bug.
+     If this is a syscall, make sure there's a nop afterwards.  */
+  {
+    int syscall_length;
+    gdb_byte *insn;
+
+    insn = i386_skip_prefixes (buf, len);
+    if (insn != NULL && i386_syscall_p (insn, &syscall_length))
+      insn[syscall_length] = NOP_OPCODE;
+  }
+
+  write_memory (to, buf, len);
+
+  if (debug_displaced)
+    {
+      fprintf_unfiltered (gdb_stdlog, "displaced: copy %s->%s: ",
+                          paddress (gdbarch, from), paddress (gdbarch, to));
+      displaced_step_dump_bytes (gdb_stdlog, buf, len);
+    }
+
+  return (struct displaced_step_closure *) buf;
 }
 
 /* Fix up the state of registers and memory after having single-stepped
@@ -587,7 +624,7 @@ i386_displaced_step_fixup (struct gdbarch *gdbarch,
       && ! i386_ret_p (insn))
     {
       ULONGEST orig_eip;
-      ULONGEST insn_len;
+      int insn_len;
 
       regcache_cooked_read_unsigned (regs, I386_EIP_REGNUM, &orig_eip);
 
@@ -606,7 +643,12 @@ i386_displaced_step_fixup (struct gdbarch *gdbarch,
          it unrelocated.  Goodness help us if there are PC-relative
          system calls.  */
       if (i386_syscall_p (insn, &insn_len)
-          && orig_eip != to + (insn - insn_start) + insn_len)
+          && orig_eip != to + (insn - insn_start) + insn_len
+	  /* GDB can get control back after the insn after the syscall.
+	     Presumably this is a kernel bug.
+	     i386_displaced_step_copy_insn ensures its a nop,
+	     we add one to the length for it.  */
+          && orig_eip != to + (insn - insn_start) + insn_len + 1)
         {
           if (debug_displaced)
             fprintf_unfiltered (gdb_stdlog,
@@ -658,6 +700,86 @@ i386_displaced_step_fixup (struct gdbarch *gdbarch,
                             paddress (gdbarch, retaddr));
     }
 }
+
+static void
+append_insns (CORE_ADDR *to, ULONGEST len, const gdb_byte *buf)
+{
+  target_write_memory (*to, buf, len);
+  *to += len;
+}
+
+static void
+i386_relocate_instruction (struct gdbarch *gdbarch,
+			   CORE_ADDR *to, CORE_ADDR oldloc)
+{
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+  gdb_byte buf[I386_MAX_INSN_LEN];
+  int offset = 0, rel32, newrel;
+  int insn_length;
+  gdb_byte *insn = buf;
+
+  read_memory (oldloc, buf, I386_MAX_INSN_LEN);
+
+  insn_length = gdb_buffered_insn_length (gdbarch, insn,
+					  I386_MAX_INSN_LEN, oldloc);
+
+  /* Get past the prefixes.  */
+  insn = i386_skip_prefixes (insn, I386_MAX_INSN_LEN);
+
+  /* Adjust calls with 32-bit relative addresses as push/jump, with
+     the address pushed being the location where the original call in
+     the user program would return to.  */
+  if (insn[0] == 0xe8)
+    {
+      gdb_byte push_buf[16];
+      unsigned int ret_addr;
+
+      /* Where "ret" in the original code will return to.  */
+      ret_addr = oldloc + insn_length;
+      push_buf[0] = 0x68; /* pushq $... */
+      memcpy (&push_buf[1], &ret_addr, 4);
+      /* Push the push.  */
+      append_insns (to, 5, push_buf);
+
+      /* Convert the relative call to a relative jump.  */
+      insn[0] = 0xe9;
+
+      /* Adjust the destination offset.  */
+      rel32 = extract_signed_integer (insn + 1, 4, byte_order);
+      newrel = (oldloc - *to) + rel32;
+      store_signed_integer (insn + 1, 4, newrel, byte_order);
+
+      /* Write the adjusted jump into its displaced location.  */
+      append_insns (to, 5, insn);
+      return;
+    }
+
+  /* Adjust jumps with 32-bit relative addresses.  Calls are already
+     handled above.  */
+  if (insn[0] == 0xe9)
+    offset = 1;
+  /* Adjust conditional jumps.  */
+  else if (insn[0] == 0x0f && (insn[1] & 0xf0) == 0x80)
+    offset = 2;
+
+  if (offset)
+    {
+      rel32 = extract_signed_integer (insn + offset, 4, byte_order);
+      newrel = (oldloc - *to) + rel32;
+      store_signed_integer (insn + offset, 4, newrel, byte_order);
+      if (debug_displaced)
+	fprintf_unfiltered (gdb_stdlog,
+			    "Adjusted insn rel32=0x%s at 0x%s to"
+			    " rel32=0x%s at 0x%s\n",
+			    hex_string (rel32), paddress (gdbarch, oldloc),
+			    hex_string (newrel), paddress (gdbarch, *to));
+    }
+
+  /* Write the adjusted instructions into their displaced
+     location.  */
+  append_insns (to, insn_length, buf);
+}
+
 
 #ifdef I386_REGNO_TO_SYMMETRY
 #error "The Sequent Symmetry is no longer supported."
@@ -3381,10 +3503,21 @@ i386_record_lea_modrm (struct i386_record_s *irp)
 
   if (irp->override >= 0)
     {
-      warning (_("Process record ignores the memory change "
-                 "of instruction at address %s because it "
-                 "can't get the value of the segment register."),
-               paddress (gdbarch, irp->orig_addr));
+      if (record_memory_query)
+        {
+	  int q;
+
+          target_terminal_ours ();
+          q = yquery (_("\
+Process record ignores the memory change of instruction at address %s\n\
+because it can't get the value of the segment register.\n\
+Do you want to stop the program?"),
+                      paddress (gdbarch, irp->orig_addr));
+            target_terminal_inferior ();
+            if (q)
+              return -1;
+        }
+
       return 0;
     }
 
@@ -4275,11 +4408,20 @@ i386_process_record (struct gdbarch *gdbarch, struct regcache *regcache,
     case 0xa3:
       if (ir.override >= 0)
         {
-	  warning (_("Process record ignores the memory change "
-                     "of instruction at address %s because "
-                     "it can't get the value of the segment "
-                     "register."),
-                   paddress (gdbarch, ir.orig_addr));
+          if (record_memory_query)
+            {
+	      int q;
+
+              target_terminal_ours ();
+              q = yquery (_("\
+Process record ignores the memory change of instruction at address %s\n\
+because it can't get the value of the segment register.\n\
+Do you want to stop the program?"),
+                          paddress (gdbarch, ir.orig_addr));
+              target_terminal_inferior ();
+              if (q)
+                return -1;
+            }
 	}
       else
 	{
@@ -4956,11 +5098,20 @@ i386_process_record (struct gdbarch *gdbarch, struct regcache *regcache,
           if (ir.aflag && (es != ds))
             {
               /* addr += ((uint32_t) read_register (I386_ES_REGNUM)) << 4; */
-              warning (_("Process record ignores the memory "
-                         "change of instruction at address %s "
-                         "because it can't get the value of the "
-                         "ES segment register."),
-                       paddress (gdbarch, ir.orig_addr));
+              if (record_memory_query)
+                {
+	          int q;
+
+                  target_terminal_ours ();
+                  q = yquery (_("\
+Process record ignores the memory change of instruction at address %s\n\
+because it can't get the value of the segment register.\n\
+Do you want to stop the program?"),
+                              paddress (gdbarch, ir.orig_addr));
+                  target_terminal_inferior ();
+                  if (q)
+                    return -1;
+                }
             }
           else
             {
@@ -5513,12 +5664,20 @@ i386_process_record (struct gdbarch *gdbarch, struct regcache *regcache,
 	      }
 	    if (ir.override >= 0)
 	      {
-		warning (_("Process record ignores the memory "
-                           "change of instruction at "
-                           "address %s because it can't get "
-                           "the value of the segment "
-                           "register."),
-                         paddress (gdbarch, ir.orig_addr));
+                if (record_memory_query)
+                  {
+	            int q;
+
+                    target_terminal_ours ();
+                    q = yquery (_("\
+Process record ignores the memory change of instruction at address %s\n\
+because it can't get the value of the segment register.\n\
+Do you want to stop the program?"),
+                                paddress (gdbarch, ir.orig_addr));
+                    target_terminal_inferior ();
+                    if (q)
+                      return -1;
+                  }
 	      }
 	    else
 	      {
@@ -5562,12 +5721,20 @@ i386_process_record (struct gdbarch *gdbarch, struct regcache *regcache,
 	      /* sidt */
 	      if (ir.override >= 0)
 		{
-		  warning (_("Process record ignores the memory "
-                             "change of instruction at "
-                             "address %s because it can't get "
-                             "the value of the segment "
-                             "register."),
-                           paddress (gdbarch, ir.orig_addr));
+                  if (record_memory_query)
+                    {
+	              int q;
+
+                      target_terminal_ours ();
+                      q = yquery (_("\
+Process record ignores the memory change of instruction at address %s\n\
+because it can't get the value of the segment register.\n\
+Do you want to stop the program?"),
+                                  paddress (gdbarch, ir.orig_addr));
+                      target_terminal_inferior ();
+                      if (q)
+                        return -1;
+                    }
 		}
 	      else
 		{
@@ -6908,6 +7075,8 @@ i386_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   tdep->num_ymm_regs = 0;
 
   tdesc_data = tdesc_data_alloc ();
+
+  set_gdbarch_relocate_instruction (gdbarch, i386_relocate_instruction);
 
   /* Hook in ABI-specific overrides, if they have been registered.  */
   info.tdep_info = (void *) tdesc_data;

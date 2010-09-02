@@ -87,6 +87,7 @@
 #define elf_core_file_failing_signal	NAME(bfd_elf,core_file_failing_signal)
 #define elf_core_file_matches_executable_p \
   NAME(bfd_elf,core_file_matches_executable_p)
+#define elf_core_file_pid		NAME(bfd_elf,core_file_pid)
 #define elf_object_p			NAME(bfd_elf,object_p)
 #define elf_core_file_p			NAME(bfd_elf,core_file_p)
 #define elf_get_symtab_upper_bound	NAME(bfd_elf,get_symtab_upper_bound)
@@ -1841,6 +1842,8 @@ NAME(_bfd_elf,bfd_from_remote_memory)
   bim->buffer = contents;
   nbfd->iostream = bim;
   nbfd->flags = BFD_IN_MEMORY;
+  nbfd->iovec = &_bfd_memory_iovec;
+  nbfd->origin = 0;
   nbfd->direction = read_direction;
   nbfd->mtime = time (NULL);
   nbfd->mtime_set = TRUE;

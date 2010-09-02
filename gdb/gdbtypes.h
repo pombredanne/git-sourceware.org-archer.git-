@@ -136,6 +136,8 @@ enum type_code
 
     TYPE_CODE_DECFLOAT,		/* Decimal floating point.  */
 
+    TYPE_CODE_MODULE,		/* Fortran module.  */
+
     /* Internal function type.  */
     TYPE_CODE_INTERNAL_FUNCTION
   };
@@ -340,8 +342,7 @@ enum field_loc_kind
   {
     FIELD_LOC_KIND_BITPOS,	/* bitpos */
     FIELD_LOC_KIND_PHYSADDR,	/* physaddr */
-    FIELD_LOC_KIND_PHYSNAME,	/* physname */
-    FIELD_LOC_KIND_DWARF_BLOCK	/* dwarf_block */
+    FIELD_LOC_KIND_PHYSNAME	/* physname */
   };
 
 /* A discriminant to determine which field in the main_type.type_specific
@@ -502,12 +503,6 @@ struct main_type
 
 	CORE_ADDR physaddr;
 	char *physname;
-
-	/* The field location can be computed by evaluating the following DWARF
-	   block.  This can be used in Fortran variable-length arrays, for
-	   instance.  */
-
-	struct dwarf2_locexpr_baton *dwarf_block;
       }
       loc;
 
@@ -686,6 +681,9 @@ struct cplus_struct_type
 
     short nfn_fields_total;
 
+    /* Number of template arguments.  */
+    unsigned short n_template_arguments;
+
     /* One if this struct is a dynamic class, as defined by the
        Itanium C++ ABI: if it requires a virtual table pointer,
        because it or any of its base classes have one or more virtual
@@ -818,6 +816,24 @@ struct cplus_struct_type
 	int line;
       }
      *localtype_ptr;
+
+    /* typedefs defined inside this class.  TYPEDEF_FIELD points to an array of
+       TYPEDEF_FIELD_COUNT elements.  */
+    struct typedef_field
+      {
+	/* Unqualified name to be prefixed by owning class qualified name.  */
+	const char *name;
+
+	/* Type this typedef named NAME represents.  */
+	struct type *type;
+      }
+    *typedef_field;
+    unsigned typedef_field_count;
+
+    /* The template arguments.  This is an array with
+       N_TEMPLATE_ARGUMENTS elements.  This is NULL for non-template
+       classes.  */
+    struct symbol **template_arguments;
   };
 
 /* Struct used in computing virtual base list */
@@ -957,7 +973,6 @@ extern void allocate_gnat_aux_type (struct type *);
 #define FIELD_BITPOS(thisfld) ((thisfld).loc.bitpos)
 #define FIELD_STATIC_PHYSNAME(thisfld) ((thisfld).loc.physname)
 #define FIELD_STATIC_PHYSADDR(thisfld) ((thisfld).loc.physaddr)
-#define FIELD_DWARF_BLOCK(thisfld) ((thisfld).loc.dwarf_block)
 #define SET_FIELD_BITPOS(thisfld, bitpos)			\
   (FIELD_LOC_KIND (thisfld) = FIELD_LOC_KIND_BITPOS,		\
    FIELD_BITPOS (thisfld) = (bitpos))
@@ -967,9 +982,6 @@ extern void allocate_gnat_aux_type (struct type *);
 #define SET_FIELD_PHYSADDR(thisfld, addr)			\
   (FIELD_LOC_KIND (thisfld) = FIELD_LOC_KIND_PHYSADDR,		\
    FIELD_STATIC_PHYSADDR (thisfld) = (addr))
-#define SET_FIELD_DWARF_BLOCK(thisfld, addr)			\
-  (FIELD_LOC_KIND (thisfld) = FIELD_LOC_KIND_DWARF_BLOCK,	\
-   FIELD_DWARF_BLOCK (thisfld) = (addr))
 #define FIELD_ARTIFICIAL(thisfld) ((thisfld).artificial)
 #define FIELD_BITSIZE(thisfld) ((thisfld).bitsize)
 
@@ -980,7 +992,6 @@ extern void allocate_gnat_aux_type (struct type *);
 #define TYPE_FIELD_BITPOS(thistype, n) FIELD_BITPOS (TYPE_FIELD (thistype, n))
 #define TYPE_FIELD_STATIC_PHYSNAME(thistype, n) FIELD_STATIC_PHYSNAME (TYPE_FIELD (thistype, n))
 #define TYPE_FIELD_STATIC_PHYSADDR(thistype, n) FIELD_STATIC_PHYSADDR (TYPE_FIELD (thistype, n))
-#define TYPE_FIELD_DWARF_BLOCK(thistype, n) FIELD_DWARF_BLOCK (TYPE_FIELD (thistype, n))
 #define TYPE_FIELD_ARTIFICIAL(thistype, n) FIELD_ARTIFICIAL(TYPE_FIELD(thistype,n))
 #define TYPE_FIELD_BITSIZE(thistype, n) FIELD_BITSIZE(TYPE_FIELD(thistype,n))
 #define TYPE_FIELD_PACKED(thistype, n) (FIELD_BITSIZE(TYPE_FIELD(thistype,n))!=0)
@@ -1020,6 +1031,13 @@ extern void allocate_gnat_aux_type (struct type *);
 #define TYPE_FN_FIELDLIST_NAME(thistype, n) TYPE_CPLUS_SPECIFIC(thistype)->fn_fieldlists[n].name
 #define TYPE_FN_FIELDLIST_LENGTH(thistype, n) TYPE_CPLUS_SPECIFIC(thistype)->fn_fieldlists[n].length
 
+#define TYPE_N_TEMPLATE_ARGUMENTS(thistype) \
+  TYPE_CPLUS_SPECIFIC (thistype)->n_template_arguments
+#define TYPE_TEMPLATE_ARGUMENTS(thistype) \
+  TYPE_CPLUS_SPECIFIC (thistype)->template_arguments
+#define TYPE_TEMPLATE_ARGUMENT(thistype, n) \
+  TYPE_CPLUS_SPECIFIC (thistype)->template_arguments[n]
+
 #define TYPE_FN_FIELD(thisfn, n) (thisfn)[n]
 #define TYPE_FN_FIELD_PHYSNAME(thisfn, n) (thisfn)[n].physname
 #define TYPE_FN_FIELD_TYPE(thisfn, n) (thisfn)[n].type
@@ -1045,12 +1063,28 @@ extern void allocate_gnat_aux_type (struct type *);
 #define TYPE_LOCALTYPE_FILE(thistype) (TYPE_CPLUS_SPECIFIC(thistype)->localtype_ptr->file)
 #define TYPE_LOCALTYPE_LINE(thistype) (TYPE_CPLUS_SPECIFIC(thistype)->localtype_ptr->line)
 
+#define TYPE_TYPEDEF_FIELD_ARRAY(thistype) \
+  TYPE_CPLUS_SPECIFIC (thistype)->typedef_field
+#define TYPE_TYPEDEF_FIELD(thistype, n) \
+  TYPE_CPLUS_SPECIFIC (thistype)->typedef_field[n]
+#define TYPE_TYPEDEF_FIELD_NAME(thistype, n) \
+  TYPE_TYPEDEF_FIELD (thistype, n).name
+#define TYPE_TYPEDEF_FIELD_TYPE(thistype, n) \
+  TYPE_TYPEDEF_FIELD (thistype, n).type
+#define TYPE_TYPEDEF_FIELD_COUNT(thistype) \
+  TYPE_CPLUS_SPECIFIC (thistype)->typedef_field_count
+
 #define TYPE_IS_OPAQUE(thistype) (((TYPE_CODE (thistype) == TYPE_CODE_STRUCT) ||        \
                                    (TYPE_CODE (thistype) == TYPE_CODE_UNION))        && \
                                   (TYPE_NFIELDS (thistype) == 0)                     && \
                                   (!HAVE_CPLUS_STRUCT (thistype)			\
 				   || TYPE_NFN_FIELDS (thistype) == 0) &&		\
                                   (TYPE_STUB (thistype) || !TYPE_STUB_SUPPORTED (thistype)))
+
+/* A helper macro that returns the name of an error type.  If the type
+   has a name, it is used; otherwise, a default is used.  */
+#define TYPE_ERROR_NAME(type) \
+  (TYPE_NAME (type) ? TYPE_NAME (type) : _("<error type>"))
 
 struct builtin_type
 {
@@ -1172,6 +1206,7 @@ extern const struct objfile_type *objfile_type (struct objfile *objfile);
 
  
 /* Explicit floating-point formats.  See "floatformat.h".  */
+extern const struct floatformat *floatformats_ieee_half[BFD_ENDIAN_UNKNOWN];
 extern const struct floatformat *floatformats_ieee_single[BFD_ENDIAN_UNKNOWN];
 extern const struct floatformat *floatformats_ieee_double[BFD_ENDIAN_UNKNOWN];
 extern const struct floatformat *floatformats_ieee_double_littlebyte_bigword[BFD_ENDIAN_UNKNOWN];
@@ -1333,7 +1368,7 @@ extern char *gdb_mangle_name (struct type *, int, int);
 
 extern struct type *lookup_typename (const struct language_defn *,
 				     struct gdbarch *, char *,
-				     struct block *, int);
+				     const struct block *, int);
 
 extern struct type *lookup_template_type (char *, struct type *,
 					  struct block *);

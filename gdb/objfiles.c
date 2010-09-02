@@ -199,9 +199,9 @@ allocate_objfile (bfd *abfd, int flags)
   struct objfile *objfile;
 
   objfile = (struct objfile *) xzalloc (sizeof (struct objfile));
-  objfile->psymbol_cache = bcache_xmalloc ();
-  objfile->macro_cache = bcache_xmalloc ();
-  objfile->filename_cache = bcache_xmalloc ();
+  objfile->psymbol_cache = psymbol_bcache_init ();
+  objfile->macro_cache = bcache_xmalloc (NULL, NULL);
+  objfile->filename_cache = bcache_xmalloc (NULL, NULL);
   /* We could use obstack_specify_allocation here instead, but
      gdb_obstack.h specifies the alloc/dealloc functions.  */
   obstack_init (&objfile->objfile_obstack);
@@ -376,7 +376,7 @@ terminate_minimal_symbol_table (struct objfile *objfile)
     memset (m, 0, sizeof (*m));
     /* Don't rely on these enumeration values being 0's.  */
     MSYMBOL_TYPE (m) = mst_unknown;
-    SYMBOL_INIT_LANGUAGE_SPECIFIC (m, language_unknown);
+    SYMBOL_SET_LANGUAGE (m, language_unknown);
   }
 }
 
@@ -658,7 +658,7 @@ free_objfile (struct objfile *objfile)
   if (objfile->static_psymbols.list)
     xfree (objfile->static_psymbols.list);
   /* Free the obstacks for non-reusable objfiles */
-  bcache_xfree (objfile->psymbol_cache);
+  psymbol_bcache_free (objfile->psymbol_cache);
   bcache_xfree (objfile->macro_cache);
   bcache_xfree (objfile->filename_cache);
   if (objfile->demangled_names_hash)
@@ -702,31 +702,52 @@ free_all_objfiles (void)
   clear_symtab_users ();
 }
 
+/* A helper function for objfile_relocate1 that relocates a single
+   symbol.  */
+
+static void
+relocate_one_symbol (struct symbol *sym, struct objfile *objfile,
+		     struct section_offsets *delta)
+{
+  fixup_symbol_section (sym, objfile);
+
+  /* The RS6000 code from which this was taken skipped
+     any symbols in STRUCT_DOMAIN or UNDEF_DOMAIN.
+     But I'm leaving out that test, on the theory that
+     they can't possibly pass the tests below.  */
+  if ((SYMBOL_CLASS (sym) == LOC_LABEL
+       || SYMBOL_CLASS (sym) == LOC_STATIC)
+      && SYMBOL_SECTION (sym) >= 0)
+    {
+      SYMBOL_VALUE_ADDRESS (sym) += ANOFFSET (delta, SYMBOL_SECTION (sym));
+    }
+}
+
 /* Relocate OBJFILE to NEW_OFFSETS.  There should be OBJFILE->NUM_SECTIONS
    entries in new_offsets.  SEPARATE_DEBUG_OBJFILE is not touched here.
    Return non-zero iff any change happened.  */
 
 static int
-objfile_relocate1 (struct objfile *objfile, struct section_offsets *new_offsets)
+objfile_relocate1 (struct objfile *objfile, 
+		   struct section_offsets *new_offsets)
 {
   struct obj_section *s;
   struct section_offsets *delta =
     ((struct section_offsets *) 
      alloca (SIZEOF_N_SECTION_OFFSETS (objfile->num_sections)));
 
-  {
-    int i;
-    int something_changed = 0;
-    for (i = 0; i < objfile->num_sections; ++i)
-      {
-	delta->offsets[i] =
-	  ANOFFSET (new_offsets, i) - ANOFFSET (objfile->section_offsets, i);
-	if (ANOFFSET (delta, i) != 0)
-	  something_changed = 1;
-      }
-    if (!something_changed)
-      return 0;
-  }
+  int i;
+  int something_changed = 0;
+
+  for (i = 0; i < objfile->num_sections; ++i)
+    {
+      delta->offsets[i] =
+	ANOFFSET (new_offsets, i) - ANOFFSET (objfile->section_offsets, i);
+      if (ANOFFSET (delta, i) != 0)
+	something_changed = 1;
+    }
+  if (!something_changed)
+    return 0;
 
   /* OK, get all the symtabs.  */
   {
@@ -767,22 +788,18 @@ objfile_relocate1 (struct objfile *objfile, struct section_offsets *new_offsets)
 
 	  ALL_BLOCK_SYMBOLS (b, iter, sym)
 	    {
-	      fixup_symbol_section (sym, objfile);
-
-	      /* The RS6000 code from which this was taken skipped
-	         any symbols in STRUCT_DOMAIN or UNDEF_DOMAIN.
-	         But I'm leaving out that test, on the theory that
-	         they can't possibly pass the tests below.  */
-	      if ((SYMBOL_CLASS (sym) == LOC_LABEL
-		   || SYMBOL_CLASS (sym) == LOC_STATIC)
-		  && SYMBOL_SECTION (sym) >= 0)
-		{
-		  SYMBOL_VALUE_ADDRESS (sym) +=
-		    ANOFFSET (delta, SYMBOL_SECTION (sym));
-		}
+	      relocate_one_symbol (sym, objfile, delta);
 	    }
 	}
     }
+  }
+
+  /* Relocate isolated symbols.  */
+  {
+    struct symbol *iter;
+
+    for (iter = objfile->template_symbols; iter; iter = iter->hash_next)
+      relocate_one_symbol (iter, objfile, delta);
   }
 
   if (objfile->psymtabs_addrmap)
@@ -794,6 +811,7 @@ objfile_relocate1 (struct objfile *objfile, struct section_offsets *new_offsets)
 
   {
     struct minimal_symbol *msym;
+
     ALL_OBJFILE_MSYMBOLS (objfile, msym)
       if (SYMBOL_SECTION (msym) >= 0)
       SYMBOL_VALUE_ADDRESS (msym) += ANOFFSET (delta, SYMBOL_SECTION (msym));
@@ -816,6 +834,7 @@ objfile_relocate1 (struct objfile *objfile, struct section_offsets *new_offsets)
 
   {
     int i;
+
     for (i = 0; i < objfile->num_sections; ++i)
       (objfile->section_offsets)->offsets[i] = ANOFFSET (new_offsets, i);
   }
@@ -1009,68 +1028,67 @@ qsort_cmp (const void *a, const void *b)
   else if (sect1_addr > sect2_addr)
     return 1;
   else
-   {
-     /* Sections are at the same address.  This could happen if
-	A) we have an objfile and a separate debuginfo.
-	B) we are confused, and have added sections without proper relocation,
-	or something like that. */
+    {
+      /* Sections are at the same address.  This could happen if
+	 A) we have an objfile and a separate debuginfo.
+	 B) we are confused, and have added sections without proper relocation,
+	 or something like that. */
 
-     const struct objfile *const objfile1 = sect1->objfile;
-     const struct objfile *const objfile2 = sect2->objfile;
+      const struct objfile *const objfile1 = sect1->objfile;
+      const struct objfile *const objfile2 = sect2->objfile;
 
-     if (objfile1->separate_debug_objfile == objfile2
-	 || objfile2->separate_debug_objfile == objfile1)
-       {
-	 /* Case A.  The ordering doesn't matter: separate debuginfo files
-	    will be filtered out later.  */
+      if (objfile1->separate_debug_objfile == objfile2
+	  || objfile2->separate_debug_objfile == objfile1)
+	{
+	  /* Case A.  The ordering doesn't matter: separate debuginfo files
+	     will be filtered out later.  */
 
-	 return 0;
-       }
+	  return 0;
+	}
 
-     /* Case B.  Maintain stable sort order, so bugs in GDB are easier to
-	triage.  This section could be slow (since we iterate over all
-	objfiles in each call to qsort_cmp), but this shouldn't happen
-	very often (GDB is already in a confused state; one hopes this
-	doesn't happen at all).  If you discover that significant time is
-	spent in the loops below, do 'set complaints 100' and examine the
-	resulting complaints.  */
+      /* Case B.  Maintain stable sort order, so bugs in GDB are easier to
+	 triage.  This section could be slow (since we iterate over all
+	 objfiles in each call to qsort_cmp), but this shouldn't happen
+	 very often (GDB is already in a confused state; one hopes this
+	 doesn't happen at all).  If you discover that significant time is
+	 spent in the loops below, do 'set complaints 100' and examine the
+	 resulting complaints.  */
 
-     if (objfile1 == objfile2)
-       {
-	 /* Both sections came from the same objfile.  We are really confused.
-	    Sort on sequence order of sections within the objfile.  */
+      if (objfile1 == objfile2)
+	{
+	  /* Both sections came from the same objfile.  We are really confused.
+	     Sort on sequence order of sections within the objfile.  */
 
-	 const struct obj_section *osect;
+	  const struct obj_section *osect;
 
-	 ALL_OBJFILE_OSECTIONS (objfile1, osect)
-	   if (osect == sect1)
-	     return -1;
-	   else if (osect == sect2)
-	     return 1;
+	  ALL_OBJFILE_OSECTIONS (objfile1, osect)
+	    if (osect == sect1)
+	      return -1;
+	    else if (osect == sect2)
+	      return 1;
 
-	 /* We should have found one of the sections before getting here.  */
-	 gdb_assert (0);
-       }
-     else
-       {
-	 /* Sort on sequence number of the objfile in the chain.  */
+	  /* We should have found one of the sections before getting here.  */
+	  gdb_assert_not_reached ("section not found");
+	}
+      else
+	{
+	  /* Sort on sequence number of the objfile in the chain.  */
 
-	 const struct objfile *objfile;
+	  const struct objfile *objfile;
 
-	 ALL_OBJFILES (objfile)
-	   if (objfile == objfile1)
-	     return -1;
-	   else if (objfile == objfile2)
-	     return 1;
+	  ALL_OBJFILES (objfile)
+	    if (objfile == objfile1)
+	      return -1;
+	    else if (objfile == objfile2)
+	      return 1;
 
-	 /* We should have found one of the objfiles before getting here.  */
-	 gdb_assert (0);
-       }
-
-   }
+	  /* We should have found one of the objfiles before getting here.  */
+	  gdb_assert_not_reached ("objfile not found");
+	}
+    }
 
   /* Unreachable.  */
-  gdb_assert (0);
+  gdb_assert_not_reached ("unexpected code path");
   return 0;
 }
 

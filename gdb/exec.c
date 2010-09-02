@@ -224,6 +224,7 @@ exec_file_attach (char *filename, int from_tty)
       if (scratch_chan < 0)
 	{
 	  char *exename = alloca (strlen (filename) + 5);
+
 	  strcat (strcpy (exename, filename), ".exe");
 	  scratch_chan = openp (getenv ("PATH"), OPF_TRY_CWD_FIRST, exename,
 	     write_files ? O_RDWR | O_BINARY : O_RDONLY | O_BINARY,
@@ -458,6 +459,7 @@ add_target_sections (struct target_section *sections,
   if (count > 0)
     {
       int space = resize_section_table (table, count);
+
       memcpy (table->sections + space,
 	      sections, count * sizeof (sections[0]));
 
@@ -477,7 +479,6 @@ void
 remove_target_sections (bfd *abfd)
 {
   struct target_section *src, *dest;
-
   struct target_section_table *table = current_target_sections;
 
   dest = table->sections;
@@ -834,11 +835,7 @@ exec_has_memory (struct target_ops *ops)
 /* Find mapped memory. */
 
 extern void
-exec_set_find_memory_regions (int (*func) (int (*) (CORE_ADDR, 
-						    unsigned long, 
-						    int, int, int, 
-						    void *),
-					   void *))
+exec_set_find_memory_regions (int (*func) (find_memory_region_ftype, void *))
 {
   exec_ops.to_find_memory_regions = func;
 }

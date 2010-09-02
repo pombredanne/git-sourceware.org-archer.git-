@@ -130,7 +130,8 @@ print_symbol_bcache_statistics (void)
     ALL_PSPACE_OBJFILES (pspace, objfile)
   {
     printf_filtered (_("Byte cache statistics for '%s':\n"), objfile->name);
-    print_bcache_statistics (objfile->psymbol_cache, "partial symbol cache");
+    print_bcache_statistics (psymbol_bcache_get_bcache (objfile->psymbol_cache),
+                             "partial symbol cache");
     print_bcache_statistics (objfile->macro_cache, "preprocessor macro cache");
     print_bcache_statistics (objfile->filename_cache, "file name cache");
   }
@@ -188,7 +189,8 @@ print_objfile_statistics (void)
     printf_filtered (_("  Total memory used for objfile obstack: %d\n"),
 		     obstack_memory_used (&objfile->objfile_obstack));
     printf_filtered (_("  Total memory used for psymbol cache: %d\n"),
-		     bcache_memory_used (objfile->psymbol_cache));
+		     bcache_memory_used (psymbol_bcache_get_bcache
+		                          (objfile->psymbol_cache)));
     printf_filtered (_("  Total memory used for macro cache: %d\n"),
 		     bcache_memory_used (objfile->macro_cache));
     printf_filtered (_("  Total memory used for file name cache: %d\n"),
@@ -391,6 +393,7 @@ dump_symtab_1 (struct objfile *objfile, struct symtab *symtab,
 	  ALL_BLOCK_SYMBOLS (b, iter, sym)
 	    {
 	      struct print_symbol_args s;
+
 	      s.gdbarch = gdbarch;
 	      s.symbol = sym;
 	      s.depth = depth + 1;
@@ -551,6 +554,7 @@ print_symbol (void *args)
 	  {
 	    unsigned i;
 	    struct type *type = check_typedef (SYMBOL_TYPE (symbol));
+
 	    fprintf_filtered (outfile, "const %u hex bytes:",
 			      TYPE_LENGTH (type));
 	    for (i = 0; i < TYPE_LENGTH (type); i++)
@@ -782,6 +786,7 @@ static int
 block_depth (struct block *block)
 {
   int i = 0;
+
   while ((block = BLOCK_SUPERBLOCK (block)) != NULL)
     {
       i++;

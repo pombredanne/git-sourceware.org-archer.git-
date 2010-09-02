@@ -592,7 +592,7 @@ bppy_new (PyTypeObject *subtype, PyObject *args, PyObject *kwargs)
 	    create_breakpoint (python_gdbarch,
 			       spec, NULL, -1,
 			       0,
-			       0, 0, 0,
+			       0, bp_breakpoint,
 			       0,
 			       AUTO_BOOLEAN_TRUE,
 			       NULL, 0, 1);
@@ -642,6 +642,7 @@ gdbpy_breakpoints (PyObject *self, PyObject *args)
   if (result)
     {
       int i, out = 0;
+
       for (i = 0; out < bppy_live; ++i)
 	{
 	  if (! bppy_breakpoints[i])
@@ -684,6 +685,7 @@ gdbpy_breakpoint_created (int num)
   if (num >= bppy_slots)
     {
       int old = bppy_slots;
+
       bppy_slots = bppy_slots * 2 + 10;
       bppy_breakpoints
 	= (breakpoint_object **) xrealloc (bppy_breakpoints,

@@ -48,6 +48,11 @@ search_pp_list (PyObject *list, PyObject *value)
       if (! function)
 	return NULL;
 
+      /* Skip if disabled.  */
+      if (PyObject_HasAttr (function, gdbpy_enabled_cst)
+	  && ! PyObject_IsTrue (PyObject_GetAttr (function, gdbpy_enabled_cst)))
+	continue;
+
       printer = PyObject_CallFunctionObjArgs (function, value, NULL);
       if (! printer)
 	return NULL;
@@ -224,10 +229,12 @@ gdbpy_get_display_hint (PyObject *printer)
     return NULL;
 
   hint = PyObject_CallMethodObjArgs (printer, gdbpy_display_hint_cst, NULL);
-  if (gdbpy_is_string (hint))
-    result = python_string_to_host_string (hint);
   if (hint)
-    Py_DECREF (hint);
+    {
+      if (gdbpy_is_string (hint))
+	result = python_string_to_host_string (hint);
+      Py_DECREF (hint);
+    }
   else
     gdbpy_print_stack ();
 
@@ -319,6 +326,7 @@ py_restore_tstate (void *p)
 {
   PyFrameObject *frame = p;
   PyThreadState *tstate = PyThreadState_GET ();
+
   tstate->frame = frame;
 }
 
@@ -597,6 +605,7 @@ int
 apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
 			  int embedded_offset, CORE_ADDR address,
 			  struct ui_file *stream, int recurse,
+			  const struct value *val,
 			  const struct value_print_options *options,
 			  const struct language_defn *language)
 {
@@ -615,6 +624,16 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
     valaddr += embedded_offset;
   value = value_from_contents_and_address (type, valaddr,
 					   address + embedded_offset);
+  if (val != NULL)
+    {
+      set_value_component_location (value, val);
+      /* set_value_component_location resets the address, so we may
+	 need to set it again.  */
+      if (VALUE_LVAL (value) != lval_internalvar
+	  && VALUE_LVAL (value) != lval_internalvar_component
+	  && VALUE_LVAL (value) != lval_computed)
+	set_value_address (value, address + embedded_offset);
+    }
 
   val_obj = value_to_value_object (value);
   if (! val_obj)
@@ -729,6 +748,7 @@ int
 apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
 			  int embedded_offset, CORE_ADDR address,
 			  struct ui_file *stream, int recurse,
+			  const struct value *val,
 			  const struct value_print_options *options,
 			  const struct language_defn *language)
 {

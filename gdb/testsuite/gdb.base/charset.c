@@ -114,12 +114,17 @@ init_utf32 ()
     utf_32_string[i] = iso_8859_1_string[i] & 0xff;
 }
 
+extern void malloc_stub (void);
+
 int main ()
 {
 #ifdef usestubs
   set_debug_traps();
   breakpoint();
 #endif
+
+  malloc_stub ();
+
   /* Initialize ascii_string.  */
   init_string (ascii_string,
                120,

@@ -654,6 +654,8 @@ i386_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
 
   gdb_assert (tdesc_data);
 
+  linux_init_abi (info, gdbarch);
+
   /* GNU/Linux uses ELF.  */
   i386_elf_init_abi (info, gdbarch);
 
@@ -888,7 +890,7 @@ i386_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
 
   /* Displaced stepping.  */
   set_gdbarch_displaced_step_copy_insn (gdbarch,
-                                        simple_displaced_step_copy_insn);
+                                        i386_displaced_step_copy_insn);
   set_gdbarch_displaced_step_fixup (gdbarch, i386_displaced_step_fixup);
   set_gdbarch_displaced_step_free_closure (gdbarch,
                                            simple_displaced_step_free_closure);

@@ -580,7 +580,7 @@ cris_elf_grok_prstatus (abfd, note)
 	elf_tdata (abfd)->core_signal = bfd_get_16 (abfd, note->descdata + 12);
 
 	/* pr_pid */
-	elf_tdata (abfd)->core_pid = bfd_get_32 (abfd, note->descdata + 22);
+	elf_tdata (abfd)->core_lwpid = bfd_get_32 (abfd, note->descdata + 22);
 
 	/* pr_reg */
 	offset = 70;
@@ -599,7 +599,7 @@ cris_elf_grok_prstatus (abfd, note)
 	elf_tdata (abfd)->core_signal = bfd_get_16 (abfd, note->descdata + 12);
 
 	/* pr_pid */
-	elf_tdata (abfd)->core_pid = bfd_get_32 (abfd, note->descdata + 22);
+	elf_tdata (abfd)->core_lwpid = bfd_get_32 (abfd, note->descdata + 22);
 
 	/* pr_reg */
 	offset = 70;
@@ -2157,7 +2157,6 @@ elf_cris_finish_dynamic_symbol (bfd *output_bfd,
     {
       asection *splt;
       asection *sgotplt;
-      asection *sgot;
       asection *srela;
       bfd_vma got_base;
 
@@ -2197,7 +2196,6 @@ elf_cris_finish_dynamic_symbol (bfd *output_bfd,
       BFD_ASSERT (h->dynindx != -1);
 
       splt = bfd_get_section_by_name (dynobj, ".plt");
-      sgot = bfd_get_section_by_name (dynobj, ".got");
       sgotplt = bfd_get_section_by_name (dynobj, ".got.plt");
       srela = bfd_get_section_by_name (dynobj, ".rela.plt");
       BFD_ASSERT (splt != NULL && sgotplt != NULL
@@ -4366,6 +4364,7 @@ elf_cris_got_elt_size (bfd *abfd ATTRIBUTE_UNUSED,
 }
 
 #define ELF_ARCH		bfd_arch_cris
+#define ELF_TARGET_ID		CRIS_ELF_DATA
 #define ELF_MACHINE_CODE	EM_CRIS
 #define ELF_MAXPAGESIZE		0x2000
 

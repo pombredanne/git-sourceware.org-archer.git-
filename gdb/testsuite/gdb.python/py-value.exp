@@ -116,16 +116,16 @@ proc test_value_numeric_ops {} {
 
   # Conversion test.
   gdb_test "print evalue" " = TWO"
-  gdb_test "python evalue = gdb.history (0)" ""
+  gdb_test_no_output "python evalue = gdb.history (0)"
   gdb_test "python print int (evalue)" "2"
 
   # Test pointer arithmethic
 
   # First, obtain the pointers
-  gdb_test "print (void *) 2" "" ""
-  gdb_test "python a = gdb.history (0)" "" ""
-  gdb_test "print (void *) 5" "" ""
-  gdb_test "python b = gdb.history (0)" "" ""
+  gdb_test "print (void *) 2" ".*" ""
+  gdb_test_no_output "python a = gdb.history (0)" ""
+  gdb_test "print (void *) 5" ".*" ""
+  gdb_test_no_output "python b = gdb.history (0)" ""
 
   gdb_test "python print 'result = ' + str(a+5)" " = 0x7" "add pointer value with python integer"
   gdb_test "python print 'result = ' + str(b-2)" " = 0x3" "subtract python integer from pointer value"
@@ -276,6 +276,35 @@ proc test_lazy_strings {} {
 }
 
 
+proc test_inferior_function_call {} {
+    global gdb_prompt hex decimal
+
+    # Correct inferior call without arguments.
+    gdb_test "p/x fp1" " = $hex.*"
+    gdb_py_test_silent_cmd "python fp1 = gdb.history (0)" "get value from history" 1
+    gdb_test "python fp1 = fp1.dereference()" ""
+    gdb_test "python result = fp1()" ""
+    gdb_test "python print result" "void"
+
+    # Correct inferior call with arguments.
+    gdb_test "p/x fp2" " = $hex.*"
+    gdb_py_test_silent_cmd "python fp2 = gdb.history (0)" "get value from history" 1
+    gdb_test "python fp2 = fp2.dereference()" ""
+    gdb_test "python result2 = fp2(10,20)" ""
+    gdb_test "python print result2" "30"
+
+    # Incorrect to call an int value.
+    gdb_test "p i" " = $decimal.*"
+    gdb_py_test_silent_cmd "python i = gdb.history (0)" "get value from history" 1
+    gdb_test "python result3 = i()" ".*Value is not callable.*"
+
+    # Incorrect number of arguments.
+    gdb_test "p/x fp2" " = $hex.*"
+    gdb_py_test_silent_cmd "python fp3 = gdb.history (0)" "get value from history" 1
+    gdb_test "python fp3 = fp3.dereference()" ""
+    gdb_test "python result2 = fp3(10)" ".*Too few arguments in function call.*"
+}
+
 # A few objfile tests.
 proc test_objfiles {} {
     gdb_test "python\nok=False\nfor file in gdb.objfiles():\n  if 'py-value' in file.filename:\n    ok=True\nprint ok\nend" "True"
@@ -345,6 +374,18 @@ proc test_subscript_regression {lang} {
      gdb_py_test_silent_cmd "python rptr = gdb.history(0)" \
 	 "Obtains value from GDB" 1
      gdb_test "python print rptr\[0\]" "2" "Check pointer passed as reference"
+
+     # Just the most basic test of dynamic_cast -- it is checked in
+     # the C++ tests.
+     gdb_test "python print bool(gdb.parse_and_eval('base').dynamic_cast(gdb.lookup_type('Derived').pointer()))" \
+	 True
+
+     # Likewise.
+     gdb_test "python print gdb.parse_and_eval('base').dynamic_type" \
+	 "Derived \[*\]"
+     # A static type case.
+     gdb_test "python print gdb.parse_and_eval('5').dynamic_type" \
+	 "int"
  }
 
  gdb_breakpoint [gdb_get_line_number "break to inspect struct and union"]
@@ -393,6 +434,22 @@ proc test_parse_and_eval {} {
     "parse_and_eval type test"
 }
 
+# Test that values are hashable.
+proc test_value_hash {} {
+  gdb_py_test_multiple "Simple Python value dictionary" \
+    "python" "" \
+    "one = gdb.Value(1)" "" \
+    "two = gdb.Value(2)" "" \
+    "three = gdb.Value(3)" "" \
+    "vdict = {one:\"one str\",two:\"two str\",three:\"three str\"}" "" \
+    "end"
+    gdb_test "python print vdict\[one\]" "one str" "Test dictionary hash"
+    gdb_test "python print vdict\[two\]" "two str" "Test dictionary hash"
+    gdb_test "python print vdict\[three\]" "three str" "Test dictionary hash"
+    gdb_test "python print one.__hash__() == hash(one)" "True" "Test inbuilt hash"
+}
+
+
 # Start with a fresh gdb.
 
 gdb_exit
@@ -409,6 +466,7 @@ test_value_boolean
 test_value_compare
 test_objfiles
 test_parse_and_eval
+test_value_hash
 
 # The following tests require execution.
 
@@ -418,6 +476,7 @@ if ![runto_main] then {
 }
 
 test_value_in_inferior
+test_inferior_function_call
 test_lazy_strings
 test_value_after_death
 

@@ -69,6 +69,7 @@ int
 deprecated_pc_in_call_dummy (struct gdbarch *gdbarch, CORE_ADDR pc)
 {
   struct dummy_frame *dummyframe;
+
   for (dummyframe = dummy_frame_stack;
        dummyframe != NULL;
        dummyframe = dummyframe->next)
@@ -217,6 +218,7 @@ dummy_frame_sniffer (const struct frame_unwind *self,
 	  if (frame_id_eq (dummyframe->id, this_id))
 	    {
 	      struct dummy_frame_cache *cache;
+
 	      cache = FRAME_OBSTACK_ZALLOC (struct dummy_frame_cache);
 	      cache->prev_regcache = get_inferior_thread_state_regcache (dummyframe->caller_state);
 	      cache->this_id = this_id;
@@ -267,11 +269,12 @@ dummy_frame_this_id (struct frame_info *this_frame,
 {
   /* The dummy-frame sniffer always fills in the cache.  */
   struct dummy_frame_cache *cache = (*this_prologue_cache);
+
   gdb_assert (cache != NULL);
   (*this_id) = cache->this_id;
 }
 
-static const struct frame_unwind dummy_frame_unwinder =
+const struct frame_unwind dummy_frame_unwind =
 {
   DUMMY_FRAME,
   dummy_frame_this_id,
@@ -280,14 +283,11 @@ static const struct frame_unwind dummy_frame_unwinder =
   dummy_frame_sniffer,
 };
 
-const struct frame_unwind *const dummy_frame_unwind = {
-  &dummy_frame_unwinder
-};
-
 static void
 fprint_dummy_frames (struct ui_file *file)
 {
   struct dummy_frame *s;
+
   for (s = dummy_frame_stack; s != NULL; s = s->next)
     {
       gdb_print_host_address (s, file);
@@ -307,6 +307,7 @@ maintenance_print_dummy_frames (char *args, int from_tty)
     {
       struct cleanup *cleanups;
       struct ui_file *file = gdb_fopen (args, "w");
+
       if (file == NULL)
 	perror_with_name (_("maintenance print dummy-frames"));
       cleanups = make_cleanup_ui_file_delete (file);

@@ -24,6 +24,7 @@
 #include "filenames.h"		/* For DOSish file names.  */
 #include "language.h"
 #include "gdb_assert.h"
+#include "exceptions.h"
 
 #include "cli/cli-decode.h"
 
@@ -126,6 +127,7 @@ filename_completer (struct cmd_list_element *ignore, char *text, char *word)
   while (1)
     {
       char *p, *q;
+
       p = rl_filename_completion_function (text, subsequent_name);
       if (return_val_used >= return_val_alloced)
 	{
@@ -389,6 +391,7 @@ add_struct_fields (struct type *type, int *nextp, char **output,
   for (i = TYPE_NFN_FIELDS (type) - 1; i >= 0; --i)
     {
       char *name = TYPE_FN_FIELDLIST_NAME (type, i);
+
       if (name && ! strncmp (name, fieldname, namelen))
 	{
 	  if (!computed_type_name)
@@ -412,13 +415,19 @@ add_struct_fields (struct type *type, int *nextp, char **output,
 char **
 expression_completer (struct cmd_list_element *ignore, char *text, char *word)
 {
-  struct type *type;
+  struct type *type = NULL;
   char *fieldname, *p;
+  volatile struct gdb_exception except;
 
   /* Perform a tentative parse of the expression, to see whether a
      field completion is required.  */
   fieldname = NULL;
-  type = parse_field_expression (text, &fieldname);
+  TRY_CATCH (except, RETURN_MASK_ERROR)
+    {
+      type = parse_field_expression (text, &fieldname);
+    }
+  if (except.reason < 0)
+    return NULL;
   if (fieldname && type)
     {
       for (;;)
@@ -783,7 +792,8 @@ command_completer (struct cmd_list_element *ignore, char *text, char *word)
 char *
 gdb_completion_word_break_characters (void)
 {
-  char ** list;
+  char **list;
+
   list = complete_line_internal (rl_line_buffer, rl_line_buffer, rl_point,
 				 handle_brkchars);
   gdb_assert (list == NULL);

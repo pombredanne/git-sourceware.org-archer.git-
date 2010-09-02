@@ -38,6 +38,13 @@
 #include "gdb_assert.h"
 #include "gdb_select.h"
 
+/* Tell create_file_handler what events we are interested in. 
+   This is used by the select version of the event loop. */
+
+#define GDB_READABLE	(1<<1)
+#define GDB_WRITABLE	(1<<2)
+#define GDB_EXCEPTION	(1<<3)
+
 /* Data point to pass to the event handler.  */
 typedef union event_data
 {
@@ -858,8 +865,8 @@ gdb_wait_for_event (int block)
   else
     {
       struct timeval select_timeout;
-
       struct timeval *timeout_p;
+
       if (block)
 	timeout_p = gdb_notifier.timeout_valid
 	  ? &gdb_notifier.select_timeout : NULL;

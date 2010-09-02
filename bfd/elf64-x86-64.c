@@ -308,7 +308,7 @@ elf64_x86_64_grok_prstatus (bfd *abfd, Elf_Internal_Note *note)
 	  = bfd_get_16 (abfd, note->descdata + 12);
 
 	/* pr_pid */
-	elf_tdata (abfd)->core_pid
+	elf_tdata (abfd)->core_lwpid
 	  = bfd_get_32 (abfd, note->descdata + 32);
 
 	/* pr_reg */
@@ -332,6 +332,8 @@ elf64_x86_64_grok_psinfo (bfd *abfd, Elf_Internal_Note *note)
 	return FALSE;
 
       case 136:		/* sizeof(struct elf_prpsinfo) on Linux/x86_64 */
+	elf_tdata (abfd)->core_pid
+	  = bfd_get_32 (abfd, note->descdata + 24);
 	elf_tdata (abfd)->core_program
 	 = _bfd_elfcore_strndup (abfd, note->descdata + 40, 16);
 	elf_tdata (abfd)->core_command
@@ -603,8 +605,6 @@ elf64_x86_64_get_local_sym_hash (struct elf64_x86_64_link_hash_table *htab,
       ret->elf.indx = sec->id;
       ret->elf.dynstr_index = ELF64_R_SYM (rel->r_info);
       ret->elf.dynindx = -1;
-      ret->elf.plt.offset = (bfd_vma) -1;
-      ret->elf.got.offset = (bfd_vma) -1;
       *slot = ret;
     }
   return &ret->elf;
@@ -950,6 +950,12 @@ elf64_x86_64_tls_transition (struct bfd_link_info *info, bfd *abfd,
   unsigned int from_type = *r_type;
   unsigned int to_type = from_type;
   bfd_boolean check = TRUE;
+
+  /* Skip TLS transition for functions.  */
+  if (h != NULL
+      && (h->type == STT_FUNC
+	  || h->type == STT_GNU_IFUNC))
+    return TRUE;
 
   switch (from_type)
     {
@@ -1657,6 +1663,24 @@ elf64_x86_64_gc_sweep_hook (bfd *abfd, struct bfd_link_info *info,
 		break;
 	      }
 	}
+      else
+	{
+	  /* A local symbol.  */
+	  Elf_Internal_Sym *isym;
+
+	  isym = bfd_sym_from_r_symndx (&htab->sym_cache,
+					abfd, r_symndx);
+
+	  /* Check relocation against local STT_GNU_IFUNC symbol.  */
+	  if (isym != NULL
+	      && ELF64_ST_TYPE (isym->st_info) == STT_GNU_IFUNC)
+	    {
+	      h = elf64_x86_64_get_local_sym_hash (htab, abfd, rel,
+						   FALSE);
+	      if (h == NULL)
+		abort ();
+	    }
+	}
 
       r_type = ELF64_R_TYPE (rel->r_info);
       if (! elf64_x86_64_tls_transition (info, abfd, sec, NULL,
@@ -1687,6 +1711,11 @@ elf64_x86_64_gc_sweep_hook (bfd *abfd, struct bfd_link_info *info,
 	        h->plt.refcount -= 1;
 	      if (h->got.refcount > 0)
 		h->got.refcount -= 1;
+	      if (h->type == STT_GNU_IFUNC)
+		{
+		  if (h->plt.refcount > 0)
+		    h->plt.refcount -= 1;
+		}
 	    }
 	  else if (local_got_refcounts != NULL)
 	    {
@@ -2345,6 +2374,23 @@ elf64_x86_64_size_dynamic_sections (bfd *output_bfd ATTRIBUTE_UNUSED,
 	  htab->tlsdesc_plt = htab->elf.splt->size;
 	  htab->elf.splt->size += PLT_ENTRY_SIZE;
 	}
+    }
+
+  if (htab->elf.sgotplt)
+    {
+      /* Don't allocate .got.plt section if there are no GOT nor PLT
+         entries.  */
+      if ((htab->elf.sgotplt->size
+	   == get_elf_backend_data (output_bfd)->got_header_size)
+	  && (htab->elf.splt == NULL
+	      || htab->elf.splt->size == 0)
+	  && (htab->elf.sgot == NULL
+	      || htab->elf.sgot->size == 0)
+	  && (htab->elf.iplt == NULL
+	      || htab->elf.iplt->size == 0)
+	  && (htab->elf.igotplt == NULL
+	      || htab->elf.igotplt->size == 0))
+	htab->elf.sgotplt->size = 0;
     }
 
   /* We now have determined the sizes of the various dynamic sections.
@@ -4142,6 +4188,13 @@ elf64_x86_64_finish_dynamic_sections (bfd *output_bfd, struct bfd_link_info *inf
 
   if (htab->elf.sgotplt)
     {
+      if (bfd_is_abs_section (htab->elf.sgotplt->output_section))
+	{
+	  (*_bfd_error_handler)
+	    (_("discarded output section: `%A'"), htab->elf.sgotplt);
+	  return FALSE;
+	}
+
       /* Fill in the first three entries in the global offset table.  */
       if (htab->elf.sgotplt->size > 0)
 	{
@@ -4403,6 +4456,7 @@ static const struct bfd_elf_special_section
 #define TARGET_LITTLE_SYM		    bfd_elf64_x86_64_vec
 #define TARGET_LITTLE_NAME		    "elf64-x86-64"
 #define ELF_ARCH			    bfd_arch_i386
+#define ELF_TARGET_ID			    X86_64_ELF_DATA
 #define ELF_MACHINE_CODE		    EM_X86_64
 #define ELF_MAXPAGESIZE			    0x200000
 #define ELF_MINPAGESIZE			    0x1000

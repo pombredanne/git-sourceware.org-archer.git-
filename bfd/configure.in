@@ -223,7 +223,7 @@ CORE_HEADER=
 TRAD_HEADER=
 if test "${target}" = "${host}"; then
   case "${host}" in
-  alpha*-*-freebsd* | alpha*-*-kfreebsd*-gnu)
+  alpha*-*-freebsd* | alpha*-*-kfreebsd*-gnu | alpha*-*-*vms*)
 	COREFILE=''
 	;;
   alpha*-*-linux-*)
@@ -233,9 +233,11 @@ if test "${target}" = "${host}"; then
   alpha*-*-netbsd* | alpha*-*-openbsd*)
 	COREFILE=netbsd-core.lo
 	;;
-  alpha*-*-*)		COREFILE=osf-core.lo ;;
+  alpha*-*-*)
+        COREFILE=osf-core.lo
+	;;
   arm-*-freebsd* | arm-*-kfreebsd*-gnu)
-			COREFILE='' ;;
+	COREFILE='' ;;
   arm-*-netbsd* | arm-*-openbsd*)
 	COREFILE=netbsd-core.lo
 	;;
@@ -770,7 +772,9 @@ do
     bfd_elf32_sh64lnbsd_vec)	tb="$tb elf32-sh64.lo elf32-sh64-com.lo elf-vxworks.lo elf32.lo $elf cofflink.lo" ;;
     bfd_elf32_sh64nbsd_vec)	tb="$tb elf32-sh64.lo elf32-sh64-com.lo elf-vxworks.lo elf32.lo $elf cofflink.lo" ;;
     bfd_elf32_sh_vec)		tb="$tb elf32-sh.lo elf-vxworks.lo elf32.lo $elf coff-sh.lo" ;;
+    bfd_elf32_shbfd_vec)	tb="$tb elf32-sh.lo elf-vxworks.lo elf32.lo $elf coff-sh.lo cofflink.lo" ;;
     bfd_elf32_shblin_vec)	tb="$tb elf32-sh.lo elf-vxworks.lo elf32.lo $elf coff-sh.lo cofflink.lo" ;;
+    bfd_elf32_shfd_vec)		tb="$tb elf32-sh.lo elf-vxworks.lo elf32.lo $elf coff-sh.lo cofflink.lo" ;;
     bfd_elf32_shl_vec)		tb="$tb elf32-sh.lo elf-vxworks.lo elf32.lo $elf coff-sh.lo" ;;
     bfd_elf32_shl_symbian_vec)	tb="$tb elf32-sh-symbian.lo elf32-sh64-com.lo elf-vxworks.lo elf32.lo $elf coff-sh.lo" ;;
     bfd_elf32_shlin_vec)	tb="$tb elf32-sh.lo elf-vxworks.lo elf32.lo $elf coff-sh.lo cofflink.lo" ;;
@@ -801,7 +805,7 @@ do
     bfd_elf64_ia64_big_vec)	tb="$tb elf64-ia64.lo elf64.lo $elf"; target_size=64 ;;
     bfd_elf64_ia64_hpux_big_vec) tb="$tb elf64-ia64.lo elf64.lo $elf"; target_size=64 ;;
     bfd_elf64_ia64_little_vec)	tb="$tb elf64-ia64.lo elf64.lo $elf"; target_size=64 ;;
-    bfd_elf64_ia64_vms_vec)	tb="$tb elf64-ia64.lo elf64.lo $elf"; target_size=64 ;;
+    bfd_elf64_ia64_vms_vec)	tb="$tb elf64-ia64.lo elf64.lo vms-lib.lo vms-misc.lo $elf"; target_size=64 ;;
     bfd_elf64_little_generic_vec) tb="$tb elf64-gen.lo elf64.lo $elf"; target_size=64 ;;
     bfd_elf64_littlemips_vec) 	tb="$tb elf64-mips.lo elf64.lo elfxx-mips.lo elf-vxworks.lo elf32.lo $elf ecofflink.lo"; target_size=64 ;;
     bfd_elf64_mmix_vec) 	tb="$tb elf64-mmix.lo elf64.lo $elf" target_size=64 ;;
@@ -872,7 +876,6 @@ do
     m88kbcs_vec)		tb="$tb coff-m88k.lo" ;;
     m88kmach3_vec)		tb="$tb m88kmach3.lo aout32.lo" ;;
     m88kopenbsd_vec)		tb="$tb m88kopenbsd.lo aout32.lo" ;;
-    maxqcoff_vec)               tb="$tb coff-maxq.lo" ;;
     mach_o_be_vec)              tb="$tb mach-o.lo" ;;
     mach_o_le_vec)              tb="$tb mach-o.lo" ;;
     mach_o_fat_vec)             tb="$tb mach-o.lo" ;;
@@ -992,7 +995,7 @@ if test x${all_targets} = xtrue ; then
   bfd_backends="${bfd_backends}"' $(ALL_BACKENDS)'
   bfd_machines="${bfd_machines}"' $(ALL_MACHINES)'
   selvecs=
-  havevecs=
+  havevecs=-DHAVE_all_vecs
   selarchs=
   test -n "$assocvecs" &&
     assocvecs=`echo $assocvecs | sed -e 's/^/\&/' -e 's/ \(.\)/,\&\1/g'`
@@ -1077,8 +1080,8 @@ test -n "${defvec}" && tdefaults="${tdefaults} -DDEFAULT_VECTOR=${defvec}"
 test -n "${selvecs}" && tdefaults="${tdefaults} -DSELECT_VECS='${selvecs}'"
 test -n "${assocvecs}" && tdefaults="${tdefaults} -DASSOCIATED_VECS='${assocvecs}'"
 test -n "${selarchs}" && tdefaults="${tdefaults} -DSELECT_ARCHITECTURES='${selarchs}'"
-test -n "${havevecs}" && tdefaults="${tdefaults} ${havevecs}"
 AC_SUBST(tdefaults)
+AC_SUBST(havevecs)
 
 dnl AC_CHECK_HEADERS(sys/mman.h)
 AC_FUNC_MMAP

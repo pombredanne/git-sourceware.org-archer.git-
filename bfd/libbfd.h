@@ -275,6 +275,8 @@ extern int _bfd_nocore_core_file_failing_signal
   (bfd *);
 extern bfd_boolean _bfd_nocore_core_file_matches_executable_p
   (bfd *, bfd *);
+extern int _bfd_nocore_core_file_pid
+  (bfd *);
 
 /* Routines to use for BFD_JUMP_TABLE_ARCHIVE when there is no archive
    file support.  Use BFD_JUMP_TABLE_ARCHIVE (_bfd_noarchive).  */
@@ -380,7 +382,9 @@ extern int _bfd_vms_lib_generic_stat_arch_elt (bfd *, struct stat *);
 extern symindex _bfd_vms_lib_find_symbol (bfd *, const char *);
 extern bfd *_bfd_vms_lib_get_imagelib_file (bfd *);
 extern const bfd_target *_bfd_vms_lib_alpha_archive_p (bfd *abfd);
-extern bfd_boolean _bfd_vms_lib_mkarchive (bfd *abfd);
+extern const bfd_target *_bfd_vms_lib_ia64_archive_p (bfd *abfd);
+extern bfd_boolean _bfd_vms_lib_alpha_mkarchive (bfd *abfd);
+extern bfd_boolean _bfd_vms_lib_ia64_mkarchive (bfd *abfd);
 
 /* Routines to use for BFD_JUMP_TABLE_SYMBOLS where there is no symbol
    support.  Use BFD_JUMP_TABLE_SYMBOLS (_bfd_nosymbols).  */
@@ -844,6 +848,7 @@ struct bfd_iovec
   void *(*bmmap) (struct bfd *abfd, void *addr, bfd_size_type len,
                   int prot, int flags, file_ptr offset);
 };
+extern const struct bfd_iovec _bfd_memory_iovec;
 /* Extracted from bfdwin.c.  */
 struct _bfd_window_internal {
   struct _bfd_window_internal *next;
@@ -1510,6 +1515,13 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_SH_TLS_DTPMOD32",
   "BFD_RELOC_SH_TLS_DTPOFF32",
   "BFD_RELOC_SH_TLS_TPOFF32",
+  "BFD_RELOC_SH_GOT20",
+  "BFD_RELOC_SH_GOTOFF20",
+  "BFD_RELOC_SH_GOTFUNCDESC",
+  "BFD_RELOC_SH_GOTFUNCDESC20",
+  "BFD_RELOC_SH_GOTOFFFUNCDESC",
+  "BFD_RELOC_SH_GOTOFFFUNCDESC20",
+  "BFD_RELOC_SH_FUNCDESC",
   "BFD_RELOC_ARC_B22_PCREL",
   "BFD_RELOC_ARC_B26",
   "BFD_RELOC_BFIN_16_IMM",
@@ -1626,6 +1638,28 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_V850_LONGJUMP",
   "BFD_RELOC_V850_ALIGN",
   "BFD_RELOC_V850_LO16_SPLIT_OFFSET",
+  "BFD_RELOC_V850_16_PCREL",
+  "BFD_RELOC_V850_17_PCREL",
+  "BFD_RELOC_V850_23",
+  "BFD_RELOC_V850_32_PCREL",
+  "BFD_RELOC_V850_32_ABS",
+  "BFD_RELOC_V850_16_SPLIT_OFFSET",
+  "BFD_RELOC_V850_16_S1",
+  "BFD_RELOC_V850_LO16_S1",
+  "BFD_RELOC_V850_CALLT_15_16_OFFSET",
+  "BFD_RELOC_V850_32_GOTPCREL",
+  "BFD_RELOC_V850_16_GOT",
+  "BFD_RELOC_V850_32_GOT",
+  "BFD_RELOC_V850_22_PLT_PCREL",
+  "BFD_RELOC_V850_32_PLT_PCREL",
+  "BFD_RELOC_V850_COPY",
+  "BFD_RELOC_V850_GLOB_DAT",
+  "BFD_RELOC_V850_JMP_SLOT",
+  "BFD_RELOC_V850_RELATIVE",
+  "BFD_RELOC_V850_16_GOTOFF",
+  "BFD_RELOC_V850_32_GOTOFF",
+  "BFD_RELOC_V850_CODE",
+  "BFD_RELOC_V850_DATA",
   "BFD_RELOC_MN10300_32_PCREL",
   "BFD_RELOC_MN10300_16_PCREL",
   "BFD_RELOC_TIC30_LDP",
