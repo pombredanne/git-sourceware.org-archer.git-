@@ -235,7 +235,7 @@ clean:
 	rm -f arm-with-iwmmxt.c
 	rm -f arm-with-vfpv2.c arm-with-vfpv3.c arm-with-neon.c
 	rm -f mips-linux.c mips64-linux.c
-	rm -f powerpc-32l.c powerpc-64l.c powerpc-e500l.c
+	rm -f powerpc-32.c powerpc-32l.c powerpc-64l.c powerpc-e500l.c
 	rm -f powerpc-altivec32l.c powerpc-cell32l.c powerpc-vsx32l.c
 	rm -f powerpc-altivec64l.c powerpc-cell64l.c powerpc-vsx64l.c
 	rm -f powerpc-isa205-32l.c powerpc-isa205-64l.c
@@ -303,6 +303,8 @@ server_h = $(srcdir)/server.h $(regcache_h) config.h $(srcdir)/target.h \
 
 linux_low_h = $(srcdir)/linux-low.h
 
+lynx_low_h = $(srcdir)/lynx-low.h $(srcdir)/server.h
+
 nto_low_h = $(srcdir)/nto-low.h
 
 UST_CFLAGS = $(ustinc) -DCONFIG_UST_GDB_INTEGRATION
@@ -357,6 +359,15 @@ signals.o: ../common/signals.c $(server_h) $(signals_def)
 memmem.o: ../gnulib/memmem.c
 	$(CC) -o memmem.o -c $(CPPFLAGS) $(INTERNAL_WARN_CFLAGS) $<
 
+# We build vasprintf with -DHAVE_CONFIG_H because we want that unit to
+# include our config.h file.  Otherwise, some system headers do not get
+# included, and the compiler emits a warning about implicitly defined
+# functions (missing declaration).
+vasprintf.o: $(srcdir)/../../libiberty/vasprintf.c
+	$(CC) -o vasprintf.o -c $(CPPFLAGS) $(INTERNAL_CFLAGS) -DHAVE_CONFIG_H $<
+vsnprintf.o: $(srcdir)/../../libiberty/vsnprintf.c
+	$(CC) -o vsnprintf.o -c $(CPPFLAGS) $(INTERNAL_CFLAGS) $<
+
 i386_low_h = $(srcdir)/i386-low.h
 
 i386-low.o: i386-low.c $(i386_low_h) $(server_h) $(target_h)
@@ -381,6 +392,8 @@ linux-x86-low.o: linux-x86-low.c $(linux_low_h) $(server_h) \
 	$(gdb_proc_service_h) $(i386_low_h)
 linux-xtensa-low.o: linux-xtensa-low.c xtensa-xtregs.c $(linux_low_h) $(server_h)
 
+lynx-low.o: lynx-low.c $(server_h) $(target_h) $(lynx_low_h)
+lynx-ppc-low.o: lynx-ppc-low.c $(server_h) $(lynx_low_h)
 nto-low.o: nto-low.c $(server_h) $(nto_low_h)
 nto-x86-low.o: nto-x86-low.c $(server_h) $(nto_low_h) $(regdef_h) $(regcache_h)
 
@@ -450,6 +463,9 @@ mips-linux.c : $(srcdir)/../regformats/mips-linux.dat $(regdat_sh)
 mips64-linux.o : mips64-linux.c $(regdef_h)
 mips64-linux.c : $(srcdir)/../regformats/mips64-linux.dat $(regdat_sh)
 	$(SHELL) $(regdat_sh) $(srcdir)/../regformats/mips64-linux.dat mips64-linux.c
+powerpc-32.o : powerpc-32.c $(regdef_h)
+powerpc-32.c : $(srcdir)/../regformats/rs6000/powerpc-32.dat $(regdat_sh)
+	$(SHELL) $(regdat_sh) $(srcdir)/../regformats/rs6000/powerpc-32.dat powerpc-32.c
 powerpc-32l.o : powerpc-32l.c $(regdef_h)
 powerpc-32l.c : $(srcdir)/../regformats/rs6000/powerpc-32l.dat $(regdat_sh)
 	$(SHELL) $(regdat_sh) $(srcdir)/../regformats/rs6000/powerpc-32l.dat powerpc-32l.c

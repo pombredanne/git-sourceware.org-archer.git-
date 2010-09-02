@@ -1,3 +1,46 @@
+2010-09-01  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdbserver/lynx-low.c, gdbserver/lynx-low.h,
+	gdbserver/lynx-ppc-low.c: New files.
+	* Makefile.in (lynx_low_h): New variable.
+	(lynx-low.o, lynx-ppc-low.o): New rules.
+	* configure.ac: On LynxOS, link with -lnetinet.
+	* configure.srv: Add handling of powerpc-*-lynxos* targets.
+	* configure: regenerate.
+
+2010-09-01  Joel Brobecker  <brobecker@adacore.com>
+
+	* Makefile.in (vasprintf.o, vsnprintf.o): New rules.
+	* configure.ac: Add check for vasprintf and vsnprintf.
+	* configure, config.in: Regenerate.
+	* server.h (vasprintf, vsnprintf): Add conditional declarations.
+
+2010-09-01  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdbreplay.c: Move include of alloca.h up, next to include of
+	malloc.h.
+	* server.h: Add include of malloc.h.
+	* mem-break.c: Remove include of malloc.h.
+	* server.c, tracepoint.c, utils.c, win32-low.c: Likewise.
+
+2010-09-01  Joel Brobecker  <brobecker@adacore.com>
+
+	* Makefile.in (memmem.o): Build with -Wno-error.
+
+2010-09-01  Joel Brobecker  <brobecker@adacore.com>
+
+	* utils.c (xsnprintf): Make non-static.
+	* server.h: Add xsnprintf declaration.
+	* linux-low.c, nto-low.c, target.c, thread-db.c, tracepoint.c:
+	replace calls to snprintf by calls to xsnprintf throughout.
+
+2010-09-01  Joel Brobecker  <brobecker@adacore.com>
+
+	* configure.ac: Add configure check for alloca.
+	* configure, config.in: Regenerate.
+	* server.h: Include alloca.h if it exists.
+	* gdbreplay.c: Include alloca.h if it exists.
+
 2010-08-28  Pedro Alves  <pedro@codesourcery.com>
 
 	* linux-low.c (__SIGRTMIN): Define if not already defined.

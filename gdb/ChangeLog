@@ -1,20 +1,58 @@
+2010-09-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* iq2000-tdep.c (iq2000_scan_prologue): Initialize SAL.END.
+
+2010-09-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* Makefile.in (GDB_WARN_CFLAGS_NO_FORMAT): Convert it to the no- form.
+	(monitor.o): Replace $(INTERNAL_WARN_CFLAGS) by $(INTERNAL_CFLAGS) and
+	add $(GDB_WARN_CFLAGS_NO_FORMAT).
+	(printcmd.o): Replace $(INTERNAL_CFLAGS_BASE) by $(INTERNAL_CFLAGS).
+
+2010-09-02  Yao Qi  <yao@codesourcery.com>
+
+	* linux-nat.c (status_to_str): Use WTERMSIG to extract the signal
+	number from a WIFSIGNALED status.
+
+2010-09-01  Tom Tromey  <tromey@redhat.com>
+
+	* symtab.h (lookup_type_symbol): Declare.
+	* symtab.c (lookup_symbol_in_language_full): Rename from
+	lookup_symbol_in_language.  Add 'for_type' argument.
+	(lookup_symbol_in_language): New function.
+	(lookup_type_symbol): Likewise.
+	(lookup_symbol_aux): Add 'for_type' argument.
+	(match_symbol_aux): New function.
+	(lookup_symbol_aux_symtabs): Use expand_one_symtab_matching.
+	(match_transparent_type): New function.
+	(basic_lookup_transparent_type): Use expand_one_symtab_matching.
+	* symfile.h (struct quick_symbol_functions)
+	<pre_expand_symtabs_matching>: Remove.
+	<expand_one_symtab_matching>: New field.
+	* psymtab.c (expand_one_symtab_matching_psymtabs): New function.
+	(pre_expand_symtabs_matching_psymtabs): Remove.
+	(psym_functions): Update.
+	* gdbtypes.c (lookup_typename): Use lookup_type_symbol.
+	* dwarf2read.c (dw2_lookup_symbol): Update comment.
+	(dw2_pre_expand_symtabs_matching): Remove.
+	(dw2_expand_one_symtab_matching): New function.
+	(dwarf2_gdb_index_functions): Update.
+
 2010-09-01  Joel Brobecker  <brobecker@adacore.com>
 
-	* Makefile.in (memmem.o): Build with -Wno-error.
+	* NEWS: Add entry announcing GDBserver support on powerpc-lynxos.
+
+2010-09-01  Marc Khouzam  <marc.khouzam@ericsson.com>
+
+	* mi/mi-main.c (mi_cmd_list_target_features): Add `reverse'
+	as a feature reported by -list-target-features.
 
 2010-09-01  Joel Brobecker  <brobecker@adacore.com>
 
-	* utils.c (xsnprintf): Make non-static.
-	* server.h: Add xsnprintf declaration.
-	* linux-low.c, nto-low.c, target.c, thread-db.c, tracepoint.c:
-	replace calls to snprintf by calls to xsnprintf throughout.
-
-2010-09-01  Joel Brobecker  <brobecker@adacore.com>
-
-	* configure.ac: Add configure check for alloca.
-	* configure, config.in: Regenerate.
-	* server.h: Include alloca.h if it exists.
-	* gdbreplay.c: Include alloca.h if it exists.
+	* features/Makefile (WHICH): Add rs6000/powerpc-32.
+	(powerpc-32.o, powerpc-32.c): New rules.
+	(clean): Also remove powerpc-32.c.
+	* regformats/rs6000/powerpc-32.dat: Generate.
 
 2010-08-31  Sami Wagiaalla  <swagiaal@redhat.com>
 
