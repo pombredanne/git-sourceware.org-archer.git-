@@ -580,12 +580,14 @@ set_running (ptid_t ptid, int running)
 
       tp = find_thread_ptid (ptid);
       gdb_assert (tp);
-      gdb_assert (tp->state_ != THREAD_EXITED);
-      if (running && tp->state_ == THREAD_STOPPED)
- 	started = 1;
-      tp->state_ = running ? THREAD_RUNNING : THREAD_STOPPED;
-      if (started)
-  	observer_notify_target_resumed (ptid);
+      if (tp->state_ != THREAD_EXITED)
+	{
+	  if (running && tp->state_ == THREAD_STOPPED)
+	    started = 1;
+	  tp->state_ = running ? THREAD_RUNNING : THREAD_STOPPED;
+	  if (started)
+	    observer_notify_target_resumed (ptid);
+	}
     }
 }
 
