@@ -8327,10 +8327,12 @@ can_use_hardware_watchpoint (struct value *v)
     {
       if (VALUE_LVAL (v) == lval_memory)
 	{
-	  if (value_lazy (v))
-	    /* A lazy memory lvalue is one that GDB never needed to fetch;
-	       we either just used its address (e.g., `a' in `a.b') or
-	       we never needed it at all (e.g., `a' in `a,b').  */
+	  if (v != head && value_lazy (v))
+	    /* A lazy memory lvalue in the chain is one that GDB never
+	       needed to fetch; we either just used its address (e.g.,
+	       `a' in `a.b') or we never needed it at all (e.g., `a'
+	       in `a,b').  This doesn't apply to HEAD; if that is
+	       lazy then it was not readable, but watch it anyway.  */
 	    ;
 	  else
 	    {
@@ -11487,7 +11489,7 @@ save_breakpoints (char *filename, int from_tty,
 	fprintf_unfiltered (fp, "  commands\n");
 	
 	ui_out_redirect (uiout, fp);
-	TRY_CATCH (ex, RETURN_MASK_ERROR)
+	TRY_CATCH (ex, RETURN_MASK_ALL)
 	  {
 	    print_command_lines (uiout, tp->commands->commands, 2);
 	  }
