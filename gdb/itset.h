@@ -19,13 +19,26 @@
 #ifndef ITSET_H
 #define ITSET_H
 
-struct itset;
 struct inferior;
+
+/* This is an opaque type representing an I/T set.  An I/T set is
+   simply a set of inferiors and/or threads.  A set may be dynamic
+   (the members are enumerated at the time of use) or static (the
+   members are enumerated at the time of construction); but this
+   distinction is hidden from the callers.  */
+
+struct itset;
+
+/* Create a new I/T set from a user specification.  The valid forms of
+   a specification are documented in the manual.  */
 
 struct itset *itset_create (const char *spec);
 
-int itset_contains_inferior (struct itset *, struct inferior *);
+/* Return true if the inferior is contained in the I/T set.  */
+int itset_contains_inferior (struct itset *itset, struct inferior *inf);
 
-void itset_free (struct itset *);
+/* Free the I/T set.  */
+
+void itset_free (struct itset *itset);
 
 #endif /* ITSET_H */

@@ -26,13 +26,29 @@
 
 #include <ctype.h>
 
+
+/* Forward declaration of the base class.  */
+
 struct itset_base;
+
+/* An element of an I/T set is a class with some virtual methods,
+   defined here.  */
 
 struct itset_vtable
 {
-  int (*contains_inferior) (struct itset_base *, struct inferior *);
+  /* Return true if the element contains the inferior.  The element
+     and the inferior are passed as arguments.  */
+
+  int (*contains_inferior) (struct itset_base *elt, struct inferior *inf);
+
+  /* Destroy the contents of this element.  If the element does not
+     require any special cleanup, this can be NULL.  This should not
+     free the element itself; that is done by the caller.  */
+
   void (*destroy) (struct itset_base *);
 };
+
+/* The base class of all I/T set elements.  */
 
 struct itset_base
 {
@@ -44,11 +60,17 @@ DEF_VEC_P (itset_base_ptr);
 
 struct itset
 {
+  /* The original specification of the set.  */
   const char *spec;
+
+  /* The elements making up the set.  */
   VEC (itset_base_ptr) *elements;
 };
 
 
+
+/* A helper function that returns true if the inferior INF is
+   contained by the set ELEMENTS.  */
 
 static int
 set_contains_inferior (VEC (itset_base_ptr) *elements, struct inferior *inf)
@@ -64,6 +86,9 @@ set_contains_inferior (VEC (itset_base_ptr) *elements, struct inferior *inf)
 
   return 0;
 }
+
+/* A helper function to destroy all the elements in the set ELEMENTS.
+   This also destroys ELEMENTS itself.  */
 
 static void
 set_free (VEC (itset_base_ptr) *elements)
@@ -83,11 +108,18 @@ set_free (VEC (itset_base_ptr) *elements)
 
 
 
+/* An I/T set element representing all inferiors using a certain
+   executable.  */
+
 struct itset_exec
 {
   struct itset_base base;
+
+  /* The name of the executable.  */
   const char *name;
 };
+
+/* Implementation of `contains_inferior' method.  */
 
 static int
 exec_contains_inferior (struct itset_base *base, struct inferior *inf)
@@ -97,6 +129,8 @@ exec_contains_inferior (struct itset_base *base, struct inferior *inf)
   /* FIXME: smarter compare */
   return strcmp (exec->name, bfd_get_filename (inf->pspace->ebfd)) == 0;
 }
+
+/* Implementation of `destroy' method.  */
 
 static void
 exec_destroy (struct itset_base *base)
@@ -112,6 +146,8 @@ static const struct itset_vtable exec_vtable =
   exec_destroy
 };
 
+/* Create a new `exec' I/T set element.  */
+
 static struct itset_base *
 create_exec_itset (const char *arg)
 {
@@ -126,14 +162,26 @@ create_exec_itset (const char *arg)
 
 
 
+/* The value representing any inferior or thread.  */
+
+#define WILDCARD -1
+
+/* An I/T set element representing a range of inferiors.  */
+
 struct itset_range
 {
   struct itset_base base;
+
+  /* The first and last inferiors in this range.  If INF_FIRST is
+     WILDCARD, then INF_LAST is unused.  */
   int inf_first, inf_last;
+
+  /* The thread number used by this range.  If WILDCARD, then this
+     matches any thread.  */
   int thread;
 };
 
-#define WILDCARD -1
+/* Implementation of `contains_inferior' method.  */
 
 static int
 range_contains_inferior (struct itset_base *base, struct inferior *inf)
@@ -152,6 +200,8 @@ static const struct itset_vtable range_vtable =
   NULL
 };
 
+/* Create a new `range' I/T set element.  */
+
 static struct itset_base *
 create_range_itset (int inf_first, int inf_last, int thread)
 {
@@ -168,6 +218,8 @@ create_range_itset (int inf_first, int inf_last, int thread)
 
 
 
+/* Implementation of `contains_inferior' method.  */
+
 static int
 current_contains_inferior (struct itset_base *base, struct inferior *inf)
 {
@@ -179,6 +231,9 @@ static const struct itset_vtable current_vtable =
   current_contains_inferior,
   NULL
 };
+
+/* Create a new I/T set element representing just the current
+   inferior.  */
 
 static struct itset_base *
 create_current_itset (void)
@@ -193,17 +248,25 @@ create_current_itset (void)
 
 
 
+/* An I/T set element representing a static list of inferiors.  */
+
 struct itset_static
 {
   struct itset_base base;
+
+  /* The inferiors.  */
   VEC (int) *elements;
 };
+
+/* Helper function to compare two ints.  */
 
 static int
 static_lessthan (const int a, const int b)
 {
   return b < a;
 }
+
+/* Implementation of `contains_inferior' method.  */
 
 static int
 static_contains_inferior (struct itset_base *base, struct inferior *inf)
@@ -217,6 +280,8 @@ static_contains_inferior (struct itset_base *base, struct inferior *inf)
     return 1;
   return 0;
 }
+
+/* Implementation of `destroy' method.  */
 
 static void
 static_free (struct itset_base *base)
@@ -232,11 +297,21 @@ static const struct itset_vtable static_vtable =
   static_free
 };
 
+/* Helper struct used to pass data through iterate_over_inferiors.  */
+
 struct iter_data
 {
+  /* The I/T set we are constructing.  */
+
   struct itset_static *st;
+
+  /* The elements of the original (dynamic) I/T set.  */
+
   VEC (itset_base_ptr) *elements;
 };
+
+/* A callback for iterate_over_inferiors that adds an inferior to the
+   result set, if it is in the source set.  */
 
 static int
 check_one_inferior (struct inferior *inf, void *datum)
@@ -249,6 +324,8 @@ check_one_inferior (struct inferior *inf, void *datum)
   /* Keep going.  */
   return 0;
 }
+
+/* Create a new static I/T set from the list of elements.  */
 
 static struct itset_base *
 create_static_itset (VEC (itset_base_ptr) *elements)
@@ -278,6 +355,9 @@ create_static_itset (VEC (itset_base_ptr) *elements)
 
 
 
+/* Helper function to skip whitespace.  Returns an updated pointer
+   into the text.  */
+
 static const char *
 skip_whitespace (const char *text)
 {
@@ -285,6 +365,12 @@ skip_whitespace (const char *text)
     ++text;
   return text;
 }
+
+/* Parse an I/T set range.  A range has the form F[:L][.T], where F is
+   the starting inferior, L is the ending inferior, and T is the
+   thread.  Updates RESULT with the new I/T set elements, and returns
+   an updated pointer into the spec.  Throws an exception on
+   error.  */
 
 static const char *
 parse_range (struct itset *result, const char *text)
@@ -324,6 +410,11 @@ parse_range (struct itset *result, const char *text)
 
   return text;
 }
+
+/* Parse a named I/T set.  Currently the only named sets which are
+   recognized are `exec (NAME)', and `current'.  Updates RESULT with
+   the new I/T set elements, and returns an updated pointer into the
+   spec.  Throws an exception on error.  */
 
 static const char *
 parse_named (struct itset *result, const char *text)
@@ -368,11 +459,16 @@ parse_named (struct itset *result, const char *text)
   return text;
 }
 
+/* A cleanup function that calls itset_free.  */
+
 static void
 itset_cleanup (void *d)
 {
   itset_free (d);
 }
+
+/* Parse an I/T set specification and return a new I/T set.  Throws an
+   exception on error.  */
 
 struct itset *
 itset_create (const char *spec)
@@ -432,15 +528,20 @@ itset_create (const char *spec)
   return result;
 }
 
+/* Return 1 if SET contains INF, 0 otherwise.  */
+
 int
 itset_contains_inferior (struct itset *set, struct inferior *inf)
 {
   return set_contains_inferior (set->elements, inf);
 }
 
+/* Destroy SET.  */
+
 void
 itset_free (struct itset *set)
 {
   set_free (set->elements);
+  xfree ((char *) set->spec);
   xfree (set);
 }
