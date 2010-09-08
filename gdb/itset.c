@@ -63,6 +63,9 @@ struct itset
   /* The original specification of the set.  */
   const char *spec;
 
+  /* The reference count.  */
+  int refc;
+
   /* The elements making up the set.  */
   VEC (itset_base_ptr) *elements;
 };
@@ -390,6 +393,8 @@ parse_range (struct itset *result, const char *text)
       if (*text == ':')
 	{
 	  ++text;
+	  if (!isdigit (*text))
+	    error (_("Expected digit in I/T set, at `%s'"), text);
 	  inf_last = strtol (text, (char **) &text, 10);
 	}
       else
@@ -400,7 +405,12 @@ parse_range (struct itset *result, const char *text)
     {
       ++text;
       if (*text == '*')
-	thread = WILDCARD;
+	{
+	  thread = WILDCARD;
+	  ++text;
+	}
+      else if (!isdigit (*text))
+	error (_("Expected digit in I/T set, at `%s'"), text);
       else
 	thread = strtol (text, (char **) &text, 10);
     }
@@ -434,11 +444,13 @@ parse_named (struct itset *result, const char *text)
 
       text = skip_whitespace (text);
       if (*text != '(')
-	error ("'(' expected in I/T set after `exec'");
+	error (_("'(' expected in I/T set after `exec'"));
       text = skip_whitespace (text + 1);
       tem = strchr (text, ')');
       if (!tem)
-	error ("no closing ')' in I/T set for `exec'");
+	error (_("No closing ')' in I/T set for `exec'"));
+      if (tem - text == 0)
+	error (_("Empty argument to `exec' in I/T set"));
       arg = xstrndup (text, tem - text);
       text = tem + 1;
       elt = create_exec_itset (arg);
@@ -447,9 +459,9 @@ parse_named (struct itset *result, const char *text)
     {
       char *tem = alloca (text - name + 1);
 
-      memcpy (tem, text, text - name);
+      memcpy (tem, name, text - name);
       tem[text - name] = '\0';
-      error (_("unknown named I/T set: `%s'"), tem);
+      error (_("Unknown named I/T set: `%s'"), tem);
     }
 
   VEC_safe_push (itset_base_ptr, result->elements, elt);
@@ -459,7 +471,7 @@ parse_named (struct itset *result, const char *text)
 
 /* A cleanup function that calls itset_free.  */
 
-static void
+void
 itset_cleanup (void *d)
 {
   itset_free (d);
@@ -477,10 +489,10 @@ itset_create (const char **specp)
   const char *spec = *specp;
 
   if (*spec != '[')
-    error ("I/T set must start with `['");
+    error (_("I/T set must start with `['"));
 
   result = XCNEW (struct itset);
-  result->elements = NULL;
+  result->refc = 1;
 
   cleanups = make_cleanup (itset_cleanup, result);
 
@@ -503,17 +515,18 @@ itset_create (const char **specp)
       else if (isalpha (*spec))
 	spec = parse_named (result, spec);
       else
-	error ("invalid I/T syntax at `%s'", spec);
+	error (_("Invalid I/T syntax at `%s'"), spec);
 
       spec = skip_whitespace (spec);
       if (*spec == ',')
 	++spec;
-      else
+      else if (*spec == ']')
 	break;
+      else
+	error (_("',' or ']' expected in I/T set, at `%s'"), spec);
     }
 
-  if (*spec != ']')
-    error ("I/T set must end with `]'");
+  /* Skip the ']'.  */
   ++spec;
 
   result->spec = xstrndup (*specp, spec - *specp);
@@ -525,10 +538,24 @@ itset_create (const char **specp)
       struct itset_base *st = create_static_itset (result->elements);
 
       set_free (result->elements);
+      result->elements = NULL;
       VEC_safe_push (itset_base_ptr, result->elements, st);
     }
 
+  discard_cleanups (cleanups);
+
   return result;
+}
+
+/* Create a new I/T set which represents the current inferior, at the
+   time that this call is made.  */
+
+struct itset *
+itset_create_current (void)
+{
+  const char *spec = "[!current]";
+
+  return itset_create (&spec);
 }
 
 /* Return 1 if SET contains INF, 0 otherwise.  */
@@ -539,12 +566,69 @@ itset_contains_inferior (struct itset *set, struct inferior *inf)
   return set_contains_inferior (set->elements, inf);
 }
 
+/* Acquire a new reference to an I/T set.  */
+
+struct itset *
+itset_reference (struct itset *itset)
+{
+  ++itset->refc;
+  return itset;
+}
+
 /* Destroy SET.  */
 
 void
 itset_free (struct itset *set)
 {
-  set_free (set->elements);
-  xfree ((char *) set->spec);
-  xfree (set);
+  if (--set->refc == 0)
+    {
+      set_free (set->elements);
+      xfree ((char *) set->spec);
+      xfree (set);
+    }
+}
+
+/* Helper struct for iterate_over_itset.  */
+
+struct iterate_data
+{
+  /* The I/T set we are using.  */
+  struct itset *itset;
+
+  /* The original callback  */
+  int (*callback) (struct inferior *, void *);
+
+  /* The data passed in to iterate_over_itset.  */
+  void *client_data;
+};
+
+/* Callback function for iterate_over_inferiors, used by
+   iterate_over_itset.  */
+
+static int
+iter_callback (struct inferior *inf, void *d)
+{
+  struct iterate_data *data = d;
+
+  if (itset_contains_inferior (data->itset, inf))
+    return data->callback (inf, data->client_data);
+
+  /* Keep going.  */
+  return 0;
+}
+
+/* Like iterate_over_inferiors, but iterate over only those inferiors
+   in ITSET.  */
+
+struct inferior *
+iterate_over_itset (struct itset *itset,
+		    int (*callback) (struct inferior *, void *), void *datum)
+{
+  struct iterate_data data;
+
+  data.itset = itset;
+  data.callback = callback;
+  data.client_data = datum;
+
+  return iterate_over_inferiors (iter_callback, &data);
 }

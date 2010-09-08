@@ -25,7 +25,8 @@ struct inferior;
    simply a set of inferiors and/or threads.  A set may be dynamic
    (the members are enumerated at the time of use) or static (the
    members are enumerated at the time of construction); but this
-   distinction is hidden from the callers.  */
+   distinction is hidden from the callers.  An I/T set object is
+   reference counted.  */
 
 struct itset;
 
@@ -36,12 +37,34 @@ struct itset;
 
 struct itset *itset_create (const char **spec);
 
+/* Create a new I/T set which represents the current inferior, at the
+   time that this call is made.  */
+
+struct itset *itset_create_current (void);
+
 /* Return true if the inferior is contained in the I/T set.  */
 
 int itset_contains_inferior (struct itset *itset, struct inferior *inf);
 
-/* Free the I/T set.  */
+/* Acquire a new reference to an I/T set.  Returns the I/T set, for
+   convenience.  */
+
+struct itset *itset_reference (struct itset *itset);
+
+/* Release a reference to an I/T set.  */
 
 void itset_free (struct itset *itset);
+
+/* A cleanup function that calls itset_free.  */
+
+void itset_cleanup (void *itset);
+
+/* Like iterate_over_inferiors, but iterate over only those inferiors
+   in ITSET.  */
+
+struct inferior *iterate_over_itset (struct itset *itset,
+				     int (*callback) (struct inferior *,
+						      void *),
+				     void *data);
 
 #endif /* ITSET_H */
