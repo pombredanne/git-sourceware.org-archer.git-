@@ -30,11 +30,14 @@ struct inferior;
 struct itset;
 
 /* Create a new I/T set from a user specification.  The valid forms of
-   a specification are documented in the manual.  */
+   a specification are documented in the manual.  *SPEC is the input
+   specification, and it is updated to point to the first non-space
+   character after the end of the specification.  */
 
-struct itset *itset_create (const char *spec);
+struct itset *itset_create (const char **spec);
 
 /* Return true if the inferior is contained in the I/T set.  */
+
 int itset_contains_inferior (struct itset *itset, struct inferior *inf);
 
 /* Free the I/T set.  */

@@ -439,9 +439,7 @@ parse_named (struct itset *result, const char *text)
       tem = strchr (text, ')');
       if (!tem)
 	error ("no closing ')' in I/T set for `exec'");
-      arg = xmalloc (tem - text + 1);
-      memcpy (arg, text, tem - text);
-      arg[tem - text] = '\0';
+      arg = xstrndup (text, tem - text);
       text = tem + 1;
       elt = create_exec_itset (arg);
     }
@@ -471,17 +469,17 @@ itset_cleanup (void *d)
    exception on error.  */
 
 struct itset *
-itset_create (const char *spec)
+itset_create (const char **specp)
 {
   int is_static = 0;
   struct itset *result;
   struct cleanup *cleanups;
+  const char *spec = *specp;
 
   if (*spec != '[')
     error ("I/T set must start with `['");
 
-  result = XNEW (struct itset);
-  result->spec = xstrdup (spec);
+  result = XCNEW (struct itset);
   result->elements = NULL;
 
   cleanups = make_cleanup (itset_cleanup, result);
@@ -516,6 +514,11 @@ itset_create (const char *spec)
 
   if (*spec != ']')
     error ("I/T set must end with `]'");
+  ++spec;
+
+  result->spec = xstrndup (*specp, spec - *specp);
+
+  *specp = skip_whitespace (spec);
 
   if (is_static)
     {
