@@ -1091,6 +1091,11 @@ cp_parse_postfix_expression (cp_parser *parser)
 	case TTYPE_OPEN_PAREN:
 	  break;
 
+	case TTYPE_CLOSE_PAREN:
+	  free_expression_chain (expr);
+	  error (_("Junk at the end of the arguments."));
+	  break;
+
 	case TTYPE_DOT:
 	case TTYPE_DEREF:
 	  break;
