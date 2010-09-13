@@ -1710,7 +1710,7 @@ fi
 build_warnings="-Wall -Wdeclaration-after-statement -Wpointer-arith \
 -Wformat-nonliteral -Wno-pointer-sign \
 -Wno-unused -Wunused-value -Wunused-function \
--Wno-switch -Wno-char-subscripts"
+-Wno-switch -Wno-char-subscripts -Wc++-compat"
 
 # Enable -Wno-format by default when using gcc on mingw since many
 # GCC versions complain about %I64.
