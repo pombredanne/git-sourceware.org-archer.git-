@@ -260,10 +260,10 @@ set_ui_file_fputs (struct ui_file *file, ui_file_fputs_ftype *fputs)
 
 void
 set_ui_file_data (struct ui_file *file, void *data,
-		  ui_file_delete_ftype *delete)
+		  ui_file_delete_ftype *deleter)
 {
   file->to_data = data;
-  file->to_delete = delete;
+  file->to_delete = deleter;
 }
 
 /* ui_file utility function for converting a ``struct ui_file'' into
