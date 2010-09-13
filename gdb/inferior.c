@@ -93,7 +93,7 @@ free_inferior (struct inferior *inf)
   xfree (inf->args);
   xfree (inf->terminal);
   free_environ (inf->environment);
-  xfree (inf->private);
+  xfree (inf->private_data);
   xfree (inf);
 }
 

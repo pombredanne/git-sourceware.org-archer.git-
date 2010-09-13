@@ -186,7 +186,7 @@ struct thread_info
   int stop_requested;
 
   /* Private data used by the target vector implementation.  */
-  struct private_thread_info *private;
+  struct private_thread_info *private_data;
 
   /* Function that is called to free PRIVATE.  If this is NULL, then
      xfree will be called on PRIVATE.  */

@@ -489,7 +489,7 @@ struct inferior
   struct continuation *continuations;
 
   /* Private data used by the target vector implementation.  */
-  struct private_inferior *private;
+  struct private_inferior *private_data;
 
   /* We keep a count of the number of times the user has requested a
      particular syscall to be tracked, and pass this information to the

@@ -114,12 +114,12 @@ free_thread (struct thread_info *tp)
 {
   clear_thread_inferior_resources (tp);
 
-  if (tp->private)
+  if (tp->private_data)
     {
       if (tp->private_dtor)
-	tp->private_dtor (tp->private);
+	tp->private_dtor (tp->private_data);
       else
-	xfree (tp->private);
+	xfree (tp->private_data);
     }
 
   xfree (tp);
@@ -218,11 +218,11 @@ add_thread_silent (ptid_t ptid)
 }
 
 struct thread_info *
-add_thread_with_info (ptid_t ptid, struct private_thread_info *private)
+add_thread_with_info (ptid_t ptid, struct private_thread_info *private_data)
 {
   struct thread_info *result = add_thread_silent (ptid);
 
-  result->private = private;
+  result->private_data = private_data;
 
   if (print_thread_events)
     printf_unfiltered (_("[New %s]\n"), target_pid_to_str (ptid));
