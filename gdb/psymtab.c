@@ -961,7 +961,7 @@ find_symbol_file_from_partial (struct objfile *objfile, const char *name)
 
 static struct partial_symbol *
 ada_lookup_partial_symbol (struct partial_symtab *pst, const char *name,
-                           int global, domain_enum namespace, int wild,
+                           int global, domain_enum domain, int wild,
 			   int (*wild_match) (const char *, int, const char *),
 			   int (*is_name_suffix) (const char *))
 {
@@ -986,7 +986,7 @@ ada_lookup_partial_symbol (struct partial_symtab *pst, const char *name,
           struct partial_symbol *psym = start[i];
 
           if (symbol_matches_domain (SYMBOL_LANGUAGE (psym),
-                                     SYMBOL_DOMAIN (psym), namespace)
+                                     SYMBOL_DOMAIN (psym), domain)
               && (*wild_match) (name, name_len, SYMBOL_LINKAGE_NAME (psym)))
             return psym;
         }
@@ -1023,7 +1023,7 @@ ada_lookup_partial_symbol (struct partial_symtab *pst, const char *name,
           struct partial_symbol *psym = start[i];
 
           if (symbol_matches_domain (SYMBOL_LANGUAGE (psym),
-                                     SYMBOL_DOMAIN (psym), namespace))
+                                     SYMBOL_DOMAIN (psym), domain))
             {
               int cmp = strncmp (name, SYMBOL_LINKAGE_NAME (psym), name_len);
 
@@ -1069,7 +1069,7 @@ ada_lookup_partial_symbol (struct partial_symtab *pst, const char *name,
           struct partial_symbol *psym = start[i];
 
           if (symbol_matches_domain (SYMBOL_LANGUAGE (psym),
-                                     SYMBOL_DOMAIN (psym), namespace))
+                                     SYMBOL_DOMAIN (psym), domain))
             {
               int cmp;
 
@@ -1103,7 +1103,7 @@ map_ada_symtabs (struct objfile *objfile,
 		 int (*wild_match) (const char *, int, const char *),
 		 int (*is_name_suffix) (const char *),
 		 void (*callback) (struct objfile *, struct symtab *, void *),
-		 const char *name, int global, domain_enum namespace, int wild,
+		 const char *name, int global, domain_enum domain, int wild,
 		 void *data)
 {
   struct partial_symtab *ps;
@@ -1112,7 +1112,7 @@ map_ada_symtabs (struct objfile *objfile,
     {
       QUIT;
       if (ps->readin
-	  || ada_lookup_partial_symbol (ps, name, global, namespace, wild,
+	  || ada_lookup_partial_symbol (ps, name, global, domain, wild,
 					wild_match, is_name_suffix))
 	{
 	  struct symtab *s = PSYMTAB_TO_SYMTAB (ps);

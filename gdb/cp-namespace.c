@@ -219,9 +219,9 @@ cp_set_block_scope (const struct symbol *symbol,
    namespace; return nonzero if so.  */
 
 int
-cp_is_anonymous (const char *namespace)
+cp_is_anonymous (const char *namespace_name)
 {
-  return (strstr (namespace, "(anonymous namespace)")
+  return (strstr (namespace_name, "(anonymous namespace)")
 	  != NULL);
 }
 
@@ -251,25 +251,25 @@ cp_lookup_symbol_nonlocal (const char *name,
    cp_lookup_symbol_nonlocal.  */
 
 static struct symbol *
-cp_lookup_symbol_in_namespace (const char *namespace,
+cp_lookup_symbol_in_namespace (const char *namespace_name,
                                const char *name,
                                const struct block *block,
                                const domain_enum domain)
 {
-  if (namespace[0] == '\0')
+  if (namespace_name[0] == '\0')
     {
       return lookup_symbol_file (name, block, domain, 0);
     }
   else
     {
-      char *concatenated_name = (char *) alloca (strlen (namespace) + 2 +
+      char *concatenated_name = (char *) alloca (strlen (namespace_name) + 2 +
 						 strlen (name) + 1);
 
-      strcpy (concatenated_name, namespace);
+      strcpy (concatenated_name, namespace_name);
       strcat (concatenated_name, "::");
       strcat (concatenated_name, name);
       return lookup_symbol_file (concatenated_name, block,
-				 domain, cp_is_anonymous (namespace));
+				 domain, cp_is_anonymous (namespace_name));
     }
 }
 
@@ -465,7 +465,7 @@ lookup_namespace_scope (const char *name,
 			const char *scope,
 			int scope_len)
 {
-  char *namespace;
+  char *namespace_name;
 
   if (scope[scope_len] != '\0')
     {
@@ -489,10 +489,10 @@ lookup_namespace_scope (const char *name,
   /* Okay, we didn't find a match in our children, so look for the
      name in the current namespace.  */
 
-  namespace = (char *) alloca (scope_len + 1);
-  strncpy (namespace, scope, scope_len);
-  namespace[scope_len] = '\0';
-  return cp_lookup_symbol_in_namespace (namespace, name, block, domain);
+  namespace_name = (char *) alloca (scope_len + 1);
+  strncpy (namespace_name, scope, scope_len);
+  namespace_name[scope_len] = '\0';
+  return cp_lookup_symbol_in_namespace (namespace_name, name, block, domain);
 }
 
 /* Look up NAME in BLOCK's static block and in global blocks.  If

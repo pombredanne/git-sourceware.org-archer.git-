@@ -4082,14 +4082,14 @@ make_array_descriptor (struct type *type, struct value *arr,
  * used in the public sources. */
 
 static int
-lookup_cached_symbol (const char *name, domain_enum namespace,
+lookup_cached_symbol (const char *name, domain_enum domain,
                       struct symbol **sym, struct block **block)
 {
   return 0;
 }
 
 static void
-cache_symbol (const char *name, domain_enum namespace, struct symbol *sym,
+cache_symbol (const char *name, domain_enum domain, struct symbol *sym,
               struct block *block)
 {
 }
@@ -4289,7 +4289,7 @@ ada_lookup_simple_minsym (const char *name)
 
 static void
 add_symbols_from_enclosing_procs (struct obstack *obstackp,
-                                  const char *name, domain_enum namespace,
+                                  const char *name, domain_enum domain,
                                   int wild_match)
 {
 }
@@ -4701,7 +4701,7 @@ ada_add_non_local_symbols (struct obstack *obstackp, const char *name,
 
 int
 ada_lookup_symbol_list (const char *name0, const struct block *block0,
-                        domain_enum namespace,
+                        domain_enum domain,
                         struct ada_symbol_info **results)
 {
   struct symbol *sym;
@@ -4740,7 +4740,7 @@ ada_lookup_symbol_list (const char *name0, const struct block *block0,
 
   /* Check the non-global symbols.  If we have ANY match, then we're done.  */
 
-  ada_add_local_symbols (&symbol_list_obstack, name, block, namespace,
+  ada_add_local_symbols (&symbol_list_obstack, name, block, domain,
                          wild_match);
   if (num_defns_collected (&symbol_list_obstack) > 0)
     goto done;
@@ -4750,7 +4750,7 @@ ada_lookup_symbol_list (const char *name0, const struct block *block0,
      the same result.  */
 
   cacheIfUnique = 1;
-  if (lookup_cached_symbol (name0, namespace, &sym, &block))
+  if (lookup_cached_symbol (name0, domain, &sym, &block))
     {
       if (sym != NULL)
         add_defn_to_vec (&symbol_list_obstack, sym, block);
@@ -4759,14 +4759,14 @@ ada_lookup_symbol_list (const char *name0, const struct block *block0,
 
   /* Search symbols from all global blocks.  */
  
-  ada_add_non_local_symbols (&symbol_list_obstack, name, namespace, 1,
+  ada_add_non_local_symbols (&symbol_list_obstack, name, domain, 1,
                              wild_match);
 
   /* Now add symbols from all per-file blocks if we've gotten no hits
      (not strictly correct, but perhaps better than an error).  */
 
   if (num_defns_collected (&symbol_list_obstack) == 0)
-    ada_add_non_local_symbols (&symbol_list_obstack, name, namespace, 0,
+    ada_add_non_local_symbols (&symbol_list_obstack, name, domain, 0,
                                wild_match);
 
 done:
@@ -4776,10 +4776,10 @@ done:
   ndefns = remove_extra_symbols (*results, ndefns);
 
   if (ndefns == 0)
-    cache_symbol (name0, namespace, NULL, NULL);
+    cache_symbol (name0, domain, NULL, NULL);
 
   if (ndefns == 1 && cacheIfUnique)
-    cache_symbol (name0, namespace, (*results)[0].sym, (*results)[0].block);
+    cache_symbol (name0, domain, (*results)[0].sym, (*results)[0].block);
 
   ndefns = remove_irrelevant_renamings (*results, ndefns, block0);
 
@@ -4788,12 +4788,12 @@ done:
 
 struct symbol *
 ada_lookup_encoded_symbol (const char *name, const struct block *block0,
-			   domain_enum namespace, struct block **block_found)
+			   domain_enum domain, struct block **block_found)
 {
   struct ada_symbol_info *candidates;
   int n_candidates;
 
-  n_candidates = ada_lookup_symbol_list (name, block0, namespace, &candidates);
+  n_candidates = ada_lookup_symbol_list (name, block0, domain, &candidates);
 
   if (n_candidates == 0)
     return NULL;
@@ -4813,14 +4813,14 @@ ada_lookup_encoded_symbol (const char *name, const struct block *block0,
    assignments occur only if the pointers are non-null).  */
 struct symbol *
 ada_lookup_symbol (const char *name, const struct block *block0,
-                   domain_enum namespace, int *is_a_field_of_this)
+                   domain_enum domain, int *is_a_field_of_this)
 {
   if (is_a_field_of_this != NULL)
     *is_a_field_of_this = 0;
 
   return
     ada_lookup_encoded_symbol (ada_encode (ada_fold_name (name)),
-			       block0, namespace, NULL);
+			       block0, domain, NULL);
 }
 
 static struct symbol *

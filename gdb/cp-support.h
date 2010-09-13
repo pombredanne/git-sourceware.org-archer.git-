@@ -121,7 +121,7 @@ extern int cp_validate_operator (const char *input);
 
 /* Functions/variables from cp-namespace.c.  */
 
-extern int cp_is_anonymous (const char *namespace);
+extern int cp_is_anonymous (const char *namespace_name);
 
 extern void cp_add_using_directive (const char *dest,
                                     const char *src,
@@ -146,7 +146,7 @@ extern struct symbol *cp_lookup_symbol_nonlocal (const char *name,
 						 const struct block *block,
 						 const domain_enum domain);
 
-extern struct symbol *cp_lookup_symbol_namespace (const char *namespace,
+extern struct symbol *cp_lookup_symbol_namespace (const char *namespace_name,
 						  const char *name,
 						  const struct block *block,
 						  const domain_enum domain);

@@ -216,7 +216,7 @@ struct quick_symbol_functions
 			   void (*callback) (struct objfile *,
 					     struct symtab *, void *),
 			   const char *name, int global,
-			   domain_enum namespace, int wild,
+			   domain_enum domain, int wild,
 			   void *data);
 
   /* Expand all symbol tables in OBJFILE matching some criteria.
