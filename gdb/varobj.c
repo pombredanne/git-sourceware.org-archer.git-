@@ -1681,7 +1681,7 @@ varobj_set_visualizer (struct varobj *var, const char *visualizer)
    returns TYPE_CHANGED, then it has done this and VARP will be modified
    to point to the new varobj.  */
 
-VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
+VEC(varobj_update_result) *varobj_update (struct varobj **varp, int is_explicit)
 {
   int changed = 0;
   int type_changed = 0;
@@ -1695,7 +1695,7 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
      changing type.  One use case for frozen varobjs is
      retaining previously evaluated expressions, and we don't
      want them to be reevaluated at all.  */
-  if (!explicit && (*varp)->frozen)
+  if (!is_explicit && (*varp)->frozen)
     return result;
 
   if (!(*varp)->root->is_valid)
