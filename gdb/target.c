@@ -1821,7 +1821,7 @@ static void
 read_whatever_is_readable (struct target_ops *ops, ULONGEST begin, ULONGEST end,
 			   VEC(memory_read_result_s) **result)
 {
-  gdb_byte *buf = xmalloc (end-begin);
+  gdb_byte *buf = (gdb_byte *) xmalloc (end-begin);
   ULONGEST current_begin = begin;
   ULONGEST current_end = end;
   int forward;
@@ -1913,7 +1913,7 @@ read_whatever_is_readable (struct target_ops *ops, ULONGEST begin, ULONGEST end,
     {
       /* The [current_end, end) range has been read.  */
       LONGEST rlen = end - current_end;
-      r.data = xmalloc (rlen);
+      r.data = (gdb_byte *) xmalloc (rlen);
       memcpy (r.data, buf + current_end - begin, rlen);
       r.begin = current_end;
       r.end = end;
@@ -1925,7 +1925,7 @@ read_whatever_is_readable (struct target_ops *ops, ULONGEST begin, ULONGEST end,
 void
 free_memory_read_result_vector (void *x)
 {
-  VEC(memory_read_result_s) *v = x;
+  VEC(memory_read_result_s) *v = (VEC(memory_read_result_s) *) x;
   memory_read_result_s *current;
   int ix;
 

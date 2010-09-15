@@ -353,7 +353,7 @@ symbol_init_cplus_specific (struct general_symbol_info *gsymbol,
   gdb_assert (gsymbol->language_specific.cplus_specific == NULL);
   gdb_assert (objfile != NULL);
 
-  gsymbol->language_specific.cplus_specific =
+  gsymbol->language_specific.cplus_specific = (struct cplus_specific *)
       OBSTACK_ZALLOC (&objfile->objfile_obstack, struct cplus_specific);
 }
 
@@ -660,7 +660,7 @@ symbol_set_names (struct general_symbol_info *gsymbol,
 	 us better bcache hit rates for partial symbols.  */
       if (!copy_name && lookup_name == linkage_name)
 	{
-	  *slot = (const struct demangled_name_entry *)
+	  *slot = (struct demangled_name_entry *)
 	    obstack_alloc (&objfile->objfile_obstack,
 			   offsetof (struct demangled_name_entry, demangled)
 			   + demangled_len + 1);
@@ -1378,7 +1378,7 @@ match_symbol_aux (struct symtab *symtab,
 		  int kind, const char *name, domain_enum domain,
 		  void *arg)
 {
-  struct objfile *objfile = arg;
+  struct objfile *objfile = (struct objfile *) arg;
 
   if (symtab->primary)
     {

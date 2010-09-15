@@ -260,7 +260,7 @@ per_cu_dwarf_call (struct dwarf_expr_context *ctx, size_t die_offset,
 static void
 dwarf_expr_dwarf_call (struct dwarf_expr_context *ctx, size_t die_offset)
 {
-  struct dwarf_expr_baton *debaton = ctx->baton;
+  struct dwarf_expr_baton *debaton = (struct dwarf2_expr_baton *) ctx->baton;
 
   return per_cu_dwarf_call (ctx, die_offset, debaton->per_cu);
 }
@@ -1070,7 +1070,7 @@ needs_frame_tls_address (void *baton, CORE_ADDR offset)
 static void
 needs_frame_dwarf_call (struct dwarf_expr_context *ctx, size_t die_offset)
 {
-  struct needs_frame_baton *nf_baton = ctx->baton;
+  struct needs_frame_baton *nf_baton = (struct needs_frame_baton *) ctx->baton;
 
   return per_cu_dwarf_call (ctx, die_offset, nf_baton->per_cu);
 }
@@ -1222,7 +1222,7 @@ compile_dwarf_to_ax (struct agent_expr *expr, struct axs_value *loc,
   unsigned int addr_size_bits = 8 * addr_size;
   int bits_big_endian = gdbarch_bits_big_endian (arch);
 
-  offsets = xmalloc ((op_end - op_ptr) * sizeof (int));
+  offsets = (int *) xmalloc ((op_end - op_ptr) * sizeof (int));
   cleanups = make_cleanup (xfree, offsets);
 
   for (i = 0; i < op_end - op_ptr; ++i)

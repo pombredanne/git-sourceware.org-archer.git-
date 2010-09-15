@@ -2813,7 +2813,8 @@ remote_static_tracepoint_marker_at (CORE_ADDR addr,
 static void
 free_current_marker (void *arg)
 {
-  struct static_tracepoint_marker **marker_p = arg;
+  struct static_tracepoint_marker **marker_p
+    = (struct static_tracepoint_marker **) arg;
 
   if (*marker_p != NULL)
     {

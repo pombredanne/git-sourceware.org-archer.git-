@@ -1504,7 +1504,7 @@ mi_cmd_data_read_memory_bytes (char *command, char **argv, int argc)
 			      - addr);
       ui_out_field_core_addr (uiout, "end", gdbarch, read_result->end);
 
-      data = xmalloc ((read_result->end - read_result->begin) * 2 + 1);
+      data = (char *) xmalloc ((read_result->end - read_result->begin) * 2 + 1);
 
       for (i = 0, p = data;
 	   i < (read_result->end - read_result->begin);
@@ -1626,7 +1626,7 @@ mi_cmd_data_write_memory_bytes (char *command, char **argv, int argc)
   cdata = argv[1];
   len = strlen (cdata)/2;
 
-  data = xmalloc (len);
+  data = (gdb_byte *) xmalloc (len);
   back_to = make_cleanup (xfree, data);
 
   for (i = 0; i < len; ++i)

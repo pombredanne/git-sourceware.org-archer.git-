@@ -1294,12 +1294,12 @@ psymbol_hash (const void *addr, int length)
   struct partial_symbol *psymbol = (struct partial_symbol *) addr;
   unsigned int lang = psymbol->ginfo.language;
   unsigned int domain = PSYMBOL_DOMAIN (psymbol);
-  unsigned int class = PSYMBOL_CLASS (psymbol);
+  unsigned int sym_class = PSYMBOL_CLASS (psymbol);
 
   h = hash_continue (&psymbol->ginfo.value, sizeof (psymbol->ginfo.value), h);
   h = hash_continue (&lang, sizeof (unsigned int), h);
   h = hash_continue (&domain, sizeof (unsigned int), h);
-  h = hash_continue (&class, sizeof (unsigned int), h);
+  h = hash_continue (&sym_class, sizeof (unsigned int), h);
   h = hash_continue (psymbol->ginfo.name, strlen (psymbol->ginfo.name), h);
 
   return h;
@@ -1362,10 +1362,11 @@ psymbol_bcache_full (struct partial_symbol *sym,
                      struct psymbol_bcache *bcache,
                      int *added)
 {
-  return bcache_full (sym,
-                      sizeof (struct partial_symbol),
-                      bcache->bcache,
-                      added);
+  return (const struct partial_symbol *)
+    bcache_full (sym,
+		 sizeof (struct partial_symbol),
+		 bcache->bcache,
+		 added);
 }
 
 /* Helper function, initialises partial symbol structure and stashes 

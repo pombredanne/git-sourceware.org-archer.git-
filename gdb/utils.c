@@ -367,7 +367,7 @@ make_cleanup_restore_uinteger (unsigned int *variable)
 static void
 do_unpush_target (void *arg)
 {
-  struct target_ops *ops = arg;
+  struct target_ops *ops = (struct target_ops *) arg;
 
   unpush_target (ops);
 }
@@ -389,7 +389,7 @@ struct restore_ui_file_closure
 static void
 do_restore_ui_file (void *p)
 {
-  struct restore_ui_file_closure *closure = p;
+  struct restore_ui_file_closure *closure = (struct restore_ui_file_closure *)p;
 
   *(closure->variable) = closure->value;
 }

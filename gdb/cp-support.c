@@ -710,7 +710,7 @@ make_symbol_overload_list (const char *func_name,
   else
     {
       char *concatenated_name
-	= alloca (strlen (namespace_name) + 2 + strlen (func_name) + 1);
+	= (char *)alloca (strlen (namespace_name) + 2 + strlen (func_name) + 1);
       strcpy (concatenated_name, namespace_name);
       strcat (concatenated_name, "::");
       strcat (concatenated_name, func_name);
@@ -843,7 +843,7 @@ make_symbol_overload_list_adl (struct type **arg_types, int nargs,
 static void
 reset_directive_searched (void *data)
 {
-  struct using_direct *direct = data;
+  struct using_direct *direct = (struct using_direct *) data;
   direct->searched = 0;
 }
 

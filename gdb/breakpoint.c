@@ -7448,7 +7448,8 @@ decode_static_tracepoint_spec (char **arg_p)
     error (_("No known static tracepoint marker named %s"), marker_str);
 
   sals.nelts = VEC_length(static_tracepoint_marker_p, markers);
-  sals.sals = xmalloc (sizeof *sals.sals * sals.nelts);
+  sals.sals
+    = (struct symtab_and_line *) xmalloc (sizeof *sals.sals * sals.nelts);
 
   for (i = 0; i < sals.nelts; i++)
     {
@@ -7521,7 +7522,7 @@ create_breakpoint (struct gdbarch *gdbarch,
       sals = decode_static_tracepoint_spec (&arg);
 
       copy_arg = savestring (addr_start, arg - addr_start);
-      addr_string = xcalloc (sals.nelts, sizeof (char **));
+      addr_string = (char **) xcalloc (sals.nelts, sizeof (char **));
       for (i = 0; i < sals.nelts; i++)
 	addr_string[i] = xstrdup (copy_arg);
       goto done;
@@ -7656,7 +7657,8 @@ create_breakpoint (struct gdbarch *gdbarch,
 	      struct cleanup *old_chain;
 
 	      expanded.nelts = 1;
-	      expanded.sals = xmalloc (sizeof (struct symtab_and_line));
+	      expanded.sals = (struct symtab_and_line *)
+		xmalloc (sizeof (struct symtab_and_line));
 	      expanded.sals[0] = sals.sals[i];
 	      old_chain = make_cleanup (xfree, expanded.sals);
 
@@ -10918,6 +10920,7 @@ detach_single_step_breakpoints (void)
   for (i = 0; i < 2; i++)
     if (single_step_breakpoints[i])
       target_remove_breakpoint (single_step_gdbarch[i],
+				(struct bp_target_info *)
 				single_step_breakpoints[i]);
 }
 

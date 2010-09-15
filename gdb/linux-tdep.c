@@ -41,7 +41,8 @@ init_linux_gdbarch_data (struct gdbarch *gdbarch)
 static struct linux_gdbarch_data *
 get_linux_gdbarch_data (struct gdbarch *gdbarch)
 {
-  return gdbarch_data (gdbarch, linux_gdbarch_data_handle);
+  return (struct linux_gdbarch_data *) gdbarch_data (gdbarch,
+						     linux_gdbarch_data_handle);
 }
 
 /* This function is suitable for architectures that don't

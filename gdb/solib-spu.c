@@ -107,7 +107,8 @@ append_ocl_sos (struct so_list **link_ptr)
 
   ALL_OBJFILES (objfile)
     {
-      ocl_program_addr_base = objfile_data (objfile, ocl_program_data_key);
+      ocl_program_addr_base = (CORE_ADDR *) objfile_data (objfile,
+							  ocl_program_data_key);
       if (ocl_program_addr_base != NULL)
         {
 	  enum bfd_endian byte_order = bfd_big_endian (objfile->obfd)?
@@ -453,7 +454,7 @@ ocl_enable_break (struct objfile *objfile)
          using the per-objfile private data mechanism.  */
       if (objfile_data (objfile, ocl_program_data_key) == NULL)
         {
-          CORE_ADDR *ocl_program_addr_base = OBSTACK_CALLOC (
+          CORE_ADDR *ocl_program_addr_base = (CORE_ADDR *) OBSTACK_CALLOC (
 		  &objfile->objfile_obstack,
 		  objfile->sections_end - objfile->sections,
 		  CORE_ADDR);

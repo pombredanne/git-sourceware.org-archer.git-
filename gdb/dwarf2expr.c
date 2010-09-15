@@ -154,7 +154,7 @@ dwarf_expr_fetch_address (struct dwarf_expr_context *ctx, int n)
   if (gdbarch_integer_to_address_p (ctx->gdbarch))
     {
       enum bfd_endian byte_order = gdbarch_byte_order (ctx->gdbarch);
-      gdb_byte *buf = alloca (ctx->addr_size);
+      gdb_byte *buf = (gdb_byte *) alloca (ctx->addr_size);
       struct type *int_type;
 
       switch (ctx->addr_size)
@@ -661,7 +661,7 @@ execute_stack_op (struct dwarf_expr_context *ctx,
 	case DW_OP_deref_size:
 	  {
 	    int addr_size = (op == DW_OP_deref ? ctx->addr_size : *op_ptr++);
-	    gdb_byte *buf = alloca (addr_size);
+	    gdb_byte *buf = (gdb_byte *) alloca (addr_size);
 	    CORE_ADDR addr = dwarf_expr_fetch_address (ctx, 0);
 	    dwarf_expr_pop (ctx);
 

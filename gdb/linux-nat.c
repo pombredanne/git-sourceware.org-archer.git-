@@ -5020,7 +5020,7 @@ linux_nat_xfer_osdata (struct target_ops *ops, enum target_object object,
 			      "</item>");
 
 	  obstack_grow_str0 (&obstack, "</osdata>\n");
-	  buf = obstack_finish (&obstack);
+	  buf = (const char *) obstack_finish (&obstack);
 	  len_avail = strlen (buf);
 	}
 

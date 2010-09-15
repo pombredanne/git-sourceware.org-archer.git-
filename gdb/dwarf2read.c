@@ -1557,8 +1557,8 @@ dwarf2_read_section (struct objfile *objfile, struct dwarf2_section_info *info)
     {
       off_t pg_offset = sectp->filepos & ~(pagesize - 1);
       size_t map_length = info->size + sectp->filepos - pg_offset;
-      caddr_t retbuf = bfd_mmap (abfd, 0, map_length, PROT_READ,
-				 MAP_PRIVATE, pg_offset);
+      caddr_t retbuf = (caddr_t) bfd_mmap (abfd, 0, map_length, PROT_READ,
+					   MAP_PRIVATE, pg_offset);
 
       if (retbuf != MAP_FAILED)
 	{
@@ -1574,7 +1574,7 @@ dwarf2_read_section (struct objfile *objfile, struct dwarf2_section_info *info)
 
   /* If we get here, we are a normal, not-compressed section.  */
   info->buffer = buf
-    = obstack_alloc (&objfile->objfile_obstack, info->size);
+    = (gdb_byte *) obstack_alloc (&objfile->objfile_obstack, info->size);
 
   /* When debugging .o files, we may need to apply relocations; see
      http://sourceware.org/ml/gdb-patches/2002-04/msg00136.html .
@@ -1602,7 +1602,8 @@ dwarf2_get_section_info (struct objfile *objfile, const char *section_name,
                          bfd_size_type *sizep)
 {
   struct dwarf2_per_objfile *data
-    = objfile_data (objfile, dwarf2_objfile_data_key);
+    = (struct dwarf2_per_objfile *)
+    objfile_data (objfile, dwarf2_objfile_data_key);
   struct dwarf2_section_info *info;
 
   /* We may see an objfile without any DWARF, in which case we just
@@ -1720,7 +1721,7 @@ create_cus_from_index (struct objfile *objfile, const gdb_byte *cu_list,
 
   dwarf2_per_objfile->n_comp_units = cu_list_elements / 2;
   dwarf2_per_objfile->all_comp_units
-    = obstack_alloc (&objfile->objfile_obstack,
+    = (struct dwarf2_per_cu_data **) obstack_alloc (&objfile->objfile_obstack,
 		     dwarf2_per_objfile->n_comp_units
 		     * sizeof (struct dwarf2_per_cu_data *));
 
@@ -1734,13 +1735,15 @@ create_cus_from_index (struct objfile *objfile, const gdb_byte *cu_list,
 	return 0;
       cu_list += 2 * 8;
 
-      the_cu = OBSTACK_ZALLOC (&objfile->objfile_obstack,
-			       struct dwarf2_per_cu_data);
+      the_cu = (struct dwarf2_per_cu_data *)
+	OBSTACK_ZALLOC (&objfile->objfile_obstack,
+			struct dwarf2_per_cu_data);
       the_cu->offset = offset;
       the_cu->length = length;
       the_cu->objfile = objfile;
-      the_cu->v.quick = OBSTACK_ZALLOC (&objfile->objfile_obstack,
-					struct dwarf2_per_cu_quick_data);
+      the_cu->v.quick = (struct dwarf2_per_cu_quick_data *)
+	OBSTACK_ZALLOC (&objfile->objfile_obstack,
+			struct dwarf2_per_cu_quick_data);
       dwarf2_per_objfile->all_comp_units[i / 2] = the_cu;
     }
 
@@ -1759,9 +1762,10 @@ create_signatured_type_table_from_index (struct objfile *objfile,
 
   dwarf2_per_objfile->n_type_comp_units = elements / 3;
   dwarf2_per_objfile->type_comp_units
-    = obstack_alloc (&objfile->objfile_obstack,
-		     dwarf2_per_objfile->n_type_comp_units
-		     * sizeof (struct dwarf2_per_cu_data *));
+    = (struct dwarf2_per_cu_data **)
+    obstack_alloc (&objfile->objfile_obstack,
+		   dwarf2_per_objfile->n_type_comp_units
+		   * sizeof (struct dwarf2_per_cu_data *));
 
   sig_types_hash = allocate_signatured_type_table (objfile);
 
@@ -1777,8 +1781,9 @@ create_signatured_type_table_from_index (struct objfile *objfile,
       signature = extract_unsigned_integer (bytes + 16, 8, BFD_ENDIAN_LITTLE);
       bytes += 3 * 8;
 
-      type_sig = OBSTACK_ZALLOC (&objfile->objfile_obstack,
-				 struct signatured_type);
+      type_sig = (struct signatured_type *)
+	OBSTACK_ZALLOC (&objfile->objfile_obstack,
+			struct signatured_type);
       type_sig->signature = signature;
       type_sig->offset = offset;
       type_sig->type_offset = type_offset;
@@ -1786,8 +1791,9 @@ create_signatured_type_table_from_index (struct objfile *objfile,
       type_sig->per_cu.offset = offset;
       type_sig->per_cu.objfile = objfile;
       type_sig->per_cu.v.quick
-	= OBSTACK_ZALLOC (&objfile->objfile_obstack,
-			  struct dwarf2_per_cu_quick_data);
+	= (struct dwarf2_per_cu_quick_data *)
+	OBSTACK_ZALLOC (&objfile->objfile_obstack,
+			struct dwarf2_per_cu_quick_data);
 
       slot = htab_find_slot (sig_types_hash, type_sig, INSERT);
       *slot = type_sig;
@@ -1923,7 +1929,8 @@ dwarf2_read_index (struct objfile *objfile)
   else if (version != 2)
     return 0;
 
-  map = OBSTACK_ZALLOC (&objfile->objfile_obstack, struct mapped_index);
+  map = (struct mapped_index *) OBSTACK_ZALLOC (&objfile->objfile_obstack,
+						struct mapped_index);
   map->total_size = dwarf2_per_objfile->gdb_index.size;
 
   metadata = (offset_type *) (addr + sizeof (offset_type));
@@ -1978,7 +1985,10 @@ dwarf2_read_index (struct objfile *objfile)
 static void
 dw2_setup (struct objfile *objfile)
 {
-  dwarf2_per_objfile = objfile_data (objfile, dwarf2_objfile_data_key);
+  dwarf2_per_objfile
+    = (struct dwarf2_per_objfile *) objfile_data (objfile,
+					   dwarf2_objfile_data_key);
+
   gdb_assert (dwarf2_per_objfile);
 }
 
@@ -2058,8 +2068,8 @@ dw2_require_line_header (struct objfile *objfile,
   this_cu->v.quick->lines = lh;
 
   this_cu->v.quick->file_names
-    = obstack_alloc (&objfile->objfile_obstack,
-		     lh->num_file_names * sizeof (char *));
+    = (const char **) obstack_alloc (&objfile->objfile_obstack,
+				     lh->num_file_names * sizeof (char *));
   for (i = 0; i < lh->num_file_names; ++i)
     this_cu->v.quick->file_names[i] = file_full_name (i + 1, lh, comp_dir);
 
@@ -2077,7 +2087,7 @@ dw2_require_full_path (struct objfile *objfile,
 {
   if (!per_cu->v.quick->full_names)
     per_cu->v.quick->full_names
-      = OBSTACK_CALLOC (&objfile->objfile_obstack,
+      = (const char **) OBSTACK_CALLOC (&objfile->objfile_obstack,
 			per_cu->v.quick->lines->num_file_names,
 			sizeof (char *));
 
@@ -2396,7 +2406,7 @@ dw2_map_ada_symtabs (struct objfile *objfile,
 		     void (*callback) (struct objfile *,
 				       struct symtab *, void *),
 		     const char *name, int global,
-		     domain_enum namespace, int wild,
+		     domain_enum domain, int wild,
 		     void *data)
 {
   /* For now, we don't support Ada, so this function can't be
@@ -2491,7 +2501,8 @@ dw2_find_pc_sect_symtab (struct objfile *objfile,
   if (!objfile->psymtabs_addrmap)
     return NULL;
 
-  data = addrmap_find (objfile->psymtabs_addrmap, pc);
+  data = (struct dwarf2_per_cu_data *) addrmap_find (objfile->psymtabs_addrmap,
+						     pc);
   if (!data)
     return NULL;
 
@@ -2613,8 +2624,10 @@ dwarf2_initialize_objfile (struct objfile *objfile)
 	{
 	  struct dwarf2_per_cu_data *per_cu = dw2_get_cu (i);
 
-	  per_cu->v.quick = OBSTACK_ZALLOC (&objfile->objfile_obstack,
-					    struct dwarf2_per_cu_quick_data);
+	  per_cu->v.quick
+	    = (struct dwarf2_per_cu_quick_data *)
+	    OBSTACK_ZALLOC (&objfile->objfile_obstack,
+			    struct dwarf2_per_cu_quick_data);
 	}
 
       /* Return 1 so that gdb sees the "quick" functions.  However,
@@ -2846,8 +2859,8 @@ allocate_signatured_type_table (struct objfile *objfile)
 static int
 add_signatured_type_cu_to_list (void **slot, void *datum)
 {
-  struct signatured_type *sigt = *slot;
-  struct dwarf2_per_cu_data ***datap = datum;
+  struct signatured_type *sigt = (struct signatured_type *) *slot;
+  struct dwarf2_per_cu_data ***datap = (struct dwarf2_per_cu_data ***) datum;
 
   **datap = &sigt->per_cu;
   ++*datap;
@@ -2941,9 +2954,10 @@ create_debug_types_hash_table (struct objfile *objfile)
 
   dwarf2_per_objfile->n_type_comp_units = htab_elements (types_htab);
   dwarf2_per_objfile->type_comp_units
-    = obstack_alloc (&objfile->objfile_obstack,
-		     dwarf2_per_objfile->n_type_comp_units
-		     * sizeof (struct dwarf2_per_cu_data *));
+    = (struct dwarf2_per_cu_data **)
+    obstack_alloc (&objfile->objfile_obstack,
+		   dwarf2_per_objfile->n_type_comp_units
+		   * sizeof (struct dwarf2_per_cu_data *));
   iter = &dwarf2_per_objfile->type_comp_units[0];
   htab_traverse_noresize (types_htab, add_signatured_type_cu_to_list, &iter);
   gdb_assert (iter - &dwarf2_per_objfile->type_comp_units[0]
@@ -3246,7 +3260,7 @@ build_type_psymtabs (struct objfile *objfile)
 static void
 psymtabs_addrmap_cleanup (void *o)
 {
-  struct objfile *objfile = o;
+  struct objfile *objfile = (struct objfile *) o;
 
   objfile->psymtabs_addrmap = NULL;
 }
@@ -5486,8 +5500,9 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
       if (child_die->tag == DW_TAG_template_type_param
 	  || child_die->tag == DW_TAG_template_value_param)
 	{
-	  templ_func = OBSTACK_ZALLOC (&objfile->objfile_obstack,
-				       struct template_symbol);
+	  templ_func = (struct template_symbol *)
+	    OBSTACK_ZALLOC (&objfile->objfile_obstack,
+			    struct template_symbol);
 	  templ_func->base.is_cplus_template_function = 1;
 	  break;
 	}
@@ -5580,9 +5595,9 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
 
       templ_func->n_template_arguments = VEC_length (symbolp, template_args);
       templ_func->template_arguments
-	= obstack_alloc (&objfile->objfile_obstack,
-			 (templ_func->n_template_arguments
-			  * sizeof (struct symbol *)));
+	= (struct symbol **) obstack_alloc (&objfile->objfile_obstack,
+					    (templ_func->n_template_arguments
+					     * sizeof (struct symbol *)));
       memcpy (templ_func->template_arguments,
 	      VEC_address (symbolp, template_args),
 	      (templ_func->n_template_arguments * sizeof (struct symbol *)));
@@ -6270,7 +6285,7 @@ dwarf2_add_typedef (struct field_info *fip, struct die_info *die,
   char *fieldname = "";
 
   /* Allocate a new field list entry and link it in.  */
-  new_field = xzalloc (sizeof (*new_field));
+  new_field = (struct typedef_field_list *) xzalloc (sizeof (*new_field));
   make_cleanup (xfree, new_field);
 
   gdb_assert (die->tag == DW_TAG_typedef);
@@ -6860,9 +6875,10 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
 	  TYPE_N_TEMPLATE_ARGUMENTS (type)
 	    = VEC_length (symbolp, template_args);
 	  TYPE_TEMPLATE_ARGUMENTS (type)
-	    = obstack_alloc (&objfile->objfile_obstack,
-			     (TYPE_N_TEMPLATE_ARGUMENTS (type)
-			      * sizeof (struct symbol *)));
+	    = (struct symbol **)
+	    obstack_alloc (&objfile->objfile_obstack,
+			   (TYPE_N_TEMPLATE_ARGUMENTS (type)
+			    * sizeof (struct symbol *)));
 	  memcpy (TYPE_TEMPLATE_ARGUMENTS (type),
 		  VEC_address (symbolp, template_args),
 		  (TYPE_N_TEMPLATE_ARGUMENTS (type)
@@ -6949,7 +6965,8 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
 
 	  ALLOCATE_CPLUS_STRUCT_TYPE (type);
 	  TYPE_TYPEDEF_FIELD_ARRAY (type)
-	    = TYPE_ALLOC (type, sizeof (TYPE_TYPEDEF_FIELD (type, 0)) * i);
+	    = (struct typedef_field *)
+	    TYPE_ALLOC (type, sizeof (TYPE_TYPEDEF_FIELD (type, 0)) * i);
 	  TYPE_TYPEDEF_FIELD_COUNT (type) = i;
 
 	  /* Reverse the list order to keep the debug info elements order.  */
@@ -10529,7 +10546,8 @@ new_symbol_full (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
       if (space)
 	sym = space;
       else
-	sym = OBSTACK_ZALLOC (&objfile->objfile_obstack, struct symbol);
+	sym = (struct symbol *) OBSTACK_ZALLOC (&objfile->objfile_obstack,
+						struct symbol);
       OBJSTAT (objfile, n_syms++);
 
       /* Cache this symbol's name and the name's demangled form (if any).  */
@@ -10899,7 +10917,7 @@ dwarf2_const_value_data (struct attribute *attr, struct type *type,
     *value = l;
   else
     {
-      gdb_byte *bytes = obstack_alloc (obstack, bits / 8);
+      gdb_byte *bytes = (gdb_byte *) obstack_alloc (obstack, bits / 8);
       store_unsigned_integer (bytes, bits / 8, byte_order, l);
       return bytes;
     }
@@ -10943,13 +10961,15 @@ dwarf2_const_value_attr (struct attribute *attr, struct type *type,
 	/* Symbols of this form are reasonably rare, so we just
 	   piggyback on the existing location code rather than writing
 	   a new implementation of symbol_computed_ops.  */
-	*baton = obstack_alloc (&objfile->objfile_obstack,
-				sizeof (struct dwarf2_locexpr_baton));
+	*baton = (struct dwarf2_locexpr_baton *)
+	  obstack_alloc (&objfile->objfile_obstack,
+			 sizeof (struct dwarf2_locexpr_baton));
 	(*baton)->per_cu = cu->per_cu;
 	gdb_assert ((*baton)->per_cu);
 
 	(*baton)->size = 2 + cu_header->addr_size;
-	data = obstack_alloc (&objfile->objfile_obstack, (*baton)->size);
+	data = (gdb_byte *) obstack_alloc (&objfile->objfile_obstack,
+					   (*baton)->size);
 	(*baton)->data = data;
 
 	data[0] = DW_OP_addr;
@@ -11195,8 +11215,8 @@ lookup_die_type (struct die_info *die, struct attribute *attr,
 			    cu->objfile->name,
 			    cu->header.offset,
 			    die->offset);
-      saved = obstack_copy0 (&cu->objfile->objfile_obstack,
-			     message, strlen (message));
+      saved = (char *) obstack_copy0 (&cu->objfile->objfile_obstack,
+				      message, strlen (message));
       xfree (message);
 
       this_type = init_type (TYPE_CODE_ERROR, 0, 0, saved, cu->objfile);
@@ -14658,7 +14678,7 @@ struct strtab_entry
 static hashval_t
 hash_strtab_entry (const void *e)
 {
-  const struct strtab_entry *entry = e;
+  const struct strtab_entry *entry = (const struct strtab_entry *) e;
   return mapped_index_string_hash (entry->str);
 }
 
@@ -14666,8 +14686,8 @@ hash_strtab_entry (const void *e)
 static int
 eq_strtab_entry (const void *a, const void *b)
 {
-  const struct strtab_entry *ea = a;
-  const struct strtab_entry *eb = b;
+  const struct strtab_entry *ea = (const struct strtab_entry *) a;
+  const struct strtab_entry *eb = (const struct strtab_entry *) b;
   return !strcmp (ea->str, eb->str);
 }
 
@@ -14691,7 +14711,7 @@ add_string (htab_t table, struct obstack *cpool, const char *str)
   entry.str = str;
   slot = htab_find_slot (table, &entry, INSERT);
   if (*slot)
-    result = *slot;
+    result = (struct strtab_entry *) *slot;
   else
     {
       result = XNEW (struct strtab_entry);
@@ -14727,7 +14747,7 @@ struct mapped_symtab
 static hashval_t
 hash_symtab_entry (const void *e)
 {
-  const struct symtab_index_entry *entry = e;
+  const struct symtab_index_entry *entry = (const struct symtab_index_entry *)e;
   return iterative_hash (VEC_address (offset_type, entry->cu_indices),
 			 sizeof (offset_type) * VEC_length (offset_type,
 							    entry->cu_indices),
@@ -14738,8 +14758,8 @@ hash_symtab_entry (const void *e)
 static int
 eq_symtab_entry (const void *a, const void *b)
 {
-  const struct symtab_index_entry *ea = a;
-  const struct symtab_index_entry *eb = b;
+  const struct symtab_index_entry *ea = (const struct symtab_index_entry *) a;
+  const struct symtab_index_entry *eb = (const struct symtab_index_entry *) b;
   int len = VEC_length (offset_type, ea->cu_indices);
   if (len != VEC_length (offset_type, eb->cu_indices))
     return 0;
@@ -14752,7 +14772,7 @@ eq_symtab_entry (const void *a, const void *b)
 static void
 delete_symtab_entry (void *p)
 {
-  struct symtab_index_entry *entry = p;
+  struct symtab_index_entry *entry = (struct symtab_index_entry *) p;
   VEC_free (offset_type, entry->cu_indices);
   xfree (entry);
 }
@@ -14780,7 +14800,7 @@ create_mapped_symtab (void)
 static void
 cleanup_mapped_symtab (void *p)
 {
-  struct mapped_symtab *symtab = p;
+  struct mapped_symtab *symtab = (struct mapped_symtab *) p;
   /* The contents of the array are freed when the other hash table is
      destroyed.  */
   xfree (symtab->data);
@@ -14884,7 +14904,8 @@ add_indices_to_cpool (htab_t index_table, struct obstack *cpool,
     }
   else
     {
-      struct symtab_index_entry *old_entry = *slot;
+      struct symtab_index_entry *old_entry
+	= (struct symtab_index_entry *) *slot;
       entry->index_offset = old_entry->index_offset;
       entry = old_entry;
     }
@@ -14996,7 +15017,7 @@ write_obstack (FILE *file, struct obstack *obstack)
 static void
 unlink_if_set (void *p)
 {
-  char **filename = p;
+  char **filename = (char **) p;
   if (*filename)
     unlink (*filename);
 }
@@ -15015,7 +15036,8 @@ struct signatured_type_index_data
 static int
 write_one_signatured_type (void **slot, void *d)
 {
-  struct signatured_type_index_data *info = d;
+  struct signatured_type_index_data *info
+    = (struct signatured_type_index_data *) d;
   struct signatured_type *entry = (struct signatured_type *) *slot;
   struct dwarf2_per_cu_data *per_cu = &entry->per_cu;
   struct partial_symtab *psymtab = per_cu->v.psymtab;
@@ -15267,7 +15289,7 @@ save_gdb_index_command (char *arg, int from_tty)
     if (stat (objfile->name, &st) < 0)
       continue;
 
-    dwarf2_per_objfile = objfile_data (objfile, dwarf2_objfile_data_key);
+    dwarf2_per_objfile = (struct dwarf2_per_objfile *) objfile_data (objfile, dwarf2_objfile_data_key);
     if (dwarf2_per_objfile)
       {
 	volatile struct gdb_exception except;
