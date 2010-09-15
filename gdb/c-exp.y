@@ -1821,7 +1821,7 @@ parse_string_or_char (char *tokptr, char **outptr, struct typed_stoken *value,
 
 struct token
 {
-  char *operator;
+  char *operator_name;
   int token;
   enum exp_opcode opcode;
   int cxx_only;
@@ -2034,7 +2034,7 @@ lex_one_token (void)
   tokstart = lexptr;
   /* See if it is a special token of length 3.  */
   for (i = 0; i < sizeof tokentab3 / sizeof tokentab3[0]; i++)
-    if (strncmp (tokstart, tokentab3[i].operator, 3) == 0)
+    if (strncmp (tokstart, tokentab3[i].operator_name, 3) == 0)
       {
 	if (tokentab3[i].cxx_only
 	    && parse_language->la_language != language_cplus)
@@ -2047,7 +2047,7 @@ lex_one_token (void)
 
   /* See if it is a special token of length 2.  */
   for (i = 0; i < sizeof tokentab2 / sizeof tokentab2[0]; i++)
-    if (strncmp (tokstart, tokentab2[i].operator, 2) == 0)
+    if (strncmp (tokstart, tokentab2[i].operator_name, 2) == 0)
       {
 	if (tokentab2[i].cxx_only
 	    && parse_language->la_language != language_cplus)
@@ -2307,7 +2307,7 @@ lex_one_token (void)
   /* Catch specific keywords.  */
   copy = copy_name (yylval.sval);
   for (i = 0; i < sizeof ident_tokens / sizeof ident_tokens[0]; i++)
-    if (strcmp (copy, ident_tokens[i].operator) == 0)
+    if (strcmp (copy, ident_tokens[i].operator_name) == 0)
       {
 	if (ident_tokens[i].cxx_only
 	    && parse_language->la_language != language_cplus)

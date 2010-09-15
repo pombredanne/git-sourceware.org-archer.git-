@@ -806,7 +806,7 @@ parse_number (p, len, parsed_float, putithere)
 
 struct token
 {
-  char *operator;
+  char *operator_name;
   int token;
   enum exp_opcode opcode;
 };
@@ -981,12 +981,12 @@ yylex ()
 	}
     }
   
-  /* See if it is a special .foo. operator.  */
+  /* See if it is a special .foo. operator_name.  */
   
-  for (i = 0; dot_ops[i].operator != NULL; i++)
-    if (strncmp (tokstart, dot_ops[i].operator, strlen (dot_ops[i].operator)) == 0)
+  for (i = 0; dot_ops[i].operator_name != NULL; i++)
+    if (strncmp (tokstart, dot_ops[i].operator_name, strlen (dot_ops[i].operator_name)) == 0)
       {
-	lexptr += strlen (dot_ops[i].operator);
+	lexptr += strlen (dot_ops[i].operator_name);
 	yylval.opcode = dot_ops[i].opcode;
 	return dot_ops[i].token;
       }
@@ -1149,11 +1149,11 @@ yylex ()
   
   /* Catch specific keywords.  */
   
-  for (i = 0; f77_keywords[i].operator != NULL; i++)
-    if (strncmp (tokstart, f77_keywords[i].operator,
-		 strlen(f77_keywords[i].operator)) == 0)
+  for (i = 0; f77_keywords[i].operator_name != NULL; i++)
+    if (strncmp (tokstart, f77_keywords[i].operator_name,
+		 strlen(f77_keywords[i].operator_name)) == 0)
       {
-	/* 	lexptr += strlen(f77_keywords[i].operator); */ 
+	/* 	lexptr += strlen(f77_keywords[i].operator_name); */ 
 	yylval.opcode = f77_keywords[i].opcode;
 	return f77_keywords[i].token;
       }

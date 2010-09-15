@@ -1032,7 +1032,7 @@ pop_current_type (void)
 
 struct token
 {
-  char *operator;
+  char *operator_name;
   int token;
   enum exp_opcode opcode;
 };
@@ -1102,8 +1102,8 @@ yylex ()
   /* See if it is a special token of length 3.  */
   if (explen > 2)
     for (i = 0; i < sizeof (tokentab3) / sizeof (tokentab3[0]); i++)
-      if (strncasecmp (tokstart, tokentab3[i].operator, 3) == 0
-          && (!isalpha (tokentab3[i].operator[0]) || explen == 3
+      if (strncasecmp (tokstart, tokentab3[i].operator_name, 3) == 0
+          && (!isalpha (tokentab3[i].operator_name[0]) || explen == 3
               || (!isalpha (tokstart[3]) && !isdigit (tokstart[3]) && tokstart[3] != '_')))
         {
           lexptr += 3;
@@ -1114,8 +1114,8 @@ yylex ()
   /* See if it is a special token of length 2.  */
   if (explen > 1)
   for (i = 0; i < sizeof (tokentab2) / sizeof (tokentab2[0]); i++)
-      if (strncasecmp (tokstart, tokentab2[i].operator, 2) == 0
-          && (!isalpha (tokentab2[i].operator[0]) || explen == 2
+      if (strncasecmp (tokstart, tokentab2[i].operator_name, 2) == 0
+          && (!isalpha (tokentab2[i].operator_name[0]) || explen == 2
               || (!isalpha (tokstart[2]) && !isdigit (tokstart[2]) && tokstart[2] != '_')))
         {
           lexptr += 2;
