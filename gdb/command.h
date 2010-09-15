@@ -217,7 +217,7 @@ typedef void (show_value_ftype) (struct ui_file *file,
 extern show_value_ftype deprecated_show_value_hack;
 
 extern void add_setshow_enum_cmd (char *name,
-				  enum command_class class,
+				  enum command_class cmd_class,
 				  const char *enumlist[],
 				  const char **var,
 				  const char *set_doc,
@@ -229,7 +229,7 @@ extern void add_setshow_enum_cmd (char *name,
 				  struct cmd_list_element **show_list);
 
 extern void add_setshow_auto_boolean_cmd (char *name,
-					  enum command_class class,
+					  enum command_class cmd_class,
 					  enum auto_boolean *var,
 					  const char *set_doc,
 					  const char *show_doc,
@@ -240,7 +240,7 @@ extern void add_setshow_auto_boolean_cmd (char *name,
 					  struct cmd_list_element **show_list);
 
 extern void add_setshow_boolean_cmd (char *name,
-				     enum command_class class,
+				     enum command_class cmd_class,
 				     int *var,
 				     const char *set_doc, const char *show_doc,
 				     const char *help_doc,
@@ -250,7 +250,7 @@ extern void add_setshow_boolean_cmd (char *name,
 				     struct cmd_list_element **show_list);
 
 extern void add_setshow_filename_cmd (char *name,
-				      enum command_class class,
+				      enum command_class cmd_class,
 				      char **var,
 				      const char *set_doc,
 				      const char *show_doc,
@@ -261,7 +261,7 @@ extern void add_setshow_filename_cmd (char *name,
 				      struct cmd_list_element **show_list);
 
 extern void add_setshow_string_cmd (char *name,
-				    enum command_class class,
+				    enum command_class cmd_class,
 				    char **var,
 				    const char *set_doc,
 				    const char *show_doc,
@@ -272,7 +272,7 @@ extern void add_setshow_string_cmd (char *name,
 				    struct cmd_list_element **show_list);
 
 extern void add_setshow_string_noescape_cmd (char *name,
-					     enum command_class class,
+					     enum command_class cmd_class,
 					     char **var,
 					     const char *set_doc,
 					     const char *show_doc,
@@ -283,7 +283,7 @@ extern void add_setshow_string_noescape_cmd (char *name,
 					     struct cmd_list_element **show_list);
 
 extern void add_setshow_optional_filename_cmd (char *name,
-					       enum command_class class,
+					       enum command_class cmd_class,
 					       char **var,
 					       const char *set_doc,
 					       const char *show_doc,
@@ -294,7 +294,7 @@ extern void add_setshow_optional_filename_cmd (char *name,
 					       struct cmd_list_element **show_list);
 
 extern void add_setshow_integer_cmd (char *name,
-				     enum command_class class,
+				     enum command_class cmd_class,
 				     int *var,
 				     const char *set_doc,
 				     const char *show_doc,
@@ -305,7 +305,7 @@ extern void add_setshow_integer_cmd (char *name,
 				     struct cmd_list_element **show_list);
 
 extern void add_setshow_uinteger_cmd (char *name,
-				      enum command_class class,
+				      enum command_class cmd_class,
 				      unsigned int *var,
 				      const char *set_doc,
 				      const char *show_doc,
@@ -316,7 +316,7 @@ extern void add_setshow_uinteger_cmd (char *name,
 				      struct cmd_list_element **show_list);
 
 extern void add_setshow_zinteger_cmd (char *name,
-				      enum command_class class,
+				      enum command_class cmd_class,
 				      int *var,
 				      const char *set_doc,
 				      const char *show_doc,
@@ -327,7 +327,7 @@ extern void add_setshow_zinteger_cmd (char *name,
 				      struct cmd_list_element **show_list);
 
 extern void add_setshow_zuinteger_cmd (char *name,
-				       enum command_class class,
+				       enum command_class cmd_class,
 				       unsigned int *var,
 				       const char *set_doc,
 				       const char *show_doc,

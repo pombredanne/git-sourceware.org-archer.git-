@@ -429,7 +429,7 @@ execute_command (char *p, int from_tty)
       if (c->flags & DEPRECATED_WARN_USER)
 	deprecated_cmd_warning (&line);
 
-      if (c->class == class_user)
+      if (c->cmd_class == class_user)
 	execute_user_command (c, arg);
       else if (c->type == set_cmd || c->type == show_cmd)
 	do_setshow_command (arg, from_tty & caution, c);

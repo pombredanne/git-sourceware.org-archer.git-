@@ -1215,7 +1215,7 @@ show_user (char *args, int from_tty)
       char *comname = args;
 
       c = lookup_cmd (&comname, cmdlist, "", 0, 1);
-      if (c->class != class_user)
+      if (c->cmd_class != class_user)
 	error (_("Not a user command."));
       show_user_1 (c, "", args, gdb_stdout);
     }
@@ -1223,7 +1223,7 @@ show_user (char *args, int from_tty)
     {
       for (c = cmdlist; c; c = c->next)
 	{
-	  if (c->class == class_user || c->prefixlist != NULL)
+	  if (c->cmd_class == class_user || c->prefixlist != NULL)
 	    show_user_1 (c, "", c->name, gdb_stdout);
 	}
     }
