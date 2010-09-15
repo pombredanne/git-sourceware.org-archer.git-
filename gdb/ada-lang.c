@@ -6871,9 +6871,9 @@ variant_field_index (struct type *type)
 /* A record type with no fields.  */
 
 static struct type *
-empty_record (struct type *template)
+empty_record (struct type *template_type)
 {
-  struct type *type = alloc_type_copy (template);
+  struct type *type = alloc_type_copy (template_type);
 
   TYPE_CODE (type) = TYPE_CODE_STRUCT;
   TYPE_NFIELDS (type) = 0;
