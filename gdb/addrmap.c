@@ -402,13 +402,13 @@ splay_foreach_copy (splay_tree_node n, void *closure)
 static struct addrmap *
 addrmap_mutable_create_fixed (struct addrmap *self, struct obstack *obstack)
 {
-  struct addrmap_mutable *mutable = (struct addrmap_mutable *) self;
+  struct addrmap_mutable *is_mutable = (struct addrmap_mutable *) self;
   struct addrmap_fixed *fixed;
   size_t num_transitions;
 
   /* Count the number of transitions in the tree.  */
   num_transitions = 0;
-  splay_tree_foreach (mutable->tree, splay_foreach_count, &num_transitions);
+  splay_tree_foreach (is_mutable->tree, splay_foreach_count, &num_transitions);
 
   /* Include an extra entry for the transition at zero (which fixed
      maps have, but mutable maps do not.)  */
@@ -426,7 +426,7 @@ addrmap_mutable_create_fixed (struct addrmap *self, struct obstack *obstack)
 
   /* Copy all entries from the splay tree to the array, in order 
      of increasing address.  */
-  splay_tree_foreach (mutable->tree, splay_foreach_copy, fixed);
+  splay_tree_foreach (is_mutable->tree, splay_foreach_copy, fixed);
 
   /* We should have filled the array.  */
   gdb_assert (fixed->num_transitions == num_transitions);
