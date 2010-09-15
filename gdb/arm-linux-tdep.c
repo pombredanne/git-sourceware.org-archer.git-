@@ -464,7 +464,7 @@ arm_linux_collect_gregset (const struct regset *regset,
 			   const struct regcache *regcache,
 			   int regnum, void *gregs_buf, size_t len)
 {
-  gdb_byte *gregs = (const gdb_byte *) gregs_buf;
+  gdb_byte *gregs = (gdb_byte *) gregs_buf;
   int regno;
 
   for (regno = ARM_A1_REGNUM; regno < ARM_PC_REGNUM; regno++)

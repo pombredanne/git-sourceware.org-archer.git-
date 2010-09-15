@@ -208,7 +208,7 @@ alpha_lds (struct gdbarch *gdbarch, void *out, const void *in)
     }
 
   reg = (sign << 63) | (exp << 52) | (frac << 29);
-  store_unsigned_integer ((const gdb_byte *) out, 8, byte_order, reg);
+  store_unsigned_integer ((gdb_byte *) out, 8, byte_order, reg);
 }
 
 /* Similarly, this represents exactly the conversion performed by
@@ -222,7 +222,7 @@ alpha_sts (struct gdbarch *gdbarch, void *out, const void *in)
 
   reg = extract_unsigned_integer ((const gdb_byte *) in, 8, byte_order);
   mem = ((reg >> 32) & 0xc0000000) | ((reg >> 29) & 0x3fffffff);
-  store_unsigned_integer ((const gdb_byte *) out, 4, byte_order, mem);
+  store_unsigned_integer ((gdb_byte *) out, 4, byte_order, mem);
 }
 
 /* The alpha needs a conversion between register and memory format if the
