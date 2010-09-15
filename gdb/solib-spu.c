@@ -56,8 +56,9 @@ spu_relocate_main_executable (int spufs_fd)
   if (symfile_objfile == NULL)
     return;
 
-  new_offsets = alloca (symfile_objfile->num_sections
-			* sizeof (struct section_offsets));
+  new_offsets
+    = (struct section_offsets *) alloca (symfile_objfile->num_sections
+					 * sizeof (struct section_offsets));
 
   for (i = 0; i < symfile_objfile->num_sections; i++)
     new_offsets->offsets[i] = SPUADDR (spufs_fd, 0);
@@ -234,7 +235,7 @@ spu_bfd_iovec_pread (bfd *abfd, void *stream, void *buf,
   CORE_ADDR addr = *(CORE_ADDR *)stream;
   int ret;
 
-  ret = target_read_memory (addr + offset, buf, nbytes);
+  ret = target_read_memory (addr + offset, (gdb_byte *) buf, nbytes);
   if (ret != 0)
     {
       bfd_set_error (bfd_error_invalid_operation);
@@ -261,7 +262,7 @@ spu_bfd_fopen (char *name, CORE_ADDR addr)
 {
   bfd *nbfd;
 
-  CORE_ADDR *open_closure = xmalloc (sizeof (CORE_ADDR));
+  CORE_ADDR *open_closure = (CORE_ADDR *) xmalloc (sizeof (CORE_ADDR));
   *open_closure = addr;
 
   nbfd = bfd_openr_iovec (xstrdup (name), "elf32-spu",
@@ -311,7 +312,8 @@ spu_bfd_open (char *pathname)
 
       if (sect_size > 20)
 	{
-	  char *buf = alloca (sect_size - 20 + strlen (original_name) + 1);
+	  char *buf = (char *) alloca (sect_size - 20 + strlen (original_name)
+				       + 1);
 
 	  bfd_get_section_contents (abfd, spu_name, buf, 20, sect_size - 20);
 	  buf[sect_size - 20] = '\0';

@@ -1014,7 +1014,8 @@ read_xcoff_symtab (struct partial_symtab *pst)
 	      {
 		char *p;
 
-		p = obstack_alloc (&objfile->objfile_obstack, E_SYMNMLEN + 1);
+		p = (char *) obstack_alloc (&objfile->objfile_obstack,
+					    E_SYMNMLEN + 1);
 		strncpy (p, cs->c_name, E_SYMNMLEN);
 		p[E_SYMNMLEN] = '\0';
 		cs->c_name = p;
@@ -2097,7 +2098,8 @@ swap_sym (struct internal_syment *symbol, union internal_auxent *aux,
 	     into the minimal symbols.  */
 	  char *p;
 
-	  p = obstack_alloc (&objfile->objfile_obstack, E_SYMNMLEN + 1);
+	  p = (char *) obstack_alloc (&objfile->objfile_obstack,
+				      E_SYMNMLEN + 1);
 	  strncpy (p, symbol->n_name, E_SYMNMLEN);
 	  p[E_SYMNMLEN] = '\0';
 	  *name = p;
@@ -2754,7 +2756,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 		if (! pst)
 		  {
 		    int name_len = p - namestring;
-		    char *name = xmalloc (name_len + 1);
+		    char *name = (char *) xmalloc (name_len + 1);
 
 		    memcpy (name, namestring, name_len);
 		    name[name_len] = '\0';
@@ -2776,7 +2778,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 		if (! pst)
 		  {
 		    int name_len = p - namestring;
-		    char *name = xmalloc (name_len + 1);
+		    char *name = (char *) xmalloc (name_len + 1);
 
 		    memcpy (name, namestring, name_len);
 		    name[name_len] = '\0';
@@ -2947,7 +2949,7 @@ xcoff_initial_scan (struct objfile *objfile, int symfile_flags)
 	   name, bfd_errmsg (bfd_get_error ()));
   size = coff_data (abfd)->local_symesz * num_symbols;
   ((struct coff_symfile_info *) objfile->deprecated_sym_private)->symtbl =
-    obstack_alloc (&objfile->objfile_obstack, size);
+    (char *) obstack_alloc (&objfile->objfile_obstack, size);
   ((struct coff_symfile_info *) objfile->deprecated_sym_private)->symtbl_num_syms =
     num_symbols;
 

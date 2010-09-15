@@ -133,7 +133,7 @@ fetch_loadmap (CORE_ADDR ldmaddr)
   /* Allocate space for the complete (external) loadmap.  */
   ext_ldmbuf_size = sizeof (struct ext_elf32_fdpic_loadmap)
                + (nsegs - 1) * sizeof (struct ext_elf32_fdpic_loadseg);
-  ext_ldmbuf = xmalloc (ext_ldmbuf_size);
+  ext_ldmbuf = (struct ext_elf32_fdpic_loadmap *) xmalloc (ext_ldmbuf_size);
 
   /* Copy over the portion of the loadmap that's already been read.  */
   memcpy (ext_ldmbuf, &ext_ldmbuf_partial, sizeof ext_ldmbuf_partial);
@@ -152,7 +152,7 @@ fetch_loadmap (CORE_ADDR ldmaddr)
      external loadsegs.  I.e, allocate the internal loadsegs.  */
   int_ldmbuf_size = sizeof (struct int_elf32_fdpic_loadmap)
                + (nsegs - 1) * sizeof (struct int_elf32_fdpic_loadseg);
-  int_ldmbuf = xmalloc (int_ldmbuf_size);
+  int_ldmbuf = (struct int_elf32_fdpic_loadmap *) xmalloc (int_ldmbuf_size);
 
   /* Place extracted information in internal structs.  */
   int_ldmbuf->version = version;
@@ -504,8 +504,9 @@ frv_current_sos (void)
 	      break;
 	    }
 
-	  sop = xcalloc (1, sizeof (struct so_list));
-	  sop->lm_info = xcalloc (1, sizeof (struct lm_info));
+	  sop = (struct so_list *) xcalloc (1, sizeof (struct so_list));
+	  sop->lm_info
+	    = (struct lm_info *) xcalloc (1, sizeof (struct lm_info));
 	  sop->lm_info->map = loadmap;
 	  sop->lm_info->got_value = got_addr;
 	  sop->lm_info->lm_addr = lm_addr;
@@ -664,7 +665,7 @@ enable_break2 (void)
       /* Read the contents of the .interp section into a local buffer;
          the contents specify the dynamic linker this program uses.  */
       interp_sect_size = bfd_section_size (exec_bfd, interp_sect);
-      buf = alloca (interp_sect_size);
+      buf = (gdb_byte *) alloca (interp_sect_size);
       bfd_get_section_contents (exec_bfd, interp_sect,
 				buf, 0, interp_sect_size);
 
@@ -923,11 +924,13 @@ frv_relocate_main_executable (void)
 
   if (main_executable_lm_info)
     xfree (main_executable_lm_info);
-  main_executable_lm_info = xcalloc (1, sizeof (struct lm_info));
+  main_executable_lm_info
+    = (struct lm_info *) xcalloc (1, sizeof (struct lm_info));
   main_executable_lm_info->map = ldm;
 
-  new_offsets = xcalloc (symfile_objfile->num_sections,
-			 sizeof (struct section_offsets));
+  new_offsets = (struct section_offsets *)
+    xcalloc (symfile_objfile->num_sections,
+	     sizeof (struct section_offsets));
   old_chain = make_cleanup (xfree, new_offsets);
   changed = 0;
 

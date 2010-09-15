@@ -187,7 +187,7 @@ send_data (void *buf, int len)
   if (!sdi_desc)
     return -1;
 
-  if (serial_write (sdi_desc, buf, len) != 0)
+  if (serial_write (sdi_desc, (const char *) buf, len) != 0)
     return -1;
 
   if (get_ack () == -1)

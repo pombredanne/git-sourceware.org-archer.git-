@@ -132,7 +132,7 @@ union irix_obj_info
 static CORE_ADDR
 extract_mips_address (void *addr, int len, enum bfd_endian byte_order)
 {
-  return extract_signed_integer (addr, len, byte_order);
+  return extract_signed_integer ((const gdb_byte *) addr, len, byte_order);
 }
 
 /* Fetch and return the link map data associated with ADDR.  Note that
@@ -559,7 +559,7 @@ irix_current_sos (void)
 
 	  memset (new, 0, sizeof (*new));
 
-	  new->lm_info = xmalloc (sizeof (struct lm_info));
+	  new->lm_info = (struct lm_info *) xmalloc (sizeof (struct lm_info));
 	  make_cleanup (xfree, new->lm_info);
 
 	  *new->lm_info = lm;
