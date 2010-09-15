@@ -505,7 +505,8 @@ ppc_supply_gregset (const struct regset *regset, struct regcache *regcache,
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
   struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
-  const struct ppc_reg_offsets *offsets = regset->descr;
+  const struct ppc_reg_offsets *offsets
+    = (const struct ppc_reg_offsets *) regset->descr;
   size_t offset;
   int regsize;
 
@@ -517,27 +518,31 @@ ppc_supply_gregset (const struct regset *regset, struct regcache *regcache,
       for (i = tdep->ppc_gp0_regnum, offset = offsets->r0_offset;
 	   i < tdep->ppc_gp0_regnum + ppc_num_gprs;
 	   i++, offset += gpr_size)
-	ppc_supply_reg (regcache, i, gregs, offset, gpr_size);
+	ppc_supply_reg (regcache, i, (const gdb_byte *) gregs,
+			offset, gpr_size);
 
       ppc_supply_reg (regcache, gdbarch_pc_regnum (gdbarch),
-		      gregs, offsets->pc_offset, gpr_size);
+		      (const gdb_byte *) gregs, offsets->pc_offset, gpr_size);
       ppc_supply_reg (regcache, tdep->ppc_ps_regnum,
-		      gregs, offsets->ps_offset, gpr_size);
+		      (const gdb_byte *) gregs, offsets->ps_offset, gpr_size);
       ppc_supply_reg (regcache, tdep->ppc_lr_regnum,
-		      gregs, offsets->lr_offset, gpr_size);
+		      (const gdb_byte *) gregs, offsets->lr_offset, gpr_size);
       ppc_supply_reg (regcache, tdep->ppc_ctr_regnum,
-		      gregs, offsets->ctr_offset, gpr_size);
+		      (const gdb_byte *) gregs, offsets->ctr_offset, gpr_size);
       ppc_supply_reg (regcache, tdep->ppc_cr_regnum,
-		      gregs, offsets->cr_offset, offsets->xr_size);
+		      (const gdb_byte *) gregs,
+		      offsets->cr_offset, offsets->xr_size);
       ppc_supply_reg (regcache, tdep->ppc_xer_regnum,
-		      gregs, offsets->xer_offset, offsets->xr_size);
+		      (const gdb_byte *) gregs,
+		      offsets->xer_offset, offsets->xr_size);
       ppc_supply_reg (regcache, tdep->ppc_mq_regnum,
-		      gregs, offsets->mq_offset, offsets->xr_size);
+		      (const gdb_byte *) gregs,
+		      offsets->mq_offset, offsets->xr_size);
       return;
     }
 
   offset = ppc_greg_offset (gdbarch, tdep, offsets, regnum, &regsize);
-  ppc_supply_reg (regcache, regnum, gregs, offset, regsize);
+  ppc_supply_reg (regcache, regnum, (const gdb_byte *) gregs, offset, regsize);
 }
 
 /* Supply register REGNUM in the floating-point register set REGSET
@@ -557,7 +562,7 @@ ppc_supply_fpregset (const struct regset *regset, struct regcache *regcache,
     return;
 
   tdep = gdbarch_tdep (gdbarch);
-  offsets = regset->descr;
+  offsets = (const struct ppc_reg_offsets *) regset->descr;
   if (regnum == -1)
     {
       int i;
@@ -565,15 +570,16 @@ ppc_supply_fpregset (const struct regset *regset, struct regcache *regcache,
       for (i = tdep->ppc_fp0_regnum, offset = offsets->f0_offset;
 	   i < tdep->ppc_fp0_regnum + ppc_num_fprs;
 	   i++, offset += 8)
-	ppc_supply_reg (regcache, i, fpregs, offset, 8);
+	ppc_supply_reg (regcache, i, (const gdb_byte *) fpregs, offset, 8);
 
       ppc_supply_reg (regcache, tdep->ppc_fpscr_regnum,
-		      fpregs, offsets->fpscr_offset, offsets->fpscr_size);
+		      (const gdb_byte *) fpregs,
+		      offsets->fpscr_offset, offsets->fpscr_size);
       return;
     }
 
   offset = ppc_fpreg_offset (tdep, offsets, regnum);
-  ppc_supply_reg (regcache, regnum, fpregs, offset,
+  ppc_supply_reg (regcache, regnum, (const gdb_byte *) fpregs, offset,
 		  regnum == tdep->ppc_fpscr_regnum ? offsets->fpscr_size : 8);
 }
 
@@ -600,12 +606,12 @@ ppc_supply_vsxregset (const struct regset *regset, struct regcache *regcache,
       for (i = tdep->ppc_vsr0_upper_regnum;
 	   i < tdep->ppc_vsr0_upper_regnum + 32;
 	   i++)
-	ppc_supply_reg (regcache, i, vsxregs, 0, 8);
+	ppc_supply_reg (regcache, i, (const gdb_byte *) vsxregs, 0, 8);
 
       return;
     }
   else
-    ppc_supply_reg (regcache, regnum, vsxregs, 0, 8);
+    ppc_supply_reg (regcache, regnum, (const gdb_byte *) vsxregs, 0, 8);
 }
 
 /* Supply register REGNUM in the Altivec register set REGSET
@@ -625,7 +631,7 @@ ppc_supply_vrregset (const struct regset *regset, struct regcache *regcache,
     return;
 
   tdep = gdbarch_tdep (gdbarch);
-  offsets = regset->descr;
+  offsets = (const struct ppc_reg_offsets *) regset->descr;
   if (regnum == -1)
     {
       int i;
@@ -633,23 +639,23 @@ ppc_supply_vrregset (const struct regset *regset, struct regcache *regcache,
       for (i = tdep->ppc_vr0_regnum, offset = offsets->vr0_offset;
 	   i < tdep->ppc_vr0_regnum + ppc_num_vrs;
 	   i++, offset += 16)
-        ppc_supply_reg (regcache, i, vrregs, offset, 16);
+        ppc_supply_reg (regcache, i, (const gdb_byte *) vrregs, offset, 16);
 
       ppc_supply_reg (regcache, (tdep->ppc_vrsave_regnum - 1),
-		      vrregs, offsets->vscr_offset, 4);
+		      (const gdb_byte *) vrregs, offsets->vscr_offset, 4);
 
       ppc_supply_reg (regcache, tdep->ppc_vrsave_regnum,
-		      vrregs, offsets->vrsave_offset, 4);
+		      (const gdb_byte *) vrregs, offsets->vrsave_offset, 4);
       return;
     }
 
   offset = ppc_vrreg_offset (tdep, offsets, regnum);
   if (regnum != tdep->ppc_vrsave_regnum
       && regnum != tdep->ppc_vrsave_regnum - 1)
-    ppc_supply_reg (regcache, regnum, vrregs, offset, 16);
+    ppc_supply_reg (regcache, regnum, (const gdb_byte *) vrregs, offset, 16);
   else
     ppc_supply_reg (regcache, regnum,
-		    vrregs, offset, 4);
+		    (const gdb_byte *) vrregs, offset, 4);
 }
 
 /* Collect register REGNUM in the general-purpose register set
@@ -664,7 +670,8 @@ ppc_collect_gregset (const struct regset *regset,
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
   struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
-  const struct ppc_reg_offsets *offsets = regset->descr;
+  const struct ppc_reg_offsets *offsets
+    = (const struct ppc_reg_offsets *) regset->descr;
   size_t offset;
   int regsize;
 
@@ -676,27 +683,30 @@ ppc_collect_gregset (const struct regset *regset,
       for (i = tdep->ppc_gp0_regnum, offset = offsets->r0_offset;
 	   i < tdep->ppc_gp0_regnum + ppc_num_gprs;
 	   i++, offset += gpr_size)
-	ppc_collect_reg (regcache, i, gregs, offset, gpr_size);
+	ppc_collect_reg (regcache, i, (gdb_byte *) gregs, offset, gpr_size);
 
       ppc_collect_reg (regcache, gdbarch_pc_regnum (gdbarch),
-		       gregs, offsets->pc_offset, gpr_size);
+		       (gdb_byte *) gregs, offsets->pc_offset, gpr_size);
       ppc_collect_reg (regcache, tdep->ppc_ps_regnum,
-		       gregs, offsets->ps_offset, gpr_size);
+		       (gdb_byte *) gregs, offsets->ps_offset, gpr_size);
       ppc_collect_reg (regcache, tdep->ppc_lr_regnum,
-		       gregs, offsets->lr_offset, gpr_size);
+		       (gdb_byte *) gregs, offsets->lr_offset, gpr_size);
       ppc_collect_reg (regcache, tdep->ppc_ctr_regnum,
-		       gregs, offsets->ctr_offset, gpr_size);
+		       (gdb_byte *) gregs, offsets->ctr_offset, gpr_size);
       ppc_collect_reg (regcache, tdep->ppc_cr_regnum,
-		       gregs, offsets->cr_offset, offsets->xr_size);
+		       (gdb_byte *) gregs,
+		       offsets->cr_offset, offsets->xr_size);
       ppc_collect_reg (regcache, tdep->ppc_xer_regnum,
-		       gregs, offsets->xer_offset, offsets->xr_size);
+		       (gdb_byte *) gregs,
+		       offsets->xer_offset, offsets->xr_size);
       ppc_collect_reg (regcache, tdep->ppc_mq_regnum,
-		       gregs, offsets->mq_offset, offsets->xr_size);
+		       (gdb_byte *) gregs,
+		       offsets->mq_offset, offsets->xr_size);
       return;
     }
 
   offset = ppc_greg_offset (gdbarch, tdep, offsets, regnum, &regsize);
-  ppc_collect_reg (regcache, regnum, gregs, offset, regsize);
+  ppc_collect_reg (regcache, regnum, (gdb_byte *) gregs, offset, regsize);
 }
 
 /* Collect register REGNUM in the floating-point register set
@@ -718,7 +728,7 @@ ppc_collect_fpregset (const struct regset *regset,
     return;
 
   tdep = gdbarch_tdep (gdbarch);
-  offsets = regset->descr;
+  offsets = (const struct ppc_reg_offsets *) regset->descr;
   if (regnum == -1)
     {
       int i;
@@ -726,15 +736,15 @@ ppc_collect_fpregset (const struct regset *regset,
       for (i = tdep->ppc_fp0_regnum, offset = offsets->f0_offset;
 	   i < tdep->ppc_fp0_regnum + ppc_num_fprs;
 	   i++, offset += 8)
-	ppc_collect_reg (regcache, i, fpregs, offset, 8);
+	ppc_collect_reg (regcache, i, (gdb_byte *) fpregs, offset, 8);
 
-      ppc_collect_reg (regcache, tdep->ppc_fpscr_regnum,
-		       fpregs, offsets->fpscr_offset, offsets->fpscr_size);
+      ppc_collect_reg (regcache, tdep->ppc_fpscr_regnum, (gdb_byte *) fpregs,
+		       offsets->fpscr_offset, offsets->fpscr_size);
       return;
     }
 
   offset = ppc_fpreg_offset (tdep, offsets, regnum);
-  ppc_collect_reg (regcache, regnum, fpregs, offset,
+  ppc_collect_reg (regcache, regnum, (gdb_byte *) fpregs, offset,
 		   regnum == tdep->ppc_fpscr_regnum ? offsets->fpscr_size : 8);
 }
 
@@ -763,12 +773,12 @@ ppc_collect_vsxregset (const struct regset *regset,
       for (i = tdep->ppc_vsr0_upper_regnum;
 	   i < tdep->ppc_vsr0_upper_regnum + 32;
 	   i++)
-	ppc_collect_reg (regcache, i, vsxregs, 0, 8);
+	ppc_collect_reg (regcache, i, (gdb_byte *) vsxregs, 0, 8);
 
       return;
     }
   else
-    ppc_collect_reg (regcache, regnum, vsxregs, 0, 8);
+    ppc_collect_reg (regcache, regnum, (gdb_byte *) vsxregs, 0, 8);
 }
 
 
@@ -791,7 +801,7 @@ ppc_collect_vrregset (const struct regset *regset,
     return;
 
   tdep = gdbarch_tdep (gdbarch);
-  offsets = regset->descr;
+  offsets = (const struct ppc_reg_offsets *) regset->descr;
   if (regnum == -1)
     {
       int i;
@@ -799,23 +809,23 @@ ppc_collect_vrregset (const struct regset *regset,
       for (i = tdep->ppc_vr0_regnum, offset = offsets->vr0_offset;
 	   i < tdep->ppc_vr0_regnum + ppc_num_vrs;
 	   i++, offset += 16)
-	ppc_collect_reg (regcache, i, vrregs, offset, 16);
+	ppc_collect_reg (regcache, i, (gdb_byte *) vrregs, offset, 16);
 
       ppc_collect_reg (regcache, (tdep->ppc_vrsave_regnum - 1),
-		       vrregs, offsets->vscr_offset, 4);
+		       (gdb_byte *) vrregs, offsets->vscr_offset, 4);
 
       ppc_collect_reg (regcache, tdep->ppc_vrsave_regnum,
-		       vrregs, offsets->vrsave_offset, 4);
+		       (gdb_byte *) vrregs, offsets->vrsave_offset, 4);
       return;
     }
 
   offset = ppc_vrreg_offset (tdep, offsets, regnum);
   if (regnum != tdep->ppc_vrsave_regnum
       && regnum != tdep->ppc_vrsave_regnum - 1)
-    ppc_collect_reg (regcache, regnum, vrregs, offset, 16);
+    ppc_collect_reg (regcache, regnum, (gdb_byte *) vrregs, offset, 16);
   else
     ppc_collect_reg (regcache, regnum,
-		    vrregs, offset, 4);
+		    (gdb_byte *) vrregs, offset, 4);
 }
 
 
@@ -3071,7 +3081,7 @@ rs6000_frame_cache (struct frame_info *this_frame, void **this_cache)
   CORE_ADDR func, pc;
 
   if ((*this_cache) != NULL)
-    return (*this_cache);
+    return (struct rs6000_frame_cache *) (*this_cache);
   cache = FRAME_OBSTACK_ZALLOC (struct rs6000_frame_cache);
   (*this_cache) = cache;
   cache->saved_regs = trad_frame_alloc_saved_regs (this_frame);
@@ -3920,7 +3930,7 @@ rs6000_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
 
   /* Hook in ABI-specific overrides, if they have been registered.  */
   info.target_desc = tdesc;
-  info.tdep_info = (void *) tdesc_data;
+  info.tdep_info = (struct gdbarch_tdep_info *) tdesc_data;
   gdbarch_init_osabi (info, gdbarch);
 
   switch (info.osabi)

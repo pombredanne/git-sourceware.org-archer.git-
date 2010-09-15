@@ -436,7 +436,7 @@ h8300_frame_cache (struct frame_info *this_frame, void **this_cache)
   CORE_ADDR current_pc;
 
   if (*this_cache)
-    return *this_cache;
+    return (struct h8300_frame_cache *) *this_cache;
 
   cache = FRAME_OBSTACK_ZALLOC (struct h8300_frame_cache);
   h8300_init_frame_cache (gdbarch, cache);
@@ -673,7 +673,7 @@ h8300_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 
       /* Pad the argument appropriately.  */
       int padded_len = align_up (len, wordsize);
-      gdb_byte *padded = alloca (padded_len);
+      gdb_byte *padded = (gdb_byte *) alloca (padded_len);
 
       memset (padded, 0, padded_len);
       memcpy (len < wordsize ? padded + padded_len - len : padded,
@@ -754,20 +754,21 @@ h8300_extract_return_value (struct type *type, struct regcache *regcache,
     case 1:
     case 2:
       regcache_cooked_read_unsigned (regcache, E_RET0_REGNUM, &c);
-      store_unsigned_integer (valbuf, len, byte_order, c);
+      store_unsigned_integer ((gdb_byte *) valbuf, len, byte_order, c);
       break;
     case 4:			/* Needs two registers on plain H8/300 */
       regcache_cooked_read_unsigned (regcache, E_RET0_REGNUM, &c);
-      store_unsigned_integer (valbuf, 2, byte_order, c);
+      store_unsigned_integer ((gdb_byte *) valbuf, 2, byte_order, c);
       regcache_cooked_read_unsigned (regcache, E_RET1_REGNUM, &c);
-      store_unsigned_integer ((void *)((char *) valbuf + 2), 2, byte_order, c);
+      store_unsigned_integer ((gdb_byte *)((char *) valbuf + 2),
+			      2, byte_order, c);
       break;
     case 8:			/* long long is now 8 bytes.  */
       if (TYPE_CODE (type) == TYPE_CODE_INT)
 	{
 	  regcache_cooked_read_unsigned (regcache, E_RET0_REGNUM, &addr);
 	  c = read_memory_unsigned_integer ((CORE_ADDR) addr, len, byte_order);
-	  store_unsigned_integer (valbuf, len, byte_order, c);
+	  store_unsigned_integer ((gdb_byte *) valbuf, len, byte_order, c);
 	}
       else
 	{
@@ -792,15 +793,15 @@ h8300h_extract_return_value (struct type *type, struct regcache *regcache,
     case 2:
     case 4:
       regcache_cooked_read_unsigned (regcache, E_RET0_REGNUM, &c);
-      store_unsigned_integer (valbuf, len, byte_order, c);
+      store_unsigned_integer ((gdb_byte *) valbuf, len, byte_order, c);
       break;
     case 8:			/* long long is now 8 bytes.  */
       if (TYPE_CODE (type) == TYPE_CODE_INT)
 	{
 	  regcache_cooked_read_unsigned (regcache, E_RET0_REGNUM, &c);
-	  store_unsigned_integer (valbuf, 4, byte_order, c);
+	  store_unsigned_integer ((gdb_byte *) valbuf, 4, byte_order, c);
 	  regcache_cooked_read_unsigned (regcache, E_RET1_REGNUM, &c);
-	  store_unsigned_integer ((void *) ((char *) valbuf + 4), 4,
+	  store_unsigned_integer ((gdb_byte *) ((char *) valbuf + 4), 4,
 				  byte_order, c);
 	}
       else
@@ -857,11 +858,13 @@ h8300_store_return_value (struct type *type, struct regcache *regcache,
     {
     case 1:
     case 2:			/* short... */
-      val = extract_unsigned_integer (valbuf, len, byte_order);
+      val = extract_unsigned_integer ((const gdb_byte *) valbuf,
+				      len, byte_order);
       regcache_cooked_write_unsigned (regcache, E_RET0_REGNUM, val);
       break;
     case 4:			/* long, float */
-      val = extract_unsigned_integer (valbuf, len, byte_order);
+      val = extract_unsigned_integer ((const gdb_byte *) valbuf,
+				      len, byte_order);
       regcache_cooked_write_unsigned (regcache, E_RET0_REGNUM,
 				      (val >> 16) & 0xffff);
       regcache_cooked_write_unsigned (regcache, E_RET1_REGNUM, val & 0xffff);
@@ -887,11 +890,12 @@ h8300h_store_return_value (struct type *type, struct regcache *regcache,
     case 1:
     case 2:
     case 4:			/* long, float */
-      val = extract_unsigned_integer (valbuf, len, byte_order);
+      val = extract_unsigned_integer ((const gdb_byte *) valbuf,
+				      len, byte_order);
       regcache_cooked_write_unsigned (regcache, E_RET0_REGNUM, val);
       break;
     case 8:
-      val = extract_unsigned_integer (valbuf, len, byte_order);
+      val = extract_unsigned_integer ((const gdb_byte *) valbuf, len, byte_order);
       regcache_cooked_write_unsigned (regcache, E_RET0_REGNUM,
 				      (val >> 32) & 0xffffffff);
       regcache_cooked_write_unsigned (regcache, E_RET1_REGNUM,

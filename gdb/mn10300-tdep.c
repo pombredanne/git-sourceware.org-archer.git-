@@ -182,10 +182,10 @@ mn10300_store_return_value (struct gdbarch *gdbarch, struct type *type,
   regsz = register_size (gdbarch, reg);
 
   if (len <= regsz)
-    regcache_raw_write_part (regcache, reg, 0, len, valbuf);
+    regcache_raw_write_part (regcache, reg, 0, len, (const gdb_byte *) valbuf);
   else if (len <= 2 * regsz)
     {
-      regcache_raw_write (regcache, reg, valbuf);
+      regcache_raw_write (regcache, reg, (const gdb_byte *) valbuf);
       gdb_assert (regsz == register_size (gdbarch, reg + 1));
       regcache_raw_write_part (regcache, reg+1, 0,
 			       len - regsz, (char *) valbuf + regsz);
@@ -1096,10 +1096,12 @@ mn10300_analyze_frame_prologue (struct frame_info *this_frame,
         stop_addr = func_start;
 
       mn10300_analyze_prologue (get_frame_arch (this_frame),
-                                func_start, stop_addr, *this_prologue_cache);
+				func_start, stop_addr,
+				(struct mn10300_prologue *)
+				*this_prologue_cache);
     }
 
-  return *this_prologue_cache;
+  return (struct mn10300_prologue *) *this_prologue_cache;
 }
 
 /* Given the next frame and a prologue cache, return this frame's
@@ -1391,7 +1393,7 @@ mn10300_gdbarch_init (struct gdbarch_info info,
   if (arches != NULL)
     return arches->gdbarch;
 
-  tdep = xmalloc (sizeof (struct gdbarch_tdep));
+  tdep = (struct gdbarch_tdep *) xmalloc (sizeof (struct gdbarch_tdep));
   gdbarch = gdbarch_alloc (&info, tdep);
 
   switch (info.bfd_arch_info->mach)

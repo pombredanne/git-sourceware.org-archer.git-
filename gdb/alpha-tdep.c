@@ -187,7 +187,8 @@ static void
 alpha_lds (struct gdbarch *gdbarch, void *out, const void *in)
 {
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
-  ULONGEST mem     = extract_unsigned_integer (in, 4, byte_order);
+  ULONGEST mem     = extract_unsigned_integer ((const gdb_byte *) in,
+					       4, byte_order);
   ULONGEST frac    = (mem >>  0) & 0x7fffff;
   ULONGEST sign    = (mem >> 31) & 1;
   ULONGEST exp_msb = (mem >> 30) & 1;
@@ -207,7 +208,7 @@ alpha_lds (struct gdbarch *gdbarch, void *out, const void *in)
     }
 
   reg = (sign << 63) | (exp << 52) | (frac << 29);
-  store_unsigned_integer (out, 8, byte_order, reg);
+  store_unsigned_integer ((const gdb_byte *) out, 8, byte_order, reg);
 }
 
 /* Similarly, this represents exactly the conversion performed by
@@ -219,9 +220,9 @@ alpha_sts (struct gdbarch *gdbarch, void *out, const void *in)
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   ULONGEST reg, mem;
 
-  reg = extract_unsigned_integer (in, 8, byte_order);
+  reg = extract_unsigned_integer ((const gdb_byte *) in, 8, byte_order);
   mem = ((reg >> 32) & 0xc0000000) | ((reg >> 29) & 0x3fffffff);
-  store_unsigned_integer (out, 4, byte_order, mem);
+  store_unsigned_integer ((const gdb_byte *) out, 4, byte_order, mem);
 }
 
 /* The alpha needs a conversion between register and memory format if the
@@ -794,7 +795,7 @@ alpha_sigtramp_frame_unwind_cache (struct frame_info *this_frame,
   struct gdbarch_tdep *tdep;
 
   if (*this_prologue_cache)
-    return *this_prologue_cache;
+    return (struct alpha_sigtramp_unwind_cache *) *this_prologue_cache;
 
   info = FRAME_OBSTACK_ZALLOC (struct alpha_sigtramp_unwind_cache);
   *this_prologue_cache = info;
@@ -1144,7 +1145,7 @@ alpha_heuristic_frame_unwind_cache (struct frame_info *this_frame,
   int frame_reg, frame_size, return_reg, reg;
 
   if (*this_prologue_cache)
-    return *this_prologue_cache;
+    return (struct alpha_heuristic_unwind_cache *) *this_prologue_cache;
 
   info = FRAME_OBSTACK_ZALLOC (struct alpha_heuristic_unwind_cache);
   *this_prologue_cache = info;
@@ -1401,7 +1402,7 @@ void
 alpha_supply_int_regs (struct regcache *regcache, int regno,
 		       const void *r0_r30, const void *pc, const void *unique)
 {
-  const gdb_byte *regs = r0_r30;
+  const gdb_byte *regs = (const gdb_byte *) r0_r30;
   int i;
 
   for (i = 0; i < 31; ++i)
@@ -1422,7 +1423,7 @@ void
 alpha_fill_int_regs (const struct regcache *regcache,
 		     int regno, void *r0_r30, void *pc, void *unique)
 {
-  gdb_byte *regs = r0_r30;
+  gdb_byte *regs = (gdb_byte *) r0_r30;
   int i;
 
   for (i = 0; i < 31; ++i)
@@ -1440,7 +1441,7 @@ void
 alpha_supply_fp_regs (struct regcache *regcache, int regno,
 		      const void *f0_f30, const void *fpcr)
 {
-  const gdb_byte *regs = f0_f30;
+  const gdb_byte *regs = (const gdb_byte *) f0_f30;
   int i;
 
   for (i = ALPHA_FP0_REGNUM; i < ALPHA_FP0_REGNUM + 31; ++i)
@@ -1456,7 +1457,7 @@ void
 alpha_fill_fp_regs (const struct regcache *regcache,
 		    int regno, void *f0_f30, void *fpcr)
 {
-  gdb_byte *regs = f0_f30;
+  gdb_byte *regs = (gdb_byte *) f0_f30;
   int i;
 
   for (i = ALPHA_FP0_REGNUM; i < ALPHA_FP0_REGNUM + 31; ++i)
@@ -1660,7 +1661,7 @@ alpha_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   if (arches != NULL)
     return arches->gdbarch;
 
-  tdep = xmalloc (sizeof (struct gdbarch_tdep));
+  tdep = (struct gdbarch_tdep *) xmalloc (sizeof (struct gdbarch_tdep));
   gdbarch = gdbarch_alloc (&info, tdep);
 
   /* Lowest text address.  This is used by heuristic_proc_start()

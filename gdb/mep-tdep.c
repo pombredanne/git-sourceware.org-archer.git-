@@ -1149,7 +1149,7 @@ mep_pseudo_cr32_read (struct gdbarch *gdbarch,
   gdb_assert (TYPE_LENGTH (register_type (gdbarch, cookednum)) == 4);
   regcache_raw_read (regcache, rawnum, buf64);
   /* Slow, but legible.  */
-  store_unsigned_integer (buf, 4, byte_order,
+  store_unsigned_integer ((gdb_byte *) buf, 4, byte_order,
 			  extract_unsigned_integer (buf64, 8, byte_order));
 }
 
@@ -1160,7 +1160,7 @@ mep_pseudo_cr64_read (struct gdbarch *gdbarch,
                       int cookednum,
                       void *buf)
 {
-  regcache_raw_read (regcache, mep_pseudo_to_raw[cookednum], buf);
+  regcache_raw_read (regcache, mep_pseudo_to_raw[cookednum], (gdb_byte *) buf);
 }
 
 
@@ -1207,7 +1207,8 @@ mep_pseudo_csr_write (struct gdbarch *gdbarch,
       ULONGEST mixed_bits;
           
       regcache_raw_read_unsigned (regcache, r->raw, &old_bits);
-      new_bits = extract_unsigned_integer (buf, size, byte_order);
+      new_bits = extract_unsigned_integer ((const gdb_byte *) buf,
+					   size, byte_order);
       mixed_bits = ((r->writeable_bits & new_bits)
                     | (~r->writeable_bits & old_bits));
       regcache_raw_write_unsigned (regcache, r->raw, mixed_bits);
@@ -1231,7 +1232,8 @@ mep_pseudo_cr32_write (struct gdbarch *gdbarch,
   gdb_assert (TYPE_LENGTH (register_type (gdbarch, cookednum)) == 4);
   /* Slow, but legible.  */
   store_unsigned_integer (buf64, 8, byte_order,
-			  extract_unsigned_integer (buf, 4, byte_order));
+			  extract_unsigned_integer ((const gdb_byte *) buf,
+						    4, byte_order));
   regcache_raw_write (regcache, rawnum, buf64);
 }
 
@@ -1242,7 +1244,8 @@ mep_pseudo_cr64_write (struct gdbarch *gdbarch,
                      int cookednum,
                      const void *buf)
 {
-  regcache_raw_write (regcache, mep_pseudo_to_raw[cookednum], buf);
+  regcache_raw_write (regcache, mep_pseudo_to_raw[cookednum],
+		      (const gdb_byte *) buf);
 }
 
 
@@ -1957,10 +1960,11 @@ mep_analyze_frame_prologue (struct frame_info *this_frame,
         stop_addr = func_start;
 
       mep_analyze_prologue (get_frame_arch (this_frame),
-			    func_start, stop_addr, *this_prologue_cache);
+			    func_start, stop_addr,
+			    (struct mep_prologue *) *this_prologue_cache);
     }
 
-  return *this_prologue_cache;
+  return (struct mep_prologue *) *this_prologue_cache;
 }
 
 

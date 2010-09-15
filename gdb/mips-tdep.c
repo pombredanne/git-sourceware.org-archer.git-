@@ -1779,7 +1779,7 @@ mips_insn16_frame_cache (struct frame_info *this_frame, void **this_cache)
   struct mips_frame_cache *cache;
 
   if ((*this_cache) != NULL)
-    return (*this_cache);
+    return (struct mips_frame_cache *) (*this_cache);
   cache = FRAME_OBSTACK_ZALLOC (struct mips_frame_cache);
   (*this_cache) = cache;
   cache->saved_regs = trad_frame_alloc_saved_regs (this_frame);
@@ -1797,7 +1797,8 @@ mips_insn16_frame_cache (struct frame_info *this_frame, void **this_cache)
     if (start_addr == 0)
       return cache;
 
-    mips16_scan_prologue (gdbarch, start_addr, pc, this_frame, *this_cache);
+    mips16_scan_prologue (gdbarch, start_addr, pc, this_frame,
+			  (struct mips_frame_cache *) *this_cache);
   }
   
   /* gdbarch_sp_regnum contains the value and not the address.  */
@@ -1805,7 +1806,7 @@ mips_insn16_frame_cache (struct frame_info *this_frame, void **this_cache)
 			gdbarch_num_regs (gdbarch) + MIPS_SP_REGNUM,
 			cache->base);
 
-  return (*this_cache);
+  return (struct mips_frame_cache *) (*this_cache);
 }
 
 static void
@@ -2130,7 +2131,7 @@ mips_insn32_frame_cache (struct frame_info *this_frame, void **this_cache)
   struct mips_frame_cache *cache;
 
   if ((*this_cache) != NULL)
-    return (*this_cache);
+    return (struct mips_frame_cache *) (*this_cache);
 
   cache = FRAME_OBSTACK_ZALLOC (struct mips_frame_cache);
   (*this_cache) = cache;
@@ -2149,7 +2150,8 @@ mips_insn32_frame_cache (struct frame_info *this_frame, void **this_cache)
     if (start_addr == 0)
       return cache;
 
-    mips32_scan_prologue (gdbarch, start_addr, pc, this_frame, *this_cache);
+    mips32_scan_prologue (gdbarch, start_addr, pc, this_frame,
+			  (struct mips_frame_cache *) *this_cache);
   }
   
   /* gdbarch_sp_regnum contains the value and not the address.  */
@@ -2157,7 +2159,7 @@ mips_insn32_frame_cache (struct frame_info *this_frame, void **this_cache)
 			gdbarch_num_regs (gdbarch) + MIPS_SP_REGNUM,
 			cache->base);
 
-  return (*this_cache);
+  return (struct mips_frame_cache *) (*this_cache);
 }
 
 static void
@@ -2238,7 +2240,7 @@ mips_stub_frame_cache (struct frame_info *this_frame, void **this_cache)
   int num_regs = gdbarch_num_regs (gdbarch);
 
   if ((*this_cache) != NULL)
-    return (*this_cache);
+    return (struct trad_frame_cache *) (*this_cache);
   this_trad_cache = trad_frame_cache_zalloc (this_frame);
   (*this_cache) = this_trad_cache;
 
@@ -4318,7 +4320,7 @@ mips_read_fp_register_single (struct frame_info *frame, int regno,
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
   int raw_size = register_size (gdbarch, regno);
-  gdb_byte *raw_buffer = alloca (raw_size);
+  gdb_byte *raw_buffer = (gdb_byte *) alloca (raw_size);
 
   if (!frame_register_read (frame, regno, raw_buffer))
     error (_("can't read register %d (%s)"),
@@ -4394,7 +4396,9 @@ mips_print_fp_register (struct ui_file *file, struct frame_info *frame,
   double doub, flt1;	/* doubles extracted from raw hex data */
   int inv1, inv2;
 
-  raw_buffer = alloca (2 * register_size (gdbarch, mips_regnum (gdbarch)->fp0));
+  raw_buffer
+    = (gdb_byte *) alloca (2 * register_size (gdbarch,
+					      mips_regnum (gdbarch)->fp0));
 
   fprintf_filtered (file, "%s:", gdbarch_register_name (gdbarch, regnum));
   fprintf_filtered (file, "%*s",
@@ -5427,7 +5431,7 @@ mips_register_g_packet_guesses (struct gdbarch *gdbarch)
 static struct value *
 value_of_mips_user_reg (struct frame_info *frame, const void *baton)
 {
-  const int *reg_p = baton;
+  const int *reg_p = (const int *) baton;
   return value_of_register (*reg_p, frame);
 }
 
@@ -6054,7 +6058,7 @@ mips_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   mips_register_g_packet_guesses (gdbarch);
 
   /* Hook in OS ABI-specific overrides, if they have been registered.  */
-  info.tdep_info = (void *) tdesc_data;
+  info.tdep_info = (struct gdbarch_tdep_info *) tdesc_data;
   gdbarch_init_osabi (info, gdbarch);
 
   /* Unwind the frame.  */

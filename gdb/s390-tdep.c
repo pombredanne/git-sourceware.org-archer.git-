@@ -447,7 +447,7 @@ static void
 s390_supply_regset (const struct regset *regset, struct regcache *regcache,
 		    int regnum, const void *regs, size_t len)
 {
-  const int *offset = regset->descr;
+  const int *offset = (const int *) regset->descr;
   int i;
 
   for (i = 0; i < S390_NUM_REGS; i++)
@@ -466,7 +466,7 @@ s390_collect_regset (const struct regset *regset,
 		     const struct regcache *regcache,
 		     int regnum, void *regs, size_t len)
 {
-  const int *offset = regset->descr;
+  const int *offset = (const int *) regset->descr;
   int i;
 
   for (i = 0; i < S390_NUM_REGS; i++)
@@ -961,7 +961,7 @@ s390_load (struct s390_prologue_data *data,
 static void
 s390_check_for_saved (void *data_untyped, pv_t addr, CORE_ADDR size, pv_t value)
 {
-  struct s390_prologue_data *data = data_untyped;
+  struct s390_prologue_data *data = (struct s390_prologue_data *) data_untyped;
   int i, offset;
 
   if (!pv_is_register (addr, S390_SP_REGNUM))
@@ -1678,7 +1678,7 @@ s390_frame_unwind_cache (struct frame_info *this_frame,
 {
   struct s390_unwind_cache *info;
   if (*this_prologue_cache)
-    return *this_prologue_cache;
+    return (struct s390_unwind_cache *) *this_prologue_cache;
 
   info = FRAME_OBSTACK_ZALLOC (struct s390_unwind_cache);
   *this_prologue_cache = info;
@@ -1768,7 +1768,7 @@ s390_stub_frame_unwind_cache (struct frame_info *this_frame,
   ULONGEST reg;
 
   if (*this_prologue_cache)
-    return *this_prologue_cache;
+    return (struct s390_stub_unwind_cache *) *this_prologue_cache;
 
   info = FRAME_OBSTACK_ZALLOC (struct s390_stub_unwind_cache);
   *this_prologue_cache = info;
@@ -1852,7 +1852,7 @@ s390_sigtramp_frame_unwind_cache (struct frame_info *this_frame,
   int i;
 
   if (*this_prologue_cache)
-    return *this_prologue_cache;
+    return (struct s390_sigtramp_unwind_cache *) *this_prologue_cache;
 
   info = FRAME_OBSTACK_ZALLOC (struct s390_sigtramp_unwind_cache);
   *this_prologue_cache = info;
@@ -2348,7 +2348,7 @@ s390_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 
   /* If the i'th argument is passed as a reference to a copy, then
      copy_addr[i] is the address of the copy we made.  */
-  CORE_ADDR *copy_addr = alloca (nargs * sizeof (CORE_ADDR));
+  CORE_ADDR *copy_addr = (CORE_ADDR *) alloca (nargs * sizeof (CORE_ADDR));
 
   /* Build the reference-to-copy area.  */
   for (i = 0; i < nargs; i++)

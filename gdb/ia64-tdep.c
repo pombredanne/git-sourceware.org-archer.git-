@@ -1067,7 +1067,7 @@ ia64_pseudo_register_write (struct gdbarch *gdbarch, struct regcache *regcache,
       if ((cfm & 0x7f) > regnum - V32_REGNUM) 
 	{
 	  ULONGEST reg_addr = rse_address_add (bsp, (regnum - V32_REGNUM));
-	  write_memory (reg_addr, (void *)buf, 8);
+	  write_memory (reg_addr, buf, 8);
 	}
     }
   else if (IA64_NAT0_REGNUM <= regnum && regnum <= IA64_NAT31_REGNUM)
@@ -1802,7 +1802,7 @@ ia64_frame_cache (struct frame_info *this_frame, void **this_cache)
   int i;
 
   if (*this_cache)
-    return *this_cache;
+    return (struct ia64_frame_cache *) *this_cache;
 
   cache = ia64_alloc_frame_cache ();
   *this_cache = cache;
@@ -2178,7 +2178,7 @@ ia64_sigtramp_frame_cache (struct frame_info *this_frame, void **this_cache)
   int i;
 
   if (*this_cache)
-    return *this_cache;
+    return (struct ia64_frame_cache *) *this_cache;
 
   cache = ia64_alloc_frame_cache ();
 
@@ -3688,7 +3688,7 @@ ia64_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 	      char to[MAX_REGISTER_SIZE];
 	      convert_typed_floating (value_contents (arg) + argoffset, float_elt_type,
 				      to, ia64_ext_type (gdbarch));
-	      regcache_cooked_write (regcache, floatreg, (void *)to);
+	      regcache_cooked_write (regcache, floatreg, (gdb_byte *)to);
 	      floatreg++;
 	      argoffset += TYPE_LENGTH (float_elt_type);
 	      len -= TYPE_LENGTH (float_elt_type);
@@ -3770,7 +3770,7 @@ ia64_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   if (arches != NULL)
     return arches->gdbarch;
 
-  tdep = xzalloc (sizeof (struct gdbarch_tdep));
+  tdep = (struct gdbarch_tdep *) xzalloc (sizeof (struct gdbarch_tdep));
   gdbarch = gdbarch_alloc (&info, tdep);
 
   /* According to the ia64 specs, instructions that store long double

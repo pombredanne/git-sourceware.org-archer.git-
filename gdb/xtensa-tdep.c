@@ -275,8 +275,9 @@ xtensa_register_type (struct gdbarch *gdbarch, int regnum)
 
 	      if (tp == NULL)
 		{
-		  char *name = xmalloc (16);
-		  tp = xmalloc (sizeof (struct ctype_cache));
+		  char *name = (char *) xmalloc (16);
+		  tp = (struct ctype_cache *)
+		    xmalloc (sizeof (struct ctype_cache));
 		  tp->next = tdep->type_entries;
 		  tdep->type_entries = tp;
 		  tp->size = size;
@@ -807,7 +808,7 @@ xtensa_supply_gregset (const struct regset *regset,
 		       const void *gregs,
 		       size_t len)
 {
-  const xtensa_elf_gregset_t *regs = gregs;
+  const xtensa_elf_gregset_t *regs = (const xtensa_elf_gregset_t *) gregs;
   struct gdbarch *gdbarch = get_regcache_arch (rc);
   int i;
 
@@ -1186,7 +1187,7 @@ xtensa_frame_cache (struct frame_info *this_frame, void **this_cache)
   int  windowed;
 
   if (*this_cache)
-    return *this_cache;
+    return (struct xtensa_frame_cache *) *this_cache;
 
   ps = get_frame_register_unsigned (this_frame, gdbarch_ps_regnum (gdbarch));
   windowed = windowing_enabled (ps);
@@ -1341,7 +1342,7 @@ xtensa_frame_prev_register (struct frame_info *this_frame,
 
   if (*this_cache == NULL)
     *this_cache = xtensa_frame_cache (this_frame, this_cache);
-  cache = *this_cache;
+  cache = (struct xtensa_frame_cache *) *this_cache;
 
   if (regnum ==gdbarch_pc_regnum (gdbarch))
     saved_reg = cache->ra;
@@ -1453,7 +1454,7 @@ xtensa_extract_return_value (struct type *type,
 			     void *dst)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
-  bfd_byte *valbuf = dst;
+  bfd_byte *valbuf = (bfd_byte *) dst;
   int len = TYPE_LENGTH (type);
   ULONGEST pc, wb;
   int callsize, areg;
@@ -1508,7 +1509,7 @@ xtensa_store_return_value (struct type *type,
 			   const void *dst)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
-  const bfd_byte *valbuf = dst;
+  const bfd_byte *valbuf = (const bfd_byte *) dst;
   unsigned int areg;
   ULONGEST pc, wb;
   int callsize;

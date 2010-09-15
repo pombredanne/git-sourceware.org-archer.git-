@@ -958,7 +958,7 @@ spu_frame_unwind_cache (struct frame_info *this_frame,
   gdb_byte buf[16];
 
   if (*this_prologue_cache)
-    return *this_prologue_cache;
+    return (struct spu_unwind_cache *) *this_prologue_cache;
 
   info = FRAME_OBSTACK_ZALLOC (struct spu_unwind_cache);
   *this_prologue_cache = info;
@@ -1157,7 +1157,7 @@ struct spu2ppu_cache
 static struct gdbarch *
 spu2ppu_prev_arch (struct frame_info *this_frame, void **this_cache)
 {
-  struct spu2ppu_cache *cache = *this_cache;
+  struct spu2ppu_cache *cache = (struct spu2ppu_cache *) *this_cache;
   return get_regcache_arch (cache->regcache);
 }
 
@@ -1165,7 +1165,7 @@ static void
 spu2ppu_this_id (struct frame_info *this_frame,
 		 void **this_cache, struct frame_id *this_id)
 {
-  struct spu2ppu_cache *cache = *this_cache;
+  struct spu2ppu_cache *cache = (struct spu2ppu_cache *) *this_cache;
   *this_id = cache->frame_id;
 }
 
@@ -1173,11 +1173,11 @@ static struct value *
 spu2ppu_prev_register (struct frame_info *this_frame,
 		       void **this_cache, int regnum)
 {
-  struct spu2ppu_cache *cache = *this_cache;
+  struct spu2ppu_cache *cache = (struct spu2ppu_cache *) *this_cache;
   struct gdbarch *gdbarch = get_regcache_arch (cache->regcache);
   gdb_byte *buf;
 
-  buf = alloca (register_size (gdbarch, regnum));
+  buf = (gdb_byte *) alloca (register_size (gdbarch, regnum));
   regcache_cooked_read (cache->regcache, regnum, buf);
   return frame_unwind_got_bytes (this_frame, regnum, buf);
 }
@@ -1235,7 +1235,7 @@ spu2ppu_sniffer (const struct frame_unwind *self,
 static void
 spu2ppu_dealloc_cache (struct frame_info *self, void *this_cache)
 {
-  struct spu2ppu_cache *cache = this_cache;
+  struct spu2ppu_cache *cache = (struct spu2ppu_cache *) this_cache;
   regcache_xfree (cache->regcache);
 }
 
@@ -1594,8 +1594,10 @@ struct spu_dis_asm_data
 static void
 spu_dis_asm_print_address (bfd_vma addr, struct disassemble_info *info)
 {
-  struct spu_dis_asm_data *data = info->application_data;
-  print_address (data->gdbarch, SPUADDR (data->id, addr), info->stream);
+  struct spu_dis_asm_data *data
+    = (struct spu_dis_asm_data *) info->application_data;
+  print_address (data->gdbarch, SPUADDR (data->id, addr),
+		 (struct ui_file *) info->stream);
 }
 
 static int
@@ -1605,7 +1607,7 @@ gdb_print_insn_spu (bfd_vma memaddr, struct disassemble_info *info)
      SPU ID encoded in the high bits is added back when we call print_address.  */
   struct disassemble_info spu_info = *info;
   struct spu_dis_asm_data data;
-  data.gdbarch = info->application_data;
+  data.gdbarch = (struct gdbarch *) info->application_data;
   data.id = SPUADDR_SPU (memaddr);
 
   spu_info.application_data = &data;
@@ -1675,7 +1677,7 @@ spu_get_overlay_table (struct objfile *objfile)
   char *ovly_table;
   int i;
 
-  tbl = objfile_data (objfile, spu_overlay_data);
+  tbl = (struct spu_overlay_table *) objfile_data (objfile, spu_overlay_data);
   if (tbl)
     return tbl;
 
@@ -1693,12 +1695,13 @@ spu_get_overlay_table (struct objfile *objfile)
   ovly_buf_table_base = SYMBOL_VALUE_ADDRESS (ovly_buf_table_msym);
   ovly_buf_table_size = MSYMBOL_SIZE (ovly_buf_table_msym);
 
-  ovly_table = xmalloc (ovly_table_size);
+  ovly_table = (char *) xmalloc (ovly_table_size);
   read_memory (ovly_table_base, ovly_table, ovly_table_size);
 
-  tbl = OBSTACK_CALLOC (&objfile->objfile_obstack,
-			objfile->sections_end - objfile->sections,
-			struct spu_overlay_table);
+  tbl = (struct spu_overlay_table *)
+    OBSTACK_CALLOC (&objfile->objfile_obstack,
+		    objfile->sections_end - objfile->sections,
+		    struct spu_overlay_table);
 
   for (i = 0; i < ovly_table_size / 16; i++)
     {
@@ -2215,7 +2218,7 @@ info_spu_dma_cmdlist (gdb_byte *buf, int nr, enum bfd_endian byte_order)
              NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     };
 
-  int *seq = alloca (nr * sizeof (int));
+  int *seq = (int *) alloca (nr * sizeof (int));
   int done = 0;
   struct cleanup *chain;
   int i, j;

@@ -330,7 +330,7 @@ cris_sigtramp_frame_unwind_cache (struct frame_info *this_frame,
   int i;
 
   if ((*this_cache))
-    return (*this_cache);
+    return (struct cris_unwind_cache *) (*this_cache);
 
   info = FRAME_OBSTACK_ZALLOC (struct cris_unwind_cache);
   (*this_cache) = info;
@@ -723,7 +723,7 @@ static struct stack_item *
 push_stack_item (struct stack_item *prev, void *contents, int len)
 {
   struct stack_item *si;
-  si = xmalloc (sizeof (struct stack_item));
+  si = (struct stack_item *) xmalloc (sizeof (struct stack_item));
   si->data = xmalloc (len);
   si->len = len;
   si->prev = prev;
@@ -758,7 +758,7 @@ cris_frame_unwind_cache (struct frame_info *this_frame,
   int i;
 
   if ((*this_prologue_cache))
-    return (*this_prologue_cache);
+    return (struct cris_unwind_cache *) (*this_prologue_cache);
 
   info = FRAME_OBSTACK_ZALLOC (struct cris_unwind_cache);
   (*this_prologue_cache) = info;
@@ -972,7 +972,7 @@ cris_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
       /* fp_arg must be word-aligned (i.e., don't += len) to match
 	 the function prologue.  */
       sp = (sp - si->len) & ~3;
-      write_memory (sp, si->data, si->len);
+      write_memory (sp, (const gdb_byte *) si->data, si->len);
       si = pop_stack_item (si);
     }
 
@@ -1716,13 +1716,14 @@ cris_store_return_value (struct type *type, struct regcache *regcache,
   if (len <= 4)
     {
       /* Put the return value in R10.  */
-      val = extract_unsigned_integer (valbuf, len, byte_order);
+      val = extract_unsigned_integer ((const gdb_byte *) valbuf,
+				      len, byte_order);
       regcache_cooked_write_unsigned (regcache, ARG1_REGNUM, val);
     }
   else if (len <= 8)
     {
       /* Put the return value in R10 and R11.  */
-      val = extract_unsigned_integer (valbuf, 4, byte_order);
+      val = extract_unsigned_integer ((gdb_byte *) valbuf, 4, byte_order);
       regcache_cooked_write_unsigned (regcache, ARG1_REGNUM, val);
       val = extract_unsigned_integer ((char *)valbuf + 4, len - 4, byte_order);
       regcache_cooked_write_unsigned (regcache, ARG2_REGNUM, val);
@@ -1888,13 +1889,13 @@ cris_extract_return_value (struct type *type, struct regcache *regcache,
     {
       /* Get the return value from R10.  */
       regcache_cooked_read_unsigned (regcache, ARG1_REGNUM, &val);
-      store_unsigned_integer (valbuf, len, byte_order, val);
+      store_unsigned_integer ((gdb_byte *) valbuf, len, byte_order, val);
     }
   else if (len <= 8)
     {
       /* Get the return value from R10 and R11.  */
       regcache_cooked_read_unsigned (regcache, ARG1_REGNUM, &val);
-      store_unsigned_integer (valbuf, 4, byte_order, val);
+      store_unsigned_integer ((gdb_byte *) valbuf, 4, byte_order, val);
       regcache_cooked_read_unsigned (regcache, ARG2_REGNUM, &val);
       store_unsigned_integer ((char *)valbuf + 4, len - 4, byte_order, val);
     }

@@ -57,7 +57,7 @@ alphanbsd_supply_fpregset (const struct regset *regset,
 			   struct regcache *regcache,
 			   int regnum, const void *fpregs, size_t len)
 {
-  const gdb_byte *regs = fpregs;
+  const gdb_byte *regs = (const gdb_byte *) fpregs;
   int i;
 
   gdb_assert (len >= ALPHANBSD_SIZEOF_FPREGS);
@@ -81,7 +81,7 @@ alphanbsd_supply_gregset (const struct regset *regset,
 			  struct regcache *regcache,
 			  int regnum, const void *gregs, size_t len)
 {
-  const gdb_byte *regs = gregs;
+  const gdb_byte *regs = (const gdb_byte *) gregs;
   int i;
 
   gdb_assert (len >= ALPHANBSD_SIZEOF_GREGS);
@@ -105,7 +105,7 @@ alphanbsd_aout_supply_gregset (const struct regset *regset,
 			       struct regcache *regcache,
 			       int regnum, const void *gregs, size_t len)
 {
-  const gdb_byte *regs = gregs;
+  const gdb_byte *regs = (const gdb_byte *) gregs;
   int i;
 
   /* Table to map a GDB register number to a trapframe register index.  */

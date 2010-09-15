@@ -205,7 +205,7 @@ hppa_linux_sigtramp_frame_unwind_cache (struct frame_info *this_frame,
   int i;
 
   if (*this_cache)
-    return *this_cache;
+    return (struct hppa_linux_sigtramp_unwind_cache *) *this_cache;
 
   info = FRAME_OBSTACK_ZALLOC (struct hppa_linux_sigtramp_unwind_cache);
   *this_cache = info;
@@ -457,7 +457,7 @@ hppa_linux_supply_regset (const struct regset *regset,
 {
   struct gdbarch *arch = get_regcache_arch (regcache);
   struct gdbarch_tdep *tdep = gdbarch_tdep (arch);
-  const char *buf = regs;
+  const char *buf = (const char *) regs;
   int i, offset;
 
   offset = 0;
@@ -475,7 +475,7 @@ hppa_linux_supply_fpregset (const struct regset *regset,
 			    struct regcache *regcache,
 			    int regnum, const void *regs, size_t len)
 {
-  const char *buf = regs;
+  const char *buf = (const char *) regs;
   int i, offset;
 
   offset = 0;

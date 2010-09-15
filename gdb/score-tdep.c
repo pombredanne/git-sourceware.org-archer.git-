@@ -1311,7 +1311,7 @@ score_make_prologue_cache (struct frame_info *this_frame, void **this_cache)
   struct score_frame_cache *cache;
 
   if ((*this_cache) != NULL)
-    return (*this_cache);
+    return (struct score_frame_cache *) (*this_cache);
 
   cache = FRAME_OBSTACK_ZALLOC (struct score_frame_cache);
   (*this_cache) = cache;
@@ -1327,15 +1327,17 @@ score_make_prologue_cache (struct frame_info *this_frame, void **this_cache)
       return cache;
 
     if (target_mach == bfd_mach_score3)
-      score3_analyze_prologue (start_addr, pc, this_frame, *this_cache);
+      score3_analyze_prologue (start_addr, pc, this_frame,
+			       (struct score_frame_cache *) *this_cache);
     else
-      score7_analyze_prologue (start_addr, pc, this_frame, *this_cache);
+      score7_analyze_prologue (start_addr, pc, this_frame,
+			       (struct score_frame_cache *) *this_cache);
   }
 
   /* Save SP.  */
   trad_frame_set_value (cache->saved_regs, SCORE_SP_REGNUM, cache->base);
 
-  return (*this_cache);
+  return (struct score_frame_cache *) (*this_cache);
 }
 
 static void
@@ -1473,7 +1475,7 @@ score_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
     {
       return (arches->gdbarch);
     }
-  tdep = xcalloc(1, sizeof(struct gdbarch_tdep));
+  tdep = (struct gdbarch_tdep *) xcalloc(1, sizeof(struct gdbarch_tdep));
   gdbarch = gdbarch_alloc (&info, tdep);
 
   set_gdbarch_short_bit (gdbarch, 16);

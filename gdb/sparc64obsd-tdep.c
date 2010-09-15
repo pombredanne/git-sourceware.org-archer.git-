@@ -62,7 +62,7 @@ sparc64obsd_supply_gregset (const struct regset *regset,
 			    struct regcache *regcache,
 			    int regnum, const void *gregs, size_t len)
 {
-  const char *regs = gregs;
+  const char *regs = (const char *) gregs;
 
   sparc64_supply_gregset (&sparc64obsd_core_gregset, regcache, regnum, regs);
   sparc64_supply_fpregset (regcache, regnum, regs + 288);
@@ -128,7 +128,7 @@ sparc64obsd_frame_cache (struct frame_info *this_frame, void **this_cache)
   CORE_ADDR addr;
 
   if (*this_cache)
-    return *this_cache;
+    return (struct sparc_frame_cache *) *this_cache;
 
   cache = sparc_frame_cache (this_frame, this_cache);
   gdb_assert (cache == *this_cache);
@@ -211,7 +211,7 @@ sparc64obsd_trapframe_cache (struct frame_info *this_frame, void **this_cache)
   int regnum;
 
   if (*this_cache)
-    return *this_cache;
+    return (struct sparc_frame_cache *) *this_cache;
 
   cache = sparc_frame_cache (this_frame, this_cache);
   gdb_assert (cache == *this_cache);

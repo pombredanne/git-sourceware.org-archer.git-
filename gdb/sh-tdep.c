@@ -1313,7 +1313,7 @@ sh_extract_return_value_nofpu (struct type *type, struct regcache *regcache,
       ULONGEST c;
 
       regcache_cooked_read_unsigned (regcache, R0_REGNUM, &c);
-      store_unsigned_integer (valbuf, len, byte_order, c);
+      store_unsigned_integer ((gdb_byte *) valbuf, len, byte_order, c);
     }
   else if (len == 8)
     {
@@ -1361,7 +1361,8 @@ sh_store_return_value_nofpu (struct type *type, struct regcache *regcache,
 
   if (len <= 4)
     {
-      val = extract_unsigned_integer (valbuf, len, byte_order);
+      val = extract_unsigned_integer ((const gdb_byte *) valbuf,
+				      len, byte_order);
       regcache_cooked_write_unsigned (regcache, R0_REGNUM, val);
     }
   else
@@ -2521,7 +2522,7 @@ sh_frame_cache (struct frame_info *this_frame, void **this_cache)
   int i;
 
   if (*this_cache)
-    return *this_cache;
+    return (struct sh_frame_cache *) *this_cache;
 
   cache = sh_alloc_frame_cache ();
   *this_cache = cache;

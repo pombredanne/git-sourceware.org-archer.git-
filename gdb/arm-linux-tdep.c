@@ -428,7 +428,7 @@ arm_linux_supply_gregset (const struct regset *regset,
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
-  const gdb_byte *gregs = gregs_buf;
+  const gdb_byte *gregs = (const gdb_byte *) gregs_buf;
   int regno;
   CORE_ADDR reg_pc;
   gdb_byte pc_buf[INT_REGISTER_SIZE];
@@ -464,7 +464,7 @@ arm_linux_collect_gregset (const struct regset *regset,
 			   const struct regcache *regcache,
 			   int regnum, void *gregs_buf, size_t len)
 {
-  gdb_byte *gregs = gregs_buf;
+  gdb_byte *gregs = (const gdb_byte *) gregs_buf;
   int regno;
 
   for (regno = ARM_A1_REGNUM; regno < ARM_PC_REGNUM; regno++)
@@ -571,7 +571,7 @@ arm_linux_supply_nwfpe (const struct regset *regset,
 			struct regcache *regcache,
 			int regnum, const void *regs_buf, size_t len)
 {
-  const gdb_byte *regs = regs_buf;
+  const gdb_byte *regs = (const gdb_byte *) regs_buf;
   int regno;
 
   if (regnum == ARM_FPS_REGNUM || regnum == -1)
@@ -588,7 +588,7 @@ arm_linux_collect_nwfpe (const struct regset *regset,
 			 const struct regcache *regcache,
 			 int regnum, void *regs_buf, size_t len)
 {
-  gdb_byte *regs = regs_buf;
+  gdb_byte *regs = (gdb_byte *) regs_buf;
   int regno;
 
   for (regno = ARM_F0_REGNUM; regno <= ARM_F7_REGNUM; regno++)
@@ -823,7 +823,8 @@ arm_linux_displaced_step_copy_insn (struct gdbarch *gdbarch,
 				    struct regcache *regs)
 {
   struct displaced_step_closure *dsc
-    = xmalloc (sizeof (struct displaced_step_closure));
+    = (struct displaced_step_closure *)
+    xmalloc (sizeof (struct displaced_step_closure));
 
   /* Detect when we enter an (inaccessible by GDB) Linux kernel helper, and
      stop at the return location.  */

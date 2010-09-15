@@ -117,12 +117,12 @@ nto_find_and_open_solib (char *solib, unsigned o_flags, char **temp_pathname)
 
   /* In case nto_root is short, add strlen(solib)
      so we can reuse arch_path below.  */
-  arch_path =
+  arch_path = (char *)
     alloca (strlen (nto_root) + strlen (arch) + strlen (endian) + 2 +
 	    strlen (solib));
   sprintf (arch_path, "%s/%s%s", nto_root, arch, endian);
 
-  buf = alloca (strlen (PATH_FMT) + strlen (arch_path) * 5 + 1);
+  buf = (char *) alloca (strlen (PATH_FMT) + strlen (arch_path) * 5 + 1);
   sprintf (buf, PATH_FMT, arch_path, arch_path, arch_path, arch_path,
 	   arch_path);
 
@@ -198,7 +198,7 @@ nto_parse_redirection (char *pargv[], const char **pin, const char **pout,
   out = "";
   err = "";
 
-  argv = xcalloc (n + 1, sizeof argv[0]);
+  argv = (char **) xcalloc (n + 1, sizeof argv[0]);
   argc = n;
   for (i = 0, n = 0; n < argc; n++)
     {

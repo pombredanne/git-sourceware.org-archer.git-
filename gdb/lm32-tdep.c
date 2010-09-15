@@ -294,7 +294,7 @@ lm32_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 	regcache_cooked_write_unsigned (regcache, first_arg_reg + i, val);
       else
 	{
-	  write_memory (sp, (void *) &val, len);
+	  write_memory (sp, (const gdb_byte *) &val, len);
 	  sp -= 4;
 	}
     }
@@ -434,7 +434,7 @@ lm32_frame_cache (struct frame_info *this_frame, void **this_prologue_cache)
   long immediate;
 
   if ((*this_prologue_cache))
-    return (*this_prologue_cache);
+    return (struct lm32_frame_cache *) (*this_prologue_cache);
 
   info = FRAME_OBSTACK_ZALLOC (struct lm32_frame_cache);
   (*this_prologue_cache) = info;
