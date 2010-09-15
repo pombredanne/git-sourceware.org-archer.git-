@@ -123,14 +123,14 @@ struct obj_section
 
 /* Relocation offset applied to S.  */
 #define obj_section_offset(s)						\
-  (((s)->objfile->section_offsets)->offsets[(s)->the_bfd_section->index])
+  ((OBJFILE_SECTION_OFFSETS ((s)->objfile))->offsets[(s)->the_bfd_section->index])
 
 /* The memory address of section S (vma + offset).  */
 #define obj_section_addr(s)				      		\
   (bfd_get_section_vma ((s)->objfile->abfd, s->the_bfd_section)		\
    + obj_section_offset (s))
 
-/* The one-passed-the-end memory address of section S
+/* The one-past-the-end memory address of section S
    (vma + size + offset).  */
 #define obj_section_endaddr(s)						\
   (bfd_get_section_vma ((s)->objfile->abfd, s->the_bfd_section)		\
@@ -152,8 +152,7 @@ struct objstats
     int sz_strtab;		/* Size of stringtable, (if applicable) */
   };
 
-#define OBJSTAT(objfile, expr) (objfile -> stats.expr)
-#define OBJSTATS struct objstats stats
+#define OBJSTAT(objfile, expr) (OBJFILE_STATS (objfile).expr)
 extern void print_objfile_statistics (void);
 extern void print_symbol_bcache_statistics (void);
 
@@ -168,7 +167,7 @@ extern void print_symbol_bcache_statistics (void);
    for modules that were loaded when GDB attached to a remote system
    (see remote-vx.c).  */
 
-struct objfile
+struct objfile_storage
   {
     /* The object file's name, tilde-expanded and absolute.
        Malloc'd; free it if you free this struct.  */
@@ -346,8 +345,8 @@ struct objfile
        objfile_obstack (which makes no sense, but I'm not sure it's
        harming anything).  */
 
-    struct obj_section
-     *sections, *sections_end;
+    struct obj_section *sections;
+    struct obj_section *sections_end;
 
     /* GDB allows to have debug symbols in separate object files.  This is
        used by .gnu_debuglink, ELF build id note and Mach-O OSO.
@@ -369,7 +368,7 @@ struct objfile
     struct objfile *separate_debug_objfile_link;
 
     /* Place to stash various statistics about this objfile */
-      OBJSTATS;
+    struct objstats stats;
 
     /* A symtab that the C++ code uses to stash special symbols
        associated to namespaces.  */
@@ -378,6 +377,54 @@ struct objfile
        "possible namespace symbols" go away.  */
     struct symtab *cp_namespace_symtab;
   };
+
+struct objfile
+{
+  struct objfile_storage *storage;
+};
+
+#define OBJFILE_NAME(obj) ((obj)->storage->name)
+#define OBJFILE_REFC(obj) ((obj)->storage->refc)
+#define OBJFILE_FLAGS(obj) ((obj)->storage->flags)
+#define OBJFILE_PSPACE(obj) ((obj)->storage->pspace)
+#define OBJFILE_SYMTABS(obj) ((obj)->storage->symtabs)
+#define OBJFILE_PSYMTABS(obj) ((obj)->storage->psymtabs)
+#define OBJFILE_PSYMTABS_ADDRMAP(obj) ((obj)->storage->psymtabs_addrmap)
+#define OBJFILE_FREE_PSYMTABS(obj) ((obj)->storage->free_psymtabs)
+#define OBJFILE_OBFD(obj) ((obj)->storage->obfd)
+#define OBJFILE_GDBARCH(obj) ((obj)->storage->gdbarch)
+#define OBJFILE_MTIME(obj) ((obj)->storage->mtime)
+#define OBJFILE_OBJFILE_OBSTACK(obj) ((obj)->storage->objfile_obstack)
+#define OBJFILE_PSYMBOL_CACHE(obj) ((obj)->storage->psymbol_cache)
+#define OBJFILE_MACRO_CACHE(obj) ((obj)->storage->macro_cache)
+#define OBJFILE_FILENAME_CACHE(obj) ((obj)->storage->filename_cache)
+#define OBJFILE_DEMANGLED_NAMES_HASH(obj) ((obj)->storage->demangled_names_hash)
+#define OBJFILE_GLOBAL_PSYMBOLS(obj) ((obj)->storage->global_psymbols)
+#define OBJFILE_STATIC_PSYMBOLS(obj) ((obj)->storage->static_psymbols)
+#define OBJFILE_MSYMBOLS(obj) ((obj)->storage->msymbols)
+#define OBJFILE_MINIMAL_SYMBOL_COUNT(obj) ((obj)->storage->minimal_symbol_count)
+#define OBJFILE_MSYMBOL_HASH(obj) ((obj)->storage->msymbol_hash)
+#define OBJFILE_MSYMBOL_DEMANGLED_HASH(obj) ((obj)->storage->msymbol_demangled_hash)
+#define OBJFILE_SF(obj) ((obj)->storage->sf)
+#define OBJFILE_EI(obj) ((obj)->storage->ei)
+#define OBJFILE_DEPRECATED_SYM_STAB_INFO(obj) ((obj)->storage->deprecated_sym_stab_info)
+#define OBJFILE_DEPRECATED_SYM_PRIVATE(obj) ((obj)->storage->deprecated_sym_private)
+#define OBJFILE_DATA(obj) ((obj)->storage->data)
+#define OBJFILE_NUM_DATA(obj) ((obj)->storage->num_data)
+#define OBJFILE_SECTION_OFFSETS(obj) ((obj)->storage->section_offsets)
+#define OBJFILE_NUM_SECTIONS(obj) ((obj)->storage->num_sections)
+#define OBJFILE_SECT_INDEX_TEXT(obj) ((obj)->storage->sect_index_text)
+#define OBJFILE_SECT_INDEX_DATA(obj) ((obj)->storage->sect_index_data)
+#define OBJFILE_SECT_INDEX_BSS(obj) ((obj)->storage->sect_index_bss)
+#define OBJFILE_SECT_INDEX_RODATA(obj) ((obj)->storage->sect_index_rodata)
+#define OBJFILE_SECTIONS_END(obj) ((obj)->storage->sections_end)
+#define OBJFILE_SECTIONS(obj) ((obj)->storage->sections)
+#define OBJFILE_SECTIONS_END(obj) ((obj)->storage->sections_end)
+#define OBJFILE_SEPARATE_DEBUG_OBJFILE(obj) ((obj)->storage->separate_debug_objfile)
+#define OBJFILE_SEPARATE_DEBUG_OBJFILE_BACKLINK(obj) ((obj)->storage->separate_debug_objfile_backlink)
+#define OBJFILE_SEPARATE_DEBUG_OBJFILE_LINK(obj) ((obj)->storage->separate_debug_objfile_link)
+#define OBJFILE_STATS(obj) ((obj)->storage->stats)
+#define OBJFILE_CP_NAMESPACE_SYMTAB(obj) ((obj)->storage->cp_namespace_symtab)
 
 /* Defines for the objfile flag word. */
 
@@ -532,12 +579,12 @@ typedef struct objfile_list *objfile_iterator_type;
 /* Traverse all symtabs in one objfile.  */
 
 #define	ALL_OBJFILE_SYMTABS(objfile, s) \
-    for ((s) = (objfile) -> symtabs; (s) != NULL; (s) = (s) -> next)
+  for ((s) = OBJFILE_SYMTABS (objfile); (s) != NULL; (s) = (s) -> next)
 
 /* Traverse all minimal symbols in one objfile.  */
 
 #define	ALL_OBJFILE_MSYMBOLS(objfile, m) \
-    for ((m) = (objfile) -> msymbols; SYMBOL_LINKAGE_NAME(m) != NULL; (m)++)
+    for ((m) = OBJFILE_MSYMBOLS (objfile); SYMBOL_LINKAGE_NAME(m) != NULL; (m)++)
 
 /* Traverse all symtabs in all objfiles in the current symbol
    space.  */
@@ -572,31 +619,31 @@ typedef struct objfile_list *objfile_iterator_type;
     ALL_OBJFILE_MSYMBOLS (objfile, m)
 
 #define ALL_OBJFILE_OSECTIONS(objfile, osect)	\
-  for (osect = objfile->sections; osect < objfile->sections_end; osect++)
+  for (osect = OBJFILE_SECTIONS (objfile); osect < OBJFILE_SECTIONS_END (objfile); osect++)
 
 #define ALL_OBJSECTIONS(iter, objfile, osect)	\
   ALL_OBJFILES (iter, objfile)			\
     ALL_OBJFILE_OSECTIONS (objfile, osect)
 
 #define SECT_OFF_DATA(objfile) \
-     ((objfile->sect_index_data == -1) \
-      ? (internal_error (__FILE__, __LINE__, _("sect_index_data not initialized")), -1) \
-      : objfile->sect_index_data)
+  ((OBJFILE_SECT_INDEX_DATA (objfile) == -1)				\
+   ? (internal_error (__FILE__, __LINE__, _("sect_index_data not initialized")), -1) \
+   : OBJFILE_SECT_INDEX_DATA (objfile))
 
 #define SECT_OFF_RODATA(objfile) \
-     ((objfile->sect_index_rodata == -1) \
-      ? (internal_error (__FILE__, __LINE__, _("sect_index_rodata not initialized")), -1) \
-      : objfile->sect_index_rodata)
+  ((OBJFILE_SECT_INDEX_RODATA (objfile) == -1)				\
+   ? (internal_error (__FILE__, __LINE__, _("sect_index_rodata not initialized")), -1) \
+   : OBJFILE_SECT_INDEX_RODATA (objfile))
 
 #define SECT_OFF_TEXT(objfile) \
-     ((objfile->sect_index_text == -1) \
-      ? (internal_error (__FILE__, __LINE__, _("sect_index_text not initialized")), -1) \
-      : objfile->sect_index_text)
+  ((OBJFILE_SECT_INDEX_TEXT (objfile) == -1)				\
+   ? (internal_error (__FILE__, __LINE__, _("sect_index_text not initialized")), -1) \
+   : OBJFILE_SECT_INDEX_TEXT (objfile))
 
 /* Sometimes the .bss section is missing from the objfile, so we don't
    want to die here. Let the users of SECT_OFF_BSS deal with an
    uninitialized section index. */
-#define SECT_OFF_BSS(objfile) (objfile)->sect_index_bss
+#define SECT_OFF_BSS(objfile) (OBJFILE_SECT_INDEX_BSS (objfile))
 
 /* Answer whether there is more than one object file loaded.  */
 

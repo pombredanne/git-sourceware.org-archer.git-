@@ -1216,13 +1216,14 @@ extern const struct floatformat *floatformats_ibm_long_double[BFD_ENDIAN_UNKNOWN
 
 #define TYPE_ALLOC(t,size)  \
    (TYPE_OBJFILE_OWNED (t) \
-    ? obstack_alloc (&TYPE_OBJFILE (t) -> objfile_obstack, size) \
+    ? obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (TYPE_OBJFILE (t)), size) \
     : xmalloc (size))
 
-#define TYPE_ZALLOC(t,size)  \
-   (TYPE_OBJFILE_OWNED (t) \
-    ? memset (obstack_alloc (&TYPE_OBJFILE (t)->objfile_obstack, size),  \
-	      0, size)  \
+#define TYPE_ZALLOC(t,size)						\
+   (TYPE_OBJFILE_OWNED (t)						\
+    ? memset (obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (TYPE_OBJFILE (t)), \
+			     size),					\
+	      0, size)							\
     : xzalloc (size))
 
 /* Use alloc_type to allocate a type owned by an objfile.

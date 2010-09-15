@@ -72,7 +72,7 @@ struct dbx_symfile_info
     asection *stab_section;
   };
 
-#define DBX_SYMFILE_INFO(o)	((o)->deprecated_sym_stab_info)
+#define DBX_SYMFILE_INFO(o)	(OBJFILE_DEPRECATED_SYM_STAB_INFO ((o)))
 #define DBX_TEXT_ADDR(o)	(DBX_SYMFILE_INFO(o)->text_addr)
 #define DBX_TEXT_SIZE(o)	(DBX_SYMFILE_INFO(o)->text_size)
 #define DBX_SYMCOUNT(o)		(DBX_SYMFILE_INFO(o)->symcount)

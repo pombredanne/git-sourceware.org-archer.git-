@@ -154,7 +154,7 @@ extern void sort_pst_symbols (struct partial_symtab *);
 /* Traverse all psymtabs in one objfile.  */
 
 #define	ALL_OBJFILE_PSYMTABS(objfile, p) \
-    for ((p) = (objfile) -> psymtabs; (p) != NULL; (p) = (p) -> next)
+    for ((p) = OBJFILE_PSYMTABS (objfile); (p) != NULL; (p) = (p) -> next)
 
 /* Traverse all psymtabs in all objfiles.  */
 
