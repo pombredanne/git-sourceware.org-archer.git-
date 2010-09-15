@@ -131,7 +131,7 @@ add_symbol_file_from_memory_command (char *args, int from_tty)
 
   /* We need some representative bfd to know the target we are looking at.  */
   if (symfile_objfile != NULL)
-    templ = symfile_objfile->obfd;
+    templ = OBJFILE_OBFD (symfile_objfile);
   else
     templ = exec_bfd;
   if (templ == NULL)

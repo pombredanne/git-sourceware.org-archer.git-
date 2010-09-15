@@ -43,8 +43,8 @@
 
 /* Stand-alone SPE executable?  */
 #define spu_standalone_p() \
-  (symfile_objfile && symfile_objfile->obfd \
-   && bfd_get_arch (symfile_objfile->obfd) == bfd_arch_spu)
+  (symfile_objfile && OBJFILE_OBFD (symfile_objfile) \
+   && bfd_get_arch (OBJFILE_OBFD (symfile_objfile)) == bfd_arch_spu)
 
 
 /* Relocate main SPE executable.  */
@@ -57,10 +57,10 @@ spu_relocate_main_executable (int spufs_fd)
   if (symfile_objfile == NULL)
     return;
 
-  new_offsets = alloca (symfile_objfile->num_sections
+  new_offsets = alloca (OBJFILE_NUM_SECTIONS (symfile_objfile)
 			* sizeof (struct section_offsets));
 
-  for (i = 0; i < symfile_objfile->num_sections; i++)
+  for (i = 0; i < OBJFILE_NUM_SECTIONS (symfile_objfile); i++)
     new_offsets->offsets[i] = SPUADDR (spufs_fd, 0);
 
   objfile_relocate (symfile_objfile, new_offsets);
@@ -110,7 +110,7 @@ append_ocl_sos (struct so_list **link_ptr)
       ocl_program_addr_base = objfile_data (objfile, ocl_program_data_key);
       if (ocl_program_addr_base != NULL)
         {
-	  enum bfd_endian byte_order = bfd_big_endian (objfile->obfd)?
+	  enum bfd_endian byte_order = bfd_big_endian (OBJFILE_OBFD (objfile))?
 					 BFD_ENDIAN_BIG : BFD_ENDIAN_LITTLE;
 	  volatile struct gdb_exception ex;
 	  TRY_CATCH (ex, RETURN_MASK_ALL)
@@ -393,7 +393,7 @@ spu_lookup_lib_symbol (const struct objfile *objfile,
 		       const char *name,
 		       const domain_enum domain)
 {
-  if (bfd_get_arch (objfile->obfd) == bfd_arch_spu)
+  if (bfd_get_arch (OBJFILE_OBFD (objfile)) == bfd_arch_spu)
     return lookup_global_symbol_from_objfile (objfile, name, domain);
 
   if (svr4_so_ops.lookup_lib_global_symbol != NULL)
@@ -453,8 +453,8 @@ ocl_enable_break (struct objfile *objfile)
       if (objfile_data (objfile, ocl_program_data_key) == NULL)
         {
           CORE_ADDR *ocl_program_addr_base = OBSTACK_CALLOC (
-		  &objfile->objfile_obstack,
-		  objfile->sections_end - objfile->sections,
+		  &OBJFILE_OBJFILE_OBSTACK (objfile),
+		  OBJFILE_SECTIONS_END (objfile) - OBJFILE_SECTIONS (objfile),
 		  CORE_ADDR);
 	  *ocl_program_addr_base = SYMBOL_VALUE_ADDRESS (addr_sym);
 	  set_objfile_data (objfile, ocl_program_data_key,

@@ -280,7 +280,7 @@ source_section_scripts (struct objfile *objfile, const char *source_name,
 static void
 auto_load_section_scripts (struct objfile *objfile, const char *section_name)
 {
-  bfd *abfd = objfile->obfd;
+  bfd *abfd = OBJFILE_OBFD (objfile);
   asection *scripts_sect;
   bfd_size_type size;
   char *p;
@@ -331,7 +331,7 @@ auto_load_objfile_script (struct objfile *objfile, const char *suffix)
   FILE *input;
   struct cleanup *cleanups;
 
-  realname = gdb_realpath (objfile->name);
+  realname = gdb_realpath (OBJFILE_NAME (objfile));
   len = strlen (realname);
   filename = xmalloc (len + strlen (suffix) + 1);
   memcpy (filename, realname, len);
@@ -395,7 +395,7 @@ auto_load_new_objfile (struct objfile *objfile)
       clear_section_scripts ();
       return;
     }
-  if (!objfile->name)
+  if (!OBJFILE_NAME (objfile))
     return;
 
   load_auto_scripts_for_objfile (objfile);

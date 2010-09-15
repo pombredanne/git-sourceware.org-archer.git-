@@ -368,7 +368,7 @@ hppa_linux_find_global_pointer (struct gdbarch *gdbarch, struct value *function)
 	    break;
 	}
 
-      if (osect < faddr_sect->objfile->sections_end)
+      if (osect < OBJFILE_SECTIONS_END (faddr_sect->objfile))
 	{
 	  CORE_ADDR addr, endaddr;
 

@@ -841,7 +841,7 @@ enable_break (void)
       return 0;
     }
 
-  if (!symfile_objfile->ei.entry_point_p)
+  if (!OBJFILE_EI (symfile_objfile).entry_point_p)
     {
       if (solib_frv_debug)
 	fprintf_unfiltered (gdb_stdlog,
@@ -863,12 +863,12 @@ enable_break (void)
     }
 
   create_solib_event_breakpoint (target_gdbarch,
-				 symfile_objfile->ei.entry_point);
+				 OBJFILE_EI (symfile_objfile).entry_point);
 
   if (solib_frv_debug)
     fprintf_unfiltered (gdb_stdlog,
 			"enable_break: solib event breakpoint placed at entry point: %s\n",
-			hex_string_custom (symfile_objfile->ei.entry_point, 8));
+			hex_string_custom (OBJFILE_EI (symfile_objfile).entry_point, 8));
   return 1;
 }
 
@@ -926,7 +926,7 @@ frv_relocate_main_executable (void)
   main_executable_lm_info = xcalloc (1, sizeof (struct lm_info));
   main_executable_lm_info->map = ldm;
 
-  new_offsets = xcalloc (symfile_objfile->num_sections,
+  new_offsets = xcalloc (OBJFILE_NUM_SECTIONS (symfile_objfile),
 			 sizeof (struct section_offsets));
   old_chain = make_cleanup (xfree, new_offsets);
   changed = 0;
@@ -942,7 +942,7 @@ frv_relocate_main_executable (void)
       /* Current address of section.  */
       addr = obj_section_addr (osect);
       /* Offset from where this section started.  */
-      offset = ANOFFSET (symfile_objfile->section_offsets, osect_idx);
+      offset = ANOFFSET (OBJFILE_SECTION_OFFSETS (symfile_objfile), osect_idx);
       /* Original address prior to any past relocations.  */
       orig_addr = addr - offset;
 
@@ -1133,7 +1133,7 @@ frv_fdpic_find_canonical_descriptor (CORE_ADDR entry_point)
 
   /* Check the main executable.  */
   addr = find_canonical_descriptor_in_load_object
-           (entry_point, got_value, name, symfile_objfile->obfd,
+           (entry_point, got_value, name, OBJFILE_OBFD (symfile_objfile),
 	    main_executable_lm_info);
 
   /* If descriptor not found via main executable, check each load object

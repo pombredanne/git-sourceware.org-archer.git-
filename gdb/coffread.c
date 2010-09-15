@@ -276,7 +276,7 @@ cs_to_bfd_section (struct coff_symbol *cs, struct objfile *objfile)
 
   args.targ_index = cs->c_secnum;
   args.resultp = &sect;
-  bfd_map_over_sections (objfile->obfd, find_targ_sec, &args);
+  bfd_map_over_sections (OBJFILE_OBFD (objfile), find_targ_sec, &args);
   return sect;
 }
 
@@ -445,21 +445,21 @@ static void
 coff_symfile_init (struct objfile *objfile)
 {
   /* Allocate struct to keep track of stab reading. */
-  objfile->deprecated_sym_stab_info = (struct dbx_symfile_info *)
+  OBJFILE_DEPRECATED_SYM_STAB_INFO (objfile) = (struct dbx_symfile_info *)
     xmalloc (sizeof (struct dbx_symfile_info));
 
-  memset (objfile->deprecated_sym_stab_info, 0,
+  memset (OBJFILE_DEPRECATED_SYM_STAB_INFO (objfile), 0,
 	  sizeof (struct dbx_symfile_info));
 
   /* Allocate struct to keep track of the symfile */
-  objfile->deprecated_sym_private = xmalloc (sizeof (struct coff_symfile_info));
+  OBJFILE_DEPRECATED_SYM_PRIVATE (objfile) = xmalloc (sizeof (struct coff_symfile_info));
 
-  memset (objfile->deprecated_sym_private, 0, sizeof (struct coff_symfile_info));
+  memset (OBJFILE_DEPRECATED_SYM_PRIVATE (objfile), 0, sizeof (struct coff_symfile_info));
 
   /* COFF objects may be reordered, so set OBJF_REORDERED.  If we
      find this causes a significant slowdown in gdb then we could
      set it in the debug symbol readers only when necessary.  */
-  objfile->flags |= OBJF_REORDERED;
+  OBJFILE_FLAGS (objfile) |= OBJF_REORDERED;
 
   init_entry_point_info (objfile);
 }
@@ -509,7 +509,7 @@ coff_symfile_read (struct objfile *objfile, int symfile_flags)
 {
   struct coff_symfile_info *info;
   struct dbx_symfile_info *dbxinfo;
-  bfd *abfd = objfile->obfd;
+  bfd *abfd = OBJFILE_OBFD (objfile);
   coff_data_type *cdata = coff_data (abfd);
   char *name = bfd_get_filename (abfd);
   int val;
@@ -519,8 +519,8 @@ coff_symfile_read (struct objfile *objfile, int symfile_flags)
   struct cleanup *back_to, *cleanup_minimal_symbols;
   int stabstrsize;
   
-  info = (struct coff_symfile_info *) objfile->deprecated_sym_private;
-  dbxinfo = objfile->deprecated_sym_stab_info;
+  info = (struct coff_symfile_info *) OBJFILE_DEPRECATED_SYM_PRIVATE (objfile);
+  dbxinfo = OBJFILE_DEPRECATED_SYM_STAB_INFO (objfile);
   symfile_bfd = abfd;		/* Kludge for swap routines */
 
 /* WARNING WILL ROBINSON!  ACCESSING BFD-PRIVATE DATA HERE!  FIXME!  */
@@ -552,8 +552,8 @@ coff_symfile_read (struct objfile *objfile, int symfile_flags)
      FIXME: We should use BFD to read the symbol table, and thus avoid
      this problem.  */
   pe_file =
-    strncmp (bfd_get_target (objfile->obfd), "pe", 2) == 0
-    || strncmp (bfd_get_target (objfile->obfd), "epoc-pe", 7) == 0;
+    strncmp (bfd_get_target (OBJFILE_OBFD (objfile)), "pe", 2) == 0
+    || strncmp (bfd_get_target (OBJFILE_OBFD (objfile)), "epoc-pe", 7) == 0;
 
 /* End of warning */
 
@@ -671,9 +671,9 @@ coff_new_init (struct objfile *ignore)
 static void
 coff_symfile_finish (struct objfile *objfile)
 {
-  if (objfile->deprecated_sym_private != NULL)
+  if (OBJFILE_DEPRECATED_SYM_PRIVATE (objfile) != NULL)
     {
-      xfree (objfile->deprecated_sym_private);
+      xfree (OBJFILE_DEPRECATED_SYM_PRIVATE (objfile));
     }
 
   /* Let stabs reader clean up */
@@ -731,15 +731,15 @@ coff_symtab_read (long symtab_offset, unsigned int nsyms,
      FIXME: Find out if this has been reported to Sun, whether it has
      been fixed in a later release, etc.  */
 
-  bfd_seek (objfile->obfd, 0, 0);
+  bfd_seek (OBJFILE_OBFD (objfile), 0, 0);
 
   /* Position to read the symbol table. */
-  val = bfd_seek (objfile->obfd, (long) symtab_offset, 0);
+  val = bfd_seek (OBJFILE_OBFD (objfile), (long) symtab_offset, 0);
   if (val < 0)
-    perror_with_name (objfile->name);
+    perror_with_name (OBJFILE_NAME (objfile));
 
   current_objfile = objfile;
-  nlist_bfd_global = objfile->obfd;
+  nlist_bfd_global = OBJFILE_OBFD (objfile);
   nlist_nsyms_global = nsyms;
   last_source_file = NULL;
   memset (opaque_type_chain, 0, sizeof opaque_type_chain);
@@ -786,7 +786,7 @@ coff_symtab_read (long symtab_offset, unsigned int nsyms,
 	  /* Record all functions -- external and static -- in minsyms. */
 	  int section = cs_to_section (cs, objfile);
 
-	  tmpaddr = cs->c_value + ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+	  tmpaddr = cs->c_value + ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
 	  record_minimal_symbol (cs, tmpaddr, mst_text, section, objfile);
 
 	  fcn_line_ptr = main_aux.x_sym.x_fcnary.x_fcn.x_lnnoptr;
@@ -852,7 +852,7 @@ coff_symtab_read (long symtab_offset, unsigned int nsyms,
 		     followed by a later file with no symbols.  */
 		  if (in_source_file)
 		    complete_symtab (filestring,
-		    cs->c_value + ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile)),
+		    cs->c_value + ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile)),
 				     main_aux.x_scn.x_scnlen);
 		  in_source_file = 0;
 		}
@@ -924,7 +924,7 @@ coff_symtab_read (long symtab_offset, unsigned int nsyms,
  		    || cs->c_sclass == C_THUMBEXTFUNC
  		    || cs->c_sclass == C_THUMBEXT
  		    || (pe_file && (cs->c_sclass == C_STAT)))
-		  tmpaddr += ANOFFSET (objfile->section_offsets, sec);
+		  tmpaddr += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), sec);
 
 		if (bfd_section->flags & SEC_CODE)
 		  {
@@ -1046,7 +1046,7 @@ coff_symtab_read (long symtab_offset, unsigned int nsyms,
 			    new->start_addr,
 			    fcn_cs_saved.c_value
 			    + fcn_aux_saved.x_sym.x_misc.x_fsize
-			    + ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile)),
+			    + ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile)),
 			    objfile
 		);
 	      within_function = 0;
@@ -1057,7 +1057,7 @@ coff_symtab_read (long symtab_offset, unsigned int nsyms,
 	  if (strcmp (cs->c_name, ".bb") == 0)
 	    {
 	      tmpaddr = cs->c_value;
-	      tmpaddr += ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+	      tmpaddr += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
 	      push_context (++depth, tmpaddr);
 	    }
 	  else if (strcmp (cs->c_name, ".eb") == 0)
@@ -1081,7 +1081,7 @@ coff_symtab_read (long symtab_offset, unsigned int nsyms,
 	      if (local_symbols && context_stack_depth > 0)
 		{
 		  tmpaddr =
-		    cs->c_value + ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+		    cs->c_value + ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
 		  /* Make a block for the local symbols within.  */
 		  finish_block (0, &local_symbols, new->old_blocks,
 				new->start_addr, tmpaddr, objfile);
@@ -1132,14 +1132,14 @@ read_one_sym (struct coff_symbol *cs,
   cs->c_symnum = symnum;
   bytes = bfd_bread (temp_sym, local_symesz, nlist_bfd_global);
   if (bytes != local_symesz)
-    error ("%s: error reading symbols", current_objfile->name);
+    error ("%s: error reading symbols", OBJFILE_NAME (current_objfile));
   bfd_coff_swap_sym_in (symfile_bfd, temp_sym, (char *) sym);
   cs->c_naux = sym->n_numaux & 0xff;
   if (cs->c_naux >= 1)
     {
       bytes  = bfd_bread (temp_aux, local_auxesz, nlist_bfd_global);
       if (bytes != local_auxesz)
-	error ("%s: error reading symbols", current_objfile->name);
+	error ("%s: error reading symbols", OBJFILE_NAME (current_objfile));
       bfd_coff_swap_aux_in (symfile_bfd, temp_aux, sym->n_type, sym->n_sclass,
 			    0, cs->c_naux, (char *) aux);
       /* If more than one aux entry, read past it (only the first aux
@@ -1148,7 +1148,7 @@ read_one_sym (struct coff_symbol *cs,
 	{
 	  bytes = bfd_bread (temp_aux, local_auxesz, nlist_bfd_global);
 	  if (bytes != local_auxesz)
-	    error ("%s: error reading symbols", current_objfile->name);
+	    error ("%s: error reading symbols", OBJFILE_NAME (current_objfile));
 	}
     }
   cs->c_name = getsymname (sym);
@@ -1398,7 +1398,7 @@ enter_linenos (long file_offset, int first_line,
       if (L_LNNO32 (&lptr) && L_LNNO32 (&lptr) <= last_line)
 	{
 	  CORE_ADDR addr = lptr.l_addr.l_paddr;
-	  addr += ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+	  addr += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
 	  record_line (current_subfile, first_line + L_LNNO32 (&lptr),
 		       gdbarch_addr_bits_remove (gdbarch, addr));
 	}
@@ -1507,13 +1507,13 @@ process_coff_symbol (struct coff_symbol *cs,
 		     struct objfile *objfile)
 {
   struct symbol *sym
-    = (struct symbol *) obstack_alloc (&objfile->objfile_obstack,
+    = (struct symbol *) obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
 				       sizeof (struct symbol));
   char *name;
 
   memset (sym, 0, sizeof (struct symbol));
   name = cs->c_name;
-  name = EXTERNAL_NAME (name, objfile->obfd);
+  name = EXTERNAL_NAME (name, OBJFILE_OBFD (objfile));
   SYMBOL_LANGUAGE (sym) = current_subfile->language;
   SYMBOL_SET_NAMES (sym, name, strlen (name), 1, objfile);
 
@@ -1524,7 +1524,7 @@ process_coff_symbol (struct coff_symbol *cs,
 
   if (ISFCN (cs->c_type))
     {
-      SYMBOL_VALUE (sym) += ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+      SYMBOL_VALUE (sym) += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
       SYMBOL_TYPE (sym) =
 	lookup_function_type (decode_function_type (cs, cs->c_type, aux, objfile));
 
@@ -1554,7 +1554,7 @@ process_coff_symbol (struct coff_symbol *cs,
 	case C_EXT:
 	  SYMBOL_CLASS (sym) = LOC_STATIC;
 	  SYMBOL_VALUE_ADDRESS (sym) = (CORE_ADDR) cs->c_value;
-	  SYMBOL_VALUE_ADDRESS (sym) += ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+	  SYMBOL_VALUE_ADDRESS (sym) += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
 	  add_symbol_to_list (sym, &global_symbols);
 	  break;
 
@@ -1563,7 +1563,7 @@ process_coff_symbol (struct coff_symbol *cs,
 	case C_STAT:
 	  SYMBOL_CLASS (sym) = LOC_STATIC;
 	  SYMBOL_VALUE_ADDRESS (sym) = (CORE_ADDR) cs->c_value;
-	  SYMBOL_VALUE_ADDRESS (sym) += ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+	  SYMBOL_VALUE_ADDRESS (sym) += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
 	  if (within_function)
 	    {
 	      /* Static symbol of local scope */
@@ -1958,7 +1958,7 @@ coff_read_struct_type (int index, int length, int lastsym,
     {
       read_one_sym (ms, &sub_sym, &sub_aux);
       name = ms->c_name;
-      name = EXTERNAL_NAME (name, objfile->obfd);
+      name = EXTERNAL_NAME (name, OBJFILE_OBFD (objfile));
 
       switch (ms->c_sclass)
 	{
@@ -1972,7 +1972,7 @@ coff_read_struct_type (int index, int length, int lastsym,
 
 	  /* Save the data.  */
 	  list->field.name =
-	    obsavestring (name, strlen (name), &objfile->objfile_obstack);
+	    obsavestring (name, strlen (name), &OBJFILE_OBJFILE_OBSTACK (objfile));
 	  FIELD_TYPE (list->field) = decode_type (ms, ms->c_type, &sub_aux,
 						  objfile);
 	  SET_FIELD_BITPOS (list->field, 8 * ms->c_value);
@@ -1989,7 +1989,7 @@ coff_read_struct_type (int index, int length, int lastsym,
 
 	  /* Save the data.  */
 	  list->field.name =
-	    obsavestring (name, strlen (name), &objfile->objfile_obstack);
+	    obsavestring (name, strlen (name), &OBJFILE_OBJFILE_OBSTACK (objfile));
 	  FIELD_TYPE (list->field) = decode_type (ms, ms->c_type, &sub_aux,
 						  objfile);
 	  SET_FIELD_BITPOS (list->field, ms->c_value);
@@ -2052,18 +2052,18 @@ coff_read_enum_type (int index, int length, int lastsym,
     {
       read_one_sym (ms, &sub_sym, &sub_aux);
       name = ms->c_name;
-      name = EXTERNAL_NAME (name, objfile->obfd);
+      name = EXTERNAL_NAME (name, OBJFILE_OBFD (objfile));
 
       switch (ms->c_sclass)
 	{
 	case C_MOE:
 	  sym = (struct symbol *) obstack_alloc
-	    (&objfile->objfile_obstack, sizeof (struct symbol));
+	    (&OBJFILE_OBJFILE_OBSTACK (objfile), sizeof (struct symbol));
 	  memset (sym, 0, sizeof (struct symbol));
 
 	  SYMBOL_SET_LINKAGE_NAME (sym,
 				   obsavestring (name, strlen (name),
-						 &objfile->objfile_obstack));
+						 &OBJFILE_OBJFILE_OBSTACK (objfile)));
 	  SYMBOL_CLASS (sym) = LOC_CONST;
 	  SYMBOL_DOMAIN (sym) = VAR_DOMAIN;
 	  SYMBOL_VALUE (sym) = ms->c_value;

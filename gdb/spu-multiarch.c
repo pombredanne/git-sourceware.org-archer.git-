@@ -44,8 +44,8 @@ static int spu_nr_solib;
 
 /* Stand-alone SPE executable?  */
 #define spu_standalone_p() \
-  (symfile_objfile && symfile_objfile->obfd \
-   && bfd_get_arch (symfile_objfile->obfd) == bfd_arch_spu)
+  (symfile_objfile && OBJFILE_OBFD (symfile_objfile) \
+   && bfd_get_arch (OBJFILE_OBFD (symfile_objfile)) == bfd_arch_spu)
 
 /* PPU side system calls.  */
 #define INSTR_SC	0x44000002

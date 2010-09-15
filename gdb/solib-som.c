@@ -196,7 +196,7 @@ som_solib_create_inferior_hook (int from_tty)
     return;
 
   /* First see if the objfile was dynamically linked.  */
-  shlib_info = bfd_get_section_by_name (symfile_objfile->obfd, "$SHLIB_INFO$");
+  shlib_info = bfd_get_section_by_name (OBJFILE_OBFD (symfile_objfile), "$SHLIB_INFO$");
   if (!shlib_info)
     return;
 
@@ -205,7 +205,7 @@ som_solib_create_inferior_hook (int from_tty)
     return;
 
   /* Read the DL header.  */
-  bfd_get_section_contents (symfile_objfile->obfd, shlib_info,
+  bfd_get_section_contents (OBJFILE_OBFD (symfile_objfile), shlib_info,
 			    (char *) &dl_header, 0, sizeof (dl_header));
 
   have_endo = 0;
@@ -570,7 +570,7 @@ link_map_start (void)
 static int
 match_main (const char *name)
 {
-  return strcmp (name, symfile_objfile->name) == 0;
+  return strcmp (name, OBJFILE_NAME (symfile_objfile)) == 0;
 }
 
 static struct so_list *
@@ -837,7 +837,7 @@ som_solib_section_offsets (struct objfile *objfile,
     {
       /* Oh what a pain!  We need the offsets before so_list->objfile
          is valid.  The BFDs will never match.  Make a best guess.  */
-      if (strstr (objfile->name, so_list->so_name))
+      if (strstr (OBJFILE_NAME (objfile), so_list->so_name))
 	{
 	  asection *private_section;
 
@@ -850,7 +850,7 @@ som_solib_section_offsets (struct objfile *objfile,
 
 	  /* We should look at presumed_dp in the SOM header, but
 	     that's not easily available.  This should be OK though.  */
-	  private_section = bfd_get_section_by_name (objfile->obfd,
+	  private_section = bfd_get_section_by_name (OBJFILE_OBFD (objfile),
 						     "$PRIVATE$");
 	  if (!private_section)
 	    {

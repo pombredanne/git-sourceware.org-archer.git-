@@ -62,7 +62,7 @@ hppabsd_find_global_pointer (struct gdbarch *gdbarch, struct value *function)
 	    break;
 	}
 
-      if (sec < faddr_sec->objfile->sections_end)
+      if (sec < OBJFILE_SECTIONS_END (faddr_sec->objfile))
 	{
 	  CORE_ADDR addr = obj_section_addr (sec);
 	  CORE_ADDR endaddr = obj_section_endaddr (sec);
@@ -87,7 +87,7 @@ hppabsd_find_global_pointer (struct gdbarch *gdbarch, struct value *function)
 		     we have to do it ourselves.  */
 		  pltgot = extract_unsigned_integer (buf, sizeof buf,
 						     byte_order);
-		  pltgot += ANOFFSET (sec->objfile->section_offsets,
+		  pltgot += ANOFFSET (OBJFILE_SECTION_OFFSETS (sec->objfile),
 				      SECT_OFF_TEXT (sec->objfile));
 
 		  return pltgot;

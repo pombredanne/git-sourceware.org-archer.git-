@@ -196,7 +196,7 @@ clone_program_space (struct program_space *dest, struct program_space *src)
     exec_file_attach (bfd_get_filename (src->ebfd), 0);
 
   if (src->symfile_object_file != NULL)
-    symbol_file_add_main (src->symfile_object_file->name, 0);
+    symbol_file_add_main (OBJFILE_NAME (src->symfile_object_file), 0);
 
   do_cleanups (old_chain);
   return dest;

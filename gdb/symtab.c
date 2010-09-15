@@ -231,8 +231,8 @@ got_symtab:
   found = 0;
   ALL_OBJFILES (iter, objfile)
   {
-    if (objfile->sf
-	&& objfile->sf->qf->lookup_symtab (objfile, name, full_path, real_path,
+    if (OBJFILE_SF (objfile)
+	&& OBJFILE_SF (objfile)->qf->lookup_symtab (objfile, name, full_path, real_path,
 					   &s))
       {
 	found = 1;
@@ -404,7 +404,7 @@ create_demangled_names_hash (struct objfile *objfile)
      Choosing a much larger table size wastes memory, and saves only about
      1% in symbol reading.  */
 
-  objfile->demangled_names_hash = htab_create_alloc
+  OBJFILE_DEMANGLED_NAMES_HASH (objfile) = htab_create_alloc
     (256, hash_demangled_name_entry, eq_demangled_name_entry,
      NULL, xcalloc, xfree);
 }
@@ -534,7 +534,7 @@ symbol_set_names (struct general_symbol_info *gsymbol,
 	gsymbol->name = (char *) linkage_name;
       else
 	{
-	  gsymbol->name = obstack_alloc (&objfile->objfile_obstack, len + 1);
+	  gsymbol->name = obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile), len + 1);
 	  memcpy (gsymbol->name, linkage_name, len);
 	  gsymbol->name[len] = '\0';
 	}
@@ -543,7 +543,7 @@ symbol_set_names (struct general_symbol_info *gsymbol,
       return;
     }
 
-  if (objfile->demangled_names_hash == NULL)
+  if (OBJFILE_DEMANGLED_NAMES_HASH (objfile) == NULL)
     create_demangled_names_hash (objfile);
 
   /* The stabs reader generally provides names that are not
@@ -583,7 +583,7 @@ symbol_set_names (struct general_symbol_info *gsymbol,
 
   entry.mangled = (char *) lookup_name;
   slot = ((struct demangled_name_entry **)
-	  htab_find_slot (objfile->demangled_names_hash,
+	  htab_find_slot (OBJFILE_DEMANGLED_NAMES_HASH (objfile),
 			  &entry, INSERT));
 
   /* If this name is not in the hash table, add it.  */
@@ -604,7 +604,7 @@ symbol_set_names (struct general_symbol_info *gsymbol,
 	 us better bcache hit rates for partial symbols.  */
       if (!copy_name && lookup_name == linkage_name)
 	{
-	  *slot = obstack_alloc (&objfile->objfile_obstack,
+	  *slot = obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
 				 offsetof (struct demangled_name_entry,
 					   demangled)
 				 + demangled_len + 1);
@@ -615,7 +615,7 @@ symbol_set_names (struct general_symbol_info *gsymbol,
 	  /* If we must copy the mangled name, put it directly after
 	     the demangled name so we can have a single
 	     allocation.  */
-	  *slot = obstack_alloc (&objfile->objfile_obstack,
+	  *slot = obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
 				 offsetof (struct demangled_name_entry,
 					   demangled)
 				 + lookup_len + demangled_len + 2);
@@ -775,15 +775,15 @@ matching_obj_sections (struct obj_section *obj_first,
   /* Otherwise check that they are in corresponding objfiles.  */
 
   ALL_OBJFILES (iter, obj)
-    if (obj->obfd == first->owner)
+    if (OBJFILE_OBFD (obj) == first->owner)
       break;
   gdb_assert (obj != NULL);
 
-  if (obj->separate_debug_objfile != NULL
-      && obj->separate_debug_objfile->obfd == second->owner)
+  if (OBJFILE_SEPARATE_DEBUG_OBJFILE (obj) != NULL
+      && OBJFILE_OBFD (OBJFILE_SEPARATE_DEBUG_OBJFILE (obj)) == second->owner)
     return 1;
-  if (obj->separate_debug_objfile_backlink != NULL
-      && obj->separate_debug_objfile_backlink->obfd == second->owner)
+  if (OBJFILE_SEPARATE_DEBUG_OBJFILE_BACKLINK (obj) != NULL
+      && OBJFILE_OBFD (OBJFILE_SEPARATE_DEBUG_OBJFILE_BACKLINK (obj)) == second->owner)
     return 1;
 
   return 0;
@@ -812,8 +812,8 @@ find_pc_sect_symtab_via_partial (CORE_ADDR pc, struct obj_section *section)
   {
     struct symtab *result = NULL;
 
-    if (objfile->sf)
-      result = objfile->sf->qf->find_pc_sect_symtab (objfile, msymbol,
+    if (OBJFILE_SF (objfile))
+      result = OBJFILE_SF (objfile)->qf->find_pc_sect_symtab (objfile, msymbol,
 						     pc, section, 0);
     if (result)
       return result;
@@ -885,7 +885,7 @@ fixup_section (struct general_symbol_info *ginfo,
       ALL_OBJFILE_OSECTIONS (objfile, s)
 	{
 	  int idx = s->the_bfd_section->index;
-	  CORE_ADDR offset = ANOFFSET (objfile->section_offsets, idx);
+	  CORE_ADDR offset = ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), idx);
 
 	  if (obj_section_addr (s) - offset <= addr
 	      && addr < obj_section_endaddr (s) - offset)
@@ -1217,8 +1217,8 @@ lookup_objfile_from_block (const struct block *block)
   ALL_SYMTABS (iter, obj, s)
     if (block == BLOCKVECTOR_BLOCK (BLOCKVECTOR (s), GLOBAL_BLOCK))
       {
-	if (obj->separate_debug_objfile_backlink)
-	  obj = obj->separate_debug_objfile_backlink;
+	if (OBJFILE_SEPARATE_DEBUG_OBJFILE_BACKLINK (obj))
+	  obj = OBJFILE_SEPARATE_DEBUG_OBJFILE_BACKLINK (obj);
 
 	return obj;
       }
@@ -1328,9 +1328,9 @@ lookup_symbol_aux_quick (struct objfile *objfile, int kind,
   const struct block *block;
   struct symbol *sym;
 
-  if (!objfile->sf)
+  if (!OBJFILE_SF (objfile))
     return NULL;
-  symtab = objfile->sf->qf->lookup_symbol (objfile, kind, name, domain);
+  symtab = OBJFILE_SF (objfile)->qf->lookup_symbol (objfile, kind, name, domain);
   if (!symtab)
     return NULL;
 
@@ -1500,9 +1500,9 @@ basic_lookup_transparent_type_quick (struct objfile *objfile, int kind,
   struct block *block;
   struct symbol *sym;
 
-  if (!objfile->sf)
+  if (!OBJFILE_SF (objfile))
     return NULL;
-  symtab = objfile->sf->qf->lookup_symbol (objfile, kind, name, STRUCT_DOMAIN);
+  symtab = OBJFILE_SF (objfile)->qf->lookup_symbol (objfile, kind, name, STRUCT_DOMAIN);
   if (!symtab)
     return NULL;
 
@@ -1616,9 +1616,9 @@ find_main_filename (void)
 
   ALL_OBJFILES (iter, objfile)
   {
-    if (!objfile->sf)
+    if (!OBJFILE_SF (objfile))
       continue;
-    result = objfile->sf->qf->find_symbol_file (objfile, name);
+    result = OBJFILE_SF (objfile)->qf->find_symbol_file (objfile, name);
     if (result)
       return result;
   }
@@ -1747,12 +1747,12 @@ find_pc_sect_symtab (CORE_ADDR pc, struct obj_section *section)
 	/* In order to better support objfiles that contain both
 	   stabs and coff debugging info, we continue on if a psymtab
 	   can't be found. */
-	if ((objfile->flags & OBJF_REORDERED) && objfile->sf)
+	if ((OBJFILE_FLAGS (objfile) & OBJF_REORDERED) && OBJFILE_SF (objfile))
 	  {
 	    struct symtab *result;
 
 	    result
-	      = objfile->sf->qf->find_pc_sect_symtab (objfile,
+	      = OBJFILE_SF (objfile)->qf->find_pc_sect_symtab (objfile,
 						      msymbol,
 						      pc, section,
 						      0);
@@ -1785,9 +1785,9 @@ find_pc_sect_symtab (CORE_ADDR pc, struct obj_section *section)
   {
     struct symtab *result;
 
-    if (!objfile->sf)
+    if (!OBJFILE_SF (objfile))
       continue;
-    result = objfile->sf->qf->find_pc_sect_symtab (objfile,
+    result = OBJFILE_SF (objfile)->qf->find_pc_sect_symtab (objfile,
 						   msymbol,
 						   pc, section,
 						   1);
@@ -2125,8 +2125,8 @@ find_line_symtab (struct symtab *symtab, int line,
 
       ALL_OBJFILES (iter, objfile)
       {
-	if (objfile->sf)
-	  objfile->sf->qf->expand_symtabs_with_filename (objfile,
+	if (OBJFILE_SF (objfile))
+	  OBJFILE_SF (objfile)->qf->expand_symtabs_with_filename (objfile,
 							 symtab->filename);
       }
 
@@ -2997,8 +2997,8 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
   datum.regexp = regexp;
   ALL_OBJFILES (oiter, objfile)
   {
-    if (objfile->sf)
-      objfile->sf->qf->expand_symtabs_matching (objfile,
+    if (OBJFILE_SF (objfile))
+      OBJFILE_SF (objfile)->qf->expand_symtabs_matching (objfile,
 						search_symbols_file_matches,
 						search_symbols_name_matches,
 						kind,
@@ -4473,7 +4473,7 @@ append_exact_match_to_sals (char *filename, char *fullname, int lineno,
 	      if (item->line == lineno)
 		{
 		  exact = 1;
-		  append_expanded_sal (ret, objfile->pspace,
+		  append_expanded_sal (ret, OBJFILE_PSPACE (objfile),
 				       symtab, lineno, item->pc);
 		}
 	      else if (!exact && item->line > lineno
@@ -4546,8 +4546,8 @@ expand_line_sal (struct symtab_and_line sal)
 	set_current_program_space (pspace);
 	ALL_PSPACE_OBJFILES (pspace, iter, objfile)
 	{
-	  if (objfile->sf)
-	    objfile->sf->qf->expand_symtabs_with_filename (objfile,
+	  if (OBJFILE_SF (objfile))
+	    OBJFILE_SF (objfile)->qf->expand_symtabs_with_filename (objfile,
 							   sal.symtab->filename);
 	}
       }

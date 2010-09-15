@@ -1532,8 +1532,8 @@ exp_uses_objfile_iter (struct objfile *exp_objfile, void *objfile_voidp)
 {
   struct objfile *objfile = objfile_voidp;
 
-  if (exp_objfile->separate_debug_objfile_backlink)
-    exp_objfile = exp_objfile->separate_debug_objfile_backlink;
+  if (OBJFILE_SEPARATE_DEBUG_OBJFILE_BACKLINK (exp_objfile))
+    exp_objfile = OBJFILE_SEPARATE_DEBUG_OBJFILE_BACKLINK (exp_objfile);
 
   return exp_objfile == objfile;
 }
@@ -1545,7 +1545,7 @@ exp_uses_objfile_iter (struct objfile *exp_objfile, void *objfile_voidp)
 int
 exp_uses_objfile (struct expression *exp, struct objfile *objfile)
 {
-  gdb_assert (objfile->separate_debug_objfile_backlink == NULL);
+  gdb_assert (OBJFILE_SEPARATE_DEBUG_OBJFILE_BACKLINK (objfile) == NULL);
 
   return exp_iterate (exp, exp_uses_objfile_iter, objfile);
 }

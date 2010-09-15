@@ -384,10 +384,10 @@ maintenance_info_sections (char *arg, int from_tty)
 	  ALL_OBJFILES (iter, ofile)
 	    {
 	      printf_filtered (_("  Object file: %s\n"), 
-			       bfd_get_filename (ofile->obfd));
+			       bfd_get_filename (OBJFILE_OBFD (ofile)));
 	      ALL_OBJFILE_OSECTIONS (ofile, osect)
 		{
-		  print_objfile_section_info (ofile->obfd, osect, arg);
+		  print_objfile_section_info (OBJFILE_OBFD (ofile), osect, arg);
 		}
 	    }
 	}
@@ -506,8 +506,8 @@ maintenance_translate_address (char *arg, int from_tty)
 	  gdb_assert (sect->the_bfd_section && sect->the_bfd_section->name);
 	  section_name = sect->the_bfd_section->name;
 
-	  gdb_assert (sect->objfile && sect->objfile->name);
-	  obj_name = sect->objfile->name;
+	  gdb_assert (sect->objfile && OBJFILE_NAME (sect->objfile));
+	  obj_name = OBJFILE_NAME (sect->objfile);
 
 	  if (MULTI_OBJFILE_P ())
 	    printf_filtered (_("%s + %s in section %s of %s\n"),

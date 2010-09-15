@@ -1103,7 +1103,7 @@ sym_info (char *arg, int from_tty)
   {
     /* Only process each object file once, even if there's a separate
        debug file.  */
-    if (objfile->separate_debug_objfile_backlink)
+    if (OBJFILE_SEPARATE_DEBUG_OBJFILE_BACKLINK (objfile))
       continue;
 
     sect_addr = overlay_mapped_address (addr, osect);
@@ -1133,8 +1133,8 @@ sym_info (char *arg, int from_tty)
 	   a pagination request inside printf_filtered.  */
 	old_chain = make_cleanup (xfree, loc_string);
 
-	gdb_assert (osect->objfile && osect->objfile->name);
-	obj_name = osect->objfile->name;
+	gdb_assert (osect->objfile && OBJFILE_NAME (osect->objfile));
+	obj_name = OBJFILE_NAME (osect->objfile);
 
 	if (MULTI_OBJFILE_P ())
 	  if (pc_in_unmapped_range (addr, osect))
@@ -1362,7 +1362,7 @@ address_info (char *exp, int from_tty)
 	      printf_filtered (_("a thread-local variable at offset %s "
 				 "in the thread-local storage for `%s'"),
 			       paddress (gdbarch, load_addr),
-			       section->objfile->name);
+			       OBJFILE_NAME (section->objfile));
 	    else
 	      {
 		printf_filtered (_("static storage at address "));
@@ -1912,9 +1912,9 @@ clear_dangling_display_expressions (struct so_list *solib)
   /* With no symbol file we cannot have a block or expression from it.  */
   if (objfile == NULL)
     return;
-  if (objfile->separate_debug_objfile_backlink)
-    objfile = objfile->separate_debug_objfile_backlink;
-  gdb_assert (objfile->pspace == solib->pspace);
+  if (OBJFILE_SEPARATE_DEBUG_OBJFILE_BACKLINK (objfile))
+    objfile = OBJFILE_SEPARATE_DEBUG_OBJFILE_BACKLINK (objfile);
+  gdb_assert (OBJFILE_PSPACE (objfile) == solib->pspace);
 
   for (d = display_chain; d != NULL; d = d->next)
     {

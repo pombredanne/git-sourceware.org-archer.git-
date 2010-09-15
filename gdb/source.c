@@ -264,7 +264,7 @@ select_source_symtab (struct symtab *s)
 
   ALL_OBJFILES (iter, ofp)
     {
-      for (s = ofp->symtabs; s; s = s->next)
+      for (s = OBJFILE_SYMTABS (ofp); s; s = s->next)
 	{
 	  const char *name = s->filename;
 	  int len = strlen (name);
@@ -283,8 +283,8 @@ select_source_symtab (struct symtab *s)
 
   ALL_OBJFILES (iter, ofp)
   {
-    if (ofp->sf)
-      s = ofp->sf->qf->find_last_source_symtab (ofp);
+    if (OBJFILE_SF (ofp))
+      s = OBJFILE_SF (ofp)->qf->find_last_source_symtab (ofp);
     if (s)
       current_source_symtab = s;
   }
@@ -317,7 +317,7 @@ forget_cached_source_info (void)
   ALL_PSPACES (pspace)
     ALL_PSPACE_OBJFILES (pspace, iter, objfile)
     {
-      for (s = objfile->symtabs; s != NULL; s = s->next)
+      for (s = OBJFILE_SYMTABS (objfile); s != NULL; s = s->next)
 	{
 	  if (s->line_charpos != NULL)
 	    {
@@ -331,8 +331,8 @@ forget_cached_source_info (void)
 	    }
 	}
 
-      if (objfile->sf)
-	objfile->sf->qf->forget_cached_source_info (objfile);
+      if (OBJFILE_SF (objfile))
+	OBJFILE_SF (objfile)->qf->forget_cached_source_info (objfile);
     }
 
   last_source_visited = NULL;
@@ -1106,8 +1106,8 @@ find_source_lines (struct symtab *s, int desc)
   if (fstat (desc, &st) < 0)
     perror_with_name (s->filename);
 
-  if (s->objfile && s->objfile->obfd)
-    mtime = s->objfile->mtime;
+  if (s->objfile && OBJFILE_OBFD (s->objfile))
+    mtime = OBJFILE_MTIME (s->objfile);
   else if (exec_bfd)
     mtime = exec_bfd_mtime;
 

@@ -216,8 +216,8 @@ find_pc_partial_function (CORE_ADDR pc, char **name, CORE_ADDR *address,
   msymbol = lookup_minimal_symbol_by_pc_section (mapped_pc, section);
   ALL_OBJFILES (iter, objfile)
   {
-    if (objfile->sf)
-      symtab = objfile->sf->qf->find_pc_sect_symtab (objfile, msymbol,
+    if (OBJFILE_SF (objfile))
+      symtab = OBJFILE_SF (objfile)->qf->find_pc_sect_symtab (objfile, msymbol,
 						     mapped_pc, section, 0);
     if (symtab)
       break;

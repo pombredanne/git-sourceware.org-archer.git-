@@ -183,7 +183,7 @@ pe_as32 (void *ptr)
 void
 read_pe_exported_syms (struct objfile *objfile)
 {
-  bfd *dll = objfile->obfd;
+  bfd *dll = OBJFILE_OBFD (objfile);
   unsigned long pe_header_offset, opthdr_ofs, num_entries, i;
   unsigned long export_rva, export_size, nsections, secptr, expptr;
   unsigned long exp_funcbase;
@@ -204,7 +204,7 @@ read_pe_exported_syms (struct objfile *objfile)
 
   struct cleanup *back_to = 0;
 
-  char const *target = bfd_get_target (objfile->obfd);
+  char const *target = bfd_get_target (OBJFILE_OBFD (objfile));
 
   is_pe64 = (strcmp (target, "pe-x86-64") == 0
 	     || strcmp (target, "pei-x86-64") == 0);
@@ -322,7 +322,7 @@ read_pe_exported_syms (struct objfile *objfile)
   for (i = 0; i < PE_SECTION_TABLE_SIZE; i++)
     {
       section_data[i].vma_offset
-	+= ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+	+= ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
     }
 
   /* Truncate name at first dot. Should maybe also convert to all

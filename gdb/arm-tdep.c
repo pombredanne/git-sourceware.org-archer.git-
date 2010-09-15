@@ -6163,7 +6163,7 @@ arm_objfile_data_free (struct objfile *objfile, void *arg)
   struct arm_per_objfile *data = arg;
   unsigned int i;
 
-  for (i = 0; i < objfile->obfd->section_count; i++)
+  for (i = 0; i < OBJFILE_OBFD (objfile)->section_count; i++)
     VEC_free (arm_mapping_symbol_s, data->section_maps[i]);
 }
 
@@ -6183,11 +6183,11 @@ arm_record_special_symbol (struct gdbarch *gdbarch, struct objfile *objfile,
   data = objfile_data (objfile, arm_objfile_data_key);
   if (data == NULL)
     {
-      data = OBSTACK_ZALLOC (&objfile->objfile_obstack,
+      data = OBSTACK_ZALLOC (&OBJFILE_OBJFILE_OBSTACK (objfile),
 			     struct arm_per_objfile);
       set_objfile_data (objfile, arm_objfile_data_key, data);
-      data->section_maps = OBSTACK_CALLOC (&objfile->objfile_obstack,
-					   objfile->obfd->section_count,
+      data->section_maps = OBSTACK_CALLOC (&OBJFILE_OBJFILE_OBSTACK (objfile),
+					   OBJFILE_OBFD (objfile)->section_count,
 					   VEC(arm_mapping_symbol_s) *);
     }
   map_p = &data->section_maps[bfd_get_section (sym)->index];

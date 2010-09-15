@@ -455,7 +455,7 @@ execute_cfa_program (struct dwarf2_fde *fde, const gdb_byte *insn_ptr,
 					   fde->cie->addr_size, insn_ptr,
 					   &bytes_read, fde->initial_location);
 	      /* Apply the objfile offset for relocatable objects.  */
-	      fs->pc += ANOFFSET (fde->cie->unit->objfile->section_offsets,
+	      fs->pc += ANOFFSET (OBJFILE_SECTION_OFFSETS (fde->cie->unit->objfile),
 				  SECT_OFF_TEXT (fde->cie->unit->objfile));
 	      insn_ptr += bytes_read;
 	      break;
@@ -1613,8 +1613,8 @@ dwarf2_frame_find_fde (CORE_ADDR *pc, CORE_ADDR *out_offset)
       if (fde_table->num_entries == 0)
 	continue;
 
-      gdb_assert (objfile->section_offsets);
-      offset = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+      gdb_assert (OBJFILE_SECTION_OFFSETS (objfile));
+      offset = ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
 
       gdb_assert (fde_table->num_entries > 0);
       if (*pc < offset + fde_table->entries[0]->initial_location)
@@ -1724,7 +1724,7 @@ decode_frame_entry_1 (struct comp_unit *unit, gdb_byte *start, int eh_frame_p,
 	return end;
 
       cie = (struct dwarf2_cie *)
-	obstack_alloc (&unit->objfile->objfile_obstack,
+	obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (unit->objfile),
 		       sizeof (struct dwarf2_cie));
       cie->initial_instructions = NULL;
       cie->cie_pointer = cie_pointer;
@@ -1895,7 +1895,7 @@ decode_frame_entry_1 (struct comp_unit *unit, gdb_byte *start, int eh_frame_p,
 	return NULL;
 
       fde = (struct dwarf2_fde *)
-	obstack_alloc (&unit->objfile->objfile_obstack,
+	obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (unit->objfile),
 		       sizeof (struct dwarf2_fde));
       fde->cie = find_cie (cie_table, cie_pointer);
       if (fde->cie == NULL)
@@ -2078,9 +2078,9 @@ dwarf2_build_frame_info (struct objfile *objfile)
   fde_table.entries = NULL;
 
   /* Build a minimal decoding of the DWARF2 compilation unit.  */
-  unit = (struct comp_unit *) obstack_alloc (&objfile->objfile_obstack,
+  unit = (struct comp_unit *) obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
 					     sizeof (struct comp_unit));
-  unit->abfd = objfile->obfd;
+  unit->abfd = OBJFILE_OBFD (objfile);
   unit->objfile = objfile;
   unit->dbase = 0;
   unit->tbase = 0;
@@ -2143,7 +2143,7 @@ dwarf2_build_frame_info (struct objfile *objfile)
 
   /* Copy fde_table to obstack: it is needed at runtime.  */
   fde_table2 = (struct dwarf2_fde_table *)
-    obstack_alloc (&objfile->objfile_obstack, sizeof (*fde_table2));
+    obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile), sizeof (*fde_table2));
 
   if (fde_table.num_entries == 0)
     {
@@ -2201,12 +2201,12 @@ dwarf2_build_frame_info (struct objfile *objfile)
 	      && fde_prev->initial_location == fde->initial_location)
 	    continue;
 
-	  obstack_grow (&objfile->objfile_obstack, &fde_table.entries[i],
+	  obstack_grow (&OBJFILE_OBJFILE_OBSTACK (objfile), &fde_table.entries[i],
 			sizeof (fde_table.entries[0]));
 	  ++fde_table2->num_entries;
 	  fde_prev = fde;
 	}
-      fde_table2->entries = obstack_finish (&objfile->objfile_obstack);
+      fde_table2->entries = obstack_finish (&OBJFILE_OBJFILE_OBSTACK (objfile));
 
       /* Discard the original fde_table.  */
       xfree (fde_table.entries);

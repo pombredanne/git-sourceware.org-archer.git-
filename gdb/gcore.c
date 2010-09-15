@@ -409,7 +409,7 @@ gcore_create_callback (CORE_ADDR vaddr, unsigned long size,
 
       ALL_OBJSECTIONS (iter, objfile, objsec)
 	{
-	  bfd *abfd = objfile->obfd;
+	  bfd *abfd = OBJFILE_OBFD (objfile);
 	  asection *asec = objsec->the_bfd_section;
 	  bfd_vma align = (bfd_vma) 1 << bfd_get_section_alignment (abfd,
 								    asec);
@@ -476,7 +476,7 @@ objfile_find_memory_regions (int (*func) (CORE_ADDR, unsigned long,
   /* Call callback function for each objfile section.  */
   ALL_OBJSECTIONS (iter, objfile, objsec)
     {
-      bfd *ibfd = objfile->obfd;
+      bfd *ibfd = OBJFILE_OBFD (objfile);
       asection *isec = objsec->the_bfd_section;
       flagword flags = bfd_get_section_flags (ibfd, isec);
 

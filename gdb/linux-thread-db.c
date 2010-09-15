@@ -875,12 +875,12 @@ thread_db_load (void)
      libpthread, try loading libthread_db from the same directory.  */
 
   ALL_OBJFILES (iter, obj)
-    if (libpthread_name_p (obj->name))
+    if (libpthread_name_p (OBJFILE_NAME (obj)))
       {
 	char path[PATH_MAX], *cp;
 
-	gdb_assert (strlen (obj->name) < sizeof (path));
-	strcpy (path, obj->name);
+	gdb_assert (strlen (OBJFILE_NAME (obj)) < sizeof (path));
+	strcpy (path, OBJFILE_NAME (obj));
 	cp = strrchr (path, '/');
 
 	if (cp == NULL)

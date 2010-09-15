@@ -340,7 +340,7 @@ mdebug_build_psymtabs (struct objfile *objfile,
 		       const struct ecoff_debug_swap *swap,
 		       struct ecoff_debug_info *info)
 {
-  cur_bfd = objfile->obfd;
+  cur_bfd = OBJFILE_OBFD (objfile);
   debug_swap = swap;
   debug_info = info;
 
@@ -356,7 +356,7 @@ mdebug_build_psymtabs (struct objfile *objfile,
       char *fdr_end;
       FDR *fdr_ptr;
 
-      info->fdr = (FDR *) obstack_alloc (&objfile->objfile_obstack,
+      info->fdr = (FDR *) obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
 					 (info->symbolic_header.ifdMax
 					  * sizeof (FDR)));
       fdr_src = info->external_fdr;
@@ -364,7 +364,7 @@ mdebug_build_psymtabs (struct objfile *objfile,
 		 + info->symbolic_header.ifdMax * swap->external_fdr_size);
       fdr_ptr = info->fdr;
       for (; fdr_src < fdr_end; fdr_src += swap->external_fdr_size, fdr_ptr++)
-	(*swap->swap_fdr_in) (objfile->obfd, fdr_src, fdr_ptr);
+	(*swap->swap_fdr_in) (OBJFILE_OBFD (objfile), fdr_src, fdr_ptr);
     }
 
   parse_partial_symbols (objfile);
@@ -509,7 +509,7 @@ add_pending (FDR *fh, char *sh, struct type *t)
   if (!p)
     {
       p = ((struct mdebug_pending *)
-	   obstack_alloc (&current_objfile->objfile_obstack,
+	   obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (current_objfile),
 			  sizeof (struct mdebug_pending)));
       p->s = sh;
       p->t = t;
@@ -1001,7 +1001,7 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
 	if (sh->iss == 0 || name[0] == '.' || name[0] == '\0')
 	  TYPE_TAG_NAME (t) = NULL;
 	else
-	  TYPE_TAG_NAME (t) = obconcat (&current_objfile->objfile_obstack, name,
+	  TYPE_TAG_NAME (t) = obconcat (&OBJFILE_OBJFILE_OBSTACK (current_objfile), name,
 					(char *) NULL);
 
 	TYPE_CODE (t) = type_code;
@@ -1046,12 +1046,12 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
 		FIELD_BITSIZE (*f) = 0;
 
 		enum_sym = ((struct symbol *)
-			    obstack_alloc (&current_objfile->objfile_obstack,
+			    obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (current_objfile),
 					   sizeof (struct symbol)));
 		memset (enum_sym, 0, sizeof (struct symbol));
 		SYMBOL_SET_LINKAGE_NAME
 		  (enum_sym, obsavestring (f->name, strlen (f->name),
-					   &current_objfile->objfile_obstack));
+					   &OBJFILE_OBJFILE_OBSTACK (current_objfile)));
 		SYMBOL_CLASS (enum_sym) = LOC_CONST;
 		SYMBOL_TYPE (enum_sym) = t;
 		SYMBOL_DOMAIN (enum_sym) = VAR_DOMAIN;
@@ -1144,7 +1144,7 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
 	  SYMBOL_CLASS (s) = LOC_CONST;
 	  SYMBOL_TYPE (s) = objfile_type (current_objfile)->builtin_void;
 	  e = ((struct mdebug_extra_func_info *)
-	       obstack_alloc (&current_objfile->objfile_obstack,
+	       obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (current_objfile),
 			      sizeof (struct mdebug_extra_func_info)));
 	  memset (e, 0, sizeof (struct mdebug_extra_func_info));
 	  SYMBOL_VALUE_BYTES (s) = (gdb_byte *) e;
@@ -1354,7 +1354,7 @@ basic_type (int bt, struct objfile *objfile)
 
   if (!map_bt)
     {
-      map_bt = OBSTACK_CALLOC (&objfile->objfile_obstack,
+      map_bt = OBSTACK_CALLOC (&OBJFILE_OBJFILE_OBSTACK (objfile),
 			       btMax, struct type *);
       set_objfile_data (objfile, basic_type_data, map_bt);
     }
@@ -1693,7 +1693,7 @@ parse_type (int fd, union aux_ext *ax, unsigned int aux_index, int *bs,
 	  else if (TYPE_TAG_NAME (tp) == NULL
 		   || strcmp (TYPE_TAG_NAME (tp), name) != 0)
 	    TYPE_TAG_NAME (tp) = obsavestring (name, strlen (name),
-					    &current_objfile->objfile_obstack);
+					    &OBJFILE_OBJFILE_OBSTACK (current_objfile));
 	}
     }
 
@@ -1729,7 +1729,7 @@ parse_type (int fd, union aux_ext *ax, unsigned int aux_index, int *bs,
 	  if (TYPE_NAME (tp) == NULL
 	      || strcmp (TYPE_NAME (tp), name) != 0)
 	    TYPE_NAME (tp) = obsavestring (name, strlen (name),
-					   &current_objfile->objfile_obstack);
+					   &OBJFILE_OBJFILE_OBSTACK (current_objfile));
 	}
     }
   if (t->bt == btTypedef)
@@ -2370,7 +2370,7 @@ parse_partial_symbols (struct objfile *objfile)
       && (bfd_get_section_flags (cur_bfd, text_sect) & SEC_RELOC))
     relocatable = 1;
 
-  extern_tab = (EXTR *) obstack_alloc (&objfile->objfile_obstack,
+  extern_tab = (EXTR *) obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
 				       sizeof (EXTR) * hdr->iextMax);
 
   includes_allocated = 30;
@@ -2415,7 +2415,7 @@ parse_partial_symbols (struct objfile *objfile)
   /* Allocate the global pending list.  */
   pending_list =
     ((struct mdebug_pending **)
-     obstack_alloc (&objfile->objfile_obstack,
+     obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
 		    hdr->ifdMax * sizeof (struct mdebug_pending *)));
   memset (pending_list, 0,
 	  hdr->ifdMax * sizeof (struct mdebug_pending *));
@@ -2524,12 +2524,12 @@ parse_partial_symbols (struct objfile *objfile)
 	{
 	case stProc:
 	  /* Beginnning of Procedure */
-	  svalue += ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+	  svalue += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
 	  break;
 	case stStaticProc:
 	  /* Load time only static procs */
 	  ms_type = mst_file_text;
-	  svalue += ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+	  svalue += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
 	  break;
 	case stGlobal:
 	  /* External symbol */
@@ -2542,17 +2542,17 @@ parse_partial_symbols (struct objfile *objfile)
 	  else if (SC_IS_DATA (ext_in->asym.sc))
 	    {
 	      ms_type = mst_data;
-	      svalue += ANOFFSET (objfile->section_offsets, SECT_OFF_DATA (objfile));
+	      svalue += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_DATA (objfile));
 	    }
 	  else if (SC_IS_BSS (ext_in->asym.sc))
 	    {
 	      ms_type = mst_bss;
-	      svalue += ANOFFSET (objfile->section_offsets, SECT_OFF_BSS (objfile));
+	      svalue += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_BSS (objfile));
 	    }
           else if (SC_IS_SBSS (ext_in->asym.sc))
             {
               ms_type = mst_bss;
-              svalue += ANOFFSET (objfile->section_offsets, 
+              svalue += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), 
                                   get_section_index (objfile, ".sbss"));
             }
 	  else
@@ -2583,27 +2583,27 @@ parse_partial_symbols (struct objfile *objfile)
           
 	  if (SC_IS_TEXT (ext_in->asym.sc))
 	    {
-              if (objfile->sect_index_text == -1)
+              if (OBJFILE_SECT_INDEX_TEXT (objfile) == -1)
                 continue;
                 
 	      ms_type = mst_file_text;
-	      svalue += ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+	      svalue += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
 	    }
 	  else if (SC_IS_DATA (ext_in->asym.sc))
 	    {
-              if (objfile->sect_index_data == -1)
+              if (OBJFILE_SECT_INDEX_DATA (objfile) == -1)
                 continue;
 
 	      ms_type = mst_file_data;
-	      svalue += ANOFFSET (objfile->section_offsets, SECT_OFF_DATA (objfile));
+	      svalue += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_DATA (objfile));
 	    }
 	  else if (SC_IS_BSS (ext_in->asym.sc))
 	    {
-              if (objfile->sect_index_bss == -1)
+              if (OBJFILE_SECT_INDEX_BSS (objfile) == -1)
                 continue;
 
 	      ms_type = mst_file_bss;
-	      svalue += ANOFFSET (objfile->section_offsets, SECT_OFF_BSS (objfile));
+	      svalue += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_BSS (objfile));
 	    }
           else if (SC_IS_SBSS (ext_in->asym.sc))
             {
@@ -2613,7 +2613,7 @@ parse_partial_symbols (struct objfile *objfile)
                 continue;
 
               ms_type = mst_file_bss;
-              svalue += ANOFFSET (objfile->section_offsets, sbss_sect_index);
+              svalue += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), sbss_sect_index);
             }
 	  else
 	    ms_type = mst_abs;
@@ -2658,16 +2658,16 @@ parse_partial_symbols (struct objfile *objfile)
 	{
 	  textlow = fh->adr;
 	  if (relocatable || textlow != 0)
-	    textlow += ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+	    textlow += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
 	}
       else
 	textlow = 0;
-      pst = start_psymtab_common (objfile, objfile->section_offsets,
+      pst = start_psymtab_common (objfile, OBJFILE_SECTION_OFFSETS (objfile),
 				  fdr_name (fh),
 				  textlow,
-				  objfile->global_psymbols.next,
-				  objfile->static_psymbols.next);
-      pst->read_symtab_private = obstack_alloc (&objfile->objfile_obstack,
+				  OBJFILE_GLOBAL_PSYMBOLS (objfile).next,
+				  OBJFILE_STATIC_PSYMBOLS (objfile).next);
+      pst->read_symtab_private = obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
 						sizeof (struct symloc));
       memset (pst->read_symtab_private, 0, sizeof (struct symloc));
 
@@ -2746,7 +2746,7 @@ parse_partial_symbols (struct objfile *objfile)
 		      CORE_ADDR procaddr;
 		      long isym;
 
-		      sh.value += ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+		      sh.value += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
 		      if (sh.st == stStaticProc)
 			{
 			  namestring = debug_info->ss + fh->issBase + sh.iss;
@@ -2793,7 +2793,7 @@ parse_partial_symbols (struct objfile *objfile)
 			case scPData:
 			case scXData:
 			  namestring = debug_info->ss + fh->issBase + sh.iss;
-			  sh.value += ANOFFSET (objfile->section_offsets, SECT_OFF_DATA (objfile));
+			  sh.value += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_DATA (objfile));
                           record_minimal_symbol (namestring, sh.value,
                                                  mst_file_data, sh.sc,
                                                  objfile);
@@ -2803,7 +2803,7 @@ parse_partial_symbols (struct objfile *objfile)
 			  /* FIXME!  Shouldn't this use cases for bss, 
 			     then have the default be abs? */
 			  namestring = debug_info->ss + fh->issBase + sh.iss;
-			  sh.value += ANOFFSET (objfile->section_offsets, SECT_OFF_BSS (objfile));
+			  sh.value += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_BSS (objfile));
                           record_minimal_symbol (namestring, sh.value,
                                                  mst_file_bss, sh.sc,
                                                  objfile);
@@ -2860,19 +2860,19 @@ parse_partial_symbols (struct objfile *objfile)
 
 		  case N_TEXT | N_EXT:
 		  case N_NBTEXT | N_EXT:
-		    sh.value += ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+		    sh.value += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
 		    goto record_it;
 
 		  case N_DATA | N_EXT:
 		  case N_NBDATA | N_EXT:
-		    sh.value += ANOFFSET (objfile->section_offsets, SECT_OFF_DATA (objfile));
+		    sh.value += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_DATA (objfile));
 		    goto record_it;
 
 		  case N_BSS:
 		  case N_BSS | N_EXT:
 		  case N_NBBSS | N_EXT:
 		  case N_SETV | N_EXT:		/* FIXME, is this in BSS? */
-		    sh.value += ANOFFSET (objfile->section_offsets, SECT_OFF_BSS (objfile));
+		    sh.value += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_BSS (objfile));
 		    goto record_it;
 
 		  case N_ABS | N_EXT:
@@ -2894,7 +2894,7 @@ parse_partial_symbols (struct objfile *objfile)
 		    continue;
 
 		  case N_DATA:
-		    sh.value += ANOFFSET (objfile->section_offsets, SECT_OFF_DATA (objfile));
+		    sh.value += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_DATA (objfile));
 		    goto record_it;
 
 		  case N_UNDF | N_EXT:
@@ -2940,7 +2940,7 @@ parse_partial_symbols (struct objfile *objfile)
 		      char *p;
 		      int prev_textlow_not_set;
 
-		      valu = sh.value + ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+		      valu = sh.value + ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
 
 		      prev_textlow_not_set = textlow_not_set;
 
@@ -3099,7 +3099,7 @@ parse_partial_symbols (struct objfile *objfile)
 		    switch (p[1])
 		      {
 		      case 'S':
-			sh.value += ANOFFSET (objfile->section_offsets, SECT_OFF_DATA (objfile));
+			sh.value += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_DATA (objfile));
 
 			if (gdbarch_static_transform_name_p (gdbarch))
 			  namestring = gdbarch_static_transform_name
@@ -3107,17 +3107,17 @@ parse_partial_symbols (struct objfile *objfile)
 
 			add_psymbol_to_list (namestring, p - namestring, 1,
 					     VAR_DOMAIN, LOC_STATIC,
-					     &objfile->static_psymbols,
+					     &OBJFILE_STATIC_PSYMBOLS (objfile),
 					     0, sh.value,
 					     psymtab_language, objfile);
 			continue;
 		      case 'G':
-			sh.value += ANOFFSET (objfile->section_offsets, SECT_OFF_DATA (objfile));
+			sh.value += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_DATA (objfile));
 			/* The addresses in these entries are reported to be
 			   wrong.  See the code that reads 'G's for symtabs. */
 			add_psymbol_to_list (namestring, p - namestring, 1,
 					     VAR_DOMAIN, LOC_STATIC,
-					     &objfile->global_psymbols,
+					     &OBJFILE_GLOBAL_PSYMBOLS (objfile),
 					     0, sh.value,
 					     psymtab_language, objfile);
 			continue;
@@ -3135,7 +3135,7 @@ parse_partial_symbols (struct objfile *objfile)
 			  {
 			    add_psymbol_to_list (namestring, p - namestring, 1,
 						 STRUCT_DOMAIN, LOC_TYPEDEF,
-						 &objfile->static_psymbols,
+						 &OBJFILE_STATIC_PSYMBOLS (objfile),
 						 sh.value, 0,
 						 psymtab_language, objfile);
 			    if (p[2] == 't')
@@ -3144,7 +3144,7 @@ parse_partial_symbols (struct objfile *objfile)
 				add_psymbol_to_list (namestring, p - namestring,
 						     1,
 						     VAR_DOMAIN, LOC_TYPEDEF,
-						     &objfile->static_psymbols,
+						     &OBJFILE_STATIC_PSYMBOLS (objfile),
 						     sh.value, 0,
 						     psymtab_language, objfile);
 				p += 1;
@@ -3156,7 +3156,7 @@ parse_partial_symbols (struct objfile *objfile)
 			  {
 			    add_psymbol_to_list (namestring, p - namestring, 1,
 						 VAR_DOMAIN, LOC_TYPEDEF,
-						 &objfile->static_psymbols,
+						 &OBJFILE_STATIC_PSYMBOLS (objfile),
 						 sh.value, 0,
 						 psymtab_language, objfile);
 			  }
@@ -3218,7 +3218,7 @@ parse_partial_symbols (struct objfile *objfile)
 				   enum constants in psymtabs, just in symtabs.  */
 				add_psymbol_to_list (p, q - p, 1,
 						     VAR_DOMAIN, LOC_CONST,
-						     &objfile->static_psymbols, 0,
+						     &OBJFILE_STATIC_PSYMBOLS (objfile), 0,
 						     0, psymtab_language, objfile);
 				/* Point past the name.  */
 				p = q;
@@ -3235,7 +3235,7 @@ parse_partial_symbols (struct objfile *objfile)
 			/* Constant, e.g. from "const" in Pascal.  */
 			add_psymbol_to_list (namestring, p - namestring, 1,
 					     VAR_DOMAIN, LOC_CONST,
-					     &objfile->static_psymbols, sh.value,
+					     &OBJFILE_STATIC_PSYMBOLS (objfile), sh.value,
 					     0, psymtab_language, objfile);
 			continue;
 
@@ -3250,10 +3250,10 @@ parse_partial_symbols (struct objfile *objfile)
 			    function_outside_compilation_unit_complaint (name);
 			    xfree (name);
 			  }
-			sh.value += ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+			sh.value += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
 			add_psymbol_to_list (namestring, p - namestring, 1,
 					     VAR_DOMAIN, LOC_BLOCK,
-					     &objfile->static_psymbols,
+					     &OBJFILE_STATIC_PSYMBOLS (objfile),
 					     0, sh.value,
 					     psymtab_language, objfile);
 			continue;
@@ -3272,10 +3272,10 @@ parse_partial_symbols (struct objfile *objfile)
 			    function_outside_compilation_unit_complaint (name);
 			    xfree (name);
 			  }
-			sh.value += ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+			sh.value += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
 			add_psymbol_to_list (namestring, p - namestring, 1,
 					     VAR_DOMAIN, LOC_BLOCK,
-					     &objfile->global_psymbols,
+					     &OBJFILE_GLOBAL_PSYMBOLS (objfile),
 					     0, sh.value,
 					     psymtab_language, objfile);
 			continue;
@@ -3427,18 +3427,18 @@ parse_partial_symbols (struct objfile *objfile)
 		  /* The value of a stEnd symbol is the displacement from the
 		     corresponding start symbol value, do not relocate it.  */
 		  if (sh.st != stEnd)
-		    sh.value += ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+		    sh.value += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
 		  break;
 		case scData:
 		case scSData:
 		case scRData:
 		case scPData:
 		case scXData:
-		  sh.value += ANOFFSET (objfile->section_offsets, SECT_OFF_DATA (objfile));
+		  sh.value += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_DATA (objfile));
 		  break;
 		case scBss:
 		case scSBss:
-		  sh.value += ANOFFSET (objfile->section_offsets, SECT_OFF_BSS (objfile));
+		  sh.value += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_BSS (objfile));
 		  break;
 		}
 
@@ -3504,12 +3504,12 @@ parse_partial_symbols (struct objfile *objfile)
 		  if (sh.st == stProc)
 		    add_psymbol_to_list (name, strlen (name), 1,
 					 VAR_DOMAIN, LOC_BLOCK,
-					 &objfile->global_psymbols,
+					 &OBJFILE_GLOBAL_PSYMBOLS (objfile),
 				    0, sh.value, psymtab_language, objfile);
 		  else
 		    add_psymbol_to_list (name, strlen (name), 1,
 					 VAR_DOMAIN, LOC_BLOCK,
-					 &objfile->static_psymbols,
+					 &OBJFILE_STATIC_PSYMBOLS (objfile),
 				    0, sh.value, psymtab_language, objfile);
 
 		  procaddr = sh.value;
@@ -3578,7 +3578,7 @@ parse_partial_symbols (struct objfile *objfile)
 		    {
 		      add_psymbol_to_list (name, strlen (name), 1,
 					   STRUCT_DOMAIN, LOC_TYPEDEF,
-					   &objfile->static_psymbols,
+					   &OBJFILE_STATIC_PSYMBOLS (objfile),
 					   0, (CORE_ADDR) 0,
 					   psymtab_language, objfile);
 		    }
@@ -3619,7 +3619,7 @@ parse_partial_symbols (struct objfile *objfile)
 	      /* Use this gdb symbol */
 	      add_psymbol_to_list (name, strlen (name), 1,
 				   VAR_DOMAIN, class,
-				   &objfile->static_psymbols,
+				   &OBJFILE_STATIC_PSYMBOLS (objfile),
 				   0, sh.value, psymtab_language, objfile);
 	    skip:
 	      cur_sdx++;	/* Go to next file symbol */
@@ -3650,18 +3650,18 @@ parse_partial_symbols (struct objfile *objfile)
 		{
 		case scText:
 		case scRConst:
-		  svalue += ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+		  svalue += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
 		  break;
 		case scData:
 		case scSData:
 		case scRData:
 		case scPData:
 		case scXData:
-		  svalue += ANOFFSET (objfile->section_offsets, SECT_OFF_DATA (objfile));
+		  svalue += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_DATA (objfile));
 		  break;
 		case scBss:
 		case scSBss:
-		  svalue += ANOFFSET (objfile->section_offsets, SECT_OFF_BSS (objfile));
+		  svalue += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_BSS (objfile));
 		  break;
 		}
 
@@ -3695,7 +3695,7 @@ parse_partial_symbols (struct objfile *objfile)
 	      name = debug_info->ssext + psh->iss;
 	      add_psymbol_to_list (name, strlen (name), 1,
 				   VAR_DOMAIN, class,
-				   &objfile->global_psymbols,
+				   &OBJFILE_GLOBAL_PSYMBOLS (objfile),
 				   0, svalue,
 				   psymtab_language, objfile);
 	    }
@@ -3724,7 +3724,7 @@ parse_partial_symbols (struct objfile *objfile)
       save_pst = fdr_to_pst[f_idx].pst;
       if (save_pst != NULL
 	  && save_pst->textlow != 0
-	  && !(objfile->flags & OBJF_REORDERED))
+	  && !(OBJFILE_FLAGS (objfile) & OBJF_REORDERED))
 	{
 	  ALL_OBJFILE_PSYMTABS (objfile, pst)
 	  {
@@ -3733,7 +3733,7 @@ parse_partial_symbols (struct objfile *objfile)
 		&& save_pst->textlow < pst->texthigh
 		&& save_pst->texthigh > pst->texthigh)
 	      {
-		objfile->flags |= OBJF_REORDERED;
+		OBJFILE_FLAGS (objfile) |= OBJF_REORDERED;
 		break;
 	      }
 	  }
@@ -3758,7 +3758,7 @@ parse_partial_symbols (struct objfile *objfile)
       pst->number_of_dependencies = 0;
       pst->dependencies =
 	((struct partial_symtab **)
-	 obstack_alloc (&objfile->objfile_obstack,
+	 obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
 			((fh->crfd - 1)
 			 * sizeof (struct partial_symtab *))));
       for (s_idx = 1; s_idx < fh->crfd; s_idx++)
@@ -3788,11 +3788,11 @@ parse_partial_symbols (struct objfile *objfile)
 
   /* Remove the dummy psymtab created for -O3 images above, if it is
      still empty, to enable the detection of stripped executables.  */
-  if (objfile->psymtabs->next == NULL
-      && objfile->psymtabs->number_of_dependencies == 0
-      && objfile->psymtabs->n_global_syms == 0
-      && objfile->psymtabs->n_static_syms == 0)
-    objfile->psymtabs = NULL;
+  if (OBJFILE_PSYMTABS (objfile)->next == NULL
+      && OBJFILE_PSYMTABS (objfile)->number_of_dependencies == 0
+      && OBJFILE_PSYMTABS (objfile)->n_global_syms == 0
+      && OBJFILE_PSYMTABS (objfile)->n_static_syms == 0)
+    OBJFILE_PSYMTABS (objfile) = NULL;
   do_cleanups (old_chain);
 }
 
@@ -3858,7 +3858,7 @@ handle_psymbol_enumerators (struct objfile *objfile, FDR *fh, int stype,
          in psymtabs, just in symtabs.  */
       add_psymbol_to_list (name, strlen (name), 1,
 			   VAR_DOMAIN, LOC_CONST,
-			   &objfile->static_psymbols, 0,
+			   &OBJFILE_STATIC_PSYMBOLS (objfile), 0,
 			   (CORE_ADDR) 0, psymtab_language, objfile);
       ext_sym += external_sym_size;
     }
@@ -4046,7 +4046,7 @@ psymtab_to_symtab_1 (struct partial_symtab *pst, char *filename)
 		     procedure specific info */
 		  struct mdebug_extra_func_info *e =
 		    ((struct mdebug_extra_func_info *)
-		     obstack_alloc (&current_objfile->objfile_obstack,
+		     obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (current_objfile),
 				    sizeof (struct mdebug_extra_func_info)));
 		  struct symbol *s = new_symbol (MDEBUG_EFI_SYMBOL_NAME);
 
@@ -4702,11 +4702,11 @@ new_psymtab (char *name, struct objfile *objfile)
   struct partial_symtab *psymtab;
 
   psymtab = allocate_psymtab (name, objfile);
-  psymtab->section_offsets = objfile->section_offsets;
+  psymtab->section_offsets = OBJFILE_SECTION_OFFSETS (objfile);
 
   /* Keep a backpointer to the file's symbols */
 
-  psymtab->read_symtab_private = obstack_alloc (&objfile->objfile_obstack,
+  psymtab->read_symtab_private = obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
 						sizeof (struct symloc));
   memset (psymtab->read_symtab_private, 0, sizeof (struct symloc));
   CUR_BFD (psymtab) = cur_bfd;
@@ -4793,7 +4793,7 @@ static struct symbol *
 new_symbol (char *name)
 {
   struct symbol *s = ((struct symbol *)
-		      obstack_alloc (&current_objfile->objfile_obstack,
+		      obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (current_objfile),
 				     sizeof (struct symbol)));
 
   memset (s, 0, sizeof (*s));
@@ -4824,7 +4824,7 @@ void
 elfmdebug_build_psymtabs (struct objfile *objfile,
 			  const struct ecoff_debug_swap *swap, asection *sec)
 {
-  bfd *abfd = objfile->obfd;
+  bfd *abfd = OBJFILE_OBFD (objfile);
   struct ecoff_debug_info *info;
   struct cleanup *back_to;
 
@@ -4836,7 +4836,7 @@ elfmdebug_build_psymtabs (struct objfile *objfile,
   back_to = make_cleanup_discard_minimal_symbols ();
 
   info = ((struct ecoff_debug_info *)
-	  obstack_alloc (&objfile->objfile_obstack,
+	  obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
 			 sizeof (struct ecoff_debug_info)));
 
   if (!(*swap->read_debug_info) (abfd, sec, info))

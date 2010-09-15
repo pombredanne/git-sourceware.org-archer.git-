@@ -1056,7 +1056,7 @@ dump_subexp_body_standard (struct expression *exp,
       gdb_print_host_address (exp->elts[elt + 1].type, stream);
       fprintf_filtered (stream, " (__thread /* \"%s\" */ ",
                         (exp->elts[elt].objfile == NULL ? "(null)"
-			 : exp->elts[elt].objfile->name));
+			 : OBJFILE_NAME (exp->elts[elt].objfile)));
       type_print (exp->elts[elt + 1].type, NULL, stream, 0);
       fprintf_filtered (stream, ")");
       elt = dump_subexp (exp, stream, elt + 3);

@@ -71,7 +71,7 @@ mipscoff_symfile_init (struct objfile *objfile)
 static void
 mipscoff_symfile_read (struct objfile *objfile, int symfile_flags)
 {
-  bfd *abfd = objfile->obfd;
+  bfd *abfd = OBJFILE_OBFD (objfile);
   struct cleanup *back_to;
 
   init_minimal_symbol_collection ();
@@ -89,7 +89,7 @@ mipscoff_symfile_read (struct objfile *objfile, int symfile_flags)
 
   /* Add alpha coff dynamic symbols.  */
 
-  read_alphacoff_dynamic_symtab (objfile->section_offsets, objfile);
+  read_alphacoff_dynamic_symtab (OBJFILE_SECTION_OFFSETS (objfile), objfile);
 
   /* Install any minimal symbols that have been collected as the current
      minimal symbols for this objfile. */
@@ -182,7 +182,7 @@ static void
 read_alphacoff_dynamic_symtab (struct section_offsets *section_offsets,
 			       struct objfile *objfile)
 {
-  bfd *abfd = objfile->obfd;
+  bfd *abfd = OBJFILE_OBFD (objfile);
   struct alphacoff_dynsecinfo si;
   char *sym_secptr;
   char *str_secptr;

@@ -1401,9 +1401,9 @@ enable_break (struct svr4_info *info, int from_tty)
 	  bfd *tmp_bfd;
 	  CORE_ADDR load_addr;
 
-	  tmp_bfd = os->objfile->obfd;
-	  load_addr = ANOFFSET (os->objfile->section_offsets,
-				os->objfile->sect_index_text);
+	  tmp_bfd = OBJFILE_OBFD (os->objfile);
+	  load_addr = ANOFFSET (OBJFILE_SECTION_OFFSETS (os->objfile),
+				OBJFILE_SECT_INDEX_TEXT (os->objfile));
 
 	  interp_sect = bfd_get_section_by_name (tmp_bfd, ".text");
 	  if (interp_sect)
@@ -2027,10 +2027,10 @@ svr4_relocate_main_executable (void)
       struct section_offsets *new_offsets;
       int i;
 
-      new_offsets = alloca (symfile_objfile->num_sections
+      new_offsets = alloca (OBJFILE_NUM_SECTIONS (symfile_objfile)
 			    * sizeof (*new_offsets));
 
-      for (i = 0; i < symfile_objfile->num_sections; i++)
+      for (i = 0; i < OBJFILE_NUM_SECTIONS (symfile_objfile); i++)
 	new_offsets->offsets[i] = displacement;
 
       objfile_relocate (symfile_objfile, new_offsets);
@@ -2346,9 +2346,9 @@ elf_lookup_lib_symbol (const struct objfile *objfile,
   else
     {
       /* OBJFILE should have been passed as the non-debug one.  */
-      gdb_assert (objfile->separate_debug_objfile_backlink == NULL);
+      gdb_assert (OBJFILE_SEPARATE_DEBUG_OBJFILE_BACKLINK (objfile) == NULL);
 
-      abfd = objfile->obfd;
+      abfd = OBJFILE_OBFD (objfile);
     }
 
   if (abfd == NULL || scan_dyntag (DT_SYMBOLIC, abfd, NULL) != 1)

@@ -1077,7 +1077,7 @@ target_translate_tls_address (struct objfile *objfile, CORE_ADDR offset)
          throw the error to some higher catcher.  */
       if (ex.reason < 0)
 	{
-	  int objfile_is_library = (objfile->flags & OBJF_SHARED);
+	  int objfile_is_library = (OBJFILE_FLAGS (objfile) & OBJF_SHARED);
 
 	  switch (ex.error)
 	    {
@@ -1087,10 +1087,10 @@ target_translate_tls_address (struct objfile *objfile, CORE_ADDR offset)
 	    case TLS_LOAD_MODULE_NOT_FOUND_ERROR:
 	      if (objfile_is_library)
 		error (_("Cannot find shared library `%s' in dynamic"
-		         " linker's load module list"), objfile->name);
+		         " linker's load module list"), OBJFILE_NAME (objfile));
 	      else
 		error (_("Cannot find executable file `%s' in dynamic"
-		         " linker's load module list"), objfile->name);
+		         " linker's load module list"), OBJFILE_NAME (objfile));
 	      break;
 	    case TLS_NOT_ALLOCATED_YET_ERROR:
 	      if (objfile_is_library)
@@ -1098,25 +1098,25 @@ target_translate_tls_address (struct objfile *objfile, CORE_ADDR offset)
 		         " thread-local variables in\n"
 		         "the shared library `%s'\n"
 		         "for %s"),
-		       objfile->name, target_pid_to_str (ptid));
+		       OBJFILE_NAME (objfile), target_pid_to_str (ptid));
 	      else
 		error (_("The inferior has not yet allocated storage for"
 		         " thread-local variables in\n"
 		         "the executable `%s'\n"
 		         "for %s"),
-		       objfile->name, target_pid_to_str (ptid));
+		       OBJFILE_NAME (objfile), target_pid_to_str (ptid));
 	      break;
 	    case TLS_GENERIC_ERROR:
 	      if (objfile_is_library)
 		error (_("Cannot find thread-local storage for %s, "
 		         "shared library %s:\n%s"),
 		       target_pid_to_str (ptid),
-		       objfile->name, ex.message);
+		       OBJFILE_NAME (objfile), ex.message);
 	      else
 		error (_("Cannot find thread-local storage for %s, "
 		         "executable file %s:\n%s"),
 		       target_pid_to_str (ptid),
-		       objfile->name, ex.message);
+		       OBJFILE_NAME (objfile), ex.message);
 	      break;
 	    default:
 	      throw_exception (ex);
@@ -2045,7 +2045,7 @@ target_info (char *args, int from_tty)
   int has_all_mem = 0;
 
   if (symfile_objfile != NULL)
-    printf_unfiltered (_("Symbols from \"%s\".\n"), symfile_objfile->name);
+    printf_unfiltered (_("Symbols from \"%s\".\n"), OBJFILE_NAME (symfile_objfile));
 
   for (t = target_stack; t != NULL; t = t->beneath)
     {

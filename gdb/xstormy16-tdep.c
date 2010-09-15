@@ -560,7 +560,7 @@ xstormy16_find_jmp_table_entry (struct gdbarch *gdbarch, CORE_ADDR faddr)
 	  break;
       }
 
-      if (osect < faddr_sect->objfile->sections_end)
+      if (osect < OBJFILE_SECTIONS_END (faddr_sect->objfile))
 	{
 	  CORE_ADDR addr, endaddr;
 

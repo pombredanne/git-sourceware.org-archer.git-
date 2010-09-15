@@ -179,7 +179,7 @@ hppa_init_objfile_priv_data (struct objfile *objfile)
   struct hppa_objfile_private *priv;
 
   priv = (struct hppa_objfile_private *)
-  	 obstack_alloc (&objfile->objfile_obstack,
+  	 obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
 	 		sizeof (struct hppa_objfile_private));
   set_objfile_data (objfile, hppa_objfile_priv_data, priv);
   memset (priv, 0, sizeof (*priv));
@@ -246,7 +246,7 @@ internalize_unwinds (struct objfile *objfile, struct unwind_table_entry *table,
 	{
           low_text_segment_address = -1;
 
-	  bfd_map_over_sections (objfile->obfd,
+	  bfd_map_over_sections (OBJFILE_OBFD (objfile),
 				 record_text_segment_lowaddr, 
 				 &low_text_segment_address);
 
@@ -257,20 +257,20 @@ internalize_unwinds (struct objfile *objfile, struct unwind_table_entry *table,
 	  text_offset = gdbarch_tdep (gdbarch)->solib_get_text_base (objfile);
 	}
 
-      bfd_get_section_contents (objfile->obfd, section, buf, 0, size);
+      bfd_get_section_contents (OBJFILE_OBFD (objfile), section, buf, 0, size);
 
       /* Now internalize the information being careful to handle host/target
          endian issues.  */
       for (i = 0; i < entries; i++)
 	{
-	  table[i].region_start = bfd_get_32 (objfile->obfd,
+	  table[i].region_start = bfd_get_32 (OBJFILE_OBFD (objfile),
 					      (bfd_byte *) buf);
 	  table[i].region_start += text_offset;
 	  buf += 4;
-	  table[i].region_end = bfd_get_32 (objfile->obfd, (bfd_byte *) buf);
+	  table[i].region_end = bfd_get_32 (OBJFILE_OBFD (objfile), (bfd_byte *) buf);
 	  table[i].region_end += text_offset;
 	  buf += 4;
-	  tmp = bfd_get_32 (objfile->obfd, (bfd_byte *) buf);
+	  tmp = bfd_get_32 (OBJFILE_OBFD (objfile), (bfd_byte *) buf);
 	  buf += 4;
 	  table[i].Cannot_unwind = (tmp >> 31) & 0x1;
 	  table[i].Millicode = (tmp >> 30) & 0x1;
@@ -296,7 +296,7 @@ internalize_unwinds (struct objfile *objfile, struct unwind_table_entry *table,
 	  table[i].Save_MRP_in_frame = (tmp >> 2) & 0x1;
 	  table[i].save_r19 = (tmp >> 1) & 0x1;
 	  table[i].Cleanup_defined = tmp & 0x1;
-	  tmp = bfd_get_32 (objfile->obfd, (bfd_byte *) buf);
+	  tmp = bfd_get_32 (OBJFILE_OBFD (objfile), (bfd_byte *) buf);
 	  buf += 4;
 	  table[i].MPE_XL_interrupt_marker = (tmp >> 31) & 0x1;
 	  table[i].HP_UX_interrupt_marker = (tmp >> 30) & 0x1;
@@ -329,8 +329,8 @@ read_unwind_info (struct objfile *objfile)
   struct hppa_unwind_info *ui;
   struct hppa_objfile_private *obj_private;
 
-  text_offset = ANOFFSET (objfile->section_offsets, 0);
-  ui = (struct hppa_unwind_info *) obstack_alloc (&objfile->objfile_obstack,
+  text_offset = ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), 0);
+  ui = (struct hppa_unwind_info *) obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
 					   sizeof (struct hppa_unwind_info));
 
   ui->table = NULL;
@@ -345,7 +345,7 @@ read_unwind_info (struct objfile *objfile)
      First determine the total size of the unwind tables so that we
      can allocate memory in a nice big hunk.  */
   total_entries = 0;
-  for (unwind_sec = objfile->obfd->sections;
+  for (unwind_sec = OBJFILE_OBFD (objfile)->sections;
        unwind_sec;
        unwind_sec = unwind_sec->next)
     {
@@ -361,7 +361,7 @@ read_unwind_info (struct objfile *objfile)
 
   /* Now compute the size of the stub unwinds.  Note the ELF tools do not
      use stub unwinds at the current time.  */
-  stub_unwind_sec = bfd_get_section_by_name (objfile->obfd, "$UNWIND_END$");
+  stub_unwind_sec = bfd_get_section_by_name (OBJFILE_OBFD (objfile), "$UNWIND_END$");
 
   if (stub_unwind_sec)
     {
@@ -380,13 +380,13 @@ read_unwind_info (struct objfile *objfile)
 
   /* Allocate memory for the unwind table.  */
   ui->table = (struct unwind_table_entry *)
-    obstack_alloc (&objfile->objfile_obstack, total_size);
+    obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile), total_size);
   ui->last = total_entries - 1;
 
   /* Now read in each unwind section and internalize the standard unwind
      entries.  */
   index = 0;
-  for (unwind_sec = objfile->obfd->sections;
+  for (unwind_sec = OBJFILE_OBFD (objfile)->sections;
        unwind_sec;
        unwind_sec = unwind_sec->next)
     {
@@ -409,7 +409,7 @@ read_unwind_info (struct objfile *objfile)
       char *buf = alloca (stub_unwind_size);
 
       /* Read in the stub unwind entries.  */
-      bfd_get_section_contents (objfile->obfd, stub_unwind_sec, buf,
+      bfd_get_section_contents (OBJFILE_OBFD (objfile), stub_unwind_sec, buf,
 				0, stub_unwind_size);
 
       /* Now convert them into regular unwind entries.  */
@@ -420,7 +420,7 @@ read_unwind_info (struct objfile *objfile)
 
 	  /* Convert offset & size into region_start and region_end.  
 	     Stuff away the stub type into "reserved" fields.  */
-	  ui->table[index].region_start = bfd_get_32 (objfile->obfd,
+	  ui->table[index].region_start = bfd_get_32 (OBJFILE_OBFD (objfile),
 						      (bfd_byte *) buf);
 	  ui->table[index].region_start += text_offset;
 	  buf += 4;
@@ -429,7 +429,7 @@ read_unwind_info (struct objfile *objfile)
 	  buf += 2;
 	  ui->table[index].region_end
 	    = ui->table[index].region_start + 4 *
-	    (bfd_get_16 (objfile->obfd, (bfd_byte *) buf) - 1);
+	    (bfd_get_16 (OBJFILE_OBFD (objfile), (bfd_byte *) buf) - 1);
 	  buf += 2;
 	}
 
@@ -923,7 +923,7 @@ hppa64_convert_code_addr_to_fptr (struct gdbarch *gdbarch, CORE_ADDR code)
 	break;
     }
 
-  if (opd < sec->objfile->sections_end)
+  if (opd < OBJFILE_SECTIONS_END (sec->objfile))
     {
       CORE_ADDR addr;
 

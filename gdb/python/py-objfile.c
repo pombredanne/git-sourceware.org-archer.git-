@@ -46,8 +46,8 @@ objfpy_get_filename (PyObject *self, void *closure)
 {
   objfile_object *obj = (objfile_object *) self;
 
-  if (obj->objfile && obj->objfile->name)
-    return PyString_Decode (obj->objfile->name, strlen (obj->objfile->name),
+  if (obj->objfile && OBJFILE_NAME (obj->objfile))
+    return PyString_Decode (OBJFILE_NAME (obj->objfile), strlen (OBJFILE_NAME (obj->objfile)),
 			    host_charset (), NULL);
   Py_RETURN_NONE;
 }

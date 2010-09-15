@@ -52,8 +52,8 @@ pspy_get_filename (PyObject *self, void *closure)
     {
       struct objfile *objfile = obj->pspace->symfile_object_file;
 
-      if (objfile && objfile->name)
-	return PyString_Decode (objfile->name, strlen (objfile->name),
+      if (objfile && OBJFILE_NAME (objfile))
+	return PyString_Decode (OBJFILE_NAME (objfile), strlen (OBJFILE_NAME (objfile)),
 				host_charset (), NULL);
     }
   Py_RETURN_NONE;

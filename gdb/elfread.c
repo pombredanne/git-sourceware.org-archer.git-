@@ -237,8 +237,8 @@ elf_symtab_read (struct objfile *objfile, int type,
   /* Name of filesym.  This is either a constant string or is saved on
      the objfile's obstack.  */
   char *filesymname = "";
-  struct dbx_symfile_info *dbx = objfile->deprecated_sym_stab_info;
-  int stripped = (bfd_get_symcount (objfile->obfd) == 0);
+  struct dbx_symfile_info *dbx = OBJFILE_DEPRECATED_SYM_STAB_INFO (objfile);
+  int stripped = (bfd_get_symcount (OBJFILE_OBFD (objfile)) == 0);
 
   for (i = 0; i < number_of_symbols; i++)
     {
@@ -253,20 +253,20 @@ elf_symtab_read (struct objfile *objfile, int type,
       /* Skip "special" symbols, e.g. ARM mapping symbols.  These are
 	 symbols which do not correspond to objects in the symbol table,
 	 but have some other target-specific meaning.  */
-      if (bfd_is_target_special_symbol (objfile->obfd, sym))
+      if (bfd_is_target_special_symbol (OBJFILE_OBFD (objfile), sym))
 	{
 	  if (gdbarch_record_special_symbol_p (gdbarch))
 	    gdbarch_record_special_symbol (gdbarch, objfile, sym);
 	  continue;
 	}
 
-      offset = ANOFFSET (objfile->section_offsets, sym->section->index);
+      offset = ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), sym->section->index);
       if (type == ST_DYNAMIC
 	  && sym->section == &bfd_und_section
 	  && (sym->flags & BSF_FUNCTION))
 	{
 	  struct minimal_symbol *msym;
-	  bfd *abfd = objfile->obfd;
+	  bfd *abfd = OBJFILE_OBFD (objfile);
 	  asection *sect; 
 
 	  /* Symbol is a reference to a function defined in
@@ -298,7 +298,7 @@ elf_symtab_read (struct objfile *objfile, int type,
 	  if (!sect)
 	    continue;
 
-	  symaddr += ANOFFSET (objfile->section_offsets, sect->index);
+	  symaddr += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), sect->index);
 
 	  msym = record_minimal_symbol
 	    (sym->name, strlen (sym->name), copy_names,
@@ -326,7 +326,7 @@ elf_symtab_read (struct objfile *objfile, int type,
 	  filesym = sym;
 	  filesymname =
 	    obsavestring ((char *) filesym->name, strlen (filesym->name),
-			  &objfile->objfile_obstack);
+			  &OBJFILE_OBJFILE_OBSTACK (objfile));
 	}
       else if (sym->flags & BSF_SECTION_SYM)
 	continue;
@@ -444,10 +444,10 @@ elf_symtab_read (struct objfile *objfile, int type,
 			  size_t size;
 
 			  max_index = SECT_OFF_BSS (objfile);
-			  if (objfile->sect_index_data > max_index)
-			    max_index = objfile->sect_index_data;
-			  if (objfile->sect_index_rodata > max_index)
-			    max_index = objfile->sect_index_rodata;
+			  if (OBJFILE_SECT_INDEX_DATA (objfile) > max_index)
+			    max_index = OBJFILE_SECT_INDEX_DATA (objfile);
+			  if (OBJFILE_SECT_INDEX_RODATA (objfile) > max_index)
+			    max_index = OBJFILE_SECT_INDEX_RODATA (objfile);
 
 			  /* max_index is the largest index we'll
 			     use into this array, so we must
@@ -690,7 +690,7 @@ find_separate_debug_file_by_buildid (struct objfile *objfile)
 {
   struct build_id *build_id;
 
-  build_id = build_id_bfd_get (objfile->obfd);
+  build_id = build_id_bfd_get (OBJFILE_OBFD (objfile));
   if (build_id != NULL)
     {
       char *build_id_name;
@@ -698,7 +698,7 @@ find_separate_debug_file_by_buildid (struct objfile *objfile)
       build_id_name = build_id_to_debug_filename (build_id);
       xfree (build_id);
       /* Prevent looping on a stripped .debug file.  */
-      if (build_id_name != NULL && strcmp (build_id_name, objfile->name) == 0)
+      if (build_id_name != NULL && strcmp (build_id_name, OBJFILE_NAME (objfile)) == 0)
         {
 	  warning (_("\"%s\": separate debug info file has no debug info"),
 		   build_id_name);
@@ -741,7 +741,7 @@ find_separate_debug_file_by_buildid (struct objfile *objfile)
 static void
 elf_symfile_read (struct objfile *objfile, int symfile_flags)
 {
-  bfd *abfd = objfile->obfd;
+  bfd *abfd = OBJFILE_OBFD (objfile);
   struct elfinfo ei;
   struct cleanup *back_to;
   long symcount = 0, dynsymcount = 0, synthcount, storage_needed;
@@ -754,28 +754,28 @@ elf_symfile_read (struct objfile *objfile, int symfile_flags)
   memset ((char *) &ei, 0, sizeof (ei));
 
   /* Allocate struct to keep track of the symfile */
-  objfile->deprecated_sym_stab_info = (struct dbx_symfile_info *)
+  OBJFILE_DEPRECATED_SYM_STAB_INFO (objfile) = (struct dbx_symfile_info *)
     xmalloc (sizeof (struct dbx_symfile_info));
-  memset ((char *) objfile->deprecated_sym_stab_info, 0, sizeof (struct dbx_symfile_info));
+  memset ((char *) OBJFILE_DEPRECATED_SYM_STAB_INFO (objfile), 0, sizeof (struct dbx_symfile_info));
   make_cleanup (free_elfinfo, (void *) objfile);
 
   /* Process the normal ELF symbol table first.  This may write some 
      chain of info into the dbx_symfile_info in objfile->deprecated_sym_stab_info,
      which can later be used by elfstab_offset_sections.  */
 
-  storage_needed = bfd_get_symtab_upper_bound (objfile->obfd);
+  storage_needed = bfd_get_symtab_upper_bound (OBJFILE_OBFD (objfile));
   if (storage_needed < 0)
-    error (_("Can't read symbols from %s: %s"), bfd_get_filename (objfile->obfd),
+    error (_("Can't read symbols from %s: %s"), bfd_get_filename (OBJFILE_OBFD (objfile)),
 	   bfd_errmsg (bfd_get_error ()));
 
   if (storage_needed > 0)
     {
       symbol_table = (asymbol **) xmalloc (storage_needed);
       make_cleanup (xfree, symbol_table);
-      symcount = bfd_canonicalize_symtab (objfile->obfd, symbol_table);
+      symcount = bfd_canonicalize_symtab (OBJFILE_OBFD (objfile), symbol_table);
 
       if (symcount < 0)
-	error (_("Can't read symbols from %s: %s"), bfd_get_filename (objfile->obfd),
+	error (_("Can't read symbols from %s: %s"), bfd_get_filename (OBJFILE_OBFD (objfile)),
 	       bfd_errmsg (bfd_get_error ()));
 
       elf_symtab_read (objfile, ST_REGULAR, symcount, symbol_table, 0);
@@ -783,17 +783,17 @@ elf_symfile_read (struct objfile *objfile, int symfile_flags)
 
   /* Add the dynamic symbols.  */
 
-  storage_needed = bfd_get_dynamic_symtab_upper_bound (objfile->obfd);
+  storage_needed = bfd_get_dynamic_symtab_upper_bound (OBJFILE_OBFD (objfile));
 
   if (storage_needed > 0)
     {
       dyn_symbol_table = (asymbol **) xmalloc (storage_needed);
       make_cleanup (xfree, dyn_symbol_table);
-      dynsymcount = bfd_canonicalize_dynamic_symtab (objfile->obfd,
+      dynsymcount = bfd_canonicalize_dynamic_symtab (OBJFILE_OBFD (objfile),
 						     dyn_symbol_table);
 
       if (dynsymcount < 0)
-	error (_("Can't read symbols from %s: %s"), bfd_get_filename (objfile->obfd),
+	error (_("Can't read symbols from %s: %s"), bfd_get_filename (OBJFILE_OBFD (objfile)),
 	       bfd_errmsg (bfd_get_error ()));
 
       elf_symtab_read (objfile, ST_DYNAMIC, dynsymcount, dyn_symbol_table, 0);
@@ -905,7 +905,7 @@ static void
 free_elfinfo (void *objp)
 {
   struct objfile *objfile = (struct objfile *) objp;
-  struct dbx_symfile_info *dbxinfo = objfile->deprecated_sym_stab_info;
+  struct dbx_symfile_info *dbxinfo = OBJFILE_DEPRECATED_SYM_STAB_INFO (objfile);
   struct stab_section_info *ssi, *nssi;
 
   ssi = dbxinfo->stab_section_info;
@@ -941,9 +941,9 @@ elf_new_init (struct objfile *ignore)
 static void
 elf_symfile_finish (struct objfile *objfile)
 {
-  if (objfile->deprecated_sym_stab_info != NULL)
+  if (OBJFILE_DEPRECATED_SYM_STAB_INFO (objfile) != NULL)
     {
-      xfree (objfile->deprecated_sym_stab_info);
+      xfree (OBJFILE_DEPRECATED_SYM_STAB_INFO (objfile));
     }
 
   dwarf2_free_objfile (objfile);
@@ -964,7 +964,7 @@ elf_symfile_init (struct objfile *objfile)
   /* ELF objects may be reordered, so set OBJF_REORDERED.  If we
      find this causes a significant slowdown in gdb then we could
      set it in the debug symbol readers only when necessary.  */
-  objfile->flags |= OBJF_REORDERED;
+  OBJFILE_FLAGS (objfile) |= OBJF_REORDERED;
 }
 
 /* When handling an ELF file that contains Sun STABS debug info,
@@ -979,7 +979,7 @@ void
 elfstab_offset_sections (struct objfile *objfile, struct partial_symtab *pst)
 {
   char *filename = pst->filename;
-  struct dbx_symfile_info *dbx = objfile->deprecated_sym_stab_info;
+  struct dbx_symfile_info *dbx = OBJFILE_DEPRECATED_SYM_STAB_INFO (objfile);
   struct stab_section_info *maybe = dbx->stab_section_info;
   struct stab_section_info *questionable = 0;
   int i;
@@ -1018,8 +1018,8 @@ elfstab_offset_sections (struct objfile *objfile, struct partial_symtab *pst)
       /* Found it!  Allocate a new psymtab struct, and fill it in.  */
       maybe->found++;
       pst->section_offsets = (struct section_offsets *)
-	obstack_alloc (&objfile->objfile_obstack, 
-		       SIZEOF_N_SECTION_OFFSETS (objfile->num_sections));
+	obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile), 
+		       SIZEOF_N_SECTION_OFFSETS (OBJFILE_NUM_SECTIONS (objfile)));
       for (i = 0; i < maybe->num_sections; i++)
 	(pst->section_offsets)->offsets[i] = maybe->sections[i];
       return;

@@ -1221,7 +1221,7 @@ ada_decode_symbol (const struct general_symbol_info *gsymbol)
 	  struct objfile *objf = gsymbol->obj_section->objfile;
 
 	  *resultp = obsavestring (decoded, strlen (decoded),
-				   &objf->objfile_obstack);
+				   &OBJFILE_OBJFILE_OBSTACK (objf));
         }
       /* Sometimes, we can't find a corresponding objfile, in which
          case, we put the result on the heap.  Since we only decode
@@ -4679,8 +4679,8 @@ ada_add_non_local_symbols (struct obstack *obstackp, const char *name,
 
   ALL_OBJFILES (iter, objfile)
   {
-    if (objfile->sf)
-      objfile->sf->qf->map_ada_symtabs (objfile, wild_match, is_name_suffix,
+    if (OBJFILE_SF (objfile))
+      OBJFILE_SF (objfile)->qf->map_ada_symtabs (objfile, wild_match, is_name_suffix,
 					ada_add_psyms, name,
 					global, domain,
 					is_wild_match, &data);
@@ -10322,7 +10322,7 @@ is_known_support_routine (struct frame_info *frame)
       if (re_exec (sal.symtab->filename))
         return 1;
       if (sal.symtab->objfile != NULL
-          && re_exec (sal.symtab->objfile->name))
+          && re_exec (OBJFILE_NAME (sal.symtab->objfile)))
         return 1;
     }
 

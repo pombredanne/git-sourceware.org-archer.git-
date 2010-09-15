@@ -639,7 +639,7 @@ solib_read_symbols (struct so_list *so, int flags)
 	  /* Have we already loaded this shared object?  */
 	  ALL_OBJFILES (iter, so->objfile)
 	    {
-	      if (strcmp (so->objfile->name, so->so_name) == 0)
+	      if (strcmp (OBJFILE_NAME (so->objfile), so->so_name) == 0)
 		break;
 	    }
 	  if (so->objfile != NULL)
@@ -793,7 +793,7 @@ update_solib_list (int from_tty, struct target_ops *target)
 	  *gdb_link = gdb->next;
 
 	  /* Unless the user loaded it explicitly, free SO's objfile.  */
-	  if (gdb->objfile && ! (gdb->objfile->flags & OBJF_USERLOADED))
+	  if (gdb->objfile && ! (OBJFILE_FLAGS (gdb->objfile) & OBJF_USERLOADED))
 	    free_objfile (gdb->objfile);
 
 	  /* Some targets' section tables might be referring to
@@ -1339,7 +1339,7 @@ reload_shared_libraries_1 (int from_tty)
 	  || (found_pathname != NULL
 	      && strcmp (found_pathname, so->so_name) != 0))
 	{
-	  if (so->objfile && ! (so->objfile->flags & OBJF_USERLOADED))
+	  if (so->objfile && ! (OBJFILE_FLAGS (so->objfile) & OBJF_USERLOADED))
 	    free_objfile (so->objfile);
 	  remove_target_sections (so->abfd);
 	  free_so_symbols (so);

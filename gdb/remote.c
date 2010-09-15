@@ -3012,11 +3012,11 @@ get_offsets (void)
     warning (_("Target reported unsupported offsets: %s"), buf);
 
   offs = ((struct section_offsets *)
-	  alloca (SIZEOF_N_SECTION_OFFSETS (symfile_objfile->num_sections)));
-  memcpy (offs, symfile_objfile->section_offsets,
-	  SIZEOF_N_SECTION_OFFSETS (symfile_objfile->num_sections));
+	  alloca (SIZEOF_N_SECTION_OFFSETS (OBJFILE_NUM_SECTIONS (symfile_objfile))));
+  memcpy (offs, OBJFILE_SECTION_OFFSETS (symfile_objfile),
+	  SIZEOF_N_SECTION_OFFSETS (OBJFILE_NUM_SECTIONS (symfile_objfile)));
 
-  data = get_symfile_segment_data (symfile_objfile->obfd);
+  data = get_symfile_segment_data (OBJFILE_OBFD (symfile_objfile));
   do_segments = (data != NULL);
   do_sections = num_segments == 0;
 
@@ -3051,7 +3051,7 @@ get_offsets (void)
 
   if (do_segments)
     {
-      int ret = symfile_map_offsets_to_segments (symfile_objfile->obfd, data,
+      int ret = symfile_map_offsets_to_segments (OBJFILE_OBFD (symfile_objfile), data,
 						 offs, num_segments, segments);
 
       if (ret == 0 && !do_sections)

@@ -917,8 +917,8 @@ make_symbol_overload_list_qualified (const char *func_name)
 
   ALL_OBJFILES (oiter, objfile)
   {
-    if (objfile->sf)
-      objfile->sf->qf->expand_symtabs_for_function (objfile, func_name);
+    if (OBJFILE_SF (objfile))
+      OBJFILE_SF (objfile)->qf->expand_symtabs_for_function (objfile, func_name);
   }
 
   /* Search upwards from currently selected frame (so that we can

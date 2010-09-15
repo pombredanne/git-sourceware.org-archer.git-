@@ -356,10 +356,10 @@ spu_gdbarch_id (struct gdbarch *gdbarch)
      provide an SPU ID.  Retrieve it from the the objfile's relocated
      address range in this special case.  */
   if (id == -1
-      && symfile_objfile && symfile_objfile->obfd
-      && bfd_get_arch (symfile_objfile->obfd) == bfd_arch_spu
-      && symfile_objfile->sections != symfile_objfile->sections_end)
-    id = SPUADDR_SPU (obj_section_addr (symfile_objfile->sections));
+      && symfile_objfile && OBJFILE_OBFD (symfile_objfile)
+      && bfd_get_arch (OBJFILE_OBFD (symfile_objfile)) == bfd_arch_spu
+      && OBJFILE_SECTIONS (symfile_objfile) != OBJFILE_SECTIONS_END (symfile_objfile))
+    id = SPUADDR_SPU (obj_section_addr (OBJFILE_SECTIONS (symfile_objfile)));
 
   return id;
 }
@@ -1691,7 +1691,7 @@ struct spu_overlay_table
 static struct spu_overlay_table *
 spu_get_overlay_table (struct objfile *objfile)
 {
-  enum bfd_endian byte_order = bfd_big_endian (objfile->obfd)?
+  enum bfd_endian byte_order = bfd_big_endian (OBJFILE_OBFD (objfile))?
 		   BFD_ENDIAN_BIG : BFD_ENDIAN_LITTLE;
   struct minimal_symbol *ovly_table_msym, *ovly_buf_table_msym;
   CORE_ADDR ovly_table_base, ovly_buf_table_base;
@@ -1722,8 +1722,8 @@ spu_get_overlay_table (struct objfile *objfile)
   ovly_table = xmalloc (ovly_table_size);
   read_memory (ovly_table_base, ovly_table, ovly_table_size);
 
-  tbl = OBSTACK_CALLOC (&objfile->objfile_obstack,
-			objfile->sections_end - objfile->sections,
+  tbl = OBSTACK_CALLOC (&OBJFILE_OBJFILE_OBSTACK (objfile),
+			OBJFILE_SECTIONS_END (objfile) - OBJFILE_SECTIONS (objfile),
 			struct spu_overlay_table);
 
   for (i = 0; i < ovly_table_size / 16; i++)
@@ -1744,7 +1744,7 @@ spu_get_overlay_table (struct objfile *objfile)
 	if (vma == bfd_section_vma (objfile->obfd, osect->the_bfd_section)
 	    && pos == osect->the_bfd_section->filepos)
 	  {
-	    int ndx = osect - objfile->sections;
+	    int ndx = osect - OBJFILE_SECTIONS (objfile);
 	    tbl[ndx].mapped_ptr = ovly_buf_table_base + (buf - 1) * 4;
 	    tbl[ndx].mapped_val = i + 1;
 	    break;
@@ -1761,7 +1761,7 @@ spu_get_overlay_table (struct objfile *objfile)
 static void
 spu_overlay_update_osect (struct obj_section *osect)
 {
-  enum bfd_endian byte_order = bfd_big_endian (osect->objfile->obfd)?
+  enum bfd_endian byte_order = bfd_big_endian (OBJFILE_OBFD (osect->objfile))?
 		   BFD_ENDIAN_BIG : BFD_ENDIAN_LITTLE;
   struct spu_overlay_table *ovly_table;
   CORE_ADDR id, val;
@@ -1770,7 +1770,7 @@ spu_overlay_update_osect (struct obj_section *osect)
   if (!ovly_table)
     return;
 
-  ovly_table += osect - osect->objfile->sections;
+  ovly_table += osect - OBJFILE_SECTIONS (osect->objfile);
   if (ovly_table->mapped_ptr == 0)
     return;
 
@@ -1816,7 +1816,7 @@ spu_overlay_new_objfile (struct objfile *objfile)
     return;
 
   /* Consider only SPU objfiles.  */
-  if (bfd_get_arch (objfile->obfd) != bfd_arch_spu)
+  if (bfd_get_arch (OBJFILE_OBFD (objfile)) != bfd_arch_spu)
     return;
 
   /* Check if this objfile has overlays.  */
@@ -1827,9 +1827,9 @@ spu_overlay_new_objfile (struct objfile *objfile)
   /* Now go and fiddle with all the LMAs.  */
   ALL_OBJFILE_OSECTIONS (objfile, osect)
     {
-      bfd *obfd = objfile->obfd;
+      bfd *obfd = OBJFILE_OBFD (objfile);
       asection *bsect = osect->the_bfd_section;
-      int ndx = osect - objfile->sections;
+      int ndx = osect - OBJFILE_SECTIONS (objfile);
 
       if (ovly_table[ndx].mapped_ptr == 0)
 	bfd_section_lma (obfd, bsect) = bfd_section_vma (obfd, bsect);
@@ -1854,7 +1854,7 @@ spu_catch_start (struct objfile *objfile)
     return;
 
   /* Consider only SPU objfiles.  */
-  if (!objfile || bfd_get_arch (objfile->obfd) != bfd_arch_spu)
+  if (!objfile || bfd_get_arch (OBJFILE_OBFD (objfile)) != bfd_arch_spu)
     return;
 
   /* The main objfile is handled differently.  */
@@ -1914,8 +1914,8 @@ spu_objfile_from_frame (struct frame_info *frame)
 
   ALL_OBJFILES (iter, obj)
     {
-      if (obj->sections != obj->sections_end
-	  && SPUADDR_SPU (obj_section_addr (obj->sections)) == tdep->id)
+      if (OBJFILE_SECTIONS (obj) != OBJFILE_SECTIONS_END (obj)
+	  && SPUADDR_SPU (obj_section_addr (OBJFILE_SECTIONS (obj))) == tdep->id)
 	return obj;
     }
 

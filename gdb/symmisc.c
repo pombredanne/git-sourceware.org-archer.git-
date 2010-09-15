@@ -130,10 +130,10 @@ print_symbol_bcache_statistics (void)
   ALL_PSPACES (pspace)
     ALL_PSPACE_OBJFILES (pspace, iter, objfile)
   {
-    printf_filtered (_("Byte cache statistics for '%s':\n"), objfile->name);
-    print_bcache_statistics (objfile->psymbol_cache, "partial symbol cache");
-    print_bcache_statistics (objfile->macro_cache, "preprocessor macro cache");
-    print_bcache_statistics (objfile->filename_cache, "file name cache");
+    printf_filtered (_("Byte cache statistics for '%s':\n"), OBJFILE_NAME (objfile));
+    print_bcache_statistics (OBJFILE_PSYMBOL_CACHE (objfile), "partial symbol cache");
+    print_bcache_statistics (OBJFILE_MACRO_CACHE (objfile), "preprocessor macro cache");
+    print_bcache_statistics (OBJFILE_FILENAME_CACHE (objfile), "file name cache");
   }
   immediate_quit--;
 }
@@ -151,7 +151,7 @@ print_objfile_statistics (void)
   ALL_PSPACES (pspace)
     ALL_PSPACE_OBJFILES (pspace, iter, objfile)
   {
-    printf_filtered (_("Statistics for '%s':\n"), objfile->name);
+    printf_filtered (_("Statistics for '%s':\n"), OBJFILE_NAME (objfile));
     if (OBJSTAT (objfile, n_stabs) > 0)
       printf_filtered (_("  Number of \"stab\" symbols read: %d\n"),
 		       OBJSTAT (objfile, n_stabs));
@@ -167,8 +167,8 @@ print_objfile_statistics (void)
     if (OBJSTAT (objfile, n_types) > 0)
       printf_filtered (_("  Number of \"types\" defined: %d\n"),
 		       OBJSTAT (objfile, n_types));
-    if (objfile->sf)
-      objfile->sf->qf->print_stats (objfile);
+    if (OBJFILE_SF (objfile))
+      OBJFILE_SF (objfile)->qf->print_stats (objfile);
     i = linetables = blockvectors = 0;
     ALL_OBJFILE_SYMTABS (objfile, s)
       {
@@ -188,13 +188,13 @@ print_objfile_statistics (void)
       printf_filtered (_("  Space used by a.out string tables: %d\n"),
 		       OBJSTAT (objfile, sz_strtab));
     printf_filtered (_("  Total memory used for objfile obstack: %d\n"),
-		     obstack_memory_used (&objfile->objfile_obstack));
+		     obstack_memory_used (&OBJFILE_OBJFILE_OBSTACK (objfile)));
     printf_filtered (_("  Total memory used for psymbol cache: %d\n"),
-		     bcache_memory_used (objfile->psymbol_cache));
+		     bcache_memory_used (OBJFILE_PSYMBOL_CACHE (objfile)));
     printf_filtered (_("  Total memory used for macro cache: %d\n"),
-		     bcache_memory_used (objfile->macro_cache));
+		     bcache_memory_used (OBJFILE_MACRO_CACHE (objfile)));
     printf_filtered (_("  Total memory used for file name cache: %d\n"),
-		     bcache_memory_used (objfile->filename_cache));
+		     bcache_memory_used (OBJFILE_FILENAME_CACHE (objfile)));
   }
   immediate_quit--;
 }
@@ -204,21 +204,21 @@ dump_objfile (struct objfile *objfile)
 {
   struct symtab *symtab;
 
-  printf_filtered ("\nObject file %s:  ", objfile->name);
+  printf_filtered ("\nObject file %s:  ", OBJFILE_NAME (objfile));
   printf_filtered ("Objfile at ");
   gdb_print_host_address (objfile, gdb_stdout);
   printf_filtered (", bfd at ");
-  gdb_print_host_address (objfile->obfd, gdb_stdout);
+  gdb_print_host_address (OBJFILE_OBFD (objfile), gdb_stdout);
   printf_filtered (", %d minsyms\n\n",
-		   objfile->minimal_symbol_count);
+		   OBJFILE_MINIMAL_SYMBOL_COUNT (objfile));
 
-  if (objfile->sf)
-    objfile->sf->qf->dump (objfile);
+  if (OBJFILE_SF (objfile))
+    OBJFILE_SF (objfile)->qf->dump (objfile);
 
-  if (objfile->symtabs)
+  if (OBJFILE_SYMTABS (objfile))
     {
       printf_filtered ("Symtabs:\n");
-      for (symtab = objfile->symtabs;
+      for (symtab = OBJFILE_SYMTABS (objfile);
 	   symtab != NULL;
 	   symtab = symtab->next)
 	{
@@ -245,8 +245,8 @@ dump_msymbols (struct objfile *objfile, struct ui_file *outfile)
   int index;
   char ms_type;
 
-  fprintf_filtered (outfile, "\nObject file %s:\n\n", objfile->name);
-  if (objfile->minimal_symbol_count == 0)
+  fprintf_filtered (outfile, "\nObject file %s:\n\n", OBJFILE_NAME (objfile));
+  if (OBJFILE_MINIMAL_SYMBOL_COUNT (objfile) == 0)
     {
       fprintf_filtered (outfile, "No minimal symbols found.\n");
       return;
@@ -306,10 +306,10 @@ dump_msymbols (struct objfile *objfile, struct ui_file *outfile)
       fputs_filtered ("\n", outfile);
       index++;
     }
-  if (objfile->minimal_symbol_count != index)
+  if (OBJFILE_MINIMAL_SYMBOL_COUNT (objfile) != index)
     {
       warning (_("internal error:  minimal symbol count %d != %d"),
-	       objfile->minimal_symbol_count, index);
+	       OBJFILE_MINIMAL_SYMBOL_COUNT (objfile), index);
     }
   fprintf_filtered (outfile, "\n");
 }
@@ -332,7 +332,7 @@ dump_symtab_1 (struct objfile *objfile, struct symtab *symtab,
   if (symtab->dirname)
     fprintf_filtered (outfile, "Compilation directory is %s\n",
 		      symtab->dirname);
-  fprintf_filtered (outfile, "Read from object file %s (", objfile->name);
+  fprintf_filtered (outfile, "Read from object file %s (", OBJFILE_NAME (objfile));
   gdb_print_host_address (objfile, outfile);
   fprintf_filtered (outfile, ")\n");
   fprintf_filtered (outfile, "Language: %s\n", language_str (symtab->language));
@@ -700,7 +700,7 @@ maintenance_print_msymbols (char *args, int from_tty)
   ALL_PSPACES (pspace)
     ALL_PSPACE_OBJFILES (pspace, iter, objfile)
       if (symname == NULL
-	  || (!stat (objfile->name, &obj_st) && sym_st.st_ino == obj_st.st_ino))
+	  || (!stat (OBJFILE_NAME (objfile), &obj_st) && sym_st.st_ino == obj_st.st_ino))
 	dump_msymbols (objfile, outfile);
   immediate_quit--;
   fprintf_filtered (outfile, "\n\n");
@@ -753,7 +753,7 @@ maintenance_info_symtabs (char *regexp, int from_tty)
 	    {
 	      if (! printed_objfile_start)
 		{
-		  printf_filtered ("{ objfile %s ", objfile->name);
+		  printf_filtered ("{ objfile %s ", OBJFILE_NAME (objfile));
 		  wrap_here ("  ");
 		  printf_filtered ("((struct objfile *) %s)\n", 
 				   host_address_to_string (objfile));

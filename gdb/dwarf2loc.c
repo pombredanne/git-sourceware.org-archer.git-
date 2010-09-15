@@ -67,10 +67,10 @@ find_location_expression (struct dwarf2_loclist_baton *baton,
   struct gdbarch *gdbarch = get_objfile_arch (objfile);
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   unsigned int addr_size = dwarf2_per_cu_addr_size (baton->per_cu);
-  int signed_addr_p = bfd_get_sign_extend_vma (objfile->obfd);
+  int signed_addr_p = bfd_get_sign_extend_vma (OBJFILE_OBFD (objfile));
   CORE_ADDR base_mask = ~(~(CORE_ADDR)1 << (addr_size * 8 - 1));
   /* Adjust base_address for relocatable objects.  */
-  CORE_ADDR base_offset = ANOFFSET (objfile->section_offsets,
+  CORE_ADDR base_offset = ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile),
 				    SECT_OFF_TEXT (objfile));
   CORE_ADDR base_address = baton->base_address + base_offset;
 
@@ -909,7 +909,7 @@ dwarf2_evaluate_loc_desc (struct type *type, struct frame_info *frame,
 
   ctx->gdbarch = get_objfile_arch (objfile);
   ctx->addr_size = dwarf2_per_cu_addr_size (per_cu);
-  ctx->offset = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+  ctx->offset = ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
   ctx->baton = &baton;
   ctx->read_reg = dwarf_expr_read_reg;
   ctx->read_mem = dwarf_expr_read_mem;
@@ -1095,7 +1095,7 @@ dwarf2_loc_desc_needs_frame (const gdb_byte *data, unsigned short size,
 
   ctx->gdbarch = get_objfile_arch (objfile);
   ctx->addr_size = dwarf2_per_cu_addr_size (per_cu);
-  ctx->offset = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+  ctx->offset = ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
   ctx->baton = &baton;
   ctx->read_reg = needs_frame_read_reg;
   ctx->read_mem = needs_frame_read_mem;
@@ -1307,7 +1307,7 @@ compile_dwarf_to_ax (struct agent_expr *expr, struct axs_value *loc,
 	    {
 	      struct objfile *objfile = dwarf2_per_cu_objfile (per_cu);
 
-	      uoffset += ANOFFSET (objfile->section_offsets,
+	      uoffset += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile),
 				   SECT_OFF_TEXT (objfile));
 	    }
 	  ax_const_l (expr, uoffset);
@@ -2041,7 +2041,7 @@ locexpr_describe_location_piece (struct symbol *symbol, struct ui_file *stream,
       fprintf_filtered (stream, 
 			_("a thread-local variable at offset 0x%s "
 			  "in the thread-local storage for `%s'"),
-			phex_nz (offset, addr_size), objfile->name);
+			phex_nz (offset, addr_size), OBJFILE_NAME (objfile));
 
       data += 1 + addr_size + 1;
     }
@@ -2508,10 +2508,10 @@ loclist_describe_location (struct symbol *symbol, CORE_ADDR addr,
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   unsigned int addr_size = dwarf2_per_cu_addr_size (dlbaton->per_cu);
   int offset_size = dwarf2_per_cu_offset_size (dlbaton->per_cu);
-  int signed_addr_p = bfd_get_sign_extend_vma (objfile->obfd);
+  int signed_addr_p = bfd_get_sign_extend_vma (OBJFILE_OBFD (objfile));
   CORE_ADDR base_mask = ~(~(CORE_ADDR)1 << (addr_size * 8 - 1));
   /* Adjust base_address for relocatable objects.  */
-  CORE_ADDR base_offset = ANOFFSET (objfile->section_offsets,
+  CORE_ADDR base_offset = ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile),
 				    SECT_OFF_TEXT (objfile));
   CORE_ADDR base_address = dlbaton->base_address + base_offset;
 

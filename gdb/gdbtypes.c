@@ -136,8 +136,8 @@ alloc_type (struct objfile *objfile)
   gdb_assert (objfile != NULL);
 
   /* Alloc the structure and start off with all fields zeroed.  */
-  type = OBSTACK_ZALLOC (&objfile->objfile_obstack, struct type);
-  TYPE_MAIN_TYPE (type) = OBSTACK_ZALLOC (&objfile->objfile_obstack,
+  type = OBSTACK_ZALLOC (&OBJFILE_OBJFILE_OBSTACK (objfile), struct type);
+  TYPE_MAIN_TYPE (type) = OBSTACK_ZALLOC (&OBJFILE_OBJFILE_OBSTACK (objfile),
 					  struct main_type);
   OBJSTAT (objfile, n_types++);
 
@@ -221,7 +221,7 @@ alloc_type_instance (struct type *oldtype)
   if (! TYPE_OBJFILE_OWNED (oldtype))
     type = XZALLOC (struct type);
   else
-    type = OBSTACK_ZALLOC (&TYPE_OBJFILE (oldtype)->objfile_obstack,
+    type = OBSTACK_ZALLOC (&OBJFILE_OBJFILE_OBSTACK (TYPE_OBJFILE (oldtype)),
 			   struct type);
 
   TYPE_MAIN_TYPE (type) = TYPE_MAIN_TYPE (oldtype);
@@ -1814,7 +1814,7 @@ init_type (enum type_code code, int length, int flags,
 
   if (name)
     TYPE_NAME (type) = obsavestring (name, strlen (name),
-				     &objfile->objfile_obstack);
+				     &OBJFILE_OBJFILE_OBSTACK (objfile));
 
   /* C++ fancies.  */
 
@@ -3013,7 +3013,7 @@ htab_t
 create_copied_types_hash (struct objfile *objfile)
 {
   return htab_create_alloc_ex (1, type_pair_hash, type_pair_eq,
-			       NULL, &objfile->objfile_obstack,
+			       NULL, &OBJFILE_OBJFILE_OBSTACK (objfile),
 			       hashtab_obstack_allocate,
 			       dummy_obstack_deallocate);
 }
@@ -3048,7 +3048,7 @@ copy_type_recursive (struct objfile *objfile,
 
   /* We must add the new type to the hash table immediately, in case
      we encounter this type again during a recursive call below.  */
-  stored = obstack_alloc (&objfile->objfile_obstack, sizeof (struct type_pair));
+  stored = obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile), sizeof (struct type_pair));
   stored->old = type;
   stored->new = new_type;
   *slot = stored;
@@ -3536,7 +3536,7 @@ objfile_type (struct objfile *objfile)
   if (objfile_type)
     return objfile_type;
 
-  objfile_type = OBSTACK_CALLOC (&objfile->objfile_obstack,
+  objfile_type = OBSTACK_CALLOC (&OBJFILE_OBJFILE_OBSTACK (objfile),
 				 1, struct objfile_type);
 
   /* Use the objfile architecture to determine basic type properties.  */
