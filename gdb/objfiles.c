@@ -200,6 +200,7 @@ allocate_objfile (bfd *abfd, int flags)
   struct objfile_list *olist, **iter;
 
   objfile = (struct objfile *) xzalloc (sizeof (struct objfile));
+  objfile->storage = XCNEW (struct objfile_storage);
   OBJFILE_REFC (objfile) = 1;
   OBJFILE_PSYMBOL_CACHE (objfile) = bcache_xmalloc ();
   OBJFILE_MACRO_CACHE (objfile) = bcache_xmalloc ();
@@ -639,6 +640,7 @@ do_free_objfile (struct objfile *objfile)
   /* Rebuild section map next time we need it.  */
   get_objfile_pspace_data (OBJFILE_PSPACE (objfile))->objfiles_changed_p = 1;
 
+  xfree (objfile->storage);
   xfree (objfile);
 }
 
