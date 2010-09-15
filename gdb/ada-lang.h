@@ -143,9 +143,9 @@ struct ada_task_info
    least M objects, updating V and S as necessary. */
 
 #define GROW_VECT(v, s, m)                                              \
-   if ((s) < (m)) (v) = grow_vect (v, &(s), m, sizeof *(v));
+   if ((s) < (m)) grow_vect ((gdb_byte **) &(v), &(s), m, sizeof *(v));
 
-extern void *grow_vect (void *, size_t *, size_t, int);
+extern void grow_vect (gdb_byte **, size_t *, size_t, int);
 
 extern int ada_get_field_index (const struct type *type,
                                 const char *field_name,

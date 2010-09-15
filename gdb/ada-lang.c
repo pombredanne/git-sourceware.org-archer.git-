@@ -417,17 +417,16 @@ ada_print_array_index (struct value *index_value, struct ui_file *stream,
    ELEMENT_SIZE, grow it to contain at least MIN_SIZE objects,
    updating *SIZE as necessary and returning the (new) array.  */
 
-void *
-grow_vect (void *vect, size_t *size, size_t min_size, int element_size)
+void
+grow_vect (gdb_byte **vect, size_t *size, size_t min_size, int element_size)
 {
   if (*size < min_size)
     {
       *size *= 2;
       if (*size < min_size)
         *size = min_size;
-      vect = xrealloc (vect, *size * element_size);
+      *vect = (gdb_byte *) xrealloc (*vect, *size * element_size);
     }
-  return vect;
 }
 
 /* True (non-zero) iff TARGET matches FIELD_NAME up to any trailing
