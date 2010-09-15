@@ -339,6 +339,7 @@ restore_integer (void *p)
 
 /* Remember the current value of *VARIABLE and make it restored when the cleanup
    is run.  */
+
 struct cleanup *
 make_cleanup_restore_integer (int *variable)
 {
@@ -350,6 +351,61 @@ make_cleanup_restore_integer (int *variable)
 
   return make_my_cleanup2 (&cleanup_chain, restore_integer, (void *)c,
 			   xfree);
+}
+
+/* Remember the current value of *VARIABLE and make it restored when the cleanup
+   is run.  */
+
+struct cleanup *
+make_cleanup_restore_uinteger (unsigned int *variable)
+{
+  return make_cleanup_restore_integer ((int *) variable);
+}
+
+/* Helper for make_cleanup_unpush_target.  */
+
+static void
+do_unpush_target (void *arg)
+{
+  struct target_ops *ops = arg;
+
+  unpush_target (ops);
+}
+
+/* Return a new cleanup that unpushes OPS.  */
+
+struct cleanup *
+make_cleanup_unpush_target (struct target_ops *ops)
+{
+  return make_my_cleanup (&cleanup_chain, do_unpush_target, ops);
+}
+
+struct restore_ui_file_closure
+{
+  struct ui_file **variable;
+  struct ui_file *value;
+};
+
+static void
+do_restore_ui_file (void *p)
+{
+  struct restore_ui_file_closure *closure = p;
+
+  *(closure->variable) = closure->value;
+}
+
+/* Remember the current value of *VARIABLE and make it restored when
+   the cleanup is run.  */
+
+struct cleanup *
+make_cleanup_restore_ui_file (struct ui_file **variable)
+{
+  struct restore_ui_file_closure *c = XNEW (struct restore_ui_file_closure);
+
+  c->variable = variable;
+  c->value = *variable;
+
+  return make_cleanup_dtor (do_restore_ui_file, (void *) c, xfree);
 }
 
 struct cleanup *
@@ -511,6 +567,100 @@ free_current_contents (void *ptr)
 void
 null_cleanup (void *arg)
 {
+}
+
+/* If nonzero, display time usage both at startup and for each command.  */
+
+static int display_time;
+
+/* If nonzero, display space usage both at startup and for each command.  */
+
+static int display_space;
+
+/* Records a run time and space usage to be used as a base for
+   reporting elapsed time or change in space.  In addition,
+   the msg_type field indicates whether the saved time is from the
+   beginning of GDB execution (0) or the beginning of an individual 
+   command execution (1).  */
+struct cmd_stats 
+{
+  int msg_type;
+  long start_time;
+  long start_space;
+};
+
+/* Set whether to display time statistics to NEW_VALUE (non-zero 
+   means true).  */
+void
+set_display_time (int new_value)
+{
+  display_time = new_value;
+}
+
+/* Set whether to display space statistics to NEW_VALUE (non-zero
+   means true).  */
+void
+set_display_space (int new_value)
+{
+  display_space = new_value;
+}
+
+/* As indicated by display_time and display_space, report GDB's elapsed time
+   and space usage from the base time and space provided in ARG, which
+   must be a pointer to a struct cmd_stat. This function is intended
+   to be called as a cleanup. */
+static void
+report_command_stats (void *arg)
+{
+  struct cmd_stats *start_stats = (struct cmd_stats *) arg;
+  int msg_type = start_stats->msg_type;
+
+  if (display_time)
+    {
+      long cmd_time = get_run_time () - start_stats->start_time;
+
+      printf_unfiltered (msg_type == 0
+			 ? _("Startup time: %ld.%06ld\n")
+			 : _("Command execution time: %ld.%06ld\n"),
+			 cmd_time / 1000000, cmd_time % 1000000);
+    }
+
+  if (display_space)
+    {
+#ifdef HAVE_SBRK
+      char *lim = (char *) sbrk (0);
+
+      long space_now = lim - lim_at_start;
+      long space_diff = space_now - start_stats->start_space;
+
+      printf_unfiltered (msg_type == 0
+			 ? _("Space used: %ld (%c%ld during startup)\n")
+			 : _("Space used: %ld (%c%ld for this command)\n"),
+			 space_now,
+			 (space_diff >= 0 ? '+' : '-'),
+			 space_diff);
+#endif
+    }
+}
+
+/* Create a cleanup that reports time and space used since its
+   creation.  Precise messages depend on MSG_TYPE:
+      0:  Initial time/space
+      1:  Individual command time/space.  */
+struct cleanup *
+make_command_stats_cleanup (int msg_type)
+{
+  struct cmd_stats *new_stat = XMALLOC (struct cmd_stats);
+  
+#ifdef HAVE_SBRK
+  char *lim = (char *) sbrk (0);
+  new_stat->start_space = lim - lim_at_start;
+#endif
+
+  new_stat->msg_type = msg_type;
+  new_stat->start_time = get_run_time ();
+
+  return make_cleanup_dtor (report_command_stats, new_stat, xfree);
 }
 
 /* Continuations are implemented as cleanups internally.  Inherit from
@@ -1522,7 +1672,7 @@ defaulted_query (const char *ctlstr, const char defchar, va_list args)
      question we're asking, and then answer the default automatically.  This
      way, important error messages don't get lost when talking to GDB
      over a pipe.  */
-  if (batch_flag || ! input_from_terminal_p ())
+  if (! input_from_terminal_p ())
     {
       wrap_here ("");
       vfprintf_filtered (gdb_stdout, ctlstr, args);
@@ -1940,6 +2090,12 @@ static int wrap_column;
 void
 init_page_info (void)
 {
+  if (batch_flag)
+    {
+      lines_per_page = UINT_MAX;
+      chars_per_line = UINT_MAX;
+    }
+  else
 #if defined(TUI)
   if (!tui_get_command_dimension (&chars_per_line, &lines_per_page))
 #endif
@@ -1982,6 +2138,44 @@ init_page_info (void)
 
   set_screen_size ();
   set_width ();
+}
+
+/* Helper for make_cleanup_restore_page_info.  */
+
+static void
+do_restore_page_info_cleanup (void *arg)
+{
+  set_screen_size ();
+  set_width ();
+}
+
+/* Provide cleanup for restoring the terminal size.  */
+
+struct cleanup *
+make_cleanup_restore_page_info (void)
+{
+  struct cleanup *back_to;
+
+  back_to = make_cleanup (do_restore_page_info_cleanup, NULL);
+  make_cleanup_restore_uinteger (&lines_per_page);
+  make_cleanup_restore_uinteger (&chars_per_line);
+
+  return back_to;
+}
+
+/* Temporarily set BATCH_FLAG and the associated unlimited terminal size.
+   Provide cleanup for restoring the original state.  */
+
+struct cleanup *
+set_batch_flag_and_make_cleanup_restore_page_info (void)
+{
+  struct cleanup *back_to = make_cleanup_restore_page_info ();
+  
+  make_cleanup_restore_integer (&batch_flag);
+  batch_flag = 1;
+  init_page_info ();
+
+  return back_to;
 }
 
 /* Set the screen size based on LINES_PER_PAGE and CHARS_PER_LINE.  */
@@ -2240,7 +2434,8 @@ fputs_maybe_filtered (const char *linebuffer, struct ui_file *stream,
 
   /* Don't do any filtering if it is disabled.  */
   if (stream != gdb_stdout
-      || !pagination_enabled
+      || ! pagination_enabled
+      || ! input_from_terminal_p ()
       || (lines_per_page == UINT_MAX && chars_per_line == UINT_MAX)
       || top_level_interpreter () == NULL
       || ui_out_is_mi_like_p (interp_ui_out (top_level_interpreter ())))

@@ -10699,6 +10699,43 @@ $as_echo "${found_usable_python}" >&6; }
   elif test "${have_python_config}" != failed; then
     if test "${have_libpython}" = no; then
 
+  version=python2.7
+
+  new_CPPFLAGS=${python_includes}
+  new_LIBS="${python_libs} -lpython2.7"
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for ${version}" >&5
+$as_echo_n "checking for ${version}... " >&6; }
+  save_CPPFLAGS=$CPPFLAGS
+  save_LIBS=$LIBS
+  CPPFLAGS="$CPPFLAGS $new_CPPFLAGS"
+  LIBS="$LIBS $new_LIBS"
+  found_usable_python=no
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include "${version}/Python.h"
+int
+main ()
+{
+Py_Initialize ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  have_libpython=${version}
+                  found_usable_python=yes
+else
+  CPPFLAGS=$save_CPPFLAGS
+                  LIBS=$save_LIBS
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: ${found_usable_python}" >&5
+$as_echo "${found_usable_python}" >&6; }
+
+    fi
+    if test "${have_libpython}" = no; then
+
   version=python2.6
 
   new_CPPFLAGS=${python_includes}
@@ -10809,7 +10846,11 @@ $as_echo "${found_usable_python}" >&6; }
 
     fi
   fi
-  if test "${have_libpython}" = python2.6; then
+  if test "${have_libpython}" = python2.7; then
+
+$as_echo "#define HAVE_LIBPYTHON2_7 1" >>confdefs.h
+
+  elif test "${have_libpython}" = python2.6; then
 
 $as_echo "#define HAVE_LIBPYTHON2_6 1" >>confdefs.h
 
@@ -10877,6 +10918,7 @@ $as_echo "#define HAVE_PYTHON 1" >>confdefs.h
   CONFIG_OBS="$CONFIG_OBS \$(SUBDIR_PYTHON_OBS)"
   CONFIG_DEPS="$CONFIG_DEPS \$(SUBDIR_PYTHON_DEPS)"
   CONFIG_SRCS="$CONFIG_SRCS \$(SUBDIR_PYTHON_SRCS)"
+  CONFIG_INSTALL="$CONFIG_INSTALL install-python"
   ENABLE_CFLAGS="$ENABLE_CFLAGS \$(SUBDIR_PYTHON_CFLAGS)"
 
   # Flags needed to compile Python code (taken from python-config --cflags).
@@ -12505,10 +12547,10 @@ $as_echo "#define HAVE_WORKING_FORK 1" >>confdefs.h
 fi
 
 for ac_func in canonicalize_file_name realpath getrusage getuid \
-		getgid pipe poll pread64 sbrk setpgid setpgrp setsid \
+		getgid pipe poll pread64 resize_term sbrk setpgid setpgrp setsid \
 		sigaction sigprocmask sigsetmask socketpair syscall \
-		ttrace wborder setlocale iconvlist libiconvlist btowc \
-		setrlimit getrlimit posix_madvise
+		ttrace wborder wresize setlocale iconvlist libiconvlist btowc \
+		setrlimit getrlimit posix_madvise waitpid
 do :
   as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
 ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
@@ -14186,65 +14228,83 @@ $as_echo "$gdb_cv_bigtoc" >&6; }
   ;;
 esac
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for the dynamic export flag" >&5
+$as_echo_n "checking for the dynamic export flag... " >&6; }
+dynamic_list=false
+if test "${gdb_native}" = yes; then
+   # The dynamically loaded libthread_db needs access to symbols in the gdb
+   # executable.  Older GNU ld supports --export-dynamic but --dynamic-list
+   # may not be supported there.
+   old_LDFLAGS="$LDFLAGS"
+   # Older GNU ld supports --export-dynamic but --dynamic-list it does not.
+   RDYNAMIC="-Wl,--dynamic-list=${srcdir}/proc-service.list"
+   LDFLAGS="$LDFLAGS $RDYNAMIC"
+   if test "${have_libpython}" = no; then
+     cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  dynamic_list=true
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+   else
+     # Workaround http://bugs.python.org/issue4434 where static
+     # libpythonX.Y.a would get its symbols required for
+     # pythonX.Y/lib-dynload/*.so modules hidden by -Wl,--dynamic-list.
+     # Problem does not happen for the recommended libpythonX.Y.so linkage.
+     old_CFLAGS="$CFLAGS"
+     CFLAGS="$CFLAGS $PYTHON_CFLAGS"
+     if test "$cross_compiling" = yes; then :
+  true
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include "${have_libpython}/Python.h"
+int
+main ()
+{
+int err;
+          Py_Initialize ();
+          err = PyRun_SimpleString ("import itertools\n");
+          Py_Finalize ();
+          return err == 0 ? 0 : 1;
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_run "$LINENO"; then :
+  dynamic_list=true
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+     CFLAGS="$old_CFLAGS"
+   fi
+   LDFLAGS="$old_LDFLAGS"
+fi
+if $dynamic_list; then
+  found="-Wl,--dynamic-list"
+  RDYNAMIC='-Wl,--dynamic-list=$(srcdir)/proc-service.list'
+else
+  found="-rdynamic"
+  RDYNAMIC="-rdynamic"
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $found" >&5
+$as_echo "$found" >&6; }
 
 
 if test ${build} = ${host} -a ${host} = ${target} ; then
-   if test "$GCC" = "yes" ; then
-      # The dynamically loaded libthread_db needs access to symbols in the gdb
-      # executable.  Older GNU ld supports --export-dynamic but --dynamic-list
-      # may not be supported there.
-      { $as_echo "$as_me:${as_lineno-$LINENO}: checking for the dynamic export flag" >&5
-$as_echo_n "checking for the dynamic export flag... " >&6; }
-      old_LDFLAGS="$LDFLAGS"
-      # Older GNU ld supports --export-dynamic but --dynamic-list it does not.
-      RDYNAMIC="-Wl,--dynamic-list=${srcdir}/proc-service.list"
-      LDFLAGS="$LDFLAGS $RDYNAMIC"
-      cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-int
-main ()
-{
-
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  found="-Wl,--dynamic-list"
-		   RDYNAMIC='-Wl,--dynamic-list=$(srcdir)/proc-service.list'
-else
-  RDYNAMIC="-rdynamic"
-		   LDFLAGS="$old_LDFLAGS $RDYNAMIC"
-		   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-int
-main ()
-{
-
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  found="-rdynamic"
-else
-  found="no"
-				# Error on its usage by .mh file.
-				RDYNAMIC="no-rdynamic-available"
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-
-      LDFLAGS="$old_LDFLAGS"
-      { $as_echo "$as_me:${as_lineno-$LINENO}: result: $found" >&5
-$as_echo "$found" >&6; }
-   fi
-
    case ${host_os} in
    hpux*)
       { $as_echo "$as_me:${as_lineno-$LINENO}: checking for HPUX/OSF thread support" >&5

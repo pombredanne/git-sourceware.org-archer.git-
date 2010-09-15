@@ -34,10 +34,18 @@ if { [gdb_compile "$srcdir/$subdir/$srcfile" $binfile \
     return -1
 }
 gdb_load $binfile
-gdb_test "tstop"       "" ""
-gdb_test "tfind none"  "" ""
+gdb_test "tstop"       ".*" ""
+gdb_test "tfind none"  ".*" ""
 runto_main
 gdb_reinitialize_dir $srcdir/$subdir
+
+# We generously give ourselves one "pass" if we successfully
+# detect that this test cannot be run on this target!
+if { ![gdb_target_supports_trace] } then {
+    pass "Current target does not support trace"
+    return 1;
+
+}
 
 # If testing on a remote host, download the source file.
 # remote_download host $srcdir/$subdir/$srcfile
@@ -48,7 +56,7 @@ gdb_reinitialize_dir $srcdir/$subdir
 #
 
 gdb_delete_tracepoints
-gdb_test "trace gdb_c_test" "" ""
+gdb_test "trace gdb_c_test" ".*" ""
 gdb_trace_setactions "setup collect actions" \
 	"" \
 	"collect parm\[0\], parm\[1\], parm\[2\], parm\[3\]" "^$" \
@@ -61,7 +69,7 @@ gdb_trace_setactions "setup collect actions" \
 	"end" ""
 
 gdb_test_no_output "tstart" "survive the long packet send"
-gdb_test "break end" "" ""
+gdb_test "break end" ".*" ""
 gdb_test "continue" \
     "Continuing.*Breakpoint $decimal, end.*" \
     "run trace experiment"

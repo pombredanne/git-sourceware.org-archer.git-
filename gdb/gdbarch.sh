@@ -363,12 +363,14 @@ v:int:long_bit:::8 * sizeof (long):4*TARGET_CHAR_BIT::0
 # machine.
 v:int:long_long_bit:::8 * sizeof (LONGEST):2*gdbarch->long_bit::0
 
-# The ABI default bit-size and format for "float", "double", and "long
-# double".  These bit/format pairs should eventually be combined into
-# a single object.  For the moment, just initialize them as a pair.
+# The ABI default bit-size and format for "half", "float", "double", and
+# "long double".  These bit/format pairs should eventually be combined
+# into a single object.  For the moment, just initialize them as a pair.
 # Each format describes both the big and little endian layouts (if
 # useful).
 
+v:int:half_bit:::16:2*TARGET_CHAR_BIT::0
+v:const struct floatformat **:half_format:::::floatformats_ieee_half::pformat (gdbarch->half_format)
 v:int:float_bit:::8 * sizeof (float):4*TARGET_CHAR_BIT::0
 v:const struct floatformat **:float_format:::::floatformats_ieee_single::pformat (gdbarch->float_format)
 v:int:double_bit:::8 * sizeof (double):8*TARGET_CHAR_BIT::0
@@ -382,13 +384,28 @@ v:const struct floatformat **:long_double_format:::::floatformats_ieee_double::p
 # / addr_bit will be set from it.
 #
 # If gdbarch_ptr_bit and gdbarch_addr_bit are different, you'll probably
-# also need to set gdbarch_pointer_to_address and gdbarch_address_to_pointer
-# as well.
+# also need to set gdbarch_dwarf2_addr_size, gdbarch_pointer_to_address and
+# gdbarch_address_to_pointer as well.
 #
 # ptr_bit is the size of a pointer on the target
 v:int:ptr_bit:::8 * sizeof (void*):gdbarch->int_bit::0
 # addr_bit is the size of a target address as represented in gdb
 v:int:addr_bit:::8 * sizeof (void*):0:gdbarch_ptr_bit (gdbarch):
+#
+# dwarf2_addr_size is the target address size as used in the Dwarf debug
+# info.  For .debug_frame FDEs, this is supposed to be the target address
+# size from the associated CU header, and which is equivalent to the
+# DWARF2_ADDR_SIZE as defined by the target specific GCC back-end.
+# Unfortunately there is no good way to determine this value.  Therefore
+# dwarf2_addr_size simply defaults to the target pointer size.
+#
+# dwarf2_addr_size is not used for .eh_frame FDEs, which are generally
+# defined using the target's pointer size so far.
+#
+# Note that dwarf2_addr_size only needs to be redefined by a target if the
+# GCC back-end defines a DWARF2_ADDR_SIZE other than the target pointer size,
+# and if Dwarf versions < 4 need to be supported.
+v:int:dwarf2_addr_size:::sizeof (void*):0:gdbarch_ptr_bit (gdbarch) / TARGET_CHAR_BIT:
 #
 # One if \`char' acts like \`signed char', zero if \`unsigned char'.
 v:int:char_signed:::1:-1:1
@@ -595,13 +612,6 @@ F:CORE_ADDR:fetch_pointer_argument:struct frame_info *frame, int argi, struct ty
 # name SECT_NAME and size SECT_SIZE.
 M:const struct regset *:regset_from_core_section:const char *sect_name, size_t sect_size:sect_name, sect_size
 
-# When creating core dumps, some systems encode the PID in addition
-# to the LWP id in core file register section names.  In those cases, the
-# "XXX" in ".reg/XXX" is encoded as [LWPID << 16 | PID].  This setting
-# is set to true for such architectures; false if "XXX" represents an LWP
-# or thread id with no special encoding.
-v:int:core_reg_section_encodes_pid:::0:0::0
-
 # Supported register notes in a core file.
 v:struct core_regset_section *:core_regset_sections:const char *name, int len::::::host_address_to_string (gdbarch->core_regset_sections)
 
@@ -609,8 +619,7 @@ v:struct core_regset_section *:core_regset_sections:const char *name, int len:::
 # core file into buffer READBUF with length LEN.
 M:LONGEST:core_xfer_shared_libraries:gdb_byte *readbuf, ULONGEST offset, LONGEST len:readbuf, offset, len
 
-# How the core_stratum layer converts a PTID from a core file to a
-# string.
+# How the core target converts a PTID from a core file to a string.
 M:char *:core_pid_to_str:ptid_t ptid:ptid
 
 # BFD target to use when generating a core file.

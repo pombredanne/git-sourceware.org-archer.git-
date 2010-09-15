@@ -622,7 +622,7 @@ dnl no -   Don't include python support.
 dnl yes -  Include python support, error if it's missing.
 dnl        If we find python in $PATH, use it to fetch configure options,
 dnl        otherwise assume the compiler can find it with no help from us.
-dnl        Python 2.6, 2.5, and then 2.4 are tried in turn.
+dnl        Python 2.7, 2.6, 2.5, and then 2.4 are tried in turn.
 dnl auto - Same as "yes", but if python is missing from the system,
 dnl        fall back to "no".
 dnl /path/to/python/exec-prefix -
@@ -631,7 +631,7 @@ dnl        If /path/to/python/exec-prefix/bin/python exists, use it to find
 dnl        the compilation parameters.  Otherwise use
 dnl        -I/path/to/python/exec-prefix/include,
 dnl        -L/path/to/python/exec-prefix/lib.
-dnl        Python 2.6, 2.5, and then 2.4 are tried in turn.
+dnl        Python 2.7, 2.6, 2.5, and then 2.4 are tried in turn.
 dnl        NOTE: This case is historical.  It is what was done for 7.0/7.1
 dnl        but is deprecated.
 dnl /path/to/python/executable -
@@ -780,6 +780,10 @@ else
     esac
   elif test "${have_python_config}" != failed; then
     if test "${have_libpython}" = no; then
+      AC_TRY_LIBPYTHON(python2.7, have_libpython,
+                       ${python_includes}, "${python_libs} -lpython2.7")
+    fi
+    if test "${have_libpython}" = no; then
       AC_TRY_LIBPYTHON(python2.6, have_libpython,
                        ${python_includes}, "${python_libs} -lpython2.6")
     fi
@@ -792,7 +796,9 @@ else
                        ${python_includes}, "${python_libs} -lpython2.4")
     fi
   fi
-  if test "${have_libpython}" = python2.6; then
+  if test "${have_libpython}" = python2.7; then
+    AC_DEFINE(HAVE_LIBPYTHON2_7, 1, [Define if Python 2.7 is being used.])
+  elif test "${have_libpython}" = python2.6; then
     AC_DEFINE(HAVE_LIBPYTHON2_6, 1, [Define if Python 2.6 is being used.])
   elif test "${have_libpython}" = python2.5; then
     AC_DEFINE(HAVE_LIBPYTHON2_5, 1, [Define if Python 2.5 is being used.])
@@ -826,6 +832,7 @@ if test "${have_libpython}" != no; then
   CONFIG_OBS="$CONFIG_OBS \$(SUBDIR_PYTHON_OBS)"
   CONFIG_DEPS="$CONFIG_DEPS \$(SUBDIR_PYTHON_DEPS)"
   CONFIG_SRCS="$CONFIG_SRCS \$(SUBDIR_PYTHON_SRCS)"
+  CONFIG_INSTALL="$CONFIG_INSTALL install-python"
   ENABLE_CFLAGS="$ENABLE_CFLAGS \$(SUBDIR_PYTHON_CFLAGS)"
 
   # Flags needed to compile Python code (taken from python-config --cflags).
@@ -952,10 +959,10 @@ AC_FUNC_ALLOCA
 AC_FUNC_MMAP
 AC_FUNC_VFORK
 AC_CHECK_FUNCS([canonicalize_file_name realpath getrusage getuid \
-		getgid pipe poll pread64 sbrk setpgid setpgrp setsid \
+		getgid pipe poll pread64 resize_term sbrk setpgid setpgrp setsid \
 		sigaction sigprocmask sigsetmask socketpair syscall \
-		ttrace wborder setlocale iconvlist libiconvlist btowc \
-		setrlimit getrlimit posix_madvise])
+		ttrace wborder wresize setlocale iconvlist libiconvlist btowc \
+		setrlimit getrlimit posix_madvise waitpid])
 AM_LANGINFO_CODESET
 
 # Check the return and argument types of ptrace.  No canned test for
@@ -1453,6 +1460,47 @@ aix*)
   ;;
 esac
 
+AC_MSG_CHECKING(for the dynamic export flag)
+dynamic_list=false
+if test "${gdb_native}" = yes; then
+   # The dynamically loaded libthread_db needs access to symbols in the gdb
+   # executable.  Older GNU ld supports --export-dynamic but --dynamic-list
+   # may not be supported there.
+   old_LDFLAGS="$LDFLAGS"
+   # Older GNU ld supports --export-dynamic but --dynamic-list it does not.
+   RDYNAMIC="-Wl,--dynamic-list=${srcdir}/proc-service.list"
+   LDFLAGS="$LDFLAGS $RDYNAMIC"
+   if test "${have_libpython}" = no; then
+     AC_TRY_LINK([], [], [dynamic_list=true])
+   else
+     # Workaround http://bugs.python.org/issue4434 where static
+     # libpythonX.Y.a would get its symbols required for
+     # pythonX.Y/lib-dynload/*.so modules hidden by -Wl,--dynamic-list.
+     # Problem does not happen for the recommended libpythonX.Y.so linkage.
+     old_CFLAGS="$CFLAGS"
+     CFLAGS="$CFLAGS $PYTHON_CFLAGS"
+     AC_RUN_IFELSE(
+       AC_LANG_PROGRAM(
+         [#include "]${have_libpython}[/Python.h"],
+         [int err;
+          Py_Initialize ();
+          err = PyRun_SimpleString ("import itertools\n");
+          Py_Finalize ();
+          return err == 0 ? 0 : 1;]),
+       [dynamic_list=true], [], [true])
+     CFLAGS="$old_CFLAGS"
+   fi
+   LDFLAGS="$old_LDFLAGS"
+fi
+if $dynamic_list; then
+  found="-Wl,--dynamic-list"
+  RDYNAMIC='-Wl,--dynamic-list=$(srcdir)/proc-service.list'
+else
+  found="-rdynamic"
+  RDYNAMIC="-rdynamic"
+fi
+AC_SUBST(RDYNAMIC)
+AC_MSG_RESULT($found)
 
 dnl For certain native configurations, we need to check whether thread
 dnl support can be built in or not.
@@ -1461,30 +1509,6 @@ dnl Note that we only want this if we are both native (host == target),
 dnl and not doing a canadian cross build (build == host).
 
 if test ${build} = ${host} -a ${host} = ${target} ; then
-   if test "$GCC" = "yes" ; then
-      # The dynamically loaded libthread_db needs access to symbols in the gdb
-      # executable.  Older GNU ld supports --export-dynamic but --dynamic-list
-      # may not be supported there.
-      AC_MSG_CHECKING(for the dynamic export flag)
-      old_LDFLAGS="$LDFLAGS"
-      # Older GNU ld supports --export-dynamic but --dynamic-list it does not.
-      RDYNAMIC="-Wl,--dynamic-list=${srcdir}/proc-service.list"
-      LDFLAGS="$LDFLAGS $RDYNAMIC"
-      AC_TRY_LINK([], [],
-		  [found="-Wl,--dynamic-list"
-		   RDYNAMIC='-Wl,--dynamic-list=$(srcdir)/proc-service.list'],
-		  [RDYNAMIC="-rdynamic"
-		   LDFLAGS="$old_LDFLAGS $RDYNAMIC"
-		   AC_TRY_LINK([], [],
-			       [found="-rdynamic"],
-			       [found="no"
-				# Error on its usage by .mh file.
-				RDYNAMIC="no-rdynamic-available"])])
-      AC_SUBST(RDYNAMIC)
-      LDFLAGS="$old_LDFLAGS"
-      AC_MSG_RESULT($found)
-   fi
-
    case ${host_os} in
    hpux*)
       AC_MSG_CHECKING(for HPUX/OSF thread support)

@@ -38,6 +38,15 @@
 #include <string.h>
 #endif
 
+#ifdef HAVE_ALLOCA_H
+#include <alloca.h>
+#endif
+/* On some systems such as MinGW, alloca is declared in malloc.h
+   (there is no alloca.h).  */
+#if HAVE_MALLOC_H
+#include <malloc.h>
+#endif
+
 #if !HAVE_DECL_STRERROR
 #ifndef strerror
 extern char *strerror (int);	/* X3.159-1989  4.11.6.2 */
@@ -52,6 +61,13 @@ extern void perror (const char *);
 
 #if !HAVE_DECL_MEMMEM
 extern void *memmem (const void *, size_t , const void *, size_t);
+#endif
+
+#if !HAVE_DECL_VASPRINTF
+extern int vasprintf(char **strp, const char *fmt, va_list ap);
+#endif
+#if !HAVE_DECL_VSNPRINTF
+int vsnprintf(char *str, size_t size, const char *format, va_list ap);
 #endif
 
 #ifndef ATTR_NORETURN
@@ -334,13 +350,20 @@ extern int disable_packet_qfThreadInfo;
 extern int multi_process;
 extern int non_stop;
 
+#if USE_WIN32API
+#include <winsock2.h>
+typedef SOCKET gdb_fildes_t;
+#else
+typedef int gdb_fildes_t;
+#endif
+
 /* Functions from event-loop.c.  */
 typedef void *gdb_client_data;
 typedef int (handler_func) (int, gdb_client_data);
 typedef int (callback_handler_func) (gdb_client_data);
 
-extern void delete_file_handler (int fd);
-extern void add_file_handler (int fd, handler_func *proc,
+extern void delete_file_handler (gdb_fildes_t fd);
+extern void add_file_handler (gdb_fildes_t fd, handler_func *proc,
 			      gdb_client_data client_data);
 extern int append_callback_event (callback_handler_func *proc,
 				   gdb_client_data client_data);
@@ -462,6 +485,8 @@ void *xmalloc (size_t) ATTR_MALLOC;
 void *xrealloc (void *, size_t);
 void *xcalloc (size_t, size_t) ATTR_MALLOC;
 char *xstrdup (const char *) ATTR_MALLOC;
+int xsnprintf (char *str, size_t size, const char *format, ...)
+  ATTR_FORMAT (printf, 3, 4);;
 void freeargv (char **argv);
 void perror_with_name (const char *string);
 void error (const char *string,...) ATTR_NORETURN ATTR_FORMAT (printf, 1, 2);
@@ -473,6 +498,7 @@ char *paddress (CORE_ADDR addr);
 char *pulongest (ULONGEST u);
 char *plongest (LONGEST l);
 char *phex_nz (ULONGEST l, int sizeof_l);
+char *pfildes (gdb_fildes_t fd);
 
 #define gdb_assert(expr)                                                      \
   ((void) ((expr) ? 0 :                                                       \
@@ -542,6 +568,10 @@ int fetch_traceframe_registers (int tfnum,
 				struct regcache *regcache,
 				int regnum);
 
+int traceframe_read_sdata (int tfnum, ULONGEST offset,
+			   unsigned char *buf, ULONGEST length,
+			   ULONGEST *nbytes);
+
 /* If a thread is determined to be collecting a fast tracepoint, this
    structure holds the collect status.  */
 
@@ -569,9 +599,62 @@ int handle_tracepoint_bkpts (struct thread_info *tinfo, CORE_ADDR stop_pc);
 void initialize_low_tracepoint (void);
 void supply_fast_tracepoint_registers (struct regcache *regcache,
 				       const unsigned char *regs);
+void supply_static_tracepoint_registers (struct regcache *regcache,
+					 const unsigned char *regs,
+					 CORE_ADDR pc);
 #else
 void stop_tracing (void);
 #endif
+
+/* Bytecode compilation function vector.  */
+
+struct emit_ops
+{
+  void (*emit_prologue) (void);
+  void (*emit_epilogue) (void);
+  void (*emit_add) (void);
+  void (*emit_sub) (void);
+  void (*emit_mul) (void);
+  void (*emit_lsh) (void);
+  void (*emit_rsh_signed) (void);
+  void (*emit_rsh_unsigned) (void);
+  void (*emit_ext) (int arg);
+  void (*emit_log_not) (void);
+  void (*emit_bit_and) (void);
+  void (*emit_bit_or) (void);
+  void (*emit_bit_xor) (void);
+  void (*emit_bit_not) (void);
+  void (*emit_equal) (void);
+  void (*emit_less_signed) (void);
+  void (*emit_less_unsigned) (void);
+  void (*emit_ref) (int size);
+  void (*emit_if_goto) (int *offset_p, int *size_p);
+  void (*emit_goto) (int *offset_p, int *size_p);
+  void (*write_goto_address) (CORE_ADDR from, CORE_ADDR to, int size);
+  void (*emit_const) (LONGEST num);
+  void (*emit_call) (CORE_ADDR fn);
+  void (*emit_reg) (int reg);
+  void (*emit_pop) (void);
+  void (*emit_stack_flush) (void);
+  void (*emit_zero_ext) (int arg);
+  void (*emit_swap) (void);
+  void (*emit_stack_adjust) (int n);
+
+  /* Emit code for a generic function that takes one fixed integer
+     argument and returns a 64-bit int (for instance, tsv getter).  */
+  void (*emit_int_call_1) (CORE_ADDR fn, int arg1);
+
+  /* Emit code for a generic function that takes one fixed integer
+     argument and a 64-bit int from the top of the stack, and returns
+     nothing (for instance, tsv setter).  */
+  void (*emit_void_call_2) (CORE_ADDR fn, int arg1);
+};
+
+/* Returns the address of the get_raw_reg function in the IPA.  */
+CORE_ADDR get_raw_reg_func_addr (void);
+
+CORE_ADDR current_insn_ptr;
+int emit_error;
 
 /* Version information, from version.c.  */
 extern const char version[];

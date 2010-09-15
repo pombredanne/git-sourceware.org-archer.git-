@@ -348,7 +348,7 @@ _bfd_vms_output_quad (struct vms_rec_wr *recwr, bfd_vma value)
 /* Output c-string as counted string.  */
 
 void
-_bfd_vms_output_counted (struct vms_rec_wr *recwr, char *value)
+_bfd_vms_output_counted (struct vms_rec_wr *recwr, const char *value)
 {
   int len;
 
@@ -366,13 +366,13 @@ _bfd_vms_output_counted (struct vms_rec_wr *recwr, char *value)
       return;
     }
   _bfd_vms_output_byte (recwr, (unsigned int) len & 0xff);
-  _bfd_vms_output_dump (recwr, (unsigned char *) value, len);
+  _bfd_vms_output_dump (recwr, (const unsigned char *)value, len);
 }
 
 /* Output character area.  */
 
 void
-_bfd_vms_output_dump (struct vms_rec_wr *recwr, unsigned char *data, int len)
+_bfd_vms_output_dump (struct vms_rec_wr *recwr, const unsigned char *data, int len)
 {
   vms_debug2 ((6, "_bfd_vms_output_dump (%d)\n", len));
 
@@ -401,8 +401,8 @@ _bfd_vms_output_fill (struct vms_rec_wr *recwr, int value, int count)
    using undocumented system call sys$modify().
    Pure VMS version.  */
 
-void
-_bfd_vms_convert_to_var (char * vms_filename)
+static void
+vms_convert_to_var (char * vms_filename)
 {
   struct FAB fab = cc$rms_fab;
 
@@ -433,8 +433,8 @@ vms_convert_to_var_1 (char *filename, int type)
    using undocumented system call sys$modify().
    Unix filename version.  */
 
-static int
-vms_convert_to_var_unix_filename (const char *unix_filename)
+int
+_bfd_vms_convert_to_var_unix_filename (const char *unix_filename)
 {
   if (decc$to_vms (unix_filename, &vms_convert_to_var_1, 0, 1) != 1)
     return FALSE;

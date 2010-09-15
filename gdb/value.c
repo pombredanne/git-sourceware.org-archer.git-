@@ -349,7 +349,7 @@ value_next (struct value *value)
 }
 
 struct type *
-value_type (struct value *value)
+value_type (const struct value *value)
 {
   return value->type;
 }
@@ -360,7 +360,7 @@ deprecated_set_value_type (struct value *value, struct type *type)
 }
 
 int
-value_offset (struct value *value)
+value_offset (const struct value *value)
 {
   return value->offset;
 }
@@ -371,7 +371,7 @@ set_value_offset (struct value *value, int offset)
 }
 
 int
-value_bitpos (struct value *value)
+value_bitpos (const struct value *value)
 {
   return value->bitpos;
 }
@@ -382,7 +382,7 @@ set_value_bitpos (struct value *value, int bit)
 }
 
 int
-value_bitsize (struct value *value)
+value_bitsize (const struct value *value)
 {
   return value->bitsize;
 }
@@ -418,12 +418,27 @@ value_enclosing_type (struct value *value)
   return value->enclosing_type;
 }
 
+static void
+require_not_optimized_out (struct value *value)
+{
+  if (value->optimized_out)
+    error (_("value has been optimized out"));
+}
+
 const gdb_byte *
-value_contents_all (struct value *value)
+value_contents_for_printing (struct value *value)
 {
   if (value->lazy)
     value_fetch_lazy (value);
   return value->contents;
+}
+
+const gdb_byte *
+value_contents_all (struct value *value)
+{
+  const gdb_byte *result = value_contents_for_printing (value);
+  require_not_optimized_out (value);
+  return result;
 }
 
 int
@@ -453,7 +468,9 @@ set_value_stack (struct value *value, int val)
 const gdb_byte *
 value_contents (struct value *value)
 {
-  return value_contents_writeable (value);
+  const gdb_byte *result = value_contents_writeable (value);
+  require_not_optimized_out (value);
+  return result;
 }
 
 gdb_byte *
@@ -497,6 +514,29 @@ set_value_optimized_out (struct value *value, int val)
 }
 
 int
+value_entirely_optimized_out (const struct value *value)
+{
+  if (!value->optimized_out)
+    return 0;
+  if (value->lval != lval_computed
+      || !value->location.computed.funcs->check_validity)
+    return 1;
+  return !value->location.computed.funcs->check_any_valid (value);
+}
+
+int
+value_bits_valid (const struct value *value, int offset, int length)
+{
+  if (value == NULL || !value->optimized_out)
+    return 1;
+  if (value->lval != lval_computed
+      || !value->location.computed.funcs->check_validity)
+    return 0;
+  return value->location.computed.funcs->check_validity (value, offset,
+							 length);
+}
+
+int
 value_embedded_offset (struct value *value)
 {
   return value->embedded_offset;
@@ -529,9 +569,9 @@ value_computed_funcs (struct value *v)
 }
 
 void *
-value_computed_closure (struct value *v)
+value_computed_closure (const struct value *v)
 {
-  gdb_assert (VALUE_LVAL (v) == lval_computed);
+  gdb_assert (v->lval == lval_computed);
 
   return v->location.computed.closure;
 }
@@ -682,6 +722,20 @@ free_all_values (void)
   all_values = 0;
 }
 
+/* Frees all the elements in a chain of values.  */
+
+void
+free_value_chain (struct value *v)
+{
+  struct value *next;
+
+  for (; v; v = next)
+    {
+      next = value_next (v);
+      value_free (v);
+    }
+}
+
 /* Remove VAL from the chain all_values
    so it will not be freed automatically.  */
 
@@ -693,6 +747,7 @@ release_value (struct value *val)
   if (all_values == val)
     {
       all_values = val->next;
+      val->next = NULL;
       return;
     }
 
@@ -701,6 +756,7 @@ release_value (struct value *val)
       if (v->next == val)
 	{
 	  v->next = val->next;
+	  val->next = NULL;
 	  break;
 	}
     }
@@ -771,15 +827,16 @@ value_copy (struct value *arg)
 }
 
 void
-set_value_component_location (struct value *component, struct value *whole)
+set_value_component_location (struct value *component,
+			      const struct value *whole)
 {
-  if (VALUE_LVAL (whole) == lval_internalvar)
+  if (whole->lval == lval_internalvar)
     VALUE_LVAL (component) = lval_internalvar_component;
   else
-    VALUE_LVAL (component) = VALUE_LVAL (whole);
+    VALUE_LVAL (component) = whole->lval;
 
   component->location = whole->location;
-  if (VALUE_LVAL (whole) == lval_computed)
+  if (whole->lval == lval_computed)
     {
       struct lval_funcs *funcs = whole->location.computed.funcs;
 
@@ -1809,7 +1866,7 @@ unpack_pointer (struct type *type, const gdb_byte *valaddr)
 }
 
 
-/* Get the value of the FIELDN'th field (which must be static) of
+/* Get the value of the FIELDNO'th field (which must be static) of
    TYPE.  Return NULL if the field doesn't exist or has been
    optimized out. */
 
@@ -1818,12 +1875,13 @@ value_static_field (struct type *type, int fieldno)
 {
   struct value *retval;
 
-  if (TYPE_FIELD_LOC_KIND (type, fieldno) == FIELD_LOC_KIND_PHYSADDR)
+  switch (TYPE_FIELD_LOC_KIND (type, fieldno))
     {
+    case FIELD_LOC_KIND_PHYSADDR:
       retval = value_at_lazy (TYPE_FIELD_TYPE (type, fieldno),
 			      TYPE_FIELD_STATIC_PHYSADDR (type, fieldno));
-    }
-  else
+      break;
+    case FIELD_LOC_KIND_PHYSNAME:
     {
       char *phys_name = TYPE_FIELD_STATIC_PHYSNAME (type, fieldno);
       /*TYPE_FIELD_NAME (type, fieldno);*/
@@ -1856,7 +1914,12 @@ value_static_field (struct type *type, int fieldno)
       if (retval && VALUE_LVAL (retval) == lval_memory)
 	SET_FIELD_PHYSADDR (TYPE_FIELD (type, fieldno),
 			    value_address (retval));
+      break;
     }
+    default:
+      gdb_assert_not_reached ("unexpected field location kind");
+    }
+
   return retval;
 }
 
@@ -2203,6 +2266,43 @@ pack_long (gdb_byte *buf, struct type *type, LONGEST num)
 }
 
 
+/* Pack NUM into BUF using a target format of TYPE.  */
+
+void
+pack_unsigned_long (gdb_byte *buf, struct type *type, ULONGEST num)
+{
+  int len;
+  enum bfd_endian byte_order;
+
+  type = check_typedef (type);
+  len = TYPE_LENGTH (type);
+  byte_order = gdbarch_byte_order (get_type_arch (type));
+
+  switch (TYPE_CODE (type))
+    {
+    case TYPE_CODE_INT:
+    case TYPE_CODE_CHAR:
+    case TYPE_CODE_ENUM:
+    case TYPE_CODE_FLAGS:
+    case TYPE_CODE_BOOL:
+    case TYPE_CODE_RANGE:
+    case TYPE_CODE_MEMBERPTR:
+      store_unsigned_integer (buf, len, byte_order, num);
+      break;
+
+    case TYPE_CODE_REF:
+    case TYPE_CODE_PTR:
+      store_typed_address (buf, type, (CORE_ADDR) num);
+      break;
+
+    default:
+      error (_("\
+Unexpected type (%d) encountered for unsigned integer constant."),
+	     TYPE_CODE (type));
+    }
+}
+
+
 /* Convert C numbers into newly allocated values.  */
 
 struct value *
@@ -2211,6 +2311,19 @@ value_from_longest (struct type *type, LONGEST num)
   struct value *val = allocate_value (type);
 
   pack_long (value_contents_raw (val), type, num);
+  return val;
+}
+
+
+/* Convert C unsigned numbers into newly allocated values.  */
+
+struct value *
+value_from_ulongest (struct type *type, ULONGEST num)
+{
+  struct value *val = allocate_value (type);
+
+  pack_unsigned_long (value_contents_raw (val), type, num);
+
   return val;
 }
 
@@ -2296,7 +2409,7 @@ coerce_array (struct value *arg)
   switch (TYPE_CODE (type))
     {
     case TYPE_CODE_ARRAY:
-      if (current_language->c_style_arrays)
+      if (!TYPE_VECTOR (type) && current_language->c_style_arrays)
 	arg = value_coerce_array (arg);
       break;
     case TYPE_CODE_FUNC:

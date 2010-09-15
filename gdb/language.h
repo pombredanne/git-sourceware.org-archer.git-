@@ -198,7 +198,7 @@ struct language_defn
 
     /* Print a type using syntax appropriate for this language. */
 
-    void (*la_print_type) (struct type *, char *, struct ui_file *, int,
+    void (*la_print_type) (struct type *, const char *, struct ui_file *, int,
 			   int);
 
     /* Print a typedef using syntax appropriate for this language.
@@ -233,6 +233,7 @@ struct language_defn
 			 const gdb_byte *contents,
 			 int embedded_offset, CORE_ADDR address,
 			 struct ui_file *stream, int recurse,
+			 const struct value *val,
 			 const struct value_print_options *options);
 
     /* Print a top-level value using syntax appropriate for this language. */
@@ -401,9 +402,9 @@ extern enum language set_language (enum language);
 #define LA_PRINT_TYPEDEF(type,new_symbol,stream) \
   (current_language->la_print_typedef(type,new_symbol,stream))
 
-#define LA_VAL_PRINT(type,valaddr,offset,addr,stream,recurse,options) \
+#define LA_VAL_PRINT(type,valaddr,offset,addr,stream,val,recurse,options) \
   (current_language->la_val_print(type,valaddr,offset,addr,stream, \
-				  recurse,options))
+				  val,recurse,options))
 #define LA_VALUE_PRINT(val,stream,options) \
   (current_language->la_value_print(val,stream,options))
 

@@ -83,6 +83,16 @@ static void xdb_handle_command (char *args, int from_tty);
 
 static int prepare_to_proceed (int);
 
+static void print_exited_reason (int exitstatus);
+
+static void print_signal_exited_reason (enum target_signal siggnal);
+
+static void print_no_history_reason (void);
+
+static void print_signal_received_reason (enum target_signal siggnal);
+
+static void print_end_stepping_range_reason (void);
+
 void _initialize_infrun (void);
 
 void nullify_last_target_wait_ptid (void);
@@ -119,7 +129,7 @@ show_debug_displaced (struct ui_file *file, int from_tty,
   fprintf_filtered (file, _("Displace stepping debugging is %s.\n"), value);
 }
 
-static int debug_infrun = 0;
+int debug_infrun = 0;
 static void
 show_debug_infrun (struct ui_file *file, int from_tty,
 		   struct cmd_list_element *c, const char *value)
@@ -178,6 +188,85 @@ show_debug_infrun (struct ui_file *file, int from_tty,
 #define SOLIB_IN_DYNAMIC_LINKER(pid,pc) 0
 #endif
 
+/* "Observer mode" is somewhat like a more extreme version of
+   non-stop, in which all GDB operations that might affect the
+   target's execution have been disabled.  */
+
+static int non_stop_1 = 0;
+
+int observer_mode = 0;
+static int observer_mode_1 = 0;
+
+static void
+set_observer_mode (char *args, int from_tty,
+		   struct cmd_list_element *c)
+{
+  extern int pagination_enabled;
+
+  if (target_has_execution)
+    {
+      observer_mode_1 = observer_mode;
+      error (_("Cannot change this setting while the inferior is running."));
+    }
+
+  observer_mode = observer_mode_1;
+
+  may_write_registers = !observer_mode;
+  may_write_memory = !observer_mode;
+  may_insert_breakpoints = !observer_mode;
+  may_insert_tracepoints = !observer_mode;
+  /* We can insert fast tracepoints in or out of observer mode,
+     but enable them if we're going into this mode.  */
+  if (observer_mode)
+    may_insert_fast_tracepoints = 1;
+  may_stop = !observer_mode;
+  update_target_permissions ();
+
+  /* Going *into* observer mode we must force non-stop, then
+     going out we leave it that way.  */
+  if (observer_mode)
+    {
+      target_async_permitted = 1;
+      pagination_enabled = 0;
+      non_stop = non_stop_1 = 1;
+    }
+
+  if (from_tty)
+    printf_filtered (_("Observer mode is now %s.\n"),
+		     (observer_mode ? "on" : "off"));
+}
+
+static void
+show_observer_mode (struct ui_file *file, int from_tty,
+		    struct cmd_list_element *c, const char *value)
+{
+  fprintf_filtered (file, _("Observer mode is %s.\n"), value);
+}
+
+/* This updates the value of observer mode based on changes in
+   permissions.  Note that we are deliberately ignoring the values of
+   may-write-registers and may-write-memory, since the user may have
+   reason to enable these during a session, for instance to turn on a
+   debugging-related global.  */
+
+void
+update_observer_mode (void)
+{
+  int newval;
+
+  newval = (!may_insert_breakpoints
+	    && !may_insert_tracepoints
+	    && may_insert_fast_tracepoints
+	    && !may_stop
+	    && non_stop);
+
+  /* Let the user know if things change.  */
+  if (newval != observer_mode)
+    printf_filtered (_("Observer mode is now %s.\n"),
+		     (newval ? "on" : "off"));
+
+  observer_mode = observer_mode_1 = newval;
+}
 
 /* Tables of how to react to signals; the user sets them.  */
 
@@ -215,7 +304,7 @@ static struct symbol *step_start_function;
 
 /* Nonzero if we want to give control to the user when we're notified
    of shared library events by the dynamic linker.  */
-static int stop_on_solib_events;
+int stop_on_solib_events;
 static void
 show_stop_on_solib_events (struct ui_file *file, int from_tty,
 			   struct cmd_list_element *c, const char *value)
@@ -1437,7 +1526,8 @@ maybe_software_singlestep (struct gdbarch *gdbarch, CORE_ADDR pc)
 {
   int hw_step = 1;
 
-  if (gdbarch_software_single_step_p (gdbarch)
+  if (execution_direction == EXEC_FORWARD
+      && gdbarch_software_single_step_p (gdbarch)
       && gdbarch_software_single_step (gdbarch, get_current_frame ()))
     {
       hw_step = 0;
@@ -2060,22 +2150,6 @@ enum infwait_states
   infwait_nonstep_watch_state
 };
 
-/* Why did the inferior stop? Used to print the appropriate messages
-   to the interface from within handle_inferior_event(). */
-enum inferior_stop_reason
-{
-  /* Step, next, nexti, stepi finished. */
-  END_STEPPING_RANGE,
-  /* Inferior terminated by signal. */
-  SIGNAL_EXITED,
-  /* Inferior exited. */
-  EXITED,
-  /* Inferior received signal, and user asked to be notified. */
-  SIGNAL_RECEIVED,
-  /* Reverse execution -- target ran out of history info.  */
-  NO_HISTORY
-};
-
 /* The PTID we'll do a target_wait on.*/
 ptid_t waiton_ptid;
 
@@ -2116,8 +2190,6 @@ static void insert_longjmp_resume_breakpoint (struct gdbarch *, CORE_ADDR);
 static void stop_stepping (struct execution_control_state *ecs);
 static void prepare_to_wait (struct execution_control_state *ecs);
 static void keep_going (struct execution_control_state *ecs);
-static void print_stop_reason (enum inferior_stop_reason stop_reason,
-			       int stop_info);
 
 /* Callback for iterate over threads.  If the thread is stopped, but
    the user/frontend doesn't know about that yet, go through
@@ -3078,7 +3150,7 @@ handle_inferior_event (struct execution_control_state *ecs)
       set_current_program_space (current_inferior ()->pspace);
       handle_vfork_child_exec_or_exit (0);
       target_terminal_ours ();	/* Must do this before mourn anyway */
-      print_stop_reason (EXITED, ecs->ws.value.integer);
+      print_exited_reason (ecs->ws.value.integer);
 
       /* Record the exit code in the convenience variable $_exitcode, so
          that the user can inspect this again later.  */
@@ -3087,6 +3159,7 @@ handle_inferior_event (struct execution_control_state *ecs)
       gdb_flush (gdb_stdout);
       target_mourn_inferior ();
       singlestep_breakpoints_inserted_p = 0;
+      cancel_single_step_breakpoints ();
       stop_print_frame = 0;
       stop_stepping (ecs);
       return;
@@ -3108,8 +3181,9 @@ handle_inferior_event (struct execution_control_state *ecs)
          may be needed. */
       target_mourn_inferior ();
 
-      print_stop_reason (SIGNAL_EXITED, ecs->ws.value.sig);
+      print_signal_exited_reason (ecs->ws.value.sig);
       singlestep_breakpoints_inserted_p = 0;
+      cancel_single_step_breakpoints ();
       stop_stepping (ecs);
       return;
 
@@ -3145,6 +3219,13 @@ handle_inferior_event (struct execution_control_state *ecs)
 	  /* This won't actually modify the breakpoint list, but will
 	     physically remove the breakpoints from the child.  */
 	  detach_breakpoints (child_pid);
+	}
+
+      if (singlestep_breakpoints_inserted_p)
+	{
+	  /* Pull the single step breakpoints out of the target. */
+	  remove_single_step_breakpoints ();
+	  singlestep_breakpoints_inserted_p = 0;
 	}
 
       /* In case the event is caught by a catchpoint, remember that
@@ -3236,6 +3317,9 @@ handle_inferior_event (struct execution_control_state *ecs)
 	  reinit_frame_cache ();
 	}
 
+      singlestep_breakpoints_inserted_p = 0;
+      cancel_single_step_breakpoints ();
+
       stop_pc = regcache_read_pc (get_thread_regcache (ecs->ptid));
 
       /* Do whatever is necessary to the parent branch of the vfork.  */
@@ -3297,7 +3381,7 @@ handle_inferior_event (struct execution_control_state *ecs)
     case TARGET_WAITKIND_NO_HISTORY:
       /* Reverse execution: target ran out of history info.  */
       stop_pc = regcache_read_pc (get_thread_regcache (ecs->ptid));
-      print_stop_reason (NO_HISTORY, 0);
+      print_no_history_reason ();
       stop_stepping (ecs);
       return;
     }
@@ -3871,7 +3955,7 @@ process_event_stop_test:
 	{
 	  printed = 1;
 	  target_terminal_ours_for_output ();
-	  print_stop_reason (SIGNAL_RECEIVED, ecs->event_thread->stop_signal);
+	  print_signal_received_reason (ecs->event_thread->stop_signal);
 	}
       /* Always stop on signals if we're either just gaining control
 	 of the program, or the user explicitly requested this thread
@@ -3967,6 +4051,12 @@ process_event_stop_test:
 	stop_stack_dummy = what.call_dummy;
       }
 
+    /* If we hit an internal event that triggers symbol changes, the
+       current frame will be invalidated within bpstat_what (e.g., if
+       we hit an internal solib event).  Re-fetch it.  */
+    frame = get_current_frame ();
+    gdbarch = get_frame_arch (frame);
+
     switch (what.main_action)
       {
       case BPSTAT_WHAT_SET_LONGJMP_RESUME:
@@ -4009,7 +4099,7 @@ infrun: BPSTAT_WHAT_SET_LONGJMP_RESUME (!gdbarch_get_longjmp_target)\n");
 	delete_step_resume_breakpoint (ecs->event_thread);
 
 	ecs->event_thread->stop_step = 1;
-	print_stop_reason (END_STEPPING_RANGE, 0);
+	print_end_stepping_range_reason ();
 	stop_stepping (ecs);
 	return;
 
@@ -4070,66 +4160,6 @@ infrun: BPSTAT_WHAT_SET_LONGJMP_RESUME (!gdbarch_get_longjmp_target)\n");
 	    return;
 	  }
 	break;
-
-      case BPSTAT_WHAT_CHECK_SHLIBS:
-	{
-          if (debug_infrun)
-	    fprintf_unfiltered (gdb_stdlog, "infrun: BPSTAT_WHAT_CHECK_SHLIBS\n");
-
-	  /* Check for any newly added shared libraries if we're
-	     supposed to be adding them automatically.  Switch
-	     terminal for any messages produced by
-	     breakpoint_re_set.  */
-	  target_terminal_ours_for_output ();
-	  /* NOTE: cagney/2003-11-25: Make certain that the target
-	     stack's section table is kept up-to-date.  Architectures,
-	     (e.g., PPC64), use the section table to perform
-	     operations such as address => section name and hence
-	     require the table to contain all sections (including
-	     those found in shared libraries).  */
-#ifdef SOLIB_ADD
-	  SOLIB_ADD (NULL, 0, &current_target, auto_solib_add);
-#else
-	  solib_add (NULL, 0, &current_target, auto_solib_add);
-#endif
-	  target_terminal_inferior ();
-
-	  /* If requested, stop when the dynamic linker notifies
-	     gdb of events.  This allows the user to get control
-	     and place breakpoints in initializer routines for
-	     dynamically loaded objects (among other things).  */
-	  if (stop_on_solib_events || stop_stack_dummy)
-	    {
-	      stop_stepping (ecs);
-	      return;
-	    }
-	  else
-	    {
-	      /* We want to step over this breakpoint, then keep going.  */
-	      ecs->event_thread->stepping_over_breakpoint = 1;
-	      break;
-	    }
-	}
-	break;
-
-      case BPSTAT_WHAT_CHECK_JIT:
-        if (debug_infrun)
-          fprintf_unfiltered (gdb_stdlog, "infrun: BPSTAT_WHAT_CHECK_JIT\n");
-
-        /* Switch terminal for any messages produced by breakpoint_re_set.  */
-        target_terminal_ours_for_output ();
-
-        jit_event_handler (gdbarch);
-
-        target_terminal_inferior ();
-
-        /* We want to step over this breakpoint, then keep going.  */
-        ecs->event_thread->stepping_over_breakpoint = 1;
-
-        break;
-
-      case BPSTAT_WHAT_LAST:
-	/* Not a real code, but listed here to shut up gcc -Wall.  */
 
       case BPSTAT_WHAT_KEEP_CHECKING:
 	break;
@@ -4267,6 +4297,7 @@ infrun: not switching back to stepped thread, it has vanished\n");
      the frame cache to be re-initialized, making our FRAME variable
      a dangling pointer.  */
   frame = get_current_frame ();
+  gdbarch = get_frame_arch (frame);
 
   /* If stepping through a line, keep going if still within it.
 
@@ -4298,7 +4329,7 @@ infrun: not switching back to stepped thread, it has vanished\n");
 	  && execution_direction == EXEC_REVERSE)
 	{
 	  ecs->event_thread->stop_step = 1;
-	  print_stop_reason (END_STEPPING_RANGE, 0);
+	  print_end_stepping_range_reason ();
 	  stop_stepping (ecs);
 	}
       else
@@ -4408,7 +4439,7 @@ infrun: not switching back to stepped thread, it has vanished\n");
 	     well.  FENN */
 	  /* And this works the same backward as frontward.  MVS */
 	  ecs->event_thread->stop_step = 1;
-	  print_stop_reason (END_STEPPING_RANGE, 0);
+	  print_end_stepping_range_reason ();
 	  stop_stepping (ecs);
 	  return;
 	}
@@ -4514,7 +4545,7 @@ infrun: not switching back to stepped thread, it has vanished\n");
 	  && step_stop_if_no_debug)
 	{
 	  ecs->event_thread->stop_step = 1;
-	  print_stop_reason (END_STEPPING_RANGE, 0);
+	  print_end_stepping_range_reason ();
 	  stop_stepping (ecs);
 	  return;
 	}
@@ -4638,7 +4669,7 @@ infrun: not switching back to stepped thread, it has vanished\n");
 	     is set, we stop the step so that the user has a chance to
 	     switch in assembly mode.  */
 	  ecs->event_thread->stop_step = 1;
-	  print_stop_reason (END_STEPPING_RANGE, 0);
+	  print_end_stepping_range_reason ();
 	  stop_stepping (ecs);
 	  return;
 	}
@@ -4659,7 +4690,7 @@ infrun: not switching back to stepped thread, it has vanished\n");
       if (debug_infrun)
 	 fprintf_unfiltered (gdb_stdlog, "infrun: stepi/nexti\n");
       ecs->event_thread->stop_step = 1;
-      print_stop_reason (END_STEPPING_RANGE, 0);
+      print_end_stepping_range_reason ();
       stop_stepping (ecs);
       return;
     }
@@ -4673,7 +4704,7 @@ infrun: not switching back to stepped thread, it has vanished\n");
       if (debug_infrun)
 	 fprintf_unfiltered (gdb_stdlog, "infrun: no line number info\n");
       ecs->event_thread->stop_step = 1;
-      print_stop_reason (END_STEPPING_RANGE, 0);
+      print_end_stepping_range_reason ();
       stop_stepping (ecs);
       return;
     }
@@ -4706,7 +4737,7 @@ infrun: not switching back to stepped thread, it has vanished\n");
 	    step_into_inline_frame (ecs->ptid);
 
 	  ecs->event_thread->stop_step = 1;
-	  print_stop_reason (END_STEPPING_RANGE, 0);
+	  print_end_stepping_range_reason ();
 	  stop_stepping (ecs);
 	  return;
 	}
@@ -4721,7 +4752,7 @@ infrun: not switching back to stepped thread, it has vanished\n");
 	  else
 	    {
 	      ecs->event_thread->stop_step = 1;
-	      print_stop_reason (END_STEPPING_RANGE, 0);
+	      print_end_stepping_range_reason ();
 	      stop_stepping (ecs);
 	    }
 	  return;
@@ -4748,7 +4779,7 @@ infrun: not switching back to stepped thread, it has vanished\n");
       else
 	{
 	  ecs->event_thread->stop_step = 1;
-	  print_stop_reason (END_STEPPING_RANGE, 0);
+	  print_end_stepping_range_reason ();
 	  stop_stepping (ecs);
 	}
       return;
@@ -4765,7 +4796,7 @@ infrun: not switching back to stepped thread, it has vanished\n");
       if (debug_infrun)
 	 fprintf_unfiltered (gdb_stdlog, "infrun: stepped to a different line\n");
       ecs->event_thread->stop_step = 1;
-      print_stop_reason (END_STEPPING_RANGE, 0);
+      print_end_stepping_range_reason ();
       stop_stepping (ecs);
       return;
     }
@@ -4866,7 +4897,7 @@ handle_step_into_function (struct gdbarch *gdbarch,
     {
       /* We are already there: stop now.  */
       ecs->event_thread->stop_step = 1;
-      print_stop_reason (END_STEPPING_RANGE, 0);
+      print_end_stepping_range_reason ();
       stop_stepping (ecs);
       return;
     }
@@ -4912,7 +4943,7 @@ handle_step_into_function_backward (struct gdbarch *gdbarch,
     {
       /* We're there already.  Just stop stepping now.  */
       ecs->event_thread->stop_step = 1;
-      print_stop_reason (END_STEPPING_RANGE, 0);
+      print_end_stepping_range_reason ();
       stop_stepping (ecs);
     }
   else
@@ -5157,116 +5188,121 @@ prepare_to_wait (struct execution_control_state *ecs)
   ecs->wait_some_more = 1;
 }
 
-/* Print why the inferior has stopped. We always print something when
-   the inferior exits, or receives a signal. The rest of the cases are
-   dealt with later on in normal_stop() and print_it_typical().  Ideally
-   there should be a call to this function from handle_inferior_event()
-   each time stop_stepping() is called.*/
+/* Several print_*_reason functions to print why the inferior has stopped.
+   We always print something when the inferior exits, or receives a signal.
+   The rest of the cases are dealt with later on in normal_stop and
+   print_it_typical.  Ideally there should be a call to one of these
+   print_*_reason functions functions from handle_inferior_event each time
+   stop_stepping is called.  */
+
+/* Print why the inferior has stopped.  
+   We are done with a step/next/si/ni command, print why the inferior has
+   stopped.  For now print nothing.  Print a message only if not in the middle
+   of doing a "step n" operation for n > 1.  */
+
 static void
-print_stop_reason (enum inferior_stop_reason stop_reason, int stop_info)
+print_end_stepping_range_reason (void)
 {
-  switch (stop_reason)
+  if ((!inferior_thread ()->step_multi || !inferior_thread ()->stop_step)
+      && ui_out_is_mi_like_p (uiout))
+    ui_out_field_string (uiout, "reason",
+                         async_reason_lookup (EXEC_ASYNC_END_STEPPING_RANGE));
+}
+
+/* The inferior was terminated by a signal, print why it stopped.  */
+
+static void
+print_signal_exited_reason (enum target_signal siggnal)
+{
+  annotate_signalled ();
+  if (ui_out_is_mi_like_p (uiout))
+    ui_out_field_string
+      (uiout, "reason", async_reason_lookup (EXEC_ASYNC_EXITED_SIGNALLED));
+  ui_out_text (uiout, "\nProgram terminated with signal ");
+  annotate_signal_name ();
+  ui_out_field_string (uiout, "signal-name",
+		       target_signal_to_name (siggnal));
+  annotate_signal_name_end ();
+  ui_out_text (uiout, ", ");
+  annotate_signal_string ();
+  ui_out_field_string (uiout, "signal-meaning",
+		       target_signal_to_string (siggnal));
+  annotate_signal_string_end ();
+  ui_out_text (uiout, ".\n");
+  ui_out_text (uiout, "The program no longer exists.\n");
+}
+
+/* The inferior program is finished, print why it stopped.  */
+
+static void
+print_exited_reason (int exitstatus)
+{
+  annotate_exited (exitstatus);
+  if (exitstatus)
     {
-    case END_STEPPING_RANGE:
-      /* We are done with a step/next/si/ni command. */
-      /* For now print nothing. */
-      /* Print a message only if not in the middle of doing a "step n"
-         operation for n > 1 */
-      if (!inferior_thread ()->step_multi
-	  || !inferior_thread ()->stop_step)
-	if (ui_out_is_mi_like_p (uiout))
-	  ui_out_field_string
-	    (uiout, "reason",
-	     async_reason_lookup (EXEC_ASYNC_END_STEPPING_RANGE));
-      break;
-    case SIGNAL_EXITED:
-      /* The inferior was terminated by a signal. */
-      annotate_signalled ();
+      if (ui_out_is_mi_like_p (uiout))
+	ui_out_field_string (uiout, "reason", 
+			     async_reason_lookup (EXEC_ASYNC_EXITED));
+      ui_out_text (uiout, "\nProgram exited with code ");
+      ui_out_field_fmt (uiout, "exit-code", "0%o", (unsigned int) exitstatus);
+      ui_out_text (uiout, ".\n");
+    }
+  else
+    {
       if (ui_out_is_mi_like_p (uiout))
 	ui_out_field_string
-	  (uiout, "reason",
-	   async_reason_lookup (EXEC_ASYNC_EXITED_SIGNALLED));
-      ui_out_text (uiout, "\nProgram terminated with signal ");
+	  (uiout, "reason", async_reason_lookup (EXEC_ASYNC_EXITED_NORMALLY));
+      ui_out_text (uiout, "\nProgram exited normally.\n");
+    }
+  /* Support the --return-child-result option.  */
+  return_child_result_value = exitstatus;
+}
+
+/* Signal received, print why the inferior has stopped.  The signal table
+   tells us to print about it. */
+
+static void
+print_signal_received_reason (enum target_signal siggnal)
+{
+  annotate_signal ();
+
+  if (siggnal == TARGET_SIGNAL_0 && !ui_out_is_mi_like_p (uiout))
+    {
+      struct thread_info *t = inferior_thread ();
+
+      ui_out_text (uiout, "\n[");
+      ui_out_field_string (uiout, "thread-name",
+			   target_pid_to_str (t->ptid));
+      ui_out_field_fmt (uiout, "thread-id", "] #%d", t->num);
+      ui_out_text (uiout, " stopped");
+    }
+  else
+    {
+      ui_out_text (uiout, "\nProgram received signal ");
       annotate_signal_name ();
+      if (ui_out_is_mi_like_p (uiout))
+	ui_out_field_string
+	  (uiout, "reason", async_reason_lookup (EXEC_ASYNC_SIGNAL_RECEIVED));
       ui_out_field_string (uiout, "signal-name",
-			   target_signal_to_name (stop_info));
+			   target_signal_to_name (siggnal));
       annotate_signal_name_end ();
       ui_out_text (uiout, ", ");
       annotate_signal_string ();
       ui_out_field_string (uiout, "signal-meaning",
-			   target_signal_to_string (stop_info));
+			   target_signal_to_string (siggnal));
       annotate_signal_string_end ();
-      ui_out_text (uiout, ".\n");
-      ui_out_text (uiout, "The program no longer exists.\n");
-      break;
-    case EXITED:
-      /* The inferior program is finished. */
-      annotate_exited (stop_info);
-      if (stop_info)
-	{
-	  if (ui_out_is_mi_like_p (uiout))
-	    ui_out_field_string (uiout, "reason", 
-				 async_reason_lookup (EXEC_ASYNC_EXITED));
-	  ui_out_text (uiout, "\nProgram exited with code ");
-	  ui_out_field_fmt (uiout, "exit-code", "0%o",
-			    (unsigned int) stop_info);
-	  ui_out_text (uiout, ".\n");
-	}
-      else
-	{
-	  if (ui_out_is_mi_like_p (uiout))
-	    ui_out_field_string
-	      (uiout, "reason",
-	       async_reason_lookup (EXEC_ASYNC_EXITED_NORMALLY));
-	  ui_out_text (uiout, "\nProgram exited normally.\n");
-	}
-      /* Support the --return-child-result option.  */
-      return_child_result_value = stop_info;
-      break;
-    case SIGNAL_RECEIVED:
-      /* Signal received.  The signal table tells us to print about
-	 it. */
-      annotate_signal ();
-
-      if (stop_info == TARGET_SIGNAL_0 && !ui_out_is_mi_like_p (uiout))
-	{
-	  struct thread_info *t = inferior_thread ();
-
-	  ui_out_text (uiout, "\n[");
-	  ui_out_field_string (uiout, "thread-name",
-			       target_pid_to_str (t->ptid));
-	  ui_out_field_fmt (uiout, "thread-id", "] #%d", t->num);
-	  ui_out_text (uiout, " stopped");
-	}
-      else
-	{
-	  ui_out_text (uiout, "\nProgram received signal ");
-	  annotate_signal_name ();
-	  if (ui_out_is_mi_like_p (uiout))
-	    ui_out_field_string
-	      (uiout, "reason", async_reason_lookup (EXEC_ASYNC_SIGNAL_RECEIVED));
-	  ui_out_field_string (uiout, "signal-name",
-			       target_signal_to_name (stop_info));
-	  annotate_signal_name_end ();
-	  ui_out_text (uiout, ", ");
-	  annotate_signal_string ();
-	  ui_out_field_string (uiout, "signal-meaning",
-			       target_signal_to_string (stop_info));
-	  annotate_signal_string_end ();
-	}
-      ui_out_text (uiout, ".\n");
-      break;
-    case NO_HISTORY:
-      /* Reverse execution: target ran out of history info.  */
-      ui_out_text (uiout, "\nNo more reverse-execution history.\n");
-      break;
-    default:
-      internal_error (__FILE__, __LINE__,
-		      _("print_stop_reason: unrecognized enum value"));
-      break;
     }
+  ui_out_text (uiout, ".\n");
 }
-
+
+/* Reverse execution: target ran out of history info, print why the inferior
+   has stopped.  */
+
+static void
+print_no_history_reason (void)
+{
+  ui_out_text (uiout, "\nNo more reverse-execution history.\n");
+}
 
 /* Here to return control to GDB when the inferior stops for real.
    Print appropriate messages, remove breakpoints, give terminal our modes.
@@ -6399,6 +6435,11 @@ set_exec_direction_func (char *args, int from_tty,
       else if (!strcmp (exec_direction, exec_reverse))
 	execution_direction = EXEC_REVERSE;
     }
+  else
+    {
+      exec_direction = exec_forward;
+      error (_("Target does not support this operation."));
+    }
 }
 
 static void
@@ -6424,7 +6465,6 @@ show_exec_direction_func (struct ui_file *out, int from_tty,
 /* User interface for non-stop mode.  */
 
 int non_stop = 0;
-static int non_stop_1 = 0;
 
 static void
 set_non_stop (char *args, int from_tty,
@@ -6495,7 +6535,7 @@ from 1-15 are allowed for compatibility with old versions of GDB.\n\
 Numeric ranges may be specified with the form LOW-HIGH (e.g. 1-5).\n\
 The special arg \"all\" is recognized to mean all signals except those\n\
 used by the debugger, typically SIGTRAP and SIGINT.\n\
-Recognized actions include \"s\" (toggles between stop and nostop), \n\
+Recognized actions include \"s\" (toggles between stop and nostop),\n\
 \"r\" (toggles between print and noprint), \"i\" (toggles between pass and \
 nopass), \"Q\" (noprint)\n\
 Stop means reenter debugger if this signal happens (implies print).\n\
@@ -6629,7 +6669,7 @@ An exec call replaces the program image of a process.\n\
 \n\
 follow-exec-mode can be:\n\
 \n\
-  new - the debugger creates a new inferior and rebinds the process \n\
+  new - the debugger creates a new inferior and rebinds the process\n\
 to this new inferior.  The program the process was running before\n\
 the exec call can be restarted afterwards by restarting the original\n\
 inferior.\n\
@@ -6726,4 +6766,17 @@ Tells gdb whether to detach the child of a fork."),
      isn't initialized yet.  At this point, we're quite sure there
      isn't another convenience variable of the same name.  */
   create_internalvar_type_lazy ("_siginfo", siginfo_make_value);
+
+  add_setshow_boolean_cmd ("observer", no_class,
+			   &observer_mode_1, _("\
+Set whether gdb controls the inferior in observer mode."), _("\
+Show whether gdb controls the inferior in observer mode."), _("\
+In observer mode, GDB can get data from the inferior, but not\n\
+affect its execution.  Registers and memory may not be changed,\n\
+breakpoints may not be set, and the program cannot be interrupted\n\
+or signalled."),
+			   set_observer_mode,
+			   show_observer_mode,
+			   &setlist,
+			   &showlist);
 }

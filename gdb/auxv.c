@@ -96,7 +96,27 @@ ld_so_xfer_auxv (gdb_byte *readbuf,
 
   pointer_address = SYMBOL_VALUE_ADDRESS (msym);
 
-  data_address = read_memory_typed_address (pointer_address, ptr_type);
+  /* The location of the _dl_auxv symbol may no longer be correct if
+     ld.so runs at a different address than the one present in the file.
+     This is very common case - for unprelinked ld.so or with a PIE executable.
+     PIE executable forces random address even for libraries already being
+     prelinked to some address.  PIE executables themselves are never prelinked
+     even on prelinked systems.  Prelinking of a PIE executable would block
+     their purpose of randomizing load of everything including the executable.
+
+     If the memory read fails, return -1 to fallback on another mechanism for
+     retrieving the AUXV.
+
+     In most cases of a PIE running under valgrind there is no way to find
+     out the base addresses of any of ld.so, executable or AUXV as everything
+     is randomized and /proc information is not relevant for the virtual
+     executable running under valgrind.  We think that we might need a valgrind
+     extension to make it work.  This is PR 11440.  */
+
+  if (target_read_memory (pointer_address, ptr_buf, ptr_size) != 0)
+    return -1;
+
+  data_address = extract_typed_address (ptr_buf, ptr_type);
 
   /* Possibly still not initialized such as during an inferior startup.  */
   if (data_address == 0)
@@ -188,8 +208,10 @@ memory_xfer_auxv (struct target_ops *ops,
   gdb_assert (readbuf || writebuf);
 
    /* ld_so_xfer_auxv is the only function safe for virtual executables being
-      executed by valgrind's memcheck.  As using ld_so_xfer_auxv is problematic
-      during inferior startup GDB does call it only for attached processes.  */
+      executed by valgrind's memcheck.  Using ld_so_xfer_auxv during inferior
+      startup is problematic, because ld.so symbol tables have not yet been
+      relocated.  So GDB uses this function only when attaching to a process.
+      */
 
   if (current_inferior ()->attach_flag != 0)
     {

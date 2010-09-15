@@ -36,6 +36,7 @@ AC_ARG_PROGRAM
 
 AC_HEADER_STDC
 
+AC_FUNC_ALLOCA
 AC_CHECK_HEADERS(sgtty.h termio.h termios.h sys/reg.h string.h dnl
 		 proc_service.h sys/procfs.h thread_db.h linux/elf.h dnl
 		 stdlib.h unistd.h dnl
@@ -43,7 +44,97 @@ AC_CHECK_HEADERS(sgtty.h termio.h termios.h sys/reg.h string.h dnl
 		 sys/ioctl.h netinet/in.h sys/socket.h netdb.h dnl
 		 netinet/tcp.h arpa/inet.h sys/wait.h)
 AC_CHECK_FUNCS(pread pwrite pread64)
-AC_REPLACE_FUNCS(memmem)
+AC_REPLACE_FUNCS(memmem vasprintf vsnprintf)
+
+# Check for UST
+ustlibs=""
+ustinc=""
+
+AC_ARG_WITH(ust, [  --with-ust=PATH       Specify prefix directory for the installed UST package
+                          Equivalent to --with-ust-include=PATH/include
+                          plus --with-ust-lib=PATH/lib])
+AC_ARG_WITH(ust_include, [  --with-ust-include=PATH Specify directory for installed UST include files])
+AC_ARG_WITH(ust_lib, [  --with-ust-lib=PATH   Specify the directory for the installed UST library])
+
+case $with_ust in
+  no)
+    ustlibs=
+    ustinc=
+    ;;
+  "" | yes)
+    ustlibs=" -lust "
+    ustinc=""
+    ;;
+  *)
+    ustlibs="-L$with_ust/lib -lust"
+    ustinc="-I$with_ust/include "
+    ;;
+esac
+if test "x$with_ust_include" != x; then
+  ustinc="-I$with_ust_include "
+fi
+if test "x$with_ust_lib" != x; then
+  ustlibs="-L$with_ust_lib -lust"
+fi
+
+if test "x$with_ust" != "xno"; then
+  saved_CFLAGS="$CFLAGS"
+  CFLAGS="$CFLAGS $ustinc"
+  AC_MSG_CHECKING([for ust])
+  AC_TRY_COMPILE([
+#define CONFIG_UST_GDB_INTEGRATION
+#include <ust/ust.h>
+  ],[],
+  [AC_MSG_RESULT([yes]); AC_DEFINE(HAVE_UST, 1, [Define if UST is available])],
+  [AC_MSG_RESULT([no]); ustlibs= ; ustinc= ])
+  CFLAGS="$saved_CFLAGS"
+fi
+
+# Flags needed for UST
+AC_SUBST(ustlibs)
+AC_SUBST(ustinc)
+
+AC_ARG_ENABLE(werror,
+  AS_HELP_STRING([--enable-werror], [treat compile warnings as errors]),
+  [case "${enableval}" in
+     yes | y) ERROR_ON_WARNING="yes" ;;
+     no | n)  ERROR_ON_WARNING="no" ;;
+     *) AC_MSG_ERROR(bad value ${enableval} for --enable-werror) ;;
+   esac])
+
+# Enable -Werror by default when using gcc
+if test "${GCC}" = yes -a -z "${ERROR_ON_WARNING}" ; then
+    ERROR_ON_WARNING=yes
+fi
+
+WERROR_CFLAGS=""
+if test "${ERROR_ON_WARNING}" = yes ; then
+    WERROR_CFLAGS="-Werror"
+fi
+
+build_warnings="-Wall -Wdeclaration-after-statement -Wpointer-arith \
+-Wformat-nonliteral -Wno-char-subscripts"
+
+WARN_CFLAGS=""
+if test "x$GCC" = xyes
+then
+    AC_MSG_CHECKING(compiler warning flags)
+    # Separate out the -Werror flag as some files just cannot be
+    # compiled with it enabled.
+    for w in ${build_warnings}; do
+	case $w in
+	-Werr*) WERROR_CFLAGS=-Werror ;;
+	*) # Check that GCC accepts it
+	    saved_CFLAGS="$CFLAGS"
+	    CFLAGS="$CFLAGS $w"
+	    AC_TRY_COMPILE([],[],WARN_CFLAGS="${WARN_CFLAGS} $w",)
+	    CFLAGS="$saved_CFLAGS"
+	esac
+    done
+    AC_MSG_RESULT(${WARN_CFLAGS} ${WERROR_CFLAGS})
+fi
+AC_SUBST(WARN_CFLAGS)
+AC_SUBST(WERROR_CFLAGS)
 
 dnl dladdr is glibc-specific.  It is used by thread-db.c but only for
 dnl debugging messages.  It lives in -ldl which is handled below so we don't
@@ -70,7 +161,7 @@ AC_TRY_LINK([
   [AC_MSG_RESULT(no)])
 fi
 
-AC_CHECK_DECLS([strerror, perror, memmem])
+AC_CHECK_DECLS([strerror, perror, memmem, vasprintf, vsnprintf])
 
 AC_CHECK_TYPES(socklen_t, [], [],
 [#include <sys/types.h>
@@ -121,6 +212,8 @@ elif test "${srv_mingw}" = "yes"; then
   LIBS="$LIBS -lws2_32"
 elif test "${srv_qnx}" = "yes"; then
   LIBS="$LIBS -lsocket"
+elif test "${srv_lynxos}" = "yes"; then
+  LIBS="$LIBS -lnetinet"
 fi
 
 if test "${srv_mingw}" = "yes"; then

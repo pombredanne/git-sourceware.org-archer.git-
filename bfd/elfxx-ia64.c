@@ -1409,8 +1409,6 @@ elfNN_ia64_section_from_shdr (bfd *abfd,
 			      const char *name,
 			      int shindex)
 {
-  asection *newsect;
-
   /* There ought to be a place to keep ELF backend specific flags, but
      at the moment there isn't one.  We just keep track of the
      sections by their name, instead.  Fortunately, the ABI gives
@@ -1433,7 +1431,6 @@ elfNN_ia64_section_from_shdr (bfd *abfd,
 
   if (! _bfd_elf_make_section_from_shdr (abfd, hdr, name, shindex))
     return FALSE;
-  newsect = hdr->bfd_section;
 
   return TRUE;
 }
@@ -5740,8 +5737,6 @@ elfNN_vms_section_from_shdr (bfd *abfd,
 			     const char *name,
 			     int shindex)
 {
-  asection *newsect;
-
   switch (hdr->sh_type)
     {
     case SHT_IA_64_VMS_TRACE:
@@ -5755,7 +5750,6 @@ elfNN_vms_section_from_shdr (bfd *abfd,
 
   if (! _bfd_elf_make_section_from_shdr (abfd, hdr, name, shindex))
     return FALSE;
-  newsect = hdr->bfd_section;
 
   return TRUE;
 }
@@ -6002,6 +5996,7 @@ elfNN_vms_close_and_cleanup (bfd *abfd)
 #define TARGET_BIG_SYM			bfd_elfNN_ia64_big_vec
 #define TARGET_BIG_NAME			"elfNN-ia64-big"
 #define ELF_ARCH			bfd_arch_ia64
+#define ELF_TARGET_ID			IA64_ELF_DATA
 #define ELF_MACHINE_CODE		EM_IA_64
 #define ELF_MACHINE_ALT1		1999	/* EAS2.3 */
 #define ELF_MACHINE_ALT2		1998	/* EAS2.2 */
@@ -6179,6 +6174,10 @@ elfNN_vms_close_and_cleanup (bfd *abfd)
 
 #undef bfd_elfNN_archive_p
 #define bfd_elfNN_archive_p _bfd_vms_lib_ia64_archive_p
+#undef bfd_elfNN_write_archive_contents
+#define bfd_elfNN_write_archive_contents _bfd_vms_lib_write_archive_contents
+#undef bfd_elfNN_mkarchive
+#define bfd_elfNN_mkarchive _bfd_vms_lib_ia64_mkarchive
 
 #define bfd_elfNN_archive_slurp_armap \
   _bfd_vms_lib_slurp_armap

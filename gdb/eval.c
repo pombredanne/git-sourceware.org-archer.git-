@@ -43,6 +43,7 @@
 #include "gdb_obstack.h"
 #include "objfiles.h"
 #include "python/python.h"
+#include "wrapper.h"
 
 #include "gdb_assert.h"
 
@@ -184,6 +185,84 @@ struct value *
 evaluate_subexpression_type (struct expression *exp, int subexp)
 {
   return evaluate_subexp (NULL_TYPE, exp, &subexp, EVAL_AVOID_SIDE_EFFECTS);
+}
+
+/* Find the current value of a watchpoint on EXP.  Return the value in
+   *VALP and *RESULTP and the chain of intermediate and final values
+   in *VAL_CHAIN.  RESULTP and VAL_CHAIN may be NULL if the caller does
+   not need them.
+
+   If a memory error occurs while evaluating the expression, *RESULTP will
+   be set to NULL.  *RESULTP may be a lazy value, if the result could
+   not be read from memory.  It is used to determine whether a value
+   is user-specified (we should watch the whole value) or intermediate
+   (we should watch only the bit used to locate the final value).
+
+   If the final value, or any intermediate value, could not be read
+   from memory, *VALP will be set to NULL.  *VAL_CHAIN will still be
+   set to any referenced values.  *VALP will never be a lazy value.
+   This is the value which we store in struct breakpoint.
+
+   If VAL_CHAIN is non-NULL, *VAL_CHAIN will be released from the
+   value chain.  The caller must free the values individually.  If
+   VAL_CHAIN is NULL, all generated values will be left on the value
+   chain.  */
+
+void
+fetch_subexp_value (struct expression *exp, int *pc, struct value **valp,
+		    struct value **resultp, struct value **val_chain)
+{
+  struct value *mark, *new_mark, *result;
+  volatile struct gdb_exception ex;
+
+  *valp = NULL;
+  if (resultp)
+    *resultp = NULL;
+  if (val_chain)
+    *val_chain = NULL;
+
+  /* Evaluate the expression.  */
+  mark = value_mark ();
+  result = NULL;
+
+  TRY_CATCH (ex, RETURN_MASK_ALL)
+    {
+      result = evaluate_subexp (NULL_TYPE, exp, pc, EVAL_NORMAL);
+    }
+  if (ex.reason < 0)
+    {
+      /* Ignore memory errors, we want watchpoints pointing at
+	 inaccessible memory to still be created; otherwise, throw the
+	 error to some higher catcher.  */
+      switch (ex.error)
+	{
+	case MEMORY_ERROR:
+	  break;
+	default:
+	  throw_exception (ex);
+	  break;
+	}
+    }
+
+  new_mark = value_mark ();
+  if (mark == new_mark)
+    return;
+  if (resultp)
+    *resultp = result;
+
+  /* Make sure it's not lazy, so that after the target stops again we
+     have a non-lazy previous value to compare with.  */
+  if (result != NULL
+      && (!value_lazy (result) || gdb_value_fetch_lazy (result)))
+    *valp = result;
+
+  if (val_chain)
+    {
+      /* Return the chain of intermediate values.  We use this to
+	 decide which addresses to watch.  */
+      *val_chain = new_mark;
+      value_release_to_mark (mark);
+    }
 }
 
 /* Extract a field operation from an expression.  If the subexpression
@@ -657,7 +736,7 @@ ptrmath_type_p (const struct language_defn *lang, struct type *type)
       return 1;
 
     case TYPE_CODE_ARRAY:
-      return lang->c_style_arrays;
+      return TYPE_VECTOR (type) ? 0 : lang->c_style_arrays;
 
     default:
       return 0;
@@ -1491,19 +1570,29 @@ evaluate_subexp_standard (struct type *expect_type,
 	{
 	  /* Non-method function call */
 	  save_pos1 = *pos;
-	  argvec[0] = evaluate_subexp_with_coercion (exp, pos, noside);
 	  tem = 1;
-	  type = value_type (argvec[0]);
-	  if (type && TYPE_CODE (type) == TYPE_CODE_PTR)
-	    type = TYPE_TARGET_TYPE (type);
-	  if (type && TYPE_CODE (type) == TYPE_CODE_FUNC)
+
+	  /* If this is a C++ function wait until overload resolution.  */
+	  if (op == OP_VAR_VALUE
+	      && overload_resolution
+	      && (exp->language_defn->la_language == language_cplus))
 	    {
-	      for (; tem <= nargs && tem <= TYPE_NFIELDS (type); tem++)
+	      (*pos) += 4; /* Skip the evaluation of the symbol.  */
+	      argvec[0] = NULL;
+	    }
+	  else
+	    {
+	      argvec[0] = evaluate_subexp_with_coercion (exp, pos, noside);
+	      type = value_type (argvec[0]);
+	      if (type && TYPE_CODE (type) == TYPE_CODE_PTR)
+		type = TYPE_TARGET_TYPE (type);
+	      if (type && TYPE_CODE (type) == TYPE_CODE_FUNC)
 		{
-		  /* pai: FIXME This seems to be coercing arguments before
-		   * overload resolution has been done! */
-		  argvec[tem] = evaluate_subexp (TYPE_FIELD_TYPE (type, tem - 1),
-						 exp, pos, noside);
+		  for (; tem <= nargs && tem <= TYPE_NFIELDS (type); tem++)
+		    {
+		      argvec[tem] = evaluate_subexp (TYPE_FIELD_TYPE (type, tem - 1),
+						     exp, pos, noside);
+		    }
 		}
 	    }
 	}
@@ -1535,7 +1624,7 @@ evaluate_subexp_standard (struct type *expect_type,
             arg_types[ix - 1] = value_type (argvec[ix]);
 
           find_overload_match (arg_types, nargs, func_name,
-                               0 /* not method */ , 0 /* strict match */ ,
+                               NON_METHOD /* not method */ , 0 /* strict match */ ,
                                NULL, NULL /* pass NULL symbol since symbol is unknown */ ,
                                NULL, &symp, NULL, 0);
 
@@ -1572,7 +1661,7 @@ evaluate_subexp_standard (struct type *expect_type,
 		arg_types[ix - 1] = value_type (argvec[ix]);
 
 	      (void) find_overload_match (arg_types, nargs, tstr,
-				     1 /* method */ , 0 /* strict match */ ,
+	                                  METHOD /* method */ , 0 /* strict match */ ,
 					  &arg2 /* the object */ , NULL,
 					  &valp, NULL, &static_memfuncp, 0);
 
@@ -1642,8 +1731,8 @@ evaluate_subexp_standard (struct type *expect_type,
 		arg_types[ix - 1] = value_type (argvec[ix]);
 
 	      (void) find_overload_match (arg_types, nargs, NULL /* no need for name */ ,
-				 0 /* not method */ , 0 /* strict match */ ,
-		      NULL, function /* the function */ ,
+	                                  NON_METHOD /* not method */ , 0 /* strict match */ ,
+	                                  NULL, function /* the function */ ,
 					  NULL, &symp, NULL, no_adl);
 
 	      if (op == OP_VAR_VALUE)
@@ -2867,6 +2956,7 @@ evaluate_subexp_with_coercion (struct expression *exp,
       var = exp->elts[pc + 2].symbol;
       type = check_typedef (SYMBOL_TYPE (var));
       if (TYPE_CODE (type) == TYPE_CODE_ARRAY
+	  && !TYPE_VECTOR (type)
 	  && CAST_IS_CONVERSION (exp->language_defn))
 	{
 	  (*pos) += 4;

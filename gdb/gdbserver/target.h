@@ -22,6 +22,8 @@
 #ifndef TARGET_H
 #define TARGET_H
 
+struct emit_ops;
+
 /* Ways to "resume" a thread.  */
 
 enum resume_kind
@@ -51,7 +53,8 @@ struct thread_resume
   /* If non-zero, send this signal when we resume, or to stop the
      thread.  If stopping a thread, and this is 0, the target should
      stop the thread however it best decides to (e.g., SIGSTOP on
-     linux; SuspendThread on win32).  */
+     linux; SuspendThread on win32).  This is a host signal value (not
+     enum target_signal).  */
   int sig;
 };
 
@@ -177,6 +180,23 @@ struct target_ops
      If REGNO is -1, store all registers; otherwise, store at least REGNO.  */
 
   void (*store_registers) (struct regcache *regcache, int regno);
+
+  /* Prepare to read or write memory from the inferior process.
+     Targets use this to do what is necessary to get the state of the
+     inferior such that it is possible to access memory.
+
+     This should generally only be called from client facing routines,
+     such as gdb_read_memory/gdb_write_memory, or the insert_point
+     callbacks.
+
+     Like `read_memory' and `write_memory' below, returns 0 on success
+     and errno on failure.  */
+
+  int (*prepare_to_access_memory) (void);
+
+  /* Undo the effects of prepare_to_access_memory.  */
+
+  void (*done_accessing_memory) (void);
 
   /* Read memory from the inferior process.  This should generally be
      called through read_inferior_memory, which handles breakpoint shadowing.
@@ -349,6 +369,10 @@ struct target_ops
 					   ULONGEST *jjump_pad_insn_size,
 					   CORE_ADDR *adjusted_insn_addr,
 					   CORE_ADDR *adjusted_insn_addr_end);
+
+  /* Return the bytecode operations vector for the current inferior.
+     Returns NULL if bytecode compilation is not supported.  */
+  struct emit_ops *(*emit_ops) (void);
 };
 
 extern struct target_ops *the_target;
@@ -452,12 +476,27 @@ void set_target_ops (struct target_ops *);
 						   adjusted_insn_addr,	\
 						   adjusted_insn_addr_end)
 
+#define target_emit_ops() \
+  (the_target->emit_ops ? (*the_target->emit_ops) () : NULL)
+
 /* Start non-stop mode, returns 0 on success, -1 on failure.   */
 
 int start_non_stop (int nonstop);
 
 ptid_t mywait (ptid_t ptid, struct target_waitstatus *ourstatus, int options,
 	       int connected_wait);
+
+#define prepare_to_access_memory()		\
+  (the_target->prepare_to_access_memory		\
+   ? (*the_target->prepare_to_access_memory) () \
+   : 0)
+
+#define done_accessing_memory()				\
+  do							\
+    {							\
+      if (the_target->done_accessing_memory)     	\
+	(*the_target->done_accessing_memory) ();  	\
+    } while (0)
 
 int read_inferior_memory (CORE_ADDR memaddr, unsigned char *myaddr, int len);
 

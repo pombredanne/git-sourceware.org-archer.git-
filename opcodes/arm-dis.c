@@ -1249,6 +1249,7 @@ static const struct opcode16 thumb_opcodes[] =
   {ARM_EXT_V4T, 0x5000, 0xFA00, "str%10'b%c\t%0-2r, [%3-5r, %6-8r]"},
   {ARM_EXT_V4T, 0x5800, 0xFA00, "ldr%10'b%c\t%0-2r, [%3-5r, %6-8r]"},
   /* format 1 */
+  {ARM_EXT_V4T, 0x0000, 0xFFC0, "mov%C\t%0-2r, %3-5r"},
   {ARM_EXT_V4T, 0x0000, 0xF800, "lsl%C\t%0-2r, %3-5r, #%6-10d"},
   {ARM_EXT_V4T, 0x0800, 0xF800, "lsr%C\t%0-2r, %3-5r, %s"},
   {ARM_EXT_V4T, 0x1000, 0xF800, "asr%C\t%0-2r, %3-5r, %s"},
@@ -2469,7 +2470,7 @@ print_insn_neon (struct disassemble_info *info, long given, bfd_boolean thumb)
 			  func (stream, "d%d-d%d", rd, rd + n - 1);
 			func (stream, "}, [%s", arm_regnames[rn]);
 			if (align)
-			  func (stream, ", :%d", 32 << align);
+			  func (stream, " :%d", 32 << align);
 			func (stream, "]");
 			if (rm == 0xd)
 			  func (stream, "!");
@@ -2544,7 +2545,7 @@ print_insn_neon (struct disassemble_info *info, long given, bfd_boolean thumb)
                             rd + i * stride, idx);
                         func (stream, "}, [%s", arm_regnames[rn]);
 			if (align)
-			  func (stream, ", :%d", align);
+			  func (stream, " :%d", align);
 			func (stream, "]");
 			if (rm == 0xd)
 			  func (stream, "!");
@@ -2585,9 +2586,9 @@ print_insn_neon (struct disassemble_info *info, long given, bfd_boolean thumb)
                             if (type == 3)
                               align = (size > 1) ? align >> 1 : align;
 			    if (type == 2 || (type == 0 && !size))
-			      func (stream, ", :<bad align %d>", align);
+			      func (stream, " :<bad align %d>", align);
 			    else
-			      func (stream, ", :%d", align);
+			      func (stream, " :%d", align);
 			  }
 			func (stream, "]");
 			if (rm == 0xd)
@@ -3154,15 +3155,32 @@ print_insn_arm (bfd_vma pc, struct disassemble_info *info, long given)
 		      break;
 
 		    case 'U':
-		      switch (given & 0xf)
+		      if ((given & 0xf0) == 0x60) 
 			{
-			case 0xf: func (stream, "sy"); break;
-			case 0x7: func (stream, "un"); break;
-			case 0xe: func (stream, "st"); break;
-			case 0x6: func (stream, "unst"); break;
-			default:
-			  func (stream, "#%d", (int) given & 0xf);
-			  break;
+			  switch (given & 0xf)
+			    {
+			    case 0xf: func (stream, "sy"); break;
+			    default:
+			      func (stream, "#%d", (int) given & 0xf);
+			      break;
+			    }
+			} 
+		      else 
+			{
+			  switch (given & 0xf)
+			    {
+			    case 0xf: func (stream, "sy"); break;
+			    case 0x7: func (stream, "un"); break;
+			    case 0xe: func (stream, "st"); break;
+			    case 0x6: func (stream, "unst"); break;
+			    case 0xb: func (stream, "ish"); break;
+			    case 0xa: func (stream, "ishst"); break;
+			    case 0x3: func (stream, "osh"); break;
+			    case 0x2: func (stream, "oshst"); break;
+			    default:
+			      func (stream, "#%d", (int) given & 0xf);
+			      break;
+			    }
 			}
 		      break;
 
@@ -3997,16 +4015,33 @@ print_insn_thumb32 (bfd_vma pc, struct disassemble_info *info, long given)
 		break;
 
 	      case 'U':
-		switch (given & 0xf)
+		if ((given & 0xf0) == 0x60) 
 		  {
-		  case 0xf: func (stream, "sy"); break;
-		  case 0x7: func (stream, "un"); break;
-		  case 0xe: func (stream, "st"); break;
-		  case 0x6: func (stream, "unst"); break;
-		  default:
-		    func (stream, "#%d", (int) given & 0xf);
-		    break;
+		    switch (given & 0xf)
+		      {
+			case 0xf: func (stream, "sy"); break;
+			default:
+			  func (stream, "#%d", (int) given & 0xf);
+			      break;
+		      }
 		  }
+		else 
+		  {
+		    switch (given & 0xf)
+		      {
+			case 0xf: func (stream, "sy"); break;
+			case 0x7: func (stream, "un"); break;
+			case 0xe: func (stream, "st"); break;
+			case 0x6: func (stream, "unst"); break;
+			case 0xb: func (stream, "ish"); break;
+			case 0xa: func (stream, "ishst"); break;
+			case 0x3: func (stream, "osh"); break;
+			case 0x2: func (stream, "oshst"); break;
+			default:
+			  func (stream, "#%d", (int) given & 0xf);
+			  break;
+		      }
+		   }
 		break;
 
 	      case 'C':

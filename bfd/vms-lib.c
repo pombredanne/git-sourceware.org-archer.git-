@@ -703,6 +703,12 @@ _bfd_vms_lib_alpha_mkarchive (bfd *abfd)
   return _bfd_vms_lib_mkarchive (abfd, vms_lib_alpha);
 }
 
+bfd_boolean
+_bfd_vms_lib_ia64_mkarchive (bfd *abfd)
+{
+  return _bfd_vms_lib_mkarchive (abfd, vms_lib_ia64);
+}
+
 /* Find NAME in the symbol index.  Return the index.  */
 
 symindex
@@ -827,7 +833,7 @@ vms_lib_read_block (struct bfd *abfd)
    function does not handle records nor EOF.  */
 
 static file_ptr
-vms_lib_bread_raw (struct bfd *abfd, void *buf, file_ptr nbytes)
+vms_lib_bread_raw (struct bfd *abfd, unsigned char *buf, file_ptr nbytes)
 {
   struct vms_lib_iovec *vec = (struct vms_lib_iovec *) abfd->iostream;
   file_ptr res;
@@ -963,7 +969,7 @@ vms_lib_bread (struct bfd *abfd, void *buf, file_ptr nbytes)
           unsigned char blen[2];
 
           /* Read record length.  */
-          if (vms_lib_bread_raw (abfd, &blen, sizeof (blen)) != sizeof (blen))
+          if (vms_lib_bread_raw (abfd, blen, sizeof (blen)) != sizeof (blen))
             return -1;
           vec->rec_len = bfd_getl16 (blen);
           if (bfd_libdata (abfd->my_archive)->kind == vms_lib_txt)
@@ -1209,7 +1215,7 @@ static bfd_boolean
 vms_lib_bopen (bfd *el, file_ptr filepos)
 {
   struct vms_lib_iovec *vec;
-  char buf[256];
+  unsigned char buf[256];
   struct vms_mhd *mhd;
   struct lib_tdata *tdata = bfd_libdata (el->my_archive);
   unsigned int len;
@@ -2105,6 +2111,7 @@ _bfd_vms_lib_write_archive_contents (bfd *arch)
           /* Write the first block (which contains an mhd).  */
           if (bfd_bwrite (blk, VMS_BLOCK_SIZE, arch) != VMS_BLOCK_SIZE)
             goto input_err;
+          off += VMS_BLOCK_SIZE;
 
           if (amt == VMS_BLOCK_SIZE - sz)
             {

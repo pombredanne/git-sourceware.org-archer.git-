@@ -3802,7 +3802,7 @@ elf_xtensa_grok_prstatus (bfd *abfd, Elf_Internal_Note *note)
   elf_tdata (abfd)->core_signal = bfd_get_16 (abfd, note->descdata + 12);
 
   /* pr_pid */
-  elf_tdata (abfd)->core_pid = bfd_get_32 (abfd, note->descdata + 24);
+  elf_tdata (abfd)->core_lwpid = bfd_get_32 (abfd, note->descdata + 24);
 
   /* pr_reg */
   offset = 72;
@@ -7829,7 +7829,6 @@ xlate_offset_with_removed_text (const xlate_map_t *map,
 				text_action_list *action_list,
 				bfd_vma offset)
 {
-  xlate_map_entry_t tmp;
   void *r;
   xlate_map_entry_t *e;
 
@@ -7838,10 +7837,6 @@ xlate_offset_with_removed_text (const xlate_map_t *map,
 
   if (map->entry_count == 0)
     return offset;
-
-  tmp.orig_address = offset;
-  tmp.new_address = offset;
-  tmp.size = 1;
 
   r = bsearch (&offset, map->entry, map->entry_count,
 	       sizeof (xlate_map_entry_t), &xlate_compare);
@@ -9660,12 +9655,10 @@ move_literal (bfd *abfd,
     {
       int r_type;
       unsigned i;
-      asection *target_sec;
       reloc_bfd_fix *fix;
       unsigned insert_at;
 
       r_type = ELF32_R_TYPE (r_rel->rela.r_info);
-      target_sec = r_reloc_get_section (r_rel);
 
       /* This is the difficult case.  We have to create a fix up.  */
       this_rela.r_offset = offset;
@@ -10773,6 +10766,7 @@ static const struct bfd_elf_special_section elf_xtensa_special_sections[] =
   { NULL,                       0,      0, 0,            0 }
 };
 
+#define ELF_TARGET_ID			XTENSA_ELF_DATA
 #ifndef ELF_ARCH
 #define TARGET_LITTLE_SYM		bfd_elf32_xtensa_le_vec
 #define TARGET_LITTLE_NAME		"elf32-xtensa-le"

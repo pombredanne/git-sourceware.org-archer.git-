@@ -171,6 +171,26 @@ struct quick_symbol_functions
 				   int kind, const char *name,
 				   domain_enum domain);
 
+  /* Expand each symbol table in OBJFILE that may have items matching
+     KIND, NAME, and DOMAIN -- these arguments are as for
+     `lookup_symbol'.  For each such symbol table, call MATCHER with
+     the symbol table and DATA arguments.  If MATCHER returns NULL,
+     keep going.  Otherwise, return the result of MATCHER.  If MATCHER
+     never returns non-NULL, return NULL.  A backend can choose to
+     implement this and then have its `lookup_symbol' hook always
+     return NULL, or the reverse.  (It doesn't make sense to implement
+     both.)  */
+  struct symbol *(*expand_one_symtab_matching)
+    (struct objfile *objfile,
+     int kind, const char *name,
+     domain_enum domain,
+     struct symbol *(*matcher) (struct symtab *symtab,
+				int kind,
+				const char *name,
+				domain_enum domain,
+				void *data),
+     void *data);
+
   /* Print statistics about any indices loaded for OBJFILE.  The
      statistics should be printed to gdb_stdout.  This is used for
      "maint print statistics".  */
@@ -201,7 +221,7 @@ struct quick_symbol_functions
 
   /* Return the file name of the file holding the symbol in OBJFILE
      named NAME.  If no such symbol exists in OBJFILE, return NULL.  */
-  char *(*find_symbol_file) (struct objfile *objfile, const char *name);
+  const char *(*find_symbol_file) (struct objfile *objfile, const char *name);
 
   /* This method is specific to Ada.  It walks the partial symbol
      tables of OBJFILE looking for a name match.  WILD_MATCH and
@@ -566,6 +586,7 @@ extern struct cleanup *increment_reading_symtab (void);
 
 extern int dwarf2_has_info (struct objfile *);
 
+extern int dwarf2_initialize_objfile (struct objfile *);
 extern void dwarf2_build_psymtabs (struct objfile *);
 extern void dwarf2_build_frame_info (struct objfile *);
 

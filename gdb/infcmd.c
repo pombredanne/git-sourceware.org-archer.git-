@@ -1009,7 +1009,7 @@ step_once (int skip_subroutines, int single_inst, int count, int thread)
 
 	      target_terminal_ours ();
 	      printf_filtered (_("\
-Single stepping until exit from function %s, \n\
+Single stepping until exit from function %s,\n\
 which has no line number information.\n"), name);
 	    }
 	}
@@ -1958,7 +1958,7 @@ default_print_registers_info (struct gdbarch *gdbarch,
 	  get_user_print_options (&opts);
 	  opts.deref_ref = 1;
 	  val_print (register_type (gdbarch, i), buffer, 0, 0,
-		     file, 0, &opts, current_language);
+		     file, 0, NULL, &opts, current_language);
 
 	  fprintf_filtered (file, "\t(raw 0x");
 	  for (j = 0; j < register_size (gdbarch, i); j++)
@@ -1981,8 +1981,7 @@ default_print_registers_info (struct gdbarch *gdbarch,
 	  get_formatted_print_options (&opts, 'x');
 	  opts.deref_ref = 1;
 	  val_print (register_type (gdbarch, i), buffer, 0, 0,
-		     file, 0, &opts,
-		     current_language);
+		     file, 0, NULL, &opts, current_language);
           /* If not a vector register, print it also according to its
              natural format.  */
 	  if (TYPE_VECTOR (register_type (gdbarch, i)) == 0)
@@ -1991,7 +1990,7 @@ default_print_registers_info (struct gdbarch *gdbarch,
 	      opts.deref_ref = 1;
 	      fprintf_filtered (file, "\t");
 	      val_print (register_type (gdbarch, i), buffer, 0, 0,
-			 file, 0, &opts, current_language);
+			 file, 0, NULL, &opts, current_language);
 	    }
 	}
 

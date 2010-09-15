@@ -52,7 +52,7 @@ void f_type_print_base (struct type *, struct ui_file *, int, int);
 /* LEVEL is the depth to indent lines by.  */
 
 void
-f_print_type (struct type *type, char *varstring, struct ui_file *stream,
+f_print_type (struct type *type, const char *varstring, struct ui_file *stream,
 	      int show, int level)
 {
   enum type_code code;
@@ -312,7 +312,7 @@ f_type_print_base (struct type *type, struct ui_file *stream, int show,
       break;
 
     case TYPE_CODE_ERROR:
-      fprintfi_filtered (level, stream, "<unknown type>");
+      fprintfi_filtered (level, stream, "%s", TYPE_ERROR_NAME (type));
       break;
 
     case TYPE_CODE_RANGE:

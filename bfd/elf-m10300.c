@@ -987,14 +987,11 @@ mn10300_elf_final_link_relocate (reloc_howto_type *howto,
   unsigned long r_type = howto->type;
   bfd_byte * hit_data = contents + offset;
   bfd *      dynobj;
-  bfd_vma *  local_got_offsets;
   asection * sgot;
   asection * splt;
   asection * sreloc;
 
   dynobj = elf_hash_table (info)->dynobj;
-  local_got_offsets = elf_local_got_offsets (input_bfd);
-
   sgot   = NULL;
   splt   = NULL;
   sreloc = NULL;
@@ -2109,7 +2106,6 @@ mn10300_elf_relax_section (bfd *abfd,
 	       section = section->next)
 	    {
 	      struct elf32_mn10300_link_hash_entry *hash;
-	      Elf_Internal_Sym *sym;
 	      asection *sym_sec = NULL;
 	      const char *sym_name;
 	      char *new_name;
@@ -2163,7 +2159,6 @@ mn10300_elf_relax_section (bfd *abfd,
 		      /* We need the name and hash table entry of the target
 			 symbol!  */
 		      hash = NULL;
-		      sym = NULL;
 		      sym_sec = NULL;
 
 		      if (r_index < symtab_hdr->sh_info)
@@ -4898,6 +4893,7 @@ _bfd_mn10300_elf_reloc_type_class (const Elf_Internal_Rela *rela)
 #define TARGET_LITTLE_SYM	bfd_elf32_mn10300_vec
 #define TARGET_LITTLE_NAME	"elf32-mn10300"
 #define ELF_ARCH		bfd_arch_mn10300
+#define ELF_TARGET_ID		MN10300_ELF_DATA
 #define ELF_MACHINE_CODE	EM_MN10300
 #define ELF_MACHINE_ALT1	EM_CYGNUS_MN10300
 #define ELF_MAXPAGESIZE		0x1000

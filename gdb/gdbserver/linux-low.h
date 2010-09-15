@@ -136,6 +136,10 @@ struct linux_target_ops
 					   ULONGEST *jjump_pad_insn_size,
 					   CORE_ADDR *adjusted_insn_addr,
 					   CORE_ADDR *adjusted_insn_addr_end);
+
+  /* Return the bytecode operations vector for the current inferior.
+     Returns NULL if bytecode compilation is not supported.  */
+  struct emit_ops *(*emit_ops) (void);
 };
 
 extern struct linux_target_ops the_low_target;
@@ -255,7 +259,7 @@ int elf_64_file_p (const char *file);
 
 void linux_attach_lwp (unsigned long pid);
 struct lwp_info *find_lwp_pid (ptid_t ptid);
-int linux_get_thread_area (int lwpid, CORE_ADDR *area);
+void linux_stop_lwp (struct lwp_info *lwp);
 
 /* From thread-db.c  */
 int thread_db_init (int use_events);

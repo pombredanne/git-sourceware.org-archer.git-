@@ -117,9 +117,11 @@ static int debug_to_insert_hw_breakpoint (struct gdbarch *,
 static int debug_to_remove_hw_breakpoint (struct gdbarch *,
 					  struct bp_target_info *);
 
-static int debug_to_insert_watchpoint (CORE_ADDR, int, int);
+static int debug_to_insert_watchpoint (CORE_ADDR, int, int,
+				       struct expression *);
 
-static int debug_to_remove_watchpoint (CORE_ADDR, int, int);
+static int debug_to_remove_watchpoint (CORE_ADDR, int, int,
+				       struct expression *);
 
 static int debug_to_stopped_by_watchpoint (void);
 
@@ -129,6 +131,9 @@ static int debug_to_watchpoint_addr_within_range (struct target_ops *,
 						  CORE_ADDR, CORE_ADDR, int);
 
 static int debug_to_region_ok_for_hw_watchpoint (CORE_ADDR, int);
+
+static int debug_to_can_accel_watchpoint_condition (CORE_ADDR, int, int,
+						    struct expression *);
 
 static void debug_to_terminal_init (void);
 
@@ -194,6 +199,22 @@ static int trust_readonly = 0;
    memory breakpoint inserted by gdb.  */
 
 static int show_memory_breakpoints = 0;
+
+/* These globals control whether GDB attempts to perform these
+   operations; they are useful for targets that need to prevent
+   inadvertant disruption, such as in non-stop mode.  */
+
+int may_write_registers = 1;
+
+int may_write_memory = 1;
+
+int may_insert_breakpoints = 1;
+
+int may_insert_tracepoints = 1;
+
+int may_insert_fast_tracepoints = 1;
+
+int may_stop = 1;
 
 /* Non-zero if we want to see trace of target level stuff.  */
 
@@ -591,6 +612,7 @@ update_current_target (void)
       INHERIT (to_stopped_by_watchpoint, t);
       INHERIT (to_watchpoint_addr_within_range, t);
       INHERIT (to_region_ok_for_hw_watchpoint, t);
+      INHERIT (to_can_accel_watchpoint_condition, t);
       INHERIT (to_terminal_init, t);
       INHERIT (to_terminal_inferior, t);
       INHERIT (to_terminal_ours_for_output, t);
@@ -612,7 +634,7 @@ update_current_target (void)
       INHERIT (to_remove_exec_catchpoint, t);
       INHERIT (to_set_syscall_catchpoint, t);
       INHERIT (to_has_exited, t);
-      /* Do not inherit to_mourn_inferiour.  */
+      /* Do not inherit to_mourn_inferior.  */
       INHERIT (to_can_run, t);
       INHERIT (to_notice_signals, t);
       /* Do not inherit to_thread_alive.  */
@@ -662,6 +684,9 @@ update_current_target (void)
       INHERIT (to_set_disconnected_tracing, t);
       INHERIT (to_set_circular_trace_buffer, t);
       INHERIT (to_get_tib_address, t);
+      INHERIT (to_set_permissions, t);
+      INHERIT (to_static_tracepoint_marker_at, t);
+      INHERIT (to_static_tracepoint_markers_by_strid, t);
       INHERIT (to_magic, t);
       /* Do not inherit to_memory_map.  */
       /* Do not inherit to_flash_erase.  */
@@ -709,10 +734,10 @@ update_current_target (void)
 	    (int (*) (struct gdbarch *, struct bp_target_info *))
 	    return_minus_one);
   de_fault (to_insert_watchpoint,
-	    (int (*) (CORE_ADDR, int, int))
+	    (int (*) (CORE_ADDR, int, int, struct expression *))
 	    return_minus_one);
   de_fault (to_remove_watchpoint,
-	    (int (*) (CORE_ADDR, int, int))
+	    (int (*) (CORE_ADDR, int, int, struct expression *))
 	    return_minus_one);
   de_fault (to_stopped_by_watchpoint,
 	    (int (*) (void))
@@ -724,6 +749,9 @@ update_current_target (void)
 	    default_watchpoint_addr_within_range);
   de_fault (to_region_ok_for_hw_watchpoint,
 	    default_region_ok_for_hw_watchpoint);
+  de_fault (to_can_accel_watchpoint_condition,
+            (int (*) (CORE_ADDR, int, int, struct expression *))
+            return_zero);
   de_fault (to_terminal_init,
 	    (void (*) (void))
 	    target_ignore);
@@ -857,6 +885,15 @@ update_current_target (void)
 	    target_ignore);
   de_fault (to_get_tib_address,
 	    (int (*) (ptid_t, CORE_ADDR *))
+	    tcomplain);
+  de_fault (to_set_permissions,
+	    (void (*) (void))
+	    target_ignore);
+  de_fault (to_static_tracepoint_marker_at,
+	    (int (*) (CORE_ADDR, struct static_tracepoint_marker *))
+	    return_zero);
+  de_fault (to_static_tracepoint_markers_by_strid,
+	    (VEC(static_tracepoint_marker_p) * (*) (const char *))
 	    tcomplain);
 #undef de_fault
 
@@ -998,6 +1035,30 @@ void
 pop_all_targets (int quitting)
 {
   pop_all_targets_above (dummy_stratum, quitting);
+}
+
+/* Return 1 if T is now pushed in the target stack.  Return 0 otherwise.  */
+
+int
+target_is_pushed (struct target_ops *t)
+{
+  struct target_ops **cur;
+
+  /* Check magic number.  If wrong, it probably means someone changed
+     the struct definition, but not all the places that initialize one.  */
+  if (t->to_magic != OPS_MAGIC)
+    {
+      fprintf_unfiltered (gdb_stderr,
+			  "Magic number of %s target struct wrong\n",
+			  t->to_shortname);
+      internal_error (__FILE__, __LINE__, _("failed internal consistency check"));
+    }
+
+  for (cur = &target_stack; (*cur) != NULL; cur = &(*cur)->beneath)
+    if (*cur == t)
+      return 1;
+
+  return 0;
 }
 
 /* Using the objfile specified in OBJFILE, find the address for the
@@ -1408,6 +1469,10 @@ target_xfer_partial (struct target_ops *ops,
 
   gdb_assert (ops->to_xfer_partial != NULL);
 
+  if (writebuf && !may_write_memory)
+    error (_("Writing to memory is not allowed (addr %s, len %s)"),
+	   core_addr_to_string_nz (offset), plongest (len));
+
   /* If this is a memory transfer, let the memory-specific code
      have a look at it instead.  Memory transfers are more
      complicated.  */
@@ -1732,72 +1797,203 @@ target_read (struct target_ops *ops,
   return len;
 }
 
-LONGEST
-target_read_until_error (struct target_ops *ops,
-			 enum target_object object,
-			 const char *annex, gdb_byte *buf,
-			 ULONGEST offset, LONGEST len)
-{
-  LONGEST xfered = 0;
+/** Assuming that the entire [begin, end) range of memory cannot be read,
+    try to read whatever subrange is possible to read.
 
+    The function results, in RESULT, either zero or one memory block.
+    If there's a readable subrange at the beginning, it is completely
+    read and returned. Any further readable subrange will not be read.
+    Otherwise, if there's a readable subrange at the end, it will be
+    completely read and returned.  Any readable subranges before it (obviously,
+    not starting at the beginning), will be ignored. In other cases --
+    either no readable subrange, or readable subrange (s) that is neither
+    at the beginning, or end, nothing is returned.
+
+    The purpose of this function is to handle a read across a boundary of
+    accessible memory in a case when memory map is not available. The above
+    restrictions are fine for this case, but will give incorrect results if
+    the memory is 'patchy'. However, supporting 'patchy' memory would require
+    trying to read every single byte, and it seems unacceptable solution.
+    Explicit memory map is recommended for this case -- and
+    target_read_memory_robust will take care of reading multiple ranges then.  */
+
+static void
+read_whatever_is_readable (struct target_ops *ops, ULONGEST begin, ULONGEST end,
+			   VEC(memory_read_result_s) **result)
+{
+  gdb_byte *buf = xmalloc (end-begin);
+  ULONGEST current_begin = begin;
+  ULONGEST current_end = end;
+  int forward;
+  memory_read_result_s r;
+
+  /* If we previously failed to read 1 byte, nothing can be done here.  */
+  if (end - begin <= 1)
+    return;
+
+  /* Check that either first or the last byte is readable, and give up
+     if not. This heuristic is meant to permit reading accessible memory
+     at the boundary of accessible region.  */
+  if (target_read_partial (ops, TARGET_OBJECT_MEMORY, NULL,
+			   buf, begin, 1) == 1)
+    {
+      forward = 1;
+      ++current_begin;
+    }
+  else if (target_read_partial (ops, TARGET_OBJECT_MEMORY, NULL,
+				buf + (end-begin) - 1, end - 1, 1) == 1)
+    {
+      forward = 0;
+      --current_end;
+    }
+  else
+    {
+      return;
+    }
+
+  /* Loop invariant is that the [current_begin, current_end) was previously
+     found to be not readable as a whole.
+
+     Note loop condition -- if the range has 1 byte, we can't divide the range
+     so there's no point trying further.  */
+  while (current_end - current_begin > 1)
+    {
+      ULONGEST first_half_begin, first_half_end;
+      ULONGEST second_half_begin, second_half_end;
+      LONGEST xfer;
+
+      ULONGEST middle = current_begin + (current_end - current_begin)/2;
+      if (forward)
+	{
+	  first_half_begin = current_begin;
+	  first_half_end = middle;
+	  second_half_begin = middle;
+	  second_half_end = current_end;
+	}
+      else
+	{
+	  first_half_begin = middle;
+	  first_half_end = current_end;
+	  second_half_begin = current_begin;
+	  second_half_end = middle;
+	}
+
+      xfer = target_read (ops, TARGET_OBJECT_MEMORY, NULL,
+			  buf + (first_half_begin - begin),
+			  first_half_begin,
+			  first_half_end - first_half_begin);
+
+      if (xfer == first_half_end - first_half_begin)
+	{
+	  /* This half reads up fine. So, the error must be in the other half.  */
+	  current_begin = second_half_begin;
+	  current_end = second_half_end;
+	}
+      else
+	{
+	  /* This half is not readable. Because we've tried one byte, we
+	     know some part of this half if actually redable. Go to the next
+	     iteration to divide again and try to read.
+
+	     We don't handle the other half, because this function only tries
+	     to read a single readable subrange.  */
+	  current_begin = first_half_begin;
+	  current_end = first_half_end;
+	}
+    }
+
+  if (forward)
+    {
+      /* The [begin, current_begin) range has been read.  */
+      r.begin = begin;
+      r.end = current_begin;
+      r.data = buf;
+    }
+  else
+    {
+      /* The [current_end, end) range has been read.  */
+      LONGEST rlen = end - current_end;
+      r.data = xmalloc (rlen);
+      memcpy (r.data, buf + current_end - begin, rlen);
+      r.begin = current_end;
+      r.end = end;
+      xfree (buf);
+    }
+  VEC_safe_push(memory_read_result_s, (*result), &r);
+}
+
+void
+free_memory_read_result_vector (void *x)
+{
+  VEC(memory_read_result_s) *v = x;
+  memory_read_result_s *current;
+  int ix;
+
+  for (ix = 0; VEC_iterate (memory_read_result_s, v, ix, current); ++ix)
+    {
+      xfree (current->data);
+    }
+  VEC_free (memory_read_result_s, v);
+}
+
+VEC(memory_read_result_s) *
+read_memory_robust (struct target_ops *ops, ULONGEST offset, LONGEST len)
+{
+  VEC(memory_read_result_s) *result = 0;
+
+  LONGEST xfered = 0;
   while (xfered < len)
     {
-      LONGEST xfer = target_read_partial (ops, object, annex,
-					  (gdb_byte *) buf + xfered,
-					  offset + xfered, len - xfered);
+      struct mem_region *region = lookup_mem_region (offset + xfered);
+      LONGEST rlen;
 
-      /* Call an observer, notifying them of the xfer progress?  */
-      if (xfer == 0)
-	return xfered;
-      if (xfer < 0)
+      /* If there is no explicit region, a fake one should be created.  */
+      gdb_assert (region);
+
+      if (region->hi == 0)
+	rlen = len - xfered;
+      else
+	rlen = region->hi - offset;
+
+      if (region->attrib.mode == MEM_NONE || region->attrib.mode == MEM_WO)
 	{
-	  /* We've got an error.  Try to read in smaller blocks.  */
-	  ULONGEST start = offset + xfered;
-	  ULONGEST remaining = len - xfered;
-	  ULONGEST half;
-
-	  /* If an attempt was made to read a random memory address,
-	     it's likely that the very first byte is not accessible.
-	     Try reading the first byte, to avoid doing log N tries
-	     below.  */
-	  xfer = target_read_partial (ops, object, annex, 
-				      (gdb_byte *) buf + xfered, start, 1);
-	  if (xfer <= 0)
-	    return xfered;
-	  start += 1;
-	  remaining -= 1;
-	  half = remaining/2;
-	  
-	  while (half > 0)
-	    {
-	      xfer = target_read_partial (ops, object, annex,
-					  (gdb_byte *) buf + xfered,
-					  start, half);
-	      if (xfer == 0)
-		return xfered;
-	      if (xfer < 0)
-		{
-		  remaining = half;		  
-		}
-	      else
-		{
-		  /* We have successfully read the first half.  So, the
-		     error must be in the second half.  Adjust start and
-		     remaining to point at the second half.  */
-		  xfered += xfer;
-		  start += xfer;
-		  remaining -= xfer;
-		}
-	      half = remaining/2;
-	    }
-
-	  return xfered;
+	  /* Cannot read this region. Note that we can end up here only
+	     if the region is explicitly marked inaccessible, or
+	     'inaccessible-by-default' is in effect.  */
+	  xfered += rlen;
 	}
-      xfered += xfer;
-      QUIT;
+      else
+	{
+	  LONGEST to_read = min (len - xfered, rlen);
+	  gdb_byte *buffer = (gdb_byte *)xmalloc (to_read);
+
+	  LONGEST xfer = target_read (ops, TARGET_OBJECT_MEMORY, NULL,
+				      (gdb_byte *) buffer,
+				      offset + xfered, to_read);
+	  /* Call an observer, notifying them of the xfer progress?  */
+	  if (xfer <= 0)
+	    {
+	      /* Got an error reading full chunk. See if maybe we can read
+		 some subrange.  */
+	      xfree (buffer);
+	      read_whatever_is_readable (ops, offset + xfered, offset + xfered + to_read, &result);
+	      xfered += to_read;
+	    }
+	  else
+	    {
+	      struct memory_read_result r;
+	      r.data = buffer;
+	      r.begin = offset + xfered;
+	      r.end = r.begin + xfer;
+	      VEC_safe_push (memory_read_result_s, result, &r);
+	      xfered += xfer;
+	    }
+	  QUIT;
+	}
     }
-  return len;
+  return result;
 }
+
 
 /* An alternative to target_write with progress callbacks.  */
 
@@ -1970,6 +2166,36 @@ get_target_memory_unsigned (struct target_ops *ops, CORE_ADDR addr,
   gdb_assert (len <= sizeof (buf));
   get_target_memory (ops, addr, buf, len);
   return extract_unsigned_integer (buf, len, byte_order);
+}
+
+int
+target_insert_breakpoint (struct gdbarch *gdbarch,
+			  struct bp_target_info *bp_tgt)
+{
+  if (!may_insert_breakpoints)
+    {
+      warning (_("May not insert breakpoints"));
+      return 1;
+    }
+
+  return (*current_target.to_insert_breakpoint) (gdbarch, bp_tgt);
+}
+
+int
+target_remove_breakpoint (struct gdbarch *gdbarch,
+			  struct bp_target_info *bp_tgt)
+{
+  /* This is kind of a weird case to handle, but the permission might
+     have been changed after breakpoints were inserted - in which case
+     we should just take the user literally and assume that any
+     breakpoints should be left in place.  */
+  if (!may_insert_breakpoints)
+    {
+      warning (_("May not remove breakpoints"));
+      return 1;
+    }
+
+  return (*current_target.to_remove_breakpoint) (gdbarch, bp_tgt);
 }
 
 static void
@@ -2262,7 +2488,7 @@ target_mourn_inferior (void)
     }
 
   internal_error (__FILE__, __LINE__,
-		  "could not find a target to follow mourn inferiour");
+		  "could not find a target to follow mourn inferior");
 }
 
 /* Look for a target which can describe architectural features, starting
@@ -2704,31 +2930,6 @@ find_run_target (void)
   return (count == 1 ? runable : NULL);
 }
 
-/* Find a single core_stratum target in the list of targets and return it.
-   If for some reason there is more than one, return NULL.  */
-
-struct target_ops *
-find_core_target (void)
-{
-  struct target_ops **t;
-  struct target_ops *runable = NULL;
-  int count;
-
-  count = 0;
-
-  for (t = target_structs; t < target_structs + target_struct_size;
-       ++t)
-    {
-      if ((*t)->to_stratum == core_stratum)
-	{
-	  runable = *t;
-	  ++count;
-	}
-    }
-
-  return (count == 1 ? runable : NULL);
-}
-
 /*
  * Find the next target down the stack from the specified target.
  */
@@ -2809,7 +3010,7 @@ dummy_pid_to_str (struct target_ops *ops, ptid_t ptid)
 
 /* Error-catcher for target_find_memory_regions.  */
 static int
-dummy_find_memory_regions (int (*ignore1) (), void *ignore2)
+dummy_find_memory_regions (find_memory_region_ftype ignore1, void *ignore2)
 {
   error (_("Command not implemented for this target."));
   return 0;
@@ -2954,6 +3155,18 @@ target_find_new_threads (void)
     }
 }
 
+void
+target_stop (ptid_t ptid)
+{
+  if (!may_stop)
+    {
+      warning (_("May not interrupt or stop the target, ignoring attempt"));
+      return;
+    }
+
+  (*current_target.to_stop) (ptid);
+}
+
 static void
 debug_to_post_attach (int pid)
 {
@@ -3062,6 +3275,9 @@ void
 target_store_registers (struct regcache *regcache, int regno)
 {
   struct target_ops *t;
+
+  if (!may_write_registers)
+    error (_("Writing to registers is not allowed (regno %d)"), regno);
 
   for (t = current_target.beneath; t != NULL; t = t->beneath)
     {
@@ -3189,8 +3405,8 @@ debug_to_insert_breakpoint (struct gdbarch *gdbarch,
   retval = debug_target.to_insert_breakpoint (gdbarch, bp_tgt);
 
   fprintf_unfiltered (gdb_stdlog,
-		      "target_insert_breakpoint (0x%lx, xxx) = %ld\n",
-		      (unsigned long) bp_tgt->placed_address,
+		      "target_insert_breakpoint (%s, xxx) = %ld\n",
+		      core_addr_to_string (bp_tgt->placed_address),
 		      (unsigned long) retval);
   return retval;
 }
@@ -3204,8 +3420,8 @@ debug_to_remove_breakpoint (struct gdbarch *gdbarch,
   retval = debug_target.to_remove_breakpoint (gdbarch, bp_tgt);
 
   fprintf_unfiltered (gdb_stdlog,
-		      "target_remove_breakpoint (0x%lx, xxx) = %ld\n",
-		      (unsigned long) bp_tgt->placed_address,
+		      "target_remove_breakpoint (%s, xxx) = %ld\n",
+		      core_addr_to_string (bp_tgt->placed_address),
 		      (unsigned long) retval);
   return retval;
 }
@@ -3234,10 +3450,24 @@ debug_to_region_ok_for_hw_watchpoint (CORE_ADDR addr, int len)
   retval = debug_target.to_region_ok_for_hw_watchpoint (addr, len);
 
   fprintf_unfiltered (gdb_stdlog,
-		      "target_region_ok_for_hw_watchpoint (%ld, %ld) = 0x%lx\n",
-		      (unsigned long) addr,
-		      (unsigned long) len,
-		      (unsigned long) retval);
+		      "target_region_ok_for_hw_watchpoint (%s, %ld) = %s\n",
+		      core_addr_to_string (addr), (unsigned long) len,
+		      core_addr_to_string (retval));
+  return retval;
+}
+
+static int
+debug_to_can_accel_watchpoint_condition (CORE_ADDR addr, int len, int rw,
+					 struct expression *cond)
+{
+  int retval;
+
+  retval = debug_target.to_can_accel_watchpoint_condition (addr, len, rw, cond);
+
+  fprintf_unfiltered (gdb_stdlog,
+		      "target_can_accel_watchpoint_condition (%s, %d, %d, %s) = %ld\n",
+		      core_addr_to_string (addr), len, rw,
+		      host_address_to_string (cond), (unsigned long) retval);
   return retval;
 }
 
@@ -3262,8 +3492,8 @@ debug_to_stopped_data_address (struct target_ops *target, CORE_ADDR *addr)
   retval = debug_target.to_stopped_data_address (target, addr);
 
   fprintf_unfiltered (gdb_stdlog,
-		      "target_stopped_data_address ([0x%lx]) = %ld\n",
-		      (unsigned long)*addr,
+		      "target_stopped_data_address ([%s]) = %ld\n",
+		      core_addr_to_string (*addr),
 		      (unsigned long)retval);
   return retval;
 }
@@ -3279,9 +3509,9 @@ debug_to_watchpoint_addr_within_range (struct target_ops *target,
 							 start, length);
 
   fprintf_filtered (gdb_stdlog,
-		    "target_watchpoint_addr_within_range (0x%lx, 0x%lx, %d) = %d\n",
-		    (unsigned long) addr, (unsigned long) start, length,
-		    retval);
+		    "target_watchpoint_addr_within_range (%s, %s, %d) = %d\n",
+		    core_addr_to_string (addr), core_addr_to_string (start),
+		    length, retval);
   return retval;
 }
 
@@ -3294,8 +3524,8 @@ debug_to_insert_hw_breakpoint (struct gdbarch *gdbarch,
   retval = debug_target.to_insert_hw_breakpoint (gdbarch, bp_tgt);
 
   fprintf_unfiltered (gdb_stdlog,
-		      "target_insert_hw_breakpoint (0x%lx, xxx) = %ld\n",
-		      (unsigned long) bp_tgt->placed_address,
+		      "target_insert_hw_breakpoint (%s, xxx) = %ld\n",
+		      core_addr_to_string (bp_tgt->placed_address),
 		      (unsigned long) retval);
   return retval;
 }
@@ -3309,35 +3539,39 @@ debug_to_remove_hw_breakpoint (struct gdbarch *gdbarch,
   retval = debug_target.to_remove_hw_breakpoint (gdbarch, bp_tgt);
 
   fprintf_unfiltered (gdb_stdlog,
-		      "target_remove_hw_breakpoint (0x%lx, xxx) = %ld\n",
-		      (unsigned long) bp_tgt->placed_address,
+		      "target_remove_hw_breakpoint (%s, xxx) = %ld\n",
+		      core_addr_to_string (bp_tgt->placed_address),
 		      (unsigned long) retval);
   return retval;
 }
 
 static int
-debug_to_insert_watchpoint (CORE_ADDR addr, int len, int type)
+debug_to_insert_watchpoint (CORE_ADDR addr, int len, int type,
+			    struct expression *cond)
 {
   int retval;
 
-  retval = debug_target.to_insert_watchpoint (addr, len, type);
+  retval = debug_target.to_insert_watchpoint (addr, len, type, cond);
 
   fprintf_unfiltered (gdb_stdlog,
-		      "target_insert_watchpoint (0x%lx, %d, %d) = %ld\n",
-		      (unsigned long) addr, len, type, (unsigned long) retval);
+		      "target_insert_watchpoint (%s, %d, %d, %s) = %ld\n",
+		      core_addr_to_string (addr), len, type,
+		      host_address_to_string (cond), (unsigned long) retval);
   return retval;
 }
 
 static int
-debug_to_remove_watchpoint (CORE_ADDR addr, int len, int type)
+debug_to_remove_watchpoint (CORE_ADDR addr, int len, int type,
+			    struct expression *cond)
 {
   int retval;
 
-  retval = debug_target.to_remove_watchpoint (addr, len, type);
+  retval = debug_target.to_remove_watchpoint (addr, len, type, cond);
 
   fprintf_unfiltered (gdb_stdlog,
-		      "target_remove_watchpoint (0x%lx, %d, %d) = %ld\n",
-		      (unsigned long) addr, len, type, (unsigned long) retval);
+		      "target_remove_watchpoint (%s, %d, %d, %s) = %ld\n",
+		      core_addr_to_string (addr), len, type,
+		      host_address_to_string (cond), (unsigned long) retval);
   return retval;
 }
 
@@ -3592,6 +3826,7 @@ setup_target_debug (void)
   current_target.to_stopped_data_address = debug_to_stopped_data_address;
   current_target.to_watchpoint_addr_within_range = debug_to_watchpoint_addr_within_range;
   current_target.to_region_ok_for_hw_watchpoint = debug_to_region_ok_for_hw_watchpoint;
+  current_target.to_can_accel_watchpoint_condition = debug_to_can_accel_watchpoint_condition;
   current_target.to_terminal_init = debug_to_terminal_init;
   current_target.to_terminal_inferior = debug_to_terminal_inferior;
   current_target.to_terminal_ours_for_output = debug_to_terminal_ours_for_output;
@@ -3680,6 +3915,62 @@ show_maintenance_target_async_permitted (struct ui_file *file, int from_tty,
 Controlling the inferior in asynchronous mode is %s.\n"), value);
 }
 
+/* Temporary copies of permission settings.  */
+
+static int may_write_registers_1 = 1;
+static int may_write_memory_1 = 1;
+static int may_insert_breakpoints_1 = 1;
+static int may_insert_tracepoints_1 = 1;
+static int may_insert_fast_tracepoints_1 = 1;
+static int may_stop_1 = 1;
+
+/* Make the user-set values match the real values again.  */
+
+void
+update_target_permissions (void)
+{
+  may_write_registers_1 = may_write_registers;
+  may_write_memory_1 = may_write_memory;
+  may_insert_breakpoints_1 = may_insert_breakpoints;
+  may_insert_tracepoints_1 = may_insert_tracepoints;
+  may_insert_fast_tracepoints_1 = may_insert_fast_tracepoints;
+  may_stop_1 = may_stop;
+}
+
+/* The one function handles (most of) the permission flags in the same
+   way.  */
+
+static void
+set_target_permissions (char *args, int from_tty,
+			struct cmd_list_element *c)
+{
+  if (target_has_execution)
+    {
+      update_target_permissions ();
+      error (_("Cannot change this setting while the inferior is running."));
+    }
+
+  /* Make the real values match the user-changed values.  */
+  may_write_registers = may_write_registers_1;
+  may_insert_breakpoints = may_insert_breakpoints_1;
+  may_insert_tracepoints = may_insert_tracepoints_1;
+  may_insert_fast_tracepoints = may_insert_fast_tracepoints_1;
+  may_stop = may_stop_1;
+  update_observer_mode ();
+}
+
+/* Set memory write permission independently of observer mode.  */
+
+static void
+set_write_memory_permission (char *args, int from_tty,
+			struct cmd_list_element *c)
+{
+  /* Make the real values match the user-changed values.  */
+  may_write_memory = may_write_memory_1;
+  update_observer_mode ();
+}
+
+
 void
 initialize_targets (void)
 {
@@ -3737,6 +4028,61 @@ By default, caching for stack access is on."),
 			   set_stack_cache_enabled_p,
 			   show_stack_cache_enabled_p,
 			   &setlist, &showlist);
+
+  add_setshow_boolean_cmd ("may-write-registers", class_support,
+			   &may_write_registers_1, _("\
+Set permission to write into registers."), _("\
+Show permission to write into registers."), _("\
+When this permission is on, GDB may write into the target's registers.\n\
+Otherwise, any sort of write attempt will result in an error."),
+			   set_target_permissions, NULL,
+			   &setlist, &showlist);
+
+  add_setshow_boolean_cmd ("may-write-memory", class_support,
+			   &may_write_memory_1, _("\
+Set permission to write into target memory."), _("\
+Show permission to write into target memory."), _("\
+When this permission is on, GDB may write into the target's memory.\n\
+Otherwise, any sort of write attempt will result in an error."),
+			   set_write_memory_permission, NULL,
+			   &setlist, &showlist);
+
+  add_setshow_boolean_cmd ("may-insert-breakpoints", class_support,
+			   &may_insert_breakpoints_1, _("\
+Set permission to insert breakpoints in the target."), _("\
+Show permission to insert breakpoints in the target."), _("\
+When this permission is on, GDB may insert breakpoints in the program.\n\
+Otherwise, any sort of insertion attempt will result in an error."),
+			   set_target_permissions, NULL,
+			   &setlist, &showlist);
+
+  add_setshow_boolean_cmd ("may-insert-tracepoints", class_support,
+			   &may_insert_tracepoints_1, _("\
+Set permission to insert tracepoints in the target."), _("\
+Show permission to insert tracepoints in the target."), _("\
+When this permission is on, GDB may insert tracepoints in the program.\n\
+Otherwise, any sort of insertion attempt will result in an error."),
+			   set_target_permissions, NULL,
+			   &setlist, &showlist);
+
+  add_setshow_boolean_cmd ("may-insert-fast-tracepoints", class_support,
+			   &may_insert_fast_tracepoints_1, _("\
+Set permission to insert fast tracepoints in the target."), _("\
+Show permission to insert fast tracepoints in the target."), _("\
+When this permission is on, GDB may insert fast tracepoints.\n\
+Otherwise, any sort of insertion attempt will result in an error."),
+			   set_target_permissions, NULL,
+			   &setlist, &showlist);
+
+  add_setshow_boolean_cmd ("may-interrupt", class_support,
+			   &may_stop_1, _("\
+Set permission to interrupt or signal the target."), _("\
+Show permission to interrupt or signal the target."), _("\
+When this permission is on, GDB may interrupt/stop the target's execution.\n\
+Otherwise, any attempt to interrupt or stop will be ignored."),
+			   set_target_permissions, NULL,
+			   &setlist, &showlist);
+
 
   target_dcache = dcache_init ();
 }

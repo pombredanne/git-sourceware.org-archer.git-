@@ -103,7 +103,6 @@ ALL_MACHINES = \
 	cpu-m68hc12.lo \
 	cpu-m68k.lo \
 	cpu-m88k.lo \
-	cpu-maxq.lo \
 	cpu-mcore.lo \
 	cpu-mep.lo \
 	cpu-microblaze.lo \
@@ -176,7 +175,6 @@ ALL_MACHINES_CFILES = \
 	cpu-m68hc12.c \
 	cpu-m68k.c \
 	cpu-m88k.c \
-	cpu-maxq.c \
 	cpu-mcore.c \
 	cpu-mep.c \
 	cpu-microblaze.c \
@@ -240,7 +238,6 @@ BFD32_BACKENDS = \
 	coff-i960.lo \
 	coff-m68k.lo \
 	coff-m88k.lo \
-	coff-maxq.lo \
 	coff-mips.lo \
 	coff-or32.lo \
 	coff-rs6000.lo \
@@ -391,7 +388,6 @@ BFD32_BACKENDS = \
 	vaxbsd.lo \
 	vaxnetbsd.lo \
 	versados.lo \
-	vms-alpha.lo \
 	vms-lib.lo \
 	vms-misc.lo \
 	xcofflink.lo \
@@ -423,7 +419,6 @@ BFD32_BACKENDS_CFILES = \
 	coff-i960.c \
 	coff-m68k.c \
 	coff-m88k.c \
-	coff-maxq.c \
 	coff-mips.c \
 	coff-or32.c \
 	coff-rs6000.c \
@@ -573,7 +568,6 @@ BFD32_BACKENDS_CFILES = \
 	vaxbsd.c \
 	vaxnetbsd.c \
 	versados.c \
-	vms-alpha.c \
 	vms-lib.c \
 	vms-misc.c \
 	xcofflink.c \
@@ -617,7 +611,8 @@ BFD64_BACKENDS = \
 	pei-ia64.lo \
 	pei-x86_64.lo \
 	pepigen.lo \
-	pex64igen.lo
+	pex64igen.lo \
+	vms-alpha.lo
 
 BFD64_BACKENDS_CFILES = \
 	aix5ppc-core.c \
@@ -646,7 +641,8 @@ BFD64_BACKENDS_CFILES = \
 	nlm64.c \
 	pe-x86_64.c \
 	pei-ia64.c \
-	pei-x86_64.c
+	pei-x86_64.c \
+	vms-alpha.c
 
 OPTIONAL_BACKENDS = \
 	aix386-core.lo \
@@ -964,3 +960,19 @@ bfdver.h: $(srcdir)/version.h $(srcdir)/Makefile.in
 	    -e "s,@report_bugs_to@,$$report_bugs_to," \
 	    < $(srcdir)/version.h > $@; \
 	echo "$${bfd_soversion}" > libtool-soversion
+
+# Disable -Werror, if it has been enabled, since coffswap.h won't
+# compile with gcc 4.5 and above.
+coff-tic4x.lo: coff-tic4x.c
+@am__fastdepCC_TRUE@	$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $< $(NO_WERROR)
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LTCOMPILE) -c -o $@ $< $(NO_WERROR)
+
+coff-tic54x.lo: coff-tic54x.c
+@am__fastdepCC_TRUE@	$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $< $(NO_WERROR)
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LTCOMPILE) -c -o $@ $< $(NO_WERROR)

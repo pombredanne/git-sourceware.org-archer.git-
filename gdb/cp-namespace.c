@@ -32,6 +32,7 @@
 #include "command.h"
 #include "frame.h"
 #include "buildsym.h"
+#include "language.h"
 
 static struct symbol *lookup_namespace_scope (const char *name,
 					      const struct block *block,
@@ -412,6 +413,95 @@ cp_lookup_symbol_imports (const char *scope,
   return NULL;
 }
 
+/* Helper function that searches an array of symbols for one named
+   NAME.  */
+
+static struct symbol *
+search_symbol_list (const char *name, int num, struct symbol **syms)
+{
+  int i;
+
+  /* Maybe we should store a dictionary in here instead.  */
+  for (i = 0; i < num; ++i)
+    {
+      if (strcmp (name, SYMBOL_NATURAL_NAME (syms[i])) == 0)
+	return syms[i];
+    }
+  return NULL;
+}
+
+/* Like cp_lookup_symbol_imports, but if BLOCK is a function, it
+   searches through the template parameters of the function and the
+   function's type.  */
+
+struct symbol *
+cp_lookup_symbol_imports_or_template (const char *scope,
+				      const char *name,
+				      const struct block *block,
+				      const domain_enum domain)
+{
+  struct symbol *function = BLOCK_FUNCTION (block);
+
+  if (function != NULL && SYMBOL_LANGUAGE (function) == language_cplus)
+    {
+      int i;
+      struct cplus_specific *cps
+	= function->ginfo.language_specific.cplus_specific;
+
+      /* Search the function's template parameters.  */
+      if (SYMBOL_IS_CPLUS_TEMPLATE_FUNCTION (function))
+	{
+	  struct template_symbol *templ = (struct template_symbol *) function;
+	  struct symbol *result;
+
+	  result = search_symbol_list (name,
+				       templ->n_template_arguments,
+				       templ->template_arguments);
+	  if (result != NULL)
+	    return result;
+	}
+
+      /* Search the template parameters of the function's defining
+	 context.  */
+      if (SYMBOL_NATURAL_NAME (function))
+	{
+	  struct type *context;
+	  char *name_copy = xstrdup (SYMBOL_NATURAL_NAME (function));
+	  struct cleanup *cleanups = make_cleanup (xfree, name_copy);
+	  const struct language_defn *lang = language_def (language_cplus);
+	  struct gdbarch *arch = SYMBOL_SYMTAB (function)->objfile->gdbarch;
+	  const struct block *parent = BLOCK_SUPERBLOCK (block);
+
+	  while (1)
+	    {
+	      struct symbol *result;
+	      unsigned int prefix_len = cp_entire_prefix_len (name_copy);
+
+	      if (prefix_len == 0)
+		context = NULL;
+	      else
+		{
+		  name_copy[prefix_len] = '\0';
+		  context = lookup_typename (lang, arch, name_copy, parent, 1);
+		}
+
+	      if (context == NULL)
+		break;
+
+	      result = search_symbol_list (name,
+					   TYPE_N_TEMPLATE_ARGUMENTS (context),
+					   TYPE_TEMPLATE_ARGUMENTS (context));
+	      if (result != NULL)
+		return result;
+	    }
+
+	  do_cleanups (cleanups);
+	}
+    }
+
+  return cp_lookup_symbol_imports (scope, name, block, domain, 1, 1);
+}
+
  /* Searches for NAME in the current namespace, and by applying relevant import
     statements belonging to BLOCK and its parents. SCOPE is the namespace scope
     of the context in which the search is being evaluated.  */
@@ -578,11 +668,24 @@ cp_lookup_nested_type (struct type *parent_type,
 	                                                    nested_name,
 	                                                    block,
 	                                                    VAR_DOMAIN);
+	char *concatenated_name;
 
-	if (sym == NULL || SYMBOL_CLASS (sym) != LOC_TYPEDEF)
-	  return NULL;
-	else
+	if (sym != NULL && SYMBOL_CLASS (sym) == LOC_TYPEDEF)
 	  return SYMBOL_TYPE (sym);
+
+	/* Now search all static file-level symbols.  Not strictly correct,
+	   but more useful than an error.  We do not try to guess any imported
+	   namespace as even the fully specified namespace seach is is already
+	   not C++ compliant and more assumptions could make it too magic.  */
+
+	concatenated_name = alloca (strlen (parent_name) + 2
+				    + strlen (nested_name) + 1);
+	sprintf (concatenated_name, "%s::%s", parent_name, nested_name);
+	sym = lookup_static_symbol_aux (concatenated_name, VAR_DOMAIN);
+	if (sym != NULL && SYMBOL_CLASS (sym) == LOC_TYPEDEF)
+	  return SYMBOL_TYPE (sym);
+
+	return NULL;
       }
     default:
       internal_error (__FILE__, __LINE__,
@@ -837,7 +940,7 @@ check_one_possible_namespace_symbol (const char *name, int len,
       sym = (struct symbol *) obstack_alloc (&objfile->objfile_obstack,
 					     sizeof (struct symbol));
       memset (sym, 0, sizeof (struct symbol));
-      SYMBOL_LANGUAGE (sym) = language_cplus;
+      SYMBOL_SET_LANGUAGE (sym, language_cplus);
       /* Note that init_type copied the name to the objfile's
 	 obstack.  */
       SYMBOL_SET_NAMES (sym, TYPE_NAME (type), len, 0, objfile);

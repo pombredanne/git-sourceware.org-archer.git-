@@ -474,12 +474,12 @@ bppy_get_commands (PyObject *self, void *closure)
   string_file = mem_fileopen ();
   chain = make_cleanup_ui_file_delete (string_file);
 
+  ui_out_redirect (uiout, string_file);
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      ui_out_redirect (uiout, string_file);
       print_command_lines (uiout, breakpoint_commands (bp), 0);
-      ui_out_redirect (uiout, NULL);
     }
+  ui_out_redirect (uiout, NULL);
   cmdstr = ui_file_xstrdup (string_file, &length);
   GDB_PY_HANDLE_EXCEPTION (except);
 
@@ -592,7 +592,7 @@ bppy_new (PyTypeObject *subtype, PyObject *args, PyObject *kwargs)
 	    create_breakpoint (python_gdbarch,
 			       spec, NULL, -1,
 			       0,
-			       0, 0, 0,
+			       0, bp_breakpoint,
 			       0,
 			       AUTO_BOOLEAN_TRUE,
 			       NULL, 0, 1);

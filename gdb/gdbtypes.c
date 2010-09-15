@@ -42,6 +42,10 @@
 
 
 /* Floatformat pairs.  */
+const struct floatformat *floatformats_ieee_half[BFD_ENDIAN_UNKNOWN] = {
+  &floatformat_ieee_half_big,
+  &floatformat_ieee_half_little
+};
 const struct floatformat *floatformats_ieee_single[BFD_ENDIAN_UNKNOWN] = {
   &floatformat_ieee_single_big,
   &floatformat_ieee_single_little
@@ -1046,12 +1050,12 @@ type_name_no_tag (const struct type *type)
 struct type *
 lookup_typename (const struct language_defn *language,
 		 struct gdbarch *gdbarch, char *name,
-		 struct block *block, int noerr)
+		 const struct block *block, int noerr)
 {
   struct symbol *sym;
   struct type *tmp;
 
-  sym = lookup_symbol (name, block, VAR_DOMAIN, 0);
+  sym = lookup_type_symbol (name, block, VAR_DOMAIN, language->la_language);
   if (sym == NULL || SYMBOL_CLASS (sym) != LOC_TYPEDEF)
     {
       tmp = language_lookup_primitive_type_by_name (language, gdbarch, name);
@@ -1212,6 +1216,7 @@ struct type *
 lookup_struct_elt_type (struct type *type, char *name, int noerr)
 {
   int i;
+  char *typename;
 
   for (;;)
     {
@@ -1225,11 +1230,9 @@ lookup_struct_elt_type (struct type *type, char *name, int noerr)
   if (TYPE_CODE (type) != TYPE_CODE_STRUCT 
       && TYPE_CODE (type) != TYPE_CODE_UNION)
     {
-      target_terminal_ours ();
-      gdb_flush (gdb_stdout);
-      fprintf_unfiltered (gdb_stderr, "Type ");
-      type_print (type, "", gdb_stderr, -1);
-      error (_(" is not a structure or union type."));
+      typename = type_to_string (type);
+      make_cleanup (xfree, typename);
+      error (_("Type %s is not a structure or union type."), typename);
     }
 
 #if 0
@@ -1281,14 +1284,9 @@ lookup_struct_elt_type (struct type *type, char *name, int noerr)
       return NULL;
     }
 
-  target_terminal_ours ();
-  gdb_flush (gdb_stdout);
-  fprintf_unfiltered (gdb_stderr, "Type ");
-  type_print (type, "", gdb_stderr, -1);
-  fprintf_unfiltered (gdb_stderr, " has no component named ");
-  fputs_filtered (name, gdb_stderr);
-  error (("."));
-  return (struct type *) -1;	/* For lint */
+  typename = type_to_string (type);
+  make_cleanup (xfree, typename);
+  error (_("Type %s has no component named %s."), typename, name);
 }
 
 /* Lookup the vptr basetype/fieldno values for TYPE.
@@ -1737,7 +1735,8 @@ check_stub_method_group (struct type *type, int method_id)
     }
 }
 
-const struct cplus_struct_type cplus_struct_default;
+/* Ensure it is in .rodata (if available) by workarounding GCC PR 44690.  */
+const struct cplus_struct_type cplus_struct_default = { };
 
 void
 allocate_cplus_struct_type (struct type *type)
@@ -2515,9 +2514,7 @@ field_is_static (struct field *f)
      to the address of the enclosing struct.  It would be nice to
      have a dedicated flag that would be set for static fields when
      the type is being created.  But in practice, checking the field
-     loc_kind should give us an accurate answer (at least as long as
-     we assume that DWARF block locations are not going to be used
-     for static fields).  FIXME?  */
+     loc_kind should give us an accurate answer.  */
   return (FIELD_LOC_KIND (*f) == FIELD_LOC_KIND_PHYSNAME
 	  || FIELD_LOC_KIND (*f) == FIELD_LOC_KIND_PHYSADDR);
 }

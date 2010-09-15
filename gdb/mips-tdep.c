@@ -5753,6 +5753,10 @@ mips_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   tdep->mips_fpu_type = fpu_type;
   tdep->register_size_valid_p = 0;
   tdep->register_size = 0;
+  tdep->gregset = NULL;
+  tdep->gregset64 = NULL;
+  tdep->fpregset = NULL;
+  tdep->fpregset64 = NULL;
 
   if (info.target_desc)
     {
@@ -6323,7 +6327,7 @@ search.  The only need to set it is when debugging a stripped executable."),
 				&mask_address_var, _("\
 Set zeroing of upper 32 bits of 64-bit addresses."), _("\
 Show zeroing of upper 32 bits of 64-bit addresses."), _("\
-Use \"on\" to enable the masking, \"off\" to disable it and \"auto\" to \n\
+Use \"on\" to enable the masking, \"off\" to disable it and \"auto\" to\n\
 allow GDB to determine the correct value."),
 				NULL, show_mask_address,
 				&setmipscmdlist, &showmipscmdlist);

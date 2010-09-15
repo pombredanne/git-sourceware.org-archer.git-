@@ -1,10 +1,6 @@
-/* Native support for GNU/Linux x86.
+/* This testcase is part of GDB, the GNU debugger.
 
-   Copyright 1986, 1987, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003, 2005, 2007, 2008, 2009, 2010
-   Free Software Foundation, Inc.
-
-   This file is part of GDB.
+   Copyright 2010 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -19,14 +15,23 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#ifndef NM_LINUX_H
-#define NM_LINUX_H
+#include <dlfcn.h>
+#include <stddef.h>
 
-#include "config/nm-linux.h"
+static int
+openlib (const char *filename)
+{
+  void *h = dlopen (filename, RTLD_LAZY);
 
-#ifdef HAVE_PTRACE_GETFPXREGS
-/* Include register set support for the SSE registers.  */
-#define FILL_FPXREGSET
-#endif
+  if (h == NULL)
+    return 0;
+  if (dlclose (h) != 0)
+    return 0;
+  return 1;
+}
 
-#endif /* nm-linux.h */
+int
+main (void)
+{
+  return 0;
+}

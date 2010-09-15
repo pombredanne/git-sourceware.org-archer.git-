@@ -35,6 +35,9 @@ struct trace_state_variable;
 struct trace_status;
 struct uploaded_tsv;
 struct uploaded_tp;
+struct static_tracepoint_marker;
+
+struct expression;
 
 /* This include file defines the interface between the main part
    of the debugger, and the part which is target-specific, or
@@ -65,8 +68,7 @@ enum strata
   {
     dummy_stratum,		/* The lowest of the low */
     file_stratum,		/* Executable files, etc */
-    core_stratum,		/* Core dump files */
-    process_stratum,		/* Executing processes */
+    process_stratum,		/* Executing processes or core dump files */
     thread_stratum,		/* Executing threads */
     record_stratum,		/* Support record debugging */
     arch_stratum		/* Architecture overrides */
@@ -261,6 +263,8 @@ enum target_object
   TARGET_OBJECT_SIGNAL_INFO,
   /* The list of threads that are being debugged.  */
   TARGET_OBJECT_THREADS,
+  /* Collected static trace data.  */
+  TARGET_OBJECT_STATIC_TRACE_DATA,
   /* Possible future objects: TARGET_OBJECT_FILE, ... */
 };
 
@@ -275,6 +279,9 @@ enum trace_find_type
     tfind_range,
     tfind_outside,
   };
+
+typedef struct static_tracepoint_marker *static_tracepoint_marker_p;
+DEF_VEC_P(static_tracepoint_marker_p);
 
 /* Request that OPS transfer up to LEN 8-bit bytes of the target's
    OBJECT.  The OFFSET, for a seekable object, specifies the
@@ -292,10 +299,23 @@ extern LONGEST target_read (struct target_ops *ops,
 			    const char *annex, gdb_byte *buf,
 			    ULONGEST offset, LONGEST len);
 
-extern LONGEST target_read_until_error (struct target_ops *ops,
-					enum target_object object,
-					const char *annex, gdb_byte *buf,
-					ULONGEST offset, LONGEST len);
+struct memory_read_result
+  {
+    /* First address that was read. */
+    ULONGEST begin;
+    /* Past-the-end address.  */
+    ULONGEST end;
+    /* The data.  */
+    gdb_byte *data;
+};
+typedef struct memory_read_result memory_read_result_s;
+DEF_VEC_O(memory_read_result_s);
+
+extern void free_memory_read_result_vector (void *);
+
+extern VEC(memory_read_result_s)* read_memory_robust (struct target_ops *ops,
+						      ULONGEST offset,
+						      LONGEST len);
   
 extern LONGEST target_write (struct target_ops *ops,
 			     enum target_object object,
@@ -420,8 +440,12 @@ struct target_ops
     int (*to_can_use_hw_breakpoint) (int, int, int);
     int (*to_insert_hw_breakpoint) (struct gdbarch *, struct bp_target_info *);
     int (*to_remove_hw_breakpoint) (struct gdbarch *, struct bp_target_info *);
-    int (*to_remove_watchpoint) (CORE_ADDR, int, int);
-    int (*to_insert_watchpoint) (CORE_ADDR, int, int);
+
+    /* Documentation of what the two routines below are expected to do is
+       provided with the corresponding target_* macros.  */
+    int (*to_remove_watchpoint) (CORE_ADDR, int, int, struct expression *);
+    int (*to_insert_watchpoint) (CORE_ADDR, int, int, struct expression *);
+
     int (*to_stopped_by_watchpoint) (void);
     int to_have_steppable_watchpoint;
     int to_have_continuable_watchpoint;
@@ -429,6 +453,8 @@ struct target_ops
     int (*to_watchpoint_addr_within_range) (struct target_ops *,
 					    CORE_ADDR, CORE_ADDR, int);
     int (*to_region_ok_for_hw_watchpoint) (CORE_ADDR, int);
+    int (*to_can_accel_watchpoint_condition) (CORE_ADDR, int, int,
+					      struct expression *);
     void (*to_terminal_init) (void);
     void (*to_terminal_inferior) (void);
     void (*to_terminal_ours_for_output) (void);
@@ -478,11 +504,7 @@ struct target_ops
     int (*to_async_mask) (int);
     int (*to_supports_non_stop) (void);
     /* find_memory_regions support method for gcore */
-    int (*to_find_memory_regions) (int (*) (CORE_ADDR,
-					    unsigned long,
-					    int, int, int,
-					    void *),
-				   void *);
+    int (*to_find_memory_regions) (find_memory_region_ftype func, void *data);
     /* make_corefile_notes support method for gcore */
     char * (*to_make_corefile_notes) (bfd *, int *);
     /* get_bookmark support method for bookmarks */
@@ -685,6 +707,19 @@ struct target_ops
     /* Return the address of the start of the Thread Information Block
        a Windows OS specific feature.  */
     int (*to_get_tib_address) (ptid_t ptid, CORE_ADDR *addr);
+
+    /* Send the new settings of write permission variables.  */
+    void (*to_set_permissions) (void);
+
+    /* Look for a static tracepoint marker at ADDR, and fill in MARKER
+       with its details.  Return 1 on success, 0 on failure.  */
+    int (*to_static_tracepoint_marker_at) (CORE_ADDR,
+					   struct static_tracepoint_marker *marker);
+
+    /* Return a vector of all tracepoints markers string id ID, or all
+       markers if ID is NULL.  */
+    VEC(static_tracepoint_marker_p) *(*to_static_tracepoint_markers_by_strid)
+      (const char *id);
 
     int to_magic;
     /* Need sub-structure for target machine related rather than comm related?
@@ -889,14 +924,14 @@ extern int inferior_has_called_syscall (ptid_t pid, int *syscall_number);
 /* Insert a breakpoint at address BP_TGT->placed_address in the target
    machine.  Result is 0 for success, or an errno value.  */
 
-#define	target_insert_breakpoint(gdbarch, bp_tgt)	\
-     (*current_target.to_insert_breakpoint) (gdbarch, bp_tgt)
+extern int target_insert_breakpoint (struct gdbarch *gdbarch,
+				     struct bp_target_info *bp_tgt);
 
 /* Remove a breakpoint at address BP_TGT->placed_address in the target
    machine.  Result is 0 for success, or an errno value.  */
 
-#define	target_remove_breakpoint(gdbarch, bp_tgt)	\
-     (*current_target.to_remove_breakpoint) (gdbarch, bp_tgt)
+extern int target_remove_breakpoint (struct gdbarch *gdbarch,
+				     struct bp_target_info *bp_tgt);
 
 /* Initialize the terminal settings we record for the inferior,
    before we actually run the inferior.  */
@@ -1091,7 +1126,7 @@ extern void target_find_new_threads (void);
    Unix, this should act like SIGSTOP).  This function is normally
    used by GUIs to implement a stop button.  */
 
-#define target_stop(ptid) (*current_target.to_stop) (ptid)
+extern void target_stop (ptid_t ptid);
 
 /* Send the specified COMMAND to the target's monitor
    (shell,interpreter) for execution.  The result of the query is
@@ -1279,14 +1314,15 @@ extern char *normal_pid_to_str (ptid_t ptid);
 
 /* Set/clear a hardware watchpoint starting at ADDR, for LEN bytes.
    TYPE is 0 for write, 1 for read, and 2 for read/write accesses.
+   COND is the expression for its condition, or NULL if there's none.
    Returns 0 for success, 1 if the watchpoint type is not supported,
    -1 for failure.  */
 
-#define	target_insert_watchpoint(addr, len, type)	\
-     (*current_target.to_insert_watchpoint) (addr, len, type)
+#define	target_insert_watchpoint(addr, len, type, cond) \
+     (*current_target.to_insert_watchpoint) (addr, len, type, cond)
 
-#define	target_remove_watchpoint(addr, len, type)	\
-     (*current_target.to_remove_watchpoint) (addr, len, type)
+#define	target_remove_watchpoint(addr, len, type, cond) \
+     (*current_target.to_remove_watchpoint) (addr, len, type, cond)
 
 #define target_insert_hw_breakpoint(gdbarch, bp_tgt) \
      (*current_target.to_insert_hw_breakpoint) (gdbarch, bp_tgt)
@@ -1302,6 +1338,19 @@ extern char *normal_pid_to_str (ptid_t ptid);
 
 #define target_watchpoint_addr_within_range(target, addr, start, length) \
   (*target.to_watchpoint_addr_within_range) (target, addr, start, length)
+
+/* Return non-zero if the target is capable of using hardware to evaluate
+   the condition expression.  In this case, if the condition is false when
+   the watched memory location changes, execution may continue without the
+   debugger being notified.
+
+   Due to limitations in the hardware implementation, it may be capable of
+   avoiding triggering the watchpoint in some cases where the condition
+   expression is false, but may report some false positives as well.
+   For this reason, GDB will still evaluate the condition expression when
+   the watchpoint triggers.  */
+#define target_can_accel_watchpoint_condition(addr, len, type, cond) \
+  (*current_target.to_can_accel_watchpoint_condition) (addr, len, type, cond)
 
 /* Target can execute in reverse?  */
 #define target_can_execute_reverse \
@@ -1378,6 +1427,15 @@ extern int target_search_memory (CORE_ADDR start_addr,
 #define target_get_tib_address(ptid, addr) \
   (*current_target.to_get_tib_address) ((ptid), (addr))
 
+#define target_set_permissions() \
+  (*current_target.to_set_permissions) ()
+
+#define target_static_tracepoint_marker_at(addr, marker) \
+  (*current_target.to_static_tracepoint_marker_at) (addr, marker)
+
+#define target_static_tracepoint_markers_by_strid(marker_id) \
+  (*current_target.to_static_tracepoint_markers_by_strid) (marker_id)
+
 /* Command logging facility.  */
 
 #define target_log_command(p)						\
@@ -1434,6 +1492,8 @@ extern void pop_all_targets (int quitting);
 /* Like pop_all_targets, but pops only targets whose stratum is
    strictly above ABOVE_STRATUM.  */
 extern void pop_all_targets_above (enum strata above_stratum, int quitting);
+
+extern int target_is_pushed (struct target_ops *t);
 
 extern CORE_ADDR target_translate_tls_address (struct objfile *objfile,
 					       CORE_ADDR offset);
@@ -1496,8 +1556,6 @@ extern void find_default_create_inferior (struct target_ops *,
 
 extern struct target_ops *find_run_target (void);
 
-extern struct target_ops *find_core_target (void);
-
 extern struct target_ops *find_target_beneath (struct target_ops *);
 
 /* Read OS data object of type TYPE from the target, and return it in
@@ -1539,6 +1597,15 @@ extern enum target_signal target_signal_from_command (int);
 /* Set the show memory breakpoints mode to show, and installs a cleanup
    to restore it back to the current value.  */
 extern struct cleanup *make_show_memory_breakpoints_cleanup (int show);
+
+extern int may_write_registers;
+extern int may_write_memory;
+extern int may_insert_breakpoints;
+extern int may_insert_tracepoints;
+extern int may_insert_fast_tracepoints;
+extern int may_stop;
+
+extern void update_target_permissions (void);
 
 
 /* Imported from machine dependent code */

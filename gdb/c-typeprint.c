@@ -56,7 +56,7 @@ static void c_type_print_modifier (struct type *, struct ui_file *,
 /* LEVEL is the depth to indent lines by.  */
 
 void
-c_print_type (struct type *type, char *varstring, struct ui_file *stream,
+c_print_type (struct type *type, const char *varstring, struct ui_file *stream,
 	      int show, int level)
 {
   enum type_code code;
@@ -107,7 +107,8 @@ c_print_typedef (struct type *type, struct symbol *new_symbol,
   type_print (type, "", stream, 0);
   if (TYPE_NAME ((SYMBOL_TYPE (new_symbol))) == 0
       || strcmp (TYPE_NAME ((SYMBOL_TYPE (new_symbol))),
-		 SYMBOL_LINKAGE_NAME (new_symbol)) != 0)
+		 SYMBOL_LINKAGE_NAME (new_symbol)) != 0
+      || TYPE_CODE (SYMBOL_TYPE (new_symbol)) == TYPE_CODE_TYPEDEF)
     fprintf_filtered (stream, " %s", SYMBOL_PRINT_NAME (new_symbol));
   fprintf_filtered (stream, ";\n");
 }
@@ -767,7 +768,8 @@ c_type_print_base (struct type *type, struct ui_file *stream, int show,
 	  cp_type_print_derivation_info (stream, type);
 
 	  fprintf_filtered (stream, "{\n");
-	  if ((TYPE_NFIELDS (type) == 0) && (TYPE_NFN_FIELDS (type) == 0))
+	  if (TYPE_NFIELDS (type) == 0 && TYPE_NFN_FIELDS (type) == 0
+	      && TYPE_TYPEDEF_FIELD_COUNT (type) == 0)
 	    {
 	      if (TYPE_STUB (type))
 		fprintfi_filtered (level + 4, stream, _("<incomplete type>\n"));
@@ -1057,6 +1059,29 @@ c_type_print_base (struct type *type, struct ui_file *stream, int show,
 		}
 	    }
 
+	  /* Print typedefs defined in this class.  */
+
+	  if (TYPE_TYPEDEF_FIELD_COUNT (type) != 0)
+	    {
+	      if (TYPE_NFIELDS (type) != 0 || TYPE_NFN_FIELDS (type) != 0)
+		fprintf_filtered (stream, "\n");
+
+	      for (i = 0; i < TYPE_TYPEDEF_FIELD_COUNT (type); i++)
+		{
+		  struct type *target = TYPE_TYPEDEF_FIELD_TYPE (type, i);
+
+		  /* Dereference the typedef declaration itself.  */
+		  gdb_assert (TYPE_CODE (target) == TYPE_CODE_TYPEDEF);
+		  target = TYPE_TARGET_TYPE (target);
+
+		  print_spaces_filtered (level + 4, stream);
+		  fprintf_filtered (stream, "typedef ");
+		  c_print_type (target, TYPE_TYPEDEF_FIELD_NAME (type, i),
+				stream, show - 1, level + 4);
+		  fprintf_filtered (stream, ";\n");
+		}
+	    }
+
 	  fprintfi_filtered (level, stream, "}");
 
 	  if (TYPE_LOCALTYPE_PTR (type) && show >= 0)
@@ -1121,7 +1146,7 @@ c_type_print_base (struct type *type, struct ui_file *stream, int show,
       break;
 
     case TYPE_CODE_ERROR:
-      fprintf_filtered (stream, _("<unknown type>"));
+      fprintf_filtered (stream, "%s", TYPE_ERROR_NAME (type));
       break;
 
     case TYPE_CODE_RANGE:

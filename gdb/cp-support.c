@@ -693,6 +693,7 @@ make_symbol_overload_list (const char *func_name,
 			   const char *namespace_name)
 {
   struct cleanup *old_cleanups;
+  const char *name;
 
   sym_return_val_size = 100;
   sym_return_val_index = 0;
@@ -704,9 +705,41 @@ make_symbol_overload_list (const char *func_name,
 
   make_symbol_overload_list_using (func_name, namespace_name);
 
+  if (namespace_name[0] == '\0')
+    name = func_name;
+  else
+    {
+      char *concatenated_name
+	= alloca (strlen (namespace_name) + 2 + strlen (func_name) + 1);
+      strcpy (concatenated_name, namespace_name);
+      strcat (concatenated_name, "::");
+      strcat (concatenated_name, func_name);
+      name = concatenated_name;
+    }
+
+  make_symbol_overload_list_qualified (name);
+
   discard_cleanups (old_cleanups);
 
   return sym_return_val;
+}
+
+/* Add all symbols with a name matching NAME in BLOCK to the overload
+   list.  */
+
+static void
+make_symbol_overload_list_block (const char *name,
+                                 const struct block *block)
+{
+  struct dict_iterator iter;
+  struct symbol *sym;
+
+  const struct dictionary *dict = BLOCK_DICT (block);
+
+  for (sym = dict_iter_name_first (dict, name, &iter);
+       sym != NULL;
+       sym = dict_iter_name_next (name, &iter))
+    overload_list_add_symbol (sym, name);
 }
 
 /* Adds the function FUNC_NAME from NAMESPACE to the overload set.  */
@@ -715,8 +748,11 @@ static void
 make_symbol_overload_list_namespace (const char *func_name,
                                      const char *namespace_name)
 {
+  const char *name;
+  const struct block *block = NULL;
+
   if (namespace_name[0] == '\0')
-    make_symbol_overload_list_qualified (func_name);
+    name = func_name;
   else
     {
       char *concatenated_name
@@ -725,8 +761,17 @@ make_symbol_overload_list_namespace (const char *func_name,
       strcpy (concatenated_name, namespace_name);
       strcat (concatenated_name, "::");
       strcat (concatenated_name, func_name);
-      make_symbol_overload_list_qualified (concatenated_name);
+      name = concatenated_name;
     }
+
+  /* Look in the static block.  */
+  block = block_static_block (get_selected_block (0));
+  make_symbol_overload_list_block (name, block);
+
+  /* Look in the global block.  */
+  block = block_global_block (block);
+  make_symbol_overload_list_block (name, block);
+
 }
 
 /* Search the namespace of the given type and namespace of and public base
@@ -793,6 +838,15 @@ make_symbol_overload_list_adl (struct type **arg_types, int nargs,
   return sym_return_val;
 }
 
+/* Used for cleanups to reset the "searched" flag in case of an error.  */
+
+static void
+reset_directive_searched (void *data)
+{
+  struct using_direct *direct = data;
+  direct->searched = 0;
+}
+
 /* This applies the using directives to add namespaces to search in,
    and then searches for overloads in all of those namespaces.  It
    adds the symbols found to sym_return_val.  Arguments are as in
@@ -802,22 +856,42 @@ static void
 make_symbol_overload_list_using (const char *func_name,
 				 const char *namespace_name)
 {
-  const struct using_direct *current;
+  struct using_direct *current;
+  const struct block *block;
 
   /* First, go through the using directives.  If any of them apply,
      look in the appropriate namespaces for new functions to match
      on.  */
 
-  for (current = block_using (get_selected_block (0));
-       current != NULL;
-       current = current->next)
-    {
-      if (strcmp (namespace_name, current->import_dest) == 0)
-	{
-	  make_symbol_overload_list_using (func_name,
-					   current->import_src);
-	}
-    }
+  for (block = get_selected_block (0);
+       block != NULL;
+       block = BLOCK_SUPERBLOCK (block))
+    for (current = block_using (block);
+	current != NULL;
+	current = current->next)
+      {
+	/* Prevent recursive calls.  */
+	if (current->searched)
+	  continue;
+
+        /* If this is a namespace alias or imported declaration ignore it.  */
+        if (current->alias != NULL || current->declaration != NULL)
+          continue;
+
+        if (strcmp (namespace_name, current->import_dest) == 0)
+	  {
+	    /* Mark this import as searched so that the recursive call does
+	       not search it again.  */
+	    struct cleanup *old_chain;
+	    current->searched = 1;
+	    old_chain = make_cleanup (reset_directive_searched, current);
+
+	    make_symbol_overload_list_using (func_name, current->import_src);
+
+	    current->searched = 0;
+	    discard_cleanups (old_chain);
+	  }
+      }
 
   /* Now, add names for this namespace.  */
   make_symbol_overload_list_namespace (func_name, namespace_name);
@@ -850,16 +924,7 @@ make_symbol_overload_list_qualified (const char *func_name)
      complete on local vars.  */
 
   for (b = get_selected_block (0); b != NULL; b = BLOCK_SUPERBLOCK (b))
-    {
-      dict = BLOCK_DICT (b);
-
-      for (sym = dict_iter_name_first (dict, func_name, &iter);
-	   sym;
-	   sym = dict_iter_name_next (func_name, &iter))
-	{
-	  overload_list_add_symbol (sym, func_name);
-	}
-    }
+    make_symbol_overload_list_block (func_name, b);
 
   surrounding_static_block = block_static_block (get_selected_block (0));
 
@@ -870,14 +935,7 @@ make_symbol_overload_list_qualified (const char *func_name)
   {
     QUIT;
     b = BLOCKVECTOR_BLOCK (BLOCKVECTOR (s), GLOBAL_BLOCK);
-    dict = BLOCK_DICT (b);
-
-    for (sym = dict_iter_name_first (dict, func_name, &iter);
-	 sym;
-	 sym = dict_iter_name_next (func_name, &iter))
-    {
-      overload_list_add_symbol (sym, func_name);
-    }
+    make_symbol_overload_list_block (func_name, b);
   }
 
   ALL_PRIMARY_SYMTABS (objfile, s)
@@ -887,14 +945,7 @@ make_symbol_overload_list_qualified (const char *func_name)
     /* Don't do this block twice.  */
     if (b == surrounding_static_block)
       continue;
-    dict = BLOCK_DICT (b);
-
-    for (sym = dict_iter_name_first (dict, func_name, &iter);
-	 sym;
-	 sym = dict_iter_name_next (func_name, &iter))
-    {
-      overload_list_add_symbol (sym, func_name);
-    }
+    make_symbol_overload_list_block (func_name, b);
   }
 }
 

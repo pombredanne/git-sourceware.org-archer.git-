@@ -152,6 +152,10 @@ struct record_entry
 /* This is the debug switch for process record.  */
 int record_debug = 0;
 
+/* If true, query if PREC cannot record memory
+   change of next instruction.  */
+int record_memory_query = 0;
+
 struct record_core_buf_entry
 {
   struct record_core_buf_entry *prev;
@@ -450,7 +454,7 @@ record_get_loc (struct record_entry *rec)
       return rec->u.reg.u.buf;
   case record_end:
   default:
-    gdb_assert (0);
+    gdb_assert_not_reached ("unexpected record_entry type");
     return NULL;
   }
 }
@@ -958,7 +962,7 @@ record_open (char *name, int from_tty)
   record_beneath_to_stopped_by_watchpoint = tmp_to_stopped_by_watchpoint;
   record_beneath_to_stopped_data_address = tmp_to_stopped_data_address;
 
-  if (current_target.to_stratum == core_stratum)
+  if (core_bfd)
     record_core_open_1 (name, from_tty);
   else
     record_open_1 (name, from_tty);
@@ -1007,9 +1011,43 @@ record_resume (struct target_ops *ops, ptid_t ptid, int step,
 
   if (!RECORD_IS_REPLAY)
     {
+      struct gdbarch *gdbarch = target_thread_architecture (ptid);
+
       record_message (get_current_regcache (), signal);
-      record_beneath_to_resume (record_beneath_to_resume_ops, ptid, 1,
-                                signal);
+
+      if (!step)
+        {
+          /* This is not hard single step.  */
+          if (!gdbarch_software_single_step_p (gdbarch))
+            {
+              /* This is a normal continue.  */
+              step = 1;
+            }
+          else
+            {
+              /* This arch support soft sigle step.  */
+              if (single_step_breakpoints_inserted ())
+                {
+                  /* This is a soft single step.  */
+                  record_resume_step = 1;
+                }
+              else
+                {
+                  /* This is a continue.
+                     Try to insert a soft single step breakpoint.  */
+                  if (!gdbarch_software_single_step (gdbarch,
+                                                     get_current_frame ()))
+                    {
+                      /* This system don't want use soft single step.
+                         Use hard sigle step.  */
+                      step = 1;
+                    }
+                }
+            }
+        }
+
+      record_beneath_to_resume (record_beneath_to_resume_ops,
+                                ptid, step, signal);
     }
 }
 
@@ -1069,6 +1107,9 @@ record_wait (struct target_ops *ops,
 			"record_resume_step = %d\n",
 			record_resume_step);
 
+  record_get_sig = 0;
+  signal (SIGINT, record_sig_handler);
+
   if (!RECORD_IS_REPLAY && ops != &record_core_ops)
     {
       if (record_resume_step)
@@ -1082,11 +1123,18 @@ record_wait (struct target_ops *ops,
 	  /* This is not a single step.  */
 	  ptid_t ret;
 	  CORE_ADDR tmp_pc;
+	  struct gdbarch *gdbarch = target_thread_architecture (inferior_ptid);
 
 	  while (1)
 	    {
 	      ret = record_beneath_to_wait (record_beneath_to_wait_ops,
 					    ptid, status, options);
+
+              if (single_step_breakpoints_inserted ())
+                remove_single_step_breakpoints ();
+
+	      if (record_resume_step)
+	        return ret;
 
 	      /* Is this a SIGTRAP?  */
 	      if (status->kind == TARGET_WAITKIND_STOPPED
@@ -1124,8 +1172,12 @@ record_wait (struct target_ops *ops,
 		    }
 		  else
 		    {
-		      /* This must be a single-step trap.  Record the
-		         insn and issue another step.  */
+		      /* This is a single-step trap.  Record the
+		         insn and issue another step.
+                         FIXME: this part can be a random SIGTRAP too.
+                         But GDB cannot handle it.  */
+                      int step = 1;
+
 		      if (!record_message_wrapper_safe (regcache,
                                                         TARGET_SIGNAL_0))
   			{
@@ -1134,8 +1186,20 @@ record_wait (struct target_ops *ops,
                            break;
   			}
 
+                      if (gdbarch_software_single_step_p (gdbarch))
+			{
+			  /* Try to insert the software single step breakpoint.
+			     If insert success, set step to 0.  */
+			  set_executing (inferior_ptid, 0);
+			  reinit_frame_cache ();
+			  if (gdbarch_software_single_step (gdbarch,
+                                                            get_current_frame ()))
+			    step = 0;
+			  set_executing (inferior_ptid, 1);
+			}
+
 		      record_beneath_to_resume (record_beneath_to_resume_ops,
-						ptid, 1,
+						ptid, step,
 						TARGET_SIGNAL_0);
 		      continue;
 		    }
@@ -1183,8 +1247,6 @@ record_wait (struct target_ops *ops,
 	    }
 	}
 
-      record_get_sig = 0;
-      signal (SIGINT, record_sig_handler);
       /* If GDB is in terminal_inferior mode, it will not get the signal.
          And in GDB replay mode, GDB doesn't need to be in terminal_inferior
          mode, because inferior will not executed.
@@ -1298,8 +1360,6 @@ Process record: hit hw watchpoint.\n");
 	}
       while (continue_flag);
 
-      signal (SIGINT, handle_sigint);
-
 replay_out:
       if (record_get_sig)
 	status->value.sig = TARGET_SIGNAL_INT;
@@ -1311,6 +1371,8 @@ replay_out:
 
       discard_cleanups (old_cleanups);
     }
+
+  signal (SIGINT, handle_sigint);
 
   do_cleanups (set_cleanups);
   return inferior_ptid;
@@ -2726,4 +2788,16 @@ record/replay buffer.  Zero means unlimited.  Default is 200000."),
 Restore the program to its state at instruction number N.\n\
 Argument is instruction number, as shown by 'info record'."),
 	   &record_cmdlist);
+
+  add_setshow_boolean_cmd ("memory-query", no_class,
+			   &record_memory_query, _("\
+Set whether query if PREC cannot record memory change of next instruction."),
+                           _("\
+Show whether query if PREC cannot record memory change of next instruction."),
+                           _("\
+Default is OFF.\n\
+When ON, query if PREC cannot record memory change of next instruction."),
+			   NULL, NULL,
+			   &set_record_cmdlist, &show_record_cmdlist);
+
 }

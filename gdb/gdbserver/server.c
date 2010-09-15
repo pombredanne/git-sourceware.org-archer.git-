@@ -28,9 +28,6 @@
 #if HAVE_SYS_WAIT_H
 #include <sys/wait.h>
 #endif
-#if HAVE_MALLOC_H
-#include <malloc.h>
-#endif
 
 ptid_t cont_thread;
 ptid_t general_thread;
@@ -158,6 +155,8 @@ queue_stop_reply (ptid_t ptid, struct target_waitstatus *status)
 void
 push_event (ptid_t ptid, struct target_waitstatus *status)
 {
+  gdb_assert (status->kind != TARGET_WAITKIND_IGNORE);
+
   queue_stop_reply (ptid, status);
 
   /* If this is the first stop reply in the queue, then inform GDB
@@ -292,15 +291,27 @@ start_inferior (char **argv)
  	  mywait (pid_to_ptid (signal_pid), &last_status, 0, 0);
 	  if (last_status.kind != TARGET_WAITKIND_STOPPED)
 	    return signal_pid;
+
+	  current_inferior->last_resume_kind = resume_stop;
+	  current_inferior->last_status = last_status;
 	}
       while (last_status.value.sig != TARGET_SIGNAL_TRAP);
 
+      current_inferior->last_resume_kind = resume_stop;
+      current_inferior->last_status = last_status;
       return signal_pid;
     }
 
   /* Wait till we are at 1st instruction in program, return new pid
      (assuming success).  */
   last_ptid = mywait (pid_to_ptid (signal_pid), &last_status, 0, 0);
+
+  if (last_status.kind != TARGET_WAITKIND_EXITED
+      && last_status.kind != TARGET_WAITKIND_SIGNALLED)
+    {
+      current_inferior->last_resume_kind = resume_stop;
+      current_inferior->last_status = last_status;
+    }
 
   return signal_pid;
 }
@@ -332,6 +343,9 @@ attach_inferior (int pid)
       if (last_status.kind == TARGET_WAITKIND_STOPPED
 	  && last_status.value.sig == TARGET_SIGNAL_STOP)
 	last_status.value.sig = TARGET_SIGNAL_TRAP;
+
+      current_inferior->last_resume_kind = resume_stop;
+      current_inferior->last_status = last_status;
     }
 
   return 0;
@@ -523,8 +537,10 @@ monitor_show_help (void)
 /* Read trace frame or inferior memory.  */
 
 static int
-read_memory (CORE_ADDR memaddr, unsigned char *myaddr, int len)
+gdb_read_memory (CORE_ADDR memaddr, unsigned char *myaddr, int len)
 {
+  int ret;
+
   if (current_traceframe >= 0)
     {
       ULONGEST nbytes;
@@ -542,19 +558,36 @@ read_memory (CORE_ADDR memaddr, unsigned char *myaddr, int len)
       /* (assume no half-trace half-real blocks for now) */
     }
 
-  return read_inferior_memory (memaddr, myaddr, len);
+  ret = prepare_to_access_memory ();
+  if (ret == 0)
+    {
+      ret = read_inferior_memory (memaddr, myaddr, len);
+      done_accessing_memory ();
+    }
+
+  return ret;
 }
 
 /* Write trace frame or inferior memory.  Actually, writing to trace
    frames is forbidden.  */
 
 static int
-write_memory (CORE_ADDR memaddr, const unsigned char *myaddr, int len)
+gdb_write_memory (CORE_ADDR memaddr, const unsigned char *myaddr, int len)
 {
   if (current_traceframe >= 0)
     return EIO;
   else
-    return write_inferior_memory (memaddr, myaddr, len);
+    {
+      int ret;
+
+      ret = prepare_to_access_memory ();
+      if (ret == 0)
+	{
+	  ret = write_inferior_memory (memaddr, myaddr, len);
+	  done_accessing_memory ();
+	}
+      return ret;
+    }
 }
 
 /* Subroutine of handle_search_memory to simplify it.  */
@@ -568,7 +601,7 @@ handle_search_memory_1 (CORE_ADDR start_addr, CORE_ADDR search_space_len,
 {
   /* Prime the search buffer.  */
 
-  if (read_memory (start_addr, search_buf, search_buf_size) != 0)
+  if (gdb_read_memory (start_addr, search_buf, search_buf_size) != 0)
     {
       warning ("Unable to access target memory at 0x%lx, halting search.",
 	       (long) start_addr);
@@ -620,8 +653,8 @@ handle_search_memory_1 (CORE_ADDR start_addr, CORE_ADDR search_space_len,
 			? search_space_len - keep_len
 			: chunk_size);
 
-	  if (read_memory (read_addr, search_buf + keep_len,
-				    nr_to_read) != 0)
+	  if (gdb_read_memory (read_addr, search_buf + keep_len,
+			       nr_to_read) != 0)
 	    {
 	      warning ("Unable to access target memory at 0x%lx, halting search.",
 		       (long) read_addr);
@@ -1338,6 +1371,52 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
       return;
     }
 
+  if (strncmp ("qXfer:statictrace:read:", own_buf,
+	       sizeof ("qXfer:statictrace:read:") -1) == 0)
+    {
+      unsigned char *data;
+      CORE_ADDR ofs;
+      unsigned int len;
+      char *annex;
+      ULONGEST nbytes;
+
+      require_running (own_buf);
+
+      if (current_traceframe == -1)
+	{
+	  write_enn (own_buf);
+	  return;
+	}
+
+      /* Reject any annex; grab the offset and length.  */
+      if (decode_xfer_read (own_buf + sizeof ("qXfer:statictrace:read:") -1,
+			    &annex, &ofs, &len) < 0
+	  || annex[0] != '\0')
+	{
+	  strcpy (own_buf, "E00");
+	  return;
+	}
+
+      /* Read one extra byte, as an indicator of whether there is
+	 more.  */
+      if (len > PBUFSIZ - 2)
+	len = PBUFSIZ - 2;
+      data = malloc (len + 1);
+      if (!data)
+	return;
+
+      if (traceframe_read_sdata (current_traceframe, ofs,
+				 data, len + 1, &nbytes))
+	write_enn (own_buf);
+      else if (nbytes > len)
+	*new_packet_len_p = write_qxfer_response (own_buf, data, len, 1);
+      else
+	*new_packet_len_p = write_qxfer_response (own_buf, data, nbytes, 0);
+
+      free (data);
+      return;
+    }
+
   /* Protocol features query.  */
   if (strncmp ("qSupported", own_buf, 10) == 0
       && (own_buf[10] == ':' || own_buf[10] == '\0'))
@@ -1436,6 +1515,8 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 	  strcat (own_buf, ";DisconnectedTracing+");
 	  if (gdb_supports_qRelocInsn && target_supports_fast_tracepoints ())
 	    strcat (own_buf, ";FastTracepoints+");
+	  strcat (own_buf, ";StaticTracepoints+");
+	  strcat (own_buf, ";qXfer:statictrace:read+");
 	}
 
       return;
@@ -1494,7 +1575,7 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 
       if (err == 0)
 	{
-	  sprintf (own_buf, "%llx", address);
+	  strcpy (own_buf, paddress(address));
 	  return;
 	}
       else if (err > 0)
@@ -1518,7 +1599,7 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
       n = (*the_target->get_tib_address) (ptid, &tlb);
       if (n == 1)
 	{
-	  sprintf (own_buf, "%llx", tlb);
+	  strcpy (own_buf, paddress(tlb));
 	  return;
 	}
       else if (n == 0)
@@ -1629,6 +1710,8 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
   own_buf[0] = 0;
 }
 
+static void gdb_wants_all_threads_stopped (void);
+
 /* Parse vCont packets.  */
 void
 handle_v_cont (char *own_buf)
@@ -1732,8 +1815,22 @@ handle_v_cont (char *own_buf)
   else
     {
       last_ptid = mywait (minus_one_ptid, &last_status, 0, 1);
+
+      if (last_status.kind != TARGET_WAITKIND_EXITED
+          && last_status.kind != TARGET_WAITKIND_SIGNALLED)
+	current_inferior->last_status = last_status;
+
+      /* From the client's perspective, all-stop mode always stops all
+	 threads implicitly (and the target backend has already done
+	 so by now).  Tag all threads as "want-stopped", so we don't
+	 resume them implicitly without the client telling us to.  */
+      gdb_wants_all_threads_stopped ();
       prepare_resume_reply (own_buf, last_ptid, &last_status);
       disable_async_io ();
+
+      if (last_status.kind == TARGET_WAITKIND_EXITED
+          || last_status.kind == TARGET_WAITKIND_SIGNALLED)
+        mourn_inferior (find_process_pid (ptid_get_pid (last_ptid)));
     }
   return;
 
@@ -1990,7 +2087,7 @@ handle_v_requests (char *own_buf, int packet_len, int *new_packet_len)
 /* Resume inferior and wait for another event.  In non-stop mode,
    don't really wait here, but return immediatelly to the event
    loop.  */
-void
+static void
 myresume (char *own_buf, int step, int sig)
 {
   struct thread_resume resume_info[2];
@@ -2032,8 +2129,20 @@ myresume (char *own_buf, int step, int sig)
   else
     {
       last_ptid = mywait (minus_one_ptid, &last_status, 0, 1);
+
+      if (last_status.kind != TARGET_WAITKIND_EXITED
+          && last_status.kind != TARGET_WAITKIND_SIGNALLED)
+	{
+	  current_inferior->last_resume_kind = resume_stop;
+	  current_inferior->last_status = last_status;
+	}
+
       prepare_resume_reply (own_buf, last_ptid, &last_status);
       disable_async_io ();
+
+      if (last_status.kind == TARGET_WAITKIND_EXITED
+          || last_status.kind == TARGET_WAITKIND_SIGNALLED)
+        mourn_inferior (find_process_pid (ptid_get_pid (last_ptid)));
     }
 }
 
@@ -2067,6 +2176,8 @@ queue_stop_reply_callback (struct inferior_list_entry *entry, void *arg)
 		     target_pid_to_str (entry->id),
 		     target_waitstatus_to_string (&thread->last_status));
 
+	  gdb_assert (thread->last_status.kind != TARGET_WAITKIND_IGNORE);
+
 	  /* Pass the last stop reply back to GDB, but don't notify
 	     yet.  */
 	  queue_stop_reply (entry->id, &thread->last_status);
@@ -2076,8 +2187,9 @@ queue_stop_reply_callback (struct inferior_list_entry *entry, void *arg)
   return 0;
 }
 
-/* Set this inferior LWP's state as "want-stopped".  We won't resume
-   this LWP until the client gives us another action for it.  */
+/* Set this inferior threads's state as "want-stopped".  We won't
+   resume this thread until the client gives us another action for
+   it.  */
 
 static void
 gdb_wants_thread_stopped (struct inferior_list_entry *entry)
@@ -2088,6 +2200,8 @@ gdb_wants_thread_stopped (struct inferior_list_entry *entry)
 
   if (thread->last_status.kind == TARGET_WAITKIND_IGNORE)
     {
+      /* Most threads are stopped implicitly (all-stop); tag that with
+	 signal 0.  */
       thread->last_status.kind = TARGET_WAITKIND_STOPPED;
       thread->last_status.value.sig = TARGET_SIGNAL_0;
     }
@@ -2829,7 +2943,7 @@ process_serial_event (void)
     case 'm':
       require_running (own_buf);
       decode_m_packet (&own_buf[1], &mem_addr, &len);
-      if (read_memory (mem_addr, mem_buf, len) == 0)
+      if (gdb_read_memory (mem_addr, mem_buf, len) == 0)
 	convert_int_to_ascii (mem_buf, own_buf, len);
       else
 	write_enn (own_buf);
@@ -2837,7 +2951,7 @@ process_serial_event (void)
     case 'M':
       require_running (own_buf);
       decode_M_packet (&own_buf[1], &mem_addr, &len, &mem_buf);
-      if (write_memory (mem_addr, mem_buf, len) == 0)
+      if (gdb_write_memory (mem_addr, mem_buf, len) == 0)
 	write_ok (own_buf);
       else
 	write_enn (own_buf);
@@ -2846,7 +2960,7 @@ process_serial_event (void)
       require_running (own_buf);
       if (decode_X_packet (&own_buf[1], packet_len - 1,
 			   &mem_addr, &len, &mem_buf) < 0
-	  || write_memory (mem_addr, mem_buf, len) != 0)
+	  || gdb_write_memory (mem_addr, mem_buf, len) != 0)
 	write_enn (own_buf);
       else
 	write_ok (own_buf);
@@ -3070,6 +3184,14 @@ handle_target_event (int err, gdb_client_data client_data)
 	  mark_breakpoints_out (process);
 	  mourn_inferior (process);
 	}
+      else
+	{
+	  /* We're reporting this thread as stopped.  Update its
+	     "want-stopped" state to what the client wants, until it
+	     gets a new resume action.  */
+	  current_inferior->last_resume_kind = resume_stop;
+	  current_inferior->last_status = last_status;
+	}
 
       if (forward_event)
 	{
@@ -3094,7 +3216,7 @@ handle_target_event (int err, gdb_client_data client_data)
 
 	      resume_info.thread = last_ptid;
 	      resume_info.kind = resume_continue;
-	      resume_info.sig = last_status.value.sig;
+	      resume_info.sig = target_signal_to_host (last_status.value.sig);
 	      (*the_target->resume) (&resume_info, 1);
 	    }
 	  else if (debug_threads)

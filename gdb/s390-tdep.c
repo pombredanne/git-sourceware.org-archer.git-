@@ -43,7 +43,7 @@
 #include "dis-asm.h"
 #include "solib-svr4.h"
 #include "prologue-value.h"
-
+#include "linux-tdep.h"
 #include "s390-tdep.h"
 
 #include "features/s390-linux32.c"
@@ -2343,14 +2343,13 @@ s390_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
   struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
   int word_size = gdbarch_ptr_bit (gdbarch) / 8;
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
-  ULONGEST orig_sp;
   int i;
 
   /* If the i'th argument is passed as a reference to a copy, then
      copy_addr[i] is the address of the copy we made.  */
   CORE_ADDR *copy_addr = (CORE_ADDR *) alloca (nargs * sizeof (CORE_ADDR));
 
-  /* Build the reference-to-copy area.  */
+  /* Reserve space for the reference-to-copy area.  */
   for (i = 0; i < nargs; i++)
     {
       struct value *arg = args[i];
@@ -2361,7 +2360,6 @@ s390_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
         {
           sp -= length;
           sp = align_down (sp, alignment_of (type));
-          write_memory (sp, value_contents (arg), length);
           copy_addr[i] = sp;
         }
     }
@@ -2376,13 +2374,26 @@ s390_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
      boundary.  */
   sp = align_down (sp, 8);
 
+  /* Allocate the standard frame areas: the register save area, the
+     word reserved for the compiler (which seems kind of meaningless),
+     and the back chain pointer.  */
+  sp -= 16*word_size + 32;
+
+  /* Now we have the final SP value.  Make sure we didn't underflow;
+     on 31-bit, this would result in addresses with the high bit set,
+     which causes confusion elsewhere.  Note that if we error out
+     here, stack and registers remain untouched.  */
+  if (gdbarch_addr_bits_remove (gdbarch, sp) != sp)
+    error (_("Stack overflow"));
+
+
   /* Finally, place the actual parameters, working from SP towards
      higher addresses.  The code above is supposed to reserve enough
      space for this.  */
   {
     int fr = 0;
     int gr = 2;
-    CORE_ADDR starg = sp;
+    CORE_ADDR starg = sp + 16*word_size + 32;
 
     /* A struct is returned using general register 2.  */
     if (struct_return)
@@ -2400,6 +2411,10 @@ s390_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 
 	if (s390_function_arg_pass_by_reference (type))
 	  {
+	    /* Actually copy the argument contents to the stack slot
+	       that was reserved above.  */
+	    write_memory (copy_addr[i], value_contents (arg), length);
+
 	    if (gr <= 6)
 	      {
 		regcache_cooked_write_unsigned (regcache, S390_R0_REGNUM + gr,
@@ -2474,11 +2489,6 @@ s390_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 	  internal_error (__FILE__, __LINE__, _("unknown argument type"));
       }
   }
-
-  /* Allocate the standard frame areas: the register save area, the
-     word reserved for the compiler (which seems kind of meaningless),
-     and the back chain pointer.  */
-  sp -= 16*word_size + 32;
 
   /* Store return address.  */
   regcache_cooked_write_unsigned (regcache, S390_RETADDR_REGNUM, bp_addr);
@@ -2898,6 +2908,10 @@ s390_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   set_gdbarch_displaced_step_location (gdbarch,
                                        displaced_step_at_entry_point);
   set_gdbarch_max_insn_length (gdbarch, S390_MAX_INSTR_SIZE);
+
+  /* Note that GNU/Linux is the only OS supported on this
+     platform.  */
+  linux_init_abi (info, gdbarch);
 
   switch (tdep->abi)
     {

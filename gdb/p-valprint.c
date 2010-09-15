@@ -54,6 +54,7 @@ int
 pascal_val_print (struct type *type, const gdb_byte *valaddr,
 		  int embedded_offset, CORE_ADDR address,
 		  struct ui_file *stream, int recurse,
+		  const struct value *original_value,
 		  const struct value_print_options *options)
 {
   struct gdbarch *gdbarch = get_type_arch (type);
@@ -125,7 +126,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
 		  i = 0;
 		}
 	      val_print_array_elements (type, valaddr + embedded_offset, address, stream,
-					recurse, options, i);
+					recurse, original_value, options, i);
 	      fprintf_filtered (stream, "}");
 	    }
 	  break;
@@ -318,7 +319,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
 	    }
 	  else
 	    pascal_object_print_value_fields (type, valaddr + embedded_offset, address, stream,
-					      recurse, options, NULL, 0);
+					      recurse, original_value, options, NULL, 0);
 	}
       break;
 
@@ -540,7 +541,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
       break;
 
     case TYPE_CODE_ERROR:
-      fprintf_filtered (stream, "<error type>");
+      fprintf_filtered (stream, "%s", TYPE_ERROR_NAME (type));
       break;
 
     case TYPE_CODE_UNDEF:
@@ -612,6 +613,7 @@ static void pascal_object_print_static_field (struct value *,
 
 static void pascal_object_print_value (struct type *, const gdb_byte *,
 				       CORE_ADDR, struct ui_file *, int,
+				       const struct value *,
 				       const struct value_print_options *,
 				       struct type **);
 
@@ -669,6 +671,7 @@ void
 pascal_object_print_value_fields (struct type *type, const gdb_byte *valaddr,
 				  CORE_ADDR address, struct ui_file *stream,
 				  int recurse,
+				  const struct value *val,
 				  const struct value_print_options *options,
 				  struct type **dont_print_vb,
 				  int dont_print_statmem)
@@ -686,7 +689,7 @@ pascal_object_print_value_fields (struct type *type, const gdb_byte *valaddr,
      duplicates of virtual baseclasses.  */
   if (n_baseclasses > 0)
     pascal_object_print_value (type, valaddr, address, stream,
-			       recurse + 1, options, dont_print_vb);
+			       recurse + 1, val, options, dont_print_vb);
 
   if (!len && n_baseclasses == 1)
     fprintf_filtered (stream, "<No data fields>");
@@ -775,6 +778,11 @@ pascal_object_print_value_fields (struct type *type, const gdb_byte *valaddr,
 		{
 		  fputs_filtered ("<optimized out or zero length>", stream);
 		}
+	      else if (!value_bits_valid (val, TYPE_FIELD_BITPOS (type, i),
+					  TYPE_FIELD_BITSIZE (type, i)))
+		{
+		  fputs_filtered (_("<value optimized out>"), stream);
+		}
 	      else
 		{
 		  struct value_print_options opts = *options;
@@ -819,7 +827,7 @@ pascal_object_print_value_fields (struct type *type, const gdb_byte *valaddr,
 		  val_print (TYPE_FIELD_TYPE (type, i),
 			     valaddr, TYPE_FIELD_BITPOS (type, i) / 8,
 			     address + TYPE_FIELD_BITPOS (type, i) / 8,
-			     stream, recurse + 1, &opts,
+			     stream, recurse + 1, val, &opts,
 			     current_language);
 		}
 	    }
@@ -850,6 +858,7 @@ static void
 pascal_object_print_value (struct type *type, const gdb_byte *valaddr,
 			   CORE_ADDR address, struct ui_file *stream,
 			   int recurse,
+			   const struct value *val,
 			   const struct value_print_options *options,
 			   struct type **dont_print_vb)
 {
@@ -924,7 +933,7 @@ pascal_object_print_value (struct type *type, const gdb_byte *valaddr,
 	fprintf_filtered (stream, "<invalid address>");
       else
 	pascal_object_print_value_fields (baseclass, base_valaddr, address + boffset,
-					  stream, recurse, options,
+					  stream, recurse, val, options,
 		     (struct type **) obstack_base (&dont_print_vb_obstack),
 					  0);
       fputs_filtered (", ", stream);
@@ -988,7 +997,8 @@ pascal_object_print_static_field (struct value *val,
 
       CHECK_TYPEDEF (type);
       pascal_object_print_value_fields (type, value_contents (val), addr,
-					stream, recurse, options, NULL, 1);
+					stream, recurse, NULL, options,
+					NULL, 1);
       return;
     }
 
