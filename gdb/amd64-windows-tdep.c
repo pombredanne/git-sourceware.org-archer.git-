@@ -37,13 +37,13 @@ static int amd64_windows_dummy_call_integer_regs[] =
    for amd64-windows.  */
 
 static void
-amd64_windows_classify (struct type *type, enum amd64_reg_class class[2])
+amd64_windows_classify (struct type *type, enum amd64_reg_class regclass[2])
 {
   switch (TYPE_CODE (type))
     {
       case TYPE_CODE_ARRAY:
 	/* Arrays are always passed by memory.	*/
-	class[0] = class[1] = AMD64_MEMORY;
+	regclass[0] = regclass[1] = AMD64_MEMORY;
 	break;
 
       case TYPE_CODE_STRUCT:
@@ -56,17 +56,17 @@ amd64_windows_classify (struct type *type, enum amd64_reg_class class[2])
 	    || TYPE_LENGTH (type) == 4
 	    || TYPE_LENGTH (type) == 8)
 	  {
-	    class[0] = AMD64_INTEGER;
-	    class[1] = AMD64_NO_CLASS;
+	    regclass[0] = AMD64_INTEGER;
+	    regclass[1] = AMD64_NO_CLASS;
 	  }
 	else
-	  class[0] = class[1] = AMD64_MEMORY;
+	  regclass[0] = regclass[1] = AMD64_MEMORY;
 	break;
 
       default:
 	/* For all the other types, the conventions are the same as
 	   with the System V ABI.  */
-	amd64_classify (type, class);
+	amd64_classify (type, regclass);
     }
 }
 

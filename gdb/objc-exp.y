@@ -142,7 +142,7 @@ yyerror (char *);
     struct block *bval;
     enum exp_opcode opcode;
     struct internalvar *ivar;
-    struct objc_class_str class;
+    struct objc_class_str cls;
 
     struct type **tvec;
     int *ivec;
@@ -180,7 +180,7 @@ parse_number (char *, int, int, YYSTYPE *);
 %token <sval> SELECTOR		/* ObjC "@selector" pseudo-operator   */
 %token <ssym> NAME /* BLOCKNAME defined below to give it higher precedence. */
 %token <tsym> TYPENAME
-%token <class> CLASSNAME	/* ObjC Class name */
+%token <cls> CLASSNAME	/* ObjC Class name */
 %type <sval> name
 %type <ssym> name_not_typename
 %type <tsym> typename
@@ -331,16 +331,16 @@ exp	:	exp '[' exp1 ']'
 
 exp	: 	'[' TYPENAME
 			{
-			  CORE_ADDR class;
+			  CORE_ADDR cls;
 
-			  class = lookup_objc_class (parse_gdbarch,
+			  cls = lookup_objc_class (parse_gdbarch,
 						     copy_name ($2.stoken));
-			  if (class == 0)
+			  if (cls == 0)
 			    error ("%s is not an ObjC Class", 
 				   copy_name ($2.stoken));
 			  write_exp_elt_opcode (OP_LONG);
 			  write_exp_elt_type (parse_type->builtin_int);
-			  write_exp_elt_longcst ((LONGEST) class);
+			  write_exp_elt_longcst ((LONGEST) cls);
 			  write_exp_elt_opcode (OP_LONG);
 			  start_msglist();
 			}
@@ -355,7 +355,7 @@ exp	:	'[' CLASSNAME
 			{
 			  write_exp_elt_opcode (OP_LONG);
 			  write_exp_elt_type (parse_type->builtin_int);
-			  write_exp_elt_longcst ((LONGEST) $2.class);
+			  write_exp_elt_longcst ((LONGEST) $2.cls);
 			  write_exp_elt_opcode (OP_LONG);
 			  start_msglist();
 			}
@@ -1752,11 +1752,11 @@ yylex ()
 	CORE_ADDR Class = lookup_objc_class (parse_gdbarch, tmp);
 	if (Class)
 	  {
-	    yylval.class.class = Class;
+	    yylval.cls.cls = Class;
 	    if ((sym = lookup_struct_typedef (tmp, 
 					      expression_context_block, 
 					      1)))
-	      yylval.class.type = SYMBOL_TYPE (sym);
+	      yylval.cls.type = SYMBOL_TYPE (sym);
 	    return CLASSNAME;
 	  }
       }

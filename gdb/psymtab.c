@@ -1271,7 +1271,7 @@ start_psymtab_common (struct objfile *objfile,
 static const struct partial_symbol *
 add_psymbol_to_bcache (char *name, int namelength, int copy_name,
 		       domain_enum domain,
-		       enum address_class class,
+		       enum address_class addr_class,
 		       long val,	/* Value as a long */
 		       CORE_ADDR coreaddr,	/* Value as a CORE_ADDR */
 		       enum language language, struct objfile *objfile,
@@ -1298,7 +1298,7 @@ add_psymbol_to_bcache (char *name, int namelength, int copy_name,
   SYMBOL_SECTION (&psymbol) = 0;
   SYMBOL_LANGUAGE (&psymbol) = language;
   PSYMBOL_DOMAIN (&psymbol) = domain;
-  PSYMBOL_CLASS (&psymbol) = class;
+  PSYMBOL_CLASS (&psymbol) = addr_class;
 
   SYMBOL_SET_NAMES (&psymbol, name, namelength, copy_name, objfile);
 
@@ -1340,7 +1340,7 @@ append_psymbol_to_list (struct psymbol_allocation_list *list,
 const struct partial_symbol *
 add_psymbol_to_list (char *name, int namelength, int copy_name,
 		     domain_enum domain,
-		     enum address_class class,
+		     enum address_class addr_class,
 		     struct psymbol_allocation_list *list, 
 		     long val,	/* Value as a long */
 		     CORE_ADDR coreaddr,	/* Value as a CORE_ADDR */
@@ -1351,7 +1351,7 @@ add_psymbol_to_list (char *name, int namelength, int copy_name,
   int added;
 
   /* Stash the partial symbol away in the cache */
-  psym = add_psymbol_to_bcache (name, namelength, copy_name, domain, class,
+  psym = add_psymbol_to_bcache (name, namelength, copy_name, domain, addr_class,
 				val, coreaddr, language, objfile, &added);
 
   /* Do not duplicate global partial symbols.  */

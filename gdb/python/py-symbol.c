@@ -129,42 +129,44 @@ static PyObject *
 sympy_is_constant (PyObject *self, void *closure)
 {
   struct symbol *symbol = NULL;
-  enum address_class class;
+  enum address_class addr_class;
 
   SYMPY_REQUIRE_VALID (self, symbol);
 
-  class = SYMBOL_CLASS (symbol);
+  addr_class = SYMBOL_CLASS (symbol);
 
-  return PyBool_FromLong (class == LOC_CONST || class == LOC_CONST_BYTES);
+  return PyBool_FromLong (addr_class == LOC_CONST || addr_class == LOC_CONST_BYTES);
 }
 
 static PyObject *
 sympy_is_function (PyObject *self, void *closure)
 {
   struct symbol *symbol = NULL;
-  enum address_class class;
+  enum address_class addr_class;
 
   SYMPY_REQUIRE_VALID (self, symbol);
 
-  class = SYMBOL_CLASS (symbol);
+  addr_class = SYMBOL_CLASS (symbol);
 
-  return PyBool_FromLong (class == LOC_BLOCK);
+  return PyBool_FromLong (addr_class == LOC_BLOCK);
 }
 
 static PyObject *
 sympy_is_variable (PyObject *self, void *closure)
 {
   struct symbol *symbol = NULL;
-  enum address_class class;
+  enum address_class addr_class;
 
   SYMPY_REQUIRE_VALID (self, symbol);
 
-  class = SYMBOL_CLASS (symbol);
+  addr_class = SYMBOL_CLASS (symbol);
 
   return PyBool_FromLong (!SYMBOL_IS_ARGUMENT (symbol)
-			  && (class == LOC_LOCAL || class == LOC_REGISTER
-			      || class == LOC_STATIC || class == LOC_COMPUTED
-			      || class == LOC_OPTIMIZED_OUT));
+			  && (addr_class == LOC_LOCAL
+			      || addr_class == LOC_REGISTER
+			      || addr_class == LOC_STATIC
+			      || addr_class == LOC_COMPUTED
+			      || addr_class == LOC_OPTIMIZED_OUT));
 }
 
 /* Given a symbol, and a symbol_object that has previously been

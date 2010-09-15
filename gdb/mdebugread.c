@@ -551,7 +551,7 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
   struct type *t;
   struct field *f;
   int count = 1;
-  enum address_class class;
+  enum address_class addr_class;
   TIR tir;
   long svalue = sh->value;
   int bitsize;
@@ -592,7 +592,7 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
       break;
 
     case stGlobal:		/* external symbol, goes into global block */
-      class = LOC_STATIC;
+      addr_class = LOC_STATIC;
       b = BLOCKVECTOR_BLOCK (BLOCKVECTOR (top_stack->cur_st),
 			     GLOBAL_BLOCK);
       s = new_symbol (name);
@@ -600,7 +600,7 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
       goto data;
 
     case stStatic:		/* static data, goes into current block. */
-      class = LOC_STATIC;
+      addr_class = LOC_STATIC;
       b = top_stack->cur_block;
       s = new_symbol (name);
       if (SC_IS_COMMON (sh->sc))
@@ -622,15 +622,15 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
       SYMBOL_VALUE (s) = svalue;
       if (sh->sc == scRegister)
 	{
-	  class = LOC_REGISTER;
+	  addr_class = LOC_REGISTER;
 	  SYMBOL_REGISTER_OPS (s) = &mdebug_register_funcs;
 	}
       else
-	class = LOC_LOCAL;
+	addr_class = LOC_LOCAL;
 
     data:			/* Common code for symbols describing data */
       SYMBOL_DOMAIN (s) = VAR_DOMAIN;
-      SYMBOL_CLASS (s) = class;
+      SYMBOL_CLASS (s) = addr_class;
       add_symbol (s, top_stack->cur_st, b);
 
       /* Type could be missing if file is compiled without debugging info.  */
@@ -3393,7 +3393,7 @@ parse_partial_symbols (struct objfile *objfile)
 	  for (cur_sdx = 0; cur_sdx < fh->csym;)
 	    {
 	      char *name;
-	      enum address_class class;
+	      enum address_class addr_class;
 
 	      (*swap_sym_in) (cur_bfd,
 			      ((char *) debug_info->external_sym
@@ -3545,7 +3545,7 @@ parse_partial_symbols (struct objfile *objfile)
 							 SECT_OFF_BSS (objfile),
 							 NULL,
 							 objfile);
-		  class = LOC_STATIC;
+		  addr_class = LOC_STATIC;
 		  break;
 
 		case stIndirect:	/* Irix5 forward declaration */
@@ -3557,11 +3557,11 @@ parse_partial_symbols (struct objfile *objfile)
 		     structs from alpha and mips cc.  */
 		  if (sh.iss == 0 || has_opaque_xref (fh, &sh))
 		    goto skip;
-		  class = LOC_TYPEDEF;
+		  addr_class = LOC_TYPEDEF;
 		  break;
 
 		case stConstant:	/* Constant decl */
-		  class = LOC_CONST;
+		  addr_class = LOC_CONST;
 		  break;
 
 		case stUnion:
@@ -3617,7 +3617,7 @@ parse_partial_symbols (struct objfile *objfile)
 		}
 	      /* Use this gdb symbol */
 	      add_psymbol_to_list (name, strlen (name), 1,
-				   VAR_DOMAIN, class,
+				   VAR_DOMAIN, addr_class,
 				   &objfile->static_psymbols,
 				   0, sh.value, psymtab_language, objfile);
 	    skip:
@@ -3631,7 +3631,7 @@ parse_partial_symbols (struct objfile *objfile)
 	  PST_PRIVATE (save_pst)->extern_tab = ext_ptr;
 	  for (; --cur_sdx >= 0; ext_ptr++)
 	    {
-	      enum address_class class;
+	      enum address_class addr_class;
 	      SYMR *psh;
 	      char *name;
 	      CORE_ADDR svalue;
@@ -3677,7 +3677,7 @@ parse_partial_symbols (struct objfile *objfile)
 		     Ignore them, as parse_external will ignore them too.  */
 		  continue;
 		case stLabel:
-		  class = LOC_LABEL;
+		  addr_class = LOC_LABEL;
 		  break;
 		default:
 		  unknown_ext_complaint (debug_info->ssext + psh->iss);
@@ -3688,12 +3688,12 @@ parse_partial_symbols (struct objfile *objfile)
 		  if (SC_IS_COMMON (psh->sc))
 		    continue;
 
-		  class = LOC_STATIC;
+		  addr_class = LOC_STATIC;
 		  break;
 		}
 	      name = debug_info->ssext + psh->iss;
 	      add_psymbol_to_list (name, strlen (name), 1,
-				   VAR_DOMAIN, class,
+				   VAR_DOMAIN, addr_class,
 				   &objfile->global_psymbols,
 				   0, svalue,
 				   psymtab_language, objfile);
@@ -4518,7 +4518,7 @@ cross_ref (int fd, union aux_ext *ax, struct type **tpp, enum type_code type_cod
 
 static struct symbol *
 mylookup_symbol (char *name, struct block *block,
-		 domain_enum domain, enum address_class class)
+		 domain_enum domain, enum address_class addr_class)
 {
   struct dict_iterator iter;
   int inc;
@@ -4529,14 +4529,14 @@ mylookup_symbol (char *name, struct block *block,
     {
       if (SYMBOL_LINKAGE_NAME (sym)[0] == inc
 	  && SYMBOL_DOMAIN (sym) == domain
-	  && SYMBOL_CLASS (sym) == class
+	  && SYMBOL_CLASS (sym) == addr_class
 	  && strcmp (SYMBOL_LINKAGE_NAME (sym), name) == 0)
 	return sym;
     }
 
   block = BLOCK_SUPERBLOCK (block);
   if (block)
-    return mylookup_symbol (name, block, domain, class);
+    return mylookup_symbol (name, block, domain, addr_class);
   return 0;
 }
 

@@ -4156,7 +4156,7 @@ struct bpstat_what
 bpstat_what (bpstat bs)
 {
   /* Classify each bpstat as one of the following.  */
-  enum class
+  enum bpstat_class
     {
       /* This bpstat element has no effect on the main_action.  */
       no_effect = 0,
@@ -4282,7 +4282,7 @@ bpstat_what (bpstat bs)
   retval.call_dummy = STOP_NONE;
   for (; bs != NULL; bs = bs->next)
     {
-      enum class bs_class = no_effect;
+      enum bpstat_class bs_class = no_effect;
       if (bs->breakpoint_at == NULL)
 	/* I suspect this can happen if it was a momentary breakpoint
 	   which has since been deleted.  */

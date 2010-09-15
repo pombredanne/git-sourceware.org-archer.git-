@@ -67,7 +67,7 @@ struct objc_class {
 
 struct objc_super {
   CORE_ADDR receiver;
-  CORE_ADDR class;
+  CORE_ADDR cls;
 };
 
 struct objc_method {
@@ -1031,7 +1031,7 @@ parse_selector (char *method, char **selector)
 }
 
 char * 
-parse_method (char *method, char *type, char **class, 
+parse_method (char *method, char *type, char **cls,
 	      char **category, char **selector)
 {
   char *s1 = NULL;
@@ -1044,7 +1044,7 @@ parse_method (char *method, char *type, char **class,
   char *nselector = NULL;
 
   gdb_assert (type != NULL);
-  gdb_assert (class != NULL);
+  gdb_assert (cls != NULL);
   gdb_assert (category != NULL);
   gdb_assert (selector != NULL);
   
@@ -1123,8 +1123,8 @@ parse_method (char *method, char *type, char **class,
 
   if (type != NULL)
     *type = ntype;
-  if (class != NULL)
-    *class = nclass;
+  if (cls != NULL)
+    *cls = nclass;
   if (category != NULL)
     *category = ncategory;
   if (selector != NULL)
@@ -1135,7 +1135,7 @@ parse_method (char *method, char *type, char **class,
 
 static void
 find_methods (struct symtab *symtab, char type, 
-	      const char *class, const char *category, 
+	      const char *cls, const char *category,
 	      const char *selector, struct symbol **syms, 
 	      unsigned int *nsym, unsigned int *ndebug)
 {
@@ -1222,8 +1222,8 @@ find_methods (struct symtab *symtab, char type,
 	  if ((type != '\0') && (ntype != type))
 	    continue;
 
-	  if ((class != NULL) 
-	      && ((nclass == NULL) || (strcmp (class, nclass) != 0)))
+	  if ((cls != NULL)
+	      && ((nclass == NULL) || (strcmp (cls, nclass) != 0)))
 	    continue;
 
 	  if ((category != NULL) && 
@@ -1292,7 +1292,7 @@ char *find_imps (struct symtab *symtab, struct block *block,
 		 unsigned int *nsym, unsigned int *ndebug)
 {
   char type = '\0';
-  char *class = NULL;
+  char *cls = NULL;
   char *category = NULL;
   char *selector = NULL;
 
@@ -1315,7 +1315,7 @@ char *find_imps (struct symtab *symtab, struct block *block,
 
   buf = (char *) alloca (strlen (method) + 1);
   strcpy (buf, method);
-  tmp = parse_method (buf, &type, &class, &category, &selector);
+  tmp = parse_method (buf, &type, &cls, &category, &selector);
 
   if (tmp == NULL)
     {
@@ -1349,10 +1349,10 @@ char *find_imps (struct symtab *symtab, struct block *block,
     }
 
   if (syms != NULL)
-    find_methods (symtab, type, class, category, selector, 
+    find_methods (symtab, type, cls, category, selector,
 		  syms + csym, &ncsym, &ncdebug);
   else
-    find_methods (symtab, type, class, category, selector, 
+    find_methods (symtab, type, cls, category, selector,
 		  NULL, &ncsym, &ncdebug);
 
   /* If we didn't find any methods, just return.  */
@@ -1668,33 +1668,33 @@ read_objc_super (struct gdbarch *gdbarch, CORE_ADDR addr,
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
 
   super->receiver = read_memory_unsigned_integer (addr, 4, byte_order);
-  super->class = read_memory_unsigned_integer (addr + 4, 4, byte_order);
+  super->cls = read_memory_unsigned_integer (addr + 4, 4, byte_order);
 };
 
 static void 
 read_objc_class (struct gdbarch *gdbarch, CORE_ADDR addr,
-		 struct objc_class *class)
+		 struct objc_class *cls)
 {
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
 
-  class->isa = read_memory_unsigned_integer (addr, 4, byte_order);
-  class->super_class = read_memory_unsigned_integer (addr + 4, 4, byte_order);
-  class->name = read_memory_unsigned_integer (addr + 8, 4, byte_order);
-  class->version = read_memory_unsigned_integer (addr + 12, 4, byte_order);
-  class->info = read_memory_unsigned_integer (addr + 16, 4, byte_order);
-  class->instance_size = read_memory_unsigned_integer (addr + 18, 4, byte_order);
-  class->ivars = read_memory_unsigned_integer (addr + 24, 4, byte_order);
-  class->methods = read_memory_unsigned_integer (addr + 28, 4, byte_order);
-  class->cache = read_memory_unsigned_integer (addr + 32, 4, byte_order);
-  class->protocols = read_memory_unsigned_integer (addr + 36, 4, byte_order);
+  cls->isa = read_memory_unsigned_integer (addr, 4, byte_order);
+  cls->super_class = read_memory_unsigned_integer (addr + 4, 4, byte_order);
+  cls->name = read_memory_unsigned_integer (addr + 8, 4, byte_order);
+  cls->version = read_memory_unsigned_integer (addr + 12, 4, byte_order);
+  cls->info = read_memory_unsigned_integer (addr + 16, 4, byte_order);
+  cls->instance_size = read_memory_unsigned_integer (addr + 18, 4, byte_order);
+  cls->ivars = read_memory_unsigned_integer (addr + 24, 4, byte_order);
+  cls->methods = read_memory_unsigned_integer (addr + 28, 4, byte_order);
+  cls->cache = read_memory_unsigned_integer (addr + 32, 4, byte_order);
+  cls->protocols = read_memory_unsigned_integer (addr + 36, 4, byte_order);
 }
 
 static CORE_ADDR
 find_implementation_from_class (struct gdbarch *gdbarch,
-				CORE_ADDR class, CORE_ADDR sel)
+				CORE_ADDR cls, CORE_ADDR sel)
 {
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
-  CORE_ADDR subclass = class;
+  CORE_ADDR subclass = cls;
 
   while (subclass != 0) 
     {
@@ -1818,10 +1818,10 @@ resolve_msgsend_super (CORE_ADDR pc, CORE_ADDR *new_pc)
   sel = gdbarch_fetch_pointer_argument (gdbarch, frame, 1, ptr_type);
 
   read_objc_super (gdbarch, super, &sstr);
-  if (sstr.class == 0)
+  if (sstr.cls == 0)
     return 0;
   
-  res = find_implementation_from_class (gdbarch, sstr.class, sel);
+  res = find_implementation_from_class (gdbarch, sstr.cls, sel);
   if (new_pc != 0)
     *new_pc = res;
   if (res == 0)
@@ -1846,10 +1846,10 @@ resolve_msgsend_super_stret (CORE_ADDR pc, CORE_ADDR *new_pc)
   sel = gdbarch_fetch_pointer_argument (gdbarch, frame, 2, ptr_type);
 
   read_objc_super (gdbarch, super, &sstr);
-  if (sstr.class == 0)
+  if (sstr.cls == 0)
     return 0;
   
-  res = find_implementation_from_class (gdbarch, sstr.class, sel);
+  res = find_implementation_from_class (gdbarch, sstr.cls, sel);
   if (new_pc != 0)
     *new_pc = res;
   if (res == 0)
