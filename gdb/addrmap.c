@@ -34,13 +34,13 @@
    implementation.  */
 struct addrmap_funcs
 {
-  void (*set_empty) (struct addrmap *this,
+  void (*set_empty) (struct addrmap *self,
                      CORE_ADDR start, CORE_ADDR end_inclusive,
                      void *obj);
-  void *(*find) (struct addrmap *this, CORE_ADDR addr);
-  struct addrmap *(*create_fixed) (struct addrmap *this,
+  void *(*find) (struct addrmap *self, CORE_ADDR addr);
+  struct addrmap *(*create_fixed) (struct addrmap *self,
                                    struct obstack *obstack);
-  void (*relocate) (struct addrmap *this, CORE_ADDR offset);
+  void (*relocate) (struct addrmap *self, CORE_ADDR offset);
 };
 
 
@@ -112,7 +112,7 @@ struct addrmap_fixed
 
 
 static void
-addrmap_fixed_set_empty (struct addrmap *this,
+addrmap_fixed_set_empty (struct addrmap *self,
                    CORE_ADDR start, CORE_ADDR end_inclusive,
                    void *obj)
 {
@@ -123,9 +123,9 @@ addrmap_fixed_set_empty (struct addrmap *this,
 
 
 static void *
-addrmap_fixed_find (struct addrmap *this, CORE_ADDR addr)
+addrmap_fixed_find (struct addrmap *self, CORE_ADDR addr)
 {
-  struct addrmap_fixed *map = (struct addrmap_fixed *) this;
+  struct addrmap_fixed *map = (struct addrmap_fixed *) self;
   struct addrmap_transition *bottom = &map->transitions[0];
   struct addrmap_transition *top = &map->transitions[map->num_transitions - 1];
 
@@ -156,7 +156,7 @@ addrmap_fixed_find (struct addrmap *this, CORE_ADDR addr)
 
 
 static struct addrmap *
-addrmap_fixed_create_fixed (struct addrmap *this, struct obstack *obstack)
+addrmap_fixed_create_fixed (struct addrmap *self, struct obstack *obstack)
 {
   internal_error (__FILE__, __LINE__,
                   _("addrmap_create_fixed is not implemented yet "
@@ -165,9 +165,9 @@ addrmap_fixed_create_fixed (struct addrmap *this, struct obstack *obstack)
 
 
 static void
-addrmap_fixed_relocate (struct addrmap *this, CORE_ADDR offset)
+addrmap_fixed_relocate (struct addrmap *self, CORE_ADDR offset)
 {
-  struct addrmap_fixed *map = (struct addrmap_fixed *) this;
+  struct addrmap_fixed *map = (struct addrmap_fixed *) self;
   size_t i;
 
   for (i = 0; i < map->num_transitions; i++)
@@ -293,26 +293,26 @@ addrmap_splay_tree_insert (struct addrmap_mutable *map, CORE_ADDR key, void *val
    tree node at ADDR, even if it would represent a "transition" from
    one value to the same value.  */
 static void
-force_transition (struct addrmap_mutable *this, CORE_ADDR addr)
+force_transition (struct addrmap_mutable *self, CORE_ADDR addr)
 {
   splay_tree_node n
-    = addrmap_splay_tree_lookup (this, addr);
+    = addrmap_splay_tree_lookup (self, addr);
 
   if (! n)
     {
-      n = addrmap_splay_tree_predecessor (this, addr);
-      addrmap_splay_tree_insert (this, addr,
+      n = addrmap_splay_tree_predecessor (self, addr);
+      addrmap_splay_tree_insert (self, addr,
                                  n ? addrmap_node_value (n) : NULL);
     }
 }
 
 
 static void
-addrmap_mutable_set_empty (struct addrmap *this,
+addrmap_mutable_set_empty (struct addrmap *self,
                            CORE_ADDR start, CORE_ADDR end_inclusive,
                            void *obj)
 {
-  struct addrmap_mutable *map = (struct addrmap_mutable *) this;
+  struct addrmap_mutable *map = (struct addrmap_mutable *) self;
   splay_tree_node n, next;
   void *prior_value;
 
@@ -362,7 +362,7 @@ addrmap_mutable_set_empty (struct addrmap *this,
 
 
 static void *
-addrmap_mutable_find (struct addrmap *this, CORE_ADDR addr)
+addrmap_mutable_find (struct addrmap *self, CORE_ADDR addr)
 {
   /* Not needed yet.  */
   internal_error (__FILE__, __LINE__,
@@ -400,9 +400,9 @@ splay_foreach_copy (splay_tree_node n, void *closure)
 
 
 static struct addrmap *
-addrmap_mutable_create_fixed (struct addrmap *this, struct obstack *obstack)
+addrmap_mutable_create_fixed (struct addrmap *self, struct obstack *obstack)
 {
-  struct addrmap_mutable *mutable = (struct addrmap_mutable *) this;
+  struct addrmap_mutable *mutable = (struct addrmap_mutable *) self;
   struct addrmap_fixed *fixed;
   size_t num_transitions;
 
@@ -436,7 +436,7 @@ addrmap_mutable_create_fixed (struct addrmap *this, struct obstack *obstack)
 
 
 static void
-addrmap_mutable_relocate (struct addrmap *this, CORE_ADDR offset)
+addrmap_mutable_relocate (struct addrmap *self, CORE_ADDR offset)
 {
   /* Not needed yet.  */
   internal_error (__FILE__, __LINE__,
