@@ -669,8 +669,7 @@ struct die_info
     /* The dies in a compilation unit form an n-ary tree.  PARENT
        points to this die's parent; CHILD points to the first child of
        this node; and all the children of a given node are chained
-       together via their SIBLING fields, terminated by a die whose
-       tag is zero.  */
+       together via their SIBLING fields.  */
     struct die_info *child;	/* Its first child, if any.  */
     struct die_info *sibling;	/* Its next sibling, if any.  */
     struct die_info *parent;	/* Its parent, if any.  */
@@ -1913,6 +1912,13 @@ dwarf2_read_index (struct objfile *objfile)
   if (dwarf2_per_objfile->gdb_index.asection == NULL
       || dwarf2_per_objfile->gdb_index.size == 0)
     return 0;
+
+  /* Older elfutils strip versions could keep the section in the main
+     executable while splitting it for the separate debug info file.  */
+  if ((bfd_get_file_flags (dwarf2_per_objfile->gdb_index.asection)
+       & SEC_HAS_CONTENTS) == 0)
+    return 0;
+
   dwarf2_read_section (objfile, &dwarf2_per_objfile->gdb_index);
 
   addr = dwarf2_per_objfile->gdb_index.buffer;
@@ -2211,7 +2217,7 @@ static struct symtab *
 dw2_lookup_symbol (struct objfile *objfile, int block_index,
 		   const char *name, domain_enum domain)
 {
-  /* We do all the work in the expand_one_symtab_matching hook
+  /* We do all the work in the pre_expand_symtabs_matching hook
      instead.  */
   return NULL;
 }
@@ -2242,46 +2248,12 @@ dw2_do_expand_symtabs_matching (struct objfile *objfile, const char *name)
     }
 }
 
-static struct symbol *
-dw2_expand_one_symtab_matching (struct objfile *objfile,
-				int kind, const char *name,
-				domain_enum domain,
-				struct symbol *(*matcher) (struct symtab *,
-							   int,
-							   const char *,
-							   domain_enum,
-							   void *),
-				void *data)
+static void
+dw2_pre_expand_symtabs_matching (struct objfile *objfile,
+				 int kind, const char *name,
+				 domain_enum domain)
 {
-  dw2_setup (objfile);
-
-  if (dwarf2_per_objfile->index_table)
-    {
-      offset_type *vec;
-
-      if (find_slot_in_mapped_hash (dwarf2_per_objfile->index_table,
-				    name, &vec))
-	{
-	  offset_type i, len = MAYBE_SWAP (*vec);
-	  for (i = 0; i < len; ++i)
-	    {
-	      offset_type cu_index = MAYBE_SWAP (vec[i + 1]);
-	      struct dwarf2_per_cu_data *cu = dw2_get_cu (cu_index);
-	      struct symtab *symtab;
-	      struct symbol *sym;
-
-	      if (cu->v.quick->symtab)
-		continue;
-
-	      symtab = dw2_instantiate_symtab (objfile, cu);
-	      sym = matcher (symtab, kind, name, domain, data);
-	      if (sym)
-		return sym;
-	    }
-	}
-    }
-
-  return NULL;
+  dw2_do_expand_symtabs_matching (objfile, name);
 }
 
 static void
@@ -2409,10 +2381,9 @@ dw2_map_ada_symtabs (struct objfile *objfile,
 		     domain_enum domain, int wild,
 		     void *data)
 {
-  /* For now, we don't support Ada, so this function can't be
-     reached.  */
-  internal_error (__FILE__, __LINE__,
-		  _("map_ada_symtabs called via index method"));
+  /* For now, we don't support Ada.  Still the function can be called if the
+     current language is Ada for a non-Ada objfile using GNU index.  As Ada
+     does not look for non-Ada symbols this function should just return.  */
 }
 
 static void
@@ -2586,7 +2557,7 @@ const struct quick_symbol_functions dwarf2_gdb_index_functions =
   dw2_forget_cached_source_info,
   dw2_lookup_symtab,
   dw2_lookup_symbol,
-  dw2_expand_one_symtab_matching,
+  dw2_pre_expand_symtabs_matching,
   dw2_print_stats,
   dw2_dump,
   dw2_relocate,
@@ -4900,8 +4871,14 @@ dwarf2_compute_name (char *name, struct die_info *die, struct dwarf2_cu *cu,
 		}
 	      else if (cu->language == language_cplus)
 		{
+		  /* Assume that an artificial first parameter is
+		     "this", but do not crash if it is not.  RealView
+		     marks unnamed (and thus unused) parameters as
+		     artificial; there is no way to differentiate
+		     the two cases.  */
 		  if (TYPE_NFIELDS (type) > 0
 		      && TYPE_FIELD_ARTIFICIAL (type, 0)
+		      && TYPE_CODE (TYPE_FIELD_TYPE (type, 0)) == TYPE_CODE_PTR
 		      && TYPE_CONST (TYPE_TARGET_TYPE (TYPE_FIELD_TYPE (type, 0))))
 		    fputs_unfiltered (" const", buf);
 		}
@@ -5539,7 +5516,8 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
 	    {
 	      struct symbol *arg = new_symbol (child_die, NULL, cu);
 
-	      VEC_safe_push (symbolp, template_args, arg);
+	      if (arg != NULL)
+		VEC_safe_push (symbolp, template_args, arg);
 	    }
 	  else
 	    process_die (child_die, cu);
@@ -6331,9 +6309,9 @@ dwarf2_attach_fields_to_type (struct field_info *fip, struct type *type,
 	(B_TYPE *) TYPE_ALLOC (type, B_BYTES (nfields));
       B_CLRALL (TYPE_FIELD_PROTECTED_BITS (type), nfields);
 
-      /* We don't set TYPE_FIELD_IGNORE_BITS here.  The DWARF reader
-	 never sets any bits in that array, so leaving it NULL lets us
-	 save a little memory.  */
+      TYPE_FIELD_IGNORE_BITS (type) =
+	(B_TYPE *) TYPE_ALLOC (type, B_BYTES (nfields));
+      B_CLRALL (TYPE_FIELD_IGNORE_BITS (type), nfields);
     }
 
   /* If the type has baseclasses, allocate and clear a bit vector for
@@ -6703,11 +6681,12 @@ quirk_gcc_member_function_pointer (struct type *type, struct objfile *objfile)
 }
 
 /* Called when we find the DIE that starts a structure or union scope
-   (definition) to process all dies that define the members of the
-   structure or union.
+   (definition) to create a type for the structure or union.  Fill in
+   the type's name and general properties; the members will not be
+   processed until process_structure_type.
 
-   NOTE: we need to call struct_type regardless of whether or not the
-   DIE has an at_name attribute, since it might be an anonymous
+   NOTE: we need to call these functions regardless of whether or not the
+   DIE has a DW_AT_name attribute, since it might be an anonymous
    structure or union.  This gets the type entered into our set of
    user defined types.
 
@@ -6725,7 +6704,6 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
   struct type *type;
   struct attribute *attr;
   char *name;
-  struct cleanup *back_to;
 
   /* If the definition of this type lives in .debug_types, read that type.
      Don't follow DW_AT_specification though, that will take us back up
@@ -6746,8 +6724,6 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
 	 Ensure TYPE is recorded in CU's type_hash table.  */
       return set_die_type (die, type, cu);
     }
-
-  back_to = make_cleanup (null_cleanup, 0);
 
   type = alloc_type (objfile);
   INIT_CPLUS_SPECIFIC (type);
@@ -6823,11 +6799,29 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
   /* set_die_type should be already done.  */
   set_descriptive_type (type, die, cu);
 
+  return type;
+}
+
+/* Finish creating a structure or union type, including filling in
+   its members and creating a symbol for it.  */
+
+static void
+process_structure_scope (struct die_info *die, struct dwarf2_cu *cu)
+{
+  struct objfile *objfile = cu->objfile;
+  struct die_info *child_die = die->child;
+  struct type *type;
+
+  type = get_die_type (die, cu);
+  if (type == NULL)
+    type = read_structure_type (die, cu);
+
   if (die->child != NULL && ! die_is_declaration (die, cu))
     {
       struct field_info fi;
       struct die_info *child_die;
       VEC (symbolp) *template_args = NULL;
+      struct cleanup *back_to = make_cleanup (null_cleanup, 0);
 
       memset (&fi, 0, sizeof (struct field_info));
 
@@ -6862,7 +6856,8 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
 	    {
 	      struct symbol *arg = new_symbol (child_die, NULL, cu);
 
-	      VEC_safe_push (symbolp, template_args, arg);
+	      if (arg != NULL)
+		VEC_safe_push (symbolp, template_args, arg);
 	    }
 
 	  child_die = sibling_die (child_die);
@@ -6980,23 +6975,11 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
 	      *dest = *src;
 	    }
 	}
+
+      do_cleanups (back_to);
     }
 
   quirk_gcc_member_function_pointer (type, cu->objfile);
-
-  do_cleanups (back_to);
-  return type;
-}
-
-static void
-process_structure_scope (struct die_info *die, struct dwarf2_cu *cu)
-{
-  struct die_info *child_die = die->child;
-  struct type *this_type;
-
-  this_type = get_die_type (die, cu);
-  if (this_type == NULL)
-    this_type = read_structure_type (die, cu);
 
   /* NOTE: carlton/2004-03-16: GCC 3.4 (or at least one of its
      snapshots) has been known to create a die giving a declaration
@@ -7026,7 +7009,7 @@ process_structure_scope (struct die_info *die, struct dwarf2_cu *cu)
      attribute, and a declaration attribute.  */
   if (dwarf2_attr (die, DW_AT_byte_size, cu) != NULL
       || !die_is_declaration (die, cu))
-    new_symbol (die, this_type, cu);
+    new_symbol (die, type, cu);
 }
 
 /* Given a DW_AT_enumeration_type die, set its type.  We do not
@@ -7357,7 +7340,7 @@ read_common_block (struct die_info *die, struct dwarf2_cu *cu)
 	{
 	  sym = new_symbol (child_die, NULL, cu);
 	  attr = dwarf2_attr (child_die, DW_AT_data_member_location, cu);
-	  if (attr)
+	  if (sym != NULL && attr != NULL)
 	    {
 	      CORE_ADDR byte_offset = 0;
 
@@ -9061,9 +9044,6 @@ fixup_partial_die (struct partial_die_info *part_die,
     }
 
   /* Set default names for some unnamed DIEs.  */
-  if (part_die->name == NULL && (part_die->tag == DW_TAG_structure_type
-				 || part_die->tag == DW_TAG_class_type))
-    part_die->name = "(anonymous class)";
 
   if (part_die->name == NULL && part_die->tag == DW_TAG_namespace)
     part_die->name = "(anonymous namespace)";

@@ -1,3 +1,239 @@
+2010-09-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* charset.c (wchar_iterate) <EILSEQ>: Return any possibly converted
+	characters.
+
+2010-09-16  Phil Muldoon  <pmuldoon@redhat.com>
+
+	PR mi/11407
+	* mi/mi-cmd-stack.c (list_args_or_locals): Catch exceptions from
+	read_var_value and common_val_print and print a warning.
+
+2010-09-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* MAINTAINERS (GLOBAL MAINTAINERS) <Jan Kratochvil>: Move the entry to
+	keep the list in alphabetical order.  Use longer e-mail address.
+
+2010-09-15  Tom Tromey  <tromey@redhat.com>
+
+	* MAINTAINERS (GLOBAL MAINTAINERS): Add Jan Kratochvil.
+
+2010-09-15  Tom Tromey  <tromey@redhat.com>
+
+	* charset.c (iconv_open): New define.
+	(iconv): Likewise.
+	(iconv_close): Likewise.
+	(phony_iconv_open): Add "phony_" prefix.
+	(phony_iconv_close): Likewise.
+	(phony_iconv): Likewise.
+	* gdb_wchar.h: Check _LIBICONV_VERSION, __STDC_ISO_10646__.
+	Change how INTERMEDIATE_ENCODING is defined.
+
+2010-09-15  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (struct die_info): Fix comment.
+
+2010-09-15  Alan Modra  <amodra@gmail.com>
+
+	PR 4606
+	* gcore.c (gcore_create_callback): Clear SEC_HAS_CONTENTS rather
+	than setting SEC_NEVER_LOAD on sections that need not be copied.
+
+2010-09-14  Tom Tromey  <tromey@redhat.com>
+
+	* psympriv.h (add_psymbol_to_list, init_psymbol_list)
+	(start_psymtab_common, allocate_psymtab, discard_psymtab):
+	Declare.
+	* symfile.h (extend_psymbol_list): Remove.
+	(add_psymbol_to_list, init_psymbol_list, start_psymtab_common)
+	(allocate_psymtab, discard_psymtab): Move to psympriv.h.
+	* psymtab.c (extend_psymbol_list): Move earlier.  Now static.
+
+2010-09-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (dw2_map_ada_symtabs): Remove the internal_error.
+	Update the comment.
+
+2010-09-14  Tom Tromey  <tromey@redhat.com>
+
+	PR symtab/8399:
+	* dwarf2loc.c (locexpr_describe_location_piece): Don't call error
+	for unrecognized frame base expression.
+
+2010-09-14  Tom Tromey  <tromey@redhat.com>
+
+	PR exp/11803:
+	* value.c (value_static_field): Use value_of_variable.
+
+2010-09-14  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* m32r-rom.c: Replace winsock.h with winsock2.h header.
+	* remote-m32r-sdi.c: Replace winsock.h by winsock2.h.
+
+2010-09-13  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	PR symtab/11992:
+	* c-exp.y (classify_name): Check is_a_member_of_this before returning
+	UNKNOWN_CPP_NAME.
+
+2010-09-13  Joel Brobecker  <brobecker@adacore.com>
+
+	* NEWS: Add x86-lynxos to the list of platforms supported by
+	gdbserver.
+
+2010-09-13  Joel Brobecker  <brobecker@adacore.com>
+
+	* NEWS: Announce GDBserver support for version 5.x of ppc-lynxos.
+
+2010-09-13  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in (HFILES_NO_SRCDIR): Add progspace.h.
+
+2010-09-13  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* i386-tdep.c (i386_ymm_type): Set type name to
+	builtin_type_vec256i.
+
+2010-09-12  Michael Snyder  <msnyder@vmware.com>
+
+	* i386-tdep.c (i386_gdbarch_init): Fix typo in comments.
+
+2010-09-12  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* i386-tdep.c (i386_gdbarch_init): Fix typo in comments.
+
+2010-09-11  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* amd64-tdep.c (amd64_register_name): Removed.
+	(amd64_init_abi): Don't call set_gdbarch_register_name.
+
+	* i386-tdep.c (i386_ymmh_regnum_p): Make it static.
+
+	* i386-tdep.h (i386_ymmh_regnum_p): Removed.
+
+2010-09-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Paul Bolle  <pebolle@tiscali.nl>
+
+	Redirect also uiout and stdtarg{,err} in execute_command_to_string.
+	* cli-logging.c (struct saved_output_files) <targerr>: New.
+	(set_logging_redirect, pop_output_files, handle_redirections):
+	Redirect also gdb_stdtargerr.
+	* defs.h (struct ui_out, make_cleanup_ui_out_redirect_pop): New
+	declarations.
+	* event-top.c (gdb_setup_readline, gdb_disable_readline): Redirect
+	also gdb_stdtargerr.
+	* top.c (execute_command_to_string): Move make_cleanup_ui_file_delete
+	to the top.  Redirect also gdb_stdlog, gdb_stdtarg and gdb_stdtargerr.
+	Use ui_out_redirect, register make_cleanup_ui_out_redirect_pop.
+	* tui/tui-io.c (tui_setup_io): Redirect also gdb_stdtargerr.
+	* utils.c (do_ui_out_redirect_pop, make_cleanup_ui_out_redirect_pop):
+	New functions.
+
+2010-09-10  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* hppa-tdep.c (unwind_command): Use host_address_to_string function
+	to display a host address.
+	* monitor.c (monitor_read_memory): Likewise.
+	* xtensa-tdep.c (xtensa_push_dummy_call): Likewise.
+
+2010-09-10  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* coffread.c (struct coff_symbol): Change c_value type from `long' to
+	`CORE_ADDRESS' as it might contain target addresses.
+
+2010-09-10  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* alpha-mdebug-tdep.c (find_proc_desc): Use SYMBOL_VALUE_BYTES macro
+	before cast to pointer to avoid warning.
+
+2010-09-09  Kevin Buettner  <kevinb@redhat.com>
+
+	* v850-tdep.c (v850_gdbarch_init): Change the v850's `char'
+	type to be signed.
+
+2010-09-09  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* dwarf2read.c (fixup_partial_die): Do not set dummy name for
+	anonymous class partial DIEs.
+
+2010-09-08  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* dwarf2read.c (dwarf2_compute_name): Check that the first
+	argument is a pointer.
+
+2010-09-08  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* dwarf2read.c (read_func_scope, read_structure_type)
+	(read_common_block): Check for a NULL return from new_symbol.
+
+2010-09-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (dwarf2_read_index): Return on no SEC_HAS_CONTENTS.
+
+2010-09-08  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* dwarf2read.c (read_structure_type): Move processing of
+	fields and member functions from here...
+	(process_structure_scope): ... to here.
+
+2010-09-08  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gnu-v3-abi.c (gnuv3_print_method_ptr): Do not use
+	the domain type.
+	(gnuv3_make_method_ptr): Likewise.
+
+2010-09-08  Tom Tromey  <tromey@redhat.com>
+
+	* breakpoint.c (create_breakpoint): Add missing _().
+
+2010-09-08  Doug Evans  <dje@google.com>
+
+	* dwarf2-frame.h (dwarf2_frame_build_info): Delete, unused.
+
+2010-09-08  Tom Tromey  <tromey@redhat.com>
+
+	Revert:
+	2010-09-01  Tom Tromey  <tromey@redhat.com>
+	* dwarf2read.c, gdbtypes.c, psymtab.c, symfile.h, symtab.c,
+	symtab.h: Revert earlier change.
+
+2010-09-09  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* psymtab.c (add_psymbol_to_bcache): Initialize
+	obj_section.
+	memset psymbol.ginfo.value to 0.
+
+2010-09-06  Pedro Alves  <pedro@codesourcery.com>
+
+	* infrun.c (resume): Extend comment on ignoring single-step
+	requests on vfork parents waiting for a vfork-done.
+
+2010-09-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Pedro Alves  <pedro@codesourcery.com>
+
+	* corelow.c (core_open): Use target_signal_from_host if CORE_GDBARCH
+	is NULL.
+	* fork-child.c (startup_inferior) <resume_signal>: Use enum
+	target_signal type.
+	* linux-nat.c (linux_nat_resume): Use target_signal_to_host before
+	calling strsignal.  Use enum target_signal type for saved_signo.
+	(linux_handle_extended_wait) <signo>: Use enum target_signal type.
+	(linux_nat_wait_1): Use enum target_signal type for signo.  Use
+	target_signal_to_host before calling strsignal.
+	* remote-m32r-sdi.c (m32r_wait, m32r_detach): Replace 0 by
+	TARGET_SIGNAL_0.
+
+2010-09-06  Pedro Alves  <pedro@codesourcery.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* common/signals.c (ANY): Remove.
+	(SET): No longer use ANY.
+
+2010-09-06  Yao Qi  <yao@codesourcery.com>
+
+	* infrunc(resume): When inferior is waiting_for_vfork_done,
+	clear step and don't use displaced stepping.
+
 2010-09-04  Daniel Jacobowitz  <dan@codesourcery.com>
 
 	* breakpoint.c (can_use_hardware_watchpoint): Handle the first

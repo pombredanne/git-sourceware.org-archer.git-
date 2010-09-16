@@ -1049,6 +1049,7 @@ gdb_setup_readline (void)
   gdb_stderr = stdio_fileopen (stderr);
   gdb_stdlog = gdb_stderr;  /* for moment */
   gdb_stdtarg = gdb_stderr; /* for moment */
+  gdb_stdtargerr = gdb_stderr; /* for moment */
 
   /* If the input stream is connected to a terminal, turn on
      editing.  */
@@ -1107,6 +1108,7 @@ gdb_disable_readline (void)
   ui_file_delete (gdb_stderr);
   gdb_stdlog = NULL;
   gdb_stdtarg = NULL;
+  gdb_stdtargerr = NULL;
 #endif
 
   rl_callback_handler_remove ();

@@ -8915,7 +8915,7 @@ automatically determine the appropriate host character set.  In this
 case, @value{GDBN} uses @samp{UTF-8}.
 
 @value{GDBN} can only use certain character sets as its host character
-set.  If you type @kbd{@w{set target-charset @key{TAB}@key{TAB}}},
+set.  If you type @kbd{@w{set host-charset @key{TAB}@key{TAB}}},
 @value{GDBN} will list the host character sets it supports.
 
 @item set charset @var{charset}
@@ -26041,8 +26041,13 @@ The @code{$pc} value for that frame.
 Function name.
 @item @var{file}
 File name of the source file where the function lives.
+@item @var{fullname}
+The full file name of the source file where the function lives.
 @item @var{line}
 Line number corresponding to the @code{$pc}.
+@item @var{from}
+The shared library where this function is defined.  This is only given
+if the frame's function is not known.
 @end table
 
 If invoked without arguments, this command prints a backtrace for the
