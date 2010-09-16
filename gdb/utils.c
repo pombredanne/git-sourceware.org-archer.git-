@@ -316,7 +316,7 @@ make_cleanup_ui_file_delete (struct ui_file *arg)
 static void
 do_ui_out_redirect_pop (void *arg)
 {
-  struct ui_out *uiout = arg;
+  struct ui_out *uiout = (struct ui_out *) arg;
 
   if (ui_out_redirect (uiout, NULL) < 0)
     warning (_("Cannot restore redirection of the current output protocol"));
