@@ -171,25 +171,14 @@ struct quick_symbol_functions
 				   int kind, const char *name,
 				   domain_enum domain);
 
-  /* Expand each symbol table in OBJFILE that may have items matching
-     KIND, NAME, and DOMAIN -- these arguments are as for
-     `lookup_symbol'.  For each such symbol table, call MATCHER with
-     the symbol table and DATA arguments.  If MATCHER returns NULL,
-     keep going.  Otherwise, return the result of MATCHER.  If MATCHER
-     never returns non-NULL, return NULL.  A backend can choose to
-     implement this and then have its `lookup_symbol' hook always
-     return NULL, or the reverse.  (It doesn't make sense to implement
-     both.)  */
-  struct symbol *(*expand_one_symtab_matching)
-    (struct objfile *objfile,
-     int kind, const char *name,
-     domain_enum domain,
-     struct symbol *(*matcher) (struct symtab *symtab,
-				int kind,
-				const char *name,
-				domain_enum domain,
-				void *data),
-     void *data);
+  /* This is called to expand symbol tables before looking up a
+     symbol.  A backend can choose to implement this and then have its
+     `lookup_symbol' hook always return NULL, or the reverse.  (It
+     doesn't make sense to implement both.)  The arguments are as for
+     `lookup_symbol'.  */
+  void (*pre_expand_symtabs_matching) (struct objfile *objfile,
+				       int kind, const char *name,
+				       domain_enum domain);
 
   /* Print statistics about any indices loaded for OBJFILE.  The
      statistics should be printed to gdb_stdout.  This is used for
@@ -393,22 +382,6 @@ extern struct symfile_segment_data *default_symfile_segments (bfd *abfd);
 extern bfd_byte *default_symfile_relocate (struct objfile *objfile,
                                            asection *sectp, bfd_byte *buf);
 
-extern void extend_psymbol_list (struct psymbol_allocation_list *,
-				 struct objfile *);
-
-/* Add any kind of symbol to a psymbol_allocation_list.  */
-
-/* #include "demangle.h" */
-
-extern const
-struct partial_symbol *add_psymbol_to_list (char *, int, int, domain_enum,
-					    enum address_class,
-					    struct psymbol_allocation_list *,
-					    long, CORE_ADDR,
-					    enum language, struct objfile *);
-
-extern void init_psymbol_list (struct objfile *, int);
-
 extern struct symtab *allocate_symtab (char *, struct objfile *);
 
 extern void add_symtab_fns (struct sym_fns *);
@@ -466,12 +439,6 @@ extern struct section_addr_info
 extern void free_section_addr_info (struct section_addr_info *);
 
 
-extern struct partial_symtab *start_psymtab_common (struct objfile *,
-						    struct section_offsets *,
-						    const char *, CORE_ADDR,
-						    struct partial_symbol **,
-						    struct partial_symbol **);
-
 /* Make a copy of the string at PTR with SIZE characters in the symbol
    obstack (and add a null character at the end in the copy).  Returns
    the address of the copy.  */
@@ -510,11 +477,6 @@ extern int auto_solib_limit;
 /* From symfile.c */
 
 extern void set_initial_language (void);
-
-extern struct partial_symtab *allocate_psymtab (const char *,
-						struct objfile *);
-
-extern void discard_psymtab (struct partial_symtab *);
 
 extern void find_lowest_section (bfd *, asection *, void *);
 

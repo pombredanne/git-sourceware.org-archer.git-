@@ -2452,8 +2452,7 @@ int
 bfd_elf_get_default_section_type (flagword flags)
 {
   if ((flags & SEC_ALLOC) != 0
-      && ((flags & (SEC_LOAD | SEC_HAS_CONTENTS)) == 0
-	  || (flags & SEC_NEVER_LOAD) != 0))
+      && (flags & (SEC_LOAD | SEC_HAS_CONTENTS)) == 0)
     return SHT_NOBITS;
   return SHT_PROGBITS;
 }
@@ -4481,8 +4480,9 @@ assign_file_positions_for_load_sections (bfd *abfd,
 	      bfd_vma s_start = sec->lma;
 	      bfd_vma adjust = s_start - p_end;
 
-	      if (s_start < p_end
-		  || p_end < p_start)
+	      if (adjust != 0
+		  && (s_start < p_end
+		      || p_end < p_start))
 		{
 		  (*_bfd_error_handler)
 		    (_("%B: section %A lma %#lx adjusted to %#lx"), abfd, sec,

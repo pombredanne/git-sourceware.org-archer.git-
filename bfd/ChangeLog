@@ -1,3 +1,61 @@
+2010-09-16  Alan Modra  <amodra@gmail.com>
+
+	* elf32-spu.c (spu_elf_size_sections): Omit fixups for non-alloc
+	sections.
+	(spu_elf_create_sections): Mark .fixup with SEC_LINKER_CREATED and
+	set dynobj.
+	(spu_elf_finish_dynamic_sections): New function.
+	(elf_backend_finish_dynamic_sections): Define.
+
+2010-09-16  Alan Modra  <amodra@gmail.com>
+
+	* elf.c (bfd_elf_get_default_section_type): Don't test SEC_NEVER_LOAD.
+	* elflink.c (elf_link_input_bfd): Likewise.
+
+2010-09-15  Kai Tietz  <kai.tietz@onevision.com>
+
+	* pei-x86_64.c (pex64_get_unwind_info): Reorgnized.
+	(pex64_get_scope_entry): Removed.
+	(find_next_xdata_or_end): New helper.
+	(pex64_dump_xdata): Reworked.
+	(pex64_bfd_print_pdata): Add checking for
+	valid pdata sorting and values. Reworked
+	output.
+
+2010-09-15  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR binutils/12004
+	* plugin.c (bfd_plugin_object_p): Handle NULL iostream.
+
+2010-09-14  Kai Tietz  <kai.tietz@onevision.com>
+
+	* pe-x86_64.c (COFF_SECTION_ALIGNMENT_ENTRIES): Make
+	.rdata, .data, and .text partial matched section names.
+	* pei-x86_64.c: Likewise.
+
+	* peXXigen.c (sort_x64_pdata): New helper.
+	(_bfd_XXi_final_link_postscript): Do pdata sorting.
+
+2010-09-09  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/11998
+	* elf.c (assign_file_positions_for_load_sections): Don't warn
+	zero LMA adjustment.
+
+2010-09-09  Bernd Schmidt  <bernds@codesourcery.com>
+
+	bfd/
+	* elflink.c (bfd_elf_final_link): Correct calculation of
+	max_external_reloc_size.
+
+2010-09-07  Alan Modra  <amodra@gmail.com>
+	    Marcus Brinkmann  <marcus.brinkmann@ruhr-uni-bochum.de>
+
+	* peXXigen.c: Whitespace.
+	(pe_print_idata): Correct section limit calculations.  Tidy array
+	indexing.
+	(_bfd_XX_print_ce_compressed_pdata): Don't leak memory.
+
 2010-09-02  Richard Henderson  <rth@redhat.com>
 
 	* config.bfd (x86_64-*-mingw*): Select 32-bit pei vectors too.

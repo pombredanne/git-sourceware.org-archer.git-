@@ -2829,7 +2829,7 @@ _bfd_elf_dynamic_symbol_p (struct elf_link_hash_entry *h,
 /* Return true if the symbol referred to by H should be considered
    to resolve local to the current module, and false otherwise.  Differs
    from (the inverse of) _bfd_elf_dynamic_symbol_p in the treatment of
-   undefined symbols.  The two functions are vitually identical except
+   undefined symbols.  The two functions are virtually identical except
    for the place where forced_local and dynindx == -1 are tested.  If
    either of those tests are true, _bfd_elf_dynamic_symbol_p will say
    the symbol is local, while _bfd_elf_symbol_refs_local_p will say
@@ -9843,7 +9843,6 @@ elf_link_input_bfd (struct elf_final_link_info *finfo, bfd *input_bfd)
 	  {
 	    /* FIXME: octets_per_byte.  */
 	    if (! (o->flags & SEC_EXCLUDE)
-		&& ! (o->output_section->flags & SEC_NEVER_LOAD)
 		&& ! bfd_set_section_contents (output_bfd, o->output_section,
 					       contents,
 					       (file_ptr) o->output_offset,
@@ -10360,7 +10359,10 @@ bfd_elf_final_link (bfd *abfd, struct bfd_link_info *info)
 		    {
 		      size_t ext_size;
 
-		      ext_size = elf_section_data (sec)->rel_hdr.sh_size;
+		      ext_size = esdi->rel_hdr.sh_size;
+		      if (esdi->rel_hdr2 != NULL)
+			ext_size += esdi->rel_hdr2->sh_size;
+
 		      if (ext_size > max_external_reloc_size)
 			max_external_reloc_size = ext_size;
 		      if (sec->reloc_count > max_internal_reloc_count)

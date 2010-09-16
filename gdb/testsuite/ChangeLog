@@ -1,3 +1,90 @@
+2010-09-16  Phil Muldoon  <pmuldoon@redhat.com>
+            Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR mi/11407
+	* gdb.mi/dw2-ref-missing-frame-func.c: New File.
+	* gdb.mi/dw2-ref-missing-frame-main.c New File.
+	* gdb.mi/dw2-ref-missing-frame.S New File.
+	* gdb.mi/dw2-ref-missing-frame.exp New File.
+
+2010-09-14  Tom Tromey  <tromey@redhat.com>
+
+	PR symtab/8399:
+	* gdb.threads/tls.exp: Remove kfail.  Update expected output.
+
+2010-09-14  Tom Tromey  <tromey@redhat.com>
+
+	PR exp/11803:
+	* gdb.threads/tls.exp: Use C++.
+	(check_thread_local): Use K::another_thread_local.
+	* gdb.threads/tls.c (class K): New.
+	(another_thread_local): Now a member of K.
+	(spin): Update.  No longer K&R C.
+
+2010-09-13  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/koenig.cc: created class for testing member lookup.
+	* gdb.cp/koenig.exp: Added test for member lookup.
+
+2010-09-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix false FAILs on sourcetree topdir directory containing "kill".
+	* gdb.base/sigall.exp (test_one_sig) <advance to $nextsig>: Extend the
+	source line matching regexp.
+
+2010-09-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.python/python.exp (set height 0, collect help from uiout)
+	(verify help to uiout): New tests.
+
+2010-09-10  Edjunior Barbosa Machado  <emachado@linux.vnet.ibm.com>
+
+	* gdb.base/break-interp.exp (test_ld) <istarget powerpc64-*>: Add
+	is_lp64_target to check 64bit target.
+
+2010-09-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/break-interp.exp (reach): Permit leading . for ppc64.
+	(test_ld) <powerpc64-*>: New.
+
+2010-09-08  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.cp/templates.exp (test_template_args): Allow "struct".
+
+2010-09-08  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.cp/templates.cc (Empty, FunctionArg): New classes.
+	(FunctionArg::method): New function.
+	(empty, arg): New variables.
+	(main): Call arg.method.
+	* gdb.cp/templates.exp (test_template_args): New function.
+	(do_tests): Call it.
+
+2010-09-08  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.threads/threxit-hop-specific.exp: Use "continue" instead
+	of "next" to proceed over pthread_exit call.
+
+2010-09-08  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.base/maint.exp: Avoid wildcards against potentially very long
+	"maint print statistics" output to prevent expect timeouts.
+
+2010-09-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/printcmds.exp (test_float_accepted): Import gdb_prompt.
+	Move here, negate and extend by XFAIL the "p 0x1.1" test from ...
+	(test_float_rejected): ... here.
+	* gdb.java/jv-print.exp (test_float_accepted): Import gdb_prompt.
+	Move here, negate and extend by XFAIL the "p 0x1.1" test from ...
+	(test_float_rejected): ... here.
+	* gdb.objc/print.exp (test_float_accepted): Import gdb_prompt.
+	Move here, negate and extend by XFAIL the "p 0x1.1" test from ...
+	(test_float_rejected): ... here.
+	* gdb.pascal/print.exp (test_float_accepted): Import gdb_prompt.
+	Move here, negate and extend by XFAIL the "p 0x1.1" test from ...
+	(test_float_rejected): ... here.
+
 2010-09-04  Daniel Jacobowitz  <dan@codesourcery.com>
 
 	* gdb.base/watchpoint.exp: Call test_inaccessible_watchpoint
