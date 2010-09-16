@@ -460,7 +460,7 @@ lookup_minimal_symbol_by_pc_section_1 (CORE_ADDR pc,
 {
   int lo;
   int hi;
-  int new;
+  int cursor;
   struct objfile *objfile;
   struct minimal_symbol *msymbol;
   struct minimal_symbol *best_symbol = NULL;
@@ -522,16 +522,16 @@ lookup_minimal_symbol_by_pc_section_1 (CORE_ADDR pc,
 	      while (SYMBOL_VALUE_ADDRESS (&msymbol[hi]) > pc)
 		{
 		  /* pc is still strictly less than highest address */
-		  /* Note "new" will always be >= lo */
-		  new = (lo + hi) / 2;
-		  if ((SYMBOL_VALUE_ADDRESS (&msymbol[new]) >= pc) ||
-		      (lo == new))
+		  /* Note "point" will always be >= lo */
+		  cursor = (lo + hi) / 2;
+		  if ((SYMBOL_VALUE_ADDRESS (&msymbol[cursor]) >= pc) ||
+		      (lo == cursor))
 		    {
-		      hi = new;
+		      hi = cursor;
 		    }
 		  else
 		    {
-		      lo = new;
+		      lo = cursor;
 		    }
 		}
 
@@ -801,7 +801,7 @@ prim_record_minimal_symbol_full (const char *name, int name_len, int copy_name,
 				 struct objfile *objfile)
 {
   struct obj_section *obj_section;
-  struct msym_bunch *new;
+  struct msym_bunch *new_bunch;
   struct minimal_symbol *msymbol;
 
   /* Don't put gcc_compiled, __gnu_compiled_cplus, and friends into
@@ -827,10 +827,10 @@ prim_record_minimal_symbol_full (const char *name, int name_len, int copy_name,
 
   if (msym_bunch_index == BUNCH_SIZE)
     {
-      new = XCALLOC (1, struct msym_bunch);
+      new_bunch = XCALLOC (1, struct msym_bunch);
       msym_bunch_index = 0;
-      new->next = msym_bunch;
-      msym_bunch = new;
+      new_bunch->next = msym_bunch;
+      msym_bunch = new_bunch;
     }
   msymbol = &msym_bunch->contents[msym_bunch_index];
   SYMBOL_SET_LANGUAGE (msymbol, language_auto);

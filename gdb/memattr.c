@@ -111,11 +111,11 @@ mem_region_cmp (const void *untyped_lhs, const void *untyped_rhs)
 /* Allocate a new memory region, with default settings.  */
 
 void
-mem_region_init (struct mem_region *new)
+mem_region_init (struct mem_region *new_mem_region)
 {
-  memset (new, 0, sizeof (struct mem_region));
-  new->enabled_p = 1;
-  new->attrib = default_mem_attrib;
+  memset (new_mem_region, 0, sizeof (struct mem_region));
+  new_mem_region->enabled_p = 1;
+  new_mem_region->attrib = default_mem_attrib;
 }
 
 /* This function should be called before any command which would
@@ -173,7 +173,7 @@ static void
 create_mem_region (CORE_ADDR lo, CORE_ADDR hi,
 		   const struct mem_attrib *attrib)
 {
-  struct mem_region new;
+  struct mem_region new_mem_region;
   int i, ix;
 
   /* lo == hi is a useless empty region */
@@ -183,11 +183,11 @@ create_mem_region (CORE_ADDR lo, CORE_ADDR hi,
       return;
     }
 
-  mem_region_init (&new);
-  new.lo = lo;
-  new.hi = hi;
+  mem_region_init (&new_mem_region);
+  new_mem_region.lo = lo;
+  new_mem_region.hi = hi;
 
-  ix = VEC_lower_bound (mem_region_s, mem_region_list, &new,
+  ix = VEC_lower_bound (mem_region_s, mem_region_list, &new_mem_region,
 			mem_region_lessthan);
 
   /* Check for an overlapping memory region.  We only need to check
@@ -213,9 +213,9 @@ create_mem_region (CORE_ADDR lo, CORE_ADDR hi,
 	}
     }
 
-  new.number = ++mem_number;
-  new.attrib = *attrib;
-  VEC_safe_insert (mem_region_s, mem_region_list, ix, &new);
+  new_mem_region.number = ++mem_number;
+  new_mem_region.attrib = *attrib;
+  VEC_safe_insert (mem_region_s, mem_region_list, ix, &new_mem_region);
 }
 
 /*

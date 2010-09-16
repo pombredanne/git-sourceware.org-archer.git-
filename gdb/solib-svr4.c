@@ -943,7 +943,7 @@ svr4_keep_data_in_core (CORE_ADDR vaddr, unsigned long size)
 {
   struct svr4_info *info;
   CORE_ADDR ldsomap;
-  struct so_list *new;
+  struct so_list *new_so_list;
   struct cleanup *old_chain;
   struct link_map_offsets *lmo;
   CORE_ADDR lm_name;
@@ -960,16 +960,16 @@ svr4_keep_data_in_core (CORE_ADDR vaddr, unsigned long size)
     return 0;
 
   lmo = svr4_fetch_link_map_offsets ();
-  new = XZALLOC (struct so_list);
-  old_chain = make_cleanup (xfree, new);
-  new->lm_info = (struct lm_info *) xmalloc (sizeof (struct lm_info));
-  make_cleanup (xfree, new->lm_info);
-  new->lm_info->l_addr = (CORE_ADDR)-1;
-  new->lm_info->lm_addr = ldsomap;
-  new->lm_info->lm = (gdb_byte *) xzalloc (lmo->link_map_size);
-  make_cleanup (xfree, new->lm_info->lm);
-  read_memory (ldsomap, new->lm_info->lm, lmo->link_map_size);
-  lm_name = LM_NAME (new);
+  new_so_list = XZALLOC (struct so_list);
+  old_chain = make_cleanup (xfree, new_so_list);
+  new_so_list->lm_info = (struct lm_info *) xmalloc (sizeof (struct lm_info));
+  make_cleanup (xfree, new_so_list->lm_info);
+  new_so_list->lm_info->l_addr = (CORE_ADDR)-1;
+  new_so_list->lm_info->lm_addr = ldsomap;
+  new_so_list->lm_info->lm = (gdb_byte *) xzalloc (lmo->link_map_size);
+  make_cleanup (xfree, new_so_list->lm_info->lm);
+  read_memory (ldsomap, new_so_list->lm_info->lm, lmo->link_map_size);
+  lm_name = LM_NAME (new_so_list);
   do_cleanups (old_chain);
 
   return (lm_name >= vaddr && lm_name < vaddr + size);
@@ -1067,23 +1067,24 @@ svr4_default_sos (void)
 
   if (info->debug_loader_offset_p)
     {
-      struct so_list *new = XZALLOC (struct so_list);
+      struct so_list *new_so_list = XZALLOC (struct so_list);
 
-      new->lm_info = (struct lm_info *) xmalloc (sizeof (struct lm_info));
+      new_so_list->lm_info
+	= (struct lm_info *) xmalloc (sizeof (struct lm_info));
 
       /* Nothing will ever check the cached copy of the link
 	 map if we set l_addr.  */
-      new->lm_info->l_addr = info->debug_loader_offset;
-      new->lm_info->lm_addr = 0;
-      new->lm_info->lm = NULL;
+      new_so_list->lm_info->l_addr = info->debug_loader_offset;
+      new_so_list->lm_info->lm_addr = 0;
+      new_so_list->lm_info->lm = NULL;
 
-      strncpy (new->so_name, info->debug_loader_name,
+      strncpy (new_so_list->so_name, info->debug_loader_name,
 	       SO_NAME_MAX_PATH_SIZE - 1);
-      new->so_name[SO_NAME_MAX_PATH_SIZE - 1] = '\0';
-      strcpy (new->so_original_name, new->so_name);
+      new_so_list->so_name[SO_NAME_MAX_PATH_SIZE - 1] = '\0';
+      strcpy (new_so_list->so_original_name, new_so_list->so_name);
 
-      *link_ptr = new;
-      link_ptr = &new->next;
+      *link_ptr = new_so_list;
+      link_ptr = &new_so_list->next;
     }
 
   return head;
@@ -1136,26 +1137,27 @@ svr4_current_sos (void)
   while (lm)
     {
       struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
-      struct so_list *new = XZALLOC (struct so_list);
-      struct cleanup *old_chain = make_cleanup (xfree, new);
+      struct so_list *new_so_list = XZALLOC (struct so_list);
+      struct cleanup *old_chain = make_cleanup (xfree, new_so_list);
       CORE_ADDR next_lm;
 
-      new->lm_info = (struct lm_info *) xmalloc (sizeof (struct lm_info));
-      make_cleanup (xfree, new->lm_info);
+      new_so_list->lm_info
+	= (struct lm_info *) xmalloc (sizeof (struct lm_info));
+      make_cleanup (xfree, new_so_list->lm_info);
 
-      new->lm_info->l_addr = (CORE_ADDR)-1;
-      new->lm_info->lm_addr = lm;
-      new->lm_info->lm = (gdb_byte *) xzalloc (lmo->link_map_size);
-      make_cleanup (xfree, new->lm_info->lm);
+      new_so_list->lm_info->l_addr = (CORE_ADDR)-1;
+      new_so_list->lm_info->lm_addr = lm;
+      new_so_list->lm_info->lm = (gdb_byte *) xzalloc (lmo->link_map_size);
+      make_cleanup (xfree, new_so_list->lm_info->lm);
 
-      read_memory (lm, new->lm_info->lm, lmo->link_map_size);
+      read_memory (lm, new_so_list->lm_info->lm, lmo->link_map_size);
 
-      next_lm = LM_NEXT (new);
+      next_lm = LM_NEXT (new_so_list);
 
-      if (LM_PREV (new) != prev_lm)
+      if (LM_PREV (new_so_list) != prev_lm)
 	{
 	  warning (_("Corrupted shared library list"));
-	  free_so (new);
+	  free_so (new_so_list);
 	  next_lm = 0;
 	}
 
@@ -1164,10 +1166,10 @@ svr4_current_sos (void)
          SVR4, it has no name.  For others (Solaris 2.3 for example), it
          does have a name, so we can no longer use a missing name to
          decide when to ignore it. */
-      else if (IGNORE_FIRST_LINK_MAP_ENTRY (new) && ldsomap == 0)
+      else if (IGNORE_FIRST_LINK_MAP_ENTRY (new_so_list) && ldsomap == 0)
 	{
-	  info->main_lm_addr = new->lm_info->lm_addr;
-	  free_so (new);
+	  info->main_lm_addr = new_so_list->lm_info->lm_addr;
+	  free_so (new_so_list);
 	}
       else
 	{
@@ -1175,29 +1177,29 @@ svr4_current_sos (void)
 	  char *buffer;
 
 	  /* Extract this shared object's name.  */
-	  target_read_string (LM_NAME (new), &buffer,
+	  target_read_string (LM_NAME (new_so_list), &buffer,
 			      SO_NAME_MAX_PATH_SIZE - 1, &errcode);
 	  if (errcode != 0)
 	    warning (_("Can't read pathname for load map: %s."),
 		     safe_strerror (errcode));
 	  else
 	    {
-	      strncpy (new->so_name, buffer, SO_NAME_MAX_PATH_SIZE - 1);
-	      new->so_name[SO_NAME_MAX_PATH_SIZE - 1] = '\0';
-	      strcpy (new->so_original_name, new->so_name);
+	      strncpy (new_so_list->so_name, buffer, SO_NAME_MAX_PATH_SIZE - 1);
+	      new_so_list->so_name[SO_NAME_MAX_PATH_SIZE - 1] = '\0';
+	      strcpy (new_so_list->so_original_name, new_so_list->so_name);
 	    }
 	  xfree (buffer);
 
 	  /* If this entry has no name, or its name matches the name
 	     for the main executable, don't include it in the list.  */
-	  if (! new->so_name[0]
-	      || match_main (new->so_name))
-	    free_so (new);
+	  if (! new_so_list->so_name[0]
+	      || match_main (new_so_list->so_name))
+	    free_so (new_so_list);
 	  else
 	    {
-	      new->next = 0;
-	      *link_ptr = new;
-	      link_ptr = &new->next;
+	      new_so_list->next = 0;
+	      *link_ptr = new_so_list;
+	      link_ptr = &new_so_list->next;
 	    }
 	}
 

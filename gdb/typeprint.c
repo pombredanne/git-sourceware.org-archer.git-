@@ -49,12 +49,13 @@ static void whatis_exp (char *, int);
 
 /* Print a description of a type in the format of a 
    typedef for the current language.
-   NEW is the new name for a type TYPE. */
+   NEW_NAME is the new name for a type TYPE. */
 
 void
-typedef_print (struct type *type, struct symbol *new, struct ui_file *stream)
+typedef_print (struct type *type, struct symbol *new_name,
+	       struct ui_file *stream)
 {
-  LA_PRINT_TYPEDEF (type, new, stream);
+  LA_PRINT_TYPEDEF (type, new_name, stream);
 }
 
 /* The default way to print a typedef.  */

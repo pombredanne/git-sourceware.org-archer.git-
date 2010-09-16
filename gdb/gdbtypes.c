@@ -2984,7 +2984,7 @@ recursive_dump_type (struct type *type, int spaces)
 
 struct type_pair
 {
-  struct type *old, *new;
+  struct type *old_type, *new_type;
 };
 
 static hashval_t
@@ -2992,7 +2992,7 @@ type_pair_hash (const void *item)
 {
   const struct type_pair *pair = (const struct type_pair *) item;
 
-  return htab_hash_pointer (pair->old);
+  return htab_hash_pointer (pair->old_type);
 }
 
 static int
@@ -3001,7 +3001,7 @@ type_pair_eq (const void *item_lhs, const void *item_rhs)
   const struct type_pair *lhs = (const struct type_pair *) item_lhs;
   const struct type_pair *rhs = (const struct type_pair *) item_rhs;
 
-  return lhs->old == rhs->old;
+  return lhs->old_type == rhs->old_type;
 }
 
 /* Allocate the hash table used by copy_type_recursive to walk
@@ -3038,10 +3038,10 @@ copy_type_recursive (struct objfile *objfile,
      if it did, the type might disappear unexpectedly.  */
   gdb_assert (TYPE_OBJFILE (type) == objfile);
 
-  pair.old = type;
+  pair.old_type = type;
   slot = htab_find_slot (copied_types, &pair, INSERT);
   if (*slot != NULL)
-    return ((struct type_pair *) *slot)->new;
+    return ((struct type_pair *) *slot)->new_type;
 
   new_type = alloc_type_arch (get_type_arch (type));
 
@@ -3049,8 +3049,8 @@ copy_type_recursive (struct objfile *objfile,
      we encounter this type again during a recursive call below.  */
   stored = (struct type_pair *) obstack_alloc (&objfile->objfile_obstack,
 					       sizeof (struct type_pair));
-  stored->old = type;
-  stored->new = new_type;
+  stored->old_type = type;
+  stored->new_type = new_type;
   *slot = stored;
 
   /* Copy the common fields of types.  For the main type, we simply

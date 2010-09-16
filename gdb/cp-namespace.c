@@ -145,7 +145,7 @@ cp_add_using_directive (const char *dest,
                         struct obstack *obstack)
 {
   struct using_direct *current;
-  struct using_direct *new;
+  struct using_direct *new_directive;
   
   /* Has it already been added?  */
 
@@ -162,20 +162,21 @@ cp_add_using_directive (const char *dest,
 	return;
     }
 
-  new = (struct using_direct *) OBSTACK_ZALLOC (obstack, struct using_direct);
+  new_directive
+    = (struct using_direct *) OBSTACK_ZALLOC (obstack, struct using_direct);
 
-  new->import_src = obsavestring (src, strlen (src), obstack);
-  new->import_dest = obsavestring (dest, strlen (dest), obstack);
+  new_directive->import_src = obsavestring (src, strlen (src), obstack);
+  new_directive->import_dest = obsavestring (dest, strlen (dest), obstack);
 
   if (alias != NULL)
-    new->alias = obsavestring (alias, strlen (alias), obstack);
+    new_directive->alias = obsavestring (alias, strlen (alias), obstack);
 
   if (declaration != NULL)
-    new->declaration = obsavestring (declaration, strlen (declaration),
-                                     obstack);
+    new_directive->declaration = obsavestring (declaration,
+					       strlen (declaration), obstack);
 
-  new->next = using_directives;
-  using_directives = new;
+  new_directive->next = using_directives;
+  using_directives = new_directive;
 }
 
 /* Record the namespace that the function defined by SYMBOL was

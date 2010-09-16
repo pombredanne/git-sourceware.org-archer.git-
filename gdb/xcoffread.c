@@ -953,7 +953,7 @@ read_xcoff_symtab (struct partial_symtab *pst)
 
   /* fcn_cs_saved is global because process_xcoff_symbol needs it. */
   union internal_auxent fcn_aux_saved;
-  struct context_stack *new;
+  struct context_stack *new_ctxt;
 
   char *filestring = " _start_ ";	/* Name of the current file. */
 
@@ -1287,13 +1287,13 @@ read_xcoff_symtab (struct partial_symtab *pst)
 
 	      within_function = 1;
 
-	      new = push_context (0, fcn_start_addr + off);
+	      new_ctxt = push_context (0, fcn_start_addr + off);
 
-	      new->name = define_symbol
+	      new_ctxt->name = define_symbol
 		(fcn_cs_saved.c_value + off,
 		 fcn_stab_saved.c_name, 0, 0, objfile);
-	      if (new->name != NULL)
-		SYMBOL_SECTION (new->name) = SECT_OFF_TEXT (objfile);
+	      if (new_ctxt->name != NULL)
+		SYMBOL_SECTION (new_ctxt->name) = SECT_OFF_TEXT (objfile);
 	    }
 	  else if (strcmp (cs->c_name, ".ef") == 0)
 	    {
@@ -1311,17 +1311,18 @@ read_xcoff_symtab (struct partial_symtab *pst)
 		  within_function = 0;
 		  break;
 		}
-	      new = pop_context ();
+	      new_ctxt = pop_context ();
 	      /* Stack must be empty now.  */
-	      if (context_stack_depth > 0 || new == NULL)
+	      if (context_stack_depth > 0 || new_ctxt == NULL)
 		{
 		  ef_complaint (cs->c_symnum);
 		  within_function = 0;
 		  break;
 		}
 
-	      finish_block (new->name, &local_symbols, new->old_blocks,
-			    new->start_addr,
+	      finish_block (new_ctxt->name, &local_symbols,
+			    new_ctxt->old_blocks,
+			    new_ctxt->start_addr,
 			    (fcn_cs_saved.c_value
 			     + fcn_aux_saved.x_sym.x_misc.x_fsize
 			     + ANOFFSET (objfile->section_offsets,
@@ -1391,7 +1392,7 @@ read_xcoff_symtab (struct partial_symtab *pst)
 	  if (strcmp (cs->c_name, ".bb") == 0)
 	    {
 	      depth++;
-	      new = push_context (depth,
+	      new_ctxt = push_context (depth,
 				  (cs->c_value
 				   + ANOFFSET (objfile->section_offsets,
 					       SECT_OFF_TEXT (objfile))));
@@ -1403,8 +1404,8 @@ read_xcoff_symtab (struct partial_symtab *pst)
 		  eb_complaint (cs->c_symnum);
 		  break;
 		}
-	      new = pop_context ();
-	      if (depth-- != new->depth)
+	      new_ctxt = pop_context ();
+	      if (depth-- != new_ctxt->depth)
 		{
 		  eb_complaint (cs->c_symnum);
 		  break;
@@ -1412,14 +1413,15 @@ read_xcoff_symtab (struct partial_symtab *pst)
 	      if (local_symbols && context_stack_depth > 0)
 		{
 		  /* Make a block for the local symbols within.  */
-		  finish_block (new->name, &local_symbols, new->old_blocks,
-				new->start_addr,
+		  finish_block (new_ctxt->name, &local_symbols,
+				new_ctxt->old_blocks,
+				new_ctxt->start_addr,
 				(cs->c_value
 				 + ANOFFSET (objfile->section_offsets,
 					     SECT_OFF_TEXT (objfile))),
 				objfile);
 		}
-	      local_symbols = new->locals;
+	      local_symbols = new_ctxt->locals;
 	    }
 	  break;
 

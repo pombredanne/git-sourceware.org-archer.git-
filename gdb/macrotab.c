@@ -447,7 +447,7 @@ macro_include (struct macro_source_file *source,
                int line,
                const char *included)
 {
-  struct macro_source_file *new;
+  struct macro_source_file *new_src;
   struct macro_source_file **link;
 
   /* Find the right position in SOURCE's `includes' list for the new
@@ -486,13 +486,13 @@ macro_include (struct macro_source_file *source,
   /* At this point, we know that LINE is an unused line number, and
      *LINK points to the entry an #inclusion at that line should
      precede.  */
-  new = new_source_file (source->table, included);
-  new->included_by = source;
-  new->included_at_line = line;
-  new->next_included = *link;
-  *link = new;
+  new_src = new_source_file (source->table, included);
+  new_src->included_by = source;
+  new_src->included_at_line = line;
+  new_src->next_included = *link;
+  *link = new_src;
 
-  return new;
+  return new_src;
 }
 
 

@@ -270,15 +270,15 @@ bcache_full (const void *addr, int length, struct bcache *bcache, int *added)
 
   /* The user's string isn't in the list.  Insert it after *ps.  */
   {
-    struct bstring *new
+    struct bstring *new_bstr
       = (struct bstring *) obstack_alloc (&bcache->cache,
 					  BSTRING_SIZE (length));
 
-    memcpy (&new->d.data, addr, length);
-    new->length = length;
-    new->next = bcache->bucket[hash_index];
-    new->half_hash = half_hash;
-    bcache->bucket[hash_index] = new;
+    memcpy (&new_bstr->d.data, addr, length);
+    new_bstr->length = length;
+    new_bstr->next = bcache->bucket[hash_index];
+    new_bstr->half_hash = half_hash;
+    bcache->bucket[hash_index] = new_bstr;
 
     bcache->unique_count++;
     bcache->unique_size += length;
@@ -287,7 +287,7 @@ bcache_full (const void *addr, int length, struct bcache *bcache, int *added)
     if (added)
       *added = 1;
 
-    return &new->d.data;
+    return &new_bstr->d.data;
   }
 }
 

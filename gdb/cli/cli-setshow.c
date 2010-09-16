@@ -131,16 +131,16 @@ do_setshow_command (char *arg, int from_tty, struct cmd_list_element *c)
 	{
 	case var_string:
 	  {
-	    char *new;
+	    char *new_val;
 	    char *p;
 	    char *q;
 	    int ch;
 
 	    if (arg == NULL)
 	      arg = "";
-	    new = (char *) xmalloc (strlen (arg) + 2);
+	    new_val = (char *) xmalloc (strlen (arg) + 2);
 	    p = arg;
-	    q = new;
+	    q = new_val;
 	    while ((ch = *p++) != '\000')
 	      {
 		if (ch == '\\')
@@ -168,10 +168,10 @@ do_setshow_command (char *arg, int from_tty, struct cmd_list_element *c)
 	      *q++ = ' ';
 #endif
 	    *q++ = '\0';
-	    new = (char *) xrealloc (new, q - new);
+	    new_val = (char *) xrealloc (new_val, q - new_val);
 	    if (*(char **) c->var != NULL)
 	      xfree (*(char **) c->var);
-	    *(char **) c->var = new;
+	    *(char **) c->var = new_val;
 	  }
 	  break;
 	case var_string_noescape:

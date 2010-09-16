@@ -3606,26 +3606,27 @@ completion_list_add_name (char *symname, char *sym_text, int sym_text_len,
      of matches. Note that the name is moved to freshly malloc'd space. */
 
   {
-    char *new;
+    char *new_symname;
 
     if (word == sym_text)
       {
-	new = (char *) xmalloc (strlen (symname) + 5);
-	strcpy (new, symname);
+	new_symname = (char *) xmalloc (strlen (symname) + 5);
+	strcpy (new_symname, symname);
       }
     else if (word > sym_text)
       {
 	/* Return some portion of symname.  */
-	new = (char *) xmalloc (strlen (symname) + 5);
-	strcpy (new, symname + (word - sym_text));
+	new_symname = (char *) xmalloc (strlen (symname) + 5);
+	strcpy (new_symname, symname + (word - sym_text));
       }
     else
       {
 	/* Return some of SYM_TEXT plus symname.  */
-	new = (char *) xmalloc (strlen (symname) + (sym_text - word) + 5);
-	strncpy (new, word, sym_text - word);
-	new[sym_text - word] = '\0';
-	strcat (new, symname);
+	new_symname = (char *) xmalloc (strlen (symname) + (sym_text - word)
+					+ 5);
+	strncpy (new_symname, word, sym_text - word);
+	new_symname[sym_text - word] = '\0';
+	strcat (new_symname, symname);
       }
 
     if (return_val_index + 3 > return_val_size)
@@ -3633,7 +3634,7 @@ completion_list_add_name (char *symname, char *sym_text, int sym_text_len,
 	newsize = (return_val_size *= 2) * sizeof (char *);
 	return_val = (char **) xrealloc ((char *) return_val, newsize);
       }
-    return_val[return_val_index++] = new;
+    return_val[return_val_index++] = new_symname;
     return_val[return_val_index] = NULL;
   }
 }
@@ -4123,7 +4124,7 @@ static void
 add_filename_to_list (const char *fname, char *text, char *word,
 		      char ***list, int *list_used, int *list_alloced)
 {
-  char *new;
+  char *new_fname;
   size_t fnlen = strlen (fname);
 
   if (*list_used + 1 >= *list_alloced)
@@ -4136,24 +4137,24 @@ add_filename_to_list (const char *fname, char *text, char *word,
   if (word == text)
     {
       /* Return exactly fname.  */
-      new = (char *) xmalloc (fnlen + 5);
-      strcpy (new, fname);
+      new_fname = (char *) xmalloc (fnlen + 5);
+      strcpy (new_fname, fname);
     }
   else if (word > text)
     {
       /* Return some portion of fname.  */
-      new = (char *) xmalloc (fnlen + 5);
-      strcpy (new, fname + (word - text));
+      new_fname = (char *) xmalloc (fnlen + 5);
+      strcpy (new_fname, fname + (word - text));
     }
   else
     {
       /* Return some of TEXT plus fname.  */
-      new = (char *) xmalloc (fnlen + (text - word) + 5);
-      strncpy (new, word, text - word);
-      new[text - word] = '\0';
-      strcat (new, fname);
+      new_fname = (char *) xmalloc (fnlen + (text - word) + 5);
+      strncpy (new_fname, word, text - word);
+      new_fname[text - word] = '\0';
+      strcat (new_fname, fname);
     }
-  (*list)[*list_used] = new;
+  (*list)[*list_used] = new_fname;
   (*list)[++*list_used] = NULL;
 }
 

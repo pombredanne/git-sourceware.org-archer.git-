@@ -260,7 +260,7 @@ per_cu_dwarf_call (struct dwarf_expr_context *ctx, size_t die_offset,
 static void
 dwarf_expr_dwarf_call (struct dwarf_expr_context *ctx, size_t die_offset)
 {
-  struct dwarf_expr_baton *debaton = (struct dwarf2_expr_baton *) ctx->baton;
+  struct dwarf_expr_baton *debaton = (struct dwarf_expr_baton *) ctx->baton;
 
   return per_cu_dwarf_call (ctx, die_offset, debaton->per_cu);
 }

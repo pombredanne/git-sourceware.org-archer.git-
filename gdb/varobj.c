@@ -915,7 +915,7 @@ restrict_range (VEC (varobj_p) *children, int *from, int *to)
 static void
 install_dynamic_child (struct varobj *var,
 		       VEC (varobj_p) **changed,
-		       VEC (varobj_p) **new,
+		       VEC (varobj_p) **new_children,
 		       VEC (varobj_p) **unchanged,
 		       int *cchanged,
 		       int index,
@@ -927,9 +927,9 @@ install_dynamic_child (struct varobj *var,
       /* There's no child yet.  */
       struct varobj *child = varobj_add_child (var, name, value);
 
-      if (new)
+      if (new_children)
 	{
-	  VEC_safe_push (varobj_p, *new, child);
+	  VEC_safe_push (varobj_p, *new_children, child);
 	  *cchanged = 1;
 	}
     }
@@ -965,7 +965,7 @@ dynamic_varobj_has_child_method (struct varobj *var)
 static int
 update_dynamic_varobj_children (struct varobj *var,
 				VEC (varobj_p) **changed,
-				VEC (varobj_p) **new,
+				VEC (varobj_p) **new_children,
 				VEC (varobj_p) **unchanged,
 				int *cchanged,
 				int update_children,
@@ -1053,7 +1053,7 @@ update_dynamic_varobj_children (struct varobj *var,
 
 	  v = convert_value_from_python (py_v);
 	  install_dynamic_child (var, can_mention ? changed : NULL,
-				 can_mention ? new : NULL,
+				 can_mention ? new_children : NULL,
 				 can_mention ? unchanged : NULL,
 				 can_mention ? cchanged : NULL, i, name, v);
 	  do_cleanups (inner);
@@ -1686,7 +1686,7 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int is_explicit)
   int changed = 0;
   int type_changed = 0;
   int i;
-  struct value *new;
+  struct value *new_children;
   VEC (varobj_update_result) *stack = NULL;
   VEC (varobj_update_result) *result = NULL;
 
@@ -1720,14 +1720,14 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int is_explicit)
 	 the frame in which a local existed. We are letting the 
 	 value_of_root variable dispose of the varobj if the type
 	 has changed.  */
-      new = value_of_root (varp, &type_changed);
+      new_children = value_of_root (varp, &type_changed);
       r.varobj = *varp;
 
       r.type_changed = type_changed;
-      if (install_new_value ((*varp), new, type_changed))
+      if (install_new_value ((*varp), new_children, type_changed))
 	r.changed = 1;
       
-      if (new == NULL)
+      if (new_children == NULL)
 	r.status = VAROBJ_NOT_IN_SCOPE;
       r.value_installed = 1;
 
@@ -1760,8 +1760,8 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int is_explicit)
 	 updated.  */
       if (!r.value_installed)
 	{	  
-	  new = value_of_child (v->parent, v->index);
-	  if (install_new_value (v, new, 0 /* type not changed */))
+	  new_children = value_of_child (v->parent, v->index);
+	  if (install_new_value (v, new_children, 0 /* type not changed */))
 	    {
 	      r.changed = 1;
 	      v->updated = 0;
@@ -1773,7 +1773,7 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int is_explicit)
 	 invoked.    */
       if (v->pretty_printer)
 	{
-	  VEC (varobj_p) *changed = 0, *new = 0, *unchanged = 0;
+	  VEC (varobj_p) *changed = 0, *new_children = 0, *unchanged = 0;
 	  int i, children_changed = 0;
 
 	  if (v->frozen)
@@ -1805,14 +1805,15 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int is_explicit)
 
 	  /* If update_dynamic_varobj_children returns 0, then we have
 	     a non-conforming pretty-printer, so we skip it.  */
-	  if (update_dynamic_varobj_children (v, &changed, &new, &unchanged,
+	  if (update_dynamic_varobj_children (v, &changed, &new_children,
+					      &unchanged,
 					      &children_changed, 1,
 					      v->from, v->to))
 	    {
-	      if (children_changed || new)
+	      if (children_changed || new_children)
 		{
 		  r.children_changed = 1;
-		  r.new = new;
+		  r.new_children = new_children;
 		}
 	      /* Push in reverse order so that the first child is
 		 popped from the work stack first, and so will be

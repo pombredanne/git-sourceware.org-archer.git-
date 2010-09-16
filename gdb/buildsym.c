@@ -1223,7 +1223,7 @@ end_symtab (CORE_ADDR end_addr, struct objfile *objfile, int section)
 struct context_stack *
 push_context (int desc, CORE_ADDR valu)
 {
-  struct context_stack *new;
+  struct context_stack *new_ctxt;
 
   if (context_stack_depth == context_stack_size)
     {
@@ -1233,20 +1233,20 @@ push_context (int desc, CORE_ADDR valu)
 		  (context_stack_size * sizeof (struct context_stack)));
     }
 
-  new = &context_stack[context_stack_depth++];
-  new->depth = desc;
-  new->locals = local_symbols;
-  new->params = param_symbols;
-  new->old_blocks = pending_blocks;
-  new->start_addr = valu;
-  new->using_directives = using_directives;
-  new->name = NULL;
+  new_ctxt = &context_stack[context_stack_depth++];
+  new_ctxt->depth = desc;
+  new_ctxt->locals = local_symbols;
+  new_ctxt->params = param_symbols;
+  new_ctxt->old_blocks = pending_blocks;
+  new_ctxt->start_addr = valu;
+  new_ctxt->using_directives = using_directives;
+  new_ctxt->name = NULL;
 
   local_symbols = NULL;
   param_symbols = NULL;
   using_directives = NULL;
 
-  return new;
+  return new_ctxt;
 }
 
 /* Pop a context block.  Returns the address of the context block just

@@ -2727,7 +2727,7 @@ process_one_symbol (int type, int desc, CORE_ADDR valu, char *name,
 		    struct objfile *objfile)
 {
   struct gdbarch *gdbarch = get_objfile_arch (objfile);
-  struct context_stack *new;
+  struct context_stack *new_ctxt;
   /* This remembers the address of the start of a function.  It is
      used because in Solaris 2, N_LBRAC, N_RBRAC, and N_SLINE entries
      are relative to the current function's start address.  On systems
@@ -2804,17 +2804,17 @@ process_one_symbol (int type, int desc, CORE_ADDR valu, char *name,
 	    }
 
 	  within_function = 0;
-	  new = pop_context ();
+	  new_ctxt = pop_context ();
 
 	  /* Make a block for the local symbols within.  */
-	  block = finish_block (new->name, &local_symbols, new->old_blocks,
-				new->start_addr, new->start_addr + valu,
-				objfile);
+	  block = finish_block (new_ctxt->name, &local_symbols,
+				new_ctxt->old_blocks, new_ctxt->start_addr,
+				new_ctxt->start_addr + valu, objfile);
 
 	  /* For C++, set the block's scope.  */
-	  if (SYMBOL_LANGUAGE (new->name) == language_cplus)
-	    cp_set_block_scope (new->name, block, &objfile->objfile_obstack,
-				"", 0);
+	  if (SYMBOL_LANGUAGE (new_ctxt->name) == language_cplus)
+	    cp_set_block_scope (new_ctxt->name, block,
+				&objfile->objfile_obstack, "", 0);
 
 	  /* May be switching to an assembler file which may not be using
 	     block relative stabs, so reset the offset.  */
@@ -2849,7 +2849,7 @@ process_one_symbol (int type, int desc, CORE_ADDR valu, char *name,
 	   N_SO, the linker did not relocate them (sigh).  */
 	valu += last_source_start_addr;
 
-      new = push_context (desc, valu);
+      new_ctxt = push_context (desc, valu);
       break;
 
     case N_RBRAC:
@@ -2874,8 +2874,8 @@ process_one_symbol (int type, int desc, CORE_ADDR valu, char *name,
 	  break;
 	}
 
-      new = pop_context ();
-      if (desc != new->depth)
+      new_ctxt = pop_context ();
+      if (desc != new_ctxt->depth)
 	lbrac_mismatch_complaint (symnum);
 
       if (local_symbols != NULL)
@@ -2888,7 +2888,7 @@ process_one_symbol (int type, int desc, CORE_ADDR valu, char *name,
 misplaced N_LBRAC entry; discarding local symbols which have \
 no enclosing block"));
 	}
-      local_symbols = new->locals;
+      local_symbols = new_ctxt->locals;
 
       if (context_stack_depth > 1)
 	{
@@ -2903,15 +2903,15 @@ no enclosing block"));
 	      /* Muzzle a compiler bug that makes end < start.
 
 		 ??? Which compilers?  Is this ever harmful?.  */
-	      if (new->start_addr > valu)
+	      if (new_ctxt->start_addr > valu)
 		{
 		  complaint (&symfile_complaints,
 			     _("block start larger than block end"));
-		  new->start_addr = valu;
+		  new_ctxt->start_addr = valu;
 		}
 	      /* Make a block for the local symbols within.  */
-	      finish_block (0, &local_symbols, new->old_blocks,
-			    new->start_addr, valu, objfile);
+	      finish_block (0, &local_symbols, new_ctxt->old_blocks,
+			    new_ctxt->start_addr, valu, objfile);
 	    }
 	}
       else
@@ -3209,21 +3209,21 @@ no enclosing block"));
 		{
 		  struct block *block;
 
-		  new = pop_context ();
+		  new_ctxt = pop_context ();
 		  /* Make a block for the local symbols within.  */
-		  block = finish_block (new->name, &local_symbols,
-					new->old_blocks, new->start_addr,
-					valu, objfile);
+		  block = finish_block (new_ctxt->name, &local_symbols,
+					new_ctxt->old_blocks,
+					new_ctxt->start_addr, valu, objfile);
 
 		  /* For C++, set the block's scope.  */
-		  if (SYMBOL_LANGUAGE (new->name) == language_cplus)
-		    cp_set_block_scope (new->name, block,
+		  if (SYMBOL_LANGUAGE (new_ctxt->name) == language_cplus)
+		    cp_set_block_scope (new_ctxt->name, block,
 					&objfile->objfile_obstack,
 					"", 0);
 		}
 
-	      new = push_context (0, valu);
-	      new->name = define_symbol (valu, name, desc, type, objfile);
+	      new_ctxt = push_context (0, valu);
+	      new_ctxt->name = define_symbol (valu, name, desc, type, objfile);
 	      break;
 
 	    default:
