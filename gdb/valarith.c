@@ -320,7 +320,7 @@ unop_user_defined_p (enum exp_opcode op, struct value *arg1)
     }
 }
 
-/* Try to find an operator named OPERATOR which takes NARGS arguments
+/* Try to find an operator named OP which takes NARGS arguments
    specified in ARGS.  If the operator found is a static member operator
    *STATIC_MEMFUNP will be set to 1, and otherwise 0.
    The search if performed through find_overload_match which will handle
@@ -329,7 +329,7 @@ unop_user_defined_p (enum exp_opcode op, struct value *arg1)
    situations or combinations thereof.  */
 
 static struct value *
-value_user_defined_cpp_op (struct value **args, int nargs, char *operator,
+value_user_defined_cpp_op (struct value **args, int nargs, char *op,
                            int *static_memfuncp)
 {
 
@@ -343,7 +343,7 @@ value_user_defined_cpp_op (struct value **args, int nargs, char *operator,
   for (i = 0; i < nargs; i++)
     arg_types[i] = value_type (args[i]);
 
-  find_overload_match (arg_types, nargs, operator, BOTH /* could be method */,
+  find_overload_match (arg_types, nargs, op, BOTH /* could be method */,
                        0 /* strict match */, &args[0], /* objp */
                        NULL /* pass NULL symbol since symbol is unknown */,
                        &valp, &symp, static_memfuncp, 0);
@@ -360,7 +360,7 @@ value_user_defined_cpp_op (struct value **args, int nargs, char *operator,
       return value_of_variable (symp, 0);
     }
 
-  error (_("Could not find %s."), operator);
+  error (_("Could not find %s."), op);
 }
 
 /* Lookup user defined operator NAME.  Return a value representing the
