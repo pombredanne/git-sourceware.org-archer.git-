@@ -55,6 +55,8 @@
 #include "gdb_stat.h"
 #include "completer.h"
 #include "vec.h"
+#include "c-lang.h"
+#include "valprint.h"
 
 #include <fcntl.h>
 #include "gdb_string.h"
@@ -207,6 +209,20 @@ struct dwarf2_per_objfile
 
   /* The mapped index.  */
   struct mapped_index *index_table;
+
+  /* Set during partial symbol reading, to prevent queueing of full
+     symbols.  */
+  int reading_partial_symbols;
+
+  /* Table mapping type .debug_info DIE offsets to types.
+     This is NULL if not allocated yet.
+     It (currently) makes sense to allocate debug_types_type_hash lazily.
+     To keep things simple we allocate both lazily.  */
+  htab_t debug_info_type_hash;
+
+  /* Table mapping type .debug_types DIE offsets to types.
+     This is NULL if not allocated yet.  */
+  htab_t debug_types_type_hash;
 };
 
 static struct dwarf2_per_objfile *dwarf2_per_objfile;
@@ -259,6 +275,29 @@ struct comp_unit_head
      This will be the first byte following the compilation unit header.  */
   unsigned int first_die_offset;
 };
+
+/* Type used for delaying computation of method physnames.
+   See comments for compute_delayed_physnames.  */
+struct delayed_method_info
+{
+  /* The type to which the method is attached, i.e., its parent class.  */
+  struct type *type;
+
+  /* The index of the method in the type's function fieldlists.  */
+  int fnfield_index;
+
+  /* The index of the method in the fieldlist.  */
+  int index;
+
+  /* The name of the DIE.  */
+  const char *name;
+
+  /*  The DIE associated with this method.  */
+  struct die_info *die;
+};
+
+typedef struct delayed_method_info delayed_method_info;
+DEF_VEC_O (delayed_method_info);
 
 /* Internal state when decoding a particular compilation unit.  */
 struct dwarf2_cu
@@ -316,11 +355,6 @@ struct dwarf2_cu
   /* Backchain to our per_cu entry if the tree has been built.  */
   struct dwarf2_per_cu_data *per_cu;
 
-  /* Pointer to the die -> type map.  Although it is stored
-     permanently in per_cu, we copy it here to avoid double
-     indirection.  */
-  htab_t type_hash;
-
   /* How many compilation units ago was this CU last referenced?  */
   int last_used;
 
@@ -337,6 +371,10 @@ struct dwarf2_cu
 
   /* Header data from the line table, during full symbol processing.  */
   struct line_header *line_header;
+
+  /* A list of methods which need to have physnames computed
+     after all type information has been read.  */
+  VEC (delayed_method_info) *method_list;
 
   /* Mark used when releasing cached dies.  */
   unsigned int mark : 1;
@@ -411,12 +449,6 @@ struct dwarf2_per_cu_data
   /* Set to non-NULL iff this CU is currently loaded.  When it gets freed out
      of the CU cache it gets reset to NULL again.  */
   struct dwarf2_cu *cu;
-
-  /* If full symbols for this CU have been read in, then this field
-     holds a map of DIE offsets to types.  It isn't always possible
-     to reconstruct this information later, so we have to preserve
-     it.  */
-  htab_t type_hash;
 
   /* The corresponding objfile.  */
   struct objfile *objfile;
@@ -542,6 +574,9 @@ struct partial_die_info
     /* Flag set if the DIE has a byte_size attribute.  */
     unsigned int has_byte_size : 1;
 
+    /* Flag set if any of the DIE's children are template arguments.  */
+    unsigned int has_template_arguments : 1;
+
     /* The name of this DIE.  Normally the value of DW_AT_name, but
        sometimes a default name for unnamed DIEs.  */
     char *name;
@@ -619,7 +654,11 @@ struct die_info
     ENUM_BITFIELD(dwarf_tag) tag : 16;
 
     /* Number of attributes */
-    unsigned short num_attrs;
+    unsigned char num_attrs;
+
+    /* True if we're presently building the full type name for the
+       type derived from this DIE.  */
+    unsigned char building_fullname : 1;
 
     /* Abbrev number */
     unsigned int abbrev;
@@ -630,8 +669,7 @@ struct die_info
     /* The dies in a compilation unit form an n-ary tree.  PARENT
        points to this die's parent; CHILD points to the first child of
        this node; and all the children of a given node are chained
-       together via their SIBLING fields, terminated by a die whose
-       tag is zero.  */
+       together via their SIBLING fields.  */
     struct die_info *child;	/* Its first child, if any.  */
     struct die_info *sibling;	/* Its next sibling, if any.  */
     struct die_info *parent;	/* Its parent, if any.  */
@@ -833,10 +871,6 @@ static void dwarf2_locate_sections (bfd *, asection *, void *);
 static void dwarf2_create_include_psymtab (char *, struct partial_symtab *,
                                            struct objfile *);
 
-static void dwarf2_build_include_psymtabs (struct dwarf2_cu *,
-                                           struct die_info *,
-                                           struct partial_symtab *);
-
 static void dwarf2_build_psymtabs_hard (struct objfile *);
 
 static void scan_partial_symbols (struct partial_die_info *,
@@ -979,9 +1013,13 @@ static struct symbol *new_symbol_full (struct die_info *, struct type *,
 static void dwarf2_const_value (struct attribute *, struct symbol *,
 				struct dwarf2_cu *);
 
-static void dwarf2_const_value_data (struct attribute *attr,
-				     struct symbol *sym,
-				     int bits);
+static void dwarf2_const_value_attr (struct attribute *attr,
+				     struct type *type,
+				     const char *name,
+				     struct obstack *obstack,
+				     struct dwarf2_cu *cu, long *value,
+				     gdb_byte **bytes,
+				     struct dwarf2_locexpr_baton **baton);
 
 static struct type *die_type (struct die_info *, struct dwarf2_cu *);
 
@@ -995,9 +1033,12 @@ static void set_descriptive_type (struct type *, struct die_info *,
 static struct type *die_containing_type (struct die_info *,
 					 struct dwarf2_cu *);
 
-static struct type *tag_type_to_type (struct die_info *, struct dwarf2_cu *);
+static struct type *lookup_die_type (struct die_info *, struct attribute *,
+				     struct dwarf2_cu *);
 
 static struct type *read_type_die (struct die_info *, struct dwarf2_cu *);
+
+static struct type *read_type_die_1 (struct die_info *, struct dwarf2_cu *);
 
 static char *determine_prefix (struct die_info *die, struct dwarf2_cu *);
 
@@ -1090,6 +1131,10 @@ static char *dwarf2_canonicalize_name (char *, struct dwarf2_cu *,
 				       struct obstack *);
 
 static char *dwarf2_name (struct die_info *die, struct dwarf2_cu *);
+
+static const char *dwarf2_full_name (char *name,
+				     struct die_info *die,
+				     struct dwarf2_cu *cu);
 
 static struct die_info *dwarf2_extension (struct die_info *die,
 					  struct dwarf2_cu **);
@@ -1217,6 +1262,9 @@ static void dwarf2_mark (struct dwarf2_cu *);
 
 static void dwarf2_clear_marks (struct dwarf2_per_cu_data *);
 
+static struct type *get_die_type_at_offset (unsigned int,
+					    struct dwarf2_per_cu_data *per_cu);
+
 static struct type *get_die_type (struct die_info *die, struct dwarf2_cu *cu);
 
 static void dwarf2_release_queue (void *dummy);
@@ -1242,7 +1290,7 @@ static gdb_byte *partial_read_comp_unit_head (struct comp_unit_head *header,
 static void init_cu_die_reader (struct die_reader_specs *reader,
 				struct dwarf2_cu *cu);
 
-static htab_t allocate_signatured_type_hash_table (struct objfile *objfile);
+static htab_t allocate_signatured_type_table (struct objfile *objfile);
 
 #if WORDS_BIGENDIAN
 
@@ -1267,6 +1315,9 @@ byte_swap (offset_type value)
 
 /* The suffix for an index file.  */
 #define INDEX_SUFFIX ".gdb-index"
+
+static const char *dwarf2_physname (char *name, struct die_info *die,
+				    struct dwarf2_cu *cu);
 
 /* Try to locate the sections we need for DWARF 2 debugging
    information and return true if we have enough to do something.  */
@@ -1564,7 +1615,7 @@ dwarf2_get_section_info (struct objfile *objfile, const char *section_name,
   else if (section_is_p (section_name, FRAME_SECTION))
     info = &data->frame;
   else
-    gdb_assert (0);
+    gdb_assert_not_reached ("unexpected section");
 
   if (info->asection != NULL && info->size != 0 && info->buffer == NULL)
     /* We haven't read this section in yet.  Do it now.  */
@@ -1693,13 +1744,14 @@ create_cus_from_index (struct objfile *objfile, const gdb_byte *cu_list,
 }
 
 /* Create the signatured type hash table from the index.  */
+
 static int
-create_signatured_type_hash_from_index (struct objfile *objfile,
-					const gdb_byte *bytes,
-					offset_type elements)
+create_signatured_type_table_from_index (struct objfile *objfile,
+					 const gdb_byte *bytes,
+					 offset_type elements)
 {
   offset_type i;
-  htab_t type_hash;
+  htab_t sig_types_hash;
 
   dwarf2_per_objfile->n_type_comp_units = elements / 3;
   dwarf2_per_objfile->type_comp_units
@@ -1707,7 +1759,7 @@ create_signatured_type_hash_from_index (struct objfile *objfile,
 		     dwarf2_per_objfile->n_type_comp_units
 		     * sizeof (struct dwarf2_per_cu_data *));
 
-  type_hash = allocate_signatured_type_hash_table (objfile);
+  sig_types_hash = allocate_signatured_type_table (objfile);
 
   for (i = 0; i < elements; i += 3)
     {
@@ -1733,13 +1785,13 @@ create_signatured_type_hash_from_index (struct objfile *objfile,
 	= OBSTACK_ZALLOC (&objfile->objfile_obstack,
 			  struct dwarf2_per_cu_quick_data);
 
-      slot = htab_find_slot (type_hash, type_sig, INSERT);
+      slot = htab_find_slot (sig_types_hash, type_sig, INSERT);
       *slot = type_sig;
 
       dwarf2_per_objfile->type_comp_units[i / 3] = &type_sig->per_cu;
     }
 
-  dwarf2_per_objfile->signatured_types = type_hash;
+  dwarf2_per_objfile->signatured_types = sig_types_hash;
 
   return 1;
 }
@@ -1851,6 +1903,13 @@ dwarf2_read_index (struct objfile *objfile)
   if (dwarf2_per_objfile->gdb_index.asection == NULL
       || dwarf2_per_objfile->gdb_index.size == 0)
     return 0;
+
+  /* Older elfutils strip versions could keep the section in the main
+     executable while splitting it for the separate debug info file.  */
+  if ((bfd_get_file_flags (dwarf2_per_objfile->gdb_index.asection)
+       & SEC_HAS_CONTENTS) == 0)
+    return 0;
+
   dwarf2_read_section (objfile, &dwarf2_per_objfile->gdb_index);
 
   addr = dwarf2_per_objfile->gdb_index.buffer;
@@ -1905,8 +1964,8 @@ dwarf2_read_index (struct objfile *objfile)
 
   if (version == 2
       && types_list_elements
-      && !create_signatured_type_hash_from_index (objfile, types_list,
-						  types_list_elements))
+      && !create_signatured_type_table_from_index (objfile, types_list,
+						   types_list_elements))
     return 0;
 
   create_addrmap_from_index (objfile, map);
@@ -1937,6 +1996,7 @@ dw2_require_line_header (struct objfile *objfile,
   struct attribute *attr;
   struct cleanup *cleanups;
   struct die_info *comp_unit_die;
+  struct dwarf2_section_info* sec;
   gdb_byte *beg_of_comp_unit, *info_ptr, *buffer;
   int has_children, i;
   struct dwarf2_cu cu;
@@ -1954,9 +2014,13 @@ dw2_require_line_header (struct objfile *objfile,
 
   cleanups = make_cleanup (free_stack_comp_unit, &cu);
 
-  dwarf2_read_section (objfile, &dwarf2_per_objfile->info);
-  buffer_size = dwarf2_per_objfile->info.size;
-  buffer = dwarf2_per_objfile->info.buffer;
+  if (this_cu->from_debug_types)
+    sec = &dwarf2_per_objfile->types;
+  else
+    sec = &dwarf2_per_objfile->info;
+  dwarf2_read_section (objfile, sec);
+  buffer_size = sec->size;
+  buffer = sec->buffer;
   info_ptr = buffer + this_cu->offset;
   beg_of_comp_unit = info_ptr;
 
@@ -2011,20 +2075,20 @@ dw2_require_line_header (struct objfile *objfile,
    invoked.  */
 static const char *
 dw2_require_full_path (struct objfile *objfile,
-		       struct dwarf2_per_cu_data *cu,
+		       struct dwarf2_per_cu_data *per_cu,
 		       int index)
 {
-  if (!cu->v.quick->full_names)
-    cu->v.quick->full_names
+  if (!per_cu->v.quick->full_names)
+    per_cu->v.quick->full_names
       = OBSTACK_CALLOC (&objfile->objfile_obstack,
-			cu->v.quick->lines->num_file_names,
+			per_cu->v.quick->lines->num_file_names,
 			sizeof (char *));
 
-  if (!cu->v.quick->full_names[index])
-    cu->v.quick->full_names[index]
-      = gdb_realpath (cu->v.quick->file_names[index]);
+  if (!per_cu->v.quick->full_names[index])
+    per_cu->v.quick->full_names[index]
+      = gdb_realpath (per_cu->v.quick->file_names[index]);
 
-  return cu->v.quick->full_names[index];
+  return per_cu->v.quick->full_names[index];
 }
 
 static struct symtab *
@@ -2045,14 +2109,14 @@ dw2_forget_cached_source_info (struct objfile *objfile)
   for (i = 0; i < (dwarf2_per_objfile->n_comp_units
 		   + dwarf2_per_objfile->n_type_comp_units); ++i)
     {
-      struct dwarf2_per_cu_data *cu = dw2_get_cu (i);
+      struct dwarf2_per_cu_data *per_cu = dw2_get_cu (i);
 
-      if (cu->v.quick->full_names)
+      if (per_cu->v.quick->full_names)
 	{
 	  int j;
 
-	  for (j = 0; j < cu->v.quick->lines->num_file_names; ++j)
-	    xfree ((void *) cu->v.quick->full_names[j]);
+	  for (j = 0; j < per_cu->v.quick->lines->num_file_names; ++j)
+	    xfree ((void *) per_cu->v.quick->full_names[j]);
 	}
     }
 }
@@ -2071,38 +2135,38 @@ dw2_lookup_symtab (struct objfile *objfile, const char *name,
 		   + dwarf2_per_objfile->n_type_comp_units); ++i)
     {
       int j;
-      struct dwarf2_per_cu_data *cu = dw2_get_cu (i);
+      struct dwarf2_per_cu_data *per_cu = dw2_get_cu (i);
 
-      if (cu->v.quick->symtab)
+      if (per_cu->v.quick->symtab)
 	continue;
 
-      dw2_require_line_header (objfile, cu);
-      if (!cu->v.quick->lines)
+      dw2_require_line_header (objfile, per_cu);
+      if (!per_cu->v.quick->lines)
 	continue;
 
-      for (j = 0; j < cu->v.quick->lines->num_file_names; ++j)
+      for (j = 0; j < per_cu->v.quick->lines->num_file_names; ++j)
 	{
-	  const char *this_name = cu->v.quick->file_names[j];
+	  const char *this_name = per_cu->v.quick->file_names[j];
 
 	  if (FILENAME_CMP (name, this_name) == 0)
 	    {
-	      *result = dw2_instantiate_symtab (objfile, cu);
+	      *result = dw2_instantiate_symtab (objfile, per_cu);
 	      return 1;
 	    }
 
 	  if (check_basename && ! base_cu
 	      && FILENAME_CMP (lbasename (this_name), name) == 0)
-	    base_cu = cu;
+	    base_cu = per_cu;
 
 	  if (full_path != NULL)
 	    {
 	      const char *this_full_name = dw2_require_full_path (objfile,
-								  cu, j);
+								  per_cu, j);
 
 	      if (this_full_name
 		  && FILENAME_CMP (full_path, this_full_name) == 0)
 		{
-		  *result = dw2_instantiate_symtab (objfile, cu);
+		  *result = dw2_instantiate_symtab (objfile, per_cu);
 		  return 1;
 		}
 	    }
@@ -2110,7 +2174,7 @@ dw2_lookup_symtab (struct objfile *objfile, const char *name,
 	  if (real_path != NULL)
 	    {
 	      const char *this_full_name = dw2_require_full_path (objfile,
-								  cu, j);
+								  per_cu, j);
 
 	      if (this_full_name != NULL)
 		{
@@ -2118,7 +2182,7 @@ dw2_lookup_symtab (struct objfile *objfile, const char *name,
 		  if (rp != NULL && FILENAME_CMP (real_path, rp) == 0)
 		    {
 		      xfree (rp);
-		      *result = dw2_instantiate_symtab (objfile, cu);
+		      *result = dw2_instantiate_symtab (objfile, per_cu);
 		      return 1;
 		    }
 		  xfree (rp);
@@ -2163,9 +2227,9 @@ dw2_do_expand_symtabs_matching (struct objfile *objfile, const char *name)
 	  for (i = 0; i < len; ++i)
 	    {
 	      offset_type cu_index = MAYBE_SWAP (vec[i + 1]);
-	      struct dwarf2_per_cu_data *cu = dw2_get_cu (cu_index);
+	      struct dwarf2_per_cu_data *per_cu = dw2_get_cu (cu_index);
 
-	      dw2_instantiate_symtab (objfile, cu);
+	      dw2_instantiate_symtab (objfile, per_cu);
 	    }
 	}
     }
@@ -2189,9 +2253,9 @@ dw2_print_stats (struct objfile *objfile)
   for (i = 0; i < (dwarf2_per_objfile->n_comp_units
 		   + dwarf2_per_objfile->n_type_comp_units); ++i)
     {
-      struct dwarf2_per_cu_data *cu = dw2_get_cu (i);
+      struct dwarf2_per_cu_data *per_cu = dw2_get_cu (i);
 
-      if (!cu->v.quick->symtab)
+      if (!per_cu->v.quick->symtab)
 	++count;
     }
   printf_filtered (_("  Number of unread CUs: %d\n"), count);
@@ -2227,9 +2291,9 @@ dw2_expand_all_symtabs (struct objfile *objfile)
   for (i = 0; i < (dwarf2_per_objfile->n_comp_units
 		   + dwarf2_per_objfile->n_type_comp_units); ++i)
     {
-      struct dwarf2_per_cu_data *cu = dw2_get_cu (i);
+      struct dwarf2_per_cu_data *per_cu = dw2_get_cu (i);
 
-      dw2_instantiate_symtab (objfile, cu);
+      dw2_instantiate_symtab (objfile, per_cu);
     }
 }
 
@@ -2244,21 +2308,21 @@ dw2_expand_symtabs_with_filename (struct objfile *objfile,
 		   + dwarf2_per_objfile->n_type_comp_units); ++i)
     {
       int j;
-      struct dwarf2_per_cu_data *cu = dw2_get_cu (i);
+      struct dwarf2_per_cu_data *per_cu = dw2_get_cu (i);
 
-      if (cu->v.quick->symtab)
+      if (per_cu->v.quick->symtab)
 	continue;
 
-      dw2_require_line_header (objfile, cu);
-      if (!cu->v.quick->lines)
+      dw2_require_line_header (objfile, per_cu);
+      if (!per_cu->v.quick->lines)
 	continue;
 
-      for (j = 0; j < cu->v.quick->lines->num_file_names; ++j)
+      for (j = 0; j < per_cu->v.quick->lines->num_file_names; ++j)
 	{
-	  const char *this_name = cu->v.quick->file_names[j];
+	  const char *this_name = per_cu->v.quick->file_names[j];
 	  if (strcmp (this_name, filename) == 0)
 	    {
-	      dw2_instantiate_symtab (objfile, cu);
+	      dw2_instantiate_symtab (objfile, per_cu);
 	      break;
 	    }
 	}
@@ -2268,7 +2332,7 @@ dw2_expand_symtabs_with_filename (struct objfile *objfile,
 static const char *
 dw2_find_symbol_file (struct objfile *objfile, const char *name)
 {
-  struct dwarf2_per_cu_data *cu;
+  struct dwarf2_per_cu_data *per_cu;
   offset_type *vec;
 
   dw2_setup (objfile);
@@ -2285,13 +2349,13 @@ dw2_find_symbol_file (struct objfile *objfile, const char *name)
      should be rewritten so that it doesn't require a custom hook.  It
      could just use the ordinary symbol tables.  */
   /* vec[0] is the length, which must always be >0.  */
-  cu = dw2_get_cu (MAYBE_SWAP (vec[1]));
+  per_cu = dw2_get_cu (MAYBE_SWAP (vec[1]));
 
-  dw2_require_line_header (objfile, cu);
-  if (!cu->v.quick->lines)
+  dw2_require_line_header (objfile, per_cu);
+  if (!per_cu->v.quick->lines)
     return NULL;
 
-  return cu->v.quick->file_names[cu->v.quick->lines->num_file_names - 1];
+  return per_cu->v.quick->file_names[per_cu->v.quick->lines->num_file_names - 1];
 }
 
 static void
@@ -2304,10 +2368,9 @@ dw2_map_ada_symtabs (struct objfile *objfile,
 		     domain_enum namespace, int wild,
 		     void *data)
 {
-  /* For now, we don't support Ada, so this function can't be
-     reached.  */
-  internal_error (__FILE__, __LINE__,
-		  _("map_ada_symtabs called via index method"));
+  /* For now, we don't support Ada.  Still the function can be called if the
+     current language is Ada for a non-Ada objfile using GNU index.  As Ada
+     does not look for non-Ada symbols this function should just return.  */
 }
 
 static void
@@ -2328,21 +2391,21 @@ dw2_expand_symtabs_matching (struct objfile *objfile,
 		   + dwarf2_per_objfile->n_type_comp_units); ++i)
     {
       int j;
-      struct dwarf2_per_cu_data *cu = dw2_get_cu (i);
+      struct dwarf2_per_cu_data *per_cu = dw2_get_cu (i);
 
-      cu->v.quick->mark = 0;
-      if (cu->v.quick->symtab)
+      per_cu->v.quick->mark = 0;
+      if (per_cu->v.quick->symtab)
 	continue;
 
-      dw2_require_line_header (objfile, cu);
-      if (!cu->v.quick->lines)
+      dw2_require_line_header (objfile, per_cu);
+      if (!per_cu->v.quick->lines)
 	continue;
 
-      for (j = 0; j < cu->v.quick->lines->num_file_names; ++j)
+      for (j = 0; j < per_cu->v.quick->lines->num_file_names; ++j)
 	{
-	  if (file_matcher (cu->v.quick->file_names[j], data))
+	  if (file_matcher (per_cu->v.quick->file_names[j], data))
 	    {
-	      cu->v.quick->mark = 1;
+	      per_cu->v.quick->mark = 1;
 	      break;
 	    }
 	}
@@ -2373,11 +2436,11 @@ dw2_expand_symtabs_matching (struct objfile *objfile,
       vec_len = MAYBE_SWAP (vec[0]);
       for (vec_idx = 0; vec_idx < vec_len; ++vec_idx)
 	{
-	  struct dwarf2_per_cu_data *cu;
+	  struct dwarf2_per_cu_data *per_cu;
 
-	  cu = dw2_get_cu (MAYBE_SWAP (vec[vec_idx + 1]));
-	  if (cu->v.quick->mark)
-	    dw2_instantiate_symtab (objfile, cu);
+	  per_cu = dw2_get_cu (MAYBE_SWAP (vec[vec_idx + 1]));
+	  if (per_cu->v.quick->mark)
+	    dw2_instantiate_symtab (objfile, per_cu);
 	}
     }
 }
@@ -2449,19 +2512,20 @@ dw2_map_symbol_filenames (struct objfile *objfile,
 		   + dwarf2_per_objfile->n_type_comp_units); ++i)
     {
       int j;
-      struct dwarf2_per_cu_data *cu = dw2_get_cu (i);
+      struct dwarf2_per_cu_data *per_cu = dw2_get_cu (i);
 
-      if (cu->v.quick->symtab)
+      if (per_cu->v.quick->symtab)
 	continue;
 
-      dw2_require_line_header (objfile, cu);
-      if (!cu->v.quick->lines)
+      dw2_require_line_header (objfile, per_cu);
+      if (!per_cu->v.quick->lines)
 	continue;
 
-      for (j = 0; j < cu->v.quick->lines->num_file_names; ++j)
+      for (j = 0; j < per_cu->v.quick->lines->num_file_names; ++j)
 	{
-	  const char *this_full_name = dw2_require_full_path (objfile, cu, j);
-	  (*fun) (cu->v.quick->file_names[j], this_full_name, data);
+	  const char *this_full_name = dw2_require_full_path (objfile, per_cu,
+							      j);
+	  (*fun) (per_cu->v.quick->file_names[j], this_full_name, data);
 	}
     }
 }
@@ -2515,10 +2579,10 @@ dwarf2_initialize_objfile (struct objfile *objfile)
       for (i = 0; i < (dwarf2_per_objfile->n_comp_units
 		       + dwarf2_per_objfile->n_type_comp_units); ++i)
 	{
-	  struct dwarf2_per_cu_data *cu = dw2_get_cu (i);
+	  struct dwarf2_per_cu_data *per_cu = dw2_get_cu (i);
 
-	  cu->v.quick = OBSTACK_ZALLOC (&objfile->objfile_obstack,
-					struct dwarf2_per_cu_quick_data);
+	  per_cu->v.quick = OBSTACK_ZALLOC (&objfile->objfile_obstack,
+					    struct dwarf2_per_cu_quick_data);
 	}
 
       /* Return 1 so that gdb sees the "quick" functions.  However,
@@ -2706,7 +2770,8 @@ dwarf2_build_include_psymtabs (struct dwarf2_cu *cu,
   if (lh == NULL)
     return;  /* No linetable, so no includes.  */
 
-  dwarf_decode_lines (lh, NULL, abfd, cu, pst);
+  /* NOTE: pst->dirname is DW_AT_comp_dir (if present).  */
+  dwarf_decode_lines (lh, pst->dirname, abfd, cu, pst);
 
   free_line_header (lh);
 }
@@ -2732,7 +2797,7 @@ eq_type_signature (const void *item_lhs, const void *item_rhs)
 /* Allocate a hash table for signatured types.  */
 
 static htab_t
-allocate_signatured_type_hash_table (struct objfile *objfile)
+allocate_signatured_type_table (struct objfile *objfile)
 {
   return htab_create_alloc_ex (41,
 			       hash_type_signature,
@@ -2777,7 +2842,7 @@ create_debug_types_hash_table (struct objfile *objfile)
       return 0;
     }
 
-  types_htab = allocate_signatured_type_hash_table (objfile);
+  types_htab = allocate_signatured_type_table (objfile);
 
   if (dwarf2_die_debug)
     fprintf_unfiltered (gdb_stdlog, "Signatured types:\n");
@@ -3161,6 +3226,8 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile)
   struct cleanup *back_to, *addrmap_cleanup;
   struct obstack temp_obstack;
 
+  dwarf2_per_objfile->reading_partial_symbols = 1;
+
   dwarf2_read_section (objfile, &dwarf2_per_objfile->info);
   info_ptr = dwarf2_per_objfile->info.buffer;
 
@@ -3224,10 +3291,11 @@ load_partial_comp_unit (struct dwarf2_per_cu_data *this_cu,
   gdb_byte *info_ptr, *beg_of_comp_unit;
   struct die_info *comp_unit_die;
   struct dwarf2_cu *cu;
-  struct cleanup *back_to;
+  struct cleanup *free_abbrevs_cleanup, *free_cu_cleanup = NULL;
   struct attribute *attr;
   int has_children;
   struct die_reader_specs reader_specs;
+  int read_cu = 0;
 
   gdb_assert (! this_cu->from_debug_types);
 
@@ -3235,27 +3303,42 @@ load_partial_comp_unit (struct dwarf2_per_cu_data *this_cu,
   info_ptr = dwarf2_per_objfile->info.buffer + this_cu->offset;
   beg_of_comp_unit = info_ptr;
 
-  cu = alloc_one_comp_unit (objfile);
+  if (this_cu->cu == NULL)
+    {
+      cu = alloc_one_comp_unit (objfile);
 
-  /* ??? Missing cleanup for CU?  */
+      read_cu = 1;
 
-  /* Link this compilation unit into the compilation unit tree.  */
-  this_cu->cu = cu;
-  cu->per_cu = this_cu;
-  cu->type_hash = this_cu->type_hash;
+      /* If an error occurs while loading, release our storage.  */
+      free_cu_cleanup = make_cleanup (free_one_comp_unit, cu);
 
-  info_ptr = partial_read_comp_unit_head (&cu->header, info_ptr,
-					  dwarf2_per_objfile->info.buffer,
-					  dwarf2_per_objfile->info.size,
-					  abfd);
+      info_ptr = partial_read_comp_unit_head (&cu->header, info_ptr,
+					      dwarf2_per_objfile->info.buffer,
+					      dwarf2_per_objfile->info.size,
+					      abfd);
 
-  /* Complete the cu_header.  */
-  cu->header.offset = this_cu->offset;
-  cu->header.first_die_offset = info_ptr - beg_of_comp_unit;
+      /* Complete the cu_header.  */
+      cu->header.offset = this_cu->offset;
+      cu->header.first_die_offset = info_ptr - beg_of_comp_unit;
+
+      /* Link this compilation unit into the compilation unit tree.  */
+      this_cu->cu = cu;
+      cu->per_cu = this_cu;
+
+      /* Link this CU into read_in_chain.  */
+      this_cu->cu->read_in_chain = dwarf2_per_objfile->read_in_chain;
+      dwarf2_per_objfile->read_in_chain = this_cu;
+    }
+  else
+    {
+      cu = this_cu->cu;
+      info_ptr += cu->header.first_die_offset;
+    }
 
   /* Read the abbrevs for this compilation unit into a table.  */
+  gdb_assert (cu->dwarf2_abbrevs == NULL);
   dwarf2_read_abbrevs (abfd, cu);
-  back_to = make_cleanup (dwarf2_free_abbrev_table, cu);
+  free_abbrevs_cleanup = make_cleanup (dwarf2_free_abbrev_table, cu);
 
   /* Read the compilation unit die.  */
   init_cu_die_reader (&reader_specs, cu);
@@ -3275,7 +3358,14 @@ load_partial_comp_unit (struct dwarf2_per_cu_data *this_cu,
   if (has_children)
     load_partial_dies (abfd, dwarf2_per_objfile->info.buffer, info_ptr, 0, cu);
 
-  do_cleanups (back_to);
+  do_cleanups (free_abbrevs_cleanup);
+
+  if (read_cu)
+    {
+      /* We've successfully allocated this compilation unit.  Let our
+	 caller clean it up when finished with it.  */
+      discard_cleanups (free_cu_cleanup);
+    }
 }
 
 /* Create a list of all compilation units in OBJFILE.  We do this only
@@ -3520,6 +3610,29 @@ partial_die_full_name (struct partial_die_info *pdi,
 		       struct dwarf2_cu *cu)
 {
   char *parent_scope;
+
+  /* If this is a template instantiation, we can not work out the
+     template arguments from partial DIEs.  So, unfortunately, we have
+     to go through the full DIEs.  At least any work we do building
+     types here will be reused if full symbols are loaded later.  */
+  if (pdi->has_template_arguments)
+    {
+      fixup_partial_die (pdi, cu);
+
+      if (pdi->name != NULL && strchr (pdi->name, '<') == NULL)
+	{
+	  struct die_info *die;
+	  struct attribute attr;
+	  struct dwarf2_cu *ref_cu = cu;
+
+	  attr.name = 0;
+	  attr.form = DW_FORM_ref_addr;
+	  attr.u.addr = pdi->offset;
+	  die = follow_die_ref (NULL, &attr, &ref_cu);
+
+	  return xstrdup (dwarf2_full_name (NULL, die, ref_cu));
+	}
+    }
 
   parent_scope = partial_die_parent_scope (pdi, cu);
   if (parent_scope == NULL)
@@ -4063,6 +4176,8 @@ dwarf2_psymtab_to_symtab (struct partial_symtab *pst)
 		= dpo_backlink->has_section_at_zero;
 	    }
 
+	  dwarf2_per_objfile->reading_partial_symbols = 0;
+
 	  psymtab_to_symtab_1 (pst);
 
 	  /* Finish up the debug error message.  */
@@ -4194,8 +4309,9 @@ load_full_comp_unit (struct dwarf2_per_cu_data *per_cu, struct objfile *objfile)
   struct dwarf2_cu *cu;
   unsigned int offset;
   gdb_byte *info_ptr, *beg_of_comp_unit;
-  struct cleanup *back_to, *free_cu_cleanup;
+  struct cleanup *free_abbrevs_cleanup = NULL, *free_cu_cleanup = NULL;
   struct attribute *attr;
+  int read_cu = 0;
 
   gdb_assert (! per_cu->from_debug_types);
 
@@ -4206,26 +4322,39 @@ load_full_comp_unit (struct dwarf2_per_cu_data *per_cu, struct objfile *objfile)
   info_ptr = dwarf2_per_objfile->info.buffer + offset;
   beg_of_comp_unit = info_ptr;
 
-  cu = alloc_one_comp_unit (objfile);
+  if (per_cu->cu == NULL)
+    {
+      cu = alloc_one_comp_unit (objfile);
 
-  /* If an error occurs while loading, release our storage.  */
-  free_cu_cleanup = make_cleanup (free_one_comp_unit, cu);
+      read_cu = 1;
 
-  /* Read in the comp_unit header.  */
-  info_ptr = read_comp_unit_head (&cu->header, info_ptr, abfd);
+      /* If an error occurs while loading, release our storage.  */
+      free_cu_cleanup = make_cleanup (free_one_comp_unit, cu);
 
-  /* Complete the cu_header.  */
-  cu->header.offset = offset;
-  cu->header.first_die_offset = info_ptr - beg_of_comp_unit;
+      /* Read in the comp_unit header.  */
+      info_ptr = read_comp_unit_head (&cu->header, info_ptr, abfd);
 
-  /* Read the abbrevs for this compilation unit.  */
-  dwarf2_read_abbrevs (abfd, cu);
-  back_to = make_cleanup (dwarf2_free_abbrev_table, cu);
+      /* Complete the cu_header.  */
+      cu->header.offset = offset;
+      cu->header.first_die_offset = info_ptr - beg_of_comp_unit;
 
-  /* Link this compilation unit into the compilation unit tree.  */
-  per_cu->cu = cu;
-  cu->per_cu = per_cu;
-  cu->type_hash = per_cu->type_hash;
+      /* Read the abbrevs for this compilation unit.  */
+      dwarf2_read_abbrevs (abfd, cu);
+      free_abbrevs_cleanup = make_cleanup (dwarf2_free_abbrev_table, cu);
+
+      /* Link this compilation unit into the compilation unit tree.  */
+      per_cu->cu = cu;
+      cu->per_cu = per_cu;
+
+      /* Link this CU into read_in_chain.  */
+      per_cu->cu->read_in_chain = dwarf2_per_objfile->read_in_chain;
+      dwarf2_per_objfile->read_in_chain = per_cu;
+    }
+  else
+    {
+      cu = per_cu->cu;
+      info_ptr += cu->header.first_die_offset;
+    }
 
   cu->dies = read_comp_unit (info_ptr, cu);
 
@@ -4245,15 +4374,64 @@ load_full_comp_unit (struct dwarf2_per_cu_data *per_cu, struct objfile *objfile)
   if (attr)
     cu->producer = DW_STRING (attr);
 
-  /* Link this CU into read_in_chain.  */
-  per_cu->cu->read_in_chain = dwarf2_per_objfile->read_in_chain;
-  dwarf2_per_objfile->read_in_chain = per_cu;
+  if (read_cu)
+    {
+      do_cleanups (free_abbrevs_cleanup);
 
-  do_cleanups (back_to);
+      /* We've successfully allocated this compilation unit.  Let our
+	 caller clean it up when finished with it.  */
+      discard_cleanups (free_cu_cleanup);
+    }
+}
 
-  /* We've successfully allocated this compilation unit.  Let our caller
-     clean it up when finished with it.  */
-  discard_cleanups (free_cu_cleanup);
+/* Add a DIE to the delayed physname list.  */
+
+static void
+add_to_method_list (struct type *type, int fnfield_index, int index,
+		    const char *name, struct die_info *die,
+		    struct dwarf2_cu *cu)
+{
+  struct delayed_method_info mi;
+  mi.type = type;
+  mi.fnfield_index = fnfield_index;
+  mi.index = index;
+  mi.name = name;
+  mi.die = die;
+  VEC_safe_push (delayed_method_info, cu->method_list, &mi);
+}
+
+/* A cleanup for freeing the delayed method list.  */
+
+static void
+free_delayed_list (void *ptr)
+{
+  struct dwarf2_cu *cu = (struct dwarf2_cu *) ptr;
+  if (cu->method_list != NULL)
+    {
+      VEC_free (delayed_method_info, cu->method_list);
+      cu->method_list = NULL;
+    }
+}
+
+/* Compute the physnames of any methods on the CU's method list.
+
+   The computation of method physnames is delayed in order to avoid the
+   (bad) condition that one of the method's formal parameters is of an as yet
+   incomplete type.  */
+
+static void
+compute_delayed_physnames (struct dwarf2_cu *cu)
+{
+  int i;
+  struct delayed_method_info *mi;
+  for (i = 0; VEC_iterate (delayed_method_info, cu->method_list, i, mi) ; ++i)
+    {
+      char *physname;
+      struct fn_fieldlist *fn_flp
+	= &TYPE_FN_FIELDLIST (mi->type, mi->fnfield_index);
+      physname = (char *) dwarf2_physname ((char *) mi->name, mi->die, cu);
+      fn_flp->fn_fields[mi->index].physname = physname ? physname : "";
+    }
 }
 
 /* Generate full symbol information for PST and CU, whose DIEs have
@@ -4266,13 +4444,14 @@ process_full_comp_unit (struct dwarf2_per_cu_data *per_cu)
   struct objfile *objfile = per_cu->objfile;
   CORE_ADDR lowpc, highpc;
   struct symtab *symtab;
-  struct cleanup *back_to;
+  struct cleanup *back_to, *delayed_list_cleanup;
   CORE_ADDR baseaddr;
 
   baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
 
   buildsym_init ();
   back_to = make_cleanup (really_free_pendings, NULL);
+  delayed_list_cleanup = make_cleanup (free_delayed_list, cu);
 
   cu->list_in_scope = &file_symbols;
 
@@ -4280,6 +4459,12 @@ process_full_comp_unit (struct dwarf2_per_cu_data *per_cu)
 
   /* Do line number decoding in read_file_scope () */
   process_die (cu->dies, cu);
+
+  /* Now that we have processed all the DIEs in the CU, all the types 
+     should be complete, and it should now be safe to compute all of the
+     physnames.  */
+  compute_delayed_physnames (cu);
+  do_cleanups (delayed_list_cleanup);
 
   /* Some compilers don't define a DW_AT_high_pc attribute for the
      compilation unit.  If the DW_AT_high_pc is missing, synthesize
@@ -4446,6 +4631,17 @@ die_needs_namespace (struct die_info *die, struct dwarf2_cu *cu)
     }
 }
 
+/* Retrieve the last character from a mem_file.  */
+
+static void
+do_ui_file_peek_last (void *object, const char *buffer, long length)
+{
+  char *last_char_p = (char *) object;
+
+  if (length > 0)
+    *last_char_p = buffer[length - 1];
+}
+
 /* Compute the fully qualified name of DIE in CU.  If PHYSNAME is nonzero,
    compute the physname for the object, which include a method's
    formal parameters (C++/Java) and return type (Java).
@@ -4505,6 +4701,130 @@ dwarf2_compute_name (char *name, struct die_info *die, struct dwarf2_cu *cu,
 	  else
 	    fputs_unfiltered (name ? name : "", buf);
 
+	  /* Template parameters may be specified in the DIE's DW_AT_name, or
+	     as children with DW_TAG_template_type_param or
+	     DW_TAG_value_type_param.  If the latter, add them to the name
+	     here.  If the name already has template parameters, then
+	     skip this step; some versions of GCC emit both, and
+	     it is more efficient to use the pre-computed name.
+
+	     Something to keep in mind about this process: it is very
+	     unlikely, or in some cases downright impossible, to produce
+	     something that will match the mangled name of a function.
+	     If the definition of the function has the same debug info,
+	     we should be able to match up with it anyway.  But fallbacks
+	     using the minimal symbol, for instance to find a method
+	     implemented in a stripped copy of libstdc++, will not work.
+	     If we do not have debug info for the definition, we will have to
+	     match them up some other way.
+
+	     When we do name matching there is a related problem with function
+	     templates; two instantiated function templates are allowed to
+	     differ only by their return types, which we do not add here.  */
+
+	  if (cu->language == language_cplus && strchr (name, '<') == NULL)
+	    {
+	      struct attribute *attr;
+	      struct die_info *child;
+	      int first = 1;
+
+	      die->building_fullname = 1;
+
+	      for (child = die->child; child != NULL; child = child->sibling)
+		{
+		  struct type *type;
+		  long value;
+		  gdb_byte *bytes;
+		  struct dwarf2_locexpr_baton *baton;
+		  struct value *v;
+
+		  if (child->tag != DW_TAG_template_type_param
+		      && child->tag != DW_TAG_template_value_param)
+		    continue;
+
+		  if (first)
+		    {
+		      fputs_unfiltered ("<", buf);
+		      first = 0;
+		    }
+		  else
+		    fputs_unfiltered (", ", buf);
+
+		  attr = dwarf2_attr (child, DW_AT_type, cu);
+		  if (attr == NULL)
+		    {
+		      complaint (&symfile_complaints,
+				 _("template parameter missing DW_AT_type"));
+		      fputs_unfiltered ("UNKNOWN_TYPE", buf);
+		      continue;
+		    }
+		  type = die_type (child, cu);
+
+		  if (child->tag == DW_TAG_template_type_param)
+		    {
+		      c_print_type (type, "", buf, -1, 0);
+		      continue;
+		    }
+
+		  attr = dwarf2_attr (child, DW_AT_const_value, cu);
+		  if (attr == NULL)
+		    {
+		      complaint (&symfile_complaints,
+				 _("template parameter missing DW_AT_const_value"));
+		      fputs_unfiltered ("UNKNOWN_VALUE", buf);
+		      continue;
+		    }
+
+		  dwarf2_const_value_attr (attr, type, name,
+					   &cu->comp_unit_obstack, cu,
+					   &value, &bytes, &baton);
+
+		  if (TYPE_NOSIGN (type))
+		    /* GDB prints characters as NUMBER 'CHAR'.  If that's
+		       changed, this can use value_print instead.  */
+		    c_printchar (value, type, buf);
+		  else
+		    {
+		      struct value_print_options opts;
+
+		      if (baton != NULL)
+			v = dwarf2_evaluate_loc_desc (type, NULL,
+						      baton->data,
+						      baton->size,
+						      baton->per_cu);
+		      else if (bytes != NULL)
+			{
+			  v = allocate_value (type);
+			  memcpy (value_contents_writeable (v), bytes,
+				  TYPE_LENGTH (type));
+			}
+		      else
+			v = value_from_longest (type, value);
+
+		      /* Specify decimal so that we do not depend on the radix.  */
+		      get_formatted_print_options (&opts, 'd');
+		      opts.raw = 1;
+		      value_print (v, buf, &opts);
+		      release_value (v);
+		      value_free (v);
+		    }
+		}
+
+	      die->building_fullname = 0;
+
+	      if (!first)
+		{
+		  /* Close the argument list, with a space if necessary
+		     (nested templates).  */
+		  char last_char = '\0';
+		  ui_file_put (buf, do_ui_file_peek_last, &last_char);
+		  if (last_char == '>')
+		    fputs_unfiltered (" >", buf);
+		  else
+		    fputs_unfiltered (">", buf);
+		}
+	    }
+
 	  /* For Java and C++ methods, append formal parameter type
 	     information, if PHYSNAME.  */
 
@@ -4526,8 +4846,14 @@ dwarf2_compute_name (char *name, struct die_info *die, struct dwarf2_cu *cu,
 		}
 	      else if (cu->language == language_cplus)
 		{
+		  /* Assume that an artificial first parameter is
+		     "this", but do not crash if it is not.  RealView
+		     marks unnamed (and thus unused) parameters as
+		     artificial; there is no way to differentiate
+		     the two cases.  */
 		  if (TYPE_NFIELDS (type) > 0
 		      && TYPE_FIELD_ARTIFICIAL (type, 0)
+		      && TYPE_CODE (TYPE_FIELD_TYPE (type, 0)) == TYPE_CODE_PTR
 		      && TYPE_CONST (TYPE_TARGET_TYPE (TYPE_FIELD_TYPE (type, 0))))
 		    fputs_unfiltered (" const", buf);
 		}
@@ -4954,12 +5280,24 @@ inherit_abstract_dies (struct die_info *die, struct dwarf2_cu *cu)
   struct die_info *origin_child_die;
   struct cleanup *cleanups;
   struct attribute *attr;
+  struct dwarf2_cu *origin_cu;
+  struct pending **origin_previous_list_in_scope;
 
   attr = dwarf2_attr (die, DW_AT_abstract_origin, cu);
   if (!attr)
     return;
 
-  origin_die = follow_die_ref (die, attr, &cu);
+  /* Note that following die references may follow to a die in a
+     different cu.  */
+
+  origin_cu = cu;
+  origin_die = follow_die_ref (die, attr, &origin_cu);
+
+  /* We're inheriting ORIGIN's children into the scope we'd put DIE's
+     symbols in.  */
+  origin_previous_list_in_scope = origin_cu->list_in_scope;
+  origin_cu->list_in_scope = cu->list_in_scope;
+
   if (die->tag != origin_die->tag
       && !(die->tag == DW_TAG_inlined_subroutine
 	   && origin_die->tag == DW_TAG_subprogram))
@@ -4987,13 +5325,16 @@ inherit_abstract_dies (struct die_info *die, struct dwarf2_cu *cu)
 	 but GCC versions at least through 4.4 generate this (GCC PR
 	 40573).  */
       struct die_info *child_origin_die = child_die;
+      struct dwarf2_cu *child_origin_cu = cu;
 
       while (1)
 	{
-	  attr = dwarf2_attr (child_origin_die, DW_AT_abstract_origin, cu);
+	  attr = dwarf2_attr (child_origin_die, DW_AT_abstract_origin,
+			      child_origin_cu);
 	  if (attr == NULL)
 	    break;
-	  child_origin_die = follow_die_ref (child_origin_die, attr, &cu);
+	  child_origin_die = follow_die_ref (child_origin_die, attr,
+					     &child_origin_cu);
 	}
 
       /* According to DWARF3 3.3.8.2 #3 new entries without their abstract
@@ -5035,10 +5376,11 @@ inherit_abstract_dies (struct die_info *die, struct dwarf2_cu *cu)
       if (offsetp >= offsets_end || *offsetp > origin_child_die->offset)
 	{
 	  /* Found that ORIGIN_CHILD_DIE is really not referenced.  */
-	  process_die (origin_child_die, cu);
+	  process_die (origin_child_die, origin_cu);
 	}
       origin_child_die = sibling_die (origin_child_die);
     }
+  origin_cu->list_in_scope = origin_previous_list_in_scope;
 
   do_cleanups (cleanups);
 }
@@ -5148,7 +5490,8 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
 	    {
 	      struct symbol *arg = new_symbol (child_die, NULL, cu);
 
-	      VEC_safe_push (symbolp, template_args, arg);
+	      if (arg != NULL)
+		VEC_safe_push (symbolp, template_args, arg);
 	    }
 	  else
 	    process_die (child_die, cu);
@@ -6028,7 +6371,6 @@ dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
   int i;
   struct fn_field *fnp;
   char *fieldname;
-  char *physname;
   struct nextfnfield *new_fnfield;
   struct type *this_type;
 
@@ -6039,9 +6381,6 @@ dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
   fieldname = dwarf2_name (die, cu);
   if (fieldname == NULL)
     return;
-
-  /* Get the mangled name.  */
-  physname = (char *) dwarf2_physname (fieldname, die, cu);
 
   /* Look up member function name in fieldlist.  */
   for (i = 0; i < fip->nfnfields; i++)
@@ -6068,7 +6407,7 @@ dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
       flp->name = fieldname;
       flp->length = 0;
       flp->head = NULL;
-      fip->nfnfields++;
+      i = fip->nfnfields++;
     }
 
   /* Create a new member function field and chain it to the field list
@@ -6082,9 +6421,19 @@ dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
 
   /* Fill in the member function field info.  */
   fnp = &new_fnfield->fnfield;
-  /* The name is already allocated along with this objfile, so we don't
-     need to duplicate it for the type.  */
-  fnp->physname = physname ? physname : "";
+
+  /* Delay processing of the physname until later.  */
+  if (cu->language == language_cplus || cu->language == language_java)
+    {
+      add_to_method_list (type, i, flp->length - 1, fieldname,
+			  die, cu);
+    }
+  else
+    {
+      char *physname = (char *) dwarf2_physname (fieldname, die, cu);
+      fnp->physname = physname ? physname : "";
+    }
+
   fnp->type = alloc_type (objfile);
   this_type = read_type_die (die, cu);
   if (this_type && TYPE_CODE (this_type) == TYPE_CODE_FUNC)
@@ -6110,7 +6459,7 @@ dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
     }
   else
     complaint (&symfile_complaints, _("member function type missing for '%s'"),
-	       physname);
+	       dwarf2_full_name (fieldname, die, cu));
 
   /* Get fcontext from DW_AT_containing_type if present.  */
   if (dwarf2_attr (die, DW_AT_containing_type, cu) != NULL)
@@ -6306,11 +6655,12 @@ quirk_gcc_member_function_pointer (struct type *type, struct objfile *objfile)
 }
 
 /* Called when we find the DIE that starts a structure or union scope
-   (definition) to process all dies that define the members of the
-   structure or union.
+   (definition) to create a type for the structure or union.  Fill in
+   the type's name and general properties; the members will not be
+   processed until process_structure_type.
 
-   NOTE: we need to call struct_type regardless of whether or not the
-   DIE has an at_name attribute, since it might be an anonymous
+   NOTE: we need to call these functions regardless of whether or not the
+   DIE has a DW_AT_name attribute, since it might be an anonymous
    structure or union.  This gets the type entered into our set of
    user defined types.
 
@@ -6328,7 +6678,6 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
   struct type *type;
   struct attribute *attr;
   char *name;
-  struct cleanup *back_to;
 
   /* If the definition of this type lives in .debug_types, read that type.
      Don't follow DW_AT_specification though, that will take us back up
@@ -6344,10 +6693,11 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
 	 This is important, for example, because for c++ classes we need
 	 TYPE_NAME set which is only done by new_symbol.  Blech.  */
       type = read_type_die (type_die, type_cu);
+
+      /* TYPE_CU may not be the same as CU.
+	 Ensure TYPE is recorded in CU's type_hash table.  */
       return set_die_type (die, type, cu);
     }
-
-  back_to = make_cleanup (null_cleanup, 0);
 
   type = alloc_type (objfile);
   INIT_CPLUS_SPECIFIC (type);
@@ -6358,7 +6708,14 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
       if (cu->language == language_cplus
 	  || cu->language == language_java)
 	{
-	  TYPE_TAG_NAME (type) = (char *) dwarf2_full_name (name, die, cu);
+	  char *full_name = (char *) dwarf2_full_name (name, die, cu);
+
+	  /* dwarf2_full_name might have already finished building the DIE's
+	     type.  If so, there is no need to continue.  */
+	  if (get_die_type (die, cu) != NULL)
+	    return get_die_type (die, cu);
+
+	  TYPE_TAG_NAME (type) = full_name;
 	  if (die->tag == DW_TAG_structure_type
 	      || die->tag == DW_TAG_class_type)
 	    TYPE_NAME (type) = TYPE_TAG_NAME (type);
@@ -6416,11 +6773,29 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
   /* set_die_type should be already done.  */
   set_descriptive_type (type, die, cu);
 
+  return type;
+}
+
+/* Finish creating a structure or union type, including filling in
+   its members and creating a symbol for it.  */
+
+static void
+process_structure_scope (struct die_info *die, struct dwarf2_cu *cu)
+{
+  struct objfile *objfile = cu->objfile;
+  struct die_info *child_die = die->child;
+  struct type *type;
+
+  type = get_die_type (die, cu);
+  if (type == NULL)
+    type = read_structure_type (die, cu);
+
   if (die->child != NULL && ! die_is_declaration (die, cu))
     {
       struct field_info fi;
       struct die_info *child_die;
       VEC (symbolp) *template_args = NULL;
+      struct cleanup *back_to = make_cleanup (null_cleanup, 0);
 
       memset (&fi, 0, sizeof (struct field_info));
 
@@ -6455,7 +6830,8 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
 	    {
 	      struct symbol *arg = new_symbol (child_die, NULL, cu);
 
-	      VEC_safe_push (symbolp, template_args, arg);
+	      if (arg != NULL)
+		VEC_safe_push (symbolp, template_args, arg);
 	    }
 
 	  child_die = sibling_die (child_die);
@@ -6571,23 +6947,11 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
 	      *dest = *src;
 	    }
 	}
+
+      do_cleanups (back_to);
     }
 
   quirk_gcc_member_function_pointer (type, cu->objfile);
-
-  do_cleanups (back_to);
-  return type;
-}
-
-static void
-process_structure_scope (struct die_info *die, struct dwarf2_cu *cu)
-{
-  struct die_info *child_die = die->child;
-  struct type *this_type;
-
-  this_type = get_die_type (die, cu);
-  if (this_type == NULL)
-    this_type = read_structure_type (die, cu);
 
   /* NOTE: carlton/2004-03-16: GCC 3.4 (or at least one of its
      snapshots) has been known to create a die giving a declaration
@@ -6617,7 +6981,7 @@ process_structure_scope (struct die_info *die, struct dwarf2_cu *cu)
      attribute, and a declaration attribute.  */
   if (dwarf2_attr (die, DW_AT_byte_size, cu) != NULL
       || !die_is_declaration (die, cu))
-    new_symbol (die, this_type, cu);
+    new_symbol (die, type, cu);
 }
 
 /* Given a DW_AT_enumeration_type die, set its type.  We do not
@@ -6641,6 +7005,9 @@ read_enumeration_type (struct die_info *die, struct dwarf2_cu *cu)
       struct die_info *type_die = follow_die_ref_or_sig (die, attr, &type_cu);
 
       type = read_type_die (type_die, type_cu);
+
+      /* TYPE_CU may not be the same as CU.
+	 Ensure TYPE is recorded in CU's type_hash table.  */
       return set_die_type (die, type, cu);
     }
 
@@ -6681,21 +7048,21 @@ read_enumeration_type (struct die_info *die, struct dwarf2_cu *cu)
 static void
 process_enumeration_scope (struct die_info *die, struct dwarf2_cu *cu)
 {
-  struct die_info *child_die;
-  struct field *fields;
-  struct symbol *sym;
-  int num_fields;
-  int unsigned_enum = 1;
-  char *name;
   struct type *this_type;
 
-  num_fields = 0;
-  fields = NULL;
   this_type = get_die_type (die, cu);
   if (this_type == NULL)
     this_type = read_enumeration_type (die, cu);
+
   if (die->child != NULL)
     {
+      struct die_info *child_die;
+      struct symbol *sym;
+      struct field *fields = NULL;
+      int num_fields = 0;
+      int unsigned_enum = 1;
+      char *name;
+
       child_die = die->child;
       while (child_die && child_die->tag)
 	{
@@ -6945,7 +7312,7 @@ read_common_block (struct die_info *die, struct dwarf2_cu *cu)
 	{
 	  sym = new_symbol (child_die, NULL, cu);
 	  attr = dwarf2_attr (child_die, DW_AT_data_member_location, cu);
-	  if (attr)
+	  if (sym != NULL && attr != NULL)
 	    {
 	      CORE_ADDR byte_offset = 0;
 
@@ -6984,6 +7351,9 @@ read_namespace_type (struct die_info *die, struct dwarf2_cu *cu)
 
       ext_die = dwarf2_extension (die, &ext_cu);
       type = read_type_die (ext_die, ext_cu);
+
+      /* EXT_CU may not be the same as CU.
+	 Ensure TYPE is recorded in CU's type_hash table.  */
       return set_die_type (die, type, cu);
     }
 
@@ -7752,6 +8122,16 @@ static struct die_info *
 read_comp_unit (gdb_byte *info_ptr, struct dwarf2_cu *cu)
 {
   struct die_reader_specs reader_specs;
+  int read_abbrevs = 0;
+  struct cleanup *back_to = NULL;
+  struct die_info *die;
+
+  if (cu->dwarf2_abbrevs == NULL)
+    {
+      dwarf2_read_abbrevs (cu->objfile->obfd, cu);
+      back_to = make_cleanup (dwarf2_free_abbrev_table, cu);
+      read_abbrevs = 1;
+    }
 
   gdb_assert (cu->die_hash == NULL);
   cu->die_hash
@@ -7765,7 +8145,12 @@ read_comp_unit (gdb_byte *info_ptr, struct dwarf2_cu *cu)
 
   init_cu_die_reader (&reader_specs, cu);
 
-  return read_die_and_children (&reader_specs, info_ptr, &info_ptr, NULL);
+  die = read_die_and_children (&reader_specs, info_ptr, &info_ptr, NULL);
+
+  if (read_abbrevs)
+    do_cleanups (back_to);
+
+  return die;
 }
 
 /* Main entry point for reading a DIE and all children.
@@ -8147,6 +8532,35 @@ load_partial_dies (bfd *abfd, gdb_byte *buffer, gdb_byte *info_ptr,
 	  continue;
 	}
 
+      /* Check for template arguments.  We never save these; if
+	 they're seen, we just mark the parent, and go on our way.  */
+      if (parent_die != NULL
+	  && cu->language == language_cplus
+	  && (abbrev->tag == DW_TAG_template_type_param
+	      || abbrev->tag == DW_TAG_template_value_param))
+	{
+	  parent_die->has_template_arguments = 1;
+
+	  if (!load_all)
+	    {
+	      /* We don't need a partial DIE for the template argument.  */
+	      info_ptr = skip_one_die (buffer, info_ptr + bytes_read, abbrev,
+				       cu);
+	      continue;
+	    }
+	}
+
+      /* We only recurse into subprograms looking for template arguments.
+	 Skip their other children.  */
+      if (!load_all
+	  && cu->language == language_cplus
+	  && parent_die != NULL
+	  && parent_die->tag == DW_TAG_subprogram)
+	{
+	  info_ptr = skip_one_die (buffer, info_ptr + bytes_read, abbrev, cu);
+	  continue;
+	}
+
       /* Check whether this DIE is interesting enough to save.  Normally
 	 we would not be interested in members here, but there may be
 	 later variables referencing them via DW_AT_specification (for
@@ -8280,8 +8694,11 @@ load_partial_dies (bfd *abfd, gdb_byte *buffer, gdb_byte *info_ptr,
 
       /* For some DIEs we want to follow their children (if any).  For C
 	 we have no reason to follow the children of structures; for other
-	 languages we have to, both so that we can get at method physnames
-	 to infer fully qualified class names, and for DW_AT_specification.
+	 languages we have to, so that we can get at method physnames
+	 to infer fully qualified class names, for DW_AT_specification,
+	 and for C++ template arguments.  For C++, we also look one level
+	 inside functions to find template arguments (if the name of the
+	 function does not already contain the template arguments).
 
 	 For Ada, we need to scan the children of subprograms and lexical
 	 blocks as well because Ada allows the definition of nested
@@ -8292,6 +8709,10 @@ load_partial_dies (bfd *abfd, gdb_byte *buffer, gdb_byte *info_ptr,
 	      || last_die->tag == DW_TAG_namespace
 	      || last_die->tag == DW_TAG_module
 	      || last_die->tag == DW_TAG_enumeration_type
+	      || (cu->language == language_cplus
+		  && last_die->tag == DW_TAG_subprogram
+		  && (last_die->name == NULL
+		      || strchr (last_die->name, '<') == NULL))
 	      || (cu->language != language_c
 		  && (last_die->tag == DW_TAG_class_type
 		      || last_die->tag == DW_TAG_interface_type
@@ -8508,12 +8929,8 @@ find_partial_die (unsigned int offset, struct dwarf2_cu *cu)
 
   per_cu = dwarf2_find_containing_comp_unit (offset, cu->objfile);
 
-  if (per_cu->cu == NULL)
-    {
-      load_partial_comp_unit (per_cu, cu->objfile);
-      per_cu->cu->read_in_chain = dwarf2_per_objfile->read_in_chain;
-      dwarf2_per_objfile->read_in_chain = per_cu;
-    }
+  if (per_cu->cu == NULL || per_cu->cu->partial_dies == NULL)
+    load_partial_comp_unit (per_cu, cu->objfile);
 
   per_cu->cu->last_used = 0;
   pd = find_partial_die_in_comp_unit (offset, per_cu->cu);
@@ -8590,9 +9007,6 @@ fixup_partial_die (struct partial_die_info *part_die,
     }
 
   /* Set default names for some unnamed DIEs.  */
-  if (part_die->name == NULL && (part_die->tag == DW_TAG_structure_type
-				 || part_die->tag == DW_TAG_class_type))
-    part_die->name = "(anonymous class)";
 
   if (part_die->name == NULL && part_die->tag == DW_TAG_namespace)
     part_die->name = "(anonymous namespace)";
@@ -9515,23 +9929,104 @@ check_cu_functions (CORE_ADDR address, struct dwarf2_cu *cu)
   return fn->lowpc;
 }
 
+/* Subroutine of dwarf_decode_lines to simplify it.
+   Return the file name of the psymtab for included file FILE_INDEX
+   in line header LH of PST.
+   COMP_DIR is the compilation directory (DW_AT_comp_dir) or NULL if unknown.
+   If space for the result is malloc'd, it will be freed by a cleanup.
+   Returns NULL if FILE_INDEX should be ignored, i.e., it is pst->filename.  */
+
+static char *
+psymtab_include_file_name (const struct line_header *lh, int file_index,
+			   const struct partial_symtab *pst,
+			   const char *comp_dir)
+{
+  const struct file_entry fe = lh->file_names [file_index];
+  char *include_name = fe.name;
+  char *include_name_to_compare = include_name;
+  char *dir_name = NULL;
+  char *pst_filename;
+  int file_is_pst;
+
+  if (fe.dir_index)
+    dir_name = lh->include_dirs[fe.dir_index - 1];
+
+  if (!IS_ABSOLUTE_PATH (include_name)
+      && (dir_name != NULL || comp_dir != NULL))
+    {
+      /* Avoid creating a duplicate psymtab for PST.
+	 We do this by comparing INCLUDE_NAME and PST_FILENAME.
+	 Before we do the comparison, however, we need to account
+	 for DIR_NAME and COMP_DIR.
+	 First prepend dir_name (if non-NULL).  If we still don't
+	 have an absolute path prepend comp_dir (if non-NULL).
+	 However, the directory we record in the include-file's
+	 psymtab does not contain COMP_DIR (to match the
+	 corresponding symtab(s)).
+
+	 Example:
+
+	 bash$ cd /tmp
+	 bash$ gcc -g ./hello.c
+	 include_name = "hello.c"
+	 dir_name = "."
+	 DW_AT_comp_dir = comp_dir = "/tmp"
+	 DW_AT_name = "./hello.c"  */
+
+      if (dir_name != NULL)
+	{
+	  include_name = concat (dir_name, SLASH_STRING,
+				 include_name, (char *)NULL);
+	  include_name_to_compare = include_name;
+	  make_cleanup (xfree, include_name);
+	}
+      if (!IS_ABSOLUTE_PATH (include_name) && comp_dir != NULL)
+	{
+	  include_name_to_compare = concat (comp_dir, SLASH_STRING,
+					    include_name, (char *)NULL);
+	}
+    }
+
+  pst_filename = pst->filename;
+  if (!IS_ABSOLUTE_PATH (pst_filename) && pst->dirname != NULL)
+    {
+      pst_filename = concat (pst->dirname, SLASH_STRING,
+			     pst_filename, (char *)NULL);
+    }
+
+  file_is_pst = strcmp (include_name_to_compare, pst_filename) == 0;
+
+  if (include_name_to_compare != include_name)
+    xfree (include_name_to_compare);
+  if (pst_filename != pst->filename)
+    xfree (pst_filename);
+
+  if (file_is_pst)
+    return NULL;
+  return include_name;
+}
+
 /* Decode the Line Number Program (LNP) for the given line_header
    structure and CU.  The actual information extracted and the type
    of structures created from the LNP depends on the value of PST.
 
    1. If PST is NULL, then this procedure uses the data from the program
       to create all necessary symbol tables, and their linetables.
-      The compilation directory of the file is passed in COMP_DIR,
-      and must not be NULL.
 
    2. If PST is not NULL, this procedure reads the program to determine
       the list of files included by the unit represented by PST, and
-      builds all the associated partial symbol tables.  In this case,
-      the value of COMP_DIR is ignored, and can thus be NULL (the COMP_DIR
-      is not used to compute the full name of the symtab, and therefore
-      omitting it when building the partial symtab does not introduce
-      the potential for inconsistency - a partial symtab and its associated
-      symbtab having a different fullname -).  */
+      builds all the associated partial symbol tables.
+
+   COMP_DIR is the compilation directory (DW_AT_comp_dir) or NULL if unknown.
+   It is used for relative paths in the line table.
+   NOTE: When processing partial symtabs (pst != NULL),
+   comp_dir == pst->dirname.
+
+   NOTE: It is important that psymtabs have the same file name (via strcmp)
+   as the corresponding symtab.  Since COMP_DIR is not used in the name of the
+   symtab we don't use it in the name of the psymtabs we create.
+   E.g. expand_line_sal requires this when finding psymtabs to expand.
+   A good testcase for this is mb-inline.exp.  */
 
 static void
 dwarf_decode_lines (struct line_header *lh, char *comp_dir, bfd *abfd,
@@ -9814,29 +10309,9 @@ dwarf_decode_lines (struct line_header *lh, char *comp_dir, bfd *abfd,
       for (file_index = 0; file_index < lh->num_file_names; file_index++)
         if (lh->file_names[file_index].included_p == 1)
           {
-            const struct file_entry fe = lh->file_names [file_index];
-            char *include_name = fe.name;
-            char *dir_name = NULL;
-            char *pst_filename = pst->filename;
-
-            if (fe.dir_index)
-              dir_name = lh->include_dirs[fe.dir_index - 1];
-
-            if (!IS_ABSOLUTE_PATH (include_name) && dir_name != NULL)
-              {
-                include_name = concat (dir_name, SLASH_STRING,
-				       include_name, (char *)NULL);
-                make_cleanup (xfree, include_name);
-              }
-
-            if (!IS_ABSOLUTE_PATH (pst_filename) && pst->dirname != NULL)
-              {
-                pst_filename = concat (pst->dirname, SLASH_STRING,
-				       pst_filename, (char *)NULL);
-                make_cleanup (xfree, pst_filename);
-              }
-
-            if (strcmp (include_name, pst_filename) != 0)
+	    char *include_name =
+	      psymtab_include_file_name (lh, file_index, pst, comp_dir);
+	    if (include_name != NULL)
               dwarf2_create_include_psymtab (include_name, pst, objfile);
           }
     }
@@ -10268,20 +10743,21 @@ new_symbol_full (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
 			       && (cu->language == language_cplus
 				   || cu->language == language_java)
 			       ? &global_symbols : cu->list_in_scope);
-	      }
 
-	    /* The semantics of C++ state that "struct foo { ... }" also
-	       defines a typedef for "foo".  A Java class declaration also
-	       defines a typedef for the class.  */
-	    if (cu->language == language_cplus
-		|| cu->language == language_java
-		|| cu->language == language_ada)
-	      {
-		/* The symbol's name is already allocated along with
-		   this objfile, so we don't need to duplicate it for
-		   the type.  */
-		if (TYPE_NAME (SYMBOL_TYPE (sym)) == 0)
-		  TYPE_NAME (SYMBOL_TYPE (sym)) = SYMBOL_SEARCH_NAME (sym);
+		/* The semantics of C++ state that "struct foo {
+		   ... }" also defines a typedef for "foo".  A Java
+		   class declaration also defines a typedef for the
+		   class.  */
+		if (cu->language == language_cplus
+		    || cu->language == language_java
+		    || cu->language == language_ada)
+		  {
+		    /* The symbol's name is already allocated along
+		       with this objfile, so we don't need to
+		       duplicate it for the type.  */
+		    if (TYPE_NAME (SYMBOL_TYPE (sym)) == 0)
+		      TYPE_NAME (SYMBOL_TYPE (sym)) = SYMBOL_SEARCH_NAME (sym);
+		  }
 	      }
 	  }
 	  break;
@@ -10353,58 +10829,97 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
   return new_symbol_full (die, type, cu, NULL);
 }
 
-/* Copy constant value from an attribute to a symbol.  */
+/* Given an attr with a DW_FORM_dataN value in host byte order,
+   zero-extend it as appropriate for the symbol's type.  The DWARF
+   standard (v4) is not entirely clear about the meaning of using
+   DW_FORM_dataN for a constant with a signed type, where the type is
+   wider than the data.  The conclusion of a discussion on the DWARF
+   list was that this is unspecified.  We choose to always zero-extend
+   because that is the interpretation long in use by GCC.  */
+
+static gdb_byte *
+dwarf2_const_value_data (struct attribute *attr, struct type *type,
+			 const char *name, struct obstack *obstack,
+			 struct dwarf2_cu *cu, long *value, int bits)
+{
+  struct objfile *objfile = cu->objfile;
+  enum bfd_endian byte_order = bfd_big_endian (objfile->obfd) ?
+				BFD_ENDIAN_BIG : BFD_ENDIAN_LITTLE;
+  LONGEST l = DW_UNSND (attr);
+
+  if (bits < sizeof (*value) * 8)
+    {
+      l &= ((LONGEST) 1 << bits) - 1;
+      *value = l;
+    }
+  else if (bits == sizeof (*value) * 8)
+    *value = l;
+  else
+    {
+      gdb_byte *bytes = obstack_alloc (obstack, bits / 8);
+      store_unsigned_integer (bytes, bits / 8, byte_order, l);
+      return bytes;
+    }
+
+  return NULL;
+}
+
+/* Read a constant value from an attribute.  Either set *VALUE, or if
+   the value does not fit in *VALUE, set *BYTES - either already
+   allocated on the objfile obstack, or newly allocated on OBSTACK,
+   or, set *BATON, if we translated the constant to a location
+   expression.  */
 
 static void
-dwarf2_const_value (struct attribute *attr, struct symbol *sym,
-		    struct dwarf2_cu *cu)
+dwarf2_const_value_attr (struct attribute *attr, struct type *type,
+			 const char *name, struct obstack *obstack,
+			 struct dwarf2_cu *cu,
+			 long *value, gdb_byte **bytes,
+			 struct dwarf2_locexpr_baton **baton)
 {
   struct objfile *objfile = cu->objfile;
   struct comp_unit_head *cu_header = &cu->header;
-  enum bfd_endian byte_order = bfd_big_endian (objfile->obfd) ?
-				BFD_ENDIAN_BIG : BFD_ENDIAN_LITTLE;
   struct dwarf_block *blk;
+  enum bfd_endian byte_order = (bfd_big_endian (objfile->obfd) ?
+				BFD_ENDIAN_BIG : BFD_ENDIAN_LITTLE);
+
+  *value = 0;
+  *bytes = NULL;
+  *baton = NULL;
 
   switch (attr->form)
     {
     case DW_FORM_addr:
       {
-	struct dwarf2_locexpr_baton *baton;
 	gdb_byte *data;
 
-	if (TYPE_LENGTH (SYMBOL_TYPE (sym)) != cu_header->addr_size)
-	  dwarf2_const_value_length_mismatch_complaint (SYMBOL_PRINT_NAME (sym),
+	if (TYPE_LENGTH (type) != cu_header->addr_size)
+	  dwarf2_const_value_length_mismatch_complaint (name,
 							cu_header->addr_size,
-							TYPE_LENGTH (SYMBOL_TYPE
-								     (sym)));
+							TYPE_LENGTH (type));
 	/* Symbols of this form are reasonably rare, so we just
 	   piggyback on the existing location code rather than writing
 	   a new implementation of symbol_computed_ops.  */
-	baton = obstack_alloc (&objfile->objfile_obstack,
-			       sizeof (struct dwarf2_locexpr_baton));
-	baton->per_cu = cu->per_cu;
-	gdb_assert (baton->per_cu);
+	*baton = obstack_alloc (&objfile->objfile_obstack,
+				sizeof (struct dwarf2_locexpr_baton));
+	(*baton)->per_cu = cu->per_cu;
+	gdb_assert ((*baton)->per_cu);
 
-	baton->size = 2 + cu_header->addr_size;
-	data = obstack_alloc (&objfile->objfile_obstack, baton->size);
-	baton->data = data;
+	(*baton)->size = 2 + cu_header->addr_size;
+	data = obstack_alloc (&objfile->objfile_obstack, (*baton)->size);
+	(*baton)->data = data;
 
 	data[0] = DW_OP_addr;
 	store_unsigned_integer (&data[1], cu_header->addr_size,
 				byte_order, DW_ADDR (attr));
 	data[cu_header->addr_size + 1] = DW_OP_stack_value;
-
-	SYMBOL_COMPUTED_OPS (sym) = &dwarf2_locexpr_funcs;
-	SYMBOL_LOCATION_BATON (sym) = baton;
-	SYMBOL_CLASS (sym) = LOC_COMPUTED;
       }
       break;
     case DW_FORM_string:
     case DW_FORM_strp:
-      /* DW_STRING is already allocated on the obstack, point directly
-	 to it.  */
-      SYMBOL_VALUE_BYTES (sym) = (gdb_byte *) DW_STRING (attr);
-      SYMBOL_CLASS (sym) = LOC_CONST_BYTES;
+      /* DW_STRING is already allocated on the objfile obstack, point
+	 directly to it.  */
+      *bytes = (gdb_byte *) DW_STRING (attr);
       break;
     case DW_FORM_block1:
     case DW_FORM_block2:
@@ -10412,15 +10927,10 @@ dwarf2_const_value (struct attribute *attr, struct symbol *sym,
     case DW_FORM_block:
     case DW_FORM_exprloc:
       blk = DW_BLOCK (attr);
-      if (TYPE_LENGTH (SYMBOL_TYPE (sym)) != blk->size)
-	dwarf2_const_value_length_mismatch_complaint (SYMBOL_PRINT_NAME (sym),
-						      blk->size,
-						      TYPE_LENGTH (SYMBOL_TYPE
-								   (sym)));
-      SYMBOL_VALUE_BYTES (sym) =
-	obstack_alloc (&objfile->objfile_obstack, blk->size);
-      memcpy (SYMBOL_VALUE_BYTES (sym), blk->data, blk->size);
-      SYMBOL_CLASS (sym) = LOC_CONST_BYTES;
+      if (TYPE_LENGTH (type) != blk->size)
+	dwarf2_const_value_length_mismatch_complaint (name, blk->size,
+						      TYPE_LENGTH (type));
+      *bytes = blk->data;
       break;
 
       /* The DW_AT_const_value attributes are supposed to carry the
@@ -10429,60 +10939,70 @@ dwarf2_const_value (struct attribute *attr, struct symbol *sym,
 	 converted to host endianness, so we just need to sign- or
 	 zero-extend it as appropriate.  */
     case DW_FORM_data1:
-      dwarf2_const_value_data (attr, sym, 8);
+      *bytes = dwarf2_const_value_data (attr, type, name, obstack, cu, value, 8);
       break;
     case DW_FORM_data2:
-      dwarf2_const_value_data (attr, sym, 16);
+      *bytes = dwarf2_const_value_data (attr, type, name, obstack, cu, value, 16);
       break;
     case DW_FORM_data4:
-      dwarf2_const_value_data (attr, sym, 32);
+      *bytes = dwarf2_const_value_data (attr, type, name, obstack, cu, value, 32);
       break;
     case DW_FORM_data8:
-      dwarf2_const_value_data (attr, sym, 64);
+      *bytes = dwarf2_const_value_data (attr, type, name, obstack, cu, value, 64);
       break;
 
     case DW_FORM_sdata:
-      SYMBOL_VALUE (sym) = DW_SND (attr);
-      SYMBOL_CLASS (sym) = LOC_CONST;
+      *value = DW_SND (attr);
       break;
 
     case DW_FORM_udata:
-      SYMBOL_VALUE (sym) = DW_UNSND (attr);
-      SYMBOL_CLASS (sym) = LOC_CONST;
+      *value = DW_UNSND (attr);
       break;
 
     default:
       complaint (&symfile_complaints,
 		 _("unsupported const value attribute form: '%s'"),
 		 dwarf_form_name (attr->form));
-      SYMBOL_VALUE (sym) = 0;
-      SYMBOL_CLASS (sym) = LOC_CONST;
+      *value = 0;
       break;
     }
 }
 
 
-/* Given an attr with a DW_FORM_dataN value in host byte order,
-   zero-extend it as appropriate for the symbol's type.  The DWARF
-   standard (v4) is not entirely clear about the meaning of using
-   DW_FORM_dataN for a constant with a signed type, where the type is
-   wider than the data.  The conclusion of a discussion on the DWARF
-   list was that this is unspecified.  We choose to always zero-extend
-   because that is the interpretation long in use by GCC.  */
+/* Copy constant value from an attribute to a symbol.  */
+
 static void
-dwarf2_const_value_data (struct attribute *attr,
-			 struct symbol *sym,
-			 int bits)
+dwarf2_const_value (struct attribute *attr, struct symbol *sym,
+		    struct dwarf2_cu *cu)
 {
-  LONGEST l = DW_UNSND (attr);
+  struct objfile *objfile = cu->objfile;
+  struct comp_unit_head *cu_header = &cu->header;
+  long value;
+  gdb_byte *bytes;
+  struct dwarf2_locexpr_baton *baton;
 
-  if (bits < sizeof (l) * 8)
-    l &= ((LONGEST) 1 << bits) - 1;
+  dwarf2_const_value_attr (attr, SYMBOL_TYPE (sym),
+			   SYMBOL_PRINT_NAME (sym),
+			   &objfile->objfile_obstack, cu,
+			   &value, &bytes, &baton);
 
-  SYMBOL_VALUE (sym) = l;
-  SYMBOL_CLASS (sym) = LOC_CONST;
+  if (baton != NULL)
+    {
+      SYMBOL_COMPUTED_OPS (sym) = &dwarf2_locexpr_funcs;
+      SYMBOL_LOCATION_BATON (sym) = baton;
+      SYMBOL_CLASS (sym) = LOC_COMPUTED;
+    }
+  else if (bytes != NULL)
+     {
+      SYMBOL_VALUE_BYTES (sym) = bytes;
+      SYMBOL_CLASS (sym) = LOC_CONST_BYTES;
+    }
+  else
+    {
+      SYMBOL_VALUE (sym) = value;
+      SYMBOL_CLASS (sym) = LOC_CONST;
+    }
 }
-
 
 /* Return the type of the die in question using its DW_AT_type attribute.  */
 
@@ -10490,7 +11010,6 @@ static struct type *
 die_type (struct die_info *die, struct dwarf2_cu *cu)
 {
   struct attribute *type_attr;
-  struct die_info *type_die;
 
   type_attr = dwarf2_attr (die, DW_AT_type, cu);
   if (!type_attr)
@@ -10499,9 +11018,7 @@ die_type (struct die_info *die, struct dwarf2_cu *cu)
       return objfile_type (cu->objfile)->builtin_void;
     }
 
-  type_die = follow_die_ref_or_sig (die, type_attr, &cu);
-
-  return tag_type_to_type (type_die, cu);
+  return lookup_die_type (die, type_attr, cu);
 }
 
 /* True iff CU's producer generates GNAT Ada auxiliary information
@@ -10522,7 +11039,6 @@ need_gnat_info (struct dwarf2_cu *cu)
   return 0;
 }
 
-
 /* Return the auxiliary type of the die in question using its
    DW_AT_GNAT_descriptive_type attribute.  Returns NULL if the
    attribute is not present.  */
@@ -10531,14 +11047,12 @@ static struct type *
 die_descriptive_type (struct die_info *die, struct dwarf2_cu *cu)
 {
   struct attribute *type_attr;
-  struct die_info *type_die;
 
   type_attr = dwarf2_attr (die, DW_AT_GNAT_descriptive_type, cu);
   if (!type_attr)
     return NULL;
 
-  type_die = follow_die_ref (die, type_attr, &cu);
-  return tag_type_to_type (type_die, cu);
+  return lookup_die_type (die, type_attr, cu);
 }
 
 /* If DIE has a descriptive_type attribute, then set the TYPE's
@@ -10564,24 +11078,72 @@ static struct type *
 die_containing_type (struct die_info *die, struct dwarf2_cu *cu)
 {
   struct attribute *type_attr;
-  struct die_info *type_die;
 
   type_attr = dwarf2_attr (die, DW_AT_containing_type, cu);
   if (!type_attr)
     error (_("Dwarf Error: Problem turning containing type into gdb type "
 	     "[in module %s]"), cu->objfile->name);
 
-  type_die = follow_die_ref_or_sig (die, type_attr, &cu);
-  return tag_type_to_type (type_die, cu);
+  return lookup_die_type (die, type_attr, cu);
 }
 
+/* Look up the type of DIE in CU using its type attribute ATTR.
+   If there is no type substitute an error marker.  */
+
 static struct type *
-tag_type_to_type (struct die_info *die, struct dwarf2_cu *cu)
+lookup_die_type (struct die_info *die, struct attribute *attr,
+		 struct dwarf2_cu *cu)
 {
   struct type *this_type;
 
-  this_type = read_type_die (die, cu);
-  if (!this_type)
+  /* First see if we have it cached.  */
+
+  if (is_ref_attr (attr))
+    {
+      unsigned int offset = dwarf2_get_ref_die_offset (attr);
+
+      this_type = get_die_type_at_offset (offset, cu->per_cu);
+    }
+  else if (attr->form == DW_FORM_sig8)
+    {
+      struct signatured_type *sig_type = DW_SIGNATURED_TYPE (attr);
+      struct dwarf2_cu *sig_cu;
+      unsigned int offset;
+
+      /* sig_type will be NULL if the signatured type is missing from
+	 the debug info.  */
+      if (sig_type == NULL)
+	error (_("Dwarf Error: Cannot find signatured DIE referenced from DIE "
+		 "at 0x%x [in module %s]"),
+	       die->offset, cu->objfile->name);
+
+      gdb_assert (sig_type->per_cu.from_debug_types);
+      offset = sig_type->offset + sig_type->type_offset;
+      this_type = get_die_type_at_offset (offset, &sig_type->per_cu);
+    }
+  else
+    {
+      dump_die_for_error (die);
+      error (_("Dwarf Error: Bad type attribute %s [in module %s]"),
+	     dwarf_attr_name (attr->name), cu->objfile->name);
+    }
+
+  /* If not cached we need to read it in.  */
+
+  if (this_type == NULL)
+    {
+      struct die_info *type_die;
+      struct dwarf2_cu *type_cu = cu;
+
+      type_die = follow_die_ref_or_sig (die, attr, &type_cu);
+      /* If the type is cached, we should have found it above.  */
+      gdb_assert (get_die_type (type_die, type_cu) == NULL);
+      this_type = read_type_die_1 (type_die, type_cu);
+    }
+
+  /* If we still don't have a type use an error marker.  */
+
+  if (this_type == NULL)
     {
       char *message, *saved;
 
@@ -10596,8 +11158,17 @@ tag_type_to_type (struct die_info *die, struct dwarf2_cu *cu)
 
       this_type = init_type (TYPE_CODE_ERROR, 0, 0, saved, cu->objfile);
     }
+
   return this_type;
 }
+
+/* Return the type in DIE, CU.
+   Returns NULL for invalid types.
+
+   This first does a lookup in the appropriate type_hash table,
+   and only reads the die in if necessary.
+
+   NOTE: This can be called when reading in partial or full symbols.  */
 
 static struct type *
 read_type_die (struct die_info *die, struct dwarf2_cu *cu)
@@ -10607,6 +11178,17 @@ read_type_die (struct die_info *die, struct dwarf2_cu *cu)
   this_type = get_die_type (die, cu);
   if (this_type)
     return this_type;
+
+  return read_type_die_1 (die, cu);
+}
+
+/* Read the type in DIE, CU.
+   Returns NULL for invalid types.  */
+
+static struct type *
+read_type_die_1 (struct die_info *die, struct dwarf2_cu *cu)
+{
+  struct type *this_type = NULL;
 
   switch (die->tag)
     {
@@ -10733,6 +11315,48 @@ determine_prefix (struct die_info *die, struct dwarf2_cu *cu)
 
   if (parent == NULL)
     return "";
+  else if (parent->building_fullname)
+    {
+      const char *name;
+      const char *parent_name;
+
+      /* It has been seen on RealView 2.2 built binaries,
+	 DW_TAG_template_type_param types actually _defined_ as
+	 children of the parent class:
+
+	 enum E {};
+	 template class <class Enum> Class{};
+	 Class<enum E> class_e;
+
+         1: DW_TAG_class_type (Class)
+           2: DW_TAG_enumeration_type (E)
+             3: DW_TAG_enumerator (enum1:0)
+             3: DW_TAG_enumerator (enum2:1)
+             ...
+           2: DW_TAG_template_type_param
+              DW_AT_type  DW_FORM_ref_udata (E)
+
+	 Besides being broken debug info, it can put GDB into an
+	 infinite loop.  Consider:
+
+	 When we're building the full name for Class<E>, we'll start
+	 at Class, and go look over its template type parameters,
+	 finding E.  We'll then try to build the full name of E, and
+	 reach here.  We're now trying to build the full name of E,
+	 and look over the parent DIE for containing scope.  In the
+	 broken case, if we followed the parent DIE of E, we'd again
+	 find Class, and once again go look at its template type
+	 arguments, etc., etc.  Simply don't consider such parent die
+	 as source-level parent of this die (it can't be, the language
+	 doesn't allow it), and break the loop here.  */
+      name = dwarf2_name (die, cu);
+      parent_name = dwarf2_name (parent, cu);
+      complaint (&symfile_complaints,
+		 _("template param type '%s' defined within parent '%s'"),
+		 name ? name : "<unknown>",
+		 parent_name ? parent_name : "<unknown>");
+      return "";
+    }
   else
     switch (parent->tag)
       {
@@ -12135,6 +12759,16 @@ static int
 maybe_queue_comp_unit (struct dwarf2_cu *this_cu,
 		       struct dwarf2_per_cu_data *per_cu)
 {
+  /* We may arrive here during partial symbol reading, if we need full
+     DIEs to process an unusual case (e.g. template arguments).  Do
+     not queue PER_CU, just tell our caller to load its DIEs.  */
+  if (dwarf2_per_objfile->reading_partial_symbols)
+    {
+      if (per_cu->cu == NULL || per_cu->cu->dies == NULL)
+	return 1;
+      return 0;
+    }
+
   /* Mark the dependence relation so that we don't flush PER_CU
      too early.  */
   dwarf2_add_dependence (this_cu, per_cu);
@@ -12182,8 +12816,9 @@ follow_die_ref_or_sig (struct die_info *src_die, struct attribute *attr,
 }
 
 /* Follow reference OFFSET.
-   On entry *REF_CU is the CU of source DIE referencing OFFSET.
-   On exit *REF_CU is the CU of the result.  */
+   On entry *REF_CU is the CU of the source die referencing OFFSET.
+   On exit *REF_CU is the CU of the result.
+   Returns NULL if OFFSET is invalid.  */
 
 static struct die_info *
 follow_die_offset (unsigned int offset, struct dwarf2_cu **ref_cu)
@@ -12193,6 +12828,8 @@ follow_die_offset (unsigned int offset, struct dwarf2_cu **ref_cu)
 
   gdb_assert (cu->per_cu != NULL);
 
+  target_cu = cu;
+
   if (cu->per_cu->from_debug_types)
     {
       /* .debug_types CUs cannot reference anything outside their CU.
@@ -12200,7 +12837,6 @@ follow_die_offset (unsigned int offset, struct dwarf2_cu **ref_cu)
 	 DW_FORM_sig8.  */
       if (! offset_in_cu_p (&cu->header, offset))
 	return NULL;
-      target_cu = cu;
     }
   else if (! offset_in_cu_p (&cu->header, offset))
     {
@@ -12214,8 +12850,12 @@ follow_die_offset (unsigned int offset, struct dwarf2_cu **ref_cu)
 
       target_cu = per_cu->cu;
     }
-  else
-    target_cu = cu;
+  else if (cu->dies == NULL)
+    {
+      /* We're loading full DIEs during partial symbol reading.  */
+      gdb_assert (dwarf2_per_objfile->reading_partial_symbols);
+      load_full_comp_unit (cu->per_cu, cu->objfile);
+    }
 
   *ref_cu = target_cu;
   temp_die.offset = offset;
@@ -13643,20 +14283,21 @@ dwarf2_free_objfile (struct objfile *objfile)
       for (i = 0; i < dwarf2_per_objfile->n_comp_units; ++i)
 	{
 	  int j;
-	  struct dwarf2_per_cu_data *cu = dwarf2_per_objfile->all_comp_units[i];
+	  struct dwarf2_per_cu_data *per_cu =
+	    dwarf2_per_objfile->all_comp_units[i];
 
-	  if (!cu->v.quick->lines)
+	  if (!per_cu->v.quick->lines)
 	    continue;
 
-	  for (j = 0; j < cu->v.quick->lines->num_file_names; ++j)
+	  for (j = 0; j < per_cu->v.quick->lines->num_file_names; ++j)
 	    {
-	      if (cu->v.quick->file_names)
-		xfree ((void *) cu->v.quick->file_names[j]);
-	      if (cu->v.quick->full_names)
-		xfree ((void *) cu->v.quick->full_names[j]);
+	      if (per_cu->v.quick->file_names)
+		xfree ((void *) per_cu->v.quick->file_names[j]);
+	      if (per_cu->v.quick->full_names)
+		xfree ((void *) per_cu->v.quick->full_names[j]);
 	    }
 
-	  free_line_header (cu->v.quick->lines);
+	  free_line_header (per_cu->v.quick->lines);
 	}
     }
 
@@ -13708,7 +14349,7 @@ offset_and_type_eq (const void *item_lhs, const void *item_rhs)
    Therefore caller should follow these rules:
      * Try to fetch any prerequisite types we may need to build this DIE type
        before building the type and calling set_die_type.
-     * After building typer call set_die_type for current DIE as soon as
+     * After building type call set_die_type for current DIE as soon as
        possible before fetching more types to complete the current type.
      * Make the type as complete as possible before fetching more types.  */
 
@@ -13716,6 +14357,8 @@ static struct type *
 set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
 {
   struct dwarf2_offset_and_type **slot, ofs;
+  struct objfile *objfile = cu->objfile;
+  htab_t *type_hash_ptr;
 
   /* For Ada types, make sure that the gnat-specific data is always
      initialized (if not already set).  There are a few types where
@@ -13730,51 +14373,68 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
       && !HAVE_GNAT_AUX_INFO (type))
     INIT_GNAT_SPECIFIC (type);
 
-  if (cu->type_hash == NULL)
+  if (cu->per_cu->from_debug_types)
+    type_hash_ptr = &dwarf2_per_objfile->debug_types_type_hash;
+  else
+    type_hash_ptr = &dwarf2_per_objfile->debug_info_type_hash;
+
+  if (*type_hash_ptr == NULL)
     {
-      gdb_assert (cu->per_cu != NULL);
-      cu->per_cu->type_hash
-	= htab_create_alloc_ex (cu->header.length / 24,
+      *type_hash_ptr
+	= htab_create_alloc_ex (127,
 				offset_and_type_hash,
 				offset_and_type_eq,
 				NULL,
-				&cu->objfile->objfile_obstack,
+				&objfile->objfile_obstack,
 				hashtab_obstack_allocate,
 				dummy_obstack_deallocate);
-      cu->type_hash = cu->per_cu->type_hash;
     }
 
   ofs.offset = die->offset;
   ofs.type = type;
   slot = (struct dwarf2_offset_and_type **)
-    htab_find_slot_with_hash (cu->type_hash, &ofs, ofs.offset, INSERT);
+    htab_find_slot_with_hash (*type_hash_ptr, &ofs, ofs.offset, INSERT);
   if (*slot)
     complaint (&symfile_complaints,
 	       _("A problem internal to GDB: DIE 0x%x has type already set"),
 	       die->offset);
-  *slot = obstack_alloc (&cu->objfile->objfile_obstack, sizeof (**slot));
+  *slot = obstack_alloc (&objfile->objfile_obstack, sizeof (**slot));
   **slot = ofs;
   return type;
 }
 
-/* Find the type for DIE in CU's type_hash, or return NULL if DIE does
-   not have a saved type.  */
+/* Look up the type for the die at DIE_OFFSET in the appropriate type_hash
+   table, or return NULL if the die does not have a saved type.  */
 
 static struct type *
-get_die_type (struct die_info *die, struct dwarf2_cu *cu)
+get_die_type_at_offset (unsigned int offset,
+			struct dwarf2_per_cu_data *per_cu)
 {
   struct dwarf2_offset_and_type *slot, ofs;
-  htab_t type_hash = cu->type_hash;
+  htab_t type_hash;
 
+  if (per_cu->from_debug_types)
+    type_hash = dwarf2_per_objfile->debug_types_type_hash;
+  else
+    type_hash = dwarf2_per_objfile->debug_info_type_hash;
   if (type_hash == NULL)
     return NULL;
 
-  ofs.offset = die->offset;
+  ofs.offset = offset;
   slot = htab_find_with_hash (type_hash, &ofs, ofs.offset);
   if (slot)
     return slot->type;
   else
     return NULL;
+}
+
+/* Look up the type for DIE in the appropriate type_hash table,
+   or return NULL if DIE does not have a saved type.  */
+
+static struct type *
+get_die_type (struct die_info *die, struct dwarf2_cu *cu)
+{
+  return get_die_type_at_offset (die->offset, cu->per_cu);
 }
 
 /* Add a dependence relationship from CU to REF_PER_CU.  */
@@ -13893,7 +14553,7 @@ munmap_section_buffer (struct dwarf2_section_info *info)
       gdb_assert (munmap ((void *) map_begin, map_length) == 0);
 #else
       /* Without HAVE_MMAP, we should never be here to begin with.  */
-      gdb_assert (0);
+      gdb_assert_not_reached ("no mmap support");
 #endif
     }
 }
@@ -13905,13 +14565,16 @@ dwarf2_per_objfile_free (struct objfile *objfile, void *d)
 {
   struct dwarf2_per_objfile *data = d;
 
+  /* This is sorted according to the order they're defined in to make it easier
+     to keep in sync.  */
   munmap_section_buffer (&data->info);
   munmap_section_buffer (&data->abbrev);
   munmap_section_buffer (&data->line);
-  munmap_section_buffer (&data->str);
-  munmap_section_buffer (&data->macinfo);
-  munmap_section_buffer (&data->ranges);
   munmap_section_buffer (&data->loc);
+  munmap_section_buffer (&data->macinfo);
+  munmap_section_buffer (&data->str);
+  munmap_section_buffer (&data->ranges);
+  munmap_section_buffer (&data->types);
   munmap_section_buffer (&data->frame);
   munmap_section_buffer (&data->eh_frame);
   munmap_section_buffer (&data->gdb_index);
@@ -14290,8 +14953,8 @@ write_one_signatured_type (void **slot, void *d)
 {
   struct signatured_type_index_data *info = d;
   struct signatured_type *entry = (struct signatured_type *) *slot;
-  struct dwarf2_per_cu_data *cu = &entry->per_cu;
-  struct partial_symtab *psymtab = cu->v.psymtab;
+  struct dwarf2_per_cu_data *per_cu = &entry->per_cu;
+  struct partial_symtab *psymtab = per_cu->v.psymtab;
   gdb_byte val[8];
 
   write_psymbols (info->symtab,
@@ -14364,8 +15027,8 @@ write_psymtabs_to_index (struct objfile *objfile, const char *dir)
      all_comp_units, but only in their own hash table.  */
   for (i = 0; i < dwarf2_per_objfile->n_comp_units; ++i)
     {
-      struct dwarf2_per_cu_data *cu = dwarf2_per_objfile->all_comp_units[i];
-      struct partial_symtab *psymtab = cu->v.psymtab;
+      struct dwarf2_per_cu_data *per_cu = dwarf2_per_objfile->all_comp_units[i];
+      struct partial_symtab *psymtab = per_cu->v.psymtab;
       gdb_byte val[8];
 
       write_psymbols (symtab,
@@ -14377,9 +15040,9 @@ write_psymtabs_to_index (struct objfile *objfile, const char *dir)
 
       add_address_entry (objfile, &addr_obstack, psymtab, i);
 
-      store_unsigned_integer (val, 8, BFD_ENDIAN_LITTLE, cu->offset);
+      store_unsigned_integer (val, 8, BFD_ENDIAN_LITTLE, per_cu->offset);
       obstack_grow (&cu_list, val, 8);
-      store_unsigned_integer (val, 8, BFD_ENDIAN_LITTLE, cu->length);
+      store_unsigned_integer (val, 8, BFD_ENDIAN_LITTLE, per_cu->length);
       obstack_grow (&cu_list, val, 8);
     }
 

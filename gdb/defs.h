@@ -337,6 +337,10 @@ extern struct cleanup *make_cleanup_freeargv (char **);
 struct ui_file;
 extern struct cleanup *make_cleanup_ui_file_delete (struct ui_file *);
 
+struct ui_out;
+extern struct cleanup *
+  make_cleanup_ui_out_redirect_pop (struct ui_out *uiout);
+
 struct section_addr_info;
 extern struct cleanup *(make_cleanup_free_section_addr_info 
                         (struct section_addr_info *));
@@ -634,12 +638,13 @@ extern void init_source_path (void);
 
 /* From exec.c */
 
+typedef int (*find_memory_region_ftype) (CORE_ADDR addr, unsigned long size,
+					 int read, int write, int exec,
+					 void *data);
+
 /* Take over the 'find_mapped_memory' vector from exec.c. */
-extern void exec_set_find_memory_regions (int (*) (int (*) (CORE_ADDR, 
-							    unsigned long, 
-							    int, int, int, 
-							    void *),
-						   void *));
+extern void exec_set_find_memory_regions
+  (int (*func) (find_memory_region_ftype func, void *data));
 
 /* Possible lvalue types.  Like enum language, this should be in
    value.h, but needs to be here for the same reason. */

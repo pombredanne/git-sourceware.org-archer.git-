@@ -580,7 +580,7 @@ cris_elf_grok_prstatus (abfd, note)
 	elf_tdata (abfd)->core_signal = bfd_get_16 (abfd, note->descdata + 12);
 
 	/* pr_pid */
-	elf_tdata (abfd)->core_pid = bfd_get_32 (abfd, note->descdata + 22);
+	elf_tdata (abfd)->core_lwpid = bfd_get_32 (abfd, note->descdata + 22);
 
 	/* pr_reg */
 	offset = 70;
@@ -599,7 +599,7 @@ cris_elf_grok_prstatus (abfd, note)
 	elf_tdata (abfd)->core_signal = bfd_get_16 (abfd, note->descdata + 12);
 
 	/* pr_pid */
-	elf_tdata (abfd)->core_pid = bfd_get_32 (abfd, note->descdata + 22);
+	elf_tdata (abfd)->core_lwpid = bfd_get_32 (abfd, note->descdata + 22);
 
 	/* pr_reg */
 	offset = 70;
@@ -4364,6 +4364,7 @@ elf_cris_got_elt_size (bfd *abfd ATTRIBUTE_UNUSED,
 }
 
 #define ELF_ARCH		bfd_arch_cris
+#define ELF_TARGET_ID		CRIS_ELF_DATA
 #define ELF_MACHINE_CODE	EM_CRIS
 #define ELF_MAXPAGESIZE		0x2000
 

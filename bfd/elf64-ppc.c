@@ -61,6 +61,7 @@ static bfd_vma opd_entry_value
 #define TARGET_BIG_SYM		bfd_elf64_powerpc_vec
 #define TARGET_BIG_NAME		"elf64-powerpc"
 #define ELF_ARCH		bfd_arch_powerpc
+#define ELF_TARGET_ID		PPC64_ELF_DATA
 #define ELF_MACHINE_CODE	EM_PPC64
 #define ELF_MAXPAGESIZE		0x10000
 #define ELF_COMMONPAGESIZE	0x1000
@@ -2651,7 +2652,7 @@ ppc64_elf_grok_prstatus (bfd *abfd, Elf_Internal_Note *note)
   elf_tdata (abfd)->core_signal = bfd_get_16 (abfd, note->descdata + 12);
 
   /* pr_pid */
-  elf_tdata (abfd)->core_pid = bfd_get_32 (abfd, note->descdata + 32);
+  elf_tdata (abfd)->core_lwpid = bfd_get_32 (abfd, note->descdata + 32);
 
   /* pr_reg */
   offset = 112;

@@ -155,7 +155,8 @@ WERROR_CFLAGS = @WERROR_CFLAGS@
 GDB_WARN_CFLAGS = $(WARN_CFLAGS)
 GDB_WERROR_CFLAGS = $(WERROR_CFLAGS)
 
-GDB_WARN_CFLAGS_NO_FORMAT = `echo " $(GDB_WARN_CFLAGS) " | sed "s/ -Wformat-nonliteral / /g"`
+GDB_WARN_CFLAGS_NO_FORMAT = `echo " $(GDB_WARN_CFLAGS) " \
+		   | sed "s/ -Wformat-nonliteral / -Wno-format-nonliteral /g"`
 
 RDYNAMIC = @RDYNAMIC@
 
@@ -787,7 +788,8 @@ annotate.h sim-regno.h dictionary.h dfp.h main.h frame-unwind.h	\
 remote-fileio.h i386-linux-tdep.h vax-tdep.h objc-lang.h \
 sentinel-frame.h bcache.h symfile.h windows-tdep.h linux-tdep.h \
 gdb_usleep.h jit.h python/python.h python/python-internal.h \
-xml-syscall.h ada-operator.inc microblaze-tdep.h
+xml-syscall.h ada-operator.inc microblaze-tdep.h \
+psymtab.h psympriv.h progspace.h
 
 # Header files that already have srcdir in them, or which are in objdir.
 
@@ -1043,6 +1045,8 @@ install-tui:
 		$(INSTALL_DATA) $(srcdir)/gdb.1 \
 			$(DESTDIR)$(man1dir)/$$transformed_name.1
 
+install-python:
+	$(SHELL) $(srcdir)/../mkinstalldirs $(DESTDIR)$(GDB_DATADIR)/python/gdb
 
 uninstall: force $(CONFIG_UNINSTALL)
 	transformed_name=`t='$(program_transform_name)'; \
@@ -1541,14 +1545,15 @@ main.o: $(srcdir)/main.c
 # definitly will not work.  "monitor.c" needs to be rewritten so that
 # it doesn't use format strings and instead uses callbacks.
 monitor.o: $(srcdir)/monitor.c
-	$(COMPILE.pre) $(INTERNAL_WARN_CFLAGS) $(COMPILE.post) $(srcdir)/monitor.c
+	$(COMPILE.pre) $(INTERNAL_CFLAGS) $(GDB_WARN_CFLAGS_NO_FORMAT) \
+		$(COMPILE.post) $(srcdir)/monitor.c
 	$(POSTCOMPILE)
 
 # Do not try to build "printcmd.c" with -Wformat-nonliteral.  It manually
 # checks format strings.
 printcmd.o: $(srcdir)/printcmd.c
-	$(COMPILE.pre) $(INTERNAL_CFLAGS_BASE) $(GDB_WARN_CFLAGS_NO_FORMAT) \
-		$(GDB_WERROR_CFLAGS) $(COMPILE.post) $(srcdir)/printcmd.c
+	$(COMPILE.pre) $(INTERNAL_CFLAGS) $(GDB_WARN_CFLAGS_NO_FORMAT) \
+		$(COMPILE.post) $(srcdir)/printcmd.c
 	$(POSTCOMPILE)
 
 # Message files.  Based on code in gcc/Makefile.in.

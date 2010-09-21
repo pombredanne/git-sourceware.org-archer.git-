@@ -2611,7 +2611,7 @@ elf64_hppa_grok_prstatus (bfd *abfd, Elf_Internal_Note *note)
 	elf_tdata (abfd)->core_signal = bfd_get_16 (abfd, note->descdata + 12);
 
 	/* pr_pid */
-	elf_tdata (abfd)->core_pid = bfd_get_32 (abfd, note->descdata + 32);
+	elf_tdata (abfd)->core_lwpid = bfd_get_32 (abfd, note->descdata + 32);
 
 	/* pr_reg */
 	offset = 112;
@@ -4045,6 +4045,7 @@ const struct elf_size_info hppa64_elf_size_info =
 #define TARGET_BIG_SYM			bfd_elf64_hppa_vec
 #define TARGET_BIG_NAME			"elf64-hppa"
 #define ELF_ARCH			bfd_arch_hppa
+#define ELF_TARGET_ID			HPPA64_ELF_DATA
 #define ELF_MACHINE_CODE		EM_PARISC
 /* This is not strictly correct.  The maximum page size for PA2.0 is
    64M.  But everything still uses 4k.  */

@@ -250,17 +250,18 @@ bfd_elf_allocate_object (bfd *abfd,
 
 
 bfd_boolean
-bfd_elf_make_generic_object (bfd *abfd)
+bfd_elf_make_object (bfd *abfd)
 {
+  const struct elf_backend_data *bed = get_elf_backend_data (abfd);
   return bfd_elf_allocate_object (abfd, sizeof (struct elf_obj_tdata),
-				  GENERIC_ELF_DATA);
+				  bed->target_id);
 }
 
 bfd_boolean
 bfd_elf_mkcorefile (bfd *abfd)
 {
   /* I think this can be done just like an object file.  */
-  return bfd_elf_make_generic_object (abfd);
+  return abfd->xvec->_bfd_set_format[(int) bfd_object] (abfd);
 }
 
 static char *
@@ -2451,8 +2452,7 @@ int
 bfd_elf_get_default_section_type (flagword flags)
 {
   if ((flags & SEC_ALLOC) != 0
-      && ((flags & (SEC_LOAD | SEC_HAS_CONTENTS)) == 0
-	  || (flags & SEC_NEVER_LOAD) != 0))
+      && (flags & (SEC_LOAD | SEC_HAS_CONTENTS)) == 0)
     return SHT_NOBITS;
   return SHT_PROGBITS;
 }
@@ -3624,6 +3624,7 @@ _bfd_elf_map_sections_to_segments (bfd *abfd, struct bfd_link_info *info)
       asection *first_tls = NULL;
       asection *dynsec, *eh_frame_hdr;
       bfd_size_type amt;
+      bfd_vma addr_mask, wrap_to = 0;
 
       /* Select the allocated sections, and sort them.  */
 
@@ -3632,6 +3633,12 @@ _bfd_elf_map_sections_to_segments (bfd *abfd, struct bfd_link_info *info)
       if (sections == NULL)
 	goto error_return;
 
+      /* Calculate top address, avoiding undefined behaviour of shift
+	 left operator when shift count is equal to size of type
+	 being shifted.  */
+      addr_mask = ((bfd_vma) 1 << (bfd_arch_bits_per_address (abfd) - 1)) - 1;
+      addr_mask = (addr_mask << 1) + 1;
+
       i = 0;
       for (s = abfd->sections; s != NULL; s = s->next)
 	{
@@ -3639,6 +3646,9 @@ _bfd_elf_map_sections_to_segments (bfd *abfd, struct bfd_link_info *info)
 	    {
 	      sections[i] = s;
 	      ++i;
+	      /* A wrapping section potentially clashes with header.  */
+	      if (((s->lma + s->size) & addr_mask) < (s->lma & addr_mask))
+		wrap_to = (s->lma + s->size) & addr_mask;
 	    }
 	}
       BFD_ASSERT (i <= bfd_count_sections (abfd));
@@ -3708,8 +3718,10 @@ _bfd_elf_map_sections_to_segments (bfd *abfd, struct bfd_link_info *info)
 	  if (phdr_size == (bfd_size_type) -1)
 	    phdr_size = get_program_header_size (abfd, info);
 	  if ((abfd->flags & D_PAGED) == 0
-	      || sections[0]->lma < phdr_size
-	      || sections[0]->lma % maxpagesize < phdr_size % maxpagesize)
+	      || (sections[0]->lma & addr_mask) < phdr_size
+	      || ((sections[0]->lma & addr_mask) % maxpagesize
+		  < phdr_size % maxpagesize)
+	      || (sections[0]->lma & addr_mask & -maxpagesize) < wrap_to)
 	    phdr_in_segment = FALSE;
 	}
 
@@ -3774,9 +3786,8 @@ _bfd_elf_map_sections_to_segments (bfd *abfd, struct bfd_link_info *info)
 	    }
 	  else if (! writable
 		   && (hdr->flags & SEC_READONLY) == 0
-		   && (((last_hdr->lma + last_size - 1)
-			& ~(maxpagesize - 1))
-		       != (hdr->lma & ~(maxpagesize - 1))))
+		   && (((last_hdr->lma + last_size - 1) & -maxpagesize)
+		       != (hdr->lma & -maxpagesize)))
 	    {
 	      /* We don't want to put a writable section in a read only
 		 segment, unless they are on the same page in memory
@@ -3883,8 +3894,8 @@ _bfd_elf_map_sections_to_segments (bfd *abfd, struct bfd_link_info *info)
 		    if (s2->next->alignment_power == 2
 			&& (s2->next->flags & SEC_LOAD) != 0
 			&& CONST_STRNEQ (s2->next->name, ".note")
-			&& align_power (s2->vma + s2->size, 2)
-			   == s2->next->vma)
+			&& align_power (s2->lma + s2->size, 2)
+			   == s2->next->lma)
 		      count++;
 		    else
 		      break;
@@ -4469,8 +4480,9 @@ assign_file_positions_for_load_sections (bfd *abfd,
 	      bfd_vma s_start = sec->lma;
 	      bfd_vma adjust = s_start - p_end;
 
-	      if (s_start < p_end
-		  || p_end < p_start)
+	      if (adjust != 0
+		  && (s_start < p_end
+		      || p_end < p_start))
 		{
 		  (*_bfd_error_handler)
 		    (_("%B: section %A lma %#lx adjusted to %#lx"), abfd, sec,
@@ -5858,7 +5870,7 @@ copy_elf_program_header (bfd *ibfd, bfd *obfd)
       bfd_size_type amt;
       Elf_Internal_Shdr *this_hdr;
       asection *first_section = NULL;
-      asection *lowest_section = NULL;
+      asection *lowest_section;
 
       /* Compute how many sections are in this segment.  */
       for (section = ibfd->sections, section_count = 0;
@@ -5868,10 +5880,8 @@ copy_elf_program_header (bfd *ibfd, bfd *obfd)
 	  this_hdr = &(elf_section_data(section)->this_hdr);
 	  if (ELF_SECTION_IN_SEGMENT (this_hdr, segment))
 	    {
-	      if (!first_section)
-		first_section = lowest_section = section;
-	      if (section->lma < lowest_section->lma)
-		lowest_section = section;
+	      if (first_section == NULL)
+		first_section = section;
 	      section_count++;
 	    }
 	}
@@ -5925,17 +5935,7 @@ copy_elf_program_header (bfd *ibfd, bfd *obfd)
 	    phdr_included = TRUE;
 	}
 
-      if (map->includes_filehdr && first_section)
-	/* We need to keep the space used by the headers fixed.  */
-	map->header_size = first_section->vma - segment->p_vaddr;
-      
-      if (!map->includes_phdrs
-	  && !map->includes_filehdr
-	  && map->p_paddr_valid)
-	/* There is some other padding before the first section.  */
-	map->p_vaddr_offset = ((lowest_section ? lowest_section->lma : 0)
-			       - segment->p_paddr);
-
+      lowest_section = first_section;
       if (section_count != 0)
 	{
 	  unsigned int isec = 0;
@@ -5948,11 +5948,40 @@ copy_elf_program_header (bfd *ibfd, bfd *obfd)
 	      if (ELF_SECTION_IN_SEGMENT (this_hdr, segment))
 		{
 		  map->sections[isec++] = section->output_section;
+		  if (section->lma < lowest_section->lma)
+		    lowest_section = section;
+		  if ((section->flags & SEC_ALLOC) != 0)
+		    {
+		      bfd_vma seg_off;
+
+		      /* Section lmas are set up from PT_LOAD header
+			 p_paddr in _bfd_elf_make_section_from_shdr.
+			 If this header has a p_paddr that disagrees
+			 with the section lma, flag the p_paddr as
+			 invalid.  */
+		      if ((section->flags & SEC_LOAD) != 0)
+			seg_off = this_hdr->sh_offset - segment->p_offset;
+		      else
+			seg_off = this_hdr->sh_addr - segment->p_vaddr;
+		      if (section->lma - segment->p_paddr != seg_off)
+			map->p_paddr_valid = FALSE;
+		    }
 		  if (isec == section_count)
 		    break;
 		}
 	    }
 	}
+
+      if (map->includes_filehdr && lowest_section != NULL)
+	/* We need to keep the space used by the headers fixed.  */
+	map->header_size = lowest_section->vma - segment->p_vaddr;
+      
+      if (!map->includes_phdrs
+	  && !map->includes_filehdr
+	  && map->p_paddr_valid)
+	/* There is some other padding before the first section.  */
+	map->p_vaddr_offset = ((lowest_section ? lowest_section->lma : 0)
+			       - segment->p_paddr);
 
       map->count = section_count;
       *pointer_to_map = map;
@@ -7519,13 +7548,19 @@ _bfd_elf_rel_vtable_reloc_fn
 # include <sys/procfs.h>
 #endif
 
-/* FIXME: this is kinda wrong, but it's what gdb wants.  */
+/* Return a PID that identifies a "thread" for threaded cores, or the
+   PID of the main process for non-threaded cores.  */
 
 static int
 elfcore_make_pid (bfd *abfd)
 {
-  return ((elf_tdata (abfd)->core_lwpid << 16)
-	  + (elf_tdata (abfd)->core_pid));
+  int pid;
+
+  pid = elf_tdata (abfd)->core_lwpid;
+  if (pid == 0)
+    pid = elf_tdata (abfd)->core_pid;
+
+  return pid;
 }
 
 /* If there isn't a section called NAME, make one, using
@@ -7615,7 +7650,8 @@ elfcore_grok_prstatus (bfd *abfd, Elf_Internal_Note *note)
 	 has already been set by another thread.  */
       if (elf_tdata (abfd)->core_signal == 0)
 	elf_tdata (abfd)->core_signal = prstat.pr_cursig;
-      elf_tdata (abfd)->core_pid = prstat.pr_pid;
+      if (elf_tdata (abfd)->core_pid == 0)
+	elf_tdata (abfd)->core_pid = prstat.pr_pid;
 
       /* pr_who exists on:
 	 solaris 2.5+
@@ -7625,6 +7661,8 @@ elfcore_grok_prstatus (bfd *abfd, Elf_Internal_Note *note)
 	 */
 #if defined (HAVE_PRSTATUS_T_PR_WHO)
       elf_tdata (abfd)->core_lwpid = prstat.pr_who;
+#else
+      elf_tdata (abfd)->core_lwpid = prstat.pr_pid;
 #endif
     }
 #if defined (HAVE_PRSTATUS32_T)
@@ -7641,7 +7679,8 @@ elfcore_grok_prstatus (bfd *abfd, Elf_Internal_Note *note)
 	 has already been set by another thread.  */
       if (elf_tdata (abfd)->core_signal == 0)
 	elf_tdata (abfd)->core_signal = prstat.pr_cursig;
-      elf_tdata (abfd)->core_pid = prstat.pr_pid;
+      if (elf_tdata (abfd)->core_pid == 0)
+	elf_tdata (abfd)->core_pid = prstat.pr_pid;
 
       /* pr_who exists on:
 	 solaris 2.5+
@@ -7651,6 +7690,8 @@ elfcore_grok_prstatus (bfd *abfd, Elf_Internal_Note *note)
 	 */
 #if defined (HAVE_PRSTATUS32_T_PR_WHO)
       elf_tdata (abfd)->core_lwpid = prstat.pr_who;
+#else
+      elf_tdata (abfd)->core_lwpid = prstat.pr_pid;
 #endif
     }
 #endif /* HAVE_PRSTATUS32_T */

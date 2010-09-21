@@ -3083,7 +3083,7 @@ elf64_mips_grok_prstatus (bfd *abfd, Elf_Internal_Note *note)
 	elf_tdata (abfd)->core_signal = bfd_get_16 (abfd, note->descdata + 12);
 
 	/* pr_pid */
-	elf_tdata (abfd)->core_pid = bfd_get_32 (abfd, note->descdata + 32);
+	elf_tdata (abfd)->core_lwpid = bfd_get_32 (abfd, note->descdata + 32);
 
 	/* pr_reg */
 	offset = 112;
@@ -3207,6 +3207,7 @@ const struct elf_size_info mips_elf64_size_info =
 };
 
 #define ELF_ARCH			bfd_arch_mips
+#define ELF_TARGET_ID			MIPS_ELF_DATA
 #define ELF_MACHINE_CODE		EM_MIPS
 
 #define elf_backend_collect		TRUE
@@ -3285,7 +3286,6 @@ const struct elf_size_info mips_elf64_size_info =
 #define bfd_elf64_set_section_contents	_bfd_mips_elf_set_section_contents
 #define bfd_elf64_bfd_get_relocated_section_contents \
 				_bfd_elf_mips_get_relocated_section_contents
-#define bfd_elf64_mkobject		_bfd_mips_elf_mkobject
 #define bfd_elf64_bfd_link_hash_table_create \
 				_bfd_mips_elf_link_hash_table_create
 #define bfd_elf64_bfd_final_link	_bfd_mips_elf_final_link

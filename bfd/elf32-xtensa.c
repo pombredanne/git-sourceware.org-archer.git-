@@ -3802,7 +3802,7 @@ elf_xtensa_grok_prstatus (bfd *abfd, Elf_Internal_Note *note)
   elf_tdata (abfd)->core_signal = bfd_get_16 (abfd, note->descdata + 12);
 
   /* pr_pid */
-  elf_tdata (abfd)->core_pid = bfd_get_32 (abfd, note->descdata + 24);
+  elf_tdata (abfd)->core_lwpid = bfd_get_32 (abfd, note->descdata + 24);
 
   /* pr_reg */
   offset = 72;
@@ -10766,6 +10766,7 @@ static const struct bfd_elf_special_section elf_xtensa_special_sections[] =
   { NULL,                       0,      0, 0,            0 }
 };
 
+#define ELF_TARGET_ID			XTENSA_ELF_DATA
 #ifndef ELF_ARCH
 #define TARGET_LITTLE_SYM		bfd_elf32_xtensa_le_vec
 #define TARGET_LITTLE_NAME		"elf32-xtensa-le"

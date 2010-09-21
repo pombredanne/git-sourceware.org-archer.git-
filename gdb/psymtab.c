@@ -37,6 +37,11 @@
 #define DEV_TTY "/dev/tty"
 #endif
 
+struct psymbol_bcache
+{
+  struct bcache *bcache;
+};
+
 /* A fast way to get from a psymtab to its symtab (after the first time).  */
 #define PSYMTAB_TO_SYMTAB(pst)  \
     ((pst) -> symtab != NULL ? (pst) -> symtab : psymtab_to_symtab (pst))
@@ -913,7 +918,7 @@ map_symbol_filenames_psymtab (struct objfile *objfile,
 	continue;
 
       fullname = psymtab_to_fullname (ps);
-      (*fun) (fullname, ps->filename, data);
+      (*fun) (ps->filename, fullname, data);
     }
 }
 
@@ -1270,6 +1275,92 @@ start_psymtab_common (struct objfile *objfile,
   return (psymtab);
 }
 
+/* Calculate a hash code for the given partial symbol.  The hash is
+   calculated using the symbol's value, language, domain, class
+   and name. These are the values which are set by
+   add_psymbol_to_bcache.  */
+
+static unsigned long
+psymbol_hash (const void *addr, int length)
+{
+  unsigned long h = 0;
+  struct partial_symbol *psymbol = (struct partial_symbol *) addr;
+  unsigned int lang = psymbol->ginfo.language;
+  unsigned int domain = PSYMBOL_DOMAIN (psymbol);
+  unsigned int class = PSYMBOL_CLASS (psymbol);
+
+  h = hash_continue (&psymbol->ginfo.value, sizeof (psymbol->ginfo.value), h);
+  h = hash_continue (&lang, sizeof (unsigned int), h);
+  h = hash_continue (&domain, sizeof (unsigned int), h);
+  h = hash_continue (&class, sizeof (unsigned int), h);
+  h = hash_continue (psymbol->ginfo.name, strlen (psymbol->ginfo.name), h);
+
+  return h;
+}
+
+/* Returns true if the symbol at addr1 equals the symbol at addr2.
+   For the comparison this function uses a symbols value,
+   language, domain, class and name.  */
+
+static int
+psymbol_compare (const void *addr1, const void *addr2, int length)
+{
+  struct partial_symbol *sym1 = (struct partial_symbol *) addr1;
+  struct partial_symbol *sym2 = (struct partial_symbol *) addr2;
+
+  return (memcmp (&sym1->ginfo.value, &sym1->ginfo.value,
+                  sizeof (sym1->ginfo.value)) == 0
+	  && sym1->ginfo.language == sym2->ginfo.language
+          && PSYMBOL_DOMAIN (sym1) == PSYMBOL_DOMAIN (sym2)
+          && PSYMBOL_CLASS (sym1) == PSYMBOL_CLASS (sym2)
+          && sym1->ginfo.name == sym2->ginfo.name);
+}
+
+/* Initialize a partial symbol bcache.  */
+
+struct psymbol_bcache *
+psymbol_bcache_init (void)
+{
+  struct psymbol_bcache *bcache = XCALLOC (1, struct psymbol_bcache);
+  bcache->bcache = bcache_xmalloc (psymbol_hash, psymbol_compare);
+  return bcache;
+}
+
+/* Free a partial symbol bcache.  */
+void
+psymbol_bcache_free (struct psymbol_bcache *bcache)
+{
+  if (bcache == NULL)
+    return;
+
+  bcache_xfree (bcache->bcache);
+  xfree (bcache);
+}
+
+/* Return the internal bcache of the psymbol_bcache BCACHE*/
+
+struct bcache *
+psymbol_bcache_get_bcache (struct psymbol_bcache *bcache)
+{
+  return bcache->bcache;
+}
+
+/* Find a copy of the SYM in BCACHE.  If BCACHE has never seen this
+   symbol before, add a copy to BCACHE.  In either case, return a pointer
+   to BCACHE's copy of the symbol.  If optional ADDED is not NULL, return
+   1 in case of new entry or 0 if returning an old entry.  */
+
+static const struct partial_symbol *
+psymbol_bcache_full (struct partial_symbol *sym,
+                     struct psymbol_bcache *bcache,
+                     int *added)
+{
+  return bcache_full (sym,
+                      sizeof (struct partial_symbol),
+                      bcache->bcache,
+                      added);
+}
+
 /* Helper function, initialises partial symbol structure and stashes 
    it into objfile's bcache.  Note that our caching mechanism will
    use all fields of struct partial_symbol to determine hash value of the
@@ -1285,15 +1376,13 @@ add_psymbol_to_bcache (char *name, int namelength, int copy_name,
 		       enum language language, struct objfile *objfile,
 		       int *added)
 {
-  /* psymbol is static so that there will be no uninitialized gaps in the
-     structure which might contain random data, causing cache misses in
-     bcache. */
-  static struct partial_symbol psymbol;
+  struct partial_symbol psymbol;
 
-  /* However, we must ensure that the entire 'value' field has been
-     zeroed before assigning to it, because an assignment may not
-     write the entire field.  */
+  /* We must ensure that the entire 'value' field has been zeroed
+     before assigning to it, because an assignment may not write the
+     entire field.  */
   memset (&psymbol.ginfo.value, 0, sizeof (psymbol.ginfo.value));
+
   /* val and coreaddr are mutually exclusive, one of them *will* be zero */
   if (val != 0)
     {
@@ -1304,6 +1393,7 @@ add_psymbol_to_bcache (char *name, int namelength, int copy_name,
       SYMBOL_VALUE_ADDRESS (&psymbol) = coreaddr;
     }
   SYMBOL_SECTION (&psymbol) = 0;
+  SYMBOL_OBJ_SECTION (&psymbol) = NULL;
   SYMBOL_SET_LANGUAGE (&psymbol, language);
   PSYMBOL_DOMAIN (&psymbol) = domain;
   PSYMBOL_CLASS (&psymbol) = class;
@@ -1311,8 +1401,38 @@ add_psymbol_to_bcache (char *name, int namelength, int copy_name,
   SYMBOL_SET_NAMES (&psymbol, name, namelength, copy_name, objfile);
 
   /* Stash the partial symbol away in the cache */
-  return bcache_full (&psymbol, sizeof (struct partial_symbol),
-		      objfile->psymbol_cache, added);
+  return psymbol_bcache_full (&psymbol,
+                              objfile->psymbol_cache,
+                              added);
+}
+
+/* Increase the space allocated for LISTP, which is probably
+   global_psymbols or static_psymbols. This space will eventually
+   be freed in free_objfile().  */
+
+static void
+extend_psymbol_list (struct psymbol_allocation_list *listp,
+		     struct objfile *objfile)
+{
+  int new_size;
+
+  if (listp->size == 0)
+    {
+      new_size = 255;
+      listp->list = (struct partial_symbol **)
+	xmalloc (new_size * sizeof (struct partial_symbol *));
+    }
+  else
+    {
+      new_size = listp->size * 2;
+      listp->list = (struct partial_symbol **)
+	xrealloc ((char *) listp->list,
+		  new_size * sizeof (struct partial_symbol *));
+    }
+  /* Next assumes we only went one over.  Should be good if
+     program works correctly */
+  listp->next = listp->list + listp->size;
+  listp->size = new_size;
 }
 
 /* Helper function, adds partial symbol to the given partial symbol
@@ -1464,35 +1584,6 @@ discard_psymtab (struct partial_symtab *pst)
 
   pst->next = pst->objfile->free_psymtabs;
   pst->objfile->free_psymtabs = pst;
-}
-
-/* Increase the space allocated for LISTP, which is probably
-   global_psymbols or static_psymbols. This space will eventually
-   be freed in free_objfile().  */
-
-void
-extend_psymbol_list (struct psymbol_allocation_list *listp,
-		     struct objfile *objfile)
-{
-  int new_size;
-
-  if (listp->size == 0)
-    {
-      new_size = 255;
-      listp->list = (struct partial_symbol **)
-	xmalloc (new_size * sizeof (struct partial_symbol *));
-    }
-  else
-    {
-      new_size = listp->size * 2;
-      listp->list = (struct partial_symbol **)
-	xrealloc ((char *) listp->list,
-		  new_size * sizeof (struct partial_symbol *));
-    }
-  /* Next assumes we only went one over.  Should be good if
-     program works correctly */
-  listp->next = listp->list + listp->size;
-  listp->size = new_size;
 }
 
 

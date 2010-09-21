@@ -199,9 +199,9 @@ allocate_objfile (bfd *abfd, int flags)
   struct objfile *objfile;
 
   objfile = (struct objfile *) xzalloc (sizeof (struct objfile));
-  objfile->psymbol_cache = bcache_xmalloc ();
-  objfile->macro_cache = bcache_xmalloc ();
-  objfile->filename_cache = bcache_xmalloc ();
+  objfile->psymbol_cache = psymbol_bcache_init ();
+  objfile->macro_cache = bcache_xmalloc (NULL, NULL);
+  objfile->filename_cache = bcache_xmalloc (NULL, NULL);
   /* We could use obstack_specify_allocation here instead, but
      gdb_obstack.h specifies the alloc/dealloc functions.  */
   obstack_init (&objfile->objfile_obstack);
@@ -658,7 +658,7 @@ free_objfile (struct objfile *objfile)
   if (objfile->static_psymbols.list)
     xfree (objfile->static_psymbols.list);
   /* Free the obstacks for non-reusable objfiles */
-  bcache_xfree (objfile->psymbol_cache);
+  psymbol_bcache_free (objfile->psymbol_cache);
   bcache_xfree (objfile->macro_cache);
   bcache_xfree (objfile->filename_cache);
   if (objfile->demangled_names_hash)
@@ -1068,7 +1068,7 @@ qsort_cmp (const void *a, const void *b)
 	      return 1;
 
 	  /* We should have found one of the sections before getting here.  */
-	  gdb_assert (0);
+	  gdb_assert_not_reached ("section not found");
 	}
       else
 	{
@@ -1083,12 +1083,12 @@ qsort_cmp (const void *a, const void *b)
 	      return 1;
 
 	  /* We should have found one of the objfiles before getting here.  */
-	  gdb_assert (0);
+	  gdb_assert_not_reached ("objfile not found");
 	}
     }
 
   /* Unreachable.  */
-  gdb_assert (0);
+  gdb_assert_not_reached ("unexpected code path");
   return 0;
 }
 

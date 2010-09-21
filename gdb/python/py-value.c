@@ -26,6 +26,8 @@
 #include "dfp.h"
 #include "valprint.h"
 #include "infcall.h"
+#include "expression.h"
+#include "cp-abi.h"
 
 #ifdef HAVE_PYTHON
 
@@ -61,6 +63,7 @@ typedef struct value_object {
   struct value *value;
   PyObject *address;
   PyObject *type;
+  PyObject *dynamic_type;
 } value_object;
 
 /* List of all values which are currently exposed to Python. It is
@@ -99,6 +102,8 @@ valpy_dealloc (PyObject *obj)
     {
       Py_DECREF (self->type);
     }
+
+  Py_XDECREF (self->dynamic_type);
 
   self->ob_type->tp_free (self);
 }
@@ -147,6 +152,7 @@ valpy_new (PyTypeObject *subtype, PyObject *args, PyObject *keywords)
   value_incref (value);
   value_obj->address = NULL;
   value_obj->type = NULL;
+  value_obj->dynamic_type = NULL;
   note_value (value_obj);
 
   return (PyObject *) value_obj;
@@ -217,13 +223,76 @@ valpy_get_type (PyObject *self, void *closure)
     {
       obj->type = type_to_type_object (value_type (obj->value));
       if (!obj->type)
-	{
-	  obj->type = Py_None;
-	  Py_INCREF (obj->type);
-	}
+	return NULL;
     }
   Py_INCREF (obj->type);
   return obj->type;
+}
+
+/* Return dynamic type of the value.  */
+
+static PyObject *
+valpy_get_dynamic_type (PyObject *self, void *closure)
+{
+  value_object *obj = (value_object *) self;
+  volatile struct gdb_exception except;
+  struct type *type = NULL;
+
+  if (obj->dynamic_type != NULL)
+    {
+      Py_INCREF (obj->dynamic_type);
+      return obj->dynamic_type;
+    }
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      struct value *val = obj->value;
+
+      type = value_type (val);
+      CHECK_TYPEDEF (type);
+
+      if (((TYPE_CODE (type) == TYPE_CODE_PTR)
+	   || (TYPE_CODE (type) == TYPE_CODE_REF))
+	  && (TYPE_CODE (TYPE_TARGET_TYPE (type)) == TYPE_CODE_CLASS))
+	{
+	  struct value *target;
+	  int was_pointer = TYPE_CODE (type) == TYPE_CODE_PTR;
+
+	  target = value_ind (val);
+	  type = value_rtti_type (target, NULL, NULL, NULL);
+
+	  if (type)
+	    {
+	      if (was_pointer)
+		type = lookup_pointer_type (type);
+	      else
+		type = lookup_reference_type (type);
+	    }
+	}
+      else if (TYPE_CODE (type) == TYPE_CODE_CLASS)
+	type = value_rtti_type (val, NULL, NULL, NULL);
+      else
+	{
+	  /* Re-use object's static type.  */
+	  type = NULL;
+	}
+    }
+  GDB_PY_HANDLE_EXCEPTION (except);
+
+  if (type == NULL)
+    {
+      /* Ensure that the TYPE field is ready.  */
+      if (!valpy_get_type (self, NULL))
+	return NULL;
+      /* We don't need to incref here, because valpy_get_type already
+	 did it for us.  */
+      obj->dynamic_type = obj->type;
+    }
+  else
+    obj->dynamic_type = type_to_type_object (type);
+
+  Py_INCREF (obj->dynamic_type);
+  return obj->dynamic_type;
 }
 
 /* Implementation of gdb.Value.lazy_string ([encoding] [, length]) ->
@@ -295,9 +364,10 @@ valpy_string (PyObject *self, PyObject *args, PyObject *kw)
   return unicode;
 }
 
-/* Cast a value to a given type.  */
+/* A helper function that implements the various cast operators.  */
+
 static PyObject *
-valpy_cast (PyObject *self, PyObject *args)
+valpy_do_cast (PyObject *self, PyObject *args, enum exp_opcode op)
 {
   PyObject *type_obj;
   struct type *type;
@@ -317,11 +387,45 @@ valpy_cast (PyObject *self, PyObject *args)
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      res_val = value_cast (type, ((value_object *) self)->value);
+      struct value *val = ((value_object *) self)->value;
+
+      if (op == UNOP_DYNAMIC_CAST)
+	res_val = value_dynamic_cast (type, val);
+      else if (op == UNOP_REINTERPRET_CAST)
+	res_val = value_reinterpret_cast (type, val);
+      else
+	{
+	  gdb_assert (op == UNOP_CAST);
+	  res_val = value_cast (type, val);
+	}
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
   return value_to_value_object (res_val);
+}
+
+/* Implementation of the "cast" method.  */
+
+static PyObject *
+valpy_cast (PyObject *self, PyObject *args)
+{
+  return valpy_do_cast (self, args, UNOP_CAST);
+}
+
+/* Implementation of the "dynamic_cast" method.  */
+
+static PyObject *
+valpy_dynamic_cast (PyObject *self, PyObject *args)
+{
+  return valpy_do_cast (self, args, UNOP_DYNAMIC_CAST);
+}
+
+/* Implementation of the "reinterpret_cast" method.  */
+
+static PyObject *
+valpy_reinterpret_cast (PyObject *self, PyObject *args)
+{
+  return valpy_do_cast (self, args, UNOP_REINTERPRET_CAST);
 }
 
 static Py_ssize_t
@@ -712,11 +816,8 @@ valpy_nonzero (PyObject *self)
 			     TYPE_LENGTH (type),
 			     gdbarch_byte_order (get_type_arch (type)));
   else
-    {
-      PyErr_SetString (PyExc_TypeError, _("Attempted truth testing on invalid "
-					  "gdb.Value type."));
-      return 0;
-    }
+    /* All other values are True.  */
+    return 1;
 }
 
 /* Implements ~ for value objects.  */
@@ -961,6 +1062,7 @@ value_to_value_object (struct value *val)
       value_incref (val);
       val_obj->address = NULL;
       val_obj->type = NULL;
+      val_obj->dynamic_type = NULL;
       note_value (val_obj);
     }
 
@@ -1136,11 +1238,22 @@ static PyGetSetDef value_object_getset[] = {
     "Boolean telling whether the value is optimized out (i.e., not available).",
     NULL },
   { "type", valpy_get_type, NULL, "Type of the value.", NULL },
+  { "dynamic_type", valpy_get_dynamic_type, NULL,
+    "Dynamic type of the value.", NULL },
   {NULL}  /* Sentinel */
 };
 
 static PyMethodDef value_object_methods[] = {
   { "cast", valpy_cast, METH_VARARGS, "Cast the value to the supplied type." },
+  { "dynamic_cast", valpy_dynamic_cast, METH_VARARGS,
+    "dynamic_cast (gdb.Type) -> gdb.Value\n\
+Cast the value to the supplied type, as if by the C++ dynamic_cast operator."
+  },
+  { "reinterpret_cast", valpy_reinterpret_cast, METH_VARARGS,
+    "reinterpret_cast (gdb.Type) -> gdb.Value\n\
+Cast the value to the supplied type, as if by the C++\n\
+reinterpret_cast operator."
+  },
   { "dereference", valpy_dereference, METH_NOARGS, "Dereferences the value." },
   { "lazy_string", (PyCFunction) valpy_lazy_string, METH_VARARGS | METH_KEYWORDS,
     "lazy_string ([encoding]  [, length]) -> lazy_string\n\

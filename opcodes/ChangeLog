@@ -1,3 +1,37 @@
+2010-09-17  Tejas Belagod  <tejas.belagod@arm.com>
+
+	* arm_dis.c (coprocessor_opcodes): Add MRC entry for APSR_nzcv.
+
+2010-09-14  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* mips-opc.c (mips_builtin_opcodes): Add "sync_acquire",
+	"sync_mb", "sync_release", "sync_rmb" and "sync_wmb".
+
+2010-09-10  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* src/opcodes/dlx-dis.c (print_insn_dlx): Use dlx_insn type for
+	dlx_insn_type array.
+
+2010-08-31  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR binutils/11960
+	* i386-dis.c (sIv): New.
+	(dis386): Replace Iq with sIv on "pushT".
+	(reg_table): Replace T with {T|} on callT, JcallT, jmpT and JjmpT.
+	(x86_64_table): Replace {T|}/{P|} with P.  
+	(putop): Add 'w' to 'T'/'P' if needed for Intel syntax.
+	(OP_sI): Update v_mode.  Remove w_mode.
+
+2010-08-27  Nathan Froyd  <froydnj@codesourcery.com>
+
+	* ppc-opc.c (powerpc_opcodes) [lswx,lswi,stswx,stswi]: Deprecate
+	on E500 and E500MC.
+
+2010-08-17  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* i386-dis.c (reg_table): Replace Eb with Mb on prefetch and
+	prefetchw.
+
 2010-08-06  Quentin Neill <quentin.neill@amd.com>
 
 	* i386-gen.c (cpu_flag_init): Define CpuNop extension flag, add

@@ -20,6 +20,14 @@
 #ifndef PSYMTAB_H
 #define PSYMTAB_H
 
+/* A bcache for partial symbols.  */
+
+struct psymbol_bcache;
+
+extern struct psymbol_bcache *psymbol_bcache_init (void);
+extern void psymbol_bcache_free (struct psymbol_bcache *);
+extern struct bcache *psymbol_bcache_get_bcache (struct psymbol_bcache *);
+
 void map_partial_symbol_names (void (*) (const char *, void *), void *);
 
 void map_partial_symbol_filenames (void (*) (const char *, const char *,

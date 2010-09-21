@@ -2770,7 +2770,7 @@ _bfd_elf_link_sec_merge_syms (struct elf_link_hash_entry *h, void *data)
 bfd_boolean
 _bfd_elf_dynamic_symbol_p (struct elf_link_hash_entry *h,
 			   struct bfd_link_info *info,
-			   bfd_boolean ignore_protected)
+			   bfd_boolean not_local_protected)
 {
   bfd_boolean binding_stays_local_p;
   const struct elf_backend_data *bed;
@@ -2809,7 +2809,7 @@ _bfd_elf_dynamic_symbol_p (struct elf_link_hash_entry *h,
       /* Proper resolution for function pointer equality may require
 	 that these symbols perhaps be resolved dynamically, even though
 	 we should be resolving them to the current module.  */
-      if (!ignore_protected || !bed->is_function_type (h->type))
+      if (!not_local_protected || !bed->is_function_type (h->type))
 	binding_stays_local_p = TRUE;
       break;
 
@@ -2818,7 +2818,7 @@ _bfd_elf_dynamic_symbol_p (struct elf_link_hash_entry *h,
     }
 
   /* If it isn't defined locally, then clearly it's dynamic.  */
-  if (!h->def_regular)
+  if (!h->def_regular && !ELF_COMMON_DEF_P (h))
     return TRUE;
 
   /* Otherwise, the symbol is dynamic if binding rules don't tell
@@ -2829,7 +2829,15 @@ _bfd_elf_dynamic_symbol_p (struct elf_link_hash_entry *h,
 /* Return true if the symbol referred to by H should be considered
    to resolve local to the current module, and false otherwise.  Differs
    from (the inverse of) _bfd_elf_dynamic_symbol_p in the treatment of
-   undefined symbols and weak symbols.  */
+   undefined symbols.  The two functions are virtually identical except
+   for the place where forced_local and dynindx == -1 are tested.  If
+   either of those tests are true, _bfd_elf_dynamic_symbol_p will say
+   the symbol is local, while _bfd_elf_symbol_refs_local_p will say
+   the symbol is local only for defined symbols.
+   It might seem that _bfd_elf_dynamic_symbol_p could be rewritten as
+   !_bfd_elf_symbol_refs_local_p, except that targets differ in their
+   treatment of undefined weak symbols.  For those that do not make
+   undefined weak symbols dynamic, both functions may return false.  */
 
 bfd_boolean
 _bfd_elf_symbol_refs_local_p (struct elf_link_hash_entry *h,
@@ -4191,7 +4199,8 @@ error_free_dyn:
 	h = (struct elf_link_hash_entry *) h->root.u.i.link;
 
       *sym_hash = h;
-      h->unique_global = (flags & BSF_GNU_UNIQUE) != 0;
+      if (is_elf_hash_table (htab))
+	h->unique_global = (flags & BSF_GNU_UNIQUE) != 0;
 
       new_weakdef = FALSE;
       if (dynamic
@@ -4791,6 +4800,7 @@ error_free_dyn:
   if (! dynamic
       && is_elf_hash_table (htab)
       && bed->check_relocs != NULL
+      && elf_object_id (abfd) == elf_hash_table_id (htab)
       && (*bed->relocs_compatible) (abfd->xvec, info->output_bfd->xvec))
     {
       asection *o;
@@ -5374,6 +5384,7 @@ compute_bucket_count (struct bfd_link_info *info ATTRIBUTE_UNUSED,
       const struct elf_backend_data *bed = get_elf_backend_data (dynobj);
       unsigned long int *counts;
       bfd_size_type amt;
+      unsigned int no_improvement_count = 0;
 
       /* Possible optimization parameters: if we have NSYMS symbols we say
 	 that the hashing table must at least have NSYMS/4 and at most
@@ -5458,7 +5469,12 @@ compute_bucket_count (struct bfd_link_info *info ATTRIBUTE_UNUSED,
 	    {
 	      best_chlen = max;
 	      best_size = i;
+              no_improvement_count = 0;
 	    }
+	  /* PR 11843: Avoid futile long searches for the best bucket size
+	     when there are a large number of symbols.  */
+	  else if (++no_improvement_count == 100)
+	    break;
 	}
 
       free (counts);
@@ -8627,7 +8643,7 @@ elf_link_output_extsym (struct elf_link_hash_entry *h, void *data)
 	ignore_undef = bed->elf_backend_ignore_undef_symbol (h);
 
       /* If we are reporting errors for this situation then do so now.  */
-      if (ignore_undef == FALSE
+      if (!ignore_undef
 	  && h->ref_dynamic
 	  && (!h->ref_regular || finfo->info->gc_sections)
 	  && ! elf_link_check_versioned_symbol (finfo->info, bed, h)
@@ -9827,7 +9843,6 @@ elf_link_input_bfd (struct elf_final_link_info *finfo, bfd *input_bfd)
 	  {
 	    /* FIXME: octets_per_byte.  */
 	    if (! (o->flags & SEC_EXCLUDE)
-		&& ! (o->output_section->flags & SEC_NEVER_LOAD)
 		&& ! bfd_set_section_contents (output_bfd, o->output_section,
 					       contents,
 					       (file_ptr) o->output_offset,
@@ -10344,7 +10359,10 @@ bfd_elf_final_link (bfd *abfd, struct bfd_link_info *info)
 		    {
 		      size_t ext_size;
 
-		      ext_size = elf_section_data (sec)->rel_hdr.sh_size;
+		      ext_size = esdi->rel_hdr.sh_size;
+		      if (esdi->rel_hdr2 != NULL)
+			ext_size += esdi->rel_hdr2->sh_size;
+
 		      if (ext_size > max_external_reloc_size)
 			max_external_reloc_size = ext_size;
 		      if (sec->reloc_count > max_internal_reloc_count)

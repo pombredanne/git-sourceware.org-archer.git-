@@ -12,6 +12,17 @@
 
      result = some_value (10,20)
 
+* C++ Improvements:
+
+  ** GDB now puts template parameters in scope when debugging in an
+     instantiation.  For example, if you have:
+
+     template<int X> int func (void) { return X; }
+
+     then if you step into func<5>, "print X" will show "5".  This
+     feature requires proper debuginfo support from the compiler; it
+     was added to GCC 4.5.
+
 * GDB now has some support for using labels in the program's source in
   linespecs.  For instance, you can use "advance label" to continue
   execution to a label.
@@ -20,6 +31,41 @@
   section.  This section holds a fast index of DWARF debugging
   information and can be used to greatly speed up GDB startup and
   operation.  See the documentation for `save gdb-index' for details.
+
+* The "watch" command now accepts an optional "-location" argument.
+  When used, this causes GDB to watch the memory referred to by the
+  expression.  Such a watchpoint is never deleted due to it going out
+  of scope.
+
+* GDB now supports thread debugging of core dumps on GNU/Linux.
+
+  GDB now activates thread debugging using the libthread_db library
+  when debugging GNU/Linux core dumps, similarly to when debugging
+  live processes.  As a result, when debugging a core dump file, GDB
+  is now able to display pthread_t ids of threads.  For example, "info
+  threads" shows the same output as when debugging the process when it
+  was live.  In earlier releases, you'd see something like this:
+
+  (gdb) info threads
+   * 1 LWP 6780  main () at main.c:10
+
+  While now you see this:
+
+  (gdb) info threads
+   * 1 Thread 0x7f0f5712a700 (LWP 6780)  main () at main.c:10
+
+  It is also now possible to inspect TLS variables when debugging core
+  dumps.
+
+  When debugging a core dump generated on a machine other than the one
+  used to run GDB, you may need to point GDB at the correct
+  libthread_db library with the "set libthread-db-search-path"
+  command.  See the user manual for more details on this command.
+
+* New features in the GDB remote stub, GDBserver
+
+  ** GDBserver is now supported on PowerPC LynxOS (versions 4.x and 5.x),
+     and i686 LynxOS (version 5.x).
 
 *** Changes in GDB 7.2
 
@@ -95,6 +141,26 @@
   remote packets have been defined to support static tracepoints, see
   the "New remote packets" section below.
 
+* Better reconstruction of tracepoints after disconnected tracing
+
+  GDB will attempt to download the original source form of tracepoint
+  definitions when starting a trace run, and then will upload these
+  upon reconnection to the target, resulting in a more accurate
+  reconstruction of the tracepoints that are in use on the target.
+
+* Observer mode
+
+  You can now exercise direct control over the ways that GDB can
+  affect your program.  For instance, you can disallow the setting of
+  breakpoints, so that the program can run continuously (assuming
+  non-stop mode).  In addition, the "observer" variable is available
+  to switch all of the different controls; in observer mode, GDB
+  cannot affect the target's behavior at all, which is useful for
+  tasks like diagnosing live systems in the field.
+
+* The new convenience variable $_thread holds the number of the
+  current thread.
+
 * New remote packets
 
 qGetTIBAddr
@@ -124,6 +190,15 @@ qXfer:statictrace:read
   Read the static trace data collected (by a `collect $_sdata'
   tracepoint action).  The remote stub reports support for this packet
   to gdb's qSupported query.
+
+QAllow
+
+  Send the current settings of GDB's permission flags.
+
+QTDPsrc
+
+  Send part of the source (textual) form of a tracepoint definition,
+  which includes location, conditional, and action list.
 
 * The source command now accepts a -s option to force searching for the
   script in the source search path even if the script name specifies
@@ -209,6 +284,29 @@ info static-tracepoint-markers
 strace FN | FILE:LINE | *ADDR | -m MARKER_ID
   Define a static tracepoint by probing a marker at the given
   function, line, address, or marker ID.
+
+set observer on|off
+show observer
+  Enable and disable observer mode.
+
+set may-write-registers on|off
+set may-write-memory on|off
+set may-insert-breakpoints on|off
+set may-insert-tracepoints on|off
+set may-insert-fast-tracepoints on|off
+set may-interrupt on|off
+  Set individual permissions for GDB effects on the target.  Note that
+  some of these settings can have undesirable or surprising
+  consequences, particularly when changed in the middle of a session.
+  For instance, disabling the writing of memory can prevent
+  breakpoints from being inserted, cause single-stepping to fail, or
+  even crash your program, if you disable after breakpoints have been
+  inserted.  However, GDB should not crash.
+
+set record memory-query on|off
+show record memory-query
+  Control whether to stop the inferior if memory changes caused
+  by an instruction cannot be recorded.
 
 * Changed commands
 
