@@ -2382,10 +2382,12 @@ dw2_expand_symtabs_matching (struct objfile *objfile,
 {
   int i;
   offset_type iter;
+  struct mapped_index *index;
 
   dw2_setup (objfile);
   if (!dwarf2_per_objfile->index_table)
     return;
+  index = dwarf2_per_objfile->index_table;
 
   for (i = 0; i < (dwarf2_per_objfile->n_comp_units
 		   + dwarf2_per_objfile->n_type_comp_units); ++i)
@@ -2411,28 +2413,24 @@ dw2_expand_symtabs_matching (struct objfile *objfile,
 	}
     }
 
-  for (iter = 0;
-       iter < dwarf2_per_objfile->index_table->index_table_slots;
-       ++iter)
+  for (iter = 0; iter < index->index_table_slots; ++iter)
     {
       offset_type idx = 2 * iter;
       const char *name;
       offset_type *vec, vec_len, vec_idx;
 
-      if (dwarf2_per_objfile->index_table->index_table[idx] == 0
-	  && dwarf2_per_objfile->index_table->index_table[idx + 1] == 0)
+      if (index->index_table[idx] == 0 && index->index_table[idx + 1] == 0)
 	continue;
 
-      name = (dwarf2_per_objfile->index_table->constant_pool
-	      + dwarf2_per_objfile->index_table->index_table[idx]);
+      name = index->constant_pool + MAYBE_SWAP (index->index_table[idx]);
 
       if (! (*name_matcher) (name, data))
 	continue;
 
       /* The name was matched, now expand corresponding CUs that were
 	 marked.  */
-      vec = (offset_type *) (dwarf2_per_objfile->index_table->constant_pool
-			     + dwarf2_per_objfile->index_table->index_table[idx + 1]);
+      vec = (offset_type *) (index->constant_pool
+			     + MAYBE_SWAP (index->index_table[idx + 1]));
       vec_len = MAYBE_SWAP (vec[0]);
       for (vec_idx = 0; vec_idx < vec_len; ++vec_idx)
 	{
@@ -2476,25 +2474,24 @@ dw2_map_symbol_names (struct objfile *objfile,
 		      void *data)
 {
   offset_type iter;
+  struct mapped_index *index;
+
   dw2_setup (objfile);
 
   if (!dwarf2_per_objfile->index_table)
     return;
+  index = dwarf2_per_objfile->index_table;
 
-  for (iter = 0;
-       iter < dwarf2_per_objfile->index_table->index_table_slots;
-       ++iter)
+  for (iter = 0; iter < index->index_table_slots; ++iter)
     {
       offset_type idx = 2 * iter;
       const char *name;
       offset_type *vec, vec_len, vec_idx;
 
-      if (dwarf2_per_objfile->index_table->index_table[idx] == 0
-	  && dwarf2_per_objfile->index_table->index_table[idx + 1] == 0)
+      if (index->index_table[idx] == 0 && index->index_table[idx + 1] == 0)
 	continue;
 
-      name = (dwarf2_per_objfile->index_table->constant_pool
-	      + dwarf2_per_objfile->index_table->index_table[idx]);
+      name = (index->constant_pool + MAYBE_SWAP (index->index_table[idx]));
 
       (*fun) (name, data);
     }
@@ -3466,6 +3463,7 @@ scan_partial_symbols (struct partial_die_info *first_die, CORE_ADDR *lowpc,
 	    case DW_TAG_subprogram:
 	      add_partial_subprogram (pdi, lowpc, highpc, need_pc, cu);
 	      break;
+	    case DW_TAG_constant:
 	    case DW_TAG_variable:
 	    case DW_TAG_typedef:
 	    case DW_TAG_union_type:
@@ -3689,6 +3687,20 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
 				      0, pdi->lowpc + baseaddr,
 				      cu->language, objfile);
 	}
+      break;
+    case DW_TAG_constant:
+      {
+        struct psymbol_allocation_list *list;
+
+	if (pdi->is_external)
+	  list = &objfile->global_psymbols;
+	else
+	  list = &objfile->static_psymbols;
+	psym = add_psymbol_to_list (actual_name, strlen (actual_name),
+				    built_actual_name, VAR_DOMAIN, LOC_STATIC,
+				    list, 0, 0, cu->language, objfile);
+
+      }
       break;
     case DW_TAG_variable:
       if (pdi->locdesc)
@@ -4599,6 +4611,7 @@ die_needs_namespace (struct die_info *die, struct dwarf2_cu *cu)
       return 1;
 
     case DW_TAG_variable:
+    case DW_TAG_constant:
       /* We only need to prefix "globally" visible variables.  These include
 	 any variable marked with DW_AT_external or any variable that
 	 lives in a namespace.  [Variables in anonymous namespaces
@@ -8567,6 +8580,7 @@ load_partial_dies (bfd *abfd, gdb_byte *buffer, gdb_byte *info_ptr,
 	 static members).  */
       if (!load_all
 	  && !is_type_tag_for_partial (abbrev->tag)
+	  && abbrev->tag != DW_TAG_constant
 	  && abbrev->tag != DW_TAG_enumerator
 	  && abbrev->tag != DW_TAG_subprogram
 	  && abbrev->tag != DW_TAG_lexical_block
@@ -8677,6 +8691,7 @@ load_partial_dies (bfd *abfd, gdb_byte *buffer, gdb_byte *info_ptr,
 	 unit with load_all_dies set.  */
 
       if (load_all
+	  || abbrev->tag == DW_TAG_constant
 	  || abbrev->tag == DW_TAG_subprogram
 	  || abbrev->tag == DW_TAG_variable
 	  || abbrev->tag == DW_TAG_namespace
@@ -10583,6 +10598,7 @@ new_symbol_full (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
 	case DW_TAG_template_value_param:
 	  suppress_add = 1;
 	  /* Fall through.  */
+	case DW_TAG_constant:
 	case DW_TAG_variable:
 	case DW_TAG_member:
 	  /* Compilation with minimal debug info may result in variables

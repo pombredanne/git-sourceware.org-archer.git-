@@ -2713,7 +2713,7 @@ find_oload_champ_namespace_loop (struct type **arg_types, int nargs,
      function symbol to start off with.)  */
 
   old_cleanups = make_cleanup (xfree, *oload_syms);
-  old_cleanups = make_cleanup (xfree, *oload_champ_bv);
+  make_cleanup (xfree, *oload_champ_bv);
   new_namespace = alloca (namespace_len + 1);
   strncpy (new_namespace, qualified_name, namespace_len);
   new_namespace[namespace_len] = '\0';
@@ -2760,7 +2760,7 @@ find_oload_champ_namespace_loop (struct type **arg_types, int nargs,
       *oload_syms = new_oload_syms;
       *oload_champ = new_oload_champ;
       *oload_champ_bv = new_oload_champ_bv;
-      discard_cleanups (old_cleanups);
+      do_cleanups (old_cleanups);
       return 0;
     }
 }
