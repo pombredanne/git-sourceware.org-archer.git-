@@ -734,7 +734,7 @@ default_symfile_offsets (struct objfile *objfile,
 {
   OBJFILE_NUM_SECTIONS (objfile) = bfd_count_sections (OBJFILE_OBFD (objfile));
   OBJFILE_SECTION_OFFSETS (objfile) = (struct section_offsets *)
-    obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
+    obstack_alloc (&OBJFILE_OBSTACK (objfile),
 		   SIZEOF_N_SECTION_OFFSETS (OBJFILE_NUM_SECTIONS (objfile)));
   relative_addr_info_to_section_offsets (OBJFILE_SECTION_OFFSETS (objfile),
 					 OBJFILE_NUM_SECTIONS (objfile), addrs);
@@ -990,7 +990,7 @@ syms_from_objfile (struct objfile *objfile,
       OBJFILE_NUM_SECTIONS (objfile) = num_offsets;
       OBJFILE_SECTION_OFFSETS (objfile)
         = ((struct section_offsets *)
-           obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile), size));
+           obstack_alloc (&OBJFILE_OBSTACK (objfile), size));
       memcpy (OBJFILE_SECTION_OFFSETS (objfile), offsets, size);
 
       init_objfile_sect_indices (objfile);
@@ -2413,7 +2413,7 @@ reread_symbols (void)
 	      htab_delete (OBJFILE_DEMANGLED_NAMES_HASH (objfile));
 	      OBJFILE_DEMANGLED_NAMES_HASH (objfile) = NULL;
 	    }
-	  obstack_free (&OBJFILE_OBJFILE_OBSTACK (objfile), 0);
+	  obstack_free (&OBJFILE_OBSTACK (objfile), 0);
 	  OBJFILE_SECTIONS (objfile) = NULL;
 	  OBJFILE_SYMTABS (objfile) = NULL;
 	  OBJFILE_PSYMTABS (objfile) = NULL;
@@ -2435,7 +2435,7 @@ reread_symbols (void)
 	     empty.  We could use obstack_specify_allocation but
 	     gdb_obstack.h specifies the alloc/dealloc
 	     functions.  */
-	  obstack_init (&OBJFILE_OBJFILE_OBSTACK (objfile));
+	  obstack_init (&OBJFILE_OBSTACK (objfile));
 	  if (build_objfile_section_table (objfile))
 	    {
 	      error (_("Can't find the file sections in `%s': %s"),
@@ -2446,7 +2446,7 @@ reread_symbols (void)
 	  /* We use the same section offsets as from last time.  I'm not
 	     sure whether that is always correct for shared libraries.  */
 	  OBJFILE_SECTION_OFFSETS (objfile) = (struct section_offsets *)
-	    obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
+	    obstack_alloc (&OBJFILE_OBSTACK (objfile),
 			   SIZEOF_N_SECTION_OFFSETS (num_offsets));
 	  memcpy (OBJFILE_SECTION_OFFSETS (objfile), offsets,
 		  SIZEOF_N_SECTION_OFFSETS (num_offsets));
@@ -2696,7 +2696,7 @@ allocate_symtab (char *filename, struct objfile *objfile)
   struct symtab *symtab;
 
   symtab = (struct symtab *)
-    obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile), sizeof (struct symtab));
+    obstack_alloc (&OBJFILE_OBSTACK (objfile), sizeof (struct symtab));
   memset (symtab, 0, sizeof (*symtab));
   symtab->filename = (char *) bcache (filename, strlen (filename) + 1,
 				      OBJFILE_FILENAME_CACHE (objfile));

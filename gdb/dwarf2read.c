@@ -1143,7 +1143,7 @@ dwarf2_has_info (struct objfile *objfile)
     {
       /* Initialize per-objfile state.  */
       struct dwarf2_per_objfile *data
-	= obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile), sizeof (*data));
+	= obstack_alloc (&OBJFILE_OBSTACK (objfile), sizeof (*data));
 
       memset (data, 0, sizeof (*data));
       set_objfile_data (objfile, dwarf2_objfile_data_key, data);
@@ -1286,7 +1286,7 @@ zlib_decompress_section (struct objfile *objfile, asection *sectp,
   strm.avail_in = compressed_size - header_size;
   strm.next_in = (Bytef*) compressed_buffer + header_size;
   strm.avail_out = uncompressed_size;
-  uncompressed_buffer = obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
+  uncompressed_buffer = obstack_alloc (&OBJFILE_OBSTACK (objfile),
                                        uncompressed_size);
   rc = inflateInit (&strm);
   while (strm.avail_in > 0)
@@ -1378,7 +1378,7 @@ dwarf2_read_section (struct objfile *objfile, struct dwarf2_section_info *info)
 
   /* If we get here, we are a normal, not-compressed section.  */
   info->buffer = buf
-    = obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile), info->size);
+    = obstack_alloc (&OBJFILE_OBSTACK (objfile), info->size);
 
   /* When debugging .o files, we may need to apply relocations; see
      http://sourceware.org/ml/gdb-patches/2002-04/msg00136.html .
@@ -1561,7 +1561,7 @@ dwarf2_create_include_psymtab (char *name, struct partial_symtab *pst,
   subpst->texthigh = 0;
 
   subpst->dependencies = (struct partial_symtab **)
-    obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
+    obstack_alloc (&OBJFILE_OBSTACK (objfile),
                    sizeof (struct partial_symtab *));
   subpst->dependencies[0] = pst;
   subpst->number_of_dependencies = 1;
@@ -1650,7 +1650,7 @@ create_debug_types_hash_table (struct objfile *objfile)
 				     hash_type_signature,
 				     eq_type_signature,
 				     NULL,
-				     &OBJFILE_OBJFILE_OBSTACK (objfile),
+				     &OBJFILE_OBSTACK (objfile),
 				     hashtab_obstack_allocate,
 				     dummy_obstack_deallocate);
 
@@ -1694,7 +1694,7 @@ create_debug_types_hash_table (struct objfile *objfile)
       ptr += 8;
       type_offset = read_offset_1 (OBJFILE_OBFD (objfile), ptr, offset_size);
 
-      type_sig = obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile), sizeof (*type_sig));
+      type_sig = obstack_alloc (&OBJFILE_OBSTACK (objfile), sizeof (*type_sig));
       memset (type_sig, 0, sizeof (*type_sig));
       type_sig->signature = signature;
       type_sig->offset = offset;
@@ -2072,7 +2072,7 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile)
     }
 
   OBJFILE_PSYMTABS_ADDRMAP (objfile) = addrmap_create_fixed (OBJFILE_PSYMTABS_ADDRMAP (objfile),
-						    &OBJFILE_OBJFILE_OBSTACK (objfile));
+						    &OBJFILE_OBSTACK (objfile));
   discard_cleanups (addrmap_cleanup);
 
   do_cleanups (back_to);
@@ -2177,7 +2177,7 @@ create_all_comp_units (struct objfile *objfile)
 				    &initial_length_size);
 
       /* Save the compilation unit for later lookup.  */
-      this_cu = obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
+      this_cu = obstack_alloc (&OBJFILE_OBSTACK (objfile),
 			       sizeof (struct dwarf2_per_cu_data));
       memset (this_cu, 0, sizeof (*this_cu));
       this_cu->offset = offset;
@@ -2196,7 +2196,7 @@ create_all_comp_units (struct objfile *objfile)
     }
 
   dwarf2_per_objfile->all_comp_units
-    = obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
+    = obstack_alloc (&OBJFILE_OBSTACK (objfile),
 		     n_comp_units * sizeof (struct dwarf2_per_cu_data *));
   memcpy (dwarf2_per_objfile->all_comp_units, all_comp_units,
 	  n_comp_units * sizeof (struct dwarf2_per_cu_data *));
@@ -3397,7 +3397,7 @@ dwarf2_compute_name (char *name, struct die_info *die, struct dwarf2_cu *cu,
 		}
 	    }
 
-	  name = ui_file_obsavestring (buf, &OBJFILE_OBJFILE_OBSTACK (cu->objfile),
+	  name = ui_file_obsavestring (buf, &OBJFILE_OBSTACK (cu->objfile),
 				       &length);
 	  ui_file_delete (buf);
 
@@ -3405,7 +3405,7 @@ dwarf2_compute_name (char *name, struct die_info *die, struct dwarf2_cu *cu,
 	    {
 	      char *cname
 		= dwarf2_canonicalize_name (name, cu,
-					    &OBJFILE_OBJFILE_OBSTACK (cu->objfile));
+					    &OBJFILE_OBSTACK (cu->objfile));
 
 	      if (cname != NULL)
 		name = cname;
@@ -3540,7 +3540,7 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
                           canonical_name,
                           import_alias,
                           imported_declaration,
-                          &OBJFILE_OBJFILE_OBSTACK (cu->objfile));
+                          &OBJFILE_OBSTACK (cu->objfile));
 }
 
 static void
@@ -4017,7 +4017,7 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
 
   /* For C++, set the block's scope.  */
   if (cu->language == language_cplus || cu->language == language_fortran)
-    cp_set_block_scope (new->name, block, &OBJFILE_OBJFILE_OBSTACK (objfile),
+    cp_set_block_scope (new->name, block, &OBJFILE_OBSTACK (objfile),
 			determine_prefix (die, cu),
 			processing_has_namespace_info);
 
@@ -5776,7 +5776,7 @@ read_namespace_type (struct die_info *die, struct dwarf2_cu *cu)
 
   previous_prefix = determine_prefix (die, cu);
   if (previous_prefix[0] != '\0')
-    name = typename_concat (&OBJFILE_OBJFILE_OBSTACK (objfile),
+    name = typename_concat (&OBJFILE_OBSTACK (objfile),
 			    previous_prefix, name, 0, cu);
 
   /* Create the type.  */
@@ -5814,7 +5814,7 @@ read_namespace (struct die_info *die, struct dwarf2_cu *cu)
 	  const char *previous_prefix = determine_prefix (die, cu);
 
 	  cp_add_using_directive (previous_prefix, TYPE_NAME (type), NULL,
-	                          NULL, &OBJFILE_OBJFILE_OBSTACK (objfile));
+	                          NULL, &OBJFILE_OBSTACK (objfile));
 	}
     }
 
@@ -7105,7 +7105,7 @@ read_partial_die (struct partial_die_info *part_die,
 	    default:
 	      part_die->name
 		= dwarf2_canonicalize_name (DW_STRING (&attr), cu,
-					    &OBJFILE_OBJFILE_OBSTACK (cu->objfile));
+					    &OBJFILE_OBSTACK (cu->objfile));
 	      break;
 	    }
 	  break;
@@ -8744,7 +8744,7 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
     {
       const char *linkagename;
 
-      sym = (struct symbol *) obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
+      sym = (struct symbol *) obstack_alloc (&OBJFILE_OBSTACK (objfile),
 					     sizeof (struct symbol));
       OBJSTAT (objfile, n_syms++);
       memset (sym, 0, sizeof (struct symbol));
@@ -9087,13 +9087,13 @@ dwarf2_const_value (struct attribute *attr, struct symbol *sym,
 	/* Symbols of this form are reasonably rare, so we just
 	   piggyback on the existing location code rather than writing
 	   a new implementation of symbol_computed_ops.  */
-	baton = obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
+	baton = obstack_alloc (&OBJFILE_OBSTACK (objfile),
 			       sizeof (struct dwarf2_locexpr_baton));
 	baton->per_cu = cu->per_cu;
 	gdb_assert (baton->per_cu);
 
 	baton->size = 2 + cu_header->addr_size;
-	data = obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile), baton->size);
+	data = obstack_alloc (&OBJFILE_OBSTACK (objfile), baton->size);
 	baton->data = data;
 
 	data[0] = DW_OP_addr;
@@ -9125,7 +9125,7 @@ dwarf2_const_value (struct attribute *attr, struct symbol *sym,
 						      TYPE_LENGTH (SYMBOL_TYPE
 								   (sym)));
       SYMBOL_VALUE_BYTES (sym) =
-	obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile), blk->size);
+	obstack_alloc (&OBJFILE_OBSTACK (objfile), blk->size);
       memcpy (SYMBOL_VALUE_BYTES (sym), blk->data, blk->size);
       SYMBOL_CLASS (sym) = LOC_CONST_BYTES;
       break;
@@ -9297,7 +9297,7 @@ tag_type_to_type (struct die_info *die, struct dwarf2_cu *cu)
 			    OBJFILE_NAME (cu->objfile),
 			    cu->header.offset,
 			    die->offset);
-      saved = obstack_copy0 (&OBJFILE_OBJFILE_OBSTACK (cu->objfile),
+      saved = obstack_copy0 (&OBJFILE_OBSTACK (cu->objfile),
 			     message, strlen (message));
       xfree (message);
 
@@ -9625,7 +9625,7 @@ dwarf2_name (struct die_info *die, struct dwarf2_cu *cu)
     {
       DW_STRING (attr)
 	= dwarf2_canonicalize_name (DW_STRING (attr), cu,
-				    &OBJFILE_OBJFILE_OBSTACK (cu->objfile));
+				    &OBJFILE_OBSTACK (cu->objfile));
       DW_STRING_IS_CANONICAL (attr) = 1;
     }
   return DW_STRING (attr);
@@ -11474,7 +11474,7 @@ macro_start_file (int file, int line,
   /* We don't create a macro table for this compilation unit
      at all until we actually get a filename.  */
   if (! pending_macros)
-    pending_macros = new_macro_table (&OBJFILE_OBJFILE_OBSTACK (objfile),
+    pending_macros = new_macro_table (&OBJFILE_OBSTACK (objfile),
                                       OBJFILE_MACRO_CACHE (objfile));
 
   if (! current_file)
@@ -11995,7 +11995,7 @@ dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
     {
       struct dwarf2_loclist_baton *baton;
 
-      baton = obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (cu->objfile),
+      baton = obstack_alloc (&OBJFILE_OBSTACK (cu->objfile),
 			     sizeof (struct dwarf2_loclist_baton));
       baton->per_cu = cu->per_cu;
       gdb_assert (baton->per_cu);
@@ -12019,7 +12019,7 @@ dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
     {
       struct dwarf2_locexpr_baton *baton;
 
-      baton = obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (cu->objfile),
+      baton = obstack_alloc (&OBJFILE_OBSTACK (cu->objfile),
 			     sizeof (struct dwarf2_locexpr_baton));
       baton->per_cu = cu->per_cu;
       gdb_assert (baton->per_cu);
@@ -12401,7 +12401,7 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
 				offset_and_type_hash,
 				offset_and_type_eq,
 				NULL,
-				&OBJFILE_OBJFILE_OBSTACK (cu->objfile),
+				&OBJFILE_OBSTACK (cu->objfile),
 				hashtab_obstack_allocate,
 				dummy_obstack_deallocate);
       cu->type_hash = cu->per_cu->type_hash;
@@ -12415,7 +12415,7 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
     complaint (&symfile_complaints,
 	       _("A problem internal to GDB: DIE 0x%x has type already set"),
 	       die->offset);
-  *slot = obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (cu->objfile), sizeof (**slot));
+  *slot = obstack_alloc (&OBJFILE_OBSTACK (cu->objfile), sizeof (**slot));
   **slot = ofs;
   return type;
 }

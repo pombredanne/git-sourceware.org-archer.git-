@@ -137,7 +137,7 @@ add_to_objfile_sections (struct bfd *abfd, struct bfd_section *asect,
   section.objfile = objfile;
   section.the_bfd_section = asect;
   section.ovly_mapped = 0;
-  obstack_grow (&OBJFILE_OBJFILE_OBSTACK (objfile), (char *) &section, sizeof (section));
+  obstack_grow (&OBJFILE_OBSTACK (objfile), (char *) &section, sizeof (section));
   OBJFILE_SECTIONS_END (objfile)
     = (struct obj_section *) (((size_t) OBJFILE_SECTIONS_END (objfile)) + 1);
 }
@@ -170,7 +170,7 @@ build_objfile_section_table (struct objfile *objfile)
   OBJFILE_SECTIONS_END (objfile) = 0;
   bfd_map_over_sections (OBJFILE_OBFD (objfile),
 			 add_to_objfile_sections, (void *) objfile);
-  OBJFILE_SECTIONS (objfile) = obstack_finish (&OBJFILE_OBJFILE_OBSTACK (objfile));
+  OBJFILE_SECTIONS (objfile) = obstack_finish (&OBJFILE_OBSTACK (objfile));
   OBJFILE_SECTIONS_END (objfile) = OBJFILE_SECTIONS (objfile) + (size_t) OBJFILE_SECTIONS_END (objfile);
   return (0);
 }
@@ -207,7 +207,7 @@ allocate_objfile (bfd *abfd, int flags)
   OBJFILE_FILENAME_CACHE (objfile) = bcache_xmalloc ();
   /* We could use obstack_specify_allocation here instead, but
      gdb_obstack.h specifies the alloc/dealloc functions.  */
-  obstack_init (&OBJFILE_OBJFILE_OBSTACK (objfile));
+  obstack_init (&OBJFILE_OBSTACK (objfile));
   terminate_minimal_symbol_table (objfile);
 
   objfile_alloc_data (objfile);
@@ -364,7 +364,7 @@ terminate_minimal_symbol_table (struct objfile *objfile)
 {
   if (! OBJFILE_MSYMBOLS (objfile))
     OBJFILE_MSYMBOLS (objfile) = ((struct minimal_symbol *)
-                         obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
+                         obstack_alloc (&OBJFILE_OBSTACK (objfile),
                                         sizeof (OBJFILE_MSYMBOLS (objfile)[0])));
 
   {
@@ -635,7 +635,7 @@ do_free_objfile (struct objfile *objfile)
   bcache_xfree (OBJFILE_FILENAME_CACHE (objfile));
   if (OBJFILE_DEMANGLED_NAMES_HASH (objfile))
     htab_delete (OBJFILE_DEMANGLED_NAMES_HASH (objfile));
-  obstack_free (&OBJFILE_OBJFILE_OBSTACK (objfile), 0);
+  obstack_free (&OBJFILE_OBSTACK (objfile), 0);
 
   /* Rebuild section map next time we need it.  */
   get_objfile_pspace_data (OBJFILE_PSPACE (objfile))->objfiles_changed_p = 1;

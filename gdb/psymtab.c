@@ -1413,12 +1413,12 @@ allocate_psymtab (const char *filename, struct objfile *objfile)
     }
   else
     psymtab = (struct partial_symtab *)
-      obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
+      obstack_alloc (&OBJFILE_OBSTACK (objfile),
 		     sizeof (struct partial_symtab));
 
   memset (psymtab, 0, sizeof (struct partial_symtab));
   psymtab->filename = obsavestring (filename, strlen (filename),
-				    &OBJFILE_OBJFILE_OBSTACK (objfile));
+				    &OBJFILE_OBSTACK (objfile));
   psymtab->symtab = NULL;
 
   /* Prepend it to the psymtab list for the objfile it belongs to.

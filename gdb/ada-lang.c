@@ -1221,7 +1221,7 @@ ada_decode_symbol (const struct general_symbol_info *gsymbol)
 	  struct objfile *objf = gsymbol->obj_section->objfile;
 
 	  *resultp = obsavestring (decoded, strlen (decoded),
-				   &OBJFILE_OBJFILE_OBSTACK (objf));
+				   &OBJFILE_OBSTACK (objf));
         }
       /* Sometimes, we can't find a corresponding objfile, in which
          case, we put the result on the heap.  Since we only decode

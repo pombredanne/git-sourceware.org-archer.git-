@@ -1097,10 +1097,10 @@ install_minimal_symbols (struct objfile *objfile)
          we will give back the excess space.  */
 
       alloc_count = msym_count + OBJFILE_MINIMAL_SYMBOL_COUNT (objfile) + 1;
-      obstack_blank (&OBJFILE_OBJFILE_OBSTACK (objfile),
+      obstack_blank (&OBJFILE_OBSTACK (objfile),
 		     alloc_count * sizeof (struct minimal_symbol));
       msymbols = (struct minimal_symbol *)
-	obstack_base (&OBJFILE_OBJFILE_OBSTACK (objfile));
+	obstack_base (&OBJFILE_OBSTACK (objfile));
 
       /* Copy in the existing minimal symbols, if there are any.  */
 
@@ -1133,10 +1133,10 @@ install_minimal_symbols (struct objfile *objfile)
 
       mcount = compact_minimal_symbols (msymbols, mcount, objfile);
 
-      obstack_blank (&OBJFILE_OBJFILE_OBSTACK (objfile),
+      obstack_blank (&OBJFILE_OBSTACK (objfile),
 	       (mcount + 1 - alloc_count) * sizeof (struct minimal_symbol));
       msymbols = (struct minimal_symbol *)
-	obstack_finish (&OBJFILE_OBJFILE_OBSTACK (objfile));
+	obstack_finish (&OBJFILE_OBSTACK (objfile));
 
       /* We also terminate the minimal symbol table with a "null symbol",
          which is *not* included in the size of the table.  This makes it

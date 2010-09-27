@@ -534,7 +534,7 @@ symbol_set_names (struct general_symbol_info *gsymbol,
 	gsymbol->name = (char *) linkage_name;
       else
 	{
-	  gsymbol->name = obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile), len + 1);
+	  gsymbol->name = obstack_alloc (&OBJFILE_OBSTACK (objfile), len + 1);
 	  memcpy (gsymbol->name, linkage_name, len);
 	  gsymbol->name[len] = '\0';
 	}
@@ -604,7 +604,7 @@ symbol_set_names (struct general_symbol_info *gsymbol,
 	 us better bcache hit rates for partial symbols.  */
       if (!copy_name && lookup_name == linkage_name)
 	{
-	  *slot = obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
+	  *slot = obstack_alloc (&OBJFILE_OBSTACK (objfile),
 				 offsetof (struct demangled_name_entry,
 					   demangled)
 				 + demangled_len + 1);
@@ -615,7 +615,7 @@ symbol_set_names (struct general_symbol_info *gsymbol,
 	  /* If we must copy the mangled name, put it directly after
 	     the demangled name so we can have a single
 	     allocation.  */
-	  *slot = obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
+	  *slot = obstack_alloc (&OBJFILE_OBSTACK (objfile),
 				 offsetof (struct demangled_name_entry,
 					   demangled)
 				 + lookup_len + demangled_len + 2);

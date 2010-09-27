@@ -326,7 +326,7 @@ elf_symtab_read (struct objfile *objfile, int type,
 	  filesym = sym;
 	  filesymname =
 	    obsavestring ((char *) filesym->name, strlen (filesym->name),
-			  &OBJFILE_OBJFILE_OBSTACK (objfile));
+			  &OBJFILE_OBSTACK (objfile));
 	}
       else if (sym->flags & BSF_SECTION_SYM)
 	continue;
@@ -1018,7 +1018,7 @@ elfstab_offset_sections (struct objfile *objfile, struct partial_symtab *pst)
       /* Found it!  Allocate a new psymtab struct, and fill it in.  */
       maybe->found++;
       pst->section_offsets = (struct section_offsets *)
-	obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile), 
+	obstack_alloc (&OBJFILE_OBSTACK (objfile), 
 		       SIZEOF_N_SECTION_OFFSETS (OBJFILE_NUM_SECTIONS (objfile)));
       for (i = 0; i < maybe->num_sections; i++)
 	(pst->section_offsets)->offsets[i] = maybe->sections[i];

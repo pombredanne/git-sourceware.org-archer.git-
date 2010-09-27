@@ -1722,7 +1722,7 @@ spu_get_overlay_table (struct objfile *objfile)
   ovly_table = xmalloc (ovly_table_size);
   read_memory (ovly_table_base, ovly_table, ovly_table_size);
 
-  tbl = OBSTACK_CALLOC (&OBJFILE_OBJFILE_OBSTACK (objfile),
+  tbl = OBSTACK_CALLOC (&OBJFILE_OBSTACK (objfile),
 			OBJFILE_SECTIONS_END (objfile) - OBJFILE_SECTIONS (objfile),
 			struct spu_overlay_table);
 

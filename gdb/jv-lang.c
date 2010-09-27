@@ -124,19 +124,19 @@ get_java_class_symtab (struct gdbarch *gdbarch)
       class_symtab = allocate_symtab ("<java-classes>", objfile);
       class_symtab->language = language_java;
       bv = (struct blockvector *)
-	obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
+	obstack_alloc (&OBJFILE_OBSTACK (objfile),
 		       sizeof (struct blockvector) + sizeof (struct block *));
       BLOCKVECTOR_NBLOCKS (bv) = 1;
       BLOCKVECTOR (class_symtab) = bv;
 
       /* Allocate dummy STATIC_BLOCK. */
-      bl = allocate_block (&OBJFILE_OBJFILE_OBSTACK (objfile));
-      BLOCK_DICT (bl) = dict_create_linear (&OBJFILE_OBJFILE_OBSTACK (objfile),
+      bl = allocate_block (&OBJFILE_OBSTACK (objfile));
+      BLOCK_DICT (bl) = dict_create_linear (&OBJFILE_OBSTACK (objfile),
 					    NULL);
       BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK) = bl;
 
       /* Allocate GLOBAL_BLOCK.  */
-      bl = allocate_block (&OBJFILE_OBJFILE_OBSTACK (objfile));
+      bl = allocate_block (&OBJFILE_OBSTACK (objfile));
       BLOCK_DICT (bl) = dict_create_hashed_expandable ();
       BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK) = bl;
       class_symtab->free_func = free_class_block;
@@ -160,7 +160,7 @@ add_class_symbol (struct type *type, CORE_ADDR addr)
   struct symbol *sym;
 
   sym = (struct symbol *)
-    obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (dynamics_objfile), sizeof (struct symbol));
+    obstack_alloc (&OBJFILE_OBSTACK (dynamics_objfile), sizeof (struct symbol));
   memset (sym, 0, sizeof (struct symbol));
   SYMBOL_LANGUAGE (sym) = language_java;
   SYMBOL_SET_LINKAGE_NAME (sym, TYPE_TAG_NAME (type));
@@ -277,7 +277,7 @@ type_from_class (struct gdbarch *gdbarch, struct value *clas)
   /* if clasloader non-null, prepend loader address. FIXME */
   temp = clas;
   utf8_name = value_struct_elt (&temp, NULL, "name", NULL, "structure");
-  name = get_java_utf8_name (&OBJFILE_OBJFILE_OBSTACK (objfile), utf8_name);
+  name = get_java_utf8_name (&OBJFILE_OBSTACK (objfile), utf8_name);
   for (nptr = name; *nptr != 0; nptr++)
     {
       if (*nptr == '/')
@@ -298,7 +298,7 @@ type_from_class (struct gdbarch *gdbarch, struct value *clas)
       int namelen = java_demangled_signature_length (signature);
 
       if (namelen > strlen (name))
-	name = obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile), namelen + 1);
+	name = obstack_alloc (&OBJFILE_OBSTACK (objfile), namelen + 1);
       java_demangled_signature_copy (name, signature);
       name[namelen] = '\0';
       is_array = 1;
@@ -436,7 +436,7 @@ java_link_class_type (struct gdbarch *gdbarch,
       temp = field;
       temp = value_struct_elt (&temp, NULL, "name", NULL, "structure");
       TYPE_FIELD_NAME (type, i) =
-	get_java_utf8_name (&OBJFILE_OBJFILE_OBSTACK (objfile), temp);
+	get_java_utf8_name (&OBJFILE_OBSTACK (objfile), temp);
       temp = field;
       accflags = value_as_long (value_struct_elt (&temp, NULL, "accflags",
 						  NULL, "structure"));
@@ -483,7 +483,7 @@ java_link_class_type (struct gdbarch *gdbarch,
   TYPE_NFN_FIELDS_TOTAL (type) = nmethods;
   j = nmethods * sizeof (struct fn_field);
   fn_fields = (struct fn_field *)
-    obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (dynamics_objfile), j);
+    obstack_alloc (&OBJFILE_OBSTACK (dynamics_objfile), j);
   memset (fn_fields, 0, j);
   fn_fieldlists = (struct fn_fieldlist *)
     alloca (nmethods * sizeof (struct fn_fieldlist));
@@ -512,7 +512,7 @@ java_link_class_type (struct gdbarch *gdbarch,
       /* Get method name. */
       temp = method;
       temp = value_struct_elt (&temp, NULL, "name", NULL, "structure");
-      mname = get_java_utf8_name (&OBJFILE_OBJFILE_OBSTACK (objfile), temp);
+      mname = get_java_utf8_name (&OBJFILE_OBSTACK (objfile), temp);
       if (strcmp (mname, "<init>") == 0)
 	mname = unqualified_name;
 
@@ -538,7 +538,7 @@ java_link_class_type (struct gdbarch *gdbarch,
 	      int l;
 
 	      if (mname != unqualified_name)
-		obstack_free (&OBJFILE_OBJFILE_OBSTACK (objfile), mname);
+		obstack_free (&OBJFILE_OBSTACK (objfile), mname);
 	      mname = fn_fieldlists[j].name;
 	      fn_fieldlists[j].length++;
 	      k = i - k;	/* Index of new slot. */
@@ -561,7 +561,7 @@ java_link_class_type (struct gdbarch *gdbarch,
 
   j = TYPE_NFN_FIELDS (type) * sizeof (struct fn_fieldlist);
   TYPE_FN_FIELDLISTS (type) = (struct fn_fieldlist *)
-    obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (dynamics_objfile), j);
+    obstack_alloc (&OBJFILE_OBSTACK (dynamics_objfile), j);
   memcpy (TYPE_FN_FIELDLISTS (type), fn_fieldlists, j);
 
   return type;

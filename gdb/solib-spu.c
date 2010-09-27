@@ -453,7 +453,7 @@ ocl_enable_break (struct objfile *objfile)
       if (objfile_data (objfile, ocl_program_data_key) == NULL)
         {
           CORE_ADDR *ocl_program_addr_base = OBSTACK_CALLOC (
-		  &OBJFILE_OBJFILE_OBSTACK (objfile),
+		  &OBJFILE_OBSTACK (objfile),
 		  OBJFILE_SECTIONS_END (objfile) - OBJFILE_SECTIONS (objfile),
 		  CORE_ADDR);
 	  *ocl_program_addr_base = SYMBOL_VALUE_ADDRESS (addr_sym);

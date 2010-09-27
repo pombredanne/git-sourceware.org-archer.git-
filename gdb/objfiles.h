@@ -394,7 +394,7 @@ struct objfile
 #define OBJFILE_OBFD(obj) ((obj)->storage->obfd)
 #define OBJFILE_GDBARCH(obj) ((obj)->storage->gdbarch)
 #define OBJFILE_MTIME(obj) ((obj)->storage->mtime)
-#define OBJFILE_OBJFILE_OBSTACK(obj) ((obj)->storage->objfile_obstack)
+#define OBJFILE_OBSTACK(obj) ((obj)->storage->objfile_obstack)
 #define OBJFILE_PSYMBOL_CACHE(obj) ((obj)->storage->psymbol_cache)
 #define OBJFILE_MACRO_CACHE(obj) ((obj)->storage->macro_cache)
 #define OBJFILE_FILENAME_CACHE(obj) ((obj)->storage->filename_cache)

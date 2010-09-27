@@ -115,7 +115,7 @@ cp_scan_for_anonymous_namespaces (const struct symbol *symbol)
 		 namespace given by the previous component if there is
 		 one, or to the global namespace if there isn't.  */
 	      cp_add_using_directive (dest, src, NULL, NULL,
-	                              &OBJFILE_OBJFILE_OBSTACK (SYMBOL_SYMTAB (symbol)->objfile));
+	                              &OBJFILE_OBSTACK (SYMBOL_SYMTAB (symbol)->objfile));
 	    }
 	  /* The "+ 2" is for the "::".  */
 	  previous_component = next_component + 2;
@@ -703,7 +703,7 @@ initialize_namespace_symtab (struct objfile *objfile)
   namespace_symtab->free_code = free_nothing;
   namespace_symtab->dirname = NULL;
 
-  bv = obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
+  bv = obstack_alloc (&OBJFILE_OBSTACK (objfile),
 		      sizeof (struct blockvector)
 		      + FIRST_LOCAL_BLOCK * sizeof (struct block *));
   BLOCKVECTOR_NBLOCKS (bv) = FIRST_LOCAL_BLOCK + 1;
@@ -711,12 +711,12 @@ initialize_namespace_symtab (struct objfile *objfile)
   
   /* Allocate empty GLOBAL_BLOCK and STATIC_BLOCK. */
 
-  bl = allocate_block (&OBJFILE_OBJFILE_OBSTACK (objfile));
-  BLOCK_DICT (bl) = dict_create_linear (&OBJFILE_OBJFILE_OBSTACK (objfile),
+  bl = allocate_block (&OBJFILE_OBSTACK (objfile));
+  BLOCK_DICT (bl) = dict_create_linear (&OBJFILE_OBSTACK (objfile),
 					NULL);
   BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK) = bl;
-  bl = allocate_block (&OBJFILE_OBJFILE_OBSTACK (objfile));
-  BLOCK_DICT (bl) = dict_create_linear (&OBJFILE_OBJFILE_OBSTACK (objfile),
+  bl = allocate_block (&OBJFILE_OBSTACK (objfile));
+  BLOCK_DICT (bl) = dict_create_linear (&OBJFILE_OBSTACK (objfile),
 					NULL);
   BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK) = bl;
 
@@ -734,7 +734,7 @@ initialize_namespace_symtab (struct objfile *objfile)
      having a symtab/block for this purpose seems like the best
      solution for now.  */
 
-  bl = allocate_block (&OBJFILE_OBJFILE_OBSTACK (objfile));
+  bl = allocate_block (&OBJFILE_OBSTACK (objfile));
   BLOCK_DICT (bl) = dict_create_hashed_expandable ();
   BLOCKVECTOR_BLOCK (bv, FIRST_LOCAL_BLOCK) = bl;
 
@@ -846,7 +846,7 @@ check_one_possible_namespace_symbol (const char *name, int len,
 
       TYPE_TAG_NAME (type) = TYPE_NAME (type);
 
-      sym = obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile), sizeof (struct symbol));
+      sym = obstack_alloc (&OBJFILE_OBSTACK (objfile), sizeof (struct symbol));
       memset (sym, 0, sizeof (struct symbol));
       SYMBOL_LANGUAGE (sym) = language_cplus;
       /* Note that init_type copied the name to the objfile's

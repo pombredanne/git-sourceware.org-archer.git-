@@ -241,16 +241,16 @@ finish_block (struct symbol *symbol, struct pending **listhead,
   struct pending_block *pblock;
   struct pending_block *opblock;
 
-  block = allocate_block (&OBJFILE_OBJFILE_OBSTACK (objfile));
+  block = allocate_block (&OBJFILE_OBSTACK (objfile));
 
   if (symbol)
     {
-      BLOCK_DICT (block) = dict_create_linear (&OBJFILE_OBJFILE_OBSTACK (objfile),
+      BLOCK_DICT (block) = dict_create_linear (&OBJFILE_OBSTACK (objfile),
 					       *listhead);
     }
   else
     {
-      BLOCK_DICT (block) = dict_create_hashed (&OBJFILE_OBJFILE_OBSTACK (objfile),
+      BLOCK_DICT (block) = dict_create_hashed (&OBJFILE_OBSTACK (objfile),
 					       *listhead);
     }
 
@@ -386,7 +386,7 @@ finish_block (struct symbol *symbol, struct pending **listhead,
       opblock = pblock;
     }
 
-  block_set_using (block, using_directives, &OBJFILE_OBJFILE_OBSTACK (objfile));
+  block_set_using (block, using_directives, &OBJFILE_OBSTACK (objfile));
   using_directives = NULL;
 
   record_pending_block (objfile, block, opblock);
@@ -409,7 +409,7 @@ record_pending_block (struct objfile *objfile, struct block *block,
   struct pending_block *pblock;
 
   pblock = (struct pending_block *)
-    obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile), sizeof (struct pending_block));
+    obstack_alloc (&OBJFILE_OBSTACK (objfile), sizeof (struct pending_block));
   pblock->block = block;
   if (opblock)
     {
@@ -469,7 +469,7 @@ make_blockvector (struct objfile *objfile)
     }
 
   blockvector = (struct blockvector *)
-    obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
+    obstack_alloc (&OBJFILE_OBSTACK (objfile),
 		   (sizeof (struct blockvector)
 		    + (i - 1) * sizeof (struct block *)));
 
@@ -491,7 +491,7 @@ make_blockvector (struct objfile *objfile)
      blockvector.  */
   if (pending_addrmap && pending_addrmap_interesting)
     BLOCKVECTOR_MAP (blockvector)
-      = addrmap_create_fixed (pending_addrmap, &OBJFILE_OBJFILE_OBSTACK (objfile));
+      = addrmap_create_fixed (pending_addrmap, &OBJFILE_OBSTACK (objfile));
   else
     BLOCKVECTOR_MAP (blockvector) = 0;
         
@@ -1072,7 +1072,7 @@ end_symtab (CORE_ADDR end_addr, struct objfile *objfile, int section)
 	    {
 	      /* Reallocate the line table on the symbol obstack */
 	      symtab->linetable = (struct linetable *)
-		obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile), linetablesize);
+		obstack_alloc (&OBJFILE_OBSTACK (objfile), linetablesize);
 	      memcpy (symtab->linetable, subfile->line_vector, linetablesize);
 	    }
 	  else
@@ -1084,7 +1084,7 @@ end_symtab (CORE_ADDR end_addr, struct objfile *objfile, int section)
 	    {
 	      /* Reallocate the dirname on the symbol obstack */
 	      symtab->dirname = (char *)
-		obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
+		obstack_alloc (&OBJFILE_OBSTACK (objfile),
 			       strlen (subfile->dirname) + 1);
 	      strcpy (symtab->dirname, subfile->dirname);
 	    }
@@ -1108,14 +1108,14 @@ end_symtab (CORE_ADDR end_addr, struct objfile *objfile, int section)
 	    {
 	      symtab->debugformat = obsavestring (subfile->debugformat,
 					      strlen (subfile->debugformat),
-						  &OBJFILE_OBJFILE_OBSTACK (objfile));
+						  &OBJFILE_OBSTACK (objfile));
 	    }
 
 	  /* Similarly for the producer.  */
 	  if (subfile->producer != NULL)
 	    symtab->producer = obsavestring (subfile->producer,
 					     strlen (subfile->producer),
-					     &OBJFILE_OBJFILE_OBSTACK (objfile));
+					     &OBJFILE_OBSTACK (objfile));
 
 	  /* All symtabs for the main file and the subfiles share a
 	     blockvector, so we need to clear primary for everything

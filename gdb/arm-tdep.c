@@ -6183,10 +6183,10 @@ arm_record_special_symbol (struct gdbarch *gdbarch, struct objfile *objfile,
   data = objfile_data (objfile, arm_objfile_data_key);
   if (data == NULL)
     {
-      data = OBSTACK_ZALLOC (&OBJFILE_OBJFILE_OBSTACK (objfile),
+      data = OBSTACK_ZALLOC (&OBJFILE_OBSTACK (objfile),
 			     struct arm_per_objfile);
       set_objfile_data (objfile, arm_objfile_data_key, data);
-      data->section_maps = OBSTACK_CALLOC (&OBJFILE_OBJFILE_OBSTACK (objfile),
+      data->section_maps = OBSTACK_CALLOC (&OBJFILE_OBSTACK (objfile),
 					   OBJFILE_OBFD (objfile)->section_count,
 					   VEC(arm_mapping_symbol_s) *);
     }

@@ -1507,7 +1507,7 @@ process_coff_symbol (struct coff_symbol *cs,
 		     struct objfile *objfile)
 {
   struct symbol *sym
-    = (struct symbol *) obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
+    = (struct symbol *) obstack_alloc (&OBJFILE_OBSTACK (objfile),
 				       sizeof (struct symbol));
   char *name;
 
@@ -1972,7 +1972,7 @@ coff_read_struct_type (int index, int length, int lastsym,
 
 	  /* Save the data.  */
 	  list->field.name =
-	    obsavestring (name, strlen (name), &OBJFILE_OBJFILE_OBSTACK (objfile));
+	    obsavestring (name, strlen (name), &OBJFILE_OBSTACK (objfile));
 	  FIELD_TYPE (list->field) = decode_type (ms, ms->c_type, &sub_aux,
 						  objfile);
 	  SET_FIELD_BITPOS (list->field, 8 * ms->c_value);
@@ -1989,7 +1989,7 @@ coff_read_struct_type (int index, int length, int lastsym,
 
 	  /* Save the data.  */
 	  list->field.name =
-	    obsavestring (name, strlen (name), &OBJFILE_OBJFILE_OBSTACK (objfile));
+	    obsavestring (name, strlen (name), &OBJFILE_OBSTACK (objfile));
 	  FIELD_TYPE (list->field) = decode_type (ms, ms->c_type, &sub_aux,
 						  objfile);
 	  SET_FIELD_BITPOS (list->field, ms->c_value);
@@ -2058,12 +2058,12 @@ coff_read_enum_type (int index, int length, int lastsym,
 	{
 	case C_MOE:
 	  sym = (struct symbol *) obstack_alloc
-	    (&OBJFILE_OBJFILE_OBSTACK (objfile), sizeof (struct symbol));
+	    (&OBJFILE_OBSTACK (objfile), sizeof (struct symbol));
 	  memset (sym, 0, sizeof (struct symbol));
 
 	  SYMBOL_SET_LINKAGE_NAME (sym,
 				   obsavestring (name, strlen (name),
-						 &OBJFILE_OBJFILE_OBSTACK (objfile)));
+						 &OBJFILE_OBSTACK (objfile)));
 	  SYMBOL_CLASS (sym) = LOC_CONST;
 	  SYMBOL_DOMAIN (sym) = VAR_DOMAIN;
 	  SYMBOL_VALUE (sym) = ms->c_value;

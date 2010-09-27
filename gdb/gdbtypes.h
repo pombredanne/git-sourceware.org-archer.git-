@@ -1216,12 +1216,12 @@ extern const struct floatformat *floatformats_ibm_long_double[BFD_ENDIAN_UNKNOWN
 
 #define TYPE_ALLOC(t,size)  \
    (TYPE_OBJFILE_OWNED (t) \
-    ? obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (TYPE_OBJFILE (t)), size) \
+    ? obstack_alloc (&OBJFILE_OBSTACK (TYPE_OBJFILE (t)), size) \
     : xmalloc (size))
 
 #define TYPE_ZALLOC(t,size)						\
    (TYPE_OBJFILE_OWNED (t)						\
-    ? memset (obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (TYPE_OBJFILE (t)), \
+    ? memset (obstack_alloc (&OBJFILE_OBSTACK (TYPE_OBJFILE (t)), \
 			     size),					\
 	      0, size)							\
     : xzalloc (size))

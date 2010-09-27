@@ -709,7 +709,7 @@ dbx_symfile_init (struct objfile *objfile)
 		   DBX_STRINGTAB_SIZE (objfile));
 
 	  DBX_STRINGTAB (objfile) =
-	    (char *) obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
+	    (char *) obstack_alloc (&OBJFILE_OBSTACK (objfile),
 				    DBX_STRINGTAB_SIZE (objfile));
 	  OBJSTAT (objfile, sz_strtab += DBX_STRINGTAB_SIZE (objfile));
 
@@ -1702,7 +1702,7 @@ pos %d"),
  		{
  		  sym_len = strlen (new_name);
  		  sym_name = obsavestring (new_name, sym_len,
- 					   &OBJFILE_OBJFILE_OBSTACK (objfile));
+ 					   &OBJFILE_OBSTACK (objfile));
  		  xfree (new_name);
  		}
               xfree (name);
@@ -2202,7 +2202,7 @@ start_psymtab (struct objfile *objfile, char *filename, CORE_ADDR textlow,
     start_psymtab_common (objfile, OBJFILE_SECTION_OFFSETS (objfile),
 			  filename, textlow, global_syms, static_syms);
 
-  result->read_symtab_private = obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
+  result->read_symtab_private = obstack_alloc (&OBJFILE_OBSTACK (objfile),
 					       sizeof (struct symloc));
   LDSYMOFF (result) = ldsymoff;
   result->read_symtab = dbx_psymtab_to_symtab;
@@ -2331,7 +2331,7 @@ end_psymtab (struct partial_symtab *pst, char **include_list, int num_includes,
   if (number_dependencies)
     {
       pst->dependencies = (struct partial_symtab **)
-	obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
+	obstack_alloc (&OBJFILE_OBSTACK (objfile),
 		       number_dependencies * sizeof (struct partial_symtab *));
       memcpy (pst->dependencies, dependency_list,
 	      number_dependencies * sizeof (struct partial_symtab *));
@@ -2347,7 +2347,7 @@ end_psymtab (struct partial_symtab *pst, char **include_list, int num_includes,
       /* Copy the sesction_offsets array from the main psymtab. */
       subpst->section_offsets = pst->section_offsets;
       subpst->read_symtab_private =
-	obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile), sizeof (struct symloc));
+	obstack_alloc (&OBJFILE_OBSTACK (objfile), sizeof (struct symloc));
       LDSYMOFF (subpst) =
 	LDSYMLEN (subpst) =
 	subpst->textlow =
@@ -2356,7 +2356,7 @@ end_psymtab (struct partial_symtab *pst, char **include_list, int num_includes,
       /* We could save slight bits of space by only making one of these,
          shared by the entire set of include files.  FIXME-someday.  */
       subpst->dependencies = (struct partial_symtab **)
-	obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile),
+	obstack_alloc (&OBJFILE_OBSTACK (objfile),
 		       sizeof (struct partial_symtab *));
       subpst->dependencies[0] = pst;
       subpst->number_of_dependencies = 1;
@@ -2815,7 +2815,7 @@ process_one_symbol (int type, int desc, CORE_ADDR valu, char *name,
 
 	  /* For C++, set the block's scope.  */
 	  if (SYMBOL_LANGUAGE (new->name) == language_cplus)
-	    cp_set_block_scope (new->name, block, &OBJFILE_OBJFILE_OBSTACK (objfile),
+	    cp_set_block_scope (new->name, block, &OBJFILE_OBSTACK (objfile),
 				"", 0);
 
 	  /* May be switching to an assembler file which may not be using
@@ -3220,7 +3220,7 @@ no enclosing block"));
 		  /* For C++, set the block's scope.  */
 		  if (SYMBOL_LANGUAGE (new->name) == language_cplus)
 		    cp_set_block_scope (new->name, block,
-					&OBJFILE_OBJFILE_OBSTACK (objfile),
+					&OBJFILE_OBSTACK (objfile),
 					"", 0);
 		}
 
@@ -3361,7 +3361,7 @@ coffstab_build_psymtabs (struct objfile *objfile,
   if (stabstrsize > bfd_get_size (sym_bfd))
     error (_("ridiculous string table size: %d bytes"), stabstrsize);
   DBX_STRINGTAB (objfile) = (char *)
-    obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile), stabstrsize + 1);
+    obstack_alloc (&OBJFILE_OBSTACK (objfile), stabstrsize + 1);
   OBJSTAT (objfile, sz_strtab += stabstrsize + 1);
 
   /* Now read in the string table in one big gulp.  */
@@ -3455,7 +3455,7 @@ elfstab_build_psymtabs (struct objfile *objfile, asection *stabsect,
   if (stabstrsize > bfd_get_size (sym_bfd))
     error (_("ridiculous string table size: %d bytes"), stabstrsize);
   DBX_STRINGTAB (objfile) = (char *)
-    obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile), stabstrsize + 1);
+    obstack_alloc (&OBJFILE_OBSTACK (objfile), stabstrsize + 1);
   OBJSTAT (objfile, sz_strtab += stabstrsize + 1);
 
   /* Now read in the string table in one big gulp.  */
@@ -3550,7 +3550,7 @@ section (%s)"),
     error (_("ridiculous string table size: %d bytes"),
 	   DBX_STRINGTAB_SIZE (objfile));
   DBX_STRINGTAB (objfile) = (char *)
-    obstack_alloc (&OBJFILE_OBJFILE_OBSTACK (objfile), DBX_STRINGTAB_SIZE (objfile) + 1);
+    obstack_alloc (&OBJFILE_OBSTACK (objfile), DBX_STRINGTAB_SIZE (objfile) + 1);
   OBJSTAT (objfile, sz_strtab += DBX_STRINGTAB_SIZE (objfile) + 1);
 
   /* Now read in the string table in one big gulp.  */
