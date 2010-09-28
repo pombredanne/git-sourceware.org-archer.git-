@@ -35,9 +35,10 @@ static const char *const jit_break_name = "__jit_debug_register_code";
 
 static const char *const jit_descriptor_name = "__jit_debug_descriptor";
 
-/* This is the address of the JIT descriptor in the inferior.  */
+/* The key used to find the JIT descriptor address in the current
+   program space.  */
 
-static CORE_ADDR jit_descriptor_addr = 0;
+static const struct program_space_data *jit_program_space_key;
 
 /* This is a boolean indicating whether we're currently registering code.  This
    is used to avoid re-entering the registration code.  We want to check for
@@ -133,6 +134,24 @@ bfd_open_from_target_memory (CORE_ADDR addr, size_t size, char *target)
                           mem_bfd_iovec_stat);
 }
 
+/* Return a pointer to the address of the JIT descriptor in the
+   current program space.  */
+
+static CORE_ADDR *
+jit_get_descriptor_pointer (void)
+{
+  void *p = program_space_data (current_program_space, jit_program_space_key);
+
+  if (p == NULL)
+    {
+      p = XCNEW (CORE_ADDR);
+      set_program_space_data (current_program_space, jit_program_space_key,
+			      p);
+    }
+
+  return p;
+}
+
 /* Helper function for reading the global JIT descriptor from remote memory.  */
 
 static void
@@ -145,6 +164,7 @@ jit_read_descriptor (struct gdbarch *gdbarch,
   int desc_size;
   gdb_byte *desc_buf;
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+  CORE_ADDR inf_addr = *jit_get_descriptor_pointer ();
 
   /* Figure out how big the descriptor is on the remote and how to read it.  */
   ptr_type = builtin_type (gdbarch)->builtin_data_ptr;
@@ -153,7 +173,7 @@ jit_read_descriptor (struct gdbarch *gdbarch,
   desc_buf = alloca (desc_size);
 
   /* Read the descriptor.  */
-  err = target_read_memory (jit_descriptor_addr, desc_buf, desc_size);
+  err = target_read_memory (inf_addr, desc_buf, desc_size);
   if (err)
     error (_("Unable to read JIT descriptor from remote memory!"));
 
@@ -314,6 +334,7 @@ jit_inferior_init (struct gdbarch *gdbarch)
   struct jit_descriptor descriptor;
   struct jit_code_entry cur_entry;
   CORE_ADDR cur_entry_addr;
+  CORE_ADDR *desc_addr_ptr;
 
   /* When we register code, GDB resets its breakpoints in case symbols have
      changed.  That in turn calls this handler, which makes us look for new
@@ -335,8 +356,9 @@ jit_inferior_init (struct gdbarch *gdbarch)
   desc_symbol = lookup_minimal_symbol (jit_descriptor_name, NULL, NULL);
   if (desc_symbol == NULL)
     return;
-  jit_descriptor_addr = SYMBOL_VALUE_ADDRESS (desc_symbol);
-  if (jit_descriptor_addr == 0)
+  desc_addr_ptr = jit_get_descriptor_pointer ();
+  *desc_addr_ptr = SYMBOL_VALUE_ADDRESS (desc_symbol);
+  if (*desc_addr_ptr == 0)
     return;
 
   /* Read the descriptor so we can check the version number and load any already
@@ -401,10 +423,11 @@ jit_inferior_exit_hook (struct inferior *inf)
 {
   struct objfile *objf;
   objfile_iterator_type iter, temp;
+  CORE_ADDR *desc_addr_ptr = jit_get_descriptor_pointer ();
 
   /* We need to reset the descriptor addr so that next time we load up the
      inferior we look for it again.  */
-  jit_descriptor_addr = 0;
+  *desc_addr_ptr = 0;
 
   ALL_OBJFILES_SAFE (iter, objf, temp)
     if (objfile_data (objf, jit_objfile_data) != NULL)
@@ -447,6 +470,14 @@ jit_event_handler (struct gdbarch *gdbarch)
     }
 }
 
+/* Clean up the JIT-specific program space data.  */
+
+static void
+jit_program_space_cleanup (struct program_space *ignore, void *data)
+{
+  xfree (data);
+}
+
 /* Provide a prototype to silence -Wmissing-prototypes.  */
 
 extern void _initialize_jit (void);
@@ -457,4 +488,6 @@ _initialize_jit (void)
   observer_attach_inferior_created (jit_inferior_created_observer);
   observer_attach_inferior_exit (jit_inferior_exit_hook);
   jit_objfile_data = register_objfile_data ();
+  jit_program_space_key
+    = register_program_space_data_with_cleanup (jit_program_space_cleanup);
 }
