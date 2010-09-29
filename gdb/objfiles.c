@@ -638,6 +638,7 @@ do_free_objfile (struct objfile *objfile)
   /* Rebuild section map next time we need it.  */
   get_objfile_pspace_data (current_program_space)->objfiles_changed_p = 1;
 
+  xfree (objfile->section_offsets);
   xfree (objfile->storage);
   xfree (objfile);
 }

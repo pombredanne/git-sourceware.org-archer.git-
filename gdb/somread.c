@@ -392,8 +392,7 @@ som_symfile_offsets (struct objfile *objfile, struct section_addr_info *addrs)
 
   objfile->num_sections = bfd_count_sections (objfile->obfd);
   objfile->section_offsets = (struct section_offsets *)
-    obstack_alloc (&objfile->objfile_obstack, 
-		   SIZEOF_N_SECTION_OFFSETS (objfile->num_sections));
+    xmalloc (SIZEOF_N_SECTION_OFFSETS (objfile->num_sections));
 
   /* FIXME: ezannoni 2000-04-20 The section names in SOM are not
      .text, .data, etc, but $TEXT$, $DATA$,... We should initialize

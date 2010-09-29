@@ -734,8 +734,7 @@ default_symfile_offsets (struct objfile *objfile,
 {
   OBJFILE_NUM_SECTIONS (objfile) = bfd_count_sections (OBJFILE_OBFD (objfile));
   OBJFILE_SECTION_OFFSETS (objfile) = (struct section_offsets *)
-    obstack_alloc (&OBJFILE_OBSTACK (objfile),
-		   SIZEOF_N_SECTION_OFFSETS (OBJFILE_NUM_SECTIONS (objfile)));
+    xmalloc (SIZEOF_N_SECTION_OFFSETS (OBJFILE_NUM_SECTIONS (objfile)));
   relative_addr_info_to_section_offsets (OBJFILE_SECTION_OFFSETS (objfile),
 					 OBJFILE_NUM_SECTIONS (objfile), addrs);
 
@@ -990,7 +989,7 @@ syms_from_objfile (struct objfile *objfile,
       OBJFILE_NUM_SECTIONS (objfile) = num_offsets;
       OBJFILE_SECTION_OFFSETS (objfile)
         = ((struct section_offsets *)
-           obstack_alloc (&OBJFILE_OBSTACK (objfile), size));
+           xmalloc (size));
       memcpy (OBJFILE_SECTION_OFFSETS (objfile), offsets, size);
 
       init_objfile_sect_indices (objfile);
@@ -2446,8 +2445,7 @@ reread_symbols (void)
 	  /* We use the same section offsets as from last time.  I'm not
 	     sure whether that is always correct for shared libraries.  */
 	  OBJFILE_SECTION_OFFSETS (objfile) = (struct section_offsets *)
-	    obstack_alloc (&OBJFILE_OBSTACK (objfile),
-			   SIZEOF_N_SECTION_OFFSETS (num_offsets));
+	    xmalloc (SIZEOF_N_SECTION_OFFSETS (num_offsets));
 	  memcpy (OBJFILE_SECTION_OFFSETS (objfile), offsets,
 		  SIZEOF_N_SECTION_OFFSETS (num_offsets));
 	  OBJFILE_NUM_SECTIONS (objfile) = num_offsets;

@@ -791,8 +791,7 @@ macho_symfile_offsets (struct objfile *objfile,
   /* Allocate section_offsets.  */
   objfile->num_sections = bfd_count_sections (objfile->obfd);
   objfile->section_offsets = (struct section_offsets *)
-    obstack_alloc (&objfile->objfile_obstack,
-                   SIZEOF_N_SECTION_OFFSETS (objfile->num_sections));
+    xmalloc (SIZEOF_N_SECTION_OFFSETS (objfile->num_sections));
   memset (objfile->section_offsets, 0,
           SIZEOF_N_SECTION_OFFSETS (objfile->num_sections));
 

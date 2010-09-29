@@ -309,18 +309,6 @@ struct objfile_storage
     void **data;
     unsigned num_data;
 
-    /* Set of relocation offsets to apply to each section.
-       Currently on the objfile_obstack (which makes no sense, but I'm
-       not sure it's harming anything).
-
-       These offsets indicate that all symbols (including partial and
-       minimal symbols) which have been read have been relocated by this
-       much.  Symbols which are yet to be read need to be relocated by
-       it.  */
-
-    struct section_offsets *section_offsets;
-    int num_sections;
-
     /* Indexes in the section_offsets array. These are initialized by the
        *_symfile_offsets() family of functions (som_symfile_offsets,
        xcoff_symfile_offsets, default_symfile_offsets). In theory they
@@ -377,6 +365,17 @@ struct objfile_storage
 struct objfile
 {
   struct objfile_storage *storage;
+
+  /* Set of relocation offsets to apply to each section.  Allocated
+     with xmalloc.
+
+     These offsets indicate that all symbols (including partial and
+     minimal symbols) which have been read have been relocated by this
+     much.  Symbols which are yet to be read need to be relocated by
+     it.  */
+
+  struct section_offsets *section_offsets;
+  int num_sections;
 };
 
 #define OBJFILE_NAME(obj) ((obj)->storage->name)
@@ -406,8 +405,8 @@ struct objfile
 #define OBJFILE_DEPRECATED_SYM_PRIVATE(obj) ((obj)->storage->deprecated_sym_private)
 #define OBJFILE_DATA(obj) ((obj)->storage->data)
 #define OBJFILE_NUM_DATA(obj) ((obj)->storage->num_data)
-#define OBJFILE_SECTION_OFFSETS(obj) ((obj)->storage->section_offsets)
-#define OBJFILE_NUM_SECTIONS(obj) ((obj)->storage->num_sections)
+#define OBJFILE_SECTION_OFFSETS(obj) ((obj)->section_offsets)
+#define OBJFILE_NUM_SECTIONS(obj) ((obj)->num_sections)
 #define OBJFILE_SECT_INDEX_TEXT(obj) ((obj)->storage->sect_index_text)
 #define OBJFILE_SECT_INDEX_DATA(obj) ((obj)->storage->sect_index_data)
 #define OBJFILE_SECT_INDEX_BSS(obj) ((obj)->storage->sect_index_bss)
