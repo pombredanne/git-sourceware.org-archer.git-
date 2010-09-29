@@ -766,8 +766,10 @@ objfile_relocate1 (struct objfile *objfile,
 		   || SYMBOL_CLASS (sym) == LOC_STATIC)
 		  && SYMBOL_SECTION (sym) >= 0)
 		{
-		  SYMBOL_VALUE_ADDRESS (sym) +=
-		    ANOFFSET (delta, SYMBOL_SECTION (sym));
+		  SET_SYMBOL_VALUE_ADDRESS (sym,
+					    SYMBOL_VALUE_ADDRESS (sym)
+					    + ANOFFSET (delta,
+							SYMBOL_SECTION (sym)));
 		}
 	    }
 	}
@@ -786,7 +788,9 @@ objfile_relocate1 (struct objfile *objfile,
 
     ALL_OBJFILE_MSYMBOLS (objfile, msym)
       if (SYMBOL_SECTION (msym) >= 0)
-      SYMBOL_VALUE_ADDRESS (msym) += ANOFFSET (delta, SYMBOL_SECTION (msym));
+	SET_SYMBOL_VALUE_ADDRESS (msym,
+				  SYMBOL_VALUE_ADDRESS (msym)
+				  + ANOFFSET (delta, SYMBOL_SECTION (msym)));
   }
   /* Relocating different sections by different amounts may cause the symbols
      to be out of order.  */

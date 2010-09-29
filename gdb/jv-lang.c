@@ -152,7 +152,7 @@ add_class_symbol (struct type *type, CORE_ADDR addr)
   /*  SYMBOL_VALUE (sym) = valu; */
   SYMBOL_TYPE (sym) = type;
   SYMBOL_DOMAIN (sym) = STRUCT_DOMAIN;
-  SYMBOL_VALUE_ADDRESS (sym) = addr;
+  SET_SYMBOL_VALUE_ADDRESS (sym, addr);
   return sym;
 }
 

@@ -164,13 +164,16 @@ extern CORE_ADDR symbol_overlayed_address (CORE_ADDR, struct obj_section *);
    field only, instead of the SYMBOL parameter.  */
 
 #define SYMBOL_VALUE(symbol)		(symbol)->ginfo.value.ivalue
-#define SYMBOL_VALUE_ADDRESS(symbol)	(symbol)->ginfo.value.address
+#define SYMBOL_VALUE_ADDRESS(symbol)	((symbol)->ginfo.value.address + 0)
 #define SYMBOL_VALUE_BYTES(symbol)	(symbol)->ginfo.value.bytes
 #define SYMBOL_BLOCK_VALUE(symbol)	(symbol)->ginfo.value.block
 #define SYMBOL_VALUE_CHAIN(symbol)	(symbol)->ginfo.value.chain
 #define SYMBOL_LANGUAGE(symbol)		(symbol)->ginfo.language
 #define SYMBOL_SECTION(symbol)		(symbol)->ginfo.section
 #define SYMBOL_OBJ_SECTION(symbol)	(symbol)->ginfo.obj_section
+
+#define SET_SYMBOL_VALUE_ADDRESS(SYMBOL, VALUE) \
+  ((SYMBOL)->ginfo.value.address = (VALUE))
 
 /* Initializes the language dependent portion of a symbol
    depending upon the language for the symbol. */

@@ -1553,8 +1553,10 @@ process_coff_symbol (struct coff_symbol *cs,
 	case C_THUMBEXTFUNC:
 	case C_EXT:
 	  SYMBOL_CLASS (sym) = LOC_STATIC;
-	  SYMBOL_VALUE_ADDRESS (sym) = (CORE_ADDR) cs->c_value;
-	  SYMBOL_VALUE_ADDRESS (sym) += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
+	  SET_SYMBOL_VALUE_ADDRESS (sym,
+				    ((CORE_ADDR) cs->c_value)
+				    + ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile),
+						SECT_OFF_TEXT (objfile)));
 	  add_symbol_to_list (sym, &global_symbols);
 	  break;
 
@@ -1562,8 +1564,10 @@ process_coff_symbol (struct coff_symbol *cs,
 	case C_THUMBSTATFUNC:
 	case C_STAT:
 	  SYMBOL_CLASS (sym) = LOC_STATIC;
-	  SYMBOL_VALUE_ADDRESS (sym) = (CORE_ADDR) cs->c_value;
-	  SYMBOL_VALUE_ADDRESS (sym) += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
+	  SET_SYMBOL_VALUE_ADDRESS (sym,
+				    ((CORE_ADDR) cs->c_value)
+				    + ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile),
+						SECT_OFF_TEXT (objfile)));
 	  if (within_function)
 	    {
 	      /* Static symbol of local scope */

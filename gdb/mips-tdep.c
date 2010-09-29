@@ -264,7 +264,7 @@ mips_elf_make_msymbol_special (asymbol * sym, struct minimal_symbol *msym)
   if (((elf_symbol_type *) (sym))->internal_elf_sym.st_other == STO_MIPS16)
     {
       MSYMBOL_TARGET_FLAG_1 (msym) = 1;
-      SYMBOL_VALUE_ADDRESS (msym) |= 1;
+      SET_SYMBOL_VALUE_ADDRESS (msym, SYMBOL_VALUE_ADDRESS (msym) | 1);
     }
 }
 

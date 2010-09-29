@@ -844,7 +844,7 @@ prim_record_minimal_symbol_full (const char *name, int name_len, int copy_name,
   SYMBOL_LANGUAGE (msymbol) = language_auto;
   SYMBOL_SET_NAMES (msymbol, name, name_len, copy_name, objfile);
 
-  SYMBOL_VALUE_ADDRESS (msymbol) = address;
+  SET_SYMBOL_VALUE_ADDRESS (msymbol, address);
   SYMBOL_SECTION (msymbol) = section;
   SYMBOL_OBJ_SECTION (msymbol) = NULL;
 
@@ -1147,7 +1147,7 @@ install_minimal_symbols (struct objfile *objfile)
          is indexed by mcount and not mcount-1. */
 
       SYMBOL_LINKAGE_NAME (&msymbols[mcount]) = NULL;
-      SYMBOL_VALUE_ADDRESS (&msymbols[mcount]) = 0;
+      SET_SYMBOL_VALUE_ADDRESS (&msymbols[mcount], 0);
       MSYMBOL_TARGET_FLAG_1 (&msymbols[mcount]) = 0;
       MSYMBOL_TARGET_FLAG_2 (&msymbols[mcount]) = 0;
       MSYMBOL_SIZE (&msymbols[mcount]) = 0;

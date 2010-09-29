@@ -547,8 +547,9 @@ relocate_psymtabs (struct objfile *objfile,
     {
       fixup_psymbol_section (*psym, objfile);
       if (SYMBOL_SECTION (*psym) >= 0)
-	SYMBOL_VALUE_ADDRESS (*psym) += ANOFFSET (delta,
-						  SYMBOL_SECTION (*psym));
+	SET_SYMBOL_VALUE_ADDRESS (*psym, (SYMBOL_VALUE_ADDRESS (*psym)
+					  + ANOFFSET (delta,
+						      SYMBOL_SECTION (*psym))));
     }
   for (psym = OBJFILE_STATIC_PSYMBOLS (objfile).list;
        psym < OBJFILE_STATIC_PSYMBOLS (objfile).next;
@@ -556,8 +557,9 @@ relocate_psymtabs (struct objfile *objfile,
     {
       fixup_psymbol_section (*psym, objfile);
       if (SYMBOL_SECTION (*psym) >= 0)
-	SYMBOL_VALUE_ADDRESS (*psym) += ANOFFSET (delta,
-						  SYMBOL_SECTION (*psym));
+	SET_SYMBOL_VALUE_ADDRESS (*psym, (SYMBOL_VALUE_ADDRESS (*psym)
+					  + ANOFFSET (delta,
+						      SYMBOL_SECTION (*psym))));
     }
 }
 
@@ -1292,7 +1294,7 @@ add_psymbol_to_bcache (char *name, int namelength, int copy_name,
     }
   else
     {
-      SYMBOL_VALUE_ADDRESS (&psymbol) = coreaddr;
+      SET_SYMBOL_VALUE_ADDRESS (&psymbol, coreaddr);
     }
   SYMBOL_SECTION (&psymbol) = 0;
   SYMBOL_LANGUAGE (&psymbol) = language;

@@ -5741,7 +5741,7 @@ read_common_block (struct die_info *die, struct dwarf2_cu *cu)
 	      else
 		dwarf2_complex_location_expr_complaint ();
 
-	      SYMBOL_VALUE_ADDRESS (sym) = base + byte_offset;
+	      SET_SYMBOL_VALUE_ADDRESS (sym, base + byte_offset);
 	      add_symbol_to_list (sym, &global_symbols);
 	    }
 	  child_die = sibling_die (child_die);
@@ -8700,12 +8700,16 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
     {
       unsigned int dummy;
 
-      SYMBOL_VALUE_ADDRESS (sym) =
-	read_address (OBJFILE_OBFD (objfile), DW_BLOCK (attr)->data + 1, cu, &dummy);
+      SET_SYMBOL_VALUE_ADDRESS (sym,
+				read_address (OBJFILE_OBFD (objfile),
+					      DW_BLOCK (attr)->data + 1,
+					      cu, &dummy));
       SYMBOL_CLASS (sym) = LOC_STATIC;
       fixup_symbol_section (sym, objfile);
-      SYMBOL_VALUE_ADDRESS (sym) += ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile),
-					      SYMBOL_SECTION (sym));
+      SET_SYMBOL_VALUE_ADDRESS (sym,
+				SYMBOL_VALUE_ADDRESS (sym)
+				+ ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile),
+					    SYMBOL_SECTION (sym)));
       return;
     }
 
@@ -8803,7 +8807,7 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
 	  attr = dwarf2_attr (die, DW_AT_low_pc, cu);
 	  if (attr)
 	    {
-	      SYMBOL_VALUE_ADDRESS (sym) = DW_ADDR (attr) + baseaddr;
+	      SET_SYMBOL_VALUE_ADDRESS (sym, DW_ADDR (attr) + baseaddr);
 	    }
 	  SYMBOL_CLASS (sym) = LOC_LABEL;
 	  break;
