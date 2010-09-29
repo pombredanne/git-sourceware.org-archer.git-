@@ -1751,7 +1751,7 @@ decode_all_digits (char **argptr, struct symtab *default_symtab,
   if (val.symtab == 0)
     val.symtab = file_symtab;
 
-  val.pspace = SYMTAB_PSPACE (val.symtab);
+  val.pspace = current_program_space;
   val.pc = 0;
   values.sals = (struct symtab_and_line *)
     xmalloc (sizeof (struct symtab_and_line));

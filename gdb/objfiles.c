@@ -242,8 +242,6 @@ allocate_objfile (bfd *abfd, int flags)
       OBJFILE_NAME (objfile) = xstrdup ("<<anonymous objfile>>");
     }
 
-  OBJFILE_PSPACE (objfile) = current_program_space;
-
   /* Initialize the section indexes for this objfile, so that we can
      later detect if they are used w/o being properly assigned to. */
 
@@ -270,7 +268,7 @@ allocate_objfile (bfd *abfd, int flags)
   OBJFILE_FLAGS (objfile) |= flags;
 
   /* Rebuild section map next time we need it.  */
-  get_objfile_pspace_data (OBJFILE_PSPACE (objfile))->objfiles_changed_p = 1;
+  get_objfile_pspace_data (current_program_space)->objfiles_changed_p = 1;
 
   return objfile;
 }
@@ -638,7 +636,7 @@ do_free_objfile (struct objfile *objfile)
   obstack_free (&OBJFILE_OBSTACK (objfile), 0);
 
   /* Rebuild section map next time we need it.  */
-  get_objfile_pspace_data (OBJFILE_PSPACE (objfile))->objfiles_changed_p = 1;
+  get_objfile_pspace_data (current_program_space)->objfiles_changed_p = 1;
 
   xfree (objfile->storage);
   xfree (objfile);
@@ -813,7 +811,7 @@ objfile_relocate1 (struct objfile *objfile,
   }
 
   /* Rebuild section map next time we need it.  */
-  get_objfile_pspace_data (OBJFILE_PSPACE (objfile))->objfiles_changed_p = 1;
+  get_objfile_pspace_data (current_program_space)->objfiles_changed_p = 1;
 
   /* Update the table in exec_ops, used to read memory.  */
   ALL_OBJFILE_OSECTIONS (objfile, s)

@@ -4473,7 +4473,7 @@ append_exact_match_to_sals (char *filename, char *fullname, int lineno,
 	      if (item->line == lineno)
 		{
 		  exact = 1;
-		  append_expanded_sal (ret, OBJFILE_PSPACE (objfile),
+		  append_expanded_sal (ret, current_program_space,
 				       symtab, lineno, item->pc);
 		}
 	      else if (!exact && item->line > lineno

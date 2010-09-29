@@ -236,7 +236,7 @@ select_source_symtab (struct symtab *s)
     {
       current_source_symtab = s;
       current_source_line = 1;
-      current_source_pspace = SYMTAB_PSPACE (s);
+      current_source_pspace = current_program_space;
       return;
     }
 

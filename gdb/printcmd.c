@@ -1914,7 +1914,6 @@ clear_dangling_display_expressions (struct so_list *solib)
     return;
   if (OBJFILE_SEPARATE_DEBUG_OBJFILE_BACKLINK (objfile))
     objfile = OBJFILE_SEPARATE_DEBUG_OBJFILE_BACKLINK (objfile);
-  gdb_assert (OBJFILE_PSPACE (objfile) == solib->pspace);
 
   for (d = display_chain; d != NULL; d = d->next)
     {

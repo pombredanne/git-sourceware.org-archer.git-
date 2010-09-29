@@ -182,10 +182,6 @@ struct objfile_storage
 
     unsigned short flags;
 
-    /* The program space associated with this objfile.  */
-
-    struct program_space *pspace;
-
     /* Each objfile points to a linked list of symtabs derived from this file,
        one symtab structure for each compilation unit (source file).  Each link
        in the symtab list contains a backpointer to this objfile. */
@@ -386,7 +382,6 @@ struct objfile
 #define OBJFILE_NAME(obj) ((obj)->storage->name)
 #define OBJFILE_REFC(obj) ((obj)->storage->refc)
 #define OBJFILE_FLAGS(obj) ((obj)->storage->flags)
-#define OBJFILE_PSPACE(obj) ((obj)->storage->pspace)
 #define OBJFILE_SYMTABS(obj) ((obj)->storage->symtabs)
 #define OBJFILE_PSYMTABS(obj) ((obj)->storage->psymtabs)
 #define OBJFILE_PSYMTABS_ADDRMAP(obj) ((obj)->storage->psymtabs_addrmap)
