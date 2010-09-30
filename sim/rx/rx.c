@@ -298,6 +298,14 @@ static unsigned char *get_byte_base;
 static RX_Opcode_Decoded **decode_cache_base;
 static SI get_byte_page;
 
+void
+reset_decoder (void)
+{
+  get_byte_base = 0;
+  decode_cache_base = 0;
+  get_byte_page = 0;
+}
+
 static inline void
 maybe_get_mem_page (SI tpc)
 {
@@ -878,7 +886,7 @@ decode_opcode ()
   unsigned long long prev_cycle_count;
 #endif
 #ifdef CYCLE_ACCURATE
-  int tx;
+  unsigned int tx;
 #endif
 
 #ifdef CYCLE_STATS
@@ -1224,7 +1232,9 @@ decode_opcode ()
       v = GS ();
       if (v == 255)
 	{
-	  DO_RETURN (rx_syscall (regs.r[5]));
+	  int rc = rx_syscall (regs.r[5]);
+	  if (! RX_STEPPED (rc))
+	    DO_RETURN (rc);
 	}
       else
 	{
@@ -1810,6 +1820,9 @@ decode_opcode ()
       break;
 
     case RXO_smovu:
+#ifdef CYCLE_ACCURATE
+      tx = regs.r[3];
+#endif
       while (regs.r[3] != 0)
 	{
 	  uma = mem_get_qi (regs.r[2] ++);
@@ -1818,6 +1831,7 @@ decode_opcode ()
 	  if (uma == 0)
 	    break;
 	}
+      cycles (2 + 3 * (int)(tx / 4) + 3 * (tx % 4));
       break;
 
     case RXO_shar: /* d = ma >> mb */

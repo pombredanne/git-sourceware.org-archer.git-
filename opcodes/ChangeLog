@@ -1,3 +1,130 @@
+2010-09-27  Ralf Wildenhues  <Ralf.Wildenhues@gmx.de>
+
+	* configure: Regenerate.
+
+2010-09-27  Andreas Krebbel  <Andreas.Krebbel@de.ibm.com>
+
+	* s390-mkopc.c (enum s390_opcde_cpu_val): Add S390_OPCODE_Z196.
+	(main): Recognize the new CPU string.
+	* s390-opc.c: Add new instruction formats and masks.
+	* s390-opc.txt: Add new z196 instructions.
+
+2010-09-27  Andreas Krebbel  <Andreas.Krebbel@de.ibm.com>
+
+	* s390-dis.c (print_insn_s390): Pick instruction with most
+	specific mask.
+	* s390-opc.c: Add unused bits to the insn mask.
+	* s390-opc.txt: Reorder some instructions to prefer more recent
+	versions.
+
+2010-09-27  Tejas Belagod  <tejas.belagod@arm.com>
+
+	* arm_dis.c (print_insn_coprocessor): Apply off-by-alignment
+	correction to unaligned PCs while printing comment.
+
+2010-09-23  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (arm_opcodes): Add Virtualiztion Extensions support.
+	(thumb32_opcodes): Likewise.
+	(banked_regname): New function.
+	(print_insn_arm): Add Virtualization Extensions support.
+	(print_insn_thumb32): Likewise.
+
+2010-09-23  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (arm_opcodes): Support disassembly of UDIV and SDIV in
+	ARM state.
+
+2010-09-23  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (arm_opcodes): SMC implies Security Extensions.
+	(thumb32_opcodes): Likewise.
+
+2010-09-23  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (arm_opcodes): Add support for pldw.
+	(thumb32_opcodes): Likewise.
+
+2010-09-22  Robin Getz  <robin.getz@analog.com>
+
+	* bfin-dis.c (fmtconst): Cast address to 32bits.
+
+2010-09-22  Mike Frysinger  <vapier@gentoo.org>
+
+	* bfin-dis.c (decode_REGMV_0): Rewrite valid combo checks.
+
+2010-09-22  Robin Getz  <robin.getz@analog.com>
+
+	* bfin-dis.c (decode_ProgCtrl_0): Check for parallel insns.
+	Reject P6/P7 to TESTSET.
+	(decode_PushPopReg_0): Check for parallel insns.  Reject pushing
+	SP onto the stack.
+	(decode_PushPopMultiple_0): Check for parallel insns.  Make sure
+	P/D fields match all the time.
+	(decode_CCflag_0): Check for parallel insns.  Verify x/y fields
+	are 0 for accumulator compares.
+	(decode_CC2stat_0): Check for parallel insns.  Reject CC<op>CC.
+	(decode_CaCTRL_0, decode_ccMV_0, decode_CC2dreg_0, decode_BRCC_0,
+	decode_UJUMP_0, decode_LOGI2op_0, decode_COMPI2opD_0,
+	decode_COMPI2opP_0, decode_LoopSetup_0, decode_LDIMMhalf_0,
+	decode_CALLa_0, decode_linkage_0, decode_pseudoDEBUG_0,
+	decode_pseudoOChar_0, decode_pseudodbg_assert_0): Check for parallel
+	insns.
+	(decode_dagMODim_0): Verify br field for IREG ops.
+	(decode_LDST_0): Reject preg load into same preg.
+	(_print_insn_bfin): Handle returns for ILLEGAL decodes.
+	(print_insn_bfin): Likewise.
+
+2010-09-22  Mike Frysinger  <vapier@gentoo.org>
+
+	* bfin-dis.c (decode_PushPopMultiple_0): Return 0 when pr > 5.
+
+2010-09-22  Robin Getz  <robin.getz@analog.com>
+
+	* bfin-dis.c (decode_dsp32shiftimm_0): Add missing "S" flag.
+
+2010-09-22  Mike Frysinger  <vapier@gentoo.org>
+
+	* bfin-dis.c (decode_CC2stat_0): Decode all ASTAT bits.
+
+2010-09-22  Robin Getz  <robin.getz@analog.com>
+
+	* bfin-dis.c (IS_DREG, IS_PREG, IS_GENREG, IS_DAGREG): Reject
+	register values greater than 8.
+	(IS_RESERVEDREG, allreg, mostreg): New helpers.
+	(decode_ProgCtrl_0): Call IS_DREG/IS_PREG as appropriate.
+	(decode_PushPopReg_0): Call mostreg/allreg as appropriate.
+	(decode_CC2dreg_0): Check valid CC register number.
+
+2010-09-22  Robin Getz  <robin.getz@analog.com>
+
+	* bfin-dis.c (decode_pseudoDEBUG_0): Add space after DBG.
+
+2010-09-22  Robin Getz  <robin.getz@analog.com>
+
+	* bfin-dis.c (machine_registers): Add AC0_COPY, V_COPY, and RND_MOD.
+	(reg_names): Likewise.
+	(decode_statbits): Likewise; while reformatting to make manageable.
+
+2010-09-22  Mike Frysinger  <vapier@gentoo.org>
+
+	* bfin-dis.c (decode_pseudoDEBUG_0): Add space after OUTC.
+	(decode_pseudoOChar_0): New function.
+	(_print_insn_bfin): Remove #if 0 and call new decode_pseudoOChar_0.
+
+2010-09-22  Robin Getz  <robin.getz@analog.com>
+
+	* bfin-dis.c (decode_dsp32shift_0): Decode sub opcodes 2/2 as
+	LSHIFT instead of SHIFT.
+
+2010-09-22  Mike Frysinger  <vapier@gentoo.org>
+
+	* bfin-dis.c (constant_formats): Constify the whole structure.
+	(fmtconst): Add const to return value.
+	(reg_names): Mark const.
+	(decode_multfunc): Mark s0/s1 as const.
+	(decode_macfunc): Mark a/sop as const.
+
 2010-09-17  Tejas Belagod  <tejas.belagod@arm.com>
 
 	* arm_dis.c (coprocessor_opcodes): Add MRC entry for APSR_nzcv.

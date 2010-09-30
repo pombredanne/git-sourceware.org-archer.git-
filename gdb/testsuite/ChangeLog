@@ -1,3 +1,40 @@
+2010-09-29  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix GDB crash on inferior calls with self-referencing classes.
+	* gdb.dwarf2/dw2-cp-infcall-ref-static.exp: New file.
+	* gdb.dwarf2/dw2-cp-infcall-ref-static-main.c: New file.
+	* gdb.dwarf2/dw2-cp-infcall-ref-static.S: New file.
+
+2010-09-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix lost siginfo_t for inferior calls.
+	* gdb.base/siginfo-infcall.exp: New file.
+	* gdb.base/siginfo-infcall.c: New file.
+
+2010-09-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.dwarf2/dw2-const.S: Minor (space) reformatting.
+
+2010-09-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.fortran/module.exp (fully qualified name of DW_TAG_constant):
+	New test.
+	* gdb.fortran/module.f90 (mod1) <var_const>: New constant.
+
+2010-09-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.dwarf2/dw2-const.S: Use .4byte to reference the target
+	type of our const type.
+
+2010-09-22  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/pr12028.cc: New.
+	* gdb.cp/pr12028.exp: New.
+
+2010-09-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.dwarf2/dw2-const.S, gdb.dwarf2/dw2-const.exp: New files.
+
 2010-09-16  Phil Muldoon  <pmuldoon@redhat.com>
             Jan Kratochvil  <jan.kratochvil@redhat.com>
 

@@ -577,9 +577,15 @@ struct partial_die_info
     /* Flag set if any of the DIE's children are template arguments.  */
     unsigned int has_template_arguments : 1;
 
+    /* Flag set if fixup_partial_die has been called on this die.  */
+    unsigned int fixup_called : 1;
+
     /* The name of this DIE.  Normally the value of DW_AT_name, but
        sometimes a default name for unnamed DIEs.  */
     char *name;
+
+    /* The linkage name, if present.  */
+    const char *linkage_name;
 
     /* The scope to prepend to our children.  This is generally
        allocated on the comp_unit_obstack, so will disappear
@@ -595,6 +601,8 @@ struct partial_die_info
 
     /* Pointer into the info_buffer (or types_buffer) pointing at the target of
        DW_AT_sibling, if any.  */
+    /* NOTE: This member isn't strictly necessary, read_partial_die could
+       return DW_AT_sibling values to its caller load_partial_dies.  */
     gdb_byte *sibling;
 
     /* If HAS_SPECIFICATION, the offset of the DIE referred to by
@@ -1915,15 +1923,10 @@ dwarf2_read_index (struct objfile *objfile)
   addr = dwarf2_per_objfile->gdb_index.buffer;
   /* Version check.  */
   version = MAYBE_SWAP (*(offset_type *) addr);
-  if (version == 1)
-    {
-      /* Index version 1 neglected to account for .debug_types.  So,
-	 if we see .debug_types, we cannot use this index.  */
-      if (dwarf2_per_objfile->types.asection != NULL
-	  && dwarf2_per_objfile->types.size != 0)
-	return 0;
-    }
-  else if (version != 2)
+  /* Versions earlier than 3 emitted every copy of a psymbol.  This
+     causes the index to behave very poorly for certain requests.  So,
+     it seems better to just ignore such indices.  */
+  if (version < 3)
     return 0;
 
   map = OBSTACK_ZALLOC (&objfile->objfile_obstack, struct mapped_index);
@@ -1937,14 +1940,11 @@ dwarf2_read_index (struct objfile *objfile)
 		      / 8);
   ++i;
 
-  if (version == 2)
-    {
-      types_list = addr + MAYBE_SWAP (metadata[i]);
-      types_list_elements = ((MAYBE_SWAP (metadata[i + 1])
-			      - MAYBE_SWAP (metadata[i]))
-			     / 8);
-      ++i;
-    }
+  types_list = addr + MAYBE_SWAP (metadata[i]);
+  types_list_elements = ((MAYBE_SWAP (metadata[i + 1])
+			  - MAYBE_SWAP (metadata[i]))
+			 / 8);
+  ++i;
 
   map->address_table = addr + MAYBE_SWAP (metadata[i]);
   map->address_table_size = (MAYBE_SWAP (metadata[i + 1])
@@ -1962,8 +1962,7 @@ dwarf2_read_index (struct objfile *objfile)
   if (!create_cus_from_index (objfile, cu_list, cu_list_elements))
     return 0;
 
-  if (version == 2
-      && types_list_elements
+  if (types_list_elements
       && !create_signatured_type_table_from_index (objfile, types_list,
 						   types_list_elements))
     return 0;
@@ -2382,10 +2381,12 @@ dw2_expand_symtabs_matching (struct objfile *objfile,
 {
   int i;
   offset_type iter;
+  struct mapped_index *index;
 
   dw2_setup (objfile);
   if (!dwarf2_per_objfile->index_table)
     return;
+  index = dwarf2_per_objfile->index_table;
 
   for (i = 0; i < (dwarf2_per_objfile->n_comp_units
 		   + dwarf2_per_objfile->n_type_comp_units); ++i)
@@ -2411,28 +2412,24 @@ dw2_expand_symtabs_matching (struct objfile *objfile,
 	}
     }
 
-  for (iter = 0;
-       iter < dwarf2_per_objfile->index_table->index_table_slots;
-       ++iter)
+  for (iter = 0; iter < index->index_table_slots; ++iter)
     {
       offset_type idx = 2 * iter;
       const char *name;
       offset_type *vec, vec_len, vec_idx;
 
-      if (dwarf2_per_objfile->index_table->index_table[idx] == 0
-	  && dwarf2_per_objfile->index_table->index_table[idx + 1] == 0)
+      if (index->index_table[idx] == 0 && index->index_table[idx + 1] == 0)
 	continue;
 
-      name = (dwarf2_per_objfile->index_table->constant_pool
-	      + dwarf2_per_objfile->index_table->index_table[idx]);
+      name = index->constant_pool + MAYBE_SWAP (index->index_table[idx]);
 
       if (! (*name_matcher) (name, data))
 	continue;
 
       /* The name was matched, now expand corresponding CUs that were
 	 marked.  */
-      vec = (offset_type *) (dwarf2_per_objfile->index_table->constant_pool
-			     + dwarf2_per_objfile->index_table->index_table[idx + 1]);
+      vec = (offset_type *) (index->constant_pool
+			     + MAYBE_SWAP (index->index_table[idx + 1]));
       vec_len = MAYBE_SWAP (vec[0]);
       for (vec_idx = 0; vec_idx < vec_len; ++vec_idx)
 	{
@@ -2476,25 +2473,24 @@ dw2_map_symbol_names (struct objfile *objfile,
 		      void *data)
 {
   offset_type iter;
+  struct mapped_index *index;
+
   dw2_setup (objfile);
 
   if (!dwarf2_per_objfile->index_table)
     return;
+  index = dwarf2_per_objfile->index_table;
 
-  for (iter = 0;
-       iter < dwarf2_per_objfile->index_table->index_table_slots;
-       ++iter)
+  for (iter = 0; iter < index->index_table_slots; ++iter)
     {
       offset_type idx = 2 * iter;
       const char *name;
       offset_type *vec, vec_len, vec_idx;
 
-      if (dwarf2_per_objfile->index_table->index_table[idx] == 0
-	  && dwarf2_per_objfile->index_table->index_table[idx + 1] == 0)
+      if (index->index_table[idx] == 0 && index->index_table[idx + 1] == 0)
 	continue;
 
-      name = (dwarf2_per_objfile->index_table->constant_pool
-	      + dwarf2_per_objfile->index_table->index_table[idx]);
+      name = (index->constant_pool + MAYBE_SWAP (index->index_table[idx]));
 
       (*fun) (name, data);
     }
@@ -3466,6 +3462,7 @@ scan_partial_symbols (struct partial_die_info *first_die, CORE_ADDR *lowpc,
 	    case DW_TAG_subprogram:
 	      add_partial_subprogram (pdi, lowpc, highpc, need_pc, cu);
 	      break;
+	    case DW_TAG_constant:
 	    case DW_TAG_variable:
 	    case DW_TAG_typedef:
 	    case DW_TAG_union_type:
@@ -3690,6 +3687,20 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
 				      cu->language, objfile);
 	}
       break;
+    case DW_TAG_constant:
+      {
+        struct psymbol_allocation_list *list;
+
+	if (pdi->is_external)
+	  list = &objfile->global_psymbols;
+	else
+	  list = &objfile->static_psymbols;
+	psym = add_psymbol_to_list (actual_name, strlen (actual_name),
+				    built_actual_name, VAR_DOMAIN, LOC_STATIC,
+				    list, 0, 0, cu->language, objfile);
+
+      }
+      break;
     case DW_TAG_variable:
       if (pdi->locdesc)
 	addr = decode_locdesc (pdi->locdesc, cu);
@@ -3897,40 +3908,6 @@ add_partial_subprogram (struct partial_die_info *pdi,
 	    add_partial_subprogram (pdi, lowpc, highpc, need_pc, cu);
 	  pdi = pdi->die_sibling;
 	}
-    }
-}
-
-/* See if we can figure out if the class lives in a namespace.  We do
-   this by looking for a member function; its demangled name will
-   contain namespace info, if there is any.  */
-
-static void
-guess_structure_name (struct partial_die_info *struct_pdi,
-		      struct dwarf2_cu *cu)
-{
-  if ((cu->language == language_cplus
-       || cu->language == language_java)
-      && cu->has_namespace_info == 0
-      && struct_pdi->has_children)
-    {
-      /* NOTE: carlton/2003-10-07: Getting the info this way changes
-	 what template types look like, because the demangler
-	 frequently doesn't give the same name as the debug info.  We
-	 could fix this by only using the demangled name to get the
-	 prefix (but see comment in read_structure_type).  */
-
-      struct partial_die_info *real_pdi;
-
-      /* If this DIE (this DIE's specification, if any) has a parent, then
-	 we should not do this.  We'll prepend the parent's fully qualified
-         name when we create the partial symbol.  */
-
-      real_pdi = struct_pdi;
-      while (real_pdi->has_specification)
-	real_pdi = find_partial_die (real_pdi->spec_offset, cu);
-
-      if (real_pdi->die_parent != NULL)
-	return;
     }
 }
 
@@ -4599,6 +4576,7 @@ die_needs_namespace (struct die_info *die, struct dwarf2_cu *cu)
       return 1;
 
     case DW_TAG_variable:
+    case DW_TAG_constant:
       /* We only need to prefix "globally" visible variables.  These include
 	 any variable marked with DW_AT_external or any variable that
 	 lives in a namespace.  [Variables in anonymous namespaces
@@ -8567,6 +8545,7 @@ load_partial_dies (bfd *abfd, gdb_byte *buffer, gdb_byte *info_ptr,
 	 static members).  */
       if (!load_all
 	  && !is_type_tag_for_partial (abbrev->tag)
+	  && abbrev->tag != DW_TAG_constant
 	  && abbrev->tag != DW_TAG_enumerator
 	  && abbrev->tag != DW_TAG_subprogram
 	  && abbrev->tag != DW_TAG_lexical_block
@@ -8677,6 +8656,7 @@ load_partial_dies (bfd *abfd, gdb_byte *buffer, gdb_byte *info_ptr,
 	 unit with load_all_dies set.  */
 
       if (load_all
+	  || abbrev->tag == DW_TAG_constant
 	  || abbrev->tag == DW_TAG_subprogram
 	  || abbrev->tag == DW_TAG_variable
 	  || abbrev->tag == DW_TAG_namespace
@@ -8795,6 +8775,7 @@ read_partial_die (struct partial_die_info *part_die,
 	     one we see.  */
 	  if (cu->language == language_ada)
 	    part_die->name = DW_STRING (&attr);
+	  part_die->linkage_name = DW_STRING (&attr);
 	  break;
 	case DW_AT_low_pc:
 	  has_low_pc_attr = 1;
@@ -8978,6 +8959,57 @@ find_partial_die (unsigned int offset, struct dwarf2_cu *cu)
   return pd;
 }
 
+/* See if we can figure out if the class lives in a namespace.  We do
+   this by looking for a member function; its demangled name will
+   contain namespace info, if there is any.  */
+
+static void
+guess_partial_die_structure_name (struct partial_die_info *struct_pdi,
+				  struct dwarf2_cu *cu)
+{
+  /* NOTE: carlton/2003-10-07: Getting the info this way changes
+     what template types look like, because the demangler
+     frequently doesn't give the same name as the debug info.  We
+     could fix this by only using the demangled name to get the
+     prefix (but see comment in read_structure_type).  */
+
+  struct partial_die_info *real_pdi;
+  struct partial_die_info *child_pdi;
+
+  /* If this DIE (this DIE's specification, if any) has a parent, then
+     we should not do this.  We'll prepend the parent's fully qualified
+     name when we create the partial symbol.  */
+
+  real_pdi = struct_pdi;
+  while (real_pdi->has_specification)
+    real_pdi = find_partial_die (real_pdi->spec_offset, cu);
+
+  if (real_pdi->die_parent != NULL)
+    return;
+
+  for (child_pdi = struct_pdi->die_child;
+       child_pdi != NULL;
+       child_pdi = child_pdi->die_sibling)
+    {
+      if (child_pdi->tag == DW_TAG_subprogram
+	  && child_pdi->linkage_name != NULL)
+	{
+	  char *actual_class_name
+	    = language_class_name_from_physname (cu->language_defn,
+						 child_pdi->linkage_name);
+	  if (actual_class_name != NULL)
+	    {
+	      struct_pdi->name
+		= obsavestring (actual_class_name,
+				strlen (actual_class_name),
+				&cu->objfile->objfile_obstack);
+	      xfree (actual_class_name);
+	    }
+	  break;
+	}
+    }
+}
+
 /* Adjust PART_DIE before generating a symbol for it.  This function
    may set the is_external flag or change the DIE's name.  */
 
@@ -8985,6 +9017,12 @@ static void
 fixup_partial_die (struct partial_die_info *part_die,
 		   struct dwarf2_cu *cu)
 {
+  /* Once we've fixed up a die, there's no point in doing so again.
+     This also avoids a memory leak if we were to call
+     guess_partial_die_structure_name multiple times.  */
+  if (part_die->fixup_called)
+    return;
+
   /* If we found a reference attribute and the DIE has no name, try
      to find a name in the referred to DIE.  */
 
@@ -9011,10 +9049,21 @@ fixup_partial_die (struct partial_die_info *part_die,
   if (part_die->name == NULL && part_die->tag == DW_TAG_namespace)
     part_die->name = "(anonymous namespace)";
 
-  if (part_die->tag == DW_TAG_structure_type
-      || part_die->tag == DW_TAG_class_type
-      || part_die->tag == DW_TAG_union_type)
-    guess_structure_name (part_die, cu);
+  /* If there is no parent die to provide a namespace, and there are
+     children, see if we can determine the namespace from their linkage
+     name.
+     NOTE: We need to do this even if cu->has_namespace_info != 0.
+     gcc-4.5 -gdwarf-4 can drop the enclosing namespace.  */
+  if (cu->language == language_cplus
+      && dwarf2_per_objfile->types.asection != NULL
+      && part_die->die_parent == NULL
+      && part_die->has_children
+      && (part_die->tag == DW_TAG_class_type
+	  || part_die->tag == DW_TAG_structure_type
+	  || part_die->tag == DW_TAG_union_type))
+    guess_partial_die_structure_name (part_die, cu);
+
+  part_die->fixup_called = 1;
 }
 
 /* Read an attribute value described by an attribute form.  */
@@ -10583,6 +10632,7 @@ new_symbol_full (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
 	case DW_TAG_template_value_param:
 	  suppress_add = 1;
 	  /* Fall through.  */
+	case DW_TAG_constant:
 	case DW_TAG_variable:
 	case DW_TAG_member:
 	  /* Compilation with minimal debug info may result in variables
@@ -11257,6 +11307,77 @@ read_type_die_1 (struct die_info *die, struct dwarf2_cu *cu)
   return this_type;
 }
 
+/* See if we can figure out if the class lives in a namespace.  We do
+   this by looking for a member function; its demangled name will
+   contain namespace info, if there is any.
+   Return the computed name or NULL.
+   Space for the result is allocated on the objfile's obstack.
+   This is the full-die version of guess_partial_die_structure_name.
+   In this case we know DIE has no useful parent.  */
+
+static char *
+guess_full_die_structure_name (struct die_info *die, struct dwarf2_cu *cu)
+{
+  struct die_info *spec_die;
+  struct dwarf2_cu *spec_cu;
+  struct die_info *child;
+
+  spec_cu = cu;
+  spec_die = die_specification (die, &spec_cu);
+  if (spec_die != NULL)
+    {
+      die = spec_die;
+      cu = spec_cu;
+    }
+
+  for (child = die->child;
+       child != NULL;
+       child = child->sibling)
+    {
+      if (child->tag == DW_TAG_subprogram)
+	{
+	  struct attribute *attr;
+
+	  attr = dwarf2_attr (child, DW_AT_linkage_name, cu);
+	  if (attr == NULL)
+	    attr = dwarf2_attr (child, DW_AT_MIPS_linkage_name, cu);
+	  if (attr != NULL)
+	    {
+	      char *actual_name
+		= language_class_name_from_physname (cu->language_defn,
+						     DW_STRING (attr));
+	      char *name = NULL;
+
+	      if (actual_name != NULL)
+		{
+		  char *die_name = dwarf2_name (die, cu);
+
+		  if (die_name != NULL
+		      && strcmp (die_name, actual_name) != 0)
+		    {
+		      /* Strip off the class name from the full name.
+			 We want the prefix.  */
+		      int die_name_len = strlen (die_name);
+		      int actual_name_len = strlen (actual_name);
+
+		      /* Test for '::' as a sanity check.  */
+		      if (actual_name_len > die_name_len + 2
+			  && actual_name[actual_name_len - die_name_len - 1] == ':')
+			name =
+			  obsavestring (actual_name,
+					actual_name_len - die_name_len - 2,
+					&cu->objfile->objfile_obstack);
+		    }
+		}
+	      xfree (actual_name);
+	      return name;
+	    }
+	}
+    }
+
+  return NULL;
+}
+
 /* Return the name of the namespace/class that DIE is defined within,
    or "" if we can't tell.  The caller should not xfree the result.
 
@@ -11383,6 +11504,20 @@ determine_prefix (struct die_info *die, struct dwarf2_cu *cu)
 	     members; no typedefs, no member functions, et cetera.
 	     So it does not need a prefix.  */
 	  return "";
+      case DW_TAG_compile_unit:
+	/* gcc-4.5 -gdwarf-4 can drop the enclosing namespace.  Cope.  */
+	if (cu->language == language_cplus
+	    && dwarf2_per_objfile->types.asection != NULL
+	    && die->child != NULL
+	    && (die->tag == DW_TAG_class_type
+		|| die->tag == DW_TAG_structure_type
+		|| die->tag == DW_TAG_union_type))
+	  {
+	    char *name = guess_full_die_structure_name (die, cu);
+	    if (name != NULL)
+	      return name;
+	  }
+	return "";
       default:
 	return determine_prefix (parent, cu);
       }
@@ -14905,15 +15040,38 @@ add_address_entry (struct objfile *objfile,
 /* Add a list of partial symbols to SYMTAB.  */
 static void
 write_psymbols (struct mapped_symtab *symtab,
+		htab_t psyms_seen,
 		struct partial_symbol **psymp,
 		int count,
-		offset_type cu_index)
+		offset_type cu_index,
+		int is_static)
 {
   for (; count-- > 0; ++psymp)
     {
+      void **slot, *lookup;
+
       if (SYMBOL_LANGUAGE (*psymp) == language_ada)
 	error (_("Ada is not currently supported by the index"));
-      add_index_entry (symtab, SYMBOL_NATURAL_NAME (*psymp), cu_index);
+
+      /* We only want to add a given psymbol once.  However, we also
+	 want to account for whether it is global or static.  So, we
+	 may add it twice, using slightly different values.  */
+      if (is_static)
+	{
+	  uintptr_t val = 1 | (uintptr_t) *psymp;
+
+	  lookup = (void *) val;
+	}
+      else
+	lookup = *psymp;
+
+      /* Only add a given psymbol once.  */
+      slot = htab_find_slot (psyms_seen, lookup, INSERT);
+      if (!*slot)
+	{
+	  *slot = lookup;
+	  add_index_entry (symtab, SYMBOL_NATURAL_NAME (*psymp), cu_index);
+	}
     }
 }
 
@@ -14943,6 +15101,7 @@ struct signatured_type_index_data
   struct objfile *objfile;
   struct mapped_symtab *symtab;
   struct obstack *types_list;
+  htab_t psyms_seen;
   int cu_index;
 };
 
@@ -14958,11 +15117,15 @@ write_one_signatured_type (void **slot, void *d)
   gdb_byte val[8];
 
   write_psymbols (info->symtab,
+		  info->psyms_seen,
 		  info->objfile->global_psymbols.list + psymtab->globals_offset,
-		  psymtab->n_global_syms, info->cu_index);
+		  psymtab->n_global_syms, info->cu_index,
+		  0);
   write_psymbols (info->symtab,
+		  info->psyms_seen,
 		  info->objfile->static_psymbols.list + psymtab->statics_offset,
-		  psymtab->n_static_syms, info->cu_index);
+		  psymtab->n_static_syms, info->cu_index,
+		  1);
 
   store_unsigned_integer (val, 8, BFD_ENDIAN_LITTLE, entry->offset);
   obstack_grow (info->types_list, val, 8);
@@ -14974,6 +15137,14 @@ write_one_signatured_type (void **slot, void *d)
   ++info->cu_index;
 
   return 1;
+}
+
+/* A cleanup function for an htab_t.  */
+
+static void
+cleanup_htab (void *arg)
+{
+  htab_delete (arg);
 }
 
 /* Create an index file for OBJFILE in the directory DIR.  */
@@ -14990,6 +15161,7 @@ write_psymtabs_to_index (struct objfile *objfile, const char *dir)
   offset_type val, size_of_contents, total_len;
   struct stat st;
   char buf[8];
+  htab_t psyms_seen;
 
   if (!objfile->psymtabs)
     return;
@@ -15022,6 +15194,10 @@ write_psymtabs_to_index (struct objfile *objfile, const char *dir)
   obstack_init (&types_cu_list);
   make_cleanup_obstack_free (&types_cu_list);
 
+  psyms_seen = htab_create_alloc (100, htab_hash_pointer, htab_eq_pointer,
+				  NULL, xcalloc, xfree);
+  make_cleanup (cleanup_htab, psyms_seen);
+
   /* The list is already sorted, so we don't need to do additional
      work here.  Also, the debug_types entries do not appear in
      all_comp_units, but only in their own hash table.  */
@@ -15032,11 +15208,15 @@ write_psymtabs_to_index (struct objfile *objfile, const char *dir)
       gdb_byte val[8];
 
       write_psymbols (symtab,
+		      psyms_seen,
 		      objfile->global_psymbols.list + psymtab->globals_offset,
-		      psymtab->n_global_syms, i);
+		      psymtab->n_global_syms, i,
+		      0);
       write_psymbols (symtab,
+		      psyms_seen,
 		      objfile->static_psymbols.list + psymtab->statics_offset,
-		      psymtab->n_static_syms, i);
+		      psymtab->n_static_syms, i,
+		      1);
 
       add_address_entry (objfile, &addr_obstack, psymtab, i);
 
@@ -15054,6 +15234,7 @@ write_psymtabs_to_index (struct objfile *objfile, const char *dir)
       sig_data.objfile = objfile;
       sig_data.symtab = symtab;
       sig_data.types_list = &types_cu_list;
+      sig_data.psyms_seen = psyms_seen;
       sig_data.cu_index = dwarf2_per_objfile->n_comp_units;
       htab_traverse_noresize (dwarf2_per_objfile->signatured_types,
 			      write_one_signatured_type, &sig_data);
@@ -15071,7 +15252,7 @@ write_psymtabs_to_index (struct objfile *objfile, const char *dir)
   total_len = size_of_contents;
 
   /* The version number.  */
-  val = MAYBE_SWAP (2);
+  val = MAYBE_SWAP (3);
   obstack_grow (&contents, &val, sizeof (val));
 
   /* The offset of the CU list from the start of the file.  */
@@ -15128,18 +15309,16 @@ write_psymtabs_to_index (struct objfile *objfile, const char *dir)
 
    1. The file header.  This is a sequence of values, of offset_type
    unless otherwise noted:
-   [0] The version number.  Currently 1 or 2.  The differences are
-   noted below.  Version 1 did not account for .debug_types sections;
-   the presence of a .debug_types section invalidates any version 1
-   index that may exist.
+
+   [0] The version number, currently 3.  Versions 1 and 2 are
+   obsolete.
    [1] The offset, from the start of the file, of the CU list.
-   [1.5] In version 2, the offset, from the start of the file, of the
-   types CU list.  This offset does not appear in version 1.  Note
-   that this can be empty, in which case this offset will be equal to
-   the next offset.
-   [2] The offset, from the start of the file, of the address section.
-   [3] The offset, from the start of the file, of the symbol table.
-   [4] The offset, from the start of the file, of the constant pool.
+   [2] The offset, from the start of the file, of the types CU list.
+   Note that this section can be empty, in which case this offset will
+   be equal to the next offset.
+   [3] The offset, from the start of the file, of the address section.
+   [4] The offset, from the start of the file, of the symbol table.
+   [5] The offset, from the start of the file, of the constant pool.
 
    2. The CU list.  This is a sequence of pairs of 64-bit
    little-endian values, sorted by the CU offset.  The first element
@@ -15150,19 +15329,19 @@ write_psymtabs_to_index (struct objfile *objfile, const char *dir)
    type CUs, then conceptually CUs and type CUs form a single list for
    the purposes of CU indices.
 
-   2.5 The types CU list.  This does not appear in a version 1 index.
-   This is a sequence of triplets of 64-bit little-endian values.  In
-   a triplet, the first value is the CU offset, the second value is
-   the type offset in the CU, and the third value is the type
-   signature.  The types CU list is not sorted.
+   3. The types CU list.  This is a sequence of triplets of 64-bit
+   little-endian values.  In a triplet, the first value is the CU
+   offset, the second value is the type offset in the CU, and the
+   third value is the type signature.  The types CU list is not
+   sorted.
 
-   3. The address section.  The address section consists of a sequence
+   4. The address section.  The address section consists of a sequence
    of address entries.  Each address entry has three elements.
    [0] The low address.  This is a 64-bit little-endian value.
    [1] The high address.  This is a 64-bit little-endian value.
    [2] The CU index.  This is an offset_type value.
 
-   4. The symbol table.  This is a hash table.  The size of the hash
+   5. The symbol table.  This is a hash table.  The size of the hash
    table is always a power of 2.  The initial hash and the step are
    currently defined by the `find_slot' function.
 
@@ -15184,7 +15363,7 @@ write_psymtabs_to_index (struct objfile *objfile, const char *dir)
    element in the hash table is used to indicate which CUs define the
    symbol.
 
-   5. The constant pool.  This is simply a bunch of bytes.  It is
+   6. The constant pool.  This is simply a bunch of bytes.  It is
    organized so that alignment is correct: CU vectors are stored
    first, followed by strings.  */
 static void
