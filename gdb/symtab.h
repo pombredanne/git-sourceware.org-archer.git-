@@ -153,8 +153,6 @@ struct general_symbol_info
   struct obj_section *obj_section;
 };
 
-extern CORE_ADDR symbol_overlayed_address (CORE_ADDR, struct obj_section *);
-
 /* Note that all the following SYMBOL_* macros are used with the
    SYMBOL argument being either a partial symbol, a minimal symbol or
    a full symbol.  All three types have a ginfo field.  In particular
@@ -164,7 +162,6 @@ extern CORE_ADDR symbol_overlayed_address (CORE_ADDR, struct obj_section *);
    field only, instead of the SYMBOL parameter.  */
 
 #define SYMBOL_VALUE(symbol)		(symbol)->ginfo.value.ivalue
-#define SYMBOL_VALUE_ADDRESS(symbol)	((symbol)->ginfo.value.address + 0)
 #define SYMBOL_VALUE_BYTES(symbol)	(symbol)->ginfo.value.bytes
 #define SYMBOL_BLOCK_VALUE(symbol)	(symbol)->ginfo.value.block
 #define SYMBOL_VALUE_CHAIN(symbol)	(symbol)->ginfo.value.chain
@@ -172,8 +169,16 @@ extern CORE_ADDR symbol_overlayed_address (CORE_ADDR, struct obj_section *);
 #define SYMBOL_SECTION(symbol)		(symbol)->ginfo.section
 #define SYMBOL_OBJ_SECTION(symbol)	(symbol)->ginfo.obj_section
 
+#define SYMBOL_VALUE_ADDRESS(symbol)	\
+  get_symbol_value_address (&(symbol)->ginfo)
+extern CORE_ADDR get_symbol_value_address (const struct general_symbol_info *);
+
 #define SET_SYMBOL_VALUE_ADDRESS(SYMBOL, VALUE) \
   ((SYMBOL)->ginfo.value.address = (VALUE))
+
+/* Return the untranslated address of the symbol.  */
+#define SYMBOL_VALUE_RAW_ADDRESS(symbol) \
+  ((symbol)->ginfo.value.address + 0)
 
 /* Initializes the language dependent portion of a symbol
    depending upon the language for the symbol. */

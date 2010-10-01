@@ -256,6 +256,14 @@ got_symtab:
   goto got_symtab;
 }
 
+
+CORE_ADDR
+get_symbol_value_address (const struct general_symbol_info *ginfo)
+{
+  return ginfo->value.address;
+}
+
+
 /* Mangle a GDB method stub type.  This actually reassembles the pieces of the
    full method name, which consist of the class name (from T), the unadorned
    method name from METHOD_ID, and the signature for the specific overload,

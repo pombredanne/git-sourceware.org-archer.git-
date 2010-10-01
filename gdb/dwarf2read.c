@@ -8707,7 +8707,7 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
       SYMBOL_CLASS (sym) = LOC_STATIC;
       fixup_symbol_section (sym, objfile);
       SET_SYMBOL_VALUE_ADDRESS (sym,
-				SYMBOL_VALUE_ADDRESS (sym)
+				SYMBOL_VALUE_RAW_ADDRESS (sym)
 				+ ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile),
 					    SYMBOL_SECTION (sym)));
       return;

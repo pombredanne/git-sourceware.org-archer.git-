@@ -1166,7 +1166,7 @@ define_symbol (CORE_ADDR valu, char *string, int desc, int type,
 		(gdbarch, SYMBOL_LINKAGE_NAME (sym));
 
 	      SYMBOL_SET_LINKAGE_NAME (sym, new_name);
-	      SET_SYMBOL_VALUE_ADDRESS (sym, SYMBOL_VALUE_ADDRESS (msym));
+	      SET_SYMBOL_VALUE_ADDRESS (sym, SYMBOL_VALUE_RAW_ADDRESS (msym));
 	    }
 	}
       SYMBOL_DOMAIN (sym) = VAR_DOMAIN;
@@ -1356,7 +1356,7 @@ define_symbol (CORE_ADDR valu, char *string, int desc, int type,
 		(gdbarch, SYMBOL_LINKAGE_NAME (sym));
 
 	      SYMBOL_SET_LINKAGE_NAME (sym, new_name);
-	      SET_SYMBOL_VALUE_ADDRESS (sym, SYMBOL_VALUE_ADDRESS (msym));
+	      SET_SYMBOL_VALUE_ADDRESS (sym, SYMBOL_VALUE_RAW_ADDRESS (msym));
 	    }
 	}
       SYMBOL_DOMAIN (sym) = VAR_DOMAIN;
@@ -4377,7 +4377,7 @@ fix_common_block (struct symbol *sym, int valu)
 
       for (j = next->nsyms - 1; j >= 0; j--)
 	SET_SYMBOL_VALUE_ADDRESS (next->symbol[j],
-				  SYMBOL_VALUE_ADDRESS (next->symbol[j])
+				  SYMBOL_VALUE_RAW_ADDRESS (next->symbol[j])
 				  + valu);
     }
 }
@@ -4655,12 +4655,12 @@ scan_file_globals (struct objfile *objfile)
 		      if (SYMBOL_CLASS (sym) == LOC_BLOCK)
 			{
 			  fix_common_block (sym,
-					    SYMBOL_VALUE_ADDRESS (msymbol));
+					    SYMBOL_VALUE_RAW_ADDRESS (msymbol));
 			}
 		      else
 			{
 			  SET_SYMBOL_VALUE_ADDRESS (sym,
-						    SYMBOL_VALUE_ADDRESS (msymbol));
+						    SYMBOL_VALUE_RAW_ADDRESS (msymbol));
 			}
 		      SYMBOL_SECTION (sym) = SYMBOL_SECTION (msymbol);
 		    }

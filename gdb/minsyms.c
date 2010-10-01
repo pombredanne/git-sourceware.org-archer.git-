@@ -523,14 +523,14 @@ lookup_minimal_symbol_by_pc_section_1 (CORE_ADDR pc,
 	     Warning: this code is trickier than it would appear at first. */
 
 	  /* Should also require that pc is <= end of objfile.  FIXME! */
-	  if (pc >= SYMBOL_VALUE_ADDRESS (&msymbol[lo]))
+	  if (pc >= SYMBOL_VALUE_RAW_ADDRESS (&msymbol[lo]))
 	    {
-	      while (SYMBOL_VALUE_ADDRESS (&msymbol[hi]) > pc)
+	      while (SYMBOL_VALUE_RAW_ADDRESS (&msymbol[hi]) > pc)
 		{
 		  /* pc is still strictly less than highest address */
 		  /* Note "new" will always be >= lo */
 		  new = (lo + hi) / 2;
-		  if ((SYMBOL_VALUE_ADDRESS (&msymbol[new]) >= pc) ||
+		  if ((SYMBOL_VALUE_RAW_ADDRESS (&msymbol[new]) >= pc) ||
 		      (lo == new))
 		    {
 		      hi = new;
@@ -545,8 +545,8 @@ lookup_minimal_symbol_by_pc_section_1 (CORE_ADDR pc,
 	         hi to point to the last one.  That way we can find the
 	         right symbol if it has an index greater than hi.  */
 	      while (hi < OBJFILE_MINIMAL_SYMBOL_COUNT (objfile) - 1
-		     && (SYMBOL_VALUE_ADDRESS (&msymbol[hi])
-			 == SYMBOL_VALUE_ADDRESS (&msymbol[hi + 1])))
+		     && (SYMBOL_VALUE_RAW_ADDRESS (&msymbol[hi])
+			 == SYMBOL_VALUE_RAW_ADDRESS (&msymbol[hi + 1])))
 		hi++;
 
 	      /* Skip various undesirable symbols.  */
@@ -593,8 +593,8 @@ lookup_minimal_symbol_by_pc_section_1 (CORE_ADDR pc,
 		      && MSYMBOL_TYPE (&msymbol[hi - 1]) == want_type
 		      && (MSYMBOL_SIZE (&msymbol[hi])
 			  == MSYMBOL_SIZE (&msymbol[hi - 1]))
-		      && (SYMBOL_VALUE_ADDRESS (&msymbol[hi])
-			  == SYMBOL_VALUE_ADDRESS (&msymbol[hi - 1]))
+		      && (SYMBOL_VALUE_RAW_ADDRESS (&msymbol[hi])
+			  == SYMBOL_VALUE_RAW_ADDRESS (&msymbol[hi - 1]))
 		      && (SYMBOL_OBJ_SECTION (&msymbol[hi])
 			  == SYMBOL_OBJ_SECTION (&msymbol[hi - 1])))
 		    {
@@ -623,9 +623,9 @@ lookup_minimal_symbol_by_pc_section_1 (CORE_ADDR pc,
 		     the cancellable variants, but both have sizes.  */
 		  if (hi > 0
 		      && MSYMBOL_SIZE (&msymbol[hi]) != 0
-		      && pc >= (SYMBOL_VALUE_ADDRESS (&msymbol[hi])
+		      && pc >= (SYMBOL_VALUE_RAW_ADDRESS (&msymbol[hi])
 				+ MSYMBOL_SIZE (&msymbol[hi]))
-		      && pc < (SYMBOL_VALUE_ADDRESS (&msymbol[hi - 1])
+		      && pc < (SYMBOL_VALUE_RAW_ADDRESS (&msymbol[hi - 1])
 			       + MSYMBOL_SIZE (&msymbol[hi - 1])))
 		    {
 		      hi--;
@@ -655,7 +655,7 @@ lookup_minimal_symbol_by_pc_section_1 (CORE_ADDR pc,
 
 	      if (hi >= 0
 		  && MSYMBOL_SIZE (&msymbol[hi]) != 0
-		  && pc >= (SYMBOL_VALUE_ADDRESS (&msymbol[hi])
+		  && pc >= (SYMBOL_VALUE_RAW_ADDRESS (&msymbol[hi])
 			    + MSYMBOL_SIZE (&msymbol[hi])))
 		{
 		  if (best_zero_sized != -1)
@@ -671,8 +671,8 @@ lookup_minimal_symbol_by_pc_section_1 (CORE_ADDR pc,
 
 	      if (hi >= 0
 		  && ((best_symbol == NULL) ||
-		      (SYMBOL_VALUE_ADDRESS (best_symbol) <
-		       SYMBOL_VALUE_ADDRESS (&msymbol[hi]))))
+		      (SYMBOL_VALUE_RAW_ADDRESS (best_symbol) <
+		       SYMBOL_VALUE_RAW_ADDRESS (&msymbol[hi]))))
 		{
 		  best_symbol = &msymbol[hi];
 		}
@@ -903,11 +903,11 @@ compare_minimal_symbols (const void *fn1p, const void *fn2p)
   fn1 = (const struct minimal_symbol *) fn1p;
   fn2 = (const struct minimal_symbol *) fn2p;
 
-  if (SYMBOL_VALUE_ADDRESS (fn1) < SYMBOL_VALUE_ADDRESS (fn2))
+  if (SYMBOL_VALUE_RAW_ADDRESS (fn1) < SYMBOL_VALUE_RAW_ADDRESS (fn2))
     {
       return (-1);		/* addr 1 is less than addr 2 */
     }
-  else if (SYMBOL_VALUE_ADDRESS (fn1) > SYMBOL_VALUE_ADDRESS (fn2))
+  else if (SYMBOL_VALUE_RAW_ADDRESS (fn1) > SYMBOL_VALUE_RAW_ADDRESS (fn2))
     {
       return (1);		/* addr 1 is greater than addr 2 */
     }
@@ -1005,8 +1005,8 @@ compact_minimal_symbols (struct minimal_symbol *msymbol, int mcount,
       copyfrom = copyto = msymbol;
       while (copyfrom < msymbol + mcount - 1)
 	{
-	  if (SYMBOL_VALUE_ADDRESS (copyfrom)
-	      == SYMBOL_VALUE_ADDRESS ((copyfrom + 1))
+	  if (SYMBOL_VALUE_RAW_ADDRESS (copyfrom)
+	      == SYMBOL_VALUE_RAW_ADDRESS ((copyfrom + 1))
 	      && strcmp (SYMBOL_LINKAGE_NAME (copyfrom),
 			 SYMBOL_LINKAGE_NAME ((copyfrom + 1))) == 0)
 	    {
