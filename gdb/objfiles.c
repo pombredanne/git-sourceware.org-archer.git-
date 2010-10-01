@@ -778,10 +778,6 @@ objfile_relocate1 (struct objfile *objfile,
     }
   }
 
-  if (OBJFILE_PSYMTABS_ADDRMAP (objfile))
-    addrmap_relocate (OBJFILE_PSYMTABS_ADDRMAP (objfile),
-		      ANOFFSET (delta, SECT_OFF_TEXT (objfile)));
-
   if (OBJFILE_SF (objfile))
     OBJFILE_SF (objfile)->qf->relocate (objfile, new_offsets, delta);
 

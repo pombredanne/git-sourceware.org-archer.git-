@@ -1909,8 +1909,7 @@ process_psymtab_comp_unit (struct objfile *objfile,
     /* Store the contiguous range if it is not empty; it can be empty for
        CUs with no code.  */
     addrmap_set_empty (OBJFILE_PSYMTABS_ADDRMAP (objfile),
-		       best_lowpc + baseaddr,
-		       best_highpc + baseaddr - 1, pst);
+		       best_lowpc, best_highpc - 1, pst);
 
   /* Check if comp unit has_children.
      If so, read the rest of the partial symbols from this comp unit.
@@ -2604,17 +2603,10 @@ add_partial_subprogram (struct partial_die_info *pdi,
           if (pdi->highpc > *highpc)
             *highpc = pdi->highpc;
 	  if (need_pc)
-	    {
-	      CORE_ADDR baseaddr;
-	      struct objfile *objfile = cu->objfile;
-
-	      baseaddr = ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile),
-				   SECT_OFF_TEXT (objfile));
-	      addrmap_set_empty (OBJFILE_PSYMTABS_ADDRMAP (objfile),
-				 pdi->lowpc + baseaddr,
-				 pdi->highpc - 1 + baseaddr,
-				 cu->per_cu->psymtab);
-	    }
+	    addrmap_set_empty (OBJFILE_PSYMTABS_ADDRMAP (cu->objfile),
+			       pdi->lowpc,
+			       pdi->highpc - 1,
+			       cu->per_cu->psymtab);
           if (!pdi->is_declaration)
 	    /* Ignore subprogram DIEs that do not have a name, they are
 	       illegal.  Do not emit a complaint at this point, we will
@@ -4119,7 +4111,6 @@ dwarf2_ranges_read (unsigned offset, CORE_ADDR *low_return,
   int low_set;
   CORE_ADDR low = 0;
   CORE_ADDR high = 0;
-  CORE_ADDR baseaddr;
 
   found_base = cu->base_known;
   base = cu->base_address;
@@ -4147,8 +4138,6 @@ dwarf2_ranges_read (unsigned offset, CORE_ADDR *low_return,
     }
 
   low_set = 0;
-
-  baseaddr = ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
 
   while (1)
     {
@@ -4191,7 +4180,7 @@ dwarf2_ranges_read (unsigned offset, CORE_ADDR *low_return,
 
       if (ranges_pst != NULL && range_beginning < range_end)
 	addrmap_set_empty (OBJFILE_PSYMTABS_ADDRMAP (objfile),
-			   range_beginning + baseaddr, range_end - 1 + baseaddr,
+			   range_beginning, range_end - 1,
 			   ranges_pst);
 
       /* FIXME: This is recording everything as a low-high

@@ -227,7 +227,13 @@ find_pc_sect_psymtab (struct objfile *objfile, CORE_ADDR pc,
 
   if (OBJFILE_PSYMTABS_ADDRMAP (objfile) != NULL)
     {
-      pst = addrmap_find (OBJFILE_PSYMTABS_ADDRMAP (objfile), pc);
+      CORE_ADDR baseaddr, uncooked_pc;
+
+      baseaddr = ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile),
+			   SECT_OFF_TEXT (objfile));
+      uncooked_pc = pc - baseaddr;
+
+      pst = addrmap_find (OBJFILE_PSYMTABS_ADDRMAP (objfile), uncooked_pc);
       if (pst != NULL)
 	{
 	  /* FIXME: addrmaps currently do not handle overlayed sections,
