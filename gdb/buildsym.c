@@ -321,7 +321,7 @@ finish_block (struct symbol *symbol, struct pending **listhead,
   /* Check to be sure that the blocks have an end address that is
      greater than starting address */
 
-  if (BLOCK_END (block) < BLOCK_START (block))
+  if (BLOCK_RAW_END (block) < BLOCK_RAW_START (block))
     {
       if (symbol)
 	{
@@ -333,11 +333,11 @@ finish_block (struct symbol *symbol, struct pending **listhead,
 	{
 	  complaint (&symfile_complaints,
 		     _("block end address %s less than block start address %s (patched it)"),
-		     paddress (gdbarch, BLOCK_END (block)),
-		     paddress (gdbarch, BLOCK_START (block)));
+		     paddress (gdbarch, BLOCK_RAW_END (block)),
+		     paddress (gdbarch, BLOCK_RAW_START (block)));
 	}
       /* Better than nothing */
-      SET_BLOCK_END (block, BLOCK_START (block));
+      SET_BLOCK_END (block, BLOCK_RAW_START (block));
     }
 
   /* Install this block as the superblock of all blocks made since the
@@ -358,7 +358,7 @@ finish_block (struct symbol *symbol, struct pending **listhead,
 	     physically nested inside this other blocks, only
 	     lexically nested.  */
 	  if (BLOCK_FUNCTION (pblock->block) == NULL
-	      && (BLOCK_START (pblock->block) < BLOCK_START (block)
+	      && (BLOCK_RAW_START (pblock->block) < BLOCK_RAW_START (block)
 		  || BLOCK_END (pblock->block) > BLOCK_END (block)))
 	    {
 	      if (symbol)
@@ -371,13 +371,13 @@ finish_block (struct symbol *symbol, struct pending **listhead,
 		{
 		  complaint (&symfile_complaints,
 			     _("inner block (%s-%s) not inside outer block (%s-%s)"),
-			     paddress (gdbarch, BLOCK_START (pblock->block)),
+			     paddress (gdbarch, BLOCK_RAW_START (pblock->block)),
 			     paddress (gdbarch, BLOCK_END (pblock->block)),
-			     paddress (gdbarch, BLOCK_START (block)),
+			     paddress (gdbarch, BLOCK_RAW_START (block)),
 			     paddress (gdbarch, BLOCK_END (block)));
 		}
-	      if (BLOCK_START (pblock->block) < BLOCK_START (block))
-		SET_BLOCK_START (pblock->block, BLOCK_START (block));
+	      if (BLOCK_RAW_START (pblock->block) < BLOCK_RAW_START (block))
+		SET_BLOCK_START (pblock->block, BLOCK_RAW_START (block));
 	      if (BLOCK_END (pblock->block) > BLOCK_END (block))
 		SET_BLOCK_END (pblock->block, BLOCK_END (block));
 	    }
@@ -430,18 +430,18 @@ record_pending_block (struct objfile *objfile, struct block *block,
    BLOCK's children before applying it to BLOCK.
 
    If a call to this function complicates the picture beyond that
-   already provided by BLOCK_START and BLOCK_END, then we create an
+   already provided by BLOCK_RAW_START and BLOCK_END, then we create an
    address map for the block.  */
 void
 record_block_range (struct block *block,
                     CORE_ADDR start, CORE_ADDR end_inclusive)
 {
   /* If this is any different from the range recorded in the block's
-     own BLOCK_START and BLOCK_END, then note that the address map has
+     own BLOCK_RAW_START and BLOCK_END, then note that the address map has
      become interesting.  Note that even if this block doesn't have
      any "interesting" ranges, some later block might, so we still
      need to record this block in the addrmap.  */
-  if (start != BLOCK_START (block)
+  if (start != BLOCK_RAW_START (block)
       || end_inclusive + 1 != BLOCK_END (block))
     pending_addrmap_interesting = 1;
 
@@ -502,11 +502,11 @@ make_blockvector (struct objfile *objfile)
     {
       for (i = 1; i < BLOCKVECTOR_NBLOCKS (blockvector); i++)
 	{
-	  if (BLOCK_START (BLOCKVECTOR_BLOCK (blockvector, i - 1))
-	      > BLOCK_START (BLOCKVECTOR_BLOCK (blockvector, i)))
+	  if (BLOCK_RAW_START (BLOCKVECTOR_BLOCK (blockvector, i - 1))
+	      > BLOCK_RAW_START (BLOCKVECTOR_BLOCK (blockvector, i)))
 	    {
 	      CORE_ADDR start
-		= BLOCK_START (BLOCKVECTOR_BLOCK (blockvector, i));
+		= BLOCK_RAW_START (BLOCKVECTOR_BLOCK (blockvector, i));
 
 	      complaint (&symfile_complaints, _("block at %s out of order"),
 			 hex_string ((LONGEST) start));
@@ -901,7 +901,7 @@ watch_main_source_file_lossage (void)
 }
 
 /* Helper function for qsort.  Parametes are `struct block *' pointers,
-   function sorts them in descending order by their BLOCK_START.  */
+   function sorts them in descending order by their BLOCK_RAW_START.  */
 
 static int
 block_compar (const void *ap, const void *bp)
@@ -909,8 +909,8 @@ block_compar (const void *ap, const void *bp)
   const struct block *a = *(const struct block **) ap;
   const struct block *b = *(const struct block **) bp;
 
-  return ((BLOCK_START (b) > BLOCK_START (a))
-	  - (BLOCK_START (b) < BLOCK_START (a)));
+  return ((BLOCK_RAW_START (b) > BLOCK_RAW_START (a))
+	  - (BLOCK_RAW_START (b) < BLOCK_RAW_START (a)));
 }
 
 /* Finish the symbol definitions for one main source file, close off

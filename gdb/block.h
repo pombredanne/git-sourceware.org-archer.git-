@@ -105,6 +105,9 @@ struct block
 #define BLOCK_DICT(bl)		(bl)->dict
 #define BLOCK_NAMESPACE(bl)   (bl)->language_specific.cplus_specific.namespace
 
+#define BLOCK_RAW_START(bl)	((bl)->startaddr + 0)
+#define BLOCK_RAW_END(bl)	((bl)->endaddr + 0)
+
 #define SET_BLOCK_START(bl, start) ((bl)->startaddr = (start))
 #define SET_BLOCK_END(bl, end) ((bl)->endaddr = (end))
 

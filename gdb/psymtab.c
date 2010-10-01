@@ -1709,7 +1709,7 @@ maintenance_check_symtabs (char *ignore, int from_tty)
       }
     if (ps->texthigh == 0)
       continue;
-    if (ps->textlow < BLOCK_START (b) || ps->texthigh > BLOCK_END (b))
+    if (ps->textlow < BLOCK_RAW_START (b) || ps->texthigh > BLOCK_RAW_END (b))
       {
 	printf_filtered ("Psymtab ");
 	puts_filtered (ps->filename);
@@ -1718,9 +1718,9 @@ maintenance_check_symtabs (char *ignore, int from_tty)
 	printf_filtered (" - ");
 	fputs_filtered (paddress (gdbarch, ps->texthigh), gdb_stdout);
 	printf_filtered (" but symtab covers only ");
-	fputs_filtered (paddress (gdbarch, BLOCK_START (b)), gdb_stdout);
+	fputs_filtered (paddress (gdbarch, BLOCK_RAW_START (b)), gdb_stdout);
 	printf_filtered (" - ");
-	fputs_filtered (paddress (gdbarch, BLOCK_END (b)), gdb_stdout);
+	fputs_filtered (paddress (gdbarch, BLOCK_RAW_END (b)), gdb_stdout);
 	printf_filtered ("\n");
       }
   }

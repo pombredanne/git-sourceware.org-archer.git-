@@ -374,9 +374,9 @@ dump_symtab_1 (struct objfile *objfile, struct symtab *symtab,
 	     wants it.  */
 	  fprintf_filtered (outfile, ", %d syms/buckets in ",
 			    dict_size (BLOCK_DICT (b)));
-	  fputs_filtered (paddress (gdbarch, BLOCK_START (b)), outfile);
+	  fputs_filtered (paddress (gdbarch, BLOCK_RAW_START (b)), outfile);
 	  fprintf_filtered (outfile, "..");
-	  fputs_filtered (paddress (gdbarch, BLOCK_END (b)), outfile);
+	  fputs_filtered (paddress (gdbarch, BLOCK_RAW_END (b)), outfile);
 	  if (BLOCK_FUNCTION (b))
 	    {
 	      fprintf_filtered (outfile, ", function %s",

@@ -137,7 +137,7 @@ blockvector_for_pc_sect (CORE_ADDR pc, struct obj_section *section,
     {
       half = (top - bot + 1) >> 1;
       b = BLOCKVECTOR_BLOCK (bl, bot + half);
-      if (BLOCK_START (b) <= pc)
+      if (BLOCK_RAW_START (b) <= pc)
 	bot += half;
       else
 	top = bot + half;
@@ -148,7 +148,7 @@ blockvector_for_pc_sect (CORE_ADDR pc, struct obj_section *section,
   while (bot >= 0)
     {
       b = BLOCKVECTOR_BLOCK (bl, bot);
-      if (BLOCK_END (b) > pc)
+      if (BLOCK_RAW_END (b) > pc)
 	{
 	  if (pblock)
 	    *pblock = b;

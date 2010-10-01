@@ -1162,11 +1162,11 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
 	      struct block *b_bad = BLOCKVECTOR_BLOCK (bv, i);
 
 	      if (BLOCK_SUPERBLOCK (b_bad) == b
-		  && BLOCK_START (b_bad) == top_stack->procadr
-		  && BLOCK_END (b_bad) == top_stack->procadr)
+		  && BLOCK_RAW_START (b_bad) == top_stack->procadr
+		  && BLOCK_RAW_END (b_bad) == top_stack->procadr)
 		{
-		  SET_BLOCK_START (b_bad, BLOCK_START (b));
-		  SET_BLOCK_END (b_bad, BLOCK_END (b));
+		  SET_BLOCK_START (b_bad, BLOCK_RAW_START (b));
+		  SET_BLOCK_END (b_bad, BLOCK_RAW_END (b));
 		}
 	    }
 
@@ -4615,9 +4615,9 @@ compare_blocks (const void *arg1, const void *arg2)
   struct block **b1 = (struct block **) arg1;
   struct block **b2 = (struct block **) arg2;
 
-  addr_diff = (BLOCK_START ((*b1))) - (BLOCK_START ((*b2)));
+  addr_diff = (BLOCK_RAW_START ((*b1))) - (BLOCK_RAW_START ((*b2)));
   if (addr_diff == 0)
-    return (BLOCK_END ((*b2))) - (BLOCK_END ((*b1)));
+    return (BLOCK_RAW_END ((*b2))) - (BLOCK_RAW_END ((*b1)));
   return addr_diff;
 }
 
@@ -4633,9 +4633,9 @@ sort_blocks (struct symtab *s)
   if (BLOCKVECTOR_NBLOCKS (bv) <= 2)
     {
       /* Cosmetic */
-      if (BLOCK_END (BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK)) == 0)
+      if (BLOCK_RAW_END (BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK)) == 0)
 	SET_BLOCK_START (BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK), 0);
-      if (BLOCK_END (BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK)) == 0)
+      if (BLOCK_RAW_END (BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK)) == 0)
 	SET_BLOCK_START (BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK), 0);
       return;
     }
@@ -4662,12 +4662,12 @@ sort_blocks (struct symtab *s)
   }
 
   SET_BLOCK_START (BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK),
-		   BLOCK_START (BLOCKVECTOR_BLOCK (bv, FIRST_LOCAL_BLOCK)));
+		   BLOCK_RAW_START (BLOCKVECTOR_BLOCK (bv, FIRST_LOCAL_BLOCK)));
 
   SET_BLOCK_START (BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK),
-		   BLOCK_START (BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK)));
+		   BLOCK_RAW_START (BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK)));
   SET_BLOCK_END (BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK),
-		 BLOCK_END (BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK)));
+		 BLOCK_RAW_END (BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK)));
 }
 
 
