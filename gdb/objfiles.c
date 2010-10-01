@@ -751,8 +751,10 @@ objfile_relocate1 (struct objfile *objfile,
 	  struct dict_iterator iter;
 
 	  b = BLOCKVECTOR_BLOCK (bv, i);
-	  BLOCK_START (b) += ANOFFSET (delta, s->block_line_section);
-	  BLOCK_END (b) += ANOFFSET (delta, s->block_line_section);
+	  SET_BLOCK_START (b, (BLOCK_START (b)
+			       + ANOFFSET (delta, s->block_line_section)));
+	  SET_BLOCK_END (b, (BLOCK_END (b)
+			     + ANOFFSET (delta, s->block_line_section)));
 
 	  ALL_BLOCK_SYMBOLS (b, iter, sym)
 	    {

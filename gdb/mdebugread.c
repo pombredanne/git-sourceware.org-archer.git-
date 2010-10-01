@@ -781,7 +781,8 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
       b = new_block (FUNCTION_BLOCK);
       SYMBOL_BLOCK_VALUE (s) = b;
       BLOCK_FUNCTION (b) = s;
-      BLOCK_START (b) = BLOCK_END (b) = sh->value;
+      SET_BLOCK_START (b, sh->value);
+      SET_BLOCK_END (b, sh->value);
       BLOCK_SUPERBLOCK (b) = top_stack->cur_block;
       add_block (b, top_stack->cur_st);
 
@@ -1113,7 +1114,7 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
 
       top_stack->blocktype = stBlock;
       b = new_block (NON_FUNCTION_BLOCK);
-      BLOCK_START (b) = sh->value + top_stack->procadr;
+      SET_BLOCK_START (b, sh->value + top_stack->procadr);
       BLOCK_SUPERBLOCK (b) = top_stack->cur_block;
       top_stack->cur_block = b;
       add_block (b, top_stack->cur_st);
@@ -1136,7 +1137,9 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
 	  struct type *ftype = top_stack->cur_type;
 	  int i;
 
-	  BLOCK_END (top_stack->cur_block) += sh->value;	/* size */
+	  SET_BLOCK_END (top_stack->cur_block,
+			 BLOCK_END (top_stack->cur_block)
+			 + sh->value);	/* size */
 
 	  /* Make up special symbol to contain procedure specific info */
 	  s = new_symbol (MDEBUG_EFI_SYMBOL_NAME);
@@ -1162,8 +1165,8 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
 		  && BLOCK_START (b_bad) == top_stack->procadr
 		  && BLOCK_END (b_bad) == top_stack->procadr)
 		{
-		  BLOCK_START (b_bad) = BLOCK_START (b);
-		  BLOCK_END (b_bad) = BLOCK_END (b);
+		  SET_BLOCK_START (b_bad, BLOCK_START (b));
+		  SET_BLOCK_END (b_bad, BLOCK_END (b));
 		}
 	    }
 
@@ -1204,7 +1207,7 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
 	  /* End of (code) block. The value of the symbol is the
 	     displacement from the procedure`s start address of the
 	     end of this block. */
-	  BLOCK_END (top_stack->cur_block) = sh->value + top_stack->procadr;
+	  SET_BLOCK_END (top_stack->cur_block, sh->value + top_stack->procadr);
 	}
       else if (sh->sc == scText && top_stack->blocktype == stNil)
 	{
@@ -4166,8 +4169,8 @@ psymtab_to_symtab_1 (struct partial_symtab *pst, char *filename)
       top_stack->cur_st = st;
       top_stack->cur_block = BLOCKVECTOR_BLOCK (BLOCKVECTOR (st),
 						STATIC_BLOCK);
-      BLOCK_START (top_stack->cur_block) = pst->textlow;
-      BLOCK_END (top_stack->cur_block) = 0;
+      SET_BLOCK_START (top_stack->cur_block, pst->textlow);
+      SET_BLOCK_END (top_stack->cur_block, 0);
       top_stack->blocktype = stFile;
       top_stack->cur_type = 0;
       top_stack->procadr = 0;
@@ -4631,9 +4634,9 @@ sort_blocks (struct symtab *s)
     {
       /* Cosmetic */
       if (BLOCK_END (BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK)) == 0)
-	BLOCK_START (BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK)) = 0;
+	SET_BLOCK_START (BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK), 0);
       if (BLOCK_END (BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK)) == 0)
-	BLOCK_START (BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK)) = 0;
+	SET_BLOCK_START (BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK), 0);
       return;
     }
   /*
@@ -4655,16 +4658,16 @@ sort_blocks (struct symtab *s)
     for (i = FIRST_LOCAL_BLOCK; i < j; i++)
       if (high < BLOCK_END (BLOCKVECTOR_BLOCK (bv, i)))
 	high = BLOCK_END (BLOCKVECTOR_BLOCK (bv, i));
-    BLOCK_END (BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK)) = high;
+    SET_BLOCK_END (BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK), high);
   }
 
-  BLOCK_START (BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK)) =
-    BLOCK_START (BLOCKVECTOR_BLOCK (bv, FIRST_LOCAL_BLOCK));
+  SET_BLOCK_START (BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK),
+		   BLOCK_START (BLOCKVECTOR_BLOCK (bv, FIRST_LOCAL_BLOCK)));
 
-  BLOCK_START (BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK)) =
-    BLOCK_START (BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK));
-  BLOCK_END (BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK)) =
-    BLOCK_END (BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK));
+  SET_BLOCK_START (BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK),
+		   BLOCK_START (BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK)));
+  SET_BLOCK_END (BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK),
+		 BLOCK_END (BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK)));
 }
 
 

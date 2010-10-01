@@ -98,12 +98,15 @@ struct block
   language_specific;
 };
 
-#define BLOCK_START(bl)		(bl)->startaddr
-#define BLOCK_END(bl)		(bl)->endaddr
+#define BLOCK_START(bl)		((bl)->startaddr + 0)
+#define BLOCK_END(bl)		((bl)->endaddr + 0)
 #define BLOCK_FUNCTION(bl)	(bl)->function
 #define BLOCK_SUPERBLOCK(bl)	(bl)->superblock
 #define BLOCK_DICT(bl)		(bl)->dict
 #define BLOCK_NAMESPACE(bl)   (bl)->language_specific.cplus_specific.namespace
+
+#define SET_BLOCK_START(bl, start) ((bl)->startaddr = (start))
+#define SET_BLOCK_END(bl, end) ((bl)->endaddr = (end))
 
 /* Macro to loop through all symbols in a block BL, in no particular
    order.  ITER helps keep track of the iteration, and should be a

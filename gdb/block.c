@@ -312,8 +312,8 @@ allocate_block (struct obstack *obstack)
 {
   struct block *bl = obstack_alloc (obstack, sizeof (struct block));
 
-  BLOCK_START (bl) = 0;
-  BLOCK_END (bl) = 0;
+  SET_BLOCK_START (bl, 0);
+  SET_BLOCK_END (bl, 0);
   BLOCK_FUNCTION (bl) = NULL;
   BLOCK_SUPERBLOCK (bl) = NULL;
   BLOCK_DICT (bl) = NULL;

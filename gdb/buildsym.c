@@ -254,8 +254,8 @@ finish_block (struct symbol *symbol, struct pending **listhead,
 					       *listhead);
     }
 
-  BLOCK_START (block) = start;
-  BLOCK_END (block) = end;
+  SET_BLOCK_START (block, start);
+  SET_BLOCK_END (block, end);
   /* Superblock filled in when containing block is made */
   BLOCK_SUPERBLOCK (block) = NULL;
   BLOCK_NAMESPACE (block) = NULL;
@@ -337,7 +337,7 @@ finish_block (struct symbol *symbol, struct pending **listhead,
 		     paddress (gdbarch, BLOCK_START (block)));
 	}
       /* Better than nothing */
-      BLOCK_END (block) = BLOCK_START (block);
+      SET_BLOCK_END (block, BLOCK_START (block));
     }
 
   /* Install this block as the superblock of all blocks made since the
@@ -377,9 +377,9 @@ finish_block (struct symbol *symbol, struct pending **listhead,
 			     paddress (gdbarch, BLOCK_END (block)));
 		}
 	      if (BLOCK_START (pblock->block) < BLOCK_START (block))
-		BLOCK_START (pblock->block) = BLOCK_START (block);
+		SET_BLOCK_START (pblock->block, BLOCK_START (block));
 	      if (BLOCK_END (pblock->block) > BLOCK_END (block))
-		BLOCK_END (pblock->block) = BLOCK_END (block);
+		SET_BLOCK_END (pblock->block, BLOCK_END (block));
 	    }
 	  BLOCK_SUPERBLOCK (pblock->block) = block;
 	}
