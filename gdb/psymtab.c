@@ -48,7 +48,8 @@ static struct partial_symbol *lookup_partial_symbol (struct partial_symtab *,
 
 static char *psymtab_to_fullname (struct partial_symtab *ps);
 
-static struct partial_symbol *find_pc_sect_psymbol (struct partial_symtab *,
+static struct partial_symbol *find_pc_sect_psymbol (CORE_ADDR,
+						    struct partial_symtab *,
 						    CORE_ADDR,
 						    struct obj_section *);
 
@@ -138,14 +139,20 @@ lookup_symtab_via_partial_symtab (struct objfile *objfile, const char *name,
    We may find a different psymtab than PST.  See FIND_PC_SECT_PSYMTAB.  */
 
 static struct partial_symtab *
-find_pc_sect_psymtab_closer (CORE_ADDR pc, struct obj_section *section,
+find_pc_sect_psymtab_closer (CORE_ADDR baseaddr,
+			     CORE_ADDR pc, struct obj_section *section,
 			     struct partial_symtab *pst,
 			     struct minimal_symbol *msymbol)
 {
   struct objfile *objfile = pst->objfile;
   struct partial_symtab *tpst;
   struct partial_symtab *best_pst = pst;
-  CORE_ADDR best_addr = PSYMTAB_TEXTLOW (pst);
+  CORE_ADDR best_addr;
+
+  if (PSYMTAB_TEXTLOW_VALID (pst))
+     best_addr = baseaddr + PSYMTAB_TEXTLOW (pst);
+  else
+    best_addr = 0;
 
   /* An objfile that has its functions reordered might have
      many partial symbol tables containing the PC, but
@@ -167,7 +174,18 @@ find_pc_sect_psymtab_closer (CORE_ADDR pc, struct obj_section *section,
      that is closest and still less than the given PC.  */
   for (tpst = pst; tpst != NULL; tpst = tpst->next)
     {
-      if (pc >= PSYMTAB_TEXTLOW (tpst) && pc < PSYMTAB_TEXTHIGH (tpst))
+      CORE_ADDR textlow, texthigh;
+
+      if (PSYMTAB_TEXTLOW_VALID (pst))
+	textlow = PSYMTAB_TEXTLOW (pst) + baseaddr;
+      else
+	textlow = 0;
+      if (PSYMTAB_TEXTHIGH_VALID (pst))
+	texthigh = PSYMTAB_TEXTHIGH (pst) + baseaddr;
+      else
+	texthigh = 0;
+
+      if (pc >= textlow && pc < baseaddr + texthigh)
 	{
 	  struct partial_symbol *p;
 	  CORE_ADDR this_addr;
@@ -176,7 +194,7 @@ find_pc_sect_psymtab_closer (CORE_ADDR pc, struct obj_section *section,
 	     corresponding msymbol, which is not necessarily
 	     true; the debug info might be much richer than the
 	     object's symbol table.  */
-	  p = find_pc_sect_psymbol (tpst, pc, section);
+	  p = find_pc_sect_psymbol (baseaddr, tpst, pc, section);
 	  if (p != NULL
 	      && SYMBOL_VALUE_ADDRESS (p)
 	      == SYMBOL_VALUE_ADDRESS (msymbol))
@@ -189,7 +207,7 @@ find_pc_sect_psymtab_closer (CORE_ADDR pc, struct obj_section *section,
 	  if (p != NULL)
 	    this_addr = SYMBOL_VALUE_ADDRESS (p);
 	  else
-	    this_addr = PSYMTAB_TEXTLOW (tpst);
+	    this_addr = textlow;
 
 	  /* Check whether it is closer than our current
 	     BEST_ADDR.  Since this symbol address is
@@ -221,17 +239,15 @@ find_pc_sect_psymtab (struct objfile *objfile, CORE_ADDR pc,
 		      struct minimal_symbol *msymbol)
 {
   struct partial_symtab *pst;
+  CORE_ADDR baseaddr = ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile),
+				 SECT_OFF_TEXT (objfile));
 
   /* Try just the PSYMTABS_ADDRMAP mapping first as it has better granularity
      than the later used TEXTLOW/TEXTHIGH one.  */
 
   if (OBJFILE_PSYMTABS_ADDRMAP (objfile) != NULL)
     {
-      CORE_ADDR baseaddr, uncooked_pc;
-
-      baseaddr = ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile),
-			   SECT_OFF_TEXT (objfile));
-      uncooked_pc = pc - baseaddr;
+      CORE_ADDR uncooked_pc = pc - baseaddr;
 
       pst = addrmap_find (OBJFILE_PSYMTABS_ADDRMAP (objfile), uncooked_pc);
       if (pst != NULL)
@@ -247,7 +263,7 @@ find_pc_sect_psymtab (struct objfile *objfile, CORE_ADDR pc,
 		 corresponding msymbol, which is not necessarily
 		 true; the debug info might be much richer than the
 		 object's symbol table.  */
-	      p = find_pc_sect_psymbol (pst, pc, section);
+	      p = find_pc_sect_psymbol (baseaddr, pst, pc, section);
 	      if (!p
 		  || SYMBOL_VALUE_ADDRESS (p)
 		  != SYMBOL_VALUE_ADDRESS (msymbol))
@@ -276,14 +292,20 @@ find_pc_sect_psymtab (struct objfile *objfile, CORE_ADDR pc,
      debug info type in single OBJFILE.  */
 
   ALL_OBJFILE_PSYMTABS (objfile, pst)
-    if (pc >= PSYMTAB_TEXTLOW (pst) && pc < PSYMTAB_TEXTHIGH (pst))
-      {
-	struct partial_symtab *best_pst;
+    {
+      if (PSYMTAB_TEXTLOW_VALID (pst)
+	  && pc >= baseaddr + PSYMTAB_TEXTLOW (pst)
+	  && PSYMTAB_TEXTHIGH_VALID (pst)
+	  && pc < baseaddr + PSYMTAB_TEXTHIGH (pst))
+	{
+	  struct partial_symtab *best_pst;
 
-	best_pst = find_pc_sect_psymtab_closer (pc, section, pst, msymbol);
-	if (best_pst != NULL)
-	  return best_pst;
-      }
+	  best_pst = find_pc_sect_psymtab_closer (baseaddr, pc, section, pst,
+						  msymbol);
+	  if (best_pst != NULL)
+	    return best_pst;
+	}
+    }
 
   return NULL;
 }
@@ -314,14 +336,20 @@ find_pc_sect_symtab_from_partial (struct objfile *objfile,
    Return 0 if none.  */
 
 static struct partial_symbol *
-find_pc_sect_psymbol (struct partial_symtab *psymtab, CORE_ADDR pc,
+find_pc_sect_psymbol (CORE_ADDR baseaddr,
+		      struct partial_symtab *psymtab, CORE_ADDR pc,
 		      struct obj_section *section)
 {
   struct partial_symbol *best = NULL, *p, **pp;
   CORE_ADDR best_pc;
-  CORE_ADDR textlow = PSYMTAB_TEXTLOW (psymtab);
+  CORE_ADDR textlow;
 
   gdb_assert (psymtab != NULL);
+
+  if (PSYMTAB_TEXTLOW_VALID (psymtab))
+    textlow = baseaddr + PSYMTAB_TEXTLOW (psymtab);
+  else
+    textlow = 0;
 
   /* Cope with programs that start at address 0 */
   best_pc = (textlow != 0) ? textlow - 1 : 0;

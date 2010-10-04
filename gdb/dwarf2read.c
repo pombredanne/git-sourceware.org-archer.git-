@@ -1804,7 +1804,6 @@ process_psymtab_comp_unit (struct objfile *objfile,
   gdb_byte *beg_of_comp_unit = info_ptr;
   struct die_info *comp_unit_die;
   struct partial_symtab *pst;
-  CORE_ADDR baseaddr;
   struct cleanup *back_to_inner;
   struct dwarf2_cu cu;
   int has_children, has_pc_info;
@@ -1889,8 +1888,6 @@ process_psymtab_comp_unit (struct objfile *objfile,
 
   pst->read_symtab_private = this_cu;
 
-  baseaddr = ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile), SECT_OFF_TEXT (objfile));
-
   /* Store the function that reads in the rest of the symbol table */
   pst->read_symtab = dwarf2_psymtab_to_symtab;
 
@@ -1937,8 +1934,7 @@ process_psymtab_comp_unit (struct objfile *objfile,
 	  best_highpc = highpc;
 	}
     }
-  set_psymtab_text_addresses (pst, best_lowpc + baseaddr,
-			      best_highpc + baseaddr);
+  set_psymtab_text_addresses (pst, best_lowpc, best_highpc);
 
   pst->n_global_syms = OBJFILE_GLOBAL_PSYMBOLS (objfile).next -
     (OBJFILE_GLOBAL_PSYMBOLS (objfile).list + pst->globals_offset);
