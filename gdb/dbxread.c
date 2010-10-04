@@ -1375,12 +1375,12 @@ read_dbx_symtab (struct objfile *objfile)
 	      if (past_first_source_file && pst
 		  /* The gould NP1 uses low values for .o and -l symbols
 		     which are not the address.  */
-		  && nlist.n_value >= pst->textlow)
+		  && nlist.n_value >= PSYMTAB_TEXTLOW (pst))
 		{
 		  end_psymtab (pst, psymtab_include_list, includes_used,
 			       symnum * symbol_size,
-			       nlist.n_value > pst->texthigh
-			       ? nlist.n_value : pst->texthigh,
+			       nlist.n_value > PSYMTAB_TEXTHIGH (pst)
+			       ? nlist.n_value : PSYMTAB_TEXTHIGH (pst),
 			       dependency_list, dependencies_used,
 			       textlow_not_set);
 		  pst = (struct partial_symtab *) 0;
@@ -1505,7 +1505,8 @@ read_dbx_symtab (struct objfile *objfile)
 		  {
 		    end_psymtab (pst, psymtab_include_list, includes_used,
 				 symnum * symbol_size,
-				 valu > pst->texthigh ? valu : pst->texthigh,
+				 (valu > PSYMTAB_TEXTHIGH (pst)
+				  ? valu : PSYMTAB_TEXTHIGH (pst)),
 				 dependency_list, dependencies_used,
 				 prev_textlow_not_set);
 		    pst = (struct partial_symtab *) 0;
@@ -1680,8 +1681,9 @@ pos %d"),
 		 function relative stabs, or the address of the function's
 		 end for old style stabs.  */
 	      valu = nlist.n_value + last_function_start;
-	      if (pst->texthigh == 0 || valu > pst->texthigh)
-		pst->texthigh = valu;
+	      if (!PSYMTAB_TEXTHIGH_VALID (pst)
+		  || valu > PSYMTAB_TEXTHIGH (pst))
+		set_psymtab_texthigh (pst, valu);
 	      break;
 	    }
 
@@ -1905,7 +1907,7 @@ pos %d"),
 	      if (pst && textlow_not_set
 		  && gdbarch_sofun_address_maybe_missing (gdbarch))
 		{
-		  pst->textlow = nlist.n_value;
+		  set_psymtab_textlow (pst, nlist.n_value);
 		  textlow_not_set = 0;
 		}
 	      /* End kludge.  */
@@ -1920,12 +1922,12 @@ pos %d"),
 		 the partial symbol table.  */
 	      if (pst
 		  && (textlow_not_set
-		      || (nlist.n_value < pst->textlow
+		      || (nlist.n_value < PSYMTAB_TEXTLOW (pst)
 			  && (nlist.n_value
 			      != ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile),
 					   SECT_OFF_TEXT (objfile))))))
 		{
-		  pst->textlow = nlist.n_value;
+		  set_psymtab_textlow (pst, nlist.n_value);
 		  textlow_not_set = 0;
 		}
 	      add_psymbol_to_list (sym_name, sym_len, 1,
@@ -1975,7 +1977,7 @@ pos %d"),
 	      if (pst && textlow_not_set
 		  && gdbarch_sofun_address_maybe_missing (gdbarch))
 		{
-		  pst->textlow = nlist.n_value;
+		  set_psymtab_textlow (pst, nlist.n_value);
 		  textlow_not_set = 0;
 		}
 	      /* End kludge.  */
@@ -1990,12 +1992,12 @@ pos %d"),
 		 the partial symbol table.  */
 	      if (pst
 		  && (textlow_not_set
-		      || (nlist.n_value < pst->textlow
+		      || (nlist.n_value < PSYMTAB_TEXTLOW (pst)
 			  && (nlist.n_value
 			      != ANOFFSET (OBJFILE_SECTION_OFFSETS (objfile),
 					   SECT_OFF_TEXT (objfile))))))
 		{
-		  pst->textlow = nlist.n_value;
+		  set_psymtab_textlow (pst, nlist.n_value);
 		  textlow_not_set = 0;
 		}
 	      add_psymbol_to_list (sym_name, sym_len, 1,
@@ -2179,7 +2181,8 @@ pos %d"),
 
       end_psymtab (pst, psymtab_include_list, includes_used,
 		   symnum * symbol_size,
-		   text_end > pst->texthigh ? text_end : pst->texthigh,
+		   (text_end > PSYMTAB_TEXTHIGH (pst)
+		    ? text_end : PSYMTAB_TEXTHIGH (pst)),
 		   dependency_list, dependencies_used, textlow_not_set);
     }
 
@@ -2200,7 +2203,10 @@ start_psymtab (struct objfile *objfile, char *filename, CORE_ADDR textlow,
 {
   struct partial_symtab *result =
     start_psymtab_common (objfile, OBJFILE_SECTION_OFFSETS (objfile),
-			  filename, textlow, global_syms, static_syms);
+			  filename, global_syms, static_syms);
+
+  if (textlow != 0)
+    set_psymtab_text_addresses (result, textlow, textlow);
 
   result->read_symtab_private = obstack_alloc (&OBJFILE_OBSTACK (objfile),
 					       sizeof (struct symloc));
@@ -2242,7 +2248,8 @@ end_psymtab (struct partial_symtab *pst, char **include_list, int num_includes,
 
   if (capping_symbol_offset != -1)
     LDSYMLEN (pst) = capping_symbol_offset - LDSYMOFF (pst);
-  pst->texthigh = capping_text;
+  if (capping_text != 0)
+    set_psymtab_texthigh (pst, capping_text);
 
   /* Under Solaris, the N_SO symbols always have a value of 0,
      instead of the usual address of the .o file.  Therefore,
@@ -2259,7 +2266,7 @@ end_psymtab (struct partial_symtab *pst, char **include_list, int num_includes,
      a reliable texthigh by taking the address plus size of the
      last function in the file.  */
 
-  if (pst->texthigh == 0 && last_function_name
+  if (!PSYMTAB_TEXTHIGH_VALID (pst) && last_function_name
       && gdbarch_sofun_address_maybe_missing (gdbarch))
     {
       char *p;
@@ -2286,8 +2293,8 @@ end_psymtab (struct partial_symtab *pst, char **include_list, int num_includes,
 	}
 
       if (minsym)
-	pst->texthigh = (SYMBOL_VALUE_RAW_ADDRESS (minsym)
-			 + MSYMBOL_SIZE (minsym));
+	set_psymtab_texthigh (pst, (SYMBOL_VALUE_RAW_ADDRESS (minsym)
+				    + MSYMBOL_SIZE (minsym)));
 
       last_function_name = NULL;
     }
@@ -2296,7 +2303,7 @@ end_psymtab (struct partial_symtab *pst, char **include_list, int num_includes,
     ;
   /* this test will be true if the last .o file is only data */
   else if (textlow_not_set)
-    pst->textlow = pst->texthigh;
+    set_psymtab_textlow (pst, PSYMTAB_TEXTHIGH (pst));
   else
     {
       struct partial_symtab *p1;
@@ -2309,12 +2316,13 @@ end_psymtab (struct partial_symtab *pst, char **include_list, int num_includes,
 
       ALL_OBJFILE_PSYMTABS (objfile, p1)
       {
-	if (p1->texthigh == 0 && p1->textlow != 0 && p1 != pst)
+	if (!PSYMTAB_TEXTHIGH_VALID (p1) && PSYMTAB_TEXTLOW_VALID (p1)
+	    && p1 != pst)
 	  {
-	    p1->texthigh = pst->textlow;
+	    set_psymtab_texthigh (pst, PSYMTAB_TEXTLOW (pst));
 	    /* if this file has only data, then make textlow match texthigh */
-	    if (p1->textlow == 0)
-	      p1->textlow = p1->texthigh;
+	    if (!PSYMTAB_TEXTLOW_VALID (p1))
+	      set_psymtab_textlow (p1, PSYMTAB_TEXTHIGH (p1));
 	  }
       }
     }
@@ -2349,10 +2357,9 @@ end_psymtab (struct partial_symtab *pst, char **include_list, int num_includes,
       subpst->section_offsets = pst->section_offsets;
       subpst->read_symtab_private =
 	obstack_alloc (&OBJFILE_OBSTACK (objfile), sizeof (struct symloc));
-      LDSYMOFF (subpst) =
-	LDSYMLEN (subpst) =
-	subpst->textlow =
-	subpst->texthigh = 0;
+      LDSYMOFF (subpst) = 0;
+      LDSYMLEN (subpst) = 0;
+      clear_psymtab_text_addresses (subpst);
 
       /* We could save slight bits of space by only making one of these,
          shared by the entire set of include files.  FIXME-someday.  */
@@ -2532,8 +2539,8 @@ read_ofile_symtab (struct partial_symtab *pst)
   objfile = pst->objfile;
   sym_offset = LDSYMOFF (pst);
   sym_size = LDSYMLEN (pst);
-  text_offset = pst->textlow;
-  text_size = pst->texthigh - pst->textlow;
+  text_offset = PSYMTAB_TEXTLOW (pst);
+  text_size = PSYMTAB_TEXTHIGH (pst) - PSYMTAB_TEXTLOW (pst);
   /* This cannot be simply objfile->section_offsets because of
      elfstab_offset_sections() which initializes the psymtab section
      offsets information in a special way, and that is different from

@@ -92,8 +92,8 @@ struct partial_symtab
   /* Range of text addresses covered by this file; texthigh is the
      beginning of the next section. */
 
-  CORE_ADDR textlow;
-  CORE_ADDR texthigh;
+  CORE_ADDR textlow_;
+  CORE_ADDR texthigh_;
 
   /* Array of pointers to all of the partial_symtab's which this one
      depends on.  Since this array can only be set to previous or
@@ -147,7 +147,28 @@ struct partial_symtab
   /* Non-zero if the symtab corresponding to this psymtab has been readin */
 
   unsigned char readin;
+
+  /* True if textlow is valid.  */
+
+  unsigned char textlow_valid;
+
+  /* True if texthigh is valid.  */
+
+  unsigned char texthigh_valid;
 };
+
+/* Accessor macros for textlow and texthigh.  */
+#define PSYMTAB_TEXTLOW(pst) ((pst)->textlow_ + 0)
+#define PSYMTAB_TEXTHIGH(pst) ((pst)->texthigh_ + 0)
+
+#define PSYMTAB_TEXTLOW_VALID(pst) ((pst)->textlow_valid + 0)
+#define PSYMTAB_TEXTHIGH_VALID(pst) ((pst)->texthigh_valid + 0)
+
+extern void set_psymtab_text_addresses (struct partial_symtab *pst,
+					CORE_ADDR low, CORE_ADDR high);
+extern void set_psymtab_textlow (struct partial_symtab *, CORE_ADDR low);
+extern void set_psymtab_texthigh (struct partial_symtab *, CORE_ADDR high);
+extern void clear_psymtab_text_addresses (struct partial_symtab *pst);
 
 extern void sort_pst_symbols (struct partial_symtab *);
 

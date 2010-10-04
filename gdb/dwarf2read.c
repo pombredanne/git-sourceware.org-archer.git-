@@ -1557,8 +1557,7 @@ dwarf2_create_include_psymtab (char *name, struct partial_symtab *pst,
   struct partial_symtab *subpst = allocate_psymtab (name, objfile);
 
   subpst->section_offsets = pst->section_offsets;
-  subpst->textlow = 0;
-  subpst->texthigh = 0;
+  clear_psymtab_text_addresses (subpst);
 
   subpst->dependencies = (struct partial_symtab **)
     obstack_alloc (&OBJFILE_OBSTACK (objfile),
@@ -1881,8 +1880,6 @@ process_psymtab_comp_unit (struct objfile *objfile,
   attr = dwarf2_attr (comp_unit_die, DW_AT_name, &cu);
   pst = start_psymtab_common (objfile, OBJFILE_SECTION_OFFSETS (objfile),
 			      (attr != NULL) ? DW_STRING (attr) : "",
-			      /* TEXTLOW and TEXTHIGH are set below.  */
-			      0,
 			      OBJFILE_GLOBAL_PSYMBOLS (objfile).next,
 			      OBJFILE_STATIC_PSYMBOLS (objfile).next);
 
@@ -1940,8 +1937,8 @@ process_psymtab_comp_unit (struct objfile *objfile,
 	  best_highpc = highpc;
 	}
     }
-  pst->textlow = best_lowpc + baseaddr;
-  pst->texthigh = best_highpc + baseaddr;
+  set_psymtab_text_addresses (pst, best_lowpc + baseaddr,
+			      best_highpc + baseaddr);
 
   pst->n_global_syms = OBJFILE_GLOBAL_PSYMBOLS (objfile).next -
     (OBJFILE_GLOBAL_PSYMBOLS (objfile).list + pst->globals_offset);

@@ -1963,8 +1963,6 @@ xcoff_start_psymtab (struct objfile *objfile, char *filename, int first_symnum,
   struct partial_symtab *result =
     start_psymtab_common (objfile, OBJFILE_SECTION_OFFSETS (objfile),
 			  filename,
-			  /* We fill in textlow later.  */
-			  0,
 			  global_syms, static_syms);
 
   result->read_symtab_private = obstack_alloc (&OBJFILE_OBSTACK (objfile),
@@ -2033,8 +2031,7 @@ xcoff_end_psymtab (struct partial_symtab *pst, char **include_list,
 						   sizeof (struct symloc));
       ((struct symloc *) subpst->read_symtab_private)->first_symnum = 0;
       ((struct symloc *) subpst->read_symtab_private)->numsyms = 0;
-      subpst->textlow = 0;
-      subpst->texthigh = 0;
+      clear_psymtab_text_addresses (subpst);
 
       /* We could save slight bits of space by only making one of these,
          shared by the entire set of include files.  FIXME-someday.  */
@@ -2289,13 +2286,17 @@ scan_xcoff_symtab (struct objfile *objfile)
 		      }
 		    if (pst != NULL)
 		      {
+			CORE_ADDR lowval = PSYMTAB_TEXTLOW (pst);
 			CORE_ADDR highval =
 			  symbol.n_value + csect_aux.x_csect.x_scnlen.l;
 
-			if (highval > pst->texthigh)
-			  pst->texthigh = highval;
-			if (pst->textlow == 0 || symbol.n_value < pst->textlow)
-			  pst->textlow = symbol.n_value;
+			if (PSYMTAB_TEXTHIGH (pst) > highval)
+			  highval = PSYMTAB_TEXTHIGH (pst);
+			if (!PSYMTAB_TEXTLOW_VALID (pst)
+			    || symbol.n_value < PSYMTAB_TEXTLOW (pst))
+			  lowval = symbol.n_value;
+
+			set_psymtab_text_addresses (pst, lowval, highval);
 		      }
 		    misc_func_recorded = 0;
 		    break;

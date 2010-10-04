@@ -2200,7 +2200,7 @@ parse_lines (FDR *fh, PDR *pr, struct linetable *lt, int maxlines,
 	halt = base + fh->cbLine;
       base += pr->cbLineOffset;
 
-      adr = pst->textlow + pr->adr - lowest_pdr_addr;
+      adr = PSYMTAB_TEXTLOW (pst) + pr->adr - lowest_pdr_addr;
 
       l = adr >> 2;		/* in words */
       for (lineno = pr->lnLow; base < halt;)
@@ -2667,9 +2667,10 @@ parse_partial_symbols (struct objfile *objfile)
 	textlow = 0;
       pst = start_psymtab_common (objfile, OBJFILE_SECTION_OFFSETS (objfile),
 				  fdr_name (fh),
-				  textlow,
 				  OBJFILE_GLOBAL_PSYMBOLS (objfile).next,
 				  OBJFILE_STATIC_PSYMBOLS (objfile).next);
+      if (textlow != 0)
+	set_psymtab_text_addresses (pst, textlow, textlow);
       pst->read_symtab_private = obstack_alloc (&OBJFILE_OBSTACK (objfile),
 						sizeof (struct symloc));
       memset (pst->read_symtab_private, 0, sizeof (struct symloc));
@@ -2710,7 +2711,7 @@ parse_partial_symbols (struct objfile *objfile)
 	psymtab_language = prev_language;
       PST_PRIVATE (pst)->pst_language = psymtab_language;
 
-      pst->texthigh = pst->textlow;
+      set_psymtab_texthigh (pst, PSYMTAB_TEXTLOW (pst));
 
       /* For stabs-in-ecoff files, the second symbol must be @stab.
          This symbol is emitted by mips-tfile to signal that the
@@ -2774,10 +2775,11 @@ parse_partial_symbols (struct objfile *objfile)
 
 			  /* Kludge for Irix 5.2 zero fh->adr.  */
 			  if (!relocatable
-			  && (pst->textlow == 0 || procaddr < pst->textlow))
-			    pst->textlow = procaddr;
-			  if (high > pst->texthigh)
-			    pst->texthigh = high;
+			      && (!PSYMTAB_TEXTLOW_VALID (pst)
+				  || procaddr < PSYMTAB_TEXTLOW (pst)))
+			    set_psymtab_textlow (pst, procaddr);
+			  if (high > PSYMTAB_TEXTHIGH (pst))
+			    set_psymtab_texthigh (pst, high);
 			}
 		    }
 		  else if (sh.st == stStatic)
@@ -3347,8 +3349,8 @@ parse_partial_symbols (struct objfile *objfile)
 		    continue;
 
 		  case N_RBRAC:
-		    if (sh.value > save_pst->texthigh)
-		      save_pst->texthigh = sh.value;
+		    if (sh.value > PSYMTAB_TEXTHIGH (save_pst))
+		      set_psymtab_texthigh (save_pst, sh.value);
 		    continue;
 		  case N_EINCL:
 		  case N_DSLINE:
@@ -3528,12 +3530,13 @@ parse_partial_symbols (struct objfile *objfile)
 
 		  /* Kludge for Irix 5.2 zero fh->adr.  */
 		  if (!relocatable
-		      && (pst->textlow == 0 || procaddr < pst->textlow))
-		    pst->textlow = procaddr;
+		      && (!PSYMTAB_TEXTLOW_VALID (pst)
+			  || procaddr < PSYMTAB_TEXTLOW (pst)))
+		    set_psymtab_textlow (pst, procaddr);
 
 		  high = procaddr + sh.value;
-		  if (high > pst->texthigh)
-		    pst->texthigh = high;
+		  if (high > PSYMTAB_TEXTHIGH (pst))
+		    set_psymtab_texthigh (pst, high);
 		  continue;
 
 		case stStatic:	/* Variable */
@@ -3708,7 +3711,7 @@ parse_partial_symbols (struct objfile *objfile)
          empty and put on the free list.  */
       fdr_to_pst[f_idx].pst = end_psymtab (save_pst,
 					psymtab_include_list, includes_used,
-					   -1, save_pst->texthigh,
+					   -1, PSYMTAB_TEXTHIGH (save_pst),
 		       dependency_list, dependencies_used, textlow_not_set);
       includes_used = 0;
       dependencies_used = 0;
@@ -3726,15 +3729,15 @@ parse_partial_symbols (struct objfile *objfile)
          other cases.  */
       save_pst = fdr_to_pst[f_idx].pst;
       if (save_pst != NULL
-	  && save_pst->textlow != 0
+	  && PSYMTAB_TEXTLOW (save_pst) != 0
 	  && !(OBJFILE_FLAGS (objfile) & OBJF_REORDERED))
 	{
 	  ALL_OBJFILE_PSYMTABS (objfile, pst)
 	  {
 	    if (save_pst != pst
-		&& save_pst->textlow >= pst->textlow
-		&& save_pst->textlow < pst->texthigh
-		&& save_pst->texthigh > pst->texthigh)
+		&& PSYMTAB_TEXTLOW (save_pst) >= PSYMTAB_TEXTLOW (pst)
+		&& PSYMTAB_TEXTLOW (save_pst) < PSYMTAB_TEXTHIGH (pst)
+		&& PSYMTAB_TEXTHIGH (save_pst) > PSYMTAB_TEXTHIGH (pst))
 	      {
 		OBJFILE_FLAGS (objfile) |= OBJF_REORDERED;
 		break;
@@ -3938,7 +3941,7 @@ psymtab_to_symtab_1 (struct partial_symtab *pst, char *filename)
   /* Do nothing if this is a dummy psymtab.  */
 
   if (pst->n_global_syms == 0 && pst->n_static_syms == 0
-      && pst->textlow == 0 && pst->texthigh == 0)
+      && !PSYMTAB_TEXTLOW_VALID (pst) && !PSYMTAB_TEXTHIGH_VALID (pst))
     return;
 
   /* Now read the symbols for this symtab */
@@ -4088,7 +4091,7 @@ psymtab_to_symtab_1 (struct partial_symtab *pst, char *filename)
 
       if (! last_symtab_ended)
 	{
-	  st = end_symtab (pst->texthigh, pst->objfile, SECT_OFF_TEXT (pst->objfile));
+	  st = end_symtab (PSYMTAB_TEXTHIGH (pst), pst->objfile, SECT_OFF_TEXT (pst->objfile));
 	  end_stabs ();
 	}
 
@@ -4169,7 +4172,7 @@ psymtab_to_symtab_1 (struct partial_symtab *pst, char *filename)
       top_stack->cur_st = st;
       top_stack->cur_block = BLOCKVECTOR_BLOCK (BLOCKVECTOR (st),
 						STATIC_BLOCK);
-      SET_BLOCK_START (top_stack->cur_block, pst->textlow);
+      SET_BLOCK_START (top_stack->cur_block, PSYMTAB_TEXTLOW (pst));
       SET_BLOCK_END (top_stack->cur_block, 0);
       top_stack->blocktype = stFile;
       top_stack->cur_type = 0;

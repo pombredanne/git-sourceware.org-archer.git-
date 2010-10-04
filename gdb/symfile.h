@@ -448,7 +448,7 @@ extern void free_section_addr_info (struct section_addr_info *);
 
 extern struct partial_symtab *start_psymtab_common (struct objfile *,
 						    struct section_offsets *,
-						    const char *, CORE_ADDR,
+						    const char *,
 						    struct partial_symbol **,
 						    struct partial_symbol **);
 
