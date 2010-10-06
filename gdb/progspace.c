@@ -611,7 +611,7 @@ program_space_data (struct program_space *pspace, const struct program_space_dat
 struct section_map_entry
 {
   /* A section.  This is the key in the map.  */
-  struct obj_section *section;
+  const struct obj_section *section;
 
   /* The objfile from which the section came.  */
   struct objfile *objfile;
@@ -657,7 +657,7 @@ clear_program_space_section_map (struct program_space *pspace)
 
 struct objfile *
 program_space_find_objfile (struct program_space *pspace,
-			    struct obj_section *section)
+			    const struct obj_section *section)
 {
   struct section_map_entry entry, *result;
 

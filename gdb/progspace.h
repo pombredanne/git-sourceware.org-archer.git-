@@ -292,6 +292,6 @@ extern void *program_space_data (struct program_space *pspace,
 
 extern void clear_program_space_section_map (struct program_space *pspace);
 extern struct objfile *program_space_find_objfile (struct program_space *pspace,
-						   struct obj_section *section);
+					     const struct obj_section *section);
 
 #endif
