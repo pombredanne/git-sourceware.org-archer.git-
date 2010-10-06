@@ -59,6 +59,7 @@
 #include "stack.h"
 
 #include "psymtab.h"
+#include "value.h"
 
 /* Define whether or not the C operator '/' truncates towards zero for
    differently signed operands (truncation direction is undefined in C). 
@@ -102,11 +103,7 @@ static int ada_type_match (struct type *, struct type *, int);
 
 static int ada_args_match (struct symbol *, struct value **, int);
 
-static struct value *ensure_lval (struct value *,
-				  struct gdbarch *, CORE_ADDR *);
-
-static struct value *make_array_descriptor (struct type *, struct value *,
-                                            struct gdbarch *, CORE_ADDR *);
+static struct value *make_array_descriptor (struct type *, struct value *);
 
 static void ada_add_block_symbols (struct obstack *,
                                    struct block *, const char *,
@@ -200,7 +197,9 @@ static int equiv_types (struct type *, struct type *);
 
 static int is_name_suffix (const char *);
 
-static int wild_match (const char *, int, const char *);
+static int advance_wild_match (const char **, const char *, int);
+
+static int wild_match (const char *, const char *);
 
 static struct value *ada_coerce_ref (struct value *);
 
@@ -1260,7 +1259,7 @@ ada_match_name (const char *sym_name, const char *name, int wild)
   if (sym_name == NULL || name == NULL)
     return 0;
   else if (wild)
-    return wild_match (name, strlen (name), sym_name);
+    return wild_match (sym_name, name) == 0;
   else
     {
       int len_name = strlen (name);
@@ -1491,8 +1490,26 @@ desc_bounds (struct value *arr)
     }
 
   else if (is_thick_pntr (type))
-    return value_struct_elt (&arr, NULL, "P_BOUNDS", NULL,
-                             _("Bad GNAT array descriptor"));
+    {
+      struct value *p_bounds = value_struct_elt (&arr, NULL, "P_BOUNDS", NULL,
+					       _("Bad GNAT array descriptor"));
+      struct type *p_bounds_type = value_type (p_bounds);
+
+      if (p_bounds_type
+	  && TYPE_CODE (p_bounds_type) == TYPE_CODE_PTR)
+	{
+	  struct type *target_type = TYPE_TARGET_TYPE (p_bounds_type);
+
+	  if (TYPE_STUB (target_type))
+	    p_bounds = value_cast (lookup_pointer_type
+				   (ada_check_typedef (target_type)),
+				   p_bounds);
+	}
+      else
+	error (_("Bad GNAT array descriptor"));
+
+      return p_bounds;
+    }
   else
     return NULL;
 }
@@ -1539,7 +1556,7 @@ desc_data_target_type (struct type *type)
 
       if (data_type
 	  && TYPE_CODE (ada_check_typedef (data_type)) == TYPE_CODE_PTR)
-	return TYPE_TARGET_TYPE (data_type);
+	return ada_check_typedef (TYPE_TARGET_TYPE (data_type));
     }
 
   return NULL;
@@ -3908,43 +3925,22 @@ parse_old_style_renaming (struct type *type,
                                 /* Evaluation: Function Calls */
 
 /* Return an lvalue containing the value VAL.  This is the identity on
-   lvalues, and otherwise has the side-effect of pushing a copy of VAL 
-   on the stack, using and updating *SP as the stack pointer, and 
-   returning an lvalue whose value_address points to the copy.  */
+   lvalues, and otherwise has the side-effect of allocating memory
+   in the inferior where a copy of the value contents is copied.  */
 
 static struct value *
-ensure_lval (struct value *val, struct gdbarch *gdbarch, CORE_ADDR *sp)
+ensure_lval (struct value *val)
 {
-  if (! VALUE_LVAL (val))
+  if (VALUE_LVAL (val) == not_lval
+      || VALUE_LVAL (val) == lval_internalvar)
     {
       int len = TYPE_LENGTH (ada_check_typedef (value_type (val)));
+      const CORE_ADDR addr =
+        value_as_long (value_allocate_space_in_inferior (len));
 
-      /* The following is taken from the structure-return code in
-	 call_function_by_hand. FIXME: Therefore, some refactoring seems 
-	 indicated. */
-      if (gdbarch_inner_than (gdbarch, 1, 2))
-	{
-	  /* Stack grows downward.  Align SP and value_address (val) after
-	     reserving sufficient space. */
-	  *sp -= len;
-	  if (gdbarch_frame_align_p (gdbarch))
-	    *sp = gdbarch_frame_align (gdbarch, *sp);
-	  set_value_address (val, *sp);
-	}
-      else
-	{
-	  /* Stack grows upward.  Align the frame, allocate space, and
-	     then again, re-align the frame. */
-	  if (gdbarch_frame_align_p (gdbarch))
-	    *sp = gdbarch_frame_align (gdbarch, *sp);
-	  set_value_address (val, *sp);
-	  *sp += len;
-	  if (gdbarch_frame_align_p (gdbarch))
-	    *sp = gdbarch_frame_align (gdbarch, *sp);
-	}
+      set_value_address (val, addr);
       VALUE_LVAL (val) = lval_memory;
-
-      write_memory (value_address (val), value_contents (val), len);
+      write_memory (addr, value_contents (val), len);
     }
 
   return val;
@@ -3956,8 +3952,7 @@ ensure_lval (struct value *val, struct gdbarch *gdbarch, CORE_ADDR *sp)
    values not residing in memory, updating it as needed.  */
 
 struct value *
-ada_convert_actual (struct value *actual, struct type *formal_type0,
-                    struct gdbarch *gdbarch, CORE_ADDR *sp)
+ada_convert_actual (struct value *actual, struct type *formal_type0)
 {
   struct type *actual_type = ada_check_typedef (value_type (actual));
   struct type *formal_type = ada_check_typedef (formal_type0);
@@ -3970,7 +3965,7 @@ ada_convert_actual (struct value *actual, struct type *formal_type0,
 
   if (ada_is_array_descriptor_type (formal_target)
       && TYPE_CODE (actual_target) == TYPE_CODE_ARRAY)
-    return make_array_descriptor (formal_type, actual, gdbarch, sp);
+    return make_array_descriptor (formal_type, actual);
   else if (TYPE_CODE (formal_type) == TYPE_CODE_PTR
 	   || TYPE_CODE (formal_type) == TYPE_CODE_REF)
     {
@@ -3990,7 +3985,7 @@ ada_convert_actual (struct value *actual, struct type *formal_type0,
               memcpy ((char *) value_contents_raw (val),
                       (char *) value_contents (actual),
                       TYPE_LENGTH (actual_type));
-              actual = ensure_lval (val, gdbarch, sp);
+              actual = ensure_lval (val);
             }
           result = value_addr (actual);
         }
@@ -4031,8 +4026,7 @@ value_pointer (struct value *value, struct type *type)
    representing a pointer to this descriptor.  */
 
 static struct value *
-make_array_descriptor (struct type *type, struct value *arr,
-		       struct gdbarch *gdbarch, CORE_ADDR *sp)
+make_array_descriptor (struct type *type, struct value *arr)
 {
   struct type *bounds_type = desc_bounds_type (type);
   struct type *desc_type = desc_base_type (type);
@@ -4054,11 +4048,11 @@ make_array_descriptor (struct type *type, struct value *arr,
                             desc_bound_bitsize (bounds_type, i, 1));
     }
 
-  bounds = ensure_lval (bounds, gdbarch, sp);
+  bounds = ensure_lval (bounds);
 
   modify_general_field (value_type (descriptor),
 			value_contents_writeable (descriptor),
-                        value_pointer (ensure_lval (arr, gdbarch, sp),
+                        value_pointer (ensure_lval (arr),
                                        TYPE_FIELD_TYPE (desc_type, 0)),
                         fat_pntr_data_bitpos (desc_type),
                         fat_pntr_data_bitsize (desc_type));
@@ -4070,7 +4064,7 @@ make_array_descriptor (struct type *type, struct value *arr,
                         fat_pntr_bounds_bitpos (desc_type),
                         fat_pntr_bounds_bitsize (desc_type));
 
-  descriptor = ensure_lval (descriptor, gdbarch, sp);
+  descriptor = ensure_lval (descriptor);
 
   if (TYPE_CODE (type) == TYPE_CODE_PTR)
     return value_addr (descriptor);
@@ -4994,30 +4988,77 @@ is_valid_name_for_wild_match (const char *name0)
   return 1;
 }
 
-/* True if NAME represents a name of the form A1.A2....An, n>=1 and
-   PATN[0..PATN_LEN-1] = Ak.Ak+1.....An for some k >= 1.  Ignores
-   informational suffixes of NAME (i.e., for which is_name_suffix is
-   true).  */
+/* Advance *NAMEP to next occurrence of TARGET0 in the string NAME0
+   that could start a simple name.  Assumes that *NAMEP points into
+   the string beginning at NAME0.  */
 
 static int
-wild_match (const char *patn0, int patn_len, const char *name0)
+advance_wild_match (const char **namep, const char *name0, int target0)
 {
-  char* match;
-  const char* start;
+  const char *name = *namep;
 
-  start = name0;
   while (1)
     {
-      match = strstr (start, patn0);
-      if (match == NULL)
+      int t0, t1, t2;
+
+      t0 = *name;
+      if (t0 == '_')
+	{
+	  t1 = name[1];
+	  if ((t1 >= 'a' && t1 <= 'z') || (t1 >= '0' && t1 <= '9'))
+	    {
+	      name += 1;
+	      if (name == name0 + 5 && strncmp (name0, "_ada", 4) == 0)
+		break;
+	      else
+		name += 1;
+	    }
+	  else if (t1 == '_' &&
+		   (((t2 = name[2]) >= 'a' && t2 <= 'z') || t2 == target0))
+	    {
+	      name += 2;
+	      break;
+	    }
+	  else
+	    return 0;
+	}
+      else if ((t0 >= 'a' && t0 <= 'z') || (t0 >= '0' && t0 <= '9'))
+	name += 1;
+      else
 	return 0;
-      if ((match == name0 
-	   || match[-1] == '.' 
-	   || (match > name0 + 1 && match[-1] == '_' && match[-2] == '_')
-	   || (match == name0 + 5 && strncmp ("_ada_", name0, 5) == 0))
-          && is_name_suffix (match + patn_len))
-        return (match == name0 || is_valid_name_for_wild_match (name0));
-      start = match + 1;
+    }
+
+  *namep = name;
+  return 1;
+}
+
+/* Return 0 iff NAME encodes a name of the form prefix.PATN.  Ignores any
+   informational suffixes of NAME (i.e., for which is_name_suffix is
+   true).  Assumes that PATN is a lower-cased Ada simple name.  */
+
+static int
+wild_match (const char *name, const char *patn)
+{
+  const char *p, *n;
+  const char *name0 = name;
+
+  while (1)
+    {
+      const char *match = name;
+
+      if (*name == *patn)
+	{
+	  for (name += 1, p = patn + 1; *p != '\0'; name += 1, p += 1)
+	    if (*p != *name)
+	      break;
+	  if (*p == '\0' && is_name_suffix (name))
+	    return match != name0 && !is_valid_name_for_wild_match (name0);
+
+	  if (name[-1] == '_')
+	    name -= 1;
+	}
+      if (!advance_wild_match (&name, name0, *patn))
+	return 1;
     }
 }
 
@@ -5051,7 +5092,7 @@ ada_add_block_symbols (struct obstack *obstackp,
       {
         if (symbol_matches_domain (SYMBOL_LANGUAGE (sym),
                                    SYMBOL_DOMAIN (sym), domain)
-            && wild_match (name, name_len, SYMBOL_LINKAGE_NAME (sym)))
+            && wild_match (SYMBOL_LINKAGE_NAME (sym), name) == 0)
           {
 	    if (SYMBOL_CLASS (sym) == LOC_UNRESOLVED)
 	      continue;
@@ -7636,7 +7677,15 @@ ada_check_typedef (struct type *type)
       char *name = TYPE_TAG_NAME (type);
       struct type *type1 = ada_find_any_type (name);
 
-      return (type1 == NULL) ? type : type1;
+      if (type1 == NULL)
+        return type;
+
+      /* TYPE1 might itself be a TYPE_CODE_TYPEDEF (this can happen with
+	 stubs pointing to arrays, as we don't create symbols for array
+	 types, only for the typedef-to-array types).  This is why
+	 we process TYPE1 with ada_check_typedef before returning
+	 the result.  */
+      return ada_check_typedef (type1);
     }
 }
 
@@ -10325,7 +10374,7 @@ is_known_support_routine (struct frame_info *frame)
 
   /* Check whether the function is a GNAT-generated entity.  */
 
-  find_frame_funname (frame, &func_name, &func_lang);
+  find_frame_funname (frame, &func_name, &func_lang, NULL);
   if (func_name == NULL)
     return 1;
 
@@ -10393,7 +10442,7 @@ ada_unhandled_exception_name_addr_from_raise (void)
       char *func_name;
       enum language func_lang;
 
-      find_frame_funname (fi, &func_name, &func_lang);
+      find_frame_funname (fi, &func_name, &func_lang, NULL);
       if (func_name != NULL
           && strcmp (func_name, exception_info->catch_exception_sym) == 0)
         break; /* We found the frame we were looking for...  */

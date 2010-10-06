@@ -1,3 +1,166 @@
+2010-10-04  Doug Evans  <dje@google.com>
+
+	* cc-with-index.sh: New file.
+
+	* dwarf2read.c (dw2_do_instantiate_symtab): Insert blank line after
+	function comment.
+	(dw2_instantiate_symtab, dw2_get_cu, extract_cu_value): Ditto.
+	(create_cus_from_index, create_addrmap_from_index): Ditto.
+	(mapped_index_string_hash, find_slot_in_mapped_hash): Ditto.
+	(dw2_setup, dw2_require_line_header, dw2_require_full_path): Ditto.
+	(dw2_do_expand_symtabs_matching): Ditto.
+	(eq_strtab_entry, create_strtab, add_string): Ditto.
+	(hash_strtab_entry): Ditto.
+	(hash_symtab_entry, eq_symtab_entry, delete_symtab_entry): Ditto.
+	(create_index_table, create_mapped_symtab, find_slot): Ditto.
+	(hash_expand, add_index_entry, add_indices_to_cpool): Ditto.
+	(write_hash_table, add_address_entry, write_psymbols): Ditto.
+	(write_obstack, unlink_if_set, write_one_signatured_type): Ditto.
+	(write_psymtabs_to_index): Ditto.
+
+2010-10-04  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c: #include "value.h".
+	(ensure_lval): Delete advance declaration.  Remove gdbarch and sp
+	arguments.  Implement using value_allocate_space_in_inferior
+	instead of allocating memory from the stack.
+	(make_array_descriptor): Remove gdbarch and sp parameters.  Update
+	calls to ensure_lval.
+	(ada_convert_actual): Remove gdbarch and sp parameters.  Update
+	calls to make_array_descriptor and ensure_lval.
+	* ada-lang.h (ada_convert_actual): Update declaration.
+	* infcall.c (value_arg_coerce): Update call to ada_convert_actual.
+
+2010-10-04  Doug Evans  <dje@google.com>
+
+	* python/python.c (_initialize_python): Define new function
+	GdbSetPythonDirectory in python.  Use it to update sys.path and
+	gdb.__path__.
+
+2010-10-03  Paul Hilfinger  <hilfinger@adacore.com>
+
+        * gdb/ada-typeprint.c (print_selected_record_field_types): New function,
+        incorporating and generalizing print_record_field_types.
+        (print_record_field_types): Change return value and update comment.
+        Re-implement using print_selected_record_field_types.
+        (print_choices): Print "=>" here.
+        Handle case of unencoded variant branch.
+        (print_variant_clauses): Reformat comment.
+        Special-case unencoded variant branch.
+
+2010-10-03  Paul Hilfinger  <hilfinger@adacore.com>
+
+        * ada-lang.c (wild_match): Reimplement.
+        Change API to eliminate unused length argument, reverse arguments and
+        make 0 the 'true' return value.
+        (advance_wild_match): New auxiliary function for wild_match to improve
+        readability.
+        (ada_match_name, ada_add_block_symbols): Use new API for wild_match.
+        * psymtab.c (ada_lookup_partial_symbol, map_ada_symtabs): Use new
+        API for wild_match.
+        * symfile.h (map_ada_symtabs): Modify declaration to use new API for
+        wild_match.
+        * dwarf2read.c (dw2_map_ada_symtabs): Ditto.
+
+2010-10-01  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (_initialize_dwarf2_read): Add usage info to help text
+	for `save gdb-index' command.
+
+2010-10-01  Tom Tromey  <tromey@redhat.com>
+
+	* symfile.h (allocate_symtab): Update.
+	* symfile.c (allocate_symtab): Make 'filename' const.
+	* psymtab.c (add_psymbol_to_bcache): Make 'name' const.
+	(add_psymbol_to_list): Likewise.
+	* psympriv.h (struct partial_symtab) <filename, dirname>: Now
+	const.
+	(add_psymbol_to_list): Update.
+	* mdebugread.c (new_symtab): Make 'name' const.
+	(psymtab_to_symtab_1): Make 'filename' const.
+	* elfread.c (elfstab_offset_sections): Update.
+	* dwarf2read.c (dwarf_decode_lines): Make 'comp_dir' const.
+	(dwarf2_start_subfile): Make 'dirname' and 'comp_dir' const.
+	(psymtab_include_file_name): Update.
+	* dbxread.c (find_stab_function_addr): Make 'filename' const.
+	* buildsym.h (start_subfile): Update.
+	* buildsym.c (start_subfile): Make arguments const.
+
+2010-09-30  Ali Lakhia  <lakhia@alumni.utexas.net>
+
+	* fork-child.c (breakup_args): Fix crash if shell forking is
+	disabled at compile time.
+
+2010-10-01  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (desc_bounds): Add handling of the case where
+	the P_BOUNDS field is a pointer to a stub.
+	(desc_data_target_type): Same for P_ARRAY field.
+	(ada_check_typedef): Strip the typedef layers from the type
+	found by ada_find_any_type.
+
+2010-10-01  Joel Brobecker  <brobecker@adacore.com>
+
+	* sparc-tdep.c (sparc32_frame_align): New function.
+	(sparc32_gdbarch_init): Set the frame_align gdbarch method.
+	* sparc64-tdep.c (sparc64_frame_align): New function.
+	(sparc64_gdbarch_init): Set the frame_align gdbarch method.
+
+2010-09-30  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* defs.h (MAX_REGISTER_SIZE): Set to 64.
+
+2010-09-30  Tom Tromey  <tromey@redhat.com>
+
+	* symfile.h (struct sym_fns) <next>: Remove.
+	(add_symtab_fns): Update.
+	* symfile.c (sym_fns_ptr): New typedef.
+	(symtab_fns): Now a VEC.
+	(add_symtab_fns): Update.  Change argument type.
+	(find_sym_fns): Update.  Change return type.
+	(get_symfile_segment_data): Update.
+	* objfiles.h (struct objfile) <sf>: Now const.
+	* somread.c (som_sym_fns): Now const.  Update.
+	* xcoffread.c (xcoff_sym_fns): Now const.  Update.
+	* mipsread.c (ecoff_sym_fns): Now const.  Update.
+	* machoread.c (macho_sym_fns): Now const.  Update.
+	* elfread.c (elf_sym_fns): Now const.  Update.
+	(elf_sym_fns_gdb_index): Likewise.
+	* dbxread.c (aout_sym_fns): Now const.  Update.
+	* coffread.c (coff_sym_fns): Now const.  Update.
+
+2010-09-30  Tom Tromey  <tromey@redhat.com>
+
+	* value.c (value_primitive_field): Take 'offset' into account for
+	packed field.
+
+2010-09-30  Tom Tromey  <tromey@redhat.com>
+
+	* completer.c (count_struct_fields): Handle anonymous structs and
+	unions.
+	(add_struct_fields): Likewise.
+
+2010-09-30  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix printing parameters of inlined functions.
+	* ada-lang.c (is_known_support_routine)
+	(ada_unhandled_exception_name_addr_from_raise): Provide NULL parameter
+	for find_frame_funname.
+	* python/py-frame.c (frapy_name): Likewise.
+	* stack.c (find_frame_funname): New parameter funcp.  Update the
+	function comment.  Fill it in.
+	(print_frame): New variable func.  Initialize it by
+	find_frame_funname.  Print arguments only if FUNC is not NULL.  Use
+	FUNC as the parameter of print_args_stub.
+	* stack.h (find_frame_funname): New parameter funcp.  Remove the
+	function declaration comment.
+
+2010-09-30  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR corefiles/12071.
+	* inferior.c (have_live_inferiors): New variables old_chain, inf and
+	tp.  Iterate INFERIOR_LIST and call target_has_execution.
+
 2010-09-29  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	Fix GDB crash on inferior calls with self-referencing classes.

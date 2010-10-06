@@ -1,3 +1,57 @@
+2010-10-05  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* gdb.arch/altivec-abi.exp: Fix a typo.
+
+2010-10-02  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* lib/mi-support.exp (thread_selected_re): Correct pattern used
+	to match a thread ID.
+
+2010-10-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix s390x testcase compatibility.
+	* gdb.dwarf2/dw2-double-set-die-type.S: Use .2byte, not .value.
+
+2010-10-01  Doug Evans  <dje@google.com>
+
+	* lib/gdb-python.exp: New file.
+	* gdb.python/py-block.exp: Use it.
+	* gdb.python/py-breakpoint.exp: Ditto.
+	* gdb.python/py-frame.exp: Ditto.
+	* gdb.python/py-inferior.exp: Ditto.
+	* gdb.python/py-param.exp: Ditto.
+	* gdb.python/py-prettyprint.exp: Ditto.
+	* gdb.python/py-shared.exp: Ditto.
+	* gdb.python/py-symbol.exp: Ditto.
+	* gdb.python/py-symtab.exp: Ditto.
+	* gdb.python/py-type.exp: Ditto.
+	* gdb.python/py-value.exp: Ditto.
+	* gdb.python/python.exp: Ditto.
+
+2010-09-30  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/anon.exp: New file.
+	* gdb.base/anon.c: New file.
+
+2010-09-30  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/completion.exp: Test completion through anonymous
+	union.
+	* gdb.base/break1.c (struct some_struct): Add anonymous union.
+
+2010-09-30  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix printing parameters of inlined functions.
+	* gdb.dwarf2/dw2-inline-param.exp: New file.
+	* gdb.dwarf2/dw2-inline-param-main.c: New file.
+	* gdb.dwarf2/dw2-inline-param.S: New file.
+
+2010-09-30  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR corefiles/12071.
+	* gdb.base/corefile.exp (quit with a process, no question: load core)
+	(quit with a core file): New tests.
+
 2010-09-29  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	Fix GDB crash on inferior calls with self-referencing classes.
