@@ -488,15 +488,15 @@ itset_create (const char **specp)
   struct cleanup *cleanups;
   const char *spec = *specp;
 
-  if (*spec != '[')
-    error (_("I/T set must start with `['"));
+  if (*spec != '{')
+    error (_("I/T set must start with `{'"));
 
   result = XCNEW (struct itset);
   result->refc = 1;
 
   cleanups = make_cleanup (itset_cleanup, result);
 
-  /* Skip the '['.  */
+  /* Skip the '{'.  */
   ++spec;
   spec = skip_whitespace (spec);
 
@@ -520,13 +520,13 @@ itset_create (const char **specp)
       spec = skip_whitespace (spec);
       if (*spec == ',')
 	++spec;
-      else if (*spec == ']')
+      else if (*spec == '}')
 	break;
       else
-	error (_("',' or ']' expected in I/T set, at `%s'"), spec);
+	error (_("',' or '}' expected in I/T set, at `%s'"), spec);
     }
 
-  /* Skip the ']'.  */
+  /* Skip the '}'.  */
   ++spec;
 
   result->spec = xstrndup (*specp, spec - *specp);
@@ -553,7 +553,7 @@ itset_create (const char **specp)
 struct itset *
 itset_create_current (void)
 {
-  const char *spec = "[!current]";
+  const char *spec = "{!current}";
 
   return itset_create (&spec);
 }
