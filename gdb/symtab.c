@@ -931,10 +931,10 @@ fixup_symbol_section (struct symbol *sym, struct objfile *objfile)
     {
     case LOC_STATIC:
     case LOC_LABEL:
-      addr = SYMBOL_VALUE_ADDRESS (sym);
+      addr = SYMBOL_VALUE_RAW_ADDRESS (sym);
       break;
     case LOC_BLOCK:
-      addr = BLOCK_START (SYMBOL_BLOCK_VALUE (sym));
+      addr = BLOCK_RAW_START (SYMBOL_BLOCK_VALUE (sym));
       break;
 
     default:
