@@ -1007,10 +1007,10 @@ static struct line_header *(dwarf_decode_line_header
                             (unsigned int offset,
                              bfd *abfd, struct dwarf2_cu *cu));
 
-static void dwarf_decode_lines (struct line_header *, char *, bfd *,
+static void dwarf_decode_lines (struct line_header *, const char *, bfd *,
 				struct dwarf2_cu *, struct partial_symtab *);
 
-static void dwarf2_start_subfile (char *, char *, char *);
+static void dwarf2_start_subfile (char *, const char *, const char *);
 
 static struct symbol *new_symbol (struct die_info *, struct type *,
 				  struct dwarf2_cu *);
@@ -1638,6 +1638,7 @@ dwarf2_get_section_info (struct objfile *objfile, const char *section_name,
 
 /* Read in the symbols for PER_CU.  OBJFILE is the objfile from which
    this CU came.  */
+
 static void
 dw2_do_instantiate_symtab (struct objfile *objfile,
 			   struct dwarf2_per_cu_data *per_cu)
@@ -1665,6 +1666,7 @@ dw2_do_instantiate_symtab (struct objfile *objfile,
 /* Ensure that the symbols for PER_CU have been read in.  OBJFILE is
    the objfile from which this CU came.  Returns the resulting symbol
    table.  */
+
 static struct symtab *
 dw2_instantiate_symtab (struct objfile *objfile,
 			struct dwarf2_per_cu_data *per_cu)
@@ -1680,6 +1682,7 @@ dw2_instantiate_symtab (struct objfile *objfile,
 }
 
 /* Return the CU given its index.  */
+
 static struct dwarf2_per_cu_data *
 dw2_get_cu (int index)
 {
@@ -1694,6 +1697,7 @@ dw2_get_cu (int index)
 /* A helper function that knows how to read a 64-bit value in a way
    that doesn't make gdb die.  Returns 1 if the conversion went ok, 0
    otherwise.  */
+
 static int
 extract_cu_value (const char *bytes, ULONGEST *result)
 {
@@ -1716,6 +1720,7 @@ extract_cu_value (const char *bytes, ULONGEST *result)
 /* Read the CU list from the mapped index, and use it to create all
    the CU objects for this objfile.  Return 0 if something went wrong,
    1 if everything went ok.  */
+
 static int
 create_cus_from_index (struct objfile *objfile, const gdb_byte *cu_list,
 		       offset_type cu_list_elements)
@@ -1806,6 +1811,7 @@ create_signatured_type_table_from_index (struct objfile *objfile,
 
 /* Read the address map data from the mapped index, and use it to
    populate the objfile's psymtabs_addrmap.  */
+
 static void
 create_addrmap_from_index (struct objfile *objfile, struct mapped_index *index)
 {
@@ -1848,6 +1854,7 @@ create_addrmap_from_index (struct objfile *objfile, struct mapped_index *index)
    maintain control over the implementation.  This is necessary
    because the hash function is tied to the format of the mapped index
    file.  */
+
 static hashval_t
 mapped_index_string_hash (const void *p)
 {
@@ -1864,6 +1871,7 @@ mapped_index_string_hash (const void *p)
 /* Find a slot in the mapped index INDEX for the object named NAME.
    If NAME is found, set *VEC_OUT to point to the CU vector in the
    constant pool and return 1.  If NAME cannot be found, return 0.  */
+
 static int
 find_slot_in_mapped_hash (struct mapped_index *index, const char *name,
 			  offset_type **vec_out)
@@ -1896,6 +1904,7 @@ find_slot_in_mapped_hash (struct mapped_index *index, const char *name,
 
 /* Read the index file.  If everything went ok, initialize the "quick"
    elements of all the CUs and return 1.  Otherwise, return 0.  */
+
 static int
 dwarf2_read_index (struct objfile *objfile)
 {
@@ -1977,6 +1986,7 @@ dwarf2_read_index (struct objfile *objfile)
 
 /* A helper for the "quick" functions which sets the global
    dwarf2_per_objfile according to OBJFILE.  */
+
 static void
 dw2_setup (struct objfile *objfile)
 {
@@ -1986,6 +1996,7 @@ dw2_setup (struct objfile *objfile)
 
 /* A helper for the "quick" functions which attempts to read the line
    table for THIS_CU.  */
+
 static void
 dw2_require_line_header (struct objfile *objfile,
 			 struct dwarf2_per_cu_data *this_cu)
@@ -2072,6 +2083,7 @@ dw2_require_line_header (struct objfile *objfile,
    real path for a given file name from the line table.
    dw2_require_line_header must have been called before this is
    invoked.  */
+
 static const char *
 dw2_require_full_path (struct objfile *objfile,
 		       struct dwarf2_per_cu_data *per_cu,
@@ -2210,6 +2222,7 @@ dw2_lookup_symbol (struct objfile *objfile, int block_index,
 
 /* A helper function that expands all symtabs that hold an object
    named NAME.  */
+
 static void
 dw2_do_expand_symtabs_matching (struct objfile *objfile, const char *name)
 {
@@ -2359,7 +2372,7 @@ dw2_find_symbol_file (struct objfile *objfile, const char *name)
 
 static void
 dw2_map_ada_symtabs (struct objfile *objfile,
-		     int (*wild_match) (const char *, int, const char *),
+		     int (*wild_match) (const char *, const char *),
 		     int (*is_name_suffix) (const char *),
 		     void (*callback) (struct objfile *,
 				       struct symtab *, void *),
@@ -9994,7 +10007,8 @@ psymtab_include_file_name (const struct line_header *lh, int file_index,
   char *include_name = fe.name;
   char *include_name_to_compare = include_name;
   char *dir_name = NULL;
-  char *pst_filename;
+  const char *pst_filename;
+  char *copied_name = NULL;
   int file_is_pst;
 
   if (fe.dir_index)
@@ -10039,16 +10053,17 @@ psymtab_include_file_name (const struct line_header *lh, int file_index,
   pst_filename = pst->filename;
   if (!IS_ABSOLUTE_PATH (pst_filename) && pst->dirname != NULL)
     {
-      pst_filename = concat (pst->dirname, SLASH_STRING,
-			     pst_filename, (char *)NULL);
+      copied_name = concat (pst->dirname, SLASH_STRING,
+			    pst_filename, (char *)NULL);
+      pst_filename = copied_name;
     }
 
   file_is_pst = strcmp (include_name_to_compare, pst_filename) == 0;
 
   if (include_name_to_compare != include_name)
     xfree (include_name_to_compare);
-  if (pst_filename != pst->filename)
-    xfree (pst_filename);
+  if (copied_name != NULL)
+    xfree (copied_name);
 
   if (file_is_pst)
     return NULL;
@@ -10078,7 +10093,7 @@ psymtab_include_file_name (const struct line_header *lh, int file_index,
    A good testcase for this is mb-inline.exp.  */
 
 static void
-dwarf_decode_lines (struct line_header *lh, char *comp_dir, bfd *abfd,
+dwarf_decode_lines (struct line_header *lh, const char *comp_dir, bfd *abfd,
 		    struct dwarf2_cu *cu, struct partial_symtab *pst)
 {
   gdb_byte *line_ptr, *extended_end;
@@ -10421,7 +10436,7 @@ dwarf_decode_lines (struct line_header *lh, char *comp_dir, bfd *abfd,
    subfile's name.  */
 
 static void
-dwarf2_start_subfile (char *filename, char *dirname, char *comp_dir)
+dwarf2_start_subfile (char *filename, const char *dirname, const char *comp_dir)
 {
   char *fullname;
 
@@ -14726,6 +14741,7 @@ struct strtab_entry
 };
 
 /* Hash function for a strtab_entry.  */
+
 static hashval_t
 hash_strtab_entry (const void *e)
 {
@@ -14734,6 +14750,7 @@ hash_strtab_entry (const void *e)
 }
 
 /* Equality function for a strtab_entry.  */
+
 static int
 eq_strtab_entry (const void *a, const void *b)
 {
@@ -14743,6 +14760,7 @@ eq_strtab_entry (const void *a, const void *b)
 }
 
 /* Create a strtab_entry hash table.  */
+
 static htab_t
 create_strtab (void)
 {
@@ -14752,6 +14770,7 @@ create_strtab (void)
 
 /* Add a string to the constant pool.  Return the string's offset in
    host order.  */
+
 static offset_type
 add_string (htab_t table, struct obstack *cpool, const char *str)
 {
@@ -14795,6 +14814,7 @@ struct mapped_symtab
 };
 
 /* Hash function for a symtab_index_entry.  */
+
 static hashval_t
 hash_symtab_entry (const void *e)
 {
@@ -14806,6 +14826,7 @@ hash_symtab_entry (const void *e)
 }
 
 /* Equality function for a symtab_index_entry.  */
+
 static int
 eq_symtab_entry (const void *a, const void *b)
 {
@@ -14820,6 +14841,7 @@ eq_symtab_entry (const void *a, const void *b)
 }
 
 /* Destroy a symtab_index_entry.  */
+
 static void
 delete_symtab_entry (void *p)
 {
@@ -14829,6 +14851,7 @@ delete_symtab_entry (void *p)
 }
 
 /* Create a hash table holding symtab_index_entry objects.  */
+
 static htab_t
 create_index_table (void)
 {
@@ -14837,6 +14860,7 @@ create_index_table (void)
 }
 
 /* Create a new mapped symtab object.  */
+
 static struct mapped_symtab *
 create_mapped_symtab (void)
 {
@@ -14848,6 +14872,7 @@ create_mapped_symtab (void)
 }
 
 /* Destroy a mapped_symtab.  */
+
 static void
 cleanup_mapped_symtab (void *p)
 {
@@ -14860,6 +14885,7 @@ cleanup_mapped_symtab (void *p)
 
 /* Find a slot in SYMTAB for the symbol NAME.  Returns a pointer to
    the slot.  */
+
 static struct symtab_index_entry **
 find_slot (struct mapped_symtab *symtab, const char *name)
 {
@@ -14877,6 +14903,7 @@ find_slot (struct mapped_symtab *symtab, const char *name)
 }
 
 /* Expand SYMTAB's hash table.  */
+
 static void
 hash_expand (struct mapped_symtab *symtab)
 {
@@ -14902,6 +14929,7 @@ hash_expand (struct mapped_symtab *symtab)
 
 /* Add an entry to SYMTAB.  NAME is the name of the symbol.  CU_INDEX
    is the index of the CU in which the symbol appears.  */
+
 static void
 add_index_entry (struct mapped_symtab *symtab, const char *name,
 		 offset_type cu_index)
@@ -14927,6 +14955,7 @@ add_index_entry (struct mapped_symtab *symtab, const char *name,
 }
 
 /* Add a vector of indices to the constant pool.  */
+
 static offset_type
 add_indices_to_cpool (htab_t index_table, struct obstack *cpool,
 		      struct symtab_index_entry *entry)
@@ -14964,6 +14993,7 @@ add_indices_to_cpool (htab_t index_table, struct obstack *cpool,
 
 /* Write the mapped hash table SYMTAB to the obstack OUTPUT, with
    constant pool entries going into the obstack CPOOL.  */
+
 static void
 write_hash_table (struct mapped_symtab *symtab,
 		  struct obstack *output, struct obstack *cpool)
@@ -15014,6 +15044,7 @@ write_hash_table (struct mapped_symtab *symtab,
 /* Write an address entry to ADDR_OBSTACK.  The addresses are taken
    from PST; CU_INDEX is the index of the CU in the vector of all
    CUs.  */
+
 static void
 add_address_entry (struct objfile *objfile,
 		   struct obstack *addr_obstack, struct partial_symtab *pst,
@@ -15038,6 +15069,7 @@ add_address_entry (struct objfile *objfile,
 }
 
 /* Add a list of partial symbols to SYMTAB.  */
+
 static void
 write_psymbols (struct mapped_symtab *symtab,
 		htab_t psyms_seen,
@@ -15077,6 +15109,7 @@ write_psymbols (struct mapped_symtab *symtab,
 
 /* Write the contents of an ("unfinished") obstack to FILE.  Throw an
    exception if there is an error.  */
+
 static void
 write_obstack (FILE *file, struct obstack *obstack)
 {
@@ -15087,6 +15120,7 @@ write_obstack (FILE *file, struct obstack *obstack)
 }
 
 /* Unlink a file if the argument is not NULL.  */
+
 static void
 unlink_if_set (void *p)
 {
@@ -15107,6 +15141,7 @@ struct signatured_type_index_data
 
 /* A helper function that writes a single signatured_type to an
    obstack.  */
+
 static int
 write_one_signatured_type (void **slot, void *d)
 {
@@ -15148,6 +15183,7 @@ cleanup_htab (void *arg)
 }
 
 /* Create an index file for OBJFILE in the directory DIR.  */
+
 static void
 write_psymtabs_to_index (struct objfile *objfile, const char *dir)
 {
@@ -15366,6 +15402,7 @@ write_psymtabs_to_index (struct objfile *objfile, const char *dir)
    6. The constant pool.  This is simply a bunch of bytes.  It is
    organized so that alignment is correct: CU vectors are stored
    first, followed by strings.  */
+
 static void
 save_gdb_index_command (char *arg, int from_tty)
 {
@@ -15468,7 +15505,9 @@ The value is the maximum depth to print."),
 			    &setdebuglist, &showdebuglist);
 
   c = add_cmd ("gdb-index", class_files, save_gdb_index_command,
-	       _("Save a .gdb-index file"),
+	       _("\
+Save a .gdb-index file.\n\
+Usage: save gdb-index DIRECTORY"),
 	       &save_cmdlist);
   set_cmd_completer (c, filename_completer);
 }

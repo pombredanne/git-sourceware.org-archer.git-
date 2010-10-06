@@ -2106,7 +2106,7 @@ static const insn_sequence elf32_arm_stub_short_branch_v4t_thumb_arm[] =
    blx to reach the stub if necessary.  */
 static const insn_sequence elf32_arm_stub_long_branch_any_arm_pic[] =
   {
-    ARM_INSN(0xe59fc000),             /* ldr   r12, [pc] */
+    ARM_INSN(0xe59fc000),             /* ldr   ip, [pc] */
     ARM_INSN(0xe08ff00c),             /* add   pc, pc, ip */
     DATA_WORD(0, R_ARM_REL32, -4),    /* dcd   R_ARM_REL32(X-4) */
   };
@@ -2117,7 +2117,7 @@ static const insn_sequence elf32_arm_stub_long_branch_any_arm_pic[] =
    ARMv7).  */
 static const insn_sequence elf32_arm_stub_long_branch_any_thumb_pic[] =
   {
-    ARM_INSN(0xe59fc004),             /* ldr   r12, [pc, #4] */
+    ARM_INSN(0xe59fc004),             /* ldr   ip, [pc, #4] */
     ARM_INSN(0xe08fc00c),             /* add   ip, pc, ip */
     ARM_INSN(0xe12fff1c),             /* bx    ip */
     DATA_WORD(0, R_ARM_REL32, 0),     /* dcd   R_ARM_REL32(X) */
@@ -3269,9 +3269,7 @@ arm_type_of_stub (struct bfd_link_info *info,
 
   /* If a stub is needed, record the actual destination type.  */
   if (stub_type != arm_stub_none)
-    {
-      *actual_st_type = st_type;
-    }
+    *actual_st_type = st_type;
 
   return stub_type;
 }
@@ -4486,7 +4484,6 @@ elf32_arm_size_stubs (bfd *output_bfd,
 		    {
 		      /* It's a local symbol.  */
 		      Elf_Internal_Sym *sym;
-		      Elf_Internal_Shdr *hdr;
 
 		      if (local_syms == NULL)
 			{
@@ -4502,8 +4499,16 @@ elf32_arm_size_stubs (bfd *output_bfd,
 			}
 
 		      sym = local_syms + r_indx;
-		      hdr = elf_elfsections (input_bfd)[sym->st_shndx];
-		      sym_sec = hdr->bfd_section;
+		      if (sym->st_shndx == SHN_UNDEF)
+			sym_sec = bfd_und_section_ptr;
+		      else if (sym->st_shndx == SHN_ABS)
+			sym_sec = bfd_abs_section_ptr;
+		      else if (sym->st_shndx == SHN_COMMON)
+			sym_sec = bfd_com_section_ptr;
+		      else
+			sym_sec =
+			  bfd_section_from_elf_index (input_bfd, sym->st_shndx);
+
 		      if (!sym_sec)
 			/* This is an undefined symbol.  It can never
 			   be resolved. */

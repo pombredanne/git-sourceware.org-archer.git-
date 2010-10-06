@@ -220,7 +220,7 @@ struct quick_symbol_functions
      This function is completely ad hoc and new implementations should
      refer to the psymtab implementation to see what to do.  */
   void (*map_ada_symtabs) (struct objfile *objfile,
-			   int (*wild_match) (const char *, int, const char *),
+			   int (*wild_match) (const char *, const char *),
 			   int (*is_name_suffix) (const char *),
 			   void (*callback) (struct objfile *,
 					     struct symtab *, void *),
@@ -345,14 +345,6 @@ struct sym_fns
   /* The "quick" (aka partial) symbol functions for this symbol
      reader.  */
   const struct quick_symbol_functions *qf;
-
-  /* Finds the next struct sym_fns.  They are allocated and
-     initialized in whatever module implements the functions pointed
-     to; an initializer calls add_symtab_fns to add them to the global
-     chain.  */
-
-  struct sym_fns *next;
-
 };
 
 extern struct section_addr_info *
@@ -382,9 +374,9 @@ extern struct symfile_segment_data *default_symfile_segments (bfd *abfd);
 extern bfd_byte *default_symfile_relocate (struct objfile *objfile,
                                            asection *sectp, bfd_byte *buf);
 
-extern struct symtab *allocate_symtab (char *, struct objfile *);
+extern struct symtab *allocate_symtab (const char *, struct objfile *);
 
-extern void add_symtab_fns (struct sym_fns *);
+extern void add_symtab_fns (const struct sym_fns *);
 
 /* This enum encodes bit-flags passed as ADD_FLAGS parameter to
    syms_from_objfile, symbol_file_add, etc.  */

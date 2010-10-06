@@ -1,4 +1,49 @@
-2010-06-27  Ralf Wildenhues  <Ralf.Wildenhues@gmx.de>
+2010-10-02  Ralf Wildenhues  <Ralf.Wildenhues@gmx.de>
+
+	PR bootstrap/45326
+	PR bootstrap/45174
+	* configure.ac: Honor initial values of $build_configargs,
+	$host_configargs, $target_configargs.  Mark the precious, so
+	environment settings get recorded.
+	* configure: Regenerate.
+
+2010-10-02  Ralf Wildenhues  <Ralf.Wildenhues@gmx.de>
+
+	Sync from GCC:
+
+	2010-09-30  Michael Eager  <eager@eagercon.com>
+
+	* configure.ac (microblaze): Add target-libssp to noconfigdirs.
+	* configure: Regenerate.
+
+	2010-09-21  Iain Sandoe  <iains@gcc.gnu.org>
+
+	* configure.ac (enable-lto): Add Darwin to the list of supported lto
+	targets and amend comment.
+	* configure: Regenerate.
+
+	2010-09-03  Jack Howarth <howarth@bromo.med.uc.edu>
+
+	* configure.ac: Enable LTO by default on Darwin.
+	* configure: Regenerate.
+
+	2010-07-23  Marc Glisse <marc.glisse@normalesup.org>
+
+	PR bootstrap/44455
+	* configure.ac (extra_mpfr_configure_flags): Copy from
+	extra_mpc_gmp_configure_flags.
+	* configure: Re-generated.
+
+2010-09-30  Ralf Wildenhues  <Ralf.Wildenhues@gmx.de>
+
+	Sync from GCC:
+
+	PR bootstrap/45796
+	* Makefile.def (info-gcc, dvi-gcc, pdf-gcc, html-gcc):
+	Depend on all-build-libiberty.
+	* Makefile.in: Regenerate.
+
+2010-09-27  Ralf Wildenhues  <Ralf.Wildenhues@gmx.de>
 
 	Sync from GCC:
 
