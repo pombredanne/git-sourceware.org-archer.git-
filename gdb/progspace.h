@@ -22,6 +22,7 @@
 #define PROGSPACE_H
 
 #include "target.h"
+#include "hashtab.h"
 
 struct target_ops;
 struct bfd;
@@ -184,6 +185,10 @@ struct program_space
        solib.c.  */
     struct so_list *so_list;
 
+    /* A map from obj_section to objfile for this inferior; used for
+       symbol address calculation.  */
+    htab_t section_map;
+
     /* Per pspace data-pointers required by other GDB modules.  */
     void **data;
     unsigned num_data;
@@ -280,10 +285,13 @@ extern void prune_program_spaces (void);
 extern const struct program_space_data *register_program_space_data (void);
 extern const struct program_space_data *register_program_space_data_with_cleanup
   (void (*cleanup) (struct program_space *, void *));
-extern void clear_program_space_data (struct program_space *pspace);
 extern void set_program_space_data (struct program_space *pspace,
 			      const struct program_space_data *data, void *value);
 extern void *program_space_data (struct program_space *pspace,
 			   const struct program_space_data *data);
+
+extern void clear_program_space_section_map (struct program_space *pspace);
+extern struct objfile *program_space_find_objfile (struct program_space *pspace,
+						   struct obj_section *section);
 
 #endif

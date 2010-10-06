@@ -260,6 +260,10 @@ got_symtab:
 CORE_ADDR
 get_symbol_value_address (const struct general_symbol_info *ginfo)
 {
+  struct objfile *objfile;
+
+  objfile = program_space_find_objfile (current_program_space,
+					ginfo->obj_section);
   return ginfo->value.address;
 }
 

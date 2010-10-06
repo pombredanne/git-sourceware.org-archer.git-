@@ -149,7 +149,9 @@ release_program_space (struct program_space *pspace)
     free_address_space (pspace->aspace);
   resize_section_table (&pspace->target_sections,
 			-resize_section_table (&pspace->target_sections, 0));
-    /* Discard any data modules have associated with the PSPACE.  */
+  if (pspace->section_map != NULL)
+    htab_delete (pspace->section_map);
+  /* Discard any data modules have associated with the PSPACE.  */
   program_space_free_data (pspace);
   xfree (pspace);
 
@@ -561,15 +563,6 @@ program_space_alloc_data (struct program_space *pspace)
 }
 
 static void
-program_space_free_data (struct program_space *pspace)
-{
-  gdb_assert (pspace->data != NULL);
-  clear_program_space_data (pspace);
-  xfree (pspace->data);
-  pspace->data = NULL;
-}
-
-void
 clear_program_space_data (struct program_space *pspace)
 {
   struct program_space_data_registration *registration;
@@ -586,6 +579,15 @@ clear_program_space_data (struct program_space *pspace)
   memset (pspace->data, 0, pspace->num_data * sizeof (void *));
 }
 
+static void
+program_space_free_data (struct program_space *pspace)
+{
+  gdb_assert (pspace->data != NULL);
+  clear_program_space_data (pspace);
+  xfree (pspace->data);
+  pspace->data = NULL;
+}
+
 void
 set_program_space_data (struct program_space *pspace,
 		       const struct program_space_data *data,
@@ -600,6 +602,102 @@ program_space_data (struct program_space *pspace, const struct program_space_dat
 {
   gdb_assert (data->index < pspace->num_data);
   return pspace->data[data->index];
+}
+
+
+
+/* An entry in the program space's section map.  */
+
+struct section_map_entry
+{
+  /* A section.  This is the key in the map.  */
+  struct obj_section *section;
+
+  /* The objfile from which the section came.  */
+  struct objfile *objfile;
+};
+
+/* Hash function for struct section_map_entry.  */
+
+static hashval_t
+hash_section_map_entry (const void *e)
+{
+  const struct section_map_entry *entry = e;
+
+  return htab_hash_pointer (entry->section);
+}
+
+/* Equality function for struct section_map_entry.  */
+
+static int
+eq_section_map_entry (const void *a, const void *b)
+{
+  const struct section_map_entry *ea = a;
+  const struct section_map_entry *eb = b;
+
+  return ea->section == eb->section;
+}
+
+/* Clear the program space's section map.  */
+
+void
+clear_program_space_section_map (struct program_space *pspace)
+{
+  if (pspace->section_map != NULL)
+    {
+      htab_delete (pspace->section_map);
+      pspace->section_map = NULL;
+    }
+}
+
+/* Given a program space and a section, find the objfile from which
+   the section came.  This function will rebuild the section map as
+   needed.  This can return NULL if the section is absolute.  This can
+   throw an exception if the section is not found.  */
+
+struct objfile *
+program_space_find_objfile (struct program_space *pspace,
+			    struct obj_section *section)
+{
+  struct section_map_entry entry, *result;
+
+  if (pspace->section_map == NULL)
+    {
+      objfile_iterator_type iter;
+      struct objfile *objfile;
+
+      pspace->section_map = htab_create_alloc (1, hash_section_map_entry,
+					       eq_section_map_entry,
+					       xfree, xcalloc, xfree);
+
+      ALL_PSPACE_OBJFILES (pspace, iter, objfile)
+	{
+	  struct obj_section *sect;
+
+	  ALL_OBJFILE_OSECTIONS (objfile, sect)
+	    {
+	      void **slot;
+
+	      entry.section = sect;
+	      slot = htab_find_slot (pspace->section_map, &entry, INSERT);
+	      gdb_assert (!*slot);
+	      result = XNEW (struct section_map_entry);
+	      result->section = sect;
+	      result->objfile = objfile;
+	      *slot = result;
+	    }
+	}
+    }
+
+  /* hmm.  latent bugs here?  */
+  if (!section || section->the_bfd_section == bfd_abs_section_ptr)
+    return NULL;
+
+  entry.section = section;
+  result = htab_find (pspace->section_map, &entry);
+  if (!result)
+    error (_("Could not find section in inferior's section map"));
+  return result->objfile;
 }
 
 

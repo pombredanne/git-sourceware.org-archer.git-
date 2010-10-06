@@ -267,6 +267,8 @@ allocate_objfile (bfd *abfd, int flags)
   /* Save passed in flag bits. */
   OBJFILE_FLAGS (objfile) |= flags;
 
+  clear_program_space_section_map (current_program_space);
+
   /* Rebuild section map next time we need it.  */
   get_objfile_pspace_data (current_program_space)->objfiles_changed_p = 1;
 
@@ -654,6 +656,8 @@ free_objfile (struct objfile *objfile)
   /* Remove it from the chain of all objfiles. */
   wrapper = unlink_objfile (objfile);
   xfree (wrapper);
+
+  clear_program_space_section_map (current_program_space);
 
   if (--OBJFILE_REFC (objfile) == 0)
     do_free_objfile (objfile);
