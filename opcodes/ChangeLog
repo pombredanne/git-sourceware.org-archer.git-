@@ -1,3 +1,39 @@
+2010-10-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Jiang Jilin  <freephp@gmail.com>
+
+	* Makefile.am (libopcodes_a_SOURCES): New as empty.
+	* Makefile.in: Regenerate.
+
+2010-10-09  Matt Rice  <ratmice@gmail.com>
+
+	* fr30-desc.h: Regenerate.
+	* frv-desc.h: Regenerate.
+	* ip2k-desc.h: Regenerate.
+	* iq2000-desc.h: Regenerate.
+	* lm32-desc.h: Regenerate.
+	* m32c-desc.h: Regenerate.
+	* m32r-desc.h: Regenerate.
+	* mep-desc.h: Regenerate.
+	* mep-opc.c: Regenerate.
+	* mt-desc.h: Regenerate.
+	* openrisc-desc.h: Regenerate.
+	* xc16x-desc.h: Regenerate.
+	* xstormy16-desc.h: Regenerate.
+
+2010-10-08  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	Fix build with -DDEBUG=7
+	* frv-opc.c: Regenerate.
+	* or32-dis.c (DEBUG): Don't redefine.
+	(find_bytes_big, or32_extract, or32_opcode_match, or32_print_register):
+	Adapt DEBUG code to some type changes throughout.
+	* or32-opc.c (or32_extract): Likewise.
+
+2010-10-07  Bernd Schmidt  <bernds@codesourcery.com>
+
+	* tic6x-dis.c (print_insn_tic6x): Correct decoding of fstg field
+	in SPKERNEL instructions.
+
 2010-10-02  H.J. Lu  <hongjiu.lu@intel.com>
 
 	PR binutils/12076
@@ -160,7 +196,7 @@
 	* i386-dis.c (sIv): New.
 	(dis386): Replace Iq with sIv on "pushT".
 	(reg_table): Replace T with {T|} on callT, JcallT, jmpT and JjmpT.
-	(x86_64_table): Replace {T|}/{P|} with P.  
+	(x86_64_table): Replace {T|}/{P|} with P.
 	(putop): Add 'w' to 'T'/'P' if needed for Intel syntax.
 	(OP_sI): Update v_mode.  Remove w_mode.
 

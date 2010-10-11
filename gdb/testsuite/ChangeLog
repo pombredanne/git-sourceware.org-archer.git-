@@ -1,3 +1,31 @@
+2010-10-08  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/oranking.exp: New test.
+	* gdb.cp/oranking.cc: New test program.
+
+2010-10-08  Ken Werner  <ken.werner@de.ibm.com>
+
+	* gdb.base/gnu_vector.c (ia, ib, fa, fb): New variables.
+	* gdb.base/gnu_vector.exp: Add tests for scalar to vector widening.
+
+2010-10-06  Ken Werner  <ken.werner@de.ibm.com>
+
+	* gdb.base/constvars.c (logical, lugged, luck, lunar, lumen, lurk,
+	lush, lynx) New constant.
+	* gdb.base/constvars.exp: Test const array types.
+	* gdb.dwarf2/dw2-strp.exp: Add const qualifier for ptype tests.
+
+2010-10-06  Doug Evans  <dje@google.com>
+
+	* gdb.base/catch-syscall.exp (do_syscall_tests): Update location
+	of syscall staging area.
+
+2010-10-06  Ken Werner  <ken.werner@de.ibm.com>
+
+	* gdb.base/gnu_vector.c: Add variable c4.
+	* gdb.base/gnu_vector.exp: Add tests for character vector printing.
+	* gdb.arch/altivec-abi.exp: Fix expect pattern of character vectors.
+
 2010-10-05  Maciej W. Rozycki  <macro@codesourcery.com>
 
 	* gdb.arch/altivec-abi.exp: Fix a typo.
