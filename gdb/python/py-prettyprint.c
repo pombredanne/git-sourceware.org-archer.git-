@@ -49,9 +49,20 @@ search_pp_list (PyObject *list, PyObject *value)
 	return NULL;
 
       /* Skip if disabled.  */
-      if (PyObject_HasAttr (function, gdbpy_enabled_cst)
-	  && ! PyObject_IsTrue (PyObject_GetAttr (function, gdbpy_enabled_cst)))
-	continue;
+      if (PyObject_HasAttr (function, gdbpy_enabled_cst))
+	{
+	  PyObject *attr = PyObject_GetAttr (function, gdbpy_enabled_cst);
+	  int cmp;
+
+	  if (!attr)
+	    return NULL;
+	  cmp = PyObject_IsTrue (attr);
+	  if (cmp == -1)
+	    return NULL;
+
+	  if (!cmp)
+	    continue;
+	}
 
       printer = PyObject_CallFunctionObjArgs (function, value, NULL);
       if (! printer)
@@ -185,8 +196,8 @@ find_pretty_printer (PyObject *value)
    is returned.  If the function returns Py_NONE that means the pretty
    printer returned the Python None as a value.  Otherwise, if the
    function returns a value,  *OUT_VALUE is set to the value, and NULL
-   is returned.  On error, *OUT_VALUE is set to NULL, and NULL is
-   returned.  */
+   is returned.  On error, *OUT_VALUE is set to NULL, NULL is
+   returned, with a python exception set.  */
 
 static PyObject *
 pretty_print_one_value (PyObject *printer, struct value **out_value)
@@ -232,7 +243,11 @@ gdbpy_get_display_hint (PyObject *printer)
   if (hint)
     {
       if (gdbpy_is_string (hint))
-	result = python_string_to_host_string (hint);
+	{
+	  result = python_string_to_host_string (hint);
+	  if (result == NULL)
+	    gdbpy_print_stack ();
+	}
       Py_DECREF (hint);
     }
   else
@@ -555,7 +570,10 @@ print_children (PyObject *printer, const char *hint,
 	  else
 	    {
 	      output = python_string_to_host_string (py_v);
-	      fputs_filtered (output, stream);
+	      if (!output)
+		gdbpy_print_stack ();
+	      else
+		fputs_filtered (output, stream);
 	      xfree (output);
 	    }
 	}

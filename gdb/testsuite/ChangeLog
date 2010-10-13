@@ -1,3 +1,27 @@
+2010-10-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.python/py-error.exp: New file.
+	* gdb.python/py-error.py: New file.
+
+2010-10-12  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/break-interp.exp (test_ld): Replace gdb_expect by
+	gdb_test_multiple.
+
+2010-10-12  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/break-interp.exp: Use ldlags for linking flags.
+	* gdb.base/prelink.exp: Likewise.
+	* gdb.base/solib-nodir.exp: Likewise.
+	* lib/gdb.exp (gdb_compile) <*-*-openbsd*>
+	(gdb_compile) <shlib_load>: Use ldlags for linking flags.
+	* lib/prelink-support.exp (build_executable_own_libs): Likewise.
+
+2010-10-12  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* break-interp.exp (test_ld): Use two separate gdb_expect statements
+	for the "info files" test to avoid timeouts on slow machines.
+
 2010-10-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* gdb.cp/infcall-dlopen.cc (openlib): Support NULL FILENAME.
