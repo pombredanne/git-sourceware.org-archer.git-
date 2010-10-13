@@ -1,5 +1,8 @@
 /* A recursive-descent C/C++ parser for GDB, the GNU debugger.
 
+   This file is largely based on the GNU CC C++ parser (g++). 
+   Simularities are not coincidental.
+
    Copyright (C) 2010 Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -18,8 +21,9 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
-#include "expression.h"
 #include "arch-utils.h"
+#include "block.h"
+#include "expression.h"		/* Must appear before dfp.h.   */
 #include "dfp.h"
 #include "gdb_assert.h"
 #include "gdb_string.h"
@@ -27,6 +31,8 @@
 #include "language.h"
 #include "objfiles.h"
 #include "parser-defs.h"
+#include "symtab.h"
+#include "value.h"
 #include "vec.h"
 
 #define parse_type builtin_type (parse_gdbarch)
@@ -115,6 +121,10 @@ static const char *token_table_strings[(int) N_TOKEN_TYPES] =
 
 typedef enum cp_keyword
  {
+   KEYWORD_CHAR,
+   KEYWORD_BOOL,
+   KEYWORD_FLOAT,
+   KEYWORD_VOID,
    KEYWORD_UNSIGNED,
    KEYWORD_TEMPLATE,
    KEYWORD_VOLATILE,
@@ -159,7 +169,7 @@ typedef struct cp_token
 {
   token_type type;
   cp_keyword keyword;
-  token_value *value;		/* Must be free'd (necesary?) */
+  token_value *value;
 } cp_token;
 
 typedef struct cp_token_list
@@ -167,6 +177,8 @@ typedef struct cp_token_list
   cp_token *token;
   struct cp_token_list *next;
 } cp_token_list;
+typedef cp_token_list *cp_saved_token_list;
+DEF_VEC_P (cp_saved_token_list);
 
 /* A token signifying the end of input.  */
 static cp_token *EOF_token;
@@ -192,6 +204,9 @@ typedef struct
 
   /* Parsing language  */
   unsigned char language;
+
+  /* Saved tokens  */
+  VEC(cp_saved_token_list) *saved_tokens;
 } cp_lexer;
 
 /* An expression "chain" which wraps the parser globals
@@ -208,11 +223,72 @@ typedef struct cp_expression
   int ptr;
 } cp_expression;
 
+/* The status of a tentative parse.  */
+
+typedef enum cp_parser_status_kind
+{
+  /* No errors have occurred.  */
+  CP_PARSER_STATUS_KIND_NO_ERROR,
+
+  /* An error has occurred.  */
+  CP_PARSER_STATUS_KIND_ERROR,
+
+  /* We are committed to this tentative parse, whether or not an error
+     has occurred.  */
+  CP_PARSER_STATUS_KIND_COMMITTED
+} cp_parser_status_kind;
+
+/* Context that is saved and restored when parsing tentatively.  */
+typedef struct cp_parser_context
+{
+  /* If this is a tentative parsing context, the status of the
+     tentative parse.  */
+  enum cp_parser_status_kind status;
+
+  /* If non-NULL, we have just seen a `x->' or `x.' expression.  Names
+     that are looked up in this context must be looked up both in the
+     scope given by OBJECT_TYPE (the type of `x' or `*x') and also in
+     the context of the containing expression.  */
+  struct type *object_type;
+
+  /* The next parsing context in the stack.  */
+  struct cp_parser_context *next;
+} cp_parser_context;
+
+/* Flags that are passed to some parsing functions.  These values can
+   be bitwise-ored together.  */
+
+enum
+{
+  /* No flags.  */
+  CP_PARSER_FLAGS_NONE = 0x0,
+  /* The construct is optional.  If it is not present, then no error
+     should be issued.  */
+  CP_PARSER_FLAGS_OPTIONAL = 0x1,
+  /* When parsing a type-specifier, treat user-defined type-names
+     as non-type identifiers.  */
+  CP_PARSER_FLAGS_NO_USER_DEFINED_TYPES = 0x2,
+  /* When parsing a type-specifier, do not try to parse a class-specifier
+     or enum-specifier.  */
+  CP_PARSER_FLAGS_NO_TYPE_DEFINITIONS = 0x4
+};
+
+/* This type is used for parameters and variables which hold
+   combinations of the above flags.  */
+typedef int cp_parser_flags;
+
 /* A parser instance  */
-typedef struct
+typedef struct cp_parser
 {
   /* The lexer  */
   cp_lexer *lexer;
+
+  /* A stack of parsing contexts.  All but the bottom entry on the stack
+     will be tentative contexts.
+
+     We parse tentatively in order to determine which construct is in use
+     in some situations.  */
+  cp_parser_context *context;
 
   cp_expression *scope;
   cp_expression *qualifying_scope;
@@ -241,15 +317,15 @@ enum cp_precedence
 enum expr_code
 {
   ERROR_CODE,
-  EQ_EXPR,
+  NOP_EXPR,
   MULT_EXPR,
   DIV_EXPR,
   MOD_EXPR,
   PLUS_EXPR,
   MINUS_EXPR,
-  AND_EXPR,
-  OR_EXPR,
-  XOR_EXPR,
+  BIT_AND_EXPR,
+  BIT_XOR_EXPR,
+  BIT_IOR_EXPR,
   RSHIFT_EXPR,
   LSHIFT_EXPR,
   AND_AND_EXPR,
@@ -269,6 +345,23 @@ enum expr_code
   TRUTH_NOT_EXPR,
   BIT_NOT_EXPR
 };
+
+/* The various kinds of non-integral constants we may encounter.  */
+typedef enum non_integral_constant
+{
+  NIC_NONE,
+
+  /* assignment operator */
+  NIC_ASSIGNMENT,
+
+#ifdef I_DONT_KNOW
+  /* a cast */
+  NIC_CAST,
+#endif
+
+  /* comma operator */
+  NIC_COMMA
+} non_integral_constant;
 
 /* An expression representing the global namespace.  */
 static cp_expression *global_namespace;
@@ -317,11 +410,11 @@ static const struct binary_operations_node binary_ops[] = {
   { TTYPE_PLUS, PLUS_EXPR, PREC_ADDITIVE_EXPRESSION },
   { TTYPE_MINUS, MINUS_EXPR, PREC_ADDITIVE_EXPRESSION },
 
-  { TTYPE_AND, AND_EXPR, PREC_AND_EXPRESSION },
+  { TTYPE_AND, BIT_AND_EXPR, PREC_AND_EXPRESSION },
 
-  { TTYPE_OR, OR_EXPR, PREC_INCLUSIVE_OR_EXPRESSION },
+  { TTYPE_OR, BIT_IOR_EXPR, PREC_INCLUSIVE_OR_EXPRESSION },
 
-  { TTYPE_XOR, XOR_EXPR, PREC_EXCLUSIVE_OR_EXPRESSION },
+  { TTYPE_XOR, BIT_XOR_EXPR, PREC_EXCLUSIVE_OR_EXPRESSION },
 
   { TTYPE_RSHIFT, RSHIFT_EXPR, PREC_SHIFT_EXPRESSION },
   { TTYPE_LSHIFT, LSHIFT_EXPR, PREC_SHIFT_EXPRESSION },
@@ -380,6 +473,10 @@ struct reserved_keywords
 
 static const struct reserved_keywords reserved_keywords[] =
 {
+  {"char", KEYWORD_CHAR, CP_LANGUAGE_ALL_C},
+  {"bool", KEYWORD_BOOL, CP_LANGUAGE_CPLUS},
+  {"float", KEYWORD_FLOAT, CP_LANGUAGE_ALL_C},
+  {"void", KEYWORD_VOID, CP_LANGUAGE_ALL_C},
   {"unsigned", KEYWORD_UNSIGNED, CP_LANGUAGE_ALL_C},
   {"template", KEYWORD_TEMPLATE, CP_LANGUAGE_CPLUS},
   {"volatile", KEYWORD_VOLATILE, CP_LANGUAGE_ALL_C},
@@ -418,13 +515,69 @@ static const struct reserved_keywords reserved_keywords[] =
   {"reinterpret_cast", KEYWORD_REINTERPRET_CAST, CP_LANGUAGE_CPLUS}
 };
 
+/* An individual decl-specifier.  */
+
+typedef enum cp_decl_spec
+{
+  ds_first,
+  ds_signed = ds_first,
+  ds_unsigned,
+  ds_short,
+  ds_long,
+  ds_const,
+  ds_volatile,
+  ds_restrict,
+  ds_inline,
+  ds_virtual,
+  ds_explicit,
+  ds_friend,
+  ds_typedef,
+  ds_constexpr,
+  ds_complex,
+  ds_thread,
+  ds_last
+} cp_decl_spec;
+
+
+/* A decl-specifier-seq.  */
+typedef struct cp_decl_specifier_seq
+{
+  /* The number of times each of the keywords has been seen.  */
+  unsigned specs[(int) ds_last];
+
+  /* The primary type, if any, given by the decl-specifier-seq.
+     Modifiers like "short", "const", and "unsigned" are not recflected
+     here. !! TRUE?? */
+  struct type *type;
+} cp_decl_specifier_seq;
+
+/* An enumeration of the kind of tags that C++ accepts.  */
+enum tag_types {
+  /* Not a tag type  */
+  none_type = 0,
+
+  /* "struct" types  */
+  struct_type,
+
+  /* "class" types  */
+  class_type,
+
+  /* "union" types  */
+  union_type,
+
+  /* "enum" types  */
+  enum_type
+};
+
+static cp_parser_context *cp_parser_context_free_list;
+
 /* Returns the current expression chain (from expout).  If the argument
    is non-NULL, then the current chain is appended to it.
 
    In both cases, expout will be reset.  */
-static cp_expression *cp_parse_expression (cp_parser *);
+static cp_expression *cp_parse_expression (cp_parser *, int);
 
-static cp_expression *cp_cast_expression (cp_parser *);
+static cp_expression *cp_cast_expression (cp_parser *, int, int);
 
 
 
@@ -433,7 +586,9 @@ static cp_expression *cp_cast_expression (cp_parser *);
 static cp_token *
 new_token (void)
 {
-  return (cp_token *) xcalloc (1, sizeof (cp_token));
+  cp_token *token = (cp_token *) xcalloc (1, sizeof (cp_token));
+  token->keyword = KEYWORD_MAX;
+  return token;
 }
 
 /* Push TOKEN onto LEXER's token stream.  */
@@ -494,6 +649,194 @@ static int
 cp_is_eof_token (cp_token *token)
 {
   return (token == EOF_token);
+}
+
+/* Return true if the next token is the indicated KEYWORD.  */
+
+static int
+cp_lexer_next_token_is_keyword (cp_lexer *lexer, cp_keyword keyword)
+{
+  return cp_lexer_peek_token (lexer)->keyword == keyword;
+}
+
+
+/* */
+
+static void
+cp_lexer_save_tokens (cp_lexer *lexer)
+{
+  VEC_safe_push (cp_saved_token_list, lexer->saved_tokens, lexer->tokens);
+}
+
+/* */
+
+static void
+cp_lexer_rollback_tokens (cp_lexer *lexer)
+{
+  lexer->tokens = VEC_pop (cp_saved_token_list, lexer->saved_tokens);
+}
+
+
+/* Construct a new parsing context.  The context below this one on the
+   stack is given by NEXT.  */
+
+static cp_parser_context *
+cp_new_context (cp_parser_context *next)
+{
+  cp_parser_context *context;
+
+  if (cp_parser_context_free_list != NULL)
+    {
+      /* Pull the first entry from the free list.  */
+      context = cp_parser_context_free_list;
+      cp_parser_context_free_list = context->next;
+      memset (context, 0, sizeof (*context));
+    }
+  else
+    context = (cp_parser_context *) xcalloc (1, sizeof (cp_parser_context));
+
+  /* No errors have occurred in this context yet.  */
+  context->status = CP_PARSER_STATUS_KIND_NO_ERROR;
+
+  /* If this is not the bottom-most context, copy information that we
+     need from the previous context.  */
+  if (next)
+    {
+      /* If, in the NEXT context, we are parsing an `x->' or `x.'
+	 expression, then we are parsing one this context, too.  */
+      context->object_type = next->object_type;
+
+      /* Thread the stack.  */
+      context->next = next;
+    }
+
+  return context;
+}
+
+/* Returns non-zero if we are parsing tentatively.  */
+
+static int
+cp_parsing_tentatively (cp_parser *parser)
+{
+  return parser->context->next != NULL;
+}
+
+/* Returns non-zero if we are parsing tentatively and are not committed to
+   this tentative parse.  */
+
+static int
+cp_uncommitted_to_tentative_parse_p (cp_parser *parser)
+{
+  return (cp_parsing_tentatively (parser)
+	  && parser->context->status != CP_PARSER_STATUS_KIND_COMMITTED);
+}
+
+/* If we are parsing tentatively, remember that an error has occurred
+   during this tentative parse.  Returns non-zero if the error was simluated;
+   zero if a message should be issued by the caller.  */
+
+static int
+cp_simulate_error (cp_parser *parser)
+{
+  if (cp_uncommitted_to_tentative_parse_p (parser))
+    {
+      parser->context->status = CP_PARSER_STATUS_KIND_ERROR;
+      return 1;
+    }
+
+  return 0;
+}
+
+/* Begin parsing tentatively.  We always save tokens while parsing
+   tentatively sotaht if the parsing fails, we can restore the tokens.  */
+
+static void
+cp_parse_tentatively (cp_parser *parser)
+{
+  /* Enter a new parsing context.  */
+  parser->context = cp_new_context (parser->context);
+
+  /* Begin saving tokens.  */
+  cp_lexer_save_tokens (parser->lexer);
+}
+
+static void
+cp_lexer_commit_tokens (cp_lexer *lexer)
+{
+  VEC_pop (cp_saved_token_list, lexer->saved_tokens);
+}
+
+
+static void
+cp_parse_error (cp_parser *parser, const char *format, ...)
+{
+  va_list args;
+
+  va_start (args, format);
+  if (!cp_simulate_error (parser))
+    verror (format, args);
+  va_end (args);
+}
+
+
+/* Returns non-zero if an error occurred during the most recent tentative
+   parse.  */
+
+static int
+cp_parse_error_occurred (cp_parser *parser)
+{
+  return (cp_parsing_tentatively (parser)
+	  && parser->context->status == CP_PARSER_STATUS_KIND_ERROR);
+}
+
+/* Stop parsing tentatively.  If a parse error has occurred, restore the
+   token stream.  Otherwise, commit to the tokens we have consumed.
+Returns non-zero if no error occured; 0 otherwise.  */
+
+static int
+cp_parse_definitely (cp_parser *parser)
+{
+  int error_occurred;
+  cp_parser_context *context;
+
+  /* Remember whether or not an error occurred, since we are about to
+     destroy that information.  */
+  error_occurred = cp_parse_error_occurred (parser);
+
+  /* Remove the top-most context from the stack.  */
+  context = parser->context;
+  parser->context = context->next;
+
+  /* If no parse errors occurred, commit to the tentative parse.  */
+  if (!error_occurred)
+    {
+      /* Commit to the tokens read tentatively, unless that was
+	 already done. */
+      if (context->status != CP_PARSER_STATUS_KIND_COMMITTED)
+	cp_lexer_commit_tokens (parser->lexer);
+    }
+  /* Otherwise if errors occurred, roll back our state so that things
+     are just as they were before we began the tentative parse.  */
+  else
+    cp_lexer_rollback_tokens (parser->lexer);
+
+  /* Add the context to the front of the free list.  */
+  context->next = cp_parser_context_free_list;
+  cp_parser_context_free_list = context;
+
+  return !error_occurred;
+}
+
+/* Abort the currently active tentative parse.  All consumed tokens
+   will be rolled back, and no diagnostics will be issued.  */
+
+static void
+cp_abort_tentative_parse (cp_parser* parser)
+{
+  cp_simulate_error (parser);
+  /* Now, pretend that we want to see if the construct was
+     successfully parsed.  */
+  cp_parse_definitely (parser);
 }
 
 
@@ -572,6 +915,17 @@ cp_expression_chain (cp_expression *chain)
     }
 
   return chain;
+}
+
+/* Utility function to write the given string to the expression
+   chain.  */
+static void
+write_expression_string (char *string)
+{
+  struct stoken tmp;
+  tmp.ptr = string;
+  tmp.length = strlen (string);
+  write_exp_string (tmp);
 }
 
 /* A helper function to parse numbers from token values.  */
@@ -863,14 +1217,79 @@ parse_number (const cp_parser *parser, token_value *value,
    error (_("Invalid number \"%s\"."), value);
 }
 
+/* */
+static int
+cp_skip_to_closing_parenthesis (cp_parser *parser, int recovering,
+				int or_comma, int consume_paren)
+{
+  unsigned paren_depth = 0;
+  unsigned brace_depth = 0;
+  unsigned square_depth = 0;
+
+  while (1)
+    {
+      cp_token *token = cp_lexer_peek_token (parser->lexer);
+
+      switch (token->type)
+	{
+	case TTYPE_EOF:
+	  return 0;
+
+	case TTYPE_OPEN_SQUARE:
+	  ++square_depth;
+	  break;
+
+	case TTYPE_CLOSE_SQUARE:
+	  if (!square_depth--)
+	    return 0;
+	  break;
+
+	case TTYPE_OPEN_BRACE:
+	  ++brace_depth;
+	  break;
+
+	case TTYPE_CLOSE_BRACE:
+	  if (!brace_depth--)
+	    return 0;
+	  break;
+
+	case TTYPE_COMMA:
+	  if (recovering && or_comma && !brace_depth && !paren_depth
+	      && !square_depth)
+	    return -1;
+	  break;
+
+	case TTYPE_OPEN_PAREN:
+	  if (!brace_depth)
+	    ++paren_depth;
+	  break;
+
+	case TTYPE_CLOSE_PAREN:
+	  if (!brace_depth && !paren_depth--)
+	    {
+	      if (consume_paren)
+		cp_lexer_consume_token (parser->lexer);
+	      return 1;
+	    }
+	  break;
+
+	default:
+	  break;
+	}
+
+      cp_lexer_consume_token (parser->lexer);
+    }
+}
+
 /* Print out an appropriate error message for an expected missing
    token of type TYPE.  */
 
 static void
 cp_required_token_error (cp_parser *parser, token_type type)
 {
-  /* keiths-FIXME: This is not really sufficiently user-friendly.  */
-  error (_("syntax error: expected %s"), token_table_strings[(int) type]);
+  /* !!FIXME!! This is not really sufficiently user-friendly.  */
+  cp_parse_error (parser, _("syntax error: expected %s"),
+		  token_table_strings[(int) type]);
 }
 
 /* If the next token in PARSER is not of type TYPE, throw an error.
@@ -886,41 +1305,145 @@ cp_require_token (cp_parser *parser, token_type type)
   return NULL;
 }
 
+/* Looks up NAME in the current scope, as given by PARSER->SCOPE.
+   NAME should have one of the representations used for an
+   id-expression.  If NAME is the ERROR_MARK_NODE, the ERROR_MARK_NODE
+   is returned.  If PARSER->SCOPE is a dependent type, then a
+   SCOPE_REF is returned.
+
+   If NAME is a TEMPLATE_ID_EXPR, then it will be immediately
+   returned; the name was already resolved when the TEMPLATE_ID_EXPR
+   was formed.  Abstractly, such entities should not be passed to this
+   function, because they do not need to be looked up, but it is
+   simpler to check for this special case here, rather than at the
+   call-sites.
+
+   In cases not explicitly covered above, this function returns a
+   DECL, OVERLOAD, or baselink representing the result of the lookup.
+   If there was no entity with the indicated NAME, the ERROR_MARK_NODE
+   is returned.
+
+   If TAG_TYPE is not NONE_TYPE, it indicates an explicit type keyword
+   (e.g., "struct") that was used.  In that case bindings that do not
+   refer to types are ignored.
+
+   If IS_TEMPLATE is TRUE, bindings that do not refer to templates are
+   ignored.
+
+   If IS_NAMESPACE is TRUE, bindings that do not refer to namespaces
+   are ignored.
+
+   If CHECK_DEPENDENCY is TRUE, names are not looked up in dependent
+   types.
+
+   If AMBIGUOUS_DECLS is non-NULL, *AMBIGUOUS_DECLS is set to a
+   TREE_LIST of candidates if name-lookup results in an ambiguity, and
+   NULL_TREE otherwise.  */
+
 static cp_expression *
-cp_parse_identifier (cp_parser *parser)
+cp_lookup_name (cp_parser *parser, char *identifier)
 {
-  cp_token *token = cp_require_token (parser, TTYPE_NAME);
-  if (token != NULL)
+  struct symbol *sym;
+  cp_expression *expr;
+  int is_a_field_of_this = 0;
+
+  if (identifier == NULL)
+    return NULL;
+
+  sym = lookup_symbol (identifier, expression_context_block, VAR_DOMAIN,
+		       (parser->lexer->language & CP_LANGUAGE_CPLUS
+			? &is_a_field_of_this : NULL));
+
+  /* !!FIXME!! I don't know how much of this is really necessary... Test.  */
+  if (sym)
     {
-      /* FIXME: Can we use parser->scope? */
-      struct symbol *sym = lookup_symbol (token->value,
-					  expression_context_block, VAR_DOMAIN,
-					  NULL);
-      if (sym != NULL)
+      if (symbol_read_needs_frame (sym))
 	{
-	  write_exp_elt_opcode (OP_VAR_VALUE);
-	  write_exp_elt_block (expression_context_block);
-	  write_exp_elt_sym (sym);
-	  write_exp_elt_opcode (OP_VAR_VALUE);
-	  return cp_expression_chain (NULL);
+	  if (innermost_block == 0
+	      || contained_in (block_found, innermost_block))
+	    innermost_block = block_found;
 	}
+
+      write_exp_elt_opcode (OP_VAR_VALUE);
+      write_exp_elt_block (block_found);
+      write_exp_elt_sym (sym);
+      write_exp_elt_opcode (OP_VAR_VALUE);
+      return cp_expression_chain (NULL);
+    }
+  else if (is_a_field_of_this)
+    {
+      /* C++: it hangs off `this'.  Must not inadvertantly convert from a method
+	 call to a data ref.  */
+      if (innermost_block == 0
+	  || contained_in (block_found, innermost_block))
+	innermost_block = block_found;
+
+      write_exp_elt_opcode (OP_THIS);
+      write_exp_elt_opcode (OP_THIS);
+      write_exp_elt_opcode (STRUCTOP_PTR);
+      write_expression_string (identifier);
+      write_exp_elt_opcode (STRUCTOP_PTR);
+    }
+  else
+    {
+      struct minimal_symbol *msymbol
+	= lookup_minimal_symbol (identifier, NULL, NULL);
+      if (msymbol != NULL)
+	write_exp_msymbol (msymbol);
+      else if (!have_full_symbols () && !have_partial_symbols ())
+	cp_parse_error (parser, _("No symbol table is loaded.  use the \"file\" command."));
       else
 	{
-	  struct minimal_symbol *msym;
-	  msym = lookup_minimal_symbol (token->value, NULL, NULL);
-	  if (msym != NULL)
-	    {
-	      write_exp_msymbol (msym);
-	      return cp_expression_chain (NULL);
-	    }
-	  else if (!have_full_symbols () && !have_partial_symbols ())
-	    error (_("No symbol table is loaded.  Use the \"file\" command."));
-	  else
-	    error (_("No symbol \"%s\" in current context."), token->value);
+	  cp_parse_error (parser, _("No symbol \"%s\" in current context."),
+			  identifier);
 	}
     }
 
   return NULL;
+}
+
+static struct type *
+cp_lookup_type_name (cp_parser *parser, char *identifier,
+		     enum tag_types tag_type)
+{
+  int is_a_field_of_this;
+  struct symbol *sym;
+  struct type *type = NULL;
+
+  if (identifier == NULL)
+    return NULL;
+
+  sym = lookup_symbol (identifier, expression_context_block, VAR_DOMAIN,
+		       (parser->lexer->language & CP_LANGUAGE_CPLUS
+			? &is_a_field_of_this : NULL));
+  
+  if (sym != NULL && SYMBOL_CLASS (sym) == LOC_TYPEDEF)
+    type = SYMBOL_TYPE (sym);
+
+  if (type == NULL)
+    {
+      /* See if it is a type.  */
+      switch (tag_type)
+	{
+	case enum_type:
+	  type = lookup_enum (identifier, expression_context_block);
+	  break;
+
+	case class_type:
+	case struct_type:
+	  type = lookup_struct (identifier, expression_context_block);
+	  break;
+	}
+    }
+
+  return type;
+}
+
+static char *
+cp_parse_identifier (cp_parser *parser)
+{
+  cp_token *token = cp_require_token (parser, TTYPE_NAME);
+  return token ? token->value : NULL;
 }
 
 static cp_expression *
@@ -946,7 +1469,23 @@ cp_parse_global_scope_opt (cp_parser *parser, int current_scope_valid_p)
   return NULL;
 }
 
-static cp_expression *
+/* Parse an unqualified-id.
+
+   unqualified-id:
+     identifier
+     operator-function-id
+     conversion-function-id
+     ~ class-name
+     template-id
+
+   Returns a representation of unqualified-id.  For the `identifier'
+   production, an IDENTIFIER_NODE is returned.  For the `~ class-name'
+   production a BIT_NOT_EXPR is returned; the operand of the
+   BIT_NOT_EXPR is an IDENTIFIER_NODE for the class-name.  For the
+   other productions, see the documentation accompanying the
+   corresponding parsing functions.  */
+
+static char *
 cp_parse_unqualified_id (cp_parser *parser, int optional_p)
 {
   cp_token *token = cp_lexer_peek_token (parser->lexer);
@@ -954,7 +1493,25 @@ cp_parse_unqualified_id (cp_parser *parser, int optional_p)
   switch (token->type)
     {
     case TTYPE_NAME:
-      return cp_parse_identifier (parser);
+      {
+	/* We don't know yet whether or not this will be a template-id.  */
+	cp_parse_tentatively (parser);
+
+	/* Try a template-id.  */
+	/* = cp_parse_template_id (...) */
+	/* for now... */
+	cp_simulate_error (parser);
+
+	/* If that worked, we're done.  */
+	if (cp_parse_definitely (parser))
+	  return NULL; /* !!FIXME!! */
+
+	/* Otherwise it's an ordinary identifier.  */
+	/* this is a problem... For some things, we want string
+	   (qualified names); for others, we want symbols (other
+	   variable productions).  */
+	return cp_parse_identifier (parser);
+      }
 
     default:
       if (optional_p)
@@ -963,29 +1520,140 @@ cp_parse_unqualified_id (cp_parser *parser, int optional_p)
     }
 }
 
+static char *
+cp_parser_operator_function_id (cp_parser *parser)
+{
+  return NULL;
+}
+
+/* Parse an (optional) nested-name-specifier.
+
+   nested-name-specifier: [C++98]
+     class-or-namespace-name :: nested-name-specifier [opt]
+     class-or-namespace-name :: template nested-name-specifier [opt]
+
+   nested-name-specifier: [C++0x]
+     type-name ::
+     namespace-name ::
+     nested-name-specifier identifier ::
+     nested-name-specifier template [opt] simple-template-id ::
+
+   PARSER->SCOPE should be set appropriately before this function is
+   called.  TYPE_P is non-zero if non-type bindings should be ignored
+   in name lookups.
+
+   Sets PARSER->SCOPE to the class or namespace 
+   specified by the nested-name-specifier, or leaves
+   it unchanged if there is no nested-name-specifier.  Returns the new
+   scope iff there is a nested-name-specifier, or NULL otherwise.  */
+
 static cp_expression *
+cp_parse_nested_name_specifier_opt (cp_parser *parser, int type_p)
+{
+  return NULL;
+}
+
+/* Parse an id-expression.
+
+   id-expression:
+     unqualified-id
+     qualified-id
+
+   qualified-id:
+     :: [opt] nested-name-specifier template [opt] unqualified-id
+     :: identifier
+     :: operator-function-id
+     :: template-id
+
+   Returns a representation of the unqualified portion of the
+   identifier.  Sets PARSER->SCOPE to the qualifying scope if there is
+   a `::' or nested-name-specifier. */
+
+static char *
 cp_parse_id_expression (cp_parser *parser, int optional_p)
 {
-  int global_scope_p
+  int global_scope_p;
+  int nested_name_specifier_p;
+
+  global_scope_p
     = (cp_parse_global_scope_opt (parser, /*current_scope_valid_p=*/ 0)
        != NULL);
 
-  if (global_scope_p)
-    {
-      cp_token *token = cp_lexer_peek_token (parser->lexer);
-      if (token->type == TTYPE_NAME)
-	return cp_parse_identifier (parser);
-    }
+  nested_name_specifier_p
+    = (cp_parse_nested_name_specifier_opt (parser, /*type_p=*/0) != NULL);
 
-  return cp_parse_unqualified_id (parser, optional_p);
+  /* If there is a nested-name-specifier, then we are looking at
+     the first qualified-id production.  */
+  if (nested_name_specifier_p)
+    {
+      /* stuff */
+      return NULL;
+    }
+  /* Otherwise, if we are in global scope, then we are looking at one
+     of the other qualified-id productions.  */
+  else if (global_scope_p)
+    {
+      cp_token *token;
+
+      /* Peek at the next token.  */
+      token = cp_lexer_peek_token (parser->lexer);
+
+      /* If it's an identifier, and the next token is not a `<', then
+	 we can avoid the template-id case.  This is an optimization
+	 for this common case.  */
+      if (token->type == TTYPE_NAME)
+	{
+	  char *ident = cp_parse_identifier (parser);
+	  return NULL;
+	}
+
+      /* Peek at the next token.  (Changes in the token buffer may
+	 have invalidated the pointer obtained above.)  */
+      token = cp_lexer_peek_token (parser->lexer);
+      switch (token->type)
+	{
+	case TTYPE_NAME:
+	  {
+	    char *ident = cp_parse_identifier (parser);
+	    return NULL;
+	  }
+
+	case TTYPE_KEYWORD:
+	  if (token->keyword == KEYWORD_OPERATOR)
+	    return cp_parser_operator_function_id (parser);
+	  /* Fall through  */
+
+	default:
+	  error (_("expected id-expression"));
+	}
+    }
+  else
+    return cp_parse_unqualified_id (parser, optional_p);
 }
 
+/* Parse a primary-expression.
+
+   primary-expression:
+     literal
+     this
+     ( expression )
+     id-expression
+
+   Returns a representation of the expression.  */
+
 static cp_expression *
-cp_parse_primary_expression (cp_parser *parser)
+cp_parse_primary_expression (cp_parser *parser, int address_p, int cast_p)
 {
   cp_token *token = cp_lexer_peek_token (parser->lexer);
   switch (token->type)
     {
+      /* literal:
+	   integer-literal
+	   character-literal
+	   floating-literal
+	   string-literal
+	   boolean-literal  */
+    case TTYPE_CHAR:
     case TTYPE_NUMBER:
       {
 	int r;
@@ -1023,8 +1691,8 @@ cp_parse_primary_expression (cp_parser *parser)
       }
       break;
 
-    case TTYPE_NAME:
-      return cp_parse_id_expression (parser, /*optional_p=*/ 0);
+    case TTYPE_STRING:
+      break;
 
     case TTYPE_OPEN_PAREN:
       {
@@ -1035,7 +1703,7 @@ cp_parse_primary_expression (cp_parser *parser)
 	cp_lexer_consume_token (parser->lexer);
 
 	/* Parse the parenthesized expression.  */
-	expr = cp_parse_expression (parser);
+	expr = cp_parse_expression (parser, cast_p);
 	c = make_cleanup (free_expression_chain, (void *) expr);
 
 	/* Consume the `)'.  */
@@ -1047,6 +1715,31 @@ cp_parse_primary_expression (cp_parser *parser)
       }
       break;
 
+    case TTYPE_KEYWORD:
+      break;
+
+    case TTYPE_NAME:
+    case TTYPE_SCOPE:
+      {
+	char *id;
+	cp_expression *expr;
+
+      id_expression:
+	/* Parse the id-expression.  */
+	id = cp_parse_id_expression (parser, /*optional_p=*/0);
+	if (id == NULL)
+	  return NULL;
+
+	/* Look up the name.  */
+	expr = cp_lookup_name (parser, id);
+	/* !!FIXME!! I don't think that a primary_expression can
+	   ever be optional?  */
+	if (expr == NULL)
+	  cp_parse_error (parser, _("expected primary-expression"));
+
+	return expr;
+      }
+
     default:
       error (_("expected primary expression"));
     }
@@ -1055,186 +1748,95 @@ cp_parse_primary_expression (cp_parser *parser)
   return NULL;
 }
 
-static cp_expression *
-cp_parse_postfix_open_square_expression (cp_parser *parser, cp_expression *expr)
+/* If parsing an integral constant-expression, issue an error mesage
+   about the fact that THING appeared and return non-zero.  Otherwise,
+   return zero.  In either case, set
+   PARSER->NON_INTEGRAL_CONSTANT_EXPRESSION_P.  !!FIXME!! Do we need this?? */
+static int
+cp_non_integral_constant_expression (cp_parser *parser,
+				     non_integral_constant thing)
 {
-  cp_lexer_consume_token (parser->lexer);
-  cp_expression_append_chain (expr, cp_parse_expression (parser));
-  cp_require_token (parser, TTYPE_CLOSE_SQUARE);
-  write_exp_elt_opcode (BINOP_SUBSCRIPT);
-  return cp_expression_chain (expr);
+  return 0;
 }
 
-static cp_expression *
-cp_parse_postfix_expression (cp_parser *parser)
-{
-  cp_expression *expr;
-  cp_token *token = cp_lexer_peek_token (parser->lexer);
+/* Parse an (optional) assignment-operator.
 
-  switch (token->type)
-    {
-    default:
-      expr = cp_parse_primary_expression (parser);
-      break;
-    }
+   assignment-operator: one of
+     = *= /= %= -= >>= <<= &= ^+ |=
 
-  while (1)
-    {
-      token = cp_lexer_peek_token (parser->lexer);
-
-      switch (token->type)
-	{
-	case TTYPE_OPEN_SQUARE:
-	  expr = cp_parse_postfix_open_square_expression (parser, expr);
-	  break;
-
-	case TTYPE_OPEN_PAREN:
-	  break;
-
-	case TTYPE_DOT:
-	case TTYPE_DEREF:
-	  break;
-
-	case TTYPE_PLUS_PLUS:
-	  break;
-
-	case TTYPE_MINUS_MINUS:
-	  break;
-
-	default:
-	  return expr;
-	}
-    }
-
-  gdb_assert_not_reached ("unreachable statement parsing postfix expression");
-  return NULL;
-}
+   If the next token is an assignment oeprator, the corresponding
+   expression code is returned, and the token is consumed.  Otherwise
+   ERROR_CODE is returned.  */
 
 static enum expr_code
-cp_unary_operator (cp_token *token)
+cp_parse_assignment_operator_opt (cp_parser *parser)
 {
+  enum expr_code op;
+  cp_token *token;
+
+  /* Peek at the next token.  */
+  token = cp_lexer_peek_token (parser->lexer);
+
   switch (token->type)
     {
-    case TTYPE_MULT:
-      return INDIRECT_REF;
+    case TTYPE_EQ:
+      op = NOP_EXPR;
+      break;
 
-    case TTYPE_AND:
-      return ADDR_EXPR;
+    case TTYPE_MULT_EQ:
+      op = MULT_EXPR;
+      break;
 
-    case TTYPE_PLUS:
-      return UNARY_PLUS_EXPR;
+    case TTYPE_DIV_EQ:
+      op = DIV_EXPR;
+      break;
 
-    case TTYPE_MINUS:
-      return NEGATE_EXPR;
+    case TTYPE_MOD_EQ:
+      op = MOD_EXPR;
+      break;
 
-    case TTYPE_NOT:
-      return TRUTH_NOT_EXPR;
+    case TTYPE_PLUS_EQ:
+      op = PLUS_EXPR;
+      break;
 
-    case TTYPE_COMPL:
-      return BIT_NOT_EXPR;
+    case TTYPE_MINUS_EQ:
+      op = MINUS_EXPR;
+      break;
+
+    case TTYPE_RSHIFT_EQ:
+      op = RSHIFT_EXPR;
+      break;
+
+    case TTYPE_LSHIFT_EQ:
+      op = LSHIFT_EXPR;
+      break;
+
+    case TTYPE_AND_EQ:
+      op = BIT_XOR_EXPR;
+      break;
+
+    case TTYPE_OR_EQ:
+      op = BIT_IOR_EXPR;
+      break;
 
     default:
-      return ERROR_CODE;
+      /* Nothing else is an assignment operator.  */
+      op = ERROR_CODE;
     }
+
+  /* If it was an assignment operator, consume the token.  */
+  if (op != ERROR_CODE)
+    cp_lexer_consume_token (parser->lexer);
+
+  return op;
 }
 
-static cp_expression *
-cp_parse_unary_expression (cp_parser *parser)
-{
-  cp_token *token;
-  enum expr_code unary_operator;
-
-  token  = cp_lexer_peek_token (parser->lexer);
-  if (token->type == TTYPE_KEYWORD)
-    {
-      ;
-    }
-
-  if (cp_lexer_next_token_is (parser->lexer, TTYPE_SCOPE))
-    {
-      ;
-    }
-
-  unary_operator = cp_unary_operator (token);
-  if (unary_operator == ERROR_CODE)
-    {
-      if (token->type == TTYPE_PLUS_PLUS)
-	unary_operator = PREINCREMENT_EXPR;
-      else if (token->type == TTYPE_MINUS_MINUS)
-	unary_operator = PREDECREMENT_EXPR;
-      /* GNU extension TTYPE_AND_AND? */
-    }
-
-  if (unary_operator != ERROR_CODE)
-    {
-      cp_expression *cast_expr;
-      enum exp_opcode operator;
-
-      token = cp_lexer_consume_token (parser->lexer);
-      cast_expr = cp_cast_expression (parser);
-      switch (unary_operator)
-	{
-	case INDIRECT_REF:
-	  operator = UNOP_IND;
-	  break;
-
-	case ADDR_EXPR:
-	  operator = UNOP_ADDR;
-	  break;
-
-	case BIT_NOT_EXPR:
-	  operator = UNOP_COMPLEMENT;
-	  break;
-
-	case PREINCREMENT_EXPR:
-	  operator = UNOP_PREINCREMENT;
-	  break;
-
-	case PREDECREMENT_EXPR:
-	  operator = UNOP_PREDECREMENT;
-	  break;
-
-	case UNARY_PLUS_EXPR:
-	  operator = UNOP_PLUS;
-	  break;
-
-	case NEGATE_EXPR:
-	  operator = UNOP_NEG;
-	  break;
-
-	case TRUTH_NOT_EXPR:
-	  operator = UNOP_LOGICAL_NOT;
-	  break;
-
-	default:
-	  gdb_assert_not_reached ("unexpected unary operator");
-	}
-
-      write_exp_elt_opcode (operator);
-      return cp_expression_chain (cast_expr);
-    }
-
-  return cp_parse_postfix_expression (parser);
-}
-
-static cp_expression *
-cp_cast_expression (cp_parser *parser)
-{
-  /* determine if parser is looking at a cast of some sort */
-#if 0
-  if (cp_lexer_next_token_is (parser->lexer, TTYPE_OPEN_PAREN))
-    {
-      /* we could be looking at a cast... */
-      return NULL;
-    }
-#endif
-  return cp_parse_unary_expression (parser);
-}
+/* Parse a cast-expression that is not the operand of a unary `&'.  */
 
 static cp_expression *
 cp_parse_simple_cast_expression (cp_parser *parser)
 {
-  return cp_cast_expression (parser);
+  return cp_cast_expression (parser, /*address_p=*/0, /*cast_p=*/0);
 }
 
 static cp_expression *
@@ -1264,15 +1866,15 @@ build_binary_op (cp_expression *lhs, cp_expression *rhs, enum expr_code code)
       operator = BINOP_SUB;
       break;
 
-    case AND_EXPR:
+    case BIT_AND_EXPR:
       operator = BINOP_BITWISE_AND;
       break;
 
-    case OR_EXPR:
+    case BIT_IOR_EXPR:
       operator = BINOP_BITWISE_IOR;
       break;
 
-    case XOR_EXPR:
+    case BIT_XOR_EXPR:
       operator = BINOP_BITWISE_XOR;
       break;
 
@@ -1329,8 +1931,50 @@ build_binary_op (cp_expression *lhs, cp_expression *rhs, enum expr_code code)
   return lhs;
 }
 
+/* Parse a binary expression of the general form:
+
+   pm-expression:
+     cast-expression
+     pm-expression .* cast-expression
+     pm-expression ->* cast-expression
+
+   multiplicative-expression:
+     pm-expression
+     multiplicative-expression * pm-expression
+     multiplicative-expression / pm-expression
+     multiplicative-expression % pm-expression
+
+   additive-expression:
+     multiplicative-expression
+     additive-expression + multiplicative-expression
+     additive-expression - multiplicative-expression
+
+   shift-expression:
+     additive-expression
+     shift-expression << additive-expression
+     shift-expression >> additive-expression
+
+   relational-expression:
+     shift-expression
+     relational-expression < shift-expression
+     relational-expression > shift-expression
+     relational-expression <= shift-expression
+     relational-expression >= shift-expression
+
+   All these are implemented with a single function like:
+
+   binary-expression:
+     simple-cast-expression
+     binary-expression <token> binary-expression
+
+   CAST_P is true if this expression is the target of a cast.
+
+   The binary_ops_token map is used to get the tree codes for each <token>
+   type. binary-expressions are associated according to a precedence table.  */
+
 static cp_expression *
-cp_parse_binary_expression (cp_parser *parser, enum cp_precedence prec)
+cp_parse_binary_expression (cp_parser *parser, int cast_p,
+			    enum cp_precedence prec)
 {
   struct cleanup *back_to, *cleanup;
   cp_expression_stack stack;
@@ -1340,7 +1984,7 @@ cp_parse_binary_expression (cp_parser *parser, enum cp_precedence prec)
   cp_expression *lhs, *rhs;
   enum expr_code operator;
 
-  lhs = cp_cast_expression (parser);
+  lhs = cp_cast_expression (parser, /*address_p=*/0, cast_p);
   back_to = make_cleanup (free_expression_chain, lhs);
 
   for (;;)
@@ -1400,9 +2044,1255 @@ cp_parse_binary_expression (cp_parser *parser, enum cp_precedence prec)
 }
 
 static cp_expression *
-cp_parse_expression (cp_parser *parser)
+cp_parse_initializer_clause (cp_parser *parser, int *non_constant_p)
 {
-  return cp_parse_binary_expression (parser, PREC_NOT_OPERATOR);
+  return NULL;
+}
+
+/* Build the assign-modify expression of the form:
+
+   lhs OPERATOR= rhs
+
+  Returns the resultant expression of the form:
+
+    lhs
+    rhs
+    BINOP_ASSIGN_MODIFY
+    OPERATOR
+    BINOP_ASSIGN_MODIFY  */
+
+static cp_expression *
+build_x_modify_expr (cp_expression *lhs, enum expr_code modifycode,
+		     cp_expression *rhs)
+{
+  /* Append RHS to LHS.  */
+  cp_expression_append_chain (lhs, rhs);
+
+  /* RHS is no longer needed.  */
+  free_expression_chain (rhs);
+
+  /* Write the assignment operator and append those elements to
+     the expression chain.  */
+  if (modifycode == NOP_EXPR)
+    write_exp_elt_opcode (BINOP_ASSIGN);
+  else
+    {
+      write_exp_elt_opcode (BINOP_ASSIGN_MODIFY);
+      switch (modifycode)
+	{
+	case MULT_EXPR:
+	  write_exp_elt_opcode (BINOP_MUL);
+	  break;
+
+	case DIV_EXPR:
+	  write_exp_elt_opcode (BINOP_DIV);
+	  break;
+
+	case MOD_EXPR:
+	  write_exp_elt_opcode (BINOP_REM);
+	  break;
+
+	case PLUS_EXPR:
+	  write_exp_elt_opcode (BINOP_ADD);
+	  break;
+
+	case MINUS_EXPR:
+	  write_exp_elt_opcode (BINOP_SUB);
+	  break;
+
+	case RSHIFT_EXPR:
+	  write_exp_elt_opcode (BINOP_RSH);
+	  break;
+
+	case LSHIFT_EXPR:
+	  write_exp_elt_opcode (BINOP_LSH);
+	  break;
+
+	case BIT_AND_EXPR:
+	  write_exp_elt_opcode (BINOP_BITWISE_AND);
+	  break;
+
+	case BIT_XOR_EXPR:
+	  write_exp_elt_opcode (BINOP_BITWISE_XOR);
+	  break;
+
+	case BIT_IOR_EXPR:
+	  write_exp_elt_opcode (BINOP_BITWISE_IOR);
+	  break;
+
+	default:
+	  (gdb_assert_not_reached
+	   ("unreachable statement in build_x_modify_expr"));
+	  break;
+	}
+      write_exp_elt_opcode (BINOP_ASSIGN_MODIFY);
+    }
+
+  return cp_expression_chain (lhs);
+};
+
+
+/* Parse an assignment-expression.
+
+   assignment-expression:
+     conditional-expression
+     logical-or-expression assignment-operator assignment-expression
+
+   CAST_P is non-zero if this expression is the target of a cast.
+
+   Returns a representation of the expression.  */
+
+static cp_expression *
+cp_parse_assignment_expression (cp_parser *parser, int cast_p)
+{
+  cp_expression *expr;
+
+  /* Parse the binary expressions (logical-or-expression).  */
+  expr = cp_parse_binary_expression (parser, cast_p, PREC_NOT_OPERATOR);
+
+  /* If the next token is a `?', then we are actually looking at a
+     conditional-expression.  */
+  if (cp_lexer_next_token_is (parser->lexer, TTYPE_QUERY))
+    return NULL /*cp_parse_question_colon_clause (parser, expr)*/;
+  else
+    {
+      enum expr_code assignment_operator;
+
+      /* If it's an assignment-operator, we're using the second
+	 production.  */
+      assignment_operator
+	= cp_parse_assignment_operator_opt (parser);
+      if (assignment_operator != ERROR_CODE)
+	{
+	  int non_constant_p;
+	  cp_expression *rhs;
+
+	  /* Parse the right-hand side of the assignment.  */
+	  rhs = cp_parse_initializer_clause (parser, &non_constant_p);
+
+	  /* An assignment may not apear in a constant-expression.  */
+	  if (cp_non_integral_constant_expression (parser, NIC_ASSIGNMENT))
+	    return NULL;
+
+	  /* Build the assignment expression.  */
+	  expr = build_x_modify_expr (expr, assignment_operator, rhs);
+	}
+    }
+
+  return expr;
+}
+
+static cp_expression *
+build_x_compound_expr (cp_expression *a, cp_expression *b)
+{
+  return a;
+}
+
+/* Parse an expression.
+
+   expression:
+     assignment-expression
+     expression , assignment-expression
+
+  CAST_P is non-zero if this expression is the target of a cast.
+
+  Returns a representation of the expression.  */
+
+static cp_expression *
+cp_parse_expression (cp_parser *parser, int cast_p)
+{
+  cp_expression *expression = NULL;
+
+  while (1)
+    {
+      cp_expression *assignment_expression;
+
+      /* Parse the next assignment-expression.  */
+      assignment_expression
+	= cp_parse_assignment_expression (parser, cast_p);
+
+      /* If this is the first assignment-expression, we can just
+	 save it away.  */
+      if (expression == NULL)
+	expression = assignment_expression;
+      else
+	expression = build_x_compound_expr (expression,
+					    assignment_expression);
+
+      /* If the next token is not a comma, then we are done with the
+	 expression.  */
+      if (!cp_lexer_next_token_is (parser->lexer, TTYPE_COMMA))
+	break;
+
+      /* Consume the `,'.  */
+      cp_lexer_consume_token (parser->lexer);
+
+      /* A comma operator cannot appear in a constant-expression.  */
+      if (cp_non_integral_constant_expression (parser, NIC_COMMA))
+	expression = NULL;
+    }
+
+  return expression;
+}
+
+/* Update the DECL_SPECS to reflect the TYPE_SPEC.  If USER_DEFINED_P
+   is non-zero, the type is a user-defined type; otherwise it is a built-in
+   type specified by a keyword.  */
+
+static void
+cp_set_decl_spec_type (cp_decl_specifier_seq *decl_specs,
+		       struct type *type_spec, int user_defined_p)
+{
+  decl_specs->type = type_spec;
+}
+
+/* A subroutine of cp_parse_postfix_expression.  We're looking for
+
+     postfix-expression [ expression ]
+
+   Returns a representation of the expression.  */
+
+static cp_expression *
+cp_parse_postfix_open_square_expression (cp_parser *parser)
+{
+  cp_expression *expr;
+
+  /* Consume the `[' token.  */
+  cp_lexer_consume_token (parser->lexer);
+
+  /* Parse the expression.  */
+  expr = cp_parse_expression (parser, /*cast_p=*/0);
+
+  /* Look for the closing `]'.  */
+  cp_require_token (parser, TTYPE_CLOSE_SQUARE);
+
+  /* Construct and return the final postfix-expression.  */
+  write_exp_elt_opcode (BINOP_SUBSCRIPT);
+  return cp_expression_chain (expr);
+}
+
+static cp_expression *
+cp_parse_functional_cast (cp_parser *parser, struct type *type)
+{
+  return NULL;
+}
+
+/* Parse a class-name.
+
+   class-name:
+     identifier
+     template-id
+
+   TAG_TYPE indicates the explicit tag given before
+   the type name, if any.
+
+   Returns the type representing the class.  */
+
+static struct type *
+cp_parse_class_name (cp_parser *parser, enum tag_types tag_type)
+{
+  cp_token *token;
+  struct type *type;
+
+  /* All class-names start with an identifier.  */
+  token = cp_lexer_peek_token (parser->lexer);
+  if (token->type != TTYPE_NAME /*&& token->type != TTYPE_TEMPLATE_ID*/)
+    {
+      cp_parse_error (parser, _("expected class-name"));
+      return NULL;
+    }
+
+  /* Handle the common case (an identifier, but not a template-id)
+     efficiently.  */
+  if (token->type == TTYPE_NAME
+      /* && !cp_nth_token_starts_template_argument_list_p (parser, 2)*/)
+    {
+      char *identifier = cp_parse_identifier (parser);
+
+      /* If the next token isn't an identifier, we are certainly not
+	 looking at a class-name.  */
+      if (identifier == NULL)
+	type = NULL;
+      else
+	{
+	  /* Look up the name.  */
+	  type = cp_lookup_type_name (parser, identifier, tag_type);
+	}
+    }
+  else
+    {
+      /* Try a template-id.  */
+      ;
+    }
+
+  if (type == NULL)
+    cp_parse_error (parser, _("expected class-name"));
+
+  return type;
+}
+
+/* Parse a non-class type name.
+
+  enum-name:
+    identifier
+
+  typedef-name:
+    identifier
+
+  Returns the type.  */
+
+static struct type *
+cp_parse_nonclass_name (cp_parser *parser)
+{
+  struct type *type;
+  char *identifier;
+
+  cp_token *token = cp_lexer_peek_token (parser->lexer);
+  identifier = cp_parse_identifier (parser);
+  if (identifier == NULL)
+    return NULL;
+
+  /* Look up the type-name.  */
+  type = cp_lookup_type_name (parser, identifier, none_type);
+
+  /* Issue an error if we did not find a type-name.  */
+  if (type == NULL)
+    {
+      if (!cp_simulate_error (parser))
+	cp_parse_error (parser, _("invalid type \"%s\" (!!FIXME!!?)"),
+			identifier);
+    }
+
+  return type;
+}
+
+/* Parse a type-name.
+
+   type-name:
+     class-name
+     enum-name
+     typedef-name
+
+   enum-name:
+     identifier
+
+   typedef-name:
+     identifier
+
+   Returns the type.  */
+
+static struct type *
+cp_parse_type_name (cp_parser *parser)
+{
+  struct type *type;
+
+  /* We can't know yet whether it is a  class-name or not.  */
+  cp_parse_tentatively (parser);
+
+  /* Try a class-name.  */
+  type = cp_parse_class_name (parser, none_type);
+
+  /* If it's not a class-name, keep looking.  */
+  if (!cp_parse_definitely (parser))
+    {
+      /* It must be a typedef-name or an enum-name.  */
+      return cp_parse_nonclass_name (parser);
+    }
+
+  return type;
+}
+
+/* Parse a simple-type-specifier.
+
+   simple-type-specifier:
+     :: [opt] nested-name-specifier [opt] type-name
+     :: [opt] nested-name-specifier template template-id
+     char
+     wchar_t
+     bool
+     short
+     int
+     long
+     signed
+     unsigned
+     float
+     double
+     void
+
+   Returns the indicated type expression.  If DECL_SPECS is not NULL, it is
+   appropriately updated.  */
+
+static struct type *
+cp_parse_simple_type_specifier (cp_parser *parser,
+				cp_decl_specifier_seq *decl_specs,
+				cp_parser_flags flags)
+{
+  cp_token *token;
+  struct type *type = NULL;
+
+  /* Peek at the next token.  */
+  token = cp_lexer_peek_token (parser->lexer);
+
+  /* If we're looking at a keyword, things are easy.  */
+  switch (token->keyword)
+    {
+    case KEYWORD_CHAR:
+      type = language_lookup_primitive_type_by_name (parse_language,
+						     parse_gdbarch,
+						     token->value);
+      break;
+
+    case KEYWORD_BOOL:
+      type = language_lookup_primitive_type_by_name (parse_language,
+						     parse_gdbarch,
+						     token->value);
+      break;
+
+    case KEYWORD_SHORT:
+      if (decl_specs)
+	++decl_specs->specs[(int) ds_short];
+      type = language_lookup_primitive_type_by_name (parse_language,
+						     parse_gdbarch,
+						     token->value);
+      break;
+
+    case KEYWORD_INT:
+      type = language_lookup_primitive_type_by_name (parse_language,
+						     parse_gdbarch,
+						     token->value);
+      break;
+
+    case KEYWORD_LONG:
+      if (decl_specs)
+	++decl_specs->specs[(int) ds_long];
+      type = language_lookup_primitive_type_by_name (parse_language,
+						     parse_gdbarch,
+						     token->value);
+      break;
+
+    case KEYWORD_UNSIGNED:
+      if (decl_specs)
+	++decl_specs->specs[(int) ds_unsigned];
+      type = language_lookup_primitive_type_by_name (parse_language,
+						     parse_gdbarch,
+						     token->value);
+      break;
+
+    case KEYWORD_SIGNED:
+      if (decl_specs)
+	++decl_specs->specs[(int) ds_signed];
+      type = language_lookup_primitive_type_by_name (parse_language,
+						     parse_gdbarch,
+						     token->value);
+      break;
+
+    case KEYWORD_FLOAT:
+      type = language_lookup_primitive_type_by_name (parse_language,
+						     parse_gdbarch,
+						     token->value);
+      break;
+
+    case KEYWORD_DOUBLE:
+      type = language_lookup_primitive_type_by_name (parse_language,
+						     parse_gdbarch,
+						     token->value);
+      break;
+
+    case KEYWORD_VOID:
+      type = language_lookup_primitive_type_by_name (parse_language,
+						     parse_gdbarch,
+						     token->value);
+      break;
+
+    default:
+      break;
+    }
+
+  /* If the type-specifier was for a built-in type, we're done.  */
+  if (type != NULL)
+    {
+      /* Record the type.  */
+      if (decl_specs
+	  && (token->keyword != KEYWORD_SIGNED
+	      && token->keyword != KEYWORD_UNSIGNED
+	      && token->keyword != KEYWORD_SHORT
+	      && token->keyword != KEYWORD_LONG))
+	cp_set_decl_spec_type (decl_specs, type, /*user_defined_p=*/0);
+
+      /* Consume the token.  */
+      cp_lexer_consume_token (parser->lexer);
+
+      /* There is no valid C++ program where a non-template type is
+	 followed by a "<".  That usually indicates the the user thought
+	 that the type was  a template.  */
+      /*cp_parser_check_for_invalid_template_id (parser, type);*/
+      return type;
+    }
+
+  /* The type-specifier must be a user-defined type.  */
+  /* !!FIXME!! Is this necessary? */
+  if (!(flags & CP_PARSER_FLAGS_NO_USER_DEFINED_TYPES))
+    {
+      int qualified_p;
+      int global_p;
+
+      /* Don't gobble tokens or issue error messages if this is an
+	 optional type-specifier.  */
+      if (flags & CP_PARSER_FLAGS_OPTIONAL)
+	cp_parse_tentatively (parser);
+
+      /* Look for the optional `::' operator.  */
+      global_p
+	= (cp_parse_global_scope_opt (parser,
+				       /*current_scope_valid_p=*/0)
+	   != NULL);
+
+      /* Look for the nested-name specifier.  */
+      qualified_p
+	= (cp_parse_nested_name_specifier_opt (parser, /*type_p=*/0)
+	   != NULL);
+
+      token = cp_lexer_peek_token (parser->lexer);
+
+      /* Look for a type-name.  */
+      type = cp_parse_type_name (parser);
+
+      /* If it didn't work out, we don't have a TYPE.  */
+      if ((flags & CP_PARSER_FLAGS_OPTIONAL)
+	   && !cp_parse_definitely (parser))
+	  type = NULL;
+
+      if (type && decl_specs)
+	cp_set_decl_spec_type (decl_specs, type, /*user_defined_p=*/1);
+    }
+
+  /* If we didn't get a type-name, issue an error message.  */
+  if (type == NULL && !(flags & CP_PARSER_FLAGS_OPTIONAL))
+    cp_parse_error (parser, _("expected type-name"));
+
+  /* There is no valid C++ program wher a non-template type is
+     followed by `<'.  That usually indicates that the user thought
+     the type was a template.  */
+  /*cp_check_for_invalid_template_id (...); */
+
+  return type;
+}
+
+static enum tag_types
+cp_token_is_class_key (cp_token *token)
+{
+  switch (token->keyword)
+    {
+    case KEYWORD_CLASS:
+      return class_type;
+    case KEYWORD_STRUCT:
+      return struct_type;
+    case KEYWORD_UNION:
+      return union_type;
+
+    default:
+      return none_type;
+    }  
+}
+
+static enum tag_types
+cp_class_key (cp_parser *parser)
+{
+  cp_token *token;
+  enum tag_types tag_type;
+
+  /* Look for the class-key.  */
+  token = cp_require_token (parser, TTYPE_KEYWORD);
+  if (!token)
+    return none_type;
+
+  /* Check to see if the TOKEN is a class-key.  */
+  tag_type = cp_token_is_class_key (token);
+  if (!tag_type)
+    error (_("expected class-key"));
+  return tag_type;
+}
+
+/* Issue an error message if the CLASS_KEY does not match the TYPE.  */
+
+static void
+cp_check_class_key (enum tag_types class_key, struct type *type)
+{
+  if ((TYPE_CODE (type) == TYPE_CODE_UNION) != (class_key == union_type))
+    error (_("%s tag used in naming %s"),
+	     class_key == union_type ? "union"
+	      : class_key == struct_type ? "struct" : "class",
+	      TYPE_NAME (type));
+}
+
+/* Parse an elaborated-type-specifier.  Note that the grammar given
+   here incorporates the resolution to DR68.
+
+   elaborated-type-specifier:
+     class-key :: [opt] nested-name-specifier [opt] identifier
+     class-key :: [opt] nested-name-specifier [opt] template [opt] template-id
+     enum-key :: [opt] nested-name-specifier [opt] identifier
+
+   Returns the TYPE specified.  */
+
+static struct type *
+cp_parse_elaborated_type_specifier (cp_parser *parser)
+{
+  enum tag_types tag_type;
+  char *identifier;
+  cp_token *token;
+  struct type *type;
+
+  /* See if we're looing at the `enum' keyword.  */
+  if (cp_lexer_next_token_is_keyword (parser->lexer, KEYWORD_ENUM))
+    {
+      /* Consume the `enum' token.  */
+      cp_lexer_consume_token (parser->lexer);
+
+      /* Remember that it's an enumeration type.  */
+      tag_type = enum_type;
+    }
+  else
+    /* Otherwise it must be a class-key.  */
+    {
+      tag_type = cp_class_key (parser);
+      if (tag_type == none_type)
+	return NULL;
+    }
+
+  cp_parse_nested_name_specifier_opt (parser, /*type_p=*/1);
+
+  /* For everything but enumeration types, consider a template-id.
+     For an enumeration type, consider only a plain identifier.  */
+  if (tag_type != enum_type)
+    {
+      ;
+    }
+
+  token = cp_lexer_peek_token (parser->lexer);
+  identifier = cp_parse_identifier (parser);
+
+  if (identifier == NULL)
+    {
+      /* I don't think this is necessary, either.  !!FIXME!! */
+      parser->scope = NULL;
+      return NULL;
+    }
+
+  /* Look up a qualified name in the usual way.  */
+  type = cp_lookup_type_name (parser, identifier, tag_type);
+  if (type == NULL)
+    return NULL;
+
+  if (tag_type != enum_type)
+    cp_check_class_key (tag_type, type);
+
+  /* A `<' cannot follow an elaborated type specifier.  If that
+     happens, the user was probably trying to form a template-id.  */
+  /*cp_check_for_invalid_template_id (parser, type);*/
+
+  return type;
+}
+
+/* */
+
+static struct type *
+cp_parse_type_specifier (cp_parser *parser, cp_parser_flags flags,
+			 cp_decl_specifier_seq *decl_specs,
+			 int is_declaration, int *declares_class_or_enum,
+			 int *is_cv_qualifier)
+{
+  struct type *type_spec;
+  cp_token *token;
+  enum cp_keyword keyword;
+  cp_decl_spec ds = ds_last;
+
+  /* Assume this type-specifier does not declare a new type.  */
+  if (declares_class_or_enum)
+    *declares_class_or_enum = 0;
+  /* And that it does not specify a cv-qualifier.  */
+  if (is_cv_qualifier)
+    *is_cv_qualifier = 0;
+
+  token = cp_lexer_peek_token (parser->lexer);
+
+  /* If we're looking at a keyword, we can use that to guide the production
+     we choose.  */
+  keyword = token->keyword;
+  switch (keyword)
+    {
+    case KEYWORD_CLASS:
+    case KEYWORD_STRUCT:
+    case KEYWORD_UNION:
+    case KEYWORD_ENUM:
+      /* Fall through  */
+    elaborated_type_specifier:
+      /* We're declaring (not defining) a class or enum.  */
+      if (declares_class_or_enum)
+	*declares_class_or_enum = 1;
+
+      type_spec = cp_parse_elaborated_type_specifier (parser);
+      if (decl_specs)
+	cp_set_decl_spec_type (decl_specs, type_spec, /*user_defined_p=*/1);
+      return type_spec;
+
+    case KEYWORD_CONST:
+      ds = ds_const;
+      if (is_cv_qualifier)
+	*is_cv_qualifier = 1;
+      break;
+
+    case KEYWORD_VOLATILE:
+      ds = ds_volatile;
+      if (is_cv_qualifier)
+	*is_cv_qualifier = 1;
+      break;
+
+    default:
+      break;
+    }
+
+  /* Handle simple keywords.  */
+  if (ds != ds_last)
+    {
+      if (decl_specs)
+	{
+	  ++decl_specs->specs[(int) ds];
+	  /* decl_specs->any_specifiers_p = 1;*/
+	}
+      /* ummm.... */
+      return NULL /*cp_lexer_consume_token (parser->lexer)->value*/;
+    }
+
+  /* If we do not alerady have a type-specifier, assume we are looking at a
+     simple-type-specifier.  */
+  type_spec = cp_parse_simple_type_specifier (parser, decl_specs, flags);
+
+  /* If we didn't find a type-specifier, and a type-specifier was not
+     optional in this context, issue an error message.  */
+  if (!type_spec && !(flags & CP_PARSER_FLAGS_OPTIONAL))
+    {
+      cp_parse_error (parser, _("expected type-specifier"));
+      return NULL;
+    }
+
+  return type_spec;
+}
+
+/* Parse a postfix-expression.
+
+   postfix-expression:
+     primary-expression
+     postfix-expression [ expression ]
+     postfix-expression ( expression-list [opt] )
+     simple-type-specifier ( expression-list [opt] )
+     typename :: [opt] nested-name-specifier identifier
+       ( expression-list [opt] )
+     typename :: [opt] nested-name-specifier template [opt] template-id
+       ( expression-list [opt] )
+     postfix-expression . template [opt] id-expression
+     postifx-expression -> template [opt] id-expression
+     postfix-expresssion . pseudo-destructor-name
+     postfix-expression -> pseudo-destructor-name
+     postfix-expression ++
+     postfix-expression --
+     dynamic_cast < type-id > ( expression )
+     static_cast < type-id > ( expression )
+     reinterpret_cast < type-id > ( expression )
+     const_cast < type-id > ( expression )
+     typeid ( expression )
+     typeid ( type-id )
+
+  If ADDRESS_P is true, the postifx expression is the operand of the
+  `&' operator.  CAST_P is true if this expression is the target of a
+  cast.
+
+  Returns a representation of the expression.  */
+
+static cp_expression *
+cp_parse_postfix_expression (cp_parser *parser, int address_p, int cast_p)
+{
+  cp_expression *expr;
+  cp_token *token = cp_lexer_peek_token (parser->lexer);
+
+  switch (token->type)
+    {
+    default:
+      {
+        struct type *type;
+
+	/* If the next thing is a simple-type-specifier, we may be
+	   looking at a function cast.  We could also be looking at
+	   an id-expression.  So we try the functional cast, and if that
+	   doesn't work, we fall back to the primary-expression.  */
+	cp_parse_tentatively (parser);
+
+	/* Look for the simple-type-specifier.  */
+	type = cp_parse_simple_type_specifier (parser, /*decl_specs=*/NULL,
+					       CP_PARSER_FLAGS_NONE);
+
+	/* Parse the cast itself.  */
+	if (!cp_parse_error_occurred (parser))
+	  expr = cp_parse_functional_cast (parser, type);
+
+	/* If that worked, we're done.  */
+	if (cp_parse_definitely (parser))
+	  break;
+
+	/* It must be a primary-expression.  */
+	expr = cp_parse_primary_expression (parser, address_p, cast_p);
+	break;
+      }
+    }
+
+  while (1)
+    {
+      token = cp_lexer_peek_token (parser->lexer);
+
+      switch (token->type)
+	{
+	case TTYPE_OPEN_SQUARE:
+	  cp_expression_append_chain (expr,
+				      (cp_parse_postfix_open_square_expression
+				       (parser)));
+	  break;
+
+	case TTYPE_OPEN_PAREN:
+	  break;
+
+	case TTYPE_DOT:
+	case TTYPE_DEREF:
+	  break;
+
+	case TTYPE_PLUS_PLUS:
+	  break;
+
+	case TTYPE_MINUS_MINUS:
+	  break;
+
+	default:
+	  return expr;
+	}
+    }
+
+  gdb_assert_not_reached ("unreachable statement parsing postfix expression");
+  return NULL;
+}
+
+static enum expr_code
+cp_unary_operator (cp_token *token)
+{
+  switch (token->type)
+    {
+    case TTYPE_MULT:
+      return INDIRECT_REF;
+
+    case TTYPE_AND:
+      return ADDR_EXPR;
+
+    case TTYPE_PLUS:
+      return UNARY_PLUS_EXPR;
+
+    case TTYPE_MINUS:
+      return NEGATE_EXPR;
+
+    case TTYPE_NOT:
+      return TRUTH_NOT_EXPR;
+
+    case TTYPE_COMPL:
+      return BIT_NOT_EXPR;
+
+    default:
+      return ERROR_CODE;
+    }
+}
+
+/* Parse a unary-expression.
+
+   unary-expression:
+     postfix-expression
+     ++ cast-expression
+     -- cast-expression
+     unary-operator cast-expression
+     sizeof unary-expression
+     sizeof ( type-id )
+     new-expression
+     delete-expression
+
+   ADDRESS_P is true if the unary-expression is appearing as the
+   operand of the `&' operator.   CAST_P is true if this expression is
+   the target of a cast.
+
+   Returns a representation of the expression.  */
+
+static cp_expression *
+cp_parse_unary_expression (cp_parser *parser, int address_p, int cast_p)
+{
+  cp_token *token;
+  enum expr_code unary_operator;
+
+  token  = cp_lexer_peek_token (parser->lexer);
+  if (token->type == TTYPE_KEYWORD)
+    {
+      ;
+    }
+
+  if (cp_lexer_next_token_is (parser->lexer, TTYPE_SCOPE))
+    {
+      ;
+    }
+
+  /* Look for a unary operator.  */
+  unary_operator = cp_unary_operator (token);
+  /* The `++' and `--' operators can be handled similarly, even though
+     they are not technically unary-operators in the grammar.  */
+  if (unary_operator == ERROR_CODE)
+    {
+      if (token->type == TTYPE_PLUS_PLUS)
+	unary_operator = PREINCREMENT_EXPR;
+      else if (token->type == TTYPE_MINUS_MINUS)
+	unary_operator = PREDECREMENT_EXPR;
+      /* GNU extension TTYPE_AND_AND? */
+    }
+
+  if (unary_operator != ERROR_CODE)
+    {
+      cp_expression *cast_expr;
+      enum exp_opcode operator;
+
+      token = cp_lexer_consume_token (parser->lexer);
+      cast_expr = cp_cast_expression (parser, unary_operator == ADDR_EXPR,
+				      /*cast_p=*/0);
+      switch (unary_operator)
+	{
+	case INDIRECT_REF:
+	  operator = UNOP_IND;
+	  break;
+
+	case ADDR_EXPR:
+	  operator = UNOP_ADDR;
+	  break;
+
+	case BIT_NOT_EXPR:
+	  operator = UNOP_COMPLEMENT;
+	  break;
+
+	case PREINCREMENT_EXPR:
+	  operator = UNOP_PREINCREMENT;
+	  break;
+
+	case PREDECREMENT_EXPR:
+	  operator = UNOP_PREDECREMENT;
+	  break;
+
+	case UNARY_PLUS_EXPR:
+	  operator = UNOP_PLUS;
+	  break;
+
+	case NEGATE_EXPR:
+	  operator = UNOP_NEG;
+	  break;
+
+	case TRUTH_NOT_EXPR:
+	  operator = UNOP_LOGICAL_NOT;
+	  break;
+
+	default:
+	  gdb_assert_not_reached ("unexpected unary operator");
+	}
+
+      write_exp_elt_opcode (operator);
+      return cp_expression_chain (cast_expr);
+    }
+
+  return cp_parse_postfix_expression (parser, address_p, cast_p);
+}
+
+/* Set *DECL_SPECS to represent an empty decl-specifier-seq.  */
+
+static void
+clear_decl_specs (cp_decl_specifier_seq *decl_specs)
+{
+  memset (decl_specs, 0, sizeof (cp_decl_specifier_seq));
+}
+
+/* Check for repeated decl-specifiers.  */
+
+static void
+cp_check_decl_specs (cp_decl_specifier_seq *decl_specs)
+{
+  int ds;
+
+  for (ds = ds_first; ds != ds_last; ++ds)
+    {
+      unsigned count = decl_specs->specs[ds];
+      if (count < 2)
+	continue;
+      /* The "long" specifier is a special case because of "long long".  */
+      if (ds == ds_long)
+	{
+	  if (count > 2)
+	    error (_("\"long long long\" is too long"));
+	}
+      else if (count > 1)
+	{
+	  static const char *const decl_spec_names[] = {
+            "signed",
+            "unsigned",
+            "short",
+            "long",
+            "const",
+            "volatile",
+            "restrict",
+            "inline",
+            "virtual",
+            "explicit",
+            "friend",
+            "typedef",
+            "constexpr",
+            "__complex",
+            "__thread"
+          };
+          error (_("duplicate %s"), decl_spec_names[ds]);
+
+	}
+    }
+}
+
+static void
+cp_parse_type_specifier_seq (cp_parser *parser, int is_declaration,
+			     int is_trailing_return,
+			     cp_decl_specifier_seq *type_specifier_seq)
+{
+  int seen_type_specifier = 0;
+  cp_parser_flags flags = CP_PARSER_FLAGS_OPTIONAL;
+  struct type *type_specifier;
+
+  clear_decl_specs (type_specifier_seq);
+
+  while (1)
+    {
+      int is_cv_qualifier;
+      type_specifier = cp_parse_type_specifier (parser, flags,
+						type_specifier_seq,
+						/*is_declaration=*/0,
+						NULL, &is_cv_qualifier);
+      if (!type_specifier)
+	{
+	  /* If the first type-specifier could not be found, this is not a
+             type-specifier-seq at all.  */
+          if (!seen_type_specifier)
+            {
+              cp_parse_error (parser, _("expected type-specifier"));
+              type_specifier_seq->type = NULL;
+              return;
+            }
+          /* If subsequent type-specifiers could not be found, the
+             type-specifier-seq is complete.  */
+          break;
+	}
+
+      seen_type_specifier = 1;
+      if (is_declaration && !is_cv_qualifier)
+	;
+    }
+
+  cp_check_decl_specs (type_specifier_seq);
+}
+
+static struct type *
+cp_parse_type_id_1 (cp_parser *parser, int is_template_arg,
+		    int is_trailing_return)
+{
+  cp_decl_specifier_seq type_specifier_seq;
+  cp_parse_type_specifier_seq (parser, /*is_declaration=*/0,
+			       is_trailing_return, &type_specifier_seq);
+  return type_specifier_seq.type;
+}
+
+static struct type *
+cp_parse_type_id (cp_parser *parser)
+{
+  return cp_parse_type_id_1 (parser, 0, 0);
+}
+
+static int
+cp_token_starts_cast_expression (cp_token *token)
+{
+  switch (token->type)
+    {
+    case TTYPE_COMMA:
+    case TTYPE_QUERY:
+    case TTYPE_COLON:
+    case TTYPE_OPEN_SQUARE:
+    case TTYPE_CLOSE_SQUARE:
+    case TTYPE_CLOSE_PAREN:
+    case TTYPE_CLOSE_BRACE:
+    case TTYPE_DOT:
+    case TTYPE_DOT_STAR:
+    case TTYPE_DEREF:
+    case TTYPE_DEREF_STAR:
+    case TTYPE_DIV:
+    case TTYPE_MOD:
+    case TTYPE_LSHIFT:
+    case TTYPE_RSHIFT:
+    case TTYPE_LESS:
+    case TTYPE_GREATER:
+    case TTYPE_LESS_EQ:
+    case TTYPE_GREATER_EQ:
+    case TTYPE_EQ_EQ:
+    case TTYPE_NOT_EQ:
+    case TTYPE_EQ:
+    case TTYPE_MULT_EQ:
+    case TTYPE_DIV_EQ:
+    case TTYPE_MOD_EQ:
+    case TTYPE_PLUS_EQ:
+    case TTYPE_MINUS_EQ:
+    case TTYPE_RSHIFT_EQ:
+    case TTYPE_LSHIFT_EQ:
+    case TTYPE_AND_EQ:
+    case TTYPE_XOR_EQ:
+    case TTYPE_OR_EQ:
+    case TTYPE_XOR:
+    case TTYPE_OR:
+    case TTYPE_OR_OR:
+    case TTYPE_EOF:
+      return 0;
+
+    default:
+      return 1;
+    }
+}
+
+/* Parse a cast-expression.
+
+   cast-expression:
+     unary-expression
+     ( type-id ) cast-expression
+
+   ADDRESS_P is true if the unary-expression is appearing as the
+   operand of the `&' operator.   CAST_P is true if this expression is
+   the target of a cast.
+
+   Returns a representation of the expression.  */
+
+static cp_expression *
+cp_cast_expression (cp_parser *parser, int address_p, int cast_p)
+{
+  struct type *type;
+  cp_expression *expr;
+
+   /* If the next token is `(', we might be looking at a cast.  */
+  if (cp_lexer_next_token_is (parser->lexer, TTYPE_OPEN_PAREN))
+    {
+      int compound_literal_p;
+
+      /* There is no way to know yet whether or this is as cast.
+	 For example, `(int (3))' is a unary-expression, while
+	 `(int) 3' is a cast. So we resort to parsing tentatively.  */
+      cp_parse_tentatively (parser);
+
+      /* Consume the '('.  */
+      cp_lexer_consume_token (parser->lexer);
+
+      /* A very tricky bit is that `(struct S) { 3 }' is a
+	 compound-literal (which we permit in C++ as an extension).
+	 But that construct is not a cast-expression -- it is a
+	 postfix-expression.  (The reason is that `(struct S) { 3 }.i'
+	 is legal; if the compound-literal were a cast-expression,
+	 you'd need an extra set of parentheses.) But if we parse
+	 the type-id and it happens to be a class-specifier, then we
+	 will commit to the parse at that point, because we cannot
+	 undo the action that is done when creating a new class.  So,
+         then we cannot back up and do a postfix-expression.
+
+         Therefore, we scan ahead to the closing `)', and check to see
+         if the token after the `)' is a `{'.  If so, we are not
+         looking at a cast-expression.
+
+         Save tokens so that we can put them back.  */
+      cp_lexer_save_tokens (parser->lexer);
+
+      /* Skip tokens until the next closing parenthesis.  If the next
+	 token is then '{', we know we are looking at a compound-literal.  */
+      compound_literal_p
+	= (cp_skip_to_closing_parenthesis (parser, 0, 0,
+					   /*consume_paren=*/ 1)
+	   && cp_lexer_next_token_is (parser->lexer, TTYPE_OPEN_BRACE));
+
+      /* Roll back the tokens we skipped.  */
+      cp_lexer_rollback_tokens (parser->lexer);
+      
+      /* If we were looking at a compound-literal, simulate an error
+	 so that the call to cp_parse_definitely below will fail.  */
+      if (compound_literal_p)
+	cp_simulate_error (parser);
+      else
+	{
+	  /* Look for the type-id.  */
+	  type = cp_parse_type_id (parser);
+
+	  /* Look for the closing `)'.  */
+	  cp_require_token (parser, TTYPE_CLOSE_PAREN);
+	}
+
+      /* At this point, the expression can only be either a cast or a
+	 parenthesized ctor such as `(T ())' that looks like a cast to a
+	 function returning T.  */
+      if (!cp_parse_error_occurred (parser)
+	  && cp_token_starts_cast_expression (cp_lexer_peek_token
+					      (parser->lexer)))
+	{
+	  cp_parse_definitely (parser);
+	  expr = cp_cast_expression (parser, /*address_p=*/0, /*cast_p=*/1);
+
+#ifdef I_DONT_KNOW
+	  /* Only type conversions to integral or enumueration types
+	     can be used in constant-expressions.  */ /*!!FIXME!! Necessary? */
+	  if (!cast_valid_in_integral_constant_expression (type)
+	      && cp_non_integral_constant_expression (parser, NIC_CAST))
+	    return NULL;
+#endif
+	  if (expr != NULL)
+	    {
+	      /* Perform that cast.  */
+	      write_exp_elt_opcode (UNOP_CAST);
+	      write_exp_elt_type (type);
+	      write_exp_elt_opcode (UNOP_CAST);
+	      return cp_expression_chain (expr);
+	    }
+	}
+      else
+	cp_abort_tentative_parse (parser);
+    }
+
+  return cp_parse_unary_expression (parser, address_p, cast_p);
+}
+
+static cp_expression *
+cp_do_parse (cp_parser *parser)
+{
+  cp_expression *result = NULL;
+
+  while (1)
+    {
+      cp_token *token = cp_lexer_peek_token (parser->lexer);
+      if (cp_is_eof_token (token))
+	break;
+
+      /* Parse the expression.  */
+      if (result == NULL)
+	result = cp_parse_expression (parser, /*cast_p=*/0);
+      else
+	{
+	  cp_expression *expr;
+	  expr = cp_parse_expression (parser, /*cast_p=*/0);
+	  cp_expression_append_chain (result, expr);
+	  free_expression_chain (expr);
+	}
+    }
+
+  return result;
 }
 
 
@@ -1660,7 +3550,6 @@ cp_lex_one_token (cp_lexer *lexer)
 	struct stoken stoken;
 
 	result->type = TTYPE_NAME;
-	result->keyword = KEYWORD_MAX;
 
 	/* Find the end of the word.  */
 	len = 0;
@@ -1716,7 +3605,6 @@ cp_lex (cp_lexer *lexer)
   while (!cp_is_eof_token (token));
 }
 
-#if 1
 static void
 _cp_dump_token_stream (const cp_lexer *lexer)
 {
@@ -1734,7 +3622,6 @@ _cp_dump_token_stream (const cp_lexer *lexer)
         }
     }
 }
-#endif
 
 static void
 free_cp_parser (void *parser_ptr)
@@ -1767,6 +3654,7 @@ new_parser (char *start)
   parser->lexer = (cp_lexer *) xcalloc (1, sizeof (cp_lexer));
   parser->lexer->buffer.buffer = start;
   parser->lexer->buffer.cur = parser->lexer->buffer.buffer;
+  parser->context = cp_new_context (NULL);
 
   switch (parse_language->la_language)
     {
@@ -1794,11 +3682,12 @@ c_parse (void)
 
   /* Lex and parse input  */
   cp_lex (parser->lexer);
-  _cp_dump_token_stream (parser->lexer);
+  if (parser_debug)
+    _cp_dump_token_stream (parser->lexer);
   lexptr += parser->lexer->buffer.cur - start;
 
   /* Parse input and reset global variables  */
-  expr = cp_parse_expression (parser);
+  expr = cp_do_parse (parser);
   xfree (expout);
   expout = expr->exp;
   expout_size = expr->size;
@@ -1823,10 +3712,14 @@ _initialize_cparser (void)
 {
   int i;
 
+  /* Create the EOF token marker.  */
   EOF_token = new_token ();
   EOF_token->type = TTYPE_EOF;
+
+  /* Create a global namespace marker.  !!FIXME!! needed? */
   global_namespace = xcalloc (1, sizeof (cp_expression));
 
+  /* Populate the binary operator map used by cp_parse_binary_expression.  */
   for (i = 0; i < sizeof (binary_ops) / sizeof (binary_ops[0]); ++i)
     binary_ops_token[binary_ops[i].token_type] = binary_ops[i];
 }
