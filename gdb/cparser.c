@@ -1516,7 +1516,8 @@ cp_parse_unqualified_id (cp_parser *parser, int optional_p)
     default:
       if (optional_p)
 	return NULL;
-      error (_("expected unqualified-id"));
+      cp_parse_error (parser, _("expected unqualified-id"));
+      return NULL;
     }
 }
 
@@ -1624,7 +1625,8 @@ cp_parse_id_expression (cp_parser *parser, int optional_p)
 	  /* Fall through  */
 
 	default:
-	  error (_("expected id-expression"));
+	  cp_parse_error (parser, _("expected id-expression"));
+	  return NULL;
 	}
     }
   else
@@ -1741,7 +1743,7 @@ cp_parse_primary_expression (cp_parser *parser, int address_p, int cast_p)
       }
 
     default:
-      error (_("expected primary expression"));
+      cp_parse_error (parser, _("expected primary expression"));
     }
 
   /* probably want a special marker like g++ does */
@@ -2609,7 +2611,7 @@ cp_class_key (cp_parser *parser)
   /* Check to see if the TOKEN is a class-key.  */
   tag_type = cp_token_is_class_key (token);
   if (!tag_type)
-    error (_("expected class-key"));
+    cp_parse_error (parser, _("expected class-key"));
   return tag_type;
 }
 
@@ -2620,9 +2622,9 @@ cp_check_class_key (enum tag_types class_key, struct type *type)
 {
   if ((TYPE_CODE (type) == TYPE_CODE_UNION) != (class_key == union_type))
     error (_("%s tag used in naming %s"),
-	     class_key == union_type ? "union"
-	      : class_key == struct_type ? "struct" : "class",
-	      TYPE_NAME (type));
+	   class_key == union_type ? "union"
+	   : class_key == struct_type ? "struct" : "class",
+	   TYPE_NAME (type));
 }
 
 /* Parse an elaborated-type-specifier.  Note that the grammar given
@@ -3689,6 +3691,9 @@ c_parse (void)
   cp_lex (parser->lexer);
   if (parser_debug)
     _cp_dump_token_stream (parser->lexer);
+
+  /* This is not quite correct... We'd actually like to base this
+     on the tokens that were consumed.  !!FIXME!! */
   lexptr += parser->lexer->buffer.cur - start;
 
   /* Parse input and reset global variables  */
