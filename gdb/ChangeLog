@@ -1,3 +1,36 @@
+2010-10-14  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdbtypes.h: Create BASE_PTR_CONVERSION_BADNESS.
+	* gdbtypes.c (rank_one_type): Move type comparison code out of here
+	to...
+	(types_equal): ...here. And changed it as follows:
+	Outside of typedefs type must be of the same TYPE_CODE.
+	When compairing two pointers or references they are equal if their
+	targets are equal.
+	Correct pointer conversions.
+
+2010-10-14  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* p-lang.c (is_pascal_string_type): Avoid crashes on structures
+	having fields without names.
+
+2010-10-13  Tom Tromey  <tromey@redhat.com>
+
+	* language.h (LA_PRINT_ARRAY_INDEX): Fix argument name.
+
+2010-10-13  Doug Evans  <dje@google.com>
+
+	New python module gdb.types.
+	* NEWS: Document it.
+	* data-directory/Makefile.in (PYTHON_FILES): Add gdb/types.py.
+	* python/lib/gdb/types.py: New file.
+
+	* c-typeprint.c: Whitespace cleanup.
+	(cp_type_print_method_args): Remove unnecessary forward decl.
+	(cp_type_print_derivation_info): Ditto.
+	(c_type_print_varspec_prefix): Mark as static at definition.
+	(c_type_print_modifier): Fix arg descriptions.
+
 2010-10-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* python/py-breakpoint.c (bppy_set_condition): New comment.
