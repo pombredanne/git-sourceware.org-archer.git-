@@ -1,3 +1,26 @@
+2010-10-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix s390x compatibility.
+	* gdb.dwarf2/pr11465.S (DW_TAG_pointer_type): Use PTRBITS.  Twice.
+	* gdb.dwarf2/pr11465.exp: Set ptrbits, use it for -DPTRBITS.
+
+2010-10-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.threads/sigstep-threads.exp: New file.
+	* gdb.threads/sigstep-threads.c: New file.
+
+2010-10-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/pie-execl.exp: New file.
+	* gdb.base/pie-execl.c: New file.
+
+2010-10-13  Doug Evans  <dje@google.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR exp/12117
+	* gdb.cp/ptype-cv-cp.cc: New file.
+	* gdb.cp/ptype-cv-cp.exp: New file.
+
 2010-10-14  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* gdb.cp/converts.cc: New test program.

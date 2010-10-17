@@ -1,3 +1,87 @@
+2010-10-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix the `stopped language detection' testcase for gcc-4.5.
+	* dwarf2read.c (read_partial_die): Set also LANGUAGE_OF_MAIN.
+	* symfile.c (set_initial_language): Move variable filename to a more
+	inner block.  Prefer LANGUAGE_OF_MAIN.
+	* symtab.c (language_of_main): New variable.
+	(set_main_name): Always reset LANGUAGE_OF_MAIN.
+	* symtab.h (language_of_main): New declaration.
+
+2010-10-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Pedro Alves  <pedro@codesourcery.com>
+
+	* gdbthread.h (currently_stepping): New declaration.
+	* infrun.c (currently_stepping): Remove the forward declaration.
+	(currently_stepping): Make it global.
+	* linux-nat.c (resume_callback) <lp->stopped && lp->status == 0>: New
+	variables tp and step, initialized them.  Pass STEP to to_resume.
+	Print also possibly "PTRACE_SINGLESTEP" if STEP.  Initialize LP->STEP.
+	* remote.c (currently_stepping_callback): New.
+	(remote_vcont_resume)
+	<ptid_equal (ptid, minus_one_ptid) || ptid_is_pid (ptid)>:
+	New variable tp.  Call currently_stepping_callback and step such
+	thread.
+
+2010-10-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* infrun.c (follow_exec): Replace symbol_file_add_main by
+	symbol_file_add with SYMFILE_DEFER_BP_RESET, set_initial_language and
+	breakpoint_re_set.
+	* m32r-rom.c (m32r_load, m32r_upload_command): Use parameter 0 for
+	clear_symtab_users.
+	* objfiles.c (free_all_objfiles): Likewise.
+	* remote-m32r-sdi.c (m32r_load): Likewise.
+	* solib-som.c (som_solib_create_inferior_hook): Likewise.
+	* symfile.c (new_symfile_objfile): New comment for add_flags.  Call
+	clear_symtab_users with ADD_FLAGS.
+	(reread_symbols): Use parameter 0 for clear_symtab_users.
+	(clear_symtab_users): New parameter add_flags.  Do not call
+	breakpoint_re_set if SYMFILE_DEFER_BP_RESET.
+	(clear_symtab_users_cleanup): Use parameter 0 for clear_symtab_users.
+	* symtab.h (clear_symtab_users): New parameter add_flags.
+
+2010-10-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix GCC false warning.
+	* varobj.c (value_get_print_value) <str_addr>: Initialize it.
+
+2010-10-16  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* p-typeprint.c (pascal_type_print_method_args): Fix problem in
+	display of type of method arguments.
+
+2010-10-15  Tom Tromey  <tromey@redhat.com>
+
+	PR python/11948:
+	* varobj.c (value_get_print_value): Use val_print_string to print
+	lazy strings.
+	* python/py-prettyprint.c (print_string_repr): Use
+	val_print_string to print lazy strings.  Fix cleanup logic.
+	(print_children): Likewise.
+	* python/python-internal.h (gdbpy_extract_lazy_string): Update.
+	* python/py-lazy-string.c (gdbpy_extract_lazy_string): Rewrite.
+	Change return type to 'void', add 'addr' argument.
+	* value.h (val_print_string): Update.
+	* valprint.c (val_print_string): Add 'encoding' argument.
+	* printcmd.c (print_formatted): Update.
+	* p-valprint.c (pascal_val_print): Update.
+	* m2-valprint.c (print_unpacked_pointer): Update.
+	(m2_print_array_contents): Likewise.
+	* jv-valprint.c (java_value_print): Update.
+	* f-valprint.c (f_val_print): Update.
+	* c-valprint.c (c_val_print): Update.
+	* auxv.c (fprint_target_auxv): Update.
+
+2010-10-15  Doug Evans  <dje@google.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR exp/12117
+	* gdbtypes.c (check_typedef): Clean up function comment.
+	Keep track of instance flags as we strip typedefs and create a new
+	type to preserve them if necessary.
+	* gdbtypes.h (type) <instance_flags>: Extend the comment.
+
 2010-10-15  Pierre Muller  <muller@ics.u-strasbg.fr>
 
 	* p-lang.c (is_pascal_string_type): Use TYPE_FIELD_NAME accessor.

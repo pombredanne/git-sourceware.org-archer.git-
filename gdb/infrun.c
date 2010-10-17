@@ -74,8 +74,6 @@ static int follow_fork (void);
 static void set_schedlock_func (char *args, int from_tty,
 				struct cmd_list_element *c);
 
-static int currently_stepping (struct thread_info *tp);
-
 static int currently_stepping_or_nexting_callback (struct thread_info *tp,
 						   void *data);
 
@@ -835,8 +833,15 @@ follow_exec (ptid_t pid, char *execd_pathname)
   /* That a.out is now the one to use. */
   exec_file_attach (execd_pathname, 0);
 
-  /* Load the main file's symbols.  */
-  symbol_file_add_main (execd_pathname, 0);
+  /* SYMFILE_DEFER_BP_RESET is used as the proper displacement for PIE
+     (Position Independent Executable) main symbol file will get applied by
+     solib_create_inferior_hook below.  breakpoint_re_set would fail to insert
+     the breakpoints with the zero displacement.  */
+
+  symbol_file_add (execd_pathname, SYMFILE_MAINLINE | SYMFILE_DEFER_BP_RESET,
+		   NULL, 0);
+
+  set_initial_language ();
 
 #ifdef SOLIB_CREATE_INFERIOR_HOOK
   SOLIB_CREATE_INFERIOR_HOOK (PIDGET (inferior_ptid));
@@ -845,6 +850,8 @@ follow_exec (ptid_t pid, char *execd_pathname)
 #endif
 
   jit_inferior_created_hook ();
+
+  breakpoint_re_set ();
 
   /* Reinsert all breakpoints.  (Those which were symbolic have
      been reset to the proper address in the new a.out, thanks
@@ -4842,7 +4849,7 @@ infrun: not switching back to stepped thread, it has vanished\n");
 
 /* Is thread TP in the middle of single-stepping?  */
 
-static int
+int
 currently_stepping (struct thread_info *tp)
 {
   return ((tp->step_range_end && tp->step_resume_breakpoint == NULL)
