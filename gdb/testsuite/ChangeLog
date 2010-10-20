@@ -1,3 +1,24 @@
+2010-10-19  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.base/watch_thread_num.exp: Revert 2008-09-03 change.
+	Skip test completely if gdb,no_hardware_watchpoints.
+
+2010-10-19  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.base/foll-fork.exp: Make regexps to match catchpoint hits more
+	strict, but do not check for any particular function name within libc.
+
+2010-10-19  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/smartp.exp: New test.
+	* gdb.cp/smartp.cc : New test.
+
+2010-10-19  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/converts.exp: Test pointer to bool conversion.
+	Test pointer to long conversion.
+	* gdb.cp/oranking.exp: Removed relevant kfail.
+
 2010-10-18  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.python/py-prettyprint.exp (run_lang_tests): Test encoding
