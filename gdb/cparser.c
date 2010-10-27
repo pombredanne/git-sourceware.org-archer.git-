@@ -3686,6 +3686,10 @@ c_parse (void)
   if (parser_debug)
     _cp_dump_token_stream (parser->lexer);
 
+  /* Adjust LEXPTR.  This won't catch any junk at the end of the expression,
+     but we'll check for that after parsing.  */
+  lexptr += parser->lexer->buffer.cur - start;
+
   /* Parse input and reset global variables  */
   expr = cp_parse_expression (parser, /*cast_p=*/0);
 
