@@ -791,7 +791,8 @@ cp_parse_error_occurred (cp_parser *parser)
 
 /* Stop parsing tentatively.  If a parse error has occurred, restore the
    token stream.  Otherwise, commit to the tokens we have consumed.
-Returns non-zero if no error occured; 0 otherwise.  */
+
+   Returns non-zero if no error occured; 0 otherwise.  */
 
 static int
 cp_parse_definitely (cp_parser *parser)
@@ -2696,7 +2697,30 @@ cp_parse_elaborated_type_specifier (cp_parser *parser)
   return type;
 }
 
-/* */
+/* Parse a type-specifier.
+
+   type-specifier:
+     simple-type-specifier
+     class-specifier
+     enum-specifier
+     elaborated-type-specifier
+     cv-qualifier
+
+   Returns a representation of the type-specifier.  
+
+   The parser flags FLAGS is used to control type-specifier parsing.
+
+   If IS_DECLARATION is TRUE, then this type-specifier is appearing
+   in a decl-specifier-seq.
+   If DECLARES_CLASS_OR_ENUM is non-NULL, and the type-specifier is a
+   class-specifier, enum-specifier, or elaborated-type-specifier, then
+   *DECLARES_CLASS_OR_ENUM is set to a nonzero value.  The value is 1
+   if a type is declared; 2 if it is defined.  Otherwise, it is set to
+   zero.
+
+   If IS_CV_QUALIFIER is non-NULL, and the type-specifier is a
+   cv-qualifier, then IS_CV_QUALIFIER is set to TRUE.  Otherwise, it
+   is set to FALSE.  */
 
 static struct type *
 cp_parse_type_specifier (cp_parser *parser, cp_parser_flags flags,
@@ -2727,8 +2751,6 @@ cp_parse_type_specifier (cp_parser *parser, cp_parser_flags flags,
     case KEYWORD_STRUCT:
     case KEYWORD_UNION:
     case KEYWORD_ENUM:
-      /* Fall through  */
-    elaborated_type_specifier:
       /* We're declaring (not defining) a class or enum.  */
       if (declares_class_or_enum)
 	*declares_class_or_enum = 1;
@@ -2860,11 +2882,6 @@ cp_parse_postfix_expression (cp_parser *parser, int address_p, int cast_p)
 	  break;
 
 	case TTYPE_OPEN_PAREN:
-	  break;
-
-	case TTYPE_CLOSE_PAREN:
-	  free_expression_chain (expr);
-	  error (_("Junk at the end of the arguments."));
 	  break;
 
 	case TTYPE_DOT:
@@ -3114,6 +3131,9 @@ cp_parse_type_id_1 (cp_parser *parser, int is_template_arg,
   cp_decl_specifier_seq type_specifier_seq;
   cp_parse_type_specifier_seq (parser, /*is_declaration=*/0,
 			       is_trailing_return, &type_specifier_seq);
+
+  /* need the abstract-declarator stuff, which includes ptr-operator
+     and similar. */
   return type_specifier_seq.type;
 }
 
@@ -3274,32 +3294,6 @@ cp_cast_expression (cp_parser *parser, int address_p, int cast_p)
     }
 
   return cp_parse_unary_expression (parser, address_p, cast_p);
-}
-
-static cp_expression *
-cp_do_parse (cp_parser *parser)
-{
-  cp_expression *result = NULL;
-
-  while (1)
-    {
-      cp_token *token = cp_lexer_peek_token (parser->lexer);
-      if (cp_is_eof_token (token))
-	break;
-
-      /* Parse the expression.  */
-      if (result == NULL)
-	result = cp_parse_expression (parser, /*cast_p=*/0);
-      else
-	{
-	  cp_expression *expr;
-	  expr = cp_parse_expression (parser, /*cast_p=*/0);
-	  cp_expression_append_chain (result, expr);
-	  free_expression_chain (expr);
-	}
-    }
-
-  return result;
 }
 
 
@@ -3692,12 +3686,15 @@ c_parse (void)
   if (parser_debug)
     _cp_dump_token_stream (parser->lexer);
 
-  /* This is not quite correct... We'd actually like to base this
-     on the tokens that were consumed.  !!FIXME!! */
-  lexptr += parser->lexer->buffer.cur - start;
-
   /* Parse input and reset global variables  */
-  expr = cp_do_parse (parser);
+  expr = cp_parse_expression (parser, /*cast_p=*/0);
+
+  if (!cp_is_eof_token (cp_lexer_peek_token (parser->lexer)))
+    {
+      free_expression_chain (expr);
+      error (_("Junk at end of expression"));
+    }
+
   xfree (expout);
   expout = expr->exp;
   expout_size = expr->size;
