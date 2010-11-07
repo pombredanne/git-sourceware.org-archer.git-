@@ -29,13 +29,11 @@ if { [prepare_for_testing ${test}.exp ${test} ${srcfile} {debug f77 additional_f
     return -1
 }
 
-if ![runto MAIN__] then {
+if ![runto $srcfile:[gdb_get_line_number "s = s"]] then {
     perror "couldn't run to breakpoint MAIN__"
     continue
 }
 
-gdb_breakpoint [gdb_get_line_number "s = s"]
-gdb_continue_to_breakpoint "s = s"
 gdb_test "frame" ".*s='foo'.*"
 gdb_test "ptype s" "type = character\\*3"
 gdb_test "p s" "\\$\[0-9\]* = 'foo'"
