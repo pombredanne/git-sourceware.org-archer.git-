@@ -8220,7 +8220,9 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
 	high = dwarf2_get_attr_constant_value (attr, 0);
       else
 	{
-	  TYPE_HIGH_BOUND_UNDEFINED (range_type) = 1;
+	  /* Ada expects an empty array on no boundary attributes.  */
+	  if (cu->language != language_ada)
+	    TYPE_HIGH_BOUND_UNDEFINED (range_type) = 1;
 	  high = low - 1;
 	}
       if (!TYPE_UNSIGNED (base_type) && (high & negative_mask))
