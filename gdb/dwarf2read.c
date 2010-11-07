@@ -5089,6 +5089,12 @@ read_file_scope (struct die_info *die, struct dwarf2_cu *cu)
   if (attr)
     cu->producer = DW_STRING (attr);
 
+  /* The XLCL doesn't generate DW_LANG_OpenCL because this attribute is not
+     standardised yet.  As a workaround for the language detection we fall
+     back to the DW_AT_producer string.  */
+  if (cu->producer && strstr (cu->producer, "IBM XL C for OpenCL") != NULL)
+    cu->language = language_opencl;
+
   /* We assume that we're processing GCC output. */
   processing_gcc_compilation = 2;
 
@@ -7193,6 +7199,19 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
   attr = dwarf2_attr (die, DW_AT_GNU_vector, cu);
   if (attr)
     make_vector_type (type);
+
+  /* The DIE may have DW_AT_byte_size set.  For example an OpenCL
+     implementation may choose to implement triple vectors using this
+     attribute.  */
+  attr = dwarf2_attr (die, DW_AT_byte_size, cu);
+  if (attr)
+    {
+      if (DW_UNSND (attr) >= TYPE_LENGTH (type))
+	TYPE_LENGTH (type) = DW_UNSND (attr);
+      else
+	complaint (&symfile_complaints, _("\
+DW_AT_byte_size for array type smaller than the total size of elements"));
+    }
 
   name = dwarf2_name (die, cu);
   if (name)
@@ -10087,7 +10106,7 @@ psymtab_include_file_name (const struct line_header *lh, int file_index,
       pst_filename = copied_name;
     }
 
-  file_is_pst = strcmp (include_name_to_compare, pst_filename) == 0;
+  file_is_pst = FILENAME_CMP (include_name_to_compare, pst_filename) == 0;
 
   if (include_name_to_compare != include_name)
     xfree (include_name_to_compare);

@@ -1,3 +1,204 @@
+2010-11-05  Doug Evans  <dje@google.com>
+
+	Make gdb.parameter("directories") work.
+	New command "set directories".
+	* NEWS: Document them.
+	* source.c (set_directories_command): New function.
+	(show_directories_1): Renamed from show_directories.
+	All callers updated.
+	(show_directories_command): New function.
+	(_initialize_source): Install "directories" as a set/show
+	variable instead of just a show command.
+
+2010-11-05  Ken Werner  <ken.werner@de.ibm.com>
+
+	* NEWS: Mention OpenCL C language support.
+	* Makefile.in (SFILES): Add opencl-lang.c.
+	(COMMON_OBS): Add opencl-lang.o.
+	* opencl-lang.c: New File
+	* defs.h (enum language): Add language_opencl.
+	* dwarf2read.c (read_file_scope): Handle DW_AT_producer for the
+	IBM XL C OpenCL compiler.
+	* c-lang.h: Include "parser-defs.h".
+	(evaluate_subexp_c): Declare.
+	* c-lang.c (evaluate_subexp_c): Remove the static qualifier.
+	(c_op_print_tab): Add declaration.
+	* eval.c (binop_promote): Handle language_opencl.
+	* c-exp.y: Lookup the primitive types instead of referring to the
+	builtins.
+
+2010-11-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix configure --enable-plugins --without-python.
+	* configure.ac (for ELF support in BFD) <"$plugins" = "yes">: New.
+	* configure: Regenerate.
+
+2010-11-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* solib.c (solib_read_symbols): Call exception_fprintf even without
+	FROM_TTY.  Print also so->so_name.
+
+2010-11-04  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdbtypes.h (struct rank): Created subrank.
+	* gdbtypes.c: Initialized subrank for all
+	'BADNESS' constants.
+	(distance_to_ancestor): New function.
+	(is_ancestor): Use distance_to_ancestor.
+	(is_public_ancestor): Ditto.
+	(sum_ranks): Handle subrank.
+	(compare_ranks): Ditto.
+	(rank_one_type): Subrank base conversions.
+
+2010-11-04  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdbtypes.h: Create struct rank.
+	Convert all 'BADNESS' macros to const struct rank declarations.
+	(sum_ranks): New function.
+	(compare_ranks): New function.
+	* valops.c (find_oload_champ): Updated.
+	(classify_oload_match): Use compare_ranks.
+	Improved comments.
+	(compare_parameters): Use compare_ranks.
+	* gdbtypes.c: Initialize 'BADNESS' constants.
+	(sum_ranks): New function.
+	(compare_ranks): New function.
+	(compare_badness): Use compare_ranks.
+	(rank_function): Use global constants instead of literals.
+	(rank_one_type): Ditto.
+	Return struct rank.
+	Use sum_ranks.
+
+2010-11-04  Doug Evans  <dje@google.com>
+
+	* python/py-prettyprint.c (find_pretty_printer_from_gdb): Fix comment.
+	(find_pretty_printer): Fix comments.
+
+2010-11-04  Hui Zhu  <teawater@gmail.com>
+
+	* tracepoint.c (remote_trace_set_readonly_regions): Change lma to vma.
+
+2010-11-03  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-valprint.c (ada_val_print_array): Move variables `eltlen'
+	and `len' declaration and computation inside block where they
+	are being used.
+
+2010-11-03  Joel Brobecker  <brobecker@adacore.com>
+
+	* valprint.c (val_print_array_elements): Put back handling of
+	empty arrays.
+
+2010-11-03  Ken Werner  <ken.werner@de.ibm.com>
+
+	* dwarf2read.c (read_array_type): Read the DW_AT_byte_size from the
+	DIE and set the length of the type.
+	* gdbtypes.h (get_array_bounds): Move here from valprint.h.
+	* gdbtypes.c (get_array_bounds): Move here from valprint.c and
+	return 0 if the corresponding bounds of the type are undefined.
+	* valprint.h (get_array_bounds): Move declaration to gdbtypes.h.
+	* valprint.c (get_array_bounds): Move implementation to gdbtypes.c.
+	(val_print_array_elements): Use get_array_bounds to compute the number
+	of array elements instead of dividing the length of the array by the
+	length of the element types.
+	* valarith.c (vector_binop): Likewise.
+	* valops.c (value_cast): Likewise.
+	* c-valprint.c (c_val_print): Likewise.
+	* c-typeprint.c (c_type_print_varspec_suffix): Likewise.
+
+2010-11-03  Ken Werner  <ken.werner@de.ibm.com>
+
+	* valarith.c (value_pos, value_neg, value_complement): Handle
+	vector types.
+	* valops.c (value_one): Likewise.
+
+2010-11-03  Ken Werner  <ken.werner@de.ibm.com>
+
+	* value.h (value_non_lval): Declare.
+	* value.c (value_non_lval): New function.
+	* eval.c (evaluate_subexp_standard) <UNOP_POSTINCREMENT,
+	UNOP_POSTDECREMENT>: Call value_non_lval to ensure to return a
+	non-lvalue.
+
+2010-11-02  Doug Evans  <dje@google.com>
+
+	New python module gdb.printing, and new commands info pretty-printer,
+	enable pretty-printer, disable pretty-printer.
+	* NEWS: Mention them.
+	* data-directory/Makefile.in (PYTHON_FILES): Add gdb/printing.py,
+	gdb/command/__init__.py, gdb/command/pretty_printers.py.
+	* python/lib/gdb/__init__.py: Install pretty-printer commands.
+	* python/lib/gdb/printing.py: New file.
+	* python/lib/gdb/command/__init__.py: New file.
+	* python/lib/gdb/command/pretty_printers.py: New file.
+
+2010-11-02  Tom Tromey  <tromey@redhat.com>
+
+	* NEWS: Mention Guile removal.
+	* defs.h (enum language) <language_scm>: Remove.
+	* Makefile.in (SFILES): Remove scm-exp.c, scm-lang.c,
+	scm-valprint.c.
+	(HFILES_NO_SRCDIR): Remove scm-lang.h, scm-tags.h.
+	(COMMON_OBS): Remove scm-exp.o, scm-lang.o, scm-valprint.o.
+	* scm-exp.c, scm-lang.c, scm-valprint.c, scm-lang.h, scm-tags.h:
+	Remove.
+
+2010-11-02  Doug Evans  <dje@google.com>
+
+	* top.c: #include "python/python.h".
+	(gdb_init): Add a comment regarding initialize_all_files.
+	Call finish_python_initialization at the end.
+	* python/python.h (finish_python_initialization): Declare.
+	* python/python.c (finish_python_initialization): New function.
+	(_initialize_python): Move python-implemented initialization there
+	and call it.
+	(GdbMethods): Use #ifdef HAVE_PYTHON for consistency.
+
+2010-11-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Revert:
+	2010-10-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+		    Pedro Alves  <pedro@codesourcery.com>
+	* gdbthread.h (currently_stepping): New declaration.
+	* infrun.c (currently_stepping): Remove the forward declaration.
+	(currently_stepping): Make it global.
+	* linux-nat.c (resume_callback) <lp->stopped && lp->status == 0>: New
+	variables tp and step, initialized them.  Pass STEP to to_resume.
+	Print also possibly "PTRACE_SINGLESTEP" if STEP.  Initialize LP->STEP.
+	* remote.c (currently_stepping_callback): New.
+	(remote_vcont_resume)
+	<ptid_equal (ptid, minus_one_ptid) || ptid_is_pid (ptid)>:
+	New variable tp.  Call currently_stepping_callback and step such
+	thread.
+
+2010-11-01  Hui Zhu  <teawater@gmail.com>
+
+	* tracepoint.c (tfile_xfer_partial): Change lma to vma.
+
+2010-10-28  Hui Zhu  <teawater@gmail.com>
+
+	* tracepoint.c (trace_save): Change utp->actions to
+	utp->step_actions.
+
+2010-10-26  Joel Brobecker  <brobecker@adacore.com>
+
+	* (_FILE_OFFSET_BITS): Fix typo in comment.
+
+2010-10-26  Joel Brobecker  <brobecker@adacore.com>
+
+	* python/python-internal.h (_FILE_OFFSET_BITS): Undefine.
+	(PyEval_InitThreads): Remove duplicate. Define as nothing.
+	(PyEval_ReleaseLock): Define as nothing.
+
+2010-10-26  Joel Brobecker  <brobecker@adacore.com>
+
+	* dwarf2read.c (psymtab_include_file_name): Replace call to strcmp
+	by call to FILENAME_CMP.
+
+2010-10-26  Joel Brobecker  <brobecker@adacore.com>
+
+	* dictionary.c (dict_hash): Move assignment out of if condition.
+
 2010-10-22  Jie Zhang  <jie@codesourcery.com>
 
 	* Makefile.in (install): Remove dependency of install-only and

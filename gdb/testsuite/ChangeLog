@@ -1,3 +1,73 @@
+2010-11-05  Doug Evans  <dje@google.com>
+
+	* gdb.base/help.exp: Update expected output.
+	* gdb.python/py-param.exp: Delete, contents moved to ...
+	* gdb.python/py-parameter.exp: ... here.  New file.
+	Add test for gdb.parameter ("directories").
+
+2010-11-05  Ken Werner  <ken.werner@de.ibm.com>
+
+	* Makefile.in (ALL_SUBDIRS): Add gdb.opencl.
+	* configure.ac (AC_OUTPUT): Add gdb.opencl/Makefile.
+	* configure: Regenerate.
+	* gdb.opencl/Makefile.in: New File.
+	* gdb.opencl/datatypes.exp: Likewise.
+	* gdb.opencl/datatypes.cl: Likewise.
+	* gdb.opencl/operators.exp: Likewise.
+	* gdb.opencl/operators.cl: Likewise.
+	* gdb.opencl/vec_comps.exp: Likewise.
+	* gdb.opencl/vec_comps.cl: Likewise.
+	* gdb.opencl/convs_casts.exp: Likewise.
+	* gdb.opencl/convs_casts.cl: Likewise.
+	* lib/opencl.exp: Likewise.
+	* lib/opencl_hostapp.c: Likewise.
+	* lib/opencl_kernel.cl: Likewise.
+	* lib/cl_util.c: Likewise.
+	* lib/cl_util.c: Likewise.
+	* gdb.base/default.exp (set language): Add "opencl" to the list of
+	languages.
+
+2010-11-04  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/overload.exp: Added test for inheritance overload.
+	* gdb.cp/overload.cc: Ditto.
+	* gdb.cp/oranking.exp: Removed releveant kfails.
+
+2010-11-04  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/null_array.exp (print my_table): Call get_compiler_info and
+	check test_compiler_info.
+
+2010-11-03  Ken Werner  <ken.werner@de.ibm.com>
+
+	* gdb.base/gnu_vector.exp: Adjust expect messages.
+
+2010-11-03  Ken Werner  <ken.werner@de.ibm.com>
+
+	* gdb.base/gnu_vector.exp: Add unary operator tests.
+
+2010-11-03  Ken Werner  <ken.werner@de.ibm.com>
+
+	* gdb.base/exprs.exp: Add tests for pre-/post- in-/decrement operators.
+
+2010-11-02  Doug Evans  <dje@google.com>
+
+	* gdb.python/py-pp-maint.c: New file.
+	* gdb.python/py-pp-maint.exp: New file.
+	* gdb.python/py-pp-maint.py: New file.
+
+2010-11-02  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/default.exp: Remove "scheme" from language list.
+
+2010-11-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Revert:
+	2010-10-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	* gdb.threads/sigstep-threads.exp: New file.
+	* gdb.threads/sigstep-threads.c: New file.
+
 2010-10-20  Michael Snyder  <msnyder@vmware.com>
 
 	* gdb.threads/fork-child-threads.exp: Don't run on remote target.

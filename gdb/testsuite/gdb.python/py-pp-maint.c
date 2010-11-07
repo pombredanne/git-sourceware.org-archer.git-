@@ -15,40 +15,54 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#include <pthread.h>
-#include <assert.h>
-#include <signal.h>
+#include <string.h>
 
-#include <asm/unistd.h>
-#include <unistd.h>
-#define tgkill(tgid, tid, sig) syscall (__NR_tgkill, (tgid), (tid), (sig))
-#define gettid() syscall (__NR_gettid)
+struct function_lookup_test
+{
+  int x,y;
+};
 
-static volatile int var;
-
-static void
-handler (int signo)	/* step-0 */
-{			/* step-0 */
-  var++;		/* step-1 */
-  tgkill (getpid (), gettid (), SIGUSR1);	/* step-2 */
+void
+init_flt (struct function_lookup_test *p, int x, int y)
+{
+  p->x = x;
+  p->y = y;
 }
 
-static void *
-start (void *arg)
+struct s
 {
-  signal (SIGUSR1, handler);
-  tgkill (getpid (), gettid (), SIGUSR1);
-  assert (0);
+  int a;
+  int *b;
+};
 
-  return NULL;
+struct ss
+{
+  struct s a;
+  struct s b;
+};
+
+void
+init_s (struct s *s, int a)
+{
+  s->a = a;
+  s->b = &s->a;
+}
+
+void
+init_ss (struct ss *s, int a, int b)
+{
+  init_s (&s->a, a);
+  init_s (&s->b, b);
 }
 
 int
-main (void)
+main ()
 {
-  pthread_t thread;
+  struct function_lookup_test flt;
+  struct ss ss;
 
-  pthread_create (&thread, NULL, start, NULL);
-  start (NULL);	/* main-start */
-  return 0;
+  init_flt (&flt, 42, 43);
+  init_ss (&ss, 1, 2);
+  
+  return 0;      /* break to inspect */
 }

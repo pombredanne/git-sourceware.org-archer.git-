@@ -849,11 +849,25 @@ struct vbase
     struct vbase *next;		/* next in chain */
   };
 
+/* Struct used to store conversion rankings.  */
+struct rank
+  {
+    short rank;
+
+    /* When two conversions are of the same type and therefore have the same
+       rank, subrank is used to differentiate the two.
+       Eg: Two derived-class-pointer to base-class-pointer conversions would
+       both have base pointer conversion rank, but the conversion with the
+       shorter distance to the ancestor is preferable. 'subrank' would be used
+       to reflect that.  */
+    short subrank;
+  };
+
 /* Struct used for ranking a function for overload resolution */
 struct badness_vector
   {
     int length;
-    int *rank;
+    struct rank *rank;
   };
 
 /* GNAT Ada-specific information for various Ada types.  */
@@ -1383,6 +1397,9 @@ extern int get_vptr_fieldno (struct type *, struct type **);
 
 extern int get_discrete_bounds (struct type *, LONGEST *, LONGEST *);
 
+extern int get_array_bounds (struct type *type, LONGEST *low_bound,
+			     LONGEST *high_bound);
+
 extern int class_types_same_p (const struct type *, const struct type *);
 
 extern int is_ancestor (struct type *, struct type *);
@@ -1396,45 +1413,52 @@ extern int is_unique_ancestor (struct type *, struct value *);
 #define LENGTH_MATCH(bv) ((bv)->rank[0])
 
 /* Badness if parameter list length doesn't match arg list length */
-#define LENGTH_MISMATCH_BADNESS      100
+extern const struct rank LENGTH_MISMATCH_BADNESS;
+
 /* Dummy badness value for nonexistent parameter positions */
-#define TOO_FEW_PARAMS_BADNESS       100
+extern const struct rank TOO_FEW_PARAMS_BADNESS;
 /* Badness if no conversion among types */
-#define INCOMPATIBLE_TYPE_BADNESS    100
+extern const struct rank INCOMPATIBLE_TYPE_BADNESS;
+
+/* Badness of an exact match.  */
+extern const struct rank EXACT_MATCH_BADNESS;
 
 /* Badness of integral promotion */
-#define INTEGER_PROMOTION_BADNESS      1
+extern const struct rank INTEGER_PROMOTION_BADNESS;
 /* Badness of floating promotion */
-#define FLOAT_PROMOTION_BADNESS        1
+extern const struct rank FLOAT_PROMOTION_BADNESS;
 /* Badness of converting a derived class pointer
    to a base class pointer.  */
-#define BASE_PTR_CONVERSION_BADNESS    1
+extern const struct rank BASE_PTR_CONVERSION_BADNESS;
 /* Badness of integral conversion */
-#define INTEGER_CONVERSION_BADNESS     2
+extern const struct rank INTEGER_CONVERSION_BADNESS;
 /* Badness of floating conversion */
-#define FLOAT_CONVERSION_BADNESS       2
+extern const struct rank FLOAT_CONVERSION_BADNESS;
 /* Badness of integer<->floating conversions */
-#define INT_FLOAT_CONVERSION_BADNESS   2
+extern const struct rank INT_FLOAT_CONVERSION_BADNESS;
 /* Badness of conversion of pointer to void pointer */
-#define VOID_PTR_CONVERSION_BADNESS    2
+extern const struct rank VOID_PTR_CONVERSION_BADNESS;
 /* Badness of conversion of pointer to boolean.  */
-#define BOOL_PTR_CONVERSION_BADNESS    3
+extern const struct rank BOOL_PTR_CONVERSION_BADNESS;
 /* Badness of converting derived to base class */
-#define BASE_CONVERSION_BADNESS        2
+extern const struct rank BASE_CONVERSION_BADNESS;
 /* Badness of converting from non-reference to reference */
-#define REFERENCE_CONVERSION_BADNESS   2
+extern const struct rank REFERENCE_CONVERSION_BADNESS;
 
 /* Non-standard conversions allowed by the debugger */
 /* Converting a pointer to an int is usually OK */
-#define NS_POINTER_CONVERSION_BADNESS 10
+extern const struct rank NS_POINTER_CONVERSION_BADNESS;
 
+
+extern struct rank sum_ranks (struct rank a, struct rank b);
+extern int compare_ranks (struct rank a, struct rank b);
 
 extern int compare_badness (struct badness_vector *, struct badness_vector *);
 
 extern struct badness_vector *rank_function (struct type **, int,
 					     struct type **, int);
 
-extern int rank_one_type (struct type *, struct type *);
+extern struct rank rank_one_type (struct type *, struct type *);
 
 extern void recursive_dump_type (struct type *, int);
 

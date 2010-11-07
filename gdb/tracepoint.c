@@ -2734,7 +2734,7 @@ trace_save (const char *filename, int target_does_save)
       for (a = 0; VEC_iterate (char_ptr, utp->actions, a, act); ++a)
 	fprintf (fp, "tp A%x:%s:%s\n",
 		 utp->number, phex_nz (utp->addr, sizeof (utp->addr)), act);
-      for (a = 0; VEC_iterate (char_ptr, utp->actions, a, act); ++a)
+      for (a = 0; VEC_iterate (char_ptr, utp->step_actions, a, act); ++a)
 	fprintf (fp, "tp S%x:%s:%s\n",
 		 utp->number, phex_nz (utp->addr, sizeof (utp->addr)), act);
       if (utp->at_string)
@@ -3991,7 +3991,7 @@ tfile_xfer_partial (struct target_ops *ops, enum target_object object,
     {
       asection *s;
       bfd_size_type size;
-      bfd_vma lma;
+      bfd_vma vma;
 
       for (s = exec_bfd->sections; s; s = s->next)
 	{
@@ -3999,16 +3999,16 @@ tfile_xfer_partial (struct target_ops *ops, enum target_object object,
 	      (s->flags & SEC_READONLY) == 0)
 	    continue;
 
-	  lma = s->lma;
+	  vma = s->vma;
 	  size = bfd_get_section_size (s);
-	  if (lma <= offset && offset < (lma + size))
+	  if (vma <= offset && offset < (vma + size))
 	    {
-	      amt = (lma + size) - offset;
+	      amt = (vma + size) - offset;
 	      if (amt > len)
 		amt = len;
 
 	      amt = bfd_get_section_contents (exec_bfd, s,
-					      readbuf, offset - lma, amt);
+					      readbuf, offset - vma, amt);
 	      return amt;
 	    }
 	}

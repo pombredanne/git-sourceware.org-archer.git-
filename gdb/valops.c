@@ -544,14 +544,17 @@ value_cast (struct type *type, struct value *arg2)
       /* Widen the scalar to a vector.  */
       struct type *eltype;
       struct value *val;
-      int i, n;
+      LONGEST low_bound, high_bound;
+      int i;
+
+      if (!get_array_bounds (type, &low_bound, &high_bound))
+	error (_("Could not determine the vector bounds"));
 
       eltype = check_typedef (TYPE_TARGET_TYPE (type));
       arg2 = value_cast (eltype, arg2);
       val = allocate_value (type);
-      n = TYPE_LENGTH (type) / TYPE_LENGTH (eltype);
 
-      for (i = 0; i < n; i++)
+      for (i = 0; i < high_bound - low_bound + 1; i++)
 	{
 	  /* Duplicate the contents of arg2 into the destination vector.  */
 	  memcpy (value_contents_writeable (val) + (i * TYPE_LENGTH (eltype)),
@@ -870,6 +873,20 @@ value_one (struct type *type, enum lval_type lv)
   else if (is_integral_type (type1))
     {
       val = value_from_longest (type, (LONGEST) 1);
+    }
+  else if (TYPE_CODE (type1) == TYPE_CODE_ARRAY && TYPE_VECTOR (type1))
+    {
+      struct type *eltype = check_typedef (TYPE_TARGET_TYPE (type1));
+      int i, n = TYPE_LENGTH (type1) / TYPE_LENGTH (eltype);
+      struct value *tmp;
+
+      val = allocate_value (type);
+      for (i = 0; i < n; i++)
+	{
+	  tmp = value_one (eltype, lv);
+	  memcpy (value_contents_writeable (val) + i * TYPE_LENGTH (eltype),
+		  value_contents_all (tmp), TYPE_LENGTH (eltype));
+	}
     }
   else
     {
@@ -2888,7 +2905,7 @@ find_oload_champ (struct type **arg_types, int nargs, int method,
 	  for (jj = 0; jj < nargs - static_offset; jj++)
 	    fprintf_filtered (gdb_stderr,
 			      "...Badness @ %d : %d\n", 
-			      jj, bv->rank[jj]);
+			      jj, bv->rank[jj].rank);
 	  fprintf_filtered (gdb_stderr,
 			    "Overload resolution champion is %d, ambiguous? %d\n", 
 			    oload_champ, oload_ambiguous);
@@ -2922,9 +2939,15 @@ classify_oload_match (struct badness_vector *oload_champ_bv,
 
   for (ix = 1; ix <= nargs - static_offset; ix++)
     {
-      if (oload_champ_bv->rank[ix] >= 100)
+      /* If this conversion is as bad as INCOMPATIBLE_TYPE_BADNESS
+         or worse return INCOMPATIBLE.  */
+      if (compare_ranks (oload_champ_bv->rank[ix],
+                         INCOMPATIBLE_TYPE_BADNESS) <= 0)
 	return INCOMPATIBLE;	/* Truly mismatched types.  */
-      else if (oload_champ_bv->rank[ix] >= 10)
+      /* Otherwise If this conversion is as bad as
+         NS_POINTER_CONVERSION_BADNESS or worse return NON_STANDARD.  */
+      else if (compare_ranks (oload_champ_bv->rank[ix],
+                              NS_POINTER_CONVERSION_BADNESS) <= 0)
 	return NON_STANDARD;	/* Non-standard type conversions
 				   needed.  */
     }
@@ -3060,9 +3083,9 @@ compare_parameters (struct type *t1, struct type *t2, int skip_artificial)
 
       for (i = 0; i < TYPE_NFIELDS (t2); ++i)
 	{
-	  if (rank_one_type (TYPE_FIELD_TYPE (t1, start + i),
-			      TYPE_FIELD_TYPE (t2, i))
-	      != 0)
+	  if (compare_ranks (rank_one_type (TYPE_FIELD_TYPE (t1, start + i),
+	                                   TYPE_FIELD_TYPE (t2, i)),
+	                     EXACT_MATCH_BADNESS) != 0)
 	    return 0;
 	}
 

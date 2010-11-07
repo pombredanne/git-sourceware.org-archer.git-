@@ -118,10 +118,6 @@ extern bfd_error_handler_type _bfd_error_handler;
 
 /* These routines allocate and free things on the BFD's objalloc.  */
 
-extern void *bfd_alloc
-  (bfd *, bfd_size_type);
-extern void *bfd_zalloc
-  (bfd *, bfd_size_type);
 extern void *bfd_alloc2
   (bfd *, bfd_size_type, bfd_size_type);
 extern void *bfd_zalloc2
@@ -628,7 +624,7 @@ extern bfd_reloc_status_type _bfd_relocate_contents
 
 /* Clear a given location using a given howto.  */
 extern void _bfd_clear_contents (reloc_howto_type *howto, bfd *input_bfd,
-				 bfd_byte *location);
+				 asection *input_section, bfd_byte *location);
 
 /* Link stabs in sections in the first pass.  */
 
@@ -812,3 +808,13 @@ extern void bfd_section_already_linked_table_traverse
 extern bfd_vma read_unsigned_leb128 (bfd *, bfd_byte *, unsigned int *);
 extern bfd_signed_vma read_signed_leb128 (bfd *, bfd_byte *, unsigned int *);
 
+struct dwarf_debug_section
+{
+  const char *uncompressed_name;
+  const char *compressed_name;
+};
+
+/* Map of uncompressed DWARF debug section name to compressed one.  It
+   is terminated by NULL uncompressed_name.  */
+
+extern struct dwarf_debug_section dwarf_debug_sections[];

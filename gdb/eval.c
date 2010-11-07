@@ -603,6 +603,7 @@ binop_promote (const struct language_defn *language, struct gdbarch *gdbarch,
 	case language_cplus:
 	case language_asm:
 	case language_objc:
+	case language_opencl:
 	  /* No promotion required.  */
 	  break;
 
@@ -690,7 +691,24 @@ binop_promote (const struct language_defn *language, struct gdbarch *gdbarch,
 			       : builtin->builtin_long_long);
 	    }
 	  break;
-
+	case language_opencl:
+	  if (result_len <= TYPE_LENGTH (lookup_signed_typename
+					 (language, gdbarch, "int")))
+	    {
+	      promoted_type =
+		(unsigned_operation
+		 ? lookup_unsigned_typename (language, gdbarch, "int")
+		 : lookup_signed_typename (language, gdbarch, "int"));
+	    }
+	  else if (result_len <= TYPE_LENGTH (lookup_signed_typename
+					      (language, gdbarch, "long")))
+	    {
+	      promoted_type =
+		(unsigned_operation
+		 ? lookup_unsigned_typename (language, gdbarch, "long")
+		 : lookup_signed_typename (language, gdbarch,"long"));
+	    }
+	  break;
 	default:
 	  /* For other languages the result type is unchanged from gdb
 	     version 6.7 for backward compatibility.
@@ -2782,6 +2800,8 @@ evaluate_subexp_standard (struct type *expect_type,
 	}
       else
 	{
+	  arg3 = value_non_lval (arg1);
+
 	  if (ptrmath_type_p (exp->language_defn, value_type (arg1)))
 	    arg2 = value_ptradd (arg1, 1);
 	  else
@@ -2794,7 +2814,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	    }
 
 	  value_assign (arg1, arg2);
-	  return arg1;
+	  return arg3;
 	}
 
     case UNOP_POSTDECREMENT:
@@ -2807,6 +2827,8 @@ evaluate_subexp_standard (struct type *expect_type,
 	}
       else
 	{
+	  arg3 = value_non_lval (arg1);
+
 	  if (ptrmath_type_p (exp->language_defn, value_type (arg1)))
 	    arg2 = value_ptradd (arg1, -1);
 	  else
@@ -2819,7 +2841,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	    }
 
 	  value_assign (arg1, arg2);
-	  return arg1;
+	  return arg3;
 	}
 
     case OP_THIS:

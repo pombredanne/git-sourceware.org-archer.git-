@@ -1256,6 +1256,10 @@ struct elf_backend_data
      actual tag number to place in the input position.  */
   int (*obj_attrs_order) (int);
 
+  /* Handle merging unknown attributes; either warn and return TRUE,
+     or give an error and return FALSE.  */
+  bfd_boolean (*obj_attrs_handle_unknown) (bfd *, int);
+
   /* This is non-zero if static TLS segments require a special alignment.  */
   unsigned static_tls_alignment;
 
@@ -2235,6 +2239,8 @@ extern void _bfd_elf_copy_obj_attributes (bfd *, bfd *);
 extern int _bfd_elf_obj_attrs_arg_type (bfd *, int, int);
 extern void _bfd_elf_parse_attributes (bfd *, Elf_Internal_Shdr *);
 extern bfd_boolean _bfd_elf_merge_object_attributes (bfd *, bfd *);
+extern bfd_boolean _bfd_elf_merge_unknown_attribute_low (bfd *, bfd *, int);
+extern bfd_boolean _bfd_elf_merge_unknown_attribute_list (bfd *, bfd *);
 extern Elf_Internal_Shdr *_bfd_elf_single_rel_hdr (asection *sec);
 
 /* The linker may needs to keep track of the number of relocs that it
@@ -2355,6 +2361,9 @@ extern asection _bfd_elf_large_com_section;
 #define RELOC_AGAINST_DISCARDED_SECTION(info, input_bfd, input_section,	\
 					rel, relend, howto, contents)	\
   {									\
+    _bfd_clear_contents (howto, input_bfd, input_section,		\
+			 contents + rel->r_offset);			\
+									\
     if (info->relocatable						\
 	&& (input_section->flags & SEC_DEBUGGING))			\
       {									\
@@ -2380,7 +2389,6 @@ extern asection _bfd_elf_large_com_section;
 	  }								\
       }									\
 									\
-    _bfd_clear_contents (howto, input_bfd, contents + rel->r_offset);	\
     rel->r_info = 0;							\
     rel->r_addend = 0;							\
     continue;								\

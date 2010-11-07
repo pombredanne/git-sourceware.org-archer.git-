@@ -41,6 +41,28 @@
 #include "hashtab.h"
 
 
+/* Initialize BADNESS constants.  */
+
+const struct rank LENGTH_MISMATCH_BADNESS = {100,0};
+
+const struct rank TOO_FEW_PARAMS_BADNESS = {100,0};
+const struct rank INCOMPATIBLE_TYPE_BADNESS = {100,0};
+
+const struct rank EXACT_MATCH_BADNESS = {0,0};
+
+const struct rank INTEGER_PROMOTION_BADNESS = {1,0};
+const struct rank FLOAT_PROMOTION_BADNESS = {1,0};
+const struct rank BASE_PTR_CONVERSION_BADNESS = {1,0};
+const struct rank INTEGER_CONVERSION_BADNESS = {2,0};
+const struct rank FLOAT_CONVERSION_BADNESS = {2,0};
+const struct rank INT_FLOAT_CONVERSION_BADNESS = {2,0};
+const struct rank VOID_PTR_CONVERSION_BADNESS = {2,0};
+const struct rank BOOL_PTR_CONVERSION_BADNESS = {3,0};
+const struct rank BASE_CONVERSION_BADNESS = {2,0};
+const struct rank REFERENCE_CONVERSION_BADNESS = {2,0};
+
+const struct rank NS_POINTER_CONVERSION_BADNESS = {10,0};
+
 /* Floatformat pairs.  */
 const struct floatformat *floatformats_ieee_half[BFD_ENDIAN_UNKNOWN] = {
   &floatformat_ieee_half_big,
@@ -800,6 +822,50 @@ get_discrete_bounds (struct type *type, LONGEST *lowp, LONGEST *highp)
     default:
       return -1;
     }
+}
+
+/* Assuming TYPE is a simple, non-empty array type, compute its upper
+   and lower bound.  Save the low bound into LOW_BOUND if not NULL.
+   Save the high bound into HIGH_BOUND if not NULL.
+
+   Return 1 if the operation was successful. Return zero otherwise,
+   in which case the values of LOW_BOUND and HIGH_BOUNDS are unmodified.
+
+   We now simply use get_discrete_bounds call to get the values
+   of the low and high bounds.
+   get_discrete_bounds can return three values:
+   1, meaning that index is a range,
+   0, meaning that index is a discrete type,
+   or -1 for failure.  */
+
+int
+get_array_bounds (struct type *type, LONGEST *low_bound, LONGEST *high_bound)
+{
+  struct type *index = TYPE_INDEX_TYPE (type);
+  LONGEST low = 0;
+  LONGEST high = 0;
+  int res;
+
+  if (index == NULL)
+    return 0;
+
+  res = get_discrete_bounds (index, &low, &high);
+  if (res == -1)
+    return 0;
+
+  /* Check if the array bounds are undefined.  */
+  if (res == 1
+      && ((low_bound && TYPE_ARRAY_LOWER_BOUND_IS_UNDEFINED (type))
+	  || (high_bound && TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED (type))))
+    return 0;
+
+  if (low_bound)
+    *low_bound = low;
+
+  if (high_bound)
+    *high_bound = high;
+
+  return 1;
 }
 
 /* Create an array type using either a blank type supplied in
@@ -1901,32 +1967,50 @@ class_types_same_p (const struct type *a, const struct type *b)
 	      && !strcmp (TYPE_NAME (a), TYPE_NAME (b))));
 }
 
-/* Check whether BASE is an ancestor or base class of DCLASS
-   Return 1 if so, and 0 if not.  If PUBLIC is 1 then only public
-   ancestors are considered, and the function returns 1 only if
-   BASE is a public ancestor of DCLASS.  */
+/* If BASE is an ancestor of DCLASS return the distance between them.
+   otherwise return -1;
+   eg:
+
+   class A {};
+   class B: public A {};
+   class C: public B {};
+   class D: C {};
+
+   distance_to_ancestor (A, A, 0) = 0
+   distance_to_ancestor (A, B, 0) = 1
+   distance_to_ancestor (A, C, 0) = 2
+   distance_to_ancestor (A, D, 0) = 3
+
+   If PUBLIC is 1 then only public ancestors are considered,
+   and the function returns the distance only if BASE is a public ancestor
+   of DCLASS.
+   Eg:
+
+   distance_to_ancestor (A, D, 1) = -1  */
 
 static int
-do_is_ancestor (struct type *base, struct type *dclass, int public)
+distance_to_ancestor (struct type *base, struct type *dclass, int public)
 {
   int i;
+  int d;
 
   CHECK_TYPEDEF (base);
   CHECK_TYPEDEF (dclass);
 
   if (class_types_same_p (base, dclass))
-    return 1;
+    return 0;
 
   for (i = 0; i < TYPE_N_BASECLASSES (dclass); i++)
     {
       if (public && ! BASETYPE_VIA_PUBLIC (dclass, i))
 	continue;
 
-      if (do_is_ancestor (base, TYPE_BASECLASS (dclass, i), public))
-	return 1;
+      d = distance_to_ancestor (base, TYPE_BASECLASS (dclass, i), public);
+      if (d >= 0)
+	return 1 + d;
     }
 
-  return 0;
+  return -1;
 }
 
 /* Check whether BASE is an ancestor or base class or DCLASS
@@ -1938,7 +2022,7 @@ do_is_ancestor (struct type *base, struct type *dclass, int public)
 int
 is_ancestor (struct type *base, struct type *dclass)
 {
-  return do_is_ancestor (base, dclass, 0);
+  return distance_to_ancestor (base, dclass, 0) >= 0;
 }
 
 /* Like is_ancestor, but only returns true when BASE is a public
@@ -1947,7 +2031,7 @@ is_ancestor (struct type *base, struct type *dclass)
 int
 is_public_ancestor (struct type *base, struct type *dclass)
 {
-  return do_is_ancestor (base, dclass, 1);
+  return distance_to_ancestor (base, dclass, 1) >= 0;
 }
 
 /* A helper function for is_unique_ancestor.  */
@@ -2012,6 +2096,41 @@ is_unique_ancestor (struct type *base, struct value *val)
 
 
 
+/* Return the sum of the rank of A with the rank of B.  */
+
+struct rank
+sum_ranks (struct rank a, struct rank b)
+{
+  struct rank c;
+  c.rank = a.rank + b.rank;
+  c.subrank = a.subrank + b.subrank;
+  return c;
+}
+
+/* Compare rank A and B and return:
+   0 if a = b
+   1 if a is better than b
+  -1 if b is better than a.  */
+
+int
+compare_ranks (struct rank a, struct rank b)
+{
+  if (a.rank == b.rank)
+    {
+      if (a.subrank == b.subrank)
+	return 0;
+      if (a.subrank < b.subrank)
+	return 1;
+      if (a.subrank > b.subrank)
+	return -1;
+    }
+
+  if (a.rank < b.rank)
+    return 1;
+
+  /* a.rank > b.rank  */
+  return -1;
+}
 
 /* Functions for overload resolution begin here */
 
@@ -2036,7 +2155,7 @@ compare_badness (struct badness_vector *a, struct badness_vector *b)
   /* Subtract b from a */
   for (i = 0; i < a->length; i++)
     {
-      tmp = a->rank[i] - b->rank[i];
+      tmp = compare_ranks (b->rank[i], a->rank[i]);
       if (tmp > 0)
 	found_pos = 1;
       else if (tmp < 0)
@@ -2084,7 +2203,9 @@ rank_function (struct type **parms, int nparms,
      arguments and ellipsis parameter lists, we should consider those
      and rank the length-match more finely.  */
 
-  LENGTH_MATCH (bv) = (nargs != nparms) ? LENGTH_MISMATCH_BADNESS : 0;
+  LENGTH_MATCH (bv) = (nargs != nparms)
+		      ? LENGTH_MISMATCH_BADNESS
+		      : EXACT_MATCH_BADNESS;
 
   /* Now rank all the parameters of the candidate function */
   for (i = 1; i <= min_len; i++)
@@ -2195,12 +2316,13 @@ types_equal (struct type *a, struct type *b)
  * PARM is to ARG.  The higher the return value, the worse the match.
  * Generally the "bad" conversions are all uniformly assigned a 100.  */
 
-int
+struct rank
 rank_one_type (struct type *parm, struct type *arg)
 {
+  struct rank rank = {0,0};
 
   if (types_equal (parm, arg))
-    return 0;
+    return EXACT_MATCH_BADNESS;
 
   /* Resolve typedefs */
   if (TYPE_CODE (parm) == TYPE_CODE_TYPEDEF)
@@ -2211,11 +2333,11 @@ rank_one_type (struct type *parm, struct type *arg)
   /* See through references, since we can almost make non-references
      references.  */
   if (TYPE_CODE (arg) == TYPE_CODE_REF)
-    return (rank_one_type (parm, TYPE_TARGET_TYPE (arg))
-	    + REFERENCE_CONVERSION_BADNESS);
+    return (sum_ranks (rank_one_type (parm, TYPE_TARGET_TYPE (arg)),
+                       REFERENCE_CONVERSION_BADNESS));
   if (TYPE_CODE (parm) == TYPE_CODE_REF)
-    return (rank_one_type (TYPE_TARGET_TYPE (parm), arg)
-	    + REFERENCE_CONVERSION_BADNESS);
+    return (sum_ranks (rank_one_type (TYPE_TARGET_TYPE (parm), arg),
+                       REFERENCE_CONVERSION_BADNESS));
   if (overload_debug)
   /* Debugging only.  */
     fprintf_filtered (gdb_stderr, 
@@ -2238,15 +2360,17 @@ rank_one_type (struct type *parm, struct type *arg)
 	    return VOID_PTR_CONVERSION_BADNESS;
 
 	  /* (b) pointer to ancestor-pointer conversion.  */
-	  if (is_ancestor (TYPE_TARGET_TYPE (parm),
-	                          TYPE_TARGET_TYPE (arg)))
-	    return BASE_PTR_CONVERSION_BADNESS;
+	  rank.subrank = distance_to_ancestor (TYPE_TARGET_TYPE (parm),
+	                                       TYPE_TARGET_TYPE (arg),
+	                                       0);
+	  if (rank.subrank >= 0)
+	    return sum_ranks (BASE_PTR_CONVERSION_BADNESS, rank);
 
 	  return INCOMPATIBLE_TYPE_BADNESS;
 	case TYPE_CODE_ARRAY:
 	  if (types_equal (TYPE_TARGET_TYPE (parm),
 	                   TYPE_TARGET_TYPE (arg)))
-	    return 0;
+	    return EXACT_MATCH_BADNESS;
 	  return INCOMPATIBLE_TYPE_BADNESS;
 	case TYPE_CODE_FUNC:
 	  return rank_one_type (TYPE_TARGET_TYPE (parm), arg);
@@ -2289,7 +2413,7 @@ rank_one_type (struct type *parm, struct type *arg)
 		{
 		  /* This case only for character types */
 		  if (TYPE_NOSIGN (arg))
-		    return 0;	/* plain char -> plain char */
+		    return EXACT_MATCH_BADNESS;	/* plain char -> plain char */
 		  else		/* signed/unsigned char -> plain char */
 		    return INTEGER_CONVERSION_BADNESS;
 		}
@@ -2301,7 +2425,7 @@ rank_one_type (struct type *parm, struct type *arg)
 			 unsigned long -> unsigned long */
 		      if (integer_types_same_name_p (TYPE_NAME (parm), 
 						     TYPE_NAME (arg)))
-			return 0;
+			return EXACT_MATCH_BADNESS;
 		      else if (integer_types_same_name_p (TYPE_NAME (arg), 
 							  "int")
 			       && integer_types_same_name_p (TYPE_NAME (parm),
@@ -2325,7 +2449,7 @@ rank_one_type (struct type *parm, struct type *arg)
 		{
 		  if (integer_types_same_name_p (TYPE_NAME (parm), 
 						 TYPE_NAME (arg)))
-		    return 0;
+		    return EXACT_MATCH_BADNESS;
 		  else if (integer_types_same_name_p (TYPE_NAME (arg), 
 						      "int")
 			   && integer_types_same_name_p (TYPE_NAME (parm), 
@@ -2391,19 +2515,19 @@ rank_one_type (struct type *parm, struct type *arg)
 	  if (TYPE_NOSIGN (parm))
 	    {
 	      if (TYPE_NOSIGN (arg))
-		return 0;
+		return EXACT_MATCH_BADNESS;
 	      else
 		return INTEGER_CONVERSION_BADNESS;
 	    }
 	  else if (TYPE_UNSIGNED (parm))
 	    {
 	      if (TYPE_UNSIGNED (arg))
-		return 0;
+		return EXACT_MATCH_BADNESS;
 	      else
 		return INTEGER_PROMOTION_BADNESS;
 	    }
 	  else if (!TYPE_NOSIGN (arg) && !TYPE_UNSIGNED (arg))
-	    return 0;
+	    return EXACT_MATCH_BADNESS;
 	  else
 	    return INTEGER_CONVERSION_BADNESS;
 	default:
@@ -2437,7 +2561,7 @@ rank_one_type (struct type *parm, struct type *arg)
 	case TYPE_CODE_PTR:
 	  return BOOL_PTR_CONVERSION_BADNESS;
 	case TYPE_CODE_BOOL:
-	  return 0;
+	  return EXACT_MATCH_BADNESS;
 	default:
 	  return INCOMPATIBLE_TYPE_BADNESS;
 	}
@@ -2449,7 +2573,7 @@ rank_one_type (struct type *parm, struct type *arg)
 	  if (TYPE_LENGTH (arg) < TYPE_LENGTH (parm))
 	    return FLOAT_PROMOTION_BADNESS;
 	  else if (TYPE_LENGTH (arg) == TYPE_LENGTH (parm))
-	    return 0;
+	    return EXACT_MATCH_BADNESS;
 	  else
 	    return FLOAT_CONVERSION_BADNESS;
 	case TYPE_CODE_INT:
@@ -2468,7 +2592,7 @@ rank_one_type (struct type *parm, struct type *arg)
 	case TYPE_CODE_FLT:
 	  return FLOAT_PROMOTION_BADNESS;
 	case TYPE_CODE_COMPLEX:
-	  return 0;
+	  return EXACT_MATCH_BADNESS;
 	default:
 	  return INCOMPATIBLE_TYPE_BADNESS;
 	}
@@ -2479,8 +2603,9 @@ rank_one_type (struct type *parm, struct type *arg)
 	{
 	case TYPE_CODE_STRUCT:
 	  /* Check for derivation */
-	  if (is_ancestor (parm, arg))
-	    return BASE_CONVERSION_BADNESS;
+	  rank.subrank = distance_to_ancestor (parm, arg, 0);
+	  if (rank.subrank >= 0)
+	    return sum_ranks (BASE_CONVERSION_BADNESS, rank);
 	  /* else fall through */
 	default:
 	  return INCOMPATIBLE_TYPE_BADNESS;

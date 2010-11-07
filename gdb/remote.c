@@ -4416,12 +4416,6 @@ append_resumption (char *p, char *endp,
   return p;
 }
 
-static int
-currently_stepping_callback (struct thread_info *tp, void *data)
-{
-  return currently_stepping (tp);
-}
-
 /* Resume the remote inferior by using a "vCont" packet.  The thread
    to be resumed is PTID; STEP and SIGGNAL indicate whether the
    resumed thread should be single-stepped and/or signalled.  If PTID
@@ -4464,8 +4458,6 @@ remote_vcont_resume (ptid_t ptid, int step, enum target_signal siggnal)
     }
   else if (ptid_equal (ptid, minus_one_ptid) || ptid_is_pid (ptid))
     {
-      struct thread_info *tp;
-
       /* Resume all threads (of all processes, or of a single
 	 process), with preference for INFERIOR_PTID.  This assumes
 	 inferior_ptid belongs to the set of all threads we are about
@@ -4474,12 +4466,6 @@ remote_vcont_resume (ptid_t ptid, int step, enum target_signal siggnal)
 	{
 	  /* Step inferior_ptid, with or without signal.  */
 	  p = append_resumption (p, endp, inferior_ptid, step, siggnal);
-	}
-
-      tp = iterate_over_threads (currently_stepping_callback, NULL);
-      if (tp && !ptid_equal (tp->ptid, inferior_ptid))
-	{
-	  p = append_resumption (p, endp, tp->ptid, 1, TARGET_SIGNAL_0);
 	}
 
       /* And continue others without a signal.  */
@@ -9892,7 +9878,7 @@ remote_trace_set_readonly_regions (void)
 {
   asection *s;
   bfd_size_type size;
-  bfd_vma lma;
+  bfd_vma vma;
   int anysecs = 0;
 
   if (!exec_bfd)
@@ -9909,10 +9895,10 @@ remote_trace_set_readonly_regions (void)
 	continue;
 
       anysecs = 1;
-      lma = s->lma;
+      vma = bfd_get_section_vma (,s);
       size = bfd_get_section_size (s);
-      sprintf_vma (tmp1, lma);
-      sprintf_vma (tmp2, lma + size);
+      sprintf_vma (tmp1, vma);
+      sprintf_vma (tmp2, vma + size);
       sprintf (target_buf + strlen (target_buf), 
 	       ":%s,%s", tmp1, tmp2);
     }

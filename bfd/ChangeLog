@@ -1,3 +1,267 @@
+2010-11-05  Joseph Myers  <joseph@codesourcery.com>
+
+	* elf32-tic6x.c (elf32_tic6x_obj_attrs_handle_unknown): New.
+	(elf32_tic6x_merge_attributes): Use
+	_bfd_elf_merge_unknown_attribute_low and
+	_bfd_elf_merge_unknown_attribute_list.
+	(elf_backend_obj_attrs_handle_unknown): Define.
+
+2010-11-05  Joseph Myers  <joseph@codesourcery.com>
+
+	* elf-attrs.c (_bfd_elf_merge_unknown_attribute_low,
+	_bfd_elf_merge_unknown_attribute_list): Correct test for matching
+	string attributes.
+
+2010-11-05  Tristan Gingold  <gingold@adacore.com>
+
+	* po/bfd.pot: Regenerate
+
+2010-11-05  Tristan Gingold  <gingold@adacore.com>
+
+	* configure.in: Bump version to 2.21.51
+	* configure: Regenerate.
+
+2010-11-04  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	PR ld/10144
+	* elfxx-mips.c (_bfd_mips_elf_check_relocs)
+	[R_MIPS_32, R_MIPS_REL32, R_MIPS_64]: Ignore relocs from
+	SEC_DEBUGGING sections.
+
+2010-11-04  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-lib.c (vms_write_index): Fix thinko: reverse the loop.
+	Use bfd_zmalloc instead of bfd_malloc.  Fix comment.
+
+2010-11-04  Kai Tietz  <kai.tietz@onevision.com>
+
+	* coffcode.h (GNU_LINKONCE_WT): New.
+	(sec_to_styp_flags): Add handling of new debug
+	section.
+	(styp_to_sec_flags): Likewise.
+
+2010-11-04  Tristan Gingold  <gingold@adacore.com>
+
+	* makefile.vms (CFLAGS): Make badalias warnings informational.
+	* vms-lib.c (vms_lib_bread): Avoid arithmetic on void pointer.
+
+2010-11-04  Joseph Myers  <joseph@codesourcery.com>
+
+	* elf-attrs.c (_bfd_elf_merge_unknown_attribute_low,
+	_bfd_elf_merge_unknown_attribute_list): New.
+	* elf-bfd.h (struct elf_backend_data): Add
+	obj_attrs_handle_unknown.
+	(_bfd_elf_merge_unknown_attribute_low,
+	_bfd_elf_merge_unknown_attribute_list): Declare.
+	* elf32-arm.c (elf32_arm_obj_attrs_handle_unknown): New.  Split
+	out from elf32_arm_merge_eabi_attributes.
+	(elf32_arm_merge_eabi_attributes): Use
+	_bfd_elf_merge_unknown_attribute_low and
+	_bfd_elf_merge_unknown_attribute_list.
+	(elf_backend_obj_attrs_handle_unknown): Define.
+	* elfxx-target.h (elf_backend_obj_attrs_handle_unknown): Define.
+	(elfNN_bed): Update initializer.
+
+2010-11-02  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* bfd.c (BFD_FLAGS_FOR_BFD_USE_MASK): New.
+	* bfd-in2.h: Regenerated.
+
+2010-11-02  Joseph Myers  <joseph@codesourcery.com>
+
+	* elf32-tic6x.c (elf32_tic6x_obj_attrs_arg_type): Except for
+	Tag_ABI_compatibility, treat odd tags as strings and even ones as
+	integers.
+	(elf32_tic6x_obj_attrs_order, elf32_tic6x_tag_to_array_alignment,
+	elf32_tic6x_array_alignment_to_tag): New.
+	(elf32_tic6x_merge_attributes): Handle more attributes.  Set type
+	for merged attributes.
+	(elf_backend_obj_attrs_order): Define.
+
+2010-10-29  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* elfxx-mips.c (mips_elf_calculate_relocation): Fix a typo.
+
+2010-10-29  Pawel Sikora  <pluto@pld-linux.org>
+
+	PR binutils/12075
+	* compress.c (bfd_compress_section_contents): Use uLong on
+	compressed_size.
+
+2010-10-29  Joseph Myers  <joseph@codesourcery.com>
+
+	* elf32-tic6x.c (elf32_tic6x_obj_attrs_arg_type): Check
+	Tag_ABI_compatibility not Tag_compatibility.
+	(elf32_tic6x_merge_attributes): Update compatibility attribute
+	name in comment.  Return FALSE if merging common attributes fails.
+
+2010-10-29  Nick Clifton  <nickc@redhat.com>
+
+	PR bintils/6962
+	* coffcode.h (handle_COMDAT): Only check the base type when
+	looking for a section symbol.
+
+2010-10-29  H.J. Lu  <hongjiu.lu@intel.com>
+	    Cary Coutant  <ccoutant@google.com>
+
+	* archive.c (bfd_openr_next_archived_file): Copy BFD_COMPRESS
+	and BFD_DECOMPRESS.
+
+	* bfd.c (BFD_COMPRESS): New.
+	(BFD_DECOMPRESS): Likewise.
+	(BFD_FLAGS_SAVED): Likewise.
+	(bfd_preserve_save): Replace BFD_IN_MEMORY with BFD_FLAGS_SAVED.
+
+	* compress.c (bfd_uncompress_section_contents): Removed.
+	(get_uncompressed_size): New.
+	(decompress_contents): Likewise.
+	(bfd_compress_section_contents): Likewise.
+	(bfd_get_full_section_contents): Likewise.
+	(bfd_is_section_compressed): Likewise.
+	(bfd_init_section_decompress_status): Likewise.
+	(bfd_init_section_compress_status): Likewise.
+
+	* dwarf2.c (dwarf_debug_sections): New.
+	(dwarf_debug_section_enum): Likewise.
+	(read_section): Remove section_name and compressed_section_name.
+	Add dwarf_debug_section_enum.  Try compressed debug section.
+	(read_indirect_string): Updated.
+	(read_abbrevs): Likewise.
+	(decode_line_info): Likewise.
+	(read_debug_ranges): Likewise.
+	(find_line): Updated.
+
+	* ecoff.c (bfd_debug_section): Add compress_status and
+	compressed_size.
+
+	* elf.c (_bfd_elf_make_section_from_shdr): Call
+	bfd_is_section_compressed to check if a DWARF debug section is
+	compressed.  Call bfd_init_section_compress_status or
+	bfd_init_section_decompress_status if needed.
+
+	* elflink.c (elf_link_input_bfd): Replace bfd_get_section_contents
+	with bfd_get_full_section_contents.
+	* merge.c (_bfd_add_merge_section): Likewise.
+	* reloc.c (bfd_generic_get_relocated_section_contents): Likewise.
+	* simple.c (bfd_simple_get_relocated_section_contents): Likewise.
+
+	* elfxx-target.h (TARGET_BIG_SYM): Allow BFD_COMPRESS and
+	BFD_DECOMPRESS.
+	(TARGET_LITTLE_SYM): Likewise.
+
+	* libbfd-in.h (dwarf_debug_section): New.
+	(dwarf_debug_sections): Likewise.
+
+	* libbfd.c (_bfd_generic_get_section_contents): Issue an error
+	when getting contents on compressed/decompressed section.
+
+	* section.c (COMPRESS_SECTION_NONE): New.
+	(COMPRESS_SECTION_DONE): Likewise.
+	(DECOMPRESS_SECTION_SIZED): Likewise.
+	(BFD_FAKE_SECTION): Add compress_status and compressed_size.
+	(bfd_malloc_and_get_section): Replace bfd_get_section_contents
+	with bfd_get_full_section_contents.
+
+	* bfd-in2.h: Regenerated.
+	* libbfd.h: Likewise.
+
+2010-10-29  Bernd Schmidt  <bernds@codesourcery.com>
+            Joseph Myers  <joseph@codesourcery.com>
+
+	* elf32-tic6x.c (elf32_tic6x_merge_attributes): Check for mismatch
+	of DSBT attributes.
+
+2010-10-25  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* elf-bfd.h (RELOC_AGAINST_DISCARDED_SECTION): Always call
+	_bfd_clear_contents.  Pass it the input section.
+	* libbfd-in.h (_bfd_clear_contents): Add input_section argument.
+	* libbfd.h: Regenerate.
+	* reloc.c (_bfd_clear_contents): Take input_section argument.
+	Use non-zero for .debug_ranges.
+	(bfd_generic_get_relocated_section_conten): Update _bfd_clear_contents
+	call.
+
+	* elf32-arm.c (elf32_arm_relocate_section): Use
+	RELOC_AGAINST_DISCARDED_SECTION.
+	* elf-m10200.c (mn10200_elf_relocate_section): Likewise.
+	* elf-m10300.c (mn10300_elf_relocate_section): Likewise.
+	* elf32-arm.c (elf32_arm_relocate_section): Likewise.
+	* elf32-avr.c (elf32_avr_relocate_section): Likewise.
+	* elf32-bfin.c (bfin_relocate_section): Likewise.
+	(bfinfdpic_relocate_section): Likewise.
+	* elf32-cr16.c (elf32_cr16_relocate_section): Likewise.
+	* elf32-cr16c.c (elf32_cr16c_relocate_section): Likewise.
+	* elf32-cris.c (cris_elf_relocate_section): Likewise.
+	* elf32-crx.c (elf32_crx_relocate_section): Likewise.
+	* elf32-d10v.c (elf32_d10v_relocate_section): Likewise.
+	* elf32-fr30.c (fr30_elf_relocate_section): Likewise.
+	* elf32-frv.c (elf32_frv_relocate_section): Likewise.
+	* elf32-h8300.c (elf32_h8_relocate_section): Likewise.
+	* elf32-hppa.c (elf32_hppa_relocate_section): Likewise.
+	* elf32-i370.c (i370_elf_relocate_section): Likewise.
+	* elf32-i860.c (elf32_i860_relocate_section): Likewise.
+	* elf32-ip2k.c (ip2k_elf_relocate_section): Likewise.
+	* elf32-iq2000.c (iq2000_elf_relocate_section): Likewise.
+	* elf32-lm32.c (lm32_elf_relocate_section): Likewise.
+	* elf32-m32c.c (m32c_elf_relocate_section): Likewise.
+	* elf32-m32r.c (m32r_elf_relocate_section): Likewise.
+	* elf32-m68hc1x.c (elf32_m68hc11_relocate_section): Likewise.
+	* elf32-m68k.c (elf_m68k_relocate_section): Likewise.
+	* elf32-mcore.c (mcore_elf_relocate_section): Likewise.
+	* elf32-mep.c (mep_elf_relocate_section): Likewise.
+	* elf32-moxie.c (moxie_elf_relocate_section): Likewise.
+	* elf32-msp430.c (elf32_msp430_relocate_section): Likewise.
+	* elf32-mt.c (mt_elf_relocate_section): Likewise.
+	* elf32-openrisc.c (openrisc_elf_relocate_section): Likewise.
+	* elf32-ppc.c (ppc_elf_relocate_section): Likewise.
+	* elf32-rx.c (rx_elf_relocate_section): Likewise.
+	* elf32-s390.c (elf_s390_relocate_section): Likewise.
+	* elf32-score.c (s3_bfd_score_elf_relocate_section): Likewise.
+	* elf32-score7.c (s7_bfd_score_elf_relocate_section): Likewise.
+	* elf32-sh.c (sh_elf_relocate_section): Likewise.
+	* elf32-spu.c (spu_elf_relocate_section): Likewise.
+	* elf32-tic6x.c (elf32_tic6x_relocate_section): Likewise.
+	* elf32-v850.c (v850_elf_relocate_section): Likewise.
+	* elf32-vax.c (elf_vax_relocate_section): Likewise.
+	* elf32-xc16x.c (elf32_xc16x_relocate_section): Likewise.
+	* elf32-xstormy16.c (xstormy16_elf_relocate_section): Likewise.
+	* elf32-xtensa.c (elf_xtensa_relocate_section): Likewise.
+	* elf64-alpha.c (elf64_alpha_relocate_section_r): Likewise.
+	(elf64_alpha_relocate_section): Likewise.
+	* elf64-hppa.c (elf64_hppa_relocate_section): Likewise.
+	* elf64-mmix.c (mmix_elf_relocate_section): Likewise.
+	* elf64-ppc.c (ppc64_elf_relocate_section): Likewise.
+	* elf64-s390.c (elf_s390_relocate_section): Likewise.
+	* elf64-sh64.c (sh_elf64_relocate_section): Likewise.
+	* elfxx-ia64.c (elfNN_ia64_relocate_section): Likewise.
+	* elfxx-mips.c (_bfd_mips_elf_relocate_section): Likewise.
+	* elfxx-sparc.c (_bfd_sparc_elf_relocate_section): Likewise.
+
+2010-10-25  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* elf32-tic6x.c: Add attribution.
+
+2010-10-25  Alan Modra  <amodra@gmail.com>
+
+	* elf32-arm.c (find_stub_size_and_template): Avoid uninitialized
+	var warning at -O3.
+
+2010-10-25  Alan Modra  <amodra@gmail.com>
+
+	* opncls.c (bfd_alloc, bfd_zalloc): Don't mark internal.
+	* libbfd-in.h (bfd_alloc, bfd_zalloc): Don't declare here.
+	* libbfd.h: Regenerate
+	* bfd-in2.h: Regenerate.
+
+2010-10-25  Alan Modra  <amodra@gmail.com>
+
+	* opncls.c (_bfd_id_counter): Rename to bfd_id_counter.
+	(bfd_reserved_id_counter, bfd_use_reserved_id): New vars.
+	(_bfd_new_bfd): Use negative id when bfd_use_reserved_id.
+	(bfd_create): Doc fix.
+	* bfd-in2.h: Regenerate.
+
 2010-10-22  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
 
 	* elfxx-sparc.c (tpoff): Define bed, static_tls_size.
@@ -60,7 +324,7 @@
 	(elf_backend_static_tls_alignment): Redefine for Solaris 2.
 	Undef again for Intel L1OM.
 
-2010-10-14  Dave Korn  <dave.korn.cygwin@gmail.com> 
+2010-10-14  Dave Korn  <dave.korn.cygwin@gmail.com>
 
 	Apply LD plugin patch series (part 6/6).
 	* aoutx.h (aout_link_check_ar_symbols): Take new "subsbfd" reference
@@ -189,7 +453,7 @@
 	Delete.
 	(elf32_tic6x_rel_relocation_p): Adjusted to match changes in
 	data structures.
- 	* elf32-microblaze.c (microblaze_elf_check_relocs): Use
+	* elf32-microblaze.c (microblaze_elf_check_relocs): Use
 	_bfd_elf_single_rel_hdr.
 	* elf32-ppc.c (ppc_elf_relax_section): Likewise.
 	* elf32-spu.c (spu_elf_relocate_section): Likewise.

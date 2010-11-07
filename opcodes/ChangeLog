@@ -1,3 +1,23 @@
+2010-11-05  Tristan Gingold  <gingold@adacore.com>
+
+	* po/opcodes.pot: Regenerate
+
+2010-10-28  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* mips-opc.c (mips_builtin_opcodes): Fix formatting of "ld".
+
+2010-10-28  Andreas Krebbel  <Andreas.Krebbel@de.ibm.com>
+
+	* s390-opc.txt: cfxr, cfdr and cfer z900 -> g5.
+
+2010-10-25  Chao-ying Fu  <fu@mips.com>
+
+	* mips-opc.c (madd, maddu, msub, msubu, mult, multu): Change D33 to D32.
+
+2010-10-25  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* tic6x-dis.c: Add attribution.
+
 2010-10-22  Alan Modra  <amodra@gmail.com>
 
 	* Makefile.am (CLEANFILES): Add stamp-lm32.  Sort.

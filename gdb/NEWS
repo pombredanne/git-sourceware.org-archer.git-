@@ -3,6 +3,14 @@
 
 *** Changes since GDB 7.2
 
+* GDB has a new command: "set directories".
+  It is like the "dir" command except that it replaces the
+  source path list instead of augmenting it.
+
+* OpenCL C
+  Initial support for the OpenCL C language (http://www.khronos.org/opencl)
+  has been integrated into GDB.
+
 * Python scripting
 
   ** GDB values in Python are now callable if the value represents a
@@ -15,6 +23,17 @@
   ** Module gdb.types has been added.
      It contains a collection of utilities for working with gdb.Types objects:
      get_basic_type, has_field, make_enum_dict.
+
+  ** Module gdb.printing has been added.
+     It contains utilities for writing and registering pretty-printers.
+     New classes: PrettyPrinter,  SubPrettyPrinter,
+     RegexpCollectionPrettyPrinter.
+     New function: register_pretty_printer.
+
+  ** New commands "info pretty-printers", "enable pretty-printer" and
+     "disable pretty-printer" have been added.
+
+  ** gdb.parameter("directories") is now available.
 
 * C++ Improvements:
 
@@ -75,6 +94,8 @@
   debugging a program using the Ravenscar Profile.  For more information,
   see the "Tasking Support when using the Ravenscar Profile" section
   in the GDB user manual.
+
+* Guile support was removed.
 
 *** Changes in GDB 7.2
 
