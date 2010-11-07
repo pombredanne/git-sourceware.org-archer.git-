@@ -964,6 +964,7 @@ extern struct coff_comdat_info *bfd_coff_get_comdat_section
 void bfd_init (void);
 
 /* Extracted from opncls.c.  */
+extern unsigned int bfd_use_reserved_id;
 bfd *bfd_fopen (const char *filename, const char *target,
     const char *mode, int fd);
 
@@ -999,6 +1000,10 @@ bfd *bfd_create (const char *filename, bfd *templ);
 bfd_boolean bfd_make_writable (bfd *abfd);
 
 bfd_boolean bfd_make_readable (bfd *abfd);
+
+void *bfd_alloc (bfd *abfd, bfd_size_type wanted);
+
+void *bfd_zalloc (bfd *abfd, bfd_size_type wanted);
 
 unsigned long bfd_calc_gnu_debuglink_crc32
    (unsigned long crc, const unsigned char *buf, bfd_size_type len);
@@ -1348,6 +1353,12 @@ typedef struct bfd_section
   /* Mark flag used by some linker backends for garbage collection.  */
   unsigned int gc_mark : 1;
 
+  /* Section compression status.  */
+  unsigned int compress_status : 2;
+#define COMPRESS_SECTION_NONE    0
+#define COMPRESS_SECTION_DONE    1
+#define DECOMPRESS_SECTION_SIZED 2
+
   /* The following flags are used by the ELF linker. */
 
   /* Mark sections which have been allocated to segments.  */
@@ -1403,6 +1414,9 @@ typedef struct bfd_section
      section multiple times.  For output sections, rawsize holds the
      section size calculated on a previous linker relaxation pass.  */
   bfd_size_type rawsize;
+
+  /* The compressed size of the section in octets.  */
+  bfd_size_type compressed_size;
 
   /* Relaxation table. */
   struct relax_table *relax;
@@ -1637,17 +1651,17 @@ extern asection bfd_ind_section;
   /* name, id,  index, next, prev, flags, user_set_vma,            */  \
   { NAME,  IDX, 0,     NULL, NULL, FLAGS, 0,                           \
                                                                        \
-  /* linker_mark, linker_has_input, gc_mark, segment_mark,         */  \
+  /* linker_mark, linker_has_input, gc_mark, decompress_status,    */  \
      0,           0,                1,       0,                        \
                                                                        \
-  /* sec_info_type, use_rela_p,                                    */  \
-     0,             0,                                                 \
+  /* segment_mark, sec_info_type, use_rela_p,                      */  \
+     0,            0,             0,                                   \
                                                                        \
   /* sec_flg0, sec_flg1, sec_flg2, sec_flg3, sec_flg4, sec_flg5,   */  \
      0,        0,        0,        0,        0,        0,              \
                                                                        \
-  /* vma, lma, size, rawsize, relax, relax_count,                  */  \
-     0,   0,   0,    0,       0,     0,                                \
+  /* vma, lma, size, rawsize, compressed_size, relax, relax_count, */  \
+     0,   0,   0,    0,       0,               0,     0,               \
                                                                        \
   /* output_offset, output_section,              alignment_power,  */  \
      0,             (struct bfd_section *) &SEC, 0,                    \
@@ -1977,6 +1991,8 @@ enum bfd_architecture
 #define bfd_mach_v850          1
 #define bfd_mach_v850e         'E'
 #define bfd_mach_v850e1        '1'
+#define bfd_mach_v850e2        0x4532
+#define bfd_mach_v850e2v3      0x45325633
   bfd_arch_arc,       /* ARC Cores */
 #define bfd_mach_arc_5         5
 #define bfd_mach_arc_6         6
@@ -3164,6 +3180,7 @@ pc-relative or some form of GOT-indirect relocation.  */
   BFD_RELOC_ARM_T32_ADD_PC12,
   BFD_RELOC_ARM_SHIFT_IMM,
   BFD_RELOC_ARM_SMC,
+  BFD_RELOC_ARM_HVC,
   BFD_RELOC_ARM_SWI,
   BFD_RELOC_ARM_MULTI,
   BFD_RELOC_ARM_CP_OFF_IMM,
@@ -3604,6 +3621,72 @@ bits placed non-contiguously in the instruction.  */
 /* This is a variation of BFD_RELOC_LO16 that can be used in v850e ld.bu
 instructions.  */
   BFD_RELOC_V850_LO16_SPLIT_OFFSET,
+
+/* This is a 16-bit reloc.  */
+  BFD_RELOC_V850_16_PCREL,
+
+/* This is a 17-bit reloc.  */
+  BFD_RELOC_V850_17_PCREL,
+
+/* This is a 23-bit reloc.  */
+  BFD_RELOC_V850_23,
+
+/* This is a 32-bit reloc.  */
+  BFD_RELOC_V850_32_PCREL,
+
+/* This is a 32-bit reloc.  */
+  BFD_RELOC_V850_32_ABS,
+
+/* This is a 16-bit reloc.  */
+  BFD_RELOC_V850_16_SPLIT_OFFSET,
+
+/* This is a 16-bit reloc.  */
+  BFD_RELOC_V850_16_S1,
+
+/* Low 16 bits. 16 bit shifted by 1.  */
+  BFD_RELOC_V850_LO16_S1,
+
+/* This is a 16 bit offset from the call table base pointer.  */
+  BFD_RELOC_V850_CALLT_15_16_OFFSET,
+
+/* DSO relocations.  */
+  BFD_RELOC_V850_32_GOTPCREL,
+
+/* DSO relocations.  */
+  BFD_RELOC_V850_16_GOT,
+
+/* DSO relocations.  */
+  BFD_RELOC_V850_32_GOT,
+
+/* DSO relocations.  */
+  BFD_RELOC_V850_22_PLT_PCREL,
+
+/* DSO relocations.  */
+  BFD_RELOC_V850_32_PLT_PCREL,
+
+/* DSO relocations.  */
+  BFD_RELOC_V850_COPY,
+
+/* DSO relocations.  */
+  BFD_RELOC_V850_GLOB_DAT,
+
+/* DSO relocations.  */
+  BFD_RELOC_V850_JMP_SLOT,
+
+/* DSO relocations.  */
+  BFD_RELOC_V850_RELATIVE,
+
+/* DSO relocations.  */
+  BFD_RELOC_V850_16_GOTOFF,
+
+/* DSO relocations.  */
+  BFD_RELOC_V850_32_GOTOFF,
+
+/* start code.  */
+  BFD_RELOC_V850_CODE,
+
+/* start data in text.  */
+  BFD_RELOC_V850_DATA,
 
 /* This is a 32bit pcrel reloc for the mn10300, offset by two bytes in the
 instruction.  */
@@ -4988,6 +5071,21 @@ struct bfd
      will be consistent from run to run.  */
 #define BFD_DETERMINISTIC_OUTPUT 0x4000
 
+  /* Compress sections in this BFD.  */
+#define BFD_COMPRESS 0x8000
+
+  /* Decompress sections in this BFD.  */
+#define BFD_DECOMPRESS 0x10000
+
+  /* Flags bits to be saved in bfd_preserve_save.  */
+#define BFD_FLAGS_SAVED \
+  (BFD_IN_MEMORY | BFD_COMPRESS | BFD_DECOMPRESS)
+
+  /* Flags bits which are for BFD use only.  */
+#define BFD_FLAGS_FOR_BFD_USE_MASK \
+  (BFD_IN_MEMORY | BFD_COMPRESS | BFD_DECOMPRESS | BFD_LINKER_CREATED \
+   | BFD_TRADITIONAL_FORMAT | BFD_DETERMINISTIC_OUTPUT)
+
   /* Currently my_archive is tested before adding origin to
      anything. I believe that this can become always an add of
      origin, with origin set to 0 for non archive files.  */
@@ -5344,6 +5442,8 @@ const char *bfd_core_file_failing_command (bfd *abfd);
 
 int bfd_core_file_failing_signal (bfd *abfd);
 
+int bfd_core_file_pid (bfd *abfd);
+
 bfd_boolean core_file_matches_executable_p
    (bfd *core_bfd, bfd *exec_bfd);
 
@@ -5540,11 +5640,13 @@ typedef struct bfd_target
 #define BFD_JUMP_TABLE_CORE(NAME) \
   NAME##_core_file_failing_command, \
   NAME##_core_file_failing_signal, \
-  NAME##_core_file_matches_executable_p
+  NAME##_core_file_matches_executable_p, \
+  NAME##_core_file_pid
 
   char *      (*_core_file_failing_command) (bfd *);
   int         (*_core_file_failing_signal) (bfd *);
   bfd_boolean (*_core_file_matches_executable_p) (bfd *, bfd *);
+  int         (*_core_file_pid) (bfd *);
 
   /* Archive entry points.  */
 #define BFD_JUMP_TABLE_ARCHIVE(NAME) \
@@ -5815,8 +5917,21 @@ bfd_byte *bfd_simple_get_relocated_section_contents
    (bfd *abfd, asection *sec, bfd_byte *outbuf, asymbol **symbol_table);
 
 /* Extracted from compress.c.  */
-bfd_boolean bfd_uncompress_section_contents
-   (bfd_byte **buffer, bfd_size_type *size);
+bfd_boolean bfd_compress_section_contents
+   (bfd *abfd, asection *section, bfd_byte *uncompressed_buffer,
+    bfd_size_type uncompressed_size);
+
+bfd_boolean bfd_get_full_section_contents
+   (bfd *abfd, asection *section, bfd_byte **ptr);
+
+bfd_boolean bfd_is_section_compressed
+   (bfd *abfd, asection *section);
+
+bfd_boolean bfd_init_section_decompress_status
+   (bfd *abfd, asection *section);
+
+bfd_boolean bfd_init_section_compress_status
+   (bfd *abfd, asection *section);
 
 #ifdef __cplusplus
 }

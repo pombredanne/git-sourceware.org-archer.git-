@@ -47,6 +47,7 @@
 #include "observer.h"
 #include "objfiles.h"
 #include "symtab.h"
+#include "exceptions.h"
 
 extern int overload_debug;
 /* Local functions.  */
@@ -422,7 +423,8 @@ value_cast (struct type *type, struct value *arg2)
     }
 
   if (current_language->c_style_arrays
-      && TYPE_CODE (type2) == TYPE_CODE_ARRAY)
+      && TYPE_CODE (type2) == TYPE_CODE_ARRAY
+      && !TYPE_VECTOR (type2))
     arg2 = value_coerce_array (arg2);
 
   if (TYPE_CODE (type2) == TYPE_CODE_FUNC)
@@ -537,6 +539,29 @@ value_cast (struct type *type, struct value *arg2)
       /* The Itanium C++ ABI represents NULL pointers to members as
 	 minus one, instead of biasing the normal case.  */
       return value_from_longest (type, -1);
+    }
+  else if (code1 == TYPE_CODE_ARRAY && TYPE_VECTOR (type) && scalar)
+    {
+      /* Widen the scalar to a vector.  */
+      struct type *eltype;
+      struct value *val;
+      LONGEST low_bound, high_bound;
+      int i;
+
+      if (!get_array_bounds (type, &low_bound, &high_bound))
+	error (_("Could not determine the vector bounds"));
+
+      eltype = check_typedef (TYPE_TARGET_TYPE (type));
+      arg2 = value_cast (eltype, arg2);
+      val = allocate_value (type);
+
+      for (i = 0; i < high_bound - low_bound + 1; i++)
+	{
+	  /* Duplicate the contents of arg2 into the destination vector.  */
+	  memcpy (value_contents_writeable (val) + (i * TYPE_LENGTH (eltype)),
+		  value_contents_all (arg2), TYPE_LENGTH (eltype));
+	}
+      return val;
     }
   else if (TYPE_LENGTH (type) == TYPE_LENGTH (type2))
     {
@@ -850,6 +875,20 @@ value_one (struct type *type, enum lval_type lv)
     {
       val = value_from_longest (type, (LONGEST) 1);
     }
+  else if (TYPE_CODE (type1) == TYPE_CODE_ARRAY && TYPE_VECTOR (type1))
+    {
+      struct type *eltype = check_typedef (TYPE_TARGET_TYPE (type1));
+      int i, n = TYPE_LENGTH (type1) / TYPE_LENGTH (eltype);
+      struct value *tmp;
+
+      val = allocate_value (type);
+      for (i = 0; i < n; i++)
+	{
+	  tmp = value_one (eltype, lv);
+	  memcpy (value_contents_writeable (val) + i * TYPE_LENGTH (eltype),
+		  value_contents_all (tmp), TYPE_LENGTH (eltype));
+	}
+    }
   else
     {
       error (_("Not a numeric type."));
@@ -1145,10 +1184,7 @@ value_assign (struct value *toval, struct value *fromval)
 
   type = value_type (toval);
   if (VALUE_LVAL (toval) != lval_internalvar)
-    {
-      toval = value_coerce_to_target (toval);
-      fromval = value_cast (type, fromval);
-    }
+    fromval = value_cast (type, fromval);
   else
     {
       /* Coerce arrays and functions to pointers, except for arrays
@@ -1504,6 +1540,7 @@ value_must_coerce_to_target (struct value *val)
   switch (TYPE_CODE (valtype))
     {
     case TYPE_CODE_ARRAY:
+      return TYPE_VECTOR (valtype) ? 0 : 1;
     case TYPE_CODE_STRING:
       return 1;
     default:
@@ -2278,7 +2315,8 @@ value_struct_elt (struct value **argp, struct value **args,
     }
 
   if (!v)
-    error (_("Structure has no component named %s."), name);
+    throw_error (NOT_FOUND_ERROR,
+                 _("Structure has no component named %s."), name);
   return v;
 }
 
@@ -2596,7 +2634,9 @@ find_overload_match (struct type **arg_types, int nargs,
 
   /* Did we find a match ?  */
   if (method_oload_champ == -1 && func_oload_champ == -1)
-    error (_("No symbol \"%s\" in current context."), name);
+    throw_error (NOT_FOUND_ERROR,
+                 _("No symbol \"%s\" in current context."),
+                 name);
 
   /* If we have found both a method match and a function
      match, find out which one is better, and calculate match
@@ -2797,7 +2837,7 @@ find_oload_champ_namespace_loop (struct type **arg_types, int nargs,
      function symbol to start off with.)  */
 
   old_cleanups = make_cleanup (xfree, *oload_syms);
-  old_cleanups = make_cleanup (xfree, *oload_champ_bv);
+  make_cleanup (xfree, *oload_champ_bv);
   new_namespace = alloca (namespace_len + 1);
   strncpy (new_namespace, qualified_name, namespace_len);
   new_namespace[namespace_len] = '\0';
@@ -2844,7 +2884,7 @@ find_oload_champ_namespace_loop (struct type **arg_types, int nargs,
       *oload_syms = new_oload_syms;
       *oload_champ = new_oload_champ;
       *oload_champ_bv = new_oload_champ_bv;
-      discard_cleanups (old_cleanups);
+      do_cleanups (old_cleanups);
       return 0;
     }
 }
@@ -2947,7 +2987,7 @@ find_oload_champ (struct type **arg_types, int nargs, int method,
 	  for (jj = 0; jj < nargs - static_offset; jj++)
 	    fprintf_filtered (gdb_stderr,
 			      "...Badness @ %d : %d\n", 
-			      jj, bv->rank[jj]);
+			      jj, bv->rank[jj].rank);
 	  fprintf_filtered (gdb_stderr,
 			    "Overload resolution champion is %d, ambiguous? %d\n", 
 			    oload_champ, oload_ambiguous);
@@ -2981,9 +3021,15 @@ classify_oload_match (struct badness_vector *oload_champ_bv,
 
   for (ix = 1; ix <= nargs - static_offset; ix++)
     {
-      if (oload_champ_bv->rank[ix] >= 100)
+      /* If this conversion is as bad as INCOMPATIBLE_TYPE_BADNESS
+         or worse return INCOMPATIBLE.  */
+      if (compare_ranks (oload_champ_bv->rank[ix],
+                         INCOMPATIBLE_TYPE_BADNESS) <= 0)
 	return INCOMPATIBLE;	/* Truly mismatched types.  */
-      else if (oload_champ_bv->rank[ix] >= 10)
+      /* Otherwise If this conversion is as bad as
+         NS_POINTER_CONVERSION_BADNESS or worse return NON_STANDARD.  */
+      else if (compare_ranks (oload_champ_bv->rank[ix],
+                              NS_POINTER_CONVERSION_BADNESS) <= 0)
 	return NON_STANDARD;	/* Non-standard type conversions
 				   needed.  */
     }
@@ -3119,9 +3165,9 @@ compare_parameters (struct type *t1, struct type *t2, int skip_artificial)
 
       for (i = 0; i < TYPE_NFIELDS (t2); ++i)
 	{
-	  if (rank_one_type (TYPE_FIELD_TYPE (t1, start + i),
-			      TYPE_FIELD_TYPE (t2, i))
-	      != 0)
+	  if (compare_ranks (rank_one_type (TYPE_FIELD_TYPE (t1, start + i),
+	                                   TYPE_FIELD_TYPE (t2, i)),
+	                     EXACT_MATCH_BADNESS) != 0)
 	    return 0;
 	}
 

@@ -36,6 +36,11 @@
 #undef _POSIX_C_SOURCE
 #undef _XOPEN_SOURCE
 
+/* On sparc-solaris, /usr/include/sys/feature_tests.h defines
+   _FILE_OFFSET_BITS, which pyconfig.h also defines.  Same work
+   around technique as above.  */
+#undef _FILE_OFFSET_BITS
+
 #if HAVE_LIBPYTHON2_4
 #include "python2.4/Python.h"
 #include "python2.4/frameobject.h"
@@ -63,10 +68,9 @@ typedef int Py_ssize_t;
 #ifndef WITH_THREAD
 #define PyGILState_Ensure() ((PyGILState_STATE) 0)
 #define PyGILState_Release(ARG) ((void)(ARG))
-#define PyEval_InitThreads() 0
+#define PyEval_InitThreads()
 #define PyThreadState_Swap(ARG) ((void)(ARG))
-#define PyEval_InitThreads() 0
-#define PyEval_ReleaseLock() 0
+#define PyEval_ReleaseLock()
 #endif
 
 /* In order to be able to parse symtab_and_line_to_sal_object function 
@@ -112,7 +116,6 @@ PyObject *gdbpy_create_lazy_string_object (CORE_ADDR address, long length,
 PyObject *gdbpy_inferiors (PyObject *unused, PyObject *unused2);
 PyObject *gdbpy_selected_thread (PyObject *self, PyObject *args);
 PyObject *gdbpy_string_to_argv (PyObject *self, PyObject *args);
-PyObject *gdbpy_get_hook_function (const char *);
 PyObject *gdbpy_parameter (PyObject *self, PyObject *args);
 PyObject *gdbpy_parameter_value (enum var_types type, void *var);
 char *gdbpy_parse_command_name (char *text,
@@ -210,9 +213,9 @@ char *gdbpy_obj_to_string (PyObject *obj);
 char *gdbpy_exception_to_string (PyObject *ptype, PyObject *pvalue);
 
 int gdbpy_is_lazy_string (PyObject *result);
-gdb_byte *gdbpy_extract_lazy_string (PyObject *string,
-				     struct type **str_type, 
-				     long *length, char **encoding);
+void gdbpy_extract_lazy_string (PyObject *string, CORE_ADDR *addr,
+				struct type **str_type, 
+				long *length, char **encoding);
 
 int gdbpy_is_value_object (PyObject *obj);
 

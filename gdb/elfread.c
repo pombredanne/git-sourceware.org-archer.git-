@@ -40,6 +40,9 @@
 
 extern void _initialize_elfread (void);
 
+/* Forward declaration.  */
+static const struct sym_fns elf_sym_fns_gdb_index;
+
 /* The struct elfinfo is available only during ELF symbol table and
    psymtab reading.  It is destroyed at the completion of psymtab-reading.
    It's local to elf_symfile_read.  */
@@ -869,11 +872,9 @@ elf_symfile_read (struct objfile *objfile, int symfile_flags)
 				str_sect->filepos,
 				bfd_section_size (abfd, str_sect));
     }
-  if (dwarf2_has_info (objfile))
-    {
-      /* DWARF 2 sections */
-      dwarf2_build_psymtabs (objfile);
-    }
+
+  if (dwarf2_has_info (objfile) && dwarf2_initialize_objfile (objfile))
+    objfile->sf = &elf_sym_fns_gdb_index;
 
   /* If the file has its own symbol tables it has no separate debug info.
      `.dynsym'/`.symtab' go to MSYMBOLS, `.debug_info' goes to SYMTABS/PSYMTABS.
@@ -978,7 +979,7 @@ elf_symfile_init (struct objfile *objfile)
 void
 elfstab_offset_sections (struct objfile *objfile, struct partial_symtab *pst)
 {
-  char *filename = pst->filename;
+  const char *filename = pst->filename;
   struct dbx_symfile_info *dbx = objfile->deprecated_sym_stab_info;
   struct stab_section_info *maybe = dbx->stab_section_info;
   struct stab_section_info *questionable = 0;
@@ -1033,7 +1034,7 @@ elfstab_offset_sections (struct objfile *objfile, struct partial_symtab *pst)
 
 /* Register that we are able to handle ELF object file formats.  */
 
-static struct sym_fns elf_sym_fns =
+static const struct sym_fns elf_sym_fns =
 {
   bfd_target_elf_flavour,
   elf_new_init,			/* sym_new_init: init anything gbl to entire symtab */
@@ -1045,8 +1046,24 @@ static struct sym_fns elf_sym_fns =
 				   a file.  */
   NULL,                         /* sym_read_linetable */
   default_symfile_relocate,	/* sym_relocate: Relocate a debug section.  */
-  &psym_functions,
-  NULL				/* next: pointer to next struct sym_fns */
+  &psym_functions
+};
+
+/* The same as elf_sym_fns, but not registered and uses the
+   DWARF-specific GNU index rather than psymtab.  */
+static const struct sym_fns elf_sym_fns_gdb_index =
+{
+  bfd_target_elf_flavour,
+  elf_new_init,			/* sym_new_init: init anything gbl to entire symab */
+  elf_symfile_init,		/* sym_init: read initial info, setup for sym_red() */
+  elf_symfile_read,		/* sym_read: read a symbol file into symtab */
+  elf_symfile_finish,		/* sym_finish: finished with file, cleanup */
+  default_symfile_offsets,	/* sym_offsets:  Translate ext. to int. relocatin */
+  elf_symfile_segments,		/* sym_segments: Get segment information from
+				   a file.  */
+  NULL,                         /* sym_read_linetable */
+  default_symfile_relocate,	/* sym_relocate: Relocate a debug section.  */
+  &dwarf2_gdb_index_functions
 };
 
 void

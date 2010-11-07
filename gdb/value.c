@@ -748,6 +748,7 @@ release_value (struct value *val)
   if (all_values == val)
     {
       all_values = val->next;
+      val->next = NULL;
       return;
     }
 
@@ -756,6 +757,7 @@ release_value (struct value *val)
       if (v->next == val)
 	{
 	  v->next = val->next;
+	  val->next = NULL;
 	  break;
 	}
     }
@@ -823,6 +825,26 @@ value_copy (struct value *arg)
         val->location.computed.closure = funcs->copy_closure (val);
     }
   return val;
+}
+
+/* Return a version of ARG that is non-lvalue.  */
+
+struct value *
+value_non_lval (struct value *arg)
+{
+  if (VALUE_LVAL (arg) != not_lval)
+    {
+      struct type *enc_type = value_enclosing_type (arg);
+      struct value *val = allocate_value (enc_type);
+
+      memcpy (value_contents_all_raw (val), value_contents_all (arg),
+	      TYPE_LENGTH (enc_type));
+      val->type = arg->type;
+      set_value_embedded_offset (val, value_embedded_offset (arg));
+      set_value_pointed_to_offset (val, value_pointed_to_offset (arg));
+      return val;
+    }
+   return arg;
 }
 
 void
@@ -1967,21 +1989,11 @@ value_static_field (struct type *type, int fieldno)
 	    }
 	}
       else
-	{
-	  /* SYM should never have a SYMBOL_CLASS which will require
-	     read_var_value to use the FRAME parameter.  */
-	  if (symbol_read_needs_frame (sym))
-	    warning (_("static field's value depends on the current "
-		     "frame - bad debug info?"));
-	  retval = read_var_value (sym, NULL);
- 	}
-      if (retval && VALUE_LVAL (retval) == lval_memory)
-	SET_FIELD_PHYSADDR (TYPE_FIELD (type, fieldno),
-			    value_address (retval));
+	retval = value_of_variable (sym, NULL);
       break;
     }
     default:
-      gdb_assert (0);
+      gdb_assert_not_reached ("unexpected field location kind");
     }
 
   return retval;
@@ -2047,8 +2059,9 @@ value_primitive_field (struct value *arg1, int offset,
 	v->bitpos = bitpos % container_bitsize;
       else
 	v->bitpos = bitpos % 8;
-      v->offset = value_embedded_offset (arg1)
-	+ (bitpos - v->bitpos) / 8;
+      v->offset = (value_embedded_offset (arg1)
+		   + offset
+		   + (bitpos - v->bitpos) / 8);
       v->parent = arg1;
       value_incref (v->parent);
       if (!value_lazy (arg1))
@@ -2490,7 +2503,7 @@ coerce_array (struct value *arg)
   switch (TYPE_CODE (type))
     {
     case TYPE_CODE_ARRAY:
-      if (current_language->c_style_arrays)
+      if (!TYPE_VECTOR (type) && current_language->c_style_arrays)
 	arg = value_coerce_array (arg);
       break;
     case TYPE_CODE_FUNC:

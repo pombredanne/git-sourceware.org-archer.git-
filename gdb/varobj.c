@@ -530,9 +530,6 @@ varobj_create (char *objname,
 	       char *expression, CORE_ADDR frame, enum varobj_type type)
 {
   struct varobj *var;
-  struct frame_info *fi;
-  struct frame_info *old_fi = NULL;
-  struct block *block;
   struct cleanup *old_chain;
 
   /* Fill out a varobj structure for the (root) variable being constructed. */
@@ -541,6 +538,9 @@ varobj_create (char *objname,
 
   if (expression != NULL)
     {
+      struct frame_info *fi;
+      struct frame_id old_id = null_frame_id;
+      struct block *block;
       char *p;
       enum varobj_languages lang;
       struct value *value = NULL;
@@ -613,7 +613,7 @@ varobj_create (char *objname,
 
 	  var->root->frame = get_frame_id (fi);
 	  var->root->thread_id = pid_to_thread_id (inferior_ptid);
-	  old_fi = get_selected_frame (NULL);
+	  old_id = get_frame_id (get_selected_frame (NULL));
 	  select_frame (fi);	 
 	}
 
@@ -641,8 +641,8 @@ varobj_create (char *objname,
       var->root->rootvar = var;
 
       /* Reset the selected frame */
-      if (old_fi != NULL)
-	select_frame (old_fi);
+      if (frame_id_p (old_id))
+	select_frame (frame_find_by_id (old_id));
     }
 
   /* If the variable object name is null, that means this
@@ -1054,6 +1054,8 @@ update_dynamic_varobj_children (struct varobj *var,
 	    error (_("Invalid item from the child list"));
 
 	  v = convert_value_from_python (py_v);
+	  if (v == NULL)
+	    gdbpy_print_stack ();
 	  install_dynamic_child (var, can_mention ? changed : NULL,
 				 can_mention ? new : NULL,
 				 can_mention ? unchanged : NULL,
@@ -2479,13 +2481,16 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
 		       struct varobj *var)
 {
   struct ui_file *stb;
-  struct cleanup *old_chain;
+  struct cleanup *old_chain = make_cleanup (null_cleanup, NULL);
   gdb_byte *thevalue = NULL;
   struct value_print_options opts;
   struct type *type = NULL;
   long len = 0;
   char *encoding = NULL;
   struct gdbarch *gdbarch = NULL;
+  /* Initialize it just to avoid a GCC false warning.  */
+  CORE_ADDR str_addr = 0;
+  int string_print = 0;
 
   if (value == NULL)
     return NULL;
@@ -2493,8 +2498,9 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
   gdbarch = get_type_arch (value_type (value));
 #if HAVE_PYTHON
   {
-    struct cleanup *back_to = varobj_ensure_python_env (var);
     PyObject *value_formatter = var->pretty_printer;
+
+    varobj_ensure_python_env (var);
 
     if (value_formatter)
       {
@@ -2507,7 +2513,6 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
 	  {
 	    char *hint;
 	    struct value *replacement;
-	    int string_print = 0;
 	    PyObject *output = NULL;
 
 	    hint = gdbpy_get_display_hint (value_formatter);
@@ -2522,10 +2527,13 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
 						  &replacement);
 	    if (output)
 	      {
+		make_cleanup_py_decref (output);
+
 		if (gdbpy_is_lazy_string (output))
 		  {
-		    thevalue = gdbpy_extract_lazy_string (output, &type,
-							  &len, &encoding);
+		    gdbpy_extract_lazy_string (output, &str_addr, &type,
+					       &len, &encoding);
+		    make_cleanup (free_current_contents, &encoding);
 		    string_print = 1;
 		  }
 		else
@@ -2541,36 +2549,36 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
 			thevalue = xmemdup (s, len + 1, len + 1);
 			type = builtin_type (gdbarch)->builtin_char;
 			Py_DECREF (py_str);
+
+			if (!string_print)
+			  {
+			    do_cleanups (old_chain);
+			    return thevalue;
+			  }
+
+			make_cleanup (xfree, thevalue);
 		      }
+		    else
+		      gdbpy_print_stack ();
 		  }
-		Py_DECREF (output);
-	      }
-	    if (thevalue && !string_print)
-	      {
-		do_cleanups (back_to);
-		xfree (encoding);
-		return thevalue;
 	      }
 	    if (replacement)
 	      value = replacement;
 	  }
       }
-    do_cleanups (back_to);
   }
 #endif
 
   stb = mem_fileopen ();
-  old_chain = make_cleanup_ui_file_delete (stb);
+  make_cleanup_ui_file_delete (stb);
 
   get_formatted_print_options (&opts, format_code[(int) format]);
   opts.deref_ref = 0;
   opts.raw = 1;
   if (thevalue)
-    {
-      make_cleanup (xfree, thevalue);
-      make_cleanup (xfree, encoding);
-      LA_PRINT_STRING (stb, type, thevalue, len, encoding, 0, &opts);
-    }
+    LA_PRINT_STRING (stb, type, thevalue, len, encoding, 0, &opts);
+  else if (string_print)
+    val_print_string (type, encoding, str_addr, len, stb, &opts);
   else
     common_val_print (value, stb, 0, &opts, current_language);
   thevalue = ui_file_xstrdup (stb, NULL);

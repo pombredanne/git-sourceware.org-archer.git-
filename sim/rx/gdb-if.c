@@ -18,6 +18,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
+#include "config.h"
 #include <stdio.h>
 #include <assert.h>
 #include <signal.h>
@@ -622,6 +623,10 @@ sim_store_register (SIM_DESC sd, int regno, unsigned char *buf, int length)
     case sim_rx_fpsw_regnum:
       put_reg (fpsw, val);
       break;
+    case sim_rx_acc_regnum:
+      put_reg (acclo, val & 0xffffffff);
+      put_reg (acchi, (val >> 32) & 0xffffffff);
+      break;
     default:
       fprintf (stderr, "rx minisim: unrecognized register number: %d\n",
 	       regno);
@@ -729,6 +734,8 @@ handle_step (int rc)
 void
 sim_resume (SIM_DESC sd, int step, int sig_to_deliver)
 {
+  int rc;
+
   check_desc (sd);
 
   if (sig_to_deliver != 0)
@@ -741,7 +748,12 @@ sim_resume (SIM_DESC sd, int step, int sig_to_deliver)
   execution_error_clear_last_error ();
 
   if (step)
-    handle_step (decode_opcode ());
+    {
+      rc = setjmp (decode_jmp_buf);
+      if (rc == 0)
+	rc = decode_opcode ();
+      handle_step (rc);
+    }
   else
     {
       /* We don't clear 'stop' here, because then we would miss
@@ -758,7 +770,9 @@ sim_resume (SIM_DESC sd, int step, int sig_to_deliver)
 	      break;
 	    }
 
-	  int rc = decode_opcode ();
+	  rc = setjmp (decode_jmp_buf);
+	  if (rc == 0)
+	    rc = decode_opcode ();
 
 	  if (execution_error_get_last_error () != SIM_ERR_NONE)
 	    {

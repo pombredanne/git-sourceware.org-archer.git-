@@ -833,7 +833,7 @@ vms_lib_read_block (struct bfd *abfd)
    function does not handle records nor EOF.  */
 
 static file_ptr
-vms_lib_bread_raw (struct bfd *abfd, void *buf, file_ptr nbytes)
+vms_lib_bread_raw (struct bfd *abfd, unsigned char *buf, file_ptr nbytes)
 {
   struct vms_lib_iovec *vec = (struct vms_lib_iovec *) abfd->iostream;
   file_ptr res;
@@ -951,11 +951,12 @@ vms_lib_dcx (struct vms_lib_iovec *vec, unsigned char *buf, file_ptr nbytes)
 /* Standard IOVEC function.  */
 
 static file_ptr
-vms_lib_bread (struct bfd *abfd, void *buf, file_ptr nbytes)
+vms_lib_bread (struct bfd *abfd, void *vbuf, file_ptr nbytes)
 {
   struct vms_lib_iovec *vec = (struct vms_lib_iovec *) abfd->iostream;
   file_ptr res;
   file_ptr chunk;
+  unsigned char *buf = (unsigned char *)vbuf;
 
   /* Do not read past the end.  */
   if (vec->where >= vec->file_len)
@@ -969,7 +970,7 @@ vms_lib_bread (struct bfd *abfd, void *buf, file_ptr nbytes)
           unsigned char blen[2];
 
           /* Read record length.  */
-          if (vms_lib_bread_raw (abfd, &blen, sizeof (blen)) != sizeof (blen))
+          if (vms_lib_bread_raw (abfd, blen, sizeof (blen)) != sizeof (blen))
             return -1;
           vec->rec_len = bfd_getl16 (blen);
           if (bfd_libdata (abfd->my_archive)->kind == vms_lib_txt)
@@ -1071,7 +1072,7 @@ vms_lib_bread (struct bfd *abfd, void *buf, file_ptr nbytes)
             }
           if (buf != NULL)
             {
-              *(unsigned char *)buf = c;
+              *buf = c;
               buf++;
             }
           nbytes--;
@@ -1215,7 +1216,7 @@ static bfd_boolean
 vms_lib_bopen (bfd *el, file_ptr filepos)
 {
   struct vms_lib_iovec *vec;
-  char buf[256];
+  unsigned char buf[256];
   struct vms_mhd *mhd;
   struct lib_tdata *tdata = bfd_libdata (el->my_archive);
   unsigned int len;
@@ -1590,7 +1591,7 @@ vms_write_index (bfd *abfd,
   /* Allocate first index block.  */
   level = 1;
   if (abfd != NULL)
-    rblk[0] = bfd_malloc (sizeof (struct vms_indexdef));
+    rblk[0] = bfd_zmalloc (sizeof (struct vms_indexdef));
   blk[0].vbn = (*vbn)++;
   blk[0].len = 0;
   blk[0].lastlen = 0;
@@ -1697,7 +1698,7 @@ vms_write_index (bfd *abfd,
                   /* Need to create a parent.  */
                   if (abfd != NULL)
                     {
-                      rblk[level] = bfd_malloc (sizeof (struct vms_indexdef));
+                      rblk[level] = bfd_zmalloc (sizeof (struct vms_indexdef));
                       bfd_putl32 (*vbn, rblk[j]->parent);
                     }
                   blk[level].vbn = (*vbn)++;
@@ -1716,7 +1717,8 @@ vms_write_index (bfd *abfd,
                   memcpy (rblk[j + 1]->keys + blk[j + 1].len,
                           rblk[j]->keys + blk[j].len,
                           blk[j].lastlen);
-                  /* Fix the entry (which in always the first field of an entry.  */
+                  /* Fix the entry (which in always the first field of an
+		     entry.  */
                   rfa = (struct vms_rfa *)(rblk[j + 1]->keys + blk[j + 1].len);
                   bfd_putl32 (blk[j].vbn, rfa->vbn);
                   bfd_putl16 (RFADEF__C_INDEX, rfa->offset);
@@ -1805,7 +1807,7 @@ vms_write_index (bfd *abfd,
     return TRUE;
 
   /* Flush.  */
-  for (j = 0; j < level; j++)
+  for (j = level - 1; j >= 0; j--)
     {
       if (j > 0)
         {

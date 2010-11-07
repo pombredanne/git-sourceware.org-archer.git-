@@ -691,7 +691,8 @@ extern int common_val_print (struct value *val,
 			     const struct value_print_options *options,
 			     const struct language_defn *language);
 
-extern int val_print_string (struct type *elttype, CORE_ADDR addr, int len,
+extern int val_print_string (struct type *elttype, const char *encoding,
+			     CORE_ADDR addr, int len,
 			     struct ui_file *stream,
 			     const struct value_print_options *options);
 
@@ -713,6 +714,8 @@ extern void preserve_values (struct objfile *);
 /* From values.c */
 
 extern struct value *value_copy (struct value *);
+
+extern struct value *value_non_lval (struct value *);
 
 extern void preserve_one_value (struct value *, struct objfile *, htab_t);
 
