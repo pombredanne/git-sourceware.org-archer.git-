@@ -1,3 +1,24 @@
+2010-11-09  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.base/watchpoint.exp: Test "watch -location" with an
+	innacessible location.
+
+2010-11-09  Edjunior Machado  <emachado@br.ibm.com>
+	    Luis Machado  <luisgpm@br.ibm.com>
+
+	* gdb.base/maint.exp: Expect "." prefix.
+	* gdb.base/nodebug.exp: Expect "." Likewise.
+	* gdb.base/sepsymtab.exp: Expect "." Likewise.
+	* gdb.base/watchpoint-cond-gone.exp: Likewise.
+	* gdb.base/watchpoint.exp: Expect a software watch to be created for
+	POWER server processors.
+
+2010-11-08  Edjunior Machado  <emachado@br.ibm.com>
+	    Luis Machado  <luisgpm@br.ibm.com>
+
+	* gdb.base/break-entry.exp: convert entry point for
+	ppc64 and expect leading `.' on ppc64's symbols
+
 2010-11-05  Doug Evans  <dje@google.com>
 
 	* gdb.base/help.exp: Update expected output.
