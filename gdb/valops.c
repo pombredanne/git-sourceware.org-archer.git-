@@ -336,7 +336,7 @@ value_cast_pointers (struct type *type, struct value *arg2)
   /* No superclass found, just change the pointer type.  */
   arg2 = value_copy (arg2);
   deprecated_set_value_type (arg2, type);
-  arg2 = value_change_enclosing_type (arg2, type);
+  set_value_enclosing_type (arg2, type);
   set_value_pointed_to_offset (arg2, 0);	/* pai: chk_val */
   return arg2;
 }
@@ -570,7 +570,7 @@ value_cast (struct type *type, struct value *arg2)
 
       arg2 = value_copy (arg2);
       deprecated_set_value_type (arg2, type);
-      arg2 = value_change_enclosing_type (arg2, type);
+      set_value_enclosing_type (arg2, type);
       set_value_pointed_to_offset (arg2, 0);	/* pai: chk_val */
       return arg2;
     }
@@ -1205,11 +1205,9 @@ value_assign (struct value *toval, struct value *fromval)
     case lval_internalvar:
       set_internalvar (VALUE_INTERNALVAR (toval), fromval);
       val = value_copy (fromval);
-      val = value_change_enclosing_type (val, 
-					 value_enclosing_type (fromval));
+      set_value_enclosing_type (val, value_enclosing_type (fromval));
       set_value_embedded_offset (val, value_embedded_offset (fromval));
-      set_value_pointed_to_offset (val, 
-				   value_pointed_to_offset (fromval));
+      set_value_pointed_to_offset (val, value_pointed_to_offset (fromval));
       return val;
 
     case lval_internalvar_component:
@@ -1400,8 +1398,7 @@ value_assign (struct value *toval, struct value *fromval)
   memcpy (value_contents_raw (val), value_contents (fromval),
 	  TYPE_LENGTH (type));
   deprecated_set_value_type (val, type);
-  val = value_change_enclosing_type (val, 
-				     value_enclosing_type (fromval));
+  set_value_enclosing_type (val, value_enclosing_type (fromval));
   set_value_embedded_offset (val, value_embedded_offset (fromval));
   set_value_pointed_to_offset (val, value_pointed_to_offset (fromval));
 
@@ -1665,7 +1662,8 @@ value_addr (struct value *arg1)
 
   /* This may be a pointer to a base subobject; so remember the
      full derived object's type ...  */
-  arg2 = value_change_enclosing_type (arg2, lookup_pointer_type (value_enclosing_type (arg1)));
+  set_value_enclosing_type (arg2,
+			    lookup_pointer_type (value_enclosing_type (arg1)));
   /* ... and also the relative position of the subobject in the full
      object.  */
   set_value_pointed_to_offset (arg2, value_embedded_offset (arg1));
@@ -1726,7 +1724,7 @@ value_ind (struct value *arg1)
       /* Re-adjust type.  */
       deprecated_set_value_type (arg2, TYPE_TARGET_TYPE (base_type));
       /* Add embedding info.  */
-      arg2 = value_change_enclosing_type (arg2, enc_type);
+      set_value_enclosing_type (arg2, enc_type);
       set_value_embedded_offset (arg2, value_pointed_to_offset (arg1));
 
       /* We may be pointing to an object of some derived type.  */
@@ -3495,7 +3493,8 @@ value_full_object (struct value *argp,
   /* pai: FIXME -- sounds iffy */
   if (full)
     {
-      argp = value_change_enclosing_type (argp, real_type);
+      argp = value_copy (argp);
+      set_value_enclosing_type (argp, real_type);
       return argp;
     }
 

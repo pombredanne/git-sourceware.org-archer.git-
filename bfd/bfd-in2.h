@@ -411,6 +411,10 @@ extern struct bfd_hash_entry *bfd_hash_lookup
 extern struct bfd_hash_entry *bfd_hash_insert
   (struct bfd_hash_table *, const char *, unsigned long);
 
+/* Rename an entry in a hash table.  */
+extern void bfd_hash_rename
+  (struct bfd_hash_table *, const char *, struct bfd_hash_entry *);
+
 /* Replace an entry in a hash table.  */
 extern void bfd_hash_replace
   (struct bfd_hash_table *, struct bfd_hash_entry *old,
@@ -1713,6 +1717,9 @@ asection *bfd_make_section (bfd *, const char *name);
 bfd_boolean bfd_set_section_flags
    (bfd *abfd, asection *sec, flagword flags);
 
+void bfd_rename_section
+   (bfd *abfd, asection *sec, const char *newname);
+
 void bfd_map_over_sections
    (bfd *abfd,
     void (*func) (bfd *abfd, asection *sect, void *obj),
@@ -1853,6 +1860,7 @@ enum bfd_architecture
 #define bfd_mach_mips5                 5
 #define bfd_mach_mips_loongson_2e      3001
 #define bfd_mach_mips_loongson_2f      3002
+#define bfd_mach_mips_loongson_3a      3003
 #define bfd_mach_mips_sb1              12310201 /* octal 'SB', 01 */
 #define bfd_mach_mips_octeon           6501
 #define bfd_mach_mips_xlr              887682   /* decimal 'XLR'  */
