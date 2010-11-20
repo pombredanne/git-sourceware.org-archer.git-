@@ -2218,6 +2218,10 @@ make_cleanup_restore_selected_frame (void)
 {
   struct frame_id *frame_idp;
 
+  /* get_selected_frame->get_current_frame would error otherwise.  */
+  if (!has_stack_frames ())
+    return make_cleanup (null_cleanup, NULL);
+
   frame_idp = xmalloc (sizeof (*frame_idp));
   *frame_idp = get_frame_id (get_selected_frame (NULL));
 
