@@ -398,6 +398,8 @@ extern struct cleanup *make_cleanup_restore_page_info (void);
 extern struct cleanup *
   set_batch_flag_and_make_cleanup_restore_page_info (void);
 
+extern struct cleanup *make_cleanup_restore_selected_frame (void);
+
 extern char *gdb_realpath (const char *);
 extern char *xfullpath (const char *);
 

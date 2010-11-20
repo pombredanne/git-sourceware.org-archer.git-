@@ -1053,7 +1053,7 @@ dwarf2_evaluate_loc_desc (struct type *type, struct frame_info *frame,
 {
   struct value *retval;
   struct dwarf_expr_context *ctx;
-  struct cleanup *old_chain = make_cleanup (null_cleanup, 0);
+  struct cleanup *old_chain;
 
   if (size == 0)
     {
@@ -1062,6 +1062,8 @@ dwarf2_evaluate_loc_desc (struct type *type, struct frame_info *frame,
       set_value_optimized_out (retval, 1);
       return retval;
     }
+
+  old_chain = make_cleanup (null_cleanup, 0);
 
   ctx = dwarf_expr_prep_ctx (frame, data, size, per_cu);
 
@@ -1097,6 +1099,10 @@ dwarf2_evaluate_loc_desc (struct type *type, struct frame_info *frame,
 	  {
 	    CORE_ADDR address = dwarf_expr_fetch_address (ctx, 0);
 	    int in_stack_memory = dwarf_expr_fetch_in_stack_memory (ctx, 0);
+
+	    /* Frame may be needed for check_typedef of TYPE_DYNAMIC.  */
+	    make_cleanup_restore_selected_frame ();
+	    select_frame (frame);
 
 	    /* object_address_set called here is required in ALLOCATE_VALUE's
 	       CHECK_TYPEDEF for the object's possible

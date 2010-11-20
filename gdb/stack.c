@@ -366,6 +366,7 @@ print_frame_args (struct symbol *func, struct frame_info *frame,
 	        {
                   const struct language_defn *language;
 		  struct value_print_options opts;
+		  struct cleanup *old_chain;
 
                   /* Use the appropriate language to display our symbol,
                      unless the user forced the language to a specific
@@ -378,7 +379,13 @@ print_frame_args (struct symbol *func, struct frame_info *frame,
 		  get_raw_print_options (&opts);
 		  opts.deref_ref = 0;
 		  opts.summary = summary;
+
+		  /* Frame may be needed for check_typedef of TYPE_DYNAMIC.  */
+		  old_chain = make_cleanup_restore_selected_frame ();
+		  select_frame (frame);
 		  common_val_print (val, stb->stream, 2, &opts, language);
+		  do_cleanups (old_chain);
+
 		  ui_out_field_stream (uiout, "value", stb);
 	        }
 	      else
