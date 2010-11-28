@@ -69,8 +69,6 @@
 #define TRUNCATION_TOWARDS_ZERO ((-5 / 2) == -2)
 #endif
 
-static void modify_general_field (struct type *, char *, LONGEST, int, int);
-
 static struct type *desc_base_type (struct type *);
 
 static struct type *desc_bounds_type (struct type *);
@@ -1342,15 +1340,6 @@ static char *bound_name[] = {
 /* Maximum number of array dimensions we are prepared to handle.  */
 
 #define MAX_ADA_DIMENS (sizeof(bound_name) / (2*sizeof(char *)))
-
-/* Like modify_field, but allows bitpos > wordlength.  */
-
-static void
-modify_general_field (struct type *type, char *addr,
-		      LONGEST fieldval, int bitpos, int bitsize)
-{
-  modify_field (type, addr + bitpos / 8, fieldval, bitpos % 8, bitsize);
-}
 
 
 /* The desc_* routines return primitive portions of array descriptors
@@ -4038,33 +4027,31 @@ make_array_descriptor (struct type *type, struct value *arr)
 
   for (i = ada_array_arity (ada_check_typedef (value_type (arr))); i > 0; i -= 1)
     {
-      modify_general_field (value_type (bounds),
-			    value_contents_writeable (bounds),
-                            ada_array_bound (arr, i, 0),
-                            desc_bound_bitpos (bounds_type, i, 0),
-                            desc_bound_bitsize (bounds_type, i, 0));
-      modify_general_field (value_type (bounds),
-			    value_contents_writeable (bounds),
-                            ada_array_bound (arr, i, 1),
-                            desc_bound_bitpos (bounds_type, i, 1),
-                            desc_bound_bitsize (bounds_type, i, 1));
+      modify_field (value_type (bounds), value_contents_writeable (bounds),
+		    ada_array_bound (arr, i, 0),
+		    desc_bound_bitpos (bounds_type, i, 0),
+		    desc_bound_bitsize (bounds_type, i, 0));
+      modify_field (value_type (bounds), value_contents_writeable (bounds),
+		    ada_array_bound (arr, i, 1),
+		    desc_bound_bitpos (bounds_type, i, 1),
+		    desc_bound_bitsize (bounds_type, i, 1));
     }
 
   bounds = ensure_lval (bounds);
 
-  modify_general_field (value_type (descriptor),
-			value_contents_writeable (descriptor),
-                        value_pointer (ensure_lval (arr),
-                                       TYPE_FIELD_TYPE (desc_type, 0)),
-                        fat_pntr_data_bitpos (desc_type),
-                        fat_pntr_data_bitsize (desc_type));
+  modify_field (value_type (descriptor),
+		value_contents_writeable (descriptor),
+		value_pointer (ensure_lval (arr),
+			       TYPE_FIELD_TYPE (desc_type, 0)),
+		fat_pntr_data_bitpos (desc_type),
+		fat_pntr_data_bitsize (desc_type));
 
-  modify_general_field (value_type (descriptor),
-			value_contents_writeable (descriptor),
-                        value_pointer (bounds,
-                                       TYPE_FIELD_TYPE (desc_type, 1)),
-                        fat_pntr_bounds_bitpos (desc_type),
-                        fat_pntr_bounds_bitsize (desc_type));
+  modify_field (value_type (descriptor),
+		value_contents_writeable (descriptor),
+		value_pointer (bounds,
+			       TYPE_FIELD_TYPE (desc_type, 1)),
+		fat_pntr_bounds_bitpos (desc_type),
+		fat_pntr_bounds_bitsize (desc_type));
 
   descriptor = ensure_lval (descriptor);
 
@@ -7043,7 +7030,7 @@ ada_template_to_fixed_record_type_1 (struct type *type,
   int nfields, bit_len;
   int variant_field;
   long off;
-  int fld_bit_len, bit_incr;
+  int fld_bit_len;
   int f;
 
   /* Compute the number of fields in this record type that are going
@@ -7085,7 +7072,7 @@ ada_template_to_fixed_record_type_1 (struct type *type,
       if (ada_is_variant_part (type, f))
         {
           variant_field = f;
-          fld_bit_len = bit_incr = 0;
+          fld_bit_len = 0;
         }
       else if (is_dynamic_field (type, f))
         {
@@ -7135,10 +7122,24 @@ ada_template_to_fixed_record_type_1 (struct type *type,
 	  field_type = ada_get_base_type (field_type);
 	  field_type = ada_to_fixed_type (field_type, field_valaddr,
 					  field_address, dval, 0);
+	  /* If the field size is already larger than the maximum
+	     object size, then the record itself will necessarily
+	     be larger than the maximum object size.  We need to make
+	     this check now, because the size might be so ridiculously
+	     large (due to an uninitialized variable in the inferior)
+	     that it would cause an overflow when adding it to the
+	     record size.  */
+	  check_size (field_type);
 
 	  TYPE_FIELD_TYPE (rtype, f) = field_type;
           TYPE_FIELD_NAME (rtype, f) = TYPE_FIELD_NAME (type, f);
-          bit_incr = fld_bit_len =
+	  /* The multiplication can potentially overflow.  But because
+	     the field length has been size-checked just above, and
+	     assuming that the maximum size is a reasonable value,
+	     an overflow should not happen in practice.  So rather than
+	     adding overflow recovery code to this already complex code,
+	     we just assume that it's not going to happen.  */
+          fld_bit_len =
             TYPE_LENGTH (TYPE_FIELD_TYPE (rtype, f)) * TARGET_CHAR_BIT;
         }
       else
@@ -7148,15 +7149,15 @@ ada_template_to_fixed_record_type_1 (struct type *type,
           TYPE_FIELD_TYPE (rtype, f) = field_type;
           TYPE_FIELD_NAME (rtype, f) = TYPE_FIELD_NAME (type, f);
           if (TYPE_FIELD_BITSIZE (type, f) > 0)
-            bit_incr = fld_bit_len =
+            fld_bit_len =
               TYPE_FIELD_BITSIZE (rtype, f) = TYPE_FIELD_BITSIZE (type, f);
           else
-            bit_incr = fld_bit_len =
+            fld_bit_len =
               TYPE_LENGTH (ada_check_typedef (field_type)) * TARGET_CHAR_BIT;
         }
       if (off + fld_bit_len > bit_len)
         bit_len = off + fld_bit_len;
-      off += bit_incr;
+      off += fld_bit_len;
       TYPE_LENGTH (rtype) =
         align_value (bit_len, TARGET_CHAR_BIT) / TARGET_CHAR_BIT;
     }
@@ -7658,7 +7659,23 @@ ada_to_fixed_type_1 (struct type *type, const gdb_byte *valaddr,
 
 /* The same as ada_to_fixed_type_1, except that it preserves the type
    if it is a TYPE_CODE_TYPEDEF of a type that is already fixed.
-   ada_to_fixed_type_1 would return the type referenced by TYPE.  */
+
+   The typedef layer needs be preserved in order to differentiate between
+   arrays and array pointers when both types are implemented using the same
+   fat pointer.  In the array pointer case, the pointer is encoded as
+   a typedef of the pointer type.  For instance, considering:
+
+	  type String_Access is access String;
+	  S1 : String_Access := null;
+
+   To the debugger, S1 is defined as a typedef of type String.  But
+   to the user, it is a pointer.  So if the user tries to print S1,
+   we should not dereference the array, but print the array address
+   instead.
+
+   If we didn't preserve the typedef layer, we would lose the fact that
+   the type is to be presented as a pointer (needs de-reference before
+   being printed).  And we would also use the source-level type name.  */
 
 struct type *
 ada_to_fixed_type (struct type *type, const gdb_byte *valaddr,
@@ -7668,8 +7685,26 @@ ada_to_fixed_type (struct type *type, const gdb_byte *valaddr,
   struct type *fixed_type =
     ada_to_fixed_type_1 (type, valaddr, address, dval, check_tag);
 
+  /*  If TYPE is a typedef and its target type is the same as the FIXED_TYPE,
+      then preserve the typedef layer.
+
+      Implementation note: We can only check the main-type portion of
+      the TYPE and FIXED_TYPE, because eliminating the typedef layer
+      from TYPE now returns a type that has the same instance flags
+      as TYPE.  For instance, if TYPE is a "typedef const", and its
+      target type is a "struct", then the typedef elimination will return
+      a "const" version of the target type.  See check_typedef for more
+      details about how the typedef layer elimination is done.
+
+      brobecker/2010-11-19: It seems to me that the only case where it is
+      useful to preserve the typedef layer is when dealing with fat pointers.
+      Perhaps, we could add a check for that and preserve the typedef layer
+      only in that situation.  But this seems unecessary so far, probably
+      because we call check_typedef/ada_check_typedef pretty much everywhere.
+      */
   if (TYPE_CODE (type) == TYPE_CODE_TYPEDEF
-      && TYPE_TARGET_TYPE (type) == fixed_type)
+      && (TYPE_MAIN_TYPE (TYPE_TARGET_TYPE (type))
+	  == TYPE_MAIN_TYPE (fixed_type)))
     return type;
 
   return fixed_type;
@@ -7769,10 +7804,12 @@ ada_check_typedef (struct type *type)
 
       /* TYPE1 might itself be a TYPE_CODE_TYPEDEF (this can happen with
 	 stubs pointing to arrays, as we don't create symbols for array
-	 types, only for the typedef-to-array types).  This is why
-	 we process TYPE1 with ada_check_typedef before returning
-	 the result.  */
-      return ada_check_typedef (type1);
+	 types, only for the typedef-to-array types).  If that's the case,
+	 strip the typedef layer.  */
+      if (TYPE_CODE (type1) == TYPE_CODE_TYPEDEF)
+	type1 = ada_check_typedef (type1);
+
+      return type1;
     }
 }
 

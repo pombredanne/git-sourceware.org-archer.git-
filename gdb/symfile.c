@@ -87,11 +87,6 @@ extern void report_transfer_performance (unsigned long, time_t, time_t);
 
 /* Functions this file defines */
 
-#if 0
-static int simple_read_overlay_region_table (void);
-static void simple_free_overlay_region_table (void);
-#endif
-
 static void load_command (char *, int);
 
 static void symbol_file_add_main_1 (char *args, int from_tty, int flags);
@@ -177,7 +172,7 @@ Dynamic symbol table reloading multiple times in one run is %s.\n"),
    this flag and then add the shared library symbols as needed.  Note
    that there is a potential for confusion, since if the shared
    library symbols are not loaded, commands like "info fun" will *not*
-   report all the functions that are actually present. */
+   report all the functions that are actually present.  */
 
 int auto_solib_add = 1;
 
@@ -187,7 +182,7 @@ int auto_solib_add = 1;
    size to exceed this threshhold, then the shlib's symbols are not
    added.  The threshold is ignored if the user explicitly asks for a
    shlib to be added, such as when using the "sharedlibrary"
-   command. */
+   command.  */
 
 int auto_solib_limit;
 
@@ -195,7 +190,7 @@ int auto_solib_limit;
 /* Make a null terminated copy of the string at PTR with SIZE characters in
    the obstack pointed to by OBSTACKP .  Returns the address of the copy.
    Note that the string at PTR does not have to be null terminated, I.E. it
-   may be part of a larger string and we are only saving a substring. */
+   may be part of a larger string and we are only saving a substring.  */
 
 char *
 obsavestring (const char *ptr, int size, struct obstack *obstackp)
@@ -241,7 +236,7 @@ obconcat (struct obstack *obstackp, ...)
   return obstack_finish (obstackp);
 }
 
-/* True if we are reading a symbol table. */
+/* True if we are reading a symbol table.  */
 
 int currently_reading_symtab = 0;
 
@@ -3302,17 +3297,8 @@ overlay_command (char *args, int from_tty)
 
 /* Cached, dynamically allocated copies of the target data structures: */
 static unsigned (*cache_ovly_table)[4] = 0;
-#if 0
-static unsigned (*cache_ovly_region_table)[3] = 0;
-#endif
 static unsigned cache_novlys = 0;
-#if 0
-static unsigned cache_novly_regions = 0;
-#endif
 static CORE_ADDR cache_ovly_table_base = 0;
-#if 0
-static CORE_ADDR cache_ovly_region_table_base = 0;
-#endif
 enum ovly_index
   {
     VMA, SIZE, LMA, MAPPED
@@ -3328,19 +3314,6 @@ simple_free_overlay_table (void)
   cache_ovly_table = NULL;
   cache_ovly_table_base = 0;
 }
-
-#if 0
-/* Throw away the cached copy of _ovly_region_table */
-static void
-simple_free_overlay_region_table (void)
-{
-  if (cache_ovly_region_table)
-    xfree (cache_ovly_region_table);
-  cache_novly_regions = 0;
-  cache_ovly_region_table = NULL;
-  cache_ovly_region_table_base = 0;
-}
-#endif
 
 /* Read an array of ints of size SIZE from the target into a local buffer.
    Convert to host order.  int LEN is number of ints  */
@@ -3401,50 +3374,6 @@ simple_read_overlay_table (void)
 
   return 1;			/* SUCCESS */
 }
-
-#if 0
-/* Find and grab a copy of the target _ovly_region_table
-   (and _novly_regions, which is needed for the table's size) */
-static int
-simple_read_overlay_region_table (void)
-{
-  struct minimal_symbol *msym;
-  struct gdbarch *gdbarch;
-  int word_size;
-  enum bfd_endian byte_order;
-
-  simple_free_overlay_region_table ();
-  msym = lookup_minimal_symbol ("_novly_regions", NULL, NULL);
-  if (msym == NULL)
-    return 0;			/* failure */
-
-  gdbarch = get_objfile_arch (msymbol_objfile (msym));
-  word_size = gdbarch_long_bit (gdbarch) / TARGET_CHAR_BIT;
-  byte_order = gdbarch_byte_order (gdbarch);
-
-  cache_novly_regions = read_memory_integer (SYMBOL_VALUE_ADDRESS (msym),
-					     4, byte_order);
-
-  cache_ovly_region_table = (void *) xmalloc (cache_novly_regions * 12);
-  if (cache_ovly_region_table != NULL)
-    {
-      msym = lookup_minimal_symbol ("_ovly_region_table", NULL, NULL);
-      if (msym != NULL)
-	{
-	  cache_ovly_region_table_base = SYMBOL_VALUE_ADDRESS (msym);
-	  read_target_long_array (cache_ovly_region_table_base,
-				  (unsigned int *) cache_ovly_region_table,
-				  cache_novly_regions * 3,
-				  word_size, byte_order);
-	}
-      else
-	return 0;		/* failure */
-    }
-  else
-    return 0;			/* failure */
-  return 1;			/* SUCCESS */
-}
-#endif
 
 /* Function: simple_overlay_update_1
    A helper function for simple_overlay_update.  Assuming a cached copy

@@ -1,3 +1,251 @@
+2010-11-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* infcall.c (struct inferior_thread_state) <siginfo_gdbarch>: Fix up
+	the comment.
+	(save_inferior_thread_state): Reset tp->stop_signal.
+
+2010-11-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* infcall.c (call_function_by_hand): Remove variable
+	caller_state_cleanup.
+
+2010-11-25  Marc Khouzam  <marc.khouzam@ericsson.com>
+
+	PR breakpoints/12217
+
+	* breakpoint.c (is_marker_spec): Check for NULL.
+
+2010-11-25  Pedro Alves  <pedro@codesourcery.com>
+
+	* breakpoint.h: No longer include python.h or python-internal.h.
+	(struct breakpoint_object): Forward declare.
+	* defs.h (PyObject) [!HAVE_PYTHON]: Don't define.
+	* varobj.c (PyObject) [!HAVE_PYTHON]: Define.
+	* python/py-breakpoint.c (build_bp_list): Cast py_bp_object to
+	PyObject pointer.
+	(gdbpy_breakpoint_created): Remove casts around py_bp_object
+	accesses.
+
+2010-11-24  Joel Brobecker  <brobecker@adacore.com>
+
+	* rs6000-tdep.c (bfd_uses_spe_extensions): Use bfd_elf_get_obj_attr_int
+	only if HAVE_ELF is defined.
+
+2010-11-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* infrun.c (struct inferior_status) <stepping_over_breakpoint>
+	(save_inferior_status) <stepping_over_breakpoint>
+	(restore_inferior_status) <stepping_over_breakpoint>: Rename to
+	trap_expected.
+	(struct inferior_status) <step_resume_break_address>: Remove.
+
+2010-11-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* infrun.c (struct inferior_status, save_inferior_status)
+	(restore_inferior_status): Group and reorder the fields, comment their
+	groups.
+
+2010-11-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* dictionary.c
+	(struct dict_vector) <iter_match_first, iter_match_next>
+	(iter_match_first_hashed, iter_match_next_hashed)
+	(iter_match_first_linear, iter_match_next_linear)
+	(dict_iter_match_first, dict_iter_match_next, iter_match_first_hashed)
+	(iter_match_next_hashed, iter_match_first_linear)
+	(iter_match_next_linear): Use symbol_compare_ftype.
+	* dictionary.h: Include symfile.h.
+	(dict_iter_match_first, dict_iter_match_next): Use
+	symbol_compare_ftype.
+	* dwarf2read.c (dw2_map_matching_symbols): Likewise.
+	* psymtab.c (match_partial_symbol, match_partial_symbol, map_block)
+	(map_matching_symbols_psymtab): Likewise.
+	* symfile.h (symbol_compare_ftype): New typedef.
+	(struct quick_symbol_functions) <map_matching_symbols): Use
+	symbol_compare_ftype.
+
+2010-11-23  Tom Tromey  <tromey@redhat.com>
+
+	* configure: Rebuild.
+	* configure.ac (READLINE_TEXI_INCFLAG): New subst.
+
+2010-11-19  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in (SUBDIRS): Add doc.
+	* configure: Rebuild.
+	* configure.ac: Don't configure in doc.  Create doc/Makefile.
+
+2010-11-23  Phil Muldoon  <pmuldoon@redhat.com>
+
+        PR python/12212
+
+	* python/py-inferior.c (find_thread_object): Check if PIDGET
+	returns 0.
+
+010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (ada_template_to_fixed_record_type_1): Delete bit_incr.
+
+2010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (ada_to_fixed_type): Expand function documentation.
+	Return the original type if the main type portions match rather
+	than when the type themselves match.
+
+2010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (ada_template_to_fixed_record_type_1):
+	For dynamic fields, check the field size against the maximum
+	object size.
+
+2010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* mips-irix-tdep.c (mips_irix_n32_stack_tramp_frame_init): New
+	function.
+	(mips_irix_n32_stack_tramp_frame): New static global.
+	(mips_irix_init_abi): Add mips_irix_n32_stack_tramp_frame to
+	list of unwinder.
+
+2010-11-22  Jerome Guitton  <guitton@adacore.com>
+
+	* ada-tasks.c (get_tcb_types_info): Use C lookups to get
+	ATCB symbols.
+
+2010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (ada_check_typedef): Call ada_check_typedef only
+	if type1 is a typedef.
+
+2010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.h (ADA_KNOWN_AUXILIARY_FUNCTION_NAME_PATTERNS): Add
+	"_finalizer" to the list.
+
+2010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* symfile.c: Remove all "#if 0"/"#endif" blocks.
+
+2010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* symfile.c: Add missing second space after period in various comments.
+
+2010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-typeprint.c (print_array_type): Fix formatting in comment.
+	(print_selected_record_field_types): Fix formatting in function
+	documentation.
+
+2010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* ravenscar-thread.c (_initialize_ravenscar): Fix copy/paste typo
+	in name of "show ravenscar" prefix command name.
+
+2010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* ravenscar-thread.c (show_ravenscar_task_switching_command):
+	Add missing '\n' in output.
+
+2010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* ravenscar-thread.c (running_thread_name): Change value.
+	(read_thread_id): Remove advance declaration.
+	(get_running_thread_msymbol): New function.
+	(has_ravenscar_runtime): Use get_running_thread_msymbol to
+	compute msym_running_thread.
+	(get_running_thread_id): Renames read_thread_id. Slight modifications
+	to not take any argument anymore, using get_running_thread_msymbol
+	to determine which symbol to use instead.
+	(ravenscar_running_thread): Use get_running_thread_id instead of
+	read_thread_id.
+
+2010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* ravenscar-sparc-thread.c (supply_register_at_address):
+	Fix passing of buf in call to regcache_raw_supply.
+
+2010-11-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (dwarf2_read_index): Ignore higher .gdb_index versions.
+
+2010-11-22  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in (.PRECIOUS): Reference ada-lex.c.
+
+2010-11-19  Keith Seitz  <keiths@redhat.com>
+
+	* data-directory/Makefile.in (SYSCALLS_INSTALL_DIR):
+	Remove extraneous '/' after $(DESTDIR).
+	(PYTHON_INSTALL_DIR): Likewise.
+
+2010-11-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix stale memory references.
+	* elfread.c (elf_symfile_read): Replace xmalloc by bfd_alloc, drop
+	xfree, new comment.
+
+2010-11-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in (.y.c): Directly create $@ from YLWRAP.
+	(.PHONY): Remove for .y outputs.
+
+2010-11-19  Will Drewry  <wad@google.com>
+	    Tavis Ormandy  <taviso@google.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (decode_locdesc): Enforce location description stack
+	boundaries.
+
+2010-11-18  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* arm-tdep.c (arm_in_function_epilogue_p): Fix code when "MOV SP"
+	instruction is found.
+
+2010-11-17  Tom Tromey  <tromey@redhat.com>
+
+	* value.c (value_entirely_optimized_out): Check the
+	'check_any_valid' field.
+
+2010-11-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* ada-lang.c (modify_general_field): Remove.
+	(make_array_descriptor): Replace all modify_general_field calls by
+	modify_field.
+	* value.c (modify_field): Update comment.  New variable bytesize.
+	Normalize BITPOS.  Initialize BYTESIZE, use it.
+
+2010-11-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (dw2_forget_cached_source_info): Clear the FULL_NAMES
+	elements after xfree.
+
+2010-11-16  Tom Tromey  <tromey@redhat.com>
+
+	* gdb-add-index.sh: Really remove.
+
+2010-11-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* dwarf2read.c (alloc_one_comp_unit): Rename prototype to ...
+	(init_one_comp_unit): ... this one.
+	(prepare_one_comp_unit): New prototype.
+	(dw2_require_line_header, process_psymtab_comp_unit): Use
+	init_one_comp_unit.
+	(process_psymtab_comp_unit): Use prepare_one_comp_unit.
+	(load_partial_comp_unit): Remove variable attr.  Use
+	init_one_comp_unit with xmalloc.  Use prepare_one_comp_unit.
+	(load_full_comp_unit): Use init_one_comp_unit with xmalloc.  Use
+	prepare_one_comp_unit.
+	(read_signatured_type): Remove variable attr.  Use init_one_comp_unit.
+	Use prepare_one_comp_unit.
+	(alloc_one_comp_unit): Rename to ...
+	(init_one_comp_unit): ... here and remove there calloc, new parameter
+	cu.
+	(prepare_one_comp_unit): New function.
+
 2010-11-14  Pierre Muller  <muller@ics.u-strasbg.fr>
 
 	* arm-tdep.c (arm_in_function_epilogue_p): Fix code to avoid

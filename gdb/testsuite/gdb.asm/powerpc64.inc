@@ -1,23 +1,32 @@
+        comment "subroutine declare"
+        .purgem gdbasm_declare
+        .macro gdbasm_declare name
+	.section	".opd","aw"
+\name:
+	.quad .\name, .TOC.@tocbase, 0
+	.section	".text"
+	.type	\name, @function
+.\name:
+        .endm
+
 	comment "subroutine prologue"
 	.macro gdbasm_enter
-	stwu	1, -16(1)
-	stw	31, 8(1)
-	mr	31, 1
-	mflr	0
-	stw	0, 20(1)
+	stdu 1, -112(1)
+	mflr 0
+	std 0, 128(1)
 	.endm
 
 	comment "subroutine epilogue"
 	.macro gdbasm_leave
-	lwz	0, 20(1)
-	mtlr	0
-	lwz	31, 8(1)
-	lwz	1, 0(1)
+	ld 0, 128(1)
+	mtlr 0
+	ld 1, 0(1)
 	blr
 	.endm
 
 	.macro gdbasm_call subr
 	bl \subr
+	nop
 	.endm
 
 	.macro gdbasm_several_nops
@@ -42,7 +51,7 @@
 	comment "Declare a data variable"
 	.purgem gdbasm_datavar
 	.macro gdbasm_datavar name value
-	.data
+	.section	".data"
 \name:
-	.long   \value
+	.long \value
 	.endm

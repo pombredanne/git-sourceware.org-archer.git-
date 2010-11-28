@@ -6047,7 +6047,7 @@ struct inferior_thread_state
   CORE_ADDR stop_pc;
   struct regcache *registers;
 
-  /* Format of SIGINFO or NULL if it is not present.  */
+  /* Format of SIGINFO_DATA or NULL if it is not present.  */
   struct gdbarch *siginfo_gdbarch;
 
   /* The inferior format depends on SIGINFO_GDBARCH and it has a length of
@@ -6094,6 +6094,10 @@ save_inferior_thread_state (void)
     }
 
   inf_state->stop_signal = tp->stop_signal;
+  /* run_inferior_call will not use the signal due to its `proceed' call with
+     TARGET_SIGNAL_0 anyway.  */
+  tp->stop_signal = TARGET_SIGNAL_0;
+
   inf_state->stop_pc = stop_pc;
 
   inf_state->registers = regcache_dup (regcache);
@@ -6160,29 +6164,34 @@ get_inferior_thread_state_regcache (struct inferior_thread_state *inf_state)
 
 /* Session related state for inferior function calls.
    These are the additional bits of state that need to be restored
-   when an inferior function call successfully completes.  */
+   when an inferior function call successfully completes.
+
+   Keep the fields in order as present in their original structures.  */
 
 struct inferior_status
 {
-  bpstat stop_bpstat;
-  int stop_step;
-  enum stop_stack_kind stop_stack_dummy;
-  int stopped_by_random_signal;
-  int stepping_over_breakpoint;
+  /* Direct copies of the struct thread_info fields:  */
   CORE_ADDR step_range_start;
   CORE_ADDR step_range_end;
   struct frame_id step_frame_id;
   struct frame_id step_stack_frame_id;
+  int trap_expected;
+  int proceed_to_finish;
+  int in_infcall;
   enum step_over_calls_kind step_over_calls;
-  CORE_ADDR step_resume_break_address;
-  int stop_after_trap;
+  int stop_step;
+  bpstat stop_bpstat;
+
+  /* Direct copies of the struct inferior fields:  */
   int stop_soon;
+
+  /* Other fields:  */
+  enum stop_stack_kind stop_stack_dummy;
+  int stopped_by_random_signal;
+  int stop_after_trap;
 
   /* ID if the selected frame when the inferior function call was made.  */
   struct frame_id selected_frame_id;
-
-  int proceed_to_finish;
-  int in_infcall;
 };
 
 /* Save all of the information associated with the inferior<==>gdb
@@ -6195,25 +6204,31 @@ save_inferior_status (void)
   struct thread_info *tp = inferior_thread ();
   struct inferior *inf = current_inferior ();
 
-  inf_status->stop_step = tp->stop_step;
-  inf_status->stop_stack_dummy = stop_stack_dummy;
-  inf_status->stopped_by_random_signal = stopped_by_random_signal;
-  inf_status->stepping_over_breakpoint = tp->trap_expected;
+  /* Direct copies of the struct thread_info fields:  */
   inf_status->step_range_start = tp->step_range_start;
   inf_status->step_range_end = tp->step_range_end;
   inf_status->step_frame_id = tp->step_frame_id;
   inf_status->step_stack_frame_id = tp->step_stack_frame_id;
+  inf_status->trap_expected = tp->trap_expected;
+  inf_status->proceed_to_finish = tp->proceed_to_finish;
+  inf_status->in_infcall = tp->in_infcall;
   inf_status->step_over_calls = tp->step_over_calls;
-  inf_status->stop_after_trap = stop_after_trap;
-  inf_status->stop_soon = inf->stop_soon;
+  inf_status->stop_step = tp->stop_step;
+
   /* Save original bpstat chain here; replace it with copy of chain.
      If caller's caller is walking the chain, they'll be happier if we
      hand them back the original chain when restore_inferior_status is
      called.  */
   inf_status->stop_bpstat = tp->stop_bpstat;
   tp->stop_bpstat = bpstat_copy (tp->stop_bpstat);
-  inf_status->proceed_to_finish = tp->proceed_to_finish;
-  inf_status->in_infcall = tp->in_infcall;
+
+  /* Direct copies of the struct inferior fields:  */
+  inf_status->stop_soon = inf->stop_soon;
+
+  /* Other fields:  */
+  inf_status->stop_stack_dummy = stop_stack_dummy;
+  inf_status->stopped_by_random_signal = stopped_by_random_signal;
+  inf_status->stop_after_trap = stop_after_trap;
 
   inf_status->selected_frame_id = get_frame_id (get_selected_frame (NULL));
 
@@ -6249,22 +6264,29 @@ restore_inferior_status (struct inferior_status *inf_status)
   struct thread_info *tp = inferior_thread ();
   struct inferior *inf = current_inferior ();
 
-  tp->stop_step = inf_status->stop_step;
-  stop_stack_dummy = inf_status->stop_stack_dummy;
-  stopped_by_random_signal = inf_status->stopped_by_random_signal;
-  tp->trap_expected = inf_status->stepping_over_breakpoint;
+  /* Direct copies of the struct thread_info fields:  */
   tp->step_range_start = inf_status->step_range_start;
   tp->step_range_end = inf_status->step_range_end;
   tp->step_frame_id = inf_status->step_frame_id;
   tp->step_stack_frame_id = inf_status->step_stack_frame_id;
+  tp->trap_expected = inf_status->trap_expected;
+  tp->proceed_to_finish = inf_status->proceed_to_finish;
+  tp->in_infcall = inf_status->in_infcall;
   tp->step_over_calls = inf_status->step_over_calls;
-  stop_after_trap = inf_status->stop_after_trap;
-  inf->stop_soon = inf_status->stop_soon;
+  tp->stop_step = inf_status->stop_step;
+
+  /* Handle the bpstat_copy of the chain.  */
   bpstat_clear (&tp->stop_bpstat);
   tp->stop_bpstat = inf_status->stop_bpstat;
   inf_status->stop_bpstat = NULL;
-  tp->proceed_to_finish = inf_status->proceed_to_finish;
-  tp->in_infcall = inf_status->in_infcall;
+
+  /* Direct copies of the struct inferior fields:  */
+  inf->stop_soon = inf_status->stop_soon;
+
+  /* Other fields:  */
+  stop_stack_dummy = inf_status->stop_stack_dummy;
+  stopped_by_random_signal = inf_status->stopped_by_random_signal;
+  stop_after_trap = inf_status->stop_after_trap;
 
   if (target_has_stack)
     {

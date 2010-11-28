@@ -1,3 +1,43 @@
+2010-11-24  Edjunior Machado  <emachado@br.ibm.com>
+
+	* gdb.asm/powerpc.inc: Use 'sys_exit' on gdbasm_exit0 macro.
+
+2010-11-24  Edjunior Machado  <emachado@br.ibm.com>
+
+	* gdb.asm/asm-source.exp: Add new target "powerpc64"; expect leading `.'
+	on ppc64's symbols; "finish" and "return" commands must accept to
+	show the caller line again as well as the line after.
+	* gdb.asm/powerpc64.inc: New file.
+
+2010-11-23  Doug Evans  <dje@google.com>
+
+	* lib/gdb.exp (gdb_test_sequence): New function.
+	(gdb_expect_list): Add verbose -log call for each pattern.
+	* gdb.base/signals.exp (test_handle_all_print): Call it.
+	Reduce timeout increment from 6 minutes to 1 minute.
+	* gdb.server/ext-run.exp: Call it.
+
+2010-11-23  Phil Muldoon  <pmuldoon@redhat.com>
+
+	PR python/12212
+
+	* gdb.python/python.exp: Check that selected_thread raises an
+	error when no inferior is loaded.
+
+2010-11-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-stack-boundary.exp: New file.
+	* gdb.dwarf2/dw2-stack-boundary.S: New file.
+
+2010-11-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-ada-ffffffff.S: New file.
+	* gdb.dwarf2/dw2-ada-ffffffff.exp: New file.
+
+2010-11-18  Doug Evans  <dje@google.com>
+
+	* gdb.server/ext-run.exp: Fix intermittent failures.
+
 2010-11-12  Nathan Froyd  <froydnj@codesourcery.com>
 
 	* gdb.stabs/gdb11479.exp: Use runto_main.

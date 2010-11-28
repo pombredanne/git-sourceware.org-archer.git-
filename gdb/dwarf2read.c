@@ -1241,7 +1241,11 @@ static struct dwarf2_per_cu_data *dwarf2_find_containing_comp_unit
 static struct dwarf2_per_cu_data *dwarf2_find_comp_unit
   (unsigned int offset, struct objfile *objfile);
 
-static struct dwarf2_cu *alloc_one_comp_unit (struct objfile *objfile);
+static void init_one_comp_unit (struct dwarf2_cu *cu,
+				struct objfile *objfile);
+
+static void prepare_one_comp_unit (struct dwarf2_cu *cu,
+				   struct die_info *comp_unit_die);
 
 static void free_one_comp_unit (void *);
 
@@ -1937,6 +1941,10 @@ dwarf2_read_index (struct objfile *objfile)
      it seems better to just ignore such indices.  */
   if (version < 3)
     return 0;
+  /* Indexes with higher version than the one supported by GDB may be no
+     longer backward compatible.  */
+  if (version > 3)
+    return 0;
 
   map = OBSTACK_ZALLOC (&objfile->objfile_obstack, struct mapped_index);
   map->total_size = dwarf2_per_objfile->gdb_index.size;
@@ -2018,10 +2026,7 @@ dw2_require_line_header (struct objfile *objfile,
     return;
   this_cu->v.quick->read_lines = 1;
 
-  memset (&cu, 0, sizeof (cu));
-  cu.objfile = objfile;
-  obstack_init (&cu.comp_unit_obstack);
-
+  init_one_comp_unit (&cu, objfile);
   cleanups = make_cleanup (free_stack_comp_unit, &cu);
 
   if (this_cu->from_debug_types)
@@ -2127,7 +2132,10 @@ dw2_forget_cached_source_info (struct objfile *objfile)
 	  int j;
 
 	  for (j = 0; j < per_cu->v.quick->lines->num_file_names; ++j)
-	    xfree ((void *) per_cu->v.quick->full_names[j]);
+	    {
+	      xfree ((void *) per_cu->v.quick->full_names[j]);
+	      per_cu->v.quick->full_names[j] = NULL;
+	    }
 	}
     }
 }
@@ -2375,10 +2383,8 @@ dw2_map_matching_symbols (const char * name, domain_enum namespace,
 			  struct objfile *objfile, int global,
 			  int (*callback) (struct block *,
 					   struct symbol *, void *),
-			  void *data,
-			  int (*match) (const char *, const char *),
-			  int (*ordered_compare) (const char *,
-						  const char *))
+			  void *data, symbol_compare_ftype *match,
+			  symbol_compare_ftype *ordered_compare)
 {
   /* Currently unimplemented; used for Ada.  The function can be called if the
      current language is Ada for a non-Ada objfile using GNU index.  As Ada
@@ -3024,10 +3030,7 @@ process_psymtab_comp_unit (struct objfile *objfile,
   CORE_ADDR best_lowpc = 0, best_highpc = 0;
   struct die_reader_specs reader_specs;
 
-  memset (&cu, 0, sizeof (cu));
-  cu.objfile = objfile;
-  obstack_init (&cu.comp_unit_obstack);
-
+  init_one_comp_unit (&cu, objfile);
   back_to_inner = make_cleanup (free_stack_comp_unit, &cu);
 
   info_ptr = partial_read_comp_unit_head (&cu.header, info_ptr,
@@ -3081,12 +3084,7 @@ process_psymtab_comp_unit (struct objfile *objfile,
       return info_ptr;
     }
 
-  /* Set the language we're debugging.  */
-  attr = dwarf2_attr (comp_unit_die, DW_AT_language, &cu);
-  if (attr)
-    set_cu_language (DW_UNSND (attr), &cu);
-  else
-    set_cu_language (language_minimal, &cu);
+  prepare_one_comp_unit (&cu, comp_unit_die);
 
   /* Allocate a new partial symbol table structure.  */
   attr = dwarf2_attr (comp_unit_die, DW_AT_name, &cu);
@@ -3301,7 +3299,6 @@ load_partial_comp_unit (struct dwarf2_per_cu_data *this_cu,
   struct die_info *comp_unit_die;
   struct dwarf2_cu *cu;
   struct cleanup *free_abbrevs_cleanup, *free_cu_cleanup = NULL;
-  struct attribute *attr;
   int has_children;
   struct die_reader_specs reader_specs;
   int read_cu = 0;
@@ -3314,7 +3311,8 @@ load_partial_comp_unit (struct dwarf2_per_cu_data *this_cu,
 
   if (this_cu->cu == NULL)
     {
-      cu = alloc_one_comp_unit (objfile);
+      cu = xmalloc (sizeof (*cu));
+      init_one_comp_unit (cu, objfile);
 
       read_cu = 1;
 
@@ -3354,12 +3352,7 @@ load_partial_comp_unit (struct dwarf2_per_cu_data *this_cu,
   info_ptr = read_full_die (&reader_specs, &comp_unit_die, info_ptr,
 			    &has_children);
 
-  /* Set the language we're debugging.  */
-  attr = dwarf2_attr (comp_unit_die, DW_AT_language, cu);
-  if (attr)
-    set_cu_language (DW_UNSND (attr), cu);
-  else
-    set_cu_language (language_minimal, cu);
+  prepare_one_comp_unit (cu, comp_unit_die);
 
   /* Check if comp unit has_children.
      If so, read the rest of the partial symbols from this comp unit.
@@ -4314,7 +4307,8 @@ load_full_comp_unit (struct dwarf2_per_cu_data *per_cu, struct objfile *objfile)
 
   if (per_cu->cu == NULL)
     {
-      cu = alloc_one_comp_unit (objfile);
+      cu = xmalloc (sizeof (*cu));
+      init_one_comp_unit (cu, objfile);
 
       read_cu = 1;
 
@@ -4352,11 +4346,7 @@ load_full_comp_unit (struct dwarf2_per_cu_data *per_cu, struct objfile *objfile)
      all objfiles needed for references have been loaded yet, and symbol
      table processing isn't initialized.  But we have to set the CU language,
      or we won't be able to build types correctly.  */
-  attr = dwarf2_attr (cu->dies, DW_AT_language, cu);
-  if (attr)
-    set_cu_language (DW_UNSND (attr), cu);
-  else
-    set_cu_language (language_minimal, cu);
+  prepare_one_comp_unit (cu, cu->dies);
 
   /* Similarly, if we do not read the producer, we can not apply
      producer-specific interpretation.  */
@@ -13220,17 +13210,15 @@ read_signatured_type (struct objfile *objfile,
   struct dwarf2_cu *cu;
   ULONGEST signature;
   struct cleanup *back_to, *free_cu_cleanup;
-  struct attribute *attr;
 
   dwarf2_read_section (objfile, &dwarf2_per_objfile->types);
   types_ptr = dwarf2_per_objfile->types.buffer + type_sig->offset;
 
   gdb_assert (type_sig->per_cu.cu == NULL);
 
-  cu = xmalloc (sizeof (struct dwarf2_cu));
-  memset (cu, 0, sizeof (struct dwarf2_cu));
-  obstack_init (&cu->comp_unit_obstack);
-  cu->objfile = objfile;
+  cu = xmalloc (sizeof (*cu));
+  init_one_comp_unit (cu, objfile);
+
   type_sig->per_cu.cu = cu;
   cu->per_cu = &type_sig->per_cu;
 
@@ -13262,11 +13250,7 @@ read_signatured_type (struct objfile *objfile,
      all objfiles needed for references have been loaded yet, and symbol
      table processing isn't initialized.  But we have to set the CU language,
      or we won't be able to build types correctly.  */
-  attr = dwarf2_attr (cu->dies, DW_AT_language, cu);
-  if (attr)
-    set_cu_language (DW_UNSND (attr), cu);
-  else
-    set_cu_language (language_minimal, cu);
+  prepare_one_comp_unit (cu, cu->dies);
 
   do_cleanups (back_to);
 
@@ -13297,8 +13281,7 @@ read_signatured_type (struct objfile *objfile,
    callers will only want a very basic result and this can become a
    complaint.
 
-   Note that stack[0] is unused except as a default error return.
-   Note that stack overflow is not yet handled.  */
+   Note that stack[0] is unused except as a default error return.  */
 
 static CORE_ADDR
 decode_locdesc (struct dwarf_block *blk, struct dwarf2_cu *cu)
@@ -13315,6 +13298,7 @@ decode_locdesc (struct dwarf_block *blk, struct dwarf2_cu *cu)
   i = 0;
   stacki = 0;
   stack[stacki] = 0;
+  stack[++stacki] = 0;
 
   while (i < size)
     {
@@ -13495,6 +13479,22 @@ decode_locdesc (struct dwarf_block *blk, struct dwarf2_cu *cu)
 	  complaint (&symfile_complaints, _("unsupported stack op: '%s'"),
 		     dwarf_stack_op_name (op, 1));
 	  return (stack[stacki]);
+	}
+
+      /* Enforce maximum stack depth of SIZE-1 to avoid writing
+         outside of the allocated space.  Also enforce minimum>0.  */
+      if (stacki >= ARRAY_SIZE (stack) - 1)
+	{
+	  complaint (&symfile_complaints,
+		     _("location description stack overflow"));
+	  return 0;
+	}
+
+      if (stacki <= 0)
+	{
+	  complaint (&symfile_complaints,
+		     _("location description stack underflow"));
+	  return 0;
 	}
     }
   return (stack[stacki]);
@@ -14314,15 +14314,29 @@ dwarf2_find_comp_unit (unsigned int offset, struct objfile *objfile)
   return this_cu;
 }
 
-/* Malloc space for a dwarf2_cu for OBJFILE and initialize it.  */
+/* Initialize dwarf2_cu CU for OBJFILE in a pre-allocated space.  */
 
-static struct dwarf2_cu *
-alloc_one_comp_unit (struct objfile *objfile)
+static void
+init_one_comp_unit (struct dwarf2_cu *cu, struct objfile *objfile)
 {
-  struct dwarf2_cu *cu = xcalloc (1, sizeof (struct dwarf2_cu));
+  memset (cu, 0, sizeof (*cu));
   cu->objfile = objfile;
   obstack_init (&cu->comp_unit_obstack);
-  return cu;
+}
+
+/* Initialize basic fields of dwarf_cu CU according to DIE COMP_UNIT_DIE.  */
+
+static void
+prepare_one_comp_unit (struct dwarf2_cu *cu, struct die_info *comp_unit_die)
+{
+  struct attribute *attr;
+
+  /* Set the language we're debugging.  */
+  attr = dwarf2_attr (comp_unit_die, DW_AT_language, cu);
+  if (attr)
+    set_cu_language (DW_UNSND (attr), cu);
+  else
+    set_cu_language (language_minimal, cu);
 }
 
 /* Release one cached compilation unit, CU.  We unlink it from the tree

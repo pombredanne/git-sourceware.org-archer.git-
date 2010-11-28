@@ -1,3 +1,40 @@
+2010-11-25  Alan Modra  <amodra@gmail.com>
+
+	* po/es.po: Update.
+	* po/fi.po: Update.
+	* po/fr.po: Update.
+	* po/ja.po: Update.
+	* po/zh_CN.po: Update.
+
+2010-11-24  Joel Brobecker  <brobecker@adacore.com>
+
+	* Makefile.am (OPTIONAL_BACKENDS): Add rs6000-core.lo.
+	(OPTIONAL_BACKENDS_CFILES): Add rs6000-core.c.
+	* Makefile.in: Regenerate.
+
+2010-11-24  Alan Modra  <amodra@gmail.com>
+
+	PR ld/12253
+	* elf-eh-frame.c (_bfd_elf_write_section_eh_frame): Correct
+	DW_EH_PE_datarel handling.  Truncate .eh_frame_hdr address to
+	ptr_size.
+
+2010-11-23  Mingming Sun  <mingm.sun@gmail.com>
+
+	* elfxx-mips.c (mips_set_isa_flags): Move bfd_mach_loongson_3a
+	after bfd_mach_mips_sb1.
+
+2010-11-17  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-lib.c (vms_write_index): Add comments.
+	Partially revert previous patch.  Free blocks later.
+
+2010-11-17  Nick Clifton  <nickc@redhat.com>
+
+	PR ld/12161
+	* elf32-avr.c (elf32_avr_check_relocs): Delete.
+	(elf_backend_check_relocs): Delete.
+
 2010-11-16  Jie Zhang  <jie.zhang@analog.com>
 
 	* elf32-bfin.c (elf32_bfin_code_in_l1): New variable.
@@ -221,7 +258,7 @@
 	* libbfd.h: Likewise.
 
 2010-10-29  Bernd Schmidt  <bernds@codesourcery.com>
-            Joseph Myers  <joseph@codesourcery.com>
+	    Joseph Myers  <joseph@codesourcery.com>
 
 	* elf32-tic6x.c (elf32_tic6x_merge_attributes): Check for mismatch
 	of DSBT attributes.
