@@ -8160,7 +8160,7 @@ pretty-printers with their names.
 If a pretty-printer can handle multiple data types, then its
 @dfn{subprinters} are the printers for the individual data types.
 Each such subprinter has its own name.
-The format of the name is @var{printer-name}:@var{subprinter-name}.
+The format of the name is @var{printer-name};@var{subprinter-name}.
 
 Pretty-printers are installed by @dfn{registering} them with @value{GDBN}.
 Typically they are automatically loaded and registered when the corresponding
@@ -22909,6 +22909,12 @@ if the user deletes the breakpoint.  In this case, the object still
 exists, but the underlying breakpoint does not.  In the cases of
 watchpoint scope, the watchpoint remains valid even if execution of the
 inferior leaves the scope of that watchpoint.
+@end defmethod
+
+@defmethod Breakpoint delete
+Permanently deletes the @value{GDBN} breakpoint.  This also
+invalidates the Python @code{Breakpoint} object.  Any further access
+to this object's attributes or methods will raise an error.
 @end defmethod
 
 @defivar Breakpoint enabled
