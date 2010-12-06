@@ -42,6 +42,12 @@ struct itset *itset_create (const char **spec);
 
 struct itset *itset_create_current (void);
 
+/* Like itset_create, but if *SPEC does not appear to be the start of
+   an I/T set, it will call itset_create_current and return the
+   result.  */
+
+struct itset *itset_create_or_default (const char **spec);
+
 /* Return true if the inferior is contained in the I/T set.  */
 
 int itset_contains_inferior (struct itset *itset, struct inferior *inf);

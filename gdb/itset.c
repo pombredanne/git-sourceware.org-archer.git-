@@ -558,6 +558,18 @@ itset_create_current (void)
   return itset_create (&spec);
 }
 
+/* Call itset_create, if *SPEC looks like an I/T set; otherwise
+   itset_create_current.  */
+
+struct itset *
+itset_create_or_default (const char **spec)
+{
+  *spec = skip_whitespace (*spec);
+  if (**spec == '{')
+    return itset_create (spec);
+  return itset_create_current ();
+}
+
 /* Return 1 if SET contains INF, 0 otherwise.  */
 
 int
