@@ -1,3 +1,61 @@
+2010-12-14  Joel Brobecker  <brobecker@adacore.com>
+
+	* irix5-nat.c: Replace fp_r, fp_regs and fp_scr by __fp_r, __fp_regs
+	and __fp_scr respectively throughout.
+	* configure.ac: Compile with -Dsiginfo=__siginfo if building with
+	Python using GCC on IRIX.
+	* configure: Regenerate.
+
+2010-12-13  Kevin Buettner  <kevinb@redhat.com>
+
+	* solib-svr4.c (enable_break): Don't attempt to place breakpoints,
+	when attaching, on the names in bkpt_names: _start, __start, and
+	main.
+
+2010-12-12  Stan Shebs  <stan@codesourcery.com>
+
+	* value.c (value_of_internalvar): Add case for trace state
+	variables.
+
+2010-12-12  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (dwarf2_per_objfile): New member quick_file_names_table.
+	(dwarf2_per_cu_quick_data): Move definition down to "quick functions"
+	section.  Delete members lines full_names.  Rename read_lines to
+	no_file_data.
+	(quick_file_names): New struct.
+	(hash_file_name_entry, eq_file_name_entry): New functions.
+	(delete_file_name_entry, create_quick_file_names_table): New functions.
+	(dwarf2_read_index): Initialize quick_file_names_table.
+	(dw2_get_file_names): Renamed from dw2_require_line_header.
+	Return pointer to quick_file_names entry.  All callers updated.
+	(dw2_get_real_path): Renamed from dw2_require_full_path.
+	Replace per_cu arg with pointer to quick_file_names entry.
+	All callers updated.
+	(dw2_free_cached_file_names): New function.
+	(dw2_forget_cached_source_info): Call it (via htab_traverse_noresize).
+	(dwarf2_initialize_objfile): Initialize quick_file_names_table in
+	the OBJF_READNOW case.
+	(dwarf2_free_objfile): Rewrite freeing of quick file names tables.
+
+2010-12-12  Mark Kettenis  <kettenis@gnu.org>
+
+	* mips64obsd-tdep.c (floatformats_mips64_quad): New define.
+	(mips64obsd_init_abi): Set long_double_bit and long_double_format.
+
+2010-12-12  Mark Kettenis  <kettenis@gnu.org>
+
+	* sparc-tdep.c: Fix typo in comment.
+
+2010-12-10  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c: Whitespace cleanup, plus comment additions.
+	No code changes.
+
+2010-12-10  Tom Tromey  <tromey@redhat.com>
+
+	* NEWS: Document exception-handling change.
+
 2010-12-09  Marc Khouzam  <marc.khouzam@ericsson.com>
 
 	* mi/mi-parse.c (mi_parse): Wrong error message.
