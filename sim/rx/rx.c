@@ -1087,10 +1087,10 @@ decode_opcode ()
       break;
 
     case RXO_branchrel:
-      if (GS())
+      if (opcode->op[1].type == RX_Operand_None || GS())
 	{
 	  int delta = GD();
-	  regs.r_pc += delta;
+	  regs.r_pc = opcode_pc + delta;
 #ifdef CYCLE_ACCURATE
 	  /* Note: specs say 3, chip says 2.  */
 	  if (delta >= 0 && delta < 16
@@ -1378,6 +1378,14 @@ decode_opcode ()
 
     case RXO_mov:
       v = GS ();
+
+      if (opcode->op[1].type == RX_Operand_Register
+	  && opcode->op[1].reg == 17 /* PC */)
+	{
+	  /* Special case.  We want the address of the insn, not the
+	     address of the next insn.  */
+	  v = opcode_pc;
+	}
 
       if (opcode->op[0].type == RX_Operand_Register
 	  && opcode->op[0].reg == 16 /* PSW */)
