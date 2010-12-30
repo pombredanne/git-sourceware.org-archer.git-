@@ -1,3 +1,173 @@
+2010-12-29  Michael Snyder  <msnyder@vmware.com>
+
+	* bcache.c: Comment clean-up.
+	* block.c: Ditto.
+	* blockframe.c: Ditto.
+	* breakpoint.c: Ditto.
+	* bsd-kvm.c: Ditto.
+	* buildsym.c: Ditto.
+
+2010-12-29  Jie Zhang  <jie.zhang@analog.com>
+
+	* configure.tgt (bfin-*-*): Set build_gdbserver to yes.
+	* NEWS: Mention new Blackfin support.
+	* regformats/reg-bfin.dat: New file.
+
+2010-12-29  Jie Zhang  <jie.zhang@analog.com>
+	    Mike Frysinger  <vapier@gentoo.org>
+
+	* Makefile.in (ALLDEPFILES): Add bfin-linux-tdep.c and bfin-tdep.c.
+	(HFILES_NO_SRCDIR): Add bfin-tdep.h.
+	(ALL_TARGET_OBS): Add bfin-linux-tdep.o and bfin-tdep.o.
+	* NEWS: Mention new Blackfin port.
+	* bfin-tdep.c, bfin-tdep.h, bfin-linux-tdep.c,
+	syscalls/bfin-linux.xml: New files.
+	* configure.tgt (bfin-*-*): Handle bfin targets.
+
+2010-12-29  Hui Zhu  <teawater@gmail.com>
+
+	* ax-gdb.c (gen_expr): Change error message.
+
+2010-12-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.c: Revert the previous change, which was probably committed
+        by accident.
+
+2010-12-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c: Fix typo in comment.
+
+2010-12-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-valprint.c (ada_val_print_1): Print null array pointers as
+	`0x0' rather than `(null)'.  Add assertion.
+
+2010-12-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.h (ada_coerce_to_simple_array): Add declaration.
+	* ada-lang.c (ada_typedef_target_type): New function.
+	(desc_base_type): Add handling of fat pointer typedefs.
+	(ada_coerce_to_simple_array): Make non-static.
+	(decode_packed_array_bitsize): Add handling of fat pointer typedefs.
+	Add assertion.
+	(ada_template_to_fixed_record_type_1, ada_to_fixed_type)
+	(ada_check_typedef): Add handling of fat pointer typedefs.
+	(ada_evaluate_subexp) [OP_FUNCALL]: Likewise.
+	* ada-typeprint.c (ada_print_type): Add handling of fat pointer
+	typedefs.
+	* ada-valprint.c (ada_val_print_1): Convert fat pointers that are not
+	array accesses to simple arrays rather than simple array pointers.
+	(ada_value_print): In the case of array descriptors, do not print
+	the value type description unless it is an array access.
+
+2010-12-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* target.h (enum target_object): Expand the documentation of
+	TARGET_OBJECT_OSDATA a bit.
+
+2010-12-28  Michael Snyder  <msnyder@vmware.com>
+
+	* command.h: Comment clean-up.
+	* cli/cli-cmds.c: Ditto.
+	* cli/cli-cmds.h: Ditto.
+	* cli/cli-decode.c: Ditto.
+	* cli/cli-decode.h: Ditto.
+	* cli/cli-dump.c: Ditto.
+	* cli/cli-interp.c: Ditto.
+	* cli/cli-logging.c: Ditto.
+	* cli/cli-script.c: Ditto.
+	* cli/cli-setshow.c: Ditto.
+	* cli/cli-setshow.h: Ditto.
+
+2010-12-28  Michael Snyder  <msnyder@vmware.com>
+
+	* event-loop.c: Comment clean-up.
+	* event-loop.h: Ditto.
+	* event-top.c: Ditto.
+	* gdb.c: Ditto.
+	* gdb.h: Ditto.
+	* main.c: Ditto.
+	* top.c: Ditto.
+	* top.h: Ditto.	
+
+2010-12-28  Pedro Alves  <pedro@codesourcery.com>
+
+	* ax-gdb.c (gen_expr) <OP_REGISTER>: Error out if trying to
+	collect a user register.
+
+2010-12-28  Hui Zhu  <teawater@gmail.com>
+
+	* gdbarch.sh (ax_pseudo_register_collect,
+	ax_pseudo_register_push_stack): new callbacks.
+	(agent_expr): Forward declare.
+	* gdbarch.h, gdbarch.c: Regenerate.
+	* ax-gdb.c (gen_expr): Remove pseudo-register check code.
+	* ax-general.c (user-regs.h): New include.
+	(ax_reg): Call gdbarch_ax_pseudo_register_push_stack.
+	(ax_reg_mask): Call gdbarch_ax_pseudo_register_collect.
+	* mips-tdep.c (ax.h): New include.
+	(mips_ax_pseudo_register_collect,
+	mips_ax_pseudo_register_push_stack): New functions.
+	(mips_gdbarch_init): Set mips_ax_pseudo_register_collect and
+	mips_ax_pseudo_register_push_stack.
+
+2010-12-28  Yao Qi  <yao@codesourcery.com>
+
+	* arm-tdep.c (arm_register_aliases): Remove sp, pc, and fp.
+
+2010-12-28  Joel Brobecker  <brobecker@adacore.com>
+
+	* inf-child.c (inf_child_acknowledge_created_inferior): Delete.
+	(inf_child_target): Do not set t->to_acknowledge_created_inferior.
+	* inf-ptrace.c (inf_ptrace_create_inferior): Remove call to
+	target_acknowledge_created_inferior.
+	* inf-ttrace.c (inf_ttrace_him): Likewise.
+	* target.h (struct target_ops): Delete to_acknowledge_created_inferior
+	field.
+	(target_acknowledge_created_inferior): Delete.
+	* target.c (update_current_target): Remove setting of
+	to_acknowledge_created_inferior field. Do default value for that
+	field either.
+	(debug_to_acknowledge_created_inferior): Delete.
+	(setup_target_debug): Remove setting of
+	current_target.to_acknowledge_created_inferior.
+
+2010-12-27  Pedro Alves  <pedro@codesourcery.com>
+
+	gdb/
+	* breakpoint.c (breakpoint_restore_shadows): When looking for the
+	location with the lowest address that overlaps the memory range we
+	want to restore shadows for, account for multiple locations at the
+	same address.
+
+2010-12-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup - renaming.
+	* breakpoint.c: Use bl for `*bp_location' variables, blp_tmp for
+	`**bp_location' helper variables, b_tmp for `*breakpoint' helper
+	variables.
+
+2010-12-27  Kevin Buettner  <kevinb@redhat.com>
+	    Hui Zhu  <teawater@gmail.com>
+
+	* mips-tedp.c (mips_register_name): Add comments.
+
+2010-12-23  Yao Qi  <yao@codesourcery.com>
+
+	* arm-tdep.c (thumb_analyze_prologue): Move some code ...
+	(EXTRACT_MOVW_MOVT_IMM_T): ... here.  New macro.
+	(EXTRACT_MOVW_MOVT_IMM_A): New macro.
+	(arm_analyze_load_stack_chk_guard): New.
+	(arm_skip_stack_protector): New.
+	(arm_skip_prologue): Adjust post_prologue_pc by
+	arm_skip_stack_protector.
+
+
+2010-12-23  Yao Qi  <yao@codesourcery.com>
+
+	* arm-tdep.c (arm_gdbarch_init): Remove invoke to
+	set_gdbarch_deprecated_fp_regnum.
+
 2010-12-22  Marc Khouzam  <marc.khouzam@ericsson.com>
 
 	* inferior.c (remove_inferior_command): Don't remove an active inferior.
