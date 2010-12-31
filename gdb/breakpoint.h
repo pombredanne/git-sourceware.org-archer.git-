@@ -24,13 +24,9 @@
 #include "value.h"
 #include "vec.h"
 
-#if HAVE_PYTHON
-#include "python/python.h"
-#include "python/python-internal.h"
-#endif
-
 struct value;
 struct block;
+struct breakpoint_object;
 
 /* This is the maximum number of bytes a breakpoint instruction can take.
    Feel free to increase it.  It's just used in a few places to size
@@ -60,6 +56,13 @@ enum bptype
     bp_access_watchpoint,	/* access watchpoint, (hardware assisted) */
     bp_longjmp,			/* secret breakpoint to find longjmp() */
     bp_longjmp_resume,		/* secret breakpoint to escape longjmp() */
+
+    /* An internal breakpoint that is installed on the unwinder's
+       debug hook.  */
+    bp_exception,
+    /* An internal breakpoint that is set at the point where an
+       exception will land.  */
+    bp_exception_resume,
 
     /* Used by wait_for_inferior for stepping over subroutine calls, for
        stepping over signal handlers, and for skipping prologues.  */
@@ -129,6 +132,9 @@ enum bptype
 
     /* Master copies of std::terminate breakpoints.  */
     bp_std_terminate_master,
+
+    /* Like bp_longjmp_master, but for exceptions.  */
+    bp_exception_master,
 
     bp_catchpoint,
 
@@ -568,7 +574,7 @@ struct breakpoint
        This is always NULL for a GDB that is not script enabled.  It
        can sometimes be NULL for enabled GDBs as not all breakpoint
        types are tracked by the Python scripting API.  */
-    PyObject *py_bp_object;
+    struct breakpoint_object *py_bp_object;
 };
 
 typedef struct breakpoint *breakpoint_p;
@@ -669,6 +675,11 @@ struct bpstat_what
        continuing from a call dummy without popping the frame is not a
        useful one).  */
     enum stop_stack_kind call_dummy;
+
+    /* Used for BPSTAT_WHAT_SET_LONGJMP_RESUME and
+       BPSTAT_WHAT_CLEAR_LONGJMP_RESUME.  True if we are handling a
+       longjmp, false if we are handling an exception.  */
+    int is_longjmp;
   };
 
 /* The possible return values for print_bpstat, print_it_normal,
@@ -929,7 +940,8 @@ extern int detach_breakpoints (int);
    this PSPACE anymore.  */
 extern void breakpoint_program_space_exit (struct program_space *pspace);
 
-extern void set_longjmp_breakpoint (int thread);
+extern void set_longjmp_breakpoint (struct thread_info *tp,
+				    struct frame_id frame);
 extern void delete_longjmp_breakpoint (int thread);
 
 extern void enable_overlay_breakpoints (void);

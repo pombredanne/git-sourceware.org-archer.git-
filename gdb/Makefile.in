@@ -508,6 +508,7 @@ ALL_TARGET_OBS = \
 	armnbsd-tdep.o armobsd-tdep.o \
 	arm-tdep.o arm-wince-tdep.o \
 	avr-tdep.o \
+	bfin-linux-tdep.o bfin-tdep.o \
 	cris-tdep.o \
 	dicos-tdep.o \
 	frv-linux-tdep.o frv-tdep.o \
@@ -782,7 +783,7 @@ annotate.h sim-regno.h dictionary.h dfp.h main.h frame-unwind.h	\
 remote-fileio.h i386-linux-tdep.h vax-tdep.h objc-lang.h \
 sentinel-frame.h bcache.h symfile.h windows-tdep.h linux-tdep.h \
 gdb_usleep.h jit.h xml-syscall.h ada-operator.inc microblaze-tdep.h \
-psymtab.h psympriv.h progspace.h
+psymtab.h psympriv.h progspace.h bfin-tdep.h
 
 # Header files that already have srcdir in them, or which are in objdir.
 
@@ -871,7 +872,7 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 
 TSOBS = inflow.o
 
-SUBDIRS = @subdirs@ data-directory
+SUBDIRS = doc @subdirs@ data-directory
 CLEANDIRS = $(SUBDIRS) gnulib
 
 # List of subdirectories in the build tree that must exist.
@@ -1420,6 +1421,7 @@ ALLDEPFILES = \
 	arm-linux-nat.c arm-linux-tdep.c arm-symbian-tdep.c arm-tdep.c \
 	armnbsd-nat.c armbsd-tdep.c armnbsd-tdep.c armobsd-tdep.c \
 	avr-tdep.c \
+	bfin-linux-tdep.c bfin-tdep.c \
 	bsd-uthread.c bsd-kvm.c \
 	core-regset.c corelow.c \
 	dcache.c dicos-tdep.c darwin-nat.c \
@@ -1615,8 +1617,10 @@ po/$(PACKAGE).pot: force
 
 .SUFFIXES: .y .l
 .y.c:
-	$(SHELL) $(YLWRAP) $< y.tab.c $@.tmp -- $(YACC) $(YFLAGS)
-	-sed -e '/extern.*malloc/d' \
+	rm -f $@ $@.tmp
+	$(SHELL) $(YLWRAP) $< y.tab.c $@ -- $(YACC) $(YFLAGS) && mv $@ $@.tmp \
+		|| (rm -f $@; false)
+	sed -e '/extern.*malloc/d' \
 	     -e '/extern.*realloc/d' \
 	     -e '/extern.*free/d' \
 	     -e '/include.*malloc.h/d' \
@@ -1625,9 +1629,9 @@ po/$(PACKAGE).pot: force
 	     -e 's/\([ \t;,(]\)free\([ \t]*[&(),]\)/\1xfree\2/g' \
 	     -e 's/\([ \t;,(]\)free$$/\1xfree/g' \
 	     -e '/^#line.*y.tab.c/d' \
-	  < $@.tmp > $@.new
-	-rm $@.tmp
-	mv $@.new ./$*.c
+	     -e "s/^\(#line.*\)`basename $<`/\1`echo $<|sed 's/\//\\\\\//g'`/" \
+	  < $@.tmp > $@
+	rm -f $@.tmp
 .l.c:
 	if [ "$(FLEX)" ] && $(FLEX) --version >/dev/null 2>&1; then \
 	    $(FLEX) -o$@ $< && \
@@ -1651,13 +1655,7 @@ po/$(PACKAGE).pot: force
 	    false; \
 	fi
 
-.PRECIOUS: ada-exp.c ada-lex.c
-.PRECIOUS: c-exp.c
-.PRECIOUS: f-exp.c
-.PRECIOUS: jv-exp.c
-.PRECIOUS: m2-exp.c
-.PRECIOUS: objc-exp.c
-.PRECIOUS: p-exp.c
+.PRECIOUS: ada-lex.c
 
 # XML rules
 

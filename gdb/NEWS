@@ -3,6 +3,14 @@
 
 *** Changes since GDB 7.2
 
+* New command line options
+
+-data-directory DIR	Specify DIR as the "data-directory".
+			This is mostly for testing purposes.
+
+* The "maint set python auto-load on|off" command has been renamed to
+  "set auto-load-scripts on|off".
+
 * GDB has a new command: "set directories".
   It is like the "dir" command except that it replaces the
   source path list instead of augmenting it.
@@ -45,6 +53,19 @@
      then if you step into func<5>, "print X" will show "5".  This
      feature requires proper debuginfo support from the compiler; it
      was added to GCC 4.5.
+
+  ** The motion commands "next", "finish", "until", and "advance" now
+     work better when exceptions are thrown.  In particular, GDB will
+     no longer lose control of the inferior; instead, the GDB will
+     stop the inferior at the point at which the exception is caught.
+     This functionality requires a change in the exception handling
+     code that was introduced in GCC 4.5.
+
+* GDB now follows GCC's rules on accessing volatile objects when
+  reading or writing target state during expression evaluation.
+  One notable difference to prior behavior is that "print x = 0"
+  no longer generates a read of x; the value of the assignment is
+  now always taken directly from the value being assigned.
 
 * GDB now has some support for using labels in the program's source in
   linespecs.  For instance, you can use "advance label" to continue
@@ -90,12 +111,22 @@
   ** GDBserver is now supported on PowerPC LynxOS (versions 4.x and 5.x),
      and i686 LynxOS (version 5.x).
 
+  ** GDBserver is now supported on Blackfin Linux.
+
+* New targets:
+
+Analog Devices, Inc. Blackfin Processor	bfin-*
+
 * Ada task switching is now supported on sparc-elf targets when
   debugging a program using the Ravenscar Profile.  For more information,
   see the "Tasking Support when using the Ravenscar Profile" section
   in the GDB user manual.
 
 * Guile support was removed.
+
+* New features in the GNU simulator
+
+  ** The --map-info flag lists all known core mappings.
 
 *** Changes in GDB 7.2
 

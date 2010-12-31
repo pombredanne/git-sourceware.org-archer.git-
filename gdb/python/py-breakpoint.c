@@ -283,6 +283,23 @@ bppy_set_task (PyObject *self, PyObject *newvalue, void *closure)
   return 0;
 }
 
+/* Python function which deletes the underlying GDB breakpoint.  This
+   triggers the breakpoint_deleted observer which will call
+   gdbpy_breakpoint_deleted; that function cleans up the Python
+   sections.  */
+
+static PyObject *
+bppy_delete_breakpoint (PyObject *self, PyObject *args)
+{
+  breakpoint_object *self_bp = (breakpoint_object *) self;
+
+  BPPY_REQUIRE_VALID (self_bp);
+
+  delete_breakpoint (self_bp->bp);
+
+  Py_RETURN_NONE;
+}
+
 
 /* Python function to set the ignore count of a breakpoint.  */
 static int
@@ -636,7 +653,7 @@ static int
 build_bp_list (struct breakpoint *b, void *arg)
 {
   PyObject *list = arg;
-  PyObject *bp = b->py_bp_object;
+  PyObject *bp = (PyObject *) b->py_bp_object;
   int iserr = 0;
 
   /* Not all breakpoints will have a companion Python object.
@@ -718,7 +735,7 @@ gdbpy_breakpoint_created (int num)
     {
       newbp->number = num;
       newbp->bp = bp;
-      newbp->bp->py_bp_object = (PyObject *) newbp;
+      newbp->bp->py_bp_object = newbp;
       Py_INCREF (newbp);
       ++bppy_live;
     }
@@ -746,7 +763,7 @@ gdbpy_breakpoint_deleted (int num)
   if (! bp)
     return;
 
-  bp_obj = ((breakpoint_object *) bp->py_bp_object);
+  bp_obj = bp->py_bp_object;
   if (bp_obj)
     {
       bp_obj->bp = NULL;
@@ -843,6 +860,8 @@ static PyMethodDef breakpoint_object_methods[] =
 {
   { "is_valid", bppy_is_valid, METH_NOARGS,
     "Return true if this breakpoint is valid, false if not." },
+  { "delete", bppy_delete_breakpoint, METH_NOARGS,
+    "Delete the underlying GDB breakpoint." },
   { NULL } /* Sentinel.  */
 };
 

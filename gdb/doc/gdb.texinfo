@@ -163,8 +163,14 @@ software in general.  We will miss him.
 
 * GDB Bugs::                    Reporting bugs in @value{GDBN}
 
+@ifset SYSTEM_READLINE
+* Command Line Editing: (rluserman).         Command Line Editing
+* Using History Interactively: (history).    Using History Interactively
+@end ifset
+@ifclear SYSTEM_READLINE
 * Command Line Editing::        Command Line Editing
 * Using History Interactively:: Using History Interactively
+@end ifclear
 * Formatting Documentation::    How to format and print @value{GDBN} documentation
 * Installing GDB::              Installing GDB
 * Maintenance Commands::        Maintenance Commands
@@ -1105,6 +1111,12 @@ used if possible.
 Run @value{GDBN} using @var{directory} as its working directory,
 instead of the current directory.
 
+@item -data-directory @var{directory}
+@cindex @code{--data-directory}
+Run @value{GDBN} using @var{directory} as its data directory.
+The data directory is where @value{GDBN} searches for its
+auxiliary files.  @xref{Data Files}.
+
 @item -fullname
 @itemx -f
 @cindex @code{--fullname}
@@ -1249,6 +1261,25 @@ different from your home directory.  Thus, you can have more than one
 init file, one generic in your home directory, and another, specific
 to the program you are debugging, in the directory where you invoke
 @value{GDBN}.
+
+@item
+If the command line specified a program to debug, or a process to
+attach to, or a core file, @value{GDBN} loads any auto-loaded
+scripts provided for the program or for its loaded shared libraries.
+@xref{Auto-loading}.
+
+If you wish to disable the auto-loading during startup,
+you must do something like the following:
+
+@smallexample
+$ gdb -ex "set auto-load-scripts off" -ex "file myprogram"
+@end smallexample
+
+The following does not work because the auto-loading is turned off too late:
+
+@smallexample
+$ gdb -ex "set auto-load-scripts off" myprogram
+@end smallexample
 
 @item
 Reads command files specified by the @samp{-x} option.  @xref{Command
@@ -8154,7 +8185,7 @@ pretty-printers with their names.
 If a pretty-printer can handle multiple data types, then its
 @dfn{subprinters} are the printers for the individual data types.
 Each such subprinter has its own name.
-The format of the name is @var{printer-name}:@var{subprinter-name}.
+The format of the name is @var{printer-name};@var{subprinter-name}.
 
 Pretty-printers are installed by @dfn{registering} them with @value{GDBN}.
 Typically they are automatically loaded and registered when the corresponding
@@ -13634,13 +13665,6 @@ some of which will be fixed with planned future releases of the debugger
 and the GNU Ada compiler.
 
 @itemize @bullet
-@item
-Currently, the debugger 
-has insufficient information to determine whether certain pointers represent
-pointers to objects or the objects themselves.
-Thus, the user may have to tack an extra @code{.all} after an expression
-to get it printed properly.
-
 @item 
 Static constants that the compiler chooses not to materialize as objects in 
 storage are invisible to the debugger.
@@ -15591,6 +15615,10 @@ You can set the default data directory by using the configure-time
 @samp{--exec-prefix}), then the default data directory will be updated
 automatically if the installed @value{GDBN} is moved to a new
 location.
+
+The data directory may also be specified with the
+@code{--data-directory} command line option.
+@xref{Mode Options}.
 
 @node Targets
 @chapter Specifying a Debugging Target
@@ -19414,7 +19442,13 @@ Disable command line editing.
 Show whether command line editing is enabled.
 @end table
 
-@xref{Command Line Editing}, for more details about the Readline
+@ifset SYSTEM_READLINE
+@xref{Command Line Editing, , , rluserman, GNU Readline Library},
+@end ifset
+@ifclear SYSTEM_READLINE
+@xref{Command Line Editing},
+@end ifclear
+for more details about the Readline
 interface.  Users unfamiliar with @sc{gnu} Emacs or @code{vi} are
 encouraged to read that chapter.
 
@@ -19428,8 +19462,14 @@ happened.  Use these commands to manage the @value{GDBN} command
 history facility.
 
 @value{GDBN} uses the @sc{gnu} History library, a part of the Readline
-package, to provide the history facility.  @xref{Using History
-Interactively}, for the detailed description of the History library.
+package, to provide the history facility.
+@ifset SYSTEM_READLINE
+@xref{Using History Interactively, , , history, GNU History Library},
+@end ifset
+@ifclear SYSTEM_READLINE
+@xref{Using History Interactively},
+@end ifclear
+for the detailed description of the History library.
 
 To issue a command to @value{GDBN} without affecting certain aspects of
 the state which is seen by users, prefix it with @samp{server }
@@ -19481,7 +19521,13 @@ This defaults to the value of the environment variable
 @end table
 
 History expansion assigns special meaning to the character @kbd{!}.
-@xref{Event Designators}, for more details.
+@ifset SYSTEM_READLINE
+@xref{Event Designators, , , history, GNU History Library},
+@end ifset
+@ifclear SYSTEM_READLINE
+@xref{Event Designators},
+@end ifclear
+for more details.
 
 @cindex history expansion, turn on/off
 Since @kbd{!} is also the logical not operator in C, history expansion
@@ -22887,6 +22933,12 @@ watchpoint scope, the watchpoint remains valid even if execution of the
 inferior leaves the scope of that watchpoint.
 @end defmethod
 
+@defmethod Breakpoint delete
+Permanently deletes the @value{GDBN} breakpoint.  This also
+invalidates the Python @code{Breakpoint} object.  Any further access
+to this object's attributes or methods will raise an error.
+@end defmethod
+
 @defivar Breakpoint enabled
 This attribute is @code{True} if the breakpoint is enabled, and
 @code{False} otherwise.  This attribute is writable.
@@ -23074,13 +23126,13 @@ debugging commands and scripts.
 Auto-loading can be enabled or disabled.
 
 @table @code
-@kindex maint set python auto-load
-@item maint set python auto-load [yes|no]
-Enable or disable the Python auto-loading feature.
+@kindex set auto-load-scripts
+@item set auto-load-scripts [yes|no]
+Enable or disable the auto-loading of Python scripts.
 
-@kindex maint show python auto-load
-@item maint show python auto-load
-Show whether Python auto-loading is enabled or disabled.
+@kindex show auto-load-scripts
+@item show auto-load-scripts
+Show whether auto-loading of Python scripts is enabled or disabled.
 @end table
 
 When reading an auto-loaded file, @value{GDBN} sets the
@@ -23482,8 +23534,14 @@ Indicates the current program counter address.
 @cindex TUI key bindings
 
 The TUI installs several key bindings in the readline keymaps
-(@pxref{Command Line Editing}).  The following key bindings
-are installed for both TUI mode and the @value{GDBN} standard mode.
+@ifset SYSTEM_READLINE
+(@pxref{Command Line Editing, , , rluserman, GNU Readline Library}).
+@end ifset
+@ifclear SYSTEM_READLINE
+(@pxref{Command Line Editing}).
+@end ifclear
+The following key bindings are installed for both TUI mode and the
+@value{GDBN} standard mode.
 
 @table @kbd
 @kindex C-x C-a
@@ -30459,8 +30517,10 @@ things without first using the debugger to find the facts.
 @c     inc-hist.texinfo
 @c Use -I with makeinfo to point to the appropriate directory,
 @c environment var TEXINPUTS with TeX.
+@ifclear SYSTEM_READLINE
 @include rluser.texi
 @include inc-hist.texinfo
+@end ifclear
 
 
 @node Formatting Documentation
@@ -31748,6 +31808,21 @@ each register and their position within the @samp{g} packet are
 determined by the @value{GDBN} internal gdbarch functions
 @code{DEPRECATED_REGISTER_RAW_SIZE} and @code{gdbarch_register_name}.  The
 specification of several standard @samp{g} packets is specified below.
+
+When reading registers from a trace frame (@pxref{Analyze Collected
+Data,,Using the Collected Data}), the stub may also return a string of
+literal @samp{x}'s in place of the register data digits, to indicate
+that the corresponding register has not been collected, thus its value
+is unavailable.  For example, for an architecture with 4 registers of
+4 bytes each, the following reply indicates to @value{GDBN} that
+registers 0 and 2 have not been collected, while registers 1 and 3
+have been collected, and both have zero value:
+
+@smallexample
+-> @code{g}
+<- @code{xxxxxxxx00000000xxxxxxxx00000000}
+@end smallexample
+
 @item E @var{NN}
 for an error.
 @end table

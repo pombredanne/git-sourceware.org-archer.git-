@@ -56,7 +56,7 @@ verbose "using GDBFLAGS = $GDBFLAGS" 2
 # INTERNAL_GDBFLAGS contains flags that the testsuite requires.
 global INTERNAL_GDBFLAGS
 if ![info exists INTERNAL_GDBFLAGS] {
-    set INTERNAL_GDBFLAGS "-nw -nx"
+    set INTERNAL_GDBFLAGS "-nw -nx -data-directory [pwd]/../data-directory"
 }
 
 # The variable gdb_prompt is a regexp which matches the gdb prompt.
@@ -919,6 +919,37 @@ proc gdb_test_no_output { args } {
             }
         }
     }
+}
+
+# Send a command and then wait for a sequence of outputs.
+# This is useful when the sequence is long and contains ".*", a single
+# regexp to match the entire output can get a timeout much easier.
+#
+# COMMAND is the command to send.
+# TEST_NAME is passed to pass/fail.  COMMAND is used if TEST_NAME is "".
+# EXPECTED_OUTPUT_LIST is a list of regexps of expected output, which are
+# processed in order, and all must be present in the output.
+#
+# It is unnecessary to specify ".*" at the beginning or end of any regexp,
+# there is an implicit ".*" between each element of EXPECTED_OUTPUT_LIST.
+# There is also an implicit ".*" between the last regexp and the gdb prompt.
+#
+# Like gdb_test and gdb_test_multiple, the output is expected to end with the
+# gdb prompt, which must not be specified in EXPECTED_OUTPUT_LIST.
+#
+# Returns:
+#    1 if the test failed,
+#    0 if the test passes,
+#   -1 if there was an internal error.
+
+proc gdb_test_sequence { command test_name expected_output_list } {
+    global gdb_prompt
+    if { $test_name == "" } {
+	set test_name $command
+    }
+    lappend expected_output_list ""; # implicit ".*" before gdb prompt
+    send_gdb "$command\n"
+    return [gdb_expect_list $test_name "$gdb_prompt $" $expected_output_list]
 }
 
 
@@ -2350,10 +2381,10 @@ proc gdb_expect { args } {
     }
 }
 
-# gdb_expect_list MESSAGE SENTINEL LIST -- expect a sequence of outputs
+# gdb_expect_list TEST SENTINEL LIST -- expect a sequence of outputs
 #
 # Check for long sequence of output by parts.
-# MESSAGE: is the test message to be printed with the test success/fail.
+# TEST: is the test message to be printed with the test success/fail.
 # SENTINEL: Is the terminal pattern indicating that output has finished.
 # LIST: is the sequence of outputs to match.
 # If the sentinel is recognized early, it is considered an error.
@@ -2362,7 +2393,7 @@ proc gdb_expect { args } {
 #    1 if the test failed,
 #    0 if the test passes,
 #   -1 if there was an internal error.
-#
+
 proc gdb_expect_list {test sentinel list} {
     global gdb_prompt
     global suppress_flag
@@ -2375,6 +2406,7 @@ proc gdb_expect_list {test sentinel list} {
     while { ${index} < [llength ${list}] } {
 	set pattern [lindex ${list} ${index}]
         set index [expr ${index} + 1]
+	verbose -log "gdb_expect_list pattern: /$pattern/" 2
 	if { ${index} == [llength ${list}] } {
 	    if { ${ok} } {
 		gdb_expect {

@@ -1757,7 +1757,7 @@ check_typedef (struct type *type)
 	TYPE_TARGET_TYPE (type) = target_type;
       if (TYPE_STUB (target_type) || TYPE_TARGET_STUB (target_type))
 	{
-	  /* Empty.  */
+	  /* Nothing we can do.  */
 	}
       else if (TYPE_CODE (type) == TYPE_CODE_ARRAY
 	       || TYPE_CODE (type) == TYPE_CODE_STRING)

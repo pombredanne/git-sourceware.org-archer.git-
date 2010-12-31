@@ -1,3 +1,34 @@
+2010-12-28  Mike Frysinger  <vapier@gentoo.org>
+
+	* hw-alloc.h (HW_NALLOC): Define.
+
+010-12-28  Mike Frysinger  <vapier@gentoo.org>
+
+	* hw-alloc.h (HW_NZALLOC): Change ME,TYPE,N to me,type,n.
+
+2010-12-15  Mike Frysinger  <vapier@gentoo.org>
+
+	* sim-memopt.c (OPTION_MAP_INFO): Define.
+	(memory_options): Handle --map-info.
+	(memory_option_handler): Handle OPTION_MAP_INFO.
+
+2010-11-22  Mike Frysinger  <vapier@gentoo.org>
+
+	* sim-profile.c (PROFILE_PC_FREQ, PROFILE_PC_NR_BUCKETS,
+	PROFILE_PC_SHIFT, PROFILE_PC_START, PROFILE_PC_END,
+	PROFILE_INSN_COUNT): Add stubs when profile is disabled.
+
+2010-11-22  Mike Frysinger  <vapier@gentoo.org>
+
+	* sim-core.c (WITH_HW): Add device casts to device_error,
+	device_io_read_buffer, and device_io_write_buffer.
+
+2010-11-16  Mike Frysinger  <vapier@gentoo.org>
+
+	* dv-sockser.c (dv_sockser_write_buffer): New function.
+	(dv_sockser_write): Rewrite to use dv_sockser_write_buffer.
+	* dv-sockser.h (dv_sockser_write_buffer): New prototype.
+
 2010-10-07  Hans-Peter Nilsson  <hp@axis.com>
 
 	* callback.c (os_lseek): Call wrap on lseek result.

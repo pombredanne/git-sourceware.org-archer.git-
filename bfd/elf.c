@@ -2082,6 +2082,7 @@ static const struct bfd_elf_special_section special_sections_f[] =
 static const struct bfd_elf_special_section special_sections_g[] =
 {
   { STRING_COMMA_LEN (".gnu.linkonce.b"), -2, SHT_NOBITS,      SHF_ALLOC + SHF_WRITE },
+  { STRING_COMMA_LEN (".gnu.lto_"),       -1, SHT_PROGBITS,    SHF_EXCLUDE },
   { STRING_COMMA_LEN (".got"),             0, SHT_PROGBITS,    SHF_ALLOC + SHF_WRITE },
   { STRING_COMMA_LEN (".gnu.version"),     0, SHT_GNU_versym,  0 },
   { STRING_COMMA_LEN (".gnu.version_d"),   0, SHT_GNU_verdef,  0 },
@@ -2303,12 +2304,19 @@ _bfd_elf_new_section_hook (bfd *abfd, asection *sec)
      anyway.  We will set ELF section type and flags for all linker
      created sections.  If user specifies BFD section flags, we will
      set ELF section type and flags based on BFD section flags in
-     elf_fake_sections.  */
-  if ((!sec->flags && abfd->direction != read_direction)
+     elf_fake_sections.  Special handling for .init_array/.fini_array
+     output sections since they may contain .ctors/.dtors input
+     sections.  We don't want _bfd_elf_init_private_section_data to
+     copy ELF section type from .ctors/.dtors input sections.  */
+  if (abfd->direction != read_direction
       || (sec->flags & SEC_LINKER_CREATED) != 0)
     {
       ssect = (*bed->get_sec_type_attr) (abfd, sec);
-      if (ssect != NULL)
+      if (ssect != NULL
+	  && (!sec->flags
+	      || (sec->flags & SEC_LINKER_CREATED) != 0
+	      || ssect->type == SHT_INIT_ARRAY
+	      || ssect->type == SHT_FINI_ARRAY))
 	{
 	  elf_section_type (sec) = ssect->type;
 	  elf_section_flags (sec) = ssect->attr;

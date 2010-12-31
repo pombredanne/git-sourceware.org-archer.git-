@@ -83,10 +83,20 @@ inferior_thread (void)
 void
 delete_step_resume_breakpoint (struct thread_info *tp)
 {
-  if (tp && tp->step_resume_breakpoint)
+  if (tp && tp->control.step_resume_breakpoint)
     {
-      delete_breakpoint (tp->step_resume_breakpoint);
-      tp->step_resume_breakpoint = NULL;
+      delete_breakpoint (tp->control.step_resume_breakpoint);
+      tp->control.step_resume_breakpoint = NULL;
+    }
+}
+
+void
+delete_exception_resume_breakpoint (struct thread_info *tp)
+{
+  if (tp && tp->control.exception_resume_breakpoint)
+    {
+      delete_breakpoint (tp->control.exception_resume_breakpoint);
+      tp->control.exception_resume_breakpoint = NULL;
     }
 }
 
@@ -97,16 +107,25 @@ clear_thread_inferior_resources (struct thread_info *tp)
      but not any user-specified thread-specific breakpoints.  We can not
      delete the breakpoint straight-off, because the inferior might not
      be stopped at the moment.  */
-  if (tp->step_resume_breakpoint)
+  if (tp->control.step_resume_breakpoint)
     {
-      tp->step_resume_breakpoint->disposition = disp_del_at_next_stop;
-      tp->step_resume_breakpoint = NULL;
+      tp->control.step_resume_breakpoint->disposition = disp_del_at_next_stop;
+      tp->control.step_resume_breakpoint = NULL;
     }
 
-  bpstat_clear (&tp->stop_bpstat);
+  if (tp->control.exception_resume_breakpoint)
+    {
+      tp->control.exception_resume_breakpoint->disposition
+	= disp_del_at_next_stop;
+      tp->control.exception_resume_breakpoint = NULL;
+    }
+
+  bpstat_clear (&tp->control.stop_bpstat);
 
   discard_all_intermediate_continuations_thread (tp);
   discard_all_continuations_thread (tp);
+
+  delete_longjmp_breakpoint (tp->num);
 }
 
 static void
@@ -759,7 +778,49 @@ print_thread_info (struct ui_out *uiout, int requested_thread, int pid)
   /* We'll be switching threads temporarily.  */
   old_chain = make_cleanup_restore_current_thread ();
 
-  make_cleanup_ui_out_list_begin_end (uiout, "threads");
+  /* For backward compatibility, we make a list for MI.  A table is
+     preferable for the CLI, though, because it shows table
+     headers.  */
+  if (ui_out_is_mi_like_p (uiout))
+    make_cleanup_ui_out_list_begin_end (uiout, "threads");
+  else
+    {
+      int n_threads = 0;
+
+      for (tp = thread_list; tp; tp = tp->next)
+	{
+	  if (requested_thread != -1 && tp->num != requested_thread)
+	    continue;
+
+	  if (pid != -1 && PIDGET (tp->ptid) != pid)
+	    continue;
+
+	  if (tp->state_ == THREAD_EXITED)
+	    continue;
+
+	  ++n_threads;
+	}
+
+      if (n_threads == 0)
+	{
+	  if (requested_thread == -1)
+	    ui_out_message (uiout, 0, _("No threads.\n"));
+	  else
+	    ui_out_message (uiout, 0, _("No thread %d.\n"), requested_thread);
+	  do_cleanups (old_chain);
+	  return;
+	}
+
+      make_cleanup_ui_out_table_begin_end (uiout, 5, n_threads, "threads");
+
+      ui_out_table_header (uiout, 1, ui_left, "current", "");
+      ui_out_table_header (uiout, 4, ui_left, "id", "Id");
+      ui_out_table_header (uiout, 17, ui_left, "target-id", "Target Id");
+      ui_out_table_header (uiout, 1, ui_noalign, "details", "");
+      ui_out_table_header (uiout, 1, ui_left, "frame", "Frame");
+      ui_out_table_body (uiout);
+    }
+
   for (tp = thread_list; tp; tp = tp->next)
     {
       struct cleanup *chain2;
@@ -783,13 +844,23 @@ print_thread_info (struct ui_out *uiout, int requested_thread, int pid)
 
       chain2 = make_cleanup_ui_out_tuple_begin_end (uiout, NULL);
 
-      if (ptid_equal (tp->ptid, current_ptid))
-	ui_out_text (uiout, "* ");
+      if (ui_out_is_mi_like_p (uiout))
+	{
+	  /* Compatibility.  */
+	  if (ptid_equal (tp->ptid, current_ptid))
+	    ui_out_text (uiout, "* ");
+	  else
+	    ui_out_text (uiout, "  ");
+	}
       else
-	ui_out_text (uiout, "  ");
+	{
+	  if (ptid_equal (tp->ptid, current_ptid))
+	    ui_out_field_string (uiout, "current", "*");
+	  else
+	    ui_out_field_skip (uiout, "current");
+	}
 
       ui_out_field_int (uiout, "id", tp->num);
-      ui_out_text (uiout, " ");
       ui_out_field_string (uiout, "target-id", target_pid_to_str (tp->ptid));
 
       extra_info = target_extra_thread_info (tp);
@@ -799,7 +870,8 @@ print_thread_info (struct ui_out *uiout, int requested_thread, int pid)
 	  ui_out_field_string (uiout, "details", extra_info);
 	  ui_out_text (uiout, ")");
 	}
-      ui_out_text (uiout, "  ");
+      else if (! ui_out_is_mi_like_p (uiout))
+	ui_out_field_skip (uiout, "details");
 
       if (tp->state_ == THREAD_RUNNING)
 	ui_out_text (uiout, "(running)\n");

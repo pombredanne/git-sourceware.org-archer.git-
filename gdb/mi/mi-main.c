@@ -1744,6 +1744,18 @@ mi_cmd_add_inferior (char *command, char **argv, int argc)
   ui_out_field_fmt (uiout, "inferior", "i%d", inf->num);
 }
 
+/* Callback used to find the first inferior other than the
+   current one. */
+   
+static int
+get_other_inferior (struct inferior *inf, void *arg)
+{
+  if (inf == current_inferior ())
+    return 0;
+
+  return 1;
+}
+
 void
 mi_cmd_remove_inferior (char *command, char **argv, int argc)
 {
@@ -1759,6 +1771,25 @@ mi_cmd_remove_inferior (char *command, char **argv, int argc)
   inf = find_inferior_id (id);
   if (!inf)
     error ("the specified thread group does not exist");
+
+  if (inf->pid != 0)
+    error (_("cannot remove an active inferior"));
+
+  if (inf == current_inferior ())
+    {
+      struct thread_info *tp = 0;
+      struct inferior *new_inferior 
+	= iterate_over_inferiors (get_other_inferior, NULL);
+
+      if (new_inferior == NULL)
+	error (_("Cannot remove last inferior"));
+
+      set_current_inferior (new_inferior);
+      if (new_inferior->pid != 0)
+	tp = any_thread_of_process (new_inferior->pid);
+      switch_to_thread (tp ? tp->ptid : null_ptid);
+      set_current_program_space (new_inferior->pspace);
+    }
 
   delete_inferior_1 (inf, 1 /* silent */);
 }
@@ -1865,11 +1896,26 @@ captured_mi_execute_command (struct ui_out *uiout, void *data)
   return;
 }
 
+/* Print a gdb exception to the MI output stream.  */
+
+static void
+mi_print_exception (const char *token, struct gdb_exception exception)
+{
+  fputs_unfiltered (token, raw_stdout);
+  fputs_unfiltered ("^error,msg=\"", raw_stdout);
+  if (exception.message == NULL)
+    fputs_unfiltered ("unknown error", raw_stdout);
+  else
+    fputstr_unfiltered (exception.message, '"', raw_stdout);
+  fputs_unfiltered ("\"\n", raw_stdout);
+}
 
 void
 mi_execute_command (char *cmd, int from_tty)
 {
-  struct mi_parse *command;
+  char *token;
+  struct mi_parse *command = NULL;
+  volatile struct gdb_exception exception;
 
   /* This is to handle EOF (^D). We just quit gdb.  */
   /* FIXME: we should call some API function here.  */
@@ -1878,12 +1924,21 @@ mi_execute_command (char *cmd, int from_tty)
 
   target_log_command (cmd);
 
-  command = mi_parse (cmd);
-
-  if (command != NULL)
+  TRY_CATCH (exception, RETURN_MASK_ALL)
+    {
+      command = mi_parse (cmd, &token);
+    }
+  if (exception.reason < 0)
+    {
+      mi_print_exception (token, exception);
+      xfree (token);
+    }
+  else
     {
       struct gdb_exception result;
       ptid_t previous_ptid = inferior_ptid;
+
+      command->token = token;
 
       if (do_timings)
 	{
@@ -1898,13 +1953,7 @@ mi_execute_command (char *cmd, int from_tty)
 	{
 	  /* The command execution failed and error() was called
 	     somewhere.  */
-	  fputs_unfiltered (command->token, raw_stdout);
-	  fputs_unfiltered ("^error,msg=\"", raw_stdout);
-	  if (result.message == NULL)
-	    fputs_unfiltered ("unknown error", raw_stdout);
-	  else
-	    fputstr_unfiltered (result.message, '"', raw_stdout);
-	  fputs_unfiltered ("\"\n", raw_stdout);
+	  mi_print_exception (command->token, result);
 	  mi_out_rewind (uiout);
 	}
 

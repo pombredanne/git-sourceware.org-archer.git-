@@ -1,3 +1,60 @@
+2010-12-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.texinfo (Ada Glitches): Remove paragraph describing the
+	occasional case where the debugger prints an array address
+	instead of the array itself.
+
+2010-12-23  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo (Packets) <read registers packet>: Document support
+	for registers that were not collected.
+
+2010-12-15  Doug Evans  <dje@google.com>
+
+	* gdb.texinfo (Startup): Document auto-loading of scripts during
+	startup.
+	(Auto-loading): Delete "maint set python auto-load on|off".
+	Add "set auto-load-scripts on|off".
+
+2010-12-07  Doug Evans  <dje@google.com>
+
+	* gdb.texinfo (Mode Options): Document -data-directory.
+	(Data Files): Add reference to -data-directory.
+
+2010-11-29  Doug Evans  <dje@google.com>
+
+	* gdb.texinfo (Pretty-Printer Introduction): Change
+	printer-name:subprinter-name to printer-name;subprinter-name.
+
+2010-11-29  Phil Muldoon  <pmuldoon@redhat.com>
+
+        PR python/12199
+
+	* gdb.texinfo (Breakpoints In Python): Document "delete" method.
+
+2010-11-23  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Top): Check SYSTEM_READLINE.
+	(Editing): Likewise.
+	(Command History): Likewise.
+	(TUI Keys): Likewise.
+	(Bug Reporting): Conditionally include rluser.texi and
+	inc-history.texinfo.
+	* Makefile.in (READLINE_TEXI_INCFLAG): New variable.
+	(GDB_DOC_SOURCE_INCLUDES): Add comment.
+	(GDBvn.texi): Set SYSTEM_READLINE when appropriate.
+	(gdb.dvi): Use READLINE_TEXI_INCFLAG.
+	(gdb.pdf): Likewise.
+	(gdb.info): Likewise.
+	(gdb/index.html): Likewise.
+
+2010-11-23  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in (Makefile): Run ../config.status.
+	(distclean): Update.
+	* configure: Remove.
+	* configure.ac: Remove.
+
 2010-11-12  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.texinfo (Basic Python): Update.  Add xref.

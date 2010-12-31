@@ -32,6 +32,11 @@ struct obj_section;
 struct obstack;
 struct block;
 
+/* Comparison function for symbol look ups.  */
+
+typedef int (symbol_compare_ftype) (const char *string1,
+				    const char *string2);
+
 /* Partial symbols are stored in the psymbol_cache and pointers to
    them are kept in a dynamically grown array that is obtained from
    malloc and grown as necessary via realloc.  Each objfile typically
@@ -204,7 +209,10 @@ struct quick_symbol_functions
   void (*expand_all_symtabs) (struct objfile *objfile);
 
   /* Read all symbol tables associated with OBJFILE which have the
-     file name FILENAME.  */
+     file name FILENAME.
+     This is for the purposes of examining code only, e.g., expand_line_sal.
+     The routine may ignore debug info that is known to not be useful with
+     code, e.g., DW_TAG_type_unit for dwarf debug info.  */
   void (*expand_symtabs_with_filename) (struct objfile *objfile,
 					const char *filename);
 
@@ -234,9 +242,8 @@ struct quick_symbol_functions
 				int (*callback) (struct block *,
 						 struct symbol *, void *),
 				void *data,
-				int (*match) (const char *, const char *),
-				int (*ordered_compare) (const char *,
-							const char *));
+				symbol_compare_ftype *match,
+				symbol_compare_ftype *ordered_compare);
 
   /* Expand all symbol tables in OBJFILE matching some criteria.
 
@@ -280,9 +287,9 @@ struct quick_symbol_functions
 			    void (*fun) (const char *, void *),
 			    void *data);
 
-  /* Call a callback for every file defined in OBJFILE.  FUN is the
-     callback.  It is passed the file's name, the file's full name,
-     and the DATA passed to this function.  */
+  /* Call a callback for every file defined in OBJFILE whose symtab is
+     not already read in.  FUN is the callback.  It is passed the file's name,
+     the file's full name, and the DATA passed to this function.  */
   void (*map_symbol_filenames) (struct objfile *objfile,
 				void (*fun) (const char *, const char *,
 					     void *),

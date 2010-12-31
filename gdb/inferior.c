@@ -124,7 +124,7 @@ add_inferior_silent (int pid)
   memset (inf, 0, sizeof (*inf));
   inf->pid = pid;
 
-  inf->stop_soon = NO_STOP_QUIETLY;
+  inf->control.stop_soon = NO_STOP_QUIETLY;
 
   inf->num = ++highest_inferior_num;
   inf->next = inferior_list;
@@ -754,6 +754,9 @@ remove_inferior_command (char *args, int from_tty)
 
   if (inf == current_inferior ())
     error (_("Can not remove current symbol inferior."));
+    
+  if (inf->pid != 0)
+    error (_("Can not remove an active inferior."));
 
   delete_inferior_1 (inf, 1);
 }

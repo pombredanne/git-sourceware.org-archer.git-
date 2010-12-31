@@ -1,3 +1,869 @@
+2010-12-29  Michael Snyder  <msnyder@vmware.com>
+
+	* bcache.c: Comment clean-up.
+	* block.c: Ditto.
+	* blockframe.c: Ditto.
+	* breakpoint.c: Ditto.
+	* bsd-kvm.c: Ditto.
+	* buildsym.c: Ditto.
+
+2010-12-29  Jie Zhang  <jie.zhang@analog.com>
+
+	* configure.tgt (bfin-*-*): Set build_gdbserver to yes.
+	* NEWS: Mention new Blackfin support.
+	* regformats/reg-bfin.dat: New file.
+
+2010-12-29  Jie Zhang  <jie.zhang@analog.com>
+	    Mike Frysinger  <vapier@gentoo.org>
+
+	* Makefile.in (ALLDEPFILES): Add bfin-linux-tdep.c and bfin-tdep.c.
+	(HFILES_NO_SRCDIR): Add bfin-tdep.h.
+	(ALL_TARGET_OBS): Add bfin-linux-tdep.o and bfin-tdep.o.
+	* NEWS: Mention new Blackfin port.
+	* bfin-tdep.c, bfin-tdep.h, bfin-linux-tdep.c,
+	syscalls/bfin-linux.xml: New files.
+	* configure.tgt (bfin-*-*): Handle bfin targets.
+
+2010-12-29  Hui Zhu  <teawater@gmail.com>
+
+	* ax-gdb.c (gen_expr): Change error message.
+
+2010-12-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.c: Revert the previous change, which was probably committed
+        by accident.
+
+2010-12-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c: Fix typo in comment.
+
+2010-12-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-valprint.c (ada_val_print_1): Print null array pointers as
+	`0x0' rather than `(null)'.  Add assertion.
+
+2010-12-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.h (ada_coerce_to_simple_array): Add declaration.
+	* ada-lang.c (ada_typedef_target_type): New function.
+	(desc_base_type): Add handling of fat pointer typedefs.
+	(ada_coerce_to_simple_array): Make non-static.
+	(decode_packed_array_bitsize): Add handling of fat pointer typedefs.
+	Add assertion.
+	(ada_template_to_fixed_record_type_1, ada_to_fixed_type)
+	(ada_check_typedef): Add handling of fat pointer typedefs.
+	(ada_evaluate_subexp) [OP_FUNCALL]: Likewise.
+	* ada-typeprint.c (ada_print_type): Add handling of fat pointer
+	typedefs.
+	* ada-valprint.c (ada_val_print_1): Convert fat pointers that are not
+	array accesses to simple arrays rather than simple array pointers.
+	(ada_value_print): In the case of array descriptors, do not print
+	the value type description unless it is an array access.
+
+2010-12-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* target.h (enum target_object): Expand the documentation of
+	TARGET_OBJECT_OSDATA a bit.
+
+2010-12-28  Michael Snyder  <msnyder@vmware.com>
+
+	* command.h: Comment clean-up.
+	* cli/cli-cmds.c: Ditto.
+	* cli/cli-cmds.h: Ditto.
+	* cli/cli-decode.c: Ditto.
+	* cli/cli-decode.h: Ditto.
+	* cli/cli-dump.c: Ditto.
+	* cli/cli-interp.c: Ditto.
+	* cli/cli-logging.c: Ditto.
+	* cli/cli-script.c: Ditto.
+	* cli/cli-setshow.c: Ditto.
+	* cli/cli-setshow.h: Ditto.
+
+2010-12-28  Michael Snyder  <msnyder@vmware.com>
+
+	* event-loop.c: Comment clean-up.
+	* event-loop.h: Ditto.
+	* event-top.c: Ditto.
+	* gdb.c: Ditto.
+	* gdb.h: Ditto.
+	* main.c: Ditto.
+	* top.c: Ditto.
+	* top.h: Ditto.	
+
+2010-12-28  Pedro Alves  <pedro@codesourcery.com>
+
+	* ax-gdb.c (gen_expr) <OP_REGISTER>: Error out if trying to
+	collect a user register.
+
+2010-12-28  Hui Zhu  <teawater@gmail.com>
+
+	* gdbarch.sh (ax_pseudo_register_collect,
+	ax_pseudo_register_push_stack): new callbacks.
+	(agent_expr): Forward declare.
+	* gdbarch.h, gdbarch.c: Regenerate.
+	* ax-gdb.c (gen_expr): Remove pseudo-register check code.
+	* ax-general.c (user-regs.h): New include.
+	(ax_reg): Call gdbarch_ax_pseudo_register_push_stack.
+	(ax_reg_mask): Call gdbarch_ax_pseudo_register_collect.
+	* mips-tdep.c (ax.h): New include.
+	(mips_ax_pseudo_register_collect,
+	mips_ax_pseudo_register_push_stack): New functions.
+	(mips_gdbarch_init): Set mips_ax_pseudo_register_collect and
+	mips_ax_pseudo_register_push_stack.
+
+2010-12-28  Yao Qi  <yao@codesourcery.com>
+
+	* arm-tdep.c (arm_register_aliases): Remove sp, pc, and fp.
+
+2010-12-28  Joel Brobecker  <brobecker@adacore.com>
+
+	* inf-child.c (inf_child_acknowledge_created_inferior): Delete.
+	(inf_child_target): Do not set t->to_acknowledge_created_inferior.
+	* inf-ptrace.c (inf_ptrace_create_inferior): Remove call to
+	target_acknowledge_created_inferior.
+	* inf-ttrace.c (inf_ttrace_him): Likewise.
+	* target.h (struct target_ops): Delete to_acknowledge_created_inferior
+	field.
+	(target_acknowledge_created_inferior): Delete.
+	* target.c (update_current_target): Remove setting of
+	to_acknowledge_created_inferior field. Do default value for that
+	field either.
+	(debug_to_acknowledge_created_inferior): Delete.
+	(setup_target_debug): Remove setting of
+	current_target.to_acknowledge_created_inferior.
+
+2010-12-27  Pedro Alves  <pedro@codesourcery.com>
+
+	gdb/
+	* breakpoint.c (breakpoint_restore_shadows): When looking for the
+	location with the lowest address that overlaps the memory range we
+	want to restore shadows for, account for multiple locations at the
+	same address.
+
+2010-12-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup - renaming.
+	* breakpoint.c: Use bl for `*bp_location' variables, blp_tmp for
+	`**bp_location' helper variables, b_tmp for `*breakpoint' helper
+	variables.
+
+2010-12-27  Kevin Buettner  <kevinb@redhat.com>
+	    Hui Zhu  <teawater@gmail.com>
+
+	* mips-tedp.c (mips_register_name): Add comments.
+
+2010-12-23  Yao Qi  <yao@codesourcery.com>
+
+	* arm-tdep.c (thumb_analyze_prologue): Move some code ...
+	(EXTRACT_MOVW_MOVT_IMM_T): ... here.  New macro.
+	(EXTRACT_MOVW_MOVT_IMM_A): New macro.
+	(arm_analyze_load_stack_chk_guard): New.
+	(arm_skip_stack_protector): New.
+	(arm_skip_prologue): Adjust post_prologue_pc by
+	arm_skip_stack_protector.
+
+
+2010-12-23  Yao Qi  <yao@codesourcery.com>
+
+	* arm-tdep.c (arm_gdbarch_init): Remove invoke to
+	set_gdbarch_deprecated_fp_regnum.
+
+2010-12-22  Marc Khouzam  <marc.khouzam@ericsson.com>
+
+	* inferior.c (remove_inferior_command): Don't remove an active inferior.
+	* mi/mi-main.c (mi_cmd_remove_inferior): Ditto.
+
+2010-12-21  Tom Tromey  <tromey@redhat.com>
+
+	* thread.c (print_thread_info): Make a ui-out table in CLI mode.
+
+2010-12-20  Yao Qi  <yao@codesourcery.com>
+
+	* arm-tdep.c (arm_register_reggroup_p): New.
+	(arm_gdbarch_init): Set arm_register_reggroup_p for hook
+	register_reggroup_p.
+
+2010-12-20  Yao Qi  <yao@codesourcery.com>
+
+	* features/arm-core.xml:  Add attribute type to reg from r0 to r12.
+	* features/arm-with-iwmmxt.c: Regenerate.
+	* features/arm-with-neon.c: Regenerate.
+	* features/arm-with-vfpv2.c: Regenerate.
+	* features/arm-with-vfpv3.c: Regenerate.
+
+2010-12-17  Marc Khouzam  <marc.khouzam@ericsson.com>
+
+	* mi/mi-main.c (mi_cmd_remove_inferior): Don't delete current inferior.
+	(get_other_inferior): New.
+
+2010-12-17  Marc Khouzam  <marc.khouzam@ericsson.com>
+
+	* python/py-progspace.c (py_free_pspace): Obtain arch another
+	way to avoid dereferencing a null pointer.
+
+2010-12-17  Michael Snyder  <msnyder@vmware.com>
+
+	* utils.c (do_my_cleanups): Comment fix-up.
+
+2010-12-17  Kevin Buettner  <kevinb@redhat.com>
+
+	* mips-tdep.c (make_mips16_addr): New function.
+	(mips_elf_make_msymbol_special): Don't set the low bit in the
+	symbol's address.
+	(mips_read_pc, mips_unwind_pc, mips_addr_bits_remove): Strip bit
+	indicating mips16 address, if present.
+	(mips_write_pc): Set bit indicating mips16 address when in a mips16
+	function.
+	(mips_eabi_push_dummy_call, mips_o64_push_dummy_call): Likewise,
+	but for each function pointer argument to inferior function call.
+
+2010-12-17  Tom Tromey  <tromey@redhat.com>
+
+	* psympriv.h (struct partial_symtab) <readin>: Move field
+	earlier.
+
+2010-12-16  Kevin Buettner  <kevinb@redhat.com>
+
+	* mips-tdep.c (mips_convert_register_float_case_p)
+	(mips_convert_register_gpreg_case_p): New functions.
+	(mips_convert_register_p): Invoke new functions above.
+	(mips_register_to_value): Add case for fetching value shorter
+	than 64 bits from a 64-bit register.
+	(mips_value_to_register): Add case for storing value shorter
+	than 64 bits into a 64-bit register.
+
+2010-12-16  Joel Borggrén-Franck  <joel.borggren.franck@gmail.com>
+
+	* python/py-value.c (value_object_type) <tp_flags>: Add
+	Py_TPFLAGS_BASETYPE.
+
+2010-12-16  Mike Frysinger  <vapier@gentoo.org>
+
+	* NEWS: Mention new sim --map-info flag.
+
+2010-12-15  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (_initialize_dwarf2_read): Fix help text of
+	"save gdb-index" command.
+
+2010-12-15  Tom Tromey  <tromey@redhat.com>
+
+	* infrun.c (save_infcall_control_state): Handle the
+	exception-resume breakpoint.
+	(restore_infcall_control_state): Likewise.
+	(discard_infcall_control_state): Likewise.
+
+2010-12-15  Kevin Buettner  <kevinb@redhat.com>
+
+	* mips-tdep.c (mips_pseudo_register_write): Sign extend 32-bit
+	cooked values that are being transferred to 64-bit raw registers.
+	(mips_pseudo_register_read): Revise to preserve symmetry with
+	mips_pseudo_register_write().
+
+2010-12-15  Greg Watson  <g.watson@computer.org>
+
+	* f-exp.y (yylex): Check entire token against keywords.
+
+2010-12-15  Doug Evans  <dje@google.com>
+
+	Rename "maint set python auto-load" to "set auto-load-scripts".
+	* NEWS: Mention it.
+	* python/py-auto-load.c (auto_load_scripts): Renamed from
+	gdbpy_auto_load.
+	(load_auto_scripts_for_objfile): Update.
+	(gdbpy_initialize_auto_load): Rename "maint set python auto-load" to
+	"set auto-load-scripts".
+
+2010-12-14  Kevin Buettner  <kevinb@redhat.com>
+
+	* mips-tdep.c (mips_eabi_push_dummy_call): Place signed, rather
+	than unsigned, values in registers.
+
+2010-12-14  Ken Werner  <ken.werner@de.ibm.com>
+
+	* valops.c (value_one): Use get_array_bounds to compute the number
+	of array elements instead of dividing the length of the array by the
+	length of the element types.
+	* valarith.c (value_complement, value_neg): Likewise.
+
+2010-12-14  Joel Brobecker  <brobecker@adacore.com>
+
+	* irix5-nat.c: Replace fp_r, fp_regs and fp_scr by __fp_r, __fp_regs
+	and __fp_scr respectively throughout.
+	* configure.ac: Compile with -Dsiginfo=__siginfo if building with
+	Python using GCC on IRIX.
+	* configure: Regenerate.
+
+2010-12-13  Kevin Buettner  <kevinb@redhat.com>
+
+	* solib-svr4.c (enable_break): Don't attempt to place breakpoints,
+	when attaching, on the names in bkpt_names: _start, __start, and
+	main.
+
+2010-12-12  Stan Shebs  <stan@codesourcery.com>
+
+	* value.c (value_of_internalvar): Add case for trace state
+	variables.
+
+2010-12-12  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (dwarf2_per_objfile): New member quick_file_names_table.
+	(dwarf2_per_cu_quick_data): Move definition down to "quick functions"
+	section.  Delete members lines full_names.  Rename read_lines to
+	no_file_data.
+	(quick_file_names): New struct.
+	(hash_file_name_entry, eq_file_name_entry): New functions.
+	(delete_file_name_entry, create_quick_file_names_table): New functions.
+	(dwarf2_read_index): Initialize quick_file_names_table.
+	(dw2_get_file_names): Renamed from dw2_require_line_header.
+	Return pointer to quick_file_names entry.  All callers updated.
+	(dw2_get_real_path): Renamed from dw2_require_full_path.
+	Replace per_cu arg with pointer to quick_file_names entry.
+	All callers updated.
+	(dw2_free_cached_file_names): New function.
+	(dw2_forget_cached_source_info): Call it (via htab_traverse_noresize).
+	(dwarf2_initialize_objfile): Initialize quick_file_names_table in
+	the OBJF_READNOW case.
+	(dwarf2_free_objfile): Rewrite freeing of quick file names tables.
+
+2010-12-12  Mark Kettenis  <kettenis@gnu.org>
+
+	* mips64obsd-tdep.c (floatformats_mips64_quad): New define.
+	(mips64obsd_init_abi): Set long_double_bit and long_double_format.
+
+2010-12-12  Mark Kettenis  <kettenis@gnu.org>
+
+	* sparc-tdep.c: Fix typo in comment.
+
+2010-12-10  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c: Whitespace cleanup, plus comment additions.
+	No code changes.
+
+2010-12-10  Tom Tromey  <tromey@redhat.com>
+
+	* NEWS: Document exception-handling change.
+
+2010-12-09  Marc Khouzam  <marc.khouzam@ericsson.com>
+
+	* mi/mi-parse.c (mi_parse): Wrong error message.
+
+2010-12-09  Doug Evans  <dje@google.com>
+
+	* symfile.h (quick_symbol_functions): Clarify usage of
+	map_symbol_filenames.
+
+2010-12-09  Tom Tromey  <tromey@redhat.com>
+
+	* mi/mi-parse.h (mi_parse): Update.
+	* mi/mi-parse.c (mi_parse_cleanup): New function.
+	(mi_parse): Add 'token' argument.  Throw exception on error.
+	* mi/mi-main.c (mi_print_exception): New function.
+	(mi_execute_command): Use mi_print_exception.  Catch exceptions
+	from mi_parse.
+
+2010-12-09  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/9593:
+	* thread.c (clear_thread_inferior_resources): Call
+	delete_longjmp_breakpoint.
+	* infrun.c (handle_inferior_event): Handle exception breakpoints.
+	(handle_inferior_event): Likewise.
+	(insert_exception_resume_breakpoint): New function.
+	(check_exception_resume): Likewise.
+	* inferior.h (delete_longjmp_breakpoint_cleanup): Declare.
+	* infcmd.c (delete_longjmp_breakpoint_cleanup): No longer static.
+	(step_1): Set thread's initiating frame.
+	(until_next_continuation): New function.
+	(until_next_command): Support exception breakpoints.
+	(finish_command_continuation): Delete longjmp breakpoint.
+	(finish_forward): Support exception breakpoints.
+	* gdbthread.h (struct thread_info) <initiating_frame>: New field.
+	* breakpoint.h (enum bptype) <bp_exception, bp_exception_resume,
+	bp_exception_master>: New constants.
+	(struct bpstat_what) <is_longjmp>: New field.
+	(set_longjmp_breakpoint): Update.
+	* breakpoint.c (create_exception_master_breakpoint): New function.
+	(update_breakpoints_after_exec): Handle bp_exception_master.  Call
+	create_exception_master_breakpoint.
+	(print_it_typical): Handle bp_exception_master, bp_exception.
+	(bpstat_stop_status): Handle bp_exception_master.
+	(bpstat_what): Handle bp_exception_master, bp_exception,
+	bp_exception_resume.
+	(bptype_string): Likewise.
+	(print_one_breakpoint_location): Likewise.
+	(allocate_bp_location): Likewise.
+	(set_longjmp_breakpoint): Handle exception breakpoints.  Change
+	interface.
+	(delete_longjmp_breakpoint): Handle exception breakpoints.
+	(mention): Likewise.
+	(struct until_break_command_continuation_args) <thread_num>: New
+	field.
+	(until_break_command_continuation): Call
+	delete_longjmp_breakpoint.
+	(until_break_command): Support exception breakpoints.
+	(delete_command): Likewise.
+	(breakpoint_re_set_one): Likewise.
+	(breakpoint_re_set): Likewise.
+
+2010-12-08  Doug Evans  <dje@google.com>
+
+	* gdbtypes.h (TYPE_IS_OPAQUE): Reformat.
+
+	* gdbtypes.c (check_typedef): Tweak comment.
+
+	PR symtab/12302
+	* dwarf2read.c (struct psymtab_cu_index_map): New struct.
+	(hash_psymtab_cu_index, eq_psymtab_cu_index): New functions.
+	(struct addrmap_index_data): New struct.
+	(add_address_entry): Remove arg `pst', new args `start', `end'.
+	(add_address_entry_worker, write_address_map): New functions.
+	(write_psymtabs_to_index): Address table generation moved to
+	write_address_map.  Build a table mapping psymtab to CU index
+	to pass to it.
+
+	* dwarf2read.c (write_psymtabs_to_index): When stat fails, pass file
+	name to perror.
+
+	* symfile.h (quick_symbol_functions): Clarify usage of
+	expand_symtabs_with_filename.
+	* dwarf2read.c (dw2_expand_symtabs_with_filename): Only iterate over
+	comp units, ignore type units.
+
+	* dwarf2read.c (dw2_expand_symtabs_with_filename): Use FILENAME_CMP.
+
+2010-12-07  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (dw2_lookup_symtab): Remove duplicate call to
+	gdb_realpath.
+
+	PR python/12227
+	* NEWS: Mention -data-directory.
+	* main.c (captured_main): Recognize -data-directory.
+
+2010-12-06  Marc Khouzam  <marc.khouzam@ericsson.com>
+
+	* mi/mi-parse.c (mi_parse): Missing else.
+
+2010-12-04  Masaki Muranaka  <monaka@monami-software.com>
+
+	* configure.tgt: Accept microblaze*-*-linux* for linux target
+	and microblaze*-*-* for  as target.
+
+2010-12-02  Keith Seitz  <keiths@redhat.com>
+
+	* linespec.c (find_method): Move name canonicalization outside
+	the loop.
+	Be paranoid and use a cleanup.
+
+2010-12-01  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (save_gdb_index_command): Add comment.
+
+2010-12-01  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* valops.c (value_assign): Returned value is never lazy.  If a
+	C++ class type is returned, fix incorrect enclosing type / embedded
+	offset.  If internal variable is returned, allocate new internalvar
+	value using value_of_internalvar.
+
+	* NEWS: Document changes in behavior of "print x = 0" and similar
+	expressions.
+
+2010-11-29  Doug Evans  <dje@google.com>
+
+	* python/lib/gdb/printing.py (register_pretty_printer): Change
+	printer-name:subprinter-name to printer-name;subprinter-name.
+	* python/lib/gdb/command/pretty_printers.py (parse_printer_regexps):
+	Ditto.
+	(InfoPrettyPrinter, EnablePrettyPrinter, DisablePrettyPrinter): Ditto.
+
+2010-11-29  Tom Tromey  <tromey@redhat.com>
+
+	* opencl-lang.c (lval_func_check_synthetic_pointer): New
+	function.
+	* value.h (struct lval_funcs) <indirect, check_synthetic_pointer>:
+	New fields.
+	(value_bits_synthetic_pointer): Declare.
+	* value.c (value_bits_synthetic_pointer): New function.
+	* valprint.c (valprint_check_validity): Handle synthetic
+	pointers.
+	* valops.c (value_ind): Use new 'indirect' lval_funcs method.
+	* valarith.c (value_ptradd): Use set_value_component_location.
+	* p-valprint.c (pascal_object_print_value_fields): Handle
+	synthetic pointers.
+	* jv-valprint.c (java_print_value_fields): Handle synthetic
+	pointers.
+	* dwarf2read.c (dwarf_stack_op_name): Add
+	DW_OP_GNU_implicit_pointer.
+	(dwarf2_fetch_die_location_block): Add get_frame_pc, baton
+	arguments.  Handle location lists.
+	(fill_in_loclist_baton): New function.
+	(dwarf2_symbol_mark_computed): Use it.
+	* dwarf2loc.h (dwarf2_find_location_expression): Declare.
+	(dwarf2_fetch_die_location_block): Add get_frame_pc, baton
+	arguments.
+	* dwarf2loc.c (dwarf2_find_location_expression): Rename from
+	find_location_expression.  No longer static.  Update all callers.
+	(dwarf_expr_frame_pc): New function.
+	(per_cu_dwarf_call): Add get_frame_pc, baton arguments.  Update
+	all callers.
+	(struct piece_closure) <per_cu>: New field.
+	(allocate_piece_closure): Add per_cu argument.
+	(read_pieced_value): Handle DWARF_VALUE_IMPLICIT_POINTER.
+	(check_pieced_value_bits): Remove validity argument, add check_for
+	argument.  Handle DWARF_VALUE_IMPLICIT_POINTER.
+	(check_pieced_value_validity, check_pieced_value_invalid):
+	Update.
+	(check_pieced_synthetic_pointer): New function.
+	(get_frame_address_in_block_wrapper): New function.
+	(indirect_pieced_value): New function.
+	(pieced_value_funcs): Update.
+	(invalid_synthetic_pointer): New function.
+	(dwarf2_evaluate_loc_desc_full): Rename from
+	dwarf2_evaluate_loc_desc.  Add byte_offset argument.
+	(dwarf2_evaluate_loc_desc): Rewrite.
+	(dwarf2_loc_desc_needs_frame): Set new field on context.
+	(get_ax_pc): New function.
+	(disassemble_dwarf_expression): Handle
+	DW_OP_GNU_implicit_pointer.
+	* dwarf2expr.h (enum dwarf_value_location)
+	<DWARF_VALUE_IMPLICIT_POINTER>: New constant.
+	(struct dwarf_expr_context) <get_frame_pc>: New field.
+	(struct dwarf_expr_piece) <v.ptr>: New field.
+	* dwarf2expr.c (add_piece): Handle DWARF_VALUE_IMPLICIT_POINTER.
+	(execute_stack_op): Handle DW_OP_GNU_implicit_pointer.
+	* dwarf2-frame.c (no_get_frame_pc): New function.
+	(execute_stack_op): Set new field on context.
+	* cp-valprint.c (cp_print_value_fields): Handle synthetic
+	pointers.
+
+2010-11-29  Phil Muldoon  <pmuldoon@redhat.com>
+
+        PR python/12199
+
+	* python/py-breakpoint.c (bppy_delete_breakpoint): New function.
+
+2010-11-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix step_resume_breakpoint unsaved during an infcall.
+	* gdbthread.h (struct thread_control_state): Move here field
+	step_resume_breakpoint ...
+	(struct thread_info): ... from here.
+	* infrun.c (save_infcall_control_state): Reset
+	control.step_resume_breakpoint to NULL.
+	(restore_infcall_control_state, discard_infcall_control_state): Delete
+	control.step_resume_breakpoint.
+	* arm-linux-tdep.c, infrun.c, thread.c: Update all the references to
+	the moved field.
+
+2010-11-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Rename and move inferior_thread_state and inferior_status.
+	* gdbthread.h (struct thread_control_state): New struct, move fields
+	step_range_start, step_range_end, step_frame_id, step_stack_frame_id,
+	trap_expected, proceed_to_finish, in_infcall, step_over_calls,
+	stop_step and stop_bpstat here from struct thread_info.
+	(struct thread_suspend_state): New struct, move field stop_signal here
+	from struct thread_info.
+	(struct thread_info): Move the fields above from this struct.
+	* inferior.h: Move the inferior_thread_state and inferior_status
+	declarations comment to their definitions at infrun.c.
+	(struct inferior_control_state): New struct, move field stop_soon from
+	struct inferior here.
+	(struct inferior_suspend_state): New empty struct.
+	(struct inferior): New fields control and suspend.  Move out field
+	stop_soon.
+	* infrun.c (struct inferior_thread_state): Rename to ...
+	(infcall_suspend_state): ... here.  Replace field stop_signal by
+	fields thread_suspend and inferior_suspend.
+	(save_inferior_thread_state): Rename to ...
+	(save_infcall_suspend_state): ... here.  New variable inf.  Update the
+	code for new fields.
+	(restore_inferior_thread_state): Rename to ...
+	(restore_infcall_suspend_state): ... here.  New variable inf.  Update
+	the code for new fields.
+	(do_restore_inferior_thread_state_cleanup): Rename to ...
+	(do_restore_infcall_suspend_state_cleanup): ... here.
+	(make_cleanup_restore_inferior_thread_state): Rename to ...
+	(make_cleanup_restore_infcall_suspend_state): ... here.
+	(discard_inferior_thread_state): Rename to ...
+	(discard_infcall_suspend_state): ... here.
+	(get_inferior_thread_state_regcache): Rename to ...
+	(get_infcall_suspend_state_regcache): ... here.
+	(struct inferior_status): Rename to ...
+	(struct infcall_control_state): ... here.  Replace fields
+	step_range_start, step_range_end, step_frame_id, step_stack_frame_id,
+	trap_expected, proceed_to_finish, in_infcall, step_over_calls,
+	stop_step, stop_bpstat and stop_soon by fields thread_control and
+	inferior_control.
+	(save_inferior_status): Rename to ...
+	(save_infcall_control_state): ... here.  Update the code for new
+	fields.
+	(restore_inferior_status): Rename to ...
+	(restore_infcall_control_state): ... here.  Update the code for new
+	fields.
+	(do_restore_inferior_status_cleanup): Rename to ...
+	(do_restore_infcall_control_state_cleanup): ... here.
+	(make_cleanup_restore_inferior_status): Rename to ...
+	(make_cleanup_restore_infcall_control_state): ... here.
+	(discard_inferior_status): Rename to ...
+	(discard_infcall_control_state): ... here.
+	* alpha-tdep.c, breakpoint.c, dummy-frame.c, dummy-frame.h,
+	exceptions.c, fbsd-nat.c, gdbthread.h, infcall.c, infcmd.c,
+	inferior.c, inferior.h, infrun.c, linux-nat.c, mi/mi-interp.c,
+	mips-tdep.c, procfs.c, solib-irix.c, solib-osf.c, solib-spu.c,
+	solib-sunos.c, solib-svr4.c, thread.c, windows-nat.c: Update all the
+	references to the moved fields and renamed functions.
+
+2010-11-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* infcall.c (struct inferior_thread_state) <siginfo_gdbarch>: Fix up
+	the comment.
+	(save_inferior_thread_state): Reset tp->stop_signal.
+
+2010-11-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* infcall.c (call_function_by_hand): Remove variable
+	caller_state_cleanup.
+
+2010-11-25  Marc Khouzam  <marc.khouzam@ericsson.com>
+
+	PR breakpoints/12217
+
+	* breakpoint.c (is_marker_spec): Check for NULL.
+
+2010-11-25  Pedro Alves  <pedro@codesourcery.com>
+
+	* breakpoint.h: No longer include python.h or python-internal.h.
+	(struct breakpoint_object): Forward declare.
+	* defs.h (PyObject) [!HAVE_PYTHON]: Don't define.
+	* varobj.c (PyObject) [!HAVE_PYTHON]: Define.
+	* python/py-breakpoint.c (build_bp_list): Cast py_bp_object to
+	PyObject pointer.
+	(gdbpy_breakpoint_created): Remove casts around py_bp_object
+	accesses.
+
+2010-11-24  Joel Brobecker  <brobecker@adacore.com>
+
+	* rs6000-tdep.c (bfd_uses_spe_extensions): Use bfd_elf_get_obj_attr_int
+	only if HAVE_ELF is defined.
+
+2010-11-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* infrun.c (struct inferior_status) <stepping_over_breakpoint>
+	(save_inferior_status) <stepping_over_breakpoint>
+	(restore_inferior_status) <stepping_over_breakpoint>: Rename to
+	trap_expected.
+	(struct inferior_status) <step_resume_break_address>: Remove.
+
+2010-11-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* infrun.c (struct inferior_status, save_inferior_status)
+	(restore_inferior_status): Group and reorder the fields, comment their
+	groups.
+
+2010-11-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* dictionary.c
+	(struct dict_vector) <iter_match_first, iter_match_next>
+	(iter_match_first_hashed, iter_match_next_hashed)
+	(iter_match_first_linear, iter_match_next_linear)
+	(dict_iter_match_first, dict_iter_match_next, iter_match_first_hashed)
+	(iter_match_next_hashed, iter_match_first_linear)
+	(iter_match_next_linear): Use symbol_compare_ftype.
+	* dictionary.h: Include symfile.h.
+	(dict_iter_match_first, dict_iter_match_next): Use
+	symbol_compare_ftype.
+	* dwarf2read.c (dw2_map_matching_symbols): Likewise.
+	* psymtab.c (match_partial_symbol, match_partial_symbol, map_block)
+	(map_matching_symbols_psymtab): Likewise.
+	* symfile.h (symbol_compare_ftype): New typedef.
+	(struct quick_symbol_functions) <map_matching_symbols): Use
+	symbol_compare_ftype.
+
+2010-11-23  Tom Tromey  <tromey@redhat.com>
+
+	* configure: Rebuild.
+	* configure.ac (READLINE_TEXI_INCFLAG): New subst.
+
+2010-11-19  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in (SUBDIRS): Add doc.
+	* configure: Rebuild.
+	* configure.ac: Don't configure in doc.  Create doc/Makefile.
+
+2010-11-23  Phil Muldoon  <pmuldoon@redhat.com>
+
+        PR python/12212
+
+	* python/py-inferior.c (find_thread_object): Check if PIDGET
+	returns 0.
+
+010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (ada_template_to_fixed_record_type_1): Delete bit_incr.
+
+2010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (ada_to_fixed_type): Expand function documentation.
+	Return the original type if the main type portions match rather
+	than when the type themselves match.
+
+2010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (ada_template_to_fixed_record_type_1):
+	For dynamic fields, check the field size against the maximum
+	object size.
+
+2010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* mips-irix-tdep.c (mips_irix_n32_stack_tramp_frame_init): New
+	function.
+	(mips_irix_n32_stack_tramp_frame): New static global.
+	(mips_irix_init_abi): Add mips_irix_n32_stack_tramp_frame to
+	list of unwinder.
+
+2010-11-22  Jerome Guitton  <guitton@adacore.com>
+
+	* ada-tasks.c (get_tcb_types_info): Use C lookups to get
+	ATCB symbols.
+
+2010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (ada_check_typedef): Call ada_check_typedef only
+	if type1 is a typedef.
+
+2010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.h (ADA_KNOWN_AUXILIARY_FUNCTION_NAME_PATTERNS): Add
+	"_finalizer" to the list.
+
+2010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* symfile.c: Remove all "#if 0"/"#endif" blocks.
+
+2010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* symfile.c: Add missing second space after period in various comments.
+
+2010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-typeprint.c (print_array_type): Fix formatting in comment.
+	(print_selected_record_field_types): Fix formatting in function
+	documentation.
+
+2010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* ravenscar-thread.c (_initialize_ravenscar): Fix copy/paste typo
+	in name of "show ravenscar" prefix command name.
+
+2010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* ravenscar-thread.c (show_ravenscar_task_switching_command):
+	Add missing '\n' in output.
+
+2010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* ravenscar-thread.c (running_thread_name): Change value.
+	(read_thread_id): Remove advance declaration.
+	(get_running_thread_msymbol): New function.
+	(has_ravenscar_runtime): Use get_running_thread_msymbol to
+	compute msym_running_thread.
+	(get_running_thread_id): Renames read_thread_id. Slight modifications
+	to not take any argument anymore, using get_running_thread_msymbol
+	to determine which symbol to use instead.
+	(ravenscar_running_thread): Use get_running_thread_id instead of
+	read_thread_id.
+
+2010-11-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* ravenscar-sparc-thread.c (supply_register_at_address):
+	Fix passing of buf in call to regcache_raw_supply.
+
+2010-11-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (dwarf2_read_index): Ignore higher .gdb_index versions.
+
+2010-11-22  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in (.PRECIOUS): Reference ada-lex.c.
+
+2010-11-19  Keith Seitz  <keiths@redhat.com>
+
+	* data-directory/Makefile.in (SYSCALLS_INSTALL_DIR):
+	Remove extraneous '/' after $(DESTDIR).
+	(PYTHON_INSTALL_DIR): Likewise.
+
+2010-11-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix stale memory references.
+	* elfread.c (elf_symfile_read): Replace xmalloc by bfd_alloc, drop
+	xfree, new comment.
+
+2010-11-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in (.y.c): Directly create $@ from YLWRAP.
+	(.PHONY): Remove for .y outputs.
+
+2010-11-19  Will Drewry  <wad@google.com>
+	    Tavis Ormandy  <taviso@google.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (decode_locdesc): Enforce location description stack
+	boundaries.
+
+2010-11-18  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* arm-tdep.c (arm_in_function_epilogue_p): Fix code when "MOV SP"
+	instruction is found.
+
+2010-11-17  Tom Tromey  <tromey@redhat.com>
+
+	* value.c (value_entirely_optimized_out): Check the
+	'check_any_valid' field.
+
+2010-11-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* ada-lang.c (modify_general_field): Remove.
+	(make_array_descriptor): Replace all modify_general_field calls by
+	modify_field.
+	* value.c (modify_field): Update comment.  New variable bytesize.
+	Normalize BITPOS.  Initialize BYTESIZE, use it.
+
+2010-11-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (dw2_forget_cached_source_info): Clear the FULL_NAMES
+	elements after xfree.
+
+2010-11-16  Tom Tromey  <tromey@redhat.com>
+
+	* gdb-add-index.sh: Really remove.
+
+2010-11-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* dwarf2read.c (alloc_one_comp_unit): Rename prototype to ...
+	(init_one_comp_unit): ... this one.
+	(prepare_one_comp_unit): New prototype.
+	(dw2_require_line_header, process_psymtab_comp_unit): Use
+	init_one_comp_unit.
+	(process_psymtab_comp_unit): Use prepare_one_comp_unit.
+	(load_partial_comp_unit): Remove variable attr.  Use
+	init_one_comp_unit with xmalloc.  Use prepare_one_comp_unit.
+	(load_full_comp_unit): Use init_one_comp_unit with xmalloc.  Use
+	prepare_one_comp_unit.
+	(read_signatured_type): Remove variable attr.  Use init_one_comp_unit.
+	Use prepare_one_comp_unit.
+	(alloc_one_comp_unit): Rename to ...
+	(init_one_comp_unit): ... here and remove there calloc, new parameter
+	cu.
+	(prepare_one_comp_unit): New function.
+
 2010-11-14  Pierre Muller  <muller@ics.u-strasbg.fr>
 
 	* arm-tdep.c (arm_in_function_epilogue_p): Fix code to avoid

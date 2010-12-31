@@ -43,6 +43,8 @@
 
 #include "python/python.h"
 
+#include "tracepoint.h"
+
 /* Prototypes for exported functions. */
 
 void _initialize_values (void);
@@ -520,7 +522,7 @@ value_entirely_optimized_out (const struct value *value)
   if (!value->optimized_out)
     return 0;
   if (value->lval != lval_computed
-      || !value->location.computed.funcs->check_validity)
+      || !value->location.computed.funcs->check_any_valid)
     return 1;
   return !value->location.computed.funcs->check_any_valid (value);
 }
@@ -535,6 +537,18 @@ value_bits_valid (const struct value *value, int offset, int length)
     return 0;
   return value->location.computed.funcs->check_validity (value, offset,
 							 length);
+}
+
+int
+value_bits_synthetic_pointer (const struct value *value,
+			      int offset, int length)
+{
+  if (value == NULL || value->lval != lval_computed
+      || !value->location.computed.funcs->check_synthetic_pointer)
+    return 0;
+  return value->location.computed.funcs->check_synthetic_pointer (value,
+								  offset,
+								  length);
 }
 
 int
@@ -1218,6 +1232,22 @@ struct value *
 value_of_internalvar (struct gdbarch *gdbarch, struct internalvar *var)
 {
   struct value *val;
+  struct trace_state_variable *tsv;
+
+  /* If there is a trace state variable of the same name, assume that
+     is what we really want to see.  */
+  tsv = find_trace_state_variable (var->name);
+  if (tsv)
+    {
+      tsv->value_known = target_get_trace_state_variable_value (tsv->number,
+								&(tsv->value));
+      if (tsv->value_known)
+	val = value_from_longest (builtin_type (gdbarch)->builtin_int64,
+				  tsv->value);
+      else
+	val = allocate_value (builtin_type (gdbarch)->builtin_void);
+      return val;
+    }
 
   switch (var->kind)
     {
@@ -2268,7 +2298,7 @@ unpack_field_as_long (struct type *type, const gdb_byte *valaddr, int fieldno)
    target byte order; the bitfield starts in the byte pointed to.  FIELDVAL
    is the desired value of the field, in host byte order.  BITPOS and BITSIZE
    indicate which bits (in target bit order) comprise the bitfield.  
-   Requires 0 < BITSIZE <= lbits, 0 <= BITPOS+BITSIZE <= lbits, and
+   Requires 0 < BITSIZE <= lbits, 0 <= BITPOS % 8 + BITSIZE <= lbits, and
    0 <= BITPOS, where lbits is the size of a LONGEST in bits.  */
 
 void
@@ -2278,6 +2308,11 @@ modify_field (struct type *type, gdb_byte *addr,
   enum bfd_endian byte_order = gdbarch_byte_order (get_type_arch (type));
   ULONGEST oword;
   ULONGEST mask = (ULONGEST) -1 >> (8 * sizeof (ULONGEST) - bitsize);
+  int bytesize;
+
+  /* Normalize BITPOS.  */
+  addr += bitpos / 8;
+  bitpos %= 8;
 
   /* If a negative fieldval fits in the field in question, chop
      off the sign extension bits.  */
@@ -2295,16 +2330,20 @@ modify_field (struct type *type, gdb_byte *addr,
       fieldval &= mask;
     }
 
-  oword = extract_unsigned_integer (addr, sizeof oword, byte_order);
+  /* Ensure no bytes outside of the modified ones get accessed as it may cause
+     false valgrind reports.  */
+
+  bytesize = (bitpos + bitsize + 7) / 8;
+  oword = extract_unsigned_integer (addr, bytesize, byte_order);
 
   /* Shifting for bit field depends on endianness of the target machine.  */
   if (gdbarch_bits_big_endian (get_type_arch (type)))
-    bitpos = sizeof (oword) * 8 - bitpos - bitsize;
+    bitpos = bytesize * 8 - bitpos - bitsize;
 
   oword &= ~(mask << bitpos);
   oword |= fieldval << bitpos;
 
-  store_unsigned_integer (addr, sizeof oword, byte_order, oword);
+  store_unsigned_integer (addr, bytesize, byte_order, oword);
 }
 
 /* Pack NUM into BUF using a target format of TYPE.  */
