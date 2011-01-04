@@ -1,6 +1,7 @@
 /* Main code for remote server for GDB.
    Copyright (C) 1989, 1993, 1994, 1995, 1997, 1998, 1999, 2000, 2002, 2003,
-   2004, 2005, 2006, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
+   2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
+   Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -2262,7 +2263,7 @@ static void
 gdbserver_version (void)
 {
   printf ("GNU gdbserver %s%s\n"
-	  "Copyright (C) 2010 Free Software Foundation, Inc.\n"
+	  "Copyright (C) 2011 Free Software Foundation, Inc.\n"
 	  "gdbserver is free software, covered by the GNU General Public License.\n"
 	  "This gdbserver was configured as \"%s\"\n",
 	  PKGVERSION, version, host_name);
