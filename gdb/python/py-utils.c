@@ -1,6 +1,6 @@
 /* General utility routines for GDB/Python.
 
-   Copyright (C) 2008, 2009, 2010 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -272,6 +272,25 @@ gdbpy_exception_to_string (PyObject *ptype, PyObject *pvalue)
     str = gdbpy_obj_to_string (ptype);
 
   return str;
+}
+
+/* Convert a GDB exception to the appropriate Python exception.
+   
+   This sets the Python error indicator, and returns NULL.  */
+
+PyObject *
+gdbpy_convert_exception (struct gdb_exception exception)
+{
+  PyObject *exc_class;
+
+  if (exception.reason == RETURN_QUIT)
+    exc_class = PyExc_KeyboardInterrupt;
+  else if (exception.error == MEMORY_ERROR)
+    exc_class = gdbpy_gdb_memory_error;
+  else
+    exc_class = gdbpy_gdb_error;
+
+  return PyErr_Format (exc_class, "%s", exception.message);
 }
 
 /* Converts OBJ to a CORE_ADDR value.

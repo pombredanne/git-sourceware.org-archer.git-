@@ -1,6 +1,6 @@
 /* This testcase is part of GDB, the GNU debugger.
 
-   Copyright 2010 Free Software Foundation, Inc.
+   Copyright 2010, 2011 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,15 +17,30 @@
 
    Contributed by Ken Werner <ken.werner@de.ibm.com>  */
 
-int __attribute__ ((vector_size (4 * sizeof(int)))) i4a = {2, 4, 8, 16};
-int __attribute__ ((vector_size (4 * sizeof(int)))) i4b = {1, 2, 8, 4};
-float __attribute__ ((vector_size (4 * sizeof(float)))) f4a = {2, 4, 8, 16};
-float __attribute__ ((vector_size (4 * sizeof(float)))) f4b = {1, 2, 8, 4};
-unsigned int __attribute__ ((vector_size (4 * sizeof(unsigned int)))) ui4 = {2, 4, 8, 16};
-int __attribute__ ((vector_size (2 * sizeof(int)))) i2 = {1, 2};
-long long __attribute__ ((vector_size (2 * sizeof(long long)))) ll2 = {1, 2};
-float __attribute__ ((vector_size (2 * sizeof(float)))) f2 = {1, 2};
-double __attribute__ ((vector_size (2 * sizeof(double)))) d2 = {1, 2};
+typedef int __attribute__ ((vector_size (4 * sizeof(int)))) int4;
+typedef unsigned int __attribute__ ((vector_size (4 * sizeof(unsigned int)))) uint4;
+typedef char __attribute__ ((vector_size (4 * sizeof(char)))) char4;
+typedef float __attribute__ ((vector_size (4 * sizeof(float)))) float4;
+
+typedef int __attribute__ ((vector_size (2 * sizeof(int)))) int2;
+typedef long long __attribute__ ((vector_size (2 * sizeof(long long)))) longlong2;
+typedef float __attribute__ ((vector_size (2 * sizeof(float)))) float2;
+typedef double __attribute__ ((vector_size (2 * sizeof(double)))) double2;
+
+int ia = 2;
+int ib = 1;
+float fa = 2;
+float fb = 1;
+char4 c4 = {1, 2, 3, 4};
+int4 i4a = {2, 4, 8, 16};
+int4 i4b = {1, 2, 8, 4};
+float4 f4a = {2, 4, 8, 16};
+float4 f4b = {1, 2, 8, 4};
+uint4 ui4 = {2, 4, 8, 16};
+int2 i2 = {1, 2};
+longlong2 ll2 = {1, 2};
+float2 f2 = {1, 2};
+double2 d2 = {1, 2};
 
 int
 main ()

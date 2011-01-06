@@ -1,7 +1,7 @@
 /* Ada language support definitions for GDB, the GNU debugger.
 
    Copyright (C) 1992, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005,
-   2007, 2008, 2009, 2010 Free Software Foundation, Inc.
+   2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -51,7 +51,8 @@ struct frame_info;
    interest to users. Each name (a basic regular expression string)
    is followed by a comma. */
 #define ADA_KNOWN_AUXILIARY_FUNCTION_NAME_PATTERNS \
-   "___clean[.$a-zA-Z0-9_]*$",
+   "___clean[.$a-zA-Z0-9_]*$", \
+   "___finalizer[.$a-zA-Z0-9_]*$",
 
 /* The maximum number of frame levels searched for non-local,
  * non-global symbols.  This limit exists as a precaution to prevent
@@ -195,6 +196,8 @@ extern int ada_array_arity (struct type *);
 struct type *ada_type_of_array (struct value *, int);
 
 extern struct value *ada_coerce_to_simple_array_ptr (struct value *);
+
+struct value *ada_coerce_to_simple_array (struct value *);
 
 extern int ada_is_simple_array_type (struct type *);
 

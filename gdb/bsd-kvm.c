@@ -1,6 +1,6 @@
 /* BSD Kernel Data Access Library (libkvm) interface.
 
-   Copyright (C) 2004, 2005, 2007, 2008, 2009, 2010
+   Copyright (C) 2004, 2005, 2007, 2008, 2009, 2010, 2011
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -194,7 +194,7 @@ bsd_kvm_fetch_registers (struct target_ops *ops,
 
   if (nl[0].n_value != 0)
     {
-      /* Found dumppcb. If it contains a valid context, return
+      /* Found dumppcb.  If it contains a valid context, return
 	 immediately.  */
       if (bsd_kvm_fetch_pcb (regcache, (struct pcb *) nl[0].n_value))
 	return;

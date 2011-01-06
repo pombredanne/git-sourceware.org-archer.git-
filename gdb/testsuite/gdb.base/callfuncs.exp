@@ -1,5 +1,5 @@
 # Copyright 1992, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003,
-# 2004, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
+# 2004, 2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -209,10 +209,14 @@ proc do_function_calls {} {
 	"call inferior func with struct - returns int"
     gdb_test "p t_structs_l(struct_val1)" "= 51" \
 	"call inferior func with struct - returns long"
-    gdb_test "p t_structs_f(struct_val1)" "= 2.12.*" \
-       	"call inferior func with struct - returns float"
-    gdb_test "p t_structs_d(struct_val1)" "= 9.87.*" \
-    	"call inferior func with struct - returns double"
+
+    if ![target_info exists gdb,skip_float_tests] {
+	gdb_test "p t_structs_f(struct_val1)" "= 2.12.*" \
+	    "call inferior func with struct - returns float"
+	gdb_test "p t_structs_d(struct_val1)" "= 9.87.*" \
+	    "call inferior func with struct - returns double"
+    }
+
     gdb_test "p t_structs_a(struct_val1)" "= (.unsigned char .. )?\"foo\"" \
     	"call inferior func with struct - returns char *"
 }

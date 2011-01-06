@@ -1,6 +1,6 @@
 /* MI Interpreter Definitions and Commands for GDB, the GNU debugger.
 
-   Copyright (C) 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010
+   Copyright (C) 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010, 2011
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -196,10 +196,12 @@ mi_cmd_interpreter_exec (char *command, char **argv, int argc)
 
   interp_to_use = interp_lookup (argv[0]);
   if (interp_to_use == NULL)
-    error ("mi_cmd_interpreter_exec: could not find interpreter \"%s\"", argv[0]);
+    error ("mi_cmd_interpreter_exec: could not find interpreter \"%s\"",
+	   argv[0]);
 
   if (!interp_exec_p (interp_to_use))
-    error ("mi_cmd_interpreter_exec: interpreter \"%s\" does not support command execution",
+    error ("mi_cmd_interpreter_exec: interpreter \"%s\" "
+	   "does not support command execution",
 	      argv[0]);
 
   /* Insert the MI out hooks, making sure to also call the interpreter's hooks
@@ -231,11 +233,12 @@ mi_cmd_interpreter_exec (char *command, char **argv, int argc)
 }
 
 /*
- * mi_insert_notify_hooks - This inserts a number of hooks that are meant to produce
- * async-notify ("=") MI messages while running commands in another interpreter
- * using mi_interpreter_exec.  The canonical use for this is to allow access to
- * the gdb CLI interpreter from within the MI, while still producing MI style output
- * when actions in the CLI command change gdb's state.
+ * mi_insert_notify_hooks - This inserts a number of hooks that are
+ * meant to produce async-notify ("=") MI messages while running
+ * commands in another interpreter using mi_interpreter_exec.  The
+ * canonical use for this is to allow access to the gdb CLI
+ * interpreter from within the MI, while still producing MI style
+ * output when actions in the CLI command change gdb's state.
 */
 
 static void
@@ -434,7 +437,7 @@ mi_about_to_proceed (void)
     {
       struct thread_info *tp = inferior_thread ();
 
-      if (tp->in_infcall)
+      if (tp->control.in_infcall)
 	return;
     }
 
@@ -477,7 +480,7 @@ mi_on_resume (ptid_t ptid)
     tp = find_thread_ptid (ptid);
 
   /* Suppress output while calling an inferior function.  */
-  if (tp->in_infcall)
+  if (tp->control.in_infcall)
     return;
 
   /* To cater for older frontends, emit ^running, but do it only once

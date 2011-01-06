@@ -1,6 +1,6 @@
 /* Python interface to inferiors.
 
-   Copyright (C) 2009, 2010 Free Software Foundation, Inc.
+   Copyright (C) 2009, 2010, 2011 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -130,6 +130,9 @@ find_thread_object (ptid_t ptid)
   PyObject *inf_obj;
 
   pid = PIDGET (ptid);
+  if (pid == 0)
+    return NULL;
+
   inf_obj = find_inferior_object (pid);
 
   if (inf_obj)
@@ -293,7 +296,8 @@ gdbpy_inferiors (PyObject *unused, PyObject *unused2)
 
 /* Implementation of gdb.read_memory (address, length).
    Returns a Python buffer object with LENGTH bytes of the inferior's
-   memory at ADDRESS.  Both arguments are integers.  */
+   memory at ADDRESS.  Both arguments are integers.  Returns NULL on error,
+   with a python exception set.  */
 static PyObject *
 infpy_read_memory (PyObject *self, PyObject *args, PyObject *kw)
 {
@@ -361,7 +365,8 @@ infpy_read_memory (PyObject *self, PyObject *args, PyObject *kw)
    Writes the contents of BUFFER (a Python object supporting the read
    buffer protocol) at ADDRESS in the inferior's memory.  Write LENGTH
    bytes from BUFFER, or its entire contents if the argument is not
-   provided.  The function returns nothing.  */
+   provided.  The function returns nothing.  Returns NULL on error, with
+   a python exception set.  */
 static PyObject *
 infpy_write_memory (PyObject *self, PyObject *args, PyObject *kw)
 {
@@ -473,7 +478,8 @@ get_char_buffer (PyObject *self, Py_ssize_t segment, char **ptrptr)
    search from ADDRESS.  PATTERN is the pattern to search for (and
    must be a Python object supporting the buffer protocol).
    Returns a Python Long object holding the address where the pattern
-   was located, or if the pattern was not found, returns None.  */
+   was located, or if the pattern was not found, returns None.  Returns NULL
+   on error, with a python exception set.  */
 static PyObject *
 infpy_search_memory (PyObject *self, PyObject *args, PyObject *kw)
 {
@@ -511,12 +517,7 @@ infpy_search_memory (PyObject *self, PyObject *args, PyObject *kw)
 	}
     }
   else
-    {
-      PyErr_SetString (PyExc_RuntimeError,
-		       _("Cannot get search address/range from Python."));
-
-      return NULL;
-    }
+    return NULL;
 
   if (!PyObject_CheckReadBuffer (pattern))
     {

@@ -1,6 +1,6 @@
 /* This testcase is part of GDB, the GNU debugger.
 
-   Copyright 2010 Free Software Foundation, Inc.
+   Copyright 2010, 2011 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -23,6 +23,9 @@ openlib (const char *filename)
 {
   void *h = dlopen (filename, RTLD_LAZY);
 
+  if (filename == NULL)
+    return 0;
+
   if (h == NULL)
     return 0;
   if (dlclose (h) != 0)
@@ -33,5 +36,8 @@ openlib (const char *filename)
 int
 main (void)
 {
+  /* Dummy call to get the function always compiled in.  */
+  openlib (NULL);
+
   return 0;
 }

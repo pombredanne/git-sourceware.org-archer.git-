@@ -1,6 +1,6 @@
 /* DWARF 2 Expression Evaluator.
 
-   Copyright (C) 2001, 2002, 2003, 2005, 2007, 2008, 2009, 2010
+   Copyright (C) 2001, 2002, 2003, 2005, 2007, 2008, 2009, 2010, 2011
    Free Software Foundation, Inc.
 
    Contributed by Daniel Berlin (dan@dberlin.org)
@@ -129,7 +129,8 @@ ULONGEST
 dwarf_expr_fetch (struct dwarf_expr_context *ctx, int n)
 {
   if (ctx->stack_len <= n)
-     error (_("Asked for position %d of stack, stack only has %d elements on it."),
+     error (_("Asked for position %d of stack, "
+	      "stack only has %d elements on it."),
 	    n, ctx->stack_len);
   return ctx->stack[ctx->stack_len - (1 + n)].value;
 
@@ -183,7 +184,8 @@ int
 dwarf_expr_fetch_in_stack_memory (struct dwarf_expr_context *ctx, int n)
 {
   if (ctx->stack_len <= n)
-     error (_("Asked for position %d of stack, stack only has %d elements on it."),
+     error (_("Asked for position %d of stack, "
+	      "stack only has %d elements on it."),
 	    n, ctx->stack_len);
   return ctx->stack[ctx->stack_len - (1 + n)].in_stack_memory;
 
@@ -232,6 +234,11 @@ add_piece (struct dwarf_expr_context *ctx, ULONGEST size, ULONGEST offset)
     {
       p->v.mem.addr = dwarf_expr_fetch_address (ctx, 0);
       p->v.mem.in_stack_memory = dwarf_expr_fetch_in_stack_memory (ctx, 0);
+    }
+  else if (p->location == DWARF_VALUE_IMPLICIT_POINTER)
+    {
+      p->v.ptr.die = ctx->len;
+      p->v.ptr.offset = (LONGEST) dwarf_expr_fetch (ctx, 0);
     }
   else
     {
@@ -527,6 +534,26 @@ execute_stack_op (struct dwarf_expr_context *ctx,
 	  dwarf_expr_require_composition (op_ptr, op_end, "DW_OP_stack_value");
 	  goto no_push;
 
+	case DW_OP_GNU_implicit_pointer:
+	  {
+	    ULONGEST die;
+	    LONGEST len;
+
+	    /* The referred-to DIE.  */
+	    ctx->len = extract_unsigned_integer (op_ptr, ctx->addr_size,
+						 byte_order);
+	    op_ptr += ctx->addr_size;
+
+	    /* The byte offset into the data.  */
+	    op_ptr = read_sleb128 (op_ptr, op_end, &len);
+	    result = (ULONGEST) len;
+
+	    ctx->location = DWARF_VALUE_IMPLICIT_POINTER;
+	    dwarf_expr_require_composition (op_ptr, op_end,
+					    "DW_OP_GNU_implicit_pointer");
+	  }
+	  break;
+
 	case DW_OP_breg0:
 	case DW_OP_breg1:
 	case DW_OP_breg2:
@@ -595,7 +622,8 @@ execute_stack_op (struct dwarf_expr_context *ctx,
 	    else if (ctx->location == DWARF_VALUE_REGISTER)
 	      result = (ctx->read_reg) (ctx->baton, dwarf_expr_fetch (ctx, 0));
 	    else
-	      error (_("Not implemented: computing frame base using explicit value operator"));
+	      error (_("Not implemented: computing frame "
+		       "base using explicit value operator"));
 	    result = result + offset;
 	    in_stack_memory = 1;
 	    ctx->stack_len = before_stack_len;
@@ -623,7 +651,8 @@ execute_stack_op (struct dwarf_expr_context *ctx,
 	    struct dwarf_stack_value t1, t2;
 
 	    if (ctx->stack_len < 2)
-	       error (_("Not enough elements for DW_OP_swap. Need 2, have %d."),
+	       error (_("Not enough elements for "
+			"DW_OP_swap. Need 2, have %d."),
 		      ctx->stack_len);
 	    t1 = ctx->stack[ctx->stack_len - 1];
 	    t2 = ctx->stack[ctx->stack_len - 2];
@@ -883,6 +912,12 @@ execute_stack_op (struct dwarf_expr_context *ctx,
       dwarf_expr_push (ctx, result, in_stack_memory);
     no_push:;
     }
+
+  /* To simplify our main caller, if the result is an implicit
+     pointer, then make a pieced value.  This is ok because we can't
+     have implicit pointers in contexts where pieces are invalid.  */
+  if (ctx->location == DWARF_VALUE_IMPLICIT_POINTER)
+    add_piece (ctx, 8 * ctx->addr_size, 0);
 
   ctx->recursion_depth--;
   gdb_assert (ctx->recursion_depth >= 0);

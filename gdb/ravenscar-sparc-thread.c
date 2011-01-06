@@ -1,6 +1,6 @@
 /* Ravenscar SPARC target support.
 
-   Copyright 2004, 2010 Free Software Foundation, Inc.
+   Copyright 2004, 2010, 2011 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -69,7 +69,7 @@ supply_register_at_address (struct regcache *regcache, int regnum,
 
   buf = (char *) alloca (buf_size);
   read_memory (register_addr, buf, buf_size);
-  regcache_raw_supply (regcache, regnum, &buf);
+  regcache_raw_supply (regcache, regnum, buf);
 }
 
 /* Return true if, for a non-running thread, REGNUM has been saved on the

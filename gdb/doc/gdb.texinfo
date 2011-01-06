@@ -1,7 +1,7 @@
 \input texinfo      @c -*-texinfo-*-
-@c Copyright (C) 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1998,
-@c 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
-@c Free Software Foundation, Inc.
+@c Copyright (C) 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
+@c 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009,
+@c 2010, 2011 Free Software Foundation, Inc.
 @c
 @c %**start of header
 @c makeinfo ignores cmds prev to setfilename, so its arg cannot make use
@@ -163,8 +163,14 @@ software in general.  We will miss him.
 
 * GDB Bugs::                    Reporting bugs in @value{GDBN}
 
+@ifset SYSTEM_READLINE
+* Command Line Editing: (rluserman).         Command Line Editing
+* Using History Interactively: (history).    Using History Interactively
+@end ifset
+@ifclear SYSTEM_READLINE
 * Command Line Editing::        Command Line Editing
 * Using History Interactively:: Using History Interactively
+@end ifclear
 * Formatting Documentation::    How to format and print @value{GDBN} documentation
 * Installing GDB::              Installing GDB
 * Maintenance Commands::        Maintenance Commands
@@ -220,6 +226,9 @@ Support for D is partial.  For information on D, see
 @cindex Modula-2
 Support for Modula-2 is partial.  For information on Modula-2, see
 @ref{Modula-2,,Modula-2}.
+
+Support for OpenCL C is partial.  For information on OpenCL C, see
+@ref{OpenCL C,,OpenCL C}.
 
 @cindex Pascal
 Debugging Pascal programs which use sets, subranges, file variables, or
@@ -1102,6 +1111,12 @@ used if possible.
 Run @value{GDBN} using @var{directory} as its working directory,
 instead of the current directory.
 
+@item -data-directory @var{directory}
+@cindex @code{--data-directory}
+Run @value{GDBN} using @var{directory} as its data directory.
+The data directory is where @value{GDBN} searches for its
+auxiliary files.  @xref{Data Files}.
+
 @item -fullname
 @itemx -f
 @cindex @code{--fullname}
@@ -1256,6 +1271,25 @@ different from your home directory.  Thus, you can have more than one
 init file, one generic in your home directory, and another, specific
 to the program you are debugging, in the directory where you invoke
 @value{GDBN}.
+
+@item
+If the command line specified a program to debug, or a process to
+attach to, or a core file, @value{GDBN} loads any auto-loaded
+scripts provided for the program or for its loaded shared libraries.
+@xref{Auto-loading}.
+
+If you wish to disable the auto-loading during startup,
+you must do something like the following:
+
+@smallexample
+$ gdb -ex "set auto-load-scripts off" -ex "file myprogram"
+@end smallexample
+
+The following does not work because the auto-loading is turned off too late:
+
+@smallexample
+$ gdb -ex "set auto-load-scripts off" myprogram
+@end smallexample
 
 @item
 Reads command files specified by the @samp{-x} option.  @xref{Command
@@ -6630,6 +6664,11 @@ Reset the source path to its default value (@samp{$cdir:$cwd} on Unix systems). 
 @c RET-repeat for @code{directory} is explicitly disabled, but since
 @c repeating it would be a no-op we do not say that.  (thanks to RMS)
 
+@item set directories @var{path-list}
+@kindex set directories
+Set the source path to @var{path-list}.
+@samp{$cdir:$cwd} are added if missing.
+
 @item show directories
 @kindex show directories
 Print the source path: show which directories it contains.
@@ -8137,8 +8176,60 @@ Show whether C@t{++} virtual function tables are pretty printed, or not.
 Python code.  It greatly simplifies the display of complex objects.  This
 mechanism works for both MI and the CLI.
 
-For example, here is how a C@t{++} @code{std::string} looks without a
-pretty-printer:
+@menu
+* Pretty-Printer Introduction::  Introduction to pretty-printers
+* Pretty-Printer Example::       An example pretty-printer
+* Pretty-Printer Commands::      Pretty-printer commands
+@end menu
+
+@node Pretty-Printer Introduction
+@subsection Pretty-Printer Introduction
+
+When @value{GDBN} prints a value, it first sees if there is a pretty-printer
+registered for the value.  If there is then @value{GDBN} invokes the
+pretty-printer to print the value.  Otherwise the value is printed normally.
+
+Pretty-printers are normally named.  This makes them easy to manage.
+The @samp{info pretty-printer} command will list all the installed
+pretty-printers with their names.
+If a pretty-printer can handle multiple data types, then its
+@dfn{subprinters} are the printers for the individual data types.
+Each such subprinter has its own name.
+The format of the name is @var{printer-name};@var{subprinter-name}.
+
+Pretty-printers are installed by @dfn{registering} them with @value{GDBN}.
+Typically they are automatically loaded and registered when the corresponding
+debug information is loaded, thus making them available without having to
+do anything special.
+
+There are three places where a pretty-printer can be registered.
+
+@itemize @bullet
+@item
+Pretty-printers registered globally are available when debugging
+all inferiors.
+
+@item
+Pretty-printers registered with a program space are available only
+when debugging that program.
+@xref{Progspaces In Python}, for more details on program spaces in Python.
+
+@item
+Pretty-printers registered with an objfile are loaded and unloaded
+with the corresponding objfile (e.g., shared library).
+@xref{Objfiles In Python}, for more details on objfiles in Python.
+@end itemize
+
+@xref{Selecting Pretty-Printers}, for further information on how 
+pretty-printers are selected,
+
+@xref{Writing a Pretty-Printer}, for implementing pretty printers
+for new types.
+
+@node Pretty-Printer Example
+@subsection Pretty-Printer Example
+
+Here is how a C@t{++} @code{std::string} looks without a pretty-printer:
 
 @smallexample
 (@value{GDBP}) print s
@@ -8163,8 +8254,91 @@ With a pretty-printer for @code{std::string} only the contents are printed:
 $2 = "abcd"
 @end smallexample
 
-For implementing pretty printers for new types you should read the Python API
-details (@pxref{Pretty Printing API}).
+@node Pretty-Printer Commands
+@subsection Pretty-Printer Commands
+@cindex pretty-printer commands
+
+@table @code
+@kindex info pretty-printer
+@item info pretty-printer [@var{object-regexp} [@var{name-regexp}]]
+Print the list of installed pretty-printers.
+This includes disabled pretty-printers, which are marked as such.
+
+@var{object-regexp} is a regular expression matching the objects
+whose pretty-printers to list.
+Objects can be @code{global}, the program space's file
+(@pxref{Progspaces In Python}),
+and the object files within that program space (@pxref{Objfiles In Python}).
+@xref{Selecting Pretty-Printers}, for details on how @value{GDBN}
+looks up a printer from these three objects.
+
+@var{name-regexp} is a regular expression matching the name of the printers
+to list.
+
+@kindex disable pretty-printer
+@item disable pretty-printer [@var{object-regexp} [@var{name-regexp}]]
+Disable pretty-printers matching @var{object-regexp} and @var{name-regexp}.
+A disabled pretty-printer is not forgotten, it may be enabled again later.
+
+@kindex enable pretty-printer
+@item enable pretty-printer [@var{object-regexp} [@var{name-regexp}]]
+Enable pretty-printers matching @var{object-regexp} and @var{name-regexp}.
+@end table
+
+Example:
+
+Suppose we have three pretty-printers installed: one from library1.so
+named @code{foo} that prints objects of type @code{foo}, and
+another from library2.so named @code{bar} that prints two types of objects,
+@code{bar1} and @code{bar2}.
+
+@smallexample
+(gdb) info pretty-printer
+library1.so:
+  foo
+library2.so:
+  bar
+    bar1
+    bar2
+(gdb) info pretty-printer library2
+library2.so:
+  bar
+    bar1
+    bar2
+(gdb) disable pretty-printer library1
+1 printer disabled
+2 of 3 printers enabled
+(gdb) info pretty-printer
+library1.so:
+  foo [disabled]
+library2.so:
+  bar
+    bar1
+    bar2
+(gdb) disable pretty-printer library2 bar:bar1
+1 printer disabled
+1 of 3 printers enabled
+(gdb) info pretty-printer library2
+library1.so:
+  foo [disabled]
+library2.so:
+  bar
+    bar1 [disabled]
+    bar2
+(gdb) disable pretty-printer library2 bar
+1 printer disabled
+0 of 3 printers enabled
+(gdb) info pretty-printer library2
+library1.so:
+  foo [disabled]
+library2.so:
+  bar [disabled]
+    bar1 [disabled]
+    bar2
+@end smallexample
+
+Note that for @code{bar} the entire printer can be disabled,
+as can each individual subprinter.
 
 @node Value History
 @section Value History
@@ -11486,7 +11660,7 @@ being set automatically by @value{GDBN}.
 @node Supported Languages
 @section Supported Languages
 
-@value{GDBN} supports C, C@t{++}, D, Objective-C, Fortran, Java, Pascal,
+@value{GDBN} supports C, C@t{++}, D, Objective-C, Fortran, Java, OpenCL C, Pascal,
 assembly, Modula-2, and Ada.
 @c This is false ...
 Some @value{GDBN} features may be used in expressions regardless of the
@@ -11507,6 +11681,7 @@ language reference or tutorial.
 * C::                           C and C@t{++}
 * D::                           D
 * Objective-C::                 Objective-C
+* OpenCL C::                    OpenCL C
 * Fortran::                     Fortran
 * Pascal::                      Pascal
 * Modula-2::                    Modula-2
@@ -12152,6 +12327,42 @@ and print the result.  Also, an additional command has been added,
 the description of an object.  However, this command may only work
 with certain Objective-C libraries that have a particular hook
 function, @code{_NSPrintForDebugger}, defined.
+
+@node OpenCL C
+@subsection OpenCL C
+
+@cindex OpenCL C
+This section provides information about @value{GDBN}s OpenCL C support.
+
+@menu
+* OpenCL C Datatypes::
+* OpenCL C Expressions::
+* OpenCL C Operators::
+@end menu
+
+@node OpenCL C Datatypes
+@subsubsection OpenCL C Datatypes
+
+@cindex OpenCL C Datatypes
+@value{GDBN} supports the builtin scalar and vector datatypes specified
+by OpenCL 1.1.  In addition the half- and double-precision floating point
+data types of the @code{cl_khr_fp16} and @code{cl_khr_fp64} OpenCL
+extensions are also known to @value{GDBN}.
+
+@node OpenCL C Expressions
+@subsubsection OpenCL C Expressions
+
+@cindex OpenCL C Expressions
+@value{GDBN} supports accesses to vector components including the access as
+lvalue where possible.  Since OpenCL C is based on C99 most C expressions
+supported by @value{GDBN} can be used as well.
+
+@node OpenCL C Operators
+@subsubsection OpenCL C Operators
+
+@cindex OpenCL C Operators
+@value{GDBN} supports the operators specified by OpenCL 1.1 for scalar and
+vector data types.
 
 @node Fortran
 @subsection Fortran
@@ -13464,13 +13675,6 @@ some of which will be fixed with planned future releases of the debugger
 and the GNU Ada compiler.
 
 @itemize @bullet
-@item
-Currently, the debugger 
-has insufficient information to determine whether certain pointers represent
-pointers to objects or the objects themselves.
-Thus, the user may have to tack an extra @code{.all} after an expression
-to get it printed properly.
-
 @item 
 Static constants that the compiler chooses not to materialize as objects in 
 storage are invisible to the debugger.
@@ -15421,6 +15625,10 @@ You can set the default data directory by using the configure-time
 @samp{--exec-prefix}), then the default data directory will be updated
 automatically if the installed @value{GDBN} is moved to a new
 location.
+
+The data directory may also be specified with the
+@code{--data-directory} command line option.
+@xref{Mode Options}.
 
 @node Targets
 @chapter Specifying a Debugging Target
@@ -19244,7 +19452,13 @@ Disable command line editing.
 Show whether command line editing is enabled.
 @end table
 
-@xref{Command Line Editing}, for more details about the Readline
+@ifset SYSTEM_READLINE
+@xref{Command Line Editing, , , rluserman, GNU Readline Library},
+@end ifset
+@ifclear SYSTEM_READLINE
+@xref{Command Line Editing},
+@end ifclear
+for more details about the Readline
 interface.  Users unfamiliar with @sc{gnu} Emacs or @code{vi} are
 encouraged to read that chapter.
 
@@ -19258,8 +19472,14 @@ happened.  Use these commands to manage the @value{GDBN} command
 history facility.
 
 @value{GDBN} uses the @sc{gnu} History library, a part of the Readline
-package, to provide the history facility.  @xref{Using History
-Interactively}, for the detailed description of the History library.
+package, to provide the history facility.
+@ifset SYSTEM_READLINE
+@xref{Using History Interactively, , , history, GNU History Library},
+@end ifset
+@ifclear SYSTEM_READLINE
+@xref{Using History Interactively},
+@end ifclear
+for the detailed description of the History library.
 
 To issue a command to @value{GDBN} without affecting certain aspects of
 the state which is seen by users, prefix it with @samp{server }
@@ -19311,7 +19531,13 @@ This defaults to the value of the environment variable
 @end table
 
 History expansion assigns special meaning to the character @kbd{!}.
-@xref{Event Designators}, for more details.
+@ifset SYSTEM_READLINE
+@xref{Event Designators, , , history, GNU History Library},
+@end ifset
+@ifclear SYSTEM_READLINE
+@xref{Event Designators},
+@end ifclear
+for more details.
 
 @cindex history expansion, turn on/off
 Since @kbd{!} is also the logical not operator in C, history expansion
@@ -20403,7 +20629,8 @@ Python programming language}.  This feature is available only if
 @cindex python directory
 Python scripts used by @value{GDBN} should be installed in
 @file{@var{data-directory}/python}, where @var{data-directory} is
-the data directory as determined at @value{GDBN} startup (@pxref{Data Files}).  This directory, known as the @dfn{python directory},
+the data directory as determined at @value{GDBN} startup (@pxref{Data Files}).
+This directory, known as the @dfn{python directory},
 is automatically added to the Python Search Path in order to allow
 the Python interpreter to locate all scripts installed at this location.
 
@@ -20411,6 +20638,7 @@ the Python interpreter to locate all scripts installed at this location.
 * Python Commands::             Accessing Python from @value{GDBN}.
 * Python API::                  Accessing @value{GDBN} from Python.
 * Auto-loading::                Automatically loading Python code.
+* Python modules::              Python modules provided by @value{GDBN}.
 @end menu
 
 @node Python Commands
@@ -20506,7 +20734,7 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 * Types In Python::             Python representation of types.
 * Pretty Printing API::         Pretty-printing values.
 * Selecting Pretty-Printers::   How GDB chooses a pretty-printer.
-* Disabling Pretty-Printers::   Disabling broken printers.
+* Writing a Pretty-Printer::    Writing a Pretty-Printer.
 * Inferiors In Python::         Python representation of inferiors (processes)
 * Threads In Python::           Accessing inferior threads from Python.
 * Commands In Python::          Implementing new commands in Python.
@@ -20577,8 +20805,9 @@ spaces if the parameter has a multi-part name.  For example,
 @samp{print object} is a valid parameter name.
 
 If the named parameter does not exist, this function throws a
-@code{RuntimeError}.  Otherwise, the parameter's value is converted to
-a Python value of the appropriate type, and returned.
+@code{gdb.error} (@pxref{Exception Handling}).  Otherwise, the
+parameter's value is converted to a Python value of the appropriate
+type, and returned.
 @end defun
 
 @findex gdb.history
@@ -20590,7 +20819,7 @@ If @var{number} is negative, then @value{GDBN} will take its absolute value
 and count backward from the last element (i.e., the most recent element) to
 find the value to return.  If @var{number} is zero, then @value{GDBN} will
 return the most recent element.  If the element specified by @var{number}
-doesn't exist in the value history, a @code{RuntimeError} exception will be
+doesn't exist in the value history, a @code{gdb.error} exception will be
 raised.
 
 If no exception is raised, the return value is always an instance of
@@ -20718,15 +20947,31 @@ Traceback (most recent call last):
 NameError: name 'foo' is not defined
 @end smallexample
 
-@value{GDBN} errors that happen in @value{GDBN} commands invoked by Python
-code are converted to Python @code{RuntimeError} exceptions.  User
-interrupt (via @kbd{C-c} or by typing @kbd{q} at a pagination
-prompt) is translated to a Python @code{KeyboardInterrupt}
-exception.  If you catch these exceptions in your Python code, your
-exception handler will see @code{RuntimeError} or
-@code{KeyboardInterrupt} as the exception type, the @value{GDBN} error
-message as its value, and the Python call stack backtrace at the
-Python statement closest to where the @value{GDBN} error occured as the
+@value{GDBN} errors that happen in @value{GDBN} commands invoked by
+Python code are converted to Python exceptions.  The type of the
+Python exception depends on the error.
+
+@ftable @code
+@item gdb.error
+This is the base class for most exceptions generated by @value{GDBN}.
+It is derived from @code{RuntimeError}, for compatibility with earlier
+versions of @value{GDBN}.
+
+If an error occurring in @value{GDBN} does not fit into some more
+specific category, then the generated exception will have this type.
+
+@item gdb.MemoryError
+This is a subclass of @code{gdb.error} which is thrown when an
+operation tried to access invalid memory in the inferior.
+
+@item KeyboardInterrupt
+User interrupt (via @kbd{C-c} or by typing @kbd{q} at a pagination
+prompt) is translated to a Python @code{KeyboardInterrupt} exception.
+@end ftable
+
+In all cases, your exception handler will see the @value{GDBN} error
+message as its value and the Python call stack backtrace at the Python
+statement closest to where the @value{GDBN} error occured as the
 traceback.
 
 @findex gdb.GdbError
@@ -20820,7 +21065,7 @@ this value, thus it is not available for fetching from the inferior.
 
 @defivar Value type
 The type of this @code{gdb.Value}.  The value of this attribute is a
-@code{gdb.Type} object.
+@code{gdb.Type} object (@pxref{Types In Python}).
 @end defivar
 
 @defivar Value dynamic_type
@@ -21091,7 +21336,7 @@ variant of this type.  That is, the result is neither @code{const} nor
 Return a Python @code{Tuple} object that contains two elements: the
 low bound of the argument type and the high bound of that type.  If
 the type does not have a range, @value{GDBN} will raise a
-@code{RuntimeError} exception.
+@code{gdb.error} exception (@pxref{Exception Handling}).
 @end defmethod
 
 @defmethod Type reference
@@ -21276,6 +21521,9 @@ A function internal to @value{GDBN}.  This is the type used to represent
 convenience functions.
 @end table
 
+Further support for types is provided in the @code{gdb.types}
+Python module (@pxref{gdb.types}).
+
 @node Pretty Printing API
 @subsubsection Pretty Printing API
 
@@ -21375,12 +21623,13 @@ printer exists, then this returns @code{None}.
 
 The Python list @code{gdb.pretty_printers} contains an array of
 functions or callable objects that have been registered via addition
-as a pretty-printer.
+as a pretty-printer.  Printers in this list are called @code{global}
+printers, they're available when debugging all inferiors.
 Each @code{gdb.Progspace} contains a @code{pretty_printers} attribute.
 Each @code{gdb.Objfile} also contains a @code{pretty_printers}
 attribute.
 
-A function on one of these lists is passed a single @code{gdb.Value}
+Each function on these lists is passed a single @code{gdb.Value}
 argument and should return a pretty-printer object conforming to the
 interface definition above (@pxref{Pretty Printing API}).  If a function
 cannot create a pretty-printer for the value, it should return
@@ -21388,9 +21637,8 @@ cannot create a pretty-printer for the value, it should return
 
 @value{GDBN} first checks the @code{pretty_printers} attribute of each
 @code{gdb.Objfile} in the current program space and iteratively calls
-each enabled function (@pxref{Disabling Pretty-Printers})
-in the list for that @code{gdb.Objfile} until it receives
-a pretty-printer object.
+each enabled lookup routine in the list for that @code{gdb.Objfile}
+until it receives a pretty-printer object.
 If no pretty-printer is found in the objfile lists, @value{GDBN} then
 searches the pretty-printer list of the current program space,
 calling each enabled function until an object is returned.
@@ -21403,20 +21651,43 @@ given list, functions are always invoked from the head of the list,
 and iterated over sequentially until the end of the list, or a printer
 object is returned.
 
+For various reasons a pretty-printer may not work.
+For example, the underlying data structure may have changed and
+the pretty-printer is out of date.
+
+The consequences of a broken pretty-printer are severe enough that
+@value{GDBN} provides support for enabling and disabling individual
+printers.  For example, if @code{print frame-arguments} is on,
+a backtrace can become highly illegible if any argument is printed
+with a broken printer.
+
+Pretty-printers are enabled and disabled by attaching an @code{enabled}
+attribute to the registered function or callable object.  If this attribute
+is present and its value is @code{False}, the printer is disabled, otherwise
+the printer is enabled.
+
+@node Writing a Pretty-Printer
+@subsubsection Writing a Pretty-Printer
+@cindex writing a pretty-printer
+
+A pretty-printer consists of two parts: a lookup function to detect
+if the type is supported, and the printer itself.
+
 Here is an example showing how a @code{std::string} printer might be
-written:
+written.  @xref{Pretty Printing API}, for details on the API this class
+must provide.
 
 @smallexample
-class StdStringPrinter:
+class StdStringPrinter(object):
     "Print a std::string"
 
-    def __init__ (self, val):
+    def __init__(self, val):
         self.val = val
 
-    def to_string (self):
+    def to_string(self):
         return self.val['_M_dataplus']['_M_p']
 
-    def display_hint (self):
+    def display_hint(self):
         return 'string'
 @end smallexample
 
@@ -21424,15 +21695,13 @@ And here is an example showing how a lookup function for the printer
 example above might be written.
 
 @smallexample
-def str_lookup_function (val):
-
+def str_lookup_function(val):
     lookup_tag = val.type.tag
-    regex = re.compile ("^std::basic_string<char,.*>$")
     if lookup_tag == None:
         return None
-    if regex.match (lookup_tag):
-        return StdStringPrinter (val)
-    
+    regex = re.compile("^std::basic_string<char,.*>$")
+    if regex.match(lookup_tag):
+        return StdStringPrinter(val)
     return None
 @end smallexample
 
@@ -21468,8 +21737,8 @@ To continue the @code{std::string} example (@pxref{Pretty Printing API}),
 this code might appear in @code{gdb.libstdcxx.v6}:
 
 @smallexample
-def register_printers (objfile):
-    objfile.pretty_printers.add (str_lookup_function)
+def register_printers(objfile):
+    objfile.pretty_printers.add(str_lookup_function)
 @end smallexample
 
 @noindent
@@ -21477,27 +21746,92 @@ And then the corresponding contents of the auto-load file would be:
 
 @smallexample
 import gdb.libstdcxx.v6
-gdb.libstdcxx.v6.register_printers (gdb.current_objfile ())
+gdb.libstdcxx.v6.register_printers(gdb.current_objfile())
 @end smallexample
 
-@node Disabling Pretty-Printers
-@subsubsection Disabling Pretty-Printers
-@cindex disabling pretty-printers
+The previous example illustrates a basic pretty-printer.
+There are a few things that can be improved on.
+The printer doesn't have a name, making it hard to identify in a
+list of installed printers.  The lookup function has a name, but
+lookup functions can have arbitrary, even identical, names.
 
-For various reasons a pretty-printer may not work.
-For example, the underlying data structure may have changed and
-the pretty-printer is out of date.
+Second, the printer only handles one type, whereas a library typically has
+several types.  One could install a lookup function for each desired type
+in the library, but one could also have a single lookup function recognize
+several types.  The latter is the conventional way this is handled.
+If a pretty-printer can handle multiple data types, then its
+@dfn{subprinters} are the printers for the individual data types.
 
-The consequences of a broken pretty-printer are severe enough that
-@value{GDBN} provides support for enabling and disabling individual
-printers.  For example, if @code{print frame-arguments} is on,
-a backtrace can become highly illegible if any argument is printed
-with a broken printer.
+The @code{gdb.printing} module provides a formal way of solving these
+problems (@pxref{gdb.printing}).
+Here is another example that handles multiple types.
 
-Pretty-printers are enabled and disabled by attaching an @code{enabled}
-attribute to the registered function or callable object.  If this attribute
-is present and its value is @code{False}, the printer is disabled, otherwise
-the printer is enabled.
+These are the types we are going to pretty-print:
+
+@smallexample
+struct foo @{ int a, b; @};
+struct bar @{ struct foo x, y; @};
+@end smallexample
+
+Here are the printers:
+
+@smallexample
+class fooPrinter:
+    """Print a foo object."""
+
+    def __init__(self, val):
+        self.val = val
+
+    def to_string(self):
+        return ("a=<" + str(self.val["a"]) +
+                "> b=<" + str(self.val["b"]) + ">")
+
+class barPrinter:
+    """Print a bar object."""
+
+    def __init__(self, val):
+        self.val = val
+
+    def to_string(self):
+        return ("x=<" + str(self.val["x"]) +
+                "> y=<" + str(self.val["y"]) + ">")
+@end smallexample
+
+This example doesn't need a lookup function, that is handled by the
+@code{gdb.printing} module.  Instead a function is provided to build up
+the object that handles the lookup.
+
+@smallexample
+import gdb.printing
+
+def build_pretty_printer():
+    pp = gdb.printing.RegexpCollectionPrettyPrinter(
+        "my_library")
+    pp.add_printer('foo', '^foo$', fooPrinter)
+    pp.add_printer('bar', '^bar$', barPrinter)
+    return pp
+@end smallexample
+
+And here is the autoload support:
+
+@smallexample
+import gdb.printing
+import my_library
+gdb.printing.register_pretty_printer(
+    gdb.current_objfile(),
+    my_library.build_pretty_printer())
+@end smallexample
+
+Finally, when this printer is loaded into @value{GDBN}, here is the
+corresponding output of @samp{info pretty-printer}:
+
+@smallexample
+(gdb) info pretty-printer
+my_library.so:
+  my_library
+    foo
+    bar
+@end smallexample
 
 @node Inferiors In Python
 @subsubsection Inferiors In Python
@@ -22193,8 +22527,8 @@ When the debugged program stops, @value{GDBN} is able to analyze its call
 stack (@pxref{Frames,,Stack frames}).  The @code{gdb.Frame} class
 represents a frame in the stack.  A @code{gdb.Frame} object is only valid
 while its corresponding frame exists in the inferior's stack.  If you try
-to use an invalid frame object, @value{GDBN} will throw a @code{RuntimeError}
-exception.
+to use an invalid frame object, @value{GDBN} will throw a @code{gdb.error}
+exception (@pxref{Exception Handling}).
 
 Two @code{gdb.Frame} objects can be compared for equality with the @code{==}
 operator, like:
@@ -22583,7 +22917,7 @@ Return the symbol table's source absolute file name.
 Python code can manipulate breakpoints via the @code{gdb.Breakpoint}
 class.
 
-@defmethod Breakpoint __init__ spec @r{[}type@r{]} @r{[}wp_class@r{]}
+@defmethod Breakpoint __init__ spec @r{[}type@r{]} @r{[}wp_class@r{]} @r{[}internal@r{]}
 Create a new breakpoint.  @var{spec} is a string naming the
 location of the breakpoint, or an expression that defines a
 watchpoint.  The contents can be any location recognized by the
@@ -22591,10 +22925,14 @@ watchpoint.  The contents can be any location recognized by the
 command.  The optional @var{type} denotes the breakpoint to create
 from the types defined later in this chapter.  This argument can be
 either: @code{BP_BREAKPOINT} or @code{BP_WATCHPOINT}.  @var{type}
-defaults to @code{BP_BREAKPOINT}.  The optional @var{wp_class}
+defaults to @code{BP_BREAKPOINT}.  The optional @var{internal} argument
+allows the breakpoint to become invisible to the user.  The breakpoint
+will neither be reported when created, nor will it be listed in the
+output from @code{info breakpoints} (but will be listed with the
+@code{maint info breakpoints} command).  The optional @var{wp_class}
 argument defines the class of watchpoint to create, if @var{type} is
-defined as @code{BP_WATCHPOINT}.  If a watchpoint class is not
-provided, it is assumed to be a @var{WP_WRITE} class.
+@code{BP_WATCHPOINT}.  If a watchpoint class is not provided, it is
+assumed to be a @var{WP_WRITE} class.
 @end defmethod
 
 The available watchpoint types represented by constants are defined in the
@@ -22624,6 +22962,12 @@ if the user deletes the breakpoint.  In this case, the object still
 exists, but the underlying breakpoint does not.  In the cases of
 watchpoint scope, the watchpoint remains valid even if execution of the
 inferior leaves the scope of that watchpoint.
+@end defmethod
+
+@defmethod Breakpoint delete
+Permanently deletes the @value{GDBN} breakpoint.  This also
+invalidates the Python @code{Breakpoint} object.  Any further access
+to this object's attributes or methods will raise an error.
 @end defmethod
 
 @defivar Breakpoint enabled
@@ -22667,6 +23011,12 @@ the user to manipulate the breakpoint.  This attribute is not writable.
 This attribute holds the breakpoint's type --- the identifier used to
 determine the actual breakpoint type or use-case.  This attribute is not
 writable.
+@end defivar
+
+@defivar Breakpoint visible
+This attribute tells whether the breakpoint is visible to the user
+when set, or when the @samp{info breakpoints} command is run.  This
+attribute is not writable.
 @end defivar
 
 The available types are represented by constants defined in the @code{gdb}
@@ -22807,13 +23157,13 @@ debugging commands and scripts.
 Auto-loading can be enabled or disabled.
 
 @table @code
-@kindex maint set python auto-load
-@item maint set python auto-load [yes|no]
-Enable or disable the Python auto-loading feature.
+@kindex set auto-load-scripts
+@item set auto-load-scripts [yes|no]
+Enable or disable the auto-loading of Python scripts.
 
-@kindex maint show python auto-load
-@item maint show python auto-load
-Show whether Python auto-loading is enabled or disabled.
+@kindex show auto-load-scripts
+@item show auto-load-scripts
+Show whether auto-loading of Python scripts is enabled or disabled.
 @end table
 
 When reading an auto-loaded file, @value{GDBN} sets the
@@ -22941,6 +23291,82 @@ cumbersome.  It may be easier to specify the scripts in the
 @code{.debug_gdb_scripts} section as relative paths, and add a path to the
 top of the source tree to the source search path.
 @end itemize
+
+@node Python modules
+@subsection Python modules
+@cindex python modules
+
+@value{GDBN} comes with a module to assist writing Python code.
+
+@menu
+* gdb.printing::       Building and registering pretty-printers.
+* gdb.types::          Utilities for working with types.
+@end menu
+
+@node gdb.printing
+@subsubsection gdb.printing
+@cindex gdb.printing
+
+This module provides a collection of utilities for working with
+pretty-printers.
+
+@table @code
+@item PrettyPrinter (@var{name}, @var{subprinters}=None)
+This class specifies the API that makes @samp{info pretty-printer},
+@samp{enable pretty-printer} and @samp{disable pretty-printer} work.
+Pretty-printers should generally inherit from this class.
+
+@item SubPrettyPrinter (@var{name})
+For printers that handle multiple types, this class specifies the
+corresponding API for the subprinters.
+
+@item RegexpCollectionPrettyPrinter (@var{name})
+Utility class for handling multiple printers, all recognized via
+regular expressions.
+@xref{Writing a Pretty-Printer}, for an example.
+
+@item register_pretty_printer (@var{obj}, @var{printer})
+Register @var{printer} with the pretty-printer list of @var{obj}.
+@end table
+
+@node gdb.types
+@subsubsection gdb.types
+@cindex gdb.types
+
+This module provides a collection of utilities for working with
+@code{gdb.Types} objects.
+
+@table @code
+@item get_basic_type (@var{type})
+Return @var{type} with const and volatile qualifiers stripped,
+and with typedefs and C@t{++} references converted to the underlying type.
+
+C@t{++} example:
+
+@smallexample
+typedef const int const_int;
+const_int foo (3);
+const_int& foo_ref (foo);
+int main () @{ return 0; @}
+@end smallexample
+
+Then in gdb:
+
+@smallexample
+(gdb) start
+(gdb) python import gdb.types
+(gdb) python foo_ref = gdb.parse_and_eval("foo_ref")
+(gdb) python print gdb.types.get_basic_type(foo_ref.type)
+int
+@end smallexample
+
+@item has_field (@var{type}, @var{field})
+Return @code{True} if @var{type}, assumed to be a type with fields
+(e.g., a structure or union), has field @var{field}.
+
+@item make_enum_dict (@var{enum_type})
+Return a Python @code{dictionary} type produced from @var{enum_type}.
+@end table
 
 @node Interpreters
 @chapter Command Interpreters
@@ -23139,8 +23565,14 @@ Indicates the current program counter address.
 @cindex TUI key bindings
 
 The TUI installs several key bindings in the readline keymaps
-(@pxref{Command Line Editing}).  The following key bindings
-are installed for both TUI mode and the @value{GDBN} standard mode.
+@ifset SYSTEM_READLINE
+(@pxref{Command Line Editing, , , rluserman, GNU Readline Library}).
+@end ifset
+@ifclear SYSTEM_READLINE
+(@pxref{Command Line Editing}).
+@end ifclear
+The following key bindings are installed for both TUI mode and the
+@value{GDBN} standard mode.
 
 @table @kbd
 @kindex C-x C-a
@@ -30116,8 +30548,10 @@ things without first using the debugger to find the facts.
 @c     inc-hist.texinfo
 @c Use -I with makeinfo to point to the appropriate directory,
 @c environment var TEXINPUTS with TeX.
+@ifclear SYSTEM_READLINE
 @include rluser.texi
 @include inc-hist.texinfo
+@end ifclear
 
 
 @node Formatting Documentation
@@ -31405,6 +31839,21 @@ each register and their position within the @samp{g} packet are
 determined by the @value{GDBN} internal gdbarch functions
 @code{DEPRECATED_REGISTER_RAW_SIZE} and @code{gdbarch_register_name}.  The
 specification of several standard @samp{g} packets is specified below.
+
+When reading registers from a trace frame (@pxref{Analyze Collected
+Data,,Using the Collected Data}), the stub may also return a string of
+literal @samp{x}'s in place of the register data digits, to indicate
+that the corresponding register has not been collected, thus its value
+is unavailable.  For example, for an architecture with 4 registers of
+4 bytes each, the following reply indicates to @value{GDBN} that
+registers 0 and 2 have not been collected, while registers 1 and 3
+have been collected, and both have zero value:
+
+@smallexample
+-> @code{g}
+<- @code{xxxxxxxx00000000xxxxxxxx00000000}
+@end smallexample
+
 @item E @var{NN}
 for an error.
 @end table

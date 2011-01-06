@@ -1,7 +1,7 @@
 /* Support for printing Ada values for GDB, the GNU debugger.
 
    Copyright (C) 1986, 1988, 1989, 1991, 1992, 1993, 1994, 1997, 2001, 2002,
-   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
+   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -603,23 +603,24 @@ ada_val_print_array (struct type *type, const gdb_byte *valaddr,
 {
   enum bfd_endian byte_order = gdbarch_byte_order (get_type_arch (type));
   struct type *elttype = TYPE_TARGET_TYPE (type);
-  unsigned int eltlen;
-  unsigned int len;
   int result = 0;
-
-  if (elttype == NULL)
-    eltlen = 0;
-  else
-    eltlen = TYPE_LENGTH (elttype);
-  if (eltlen == 0)
-    len = 0;
-  else
-    len = TYPE_LENGTH (type) / eltlen;
 
   /* For an array of chars, print with string syntax.  */
   if (ada_is_string_type (type)
       && (options->format == 0 || options->format == 's'))
     {
+      unsigned int eltlen;
+      unsigned int len;
+
+      if (elttype == NULL)
+        eltlen = 0;
+      else
+        eltlen = TYPE_LENGTH (elttype);
+      if (eltlen == 0)
+        len = 0;
+      else
+        len = TYPE_LENGTH (type) / eltlen;
+
       if (options->prettyprint_arrays)
         print_spaces_filtered (2 + 2 * recurse, stream);
 
@@ -683,10 +684,14 @@ ada_val_print_1 (struct type *type, const gdb_byte *valaddr0,
       struct value *val;
 
       val = value_from_contents_and_address (type, valaddr, address);
-      val = ada_coerce_to_simple_array_ptr (val);
+      if (TYPE_CODE (type) == TYPE_CODE_TYPEDEF)  /* array access type.  */
+	val = ada_coerce_to_simple_array_ptr (val);
+      else
+	val = ada_coerce_to_simple_array (val);
       if (val == NULL)
 	{
-	  fprintf_filtered (stream, "(null)");
+	  gdb_assert (TYPE_CODE (type) == TYPE_CODE_TYPEDEF);
+	  fprintf_filtered (stream, "0x0");
 	  retn = 0;
 	}
       else
@@ -946,9 +951,15 @@ ada_value_print (struct value *val0, struct ui_file *stream,
     }
   else if (ada_is_array_descriptor_type (type))
     {
-      fprintf_filtered (stream, "(");
-      type_print (type, "", stream, -1);
-      fprintf_filtered (stream, ") ");
+      /* We do not print the type description unless TYPE is an array
+	 access type (this is encoded by the compiler as a typedef to
+	 a fat pointer - hence the check against TYPE_CODE_TYPEDEF).  */
+      if (TYPE_CODE (type) == TYPE_CODE_TYPEDEF)
+        {
+	  fprintf_filtered (stream, "(");
+	  type_print (type, "", stream, -1);
+	  fprintf_filtered (stream, ") ");
+	}
     }
   else if (ada_is_bogus_array_descriptor (type))
     {

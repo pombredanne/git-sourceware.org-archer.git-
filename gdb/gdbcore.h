@@ -1,7 +1,7 @@
 /* Machine independent variables that describe the core file under GDB.
 
    Copyright (C) 1986, 1987, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1997, 1998, 1999, 2000, 2001, 2004, 2007, 2008, 2009, 2010
+   1997, 1998, 1999, 2000, 2001, 2004, 2007, 2008, 2009, 2010, 2011
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -58,13 +58,15 @@ extern void read_stack (CORE_ADDR memaddr, gdb_byte *myaddr, int len);
 extern LONGEST read_memory_integer (CORE_ADDR memaddr,
 				    int len, enum bfd_endian byte_order);
 extern int safe_read_memory_integer (CORE_ADDR memaddr, int len,
-				     enum bfd_endian byte_order, LONGEST *return_value);
+				     enum bfd_endian byte_order,
+				     LONGEST *return_value);
 
 /* Read an unsigned integer from debugged memory, given address and
    number of bytes.  */
 
 extern ULONGEST read_memory_unsigned_integer (CORE_ADDR memaddr,
-					      int len, enum bfd_endian byte_order);
+					      int len,
+					      enum bfd_endian byte_order);
 
 /* Read a null-terminated string from the debuggee's memory, given address,
  * a buffer into which to place the string, and the maximum available space */

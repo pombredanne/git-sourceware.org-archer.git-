@@ -1,6 +1,6 @@
 /* UI_FILE - a generic STDIO like output stream.
 
-   Copyright (C) 1999, 2000, 2001, 2002, 2007, 2008, 2009, 2010
+   Copyright (C) 1999, 2000, 2001, 2002, 2007, 2008, 2009, 2010, 2011
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -441,7 +441,7 @@ static ui_file_fputs_ftype stdio_file_fputs;
 static ui_file_read_ftype stdio_file_read;
 static ui_file_isatty_ftype stdio_file_isatty;
 static ui_file_delete_ftype stdio_file_delete;
-static struct ui_file *stdio_file_new (FILE * file, int close_p);
+static struct ui_file *stdio_file_new (FILE *file, int close_p);
 static ui_file_flush_ftype stdio_file_flush;
 
 static int stdio_file_magic;

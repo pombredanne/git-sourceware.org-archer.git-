@@ -173,6 +173,7 @@ DESCRIPTION
 .#define bfd_mach_mips5                 5
 .#define bfd_mach_mips_loongson_2e      3001
 .#define bfd_mach_mips_loongson_2f      3002
+.#define bfd_mach_mips_loongson_3a      3003
 .#define bfd_mach_mips_sb1              12310201 {* octal 'SB', 01 *}
 .#define bfd_mach_mips_octeon		6501
 .#define bfd_mach_mips_xlr              887682   {* decimal 'XLR'  *}
@@ -184,6 +185,8 @@ DESCRIPTION
 .#define bfd_mach_i386_i386 1
 .#define bfd_mach_i386_i8086 2
 .#define bfd_mach_i386_i386_intel_syntax 3
+.#define bfd_mach_x64_32 32
+.#define bfd_mach_x64_32_intel_syntax 33
 .#define bfd_mach_x86_64 64
 .#define bfd_mach_x86_64_intel_syntax 65
 .  bfd_arch_l1om,   {* Intel L1OM *}

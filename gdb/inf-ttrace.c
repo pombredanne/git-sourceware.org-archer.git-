@@ -1,6 +1,6 @@
 /* Low-level child interface to ttrace.
 
-   Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010
+   Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -461,8 +461,9 @@ inf_ttrace_follow_fork (struct target_ops *ops, int follow_child)
       detach_breakpoints (pid);
 
       target_terminal_ours ();
-      fprintf_unfiltered (gdb_stdlog, _("\
-Attaching after fork to child process %ld.\n"), (long)fpid);
+      fprintf_unfiltered (gdb_stdlog,
+			  _("Attaching after fork to child process %ld.\n"),
+			  (long)fpid);
     }
   else
     {
@@ -470,8 +471,9 @@ Attaching after fork to child process %ld.\n"), (long)fpid);
       detach_breakpoints (fpid);
 
       target_terminal_ours ();
-      fprintf_unfiltered (gdb_stdlog, _("\
-Detaching after fork from child process %ld.\n"), (long)fpid);
+      fprintf_unfiltered (gdb_stdlog,
+			  _("Detaching after fork from child process %ld.\n"),
+			  (long)fpid);
     }
 
   if (tts.tts_event == TTEVT_VFORK)
@@ -624,13 +626,6 @@ inf_ttrace_him (struct target_ops *ops, int pid)
   do_cleanups (old_chain);
 
   push_target (ops);
-
-  /* On some targets, there must be some explicit synchronization
-     between the parent and child processes after the debugger forks,
-     and before the child execs the debuggee program.  This call
-     basically gives permission for the child to exec.  */
-
-  target_acknowledge_created_inferior (pid);
 
   /* START_INFERIOR_TRAPS_EXPECTED is defined in inferior.h, and will
      be 1 or 2 depending on whether we're starting without or with a
@@ -1175,7 +1170,8 @@ inf_ttrace_xfer_memory (CORE_ADDR addr, ULONGEST len,
 static LONGEST
 inf_ttrace_xfer_partial (struct target_ops *ops, enum target_object object,
 			 const char *annex, gdb_byte *readbuf,
-			 const gdb_byte *writebuf, ULONGEST offset, LONGEST len)
+			 const gdb_byte *writebuf,
+			 ULONGEST offset, LONGEST len)
 {
   switch (object)
     {

@@ -1,5 +1,5 @@
 /* Support for printing Pascal types for GDB, the GNU debugger.
-   Copyright (C) 2000, 2001, 2002, 2006, 2007, 2008, 2009, 2010
+   Copyright (C) 2000, 2001, 2002, 2006, 2007, 2008, 2009, 2010, 2011
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -36,11 +36,14 @@
 #include <errno.h>
 #include <ctype.h>
 
-static void pascal_type_print_varspec_suffix (struct type *, struct ui_file *, int, int, int);
+static void pascal_type_print_varspec_suffix (struct type *, struct ui_file *,
+					      int, int, int);
 
-static void pascal_type_print_derivation_info (struct ui_file *, struct type *);
+static void pascal_type_print_derivation_info (struct ui_file *,
+					       struct type *);
 
-void pascal_type_print_varspec_prefix (struct type *, struct ui_file *, int, int);
+void pascal_type_print_varspec_prefix (struct type *, struct ui_file *,
+				       int, int);
 
 
 /* LEVEL is the depth to indent lines by.  */
@@ -165,14 +168,15 @@ pascal_type_print_method_args (char *physname, char *methodname,
 
   if (physname && (*physname != 0))
     {
-      int i = 0;
-      int len = 0;
-      char storec;
-      char *argname;
       fputs_filtered (" (", stream);
       /* we must demangle this */
       while (isdigit (physname[0]))
 	{
+	  int len = 0;
+	  int i;
+	  char storec;
+	  char *argname;
+
 	  while (isdigit (physname[len]))
 	    {
 	      len++;
@@ -218,7 +222,8 @@ pascal_type_print_varspec_prefix (struct type *type, struct ui_file *stream,
     case TYPE_CODE_PTR:
       fprintf_filtered (stream, "^");
       pascal_type_print_varspec_prefix (TYPE_TARGET_TYPE (type), stream, 0, 1);
-      break;			/* pointer should be handled normally in pascal */
+      break;			/* pointer should be handled normally
+				   in pascal */
 
     case TYPE_CODE_METHOD:
       if (passed_a_ptr)
@@ -235,7 +240,8 @@ pascal_type_print_varspec_prefix (struct type *type, struct ui_file *stream,
       if (passed_a_ptr)
 	{
 	  fprintf_filtered (stream, " ");
-	  pascal_type_print_base (TYPE_DOMAIN_TYPE (type), stream, 0, passed_a_ptr);
+	  pascal_type_print_base (TYPE_DOMAIN_TYPE (type),
+				  stream, 0, passed_a_ptr);
 	  fprintf_filtered (stream, "::");
 	}
       break;
@@ -318,7 +324,8 @@ pascal_print_func_args (struct type *type, struct ui_file *stream)
          {
          fprintf_filtered (stream, "var ");
          } */
-      pascal_print_type (TYPE_FIELD_TYPE (type, i), ""	/* TYPE_FIELD_NAME seems invalid ! */
+      pascal_print_type (TYPE_FIELD_TYPE (type, i), ""	/* TYPE_FIELD_NAME
+							   seems invalid!  */
 			 ,stream, -1, 0);
     }
   if (len)
@@ -360,7 +367,8 @@ pascal_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
       if (TYPE_CODE (TYPE_TARGET_TYPE (type)) != TYPE_CODE_VOID)
 	{
 	  fprintf_filtered (stream, " : ");
-	  pascal_type_print_varspec_prefix (TYPE_TARGET_TYPE (type), stream, 0, 0);
+	  pascal_type_print_varspec_prefix (TYPE_TARGET_TYPE (type),
+					    stream, 0, 0);
 	  pascal_type_print_base (TYPE_TARGET_TYPE (type), stream, show, 0);
 	  pascal_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream, 0,
 					    passed_a_ptr, 0);
@@ -369,7 +377,8 @@ pascal_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
 
     case TYPE_CODE_PTR:
     case TYPE_CODE_REF:
-      pascal_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream, 0, 1, 0);
+      pascal_type_print_varspec_suffix (TYPE_TARGET_TYPE (type),
+					stream, 0, 1, 0);
       break;
 
     case TYPE_CODE_FUNC:
@@ -380,7 +389,8 @@ pascal_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
       if (TYPE_CODE (TYPE_TARGET_TYPE (type)) != TYPE_CODE_VOID)
 	{
 	  fprintf_filtered (stream, " : ");
-	  pascal_type_print_varspec_prefix (TYPE_TARGET_TYPE (type), stream, 0, 0);
+	  pascal_type_print_varspec_prefix (TYPE_TARGET_TYPE (type),
+					    stream, 0, 0);
 	  pascal_type_print_base (TYPE_TARGET_TYPE (type), stream, show, 0);
 	  pascal_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream, 0,
 					    passed_a_ptr, 0);
@@ -450,7 +460,8 @@ pascal_type_print_base (struct type *type, struct ui_file *stream, int show,
     }
 
   /* void pointer */
-  if ((TYPE_CODE (type) == TYPE_CODE_PTR) && (TYPE_CODE (TYPE_TARGET_TYPE (type)) == TYPE_CODE_VOID))
+  if ((TYPE_CODE (type) == TYPE_CODE_PTR)
+      && (TYPE_CODE (TYPE_TARGET_TYPE (type)) == TYPE_CODE_VOID))
     {
       fputs_filtered (TYPE_NAME (type) ? TYPE_NAME (type) : "pointer",
 		      stream);
@@ -479,9 +490,12 @@ pascal_type_print_base (struct type *type, struct ui_file *stream, int show,
       break;
 
     case TYPE_CODE_ARRAY:
-      /* pascal_type_print_varspec_prefix (TYPE_TARGET_TYPE (type), stream, 0, 0);
-         pascal_type_print_base (TYPE_TARGET_TYPE (type), stream, show, level);
-         pascal_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream, 0, 0, 0); */
+      /* pascal_type_print_varspec_prefix (TYPE_TARGET_TYPE (type),
+	                                   stream, 0, 0);
+         pascal_type_print_base (TYPE_TARGET_TYPE (type),
+	                         stream, show, level);
+         pascal_type_print_varspec_suffix (TYPE_TARGET_TYPE (type),
+	                                   stream, 0, 0, 0); */
       pascal_print_type (TYPE_TARGET_TYPE (type), NULL, stream, 0, 0);
       break;
 
@@ -740,7 +754,8 @@ pascal_type_print_base (struct type *type, struct ui_file *stream, int show,
 	      fputs_filtered (TYPE_FIELD_NAME (type, i), stream);
 	      if (lastval != TYPE_FIELD_BITPOS (type, i))
 		{
-		  fprintf_filtered (stream, " := %d", TYPE_FIELD_BITPOS (type, i));
+		  fprintf_filtered (stream,
+				    " := %d", TYPE_FIELD_BITPOS (type, i));
 		  lastval = TYPE_FIELD_BITPOS (type, i);
 		}
 	      lastval++;

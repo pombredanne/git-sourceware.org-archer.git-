@@ -1,7 +1,7 @@
 /* Support for printing Java values for GDB, the GNU debugger.
 
    Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007,
-   2008, 2009, 2010 Free Software Foundation, Inc.
+   2008, 2009, 2010, 2011 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -239,7 +239,8 @@ java_value_print (struct value *val, struct ui_file *stream,
       value_free_to_mark (mark);	/* Release unnecessary values */
 
       char_type = builtin_java_type (gdbarch)->builtin_char;
-      val_print_string (char_type, data + boffset, count, stream, options);
+      val_print_string (char_type, NULL, data + boffset, count, stream,
+			options);
 
       return 0;
     }
@@ -392,6 +393,14 @@ java_print_value_fields (struct type *type, const gdb_byte *valaddr,
 	      if (TYPE_FIELD_IGNORE (type, i))
 		{
 		  fputs_filtered ("<optimized out or zero length>", stream);
+		}
+	      else if (value_bits_synthetic_pointer (val,
+						     TYPE_FIELD_BITPOS (type,
+									i),
+						     TYPE_FIELD_BITSIZE (type,
+									 i)))
+		{
+		  fputs_filtered (_("<synthetic pointer>"), stream);
 		}
 	      else if (!value_bits_valid (val, TYPE_FIELD_BITPOS (type, i),
 					  TYPE_FIELD_BITSIZE (type, i)))

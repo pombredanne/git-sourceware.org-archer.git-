@@ -8277,10 +8277,10 @@ alpha_vms_link_add_archive_symbols (bfd *abfd, struct bfd_link_info *info)
       /* Unlike the generic linker, we know that this element provides
 	 a definition for an undefined symbol and we know that we want
 	 to include it.  We don't need to check anything.  */
-      if (! (*info->callbacks->add_archive_element) (info, element,
-                                                     h->root.string))
+      if (!(*info->callbacks
+	    ->add_archive_element) (info, element, h->root.string, &element))
 	return FALSE;
-      if (! alpha_vms_link_add_object_symbols (element, info))
+      if (!alpha_vms_link_add_object_symbols (element, info))
 	return FALSE;
 
       orig_element->archive_pass = pass;

@@ -1,7 +1,7 @@
 /* Handle OSF/1, Digital UNIX, and Tru64 shared libraries
    for GDB, the GNU Debugger.
    Copyright (C) 1993, 1994, 1995, 1996, 1998, 1999, 2000, 2001, 2007, 2008,
-   2009, 2010 Free Software Foundation, Inc.
+   2009, 2010, 2011 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -221,7 +221,8 @@ fetch_sec_names (struct lm_info *lmi)
       target_read_string (lms->nameaddr, &name, PATH_MAX, &errcode);
       if (errcode != 0)
 	{
-	  warning (_("unable to read shared sec name at 0x%lx"), lms->nameaddr);
+	  warning (_("unable to read shared sec name at 0x%lx"),
+		   lms->nameaddr);
 	  name = xstrdup ("");
 	}
       lms->name = name;
@@ -340,14 +341,14 @@ osf_solib_create_inferior_hook (int from_tty)
 
   tp = inferior_thread ();
   clear_proceed_status ();
-  inf->stop_soon = STOP_QUIETLY;
-  tp->stop_signal = TARGET_SIGNAL_0;
+  inf->control.stop_soon = STOP_QUIETLY;
+  tp->suspend.stop_signal = TARGET_SIGNAL_0;
   do
     {
-      target_resume (minus_one_ptid, 0, tp->stop_signal);
+      target_resume (minus_one_ptid, 0, tp->suspend.stop_signal);
       wait_for_inferior (0);
     }
-  while (tp->stop_signal != TARGET_SIGNAL_TRAP);
+  while (tp->suspend.stop_signal != TARGET_SIGNAL_TRAP);
 
   /*  solib_add will call reinit_frame_cache.
      But we are stopped in the runtime loader and we do not have symbols
@@ -356,7 +357,7 @@ osf_solib_create_inferior_hook (int from_tty)
      Delaying the resetting of stop_soon until after symbol loading
      suppresses the warning.  */
   solib_add ((char *) 0, 0, (struct target_ops *) 0, auto_solib_add);
-  inf->stop_soon = NO_STOP_QUIETLY;
+  inf->control.stop_soon = NO_STOP_QUIETLY;
 }
 
 /* target_so_ops callback.  Do additional symbol handling, lookup, etc. after

@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008, 2009, 2010 Free Software Foundation, Inc.
+   2008, 2009, 2010, 2011 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -136,8 +136,9 @@ extern void deprecated_set_value_modifiable (struct value *value,
    normally.  */
 
 extern struct type *value_enclosing_type (struct value *);
-extern struct value *value_change_enclosing_type (struct value *val,
-						  struct type *new_type);
+extern void set_value_enclosing_type (struct value *val,
+				      struct type *new_type);
+
 extern int value_pointed_to_offset (struct value *value);
 extern void set_value_pointed_to_offset (struct value *value, int val);
 extern int value_embedded_offset (struct value *value);
@@ -171,6 +172,16 @@ struct lval_funcs
 
   /* Return 1 if any bit in VALUE is valid, 0 if they are all invalid.  */
   int (*check_any_valid) (const struct value *value);
+
+  /* If non-NULL, this is used to implement pointer indirection for
+     this value.  This method may return NULL, in which case value_ind
+     will fall back to ordinary indirection.  */
+  struct value *(*indirect) (struct value *value);
+
+  /* If non-NULL, this is used to determine whether the indicated bits
+     of VALUE are a synthetic pointer.  */
+  int (*check_synthetic_pointer) (const struct value *value,
+				  int offset, int length);
 
   /* Return a duplicate of VALUE's closure, for use in a new value.
      This may simply return the same closure, if VALUE's is
@@ -336,6 +347,12 @@ extern struct value *coerce_array (struct value *value);
 
 extern int value_bits_valid (const struct value *value,
 			     int offset, int length);
+
+/* Given a value, determine whether the bits starting at OFFSET and
+   extending for LENGTH bits are a synthetic pointer.  */
+
+extern int value_bits_synthetic_pointer (const struct value *value,
+					 int offset, int length);
 
 
 
@@ -687,7 +704,8 @@ extern int common_val_print (struct value *val,
 			     const struct value_print_options *options,
 			     const struct language_defn *language);
 
-extern int val_print_string (struct type *elttype, CORE_ADDR addr, int len,
+extern int val_print_string (struct type *elttype, const char *encoding,
+			     CORE_ADDR addr, int len,
 			     struct ui_file *stream,
 			     const struct value_print_options *options);
 
@@ -709,6 +727,8 @@ extern void preserve_values (struct objfile *);
 /* From values.c */
 
 extern struct value *value_copy (struct value *);
+
+extern struct value *value_non_lval (struct value *);
 
 extern void preserve_one_value (struct value *, struct objfile *, htab_t);
 

@@ -2,7 +2,7 @@
    Unix.
 
    Copyright (C) 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1998,
-   1999, 2000, 2001, 2002, 2004, 2005, 2007, 2008, 2009, 2010
+   1999, 2000, 2001, 2002, 2004, 2005, 2007, 2008, 2009, 2010, 2011
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -85,13 +85,6 @@ inf_child_post_startup_inferior (ptid_t ptid)
 {
   /* This version of Unix doesn't require a meaningful "post startup
      inferior" operation by a debugger.  */
-}
-
-static void
-inf_child_acknowledge_created_inferior (int pid)
-{
-  /* This version of Unix doesn't require a meaningful "acknowledge
-     created inferior" operation by a debugger.  */
 }
 
 static void
@@ -192,7 +185,6 @@ inf_child_target (void)
   t->to_terminal_ours = terminal_ours;
   t->to_terminal_info = child_terminal_info;
   t->to_post_startup_inferior = inf_child_post_startup_inferior;
-  t->to_acknowledge_created_inferior = inf_child_acknowledge_created_inferior;
   t->to_insert_fork_catchpoint = inf_child_insert_fork_catchpoint;
   t->to_remove_fork_catchpoint = inf_child_remove_fork_catchpoint;
   t->to_insert_vfork_catchpoint = inf_child_insert_vfork_catchpoint;

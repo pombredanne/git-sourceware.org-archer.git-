@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2002, 2003, 2004, 2005, 2006, 2007, 2008,
-   2009, 2010 Free Software Foundation, Inc.
+   2009, 2010, 2011 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -41,6 +41,8 @@
 #include "cli/cli-decode.h"
 
 #include "python/python.h"
+
+#include "tracepoint.h"
 
 /* Prototypes for exported functions. */
 
@@ -519,7 +521,7 @@ value_entirely_optimized_out (const struct value *value)
   if (!value->optimized_out)
     return 0;
   if (value->lval != lval_computed
-      || !value->location.computed.funcs->check_validity)
+      || !value->location.computed.funcs->check_any_valid)
     return 1;
   return !value->location.computed.funcs->check_any_valid (value);
 }
@@ -534,6 +536,18 @@ value_bits_valid (const struct value *value, int offset, int length)
     return 0;
   return value->location.computed.funcs->check_validity (value, offset,
 							 length);
+}
+
+int
+value_bits_synthetic_pointer (const struct value *value,
+			      int offset, int length)
+{
+  if (value == NULL || value->lval != lval_computed
+      || !value->location.computed.funcs->check_synthetic_pointer)
+    return 0;
+  return value->location.computed.funcs->check_synthetic_pointer (value,
+								  offset,
+								  length);
 }
 
 int
@@ -826,6 +840,26 @@ value_copy (struct value *arg)
   return val;
 }
 
+/* Return a version of ARG that is non-lvalue.  */
+
+struct value *
+value_non_lval (struct value *arg)
+{
+  if (VALUE_LVAL (arg) != not_lval)
+    {
+      struct type *enc_type = value_enclosing_type (arg);
+      struct value *val = allocate_value (enc_type);
+
+      memcpy (value_contents_all_raw (val), value_contents_all (arg),
+	      TYPE_LENGTH (enc_type));
+      val->type = arg->type;
+      set_value_embedded_offset (val, value_embedded_offset (arg));
+      set_value_pointed_to_offset (val, value_pointed_to_offset (arg));
+      return val;
+    }
+   return arg;
+}
+
 void
 set_value_component_location (struct value *component,
 			      const struct value *whole)
@@ -922,7 +956,8 @@ access_value_history (int num)
   /* Now absnum is always absolute and origin zero.  */
 
   chunk = value_history_chain;
-  for (i = (value_history_count - 1) / VALUE_HISTORY_CHUNK - absnum / VALUE_HISTORY_CHUNK;
+  for (i = (value_history_count - 1) / VALUE_HISTORY_CHUNK
+	 - absnum / VALUE_HISTORY_CHUNK;
        i > 0; i--)
     chunk = chunk->next;
 
@@ -1057,8 +1092,8 @@ struct internalvar
 
 static struct internalvar *internalvars;
 
-/* If the variable does not already exist create it and give it the value given.
-   If no value is given then the default is zero.  */
+/* If the variable does not already exist create it and give it the
+   value given.  If no value is given then the default is zero.  */
 static void
 init_if_undefined_command (char* args, int from_tty)
 {
@@ -1078,7 +1113,8 @@ init_if_undefined_command (char* args, int from_tty)
   /* Extract the variable from the parsed expression.
      In the case of an assign the lvalue will be in elts[1] and elts[2].  */
   if (expr->elts[1].opcode != OP_INTERNALVAR)
-    error (_("The first parameter to init-if-undefined should be a GDB variable."));
+    error (_("The first parameter to init-if-undefined "
+	     "should be a GDB variable."));
   intvar = expr->elts[2].internalvar;
 
   /* Only evaluate the expression if the lvalue is void.
@@ -1165,6 +1201,22 @@ struct value *
 value_of_internalvar (struct gdbarch *gdbarch, struct internalvar *var)
 {
   struct value *val;
+  struct trace_state_variable *tsv;
+
+  /* If there is a trace state variable of the same name, assume that
+     is what we really want to see.  */
+  tsv = find_trace_state_variable (var->name);
+  if (tsv)
+    {
+      tsv->value_known = target_get_trace_state_variable_value (tsv->number,
+								&(tsv->value));
+      if (tsv->value_known)
+	val = value_from_longest (builtin_type (gdbarch)->builtin_int64,
+				  tsv->value);
+      else
+	val = allocate_value (builtin_type (gdbarch)->builtin_void);
+      return val;
+    }
 
   switch (var->kind)
     {
@@ -1586,10 +1638,11 @@ show_convenience (char *ignore, int from_tty)
       printf_filtered (("\n"));
     }
   if (!varseen)
-    printf_unfiltered (_("\
-No debugger convenience variables now defined.\n\
-Convenience variables have names starting with \"$\";\n\
-use \"set\" as in \"set $foo = 5\" to define them.\n"));
+    printf_unfiltered (_("No debugger convenience variables now defined.\n"
+			 "Convenience variables have "
+			 "names starting with \"$\";\n"
+			 "use \"set\" as in \"set "
+			 "$foo = 5\" to define them.\n"));
 }
 
 /* Extract a value as a C number (either long or double).
@@ -1913,21 +1966,20 @@ value_static_field (struct type *type, int fieldno)
   return retval;
 }
 
-/* Change the enclosing type of a value object VAL to NEW_ENCL_TYPE.  
-   You have to be careful here, since the size of the data area for the value 
-   is set by the length of the enclosing type.  So if NEW_ENCL_TYPE is bigger 
-   than the old enclosing type, you have to allocate more space for the data.  
-   The return value is a pointer to the new version of this value structure. */
+/* Change the enclosing type of a value object VAL to NEW_ENCL_TYPE.
+   You have to be careful here, since the size of the data area for the value
+   is set by the length of the enclosing type.  So if NEW_ENCL_TYPE is bigger
+   than the old enclosing type, you have to allocate more space for the
+   data.  */
 
-struct value *
-value_change_enclosing_type (struct value *val, struct type *new_encl_type)
+void
+set_value_enclosing_type (struct value *val, struct type *new_encl_type)
 {
   if (TYPE_LENGTH (new_encl_type) > TYPE_LENGTH (value_enclosing_type (val))) 
     val->contents =
       (gdb_byte *) xrealloc (val->contents, TYPE_LENGTH (new_encl_type));
 
   val->enclosing_type = new_encl_type;
-  return val;
 }
 
 /* Given a value ARG1 (offset by OFFSET bytes)
@@ -2050,7 +2102,8 @@ value_field (struct value *arg1, int fieldno)
  */
 
 struct value *
-value_fn_field (struct value **arg1p, struct fn_field *f, int j, struct type *type,
+value_fn_field (struct value **arg1p, struct fn_field *f,
+		int j, struct type *type,
 		int offset)
 {
   struct value *v;
@@ -2183,7 +2236,7 @@ unpack_field_as_long (struct type *type, const gdb_byte *valaddr, int fieldno)
    target byte order; the bitfield starts in the byte pointed to.  FIELDVAL
    is the desired value of the field, in host byte order.  BITPOS and BITSIZE
    indicate which bits (in target bit order) comprise the bitfield.  
-   Requires 0 < BITSIZE <= lbits, 0 <= BITPOS+BITSIZE <= lbits, and
+   Requires 0 < BITSIZE <= lbits, 0 <= BITPOS % 8 + BITSIZE <= lbits, and
    0 <= BITPOS, where lbits is the size of a LONGEST in bits.  */
 
 void
@@ -2193,6 +2246,11 @@ modify_field (struct type *type, gdb_byte *addr,
   enum bfd_endian byte_order = gdbarch_byte_order (get_type_arch (type));
   ULONGEST oword;
   ULONGEST mask = (ULONGEST) -1 >> (8 * sizeof (ULONGEST) - bitsize);
+  int bytesize;
+
+  /* Normalize BITPOS.  */
+  addr += bitpos / 8;
+  bitpos %= 8;
 
   /* If a negative fieldval fits in the field in question, chop
      off the sign extension bits.  */
@@ -2210,16 +2268,20 @@ modify_field (struct type *type, gdb_byte *addr,
       fieldval &= mask;
     }
 
-  oword = extract_unsigned_integer (addr, sizeof oword, byte_order);
+  /* Ensure no bytes outside of the modified ones get accessed as it may cause
+     false valgrind reports.  */
+
+  bytesize = (bitpos + bitsize + 7) / 8;
+  oword = extract_unsigned_integer (addr, bytesize, byte_order);
 
   /* Shifting for bit field depends on endianness of the target machine.  */
   if (gdbarch_bits_big_endian (get_type_arch (type)))
-    bitpos = sizeof (oword) * 8 - bitpos - bitsize;
+    bitpos = bytesize * 8 - bitpos - bitsize;
 
   oword &= ~(mask << bitpos);
   oword |= fieldval << bitpos;
 
-  store_unsigned_integer (addr, sizeof oword, byte_order, oword);
+  store_unsigned_integer (addr, bytesize, byte_order, oword);
 }
 
 /* Pack NUM into BUF using a target format of TYPE.  */
@@ -2287,8 +2349,8 @@ pack_unsigned_long (gdb_byte *buf, struct type *type, ULONGEST num)
       break;
 
     default:
-      error (_("\
-Unexpected type (%d) encountered for unsigned integer constant."),
+      error (_("Unexpected type (%d) encountered "
+	       "for unsigned integer constant."),
 	     TYPE_CODE (type));
     }
 }
@@ -2464,8 +2526,8 @@ A few convenience variables are given values automatically:\n\
 \"$__\" holds the contents of the last address examined with \"x\"."),
 	   &showlist);
 
-  add_cmd ("values", no_class, show_values,
-	   _("Elements of value history around item number IDX (or last ten)."),
+  add_cmd ("values", no_class, show_values, _("\
+Elements of value history around item number IDX (or last ten)."),
 	   &showlist);
 
   add_com ("init-if-undefined", class_vars, init_if_undefined_command, _("\

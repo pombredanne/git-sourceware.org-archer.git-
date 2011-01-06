@@ -3,7 +3,7 @@
 # Architecture commands for GDB, the GNU debugger.
 #
 # Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-# 2008, 2009, 2010 Free Software Foundation, Inc.
+# 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
 #
 # This file is part of GDB.
 #
@@ -426,6 +426,15 @@ v:int:num_regs:::0:-1
 # These pseudo-registers may be aliases for other registers,
 # combinations of other registers, or they may be computed by GDB.
 v:int:num_pseudo_regs:::0:0::0
+
+# Assemble agent expression bytecode to collect pseudo-register REG.
+# Return -1 if something goes wrong, 0 otherwise.
+M:int:ax_pseudo_register_collect:struct agent_expr *ax, int reg:ax, reg
+
+# Assemble agent expression bytecode to push the value of pseudo-register
+# REG on the interpreter stack.
+# Return -1 if something goes wrong, 0 otherwise.
+M:int:ax_pseudo_register_push_stack:struct agent_expr *ax, int reg:ax, reg
 
 # GDB's standard (or well known) register numbers.  These can map onto
 # a real register or a pseudo (computed) register or not be defined at
@@ -919,6 +928,7 @@ struct target_desc;
 struct displaced_step_closure;
 struct core_regset_section;
 struct syscall;
+struct agent_expr;
 
 /* The architecture associated with the connection to the target.
  

@@ -1,6 +1,6 @@
 /* Python interface to values.
 
-   Copyright (C) 2008, 2009, 2010 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -119,7 +119,8 @@ note_value (value_object *value_obj)
   values_in_python = value_obj;
 }
 
-/* Called when a new gdb.Value object needs to be allocated.  */
+/* Called when a new gdb.Value object needs to be allocated.  Returns NULL on
+   error, with a python exception set.  */
 static PyObject *
 valpy_new (PyTypeObject *subtype, PyObject *args, PyObject *keywords)
 {
@@ -320,7 +321,8 @@ valpy_lazy_string (PyObject *self, PyObject *args, PyObject *kw)
     value = value_ind (value);
 
   str_obj = gdbpy_create_lazy_string_object (value_address (value), length,
-					     user_encoding, value_type (value));
+					     user_encoding,
+					     value_type (value));
 
   return (PyObject *) str_obj;
 }
@@ -438,7 +440,7 @@ valpy_length (PyObject *self)
 }
 
 /* Given string name of an element inside structure, return its value
-   object.  */
+   object.  Returns NULL on error, with a python exception set.  */
 static PyObject *
 valpy_getitem (PyObject *self, PyObject *key)
 {
@@ -499,7 +501,7 @@ valpy_setitem (PyObject *self, PyObject *key, PyObject *value)
 }
 
 /* Called by the Python interpreter to perform an inferior function
-   call on the value.  */
+   call on the value.  Returns NULL on error, with a python exception set.  */
 static PyObject *
 valpy_call (PyObject *self, PyObject *args, PyObject *keywords)
 {
@@ -619,7 +621,8 @@ enum valpy_opcode
   ((TYPE_CODE (TYPE) == TYPE_CODE_REF) ? (TYPE_TARGET_TYPE (TYPE)) : (TYPE))
 
 /* Returns a value object which is the result of applying the operation
-   specified by OPCODE to the given arguments.  */
+   specified by OPCODE to the given arguments.  Returns NULL on error, with
+   a python exception set.  */
 static PyObject *
 valpy_binop (enum valpy_opcode opcode, PyObject *self, PyObject *other)
 {
@@ -871,7 +874,8 @@ valpy_xor (PyObject *self, PyObject *other)
   return valpy_binop (VALPY_BITXOR, self, other);
 }
 
-/* Implements comparison operations for value objects.  */
+/* Implements comparison operations for value objects.  Returns NULL on error,
+   with a python exception set.  */
 static PyObject *
 valpy_richcompare (PyObject *self, PyObject *other, int op)
 {
@@ -1175,7 +1179,8 @@ convert_value_from_python (PyObject *obj)
 	  value = value_copy (((value_object *) result)->value);
 	}
       else
-	PyErr_Format (PyExc_TypeError, _("Could not convert Python object: %s."),
+	PyErr_Format (PyExc_TypeError,
+		      _("Could not convert Python object: %s."),
 		      PyString_AsString (PyObject_Str (obj)));
     }
   if (except.reason < 0)
@@ -1235,7 +1240,8 @@ static PyGetSetDef value_object_getset[] = {
   { "address", valpy_get_address, NULL, "The address of the value.",
     NULL },
   { "is_optimized_out", valpy_get_is_optimized_out, NULL,
-    "Boolean telling whether the value is optimized out (i.e., not available).",
+    "Boolean telling whether the value is optimized "
+    "out (i.e., not available).",
     NULL },
   { "type", valpy_get_type, NULL, "Type of the value.", NULL },
   { "dynamic_type", valpy_get_dynamic_type, NULL,
@@ -1255,7 +1261,8 @@ Cast the value to the supplied type, as if by the C++\n\
 reinterpret_cast operator."
   },
   { "dereference", valpy_dereference, METH_NOARGS, "Dereferences the value." },
-  { "lazy_string", (PyCFunction) valpy_lazy_string, METH_VARARGS | METH_KEYWORDS,
+  { "lazy_string", (PyCFunction) valpy_lazy_string,
+    METH_VARARGS | METH_KEYWORDS,
     "lazy_string ([encoding]  [, length]) -> lazy_string\n\
 Return a lazy string representation of the value." },
   { "string", (PyCFunction) valpy_string, METH_VARARGS | METH_KEYWORDS,
@@ -1317,7 +1324,8 @@ PyTypeObject value_object_type = {
   0,				  /*tp_getattro*/
   0,				  /*tp_setattro*/
   0,				  /*tp_as_buffer*/
-  Py_TPFLAGS_DEFAULT | Py_TPFLAGS_CHECKTYPES,	/*tp_flags*/
+  Py_TPFLAGS_DEFAULT | Py_TPFLAGS_CHECKTYPES
+  | Py_TPFLAGS_BASETYPE,	  /*tp_flags*/
   "GDB value object",		  /* tp_doc */
   0,				  /* tp_traverse */
   0,				  /* tp_clear */

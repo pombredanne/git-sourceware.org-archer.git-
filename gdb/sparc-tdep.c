@@ -1,6 +1,6 @@
 /* Target-dependent code for SPARC.
 
-   Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
+   Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -63,7 +63,7 @@ struct regset;
    sparc64-tdep.c; don't add any here.  */
 
 /* The SPARC Floating-Point Quad-Precision format is similar to
-   big-endian IA-64 Quad-recision format.  */
+   big-endian IA-64 Quad-Precision format.  */
 #define floatformats_sparc_quad floatformats_ia64_quad
 
 /* The stack pointer is offset from the stack frame by a BIAS of 2047

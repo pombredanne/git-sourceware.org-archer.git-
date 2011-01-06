@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
    1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008,
-   2009, 2010 Free Software Foundation, Inc.
+   2009, 2010, 2011 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -117,8 +117,9 @@ static void
 show_print_max (struct ui_file *file, int from_tty,
 		struct cmd_list_element *c, const char *value)
 {
-  fprintf_filtered (file, _("\
-Limit on string chars or array elements to print is %s.\n"),
+  fprintf_filtered (file,
+		    _("Limit on string chars or array "
+		      "elements to print is %s.\n"),
 		    value);
 }
 
@@ -130,8 +131,8 @@ static void
 show_input_radix (struct ui_file *file, int from_tty,
 		  struct cmd_list_element *c, const char *value)
 {
-  fprintf_filtered (file, _("\
-Default input radix for entering numbers is %s.\n"),
+  fprintf_filtered (file,
+		    _("Default input radix for entering numbers is %s.\n"),
 		    value);
 }
 
@@ -140,8 +141,8 @@ static void
 show_output_radix (struct ui_file *file, int from_tty,
 		   struct cmd_list_element *c, const char *value)
 {
-  fprintf_filtered (file, _("\
-Default output radix for printing of values is %s.\n"),
+  fprintf_filtered (file,
+		    _("Default output radix for printing of values is %s.\n"),
 		    value);
 }
 
@@ -173,8 +174,9 @@ static void
 show_stop_print_at_null (struct ui_file *file, int from_tty,
 			 struct cmd_list_element *c, const char *value)
 {
-  fprintf_filtered (file, _("\
-Printing of char arrays to stop at first null char is %s.\n"),
+  fprintf_filtered (file,
+		    _("Printing of char arrays to stop "
+		      "at first null char is %s.\n"),
 		    value);
 }
 
@@ -203,8 +205,8 @@ static void
 show_unionprint (struct ui_file *file, int from_tty,
 		 struct cmd_list_element *c, const char *value)
 {
-  fprintf_filtered (file, _("\
-Printing of unions interior to structures is %s.\n"),
+  fprintf_filtered (file,
+		    _("Printing of unions interior to structures is %s.\n"),
 		    value);
 }
 
@@ -271,6 +273,13 @@ valprint_check_validity (struct ui_file *stream,
 			      TARGET_CHAR_BIT * TYPE_LENGTH (type)))
 	{
 	  fprintf_filtered (stream, _("<value optimized out>"));
+	  return 0;
+	}
+
+      if (value_bits_synthetic_pointer (val, TARGET_CHAR_BIT * offset,
+					TARGET_CHAR_BIT * TYPE_LENGTH (type)))
+	{
+	  fputs_filtered (_("<synthetic pointer>"), stream);
 	  return 0;
 	}
     }
@@ -546,7 +555,8 @@ print_longest (struct ui_file *stream, int format, int use_c_format,
     case 'o':
       val = int_string (val_long, 8, 0, 0, use_c_format); break;
     default:
-      internal_error (__FILE__, __LINE__, _("failed internal consistency check"));
+      internal_error (__FILE__, __LINE__,
+		      _("failed internal consistency check"));
     } 
   fputs_filtered (val, stream);
 }
@@ -1031,7 +1041,8 @@ print_hex_chars (struct ui_file *stream, const gdb_byte *valaddr,
     }
 }
 
-/* VALADDR points to a char integer of LEN bytes.  Print it out in appropriate language form on stream.  
+/* VALADDR points to a char integer of LEN bytes.
+   Print it out in appropriate language form on stream.  
    Omit any leading zero chars.  */
 
 void
@@ -1065,44 +1076,6 @@ print_char_chars (struct ui_file *stream, struct type *type,
 	  --p;
 	}
     }
-}
-
-/* Assuming TYPE is a simple, non-empty array type, compute its upper
-   and lower bound.  Save the low bound into LOW_BOUND if not NULL.
-   Save the high bound into HIGH_BOUND if not NULL.
-
-   Return 1 if the operation was successful. Return zero otherwise,
-   in which case the values of LOW_BOUND and HIGH_BOUNDS are unmodified.
-  
-   We now simply use get_discrete_bounds call to get the values
-   of the low and high bounds. 
-   get_discrete_bounds can return three values:
-   1, meaning that index is a range,
-   0, meaning that index is a discrete type,
-   or -1 for failure.  */
-
-int
-get_array_bounds (struct type *type, LONGEST *low_bound, LONGEST *high_bound)
-{
-  struct type *index = TYPE_INDEX_TYPE (type);
-  LONGEST low = 0;
-  LONGEST high = 0;
-  int res;
-                                
-  if (index == NULL)
-    return 0;
-
-  res = get_discrete_bounds (index, &low, &high);
-  if (res == -1)
-    return 0;
-
-  if (low_bound)
-    *low_bound = low;
-
-  if (high_bound)
-    *high_bound = high;
-
-  return 1;
 }
 
 /* Print on STREAM using the given OPTIONS the index for the element
@@ -1149,38 +1122,29 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
   unsigned int rep1;
   /* Number of repetitions we have detected so far.  */
   unsigned int reps;
-  LONGEST low_bound_index = 0;
+  LONGEST low_bound, high_bound;
 
   elttype = TYPE_TARGET_TYPE (type);
   eltlen = TYPE_LENGTH (check_typedef (elttype));
   index_type = TYPE_INDEX_TYPE (type);
 
-  /* Compute the number of elements in the array.  On most arrays,
-     the size of its elements is not zero, and so the number of elements
-     is simply the size of the array divided by the size of the elements.
-     But for arrays of elements whose size is zero, we need to look at
-     the bounds.  */
-  if (eltlen != 0)
-    len = TYPE_LENGTH (type) / eltlen;
+  if (get_array_bounds (type, &low_bound, &high_bound))
+    {
+      /* The array length should normally be HIGH_BOUND - LOW_BOUND + 1.
+         But we have to be a little extra careful, because some languages
+	 such as Ada allow LOW_BOUND to be greater than HIGH_BOUND for
+	 empty arrays.  In that situation, the array length is just zero,
+	 not negative!  */
+      if (low_bound > high_bound)
+	len = 0;
+      else
+	len = high_bound - low_bound + 1;
+    }
   else
     {
-      LONGEST low, hi;
-
-      if (get_array_bounds (type, &low, &hi))
-        len = hi - low + 1;
-      else
-        {
-          warning (_("unable to get bounds of array, assuming null array"));
-          len = 0;
-        }
-    }
-
-  /* Get the array low bound.  This only makes sense if the array
-     has one or more element in it.  */
-  if (len > 0 && !get_array_bounds (type, &low_bound_index, NULL))
-    {
-      warning (_("unable to get low bound of array, using zero as default"));
-      low_bound_index = 0;
+      warning (_("unable to get bounds of array, assuming null array"));
+      low_bound = 0;
+      len = 0;
     }
 
   annotate_array_section_begin (i, elttype);
@@ -1200,7 +1164,7 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
 	    }
 	}
       wrap_here (n_spaces (2 + 2 * recurse));
-      maybe_print_array_index (index_type, i + low_bound_index,
+      maybe_print_array_index (index_type, i + low_bound,
                                stream, options);
 
       rep1 = i + 1;
@@ -1247,7 +1211,8 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
    function be eliminated.  */
 
 static int
-partial_memory_read (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int *errnoptr)
+partial_memory_read (CORE_ADDR memaddr, gdb_byte *myaddr,
+		     int len, int *errnoptr)
 {
   int nread;			/* Number of bytes actually read. */
   int errcode;			/* Error from last read. */
@@ -1309,7 +1274,8 @@ read_string (CORE_ADDR addr, int len, int width, unsigned int fetchlimit,
   int errcode;			/* Errno returned from bad reads.  */
   unsigned int nfetch;		/* Chars to fetch / chars fetched.  */
   unsigned int chunksize;	/* Size of each fetch, in chars.  */
-  gdb_byte *bufptr;		/* Pointer to next available byte in buffer.  */
+  gdb_byte *bufptr;		/* Pointer to next available byte in
+				   buffer.  */
   gdb_byte *limit;		/* First location past end of fetch buffer.  */
   struct cleanup *old_chain = NULL;	/* Top of the old cleanup chain.  */
 
@@ -1414,10 +1380,13 @@ read_string (CORE_ADDR addr, int len, int width, unsigned int fetchlimit,
    characters, of WIDTH bytes a piece, to STREAM.  If LEN is -1, printing
    stops at the first null byte, otherwise printing proceeds (including null
    bytes) until either print_max or LEN characters have been printed,
-   whichever is smaller.  */
+   whichever is smaller.  ENCODING is the name of the string's
+   encoding.  It can be NULL, in which case the target encoding is
+   assumed.  */
 
 int
-val_print_string (struct type *elttype, CORE_ADDR addr, int len,
+val_print_string (struct type *elttype, const char *encoding,
+		  CORE_ADDR addr, int len,
 		  struct ui_file *stream,
 		  const struct value_print_options *options)
 {
@@ -1440,7 +1409,8 @@ val_print_string (struct type *elttype, CORE_ADDR addr, int len,
      because finding the null byte (or available memory) is what actually
      limits the fetch.  */
 
-  fetchlimit = (len == -1 ? options->print_max : min (len, options->print_max));
+  fetchlimit = (len == -1 ? options->print_max : min (len,
+						      options->print_max));
 
   errcode = read_string (addr, len, width, fetchlimit, byte_order,
 			 &buffer, &bytes_read);
@@ -1448,8 +1418,9 @@ val_print_string (struct type *elttype, CORE_ADDR addr, int len,
 
   addr += bytes_read;
 
-  /* We now have either successfully filled the buffer to fetchlimit, or
-     terminated early due to an error or finding a null char when LEN is -1.  */
+  /* We now have either successfully filled the buffer to fetchlimit,
+     or terminated early due to an error or finding a null char when
+     LEN is -1.  */
 
   /* Determine found_nul by looking at the last character read.  */
   found_nul = extract_unsigned_integer (buffer + bytes_read - width, width,
@@ -1486,7 +1457,7 @@ val_print_string (struct type *elttype, CORE_ADDR addr, int len,
 	  fputs_filtered (" ", stream);
 	}
       LA_PRINT_STRING (stream, elttype, buffer, bytes_read / width,
-		       NULL, force_ellipsis, options);
+		       encoding, force_ellipsis, options);
     }
 
   if (errcode != 0)
@@ -1547,7 +1518,8 @@ set_input_radix_1 (int from_tty, unsigned radix)
   input_radix_1 = input_radix = radix;
   if (from_tty)
     {
-      printf_filtered (_("Input radix now set to decimal %u, hex %x, octal %o.\n"),
+      printf_filtered (_("Input radix now set to "
+			 "decimal %u, hex %x, octal %o.\n"),
 		       radix, radix, radix);
     }
 }
@@ -1582,13 +1554,15 @@ set_output_radix_1 (int from_tty, unsigned radix)
       break;
     default:
       output_radix_1 = output_radix;
-      error (_("Unsupported output radix ``decimal %u''; output radix unchanged."),
+      error (_("Unsupported output radix ``decimal %u''; "
+	       "output radix unchanged."),
 	     radix);
     }
   output_radix_1 = output_radix = radix;
   if (from_tty)
     {
-      printf_filtered (_("Output radix now set to decimal %u, hex %x, octal %o.\n"),
+      printf_filtered (_("Output radix now set to "
+			 "decimal %u, hex %x, octal %o.\n"),
 		       radix, radix, radix);
     }
 }
@@ -1611,7 +1585,8 @@ set_radix (char *arg, int from_tty)
   set_input_radix_1 (0, radix);
   if (from_tty)
     {
-      printf_filtered (_("Input and output radices now set to decimal %u, hex %x, octal %o.\n"),
+      printf_filtered (_("Input and output radices now set to "
+			 "decimal %u, hex %x, octal %o.\n"),
 		       radix, radix, radix);
     }
 }
@@ -1625,14 +1600,17 @@ show_radix (char *arg, int from_tty)
     {
       if (input_radix == output_radix)
 	{
-	  printf_filtered (_("Input and output radices set to decimal %u, hex %x, octal %o.\n"),
+	  printf_filtered (_("Input and output radices set to "
+			     "decimal %u, hex %x, octal %o.\n"),
 			   input_radix, input_radix, input_radix);
 	}
       else
 	{
-	  printf_filtered (_("Input radix set to decimal %u, hex %x, octal %o.\n"),
+	  printf_filtered (_("Input radix set to decimal "
+			     "%u, hex %x, octal %o.\n"),
 			   input_radix, input_radix, input_radix);
-	  printf_filtered (_("Output radix set to decimal %u, hex %x, octal %o.\n"),
+	  printf_filtered (_("Output radix set to decimal "
+			     "%u, hex %x, octal %o.\n"),
 			   output_radix, output_radix, output_radix);
 	}
     }

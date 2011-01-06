@@ -1,3 +1,51 @@
+2010-12-31  John David Anglin  <dave.anglin@nrc-cnrc.gc.ca>
+
+	PR gas/11395
+	* hppa.h (pa_opcodes): Revert last change.  Exchange 32 and 64-bit
+	"bb" entries.
+
+2010-12-26  John David Anglin  <dave.anglin@nrc-cnrc.gc.ca>
+
+	PR gas/11395
+	* hppa.h: Clear "d" bit in "add" and "sub" patterns.
+
+2010-12-18  Richard Sandiford  <rdsandiford@googlemail.com>
+
+	* mips.h: Update commentary after last commit.
+
+2010-12-18  Mingjie Xing  <mingjie.xing@gmail.com>
+
+	* mips.h (OP_*_OFFSET_A, OP_*_OFFSET_B, OP_*_OFFSET_C)
+	(OP_*_RZ, OP_*_FZ, INSN2_M_FP_D, INSN2_WRITE_GPR_Z, INSN2_WRITE_FPR_Z)
+	(INSN2_READ_GPR_Z, INSN2_READ_FPR_Z, INSN2_READ_GPR_D): Define.
+
+2010-11-23  Richard Sandiford  <rdsandiford@googlemail.com>
+
+	* mips.h: Fix previous commit.
+
+2010-11-23  Maciej W. Rozycki  <macro@linux-mips.org>
+
+	* mips.h (INSN_CHIP_MASK): Update according to INSN_LOONGSON_3A.
+	(INSN_LOONGSON_3A): Clear bit 31.
+
+2010-11-15  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	PR gas/12198
+	* arm.h (ARM_AEXT_V6M_ONLY): New define.
+	(ARM_AEXT_V6M): Rewrite in terms of ARM_AEXT_V6M_ONLY.
+	(ARM_ARCH_V6M_ONLY): New define.
+
+2010-11-11  Mingming Sun  <mingm.sun@gmail.com>
+
+	* mips.h (INSN_LOONGSON_3A): Defined.
+	(CPU_LOONGSON_3A): Defined.
+	(OPCODE_IS_MEMBER): Add LOONGSON_3A.
+
+2010-10-09  Matt Rice  <ratmice@gmail.com>
+
+	* cgen.h (CGEN_ATTR, CGEN_ATTR_TYPE): Rename bool attribute to bool_.
+	(CGEN_ATTR_BOOLS, CGEN_ATTR_CGEN_INSN_ALIAS_VALUE): Likewise.
+
 2010-09-23  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
 
 	* arm.h (ARM_EXT_VIRT): New define.
@@ -6,7 +54,7 @@
 	Extensions.
 
 2010-09-23  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
-	
+
 	* arm.h (ARM_AEXT_ADIV): New define.
 	(ARM_ARCH_V7A_IDIV_MP_SEC): Likewise.
 

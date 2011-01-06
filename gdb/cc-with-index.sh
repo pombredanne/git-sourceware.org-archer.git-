@@ -1,7 +1,7 @@
 #! /bin/sh
 # Wrapper around gcc to add the .gdb_index section when running the testsuite.
 
-# Copyright (C) 2010 Free Software Foundation, Inc.
+# Copyright (C) 2010, 2011 Free Software Foundation, Inc.
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 3 of the License, or
@@ -50,6 +50,7 @@ OBJCOPY=${OBJCOPY:-objcopy}
 
 have_link=unknown
 next_is_output_file=no
+output_file=a.out
 
 for arg in "$@"
 do

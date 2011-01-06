@@ -1,7 +1,7 @@
 /* Machine independent support for SVR4 /proc (process file system) for GDB.
 
-   Copyright (C) 1999, 2000, 2001, 2002, 2003, 2006, 2007, 2008, 2009, 2010
-   Free Software Foundation, Inc.
+   Copyright (C) 1999, 2000, 2001, 2002, 2003, 2006, 2007, 2008, 2009, 2010,
+   2011 Free Software Foundation, Inc.
 
    Written by Michael Snyder at Cygnus Solutions.
    Based on work by Fred Fish, Stu Grossman, Geoff Noer, and others.
@@ -133,7 +133,8 @@ static int procfs_xfer_memory (CORE_ADDR, gdb_byte *, int, int,
 static LONGEST procfs_xfer_partial (struct target_ops *ops,
 				    enum target_object object,
 				    const char *annex,
-				    gdb_byte *readbuf, const gdb_byte *writebuf,
+				    gdb_byte *readbuf,
+				    const gdb_byte *writebuf,
 				    ULONGEST offset, LONGEST len);
 
 static int procfs_thread_alive (struct target_ops *ops, ptid_t);
@@ -486,8 +487,8 @@ find_procinfo_or_die (int pid, int tid)
   if (pi == NULL)
     {
       if (tid)
-	error (_("\
-procfs: couldn't find pid %d (kernel thread %d) in procinfo list."),
+	error (_("procfs: couldn't find pid %d "
+		 "(kernel thread %d) in procinfo list."),
 	       pid, tid);
       else
 	error (_("procfs: couldn't find pid %d in procinfo list."), pid);
@@ -898,8 +899,8 @@ load_syscalls (procinfo *pi)
 
   if (header.pr_nsyscalls == 0)
     {
-      error (_("\
-load_syscalls: /proc/%d/sysent contains no syscalls!"), pi->pid);
+      error (_("load_syscalls: /proc/%d/sysent contains no syscalls!"),
+	     pi->pid);
     }
 
   size = header.pr_nsyscalls * sizeof (prsyscall_t);
@@ -1060,7 +1061,8 @@ fltset_t *proc_get_traced_faults (procinfo * pi, fltset_t * save);
 gdb_sigset_t *proc_get_traced_signals (procinfo * pi, gdb_sigset_t * save);
 gdb_sigset_t *proc_get_held_signals (procinfo * pi, gdb_sigset_t * save);
 gdb_sigset_t *proc_get_pending_signals (procinfo * pi, gdb_sigset_t * save);
-gdb_sigaction_t *proc_get_signal_actions (procinfo * pi, gdb_sigaction_t *save);
+gdb_sigaction_t *proc_get_signal_actions (procinfo * pi,
+					  gdb_sigaction_t *save);
 
 void proc_warn (procinfo * pi, char *func, int line);
 void proc_error (procinfo * pi, char *func, int line);
@@ -3852,7 +3854,8 @@ wait_again:
 	      wait_retval = wait (&wstat); /* "wait" for the child's exit  */
 
 	      if (wait_retval != PIDGET (inferior_ptid)) /* wrong child? */
-		error (_("procfs: couldn't stop process %d: wait returned %d."),
+		error (_("procfs: couldn't stop "
+			 "process %d: wait returned %d."),
 		       PIDGET (inferior_ptid), wait_retval);
 	      /* FIXME: might I not just use waitpid?
 		 Or try find_procinfo to see if I know about this child? */
@@ -3968,7 +3971,8 @@ wait_again:
 		      if ((nsysargs = proc_nsysarg (pi)) > 0 &&
 			  (sysargs  = proc_sysargs (pi)) != NULL)
 			{
-			  printf_filtered (_("%ld syscall arguments:\n"), nsysargs);
+			  printf_filtered (_("%ld syscall arguments:\n"),
+					   nsysargs);
 			  for (i = 0; i < nsysargs; i++)
 			    printf_filtered ("#%ld: 0x%08lx\n",
 					     i, sysargs[i]);
@@ -4159,8 +4163,8 @@ wait_again:
 #endif
 		  wstat = (SIGFPE << 8) | 0177;
 		  break;
-		case FLTPAGE:		/* Recoverable page fault */
-		default:	 /* FIXME: use si_signo if possible for fault */
+		case FLTPAGE:	/* Recoverable page fault */
+		default:	/* FIXME: use si_signo if possible for fault */
 		  retval = pid_to_ptid (-1);
 		  printf_filtered ("procfs:%d -- ", __LINE__);
 		  printf_filtered (_("child stopped for unknown reason:\n"));
@@ -5690,7 +5694,7 @@ procfs_corefile_thread_callback (procinfo *pi, procinfo *thread, void *data)
 static int
 find_signalled_thread (struct thread_info *info, void *data)
 {
-  if (info->stop_signal != TARGET_SIGNAL_0
+  if (info->suspend.stop_signal != TARGET_SIGNAL_0
       && ptid_get_pid (info->ptid) == ptid_get_pid (inferior_ptid))
     return 1;
 
@@ -5704,7 +5708,7 @@ find_stop_signal (void)
     iterate_over_threads (find_signalled_thread, NULL);
 
   if (info)
-    return info->stop_signal;
+    return info->suspend.stop_signal;
   else
     return TARGET_SIGNAL_0;
 }
@@ -5761,7 +5765,8 @@ procfs_make_note_section (bfd *obfd, int *note_size)
   thread_args.note_data = note_data;
   thread_args.note_size = note_size;
   thread_args.stop_signal = stop_signal;
-  proc_iterate_over_threads (pi, procfs_corefile_thread_callback, &thread_args);
+  proc_iterate_over_threads (pi, procfs_corefile_thread_callback,
+			     &thread_args);
 
   /* There should be always at least one thread.  */
   gdb_assert (thread_args.note_data != note_data);

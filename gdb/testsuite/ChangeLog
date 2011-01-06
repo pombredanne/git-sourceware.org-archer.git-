@@ -1,3 +1,484 @@
+2011-01-06  Joel Brobecker  <brobecker@adacore.com>
+
+        * gdb.ada/array_bounds.exp, gdb.ada/array_return.exp,
+        gdb.ada/array_subscript_addr.exp, gdb.ada/arrayidx.exp,
+        gdb.ada/arrayparam.exp, gdb.ada/arrayptr.exp,
+        gdb.ada/atomic_enum.exp, gdb.ada/call_pn.exp,
+        gdb.ada/catch_ex.exp, gdb.ada/char_param.exp,
+        gdb.ada/complete.exp, gdb.ada/exprs.exp, gdb.ada/fixed_cmp.exp,
+        gdb.ada/fixed_points.exp, gdb.ada/formatted_ref.exp,
+        gdb.ada/frame_args.exp, gdb.ada/fun_addr.exp,
+        gdb.ada/fun_in_declare.exp, gdb.ada/funcall_param.exp,
+        gdb.ada/homonym.exp, gdb.ada/int_deref.exp,
+        gdb.ada/interface.exp, gdb.ada/lang_switch.exp,
+        gdb.ada/mod_from_name.exp, gdb.ada/nested.exp,
+        gdb.ada/null_array.exp, gdb.ada/null_record.exp,
+        gdb.ada/packed_array.exp, gdb.ada/packed_tagged.exp,
+        gdb.ada/print_chars.exp, gdb.ada/print_pc.exp,
+        gdb.ada/ptype_field.exp, gdb.ada/ptype_tagged_param.exp,
+        gdb.ada/rec_return.exp, gdb.ada/ref_param.exp,
+        gdb.ada/ref_tick_size.exp, gdb.ada/start.exp,
+        gdb.ada/str_ref_cmp.exp, gdb.ada/sym_print_name.exp,
+        gdb.ada/taft_type.exp, gdb.ada/tagged.exp, gdb.ada/tasks.exp,
+        gdb.ada/tick_last_segv.exp, gdb.ada/type_coercion.exp,
+        gdb.ada/uninitialized_vars.exp,
+        gdb.ada/variant_record_packed_array.exp, gdb.ada/watch_arg.exp:
+        Simplify by using clean_restart.
+
+2011-01-06  Joel Brobecker  <brobecker@adacore.com>
+
+	Add marker to be used as anchor for inserting breakpoints.
+	* gdb.ada/null_record/null_record.adb: Add "-- START" comment.
+	* gdb.ada/start/dummy.adb, gdb.ada/uninitialized_vars/parse.adb:
+	Likewise.
+
+	Remove uses of gdb_start_cmd.
+	* gdb.ada/null_record.exp: Remove use of gdb_start_cmd.
+	* gdb.ada/print_pc.exp, gdb.ada/uninitialized_vars.exp: Ditto.
+
+	Do not run testcase if testing with GDBserver.
+	* gdb.ada/exec_changed.exp, gdb.ada/start.exp: Abort as untested
+	if testing with GDBserver.
+
+2011-01-06  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/complete/foo.adb, gdb.ada/complete/pck.adb,
+	gdb.ada/complete/pck.ads, gdb.ada/print_chars/foo.adb: Add
+	copyright header.
+
+2011-01-05  Joel Brobecker  <brobecker@adacore.com>
+
+	* testsuite/configure.ac, testsuite/gdb.arch/gdb1291.s,
+	testsuite/gdb.arch/gdb1431.s, testsuite/gdb.fortran/array-element.f,
+	testsuite/gdb.fortran/complex.f,
+	testsuite/gdb.fortran/derived-type.f90,
+	testsuite/gdb.fortran/library-module-lib.f90,
+	testsuite/gdb.fortran/library-module-main.f90,
+	testsuite/gdb.fortran/logical.f90, testsuite/gdb.fortran/module.f90,
+	testsuite/gdb.fortran/subarray.f, testsuite/gdb.mi/array.f:
+	Copyright year update.
+
+2011-01-05  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.base/langs1.f: Add copyright header.
+
+2011-01-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/morestack.exp: New file.
+	* gdb.base/morestack.c: New file.
+
+2011-01-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.ada/gnat_ada.gpr: Fix copyright comment line regression by 2011.
+
+2010-12-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/arrayptr/foo.adb: Add new local variable Null_String.
+	* gdb.ada/arrayptr.exp: Add test printing that new variable.
+
+2010-12-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/lang_switch.exp: Correct expected parameter value.
+
+2010-12-25  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* gdb.threads/tls.exp: Fix typo.
+
+	* gdb.threads/thread-specific.exp (get_thread_list): Update.
+	* gdb.threads/execl.exp: Update.
+
+2010-12-23  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.arch/arm-disp-step.exp: New.
+	* gdb.arch/arm-disp-step.S: New.
+
+2010-12-21  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.threads/execl.exp: Update.
+	* gdb.threads/linux-dp.exp: Update.
+	* gdb.threads/manythreads.exp: Update.
+	* gdb.threads/tls.exp: Update.
+
+2010-12-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.cp/nextoverthrow.cc (dummy): Return int 0.
+	(NextOverThrowDerivates) <resumebpt>: New.
+	(resumebpt_test): New.
+	(main): Call resumebpt_test.
+	* gdb.cp/nextoverthrow.exp: New block for test of "resumebpt".
+
+2010-12-12  Stan Shebs  <stan@codesourcery.com>
+
+	* gdb.trace/tsv.exp: Test print command on trace state variables.
+
+2010-12-09  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/interp.exp: Add regression test.
+
+2010-12-09  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.java/jnpe.java: New file.
+	* gdb.java/jnpe.exp: New file.
+	* gdb.cp/nextoverthrow.exp: New file.
+	* gdb.cp/nextoverthrow.cc: New file.
+
+2010-12-07  Doug Evans  <dje@google.com>
+
+	* gdb.base/catch-syscall.exp (do_syscall_tests): Remove setting
+	of data-directory.
+	* lib/gdb-python.exp (gdb_check_python_config): Delete, all callers
+	updated.
+	* lib/gdb.exp (INTERNAL_GDBFLAGS): Add -data-directory.
+
+2010-11-29  Michael Snyder  <msnyder@msnyder-server.eng.vmware.com>
+
+	* gdb.base/callfuncs.exp: Test for skip_float_tests.
+	* gdb.base/call-sc.exp: Ditto.
+	* gdb.base/finish.exp: Ditto.
+	* gdb.base/return.exp: Ditto.
+	* gdb.base/return2.exp: Ditto.
+
+2010-11-30  Doug Evans  <dje@google.com>
+
+	* lib/gdb.exp (gdb_test_sequence): Return result of gdb_expect_list.
+	(gdb_expect_list): Fix spelling errors in comments.
+	* gdb.arch/system-gcore.exp: Use gdb_test_sequence instead of
+	send_gdb/gdb_expect_list where applicable.
+	* gdb.base/call-ar-st.exp: Ditto.
+	* gdb.base/funcargs.exp: Ditto.
+	* gdb.base/gcore.exp: Ditto.
+	* gdb.base/page.exp: Ditto.
+	* gdb.base/sigaltstack.exp: Ditto.
+	* gdb.base/siginfo.exp: Ditto.
+	* gdb.base/sigstep.exp: Ditto.
+	* gdb.base/trace-commands.exp: Ditto.
+
+2010-11-29  Doug Evans  <dje@google.com>
+
+	* gdb.python/py-pp-maint.exp: Change printer-name:subprinter-name to
+	printer-name;subprinter-name.
+
+2010-11-29  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/implptr.exp: New file.
+	* gdb.dwarf2/implptr.c: New file.
+	* gdb.dwarf2/implptr.S: New file.
+
+2010-11-29  Phil Muldoon  <pmuldoon@redhat.com>
+
+        PR python/12199
+
+	* gdb.python/py-breakpoint.exp: Test the delete method.
+
+2010-11-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix step_resume_breakpoint unsaved during an infcall.
+	* gdb.base/step-resume-infcall.exp: New file.
+	* gdb.base/step-resume-infcall.c: New file.
+
+2010-11-24  Edjunior Machado  <emachado@br.ibm.com>
+
+	* gdb.asm/powerpc.inc: Use 'sys_exit' on gdbasm_exit0 macro.
+
+2010-11-24  Edjunior Machado  <emachado@br.ibm.com>
+
+	* gdb.asm/asm-source.exp: Add new target "powerpc64"; expect leading `.'
+	on ppc64's symbols; "finish" and "return" commands must accept to
+	show the caller line again as well as the line after.
+	* gdb.asm/powerpc64.inc: New file.
+
+2010-11-23  Doug Evans  <dje@google.com>
+
+	* lib/gdb.exp (gdb_test_sequence): New function.
+	(gdb_expect_list): Add verbose -log call for each pattern.
+	* gdb.base/signals.exp (test_handle_all_print): Call it.
+	Reduce timeout increment from 6 minutes to 1 minute.
+	* gdb.server/ext-run.exp: Call it.
+
+2010-11-23  Phil Muldoon  <pmuldoon@redhat.com>
+
+	PR python/12212
+
+	* gdb.python/python.exp: Check that selected_thread raises an
+	error when no inferior is loaded.
+
+2010-11-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-stack-boundary.exp: New file.
+	* gdb.dwarf2/dw2-stack-boundary.S: New file.
+
+2010-11-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-ada-ffffffff.S: New file.
+	* gdb.dwarf2/dw2-ada-ffffffff.exp: New file.
+
+2010-11-18  Doug Evans  <dje@google.com>
+
+	* gdb.server/ext-run.exp: Fix intermittent failures.
+
+2010-11-12  Nathan Froyd  <froydnj@codesourcery.com>
+
+	* gdb.stabs/gdb11479.exp: Use runto_main.
+
+2010-11-12  Nathan Froyd  <froydnj@codesourcery.com>
+
+	* gdb.base/break-entry.exp: Skip if using a stub.
+
+2010-11-12  Nathan Froyd  <froydnj@codesourcery.com>
+
+	* gdb.python/py-inferior.exp: Pack values in target endianness.
+
+2010-11-12  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.python/py-prettyprint.c (main): Add new 'ns2' local.
+	* gdb.python/py-prettyprint.exp (run_lang_tests): Add test for
+	MemoryError.
+	* gdb.python/python.exp (gdb_py_test_multiple): Update exception
+	type.
+	* gdb.python/py-value.exp (test_value_in_inferior): Add test for
+	MemoryError.
+	(test_subscript_regression): Update exception type.
+
+2010-11-11  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.python/py-breakpoint.exp: Add internal watchpoint and
+	breakpoint tests.
+
+2010-11-09  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.base/watchpoint.exp: Test "watch -location" with an
+	innacessible location.
+
+2010-11-09  Edjunior Machado  <emachado@br.ibm.com>
+	    Luis Machado  <luisgpm@br.ibm.com>
+
+	* gdb.base/maint.exp: Expect "." prefix.
+	* gdb.base/nodebug.exp: Expect "." Likewise.
+	* gdb.base/sepsymtab.exp: Expect "." Likewise.
+	* gdb.base/watchpoint-cond-gone.exp: Likewise.
+	* gdb.base/watchpoint.exp: Expect a software watch to be created for
+	POWER server processors.
+
+2010-11-08  Edjunior Machado  <emachado@br.ibm.com>
+	    Luis Machado  <luisgpm@br.ibm.com>
+
+	* gdb.base/break-entry.exp: convert entry point for
+	ppc64 and expect leading `.' on ppc64's symbols
+
+2010-11-05  Doug Evans  <dje@google.com>
+
+	* gdb.base/help.exp: Update expected output.
+	* gdb.python/py-param.exp: Delete, contents moved to ...
+	* gdb.python/py-parameter.exp: ... here.  New file.
+	Add test for gdb.parameter ("directories").
+
+2010-11-05  Ken Werner  <ken.werner@de.ibm.com>
+
+	* Makefile.in (ALL_SUBDIRS): Add gdb.opencl.
+	* configure.ac (AC_OUTPUT): Add gdb.opencl/Makefile.
+	* configure: Regenerate.
+	* gdb.opencl/Makefile.in: New File.
+	* gdb.opencl/datatypes.exp: Likewise.
+	* gdb.opencl/datatypes.cl: Likewise.
+	* gdb.opencl/operators.exp: Likewise.
+	* gdb.opencl/operators.cl: Likewise.
+	* gdb.opencl/vec_comps.exp: Likewise.
+	* gdb.opencl/vec_comps.cl: Likewise.
+	* gdb.opencl/convs_casts.exp: Likewise.
+	* gdb.opencl/convs_casts.cl: Likewise.
+	* lib/opencl.exp: Likewise.
+	* lib/opencl_hostapp.c: Likewise.
+	* lib/opencl_kernel.cl: Likewise.
+	* lib/cl_util.c: Likewise.
+	* lib/cl_util.c: Likewise.
+	* gdb.base/default.exp (set language): Add "opencl" to the list of
+	languages.
+
+2010-11-04  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/overload.exp: Added test for inheritance overload.
+	* gdb.cp/overload.cc: Ditto.
+	* gdb.cp/oranking.exp: Removed releveant kfails.
+
+2010-11-04  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/null_array.exp (print my_table): Call get_compiler_info and
+	check test_compiler_info.
+
+2010-11-03  Ken Werner  <ken.werner@de.ibm.com>
+
+	* gdb.base/gnu_vector.exp: Adjust expect messages.
+
+2010-11-03  Ken Werner  <ken.werner@de.ibm.com>
+
+	* gdb.base/gnu_vector.exp: Add unary operator tests.
+
+2010-11-03  Ken Werner  <ken.werner@de.ibm.com>
+
+	* gdb.base/exprs.exp: Add tests for pre-/post- in-/decrement operators.
+
+2010-11-02  Doug Evans  <dje@google.com>
+
+	* gdb.python/py-pp-maint.c: New file.
+	* gdb.python/py-pp-maint.exp: New file.
+	* gdb.python/py-pp-maint.py: New file.
+
+2010-11-02  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/default.exp: Remove "scheme" from language list.
+
+2010-11-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Revert:
+	2010-10-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	* gdb.threads/sigstep-threads.exp: New file.
+	* gdb.threads/sigstep-threads.c: New file.
+
+2010-10-20  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.threads/fork-child-threads.exp: Don't run on remote target.
+
+2010-10-19  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.base/watch_thread_num.exp: Revert 2008-09-03 change.
+	Skip test completely if gdb,no_hardware_watchpoints.
+
+2010-10-19  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.base/foll-fork.exp: Make regexps to match catchpoint hits more
+	strict, but do not check for any particular function name within libc.
+
+2010-10-19  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/smartp.exp: New test.
+	* gdb.cp/smartp.cc : New test.
+
+2010-10-19  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/converts.exp: Test pointer to bool conversion.
+	Test pointer to long conversion.
+	* gdb.cp/oranking.exp: Removed relevant kfail.
+
+2010-10-18  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.python/py-prettyprint.exp (run_lang_tests): Test encoding
+	argument to lazy_string.
+	* gdb.python/py-prettyprint.py (pp_ls_encoding): New global.
+	(pp_ls.to_string): Use it.
+	* gdb.python/py-prettyprint.c (main): Move declarations to top.
+	Add "estring2" local.
+
+2010-10-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix s390x compatibility.
+	* gdb.dwarf2/pr11465.S (DW_TAG_pointer_type): Use PTRBITS.  Twice.
+	* gdb.dwarf2/pr11465.exp: Set ptrbits, use it for -DPTRBITS.
+
+2010-10-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.threads/sigstep-threads.exp: New file.
+	* gdb.threads/sigstep-threads.c: New file.
+
+2010-10-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/pie-execl.exp: New file.
+	* gdb.base/pie-execl.c: New file.
+
+2010-10-13  Doug Evans  <dje@google.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR exp/12117
+	* gdb.cp/ptype-cv-cp.cc: New file.
+	* gdb.cp/ptype-cv-cp.exp: New file.
+
+2010-10-14  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/converts.cc: New test program.
+	* gdb.cp/converts.exp: New test.
+	* gdb.cp/overload.exp: Added test for void* vs int*.
+	* gdb.cp/overload.exp: Ditto.
+	* gdb.cp/oranking.exp: Removed related kfail.
+
+2010-10-13  Doug Evans  <dje@google.com>
+
+	* lib/gdb-python.exp (gdb_check_python_config): New function.
+	* gdb.python/Makefile.in (EXECUTABLES): Add lib-types.
+	* gdb.python/lib-types.cc: New file.
+	* gdb.python/lib-types.exp: New file.
+
+2010-10-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.python/py-error.exp: New file.
+	* gdb.python/py-error.py: New file.
+
+2010-10-12  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/break-interp.exp (test_ld): Replace gdb_expect by
+	gdb_test_multiple.
+
+2010-10-12  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/break-interp.exp: Use ldlags for linking flags.
+	* gdb.base/prelink.exp: Likewise.
+	* gdb.base/solib-nodir.exp: Likewise.
+	* lib/gdb.exp (gdb_compile) <*-*-openbsd*>
+	(gdb_compile) <shlib_load>: Use ldlags for linking flags.
+	* lib/prelink-support.exp (build_executable_own_libs): Likewise.
+
+2010-10-12  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* break-interp.exp (test_ld): Use two separate gdb_expect statements
+	for the "info files" test to avoid timeouts on slow machines.
+
+2010-10-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.cp/infcall-dlopen.cc (openlib): Support NULL FILENAME.
+	(main): Make openlib dummy call.
+
+2010-10-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix missing _start PIE relocation on ppc64 due to stop on dl_main.
+	* break-interp.exp (reach): Move the core body ...
+	(reach_1): ... here.  Use stop-on-solib-events for _dl_debug_state.
+	(test_ld): Provide always real argument, even to the linker.  Replace
+	dl_main by _dl_debug_state.
+
+2010-10-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix results of prelinked PIEs on ppc*.
+	* gdb.base/break-interp.exp (reach, test_core, test_attach_gdb):
+	Accept also DISPLACEMENT "PRESENT".
+	(main): Replace "ZERO" displacements by "PRESENT".
+
+2010-10-08  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/oranking.exp: New test.
+	* gdb.cp/oranking.cc: New test program.
+
+2010-10-08  Ken Werner  <ken.werner@de.ibm.com>
+
+	* gdb.base/gnu_vector.c (ia, ib, fa, fb): New variables.
+	* gdb.base/gnu_vector.exp: Add tests for scalar to vector widening.
+
+2010-10-06  Ken Werner  <ken.werner@de.ibm.com>
+
+	* gdb.base/constvars.c (logical, lugged, luck, lunar, lumen, lurk,
+	lush, lynx) New constant.
+	* gdb.base/constvars.exp: Test const array types.
+	* gdb.dwarf2/dw2-strp.exp: Add const qualifier for ptype tests.
+
+2010-10-06  Doug Evans  <dje@google.com>
+
+	* gdb.base/catch-syscall.exp (do_syscall_tests): Update location
+	of syscall staging area.
+
+2010-10-06  Ken Werner  <ken.werner@de.ibm.com>
+
+	* gdb.base/gnu_vector.c: Add variable c4.
+	* gdb.base/gnu_vector.exp: Add tests for character vector printing.
+	* gdb.arch/altivec-abi.exp: Fix expect pattern of character vectors.
+
 2010-10-05  Maciej W. Rozycki  <macro@codesourcery.com>
 
 	* gdb.arch/altivec-abi.exp: Fix a typo.

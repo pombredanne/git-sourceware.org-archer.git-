@@ -1,7 +1,7 @@
 /* Serial interface for raw TCP connections on Un*x like systems.
 
    Copyright (C) 1992, 1993, 1994, 1995, 1996, 1998, 1999, 2001, 2005, 2006,
-   2007, 2008, 2009, 2010 Free Software Foundation, Inc.
+   2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -178,7 +178,7 @@ net_open (struct serial *scb, const char *name)
   port_str = strchr (name, ':');
 
   if (!port_str)
-    error (_("net_open: No colon in host name!"));	   /* Shouldn't ever happen */
+    error (_("net_open: No colon in host name!"));  /* Shouldn't ever happen */
 
   tmp = min (port_str - name, (int) sizeof hostname - 1);
   strncpy (hostname, name, tmp);	/* Don't want colon */
@@ -216,7 +216,8 @@ net_open (struct serial *scb, const char *name)
   ioarg = 1;
   ioctl (scb->fd, FIONBIO, &ioarg);
 
-  /* Use Non-blocking connect.  connect() will return 0 if connected already. */
+  /* Use Non-blocking connect.  connect() will return 0 if connected
+     already. */
   n = connect (scb->fd, (struct sockaddr *) &sockaddr, sizeof (sockaddr));
 
   if (n < 0)

@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008, 2009, 2010 Free Software Foundation, Inc.
+   2008, 2009, 2010, 2011 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -108,8 +108,9 @@ static void
 show_max_symbolic_offset (struct ui_file *file, int from_tty,
 			  struct cmd_list_element *c, const char *value)
 {
-  fprintf_filtered (file, _("\
-The largest offset that will be printed in <symbol+1234> form is %s.\n"),
+  fprintf_filtered (file,
+		    _("The largest offset that will be "
+		      "printed in <symbol+1234> form is %s.\n"),
 		    value);
 }
 
@@ -120,8 +121,8 @@ static void
 show_print_symbol_filename (struct ui_file *file, int from_tty,
 			    struct cmd_list_element *c, const char *value)
 {
-  fprintf_filtered (file, _("\
-Printing of source filename and line number with <symbol> is %s.\n"),
+  fprintf_filtered (file, _("Printing of source filename and "
+			    "line number with <symbol> is %s.\n"),
 		    value);
 }
 
@@ -260,7 +261,8 @@ decode_format (char **string_ptr, int oformat, int osize)
 	val.size = osize ? 'b' : osize;
 	break;
       case 's':
-	/* Display strings with byte size chars unless explicitly specified.  */
+	/* Display strings with byte size chars unless explicitly
+	   specified.  */
 	val.size = '\0';
 	break;
 
@@ -298,7 +300,7 @@ print_formatted (struct value *val, int size,
 	    struct type *elttype = value_type (val);
 
 	    next_address = (value_address (val)
-			    + val_print_string (elttype,
+			    + val_print_string (elttype, NULL,
 						value_address (val), -1,
 						stream, options) * len);
 	  }
@@ -1273,7 +1275,8 @@ address_info (char *exp, int from_tty)
 	 Unfortunately DWARF 2 stores the frame-base (instead of the
 	 function) location in a function's symbol.  Oops!  For the
 	 moment enable this when/where applicable.  */
-      SYMBOL_COMPUTED_OPS (sym)->describe_location (sym, context_pc, gdb_stdout);
+      SYMBOL_COMPUTED_OPS (sym)->describe_location (sym, context_pc,
+						    gdb_stdout);
       break;
 
     case LOC_REGISTER:
@@ -1793,8 +1796,9 @@ disable_current_display (void)
   if (current_display_number >= 0)
     {
       disable_display (current_display_number);
-      fprintf_unfiltered (gdb_stderr, _("\
-Disabling display %d to avoid infinite recursion.\n"),
+      fprintf_unfiltered (gdb_stderr,
+			  _("Disabling display %d to "
+			    "avoid infinite recursion.\n"),
 			  current_display_number);
     }
   current_display_number = -1;
@@ -2258,7 +2262,8 @@ ui_printf (char *arg, struct ui_file *stream)
 	    }
 
 	  if (bad)
-	    error (_("Inappropriate modifiers to format specifier '%c' in printf"),
+	    error (_("Inappropriate modifiers to "
+		     "format specifier '%c' in printf"),
 		   *f);
 
 	  f++;

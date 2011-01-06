@@ -1,7 +1,7 @@
 /* Handle SunOS shared libraries for GDB, the GNU Debugger.
 
    Copyright (C) 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1998, 1999, 2000,
-   2001, 2004, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
+   2001, 2004, 2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -540,7 +540,8 @@ disable_break (void)
 
   if (stop_pc != breakpoint_addr)
     {
-      warning (_("stopped at unknown breakpoint while handling shared libraries"));
+      warning (_("stopped at unknown breakpoint "
+		 "while handling shared libraries"));
     }
 
   return 1;
@@ -772,15 +773,15 @@ sunos_solib_create_inferior_hook (int from_tty)
 
   clear_proceed_status ();
 
-  inf->stop_soon = STOP_QUIETLY;
-  tp->stop_signal = TARGET_SIGNAL_0;
+  inf->control.stop_soon = STOP_QUIETLY;
+  tp->suspend.stop_signal = TARGET_SIGNAL_0;
   do
     {
-      target_resume (pid_to_ptid (-1), 0, tp->stop_signal);
+      target_resume (pid_to_ptid (-1), 0, tp->suspend.stop_signal);
       wait_for_inferior (0);
     }
-  while (tp->stop_signal != TARGET_SIGNAL_TRAP);
-  inf->stop_soon = NO_STOP_QUIETLY;
+  while (tp->suspend.stop_signal != TARGET_SIGNAL_TRAP);
+  inf->control.stop_soon = NO_STOP_QUIETLY;
 
   /* We are now either at the "mapping complete" breakpoint (or somewhere
      else, a condition we aren't prepared to deal with anyway), so adjust

@@ -2341,14 +2341,12 @@ _bfd_elf_link_output_relocs (bfd *output_bfd,
   Elf_Internal_Rela *irelaend;
   bfd_byte *erel;
   struct bfd_elf_section_reloc_data *output_reldata;
-  Elf_Internal_Shdr *output_rel_hdr;
   asection *output_section;
   const struct elf_backend_data *bed;
   void (*swap_out) (bfd *, const Elf_Internal_Rela *, bfd_byte *);
   struct bfd_elf_section_data *esdo;
 
   output_section = input_section->output_section;
-  output_rel_hdr = NULL;
 
   bed = get_elf_backend_data (output_bfd);
   esdo = elf_section_data (output_section);
@@ -5075,10 +5073,10 @@ elf_link_add_archive_symbols (bfd *abfd, struct bfd_link_info *info)
 
 	  undefs_tail = info->hash->undefs_tail;
 
-	  if (! (*info->callbacks->add_archive_element) (info, element,
-							 symdef->name))
+	  if (!(*info->callbacks
+		->add_archive_element) (info, element, symdef->name, &element))
 	    goto error_return;
-	  if (! bfd_link_add_symbols (element, info))
+	  if (!bfd_link_add_symbols (element, info))
 	    goto error_return;
 
 	  /* If there are any new undefined symbols, we need to make
@@ -7884,7 +7882,8 @@ bfd_elf_perform_complex_relocation (bfd *input_bfd,
 	  "chunksz %ld, start %ld, len %ld, oplen %ld\n"
 	  "    dest: %8.8lx, mask: %8.8lx, reloc: %8.8lx\n",
 	  lsb0_p, signed_p, trunc_p, wordsz, chunksz, start, len,
-	  oplen, x, mask,  relocation);
+	  oplen, (unsigned long) x, (unsigned long) mask,
+	  (unsigned long) relocation);
 #endif
 
   r = bfd_reloc_ok;
@@ -7904,8 +7903,8 @@ bfd_elf_perform_complex_relocation (bfd *input_bfd,
 	  "         shifted mask: %8.8lx\n"
 	  " shifted/masked reloc: %8.8lx\n"
 	  "               result: %8.8lx\n",
-	  relocation, (mask << shift),
-	  ((relocation & mask) << shift), x);
+	  (unsigned long) relocation, (unsigned long) (mask << shift),
+	  (unsigned long) ((relocation & mask) << shift), (unsigned long) x);
 #endif
   /* FIXME: octets_per_byte.  */
   put_value (wordsz, chunksz, input_bfd, x, contents + rel->r_offset);
@@ -8641,6 +8640,7 @@ elf_link_output_extsym (struct elf_link_hash_entry *h, void *data)
 		  h->ref_regular ? NULL : h->root.u.undef.abfd,
 		  NULL, 0, finfo->info->unresolved_syms_in_shared_libs == RM_GENERATE_ERROR)))
 	    {
+	      bfd_set_error (bfd_error_bad_value);
 	      eoinfo->failed = TRUE;
 	      return FALSE;
 	    }
@@ -8657,16 +8657,21 @@ elf_link_output_extsym (struct elf_link_hash_entry *h, void *data)
       && !h->dynamic_weak
       && ! elf_link_check_versioned_symbol (finfo->info, bed, h))
     {
-      (*_bfd_error_handler)
-	(_("%B: %s symbol `%s' in %B is referenced by DSO"),
-	 finfo->output_bfd,
-	 h->root.u.def.section == bfd_abs_section_ptr
-	 ? finfo->output_bfd : h->root.u.def.section->owner,
-	 ELF_ST_VISIBILITY (h->other) == STV_INTERNAL
-	 ? "internal"
-	 : ELF_ST_VISIBILITY (h->other) == STV_HIDDEN
-	 ? "hidden" : "local",
-	 h->root.root.string);
+      bfd *def_bfd;
+      const char *msg;
+
+      if (ELF_ST_VISIBILITY (h->other) == STV_INTERNAL)
+	msg = _("%B: internal symbol `%s' in %B is referenced by DSO");
+      else if (ELF_ST_VISIBILITY (h->other) == STV_HIDDEN)
+	msg = _("%B: hidden symbol `%s' in %B is referenced by DSO");
+      else
+	msg = _("%B: local symbol `%s' in %B is referenced by DSO");
+      def_bfd = finfo->output_bfd;
+      if (h->root.u.def.section != bfd_abs_section_ptr)
+	def_bfd = h->root.u.def.section->owner;
+      (*_bfd_error_handler) (msg, finfo->output_bfd, def_bfd,
+			     h->root.root.string);
+      bfd_set_error (bfd_error_bad_value);
       eoinfo->failed = TRUE;
       return FALSE;
     }
@@ -8751,6 +8756,7 @@ elf_link_output_extsym (struct elf_link_hash_entry *h, void *data)
 		(*_bfd_error_handler)
 		  (_("%B: could not find output section %A for input section %A"),
 		   finfo->output_bfd, input_sec->output_section, input_sec);
+		bfd_set_error (bfd_error_nonrepresentable_section);
 		eoinfo->failed = TRUE;
 		return FALSE;
 	      }
@@ -8868,14 +8874,16 @@ elf_link_output_extsym (struct elf_link_hash_entry *h, void *data)
       && h->root.type == bfd_link_hash_undefined
       && !h->def_regular)
     {
-      (*_bfd_error_handler)
-	(_("%B: %s symbol `%s' isn't defined"),
-	 finfo->output_bfd,
-	 ELF_ST_VISIBILITY (sym.st_other) == STV_PROTECTED
-	 ? "protected"
-	 : ELF_ST_VISIBILITY (sym.st_other) == STV_INTERNAL
-	 ? "internal" : "hidden",
-	 h->root.root.string);
+      const char *msg;
+
+      if (ELF_ST_VISIBILITY (sym.st_other) == STV_PROTECTED)
+	msg = _("%B: protected symbol `%s' isn't defined");
+      else if (ELF_ST_VISIBILITY (sym.st_other) == STV_INTERNAL)
+	msg = _("%B: internal symbol `%s' isn't defined");
+      else
+	msg = _("%B: hidden symbol `%s' isn't defined");
+      (*_bfd_error_handler) (msg, finfo->output_bfd, h->root.root.string);
+      bfd_set_error (bfd_error_bad_value);
       eoinfo->failed = TRUE;
       return FALSE;
     }
@@ -9352,10 +9360,8 @@ elf_link_input_bfd (struct elf_final_link_info *finfo, bfd *input_bfd)
 	contents = elf_section_data (o)->this_hdr.contents;
       else
 	{
-	  bfd_size_type amt = o->rawsize ? o->rawsize : o->size;
-
 	  contents = finfo->contents;
-	  if (! bfd_get_section_contents (input_bfd, o, contents, 0, amt))
+	  if (! bfd_get_full_section_contents (input_bfd, o, &contents))
 	    return FALSE;
 	}
 
@@ -9464,7 +9470,8 @@ elf_link_input_bfd (struct elf_final_link_info *finfo, bfd *input_bfd)
 #ifdef DEBUG
 		  printf ("Encountered a complex symbol!");
 		  printf (" (input_bfd %s, section %s, reloc %ld\n",
-			  input_bfd->filename, o->name, rel - internal_relocs);
+			  input_bfd->filename, o->name,
+			  (long) (rel - internal_relocs));
 		  printf (" symbol: idx  %8.8lx, name %s\n",
 			  r_symndx, sym_name);
 		  printf (" reloc : info %8.8lx, addr %8.8lx\n",
@@ -10621,7 +10628,11 @@ bfd_elf_final_link (bfd *abfd, struct bfd_link_info *info)
 	  end = sec->vma + size;
 	}
       base = elf_hash_table (info)->tls_sec->vma;
-      end = align_power (end, elf_hash_table (info)->tls_sec->alignment_power);
+      /* Only align end of TLS section if static TLS doesn't have special
+	 alignment requirements.  */
+      if (bed->static_tls_alignment == 1)
+	end = align_power (end,
+			   elf_hash_table (info)->tls_sec->alignment_power);
       elf_hash_table (info)->tls_size = end - base;
     }
 
@@ -10679,7 +10690,34 @@ bfd_elf_final_link (bfd *abfd, struct bfd_link_info *info)
 	  else
 	    {
 	      if (! _bfd_default_link_order (abfd, info, o, p))
-		goto error_return;
+		{
+		  if (p->type == bfd_indirect_link_order
+		      && (bfd_get_flavour (sub)
+			  == bfd_target_elf_flavour)
+		      && (elf_elfheader (sub)->e_ident[EI_CLASS]
+			  != bed->s->elfclass))
+		    {
+		      const char *iclass, *oclass;
+
+		      if (bed->s->elfclass == ELFCLASS64)
+			{
+			  iclass = "ELFCLASS32";
+			  oclass = "ELFCLASS64";
+			}
+		      else
+			{
+			  iclass = "ELFCLASS64";
+			  oclass = "ELFCLASS32";
+			}
+
+		      bfd_set_error (bfd_error_wrong_format);
+		      (*_bfd_error_handler)
+			(_("%B: file class %s incompatible with %s"),
+			 sub, iclass, oclass);
+		    }
+
+		  goto error_return;
+		}
 	    }
 	}
     }
@@ -12690,4 +12728,26 @@ _bfd_elf_copy_link_hash_symbol_type (bfd *abfd ATTRIBUTE_UNUSED,
   struct elf_link_hash_entry *ehsrc = (struct elf_link_hash_entry *)hsrc;
 
   ehdest->type = ehsrc->type;
+}
+
+/* Append a RELA relocation REL to section S in BFD.  */
+
+void
+elf_append_rela (bfd *abfd, asection *s, Elf_Internal_Rela *rel)
+{
+  const struct elf_backend_data *bed = get_elf_backend_data (abfd);
+  bfd_byte *loc = s->contents + (s->reloc_count++ * bed->s->sizeof_rela);
+  BFD_ASSERT (loc + bed->s->sizeof_rela <= s->contents + s->size);
+  bed->s->swap_reloca_out (abfd, rel, loc);
+}
+
+/* Append a REL relocation REL to section S in BFD.  */
+
+void
+elf_append_rel (bfd *abfd, asection *s, Elf_Internal_Rela *rel)
+{
+  const struct elf_backend_data *bed = get_elf_backend_data (abfd);
+  bfd_byte *loc = s->contents + (s->reloc_count++ * bed->s->sizeof_rel);
+  BFD_ASSERT (loc + bed->s->sizeof_rel <= s->contents + s->size);
+  bed->s->swap_reloca_out (abfd, rel, loc);
 }

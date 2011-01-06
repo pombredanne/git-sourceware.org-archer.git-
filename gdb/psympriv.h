@@ -1,6 +1,6 @@
 /* Private partial symbol table definitions.
 
-   Copyright (C) 2009, 2010 Free Software Foundation, Inc.
+   Copyright (C) 2009, 2010, 2011 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -129,6 +129,12 @@ struct partial_symtab
   int statics_offset;
   int n_static_syms;
 
+  /* Non-zero if the symtab corresponding to this psymtab has been
+     readin.  This is located here so that this structure packs better
+     on 64-bit systems.  */
+
+  unsigned char readin;
+
   /* Pointer to symtab eventually allocated for this source file, 0 if
      !readin or if we haven't looked for the symtab after it was readin.  */
 
@@ -145,10 +151,6 @@ struct partial_symtab
      the various symbol reading modules.  */
 
   void *read_symtab_private;
-
-  /* Non-zero if the symtab corresponding to this psymtab has been readin */
-
-  unsigned char readin;
 };
 
 extern void sort_pst_symbols (struct partial_symtab *);
@@ -156,7 +158,8 @@ extern void sort_pst_symbols (struct partial_symtab *);
 /* Add any kind of symbol to a psymbol_allocation_list.  */
 
 extern const
-struct partial_symbol *add_psymbol_to_list (const char *, int, int, domain_enum,
+struct partial_symbol *add_psymbol_to_list (const char *, int,
+					    int, domain_enum,
 					    enum address_class,
 					    struct psymbol_allocation_list *,
 					    long, CORE_ADDR,

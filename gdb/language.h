@@ -1,7 +1,7 @@
 /* Source-language-related definitions for GDB.
 
    Copyright (C) 1991, 1992, 1993, 1994, 1995, 1998, 1999, 2000, 2003, 2004,
-   2007, 2008, 2009, 2010 Free Software Foundation, Inc.
+   2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
 
    Contributed by the Department of Computer Science at the State University
    of New York at Buffalo.
@@ -186,7 +186,8 @@ struct language_defn
 
     void (*la_post_parser) (struct expression ** expp, int void_context_p);
 
-    void (*la_printchar) (int ch, struct type *chtype, struct ui_file * stream);
+    void (*la_printchar) (int ch, struct type *chtype,
+			  struct ui_file * stream);
 
     void (*la_printstr) (struct ui_file * stream, struct type *elttype,
 			 const gdb_byte *string, unsigned int length,
@@ -410,7 +411,7 @@ extern enum language set_language (enum language);
 
 #define LA_PRINT_CHAR(ch, type, stream) \
   (current_language->la_printchar(ch, type, stream))
-#define LA_PRINT_STRING(stream, elttype, string, length, encoding, force_ellipses,options) \
+#define LA_PRINT_STRING(stream, elttype, string, length, encoding, force_ellipses, options) \
   (current_language->la_printstr(stream, elttype, string, length, \
 				 encoding, force_ellipses,options))
 #define LA_EMIT_CHAR(ch, type, stream, quoter) \
@@ -418,7 +419,7 @@ extern enum language set_language (enum language);
 #define LA_GET_STRING(value, buffer, length, chartype, encoding) \
   (current_language->la_get_string(value, buffer, length, chartype, encoding))
 
-#define LA_PRINT_ARRAY_INDEX(index_value, stream, optins) \
+#define LA_PRINT_ARRAY_INDEX(index_value, stream, options) \
   (current_language->la_print_array_index(index_value, stream, options))
 
 /* Test a character to decide whether it can be printed in literal form

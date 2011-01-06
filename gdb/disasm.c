@@ -1,7 +1,7 @@
 /* Disassemble support for GDB.
 
-   Copyright (C) 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010
-   Free Software Foundation, Inc.
+   Copyright (C) 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010,
+   2011 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -286,7 +286,8 @@ do_mixed_source_and_assembly (struct gdbarch *gdbarch, struct ui_out *uiout,
 	  else
 	    {
 	      ui_out_tuple_chain
-		= make_cleanup_ui_out_tuple_begin_end (uiout, "src_and_asm_line");
+		= make_cleanup_ui_out_tuple_begin_end (uiout,
+						       "src_and_asm_line");
 	      print_source_lines (symtab, mle[i].line, mle[i].line + 1, 0);
 	    }
 

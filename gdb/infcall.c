@@ -2,7 +2,7 @@
 
    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
    1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008, 2009, 2010 Free Software Foundation, Inc.
+   2008, 2009, 2010, 2011 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -77,8 +77,9 @@ static void
 show_coerce_float_to_double_p (struct ui_file *file, int from_tty,
 			       struct cmd_list_element *c, const char *value)
 {
-  fprintf_filtered (file, _("\
-Coercion of floats to doubles when calling functions is %s.\n"),
+  fprintf_filtered (file,
+		    _("Coercion of floats to doubles "
+		      "when calling functions is %s.\n"),
 		    value);
 }
 
@@ -94,8 +95,9 @@ static void
 show_unwind_on_signal_p (struct ui_file *file, int from_tty,
 			 struct cmd_list_element *c, const char *value)
 {
-  fprintf_filtered (file, _("\
-Unwinding of stack if a signal is received while in a call dummy is %s.\n"),
+  fprintf_filtered (file,
+		    _("Unwinding of stack if a signal is "
+		      "received while in a call dummy is %s.\n"),
 		    value);
 }
 
@@ -119,8 +121,9 @@ show_unwind_on_terminating_exception_p (struct ui_file *file, int from_tty,
 					const char *value)
 
 {
-  fprintf_filtered (file, _("\
-Unwind stack if a C++ exception is unhandled while in a call dummy is %s.\n"),
+  fprintf_filtered (file,
+		    _("Unwind stack if a C++ exception is "
+		      "unhandled while in a call dummy is %s.\n"),
 		    value);
 }
 
@@ -360,16 +363,18 @@ run_inferior_call (struct thread_info *call_thread, CORE_ADDR real_pc)
 {
   volatile struct gdb_exception e;
   int saved_async = 0;
-  int saved_in_infcall = call_thread->in_infcall;
+  int saved_in_infcall = call_thread->control.in_infcall;
   ptid_t call_thread_ptid = call_thread->ptid;
   char *saved_target_shortname = xstrdup (target_shortname);
 
-  call_thread->in_infcall = 1;
+  call_thread->control.in_infcall = 1;
 
   clear_proceed_status ();
 
   disable_watchpoints_before_interactive_call_start ();
-  call_thread->proceed_to_finish = 1; /* We want stop_registers, please... */
+
+  /* We want stop_registers, please... */
+  call_thread->control.proceed_to_finish = 1;
 
   if (target_can_async_p ())
     saved_async = target_async_mask (0);
@@ -397,11 +402,11 @@ run_inferior_call (struct thread_info *call_thread, CORE_ADDR real_pc)
   if (e.reason < 0)
     {
       if (call_thread != NULL)
-	breakpoint_auto_delete (call_thread->stop_bpstat);
+	breakpoint_auto_delete (call_thread->control.stop_bpstat);
     }
 
   if (call_thread != NULL)
-    call_thread->in_infcall = saved_in_infcall;
+    call_thread->control.in_infcall = saved_in_infcall;
 
   xfree (saved_target_shortname);
 
@@ -440,10 +445,9 @@ call_function_by_hand (struct value *function, int nargs, struct value **args)
   struct type *values_type, *target_values_type;
   unsigned char struct_return = 0, lang_struct_return = 0;
   CORE_ADDR struct_addr = 0;
-  struct inferior_status *inf_status;
+  struct infcall_control_state *inf_status;
   struct cleanup *inf_status_cleanup;
-  struct inferior_thread_state *caller_state;
-  struct cleanup *caller_state_cleanup;
+  struct infcall_suspend_state *caller_state;
   CORE_ADDR funaddr;
   CORE_ADDR real_pc;
   struct type *ftype = check_typedef (value_type (function));
@@ -474,16 +478,17 @@ call_function_by_hand (struct value *function, int nargs, struct value **args)
 
   /* A cleanup for the inferior status.
      This is only needed while we're preparing the inferior function call.  */
-  inf_status = save_inferior_status ();
-  inf_status_cleanup = make_cleanup_restore_inferior_status (inf_status);
+  inf_status = save_infcall_control_state ();
+  inf_status_cleanup
+    = make_cleanup_restore_infcall_control_state (inf_status);
 
   /* Save the caller's registers and other state associated with the
      inferior itself so that they can be restored once the
      callee returns.  To allow nested calls the registers are (further
      down) pushed onto a dummy frame stack.  Include a cleanup (which
      is tossed once the regcache has been pushed).  */
-  caller_state = save_inferior_thread_state ();
-  caller_state_cleanup = make_cleanup_restore_inferior_thread_state (caller_state);
+  caller_state = save_infcall_suspend_state ();
+  make_cleanup_restore_infcall_suspend_state (caller_state);
 
   /* Ensure that the initial SP is correctly aligned.  */
   {
@@ -811,7 +816,7 @@ call_function_by_hand (struct value *function, int nargs, struct value **args)
       const char *name = get_function_name (funaddr,
                                             name_buf, sizeof (name_buf));
 
-      discard_inferior_status (inf_status);
+      discard_infcall_control_state (inf_status);
 
       /* We could discard the dummy frame here if the program exited,
          but it will get garbage collected the next time the program is
@@ -820,12 +825,12 @@ call_function_by_hand (struct value *function, int nargs, struct value **args)
       switch (e.reason)
 	{
 	case RETURN_ERROR:
-	  throw_error (e.error, _("\
-%s\n\
-An error occurred while in a function called from GDB.\n\
-Evaluation of the expression containing the function\n\
-(%s) will be abandoned.\n\
-When the function is done executing, GDB will silently stop."),
+	  throw_error (e.error,
+		       _("%s\nAn error occurred while in a "
+			 "function called from GDB.\n Evaluation "
+			 "of the expression containing the function\n	"
+			 "(%s) will be abandoned.\nWhen the function "
+			 "is done executing, GDB will silently stop."),
 		       e.message, name);
 	case RETURN_QUIT:
 	default:
@@ -843,16 +848,16 @@ When the function is done executing, GDB will silently stop."),
 
       /* If we try to restore the inferior status,
 	 we'll crash as the inferior is no longer running.  */
-      discard_inferior_status (inf_status);
+      discard_infcall_control_state (inf_status);
 
       /* We could discard the dummy frame here given that the program exited,
          but it will get garbage collected the next time the program is
          run anyway.  */
 
-      error (_("\
-The program being debugged exited while in a function called from GDB.\n\
-Evaluation of the expression containing the function\n\
-(%s) will be abandoned."),
+      error (_("The program being debugged exited while in a function "
+	       "called from GDB.\n"
+	       "Evaluation of the expression containing the function\n"
+	       "(%s) will be abandoned."),
 	     name);
     }
 
@@ -865,23 +870,22 @@ Evaluation of the expression containing the function\n\
 	 signal or breakpoint while our thread was running.
 	 There's no point in restoring the inferior status,
 	 we're in a different thread.  */
-      discard_inferior_status (inf_status);
+      discard_infcall_control_state (inf_status);
       /* Keep the dummy frame record, if the user switches back to the
 	 thread with the hand-call, we'll need it.  */
       if (stopped_by_random_signal)
-	error (_("\
-The program received a signal in another thread while\n\
-making a function call from GDB.\n\
-Evaluation of the expression containing the function\n\
-(%s) will be abandoned.\n\
-When the function is done executing, GDB will silently stop."),
+	error (_("The program received a signal in another thread while\n"
+		 "making a function call from GDB.\nEvaluation "
+		 "of the expression containing the function\n"
+		 "(%s) will be abandoned.\nWhen the function "
+		 "is done executing, GDB will silently stop."),
 	       name);
       else
-	error (_("\
-The program stopped in another thread while making a function call from GDB.\n\
-Evaluation of the expression containing the function\n\
-(%s) will be abandoned.\n\
-When the function is done executing, GDB will silently stop."),
+	error (_("The program stopped in another thread while making "
+		 "a function call from GDB.\nEvaluation "
+		 "of the expression containing the function\n"
+		 "(%s) will be abandoned.\nWhen the function "
+		 "is done executing, GDB will silently stop."),
 	       name);
     }
 
@@ -906,16 +910,16 @@ When the function is done executing, GDB will silently stop."),
 
 	      /* We also need to restore inferior status to that before the
 		 dummy call.  */
-	      restore_inferior_status (inf_status);
+	      restore_infcall_control_state (inf_status);
 
 	      /* FIXME: Insert a bunch of wrap_here; name can be very
 		 long if it's a C++ name with arguments and stuff.  */
-	      error (_("\
-The program being debugged was signaled while in a function called from GDB.\n\
-GDB has restored the context to what it was before the call.\n\
-To change this behavior use \"set unwindonsignal off\".\n\
-Evaluation of the expression containing the function\n\
-(%s) will be abandoned."),
+	      error (_("The program being debugged was signaled while "
+		       "in a function called from GDB.\nGDB has restored "
+		       "the context to what it was before the call.\n "
+		       "To change this behavior use \"set unwindonsignal "
+		       "off\".\nEvaluation of the expression containing "
+		       "the function\n(%s) will be abandoned."),
 		     name);
 	    }
 	  else
@@ -924,17 +928,18 @@ Evaluation of the expression containing the function\n\
 		 (default).
 		 Discard inferior status, we're not at the same point
 		 we started at.  */
-	      discard_inferior_status (inf_status);
+	      discard_infcall_control_state (inf_status);
 
 	      /* FIXME: Insert a bunch of wrap_here; name can be very
 		 long if it's a C++ name with arguments and stuff.  */
-	      error (_("\
-The program being debugged was signaled while in a function called from GDB.\n\
-GDB remains in the frame where the signal was received.\n\
-To change this behavior use \"set unwindonsignal on\".\n\
-Evaluation of the expression containing the function\n\
-(%s) will be abandoned.\n\
-When the function is done executing, GDB will silently stop."),
+	      error (_("The program being debugged was signaled while "
+		       "in a function called from GDB.\nGDB remains in "
+		       "the frame where the signal was received.\nTo change "
+		       "this behavior use \"set unwindonsignal on\".\n"
+		       "Evaluation of the expression containing the "
+		       "function\n(%s) will be abandoned.\n"
+		       "When the function is done executing, GDB will "
+		       "silently stop."),
 		     name);
 	    }
 	}
@@ -947,16 +952,20 @@ When the function is done executing, GDB will silently stop."),
 
 	  /* We also need to restore inferior status to that before
 	     the dummy call.  */
-	  restore_inferior_status (inf_status);
+	  restore_infcall_control_state (inf_status);
 
-	  error (_("\
-The program being debugged entered a std::terminate call, most likely\n\
-caused by an unhandled C++ exception.  GDB blocked this call in order\n\
-to prevent the program from being terminated, and has restored the\n\
-context to its original state before the call.\n\
-To change this behaviour use \"set unwind-on-terminating-exception off\".\n\
-Evaluation of the expression containing the function (%s)\n\
-will be abandoned."),
+	  error (_("The program being debugged entered a "
+		   "std::terminate call, most likely\n"
+		   "caused by an unhandled C++ exception.  "
+		   "GDB blocked this call in order\n"
+		   "to prevent the program from being "
+		   "terminated, and has restored the\n"
+		   "context to its original state before the call.\n"
+		   "To change this behaviour use \"set "
+		   "unwind-on-terminating-exception off\".\n"
+		   "Evaluation of the expression "
+		   "containing the function (%s)\n"
+		   "will be abandoned."),
 		 name);
 	}
       else if (stop_stack_dummy == STOP_NONE)
@@ -966,7 +975,7 @@ will be abandoned."),
 	     Keep the dummy frame, the user may want to examine its state.
 	     Discard inferior status, we're not at the same point
 	     we started at.  */
-	  discard_inferior_status (inf_status);
+	  discard_infcall_control_state (inf_status);
 
 	  /* The following error message used to say "The expression
 	     which contained the function call has been discarded."
@@ -976,11 +985,13 @@ will be abandoned."),
 	     someday this will be implemented (it would not be easy).  */
 	  /* FIXME: Insert a bunch of wrap_here; name can be very long if it's
 	     a C++ name with arguments and stuff.  */
-	  error (_("\
-The program being debugged stopped while in a function called from GDB.\n\
-Evaluation of the expression containing the function\n\
-(%s) will be abandoned.\n\
-When the function is done executing, GDB will silently stop."),
+	  error (_("The program being debugged stopped "
+		   "while in a function called from GDB.\n"
+		   "Evaluation of the expression "
+		   "containing the function\n"
+		   "(%s) will be abandoned.\n"
+		   "When the function is done executing, "
+		   "GDB will silently stop."),
 		 name);
 	}
 
@@ -1003,7 +1014,7 @@ When the function is done executing, GDB will silently stop."),
 
     /* Inferior call is successful.  Restore the inferior status.
        At this stage, leave the RETBUF alone.  */
-    restore_inferior_status (inf_status);
+    restore_infcall_control_state (inf_status);
 
     /* Figure out the value returned by the function.  */
 
@@ -1077,7 +1088,8 @@ The default is to stop in the frame where the signal was received."),
   add_setshow_boolean_cmd ("unwind-on-terminating-exception", no_class,
 			   &unwind_on_terminating_exception_p, _("\
 Set unwinding of stack if std::terminate is called while in call dummy."), _("\
-Show unwinding of stack if std::terminate() is called while in a call dummy."), _("\
+Show unwinding of stack if std::terminate() is called while in a call dummy."),
+			   _("\
 The unwind on terminating exception flag lets the user determine\n\
 what gdb should do if a std::terminate() call is made from the\n\
 default exception handler.  If set, gdb unwinds the stack and restores\n\

@@ -1,6 +1,6 @@
 /* Gdb/Python header for private use by Python module.
 
-   Copyright (C) 2008, 2009, 2010 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -36,6 +36,11 @@
 #undef _POSIX_C_SOURCE
 #undef _XOPEN_SOURCE
 
+/* On sparc-solaris, /usr/include/sys/feature_tests.h defines
+   _FILE_OFFSET_BITS, which pyconfig.h also defines.  Same work
+   around technique as above.  */
+#undef _FILE_OFFSET_BITS
+
 #if HAVE_LIBPYTHON2_4
 #include "python2.4/Python.h"
 #include "python2.4/frameobject.h"
@@ -63,10 +68,9 @@ typedef int Py_ssize_t;
 #ifndef WITH_THREAD
 #define PyGILState_Ensure() ((PyGILState_STATE) 0)
 #define PyGILState_Release(ARG) ((void)(ARG))
-#define PyEval_InitThreads() 0
+#define PyEval_InitThreads()
 #define PyThreadState_Swap(ARG) ((void)(ARG))
-#define PyEval_InitThreads() 0
-#define PyEval_ReleaseLock() 0
+#define PyEval_ReleaseLock()
 #endif
 
 /* In order to be able to parse symtab_and_line_to_sal_object function 
@@ -75,6 +79,8 @@ typedef int Py_ssize_t;
 
 /* Also needed to parse enum var_types. */
 #include "command.h"
+
+#include "exceptions.h"
 
 struct block;
 struct value;
@@ -109,7 +115,8 @@ PyObject *gdbpy_selected_frame (PyObject *self, PyObject *args);
 PyObject *gdbpy_block_for_pc (PyObject *self, PyObject *args);
 PyObject *gdbpy_lookup_type (PyObject *self, PyObject *args, PyObject *kw);
 PyObject *gdbpy_create_lazy_string_object (CORE_ADDR address, long length,
-					   const char *encoding, struct type *type);
+					   const char *encoding,
+					   struct type *type);
 PyObject *gdbpy_inferiors (PyObject *unused, PyObject *unused2);
 PyObject *gdbpy_selected_thread (PyObject *self, PyObject *args);
 PyObject *gdbpy_string_to_argv (PyObject *self, PyObject *args);
@@ -189,9 +196,7 @@ PyObject *gdbpy_parameter_value (enum var_types, void *);
 #define GDB_PY_HANDLE_EXCEPTION(Exception)				\
     do {								\
       if (Exception.reason < 0)						\
-	return PyErr_Format (Exception.reason == RETURN_QUIT		\
-			     ? PyExc_KeyboardInterrupt : PyExc_RuntimeError, \
-			     "%s", Exception.message);			\
+	return gdbpy_convert_exception (Exception);			\
     } while (0)
 
 /* Use this after a TRY_EXCEPT to throw the appropriate Python
@@ -200,9 +205,7 @@ PyObject *gdbpy_parameter_value (enum var_types, void *);
     do {								\
       if (Exception.reason < 0)						\
         {								\
-	  PyErr_Format (Exception.reason == RETURN_QUIT			\
-			? PyExc_KeyboardInterrupt : PyExc_RuntimeError, \
-			"%s", Exception.message);			\
+	  gdbpy_convert_exception (Exception);				\
 	  return -1;							\
 	}								\
     } while (0)
@@ -223,16 +226,17 @@ char *gdbpy_obj_to_string (PyObject *obj);
 char *gdbpy_exception_to_string (PyObject *ptype, PyObject *pvalue);
 
 int gdbpy_is_lazy_string (PyObject *result);
-gdb_byte *gdbpy_extract_lazy_string (PyObject *string,
-				     struct type **str_type, 
-				     long *length, char **encoding);
+void gdbpy_extract_lazy_string (PyObject *string, CORE_ADDR *addr,
+				struct type **str_type, 
+				long *length, char **encoding);
 
 int gdbpy_is_value_object (PyObject *obj);
 
 /* Note that these are declared here, and not in python.h with the
    other pretty-printer functions, because they refer to PyObject.  */
 PyObject *apply_varobj_pretty_printer (PyObject *print_obj,
-				       struct value **replacement);
+				       struct value **replacement,
+				       struct ui_file *stream);
 PyObject *gdbpy_get_varobj_pretty_printer (struct value *value);
 PyObject *gdbpy_instantiate_printer (PyObject *cons, PyObject *value);
 char *gdbpy_get_display_hint (PyObject *printer);
@@ -244,7 +248,12 @@ extern PyObject *gdbpy_display_hint_cst;
 extern PyObject *gdbpy_doc_cst;
 extern PyObject *gdbpy_enabled_cst;
 
+/* Exception types.  */
+extern PyObject *gdbpy_gdb_error;
+extern PyObject *gdbpy_gdb_memory_error;
 extern PyObject *gdbpy_gdberror_exc;
+
+extern PyObject *gdbpy_convert_exception (struct gdb_exception);
 
 int get_addr_from_python (PyObject *obj, CORE_ADDR *addr);
 

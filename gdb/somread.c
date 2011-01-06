@@ -1,6 +1,6 @@
 /* Read HP PA/Risc object files for GDB.
    Copyright (C) 1991, 1992, 1994, 1995, 1996, 1998, 1999, 2000, 2001, 2002,
-   2004, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
+   2004, 2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
    Written by Fred Fish at Cygnus Support.
 
    This file is part of GDB.
@@ -430,15 +430,14 @@ som_symfile_offsets (struct objfile *objfile, struct section_addr_info *addrs)
 static const struct sym_fns som_sym_fns =
 {
   bfd_target_som_flavour,
-  som_new_init,			/* sym_new_init: init anything gbl to entire symtab */
-  som_symfile_init,		/* sym_init: read initial info, setup for sym_read() */
-  som_symfile_read,		/* sym_read: read a symbol file into symtab */
-  som_symfile_finish,		/* sym_finish: finished with file, cleanup */
-  som_symfile_offsets,		/* sym_offsets:  Translate ext. to int. relocation */
-  default_symfile_segments,	/* sym_segments: Get segment information from
-				   a file.  */
-  NULL,                         /* sym_read_linetable */
-  default_symfile_relocate,	/* sym_relocate: Relocate a debug section.  */
+  som_new_init,			/* init anything gbl to entire symtab */
+  som_symfile_init,		/* read initial info, setup for sym_read() */
+  som_symfile_read,		/* read a symbol file into symtab */
+  som_symfile_finish,		/* finished with file, cleanup */
+  som_symfile_offsets,		/* Translate ext. to int. relocation */
+  default_symfile_segments,	/* Get segment information from a file.  */
+  NULL,
+  default_symfile_relocate,	/* Relocate a debug section.  */
   &psym_functions
 };
 

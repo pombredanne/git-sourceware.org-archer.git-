@@ -822,11 +822,7 @@ _bfd_elf_make_section_from_shdr (bfd *abfd,
   const struct elf_backend_data *bed;
 
   if (hdr->bfd_section != NULL)
-    {
-      BFD_ASSERT (strcmp (name,
-			  bfd_get_section_name (abfd, hdr->bfd_section)) == 0);
-      return TRUE;
-    }
+    return TRUE;
 
   newsect = bfd_make_section_anyway (abfd, name);
   if (newsect == NULL)
@@ -1007,6 +1003,77 @@ _bfd_elf_make_section_from_shdr (bfd *abfd,
 		break;
 	    }
 	}
+    }
+
+  /* Compress/decompress DWARF debug sections with names: .debug_* and
+     .zdebug_*, after the section flags is set.  */
+  if ((flags & SEC_DEBUGGING)
+      && ((name[1] == 'd' && name[6] == '_')
+	  || (name[1] == 'z' && name[7] == '_')))
+    {
+      enum { nothing, compress, decompress } action = nothing;
+      char *new_name;
+
+      if (bfd_is_section_compressed (abfd, newsect))
+	{
+	  /* Compressed section.  Check if we should decompress.  */
+	  if ((abfd->flags & BFD_DECOMPRESS))
+	    action = decompress;
+	}
+      else
+	{
+	  /* Normal section.  Check if we should compress.  */
+	  if ((abfd->flags & BFD_COMPRESS))
+	    action = compress;
+	}
+
+      new_name = NULL;
+      switch (action)
+	{
+	case nothing:
+	  break;
+	case compress:
+	  if (!bfd_init_section_compress_status (abfd, newsect))
+	    {
+	      (*_bfd_error_handler)
+		(_("%B: unable to initialize commpress status for section %s"),
+		 abfd, name);
+	      return FALSE;
+	    }
+	  if (name[1] != 'z')
+	    {
+	      unsigned int len = strlen (name);
+
+	      new_name = bfd_alloc (abfd, len + 2);
+	      if (new_name == NULL)
+		return FALSE;
+	      new_name[0] = '.';
+	      new_name[1] = 'z';
+	      memcpy (new_name + 2, name + 1, len);
+	    }
+	  break;
+	case decompress:
+	  if (!bfd_init_section_decompress_status (abfd, newsect))
+	    {
+	      (*_bfd_error_handler)
+		(_("%B: unable to initialize decommpress status for section %s"),
+		 abfd, name);
+	      return FALSE;
+	    }
+	  if (name[1] == 'z')
+	    {
+	      unsigned int len = strlen (name);
+
+	      new_name = bfd_alloc (abfd, len);
+	      if (new_name == NULL)
+		return FALSE;
+	      new_name[0] = '.';
+	      memcpy (new_name + 1, name + 2, len - 1);
+	    }
+	  break;
+	}
+      if (new_name != NULL)
+	bfd_rename_section (abfd, newsect, new_name);
     }
 
   return TRUE;
@@ -2015,6 +2082,7 @@ static const struct bfd_elf_special_section special_sections_f[] =
 static const struct bfd_elf_special_section special_sections_g[] =
 {
   { STRING_COMMA_LEN (".gnu.linkonce.b"), -2, SHT_NOBITS,      SHF_ALLOC + SHF_WRITE },
+  { STRING_COMMA_LEN (".gnu.lto_"),       -1, SHT_PROGBITS,    SHF_EXCLUDE },
   { STRING_COMMA_LEN (".got"),             0, SHT_PROGBITS,    SHF_ALLOC + SHF_WRITE },
   { STRING_COMMA_LEN (".gnu.version"),     0, SHT_GNU_versym,  0 },
   { STRING_COMMA_LEN (".gnu.version_d"),   0, SHT_GNU_verdef,  0 },
@@ -2236,12 +2304,19 @@ _bfd_elf_new_section_hook (bfd *abfd, asection *sec)
      anyway.  We will set ELF section type and flags for all linker
      created sections.  If user specifies BFD section flags, we will
      set ELF section type and flags based on BFD section flags in
-     elf_fake_sections.  */
-  if ((!sec->flags && abfd->direction != read_direction)
+     elf_fake_sections.  Special handling for .init_array/.fini_array
+     output sections since they may contain .ctors/.dtors input
+     sections.  We don't want _bfd_elf_init_private_section_data to
+     copy ELF section type from .ctors/.dtors input sections.  */
+  if (abfd->direction != read_direction
       || (sec->flags & SEC_LINKER_CREATED) != 0)
     {
       ssect = (*bed->get_sec_type_attr) (abfd, sec);
-      if (ssect != NULL)
+      if (ssect != NULL
+	  && (!sec->flags
+	      || (sec->flags & SEC_LINKER_CREATED) != 0
+	      || ssect->type == SHT_INIT_ARRAY
+	      || ssect->type == SHT_FINI_ARRAY))
 	{
 	  elf_section_type (sec) = ssect->type;
 	  elf_section_flags (sec) = ssect->attr;
@@ -5217,9 +5292,8 @@ _bfd_elf_symbol_from_bfd_symbol (bfd *abfd, asymbol **asym_ptr_ptr)
 #if DEBUG & 4
   {
     fprintf (stderr,
-	     "elf_symbol_from_bfd_symbol 0x%.8lx, name = %s, sym num = %d, flags = 0x%.8lx%s\n",
-	     (long) asym_ptr, asym_ptr->name, idx, flags,
-	     elf_symbol_flags (flags));
+	     "elf_symbol_from_bfd_symbol 0x%.8lx, name = %s, sym num = %d, flags = 0x%.8lx\n",
+	     (long) asym_ptr, asym_ptr->name, idx, (long) flags);
     fflush (stderr);
   }
 #endif

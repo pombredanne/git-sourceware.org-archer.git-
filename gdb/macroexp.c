@@ -1,5 +1,6 @@
 /* C preprocessor macro expansion for GDB.
-   Copyright (C) 2002, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
+   Copyright (C) 2002, 2007, 2008, 2009, 2010, 2011
+   Free Software Foundation, Inc.
    Contributed by Red Hat, Inc.
 
    This file is part of GDB.
@@ -901,7 +902,8 @@ find_parameter (const struct macro_buffer *tok,
     return -1;
 
   for (i = 0; i < argc; ++i)
-    if (tok->len == strlen (argv[i]) && ! memcmp (tok->text, argv[i], tok->len))
+    if (tok->len == strlen (argv[i]) 
+	&& !memcmp (tok->text, argv[i], tok->len))
       return i;
 
   if (is_varargs && tok->len == va_arg_name->len

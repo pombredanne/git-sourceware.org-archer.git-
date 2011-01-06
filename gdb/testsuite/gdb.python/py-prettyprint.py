@@ -1,4 +1,4 @@
-# Copyright (C) 2008, 2009, 2010 Free Software Foundation, Inc.
+# Copyright (C) 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -139,6 +139,8 @@ class pp_ns:
     def display_hint (self):
         return 'string'
 
+pp_ls_encoding = None
+
 class pp_ls:
     "Print a std::basic_string of some kind"
 
@@ -146,7 +148,10 @@ class pp_ls:
         self.val = val
 
     def to_string(self):
-        return self.val['lazy_str'].lazy_string()
+        if pp_ls_encoding is not None:
+            return self.val['lazy_str'].lazy_string(encoding = pp_ls_encoding)
+        else:
+            return self.val['lazy_str'].lazy_string()
 
     def display_hint (self):
         return 'string'

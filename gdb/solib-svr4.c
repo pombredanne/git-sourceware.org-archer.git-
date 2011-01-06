@@ -1,7 +1,7 @@
 /* Handle SVR4 shared libraries for GDB, the GNU Debugger.
 
    Copyright (C) 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1998, 1999, 2000,
-   2001, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
+   2001, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
    Free Software Foundation, Inc.
 
    This file is part of GDB.
@@ -1369,8 +1369,8 @@ enable_break (struct svr4_info *info, int from_tty)
 
       sym_addr = gdbarch_addr_bits_remove
 	(target_gdbarch, gdbarch_convert_from_func_ptr_addr (target_gdbarch,
-							      sym_addr,
-							      &current_target));
+							     sym_addr,
+							     &current_target));
 
       /* On at least some versions of Solaris there's a dynamic relocation
 	 on _r_debug.r_brk and SYM_ADDR may not be relocated yet, e.g., if
@@ -1607,17 +1607,20 @@ enable_break (struct svr4_info *info, int from_tty)
 	}
     }
 
-  for (bkpt_namep = bkpt_names; *bkpt_namep != NULL; bkpt_namep++)
+  if (!current_inferior ()->attach_flag)
     {
-      msymbol = lookup_minimal_symbol (*bkpt_namep, NULL, symfile_objfile);
-      if ((msymbol != NULL) && (SYMBOL_VALUE_ADDRESS (msymbol) != 0))
+      for (bkpt_namep = bkpt_names; *bkpt_namep != NULL; bkpt_namep++)
 	{
-	  sym_addr = SYMBOL_VALUE_ADDRESS (msymbol);
-	  sym_addr = gdbarch_convert_from_func_ptr_addr (target_gdbarch,
-							 sym_addr,
-							 &current_target);
-	  create_solib_event_breakpoint (target_gdbarch, sym_addr);
-	  return 1;
+	  msymbol = lookup_minimal_symbol (*bkpt_namep, NULL, symfile_objfile);
+	  if ((msymbol != NULL) && (SYMBOL_VALUE_ADDRESS (msymbol) != 0))
+	    {
+	      sym_addr = SYMBOL_VALUE_ADDRESS (msymbol);
+	      sym_addr = gdbarch_convert_from_func_ptr_addr (target_gdbarch,
+							     sym_addr,
+							     &current_target);
+	      create_solib_event_breakpoint (target_gdbarch, sym_addr);
+	      return 1;
+	    }
 	}
     }
   return 0;
@@ -1785,8 +1788,8 @@ svr4_exec_displacement (CORE_ADDR *displacementp)
 	     may be different from EXEC_BFD as the file may have been prelinked
 	     to a different address after the executable has been loaded.
 	     Moreover the address of placement in target memory can be
-	     different from what the program headers in target memory say - this
-	     is the goal of PIE.
+	     different from what the program headers in target memory say -
+	     this is the goal of PIE.
 
 	     Detected DISPLACEMENT covers both the offsets of PIE placement and
 	     possible new prelink performed after start of the program.  Here
@@ -1796,7 +1799,8 @@ svr4_exec_displacement (CORE_ADDR *displacementp)
 	  if (phdrs_size != phdrs2_size
 	      || bfd_get_arch_size (exec_bfd) != arch_size)
 	    ok = 0;
-	  else if (arch_size == 32 && phdrs_size >= sizeof (Elf32_External_Phdr)
+	  else if (arch_size == 32
+		   && phdrs_size >= sizeof (Elf32_External_Phdr)
 	           && phdrs_size % sizeof (Elf32_External_Phdr) == 0)
 	    {
 	      Elf_Internal_Ehdr *ehdr2 = elf_tdata (exec_bfd)->elf_header;
@@ -1844,6 +1848,7 @@ svr4_exec_displacement (CORE_ADDR *displacementp)
 		  Elf32_External_Phdr *phdr2p;
 		  gdb_byte *buf_vaddr_p, *buf_paddr_p;
 		  CORE_ADDR vaddr, paddr;
+		  asection *plt2_asect;
 
 		  phdrp = &((Elf32_External_Phdr *) buf)[i];
 		  buf_vaddr_p = (gdb_byte *) &phdrp->p_vaddr;
@@ -1858,22 +1863,53 @@ svr4_exec_displacement (CORE_ADDR *displacementp)
 
 		  /* Check also other adjustment combinations - PR 11786.  */
 
-		  vaddr = extract_unsigned_integer (buf_vaddr_p, 4, byte_order);
+		  vaddr = extract_unsigned_integer (buf_vaddr_p, 4,
+						    byte_order);
 		  vaddr -= displacement;
 		  store_unsigned_integer (buf_vaddr_p, 4, byte_order, vaddr);
 
-		  paddr = extract_unsigned_integer (buf_paddr_p, 4, byte_order);
+		  paddr = extract_unsigned_integer (buf_paddr_p, 4,
+						    byte_order);
 		  paddr -= displacement;
 		  store_unsigned_integer (buf_paddr_p, 4, byte_order, paddr);
 
 		  if (memcmp (phdrp, phdr2p, sizeof (*phdrp)) == 0)
 		    continue;
 
+		  /* prelink can convert .plt SHT_NOBITS to SHT_PROGBITS.  */
+		  plt2_asect = bfd_get_section_by_name (exec_bfd, ".plt");
+		  if (plt2_asect)
+		    {
+		      int content2;
+		      gdb_byte *buf_filesz_p = (gdb_byte *) &phdrp->p_filesz;
+		      CORE_ADDR filesz;
+
+		      content2 = (bfd_get_section_flags (exec_bfd, plt2_asect)
+				  & SEC_HAS_CONTENTS) != 0;
+
+		      filesz = extract_unsigned_integer (buf_filesz_p, 4,
+							 byte_order);
+
+		      /* PLT2_ASECT is from on-disk file (exec_bfd) while
+			 FILESZ is from the in-memory image.  */
+		      if (content2)
+			filesz += bfd_get_section_size (plt2_asect);
+		      else
+			filesz -= bfd_get_section_size (plt2_asect);
+
+		      store_unsigned_integer (buf_filesz_p, 4, byte_order,
+					      filesz);
+
+		      if (memcmp (phdrp, phdr2p, sizeof (*phdrp)) == 0)
+			continue;
+		    }
+
 		  ok = 0;
 		  break;
 		}
 	    }
-	  else if (arch_size == 64 && phdrs_size >= sizeof (Elf64_External_Phdr)
+	  else if (arch_size == 64
+		   && phdrs_size >= sizeof (Elf64_External_Phdr)
 	           && phdrs_size % sizeof (Elf64_External_Phdr) == 0)
 	    {
 	      Elf_Internal_Ehdr *ehdr2 = elf_tdata (exec_bfd)->elf_header;
@@ -1921,6 +1957,7 @@ svr4_exec_displacement (CORE_ADDR *displacementp)
 		  Elf64_External_Phdr *phdr2p;
 		  gdb_byte *buf_vaddr_p, *buf_paddr_p;
 		  CORE_ADDR vaddr, paddr;
+		  asection *plt2_asect;
 
 		  phdrp = &((Elf64_External_Phdr *) buf)[i];
 		  buf_vaddr_p = (gdb_byte *) &phdrp->p_vaddr;
@@ -1935,16 +1972,46 @@ svr4_exec_displacement (CORE_ADDR *displacementp)
 
 		  /* Check also other adjustment combinations - PR 11786.  */
 
-		  vaddr = extract_unsigned_integer (buf_vaddr_p, 8, byte_order);
+		  vaddr = extract_unsigned_integer (buf_vaddr_p, 8,
+						    byte_order);
 		  vaddr -= displacement;
 		  store_unsigned_integer (buf_vaddr_p, 8, byte_order, vaddr);
 
-		  paddr = extract_unsigned_integer (buf_paddr_p, 8, byte_order);
+		  paddr = extract_unsigned_integer (buf_paddr_p, 8,
+						    byte_order);
 		  paddr -= displacement;
 		  store_unsigned_integer (buf_paddr_p, 8, byte_order, paddr);
 
 		  if (memcmp (phdrp, phdr2p, sizeof (*phdrp)) == 0)
 		    continue;
+
+		  /* prelink can convert .plt SHT_NOBITS to SHT_PROGBITS.  */
+		  plt2_asect = bfd_get_section_by_name (exec_bfd, ".plt");
+		  if (plt2_asect)
+		    {
+		      int content2;
+		      gdb_byte *buf_filesz_p = (gdb_byte *) &phdrp->p_filesz;
+		      CORE_ADDR filesz;
+
+		      content2 = (bfd_get_section_flags (exec_bfd, plt2_asect)
+				  & SEC_HAS_CONTENTS) != 0;
+
+		      filesz = extract_unsigned_integer (buf_filesz_p, 8,
+							 byte_order);
+
+		      /* PLT2_ASECT is from on-disk file (exec_bfd) while
+			 FILESZ is from the in-memory image.  */
+		      if (content2)
+			filesz += bfd_get_section_size (plt2_asect);
+		      else
+			filesz -= bfd_get_section_size (plt2_asect);
+
+		      store_unsigned_integer (buf_filesz_p, 8, byte_order,
+					      filesz);
+
+		      if (memcmp (phdrp, phdr2p, sizeof (*phdrp)) == 0)
+			continue;
+		    }
 
 		  ok = 0;
 		  break;
@@ -2130,15 +2197,15 @@ svr4_solib_create_inferior_hook (int from_tty)
   tp = inferior_thread ();
 
   clear_proceed_status ();
-  inf->stop_soon = STOP_QUIETLY;
-  tp->stop_signal = TARGET_SIGNAL_0;
+  inf->control.stop_soon = STOP_QUIETLY;
+  tp->suspend.stop_signal = TARGET_SIGNAL_0;
   do
     {
-      target_resume (pid_to_ptid (-1), 0, tp->stop_signal);
+      target_resume (pid_to_ptid (-1), 0, tp->suspend.stop_signal);
       wait_for_inferior (0);
     }
-  while (tp->stop_signal != TARGET_SIGNAL_TRAP);
-  inf->stop_soon = NO_STOP_QUIETLY;
+  while (tp->suspend.stop_signal != TARGET_SIGNAL_TRAP);
+  inf->control.stop_soon = NO_STOP_QUIETLY;
 #endif /* defined(_SCO_DS) */
 }
 

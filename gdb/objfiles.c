@@ -1,7 +1,8 @@
 /* GDB routines for manipulating objfiles.
 
    Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001,
-   2002, 2003, 2004, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
+   2002, 2003, 2004, 2007, 2008, 2009, 2010, 2011
+   Free Software Foundation, Inc.
 
    Contributed by Cygnus Support, using pieces from other GDB modules.
 
@@ -137,7 +138,8 @@ add_to_objfile_sections (struct bfd *abfd, struct bfd_section *asect,
   section.objfile = objfile;
   section.the_bfd_section = asect;
   section.ovly_mapped = 0;
-  obstack_grow (&objfile->objfile_obstack, (char *) &section, sizeof (section));
+  obstack_grow (&objfile->objfile_obstack,
+		(char *) &section, sizeof (section));
   objfile->sections_end
     = (struct obj_section *) (((size_t) objfile->sections_end) + 1);
 }
@@ -692,7 +694,7 @@ free_all_objfiles (void)
   {
     free_objfile (objfile);
   }
-  clear_symtab_users ();
+  clear_symtab_users (0);
 }
 
 /* A helper function for objfile_relocate1 that relocates a single

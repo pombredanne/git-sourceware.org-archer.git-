@@ -1,7 +1,7 @@
 /* Interface between GDB and target environments, including files and processes
 
    Copyright (C) 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
+   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
    Free Software Foundation, Inc.
 
    Contributed by Cygnus Support.  Written by John Gilmore.
@@ -256,7 +256,8 @@ enum target_object
   /* Currently loaded libraries, in XML format.  */
   TARGET_OBJECT_LIBRARIES,
   /* Get OS specific data.  The ANNEX specifies the type (running
-     processes, etc.).  */
+     processes, etc.).  The data being transfered is expected to follow
+     the DTD specified in features/osdata.dtd.  */
   TARGET_OBJECT_OSDATA,
   /* Extra signal info.  Usually the contents of `siginfo_t' on unix
      platforms.  */
@@ -467,7 +468,6 @@ struct target_ops
     void (*to_create_inferior) (struct target_ops *, 
 				char *, char *, char **, int);
     void (*to_post_startup_inferior) (ptid_t);
-    void (*to_acknowledge_created_inferior) (int);
     void (*to_insert_fork_catchpoint) (int);
     int (*to_remove_fork_catchpoint) (int);
     void (*to_insert_vfork_catchpoint) (int);
@@ -693,8 +693,9 @@ struct target_ops
        This information is updated only when:
        - update_thread_list is called
        - thread stops
-       If the core cannot be determined -- either for the specified thread, or
-       right now, or in this debug session, or for this target -- return -1.  */
+       If the core cannot be determined -- either for the specified
+       thread, or right now, or in this debug session, or for this
+       target -- return -1.  */
     int (*to_core_of_thread) (struct target_ops *, ptid_t ptid);
 
     /* Verify that the memory in the [MEMADDR, MEMADDR+SIZE) range
@@ -1025,12 +1026,6 @@ void target_create_inferior (char *exec_file, char *args,
 
 #define target_post_startup_inferior(ptid) \
      (*current_target.to_post_startup_inferior) (ptid)
-
-/* On some targets, the sequence of starting up an inferior requires
-   some synchronization between gdb and the new inferior process, PID.  */
-
-#define target_acknowledge_created_inferior(pid) \
-     (*current_target.to_acknowledge_created_inferior) (pid)
 
 /* On some targets, we can catch an inferior fork or vfork event when
    it occurs.  These functions insert/remove an already-created
@@ -1544,13 +1539,17 @@ extern struct target_section_table *target_get_section_table
 
 /* From mem-break.c */
 
-extern int memory_remove_breakpoint (struct gdbarch *, struct bp_target_info *);
+extern int memory_remove_breakpoint (struct gdbarch *,
+				     struct bp_target_info *);
 
-extern int memory_insert_breakpoint (struct gdbarch *, struct bp_target_info *);
+extern int memory_insert_breakpoint (struct gdbarch *,
+				     struct bp_target_info *);
 
-extern int default_memory_remove_breakpoint (struct gdbarch *, struct bp_target_info *);
+extern int default_memory_remove_breakpoint (struct gdbarch *,
+					     struct bp_target_info *);
 
-extern int default_memory_insert_breakpoint (struct gdbarch *, struct bp_target_info *);
+extern int default_memory_insert_breakpoint (struct gdbarch *,
+					     struct bp_target_info *);
 
 
 /* From target.c */

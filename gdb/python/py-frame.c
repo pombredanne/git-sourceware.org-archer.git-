@@ -1,6 +1,6 @@
 /* Python interface to stack frames
 
-   Copyright (C) 2008, 2009, 2010 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -385,7 +385,8 @@ frapy_find_sal (PyObject *self, PyObject *args)
    start the search from that block, otherwise search from the frame's
    current block (determined by examining the resume address of the
    frame).  The variable argument must be a string or an instance of a
-   gdb.Symbol.  The block argument must be an instance of gdb.Block.  */
+   gdb.Symbol.  The block argument must be an instance of gdb.Block.  Returns
+   NULL on error, with a python exception set.  */
 static PyObject *
 frapy_read_var (PyObject *self, PyObject *args)
 {
@@ -568,9 +569,9 @@ gdbpy_initialize_frames (void)
   if (PyType_Ready (&frame_object_type) < 0)
     return;
 
-  /* Note: These would probably be best exposed as class attributes of Frame,
-     but I don't know how to do it except by messing with the type's dictionary.
-     That seems too messy.  */
+  /* Note: These would probably be best exposed as class attributes of
+     Frame, but I don't know how to do it except by messing with the
+     type's dictionary.  That seems too messy.  */
   PyModule_AddIntConstant (gdb_module, "NORMAL_FRAME", NORMAL_FRAME);
   PyModule_AddIntConstant (gdb_module, "DUMMY_FRAME", DUMMY_FRAME);
   PyModule_AddIntConstant (gdb_module, "SIGTRAMP_FRAME", SIGTRAMP_FRAME);

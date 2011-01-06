@@ -1,7 +1,7 @@
 /* Implementation of the GDB variable objects API.
 
    Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008,
-   2009, 2010 Free Software Foundation, Inc.
+   2009, 2010, 2011 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -721,8 +721,9 @@ varobj_get_expression (struct varobj *var)
 }
 
 /* Deletes a varobj and all its children if only_children == 0,
-   otherwise deletes only the children; returns a malloc'ed list of all the 
-   (malloc'ed) names of the variables that have been deleted (NULL terminated) */
+   otherwise deletes only the children; returns a malloc'ed list of
+   all the (malloc'ed) names of the variables that have been deleted
+   (NULL terminated) */
 
 int
 varobj_delete (struct varobj *var, char ***dellist, int only_children)
@@ -1052,6 +1053,8 @@ update_dynamic_varobj_children (struct varobj *var,
 	    error (_("Invalid item from the child list"));
 
 	  v = convert_value_from_python (py_v);
+	  if (v == NULL)
+	    gdbpy_print_stack ();
 	  install_dynamic_child (var, can_mention ? changed : NULL,
 				 can_mention ? new : NULL,
 				 can_mention ? unchanged : NULL,
@@ -1453,8 +1456,8 @@ install_new_value (struct varobj *var, struct value *value, int initial)
   char *print_value = NULL;
 
   /* We need to know the varobj's type to decide if the value should
-     be fetched or not.  C++ fake children (public/protected/private) don't have
-     a type. */
+     be fetched or not.  C++ fake children (public/protected/private)
+     don't have a type. */
   gdb_assert (var->type || CPLUS_FAKE_CHILD (var));
   changeable = varobj_value_is_changeable_p (var);
 
@@ -1526,10 +1529,11 @@ install_new_value (struct varobj *var, struct value *value, int initial)
      to compare with.  */
   if (!initial && changeable)
     {
-      /* If the value of the varobj was changed by -var-set-value, then the 
-	 value in the varobj and in the target is the same.  However, that value
-	 is different from the value that the varobj had after the previous
-	 -var-update. So need to the varobj as changed.  */
+      /* If the value of the varobj was changed by -var-set-value,
+	 then the value in the varobj and in the target is the same.
+	 However, that value is different from the value that the
+	 varobj had after the previous -var-update. So need to the
+	 varobj as changed.  */
       if (var->updated)
 	{
 	  changed = 1;
@@ -2056,9 +2060,9 @@ uninstall_variable (struct varobj *var)
 	    }
 	  if (cr == NULL)
 	    {
-	      warning
-		("Assertion failed: Could not find varobj \"%s\" in root list",
-		 var->obj_name);
+	      warning (_("Assertion failed: Could not find "
+		         "varobj \"%s\" in root list"),
+		       var->obj_name);
 	      return;
 	    }
 	  if (prer == NULL)
@@ -2156,7 +2160,7 @@ new_root_variable (void)
 {
   struct varobj *var = new_variable ();
 
-  var->root = (struct varobj_root *) xmalloc (sizeof (struct varobj_root));;
+  var->root = (struct varobj_root *) xmalloc (sizeof (struct varobj_root));
   var->root->lang = NULL;
   var->root->exp = NULL;
   var->root->valid_block = NULL;
@@ -2356,14 +2360,16 @@ number_of_children (struct varobj *var)
   return (*var->root->lang->number_of_children) (var);;
 }
 
-/* What is the expression for the root varobj VAR? Returns a malloc'd string. */
+/* What is the expression for the root varobj VAR? Returns a malloc'd
+   string. */
 static char *
 name_of_variable (struct varobj *var)
 {
   return (*var->root->lang->name_of_variable) (var);
 }
 
-/* What is the name of the INDEX'th child of VAR? Returns a malloc'd string. */
+/* What is the name of the INDEX'th child of VAR? Returns a malloc'd
+   string. */
 static char *
 name_of_child (struct varobj *var, int index)
 {
@@ -2484,28 +2490,37 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
   long len = 0;
   char *encoding = NULL;
   struct gdbarch *gdbarch = NULL;
+  /* Initialize it just to avoid a GCC false warning.  */
+  CORE_ADDR str_addr = 0;
+  int string_print = 0;
 
   if (value == NULL)
     return NULL;
 
+  stb = mem_fileopen ();
+  old_chain = make_cleanup_ui_file_delete (stb);
+
   gdbarch = get_type_arch (value_type (value));
 #if HAVE_PYTHON
   {
-    struct cleanup *back_to = varobj_ensure_python_env (var);
     PyObject *value_formatter = var->pretty_printer;
+
+    varobj_ensure_python_env (var);
 
     if (value_formatter)
       {
 	/* First check to see if we have any children at all.  If so,
 	   we simply return {...}.  */
 	if (dynamic_varobj_has_child_method (var))
-	  return xstrdup ("{...}");
+	  {
+	    do_cleanups (old_chain);
+	    return xstrdup ("{...}");
+	  }
 
 	if (PyObject_HasAttr (value_formatter, gdbpy_to_string_cst))
 	  {
 	    char *hint;
 	    struct value *replacement;
-	    int string_print = 0;
 	    PyObject *output = NULL;
 
 	    hint = gdbpy_get_display_hint (value_formatter);
@@ -2517,13 +2532,17 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
 	      }
 
 	    output = apply_varobj_pretty_printer (value_formatter,
-						  &replacement);
+						  &replacement,
+						  stb);
 	    if (output)
 	      {
+		make_cleanup_py_decref (output);
+
 		if (gdbpy_is_lazy_string (output))
 		  {
-		    thevalue = gdbpy_extract_lazy_string (output, &type,
-							  &len, &encoding);
+		    gdbpy_extract_lazy_string (output, &str_addr, &type,
+					       &len, &encoding);
+		    make_cleanup (free_current_contents, &encoding);
 		    string_print = 1;
 		  }
 		else
@@ -2539,36 +2558,33 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
 			thevalue = xmemdup (s, len + 1, len + 1);
 			type = builtin_type (gdbarch)->builtin_char;
 			Py_DECREF (py_str);
+
+			if (!string_print)
+			  {
+			    do_cleanups (old_chain);
+			    return thevalue;
+			  }
+
+			make_cleanup (xfree, thevalue);
 		      }
+		    else
+		      gdbpy_print_stack ();
 		  }
-		Py_DECREF (output);
-	      }
-	    if (thevalue && !string_print)
-	      {
-		do_cleanups (back_to);
-		xfree (encoding);
-		return thevalue;
 	      }
 	    if (replacement)
 	      value = replacement;
 	  }
       }
-    do_cleanups (back_to);
   }
 #endif
-
-  stb = mem_fileopen ();
-  old_chain = make_cleanup_ui_file_delete (stb);
 
   get_formatted_print_options (&opts, format_code[(int) format]);
   opts.deref_ref = 0;
   opts.raw = 1;
   if (thevalue)
-    {
-      make_cleanup (xfree, thevalue);
-      make_cleanup (xfree, encoding);
-      LA_PRINT_STRING (stb, type, thevalue, len, encoding, 0, &opts);
-    }
+    LA_PRINT_STRING (stb, type, thevalue, len, encoding, 0, &opts);
+  else if (string_print)
+    val_print_string (type, encoding, str_addr, len, stb, &opts);
   else
     common_val_print (value, stb, 0, &opts, current_language);
   thevalue = ui_file_xstrdup (stb, NULL);
@@ -2836,9 +2852,10 @@ c_describe_child (struct varobj *parent, int index,
     {
     case TYPE_CODE_ARRAY:
       if (cname)
-	*cname = xstrdup (int_string (index 
-				      + TYPE_LOW_BOUND (TYPE_INDEX_TYPE (type)),
-				      10, 1, 0, 0));
+	*cname
+	  = xstrdup (int_string (index 
+				 + TYPE_LOW_BOUND (TYPE_INDEX_TYPE (type)),
+				 10, 1, 0, 0));
 
       if (cvalue && value)
 	{
@@ -3286,9 +3303,10 @@ cplus_describe_child (struct varobj *parent, int index,
 	    *ctype = TYPE_FIELD_TYPE (type, type_index);
 
 	  if (cfull_expression)
-	    *cfull_expression = xstrprintf ("((%s)%s%s)", parent_expression,
-					    join, 
-					    TYPE_FIELD_NAME (type, type_index));
+	    *cfull_expression
+	      = xstrprintf ("((%s)%s%s)", parent_expression,
+			    join, 
+			    TYPE_FIELD_NAME (type, type_index));
 	}
       else if (index < TYPE_N_BASECLASSES (type))
 	{
@@ -3537,12 +3555,11 @@ _initialize_varobj (void)
   memset (varobj_table, 0, sizeof_table);
 
   add_setshow_zinteger_cmd ("debugvarobj", class_maintenance,
-			    &varobjdebug, _("\
-Set varobj debugging."), _("\
-Show varobj debugging."), _("\
-When non-zero, varobj debugging is enabled."),
-			    NULL,
-			    show_varobjdebug,
+			    &varobjdebug,
+			    _("Set varobj debugging."),
+			    _("Show varobj debugging."),
+			    _("When non-zero, varobj debugging is enabled."),
+			    NULL, show_varobjdebug,
 			    &setlist, &showlist);
 }
 

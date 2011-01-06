@@ -1,7 +1,7 @@
 /* Generate a core file for the inferior process.
 
-   Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
-   Free Software Foundation, Inc.
+   Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
+   2011 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -537,7 +537,8 @@ gcore_copy_callback (bfd *obfd, asection *osec, void *ignored)
       if (target_read_memory (bfd_section_vma (obfd, osec) + offset,
 			      memhunk, size) != 0)
 	{
-	  warning (_("Memory read failed for corefile section, %s bytes at %s."),
+	  warning (_("Memory read failed for corefile "
+		     "section, %s bytes at %s."),
 		   plongest (size),
 		   paddress (target_gdbarch, bfd_section_vma (obfd, osec)));
 	  break;

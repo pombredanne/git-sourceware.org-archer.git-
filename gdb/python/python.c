@@ -1,6 +1,6 @@
 /* General python/gdb code
 
-   Copyright (C) 2008, 2009, 2010 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -69,6 +69,12 @@ PyObject *gdbpy_enabled_cst;
 /* The GdbError exception.  */
 PyObject *gdbpy_gdberror_exc;
 
+/* The `gdb.error' base class.  */
+PyObject *gdbpy_gdb_error;
+
+/* The `gdb.MemoryError' exception.  */
+PyObject *gdbpy_gdb_memory_error;
+
 /* Architecture and language to be used in callbacks from
    the Python interpreter.  */
 struct gdbarch *python_gdbarch;
@@ -82,12 +88,23 @@ struct python_env
   PyGILState_STATE state;
   struct gdbarch *gdbarch;
   const struct language_defn *language;
+  PyObject *error_type, *error_value, *error_traceback;
 };
 
 static void
 restore_python_env (void *p)
 {
   struct python_env *env = (struct python_env *)p;
+
+  /* Leftover Python error is forbidden by Python Exception Handling.  */
+  if (PyErr_Occurred ())
+    {
+      /* This order is similar to the one calling error afterwards. */
+      gdbpy_print_stack ();
+      warning (_("internal error: Unhandled Python exception"));
+    }
+
+  PyErr_Restore (env->error_type, env->error_value, env->error_traceback);
 
   PyGILState_Release (env->state);
   python_gdbarch = env->gdbarch;
@@ -111,6 +128,9 @@ ensure_python_env (struct gdbarch *gdbarch,
   python_gdbarch = gdbarch;
   python_language = language;
 
+  /* Save it and ensure ! PyErr_Occurred () afterwards.  */
+  PyErr_Fetch (&env->error_type, &env->error_value, &env->error_traceback);
+  
   return make_cleanup (restore_python_env, env);
 }
 
@@ -419,7 +439,8 @@ gdbpy_solib_name (PyObject *self, PyObject *args)
 static PyObject *
 gdbpy_decode_line (PyObject *self, PyObject *args)
 {
-  struct symtabs_and_lines sals = { NULL, 0 }; /* Initialize to appease gcc.  */
+  struct symtabs_and_lines sals = { NULL, 0 }; /* Initialize to
+						  appease gcc.  */
   struct symtab_and_line sal;
   char *arg = NULL;
   char *copy = NULL;
@@ -990,7 +1011,8 @@ Enables or disables printing of Python stack traces."),
   /* The casts to (char*) are for python 2.4.  */
   PyModule_AddStringConstant (gdb_module, "VERSION", (char*) version);
   PyModule_AddStringConstant (gdb_module, "HOST_CONFIG", (char*) host_name);
-  PyModule_AddStringConstant (gdb_module, "TARGET_CONFIG", (char*) target_name);
+  PyModule_AddStringConstant (gdb_module, "TARGET_CONFIG",
+			      (char*) target_name);
 
   /* gdb.parameter ("data-directory") doesn't necessarily exist when the python
      script below is run (depending on order of _initialize_* functions).
@@ -1002,6 +1024,13 @@ Enables or disables printing of Python stack traces."),
     PyModule_AddStringConstant (gdb_module, "PYTHONDIR", gdb_pythondir);
     xfree (gdb_pythondir);
   }
+
+  gdbpy_gdb_error = PyErr_NewException ("gdb.error", PyExc_RuntimeError, NULL);
+  PyModule_AddObject (gdb_module, "error", gdbpy_gdb_error);
+
+  gdbpy_gdb_memory_error = PyErr_NewException ("gdb.MemoryError",
+					       gdbpy_gdb_error, NULL);
+  PyModule_AddObject (gdb_module, "MemoryError", gdbpy_gdb_memory_error);
 
   gdbpy_gdberror_exc = PyErr_NewException ("gdb.GdbError", NULL, NULL);
   PyModule_AddObject (gdb_module, "GdbError", gdbpy_gdberror_exc);
@@ -1033,9 +1062,26 @@ Enables or disables printing of Python stack traces."),
   gdbpy_doc_cst = PyString_FromString ("__doc__");
   gdbpy_enabled_cst = PyString_FromString ("enabled");
 
-  /* Remaining initialization is done in Python.
-     - create a couple objects which are used for Python's stdout and stderr
-     - provide function GdbSetPythonDirectory  */
+  /* Release the GIL while gdb runs.  */
+  PyThreadState_Swap (NULL);
+  PyEval_ReleaseLock ();
+
+#endif /* HAVE_PYTHON */
+}
+
+#ifdef HAVE_PYTHON
+
+/* Perform the remaining python initializations.
+   These must be done after GDB is at least mostly initialized.
+   E.g., The "info pretty-printer" command needs the "info" prefix
+   command installed.  */
+
+void
+finish_python_initialization (void)
+{
+  struct cleanup *cleanup;
+
+  cleanup = ensure_python_env (get_current_arch (), current_language);
 
   PyRun_SimpleString ("\
 import os\n\
@@ -1091,16 +1137,14 @@ def GdbSetPythonDirectory (dir):\n\
 GdbSetPythonDirectory (gdb.PYTHONDIR)\n\
 ");
 
-  /* Release the GIL while gdb runs.  */
-  PyThreadState_Swap (NULL);
-  PyEval_ReleaseLock ();
+  do_cleanups (cleanup);
+}
 
 #endif /* HAVE_PYTHON */
-}
 
 
 
-#if HAVE_PYTHON
+#ifdef HAVE_PYTHON
 
 static PyMethodDef GdbMethods[] =
 {

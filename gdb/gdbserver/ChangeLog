@@ -1,3 +1,59 @@
+2011-01-05  Michael Snyder  <msnyder@msnyder-server.eng.vmware.com>
+
+	* gdbreplay.c: Shorten lines of >= 80 columns.
+	* linux-low.c: Ditto.
+	* linux-ppc-low.c: Ditto.
+	* linux-s390-low.c: Ditto.
+	* linux-sparc-low.c: Ditto.
+	* linux-x86-low.c: Ditto.
+	* linux-xtensa-low.c: Ditto.
+	* mem-break.c: Ditto.
+	* nto-low.c: Ditto.
+	* regcache.h: Ditto.
+	* remote-utils.c: Ditto.
+	* server.c: Ditto.
+	* server.h: Ditto.
+	* thread-db.c: Ditto.
+	* tracepoint.c: Ditto.
+	* utils.c: Ditto.
+	* win32-low.h: Ditto.
+
+2011-01-05  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdbserver/configure.ac, gdbserver/gdbserver.1: Copyright year
+	update.
+
+2011-01-01  Joel Brobecker  <brobecker@adacore.com>
+
+	* server.c (gdbserver_version): Update copyright year in version
+	output.
+	* gdbreplay.c (gdbreplay_version): Ditto.
+
+2010-12-29  Jie Zhang  <jie.zhang@analog.com>
+
+	* configure.srv (bfin-*-*linux*): Handle Blackfin/Linux targets.
+	* linux-bfin-low.c: New file.
+	* linux-low.c: Define PT_TEXT_ADDR, PT_TEXT_END_ADDR, and
+	PT_DATA_ADDR for BFIN targets.
+	* Makefile.in (SFILES): Add linux-bfin-low.c.
+	(clean): Remove reg-bfin.c.
+	(linux-bfin-low.o, reg-bfin.o, reg-bfin.c): New targets.
+	* README: Mention supported Blackfin targets.
+
+2010-12-23  Mike Frysinger  <vapier@gentoo.org>
+
+	* .gitignore: New file.
+
+2010-11-16  Mike Frysinger  <vapier@gentoo.org>
+
+	* linux-low.c (linux_tracefork_child): Add char* cast to arg.
+
+2010-10-22  Jie Zhang  <jie@codesourcery.com>
+
+	* Makefile.in: Add FLAGS_TO_PASS variable.
+	(install): Remove dependency of install-only and recursively
+	invoke make for install-only.
+
 2010-10-04  Doug Evans  <dje@google.com>
 
 	* Makefile.in (uninstall): Use $(DESTDIR).

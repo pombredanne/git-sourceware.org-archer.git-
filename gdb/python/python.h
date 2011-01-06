@@ -1,6 +1,6 @@
 /* Python/gdb header for generic use in gdb
 
-   Copyright (C) 2008, 2009, 2010 Free Software Foundation, Inc.
+   Copyright (C) 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -23,6 +23,8 @@
 #include "value.h"
 
 extern int gdbpy_global_auto_load;
+
+extern void finish_python_initialization (void);
 
 void eval_python_from_control_command (struct command_line *);
 

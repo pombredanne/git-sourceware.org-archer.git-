@@ -1,7 +1,7 @@
 /* Output generating routines for GDB.
 
-   Copyright (C) 1999, 2000, 2001, 2002, 2003, 2005, 2007, 2008, 2009, 2010
-   Free Software Foundation, Inc.
+   Copyright (C) 1999, 2000, 2001, 2002, 2003, 2005, 2007, 2008, 2009, 2010,
+   2011 Free Software Foundation, Inc.
 
    Contributed by Cygnus Solutions.
    Written by Fernando Nasser for Cygnus.
@@ -96,8 +96,8 @@ extern void ui_out_table_body (struct ui_out *uiout);
 
 extern struct cleanup *make_cleanup_ui_out_table_begin_end (struct ui_out *ui_out,
                                                             int nr_cols,
-                                                           int nr_rows,
-                                                           const char *tblid);
+							    int nr_rows,
+							    const char *tblid);
 /* Compatibility wrappers.  */
 
 extern struct cleanup *make_cleanup_ui_out_list_begin_end (struct ui_out *uiout,

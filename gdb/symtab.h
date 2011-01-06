@@ -1,8 +1,8 @@
 /* Symbol table definitions for GDB.
 
    Copyright (C) 1986, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009, 2010
-   Free Software Foundation, Inc.
+   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009, 2010,
+   2011 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -723,9 +723,10 @@ struct section_offsets
 };
 
 #define	ANOFFSET(secoff, whichone) \
-   ((whichone == -1) \
-    ? (internal_error (__FILE__, __LINE__, _("Section index is uninitialized")), -1) \
-    : secoff->offsets[whichone])
+  ((whichone == -1)			  \
+   ? (internal_error (__FILE__, __LINE__, \
+		      _("Section index is uninitialized")), -1) \
+   : secoff->offsets[whichone])
 
 /* The size of a section_offsets table for N sections.  */
 #define SIZEOF_N_SECTION_OFFSETS(n) \
@@ -1186,7 +1187,7 @@ extern void skip_prologue_sal (struct symtab_and_line *);
 
 /* symfile.c */
 
-extern void clear_symtab_users (void);
+extern void clear_symtab_users (int add_flags);
 
 extern enum language deduce_language_from_filename (const char *);
 
@@ -1238,9 +1239,10 @@ extern struct cleanup *make_cleanup_free_search_symbols (struct symbol_search
    const. */
 extern void set_main_name (const char *name);
 extern /*const */ char *main_name (void);
+extern enum language language_of_main;
 
 /* Check global symbols in objfile.  */
-struct symbol *lookup_global_symbol_from_objfile (const struct objfile *objfile,
+struct symbol *lookup_global_symbol_from_objfile (const struct objfile *,
 						  const char *name,
 						  const domain_enum domain);
 

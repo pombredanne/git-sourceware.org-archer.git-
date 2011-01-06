@@ -1,5 +1,6 @@
 /* SPU target-dependent code for GDB, the GNU debugger.
-   Copyright (C) 2006, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
+   Copyright (C) 2006, 2007, 2008, 2009, 2010, 2011
+   Free Software Foundation, Inc.
 
    Contributed by Ulrich Weigand <uweigand@de.ibm.com>.
    Based on a port by Sid Manning <sid@us.ibm.com>.
@@ -1895,7 +1896,8 @@ spu_catch_start (struct objfile *objfile)
 		     bp_breakpoint /* type_wanted */,
 		     0 /* ignore_count */,
 		     AUTO_BOOLEAN_FALSE /* pending_break_support */,
-		     NULL /* ops */, 0 /* from_tty */, 1 /* enabled */);
+		     NULL /* ops */, 0 /* from_tty */, 1 /* enabled */,
+		     0 /* internal  */);
 }
 
 

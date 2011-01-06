@@ -1,7 +1,7 @@
 /* Target-vector operations for controlling windows child processes, for GDB.
 
    Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
-   2005, 2006, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
+   2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
 
    Contributed by Cygnus Solutions, A Red Hat Company.
 
@@ -1704,20 +1704,20 @@ do_initial_windows_stuff (struct target_ops *ops, DWORD pid, int attaching)
   target_terminal_inferior ();
 
   windows_initialization_done = 0;
-  inf->stop_soon = STOP_QUIETLY;
+  inf->control.stop_soon = STOP_QUIETLY;
   while (1)
     {
       stop_after_trap = 1;
       wait_for_inferior (0);
       tp = inferior_thread ();
-      if (tp->stop_signal != TARGET_SIGNAL_TRAP)
-	resume (0, tp->stop_signal);
+      if (tp->suspend.stop_signal != TARGET_SIGNAL_TRAP)
+	resume (0, tp->suspend.stop_signal);
       else
 	break;
     }
 
   windows_initialization_done = 1;
-  inf->stop_soon = NO_STOP_QUIETLY;
+  inf->control.stop_soon = NO_STOP_QUIETLY;
   stop_after_trap = 0;
   return;
 }

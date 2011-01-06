@@ -1,4 +1,4 @@
-# Copyright (C) 2010 Free Software Foundation, Inc.
+# Copyright (C) 2010, 2011 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,8 +13,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# This file is part of the GDB testsuite.  It tests the mechanism
-# exposing convenience functions to Python.
+# This file is part of the GDB testsuite.
+# It tests gdb.parameter and gdb.Parameter.
 
 if $tracelevel then {
     strace $tracelevel
@@ -29,6 +29,9 @@ gdb_reinitialize_dir $srcdir/$subdir
 
 # Skip all tests if Python scripting is not enabled.
 if { [skip_python_tests] } { continue }
+
+# We use "." here instead of ":" so that this works on win32 too.
+gdb_test "python print gdb.parameter ('directories')" "$srcdir/$subdir.\\\$cdir.\\\$cwd"
 
 # Test a simple boolean parameter.
 gdb_py_test_multiple "Simple gdb booleanparameter" \

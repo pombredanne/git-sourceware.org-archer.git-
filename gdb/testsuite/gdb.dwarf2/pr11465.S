@@ -1,4 +1,4 @@
-/* Copyright 2010 Free Software Foundation, Inc.
+/* Copyright 2010, 2011 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -88,14 +88,14 @@ die77:	.uleb128 0x9		/* DW_TAG_formal_parameter */
 	.byte	0x0
 	.byte	0x0
 die7e:	.uleb128 0xa		/* DW_TAG_pointer_type */
-	.byte	0x4		/* DW_AT_byte_size */
+	.byte	PTRBITS / 8	/* DW_AT_byte_size */
 	.long	die84-d		/* DW_AT_type */
 die84:	.uleb128 0xb		/* DW_TAG_subroutine_type */
 die89:	.uleb128 0x9		/* DW_TAG_formal_parameter */
 	.long	die5e-d		/* DW_AT_type */
 	.byte	0x0
 die8f:	.uleb128 0xa		/* DW_TAG_pointer_type */
-	.byte	0x4		/* DW_AT_byte_size */
+	.byte	PTRBITS / 8	/* DW_AT_byte_size */
 	.long	die5e-d		/* DW_AT_type */
 die95:	.uleb128 0xc		/* DW_TAG_subprogram */
 	.long	die6a-d		/* DW_AT_specification */

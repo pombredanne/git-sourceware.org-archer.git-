@@ -1,6 +1,6 @@
 /* This testcase is part of GDB, the GNU debugger.
 
-   Copyright 2008, 2009, 2010 Free Software Foundation, Inc.
+   Copyright 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -213,6 +213,9 @@ main ()
   /* Clearing by being `static' could invoke an other GDB C++ bug.  */
   struct nullstr nullstr;
   nostring_type nstype;
+  struct ns ns, ns2;
+  struct lazystring estring, estring2;
+
   nstype.elements = narray;
   nstype.len = 0;
 
@@ -225,12 +228,17 @@ main ()
   init_s (&arraystruct.x[0], 23);
   init_s (&arraystruct.x[1], 24);
 
-  struct ns  ns;
   ns.null_str = "embedded\0null\0string";
   ns.length = 20;
 
-  struct lazystring estring;
+  /* Make a "corrupted" string.  */
+  ns2.null_str = NULL;
+  ns2.length = 20;
+
   estring.lazy_str = "embedded x\201\202\203\204" ;
+
+  /* Incomplete UTF-8, but ok Latin-1.  */
+  estring2.lazy_str = "embedded x\302";
 
 #ifdef __cplusplus
   S cps;

@@ -1,7 +1,7 @@
 /* MI Command Set.
 
-   Copyright (C) 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010
-   Free Software Foundation, Inc.
+   Copyright (C) 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010,
+   2011 Free Software Foundation, Inc.
 
    Contributed by Cygnus Solutions (a Red Hat company).
 
@@ -96,7 +96,7 @@ static void mi_cmd_execute (struct mi_parse *parse);
 static void mi_execute_cli_command (const char *cmd, int args_p,
 				    const char *args);
 static void mi_execute_async_cli_command (char *cli_command, 
-							char **argv, int argc);
+					  char **argv, int argc);
 static int register_changed_p (int regnum, struct regcache *,
 			       struct regcache *);
 static void get_register (struct frame_info *, int regnum, int format);
@@ -240,7 +240,9 @@ exec_continue (char **argv, int argc)
 
 	  if (!current_context->all)
 	    {
-	      struct inferior *inf = find_inferior_id (current_context->thread_group);
+	      struct inferior *inf
+		= find_inferior_id (current_context->thread_group);
+
 	      pid = inf->pid;
 	    }
 	  iterate_over_threads (proceed_thread_callback, &pid);
@@ -418,19 +420,40 @@ void
 mi_cmd_target_detach (char *command, char **argv, int argc)
 {
   if (argc != 0 && argc != 1)
-    error ("Usage: -target-detach [thread-group]");
+    error ("Usage: -target-detach [pid | thread-group]");
 
   if (argc == 1)
     {
       struct thread_info *tp;
       char *end = argv[0];
-      int pid = strtol (argv[0], &end, 10);
+      int pid;
 
-      if (*end != '\0')
-	error (_("Cannot parse thread group id '%s'"), argv[0]);
+      /* First see if we are dealing with a thread-group id.  */
+      if (*argv[0] == 'i')
+	{
+	  struct inferior *inf;
+	  int id = strtoul (argv[0] + 1, &end, 0);
+
+	  if (*end != '\0')
+	    error (_("Invalid syntax of thread-group id '%s'"), argv[0]);
+
+	  inf = find_inferior_id (id);
+	  if (!inf)
+	    error (_("Non-existent thread-group id '%d'"), id);
+
+	  pid = inf->pid;
+	}
+      else
+	{
+	  /* We must be dealing with a pid.  */
+	  pid = strtol (argv[0], &end, 10);
+
+	  if (*end != '\0')
+	    error (_("Invalid identifier '%s'"), argv[0]);
+	}
 
       /* Pick any thread in the desired process.  Current
-	 target_detach deteches from the parent of inferior_ptid.  */
+	 target_detach detaches from the parent of inferior_ptid.  */
       tp = iterate_over_threads (find_thread_of_process, &pid);
       if (!tp)
 	error (_("Thread group is empty"));
@@ -809,7 +832,8 @@ mi_cmd_list_thread_groups (char *command, char **argv, int argc)
 	  else if (strcmp (optarg, "1") == 0)
 	    recurse = 1;
 	  else
-	    error ("only '0' and '1' are valid values for the '--recurse' option");
+	    error ("only '0' and '1' are valid values "
+		   "for the '--recurse' option");
 	  break;
 	}
     }
@@ -960,7 +984,8 @@ mi_cmd_data_list_changed_registers (char *command, char **argv, int argc)
 	    continue;
 	  changed = register_changed_p (regnum, prev_regs, this_regs);
 	  if (changed < 0)
-	    error ("mi_cmd_data_list_changed_registers: Unable to read register contents.");
+	    error ("mi_cmd_data_list_changed_registers: "
+		   "Unable to read register contents.");
 	  else if (changed)
 	    ui_out_field_int (uiout, NULL, regnum);
 	}
@@ -978,7 +1003,8 @@ mi_cmd_data_list_changed_registers (char *command, char **argv, int argc)
 	{
 	  changed = register_changed_p (regnum, prev_regs, this_regs);
 	  if (changed < 0)
-	    error ("mi_cmd_data_list_register_change: Unable to read register contents.");
+	    error ("mi_cmd_data_list_register_change: "
+		   "Unable to read register contents.");
 	  else if (changed)
 	    ui_out_field_int (uiout, NULL, regnum);
 	}
@@ -1037,7 +1063,8 @@ mi_cmd_data_list_register_values (char *command, char **argv, int argc)
      upon the particular processor being debugged.  */
 
   if (argc == 0)
-    error ("mi_cmd_data_list_register_values: Usage: -data-list-register-values <format> [<regnum1>...<regnumN>]");
+    error ("mi_cmd_data_list_register_values: Usage: "
+	   "-data-list-register-values <format> [<regnum1>...<regnumN>]");
 
   format = (int) argv[0][0];
 
@@ -1139,7 +1166,8 @@ get_register (struct frame_info *frame, int regnum, int format)
 
 /* Write given values into registers. The registers and values are
    given as pairs.  The corresponding MI command is 
-   -data-write-register-values <format> [<regnum1> <value1>...<regnumN> <valueN>]*/
+   -data-write-register-values <format>
+                               [<regnum1> <value1>...<regnumN> <valueN>] */
 void
 mi_cmd_data_write_register_values (char *command, char **argv, int argc)
 {
@@ -1159,7 +1187,8 @@ mi_cmd_data_write_register_values (char *command, char **argv, int argc)
   numregs = gdbarch_num_regs (gdbarch) + gdbarch_num_pseudo_regs (gdbarch);
 
   if (argc == 0)
-    error ("mi_cmd_data_write_register_values: Usage: -data-write-register-values <format> [<regnum1> <value1>...<regnumN> <valueN>]");
+    error ("mi_cmd_data_write_register_values: Usage: -data-write-register-"
+	   "values <format> [<regnum1> <value1>...<regnumN> <valueN>]");
 
   format = (int) argv[0][0];
 
@@ -1170,7 +1199,8 @@ mi_cmd_data_write_register_values (char *command, char **argv, int argc)
     error ("mi_cmd_data_write_register_values: No regs and values specified.");
 
   if ((argc - 1) % 2)
-    error ("mi_cmd_data_write_register_values: Regs and vals are not in pairs.");
+    error ("mi_cmd_data_write_register_values: "
+	   "Regs and vals are not in pairs.");
 
   for (i = 1; i < argc; i = i + 2)
     {
@@ -1210,7 +1240,8 @@ mi_cmd_data_evaluate_expression (char *command, char **argv, int argc)
   if (argc != 1)
     {
       ui_out_stream_delete (stb);
-      error ("mi_cmd_data_evaluate_expression: Usage: -data-evaluate-expression expression");
+      error ("mi_cmd_data_evaluate_expression: "
+	     "Usage: -data-evaluate-expression expression");
     }
 
   expr = parse_expression (argv[0]);
@@ -1296,7 +1327,8 @@ mi_cmd_data_read_memory (char *command, char **argv, int argc)
   argc -= optind;
 
   if (argc < 5 || argc > 6)
-    error ("mi_cmd_data_read_memory: Usage: ADDR WORD-FORMAT WORD-SIZE NR-ROWS NR-COLS [ASCHAR].");
+    error ("mi_cmd_data_read_memory: Usage: "
+	   "ADDR WORD-FORMAT WORD-SIZE NR-ROWS NR-COLS [ASCHAR].");
 
   /* Extract all the arguments. */
 
@@ -1389,7 +1421,8 @@ mi_cmd_data_read_memory (char *command, char **argv, int argc)
 
 	cleanup_tuple = make_cleanup_ui_out_tuple_begin_end (uiout, NULL);
 	ui_out_field_core_addr (uiout, "addr", gdbarch, addr + row_byte);
-	/* ui_out_field_core_addr_symbolic (uiout, "saddr", addr + row_byte); */
+	/* ui_out_field_core_addr_symbolic (uiout, "saddr", addr +
+	   row_byte); */
 	cleanup_list_data = make_cleanup_ui_out_list_begin_end (uiout, "data");
 	get_formatted_print_options (&opts, word_format);
 	for (col = 0, col_byte = row_byte;
@@ -1414,7 +1447,8 @@ mi_cmd_data_read_memory (char *command, char **argv, int argc)
 	    int byte;
 
 	    ui_file_rewind (stream->stream);
-	    for (byte = row_byte; byte < row_byte + word_size * nr_cols; byte++)
+	    for (byte = row_byte;
+		 byte < row_byte + word_size * nr_cols; byte++)
 	      {
 		if (byte >= nr_bytes)
 		  {
@@ -1579,7 +1613,8 @@ mi_cmd_data_write_memory (char *command, char **argv, int argc)
   argc -= optind;
 
   if (argc != 4)
-    error ("mi_cmd_data_write_memory: Usage: [-o COLUMN_OFFSET] ADDR FORMAT WORD-SIZE VALUE.");
+    error ("mi_cmd_data_write_memory: Usage: "
+	   "[-o COLUMN_OFFSET] ADDR FORMAT WORD-SIZE VALUE.");
 
   /* Extract all the arguments.  */
   /* Start address of the memory dump.  */
@@ -1723,6 +1758,18 @@ mi_cmd_add_inferior (char *command, char **argv, int argc)
   ui_out_field_fmt (uiout, "inferior", "i%d", inf->num);
 }
 
+/* Callback used to find the first inferior other than the
+   current one. */
+   
+static int
+get_other_inferior (struct inferior *inf, void *arg)
+{
+  if (inf == current_inferior ())
+    return 0;
+
+  return 1;
+}
+
 void
 mi_cmd_remove_inferior (char *command, char **argv, int argc)
 {
@@ -1738,6 +1785,25 @@ mi_cmd_remove_inferior (char *command, char **argv, int argc)
   inf = find_inferior_id (id);
   if (!inf)
     error ("the specified thread group does not exist");
+
+  if (inf->pid != 0)
+    error (_("cannot remove an active inferior"));
+
+  if (inf == current_inferior ())
+    {
+      struct thread_info *tp = 0;
+      struct inferior *new_inferior 
+	= iterate_over_inferiors (get_other_inferior, NULL);
+
+      if (new_inferior == NULL)
+	error (_("Cannot remove last inferior"));
+
+      set_current_inferior (new_inferior);
+      if (new_inferior->pid != 0)
+	tp = any_thread_of_process (new_inferior->pid);
+      switch_to_thread (tp ? tp->ptid : null_ptid);
+      set_current_program_space (new_inferior->pspace);
+    }
 
   delete_inferior_1 (inf, 1 /* silent */);
 }
@@ -1844,11 +1910,26 @@ captured_mi_execute_command (struct ui_out *uiout, void *data)
   return;
 }
 
+/* Print a gdb exception to the MI output stream.  */
+
+static void
+mi_print_exception (const char *token, struct gdb_exception exception)
+{
+  fputs_unfiltered (token, raw_stdout);
+  fputs_unfiltered ("^error,msg=\"", raw_stdout);
+  if (exception.message == NULL)
+    fputs_unfiltered ("unknown error", raw_stdout);
+  else
+    fputstr_unfiltered (exception.message, '"', raw_stdout);
+  fputs_unfiltered ("\"\n", raw_stdout);
+}
 
 void
 mi_execute_command (char *cmd, int from_tty)
 {
-  struct mi_parse *command;
+  char *token;
+  struct mi_parse *command = NULL;
+  volatile struct gdb_exception exception;
 
   /* This is to handle EOF (^D). We just quit gdb.  */
   /* FIXME: we should call some API function here.  */
@@ -1857,12 +1938,21 @@ mi_execute_command (char *cmd, int from_tty)
 
   target_log_command (cmd);
 
-  command = mi_parse (cmd);
-
-  if (command != NULL)
+  TRY_CATCH (exception, RETURN_MASK_ALL)
+    {
+      command = mi_parse (cmd, &token);
+    }
+  if (exception.reason < 0)
+    {
+      mi_print_exception (token, exception);
+      xfree (token);
+    }
+  else
     {
       struct gdb_exception result;
       ptid_t previous_ptid = inferior_ptid;
+
+      command->token = token;
 
       if (do_timings)
 	{
@@ -1877,13 +1967,7 @@ mi_execute_command (char *cmd, int from_tty)
 	{
 	  /* The command execution failed and error() was called
 	     somewhere.  */
-	  fputs_unfiltered (command->token, raw_stdout);
-	  fputs_unfiltered ("^error,msg=\"", raw_stdout);
-	  if (result.message == NULL)
-	    fputs_unfiltered ("unknown error", raw_stdout);
-	  else
-	    fputstr_unfiltered (result.message, '"', raw_stdout);
-	  fputs_unfiltered ("\"\n", raw_stdout);
+	  mi_print_exception (command->token, result);
 	  mi_out_rewind (uiout);
 	}
 
