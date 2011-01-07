@@ -118,7 +118,8 @@ f77_get_dynamic_length_of_aggregate (struct type *type)
   /* Patch in a valid length value. */
 
   TYPE_LENGTH (type) =
-    (upper_bound - lower_bound + 1) * TYPE_LENGTH (check_typedef (TYPE_TARGET_TYPE (type)));
+    (upper_bound - lower_bound + 1)
+    * TYPE_LENGTH (check_typedef (TYPE_TARGET_TYPE (type)));
 }
 
 /* Function that sets up the array offset,size table for the array 
@@ -231,7 +232,8 @@ f77_print_array (struct type *type, const gdb_byte *valaddr,
   ndimensions = calc_f77_array_dims (type);
 
   if (ndimensions > MAX_FORTRAN_DIMS || ndimensions < 0)
-    error (_("Type node corrupt! F77 arrays cannot have %d subscripts (%d Max)"),
+    error (_("\
+Type node corrupt! F77 arrays cannot have %d subscripts (%d Max)"),
 	   ndimensions, MAX_FORTRAN_DIMS);
 
   /* Since F77 arrays are stored column-major, we set up an 
@@ -280,7 +282,8 @@ f_val_print (struct type *type, const gdb_byte *valaddr, int embedded_offset,
 
     case TYPE_CODE_ARRAY:
       fprintf_filtered (stream, "(");
-      f77_print_array (type, valaddr, address, stream, recurse, original_value, options);
+      f77_print_array (type, valaddr, address, stream,
+		       recurse, original_value, options);
       fprintf_filtered (stream, ")");
       break;
 

@@ -231,7 +231,8 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
       else if (pascal_object_is_vtbl_member (type))
 	{
 	  /* print vtbl's nicely */
-	  CORE_ADDR vt_address = unpack_pointer (type, valaddr + embedded_offset);
+	  CORE_ADDR vt_address = unpack_pointer (type,
+						 valaddr + embedded_offset);
 	  struct minimal_symbol *msymbol =
 	    lookup_minimal_symbol_by_pc (vt_address);
 
@@ -327,8 +328,12 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
 	  /* Extract the address, assume that it is unsigned.  */
 	  print_address_demangle
 	    (gdbarch,
-	     extract_unsigned_integer (valaddr + embedded_offset + TYPE_FIELD_BITPOS (type, VTBL_FNADDR_OFFSET) / 8,
-				       TYPE_LENGTH (TYPE_FIELD_TYPE (type, VTBL_FNADDR_OFFSET)), byte_order),
+	     extract_unsigned_integer (valaddr + embedded_offset
+				       + TYPE_FIELD_BITPOS (type,
+							    VTBL_FNADDR_OFFSET) / 8,
+				       TYPE_LENGTH (TYPE_FIELD_TYPE (type,
+								     VTBL_FNADDR_OFFSET)),
+				       byte_order),
 	     stream, demangle);
 	}
       else
@@ -336,14 +341,18 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
           if (is_pascal_string_type (type, &length_pos, &length_size,
                                      &string_pos, &char_type, NULL))
 	    {
-	      len = extract_unsigned_integer (valaddr + embedded_offset + length_pos, length_size, byte_order);
+	      len = extract_unsigned_integer (valaddr + embedded_offset
+					      + length_pos, length_size,
+					      byte_order);
 	      LA_PRINT_STRING (stream, char_type, 
 			       valaddr + embedded_offset + string_pos,
 			       len, NULL, 0, options);
 	    }
 	  else
-	    pascal_object_print_value_fields (type, valaddr + embedded_offset, address, stream,
-					      recurse, original_value, options, NULL, 0);
+	    pascal_object_print_value_fields (type, valaddr + embedded_offset,
+					      address, stream, recurse,
+					      original_value, options,
+					      NULL, 0);
 	}
       break;
 
@@ -524,7 +533,8 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
 
 	  for (i = low_bound; i <= high_bound; i++)
 	    {
-	      int element = value_bit_index (type, valaddr + embedded_offset, i);
+	      int element = value_bit_index (type,
+					     valaddr + embedded_offset, i);
 
 	      if (element < 0)
 		{
@@ -540,13 +550,17 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
 		  print_type_scalar (range, i, stream);
 		  need_comma = 1;
 
-		  if (i + 1 <= high_bound && value_bit_index (type, valaddr + embedded_offset, ++i))
+		  if (i + 1 <= high_bound
+		      && value_bit_index (type,
+					  valaddr + embedded_offset, ++i))
 		    {
 		      int j = i;
 
 		      fputs_filtered ("..", stream);
 		      while (i + 1 <= high_bound
-			     && value_bit_index (type, valaddr + embedded_offset, ++i))
+			     && value_bit_index (type,
+						 valaddr + embedded_offset,
+						 ++i))
 			j = i;
 		      print_type_scalar (range, j, stream);
 		    }
@@ -576,7 +590,8 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
       break;
 
     default:
-      error (_("Invalid pascal type code %d in symbol table."), TYPE_CODE (type));
+      error (_("Invalid pascal type code %d in symbol table."),
+	     TYPE_CODE (type));
     }
   gdb_flush (stream);
   do_cleanups (back_to);
@@ -670,7 +685,8 @@ pascal_object_is_vtbl_member (struct type *type)
       if (TYPE_CODE (type) == TYPE_CODE_ARRAY)
 	{
 	  type = TYPE_TARGET_TYPE (type);
-	  if (TYPE_CODE (type) == TYPE_CODE_STRUCT	/* if not using thunks */
+	  if (TYPE_CODE (type) == TYPE_CODE_STRUCT	/* if not using
+							   thunks */
 	      || TYPE_CODE (type) == TYPE_CODE_PTR)	/* if using thunks */
 	    {
 	      /* Virtual functions tables are full of pointers
@@ -836,7 +852,8 @@ pascal_object_print_value_fields (struct type *type, const gdb_byte *valaddr,
 		}
 	      else if (field_is_static (&TYPE_FIELD (type, i)))
 		{
-		  /* struct value *v = value_static_field (type, i); v4.17 specific */
+		  /* struct value *v = value_static_field (type, i);
+		     v4.17 specific */
 		  struct value *v;
 
 		  v = value_from_longest (TYPE_FIELD_TYPE (type, i),
@@ -965,8 +982,9 @@ pascal_object_print_value (struct type *type, const gdb_byte *valaddr,
       if (boffset == -1)
 	fprintf_filtered (stream, "<invalid address>");
       else
-	pascal_object_print_value_fields (baseclass, base_valaddr, address + boffset,
-					  stream, recurse, val, options,
+	pascal_object_print_value_fields (baseclass, base_valaddr,
+					  address + boffset, stream,
+					  recurse, val, options,
 		     (struct type **) obstack_base (&dont_print_vb_obstack),
 					  0);
       fputs_filtered (", ", stream);
@@ -1018,7 +1036,8 @@ pascal_object_print_static_field (struct value *val,
 	{
 	  if (value_address (val) == first_dont_print[i])
 	    {
-	      fputs_filtered ("<same as static member of an already seen type>",
+	      fputs_filtered ("\
+<same as static member of an already seen type>",
 			      stream);
 	      return;
 	    }
@@ -1040,7 +1059,8 @@ pascal_object_print_static_field (struct value *val,
   common_val_print (val, stream, recurse, &opts, current_language);
 }
 
-extern initialize_file_ftype _initialize_pascal_valprint; /* -Wmissing-prototypes */
+/* -Wmissing-prototypes */
+extern initialize_file_ftype _initialize_pascal_valprint;
 
 void
 _initialize_pascal_valprint (void)
