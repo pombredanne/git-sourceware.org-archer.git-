@@ -1,6 +1,6 @@
 # Filtering backtrace.
 
-# Copyright (C) 2008 Free Software Foundation, Inc.
+# Copyright (C) 2008, 2011 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@ an iterator returning such objects."""
     if frame_filter == None:
         frame_filter = constructor
     else:
-        frame_filter = lambda iterator: constructor (frame_filter (iterator))
+        frame_filter = lambda iterator, filter = frame_filter: constructor (filter (iterator))
 
 def create_frame_filter (iter):
     global frame_filter
