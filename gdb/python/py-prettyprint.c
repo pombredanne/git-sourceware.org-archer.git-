@@ -227,10 +227,10 @@ pretty_print_one_value (PyObject *printer, struct value **out_value)
 	      && result != Py_None)
 	    {
 	      *out_value = convert_value_from_python (result);
- 	      if (PyErr_Occurred ())
- 		*out_value = NULL;
- 	      Py_DECREF (result);
- 	      result = NULL;
+	      if (PyErr_Occurred ())
+		*out_value = NULL;
+	      Py_DECREF (result);
+	      result = NULL;
 	    }
 	}
     }
@@ -763,7 +763,14 @@ gdbpy_get_varobj_pretty_printer (struct value *value)
 {
   PyObject *val_obj;
   PyObject *pretty_printer = NULL;
+  volatile struct gdb_exception except;
 
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      value = value_copy (value);
+    }
+  GDB_PY_HANDLE_EXCEPTION (except);
+  
   val_obj = value_to_value_object (value);
   if (! val_obj)
     return NULL;

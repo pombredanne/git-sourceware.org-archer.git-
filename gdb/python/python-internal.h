@@ -88,11 +88,10 @@ struct language_defn;
 struct program_space;
 
 extern PyObject *gdb_module;
-extern PyTypeObject block_object_type;
 extern PyTypeObject value_object_type;
+extern PyTypeObject block_object_type;
 extern PyTypeObject symbol_object_type;
 
-/* Used in python-inferior.c.  */
 typedef struct
 {
   PyObject_HEAD
@@ -134,10 +133,6 @@ PyObject *block_to_block_object (struct block *block, struct objfile *objfile);
 PyObject *value_to_value_object (struct value *v);
 PyObject *type_to_type_object (struct type *);
 PyObject *frame_info_to_frame_object (struct frame_info *frame);
-PyObject *frame_info_to_frame_object (struct frame_info *frame);
-thread_object *create_thread_object (struct thread_info *tp);
-thread_object *find_thread_object (ptid_t ptid);
-PyObject *find_inferior_object (int pid);
 
 PyObject *pspace_to_pspace_object (struct program_space *);
 PyObject *pspy_get_printers (PyObject *, void *);
@@ -158,9 +153,7 @@ struct symtab *symtab_object_to_symtab (PyObject *obj);
 struct symtab_and_line *sal_object_to_symtab_and_line (PyObject *obj);
 
 void gdbpy_initialize_auto_load (void);
-
 void gdbpy_initialize_values (void);
-void gdbpy_initialize_breakpoints (void);
 void gdbpy_initialize_frames (void);
 void gdbpy_initialize_symtabs (void);
 void gdbpy_initialize_commands (void);
@@ -168,7 +161,6 @@ void gdbpy_initialize_symbols (void);
 void gdbpy_initialize_symtabs (void);
 void gdbpy_initialize_blocks (void);
 void gdbpy_initialize_types (void);
-void gdbpy_initialize_blocks (void);
 void gdbpy_initialize_functions (void);
 void gdbpy_initialize_pspace (void);
 void gdbpy_initialize_objfile (void);
@@ -185,12 +177,6 @@ struct cleanup *ensure_python_env (struct gdbarch *gdbarch,
 
 extern struct gdbarch *python_gdbarch;
 extern const struct language_defn *python_language;
-
-char *gdbpy_parse_command_name (char *text,
-				struct cmd_list_element ***base_list,
-				struct cmd_list_element **start_list);
-
-PyObject *gdbpy_parameter_value (enum var_types, void *);
 
 /* Use this after a TRY_EXCEPT to throw the appropriate Python
    exception.  */
@@ -239,14 +225,13 @@ PyObject *apply_varobj_pretty_printer (PyObject *print_obj,
 				       struct value **replacement,
 				       struct ui_file *stream);
 PyObject *gdbpy_get_varobj_pretty_printer (struct value *value);
-PyObject *gdbpy_instantiate_printer (PyObject *cons, PyObject *value);
 char *gdbpy_get_display_hint (PyObject *printer);
 PyObject *gdbpy_default_visualizer (PyObject *self, PyObject *args);
 
+extern PyObject *gdbpy_doc_cst;
 extern PyObject *gdbpy_children_cst;
 extern PyObject *gdbpy_to_string_cst;
 extern PyObject *gdbpy_display_hint_cst;
-extern PyObject *gdbpy_doc_cst;
 extern PyObject *gdbpy_enabled_cst;
 
 /* Exception types.  */

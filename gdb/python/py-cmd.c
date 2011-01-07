@@ -49,7 +49,8 @@ static struct cmdpy_completer completers[] =
 
 #define N_COMPLETERS (sizeof (completers) / sizeof (completers[0]))
 
-/* A gdb command.  */
+/* A gdb command.  For the time being only ordinary commands (not
+   set/show commands) are allowed.  */
 struct cmdpy_object
 {
   PyObject_HEAD
