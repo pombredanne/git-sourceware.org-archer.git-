@@ -26,8 +26,6 @@
 #include "gdbcmd.h"
 #include "block.h"
 #include "valprint.h"
-#include "objfiles.h"
-#include "parser-defs.h"
 
 #include "gdb_assert.h"
 #include "gdb_string.h"
