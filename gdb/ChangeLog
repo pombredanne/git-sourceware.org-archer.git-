@@ -1,3 +1,41 @@
+2011-01-06  Tom Tromey  <tromey@redhat.com>
+
+	PR python/12367:
+	* NEWS: Add item.
+	* python/python.c (GdbMethods): Add "newest_frame" method.
+	* python/python-internal.h (gdbpy_newest_frame): Declare.
+	* python/py-frame.c (gdbpy_newest_frame): New function.
+
+2010-01-06  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* jit.h (struct jit_code_entry): use ULONGEST for symfile_size.
+	* jit.c (jit_debug): New variable.
+	(show_jit_debug): New function.
+	(struct target_buffer): Use ULONGEST.
+	(bfd_open_from_target_memory): Likewise.
+	(jit_register_code, jit_inferior_init): Add debug output.
+	(_initialize_jit): Register "debug jit" command.
+
+2011-01-06  Tom Tromey  <tromey@redhat.com>
+
+	* frame.h (enum frame_type) <INLINE_FRAME>: Fix comment.
+	* python/py-frame.c (gdbpy_initialize_frames): Add INLINE_FRAME
+	and ARCH_FRAME.
+
+2011-01-06  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-frame.c (frapy_block): Use get_frame_block.
+
+2011-01-06  Joel Brobecker  <brobecker@adacore.com>
+
+	Do not stop on SIGPRIO signals by default
+	* infrun.c (_initialize_infrun): Unset signal_stop and
+	signal_print for TARGET_SIGNAL_PRIO.
+
+2011-01-06  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-tasks.c: Fix style violation in comment.
+
 2011-01-06  Joel Brobecker  <brobecker@adacore.com>
 
 	* linespec.c (decode_compound, find_method): Remove trailing \n
