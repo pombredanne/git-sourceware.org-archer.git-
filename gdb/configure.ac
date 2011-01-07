@@ -108,51 +108,7 @@ AS_HELP_STRING([--with-relocated-sources=PATH], [automatically relocate this pat
               [Relocated directory for source files. ])
 ])
 
-# GDB's datadir relocation
-
-gdbdatadir=${datadir}/gdb
-
-AC_ARG_WITH([gdb-datadir],
-  [AS_HELP_STRING([--with-gdb-datadir],
-                  [look for global separate data files in this path [DATADIR/gdb]])], [gdbdatadir="${withval}"])
-
-AC_DEFINE_DIR(GDB_DATADIR, gdbdatadir,
-              [Global directory for GDB data files. ])
-
-if test "x$exec_prefix" = xNONE || test "x$exec_prefix" = 'x${prefix}'; then
-  if test "x$prefix" = xNONE; then
-    test_prefix=/usr/local
-  else
-    test_prefix=$prefix
-  fi
-else
-  test_prefix=$exec_prefix
-fi
-
-case ${gdbdatadir} in
-  "${test_prefix}"|"${test_prefix}/"*|\
-  '${exec_prefix}'|'${exec_prefix}/'*)
-    AC_DEFINE(GDB_DATADIR_RELOCATABLE, 1, [Define if GDB datadir should be relocated when GDB is moved.])
-  ;;
-esac
-GDB_DATADIR_PATH=${gdbdatadir}
-AC_SUBST(GDB_DATADIR_PATH)
-
-AC_ARG_WITH([pythondir],
-  [AS_HELP_STRING([--with-pythondir],
-                  [install Python data files in this path [DATADIR/gdb/python]])], [pythondir="${withval}"], [pythondir=no])
-
-# If the user passed in a path, define it.  Otherwise, compute it at
-# runtime based on the possibly-relocatable datadir.
-if test "$pythondir" = "no"; then
-  pythondir='$(GDB_DATADIR_PATH)/python'
-else
-  AC_DEFINE_UNQUOTED(PYTHONDIR, "$pythondir",
-      [Define to install path for Python sources])
-fi
-AC_SUBST(pythondir)
-
-
+AC_CONFIG_SUBDIRS(testsuite)
 
 # Check whether to support alternative target configurations
 AC_ARG_ENABLE(targets,
@@ -880,7 +836,6 @@ if test "${have_libpython}" != no; then
   CONFIG_DEPS="$CONFIG_DEPS \$(SUBDIR_PYTHON_DEPS)"
   CONFIG_SRCS="$CONFIG_SRCS \$(SUBDIR_PYTHON_SRCS)"
   CONFIG_INSTALL="$CONFIG_INSTALL install-python"
-  CONFIG_UNINSTALL="$CONFIG_UNINSTALL uninstall-python"
   ENABLE_CFLAGS="$ENABLE_CFLAGS \$(SUBDIR_PYTHON_CFLAGS)"
 
   # Flags needed to compile Python code (taken from python-config --cflags).

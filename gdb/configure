@@ -680,8 +680,6 @@ REPORT_BUGS_TO
 PKGVERSION
 TARGET_OBS
 subdirs
-pythondir
-GDB_DATADIR_PATH
 GDB_DATADIR
 DEBUGDIR
 am__fastdepCC_FALSE
@@ -948,7 +946,6 @@ enable_dependency_tracking
 with_separate_debug_dir
 with_gdb_datadir
 with_relocated_sources
-with_pythondir
 enable_targets
 enable_64_bit_bfd
 enable_gdbcli
@@ -1653,10 +1650,6 @@ Optional Packages:
                           [DATADIR/gdb]
   --with-relocated-sources=PATH
                           automatically relocate this path for source files
-  --with-gdb-datadir      look for global separate data files in this path
-                          [DATADIR/gdb]
-  --with-pythondir        install Python data files in this path
-                          [DATADIR/gdb/python]
   --with-libunwind        use libunwind frame unwinding support
   --with-curses           use the curses library instead of the termcap
                           library
@@ -7889,73 +7882,6 @@ _ACEOF
 fi
 
 
-# GDB's datadir relocation
-
-gdbdatadir=${datadir}/gdb
-
-
-# Check whether --with-gdb-datadir was given.
-if test "${with_gdb_datadir+set}" = set; then :
-  withval=$with_gdb_datadir; gdbdatadir="${withval}"
-fi
-
-
-
-  test "x$prefix" = xNONE && prefix="$ac_default_prefix"
-  test "x$exec_prefix" = xNONE && exec_prefix='${prefix}'
-  ac_define_dir=`eval echo $gdbdatadir`
-  ac_define_dir=`eval echo $ac_define_dir`
-
-cat >>confdefs.h <<_ACEOF
-#define GDB_DATADIR "$ac_define_dir"
-_ACEOF
-
-
-
-if test "x$exec_prefix" = xNONE || test "x$exec_prefix" = 'x${prefix}'; then
-  if test "x$prefix" = xNONE; then
-    test_prefix=/usr/local
-  else
-    test_prefix=$prefix
-  fi
-else
-  test_prefix=$exec_prefix
-fi
-
-case ${gdbdatadir} in
-  "${test_prefix}"|"${test_prefix}/"*|\
-  '${exec_prefix}'|'${exec_prefix}/'*)
-
-$as_echo "#define GDB_DATADIR_RELOCATABLE 1" >>confdefs.h
-
-  ;;
-esac
-GDB_DATADIR_PATH=${gdbdatadir}
-
-
-
-# Check whether --with-pythondir was given.
-if test "${with_pythondir+set}" = set; then :
-  withval=$with_pythondir; pythondir="${withval}"
-else
-  pythondir=no
-fi
-
-
-# If the user passed in a path, define it.  Otherwise, compute it at
-# runtime based on the possibly-relocatable datadir.
-if test "$pythondir" = "no"; then
-  pythondir='$(GDB_DATADIR_PATH)/python'
-else
-
-cat >>confdefs.h <<_ACEOF
-#define PYTHONDIR "$pythondir"
-_ACEOF
-
-fi
-
-
-
 
 
 subdirs="$subdirs testsuite"
@@ -11000,7 +10926,6 @@ $as_echo "#define HAVE_PYTHON 1" >>confdefs.h
   CONFIG_DEPS="$CONFIG_DEPS \$(SUBDIR_PYTHON_DEPS)"
   CONFIG_SRCS="$CONFIG_SRCS \$(SUBDIR_PYTHON_SRCS)"
   CONFIG_INSTALL="$CONFIG_INSTALL install-python"
-  CONFIG_UNINSTALL="$CONFIG_UNINSTALL uninstall-python"
   ENABLE_CFLAGS="$ENABLE_CFLAGS \$(SUBDIR_PYTHON_CFLAGS)"
 
   # Flags needed to compile Python code (taken from python-config --cflags).
@@ -14875,6 +14800,11 @@ if test "${enable_werror+set}" = set; then :
    esac
 fi
 
+
+# Enable -Werror by default when using gcc
+if test "${GCC}" = yes -a -z "${ERROR_ON_WARNING}" ; then
+    ERROR_ON_WARNING=yes
+fi
 
 WERROR_CFLAGS=""
 if test "${ERROR_ON_WARNING}" = yes ; then

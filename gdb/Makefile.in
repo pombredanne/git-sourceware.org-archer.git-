@@ -170,12 +170,6 @@ TARGET_SYSTEM_ROOT = @TARGET_SYSTEM_ROOT@
 TARGET_SYSTEM_ROOT_DEFINE = @TARGET_SYSTEM_ROOT_DEFINE@
 
 # Did the user give us a --with-gdb-datadir option?
-GDB_DATADIR_PATH = @GDB_DATADIR_PATH@
-
-# The argument to --with-pythondir.  If not given, this is
-# GDB_DATADIR_PATH/python.
-pythondir = @pythondir@
-
 GDB_DATADIR = @GDB_DATADIR@
 
 # Helper code from gnulib.
@@ -2070,36 +2064,6 @@ py-utils.o: $(srcdir)/python/py-utils.c
 py-value.o: $(srcdir)/python/py-value.c
 	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-value.c
 	$(POSTCOMPILE)
-
-# All python library files, with the "python/lib" stripped off.
-# Note that we should only install files in the "gdb" module.
-PY_FILES = gdb/FrameIterator.py gdb/FrameWrapper.py gdb/command/alias.py \
-    gdb/command/backtrace.py gdb/command/require.py \
-    gdb/command/pahole.py gdb/command/upto.py gdb/command/__init__.py \
-    gdb/command/ignore_errors.py \
-    gdb/function/caller_is.py gdb/function/in_scope.py \
-    gdb/function/__init__.py gdb/backtrace.py gdb/__init__.py
-
-# Install the Python library.  Python library files go under
-# $(pythondir).
-install-python:
-	files='$(PY_FILES)'; for file in $$files; do \
-	  dir=`echo "$$file" | sed 's,/[^/]*$$,,'`; \
-	  $(SHELL) $(srcdir)/../mkinstalldirs $(DESTDIR)$(pythondir)/$$dir; \
-	  $(INSTALL_DATA) $(srcdir)/python/lib/$$file $(DESTDIR)$(pythondir)/$$file; \
-	done
-
-# Other packages may have their files installed in $(pythondir).
-uninstall-python:
-	files='$(PY_FILES)'; for file in $$files; do \
-	  slashdir=`echo "/$$file" | sed 's,/[^/]*$$,,'`; \
-	  rm -f $(DESTDIR)$(pythondir)/$$file; \
-	  while test "x$$file" != "x$$slashdir"; do \
-	    rmdir 2>/dev/null "$(DESTDIR)$(pythondir)$$slashdir"; \
-	    file="$$slashdir"; \
-	    slashdir=`echo "$$file" | sed 's,/[^/]*$$,,'`; \
-	  done \
-	done
 
 #
 # Dependency tracking.  Most of this is conditional on GNU Make being
