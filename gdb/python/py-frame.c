@@ -211,20 +211,22 @@ static PyObject *
 frapy_block (PyObject *self, PyObject *args)
 {
   struct frame_info *frame;
-  struct block *block = NULL;
+  struct block *block = NULL, *fn_block;
   volatile struct gdb_exception except;
-  struct symtab_and_line sal;
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
       FRAPY_REQUIRE_VALID ((frame_object *) self, frame);
-
-      find_frame_sal (frame, &sal);
-      block = block_for_pc (get_frame_address_in_block (frame));
+      block = get_frame_block (frame, NULL);
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
-  if (!sal.symtab || !sal.symtab->objfile)
+  for (fn_block = block;
+       fn_block != NULL && BLOCK_FUNCTION (fn_block) == NULL;
+       fn_block = BLOCK_SUPERBLOCK (fn_block))
+    ;
+
+  if (block == NULL || fn_block == NULL || BLOCK_FUNCTION (fn_block) == NULL)
     {
       PyErr_SetString (PyExc_RuntimeError,
 		       _("Cannot locate object file for block."));
@@ -232,7 +234,12 @@ frapy_block (PyObject *self, PyObject *args)
     }
 
   if (block)
-    return block_to_block_object (block, sal.symtab->objfile);
+    {
+      struct symtab *symt;
+
+      symt = SYMBOL_SYMTAB (BLOCK_FUNCTION (fn_block));
+      return block_to_block_object (block, symt->objfile);
+    }
 
   Py_RETURN_NONE;
 }
@@ -491,6 +498,26 @@ frapy_select (PyObject *self, PyObject *args)
   Py_RETURN_NONE;
 }
 
+/* Implementation of gdb.newest_frame () -> gdb.Frame.
+   Returns the newest frame object.  */
+
+PyObject *
+gdbpy_newest_frame (PyObject *self, PyObject *args)
+{
+  struct frame_info *frame;
+  PyObject *frame_obj = NULL;   /* Initialize to appease gcc warning.  */
+  volatile struct gdb_exception except;
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      frame = get_current_frame ();
+      frame_obj = frame_info_to_frame_object (frame);
+    }
+  GDB_PY_HANDLE_EXCEPTION (except);
+
+  return frame_obj;
+}
+
 /* Implementation of gdb.selected_frame () -> gdb.Frame.
    Returns the selected frame object.  */
 
@@ -574,7 +601,9 @@ gdbpy_initialize_frames (void)
      type's dictionary.  That seems too messy.  */
   PyModule_AddIntConstant (gdb_module, "NORMAL_FRAME", NORMAL_FRAME);
   PyModule_AddIntConstant (gdb_module, "DUMMY_FRAME", DUMMY_FRAME);
+  PyModule_AddIntConstant (gdb_module, "INLINE_FRAME", INLINE_FRAME);
   PyModule_AddIntConstant (gdb_module, "SIGTRAMP_FRAME", SIGTRAMP_FRAME);
+  PyModule_AddIntConstant (gdb_module, "ARCH_FRAME", ARCH_FRAME);
   PyModule_AddIntConstant (gdb_module, "SENTINEL_FRAME", SENTINEL_FRAME);
   PyModule_AddIntConstant (gdb_module,
 			   "FRAME_UNWIND_NO_REASON", UNWIND_NO_REASON);
