@@ -3532,8 +3532,12 @@ copy_type_recursive_1 (struct objfile *objfile,
 	      TYPE_LOW_BOUND_UNDEFINED (new_type) = 1;
 	    }
 	  else
-	    TYPE_LOW_BOUND (new_type) = dwarf_locexpr_baton_eval
+	    {
+	      TYPE_LOW_BOUND (new_type) = dwarf_locexpr_baton_eval
 				(TYPE_RANGE_DATA (new_type)->low.u.dwarf_block);
+	      if (TYPE_LOW_BOUND (new_type) >= 0)
+		TYPE_UNSIGNED (new_type) = 1;
+	    }
 	  TYPE_RANGE_DATA (new_type)->low.kind = RANGE_BOUND_KIND_CONSTANT;
 	  break;
 	case RANGE_BOUND_KIND_DWARF_LOCLIST:
@@ -3549,7 +3553,11 @@ copy_type_recursive_1 (struct objfile *objfile,
 	        && dwarf_loclist_baton_eval
 		  (TYPE_RANGE_DATA (new_type)->low.u.dwarf_loclist.loclist,
 		   TYPE_RANGE_DATA (new_type)->low.u.dwarf_loclist.type, &addr))
-	      TYPE_LOW_BOUND (new_type) = addr;
+	      {
+		TYPE_LOW_BOUND (new_type) = addr;
+		if (TYPE_LOW_BOUND (new_type) >= 0)
+		  TYPE_UNSIGNED (new_type) = 1;
+	      }
 	    else
 	      {
 		/* We should set 1 for Fortran but how to find the language?  */
