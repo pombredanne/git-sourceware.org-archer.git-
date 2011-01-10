@@ -44,6 +44,7 @@
 #include "objfiles.h"
 #include "python/python.h"
 #include "wrapper.h"
+#include "dwarf2loc.h"
 
 #include "gdb_assert.h"
 
@@ -806,6 +807,7 @@ evaluate_subexp_standard (struct type *expect_type,
   int save_pos1;
   struct symbol *function = NULL;
   char *function_name = NULL;
+  struct cleanup *old_chain;
 
   pc = (*pos)++;
   op = exp->elts[pc].opcode;
@@ -1877,6 +1879,8 @@ evaluate_subexp_standard (struct type *expect_type,
 
       /* First determine the type code we are dealing with.  */
       arg1 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
+      old_chain = make_cleanup (null_cleanup, 0);
+      object_address_set (value_raw_address (arg1));
       type = check_typedef (value_type (arg1));
       code = TYPE_CODE (type);
 
@@ -1897,6 +1901,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	      code = TYPE_CODE (type);
 	    }
 	} 
+      do_cleanups (old_chain);
 
       switch (code)
 	{
@@ -2361,6 +2366,9 @@ evaluate_subexp_standard (struct type *expect_type,
 	if (nargs > MAX_FORTRAN_DIMS)
 	  error (_("Too many subscripts for F77 (%d Max)"), MAX_FORTRAN_DIMS);
 
+	old_chain = make_cleanup (null_cleanup, 0);
+	object_address_set (value_raw_address (arg1));
+
 	ndimensions = calc_f77_array_dims (type);
 
 	if (nargs != ndimensions)
@@ -2392,6 +2400,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	    array = value_subscripted_rvalue (array, index, lower);
 	  }
 
+	do_cleanups (old_chain);
 	return array;
       }
 
@@ -2626,15 +2635,23 @@ evaluate_subexp_standard (struct type *expect_type,
       if (expect_type && TYPE_CODE (expect_type) == TYPE_CODE_PTR)
 	expect_type = TYPE_TARGET_TYPE (check_typedef (expect_type));
       arg1 = evaluate_subexp (expect_type, exp, pos, noside);
+      old_chain = make_cleanup (null_cleanup, 0);
+      object_address_set (value_raw_address (arg1));
       type = check_typedef (value_type (arg1));
       if (TYPE_CODE (type) == TYPE_CODE_METHODPTR
 	  || TYPE_CODE (type) == TYPE_CODE_MEMBERPTR)
 	error (_("Attempt to dereference pointer "
 		 "to member without an object"));
       if (noside == EVAL_SKIP)
-	goto nosideret;
+	{
+	  do_cleanups (old_chain);
+	  goto nosideret;
+	}
       if (unop_user_defined_p (op, arg1))
-	return value_x_unop (arg1, op, noside);
+	{
+	  do_cleanups (old_chain);
+	  return value_x_unop (arg1, op, noside);
+	}
       else if (noside == EVAL_AVOID_SIDE_EFFECTS)
 	{
 	  type = check_typedef (value_type (arg1));
@@ -2643,12 +2660,18 @@ evaluate_subexp_standard (struct type *expect_type,
 	  /* In C you can dereference an array to get the 1st elt.  */
 	      || TYPE_CODE (type) == TYPE_CODE_ARRAY
 	    )
-	    return value_zero (TYPE_TARGET_TYPE (type),
-			       lval_memory);
+	    {
+	      do_cleanups (old_chain);
+	      return value_zero (TYPE_TARGET_TYPE (type),
+				 lval_memory);
+	    }
 	  else if (TYPE_CODE (type) == TYPE_CODE_INT)
-	    /* GDB allows dereferencing an int.  */
-	    return value_zero (builtin_type (exp->gdbarch)->builtin_int,
-			       lval_memory);
+	    {
+	      do_cleanups (old_chain);
+	      /* GDB allows dereferencing an int.  */
+	      return value_zero (builtin_type (exp->gdbarch)->builtin_int,
+				 lval_memory);
+	    }
 	  else
 	    error (_("Attempt to take contents of a non-pointer value."));
 	}
@@ -2658,9 +2681,14 @@ evaluate_subexp_standard (struct type *expect_type,
 	 do.  "long long" variables are rare enough that
 	 BUILTIN_TYPE_LONGEST would seem to be a mistake.  */
       if (TYPE_CODE (type) == TYPE_CODE_INT)
-	return value_at_lazy (builtin_type (exp->gdbarch)->builtin_int,
-			      (CORE_ADDR) value_as_address (arg1));
-      return value_ind (arg1);
+	{
+	  do_cleanups (old_chain);
+	  return value_at_lazy (builtin_type (exp->gdbarch)->builtin_int,
+				(CORE_ADDR) value_as_address (arg1));
+	}
+      arg1 = value_ind (arg1);
+      do_cleanups (old_chain);
+      return arg1;
 
     case UNOP_ADDR:
       /* C++: check for and handle pointer to members.  */
@@ -3006,7 +3034,7 @@ evaluate_subexp_with_coercion (struct expression *exp,
 {
   enum exp_opcode op;
   int pc;
-  struct value *val;
+  struct value *val = NULL;
   struct symbol *var;
   struct type *type;
 
@@ -3017,13 +3045,18 @@ evaluate_subexp_with_coercion (struct expression *exp,
     {
     case OP_VAR_VALUE:
       var = exp->elts[pc + 2].symbol;
+      /* address_of_variable will call object_address_set for check_typedef.
+	 Call it only if required as it can error-out on VAR in register.  */
+      if (TYPE_DYNAMIC (SYMBOL_TYPE (var)))
+	val = address_of_variable (var, exp->elts[pc + 1].block);
       type = check_typedef (SYMBOL_TYPE (var));
       if (TYPE_CODE (type) == TYPE_CODE_ARRAY
 	  && !TYPE_VECTOR (type)
 	  && CAST_IS_CONVERSION (exp->language_defn))
 	{
 	  (*pos) += 4;
-	  val = address_of_variable (var, exp->elts[pc + 1].block);
+	  if (!val)
+	    val = address_of_variable (var, exp->elts[pc + 1].block);
 	  return value_cast (lookup_pointer_type (TYPE_TARGET_TYPE (type)),
 			     val);
 	}
@@ -3075,9 +3108,13 @@ evaluate_subexp_for_sizeof (struct expression *exp, int *pos)
 
     case OP_VAR_VALUE:
       (*pos) += 4;
-      type = check_typedef (SYMBOL_TYPE (exp->elts[pc + 2].symbol));
-      return
-	value_from_longest (size_type, (LONGEST) TYPE_LENGTH (type));
+      /* We do not need to call read_var_value but the object evaluation may
+	 need to have executed object_address_set which needs valid
+	 SYMBOL_VALUE_ADDRESS of the symbol.  Still VALUE returned by
+	 read_var_value we left as lazy.  */
+      type = value_type (read_var_value (exp->elts[pc + 2].symbol,
+					deprecated_safe_get_selected_frame ()));
+      return value_from_longest (size_type, (LONGEST) TYPE_LENGTH (type));
 
     default:
       val = evaluate_subexp (NULL_TYPE, exp, pos, EVAL_AVOID_SIDE_EFFECTS);

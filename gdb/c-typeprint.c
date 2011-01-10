@@ -609,9 +609,14 @@ c_type_print_varspec_suffix (struct type *type,
 	  fprintf_filtered (stream, ")");
 
 	fprintf_filtered (stream, "[");
-	if (get_array_bounds (type, &low_bound, &high_bound))
-	  fprintf_filtered (stream, "%d", 
-			    (int) (high_bound - low_bound + 1));
+	if (TYPE_RANGE_DATA (TYPE_INDEX_TYPE (type))->high.kind
+	    != RANGE_BOUND_KIND_CONSTANT)
+	  {
+	    /* No _() - printed sources should not be locale dependent.  */
+	    fprintf_filtered (stream, "variable");
+	  }
+	else if (get_array_bounds (type, &low_bound, &high_bound))
+	  fprintf_filtered (stream, "%d", (int) (high_bound - low_bound + 1));
 	fprintf_filtered (stream, "]");
 
 	c_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream,

@@ -114,9 +114,15 @@ struct dwarf_expr_context
 #if 0
   /* Not yet implemented.  */
 
+  /* Return the location expression for the dwarf expression
+     subroutine in the die at OFFSET in the current compilation unit.
+     The result must be live until the current expression evaluation
+     is complete.  */
+  unsigned char *(*get_subr) (void *baton, off_t offset, size_t *length);
+#endif
+
   /* Return the `object address' for DW_OP_push_object_address.  */
   CORE_ADDR (*get_object_address) (void *baton);
-#endif
 
   /* The current depth of dwarf expression recursion, via DW_OP_call*,
      DW_OP_fbreg, DW_OP_push_object_address, etc., and the maximum

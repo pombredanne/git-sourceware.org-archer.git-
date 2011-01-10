@@ -35,6 +35,7 @@
 #include "user-regs.h"
 #include "block.h"
 #include "objfiles.h"
+#include "dwarf2loc.h"
 
 /* Basic byte-swapping routines.  All 'extract' functions return a
    host-format integer from a target-format integer at ADDR which is
@@ -400,28 +401,17 @@ symbol_read_needs_frame (struct symbol *sym)
 
 /* Given a struct symbol for a variable,
    and a stack frame id, read the value of the variable
-   and return a (pointer to a) struct value containing the value.
-   If the variable cannot be found, return a zero pointer.  */
+   and return a (pointer to a) struct value containing the value. 
+   If the variable cannot be found, return a zero pointer.
+   We have to first find the address of the variable before allocating struct
+   value to return as its size may depend on DW_OP_PUSH_OBJECT_ADDRESS possibly
+   used by its type.  */
 
 struct value *
 read_var_value (struct symbol *var, struct frame_info *frame)
 {
-  struct value *v;
   struct type *type = SYMBOL_TYPE (var);
   CORE_ADDR addr;
-  int len;
-
-  if (SYMBOL_CLASS (var) == LOC_COMPUTED
-      || SYMBOL_CLASS (var) == LOC_REGISTER)
-    /* These cases do not use V.  */
-    v = NULL;
-  else
-    {
-      v = allocate_value (type);
-      VALUE_LVAL (v) = lval_memory;	/* The most likely possibility.  */
-    }
-
-  len = TYPE_LENGTH (type);
 
   if (symbol_read_needs_frame (var))
     gdb_assert (frame);
@@ -429,33 +419,43 @@ read_var_value (struct symbol *var, struct frame_info *frame)
   switch (SYMBOL_CLASS (var))
     {
     case LOC_CONST:
-      /* Put the constant back in target format.  */
-      store_signed_integer (value_contents_raw (v), len,
-			    gdbarch_byte_order (get_type_arch (type)),
-			    (LONGEST) SYMBOL_VALUE (var));
-      VALUE_LVAL (v) = not_lval;
-      return v;
+      {
+	/* Put the constant back in target format.  */
+	struct value *v = allocate_value (type);
+	VALUE_LVAL (v) = not_lval;
+	store_signed_integer (value_contents_raw (v), TYPE_LENGTH (type),
+			      gdbarch_byte_order (get_type_arch (type)),
+			      (LONGEST) SYMBOL_VALUE (var));
+	return v;
+      }
 
     case LOC_LABEL:
-      /* Put the constant back in target format.  */
-      if (overlay_debugging)
-	{
-	  CORE_ADDR addr
-	    = symbol_overlayed_address (SYMBOL_VALUE_ADDRESS (var),
-					SYMBOL_OBJ_SECTION (var));
+      {
+	/* Put the constant back in target format.  */
+	struct value *v = allocate_value (type);
+	VALUE_LVAL (v) = not_lval;
+	if (overlay_debugging)
+	  {
+	    CORE_ADDR addr
+	      = symbol_overlayed_address (SYMBOL_VALUE_ADDRESS (var),
+					  SYMBOL_OBJ_SECTION (var));
 
-	  store_typed_address (value_contents_raw (v), type, addr);
-	}
-      else
-	store_typed_address (value_contents_raw (v), type,
-			      SYMBOL_VALUE_ADDRESS (var));
-      VALUE_LVAL (v) = not_lval;
-      return v;
+	    store_typed_address (value_contents_raw (v), type, addr);
+	  }
+	else
+	  store_typed_address (value_contents_raw (v), type,
+				SYMBOL_VALUE_ADDRESS (var));
+	return v;
+      }
 
     case LOC_CONST_BYTES:
-      memcpy (value_contents_raw (v), SYMBOL_VALUE_BYTES (var), len);
-      VALUE_LVAL (v) = not_lval;
-      return v;
+      {
+	struct value *v = allocate_value (type);
+	VALUE_LVAL (v) = not_lval;
+	memcpy (value_contents_raw (v), SYMBOL_VALUE_BYTES (var),
+		TYPE_LENGTH (type));
+	return v;
+      }
 
     case LOC_STATIC:
       if (overlay_debugging)
@@ -496,12 +496,23 @@ read_var_value (struct symbol *var, struct frame_info *frame)
       break;
 
     case LOC_BLOCK:
-      if (overlay_debugging)
-	set_value_address (v, symbol_overlayed_address
-	  (BLOCK_START (SYMBOL_BLOCK_VALUE (var)), SYMBOL_OBJ_SECTION (var)));
-      else
-	set_value_address (v, BLOCK_START (SYMBOL_BLOCK_VALUE (var)));
-      return v;
+      {
+        CORE_ADDR addr;
+	struct value *v;
+
+	if (overlay_debugging)
+	  addr = symbol_overlayed_address
+	    (BLOCK_START (SYMBOL_BLOCK_VALUE (var)), SYMBOL_OBJ_SECTION (var));
+	else
+	  addr = BLOCK_START (SYMBOL_BLOCK_VALUE (var));
+	/* ADDR is set here for ALLOCATE_VALUE's CHECK_TYPEDEF for
+	   DW_OP_push_object_address.  */
+	object_address_set (addr);
+	v = allocate_value (type);
+	VALUE_LVAL (v) = lval_memory;
+	set_value_address (v, addr);
+	return v;
+      }
 
     case LOC_REGISTER:
     case LOC_REGPARM_ADDR:
@@ -520,7 +531,6 @@ read_var_value (struct symbol *var, struct frame_info *frame)
 	      error (_("Value of register variable not available."));
 
 	    addr = value_as_address (regval);
-	    VALUE_LVAL (v) = lval_memory;
 	  }
 	else
 	  {
@@ -563,18 +573,33 @@ read_var_value (struct symbol *var, struct frame_info *frame)
       break;
 
     case LOC_OPTIMIZED_OUT:
-      VALUE_LVAL (v) = not_lval;
-      set_value_optimized_out (v, 1);
-      return v;
+      {
+        struct value *v = allocate_value (type);
+
+	VALUE_LVAL (v) = not_lval;
+	set_value_optimized_out (v, 1);
+	return v;
+      }
 
     default:
       error (_("Cannot look up value of a botched symbol."));
       break;
     }
 
-  set_value_address (v, addr);
-  set_value_lazy (v, 1);
-  return v;
+  {
+    struct value *v;
+
+    /* ADDR is set here for ALLOCATE_VALUE's CHECK_TYPEDEF for
+       DW_OP_PUSH_OBJECT_ADDRESS.  */
+    object_address_set (addr);
+    v = allocate_value (type);
+    VALUE_LVAL (v) = lval_memory;
+    set_value_address (v, addr);
+
+    set_value_lazy (v, 1);
+
+    return v;
+  }
 }
 
 /* Install default attributes for register values.  */
@@ -611,10 +636,11 @@ struct value *
 value_from_register (struct type *type, int regnum, struct frame_info *frame)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
-  struct type *type1 = check_typedef (type);
   struct value *v;
 
-  if (gdbarch_convert_register_p (gdbarch, regnum, type1))
+  type = check_typedef (type);
+
+  if (gdbarch_convert_register_p (gdbarch, regnum, type))
     {
       /* The ISA/ABI need to something weird when obtaining the
          specified value from this register.  It might need to
@@ -628,7 +654,7 @@ value_from_register (struct type *type, int regnum, struct frame_info *frame)
       VALUE_FRAME_ID (v) = get_frame_id (frame);
       VALUE_REGNUM (v) = regnum;
       gdbarch_register_to_value (gdbarch,
-				 frame, regnum, type1, value_contents_raw (v));
+				 frame, regnum, type, value_contents_raw (v));
     }
   else
     {

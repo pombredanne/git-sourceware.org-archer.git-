@@ -36,6 +36,7 @@
 #include "gdb_string.h"
 #include "exceptions.h"
 #include "valprint.h"
+#include "dwarf2loc.h"
 #include <errno.h>
 
 extern void _initialize_typeprint (void);
@@ -77,6 +78,9 @@ void
 type_print (struct type *type, char *varstring, struct ui_file *stream,
 	    int show)
 {
+  if (show >= 0)
+    type = check_typedef (type);
+
   LA_PRINT_TYPE (type, varstring, stream, show, 0);
 }
 
@@ -115,7 +119,8 @@ whatis_exp (char *exp, int show)
 {
   struct expression *expr;
   struct value *val;
-  struct cleanup *old_chain = NULL;
+  /* Required at least for the object_address_set call.  */
+  struct cleanup *old_chain = make_cleanup (null_cleanup, NULL);
   struct type *real_type = NULL;
   struct type *type;
   int full = 0;
@@ -126,12 +131,13 @@ whatis_exp (char *exp, int show)
   if (exp)
     {
       expr = parse_expression (exp);
-      old_chain = make_cleanup (free_current_contents, &expr);
+      make_cleanup (free_current_contents, &expr);
       val = evaluate_type (expr);
     }
   else
     val = access_value_history (0);
 
+  object_address_set (value_raw_address (val));
   type = value_type (val);
 
   get_user_print_options (&opts);
@@ -168,8 +174,7 @@ whatis_exp (char *exp, int show)
   type_print (type, "", gdb_stdout, show);
   printf_filtered ("\n");
 
-  if (exp)
-    do_cleanups (old_chain);
+  do_cleanups (old_chain);
 }
 
 static void

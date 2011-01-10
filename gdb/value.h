@@ -389,6 +389,10 @@ extern struct value *value_from_double (struct type *type, DOUBLEST num);
 extern struct value *value_from_decfloat (struct type *type,
 					  const gdb_byte *decbytes);
 
+extern const char *object_address_data_not_valid (struct type *type);
+extern struct type *object_address_get_data (struct type *type,
+					     CORE_ADDR *address_return);
+
 extern struct value *value_at (struct type *type, CORE_ADDR addr);
 extern struct value *value_at_lazy (struct type *type, CORE_ADDR addr);
 

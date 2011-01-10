@@ -973,6 +973,11 @@ print_command_1 (char *exp, int inspect, int voidprint)
   else
     val = access_value_history (0);
 
+  /* Do not try to OBJECT_ADDRESS_SET here anything.  We are interested in the
+     source variable base addresses as found by READ_VAR_VALUE.  The value here
+     can be already a calculated expression address inappropriate for
+     DW_OP_push_object_address.  */
+
   if (voidprint || (val && value_type (val) &&
 		    TYPE_CODE (value_type (val)) != TYPE_CODE_VOID))
     {
@@ -1474,6 +1479,22 @@ x_command (char *exp, int from_tty)
 	set_internalvar (lookup_internalvar ("__"), last_examine_value);
     }
 }
+
+/* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
+
+static void
+print_types_mark_used (void)
+{
+  struct display *d;
+
+  if (last_examine_value)
+    type_mark_used (value_type (last_examine_value));
+
+  for (d = display_chain; d; d = d->next)
+    if (d->exp)
+      exp_types_mark_used (d->exp);
+}
+
 
 
 /* Add an expression to the auto-display chain.
@@ -2874,4 +2895,6 @@ Show printing of source filename and line number with <symbol>."), NULL,
   add_com ("eval", no_class, eval_command, _("\
 Convert \"printf format string\", arg1, arg2, arg3, ..., argn to\n\
 a command line, and call it."));
+
+  observer_attach_mark_used (print_types_mark_used);
 }

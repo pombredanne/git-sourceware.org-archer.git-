@@ -707,7 +707,6 @@ mi_cmd_var_update (char *command, char **argv, int argc)
     }
   else
     {
-      /* Get varobj handle, if a valid var obj name was specified */
       struct varobj *var = varobj_get_handle (name);
 
       varobj_update_one (var, print_values, 1 /* explicit */);

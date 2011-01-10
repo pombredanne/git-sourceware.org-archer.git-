@@ -214,6 +214,11 @@ enum type_instance_flag_value
 
 #define TYPE_TARGET_STUB(t)	(TYPE_MAIN_TYPE (t)->flag_target_stub)
 
+/* Type needs to be evaluated on each CHECK_TYPEDEF and its results must not be
+   sticky.  */
+
+#define TYPE_DYNAMIC(t)		(TYPE_MAIN_TYPE (t)->flag_dynamic)
+
 /* Static type.  If this is set, the corresponding type had 
    a static modifier.
    Note: This may be unnecessary, since static data members
@@ -284,6 +289,48 @@ enum type_instance_flag_value
    the type.  If false, the structure was declared as a "struct".  */
 
 #define TYPE_DECLARED_CLASS(t) (TYPE_MAIN_TYPE (t)->flag_declared_class)
+
+/* Define this type as being reclaimable during free_all_types.  Type is
+   required to be have TYPE_OBJFILE set to NULL.  Setting this flag requires
+   initializing TYPE_DISCARDABLE_AGE, see alloc_type_discardable.  */
+
+#define TYPE_DISCARDABLE(t)	(TYPE_MAIN_TYPE (t)->flag_discardable)
+
+/* Marker this type has been visited by the type_mark_used by this
+   mark-and-sweep types garbage collecting pass.  Current pass is represented
+   by TYPE_DISCARDABLE_AGE_CURRENT.  */
+
+#define TYPE_DISCARDABLE_AGE(t)	(TYPE_MAIN_TYPE (t)->flag_discardable_age)
+
+/* Is HIGH_BOUND a low-bound relative count (1) or the high bound itself (0)?  */
+
+#define TYPE_RANGE_HIGH_BOUND_IS_COUNT(range_type) \
+  (TYPE_MAIN_TYPE (range_type)->flag_range_high_bound_is_count)
+
+/* Not allocated.  TYPE_ALLOCATED(t) must be NULL in such case.  If this flag
+   is unset and TYPE_ALLOCATED(t) is NULL then the type is allocated.  If this
+   flag is unset and TYPE_ALLOCATED(t) is not NULL then its DWARF block
+   determines the actual allocation state.  */
+
+#define TYPE_NOT_ALLOCATED(t)	(TYPE_MAIN_TYPE (t)->flag_not_allocated)
+
+/* Not associated.  TYPE_ASSOCIATED(t) must be NULL in such case.  If this flag
+   is unset and TYPE_ASSOCIATED(t) is NULL then the type is associated.  If
+   this flag is unset and TYPE_ASSOCIATED(t) is not NULL then its DWARF block
+   determines the actual association state.  */
+
+#define TYPE_NOT_ASSOCIATED(t)	(TYPE_MAIN_TYPE (t)->flag_not_associated)
+
+/* Address of the actual data as for DW_AT_data_location.  Its dwarf block must
+   not be evaluated unless both TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are
+   false.  If TYPE_DATA_LOCATION_IS_ADDR set then TYPE_DATA_LOCATION_ADDR value
+   is the actual data address value.  If unset and
+   TYPE_DATA_LOCATION_DWARF_BLOCK is NULL then the value is the normal
+   value_raw_address.  If unset and TYPE_DATA_LOCATION_DWARF_BLOCK is not NULL
+   then its DWARF block determines the actual data address.  */
+
+#define TYPE_DATA_LOCATION_IS_ADDR(t) \
+  (TYPE_MAIN_TYPE (t)->flag_data_location_is_addr)
 
 /* Constant type.  If this is set, the corresponding type has a
    const modifier.  */
@@ -392,6 +439,13 @@ struct main_type
   /* True if this type was declared with "class" rather than
      "struct".  */
   unsigned int flag_declared_class : 1;
+  unsigned int flag_discardable : 1;
+  unsigned int flag_discardable_age : 1;
+  unsigned int flag_dynamic : 1;
+  unsigned int flag_range_high_bound_is_count : 1;
+  unsigned int flag_not_allocated : 1;
+  unsigned int flag_not_associated : 1;
+  unsigned int flag_data_location_is_addr : 1;
 
   /* A discriminant telling us which field of the type_specific union
      is being used for this type, if any.  */
@@ -464,6 +518,20 @@ struct main_type
      Unused otherwise.  */
 
   struct type *target_type;
+
+  /* For DW_AT_data_location.  */
+  union
+    {
+      struct dwarf2_locexpr_baton *dwarf_block;
+      CORE_ADDR addr;
+    }
+  data_location;
+
+  /* For DW_AT_allocated.  */
+  struct dwarf2_locexpr_baton *allocated;
+
+  /* For DW_AT_associated.  */
+  struct dwarf2_locexpr_baton *associated;
 
   /* For structure and union types, a description of each field.
      For set and pascal array types, there is one "field",
@@ -539,13 +607,34 @@ struct main_type
 
     struct range_bounds
     {
+      struct
+	{
+	  union
+	    {
+	      LONGEST constant;
+	      struct dwarf2_locexpr_baton *dwarf_block;
+	      struct
+		{
+		  struct dwarf2_loclist_baton *loclist;
+		  struct type *type;
+		}
+	      dwarf_loclist;
+	    }
+	  u;
+	  enum range_bound_kind
+	    {
+	      RANGE_BOUND_KIND_CONSTANT,
+	      RANGE_BOUND_KIND_DWARF_BLOCK,
+	      RANGE_BOUND_KIND_DWARF_LOCLIST
+	    }
+	  kind;
+	}
       /* Low bound of range.  */
-
-      LONGEST low;
-
+      low,
       /* High bound of range.  */
-
-      LONGEST high;
+      high,
+      /* Byte stride of range.  */
+      byte_stride;
 
       /* Flags indicating whether the values of low and high are
          valid.  When true, the respective range value is
@@ -918,9 +1007,9 @@ extern void allocate_gnat_aux_type (struct type *);
 #define TYPE_POINTER_TYPE(thistype) (thistype)->pointer_type
 #define TYPE_REFERENCE_TYPE(thistype) (thistype)->reference_type
 #define TYPE_CHAIN(thistype) (thistype)->chain
-/* Note that if thistype is a TYPEDEF type, you have to call check_typedef.
-   But check_typedef does set the TYPE_LENGTH of the TYPEDEF type,
-   so you only have to call check_typedef once.  Since allocate_value
+/* Note that if thistype is a TYPEDEF, ARRAY or STRING type, you have to call
+   check_typedef.  But check_typedef does set the TYPE_LENGTH of the TYPEDEF
+   type, so you only have to call check_typedef once.  Since allocate_value
    calls check_typedef, TYPE_LENGTH (VALUE_TYPE (X)) is safe.  */
 #define TYPE_LENGTH(thistype) (thistype)->length
 /* Note that TYPE_CODE can be TYPE_CODE_TYPEDEF, so if you want the real
@@ -928,11 +1017,16 @@ extern void allocate_gnat_aux_type (struct type *);
 #define TYPE_CODE(thistype) TYPE_MAIN_TYPE(thistype)->code
 #define TYPE_NFIELDS(thistype) TYPE_MAIN_TYPE(thistype)->nfields
 #define TYPE_FIELDS(thistype) TYPE_MAIN_TYPE(thistype)->flds_bnds.fields
+#define TYPE_DATA_LOCATION_DWARF_BLOCK(thistype) TYPE_MAIN_TYPE (thistype)->data_location.dwarf_block
+#define TYPE_DATA_LOCATION_ADDR(thistype) TYPE_MAIN_TYPE (thistype)->data_location.addr
+#define TYPE_ALLOCATED(thistype) TYPE_MAIN_TYPE (thistype)->allocated
+#define TYPE_ASSOCIATED(thistype) TYPE_MAIN_TYPE (thistype)->associated
 
 #define TYPE_INDEX_TYPE(type) TYPE_FIELD_TYPE (type, 0)
 #define TYPE_RANGE_DATA(thistype) TYPE_MAIN_TYPE(thistype)->flds_bnds.bounds
-#define TYPE_LOW_BOUND(range_type) TYPE_RANGE_DATA(range_type)->low
-#define TYPE_HIGH_BOUND(range_type) TYPE_RANGE_DATA(range_type)->high
+#define TYPE_LOW_BOUND(range_type) TYPE_RANGE_DATA(range_type)->low.u.constant
+#define TYPE_HIGH_BOUND(range_type) TYPE_RANGE_DATA(range_type)->high.u.constant
+#define TYPE_BYTE_STRIDE(range_type) TYPE_RANGE_DATA(range_type)->byte_stride.u.constant
 #define TYPE_LOW_BOUND_UNDEFINED(range_type) \
    TYPE_RANGE_DATA(range_type)->low_undefined
 #define TYPE_HIGH_BOUND_UNDEFINED(range_type) \
@@ -949,7 +1043,14 @@ extern void allocate_gnat_aux_type (struct type *);
    (TYPE_HIGH_BOUND(TYPE_INDEX_TYPE((arraytype))))
 
 #define TYPE_ARRAY_LOWER_BOUND_VALUE(arraytype) \
-   (TYPE_LOW_BOUND(TYPE_INDEX_TYPE((arraytype))))
+  TYPE_LOW_BOUND (TYPE_INDEX_TYPE (arraytype))
+
+/* TYPE_BYTE_STRIDE (TYPE_INDEX_TYPE (arraytype)) with a fallback to the
+   element size if no specific stride value is known.  */
+#define TYPE_ARRAY_BYTE_STRIDE_VALUE(arraytype)		\
+  (TYPE_BYTE_STRIDE (TYPE_INDEX_TYPE (arraytype)) == 0	\
+   ? TYPE_LENGTH (TYPE_TARGET_TYPE (arraytype))		\
+   : TYPE_BYTE_STRIDE (TYPE_INDEX_TYPE (arraytype)))
 
 /* C++ */
 
@@ -1365,6 +1466,18 @@ extern struct type *create_array_type (struct type *, struct type *,
 				       struct type *);
 extern struct type *lookup_array_range_type (struct type *, int, int);
 
+extern CORE_ADDR type_range_any_field_internal (struct type *range_type,
+						int fieldno);
+
+extern int type_range_high_bound_internal (struct type *range_type);
+
+extern int type_range_count_bound_internal (struct type *range_type);
+
+extern CORE_ADDR type_range_byte_stride_internal (struct type *range_type,
+						  struct type *element_type);
+
+extern void finalize_type (struct type *type);
+
 extern struct type *create_string_type (struct type *, struct type *,
 					struct type *);
 extern struct type *lookup_string_range_type (struct type *, int, int);
@@ -1409,6 +1522,8 @@ extern int is_ancestor (struct type *, struct type *);
 extern int is_public_ancestor (struct type *, struct type *);
 
 extern int is_unique_ancestor (struct type *, struct value *);
+
+extern void type_mark_used (struct type *type);
 
 /* Overload resolution */
 
@@ -1480,10 +1595,11 @@ extern void maintenance_print_type (char *, int);
 
 extern htab_t create_copied_types_hash (struct objfile *objfile);
 
-extern struct type *copy_type_recursive (struct objfile *objfile,
-					 struct type *type,
+extern struct type *copy_type_recursive (struct type *type,
 					 htab_t copied_types);
 
 extern struct type *copy_type (const struct type *type);
+
+extern void free_all_types (void);
 
 #endif /* GDBTYPES_H */

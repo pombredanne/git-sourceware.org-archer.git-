@@ -11811,6 +11811,22 @@ all_tracepoints ()
   return tp_vec;
 }
 
+/* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
+
+static void
+breakpoint_types_mark_used (void)
+{
+  struct breakpoint *b;
+
+  ALL_BREAKPOINTS (b)
+    {
+      if (b->exp)
+	exp_types_mark_used (b->exp);
+      if (b->val)
+	type_mark_used (value_type (b->val));
+    }
+}
+
 
 /* This help string is used for the break, hbreak, tbreak and thbreak
    commands.  It is defined as a macro to prevent duplication.
@@ -12430,4 +12446,5 @@ inferior in all-stop mode, gdb behaves as if always-inserted mode is off."),
   automatic_hardware_breakpoints = 1;
 
   observer_attach_about_to_proceed (breakpoint_about_to_proceed);
+  observer_attach_mark_used (breakpoint_types_mark_used);
 }
