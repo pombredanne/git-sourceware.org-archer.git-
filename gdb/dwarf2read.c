@@ -8262,6 +8262,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
 
   /* LOW_BOUND and HIGH_BOUND are set for real below.  */
   range_type = create_range_type (NULL, base_type, 0, -1);
+  TYPE_UNSIGNED (range_type) = 0;
 
   negative_mask = 
     (LONGEST) -1 << (TYPE_LENGTH (base_type) * TARGET_CHAR_BIT - 1);
