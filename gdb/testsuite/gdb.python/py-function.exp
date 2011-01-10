@@ -20,6 +20,8 @@ if $tracelevel then {
     strace $tracelevel
 }
 
+load_lib gdb-python.exp
+
 # Start with a fresh gdb.
 
 gdb_exit
