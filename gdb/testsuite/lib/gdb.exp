@@ -28,7 +28,6 @@ if {$tool == ""} {
 }
 
 load_lib libgloss.exp
-load_lib python-support.exp
 
 global GDB
 
