@@ -941,8 +941,18 @@ create_array_type (struct type *result_type,
   TYPE_INDEX_TYPE (result_type) = range_type;
   TYPE_VPTR_FIELDNO (result_type) = -1;
 
-  CHECK_TYPEDEF (element_type);
-  TYPE_LENGTH (result_type) = type_length_get (result_type, element_type, 0);
+  /* DWARF blocks may depend on runtime information like
+     DW_OP_PUSH_OBJECT_ADDRESS not being available during the
+     CREATE_ARRAY_TYPE time.  */
+  if (TYPE_RANGE_DATA (range_type)->low.kind != RANGE_BOUND_KIND_CONSTANT
+      || TYPE_RANGE_DATA (range_type)->high.kind != RANGE_BOUND_KIND_CONSTANT)
+    TYPE_LENGTH (result_type) = 0;
+  else
+    {
+      CHECK_TYPEDEF (element_type);
+      TYPE_LENGTH (result_type) = type_length_get (result_type, element_type,
+						   0);
+    }
   if (TYPE_LENGTH (result_type) == 0)
     {
       /* The real size will be computed for specific instances by
