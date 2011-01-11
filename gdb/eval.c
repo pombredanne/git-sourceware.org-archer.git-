@@ -617,8 +617,9 @@ value_f90_subarray (struct value *array, struct expression *exp, int *pos,
 
 	case SUBSCRIPT_NUMBER:
 	  {
-	    int lower = f77_get_lowerbound (value_type (array));
-
+	    int lower;
+	    
+	    lower = f77_get_lowerbound (check_typedef (value_type (array)));
 	    array = value_subscripted_rvalue (array, index->number, lower);
 	  }
 	  break;
