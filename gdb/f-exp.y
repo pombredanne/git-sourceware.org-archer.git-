@@ -285,19 +285,17 @@ exp	:	exp '('
 arglist	:
 	;
 
-argexplist:	exp
+arglist	:	exp
 			{ arglist_len = 1; }
 	;
 
-argexplist:	argexplist ',' exp %prec ABOVE_COMMA
+arglist :	subrange
+			{ arglist_len = 1; }
+	;
+   
+arglist	:	arglist ',' exp       %prec ABOVE_COMMA
 			{ arglist_len++; }
-	;
-
-argsubrangelist:subrange
-			{ arglist_len = 1; }
-	;
-
-argsubrangelist:argsubrangelist ',' subrange %prec ABOVE_COMMA
+	|	arglist ',' subrange  %prec ABOVE_COMMA
 			{ arglist_len++; }
 	;
 

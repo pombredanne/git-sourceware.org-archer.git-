@@ -509,7 +509,7 @@ static struct value *
 value_f90_subarray (struct value *array, struct expression *exp, int *pos,
 		    int nargs, enum noside noside)
 {
-  struct type *type = check_typedef (value_type (array));
+  struct type *type;
   struct subscript_index
     {
       int pos;
@@ -533,6 +533,8 @@ value_f90_subarray (struct value *array, struct expression *exp, int *pos,
 
   old_chain = make_cleanup (null_cleanup, 0);
   object_address_set (value_raw_address (array));
+
+  type = check_typedef (value_type (array));
 
   if (nargs != calc_f77_array_dims (type))
     error (_("Wrong number of subscripts"));
