@@ -147,6 +147,8 @@ static void print_bit_vector (B_TYPE *, int);
 static void print_arg_types (struct field *, int, int);
 static void dump_fn_fieldlists (struct type *, int);
 static void print_cplus_stuff (struct type *, int);
+static LONGEST type_length_get (struct type *type, struct type *target_type,
+				int full_span);
 
 /* The hash table holding all discardable `struct type *' references.  */
 static htab_t type_discardable_table;
@@ -939,33 +941,8 @@ create_array_type (struct type *result_type,
   TYPE_INDEX_TYPE (result_type) = range_type;
   TYPE_VPTR_FIELDNO (result_type) = -1;
 
-  /* DWARF blocks may depend on runtime information like
-     DW_OP_PUSH_OBJECT_ADDRESS not being available during the
-     CREATE_ARRAY_TYPE time.  */
-  if (TYPE_RANGE_DATA (range_type)->low.kind != RANGE_BOUND_KIND_CONSTANT
-      || TYPE_RANGE_DATA (range_type)->high.kind != RANGE_BOUND_KIND_CONSTANT
-      || TYPE_LOW_BOUND_UNDEFINED (range_type) 
-      || TYPE_HIGH_BOUND_UNDEFINED (range_type) 
-      || get_discrete_bounds (range_type, &low_bound, &high_bound) < 0)
-    {
-      low_bound = 0;
-      high_bound = -1;
-    }
-
-  /* Be careful when setting the array length.  Ada arrays can be
-     empty arrays with the high_bound being smaller than the low_bound.
-     In such cases, the array length should be zero.  TYPE_TARGET_STUB needs to
-     be checked as it may have dependencies on DWARF blocks depending on
-     runtime information not available during the CREATE_ARRAY_TYPE time.  */
-  if (high_bound < low_bound || TYPE_TARGET_STUB (element_type))
-    TYPE_LENGTH (result_type) = 0;
-  else
-    {
-      CHECK_TYPEDEF (element_type);
-      TYPE_LENGTH (result_type) =
-	TYPE_LENGTH (element_type) * (high_bound - low_bound + 1);
-    }
-
+  CHECK_TYPEDEF (element_type);
+  TYPE_LENGTH (result_type) = type_length_get (result_type, element_type, 0);
   if (TYPE_LENGTH (result_type) == 0)
     {
       /* The real size will be computed for specific instances by
