@@ -1727,7 +1727,6 @@ check_typedef (struct type *type)
   if (TYPE_DYNAMIC (type))
     {
       htab_t copied_types;
-      struct type *type_old = type;
 
       copied_types = create_copied_types_hash (NULL);
       type = copy_type_recursive (type, copied_types);
@@ -3660,6 +3659,16 @@ copy_type_recursive_1 (struct objfile *objfile,
       copy_type_recursive_1 (objfile,
 			     TYPE_VPTR_BASETYPE (type),
 			     copied_types);
+
+  if (TYPE_CODE (new_type) == TYPE_CODE_ARRAY)
+    {
+      struct type *new_index_type = TYPE_INDEX_TYPE (new_type);
+
+      if (TYPE_BYTE_STRIDE (new_index_type) == 0)
+	TYPE_BYTE_STRIDE (new_index_type)
+	  = TYPE_LENGTH (TYPE_TARGET_TYPE (new_type));
+    }
+
   /* Maybe copy the type_specific bits.
 
      NOTE drow/2005-12-09: We do not copy the C++-specific bits like

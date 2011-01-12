@@ -528,13 +528,26 @@ value_f90_subarray (struct value *array, struct expression *exp, int *pos,
   *subscript_array;
   int i;
   struct cleanup *old_chain;
-  struct value *retval = NULL;
   struct type *parent_type = NULL;
+  LONGEST value_byte_offset = 0;
+  htab_t copied_types;
 
   old_chain = make_cleanup (null_cleanup, 0);
   object_address_set (value_raw_address (array));
 
+  array = value_copy (array);
   type = check_typedef (value_type (array));
+  f_object_address_data_valid_or_error (type);
+
+  copied_types = create_copied_types_hash (NULL);
+  type = copy_type_recursive (type, copied_types);
+  htab_delete (copied_types);
+
+  if (TYPE_DATA_LOCATION_IS_ADDR (type))
+    {
+      set_value_address (array, TYPE_DATA_LOCATION_ADDR (type));
+      TYPE_DATA_LOCATION_IS_ADDR (type) = 0;
+    }
 
   if (nargs != calc_f77_array_dims (type))
     error (_("Wrong number of subscripts"));
@@ -590,14 +603,14 @@ value_f90_subarray (struct value *array, struct expression *exp, int *pos,
   for (i = nargs - 1; i >= 0; i--)
     {
       struct subscript_index *index = &subscript_array[i];
-      struct type *new_parent_type = parent_type;
+      struct type *range_type = TYPE_INDEX_TYPE (type);
 
       switch (index->kind)
 	{
 	case SUBSCRIPT_RANGE:
 	  {
 	    struct subscript_range *range = &index->range;
-	    struct type *range_type = TYPE_INDEX_TYPE (value_type (array));
+	    LONGEST byte_offset;
 
 	    if (range->f90_range_type == LOW_BOUND_DEFAULT
 		|| range->f90_range_type == BOTH_BOUND_DEFAULT)
@@ -607,36 +620,61 @@ value_f90_subarray (struct value *array, struct expression *exp, int *pos,
 		|| range->f90_range_type == BOTH_BOUND_DEFAULT)
 	      range->high_bound = TYPE_HIGH_BOUND (range_type);
 
-	    array = value_slice (array, range->low_bound,
-				 range->high_bound - range->low_bound + 1);
-	    if (retval == NULL)
-	      retval = array;
-	    new_parent_type = value_type (array);
+	    if (range->low_bound < TYPE_LOW_BOUND (range_type)
+		|| (!TYPE_HIGH_BOUND_UNDEFINED (range_type)
+		    && range->high_bound > TYPE_HIGH_BOUND (range_type)))
+	      error (_("slice out of range"));
+
+	    byte_offset = ((range->low_bound - TYPE_LOW_BOUND (range_type))
+			   * TYPE_ARRAY_BYTE_STRIDE_VALUE (type));
+	    TYPE_LOW_BOUND (range_type) = range->low_bound;
+	    TYPE_HIGH_BOUND (range_type) = range->high_bound;
+	    if (range->f90_range_type == LOW_BOUND_DEFAULT
+		|| range->f90_range_type == NONE_BOUND_DEFAULT)
+	      TYPE_HIGH_BOUND_UNDEFINED (range_type) = 0;
+
+	    if (parent_type == NULL)
+	      {
+		deprecated_set_value_type (array, type);
+		set_value_enclosing_type (array, type);
+	      }
+	    parent_type = type;
+	    value_byte_offset += byte_offset;
+	    type = TYPE_TARGET_TYPE (type);
 	  }
 	  break;
 
 	case SUBSCRIPT_NUMBER:
 	  {
-	    int lower;
-	    
-	    lower = f77_get_lowerbound (check_typedef (value_type (array)));
-	    array = value_subscripted_rvalue (array, index->number, lower);
+	    LONGEST byte_offset;
+
+	    if (index->number < TYPE_LOW_BOUND (range_type)
+		|| (!TYPE_HIGH_BOUND_UNDEFINED (range_type)
+		    && index->number > TYPE_HIGH_BOUND (range_type)))
+	      error (_("no such vector element"));
+
+	    byte_offset = ((index->number - TYPE_LOW_BOUND (range_type))
+			   * TYPE_ARRAY_BYTE_STRIDE_VALUE (type));
+
+	    type = TYPE_TARGET_TYPE (type);
+	    if (parent_type)
+	      TYPE_TARGET_TYPE (parent_type) = type;
+	    else
+	      {
+		deprecated_set_value_type (array, type);
+		set_value_enclosing_type (array, type);
+	      }
+	    value_byte_offset += byte_offset;
 	  }
 	  break;
 	}
-
-      if (parent_type != NULL)
-	TYPE_TARGET_TYPE (parent_type) = value_type (array);
-      parent_type = new_parent_type;
     }
 
-  if (retval == NULL)
-    retval = array;
-  set_value_offset (retval, value_offset (array));
-  check_typedef (value_type (retval));
+  set_value_offset (array, (value_offset (array) + value_byte_offset));
+  check_typedef (value_type (array));
 
   do_cleanups (old_chain);
-  return retval;
+  return array;
 }
 
 
