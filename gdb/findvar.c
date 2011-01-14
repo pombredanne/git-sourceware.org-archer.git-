@@ -430,7 +430,6 @@ read_var_value (struct symbol *var, struct frame_info *frame)
     case LOC_LABEL:
       /* Put the constant back in target format.  */
       v = allocate_value (type);
-      VALUE_LVAL (v) = not_lval;
       if (overlay_debugging)
 	{
 	  CORE_ADDR addr
@@ -442,13 +441,14 @@ read_var_value (struct symbol *var, struct frame_info *frame)
       else
 	store_typed_address (value_contents_raw (v), type,
 			      SYMBOL_VALUE_ADDRESS (var));
+      VALUE_LVAL (v) = not_lval;
       return v;
 
     case LOC_CONST_BYTES:
       v = allocate_value (type);
-      VALUE_LVAL (v) = not_lval;
       memcpy (value_contents_raw (v), SYMBOL_VALUE_BYTES (var),
 	      TYPE_LENGTH (type));
+      VALUE_LVAL (v) = not_lval;
       return v;
 
     case LOC_STATIC:
@@ -494,22 +494,13 @@ read_var_value (struct symbol *var, struct frame_info *frame)
       break;
 
     case LOC_BLOCK:
-      {
-        CORE_ADDR addr;
-
-	v = allocate_value_lazy (type);
-	if (overlay_debugging)
-	  addr = symbol_overlayed_address
-	    (BLOCK_START (SYMBOL_BLOCK_VALUE (var)), SYMBOL_OBJ_SECTION (var));
-	else
-	  addr = BLOCK_START (SYMBOL_BLOCK_VALUE (var));
-	/* ADDR is set here for ALLOCATE_VALUE's CHECK_TYPEDEF for
-	   DW_OP_push_object_address.  */
-	object_address_set (addr);
-	VALUE_LVAL (v) = lval_memory;
-	set_value_address (v, addr);
-	return v;
-      }
+      v = allocate_value_lazy (type);
+      if (overlay_debugging)
+	addr = symbol_overlayed_address
+	  (BLOCK_START (SYMBOL_BLOCK_VALUE (var)), SYMBOL_OBJ_SECTION (var));
+      else
+	addr = BLOCK_START (SYMBOL_BLOCK_VALUE (var));
+      break;
 
     case LOC_REGISTER:
     case LOC_REGPARM_ADDR:
@@ -528,6 +519,7 @@ read_var_value (struct symbol *var, struct frame_info *frame)
 	      error (_("Value of register variable not available."));
 
 	    addr = value_as_address (regval);
+	    v = allocate_value_lazy (type);
 	  }
 	else
 	  {
@@ -572,7 +564,6 @@ read_var_value (struct symbol *var, struct frame_info *frame)
 
     case LOC_OPTIMIZED_OUT:
       v = allocate_value_lazy (type);
-
       VALUE_LVAL (v) = not_lval;
       set_value_optimized_out (v, 1);
       return v;
