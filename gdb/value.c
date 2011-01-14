@@ -45,7 +45,7 @@
 
 #include "tracepoint.h"
 
-/* Prototypes for exported functions. */
+/* Prototypes for exported functions.  */
 
 void _initialize_values (void);
 
@@ -108,7 +108,7 @@ struct value
 
   /* Only used for bitfields; position of start of field.  For
      gdbarch_bits_big_endian=0 targets, it is the position of the LSB.  For
-     gdbarch_bits_big_endian=1 targets, it is the position of the MSB. */
+     gdbarch_bits_big_endian=1 targets, it is the position of the MSB.  */
   int bitpos;
 
   /* Only used for bitfields; the containing value.  This allows a
@@ -215,7 +215,7 @@ struct value
   int reference_count;
 };
 
-/* Prototypes for local functions. */
+/* Prototypes for local functions.  */
 
 static void show_values (char *, int);
 
@@ -240,7 +240,7 @@ struct value_history_chunk
 
 static struct value_history_chunk *value_history_chain;
 
-static int value_history_count;	/* Abs number of last entry stored */
+static int value_history_count;	/* Abs number of last entry stored.  */
 
 
 /* List of all value objects currently allocated
@@ -333,12 +333,11 @@ allocate_computed_value (struct type *type,
                          struct lval_funcs *funcs,
                          void *closure)
 {
-  struct value *v = allocate_value (type);
+  struct value *v = allocate_value_lazy (type);
 
   VALUE_LVAL (v) = lval_computed;
   v->location.computed.funcs = funcs;
   v->location.computed.closure = closure;
-  set_value_lazy (v, 1);
 
   return v;
 }
@@ -1289,7 +1288,7 @@ value_of_internalvar (struct gdbarch *gdbarch, struct internalvar *var)
       break;
 
     default:
-      internal_error (__FILE__, __LINE__, "bad kind");
+      internal_error (__FILE__, __LINE__, _("bad kind"));
     }
 
   /* Change the VALUE_LVAL to lval_internalvar so that future operations
@@ -1369,7 +1368,7 @@ set_internalvar_component (struct internalvar *var, int offset, int bitpos,
 
     default:
       /* We can never get a component of any other kind.  */
-      internal_error (__FILE__, __LINE__, "set_internalvar_component");
+      internal_error (__FILE__, __LINE__, _("set_internalvar_component"));
     }
 }
 
@@ -1738,7 +1737,7 @@ value_as_double (struct value *val)
   return foo;
 }
 
-/* Extract a value as a C pointer. Does not deallocate the value.  
+/* Extract a value as a C pointer.  Does not deallocate the value.
    Note that val's type may not actually be a pointer; value_as_long
    handles all the cases.  */
 CORE_ADDR
@@ -1917,7 +1916,7 @@ unpack_double (struct type *type, const gdb_byte *valaddr, int *invp)
   int len;
   int nosign;
 
-  *invp = 0;			/* Assume valid.   */
+  *invp = 0;			/* Assume valid.  */
   CHECK_TYPEDEF (type);
   code = TYPE_CODE (type);
   len = TYPE_LENGTH (type);
@@ -1987,7 +1986,7 @@ unpack_pointer (struct type *type, const gdb_byte *valaddr)
 
 /* Get the value of the FIELDNO'th field (which must be static) of
    TYPE.  Return NULL if the field doesn't exist or has been
-   optimized out. */
+   optimized out.  */
 
 struct value *
 value_static_field (struct type *type, int fieldno)
@@ -2003,13 +2002,13 @@ value_static_field (struct type *type, int fieldno)
     case FIELD_LOC_KIND_PHYSNAME:
     {
       char *phys_name = TYPE_FIELD_STATIC_PHYSNAME (type, fieldno);
-      /*TYPE_FIELD_NAME (type, fieldno);*/
+      /* TYPE_FIELD_NAME (type, fieldno); */
       struct symbol *sym = lookup_symbol (phys_name, 0, VAR_DOMAIN, 0);
 
       if (sym == NULL)
 	{
 	  /* With some compilers, e.g. HP aCC, static data members are
-	     reported as non-debuggable symbols */
+	     reported as non-debuggable symbols.  */
 	  struct minimal_symbol *msym = lookup_minimal_symbol (phys_name,
 							       NULL, NULL);
 
@@ -2051,7 +2050,7 @@ set_value_enclosing_type (struct value *val, struct type *new_encl_type)
 /* Given a value ARG1 (offset by OFFSET bytes)
    of a struct or union type ARG_TYPE,
    extract and return the value of one of its (non-static) fields.
-   FIELDNO says which field. */
+   FIELDNO says which field.  */
 
 struct value *
 value_primitive_field (struct value *arg1, int offset,
@@ -2151,7 +2150,7 @@ value_primitive_field (struct value *arg1, int offset,
 
 /* Given a value ARG1 of a struct or union type,
    extract and return the value of one of its (non-static) fields.
-   FIELDNO says which field. */
+   FIELDNO says which field.  */
 
 struct value *
 value_field (struct value *arg1, int fieldno)
@@ -2164,8 +2163,7 @@ value_field (struct value *arg1, int fieldno)
    J is an index into F which provides the desired method.
 
    We only use the symbol for its address, so be happy with either a
-   full symbol or a minimal symbol.
- */
+   full symbol or a minimal symbol.  */
 
 struct value *
 value_fn_field (struct value **arg1p, struct fn_field *f,
@@ -2215,8 +2213,7 @@ value_fn_field (struct value **arg1p, struct fn_field *f,
 					value_addr (*arg1p)));
 
       /* Move the `this' pointer according to the offset.
-         VALUE_OFFSET (*arg1p) += offset;
-       */
+         VALUE_OFFSET (*arg1p) += offset; */
     }
 
   return v;
@@ -2236,7 +2233,7 @@ value_fn_field (struct value **arg1p, struct fn_field *f,
    number of bits from the LSB of the anonymous object to the LSB of the
    bitfield.
 
-   If the field is signed, we also do sign extension. */
+   If the field is signed, we also do sign extension.  */
 
 LONGEST
 unpack_bits_as_long (struct type *field_type, const gdb_byte *valaddr,
@@ -2259,7 +2256,7 @@ unpack_bits_as_long (struct type *field_type, const gdb_byte *valaddr,
   val = extract_unsigned_integer (valaddr + bitpos / 8,
 				  bytes_read, byte_order);
 
-  /* Extract bits.  See comment above. */
+  /* Extract bits.  See comment above.  */
 
   if (gdbarch_bits_big_endian (get_type_arch (field_type)))
     lsbcount = (bytes_read * 8 - bitpos % 8 - bitsize);
@@ -2268,7 +2265,7 @@ unpack_bits_as_long (struct type *field_type, const gdb_byte *valaddr,
   val >>= lsbcount;
 
   /* If the field does not entirely fill a LONGEST, then zero the sign bits.
-     If the field is signed, and is negative, then sign extend. */
+     If the field is signed, and is negative, then sign extend.  */
 
   if ((bitsize > 0) && (bitsize < 8 * (int) sizeof (val)))
     {
@@ -2301,7 +2298,7 @@ unpack_field_as_long (struct type *type, const gdb_byte *valaddr, int fieldno)
 /* Modify the value of a bitfield.  ADDR points to a block of memory in
    target byte order; the bitfield starts in the byte pointed to.  FIELDVAL
    is the desired value of the field, in host byte order.  BITPOS and BITSIZE
-   indicate which bits (in target bit order) comprise the bitfield.  
+   indicate which bits (in target bit order) comprise the bitfield.
    Requires 0 < BITSIZE <= lbits, 0 <= BITPOS % 8 + BITSIZE <= lbits, and
    0 <= BITPOS, where lbits is the size of a LONGEST in bits.  */
 
@@ -2468,12 +2465,15 @@ value_from_contents_and_address (struct type *type,
 				 const gdb_byte *valaddr,
 				 CORE_ADDR address)
 {
-  struct value *v = allocate_value (type);
+  struct value *v;
 
   if (valaddr == NULL)
-    set_value_lazy (v, 1);
+    v = allocate_value_lazy (type);
   else
-    memcpy (value_contents_raw (v), valaddr, TYPE_LENGTH (type));
+    {
+      v = allocate_value (type);
+      memcpy (value_contents_raw (v), valaddr, TYPE_LENGTH (type));
+    }
   set_value_address (v, address);
   VALUE_LVAL (v) = lval_memory;
   return v;

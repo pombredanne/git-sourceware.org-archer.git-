@@ -1,3 +1,500 @@
+2011-01-13  Joel Brobecker  <brobecker@adacore.com>
+
+	* hpux-thread.c (hpux_pid_to_str): Delete.
+
+2011-01-13  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-valprint.c (ada_emit_char): Remove strange code.
+	Check that c is <= UCHAR_MAX before passing it to isascii.
+	(char_at): Do not assume that TYPE_LEN is either 1 or 2.
+
+2011-01-13  Joel Brobecker  <brobecker@adacore.com>
+
+	* top.c (input_from_terminal_p): Restrict the use of interactive_mode
+	to the case where instream is stdin.
+
+2011-01-13  Joel Brobecker  <brobecker@adacore.com>
+
+	* ia64-tdep.h (struct regcache): Forward declare.
+	(struct ia64_infcall_ops): New struct type.
+	(struct gdbarch_tdep): New fields "find_global_pointer_from_solib"
+	and "infcall_ops".
+	* ia64-tdep.c (ia64_find_global_pointer_from_dynamic_section):
+	Renames ia64_find_global_pointer.
+	(ia64_find_global_pointer, ia64_allocate_new_rse_frame)
+	(ia64_store_argument_in_slot, ia64_set_function_addr: New function.
+	(ia64_push_dummy_call): Adjust to use the new tdep ia64_infocall_ops
+	methods.
+	(ia64_infcall_ops): New static global constant.
+	(ia64_gdbarch_init): Set tdep->infcall_ops.
+	* ia64-hpux-nat.c (ia64_hpux_xfer_solib_got): New function.
+	(ia64_hpux_xfer_partial): Add TARGET_OBJECT_HPUX_SOLIB_GOT handing.
+	* ia64-hpux-tdep.c: Include "regcache.h", "gdbcore.h" and "inferior.h".
+	(ia64_hpux_dummy_code): New static global constant.
+	(ia64_hpux_push_dummy_code, ia64_hpux_allocate_new_rse_frame)
+	(ia64_hpux_store_argument_in_slot, ia64_hpux_set_function_addr)
+	(ia64_hpux_dummy_id, ia64_hpux_find_global_pointer_from_solib):
+	New function.
+	(ia64_hpux_infcall_ops): New static global constant.
+	(ia64_hpux_init_abi): Install gdbarch and tdep methods needed
+	for inferior function calls to work properly on ia64-hpux.
+
+2011-01-13  Joel Brobecker  <brobecker@adacore.com>
+
+	* target.h (enum target_object): Add TARGET_OBJECT_HPUX_UREGS.
+	* ia64-tdep.h (struct frame_info): forward declaration.
+	(struct gdbarch_tdep): Add field size_of_register_frame.
+	* ia64-tdep.c (ia64_access_reg): Use tdep->size_of_register_frame
+	to determine the size of the register frame.
+	(ia64_size_of_register_frame): New function.
+	(ia64_gdbarch_init): Set tdep->size_of_register_frame.
+	* ia64-hpux-tdep.c: Include "target.h" and "frame.h".
+	(IA64_HPUX_UREG_REASON): New macro.
+	(ia64_hpux_stopped_in_syscall, ia64_hpux_size_of_register_frame):
+	New functions.
+	(ia64_hpux_init_abi): Set tdep->size_of_register_frame.
+	* ia64-hpux-nat.c (ia64_hpux_xfer_uregs): New function.
+	(ia64_hpux_xfer_partial): Add handling of TARGET_OBJECT_HPUX_UREGS
+	objects.
+
+2011-01-13  Joel Brobecker  <brobecker@adacore.com>
+
+	Add support for ia64-hpux.
+	* config/ia64/hpux.mh, ia64-hpux-nat.c, ia64-hpux-tdep.c,
+	ia64-hpux-tdep.h, solib-ia64-hpux.c, solib-ia64-hpux.h: New files.
+
+	* configure.host: Add handling for ia64-hpux hosts.  Add associated
+	floatformats.
+	* configure.tgt: Add handling for ia64-hpux targets.
+	* Makefile.in (ALL_64_TARGET_OBS): Add ia64-hpux-tdep.o.
+	(HFILES_NO_SRCDIR): Add ia64-hpux-tdep.h.
+	(ALLDEPFILES): Add ia64-hpux-nat.c ia64-hpux-tdep.c.
+
+2011-01-13  Joel Brobecker  <brobecker@adacore.com>
+
+	[ttrace] Compute thread list immediately after attach.
+	* inf_ttrace_attach (inf_ttrace_create_threads_after_attach):
+	New subprogram.
+	(inf_ttrace_attach): Use it.
+
+2011-01-13  Joel Brobecker  <brobecker@adacore.com>
+
+	* libunwind-frame.c (libunwind_frame_cache): Do not return NULL
+	if we could not determine the frame's function address.  Instead,
+	use the frame's PC, and then continue.
+
+2011-01-13  Joel Brobecker  <brobecker@adacore.com>
+
+	* libunwind-frame.c (__LITTLE_ENDIAN, __BIG_ENDIAN): Define if
+	not already defined.
+
+2011-01-13  Joel Brobecker  <brobecker@adacore.com>
+
+	* ia64-tdep.c (ia64_struct_type_p): New function.
+	(ia64_extract_return_value): Handle integral values that are
+	less than 8 bytes long.
+	(ia64_push_dummy_call): Likewise.
+
+2011-01-13  Joel Brobecker  <brobecker@adacore.com>
+
+	* ia64-tdep.c (floatformat_ia64_ext_little): Renames
+	floatformat_ia64_ext.
+	(floatformat_ia64_ext_big): New static const.
+	(floatformats_ia64_ext): Set first entry to &floatformat_ia64_ext_big.
+
+2011-01-12  Tom Tromey  <tromey@redhat.com>
+
+	* mi/mi-symbol-cmds.c (mi_cmd_symbol_list_lines): Fix error
+	messages.
+	* mi/mi-main.c (mi_cmd_thread_select): Fix error messages.
+	(mi_cmd_thread_list_ids): Likewise.
+	(mi_cmd_data_list_changed_registers): Likewise.
+	(mi_cmd_data_list_register_values): Likewise.
+	(mi_cmd_data_write_register_values): Likewise.
+	(mi_cmd_data_evaluate_expression): Likewise.
+	(mi_cmd_data_read_memory): Likewise.
+	(mi_cmd_data_read_memory_bytes): Likewise.
+	(mi_cmd_data_write_memory): Likewise.
+	(mi_cmd_enable_timings): Likewise.
+	* mi/mi-interp.c (mi_cmd_interpreter_exec): Fix error messages.
+	* mi/mi-cmd-var.c (mi_cmd_var_create): Fix error messages.
+	(mi_cmd_var_delete): Likewise.
+	(mi_cmd_var_set_format): Likewise.
+	(mi_cmd_var_show_format): Likewise.
+	(mi_cmd_var_info_num_children): Likewise.
+	(mi_cmd_var_list_children): Likewise.
+	(mi_cmd_var_info_type): Likewise.
+	(mi_cmd_var_info_expression): Likewise.
+	(mi_cmd_var_show_attributes): Likewise.
+	(mi_cmd_var_assign): Likewise.
+	(mi_cmd_var_update): Likewise.
+	(mi_cmd_enable_pretty_printing): Likewise.
+	(mi_cmd_var_set_update_range): Likewise.
+	* mi/mi-cmd-target.c (mi_cmd_target_file_get): Fix error
+	messages.
+	(mi_cmd_target_file_put): Likewise.
+	(mi_cmd_target_file_delete): Likewise.
+	* mi/mi-cmd-stack.c (mi_cmd_stack_list_frames): Fix error
+	messages.
+	(mi_cmd_stack_info_depth): Likewise.
+	(mi_cmd_stack_list_locals): Likewise.
+	(mi_cmd_stack_list_args): Likewise.
+	(mi_cmd_stack_select_frame): Likewise.
+	(mi_cmd_stack_select_frame): Likewise.
+	(mi_cmd_stack_info_frame): Likewise.
+	* mi/mi-cmd-file.c (mi_cmd_file_list_exec_source_file): Fix error
+	messages.
+	(mi_cmd_file_list_exec_source_files): Likewise.
+	* mi/mi-cmd-env.c (mi_cmd_env_pwd): Fix error messages.
+	(mi_cmd_env_cd): Likewise.
+	(mi_cmd_env_path): Likewise.
+	(mi_cmd_env_dir): Likewise.
+	(mi_cmd_inferior_tty_show): Likewise.
+	* mi/mi-cmd-disas.c (mi_cmd_disassemble): Fix error messages.
+	* mi/mi-cmd-break.c (mi_cmd_break_insert): Fix error messages.
+	(mi_cmd_break_watch): Likewise.
+
+2011-01-12  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* ppc-linux-nat.c (booke_cmp_hw_point): Fix whitespace.
+	(ppc_linux_insert_hw_breakpoint): Likewise.
+	(ppc_linux_remove_hw_breakpoint): Likewise.
+	(ppc_linux_insert_watchpoint): Likewise.
+
+2011-01-12  Andrew Burgess  <aburgess@broadcom.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR fortran/11104 and DWARF unbound arrays detection.
+	* dwarf2read.c (read_subrange_type): Set zero length on unspecified
+	upper bound.  Set TYPE_HIGH_BOUND_UNDEFINED if not language_ada on
+	unspecified upper bound.
+	* eval.c (evaluate_subexp_standard) <multi_f77_subscript>: Remove
+	variables array_size_array, tmp_type and offset_item.  New variable
+	array.  Remove call to f77_get_upperbound.  New variables array_type
+	and index.  Call value_subscripted_rvalue for each dimenasion.  Remove
+	the final call to deprecated_set_value_type.
+
+2011-01-12  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Make value allocations more lazy.
+	* ada-lang.c (coerce_unspec_val_to_type): Use allocate_value_lazy
+	instead of allocate_value and set_value_lazy when possible.
+	* dwarf2loc.c (dwarf2_evaluate_loc_desc_full): Use allocate_value_lazy 
+	instead of allocate_value and set_value_lazy.
+	* findvar.c (value_of_register_lazy): Likewise.
+	(read_var_value): Remove V preallocation, call just check_typedef in
+	advance.  Move allocate_value to LOC_CONST, LOC_LABEL, 
+	LOC_CONST_BYTES.  Use allocate_value_lazy in LOC_STATIC, LOC_ARG,
+	LOC_REF_ARG, LOC_LOCAL, LOC_BLOCK.  Set ADDR instead of
+	set_value_address and break in LOC_BLOCK.  Use allocate_value_lazy and
+	remove lval_memory set in LOC_REGPARM_ADDR.  Use allocate_value_lazy
+	in LOC_UNRESOLVED and LOC_OPTIMIZED_OUT.  Add setting lval_memory at
+	the end, remove set_value_lazy there.
+	* valarith.c (value_subscripted_rvalue): Use allocate_value_lazy
+	instead of allocate_value and set_value_lazy when possible.
+	* valops.c (value_fetch_lazy): Do nop for value_optimized_out VAL.
+	* value.c (allocate_computed_value): Use allocate_value_lazy instead
+	of allocate_value and set_value_lazy.
+	(value_from_contents_and_address): Use allocate_value_lazy instead of
+	allocate_value and set_value_lazy when possible.
+
+2011-01-12  Andrew Burgess  <aburgess@broadcom.com>
+
+	* disasm.c (dump_insns): Support dumping opcodes for MI.
+	* mi/mi-cmd-disas.c (mi_cmd_disassemble): Allow mode to control
+	dumping of instruction opcodes.
+
+2011-01-09  Robert Millan  <rmh@gnu.org>  (tiny patch)
+
+	* configure.tgt: Detect GNU/kFreeBSD and set `gdb_osabi'
+	appropiately.
+
+2011-01-11  Tom Tromey  <tromey@redhat.com>
+
+	* thread.c (do_captured_thread_select): Emit newline before
+	printing frame.
+
+2011-01-11  Michael Snyder  <msnyder@vmware.com>
+
+	* s390-tdep.c: Comment cleanup, mostly periods and spaces.
+	* score-tdep.c: Ditto.
+	* score-tdep.h: Ditto.
+	* ser-base.c: Ditto.
+	* ser-go32.c: Ditto.
+	* serial.c: Ditto.
+	* serial.h: Ditto.
+	* ser-mingw.c: Ditto.
+	* ser-pipe.c: Ditto.
+	* ser-tcp.c: Ditto.
+	* ser-unix.c: Ditto.
+	* sh64-tdep.c: Ditto.
+	* shnbsd-nat.c: Ditto.
+	* sh-tdep.c: Ditto.
+	* sh-tdep.h: Ditto.
+	* solib.c: Ditto.
+	* solib-darwin.c: Ditto.
+	* solib-frv.c: Ditto.
+	* solib.h: Ditto.
+	* solib-irix.c: Ditto.
+	* solib-osf.c: Ditto.
+	* solib-pa64.c: Ditto.
+	* solib-som.c: Ditto.
+	* solib-spu.c: Ditto.
+	* solib-sunos.c: Ditto.
+	* solib-svr4.c: Ditto.
+	* solist.h: Ditto.
+	* sol-thread.c: Ditto.
+	* somread.c: Ditto.
+	* source.c: Ditto.
+	* source.h: Ditto.
+	* sparc64-linux-tdep.c: Ditto.
+	* sparc64-tdep.c: Ditto.
+	* sparc-linux-nat.c: Ditto.
+	* sparc-linux-tdep.c: Ditto.
+	* sparc-sol2-nat.c: Ditto.
+	* sparc-sol2-tdep.c: Ditto.
+	* sparc-tdep.c: Ditto.
+	* sparc-tdep.h: Ditto.
+	* spu-tdep.c: Ditto.
+	* stabsread.c: Ditto.
+	* stabsread.h: Ditto.
+	* stack.c: Ditto.
+	* symfile.c: Ditto.
+	* symfile.h: Ditto.
+	* symmisc.c: Ditto.
+	* symtab.c: Ditto.
+	* symtab.h: Ditto.
+	* target.c: Ditto.
+	* target-descriptions.c: Ditto.
+	* target-descriptions.h: Ditto.
+	* target.h: Ditto.
+	* target-memory.c: Ditto.
+	* terminal.h: Ditto.
+	* thread.c: Ditto.
+	* top.c: Ditto.
+	* tracepoint.c: Ditto.
+	* tracepoint.h: Ditto.
+	* trad-frame.h: Ditto.
+	* typeprint.c: Ditto.
+
+2011-01-11  Michael Snyder  <msnyder@vmware.com>
+
+	* ui-file.c: Comment cleanup, mostly periods and spaces.
+	* ui-file.h: Ditto.
+	* ui-out.c: Ditto.
+	* ui-out.h: Ditto.
+	* utils.c: Ditto.
+	* v850-tdep.c: Ditto.
+	* valarith.c: Ditto.
+	* valops.c: Ditto.
+	* valprint.c: Ditto.
+	* valprint.h: Ditto.
+	* value.c: Ditto.
+	* value.h: Ditto.
+	* varobj.c: Ditto.
+	* varobj.h: Ditto.
+	* vax-tdep.c: Ditto.
+	* vec.c: Ditto.
+	* vec.h: Ditto.
+	* version.h: Ditto.
+	* windows-nat.c: Ditto.
+	* windows-tdep.c: Ditto.
+	* xcoffread.c: Ditto.
+	* xcoffsolib.c: Ditto.
+	* xml-support.c: Ditto.
+	* xstormy16-tdep.c: Ditto.
+	* xtensa-tdep.c: Ditto.
+	* xtensa-tdep.h: Ditto.
+
+2011-01-11  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* breakpoint.c (resources_needed_watchpoint): Fix indentation.
+	* gdbtypes.c (is_scalar_type_recursive): Fix formatting.
+
+2011-01-11  Sergio Durigan Junior  <sergiodj@linux.vnet.ibm.com>
+	    Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	Implement support for PowerPC BookE ranged watchpoints.
+	* breakpoint.h 
+	(struct breakpoint_ops) <resources_needed>: New method.
+	Initialize to NULL in all existing breakpoint_ops instances.
+	(struct breakpoint) <exact>: New field.
+	(target_exact_watchpoints): Declare external global.
+	* breakpoint.c (target_exact_watchpoints): New global flag.
+	(update_watchpoint): Set b->type to bp_hardware_watchpoint and
+	b->enable_state to bp_enabled before calling
+	hw_watchpoint_used_count.
+	(hw_watchpoint_used_count): Iterate over all bp_locations in a
+	watchpoint.  Call breakpoint's breakpoint_ops.resources_needed
+	if available.
+	(insert_watchpoint, remove_watchpoint): Use fixed length of 1 byte
+	if the watchpoint is exact.
+	(resources_needed_watchpoint): New function.
+	(watchpoint_breakpoint_ops): Add resources_needed_watchpoint.
+	(watch_command_1): Set b->exact if the user asked for an exact
+	watchpoint and one can be set.
+	(can_use_hardware_watchpoint): Add exact_watchpoints argument.
+	Pass fixed length of 1 to target_region_ok_for_hw_watchpoint if
+	the user asks for an exact watchpoint and one can be set.  Return
+	number of needed debug registers to watch the expression.
+	* gdbtypes.c (is_scalar_type): New function, based on
+	valprint.c:scalar_type_p.
+	(is_scalar_type_recursive): New function.
+	* gdbtypes.h (is_scalar_type_recursive): Declare.
+	* ppc-linux-nat.c (ppc_linux_region_ok_for_hw_watchpoint): Always
+	handle regions when ranged watchpoints are available.
+	(create_watchpoint_request): New function.
+	(ppc_linux_insert_watchpoint, ppc_linux_remove_watchpoint): Use
+	create_watchpoint_request.
+	* rs6000-tdep.c (show_powerpc_exact_watchpoints): New function.
+	(_initialize_rs6000_tdep): Add `exact-watchpoints' boolean to the
+	`set powerpc' and `show powerpc' commands.
+	* target.h (struct target_ops) <to_region_ok_for_hw_watchpoint>:
+	Mention documentation comment in the target macro.
+	(target_region_ok_for_hw_watchpoint): Document return value.
+
+2011-01-11  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* breakpoint.c (update_watchpoint): Decide on using a software or
+	hardware watchpoint after the bp_locations are created.
+
+2010-01-11  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	Convert hardware watchpoints to use breakpoint_ops.
+	* breakpoint.h (breakpoint_ops) <insert>: Rename to...
+	<insert_location>: ... this.  Return int instead of void.
+	Accept pointer to struct bp_location instead of pointer to
+	struct breakpoint.  Adapt all implementations.
+	(breakpoint_ops) <remove>: Rename to... 
+	<remove_location>: ... this.  Accept pointer to struct bp_location
+	instead of pointer to struct breakpoint.  Adapt all implementations.
+	* breakpoint.c (insert_catchpoint): Delete function.
+	(insert_bp_location): Call the watchpoint or catchpoint's
+	breakpoint_ops.insert method.
+	(remove_breakpoint_1): Call the watchpoint or catchpoint's
+	breakpoint_ops.remove method.
+	(insert_watchpoint, remove_watchpoint): New functions.
+	(watchpoint_breakpoint_ops): New structure.
+	(watch_command_1): Initialize the OPS field.
+	* inf-child.c (inf_child_insert_fork_catchpoint)
+	(inf_child_remove_fork_catchpoint, inf_child_insert_vfork_catchpoint)
+	(inf_child_remove_vfork_catchpoint, inf_child_insert_exec_catchpoint)
+	(inf_child_remove_exec_catchpoint, inf_child_set_syscall_catchpoint):
+	Delete functions.
+	(inf_child_target): Remove initialization of to_insert_fork_catchpoint,
+	to_remove_fork_catchpoint, to_insert_vfork_catchpoint,
+	to_remove_vfork_catchpoint, to_insert_exec_catchpoint,
+	to_remove_exec_catchpoint and to_set_syscall_catchpoint.
+	* target.c (update_current_target): Change default implementation of
+	to_insert_fork_catchpoint, to_remove_fork_catchpoint,
+	to_insert_vfork_catchpoint, to_remove_vfork_catchpoint,
+	to_insert_exec_catchpoint, to_remove_exec_catchpoint and
+	to_set_syscall_catchpoint to return_one.
+	(debug_to_insert_fork_catchpoint, debug_to_insert_vfork_catchpoint)
+	(debug_to_insert_exec_catchpoint): Report return value.
+	* target.h (to_insert_fork_catchpoint, to_insert_vfork_catchpoint)
+	(to_insert_exec_catchpoint): Change declaration to return int instead
+	of void.
+
+2011-01-11  Michael Snyder  <msnyder@vmware.com>
+
+	* arm-tdep.c: Internationalization.
+	* c-lang.c: Ditto.
+	* charset.c: Ditto.
+	* fork-child.c: Ditto.
+	* nto-procfs.c: Ditto.
+	* ppc-sysv-tdep.c: Ditto.
+	* procfs.c: Ditto.
+	* remote-mips.c: Ditto.
+	* remote.c: Ditto.
+	* rs6000-nat.c: Ditto.
+	* rs6000-tdep.c: Ditto.
+	* target.c: Ditto.
+	* valops.c: Ditto.
+	* value.c: Ditto.
+	* xml-support.c: Ditto.
+	* mi/mi-cmd-break.c: Ditto.
+	* mi/mi-cmd-var.c: Ditto.
+	* mi/mi-interp.c: Ditto.
+	* mi/mi-main.c: Ditto.
+
+2011-01-11  Andrew Burgess  <aburgess@broadcom.com>
+
+	* remote-sim.c (gdbsim_store_register): Update API to
+	sim_store_register to check more error conditions.
+
+2011-01-10  Michael Snyder  <msnyder@vmware.com>
+
+	* nto-procfs.c: Comment cleanup, mostly periods and spaces.
+	* nto-tdep.c: Ditto.
+	* nto-tdep.h: Ditto.
+	* objc-exp.y: Ditto.
+	* objc-lang.c: Ditto.
+	* objfiles.c: Ditto.
+	* objfiles.h: Ditto.
+	* observer.c: Ditto.
+	* opencl-lang.c: Ditto.
+	* osabi.c: Ditto.
+	* parse.c: Ditto.
+	* parser-defs.h: Ditto.
+	* p-exp.y: Ditto.
+	* p-lang.c: Ditto.
+	* posix-hdep.c: Ditto.
+	* ppcbug-rom.c: Ditto.
+	* ppc-linux-nat.c: Ditto.
+	* ppc-linux-tdep.c: Ditto.
+	* ppc-linux-tdep.h: Ditto.
+	* ppcnbsd-tdep.c: Ditto.
+	* ppcobsd-tdep.c: Ditto.
+	* ppcobsd-tdep.h: Ditto.
+	* ppc-sysv-tdep.c: Ditto.
+	* ppc-tdep.h: Ditto.
+	* printcmd.c: Ditto.
+	* proc-abi.c: Ditto.
+	* proc-flags.c: Ditto.
+	* procfs.c: Ditto.
+	* proc-utils.h: Ditto.
+	* progspace.h: Ditto.
+	* prologue-value.c: Ditto.
+	* prologue-value.h: Ditto.
+	* psympriv.h: Ditto.
+	* psymtab.c: Ditto.
+	* p-typeprint.c: Ditto.
+	* p-valprint.c: Ditto.
+	* ravenscar-sparc-thread.c: Ditto.
+	* ravenscar-thread.c: Ditto.
+	* ravenscar-thread.h: Ditto.
+	* record.c: Ditto.
+	* regcache.c: Ditto.
+	* regcache.h: Ditto.
+	* remote.c: Ditto.
+	* remote-fileio.c: Ditto.
+	* remote-fileio.h: Ditto.
+	* remote.h: Ditto.
+	* remote-m32r-sdi.c: Ditto.
+	* remote-mips.c: Ditto.
+	* remote-sim.c: Ditto.
+	* rs6000-aix-tdep.c: Ditto.
+	* rs6000-nat.c: Ditto.
+	* rs6000-tdep.c: Ditto.
+
+2011-01-10  Michael Snyder  <msnyder@vmware.com>
+
+	* charset.c (validate): Internationalization.
+	* coffread.c (read_one_sym): Ditto.
+	* dwarf2read.c (dwarf2_attach_fields_to_type): Ditto.
+	* h8300-tdep.c (H8300_extract_return_value): Ditto.
+	* inflow.c (new_tty): Ditto.
+	* iq2000-tdep.c (iq2000_breakpoint_from_pc): Ditto.
+	* m32c-tdep.c (m32c_return_value): Ditto.
+	* mep-tdep.c (mep_store_return_value): Ditto.
+	* score-tdep.c (score7_fetch_insn): Ditto.
+	* ser-mingw.c (pipe_windows_open): Ditto.
+	* sh64-tdep.c (sh64_extract_return_value): Ditto.
+	* spu-tdep.c (spu_register_type): Ditto.
+	* tracepoint.c (trace_find_command): Ditto.
+	* valarith.c (value_pos): Ditto.
+
 2011-01-10  Joel Brobecker  <brobecker@adacore.com>
 
 	* ada-valprint.c (printstr): Minor comment reformatting.

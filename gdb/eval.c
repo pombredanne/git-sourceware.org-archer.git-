@@ -2385,20 +2385,19 @@ evaluate_subexp_standard (struct type *expect_type,
 	/* Now that we know we have a legal array subscript expression 
 	   let us actually find out where this element exists in the array.  */
 
-	offset_item = 0;
 	/* Take array indices left to right.  */
 	for (i = 0; i < nargs; i++)
 	  {
 	    /* Evaluate each subscript; it must be a legal integer in F77.  */
 	    arg2 = evaluate_subexp_with_coercion (exp, pos, noside);
 
-	    /* Fill in the subscript and array size arrays.  */
+	    /* Fill in the subscript array.  */
 
 	    subscript_array[i] = value_as_long (arg2);
 	  }
 
 	/* Internal type of array is arranged right to left.  */
-	for (i = 0; i < nargs; i++)
+	for (i = nargs; i > 0; i--)
 	  {
 	    upper = f77_get_upperbound (tmp_type);
 	    lower = f77_get_lowerbound (tmp_type);
@@ -2419,9 +2418,6 @@ evaluate_subexp_standard (struct type *expect_type,
 	       that we actually have a one-dimensional array 
 	       of base element type that we apply a simple 
 	       offset to.  */
-
-	    if (i < nargs - 1)
-	      tmp_type = check_typedef (TYPE_TARGET_TYPE (tmp_type));
 	  }
 
 	/* Kept for the f77_get_upperbound / f77_get_lowerbound calls above.  */

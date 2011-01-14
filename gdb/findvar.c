@@ -307,11 +307,10 @@ value_of_register_lazy (struct frame_info *frame, int regnum)
   /* We should have a valid (i.e. non-sentinel) frame.  */
   gdb_assert (frame_id_p (get_frame_id (frame)));
 
-  reg_val = allocate_value (register_type (gdbarch, regnum));
+  reg_val = allocate_value_lazy (register_type (gdbarch, regnum));
   VALUE_LVAL (reg_val) = lval_register;
   VALUE_REGNUM (reg_val) = regnum;
   VALUE_FRAME_ID (reg_val) = get_frame_id (frame);
-  set_value_lazy (reg_val, 1);
   return reg_val;
 }
 
@@ -410,6 +409,7 @@ symbol_read_needs_frame (struct symbol *sym)
 struct value *
 read_var_value (struct symbol *var, struct frame_info *frame)
 {
+  struct value *v;
   struct type *type = SYMBOL_TYPE (var);
   CORE_ADDR addr;
 
@@ -419,45 +419,40 @@ read_var_value (struct symbol *var, struct frame_info *frame)
   switch (SYMBOL_CLASS (var))
     {
     case LOC_CONST:
-      {
-	/* Put the constant back in target format.  */
-	struct value *v = allocate_value (type);
-	VALUE_LVAL (v) = not_lval;
-	store_signed_integer (value_contents_raw (v), TYPE_LENGTH (type),
-			      gdbarch_byte_order (get_type_arch (type)),
-			      (LONGEST) SYMBOL_VALUE (var));
-	return v;
-      }
+      /* Put the constant back in target format.  */
+      v = allocate_value (type);
+      store_signed_integer (value_contents_raw (v), TYPE_LENGTH (type),
+			    gdbarch_byte_order (get_type_arch (type)),
+			    (LONGEST) SYMBOL_VALUE (var));
+      VALUE_LVAL (v) = not_lval;
+      return v;
 
     case LOC_LABEL:
-      {
-	/* Put the constant back in target format.  */
-	struct value *v = allocate_value (type);
-	VALUE_LVAL (v) = not_lval;
-	if (overlay_debugging)
-	  {
-	    CORE_ADDR addr
-	      = symbol_overlayed_address (SYMBOL_VALUE_ADDRESS (var),
-					  SYMBOL_OBJ_SECTION (var));
+      /* Put the constant back in target format.  */
+      v = allocate_value (type);
+      VALUE_LVAL (v) = not_lval;
+      if (overlay_debugging)
+	{
+	  CORE_ADDR addr
+	    = symbol_overlayed_address (SYMBOL_VALUE_ADDRESS (var),
+					SYMBOL_OBJ_SECTION (var));
 
-	    store_typed_address (value_contents_raw (v), type, addr);
-	  }
-	else
-	  store_typed_address (value_contents_raw (v), type,
-				SYMBOL_VALUE_ADDRESS (var));
-	return v;
-      }
+	  store_typed_address (value_contents_raw (v), type, addr);
+	}
+      else
+	store_typed_address (value_contents_raw (v), type,
+			      SYMBOL_VALUE_ADDRESS (var));
+      return v;
 
     case LOC_CONST_BYTES:
-      {
-	struct value *v = allocate_value (type);
-	VALUE_LVAL (v) = not_lval;
-	memcpy (value_contents_raw (v), SYMBOL_VALUE_BYTES (var),
-		TYPE_LENGTH (type));
-	return v;
-      }
+      v = allocate_value (type);
+      VALUE_LVAL (v) = not_lval;
+      memcpy (value_contents_raw (v), SYMBOL_VALUE_BYTES (var),
+	      TYPE_LENGTH (type));
+      return v;
 
     case LOC_STATIC:
+      v = allocate_value_lazy (type);
       if (overlay_debugging)
 	addr = symbol_overlayed_address (SYMBOL_VALUE_ADDRESS (var),
 					 SYMBOL_OBJ_SECTION (var));
@@ -470,6 +465,7 @@ read_var_value (struct symbol *var, struct frame_info *frame)
       if (!addr)
 	return 0;
       addr += SYMBOL_VALUE (var);
+      v = allocate_value_lazy (type);
       break;
 
     case LOC_REF_ARG:
@@ -483,12 +479,14 @@ read_var_value (struct symbol *var, struct frame_info *frame)
 	argref += SYMBOL_VALUE (var);
 	ref = value_at (lookup_pointer_type (type), argref);
 	addr = value_as_address (ref);
+	v = allocate_value_lazy (type);
 	break;
       }
 
     case LOC_LOCAL:
       addr = get_frame_locals_address (frame);
       addr += SYMBOL_VALUE (var);
+      v = allocate_value_lazy (type);
       break;
 
     case LOC_TYPEDEF:
@@ -498,8 +496,8 @@ read_var_value (struct symbol *var, struct frame_info *frame)
     case LOC_BLOCK:
       {
         CORE_ADDR addr;
-	struct value *v;
 
+	v = allocate_value_lazy (type);
 	if (overlay_debugging)
 	  addr = symbol_overlayed_address
 	    (BLOCK_START (SYMBOL_BLOCK_VALUE (var)), SYMBOL_OBJ_SECTION (var));
@@ -508,7 +506,6 @@ read_var_value (struct symbol *var, struct frame_info *frame)
 	/* ADDR is set here for ALLOCATE_VALUE's CHECK_TYPEDEF for
 	   DW_OP_push_object_address.  */
 	object_address_set (addr);
-	v = allocate_value (type);
 	VALUE_LVAL (v) = lval_memory;
 	set_value_address (v, addr);
 	return v;
@@ -569,37 +566,28 @@ read_var_value (struct symbol *var, struct frame_info *frame)
 	if (obj_section
 	    && (obj_section->the_bfd_section->flags & SEC_THREAD_LOCAL) != 0)
 	  addr = target_translate_tls_address (obj_section->objfile, addr);
+	v = allocate_value_lazy (type);
       }
       break;
 
     case LOC_OPTIMIZED_OUT:
-      {
-        struct value *v = allocate_value (type);
+      v = allocate_value_lazy (type);
 
-	VALUE_LVAL (v) = not_lval;
-	set_value_optimized_out (v, 1);
-	return v;
-      }
+      VALUE_LVAL (v) = not_lval;
+      set_value_optimized_out (v, 1);
+      return v;
 
     default:
       error (_("Cannot look up value of a botched symbol."));
       break;
     }
 
-  {
-    struct value *v;
-
-    /* ADDR is set here for ALLOCATE_VALUE's CHECK_TYPEDEF for
-       DW_OP_PUSH_OBJECT_ADDRESS.  */
-    object_address_set (addr);
-    v = allocate_value (type);
-    VALUE_LVAL (v) = lval_memory;
-    set_value_address (v, addr);
-
-    set_value_lazy (v, 1);
-
-    return v;
-  }
+  /* ADDR is set here for ALLOCATE_VALUE's CHECK_TYPEDEF for
+     DW_OP_PUSH_OBJECT_ADDRESS.  */
+  object_address_set (addr);
+  VALUE_LVAL (v) = lval_memory;
+  set_value_address (v, addr);
+  return v;
 }
 
 /* Install default attributes for register values.  */

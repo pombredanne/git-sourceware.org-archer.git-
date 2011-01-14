@@ -6506,7 +6506,7 @@ dwarf2_attach_fields_to_type (struct field_info *fip, struct type *type,
 	    case DW_VIRTUALITY_virtual:
 	    case DW_VIRTUALITY_pure_virtual:
 	      if (cu->language == language_ada)
-		error ("unexpected virtuality in component of Ada type");
+		error (_("unexpected virtuality in component of Ada type"));
 	      SET_TYPE_FIELD_VIRTUAL (type, nfields);
 	      break;
 	    }
@@ -6530,7 +6530,7 @@ dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
   struct type *this_type;
 
   if (cu->language == language_ada)
-    error ("unexpected member function in Ada type");
+    error (_("unexpected member function in Ada type"));
 
   /* Get name of member function.  */
   fieldname = dwarf2_name (die, cu);
@@ -6721,7 +6721,7 @@ dwarf2_attach_fn_fields_to_type (struct field_info *fip, struct type *type,
   int i;
 
   if (cu->language == language_ada)
-    error ("unexpected member functions in Ada type");
+    error (_("unexpected member functions in Ada type"));
 
   ALLOCATE_CPLUS_STRUCT_TYPE (type);
   TYPE_FN_FIELDLISTS (type) = (struct fn_fieldlist *)
@@ -8456,6 +8456,10 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
 		   _("Found DW_AT_byte_stride with unsupported value 0"));
     }
 
+  /* Ada expects an empty array on no boundary attributes.  */
+  if (attr == NULL && cu->language != language_ada)
+    TYPE_HIGH_BOUND_UNDEFINED (range_type) = 1;
+
   name = dwarf2_name (die, cu);
   if (name)
     TYPE_NAME (range_type) = name;
@@ -9749,7 +9753,8 @@ read_address (bfd *abfd, gdb_byte *buf, struct dwarf2_cu *cu,
 	  break;
 	default:
 	  internal_error (__FILE__, __LINE__,
-			  _("read_address: bad switch, unsigned [in module %s]"),
+			  _("read_address: bad switch, "
+			    "unsigned [in module %s]"),
 			  bfd_get_filename (abfd));
 	}
     }
