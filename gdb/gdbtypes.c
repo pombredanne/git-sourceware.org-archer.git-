@@ -945,7 +945,8 @@ create_array_type (struct type *result_type,
      DW_OP_PUSH_OBJECT_ADDRESS not being available during the
      CREATE_ARRAY_TYPE time.  */
   if (TYPE_RANGE_DATA (range_type)->low.kind != RANGE_BOUND_KIND_CONSTANT
-      || TYPE_RANGE_DATA (range_type)->high.kind != RANGE_BOUND_KIND_CONSTANT)
+      || TYPE_RANGE_DATA (range_type)->high.kind != RANGE_BOUND_KIND_CONSTANT
+      || TYPE_DYNAMIC (element_type))
     TYPE_LENGTH (result_type) = 0;
   else
     {
