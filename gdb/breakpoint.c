@@ -98,7 +98,7 @@ static void clear_command (char *, int);
 
 static void catch_command (char *, int);
 
-static int can_use_hardware_watchpoint (struct value *);
+static int can_use_hardware_watchpoint (struct value *, int);
 
 static void break_command_1 (char *, int, int);
 
@@ -350,6 +350,9 @@ static int executing_breakpoint_commands;
 
 /* Are overlay event breakpoints enabled? */
 static int overlay_events_enabled;
+
+/* See description in breakpoint.h. */
+int target_exact_watchpoints = 0;
 
 /* Walk the following statement or block through all breakpoints.
    ALL_BREAKPOINTS_SAFE does so even if the statment deletes the
@@ -1228,18 +1231,6 @@ breakpoint_restore_shadows (gdb_byte *buf, ULONGEST memaddr, LONGEST len)
 }
 
 
-/* A wrapper function for inserting catchpoints.  */
-static void
-insert_catchpoint (struct ui_out *uo, void *args)
-{
-  struct breakpoint *b = (struct breakpoint *) args;
-
-  gdb_assert (b->type == bp_catchpoint);
-  gdb_assert (b->ops != NULL && b->ops->insert != NULL);
-
-  b->ops->insert (b);
-}
-
 /* Return true if BPT is of any hardware watchpoint kind.  */
 
 static int
@@ -1438,43 +1429,10 @@ update_watchpoint (struct breakpoint *b, int reparse)
 	  b->val_valid = 1;
 	}
 
-	/* Change the type of breakpoint between hardware assisted or
-	   an ordinary watchpoint depending on the hardware support
-	   and free hardware slots.  REPARSE is set when the inferior
-	   is started.  */
-	if ((b->type == bp_watchpoint || b->type == bp_hardware_watchpoint)
-	    && reparse)
-	  {
-	    int i, mem_cnt, other_type_used;
-
-	    /* We need to determine how many resources are already
-	       used for all other hardware watchpoints to see if we
-	       still have enough resources to also fit this watchpoint
-	       in as well.  To avoid the hw_watchpoint_used_count call
-	       below from counting this watchpoint, make sure that it
-	       is marked as a software watchpoint.  */
-	    b->type = bp_watchpoint;
-	    i = hw_watchpoint_used_count (bp_hardware_watchpoint,
-					  &other_type_used);
-	    mem_cnt = can_use_hardware_watchpoint (val_chain);
-
-	    if (!mem_cnt)
-	      b->type = bp_watchpoint;
-	    else
-	      {
-		int target_resources_ok = target_can_use_hardware_watchpoint
-		  (bp_hardware_watchpoint, i + mem_cnt, other_type_used);
-		if (target_resources_ok <= 0)
-		  b->type = bp_watchpoint;
-		else
-		  b->type = bp_hardware_watchpoint;
-	      }
-	  }
-
       frame_pspace = get_frame_program_space (get_selected_frame (NULL));
 
       /* Look at each value on the value chain.  */
-      for (v = val_chain; v; v = next)
+      for (v = val_chain; v; v = value_next (v))
 	{
 	  /* If it's a memory location, and GDB actually needed
 	     its contents to evaluate the expression, then we
@@ -1517,7 +1475,62 @@ update_watchpoint (struct breakpoint *b, int reparse)
 		  loc->watchpoint_type = type;
 		}
 	    }
+	}
 
+      /* Change the type of breakpoint between hardware assisted or
+	 an ordinary watchpoint depending on the hardware support
+	 and free hardware slots.  REPARSE is set when the inferior
+	 is started.  */
+      if ((b->type == bp_watchpoint || b->type == bp_hardware_watchpoint)
+	  && reparse)
+	{
+	  int reg_cnt;
+	  enum bp_loc_type loc_type;
+	  struct bp_location *bl;
+
+	  reg_cnt = can_use_hardware_watchpoint (val_chain, b->exact);
+
+	  if (reg_cnt)
+	    {
+	      int i, target_resources_ok, other_type_used;
+	      enum enable_state orig_enable_state;
+
+	      /* We need to determine how many resources are already
+		 used for all other hardware watchpoints plus this one
+		 to see if we still have enough resources to also fit
+		 this watchpoint in as well.  To guarantee the
+		 hw_watchpoint_used_count call below counts this
+		 watchpoint, make sure that it is marked as a hardware
+		 watchpoint.  */
+	      b->type = bp_hardware_watchpoint;
+
+	      /* hw_watchpoint_used_count ignores disabled watchpoints,
+		 and b might be disabled if we're being called from
+		 do_enable_breakpoint.  */
+	      orig_enable_state = b->enable_state;
+	      b->enable_state = bp_enabled;
+
+	      i = hw_watchpoint_used_count (bp_hardware_watchpoint,
+					    &other_type_used);
+
+	      b->enable_state = orig_enable_state;
+
+	      target_resources_ok = target_can_use_hardware_watchpoint
+		    (bp_hardware_watchpoint, i, other_type_used);
+	      if (target_resources_ok <= 0)
+		b->type = bp_watchpoint;
+	    }
+	  else
+	    b->type = bp_watchpoint;
+
+	  loc_type = (b->type == bp_watchpoint? bp_loc_other
+		      : bp_loc_hardware_watchpoint);
+	  for (bl = b->loc; bl; bl = bl->next)
+	    bl->loc_type = loc_type;
+	}
+
+      for (v = val_chain; v; v = next)
+	{
 	  next = value_next (v);
 	  if (v != b->val)
 	    value_free (v);
@@ -1790,10 +1803,10 @@ insert_bp_location (struct bp_location *bl,
 	      watchpoints.  It's not clear that it's necessary...  */
 	   && bl->owner->disposition != disp_del_at_next_stop)
     {
-      val = target_insert_watchpoint (bl->address,
-				      bl->length,
-				      bl->watchpoint_type,
-				      bl->owner->cond_exp);
+      gdb_assert (bl->owner->ops != NULL
+		  && bl->owner->ops->insert_location != NULL);
+
+      val = bl->owner->ops->insert_location (bl);
 
       /* If trying to set a read-watchpoint, and it turns out it's not
 	 supported, try emulating one with an access watchpoint.  */
@@ -1819,12 +1832,12 @@ insert_bp_location (struct bp_location *bl,
 
 	  if (val == 1)
 	    {
-	      val = target_insert_watchpoint (bl->address,
-					      bl->length,
-					      hw_access,
-					      bl->owner->cond_exp);
-	      if (val == 0)
-		bl->watchpoint_type = hw_access;
+	      bl->watchpoint_type = hw_access;
+	      val = bl->owner->ops->insert_location (bl);
+
+	      if (val)
+		/* Back to the original value.  */
+		bl->watchpoint_type = hw_read;
 	    }
 	}
 
@@ -1833,14 +1846,23 @@ insert_bp_location (struct bp_location *bl,
 
   else if (bl->owner->type == bp_catchpoint)
     {
-      struct gdb_exception e = catch_exception (uiout, insert_catchpoint,
-						bl->owner, RETURN_MASK_ERROR);
-      exception_fprintf (gdb_stderr, e, "warning: inserting catchpoint %d: ",
-			 bl->owner->number);
-      if (e.reason < 0)
-	bl->owner->enable_state = bp_disabled;
-      else
-	bl->inserted = 1;
+      gdb_assert (bl->owner->ops != NULL
+		  && bl->owner->ops->insert_location != NULL);
+
+      val = bl->owner->ops->insert_location (bl);
+      if (val)
+	{
+	  bl->owner->enable_state = bp_disabled;
+
+	  if (val == 1)
+	    warning (_("\
+Error inserting catchpoint %d: Your system does not support this type\n\
+of catchpoint."), bl->owner->number);
+	  else
+	    warning (_("Error inserting catchpoint %d."), bl->owner->number);
+	}
+
+      bl->inserted = (val == 0);
 
       /* We've already printed an error message if there was a problem
 	 inserting this catchpoint, and we've disabled the catchpoint,
@@ -2537,10 +2559,11 @@ remove_breakpoint_1 (struct bp_location *bl, insertion_state_t is)
     }
   else if (bl->loc_type == bp_loc_hardware_watchpoint)
     {
+      gdb_assert (bl->owner->ops != NULL
+		  && bl->owner->ops->remove_location != NULL);
+
       bl->inserted = (is == mark_inserted);
-      val = target_remove_watchpoint (bl->address, bl->length,
-				      bl->watchpoint_type, 
-				      bl->owner->cond_exp);
+      bl->owner->ops->remove_location (bl);
 
       /* Failure to remove any of the hardware watchpoints comes here.  */
       if ((is == mark_uninserted) && (bl->inserted))
@@ -2551,11 +2574,13 @@ remove_breakpoint_1 (struct bp_location *bl, insertion_state_t is)
            && breakpoint_enabled (bl->owner)
            && !bl->duplicate)
     {
-      gdb_assert (bl->owner->ops != NULL && bl->owner->ops->remove != NULL);
+      gdb_assert (bl->owner->ops != NULL
+		  && bl->owner->ops->remove_location != NULL);
 
-      val = bl->owner->ops->remove (bl->owner);
+      val = bl->owner->ops->remove_location (bl);
       if (val)
 	return val;
+
       bl->inserted = (is == mark_inserted);
     }
 
@@ -5997,17 +6022,17 @@ disable_breakpoints_in_unloaded_shlib (struct so_list *solib)
 /* Implement the "insert" breakpoint_ops method for fork
    catchpoints.  */
 
-static void
-insert_catch_fork (struct breakpoint *b)
+static int
+insert_catch_fork (struct bp_location *bl)
 {
-  target_insert_fork_catchpoint (PIDGET (inferior_ptid));
+  return target_insert_fork_catchpoint (PIDGET (inferior_ptid));
 }
 
 /* Implement the "remove" breakpoint_ops method for fork
    catchpoints.  */
 
 static int
-remove_catch_fork (struct breakpoint *b)
+remove_catch_fork (struct bp_location *bl)
 {
   return target_remove_fork_catchpoint (PIDGET (inferior_ptid));
 }
@@ -6084,6 +6109,7 @@ static struct breakpoint_ops catch_fork_breakpoint_ops =
   insert_catch_fork,
   remove_catch_fork,
   breakpoint_hit_catch_fork,
+  NULL, /* resources_needed */
   print_it_catch_fork,
   print_one_catch_fork,
   print_mention_catch_fork,
@@ -6093,17 +6119,17 @@ static struct breakpoint_ops catch_fork_breakpoint_ops =
 /* Implement the "insert" breakpoint_ops method for vfork
    catchpoints.  */
 
-static void
-insert_catch_vfork (struct breakpoint *b)
+static int
+insert_catch_vfork (struct bp_location *bl)
 {
-  target_insert_vfork_catchpoint (PIDGET (inferior_ptid));
+  return target_insert_vfork_catchpoint (PIDGET (inferior_ptid));
 }
 
 /* Implement the "remove" breakpoint_ops method for vfork
    catchpoints.  */
 
 static int
-remove_catch_vfork (struct breakpoint *b)
+remove_catch_vfork (struct bp_location *bl)
 {
   return target_remove_vfork_catchpoint (PIDGET (inferior_ptid));
 }
@@ -6179,6 +6205,7 @@ static struct breakpoint_ops catch_vfork_breakpoint_ops =
   insert_catch_vfork,
   remove_catch_vfork,
   breakpoint_hit_catch_vfork,
+  NULL, /* resources_needed */
   print_it_catch_vfork,
   print_one_catch_vfork,
   print_mention_catch_vfork,
@@ -6188,20 +6215,20 @@ static struct breakpoint_ops catch_vfork_breakpoint_ops =
 /* Implement the "insert" breakpoint_ops method for syscall
    catchpoints.  */
 
-static void
-insert_catch_syscall (struct breakpoint *b)
+static int
+insert_catch_syscall (struct bp_location *bl)
 {
   struct inferior *inf = current_inferior ();
 
   ++inf->total_syscalls_count;
-  if (!b->syscalls_to_be_caught)
+  if (!bl->owner->syscalls_to_be_caught)
     ++inf->any_syscall_count;
   else
     {
       int i, iter;
 
       for (i = 0;
-           VEC_iterate (int, b->syscalls_to_be_caught, i, iter);
+           VEC_iterate (int, bl->owner->syscalls_to_be_caught, i, iter);
            i++)
 	{
           int elem;
@@ -6223,30 +6250,30 @@ insert_catch_syscall (struct breakpoint *b)
 	}
     }
 
-  target_set_syscall_catchpoint (PIDGET (inferior_ptid),
-				 inf->total_syscalls_count != 0,
-				 inf->any_syscall_count,
-				 VEC_length (int, inf->syscalls_counts),
-				 VEC_address (int, inf->syscalls_counts));
+  return target_set_syscall_catchpoint (PIDGET (inferior_ptid),
+					inf->total_syscalls_count != 0,
+					inf->any_syscall_count,
+					VEC_length (int, inf->syscalls_counts),
+					VEC_address (int, inf->syscalls_counts));
 }
 
 /* Implement the "remove" breakpoint_ops method for syscall
    catchpoints.  */
 
 static int
-remove_catch_syscall (struct breakpoint *b)
+remove_catch_syscall (struct bp_location *bl)
 {
   struct inferior *inf = current_inferior ();
 
   --inf->total_syscalls_count;
-  if (!b->syscalls_to_be_caught)
+  if (!bl->owner->syscalls_to_be_caught)
     --inf->any_syscall_count;
   else
     {
       int i, iter;
 
       for (i = 0;
-           VEC_iterate (int, b->syscalls_to_be_caught, i, iter);
+           VEC_iterate (int, bl->owner->syscalls_to_be_caught, i, iter);
            i++)
 	{
           int elem;
@@ -6462,6 +6489,7 @@ static struct breakpoint_ops catch_syscall_breakpoint_ops =
   insert_catch_syscall,
   remove_catch_syscall,
   breakpoint_hit_catch_syscall,
+  NULL, /* resources_needed */
   print_it_catch_syscall,
   print_one_catch_syscall,
   print_mention_catch_syscall,
@@ -6546,14 +6574,14 @@ create_fork_vfork_event_catchpoint (struct gdbarch *gdbarch,
 
 /* Exec catchpoints.  */
 
-static void
-insert_catch_exec (struct breakpoint *b)
+static int
+insert_catch_exec (struct bp_location *bl)
 {
-  target_insert_exec_catchpoint (PIDGET (inferior_ptid));
+  return target_insert_exec_catchpoint (PIDGET (inferior_ptid));
 }
 
 static int
-remove_catch_exec (struct breakpoint *b)
+remove_catch_exec (struct bp_location *bl)
 {
   return target_remove_exec_catchpoint (PIDGET (inferior_ptid));
 }
@@ -6615,6 +6643,7 @@ static struct breakpoint_ops catch_exec_breakpoint_ops =
   insert_catch_exec,
   remove_catch_exec,
   breakpoint_hit_catch_exec,
+  NULL, /* resources_needed */
   print_it_catch_exec,
   print_one_catch_exec,
   print_mention_catch_exec,
@@ -6655,20 +6684,30 @@ hw_breakpoint_used_count (void)
 static int
 hw_watchpoint_used_count (enum bptype type, int *other_type_used)
 {
-  struct breakpoint *b;
   int i = 0;
+  struct breakpoint *b;
+  struct bp_location *bl;
 
   *other_type_used = 0;
   ALL_BREAKPOINTS (b)
-  {
-    if (breakpoint_enabled (b))
-      {
+    {
+      if (!breakpoint_enabled (b))
+	continue;
+
 	if (b->type == type)
-	  i++;
+	  for (bl = b->loc; bl; bl = bl->next)
+	    {
+	      /* Special types of hardware watchpoints may use more than
+		 one register.  */
+	      if (b->ops && b->ops->resources_needed)
+		i += b->ops->resources_needed (bl);
+	      else
+		i++;
+	    }
 	else if (is_hardware_watchpoint (b))
 	  *other_type_used = 1;
-      }
-  }
+    }
+
   return i;
 }
 
@@ -8211,6 +8250,53 @@ watchpoint_exp_is_const (const struct expression *exp)
   return 1;
 }
 
+/* Implement the "insert" breakpoint_ops method for hardware watchpoints.  */
+
+static int
+insert_watchpoint (struct bp_location *bl)
+{
+  int length = bl->owner->exact? 1 : bl->length;
+
+  return target_insert_watchpoint (bl->address, length, bl->watchpoint_type,
+				   bl->owner->cond_exp);
+}
+
+/* Implement the "remove" breakpoint_ops method for hardware watchpoints.  */
+
+static int
+remove_watchpoint (struct bp_location *bl)
+{
+  int length = bl->owner->exact? 1 : bl->length;
+
+  return target_remove_watchpoint (bl->address, length, bl->watchpoint_type,
+				   bl->owner->cond_exp);
+}
+
+/* Implement the "resources_needed" breakpoint_ops method for
+   hardware watchpoints.  */
+
+static int
+resources_needed_watchpoint (const struct bp_location *bl)
+{
+  int length = bl->owner->exact? 1 : bl->length;
+
+  return target_region_ok_for_hw_watchpoint (bl->address, length);
+}
+
+/* The breakpoint_ops structure to be used in hardware watchpoints.  */
+
+static struct breakpoint_ops watchpoint_breakpoint_ops =
+{
+  insert_watchpoint,
+  remove_watchpoint,
+  NULL, /* breakpoint_hit */
+  resources_needed_watchpoint,
+  NULL, /* print_it */
+  NULL, /* print_one */
+  NULL, /* print_mention */
+  NULL  /* print_recreate */
+};
+
 /* accessflag:  hw_write:  watch write, 
                 hw_read:   watch read, 
 		hw_access: watch access (read or write) */
@@ -8231,7 +8317,7 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
   char *cond_end = NULL;
   int i, other_type_used, target_resources_ok = 0;
   enum bptype bp_type;
-  int mem_cnt = 0;
+  int reg_cnt = 0;
   int thread = -1;
   int pc = 0;
 
@@ -8366,14 +8452,14 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
   else
     bp_type = bp_hardware_watchpoint;
 
-  mem_cnt = can_use_hardware_watchpoint (val);
-  if (mem_cnt == 0 && bp_type != bp_hardware_watchpoint)
+  reg_cnt = can_use_hardware_watchpoint (val, target_exact_watchpoints);
+  if (reg_cnt == 0 && bp_type != bp_hardware_watchpoint)
     error (_("Expression cannot be implemented with read/access watchpoint."));
-  if (mem_cnt != 0)
+  if (reg_cnt != 0)
     {
       i = hw_watchpoint_used_count (bp_type, &other_type_used);
       target_resources_ok = 
-	target_can_use_hardware_watchpoint (bp_type, i + mem_cnt, 
+	target_can_use_hardware_watchpoint (bp_type, i + reg_cnt,
 					    other_type_used);
       if (target_resources_ok == 0 && bp_type != bp_hardware_watchpoint)
 	error (_("Target does not support this type of hardware watchpoint."));
@@ -8385,7 +8471,7 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
 
   /* Change the type of breakpoint to an ordinary watchpoint if a
      hardware watchpoint could not be set.  */
-  if (!mem_cnt || target_resources_ok <= 0)
+  if (!reg_cnt || target_resources_ok <= 0)
     bp_type = bp_watchpoint;
 
   frame = block_innermost_frame (exp_valid_block);
@@ -8454,6 +8540,12 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
     b->exp_string = savestring (exp_start, exp_end - exp_start);
   b->val = val;
   b->val_valid = 1;
+  b->ops = &watchpoint_breakpoint_ops;
+
+  /* Use an exact watchpoint when there's only one memory region to be
+     watched, and only one debug register is needed to watch it.  */
+  b->exact = target_exact_watchpoints && reg_cnt == 1;
+
   if (cond_start)
     b->cond_string = savestring (cond_start, cond_end - cond_start);
   else
@@ -8493,12 +8585,15 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
   update_global_location_list (1);
 }
 
-/* Return count of locations need to be watched and can be handled in
-   hardware.  If the watchpoint can not be handled in hardware return
-   zero.  */
+/* Return count of debug registers needed to watch the given expression.
+   If EXACT_WATCHPOINTS is 1, then consider that only the address of
+   the start of the watched region will be monitored (i.e., all accesses
+   will be aligned).  This uses less debug registers on some targets.
+
+   If the watchpoint cannot be handled in hardware return zero.  */
 
 static int
-can_use_hardware_watchpoint (struct value *v)
+can_use_hardware_watchpoint (struct value *v, int exact_watchpoints)
 {
   int found_memory_cnt = 0;
   struct value *head = v;
@@ -8551,12 +8646,18 @@ can_use_hardware_watchpoint (struct value *v)
 		      && TYPE_CODE (vtype) != TYPE_CODE_ARRAY))
 		{
 		  CORE_ADDR vaddr = value_address (v);
-		  int       len   = TYPE_LENGTH (value_type (v));
+		  int len;
+		  int num_regs;
 
-		  if (!target_region_ok_for_hw_watchpoint (vaddr, len))
+		  len = (exact_watchpoints
+			 && is_scalar_type_recursive (vtype))?
+		    1 : TYPE_LENGTH (value_type (v));
+
+		  num_regs = target_region_ok_for_hw_watchpoint (vaddr, len);
+		  if (!num_regs)
 		    return 0;
 		  else
-		    found_memory_cnt++;
+		    found_memory_cnt += num_regs;
 		}
 	    }
 	}
@@ -8982,6 +9083,7 @@ static struct breakpoint_ops gnu_v3_exception_catchpoint_ops = {
   NULL, /* insert */
   NULL, /* remove */
   NULL, /* breakpoint_hit */
+  NULL, /* resources_needed */
   print_exception_catchpoint,
   print_one_exception_catchpoint,
   print_mention_exception_catchpoint,

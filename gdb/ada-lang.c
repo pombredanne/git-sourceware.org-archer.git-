@@ -556,17 +556,19 @@ coerce_unspec_val_to_type (struct value *val, struct type *type)
          trying to allocate some memory for it.  */
       check_size (type);
 
-      result = allocate_value (type);
+      if (value_lazy (val)
+          || TYPE_LENGTH (type) > TYPE_LENGTH (value_type (val)))
+	result = allocate_value_lazy (type);
+      else
+	{
+	  result = allocate_value (type);
+	  memcpy (value_contents_raw (result), value_contents (val),
+		  TYPE_LENGTH (type));
+	}
       set_value_component_location (result, val);
       set_value_bitsize (result, value_bitsize (val));
       set_value_bitpos (result, value_bitpos (val));
       set_value_address (result, value_address (val));
-      if (value_lazy (val)
-          || TYPE_LENGTH (type) > TYPE_LENGTH (value_type (val)))
-        set_value_lazy (result, 1);
-      else
-        memcpy (value_contents_raw (result), value_contents (val),
-                TYPE_LENGTH (type));
       return result;
     }
 }
@@ -10901,6 +10903,7 @@ static struct breakpoint_ops catch_exception_breakpoint_ops =
   NULL, /* insert */
   NULL, /* remove */
   NULL, /* breakpoint_hit */
+  NULL, /* resources_needed */
   print_it_catch_exception,
   print_one_catch_exception,
   print_mention_catch_exception,
@@ -10939,6 +10942,7 @@ static struct breakpoint_ops catch_exception_unhandled_breakpoint_ops = {
   NULL, /* insert */
   NULL, /* remove */
   NULL, /* breakpoint_hit */
+  NULL, /* resources_needed */
   print_it_catch_exception_unhandled,
   print_one_catch_exception_unhandled,
   print_mention_catch_exception_unhandled,
@@ -10975,6 +10979,7 @@ static struct breakpoint_ops catch_assert_breakpoint_ops = {
   NULL, /* insert */
   NULL, /* remove */
   NULL, /* breakpoint_hit */
+  NULL, /* resources_needed */
   print_it_catch_assert,
   print_one_catch_assert,
   print_mention_catch_assert,

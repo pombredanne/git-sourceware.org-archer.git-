@@ -368,20 +368,27 @@ struct bp_location
    will be called instead of the performing the default action for this
    bptype.  */
 
-struct breakpoint_ops 
+struct breakpoint_ops
 {
-  /* Insert the breakpoint or activate the catchpoint.  Should raise
-     an exception if the operation failed.  */
-  void (*insert) (struct breakpoint *);
+  /* Insert the breakpoint or watchpoint or activate the catchpoint.
+     Return 0 for success, 1 if the breakpoint, watchpoint or catchpoint
+     type is not supported, -1 for failure.  */
+  int (*insert_location) (struct bp_location *);
 
   /* Remove the breakpoint/catchpoint that was previously inserted
-     with the "insert" method above.  Return non-zero if the operation
-     succeeded.  */
-  int (*remove) (struct breakpoint *);
+     with the "insert" method above.  Return 0 for success, 1 if the
+     breakpoint, watchpoint or catchpoint type is not supported,
+     -1 for failure.  */
+  int (*remove_location) (struct bp_location *);
 
   /* Return non-zero if the debugger should tell the user that this
      breakpoint was hit.  */
   int (*breakpoint_hit) (struct breakpoint *);
+
+  /* Tell how many hardware resources (debug registers) are needed
+     for this breakpoint.  If this function is not provided, then
+     the breakpoint or watchpoint needs one debug register.  */
+  int (*resources_needed) (const struct bp_location *);
 
   /* The normal print routine for this breakpoint, called when we
      hit it.  */
@@ -422,6 +429,13 @@ DEF_VEC_P(bp_location_p);
    breakpoints share a single command list.  This is an implementation
    detail to the breakpoints module.  */
 struct counted_command_line;
+
+/* Some targets (e.g., embedded PowerPC) need two debug registers to set
+   a watchpoint over a memory region.  If this flag is true, GDB will use
+   only one register per watchpoint, thus assuming that all acesses that
+   modify a memory location happen at its starting address. */
+
+extern int target_exact_watchpoints;
 
 /* Note that the ->silent field is not currently used by any commands
    (though the code is in there if it was to be, and set_raw_breakpoint
@@ -593,7 +607,10 @@ struct breakpoint
        can sometimes be NULL for enabled GDBs as not all breakpoint
        types are tracked by the Python scripting API.  */
     struct breakpoint_object *py_bp_object;
-};
+
+    /* Whether this watchpoint is exact (see target_exact_watchpoints).  */
+    int exact;
+  };
 
 typedef struct breakpoint *breakpoint_p;
 DEF_VEC_P(breakpoint_p);

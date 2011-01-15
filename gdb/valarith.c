@@ -34,7 +34,7 @@
 #include "exceptions.h"
 
 /* Define whether or not the C operator '/' truncates towards zero for
-   differently signed operands (truncation direction is undefined in C). */
+   differently signed operands (truncation direction is undefined in C).  */
 
 #ifndef TRUNCATION_TOWARDS_ZERO
 #define TRUNCATION_TOWARDS_ZERO ((-5 / 2) == -2)
@@ -47,8 +47,7 @@ void _initialize_valarith (void);
    If the pointer type is void *, then return 1.
    If the target type is incomplete, then error out.
    This isn't a general purpose function, but just a 
-   helper for value_ptradd.
-*/
+   helper for value_ptradd.  */
 
 static LONGEST
 find_size_for_pointer_math (struct type *ptr_type)
@@ -146,7 +145,7 @@ value_ptrdiff (struct value *arg1, struct value *arg2)
    See comments in value_coerce_array() for rationale for reason for
    doing lower bounds adjustment here rather than there.
    FIXME:  Perhaps we should validate that the index is valid and if
-   verbosity is set, warn about invalid indices (but still use them). */
+   verbosity is set, warn about invalid indices (but still use them).  */
 
 struct value *
 value_subscript (struct value *array, LONGEST index)
@@ -209,12 +208,14 @@ value_subscripted_rvalue (struct value *array, LONGEST index, int lowerbound)
 			     && elt_offs >= TYPE_LENGTH (array_type)))
     error (_("no such vector element"));
 
-  v = allocate_value (elt_type);
   if (VALUE_LVAL (array) == lval_memory && value_lazy (array))
-    set_value_lazy (v, 1);
+    v = allocate_value_lazy (elt_type);
   else
-    memcpy (value_contents_writeable (v),
-	    value_contents (array) + elt_offs, elt_size);
+    {
+      v = allocate_value (elt_type);
+      memcpy (value_contents_writeable (v),
+	      value_contents (array) + elt_offs, elt_size);
+    }
 
   set_value_component_location (v, array);
   VALUE_REGNUM (v) = VALUE_REGNUM (array);
@@ -350,7 +351,7 @@ value_user_defined_cpp_op (struct value **args, int nargs, char *operator,
   int i;
 
   arg_types = (struct type **) alloca (nargs * (sizeof (struct type *)));
-  /* Prepare list of argument types for overload resolution */
+  /* Prepare list of argument types for overload resolution.  */
   for (i = 0; i < nargs; i++)
     arg_types[i] = value_type (args[i]);
 
@@ -424,7 +425,7 @@ value_x_binop (struct value *arg1, struct value *arg2, enum exp_opcode op,
   argvec[2] = arg2;
   argvec[3] = 0;
 
-  /* make the right function name up */
+  /* Make the right function name up.  */
   strcpy (tstr, "operator__");
   ptr = tstr + 8;
   switch (op)
@@ -561,7 +562,7 @@ value_x_binop (struct value *arg1, struct value *arg2, enum exp_opcode op,
 }
 
 /* We know that arg1 is a structure, so try to find a unary user
-   defined operator that matches the operator in question.  
+   defined operator that matches the operator in question.
    Create an argument vector that calls arg1.operator @ (arg1)
    and return that value (where '@' is (almost) any unary operator which
    is legal for GNU C++).  */
@@ -589,7 +590,7 @@ value_x_unop (struct value *arg1, enum exp_opcode op, enum noside noside)
 
   nargs = 1;
 
-  /* make the right function name up */
+  /* Make the right function name up.  */
   strcpy (tstr, "operator__");
   ptr = tstr + 8;
   strcpy (mangle_tstr, "__");
@@ -682,8 +683,7 @@ value_x_unop (struct value *arg1, enum exp_opcode op, enum noside noside)
    values of length 1.
 
    (3)  Character values are also allowed and are treated as character
-   string values of length 1.
- */
+   string values of length 1.  */
 
 struct value *
 value_concat (struct value *arg1, struct value *arg2)
@@ -703,7 +703,7 @@ value_concat (struct value *arg1, struct value *arg2)
      or a repeat count and a value to be repeated.  INVAL1 is set to the
      first of two concatenated values, or the repeat count.  INVAL2 is set
      to the second of the two concatenated values or the value to be 
-     repeated. */
+     repeated.  */
 
   if (TYPE_CODE (type2) == TYPE_CODE_INT)
     {
@@ -720,12 +720,12 @@ value_concat (struct value *arg1, struct value *arg2)
       inval2 = arg2;
     }
 
-  /* Now process the input values. */
+  /* Now process the input values.  */
 
   if (TYPE_CODE (type1) == TYPE_CODE_INT)
     {
       /* We have a repeat count.  Validate the second value and then
-         construct a value repeated that many times. */
+         construct a value repeated that many times.  */
       if (TYPE_CODE (type2) == TYPE_CODE_STRING
 	  || TYPE_CODE (type2) == TYPE_CODE_CHAR)
 	{
@@ -768,7 +768,7 @@ value_concat (struct value *arg1, struct value *arg2)
   else if (TYPE_CODE (type1) == TYPE_CODE_STRING
 	   || TYPE_CODE (type1) == TYPE_CODE_CHAR)
     {
-      /* We have two character strings to concatenate. */
+      /* We have two character strings to concatenate.  */
       if (TYPE_CODE (type2) != TYPE_CODE_STRING
 	  && TYPE_CODE (type2) != TYPE_CODE_CHAR)
 	{
@@ -803,7 +803,7 @@ value_concat (struct value *arg1, struct value *arg2)
   else if (TYPE_CODE (type1) == TYPE_CODE_BITSTRING
 	   || TYPE_CODE (type1) == TYPE_CODE_BOOL)
     {
-      /* We have two bitstrings to concatenate. */
+      /* We have two bitstrings to concatenate.  */
       if (TYPE_CODE (type2) != TYPE_CODE_BITSTRING
 	  && TYPE_CODE (type2) != TYPE_CODE_BOOL)
 	{
@@ -814,7 +814,7 @@ value_concat (struct value *arg1, struct value *arg2)
     }
   else
     {
-      /* We don't know how to concatenate these operands. */
+      /* We don't know how to concatenate these operands.  */
       error (_("illegal operands for concatenation."));
     }
   return (outval);
@@ -822,6 +822,7 @@ value_concat (struct value *arg1, struct value *arg2)
 
 /* Integer exponentiation: V1**V2, where both arguments are
    integers.  Requires V1 != 0 if V2 < 0.  Returns 1 for 0 ** 0.  */
+
 static LONGEST
 integer_pow (LONGEST v1, LONGEST v2)
 {
@@ -834,7 +835,7 @@ integer_pow (LONGEST v1, LONGEST v2)
     }
   else 
     {
-      /* The Russian Peasant's Algorithm */
+      /* The Russian Peasant's Algorithm.  */
       LONGEST v;
       
       v = 1;
@@ -852,6 +853,7 @@ integer_pow (LONGEST v1, LONGEST v2)
 
 /* Integer exponentiation: V1**V2, where both arguments are
    integers.  Requires V1 != 0 if V2 < 0.  Returns 1 for 0 ** 0.  */
+
 static ULONGEST
 uinteger_pow (ULONGEST v1, LONGEST v2)
 {
@@ -864,7 +866,7 @@ uinteger_pow (ULONGEST v1, LONGEST v2)
     }
   else 
     {
-      /* The Russian Peasant's Algorithm */
+      /* The Russian Peasant's Algorithm.  */
       ULONGEST v;
       
       v = 1;
@@ -1182,7 +1184,7 @@ scalar_binop (struct value *arg1, struct value *arg2, enum exp_opcode op)
 
 	    case BINOP_MOD:
 	      /* Knuth 1.2.4, integer only.  Note that unlike the C '%' op,
-	         v1 mod 0 has a defined value, v1. */
+	         v1 mod 0 has a defined value, v1.  */
 	      if (v2 == 0)
 		{
 		  v = v1;
@@ -1190,7 +1192,7 @@ scalar_binop (struct value *arg1, struct value *arg2, enum exp_opcode op)
 	      else
 		{
 		  v = v1 / v2;
-		  /* Note floor(v1/v2) == v1/v2 for unsigned. */
+		  /* Note floor(v1/v2) == v1/v2 for unsigned.  */
 		  v = v1 - (v2 * v);
 		}
 	      break;
@@ -1308,7 +1310,7 @@ scalar_binop (struct value *arg1, struct value *arg2, enum exp_opcode op)
 
 	    case BINOP_MOD:
 	      /* Knuth 1.2.4, integer only.  Note that unlike the C '%' op,
-	         X mod 0 has a defined value, X. */
+	         X mod 0 has a defined value, X.  */
 	      if (v2 == 0)
 		{
 		  v = v1;
@@ -1316,7 +1318,7 @@ scalar_binop (struct value *arg1, struct value *arg2, enum exp_opcode op)
 	      else
 		{
 		  v = v1 / v2;
-		  /* Compute floor. */
+		  /* Compute floor.  */
 		  if (TRUNCATION_TOWARDS_ZERO && (v < 0) && ((v1 % v2) != 0))
 		    {
 		      v--;
@@ -1518,7 +1520,7 @@ value_logical_not (struct value *arg1)
 }
 
 /* Perform a comparison on two string values (whose content are not
-   necessarily null terminated) based on their length */
+   necessarily null terminated) based on their length.  */
 
 static int
 value_strcmp (struct value *arg1, struct value *arg2)
@@ -1624,7 +1626,7 @@ value_equal (struct value *arg1, struct value *arg2)
   else
     {
       error (_("Invalid type combination in equality test."));
-      return 0;			/* For lint -- never reached */
+      return 0;			/* For lint -- never reached.  */
     }
 }
 
@@ -1738,8 +1740,8 @@ value_pos (struct value *arg1)
     }
   else
     {
-      error ("Argument to positive operation not a number.");
-      return 0;			/* For lint -- never reached */
+      error (_("Argument to positive operation not a number."));
+      return 0;			/* For lint -- never reached.  */
     }
 }
 
@@ -1755,7 +1757,7 @@ value_neg (struct value *arg1)
     {
       struct value *val = allocate_value (type);
       int len = TYPE_LENGTH (type);
-      gdb_byte decbytes[16];  /* a decfloat is at most 128 bits long */
+      gdb_byte decbytes[16];  /* a decfloat is at most 128 bits long.  */
 
       memcpy (decbytes, value_contents (arg1), len);
 
@@ -1794,7 +1796,7 @@ value_neg (struct value *arg1)
   else
     {
       error (_("Argument to negate operation not a number."));
-      return 0;			/* For lint -- never reached */
+      return 0;			/* For lint -- never reached.  */
     }
 }
 
@@ -1835,7 +1837,7 @@ value_complement (struct value *arg1)
 
 /* The INDEX'th bit of SET value whose value_type is TYPE,
    and whose value_contents is valaddr.
-   Return -1 if out of range, -2 other error. */
+   Return -1 if out of range, -2 other error.  */
 
 int
 value_bit_index (struct type *type, const gdb_byte *valaddr, int index)
