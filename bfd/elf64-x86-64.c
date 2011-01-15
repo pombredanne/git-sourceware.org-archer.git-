@@ -495,7 +495,7 @@ struct elf_x86_64_link_hash_table
 
   bfd_vma (*r_info) (bfd_vma, bfd_vma);
   bfd_vma (*r_sym) (bfd_vma);
-  void (*swap_reloca_out) (bfd *, const Elf_Internal_Rela *, bfd_byte *);
+  unsigned int pointer_r_type;
   const char *dynamic_interpreter;
   int dynamic_interpreter_size;
 
@@ -659,7 +659,7 @@ elf_x86_64_link_hash_table_create (bfd *abfd)
     {
       ret->r_info = elf64_r_info;
       ret->r_sym = elf64_r_sym;
-      ret->swap_reloca_out = bfd_elf64_swap_reloca_out;
+      ret->pointer_r_type = R_X86_64_64;
       ret->dynamic_interpreter = ELF64_DYNAMIC_INTERPRETER;
       ret->dynamic_interpreter_size = sizeof ELF64_DYNAMIC_INTERPRETER;
     }
@@ -667,7 +667,7 @@ elf_x86_64_link_hash_table_create (bfd *abfd)
     {
       ret->r_info = elf32_r_info;
       ret->r_sym = elf32_r_sym;
-      ret->swap_reloca_out = bfd_elf32_swap_reloca_out;
+      ret->pointer_r_type = R_X86_64_32;
       ret->dynamic_interpreter = ELF32_DYNAMIC_INTERPRETER;
       ret->dynamic_interpreter_size = sizeof ELF32_DYNAMIC_INTERPRETER;
     }
@@ -1235,6 +1235,9 @@ elf_x86_64_check_relocs (bfd *abfd, struct bfd_link_info *info,
 		  bfd_set_error (bfd_error_bad_value);
 		  return FALSE;
 
+		case R_X86_64_32:
+		  if (ABI_64_P (abfd))
+		    goto not_pointer;
 		case R_X86_64_64:
 		  h->non_got_ref = 1;
 		  h->pointer_equality_needed = 1;
@@ -1252,9 +1255,9 @@ elf_x86_64_check_relocs (bfd *abfd, struct bfd_link_info *info,
 		  break;
 
 		case R_X86_64_32S:
-		case R_X86_64_32:
 		case R_X86_64_PC32:
 		case R_X86_64_PC64:
+not_pointer:
 		  h->non_got_ref = 1;
 		  if (r_type != R_X86_64_PC32
 		      && r_type != R_X86_64_PC64)
@@ -1451,16 +1454,17 @@ elf_x86_64_check_relocs (bfd *abfd, struct bfd_link_info *info,
 	    }
 	  goto create_got;
 
+	case R_X86_64_32:
+	  if (!ABI_64_P (abfd))
+	    goto pointer;
 	case R_X86_64_8:
 	case R_X86_64_16:
-	case R_X86_64_32:
 	case R_X86_64_32S:
 	  /* Let's help debug shared library creation.  These relocs
 	     cannot be used in shared libs.  Don't error out for
 	     sections we don't care about, such as debug sections or
 	     non-constant sections.  */
 	  if (info->shared
-	      && ABI_64_P (abfd)
 	      && (sec->flags & SEC_ALLOC) != 0
 	      && (sec->flags & SEC_READONLY) != 0)
 	    {
@@ -1481,6 +1485,7 @@ elf_x86_64_check_relocs (bfd *abfd, struct bfd_link_info *info,
 	case R_X86_64_PC32:
 	case R_X86_64_PC64:
 	case R_X86_64_64:
+pointer:
 	  if (h != NULL && info->executable)
 	    {
 	      /* If this reloc is in a read-only section, we might
@@ -1545,7 +1550,8 @@ elf_x86_64_check_relocs (bfd *abfd, struct bfd_link_info *info,
 		    htab->elf.dynobj = abfd;
 
 		  sreloc = _bfd_elf_make_dynamic_reloc_section
-		    (sec, htab->elf.dynobj, 3, abfd, /*rela?*/ TRUE);
+		    (sec, htab->elf.dynobj, ABI_64_P (abfd) ? 3 : 2,
+		     abfd, /*rela?*/ TRUE);
 
 		  if (sreloc == NULL)
 		    return FALSE;
@@ -1699,7 +1705,7 @@ elf_x86_64_gc_sweep_hook (bfd *abfd, struct bfd_link_info *info,
 
 	  /* Check relocation against local STT_GNU_IFUNC symbol.  */
 	  if (isym != NULL
-	      && ELF64_ST_TYPE (isym->st_info) == STT_GNU_IFUNC)
+	      && ELF_ST_TYPE (isym->st_info) == STT_GNU_IFUNC)
 	    {
 	      h = elf_x86_64_get_local_sym_hash (htab, abfd, rel, FALSE);
 	      if (h == NULL)
@@ -2832,6 +2838,9 @@ elf_x86_64_relocate_section (bfd *output_bfd,
 		abort ();
 	      goto do_relocation;
 
+	    case R_X86_64_32:
+	      if (ABI_64_P (output_bfd))
+		goto do_relocation;
 	    case R_X86_64_64: 
 	      if (rel->r_addend != 0)
 		{
@@ -2896,7 +2905,6 @@ elf_x86_64_relocate_section (bfd *output_bfd,
 		  continue;
 		}
 
-	    case R_X86_64_32:
 	    case R_X86_64_PC32:
 	    case R_X86_64_PC64:
 	    case R_X86_64_PLT32:
@@ -3309,7 +3317,7 @@ elf_x86_64_relocate_section (bfd *output_bfd,
 	      else
 		{
 		  /* This symbol is local, or marked to become local.  */
-		  if (r_type == R_X86_64_64)
+		  if (r_type == htab->pointer_r_type)
 		    {
 		      relocate = TRUE;
 		      outrel.r_info = htab->r_info (0, R_X86_64_RELATIVE);
@@ -3945,7 +3953,7 @@ elf_x86_64_finish_dynamic_symbol (bfd *output_bfd,
 
       bed = get_elf_backend_data (output_bfd);
       loc = relplt->contents + plt_index * bed->s->sizeof_rela;
-      htab->swap_reloca_out (output_bfd, &rela, loc);
+      bed->s->swap_reloca_out (output_bfd, &rela, loc);
 
       if (!h->def_regular)
 	{
@@ -4116,19 +4124,23 @@ elf_x86_64_finish_dynamic_sections (bfd *output_bfd,
 
   if (htab->elf.dynamic_sections_created)
     {
-      Elf64_External_Dyn *dyncon, *dynconend;
+      bfd_byte *dyncon, *dynconend;
+      const struct elf_backend_data *bed;
+      bfd_size_type sizeof_dyn;
 
       if (sdyn == NULL || htab->elf.sgot == NULL)
 	abort ();
 
-      dyncon = (Elf64_External_Dyn *) sdyn->contents;
-      dynconend = (Elf64_External_Dyn *) (sdyn->contents + sdyn->size);
-      for (; dyncon < dynconend; dyncon++)
+      bed = get_elf_backend_data (dynobj);
+      sizeof_dyn = bed->s->sizeof_dyn;
+      dyncon = sdyn->contents;
+      dynconend = sdyn->contents + sdyn->size;
+      for (; dyncon < dynconend; dyncon += sizeof_dyn)
 	{
 	  Elf_Internal_Dyn dyn;
 	  asection *s;
 
-	  bfd_elf64_swap_dyn_in (dynobj, dyncon, &dyn);
+	  (*bed->s->swap_dyn_in) (dynobj, dyncon, &dyn);
 
 	  switch (dyn.d_tag)
 	    {
@@ -4177,7 +4189,7 @@ elf_x86_64_finish_dynamic_sections (bfd *output_bfd,
 	      break;
 	    }
 
-	  bfd_elf64_swap_dyn_out (output_bfd, &dyn, dyncon);
+	  (*bed->s->swap_dyn_out) (output_bfd, &dyn, dyncon);
 	}
 
       /* Fill in the special first entry in the procedure linkage table.  */

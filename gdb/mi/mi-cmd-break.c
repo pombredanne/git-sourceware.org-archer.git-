@@ -103,7 +103,7 @@ mi_cmd_break_insert (char *command, char **argv, int argc)
 
   while (1)
     {
-      int opt = mi_getopt ("mi_cmd_break_insert", argc, argv,
+      int opt = mi_getopt ("-break-insert", argc, argv,
 			   opts, &optind, &optarg);
       if (opt < 0)
 	break;
@@ -137,9 +137,9 @@ mi_cmd_break_insert (char *command, char **argv, int argc)
     }
 
   if (optind >= argc)
-    error (_("mi_cmd_break_insert: Missing <location>"));
+    error (_("-break-insert: Missing <location>"));
   if (optind < argc - 1)
-    error (_("mi_cmd_break_insert: Garbage following <location>"));
+    error (_("-break-insert: Garbage following <location>"));
   address = argv[optind];
 
   /* Now we have what we need, let's insert the breakpoint! */
@@ -235,7 +235,7 @@ mi_cmd_break_watch (char *command, char **argv, int argc)
 
   while (1)
     {
-      int opt = mi_getopt ("mi_cmd_break_watch", argc, argv,
+      int opt = mi_getopt ("-break-watch", argc, argv,
 			   opts, &optind, &optarg);
 
       if (opt < 0)
@@ -251,9 +251,9 @@ mi_cmd_break_watch (char *command, char **argv, int argc)
 	}
     }
   if (optind >= argc)
-    error (_("mi_cmd_break_watch: Missing <expression>"));
+    error (_("-break-watch: Missing <expression>"));
   if (optind < argc - 1)
-    error (_("mi_cmd_break_watch: Garbage following <expression>"));
+    error (_("-break-watch: Garbage following <expression>"));
   expr = argv[optind];
 
   /* Now we have what we need, let's insert the watchpoint! */
@@ -269,7 +269,7 @@ mi_cmd_break_watch (char *command, char **argv, int argc)
       awatch_command_wrapper (expr, FROM_TTY, 0);
       break;
     default:
-      error (_("mi_cmd_break_watch: Unknown watchpoint type."));
+      error (_("-break-watch: Unknown watchpoint type."));
     }
 }
 
@@ -300,19 +300,19 @@ mi_cmd_break_commands (char *command, char **argv, int argc)
   struct breakpoint *b;
 
   if (argc < 1)
-    error ("USAGE: %s <BKPT> [<COMMAND> [<COMMAND>...]]", command);
+    error (_("USAGE: %s <BKPT> [<COMMAND> [<COMMAND>...]]"), command);
 
   bnum = strtol (argv[0], &endptr, 0);
   if (endptr == argv[0])
-    error ("breakpoint number argument \"%s\" is not a number.",
+    error (_("breakpoint number argument \"%s\" is not a number."),
 	   argv[0]);
   else if (*endptr != '\0')
-    error ("junk at the end of breakpoint number argument \"%s\".",
+    error (_("junk at the end of breakpoint number argument \"%s\"."),
 	   argv[0]);
 
   b = get_breakpoint (bnum);
   if (b == NULL)
-    error ("breakpoint %d not found.", bnum);
+    error (_("breakpoint %d not found."), bnum);
 
   mi_command_line_array = argv;
   mi_command_line_array_ptr = 1;
