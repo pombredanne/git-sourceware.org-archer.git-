@@ -753,7 +753,7 @@ extern struct value *value_allocate_space_in_inferior (int);
 extern struct value *value_of_local (const char *name, int complain);
 
 extern struct value *value_subscripted_rvalue (struct value *array,
-					       CORE_ADDR offset);
+					       LONGEST index, int lowerbound);
 
 /* User function handler.  */
 

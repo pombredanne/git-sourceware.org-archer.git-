@@ -164,26 +164,12 @@ value_subscript (struct value *array, LONGEST index)
 
       get_discrete_bounds (range_type, &lowerbound, &upperbound);
       if (VALUE_LVAL (array) != lval_memory)
-	{
-	  if (index >= lowerbound && index <= upperbound)
-	    {
-	      CORE_ADDR element_size = TYPE_LENGTH (TYPE_TARGET_TYPE (tarray));
-	      CORE_ADDR offset = (index - lowerbound) * element_size;
-
-	      return value_subscripted_rvalue (array, offset);
-	    }
-	  error (_("array or string index out of range"));
-	}
+	return value_subscripted_rvalue (array, index, lowerbound);
 
       if (c_style == 0)
 	{
 	  if (index >= lowerbound && index <= upperbound)
-	    {
-	      CORE_ADDR element_size = TYPE_LENGTH (TYPE_TARGET_TYPE (tarray));
-	      CORE_ADDR offset = (index - lowerbound) * element_size;
-
-	      return value_subscripted_rvalue (array, offset);
-	    }
+	    return value_subscripted_rvalue (array, index, lowerbound);
 	  /* Emit warning unless we have an array of unknown size.
 	     An array of unknown size has lowerbound 0 and upperbound -1.  */
 	  if (upperbound > -1)
@@ -202,38 +188,39 @@ value_subscript (struct value *array, LONGEST index)
     error (_("not an array or string"));
 }
 
-/* Return the value of *((void *) ARRAY + ELEMENT), ARRAY an aggregate rvalue
-   (eg, a vector register).  This routine used to promote floats to doubles,
-   but no longer does.  OFFSET is zero-based with 0 for the lowermost existing
-   element, it must be expressed in bytes (therefore multiplied by
-   check_typedef (TYPE_TARGET_TYPE (array_type)).  */
+/* Return the value of EXPR[IDX], expr an aggregate rvalue
+   (eg, a vector register).  This routine used to promote floats
+   to doubles, but no longer does.  */
 
 struct value *
-value_subscripted_rvalue (struct value *array, CORE_ADDR offset)
+value_subscripted_rvalue (struct value *array, LONGEST index, int lowerbound)
 {
   struct type *array_type = check_typedef (value_type (array));
   struct type *elt_type = check_typedef (TYPE_TARGET_TYPE (array_type));
+  unsigned int elt_size = TYPE_LENGTH (elt_type);
+  unsigned int elt_stride
+    = (TYPE_BYTE_STRIDE (TYPE_INDEX_TYPE (array_type)) == 0
+       ? elt_size : TYPE_BYTE_STRIDE (TYPE_INDEX_TYPE (array_type)));
+  unsigned int elt_offs = elt_stride * longest_to_int (index - lowerbound);
   struct value *v;
 
-  /* Do not check TYPE_LENGTH (array_type) as we may have been given the
-     innermost dimension of a multi-dimensional Fortran array where its length
-     is shorter than the possibly accessed element offset.  */
+  if (index < lowerbound || (!TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED (array_type)
+			     && elt_offs >= TYPE_LENGTH (array_type)))
+    error (_("no such vector element"));
 
   if (VALUE_LVAL (array) == lval_memory && value_lazy (array))
     v = allocate_value_lazy (elt_type);
   else
     {
-      unsigned int elt_size = TYPE_LENGTH (elt_type);
-
       v = allocate_value (elt_type);
       memcpy (value_contents_writeable (v),
-	      value_contents (array) + offset, elt_size);
+	      value_contents (array) + elt_offs, elt_size);
     }
 
   set_value_component_location (v, array);
   VALUE_REGNUM (v) = VALUE_REGNUM (array);
   VALUE_FRAME_ID (v) = VALUE_FRAME_ID (array);
-  set_value_offset (v, value_offset (array) + offset);
+  set_value_offset (v, value_offset (array) + elt_offs);
   return v;
 }
 

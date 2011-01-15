@@ -506,27 +506,201 @@ init_array_element (struct value *array, struct value *element,
 }
 
 static struct value *
-value_f90_subarray (struct value *array,
-		    struct expression *exp, int *pos, enum noside noside)
+value_f90_subarray (struct value *array, struct expression *exp, int *pos,
+		    int nargs, enum noside noside)
 {
-  int pc = (*pos) + 1;
-  LONGEST low_bound, high_bound;
-  struct type *range = check_typedef (TYPE_INDEX_TYPE (value_type (array)));
-  enum f90_range_type range_type = longest_to_int (exp->elts[pc].longconst);
- 
-  *pos += 3;
+  /* Type to use for the newly allocated value ARRAY.  */
+  struct type *new_array_type;
 
-  if (range_type == LOW_BOUND_DEFAULT || range_type == BOTH_BOUND_DEFAULT)
-    low_bound = TYPE_LOW_BOUND (range);
+  /* Type being iterated for each dimension.  */
+  struct type *type;
+
+  /* Pointer in the last holder to the type of current dimension.  */
+  struct type **typep = &new_array_type;
+
+  struct subscript_index
+    {
+      int pos;
+      enum { SUBSCRIPT_RANGE, SUBSCRIPT_NUMBER } kind;
+      union
+	{
+	  struct subscript_range
+	    {
+	      enum f90_range_type f90_range_type;
+	      LONGEST low_bound, high_bound;
+	    }
+	  range;
+	  LONGEST number;
+	};
+    }
+  *subscript_array;
+  int i;
+  struct cleanup *old_chain;
+  CORE_ADDR value_byte_address, value_byte_offset = 0;
+  htab_t copied_types;
+  struct value *saved_array;
+
+  old_chain = make_cleanup (null_cleanup, 0);
+  object_address_set (value_raw_address (array));
+
+  if (value_optimized_out (array)
+      || (VALUE_LVAL (array) != not_lval
+          && VALUE_LVAL (array) != lval_memory
+	  && VALUE_LVAL (array) != lval_internalvar_component
+	  && VALUE_LVAL (array) != lval_internalvar))
+    error (_("value being subranged must be in memory"));
+  type = check_typedef (value_type (array));
+  f_object_address_data_valid_or_error (type);
+
+  copied_types = create_copied_types_hash (NULL);
+  type = copy_type_recursive (type, copied_types);
+  htab_delete (copied_types);
+
+  if (nargs != calc_f77_array_dims (type))
+    error (_("Wrong number of subscripts"));
+
+  if (TYPE_DATA_LOCATION_IS_ADDR (type))
+    {
+      value_byte_address = (TYPE_DATA_LOCATION_ADDR (type)
+			    + value_offset (array));
+      TYPE_DATA_LOCATION_IS_ADDR (type) = 0;
+    }
   else
-    low_bound = value_as_long (evaluate_subexp (NULL_TYPE, exp, pos, noside));
+    value_byte_address = value_address (array);
 
-  if (range_type == HIGH_BOUND_DEFAULT || range_type == BOTH_BOUND_DEFAULT)
-    high_bound = TYPE_HIGH_BOUND (range);
+  new_array_type = type;
+
+  subscript_array = alloca (sizeof (*subscript_array) * nargs);
+
+  gdb_assert (nargs > 0);
+
+  /* Now that we know we have a legal array subscript expression 
+     let us actually find out where this element exists in the array.  */
+
+  /* Take array indices left to right.  */
+  for (i = 0; i < nargs; i++)
+    {
+      struct subscript_index *index = &subscript_array[i];
+
+      index->pos = *pos;
+      
+      if (exp->elts[*pos].opcode == OP_F90_RANGE)
+	{
+	  int pc = (*pos) + 1;
+	  struct subscript_range *range;
+
+	  index->kind = SUBSCRIPT_RANGE;
+	  range = &index->range;
+
+	  *pos += 3;
+	  range->f90_range_type = longest_to_int (exp->elts[pc].longconst);
+
+	  if (range->f90_range_type == HIGH_BOUND_DEFAULT
+	      || range->f90_range_type == NONE_BOUND_DEFAULT)
+	    range->low_bound = value_as_long (evaluate_subexp (NULL_TYPE, exp,
+							       pos, noside));
+
+	  if (range->f90_range_type == LOW_BOUND_DEFAULT
+	      || range->f90_range_type == NONE_BOUND_DEFAULT)
+	    range->high_bound = value_as_long (evaluate_subexp (NULL_TYPE, exp,
+								pos, noside));
+	}
+      else
+	{
+	  struct value *val;
+
+	  index->kind = SUBSCRIPT_NUMBER;
+
+	  /* Evaluate each subscript; it must be a legal integer in F77.  */
+	  val = evaluate_subexp_with_coercion (exp, pos, noside);
+	  index->number = value_as_long (val);
+	}
+    }
+
+  /* Internal type of array is arranged right to left.  */
+  for (i = nargs - 1; i >= 0; i--)
+    {
+      struct subscript_index *index = &subscript_array[i];
+      struct type *range_type = TYPE_INDEX_TYPE (type);
+
+      switch (index->kind)
+	{
+	case SUBSCRIPT_RANGE:
+	  {
+	    struct subscript_range *range = &index->range;
+	    CORE_ADDR byte_offset;
+
+	    if (range->f90_range_type == LOW_BOUND_DEFAULT
+		|| range->f90_range_type == BOTH_BOUND_DEFAULT)
+	      range->low_bound = TYPE_LOW_BOUND (range_type);
+
+	    if (range->f90_range_type == HIGH_BOUND_DEFAULT
+		|| range->f90_range_type == BOTH_BOUND_DEFAULT)
+	      range->high_bound = TYPE_HIGH_BOUND (range_type);
+
+	    if (range->low_bound < TYPE_LOW_BOUND (range_type)
+		|| (!TYPE_HIGH_BOUND_UNDEFINED (range_type)
+		    && range->high_bound > TYPE_HIGH_BOUND (range_type)))
+	      error (_("slice out of range"));
+
+	    byte_offset = ((range->low_bound - TYPE_LOW_BOUND (range_type))
+			   * TYPE_ARRAY_BYTE_STRIDE_VALUE (type));
+	    TYPE_LOW_BOUND (range_type) = range->low_bound;
+	    TYPE_HIGH_BOUND (range_type) = range->high_bound;
+	    if (range->f90_range_type == LOW_BOUND_DEFAULT
+		|| range->f90_range_type == NONE_BOUND_DEFAULT)
+	      TYPE_HIGH_BOUND_UNDEFINED (range_type) = 0;
+
+	    typep = &TYPE_TARGET_TYPE (type);
+	    value_byte_offset += byte_offset;
+	    type = TYPE_TARGET_TYPE (type);
+	  }
+	  break;
+
+	case SUBSCRIPT_NUMBER:
+	  {
+	    CORE_ADDR byte_offset;
+
+	    if (index->number < TYPE_LOW_BOUND (range_type)
+		|| (!TYPE_HIGH_BOUND_UNDEFINED (range_type)
+		    && index->number > TYPE_HIGH_BOUND (range_type)))
+	      error (_("no such vector element"));
+
+	    byte_offset = ((index->number - TYPE_LOW_BOUND (range_type))
+			   * TYPE_ARRAY_BYTE_STRIDE_VALUE (type));
+
+	    type = TYPE_TARGET_TYPE (type);
+	    *typep = type;
+	    value_byte_offset += byte_offset;
+	  }
+	  break;
+	}
+    }
+
+  check_typedef (new_array_type);
+  saved_array = array;
+  array = allocate_value_lazy (new_array_type);
+  VALUE_LVAL (array) = VALUE_LVAL (saved_array);
+  if (VALUE_LVAL (saved_array) == lval_internalvar_component)
+    VALUE_LVAL (array) = lval_internalvar;
   else
-    high_bound = value_as_long (evaluate_subexp (NULL_TYPE, exp, pos, noside));
+    VALUE_LVAL (array) = VALUE_LVAL (saved_array);
+  VALUE_FRAME_ID (array) = VALUE_FRAME_ID (saved_array);
+  if (VALUE_LVAL (array) != lval_internalvar)
+    set_value_address (array, value_byte_address + value_byte_offset);
 
-  return value_slice (array, low_bound, high_bound - low_bound + 1);
+  if (!value_lazy (saved_array))
+    {
+      allocate_value_contents (array);
+      set_value_lazy (array, 0);
+
+      memcpy (value_contents_writeable (array),
+	      value_contents (saved_array) + value_byte_offset,
+	      TYPE_LENGTH (new_array_type));
+    }
+
+  do_cleanups (old_chain);
+  return array;
 }
 
 
@@ -1906,19 +2080,8 @@ evaluate_subexp_standard (struct type *expect_type,
       switch (code)
 	{
 	case TYPE_CODE_ARRAY:
-	  if (exp->elts[*pos].opcode == OP_F90_RANGE)
-	    return value_f90_subarray (arg1, exp, pos, noside);
-	  else
-	    goto multi_f77_subscript;
-
 	case TYPE_CODE_STRING:
-	  if (exp->elts[*pos].opcode == OP_F90_RANGE)
-	    return value_f90_subarray (arg1, exp, pos, noside);
-	  else
-	    {
-	      arg2 = evaluate_subexp_with_coercion (exp, pos, noside);
-	      return value_subscript (arg1, value_as_long (arg2));
-	    }
+	  return value_f90_subarray (arg1, exp, pos, nargs, noside);
 
 	case TYPE_CODE_PTR:
 	case TYPE_CODE_FUNC:
@@ -2356,103 +2519,6 @@ evaluate_subexp_standard (struct type *expect_type,
 	    }
 	}
       return (arg1);
-
-    multi_f77_subscript:
-      {
-	int subscript_array[MAX_FORTRAN_DIMS];
-	int array_size_array[MAX_FORTRAN_DIMS];
-	int byte_stride_array[MAX_FORTRAN_DIMS];
-	int ndimensions = 1, i;
-	struct type *tmp_type;
-	int offset_item;	/* The array offset where the item lives.  */
-	CORE_ADDR offset_byte;	/* byte_stride based offset  */
-	unsigned element_size;
-
-	if (nargs > MAX_FORTRAN_DIMS)
-	  error (_("Too many subscripts for F77 (%d Max)"), MAX_FORTRAN_DIMS);
-
-	old_chain = make_cleanup (null_cleanup, 0);
-	object_address_set (value_raw_address (arg1));
-
-	tmp_type = check_typedef (value_type (arg1));
-	ndimensions = calc_f77_array_dims (type);
-
-	if (nargs != ndimensions)
-	  error (_("Wrong number of subscripts"));
-
-	gdb_assert (nargs > 0);
-
-	/* Now that we know we have a legal array subscript expression 
-	   let us actually find out where this element exists in the array.  */
-
-	/* Take array indices left to right.  */
-	for (i = 0; i < nargs; i++)
-	  {
-	    /* Evaluate each subscript; it must be a legal integer in F77.  */
-	    arg2 = evaluate_subexp_with_coercion (exp, pos, noside);
-
-	    /* Fill in the subscript array.  */
-
-	    subscript_array[i] = value_as_long (arg2);
-	  }
-
-	/* Internal type of array is arranged right to left.  */
-	for (i = 0; i < nargs; i++)
-	  {
-	    upper = f77_get_upperbound (tmp_type);
-	    lower = f77_get_lowerbound (tmp_type);
-
-	    byte_stride_array[nargs - i - 1] =
-					TYPE_ARRAY_BYTE_STRIDE_VALUE (tmp_type);
-
-	    array_size_array[nargs - i - 1] = upper - lower + 1;
-
-	    /* Zero-normalize subscripts so that offsetting will work.  */
-
-	    subscript_array[nargs - i - 1] -= lower;
-
-	    /* If we are at the bottom of a multidimensional 
-	       array type then keep a ptr to the last ARRAY
-	       type around for use when calling value_subscript()
-	       below.  This is done because we pretend to value_subscript
-	       that we actually have a one-dimensional array 
-	       of base element type that we apply a simple 
-	       offset to.  */
-
-	    if (i < nargs - 1)
-	      tmp_type = check_typedef (TYPE_TARGET_TYPE (tmp_type));
-	  }
-
-	/* Kept for the f77_get_upperbound / f77_get_lowerbound calls above.  */
-	do_cleanups (old_chain);
-
-	/* Now let us calculate the offset for this item.  */
-
-	offset_item = 0;
-	offset_byte = 0;
-
-	for (i = ndimensions - 1; i >= 0; --i)
-	  {
-	    offset_item *= array_size_array[i];
-	    if (byte_stride_array[i] == 0)
-	      offset_item += subscript_array[i];
-	    else
-	      offset_byte += subscript_array[i] * byte_stride_array[i];
-	  }
-
-	element_size = TYPE_LENGTH (TYPE_TARGET_TYPE (tmp_type));
-	offset_byte += offset_item * element_size;
-
-	/* Let us now play a dirty trick: we will take arg1 
-	   which is a value node pointing to the topmost level
-	   of the multidimensional array-set and pretend
-	   that it is actually a array of the final element 
-	   type, this will ensure that value_subscript()
-	   returns the correct type value.  */
-
-	deprecated_set_value_type (arg1, tmp_type);
-	return value_subscripted_rvalue (arg1, offset_byte);
-      }
 
     case BINOP_LOGICAL_AND:
       arg1 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
@@ -3195,18 +3261,25 @@ parse_and_eval_type (char *p, int length)
 int
 calc_f77_array_dims (struct type *array_type)
 {
-  int ndimen = 1;
-  struct type *tmp_type;
-
-  if ((TYPE_CODE (array_type) != TYPE_CODE_ARRAY))
-    error (_("Can't get dimensions for a non-array type"));
-
-  tmp_type = array_type;
-
-  while ((tmp_type = TYPE_TARGET_TYPE (tmp_type)))
+  switch (TYPE_CODE (array_type))
     {
-      if (TYPE_CODE (tmp_type) == TYPE_CODE_ARRAY)
-	++ndimen;
+    case TYPE_CODE_STRING:
+      return 1;
+
+    case TYPE_CODE_ARRAY:
+      {
+	int ndimen = 1;
+
+	while ((array_type = TYPE_TARGET_TYPE (array_type)))
+	  {
+	    if (TYPE_CODE (array_type) == TYPE_CODE_ARRAY)
+	      ++ndimen;
+	  }
+	return ndimen;
+      }
+
+    default:
+      error (_("Can't get dimensions for a non-array/non-string type"));
     }
-  return ndimen;
+
 }

@@ -3669,6 +3669,8 @@ value_slice (struct value *array, int lowbound, int length)
 					TYPE_TARGET_TYPE (range_type),
 					lowbound, 
 					lowbound + length - 1);
+  TYPE_BYTE_STRIDE (slice_range_type) = TYPE_BYTE_STRIDE (range_type);
+
   if (TYPE_CODE (array_type) == TYPE_CODE_BITSTRING)
     {
       int i;
