@@ -520,7 +520,6 @@ value_f90_subarray (struct value *array, struct expression *exp, int *pos,
 
   struct subscript_index
     {
-      int pos;
       enum { SUBSCRIPT_RANGE, SUBSCRIPT_NUMBER } kind;
       union
 	{
@@ -582,8 +581,6 @@ value_f90_subarray (struct value *array, struct expression *exp, int *pos,
     {
       struct subscript_index *index = &subscript_array[i];
 
-      index->pos = *pos;
-      
       if (exp->elts[*pos].opcode == OP_F90_RANGE)
 	{
 	  int pc = (*pos) + 1;
