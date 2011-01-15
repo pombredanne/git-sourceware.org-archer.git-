@@ -544,7 +544,8 @@ value_f90_subarray (struct value *array, struct expression *exp, int *pos,
   object_address_set (value_raw_address (array));
 
   if (value_optimized_out (array)
-      || (VALUE_LVAL (array) != lval_memory
+      || (VALUE_LVAL (array) != not_lval
+          && VALUE_LVAL (array) != lval_memory
 	  && VALUE_LVAL (array) != lval_internalvar_component
 	  && VALUE_LVAL (array) != lval_internalvar))
     error (_("value being subranged must be in memory"));
