@@ -509,7 +509,15 @@ static struct value *
 value_f90_subarray (struct value *array, struct expression *exp, int *pos,
 		    int nargs, enum noside noside)
 {
+  /* Type to use for the newly allocated value ARRAY.  */
+  struct type *new_array_type;
+
+  /* Type being iterated for each dimension.  */
   struct type *type;
+
+  /* Pointer in the last holder to the type of current dimension.  */
+  struct type **typep = &new_array_type;
+
   struct subscript_index
     {
       int pos;
@@ -528,14 +536,18 @@ value_f90_subarray (struct value *array, struct expression *exp, int *pos,
   *subscript_array;
   int i;
   struct cleanup *old_chain;
-  struct type *parent_type = NULL;
-  LONGEST value_byte_offset = 0;
+  CORE_ADDR value_byte_address, value_byte_offset = 0;
   htab_t copied_types;
+  struct value *saved_array;
 
   old_chain = make_cleanup (null_cleanup, 0);
   object_address_set (value_raw_address (array));
 
-  array = value_copy (array);
+  if (value_optimized_out (array)
+      || (VALUE_LVAL (array) != lval_memory
+	  && VALUE_LVAL (array) != lval_internalvar_component
+	  && VALUE_LVAL (array) != lval_internalvar))
+    error (_("value being subranged must be in memory"));
   type = check_typedef (value_type (array));
   f_object_address_data_valid_or_error (type);
 
@@ -543,14 +555,19 @@ value_f90_subarray (struct value *array, struct expression *exp, int *pos,
   type = copy_type_recursive (type, copied_types);
   htab_delete (copied_types);
 
-  if (TYPE_DATA_LOCATION_IS_ADDR (type))
-    {
-      set_value_address (array, TYPE_DATA_LOCATION_ADDR (type));
-      TYPE_DATA_LOCATION_IS_ADDR (type) = 0;
-    }
-
   if (nargs != calc_f77_array_dims (type))
     error (_("Wrong number of subscripts"));
+
+  if (TYPE_DATA_LOCATION_IS_ADDR (type))
+    {
+      value_byte_address = (TYPE_DATA_LOCATION_ADDR (type)
+			    + value_offset (array));
+      TYPE_DATA_LOCATION_IS_ADDR (type) = 0;
+    }
+  else
+    value_byte_address = value_address (array);
+
+  new_array_type = type;
 
   subscript_array = alloca (sizeof (*subscript_array) * nargs);
 
@@ -610,7 +627,7 @@ value_f90_subarray (struct value *array, struct expression *exp, int *pos,
 	case SUBSCRIPT_RANGE:
 	  {
 	    struct subscript_range *range = &index->range;
-	    LONGEST byte_offset;
+	    CORE_ADDR byte_offset;
 
 	    if (range->f90_range_type == LOW_BOUND_DEFAULT
 		|| range->f90_range_type == BOTH_BOUND_DEFAULT)
@@ -633,12 +650,7 @@ value_f90_subarray (struct value *array, struct expression *exp, int *pos,
 		|| range->f90_range_type == NONE_BOUND_DEFAULT)
 	      TYPE_HIGH_BOUND_UNDEFINED (range_type) = 0;
 
-	    if (parent_type == NULL)
-	      {
-		deprecated_set_value_type (array, type);
-		set_value_enclosing_type (array, type);
-	      }
-	    parent_type = type;
+	    typep = &TYPE_TARGET_TYPE (type);
 	    value_byte_offset += byte_offset;
 	    type = TYPE_TARGET_TYPE (type);
 	  }
@@ -646,7 +658,7 @@ value_f90_subarray (struct value *array, struct expression *exp, int *pos,
 
 	case SUBSCRIPT_NUMBER:
 	  {
-	    LONGEST byte_offset;
+	    CORE_ADDR byte_offset;
 
 	    if (index->number < TYPE_LOW_BOUND (range_type)
 		|| (!TYPE_HIGH_BOUND_UNDEFINED (range_type)
@@ -657,21 +669,34 @@ value_f90_subarray (struct value *array, struct expression *exp, int *pos,
 			   * TYPE_ARRAY_BYTE_STRIDE_VALUE (type));
 
 	    type = TYPE_TARGET_TYPE (type);
-	    if (parent_type)
-	      TYPE_TARGET_TYPE (parent_type) = type;
-	    else
-	      {
-		deprecated_set_value_type (array, type);
-		set_value_enclosing_type (array, type);
-	      }
+	    *typep = type;
 	    value_byte_offset += byte_offset;
 	  }
 	  break;
 	}
     }
 
-  set_value_offset (array, (value_offset (array) + value_byte_offset));
-  check_typedef (value_type (array));
+  check_typedef (new_array_type);
+  saved_array = array;
+  array = allocate_value_lazy (new_array_type);
+  VALUE_LVAL (array) = VALUE_LVAL (saved_array);
+  if (VALUE_LVAL (saved_array) == lval_internalvar_component)
+    VALUE_LVAL (array) = lval_internalvar;
+  else
+    VALUE_LVAL (array) = VALUE_LVAL (saved_array);
+  VALUE_FRAME_ID (array) = VALUE_FRAME_ID (saved_array);
+  if (VALUE_LVAL (array) != lval_internalvar)
+    set_value_address (array, value_byte_address + value_byte_offset);
+
+  if (!value_lazy (saved_array))
+    {
+      allocate_value_contents (array);
+      set_value_lazy (array, 0);
+
+      memcpy (value_contents_writeable (array),
+	      value_contents (saved_array) + value_byte_offset,
+	      TYPE_LENGTH (new_array_type));
+    }
 
   do_cleanups (old_chain);
   return array;
