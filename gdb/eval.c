@@ -2397,7 +2397,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	  }
 
 	/* Internal type of array is arranged right to left.  */
-	for (i = nargs; i > 0; i--)
+	for (i = 0; i < nargs; i++)
 	  {
 	    upper = f77_get_upperbound (tmp_type);
 	    lower = f77_get_lowerbound (tmp_type);
@@ -2418,6 +2418,9 @@ evaluate_subexp_standard (struct type *expect_type,
 	       that we actually have a one-dimensional array 
 	       of base element type that we apply a simple 
 	       offset to.  */
+
+	    if (i < nargs - 1)
+	      tmp_type = check_typedef (TYPE_TARGET_TYPE (tmp_type));
 	  }
 
 	/* Kept for the f77_get_upperbound / f77_get_lowerbound calls above.  */

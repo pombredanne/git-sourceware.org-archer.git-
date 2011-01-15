@@ -8456,10 +8456,6 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
 		   _("Found DW_AT_byte_stride with unsupported value 0"));
     }
 
-  /* Ada expects an empty array on no boundary attributes.  */
-  if (attr == NULL && cu->language != language_ada)
-    TYPE_HIGH_BOUND_UNDEFINED (range_type) = 1;
-
   name = dwarf2_name (die, cu);
   if (name)
     TYPE_NAME (range_type) = name;
