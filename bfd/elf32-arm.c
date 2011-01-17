@@ -1,6 +1,6 @@
 /* 32-bit ELF support for ARM
    Copyright 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008, 2009, 2010  Free Software Foundation, Inc.
+   2008, 2009, 2010, 2011  Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
 
@@ -6985,8 +6985,11 @@ elf32_arm_abs12_reloc (bfd *abfd, void *data, bfd_vma value)
 
    Return bfd_reloc_ok if we're done, bfd_reloc_continue if the caller
    is to then call final_link_relocate.  Return other values in the
-   case of error.  */
- 
+   case of error.
+
+   FIXME:When --emit-relocs is in effect, we'll emit relocs describing
+   the pre-relaxed code.  It would be nice if the relocs were updated
+   to match the optimization.   */
 
 static bfd_reloc_status_type 
 elf32_arm_tls_relax (struct elf32_arm_link_hash_table *globals,
@@ -12004,8 +12007,6 @@ allocate_dynrelocs (struct elf_link_hash_entry *h, void * inf)
   struct elf_dyn_relocs *p;
   bfd_signed_vma thumb_refs;
 
-  eh = (struct elf32_arm_link_hash_entry *) h;
-
   if (h->root.type == bfd_link_hash_indirect)
     return TRUE;
 
@@ -12014,6 +12015,8 @@ allocate_dynrelocs (struct elf_link_hash_entry *h, void * inf)
        entry in the hash table, thus we never get to see the real
        symbol in a hash traversal.  So look at it now.  */
     h = (struct elf_link_hash_entry *) h->root.u.i.link;
+
+  eh = (struct elf32_arm_link_hash_entry *) h;
 
   info = (struct bfd_link_info *) inf;
   htab = elf32_arm_hash_table (info);

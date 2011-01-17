@@ -2741,68 +2741,11 @@ For example,
 
 @smallexample
 (@value{GDBP}) info threads
-  3 process 35 thread 27  0x34e5 in sigpause ()
-  2 process 35 thread 23  0x34e5 in sigpause ()
-* 1 process 35 thread 13  main (argc=1, argv=0x7ffffff8)
+  Id   Target Id         Frame
+  3    process 35 thread 27  0x34e5 in sigpause ()
+  2    process 35 thread 23  0x34e5 in sigpause ()
+* 1    process 35 thread 13  main (argc=1, argv=0x7ffffff8)
     at threadtest.c:68
-@end smallexample
-
-On HP-UX systems:
-
-@cindex debugging multithreaded programs (on HP-UX)
-@cindex thread identifier (GDB), on HP-UX
-For debugging purposes, @value{GDBN} associates its own thread
-number---a small integer assigned in thread-creation order---with each
-thread in your program.
-
-@cindex @code{New} @var{systag} message, on HP-UX
-@cindex thread identifier (system), on HP-UX
-@c FIXME-implementors!! It would be more helpful if the [New...] message
-@c included GDB's numeric thread handle, so you could just go to that
-@c thread without first checking `info threads'.
-Whenever @value{GDBN} detects a new thread in your program, it displays
-both @value{GDBN}'s thread number and the target system's identification for the thread with a message in the
-form @samp{[New @var{systag}]}.  @var{systag} is a thread identifier
-whose form varies depending on the particular system.  For example, on
-HP-UX, you see
-
-@smallexample
-[New thread 2 (system thread 26594)]
-@end smallexample
-
-@noindent
-when @value{GDBN} notices a new thread.
-
-@table @code
-@kindex info threads (HP-UX)
-@item info threads
-Display a summary of all threads currently in your
-program.  @value{GDBN} displays for each thread (in this order):
-
-@enumerate
-@item the thread number assigned by @value{GDBN}
-
-@item the target system's thread identifier (@var{systag})
-
-@item the current stack frame summary for that thread
-@end enumerate
-
-@noindent
-An asterisk @samp{*} to the left of the @value{GDBN} thread number
-indicates the current thread.
-
-For example,
-@end table
-@c end table here to get a little more width for example
-
-@smallexample
-(@value{GDBP}) info threads
-    * 3 system thread 26607  worker (wptr=0x7b09c318 "@@") \@*
-                               at quicksort.c:137
-      2 system thread 26606  0x7b0030d8 in __ksleep () \@*
-                               from /usr/lib/libc.2
-      1 system thread 27905  0x7b003498 in _brk () \@*
-                               from /usr/lib/libc.2
 @end smallexample
 
 On Solaris, you can display more information about user threads with a
@@ -2825,10 +2768,10 @@ shown in the first field of the @samp{info threads} display.
 you selected, and its current stack frame summary:
 
 @smallexample
-@c FIXME!! This example made up; find a @value{GDBN} w/threads and get real one
 (@value{GDBP}) thread 2
-[Switching to process 35 thread 23]
-0x34e5 in sigpause ()
+[Switching to thread 2 (Thread 0xb7fdab70 (LWP 12747))]
+#0  some_function (ignore=0x0) at example.c:8
+8	    printf ("hello\n");
 @end smallexample
 
 @noindent
@@ -2845,7 +2788,7 @@ information on convenience variables.
 
 @kindex thread apply
 @cindex apply command to several threads
-@item thread apply [@var{threadno}] [@var{all}] @var{command}
+@item thread apply [@var{threadno} | all] @var{command}
 The @code{thread apply} command allows you to apply the named
 @var{command} to one or more threads.  Specify the numbers of the
 threads that you want affected with the command argument
@@ -18731,9 +18674,25 @@ implement in hardware simple hardware watchpoint conditions of the form:
   if  @var{ADDRESS|VARIABLE} == @var{CONSTANT EXPRESSION}
 @end smallexample
 
-The DVC register will be automatically used whenever @value{GDBN} detects
-such pattern in a condition expression.  This feature is available in native
-@value{GDBN} running on a Linux kernel version 2.6.34 or newer.
+The DVC register will be automatically used when @value{GDBN} detects
+such pattern in a condition expression, and the created watchpoint uses one
+debug register (either the @code{exact-watchpoints} option is on and the
+variable is scalar, or the variable has a length of one byte).  This feature
+is available in native @value{GDBN} running on a Linux kernel version 2.6.34
+or newer.
+
+When running on PowerPC embedded processors, @value{GDBN} automatically uses
+ranged hardware watchpoints, unless the @code{exact-watchpoints} option is on,
+in which case watchpoints using only one debug register are created when
+watching variables of scalar types.
+
+You can create an artificial array to watch an arbitrary memory
+region using one of the following commands (@pxref{Expressions}):
+
+@smallexample
+(@value{GDBP}) watch *((char *) @var{address})@@@var{length}
+(@value{GDBP}) watch @{char[@var{length}]@} @var{address}
+@end smallexample
 
 @value{GDBN} provides the following PowerPC-specific commands:
 
@@ -18753,6 +18712,12 @@ arguments and return values.  The valid options are @samp{auto};
 @samp{altivec}, to use AltiVec registers; and @samp{spe} to use SPE
 registers.  By default, @value{GDBN} selects the calling convention
 based on the selected architecture and the provided executable file.
+
+@item set powerpc exact-watchpoints
+@itemx show powerpc exact-watchpoints
+Allow @value{GDBN} to use only one debug register when watching a variable
+of scalar type, thus assuming that the variable is accessed through the
+address of its first byte.
 
 @kindex target dink32
 @item target dink32 @var{dev}
@@ -27680,8 +27645,9 @@ displayed; if @var{lines} is higher than the number of lines between
 @var{start-addr} and @var{end-addr}, only the lines up to @var{end-addr}
 are displayed.
 @item @var{mode}
-is either 0 (meaning only disassembly) or 1 (meaning mixed source and
-disassembly).
+is either 0 (meaning only disassembly), 1 (meaning mixed source and
+disassembly), 2 (meaning disassembly with raw opcodes), or 3 (meaning
+mixed source and disassembly with raw opcodes).
 @end table
 
 @subsubheading Result
