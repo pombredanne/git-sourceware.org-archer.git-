@@ -80,7 +80,7 @@ Use of the 'raw' qualifier avoids any filtering by loadable modules.
 
         # FIXME: provide option to start at selected frame
         # However, should still number as if starting from newest
-        newest_frame = gdb.selected_thread ().newest_frame ()
+        newest_frame = gdb.newest_frame()
         iter = itertools.imap (FrameWrapper,
                                FrameIterator (newest_frame))
         if filter:
