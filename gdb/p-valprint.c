@@ -74,6 +74,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
   CORE_ADDR saved_address = address;
   
   back_to = make_cleanup (null_cleanup, 0);
+  address += embedded_offset;
   type = object_address_get_data (type, &address);
   if (type == NULL)
     {
@@ -82,14 +83,17 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
       do_cleanups (back_to);
       return 0;
     }
-  if (address != saved_address)
+  if (address != saved_address + embedded_offset)
     {
       size_t length = TYPE_LENGTH (type);
 
       valaddr = xmalloc (length);
       make_cleanup (xfree, (gdb_byte *) valaddr);
       read_memory (address, (gdb_byte *) valaddr, length);
+      embedded_offset = 0;
     }
+  else
+    address -= embedded_offset;
   switch (TYPE_CODE (type))
     {
     case TYPE_CODE_ARRAY:
