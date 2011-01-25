@@ -62,6 +62,19 @@ vardata:
 	.4byte		.Llenb_var-.Lcu1_begin	/* DW_AT_upper_bound */
 	.byte		0			/* End of children of die */
 
+	/* DW_AT_upper_bound is referencing register.  */
+.Larrayreg_type:
+	.uleb128	2			/* Abbrev: DW_TAG_array_type */
+	.4byte		.Lchar_type-.Lcu1_begin	/* DW_AT_type */
+
+	.uleb128	8			/* Abbrev: DW_TAG_subrange_type with block */
+	.4byte		.Luint_type-.Lcu1_begin	/* DW_AT_type */
+	.byte		0			/* DW_AT_lower_bound */
+	.byte		2f - 1f			/* DW_AT_upper_bound */
+1:	.byte		0x50			/* DW_OP_reg0 */
+2:
+	.byte		0			/* End of children of die */
+
 .Luint_type:
 	.uleb128	4			/* Abbrev: DW_TAG_base_type */
 	.4byte		.Luint_str		/* DW_AT_name */
@@ -98,6 +111,15 @@ vardata:
 	.uleb128	6			/* Abbrev: DW_TAG_variable DW_FORM_string */
 	.string		"b_string"		/* DW_AT_name */
 	.4byte		.Larrayb_type-.Lcu1_begin /* DW_AT_type */
+	.byte		2f - 1f			/* DW_AT_location */
+1:	.byte		3			/*   DW_OP_addr */
+	.4byte		vardata			/*   <addr> */
+2:
+
+	/* DW_AT_upper_bound is referencing register.  */
+	.uleb128	6			/* Abbrev: DW_TAG_variable DW_FORM_string */
+	.string		"reg_string"		/* DW_AT_name */
+	.4byte		.Larrayreg_type-.Lcu1_begin /* DW_AT_type */
 	.byte		2f - 1f			/* DW_AT_location */
 1:	.byte		3			/*   DW_OP_addr */
 	.4byte		vardata			/*   <addr> */
@@ -197,6 +219,18 @@ vardata:
 	.uleb128	0x0c			/* DW_FORM_flag */
 	.uleb128	0x49			/* DW_AT_type */
 	.uleb128	0x13			/* DW_FORM_ref4 */
+	.byte		0x0			/* Terminator */
+	.byte		0x0			/* Terminator */
+
+	.uleb128	8			/* Abbrev code */
+	.uleb128	0x21			/* DW_TAG_subrange_type with block */
+	.byte		0x0			/* no children */
+	.uleb128	0x49			/* DW_AT_type */
+	.uleb128	0x13			/* DW_FORM_ref4 */
+	.uleb128	0x22			/* DW_AT_lower_bound */
+	.uleb128	0xb			/* DW_FORM_data1 */
+	.uleb128	0x2f			/* DW_AT_upper_bound */
+	.uleb128	0xa			/* DW_FORM_block1 */
 	.byte		0x0			/* Terminator */
 	.byte		0x0			/* Terminator */
 

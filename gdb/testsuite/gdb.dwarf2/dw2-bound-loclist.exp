@@ -49,3 +49,6 @@ gdb_test "ptype a_string" {type = char \[4\]}
 
 gdb_test "p b_string" { = (0x[0-9a-f]+ )?"seennotseen"}
 gdb_test "ptype b_string" {type = char \[\]}
+
+# The register contains unpredictable value - the array size.
+gdb_test "ptype reg_string" {type = char \[-?[0-9]+\]}
