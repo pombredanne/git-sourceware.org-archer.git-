@@ -1,3 +1,203 @@
+2011-01-25  Pedro Alves  <pedro@codesourcery.com>
+
+	* regcache.c (struct regcache_descr): Remove outdated comment.
+	(init_regcache_descr): Remove sizeof_raw_register_valid_p
+	overallocate hack.
+	(regcache_xmalloc): Rename to ...
+	(regcache_xmalloc_1): ... this.  Add `readonly_p' parameter.
+	Allocate the regcache type accordingly.
+	(regcache_xmalloc): New as wrapper around regcache_xmalloc_1.
+	(regcache_xfree): Asser the source is also readonly.  Copy sizeof
+	cooked registers, not raw.
+	(regcache_dup_no_passthrough): Delete.
+	(get_thread_arch_regcache): Use regcache_xmalloc_1.
+	* h8300-tdep.c (h8300_push_dummy_call): Tweak comment to not
+	mention obsolete write_register_bytes.
+	* regcache.h (regcache_dup_no_passthrough): Delete declaration.
+
+2011-01-25  Pedro Alves  <pedro@codesourcery.com>
+
+	Stop remote_read_bytes from handling partial reads itself.
+
+	* remote-fileio.c: Include target.h.
+	(remote_fileio_write_bytes): Delete.
+	(remote_fileio_func_open, remote_fileio_func_write)
+	(remote_fileio_func_rename, remote_fileio_func_unlink): Use
+	target_read_memory.
+	(remote_fileio_func_stat): Use target_read_memory and
+	target_write_memory.
+	(remote_fileio_func_gettimeofday): Use target_write_memory.
+	(remote_fileio_func_system): Use target_read_memory.
+	* remote.c (remote_write_bytes): Make it static.
+	(remote_read_bytes): Don't handle partial reads here.
+	* remote.h (remote_read_bytes): Delete declaration.
+
+2011-01-25  Pedro Alves  <pedro@codesourcery.com>
+
+	Simplify XML parsing a bit.
+
+	* xml-support.h (gdb_xml_parse_quick): Declare.
+	* xml-support.c (gdb_xml_create_parser_and_cleanup_1): Renamed
+	from gdb_xml_create_parser_and_cleanup, and added `old_chain'
+	parameter.
+	(gdb_xml_create_parser_and_cleanup): Reimplement on top of
+	gdb_xml_create_parser_and_cleanup_1.
+	(gdb_xml_parse_quick): New.
+	* memory-map.c (parse_memory_map): Use gdb_xml_parse_quick.
+	* osdata.c (osdata_parse): Ditto.
+	* remote.c (remote_threads_info): Ditto.
+	* solib-target.c (solib_target_parse_libraries): Ditto.
+	* xml-syscall.c (syscall_parse_xml): Ditto.
+	* xml-tdesc.c (tdesc_parse_xml): Ditto.
+
+2011-01-24  Kevin Buettner  <kevinb@redhat.com>
+
+	* configure.tgt (mips*-*-elf): New; just like mips*-*-*, but
+	with remote-mips.o added to gdb_target_obs.
+	* Makefile.in (ALL_TARGET_OBS): Add remote-mips.o.
+
+2011-01-24  Pedro Alves  <pedro@codesourcery.com>
+
+	* ada-valprint.c (val_print_packed_array_elements): Pass the
+	correct struct value to val_print.
+	(ada_val_print_1): Ditto.
+
+2011-01-24  Pedro Alves  <pedro@codesourcery.com>
+
+	Don't lose embedded_offset in printing routines throughout.
+
+	* valprint.h (val_print_array_elements): Change prototype.
+	* valprint.c (val_print_array_elements): Add `embedded_offset'
+	parameter, and adjust to pass it down to val_print, while passing
+	`valaddr' or `address' unmodified.  Take embedded_offset into
+	account when checking repetitions.
+	* c-valprint.c (c_val_print): Pass embedded_offset to
+	val_print_array_elements instead of adjusting `valaddr' and
+	`address'.
+	* m2-valprint.c (m2_print_array_contents, m2_val_print): Pass
+	embedded_offset to val_print_array_elements instead of adjusting
+	`valaddr'.
+	* p-lang.h (pascal_object_print_value_fields): Adjust prototype.
+	* p-valprint.c (pascal_val_print): Pass embedded_offset to
+	val_print_array_elements and pascal_object_print_value_fields
+	instead of adjusting `valaddr'.
+	(pascal_object_print_value_fields): Add `offset' parameter, and
+	adjust to use it.
+	(pascal_object_print_value): Add `offset' parameter, and adjust to
+	use it.
+	(pascal_object_print_static_field): Use
+	value_contents_for_printing/value_embedded_offset, rather than
+	value_contents.
+	* ada-valprint.c (val_print_packed_array_elements): Add `offset'
+	parameter, and adjust to use it.  Use
+	value_contents_for_printing/value_embedded_offset, rather than
+	value_contents.
+	(ada_val_print): Rename `valaddr0' parameter to `valaddr'.
+	(ada_val_print_array): Add `offset' parameter, and adjust to use
+	it.
+	(ada_val_print_1): Rename `valaddr0' parameter to `valaddr', and
+	`embedded_offset' to `offset'.  Don't re-adjust `valaddr'.
+	Instead work with offsets.  Use
+	value_contents_for_printing/value_embedded_offset, rather than
+	value_contents.  Change `defer_val_int' local type to CORE_ADDR,
+	and use value_from_pointer to extract a target pointer, rather
+	than value_from_longest.
+	(print_variant_part): Add `offset' parameter.  Replace
+	`outer_valaddr' parameter by a new `outer_offset' parameter.
+	Don't re-adjust `valaddr'.  Instead pass down adjusted offsets.
+	(ada_value_print): Use
+	value_contents_for_printing/value_embedded_offset, rather than
+	value_contents.
+	(print_record): Add `offset' parameter, and adjust to pass it
+	down.
+	(print_field_values): Add `offset' parameter.  Replace
+	`outer_valaddr' parameter by a new `outer_offset' parameter.
+	Don't re-adjust `valaddr'.  Instead pass down adjusted offsets.
+	Use value_contents_for_printing/value_embedded_offset, rather than
+	value_contents.
+	* d-valprint.c (dynamic_array_type): Use
+	value_contents_for_printing/value_embedded_offset, rather than
+	value_contents.
+	* jv-valprint.c (java_print_value_fields): Add `offset' parameter.
+	Don't re-adjust `valaddr'.  Instead pass down adjusted offsets.
+	(java_print_value_fields): Take `offset' into account.  Don't
+	re-adjust `valaddr'.  Instead pass down adjusted offsets.
+	(java_val_print): Take `embedded_offset' into account.  Pass it to
+	java_print_value_fields.
+	* f-valprint.c (f77_print_array_1): Add `embedded_offset'
+	parameter.  Don't re-adjust `valaddr' or `address'.  Instead pass
+	down adjusted offsets.
+	(f77_print_array): Add `embedded_offset' parameter.  Pass it down.
+	(f_val_print): Take `embedded_offset' into account.
+
+2011-01-21  Joel Brobecker  <brobecker@adacore.com>
+
+	* inflow.c: Include "gdbcmd.h".
+	(interactive_mode): New static global, moved here from top.c.
+	(show_interactive_mode): New function, moved here from top.c.
+	use gdb_has_a_terminal instead of input_from_terminal_p to
+	determine the current mode.
+	(gdb_has_a_terminal): Add handling of the "iteractive-mode"
+	setting.
+	(_initialize_inflow): Add the "set/show interactive-mode"
+	commands.  Moved here from top.c, after having adjusted slightly
+	the help text.
+	* top.c (interactive_mode, show_interactive_mode): Delete, moved
+	to inflow.c.
+	(input_from_terminal_p): Remove handling of "interactive-mode"
+	setting, moved to infow.c.
+	(init_main): Remove creation of the "set/show interactive-mode"
+	commands, moved to inflow.c.
+
+2011-01-19  Joel Brobecker  <brobecker@adacore.com>
+
+	* NEWS: Add entry for native ia64-hpux support.
+
+2011-01-19  Tom Tromey  <tromey@redhat.com>
+
+	PR mi/8618:
+	* thread.c (free_thread): Free 'name'.
+	(print_thread_info): Emit thread name.  Change CLI output.
+	(thread_name_command): New function.
+	(do_captured_thread_select): Emit newline.
+	(_initialize_thread): Register 'thread name' command.
+	* target.h (struct target_ops) <to_thread_name>: New field.
+	(target_thread_name): New macro.
+	* target.c (update_current_target): Handle to_thread_name.
+	* python/py-infthread.c (thpy_get_name): New function.
+	(thpy_set_name): Likewise.
+	(thread_object_getset): Add "name".
+	* linux-nat.c (linux_nat_thread_name): New function.
+	(linux_nat_add_target): Set to_thread_name.
+	* gdbthread.h (struct thread_info) <name>: New field.
+
+2011-01-18  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-valprint.c (ada_print_scalar): Remove unsigned char downcast.
+	(ada_val_print_1): Likewise.
+
+2011-01-18  Joel Brobecker  <brobecker@adacore.com>
+
+	* rs6000-tdep.c (rs6000_skip_prologue): Make sure that the prologue
+	upper limit address is not greater than the function end address
+	when the upper limit could not be computed using the debugging
+	info.
+
+2011-01-17  Tom Tromey  <tromey@redhat.com>
+
+	* cli/cli-cmds.c (apropos_command): Free the compiled regex.  Use
+	get_regcomp_error.
+	* utils.c: Include gdb_regex.h.
+	(do_regfree_cleanup): New function.
+	(make_regfree_cleanup): Likewise.
+	(get_regcomp_error): Likewise.
+	* gdb_regex.h (make_regfree_cleanup, get_regcomp_error): Declare.
+
+2011-01-17  Tom Tromey  <tromey@redhat.com>
+
+	* cli/cli-cmds.c (apropos_command): Fix formatting.  Don't call
+	re_compile_fastmap.
+
 2011-01-17  Pierre Muller  <muller@ics.u-strasbg.fr>
 
 	* p-exp.y (intvar): New static variable, used to set CURRENT_TYPE

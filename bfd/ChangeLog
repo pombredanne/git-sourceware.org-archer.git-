@@ -1,3 +1,36 @@
+2011-01-22  Richard Sandiford  <rdsandiford@googlemail.com>
+
+	* elfxx-mips.c (_bfd_mips_elf_merge_private_bfd_data): Ignore
+	common sections too.
+
+2011-01-18  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elf64-x86-64.c (elf_backend_want_plt_sym): Redefine to 0 after
+	Solaris target.
+
+2011-01-18  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	Fix compilation for mingw64.
+	* coffcode.h (coff_slurp_symbol_table): Add intptr_t intermediate
+	typecast to avoid warning.
+	* elf32-rx.c: Add "bfd_stdint.h" include required for int32_t type
+	usage.
+	* elfxx-ia64.c (elfNN_ia64_relax_br): Use intptr_t typeacast instead
+	of long for pointer to avoid warning.
+	(elfNN_ia64_relax_brl): Idem.
+	(elfNN_ia64_install_value): Idem.
+	* vms-alpha.c (_bfd_vms_slurp_etir): Idem.
+
+2011-01-17  Richard Sandiford  <richard.sandiford@linaro.org>
+
+	* elf32-arm.c (elf32_arm_check_relocs): Check needs_plt rather than
+	h->needs_plt when deciding whether to record a possible dynamic reloc.
+
+2011-01-17  Richard Sandiford  <richard.sandiford@linaro.org>
+
+	* elf32-arm.c (elf32_arm_gc_sweep_hook): Remove all registered
+	dynamic relocs for the removed section.
+
 2011-01-15  H.J. Lu  <hongjiu.lu@intel.com>
 
 	* elf64-x86-64.c (elf_x86_64_check_relocs): Check invalid x32

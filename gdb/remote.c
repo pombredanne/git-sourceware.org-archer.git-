@@ -2595,25 +2595,16 @@ remote_threads_info (struct target_ops *ops)
 					 TARGET_OBJECT_THREADS, NULL);
 
       struct cleanup *back_to = make_cleanup (xfree, xml);
+
       if (xml && *xml)
 	{
-	  struct gdb_xml_parser *parser;
 	  struct threads_parsing_context context;
-	  struct cleanup *clear_parsing_context;
 
-	  context.items = 0;
-	  /* Note: this parser cleanup is already guarded by BACK_TO
-	     above.  */
-	  parser = gdb_xml_create_parser_and_cleanup (_("threads"),
-						      threads_elements,
-						      &context);
+	  context.items = NULL;
+	  make_cleanup (clear_threads_parsing_context, &context);
 
-	  gdb_xml_use_dtd (parser, "threads.dtd");
-
-	  clear_parsing_context
-	    = make_cleanup (clear_threads_parsing_context, &context);
-
-	  if (gdb_xml_parse (parser, xml) == 0)
+	  if (gdb_xml_parse_quick (_("threads"), "threads.dtd",
+				   threads_elements, xml, &context) == 0)
 	    {
 	      int i;
 	      struct thread_item *item;
@@ -2640,8 +2631,6 @@ remote_threads_info (struct target_ops *ops)
 		    }
 		}
 	    }
-
-	  do_cleanups (clear_parsing_context);
 	}
 
       do_cleanups (back_to);
@@ -6367,7 +6356,7 @@ remote_write_bytes_aux (const char *header, CORE_ADDR memaddr,
    Returns number of bytes transferred, or 0 (setting errno) for
    error.  Only transfer a single packet.  */
 
-int
+static int
 remote_write_bytes (CORE_ADDR memaddr, const gdb_byte *myaddr, int len)
 {
   char *packet_format = 0;
@@ -6402,19 +6391,14 @@ remote_write_bytes (CORE_ADDR memaddr, const gdb_byte *myaddr, int len)
 
    Returns number of bytes transferred, or 0 for error.  */
 
-/* NOTE: cagney/1999-10-18: This function (and its siblings in other
-   remote targets) shouldn't attempt to read the entire buffer.
-   Instead it should read a single packet worth of data and then
-   return the byte size of that packet to the caller.  The caller (its
-   caller and its callers caller ;-) already contains code for
-   handling partial reads.  */
-
-int
+static int
 remote_read_bytes (CORE_ADDR memaddr, gdb_byte *myaddr, int len)
 {
   struct remote_state *rs = get_remote_state ();
   int max_buf_size;		/* Max size of packet output buffer.  */
-  int origlen;
+  char *p;
+  int todo;
+  int i;
 
   if (len <= 0)
     return 0;
@@ -6423,56 +6407,37 @@ remote_read_bytes (CORE_ADDR memaddr, gdb_byte *myaddr, int len)
   /* The packet buffer will be large enough for the payload;
      get_memory_packet_size ensures this.  */
 
-  origlen = len;
-  while (len > 0)
+  /* Number if bytes that will fit.  */
+  todo = min (len, max_buf_size / 2);
+
+  /* Construct "m"<memaddr>","<len>".  */
+  memaddr = remote_address_masked (memaddr);
+  p = rs->buf;
+  *p++ = 'm';
+  p += hexnumstr (p, (ULONGEST) memaddr);
+  *p++ = ',';
+  p += hexnumstr (p, (ULONGEST) todo);
+  *p = '\0';
+  putpkt (rs->buf);
+  getpkt (&rs->buf, &rs->buf_size, 0);
+  if (rs->buf[0] == 'E'
+      && isxdigit (rs->buf[1]) && isxdigit (rs->buf[2])
+      && rs->buf[3] == '\0')
     {
-      char *p;
-      int todo;
-      int i;
-
-      todo = min (len, max_buf_size / 2);	/* num bytes that will fit.  */
-
-      /* construct "m"<memaddr>","<len>" */
-      /* sprintf (rs->buf, "m%lx,%x", (unsigned long) memaddr, todo); */
-      memaddr = remote_address_masked (memaddr);
-      p = rs->buf;
-      *p++ = 'm';
-      p += hexnumstr (p, (ULONGEST) memaddr);
-      *p++ = ',';
-      p += hexnumstr (p, (ULONGEST) todo);
-      *p = '\0';
-
-      putpkt (rs->buf);
-      getpkt (&rs->buf, &rs->buf_size, 0);
-
-      if (rs->buf[0] == 'E'
-	  && isxdigit (rs->buf[1]) && isxdigit (rs->buf[2])
-	  && rs->buf[3] == '\0')
-	{
-	  /* There is no correspondance between what the remote
-	     protocol uses for errors and errno codes.  We would like
-	     a cleaner way of representing errors (big enough to
-	     include errno codes, bfd_error codes, and others).  But
-	     for now just return EIO.  */
-	  errno = EIO;
-	  return 0;
-	}
-
-      /* Reply describes memory byte by byte,
-         each byte encoded as two hex characters.  */
-
-      p = rs->buf;
-      if ((i = hex2bin (p, myaddr, todo)) < todo)
-	{
-	  /* Reply is short.  This means that we were able to read
-	     only part of what we wanted to.  */
-	  return i + (origlen - len);
-	}
-      myaddr += todo;
-      memaddr += todo;
-      len -= todo;
+      /* There is no correspondance between what the remote protocol
+	 uses for errors and errno codes.  We would like a cleaner way
+	 of representing errors (big enough to include errno codes,
+	 bfd_error codes, and others).  But for now just return
+	 EIO.  */
+      errno = EIO;
+      return 0;
     }
-  return origlen;
+  /* Reply describes memory byte by byte, each byte encoded as two hex
+     characters.  */
+  p = rs->buf;
+  i = hex2bin (p, myaddr, todo);
+  /* Return what we have.  Let higher layers handle partial reads.  */
+  return i;
 }
 
 
