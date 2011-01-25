@@ -1,3 +1,55 @@
+2011-01-25  Pedro Alves  <pedro@codesourcery.com>
+
+	* regcache.c (struct regcache_descr): Remove outdated comment.
+	(init_regcache_descr): Remove sizeof_raw_register_valid_p
+	overallocate hack.
+	(regcache_xmalloc): Rename to ...
+	(regcache_xmalloc_1): ... this.  Add `readonly_p' parameter.
+	Allocate the regcache type accordingly.
+	(regcache_xmalloc): New as wrapper around regcache_xmalloc_1.
+	(regcache_xfree): Asser the source is also readonly.  Copy sizeof
+	cooked registers, not raw.
+	(regcache_dup_no_passthrough): Delete.
+	(get_thread_arch_regcache): Use regcache_xmalloc_1.
+	* h8300-tdep.c (h8300_push_dummy_call): Tweak comment to not
+	mention obsolete write_register_bytes.
+	* regcache.h (regcache_dup_no_passthrough): Delete declaration.
+
+2011-01-25  Pedro Alves  <pedro@codesourcery.com>
+
+	Stop remote_read_bytes from handling partial reads itself.
+
+	* remote-fileio.c: Include target.h.
+	(remote_fileio_write_bytes): Delete.
+	(remote_fileio_func_open, remote_fileio_func_write)
+	(remote_fileio_func_rename, remote_fileio_func_unlink): Use
+	target_read_memory.
+	(remote_fileio_func_stat): Use target_read_memory and
+	target_write_memory.
+	(remote_fileio_func_gettimeofday): Use target_write_memory.
+	(remote_fileio_func_system): Use target_read_memory.
+	* remote.c (remote_write_bytes): Make it static.
+	(remote_read_bytes): Don't handle partial reads here.
+	* remote.h (remote_read_bytes): Delete declaration.
+
+2011-01-25  Pedro Alves  <pedro@codesourcery.com>
+
+	Simplify XML parsing a bit.
+
+	* xml-support.h (gdb_xml_parse_quick): Declare.
+	* xml-support.c (gdb_xml_create_parser_and_cleanup_1): Renamed
+	from gdb_xml_create_parser_and_cleanup, and added `old_chain'
+	parameter.
+	(gdb_xml_create_parser_and_cleanup): Reimplement on top of
+	gdb_xml_create_parser_and_cleanup_1.
+	(gdb_xml_parse_quick): New.
+	* memory-map.c (parse_memory_map): Use gdb_xml_parse_quick.
+	* osdata.c (osdata_parse): Ditto.
+	* remote.c (remote_threads_info): Ditto.
+	* solib-target.c (solib_target_parse_libraries): Ditto.
+	* xml-syscall.c (syscall_parse_xml): Ditto.
+	* xml-tdesc.c (tdesc_parse_xml): Ditto.
+
 2011-01-24  Kevin Buettner  <kevinb@redhat.com>
 
 	* configure.tgt (mips*-*-elf): New; just like mips*-*-*, but
