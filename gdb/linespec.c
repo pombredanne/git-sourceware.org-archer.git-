@@ -740,6 +740,7 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
   struct cleanup *cleanup;
   struct expression *exp;
   struct value *val;
+  char *tmpcp;
 
   if (not_found_ptr)
     *not_found_ptr = 0;
@@ -933,11 +934,16 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
   saved_copy = alloca (strlen (copy) + 1);
   strcpy (saved_copy, copy);
 
-  exp = parse_exp_1 (argptr, NULL, 0);
-  cleanup = make_cleanup (xfree, exp);
-  val = evaluate_expression (exp);
+  if (strcmp(copy,"main")!=0) 
+    {
+      tmpcp=*argptr;
+      exp = parse_exp_1 (argptr, NULL, 0);
+      cleanup = make_cleanup (xfree, exp);
+      val = evaluate_expression (exp);
+      *argptr=tmpcp;
+    }
 
-
+//  cleanup = make_cleanup (null_cleanup, NULL);
   p = cp_canonicalize_string (copy);
   if (p)
     {
