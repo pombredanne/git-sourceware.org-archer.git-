@@ -784,6 +784,23 @@ make_params (int num_types, struct type **param_types)
   return type;
 }
 
+struct type *
+type_instance_expect_type (struct expression *exp, int *pos)
+{
+  int pc = *pos;
+  int nargs = longest_to_int (exp->elts[pc + 1].longconst);
+  struct type **arg_types = alloca (nargs * sizeof (*arg_types));
+  int ix;
+
+  gdb_assert (exp->elts[pc].opcode == TYPE_INSTANCE);
+  *(pos) += 2 + nargs + 2;
+
+  for (ix = 0; ix < nargs; ++ix)
+    arg_types[ix] = exp->elts[pc + 1 + ix + 1].type;
+
+  return make_params (nargs, arg_types);
+}
+
 struct value *
 evaluate_subexp_standard (struct type *expect_type,
 			  struct expression *exp, int *pos,
@@ -2070,13 +2087,8 @@ evaluate_subexp_standard (struct type *expect_type,
 	}
 
     case TYPE_INSTANCE:
-      nargs = longest_to_int (exp->elts[pc + 1].longconst);
-      arg_types = (struct type **) alloca (nargs * sizeof (struct type *));
-      for (ix = 0; ix < nargs; ++ix)
-	arg_types[ix] = exp->elts[pc + 1 + ix + 1].type;
-
-      expect_type = make_params (nargs, arg_types);
-      *(pos) += 3 + nargs;
+      (*pos)--;
+      expect_type = type_instance_expect_type (exp, pos);
       arg1 = evaluate_subexp_standard (expect_type, exp, pos, noside);
       xfree (TYPE_FIELDS (expect_type));
       xfree (TYPE_MAIN_TYPE (expect_type));

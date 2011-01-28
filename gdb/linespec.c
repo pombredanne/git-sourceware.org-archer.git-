@@ -129,10 +129,12 @@ static struct symtabs_and_lines decode_dollar (char *copy,
 static int decode_label (char *copy, char ***canonical,
 			 struct symtabs_and_lines *result);
 
+#if 0
 static struct symtabs_and_lines decode_variable (char *copy,
 						 int funfirstline,
 						 char ***canonical,
 						 struct symtab *file_symtab);
+#endif
 
 static struct
 symtabs_and_lines symbol_found (int funfirstline,
@@ -716,6 +718,7 @@ find_method_overload_end (char *p)
    lack of single quotes.  FIXME: write a linespec_completer which we
    can use as appropriate instead of make_symbol_completion_list.  */
 
+#include "valprint.h"
 struct symtabs_and_lines
 decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
 	       int default_line, char ***canonical, int *not_found_ptr)
@@ -740,7 +743,8 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
   struct cleanup *cleanup;
   struct expression *exp;
   struct value *val;
-  char *tmpcp;
+  int pc;
+  struct type *expect_type;
 
   if (not_found_ptr)
     *not_found_ptr = 0;
@@ -935,49 +939,67 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
   strcpy (saved_copy, copy);
   cleanup = make_cleanup (null_cleanup, NULL);
 
-  if (strcmp(copy,"main")!=0) 
+  exp = parse_exp_1 (argptr, NULL, 0);
+  make_cleanup (xfree, exp);
+  pc = 0;
+  expect_type = NULL;
+
+  for (;;)
     {
-      tmpcp=*argptr;
-      exp = parse_exp_1 (argptr, NULL, 0);
-      make_cleanup (xfree, exp);
-      val = evaluate_type (exp);
-      *argptr=tmpcp;
-    }
-
-  p = cp_canonicalize_string (copy);
-  if (p)
-    {
-puts(p);
-      make_cleanup (xfree, p);
-
-      copy = alloca (1 + strlen (p) + 1);
-      *copy++ = '\0';
-      strcpy (copy, p);
-    }
-
-  while (copy[0] != '\0')
-    {
-      struct symtabs_and_lines retval;
-
-      retval = decode_variable (copy, funfirstline, canonical, file_symtab);
-      if (retval.sals != NULL)
+      switch (exp->elts[pc].opcode)
 	{
-	  p = *argptr + strlen (copy);
-	  while (*p == ' ' || *p == '\t')
-	    p++;
-	  *argptr = p;
+	case TYPE_INSTANCE:
+	  expect_type = type_instance_expect_type (exp, &pc);
+	  continue;
 
-	  do_cleanups (cleanup);
-	  return retval;
+	case OP_FUNCALL:
+	  /* Skip the whole OP_FUNCALL element, follows OP_VAR_VALUE with
+	     the function symbol.  Next folow the function arguments which
+	     we can ignore as the OP_VAR_VALUE's symbol is alread chosen
+	     appropriately.  */
+	  pc += 4;
+	  continue;
+
+	case OP_VAR_VALUE:
+	  {
+	    struct symbol *sym = exp->elts[pc + 2].symbol;
+
+	    do_cleanups (cleanup);
+	    return symbol_found (funfirstline, canonical, copy, sym,
+				 file_symtab);
+	  }
+	
+	case OP_SCOPE:
+	  {
+	    struct value *val;
+
+	    val = value_aggregate_elt (exp->elts[pc + 1].type,
+				       &exp->elts[pc + 3].string,
+				       expect_type, 0, EVAL_NORMAL);
+	    if (expect_type)
+	      {
+		xfree (TYPE_FIELDS (expect_type));
+		xfree (TYPE_MAIN_TYPE (expect_type));
+		xfree (expect_type);
+	      }
+
+	    if (val == NULL)
+	      error (_("There is no field named %s"),
+		     &exp->elts[pc + 3].string);
+
+	    {
+	      struct value_print_options opts;
+
+	      printf_filtered ("XXX = ");
+	      get_user_print_options (&opts);
+	      value_print (val, gdb_stdout, &opts);
+	      printf_filtered ("\n");
+	    }
+	  }
+
+	break;
 	}
-
-      p = copy + strlen (copy) - 1;
-      q = skip_quoted_chars (p, NULL, NULL, -1);
-      if (q == p)
-	q--;
-      if (q < copy)
-	q = copy;
-      *q = '\0';
+      break;
     }
 
   if (not_found_ptr)
@@ -1963,6 +1985,7 @@ decode_label (char *copy, char ***canonical, struct symtabs_and_lines *result)
    not NULL and the function cannot be found, store boolean true in
    the location pointed to and do not issue an error message.  */ 
 
+#if 0
 static struct symtabs_and_lines
 decode_variable (char *copy, int funfirstline, char ***canonical,
 		 struct symtab *file_symtab)
@@ -1990,7 +2013,7 @@ decode_variable (char *copy, int funfirstline, char ***canonical,
   retval.nelts = 0;
   return retval;
 }
-
+#endif
 
 
 
