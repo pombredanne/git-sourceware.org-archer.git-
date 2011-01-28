@@ -836,7 +836,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	goto nosideret;
       arg1 = value_aggregate_elt (exp->elts[pc + 1].type,
 				  &exp->elts[pc + 3].string,
-				  expect_type, 0, noside);
+				  expect_type, 0, noside, NULL, NULL);
       if (arg1 == NULL)
 	error (_("There is no field named %s"), &exp->elts[pc + 3].string);
       return arg1;
@@ -2974,7 +2974,7 @@ evaluate_subexp_for_address (struct expression *exp, int *pos,
       (*pos) += 5 + BYTES_TO_EXP_ELEM (tem + 1);
       x = value_aggregate_elt (exp->elts[pc + 1].type,
 			       &exp->elts[pc + 3].string,
-			       NULL, 1, noside);
+			       NULL, 1, noside, NULL, NULL);
       if (x == NULL)
 	error (_("There is no field named %s"), &exp->elts[pc + 3].string);
       return x;
