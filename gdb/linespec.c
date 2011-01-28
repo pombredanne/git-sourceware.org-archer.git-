@@ -933,17 +933,17 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
 
   saved_copy = alloca (strlen (copy) + 1);
   strcpy (saved_copy, copy);
+  cleanup = make_cleanup (null_cleanup, NULL);
 
   if (strcmp(copy,"main")!=0) 
     {
       tmpcp=*argptr;
       exp = parse_exp_1 (argptr, NULL, 0);
-      cleanup = make_cleanup (xfree, exp);
-      val = evaluate_expression (exp);
+      make_cleanup (xfree, exp);
+      val = evaluate_type (exp);
       *argptr=tmpcp;
     }
 
-//  cleanup = make_cleanup (null_cleanup, NULL);
   p = cp_canonicalize_string (copy);
   if (p)
     {
