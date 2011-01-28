@@ -488,7 +488,7 @@ extern struct value *value_aggregate_elt (struct type *curtype,
 					  int want_address,
 					  enum noside noside,
 					  const char **physnamep,
-					  const struct symbol **symbolp);
+					  struct symbol **symbolp);
 
 extern struct value *value_static_field (struct type *type, int fieldno);
 

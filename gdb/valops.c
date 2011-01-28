@@ -90,17 +90,16 @@ static struct value *
   value_struct_elt_for_reference (struct type *, int, struct type *, char *,
 				  struct type *, int, enum noside,
 				  const char **physnamep,
-				  const struct symbol **symbolp);
+				  struct symbol **symbolp);
 
 static struct value *value_namespace_elt (const struct type *,
 					  char *, int , enum noside,
 					  const char **physnamep,
-					  const struct symbol **symbolp);
+					  struct symbol **symbolp);
 
 static struct value *
   value_maybe_namespace_elt (const struct type *, char *, int, enum noside,
-			     const char **physnamep,
-			     const struct symbol **symbolp);
+			     const char **physnamep, struct symbol **symbolp);
 
 static CORE_ADDR allocate_space_in_inferior (int);
 
@@ -3069,7 +3068,7 @@ struct value *
 value_aggregate_elt (struct type *curtype, char *name,
 		     struct type *expect_type, int want_address,
 		     enum noside noside, const char **physnamep,
-		     const struct symbol **symbolp)
+		     struct symbol **symbolp)
 {
   switch (TYPE_CODE (curtype))
     {
@@ -3152,7 +3151,7 @@ value_struct_elt_for_reference (struct type *domain, int offset,
 				struct type *intype, 
 				int want_address,
 				enum noside noside, const char **physnamep,
-				const struct symbol **symbolp)
+				struct symbol **symbolp)
 {
   struct type *t = curtype;
   int i;
@@ -3369,7 +3368,7 @@ value_struct_elt_for_reference (struct type *domain, int offset,
 static struct value *
 value_namespace_elt (const struct type *curtype,
 		     char *name, int want_address, enum noside noside,
-		     const char **physnamep, const struct symbol **symbolp)
+		     const char **physnamep, struct symbol **symbolp)
 {
   struct value *retval = value_maybe_namespace_elt (curtype, name,
 						    want_address, noside,
@@ -3392,7 +3391,7 @@ static struct value *
 value_maybe_namespace_elt (const struct type *curtype,
 			   char *name, int want_address,
 			   enum noside noside, const char **physnamep,
-			   const struct symbol **symbolp)
+			   struct symbol **symbolp)
 {
   const char *namespace_name = TYPE_TAG_NAME (curtype);
   struct symbol *sym;

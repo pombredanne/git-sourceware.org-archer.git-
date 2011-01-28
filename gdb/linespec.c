@@ -99,7 +99,7 @@ static int add_constructors (int method_counter, struct type *t,
 #endif
 
 static void build_canonical_line_spec (struct symtab_and_line *,
-				       char *, char ***);
+				       const char *, char ***);
 
 static char *find_toplevel_char (char *s, char c);
 
@@ -129,17 +129,15 @@ static struct symtabs_and_lines decode_dollar (char *copy,
 static int decode_label (char *copy, char ***canonical,
 			 struct symtabs_and_lines *result);
 
-#if 0
-static struct symtabs_and_lines decode_variable (char *copy,
+static struct symtabs_and_lines decode_variable (const char *copy,
 						 int funfirstline,
 						 char ***canonical,
 						 struct symtab *file_symtab);
-#endif
 
 static struct
 symtabs_and_lines symbol_found (int funfirstline,
 				char ***canonical,
-				char *copy,
+				const char *copy,
 				struct symbol *sym,
 				struct symtab *file_symtab);
 
@@ -395,7 +393,7 @@ add_constructors (int method_counter, struct type *t,
    line spec is `filename:linenum'.  */
 
 static void
-build_canonical_line_spec (struct symtab_and_line *sal, char *symname,
+build_canonical_line_spec (struct symtab_and_line *sal, const char *symname,
 			   char ***canonical)
 {
   char **canonical_arr;
@@ -972,15 +970,29 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
 	case OP_SCOPE:
 	  {
 	    struct value *val;
+	    const char *physname;
+	    struct symbol *sym;
 
 	    val = value_aggregate_elt (exp->elts[pc + 1].type,
-				       &exp->elts[pc + 3].string,
-				       expect_type, 0, EVAL_NORMAL);
+				       &exp->elts[pc + 3].string, expect_type,
+				       0, EVAL_NORMAL, &physname, &sym);
 	    if (expect_type)
 	      {
 		xfree (TYPE_FIELDS (expect_type));
 		xfree (TYPE_MAIN_TYPE (expect_type));
 		xfree (expect_type);
+	      }
+	    if (sym)
+	      return symbol_found (funfirstline, canonical, copy, sym,
+	                           file_symtab);
+	    if (physname)
+	      {
+		struct symtabs_and_lines retval;
+
+		retval = decode_variable (physname, funfirstline, canonical,
+					  file_symtab);
+		if (retval.sals)
+		  return retval;
 	      }
 
 	    if (val == NULL)
@@ -1985,9 +1997,8 @@ decode_label (char *copy, char ***canonical, struct symtabs_and_lines *result)
    not NULL and the function cannot be found, store boolean true in
    the location pointed to and do not issue an error message.  */ 
 
-#if 0
 static struct symtabs_and_lines
-decode_variable (char *copy, int funfirstline, char ***canonical,
+decode_variable (const char *copy, int funfirstline, char ***canonical,
 		 struct symtab *file_symtab)
 {
   struct symbol *sym;
@@ -2013,7 +2024,6 @@ decode_variable (char *copy, int funfirstline, char ***canonical,
   retval.nelts = 0;
   return retval;
 }
-#endif
 
 
 
@@ -2024,7 +2034,7 @@ decode_variable (char *copy, int funfirstline, char ***canonical,
    corresponding struct symtabs_and_lines.  */
 
 static struct symtabs_and_lines
-symbol_found (int funfirstline, char ***canonical, char *copy,
+symbol_found (int funfirstline, char ***canonical, const char *copy,
 	      struct symbol *sym, struct symtab *file_symtab)
 {
   struct symtabs_and_lines values;
