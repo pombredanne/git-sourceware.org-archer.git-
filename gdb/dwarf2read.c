@@ -2341,7 +2341,8 @@ dw2_lookup_symtab (struct objfile *objfile, const char *name,
 
 static struct symtab *
 dw2_lookup_symbol (struct objfile *objfile, int block_index,
-		   const char *name, domain_enum domain)
+		   const char *name, domain_enum domain,
+		   enum language language)
 {
   /* We do all the work in the pre_expand_symtabs_matching hook
      instead.  */
@@ -2417,7 +2418,8 @@ dw2_relocate (struct objfile *objfile, struct section_offsets *new_offsets,
 
 static void
 dw2_expand_symtabs_for_function (struct objfile *objfile,
-				 const char *func_name)
+				 const char *func_name,
+				 enum language language)
 {
   dw2_do_expand_symtabs_matching (objfile, func_name);
 }
@@ -2477,7 +2479,8 @@ dw2_expand_symtabs_with_filename (struct objfile *objfile,
 }
 
 static const char *
-dw2_find_symbol_file (struct objfile *objfile, const char *name)
+dw2_find_symbol_file (struct objfile *objfile, const char *name,
+		      enum language language)
 {
   struct dwarf2_per_cu_data *per_cu;
   offset_type *vec;

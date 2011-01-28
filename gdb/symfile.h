@@ -167,14 +167,15 @@ struct quick_symbol_functions
   /* Check to see if the symbol is defined in a "partial" symbol table
      of OBJFILE.  KIND should be either GLOBAL_BLOCK or STATIC_BLOCK,
      depending on whether we want to search global symbols or static
-     symbols.  NAME is the name of the symbol to look for.  DOMAIN
-     indicates what sort of symbol to search for.
+     symbols.  NAME (valid in LANGUAGE) is the name of the symbol to look for.
+     DOMAIN indicates what sort of symbol to search for.
 
      Returns the newly-expanded symbol table in which the symbol is
      defined, or NULL if no such symbol table exists.  */
   struct symtab *(*lookup_symbol) (struct objfile *objfile,
 				   int kind, const char *name,
-				   domain_enum domain);
+				   domain_enum domain,
+				   enum language language);
 
   /* This is called to expand symbol tables before looking up a
      symbol.  A backend can choose to implement this and then have its
@@ -200,10 +201,11 @@ struct quick_symbol_functions
 		    struct section_offsets *new_offsets,
 		    struct section_offsets *delta);
 
-  /* Find all the symbols in OBJFILE named FUNC_NAME, and ensure that
-     the corresponding symbol tables are loaded.  */
+  /* Find all the symbols in OBJFILE named FUNC_NAME (valid in LANGUAGE),
+     and ensure that the corresponding symbol tables are loaded.  */
   void (*expand_symtabs_for_function) (struct objfile *objfile,
-				       const char *func_name);
+				       const char *func_name,
+				       enum language language);
 
   /* Read all symbol tables associated with OBJFILE.  */
   void (*expand_all_symtabs) (struct objfile *objfile);
@@ -217,8 +219,10 @@ struct quick_symbol_functions
 					const char *filename);
 
   /* Return the file name of the file holding the symbol in OBJFILE
-     named NAME.  If no such symbol exists in OBJFILE, return NULL.  */
-  const char *(*find_symbol_file) (struct objfile *objfile, const char *name);
+     named NAME (valid in LANGUAGE).  If no such symbol exists in OBJFILE,
+     return NULL.  */
+  const char *(*find_symbol_file) (struct objfile *objfile, const char *name,
+				   enum language language);
 
   /* Find global or static symbols in all tables that are in NAMESPACE 
      and for which MATCH (symbol name, NAME) == 0, passing each to 

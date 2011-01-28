@@ -35,6 +35,7 @@
 #include "exceptions.h"
 #include "expression.h"
 #include "value.h"
+#include "language.h"
 
 #include "safe-ctype.h"
 
@@ -936,7 +937,8 @@ make_symbol_overload_list_qualified (const char *func_name)
   ALL_OBJFILES (objfile)
   {
     if (objfile->sf)
-      objfile->sf->qf->expand_symtabs_for_function (objfile, func_name);
+      objfile->sf->qf->expand_symtabs_for_function (objfile, func_name,
+						    language_cplus);
   }
 
   /* Search upwards from currently selected frame (so that we can

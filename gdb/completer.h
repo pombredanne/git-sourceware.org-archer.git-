@@ -46,7 +46,7 @@ extern char *gdb_completion_word_break_characters (void);
 
 /* Exported to linespec.c */
 
-extern char *skip_quoted_chars (char *, char *, char *);
+extern char *skip_quoted_chars (char *, char *, char *, int direction);
 
 extern char *skip_quoted (char *);
 
