@@ -917,18 +917,13 @@ line_completion_function (const char *text, int matches,
    characters QUOTECHARS and the the word break characters
    BREAKCHARS).  Returns pointer to the location after the "word".  If
    either QUOTECHARS or BREAKCHARS is NULL, use the same values used
-   by the completer.  Use 1 for DIRECTION to seach forward in STR, use -1 to
-   search backwards (ensure starting delimiter!), other values are not
-   permitted.  */
+   by the completer.  */
 
 char *
-skip_quoted_chars (char *str, char *quotechars, char *breakchars,
-                   int direction)
+skip_quoted_chars (char *str, char *quotechars, char *breakchars)
 {
   char quote_char = '\0';
   char *scan;
-
-  gdb_assert (direction == +1 || direction == -1);
 
   if (quotechars == NULL)
     quotechars = gdb_completer_quote_characters;
@@ -936,7 +931,7 @@ skip_quoted_chars (char *str, char *quotechars, char *breakchars,
   if (breakchars == NULL)
     breakchars = current_language->la_word_break_characters();
 
-  for (scan = str; *scan != '\0'; scan += direction)
+  for (scan = str; *scan != '\0'; scan++)
     {
       if (quote_char != '\0')
 	{
@@ -944,7 +939,7 @@ skip_quoted_chars (char *str, char *quotechars, char *breakchars,
 	  if (*scan == quote_char)
 	    {
 	      /* Found matching close quote.  */
-	      scan += direction;
+	      scan++;
 	      break;
 	    }
 	}
@@ -969,5 +964,5 @@ skip_quoted_chars (char *str, char *quotechars, char *breakchars,
 char *
 skip_quoted (char *str)
 {
-  return skip_quoted_chars (str, NULL, NULL, +1);
+  return skip_quoted_chars (str, NULL, NULL);
 }

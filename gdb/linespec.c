@@ -644,6 +644,7 @@ decode_line_2 (struct symbol *sym_arr[], int nelts, int funfirstline,
 
    This function assumes that P has already been validated to contain
    overload information, and it will assert if *P != '('.  */
+#if 0
 static char *
 find_method_overload_end (char *p)
 {
@@ -658,13 +659,17 @@ find_method_overload_end (char *p)
       else if (*p == ')')
 	{
 	  if (--depth == 0)
-	    return ++p;
+	    {
+	      ++p;
+	      break;
+	    }
 	}
       ++p;
     }
 
-  return NULL;
+  return p;
 }
+#endif
 
 /* The parser of linespec itself.  */
 
@@ -732,7 +737,6 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
   int is_quoted;
   /* Is *ARGPTR is enclosed in double quotes?  */
   int is_quote_enclosed;
-  int is_objc_method = 0;
   char *saved_arg = *argptr;
   /* If IS_QUOTED, the end of the quoted bit.  */
   char *end_quote = NULL;
@@ -772,11 +776,6 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
      point to "::B::foo".  Argptr is not changed by this call.  */
 
   first_half = p = locate_first_half (argptr, &is_quote_enclosed);
-
-  /* Check if this is an Objective-C method (anything that starts with
-     a '+' or '-' and a '[').  */
-  if (is_objc_method_format (p))
-    is_objc_method = 1;
 
   /* Check if the symbol could be an Objective-C selector.  */
 
@@ -849,75 +848,13 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
       if (p[-1] != '\'')
 	error (_("Unmatched single quote."));
     }
-  else if (is_objc_method)
-    {
-      /* allow word separators in method names for Obj-C.  */
-      p = skip_quoted_chars (*argptr, NULL, "", +1);
-    }
-  else
-    {
-      p = skip_quoted (*argptr);
-
-      switch (current_language->la_language)
-	{
-	case language_cplus:
-	  while (p[0] == ':' && p[1] == ':')
-	    p = skip_quoted (p + 2);
-	  break;
-	case language_java:
-	  while (p[0] == '.')
-	    p = skip_quoted (p + 1);
-	  break;
-	}
-    }
-
-  /* Keep any template parameters.  */
-  if (*p == '<')
-    {
-      q = find_template_name_end (p);
-      if (q != NULL)
-	p = q;
-    }
-
-  /* Keep method overload information.  */
-  if (*p == '(')
-    {
-      q = find_method_overload_end (p);
-      if (q != NULL)
-	p = q;
-    }
-
-  /* Make sure we keep important kewords like "const".  */
-  if (strncmp (p, " const", 6) == 0)
-    p += 6;
-
-// FIXME
-  p += strlen (p);
-
-  copy = alloca (p - *argptr + 1);
-  memcpy (copy, *argptr, p - *argptr);
-  copy[p - *argptr] = '\0';
-  if (p != *argptr
-      && copy[0]
-      && copy[0] == copy[p - *argptr - 1]
-      && strchr (get_gdb_completer_quote_characters (), copy[0]) != NULL)
-    {
-      copy[p - *argptr - 1] = '\0';
-      copy++;
-    }
-  else if (is_quoted)
-    copy[p - *argptr - 1] = '\0';
-  while (*p == ' ' || *p == '\t')
-    p++;
-// FIXME
-//  *argptr = p;
 
   /* If it starts with $: may be a legitimate variable or routine name
      (e.g. HP-UX millicode routines such as $$dyncall), or it may
      be history value, or it may be a convenience variable.  */
 
-  if (*copy == '$')
-    return decode_dollar (copy, funfirstline, default_symtab,
+  if (**argptr == '$')
+    return decode_dollar (*argptr, funfirstline, default_symtab,
 			  canonical, file_symtab);
 
   /* Try the token as a label, but only if no file was specified,
@@ -926,21 +863,23 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
   if (!file_symtab)
     {
       struct symtabs_and_lines label_result;
-      if (decode_label (copy, canonical, &label_result))
+
+      if (decode_label (*argptr, canonical, &label_result))
 	return label_result;
     }
 
   /* Look up that token as a variable.
      If file specified, use that file's per-file block to start with.  */
 
-  saved_copy = alloca (strlen (copy) + 1);
-  strcpy (saved_copy, copy);
-  cleanup = make_cleanup (null_cleanup, NULL);
+  saved_copy = alloca (strlen (*argptr) + 1);
+  strcpy (saved_copy, *argptr);
 
   exp = parse_exp_1 (argptr, NULL, 0);
-  make_cleanup (xfree, exp);
+  cleanup = make_cleanup (xfree, exp);
   pc = 0;
   expect_type = NULL;
+
+  saved_copy[strlen (saved_copy) - strlen (*argptr)] = '\0';
 
   for (;;)
     {
@@ -963,7 +902,7 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
 	    struct symbol *sym = exp->elts[pc + 2].symbol;
 
 	    do_cleanups (cleanup);
-	    return symbol_found (funfirstline, canonical, copy, sym,
+	    return symbol_found (funfirstline, canonical, saved_copy, sym,
 				 file_symtab);
 	  }
 	
@@ -983,7 +922,7 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
 		xfree (expect_type);
 	      }
 	    if (sym)
-	      return symbol_found (funfirstline, canonical, copy, sym,
+	      return symbol_found (funfirstline, canonical, saved_copy, sym,
 	                           file_symtab);
 	    if (physname)
 	      {
@@ -1491,7 +1430,6 @@ decode_compound (char **argptr, int funfirstline, char ***canonical,
 	  a = strchr (p, '(');
 	  if (a != NULL)
 	    p = find_method_overload_end (a);
-// FIXME!
 
 	  /* Make sure we keep important kewords like "const".  */
 	  if (strncmp (p, " const", 6) == 0)
