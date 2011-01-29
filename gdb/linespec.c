@@ -120,11 +120,13 @@ symtabs_and_lines decode_all_digits (char **argptr,
 				     struct symtab *file_symtab,
 				     char *q);
 
+#if 0
 static struct symtabs_and_lines decode_dollar (char *copy,
 					       int funfirstline,
 					       struct symtab *default_symtab,
 					       char ***canonical,
 					       struct symtab *file_symtab);
+#endif
 
 static int decode_label (char *copy, char ***canonical,
 			 struct symtabs_and_lines *result);
@@ -731,14 +733,14 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
   /* If a file name is specified, this is its symtab.  */
   struct symtab *file_symtab = NULL;
 
-  char *copy, *saved_copy;
+  char *copy, *copy_parsed;
   /* This says whether or not something in *ARGPTR is quoted with
      completer_quotes (i.e. with single quotes).  */
   int is_quoted;
   /* Is *ARGPTR is enclosed in double quotes?  */
   int is_quote_enclosed;
   char *saved_arg = *argptr;
-  /* If IS_QUOTED, the end of the quoted bit.  */
+  /* If IS_QUOTED, the end of the quoted bit - after the quote character.  */
   char *end_quote = NULL;
   /* The "first half" of the linespec.  */
   char *first_half;
@@ -839,23 +841,14 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
   /* Arg token is not digits => try it as a variable name
      Find the next token (everything up to end or next whitespace).  */
 
-  if (**argptr == '$')		/* May be a convenience variable.  */
-    /* One or two $ chars possible.  */
-    p = skip_quoted (*argptr + (((*argptr)[1] == '$') ? 2 : 1));
-  else if (is_quoted)
+  if (is_quoted)
     {
       p = end_quote;
-      if (p[-1] != '\'')
+      if (strchr (get_gdb_completer_quote_characters (), p[-1]) == NULL)
 	error (_("Unmatched single quote."));
     }
-
-  /* If it starts with $: may be a legitimate variable or routine name
-     (e.g. HP-UX millicode routines such as $$dyncall), or it may
-     be history value, or it may be a convenience variable.  */
-
-  if (**argptr == '$')
-    return decode_dollar (*argptr, funfirstline, default_symtab,
-			  canonical, file_symtab);
+  else
+    p = *argptr + strlen (*argptr);
 
   /* Try the token as a label, but only if no file was specified,
      because we can only really find labels in the current scope.  */
@@ -864,23 +857,58 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
     {
       struct symtabs_and_lines label_result;
 
-      if (decode_label (*argptr, canonical, &label_result))
-	return label_result;
+      if (!is_quoted)
+	q = skip_quoted (*argptr);
+
+      copy = alloca (q - *argptr + 1);
+      memcpy (copy, *argptr, q - *argptr);
+      copy[q - *argptr] = '\0';
+
+      if (decode_label (copy, canonical, &label_result))
+	{
+	  *argptr = q;
+	  return label_result;
+	}
     }
 
   /* Look up that token as a variable.
      If file specified, use that file's per-file block to start with.  */
 
-  saved_copy = alloca (strlen (*argptr) + 1);
-  strcpy (saved_copy, *argptr);
+  copy = (char *) alloca (p - *argptr + 1);
+  memcpy (copy, *argptr, p - *argptr);
+  copy[p - *argptr] = '\0';
+  if (p != *argptr
+      && copy[0]
+      && copy[0] == copy[p - *argptr - 1]
+      && strchr (get_gdb_completer_quote_characters (), copy[0]) != NULL)
+    {
+      copy[p - *argptr - 1] = '\0';
+      copy++;
+    }
+  else if (is_quoted)
+    copy[p - *argptr - 1] = '\0';
+  while (*p == ' ' || *p == '\t')
+    p++;
 
-  exp = parse_exp_1 (argptr, NULL, 0);
+  copy_parsed = copy;
+  exp = parse_exp_1 (&copy_parsed,
+		     (file_symtab
+		      ? BLOCKVECTOR_BLOCK (BLOCKVECTOR (file_symtab),
+					   STATIC_BLOCK)
+		      : get_selected_block (0)),
+		     0);
   cleanup = make_cleanup (xfree, exp);
+  if (*copy_parsed)
+    {
+      /* The expression has not been parsed completely.  If there were some
+         quotes the caller will probably error on them.  */
+      *argptr += copy_parsed - copy;
+    }
+  else
+    *argptr = p;
+
   pc = 0;
   expect_type = NULL;
-
-  saved_copy[strlen (saved_copy) - strlen (*argptr)] = '\0';
-
   for (;;)
     {
       switch (exp->elts[pc].opcode)
@@ -902,7 +930,7 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
 	    struct symbol *sym = exp->elts[pc + 2].symbol;
 
 	    do_cleanups (cleanup);
-	    return symbol_found (funfirstline, canonical, saved_copy, sym,
+	    return symbol_found (funfirstline, canonical, copy, sym,
 				 file_symtab);
 	  }
 	
@@ -922,7 +950,7 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
 		xfree (expect_type);
 	      }
 	    if (sym)
-	      return symbol_found (funfirstline, canonical, saved_copy, sym,
+	      return symbol_found (funfirstline, canonical, copy, sym,
 	                           file_symtab);
 	    if (physname)
 	      {
@@ -961,8 +989,7 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
       && !have_minimal_symbols ())
     throw_error (NOT_FOUND_ERROR,
 		 _("No symbol table is loaded.  Use the \"file\" command."));
-  throw_error (NOT_FOUND_ERROR, _("Function \"%s\" not defined."),
-	       saved_copy);
+  throw_error (NOT_FOUND_ERROR, _("Function \"%s\" not defined."), copy);
 }
 
 
@@ -1089,14 +1116,6 @@ locate_first_half (char **argptr, int *is_quote_enclosed)
     }
   for (; *p; p++)
     {
-      if (p[0] == '<')
-	{
-	  char *temp_end = find_template_name_end (p);
-
-	  if (!temp_end)
-	    error (_("malformed template specification in command"));
-	  p = temp_end;
-	}
       /* Check for a colon and a plus or minus and a [ (which
          indicates an Objective-C method).  */
       if (is_objc_method_format (p))
@@ -1113,18 +1132,6 @@ locate_first_half (char **argptr, int *is_quote_enclosed)
 	      && ((p[1] == ':') || (strchr (p + 1, ':') == NULL)))
 	  || ((p[0] == ' ') && !*is_quote_enclosed))
 	break;
-      if (p[0] == '.' && strchr (p, ':') == NULL)
-	{
-	  /* Java qualified method.  Find the *last* '.', since the
-	     others are package qualifiers.  Stop at any open parenthesis
-	     which might provide overload information.  */
-	  for (p1 = p; *p1 && *p1 != '('; p1++)
-	    {
-	      if (*p1 == '.')
-		p = p1;
-	    }
-	  break;
-	}
     }
   while (p[0] == ' ' || p[0] == '\t')
     p++;
@@ -1836,6 +1843,7 @@ decode_all_digits (char **argptr, struct symtab *default_symtab,
 
 /* Decode a linespec starting with a dollar sign.  */
 
+#if 0
 static struct symtabs_and_lines
 decode_dollar (char *copy, int funfirstline, struct symtab *default_symtab,
 	       char ***canonical, struct symtab *file_symtab)
@@ -1906,6 +1914,7 @@ decode_dollar (char *copy, int funfirstline, struct symtab *default_symtab,
 
   return values;
 }
+#endif
 
 
 
