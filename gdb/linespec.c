@@ -918,11 +918,14 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
 	  continue;
 
 	case OP_FUNCALL:
-	  /* Skip the whole OP_FUNCALL element, follows OP_VAR_VALUE with
-	     the function symbol.  Next folow the function arguments which
-	     we can ignore as the OP_VAR_VALUE's symbol is alread chosen
-	     appropriately.  */
-	  pc += 4;
+	  {
+	    struct value **argvec, *funcval;
+
+	    argvec = get_funcall_argvec (exp, &pc, EVAL_AVOID_SIDE_EFFECTS);
+	    funcval = argvec[0];
+	    xfree (argvec);
+
+	  }
 	  continue;
 
 	case OP_VAR_VALUE:
