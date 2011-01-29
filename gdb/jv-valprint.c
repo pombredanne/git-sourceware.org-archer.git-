@@ -407,7 +407,7 @@ java_print_value_fields (struct type *type, const gdb_byte *valaddr,
 	      else if (!value_bits_valid (val, TYPE_FIELD_BITPOS (type, i),
 					  TYPE_FIELD_BITSIZE (type, i)))
 		{
-		  fputs_filtered (_("<value optimized out>"), stream);
+		  val_print_optimized_out (stream);
 		}
 	      else
 		{
@@ -434,7 +434,7 @@ java_print_value_fields (struct type *type, const gdb_byte *valaddr,
 		  struct value *v = value_static_field (type, i);
 
 		  if (v == NULL)
-		    fputs_filtered ("<optimized out>", stream);
+		    val_print_optimized_out (stream);
 		  else
 		    {
 		      struct value_print_options opts;
@@ -499,8 +499,8 @@ java_val_print (struct type *type, const gdb_byte *valaddr,
     case TYPE_CODE_PTR:
       if (options->format && options->format != 's')
 	{
-	  print_scalar_formatted (valaddr + embedded_offset,
-				  type, options, 0, stream);
+	  val_print_scalar_formatted (type, valaddr, embedded_offset,
+				      val, options, 0, stream);
 	  break;
 	}
 #if 0
@@ -552,8 +552,8 @@ java_val_print (struct type *type, const gdb_byte *valaddr,
 
 	  opts.format = (options->format ? options->format
 			 : options->output_format);
-	  print_scalar_formatted (valaddr + embedded_offset,
-				  type, &opts, 0, stream);
+	  val_print_scalar_formatted (type, valaddr, embedded_offset,
+				      val, &opts, 0, stream);
 	}
       else if (TYPE_CODE (type) == TYPE_CODE_CHAR
 	       || (TYPE_CODE (type) == TYPE_CODE_INT
