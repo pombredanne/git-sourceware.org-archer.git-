@@ -17,4 +17,5 @@ if { [prepare_for_testing noparam.exp "noparam" "noparam.cc" {debug c++}] } {
     return -1
 }
 
-gdb_test "p C::m (int)"
+# Check if GDB does not crash.
+gdb_test "p C::m (int)" "no member function matches that type instantiation"
