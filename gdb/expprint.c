@@ -978,6 +978,7 @@ dump_subexp_body_standard (struct expression *exp,
 	  }
 	/* Ending LEN and ending TYPE_INSTANCE.  */
 	elt += 2;
+	elt = dump_subexp (exp, stream, elt);
       }
       break;
     default:
