@@ -1,3 +1,42 @@
+2011-01-31  Joel Brobecker  <brobecker@adacore.com>
+
+	* configure.ac: Add handling of Python distribution on Windows.
+	* python-config.py: If the LIBS, SYSLIBS, LIBPL and/or LINKFORSHARED
+	sysconfig variables are not defined, then do not use them.
+	On Windows, if LIBPL is not defined, then use prefix + '/libs'
+	instead.  On Windows, return all paths using forward-slashes
+	rather than backslashes.
+
+2011-01-31  Joel Brobecker  <brobecker@adacore.com>
+
+	* configure.ac: Remove fallback behavior for building
+	against Python.  Remove tweaking of Python include path.
+	Add PYTHON_CPPFLAGS and PYTHON_LIBS substitution.
+	(AC_TRY_LIBPYTHON):  Adjust program used in linking test.
+	If link is successful, set PYTHON_CPPFLAGS and PYTHON_LIBS.
+	Always restore CPPFLAGS and LIBS after linking test.
+	* configure: Regenerated.
+	* Makefile.in (INTERNAL_CPPFLAGS): Add @PYTHON_CPPFLAGS@.
+	(INSTALLED_LIBS, CLIBS): Add @PYTHON_LIBS@.
+	* python/python-internal.h: Adjust includes of Python .h files.
+
+2011-01-31  Joel Brobecker  <brobecker@adacore.com>
+
+	* tracepoint.c (traceframe_walk_blocks): Add missing i18n markup
+	in error message.
+
+2011-01-31  Joel Brobecker  <brobecker@adacore.com>
+
+	* inflow.c (gdb_has_a_terminal): Fix typo in interactive_mode
+	value test.
+
+2011-01-31  Yao Qi  <yao@codesourcery.com>
+
+	* arm-linux-nat.c: Update calls to regcache_register_status
+	instead of regcache_valid_p.
+	* aix-thread.c: Likewise.
+	* i386gnu-nat.c: Likewise.
+
 2011-01-29  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	Fix crash.
