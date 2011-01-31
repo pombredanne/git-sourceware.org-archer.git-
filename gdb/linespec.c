@@ -920,8 +920,11 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
 	case OP_FUNCALL:
 	  {
 	    struct value **argvec, *funcval;
+	    struct any_symbol anysym;
 
-	    argvec = get_funcall_argvec (exp, &pc, EVAL_AVOID_SIDE_EFFECTS);
+	    memset (&anysym, 0, sizeof (anysym));
+	    argvec = get_funcall_argvec (exp, &pc, EVAL_AVOID_SIDE_EFFECTS,
+					 &anysym);
 	    funcval = argvec[0];
 	    xfree (argvec);
 

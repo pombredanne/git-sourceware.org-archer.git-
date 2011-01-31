@@ -490,7 +490,8 @@ extern struct value *value_aggregate_elt (struct type *curtype,
 					  const char **physnamep,
 					  struct symbol **symbolp);
 
-extern struct value *value_static_field (struct type *type, int fieldno);
+extern struct value *value_static_field (struct type *type, int fieldno,
+					 struct any_symbol *anysym_return);
 
 extern struct fn_field *value_find_oload_method_list (struct value **,
 						      const char *,
@@ -645,7 +646,8 @@ extern struct value *value_x_unop (struct value *arg1, enum exp_opcode op,
 				   enum noside noside);
 
 extern struct value *value_fn_field (struct value **arg1p, struct fn_field *f,
-				     int j, struct type *type, int offset);
+				     int j, struct type *type, int offset,
+				     struct any_symbol *anysym_return);
 
 extern int binop_types_user_defined_p (enum exp_opcode op,
 				       struct type *type1,

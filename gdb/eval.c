@@ -803,7 +803,7 @@ type_instance_expect_type (struct expression *exp, int *pos)
 
 struct value **
 get_funcall_argvec (struct expression *exp, int *pos, enum noside noside,
-		    struct symbol **symbolp)
+		    struct any_symbol *anysym_return)
 {
   int pc = *pos, pc2 = 0;
   enum exp_opcode op;
@@ -816,9 +816,6 @@ get_funcall_argvec (struct expression *exp, int *pos, enum noside noside,
   char *function_name = NULL;
   struct type **arg_types;
   struct cleanup *old_chain;
-
-  if (symbolp)
-    *symbolp = NULL;
 
   (*pos) += 3;
   op = exp->elts[*pos].opcode;
@@ -1048,6 +1045,8 @@ get_funcall_argvec (struct expression *exp, int *pos, enum noside noside,
 
       /* Now fix the expression being evaluated.  */
       exp->elts[save_pos1 + 2].symbol = symp;
+      if (anysym_return)
+	*anysym_return->symbol = symp;
       argvec[0] = evaluate_subexp_with_coercion (exp, &save_pos1, noside);
     }
 
@@ -1860,7 +1859,7 @@ evaluate_subexp_standard (struct type *expect_type,
 
     case OP_FUNCALL:
       (*pos)--;
-      argvec2 = get_funcall_argvec (exp, pos, noside);
+      argvec2 = get_funcall_argvec (exp, pos, noside, NULL);
       if (noside == EVAL_SKIP)
 	goto nosideret;
 

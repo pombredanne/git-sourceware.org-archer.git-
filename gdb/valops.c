@@ -55,7 +55,8 @@ static int typecmp (int staticp, int varargs, int nargs,
 		    struct field t1[], struct value *t2[]);
 
 static struct value *search_struct_field (const char *, struct value *, 
-					  int, struct type *, int);
+					  int, struct type *, int,
+					  struct any_symbol *anysym_return);
 
 static struct value *search_struct_method (const char *, struct value **,
 					   struct value **,
@@ -254,7 +255,7 @@ value_cast_structs (struct type *type, struct value *v2)
   if (TYPE_NAME (t1) != NULL)
     {
       v = search_struct_field (type_name_no_tag (t1),
-			       v2, 0, t2, 1);
+			       v2, 0, t2, 1, NULL);
       if (v)
 	return v;
     }
@@ -280,7 +281,8 @@ value_cast_structs (struct type *type, struct value *v2)
 	      && !strcmp (TYPE_NAME (real_type), TYPE_NAME (t1)))
 	    return v;
 
-	  v = search_struct_field (type_name_no_tag (t2), v, 0, real_type, 1);
+	  v = search_struct_field (type_name_no_tag (t2), v, 0, real_type, 1,
+				   NULL);
 	  if (v)
 	    return v;
 	}
@@ -289,7 +291,7 @@ value_cast_structs (struct type *type, struct value *v2)
 	 T2.  This wouldn't work properly for classes with virtual
 	 bases, but those were handled above.  */
       v = search_struct_field (type_name_no_tag (t2),
-			       value_zero (t1, not_lval), 0, t1, 1);
+			       value_zero (t1, not_lval), 0, t1, 1, NULL);
       if (v)
 	{
 	  /* Downcasting is possible (t1 is superclass of v2).  */
@@ -1903,7 +1905,8 @@ typecmp (int staticp, int varargs, int nargs,
 
 static struct value *
 search_struct_field (const char *name, struct value *arg1, int offset,
-		     struct type *type, int looking_for_baseclass)
+		     struct type *type, int looking_for_baseclass,
+		     struct any_symbol *anysym_return)
 {
   int i;
   int nbases;
@@ -1922,7 +1925,7 @@ search_struct_field (const char *name, struct value *arg1, int offset,
 
 	    if (field_is_static (&TYPE_FIELD (type, i)))
 	      {
-		v = value_static_field (type, i);
+		v = value_static_field (type, i, anysym_return);
 		if (v == 0)
 		  error (_("field %s is nonexistent or "
 			   "has been optimized out"),
@@ -1974,8 +1977,8 @@ search_struct_field (const char *name, struct value *arg1, int offset,
 		  new_offset += TYPE_FIELD_BITPOS (type, i) / 8;
 
 		v = search_struct_field (name, arg1, new_offset, 
-					 field_type,
-					 looking_for_baseclass);
+					 field_type, looking_for_baseclass,
+					 anysym_return);
 		if (v)
 		  return v;
 	      }
@@ -2038,7 +2041,7 @@ search_struct_field (const char *name, struct value *arg1, int offset,
 	    return v2;
 	  v = search_struct_field (name, v2, 0,
 				   TYPE_BASECLASS (type, i),
-				   looking_for_baseclass);
+				   looking_for_baseclass, anysym_return);
 	}
       else if (found_baseclass)
 	v = value_primitive_field (arg1, offset, i, type);
@@ -2046,7 +2049,8 @@ search_struct_field (const char *name, struct value *arg1, int offset,
 	v = search_struct_field (name, arg1,
 				 offset + TYPE_BASECLASS_BITPOS (type, 
 								 i) / 8,
-				 basetype, looking_for_baseclass);
+				 basetype, looking_for_baseclass,
+				 anysym_return);
       if (v)
 	return v;
     }
@@ -2436,7 +2440,7 @@ int
 find_overload_match (struct type **arg_types, int nargs, 
 		     const char *name, enum oload_search_type method,
 		     int lax, struct value **objp, struct symbol *fsym,
-		     struct value **valp, struct symbol **symp, 
+		     struct value **valp, struct any_symbol *anysym_return, 
 		     int *staticp, const int no_adl)
 {
   struct value *obj = (objp ? *objp : NULL);
@@ -2482,7 +2486,8 @@ find_overload_match (struct type **arg_types, int nargs,
       if (TYPE_CODE (check_typedef (value_type (obj))) == TYPE_CODE_STRUCT)
 	{
 	  *valp = search_struct_field (name, obj, 0,
-				       check_typedef (value_type (obj)), 0);
+				       check_typedef (value_type (obj)), 0,
+				       anysym_return);
 	  if (*valp)
 	    {
 	      *staticp = 1;
@@ -2570,7 +2575,8 @@ find_overload_match (struct type **arg_types, int nargs,
 	 same if cp_func_name fails for some reason.  */
       if (func_name == NULL)
         {
-	  *symp = fsym;
+	  if (anysym_return)
+	    anysym_return->symbol = fsym;
           return 0;
         }
 
@@ -2670,10 +2676,10 @@ find_overload_match (struct type **arg_types, int nargs,
 					basetype, boffset);
       else
 	*valp = value_fn_field (&temp, fns_ptr, method_oload_champ,
-				basetype, boffset);
+				basetype, boffset, anysym_return);
     }
-  else
-    *symp = oload_syms[func_oload_champ];
+  else if (anysym_return)
+    anysym_return->symbol = oload_syms[func_oload_champ];
 
   if (objp)
     {
