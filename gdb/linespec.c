@@ -723,7 +723,6 @@ find_method_overload_end (char *p)
    lack of single quotes.  FIXME: write a linespec_completer which we
    can use as appropriate instead of make_symbol_completion_list.  */
 
-#include "valprint.h"
 struct symtabs_and_lines
 decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
 	       int default_line, char ***canonical, int *not_found_ptr)
