@@ -917,6 +917,7 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
       struct value *funcval;
 
       memset (&anysym, 0, sizeof (anysym));
+      funcval = NULL;
 
       switch (exp->elts[pc].opcode)
 	{
@@ -940,6 +941,7 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
 	  break;
 	
 	case OP_SCOPE:
+	  /* FIXME: EVAL_AVOID_SIDE_EFFECTS does not produce value!  */
 	  funcval = value_aggregate_elt (exp->elts[pc + 1].type,
 					 &exp->elts[pc + 3].string,
 					 expect_type, 0, EVAL_NORMAL,
@@ -949,7 +951,11 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
 		   &exp->elts[pc + 3].string);
 	  break;
 
-	break;
+	default:
+	  /* FIXME: EVAL_AVOID_SIDE_EFFECTS does not produce value!  */
+	  funcval = evaluate_subexp_with_coercion (exp, &pc,
+						   EVAL_NORMAL);
+	  break;
 	}
 
       if (expect_type)
@@ -1119,6 +1125,16 @@ locate_first_half (char **argptr, int *is_quote_enclosed)
     }
   for (; *p; p++)
     {
+      if (p[0] == '<')
+	{
+	  char *temp_end = find_template_name_end (p);
+
+	  /* Kept only for backward compatible de-quotation.  */
+
+	  if (!temp_end)
+	    error (_("malformed template specification in command"));
+	  p = temp_end;
+	}
       /* Check for a colon and a plus or minus and a [ (which
          indicates an Objective-C method).  */
       if (is_objc_method_format (p))
@@ -1135,6 +1151,20 @@ locate_first_half (char **argptr, int *is_quote_enclosed)
 	      && ((p[1] == ':') || (strchr (p + 1, ':') == NULL)))
 	  || ((p[0] == ' ') && !*is_quote_enclosed))
 	break;
+      if (p[0] == '.' && strchr (p, ':') == NULL)
+	{
+	  /* Kept only for backward compatible de-quotation.  */
+
+	  /* Java qualified method.  Find the *last* '.', since the
+	     others are package qualifiers.  Stop at any open parenthesis
+	     which might provide overload information.  */
+	  for (p1 = p; *p1 && *p1 != '('; p1++)
+	    {
+	      if (*p1 == '.')
+		p = p1;
+	    }
+	  break;
+	}
     }
   while (p[0] == ' ' || p[0] == '\t')
     p++;
