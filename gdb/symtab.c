@@ -1380,7 +1380,8 @@ lookup_symbol_aux_quick (struct objfile *objfile, int kind,
 
   if (!objfile->sf)
     return NULL;
-  symtab = objfile->sf->qf->lookup_symbol (objfile, kind, name, domain);
+  symtab = objfile->sf->qf->lookup_symbol (objfile, kind, name, domain,
+					   current_language->la_language);
   if (!symtab)
     return NULL;
 
@@ -1554,7 +1555,8 @@ basic_lookup_transparent_type_quick (struct objfile *objfile, int kind,
 
   if (!objfile->sf)
     return NULL;
-  symtab = objfile->sf->qf->lookup_symbol (objfile, kind, name, STRUCT_DOMAIN);
+  symtab = objfile->sf->qf->lookup_symbol (objfile, kind, name, STRUCT_DOMAIN,
+					   current_language->la_language);
   if (!symtab)
     return NULL;
 
@@ -1686,7 +1688,8 @@ find_main_filename (void)
 
     if (!objfile->sf)
       continue;
-    result = objfile->sf->qf->find_symbol_file (objfile, name);
+    result = objfile->sf->qf->find_symbol_file (objfile, name,
+						current_language->la_language);
     if (result)
       return result;
   }

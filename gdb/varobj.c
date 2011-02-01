@@ -2802,7 +2802,7 @@ value_struct_element_index (struct value *value, int type_index)
   TRY_CATCH (e, RETURN_MASK_ERROR)
     {
       if (field_is_static (&TYPE_FIELD (type, type_index)))
-	result = value_static_field (type, type_index);
+	result = value_static_field (type, type_index, NULL);
       else
 	result = value_primitive_field (value, 0, type_index, type);
     }

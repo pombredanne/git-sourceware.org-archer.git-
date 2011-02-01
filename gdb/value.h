@@ -482,13 +482,22 @@ extern struct value *value_struct_elt (struct value **argp,
 				       const char *name, int *static_memfuncp,
 				       const char *err);
 
+extern struct value *value_struct_elt_anysym (struct value **argp,
+					      struct value **args,
+					      const char *name,
+					      int *static_memfuncp,
+					      const char *err,
+					    struct any_symbol *anysym_return);
+
 extern struct value *value_aggregate_elt (struct type *curtype,
 					  char *name,
 					  struct type *expect_type,
 					  int want_address,
-					  enum noside noside);
+					  enum noside noside,
+					  struct any_symbol *anysym_return);
 
-extern struct value *value_static_field (struct type *type, int fieldno);
+extern struct value *value_static_field (struct type *type, int fieldno,
+					 struct any_symbol *anysym_return);
 
 extern struct fn_field *value_find_oload_method_list (struct value **,
 						      const char *,
@@ -501,7 +510,8 @@ extern int find_overload_match (struct type **arg_types, int nargs,
 				const char *name,
 				enum oload_search_type method, int lax,
 				struct value **objp, struct symbol *fsym,
-				struct value **valp, struct symbol **symp,
+				struct value **valp,
+				struct any_symbol *anysym_return,
 				int *staticp, const int no_adl);
 
 extern struct value *value_field (struct value *arg1, int fieldno);
@@ -643,7 +653,8 @@ extern struct value *value_x_unop (struct value *arg1, enum exp_opcode op,
 				   enum noside noside);
 
 extern struct value *value_fn_field (struct value **arg1p, struct fn_field *f,
-				     int j, struct type *type, int offset);
+				     int j, struct type *type, int offset,
+				     struct any_symbol *anysym_return);
 
 extern int binop_types_user_defined_p (enum exp_opcode op,
 				       struct type *type1,

@@ -649,6 +649,12 @@ struct symbol
 #define SYMBOL_REGISTER_OPS(symbol)     (symbol)->ops.ops_register
 #define SYMBOL_LOCATION_BATON(symbol)   (symbol)->aux_value
 
+struct any_symbol
+{
+  struct symbol *symbol;
+  struct minimal_symbol *minimal_symbol;
+};
+
 /* An instance of this type is used to represent a C++ template
    function.  It includes a "struct symbol" as a kind of base class;
    users downcast to "struct template_symbol *" when needed.  A symbol

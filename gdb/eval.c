@@ -784,6 +784,415 @@ make_params (int num_types, struct type **param_types)
   return type;
 }
 
+struct type *
+type_instance_expect_type (struct expression *exp, int *pos)
+{
+  int pc = *pos;
+  int nargs = longest_to_int (exp->elts[pc + 1].longconst);
+  struct type **arg_types = alloca (nargs * sizeof (*arg_types));
+  int ix;
+
+  gdb_assert (exp->elts[pc].opcode == TYPE_INSTANCE);
+  *(pos) += 2 + nargs + 2;
+
+  for (ix = 0; ix < nargs; ++ix)
+    arg_types[ix] = exp->elts[pc + 1 + ix + 1].type;
+
+  return make_params (nargs, arg_types);
+}
+
+struct value **
+get_funcall_argvec (struct expression *exp, int *pos, enum noside noside,
+		    struct any_symbol *anysym_return)
+{
+  int pc = *pos, pc2 = 0;
+  enum exp_opcode op;
+  struct value **argvec;
+  int nargs, tem, save_pos1, ix;
+  struct value *arg1 = NULL;
+  struct value *arg2 = NULL;
+  struct type *type;
+  struct symbol *function = NULL;
+  char *function_name = NULL;
+  struct type **arg_types;
+  struct cleanup *old_chain;
+  struct any_symbol anysym;
+
+  if (anysym_return == NULL)
+    {
+      memset (&anysym, 0, sizeof (anysym));
+      anysym_return = &anysym;
+    }
+
+  (*pos) += 3;
+  op = exp->elts[*pos].opcode;
+  nargs = longest_to_int (exp->elts[pc + 1].longconst);
+  /* Allocate arg vector, including space for the function to be
+     called in argvec[0] and a terminating NULL.  */
+  argvec = xmalloc (sizeof (struct value *) * (nargs + 3));
+  old_chain = make_cleanup (xfree, argvec);
+  if (op == STRUCTOP_MEMBER || op == STRUCTOP_MPTR)
+    {
+      nargs++;
+      /* First, evaluate the structure into arg2.  */
+      pc2 = (*pos)++;
+
+      if (noside == EVAL_SKIP)
+	{
+	  do_cleanups (old_chain);
+	  return NULL;
+	}
+
+      if (op == STRUCTOP_MEMBER)
+	{
+	  arg2 = evaluate_subexp_for_address (exp, pos, noside);
+	}
+      else
+	{
+	  arg2 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
+	}
+
+      /* If the function is a virtual function, then the aggregate value
+	 (providing the structure) plays its part by providing the vtable.
+	 Otherwise, it is just along for the ride: call the function directly.
+	 */
+
+      arg1 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
+
+      if (TYPE_CODE (check_typedef (value_type (arg1)))
+	  != TYPE_CODE_METHODPTR)
+	error (_("Non-pointer-to-member value used in pointer-to-member "
+		 "construct"));
+
+      if (noside == EVAL_AVOID_SIDE_EFFECTS)
+	{
+	  struct type *method_type = check_typedef (value_type (arg1));
+
+	  arg1 = value_zero (method_type, not_lval);
+	}
+      else
+	arg1 = cplus_method_ptr_to_value (&arg2, arg1);
+
+      /* Now, say which argument to start evaluating from.  */
+      tem = 2;
+    }
+  else if (op == STRUCTOP_STRUCT || op == STRUCTOP_PTR)
+    {
+      /* Hair for method invocations.  */
+      int tem2;
+
+      nargs++;
+      /* First, evaluate the structure into arg2.  */
+      pc2 = (*pos)++;
+      tem2 = longest_to_int (exp->elts[pc2 + 1].longconst);
+      *pos += 3 + BYTES_TO_EXP_ELEM (tem2 + 1);
+      if (noside == EVAL_SKIP)
+	{
+	  do_cleanups (old_chain);
+	  return NULL;
+	}
+
+      if (op == STRUCTOP_STRUCT)
+	{
+	  /* If v is a variable in a register, and the user types v.method (),
+	     this will produce an error, because v has no address.
+
+
+	     A possible way around this would be to allocate a copy of the
+	     variable on the stack, copy in the contents, call the function,
+	     and copy out the contents.  I.e. convert this from call by
+	     reference to call by copy-return (or whatever it's called).
+	     However, this does not work because it is not the same: the
+	     method being called could stash a copy of the address, and then
+	     future uses through that address (after the method returns) would
+	     be expected to use the variable itself, not some copy of it.  */
+	  arg2 = evaluate_subexp_for_address (exp, pos, noside);
+	}
+      else
+	{
+	  arg2 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
+
+	  /* Check to see if the operator '->' has been overloaded.  If the
+	     operator has been overloaded replace arg2 with the value returned
+	     by the custom operator and continue evaluation.  */
+	  while (unop_user_defined_p (op, arg2))
+	    {
+	      volatile struct gdb_exception except;
+	      struct value *value = NULL;
+	      TRY_CATCH (except, RETURN_MASK_ERROR)
+		{
+		  value = value_x_unop (arg2, op, noside);
+		}
+
+	      if (except.reason < 0)
+		{
+		  if (except.error == NOT_FOUND_ERROR)
+		    break;
+		  else
+		    throw_exception (except);
+		}
+	      arg2 = value;
+	    }
+	}
+      /* Now, say which argument to start evaluating from.  */
+      tem = 2;
+    }
+  else if (op == OP_SCOPE && overload_resolution
+	   && (exp->language_defn->la_language == language_cplus))
+    {
+      /* Unpack it locally so we can properly handle overload resolution.  */
+      char *name;
+      int local_tem;
+
+      pc2 = (*pos)++;
+      local_tem = longest_to_int (exp->elts[pc2 + 2].longconst);
+      (*pos) += 4 + BYTES_TO_EXP_ELEM (local_tem + 1);
+      type = exp->elts[pc2 + 1].type;
+      name = &exp->elts[pc2 + 3].string;
+
+      function = NULL;
+      function_name = NULL;
+      if (TYPE_CODE (type) == TYPE_CODE_NAMESPACE)
+	{
+	  function = cp_lookup_symbol_namespace (TYPE_TAG_NAME (type), name,
+						 get_selected_block (0),
+						 VAR_DOMAIN);
+	  if (function == NULL)
+	    error (_("No symbol \"%s\" in namespace \"%s\"."), 
+		   name, TYPE_TAG_NAME (type));
+
+	  tem = 1;
+	}
+      else
+	{
+	  gdb_assert (TYPE_CODE (type) == TYPE_CODE_STRUCT
+		      || TYPE_CODE (type) == TYPE_CODE_UNION);
+	  function_name = name;
+
+	  arg2 = value_zero (type, lval_memory);
+	  ++nargs;
+	  tem = 2;
+	}
+    }
+  else if (op == OP_ADL_FUNC)
+    {
+      /* Save the function position and move pos so that the arguments
+	 can be evaluated.  */
+      int func_name_len;
+
+      save_pos1 = *pos;
+      tem = 1;
+
+      func_name_len = longest_to_int (exp->elts[save_pos1 + 3].longconst);
+      (*pos) += 6 + BYTES_TO_EXP_ELEM (func_name_len + 1);
+    }
+  else
+    {
+      /* Non-method function call.  */
+      save_pos1 = *pos;
+      tem = 1;
+
+      /* If this is a C++ function wait until overload resolution.  */
+      if (op == OP_VAR_VALUE && overload_resolution
+	  && (exp->language_defn->la_language == language_cplus))
+	{
+	  (*pos) += 4; /* Skip the evaluation of the symbol.  */
+	  argvec[0] = NULL;
+	}
+      else
+	{
+	  argvec[0] = evaluate_subexp_with_coercion (exp, pos, noside);
+	  type = value_type (argvec[0]);
+	  if (type && TYPE_CODE (type) == TYPE_CODE_PTR)
+	    type = TYPE_TARGET_TYPE (type);
+	  if (type && TYPE_CODE (type) == TYPE_CODE_FUNC)
+	    {
+	      for (; tem <= nargs && tem <= TYPE_NFIELDS (type); tem++)
+		{
+		  argvec[tem] = evaluate_subexp (TYPE_FIELD_TYPE (type,
+								  tem - 1),
+						 exp, pos, noside);
+		}
+	    }
+	}
+    }
+
+  /* Evaluate arguments.  */
+  for (; tem <= nargs; tem++)
+    {
+      /* Ensure that array expressions are coerced into pointer objects.  */
+      argvec[tem] = evaluate_subexp_with_coercion (exp, pos, noside);
+    }
+
+  /* Signal end of arglist.  */
+  argvec[tem] = 0;
+  if (op == OP_ADL_FUNC)
+    {
+      char *func_name;
+      int name_len;
+      int string_pc = save_pos1 + 3;
+
+      /* Extract the function name.  */
+      name_len = longest_to_int (exp->elts[string_pc].longconst);
+      func_name = (char *) alloca (name_len + 1);
+      strcpy (func_name, &exp->elts[string_pc + 1].string);
+
+      /* Prepare list of argument types for overload resolution.  */
+      arg_types = alloca (nargs * (sizeof (struct type *)));
+      for (ix = 1; ix <= nargs; ix++)
+	arg_types[ix - 1] = value_type (argvec[ix]);
+
+      find_overload_match (arg_types, nargs, func_name,
+			   NON_METHOD, /* not method */
+			   0,          /* strict match */
+			   NULL, NULL, /* pass NULL symbol since
+					  symbol is unknown */
+			   NULL, anysym_return, NULL, 0);
+
+      /* Now fix the expression being evaluated.  */
+      exp->elts[save_pos1 + 2].symbol = anysym_return->symbol;
+      argvec[0] = evaluate_subexp_with_coercion (exp, &save_pos1, noside);
+    }
+
+  if (op == STRUCTOP_STRUCT || op == STRUCTOP_PTR
+      || (op == OP_SCOPE && function_name != NULL))
+    {
+      int static_memfuncp;
+      char *tstr;
+
+      /* Method invocation : stuff "this" as first parameter.  */
+      argvec[1] = arg2;
+
+      if (op != OP_SCOPE)
+	{
+	  /* Name of method from expression.  */
+	  tstr = &exp->elts[pc2 + 2].string;
+	}
+      else
+	tstr = function_name;
+
+      if (overload_resolution && (exp->language_defn->la_language
+				  == language_cplus))
+	{
+	  /* Language is C++, do some overload resolution before
+	     evaluation.  */
+	  struct value *valp = NULL;
+
+	  /* Prepare list of argument types for overload resolution.  */
+	  arg_types = alloca (nargs * (sizeof (struct type *)));
+	  for (ix = 1; ix <= nargs; ix++)
+	    arg_types[ix - 1] = value_type (argvec[ix]);
+
+	  (void) find_overload_match (arg_types, nargs, tstr,
+				      METHOD, /* method */
+				      0,      /* strict match */
+				      &arg2,  /* the object */
+				      NULL, &valp, NULL,
+				      &static_memfuncp, 0);
+
+	  if (op == OP_SCOPE && !static_memfuncp)
+	    {
+	      /* For the time being, we don't handle this.  */
+	      error (_("Call to overloaded function %s requires "
+		       "`this' pointer"),
+		     function_name);
+	    }
+	  argvec[1] = arg2;	/* the ``this'' pointer */
+	  argvec[0] = valp;	/* Use the method found after overload
+			       resolution.  */
+	}
+      else
+	/* Non-C++ case -- or no overload resolution.  */
+	{
+	  struct value *temp = arg2;
+
+	  argvec[0] = value_struct_elt_anysym (&temp, argvec + 1, tstr,
+					       &static_memfuncp,
+					       (op == STRUCTOP_STRUCT
+						? "structure"
+						: "structure pointer"),
+					       anysym_return);
+	  /* value_struct_elt_anysym updates temp with the correct value
+	     of the ``this'' pointer if necessary, so modify argvec[1] to
+	     reflect any ``this'' changes.  */
+	  arg2
+	    = value_from_longest (lookup_pointer_type(value_type (temp)),
+				  value_address (temp)
+				  + value_embedded_offset (temp));
+	  argvec[1] = arg2;	/* the ``this'' pointer */
+	}
+
+      if (static_memfuncp)
+	{
+	  nargs--;
+	  memmove (argvec[1], &argvec[2], (1 + nargs + 1) * sizeof (*argvec));
+	}
+    }
+  else if (op == STRUCTOP_MEMBER || op == STRUCTOP_MPTR)
+    {
+      argvec[1] = arg2;
+      argvec[0] = arg1;
+    }
+  else if (op == OP_VAR_VALUE || (op == OP_SCOPE && function != NULL))
+    {
+      /* Non-member function being called.  */
+      /* fn: This can only be done for C++ functions.  A C-style function
+	 in a C++ program, for instance, does not have the fields that 
+	 are expected here.  */
+
+      if (overload_resolution && (exp->language_defn->la_language
+				  == language_cplus))
+	{
+	  /* Language is C++, do some overload resolution before
+	     evaluation.  */
+	  int no_adl = 0;
+
+	  /* If a scope has been specified disable ADL.  */
+	  if (op == OP_SCOPE)
+	    no_adl = 1;
+
+	  if (op == OP_VAR_VALUE)
+	    function = exp->elts[save_pos1+2].symbol;
+
+	  /* Prepare list of argument types for overload resolution.  */
+	  arg_types = alloca (nargs * (sizeof (struct type *)));
+	  for (ix = 1; ix <= nargs; ix++)
+	    arg_types[ix - 1] = value_type (argvec[ix]);
+
+	  (void) find_overload_match (arg_types, nargs,
+				      NULL,        /* no need for name */
+				      NON_METHOD,  /* not method */
+				      0,           /* strict match */
+				      NULL, function, /* the function */
+				      NULL, anysym_return, NULL, no_adl);
+
+	  if (op == OP_VAR_VALUE)
+	    {
+	      /* Now fix the expression being evaluated.  */
+	      exp->elts[save_pos1+2].symbol = anysym_return->symbol;
+	      argvec[0] = evaluate_subexp_with_coercion (exp, &save_pos1,
+							 noside);
+	    }
+	  else
+	    argvec[0] = value_of_variable (anysym_return->symbol,
+					   get_selected_block (0));
+	}
+      else
+	{
+	  /* Not C++, or no overload resolution allowed.  */
+	  /* Nothing to be done; argvec already correctly set up.  */
+	}
+    }
+  else
+    {
+      /* It is probably a C-style function.  */
+      /* Nothing to be done; argvec already correctly set up.  */
+    }
+
+  discard_cleanups (old_chain);
+  return argvec;
+}
+
 struct value *
 evaluate_subexp_standard (struct type *expect_type,
 			  struct expression *exp, int *pos,
@@ -797,7 +1206,7 @@ evaluate_subexp_standard (struct type *expect_type,
   struct value *arg3;
   struct type *type;
   int nargs;
-  struct value **argvec;
+  struct value **argvec, **argvec2;
   int upper, lower;
   int code;
   int ix;
@@ -819,7 +1228,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	goto nosideret;
       arg1 = value_aggregate_elt (exp->elts[pc + 1].type,
 				  &exp->elts[pc + 3].string,
-				  expect_type, 0, noside);
+				  expect_type, 0, noside, NULL);
       if (arg1 == NULL)
 	error (_("There is no field named %s"), &exp->elts[pc + 3].string);
       return arg1;
@@ -1453,376 +1862,17 @@ evaluate_subexp_standard (struct type *expect_type,
       break;
 
     case OP_FUNCALL:
-      (*pos) += 2;
-      op = exp->elts[*pos].opcode;
-      nargs = longest_to_int (exp->elts[pc + 1].longconst);
-      /* Allocate arg vector, including space for the function to be
-         called in argvec[0] and a terminating NULL.  */
-      argvec = (struct value **)
-	alloca (sizeof (struct value *) * (nargs + 3));
-      if (op == STRUCTOP_MEMBER || op == STRUCTOP_MPTR)
-	{
-	  nargs++;
-	  /* First, evaluate the structure into arg2.  */
-	  pc2 = (*pos)++;
+      (*pos)--;
+      argvec2 = get_funcall_argvec (exp, pos, noside, NULL);
+      if (noside == EVAL_SKIP)
+	goto nosideret;
 
-	  if (noside == EVAL_SKIP)
-	    goto nosideret;
+      for (nargs = 0; argvec2[1 + nargs] != NULL; nargs++);
 
-	  if (op == STRUCTOP_MEMBER)
-	    {
-	      arg2 = evaluate_subexp_for_address (exp, pos, noside);
-	    }
-	  else
-	    {
-	      arg2 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
-	    }
-
-	  /* If the function is a virtual function, then the
-	     aggregate value (providing the structure) plays
-	     its part by providing the vtable.  Otherwise,
-	     it is just along for the ride: call the function
-	     directly.  */
-
-	  arg1 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
-
-	  if (TYPE_CODE (check_typedef (value_type (arg1)))
-	      != TYPE_CODE_METHODPTR)
-	    error (_("Non-pointer-to-member value used in pointer-to-member "
-		     "construct"));
-
-	  if (noside == EVAL_AVOID_SIDE_EFFECTS)
-	    {
-	      struct type *method_type = check_typedef (value_type (arg1));
-
-	      arg1 = value_zero (method_type, not_lval);
-	    }
-	  else
-	    arg1 = cplus_method_ptr_to_value (&arg2, arg1);
-
-	  /* Now, say which argument to start evaluating from.  */
-	  tem = 2;
-	}
-      else if (op == STRUCTOP_STRUCT || op == STRUCTOP_PTR)
-	{
-	  /* Hair for method invocations.  */
-	  int tem2;
-
-	  nargs++;
-	  /* First, evaluate the structure into arg2.  */
-	  pc2 = (*pos)++;
-	  tem2 = longest_to_int (exp->elts[pc2 + 1].longconst);
-	  *pos += 3 + BYTES_TO_EXP_ELEM (tem2 + 1);
-	  if (noside == EVAL_SKIP)
-	    goto nosideret;
-
-	  if (op == STRUCTOP_STRUCT)
-	    {
-	      /* If v is a variable in a register, and the user types
-	         v.method (), this will produce an error, because v has
-	         no address.
-
-	         A possible way around this would be to allocate a
-	         copy of the variable on the stack, copy in the
-	         contents, call the function, and copy out the
-	         contents.  I.e. convert this from call by reference
-	         to call by copy-return (or whatever it's called).
-	         However, this does not work because it is not the
-	         same: the method being called could stash a copy of
-	         the address, and then future uses through that address
-	         (after the method returns) would be expected to
-	         use the variable itself, not some copy of it.  */
-	      arg2 = evaluate_subexp_for_address (exp, pos, noside);
-	    }
-	  else
-	    {
-	      arg2 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
-
-	      /* Check to see if the operator '->' has been
-	         overloaded.  If the operator has been overloaded
-	         replace arg2 with the value returned by the custom
-	         operator and continue evaluation.  */
-	      while (unop_user_defined_p (op, arg2))
-		{
-		  volatile struct gdb_exception except;
-		  struct value *value = NULL;
-		  TRY_CATCH (except, RETURN_MASK_ERROR)
-		    {
-		      value = value_x_unop (arg2, op, noside);
-		    }
-
-		  if (except.reason < 0)
-		    {
-		      if (except.error == NOT_FOUND_ERROR)
-			break;
-		      else
-			throw_exception (except);
-		    }
-		  arg2 = value;
-		}
-	    }
-	  /* Now, say which argument to start evaluating from.  */
-	  tem = 2;
-	}
-      else if (op == OP_SCOPE
-	       && overload_resolution
-	       && (exp->language_defn->la_language == language_cplus))
-	{
-	  /* Unpack it locally so we can properly handle overload
-	     resolution.  */
-	  char *name;
-	  int local_tem;
-
-	  pc2 = (*pos)++;
-	  local_tem = longest_to_int (exp->elts[pc2 + 2].longconst);
-	  (*pos) += 4 + BYTES_TO_EXP_ELEM (local_tem + 1);
-	  type = exp->elts[pc2 + 1].type;
-	  name = &exp->elts[pc2 + 3].string;
-
-	  function = NULL;
-	  function_name = NULL;
-	  if (TYPE_CODE (type) == TYPE_CODE_NAMESPACE)
-	    {
-	      function = cp_lookup_symbol_namespace (TYPE_TAG_NAME (type),
-						     name,
-						     get_selected_block (0),
-						     VAR_DOMAIN);
-	      if (function == NULL)
-		error (_("No symbol \"%s\" in namespace \"%s\"."), 
-		       name, TYPE_TAG_NAME (type));
-
-	      tem = 1;
-	    }
-	  else
-	    {
-	      gdb_assert (TYPE_CODE (type) == TYPE_CODE_STRUCT
-			  || TYPE_CODE (type) == TYPE_CODE_UNION);
-	      function_name = name;
-
-	      arg2 = value_zero (type, lval_memory);
-	      ++nargs;
-	      tem = 2;
-	    }
-	}
-      else if (op == OP_ADL_FUNC)
-        {
-          /* Save the function position and move pos so that the arguments
-             can be evaluated.  */
-          int func_name_len;
-
-          save_pos1 = *pos;
-          tem = 1;
-
-          func_name_len = longest_to_int (exp->elts[save_pos1 + 3].longconst);
-          (*pos) += 6 + BYTES_TO_EXP_ELEM (func_name_len + 1);
-        }
-      else
-	{
-	  /* Non-method function call.  */
-	  save_pos1 = *pos;
-	  tem = 1;
-
-	  /* If this is a C++ function wait until overload resolution.  */
-	  if (op == OP_VAR_VALUE
-	      && overload_resolution
-	      && (exp->language_defn->la_language == language_cplus))
-	    {
-	      (*pos) += 4; /* Skip the evaluation of the symbol.  */
-	      argvec[0] = NULL;
-	    }
-	  else
-	    {
-	      argvec[0] = evaluate_subexp_with_coercion (exp, pos, noside);
-	      type = value_type (argvec[0]);
-	      if (type && TYPE_CODE (type) == TYPE_CODE_PTR)
-		type = TYPE_TARGET_TYPE (type);
-	      if (type && TYPE_CODE (type) == TYPE_CODE_FUNC)
-		{
-		  for (; tem <= nargs && tem <= TYPE_NFIELDS (type); tem++)
-		    {
-		      argvec[tem] = evaluate_subexp (TYPE_FIELD_TYPE (type,
-								      tem - 1),
-						     exp, pos, noside);
-		    }
-		}
-	    }
-	}
-
-      /* Evaluate arguments.  */
-      for (; tem <= nargs; tem++)
-	{
-	  /* Ensure that array expressions are coerced into pointer
-	     objects.  */
-	  argvec[tem] = evaluate_subexp_with_coercion (exp, pos, noside);
-	}
-
-      /* Signal end of arglist.  */
-      argvec[tem] = 0;
-      if (op == OP_ADL_FUNC)
-        {
-          struct symbol *symp;
-          char *func_name;
-          int  name_len;
-          int string_pc = save_pos1 + 3;
-
-          /* Extract the function name.  */
-          name_len = longest_to_int (exp->elts[string_pc].longconst);
-          func_name = (char *) alloca (name_len + 1);
-          strcpy (func_name, &exp->elts[string_pc + 1].string);
-
-          /* Prepare list of argument types for overload resolution.  */
-          arg_types = (struct type **)
-	    alloca (nargs * (sizeof (struct type *)));
-          for (ix = 1; ix <= nargs; ix++)
-            arg_types[ix - 1] = value_type (argvec[ix]);
-
-          find_overload_match (arg_types, nargs, func_name,
-                               NON_METHOD, /* not method */
-			       0,          /* strict match */
-                               NULL, NULL, /* pass NULL symbol since
-					      symbol is unknown */
-                               NULL, &symp, NULL, 0);
-
-          /* Now fix the expression being evaluated.  */
-          exp->elts[save_pos1 + 2].symbol = symp;
-          argvec[0] = evaluate_subexp_with_coercion (exp, &save_pos1, noside);
-        }
-
-      if (op == STRUCTOP_STRUCT || op == STRUCTOP_PTR
-	  || (op == OP_SCOPE && function_name != NULL))
-	{
-	  int static_memfuncp;
-	  char *tstr;
-
-	  /* Method invocation : stuff "this" as first parameter.  */
-	  argvec[1] = arg2;
-
-	  if (op != OP_SCOPE)
-	    {
-	      /* Name of method from expression.  */
-	      tstr = &exp->elts[pc2 + 2].string;
-	    }
-	  else
-	    tstr = function_name;
-
-	  if (overload_resolution && (exp->language_defn->la_language
-				      == language_cplus))
-	    {
-	      /* Language is C++, do some overload resolution before
-		 evaluation.  */
-	      struct value *valp = NULL;
-
-	      /* Prepare list of argument types for overload resolution.  */
-	      arg_types = (struct type **)
-		alloca (nargs * (sizeof (struct type *)));
-	      for (ix = 1; ix <= nargs; ix++)
-		arg_types[ix - 1] = value_type (argvec[ix]);
-
-	      (void) find_overload_match (arg_types, nargs, tstr,
-	                                  METHOD, /* method */
-					  0,      /* strict match */
-					  &arg2,  /* the object */
-					  NULL, &valp, NULL,
-					  &static_memfuncp, 0);
-
-	      if (op == OP_SCOPE && !static_memfuncp)
-		{
-		  /* For the time being, we don't handle this.  */
-		  error (_("Call to overloaded function %s requires "
-			   "`this' pointer"),
-			 function_name);
-		}
-	      argvec[1] = arg2;	/* the ``this'' pointer */
-	      argvec[0] = valp;	/* Use the method found after overload
-				   resolution.  */
-	    }
-	  else
-	    /* Non-C++ case -- or no overload resolution.  */
-	    {
-	      struct value *temp = arg2;
-
-	      argvec[0] = value_struct_elt (&temp, argvec + 1, tstr,
-					    &static_memfuncp,
-					    op == STRUCTOP_STRUCT
-				       ? "structure" : "structure pointer");
-	      /* value_struct_elt updates temp with the correct value
-	 	 of the ``this'' pointer if necessary, so modify argvec[1] to
-		 reflect any ``this'' changes.  */
-	      arg2
-		= value_from_longest (lookup_pointer_type(value_type (temp)),
-				      value_address (temp)
-				      + value_embedded_offset (temp));
-	      argvec[1] = arg2;	/* the ``this'' pointer */
-	    }
-
-	  if (static_memfuncp)
-	    {
-	      argvec[1] = argvec[0];
-	      nargs--;
-	      argvec++;
-	    }
-	}
-      else if (op == STRUCTOP_MEMBER || op == STRUCTOP_MPTR)
-	{
-	  argvec[1] = arg2;
-	  argvec[0] = arg1;
-	}
-      else if (op == OP_VAR_VALUE || (op == OP_SCOPE && function != NULL))
-	{
-	  /* Non-member function being called.  */
-          /* fn: This can only be done for C++ functions.  A C-style function
-             in a C++ program, for instance, does not have the fields that 
-             are expected here.  */
-
-	  if (overload_resolution && (exp->language_defn->la_language
-				      == language_cplus))
-	    {
-	      /* Language is C++, do some overload resolution before
-		 evaluation.  */
-	      struct symbol *symp;
-	      int no_adl = 0;
-
-	      /* If a scope has been specified disable ADL.  */
-	      if (op == OP_SCOPE)
-		no_adl = 1;
-
-	      if (op == OP_VAR_VALUE)
-		function = exp->elts[save_pos1+2].symbol;
-
-	      /* Prepare list of argument types for overload resolution.  */
-	      arg_types = (struct type **)
-		alloca (nargs * (sizeof (struct type *)));
-	      for (ix = 1; ix <= nargs; ix++)
-		arg_types[ix - 1] = value_type (argvec[ix]);
-
-	      (void) find_overload_match (arg_types, nargs,
-					  NULL,        /* no need for name */
-	                                  NON_METHOD,  /* not method */
-					  0,           /* strict match */
-	                                  NULL, function, /* the function */
-					  NULL, &symp, NULL, no_adl);
-
-	      if (op == OP_VAR_VALUE)
-		{
-		  /* Now fix the expression being evaluated.  */
-		  exp->elts[save_pos1+2].symbol = symp;
-		  argvec[0] = evaluate_subexp_with_coercion (exp, &save_pos1,
-							     noside);
-		}
-	      else
-		argvec[0] = value_of_variable (symp, get_selected_block (0));
-	    }
-	  else
-	    {
-	      /* Not C++, or no overload resolution allowed.  */
-	      /* Nothing to be done; argvec already correctly set up.  */
-	    }
-	}
-      else
-	{
-	  /* It is probably a C-style function.  */
-	  /* Nothing to be done; argvec already correctly set up.  */
-	}
+      /* Move xmalloc-ated ARGVEC2 to alloca-ted ARGVEC.  */
+      argvec = alloca ((1 + nargs + 1) * sizeof (*argvec));
+      memcpy (argvec, argvec2, (1 + nargs + 1) * sizeof (*argvec));
+      xfree (argvec2);
 
     do_call_it:
 
@@ -2070,13 +2120,8 @@ evaluate_subexp_standard (struct type *expect_type,
 	}
 
     case TYPE_INSTANCE:
-      nargs = longest_to_int (exp->elts[pc + 1].longconst);
-      arg_types = (struct type **) alloca (nargs * sizeof (struct type *));
-      for (ix = 0; ix < nargs; ++ix)
-	arg_types[ix] = exp->elts[pc + 1 + ix + 1].type;
-
-      expect_type = make_params (nargs, arg_types);
-      *(pos) += 3 + nargs;
+      (*pos)--;
+      expect_type = type_instance_expect_type (exp, pos);
       arg1 = evaluate_subexp_standard (expect_type, exp, pos, noside);
       xfree (TYPE_FIELDS (expect_type));
       xfree (TYPE_MAIN_TYPE (expect_type));
@@ -2962,7 +3007,7 @@ evaluate_subexp_for_address (struct expression *exp, int *pos,
       (*pos) += 5 + BYTES_TO_EXP_ELEM (tem + 1);
       x = value_aggregate_elt (exp->elts[pc + 1].type,
 			       &exp->elts[pc + 3].string,
-			       NULL, 1, noside);
+			       NULL, 1, noside, NULL);
       if (x == NULL)
 	error (_("There is no field named %s"), &exp->elts[pc + 3].string);
       return x;

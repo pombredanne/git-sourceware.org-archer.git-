@@ -33,6 +33,8 @@
 #include "readline/readline.h"
 #include "gdb_regex.h"
 #include "dictionary.h"
+#include "language.h"
+#include "cp-support.h"
 
 #ifndef DEV_TTY
 #define DEV_TTY "/dev/tty"
@@ -55,7 +57,8 @@ static struct partial_symbol *match_partial_symbol (struct partial_symtab *,
 
 static struct partial_symbol *lookup_partial_symbol (struct partial_symtab *,
 						     const char *, int,
-						     domain_enum);
+						     domain_enum,
+						     enum language);
 
 static char *psymtab_to_fullname (struct partial_symtab *ps);
 
@@ -418,15 +421,35 @@ fixup_psymbol_section (struct partial_symbol *psym, struct objfile *objfile)
 static struct symtab *
 lookup_symbol_aux_psymtabs (struct objfile *objfile,
 			    int block_index, const char *name,
-			    const domain_enum domain)
+			    const domain_enum domain, enum language language)
 {
   struct partial_symtab *ps;
   const int psymtab_index = (block_index == GLOBAL_BLOCK ? 1 : 0);
 
   ALL_OBJFILE_PSYMTABS (objfile, ps)
   {
-    if (!ps->readin && lookup_partial_symbol (ps, name, psymtab_index, domain))
-      return PSYMTAB_TO_SYMTAB (ps);
+    if (!ps->readin
+	&& lookup_partial_symbol (ps, name, psymtab_index, domain, language))
+      {
+	struct symbol *sym;
+	struct symtab *stab = PSYMTAB_TO_SYMTAB (ps);
+	sym = NULL;
+
+	/* Some caution must be observed with overloaded functions
+	   and methods, since the psymtab will not contain any overload
+	   information (but NAME might contain it).  */
+	if (stab->primary)
+	  {
+	    struct blockvector *bv = BLOCKVECTOR (stab);
+	    struct block *block = BLOCKVECTOR_BLOCK (bv, block_index);
+	    sym = lookup_block_symbol (block, name, domain);
+	  }
+
+	if (sym && strcmp_iw (SYMBOL_SEARCH_NAME (sym), name) == 0)
+	  return stab;
+
+	/* Keep looking through other psymtabs.  */
+      }
   }
 
   return NULL;
@@ -519,22 +542,58 @@ pre_expand_symtabs_matching_psymtabs (struct objfile *objfile,
   /* Nothing.  */
 }
 
+/* Returns the name used to search psymtabs.  Unlike symtabs, psymtabs do
+   not contain any method/function instance information (since this would
+   force reading type information while reading psymtabs).  Therefore,
+   if NAME contains overload information, it must be stripped before searching
+   psymtabs.
+
+   The caller is responsible for freeing the return result.  */
+
+static const char *
+psymtab_search_name (const char *name, enum language language)
+{
+  switch (language)
+    {
+    case language_cplus:
+    case language_java:
+      {
+       if (strchr (name, '('))
+         {
+           char *ret = cp_remove_params (name);
+           if (ret)
+             return ret;
+         }
+      }
+
+    default:
+      break;
+    }
+
+  return xstrdup (name);
+}
+
 /* Look, in partial_symtab PST, for symbol whose natural name is NAME.
    Check the global symbols if GLOBAL, the static symbols if not.  */
 
 static struct partial_symbol *
 lookup_partial_symbol (struct partial_symtab *pst, const char *name,
-		       int global, domain_enum domain)
+		       int global, domain_enum domain, enum language language)
 {
   struct partial_symbol **start, **psym;
   struct partial_symbol **top, **real_top, **bottom, **center;
   int length = (global ? pst->n_global_syms : pst->n_static_syms);
   int do_linear_search = 1;
+  const char *search_name;
+  struct cleanup *cleanup;
 
   if (length == 0)
     {
       return (NULL);
     }
+
+  search_name = psymtab_search_name (name, language);
+  cleanup = make_cleanup (xfree, (void *) search_name);
   start = (global ?
 	   pst->objfile->global_psymbols.list + pst->globals_offset :
 	   pst->objfile->static_psymbols.list + pst->statics_offset);
@@ -563,7 +622,8 @@ lookup_partial_symbol (struct partial_symtab *pst, const char *name,
 	    {
 	      do_linear_search = 1;
 	    }
-	  if (strcmp_iw_ordered (SYMBOL_SEARCH_NAME (*center), name) >= 0)
+	  if (strcmp_iw_ordered (SYMBOL_SEARCH_NAME (*center),
+				 search_name) >= 0)
 	    {
 	      top = center;
 	    }
@@ -577,11 +637,14 @@ lookup_partial_symbol (struct partial_symtab *pst, const char *name,
 			_("failed internal consistency check"));
 
       while (top <= real_top
-	     && SYMBOL_MATCHES_SEARCH_NAME (*top, name))
+	     && SYMBOL_MATCHES_SEARCH_NAME (*top, search_name))
 	{
 	  if (symbol_matches_domain (SYMBOL_LANGUAGE (*top),
 				     SYMBOL_DOMAIN (*top), domain))
-	    return (*top);
+	    {
+	      do_cleanups (cleanup);
+	      return (*top);
+	    }
 	  top++;
 	}
     }
@@ -596,10 +659,14 @@ lookup_partial_symbol (struct partial_symtab *pst, const char *name,
 	  if (symbol_matches_domain (SYMBOL_LANGUAGE (*psym),
 				     SYMBOL_DOMAIN (*psym), domain)
 	      && SYMBOL_MATCHES_SEARCH_NAME (*psym, name))
-	    return (*psym);
+	    {
+	      do_cleanups (cleanup);
+	      return (*psym);
+	    }
 	}
     }
 
+  do_cleanups (cleanup);
   return (NULL);
 }
 
@@ -911,7 +978,8 @@ dump_psymtabs_for_objfile (struct objfile *objfile)
    by matching FUNC_NAME.  Make sure we read that symbol table in.  */
 
 static void
-read_symtabs_for_function (struct objfile *objfile, const char *func_name)
+read_symtabs_for_function (struct objfile *objfile, const char *func_name,
+			   enum language language)
 {
   struct partial_symtab *ps;
 
@@ -920,9 +988,9 @@ read_symtabs_for_function (struct objfile *objfile, const char *func_name)
     if (ps->readin)
       continue;
 
-    if ((lookup_partial_symbol (ps, func_name, 1, VAR_DOMAIN)
+    if ((lookup_partial_symbol (ps, func_name, 1, VAR_DOMAIN, language)
 	 != NULL)
-	|| (lookup_partial_symbol (ps, func_name, 0, VAR_DOMAIN)
+	|| (lookup_partial_symbol (ps, func_name, 0, VAR_DOMAIN, language)
 	    != NULL))
       psymtab_to_symtab (ps);
   }
@@ -1042,13 +1110,14 @@ psymtab_to_fullname (struct partial_symtab *ps)
 }
 
 static const char *
-find_symbol_file_from_partial (struct objfile *objfile, const char *name)
+find_symbol_file_from_partial (struct objfile *objfile, const char *name,
+			       enum language language)
 {
   struct partial_symtab *pst;
 
   ALL_OBJFILE_PSYMTABS (objfile, pst)
     {
-      if (lookup_partial_symbol (pst, name, 1, VAR_DOMAIN))
+      if (lookup_partial_symbol (pst, name, 1, VAR_DOMAIN, language))
 	return pst->filename;
     }
   return NULL;

@@ -1,6 +1,6 @@
-/* Header for GDB line completion.
-   Copyright (C) 2000, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+/* This testcase is part of GDB, the GNU debugger.
+
+   Copyright 2010 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -13,18 +13,20 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#if !defined (LINESPEC_H)
-#define LINESPEC_H 1
+   Please email any bugs, comments, and/or additions to this file to:
+   bug-gdb@gnu.org  */
 
-struct symtab;
+namespace A {
 
-extern struct symtabs_and_lines
-	decode_line_1 (char **argptr, int funfirstline,
-		       struct symtab *default_symtab, int default_line,
-		       char ***canonical, int *not_found_ptr);
+class pr11734
+{
+ public:
+  static void foo ();
+  static void foo (int);
+  static void foo (char *);
+  long l;
+};
 
-extern void cplusplus_error (const char *name, const char *fmt, ...);
-
-#endif /* defined (LINESPEC_H) */
+}

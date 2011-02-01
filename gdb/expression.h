@@ -133,6 +133,13 @@ enum noside
 extern struct value *evaluate_subexp_standard
   (struct type *, struct expression *, int *, enum noside);
 
+extern struct type *type_instance_expect_type (struct expression *exp,
+					       int *pos);
+
+extern struct value **get_funcall_argvec (struct expression *exp, int *pos,
+					  enum noside noside,
+					  struct any_symbol *anysym_return);
+
 /* From expprint.c */
 
 extern void print_expression (struct expression *, struct ui_file *);

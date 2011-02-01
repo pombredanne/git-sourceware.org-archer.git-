@@ -61,6 +61,7 @@ static struct symtabs_and_lines decode_objc (char **argptr,
 					     char ***canonical,
 					     char *saved_arg);
 
+#if 0
 static struct symtabs_and_lines decode_compound (char **argptr,
 						 int funfirstline,
 						 char ***canonical,
@@ -93,9 +94,10 @@ static int add_matching_methods (int method_counter, struct type *t,
 static int add_constructors (int method_counter, struct type *t,
 			     enum language language,
 			     struct symbol **sym_arr);
+#endif
 
 static void build_canonical_line_spec (struct symtab_and_line *,
-				       char *, char ***);
+				       const char *, char ***);
 
 static char *find_toplevel_char (char *s, char c);
 
@@ -116,25 +118,28 @@ symtabs_and_lines decode_all_digits (char **argptr,
 				     struct symtab *file_symtab,
 				     char *q);
 
+#if 0
 static struct symtabs_and_lines decode_dollar (char *copy,
 					       int funfirstline,
 					       struct symtab *default_symtab,
 					       char ***canonical,
 					       struct symtab *file_symtab);
+#endif
 
 static int decode_label (char *copy, char ***canonical,
 			 struct symtabs_and_lines *result);
 
-static struct symtabs_and_lines decode_variable (char *copy,
+#if 0
+static struct symtabs_and_lines decode_variable (const char *copy,
 						 int funfirstline,
 						 char ***canonical,
-						 struct symtab *file_symtab,
-						 int *not_found_ptr);
+						 struct symtab *file_symtab);
+#endif
 
 static struct
 symtabs_and_lines symbol_found (int funfirstline,
 				char ***canonical,
-				char *copy,
+				const char *copy,
 				struct symbol *sym,
 				struct symtab *file_symtab);
 
@@ -148,7 +153,7 @@ symtabs_and_lines minsym_found (int funfirstline,
    single quoted demangled C++ symbols as part of the completion
    error.  */
 
-static void
+void
 cplusplus_error (const char *name, const char *fmt, ...)
 {
   struct ui_file *tmp_stream;
@@ -182,6 +187,7 @@ cplusplus_error (const char *name, const char *fmt, ...)
    reader because the type of the baseclass might still be stubbed
    when the definition of the derived class is parsed.  */
 
+#if 0
 static int
 total_number_of_methods (struct type *type)
 {
@@ -379,6 +385,7 @@ add_constructors (int method_counter, struct type *t,
 
   return i1;
 }
+#endif
 
 /* Helper function for decode_line_1.
    Build a canonical line spec in CANONICAL if it is non-NULL and if
@@ -388,7 +395,7 @@ add_constructors (int method_counter, struct type *t,
    line spec is `filename:linenum'.  */
 
 static void
-build_canonical_line_spec (struct symtab_and_line *sal, char *symname,
+build_canonical_line_spec (struct symtab_and_line *sal, const char *symname,
 			   char ***canonical)
 {
   char **canonical_arr;
@@ -639,6 +646,7 @@ decode_line_2 (struct symbol *sym_arr[], int nelts, int funfirstline,
 
    This function assumes that P has already been validated to contain
    overload information, and it will assert if *P != '('.  */
+#if 0
 static char *
 find_method_overload_end (char *p)
 {
@@ -663,6 +671,7 @@ find_method_overload_end (char *p)
 
   return p;
 }
+#endif
 
 /* The parser of linespec itself.  */
 
@@ -723,18 +732,22 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
   /* If a file name is specified, this is its symtab.  */
   struct symtab *file_symtab = NULL;
 
-  char *copy;
+  char *copy, *copy_parsed;
   /* This says whether or not something in *ARGPTR is quoted with
      completer_quotes (i.e. with single quotes).  */
   int is_quoted;
   /* Is *ARGPTR is enclosed in double quotes?  */
   int is_quote_enclosed;
-  int is_objc_method = 0;
   char *saved_arg = *argptr;
-  /* If IS_QUOTED, the end of the quoted bit.  */
+  /* If IS_QUOTED, the end of the quoted bit - after the quote character.  */
   char *end_quote = NULL;
   /* The "first half" of the linespec.  */
   char *first_half;
+  struct cleanup *cleanup;
+  struct expression *exp;
+  struct value *val;
+  int pc;
+  struct type *expect_type;
 
   if (not_found_ptr)
     *not_found_ptr = 0;
@@ -765,11 +778,6 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
 
   first_half = p = locate_first_half (argptr, &is_quote_enclosed);
 
-  /* Check if this is an Objective-C method (anything that starts with
-     a '+' or '-' and a '[').  */
-  if (is_objc_method_format (p))
-    is_objc_method = 1;
-
   /* Check if the symbol could be an Objective-C selector.  */
 
   {
@@ -783,28 +791,8 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
 
   /* Does it look like there actually were two parts?  */
 
-  if (p[0] == ':' || p[0] == '.')
+  if (p[0] == ':' && p[1] != ':')
     {
-      /* Is it a C++ or Java compound data structure?
-	 The check on p[1] == ':' is capturing the case of "::",
-	 since p[0]==':' was checked above.
-	 Note that the call to decode_compound does everything
-	 for us, including the lookup on the symbol table, so we
-	 can return now.  */
-	
-      if (p[0] == '.' || p[1] == ':')
-	{
-	  struct symtabs_and_lines values;
-
-	  if (is_quote_enclosed)
-	    ++saved_arg;
-	  values = decode_compound (argptr, funfirstline, canonical,
-				    saved_arg, p, not_found_ptr);
-	  if (is_quoted && **argptr == '\'')
-	    *argptr = *argptr + 1;
-	  return values;
-	}
-
       /* No, the first part is a filename; set file_symtab to be that file's
 	 symtab.  Also, move argptr past the filename.  */
 
@@ -852,61 +840,14 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
   /* Arg token is not digits => try it as a variable name
      Find the next token (everything up to end or next whitespace).  */
 
-  if (**argptr == '$')		/* May be a convenience variable.  */
-    /* One or two $ chars possible.  */
-    p = skip_quoted (*argptr + (((*argptr)[1] == '$') ? 2 : 1));
-  else if (is_quoted)
+  if (is_quoted)
     {
       p = end_quote;
-      if (p[-1] != '\'')
+      if (strchr (get_gdb_completer_quote_characters (), p[-1]) == NULL)
 	error (_("Unmatched single quote."));
     }
-  else if (is_objc_method)
-    {
-      /* allow word separators in method names for Obj-C.  */
-      p = skip_quoted_chars (*argptr, NULL, "");
-    }
   else
-    {
-      p = skip_quoted (*argptr);
-    }
-
-  /* Keep any template parameters.  */
-  if (*p == '<')
-    p = find_template_name_end (p);
-
-  /* Keep method overload information.  */
-  if (*p == '(')
-    p = find_method_overload_end (p);
-
-  /* Make sure we keep important kewords like "const".  */
-  if (strncmp (p, " const", 6) == 0)
-    p += 6;
-
-  copy = (char *) alloca (p - *argptr + 1);
-  memcpy (copy, *argptr, p - *argptr);
-  copy[p - *argptr] = '\0';
-  if (p != *argptr
-      && copy[0]
-      && copy[0] == copy[p - *argptr - 1]
-      && strchr (get_gdb_completer_quote_characters (), copy[0]) != NULL)
-    {
-      copy[p - *argptr - 1] = '\0';
-      copy++;
-    }
-  else if (is_quoted)
-    copy[p - *argptr - 1] = '\0';
-  while (*p == ' ' || *p == '\t')
-    p++;
-  *argptr = p;
-
-  /* If it starts with $: may be a legitimate variable or routine name
-     (e.g. HP-UX millicode routines such as $$dyncall), or it may
-     be history value, or it may be a convenience variable.  */
-
-  if (*copy == '$')
-    return decode_dollar (copy, funfirstline, default_symtab,
-			  canonical, file_symtab);
+    p = *argptr + strlen (*argptr);
 
   /* Try the token as a label, but only if no file was specified,
      because we can only really find labels in the current scope.  */
@@ -914,15 +855,160 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
   if (!file_symtab)
     {
       struct symtabs_and_lines label_result;
+
+      if (!is_quoted)
+	q = skip_quoted (*argptr);
+
+      copy = alloca (q - *argptr + 1);
+      memcpy (copy, *argptr, q - *argptr);
+      copy[q - *argptr] = '\0';
+
       if (decode_label (copy, canonical, &label_result))
-	return label_result;
+	{
+	  *argptr = q;
+	  return label_result;
+	}
     }
 
   /* Look up that token as a variable.
      If file specified, use that file's per-file block to start with.  */
 
-  return decode_variable (copy, funfirstline, canonical,
-			  file_symtab, not_found_ptr);
+  copy = (char *) alloca (p - *argptr + 1);
+  memcpy (copy, *argptr, p - *argptr);
+  copy[p - *argptr] = '\0';
+  if (is_quoted)
+    copy[p - *argptr - 1] = '\0';
+  while (*p == ' ' || *p == '\t')
+    p++;
+
+  /* Remove any get_gdb_completer_quote_characters () inside.  GDB has to keep
+     backward compatibility with class::'member' syntax but the :: delimiter
+     is no longer found by this function.  */
+  p = copy;
+  for (;;)
+    {
+      char c;
+
+      p = &p[strcspn (p, get_gdb_completer_quote_characters ())];
+      c = *p;
+      if (!c)
+	break;
+      memmove (p, &p[1], strlen (&p[1]) + 1);
+      q = strchr (p, c);
+      if (q)
+	{
+	  memmove (q, &q[1], strlen (&q[1]) + 1);
+	  p = q;
+	}
+    }
+
+  copy_parsed = copy;
+  exp = parse_exp_1 (&copy_parsed,
+		     (file_symtab
+		      ? BLOCKVECTOR_BLOCK (BLOCKVECTOR (file_symtab),
+					   STATIC_BLOCK)
+		      : get_selected_block (0)),
+		     0);
+  cleanup = make_cleanup (xfree, exp);
+  if (*copy_parsed)
+    {
+      /* The expression has not been parsed completely.  If there were some
+         quotes the caller will probably error on them.  */
+      *argptr += copy_parsed - copy;
+    }
+  else
+    *argptr += strlen (*argptr);
+
+  pc = 0;
+  expect_type = NULL;
+  for (;;)
+    {
+      struct any_symbol anysym;
+      struct value *funcval;
+
+      memset (&anysym, 0, sizeof (anysym));
+      funcval = NULL;
+
+      switch (exp->elts[pc].opcode)
+	{
+	case TYPE_INSTANCE:
+	  expect_type = type_instance_expect_type (exp, &pc);
+	  continue;
+
+	case OP_FUNCALL:
+	  {
+	    struct value **argvec;
+
+	    argvec = get_funcall_argvec (exp, &pc, EVAL_AVOID_SIDE_EFFECTS,
+					 &anysym);
+	    funcval = argvec[0];
+	    xfree (argvec);
+	  }
+	  break;
+
+	case OP_VAR_VALUE:
+	  anysym.symbol = exp->elts[pc + 2].symbol;
+	  break;
+	
+	case OP_SCOPE:
+	  /* FIXME: EVAL_AVOID_SIDE_EFFECTS does not produce value!  */
+	  funcval = value_aggregate_elt (exp->elts[pc + 1].type,
+					 &exp->elts[pc + 3].string,
+					 expect_type, 0, EVAL_NORMAL,
+					 &anysym);
+	  if (funcval == NULL)
+	    error (_("There is no field named %s"),
+		   &exp->elts[pc + 3].string);
+	  break;
+
+	default:
+	  /* FIXME: EVAL_AVOID_SIDE_EFFECTS does not produce value!  */
+	  funcval = evaluate_subexp_with_coercion (exp, &pc,
+						   EVAL_NORMAL);
+	  break;
+	}
+
+      if (expect_type)
+	{
+	  xfree (TYPE_FIELDS (expect_type));
+	  xfree (TYPE_MAIN_TYPE (expect_type));
+	  xfree (expect_type);
+	}
+
+      if (anysym.symbol)
+	return symbol_found (funfirstline, canonical, copy,
+			     anysym.symbol, file_symtab);
+
+      if (anysym.minimal_symbol)
+	return minsym_found (funfirstline, anysym.minimal_symbol);
+
+      if (funcval)
+	{
+	  struct symtabs_and_lines values;
+	  CORE_ADDR pc = value_as_address (funcval);
+
+	  values.nelts = 1;
+	  values.sals = xmalloc (sizeof (*values.sals));
+	  values.sals[0] = find_pc_line (pc, 0);
+	  values.sals[0].pc = pc;
+	  values.sals[0].section = find_pc_overlay (pc);
+	  values.sals[0].explicit_pc = 1;
+
+	  return values;
+	}
+
+      break;
+    }
+
+  if (not_found_ptr)
+    *not_found_ptr = 1;
+
+  if (!have_full_symbols ()
+      && !have_partial_symbols ()
+      && !have_minimal_symbols ())
+    throw_error (NOT_FOUND_ERROR,
+		 _("No symbol table is loaded.  Use the \"file\" command."));
+  throw_error (NOT_FOUND_ERROR, _("Function \"%s\" not defined."), copy);
 }
 
 
@@ -1049,14 +1135,6 @@ locate_first_half (char **argptr, int *is_quote_enclosed)
     }
   for (; *p; p++)
     {
-      if (p[0] == '<')
-	{
-	  char *temp_end = find_template_name_end (p);
-
-	  if (!temp_end)
-	    error (_("malformed template specification in command"));
-	  p = temp_end;
-	}
       /* Check for a colon and a plus or minus and a [ (which
          indicates an Objective-C method).  */
       if (is_objc_method_format (p))
@@ -1073,18 +1151,6 @@ locate_first_half (char **argptr, int *is_quote_enclosed)
 	      && ((p[1] == ':') || (strchr (p + 1, ':') == NULL)))
 	  || ((p[0] == ' ') && !*is_quote_enclosed))
 	break;
-      if (p[0] == '.' && strchr (p, ':') == NULL)
-	{
-	  /* Java qualified method.  Find the *last* '.', since the
-	     others are package qualifiers.  Stop at any open parenthesis
-	     which might provide overload information.  */
-	  for (p1 = p; *p1 && *p1 != '('; p1++)
-	    {
-	      if (*p1 == '.')
-		p = p1;
-	    }
-	  break;
-	}
     }
   while (p[0] == ' ' || p[0] == '\t')
     p++;
@@ -1224,6 +1290,7 @@ decode_objc (char **argptr, int funfirstline, struct symtab *file_symtab,
    an example, on entrance to this function we could have ARGPTR
    pointing to "AAA::inA::fun" and P pointing to "::inA::fun".  */
 
+#if 0
 static struct symtabs_and_lines
 decode_compound (char **argptr, int funfirstline, char ***canonical,
 		 char *saved_arg, char *p, int *not_found_ptr)
@@ -1646,6 +1713,7 @@ find_method (int funfirstline, char ***canonical, char *saved_arg,
 			 SYMBOL_PRINT_NAME (sym_class), copy);
     }
 }
+#endif
 
 
 
@@ -1794,6 +1862,7 @@ decode_all_digits (char **argptr, struct symtab *default_symtab,
 
 /* Decode a linespec starting with a dollar sign.  */
 
+#if 0
 static struct symtabs_and_lines
 decode_dollar (char *copy, int funfirstline, struct symtab *default_symtab,
 	       char ***canonical, struct symtab *file_symtab)
@@ -1864,6 +1933,7 @@ decode_dollar (char *copy, int funfirstline, struct symtab *default_symtab,
 
   return values;
 }
+#endif
 
 
 
@@ -1893,12 +1963,14 @@ decode_label (char *copy, char ***canonical, struct symtabs_and_lines *result)
    not NULL and the function cannot be found, store boolean true in
    the location pointed to and do not issue an error message.  */ 
 
+#if 0
 static struct symtabs_and_lines
-decode_variable (char *copy, int funfirstline, char ***canonical,
-		 struct symtab *file_symtab, int *not_found_ptr)
+decode_variable (const char *copy, int funfirstline, char ***canonical,
+		 struct symtab *file_symtab)
 {
   struct symbol *sym;
   struct minimal_symbol *msymbol;
+  struct symtabs_and_lines retval;
 
   sym = lookup_symbol (copy,
 		       (file_symtab
@@ -1915,17 +1987,11 @@ decode_variable (char *copy, int funfirstline, char ***canonical,
   if (msymbol != NULL)
     return minsym_found (funfirstline, msymbol);
 
-  if (not_found_ptr)
-    *not_found_ptr = 1;
-
-  if (!have_full_symbols ()
-      && !have_partial_symbols ()
-      && !have_minimal_symbols ())
-    throw_error (NOT_FOUND_ERROR,
-		 _("No symbol table is loaded.  Use the \"file\" command."));
-  throw_error (NOT_FOUND_ERROR, _("Function \"%s\" not defined."), copy);
+  retval.sals = NULL;
+  retval.nelts = 0;
+  return retval;
 }
-
+#endif
 
 
 
@@ -1936,7 +2002,7 @@ decode_variable (char *copy, int funfirstline, char ***canonical,
    corresponding struct symtabs_and_lines.  */
 
 static struct symtabs_and_lines
-symbol_found (int funfirstline, char ***canonical, char *copy,
+symbol_found (int funfirstline, char ***canonical, const char *copy,
 	      struct symbol *sym, struct symtab *file_symtab)
 {
   struct symtabs_and_lines values;

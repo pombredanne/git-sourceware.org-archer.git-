@@ -340,7 +340,7 @@ cp_print_value_fields (struct type *type, struct type *real_type,
 		}
 	      else if (field_is_static (&TYPE_FIELD (type, i)))
 		{
-		  struct value *v = value_static_field (type, i);
+		  struct value *v = value_static_field (type, i, NULL);
 
 		  if (v == NULL)
 		    val_print_optimized_out (stream);

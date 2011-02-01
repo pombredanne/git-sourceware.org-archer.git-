@@ -55,11 +55,13 @@ static int typecmp (int staticp, int varargs, int nargs,
 		    struct field t1[], struct value *t2[]);
 
 static struct value *search_struct_field (const char *, struct value *, 
-					  int, struct type *, int);
+					  int, struct type *, int,
+					  struct any_symbol *anysym_return);
 
 static struct value *search_struct_method (const char *, struct value **,
 					   struct value **,
-					   int, int *, struct type *);
+					   int, int *, struct type *,
+					   struct any_symbol *anysym_return);
 
 static int find_oload_champ_namespace (struct type **, int,
 				       const char *, const char *,
@@ -86,18 +88,18 @@ static enum
 oload_classification classify_oload_match (struct badness_vector *,
 					   int, int);
 
-static struct value *value_struct_elt_for_reference (struct type *,
-						     int, struct type *,
-						     char *,
-						     struct type *,
-						     int, enum noside);
+static struct value *
+  value_struct_elt_for_reference (struct type *, int, struct type *, char *,
+				  struct type *, int, enum noside,
+				  struct any_symbol *anysym_return);
 
 static struct value *value_namespace_elt (const struct type *,
-					  char *, int , enum noside);
+					  char *, int , enum noside,
+					  struct any_symbol *anysym_return);
 
-static struct value *value_maybe_namespace_elt (const struct type *,
-						char *, int,
-						enum noside);
+static struct value *
+  value_maybe_namespace_elt (const struct type *, char *, int, enum noside,
+			     struct any_symbol *anysym_return);
 
 static CORE_ADDR allocate_space_in_inferior (int);
 
@@ -252,7 +254,7 @@ value_cast_structs (struct type *type, struct value *v2)
   if (TYPE_NAME (t1) != NULL)
     {
       v = search_struct_field (type_name_no_tag (t1),
-			       v2, 0, t2, 1);
+			       v2, 0, t2, 1, NULL);
       if (v)
 	return v;
     }
@@ -278,7 +280,8 @@ value_cast_structs (struct type *type, struct value *v2)
 	      && !strcmp (TYPE_NAME (real_type), TYPE_NAME (t1)))
 	    return v;
 
-	  v = search_struct_field (type_name_no_tag (t2), v, 0, real_type, 1);
+	  v = search_struct_field (type_name_no_tag (t2), v, 0, real_type, 1,
+				   NULL);
 	  if (v)
 	    return v;
 	}
@@ -287,7 +290,7 @@ value_cast_structs (struct type *type, struct value *v2)
 	 T2.  This wouldn't work properly for classes with virtual
 	 bases, but those were handled above.  */
       v = search_struct_field (type_name_no_tag (t2),
-			       value_zero (t1, not_lval), 0, t1, 1);
+			       value_zero (t1, not_lval), 0, t1, 1, NULL);
       if (v)
 	{
 	  /* Downcasting is possible (t1 is superclass of v2).  */
@@ -1901,7 +1904,8 @@ typecmp (int staticp, int varargs, int nargs,
 
 static struct value *
 search_struct_field (const char *name, struct value *arg1, int offset,
-		     struct type *type, int looking_for_baseclass)
+		     struct type *type, int looking_for_baseclass,
+		     struct any_symbol *anysym_return)
 {
   int i;
   int nbases;
@@ -1920,7 +1924,7 @@ search_struct_field (const char *name, struct value *arg1, int offset,
 
 	    if (field_is_static (&TYPE_FIELD (type, i)))
 	      {
-		v = value_static_field (type, i);
+		v = value_static_field (type, i, anysym_return);
 		if (v == 0)
 		  error (_("field %s is nonexistent or "
 			   "has been optimized out"),
@@ -1972,8 +1976,8 @@ search_struct_field (const char *name, struct value *arg1, int offset,
 		  new_offset += TYPE_FIELD_BITPOS (type, i) / 8;
 
 		v = search_struct_field (name, arg1, new_offset, 
-					 field_type,
-					 looking_for_baseclass);
+					 field_type, looking_for_baseclass,
+					 anysym_return);
 		if (v)
 		  return v;
 	      }
@@ -2036,7 +2040,7 @@ search_struct_field (const char *name, struct value *arg1, int offset,
 	    return v2;
 	  v = search_struct_field (name, v2, 0,
 				   TYPE_BASECLASS (type, i),
-				   looking_for_baseclass);
+				   looking_for_baseclass, anysym_return);
 	}
       else if (found_baseclass)
 	v = value_primitive_field (arg1, offset, i, type);
@@ -2044,7 +2048,8 @@ search_struct_field (const char *name, struct value *arg1, int offset,
 	v = search_struct_field (name, arg1,
 				 offset + TYPE_BASECLASS_BITPOS (type, 
 								 i) / 8,
-				 basetype, looking_for_baseclass);
+				 basetype, looking_for_baseclass,
+				 anysym_return);
       if (v)
 	return v;
     }
@@ -2062,7 +2067,8 @@ search_struct_field (const char *name, struct value *arg1, int offset,
 static struct value *
 search_struct_method (const char *name, struct value **arg1p,
 		      struct value **args, int offset,
-		      int *static_memfuncp, struct type *type)
+		      int *static_memfuncp, struct type *type,
+		      struct any_symbol *anysym_return)
 {
   int i;
   struct value *v;
@@ -2096,7 +2102,7 @@ search_struct_method (const char *name, struct value **arg1p,
 		     "`%s': no arguments supplied"), name);
 	  else if (j == 0 && args == 0)
 	    {
-	      v = value_fn_field (arg1p, f, j, type, offset);
+	      v = value_fn_field (arg1p, f, j, type, offset, anysym_return);
 	      if (v != NULL)
 		return v;
 	    }
@@ -2114,7 +2120,8 @@ search_struct_method (const char *name, struct value **arg1p,
 		    if (TYPE_FN_FIELD_STATIC_P (f, j) 
 			&& static_memfuncp)
 		      *static_memfuncp = 1;
-		    v = value_fn_field (arg1p, f, j, type, offset);
+		    v = value_fn_field (arg1p, f, j, type, offset,
+					anysym_return);
 		    if (v != NULL)
 		      return v;       
 		  }
@@ -2158,7 +2165,8 @@ search_struct_method (const char *name, struct value **arg1p,
 	  base_offset = TYPE_BASECLASS_BITPOS (type, i) / 8;
 	}
       v = search_struct_method (name, arg1p, args, base_offset + offset,
-				static_memfuncp, TYPE_BASECLASS (type, i));
+				static_memfuncp, TYPE_BASECLASS (type, i),
+				anysym_return);
       if (v == (struct value *) - 1)
 	{
 	  name_matched = 1;
@@ -2192,8 +2200,9 @@ search_struct_method (const char *name, struct value **arg1p,
    found.  */
 
 struct value *
-value_struct_elt (struct value **argp, struct value **args,
-		  const char *name, int *static_memfuncp, const char *err)
+value_struct_elt_anysym (struct value **argp, struct value **args,
+			 const char *name, int *static_memfuncp,
+			 const char *err, struct any_symbol *anysym_return)
 {
   struct type *t;
   struct value *v;
@@ -2228,14 +2237,14 @@ value_struct_elt (struct value **argp, struct value **args,
 
       /* Try as a field first, because if we succeed, there is less
          work to be done.  */
-      v = search_struct_field (name, *argp, 0, t, 0);
+      v = search_struct_field (name, *argp, 0, t, 0, anysym_return);
       if (v)
 	return v;
 
       /* C++: If it was not found as a data field, then try to
          return it as a pointer to a method.  */
       v = search_struct_method (name, argp, args, 0, 
-				static_memfuncp, t);
+				static_memfuncp, t, anysym_return);
 
       if (v == (struct value *) - 1)
 	error (_("Cannot take address of method %s."), name);
@@ -2250,7 +2259,7 @@ value_struct_elt (struct value **argp, struct value **args,
     }
 
     v = search_struct_method (name, argp, args, 0, 
-			      static_memfuncp, t);
+			      static_memfuncp, t, anysym_return);
   
   if (v == (struct value *) - 1)
     {
@@ -2262,7 +2271,7 @@ value_struct_elt (struct value **argp, struct value **args,
       /* See if user tried to invoke data as function.  If so, hand it
          back.  If it's not callable (i.e., a pointer to function),
          gdb should give an error.  */
-      v = search_struct_field (name, *argp, 0, t, 0);
+      v = search_struct_field (name, *argp, 0, t, 0, anysym_return);
       /* If we found an ordinary field, then it is not a method call.
 	 So, treat it as if it were a static member function.  */
       if (v && static_memfuncp)
@@ -2273,6 +2282,14 @@ value_struct_elt (struct value **argp, struct value **args,
     throw_error (NOT_FOUND_ERROR,
                  _("Structure has no component named %s."), name);
   return v;
+}
+
+struct value *
+value_struct_elt (struct value **argp, struct value **args,
+		  const char *name, int *static_memfuncp, const char *err)
+{
+  return value_struct_elt_anysym (argp, args, name, static_memfuncp, err,
+				  NULL);
 }
 
 /* Search through the methods of an object (and its bases) to find a
@@ -2369,7 +2386,7 @@ value_find_oload_method_list (struct value **argp, const char *method,
 
   t = check_typedef (value_type (*argp));
 
-  /* Code snarfed from value_struct_elt.  */
+  /* Code snarfed from value_struct_elt_anysym.  */
   while (TYPE_CODE (t) == TYPE_CODE_PTR || TYPE_CODE (t) == TYPE_CODE_REF)
     {
       *argp = value_ind (*argp);
@@ -2434,7 +2451,7 @@ int
 find_overload_match (struct type **arg_types, int nargs, 
 		     const char *name, enum oload_search_type method,
 		     int lax, struct value **objp, struct symbol *fsym,
-		     struct value **valp, struct symbol **symp, 
+		     struct value **valp, struct any_symbol *anysym_return, 
 		     int *staticp, const int no_adl)
 {
   struct value *obj = (objp ? *objp : NULL);
@@ -2480,7 +2497,8 @@ find_overload_match (struct type **arg_types, int nargs,
       if (TYPE_CODE (check_typedef (value_type (obj))) == TYPE_CODE_STRUCT)
 	{
 	  *valp = search_struct_field (name, obj, 0,
-				       check_typedef (value_type (obj)), 0);
+				       check_typedef (value_type (obj)), 0,
+				       anysym_return);
 	  if (*valp)
 	    {
 	      *staticp = 1;
@@ -2568,7 +2586,8 @@ find_overload_match (struct type **arg_types, int nargs,
 	 same if cp_func_name fails for some reason.  */
       if (func_name == NULL)
         {
-	  *symp = fsym;
+	  if (anysym_return)
+	    anysym_return->symbol = fsym;
           return 0;
         }
 
@@ -2668,10 +2687,10 @@ find_overload_match (struct type **arg_types, int nargs,
 					basetype, boffset);
       else
 	*valp = value_fn_field (&temp, fns_ptr, method_oload_champ,
-				basetype, boffset);
+				basetype, boffset, anysym_return);
     }
-  else
-    *symp = oload_syms[func_oload_champ];
+  else if (anysym_return)
+    anysym_return->symbol = oload_syms[func_oload_champ];
 
   if (objp)
     {
@@ -3065,18 +3084,18 @@ check_field (struct type *type, const char *name)
 struct value *
 value_aggregate_elt (struct type *curtype, char *name,
 		     struct type *expect_type, int want_address,
-		     enum noside noside)
+		     enum noside noside, struct any_symbol *anysym_return)
 {
   switch (TYPE_CODE (curtype))
     {
     case TYPE_CODE_STRUCT:
     case TYPE_CODE_UNION:
       return value_struct_elt_for_reference (curtype, 0, curtype, 
-					     name, expect_type,
-					     want_address, noside);
+					     name, expect_type, want_address,
+					     noside, anysym_return);
     case TYPE_CODE_NAMESPACE:
       return value_namespace_elt (curtype, name, 
-				  want_address, noside);
+				  want_address, noside, anysym_return);
     default:
       internal_error (__FILE__, __LINE__,
 		      _("non-aggregate type in value_aggregate_elt"));
@@ -3147,7 +3166,8 @@ value_struct_elt_for_reference (struct type *domain, int offset,
 				struct type *curtype, char *name,
 				struct type *intype, 
 				int want_address,
-				enum noside noside)
+				enum noside noside,
+				struct any_symbol *anysym_return)
 {
   struct type *t = curtype;
   int i;
@@ -3166,7 +3186,7 @@ value_struct_elt_for_reference (struct type *domain, int offset,
 	{
 	  if (field_is_static (&TYPE_FIELD (t, i)))
 	    {
-	      v = value_static_field (t, i);
+	      v = value_static_field (t, i, anysym_return);
 	      if (v == NULL)
 		error (_("static field %s has been optimized out"),
 		       name);
@@ -3268,6 +3288,9 @@ value_struct_elt_for_reference (struct type *domain, int offset,
 	      if (s == NULL)
 		return NULL;
 
+	      if (anysym_return)
+		anysym_return->symbol = s;
+
 	      if (want_address)
 		return value_addr (read_var_value (s, 0));
 	      else
@@ -3299,6 +3322,9 @@ value_struct_elt_for_reference (struct type *domain, int offset,
 	      if (s == NULL)
 		return NULL;
 
+	      if (anysym_return)
+		anysym_return->symbol = s;
+
 	      v = read_var_value (s, 0);
 	      if (!want_address)
 		result = v;
@@ -3325,8 +3351,8 @@ value_struct_elt_for_reference (struct type *domain, int offset,
       v = value_struct_elt_for_reference (domain,
 					  offset + base_offset,
 					  TYPE_BASECLASS (t, i),
-					  name, intype, 
-					  want_address, noside);
+					  name, intype, want_address, noside,
+					  anysym_return);
       if (v)
 	return v;
     }
@@ -3336,7 +3362,7 @@ value_struct_elt_for_reference (struct type *domain, int offset,
      classes.  */
 
   return value_maybe_namespace_elt (curtype, name, 
-				    want_address, noside);
+				    want_address, noside, anysym_return);
 }
 
 /* C++: Return the member NAME of the namespace given by the type
@@ -3344,12 +3370,12 @@ value_struct_elt_for_reference (struct type *domain, int offset,
 
 static struct value *
 value_namespace_elt (const struct type *curtype,
-		     char *name, int want_address,
-		     enum noside noside)
+		     char *name, int want_address, enum noside noside,
+		     struct any_symbol *anysym_return)
 {
   struct value *retval = value_maybe_namespace_elt (curtype, name,
-						    want_address, 
-						    noside);
+						    want_address, noside,
+						    anysym_return);
 
   if (retval == NULL)
     error (_("No symbol \"%s\" in namespace \"%s\"."), 
@@ -3367,7 +3393,8 @@ value_namespace_elt (const struct type *curtype,
 static struct value *
 value_maybe_namespace_elt (const struct type *curtype,
 			   char *name, int want_address,
-			   enum noside noside)
+			   enum noside noside,
+			   struct any_symbol *anysym_return)
 {
   const char *namespace_name = TYPE_TAG_NAME (curtype);
   struct symbol *sym;
@@ -3384,6 +3411,9 @@ value_maybe_namespace_elt (const struct type *curtype,
       sprintf (concatenated_name, "%s::%s", namespace_name, name);
       sym = lookup_static_symbol_aux (concatenated_name, VAR_DOMAIN);
     }
+
+  if (anysym_return)
+    anysym_return->symbol = sym;
 
   if (sym == NULL)
     return NULL;

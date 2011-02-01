@@ -1930,7 +1930,8 @@ unpack_pointer (struct type *type, const gdb_byte *valaddr)
    optimized out.  */
 
 struct value *
-value_static_field (struct type *type, int fieldno)
+value_static_field (struct type *type, int fieldno,
+		    struct any_symbol *anysym_return)
 {
   struct value *retval;
 
@@ -1954,9 +1955,13 @@ value_static_field (struct type *type, int fieldno)
 							       NULL, NULL);
 
 	  if (!msym)
-	    return NULL;
+	    {
+	      return NULL;
+	    }
 	  else
 	    {
+	      if (anysym_return)
+		anysym_return->minimal_symbol = msym;
 	      retval = value_at_lazy (TYPE_FIELD_TYPE (type, fieldno),
 				      SYMBOL_VALUE_ADDRESS (msym));
 	    }
@@ -2108,8 +2113,8 @@ value_field (struct value *arg1, int fieldno)
 
 struct value *
 value_fn_field (struct value **arg1p, struct fn_field *f,
-		int j, struct type *type,
-		int offset)
+		int j, struct type *type, int offset,
+		struct any_symbol *anysym_return)
 {
   struct value *v;
   struct type *ftype = TYPE_FN_FIELD_TYPE (f, j);
@@ -2120,6 +2125,8 @@ value_fn_field (struct value **arg1p, struct fn_field *f,
   sym = lookup_symbol (physname, 0, VAR_DOMAIN, 0);
   if (sym != NULL)
     {
+      if (anysym_return)
+	anysym_return->symbol = sym;
       msym = NULL;
     }
   else
@@ -2128,6 +2135,8 @@ value_fn_field (struct value **arg1p, struct fn_field *f,
       msym = lookup_minimal_symbol (physname, NULL, NULL);
       if (msym == NULL)
 	return NULL;
+      if (anysym_return)
+	anysym_return->minimal_symbol = msym;
     }
 
   v = allocate_value (ftype);

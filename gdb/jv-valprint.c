@@ -431,7 +431,7 @@ java_print_value_fields (struct type *type, const gdb_byte *valaddr,
 		}
 	      else if (field_is_static (&TYPE_FIELD (type, i)))
 		{
-		  struct value *v = value_static_field (type, i);
+		  struct value *v = value_static_field (type, i, NULL);
 
 		  if (v == NULL)
 		    val_print_optimized_out (stream);
