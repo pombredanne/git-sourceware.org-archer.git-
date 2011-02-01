@@ -940,6 +940,46 @@ breakpoint_set_commands (struct breakpoint *b,
   observer_notify_breakpoint_modified (b->number);
 }
 
+/* Set the internal `silent' flag on the breakpoint.  Note that this
+   is not the same as the "silent" that may appear in the breakpoint's
+   commands.  */
+
+void
+breakpoint_set_silent (struct breakpoint *b, int silent)
+{
+  int old_silent = b->silent;
+
+  b->silent = silent;
+  if (old_silent != silent)
+    observer_notify_breakpoint_modified (b->number);
+}
+
+/* Set the thread for this breakpoint.  If THREAD is -1, make the
+   breakpoint work for any thread.  */
+
+void
+breakpoint_set_thread (struct breakpoint *b, int thread)
+{
+  int old_thread = b->thread;
+
+  b->thread = thread;
+  if (old_thread != thread)
+    observer_notify_breakpoint_modified (b->number);
+}
+
+/* Set the task for this breakpoint.  If TASK is 0, make the
+   breakpoint work for any task.  */
+
+void
+breakpoint_set_task (struct breakpoint *b, int task)
+{
+  int old_task = b->task;
+
+  b->task = task;
+  if (old_task != task)
+    observer_notify_breakpoint_modified (b->number);
+}
+
 void
 check_tracepoint_command (char *line, void *closure)
 {
@@ -5064,6 +5104,15 @@ user_settable_breakpoint (const struct breakpoint *b)
 	  || is_watchpoint (b));
 }
 
+/* Return true if this breakpoint was set by the user, false if it is
+   internal or momentary.  */
+
+int
+user_breakpoint_p (struct breakpoint *b)
+{
+  return user_settable_breakpoint (b) && b->number > 0;
+}
+
 /* Print information on user settable breakpoint (watchpoint, etc)
    number BNUM.  If BNUM is -1 print all user-settable breakpoints.
    If ALLFLAG is non-zero, include non-user-settable breakpoints.  If
@@ -5096,8 +5145,7 @@ breakpoint_1 (int bnum, int allflag,
 	if (filter && !filter (b))
 	  continue;
 	
-	if (allflag || (user_settable_breakpoint (b)
-			&& b->number > 0))
+	if (allflag || user_breakpoint_p (b))
 	  {
 	    int addr_bit, type_len;
 
@@ -5169,8 +5217,7 @@ breakpoint_1 (int bnum, int allflag,
 	
 	/* We only print out user settable breakpoints unless the
 	   allflag is set.  */
-	if (allflag || (user_settable_breakpoint (b)
-			&& b->number > 0))
+	if (allflag || user_breakpoint_p (b))
 	  print_one_breakpoint (b, &last_loc, print_address_bits, allflag);
       }
   }
@@ -5909,6 +5956,19 @@ create_jit_event_breakpoint (struct gdbarch *gdbarch, CORE_ADDR address)
   b = create_internal_breakpoint (gdbarch, address, bp_jit_event);
   update_global_location_list_nothrow (1);
   return b;
+}
+
+/* Remove JIT code registration and unregistration breakpoint(s).  */
+
+void
+remove_jit_event_breakpoints (void)
+{
+  struct breakpoint *b, *b_tmp;
+
+  ALL_BREAKPOINTS_SAFE (b, b_tmp)
+    if (b->type == bp_jit_event
+	&& b->loc->pspace == current_program_space)
+      delete_breakpoint (b);
 }
 
 void
@@ -10731,13 +10791,6 @@ set_ignore_count (int bptnum, int count, int from_tty)
   error (_("No breakpoint number %d."), bptnum);
 }
 
-void
-make_breakpoint_silent (struct breakpoint *b)
-{
-  /* Silence the breakpoint.  */
-  b->silent = 1;
-}
-
 /* Command to set ignore-count of breakpoint N to COUNT.  */
 
 static void
@@ -11727,7 +11780,7 @@ save_breakpoints (char *filename, int from_tty,
   ALL_BREAKPOINTS (tp)
   {
     /* Skip internal and momentary breakpoints.  */
-    if (!user_settable_breakpoint (tp) || tp->number < 0)
+    if (!user_breakpoint_p (tp))
       continue;
 
     /* If we have a filter, only save the breakpoints it accepts.  */
@@ -11765,7 +11818,7 @@ save_breakpoints (char *filename, int from_tty,
   ALL_BREAKPOINTS (tp)
   {
     /* Skip internal and momentary breakpoints.  */
-    if (!user_settable_breakpoint (tp) || tp->number < 0)
+    if (!user_breakpoint_p (tp))
       continue;
 
     /* If we have a filter, only save the breakpoints it accepts.  */
