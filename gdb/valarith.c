@@ -342,27 +342,29 @@ value_user_defined_cpp_op (struct value **args, int nargs, char *operator,
   struct value *valp = NULL;
   struct type **arg_types;
   int i;
+  struct any_symbol anysym;
 
   arg_types = (struct type **) alloca (nargs * (sizeof (struct type *)));
   /* Prepare list of argument types for overload resolution.  */
   for (i = 0; i < nargs; i++)
     arg_types[i] = value_type (args[i]);
 
+  memset (&anysym, 0, sizeof (anysym));
   find_overload_match (arg_types, nargs, operator, BOTH /* could be method */,
                        0 /* strict match */, &args[0], /* objp */
                        NULL /* pass NULL symbol since symbol is unknown */,
-                       &valp, &symp, static_memfuncp, 0);
+                       &valp, &anysym, static_memfuncp, 0);
 
   if (valp)
     return valp;
 
-  if (symp)
+  if (anysym.symbol)
     {
       /* This is a non member function and does not
          expect a reference as its first argument
          rather the explicit structure.  */
       args[0] = value_ind (args[0]);
-      return value_of_variable (symp, 0);
+      return value_of_variable (anysym.symbol, 0);
     }
 
   error (_("Could not find %s."), operator);

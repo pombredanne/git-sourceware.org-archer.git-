@@ -653,6 +653,7 @@ struct any_symbol
 {
   struct symbol *symbol;
   struct minimal_symbol *minimal_symbol;
+  const char *physname;
 };
 
 /* An instance of this type is used to represent a C++ template

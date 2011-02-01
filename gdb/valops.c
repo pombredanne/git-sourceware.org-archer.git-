@@ -90,17 +90,15 @@ oload_classification classify_oload_match (struct badness_vector *,
 static struct value *
   value_struct_elt_for_reference (struct type *, int, struct type *, char *,
 				  struct type *, int, enum noside,
-				  const char **physnamep,
-				  struct symbol **symbolp);
+				  struct any_symbol *anysym_return);
 
 static struct value *value_namespace_elt (const struct type *,
 					  char *, int , enum noside,
-					  const char **physnamep,
-					  struct symbol **symbolp);
+					  struct any_symbol *anysym_return);
 
 static struct value *
   value_maybe_namespace_elt (const struct type *, char *, int, enum noside,
-			     const char **physnamep, struct symbol **symbolp);
+			     struct any_symbol *anysym_return);
 
 static CORE_ADDR allocate_space_in_inferior (int);
 
@@ -3073,8 +3071,7 @@ check_field (struct type *type, const char *name)
 struct value *
 value_aggregate_elt (struct type *curtype, char *name,
 		     struct type *expect_type, int want_address,
-		     enum noside noside, const char **physnamep,
-		     struct symbol **symbolp)
+		     enum noside noside, struct any_symbol *anysym_return)
 {
   switch (TYPE_CODE (curtype))
     {
@@ -3082,10 +3079,10 @@ value_aggregate_elt (struct type *curtype, char *name,
     case TYPE_CODE_UNION:
       return value_struct_elt_for_reference (curtype, 0, curtype, 
 					     name, expect_type, want_address,
-					     noside, physnamep, symbolp);
+					     noside, anysym_return);
     case TYPE_CODE_NAMESPACE:
       return value_namespace_elt (curtype, name, 
-				  want_address, noside, physnamep, symbolp);
+				  want_address, noside, anysym_return);
     default:
       internal_error (__FILE__, __LINE__,
 		      _("non-aggregate type in value_aggregate_elt"));
@@ -3156,17 +3153,12 @@ value_struct_elt_for_reference (struct type *domain, int offset,
 				struct type *curtype, char *name,
 				struct type *intype, 
 				int want_address,
-				enum noside noside, const char **physnamep,
-				struct symbol **symbolp)
+				enum noside noside,
+				struct any_symbol *anysym_return)
 {
   struct type *t = curtype;
   int i;
   struct value *v, *result;
-
-  if (physnamep)
-    *physnamep = NULL;
-  if (symbolp)
-    *symbolp = NULL;
 
   if (TYPE_CODE (t) != TYPE_CODE_STRUCT
       && TYPE_CODE (t) != TYPE_CODE_UNION)
@@ -3181,9 +3173,9 @@ value_struct_elt_for_reference (struct type *domain, int offset,
 	{
 	  if (field_is_static (&TYPE_FIELD (t, i)))
 	    {
-	      if (physnamep
+	      if (anysym_return
 	          && TYPE_FIELD_LOC_KIND (t, i) == FIELD_LOC_KIND_PHYSNAME)
-		*physnamep = TYPE_FIELD_STATIC_PHYSNAME (t, i);
+		anysym_return->physname = TYPE_FIELD_STATIC_PHYSNAME (t, i);
 
 	      v = value_static_field (t, i);
 	      if (v == NULL)
@@ -3284,10 +3276,11 @@ value_struct_elt_for_reference (struct type *domain, int offset,
 		lookup_symbol (TYPE_FN_FIELD_PHYSNAME (f, j),
 			       0, VAR_DOMAIN, 0);
 
-	      if (physnamep)
-		*physnamep = TYPE_FN_FIELD_PHYSNAME (f, j);
-	      if (symbolp)
-		*symbolp = s;
+	      if (anysym_return)
+		{
+		  anysym_return->physname = TYPE_FN_FIELD_PHYSNAME (f, j);;
+		  anysym_return->symbol = s;
+		}
 
 	      if (s == NULL)
 		return NULL;
@@ -3320,10 +3313,11 @@ value_struct_elt_for_reference (struct type *domain, int offset,
 		lookup_symbol (TYPE_FN_FIELD_PHYSNAME (f, j),
 			       0, VAR_DOMAIN, 0);
 
-	      if (physnamep)
-		*physnamep = TYPE_FN_FIELD_PHYSNAME (f, j);
-	      if (symbolp)
-		*symbolp = s;
+	      if (anysym_return)
+		{
+		  anysym_return->physname = TYPE_FN_FIELD_PHYSNAME (f, j);;
+		  anysym_return->symbol = s;
+		}
 
 	      if (s == NULL)
 		return NULL;
@@ -3355,7 +3349,7 @@ value_struct_elt_for_reference (struct type *domain, int offset,
 					  offset + base_offset,
 					  TYPE_BASECLASS (t, i),
 					  name, intype, want_address, noside,
-					  physnamep, symbolp);
+					  anysym_return);
       if (v)
 	return v;
     }
@@ -3365,7 +3359,7 @@ value_struct_elt_for_reference (struct type *domain, int offset,
      classes.  */
 
   return value_maybe_namespace_elt (curtype, name, 
-				    want_address, noside, physnamep, symbolp);
+				    want_address, noside, anysym_return);
 }
 
 /* C++: Return the member NAME of the namespace given by the type
@@ -3374,11 +3368,11 @@ value_struct_elt_for_reference (struct type *domain, int offset,
 static struct value *
 value_namespace_elt (const struct type *curtype,
 		     char *name, int want_address, enum noside noside,
-		     const char **physnamep, struct symbol **symbolp)
+		     struct any_symbol *anysym_return)
 {
   struct value *retval = value_maybe_namespace_elt (curtype, name,
 						    want_address, noside,
-						    physnamep, symbolp);
+						    anysym_return);
 
   if (retval == NULL)
     error (_("No symbol \"%s\" in namespace \"%s\"."), 
@@ -3396,17 +3390,12 @@ value_namespace_elt (const struct type *curtype,
 static struct value *
 value_maybe_namespace_elt (const struct type *curtype,
 			   char *name, int want_address,
-			   enum noside noside, const char **physnamep,
-			   struct symbol **symbolp)
+			   enum noside noside,
+			   struct any_symbol *anysym_return)
 {
   const char *namespace_name = TYPE_TAG_NAME (curtype);
   struct symbol *sym;
   struct value *result;
-
-  if (physnamep)
-    *physnamep = NULL;
-  if (symbolp)
-    *symbolp = NULL;
 
   sym = cp_lookup_symbol_namespace (namespace_name, name,
 				    get_selected_block (0), VAR_DOMAIN);
@@ -3420,8 +3409,8 @@ value_maybe_namespace_elt (const struct type *curtype,
       sym = lookup_static_symbol_aux (concatenated_name, VAR_DOMAIN);
     }
 
-  if (symbolp)
-    *symbolp = sym;
+  if (anysym_return)
+    anysym_return->symbol = sym;
 
   if (sym == NULL)
     return NULL;

@@ -816,6 +816,13 @@ get_funcall_argvec (struct expression *exp, int *pos, enum noside noside,
   char *function_name = NULL;
   struct type **arg_types;
   struct cleanup *old_chain;
+  struct any_symbol anysym;
+
+  if (anysym_return == NULL)
+    {
+      memset (&anysym, 0, sizeof (anysym));
+      anysym_return = &anysym;
+    }
 
   (*pos) += 3;
   op = exp->elts[*pos].opcode;
@@ -1021,7 +1028,6 @@ get_funcall_argvec (struct expression *exp, int *pos, enum noside noside,
   argvec[tem] = 0;
   if (op == OP_ADL_FUNC)
     {
-      struct symbol *symp;
       char *func_name;
       int name_len;
       int string_pc = save_pos1 + 3;
@@ -1041,12 +1047,10 @@ get_funcall_argvec (struct expression *exp, int *pos, enum noside noside,
 			   0,          /* strict match */
 			   NULL, NULL, /* pass NULL symbol since
 					  symbol is unknown */
-			   NULL, &symp, NULL, 0);
+			   NULL, anysym_return, NULL, 0);
 
       /* Now fix the expression being evaluated.  */
-      exp->elts[save_pos1 + 2].symbol = symp;
-      if (anysym_return)
-	*anysym_return->symbol = symp;
+      exp->elts[save_pos1 + 2].symbol = anysym_return->symbol;
       argvec[0] = evaluate_subexp_with_coercion (exp, &save_pos1, noside);
     }
 
@@ -1141,7 +1145,6 @@ get_funcall_argvec (struct expression *exp, int *pos, enum noside noside,
 	{
 	  /* Language is C++, do some overload resolution before
 	     evaluation.  */
-	  struct symbol *symp;
 	  int no_adl = 0;
 
 	  /* If a scope has been specified disable ADL.  */
@@ -1161,17 +1164,18 @@ get_funcall_argvec (struct expression *exp, int *pos, enum noside noside,
 				      NON_METHOD,  /* not method */
 				      0,           /* strict match */
 				      NULL, function, /* the function */
-				      NULL, &symp, NULL, no_adl);
+				      NULL, anysym_return, NULL, no_adl);
 
 	  if (op == OP_VAR_VALUE)
 	    {
 	      /* Now fix the expression being evaluated.  */
-	      exp->elts[save_pos1+2].symbol = symp;
+	      exp->elts[save_pos1+2].symbol = anysym_return->symbol;
 	      argvec[0] = evaluate_subexp_with_coercion (exp, &save_pos1,
 							 noside);
 	    }
 	  else
-	    argvec[0] = value_of_variable (symp, get_selected_block (0));
+	    argvec[0] = value_of_variable (anysym_return->symbol,
+					   get_selected_block (0));
 	}
       else
 	{
@@ -1224,7 +1228,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	goto nosideret;
       arg1 = value_aggregate_elt (exp->elts[pc + 1].type,
 				  &exp->elts[pc + 3].string,
-				  expect_type, 0, noside, NULL, NULL);
+				  expect_type, 0, noside, NULL);
       if (arg1 == NULL)
 	error (_("There is no field named %s"), &exp->elts[pc + 3].string);
       return arg1;
@@ -1863,7 +1867,7 @@ evaluate_subexp_standard (struct type *expect_type,
       if (noside == EVAL_SKIP)
 	goto nosideret;
 
-      for (nargs = 0; argvec[1 + nargs] != NULL; nargs++);
+      for (nargs = 0; argvec2[1 + nargs] != NULL; nargs++);
 
       /* Move xmalloc-ated ARGVEC2 to alloca-ted ARGVEC.  */
       argvec = alloca ((1 + nargs + 1) * sizeof (*argvec));
@@ -3003,7 +3007,7 @@ evaluate_subexp_for_address (struct expression *exp, int *pos,
       (*pos) += 5 + BYTES_TO_EXP_ELEM (tem + 1);
       x = value_aggregate_elt (exp->elts[pc + 1].type,
 			       &exp->elts[pc + 3].string,
-			       NULL, 1, noside, NULL, NULL);
+			       NULL, 1, noside, NULL);
       if (x == NULL)
 	error (_("There is no field named %s"), &exp->elts[pc + 3].string);
       return x;

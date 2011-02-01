@@ -487,8 +487,7 @@ extern struct value *value_aggregate_elt (struct type *curtype,
 					  struct type *expect_type,
 					  int want_address,
 					  enum noside noside,
-					  const char **physnamep,
-					  struct symbol **symbolp);
+					  struct any_symbol *anysym_return);
 
 extern struct value *value_static_field (struct type *type, int fieldno,
 					 struct any_symbol *anysym_return);
@@ -504,7 +503,8 @@ extern int find_overload_match (struct type **arg_types, int nargs,
 				const char *name,
 				enum oload_search_type method, int lax,
 				struct value **objp, struct symbol *fsym,
-				struct value **valp, struct symbol **symp,
+				struct value **valp,
+				struct any_symbol *anysym_return,
 				int *staticp, const int no_adl);
 
 extern struct value *value_field (struct value *arg1, int fieldno);

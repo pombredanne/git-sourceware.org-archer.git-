@@ -943,27 +943,27 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
 	case OP_SCOPE:
 	  {
 	    struct value *val;
-	    const char *physname;
-	    struct symbol *sym;
+	    struct any_symbol anysym;
 
+	    memset (&anysym, 0, sizeof (anysym));
 	    val = value_aggregate_elt (exp->elts[pc + 1].type,
 				       &exp->elts[pc + 3].string, expect_type,
-				       0, EVAL_NORMAL, &physname, &sym);
+				       0, EVAL_NORMAL, &anysym);
 	    if (expect_type)
 	      {
 		xfree (TYPE_FIELDS (expect_type));
 		xfree (TYPE_MAIN_TYPE (expect_type));
 		xfree (expect_type);
 	      }
-	    if (sym)
-	      return symbol_found (funfirstline, canonical, copy, sym,
-	                           file_symtab);
-	    if (physname)
+	    if (anysym.symbol)
+	      return symbol_found (funfirstline, canonical, copy,
+				   anysym.symbol, file_symtab);
+	    if (anysym.physname)
 	      {
 		struct symtabs_and_lines retval;
 
-		retval = decode_variable (physname, funfirstline, canonical,
-					  file_symtab);
+		retval = decode_variable (anysym.physname, funfirstline,
+					  canonical, file_symtab);
 		if (retval.sals)
 		  return retval;
 	      }
