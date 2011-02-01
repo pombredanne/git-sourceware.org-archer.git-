@@ -25,4 +25,6 @@ extern struct symtabs_and_lines
 		       struct symtab *default_symtab, int default_line,
 		       char ***canonical, int *not_found_ptr);
 
+extern void cplusplus_error (const char *name, const char *fmt, ...);
+
 #endif /* defined (LINESPEC_H) */

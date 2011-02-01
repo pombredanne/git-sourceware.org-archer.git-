@@ -54,6 +54,7 @@
 #include "dfp.h"
 #include "gdb_assert.h"
 #include "macroscope.h"
+#include "linespec.h"
 
 #define parse_type builtin_type (parse_gdbarch)
 
@@ -895,6 +896,22 @@ variable:	name_not_typename
 				write_exp_msymbol (msymbol);
 			      else if (!have_full_symbols () && !have_partial_symbols ())
 				error ("No symbol table is loaded.  Use the \"file\" command.");
+			      else if (yychar == COLONCOLON
+                                       || (yychar == YYEMPTY && yylex () == COLONCOLON))
+				{
+				  char *classname, *member, *s;
+
+				  s = copy_name ($1.stoken);
+				  classname = alloca (strlen (s) + 1);
+				  strcpy (classname, s);
+				  yylex ();
+				  member = copy_name (yylval.sval);
+				  s = alloca (strlen (classname) + 2 + strlen (member) + 1);
+				  sprintf (s, "%s::%s", classname, member);
+
+				  cplusplus_error (s, "Can't find member of namespace, "
+						      "class, struct, or union named \"%s\"\n", s);
+				}
 			      else
 				error ("No symbol \"%s\" in current context.",
 				       copy_name ($1.stoken));
