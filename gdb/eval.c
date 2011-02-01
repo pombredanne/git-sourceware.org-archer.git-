@@ -1124,9 +1124,8 @@ get_funcall_argvec (struct expression *exp, int *pos, enum noside noside,
 
       if (static_memfuncp)
 	{
-	  argvec[1] = argvec[0];
 	  nargs--;
-	  argvec++;
+	  memmove (argvec[1], &argvec[2], (1 + nargs + 1) * sizeof (*argvec));
 	}
     }
   else if (op == STRUCTOP_MEMBER || op == STRUCTOP_MPTR)
