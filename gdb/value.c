@@ -1956,12 +1956,12 @@ value_static_field (struct type *type, int fieldno,
 
 	  if (!msym)
 	    {
-	      if (anysym_return)
-		anysym_return->minimal_symbol = msym;
 	      return NULL;
 	    }
 	  else
 	    {
+	      if (anysym_return)
+		anysym_return->minimal_symbol = msym;
 	      retval = value_at_lazy (TYPE_FIELD_TYPE (type, fieldno),
 				      SYMBOL_VALUE_ADDRESS (msym));
 	    }

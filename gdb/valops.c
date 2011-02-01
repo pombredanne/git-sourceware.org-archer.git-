@@ -60,7 +60,8 @@ static struct value *search_struct_field (const char *, struct value *,
 
 static struct value *search_struct_method (const char *, struct value **,
 					   struct value **,
-					   int, int *, struct type *);
+					   int, int *, struct type *,
+					   struct any_symbol *anysym_return);
 
 static int find_oload_champ_namespace (struct type **, int,
 				       const char *, const char *,
@@ -2066,7 +2067,8 @@ search_struct_field (const char *name, struct value *arg1, int offset,
 static struct value *
 search_struct_method (const char *name, struct value **arg1p,
 		      struct value **args, int offset,
-		      int *static_memfuncp, struct type *type)
+		      int *static_memfuncp, struct type *type,
+		      struct any_symbol *anysym_return)
 {
   int i;
   struct value *v;
@@ -2100,7 +2102,7 @@ search_struct_method (const char *name, struct value **arg1p,
 		     "`%s': no arguments supplied"), name);
 	  else if (j == 0 && args == 0)
 	    {
-	      v = value_fn_field (arg1p, f, j, type, offset);
+	      v = value_fn_field (arg1p, f, j, type, offset, anysym_return);
 	      if (v != NULL)
 		return v;
 	    }
@@ -2118,7 +2120,8 @@ search_struct_method (const char *name, struct value **arg1p,
 		    if (TYPE_FN_FIELD_STATIC_P (f, j) 
 			&& static_memfuncp)
 		      *static_memfuncp = 1;
-		    v = value_fn_field (arg1p, f, j, type, offset);
+		    v = value_fn_field (arg1p, f, j, type, offset,
+					anysym_return);
 		    if (v != NULL)
 		      return v;       
 		  }
@@ -2162,7 +2165,8 @@ search_struct_method (const char *name, struct value **arg1p,
 	  base_offset = TYPE_BASECLASS_BITPOS (type, i) / 8;
 	}
       v = search_struct_method (name, arg1p, args, base_offset + offset,
-				static_memfuncp, TYPE_BASECLASS (type, i));
+				static_memfuncp, TYPE_BASECLASS (type, i),
+				anysym_return);
       if (v == (struct value *) - 1)
 	{
 	  name_matched = 1;
@@ -2196,8 +2200,9 @@ search_struct_method (const char *name, struct value **arg1p,
    found.  */
 
 struct value *
-value_struct_elt (struct value **argp, struct value **args,
-		  const char *name, int *static_memfuncp, const char *err)
+value_struct_elt_anysym (struct value **argp, struct value **args,
+			 const char *name, int *static_memfuncp,
+			 const char *err, struct any_symbol *anysym_return)
 {
   struct type *t;
   struct value *v;
@@ -2232,14 +2237,14 @@ value_struct_elt (struct value **argp, struct value **args,
 
       /* Try as a field first, because if we succeed, there is less
          work to be done.  */
-      v = search_struct_field (name, *argp, 0, t, 0);
+      v = search_struct_field (name, *argp, 0, t, 0, anysym_return);
       if (v)
 	return v;
 
       /* C++: If it was not found as a data field, then try to
          return it as a pointer to a method.  */
       v = search_struct_method (name, argp, args, 0, 
-				static_memfuncp, t);
+				static_memfuncp, t, anysym_return);
 
       if (v == (struct value *) - 1)
 	error (_("Cannot take address of method %s."), name);
@@ -2254,7 +2259,7 @@ value_struct_elt (struct value **argp, struct value **args,
     }
 
     v = search_struct_method (name, argp, args, 0, 
-			      static_memfuncp, t);
+			      static_memfuncp, t, anysym_return);
   
   if (v == (struct value *) - 1)
     {
@@ -2266,7 +2271,7 @@ value_struct_elt (struct value **argp, struct value **args,
       /* See if user tried to invoke data as function.  If so, hand it
          back.  If it's not callable (i.e., a pointer to function),
          gdb should give an error.  */
-      v = search_struct_field (name, *argp, 0, t, 0);
+      v = search_struct_field (name, *argp, 0, t, 0, anysym_return);
       /* If we found an ordinary field, then it is not a method call.
 	 So, treat it as if it were a static member function.  */
       if (v && static_memfuncp)
@@ -2277,6 +2282,14 @@ value_struct_elt (struct value **argp, struct value **args,
     throw_error (NOT_FOUND_ERROR,
                  _("Structure has no component named %s."), name);
   return v;
+}
+
+struct value *
+value_struct_elt (struct value **argp, struct value **args,
+		  const char *name, int *static_memfuncp, const char *err)
+{
+  return value_struct_elt_anysym (argp, args, name, static_memfuncp, err,
+				  NULL);
 }
 
 /* Search through the methods of an object (and its bases) to find a
@@ -2373,7 +2386,7 @@ value_find_oload_method_list (struct value **argp, const char *method,
 
   t = check_typedef (value_type (*argp));
 
-  /* Code snarfed from value_struct_elt.  */
+  /* Code snarfed from value_struct_elt_anysym.  */
   while (TYPE_CODE (t) == TYPE_CODE_PTR || TYPE_CODE (t) == TYPE_CODE_REF)
     {
       *argp = value_ind (*argp);
@@ -3173,11 +3186,7 @@ value_struct_elt_for_reference (struct type *domain, int offset,
 	{
 	  if (field_is_static (&TYPE_FIELD (t, i)))
 	    {
-	      if (anysym_return
-	          && TYPE_FIELD_LOC_KIND (t, i) == FIELD_LOC_KIND_PHYSNAME)
-		anysym_return->physname = TYPE_FIELD_STATIC_PHYSNAME (t, i);
-
-	      v = value_static_field (t, i);
+	      v = value_static_field (t, i, anysym_return);
 	      if (v == NULL)
 		error (_("static field %s has been optimized out"),
 		       name);

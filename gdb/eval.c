@@ -1106,12 +1106,13 @@ get_funcall_argvec (struct expression *exp, int *pos, enum noside noside,
 	{
 	  struct value *temp = arg2;
 
-	  argvec[0] = value_struct_elt (&temp, argvec + 1, tstr,
-					&static_memfuncp,
-					(op == STRUCTOP_STRUCT
-					 ? "structure"
-					 : "structure pointer"));
-	  /* value_struct_elt updates temp with the correct value
+	  argvec[0] = value_struct_elt_anysym (&temp, argvec + 1, tstr,
+					       &static_memfuncp,
+					       (op == STRUCTOP_STRUCT
+						? "structure"
+						: "structure pointer"),
+					       anysym_return);
+	  /* value_struct_elt_anysym updates temp with the correct value
 	     of the ``this'' pointer if necessary, so modify argvec[1] to
 	     reflect any ``this'' changes.  */
 	  arg2
