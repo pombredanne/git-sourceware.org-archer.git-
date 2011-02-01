@@ -879,18 +879,31 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
   copy = (char *) alloca (p - *argptr + 1);
   memcpy (copy, *argptr, p - *argptr);
   copy[p - *argptr] = '\0';
-  if (p != *argptr
-      && copy[0]
-      && copy[0] == copy[p - *argptr - 1]
-      && strchr (get_gdb_completer_quote_characters (), copy[0]) != NULL)
-    {
-      copy[p - *argptr - 1] = '\0';
-      copy++;
-    }
-  else if (is_quoted)
+  if (is_quoted)
     copy[p - *argptr - 1] = '\0';
   while (*p == ' ' || *p == '\t')
     p++;
+
+  /* Remove any get_gdb_completer_quote_characters () inside.  GDB has to keep
+     backward compatibility with class::'member' syntax but the :: delimiter
+     is no longer found by this function.  */
+  p = copy;
+  for (;;)
+    {
+      char c;
+
+      p = &p[strcspn (p, get_gdb_completer_quote_characters ())];
+      c = *p;
+      if (!c)
+	break;
+      memmove (p, &p[1], strlen (&p[1]) + 1);
+      q = strchr (p, c);
+      if (q)
+	{
+	  memmove (q, &q[1], strlen (&q[1]) + 1);
+	  p = q;
+	}
+    }
 
   copy_parsed = copy;
   exp = parse_exp_1 (&copy_parsed,
@@ -907,7 +920,7 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
       *argptr += copy_parsed - copy;
     }
   else
-    *argptr = p;
+    *argptr += strlen (*argptr);
 
   pc = 0;
   expect_type = NULL;
@@ -1125,16 +1138,6 @@ locate_first_half (char **argptr, int *is_quote_enclosed)
     }
   for (; *p; p++)
     {
-      if (p[0] == '<')
-	{
-	  char *temp_end = find_template_name_end (p);
-
-	  /* Kept only for backward compatible de-quotation.  */
-
-	  if (!temp_end)
-	    error (_("malformed template specification in command"));
-	  p = temp_end;
-	}
       /* Check for a colon and a plus or minus and a [ (which
          indicates an Objective-C method).  */
       if (is_objc_method_format (p))
@@ -1151,20 +1154,6 @@ locate_first_half (char **argptr, int *is_quote_enclosed)
 	      && ((p[1] == ':') || (strchr (p + 1, ':') == NULL)))
 	  || ((p[0] == ' ') && !*is_quote_enclosed))
 	break;
-      if (p[0] == '.' && strchr (p, ':') == NULL)
-	{
-	  /* Kept only for backward compatible de-quotation.  */
-
-	  /* Java qualified method.  Find the *last* '.', since the
-	     others are package qualifiers.  Stop at any open parenthesis
-	     which might provide overload information.  */
-	  for (p1 = p; *p1 && *p1 != '('; p1++)
-	    {
-	      if (*p1 == '.')
-		p = p1;
-	    }
-	  break;
-	}
     }
   while (p[0] == ' ' || p[0] == '\t')
     p++;
