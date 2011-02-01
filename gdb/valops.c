@@ -3285,14 +3285,11 @@ value_struct_elt_for_reference (struct type *domain, int offset,
 		lookup_symbol (TYPE_FN_FIELD_PHYSNAME (f, j),
 			       0, VAR_DOMAIN, 0);
 
-	      if (anysym_return)
-		{
-		  anysym_return->physname = TYPE_FN_FIELD_PHYSNAME (f, j);;
-		  anysym_return->symbol = s;
-		}
-
 	      if (s == NULL)
 		return NULL;
+
+	      if (anysym_return)
+		anysym_return->symbol = s;
 
 	      if (want_address)
 		return value_addr (read_var_value (s, 0));
@@ -3322,14 +3319,11 @@ value_struct_elt_for_reference (struct type *domain, int offset,
 		lookup_symbol (TYPE_FN_FIELD_PHYSNAME (f, j),
 			       0, VAR_DOMAIN, 0);
 
-	      if (anysym_return)
-		{
-		  anysym_return->physname = TYPE_FN_FIELD_PHYSNAME (f, j);;
-		  anysym_return->symbol = s;
-		}
-
 	      if (s == NULL)
 		return NULL;
+
+	      if (anysym_return)
+		anysym_return->symbol = s;
 
 	      v = read_var_value (s, 0);
 	      if (!want_address)

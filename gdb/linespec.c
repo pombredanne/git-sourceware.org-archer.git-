@@ -131,10 +131,12 @@ static struct symtabs_and_lines decode_dollar (char *copy,
 static int decode_label (char *copy, char ***canonical,
 			 struct symtabs_and_lines *result);
 
+#if 0
 static struct symtabs_and_lines decode_variable (const char *copy,
 						 int funfirstline,
 						 char ***canonical,
 						 struct symtab *file_symtab);
+#endif
 
 static struct
 symtabs_and_lines symbol_found (int funfirstline,
@@ -911,6 +913,11 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
   expect_type = NULL;
   for (;;)
     {
+      struct any_symbol anysym;
+      struct value *funcval;
+
+      memset (&anysym, 0, sizeof (anysym));
+
       switch (exp->elts[pc].opcode)
 	{
 	case TYPE_INSTANCE:
@@ -919,71 +926,61 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
 
 	case OP_FUNCALL:
 	  {
-	    struct value **argvec, *funcval;
-	    struct any_symbol anysym;
+	    struct value **argvec;
 
-	    memset (&anysym, 0, sizeof (anysym));
 	    argvec = get_funcall_argvec (exp, &pc, EVAL_AVOID_SIDE_EFFECTS,
 					 &anysym);
 	    funcval = argvec[0];
 	    xfree (argvec);
-
 	  }
-	  continue;
+	  break;
 
 	case OP_VAR_VALUE:
-	  {
-	    struct symbol *sym = exp->elts[pc + 2].symbol;
-
-	    do_cleanups (cleanup);
-	    return symbol_found (funfirstline, canonical, copy, sym,
-				 file_symtab);
-	  }
+	  anysym.symbol = exp->elts[pc + 2].symbol;
+	  break;
 	
 	case OP_SCOPE:
-	  {
-	    struct value *val;
-	    struct any_symbol anysym;
-
-	    memset (&anysym, 0, sizeof (anysym));
-	    val = value_aggregate_elt (exp->elts[pc + 1].type,
-				       &exp->elts[pc + 3].string, expect_type,
-				       0, EVAL_NORMAL, &anysym);
-	    if (expect_type)
-	      {
-		xfree (TYPE_FIELDS (expect_type));
-		xfree (TYPE_MAIN_TYPE (expect_type));
-		xfree (expect_type);
-	      }
-	    if (anysym.symbol)
-	      return symbol_found (funfirstline, canonical, copy,
-				   anysym.symbol, file_symtab);
-	    if (anysym.physname)
-	      {
-		struct symtabs_and_lines retval;
-
-		retval = decode_variable (anysym.physname, funfirstline,
-					  canonical, file_symtab);
-		if (retval.sals)
-		  return retval;
-	      }
-
-	    if (val == NULL)
-	      error (_("There is no field named %s"),
-		     &exp->elts[pc + 3].string);
-
-	    {
-	      struct value_print_options opts;
-
-	      printf_filtered ("XXX = ");
-	      get_user_print_options (&opts);
-	      value_print (val, gdb_stdout, &opts);
-	      printf_filtered ("\n");
-	    }
-	  }
+	  funcval = value_aggregate_elt (exp->elts[pc + 1].type,
+					 &exp->elts[pc + 3].string,
+					 expect_type, 0, EVAL_NORMAL,
+					 &anysym);
+	  if (funcval == NULL)
+	    error (_("There is no field named %s"),
+		   &exp->elts[pc + 3].string);
+	  break;
 
 	break;
 	}
+
+      if (expect_type)
+	{
+	  xfree (TYPE_FIELDS (expect_type));
+	  xfree (TYPE_MAIN_TYPE (expect_type));
+	  xfree (expect_type);
+	}
+
+      if (anysym.symbol)
+	return symbol_found (funfirstline, canonical, copy,
+			     anysym.symbol, file_symtab);
+
+      if (anysym.minimal_symbol)
+	return minsym_found (funfirstline, anysym.minimal_symbol);
+
+      if (funcval)
+	{
+	  struct symtabs_and_lines values;
+	  CORE_ADDR pc = value_as_address (funcval);
+
+	  values.nelts = 1;
+	  values.sals = xmalloc (sizeof (*values.sals));
+	  values.sals[0] = find_pc_line (pc, 0);
+	  values.sals[0].pc = pc;
+	  values.sals[0].section = find_pc_overlay (pc);
+	  values.sals[0].explicit_pc = 1;
+
+	  return values;
+	}
+
       break;
     }
 
@@ -1950,6 +1947,7 @@ decode_label (char *copy, char ***canonical, struct symtabs_and_lines *result)
    not NULL and the function cannot be found, store boolean true in
    the location pointed to and do not issue an error message.  */ 
 
+#if 0
 static struct symtabs_and_lines
 decode_variable (const char *copy, int funfirstline, char ***canonical,
 		 struct symtab *file_symtab)
@@ -1977,6 +1975,7 @@ decode_variable (const char *copy, int funfirstline, char ***canonical,
   retval.nelts = 0;
   return retval;
 }
+#endif
 
 
 
