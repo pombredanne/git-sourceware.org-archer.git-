@@ -1,3 +1,162 @@
+2011-02-04  Sami Wagiaalla  <swagiaal@redhat.com>
+                Oguz Kayral <oguzkayral@gmail.com>
+
+	* python/py-inferior.c (python_on_normal_stop): New function.
+	(python_on_resume): New function.
+	(python_inferior_exit): New function.
+	(gdbpy_initialize_inferior): Add normal_stop, target_resumed, and
+	inferior_exit observers.
+	* python/py-evtregistry.c: New file.
+	* python/py-threadevent.c : New file.
+	* python/py-event.c: New file.
+	* python/py-evts.c: New file.
+	* python/py-continueevent.c: New file.
+	* python/py-bpevent.c: New file.
+	* python/py-signalevent.c: New file.
+	* python/py-exetiedevent.c: New file.
+	* python/py-breakpoint.c (gdbpy_breakpoint_from_bpstats): New function.
+	Move struct breakpoint_object from here...
+	* python/python-internal.h: ... to here.
+	* python/py-event.h: New file.
+	* python/py-events.h: New file.
+	* Makefile.in (SUBDIR_PYTHON_OBS): Add py-breakpointstopevent.o,
+	py-continueevent.o, py-event.o, py-eventregistry.o, py-events.o,
+	py-exitedevent.o, py-signalstopevent.o, and py-stopevent.o.
+	(SUBDIR_PYTHON_SRCS): Add py-breakpointstopevent.c,
+	py-continueevent.c, py-event.c, py-eventregistry.c, py-events.c,
+	py-exitedevent.c, py-signalstopevent.c, and py-stopevent.c.
+	Add build rules for all the above.
+
+2011-02-04  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (dwarf2_section_empty_p): New function.
+	(dwarf2_read_section): Use dwarf2_section_empty_p.
+	(dwarf2_section_size): New function.
+	(dwarf2_get_section_info): Unconditionally read section.
+	(dwarf2_read_index): Use dwarf2_section_empty_p.
+	(partial_read_comp_unit_head): Use dwarf2_section_size.
+	(dwarf2_symbol_mark_computed): Likewise.
+
+2011-02-04 David Daney <ddaney@caviumnetworks.com>
+
+	* NEWS: Add item for "catch syscall" on mips*-linux* targets.
+
+2011-02-04 David Daney <ddaney@caviumnetworks.com>
+
+	* mips-linux-tdep.c: Include xml-syscall.h.
+	(mips_linux_get_syscall_number): New function.
+	(mips_linux_init_abi): Add calls to
+	mips_linux_get_syscall_number() and set_xml_syscall_file_name().
+	* data-directory/Makefile.in (SYSCALLS_FILES): Add
+	mips-o32-linux.xml, mips-n32-linux.xml and mips-n64-linux.xml
+	* syscalls/mips-n32-linux.xml: New file.
+	* syscalls/mips-n64-linux.xml: New file.
+	* syscalls/mips-o32-linux.xml: New file.
+
+2011-02-04  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* dwarf2read.c (dwarf2_ranges_read): Skip empty range entries.
+	Complain about inverted range entries.
+	(dwarf2_record_block_ranges): Likewise.
+
+2011-02-04  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	Fix some typos.
+	* breakpoint.c (update_watchpoint): Fix name of the
+	update_global_location_list function.
+	(print_one_breakpoint): Fix typo.
+	(_initialize_breakpoint): Remove extra space in hbreak help
+	string.
+	* breakpoint.h (struct bp_location) <length>: Fix field
+	description.
+
+2011-02-04  Pedro Alves  <pedro@codesourcery.com>
+
+	* regcache.c (registers_changed_ptid): Don't explictly always
+	clear `current_regcache'.  Only clear current_thread_ptid and
+	current_thread_arch when PTID matches.  Only reinit the frame
+	cache if PTID matches the current inferior_ptid.  Move alloca(0)
+	call to ...
+	(registers_changed): ... here.
+
+2011-02-03  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* arm-tdep.c (arm_skip_stack_protector): Accept any symbol that
+	starts with __stack_chk_guard as stack guard symbol.
+
+2011-02-03  Andrew Burgess  <aburgess@broadcom.com>
+
+	* disasm.c (compare_lines): Handle the end of sequence markers
+	within the line table to better support disassembling over
+	compilation unit boundaries.
+
+2011-02-02  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* arm-tdep.c (skip_prologue_function): Add GDBARCH and IS_THUMB
+	arguments.  Skip in-prologue calls to glibc __aeabi_read_tp
+	implementation even if no symbols are available.
+	(thumb_analyze_prologue): Update call to skip_prologue_function.
+	(arm_analyze_prologue): Likewise.
+
+2011-02-02  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* arm-tdep.c: Include "observer.h".
+	(arm_prologue_this_id): Use frame PC if get_frame_func returns 0.
+	(arm_exidx_data_key): New static variable.
+	(struct arm_exidx_entry, arm_exidx_entry_s): New data types.
+	(struct arm_exidx_data): Likewise.
+	(arm_exidx_data_free): New function.
+	(arm_compare_exidx_entries): Likewise.
+	(arm_obj_section_from_vma): Likewise.
+	(arm_exidx_new_objfile): Likewise.
+	(arm_find_exidx_entry): Likewise.
+	(arm_exidx_fill_cache): Likewise.
+	(arm_exidx_unwind_sniffer): Likewise.
+	(arm_exidx_unwind): New global variable.
+	(arm_gdbarch_init): Append unwinder arm_exidx_unwind.
+	(_initialize_arm_tdep): Attach arm_exidx_new_objfile to new_objfile
+	observer.  Register arm_exidx_data_key as objfile data.
+
+2011-02-02  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* arm-tdep.c (arm_analyze_load_stack_chk_guard): Avoid build break
+	due to accessing uninitialized variable.  Fix indentation.
+
+2011-02-02  Pedro Alves  <pedro@codesourcery.com>
+
+	* c-valprint.c (c_value_print): When doing virtual base pointer
+	adjustment, create a new value with adjusted contents rather than
+	changing the contents of the value being printed (and getting it
+	wrong).
+
+2011-02-02  Pedro Alves  <pedro@codesourcery.com>
+
+	* xml-support.c (xml_find_attribute): New.
+	(xinclude_start_include): Use it.
+	* xml-support.h (xml_find_attribute): Declare.
+	* memory-map.c (memory_map_start_memory)
+	(memory_map_start_property): Use xml_find_attribute.
+	* osdata.c (osdata_start_osdata, osdata_start_column): Use
+	xml_find_attribute.
+	* remote.c (start_thread): Use xml_find_attribute.
+	* solib-target.c (library_list_start_segment)
+	(library_list_start_section, library_list_start_library)
+	(library_list_start_list): Use xml_find_attribute.
+	* xml-tdesc.c (tdesc_start_target, tdesc_start_feature)
+	(tdesc_start_union, tdesc_start_struct, tdesc_start_flags)
+	(tdesc_start_field): Use xml_find_attribute.
+
+2011-02-02  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* opencl-lang.c (STRINGIFY): Rename to OCL_STRING.
+	(BUILD_OCL_VTYPES): Update.
+
+2011-02-02  Joel Brobecker  <brobecker@adacore.com>
+
+	* configure.ac: Work around non-GNU sed limitation when computing
+	python version number.
+	* configure: Regenerate.
+
 2011-02-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	Fix debug printing of TYPE_INSTANCE.
