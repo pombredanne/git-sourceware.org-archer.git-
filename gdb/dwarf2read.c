@@ -14656,7 +14656,7 @@ dwarf2_attr_to_loclist_baton (struct attribute *attr, struct dwarf2_cu *cu)
 	   the section.  If so, fall through to the complaint in the
 	   other branch.  */
 	&& DW_UNSND (attr) < dwarf2_section_size (dwarf2_per_objfile->objfile,
-						  &dwarf2_per_objfile->loc))
+						  &dwarf2_per_objfile->loc)))
     return NULL;
 
   baton = obstack_alloc (&cu->objfile->objfile_obstack,
