@@ -1,3 +1,95 @@
+2011-02-04  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.python/py-evthreads.c: New file.
+	* gdb.python/py-evthreads.exp: New file.
+	* gdb.python/py-events.py: New file.
+	* gdb.python/py-events.exp: New file.
+	* gdb.python/py-events.c: New file.
+
+2011-02-04 David Daney <ddaney@caviumnetworks.com>
+
+	* gdb.base/catch-syscall.exp: Enable for mips*-linux*.
+
+2011-02-03  Andrew Burgess  <aburgess@broadcom.com>
+
+	* gdb.base/disasm-end-cu-1.c, gdb.base/disasm-end-cu-2.c,
+	gdb.base/disasm-end-cu.exp: New test for disassembling over the
+	boundary between two compilation units.
+
+2011-02-02  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.cp/virtbase.cc (VirtualBase, VirtualMiddleA, VirtualMiddleB)
+	(Virtual): New structs.
+	(virtual_o, virtual_middle_b): New globals.
+	* gdb.cp/virtbase.exp: New tests.
+
+2011-01-31  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* gdb.base/jit.exp: New file.
+	* gdb.base/jit-main.c: New file.
+	* gdb.base/jit-solib.c: New file.
+
+2011-01-31  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.opencl/convs_casts.exp: Use tbreak instead of break to
+	proceed to initial kernel entry point.
+	* gdb.opencl/datatypes.exp: Likewise.
+	* gdb.opencl/operators.exp: Likewise.
+	* gdb.opencl/vec_comps.exp: Likewise.
+
+2011-01-31  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/nsnested.cc: New.
+	* gdb.cp/nsnested.exp: New.
+	* gdb.cp/nsnoimports.exp: New.
+	* gdb.cp/nsnoimports.cc: New.
+
+2011-01-31  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.base/interact.exp: Add extra tests that verify that
+	the value of the interactive-mode setting does not change
+	after the script is sourced.
+
+2011-01-29  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.cp/noparam.exp: New file.
+	* gdb.cp/noparam.cc: New file.
+
+2011-01-28  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.trace/tfile.exp: Test that with no traceframe selected,
+	there's no stack or registers.
+
+2011-01-26  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.python/py-prettyprint.exp (run_lang_tests): Ensure no blank
+	space before string output.  Add test for "set print pretty off"
+	case.
+
+2011-01-25  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.base/frame-args.exp: Adjust.
+	* gdb.dwarf2/dw2-noloc.exp: Adjust.
+	* gdb.dwarf2/dw2-inline-param.exp: Adjust.
+	* gdb.dwarf2/pieces.exp: Adjust.
+	* gdb.opt/clobbered-registers-O2.exp: Adjust.
+	* gdb.opt/inline-locals.exp: Adjust.
+	* gdb.threads/fork-child-threads.exp: Adjust.
+
+2011-01-25  Ken Werner  <ken.werner@de.ibm.com>
+
+	* gdb.opencl/convs_casts.cl: Move program scope variables into the
+	OpenCL kernel function. Add a comment as marker. Add address space
+	qualifiers for the remaining program scope variables.
+	* gdb.opencl/datatypes.cl: Likewise.
+	* gdb.opencl/operators.cl: Likewise.
+	* gdb.opencl/vec_comps.cl: Likewise.
+	* gdb.opencl/convs_casts.exp: Replace gdb_test_multiple by gdb_test.
+	Add breakpoint at the marker comment.
+	* gdb.opencl/datatypes.exp: Likewise.
+	* gdb.opencl/operators.exp: Likewise.
+	* gdb.opencl/vec_comps.exp: Likewise.
+
 2011-01-24  Pedro Alves  <pedro@codesourcery.com>
 
 	* gdb.base/printcmds.c (some_struct): New struct and instance.

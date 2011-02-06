@@ -1518,6 +1518,14 @@ zlib_decompress_section (struct objfile *objfile, asection *sectp,
 #endif
 }
 
+/* A helper function that decides whether a section is empty.  */
+
+static int
+dwarf2_section_empty_p (struct dwarf2_section_info *info)
+{
+  return info->asection == NULL || info->size == 0;
+}
+
 /* Read the contents of the section SECTP from object file specified by
    OBJFILE, store info about the section into INFO.
    If the section is compressed, uncompress it before returning.  */
@@ -1536,7 +1544,7 @@ dwarf2_read_section (struct objfile *objfile, struct dwarf2_section_info *info)
   info->was_mmapped = 0;
   info->readin = 1;
 
-  if (info->asection == NULL || info->size == 0)
+  if (dwarf2_section_empty_p (info))
     return;
 
   /* Check if the file has a 4-byte header indicating compression.  */
@@ -1601,6 +1609,22 @@ dwarf2_read_section (struct objfile *objfile, struct dwarf2_section_info *info)
 	   bfd_get_filename (abfd));
 }
 
+/* A helper function that returns the size of a section in a safe way.
+   If you are positive that the section has been read before using the
+   size, then it is safe to refer to the dwarf2_section_info object's
+   "size" field directly.  In other cases, you must call this
+   function, because for compressed sections the size field is not set
+   correctly until the section has been read.  */
+
+static bfd_size_type
+dwarf2_section_size (struct objfile *objfile,
+		     struct dwarf2_section_info *info)
+{
+  if (!info->readin)
+    dwarf2_read_section (objfile, info);
+  return info->size;
+}
+
 /* Fill in SECTP, BUFP and SIZEP with section info, given OBJFILE and
    SECTION_NAME.  */
 
@@ -1629,9 +1653,7 @@ dwarf2_get_section_info (struct objfile *objfile, const char *section_name,
   else
     gdb_assert_not_reached ("unexpected section");
 
-  if (info->asection != NULL && info->size != 0 && info->buffer == NULL)
-    /* We haven't read this section in yet.  Do it now.  */
-    dwarf2_read_section (objfile, info);
+  dwarf2_read_section (objfile, info);
 
   *sectp = info->asection;
   *bufp = info->buffer;
@@ -2017,8 +2039,7 @@ dwarf2_read_index (struct objfile *objfile)
   offset_type types_list_elements = 0;
   int i;
 
-  if (dwarf2_per_objfile->gdb_index.asection == NULL
-      || dwarf2_per_objfile->gdb_index.size == 0)
+  if (dwarf2_section_empty_p (&dwarf2_per_objfile->gdb_index))
     return 0;
 
   /* Older elfutils strip versions could keep the section in the main
@@ -2033,13 +2054,14 @@ dwarf2_read_index (struct objfile *objfile)
   /* Version check.  */
   version = MAYBE_SWAP (*(offset_type *) addr);
   /* Versions earlier than 3 emitted every copy of a psymbol.  This
-     causes the index to behave very poorly for certain requests.  So,
-     it seems better to just ignore such indices.  */
-  if (version < 3)
+     causes the index to behave very poorly for certain requests.  Version 4
+     contained incomplete addrmap.  So, it seems better to just ignore such
+     indices.  */
+  if (version < 4)
     return 0;
   /* Indexes with higher version than the one supported by GDB may be no
      longer backward compatible.  */
-  if (version > 3)
+  if (version > 4)
     return 0;
 
   map = OBSTACK_ZALLOC (&objfile->objfile_obstack, struct mapped_index);
@@ -2831,7 +2853,9 @@ partial_read_comp_unit_head (struct comp_unit_head *header, gdb_byte *info_ptr,
 	   "(is %d, should be 2, 3, or 4) [in module %s]"), header->version,
 	   bfd_get_filename (abfd));
 
-  if (header->abbrev_offset >= dwarf2_per_objfile->abbrev.size)
+  if (header->abbrev_offset
+      >= dwarf2_section_size (dwarf2_per_objfile->objfile,
+			      &dwarf2_per_objfile->abbrev))
     error (_("Dwarf Error: bad offset (0x%lx) in compilation unit header "
 	   "(offset 0x%lx + 6) [in module %s]"),
 	   (long) header->abbrev_offset,
@@ -5871,10 +5895,22 @@ dwarf2_ranges_read (unsigned offset, CORE_ADDR *low_return,
 	  return 0;
 	}
 
+      if (range_beginning > range_end)
+	{
+	  /* Inverted range entries are invalid.  */
+	  complaint (&symfile_complaints,
+		     _("Invalid .debug_ranges data (inverted range)"));
+	  return 0;
+	}
+
+      /* Empty range entries have no effect.  */
+      if (range_beginning == range_end)
+	continue;
+
       range_beginning += base;
       range_end += base;
 
-      if (ranges_pst != NULL && range_beginning < range_end)
+      if (ranges_pst != NULL)
 	addrmap_set_empty (objfile->psymtabs_addrmap,
 			   range_beginning + baseaddr,
 			   range_end - 1 + baseaddr,
@@ -6156,6 +6192,19 @@ dwarf2_record_block_ranges (struct die_info *die, struct block *block,
 			       "(no base address)"));
                   return;
                 }
+
+	      if (start > end)
+		{
+		  /* Inverted range entries are invalid.  */
+		  complaint (&symfile_complaints,
+			     _("Invalid .debug_ranges data "
+			       "(inverted range)"));
+		  return;
+		}
+
+	      /* Empty range entries have no effect.  */
+	      if (start == end)
+		continue;
 
               record_block_range (block,
                                   baseaddr + base + start,
@@ -14606,7 +14655,8 @@ dwarf2_attr_to_loclist_baton (struct attribute *attr, struct dwarf2_cu *cu)
 	/* ".debug_loc" may not exist at all, or the offset may be outside
 	   the section.  If so, fall through to the complaint in the
 	   other branch.  */
-	&& DW_UNSND (attr) < dwarf2_per_objfile->loc.size))
+	&& DW_UNSND (attr) < dwarf2_section_size (dwarf2_per_objfile->objfile,
+						  &dwarf2_per_objfile->loc))
     return NULL;
 
   baton = obstack_alloc (&cu->objfile->objfile_obstack,
@@ -15960,7 +16010,7 @@ write_psymtabs_to_index (struct objfile *objfile, const char *dir)
   total_len = size_of_contents;
 
   /* The version number.  */
-  val = MAYBE_SWAP (3);
+  val = MAYBE_SWAP (4);
   obstack_grow (&contents, &val, sizeof (val));
 
   /* The offset of the CU list from the start of the file.  */
@@ -16018,7 +16068,7 @@ write_psymtabs_to_index (struct objfile *objfile, const char *dir)
    1. The file header.  This is a sequence of values, of offset_type
    unless otherwise noted:
 
-   [0] The version number, currently 3.  Versions 1 and 2 are
+   [0] The version number, currently 4.  Versions 1, 2 and 3 are
    obsolete.
    [1] The offset, from the start of the file, of the CU list.
    [2] The offset, from the start of the file, of the types CU list.

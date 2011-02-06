@@ -3,6 +3,8 @@
 
 *** Changes since GDB 7.2
 
+* The "catch syscall" command now works on mips*-linux* targets.
+
 * The -data-disassemble MI command now supports modes 2 and 3 for
   dumping the instruction opcodes.
 
@@ -59,6 +61,22 @@
 
   ** The gdb.InferiorThread class has a new "name" attribute.  This
      holds the thread's name.
+
+  ** Python Support for Inferior events.
+     Python scripts can add observers to be notified of events
+     occurring the in process being debugged.
+     The following events are currently supported:
+     - gdb.events.cont Continue event.
+     - gdb.events.exited Inferior exited event.
+     - gdb.events.stop Signal received, and Breakpoint hit events.
+
+  ** Python Support for Inferior events.
+     Python scripts can add observers to be notified of events
+     occurring the in process being debugged.
+     The following events are currently supported:
+     - gdb.events.cont Continue event.
+     - gdb.events.exited Inferior exited event.
+     - gdb.events.stop Signal received, and Breakpoint hit events.
 
 * C++ Improvements:
 
