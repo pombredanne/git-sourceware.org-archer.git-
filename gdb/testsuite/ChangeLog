@@ -1,3 +1,36 @@
+2011-02-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix const/volatile qualifiers of C++ types, PR c++/12328.
+	* gdb.cp/overload-const.exp: New file.
+	* gdb.cp/overload-const.cc: New file.
+
+2011-02-08  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.opencl/callfuncs.cl: New file.
+	* gdb.opencl/callfuncs.exp: New test.
+	* gdb.opencl/Makefile.in (EXECUTABLES): Add callfuncs.
+
+2011-02-08  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.arch/altivec-abi.c (vec_func): Make use of intv_on_stack_f
+	when computing result.
+	* gdb.arch/altivec-abi.exp: Update expected results.
+
+2011-02-07  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.base/break-interp.exp: Remove ${objdir} from test messages.
+	* gdb.base/jit.exp: Likewise.
+	* gdb.base/pie-execl.exp: Likewise.
+	* gdb.base/solib-nodir.exp: Likewise.
+	* gdb.base/solib-overlap.exp: Likewise.
+
+2011-02-07  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.trace/collection.c (global_pieces): New.
+	* gdb.trace/collection.exp (gdb_collect_global_in_pieces_test):
+	New procedure.
+	(gdb_trace_collection_test): Call it.
+
 2011-02-04  Sami Wagiaalla  <swagiaal@redhat.com>
 
 	* gdb.python/py-evthreads.c: New file.

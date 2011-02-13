@@ -1,5 +1,103 @@
+2011-02-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix const/volatile qualifiers of C++ types, PR c++/12328.
+	* c-typeprint.c (c_type_print_args): Update the function comment.  New
+	variable param_type, initialize it.  Remove const/volatile qualifiers
+	for language_cplus and !show_artificial.  Use param_type.
+
+2011-02-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symtab.c (find_pc_sect_line): New variable objfile, initialize it
+	from S.  Iterate S using ALL_OBJFILE_SYMTABS.  Verify BV for each S.
+	* symtab.h (struct symtab) <next>: Comment extension.
+
+2011-02-12  Yao Qi  <yao@codesourcery.com>
+
+	* Makefile.in (CLEANDIRS): Remove duplicated common dir.
+
+2011-02-11  Pedro Alves  <pedro@codesourcery.com>
+
+	* infrun.c (proceed): Move switching out and in of tfind mode from
+	here ...
+	(fetch_inferior_event): ... to here.
+
+2011-02-11  Yao Qi  <yao@codesourcery.com>
+
+	* Makefile.in: Remove signals.o from COMMON_OBS.  Link
+	libcommon.a.
+	* configure.ac: Add common to sub dir.
+	* configure: Regenerate.
+
+2011-02-10  Pedro Alves  <pedro@codesourcery.com>
+
+	* vec.h (VEC_block_remove): Place VEC_ASSERT_INFO on the right
+	side of the parenthesis.
+
+	Merge from GCC:
+	2010-07-13  Jakub Jelinek  <jakub@redhat.com>
+	* vec.h (VEC_block_remove): Fix comment.
+
+2011-02-08  Michael Snyder  <msnyder@vmware.com>
+
+	* linux-nat.c (linux_nat_filter_event): Fix typo in comment.
+
+2011-02-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* i386-tdep.c (i386_process_record): Rename l suffixes to d suffixes
+	in comments for pcmpgtd, pcmpeqd, psubd, paddd, pcmpgtd, pcmpeqd,
+	psubd and paddd.
+
+2011-02-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR 12361.
+	* i386-tdep.c (i386_process_record) <0x660f3807>: Fix the comment to
+	phsubsw.
+	(i386_process_record) <lddqu>: Fix the opcode to 0xf20ff0.
+	(i386_process_record) <0x0f3807>: Fix the comment to phsubsw.
+
+2011-02-08  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* dwarf2read.c (read_subroutine_type): Set special calling
+	convention flag for functions compiled by IBM XL C for OpenCL.
+	* ppc-sysv-tdep.c: Include "dwarf2.h"
+	(ppc_sysv_abi_push_dummy_call): Implement IBM OpenCL vector types
+	calling convention.
+	(do_ppc_sysv_return_value): Add FUNC_TYPE argument.  Implement
+	IBM OpenCL vector types calling convention.
+	(ppc_sysv_abi_return_value): Pass through FUNC_TYPE.
+	(ppc_sysv_abi_broken_return_value): Likewise.
+	(ppc64_sysv_abi_push_dummy_call): Implement IBM OpenCL vector
+	types calling convention.
+	(ppc64_sysv_abi_return_value): Likewise.
+	* spu-tdep.c: Include "dwarf2.h"
+	(spu_return_value): Implement IBM OpenCL vector types calling
+	convention.
+
+2011-02-08  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* ppc-sysv-tdep.c (ppc64_sysv_abi_push_dummy_call): Implement
+	correct ABI for AltiVec vector arguments.
+
+2011-02-07  Pedro Alves  <pedro@codesourcery.com>
+
+	* valprint.c (val_print): Extend comment.
+	* ada-valprint.c (ada_valprint): Rewrite comment deferring
+	interface explanation to val_print.
+	(ada_val_print_array): Adjust comment to current interface.
+	(print_field_values): Adjust comment to current interface.
+	* c-valprint.c (c_val_print): Rewrite comment deferring interface
+	explanation to val_print.
+	* f-valprint.c (f_val_print): Ditto.
+	* jv-valprint.c (java_val_print): Ditto.
+	* m2-valprint.c (m2_val_print): Ditto.
+	* p-valprint.c (pascal_val_print): Ditto.
+
+2011-02-07  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* breakpoint.c (parse_breakpoint_sals): Fix description.
+
 2011-02-04  Sami Wagiaalla  <swagiaal@redhat.com>
-                Oguz Kayral <oguzkayral@gmail.com>
+	    Oguz Kayral <oguzkayral@gmail.com>
 
 	* python/py-inferior.c (python_on_normal_stop): New function.
 	(python_on_resume): New function.
