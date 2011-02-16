@@ -603,10 +603,10 @@ read_pieced_value (struct value *v)
 	  break;
 
 	case DWARF_VALUE_MEMORY:
-	  if (p->v.mem.in_stack_memory)
-	    read_stack (p->v.mem.addr + source_offset, buffer, this_size);
-	  else
-	    read_memory (p->v.mem.addr + source_offset, buffer, this_size);
+	  read_value_memory (v, offset,
+			     p->v.mem.in_stack_memory,
+			     p->v.mem.addr + source_offset,
+			     buffer, this_size);
 	  break;
 
 	case DWARF_VALUE_STACK:
@@ -1334,8 +1334,15 @@ dwarf2_loc_desc_needs_frame (const gdb_byte *data, unsigned short size,
 static void
 unimplemented (unsigned int op)
 {
-  error (_("DWARF operator %s cannot be translated to an agent expression"),
-	 dwarf_stack_op_name (op, 1));
+  const char *name = dwarf_stack_op_name (op);
+
+  if (name)
+    error (_("DWARF operator %s cannot be translated to an agent expression"),
+	   name);
+  else
+    error (_("Unknown DWARF operator 0x%02x cannot be translated "
+	     "to an agent expression"),
+	   op);
 }
 
 /* A helper function to convert a DWARF register to an arch register.
@@ -1793,8 +1800,10 @@ compile_dwarf_to_ax (struct agent_expr *expr, struct axs_value *loc,
 		ax_simple (expr, aop_ref64);
 		break;
 	      default:
+		/* Note that dwarf_stack_op_name will never return
+		   NULL here.  */
 		error (_("Unsupported size %d in %s"),
-		       size, dwarf_stack_op_name (op, 1));
+		       size, dwarf_stack_op_name (op));
 	      }
 	  }
 	  break;
@@ -2070,7 +2079,7 @@ compile_dwarf_to_ax (struct agent_expr *expr, struct axs_value *loc,
 	  unimplemented (op);
 
 	default:
-	  error (_("Unhandled dwarf expression opcode 0x%x"), op);
+	  unimplemented (op);
 	}
     }
 
@@ -2295,7 +2304,7 @@ disassemble_dwarf_expression (struct ui_file *stream,
       LONGEST l;
       const char *name;
 
-      name = dwarf_stack_op_name (op, 0);
+      name = dwarf_stack_op_name (op);
 
       if (!name)
 	error (_("Unrecognized DWARF opcode 0x%02x at %ld"),

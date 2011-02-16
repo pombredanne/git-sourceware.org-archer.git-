@@ -187,6 +187,8 @@ c_val_print (struct type *type, const gdb_byte *valaddr,
 	     long as the entire array is valid.  */
           if (c_textual_element_type (unresolved_elttype,
 				      options->format)
+	      && value_bytes_available (original_value, embedded_offset,
+					TYPE_LENGTH (type))
 	      && value_bits_valid (original_value,
 				   TARGET_CHAR_BIT * embedded_offset,
 				   TARGET_CHAR_BIT * TYPE_LENGTH (type)))
@@ -684,29 +686,33 @@ c_value_print (struct value *val, struct ui_file *stream,
 	    }
 	  /* Pointer to class, check real type of object.  */
 	  fprintf_filtered (stream, "(");
-          real_type = value_rtti_target_type (val, &full,
-					      &top, &using_enc);
-          if (real_type)
-	    {
-	      /* RTTI entry found.  */
-              if (TYPE_CODE (type) == TYPE_CODE_PTR)
-                {
-                  /* Create a pointer type pointing to the real
-		     type.  */
-                  type = lookup_pointer_type (real_type);
-                }
-              else
-                {
-                  /* Create a reference type referencing the real
-		     type.  */
-                  type = lookup_reference_type (real_type);
-                }
-	      /* JYG: Need to adjust pointer value.  */
-	      val = value_from_pointer (type, value_as_address (val) - top);
 
-              /* Note: When we look up RTTI entries, we don't get any 
-                 information on const or volatile attributes.  */
-            }
+	  if (value_entirely_available (val))
+ 	    {
+	      real_type = value_rtti_target_type (val, &full, &top, &using_enc);
+	      if (real_type)
+		{
+		  /* RTTI entry found.  */
+		  if (TYPE_CODE (type) == TYPE_CODE_PTR)
+		    {
+		      /* Create a pointer type pointing to the real
+			 type.  */
+		      type = lookup_pointer_type (real_type);
+		    }
+		  else
+		    {
+		      /* Create a reference type referencing the real
+			 type.  */
+		      type = lookup_reference_type (real_type);
+		    }
+		  /* Need to adjust pointer value.  */
+		  val = value_from_pointer (type, value_as_address (val) - top);
+
+		  /* Note: When we look up RTTI entries, we don't get
+		     any information on const or volatile
+		     attributes.  */
+		}
+	    }
           type_print (type, "", stream, -1);
 	  fprintf_filtered (stream, ") ");
 	  val_type = type;

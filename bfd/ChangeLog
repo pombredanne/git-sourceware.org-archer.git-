@@ -1,3 +1,27 @@
+2011-02-16  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elf64-x86-64.c (elf_x86_64_check_relocs): Check relocation
+	overflow only for ABI_64_P.
+	(elf_x86_64_relocate_section): Likewise.
+
+2011-02-15  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-alpha.c (alpha_vms_link_add_archive_symbols): Add a comment.
+
+2011-02-15  Alan Modra  <amodra@gmail.com>
+
+	* elf64-ppc.c (ppc64_elf_edit_toc): Reinstate second read of
+	toc relocs.  Fuss over free(NULL).
+
+2011-02-14  Mike Frysinger  <vapier@gentoo.org>
+
+	* elflink.c (bfd_elf_size_dynamic_sections): Add
+	bfd_get_symbol_leading_char to the start of newname.
+
+2011-02-13  Ralf Wildenhues  <Ralf.Wildenhues@gmx.de>
+
+	* configure: Regenerate.
+
 2011-02-09  Alan Modra  <amodra@gmail.com>
 
 	* elf64-ppc.c (ppc64_elf_edit_toc): Don't free toc relocs until

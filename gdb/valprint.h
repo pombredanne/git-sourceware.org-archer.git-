@@ -154,4 +154,8 @@ int read_string (CORE_ADDR addr, int len, int width, unsigned int fetchlimit,
 
 extern void val_print_optimized_out (struct ui_file *stream);
 
+extern void val_print_unavailable (struct ui_file *stream);
+
+extern void val_print_invalid_address (struct ui_file *stream);
+
 #endif

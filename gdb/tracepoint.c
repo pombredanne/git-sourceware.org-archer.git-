@@ -50,6 +50,7 @@
 #include "source.h"
 #include "ax.h"
 #include "ax-gdb.h"
+#include "memrange.h"
 
 /* readline include files */
 #include "readline/readline.h"
@@ -130,6 +131,14 @@ extern void output_command (char *, int);
 typedef struct trace_state_variable tsv_s;
 DEF_VEC_O(tsv_s);
 
+/* An object describing the contents of a traceframe.  */
+
+struct traceframe_info
+{
+  /* Collected memory.  */
+  VEC(mem_range_s) *memory;
+};
+
 static VEC(tsv_s) *tvariables;
 
 /* The next integer to assign to a variable.  */
@@ -147,6 +156,12 @@ static struct symbol *traceframe_fun;
 
 /* Symtab and line for last traceframe collected.  */
 static struct symtab_and_line traceframe_sal;
+
+/* The traceframe info of the current traceframe.  NULL if we haven't
+   yet attempted to fetch it, or if the target does not support
+   fetching this object, or if we're not inspecting a traceframe
+   presently.  */
+static struct traceframe_info *traceframe_info;
 
 /* Tracing command lists.  */
 static struct cmd_list_element *tfindlist;
@@ -206,6 +221,29 @@ struct trace_status *
 current_trace_status ()
 {
   return &trace_status;
+}
+
+/* Destroy INFO.  */
+
+static void
+free_traceframe_info (struct traceframe_info *info)
+{
+  if (info != NULL)
+    {
+      VEC_free (mem_range_s, info->memory);
+
+      xfree (info);
+    }
+}
+
+/* Free and and clear the traceframe info cache of the current
+   traceframe.  */
+
+static void
+clear_traceframe_info (void)
+{
+  free_traceframe_info (traceframe_info);
+  traceframe_info = NULL;
 }
 
 /* Set traceframe number to NUM.  */
@@ -803,11 +841,11 @@ memrange_sortmerge (struct collection_list *memranges)
     {
       for (a = 0, b = 1; b < memranges->next_memrange; b++)
 	{
-	  if (memranges->list[a].type == memranges->list[b].type &&
-	      memranges->list[b].start - memranges->list[a].end <=
-	      MAX_REGISTER_SIZE)
+	  /* If memrange b overlaps or is adjacent to memrange a,
+	     merge them.  */
+	  if (memranges->list[a].type == memranges->list[b].type
+	      && memranges->list[b].start <= memranges->list[a].end)
 	    {
-	      /* memrange b starts before memrange a ends; merge them.  */
 	      if (memranges->list[b].end > memranges->list[a].end)
 		memranges->list[a].end = memranges->list[b].end;
 	      continue;		/* next b, same a */
@@ -1597,6 +1635,7 @@ start_tracing (void)
   set_tracepoint_num (-1);
   set_traceframe_context (NULL);
   current_trace_status()->running = 1;
+  clear_traceframe_info ();
 }
 
 /* tstart command:
@@ -1888,7 +1927,7 @@ disconnect_tracing (int from_tty)
      confusing upon reconnection.  Just use these calls instead of
      full tfind_1 behavior because we're in the middle of detaching,
      and there's no point to updating current stack frame etc.  */
-  set_traceframe_number (-1);
+  set_current_traceframe (-1);
   set_traceframe_context (NULL);
 }
 
@@ -1964,6 +2003,7 @@ tfind_1 (enum trace_find_type type, int num,
   registers_changed ();
   target_dcache_invalidate ();
   set_traceframe_num (target_frameno);
+  clear_traceframe_info ();
   set_tracepoint_num (tp ? tp->number : target_tracept);
   if (target_frameno == -1)
     set_traceframe_context (NULL);
@@ -2895,7 +2935,7 @@ get_traceframe_number (void)
    if NUM is already current.  */
 
 void
-set_traceframe_number (int num)
+set_current_traceframe (int num)
 {
   int newnum;
 
@@ -2915,6 +2955,17 @@ set_traceframe_number (int num)
   /* Changing the traceframe changes our view of registers and of the
      frame chain.  */
   registers_changed ();
+
+  clear_traceframe_info ();
+}
+
+/* Make the traceframe NUM be the current trace frame, and do nothing
+   more.  */
+
+void
+set_traceframe_number (int num)
+{
+  traceframe_number = num;
 }
 
 /* A cleanup used when switching away and back from tfind mode.  */
@@ -2930,7 +2981,7 @@ do_restore_current_traceframe_cleanup (void *arg)
 {
   struct current_traceframe_cleanup *old = arg;
 
-  set_traceframe_number (old->traceframe_number);
+  set_current_traceframe (old->traceframe_number);
 }
 
 static void
@@ -2951,6 +3002,12 @@ make_cleanup_restore_current_traceframe (void)
 
   return make_cleanup_dtor (do_restore_current_traceframe_cleanup, old,
 			    restore_current_traceframe_cleanup_dtor);
+}
+
+struct cleanup *
+make_cleanup_restore_traceframe_number (void)
+{
+  return make_cleanup_restore_integer (&traceframe_number);
 }
 
 /* Given a number and address, return an uploaded tracepoint with that
@@ -3205,6 +3262,7 @@ char *trace_filename;
 int trace_fd = -1;
 off_t trace_frames_offset;
 off_t cur_offset;
+int cur_traceframe_number;
 int cur_data_size;
 int trace_regblock_size;
 
@@ -3295,6 +3353,8 @@ tfile_open (char *filename, int from_tty)
   ts->buffer_free = 0;
   ts->disconnected_tracing = 0;
   ts->circular_buffer = 0;
+
+  cur_traceframe_number = -1;
 
   /* Read through a section of newline-terminated lines that
      define things like tracepoints.  */
@@ -3710,6 +3770,28 @@ tfile_get_traceframe_address (off_t tframe_offset)
   return addr;
 }
 
+/* Make tfile's selected traceframe match GDB's selected
+   traceframe.  */
+
+static void
+set_tfile_traceframe (void)
+{
+  int newnum;
+
+  if (cur_traceframe_number == get_traceframe_number ())
+    return;
+
+  /* Avoid recursion, tfile_trace_find calls us again.  */
+  cur_traceframe_number = get_traceframe_number ();
+
+  newnum = target_trace_find (tfind_number,
+			      get_traceframe_number (), 0, 0, NULL);
+
+  /* Should not happen.  If it does, all bets are off.  */
+  if (newnum != get_traceframe_number ())
+    warning (_("could not set tfile's traceframe"));
+}
+
 /* Given a type of search and some parameters, scan the collection of
    traceframes in the file looking for a match.  When found, return
    both the traceframe and tracepoint number, otherwise -1 for
@@ -3725,6 +3807,12 @@ tfile_trace_find (enum trace_find_type type, int num,
   struct breakpoint *tp;
   off_t offset, tframe_offset;
   ULONGEST tfaddr;
+
+  /* Lookups other than by absolute frame number depend on the current
+     trace selected, so make sure it is correct on the tfile end
+     first.  */
+  if (type != tfind_number)
+    set_tfile_traceframe ();
 
   lseek (trace_fd, trace_frames_offset, SEEK_SET);
   offset = trace_frames_offset;
@@ -3778,6 +3866,7 @@ tfile_trace_find (enum trace_find_type type, int num,
 	    *tpp = tpnum;
 	  cur_offset = offset;
 	  cur_data_size = data_size;
+	  cur_traceframe_number = tfnum;
 	  return tfnum;
 	}
       /* Skip past the traceframe's data.  */
@@ -3894,6 +3983,8 @@ tfile_fetch_registers (struct target_ops *ops,
   if (!trace_regblock_size)
     return;
 
+  set_tfile_traceframe ();
+
   regs = alloca (trace_regblock_size);
 
   if (traceframe_find_block_type ('R', 0) >= 0)
@@ -3977,7 +4068,9 @@ tfile_xfer_partial (struct target_ops *ops, enum target_object object,
   if (readbuf == NULL)
     error (_("tfile_xfer_partial: trace file is read-only"));
 
-  if (traceframe_number != -1)
+  set_tfile_traceframe ();
+
+ if (traceframe_number != -1)
     {
       int pos = 0;
 
@@ -4060,6 +4153,8 @@ tfile_get_trace_state_variable_value (int tsvnum, LONGEST *val)
 {
   int pos;
 
+  set_tfile_traceframe ();
+
   pos = 0;
   while ((pos = traceframe_find_block_type ('V', pos)) >= 0)
     {
@@ -4108,6 +4203,56 @@ tfile_has_registers (struct target_ops *ops)
   return traceframe_number != -1;
 }
 
+/* Callback for traceframe_walk_blocks.  Builds a traceframe_info
+   object for the tfile target's current traceframe.  */
+
+static int
+build_traceframe_info (char blocktype, void *data)
+{
+  struct traceframe_info *info = data;
+
+  switch (blocktype)
+    {
+    case 'M':
+      {
+	struct mem_range *r;
+	ULONGEST maddr;
+	unsigned short mlen;
+
+	tfile_read ((gdb_byte *) &maddr, 8);
+	tfile_read ((gdb_byte *) &mlen, 2);
+
+	r = VEC_safe_push (mem_range_s, info->memory, NULL);
+
+	r->start = maddr;
+	r->length = mlen;
+	break;
+      }
+    case 'V':
+    case 'R':
+    case 'S':
+      {
+	break;
+      }
+    default:
+      warning (_("Unhandled trace block type (%d) '%c ' "
+		 "while building trace frame info."),
+	       blocktype, blocktype);
+      break;
+    }
+
+  return 0;
+}
+
+static struct traceframe_info *
+tfile_traceframe_info (void)
+{
+  struct traceframe_info *info = XCNEW (struct traceframe_info);
+
+  traceframe_walk_blocks (build_traceframe_info, 0, info);
+  return info;
+}
+
 static void
 init_tfile_ops (void)
 {
@@ -4129,6 +4274,7 @@ init_tfile_ops (void)
   tfile_ops.to_has_memory = tfile_has_memory;
   tfile_ops.to_has_stack = tfile_has_stack;
   tfile_ops.to_has_registers = tfile_has_registers;
+  tfile_ops.to_traceframe_info = tfile_traceframe_info;
   tfile_ops.to_magic = OPS_MAGIC;
 }
 
@@ -4378,6 +4524,160 @@ sdata_make_value (struct gdbarch *gdbarch, struct internalvar *var)
     }
   else
     return allocate_value (builtin_type (gdbarch)->builtin_void);
+}
+
+#if !defined(HAVE_LIBEXPAT)
+
+struct traceframe_info *
+parse_traceframe_info (const char *tframe_info)
+{
+  static int have_warned;
+
+  if (!have_warned)
+    {
+      have_warned = 1;
+      warning (_("Can not parse XML trace frame info; XML support "
+		 "was disabled at compile time"));
+    }
+
+  return NULL;
+}
+
+#else /* HAVE_LIBEXPAT */
+
+#include "xml-support.h"
+
+/* Handle the start of a <memory> element.  */
+
+static void
+traceframe_info_start_memory (struct gdb_xml_parser *parser,
+			      const struct gdb_xml_element *element,
+			      void *user_data, VEC(gdb_xml_value_s) *attributes)
+{
+  struct traceframe_info *info = user_data;
+  struct mem_range *r = VEC_safe_push (mem_range_s, info->memory, NULL);
+  ULONGEST *start_p, *length_p;
+
+  start_p = xml_find_attribute (attributes, "start")->value;
+  length_p = xml_find_attribute (attributes, "length")->value;
+
+  r->start = *start_p;
+  r->length = *length_p;
+}
+
+/* Discard the constructed trace frame info (if an error occurs).  */
+
+static void
+free_result (void *p)
+{
+  struct traceframe_info *result = p;
+
+  free_traceframe_info (result);
+}
+
+/* The allowed elements and attributes for an XML memory map.  */
+
+static const struct gdb_xml_attribute memory_attributes[] = {
+  { "start", GDB_XML_AF_NONE, gdb_xml_parse_attr_ulongest, NULL },
+  { "length", GDB_XML_AF_NONE, gdb_xml_parse_attr_ulongest, NULL },
+  { NULL, GDB_XML_AF_NONE, NULL, NULL }
+};
+
+static const struct gdb_xml_element traceframe_info_children[] = {
+  { "memory", memory_attributes, NULL,
+    GDB_XML_EF_REPEATABLE | GDB_XML_EF_OPTIONAL,
+    traceframe_info_start_memory, NULL },
+  { NULL, NULL, NULL, GDB_XML_EF_NONE, NULL, NULL }
+};
+
+static const struct gdb_xml_element traceframe_info_elements[] = {
+  { "traceframe-info", NULL, traceframe_info_children, GDB_XML_EF_NONE,
+    NULL, NULL },
+  { NULL, NULL, NULL, GDB_XML_EF_NONE, NULL, NULL }
+};
+
+/* Parse a traceframe-info XML document.  */
+
+struct traceframe_info *
+parse_traceframe_info (const char *tframe_info)
+{
+  struct traceframe_info *result;
+  struct cleanup *back_to;
+
+  result = XCNEW (struct traceframe_info);
+  back_to = make_cleanup (free_result, result);
+
+  if (gdb_xml_parse_quick (_("trace frame info"),
+			   "traceframe-info.dtd", traceframe_info_elements,
+			   tframe_info, result) == 0)
+    {
+      /* Parsed successfully, keep the result.  */
+      discard_cleanups (back_to);
+
+      return result;
+    }
+
+  do_cleanups (back_to);
+  return NULL;
+}
+
+#endif /* HAVE_LIBEXPAT */
+
+/* Returns the traceframe_info object for the current traceframe.
+   This is where we avoid re-fetching the object from the target if we
+   already have it cached.  */
+
+struct traceframe_info *
+get_traceframe_info (void)
+{
+  if (traceframe_info == NULL)
+    traceframe_info = target_traceframe_info ();
+
+  return traceframe_info;
+}
+
+/* If the target supports the query, return in RESULT the set of
+   collected memory in the current traceframe, found within the LEN
+   bytes range starting at MEMADDR.  Returns true if the target
+   supports the query, otherwise returns false, and RESULT is left
+   undefined.  */
+
+int
+traceframe_available_memory (VEC(mem_range_s) **result,
+			     CORE_ADDR memaddr, ULONGEST len)
+{
+  struct traceframe_info *info = get_traceframe_info ();
+
+  if (info != NULL)
+    {
+      struct mem_range *r;
+      int i;
+
+      *result = NULL;
+
+      for (i = 0; VEC_iterate (mem_range_s, info->memory, i, r); i++)
+	if (mem_ranges_overlap (r->start, r->length, memaddr, len))
+	  {
+	    ULONGEST lo1, hi1, lo2, hi2;
+	    struct mem_range *nr;
+
+	    lo1 = memaddr;
+	    hi1 = memaddr + len;
+
+	    lo2 = r->start;
+	    hi2 = r->start + r->length;
+
+	    nr = VEC_safe_push (mem_range_s, *result, NULL);
+
+	    nr->start = max (lo1, lo2);
+	    nr->length = min (hi1, hi2) - nr->start;
+	  }
+
+      normalize_mem_ranges (*result);
+      return 1;
+    }
+
+  return 0;
 }
 
 /* module initialization */
