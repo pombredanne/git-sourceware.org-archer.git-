@@ -563,6 +563,7 @@ value_f90_subarray (struct value *array, struct expression *exp, int *pos,
       value_byte_address = (TYPE_DATA_LOCATION_ADDR (type)
 			    + value_offset (array));
       TYPE_DATA_LOCATION_IS_ADDR (type) = 0;
+      TYPE_DATA_LOCATION_DWARF_BLOCK (type) = NULL;
     }
   else
     value_byte_address = value_address (array);

@@ -14,10 +14,15 @@
 ! along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 program test
-  integer :: a (4, 3)
+  integer, target :: a (4, 3)
+  integer, allocatable :: alloc (:, :)
+  integer, pointer :: ptr (:, :)
   do 1 i = 1, 4
   do 1 j = 1, 3
     a (i, j) = j * 10 + i
 1 continue
+  allocate (alloc (4, 3))
+  alloc = a
+  ptr => a
   write (*,*) a                 ! break-static
 end
