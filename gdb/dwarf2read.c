@@ -7416,6 +7416,14 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
     for (i = ndim - 1; i >= 0; i--)
       type = create_single_array_dimension (type, range_types[i], die, cu);
 
+  /* Data locations should be set only for the outermost dimension as they
+     would be confusing for the dereferenced offset on the inner ones.  */
+  attr = dwarf2_attr (die, DW_AT_data_location, cu);
+  if (attr_form_is_block (attr))
+    TYPE_DATA_LOCATION_DWARF_BLOCK (type)
+      = dwarf2_attr_to_locexpr_baton (attr, cu);
+  gdb_assert (!TYPE_DATA_LOCATION_IS_ADDR (type));
+
   /* Understand Dwarf2 support for vector types (like they occur on
      the PowerPC w/ AltiVec).  Gcc just adds another attribute to the
      array type.  This is not part of the Dwarf2/3 standard yet, but a
@@ -15071,12 +15079,6 @@ fetch_die_type_attrs (struct die_info *die, struct type *type,
 		      struct dwarf2_cu *cu)
 {
   struct attribute *attr;
-
-  attr = dwarf2_attr (die, DW_AT_data_location, cu);
-  if (attr_form_is_block (attr))
-    TYPE_DATA_LOCATION_DWARF_BLOCK (type) = dwarf2_attr_to_locexpr_baton (attr,
-									  cu);
-  gdb_assert (!TYPE_DATA_LOCATION_IS_ADDR (type));
 
   attr = dwarf2_attr (die, DW_AT_allocated, cu);
   if (attr_form_is_block (attr))

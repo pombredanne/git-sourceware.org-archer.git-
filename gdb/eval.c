@@ -566,7 +566,10 @@ value_f90_subarray (struct value *array, struct expression *exp, int *pos,
       TYPE_DATA_LOCATION_DWARF_BLOCK (type) = NULL;
     }
   else
-    value_byte_address = value_address (array);
+    {
+      gdb_assert (TYPE_DATA_LOCATION_DWARF_BLOCK (type) == NULL);
+      value_byte_address = value_address (array);
+    }
 
   new_array_type = type;
 
