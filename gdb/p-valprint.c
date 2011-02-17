@@ -38,6 +38,7 @@
 #include "p-lang.h"
 #include "cp-abi.h"
 #include "cp-support.h"
+#include "exceptions.h"
 #include "dwarf2loc.h"
 
 
@@ -837,9 +838,7 @@ pascal_object_print_value_fields (struct type *type, const gdb_byte *valaddr,
 		{
 		  struct value_print_options opts = *options;
 
-		  v = value_from_longest (TYPE_FIELD_TYPE (type, i),
-				   unpack_field_as_long (type,
-							 valaddr + offset, i));
+		  v = value_field_bitfield (type, i, valaddr, offset, val);
 
 		  opts.deref_ref = 0;
 		  common_val_print (v, stream, recurse + 1, &opts,
@@ -858,9 +857,7 @@ pascal_object_print_value_fields (struct type *type, const gdb_byte *valaddr,
 		     v4.17 specific.  */
 		  struct value *v;
 
-		  v = value_from_longest
-		    (TYPE_FIELD_TYPE (type, i),
-		     unpack_field_as_long (type, valaddr + offset, i));
+		  v = value_field_bitfield (type, i, valaddr, offset, val);
 
 		  if (v == NULL)
 		    val_print_optimized_out (stream);
@@ -931,11 +928,13 @@ pascal_object_print_value (struct type *type, const gdb_byte *valaddr,
 
   for (i = 0; i < n_baseclasses; i++)
     {
-      int boffset;
+      int boffset = 0;
       struct type *baseclass = check_typedef (TYPE_BASECLASS (type, i));
       char *basename = type_name_no_tag (baseclass);
-      const gdb_byte *base_valaddr;
+      const gdb_byte *base_valaddr = NULL;
       int thisoffset;
+      volatile struct gdb_exception ex;
+      int skip = 0;
 
       if (BASETYPE_VIA_VIRTUAL (type, i))
 	{
@@ -954,7 +953,38 @@ pascal_object_print_value (struct type *type, const gdb_byte *valaddr,
 
       thisoffset = offset;
 
-      boffset = baseclass_offset (type, i, valaddr + offset, address + offset);
+      TRY_CATCH (ex, RETURN_MASK_ERROR)
+	{
+	  boffset = baseclass_offset (type, i, valaddr, offset, address, val);
+	}
+      if (ex.reason < 0 && ex.error == NOT_AVAILABLE_ERROR)
+	skip = -1;
+      else if (ex.reason < 0)
+	skip = 1;
+      else
+	{
+	  skip = 0;
+
+	  /* The virtual base class pointer might have been clobbered by the
+	     user program. Make sure that it still points to a valid memory
+	     location.  */
+
+	  if (boffset < 0 || boffset >= TYPE_LENGTH (type))
+	    {
+	      /* FIXME (alloc): not safe is baseclass is really really big. */
+	      gdb_byte *buf = alloca (TYPE_LENGTH (baseclass));
+
+	      base_valaddr = buf;
+	      if (target_read_memory (address + boffset, buf,
+				      TYPE_LENGTH (baseclass)) != 0)
+		skip = 1;
+	      address = address + boffset;
+	      thisoffset = 0;
+	      boffset = 0;
+	    }
+	  else
+	    base_valaddr = valaddr;
+	}
 
       if (options->pretty)
 	{
@@ -968,28 +998,10 @@ pascal_object_print_value (struct type *type, const gdb_byte *valaddr,
       fputs_filtered (basename ? basename : "", stream);
       fputs_filtered ("> = ", stream);
 
-      /* The virtual base class pointer might have been clobbered by the
-         user program.  Make sure that it still points to a valid memory
-         location.  */
-
-      if (boffset != -1 && (boffset < 0 || boffset >= TYPE_LENGTH (type)))
-	{
-	  /* FIXME (alloc): not safe is baseclass is really really big.  */
-	  gdb_byte *buf = alloca (TYPE_LENGTH (baseclass));
-
-	  base_valaddr = buf;
-	  if (target_read_memory (address + boffset, buf,
-				  TYPE_LENGTH (baseclass)) != 0)
-	    boffset = -1;
-	  address = address + boffset;
-	  thisoffset = 0;
-	  boffset = 0;
-	}
-      else
-	base_valaddr = valaddr;
-
-      if (boffset == -1)
-	fprintf_filtered (stream, "<invalid address>");
+      if (skip < 0)
+	val_print_unavailable (stream);
+      else if (skip > 0)
+	val_print_invalid_address (stream);
       else
 	pascal_object_print_value_fields (baseclass, base_valaddr,
 					  thisoffset + boffset, address,

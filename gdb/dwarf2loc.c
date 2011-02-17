@@ -769,10 +769,10 @@ read_pieced_value (struct value *v)
 	  break;
 
 	case DWARF_VALUE_MEMORY:
-	  if (p->v.mem.in_stack_memory)
-	    read_stack (p->v.mem.addr + source_offset, buffer, this_size);
-	  else
-	    read_memory (p->v.mem.addr + source_offset, buffer, this_size);
+	  read_value_memory (v, offset,
+			     p->v.mem.in_stack_memory,
+			     p->v.mem.addr + source_offset,
+			     buffer, this_size);
 	  break;
 
 	case DWARF_VALUE_STACK:
@@ -1492,8 +1492,15 @@ dwarf2_loc_desc_needs_frame (const gdb_byte *data, unsigned short size,
 static void
 unimplemented (unsigned int op)
 {
-  error (_("DWARF operator %s cannot be translated to an agent expression"),
-	 dwarf_stack_op_name (op, 1));
+  const char *name = dwarf_stack_op_name (op);
+
+  if (name)
+    error (_("DWARF operator %s cannot be translated to an agent expression"),
+	   name);
+  else
+    error (_("Unknown DWARF operator 0x%02x cannot be translated "
+	     "to an agent expression"),
+	   op);
 }
 
 /* A helper function to convert a DWARF register to an arch register.
@@ -1577,11 +1584,11 @@ get_ax_pc (void *baton)
    example, if the expression cannot be compiled, or if the expression
    is invalid.  */
 
-static void
-compile_dwarf_to_ax (struct agent_expr *expr, struct axs_value *loc,
-		     struct gdbarch *arch, unsigned int addr_size,
-		     const gdb_byte *op_ptr, const gdb_byte *op_end,
-		     struct dwarf2_per_cu_data *per_cu)
+void
+dwarf2_compile_expr_to_ax (struct agent_expr *expr, struct axs_value *loc,
+			   struct gdbarch *arch, unsigned int addr_size,
+			   const gdb_byte *op_ptr, const gdb_byte *op_end,
+			   struct dwarf2_per_cu_data *per_cu)
 {
   struct cleanup *cleanups;
   int i, *offsets;
@@ -1868,8 +1875,8 @@ compile_dwarf_to_ax (struct agent_expr *expr, struct axs_value *loc,
 				     &datastart, &datalen);
 
 	    op_ptr = read_sleb128 (op_ptr, op_end, &offset);
-	    compile_dwarf_to_ax (expr, loc, arch, addr_size, datastart,
-				 datastart + datalen, per_cu);
+	    dwarf2_compile_expr_to_ax (expr, loc, arch, addr_size, datastart,
+				       datastart + datalen, per_cu);
 
 	    if (offset != 0)
 	      {
@@ -1951,8 +1958,10 @@ compile_dwarf_to_ax (struct agent_expr *expr, struct axs_value *loc,
 		ax_simple (expr, aop_ref64);
 		break;
 	      default:
+		/* Note that dwarf_stack_op_name will never return
+		   NULL here.  */
 		error (_("Unsupported size %d in %s"),
-		       size, dwarf_stack_op_name (op, 1));
+		       size, dwarf_stack_op_name (op));
 	      }
 	  }
 	  break;
@@ -2104,7 +2113,8 @@ compile_dwarf_to_ax (struct agent_expr *expr, struct axs_value *loc,
 	  break;
 
 	case DW_OP_call_frame_cfa:
-	  unimplemented (op);
+	  dwarf2_compile_cfa_to_ax (expr, loc, arch, expr->scope, per_cu);
+	  loc->kind = axs_lvalue_memory;
 	  break;
 
 	case DW_OP_GNU_push_tls_address:
@@ -2218,9 +2228,9 @@ compile_dwarf_to_ax (struct agent_expr *expr, struct axs_value *loc,
 	    /* DW_OP_call_ref is currently not supported.  */
 	    gdb_assert (block.per_cu == per_cu);
 
-	    compile_dwarf_to_ax (expr, loc, arch, addr_size,
-				 block.data, block.data + block.size,
-				 per_cu);
+	    dwarf2_compile_expr_to_ax (expr, loc, arch, addr_size,
+				       block.data, block.data + block.size,
+				       per_cu);
 	  }
 	  break;
 
@@ -2228,7 +2238,7 @@ compile_dwarf_to_ax (struct agent_expr *expr, struct axs_value *loc,
 	  unimplemented (op);
 
 	default:
-	  error (_("Unhandled dwarf expression opcode 0x%x"), op);
+	  unimplemented (op);
 	}
     }
 
@@ -2453,7 +2463,7 @@ disassemble_dwarf_expression (struct ui_file *stream,
       LONGEST l;
       const char *name;
 
-      name = dwarf_stack_op_name (op, 0);
+      name = dwarf_stack_op_name (op);
 
       if (!name)
 	error (_("Unrecognized DWARF opcode 0x%02x at %ld"),
@@ -2822,9 +2832,9 @@ locexpr_tracepoint_var_ref (struct symbol *symbol, struct gdbarch *gdbarch,
   if (dlbaton->data == NULL || dlbaton->size == 0)
     value->optimized_out = 1;
   else
-    compile_dwarf_to_ax (ax, value, gdbarch, addr_size,
-			 dlbaton->data, dlbaton->data + dlbaton->size,
-			 dlbaton->per_cu);
+    dwarf2_compile_expr_to_ax (ax, value, gdbarch, addr_size,
+			       dlbaton->data, dlbaton->data + dlbaton->size,
+			       dlbaton->per_cu);
 }
 
 /* The set of location functions used with the DWARF-2 expression
@@ -2975,8 +2985,8 @@ loclist_tracepoint_var_ref (struct symbol *symbol, struct gdbarch *gdbarch,
   if (data == NULL || size == 0)
     value->optimized_out = 1;
   else
-    compile_dwarf_to_ax (ax, value, gdbarch, addr_size, data, data + size,
-			 dlbaton->per_cu);
+    dwarf2_compile_expr_to_ax (ax, value, gdbarch, addr_size, data, data + size,
+			       dlbaton->per_cu);
 }
 
 /* The set of location functions used with the DWARF-2 location lists.  */
