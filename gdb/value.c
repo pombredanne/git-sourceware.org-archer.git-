@@ -2014,10 +2014,6 @@ value_types_mark_used (void)
       case INTERNALVAR_INTEGER:
 	type_mark_used (var->u.integer.type);
 	break;
-
-      case INTERNALVAR_POINTER:
-	type_mark_used (var->u.pointer.type);
-	break;
       }
 
   for (chunk = value_history_chain; chunk != NULL; chunk = chunk->next)
