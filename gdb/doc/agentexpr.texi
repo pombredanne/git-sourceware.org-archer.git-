@@ -391,6 +391,16 @@ Exchange the top two items on the stack.
 @item @code{pop} (0x29): @var{a} =>
 Discard the top value on the stack.
 
+@item @code{pick} (0x32) @var{n}: @var{a} @dots{} @var{b} => @var{a} @dots{} @var{b} @var{a}
+Duplicate an item from the stack and push it on the top of the stack.
+@var{n}, a single byte, indicates the stack item to copy.  If @var{n}
+is zero, this is the same as @code{dup}; if @var{n} is one, it copies
+the item under the top item, etc.  If @var{n} exceeds the number of
+items on the stack, terminate with an error.
+
+@item @code{rot} (0x33): @var{a} @var{b} @var{c} => @var{c} @var{b} @var{a}
+Rotate the top three items on the stack.
+
 @item @code{if_goto} (0x20) @var{offset}: @var{a} @result{}
 Pop an integer off the stack; if it is non-zero, branch to the given
 offset in the bytecode string.  Otherwise, continue to the next
@@ -478,6 +488,13 @@ named @code{trace_quick16}, for consistency.
 @item @code{tracev} (0x2e) @var{n}: @result{} @var{a}
 Record the value of trace state variable number @var{n} in the trace
 buffer.  The handling of @var{n} is as described for @code{getv}.
+
+@item @code{printf} (0x31) @var{n} @var{template}: @result{}
+Print the values in the stack under the control of the string template.
+The end of @var{template} is 0x00.
+If @var{n} is 0, just output the string template.
+If @var{n} is 1, pop a value from the stack and print it under the control
+of the string template.
 
 @item @code{end} (0x27): @result{}
 Stop executing bytecode; the result should be the top element of the

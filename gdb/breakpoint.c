@@ -561,8 +561,6 @@ struct program_space *default_breakpoint_pspace;
    name of a convenience variable.  Making it an expression wouldn't
    work well for map_breakpoint_numbers (e.g. "4 + 5 + 6").
 
-   If the string is a NULL pointer, that denotes the last breakpoint.
-   
    TRAILER is a character which can be found after the number; most
    commonly this is `-'.  If you don't want a trailer, use \0.  */
 
@@ -572,10 +570,7 @@ get_number_trailer (char **pp, int trailer)
   int retval = 0;	/* default */
   char *p = *pp;
 
-  if (p == NULL)
-    /* Empty line means refer to the last breakpoint.  */
-    return breakpoint_count;
-  else if (*p == '$')
+  if (*p == '$')
     {
       /* Make a copy of the name, so we can null-terminate it
          to pass to lookup_internalvar().  */
@@ -651,7 +646,7 @@ get_number (char **pp)
    is completed.  The call that completes the range will advance
    pointer PP past <number2>.  */
 
-int 
+int
 get_number_or_range (char **pp)
 {
   static int last_retval, end_value;
@@ -938,6 +933,46 @@ breakpoint_set_commands (struct breakpoint *b,
   b->commands = alloc_counted_command_line (commands);
   breakpoints_changed ();
   observer_notify_breakpoint_modified (b->number);
+}
+
+/* Set the internal `silent' flag on the breakpoint.  Note that this
+   is not the same as the "silent" that may appear in the breakpoint's
+   commands.  */
+
+void
+breakpoint_set_silent (struct breakpoint *b, int silent)
+{
+  int old_silent = b->silent;
+
+  b->silent = silent;
+  if (old_silent != silent)
+    observer_notify_breakpoint_modified (b->number);
+}
+
+/* Set the thread for this breakpoint.  If THREAD is -1, make the
+   breakpoint work for any thread.  */
+
+void
+breakpoint_set_thread (struct breakpoint *b, int thread)
+{
+  int old_thread = b->thread;
+
+  b->thread = thread;
+  if (old_thread != thread)
+    observer_notify_breakpoint_modified (b->number);
+}
+
+/* Set the task for this breakpoint.  If TASK is 0, make the
+   breakpoint work for any task.  */
+
+void
+breakpoint_set_task (struct breakpoint *b, int task)
+{
+  int old_task = b->task;
+
+  b->task = task;
+  if (old_task != task)
+    observer_notify_breakpoint_modified (b->number);
 }
 
 void
@@ -1334,8 +1369,8 @@ update_watchpoint (struct breakpoint *b, int reparse)
   if (!watchpoint_in_thread_scope (b))
     return;
 
-  /* We don't free locations.  They are stored in bp_location array
-     and update_global_locations will eventually delete them and
+  /* We don't free locations.  They are stored in the bp_location array
+     and update_global_location_list will eventually delete them and
      remove breakpoints if needed.  */
   b->loc = NULL;
 
@@ -2177,22 +2212,94 @@ create_internal_breakpoint (struct gdbarch *gdbarch,
   return b;
 }
 
+static const char *const longjmp_names[] =
+  {
+    "longjmp", "_longjmp", "siglongjmp", "_siglongjmp"
+  };
+#define NUM_LONGJMP_NAMES ARRAY_SIZE(longjmp_names)
+
+/* Per-objfile data private to breakpoint.c.  */
+struct breakpoint_objfile_data
+{
+  /* Minimal symbol for "_ovly_debug_event" (if any).  */
+  struct minimal_symbol *overlay_msym;
+
+  /* Minimal symbol(s) for "longjmp", "siglongjmp", etc. (if any).  */
+  struct minimal_symbol *longjmp_msym[NUM_LONGJMP_NAMES];
+
+  /* Minimal symbol for "std::terminate()" (if any).  */
+  struct minimal_symbol *terminate_msym;
+
+  /* Minimal symbol for "_Unwind_DebugHook" (if any).  */
+  struct minimal_symbol *exception_msym;
+};
+
+static const struct objfile_data *breakpoint_objfile_key;
+
+/* Minimal symbol not found sentinel.  */
+static struct minimal_symbol msym_not_found;
+
+/* Returns TRUE if MSYM point to the "not found" sentinel.  */
+
+static int
+msym_not_found_p (const struct minimal_symbol *msym)
+{
+  return msym == &msym_not_found;
+}
+
+/* Return per-objfile data needed by breakpoint.c.
+   Allocate the data if necessary.  */
+
+static struct breakpoint_objfile_data *
+get_breakpoint_objfile_data (struct objfile *objfile)
+{
+  struct breakpoint_objfile_data *bp_objfile_data;
+
+  bp_objfile_data = objfile_data (objfile, breakpoint_objfile_key);
+  if (bp_objfile_data == NULL)
+    {
+      bp_objfile_data = obstack_alloc (&objfile->objfile_obstack,
+				       sizeof (*bp_objfile_data));
+
+      memset (bp_objfile_data, 0, sizeof (*bp_objfile_data));
+      set_objfile_data (objfile, breakpoint_objfile_key, bp_objfile_data);
+    }
+  return bp_objfile_data;
+}
+
 static void
-create_overlay_event_breakpoint (char *func_name)
+create_overlay_event_breakpoint (void)
 {
   struct objfile *objfile;
+  const char *const func_name = "_ovly_debug_event";
 
   ALL_OBJFILES (objfile)
     {
       struct breakpoint *b;
-      struct minimal_symbol *m;
+      struct breakpoint_objfile_data *bp_objfile_data;
+      CORE_ADDR addr;
 
-      m = lookup_minimal_symbol_text (func_name, objfile);
-      if (m == NULL)
-        continue;
+      bp_objfile_data = get_breakpoint_objfile_data (objfile);
 
-      b = create_internal_breakpoint (get_objfile_arch (objfile),
-				      SYMBOL_VALUE_ADDRESS (m),
+      if (msym_not_found_p (bp_objfile_data->overlay_msym))
+	continue;
+
+      if (bp_objfile_data->overlay_msym == NULL)
+	{
+	  struct minimal_symbol *m;
+
+	  m = lookup_minimal_symbol_text (func_name, objfile);
+	  if (m == NULL)
+	    {
+	      /* Avoid future lookups in this objfile.  */
+	      bp_objfile_data->overlay_msym = &msym_not_found;
+	      continue;
+	    }
+	  bp_objfile_data->overlay_msym = m;
+	}
+
+      addr = SYMBOL_VALUE_ADDRESS (bp_objfile_data->overlay_msym);
+      b = create_internal_breakpoint (get_objfile_arch (objfile), addr,
                                       bp_overlay_event);
       b->addr_string = xstrdup (func_name);
 
@@ -2211,70 +2318,117 @@ create_overlay_event_breakpoint (char *func_name)
 }
 
 static void
-create_longjmp_master_breakpoint (char *func_name)
+create_longjmp_master_breakpoint (void)
 {
   struct program_space *pspace;
-  struct objfile *objfile;
   struct cleanup *old_chain;
 
   old_chain = save_current_program_space ();
 
   ALL_PSPACES (pspace)
-  ALL_OBJFILES (objfile)
-    {
-      struct breakpoint *b;
-      struct minimal_symbol *m;
+  {
+    struct objfile *objfile;
 
-      if (!gdbarch_get_longjmp_target_p (get_objfile_arch (objfile)))
+    set_current_program_space (pspace);
+
+    ALL_OBJFILES (objfile)
+    {
+      int i;
+      struct gdbarch *gdbarch;
+      struct breakpoint_objfile_data *bp_objfile_data;
+
+      gdbarch = get_objfile_arch (objfile);
+      if (!gdbarch_get_longjmp_target_p (gdbarch))
 	continue;
 
-      set_current_program_space (pspace);
+      bp_objfile_data = get_breakpoint_objfile_data (objfile);
 
-      m = lookup_minimal_symbol_text (func_name, objfile);
-      if (m == NULL)
-        continue;
+      for (i = 0; i < NUM_LONGJMP_NAMES; i++)
+	{
+	  struct breakpoint *b;
+	  const char *func_name;
+	  CORE_ADDR addr;
 
-      b = create_internal_breakpoint (get_objfile_arch (objfile),
-				      SYMBOL_VALUE_ADDRESS (m),
-                                      bp_longjmp_master);
-      b->addr_string = xstrdup (func_name);
-      b->enable_state = bp_disabled;
+	  if (msym_not_found_p (bp_objfile_data->longjmp_msym[i]))
+	    continue;
+
+	  func_name = longjmp_names[i];
+	  if (bp_objfile_data->longjmp_msym[i] == NULL)
+	    {
+	      struct minimal_symbol *m;
+
+	      m = lookup_minimal_symbol_text (func_name, objfile);
+	      if (m == NULL)
+		{
+		  /* Prevent future lookups in this objfile.  */
+		  bp_objfile_data->longjmp_msym[i] = &msym_not_found;
+		  continue;
+		}
+	      bp_objfile_data->longjmp_msym[i] = m;
+	    }
+
+	  addr = SYMBOL_VALUE_ADDRESS (bp_objfile_data->longjmp_msym[i]);
+	  b = create_internal_breakpoint (gdbarch, addr, bp_longjmp_master);
+	  b->addr_string = xstrdup (func_name);
+	  b->enable_state = bp_disabled;
+	}
     }
+  }
   update_global_location_list (1);
 
   do_cleanups (old_chain);
 }
 
-/* Create a master std::terminate breakpoint.  The actual function
-   looked for is named FUNC_NAME.  */
+/* Create a master std::terminate breakpoint.  */
 static void
-create_std_terminate_master_breakpoint (const char *func_name)
+create_std_terminate_master_breakpoint (void)
 {
   struct program_space *pspace;
-  struct objfile *objfile;
   struct cleanup *old_chain;
+  const char *const func_name = "std::terminate()";
 
   old_chain = save_current_program_space ();
 
   ALL_PSPACES (pspace)
+  {
+    struct objfile *objfile;
+    CORE_ADDR addr;
+
+    set_current_program_space (pspace);
+
     ALL_OBJFILES (objfile)
     {
       struct breakpoint *b;
-      struct minimal_symbol *m;
+      struct breakpoint_objfile_data *bp_objfile_data;
 
-      set_current_program_space (pspace);
+      bp_objfile_data = get_breakpoint_objfile_data (objfile);
 
-      m = lookup_minimal_symbol (func_name, NULL, objfile);
-      if (m == NULL || (MSYMBOL_TYPE (m) != mst_text
-			&& MSYMBOL_TYPE (m) != mst_file_text))
-        continue;
+      if (msym_not_found_p (bp_objfile_data->terminate_msym))
+	continue;
 
-      b = create_internal_breakpoint (get_objfile_arch (objfile),
-				      SYMBOL_VALUE_ADDRESS (m),
+      if (bp_objfile_data->terminate_msym == NULL)
+	{
+	  struct minimal_symbol *m;
+
+	  m = lookup_minimal_symbol (func_name, NULL, objfile);
+	  if (m == NULL || (MSYMBOL_TYPE (m) != mst_text
+			    && MSYMBOL_TYPE (m) != mst_file_text))
+	    {
+	      /* Prevent future lookups in this objfile.  */
+	      bp_objfile_data->terminate_msym = &msym_not_found;
+	      continue;
+	    }
+	  bp_objfile_data->terminate_msym = m;
+	}
+
+      addr = SYMBOL_VALUE_ADDRESS (bp_objfile_data->terminate_msym);
+      b = create_internal_breakpoint (get_objfile_arch (objfile), addr,
                                       bp_std_terminate_master);
       b->addr_string = xstrdup (func_name);
       b->enable_state = bp_disabled;
     }
+  }
+
   update_global_location_list (1);
 
   do_cleanups (old_chain);
@@ -2286,24 +2440,42 @@ void
 create_exception_master_breakpoint (void)
 {
   struct objfile *objfile;
+  const char *const func_name = "_Unwind_DebugHook";
 
   ALL_OBJFILES (objfile)
     {
-      struct minimal_symbol *debug_hook;
+      struct breakpoint *b;
+      struct gdbarch *gdbarch;
+      struct breakpoint_objfile_data *bp_objfile_data;
+      CORE_ADDR addr;
 
-      debug_hook = lookup_minimal_symbol ("_Unwind_DebugHook", NULL, objfile);
-      if (debug_hook != NULL)
+      bp_objfile_data = get_breakpoint_objfile_data (objfile);
+
+      if (msym_not_found_p (bp_objfile_data->exception_msym))
+	continue;
+
+      gdbarch = get_objfile_arch (objfile);
+
+      if (bp_objfile_data->exception_msym == NULL)
 	{
-	  struct breakpoint *b;
-	  CORE_ADDR addr = SYMBOL_VALUE_ADDRESS (debug_hook);
-	  struct gdbarch *gdbarch = get_objfile_arch (objfile);
+	  struct minimal_symbol *debug_hook;
 
-	  addr = gdbarch_convert_from_func_ptr_addr (gdbarch, addr,
-						     &current_target);
-	  b = create_internal_breakpoint (gdbarch, addr, bp_exception_master);
-	  b->addr_string = xstrdup ("_Unwind_DebugHook");
-	  b->enable_state = bp_disabled;
+	  debug_hook = lookup_minimal_symbol (func_name, NULL, objfile);
+	  if (debug_hook == NULL)
+	    {
+	      bp_objfile_data->exception_msym = &msym_not_found;
+	      continue;
+	    }
+
+	  bp_objfile_data->exception_msym = debug_hook;
 	}
+
+      addr = SYMBOL_VALUE_ADDRESS (bp_objfile_data->exception_msym);
+      addr = gdbarch_convert_from_func_ptr_addr (gdbarch, addr,
+						 &current_target);
+      b = create_internal_breakpoint (gdbarch, addr, bp_exception_master);
+      b->addr_string = xstrdup (func_name);
+      b->enable_state = bp_disabled;
     }
 
   update_global_location_list (1);
@@ -2422,12 +2594,9 @@ update_breakpoints_after_exec (void)
       }
   }
   /* FIXME what about longjmp breakpoints?  Re-create them here?  */
-  create_overlay_event_breakpoint ("_ovly_debug_event");
-  create_longjmp_master_breakpoint ("longjmp");
-  create_longjmp_master_breakpoint ("_longjmp");
-  create_longjmp_master_breakpoint ("siglongjmp");
-  create_longjmp_master_breakpoint ("_siglongjmp");
-  create_std_terminate_master_breakpoint ("std::terminate()");
+  create_overlay_event_breakpoint ();
+  create_longjmp_master_breakpoint ();
+  create_std_terminate_master_breakpoint ();
   create_exception_master_breakpoint ();
 }
 
@@ -4972,7 +5141,7 @@ print_one_breakpoint (struct breakpoint *b,
 	 situation.
 
 	 Note that while hardware watchpoints have several locations
-	 internally, that's no a property exposed to user.  */
+	 internally, that's not a property exposed to user.  */
       if (b->loc 
 	  && !is_hardware_watchpoint (b)
 	  && (b->loc->next || !b->loc->enabled)
@@ -5064,6 +5233,15 @@ user_settable_breakpoint (const struct breakpoint *b)
 	  || is_watchpoint (b));
 }
 
+/* Return true if this breakpoint was set by the user, false if it is
+   internal or momentary.  */
+
+int
+user_breakpoint_p (struct breakpoint *b)
+{
+  return user_settable_breakpoint (b) && b->number > 0;
+}
+
 /* Print information on user settable breakpoint (watchpoint, etc)
    number BNUM.  If BNUM is -1 print all user-settable breakpoints.
    If ALLFLAG is non-zero, include non-user-settable breakpoints.  If
@@ -5096,8 +5274,7 @@ breakpoint_1 (int bnum, int allflag,
 	if (filter && !filter (b))
 	  continue;
 	
-	if (allflag || (user_settable_breakpoint (b)
-			&& b->number > 0))
+	if (allflag || user_breakpoint_p (b))
 	  {
 	    int addr_bit, type_len;
 
@@ -5169,8 +5346,7 @@ breakpoint_1 (int bnum, int allflag,
 	
 	/* We only print out user settable breakpoints unless the
 	   allflag is set.  */
-	if (allflag || (user_settable_breakpoint (b)
-			&& b->number > 0))
+	if (allflag || user_breakpoint_p (b))
 	  print_one_breakpoint (b, &last_loc, print_address_bits, allflag);
       }
   }
@@ -5909,6 +6085,19 @@ create_jit_event_breakpoint (struct gdbarch *gdbarch, CORE_ADDR address)
   b = create_internal_breakpoint (gdbarch, address, bp_jit_event);
   update_global_location_list_nothrow (1);
   return b;
+}
+
+/* Remove JIT code registration and unregistration breakpoint(s).  */
+
+void
+remove_jit_event_breakpoints (void)
+{
+  struct breakpoint *b, *b_tmp;
+
+  ALL_BREAKPOINTS_SAFE (b, b_tmp)
+    if (b->type == bp_jit_event
+	&& b->loc->pspace == current_program_space)
+      delete_breakpoint (b);
 }
 
 void
@@ -7425,10 +7614,13 @@ create_breakpoints_sal (struct gdbarch *gdbarch,
     }
 }
 
-/* Parse ARG which is assumed to be a SAL specification possibly
+/* Parse ADDRESS which is assumed to be a SAL specification possibly
    followed by conditionals.  On return, SALS contains an array of SAL
    addresses found.  ADDR_STRING contains a vector of (canonical)
-   address strings.  ARG points to the end of the SAL.  */
+   address strings.  ADDRESS points to the end of the SAL.
+
+   The array and the line spec strings are allocated on the heap, it is
+   the caller's responsibility to free them.  */
 
 static void
 parse_breakpoint_sals (char **address,
@@ -10656,12 +10848,9 @@ breakpoint_re_set (void)
 
   do_cleanups (old_chain);
 
-  create_overlay_event_breakpoint ("_ovly_debug_event");
-  create_longjmp_master_breakpoint ("longjmp");
-  create_longjmp_master_breakpoint ("_longjmp");
-  create_longjmp_master_breakpoint ("siglongjmp");
-  create_longjmp_master_breakpoint ("_siglongjmp");
-  create_std_terminate_master_breakpoint ("std::terminate()");
+  create_overlay_event_breakpoint ();
+  create_longjmp_master_breakpoint ();
+  create_std_terminate_master_breakpoint ();
   create_exception_master_breakpoint ();
 }
 
@@ -10729,13 +10918,6 @@ set_ignore_count (int bptnum, int count, int from_tty)
     }
 
   error (_("No breakpoint number %d."), bptnum);
-}
-
-void
-make_breakpoint_silent (struct breakpoint *b)
-{
-  /* Silence the breakpoint.  */
-  b->silent = 1;
 }
 
 /* Command to set ignore-count of breakpoint N to COUNT.  */
@@ -11727,7 +11909,7 @@ save_breakpoints (char *filename, int from_tty,
   ALL_BREAKPOINTS (tp)
   {
     /* Skip internal and momentary breakpoints.  */
-    if (!user_settable_breakpoint (tp) || tp->number < 0)
+    if (!user_breakpoint_p (tp))
       continue;
 
     /* If we have a filter, only save the breakpoints it accepts.  */
@@ -11765,7 +11947,7 @@ save_breakpoints (char *filename, int from_tty,
   ALL_BREAKPOINTS (tp)
   {
     /* Skip internal and momentary breakpoints.  */
-    if (!user_settable_breakpoint (tp) || tp->number < 0)
+    if (!user_breakpoint_p (tp))
       continue;
 
     /* If we have a filter, only save the breakpoints it accepts.  */
@@ -12007,6 +12189,8 @@ _initialize_breakpoint (void)
   observer_attach_inferior_exit (clear_syscall_counts);
   observer_attach_memory_changed (invalidate_bp_value_on_memory_change);
 
+  breakpoint_objfile_key = register_objfile_data ();
+
   breakpoint_chain = 0;
   /* Don't bother to call set_breakpoint_count.  $bpnum isn't useful
      before a breakpoint is set.  */
@@ -12044,7 +12228,7 @@ BREAK_ARGS_HELP ("tbreak")));
   set_cmd_completer (c, location_completer);
 
   c = add_com ("hbreak", class_breakpoint, hbreak_command, _("\
-Set a hardware assisted  breakpoint.\n\
+Set a hardware assisted breakpoint.\n\
 Like \"break\" except the breakpoint requires hardware support,\n\
 some target hardware may not have this support.\n\
 \n"

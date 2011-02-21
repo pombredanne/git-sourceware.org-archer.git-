@@ -1,3 +1,245 @@
+2011-02-21  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/packed_array.exp: Add xfail for "print u_var" if
+	the debugger is unable to find the array bounds.
+
+2011-02-18  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.cp/typedef-operator.exp: New file.
+	* gdb.cp/typedef-operator.cc: New file.
+
+2011-02-17  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.threads/thread-find.exp: Fix regular expressions.
+
+2011-02-17  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/packed_array: Expand testcase to test printing of
+	unconstrained packed array.
+
+2011-02-17  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.dwarf2/dw2-ranges.exp: Simplify using clean_restart.
+
+2011-02-16  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.trace/collection.c (globalarr3): New global.
+	(main): Initialize it before collecting, and and clear it
+	afterwards.
+	* gdb.trace/collection.exp (gdb_collect_globals_test): Test
+	collecting with '{type} addr', where the addr expression is not an
+	rvalue.
+
+2011-02-16  Ken Werner  <ken.werner@de.ibm.com>
+
+	* gdb.opencl/datatypes.exp: Allow "false" when printing the content of
+	a bool variable. Expect correct OpenCL names for vector types. Use the
+	uc3 variable name instead of referring to the uchar3 built-in type.
+	Escape the asterisk at the half pointer test.
+
+2011-02-16  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.trace/collection.c (globalarr2): New global.
+	(main): Initialize it before collecting, and and clear it
+	afterwards.
+	* gdb.trace/collection.exp (gdb_collect_globals_test): Test
+	collecting overlapping memory ranges.
+
+2011-02-15  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.base/default.exp: Add tests for thread commands.
+	* gdb.base/help.exp: Add tests for thread commands.
+	* gdb.threads/thread-find.exp: New test for thread find command.
+
+2011-02-15  Ken Werner  <ken.werner@de.ibm.com>
+
+	* gdb.opencl/datatypes.exp: Expect the size of a bool to be one byte.
+
+2011-02-15  Yao Qi  <yao@codesourcery.com>
+
+	PR tdep/12352
+	* gdb.arch/arm-disp-step.S : New test for str instruction.
+	* gdb.arch/arm-disp-step.exp : Likewise.
+
+2011-02-15  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.arch/vsx-regs.exp: Add "vector_register1_vr" and
+	"vector_register2_vr" test strings.  Test the extended floating
+	point registers (F32~F63).
+	* lib/gdb.exp (skip_vsx_tests): Update compile flags for the
+	IBM XL C compiler.  Make the test program use a register provided
+	by the compiler for the lxvd2x instruction.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.trace/unavailable.cc (class Base, class Middle, class
+	Derived): New types.
+	(derived_unavail, derived_partial, derived_whole): New globals.
+	(virtual_partial): New global.
+	(virtualp): Point at virtual_partial.
+	* gdb.trace/unavailable.exp (gdb_collect_globals_test): Add tests
+	related to unavailable vptr.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.trace/unavailable.cc (a, b, c): New globals.
+	(main): Set and clear them.
+	* gdb.trace/unavailable.exp (gdb_collect_globals_test): Collect
+	`a' and `c', and check that `b' isn't collected, although `a' and
+	`c' are.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.trace/unavailable.cc (struct Virtual): New.
+	(virtualp): New global pointer.
+	* gdb.trace/unavailable.exp (gdb_collect_globals_test): Test
+	printing a pointer to an object whose type has a vtable, with
+	print object on.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.trace/unavailable.exp (gdb_collect_globals_test): Test that
+	value repeat handles unavailableness.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.trace/unavailable.exp (gdb_collect_globals_test): Add new
+	tests for building arrays from unavailable values, subscripting
+	non-memory rvalue unvailable arrays, and accessing fields or
+	baseclasses of non-lazy unavailable values,
+	* gdb.trace/unavailable.cc (small_struct, small_struct_b): New
+	struct types.
+	(g_smallstruct, g_smallstruct_b): New globals.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.trace/unavailable.cc, gdb.trace/unavailable.exp: New files.
+
+2011-02-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix const/volatile qualifiers of C++ types, PR c++/12328.
+	* gdb.cp/overload-const.exp: New file.
+	* gdb.cp/overload-const.cc: New file.
+
+2011-02-08  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.opencl/callfuncs.cl: New file.
+	* gdb.opencl/callfuncs.exp: New test.
+	* gdb.opencl/Makefile.in (EXECUTABLES): Add callfuncs.
+
+2011-02-08  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.arch/altivec-abi.c (vec_func): Make use of intv_on_stack_f
+	when computing result.
+	* gdb.arch/altivec-abi.exp: Update expected results.
+
+2011-02-07  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* gdb.base/break-interp.exp: Remove ${objdir} from test messages.
+	* gdb.base/jit.exp: Likewise.
+	* gdb.base/pie-execl.exp: Likewise.
+	* gdb.base/solib-nodir.exp: Likewise.
+	* gdb.base/solib-overlap.exp: Likewise.
+
+2011-02-07  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.trace/collection.c (global_pieces): New.
+	* gdb.trace/collection.exp (gdb_collect_global_in_pieces_test):
+	New procedure.
+	(gdb_trace_collection_test): Call it.
+
+2011-02-04  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.python/py-evthreads.c: New file.
+	* gdb.python/py-evthreads.exp: New file.
+	* gdb.python/py-events.py: New file.
+	* gdb.python/py-events.exp: New file.
+	* gdb.python/py-events.c: New file.
+
+2011-02-04 David Daney <ddaney@caviumnetworks.com>
+
+	* gdb.base/catch-syscall.exp: Enable for mips*-linux*.
+
+2011-02-03  Andrew Burgess  <aburgess@broadcom.com>
+
+	* gdb.base/disasm-end-cu-1.c, gdb.base/disasm-end-cu-2.c,
+	gdb.base/disasm-end-cu.exp: New test for disassembling over the
+	boundary between two compilation units.
+
+2011-02-02  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.cp/virtbase.cc (VirtualBase, VirtualMiddleA, VirtualMiddleB)
+	(Virtual): New structs.
+	(virtual_o, virtual_middle_b): New globals.
+	* gdb.cp/virtbase.exp: New tests.
+
+2011-01-31  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* gdb.base/jit.exp: New file.
+	* gdb.base/jit-main.c: New file.
+	* gdb.base/jit-solib.c: New file.
+
+2011-01-31  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.opencl/convs_casts.exp: Use tbreak instead of break to
+	proceed to initial kernel entry point.
+	* gdb.opencl/datatypes.exp: Likewise.
+	* gdb.opencl/operators.exp: Likewise.
+	* gdb.opencl/vec_comps.exp: Likewise.
+
+2011-01-31  Sami Wagiaalla  <swagiaal@redhat.com>
+
+	* gdb.cp/nsnested.cc: New.
+	* gdb.cp/nsnested.exp: New.
+	* gdb.cp/nsnoimports.exp: New.
+	* gdb.cp/nsnoimports.cc: New.
+
+2011-01-31  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.base/interact.exp: Add extra tests that verify that
+	the value of the interactive-mode setting does not change
+	after the script is sourced.
+
+2011-01-29  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.cp/noparam.exp: New file.
+	* gdb.cp/noparam.cc: New file.
+
+2011-01-28  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.trace/tfile.exp: Test that with no traceframe selected,
+	there's no stack or registers.
+
+2011-01-26  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.python/py-prettyprint.exp (run_lang_tests): Ensure no blank
+	space before string output.  Add test for "set print pretty off"
+	case.
+
+2011-01-25  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.base/frame-args.exp: Adjust.
+	* gdb.dwarf2/dw2-noloc.exp: Adjust.
+	* gdb.dwarf2/dw2-inline-param.exp: Adjust.
+	* gdb.dwarf2/pieces.exp: Adjust.
+	* gdb.opt/clobbered-registers-O2.exp: Adjust.
+	* gdb.opt/inline-locals.exp: Adjust.
+	* gdb.threads/fork-child-threads.exp: Adjust.
+
+2011-01-25  Ken Werner  <ken.werner@de.ibm.com>
+
+	* gdb.opencl/convs_casts.cl: Move program scope variables into the
+	OpenCL kernel function. Add a comment as marker. Add address space
+	qualifiers for the remaining program scope variables.
+	* gdb.opencl/datatypes.cl: Likewise.
+	* gdb.opencl/operators.cl: Likewise.
+	* gdb.opencl/vec_comps.cl: Likewise.
+	* gdb.opencl/convs_casts.exp: Replace gdb_test_multiple by gdb_test.
+	Add breakpoint at the marker comment.
+	* gdb.opencl/datatypes.exp: Likewise.
+	* gdb.opencl/operators.exp: Likewise.
+	* gdb.opencl/vec_comps.exp: Likewise.
+
 2011-01-24  Pedro Alves  <pedro@codesourcery.com>
 
 	* gdb.base/printcmds.c (some_struct): New struct and instance.
@@ -272,7 +514,7 @@
 	updated.
 	* lib/gdb.exp (INTERNAL_GDBFLAGS): Add -data-directory.
 
-2010-11-29  Michael Snyder  <msnyder@msnyder-server.eng.vmware.com>
+2010-11-29  Michael Snyder  <msnyder@vmware.com>
 
 	* gdb.base/callfuncs.exp: Test for skip_float_tests.
 	* gdb.base/call-sc.exp: Ditto.

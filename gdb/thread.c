@@ -43,6 +43,7 @@
 #include "observer.h"
 #include "annotate.h"
 #include "cli/cli-decode.h"
+#include "gdb_regex.h"
 
 /* Definition of struct thread_info exported to gdbthread.h.  */
 
@@ -954,18 +955,34 @@ No selected thread.  See `help thread'.\n");
     }
 }
 
-
 /* Print information about currently known threads 
 
- * Note: this has the drawback that it _really_ switches
- *       threads, which frees the frame cache.  A no-side
- *       effects info-threads command would be nicer.
- */
+   Optional ARG is a thread id, or list of thread ids.
+
+   Note: this has the drawback that it _really_ switches
+         threads, which frees the frame cache.  A no-side
+         effects info-threads command would be nicer.  */
 
 static void
 info_threads_command (char *arg, int from_tty)
 {
-  print_thread_info (uiout, -1, -1);
+  int tid = -1;
+
+  if (arg == NULL || *arg == '\0')
+    {
+      print_thread_info (uiout, -1, -1);
+      return;
+    }
+
+  while (arg != NULL && *arg != '\0')
+    {
+      tid = get_number_or_range (&arg);
+
+      if (tid <= 0)
+	error (_("invalid thread id %d"), tid);
+
+      print_thread_info (uiout, tid, -1);
+    }
 }
 
 /* Switch from one thread to another.  */
@@ -1195,7 +1212,6 @@ static void
 thread_apply_command (char *tidlist, int from_tty)
 {
   char *cmd;
-  char *p;
   struct cleanup *old_chain;
   char *saved_cmd;
 
@@ -1214,51 +1230,29 @@ thread_apply_command (char *tidlist, int from_tty)
   while (tidlist < cmd)
     {
       struct thread_info *tp;
-      int start, end;
+      int start;
+      char *p = tidlist;
 
-      start = strtol (tidlist, &p, 10);
-      if (p == tidlist)
-	error (_("Error parsing %s"), tidlist);
-      tidlist = p;
-
-      while (*tidlist == ' ' || *tidlist == '\t')
-	tidlist++;
-
-      if (*tidlist == '-')	/* Got a range of IDs?  */
-	{
-	  tidlist++;		/* Skip the - */
-	  end = strtol (tidlist, &p, 10);
-	  if (p == tidlist)
-	    error (_("Error parsing %s"), tidlist);
-	  tidlist = p;
-
-	  while (*tidlist == ' ' || *tidlist == '\t')
-	    tidlist++;
-	}
-      else
-	end = start;
+      start = get_number_or_range (&tidlist);
 
       make_cleanup_restore_current_thread ();
 
-      for (; start <= end; start++)
+      tp = find_thread_id (start);
+
+      if (!tp)
+	warning (_("Unknown thread %d."), start);
+      else if (!thread_alive (tp))
+	warning (_("Thread %d has terminated."), start);
+      else
 	{
-	  tp = find_thread_id (start);
+	  switch_to_thread (tp->ptid);
 
-	  if (!tp)
-	    warning (_("Unknown thread %d."), start);
-	  else if (!thread_alive (tp))
-	    warning (_("Thread %d has terminated."), start);
-	  else
-	    {
-	      switch_to_thread (tp->ptid);
+	  printf_filtered (_("\nThread %d (%s):\n"), tp->num,
+			   target_pid_to_str (inferior_ptid));
+	  execute_command (cmd, from_tty);
 
-	      printf_filtered (_("\nThread %d (%s):\n"), tp->num,
-			       target_pid_to_str (inferior_ptid));
-	      execute_command (cmd, from_tty);
-
-	      /* Restore exact command used previously.  */
-	      strcpy (cmd, saved_cmd);
-	    }
+	  /* Restore exact command used previously.  */
+	  strcpy (cmd, saved_cmd);
 	}
     }
 
@@ -1311,6 +1305,60 @@ thread_name_command (char *arg, int from_tty)
   info = inferior_thread ();
   xfree (info->name);
   info->name = arg ? xstrdup (arg) : NULL;
+}
+
+/* Find thread ids with a name, target pid, or extra info matching ARG.  */
+
+static void
+thread_find_command (char *arg, int from_tty)
+{
+  struct thread_info *tp;
+  char *tmp;
+  unsigned long match = 0;
+
+  if (arg == NULL || *arg == '\0')
+    error (_("Command requires an argument."));
+
+  tmp = re_comp (arg);
+  if (tmp != 0)
+    error (_("Invalid regexp (%s): %s"), tmp, arg);
+
+  update_thread_list ();
+  for (tp = thread_list; tp; tp = tp->next)
+    {
+      if (tp->name != NULL && re_exec (tp->name))
+	{
+	  printf_filtered (_("Thread %d has name '%s'\n"),
+			   tp->num, tp->name);
+	  match++;
+	}
+
+      tmp = target_thread_name (tp);
+      if (tmp != NULL && re_exec (tmp))
+	{
+	  printf_filtered (_("Thread %d has target name '%s'\n"),
+			   tp->num, tmp);
+	  match++;
+	}
+
+      tmp = target_pid_to_str (tp->ptid);
+      if (tmp != NULL && re_exec (tmp))
+	{
+	  printf_filtered (_("Thread %d has target id '%s'\n"),
+			   tp->num, tmp);
+	  match++;
+	}
+
+      tmp = target_extra_thread_info (tp);
+      if (tmp != NULL && re_exec (tmp))
+	{
+	  printf_filtered (_("Thread %d has extra info '%s'\n"),
+			   tp->num, tmp);
+	  match++;
+	}
+    }
+  if (!match)
+    printf_filtered (_("No threads match '%s'\n"), arg);
 }
 
 /* Print notices when new threads are attached and detached.  */
@@ -1403,8 +1451,11 @@ _initialize_thread (void)
 {
   static struct cmd_list_element *thread_apply_list = NULL;
 
-  add_info ("threads", info_threads_command,
-	    _("IDs of currently known threads."));
+  add_info ("threads", info_threads_command, 
+	    _("Display currently known threads.\n\
+Usage: info threads [ID]...\n\
+Optional arguments are thread IDs with spaces between.\n\
+If no arguments, all threads are displayed."));
 
   add_prefix_cmd ("thread", class_run, thread_command, _("\
 Use this command to switch between threads.\n\
@@ -1422,6 +1473,12 @@ The new thread ID must be currently known."),
 	   _("Set the current thread's name.\n\
 Usage: thread name [NAME]\n\
 If NAME is not given, then any existing name is removed."), &thread_cmd_list);
+
+  add_cmd ("find", class_run, thread_find_command, _("\
+Find threads that match a regular expression.\n\
+Usage: thread find REGEXP\n\
+Will display thread ids whose name, target ID, or extra info matches REGEXP."),
+	   &thread_cmd_list);
 
   if (!xdb_commands)
     add_com_alias ("t", "thread", class_run, 1);

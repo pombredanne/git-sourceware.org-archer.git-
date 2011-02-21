@@ -1,3 +1,1147 @@
+2011-02-21  Hui Zhu  <teawater@gmail.com>
+
+	* Makefile.in (HFILES_NO_SRCDIR): Add printcmd.h.
+	* ax-gdb.c (gen_printf_expr_callback): New function.
+	* ax-gdb.h (gen_printf_expr_callback): Forward declare.
+	* ax-general.c (ax_memcpy): New function.
+	(ax_print): Handle "printf".
+	(ax_reqs): Ditto.
+	* ax.h (ax_memcpy): Forward declare.
+	* common/ax.def (invalid2): Removed.
+	(printf): New entry.
+	* printcmd.c (printcmd.h): New include.
+	(string_printf): New function.
+	(ui_printf): Removed.
+	(printf_command): Remove static.  Call string_printf.
+	(eval_command): Call string_printf.
+	* printcmd.h: New file.
+	* tracepoint.c (validate_actionline,
+	encode_actions_1): handle printf_command.
+
+2011-02-19  Michael Snyder  <msnyder@vmware.com>
+
+	* reverse.c (delete_one_bookmark): Argument is now bookmark
+	id rather than pointer to bookmark struct.
+	(delete_bookmark_command): Use get_number_or_range.
+	(goto_bookmark_command): Parse with get_number instead of strtoul.
+	(bookmark_1): New function.  Print info for one bookmark.
+	(bookmarks_info): Use get_number_or_range and bookmark_1.
+
+2011-02-18  Michael Snyder  <msnyder@vmware.com>
+
+	* thread.c (info_threads_command): Re-implement using 
+	get_number_or_range.
+	(thread_apply_command): Ditto.
+
+2011-02-18  Tom Tromey  <tromey@redhat.com>
+
+	* common/ax.def: New file.
+	* ax.h (enum agent_op): Use ax.def.
+	* ax-general.c (aop_map): Use ax.def.
+
+2011-02-18  Tom Tromey  <tromey@redhat.com>
+
+	* ax-general.c (aop_map): Add pick and rot.
+	* dwarf2loc.c (compile_dwarf_to_ax) <DW_OP_over>: Reimplement.
+	<DW_OP_rot>: Implement.
+	* ax.h (enum agent_op) <aop_pick, aop_rot>: New constants.
+	(ax_pick): Declare.
+	* ax-general.c (ax_pick): New function.
+
+2011-02-18  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in (HFILES_NO_SRCDIR): Don't mention ada-operator.inc.
+
+2011-02-18  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Tom Tromey  <tromey@redhat.com>
+
+	* cp-support.c (make_symbol_overload_list_namespace): Do not call
+	make_symbol_overload_list_block with NULL BLOCK.
+	* valarith.c (unop_user_defined_p): Resolve also TYPE_CODE_TYPEDEF.
+
+2011-02-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* breakpoint.c (get_number_trailer): No longer accept a NULL PP.
+	* breakpoint.h (get_number_or_range): Declare.
+	* printcmd.c (ALL_DISPLAYS): Declare.
+	(delete_display): Reimplement taking a display pointer.
+	(undisplay_command): Accept a range of displays to delete, using
+	get_number_or_range.
+
+2011-02-18  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* c-valprint.c (c_val_print): Add embedded_offset to address
+	for arrays of unspecified length.
+	* p-valprint.c (pascal_val_print): Likewise.
+
+2011-02-18  Yao Qi  <yao@codesourcery.com>
+
+	* gdb/arm-tdep.c (arm_displaced_step_copy_insn): Move code to ...
+	(arm_process_displaced_insn): .. here. Remove parameter INSN.
+	(thumb_process_displaced_insn): New.
+	* gdb/arm-linux-tdep.c (arm_linux_displaced_step_copy_insn): Update
+	call to arm_process_displaced_insn.
+	* gdb/arm-tdep.h : Update declaration of arm_process_displaced_insn.
+
+2011-02-17  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2loc.h (dwarf2_compile_expr_to_ax): Declare.
+	* dwarf2loc.c (dwarf2_compile_expr_to_ax): Rename from
+	compile_dwarf_to_ax.  No longer static.  Call
+	dwarf2_compile_cfa_to_ax.
+	(locexpr_tracepoint_var_ref): Update.
+	(loclist_tracepoint_var_ref): Update.
+	* dwarf2-frame.h (dwarf2_compile_cfa_to_ax): Declare.
+	* dwarf2-frame.c (execute_cfa_program): Remove 'this_frame'
+	argument; add 'gdbarch' and 'pc'.
+	(dwarf2_compile_cfa_to_ax): New function.
+	(dwarf2_frame_cache): Update.
+
+2011-02-17  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (ada_type_of_array): Fix the size of the array
+	in the case of an unconstrained packed array.
+
+2011-02-17  Yao Qi  <yao@codesourcery.com>
+
+	* common/Makefile.in: Add more targets for make.
+
+2011-02-16  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2loc.c (unimplemented): Fix typo.
+
+2011-02-16  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2loc.c (unimplemented): Handle unnamed opcodes.
+	(compile_dwarf_to_ax) <default>: Use unimplemented.
+	<DW_OP_deref>: Update.
+	(disassemble_dwarf_expression): Update.
+	* dwarf2read.c (dwarf_stack_op_name): Remove 'def' argument.
+	(decode_locdesc): Update.
+	* dwarf2expr.h (dwarf_stack_op_name): Update.
+
+2011-02-16  Tom Tromey  <tromey@redhat.com>
+
+	* ax.h (struct aop_map) <name>: Now const.
+
+2011-02-16  Tom Tromey  <tromey@redhat.com>
+
+	* ax-gdb.c.c (gen_expr) <UNOP_MEMVAL>: Handle value kinds other
+	than axs_rvalue.
+
+2011-02-16  Yao Qi  <yao@codesourcery.com>
+
+	* infrun.c (get_displaced_step_closure_by_addr): New.
+	* inferior.h: Declare it.
+	* arm-tdep.c: (arm_pc_is_thumb): Call
+	get_displaced_step_closure_by_addr.  Adjust MEMADDR if it
+	returns non-NULL.
+
+2011-02-16  Pedro Alves  <pedro@codesourcery.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	gdb/
+	* tracepoint.c (memrange_sortmerge): Fix list A's end calculation.
+
+2011-02-16  Pedro Alves  <pedro@codesourcery.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* value.c (value_contents_copy_raw): Extend describing comment.
+	Assert that the destination contents we're overwriting are wholly
+	available.
+	(value_contents_copy): Extend describing comment.
+
+2011-02-16  Pedro Alves  <pedro@codesourcery.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* value.c (value_available_contents_eq): Remove redundant local
+	variables.  Fix available contents comparision.
+	* value.h (value_available_contents_eq): Extend describing
+	comment.
+
+2011-02-16  Yao Qi  <yao@codesourcery.com>
+
+	* thread.c (info_threads_command): Add missing i18n markup and remove
+	trailing newline.
+
+2011-02-15  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* breakpoint.c (longjmp_names): New variable.
+	(struct breakpoint_objfile_data): New type.
+	(breakpoint_objfile_key): New variable.
+	(msym_not_found): New variable.
+	(msym_not_found_p): New predicate.
+	(get_breakpoint_objfile_data): New function.
+	(create_overlay_event_breakpoint): Check per-objfile cache for
+	symbols first.
+	(create_longjmp_master_breakpoint): Likewise.
+	(create_std_terminate_master_breakpoint): Likewise.
+	(create_exception_master_breakpoint): Likewise.
+	(_initialize_breakpoint): Register per-objfile data key.
+
+2011-02-15  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* breakpoint.c ((create_overlay_event_breakpoint): Const-propagate
+	parameter value.
+	(create_longjmp_master_breakpoint): Loop over longjmp names.
+	(create_std_terminate_master_breakpoint): Const-propagate parameter
+	value.
+	(update_breakpoints_after_exec): Adjust.
+	(breakpoint_re_set): Adjust.
+
+2011-02-15  Michael Snyder  <msnyder@vmware.com>
+
+	* thread.c (info_threads_command): Process arg as thread id,
+	or list of thread ids.
+	(thread_find_command): New command.
+	(_initialize_thread): Document argument for info threads.
+	Document 'thread find' command.
+	* NEWS: Document new command "thread find".
+
+2011-02-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* Makefile.in (ACLOCAL_AMFLAGS): Add `-I ../config'.
+	* aclocal.m4: Regenerated with aclocal-1.11.1.
+	* common/configure: Regenerate with autoconf-2.64.
+
+2011-02-15  Ken Werner  <ken.werner@de.ibm.com>
+
+	* opencl-lang.c (build_opencl_types): Set the size of the built-in
+	bool data type to a size of one byte.
+
+2011-02-15  Pedro Alves  <pedro@codesourcery.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* target.c (memory_xfer_live_readonly_partial): Document where to
+	look for interface description.
+
+2011-02-15  Yao Qi  <yao@codesourcery.com>
+
+	PR tdep/12352
+	* arm-tdep.c (copy_ldr_str_ldrb_strb): Replace PC with SP in
+	order to store PC value on stack instead of text section.
+
+2011-02-15  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* rs6000-tdep.c (IS_EFP_PSEUDOREG): Use correct constant for
+	the EFP register set size.
+	(efpr_pseudo_register_read): Use regcache_raw_read_part to read
+	data from the VMX register.
+	(efpr_pseudo_register_write): Use regcache_raw_write_part to read
+	and write data from/to the VMX register.
+
+2011-02-14  Michael Snyder  <msnyder@vmware.com>
+
+	* command.h (enum command_class): New class 'no_set_class', for
+	"show" commands without a corresponding "set" command.
+	* value.c (_initialize_values): Use 'no_set_class' for "show values".
+	* copying.c (_initialize_copying): Ditto for "show copying" and
+	"show warranty".
+	* cli/cli-cmds.c (init_cli_cmds): Ditto for "show commands" and
+	"show version".
+	* cli/cli-setshow.c (cmd_show_list): Skip "show" commands for
+	which there is no corresponding "set" command (eg. "show copying").
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* exec.c (section_table_available_memory): Change `len' parameter
+	type to ULONGEST.
+	* exec.h (section_table_available_memory): Ditto.
+	* value.h (read_value_memory): Rename the `offset' parameter to
+	`embedded_offset'.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* memrange.c (compare_mem_ranges): Mention sort order in
+	describing comment.
+	(normalize_mem_ranges): Add comment.  Fix ra->length calculation.
+	* tracepoint.c (traceframe_available_memory): Extend comment to
+	mention what happens to RESULT when the target does not support
+	the query.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* value.c (mark_value_bytes_unavailable): Fix indexing the `bef'
+	range.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* value.c (value_bits_valid, value_bits_synthetic_pointer):
+	No longer handle NULL values.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* exceptions.h (NOT_AVAILABLE_ERROR): New error.
+	* value.c: Include "exceptions.h".
+	(require_available): Throw NOT_AVAILABLE_ERROR instead of a
+	generic error.
+	* cp-abi.c: Include gdb_assert.h.
+	(baseclass_offset): Add `embedded_offset' and `val' parameters.
+	Assert the method is implemented.  Wrap NOT_AVAILABLE_ERROR
+	errors.
+	* cp-abi.h (baseclass_offset): Add `embedded_offset' and `val'
+	parameters.  No longer returns -1 on error.
+	(struct cp_abi_ops) <baseclass_offset>: Add `embedded_offset' and
+	`val' parameters.
+	* cp-valprint.c: Include exceptions.h.
+	(cp_print_value): Handle NOT_AVAILABLE_ERROR errors when fetching
+	the baseclass_offset.  Handle unavailable base classes.  Use
+	val_print_invalid_address.
+	* p-valprint.c: Include exceptions.h.
+	(pascal_object_print_value): Handle NOT_AVAILABLE_ERROR errors
+	when fetching the baseclass_offset.  No longer expect
+	baseclass_offset returning -1.  Handle unavailable base classes.
+	Use val_print_invalid_address.
+	* valops.c (dynamic_cast_check_1): Rename `contents' parameter to
+	`valaddr' parameter, and change its type to gdb_byte pointer.  Add
+	`embedded_offset' and `val' parameters.  Adjust.
+	(dynamic_cast_check_2): Rename `contents' parameter to `valaddr'
+	parameter, and change its type to gdb_byte pointer.  Add
+	`embedded_offset' and `val' parameters.  Adjust.  No longer expect
+	baseclass_offset returning -1.
+	(value_dynamic_cast): Use value_contents_for_printing rather than
+	value_contents.  Adjust.
+	(search_struct_field): No longer expect baseclass_offset returning
+	-1.
+	(search_struct_method): If reading memory from the target is
+	necessary, wrap it in a new value to pass to baseclass_offset.  No
+	longer expect baseclass_offset returning -1.
+	(find_method_list): No longer expect baseclass_offset returning
+	-1.  Use value_contents_for_printing rather than value_contents.
+	* valprint.c (val_print_invalid_address): New function.
+	* valprint.h (val_print_invalid_address): Declare.
+	* gdbtypes.c (is_unique_ancestor_worker): New `embedded_offset'
+	and `val' parameters.  No longer expect baseclass_offset returning
+	-1.  Adjust.
+	* gnu-v2-abi.c: Include "exceptions.h".
+	(gnuv2_baseclass_offset): Add `embedded_offset' and `val'
+	parameters.  Handle unavailable memory.  Recurse through
+	gnuv2_baseclass_offset directly, rather than through
+	baseclass_offset.  No longer returns -1 on not found, instead
+	throw an error.
+	* gnu-v3-abi.c (gnuv3_baseclass_offset): Add `embedded_offset' and
+	`val' parameters.  Adjust.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* tracepoint.c (memrange_sortmerge): Don't merge ranges that are
+	almost but not quite adjacent.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* value.h (value_entirely_available): Declare.
+	* value.c (value_entirely_available): New function.
+	* c-valprint.c (c_value_print): Don't try fetching the pointer's
+	real type if the pointer is unavailable.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* valops.c (value_repeat): Use read_value_memory instead of
+	read_memory.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* value.h (value_contents_copy, value_contents_copy_raw): Declare.
+	* value.c (value_contents_copy_raw, value_contents_copy): New
+	functions.
+	(value_primitive_field): Use value_contents_copy_raw instead of
+	memcpy.
+	* valops.c (value_fetch_lazy): Use value_contents_copy instead of
+	memcpy.
+	(value_array, value_slice): Ditto.
+	* valarith.c (value_subscripted_rvalue): Use
+	value_contents_copy_raw instead of memcpy.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+
+	<unavailable> references.
+
+	* valops.c (get_value_at): Use value_from_contents_and_address,
+	avoiding read_memory.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* c-valprint.c (c_val_print): Print a string with unavailable
+	contents as an array.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* value.h (unpack_bits_as_long): Delete declaration.
+	(unpack_value_bits_as_long): Declare.
+	(unpack_value_field_as_long): Declare.
+	(value_field_bitfield): Declare.
+	* value.c (unpack_bits_as_long): Rename to...
+	(unpack_value_bits_as_long_1): ... this.  Add embedded_offset and
+	value parameters.  Return the extracted result in a new output
+	parameter.  If the value contents are unavailable, return false,
+	otherwise return true.
+	(unpack_value_bits_as_long): New.
+	(unpack_field_as_long): Rename to...
+	(unpack_value_field_as_long_1): ... this.  Add embedded_offset and
+	Add embedded_offset and value parameters.  Return the extracted
+	result in a new output parameter. If the value contents are
+	unavailable, return false, otherwise return true.
+	(unpack_value_field_as_long): New.
+	(unpack_field_as_long_1): New.
+	(unpack_field_as_long): Reimplement as wrapper around
+	unpack_value_field_as_long_1.
+	(value_field_bitfield): New function.
+	* valops.c (value_fetch_lazy): When fetching a bitfield, use
+	unpack_value_bits_as_long.  Mark the value as unavailable, if it
+	is unavailable.
+	* jv-valprint.c (java_print_value_fields): Use
+	value_field_bitfield.
+	* p-valprint.c (pascal_object_print_value_fields): Use
+	value_field_bitfield.
+	* cp-valprint.c (cp_print_value_fields): Use value_field_bitfield.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* value.c (get_internalvar_integer): Also return the int value of
+	TYPE_CODE_INT INTERNALVAR_VALUE values.
+	(set_internalvar): Don't special case TYPE_CODE_INT.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* value.c (struct internalvar) <enum internalvar_kind>: Remove
+	INTERNALVAR_POINTER.
+	<pointer>: Delete.
+	(value_of_internalvar): Remove INTERNALVAR_POINTER handling.
+	(set_internalvar): Remove special TYPE_CODE_PTR handling.
+	(preserve_one_internalvar): Remove INTERNALVAR_POINTER handling.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* value.h (value_available_contents_eq): Declare.
+	* value.c (find_first_range_overlap): New function.
+	(value_available_contents_eq): New function.
+	* valprint.c (val_print_array_elements): Use
+	value_available_contents_eq.
+	* ada-valprint.c (val_print_packed_array_elements): Use
+	value_available_contents_eq.
+	* jv-valprint.c (java_value_print): Use
+	value_available_contents_eq.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* target.c (target_read_live_memory): New function.
+	(memory_xfer_live_readonly_partial): New.
+	(memory_xfer_partial): If reading from a traceframe, fallback to
+	reading unavailable read-only memory from read-only regions of
+	live target memory.
+	* tracepoint.c (disconnect_tracing): Adjust.
+	(set_current_traceframe): New, factored out from
+	set_traceframe_number.
+	(set_traceframe_number): Reimplement to only change the traceframe
+	number on the GDB side.
+	(do_restore_current_traceframe_cleanup): Adjust.
+	(make_cleanup_restore_traceframe_number): New.
+	(cur_traceframe_number): New global.
+	(tfile_open): Set cur_traceframe_number to no traceframe.
+	(set_tfile_traceframe): New function.
+	(tfile_trace_find): If looking up a traceframe using any method
+	other than by number, make sure the current tfile traceframe
+	matches gdb's current traceframe.  Update the current tfile
+	traceframe if the lookup succeeded.
+	(tfile_fetch_registers, tfile_xfer_partial)
+	(tfile_get_trace_state_variable_value): Make sure the remote
+	traceframe matches gdb's current traceframe.
+	* remote.c (remote_traceframe_number): New global.
+	(remote_open_1): Set it to -1.
+	(set_remote_traceframe): New function.
+	(remote_fetch_registers, remote_store_registers)
+	(remote_xfer_memory, remote_xfer_partial)
+	(remote_get_trace_state_variable_value): Make sure the remote
+	traceframe matches gdb's current traceframe.
+	(remote_trace_find): If looking up a traceframe using any method
+	other than by number, make sure the current remote traceframe
+	matches gdb's current traceframe.  Update the current remote
+	traceframe if the lookup succeeded.
+	* infrun.c (fetch_inferior_event): Adjust.
+	* tracepoint.h (set_current_traceframe): Declare.
+	(get_traceframe_number, set_traceframe_number): Add describing
+	comments.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+
+	Mark pieces of values as unavailable if the corresponding memory
+	is unavailable.
+
+	* valops.c: Include tracepoint.h.
+	(value_fetch_lazy): Use read_value_memory.
+	(read_value_memory): New.
+	* value.h (read_value_memory): Declare.
+	* dwarf2loc.c (read_pieced_value): Use read_value_memory.
+	* exec.c (section_table_available_memory): New function.
+	* exec.h (section_table_available_memory): Declare.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* Makefile.in (SFILES): Add memrange.c.
+	(HFILES_NO_SRCDIR): Add memrange.h.
+	(COMMON_OBS): Add memrange.o.
+	* memrange.c: New file.
+	* memrange.h: New file.
+	* tracepoint.c: Include memrange.h.
+	(struct mem_range): Delete.
+	(mem_range_s): Delete.
+	(traceframe_available_memory): New function.
+	* tracepoint.h (traceframe_available_memory): Declare.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* target.h (struct traceframe_info): Forward declare.
+	(enum target_object): Add TARGET_OBJECT_TRACEFRAME_INFO.
+	(struct target_ops) <to_traceframe_info>: New field.
+	(target_traceframe_info): New.
+	* target.c (update_current_target): Inherit and default
+	to_traceframe_info.
+	* remote.c (PACKET_qXfer_traceframe_info): New.
+	(remote_protocol_features): Register qXfer:traceframe-info:read.
+	(remote_xfer_partial): Handle TARGET_OBJECT_TRACEFRAME_INFO.
+	(remote_traceframe_info): New.
+	(init_remote_ops): Install it.
+	(_initialize_remote): Install "set/show remote traceframe-info"
+	commands.
+	* tracepoint.h (parse_traceframe_info): Declare.
+	* tracepoint.c (struct mem_range): New.
+	(mem_range_s): New typedef.
+	(struct traceframe_info): New.
+	(traceframe_info): New global.
+	(free_traceframe_info): New function.
+	(clear_traceframe_info): New function.
+	(start_tracing, tfind_1, set_traceframe_number): Clear traceframe
+	info.
+	(build_traceframe_info): New function.
+	(tfile_traceframe_info): New function.
+	(init_tfile_ops): Install tfile_traceframe_info.
+	(traceframe_info_start_memory, free_result): New functions.
+	(memory_attributes, traceframe_info_elements): New globals.
+	(parse_traceframe_info, get_traceframe_info): New functions.
+	* features/traceframe-info.dtd: New file.
+	* Makefile.in (XMLFILES): Add traceframe-info.dtd.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+
+	Base support for <unavailable> value contents.
+
+	* value.h (value_bytes_available): Declare.
+	(mark_value_bytes_unavailable): Declare.
+	* value.c (struct range): New struct.
+	(range_s): New typedef.
+	(ranges_overlap): New function.
+	(range_lessthan): New function.
+	(ranges_contain_p): New function.
+	(struct value) <unavailable>: New field.
+	(value_bytes_available): New function.
+	(mark_value_bytes_unavailable): New function.
+	(require_not_optimized_out): Constify parameter.
+	(require_available): New function.
+	(value_contents_all, value_contents): Require all bytes be
+	available.
+	(value_free): Free `unavailable'.
+	(value_copy): Copy `unavailable'.
+	* valprint.h (val_print_unavailable): Declare.
+	* valprint.c (valprint_check_validity): Rename `offset' parameter
+	to `embedded_offset'.  If printing a scalar, check whether the
+	value chunk is available.
+	(val_print_unavailable): New.
+	(val_print_scalar_formatted): Check whether the value is
+	available.
+	* python/py-prettyprint.c (apply_val_pretty_printer): Refuse
+	pretty-printing unavailable values.
+
+2011-02-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix const/volatile qualifiers of C++ types, PR c++/12328.
+	* c-typeprint.c (c_type_print_args): Update the function comment.  New
+	variable param_type, initialize it.  Remove const/volatile qualifiers
+	for language_cplus and !show_artificial.  Use param_type.
+
+2011-02-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symtab.c (find_pc_sect_line): New variable objfile, initialize it
+	from S.  Iterate S using ALL_OBJFILE_SYMTABS.  Verify BV for each S.
+	* symtab.h (struct symtab) <next>: Comment extension.
+
+2011-02-12  Yao Qi  <yao@codesourcery.com>
+
+	* Makefile.in (CLEANDIRS): Remove duplicated common dir.
+
+2011-02-11  Yao Qi  <yao@codesourcery.com>
+
+	* common/Makefile.in: Add copyright header.
+
+2011-02-11  Pedro Alves  <pedro@codesourcery.com>
+
+	* infrun.c (proceed): Move switching out and in of tfind mode from
+	here ...
+	(fetch_inferior_event): ... to here.
+
+2011-02-11  Yao Qi  <yao@codesourcery.com>
+
+	* Makefile.in: Remove signals.o from COMMON_OBS.  Link
+	libcommon.a.
+	* configure.ac: Add common to sub dir.
+	* configure: Regenerate.
+
+2011-02-11  Yao Qi  <yao@codesourcery.com>
+
+	Build libcommon.a.
+
+	* common/Makefile.in: New.
+	* common/configure.ac: New.
+	* common/aclocal.m4: New.
+	* common/configure: Generate.
+
+2011-02-10  Pedro Alves  <pedro@codesourcery.com>
+
+	* vec.h (VEC_block_remove): Place VEC_ASSERT_INFO on the right
+	side of the parenthesis.
+
+	Merge from GCC:
+	2010-07-13  Jakub Jelinek  <jakub@redhat.com>
+	* vec.h (VEC_block_remove): Fix comment.
+
+2011-02-08  Michael Snyder  <msnyder@vmware.com>
+
+	* linux-nat.c (linux_nat_filter_event): Fix typo in comment.
+
+2011-02-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* i386-tdep.c (i386_process_record): Rename l suffixes to d suffixes
+	in comments for pcmpgtd, pcmpeqd, psubd, paddd, pcmpgtd, pcmpeqd,
+	psubd and paddd.
+
+2011-02-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR 12361.
+	* i386-tdep.c (i386_process_record) <0x660f3807>: Fix the comment to
+	phsubsw.
+	(i386_process_record) <lddqu>: Fix the opcode to 0xf20ff0.
+	(i386_process_record) <0x0f3807>: Fix the comment to phsubsw.
+
+2011-02-08  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* dwarf2read.c (read_subroutine_type): Set special calling
+	convention flag for functions compiled by IBM XL C for OpenCL.
+	* ppc-sysv-tdep.c: Include "dwarf2.h"
+	(ppc_sysv_abi_push_dummy_call): Implement IBM OpenCL vector types
+	calling convention.
+	(do_ppc_sysv_return_value): Add FUNC_TYPE argument.  Implement
+	IBM OpenCL vector types calling convention.
+	(ppc_sysv_abi_return_value): Pass through FUNC_TYPE.
+	(ppc_sysv_abi_broken_return_value): Likewise.
+	(ppc64_sysv_abi_push_dummy_call): Implement IBM OpenCL vector
+	types calling convention.
+	(ppc64_sysv_abi_return_value): Likewise.
+	* spu-tdep.c: Include "dwarf2.h"
+	(spu_return_value): Implement IBM OpenCL vector types calling
+	convention.
+
+2011-02-08  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* ppc-sysv-tdep.c (ppc64_sysv_abi_push_dummy_call): Implement
+	correct ABI for AltiVec vector arguments.
+
+2011-02-07  Pedro Alves  <pedro@codesourcery.com>
+
+	* valprint.c (val_print): Extend comment.
+	* ada-valprint.c (ada_valprint): Rewrite comment deferring
+	interface explanation to val_print.
+	(ada_val_print_array): Adjust comment to current interface.
+	(print_field_values): Adjust comment to current interface.
+	* c-valprint.c (c_val_print): Rewrite comment deferring interface
+	explanation to val_print.
+	* f-valprint.c (f_val_print): Ditto.
+	* jv-valprint.c (java_val_print): Ditto.
+	* m2-valprint.c (m2_val_print): Ditto.
+	* p-valprint.c (pascal_val_print): Ditto.
+
+2011-02-07  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* breakpoint.c (parse_breakpoint_sals): Fix description.
+
+2011-02-04  Sami Wagiaalla  <swagiaal@redhat.com>
+	    Oguz Kayral <oguzkayral@gmail.com>
+
+	* python/py-inferior.c (python_on_normal_stop): New function.
+	(python_on_resume): New function.
+	(python_inferior_exit): New function.
+	(gdbpy_initialize_inferior): Add normal_stop, target_resumed, and
+	inferior_exit observers.
+	* python/py-evtregistry.c: New file.
+	* python/py-threadevent.c : New file.
+	* python/py-event.c: New file.
+	* python/py-evts.c: New file.
+	* python/py-continueevent.c: New file.
+	* python/py-bpevent.c: New file.
+	* python/py-signalevent.c: New file.
+	* python/py-exetiedevent.c: New file.
+	* python/py-breakpoint.c (gdbpy_breakpoint_from_bpstats): New function.
+	Move struct breakpoint_object from here...
+	* python/python-internal.h: ... to here.
+	* python/py-event.h: New file.
+	* python/py-events.h: New file.
+	* Makefile.in (SUBDIR_PYTHON_OBS): Add py-breakpointstopevent.o,
+	py-continueevent.o, py-event.o, py-eventregistry.o, py-events.o,
+	py-exitedevent.o, py-signalstopevent.o, and py-stopevent.o.
+	(SUBDIR_PYTHON_SRCS): Add py-breakpointstopevent.c,
+	py-continueevent.c, py-event.c, py-eventregistry.c, py-events.c,
+	py-exitedevent.c, py-signalstopevent.c, and py-stopevent.c.
+	Add build rules for all the above.
+
+2011-02-04  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (dwarf2_section_empty_p): New function.
+	(dwarf2_read_section): Use dwarf2_section_empty_p.
+	(dwarf2_section_size): New function.
+	(dwarf2_get_section_info): Unconditionally read section.
+	(dwarf2_read_index): Use dwarf2_section_empty_p.
+	(partial_read_comp_unit_head): Use dwarf2_section_size.
+	(dwarf2_symbol_mark_computed): Likewise.
+
+2011-02-04 David Daney <ddaney@caviumnetworks.com>
+
+	* NEWS: Add item for "catch syscall" on mips*-linux* targets.
+
+2011-02-04 David Daney <ddaney@caviumnetworks.com>
+
+	* mips-linux-tdep.c: Include xml-syscall.h.
+	(mips_linux_get_syscall_number): New function.
+	(mips_linux_init_abi): Add calls to
+	mips_linux_get_syscall_number() and set_xml_syscall_file_name().
+	* data-directory/Makefile.in (SYSCALLS_FILES): Add
+	mips-o32-linux.xml, mips-n32-linux.xml and mips-n64-linux.xml
+	* syscalls/mips-n32-linux.xml: New file.
+	* syscalls/mips-n64-linux.xml: New file.
+	* syscalls/mips-o32-linux.xml: New file.
+
+2011-02-04  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* dwarf2read.c (dwarf2_ranges_read): Skip empty range entries.
+	Complain about inverted range entries.
+	(dwarf2_record_block_ranges): Likewise.
+
+2011-02-04  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	Fix some typos.
+	* breakpoint.c (update_watchpoint): Fix name of the
+	update_global_location_list function.
+	(print_one_breakpoint): Fix typo.
+	(_initialize_breakpoint): Remove extra space in hbreak help
+	string.
+	* breakpoint.h (struct bp_location) <length>: Fix field
+	description.
+
+2011-02-04  Pedro Alves  <pedro@codesourcery.com>
+
+	* regcache.c (registers_changed_ptid): Don't explictly always
+	clear `current_regcache'.  Only clear current_thread_ptid and
+	current_thread_arch when PTID matches.  Only reinit the frame
+	cache if PTID matches the current inferior_ptid.  Move alloca(0)
+	call to ...
+	(registers_changed): ... here.
+
+2011-02-03  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* arm-tdep.c (arm_skip_stack_protector): Accept any symbol that
+	starts with __stack_chk_guard as stack guard symbol.
+
+2011-02-03  Andrew Burgess  <aburgess@broadcom.com>
+
+	* disasm.c (compare_lines): Handle the end of sequence markers
+	within the line table to better support disassembling over
+	compilation unit boundaries.
+
+2011-02-02  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* arm-tdep.c (skip_prologue_function): Add GDBARCH and IS_THUMB
+	arguments.  Skip in-prologue calls to glibc __aeabi_read_tp
+	implementation even if no symbols are available.
+	(thumb_analyze_prologue): Update call to skip_prologue_function.
+	(arm_analyze_prologue): Likewise.
+
+2011-02-02  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* arm-tdep.c: Include "observer.h".
+	(arm_prologue_this_id): Use frame PC if get_frame_func returns 0.
+	(arm_exidx_data_key): New static variable.
+	(struct arm_exidx_entry, arm_exidx_entry_s): New data types.
+	(struct arm_exidx_data): Likewise.
+	(arm_exidx_data_free): New function.
+	(arm_compare_exidx_entries): Likewise.
+	(arm_obj_section_from_vma): Likewise.
+	(arm_exidx_new_objfile): Likewise.
+	(arm_find_exidx_entry): Likewise.
+	(arm_exidx_fill_cache): Likewise.
+	(arm_exidx_unwind_sniffer): Likewise.
+	(arm_exidx_unwind): New global variable.
+	(arm_gdbarch_init): Append unwinder arm_exidx_unwind.
+	(_initialize_arm_tdep): Attach arm_exidx_new_objfile to new_objfile
+	observer.  Register arm_exidx_data_key as objfile data.
+
+2011-02-02  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* arm-tdep.c (arm_analyze_load_stack_chk_guard): Avoid build break
+	due to accessing uninitialized variable.  Fix indentation.
+
+2011-02-02  Pedro Alves  <pedro@codesourcery.com>
+
+	* c-valprint.c (c_value_print): When doing virtual base pointer
+	adjustment, create a new value with adjusted contents rather than
+	changing the contents of the value being printed (and getting it
+	wrong).
+
+2011-02-02  Pedro Alves  <pedro@codesourcery.com>
+
+	* xml-support.c (xml_find_attribute): New.
+	(xinclude_start_include): Use it.
+	* xml-support.h (xml_find_attribute): Declare.
+	* memory-map.c (memory_map_start_memory)
+	(memory_map_start_property): Use xml_find_attribute.
+	* osdata.c (osdata_start_osdata, osdata_start_column): Use
+	xml_find_attribute.
+	* remote.c (start_thread): Use xml_find_attribute.
+	* solib-target.c (library_list_start_segment)
+	(library_list_start_section, library_list_start_library)
+	(library_list_start_list): Use xml_find_attribute.
+	* xml-tdesc.c (tdesc_start_target, tdesc_start_feature)
+	(tdesc_start_union, tdesc_start_struct, tdesc_start_flags)
+	(tdesc_start_field): Use xml_find_attribute.
+
+2011-02-02  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* opencl-lang.c (STRINGIFY): Rename to OCL_STRING.
+	(BUILD_OCL_VTYPES): Update.
+
+2011-02-02  Joel Brobecker  <brobecker@adacore.com>
+
+	* configure.ac: Work around non-GNU sed limitation when computing
+	python version number.
+	* configure: Regenerate.
+
+2011-02-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix debug printing of TYPE_INSTANCE.
+	* expprint.c (print_subexp_standard) <TYPE_INSTANCE>: New.
+	(dump_subexp_body_standard) <TYPE_INSTANCE>: New.
+
+2011-02-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix debug printing of BINOP_IN, OP_OBJC_MSGCALL,
+	OP_F77_UNDETERMINED_ARGLIST, OP_COMPLEX, OP_OBJC_SELECTOR, OP_NAME,
+	OP_OBJC_NSSTRING, OP_F90_RANGE and OP_DECFLOAT.
+	* ada-operator.inc: Rename the file to ...
+	* ada-operator.def: ... here, wrap all the entries by macro OP.
+	* expprint.c (op_name_standard): Remove all the entries.  Include
+	"std-operator.def" instead.
+	* expression.h (enum exp_opcode): Include "std-operator.def" and
+	"ada-operator.def".  Move all the entries ...
+	* std-operator.def: ... here, wrap all the entries by macro OP.
+
+2011-01-31  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* breakpoint.h (remove_jit_event_breakpoints): New prototype.
+	* breakpoint.c (remove_jit_event_breakpoints): New function.
+	* jit.c (jit_descriptor_addr): Delete.
+	(registering_code): Delete.
+	(clear_int): Delete.
+	(jit_inferior_data): New variable.
+	(struct jit_inferior_data): New type.
+	(get_jit_inferior_data): New function.
+	(jit_inferior_data_cleanup): New function.
+	(jit_read_descriptor): Adjust.
+	(jit_register_code): Adjust.
+	(jit_breakpoint_re_set_internal): New function; move code here ...
+	(jit_inferior_init): ... from here.
+	(jit_breakpoint_re_set): Adjust.
+	(jit_reset_inferior_data_and_breakpoints): New function.
+	(jit_inferior_created_observer): Adjust.
+	(jit_inferior_exit_hook): Adjust.
+	(jit_executable_changed_observer): New function.
+	(jit_event_handler): Adjust.
+	(_initialize_jit): Adjust.
+
+2011-01-31  Michael Snyder  <msnyder@vmware.com>
+
+	* m32r-tdep.c (m32r_gdbarch_init): Replace accidentally deleted
+	line.
+
+2011-01-31  Tom Tromey  <tromey@redhat.com>
+
+	PR python/12216:
+	* python/python.c (execute_gdb_command): Call
+	prevent_dont_repeat.
+	* top.c (suppress_dont_repeat): New global.
+	(dont_repeat): Use it.
+	(prevent_dont_repeat): New function.
+	* command.h (prevent_dont_repeat): Declare.
+
+2011-01-31  Tom Tromey  <tromey@redhat.com>
+
+	* infcmd.c (finish_backward): Use breakpoint_set_silent.
+	* python/py-breakpoint.c (bppy_set_silent): Use
+	breakpoint_set_silent.
+	(bppy_set_thread): Use breakpoint_set_thread.
+	(bppy_set_task): Use breakpoint_set_task.
+	* breakpoint.h (breakpoint_set_silent, breakpoint_set_thread)
+	(breakpoint_set_task): Declare.
+	(make_breakpoint_silent): Remove.
+	* breakpoint.c (breakpoint_set_silent): New function.
+	(breakpoint_set_thread): Likewise.
+	(breakpoint_set_task): Likewise.
+	(make_breakpoint_silent): Remove.
+
+2011-01-31  Tom Tromey  <tromey@redhat.com>
+
+	* breakpoint.h (user_breakpoint_p): Declare.
+	* breakpoint.c (user_breakpoint_p): New function.
+	(breakpoint_1): Use it.
+	(save_breakpoints): Likewise.
+
+2011-01-31  Joel Brobecker  <brobecker@adacore.com>
+
+	* configure.ac: Add handling of Python distribution on Windows.
+	* python-config.py: If the LIBS, SYSLIBS, LIBPL and/or LINKFORSHARED
+	sysconfig variables are not defined, then do not use them.
+	On Windows, if LIBPL is not defined, then use prefix + '/libs'
+	instead.  On Windows, return all paths using forward-slashes
+	rather than backslashes.
+
+2011-01-31  Joel Brobecker  <brobecker@adacore.com>
+
+	* configure.ac: Remove fallback behavior for building
+	against Python.  Remove tweaking of Python include path.
+	Add PYTHON_CPPFLAGS and PYTHON_LIBS substitution.
+	(AC_TRY_LIBPYTHON):  Adjust program used in linking test.
+	If link is successful, set PYTHON_CPPFLAGS and PYTHON_LIBS.
+	Always restore CPPFLAGS and LIBS after linking test.
+	* configure: Regenerated.
+	* Makefile.in (INTERNAL_CPPFLAGS): Add @PYTHON_CPPFLAGS@.
+	(INSTALLED_LIBS, CLIBS): Add @PYTHON_LIBS@.
+	* python/python-internal.h: Adjust includes of Python .h files.
+
+2011-01-31  Joel Brobecker  <brobecker@adacore.com>
+
+	* tracepoint.c (traceframe_walk_blocks): Add missing i18n markup
+	in error message.
+
+2011-01-31  Joel Brobecker  <brobecker@adacore.com>
+
+	* inflow.c (gdb_has_a_terminal): Fix typo in interactive_mode
+	value test.
+
+2011-01-31  Yao Qi  <yao@codesourcery.com>
+
+	* arm-linux-nat.c: Update calls to regcache_register_status
+	instead of regcache_valid_p.
+	* aix-thread.c: Likewise.
+	* i386gnu-nat.c: Likewise.
+
+2011-01-29  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix crash.
+	* valops.c (compare_parameters): Verify TYPE_NFIELDS before
+	touching TYPE_FIELD_ARTIFICIAL.
+
+2011-01-28  Richard Earnshaw  <rearnsha@arm.com>
+
+	* MAINTAINERS: Move myself from Responsible Maintainers to Authorized
+	Committers.
+
+2011-01-28  Pedro Alves  <pedro@codesourcery.com>
+
+	* tracepoint.c (tfile_xfer_partial): If there's no traceframe
+	selected, don't try iterating over the traceframe's blocks.
+	(tfile_has_stack): If there's no traceframe selected, then there's
+	no stack.
+	(tfile_has_registers): If there's no traceframe selected, then
+	there's no registers.
+
+2011-01-28  Pedro Alves  <pedro@codesourcery.com>
+
+	* target.c (memory_xfer_partial): No need to restore shadows if we
+	haven't read anything.
+
+2011-01-28  Pedro Alves  <pedro@codesourcery.com>
+
+	* mips-tdep.c (mips_print_register): Use get_frame_register_value
+	and val_print_scalar_formatted.
+
+2011-01-27  Pedro Alves  <pedro@codesourcery.com>
+
+	* tracepoint.c (tfile_read): New.
+	(tfile_open): Use it.
+	(tfile_get_traceframe_address): Use it.
+	(tfile_trace_find): Use it.
+	(walk_blocks_callback_func): New typedef.
+	(match_blocktype): New function.
+	(traceframe_walk_blocks): New function.
+	(traceframe_find_block_type): New function.
+	(tfile_fetch_registers, tfile_xfer_partial)
+	(tfile_get_trace_state_variable_value): Use
+	traceframe_find_block_type and tfile_read.
+
+2011-01-26  Kevin Buettner  <kevinb@redhat.com>
+
+	* remote-mips.c: Add internationalization mark ups.  Remove
+	trailing \n from already marked up strings.
+
+2011-01-26  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-prettyprint.c (print_string_repr): Clear
+	'addressprint' option when calling val_print_string.
+	(print_children): Handle Val_pretty_default.  Clear 'addressprint'
+	option when calling val_print_string.
+
+2011-01-26  Tom Tromey  <tromey@redhat.com>
+
+	* python/python.c (gdbpy_solib_name): Use gdb_py_longest and
+	GDB_PY_LL_ARG.
+	* python/python-internal.h (GDB_PY_LL_ARG, GDB_PY_LLU_ARG): New
+	macros.
+	(gdb_py_longest, gdb_py_ulongest): New typedefs.
+	(gdb_py_long_from_longest, gdb_py_long_from_ulongest)
+	(gdb_py_long_as_ulongest): New defines.
+	(gdb_py_object_from_longest, gdb_py_object_from_ulongest)
+	(gdb_py_int_as_long): Declare.
+	* python/py-value.c (valpy_lazy_string): Use gdb_py_longest,
+	GDB_PY_LL_ARG, gdb_py_object_from_longest.
+	(valpy_long): Add comment.
+	* python/py-utils.c (get_addr_from_python): Use
+	gdb_py_long_as_ulongest.  Handle overflow properly.
+	(gdb_py_object_from_longest): New function.
+	(gdb_py_object_from_ulongest): Likewise.
+	(gdb_py_int_as_long): Likewise.
+	* python/py-type.c (typy_array): Use gdb_py_int_as_long.
+	* python/py-symtab.c (salpy_get_pc): Use
+	gdb_py_long_from_ulongest.
+	(salpy_get_line): Use PyInt_FromLong.
+	* python/py-param.c (set_parameter_value): Use
+	gdb_py_int_as_long.
+	* python/py-lazy-string.c (stpy_get_address): Use
+	gdb_py_long_from_ulongest.
+	* python/py-frame.c (frapy_pc): Use gdb_py_long_from_ulongest.
+	* python/py-cmd.c (cmdpy_completer): Use gdb_py_int_as_long.
+	* python/py-breakpoint.c (bppy_set_thread): Use
+	gdb_py_int_as_long.
+	(bppy_set_task): Likewise.
+	(bppy_set_ignore_count): Likewise.
+	(bppy_set_hit_count): Likewise.
+	* python/py-block.c (blpy_get_start): Use
+	gdb_py_object_from_ulongest.
+	(blpy_get_end): Likewise.
+	(gdbpy_block_for_pc): Use gdb_py_ulongest and GDB_PY_LLU_ARG.
+
+2011-01-25  Mathieu Lacage  <mathieu.lacage@inria.fr>
+
+	PR/symtab 11766:
+	* gdb/objfiles.h (struct objfile) <addr_low>: New field.
+	* gdb/solib.c (solib_read_symbols): Check for addr_low in
+	equality test for objfile, initialize addr_low if needed.
+
+2011-01-25  Pedro Alves  <pedro@codesourcery.com>
+
+	* tui/tui-regs.c (tui_register_format): Remove dead code.
+
+2011-01-25  Pedro Alves  <pedro@codesourcery.com>
+
+	* printcmd.c (print_formatted): Use val_print_scalar_formatted
+	instead of print_scalar_formatted.
+	(print_scalar_formatted): Don't handle 's' format strings here,
+	and add an assertion that we never see such format here.
+	* valprint.h (val_print_scalar_formatted): Declare.
+	* valprint.c (val_print_scalar_formatted): New.
+	* c-valprint.c (c_val_print): Use val_print_scalar_formatted
+	instead of print_scalar_formatted.
+	* jv-valprint.c (java_val_print): Ditto.
+	* p-valprint.c (pascal_val_print): Ditto.
+	* ada-valprint.c (ada_val_print_1): Ditto.
+	* f-valprint.c (f_val_print): Ditto.
+	* infcmd.c (registers_info): Ditto.
+	* m2-valprint.c (m2_val_print): Ditto.
+
+2011-01-25  Pedro Alves  <pedro@codesourcery.com>
+
+	* m2-valprint.c (print_unbounded_array): Pass
+	value_contents_for_printing rather than value_contents, to
+	m2_print_array_contents.  Also pass in the value.
+
+2011-01-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (dwarf2_read_index, write_psymtabs_to_index)
+	(save_gdb_index_command): Switch to .gdb_index version 4.
+
+2011-01-25  Pedro Alves  <pedro@codesourcery.com>
+
+	* mi/mi-main.c (get_register): Use get_frame_register_value rather
+	than frame_register, and always pass a valid value to val_print.
+
+2011-01-25  Pedro Alves  <pedro@codesourcery.com>
+
+	Centralize printing "<optimized out>".
+
+	* valprint.h (val_print_optimized_out): Declare.
+	* cp-valprint.c (cp_print_value_fields): Use
+	val_print_optimized_out.
+	* jv-valprint.c (java_print_value_fields): Ditto.
+	* p-valprint.c (pascal_object_print_value_fields): Ditto.
+	* printcmd.c (print_formatted): Ditto.
+	* valprint.c (valprint_check_validity): Ditto.
+	(value_check_printable): Ditto.
+	(val_print_optimized_out): New.
+
+2011-01-25  Pedro Alves  <pedro@codesourcery.com>
+
+	* infcmd.c (default_print_registers_info): Allocate values so to
+	never pass a NULL value to val_print.
+
+2011-01-25  Pedro Alves  <pedro@codesourcery.com>
+
+	* cp-valprint.c (cp_print_value): Treat the 'skip' local as
+	boolean.  Make sure to always pass a value that matches the
+	contents buffer to callees.  Preserve `address' for following
+	iterations.
+	* value.c (value_contents_for_printing_const): New.
+	(value_address): Constify value argument.
+	* value.h (value_contents_for_printing_const): Declare.
+	(value_address): Constify value argument.
+
+2011-01-25  Pedro Alves  <pedro@codesourcery.com>
+
+	* regcache.c (struct regcache_descr): Rename
+	sizeof_raw_register_valid_p field to sizeof_raw_register_status,
+	and sizeof_cooked_register_valid_p to
+	sizeof_cooked_register_status.
+	(init_regcache_descr): Adjust.
+	(struct regcache): Rename register_valid_p field to
+	register_status.
+	(regcache_xmalloc_1, regcache_xfree, regcache_save)
+	(do_cooked_read): Adjust.
+	(regcache_valid_p): Rename to ...
+	(regcache_register_status): ... this.  Adjust.
+	(regcache_invalidate): Adjust.
+	(regcache_raw_read, regcache_cooked_read, regcache_raw_write):
+	Adjust.
+	(regcache_raw_supply): Adjust.  If buf i NULL, mark the register
+	as unavailable, not valid.
+	(regcache_dump): Adjust.
+	* regcache.h (enum register_status): New.
+	(regcache_register_status): Declare.
+	(regcache_invalidate): Delete declaration.
+	* corelow.c (get_core_registers): Adjust.
+	* tracepoint.c (tfile_fetch_registers): Adjust.
+	* trad-frame.c (REG_VALUE): Rename to ...
+	(TF_REG_VALUE): ... this.
+	(REG_UNKNOWN): Rename to ...
+	(TF_REG_UNKNOWN): ... this.
+	(trad_frame_set_value, trad_frame_set_unknown): Adjust.
+	* mi/mi-main.c (register_changed_p): Adjust.
+
 2011-01-25  Pedro Alves  <pedro@codesourcery.com>
 
 	* regcache.c (struct regcache_descr): Remove outdated comment.

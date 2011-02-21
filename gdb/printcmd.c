@@ -49,6 +49,7 @@
 #include "parser-defs.h"
 #include "charset.h"
 #include "arch-utils.h"
+#include "printcmd.h"
 
 #ifdef TUI
 #include "tui/tui.h"		/* For tui_active et al.   */
@@ -166,6 +167,11 @@ struct display
 static struct display *display_chain;
 
 static int display_number;
+
+/* Walk the following statement or block through all displays.  */
+
+#define ALL_DISPLAYS(B)				\
+  for (B = display_chain; B; B = B->next)
 
 /* Prototypes for exported functions.  */
 
@@ -329,8 +335,11 @@ print_formatted (struct value *val, int size,
   else
     /* User specified format, so don't look to the the type to
        tell us what to do.  */
-    print_scalar_formatted (value_contents (val), type,
-			    options, size, stream);
+    val_print_scalar_formatted (type,
+				value_contents_for_printing (val),
+				value_embedded_offset (val),
+				val,
+				options, size, stream);
 }
 
 /* Return builtin floating point type of same length as TYPE.
@@ -353,11 +362,8 @@ float_type_from_length (struct type *type)
 }
 
 /* Print a scalar of data of type TYPE, pointed to in GDB by VALADDR,
-   according to OPTIONS and SIZE on STREAM.
-   Formats s and i are not supported at this level.
-
-   This is how the elements of an array or structure are printed
-   with a format.  */
+   according to OPTIONS and SIZE on STREAM.  Formats s and i are not
+   supported at this level.  */
 
 void
 print_scalar_formatted (const void *valaddr, struct type *type,
@@ -369,18 +375,8 @@ print_scalar_formatted (const void *valaddr, struct type *type,
   unsigned int len = TYPE_LENGTH (type);
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
 
-  /* If we get here with a string format, try again without it.  Go
-     all the way back to the language printers, which may call us
-     again.  */
-  if (options->format == 's')
-    {
-      struct value_print_options opts = *options;
-      opts.format = 0;
-      opts.deref_ref = 0;
-      val_print (type, valaddr, 0, 0, stream, 0, NULL, &opts,
-		 current_language);
-      return;
-    }
+  /* String printing should go through val_print_scalar_formatted.  */
+  gdb_assert (options->format != 's');
 
   if (len > sizeof(LONGEST) &&
       (TYPE_CODE (type) == TYPE_CODE_INT
@@ -1565,35 +1561,26 @@ clear_displays (void)
     }
 }
 
-/* Delete the auto-display number NUM.  */
+/* Delete the auto-display DISPLAY.  */
 
 static void
-delete_display (int num)
+delete_display (struct display *display)
 {
-  struct display *d1, *d;
+  struct display *d;
 
-  if (!display_chain)
-    error (_("No display number %d."), num);
+  gdb_assert (display != NULL);
 
-  if (display_chain->number == num)
-    {
-      d1 = display_chain;
-      display_chain = d1->next;
-      free_display (d1);
-    }
-  else
-    for (d = display_chain;; d = d->next)
+  if (display_chain == display)
+    display_chain = display->next;
+
+  ALL_DISPLAYS (d)
+    if (d->next == display)
       {
-	if (d->next == 0)
-	  error (_("No display number %d."), num);
-	if (d->next->number == num)
-	  {
-	    d1 = d->next;
-	    d->next = d1->next;
-	    free_display (d1);
-	    break;
-	  }
+	d->next = display->next;
+	break;
       }
+
+  free_display (display);
 }
 
 /* Delete some values from the auto-display chain.
@@ -1617,18 +1604,24 @@ undisplay_command (char *args, int from_tty)
   while (*p)
     {
       p1 = p;
-      while (*p1 >= '0' && *p1 <= '9')
-	p1++;
-      if (*p1 && *p1 != ' ' && *p1 != '\t')
-	error (_("Arguments must be display numbers."));
 
-      num = atoi (p);
+      num = get_number_or_range (&p1);
+      if (num == 0)
+	warning (_("bad display number at or near '%s'"), p);
+      else
+	{
+	  struct display *d;
 
-      delete_display (num);
+	  ALL_DISPLAYS (d)
+	    if (d->number == num)
+	      break;
+	  if (d == NULL)
+	    printf_unfiltered (_("No display number %d.\n"), num);
+	  else
+	    delete_display (d);
+	}
 
       p = p1;
-      while (*p == ' ' || *p == '\t')
-	p++;
     }
   dont_repeat ();
 }
@@ -1968,10 +1961,9 @@ print_variable_and_value (const char *name, struct symbol *var,
   fprintf_filtered (stream, "\n");
 }
 
-/* printf "printf format string" ARG to STREAM.  */
-
-static void
-ui_printf (char *arg, struct ui_file *stream)
+void
+string_printf (char *arg, struct ui_file *stream, printf_callback callback,
+	       void *loc_v, void *aexpr_v)
 {
   char *f = NULL;
   char *s = arg;
@@ -1982,6 +1974,8 @@ ui_printf (char *arg, struct ui_file *stream)
   int nargs = 0;
   int allocated_args = 20;
   struct cleanup *old_cleanups;
+  struct bp_location *loc = loc_v;
+  struct agent_expr *aexpr = aexpr_v;
 
   val_args = xmalloc (allocated_args * sizeof (struct value *));
   old_cleanups = make_cleanup (free_current_contents, &val_args);
@@ -2304,25 +2298,41 @@ ui_printf (char *arg, struct ui_file *stream)
     /* Now, parse all arguments and evaluate them.
        Store the VALUEs in VAL_ARGS.  */
 
+    if (callback)
+      current_substring = substrings;
     while (*s != '\0')
       {
 	char *s1;
 
+	s1 = s;
 	if (nargs == allocated_args)
 	  val_args = (struct value **) xrealloc ((char *) val_args,
 						 (allocated_args *= 2)
 						 * sizeof (struct value *));
-	s1 = s;
-	val_args[nargs] = parse_to_comma_and_eval (&s1);
+	if (callback)
+	  {
+	    if (nargs >= nargs_wanted)
+	      error (_("Wrong number of arguments for specified "
+		       "format-string"));
+	    callback (current_substring, &s1, loc, aexpr);
+	    current_substring += strlen (current_substring) + 1;
+	  }
+	else
+	  val_args[nargs] = parse_to_comma_and_eval (&s1);
 
 	nargs++;
 	s = s1;
 	if (*s == ',')
 	  s++;
       }
+    if (callback)
+      callback (last_arg, NULL, loc, aexpr);
 
     if (nargs != nargs_wanted)
       error (_("Wrong number of arguments for specified format-string"));
+
+    if (!stream)
+      goto after_print;
 
     /* Now actually print them.  */
     current_substring = substrings;
@@ -2678,15 +2688,17 @@ ui_printf (char *arg, struct ui_file *stream)
        by default, which will warn here if there is no argument.  */
     fprintf_filtered (stream, last_arg, 0);
   }
+
+after_print:
   do_cleanups (old_cleanups);
 }
 
 /* Implement the "printf" command.  */
 
-static void
+void
 printf_command (char *arg, int from_tty)
 {
-  ui_printf (arg, gdb_stdout);
+  string_printf (arg, gdb_stdout, NULL, NULL, NULL);
 }
 
 /* Implement the "eval" command.  */
@@ -2698,7 +2710,7 @@ eval_command (char *arg, int from_tty)
   struct cleanup *cleanups = make_cleanup_ui_file_delete (ui_out);
   char *expanded;
 
-  ui_printf (arg, ui_out);
+  string_printf (arg, ui_out, NULL, NULL, NULL);
 
   expanded = ui_file_xstrdup (ui_out, NULL);
   make_cleanup (xfree, expanded);

@@ -1,3 +1,47 @@
+2011-02-21  Hui Zhu  <teawater@gmail.com>
+
+	* agentexpr.texi (Bytecode Descriptions): Add printf.
+	* gdb.texinfo (Tracepoint Action Lists): Add printf.
+
+2011-02-18  Tom Tromey  <tromey@redhat.com>
+
+	* agentexpr.texi (Bytecode Descriptions): Document pick and rot.
+
+2011-02-14  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.texinfo (threads): Document argument for "info threads" cmd.
+	Document new command "thread find".
+
+2011-02-14  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.texinfo (Threads): Update example of new thread message.
+
+2011-02-14  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo (Remote Configuration): Mention set/show remote
+	traceframe-info.
+	(Tools/Packages Optional for Building GDB): Mention that expat is
+	used for traceframe info.
+	(Remote Protocol) <Menu>: Add "Traceframe Info Format".
+	(General Query Packets) <qSupported>: Describe the
+	qXfer:traceframe-info:read feature.
+	(qXfer::read): Describe qXfer:traceframe-info:read.
+	(Traceframe Info Format): New section.
+
+2011-02-04  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdbint.texinfo (Formatting): Mention some formatting guidelines
+	for casts and unary operators.
+
+2011-02-04  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (GDB/MI Async Records): Document that symbols-loaded
+	is not useful.
+
+2011-01-25  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo: s/value optimized out/optimized out/g
+
 2011-01-21  Joel Brobecker  <brobecker@adacore.com>
 
 	* gdb.texinfo (Other Misc Settings): Rework part of the

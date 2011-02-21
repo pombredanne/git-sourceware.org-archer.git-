@@ -1,3 +1,74 @@
+2011-02-19  Mike Frysinger  <vapier@gentoo.org>
+
+	* bfin-dis.c (saved_state): Mark static.  Change a[01]x to ax[] and
+	a[01]w to aw[].  Delete ac0, ac0_copy, ac1, an, aq, av0, av0s, av1,
+	av1s, az, cc, v, v_copy, vs, rnd_mod, v_internal, pc, ticks, insts,
+	exception, end_of_registers, msize, memory, bfd_mach.
+	(CCREG, PCREG, A0XREG, A0WREG, A1XREG, A1WREG, LC0REG, LT0REG,
+	LB0REG, LC1REG, LT1REG, LB1REG): Delete
+	(AXREG, AWREG, LCREG, LTREG, LBREG): Define.
+	(get_allreg): Change to new defines.  Fallback to abort().
+
+2011-02-14  Mike Frysinger  <vapier@gentoo.org>
+
+	* bfin-dis.c: Add whitespace/parenthesis where needed.
+
+2011-02-14  Mike Frysinger  <vapier@gentoo.org>
+
+	* bfin-dis.c (decode_LoopSetup_0): Return when reg is greater
+	than 7.
+
+2011-02-13  Ralf Wildenhues  <Ralf.Wildenhues@gmx.de>
+
+	* configure: Regenerate.
+
+2011-02-13  Mike Frysinger  <vapier@gentoo.org>
+
+	* bfin-dis.c (decode_dsp32alu_0): Fix typo with A1 reg.
+
+2011-02-13  Mike Frysinger  <vapier@gentoo.org>
+
+	* bfin-dis.c (decode_dsp32mult_0): Add 1 to dst for mac1.  Output
+	dregs only when P is set, and dregs_lo otherwise.
+
+2011-02-13  Mike Frysinger  <vapier@gentoo.org>
+
+	* bfin-dis.c (decode_dsp32alu_0): Delete BYTEOP2M code.
+
+2011-02-12  Mike Frysinger  <vapier@gentoo.org>
+
+	* bfin-dis.c (decode_pseudoDEBUG_0): Add space after PRNT.
+
+2011-02-12  Mike Frysinger  <vapier@gentoo.org>
+
+	* bfin-dis.c (machine_registers): Delete REG_GP.
+	(reg_names): Delete "GP".
+	(decode_allregs): Change REG_GP to REG_LASTREG.
+
+2011-02-12  Mike Frysinger  <vapier@gentoo.org>
+
+	* bfin.h (M_S2RND, M_T, M_W32, M_FU, M_TFU, M_IS, M_ISS2, M_IH,
+	M_IU): Define.
+	(is_macmod_pmove, is_macmod_hmove): New functions.
+
+2011-02-11  Mike Frysinger  <vapier@gentoo.org>
+
+	* bfin-dis.c (reg_names): Add const.
+	(decode_dregs_lo, decode_dregs_hi, decode_dregs, decode_dregs_byte,
+	decode_pregs, decode_iregs, decode_mregs, decode_dpregs, decode_gregs,
+	decode_regs, decode_regs_lo, decode_regs_hi, decode_statbits,
+	decode_counters, decode_allregs): Likewise.
+
+2011-02-09  Michael Snyder  <msnyder@vmware.com>
+
+	* i386-dis.c (OP_J): Parenthesize expression to prevent 
+	truncated addresses.
+	(print_insn): Fix indentation off-by-one.
+
+2011-02-01  Nick Clifton  <nickc@redhat.com>
+
+	* po/da.po: Updated Danish translation.
+
 2011-01-21  Dave Murphy  <davem@devkitpro.org>
 
 	* ppc-opc.c (NON32, NO371): Remove PPC_OPCODE_PPCPS.

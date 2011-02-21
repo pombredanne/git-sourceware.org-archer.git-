@@ -143,6 +143,17 @@ ax_simple (struct agent_expr *x, enum agent_op op)
   x->buf[x->len++] = op;
 }
 
+/* Append a pick operator to EXPR.  DEPTH is the stack item to pick,
+   with 0 being top of stack.  */
+void
+ax_pick (struct agent_expr *x, int depth)
+{
+  if (depth < 0 || depth > 255)
+    error (_("GDB bug: ax-general.c (ax_pick): stack depth out of range"));
+  ax_simple (x, aop_pick);
+  append_const (x, 1, depth);
+}
+
 
 /* Append a sign-extension or zero-extension instruction to EXPR, to
    extend an N-bit value.  */
@@ -319,6 +330,14 @@ ax_tsv (struct agent_expr *x, enum agent_op op, int num)
   x->buf[x->len + 2] = (num) & 0xff;
   x->len += 3;
 }
+
+void
+ax_memcpy (struct agent_expr *x, const void *src, size_t n)
+{
+  grow_expr (x, n);
+  memcpy (x->buf + x->len, src, n);
+  x->len += n;
+}
 
 
 
@@ -327,55 +346,11 @@ ax_tsv (struct agent_expr *x, enum agent_op op, int num)
 
 struct aop_map aop_map[] =
 {
-  {0, 0, 0, 0, 0},
-  {"float", 0, 0, 0, 0},	/* 0x01 */
-  {"add", 0, 0, 2, 1},		/* 0x02 */
-  {"sub", 0, 0, 2, 1},		/* 0x03 */
-  {"mul", 0, 0, 2, 1},		/* 0x04 */
-  {"div_signed", 0, 0, 2, 1},	/* 0x05 */
-  {"div_unsigned", 0, 0, 2, 1},	/* 0x06 */
-  {"rem_signed", 0, 0, 2, 1},	/* 0x07 */
-  {"rem_unsigned", 0, 0, 2, 1},	/* 0x08 */
-  {"lsh", 0, 0, 2, 1},		/* 0x09 */
-  {"rsh_signed", 0, 0, 2, 1},	/* 0x0a */
-  {"rsh_unsigned", 0, 0, 2, 1},	/* 0x0b */
-  {"trace", 0, 0, 2, 0},	/* 0x0c */
-  {"trace_quick", 1, 0, 1, 1},	/* 0x0d */
-  {"log_not", 0, 0, 1, 1},	/* 0x0e */
-  {"bit_and", 0, 0, 2, 1},	/* 0x0f */
-  {"bit_or", 0, 0, 2, 1},	/* 0x10 */
-  {"bit_xor", 0, 0, 2, 1},	/* 0x11 */
-  {"bit_not", 0, 0, 1, 1},	/* 0x12 */
-  {"equal", 0, 0, 2, 1},	/* 0x13 */
-  {"less_signed", 0, 0, 2, 1},	/* 0x14 */
-  {"less_unsigned", 0, 0, 2, 1},	/* 0x15 */
-  {"ext", 1, 0, 1, 1},		/* 0x16 */
-  {"ref8", 0, 8, 1, 1},		/* 0x17 */
-  {"ref16", 0, 16, 1, 1},	/* 0x18 */
-  {"ref32", 0, 32, 1, 1},	/* 0x19 */
-  {"ref64", 0, 64, 1, 1},	/* 0x1a */
-  {"ref_float", 0, 0, 1, 1},	/* 0x1b */
-  {"ref_double", 0, 0, 1, 1},	/* 0x1c */
-  {"ref_long_double", 0, 0, 1, 1},	/* 0x1d */
-  {"l_to_d", 0, 0, 1, 1},	/* 0x1e */
-  {"d_to_l", 0, 0, 1, 1},	/* 0x1f */
-  {"if_goto", 2, 0, 1, 0},	/* 0x20 */
-  {"goto", 2, 0, 0, 0},		/* 0x21 */
-  {"const8", 1, 8, 0, 1},	/* 0x22 */
-  {"const16", 2, 16, 0, 1},	/* 0x23 */
-  {"const32", 4, 32, 0, 1},	/* 0x24 */
-  {"const64", 8, 64, 0, 1},	/* 0x25 */
-  {"reg", 2, 0, 0, 1},		/* 0x26 */
-  {"end", 0, 0, 0, 0},		/* 0x27 */
-  {"dup", 0, 0, 1, 2},		/* 0x28 */
-  {"pop", 0, 0, 1, 0},		/* 0x29 */
-  {"zero_ext", 1, 0, 1, 1},	/* 0x2a */
-  {"swap", 0, 0, 2, 2},		/* 0x2b */
-  {"getv", 2, 0, 0, 1},		/* 0x2c */
-  {"setv", 2, 0, 0, 1},		/* 0x2d */
-  {"tracev", 2, 0, 0, 1},	/* 0x2e */
-  {0, 0, 0, 0, 0},		/* 0x2f */
-  {"trace16", 2, 0, 1, 1},	/* 0x30 */
+  {0, 0, 0, 0, 0}
+#define DEFOP(NAME, SIZE, DATA_SIZE, CONSUMED, PRODUCED, VALUE) \
+  , { # NAME, SIZE, DATA_SIZE, CONSUMED, PRODUCED }
+#include "ax.def"
+#undef DEFOP
 };
 
 
@@ -401,6 +376,7 @@ ax_print (struct ui_file *f, struct agent_expr *x)
   for (i = 0; i < x->len;)
     {
       enum agent_op op = x->buf[i];
+      int op_size;
 
       if (op >= (sizeof (aop_map) / sizeof (aop_map[0]))
 	  || !aop_map[op].name)
@@ -409,7 +385,19 @@ ax_print (struct ui_file *f, struct agent_expr *x)
 	  i++;
 	  continue;
 	}
-      if (i + 1 + aop_map[op].op_size > x->len)
+      if (op == aop_printf)
+        {
+	  if (i + 2 >= x->len)
+	    {
+	      fprintf_filtered (f, _("%3d  <bad opcode %02x>\n"), i, op);
+	      i++;
+	      continue;
+	    }
+	  op_size = 1 + strlen (x->buf + i + 2) + 1;
+	}
+      else
+	op_size = aop_map[op].op_size;
+      if (i + 1 + op_size > x->len)
 	{
 	  fprintf_filtered (f, _("%3d  <incomplete opcode %s>\n"),
 			    i, aop_map[op].name);
@@ -417,15 +405,15 @@ ax_print (struct ui_file *f, struct agent_expr *x)
 	}
 
       fprintf_filtered (f, "%3d  %s", i, aop_map[op].name);
-      if (aop_map[op].op_size > 0)
+      if (op_size > 0)
 	{
 	  fputs_filtered (" ", f);
 
 	  print_longest (f, 'd', 0,
-			 read_const (x, i + 1, aop_map[op].op_size));
+			 read_const (x, i + 1, op_size));
 	}
       fprintf_filtered (f, "\n");
-      i += 1 + aop_map[op].op_size;
+      i += 1 + op_size;
 
       is_float = (op == aop_float);
     }
@@ -493,6 +481,8 @@ ax_reqs (struct agent_expr *ax)
   /* Pointer to a description of the present op.  */
   struct aop_map *op;
 
+  int op_size = 0, consumed = 0;
+
   memset (targets, 0, ax->len * sizeof (targets[0]));
   memset (boundary, 0, ax->len * sizeof (boundary[0]));
 
@@ -500,7 +490,7 @@ ax_reqs (struct agent_expr *ax)
   ax->flaw = agent_flaw_none;
   ax->max_data_size = 0;
 
-  for (i = 0; i < ax->len; i += 1 + op->op_size)
+  for (i = 0; i < ax->len; i += 1 + op_size)
     {
       if (ax->buf[i] > (sizeof (aop_map) / sizeof (aop_map[0])))
 	{
@@ -516,7 +506,23 @@ ax_reqs (struct agent_expr *ax)
 	  return;
 	}
 
-      if (i + 1 + op->op_size > ax->len)
+      if (ax->buf[i] == aop_printf)
+        {
+	  if (i + 2 >= ax->len)
+	    {
+	      ax->flaw = agent_flaw_incomplete_instruction;
+	      return;
+	    }
+	  consumed = ax->buf[i + 1];
+	  op_size = 1 + strlen (ax->buf + i + 2) + 1;
+	}
+      else
+        {
+	  op_size = op->op_size;
+	  consumed = op->consumed;
+        }
+
+      if (i + 1 + op_size > ax->len)
 	{
 	  ax->flaw = agent_flaw_incomplete_instruction;
 	  return;
@@ -534,7 +540,7 @@ ax_reqs (struct agent_expr *ax)
       boundary[i] = 1;
       heights[i] = height;
 
-      height -= op->consumed;
+      height -= consumed;
       if (height < ax->min_height)
 	ax->min_height = height;
       height += op->produced;

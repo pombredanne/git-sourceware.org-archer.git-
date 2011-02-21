@@ -179,8 +179,11 @@ java_value_print (struct value *val, struct ui_file *stream,
 		  set_value_lazy (next_v, 1);
 		  set_value_offset (next_v, value_offset (next_v)
 				    + TYPE_LENGTH (el_type));
-		  if (memcmp (value_contents (v), value_contents (next_v),
-			      TYPE_LENGTH (el_type)) != 0)
+		  value_fetch_lazy (next_v);
+		  if (!(value_available_contents_eq
+			(v, value_embedded_offset (v),
+			 next_v, value_embedded_offset (next_v),
+			 TYPE_LENGTH (el_type))))
 		    break;
 		}
 
@@ -407,15 +410,13 @@ java_print_value_fields (struct type *type, const gdb_byte *valaddr,
 	      else if (!value_bits_valid (val, TYPE_FIELD_BITPOS (type, i),
 					  TYPE_FIELD_BITSIZE (type, i)))
 		{
-		  fputs_filtered (_("<value optimized out>"), stream);
+		  val_print_optimized_out (stream);
 		}
 	      else
 		{
 		  struct value_print_options opts;
 
-		  v = value_from_longest
-		    (TYPE_FIELD_TYPE (type, i),
-		     unpack_field_as_long (type, valaddr + offset, i));
+		  v = value_field_bitfield (type, i, valaddr, offset, val);
 
 		  opts = *options;
 		  opts.deref_ref = 0;
@@ -434,7 +435,7 @@ java_print_value_fields (struct type *type, const gdb_byte *valaddr,
 		  struct value *v = value_static_field (type, i);
 
 		  if (v == NULL)
-		    fputs_filtered ("<optimized out>", stream);
+		    val_print_optimized_out (stream);
 		  else
 		    {
 		      struct value_print_options opts;
@@ -474,12 +475,9 @@ java_print_value_fields (struct type *type, const gdb_byte *valaddr,
   fprintf_filtered (stream, "}");
 }
 
-/* Print data of type TYPE located at VALADDR (within GDB), which came from
-   the inferior at address ADDRESS, onto stdio stream STREAM according to
-   OPTIONS.  The data at VALADDR is in target byte order.
-
-   If the data are a string pointer, returns the number of string characters
-   printed.  */
+/* See val_print for a description of the various parameters of this
+   function; they are identical.  The semantics of the return value is
+   also identical to val_print.  */
 
 int
 java_val_print (struct type *type, const gdb_byte *valaddr,
@@ -499,8 +497,8 @@ java_val_print (struct type *type, const gdb_byte *valaddr,
     case TYPE_CODE_PTR:
       if (options->format && options->format != 's')
 	{
-	  print_scalar_formatted (valaddr + embedded_offset,
-				  type, options, 0, stream);
+	  val_print_scalar_formatted (type, valaddr, embedded_offset,
+				      val, options, 0, stream);
 	  break;
 	}
 #if 0
@@ -552,8 +550,8 @@ java_val_print (struct type *type, const gdb_byte *valaddr,
 
 	  opts.format = (options->format ? options->format
 			 : options->output_format);
-	  print_scalar_formatted (valaddr + embedded_offset,
-				  type, &opts, 0, stream);
+	  val_print_scalar_formatted (type, valaddr, embedded_offset,
+				      val, &opts, 0, stream);
 	}
       else if (TYPE_CODE (type) == TYPE_CODE_CHAR
 	       || (TYPE_CODE (type) == TYPE_CODE_INT

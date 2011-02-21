@@ -1,3 +1,51 @@
+2011-02-15  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-alpha.c (alpha_vms_link_add_archive_symbols): Add a comment.
+
+2011-02-15  Alan Modra  <amodra@gmail.com>
+
+	* elf64-ppc.c (ppc64_elf_edit_toc): Reinstate second read of
+	toc relocs.  Fuss over free(NULL).
+
+2011-02-14  Mike Frysinger  <vapier@gentoo.org>
+
+	* elflink.c (bfd_elf_size_dynamic_sections): Add
+	bfd_get_symbol_leading_char to the start of newname.
+
+2011-02-13  Ralf Wildenhues  <Ralf.Wildenhues@gmx.de>
+
+	* configure: Regenerate.
+
+2011-02-09  Alan Modra  <amodra@gmail.com>
+
+	* elf64-ppc.c (ppc64_elf_edit_toc): Don't free toc relocs until
+	we are done.  When optimising large toc, check that a global
+	symbol on a toc reloc is defined in a kept section.
+
+2011-02-08  Nick Clifton  <nickc@redhat.com>
+
+	PR binutils/12467
+	* elf.c (assign_file_positions_for_load_sections): Set the program
+	header offset and entry size to zero if there are no program
+	headers.
+
+2011-02-08  Alan Modra  <amodra@gmail.com>
+
+	* elf64-ppc.c (ppc64_elf_edit_toc): Don't segfault on NULL
+	local_syms when looking for local symbols in .toc.
+
+2011-02-01  Alan Modra  <amodra@gmail.com>
+
+	* elf64-ppc.c (ppc64_elf_next_input_section): Use elf_gp value
+	for toc pointer on any section having makes_toc_func_call set.
+	(check_pasted_section): Ensure pasted .init/.fini fragments use
+	the same toc if any has makes_toc_func_call set.
+
+2011-01-28  Joseph Myers  <joseph@codesourcery.com>
+
+	* elf32-ppc.c (ppc_elf_link_hash_newfunc): Initialize has_sda_refs
+	field.
+
 2011-01-22  Richard Sandiford  <rdsandiford@googlemail.com>
 
 	* elfxx-mips.c (_bfd_mips_elf_merge_private_bfd_data): Ignore

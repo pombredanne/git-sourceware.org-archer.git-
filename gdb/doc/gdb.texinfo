@@ -2693,7 +2693,7 @@ whose form varies depending on the particular system.  For example, on
 @sc{gnu}/Linux, you might see
 
 @smallexample
-[New Thread 46912507313328 (LWP 25582)]
+[New Thread 0x41e02940 (LWP 25582)]
 @end smallexample
 
 @noindent
@@ -2716,9 +2716,11 @@ number---always a single integer---with each thread in your program.
 
 @table @code
 @kindex info threads
-@item info threads
-Display a summary of all threads currently in your
-program.  @value{GDBN} displays for each thread (in this order):
+@item info threads @r{[}@var{id}@dots{}@r{]}
+Display a summary of all threads currently in your program.  Optional 
+argument @var{id}@dots{} is one or more thread ids separated by spaces, and
+means to print information only about the specified thread or threads.
+@value{GDBN} displays for each thread (in this order):
 
 @enumerate
 @item
@@ -2814,6 +2816,25 @@ determine the name of the thread as given by the OS.  On these
 systems, a name specified with @samp{thread name} will override the
 system-give name, and removing the user-specified name will cause
 @value{GDBN} to once again display the system-specified name.
+
+@kindex thread find
+@cindex search for a thread
+@item thread find [@var{regexp}]
+Search for and display thread ids whose name or @var{systag}
+matches the supplied regular expression.
+
+As well as being the complement to the @samp{thread name} command, 
+this command also allows you to identify a thread by its target 
+@var{systag}.  For instance, on @sc{gnu}/Linux, the target @var{systag}
+is the LWP id.
+
+@smallexample
+(@value{GDBN}) thread find 26688
+Thread 4 has target id 'Thread 0x41e02940 (LWP 26688)'
+(@value{GDBN}) info thread 4
+  Id   Target Id         Frame 
+  4    Thread 0x41e02940 (LWP 26688) 0x00000031ca6cd372 in select ()
+@end smallexample
 
 @kindex set print thread-events
 @cindex print messages on thread start and exit
@@ -5961,7 +5982,7 @@ only if it is a scalar (integer, pointer, enumeration, etc).  See command
 @kbd{set print frame-arguments} in @ref{Print Settings} for more details
 on how to configure the way function parameter values are printed.
 
-@cindex value optimized out, in backtrace
+@cindex optimized out, in backtrace
 @cindex function call arguments, optimized out
 If your program was compiled with optimizations, some compilers will
 optimize away arguments passed to functions if those arguments are
@@ -5975,8 +5996,8 @@ such a backtrace might look like:
 @group
 #0  m4_traceon (obs=0x24eb0, argc=1, argv=0x2b8c8)
     at builtin.c:993
-#1  0x6e38 in expand_macro (sym=<value optimized out>) at macro.c:242
-#2  0x6840 in expand_token (obs=0x0, t=<value optimized out>, td=0xf7fffb08)
+#1  0x6e38 in expand_macro (sym=<optimized out>) at macro.c:242
+#2  0x6840 in expand_token (obs=0x0, t=<optimized out>, td=0xf7fffb08)
     at macro.c:71
 (More stack frames follow...)
 @end group
@@ -5984,7 +6005,7 @@ such a backtrace might look like:
 
 @noindent
 The values of arguments that were not saved in their stack frames are
-shown as @samp{<value optimized out>}.
+shown as @samp{<optimized out>}.
 
 If you need to display the values of such optimized-out arguments,
 either deduce that from other variables whose values depend on the one
@@ -10230,6 +10251,12 @@ are discarded, so this is mainly useful for assigning values to trace
 state variables (@pxref{Trace State Variables}) without adding those
 values to the trace buffer, as would be the case if the @code{collect}
 action were used.
+
+@kindex printf
+@item printf @var{template}, @var{expressions}@dots{}
+Print the values of one or more @var{expressions} under the control of
+the string @var{template} in @code{gdbserver} part.
+The command format is with simple @code{printf} (@pxref{Output, printf}).
 
 @kindex while-stepping @r{(tracepoints)}
 @item while-stepping @var{n}
@@ -16708,6 +16735,10 @@ are:
 @item @code{query-attached}
 @tab @code{qAttached}
 @tab Querying remote process attach state.
+
+@item @code{traceframe-info}
+@tab @code{qXfer:traceframe-info:read}
+@tab Traceframe info
 @end multitable
 
 @node Remote Stub
@@ -20728,6 +20759,7 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 * Selecting Pretty-Printers::   How GDB chooses a pretty-printer.
 * Writing a Pretty-Printer::    Writing a Pretty-Printer.
 * Inferiors In Python::         Python representation of inferiors (processes)
+* Events In Python::            Listening for events from @value{GDBN}.
 * Threads In Python::           Accessing inferior threads from Python.
 * Commands In Python::          Implementing new commands in Python.
 * Parameters In Python::        Adding new @value{GDBN} parameters.
@@ -21820,7 +21852,7 @@ my_library.so:
 
 @node Inferiors In Python
 @subsubsection Inferiors In Python
-@cindex inferiors in python
+@cindex inferiors in Python
 
 @findex gdb.Inferior
 Programs which are being run under @value{GDBN} are called inferiors
@@ -21889,6 +21921,123 @@ object returned from @code{gdb.read_memory}.  Returns a Python @code{Long}
 containing the address where the pattern was found, or @code{None} if
 the pattern could not be found.
 @end defmethod
+@end table
+
+@node Events In Python
+@subsubsection Events In Python
+@cindex inferior events in Python
+
+@value{GDBN} provides a general event facility so that Python code can be
+notified of various state changes, particularly changes that occur in
+the inferior.
+
+An @dfn{event} is just an object that describes some state change.  The
+type of the object and its attributes will vary depending on the details
+of the change.  All the existing events are described below.
+
+In order to be notified of an event, you must register an event handler
+with an @dfn{event registry}.  An event registry is an object in the
+@code{gdb.events} module which dispatches particular events.  A registry
+provides methods to register and unregister event handlers:
+
+@table @code
+@defmethod EventRegistry connect object
+Add the given callable @var{object} to the registry.  This object will be
+called when an event corresponding to this registry occurs.
+@end defmethod
+
+@defmethod EventRegistry disconnect object
+Remove the given @var{object} from the registry.  Once removed, the object
+will no longer receive notifications of events.
+@end defmethod
+@end table
+
+Here is an example:
+
+@smallexample
+def exit_handler (event):
+    print "event type: exit"
+    print "exit code: %d" % (event.exit_code)
+
+gdb.events.exited.connect (exit_handler)
+@end smallexample
+
+In the above example we connect our handler @code{exit_handler} to the
+registry @code{events.exited}.  Once connected, @code{exit_handler} gets
+called when the inferior exits.  The argument @dfn{event} in this example is
+of type @code{gdb.ExitedEvent}.  As you can see in the example the
+@code{ExitedEvent} object has an attribute which indicates the exit code of
+the inferior.
+
+The following is a listing of the event registries that are available and
+details of the events they emit:
+
+@table @code
+
+@item events.cont
+Emits @code{gdb.ThreadEvent}.
+
+Some events can be thread specific when @value{GDBN} is running in non-stop
+mode.  When represented in Python, these events all extend
+@code{gdb.ThreadEvent}.  Note, this event is not emitted directly; instead,
+events which are emitted by this or other modules might extend this event.
+Examples of these events are @code{gdb.BreakpointEvent} and
+@code{gdb.ContinueEvent}.
+
+@table @code
+@defivar ThreadEvent inferior_thread
+In non-stop mode this attribute will be set to the specific thread which was
+involved in the emitted event. Otherwise, it will be set to @code{None}.
+@end defivar
+@end table
+
+Emits @code{gdb.ContinueEvent} which extends @code{gdb.ThreadEvent}.
+
+This event indicates that the inferior has been continued after a stop. For
+inherited attribute refer to @code{gdb.ThreadEvent} above.
+
+@item events.exited
+Emits @code{events.ExitedEvent} which indicates that the inferior has exited.
+@code{events.ExitedEvent} has one attribute:
+@table @code
+@defivar ExitedEvent exit_code
+An integer representing the exit code which the inferior has returned.
+@end defivar
+@end table
+
+@item events.stop
+Emits @code{gdb.StopEvent} which extends @code{gdb.ThreadEvent}.
+
+Indicates that the inferior has stopped.  All events emitted by this registry
+extend StopEvent.  As a child of @code{gdb.ThreadEvent}, @code{gdb.StopEvent}
+will indicate the stopped thread when @value{GDBN} is running in non-stop
+mode.  Refer to @code{gdb.ThreadEvent} above for more details.
+
+Emits @code{gdb.SignalEvent} which extends @code{gdb.StopEvent}.
+
+This event indicates that the inferior or one of its threads has received as
+signal.  @code{gdb.SignalEvent} has the following attributes:
+
+@table @code
+@defivar SignalEvent stop_signal
+A string representing the signal received by the inferior.  A list of possible
+signal values can be obtained by running the command @code{info signals} in
+the @value{GDBN} command prompt.
+@end defivar
+@end table
+
+Also emits  @code{gdb.BreakpointEvent} which extends @code{gdb.StopEvent}.
+
+@code{gdb.BreakpointEvent} event indicates that a breakpoint has been hit, and
+has the following attributes:
+
+@table @code
+@defivar BreakpointEvent breakpoint
+A reference to the breakpoint that was hit of type @code{gdb.Breakpoint}.
+@xref{Breakpoints In Python}, for details of the @code{gdb.Breakpoint} object.
+@end defivar
+@end table
+
 @end table
 
 @node Threads In Python
@@ -24795,11 +24944,12 @@ opaque identifier of the library.  For remote debugging case,
 @var{target-name} and @var{host-name} fields give the name of the
 library file on the target, and on the host respectively.  For native
 debugging, both those fields have the same value.  The
-@var{symbols-loaded} field reports if the debug symbols for this
-library are loaded.  The @var{thread-group} field, if present,
-specifies the id of the thread group in whose context the library was loaded.
-If the field is absent, it means the library was loaded in the context
-of all present thread groups.
+@var{symbols-loaded} field is emitted only for backward compatibility
+and should not be relied on to convey any useful information.  The
+@var{thread-group} field, if present, specifies the id of the thread
+group in whose context the library was loaded.  If the field is
+absent, it means the library was loaded in the context of all present
+thread groups.
 
 @item =library-unloaded,...
 Reports that a library was unloaded by the program.  This notification
@@ -30753,6 +30903,8 @@ Target descriptions (@pxref{Target Descriptions})
 Remote shared library lists (@pxref{Library List Format})
 @item
 MS-Windows shared libraries (@pxref{Shared Libraries})
+@item
+Traceframe info (@pxref{Traceframe Info Format})
 @end itemize
 
 @item zlib
@@ -31575,6 +31727,7 @@ Show the current setting of the target wait timeout.
 * Library List Format::
 * Memory Map Format::
 * Thread List Format::
+* Traceframe Info Format::
 @end menu
 
 @node Overview
@@ -33125,6 +33278,11 @@ These are the currently defined stub features and their properties:
 @tab @samp{-}
 @tab Yes
 
+@item @samp{qXfer:traceframe-info:read}
+@tab No
+@tab @samp{-}
+@tab Yes
+
 
 @item @samp{QNonStop}
 @tab No
@@ -33226,6 +33384,10 @@ The remote stub understands the @samp{qXfer:siginfo:write} packet
 @item qXfer:threads:read
 The remote stub understands the @samp{qXfer:threads:read} packet
 (@pxref{qXfer threads read}).
+
+@item qXfer:traceframe-info:read
+The remote stub understands the @samp{qXfer:traceframe-info:read}
+packet (@pxref{qXfer traceframe info read}).
 
 @item QNonStop
 The remote stub understands the @samp{QNonStop} packet
@@ -33461,6 +33623,16 @@ by supplying an appropriate @samp{qSupported} response
 Access the list of threads on target.  @xref{Thread List Format}.  The
 annex part of the generic @samp{qXfer} packet must be empty
 (@pxref{qXfer read}).
+
+This packet is not probed by default; the remote stub must request it,
+by supplying an appropriate @samp{qSupported} response (@pxref{qSupported}).
+
+@item qXfer:traceframe-info:read::@var{offset},@var{length}
+@anchor{qXfer traceframe info read}
+
+Return a description of the current traceframe's contents.
+@xref{Traceframe Info Format}.  The annex part of the generic
+@samp{qXfer} packet must be empty (@pxref{qXfer read}).
 
 This packet is not probed by default; the remote stub must request it,
 by supplying an appropriate @samp{qSupported} response (@pxref{qSupported}).
@@ -35755,6 +35927,58 @@ identifies the thread (@pxref{thread-id syntax}).  The
 @samp{core} attribute, if present, specifies which processor core
 the thread was last executing on.  The content of the of @samp{thread}
 element is interpreted as human-readable auxilliary information.
+
+@node Traceframe Info Format
+@section Traceframe Info Format
+@cindex traceframe info format
+
+To be able to know which objects in the inferior can be examined when
+inspecting a tracepoint hit, @value{GDBN} needs to obtain the list of
+memory ranges, registers and trace state variables that have been
+collected in a traceframe.
+
+This list is obtained using the @samp{qXfer:traceframe-info:read}
+(@pxref{qXfer traceframe info read}) packet and is an XML document.
+
+@value{GDBN} must be linked with the Expat library to support XML
+traceframe info discovery.  @xref{Expat}.
+
+The top-level structure of the document is shown below:
+
+@smallexample
+<?xml version="1.0"?>
+<!DOCTYPE traceframe-info
+          PUBLIC "+//IDN gnu.org//DTD GDB Memory Map V1.0//EN"
+                 "http://sourceware.org/gdb/gdb-traceframe-info.dtd">
+<traceframe-info>
+   block...
+</traceframe-info>
+@end smallexample
+
+Each traceframe block can be either:
+
+@itemize
+
+@item
+A region of collected memory starting at @var{addr} and extending for
+@var{length} bytes from there:
+
+@smallexample
+<memory start="@var{addr}" length="@var{length}"/>
+@end smallexample
+
+@end itemize
+
+The formal DTD for the traceframe info format is given below:
+
+@smallexample
+<!ELEMENT traceframe-info  (memory)* >
+<!ATTLIST traceframe-info  version CDATA   #FIXED  "1.0">
+
+<!ELEMENT memory        EMPTY>
+<!ATTLIST memory        start   CDATA   #REQUIRED
+                        length  CDATA   #REQUIRED>
+@end smallexample
 
 @include agentexpr.texi
 

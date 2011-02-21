@@ -200,7 +200,9 @@ val_print_packed_array_elements (struct type *type, const gdb_byte *valaddr,
 					       (i * bitsize) / HOST_CHAR_BIT,
 					       (i * bitsize) % HOST_CHAR_BIT,
 					       bitsize, elttype);
-	  if (memcmp (value_contents (v0), value_contents (v1), eltlen) != 0)
+	  if (!value_available_contents_eq (v0, value_embedded_offset (v0),
+					    v1, value_embedded_offset (v1),
+					    eltlen))
 	    break;
 	}
 
@@ -564,15 +566,9 @@ ada_printstr (struct ui_file *stream, struct type *type,
 }
 
 
-/* Print data of type TYPE located at VALADDR (within GDB), which came from
-   the inferior at address ADDRESS, onto stdio stream STREAM according to
-   OPTIONS.  The data at VALADDR is in target byte order.
-
-   If the data is printed as a string, returns the number of string characters
-   printed.
-
-   RECURSE indicates the amount of indentation to supply before
-   continuation lines; this amount is roughly twice the value of RECURSE.  */
+/* See val_print for a description of the various parameters of this
+   function; they are identical.  The semantics of the return value is
+   also identical to val_print.  */
 
 int
 ada_val_print (struct type *type, const gdb_byte *valaddr,
@@ -598,7 +594,7 @@ ada_val_print (struct type *type, const gdb_byte *valaddr,
 }
 
 /* Assuming TYPE is a simple array, print the value of this array located
-   at VALADDR.  See ada_val_print for a description of the various
+   at VALADDR + OFFSET.  See ada_val_print for a description of the various
    parameters of this function; they are identical.  The semantics
    of the return value is also identical to ada_val_print.  */
 
@@ -788,8 +784,8 @@ ada_val_print_1 (struct type *type, const gdb_byte *valaddr,
 	      struct value_print_options opts = *options;
 
 	      opts.format = format;
-	      print_scalar_formatted (valaddr + offset_aligned,
-				      type, &opts, 0, stream);
+	      val_print_scalar_formatted (type, valaddr, offset_aligned,
+					  original_value, &opts, 0, stream);
 	    }
           else if (ada_is_system_address_type (type))
             {
@@ -827,8 +823,8 @@ ada_val_print_1 (struct type *type, const gdb_byte *valaddr,
     case TYPE_CODE_ENUM:
       if (options->format)
 	{
-	  print_scalar_formatted (valaddr + offset_aligned,
-				  type, options, 0, stream);
+	  val_print_scalar_formatted (type, valaddr, offset_aligned,
+				      original_value, options, 0, stream);
 	  break;
 	}
       len = TYPE_NFIELDS (type);
@@ -858,8 +854,8 @@ ada_val_print_1 (struct type *type, const gdb_byte *valaddr,
 
     case TYPE_CODE_FLAGS:
       if (options->format)
-	print_scalar_formatted (valaddr + offset_aligned,
-				type, options, 0, stream);
+	val_print_scalar_formatted (type, valaddr, offset_aligned,
+				    original_value, options, 0, stream);
       else
 	val_print_type_code_flags (type, valaddr + offset_aligned, stream);
       break;
@@ -1026,13 +1022,14 @@ print_record (struct type *type, const gdb_byte *valaddr,
   fprintf_filtered (stream, ")");
 }
 
-/* Print out fields of value at VALADDR having structure type TYPE.
+/* Print out fields of value at VALADDR + OFFSET having structure type TYPE.
 
-   TYPE, VALADDR, STREAM, RECURSE, and OPTIONS have the
-   same meanings as in ada_print_value and ada_val_print.
+   TYPE, VALADDR, OFFSET, STREAM, RECURSE, and OPTIONS have the same
+   meanings as in ada_print_value and ada_val_print.
 
-   OUTER_TYPE and OUTER_VALADDR give type and address of enclosing record
-   (used to get discriminant values when printing variant parts).
+   OUTER_TYPE and OUTER_OFFSET give type and address of enclosing
+   record (used to get discriminant values when printing variant
+   parts).
 
    COMMA_NEEDED is 1 if fields have been printed at the current recursion
    level, so that a comma is needed before any field printed by this

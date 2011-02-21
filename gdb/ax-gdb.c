@@ -2044,14 +2044,13 @@ gen_expr (struct expression *exp, union exp_element **pc,
 
 	(*pc) += 3;
 	gen_expr (exp, pc, ax, value);
-	/* I'm not sure I understand UNOP_MEMVAL entirely.  I think
-	   it's just a hack for dealing with minsyms; you take some
-	   integer constant, pretend it's the address of an lvalue of
-	   the given type, and dereference it.  */
-	if (value->kind != axs_rvalue)
-	  /* This would be weird.  */
-	  internal_error (__FILE__, __LINE__,
-			  _("gen_expr: OP_MEMVAL operand isn't an rvalue???"));
+
+	/* If we have an axs_rvalue or an axs_lvalue_memory, then we
+	   already have the right value on the stack.  For
+	   axs_lvalue_register, we must convert.  */
+	if (value->kind == axs_lvalue_register)
+	  require_rvalue (ax, value);
+
 	value->type = type;
 	value->kind = axs_lvalue_memory;
       }
@@ -2444,6 +2443,65 @@ gen_eval_for_expr (CORE_ADDR scope, struct expression *expr)
      will have to get more complicated.  */
   discard_cleanups (old_chain);
   return ax;
+}
+
+void
+gen_printf_expr_callback (char *fbuf, char **expp, void *loc_v, void *aexpr_v)
+{
+  struct bp_location	*loc = loc_v;
+  struct agent_expr	*aexpr = aexpr_v;
+
+  if (expp)
+    {
+      struct cleanup *old_chain = NULL;
+      struct expression *expr = NULL;
+      union exp_element *pc;
+      struct axs_value value;
+
+      expr = parse_exp_1 (expp, block_for_pc (loc->address), 1);
+      old_chain = make_cleanup (free_current_contents, &expr);
+
+      pc = expr->elts;
+      trace_kludge = 0;
+      value.optimized_out = 0;
+      gen_expr (expr, &pc, aexpr, &value);
+
+      if (value.optimized_out)
+        error (_("value has been optimized out"));
+      switch (value.kind)
+        {
+	case axs_lvalue_memory:
+	  if (TYPE_CODE (value.type) != TYPE_CODE_ARRAY)
+	    {
+	      int length = TYPE_LENGTH (check_typedef (value.type));
+	      switch (length)
+		{
+		case 4:
+		  ax_simple (aexpr, aop_ref32);
+		  break;
+		case 8:
+		  ax_simple (aexpr, aop_ref64);
+		  break;
+		default:
+		  error (_("Size of value is not OK."));
+		  break;
+		}
+	    }
+	  break;
+	case axs_lvalue_register:
+	  ax_reg (aexpr, value.u.reg);
+	  break;
+        }
+
+      do_cleanups (old_chain);
+    }
+
+  ax_simple (aexpr, aop_printf);
+  if (expp)
+    ax_simple (aexpr, 1);
+  else
+    ax_simple (aexpr, 0);
+  ax_memcpy (aexpr, fbuf, strlen (fbuf) + 1);
 }
 
 static void
