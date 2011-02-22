@@ -1,3 +1,148 @@
+2011-02-22  Tom Tromey  <tromey@redhat.com>
+
+	* language.c (language_class_name_from_physname): Rename
+	'curr_language' argument to 'lang'; use in body.
+
+2011-02-22  Michael Snyder  <msnyder@vmware.com>
+
+	* cli/cli-utils.c (number_is_in_list): Check for zero return.
+
+2011-02-22  Pedro Alves  <pedro@codesourcery.com>
+
+	* frame-unwind.h: Fix comment to mention the this frame, not the
+	next.
+
+2011-02-22  Tom Tromey  <tromey@redhat.com>
+
+	* symfile.c (auto_solib_limit): Remove.
+	* symfile.h (auto_solib_limit): Remove.
+
+2011-02-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* Makefile.in (INSTALLED_LIBS): Delete.  Update comment.
+
+2011-02-21  Michael Snyder  <msnyder@vmware.com>
+
+	* gdbthread.h (print_thread_info): Change prototype.
+	* thread.c (print_thread_info): Accept char* instead of int for
+	requested_threads argument.  Use new function number_is_in_list
+	to determine which threads to list.
+	(info_threads_command): Pass char* to print_thread_info.
+	* cli/cli-utils.c (number_is_in_list): New function.
+	* cli/cli-utils.h (number_is_in_list): Export.
+	* mi/mi-main.c (mi_cmd_thread_info): Pass char* to 
+	print_thread_info.
+	(print_one_inferior): Ditto.
+	(mi_cmd_list_thread_groups): Ditto.
+
+2011-02-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* common/Makefile.in (CFLAGS): New.
+	(COMPILE): Add $(CFLAGS).
+
+2011-02-21  Tom Tromey  <tromey@redhat.com>
+
+	* breakpoint.c (catch_syscall_command_1): Fix typo.
+
+2011-02-21  Tom Tromey  <tromey@redhat.com>
+
+	* reverse.c: Include cli-utils.h.
+	* printcmd.c: Include cli-utils.h.
+	(string_printf): Use skip_spaces.
+	* cli/cli-utils.h: New file.
+	* cli/cli-utils.c: New file.
+	* cli/cli-dump.h (skip_spaces): Move to cli-utils.h.
+	* cli/cli-dump.c (skip_spaces): Move to cli-utils.c.
+	* breakpoint.h (get_number, get_number_or_range): Move to
+	cli-utils.h.
+	* breakpoint.c: Include cli-utils.h.
+	(get_number_trailer, get_number, get_number_or_range)
+	(ep_skip_leading_whitespace): Move to cli-utils.c.
+	(create_breakpoint_sal, find_condition_and_thread)
+	(decode_static_tracepoint_spec, watch_command_1)
+	(watch_maybe_just_location, ep_parse_optional_if_clause)
+	(catch_fork_command_1, catch_exec_command_1)
+	(catch_syscall_command_1): Use skip_spaces, skip_to_space.
+	* Makefile.in (SUBDIR_CLI_OBS): Add cli-utils.o.
+	(SUBDIR_CLI_SRCS): Add cli-utils.c.
+	(HFILES_NO_SRCDIR): Add cli-utils.h.
+	(cli-utils.o): New target.
+
+2011-02-18  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* remote.c (remote_close): Reset INFERIOR_PTID to NULL_PTID
+	before calling discard_all_inferiors.
+
+2011-02-21  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* opencl-lang.c (STRUCT_OCL_TYPE): Remove.
+	(struct builtin_opencl_type): Remove.
+	(builtin_opencl_type): Change return type to "struct type **".
+	(lookup_opencl_vector_type): Update caller.
+	(opencl_language_arch_info): Copy primitive type vector from gdbarch.
+	(build_opencl_types): Install plain array of "struct type *"
+	instead of "struct builtin_opencl_type".
+
+2011-02-21  Matthew Gretton-Dann <matthew.gretton-dann@arm.com>
+	    Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* arm-linux-nat.c: Include "observer.h" and "gdbthread.h".
+	(PTRACE_GETHBPREGS, PTRACE_SETHBPREGS): Define.
+	(struct arm_linux_hwbp_cap): New type.
+	(arm_linux_get_hwbp_cap): New function.
+	(arm_linux_get_hw_breakpoint_count): Likewise.
+	(arm_linux_get_hw_watchpoint_count): Likewise.
+	(arm_linux_can_use_hw_breakpoint): Likewise.
+	(arm_hwbp_type): New type.
+	(arm_hwbp_control_t): Likewise.
+	(struct arm_linux_hw_breakpoint): Likewise.
+	(struct arm_linux_thread_points): Likewise.
+	(arm_threads): New global variable.
+	(arm_linux_find_breakpoints_by_tid): New function.
+	(arm_hwbp_control_initialize): Likewise.
+	(arm_hwbp_control_is_enabled): Likewise.
+	(arm_hwbp_control_disable): Likewise.
+	(arm_linux_hw_breakpoint_initialize): Likewise.
+	(arm_linux_get_hwbp_type): Likewise.
+	(arm_linux_hw_watchpoint_initialize): Likewise.
+	(arm_linux_hw_breakpoint_equal): Likewise.
+	(arm_linux_insert_hw_breakpoint1): Likewise.
+	(arm_linux_remove_hw_breakpoint1): Likewise.
+	(arm_linux_insert_hw_breakpoint): Likewise.
+	(arm_linux_remove_hw_breakpoint): Likewise.
+	(arm_linux_region_ok_for_hw_watchpoint): Likewise.
+	(arm_linux_insert_watchpoint): Likewise.
+	(arm_linux_remove_watchpoint): Likewise.
+	(arm_linux_stopped_data_address): Likewise.
+	(arm_linux_stopped_by_watchpoint): Likewise.
+	(arm_linux_watchpoint_addr_within_range): Likewise.
+	(arm_linux_new_thread): Likewise.
+	(arm_linux_thread_exit): Likewise.
+	(_initialize_arm_linux_nat): Install hardware breakpoint/watchpoint
+	related target callbacks.  Register arm_linux_new_thread and
+	arm_linux_thread_exit.
+	* arm-tdep.h (arm_pc_is_thumb): Add prototype.
+	* arm-tdep.c (arm_pc_is_thumb): Make global.
+	(arm_gdbarch_init): Call set_gdbarch_have_nonsteppable_watchpoint.
+
+2011-02-21  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* breakpoint.c (update_watchpoint): Do not attempt to recreate
+	per-frame locations while within a function epilogue.
+
+2011-02-21  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* ser-mingw.c (ser_windows_close): Reformat comment to better conform
+	to GNU coding standards.
+
+2011-02-21  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	Allow use of mingw native on Windows 95 OS.
+	* ser-mingw.c (CancelIo): New macro for dynamically loaded DLL entry.
+	(ser_windows_close): Only call CancelIo if function exists.
+	(_initialize_ser_windows): Use LoadLirary/GetProcAddress
+	to check for existence of CancelIo function in kernel32 DLL.
+
 2011-02-21  Hui Zhu  <teawater@gmail.com>
 
 	* Makefile.in (HFILES_NO_SRCDIR): Add printcmd.h.
