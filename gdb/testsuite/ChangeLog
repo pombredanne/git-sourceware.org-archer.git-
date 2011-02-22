@@ -1,3 +1,67 @@
+2011-02-22  Michael Snyder  <msnyder@vmware.com>
+
+	* Makefile.in: Make more clean.
+	* gdb.ada/Makefile.in: Ditto.
+	* gdb.arch/Makefile.in: Ditto.
+	* gdb.asm/Makefile.in: Ditto.
+	* gdb.base/Makefile.in: Ditto.
+	* gdb.cp/Makefile.in: Ditto.
+	* gdb.dwarf2/Makefile.in: Ditto.
+	* gdb.java/Makefile.in: Ditto.
+	* gdb.mi/Makefile.in: Ditto.
+	* gdb.modula2/Makefile.in: Ditto.
+	* gdb.python/Makefile.in: Ditto.
+	* gdb.server/Makefile.in: Ditto.
+	* gdb.stabs/Makefile.in: Ditto.
+	* gdb.threads/Makefile.in: Ditto.
+	* gdb.trace/Makefile.in: Ditto.
+
+2011-02-22  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.threads/thread-find.exp: Add tests for bad input to 
+	info threads.
+
+2011-02-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.python/py-breakpoint.exp: Fix the expected output of
+	one of the "maint info breakpoints" tests to accept the output
+	generated on platforms that do not have hardware watchpoints.
+
+2011-02-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.python/py-breakpoint.exp: Remove unnecessary call to
+	clean_restart.  Be a little stricter in the expected output
+	for one of the tests.  Fix a typo in one of the comments.
+
+2011-02-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.python/py-block.exp: Simplify using prepare_for_testing.
+	Delete variable binfile, no longer use.  Add or modify test
+	comments to make them unique.
+
+2011-02-21  Michael Snyder  <msnyder@vmware.com>
+
+	* Makefile.in: Update for make clean.
+	* gdb.ada/Makefile.in: Ditto.
+	* gdb.arch/Makefile.in: Ditto.
+	* gdb.asm/Makefile.in: Ditto.
+	* gdb.base/Makefile.in: Ditto.
+	* gdb.cp/Makefile.in: Ditto.
+	* gdb.dwarf2/Makefile.in: Ditto.
+	* gdb.java/Makefile.in: Ditto.
+	* gdb.mi/Makefile.in: Ditto.
+	* gdb.modula2/Makefile.in: Ditto.
+	* gdb.python/Makefile.in: Ditto.
+	* gdb.server/Makefile.in: Ditto.
+	* gdb.stabs/Makefile.in: Ditto.
+	* gdb.threads/Makefile.in: Ditto.
+	* gdb.trace/Makefile.in: Ditto.
+
+2011-02-21  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.threads/thread-find.exp: Update patterns for changes in
+	output of "info threads" command.
+
 2011-02-21  Matthew Gretton-Dann <matthew.gretton-dann@arm.com>
 	    Ulrich Weigand  <uweigand@de.ibm.com>
 
