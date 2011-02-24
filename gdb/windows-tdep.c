@@ -292,7 +292,8 @@ display_one_tib (ptid_t ptid)
   ULONGEST sizeof_ptr = gdbarch_ptr_bit (target_gdbarch);
   enum bfd_endian byte_order = gdbarch_byte_order (target_gdbarch);
 
-  if (sizeof_ptr == 64)
+  /* 64-bit GDB seems to get a 64-bit TIB even for 32-bit processes.  */
+  if (sizeof_ptr == 64 || sizeof(void *) == 8)
     {
       size = sizeof (uint64_t);
       tib_size = sizeof (thread_information_64);

@@ -25,6 +25,7 @@
 #include "gdb/fileio.h"
 #include "mem-break.h"
 #include "win32-low.h"
+#include "windows-hdep.h"
 
 #include <windows.h>
 #include <winnt.h>
@@ -536,13 +537,17 @@ win32_create_inferior (char *program, char **program_args)
   path_ptr = getenv ("PATH");
   if (path_ptr)
     {
+      int len = gdb_windows_conv_path_list (WINDOWS_POSIX_TO_NATIVE_A,
+					    path_ptr, NULL, 0);
       orig_path = alloca (strlen (path_ptr) + 1);
-      new_path = alloca (cygwin_posix_to_win32_path_list_buf_size (path_ptr));
+      new_path = alloca (len);
       strcpy (orig_path, path_ptr);
-      cygwin_posix_to_win32_path_list (path_ptr, new_path);
+      gdb_windows_conv_path_list (WINDOWS_POSIX_TO_NATIVE_A, path_ptr,
+				  new_path, len);
       setenv ("PATH", new_path, 1);
     }
-  cygwin_conv_to_win32_path (program, real_path);
+  gdb_windows_conv_path (WINDOWS_POSIX_TO_NATIVE_A, program, real_path,
+			 MAXPATHLEN);
   program = real_path;
 #endif
 
@@ -924,11 +929,7 @@ win32_add_one_solib (const char *name, CORE_ADDR load_addr)
     }
 #endif
 
-#ifdef __CYGWIN__
-  cygwin_conv_to_posix_path (buf, buf2);
-#else
-  strcpy (buf2, buf);
-#endif
+  gdb_windows_conv_path (WINDOWS_NATIVE_A_TO_POSIX, buf, buf2, MAX_PATH + 1);
 
   loaded_dll (buf2, load_addr);
 }

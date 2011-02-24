@@ -27,6 +27,7 @@
 #include "gdb_string.h"
 #include "readline/readline.h"
 
+#include <stdio.h>
 #include <windows.h>
 
 /* This event is signalled whenever an asynchronous SIGINT handler
@@ -36,6 +37,7 @@ static HANDLE sigint_event;
 /* When SIGINT_EVENT is signalled, gdb_select will call this
    function.  */
 struct async_signal_handler *sigint_handler;
+
 
 /* The strerror() function can return NULL for errno values that are
    out of range.  Provide a "safe" version that always returns a
@@ -256,4 +258,8 @@ void
 _initialize_mingw_hdep (void)
 {
   sigint_event = CreateEvent (0, FALSE, FALSE, 0);
+  SetErrorMode (SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX
+		| SEM_NOOPENFILEERRORBOX);
+  setvbuf (stdout, NULL, _IONBF, BUFSIZ);
+  setvbuf (stderr, NULL, _IONBF, BUFSIZ);
 }

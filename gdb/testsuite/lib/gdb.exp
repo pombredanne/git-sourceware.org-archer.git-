@@ -97,6 +97,135 @@ if ![info exists env(EXEEXT)] {
     set EXEEXT $env(EXEEXT)
 }
 
+global cygpath
+global use_cygpath
+
+set use_cygpath "no"
+set cygpath ""
+if { [catch {exec which "cygpath"} cygpath] != 0 } {
+  set use_cygpath "no"
+} else {
+  if { [file exists $cygpath] } {
+    set use_cygpath "yes"
+  }
+}
+ 
+verbose "cygpath is '$cygpath'"
+verbose "use_cygpath is '$use_cygpath'"
+
+global transform_gdb_expect_code
+set transform_gdb_expect_code ""
+
+if { [istarget "*-*-mingw*"] || [istarget "*djgpp"]
+     || [istarget "*-*-solaris*"] } {
+  set transform_gdb_expect_code "adapt_expcode_to_text_mode";
+  verbose "Using adapt_expcode_to_text_mode proc for target"
+}
+
+# Special code used to transform regular expressions inside
+# gdb_expect to be able to cope with the two \r appearing if 
+# stdout is open in text mode.
+# This simply replaces all \r\n by \r+\n, expect if the pattern is within
+# square brackets.
+# FIXME: if expcode contains variables that themselves contain \r\n
+# patterns, those patterns are not correctly converted.
+
+proc adapt_expcode_to_text_mode { expcode } {
+    global gdb_prompt
+    verbose "Special replacement in gdb_expect entry expcode=\"$expcode\"" 3
+    # Protect all '\r\n' inside square brackets by
+    # replacing those '\r\n' by '\rzz\n'
+    set subst1a [regsub -all {\[([^]]*)\\r\\n([^]]*)\]} "$expcode" \
+		{[\1\\rzz\\n\2]} expcode1a]
+    if { $subst1a > 0 } {
+	verbose "subst1a $subst1a"
+	verbose "before \"$expcode\""
+	verbose "after \"$expcode1a\""
+    }
+    set subst1b [regsub -all {\[([^]]*)\r\n([^]]*)\]} $expcode1a \
+		{[\1\rzz\n\2]} expcode1b]
+    if { $subst1b > 0 } {
+	verbose "subst1b $subst1b"
+	verbose "before \"$expcode1a\""
+	verbose "after \"$expcode1b\""
+    }
+
+    set substp0 [regsub -all {\\[(\\]gdb\\[)\\]} [subst -nobackslashes {$gdb_prompt}] {.*gdb.*} modprompt0]
+    set substp1 [regsub -all {\\} [subst -nobackslashes {$modprompt0}] {\\\\} modprompt1]
+    set substp2 [regsub -all {\r\n} [subst -nobackslashes {$modprompt1}] {\\r\\n} modprompt2]
+
+    set substp3 [regsub -all {\\\\} [subst -nobackslashes {$modprompt2}] {\\} modprompt]
+    if { $substp2 > 0 } {
+	verbose "Subst found in gdb_prompt"
+	verbose [subst -nobackslashes $gdb_prompt]
+	verbose "modprompt1 [subst -nobackslashes $modprompt1]"
+	verbose "modprompt2"
+	verbose [subst -nobackslashes $modprompt2]
+	verbose "modprompt"
+	verbose [subst  $modprompt]
+        set subst1gdb [regsub -all {\$gdb_prompt} $expcode1b "$modprompt" \
+	    expcode1c]
+    if { $subst1gdb > 0 } {
+	verbose "subst1gdb $subst1gdb"
+	verbose "before \"$expcode1b\""
+	verbose "after \"$expcode1c\""
+    }
+
+
+	verbose "Subst for gdb_prompt found = $subst1gdb"
+	set expcode1 "$expcode1c"
+    } else {
+	verbose "No subst for gdb_prompt found"
+	set expcode1 "$expcode1b"
+    }
+    verbose "expcode1 is \"$expcode1\"" 
+    set subst2a [regsub -all {\\r\\n} $expcode1 {\\r+\\n} expcode2a]
+    if { $subst2a > 0 } {
+	verbose "subst2a $subst2a"
+	verbose "before \"$expcode1\""
+	verbose "after \"$expcode2a\""
+    }
+    set subst2b [regsub -all {\r\n} $expcode2a "\r+\n" expcode2]
+    if { $subst2b > 0 } {
+	verbose "subst2b $subst2b"
+	verbose "before \"$expcode2a\""
+	verbose "after \"$expcode2\""
+    }
+
+    set subst3a [regsub -all {\[([^]]*)\\rzz\\n([^]]*)\]} $expcode2 \
+		{[\1\r\n\2]} expcode3a]
+    if { $subst3a > 0 } {
+	verbose "subst3a $subst3a"
+	verbose "before \"$expcode2\""
+	verbose "after \"$expcode3a\""
+    }
+
+    set subst3b [regsub -all {\[([^]]*)\\rzz\\n([^]]*)\]} $expcode3a \
+		{[\1\r\n\2]} expcode3]
+    if { $subst3b > 0 } {
+	verbose "subst3b $subst3b"
+	verbose "before \"$expcode3a\""
+	verbose "after \"$expcode3\""
+    }
+
+    set subst1 [expr $subst1a + $subst1b];
+    set subst2 [expr $subst2a + $subst2b];
+    set subst3 [expr $subst3a + $subst3b];
+    set subst [expr $subst1 + $subst2 + $subst3];
+    if { $subst1 != $subst3 } {
+	verbose "Problem with substitution expcode3=\"$expcode3\""
+    }
+    if { $subst2 != 0 } {
+	verbose "Special replacement gdb_expect substs=$subst"
+	set expcode $expcode3;
+	verbose "Special replacement in gdb_expect returned expcode=\"$expcode\""
+    }
+    if { $subst != 0 } {
+	verbose "subst1=$subst1 subst2=$subst2 subst3=$subst3" 3
+    }
+    return $expcode;
+}
+
 set octal "\[0-7\]+"
 
 ### Only procedures should come after this point.
@@ -1217,6 +1346,8 @@ proc gdb_file_cmd { arg } {
     global verbose
     global GDB
     global last_loaded_file
+    global use_cygpath
+    global cygpath
 
     set last_loaded_file $arg
 
@@ -1243,10 +1374,28 @@ proc gdb_file_cmd { arg } {
 	    exp_continue
 	}
 	-re "$gdb_prompt $" {
+	    verbose "Killing OK"
 	    # OK.
 	}
     }
 
+    if { $use_cygpath == "yes" && [istarget *-*-mingw*]} {
+      verbose "Calling cygpath"
+      set resarg [remote_exec host $cygpath "-m $arg"]
+      set narg [lindex $resarg 1]
+      regsub -all {(\r|\n)} $narg "" narg
+      regsub {^(\[A-Za-z\]):/} $narg "/\1/" narg
+      set arg "$narg" 
+    } else {
+      # Using 
+      if { [istarget *-*-mingw*] } {
+	set substcount [regsub "^/(\[A-Za-z\])/" $arg {\1:/}  narg] 
+        verbose "Converting path to mingw style from $arg to $narg count=$substcount"
+	set arg "$narg"
+      } else {
+        set narg "$arg"
+      }
+    }
     send_gdb "file $arg\n"
     gdb_expect 120 {
 	-re "Reading symbols from.*no debugging symbols found.*done.*$gdb_prompt $" {
@@ -2423,6 +2572,10 @@ proc gdb_expect { args } {
 	}
     }
 
+    global transform_gdb_expect_code;
+    if { "$transform_gdb_expect_code" != "" } {
+	set expcode [$transform_gdb_expect_code $expcode];
+    }
     global suppress_flag;
     global remote_suppress_flag;
     if [info exists remote_suppress_flag] {

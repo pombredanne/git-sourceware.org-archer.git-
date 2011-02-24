@@ -35,6 +35,9 @@
 #include "gdb_stat.h"
 #include "regcache.h"
 #include <ctype.h>
+#ifdef _WIN32
+#include <windows-hdep.h>
+#endif /* _WIN32 */
 #include "mips-tdep.h"
 #include "gdbthread.h"
 

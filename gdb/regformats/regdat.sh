@@ -25,6 +25,16 @@ move_if_change ()
     if test -r ${file} && cmp -s "${file}" new-"${file}"
     then
 	echo "${file} unchanged." 1>&2
+	if test ${file} -ot $0
+	then
+	    echo "Script \"$0\" is newer, touching \"${file}\"" 1>&2
+	    touch -r $0 ${file}
+	fi
+	if test ${file} -ot $1
+	then
+	    echo "Data file \"$1\" is newer, touching \"${file}\"" 1>&2
+	    touch -r $1 ${file}
+	fi
     else
 	mv new-"${file}" "${file}"
 	echo "${file} updated." 1>&2

@@ -22,16 +22,17 @@
 
 struct value;
 
-/* Defined in p-lang.c */
+/* Defined in p-lang.c file.  */
 extern const char *pascal_main_name (void);
 
-extern int pascal_parse (void);	/* Defined in p-exp.y */
+/* Defined in p-exp.y file.  */
+extern int pascal_parse (void);
 
-extern void pascal_error (char *);	/* Defined in p-exp.y */
+extern void pascal_error (char *);
 
-/* Defined in p-typeprint.c */
-extern void pascal_print_type (struct type *, const char *, struct ui_file *,
-			       int, int);
+/* Defined in p-typeprint.c file.  */
+extern void pascal_print_type (struct type *, const char *,
+			       struct ui_file *, int, int);
 
 extern void pascal_print_typedef (struct type *, struct symbol *,
 				  struct ui_file *);
@@ -47,27 +48,28 @@ extern int pascal_value_print (struct value *, struct ui_file *,
 extern void pascal_type_print_method_args (char *, char *,
 					   struct ui_file *);
 
-/* These are in p-lang.c: */
+/* These are in p-lang.c file. */
 
-extern int 
+extern int
   is_pascal_string_type (struct type *, int *, int *, int *,
 			 struct type **, char **);
 
 extern void pascal_printchar (int, struct type *, struct ui_file *);
 
-extern void pascal_printstr (struct ui_file *, struct type *, const gdb_byte *,
-			     unsigned int, const char *, int,
-			     const struct value_print_options *);
+extern void pascal_printstr (struct ui_file *, struct type *,
+			     const gdb_byte *, unsigned int, const char *,
+			     int, const struct value_print_options *);
 
 extern struct type **const (pascal_builtin_types[]);
 
-/* These are in p-typeprint.c: */
+/* These are in p-typeprint.c file. */
 
 extern void
   pascal_type_print_base (struct type *, struct ui_file *, int, int);
 
 extern void
-  pascal_type_print_varspec_prefix (struct type *, struct ui_file *, int, int);
+  pascal_type_print_varspec_prefix (struct type *, struct ui_file *, int,
+				    int);
 
 extern void pascal_object_print_value_fields (struct type *, const gdb_byte *,
 					      int,

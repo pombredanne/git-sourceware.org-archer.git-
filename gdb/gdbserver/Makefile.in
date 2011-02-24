@@ -367,6 +367,8 @@ server_h = $(srcdir)/server.h $(regcache_h) config.h $(srcdir)/target.h \
 		$(srcdir)/mem-break.h $(srcdir)/../common/gdb_signals.h \
 		$(signals_h)
 
+windows_hdep_h = $(srcdir)/../common/windows-hdep.h
+
 linux_low_h = $(srcdir)/linux-low.h
 
 lynx_low_h = $(srcdir)/lynx-low.h $(srcdir)/server.h
@@ -467,6 +469,12 @@ win32-low.o: win32-low.c $(win32_low_h) $(server_h) $(regdef_h) $(regcache_h)
 
 win32-arm-low.o: win32-arm-low.c $(win32_low_h) $(server_h)
 win32-i386-low.o: win32-i386-low.c $(win32_low_h) $(server_h) $(i386_low_h)
+
+# gdb/common/ dependencies
+
+windows-hdep.o: $(srcdir)/../common/windows-hdep.c $(windows_hdep_h)
+	${CC} -o windows-hdep.o -c -DGDBSERVER ${INTERNAL_CFLAGS} $<
+
 
 spu-low.o: spu-low.c $(server_h)
 

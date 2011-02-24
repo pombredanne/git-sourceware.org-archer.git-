@@ -17,6 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 srcdir = @srcdir@
+top_builddir = ..
 ACLOCAL = @ACLOCAL@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
@@ -28,10 +29,17 @@ COMMON_CPU_OBJ = @COMMON_CPU_OBJ@
 CFLAGS = @CFLAGS@
 
 BFD_DIR = ../../bfd
+
 BFD_SRC = $(srcdir)/$(BFD_DIR)
 BFD_CFLAGS = -I$(BFD_DIR) -I$(BFD_SRC)
+# Where is the INTL library?  Typically in ../intl.
+INTL = @LIBINTL@
+INTL_DEPS = @INTL_DEP@
+INTL_CFLAGS = @INCINTL@
 
-INCLUDES = -I. -I../ -I$(srcdir) -I$(srcdir)/../../include @GDB_INCLUDE@
+
+INCLUDES = -I. -I../ -I$(srcdir) -I$(srcdir)/../../include \
+	@GDB_INCLUDE@ $(INTL_CFLAGS)
 
 libcommon_a_OBJS = signals.o $(COMMON_CPU_OBJ)
 libcommon_a_SOURCES = signals.c $(COMMON_CPU_SRC)

@@ -38,7 +38,17 @@ proc pascal_init {} {
     global gpc_compiler
     global fpc_compiler
     global env
+    global cygpath
+    global use_cygpath
+
+    set use_cygpath "no"
+    set cygpath [exec which "cygpath"]
+    if { [file exists $cygpath] } {
+      set use_cygpath "yes"
+      verbose "cygpath is '$cygpath'" 2
+    }
  
+
     if { $pascal_init_done == 1 } {
 	return
     }
@@ -99,6 +109,9 @@ proc gpc_compile {source dest type options} {
 
 proc fpc_compile {source dest type options} {
     global fpc_compiler
+    global use_cygpath
+    global cygpath
+
     set add_flags ""
     if {$type == "object"} {
 	append add_flags " -Cn"
@@ -121,6 +134,16 @@ proc fpc_compile {source dest type options} {
 	    }
 	}
     }
+    if { $use_cygpath == "yes" } {
+      set resdest [remote_exec host $cygpath "-m $dest"]
+      set dest [lindex $resdest 1]
+      regsub -all {(\r|\n)} $dest "" dest
+      set ressource [remote_exec host $cygpath "-m $source"]
+      set source [lindex $ressource 1]
+      regsub -all {(\r|\n)} $source "" source
+    }
+    verbose "Compiling '$source' to '$dest' using $fpc_compiler"
+    verbose "Using '$add_flags' options"
 
     set result [remote_exec host $fpc_compiler "-o$dest $add_flags $source"]
     return $result

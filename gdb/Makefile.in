@@ -2019,6 +2019,12 @@ tui-winsource.o: $(srcdir)/tui/tui-winsource.c
 	$(COMPILE) $(srcdir)/tui/tui-winsource.c
 	$(POSTCOMPILE)
 
+
+# gdb/common/ dependencies
+
+windows-hdep.o: $(srcdir)/common/windows-hdep.c
+	$(COMPILE) $(srcdir)/common/windows-hdep.c
+
 #
 # gdb/python/ dependencies
 #
