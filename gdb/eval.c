@@ -513,7 +513,7 @@ value_f90_subarray (struct value *array, struct expression *exp, int *pos,
   struct type *new_array_type;
 
   /* Type being iterated for each dimension.  */
-  struct type *type;
+  struct type *type, *type_last_target;
 
   /* Pointer in the last holder to the type of current dimension.  */
   struct type **typep = &new_array_type;
@@ -533,6 +533,7 @@ value_f90_subarray (struct value *array, struct expression *exp, int *pos,
 	};
     }
   *subscript_array;
+  struct type **type_array;
   int i;
   struct cleanup *old_chain;
   CORE_ADDR value_byte_address, value_byte_offset = 0;
@@ -678,7 +679,21 @@ value_f90_subarray (struct value *array, struct expression *exp, int *pos,
 	}
     }
 
-  check_typedef (new_array_type);
+  type_last_target = type;
+  type_array = alloca (sizeof (*type_array) * nargs);
+  i = 0;
+  for (type = new_array_type; type != type_last_target;
+       type = TYPE_TARGET_TYPE (type))
+    type_array[i++] = type;
+  while (i > 0)
+    {
+      struct type *type = type_array[--i];
+
+      /* Force TYPE_LENGTH (type) recalculation.  */
+      TYPE_TARGET_STUB (type) = 1;
+      check_typedef (type);
+    }
+
   saved_array = array;
   array = allocate_value_lazy (new_array_type);
   VALUE_LVAL (array) = VALUE_LVAL (saved_array);

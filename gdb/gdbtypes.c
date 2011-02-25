@@ -1734,6 +1734,8 @@ check_typedef (struct type *type)
       htab_delete (copied_types);
 
       gdb_assert (TYPE_DYNAMIC (type) == 0);
+      /* Force TYPE_LENGTH (type) recalculation.  */
+      TYPE_DYNAMIC (type) = 1;
     }
 
   if (TYPE_TARGET_STUB (type) || TYPE_DYNAMIC (type))
