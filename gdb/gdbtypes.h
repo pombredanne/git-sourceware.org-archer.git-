@@ -290,6 +290,7 @@ enum type_instance_flag_value
 
 #define TYPE_DECLARED_CLASS(t) (TYPE_MAIN_TYPE (t)->flag_declared_class)
 
+#if 0
 /* Define this type as being reclaimable during free_all_types.  Type is
    required to be have TYPE_OBJFILE set to NULL.  Setting this flag requires
    initializing TYPE_DISCARDABLE_AGE, see alloc_type_discardable.  */
@@ -301,6 +302,7 @@ enum type_instance_flag_value
    by TYPE_DISCARDABLE_AGE_CURRENT.  */
 
 #define TYPE_DISCARDABLE_AGE(t)	(TYPE_MAIN_TYPE (t)->flag_discardable_age)
+#endif
 
 /* Is HIGH_BOUND a low-bound relative count (1) or the high bound itself (0)?  */
 
@@ -439,8 +441,10 @@ struct main_type
   /* True if this type was declared with "class" rather than
      "struct".  */
   unsigned int flag_declared_class : 1;
+#if 0
   unsigned int flag_discardable : 1;
   unsigned int flag_discardable_age : 1;
+#endif
   unsigned int flag_dynamic : 1;
   unsigned int flag_range_high_bound_is_count : 1;
   unsigned int flag_not_allocated : 1;
@@ -1523,7 +1527,9 @@ extern int is_public_ancestor (struct type *, struct type *);
 
 extern int is_unique_ancestor (struct type *, struct value *);
 
+#if 0
 extern void type_mark_used (struct type *type);
+#endif
 
 /* Overload resolution */
 
@@ -1602,6 +1608,8 @@ extern struct type *copy_type_recursive (struct type *type,
 
 extern struct type *copy_type (const struct type *type);
 
+#if 0
 extern void free_all_types (void);
+#endif
 
 #endif /* GDBTYPES_H */

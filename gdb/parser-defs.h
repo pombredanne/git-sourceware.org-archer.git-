@@ -334,6 +334,8 @@ extern int exp_uses_objfile (struct expression *exp, struct objfile *objfile);
 
 extern int exp_uses_objfile (struct expression *exp, struct objfile *objfile);
 
+#if 0
 extern void exp_types_mark_used (struct expression *exp);
+#endif
 
 #endif /* PARSER_DEFS_H */

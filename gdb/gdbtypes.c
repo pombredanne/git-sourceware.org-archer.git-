@@ -150,11 +150,13 @@ static void print_cplus_stuff (struct type *, int);
 static LONGEST type_length_get (struct type *type, struct type *target_type,
 				int full_span);
 
+#if 0
 /* The hash table holding all discardable `struct type *' references.  */
 static htab_t type_discardable_table;
 
 /* Current type_discardable_check pass used for TYPE_DISCARDABLE_AGE.  */
 static int type_discardable_age_current;
+#endif
 
 /* Allocate a new OBJFILE-associated type structure and fill it
    with some defaults.  Space for the type structure is allocated
@@ -185,6 +187,7 @@ alloc_type (struct objfile *objfile)
   return type;
 }
 
+#if 0
 /* Declare TYPE as discardable on next garbage collection by free_all_types.
    You must call type_mark_used during each free_all_types to protect TYPE from
    being deallocated.  */
@@ -203,6 +206,7 @@ set_type_as_discardable (struct type *type)
   gdb_assert (!*slot);
   *slot = type;
 }
+#endif
 
 /* Allocate a new type like alloc_type but preserve for it the discardability
    state of PARENT_TYPE.  */
@@ -212,8 +216,10 @@ alloc_type_as_parent (struct type *parent_type)
 {
   struct type *new_type = alloc_type_copy (parent_type);
 
+#if 0
   if (TYPE_DISCARDABLE (parent_type))
     set_type_as_discardable (new_type);
+#endif
 
   return new_type;
 }
@@ -3462,11 +3468,13 @@ copy_type_recursive_1 (struct objfile *objfile,
   TYPE_OBJFILE_OWNED (new_type) = 0;
   TYPE_OWNER (new_type).gdbarch = get_type_arch (type);
 
+#if 0
   /* TYPE_MAIN_TYPE memory copy above rewrote the TYPE_DISCARDABLE flag so we
      need to initialize it again.  And even if TYPE was already discardable
      NEW_TYPE so far is not registered in TYPE_DISCARDABLE_TABLE.  */
   TYPE_DISCARDABLE (new_type) = 0;
   set_type_as_discardable (new_type);
+#endif
 
   /* Pre-clear the fields processed by delete_main_type.  If DWARF block
      evaluations below call error we would leave an unfreeable TYPE.  */
@@ -3788,6 +3796,7 @@ copy_type (const struct type *type)
   return new_type;
 }
 
+#if 0
 /* Callback type for main_type_crawl.  */
 typedef int (*main_type_crawl_iter) (struct type *type, void *data);
 
@@ -3981,6 +3990,7 @@ free_all_types (void)
 
   htab_traverse (type_discardable_table, type_discardable_remove, NULL);
 }
+#endif
 
 /* Helper functions to initialize architecture-specific types.  */
 
@@ -4497,9 +4507,11 @@ _initialize_gdbtypes (void)
 {
   gdbtypes_data = gdbarch_data_register_post_init (gdbtypes_post_init);
 
+#if 0
   type_discardable_table = htab_create_alloc (20, type_discardable_hash,
 					     type_discardable_equal, NULL,
 					     xcalloc, xfree);
+#endif
 
   objfile_type_data = register_objfile_data ();
 

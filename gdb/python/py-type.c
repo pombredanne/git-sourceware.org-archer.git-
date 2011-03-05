@@ -47,8 +47,10 @@ typedef struct pyty_type_object
   struct pyty_type_object *next;
 } type_object;
 
+#if 0
 /* First element of a doubly-linked list of TYPE_DISCARDABLE Types.  */
 static type_object *pyty_objects_discardable;
+#endif
 
 static PyTypeObject type_object_type;
 
@@ -948,6 +950,7 @@ typy_link (type_object *type_obj)
 	type_obj->next->prev = type_obj;
       set_objfile_data (objfile, typy_objfile_data_key, type_obj);
     }
+#if 0
   else if (type_obj->type && TYPE_DISCARDABLE (type_obj->type))
     {
       type_obj->next = pyty_objects_discardable;
@@ -955,6 +958,7 @@ typy_link (type_object *type_obj)
 	type_obj->next->prev = type_obj;
       pyty_objects_discardable = type_obj;
     }
+#endif
   else
     type_obj->next = NULL;
 }
@@ -973,8 +977,10 @@ typy_unlink (type_object *type_obj)
 
       set_objfile_data (objfile, typy_objfile_data_key, type_obj->next);
     }
+#if 0
   else if (pyty_objects_discardable == type_obj)
     pyty_objects_discardable = type_obj->next;
+#endif
 
   if (type_obj->next)
     type_obj->next->prev = type_obj->prev;
@@ -1023,6 +1029,7 @@ typy_dealloc (PyObject *obj)
   type_obj->ob_type->tp_free (obj);
 }
 
+#if 0
 /* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
 static void
 typy_types_mark_used (void)
@@ -1034,6 +1041,7 @@ typy_types_mark_used (void)
        type_obj = type_obj->next)
     type_mark_used (type_obj->type);
 }
+#endif
 
 /* Create a new Type referring to TYPE.  */
 PyObject *
@@ -1121,7 +1129,9 @@ gdbpy_initialize_types (void)
   Py_INCREF (&field_object_type);
   PyModule_AddObject (gdb_module, "Field", (PyObject *) &field_object_type);
 
+#if 0
   observer_attach_mark_used (typy_types_mark_used);
+#endif
 }
 
 

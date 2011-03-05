@@ -343,7 +343,9 @@ void
 prepare_execute_command (void)
 {
   free_all_values ();
+#if 0
   free_all_types ();
+#endif
 
   /* With multiple threads running while the one we're examining is
      stopped, the dcache can get stale without us being able to detect

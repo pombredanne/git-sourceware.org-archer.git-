@@ -1516,7 +1516,9 @@ value_history_cleanup (void *unused)
 
   /* Free the unreferenced types above.  */
   free_all_values ();
+#if 0
   free_all_types ();
+#endif
 }
 
 /* Internal variables.  These are variables within the debugger
@@ -1996,6 +1998,7 @@ call_internal_function (struct gdbarch *gdbarch,
   return (*ifn->handler) (gdbarch, language, ifn->cookie, argc, argv);
 }
 
+#if 0
 /* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
 
 static void
@@ -2025,6 +2028,7 @@ value_types_mark_used (void)
 	  type_mark_used (value_type (chunk->values[i]));
     }
 }
+#endif
 
 /* The 'function' command.  This does nothing -- it is just a
    placeholder to let "help function NAME" work.  This is also used as
@@ -3174,5 +3178,7 @@ Placeholder command for showing help on convenience functions."),
 
   make_final_cleanup (value_history_cleanup, NULL);
 
+#if 0
   observer_attach_mark_used (value_types_mark_used);
+#endif
 }

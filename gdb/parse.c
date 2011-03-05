@@ -1627,6 +1627,7 @@ exp_uses_objfile (struct expression *exp, struct objfile *objfile)
 
 /* Helper for exp_types_mark_used.  */
 
+#if 0
 static int
 exp_types_mark_used_iter (struct type *type, void *unused)
 {
@@ -1643,6 +1644,7 @@ exp_types_mark_used (struct expression *exp)
 {
   exp_iterate (exp, exp_types_mark_used_iter, NULL, NULL);
 }
+#endif
 
 void
 _initialize_parse (void)

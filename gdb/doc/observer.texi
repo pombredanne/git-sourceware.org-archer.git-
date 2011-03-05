@@ -223,10 +223,10 @@ Bytes from @var{data} to @var{data} + @var{len} have been written
 to the current inferior at @var{addr}.
 @end deftypefun
 
-@deftypefun void mark_used (void)
-Mark any possibly reclaimable objects as used during a mark-and-sweep garbage
-collector pass.  Currently only @code{type_mark_used} marker is supported.
-@end deftypefun
+@c @deftypefun void mark_used (void)
+@c Mark any possibly reclaimable objects as used during a mark-and-sweep garbage
+@c collector pass.  Currently only @code{type_mark_used} marker is supported.
+@c @end deftypefun
 
 @deftypefun void test_notification (int @var{somearg})
 This observer is used for internal testing.  Do not use.  

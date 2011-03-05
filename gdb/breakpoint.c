@@ -12100,6 +12100,7 @@ all_tracepoints ()
   return tp_vec;
 }
 
+#if 0
 /* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
 
 static void
@@ -12115,6 +12116,7 @@ breakpoint_types_mark_used (void)
 	type_mark_used (value_type (b->val));
     }
 }
+#endif
 
 
 /* This help string is used for the break, hbreak, tbreak and thbreak
@@ -12737,5 +12739,7 @@ inferior in all-stop mode, gdb behaves as if always-inserted mode is off."),
   automatic_hardware_breakpoints = 1;
 
   observer_attach_about_to_proceed (breakpoint_about_to_proceed);
+#if 0
   observer_attach_mark_used (breakpoint_types_mark_used);
+#endif
 }

@@ -1471,6 +1471,7 @@ x_command (char *exp, int from_tty)
     }
 }
 
+#if 0
 /* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
 
 static void
@@ -1485,6 +1486,7 @@ print_types_mark_used (void)
     if (d->exp)
       exp_types_mark_used (d->exp);
 }
+#endif
 
 
 
@@ -2887,5 +2889,7 @@ Show printing of source filename and line number with <symbol>."), NULL,
 Convert \"printf format string\", arg1, arg2, arg3, ..., argn to\n\
 a command line, and call it."));
 
+#if 0
   observer_attach_mark_used (print_types_mark_used);
+#endif
 }

@@ -1212,6 +1212,7 @@ gdbpy_is_value_object (PyObject *obj)
   return PyObject_TypeCheck (obj, &value_object_type);
 }
 
+#if 0
 /* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
 
 static void
@@ -1222,6 +1223,7 @@ python_types_mark_used (void)
   for (iter = values_in_python; iter; iter = iter->next)
     type_mark_used (value_type (iter->value));
 }
+#endif
 
 void
 gdbpy_initialize_values (void)
@@ -1234,7 +1236,9 @@ gdbpy_initialize_values (void)
 
   values_in_python = NULL;
 
+#if 0
   observer_attach_mark_used (python_types_mark_used);
+#endif
 }
 
 
