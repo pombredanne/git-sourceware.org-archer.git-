@@ -94,22 +94,6 @@ parse_and_eval_address (char *exp)
   return addr;
 }
 
-/* Like parse_and_eval_address but takes a pointer to a char * variable
-   and advanced that variable across the characters parsed.  */
-
-CORE_ADDR
-parse_and_eval_address_1 (char **expptr)
-{
-  struct expression *expr = parse_exp_1 (expptr, (struct block *) 0, 0);
-  CORE_ADDR addr;
-  struct cleanup *old_chain =
-    make_cleanup (free_current_contents, &expr);
-
-  addr = value_as_address (evaluate_expression (expr));
-  do_cleanups (old_chain);
-  return addr;
-}
-
 /* Like parse_and_eval_address, but treats the value of the expression
    as an integer, not an address, returns a LONGEST, not a CORE_ADDR.  */
 LONGEST
@@ -1518,13 +1502,12 @@ evaluate_subexp_standard (struct type *expect_type,
 
 	if (method)
 	  {
-	    struct block *b;
 	    CORE_ADDR funaddr;
 	    struct type *val_type;
 
 	    funaddr = find_function_addr (method, &val_type);
 
-	    b = block_for_pc (funaddr);
+	    block_for_pc (funaddr);
 
 	    CHECK_TYPEDEF (val_type);
 	  
@@ -2417,8 +2400,8 @@ evaluate_subexp_standard (struct type *expect_type,
 	}
 
     case BINOP_RANGE:
-      arg1 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
-      arg2 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
+      evaluate_subexp (NULL_TYPE, exp, pos, noside);
+      evaluate_subexp (NULL_TYPE, exp, pos, noside);
       if (noside == EVAL_SKIP)
 	goto nosideret;
       error (_("':' operator used in invalid context"));
@@ -2540,7 +2523,7 @@ evaluate_subexp_standard (struct type *expect_type,
       arg1 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
       if (noside == EVAL_SKIP)
 	{
-	  arg2 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
+	  evaluate_subexp (NULL_TYPE, exp, pos, noside);
 	  goto nosideret;
 	}
 
@@ -2567,7 +2550,7 @@ evaluate_subexp_standard (struct type *expect_type,
       arg1 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
       if (noside == EVAL_SKIP)
 	{
-	  arg2 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
+	  evaluate_subexp (NULL_TYPE, exp, pos, noside);
 	  goto nosideret;
 	}
 

@@ -121,7 +121,7 @@ queue_stop_reply (ptid_t ptid, struct target_waitstatus *status)
 {
   struct vstop_notif *new_notif;
 
-  new_notif = malloc (sizeof (*new_notif));
+  new_notif = xmalloc (sizeof (*new_notif));
   new_notif->next = NULL;
   new_notif->ptid = ptid;
   new_notif->status = *status;
@@ -1357,7 +1357,7 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 
       sprintf (own_buf, "QC");
       own_buf += 2;
-      own_buf = write_ptid (own_buf, gdb_id);
+      write_ptid (own_buf, gdb_id);
       return;
     }
 

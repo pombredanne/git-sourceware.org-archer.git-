@@ -35,7 +35,7 @@
 #include "python-internal.h"
 
 /* Even though Python scalar types directly map to host types, we use
-   target types here to remain consistent with the the values system in
+   target types here to remain consistent with the values system in
    GDB (which uses target arithmetic).  */
 
 /* Python's integer type corresponds to C's long type.  */
@@ -1163,9 +1163,8 @@ convert_value_from_python (PyObject *obj)
       else if (gdbpy_is_lazy_string (obj))
 	{
 	  PyObject *result;
-	  PyObject *function = PyString_FromString ("value");
 
-	  result = PyObject_CallMethodObjArgs (obj, function,  NULL);
+	  result = PyObject_CallMethodObjArgs (obj, gdbpy_value_cst,  NULL);
 	  value = value_copy (((value_object *) result)->value);
 	}
       else

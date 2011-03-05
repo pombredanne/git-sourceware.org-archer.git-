@@ -1,3 +1,81 @@
+2011-03-05  Yao Qi  <yao@codesourcery.com>
+
+	* Makefile.in (CLEANDIRS, REQUIRED_SUBDIRS): New variable.
+	(subdir_do): New make target.  Copied from gdb/Makefile.
+	(maintainer-clean, realclean, distclean, clean): Call corresponding
+	make targets in common/Makefile.
+
+2011-03-04  Yao Qi  <yao@codesourcery.com>
+
+	* Makefile.in: Remove GNU make feature --directory.
+
+2011-02-28  Michael Snyder  <msnyder@vmware.com>
+
+	* utils.c (decimal2str): Initialize 'width' to nine, then
+	don't mess with it.
+
+2011-02-28  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* hostio.c (require_data): Free *data, not data.
+
+2011-02-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* hostio.c (require_data): Use free, not xfree.
+
+2011-02-27  Michael Snyder  <msnyder@vmware.com>
+
+	* server.c (handle_query): Discard unused value.
+
+	* hostio.c (require_data): Free malloc memory before returning
+	error.
+
+2011-02-26  Michael Snyder  <msnyder@vmware.com>
+
+	* linux-low.c (list_threads): Call closedir for dirent.
+
+2011-02-27  Michael Snyder  <msnyder@vmware.com>
+
+	* i386-low.c (i386-length_and_rw_bits): Comment the fact that
+	a case statement falls through.
+
+	* linux-low.c (linux_xfer_siginfo): Fix fencepost error.
+
+	* linux-amd64-ipa.c (gdb_agent_get_raw_reg): Fix fencepost error
+	in comparison.
+
+2011-02-26  Michael Snyder  <msnyder@vmware.com>
+
+	* utils.c (decimal2str): Eliminate dead code and dead param.
+	(pulongest): Drop dead param from call to decimal2str.
+	(plongest): Ditto.
+
+2011-02-24  Joel Brobecker  <brobecker@adacore.com>
+
+	Revert the following patch (not approved yet):
+	2011-02-21  Hui Zhu  <teawater@gmail.com>
+	* tracepoint.c (tp_printf): New function.
+	(eval_agent_expr): Handle gdb_agent_op_printf.
+
+2011-02-21  Hui Zhu  <teawater@gmail.com>
+
+	* tracepoint.c (tp_printf): New function.
+	(eval_agent_expr): Handle gdb_agent_op_printf.
+
+2011-02-18  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in (tracepoint-ipa.o): Depend on ax.def.
+	(tracepoint.o): Likewise.
+	* tracepoint.c (enum gdb_agent_op): Use ax.def.
+	(gdb_agent_op_names): Likewise.
+
+2011-02-18  Tom Tromey  <tromey@redhat.com>
+
+	* tracepoint.c (enum gdb_agent_op) <gdb_agent_op_pick,
+	gdb_agent_op_rot>: New constants.
+	(gdb_agent_op_names): Add pick and roll.
+	(eval_agent_expr) <gdb_agent_op_pick, gdb_agent_op_rot>: New
+	cases.
+
 2011-02-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* aclocal.m4: Regenerated with aclocal-1.11.1.

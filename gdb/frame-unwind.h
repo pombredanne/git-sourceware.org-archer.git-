@@ -33,8 +33,8 @@ struct value;
 
 /* The following unwind functions assume a chain of frames forming the
    sequence: (outer) prev <-> this <-> next (inner).  All the
-   functions are called with the next frame's `struct frame_info'
-   and this frame's prologue cache.
+   functions are called with this frame's `struct frame_info' and
+   prologue cache.
 
    THIS frame's register values can be obtained by unwinding NEXT
    frame's registers (a recursive operation).
@@ -148,7 +148,7 @@ struct frame_unwind
    search list (so it is sniffed before previously registered
    unwinders).  By using a prepend, later calls can install unwinders
    that override earlier calls.  This allows, for instance, an OSABI
-   to install a a more specific sigtramp unwinder that overrides the
+   to install a more specific sigtramp unwinder that overrides the
    traditional brute-force unwinder.  */
 extern void frame_unwind_prepend_unwinder (struct gdbarch *,
 					   const struct frame_unwind *);
