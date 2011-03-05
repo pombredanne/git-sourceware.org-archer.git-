@@ -4518,6 +4518,7 @@ list_threads (int pid, struct buffer *buffer, char **cores)
 		}
 	    }
 	}
+      closedir (dir);
     }
 
   if (cores)
@@ -4728,7 +4729,7 @@ linux_xfer_siginfo (const char *annex, unsigned char *readbuf,
 	     readbuf != NULL ? "Reading" : "Writing",
 	     pid);
 
-  if (offset > sizeof (siginfo))
+  if (offset >= sizeof (siginfo))
     return -1;
 
   if (ptrace (PTRACE_GETSIGINFO, pid, 0, &siginfo) != 0)

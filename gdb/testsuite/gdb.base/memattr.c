@@ -1,9 +1,6 @@
-/* Native-dependent code for NetBSD.
+/* This testcase is part of GDB, the GNU debugger.
 
-   Copyright (C) 2006, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
-
-   This file is part of GDB.
+   Copyright 2011 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -18,29 +15,14 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#include "defs.h"
+#define MEMSIZE 64
+static int mem1[MEMSIZE] = {111, 222, 333, 444, 555};
+static int mem2[MEMSIZE];
+static int mem3[MEMSIZE];
+static int mem4[MEMSIZE];
+static int mem5[MEMSIZE];
 
-#include <sys/param.h>
-
-#include "nbsd-nat.h"
-
-/* Return the name of a file that can be opened to get the symbols for
-   the child process identified by PID.  */
-
-char *
-nbsd_pid_to_exec_file (int pid)
+int main()
 {
-  size_t len = MAXPATHLEN;
-  char *buf = xcalloc (len, sizeof (char));
-  char *path;
-
-  path = xstrprintf ("/proc/%d/exe", pid);
-  if (readlink (path, buf, MAXPATHLEN) == -1)
-    {
-      xfree (buf);
-      buf = NULL;
-    }
-
-  xfree (path);
-  return buf;
+  return 0;
 }

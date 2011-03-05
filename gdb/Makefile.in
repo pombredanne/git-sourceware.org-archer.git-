@@ -808,7 +808,7 @@ annotate.h sim-regno.h dictionary.h dfp.h main.h frame-unwind.h	\
 remote-fileio.h i386-linux-tdep.h vax-tdep.h objc-lang.h \
 sentinel-frame.h bcache.h symfile.h windows-tdep.h linux-tdep.h \
 gdb_usleep.h jit.h xml-syscall.h microblaze-tdep.h \
-psymtab.h psympriv.h progspace.h bfin-tdep.h ia64-hpux-tdep.h printcmd.h \
+psymtab.h psympriv.h progspace.h bfin-tdep.h ia64-hpux-tdep.h \
 python/python.h python/python-internal.h
 
 # Header files that already have srcdir in them, or which are in objdir.
@@ -1175,22 +1175,6 @@ all-lib: gnulib/Makefile
 $(LIBCOMMON): $(LIBCOMMON_DIR)/Makefile
 	@$(MAKE) $(FLAGS_TO_PASS) DO=all DODIRS=common subdir_do
 
-configure-common: 
-	@: $(MAKE); $(unstage)
-	@r=`${PWD_COMMAND}`; export r; \
-	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
-        test ! -f common/Makefile || exit 0; \
-        $(SHELL) $(srcdir)/../mkinstalldirs common ; \
-        $(HOST_EXPORTS)  \
-        echo Configuring in common; \
-        cd "common" || exit 1; \
-        commondir="$$s/common"; \
-        srcdiroption="--srcdir=$${commondir}"; \
-	$(SHELL) $${commondir}/configure --enable-gdbserver=no \
-          $(HOST_CONFIGARGS) --build=${build_alias} --host=${host_alias} \
-          --target=${target_alias} $${srcdiroption}  \
-          || exit 1
-
 # Convenience rule to handle recursion.
 .PHONY: all-data-directory
 all-data-directory: data-directory/Makefile
@@ -1238,7 +1222,7 @@ tags: TAGS
 clean mostlyclean: $(CONFIG_CLEAN)
 	@$(MAKE) $(FLAGS_TO_PASS) DO=clean "DODIRS=$(CLEANDIRS)" subdir_do
 	rm -f *.o *.a $(ADD_FILES) *~ init.c-tmp init.l-tmp version.c-tmp
-	rm -f init.c version.c
+	rm -f init.c version.c observer.h observer.inc
 	rm -f gdb$(EXEEXT) core make.log
 	rm -f gdb[0-9]$(EXEEXT)
 	rm -f test-cp-name-parser$(EXEEXT)
@@ -1325,13 +1309,6 @@ data-directory/Makefile: data-directory/Makefile.in config.status @frags@
 	  CONFIG_HEADERS= \
 	  CONFIG_LINKS= \
 	  $(SHELL) config.status
-
-common/Makefile: configure-common common/Makefile.in config.status @frags@
-        CONFIG_FILES="common/Makefile" \
-          CONFIG_COMMANDS="depfiles" \
-          CONFIG_HEADERS= \
-          CONFIG_LINKS= \
-          $(SHELL) config.status
 
 config.h: stamp-h ; @true
 stamp-h: $(srcdir)/config.in config.status

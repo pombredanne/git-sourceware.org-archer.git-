@@ -65,6 +65,7 @@ PyObject *gdbpy_children_cst;
 PyObject *gdbpy_display_hint_cst;
 PyObject *gdbpy_doc_cst;
 PyObject *gdbpy_enabled_cst;
+PyObject *gdbpy_value_cst;
 
 /* The GdbError exception.  */
 PyObject *gdbpy_gdberror_exc;
@@ -1065,6 +1066,7 @@ Enables or disables printing of Python stack traces."),
   gdbpy_display_hint_cst = PyString_FromString ("display_hint");
   gdbpy_doc_cst = PyString_FromString ("__doc__");
   gdbpy_enabled_cst = PyString_FromString ("enabled");
+  gdbpy_value_cst = PyString_FromString ("value");
 
   /* Release the GIL while gdb runs.  */
   PyThreadState_Swap (NULL);
@@ -1197,6 +1199,10 @@ Return a Type corresponding to the given name." },
 Return a tuple with the symbol corresponding to the given name (or None) and\n\
 a boolean indicating if name is a field of the current implied argument\n\
 `this' (when the current language is object-oriented)." },
+  { "lookup_global_symbol", (PyCFunction) gdbpy_lookup_global_symbol,
+    METH_VARARGS | METH_KEYWORDS,
+    "lookup_global_symbol (name [, domain]) -> symbol\n\
+Return the symbol corresponding to the given name (or None)." },
   { "block_for_pc", gdbpy_block_for_pc, METH_VARARGS,
     "Return the block containing the given pc value, or None." },
   { "solib_name", gdbpy_solib_name, METH_VARARGS,

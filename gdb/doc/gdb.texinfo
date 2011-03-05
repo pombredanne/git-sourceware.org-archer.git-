@@ -2475,7 +2475,7 @@ You can get multiple executables into a debugging session via the
 systems @value{GDBN} can add inferiors to the debug session
 automatically by following calls to @code{fork} and @code{exec}.  To
 remove inferiors from the debugging session use the
-@w{@code{remove-inferior}} command.
+@w{@code{remove-inferiors}} command.
 
 @table @code
 @kindex add-inferior
@@ -2508,37 +2508,37 @@ Added inferior 2.
 
 You can now simply switch focus to inferior 2 and run it.
 
-@kindex remove-inferior
-@item remove-inferior @var{infno}
-Removes the inferior @var{infno}.  It is not possible to remove an
-inferior that is running with this command.  For those, use the
-@code{kill} or @code{detach} command first.
+@kindex remove-inferiors
+@item remove-inferiors @var{infno}@dots{}
+Removes the inferior or inferiors @var{infno}@dots{}.  It is not
+possible to remove an inferior that is running with this command.  For
+those, use the @code{kill} or @code{detach} command first.
 
 @end table
 
 To quit debugging one of the running inferiors that is not the current
 inferior, you can either detach from it by using the @w{@code{detach
 inferior}} command (allowing it to run independently), or kill it
-using the @w{@code{kill inferior}} command:
+using the @w{@code{kill inferiors}} command:
 
 @table @code
-@kindex detach inferior @var{infno}
-@item detach inferior @var{infno}
-Detach from the inferior identified by @value{GDBN} inferior number
-@var{infno}.  Note that the inferior's entry still stays on the list
-of inferiors shown by @code{info inferiors}, but its Description will
-show @samp{<null>}.
+@kindex detach inferiors @var{infno}@dots{}
+@item detach inferior @var{infno}@dots{}
+Detach from the inferior or inferiors identified by @value{GDBN}
+inferior number(s) @var{infno}@dots{}.  Note that the inferior's entry
+still stays on the list of inferiors shown by @code{info inferiors},
+but its Description will show @samp{<null>}.
 
-@kindex kill inferior @var{infno}
-@item kill inferior @var{infno}
-Kill the inferior identified by @value{GDBN} inferior number
-@var{infno}.  Note that the inferior's entry still stays on the list
-of inferiors shown by @code{info inferiors}, but its Description will
-show @samp{<null>}.
+@kindex kill inferiors @var{infno}@dots{}
+@item kill inferiors @var{infno}@dots{}
+Kill the inferior or inferiors identified by @value{GDBN} inferior
+number(s) @var{infno}@dots{}.  Note that the inferior's entry still
+stays on the list of inferiors shown by @code{info inferiors}, but its
+Description will show @samp{<null>}.
 @end table
 
 After the successful completion of a command such as @code{detach},
-@code{detach inferior}, @code{kill} or @code{kill inferior}, or after
+@code{detach inferiors}, @code{kill} or @code{kill inferiors}, or after
 a normal process exit, the inferior is still valid and listed with
 @code{info inferiors}, ready to be restarted.
 
@@ -2996,8 +2996,8 @@ to another by using the @code{inferior} command (@pxref{Inferiors and
 Programs, ,Debugging Multiple Inferiors and Programs}).
 
 To quit debugging one of the forked processes, you can either detach
-from it by using the @w{@code{detach inferior}} command (allowing it
-to run independently), or kill it using the @w{@code{kill inferior}}
+from it by using the @w{@code{detach inferiors}} command (allowing it
+to run independently), or kill it using the @w{@code{kill inferiors}}
 command.  @xref{Inferiors and Programs, ,Debugging Multiple Inferiors
 and Programs}.
 
@@ -3448,12 +3448,12 @@ optionally be surrounded by spaces.
 
 @kindex info breakpoints
 @cindex @code{$_} and @code{info breakpoints}
-@item info breakpoints @r{[}@var{n}@r{]}
-@itemx info break @r{[}@var{n}@r{]}
+@item info breakpoints @r{[}@var{n}@dots{}@r{]}
+@itemx info break @r{[}@var{n}@dots{}@r{]}
 Print a table of all breakpoints, watchpoints, and catchpoints set and
 not deleted.  Optional argument @var{n} means print information only
-about the specified breakpoint (or watchpoint or catchpoint).  For
-each breakpoint, following columns are printed:
+about the specified breakpoint(s) (or watchpoint(s) or catchpoint(s)).
+For each breakpoint, following columns are printed:
 
 @table @emph
 @item Breakpoint Numbers
@@ -3773,8 +3773,8 @@ by the program.
 Set a watchpoint that will break when @var{expr} is either read from
 or written into by the program.
 
-@kindex info watchpoints @r{[}@var{n}@r{]}
-@item info watchpoints
+@kindex info watchpoints @r{[}@var{n}@dots{}@r{]}
+@item info watchpoints @r{[}@var{n}@dots{}@r{]}
 This command prints a list of watchpoints, using the same format as
 @code{info break} (@pxref{Set Breaks}).
 @end table
@@ -10073,7 +10073,7 @@ just as with breakpoints.
 
 Unlike breakpoint conditions, @value{GDBN} does not actually evaluate
 the conditional expression itself.  Instead, @value{GDBN} encodes the
-expression into an agent expression (@pxref{Agent Expressions}
+expression into an agent expression (@pxref{Agent Expressions})
 suitable for execution on the target, independently of @value{GDBN}.
 Global variables become raw memory locations, locals become stack
 accesses, and so forth.
@@ -10252,12 +10252,6 @@ state variables (@pxref{Trace State Variables}) without adding those
 values to the trace buffer, as would be the case if the @code{collect}
 action were used.
 
-@kindex printf
-@item printf @var{template}, @var{expressions}@dots{}
-Print the values of one or more @var{expressions} under the control of
-the string @var{template} in @code{gdbserver} part.
-The command format is with simple @code{printf} (@pxref{Output, printf}).
-
 @kindex while-stepping @r{(tracepoints)}
 @item while-stepping @var{n}
 Perform @var{n} single-step instruction traces after the tracepoint,
@@ -10299,10 +10293,10 @@ tracepoint hit.
 @subsection Listing Tracepoints
 
 @table @code
-@kindex info tracepoints
-@kindex info tp
+@kindex info tracepoints @r{[}@var{n}@dots{}@r{]}
+@kindex info tp @r{[}@var{n}@dots{}@r{]}
 @cindex information about tracepoints
-@item info tracepoints @r{[}@var{num}@r{]}
+@item info tracepoints @r{[}@var{num}@dots{}@r{]}
 Display information about the tracepoint @var{num}.  If you don't
 specify a tracepoint number, displays information about all the
 tracepoints defined so far.  The format is similar to that used for
@@ -10485,7 +10479,7 @@ frames, oldest first, until there is enough room to continue
 collecting.  This is especially useful if your tracepoints are being
 hit too often, and your trace gets terminated prematurely because the
 buffer is full.  To ask for a circular trace buffer, simply set
-@samp{circular_trace_buffer} to on.  You can set this at any time,
+@samp{circular-trace-buffer} to on.  You can set this at any time,
 including during tracing; if the agent can do it, it will change
 buffer handling on the fly, otherwise it will not take effect until
 the next run.
@@ -22853,7 +22847,7 @@ The following symbol-related functions are available in the @code{gdb}
 module:
 
 @findex gdb.lookup_symbol
-@defun lookup_symbol name [block] [domain]
+@defun lookup_symbol name @r{[}block@r{]} @r{[}domain@r{]}
 This function searches for a symbol by name.  The search scope can be
 restricted to the parameters defined in the optional domain and block
 arguments.
@@ -22861,10 +22855,33 @@ arguments.
 @var{name} is the name of the symbol.  It must be a string.  The
 optional @var{block} argument restricts the search to symbols visible
 in that @var{block}.  The @var{block} argument must be a
-@code{gdb.Block} object.  The optional @var{domain} argument restricts
+@code{gdb.Block} object.  If omitted, the block for the current frame
+is used.  The optional @var{domain} argument restricts
 the search to the domain type.  The @var{domain} argument must be a
 domain constant defined in the @code{gdb} module and described later
 in this chapter.
+
+The result is a tuple of two elements.
+The first element is a @code{gdb.Symbol} object or @code{None} if the symbol
+is not found.
+If the symbol is found, the second element is @code{True} if the symbol
+is a field of a method's object (e.g., @code{this} in C@t{++}),
+otherwise it is @code{False}.
+If the symbol is not found, the second element is @code{False}.
+@end defun
+
+@findex gdb.lookup_global_symbol
+@defun lookup_global_symbol name @r{[}domain@r{]}
+This function searches for a global symbol by name.
+The search scope can be restricted to by the domain argument.
+
+@var{name} is the name of the symbol.  It must be a string.
+The optional @var{domain} argument restricts the search to the domain type.
+The @var{domain} argument must be a domain constant defined in the @code{gdb}
+module and described later in this chapter.
+
+The result is a @code{gdb.Symbol} object or @code{None} if the symbol
+is not found.
 @end defun
 
 A @code{gdb.Symbol} object has the following attributes:

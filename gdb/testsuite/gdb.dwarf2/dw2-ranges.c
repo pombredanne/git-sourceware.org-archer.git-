@@ -1,30 +1,34 @@
-/* Print values for GNU debugger GDB.
-
-   Copyright (C) 2011 Free Software Foundation, Inc.
-
-   This file is part of GDB.
-
+/*
+   Copyright 2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+   
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 3 of the License, or
    (at your option) any later version.
-
+   
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-
+   
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
-#ifndef _PRINTCMD_H_
-#define _PRINTCMD_H_
+/* Despite the sections below will be adjacent the assembler has to produce
+   DW_AT_ranges as the linker could place both sections at arbitrary locations.
+   */
 
-extern void printf_command (char *arg, int from_tty);
-typedef void (printf_callback) (char *fbuf, char **expp, void *loc_v,
-				void *aexpr_v);
-extern void string_printf (char *arg, struct ui_file *stream,
-			   printf_callback callback, void *loc_v,
-			   void *aexpr_v);
+/* `.fini' section is here to make sure `dw2-ranges.c'
+   vs. `dw2-ranges2.c' overlap their DW_AT_ranges with each other.  */
 
-#endif /* _PRINTCMD_H_ */
+void __attribute__ ((section (".fini")))
+func (void)
+{
+}
+
+int
+main (void)
+{
+  return 0;
+}
