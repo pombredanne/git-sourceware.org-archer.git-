@@ -1,3 +1,59 @@
+2011-03-04  Alan Modra  <amodra@gmail.com>
+
+	* archive.c (bsd_write_armap): Don't call stat in deterministic
+	mode, and don't use st_mtime if stat returns error.
+
+2011-03-03  Michael Snyder  <msnyder@vmware.com>
+
+	* elf64-x86-64.c (elf_x86_64_relocate_section): Remove dead code.
+
+	* coff-x86_64.c (coff_amd64_rtype_to_howto): Fencepost error.
+
+	* aoutx.h (aout_final_link): Use sizeof int not sizeof int*.
+	(aout_link_write_other_symbol): Missing break statement.
+
+	* dwarf2.c (scan_unit_for_symbols): Stop memory leak.
+
+	* archive.c (_bfd_slurp_extended_name_table): Fail if bfd_seek fails.
+
+2011-03-03  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elf64-x86-64.c (elf_x86_64_check_tls_transition): Supprt TLS
+	x32 IE->LE transition.
+	(elf_x86_64_relocate_section): Likewise.
+
+2011-03-02  Bernd Schmidt  <bernds@codesourcery.com>
+
+        * elflink.c (is_reloc_section): Remove function.
+        (get_dynamic_reloc_section_name): Construct string manually.
+
+2011-02-28  Kai Tietz  <kai.tietz@onevision.com>
+
+	* archive.c (_bfd_find_nested_archive): Use filename_(n)cmp.
+	(adjust_relative_path): Likewise.
+	(_bfd_construct_extended_name_table): Likewise.
+	* corefile.c (generic_core_file_matches_executable_p): Likewise.
+	* elf32-bfin.c (bfinfdpic_relocate_section): Likewise.
+	* elf32-frv.c (elf32_frv_relocate_section): Likewise.
+	* elf32-spu.c (sort_bfds): Likewise.
+	(spu_elf_auto_overlay): Likewise.
+	* syms.c (_bfd_stab_section_find_nearest_line): Likewise.
+	* xcofflink.c (xcoff_set_import_path): Likewise.
+	* xtensa-isa.c (xtensa_regfile_lookup): Likewise.
+	(xtensa_regfile_lookup_shortname): Likewise.
+
+2011-02-28  Alan Modra  <amodra@gmail.com>
+
+	PR 12513
+	* archive.c (bfd_slurp_bsd_armap_f2): Sanity check parsed_size and
+	stringsize.  Properly sanity check symdef_count.  Remove redundant
+	bfd_release.
+
+2011-02-25  Rafael Ávila de Espíndola <respindola@mozilla.com>
+
+	* plugin.c (bfd_plugin_object_p): Correctly set the filesize
+	and handle claim_file seeking. Only try to load the plugin once.
+
 2011-02-22  Andreas Schwab  <schwab@redhat.com>
 
 	* elf32-m68k.c (elf_m68k_finish_dynamic_symbol): For a TLS_GD

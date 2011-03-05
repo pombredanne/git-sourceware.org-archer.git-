@@ -1312,7 +1312,7 @@ read_dbx_symtab (struct objfile *objfile)
 
          *) The assignment to namestring.
          *) The call to strchr.
-         *) The addition of a partial symbol the the two partial
+         *) The addition of a partial symbol the two partial
          symbol lists.  This last is a large section of code, so
          I've imbedded it in the following macro.  */
 
@@ -1728,8 +1728,7 @@ read_dbx_symtab (struct objfile *objfile)
 					 data_sect_index);
 
 	      if (gdbarch_static_transform_name_p (gdbarch))
-		namestring = gdbarch_static_transform_name (gdbarch,
-							    namestring);
+		gdbarch_static_transform_name (gdbarch, namestring);
 
 	      add_psymbol_to_list (sym_name, sym_len, 1,
 				   VAR_DOMAIN, LOC_STATIC,
@@ -2853,7 +2852,7 @@ process_one_symbol (int type, int desc, CORE_ADDR valu, char *name,
 	   N_SO, the linker did not relocate them (sigh).  */
 	valu += last_source_start_addr;
 
-      new = push_context (desc, valu);
+      push_context (desc, valu);
       break;
 
     case N_RBRAC:

@@ -214,7 +214,7 @@ serial_open (const char *name)
   scb->bufp = scb->buf;
   scb->error_fd = -1;
 
-  /* `...->open (...)' would get expanded by an the open(2) syscall macro.  */
+  /* `...->open (...)' would get expanded by the open(2) syscall macro.  */
   if ((*scb->ops->open) (scb, open_name))
     {
       xfree (scb);
@@ -491,6 +491,12 @@ serial_ttystate
 serial_get_tty_state (struct serial *scb)
 {
   return scb->ops->get_tty_state (scb);
+}
+
+serial_ttystate
+serial_copy_tty_state (struct serial *scb, serial_ttystate ttystate)
+{
+  return scb->ops->copy_tty_state (scb, ttystate);
 }
 
 int
