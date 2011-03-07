@@ -176,16 +176,6 @@ show_symbol_reloading (struct ui_file *file, int from_tty,
    report all the functions that are actually present.  */
 
 int auto_solib_add = 1;
-
-/* For systems that support it, a threshold size in megabytes.  If
-   automatically adding a new library's symbol table to those already
-   known to the debugger would cause the total shared library symbol
-   size to exceed this threshhold, then the shlib's symbols are not
-   added.  The threshold is ignored if the user explicitly asks for a
-   shlib to be added, such as when using the "sharedlibrary"
-   command.  */
-
-int auto_solib_limit;
 
 
 /* Make a null terminated copy of the string at PTR with SIZE characters in
@@ -1707,8 +1697,7 @@ get_section_index (struct objfile *objfile, char *section_name)
 
 /* Link SF into the global symtab_fns list.  Called on startup by the
    _initialize routine in each object file format reader, to register
-   information about each format the the reader is prepared to
-   handle.  */
+   information about each format the reader is prepared to handle.  */
 
 void
 add_symtab_fns (const struct sym_fns *sf)
@@ -3443,15 +3432,24 @@ simple_overlay_update (struct obj_section *osect)
   if (osect)
     /* Have we got a cached copy of the target's overlay table?  */
     if (cache_ovly_table != NULL)
-      /* Does its cached location match what's currently in the symtab?  */
-      if (cache_ovly_table_base ==
-	  SYMBOL_VALUE_ADDRESS (lookup_minimal_symbol ("_ovly_table",
-						       NULL, NULL)))
-	/* Then go ahead and try to look up this single section in the
-	   cache.  */
-	if (simple_overlay_update_1 (osect))
-	  /* Found it!  We're done.  */
-	  return;
+      {
+	/* Does its cached location match what's currently in the
+	   symtab?  */
+	struct minimal_symbol *minsym
+	  = lookup_minimal_symbol ("_ovly_table", NULL, NULL);
+
+	if (minsym == NULL)
+	  error (_("Error reading inferior's overlay table: couldn't "
+		   "find `_ovly_table' array\n"
+		   "in inferior.  Use `overlay manual' mode."));
+	
+	if (cache_ovly_table_base == SYMBOL_VALUE_ADDRESS (minsym))
+	  /* Then go ahead and try to look up this single section in
+	     the cache.  */
+	  if (simple_overlay_update_1 (osect))
+	    /* Found it!  We're done.  */
+	    return;
+      }
 
   /* Cached table no good: need to read the entire table anew.
      Or else we want all the sections, in which case it's actually

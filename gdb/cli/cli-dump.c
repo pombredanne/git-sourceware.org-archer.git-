@@ -32,19 +32,10 @@
 #include "target.h"
 #include "readline/readline.h"
 #include "gdbcore.h"
+#include "cli/cli-utils.h"
 
 #define XMALLOC(TYPE) ((TYPE*) xmalloc (sizeof (TYPE)))
 
-
-char *
-skip_spaces (char *chp)
-{
-  if (chp == NULL)
-    return NULL;
-  while (isspace (*chp))
-    chp++;
-  return chp;
-}
 
 char *
 scan_expression_with_cleanup (char **cmd, const char *def)
@@ -211,7 +202,9 @@ dump_bfd_file (const char *filename, const char *mode,
 					  | SEC_ALLOC
 					  | SEC_LOAD));
   osection->entsize = 0;
-  bfd_set_section_contents (obfd, osection, buf, 0, len);
+  if (!bfd_set_section_contents (obfd, osection, buf, 0, len))
+    warning (_("writing dump file '%s' (%s)"), filename, 
+	     bfd_errmsg (bfd_get_error ()));
 }
 
 static void
@@ -520,7 +513,11 @@ restore_binary_file (char *filename, struct callback_data *data)
 
   /* Get the file size for reading.  */
   if (fseek (file, 0, SEEK_END) == 0)
-    len = ftell (file);
+    {
+      len = ftell (file);
+      if (len < 0)
+	perror_with_name (filename);
+    }
   else
     perror_with_name (filename);
 

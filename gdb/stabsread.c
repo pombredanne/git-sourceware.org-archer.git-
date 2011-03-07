@@ -2124,6 +2124,7 @@ rs6000_builtin_type (int typenum, struct objfile *objfile)
     case 9:
       rettype = init_type (TYPE_CODE_INT, 4, TYPE_FLAG_UNSIGNED,
 			   "unsigned", objfile);
+      break;
     case 10:
       rettype = init_type (TYPE_CODE_INT, 4, TYPE_FLAG_UNSIGNED,
 			   "unsigned long", objfile);
@@ -3477,7 +3478,7 @@ set_length_in_type_chain (struct type *type)
    describing the type.
 
    PP points to a character pointer that points to the next unconsumed token
-   in the the stabs string.  For example, given stabs "A:T4=s4a:1,0,32;;",
+   in the stabs string.  For example, given stabs "A:T4=s4a:1,0,32;;",
    *PP will point to "4a:1,0,32;;".
 
    TYPE points to an incomplete type that needs to be filled in.

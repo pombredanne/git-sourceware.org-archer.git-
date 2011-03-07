@@ -943,7 +943,7 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
 			   tsym.st);
 	      }
 	  }
-      end_of_fields:;
+      end_of_fields:
 
 	/* In an stBlock, there is no way to distinguish structs,
 	   unions, and enums at this point.  This is a bug in the
@@ -2897,7 +2897,7 @@ parse_partial_symbols (struct objfile *objfile)
 
 		  case N_ABS | N_EXT:
 		  record_it:
-		  continue;
+		    continue;
 
 		  /* Standard, local, non-debugger, symbols.  */
 
@@ -3860,7 +3860,7 @@ parse_partial_symbols (struct objfile *objfile)
 }
 
 /* If the current psymbol has an enumerated type, we need to add
-   all the the enum constants to the partial symbol table.  */
+   all the enum constants to the partial symbol table.  */
 
 static void
 handle_psymbol_enumerators (struct objfile *objfile, FDR *fh, int stype,
