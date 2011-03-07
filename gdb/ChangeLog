@@ -1,3 +1,25 @@
+2011-03-05  Michael Snyder  <msnyder@vmware.com>
+
+	* source.c (add_path): Replace semicolon at end of block.
+	* dwarf2expr.c (execute_stack_op): Ditto.
+
+2011-03-05  Mike Frysinger  <vapier@gentoo.org>
+
+	* bfin-tdep.c: Include sim-regno.h and gdb/sim-bfin.h.
+	* configure.tgt (bfin-*-*linux*): Define gdb_sim.
+	(bfin-*-*): Likewise.
+
+2011-03-05  Michael Snyder  <msnyder@vmware.com>
+
+	* dwarf2expr.c (execute_stack_op): Delete superfluous semicolon.
+	* mdebugread.c (parse_symbol): Ditto.
+	* parse.c (parse_exp_in_context): Ditto.
+	* source.c (add_path): Ditto.
+	* utils.c (gnu_debuglink_crc32): Ditto.
+	* varobj.c (variable_language): Ditto.
+
+	* linux-tdep.c (linux_get_siginfo_type): Stop memory leak.
+
 2011-03-04  Michael Snyder  <msnyder@vmware.com>
 
 	* linux-fork.c (inferior_call_waitptid): Fix copy/paste error.
